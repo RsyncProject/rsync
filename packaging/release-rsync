@@ -1,11 +1,11 @@
 #!/usr/bin/perl
-use strict;
-
 # This script expects the directory ~/samba-rsync-ftp to exist and to be a
 # copy of the /home/ftp/pub/rsync dir on samba.org.  When the script is done,
 # the git repository in the current directory will be updated, and the local
 # ~/samba-rsync-ftp dir will be ready to be rsynced to samba.org.
 
+use strict;
+use warnings;
 use Cwd;
 use Getopt::Long;
 use Term::ReadKey;
@@ -14,6 +14,7 @@ use Date::Format;
 my $dest = $ENV{HOME} . '/samba-rsync-ftp';
 my $passfile = $ENV{HOME} . '/.rsyncpass';
 my $path = $ENV{PATH};
+my $make_gen_cmd = 'make -f prepare-source.mak conf && ./config.status && make gen';
 
 &Getopt::Long::Configure('bundling');
 &usage if !&GetOptions(
@@ -60,11 +61,8 @@ die "There is no .git dir in the current directory.\n" unless -d '.git';
 die "'a' must not exist in the current directory.\n" if -e 'a';
 die "'b' must not exist in the current directory.\n" if -e 'b';
 
-open(IN, '-|', 'git status') or die $!;
-my $status = join('', <IN>);
-close IN;
-die "The checkout is not clean:\n", $status unless $status =~ /\nnothing to commit \(working directory clean\)/;
-die "The checkout is not on the $master_branch branch.\n" unless $status =~ /^# On branch $master_branch\n/;
+require 'packaging/git-status.pl';
+check_git_state($master_branch, 1, 1);
 
 my $confversion;
 open(IN, '<', 'configure.ac') or die $!;
@@ -79,8 +77,27 @@ die "Unable to find RSYNC_VERSION in configure.ac\n" unless defined $confversion
 
 open(IN, '<', 'OLDNEWS') or die $!;
 $_ = <IN>;
-close IN;
 my($lastversion) = /(\d+\.\d+\.\d+)/;
+my($last_protocol_version, %pdate);
+while (<IN>) {
+    if (my($ver,$pdate,$pver) = /^\s+\S\S\s\S\S\S\s\d\d\d\d\s+(\d+\.\d+\.\d+)\s+(\d\d \w\w\w \d\d\d\d\s+)?(\d+)$/) {
+	$pdate{$ver} = $pdate if defined $pdate;
+	$last_protocol_version = $pver if $ver eq $lastversion;
+    }
+}
+close IN;
+die "Unable to determine protocol_version for $lastversion.\n" unless defined $last_protocol_version;
+
+my $protocol_version;
+open(IN, '<', 'rsync.h') or die $!;
+while (<IN>) {
+    if (/^#define\s+PROTOCOL_VERSION\s+(\d+)/) {
+	$protocol_version = $1;
+	last;
+    }
+}
+close IN;
+die "Unable to determine the current PROTOCOL_VERSION.\n" unless defined $protocol_version;
 
 my $version = $confversion;
 $version =~ s/dev/pre1/ || $version =~ s/pre(\d+)/ 'pre' . ($1 + 1) /e;
@@ -117,6 +134,23 @@ print "Please enter the RPM release number of this release: [$release] ";
 chomp($_ = <STDIN>);
 $release = $_ if $_ ne '';
 $release .= ".$pre" if $pre;
+
+(my $finalversion = $version) =~ s/pre\d+//;
+my($proto_changed,$proto_change_date);
+if ($protocol_version eq $last_protocol_version) {
+    $proto_changed = 'unchanged';
+    $proto_change_date = "\t\t";
+} else {
+    $proto_changed = 'changed';
+    if (!defined($proto_change_date = $pdate{$finalversion})) {
+	while (1) {
+	    print "On what date did the protocol change to $protocol_version get checked in? (dd Mmm yyyy) ";
+	    chomp($_ = <STDIN>);
+	    last if /^\d\d \w\w\w \d\d\d\d$/;
+	}
+	$proto_change_date = "$_\t";
+    }
+}
 
 my($srcdir,$srcdiffdir,$lastsrcdir,$skipping);
 if ($lastversion =~ /pre/) {
@@ -157,7 +191,6 @@ EOT
 print "<Press Enter to continue> ";
 $_ = <STDIN>;
 
-(my $finalversion = $version) =~ s/pre\d+//;
 my %specvars = ( 'Version:' => $finalversion, 'Release:' => $release,
 		 '%define fullversion' => "\%{version}$pre", 'Released' => "$version.",
 		 '%define srcdir' => $srcdir );
@@ -184,18 +217,19 @@ foreach my $fn (@tweak_files) {
 	s/^(This man ?page is current for version) \S+ (of rsync)/$1 $version $2/m
 	    or die "Unable to update current version info in $fn\n";
     } elsif ($fn eq 'rsync.h') {
-	s/(#define\s+SUBPROTOCOL_VERSION)\s+\d+/$1 0/
+	s{(#define\s+SUBPROTOCOL_VERSION)\s+(\d+)}
+	 { $1 . ' ' . get_subprotocol_version($2) }e
 	    or die "Unable to find SUBPROTOCOL_VERSION define in $fn\n";
-	next if $pre;
     } elsif ($fn eq 'NEWS') {
-	s/^(NEWS for rsync \Q$finalversion\E) \(UNRELEASED\)\s*\n/$1 ($today)\n/mi
-	    or die "The first line of $fn is not in the right format.  It must be:\n"
-		 . "NEWS for rsync $finalversion (UNRELEASED)\n";
-	next if $pre;
+	s{^(NEWS for rsync \Q$finalversion\E )(\(UNRELEASED\))\s*(\nProtocol: )(\d+) (\([^)]+\))\n}
+	 { $1 . ($pre ? $2 : "($today)") . "$3$protocol_version ($proto_changed)\n" }ei
+	    or die "The first 2 lines of $fn are not in the right format.  They must be:\n"
+		 . "NEWS for rsync $finalversion (UNRELEASED)\n"
+		 . "Protocol: $protocol_version ($proto_changed)\n";
     } elsif ($fn eq 'OLDNEWS') {
-	s/^\t\S\S\s\S\S\S\s\d\d\d\d(\t\Q$finalversion\E)/\t$ztoday$1/m
+	s{^(\t\S\S\s\S\S\S\s\d\d\d\d)(\t\Q$finalversion\E\t).*}
+	 { ($pre ? $1 : "\t$ztoday") . $2 . $proto_change_date . $protocol_version }em
 	    or die "Unable to find \"?? ??? $year\t$finalversion\" line in $fn\n";
-	next if $pre;
     } elsif ($fn eq 'options.c') {
 	if (s/(Copyright \(C\) 2002-)(\d+)( Wayne Davison)/$1$year$3/
 	 && $2 ne $year) {
@@ -229,7 +263,7 @@ print $break, <<EOT;
 
 About to:
     - commit all version changes
-    - merge the $master_branch branch into the patch/* branches
+    - merge the $master_branch branch into the patch/$master_branch/* branches
     - update the files in the "patches" dir and OPTIONALLY
       (if you type 'y') to launch a shell for each patch
 
@@ -243,8 +277,12 @@ print "Updating files in \"patches\" dir ...\n";
 system "packaging/patch-update --branch=$master_branch";
 
 if ($ans =~ /^y/i) {
-    print "\nVisiting all \"patch/*\" branches ...\n";
+    print "\nVisiting all \"patch/$master_branch/*\" branches ...\n";
     system "packaging/patch-update --branch=$master_branch --shell";
+}
+
+if (-d 'patches/.git') {
+    system "cd patches && git commit -a -m 'The patches for $version.'" and exit 1;
 }
 
 print $break, <<EOT;
@@ -264,6 +302,9 @@ EOT
 print "<Press Enter to continue> ";
 $_ = <STDIN>;
 
+# We want to use our passphrase-providing "gpg" script, so modify the PATH.
+$ENV{PATH} = "$curdir/packaging/bin:$path";
+
 my $passphrase;
 while (1) {
     ReadMode('noecho');
@@ -281,16 +322,22 @@ while (1) {
     umask $oldmask;
     $ENV{'GPG_PASSFILE'} = $passfile;
 
-    # We want to use our passphrase-providing "gpg" script, so modify the PATH.
-    $ENV{PATH} = "packaging/bin:$path";
     $_ = `git tag -s -m 'Version $version.' v$version 2>&1`;
-    $ENV{PATH} = $path;
-    unlink($passfile);
     print $_;
     next if /bad passphrase/;
-    last unless /failed/;
-    exit 1;
+    exit 1 if /failed/;
+
+    if (-d 'patches/.git') {
+	$_ = `cd patches && git tag -s -m 'Version $version.' v$version 2>&1`;
+	print $_;
+	exit 1 if /bad passphrase|failed/;
+    }
+
+    unlink($passfile);
+    last;
 }
+
+$ENV{PATH} = $path;
 
 # Extract the generated files from the old tar.
 @_ = @extra_files;
@@ -299,7 +346,7 @@ system "tar xzf $lasttar_file @_";
 rename("rsync-$lastversion", 'a');
 
 print "Creating $diff_file ...\n";
-system "./config.status Makefile; make gen; rsync -a @extra_files b/";
+system "$make_gen_cmd && rsync -a @extra_files b/" and exit 1;
 my $sed_script = 's:^((---|\+\+\+) [ab]/[^\t]+)\t.*:\1:';
 system "(git diff v$lastversion v$version; diff -upN a b | sed -r '$sed_script') | gzip -9 >$diff_file";
 system "rm -rf a";
@@ -353,6 +400,15 @@ rsync-announce@lists.samba.org and rsync@lists.samba.org (and the web)!
 EOT
 
 exit;
+
+sub get_subprotocol_version
+{
+    my($subver) = @_;
+    if ($pre && $proto_changed eq 'changed') {
+	return $subver == 0 ? 1 : $subver;
+    }
+    0;
+}
 
 sub usage
 {

@@ -1,0 +1,83 @@
+#!/usr/bin/perl
+# This script checks the *.c files for extraneous "extern" variables,
+# for vars that are defined but not used, and for inconsistent array
+# sizes.  Run it from inside the main rsync directory.
+
+use strict;
+use warnings;
+
+my %add_syscall_c = map { $_ => 1 } qw( t_stub.c t_unsafe.c tls.c trimslash.c );
+my %add_compat_c = map { $_ => 1 } qw( t_stub.c tls.c trimslash.c wildtest.c );
+my %add_util_c = map { $_ => 1 } qw( t_stub.c t_unsafe.c );
+my %sizes;
+
+open(IN, '<', 'syscall.c') or die $!;
+undef $/; my $syscall_c = <IN>; $/ = "\n";
+close IN;
+$syscall_c =~ s/^extern\s.*//mg;
+
+open(IN, '<', 'lib/compat.c') or die $!;
+undef $/; my $compat_c = <IN>; $/ = "\n";
+close IN;
+$compat_c =~ s/^extern\s.*//mg;
+
+open(IN, '<', 'util.c') or die $!;
+undef $/; my $util_c = <IN>; $/ = "\n";
+close IN;
+$util_c =~ s/^extern\s.*//mg;
+
+my @files = glob('*.c');
+
+foreach my $fn (@files) {
+    open(IN, '<', $fn) or die $!;
+    undef $/; $_ = <IN>; $/ = "\n";
+    close IN;
+
+    my @vars = /^(?!(?:extern|enum)\s)([a-zA-Z]\S*\s+.*);/mg;
+    my @externs = /^extern\s+(.*);/mg;
+
+    $_ .= $syscall_c if $add_syscall_c{$fn};
+    $_ .= $compat_c if $add_compat_c{$fn};
+    $_ .= $util_c if $add_util_c{$fn};
+    s/INFO_GTE/info_levels/g;
+    s/DEBUG_GTE/debug_levels/g;
+
+    check_vars($fn, 'var', @vars);
+    check_vars($fn, 'extern', @externs);
+}
+
+exit;
+
+# The file's contents are in $_.
+sub check_vars
+{
+    my $fn = shift;
+    my $type = shift;
+
+    foreach my $line (@_) {
+	$line =~ s/\s*\{.*\}//;
+	$line =~ s/\s*\(.*\)//;
+	foreach my $item (split(/\s*,\s*/, $line)) {
+	    $item =~ s/\s*=.*//;
+	    my $sz = $item =~ s/(\[.*?\])// ? $1 : '';
+	    my($var) = $item =~ /([^*\s]+)$/;
+	    if (!defined $var) {
+		print "Bogus match? ($item)\n";
+		next;
+	    }
+	    if ($sz) {
+		if (defined $sizes{$var}) {
+		    if ($sizes{$var} ne $sz) {
+			print $fn, ' has inconsistent size for "', $var,
+			    "\": $sizes{$var} vs $sz\n";
+		    }
+		} else {
+		    $sizes{$var} = $sz;
+		}
+	    }
+	    my @matches = /(?<!\sstruct )\b(\Q$var\E)(?!\w)/g;
+	    push(@matches, /(\QSIGACTION(\E)/g) if $var eq 'sigact';
+	    print $fn, " has extraneous $type: \"", $var, "\"\n" if @matches == 1;
+	}
+    }
+}

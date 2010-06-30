@@ -1,11 +1,12 @@
-#!/usr/bin/perl -w
-# This script is used to turn one or more of the "patch/*" branches
+#!/usr/bin/perl
+# This script is used to turn one or more of the "patch/BASE/*" branches
 # into one or more diffs in the "patches" directory.  Pass the option
 # --gen if you want generated files in the diffs.  Pass the name of
 # one or more diffs if you want to just update a subset of all the
 # diffs.
 
 use strict;
+use warnings;
 use Getopt::Long;
 
 my $patches_dir = 'patches';
@@ -30,10 +31,19 @@ if (defined $incl_generated_files) {
 die "No '$patches_dir' directory was found.\n" unless -d $patches_dir;
 die "No '.git' directory present in the current dir.\n" unless -d '.git';
 
-my($status, $is_clean, $starting_branch) = &check_git_status;
-if (!$skip_branch_check && !$is_clean) {
-    die "The checkout is not clean:\n", $status;
+require 'packaging/git-status.pl';
+check_git_state($master_branch, !$skip_branch_check, 1);
+
+my $master_commit;
+open PIPE, '-|', "git log -1 --no-color $master_branch" or die $!;
+while (<PIPE>) {
+    if (/^commit (\S+)/) {
+	$master_commit = $1;
+	last;
+    }
 }
+close PIPE;
+die "Unable to determine commit hash for master branch: $master_branch\n" unless defined $master_commit;
 
 my @extra_files;
 open(IN, '<', 'Makefile.in') or die "Couldn't open Makefile.in: $!\n";
@@ -60,7 +70,7 @@ my %patches;
 # Start by finding all patches so that we can load all possible parents.
 open(PIPE, '-|', 'git', 'branch', '-l') or die $!;
 while (<PIPE>) {
-    if (m# patch/(.*)#) {
+    if (m# patch/\Q$master_branch\E/(.*)#o) {
 	$patches{$1} = 1;
     }
 }
@@ -70,7 +80,7 @@ my @patches = sort keys %patches;
 
 my(%parent, %description);
 foreach my $patch (@patches) {
-    my $branch = "patch/$patch";
+    my $branch = "patch/$master_branch/$patch";
     my $desc = '';
     open(PIPE, '-|', 'git', 'diff', '-U1000', "$master_branch...$branch", '--', "PATCH.$patch") or die $!;
     while (<PIPE>) {
@@ -114,7 +124,7 @@ if ($incl_generated_files) {
 }
 
 sleep 1 while $last_touch >= time;
-system "git checkout $starting_branch" and exit 1;
+system "git checkout $master_branch" and exit 1;
 
 exit;
 
@@ -124,24 +134,27 @@ sub update_patch
     my($patch) = @_;
 
     my $parent = $parent{$patch};
+    my $based_on;
     if (defined $parent) {
 	unless ($completed{$parent}++) {
 	    update_patch($parent);
 	}
-	$parent = "patch/$parent";
+	$based_on = $parent = "patch/$master_branch/$parent";
     } else {
 	$parent = $master_branch;
+	$based_on = $master_commit;
     }
 
     print "======== $patch ========\n";
 
     sleep 1 while $incl_generated_files && $last_touch >= time;
-    system "git checkout patch/$patch" and return 0;
+    system "git checkout patch/$master_branch/$patch" and return 0;
 
-    my $ok = system("git merge $parent") == 0;
+    my $ok = system("git merge $based_on") == 0;
     if (!$ok || $launch_shell) {
-	print qq|"git merge $parent" incomplete -- please fix.\n| if !$ok;
-	$ENV{PS1} = "[$parent] patch/$patch: ";
+	my($parent_dir) = $parent =~ m{([^/]+)$};
+	print qq|"git merge $based_on" incomplete -- please fix.\n| if !$ok;
+	$ENV{PS1} = "[$parent_dir] $patch: ";
 	while (1) {
 	    if (system($ENV{SHELL}) != 0) {
 		print "Abort? [n/y] ";
@@ -149,21 +162,21 @@ sub update_patch
 		next unless /^y/i;
 		return 0;
 	    }
-	    ($status, $is_clean) = &check_git_status;
+	    my($cur_branch, $is_clean, $status) = check_git_status(0);
 	    last if $is_clean;
 	    print $status;
 	}
     }
 
     open(OUT, '>', "$patches_dir/$patch.diff") or die $!;
-    print OUT $description{$patch}, "\n";
+    print OUT $description{$patch}, "\nbased-on: $based_on\n";
 
     if ($incl_generated_files) {
 	system "$make_gen_cmd && rsync -a @extra_files $tmp_dir/$patch/" and exit 1;
     }
     $last_touch = time;
 
-    open(PIPE, '-|', 'git', 'diff', $parent) or die $!;
+    open(PIPE, '-|', 'git', 'diff', $based_on) or die $!;
     DIFF: while (<PIPE>) {
 	while (m{^diff --git a/PATCH}) {
 	    while (<PIPE>) {
@@ -200,22 +213,18 @@ sub update_patch
 
 exit;
 
-sub check_git_status
-{
-    open(IN, '-|', 'git status') or die $!;
-    my $status = join('', <IN>);
-    close IN;
-    my $is_clean = $status =~ /\nnothing to commit \(working directory clean\)/;
-    my($starting_branch) = $status =~ /^# On branch (.+)\n/;
-    ($status, $is_clean, $starting_branch);
-}
-
 sub usage
 {
     die <<EOT;
-Usage: patch-update [OPTIONS]
+Usage: patch-update [OPTIONS] [patches/DIFF...]
 
---gen[=DIR]   Include generated files.  Optional dest DIR overrides "patches".
---skip-check  Skip the check that ensures starting with a clean branch.
+Options:
+-b, --branch=BRANCH  The master branch to merge into the patch/BASE/* branches.
+    --gen[=DIR]      Include generated files.  Optional destination DIR
+                     arg overrides the default of using the "patches" dir.
+    --skip-check     Skip the check that ensures starting with a clean branch.
+-s, --shell          Launch a shell for every patch/BASE/* branch updated, not
+                     just when a conflict occurs.
+-h, --help           Output this help message.
 EOT
 }

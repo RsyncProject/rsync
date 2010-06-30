@@ -3,8 +3,8 @@ use strict;
 
 # This script expects the directory ~/samba-rsync-ftp to exist and to be a
 # copy of the /home/ftp/pub/rsync dir on samba.org.  It also requires a
-# pristine CVS checkout of rsync (don't use your normal rsync build dir
-# unless you're 100% sure that there are not unchecked-in changes).
+# git checkout of rsync (feel free to use your normal rsync build dir as
+# long as it doesn't have any uncommitted changes).
 #
 # If this is run with -ctu, it will make an updated "nightly" tar file in
 # the nightly dir.  It will also remove any old tar files, regenerate the
@@ -55,6 +55,58 @@ if ($make_tar) {
 	}
     }
     close IN;
+
+    my $confversion;
+    open(IN, '<', 'configure.ac') or die "Unable to open configure.ac: $!\n";
+    while (<IN>) {
+	if (/^RSYNC_VERSION=(.*)/) {
+	    $confversion = $1;
+	    last;
+	}
+    }
+    close IN;
+    die "Unable to find RSYNC_VERSION in configure.ac\n" unless defined $confversion;
+
+    open(IN, '<', 'OLDNEWS') or die "Unable to open OLDNEWS: $!\n";
+    $_ = <IN>;
+    my($lastversion) = /(\d+\.\d+\.\d+)/;
+    my $last_protocol_version;
+    while (<IN>) {
+	if (my($ver,$pdate,$pver) = /^\s+\S\S\s\S\S\S\s\d\d\d\d\s+(\d+\.\d+\.\d+)\s+(\d\d \w\w\w \d\d\d\d\s+)?(\d+)$/) {
+	    $last_protocol_version = $pver if $ver eq $lastversion;
+	}
+    }
+    close IN;
+    die "Unable to determine protocol_version for $lastversion.\n" unless defined $last_protocol_version;
+
+    my($protocol_version,$subprotocol_version);
+    open(IN, '<', 'rsync.h') or die "Unable to open rsync.h: $!\n";
+    while (<IN>) {
+	if (/^#define\s+PROTOCOL_VERSION\s+(\d+)/) {
+	    $protocol_version = $1;
+	} elsif (/^#define\s+SUBPROTOCOL_VERSION\s+(\d+)/) {
+	    $subprotocol_version = $1;
+	}
+    }
+    close IN;
+    die "Unable to determine the current PROTOCOL_VERSION.\n" unless defined $protocol_version;
+    die "Unable to determine the current SUBPROTOCOL_VERSION.\n" unless defined $subprotocol_version;
+
+    if ($confversion =~ /dev|pre/) {
+	if ($last_protocol_version ne $protocol_version) {
+	    if ($subprotocol_version == 0) {
+		die "SUBPROTOCOL_VERSION must not be 0 for a non-final release with a changed PROTOCOL_VERSION.\n";
+	    }
+	} else {
+	    if ($subprotocol_version != 0) {
+		die "SUBPROTOCOL_VERSION must be 0 when the PROTOCOL_VERSION hasn't changed from the last release.\n";
+	    }
+	}
+    } else {
+	if ($subprotocol_version != 0) {
+	    die "SUBPROTOCOL_VERSION must be 0 for a final release.\n";
+	}
+    }
 
     print "Creating $name.tar.gz\n";
     system "rsync -a @extra_files $name/";

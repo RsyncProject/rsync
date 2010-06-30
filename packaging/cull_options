@@ -7,7 +7,7 @@ use strict;
 our %short_no_arg;
 our %short_with_num;
 our %long_opt = (
-    'no-i-r' => 0,
+    'daemon' => -1,
     'fake-super' => 0,
     'log-file' => 3,
 );
@@ -24,7 +24,7 @@ while (<IN>) {
 	undef $last_long_opt;
     } elsif (/\Qargs[ac++]\E = "--([^"=]+)"/) {
 	$last_long_opt = $1;
-	$long_opt{$1} = 0;
+	$long_opt{$1} = 0 unless exists $long_opt{$1};
     } elsif (defined($last_long_opt)
 	&& /\Qargs[ac++]\E = ([^["\s]+);/ && $1 ne 'dest_option') {
 	$long_opt{$last_long_opt} = 2;
