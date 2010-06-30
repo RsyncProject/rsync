@@ -76,7 +76,7 @@ extern int fuzzy_basis;
 extern int always_checksum;
 extern int checksum_len;
 extern char *partial_dir;
-extern char *basis_dir[];
+extern char *basis_dir[MAX_BASIS_DIRS+1];
 extern int compare_dest;
 extern int copy_dest;
 extern int link_dest;

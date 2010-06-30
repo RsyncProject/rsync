@@ -85,7 +85,6 @@ int numeric_ids = 0;
 int allow_8bit_chars = 0;
 int force_delete = 0;
 int io_timeout = 0;
-int allowed_lull = 0;
 int prune_empty_dirs = 0;
 int use_qsort = 0;
 char *files_from = NULL;

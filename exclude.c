@@ -37,7 +37,7 @@ extern int sanitize_paths;
 extern int protocol_version;
 extern int module_id;
 
-extern char curr_dir[];
+extern char curr_dir[MAXPATHLEN];
 extern unsigned int curr_dir_len;
 extern unsigned int module_dirlen;
 

@@ -36,7 +36,6 @@
 extern int bwlimit;
 extern size_t bwlimit_writemax;
 extern int io_timeout;
-extern int allowed_lull;
 extern int am_server;
 extern int am_daemon;
 extern int am_sender;
@@ -47,7 +46,6 @@ extern int eol_nulls;
 extern int flist_eof;
 extern int list_only;
 extern int read_batch;
-extern int csum_length;
 extern int compat_flags;
 extern int protect_args;
 extern int checksum_seed;
@@ -61,7 +59,8 @@ extern int filesfrom_convert;
 extern iconv_t ic_send, ic_recv;
 #endif
 
-const char phase_unknown[] = "unknown";
+int csum_length = SHORT_SUM_LENGTH; /* initial value */
+int allowed_lull = 0;
 int ignore_timeout = 0;
 int batch_fd = -1;
 int msgdone_cnt = 0;

@@ -53,7 +53,7 @@ extern mode_t orig_umask;
 extern struct stats stats;
 extern char *tmpdir;
 extern char *partial_dir;
-extern char *basis_dir[];
+extern char *basis_dir[MAX_BASIS_DIRS+1];
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern struct filter_list_struct daemon_filter_list;
 

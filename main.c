@@ -70,7 +70,7 @@ extern struct stats stats;
 extern char *filesfrom_host;
 extern char *partial_dir;
 extern char *dest_option;
-extern char *basis_dir[];
+extern char *basis_dir[MAX_BASIS_DIRS+1];
 extern char *rsync_path;
 extern char *shell_cmd;
 extern char *batch_name;
