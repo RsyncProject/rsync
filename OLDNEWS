@@ -1,3 +1,69 @@
+NEWS for rsync 3.0.7 (31 Dec 2009)
+Protocol: 30 (unchanged)
+Changes since 3.0.6:
+
+  BUG FIXES:
+
+    - Fixed a bogus free when using --xattrs with --backup.
+
+    - Avoid an error when --dry-run  was trying to stat a prior hard-link file
+      that hasn't really been created.
+
+    - Fixed a problem with --compress (-z) where the receiving side could
+      return the error "inflate (token) returned -5".
+
+    - Fixed a bug where --delete-during could delete in a directory before it
+      noticed that the sending side sent an I/O error for that directory (both
+      sides of the transfer must be at least 3.0.7).
+
+    - Improved --skip-compress's error handling of bad character-sets and got
+      rid of a lingering debug fprintf().
+
+    - Fixed the daemon's conveyance of io_error value from the sender.
+
+    - An rsync daemon use seteuid() (when available) if it used setuid().
+
+    - Get the permissions right on a --fake-super transferred directory that
+      needs more owner permissions to emulate root behavior.
+
+    - An absolute-path filter rule (i.e. with a '/' modifier) no longer loses
+      its modifier when sending the filter rules to the remote rsync.
+
+    - Improved the "--delete does not work without -r or -d" message.
+
+    - Improved rsync's handling of --timeout to avoid a weird timeout case
+      where the sender could timeout even though it has recently written data
+      to the socket (but hasn't read data recently, due to the writing).
+
+    - Some misc manpage improvements.
+
+    - Fixed the chmod-temp-dir testsuite on a system without /var/tmp.
+
+    - Make sure that a timeout specified in the daemon's config is used as a
+      maximum timeout value when the user also specifies a timeout.
+
+    - Improved the error-exit reporting when rsync gets an error trying to
+      cleanup after an error:  the initial error is reported.
+
+    - Improved configure's detection of IPv6 for solaris and cygwin.
+
+    - The AIX sysacls routines will now return ENOSYS if ENOTSUP is missing.
+
+    - Made our (only used if missing) getaddrinfo() routine use inet_pton()
+      (which we also provide) instead of inet_aton().
+
+    - The exit-related debug messages now mention the program's role so it is
+      clear who output what message.
+
+  DEVELOPER RELATED:
+
+    - Got rid of type-punned compiler warnings output by newer gcc versions.
+
+    - The Makefile now ensures that proto.h will be rebuilt if config.h changes.
+
+    - The testsuite no longer uses "id -u", so it works better on solaris.
+
+
 NEWS for rsync 3.0.6 (8 May 2009)
 Protocol: 30 (unchanged)
 Changes since 3.0.5:
@@ -3028,6 +3094,7 @@ Changes since 2.4.6:
 
 Partial Protocol History
 	RELEASE DATE	VER.	DATE OF COMMIT*	PROTOCOL
+	?? ??? 2010	3.0.8			30
 	31 Dec 2009	3.0.7			30
 	08 May 2009	3.0.6			30
 	28 Dec 2008	3.0.5			30
