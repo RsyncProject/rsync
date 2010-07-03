@@ -10,6 +10,11 @@ Changes since 3.0.7:
     - Fixed a potential crash when an rsync daemon has a filter/exclude list
       and the transfer is using ACLs or extended attributes.
 
+    - Fixed compression-ignoring of upper-case suffixes.
+
+    - If the destination arg is an empty string, it will be treated as a
+      reference to the current directory (as 2.x used to do).
+
     - Fixed a batch-file writing bug that would not write out the full set of
       compatibility flags that the transfer was using.  This fixes a potential
       protocol problem for a batch file that contains a sender-side I/O error:
@@ -19,8 +24,15 @@ Changes since 3.0.7:
       hashing is working right, and to supply more information if the hard-link
       code fails.
 
+    - Fix the popt arg parsing so that an option that doesn't take an arg will
+      reject an attempt to supply and arg.
+
     - A couple minor option tweaks to support/rrsync script, and also some
       regex changes that make vim highlighting happier.
+
+    - A few manpage improvements.
+
+    - A couple fixes to the socketpair_tcp() routine.
 
   DEVELOPER RELATED:
 
