@@ -336,7 +336,7 @@ int copy_xattrs(const char *source, const char *dest)
 		if (sys_lsetxattr(dest, name, ptr, datum_len) < 0) {
 			int save_errno = errno ? errno : EINVAL;
 			rsyserr(FERROR_XFER, errno,
-				"rsync_xal_set: lsetxattr(\"%s\",\"%s\") failed",
+				"copy_xattrs: lsetxattr(\"%s\",\"%s\") failed",
 				dest, name);
 			errno = save_errno;
 			return -1;
@@ -661,7 +661,7 @@ void receive_xattr(int f, struct file_struct *file)
 		F_XATTR(file) = ndx - 1;
 		return;
 	}
-	
+
 	if ((count = read_varint(f)) != 0) {
 		(void)EXPAND_ITEM_LIST(&temp_xattr, rsync_xa, count);
 		temp_xattr.count = 0;
