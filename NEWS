@@ -10,7 +10,11 @@ Changes since 3.0.7:
     - Fixed a potential crash when an rsync daemon has a filter/exclude list
       and the transfer is using ACLs or extended attributes.
 
-    - Fixed compression-ignoring of upper-case suffixes.
+    - Fixed a bug in the comparing of upper-case letters in file suffixes for
+      --skip-compress.
+
+    - If an rsync daemon has a module configured without a path setting, rsync
+      will now disallow access to that module.
 
     - If the destination arg is an empty string, it will be treated as a
       reference to the current directory (as 2.x used to do).
