@@ -28,6 +28,8 @@ Changes since 3.0.7:
       hashing is working right, and to supply more information if the hard-link
       code fails.
 
+    - Improved the unsafe-symlink errors messages.
+
     - Fix the popt arg parsing so that an option that doesn't take an arg will
       reject an attempt to supply and arg.
 
@@ -36,9 +38,11 @@ Changes since 3.0.7:
 
     - A few manpage improvements.
 
-    - A couple fixes to the socketpair_tcp() routine.
-
   DEVELOPER RELATED:
+
+    - Use lchmod() whenever it is available (not just on symlinks).
+
+    - A couple fixes to the socketpair_tcp() routine.
 
     - Updated the helper scripts in the packaging subdirectory.
 
