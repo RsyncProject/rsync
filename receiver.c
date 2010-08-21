@@ -228,7 +228,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 		sum.flength = (OFF_T)sum.count * sum.blength;
 		if (sum.remainder)
 			sum.flength -= sum.blength - sum.remainder;
-		if (append_mode == 2) {
+		if (append_mode == 2 && mapbuf) {
 			for (j = CHUNK_SIZE; j < sum.flength; j += CHUNK_SIZE) {
 				if (INFO_GTE(PROGRESS, 1))
 					show_progress(offset, total_size);
