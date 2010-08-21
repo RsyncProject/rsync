@@ -173,7 +173,7 @@ int open_tmpfile(char *fnametmp, const char *fname, struct file_struct *file)
 	 * access to ensure that there is no race condition.  They will be
 	 * correctly updated after the right owner and group info is set.
 	 * (Thanks to snabb@epipe.fi for pointing this out.) */
-	fd = do_mkstemp(fnametmp, file->mode & INITACCESSPERMS);
+	fd = do_mkstemp(fnametmp, (file->mode & INITACCESSPERMS) | S_IWUSR);
 
 #if 0
 	/* In most cases parent directories will already exist because their

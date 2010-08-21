@@ -644,15 +644,13 @@ int finish_transfer(const char *fname, const char *fnametmp,
 	/* move tmp file over real file */
 	if (DEBUG_GTE(RECV, 1))
 		rprintf(FINFO, "renaming %s to %s\n", fnametmp, fname);
-	ret = robust_rename(fnametmp, fname, temp_copy_name,
-			    file->mode & INITACCESSPERMS);
+	ret = robust_rename(fnametmp, fname, temp_copy_name, file->mode);
 	if (ret < 0) {
 		rsyserr(FERROR_XFER, errno, "%s %s -> \"%s\"",
 			ret == -2 ? "copy" : "rename",
 			full_fname(fnametmp), fname);
 		if (!partialptr || (ret == -2 && temp_copy_name)
-		 || robust_rename(fnametmp, partialptr, NULL,
-				  file->mode & INITACCESSPERMS) < 0)
+		 || robust_rename(fnametmp, partialptr, NULL, file->mode) < 0)
 			do_unlink(fnametmp);
 		return 0;
 	}

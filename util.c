@@ -329,6 +329,11 @@ int copy_file(const char *source, const char *dest, int ofd, mode_t mode)
 			return -1;
 		}
 
+#ifdef SUPPORT_XATTRS
+		if (preserve_xattrs)
+			mode |= S_IWUSR;
+#endif
+		mode &= INITACCESSPERMS;
 		if ((ofd = do_open(dest, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, mode)) < 0) {
 			int save_errno = errno;
 			rsyserr(FERROR_XFER, save_errno, "open %s", full_fname(dest));
