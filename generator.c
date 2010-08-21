@@ -761,6 +761,12 @@ static void sum_sizes_sqroot(struct sum_struct *sum, int64 len)
 	int s2length;
 	int64 l;
 
+	if (len < 0) {
+		/* The file length overflowed our int64 var, so we can't process this file. */
+		sum->count = -1; /* indicate overflow error */
+		return;
+	}
+
 	if (block_size)
 		blength = block_size;
 	else if (len <= BLOCK_SIZE * BLOCK_SIZE)
