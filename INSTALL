@@ -17,13 +17,25 @@ for the daemon by editing the NOBODY_USER and NOBODY_GROUP defines in
 config.h, or just override them in your /etc/rsyncd.conf file.
 
 As of 2.4.7, rsync uses Eric Troan's popt option-parsing library.  A
-cut-down copy of release 1.6.4 is included in the rsync distribution,
+cut-down copy of a recent release is included in the rsync distribution,
 and will be used if there is no popt library on your build host, or if
 the --with-included-popt option is passed to ./configure.
 
 If you configure using --enable-maintainer-mode, then rsync will try
 to pop up an xterm on DISPLAY=:0 if it crashes.  You might find this
 useful, but it should be turned off for production builds.
+
+MAKE COMPATIBILITY
+------------------
+
+Note that Makefile.in has a rule that uses a wildcard in a prerequisite.  If
+your make has a problem with this rule, you will see an error like this:
+
+    Don't know how to make ./*.c
+
+You can change the "proto.h-tstamp" target to omit its prerequisite args,
+but keep in mind that this will make a manual removal of "proto.h-tstamp"
+necessary anytime the function prototypes change.
 
 RPM NOTES
 ---------
