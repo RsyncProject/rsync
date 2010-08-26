@@ -1,7 +1,7 @@
 /*
- * End-of-run cleanup helper code used by cleanup.c.
+ * Allow an arbitrary sequence of case labels.
  *
- * Copyright (C) 2006-2008 Wayne Davison
+ * Copyright (C) 2006-2010 Wayne Davison
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,63 +17,60 @@
  * with this program; if not, visit the http://fsf.org website.
  */
 
-/* This is included by cleanup.c multiple times, once for every segement in
- * the _exit_cleanup() code.  This produces the next "case N:" statement in
- * sequence and increments the cleanup_step variable by 1.  This ensures that
- * our case statements never get out of whack due to added/removed steps. */
+/* This is included multiple times, once for every segement in a switch statement.
+ * This produces the next "case N:" statement in sequence. */
 
-#if !defined EXIT_CLEANUP_CASE_0
-#define EXIT_CLEANUP_CASE_0
+#if !defined CASE_N_STATE_0
+#define CASE_N_STATE_0
 	case 0:
-#elif !defined EXIT_CLEANUP_CASE_1
-#define EXIT_CLEANUP_CASE_1
+#elif !defined CASE_N_STATE_1
+#define CASE_N_STATE_1
 	case 1:
-#elif !defined EXIT_CLEANUP_CASE_2
-#define EXIT_CLEANUP_CASE_2
+#elif !defined CASE_N_STATE_2
+#define CASE_N_STATE_2
 	case 2:
-#elif !defined EXIT_CLEANUP_CASE_3
-#define EXIT_CLEANUP_CASE_3
+#elif !defined CASE_N_STATE_3
+#define CASE_N_STATE_3
 	case 3:
-#elif !defined EXIT_CLEANUP_CASE_4
-#define EXIT_CLEANUP_CASE_4
+#elif !defined CASE_N_STATE_4
+#define CASE_N_STATE_4
 	case 4:
-#elif !defined EXIT_CLEANUP_CASE_5
-#define EXIT_CLEANUP_CASE_5
+#elif !defined CASE_N_STATE_5
+#define CASE_N_STATE_5
 	case 5:
-#elif !defined EXIT_CLEANUP_CASE_6
-#define EXIT_CLEANUP_CASE_6
+#elif !defined CASE_N_STATE_6
+#define CASE_N_STATE_6
 	case 6:
-#elif !defined EXIT_CLEANUP_CASE_7
-#define EXIT_CLEANUP_CASE_7
+#elif !defined CASE_N_STATE_7
+#define CASE_N_STATE_7
 	case 7:
-#elif !defined EXIT_CLEANUP_CASE_8
-#define EXIT_CLEANUP_CASE_8
+#elif !defined CASE_N_STATE_8
+#define CASE_N_STATE_8
 	case 8:
-#elif !defined EXIT_CLEANUP_CASE_9
-#define EXIT_CLEANUP_CASE_9
+#elif !defined CASE_N_STATE_9
+#define CASE_N_STATE_9
 	case 9:
-#elif !defined EXIT_CLEANUP_CASE_10
-#define EXIT_CLEANUP_CASE_10
+#elif !defined CASE_N_STATE_10
+#define CASE_N_STATE_10
 	case 10:
-#elif !defined EXIT_CLEANUP_CASE_11
-#define EXIT_CLEANUP_CASE_11
+#elif !defined CASE_N_STATE_11
+#define CASE_N_STATE_11
 	case 11:
-#elif !defined EXIT_CLEANUP_CASE_12
-#define EXIT_CLEANUP_CASE_12
+#elif !defined CASE_N_STATE_12
+#define CASE_N_STATE_12
 	case 12:
-#elif !defined EXIT_CLEANUP_CASE_13
-#define EXIT_CLEANUP_CASE_13
+#elif !defined CASE_N_STATE_13
+#define CASE_N_STATE_13
 	case 13:
-#elif !defined EXIT_CLEANUP_CASE_14
-#define EXIT_CLEANUP_CASE_14
+#elif !defined CASE_N_STATE_14
+#define CASE_N_STATE_14
 	case 14:
-#elif !defined EXIT_CLEANUP_CASE_15
-#define EXIT_CLEANUP_CASE_15
+#elif !defined CASE_N_STATE_15
+#define CASE_N_STATE_15
 	case 15:
-#elif !defined EXIT_CLEANUP_CASE_16
-#define EXIT_CLEANUP_CASE_16
+#elif !defined CASE_N_STATE_16
+#define CASE_N_STATE_16
 	case 16:
 #else
 #error Need to add more case statements!
 #endif
-		cleanup_step++;
