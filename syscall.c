@@ -327,3 +327,77 @@ OFF_T do_lseek(int fd, OFF_T offset, int whence)
 	return lseek(fd, offset, whence);
 #endif
 }
+
+#ifdef HAVE_UTIMENSAT
+int do_utimensat(const char *fname, time_t modtime, uint32 mod_nsec)
+{
+	struct timespec t[2];
+
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+
+	t[0].tv_sec = 0;
+	t[0].tv_nsec = UTIME_NOW;
+	t[1].tv_sec = modtime;
+	t[1].tv_nsec = mod_nsec;
+	return utimensat(AT_FDCWD, fname, t, AT_SYMLINK_NOFOLLOW);
+}
+#endif
+
+#ifdef HAVE_LUTIMES
+int do_lutimes(const char *fname, time_t modtime, uint32 mod_nsec)
+{
+	struct timeval t[2];
+
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+
+	t[0].tv_sec = time(NULL);
+	t[0].tv_usec = 0;
+	t[1].tv_sec = modtime;
+	t[1].tv_usec = mod_nsec / 1000;
+	return lutimes(fname, t);
+}
+#endif
+
+#ifdef HAVE_UTIMES
+int do_utimes(const char *fname, time_t modtime, uint32 mod_nsec)
+{
+	struct timeval t[2];
+
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+
+	t[0].tv_sec = time(NULL);
+	t[0].tv_usec = 0;
+	t[1].tv_sec = modtime;
+	t[1].tv_usec = mod_nsec / 1000;
+	return utimes(fname, t);
+}
+
+#elif defined HAVE_UTIME
+int do_utime(const char *fname, time_t modtime, UNUSED(uint32 mod_nsec))
+{
+#ifdef HAVE_STRUCT_UTIMBUF
+	struct utimbuf tbuf;
+#else
+	time_t t[2];
+#endif
+
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+
+# ifdef HAVE_STRUCT_UTIMBUF
+	tbuf.actime = time(NULL);
+	tbuf.modtime = modtime;
+	return utime(fname, &tbuf);
+# else
+	t[0] = time(NULL);
+	t[1] = modtime;
+	return utime(fname, t);
+# endif
+}
+
+#else
+#error Need utimes or utime function.
+#endif

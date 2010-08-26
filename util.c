@@ -25,7 +25,6 @@
 #include "itypes.h"
 #include "inums.h"
 
-extern int dry_run;
 extern int module_id;
 extern int modify_window;
 extern int relative_paths;
@@ -123,10 +122,11 @@ NORETURN void overflow_exit(const char *str)
 	exit_cleanup(RERR_MALLOC);
 }
 
+/* This returns 0 for success, 1 for a symlink if symlink time-setting
+ * is not possible, or -1 for any other error. */
 int set_modtime(const char *fname, time_t modtime, uint32 mod_nsec, mode_t mode)
 {
-	if (!(preserve_times & PRESERVE_LINK_TIMES) && S_ISLNK(mode))
-		return 1;
+	static int switch_step = 0;
 
 	if (DEBUG_GTE(TIME, 1)) {
 		rprintf(FINFO, "set modtime of %s to (%ld) %s",
@@ -134,42 +134,49 @@ int set_modtime(const char *fname, time_t modtime, uint32 mod_nsec, mode_t mode)
 			asctime(localtime(&modtime)));
 	}
 
-	if (dry_run)
-		return 0;
-
-	{
+	switch (switch_step) {
 #ifdef HAVE_UTIMENSAT
-		struct timespec t[2];
-		t[0].tv_sec = 0;
-		t[0].tv_nsec = UTIME_NOW;
-		t[1].tv_sec = modtime;
-		t[1].tv_nsec = mod_nsec;
-		return utimensat(AT_FDCWD, fname, t, AT_SYMLINK_NOFOLLOW);
-#elif defined HAVE_UTIMES || defined HAVE_LUTIMES
-		struct timeval t[2];
-		t[0].tv_sec = time(NULL);
-		t[0].tv_usec = 0;
-		t[1].tv_sec = modtime;
-		t[1].tv_usec = mod_nsec / 1000;
-# ifdef HAVE_LUTIMES
-		return lutimes(fname, t);
-# else
-		return utimes(fname, t);
-# endif
-#elif defined HAVE_STRUCT_UTIMBUF
-		struct utimbuf tbuf;
-		tbuf.actime = time(NULL);
-		tbuf.modtime = modtime;
-		return utime(fname,&tbuf);
-#elif defined HAVE_UTIME
-		time_t t[2];
-		t[0] = time(NULL);
-		t[1] = modtime;
-		return utime(fname,t);
-#else
-#error No file-time-modification routine found!
+#include "case_N.h"
+		if (do_utimensat(fname, modtime, mod_nsec) == 0)
+			break;
+		if (errno != ENOSYS)
+			return -1;
+		switch_step++;
+		/* FALLTHROUGH */
 #endif
+
+#ifdef HAVE_LUTIMES
+#include "case_N.h"
+		if (do_lutimes(fname, modtime, mod_nsec) == 0)
+			break;
+		if (errno != ENOSYS)
+			return -1;
+		switch_step++;
+		/* FALLTHROUGH */
+#endif
+
+#include "case_N.h"
+		switch_step++;
+		if (preserve_times & PRESERVE_LINK_TIMES) {
+			preserve_times &= ~PRESERVE_LINK_TIMES;
+			if (S_ISLNK(mode))
+				return 1;
+		}
+		/* FALLTHROUGH */
+
+#include "case_N.h"
+#ifdef HAVE_UTIMES
+		if (do_utimes(fname, modtime, mod_nsec) == 0)
+			break;
+#else
+		if (do_utime(fname, modtime, mod_nsec) == 0)
+			break;
+#endif
+
+		return -1;
 	}
+
+	return 0;
 }
 
 /* Create any necessary directories in fname.  Any missing directories are
