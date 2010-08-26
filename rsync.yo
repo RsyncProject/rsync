@@ -356,6 +356,7 @@ to the detailed description below for a complete description.  verb(
  -D                          same as --devices --specials
  -t, --times                 preserve modification times
  -O, --omit-dir-times        omit directories from --times
+ -J, --omit-link-times       omit symlinks from --times
      --super                 receiver attempts super-user activities
      --fake-super            store/recover privileged attrs using xattrs
  -S, --sparse                handle sparse files efficiently
@@ -1113,6 +1114,9 @@ dit(bf(-O, --omit-dir-times)) This tells rsync to omit directories when
 it is preserving modification times (see bf(--times)).  If NFS is sharing
 the directories on the receiving side, it is a good idea to use bf(-O).
 This option is inferred if you use bf(--backup) without bf(--backup-dir).
+
+dit(bf(-J, --omit-link-times)) This tells rsync to omit symlinks when
+it is preserving modification times (see bf(--times)).
 
 dit(bf(--super)) This tells the receiving side to attempt super-user
 activities even if the receiving rsync wasn't run by the super-user.  These

@@ -29,6 +29,7 @@ extern int dry_run;
 extern int module_id;
 extern int modify_window;
 extern int relative_paths;
+extern int preserve_times;
 extern int preserve_xattrs;
 extern char *module_dir;
 extern unsigned int module_dirlen;
@@ -124,10 +125,8 @@ NORETURN void overflow_exit(const char *str)
 
 int set_modtime(const char *fname, time_t modtime, uint32 mod_nsec, mode_t mode)
 {
-#ifndef CAN_SET_SYMLINK_TIMES
-	if (S_ISLNK(mode))
+	if (!(preserve_times & PRESERVE_LINK_TIMES) && S_ISLNK(mode))
 		return 1;
-#endif
 
 	if (DEBUG_GTE(TIME, 1)) {
 		rprintf(FINFO, "set modtime of %s to (%ld) %s",
@@ -145,9 +144,7 @@ int set_modtime(const char *fname, time_t modtime, uint32 mod_nsec, mode_t mode)
 		t[0].tv_nsec = UTIME_NOW;
 		t[1].tv_sec = modtime;
 		t[1].tv_nsec = mod_nsec;
-		if (utimensat(AT_FDCWD, fname, t, AT_SYMLINK_NOFOLLOW) < 0)
-			return S_ISLNK(mode) && errno == ENOSYS ? 1 : -1;
-		return 0;
+		return utimensat(AT_FDCWD, fname, t, AT_SYMLINK_NOFOLLOW);
 #elif defined HAVE_UTIMES || defined HAVE_LUTIMES
 		struct timeval t[2];
 		t[0].tv_sec = time(NULL);
@@ -155,9 +152,7 @@ int set_modtime(const char *fname, time_t modtime, uint32 mod_nsec, mode_t mode)
 		t[1].tv_sec = modtime;
 		t[1].tv_usec = mod_nsec / 1000;
 # ifdef HAVE_LUTIMES
-		if (lutimes(fname, t) < 0)
-			return S_ISLNK(mode) && errno == ENOSYS ? 1 : -1;
-		return 0;
+		return lutimes(fname, t);
 # else
 		return utimes(fname, t);
 # endif

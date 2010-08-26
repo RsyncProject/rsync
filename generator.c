@@ -390,12 +390,9 @@ static void do_delete_pass(void)
 
 int unchanged_attrs(const char *fname, struct file_struct *file, stat_x *sxp)
 {
-#ifndef CAN_SET_SYMLINK_TIMES
-	if (S_ISLNK(file->mode)) {
+	if (!(preserve_times & PRESERVE_LINK_TIMES) && S_ISLNK(file->mode)) {
 		;
-	} else
-#endif
-	if (preserve_times && cmp_time(sxp->st.st_mtime, file->modtime) != 0)
+	} else if (preserve_times && cmp_time(sxp->st.st_mtime, file->modtime) != 0)
 		return 0;
 
 	if (preserve_perms) {
@@ -437,12 +434,9 @@ void itemize(const char *fnamecmp, struct file_struct *file, int ndx, int statre
 {
 	if (statret >= 0) { /* A from-dest-dir statret can == 1! */
 		int keep_time = !preserve_times ? 0
-		    : S_ISDIR(file->mode) ? preserve_times > 1 :
-#ifdef CAN_SET_SYMLINK_TIMES
-		    1;
-#else
-		    !S_ISLNK(file->mode);
-#endif
+		    : S_ISDIR(file->mode) ? preserve_times & PRESERVE_DIR_TIMES
+		    : S_ISLNK(file->mode) ? preserve_times & PRESERVE_LINK_TIMES
+		    : 1;
 
 		if (S_ISREG(file->mode) && F_LENGTH(file) != sxp->st.st_size)
 			iflags |= ITEM_REPORT_SIZE;
@@ -2056,7 +2050,7 @@ void generate_files(int f_out, const char *local_name)
 	}
 	solo_file = local_name;
 	dir_tweaking = !(list_only || solo_file || dry_run);
-	need_retouch_dir_times = preserve_times > 1;
+	need_retouch_dir_times = preserve_times & PRESERVE_DIR_TIMES;
 	loopchk_limit = allowed_lull ? allowed_lull * 5 : 200;
 	symlink_timeset_failed_flags = ITEM_REPORT_TIME
 	    | (protocol_version >= 30 || !am_server ? ITEM_REPORT_TIMEFAIL : 0);

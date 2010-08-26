@@ -489,11 +489,13 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		set_xattr(fname, file, fnamecmp, sxp);
 #endif
 
-	if (!preserve_times || (S_ISDIR(sxp->st.st_mode) && preserve_times == 1))
+	if (!preserve_times
+	 || (!(preserve_times & PRESERVE_DIR_TIMES) && S_ISDIR(sxp->st.st_mode))
+	 || (!(preserve_times & PRESERVE_LINK_TIMES) && S_ISLNK(sxp->st.st_mode)))
 		flags |= ATTRS_SKIP_MTIME;
 	if (!(flags & ATTRS_SKIP_MTIME)
 	    && cmp_time(sxp->st.st_mtime, file->modtime) != 0) {
-		int ret = set_modtime(fname, file->modtime, F_MOD_NSEC(file), sxp->st.st_mode);
+		int ret = set_modtime(fname, file->modtime, F_MOD_NSEC(file), file->mode);
 		if (ret < 0) {
 			rsyserr(FERROR_XFER, errno, "failed to set times on %s",
 				full_fname(fname));

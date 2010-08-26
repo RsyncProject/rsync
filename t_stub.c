@@ -25,6 +25,7 @@ int modify_window = 0;
 int module_id = -1;
 int relative_paths = 0;
 int module_dirlen = 0;
+int preserve_times = 0;
 int preserve_xattrs = 0;
 char number_separator = ',';
 char *partial_dir;

@@ -293,6 +293,7 @@ static int do_stats = 0;
 static int do_progress = 0;
 static int daemon_opt;   /* sets am_daemon after option error-reporting */
 static int omit_dir_times = 0;
+static int omit_link_times = 0;
 static int F_option_cnt = 0;
 static int modify_window_set;
 static int itemize_changes = 0;
@@ -699,6 +700,7 @@ void usage(enum logcode F)
   rprintf(F," -D                          same as --devices --specials\n");
   rprintf(F," -t, --times                 preserve modification times\n");
   rprintf(F," -O, --omit-dir-times        omit directories from --times\n");
+  rprintf(F," -J, --omit-link-times       omit symlinks from --times\n");
   rprintf(F,"     --super                 receiver attempts super-user activities\n");
 #ifdef SUPPORT_XATTRS
   rprintf(F,"     --fake-super            store/recover privileged attrs using xattrs\n");
@@ -843,12 +845,15 @@ static struct poptOption long_options[] = {
   {"xattrs",          'X', POPT_ARG_NONE,   0, 'X', 0, 0 },
   {"no-xattrs",        0,  POPT_ARG_VAL,    &preserve_xattrs, 0, 0, 0 },
   {"no-X",             0,  POPT_ARG_VAL,    &preserve_xattrs, 0, 0, 0 },
-  {"times",           't', POPT_ARG_VAL,    &preserve_times, 2, 0, 0 },
+  {"times",           't', POPT_ARG_VAL,    &preserve_times, 1, 0, 0 },
   {"no-times",         0,  POPT_ARG_VAL,    &preserve_times, 0, 0, 0 },
   {"no-t",             0,  POPT_ARG_VAL,    &preserve_times, 0, 0, 0 },
   {"omit-dir-times",  'O', POPT_ARG_VAL,    &omit_dir_times, 1, 0, 0 },
   {"no-omit-dir-times",0,  POPT_ARG_VAL,    &omit_dir_times, 0, 0, 0 },
   {"no-O",             0,  POPT_ARG_VAL,    &omit_dir_times, 0, 0, 0 },
+  {"omit-link-times", 'J', POPT_ARG_VAL,    &omit_link_times, 1, 0, 0 },
+  {"no-omit-link-times",0, POPT_ARG_VAL,    &omit_link_times, 0, 0, 0 },
+  {"no-J",             0,  POPT_ARG_VAL,    &omit_link_times, 0, 0, 0 },
   {"modify-window",    0,  POPT_ARG_INT,    &modify_window, OPT_MODIFY_WINDOW, 0, 0 },
   {"super",            0,  POPT_ARG_VAL,    &am_root, 2, 0, 0 },
   {"no-super",         0,  POPT_ARG_VAL,    &am_root, 0, 0, 0 },
@@ -1452,7 +1457,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			preserve_links = 1;
 #endif
 			preserve_perms = 1;
-			preserve_times = 2;
+			preserve_times = 1;
 			preserve_gid = 1;
 			preserve_uid = 1;
 			preserve_devices = 1;
@@ -2072,13 +2077,19 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		parse_filter_str(&filter_list, backup_dir_buf, rule_template(0), 0);
 	}
 
+	if (preserve_times) {
+		preserve_times = PRESERVE_FILE_TIMES;
+		if (!omit_dir_times)
+			preserve_times |= PRESERVE_DIR_TIMES;
+#ifdef CAN_SET_SYMLINK_TIMES
+		if (!omit_link_times)
+			preserve_times |= PRESERVE_LINK_TIMES;
+#endif
+	}
+
 	if (make_backups && !backup_dir) {
 		omit_dir_times = 0; /* Implied, so avoid -O to sender. */
-		if (preserve_times > 1)
-			preserve_times = 1;
-	} else if (omit_dir_times) {
-		if (preserve_times > 1)
-			preserve_times = 1;
+		preserve_times &= ~PRESERVE_DIR_TIMES;
 	}
 
 	if (stdout_format) {
@@ -2315,6 +2326,8 @@ void server_options(char **args, int *argc_p)
 			argstr[x++] = 'm';
 		if (omit_dir_times)
 			argstr[x++] = 'O';
+		if (omit_link_times)
+			argstr[x++] = 'J';
 	} else {
 		if (copy_links)
 			argstr[x++] = 'L';
