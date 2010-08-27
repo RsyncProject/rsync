@@ -33,9 +33,9 @@ your make has a problem with this rule, you will see an error like this:
 
     Don't know how to make ./*.c
 
-You can change the "proto.h-tstamp" target to omit the "$(srcdir)/*.c"
-source, but keep in mind that this will make a manual run of "make proto"
-necessary (prior to a "make") anytime the function prototypes change.
+You can change the "proto.h-tstamp" target to omit its prerequisite args,
+but keep in mind that this will make a manual removal of "proto.h-tstamp"
+necessary anytime the function prototypes change.
 
 RPM NOTES
 ---------
