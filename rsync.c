@@ -495,7 +495,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		flags |= ATTRS_SKIP_MTIME;
 	if (!(flags & ATTRS_SKIP_MTIME)
 	    && cmp_time(sxp->st.st_mtime, file->modtime) != 0) {
-		int ret = set_modtime(fname, file->modtime, F_MOD_NSEC(file), file->mode);
+		int ret = set_modtime(fname, file->modtime, F_MOD_NSEC(file), sxp->st.st_mode);
 		if (ret < 0) {
 			rsyserr(FERROR_XFER, errno, "failed to set times on %s",
 				full_fname(fname));
