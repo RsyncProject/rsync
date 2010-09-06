@@ -857,7 +857,7 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 		if (i == xalp->count) {
 			if (sys_lremovexattr(fname, name) < 0) {
 				rsyserr(FERROR_XFER, errno,
-					"rsync_xal_clear: lremovexattr(\"%s\",\"%s\") failed",
+					"rsync_xal_set: lremovexattr(\"%s\",\"%s\") failed",
 					fname, name);
 				ret = -1;
 			} else /* make sure caller sets mtime */
