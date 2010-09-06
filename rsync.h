@@ -430,6 +430,8 @@ typedef unsigned int mode_t;
 #endif
 #ifndef HAVE_OFF_T
 typedef long off_t;
+#undef SIZEOF_OFF_T
+#define SIZEOF_OFF_T SIZEOF_LONG
 #endif
 #ifndef HAVE_SIZE_T
 typedef unsigned int size_t;
