@@ -320,6 +320,8 @@ attempted uploads will fail. If "read only" is false then uploads will
 be possible if file permissions on the daemon side allow them. The default
 is for all modules to be read only.
 
+Note that "auth users" can override this setting on a per-user basis.
+
 dit(bf(write only)) This parameter determines whether clients
 will be able to download files or not. If "write only" is true then any
 attempted downloads will fail. If "write only" is false then downloads
@@ -432,10 +434,12 @@ be on to the clients.
 See the description of the bf(--chmod) rsync option and the bf(chmod)(1)
 manpage for information on the format of this string.
 
-dit(bf(auth users)) This parameter specifies a comma and
-space-separated list of usernames that will be allowed to connect to
+dit(bf(auth users)) This parameter specifies a comma and/or space-separated
+list of authorization rules.  In its simplest form, you list the usernames
+that will be allowed to connect to
 this module. The usernames do not need to exist on the local
-system. The usernames may also contain shell wildcard characters. If
+system. The rules may contain shell wildcard characters that will be matched
+against the username provided by the client for authentication. If
 "auth users" is set then the client will be challenged to supply a
 username and password to connect to the module. A challenge response
 authentication protocol is used for this exchange. The plain text
@@ -443,24 +447,65 @@ usernames and passwords are stored in the file specified by the
 "secrets file" parameter. The default is for all users to be able to
 connect without a password (this is called "anonymous rsync").
 
+In addition to username matching, you can specify groupname matching via a '@'
+prefix.  When using groupname matching, the authenticating username must be a
+real user on the system, or it will be assumed to be a member of no groups.
+For example, specifying "@rsync" will match the authenticating user if the
+named user is a member of the rsync group.
+
+Finally, options may be specified after a colon (:).  The options allow you to
+"deny" a user or a group, set the access to "ro" (read-only), or set the access
+to "rw" (read/write).  Setting an auth-rule-specific ro/rw setting overrides
+the module's "read only" setting.
+
+Be sure to put the rules in the order you want them to be matched, because the
+checking stops at the first matching user or group, and that is the only auth
+that is checked.  For example:
+
+verb(  auth users = joe:deny @guest:deny admin:rw @rsync:ro susan joe sam )
+
+In the above rule, user joe will be denied access no matter what.  Any user
+that is in the group "guest" is also denied access.  The user "admin" gets
+access in read/write mode, but only if the admin user is not in group "guest"
+(because the admin user-matching rule would never be reached if the user is in
+group "guest").  Any other user who is in group "rsync" will get read-only
+access.  Finally, users susan, joe, and sam get the ro/rw setting of the
+module, but only if the user didn't match an earlier group-matching rule.
+
+See the description of the secrets file for how you can have per-user passwords
+as well as per-group passwords.  It also explains how a user can authenticate
+using their user password or (when applicable) a group password, depending on
+what rule is being authenticated.
+
 See also the section entitled "USING RSYNC-DAEMON FEATURES VIA A REMOTE
 SHELL CONNECTION" in bf(rsync)(1) for information on how handle an
 rsyncd.conf-level username that differs from the remote-shell-level
 username when using a remote shell to connect to an rsync daemon.
 
-dit(bf(secrets file)) This parameter specifies the name of
-a file that contains the username:password pairs used for
-authenticating this module. This file is only consulted if the "auth
-users" parameter is specified. The file is line based and contains
-username:password pairs separated by a single colon. Any line starting
-with a hash (#) is considered a comment and is skipped. The passwords
-can contain any characters but be warned that many operating systems
-limit the length of passwords that can be typed at the client end, so
-you may find that passwords longer than 8 characters don't work.
+dit(bf(secrets file)) This parameter specifies the name of a file that contains
+the username:password and/or @groupname:password pairs used for authenticating
+this module. This file is only consulted if the "auth users" parameter is
+specified.  The file is line-based and contains one name:password pair per
+line.  Any line has a hash (#) as the very first character on the line is
+considered a comment and is skipped.  The passwords can contain any characters
+but be warned that many operating systems limit the length of passwords that
+can be typed at the client end, so you may find that passwords longer than 8
+characters don't work.
+
+The use of group-specific lines are only relevant when the module is being
+authorized using a matching "@groupname" rule.  When that happens, the user
+can be authorized via either their "username:password" line or the
+"@groupname:password" line for the group that triggered the authentication.
+
+It is up to you what kind of password entries you want to include, either
+users, groups, or both.  The use of group rules in "auth users" does not
+require that you specify a group password if you do not want to use shared
+passwords.
 
 There is no default for the "secrets file" parameter, you must choose a name
 (such as tt(/etc/rsyncd.secrets)).  The file must normally not be readable
-by "other"; see "strict modes".
+by "other"; see "strict modes".  If the file is not found or is rejected, no
+logins for a "user auth" module will be possible.
 
 dit(bf(strict modes)) This parameter determines whether or not
 the permissions on the secrets file will be checked.  If "strict modes" is

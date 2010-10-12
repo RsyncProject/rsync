@@ -164,7 +164,7 @@ static int exchange_protocols(int f_in, int f_out, char *buf, size_t bufsiz, int
 	}
 
 	/* This strips the \n. */
-	if (!read_line_old(f_in, buf, bufsiz)) {
+	if (!read_line_old(f_in, buf, bufsiz, 0)) {
 		if (am_client)
 			rprintf(FERROR, "rsync: did not see server greeting\n");
 		return -1;
@@ -283,7 +283,7 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 	kluge_around_eof = list_only && protocol_version < 25 ? 1 : 0;
 
 	while (1) {
-		if (!read_line_old(f_in, line, sizeof line)) {
+		if (!read_line_old(f_in, line, sizeof line, 0)) {
 			rprintf(FERROR, "rsync: didn't get server startup line\n");
 			return -1;
 		}
@@ -544,6 +544,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 		return -1;
 	}
 
+	read_only = lp_read_only(i); /* may also be overridden by auth_server() */
 	auth_user = auth_server(f_in, f_out, i, host, addr, "@RSYNCD: AUTHREQD ");
 
 	if (!auth_user) {
@@ -553,9 +554,6 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	set_env_str("RSYNC_USER_NAME", auth_user);
 
 	module_id = i;
-
-	if (lp_read_only(i))
-		read_only = 1;
 
 	if (lp_transfer_logging(i) && !logfile_format)
 		logfile_format = lp_log_format(i);
@@ -1034,7 +1032,7 @@ int start_daemon(int f_in, int f_out)
 		return -1;
 
 	line[0] = 0;
-	if (!read_line_old(f_in, line, sizeof line))
+	if (!read_line_old(f_in, line, sizeof line, 0))
 		return -1;
 
 	if (!*line || strcmp(line, "#list") == 0) {

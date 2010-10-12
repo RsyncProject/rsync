@@ -83,6 +83,9 @@ Changes since 3.0.4:
       daemon to complain about an inability to set explicitly-specified uid/gid
       values, even when not run by a super-user.
 
+    - Added per-user authorization options and group-authorization support to
+      the daemon's "auth users" parameter.
+
     - Added a way to reference environment variables in a daemon's config file
       (using %VAR% references).
 
