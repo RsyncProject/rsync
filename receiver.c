@@ -285,8 +285,9 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 
 		if (DEBUG_GTE(DELTASUM, 3)) {
 			rprintf(FINFO,
-				"chunk[%d] of size %ld at %s offset=%s\n",
-				i, (long)len, big_num(offset2), big_num(offset));
+				"chunk[%d] of size %ld at %s offset=%s%s\n",
+				i, (long)len, big_num(offset2), big_num(offset),
+				updating_basis_or_equiv && offset == offset2 ? " (seek)" : "");
 		}
 
 		if (mapbuf) {
