@@ -27,24 +27,32 @@
 
 extern int sparse_files;
 
-static char last_byte;
 static OFF_T sparse_seek = 0;
 
-int sparse_end(int f)
+int sparse_end(int f, OFF_T size)
 {
 	int ret;
 
 	if (!sparse_seek)
 		return 0;
 
-	do_lseek(f, sparse_seek-1, SEEK_CUR);
+#ifdef HAVE_FTRUNCATE
+	ret = do_ftruncate(f, size);
+#else
+	if (do_lseek(f, sparse_seek-1, SEEK_CUR) != size-1)
+		ret = -1;
+	else {
+		do {
+			ret = write(f, "", 1);
+		} while (ret < 0 && errno == EINTR);
+
+		ret = ret <= 0 ? -1 : 0;
+	}
+#endif
+
 	sparse_seek = 0;
 
-	do {
-		ret = write(f, "", 1);
-	} while (ret < 0 && errno == EINTR);
-
-	return ret <= 0 ? -1 : 0;
+	return ret;
 }
 
 
@@ -55,10 +63,6 @@ static int write_sparse(int f, char *buf, int len)
 
 	for (l1 = 0; l1 < len && buf[l1] == 0; l1++) {}
 	for (l2 = 0; l2 < len-l1 && buf[len-(l2+1)] == 0; l2++) {}
-
-	/* XXX Riddle me this: why does this function SLOW DOWN when I
-	 * remove the following (unneeded) line?? Core Duo weirdness? */
-	last_byte = buf[len-1];
 
 	sparse_seek += l1;
 
