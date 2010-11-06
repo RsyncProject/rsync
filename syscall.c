@@ -226,6 +226,22 @@ int do_rename(const char *fname1, const char *fname2)
 	return rename(fname1, fname2);
 }
 
+#ifdef HAVE_FTRUNCATE
+int do_ftruncate(int fd, OFF_T size)
+{
+	int ret;
+
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+
+	do {
+		ret = ftruncate(fd, size);
+	} while (ret < 0 && errno == EINTR);
+
+	return ret;
+}
+#endif
+
 void trim_trailing_slashes(char *name)
 {
 	int l;

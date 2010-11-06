@@ -322,8 +322,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 		goto report_write_error;
 
 #ifdef HAVE_FTRUNCATE
-	if (inplace && fd != -1
-	 && ftruncate(fd, offset) < 0) {
+	if (inplace && fd != -1 && do_ftruncate(fd, offset) < 0) {
 		rsyserr(FERROR_XFER, errno, "ftruncate failed on %s",
 			full_fname(fname));
 	}
@@ -332,7 +331,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 	if (INFO_GTE(PROGRESS, 1))
 		end_progress(total_size);
 
-	if (fd != -1 && offset > 0 && sparse_end(fd) != 0) {
+	if (fd != -1 && offset > 0 && sparse_end(fd, offset) != 0) {
 	    report_write_error:
 		rsyserr(FERROR_XFER, errno, "write failed on %s",
 			full_fname(fname));
