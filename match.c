@@ -235,7 +235,7 @@ static void hash_search(int f,struct sum_struct *s,
 			 * one with an identical offset, so we prefer that over
 			 * the adjacent want_i optimization. */
 			if (updating_basis_file) {
-				/* All the sender's chunks start at blength boundaries. */
+				/* All the generator's chunks start at blength boundaries. */
 				while (aligned_offset < offset)
 					aligned_offset += s->blength;
 				if (offset == aligned_offset) {
@@ -249,8 +249,7 @@ static void hash_search(int f,struct sum_struct *s,
 								break;
 							i = i2;
 						}
-						/* This chunk was at the same offset on
-						 * both the sender and the receiver. */
+						/* This chunk remained in the same spot in the old and new file. */
 						s->sums[i].flags |= SUMFLG_SAME_OFFSET;
 						want_i = i;
 					}
