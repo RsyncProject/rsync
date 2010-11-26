@@ -129,6 +129,14 @@ int get_tmpname(char *fnametmp, const char *fname, BOOL make_unique)
 		added = maxname - 1;
 	suf = fnametmp + length + added;
 
+	/* Trim any dangling high-bit chars if the first-trimmed char (if any) is
+	 * also a high-bit char, just in case we cut into a multi-byte sequence.
+	 * We are guaranteed to stop because of the leading '.' we added. */
+	if ((int)f[added] & 0x80) {
+		while ((int)suf[-1] & 0x80)
+			suf--;
+	}
+
 	if (make_unique) {
 		static unsigned counter_limit;
 		unsigned counter;
