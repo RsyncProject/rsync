@@ -1491,17 +1491,18 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		return 0;
 	}
 	if (backup_dir) {
-		backup_dir_len = strlcpy(backup_dir_buf, backup_dir, sizeof backup_dir_buf);
-		backup_dir_remainder = sizeof backup_dir_buf - backup_dir_len;
-		if (backup_dir_remainder < 32) {
+		size_t len = strlcpy(backup_dir_buf, backup_dir, sizeof backup_dir_buf);
+		if (len > sizeof backup_dir_buf - 128) {
 			snprintf(err_buf, sizeof err_buf,
 				"the --backup-dir path is WAY too long.\n");
 			return 0;
 		}
+		backup_dir_len = (int)len;
 		if (backup_dir_buf[backup_dir_len - 1] != '/') {
 			backup_dir_buf[backup_dir_len++] = '/';
 			backup_dir_buf[backup_dir_len] = '\0';
 		}
+		backup_dir_remainder = sizeof backup_dir_buf - backup_dir_len;
 		if (verbose > 1 && !am_sender)
 			rprintf(FINFO, "backup_dir is %s\n", backup_dir_buf);
 	} else if (!backup_suffix_len && (!am_server || !am_sender)) {
