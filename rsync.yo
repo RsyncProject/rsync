@@ -1051,7 +1051,7 @@ used by bf(--fake-super)) unless you repeat the option (e.g. -XX).  This
 "copy all xattrs" mode cannot be used with bf(--fake-super).
 
 dit(bf(--chmod)) This option tells rsync to apply one or more
-comma-separated "chmod" strings to the permission of the files in the
+comma-separated "chmod" modes to the permission of the files in the
 transfer.  The resulting value is treated as though it were the permissions
 that the sending side supplied for the file, which means that this option
 can seem to have no effect on existing files if bf(--perms) is not enabled.
@@ -1059,9 +1059,16 @@ can seem to have no effect on existing files if bf(--perms) is not enabled.
 In addition to the normal parsing rules specified in the bf(chmod)(1)
 manpage, you can specify an item that should only apply to a directory by
 prefixing it with a 'D', or specify an item that should only apply to a
-file by prefixing it with a 'F'.  For example:
+file by prefixing it with a 'F'.  For example, the following will ensure
+that all directories get marked set-gid, that no files are other-writable,
+that both are user-writable and group-writable, and that both have
+consistent executability across all bits:
 
 quote(--chmod=Dg+s,ug+w,Fo-w,+X)
+
+Using octal mode numbers is also allowed:
+
+quote(--chmod=D2775,F664)
 
 It is also legal to specify multiple bf(--chmod) options, as each
 additional option is just appended to the list of changes to make.

@@ -19,6 +19,7 @@
  */
 
 #include "rsync.h"
+#include "itypes.h"
 
 extern mode_t orig_umask;
 
@@ -35,10 +36,12 @@ struct chmod_mode_struct {
 #define CHMOD_ADD 1
 #define CHMOD_SUB 2
 #define CHMOD_EQ  3
+#define CHMOD_SET 4
 
 #define STATE_ERROR 0
 #define STATE_1ST_HALF 1
 #define STATE_2ND_HALF 2
+#define STATE_OCTAL_NUM 3
 
 /* Parse a chmod-style argument, and break it down into one or more AND/OR
  * pairs in a linked list.  We return a pointer to new items on succcess
@@ -87,6 +90,10 @@ struct chmod_mode_struct *parse_chmod(const char *modestr,
 				curr_mode->ModeAND = CHMOD_BITS - (where * 7) - (topoct ? topbits : 0);
 				curr_mode->ModeOR  = bits + topoct;
 				break;
+			case CHMOD_SET:
+				curr_mode->ModeAND = 0;
+				curr_mode->ModeOR  = bits;
+				break;
 			}
 
 			curr_mode->flags = flags;
@@ -99,7 +106,8 @@ struct chmod_mode_struct *parse_chmod(const char *modestr,
 			where = what = op = topoct = topbits = flags = 0;
 		}
 
-		if (state != STATE_2ND_HALF) {
+		switch (state) {
+		case STATE_1ST_HALF:
 			switch (*modestr) {
 			case 'D':
 				if (flags & FLAG_FILES_ONLY)
@@ -138,10 +146,17 @@ struct chmod_mode_struct *parse_chmod(const char *modestr,
 				state = STATE_2ND_HALF;
 				break;
 			default:
-				state = STATE_ERROR;
+				if (isDigit(modestr) && *modestr < '8' && !where) {
+					op = CHMOD_SET;
+					state =  STATE_OCTAL_NUM;
+					where = 1;
+					what = *modestr - '0';
+				} else
+					state = STATE_ERROR;
 				break;
 			}
-		} else {
+			break;
+		case STATE_2ND_HALF:
 			switch (*modestr) {
 			case 'r':
 				what |= 4;
@@ -168,6 +183,15 @@ struct chmod_mode_struct *parse_chmod(const char *modestr,
 				state = STATE_ERROR;
 				break;
 			}
+			break;
+		case STATE_OCTAL_NUM:
+			if (isDigit(modestr) && *modestr < '8') {
+				what = what*8 + *modestr - '0';
+				if (what > CHMOD_BITS)
+					state = STATE_ERROR;
+			} else
+				state = STATE_ERROR;
+			break;
 		}
 		modestr++;
 	}
