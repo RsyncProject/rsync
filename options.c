@@ -2044,17 +2044,18 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		return 0;
 	}
 	if (backup_dir) {
+		size_t len;
 		while (*backup_dir == '.' && backup_dir[1] == '/')
 			backup_dir += 2;
 		if (*backup_dir == '.' && backup_dir[1] == '\0')
 			backup_dir++;
-		backup_dir_len = strlcpy(backup_dir_buf, backup_dir, sizeof backup_dir_buf);
-		backup_dir_remainder = sizeof backup_dir_buf - backup_dir_len;
-		if (backup_dir_remainder < 128) {
+		len = strlcpy(backup_dir_buf, backup_dir, sizeof backup_dir_buf);
+		if (len > sizeof backup_dir_buf - 128) {
 			snprintf(err_buf, sizeof err_buf,
 				"the --backup-dir path is WAY too long.\n");
 			return 0;
 		}
+		backup_dir_len = (int)len;
 		if (!backup_dir_len) {
 			backup_dir_len = -1;
 			backup_dir = NULL;
@@ -2062,6 +2063,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			backup_dir_buf[backup_dir_len++] = '/';
 			backup_dir_buf[backup_dir_len] = '\0';
 		}
+		backup_dir_remainder = sizeof backup_dir_buf - backup_dir_len;
 	}
 	if (backup_dir) {
 		/* No need for a suffix or a protect rule. */
