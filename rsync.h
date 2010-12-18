@@ -344,6 +344,14 @@ enum msgcode {
 #define CAN_SET_SYMLINK_TIMES 1
 #endif
 
+#if defined HAVE_LCHOWN || defined CHOWN_MODIFIES_SYMLINK
+#define CAN_CHOWN_SYMLINK 1
+#endif
+
+#if defined HAVE_LCHMOD || defined HAVE_SETATTRLIST
+#define CAN_CHMOD_SYMLINK 1
+#endif
+
 #ifdef HAVE_SYS_SELECT_H
 #include <sys/select.h>
 #endif

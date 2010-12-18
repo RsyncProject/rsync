@@ -564,42 +564,100 @@ static void do_delete_pass(void)
 		rprintf(FINFO, "                    \r");
 }
 
-int unchanged_attrs(const char *fname, struct file_struct *file, stat_x *sxp)
+static inline int time_differs(struct file_struct *file, stat_x *sxp)
 {
-	if (!(preserve_times & PRESERVE_LINK_TIMES) && S_ISLNK(file->mode)) {
-		;
-	} else if (preserve_times && cmp_time(sxp->st.st_mtime, file->modtime) != 0)
-		return 0;
+	return cmp_time(sxp->st.st_mtime, file->modtime);
+}
 
-	if (preserve_perms) {
-		if (!BITS_EQUAL(sxp->st.st_mode, file->mode, CHMOD_BITS))
-			return 0;
-	} else if (preserve_executability
-	 && ((sxp->st.st_mode & 0111 ? 1 : 0) ^ (file->mode & 0111 ? 1 : 0)))
-		return 0;
+static inline int perms_differ(struct file_struct *file, stat_x *sxp)
+{
+	if (preserve_perms)
+		return !BITS_EQUAL(sxp->st.st_mode, file->mode, CHMOD_BITS);
 
+	if (preserve_executability)
+		return (sxp->st.st_mode & 0111 ? 1 : 0) ^ (file->mode & 0111 ? 1 : 0);
+
+	return 0;
+}
+
+static inline int ownership_differs(struct file_struct *file, stat_x *sxp)
+{
 	if (am_root && uid_ndx && sxp->st.st_uid != (uid_t)F_OWNER(file))
-		return 0;
+		return 1;
 
 	if (gid_ndx && !(file->flags & FLAG_SKIP_GROUP) && sxp->st.st_gid != (gid_t)F_GROUP(file))
-		return 0;
+		return 1;
+
+	return 0;
+}
 
 #ifdef SUPPORT_ACLS
-	if (preserve_acls && !S_ISLNK(file->mode)) {
+static inline int acls_differ(const char *fname, struct file_struct *file, stat_x *sxp)
+{
+	if (preserve_acls) {
 		if (!ACL_READY(*sxp))
 			get_acl(fname, sxp);
 		if (set_acl(NULL, file, sxp, file->mode))
-			return 0;
+			return 1;
 	}
+
+	return 0;
+}
 #endif
+
 #ifdef SUPPORT_XATTRS
+static inline int xattrs_differ(const char *fname, struct file_struct *file, stat_x *sxp)
+{
 	if (preserve_xattrs) {
 		if (!XATTR_READY(*sxp))
 			get_xattr(fname, sxp);
 		if (xattr_diff(file, sxp, 0))
-			return 0;
+			return 1;
 	}
+
+	return 0;
+}
 #endif
+
+int unchanged_attrs(const char *fname, struct file_struct *file, stat_x *sxp)
+{
+	if (S_ISLNK(file->mode)) {
+#ifdef CAN_SET_SYMLINK_TIMES
+		if (preserve_times & PRESERVE_LINK_TIMES && time_differs(file, sxp))
+			return 0;
+#endif
+#ifdef CAN_CHMOD_SYMLINK
+		if (perms_differ(file, sxp))
+			return 0;
+#endif
+#ifndef CAN_CHOWN_SYMLINK
+		if (ownership_differs(file, sxp))
+			return 0;
+#endif
+#if defined SUPPORT_ACLS && 0 /* no current symlink-ACL support */
+		if (acls_differ(fname, file, sxp))
+			return 0;
+#endif
+#if defined SUPPORT_XATTRS && !defined NO_SYMLINK_XATTRS
+		if (xattrs_differ(fname, file, sxp))
+			return 0;
+#endif
+	} else {
+		if (preserve_times && time_differs(file, sxp))
+			return 0;
+		if (perms_differ(file, sxp))
+			return 0;
+		if (ownership_differs(file, sxp))
+			return 0;
+#ifdef SUPPORT_ACLS
+		if (acls_differ(fname, file, sxp))
+			return 0;
+#endif
+#ifdef SUPPORT_XATTRS
+		if (xattrs_differ(fname, file, sxp))
+			return 0;
+#endif
+	}
 
 	return 1;
 }
