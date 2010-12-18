@@ -991,7 +991,10 @@ can seem to have no effect on existing files if bf(--perms) is not enabled.
 In addition to the normal parsing rules specified in the bf(chmod)(1)
 manpage, you can specify an item that should only apply to a directory by
 prefixing it with a 'D', or specify an item that should only apply to a
-file by prefixing it with a 'F'.  For example:
+file by prefixing it with a 'F'.  For example, the following will ensure
+that all directories get marked set-gid, that no files are other-writable,
+that both are user-writable and group-writable, and that both have
+consistent executability across all bits:
 
 quote(--chmod=Dg+s,ug+w,Fo-w,+X)
 
