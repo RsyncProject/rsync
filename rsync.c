@@ -510,7 +510,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	change_uid = am_root && uid_ndx && sxp->st.st_uid != (uid_t)F_OWNER(file);
 	change_gid = gid_ndx && !(file->flags & FLAG_SKIP_GROUP)
 		  && sxp->st.st_gid != (gid_t)F_GROUP(file);
-#if !defined HAVE_LCHOWN && !defined CHOWN_MODIFIES_SYMLINK
+#ifndef CAN_CHOWN_SYMLINK
 	if (S_ISLNK(sxp->st.st_mode)) {
 		;
 	} else
