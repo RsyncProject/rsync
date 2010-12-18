@@ -141,7 +141,7 @@ static void matched(int f, struct sum_struct *s, struct map_struct *buf,
 static void hash_search(int f,struct sum_struct *s,
 			struct map_struct *buf, OFF_T len)
 {
-	OFF_T offset, end;
+	OFF_T offset, aligned_offset, end;
 	int32 k, want_i, backup;
 	char sum2[SUM_LENGTH];
 	uint32 s1, s2, sum;
@@ -167,7 +167,7 @@ static void hash_search(int f,struct sum_struct *s,
 	if (verbose > 3)
 		rprintf(FINFO, "sum=%.8x k=%ld\n", sum, (long)k);
 
-	offset = 0;
+	offset = aligned_offset = 0;
 
 	end = len + 1 - s->sums[s->count-1].len;
 
@@ -232,24 +232,26 @@ static void hash_search(int f,struct sum_struct *s,
 
 			/* When updating in-place, the best possible match is
 			 * one with an identical offset, so we prefer that over
-			 * the following want_i optimization. */
+			 * the adjacent want_i optimization. */
 			if (updating_basis_file) {
-				int32 i2;
-				for (i2 = i; i2 >= 0; i2 = s->sums[i2].chain) {
-					if (s->sums[i2].offset != offset)
-						continue;
-					if (i2 != i) {
-						if (sum != s->sums[i2].sum1)
-							break;
-						if (memcmp(sum2, s->sums[i2].sum2,
-							   s->s2length) != 0)
-							break;
-						i = i2;
+				/* All the generator's chunks start at blength boundaries. */
+				while (aligned_offset < offset)
+					aligned_offset += s->blength;
+				if (offset == aligned_offset) {
+					int32 i2;
+					for (i2 = i; i2 >= 0; i2 = s->sums[i2].chain) {
+						if (s->sums[i2].offset != offset)
+							continue;
+						if (i2 != i) {
+							if (sum != s->sums[i2].sum1
+							 || memcmp(sum2, s->sums[i2].sum2, s->s2length) != 0)
+								break;
+							i = i2;
+						}
+						/* This chunk remained in the same spot in the old and new file. */
+						s->sums[i].flags |= SUMFLG_SAME_OFFSET;
+						want_i = i;
 					}
-					/* This chunk was at the same offset on
-					 * both the sender and the receiver. */
-					s->sums[i].flags |= SUMFLG_SAME_OFFSET;
-					goto set_want_i;
 				}
 			}
 
@@ -264,7 +266,6 @@ static void hash_search(int f,struct sum_struct *s,
 				 * will be happy */
 				i = want_i;
 			}
-		    set_want_i:
 			want_i = i + 1;
 
 			matched(f,s,buf,offset,i);
