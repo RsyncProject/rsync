@@ -249,8 +249,9 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 
 		if (verbose > 3) {
 			rprintf(FINFO,
-				"chunk[%d] of size %ld at %.0f offset=%.0f\n",
-				i, (long)len, (double)offset2, (double)offset);
+				"chunk[%d] of size %ld at %.0f offset=%.0f%s\n",
+				i, (long)len, (double)offset2, (double)offset,
+				updating_basis_or_equiv && offset == offset2 ? " (seek)" : "");
 		}
 
 		if (mapbuf) {
