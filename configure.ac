@@ -46,7 +46,7 @@ AC_DEFINE([_GNU_SOURCE], 1,
           [Define _GNU_SOURCE so that we get all necessary prototypes])
 
 if test x"$ac_cv_prog_cc_stdc" = x"no"; then
-	AC_MSG_WARN([rsync requires an ANSI C compiler and you don't seem to have one])
+	AC_MSG_WARN([rsync requires an ANSI C compiler and you do not seem to have one])
 fi
 
 AC_ARG_ENABLE(profile,
@@ -199,7 +199,7 @@ ipv6trylibc=yes
 
 AC_ARG_ENABLE(ipv6,
 	AC_HELP_STRING([--disable-ipv6],
-		[don't even try to use IPv6]))
+		[do not even try to use IPv6]))
 if test x"$enable_ipv6" != x"no"; then
 	AC_MSG_CHECKING([ipv6 stack type])
 	for i in inria kame linux-glibc linux-inet6 solaris toshiba v6d zeta cygwin; do
@@ -313,7 +313,7 @@ AC_ARG_ENABLE([locale],
 	AC_HELP_STRING([--disable-locale],
 		[disable locale features]))
 AH_TEMPLATE([CONFIG_LOCALE],
-[Undefine if you don't want locale features.  By default this is defined.])
+[Undefine if you do not want locale features.  By default this is defined.])
 if test x"$enable_locale" != x"no"; then
 	AC_DEFINE(CONFIG_LOCALE)
 fi
@@ -981,6 +981,7 @@ else
 	AC_MSG_RESULT(Using Linux xattrs)
 	AC_DEFINE(HAVE_LINUX_XATTRS, 1, [True if you have Linux xattrs])
 	AC_DEFINE(SUPPORT_XATTRS, 1)
+	AC_DEFINE(NO_SYMLINK_XATTRS, 1, [True if symlinks do not support xattrs])
 	;;
     darwin*)
 	AC_MSG_RESULT(Using OS X xattrs)
@@ -996,7 +997,7 @@ else
 	AC_MSG_RESULT(Using Solaris xattrs)
 	AC_DEFINE(HAVE_SOLARIS_XATTRS, 1, [True if you have Solaris xattrs])
 	AC_DEFINE(SUPPORT_XATTRS, 1)
-	AC_DEFINE(NO_SYMLINK_XATTRS, 1, [True if symlinks don't support xattrs])
+	AC_DEFINE(NO_SYMLINK_XATTRS, 1)
 	;;
     *)
 	if test x"$enable_xattr_support" = x"yes"; then
