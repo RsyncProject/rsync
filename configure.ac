@@ -46,7 +46,7 @@ AC_DEFINE([_GNU_SOURCE], 1,
           [Define _GNU_SOURCE so that we get all necessary prototypes])
 
 if test x"$ac_cv_prog_cc_stdc" = x"no"; then
-	AC_MSG_WARN([rsync requires an ANSI C compiler and you don't seem to have one])
+	AC_MSG_WARN([rsync requires an ANSI C compiler and you do not seem to have one])
 fi
 
 AC_ARG_ENABLE(profile,
@@ -193,7 +193,7 @@ ipv6trylibc=yes
 
 AC_ARG_ENABLE(ipv6,
 	AC_HELP_STRING([--disable-ipv6],
-		[don't even try to use IPv6]))
+		[do not even try to use IPv6]))
 if test x"$enable_ipv6" != x"no"; then
 	AC_MSG_CHECKING([ipv6 stack type])
 	for i in inria kame linux-glibc linux-inet6 solaris toshiba v6d zeta cygwin; do
@@ -307,7 +307,7 @@ AC_ARG_ENABLE([locale],
 	AC_HELP_STRING([--disable-locale],
 		[disable locale features]))
 AH_TEMPLATE([CONFIG_LOCALE],
-[Undefine if you don't want locale features.  By default this is defined.])
+[Undefine if you do not want locale features.  By default this is defined.])
 if test x"$enable_locale" != x"no"; then
 	AC_DEFINE(CONFIG_LOCALE)
 fi
