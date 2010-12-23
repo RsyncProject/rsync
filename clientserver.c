@@ -259,7 +259,10 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 		if (strncmp(*argv, modname, modlen) == 0
 		 && argv[0][modlen] == '\0')
 			sargs[sargc++] = modname; /* we send "modname/" */
-		else
+		else if (**argv == '-') {
+			if (asprintf(sargs + sargc++, "./%s", *argv) < 0)
+				out_of_memory("start_inband_exchange");
+		} else
 			sargs[sargc++] = *argv;
 		argv++;
 		argc--;
