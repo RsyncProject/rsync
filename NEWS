@@ -4,11 +4,14 @@ Changes since 3.0.7:
 
   BUG FIXES:
 
-    - Fixed a buffer-overflow issue where a directory path that is exactly
-      MAXPATHLEN was not handled correctly.
+    - Fixed two buffer-overflow issues: one where a directory path that is
+      exactly MAXPATHLEN was not handled correctly, and one handling a
+      --backup-dir that is extra extra large.
 
     - Fixed a potential crash when an rsync daemon has a filter/exclude list
       and the transfer is using ACLs or extended attributes.
+
+    - Properly handle requesting remote filenames that start with a dash.
 
     - Fixed a bug in the comparing of upper-case letters in file suffixes for
       --skip-compress.
@@ -28,7 +31,27 @@ Changes since 3.0.7:
       hashing is working right, and to supply more information if the hard-link
       code fails.
 
+    - The --inplace code was improved to not search for an impossible checksum
+      position.  The quadruple-verbose chunk[N] message will now mention when
+      an inplace chunk was handled by a seek rather than a read+write.
+
+    - If we fail to connect to an rsync daemon, report all the connection
+      errors (e.g. ipv4 & ipv6), not just the last one.
+
+    - Fixed an issue where an xattr and/or acl transfer that used an alt-dest
+      option (e.g. --link-dest) could output an error trying to itemize the
+      changes against the alt-dest directory's xattr/acl info but was instead
+      tryring to access the not-yet-existing new destination directory.
+
+    - Improved xattr system-error messages to mention the full path to the
+      file.
+
     - Improved the unsafe-symlink errors messages.
+
+    - Fixed a bug setting xattrs on new files that aren't user writable.
+
+    - Fixed a bug with --fake-super when copying files and dirs that aren't
+      user writable.
 
     - Fix the popt arg parsing so that an option that doesn't take an arg will
       reject an attempt to supply and arg.
