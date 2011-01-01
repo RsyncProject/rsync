@@ -182,7 +182,7 @@ int open_socket_out(char *host, int port, const char *bind_addr,
 		    int af_hint)
 {
 	int type = SOCK_STREAM;
-	int error, s;
+	int error, s, j, addr_cnt, *errnos;
 	struct addrinfo hints, *res0, *res;
 	char portbuf[10];
 	char *h, *cp;
@@ -244,12 +244,17 @@ int open_socket_out(char *host, int port, const char *bind_addr,
 		return -1;
 	}
 
+	for (res = res0, addr_cnt = 0; res; res = res->ai_next, addr_cnt++) {}
+	errnos = new_array0(int, addr_cnt);
+	if (!errnos)
+		out_of_memory("open_socket_out");
+
 	s = -1;
 	/* Try to connect to all addresses for this machine until we get
 	 * through.  It might e.g. be multi-homed, or have both IPv4 and IPv6
 	 * addresses.  We need to create a socket for each record, since the
 	 * address record tells us what protocol to use to try to connect. */
-	for (res = res0; res; res = res->ai_next) {
+	for (res = res0, j = 0; res; res = res->ai_next, j++) {
 		s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 		if (s < 0)
 			continue;
@@ -280,8 +285,10 @@ int open_socket_out(char *host, int port, const char *bind_addr,
 		if (connect_timeout > 0)
 			alarm(0);
 
-		if (s < 0)
+		if (s < 0) {
+			errnos[j] = errno;
 			continue;
+		}
 
 		if (proxied
 		 && establish_proxy_connection(s, host, port,
@@ -293,10 +300,21 @@ int open_socket_out(char *host, int port, const char *bind_addr,
 		break;
 	}
 	freeaddrinfo(res0);
+
 	if (s < 0) {
-		rsyserr(FERROR, errno, "failed to connect to %s", h);
-		return -1;
+		char buf[2048];
+		for (res = res0, j = 0; res; res = res->ai_next, j++) {
+			if (errnos[j] == 0)
+				continue;
+			if (inet_ntop(res->ai_family, res->ai_addr->sa_data + 2, buf, sizeof buf) == NULL)
+				strlcpy(buf, "*inet_ntop failed*", sizeof buf);
+			rsyserr(FERROR, errnos[j], "failed to connect to %s (%s)", h, buf);
+		}
+		s = -1;
 	}
+
+	free(errnos);
+
 	return s;
 }
 
