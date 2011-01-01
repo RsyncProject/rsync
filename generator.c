@@ -1282,6 +1282,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		goto cleanup;
 	}
 
+	fnamecmp = fname;
+
 	if (is_dir) {
 		if (!implied_dirs && file->flags & FLAG_IMPLIED_DIR)
 			goto cleanup;
@@ -1329,11 +1331,13 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				itemizing = 0;
 				code = FNONE;
 				statret = 1;
-			} else if (j >= 0)
+			} else if (j >= 0) {
 				statret = 1;
+				fnamecmp = fnamecmpbuf;
+			}
 		}
 		if (itemizing && f_out != -1) {
-			itemize(fname, file, ndx, statret, &sx,
+			itemize(fnamecmp, file, ndx, statret, &sx,
 				statret ? ITEM_LOCAL_CHANGE : 0, 0, NULL);
 		}
 		if (real_ret != 0 && do_mkdir(fname,file->mode) < 0 && errno != EEXIST) {
@@ -1590,7 +1594,6 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		goto cleanup;
 	}
 
-	fnamecmp = fname;
 	fnamecmp_type = FNAMECMP_FNAME;
 
 	if (statret == 0 && !S_ISREG(sx.st.st_mode)) {
