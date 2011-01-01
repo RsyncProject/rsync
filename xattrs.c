@@ -138,7 +138,7 @@ static ssize_t get_xattr_names(const char *fname)
 		  got_error:
 			rsyserr(FERROR_XFER, errno,
 				"get_xattr_names: llistxattr(\"%s\",%.0f) failed",
-				fname, arg);
+				full_fname(fname), arg);
 			return -1;
 		}
 		list_len = sys_llistxattr(fname, NULL, 0);
@@ -174,7 +174,7 @@ static char *get_xattr_data(const char *fname, const char *name, size_t *len_ptr
 			return NULL;
 		rsyserr(FERROR_XFER, errno,
 			"get_xattr_data: lgetxattr(\"%s\",\"%s\",0) failed",
-			fname, name);
+			full_fname(fname), name);
 		return NULL;
 	}
 
@@ -191,11 +191,11 @@ static char *get_xattr_data(const char *fname, const char *name, size_t *len_ptr
 			if (len == (size_t)-1) {
 				rsyserr(FERROR_XFER, errno,
 				    "get_xattr_data: lgetxattr(\"%s\",\"%s\",%ld)"
-				    " failed", fname, name, (long)datum_len);
+				    " failed", full_fname(fname), name, (long)datum_len);
 			} else {
 				rprintf(FERROR_XFER,
 				    "get_xattr_data: lgetxattr(\"%s\",\"%s\",%ld)"
-				    " returned %ld\n", fname, name,
+				    " returned %ld\n", full_fname(fname), name,
 				    (long)datum_len, (long)len);
 			}
 			free(ptr);
@@ -322,7 +322,7 @@ int copy_xattrs(const char *source, const char *dest)
 			int save_errno = errno ? errno : EINVAL;
 			rsyserr(FERROR_XFER, errno,
 				"copy_xattrs: lsetxattr(\"%s\",\"%s\") failed",
-				dest, name);
+				full_fname(dest), name);
 			errno = save_errno;
 			return -1;
 		}
@@ -807,7 +807,7 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 			else if (sys_lsetxattr(fname, name, ptr, len) < 0) {
 				rsyserr(FERROR_XFER, errno,
 					"rsync_xal_set: lsetxattr(\"%s\",\"%s\") failed",
-					fname, name);
+					full_fname(fname), name);
 				ret = -1;
 			} else /* make sure caller sets mtime */
 				sxp->st.st_mtime = (time_t)-1;
@@ -828,7 +828,7 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 		if (sys_lsetxattr(fname, name, rxas[i].datum, rxas[i].datum_len) < 0) {
 			rsyserr(FERROR_XFER, errno,
 				"rsync_xal_set: lsetxattr(\"%s\",\"%s\") failed",
-				fname, name);
+				full_fname(fname), name);
 			ret = -1;
 		} else /* make sure caller sets mtime */
 			sxp->st.st_mtime = (time_t)-1;
@@ -858,7 +858,7 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 			if (sys_lremovexattr(fname, name) < 0) {
 				rsyserr(FERROR_XFER, errno,
 					"rsync_xal_set: lremovexattr(\"%s\",\"%s\") failed",
-					fname, name);
+					full_fname(fname), name);
 				ret = -1;
 			} else /* make sure caller sets mtime */
 				sxp->st.st_mtime = (time_t)-1;
@@ -901,7 +901,7 @@ int set_xattr_acl(const char *fname, int is_access_acl, const char *buf, size_t 
 	if (sys_lsetxattr(fname, name, buf, buf_len) < 0) {
 		rsyserr(FERROR_XFER, errno,
 			"set_xattr_acl: lsetxattr(\"%s\",\"%s\") failed",
-			fname, name);
+			full_fname(fname), name);
 		return -1;
 	}
 	return 0;
