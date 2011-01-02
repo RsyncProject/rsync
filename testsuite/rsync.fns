@@ -222,7 +222,7 @@ checkit() {
     eval "$1" 
     status=$?
     if [ $status != 0 ]; then
-	failed="YES";
+	failed="$failed status=$status"
     fi
 
     echo "-------------"
@@ -230,7 +230,7 @@ checkit() {
     echo ""
     ( cd "$2" && rsync_ls_lR . ) > "$tmpdir/ls-from"
     ( cd "$3" && rsync_ls_lR . ) > "$tmpdir/ls-to"
-    diff $diffopt "$tmpdir/ls-from" "$tmpdir/ls-to" || failed=YES
+    diff $diffopt "$tmpdir/ls-from" "$tmpdir/ls-to" || failed="$failed dir-diff"
 
     echo "-------------"
     echo "check how the files compare with diff:"
@@ -238,15 +238,16 @@ checkit() {
     if [ "x$4" != x ]; then
 	echo "  === Skipping (as directed) ==="
     else
-	diff -r $diffopt "$2" "$3" || failed=YES
+	diff -r $diffopt "$2" "$3" || failed="$failed file-diff"
     fi
 
     echo "-------------"
     if [ -z "$failed" ] ; then
 	return 0
-    else
-	return 1
     fi
+
+    echo "Failed: $failed"
+    return 1
 }
 
 
