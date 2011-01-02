@@ -963,7 +963,10 @@ see the bf(--inplace) option for more caveats).
 If incremental recursion is active (see bf(--recursive)), rsync may transfer
 a missing hard-linked file before it finds that another link for that contents
 exists elsewhere in the hierarchy.  This does not affect the accuracy of
-the transfer, just its efficiency.  One way to avoid this is to disable
+the transfer (i.e. which files are hard-linked together), just its efficiency
+(i.e. copying the data for a new, early copy of a hard-linked file that could
+have been found later in the transfer in another member of the hard-linked
+set of files).  One way to avoid this inefficiency is to disable
 incremental recursion using the bf(--no-inc-recursive) option.
 
 dit(bf(-p, --perms)) This option causes the receiving rsync to set the
