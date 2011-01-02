@@ -781,7 +781,9 @@ quote(itemization(
   it() The file's data will be in an inconsistent state during the transfer
   and will be left that way if the transfer is interrupted or if an update
   fails.
-  it() A file that does not have write permissions cannot be updated.
+  it() A file that rsync cannot write to cannot be updated. While a super user
+  can update any file, a normal user needs to be granted write permission for
+  the open of the file for writing to be successful.
   it() The efficiency of rsync's delta-transfer algorithm may be reduced if
   some data in the destination file is overwritten before it can be copied to
   a position later in the file.  This does not apply if you use bf(--backup),
@@ -794,7 +796,8 @@ accessed by others, so be careful when choosing to use this for a copy.
 
 This option is useful for transferring large files with block-based changes
 or appended data, and also on systems that are disk bound, not network
-bound.
+bound.  It can also help keep a copy-on-write filesystem snapshot from
+diverging the entire contents of a file that only has minor changes.
 
 The option implies bf(--partial) (since an interrupted transfer does not delete
 the file), but conflicts with bf(--partial-dir) and bf(--delay-updates).
