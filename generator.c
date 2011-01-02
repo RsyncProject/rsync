@@ -1285,8 +1285,15 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	fnamecmp = fname;
 
 	if (is_dir) {
+		mode_t added_perms;
 		if (!implied_dirs && file->flags & FLAG_IMPLIED_DIR)
 			goto cleanup;
+		if (am_root < 0) {
+			/* For --fake-super, the dir must be useable by the copying
+			 * user, just like it would be for root. */
+			added_perms = S_IRUSR|S_IWUSR|S_IXUSR;
+		} else
+			added_perms = 0;
 		if (is_dir < 0) {
 			/* In inc_recurse mode we want to make sure any missing
 			 * directories get created while we're still processing
@@ -1297,7 +1304,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			 && (S_ISDIR(sx.st.st_mode)
 			  || delete_item(fname, sx.st.st_mode, del_opts | DEL_FOR_DIR) != 0))
 				goto cleanup; /* Any errors get reported later. */
-			if (do_mkdir(fname, file->mode & 0700) == 0)
+			if (do_mkdir(fname, (file->mode|added_perms) & 0700) == 0)
 				file->flags |= FLAG_DIR_CREATED;
 			goto cleanup;
 		}
@@ -1340,10 +1347,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			itemize(fnamecmp, file, ndx, statret, &sx,
 				statret ? ITEM_LOCAL_CHANGE : 0, 0, NULL);
 		}
-		if (real_ret != 0 && do_mkdir(fname,file->mode) < 0 && errno != EEXIST) {
+		if (real_ret != 0 && do_mkdir(fname,file->mode|added_perms) < 0 && errno != EEXIST) {
 			if (!relative_paths || errno != ENOENT
 			 || make_path(fname, MKP_DROP_NAME | MKP_SKIP_SLASH) < 0
-			 || (do_mkdir(fname, file->mode) < 0 && errno != EEXIST)) {
+			 || (do_mkdir(fname, file->mode|added_perms) < 0 && errno != EEXIST)) {
 				rsyserr(FERROR_XFER, errno,
 					"recv_generator: mkdir %s failed",
 					full_fname(fname));
