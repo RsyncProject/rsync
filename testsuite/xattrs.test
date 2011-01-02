@@ -48,7 +48,9 @@ makepath "$chkdir/foo"
 echo wow >"$chkdir/file1"
 cp_touch "$fromdir/foo/file3" "$chkdir/foo"
 
-files='foo file0 file1 file2 foo/file3 file4 foo/bar foo/bar/file5'
+dirs='foo foo/bar'
+files='file0 file1 file2 foo/file3 file4 foo/bar/file5'
+
 uid_gid=`"$TOOLDIR/tls" "$fromdir/foo" | sed 's/^.* \([0-9][0-9]*\)\.\([0-9][0-9]*\) .*/\1:\2/'`
 
 cd "$fromdir"
@@ -80,32 +82,32 @@ xset user.extra 'remove me' "$chkdir/file1"
 xset user.foo 'old foo' "$chkdir/foo/file3"
 xset $RUSR.equal 'this long attribute should remain the same and not need to be transferred' "$chkdir/foo/file3"
 
-xls $files >"$scratchdir/xattrs.txt"
+xls $dirs $files >"$scratchdir/xattrs.txt"
 
 # OK, let's try a simple xattr copy.
 checkit "$RSYNC -avX --super . '$chkdir/'" "$fromdir" "$chkdir"
 
 cd "$chkdir"
-xls $files | diff $diffopt "$scratchdir/xattrs.txt" -
+xls $dirs $files | diff $diffopt "$scratchdir/xattrs.txt" -
 
 cd "$fromdir"
 
 checkit "$RSYNC -aiX --super --copy-dest=../chk . ../to" "$fromdir" "$todir"
 
 cd "$todir"
-xls $files | diff $diffopt "$scratchdir/xattrs.txt" -
+xls $dirs $files | diff $diffopt "$scratchdir/xattrs.txt" -
 
 cd "$fromdir"
 rm -rf "$todir"
 
 xset user.nice 'this is nice, but different' file1
 
-xls $files >"$scratchdir/xattrs.txt"
+xls $dirs $files >"$scratchdir/xattrs.txt"
 
 checkit "$RSYNC -aiX --fake-super --link-dest=../chk . ../to" "$chkdir" "$todir"
 
 cd "$todir"
-xls $files | diff $diffopt "$scratchdir/xattrs.txt" -
+xls $dirs $files | diff $diffopt "$scratchdir/xattrs.txt" -
 
 sed -n -e '/^[^ ][^ ]*  *[^ ][^ ]*  *[^ ][^ ]*  *1 /p' "$scratchdir/ls-to" >"$scratchdir/ls-diff-all"
 fgrep -v './file1' "$scratchdir/ls-diff-all" >"$scratchdir/ls-diff" || :
@@ -120,13 +122,13 @@ if [ ! -s "$scratchdir/ls-diff-all" ]; then
 fi
 
 cd "$chkdir"
-chmod go-rwx . $files
+chmod go-rwx . $dirs $files
 
 xset user.nice 'this is nice, but different' file1
+xset user.rsync.%stat "40000 0,0 $uid_gid" $dirs
 xset user.rsync.%stat "100000 0,0 $uid_gid" $files
-xset user.rsync.%stat "40000 0,0 $uid_gid" foo foo/bar
 
-xls $files >"$scratchdir/xattrs.txt"
+xls $dirs $files >"$scratchdir/xattrs.txt"
 
 cd "$fromdir"
 rm -rf "$todir"
@@ -135,7 +137,7 @@ rm -rf "$todir"
 checkit "$RSYNC -aiX --fake-super --chmod=a= . ../to" "$chkdir" "$todir" # 2>"$scratchdir/errors.txt"
 
 cd "$todir"
-xls $files | diff $diffopt "$scratchdir/xattrs.txt" -
+xls $dirs $files | diff $diffopt "$scratchdir/xattrs.txt" -
 
 cd "$fromdir"
 rm -rf "$todir" "$chkdir"
