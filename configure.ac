@@ -987,6 +987,8 @@ else
 	AC_MSG_RESULT(Using OS X xattrs)
 	AC_DEFINE(HAVE_OSX_XATTRS, 1, [True if you have Mac OS X xattrs])
 	AC_DEFINE(SUPPORT_XATTRS, 1)
+	AC_DEFINE(NO_DEVICE_XATTRS, 1, [True if device files do not support xattrs])
+	AC_DEFINE(NO_SPECIAL_XATTRS, 1, [True if special files do not support xattrs])
 	;;
     freebsd*)
 	AC_MSG_RESULT(Using FreeBSD extattrs)

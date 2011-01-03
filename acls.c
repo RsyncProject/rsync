@@ -31,6 +31,8 @@ extern int list_only;
 extern int orig_umask;
 extern int numeric_ids;
 extern int inc_recurse;
+extern int preserve_devices;
+extern int preserve_specials;
 
 /* Flags used to indicate what items are being transmitted for an entry. */
 #define XMIT_USER_OBJ (1<<0)
@@ -537,6 +539,23 @@ static int get_rsync_acl(const char *fname, rsync_acl *racl,
 int get_acl(const char *fname, stat_x *sxp)
 {
 	sxp->acc_acl = create_racl();
+
+	if (S_ISREG(sxp->st.st_mode) || S_ISDIR(sxp->st.st_mode)) {
+		/* Everyone supports this. */
+	} else if (S_ISLNK(sxp->st.st_mode)) {
+		return 0;
+	} else if (IS_SPECIAL(sxp->st.st_mode)) {
+#ifndef NO_SPECIAL_ACLS
+		if (!preserve_specials)
+#endif
+			return 0;
+	} else if (IS_DEVICE(sxp->st.st_mode)) {
+#ifndef NO_DEVICE_ACLS
+		if (!preserve_devices)
+#endif
+			return 0;
+	}
+
 	if (get_rsync_acl(fname, sxp->acc_acl, SMB_ACL_TYPE_ACCESS,
 			  sxp->st.st_mode) < 0) {
 		free_acl(sxp);
