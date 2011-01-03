@@ -1429,6 +1429,7 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 #endif
 #ifdef SUPPORT_XATTRS
 		if (preserve_xattrs) {
+			sx.st.st_mode = file->mode;
 			sx.xattr = NULL;
 			if (get_xattr(fname, &sx) < 0) {
 				io_error |= IOERR_GENERAL;
