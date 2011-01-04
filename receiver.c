@@ -64,31 +64,29 @@ static flist_ndx_list batch_redo_list;
 /* We're either updating the basis file or an identical copy: */
 static int updating_basis_or_equiv;
 
-/*
- * get_tmpname() - create a tmp filename for a given filename
- *
- *   If a tmpdir is defined, use that as the directory to
- *   put it in.  Otherwise, the tmp filename is in the same
- *   directory as the given name.  Note that there may be no
- *   directory at all in the given name!
- *
- *   The tmp filename is basically the given filename with a
- *   dot prepended, and .XXXXXX appended (for mkstemp() to
- *   put its unique gunk in).  Take care to not exceed
- *   either the MAXPATHLEN or NAME_MAX, esp. the last, as
- *   the basename basically becomes 8 chars longer. In that
- *   case, the original name is shortened sufficiently to
- *   make it all fit.
- *
- *   Of course, there's no real reason for the tmp name to
- *   look like the original, except to satisfy us humans.
- *   As long as it's unique, rsync will work.
- */
+#define TMPNAME_SUFFIX ".XXXXXX"
+#define TMPNAME_SUFFIX_LEN ((int)sizeof TMPNAME_SUFFIX - 1)
 
+/* get_tmpname() - create a tmp filename for a given filename
+ *
+ * If a tmpdir is defined, use that as the directory to put it in.  Otherwise,
+ * the tmp filename is in the same directory as the given name.  Note that
+ * there may be no directory at all in the given name!
+ *
+ * The tmp filename is basically the given filename with a dot prepended, and
+ * .XXXXXX appended (for mkstemp() to put its unique gunk in).  We take care
+ * to not exceed either the MAXPATHLEN or NAME_MAX, especially the last, as
+ * the basename basically becomes 8 characters longer.  In such a case, the
+ * original name is shortened sufficiently to make it all fit.
+ *
+ * Of course, the only reason the file is based on the original name is to
+ * make it easier to figure out what purpose a temp file is serving when a
+ * transfer is in progress. */
 int get_tmpname(char *fnametmp, const char *fname)
 {
 	int maxname, added, length = 0;
 	const char *f;
+	char *suf;
 
 	if (tmpdir) {
 		/* Note: this can't overflow, so the return value is safe */
@@ -108,8 +106,9 @@ int get_tmpname(char *fnametmp, const char *fname)
 	fnametmp[length++] = '.';
 
 	/* The maxname value is bufsize, and includes space for the '\0'.
-	 * (Note that NAME_MAX get -8 for the leading '.' above.) */
-	maxname = MIN(MAXPATHLEN - 7 - length, NAME_MAX - 8);
+	 * NAME_MAX needs an extra -1 for the name's leading dot. */
+	maxname = MIN(MAXPATHLEN - length - TMPNAME_SUFFIX_LEN,
+		      NAME_MAX - 1 - TMPNAME_SUFFIX_LEN);
 
 	if (maxname < 1) {
 		rprintf(FERROR_XFER, "temporary filename too long: %s\n", fname);
@@ -120,7 +119,17 @@ int get_tmpname(char *fnametmp, const char *fname)
 	added = strlcpy(fnametmp + length, f, maxname);
 	if (added >= maxname)
 		added = maxname - 1;
-	memcpy(fnametmp + length + added, ".XXXXXX", 8);
+	suf = fnametmp + length + added;
+
+	/* Trim any dangling high-bit chars if the first-trimmed char (if any) is
+	 * also a high-bit char, just in case we cut into a multi-byte sequence.
+	 * We are guaranteed to stop because of the leading '.' we added. */
+	if ((int)f[added] & 0x80) {
+		while ((int)suf[-1] & 0x80)
+			suf--;
+	}
+
+	memcpy(suf, TMPNAME_SUFFIX, TMPNAME_SUFFIX_LEN+1);
 
 	return 1;
 }
