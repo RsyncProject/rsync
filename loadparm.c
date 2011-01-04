@@ -97,6 +97,7 @@ typedef struct {
 	char *pid_file;
 	char *socket_options;
 
+	int listen_backlog;
 	int rsync_port;
 } global_vars;
 
@@ -175,6 +176,7 @@ static const all_vars Defaults = {
  /* pid_file; */		NULL,
  /* socket_options; */		NULL,
 
+ /* listen_backlog; */		5,
  /* rsync_port; */		0,
  },
 
@@ -311,6 +313,7 @@ static struct enum_list enum_facilities[] = {
 static struct parm_struct parm_table[] =
 {
  {"address",           P_STRING, P_GLOBAL,&Vars.g.bind_address,        NULL,0},
+ {"listen backlog",    P_INTEGER,P_GLOBAL,&Vars.g.listen_backlog,      NULL,0},
  {"motd file",         P_STRING, P_GLOBAL,&Vars.g.motd_file,           NULL,0},
  {"pid file",          P_STRING, P_GLOBAL,&Vars.g.pid_file,            NULL,0},
  {"port",              P_INTEGER,P_GLOBAL,&Vars.g.rsync_port,          NULL,0},
@@ -445,6 +448,7 @@ FN_GLOBAL_STRING(lp_motd_file, &Vars.g.motd_file)
 FN_GLOBAL_STRING(lp_pid_file, &Vars.g.pid_file)
 FN_GLOBAL_STRING(lp_socket_options, &Vars.g.socket_options)
 
+FN_GLOBAL_INTEGER(lp_listen_backlog, &Vars.g.listen_backlog)
 FN_GLOBAL_INTEGER(lp_rsync_port, &Vars.g.rsync_port)
 
 FN_LOCAL_STRING(lp_auth_users, auth_users)

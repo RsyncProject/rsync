@@ -546,7 +546,7 @@ void start_accept_loop(int port, int (*fn)(int, int))
 	/* ready to listen */
 	FD_ZERO(&deffds);
 	for (i = 0, maxfd = -1; sp[i] >= 0; i++) {
-		if (listen(sp[i], 5) < 0) {
+		if (listen(sp[i], lp_listen_backlog()) < 0) {
 			rsyserr(FERROR, errno, "listen() on socket failed");
 #ifdef INET6
 			if (errno == EADDRINUSE && i > 0) {

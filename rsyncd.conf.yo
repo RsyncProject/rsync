@@ -120,6 +120,9 @@ details on some of the options you may be able to set. By default no
 special socket options are set.  These settings can also be specified
 via the bf(--sockopts) command-line option.
 
+dit(bf(listen backlog)) You can override the default backlog value when the
+daemon listens for connections.  It defaults to 5.
+
 enddit()
 
 manpagesection(MODULE PARAMETERS)
