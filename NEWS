@@ -77,6 +77,9 @@ Changes since 3.0.4:
     - Added the "reverse lookup" parameter to the rsync daemon config file to
       allow reverse-DNS lookups to be disabled.
 
+    - Added a forward-DNS lookup for the daemon's hosts allow/deny config.  Can
+      be disabled via "forward lookup" parameter (defaults to enabled).
+
     - Added a way for more than one group to be specified in the daemon's
       config file, including a way to specify that you want all of the
       specified user's groups without having to name them.  Also changed the

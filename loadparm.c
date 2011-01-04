@@ -139,6 +139,7 @@ typedef struct {
 	int timeout;
 
 	BOOL fake_super;
+	BOOL forward_lookup;
 	BOOL ignore_errors;
 	BOOL ignore_nonreadable;
 	BOOL list;
@@ -211,6 +212,7 @@ static const all_vars Defaults = {
  /* timeout; */			0,
 
  /* fake_super; */		False,
+ /* forward_lookup; */		True,
  /* ignore_errors; */		False,
  /* ignore_nonreadable; */	False,
  /* list; */			True,
@@ -322,6 +324,7 @@ static struct parm_struct parm_table[] =
  {"exclude",           P_STRING, P_LOCAL, &Vars.l.exclude,             NULL,0},
  {"fake super",        P_BOOL,   P_LOCAL, &Vars.l.fake_super,          NULL,0},
  {"filter",            P_STRING, P_LOCAL, &Vars.l.filter,              NULL,0},
+ {"forward lookup",    P_BOOL,   P_LOCAL, &Vars.l.forward_lookup,      NULL,0},
  {"gid",               P_STRING, P_LOCAL, &Vars.l.gid,                 NULL,0},
  {"hosts allow",       P_STRING, P_LOCAL, &Vars.l.hosts_allow,         NULL,0},
  {"hosts deny",        P_STRING, P_LOCAL, &Vars.l.hosts_deny,          NULL,0},
@@ -476,6 +479,7 @@ FN_LOCAL_INTEGER(lp_syslog_facility, syslog_facility)
 FN_LOCAL_INTEGER(lp_timeout, timeout)
 
 FN_LOCAL_BOOL(lp_fake_super, fake_super)
+FN_LOCAL_BOOL(lp_forward_lookup, forward_lookup)
 FN_LOCAL_BOOL(lp_ignore_errors, ignore_errors)
 FN_LOCAL_BOOL(lp_ignore_nonreadable, ignore_nonreadable)
 FN_LOCAL_BOOL(lp_list, list)

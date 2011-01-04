@@ -532,13 +532,14 @@ quote(itemization(
   IP address and maskaddr is the netmask in dotted decimal notation for IPv4,
   or similar for IPv6, e.g. ffff:ffff:ffff:ffff:: instead of /64. All IP
   addresses which match the masked IP address will be allowed in.
-  it() a hostname. The hostname as determined by a reverse lookup will
-  be matched (case insensitive) against the pattern. Only an exact
-  match is allowed in.  This only works if "reverse lookup" is enabled
-  (the default).
-  it() a hostname pattern using wildcards. These are matched using the
-  same rules as normal unix filename matching. If the pattern matches
-  then the client is allowed in.
+  it() a hostname pattern using wildcards. If the hostname of the connecting IP
+  (as determined by a reverse lookup) matches the wildcarded name (using the
+  same rules as normal unix filename matching), the client is allowed in.  This
+  only works if "reverse lookup" is enabled (the default).
+  it() a hostname. A plain hostname is matched against the reverse DNS of the
+  connecting IP (if "reverse lookup" is enabled), and/or the IP of the given
+  hostname is matched against the connecting IP (if "forward lookup" is
+  enabled, as it is by default).  Any match will be allowed in.
 ))
 
 Note IPv6 link-local addresses can have a scope in the address specification:
@@ -577,6 +578,11 @@ If this parameter is enabled globally (even by default), rsync performs the
 lookup as soon as a client connects, so disabling it for a module will not
 avoid the lookup.  Thus, you probably want to disable it globally and then
 enable it for modules that need the information.
+
+dit(bf(forward lookup)) Controls whether the daemon performs a forward lookup
+on any hostname specified in an hosts allow/deny setting.  By default this is
+enabled, allowing the use of an explicit hostname that would not be returned
+by reverse DNS of the connecting IP.
 
 dit(bf(ignore errors)) This parameter tells rsyncd to
 ignore I/O errors on the daemon when deciding whether to run the delete

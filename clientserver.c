@@ -515,7 +515,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	set_env_str("RSYNC_HOST_NAME", host);
 	set_env_str("RSYNC_HOST_ADDR", addr);
 
-	if (!allow_access(addr, host, lp_hosts_allow(i), lp_hosts_deny(i))) {
+	if (!allow_access(addr, &host, i)) {
 		rprintf(FLOG, "rsync denied on module %s from %s (%s)\n",
 			name, host, addr);
 		if (!lp_list(i))
