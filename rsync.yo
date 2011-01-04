@@ -1491,6 +1491,12 @@ bf(--files-from) filenames are being sent from one host to another, the
 filenames will be translated from the sending host's charset to the
 receiving host's charset.
 
+NOTE: sorting the list of files in the --files-from input helps rsync to be
+more efficient, as it will avoid re-visiting the path elements that are shared
+between adjacent entries.  If the input is not sorted, some path elements
+(implied directories) may end up being scanned multiple times, and rsync will
+eventually unduplicate them after they get turned into file-list elements.
+
 dit(bf(-0, --from0)) This tells rsync that the rules/filenames it reads from a
 file are terminated by a null ('\0') character, not a NL, CR, or CR+LF.
 This affects bf(--exclude-from), bf(--include-from), bf(--files-from), and any
