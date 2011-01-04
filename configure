@@ -8,6 +8,8 @@ realconfigure="$dir/configure.sh"
 
 if test ! -f "$realconfigure"; then
     if test -f "$HOME/build_farm/build_test.fns"; then
+	# Test the included popt
+	set -- --with-included-popt "${@}"
 	# Allow the build farm to grab latest files via rsync.
 	actions='build fetch'
     else
