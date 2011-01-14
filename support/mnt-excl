@@ -24,7 +24,8 @@
 # can exclude some absolute paths from the transfer based on the mount
 # dirs.  For instance:
 #
-# awk '{print $2}' /proc/mounts | rsync -avf 'merge,/- -' /dir host:/dest/
+# awk '{print $2}' /proc/mounts | grep -v '^/$' | \
+#   rsync -avf 'merge,/- -' /dir host:/dest/
 
 use strict;
 use warnings;
@@ -32,8 +33,9 @@ use Cwd 'abs_path';
 
 my $file = '/proc/mounts';
 my $dir = shift || '/';
-$dir = abs_path($dir);
-$dir =~ s#([^/]*)$##;
+my $trailing_slash = $dir =~ m{./$} ? '/' : '';
+$dir = abs_path($dir) . $trailing_slash;
+$dir =~ s{([^/]*)$}{};
 my $trailing = $1;
 $trailing = '' if $trailing eq '.' || !-d "$dir$trailing";
 $trailing .= '/' if $trailing ne '';
@@ -41,7 +43,7 @@ $trailing .= '/' if $trailing ne '';
 open(IN, $file) or die "Unable to open $file: $!\n";
 while (<IN>) {
     $_ = (split)[1];
-    next unless s#^\Q$dir$trailing\E##o && $_ ne '';
+    next unless s{^\Q$dir$trailing\E}{}o && $_ ne '';
     print "- /$trailing$_\n";
 }
 close IN;
