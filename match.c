@@ -91,8 +91,7 @@ static void build_hash_table(struct sum_struct *s)
 static OFF_T last_match;
 
 
-/**
- * Transmit a literal and/or match token.
+/* Transmit a literal and/or match token.
  *
  * This delightfully-named function is called either when we find a
  * match and need to transmit all the unmatched data leading up to it,
@@ -100,9 +99,9 @@ static OFF_T last_match;
  * transmit it.  As a result of this second case, it is called even if
  * we have not matched at all!
  *
- * @param i If >0, the number of a matched token.  If 0, indicates we
- * have only literal data.
- **/
+ * If i >= 0, the number of a matched token.  If < 0, indicates we have
+ * only literal data.  A -1 will send a 0-token-int too, and a -2 sends
+ * only literal data, w/o any token-int. */
 static void matched(int f, struct sum_struct *s, struct map_struct *buf,
 		    OFF_T offset, int32 i)
 {
@@ -245,6 +244,7 @@ static void hash_search(int f,struct sum_struct *s,
 							continue;
 						if (i2 != i) {
 							if (sum != s->sums[i2].sum1
+							 || l != s->sums[i2].len
 							 || memcmp(sum2, s->sums[i2].sum2, s->s2length) != 0)
 								break;
 							i = i2;
@@ -252,6 +252,7 @@ static void hash_search(int f,struct sum_struct *s,
 						/* This chunk remained in the same spot in the old and new file. */
 						s->sums[i].flags |= SUMFLG_SAME_OFFSET;
 						want_i = i;
+						break;
 					}
 				}
 			}
