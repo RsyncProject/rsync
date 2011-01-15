@@ -257,7 +257,11 @@ static void hash_search(int f,struct sum_struct *s,
 							 * in the sender's file, we'll output enough literal data
 							 * to re-align with the basis file, and get back to seeking
 							 * instead of writing. */
-							map = (schar *)map_ptr(buf, aligned_offset, l);
+							backup = (int32)(aligned_offset - last_match);
+							if (backup < 0)
+								backup = 0;
+							map = (schar *)map_ptr(buf, aligned_offset - backup, l + backup)
+							    + backup;
 							sum = get_checksum1((char *)map, l);
 							if (sum != s->sums[i2].sum1)
 								break;
