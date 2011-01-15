@@ -237,10 +237,11 @@ static void hash_search(int f,struct sum_struct *s,
 				/* All the generator's chunks start at blength boundaries. */
 				while (aligned_offset < offset)
 					aligned_offset += s->blength;
-				if (offset == aligned_offset) {
+				if (offset == aligned_offset
+				 || (sum == 0 && l == s->blength && aligned_offset + l <= len)) {
 					int32 i2;
 					for (i2 = i; i2 >= 0; i2 = s->sums[i2].chain) {
-						if (s->sums[i2].offset != offset)
+						if (s->sums[i2].offset != aligned_offset)
 							continue;
 						if (i2 != i) {
 							if (sum != s->sums[i2].sum1
@@ -249,9 +250,26 @@ static void hash_search(int f,struct sum_struct *s,
 								break;
 							i = i2;
 						}
+						want_i = i;
+						if (offset != aligned_offset) {
+							/* We've matched some zeros in a spot that is also zeros
+							 * further along in the basis file, if we find zeros ahead
+							 * in the sender's file, we'll output enough literal data
+							 * to re-align with the basis file, and get back to seeking
+							 * instead of writing. */
+							map = (schar *)map_ptr(buf, aligned_offset, l);
+							sum = get_checksum1((char *)map, l);
+							if (sum != s->sums[i2].sum1)
+								break;
+							get_checksum2((char *)map, l, sum2);
+							if (memcmp(sum2, s->sums[i2].sum2, s->s2length) != 0)
+								break;
+							/* OK, we have a re-alignment match.  Bump the offset
+							 * forward to the new match point. */
+							offset = aligned_offset;
+						}
 						/* This chunk remained in the same spot in the old and new file. */
 						s->sums[i].flags |= SUMFLG_SAME_OFFSET;
-						want_i = i;
 						break;
 					}
 				}
