@@ -141,7 +141,7 @@ static void hash_search(int f,struct sum_struct *s,
 			struct map_struct *buf, OFF_T len)
 {
 	OFF_T offset, aligned_offset, end;
-	int32 k, want_i, backup;
+	int32 k, want_i, aligned_i, backup;
 	char sum2[SUM_LENGTH];
 	uint32 s1, s2, sum;
 	int more;
@@ -166,7 +166,7 @@ static void hash_search(int f,struct sum_struct *s,
 	if (verbose > 3)
 		rprintf(FINFO, "sum=%.8x k=%ld\n", sum, (long)k);
 
-	offset = aligned_offset = 0;
+	offset = aligned_offset = aligned_i = 0;
 
 	end = len + 1 - s->sums[s->count-1].len;
 
@@ -234,28 +234,25 @@ static void hash_search(int f,struct sum_struct *s,
 			 * the adjacent want_i optimization. */
 			if (updating_basis_file) {
 				/* All the generator's chunks start at blength boundaries. */
-				while (aligned_offset < offset)
+				while (aligned_offset < offset) {
 					aligned_offset += s->blength;
+					aligned_i++;
+				}
 				if (offset == aligned_offset) {
-					int32 i2;
-					for (i2 = i; i2 >= 0; i2 = s->sums[i2].chain) {
-						if (s->sums[i2].offset != offset)
-							continue;
-						if (i2 != i) {
-							if (sum != s->sums[i2].sum1
-							 || l != s->sums[i2].len
-							 || memcmp(sum2, s->sums[i2].sum2, s->s2length) != 0)
-								break;
-							i = i2;
-						}
-						/* This chunk remained in the same spot in the old and new file. */
-						s->sums[i].flags |= SUMFLG_SAME_OFFSET;
-						want_i = i;
-						break;
+					if (i != aligned_i) {
+						if (sum != s->sums[aligned_i].sum1
+						 || l != s->sums[aligned_i].len
+						 || memcmp(sum2, s->sums[aligned_i].sum2, s->s2length) != 0)
+							goto check_want_i;
+						i = aligned_i;
 					}
+					/* This identical chunk is in the same spot in the old and new file. */
+					s->sums[i].flags |= SUMFLG_SAME_OFFSET;
+					want_i = i;
 				}
 			}
 
+		  check_want_i:
 			/* we've found a match, but now check to see
 			 * if want_i can hint at a better match. */
 			if (i != want_i && want_i < s->count
