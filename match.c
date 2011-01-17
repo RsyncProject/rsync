@@ -142,7 +142,7 @@ static void hash_search(int f,struct sum_struct *s,
 			struct map_struct *buf, OFF_T len)
 {
 	OFF_T offset, aligned_offset, end;
-	int32 k, want_i, backup;
+	int32 k, want_i, aligned_i, backup;
 	char sum2[SUM_LENGTH];
 	uint32 s1, s2, sum;
 	int more;
@@ -167,7 +167,7 @@ static void hash_search(int f,struct sum_struct *s,
 	if (DEBUG_GTE(DELTASUM, 3))
 		rprintf(FINFO, "sum=%.8x k=%ld\n", sum, (long)k);
 
-	offset = aligned_offset = 0;
+	offset = aligned_offset = aligned_i = 0;
 
 	end = len + 1 - s->sums[s->count-1].len;
 
@@ -235,50 +235,47 @@ static void hash_search(int f,struct sum_struct *s,
 			 * the adjacent want_i optimization. */
 			if (updating_basis_file) {
 				/* All the generator's chunks start at blength boundaries. */
-				while (aligned_offset < offset)
+				while (aligned_offset < offset) {
 					aligned_offset += s->blength;
+					aligned_i++;
+				}
 				if (offset == aligned_offset
 				 || (sum == 0 && l == s->blength && aligned_offset + l <= len)) {
-					int32 i2;
-					for (i2 = i; i2 >= 0; i2 = s->sums[i2].chain) {
-						if (s->sums[i2].offset != aligned_offset)
-							continue;
-						if (i2 != i) {
-							if (sum != s->sums[i2].sum1
-							 || l != s->sums[i2].len
-							 || memcmp(sum2, s->sums[i2].sum2, s->s2length) != 0)
-								break;
-							i = i2;
-						}
-						want_i = i;
-						if (offset != aligned_offset) {
-							/* We've matched some zeros in a spot that is also zeros
-							 * further along in the basis file, if we find zeros ahead
-							 * in the sender's file, we'll output enough literal data
-							 * to re-align with the basis file, and get back to seeking
-							 * instead of writing. */
-							backup = (int32)(aligned_offset - last_match);
-							if (backup < 0)
-								backup = 0;
-							map = (schar *)map_ptr(buf, aligned_offset - backup, l + backup)
-							    + backup;
-							sum = get_checksum1((char *)map, l);
-							if (sum != s->sums[i2].sum1)
-								break;
-							get_checksum2((char *)map, l, sum2);
-							if (memcmp(sum2, s->sums[i2].sum2, s->s2length) != 0)
-								break;
-							/* OK, we have a re-alignment match.  Bump the offset
-							 * forward to the new match point. */
-							offset = aligned_offset;
-						}
-						/* This chunk remained in the same spot in the old and new file. */
-						s->sums[i].flags |= SUMFLG_SAME_OFFSET;
-						break;
+					if (i != aligned_i) {
+						if (sum != s->sums[aligned_i].sum1
+						 || l != s->sums[aligned_i].len
+						 || memcmp(sum2, s->sums[aligned_i].sum2, s->s2length) != 0)
+							goto check_want_i;
+						i = aligned_i;
 					}
+					if (offset != aligned_offset) {
+						/* We've matched some zeros in a spot that is also zeros
+						 * further along in the basis file, if we find zeros ahead
+						 * in the sender's file, we'll output enough literal data
+						 * to re-align with the basis file, and get back to seeking
+						 * instead of writing. */
+						backup = (int32)(aligned_offset - last_match);
+						if (backup < 0)
+							backup = 0;
+						map = (schar *)map_ptr(buf, aligned_offset - backup, l + backup)
+						    + backup;
+						sum = get_checksum1((char *)map, l);
+						if (sum != s->sums[i].sum1)
+							goto check_want_i;
+						get_checksum2((char *)map, l, sum2);
+						if (memcmp(sum2, s->sums[i].sum2, s->s2length) != 0)
+							goto check_want_i;
+						/* OK, we have a re-alignment match.  Bump the offset
+						 * forward to the new match point. */
+						offset = aligned_offset;
+					}
+					/* This identical chunk is in the same spot in the old and new file. */
+					s->sums[i].flags |= SUMFLG_SAME_OFFSET;
+					want_i = i;
 				}
 			}
 
+		  check_want_i:
 			/* we've found a match, but now check to see
 			 * if want_i can hint at a better match. */
 			if (i != want_i && want_i < s->count
