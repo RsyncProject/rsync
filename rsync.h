@@ -83,8 +83,8 @@
 
 /* These flags are passed to functions but not stored. */
 
-#define FLAG_DEL_NEEDS_UID (1<<15)/* generator, but must be unique */
 #define FLAG_DIVERT_DIRS (1<<16)/* sender, but must be unique */
+#define FLAG_DEL_NEEDS_UID (1<<17)/* generator, but must be unique */
 
 /* These flags are for get_dirlist(). */
 #define GDL_IGNORE_FILTER_RULES (1<<0)
