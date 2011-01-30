@@ -276,7 +276,6 @@ static void delete_in_dir(char *fbuf, struct file_struct *file, dev_t *fs_dev)
 	struct file_list *dirlist;
 	char delbuf[MAXPATHLEN];
 	int dlen, i;
-	int save_uid_ndx = uid_ndx;
 
 	if (!fbuf) {
 		change_local_filter_dir(NULL, 0, 0);
@@ -308,9 +307,6 @@ static void delete_in_dir(char *fbuf, struct file_struct *file, dev_t *fs_dev)
 			return;
 	}
 
-	if (!uid_ndx)
-		uid_ndx = ++file_extra_cnt;
-
 	dirlist = get_dirlist(fbuf, dlen, 0);
 
 	/* If an item in dirlist is not found in flist, delete it
@@ -330,7 +326,7 @@ static void delete_in_dir(char *fbuf, struct file_struct *file, dev_t *fs_dev)
 		 * a delete_item call with a DEL_MAKE_ROOM flag. */
 		if (flist_find_ignore_dirness(cur_flist, fp) < 0) {
 			int flags = DEL_RECURSE;
-			if (!(fp->mode & S_IWUSR) && !am_root && (uid_t)F_OWNER(fp) == our_uid)
+			if (!(fp->mode & S_IWUSR) && !am_root && fp->flags & FLAG_OWNED_BY_US)
 				flags |= DEL_NO_UID_WRITE;
 			f_name(fp, delbuf);
 			if (delete_during == 2) {
@@ -342,11 +338,6 @@ static void delete_in_dir(char *fbuf, struct file_struct *file, dev_t *fs_dev)
 	}
 
 	flist_free(dirlist);
-
-	if (!save_uid_ndx) {
-		--file_extra_cnt;
-		uid_ndx = 0;
-	}
 }
 
 /* This deletes any files on the receiving side that are not present on the

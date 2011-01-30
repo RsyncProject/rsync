@@ -69,6 +69,7 @@ extern int sender_symlink_iconv;
 extern int output_needs_newline;
 extern int sender_keeps_checksum;
 extern int unsort_ndx;
+extern uid_t our_uid;
 extern struct stats stats;
 extern char *filesfrom_host;
 extern char *usermap, *groupmap;
@@ -1371,10 +1372,12 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	}
 #endif
 	file->mode = st.st_mode;
-	if (uid_ndx) /* Check uid_ndx instead of preserve_uid for del support */
+	if (preserve_uid)
 		F_OWNER(file) = st.st_uid;
-	if (gid_ndx) /* Check gid_ndx instead of preserve_gid for del support */
+	if (preserve_gid)
 		F_GROUP(file) = st.st_gid;
+	if (am_generator && st.st_uid == our_uid)
+		file->flags |= FLAG_OWNED_BY_US;
 
 	if (basename != thisname)
 		file->dirname = lastdir;

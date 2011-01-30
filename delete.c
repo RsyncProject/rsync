@@ -28,7 +28,6 @@ extern int max_delete;
 extern char *backup_dir;
 extern char *backup_suffix;
 extern int backup_suffix_len;
-extern uid_t our_uid;
 extern struct stats stats;
 
 int ignore_perishable = 0;
@@ -98,7 +97,7 @@ static enum delret delete_dir_contents(char *fname, uint16 flags)
 		}
 
 		strlcpy(p, fp->basename, remainder);
-		if (!(fp->mode & S_IWUSR) && !am_root && (uid_t)F_OWNER(fp) == our_uid)
+		if (!(fp->mode & S_IWUSR) && !am_root && fp->flags & FLAG_OWNED_BY_US)
 			do_chmod(fname, fp->mode | S_IWUSR);
 		/* Save stack by recursing to ourself directly. */
 		if (S_ISDIR(fp->mode)) {
@@ -143,19 +142,12 @@ enum delret delete_item(char *fbuf, uint16 mode, uint16 flags)
 		do_chmod(fbuf, mode | S_IWUSR);
 
 	if (S_ISDIR(mode) && !(flags & DEL_DIR_IS_EMPTY)) {
-		int save_uid_ndx = uid_ndx;
 		/* This only happens on the first call to delete_item() since
 		 * delete_dir_contents() always calls us w/DEL_DIR_IS_EMPTY. */
-		if (!uid_ndx)
-			uid_ndx = ++file_extra_cnt;
 		ignore_perishable = 1;
 		/* If DEL_RECURSE is not set, this just reports emptiness. */
 		ret = delete_dir_contents(fbuf, flags);
 		ignore_perishable = 0;
-		if (!save_uid_ndx) {
-			--file_extra_cnt;
-			uid_ndx = 0;
-		}
 		if (ret == DR_NOT_EMPTY || ret == DR_AT_LIMIT)
 			goto check_ret;
 		/* OK: try to delete the directory. */

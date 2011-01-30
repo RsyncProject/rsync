@@ -66,6 +66,7 @@
 /* These flags are used in the live flist data. */
 
 #define FLAG_TOP_DIR (1<<0)	/* sender/receiver/generator */
+#define FLAG_OWNED_BY_US (1<<0) /* generator: set by make_file() for aux flists only */
 #define FLAG_FILE_SENT (1<<1)	/* sender/receiver/generator */
 #define FLAG_DIR_CREATED (1<<1)	/* generator */
 #define FLAG_CONTENT_DIR (1<<2)	/* sender/receiver/generator */
