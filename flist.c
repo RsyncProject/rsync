@@ -67,6 +67,7 @@ extern int use_safe_inc_flist;
 extern int need_unsorted_flist;
 extern int sender_symlink_iconv;
 extern int unsort_ndx;
+extern uid_t our_uid;
 extern struct stats stats;
 extern char *filesfrom_host;
 
@@ -1227,9 +1228,6 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	linkname_len = 0;
 #endif
 
-	if (!uid_ndx && flags & FLAG_DEL_NEEDS_UID)
-		extra_len += EXTRA_LEN;
-
 #if SIZEOF_CAPITAL_OFF_T >= 8
 	if (st.st_size > 0xFFFFFFFFu && S_ISREG(st.st_mode))
 		extra_len += EXTRA_LEN;
@@ -1286,12 +1284,12 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	}
 #endif
 	file->mode = st.st_mode;
-	if (uid_ndx) /* Check uid_ndx instead of preserve_uid for del support */
+	if (preserve_uid)
 		F_OWNER(file) = st.st_uid;
-	else if (flags & FLAG_DEL_NEEDS_UID)
-		F_DEL_OWNER(file) = st.st_uid;
-	if (gid_ndx) /* Check gid_ndx instead of preserve_gid for del support */
+	if (preserve_gid)
 		F_GROUP(file) = st.st_gid;
+	if (am_generator && st.st_uid == our_uid)
+		file->flags |= FLAG_OWNED_BY_US;
 
 	if (basename != thisname)
 		file->dirname = lastdir;
@@ -3066,8 +3064,7 @@ struct file_list *get_dirlist(char *dirname, int dlen, int flags)
 
 	recurse = 0;
 	xfer_dirs = 1;
-	send_directory(senddir_fd, dirlist, dirname, dlen,
-		       FLAG_CONTENT_DIR | (flags & GDL_DEL_NEEDS_UID ? FLAG_DEL_NEEDS_UID : 0));
+	send_directory(senddir_fd, dirlist, dirname, dlen, FLAG_CONTENT_DIR);
 	xfer_dirs = save_xfer_dirs;
 	recurse = save_recurse;
 	if (do_progress)

@@ -65,6 +65,7 @@
 /* These flags are used in the live flist data. */
 
 #define FLAG_TOP_DIR (1<<0)	/* sender/receiver/generator */
+#define FLAG_OWNED_BY_US (1<<0) /* generator: set by make_file() for aux flists only */
 #define FLAG_FILE_SENT (1<<1)	/* sender/receiver/generator */
 #define FLAG_DIR_CREATED (1<<1)	/* generator */
 #define FLAG_CONTENT_DIR (1<<2)	/* sender/receiver/generator */
@@ -83,13 +84,12 @@
 
 /* These flags are passed to functions but not stored. */
 
-#define FLAG_DIVERT_DIRS (1<<16)/* sender, but must be unique */
-#define FLAG_DEL_NEEDS_UID (1<<17)/* generator, but must be unique */
+#define FLAG_DIVERT_DIRS (1<<16)   /* sender, but must be unique */
 
 /* These flags are for get_dirlist(). */
 #define GDL_IGNORE_FILTER_RULES (1<<0)
-#define GDL_DEL_NEEDS_UID (1<<1)
 
+/* Some helper macros for matching bits. */
 #define BITS_SET(val,bits) (((val) & (bits)) == (bits))
 #define BITS_SETnUNSET(val,onbits,offbits) (((val) & ((onbits)|(offbits))) == (onbits))
 #define BITS_EQUAL(b1,b2,mask) (((unsigned)(b1) & (unsigned)(mask)) \
@@ -100,7 +100,7 @@
 
 /* This is used when working on a new protocol version in CVS, and should
  * be a new non-zero value for each CVS change that affects the protocol.
- * It must ALWAYS be 0 when the protocol goes final! */
+ * It must ALWAYS be 0 when the protocol goes final (and NEVER before)! */
 #define SUBPROTOCOL_VERSION 0
 
 /* We refuse to interoperate with versions that are not in this range.
@@ -699,10 +699,6 @@ extern int xattrs_ndx;
 /* The sum is only present on regular files. */
 #define F_SUM(f) ((char*)OPT_EXTRA(f, LEN64_BUMP(f) + HLINK_BUMP(f) \
 				    + SUM_EXTRA_CNT - 1))
-
-/* When deleting w/o --owner, we put the UID info last (like F_SUM(), but smaller).
- * This is OK, because delete lists never need checksums. */
-#define F_DEL_OWNER(f) OPT_EXTRA(f, LEN64_BUMP(f) + HLINK_BUMP(f))->unum
 
 /* Some utility defines: */
 #define F_IS_ACTIVE(f) (f)->basename[0]

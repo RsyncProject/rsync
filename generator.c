@@ -251,7 +251,7 @@ static enum delret delete_dir_contents(char *fname, uint16 flags)
 	save_filters = push_local_filters(fname, dlen);
 
 	non_perishable_cnt = 0;
-	dirlist = get_dirlist(fname, dlen, GDL_DEL_NEEDS_UID);
+	dirlist = get_dirlist(fname, dlen, 0);
 	ret = non_perishable_cnt ? DR_NOT_EMPTY : DR_SUCCESS;
 
 	if (!dirlist->used)
@@ -273,7 +273,6 @@ static enum delret delete_dir_contents(char *fname, uint16 flags)
 
 	for (j = dirlist->used; j--; ) {
 		struct file_struct *fp = dirlist->files[j];
-		uid_t fp_owner = uid_ndx ? F_OWNER(fp) : F_DEL_OWNER(fp);
 
 		if (fp->flags & FLAG_MOUNT_DIR && S_ISDIR(fp->mode)) {
 			if (verbose > 1) {
@@ -286,7 +285,7 @@ static enum delret delete_dir_contents(char *fname, uint16 flags)
 		}
 
 		strlcpy(p, fp->basename, remainder);
-		if (!(fp->mode & S_IWUSR) && !am_root && fp_owner == our_uid)
+		if (!(fp->mode & S_IWUSR) && !am_root && fp->flags & FLAG_OWNED_BY_US)
 			do_chmod(fname, fp->mode | S_IWUSR);
 		/* Save stack by recursing to ourself directly. */
 		if (S_ISDIR(fp->mode)) {
@@ -495,7 +494,7 @@ static void delete_in_dir(char *fbuf, struct file_struct *file, dev_t *fs_dev)
 			return;
 	}
 
-	dirlist = get_dirlist(fbuf, dlen, GDL_DEL_NEEDS_UID);
+	dirlist = get_dirlist(fbuf, dlen, 0);
 
 	/* If an item in dirlist is not found in flist, delete it
 	 * from the filesystem. */
@@ -514,8 +513,7 @@ static void delete_in_dir(char *fbuf, struct file_struct *file, dev_t *fs_dev)
 		 * a delete_item call with a DEL_MAKE_ROOM flag. */
 		if (flist_find_ignore_dirness(cur_flist, fp) < 0) {
 			int flags = DEL_RECURSE;
-			uid_t fp_owner = uid_ndx ? F_OWNER(fp) : F_DEL_OWNER(fp);
-			if (!(fp->mode & S_IWUSR) && !am_root && fp_owner == our_uid)
+			if (!(fp->mode & S_IWUSR) && !am_root && fp->flags & FLAG_OWNED_BY_US)
 				flags |= DEL_NO_UID_WRITE;
 			f_name(fp, delbuf);
 			if (delete_during == 2) {
