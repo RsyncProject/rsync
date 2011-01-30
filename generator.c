@@ -44,8 +44,6 @@ extern int preserve_hard_links;
 extern int preserve_executability;
 extern int preserve_perms;
 extern int preserve_times;
-extern int uid_ndx;
-extern int gid_ndx;
 extern int delete_mode;
 extern int delete_before;
 extern int delete_during;
@@ -169,19 +167,12 @@ static enum delret delete_item(char *fbuf, uint16 mode, uint16 flags)
 		do_chmod(fbuf, mode | S_IWUSR);
 
 	if (S_ISDIR(mode) && !(flags & DEL_DIR_IS_EMPTY)) {
-		int save_uid_ndx = uid_ndx;
 		/* This only happens on the first call to delete_item() since
 		 * delete_dir_contents() always calls us w/DEL_DIR_IS_EMPTY. */
-		if (!uid_ndx)
-			uid_ndx = ++file_extra_cnt;
 		ignore_perishable = 1;
 		/* If DEL_RECURSE is not set, this just reports emptiness. */
 		ret = delete_dir_contents(fbuf, flags);
 		ignore_perishable = 0;
-		if (!save_uid_ndx) {
-			--file_extra_cnt;
-			uid_ndx = 0;
-		}
 		if (ret == DR_NOT_EMPTY || ret == DR_AT_LIMIT)
 			goto check_ret;
 		/* OK: try to delete the directory. */
@@ -260,7 +251,7 @@ static enum delret delete_dir_contents(char *fname, uint16 flags)
 	save_filters = push_local_filters(fname, dlen);
 
 	non_perishable_cnt = 0;
-	dirlist = get_dirlist(fname, dlen, 0);
+	dirlist = get_dirlist(fname, dlen, GDL_DEL_NEEDS_UID);
 	ret = non_perishable_cnt ? DR_NOT_EMPTY : DR_SUCCESS;
 
 	if (!dirlist->used)
@@ -282,6 +273,7 @@ static enum delret delete_dir_contents(char *fname, uint16 flags)
 
 	for (j = dirlist->used; j--; ) {
 		struct file_struct *fp = dirlist->files[j];
+		uid_t fp_owner = uid_ndx ? F_OWNER(fp) : F_DEL_OWNER(fp);
 
 		if (fp->flags & FLAG_MOUNT_DIR && S_ISDIR(fp->mode)) {
 			if (verbose > 1) {
@@ -294,7 +286,7 @@ static enum delret delete_dir_contents(char *fname, uint16 flags)
 		}
 
 		strlcpy(p, fp->basename, remainder);
-		if (!(fp->mode & S_IWUSR) && !am_root && (uid_t)F_OWNER(fp) == our_uid)
+		if (!(fp->mode & S_IWUSR) && !am_root && fp_owner == our_uid)
 			do_chmod(fname, fp->mode | S_IWUSR);
 		/* Save stack by recursing to ourself directly. */
 		if (S_ISDIR(fp->mode)) {
@@ -472,7 +464,6 @@ static void delete_in_dir(char *fbuf, struct file_struct *file, dev_t *fs_dev)
 	struct file_list *dirlist;
 	char delbuf[MAXPATHLEN];
 	int dlen, i;
-	int save_uid_ndx = uid_ndx;
 
 	if (!fbuf) {
 		change_local_filter_dir(NULL, 0, 0);
@@ -504,10 +495,7 @@ static void delete_in_dir(char *fbuf, struct file_struct *file, dev_t *fs_dev)
 			return;
 	}
 
-	if (!uid_ndx)
-		uid_ndx = ++file_extra_cnt;
-
-	dirlist = get_dirlist(fbuf, dlen, 0);
+	dirlist = get_dirlist(fbuf, dlen, GDL_DEL_NEEDS_UID);
 
 	/* If an item in dirlist is not found in flist, delete it
 	 * from the filesystem. */
@@ -526,7 +514,8 @@ static void delete_in_dir(char *fbuf, struct file_struct *file, dev_t *fs_dev)
 		 * a delete_item call with a DEL_MAKE_ROOM flag. */
 		if (flist_find_ignore_dirness(cur_flist, fp) < 0) {
 			int flags = DEL_RECURSE;
-			if (!(fp->mode & S_IWUSR) && !am_root && (uid_t)F_OWNER(fp) == our_uid)
+			uid_t fp_owner = uid_ndx ? F_OWNER(fp) : F_DEL_OWNER(fp);
+			if (!(fp->mode & S_IWUSR) && !am_root && fp_owner == our_uid)
 				flags |= DEL_NO_UID_WRITE;
 			f_name(fp, delbuf);
 			if (delete_during == 2) {
@@ -538,11 +527,6 @@ static void delete_in_dir(char *fbuf, struct file_struct *file, dev_t *fs_dev)
 	}
 
 	flist_free(dirlist);
-
-	if (!save_uid_ndx) {
-		--file_extra_cnt;
-		uid_ndx = 0;
-	}
 }
 
 /* This deletes any files on the receiving side that are not present on the
@@ -1367,7 +1351,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 		if (need_fuzzy_dirlist && S_ISREG(file->mode)) {
 			strlcpy(fnamecmpbuf, dn, sizeof fnamecmpbuf);
-			fuzzy_dirlist = get_dirlist(fnamecmpbuf, -1, 1);
+			fuzzy_dirlist = get_dirlist(fnamecmpbuf, -1, GDL_IGNORE_FILTER_RULES);
 			need_fuzzy_dirlist = 0;
 		}
 

@@ -35,8 +35,6 @@ extern int msg_fd_out;
 extern int allow_8bit_chars;
 extern int protocol_version;
 extern int preserve_times;
-extern int uid_ndx;
-extern int gid_ndx;
 extern int progress_is_active;
 extern int stdout_format_has_i;
 extern int stdout_format_has_o_or_i;

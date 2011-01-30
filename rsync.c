@@ -42,8 +42,6 @@ extern int am_generator;
 extern int am_starting_up;
 extern int allow_8bit_chars;
 extern int protocol_version;
-extern int uid_ndx;
-extern int gid_ndx;
 extern int inc_recurse;
 extern int inplace;
 extern int flist_eof;
