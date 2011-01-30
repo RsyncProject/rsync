@@ -37,8 +37,6 @@ extern int protocol_version;
 extern int always_checksum;
 extern int preserve_times;
 extern int msgs2stderr;
-extern int uid_ndx;
-extern int gid_ndx;
 extern int stdout_format_has_i;
 extern int stdout_format_has_o_or_i;
 extern int logfile_format_has_i;

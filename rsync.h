@@ -85,8 +85,12 @@
 
 /* These flags are passed to functions but not stored. */
 
-#define FLAG_DIVERT_DIRS (1<<16)/* sender */
+#define FLAG_DIVERT_DIRS (1<<16)   /* sender, but must be unique */
 
+/* These flags are for get_dirlist(). */
+#define GDL_IGNORE_FILTER_RULES (1<<0)
+
+/* Some helper macros for matching bits. */
 #define BITS_SET(val,bits) (((val) & (bits)) == (bits))
 #define BITS_SETnUNSET(val,onbits,offbits) (((val) & ((onbits)|(offbits))) == (onbits))
 #define BITS_EQUAL(b1,b2,mask) (((unsigned)(b1) & (unsigned)(mask)) \

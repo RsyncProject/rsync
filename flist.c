@@ -52,12 +52,9 @@ extern int preserve_devices;
 extern int preserve_specials;
 extern int delete_during;
 extern int missing_args;
-extern int uid_ndx;
-extern int gid_ndx;
 extern int eol_nulls;
 extern int relative_paths;
 extern int implied_dirs;
-extern int file_extra_cnt;
 extern int ignore_perishable;
 extern int non_perishable_cnt;
 extern int prune_empty_dirs;
@@ -3177,13 +3174,14 @@ char *f_name(const struct file_struct *f, char *fbuf)
  * of the dirname string, and also indicates that "dirname" is a MAXPATHLEN
  * buffer (the functions we call will append names onto the end, but the old
  * dir value will be restored on exit). */
-struct file_list *get_dirlist(char *dirname, int dlen, int ignore_filter_rules)
+struct file_list *get_dirlist(char *dirname, int dlen, int flags)
 {
 	struct file_list *dirlist;
 	char dirbuf[MAXPATHLEN];
 	int save_recurse = recurse;
 	int save_xfer_dirs = xfer_dirs;
 	int save_prune_empty_dirs = prune_empty_dirs;
+	int senddir_fd = flags & GDL_IGNORE_FILTER_RULES ? -2 : -1;
 
 	if (dlen < 0) {
 		dlen = strlcpy(dirbuf, dirname, MAXPATHLEN);
@@ -3196,7 +3194,7 @@ struct file_list *get_dirlist(char *dirname, int dlen, int ignore_filter_rules)
 
 	recurse = 0;
 	xfer_dirs = 1;
-	send_directory(ignore_filter_rules ? -2 : -1, dirlist, dirname, dlen, FLAG_CONTENT_DIR);
+	send_directory(senddir_fd, dirlist, dirname, dlen, FLAG_CONTENT_DIR);
 	xfer_dirs = save_xfer_dirs;
 	recurse = save_recurse;
 	if (INFO_GTE(PROGRESS, 1))

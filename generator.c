@@ -44,8 +44,6 @@ extern int preserve_hard_links;
 extern int preserve_executability;
 extern int preserve_perms;
 extern int preserve_times;
-extern int uid_ndx;
-extern int gid_ndx;
 extern int delete_mode;
 extern int delete_before;
 extern int delete_during;
@@ -1233,7 +1231,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 		if (need_fuzzy_dirlist && S_ISREG(file->mode)) {
 			strlcpy(fnamecmpbuf, dn, sizeof fnamecmpbuf);
-			fuzzy_dirlist = get_dirlist(fnamecmpbuf, -1, 1);
+			fuzzy_dirlist = get_dirlist(fnamecmpbuf, -1, GDL_IGNORE_FILTER_RULES);
 			need_fuzzy_dirlist = 0;
 		}
 
