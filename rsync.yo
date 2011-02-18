@@ -1361,7 +1361,7 @@ initial items are marked as perishable -- see the FILTER RULES section):
 
 quote(quote(tt(RCS SCCS CVS CVS.adm RCSLOG cvslog.* tags TAGS .make.state
 .nse_depinfo *~ #* .#* ,* _$* *$ *.old *.bak *.BAK *.orig *.rej .del-*
-*.a *.olb *.o *.obj *.so *.exe *.Z *.elc *.ln core .svn/ .git/ .bzr/)))
+*.a *.olb *.o *.obj *.so *.exe *.Z *.elc *.ln core .svn/ .git/ .hg/ .bzr/)))
 
 then, files listed in a $HOME/.cvsignore are added to the list and any
 files listed in the CVSIGNORE environment variable (all cvsignore names
