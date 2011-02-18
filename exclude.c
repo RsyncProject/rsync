@@ -1036,7 +1036,7 @@ static char default_cvsignore[] =
 	" *.a *.olb *.o *.obj *.so *.exe"
 	" *.Z *.elc *.ln core"
 	/* The rest we added to suit ourself. */
-	" .svn/ .git/ .bzr/";
+	" .svn/ .git/ .hg/ .bzr/";
 
 static void get_cvs_excludes(uint32 rflags)
 {
