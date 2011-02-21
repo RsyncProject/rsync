@@ -253,7 +253,7 @@ static void print_rsync_version(enum logcode f)
 #ifdef ICONV_OPTION
 	iconv = "";
 #endif
-#if defined HAVE_LUTIMES && defined HAVE_UTIMES
+#ifdef CAN_SET_SYMLINK_TIMES
 	symtimes = "";
 #endif
 
@@ -486,7 +486,7 @@ static struct poptOption long_options[] = {
   {"xattrs",          'X', POPT_ARG_NONE,   0, 'X', 0, 0 },
   {"no-xattrs",        0,  POPT_ARG_VAL,    &preserve_xattrs, 0, 0, 0 },
   {"no-X",             0,  POPT_ARG_VAL,    &preserve_xattrs, 0, 0, 0 },
-  {"times",           't', POPT_ARG_VAL,    &preserve_times, 2, 0, 0 },
+  {"times",           't', POPT_ARG_VAL,    &preserve_times, 1, 0, 0 },
   {"no-times",         0,  POPT_ARG_VAL,    &preserve_times, 0, 0, 0 },
   {"no-t",             0,  POPT_ARG_VAL,    &preserve_times, 0, 0, 0 },
   {"omit-dir-times",  'O', POPT_ARG_VAL,    &omit_dir_times, 1, 0, 0 },
@@ -1064,7 +1064,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			preserve_links = 1;
 #endif
 			preserve_perms = 1;
-			preserve_times = 2;
+			preserve_times = 1;
 			preserve_gid = 1;
 			preserve_uid = 1;
 			preserve_devices = 1;
@@ -1515,13 +1515,18 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		parse_rule(&filter_list, backup_dir_buf, 0, 0);
 	}
 
+	if (preserve_times) {
+		preserve_times = PRESERVE_FILE_TIMES;
+		if (!omit_dir_times)
+			preserve_times |= PRESERVE_DIR_TIMES;
+#ifdef CAN_SET_SYMLINK_TIMES
+		preserve_times |= PRESERVE_LINK_TIMES;
+#endif
+	}
+
 	if (make_backups && !backup_dir) {
 		omit_dir_times = 0; /* Implied, so avoid -O to sender. */
-		if (preserve_times > 1)
-			preserve_times = 1;
-	} else if (omit_dir_times) {
-		if (preserve_times > 1)
-			preserve_times = 1;
+		preserve_times &= ~PRESERVE_DIR_TIMES;
 	}
 
 	if (stdout_format) {
@@ -1831,7 +1836,7 @@ void server_options(char **args, int *argc_p)
 			argstr[x++] = '.';
 		if (allow_inc_recurse)
 			argstr[x++] = 'i';
-#if defined HAVE_LUTIMES && defined HAVE_UTIMES
+#ifdef CAN_SET_SYMLINK_TIMES
 		argstr[x++] = 'L';
 #endif
 #ifdef ICONV_OPTION

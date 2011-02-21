@@ -251,7 +251,7 @@ void setup_protocol(int f_out,int f_in)
 	} else if (protocol_version >= 30) {
 		if (am_server) {
 			compat_flags = allow_inc_recurse ? CF_INC_RECURSE : 0;
-#if defined HAVE_LUTIMES && defined HAVE_UTIMES
+#ifdef CAN_SET_SYMLINK_TIMES
 			compat_flags |= CF_SYMLINK_TIMES;
 #endif
 #ifdef ICONV_OPTION
@@ -269,7 +269,7 @@ void setup_protocol(int f_out,int f_in)
 			    ? strchr(client_info, 'L') != NULL
 			    : !!(compat_flags & CF_SYMLINK_TIMES);
 		}
-#if defined HAVE_LUTIMES && defined HAVE_UTIMES
+#ifdef CAN_SET_SYMLINK_TIMES
 		else
 			receiver_symlink_times = 1;
 #endif
@@ -287,7 +287,7 @@ void setup_protocol(int f_out,int f_in)
 		}
 		use_safe_inc_flist = !!(compat_flags & CF_SAFE_FLIST);
 		need_messages_from_generator = 1;
-#if defined HAVE_LUTIMES && defined HAVE_UTIMES
+#ifdef CAN_SET_SYMLINK_TIMES
 	} else if (!am_sender) {
 		receiver_symlink_times = 1;
 #endif
