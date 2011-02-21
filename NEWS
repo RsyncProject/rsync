@@ -21,7 +21,7 @@ Changes since 3.0.7:
       being too big and skip it.
 
     - For devices and special files, we now avoid gathering useless ACL and/or
-      xattr information for files that aren't being copied.  (The uncopied
+      xattr information for files that aren't being copied.  (The un-copied
       files are still put into the file list, but there's no need to gather
       data that is not going to be used.)  This ensures that if the user uses
       --no-D, that rsync can't possibly complain about being unable to gather
@@ -41,6 +41,11 @@ Changes since 3.0.7:
     - If the destination arg is an empty string, it will be treated as a
       reference to the current directory (as 2.x used to do).
 
+    - If rsync was compiled with a newer time-setting function (such as
+      lutimes), rsync will fall-back to an older function (such as utimes) on a
+      system where the newer function is not around.  This helps to make the
+      rsync binary more portable in mixed-OS-release situations.
+
     - Fixed a batch-file writing bug that would not write out the full set of
       compatibility flags that the transfer was using.  This fixes a potential
       protocol problem for a batch file that contains a sender-side I/O error:
@@ -57,6 +62,8 @@ Changes since 3.0.7:
     - If we fail to connect to an rsync daemon, report all the connection
       errors (e.g. IPv4 & IPv6), not just the last one.
 
+    - Improved ACL mask handling, e.g. for Solaris.
+
     - Fixed an issue where an xattr and/or ACL transfer that used an alt-dest
       option (e.g. --link-dest) could output an error trying to itemize the
       changes against the alt-dest directory's xattr/ACL info but was instead
@@ -64,6 +71,9 @@ Changes since 3.0.7:
 
     - Improved xattr system-error messages to mention the full path to the
       file.
+
+    - The --link-dest checking for identical symlinks now avoids considering
+      attribute differences that cannot be changed on the receiver.
 
     - Avoid trying to read/write xattrs on certain file types for certain OSes.
       Improved configure to set NO_SYMLINK_XATTRS, NO_DEVICE_XATTRS, and/or
@@ -75,6 +85,9 @@ Changes since 3.0.7:
 
     - Fixed a bug with --fake-super when copying files and dirs that aren't
       user writable.
+
+    - Fixed a bug where a sparse file could have its last sparse block turned
+      into a real block when rsync sets the file size (requires ftruncate).
 
     - If a temp-file name is too long, rsync now avoids truncating the name in
       the middle of adjacent high-bit characters.  This prevents a potential
