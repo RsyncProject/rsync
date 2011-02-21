@@ -597,7 +597,7 @@ int recv_xattr_request(struct file_struct *file, int f_in)
 
 	if (F_XATTR(file) < 0) {
 		rprintf(FERROR, "recv_xattr_request: internal data error!\n");
-		exit_cleanup(RERR_STREAMIO);
+		exit_cleanup(RERR_PROTOCOL);
 	}
 	lst += F_XATTR(file);
 
@@ -613,12 +613,12 @@ int recv_xattr_request(struct file_struct *file, int f_in)
 		if (!cnt || rxa->num != num) {
 			rprintf(FERROR, "[%s] could not find xattr #%d for %s\n",
 				who_am_i(), num, f_name(file, NULL));
-			exit_cleanup(RERR_STREAMIO);
+			exit_cleanup(RERR_PROTOCOL);
 		}
 		if (!XATTR_ABBREV(*rxa) || rxa->datum[0] != XSTATE_ABBREV) {
 			rprintf(FERROR, "[%s] internal abbrev error on %s (%s, len=%ld)!\n",
 				who_am_i(), f_name(file, NULL), rxa->name, (long)rxa->datum_len);
-			exit_cleanup(RERR_STREAMIO);
+			exit_cleanup(RERR_PROTOCOL);
 		}
 
 		if (am_sender) {
@@ -662,7 +662,7 @@ void receive_xattr(int f, struct file_struct *file)
 	if (ndx < 0 || (size_t)ndx > rsync_xal_l.count) {
 		rprintf(FERROR, "receive_xattr: xa index %d out of"
 			" range for %s\n", ndx, f_name(file, NULL));
-		exit_cleanup(RERR_STREAMIO);
+		exit_cleanup(RERR_PROTOCOL);
 	}
 
 	if (ndx != 0) {
@@ -905,6 +905,25 @@ int set_xattr(const char *fname, const struct file_struct *file,
 		errno = EROFS;
 		return -1;
 	}
+
+#ifdef NO_SPECIAL_XATTRS
+	if (IS_SPECIAL(sxp->st.st_mode)) {
+		errno = ENOTSUP;
+		return -1;
+	}
+#endif
+#ifdef NO_DEVICE_XATTRS
+	if (IS_DEVICE(sxp->st.st_mode)) {
+		errno = ENOTSUP;
+		return -1;
+	}
+#endif
+#ifdef NO_SYMLINK_XATTRS
+	if (S_ISLNK(sxp->st.st_mode)) {
+		errno = ENOTSUP;
+		return -1;
+	}
+#endif
 
 	ndx = F_XATTR(file);
 	return rsync_xal_set(fname, lst + ndx, fnamecmp, sxp);
