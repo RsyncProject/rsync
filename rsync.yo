@@ -943,13 +943,14 @@ destination exactly matches that on the source.  Cases in which the
 destination may end up with extra hard links include the following:
 
 quote(itemization(
-  it() If the destination already contains hard links, rsync will not break
-  them explicitly.  However, if one or more of the paths have content
-  differences, the normal file-update process will break those links, unless
-  you are using the bf(--inplace) option.
+  it() If the destination contains extraneous hard-linked files, rsync will not
+  break them explicitly.  However, if one or more of the paths have content
+  differences, the normal file-update process will break those extra links
+  (unless you are using the bf(--inplace) option).
   it() If you specify a bf(--link-dest) directory that contains hard links,
-  rsync may use the same bf(--link-dest) file multiple times via several of
-  its paths.
+  the linking of the destination files against the bf(--link-dest) files can
+  cause some paths in the destination to become linked together due to the
+  bf(--link-dest) associations.
 ))
 
 Note that rsync can only detect hard links between files that are inside
