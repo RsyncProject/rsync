@@ -8,10 +8,29 @@ Changes since 3.0.7:
       exactly MAXPATHLEN was not handled correctly, and one handling a
       --backup-dir that is extra extra large.
 
-    - Fixed a potential crash when an rsync daemon has a filter/exclude list
-      and the transfer is using ACLs or extended attributes.
+    - Fixed a data-corruption issue when preserving hard-links without
+      preserving file ownership, and doing deletions either before or during
+      the transfer.  This fixes some assert errors in the hard-linking code,
+      and some potential failed checksums (via -c) that should have matched.
 
-    - Properly handle requesting remote filenames that start with a dash.
+    - Fixed a potential crash when an rsync daemon has a filter/exclude list
+      and the transfer is using ACLs or xattrs.
+
+    - Fixed a hang if a really large file is being processed by an rsync that
+      can't handle 64-bit numbers.  Rsync will now complain about the file
+      being too big and skip it.
+
+    - For devices and special files, we now avoid gathering useless ACL and/or
+      xattr information for files that aren't being copied.  (The uncopied
+      files are still put into the file list, but there's no need to gather
+      data that is not going to be used.)  This ensures that if the user uses
+      --no-D, that rsync can't possibly complain about being unable to gather
+      extended information from special files that are in the file list (but
+      not in the transfer).
+
+    - Properly handle requesting remote filenames that start with a dash.  This
+      avoids a potential error where a filename could be interpreted as a
+      (usually invalid) option.
 
     - Fixed a bug in the comparing of upper-case letters in file suffixes for
       --skip-compress.
@@ -36,15 +55,19 @@ Changes since 3.0.7:
       an inplace chunk was handled by a seek rather than a read+write.
 
     - If we fail to connect to an rsync daemon, report all the connection
-      errors (e.g. ipv4 & ipv6), not just the last one.
+      errors (e.g. IPv4 & IPv6), not just the last one.
 
-    - Fixed an issue where an xattr and/or acl transfer that used an alt-dest
+    - Fixed an issue where an xattr and/or ACL transfer that used an alt-dest
       option (e.g. --link-dest) could output an error trying to itemize the
-      changes against the alt-dest directory's xattr/acl info but was instead
-      tryring to access the not-yet-existing new destination directory.
+      changes against the alt-dest directory's xattr/ACL info but was instead
+      trying to access the not-yet-existing new destination directory.
 
     - Improved xattr system-error messages to mention the full path to the
       file.
+
+    - Avoid trying to read/write xattrs on certain file types for certain OSes.
+      Improved configure to set NO_SYMLINK_XATTRS, NO_DEVICE_XATTRS, and/or
+      NO_SPECIAL_XATTRS defines in config.h.
 
     - Improved the unsafe-symlink errors messages.
 
@@ -53,13 +76,30 @@ Changes since 3.0.7:
     - Fixed a bug with --fake-super when copying files and dirs that aren't
       user writable.
 
+    - If a temp-file name is too long, rsync now avoids truncating the name in
+      the middle of adjacent high-bit characters.  This prevents a potential
+      filename error if the filesystem doesn't allow a name to contain an
+      invalid multi-byte sequence.
+
+    - If a muli-protocol socket connection fails (i.e., when contacting a
+      daemon), we now report all the failures, not just the last one.  This
+      avoids losing a relevant error (e.g. an IPv4 connection-refused error)
+      that happened before the final error (e.g. an IPv6 protocol-not-supported
+      error).
+
     - Fix the popt arg parsing so that an option that doesn't take an arg will
-      reject an attempt to supply and arg.
+      reject an attempt to supply one.
 
     - A couple minor option tweaks to support/rrsync script, and also some
       regex changes that make vim highlighting happier.
 
+    - Fixed some issues in the support/mnt-excl script.
+
     - A few manpage improvements.
+
+  ENHANCEMENTS:
+
+    - Added ".hg/" to the default cvs excludes (see -C & --cvs-exclude).
 
   DEVELOPER RELATED:
 
