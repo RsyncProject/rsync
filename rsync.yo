@@ -732,7 +732,9 @@ quote(itemization(
   it() The file's data will be in an inconsistent state during the transfer
   and will be left that way if the transfer is interrupted or if an update
   fails.
-  it() A file that does not have write permissions cannot be updated.
+  it() A file that rsync cannot write to cannot be updated. While a super user
+  can update any file, a normal user needs to be granted write permission for
+  the open of the file for writing to be successful.
   it() The efficiency of rsync's delta-transfer algorithm may be reduced if
   some data in the destination file is overwritten before it can be copied to
   a position later in the file.  This does not apply if you use bf(--backup),
@@ -745,7 +747,8 @@ accessed by others, so be careful when choosing to use this for a copy.
 
 This option is useful for transferring large files with block-based changes
 or appended data, and also on systems that are disk bound, not network
-bound.
+bound.  It can also help keep a copy-on-write filesystem snapshot from
+diverging the entire contents of a file that only has minor changes.
 
 The option implies bf(--partial) (since an interrupted transfer does not delete
 the file), but conflicts with bf(--partial-dir) and bf(--delay-updates).
@@ -872,13 +875,14 @@ destination exactly matches that on the source.  Cases in which the
 destination may end up with extra hard links include the following:
 
 quote(itemization(
-  it() If the destination already contains hard links, rsync will not break
-  them explicitly.  However, if one or more of the paths have content
-  differences, the normal file-update process will break those links, unless
-  you are using the bf(--inplace) option.
+  it() If the destination contains extraneous hard-linked files, rsync will not
+  break them explicitly.  However, if one or more of the paths have content
+  differences, the normal file-update process will break those extra links
+  (unless you are using the bf(--inplace) option).
   it() If you specify a bf(--link-dest) directory that contains hard links,
-  rsync may use the same bf(--link-dest) file multiple times via several of
-  its paths.
+  the linking of the destination files against the bf(--link-dest) files can
+  cause some paths in the destination to become linked together due to the
+  bf(--link-dest) associations.
 ))
 
 Note that rsync can only detect hard links between files that are inside
@@ -892,7 +896,10 @@ see the bf(--inplace) option for more caveats).
 If incremental recursion is active (see bf(--recursive)), rsync may transfer
 a missing hard-linked file before it finds that another link for that contents
 exists elsewhere in the hierarchy.  This does not affect the accuracy of
-the transfer, just its efficiency.  One way to avoid this is to disable
+the transfer (i.e. which files are hard-linked together), just its efficiency
+(i.e. copying the data for a new, early copy of a hard-linked file that could
+have been found later in the transfer in another member of the hard-linked
+set of files).  One way to avoid this inefficiency is to disable
 incremental recursion using the bf(--no-inc-recursive) option.
 
 dit(bf(-p, --perms)) This option causes the receiving rsync to set the
@@ -1655,7 +1662,7 @@ You may specify an empty string to indicate that no file should be skipped.
 
 Simple character-class matching is supported: each must consist of a list
 of letters inside the square brackets (e.g. no special classes, such as
-"[:alpha:]", are supported).
+"[:alpha:]", are supported, and '-' has no special meaning).
 
 The characters asterisk (*) and question-mark (?) have no special meaning.
 
@@ -1664,10 +1671,26 @@ matches 2 suffixes):
 
 verb(    --skip-compress=gz/jpg/mp[34]/7z/bz2)
 
-The default list of suffixes that will not be compressed is this (several
-of these are newly added for 3.0.0):
+The default list of suffixes that will not be compressed is this (in this
+version of rsync):
 
-verb(    gz/zip/z/rpm/deb/iso/bz2/t[gb]z/7z/mp[34]/mov/avi/ogg/jpg/jpeg)
+bf(7z)
+bf(avi)
+bf(bz2)
+bf(deb)
+bf(gz)
+bf(iso)
+bf(jpeg)
+bf(jpg)
+bf(mov)
+bf(mp3)
+bf(mp4)
+bf(ogg)
+bf(rpm)
+bf(tbz)
+bf(tgz)
+bf(z)
+bf(zip)
 
 This list will be replaced by your bf(--skip-compress) list in all but one
 situation: a copy from a daemon rsync will add your skipped suffixes to
@@ -2066,7 +2089,8 @@ transfer that may be interrupted.
 
 dit(bf(--password-file)) This option allows you to provide a password in a
 file for accessing an rsync daemon.  The file must not be world readable.
-It should contain just the password as a single line.
+It should contain just the password as the first line of the file (all
+other lines are ignored).
 
 This option does not supply a password to a remote shell transport such as
 ssh; to learn how to do that, consult the remote shell's documentation.
@@ -2509,10 +2533,14 @@ itemization(
   also disabled).
   it() You may also specify any of the modifiers for the "+" or "-" rules
   (above) in order to have the rules that are read in from the file
-  default to having that modifier set.  For instance, "merge,-/ .excl" would
+  default to having that modifier set (except for the bf(!) modifier, which
+  would not be useful).  For instance, "merge,-/ .excl" would
   treat the contents of .excl as absolute-path excludes,
   while "dir-merge,s .filt" and ":sC" would each make all their
-  per-directory rules apply only on the sending side.
+  per-directory rules apply only on the sending side.  If the merge rule
+  specifies sides to affect (via the bf(s) or bf(r) modifier or both),
+  then the rules in the file must not specify sides (via a modifier or
+  a rule prefix such as bf(hide)).
 )
 
 Per-directory rules are inherited in all subdirectories of the directory
@@ -2926,7 +2954,7 @@ dit(bf(CVSIGNORE)) The CVSIGNORE environment variable supplements any
 ignore patterns in .cvsignore files. See the bf(--cvs-exclude) option for
 more details.
 dit(bf(RSYNC_ICONV)) Specify a default bf(--iconv) setting using this
-environment variable.
+environment variable. (First supported in 3.0.0.)
 dit(bf(RSYNC_RSH)) The RSYNC_RSH environment variable allows you to
 override the default shell used as the transport for rsync.  Command line
 options are permitted after the command name, just as in the bf(-e) option.
