@@ -1101,6 +1101,9 @@ int default_perms_for_dir(const char *dir)
 	if (sacl == NULL) {
 		/* Couldn't get an ACL.  Darn. */
 		switch (errno) {
+		case EINVAL:
+			/* If SMB_ACL_TYPE_DEFAULT isn't valid, then the ACLs must be non-POSIX. */
+			break;
 #ifdef ENOTSUP
 		case ENOTSUP:
 #endif
