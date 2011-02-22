@@ -1,5 +1,5 @@
 mailto(rsync-bugs@samba.org)
-manpage(rsync)(1)(31 Dec 2009)()()
+manpage(rsync)(1)(22 Feb 2011)()()
 manpagename(rsync)(a fast, versatile, remote (and local) file-copying tool)
 manpagesynopsis()
 
@@ -2999,7 +2999,7 @@ url(http://rsync.samba.org/)(http://rsync.samba.org/)
 
 manpagesection(VERSION)
 
-This man page is current for version 3.0.7 of rsync.
+This man page is current for version 3.0.8pre1 of rsync.
 
 manpagesection(INTERNAL OPTIONS)
 
