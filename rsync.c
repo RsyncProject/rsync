@@ -527,9 +527,9 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 			}
 		}
 		if (am_root >= 0) {
-			if (do_lchown(fname,
-			    change_uid ? (uid_t)F_OWNER(file) : sxp->st.st_uid,
-			    change_gid ? (gid_t)F_GROUP(file) : sxp->st.st_gid) != 0) {
+			uid_t uid = change_uid ? (uid_t)F_OWNER(file) : sxp->st.st_uid;
+			gid_t gid = change_gid ? (gid_t)F_GROUP(file) : sxp->st.st_gid;
+			if (do_lchown(fname, uid, gid) != 0) {
 				/* We shouldn't have attempted to change uid
 				 * or gid unless have the privilege. */
 				rsyserr(FERROR_XFER, errno, "%s %s failed",
@@ -537,6 +537,10 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 				    full_fname(fname));
 				goto cleanup;
 			}
+			if (uid == (uid_t)-1 && sxp->st.st_uid != (uid_t)-1)
+				rprintf(FERROR_XFER, "uid 4294967295 (-1) is impossible to set on %s\n", full_fname(fname));
+			if (gid == (gid_t)-1 && sxp->st.st_gid != (gid_t)-1)
+				rprintf(FERROR_XFER, "gid 4294967295 (-1) is impossible to set on %s\n", full_fname(fname));
 			/* A lchown had been done, so we need to re-stat if
 			 * the destination had the setuid or setgid bits set
 			 * (due to the side effect of the chown call). */

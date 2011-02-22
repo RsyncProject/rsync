@@ -43,8 +43,6 @@ extern char *groupmap;
 # endif
 #endif
 
-#define GID_NONE ((gid_t)-1)
-
 #define NFLAGS_WILD_NAME_MATCH (1<<0)
 #define NFLAGS_NAME_MATCH (1<<1)
 
@@ -57,6 +55,26 @@ struct idlist {
 
 static struct idlist *uidlist, *uidmap;
 static struct idlist *gidlist, *gidmap;
+
+static id_t id_parse(const char *num_str)
+{
+	id_t tmp, num = 0;
+	const char *cp = num_str;
+
+	while (*cp) {
+		if (!isDigit(cp)) {
+		  invalid_num:
+			rprintf(FERROR, "Invalid ID number: %s\n", num_str);
+			exit_cleanup(RERR_SYNTAX);
+		}
+		tmp = num * 10 + *cp++ - '0';
+		if (tmp < num)
+			goto invalid_num;
+		num = tmp;
+	}
+
+	return num;
+}
 
 static struct idlist *add_to_list(struct idlist **root, id_t id, const char *name,
 				  id_t id2, uint16 flags)
@@ -98,7 +116,7 @@ int user_to_uid(const char *name, uid_t *uid_p, BOOL num_ok)
 	if (!name || !*name)
 		return 0;
 	if (num_ok && name[strspn(name, "0123456789")] == '\0') {
-		*uid_p = atol(name);
+		*uid_p = id_parse(name);
 		return 1;
 	}
 	if (!(pass = getpwnam(name)))
@@ -114,7 +132,7 @@ int group_to_gid(const char *name, gid_t *gid_p, BOOL num_ok)
 	if (!name || !*name)
 		return 0;
 	if (num_ok && name[strspn(name, "0123456789")] == '\0') {
-		*gid_p = atol(name);
+		*gid_p = id_parse(name);
 		return 1;
 	}
 	if (!(grp = getgrnam(name)))
@@ -126,12 +144,12 @@ int group_to_gid(const char *name, gid_t *gid_p, BOOL num_ok)
 static int is_in_group(gid_t gid)
 {
 #ifdef HAVE_GETGROUPS
-	static gid_t last_in = GID_NONE, last_out;
-	static int ngroups = -2;
+	static gid_t last_in;
+	static int ngroups = -2, last_out = -1;
 	static GETGROUPS_T *gidset;
 	int n;
 
-	if (gid == last_in)
+	if (gid == last_in && last_out >= 0)
 		return last_out;
 	if (ngroups < -1) {
 		if ((ngroups = getgroups(0, NULL)) < 0)
@@ -230,13 +248,11 @@ static struct idlist *recv_add_id(struct idlist **idlist_ptr, struct idlist *idm
 /* this function is a definate candidate for a faster algorithm */
 uid_t match_uid(uid_t uid)
 {
-	static uid_t last_in = -1, last_out = -1;
+	static struct idlist *last = NULL;
 	struct idlist *list;
 
-	if (uid == last_in)
-		return last_out;
-
-	last_in = uid;
+	if (last && uid == last->id)
+		return last->id2;
 
 	for (list = uidlist; list; list = list->next) {
 		if (list->id == uid)
@@ -245,8 +261,9 @@ uid_t match_uid(uid_t uid)
 
 	if (!list)
 		list = recv_add_id(&uidlist, uidmap, uid, NULL);
+	last = list;
 
-	return last_out = list->id2;
+	return list->id2;
 }
 
 gid_t match_gid(gid_t gid, uint16 *flags_ptr)
@@ -446,11 +463,11 @@ void parse_name_map(char *map, BOOL usernames)
 				exit_cleanup(RERR_SYNTAX);
 			}
 			if (dash)
-				name = (char *)atol(dash+1);
+				name = (char *)id_parse(dash+1);
 			else
 				name = (char *)0;
 			flags = 0;
-			id1 = atol(cp);
+			id1 = id_parse(cp);
 		} else if (strpbrk(cp, "*[?")) {
 			flags = NFLAGS_WILD_NAME_MATCH;
 			name = cp;
