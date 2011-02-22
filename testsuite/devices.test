@@ -116,7 +116,7 @@ cD$all_plus char2
 cD$all_plus char3
 cS$all_plus fifo
 EOT
-if test ! -b "$fromdir/block2.5"; then
+if test ! -r "$fromdir/block2.5"; then
     grep -v block2.5 <"$chkfile" >"$chkfile.new"
     mv "$chkfile.new" "$chkfile"
 fi
@@ -128,7 +128,7 @@ echo ""
 ( cd "$todir" && rsync_ls_lR . ) > "$tmpdir/ls-to"
 diff $diffopt "$tmpdir/ls-from" "$tmpdir/ls-to"
 
-if test -b "$fromdir/block2.5"; then
+if test -r "$fromdir/block2.5"; then
     set -x
     $RSYNC -aii --link-dest="$todir" "$fromdir/" "$chkdir/" \
 	| tee "$outfile"
