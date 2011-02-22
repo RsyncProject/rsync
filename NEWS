@@ -100,6 +100,11 @@ Changes since 3.0.7:
       that happened before the final error (e.g. an IPv6 protocol-not-supported
       error).
 
+    - Generate a transfer error if we try to call chown with a -1 for a uid or
+      a gid (which is not settable).
+
+    - Fixed a forceful delete of a file with --one-file-system.
+
     - Fix the popt arg parsing so that an option that doesn't take an arg will
       reject an attempt to supply one.
 
