@@ -39,8 +39,6 @@ extern int numeric_ids;
 # endif
 #endif
 
-#define GID_NONE ((gid_t)-1)
-
 struct idlist {
 	struct idlist *next;
 	const char *name;
@@ -103,12 +101,12 @@ static gid_t map_gid(gid_t id, const char *name)
 static int is_in_group(gid_t gid)
 {
 #ifdef HAVE_GETGROUPS
-	static gid_t last_in = GID_NONE, last_out;
-	static int ngroups = -2;
+	static gid_t last_in;
+	static int ngroups = -2, last_out = -1;
 	static GETGROUPS_T *gidset;
 	int n;
 
-	if (gid == last_in)
+	if (gid == last_in && last_out >= 0)
 		return last_out;
 	if (ngroups < -1) {
 		gid_t mygid = MY_GID();
