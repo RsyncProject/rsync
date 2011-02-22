@@ -2781,6 +2781,11 @@ int no_acl_syscall_error(int err)
 		return 1;
 	}
 #endif
+	if (err == EINVAL) {
+		/* If the type of SMB_ACL_TYPE_ACCESS or SMB_ACL_TYPE_DEFAULT
+		 * isn't valid, then the ACLs must be non-POSIX. */
+		return 1;
+	}
 	return 0;
 }
 
