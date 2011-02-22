@@ -64,6 +64,7 @@ extern int write_batch;
 extern int batch_fd;
 extern int filesfrom_fd;
 extern int connect_timeout;
+extern dev_t filesystem_dev;
 extern pid_t cleanup_child_pid;
 extern unsigned int module_dirlen;
 extern struct stats stats;
@@ -542,6 +543,7 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 					full_fname(dest_path));
 				exit_cleanup(RERR_FILESELECT);
 			}
+			filesystem_dev = st.st_dev; /* ensures --force works right w/-x */
 			return NULL;
 		}
 		if (file_total > 1) {
