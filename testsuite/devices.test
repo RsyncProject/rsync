@@ -74,7 +74,7 @@ mknod "$fromdir/char3" c 42 69  || test_skipped "Can't create char device node"
 mknod "$fromdir/block" b 42 69 || test_skipped "Can't create block device node"
 mknod "$fromdir/block2" b 42 73 || test_skipped "Can't create block device node"
 mknod "$fromdir/block3" b 105 73 || test_skipped "Can't create block device node"
-ln "$fromdir/block3" "$fromdir/block2.5" || echo "Skipping hard-linked device test..."
+ln "$fromdir/block3" "$fromdir/block3.5" || echo "Skipping hard-linked device test..."
 mkfifo "$fromdir/fifo" || mknod "$fromdir/fifo" p || test_skipped "Can't run mkfifo"
 # Work around time rounding/truncating issue by touching both files.
 touch -r "$fromdir/block" "$fromdir/block" "$fromdir/block2"
@@ -109,15 +109,15 @@ cat <<EOT >"$chkfile"
 .d..t.$dots ./
 cDc.t.$dots block
 cDc...$dots block2
-cD$all_plus block2.5
-hD$all_plus block3 => block2.5
+cD$all_plus block3
+hD$all_plus block3.5 => block3
 cD$all_plus char
 cD$all_plus char2
 cD$all_plus char3
 cS$all_plus fifo
 EOT
-if test ! -r "$fromdir/block2.5"; then
-    sed -e '/block2\.5/d' <"$chkfile" >"$chkfile.new"
+if test ! -b "$fromdir/block3.5"; then
+    grep -v block3.5 <"$chkfile" >"$chkfile.new"
     mv "$chkfile.new" "$chkfile"
 fi
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 4 failed"
@@ -128,7 +128,7 @@ echo ""
 ( cd "$todir" && rsync_ls_lR . ) > "$tmpdir/ls-to"
 diff $diffopt "$tmpdir/ls-from" "$tmpdir/ls-to"
 
-if test -b "$fromdir/block2.5"; then
+if test -b "$fromdir/block3.5"; then
     set -x
     $RSYNC -aii --link-dest="$todir" "$fromdir/" "$chkdir/" \
 	| tee "$outfile"
@@ -136,14 +136,14 @@ if test -b "$fromdir/block2.5"; then
 cd$allspace ./
 hD$allspace block
 hD$allspace block2
-hD$allspace block2.5
 hD$allspace block3
+hD$allspace block3.5
 hD$allspace char
 hD$allspace char2
 hD$allspace char3
 hS$allspace fifo
 EOT
-    diff $diffopt "$chkfile" "$outfile" || test_fail "test 4 failed"
+    diff $diffopt "$chkfile" "$outfile" || test_fail "test 5 failed"
 fi
 
 # The script would have aborted on error, so getting here means we've won.
