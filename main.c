@@ -70,6 +70,7 @@ extern int sock_f_out;
 extern int filesfrom_fd;
 extern int connect_timeout;
 extern int send_msgs_to_gen;
+extern dev_t filesystem_dev;
 extern pid_t cleanup_child_pid;
 extern size_t bwlimit_writemax;
 extern unsigned int module_dirlen;
@@ -610,6 +611,7 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 					full_fname(dest_path));
 				exit_cleanup(RERR_FILESELECT);
 			}
+			filesystem_dev = st.st_dev; /* ensures --force works right w/-x */
 			return NULL;
 		}
 		if (file_total > 1) {
