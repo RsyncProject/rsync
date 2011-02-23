@@ -943,7 +943,8 @@ destination exactly matches that on the source.  Cases in which the
 destination may end up with extra hard links include the following:
 
 quote(itemization(
-  it() If the destination contains extraneous hard-linked files, rsync will not
+  it() If the destination contains extraneous hard-links (more linking than
+  what is present in the source file list), the copying algorithm will not
   break them explicitly.  However, if one or more of the paths have content
   differences, the normal file-update process will break those extra links
   (unless you are using the bf(--inplace) option).
