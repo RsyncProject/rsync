@@ -59,9 +59,6 @@ Changes since 3.0.7:
       position.  The quadruple-verbose chunk[N] message will now mention when
       an inplace chunk was handled by a seek rather than a read+write.
 
-    - If we fail to connect to an rsync daemon, report all the connection
-      errors (e.g. IPv4 & IPv6), not just the last one.
-
     - Improved ACL mask handling, e.g. for Solaris.
 
     - Fixed an issue where an xattr and/or ACL transfer that used an alt-dest
@@ -103,17 +100,18 @@ Changes since 3.0.7:
     - Generate a transfer error if we try to call chown with a -1 for a uid or
       a gid (which is not settable).
 
-    - Fixed a forceful delete of a file with --one-file-system.
+    - Fixed the working of --force when used with --one-file-system.
 
     - Fix the popt arg parsing so that an option that doesn't take an arg will
-      reject an attempt to supply one.
+      reject an attempt to supply one (can configure --with-included-popt if
+      your system's popt library doesn't yet have this fix).
 
-    - A couple minor option tweaks to support/rrsync script, and also some
+    - A couple minor option tweaks to the support/rrsync script, and also some
       regex changes that make vim highlighting happier.
 
     - Fixed some issues in the support/mnt-excl script.
 
-    - A few manpage improvements.
+    - Various manpage improvements.
 
   ENHANCEMENTS:
 
