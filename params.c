@@ -428,6 +428,7 @@ static int name_cmp(const void *n1, const void *n2)
 static int include_config(char *include, int manage_globals)
 {
     STRUCT_STAT sb;
+    char *match = manage_globals ? "*.conf" : "*.inc";
     int ret;
 
     if (do_stat(include, &sb) < 0) {
@@ -457,7 +458,7 @@ static int include_config(char *include, int manage_globals)
 
 	while ((di = readdir(d)) != NULL) {
 	    char *dname = d_name(di);
-	    if (!wildmatch("*.conf", dname))
+	    if (!wildmatch(match, dname))
 		continue;
 	    bpp = EXPAND_ITEM_LIST(&conf_list, char *, 32);
 	    pathjoin(buf, sizeof buf, include, dname);

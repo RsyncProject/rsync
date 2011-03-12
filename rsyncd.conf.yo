@@ -756,7 +756,8 @@ parameters in a module started in another file, can affect the defaults for
 other files, etc.
 
 When an bf(&include) or bf(&merge) directive refers to a directory, it will read
-in all the bf(*.conf) files contained inside that directory (without any
+in all the bf(*.conf) or bf(*.inc) files (respectively) that are contained inside
+that directory (without any
 recursive scanning), with the files sorted into alpha order.  So, if you have a
 directory named "rsyncd.d" with the files "foo.conf", "bar.conf", and
 "baz.conf" inside it, this directive:
@@ -773,17 +774,25 @@ except that it adjusts as files are added and removed from the directory.
 
 The advantage of the bf(&include) directive is that you can define one or more
 modules in a separate file without worrying about unintended side-effects
-between the self-contained module files.  For instance, this is a useful
-/etc/rsyncd.conf file:
+between the self-contained module files.
+
+The advantage of the bf(&merge) directive is that you can load config snippets
+that can be included into multiple module definitions, and you can also set
+global values that will affect connections (such as bf(motd file)), or globals
+that will affect other include files.
+
+For example, this is a useful /etc/rsyncd.conf file:
 
 verb(    port = 873
     log file = /var/log/rsync.log
     pid file = /var/lock/rsync.lock
 
+    &merge /etc/rsyncd.d
     &include /etc/rsyncd.d )
 
-The advantage of the bf(&merge) directive is that you can load config snippets
-that can be included into multiple module definitions.
+This file merges any /etc/rsyncd.d/*.inc files, and then includes any
+/etc/rsyncd.d/*.conf files, which each include file being isolated from
+the reset (so that each include's globals don't affect any others).
 
 manpagesection(AUTHENTICATION STRENGTH)
 
