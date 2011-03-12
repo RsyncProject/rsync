@@ -790,9 +790,9 @@ verb(    port = 873
     &merge /etc/rsyncd.d
     &include /etc/rsyncd.d )
 
-This file merges any /etc/rsyncd.d/*.inc files, and then includes any
-/etc/rsyncd.d/*.conf files, which each include file being isolated from
-the reset (so that each include's globals don't affect any others).
+This would merge any /etc/rsyncd.d/*.inc files (for global values that should
+stay in effect), and then include any /etc/rsyncd.d/*.conf files (defining
+modules without any global-value cross-talk).
 
 manpagesection(AUTHENTICATION STRENGTH)
 
