@@ -26,6 +26,7 @@ chkdir="$tmpdir/chk"
 all_plus='+++++++++'
 allspace='         '
 dots='.....' # trailing dots after changes
+tab_ch='	' # a single tab character
 
 # Berkley's nice.
 PATH="$PATH:/usr/ucb"
