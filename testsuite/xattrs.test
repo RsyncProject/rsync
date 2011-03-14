@@ -18,8 +18,9 @@ case "`xattr 2>&1`" in
 	xattr -s "$xnam" "$xval" "${@}"
     }
     xls() {
-	xattr -l "${@}"
+	xattr -l "${@}" | sed "s/^[ $tab_ch]*//"
     }
+    RSYNC_PREFIX='rsync'
     RUSR='rsync.nonuser'
     ;;
 *)
@@ -32,6 +33,7 @@ case "`xattr 2>&1`" in
     xls() {
 	getfattr -d "${@}"
     }
+    RSYNC_PREFIX='user.rsync'
     RUSR='user.rsync'
     ;;
 esac
@@ -125,8 +127,8 @@ cd "$chkdir"
 chmod go-rwx . $dirs $files
 
 xset user.nice 'this is nice, but different' file1
-xset user.rsync.%stat "40000 0,0 $uid_gid" $dirs
-xset user.rsync.%stat "100000 0,0 $uid_gid" $files
+xset $RSYNC_PREFIX.%stat "40000 0,0 $uid_gid" $dirs
+xset $RSYNC_PREFIX.%stat "100000 0,0 $uid_gid" $files
 
 xls $dirs $files >"$scratchdir/xattrs.txt"
 
