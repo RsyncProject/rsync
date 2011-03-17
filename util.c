@@ -24,7 +24,6 @@
 #include "ifuncs.h"
 
 extern int verbose;
-extern int dry_run;
 extern int module_id;
 extern int modify_window;
 extern int relative_paths;
