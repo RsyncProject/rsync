@@ -589,9 +589,9 @@ static void send_ida_entries(int f, const ida_entries *idal)
 		const char *name;
 		if (ida->access & NAME_IS_USER) {
 			xbits |= XFLAG_NAME_IS_USER;
-			name = add_uid(ida->id);
+			name = numeric_ids ? NULL : add_uid(ida->id);
 		} else
-			name = add_gid(ida->id);
+			name = numeric_ids ? NULL : add_gid(ida->id);
 		write_varint(f, ida->id);
 		if (inc_recurse && name) {
 			int len = strlen(name);
