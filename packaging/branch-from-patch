@@ -13,6 +13,9 @@ use Getopt::Long;
 );
 &usage if $help_opt;
 
+require 'packaging/git-status.pl';
+check_git_state($master_branch, !$skip_branch_check, 1);
+
 my %local_branch;
 open PIPE, '-|', 'git branch -l' or die "Unable to fork: $!\n";
 while (<PIPE>) {
@@ -29,9 +32,6 @@ if ($delete_local_branches) {
     }
     %local_branch = ( );
 }
-
-require 'packaging/git-status.pl';
-check_git_state($master_branch, !$skip_branch_check, 1);
 
 my @patch_list;
 foreach (@ARGV) {
