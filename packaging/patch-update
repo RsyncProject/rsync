@@ -32,7 +32,7 @@ die "No '$patches_dir' directory was found.\n" unless -d $patches_dir;
 die "No '.git' directory present in the current dir.\n" unless -d '.git';
 
 require 'packaging/git-status.pl';
-check_git_state($master_branch, !$skip_branch_check, 1);
+my $starting_branch = check_git_state($master_branch, !$skip_branch_check, 1);
 
 my $master_commit;
 open PIPE, '-|', "git log -1 --no-color $master_branch" or die $!;
@@ -124,7 +124,7 @@ if ($incl_generated_files) {
 }
 
 sleep 1 while $last_touch >= time;
-system "git checkout $master_branch" and exit 1;
+system "git checkout $starting_branch" and exit 1;
 
 exit;
 
