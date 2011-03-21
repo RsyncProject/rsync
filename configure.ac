@@ -428,8 +428,10 @@ fi
 
 AC_SEARCH_LIBS(inet_ntop, resolv)
 
-# Solaris and HP-UX weirdness:
-# Search for libiconv_open (not iconv_open) to discover if -liconv is needed!
+# For OS X, Solaris, HP-UX, etc.: figure out if -liconv is needed.  We'll
+# accept either iconv_open or libiconv_open, since some include files map
+# the former to the latter.
+AC_SEARCH_LIBS(iconv_open, iconv)
 AC_SEARCH_LIBS(libiconv_open, iconv)
 
 AC_MSG_CHECKING([for iconv declaration])
