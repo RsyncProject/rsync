@@ -61,6 +61,9 @@ Changes since 3.0.7:
 
     - Improved ACL mask handling, e.g. for Solaris.
 
+    - Fixed a bug that prevented --numeric-ids from disabling the translation
+      of user/group IDs for ACLs.
+
     - Fixed an issue where an xattr and/or ACL transfer that used an alt-dest
       option (e.g. --link-dest) could output an error trying to itemize the
       changes against the alt-dest directory's xattr/ACL info but was instead
@@ -126,3 +129,7 @@ Changes since 3.0.7:
     - Updated the helper scripts in the packaging subdirectory.
 
     - Renamed configure.in to configure.ac.
+
+    - Fixed configure's checking for iconv routines for newer OS X versions.
+
+    - Fixed the testsuite/xattrs.test script on OS X.
