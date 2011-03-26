@@ -95,8 +95,8 @@ Changes since 3.0.4:
     - When replacing a non-dir with a symlink/hard-link/device/special-file,
       the update should now be done in an atomic manner.
 
-    - Fixed a free of the wrong pointer in uncache_tmp_xattrs() (which only
-      sometimes affects an --xattr transfer when --backup is used).
+    - Avoid re-sending xattr info for hard-linked files w/the same xattrs
+      (protocol 31).
 
     - When backing up a file, try to hard-link the file into place so that the
       upcoming replacement of the destination file will be atomic.

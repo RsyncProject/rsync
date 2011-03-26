@@ -155,7 +155,8 @@ static void write_ndx_and_attrs(int f_out, int ndx, int iflags,
 	if (iflags & ITEM_XNAME_FOLLOWS)
 		write_vstring(f_out, buf, len);
 #ifdef SUPPORT_XATTRS
-	if (preserve_xattrs && iflags & ITEM_REPORT_XATTR && do_xfers)
+	if (preserve_xattrs && iflags & ITEM_REPORT_XATTR && do_xfers
+	 && (protocol_version < 31 || !BITS_SET(iflags, ITEM_XNAME_FOLLOWS|ITEM_LOCAL_CHANGE)))
 		send_xattr_request(fname, file, f_out);
 #endif
 }
@@ -236,7 +237,8 @@ void send_files(int f_in, int f_out)
 			rprintf(FINFO, "send_files(%d, %s%s%s)\n", ndx, path,slash,fname);
 
 #ifdef SUPPORT_XATTRS
-		if (preserve_xattrs && iflags & ITEM_REPORT_XATTR && do_xfers)
+		if (preserve_xattrs && iflags & ITEM_REPORT_XATTR && do_xfers
+		 && (protocol_version < 31 || !BITS_SET(iflags, ITEM_XNAME_FOLLOWS|ITEM_LOCAL_CHANGE)))
 			recv_xattr_request(file, f_in);
 #endif
 
