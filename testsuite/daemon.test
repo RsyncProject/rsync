@@ -50,19 +50,22 @@ case `get_testuid` in
     ;;
 esac
 
-$RSYNC -ve "$SSH" --rsync-path="$RSYNC$confopt" localhost::
-
-RSYNC_CONNECT_PROG="$RSYNC --config=$conf --daemon"
-export RSYNC_CONNECT_PROG
-
-$RSYNC -v localhost:: \
-    | tee "$outfile"
 # These have a space-padded 15-char name, then a tab, then a comment.
 sed 's/NOCOMMENT//' <<EOT >"$chkfile"
 test-from      	r/o
 test-to        	r/w
 test-scratch   	NOCOMMENT
 EOT
+
+$RSYNC -ve "$SSH" --rsync-path="$RSYNC$confopt" localhost:: | tee "$outfile"
+echo '===='
+diff $diffopt "$chkfile" "$outfile" || test_fail "test 0 failed"
+
+RSYNC_CONNECT_PROG="$RSYNC --config=$conf --daemon"
+export RSYNC_CONNECT_PROG
+
+$RSYNC -v localhost:: | tee "$outfile"
+echo '===='
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 1 failed"
 
 $RSYNC -r localhost::test-hidden \
