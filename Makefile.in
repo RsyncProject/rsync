@@ -48,7 +48,7 @@ TLS_OBJ = tls.o syscall.o lib/compat.o lib/snprintf.o lib/permstring.o lib/sysxa
 CHECK_PROGS = rsync$(EXEEXT) tls$(EXEEXT) getgroups$(EXEEXT) getfsdev$(EXEEXT) \
 	trimslash$(EXEEXT) t_unsafe$(EXEEXT) wildtest$(EXEEXT)
 
-CHECK_SYMLINKS = testsuite/chown-fake.test testsuite/devices-fake.test
+CHECK_SYMLINKS = testsuite/chown-fake.test testsuite/devices-fake.test testsuite/xattrs-hlink.test
 
 # Objects for CHECK_PROGS to clean
 CHECK_OBJS=tls.o getgroups.o getfsdev.o t_stub.o t_unsafe.o trimslash.o wildtest.o
@@ -248,6 +248,9 @@ testsuite/chown-fake.test:
 
 testsuite/devices-fake.test:
 	ln -s devices.test $(srcdir)/testsuite/devices-fake.test
+
+testsuite/xattrs-hlink.test:
+	ln -s xattrs.test $(srcdir)/testsuite/xattrs-hlink.test
 
 # This does *not* depend on building or installing: you can use it to
 # check a version installed from a binary or some other source tree,

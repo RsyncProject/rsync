@@ -83,6 +83,8 @@ Changes since 3.0.7:
 
     - Fixed a bug setting xattrs on new files that aren't user writable.
 
+    - Avoid re-setting xattrs on a hard-linked file w/the same xattrs.
+
     - Fixed a bug with --fake-super when copying files and dirs that aren't
       user writable.
 

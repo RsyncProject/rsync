@@ -6,6 +6,7 @@
 # Test that rsync handles basic xattr preservation.
 
 . $srcdir/testsuite/rsync.fns
+lnkdir="$tmpdir/lnk"
 
 $RSYNC --version | grep ", xattrs" >/dev/null || test_skipped "Rsync is configured without xattr support"
 
@@ -38,7 +39,7 @@ case "`xattr 2>&1`" in
     ;;
 esac
 
-makepath "$fromdir/foo/bar"
+makepath "$lnkdir" "$fromdir/foo/bar"
 echo now >"$fromdir/file0"
 echo something >"$fromdir/file1"
 echo else >"$fromdir/file2"
@@ -73,10 +74,16 @@ xset user.dir1 'need to test directory xattrs too' foo
 xset user.dir2 'another xattr' foo
 xset user.dir3 'this is one last one for the moment' foo
 
+xset user.dir4 'another dir test' foo/bar
+xset user.dir5 'one last one' foo/bar
+
 xset user.foo 'new foo' foo/file3 foo/bar/file5
 xset user.bar 'new bar' foo/file3 foo/bar/file5
 xset user.long 'this is also a long attribute that will be truncated in the initial data send' foo/file3 foo/bar/file5
 xset $RUSR.equal 'this long attribute should remain the same and not need to be transferred' foo/file3 foo/bar/file5
+
+xset user.dir0 'old extra value' "$chkdir/foo"
+xset user.dir1 'old dir value' "$chkdir/foo"
 
 xset user.short 'old short' "$chkdir/file1"
 xset user.extra 'remove me' "$chkdir/file1"
@@ -84,20 +91,42 @@ xset user.extra 'remove me' "$chkdir/file1"
 xset user.foo 'old foo' "$chkdir/foo/file3"
 xset $RUSR.equal 'this long attribute should remain the same and not need to be transferred' "$chkdir/foo/file3"
 
+case $0 in
+*hlink*)
+    ln foo/bar/file5 foo/bar/file6 || test_skipped "Can't create hardlink"
+    files="$files foo/bar/file6"
+    dashH='-H'
+    altDest='--link-dest'
+    ;;
+*)
+    dashH=''
+    altDest='--copy-dest'
+    ;;
+esac
+
 xls $dirs $files >"$scratchdir/xattrs.txt"
 
 # OK, let's try a simple xattr copy.
-checkit "$RSYNC -avX --super . '$chkdir/'" "$fromdir" "$chkdir"
+checkit "$RSYNC -avX $dashH --super . '$chkdir/'" "$fromdir" "$chkdir"
 
 cd "$chkdir"
 xls $dirs $files | diff $diffopt "$scratchdir/xattrs.txt" -
 
 cd "$fromdir"
 
-checkit "$RSYNC -aiX --super --copy-dest=../chk . ../to" "$fromdir" "$todir"
+if [ "$dashH" ]; then
+    for fn in $files; do
+	name=`basename $fn`
+	ln $fn ../lnk/$name
+    done
+fi
+
+checkit "$RSYNC -aiX $dashH --super $altDest=../chk . ../to" "$fromdir" "$todir"
 
 cd "$todir"
 xls $dirs $files | diff $diffopt "$scratchdir/xattrs.txt" -
+
+[ "$dashH" ] && rm -rf "$lnkdir"
 
 cd "$fromdir"
 rm -rf "$todir"
@@ -106,7 +135,7 @@ xset user.nice 'this is nice, but different' file1
 
 xls $dirs $files >"$scratchdir/xattrs.txt"
 
-checkit "$RSYNC -aiX --fake-super --link-dest=../chk . ../to" "$chkdir" "$todir"
+checkit "$RSYNC -aiX $dashH --fake-super --link-dest=../chk . ../to" "$chkdir" "$todir"
 
 cd "$todir"
 xls $dirs $files | diff $diffopt "$scratchdir/xattrs.txt" -
@@ -136,7 +165,7 @@ cd "$fromdir"
 rm -rf "$todir"
 
 # When run by a non-root tester, this checks if no-user-perm files/dirs can be copied.
-checkit "$RSYNC -aiX --fake-super --chmod=a= . ../to" "$chkdir" "$todir" # 2>"$scratchdir/errors.txt"
+checkit "$RSYNC -aiX $dashH --fake-super --chmod=a= . ../to" "$chkdir" "$todir" # 2>"$scratchdir/errors.txt"
 
 cd "$todir"
 xls $dirs $files | diff $diffopt "$scratchdir/xattrs.txt" -
@@ -148,10 +177,13 @@ $RSYNC -aX file1 file2
 $RSYNC -aX file1 file2 ../chk/
 $RSYNC -aX --del ../chk/ .
 $RSYNC -aX file1 ../lnk/
+[ "$dashH" ] && ln "$chkdir/file1" ../lnk/extra-link
 
 xls file1 file2 >"$scratchdir/xattrs.txt"
 
-checkit "$RSYNC -aiiX --copy-dest=../lnk . ../to" "$chkdir" "$todir"
+checkit "$RSYNC -aiiX $dashH $altDest=../lnk . ../to" "$chkdir" "$todir"
+
+[ "$dashH" ] && rm ../lnk/extra-link
 
 cd "$todir"
 xls file1 file2 | diff $diffopt "$scratchdir/xattrs.txt" -
