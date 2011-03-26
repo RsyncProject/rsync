@@ -10,8 +10,9 @@ Changes since 3.0.7:
 
     - Fixed a data-corruption issue when preserving hard-links without
       preserving file ownership, and doing deletions either before or during
-      the transfer.  This fixes some assert errors in the hard-linking code,
-      and some potential failed checksums (via -c) that should have matched.
+      the transfer (CVE-2011-1097).  This fixes some assert errors in the
+      hard-linking code, and some potential failed checksums (via -c) that
+      should have matched.
 
     - Fixed a potential crash when an rsync daemon has a filter/exclude list
       and the transfer is using ACLs or xattrs.
