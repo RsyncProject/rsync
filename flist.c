@@ -1646,11 +1646,12 @@ static void send_directory(int f, struct file_list *flist, char *fbuf, int len,
 		remainder = 0;
 
 	for (errno = 0, di = readdir(d); di; errno = 0, di = readdir(d)) {
+		unsigned name_len;
 		char *dname = d_name(di);
 		if (dname[0] == '.' && (dname[1] == '\0'
 		    || (dname[1] == '.' && dname[2] == '\0')))
 			continue;
-		unsigned name_len = strlcpy(p, dname, remainder);
+		name_len = strlcpy(p, dname, remainder);
 		if (name_len >= remainder) {
 			char save = fbuf[len];
 			fbuf[len] = '\0';
