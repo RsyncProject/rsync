@@ -665,6 +665,21 @@ struct ht_int64_node {
 #define ACLS_NEED_MASK 1
 #endif
 
+#if defined HAVE_FALLOCATE || HAVE_SYS_FALLOCATE
+#include <linux/falloc.h>
+#ifdef FALLOC_FL_KEEP_SIZE
+#define SUPPORT_PREALLOCATION 1
+#elif defined HAVE_FTRUNCATE
+#define SUPPORT_PREALLOCATION 1
+#define PREALLOCATE_NEEDS_TRUNCATE 1
+#endif
+#else /* !fallocate */
+#if defined HAVE_EFFICIENT_POSIX_FALLOCATE && defined HAVE_FTRUNCATE
+#define SUPPORT_PREALLOCATION 1
+#define PREALLOCATE_NEEDS_TRUNCATE 1
+#endif
+#endif
+
 union file_extras {
 	int32 num;
 	uint32 unum;

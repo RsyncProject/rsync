@@ -45,6 +45,7 @@ extern int cleanup_got_literal;
 extern int remove_source_files;
 extern int append_mode;
 extern int sparse_files;
+extern int preallocate_files;
 extern int keep_partial;
 extern int checksum_len;
 extern int checksum_seed;
@@ -227,6 +228,22 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 	char *data;
 	int32 i;
 	char *map = NULL;
+#ifdef SUPPORT_PREALLOCATION
+#ifdef PREALLOCATE_NEEDS_TRUNCATE
+	OFF_T preallocated_len = 0;
+#endif
+
+	if (preallocate_files && fd != -1 && total_size > 0) {
+		/* Try to preallocate enough space for file's eventual length.  Can
+		 * reduce fragmentation on filesystems like ext4, xfs, and NTFS. */
+		if (do_fallocate(fd, 0, total_size) == 0) {
+#ifdef PREALLOCATE_NEEDS_TRUNCATE
+			preallocated_len = total_size;
+#endif
+		} else
+			rsyserr(FWARNING, errno, "do_fallocate %s", full_fname(fname));
+	}
+#endif
 
 	read_sum_head(f_in, &sum);
 
@@ -341,7 +358,14 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 		goto report_write_error;
 
 #ifdef HAVE_FTRUNCATE
-	if (inplace && fd != -1 && do_ftruncate(fd, offset) < 0) {
+	/* inplace: New data could be shorter than old data.
+	 * preallocate_files: total_size could have been an overestimate.
+	 *     Cut off any extra preallocated zeros from dest file. */
+	if ((inplace
+#ifdef PREALLOCATE_NEEDS_TRUNCATE
+	  || preallocated_len > offset
+#endif
+	  ) && fd != -1 && do_ftruncate(fd, offset) < 0) {
 		rsyserr(FERROR_XFER, errno, "ftruncate failed on %s",
 			full_fname(fname));
 	}

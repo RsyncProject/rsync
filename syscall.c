@@ -29,6 +29,10 @@
 #include <sys/attr.h>
 #endif
 
+#if defined HAVE_SYS_FALLOCATE && !defined HAVE_FALLOCATE
+#include <sys/syscall.h>
+#endif
+
 extern int dry_run;
 extern int am_root;
 extern int am_sender;
@@ -416,4 +420,26 @@ int do_utime(const char *fname, time_t modtime, UNUSED(uint32 mod_nsec))
 
 #else
 #error Need utimes or utime function.
+#endif
+
+#ifdef SUPPORT_PREALLOCATION
+int do_fallocate(int fd, OFF_T offset, OFF_T length)
+{
+#ifdef FALLOC_FL_KEEP_SIZE
+#define DO_FALLOC_OPTIONS FALLOC_FL_KEEP_SIZE
+#else
+#define DO_FALLOC_OPTIONS 0
+#endif
+	RETURN_ERROR_IF(dry_run, 0);
+	RETURN_ERROR_IF_RO_OR_LO;
+#if defined HAVE_FALLOCATE
+	return fallocate(fd, DO_FALLOC_OPTIONS, offset, length);
+#elif defined HAVE_SYS_FALLOCATE
+	return syscall(SYS_fallocate, fd, DO_FALLOC_OPTIONS, (loff_t)offset, (loff_t)length);
+#elif defined HAVE_EFFICIENT_POSIX_FALLOCATE
+	return posix_fallocate(fd, offset, length);
+#else
+#error Coding error in SUPPORT_PREALLOCATION logic.
+#endif
+}
 #endif

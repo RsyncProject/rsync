@@ -34,6 +34,7 @@ extern int inplace;
 extern int recurse;
 extern int use_qsort;
 extern int allow_inc_recurse;
+extern int preallocate_files;
 extern int append_mode;
 extern int fuzzy_basis;
 extern int read_batch;
@@ -188,6 +189,14 @@ void setup_protocol(int f_out,int f_in)
 	}
 	if (read_batch)
 		check_batch_flags();
+
+#ifndef SUPPORT_PREALLOCATION
+	if (preallocate_files && !am_sender) {
+		rprintf(FERROR, "preallocation is not supported on this %s\n",
+			am_server ? "Server" : "Client");
+		exit_cleanup(RERR_SYNTAX);
+	}
+#endif
 
 	if (protocol_version < 30) {
 		if (append_mode == 1)

@@ -591,12 +591,48 @@ AC_CHECK_FUNCS(waitpid wait4 getcwd strdup chown chmod lchmod mknod mkfifo \
     setlocale setmode open64 lseek64 mkstemp64 mtrace va_copy __va_copy \
     seteuid strerror putenv iconv_open locale_charset nl_langinfo getxattr \
     extattr_get_link sigaction sigprocmask setattrlist getgrouplist \
-    initgroups utimensat)
+    initgroups utimensat posix_fallocate)
 
 dnl cygwin iconv.h defines iconv_open as libiconv_open
 if test x"$ac_cv_func_iconv_open" != x"yes"; then
     AC_CHECK_FUNC(libiconv_open, [ac_cv_func_iconv_open=yes; AC_DEFINE(HAVE_ICONV_OPEN, 1)])
 fi
+
+dnl Preallocation stuff (also fallocate, posix_fallocate function tests above):
+
+AC_CACHE_CHECK([for useable fallocate],rsync_cv_have_fallocate,[
+AC_TRY_LINK([#include <fcntl.h>
+#include <sys/types.h>],
+[fallocate(0, 0, 0, 0);],
+rsync_cv_have_fallocate=yes,rsync_cv_have_fallocate=no)])
+if test x"$rsync_cv_have_fallocate" = x"yes"; then
+    AC_DEFINE(HAVE_FALLOCATE, 1, [Define to 1 if you have the fallocate function and it compiles and links without error])
+fi
+
+AC_CACHE_CHECK([for SYS_fallocate],rsync_cv_have_sys_fallocate,[
+AC_TRY_COMPILE([#include <sys/syscall.h>
+#include <sys/types.h>],
+[syscall(SYS_fallocate, 0, 0, (loff_t)0, (loff_t)0);],
+rsync_cv_have_sys_fallocate=yes,rsync_cv_have_sys_fallocate=no)])
+if test x"$rsync_cv_have_sys_fallocate" = x"yes"; then
+    AC_DEFINE(HAVE_SYS_FALLOCATE, 1, [Define to 1 if you have the SYS_fallocate syscall number])
+fi
+
+if test x"$ac_cv_func_posix_fallocate" = x"yes"; then
+    AC_MSG_CHECKING([whether posix_fallocate is efficient])
+    case $host_os in
+    *cygwin*)
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_EFFICIENT_POSIX_FALLOCATE, 1,
+		  [Define if posix_fallocate is efficient (Cygwin)])
+	;;
+    *)
+	AC_MSG_RESULT(no)
+	;;
+    esac
+fi
+
+dnl End of preallocation stuff
 
 AC_CHECK_FUNCS(getpgrp tcgetpgrp)
 if test $ac_cv_func_getpgrp = yes; then

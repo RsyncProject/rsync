@@ -73,6 +73,7 @@ int remove_source_files = 0;
 int one_file_system = 0;
 int protocol_version = PROTOCOL_VERSION;
 int sparse_files = 0;
+int preallocate_files = 0;
 int do_compression = 0;
 int def_compress_level = Z_DEFAULT_COMPRESSION;
 int am_root = 0; /* 0 = normal, 1 = root, 2 = --super, -1 = --fake-super */
@@ -562,6 +563,7 @@ static void print_rsync_version(enum logcode f)
 	char const *got_socketpair = "no ";
 	char const *have_inplace = "no ";
 	char const *hardlinks = "no ";
+	char const *prealloc = "no ";
 	char const *symtimes = "no ";
 	char const *acls = "no ";
 	char const *xattrs = "no ";
@@ -582,6 +584,9 @@ static void print_rsync_version(enum logcode f)
 #endif
 #ifdef SUPPORT_HARD_LINKS
 	hardlinks = "";
+#endif
+#ifdef SUPPORT_PREALLOCATION
+	prealloc = "";
 #endif
 #ifdef SUPPORT_ACLS
 	acls = "";
@@ -614,8 +619,8 @@ static void print_rsync_version(enum logcode f)
 		(int)(sizeof (int64) * 8));
 	rprintf(f, "    %ssocketpairs, %shardlinks, %ssymlinks, %sIPv6, batchfiles, %sinplace,\n",
 		got_socketpair, hardlinks, links, ipv6, have_inplace);
-	rprintf(f, "    %sappend, %sACLs, %sxattrs, %siconv, %ssymtimes\n",
-		have_inplace, acls, xattrs, iconv, symtimes);
+	rprintf(f, "    %sappend, %sACLs, %sxattrs, %siconv, %ssymtimes, %sprealloc\n",
+		have_inplace, acls, xattrs, iconv, symtimes, prealloc);
 
 #ifdef MAINTAINER_MODE
 	rprintf(f, "Panic Action: \"%s\"\n", get_panic_action());
@@ -706,6 +711,11 @@ void usage(enum logcode F)
   rprintf(F,"     --fake-super            store/recover privileged attrs using xattrs\n");
 #endif
   rprintf(F," -S, --sparse                handle sparse files efficiently\n");
+#ifdef SUPPORT_PREALLOCATION
+  rprintf(F,"     --preallocate           allocate dest files before writing them\n");
+#else
+  rprintf(F,"     --preallocate           pre-allocate dest files on remote receiver\n");
+#endif
   rprintf(F," -n, --dry-run               perform a trial run with no changes made\n");
   rprintf(F," -W, --whole-file            copy files whole (without delta-xfer algorithm)\n");
   rprintf(F," -x, --one-file-system       don't cross filesystem boundaries\n");
@@ -905,6 +915,7 @@ static struct poptOption long_options[] = {
   {"sparse",          'S', POPT_ARG_VAL,    &sparse_files, 1, 0, 0 },
   {"no-sparse",        0,  POPT_ARG_VAL,    &sparse_files, 0, 0, 0 },
   {"no-S",             0,  POPT_ARG_VAL,    &sparse_files, 0, 0, 0 },
+  {"preallocate",      0,  POPT_ARG_NONE,   &preallocate_files, 0, 0, 0},
   {"inplace",          0,  POPT_ARG_VAL,    &inplace, 1, 0, 0 },
   {"no-inplace",       0,  POPT_ARG_VAL,    &inplace, 0, 0, 0 },
   {"append",           0,  POPT_ARG_NONE,   0, OPT_APPEND, 0, 0 },
@@ -2675,6 +2686,9 @@ void server_options(char **args, int *argc_p)
 		args[ac++] = "--remove-source-files";
 	else if (remove_source_files)
 		args[ac++] = "--remove-sent-files";
+
+	if (preallocate_files && am_sender)
+		args[ac++] = "--preallocate";
 
 	if (ac > MAX_SERVER_ARGS) { /* Not possible... */
 		rprintf(FERROR, "argc overflow in server_options().\n");

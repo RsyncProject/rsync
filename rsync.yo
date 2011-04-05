@@ -360,6 +360,7 @@ to the detailed description below for a complete description.  verb(
      --super                 receiver attempts super-user activities
      --fake-super            store/recover privileged attrs using xattrs
  -S, --sparse                handle sparse files efficiently
+     --preallocate           allocate dest files before writing
  -n, --dry-run               perform a trial run with no changes made
  -W, --whole-file            copy files whole (w/o delta-xfer algorithm)
  -x, --one-file-system       don't cross filesystem boundaries
@@ -1177,6 +1178,17 @@ See also the "fake super" setting in the daemon's rsyncd.conf file.
 dit(bf(-S, --sparse)) Try to handle sparse files efficiently so they take
 up less space on the destination.  Conflicts with bf(--inplace) because it's
 not possible to overwrite data in a sparse fashion.
+
+dit(bf(--preallocate)) This tells the receiver to allocate each destination
+file to its eventual size before writing data to the file.  Rsync will only use
+the real filesystem-level preallocation support provided by Linux's
+bf(fallocate)(2) system call or Cygwin's bf(posix_fallocate)(3), not the slow
+glibc implementation that writes a zero byte into each block.
+
+Without this option, larger files may not be entirely contiguous on the
+filesystem, but with this option rsync will probably copy more slowly.  If the
+destination is not an extent-supporting filesystem (such as ext4, xfs, NTFS,
+etc.), this option may have no positive effect at all.
 
 dit(bf(-n, --dry-run)) This makes rsync perform a trial run that doesn't
 make any changes (and produces mostly the same output as a real run).  It
