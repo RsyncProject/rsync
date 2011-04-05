@@ -94,7 +94,7 @@ static int updating_basis_or_equiv;
  * transfer is in progress. */
 int get_tmpname(char *fnametmp, const char *fname, BOOL make_unique)
 {
-	int maxname, added, length = 0;
+	int maxname, length = 0;
 	const char *f;
 	char *suf;
 
@@ -113,6 +113,8 @@ int get_tmpname(char *fnametmp, const char *fname, BOOL make_unique)
 		}
 	} else
 		f = fname;
+	if (*f == '.') /* avoid an extra leading dot for OS X's sake */
+		f++;
 	fnametmp[length++] = '.';
 
 	/* The maxname value is bufsize, and includes space for the '\0'.
@@ -120,24 +122,30 @@ int get_tmpname(char *fnametmp, const char *fname, BOOL make_unique)
 	maxname = MIN(MAXPATHLEN - length - TMPNAME_SUFFIX_LEN,
 		      NAME_MAX - 1 - TMPNAME_SUFFIX_LEN);
 
-	if (maxname < 1) {
+	if (maxname < 0) {
 		rprintf(FERROR_XFER, "temporary filename too long: %s\n", fname);
 		fnametmp[0] = '\0';
 		return 0;
 	}
 
-	added = strlcpy(fnametmp + length, f, maxname);
-	if (added >= maxname)
-		added = maxname - 1;
-	suf = fnametmp + length + added;
+	if (maxname) {
+		int added = strlcpy(fnametmp + length, f, maxname);
+		if (added >= maxname)
+			added = maxname - 1;
+		suf = fnametmp + length + added;
 
-	/* Trim any dangling high-bit chars if the first-trimmed char (if any) is
-	 * also a high-bit char, just in case we cut into a multi-byte sequence.
-	 * We are guaranteed to stop because of the leading '.' we added. */
-	if ((int)f[added] & 0x80) {
-		while ((int)suf[-1] & 0x80)
+		/* Trim any dangling high-bit chars if the first-trimmed char (if any) is
+		 * also a high-bit char, just in case we cut into a multi-byte sequence.
+		 * We are guaranteed to stop because of the leading '.' we added. */
+		if ((int)f[added] & 0x80) {
+			while ((int)suf[-1] & 0x80)
+				suf--;
+		}
+		/* trim one trailing dot before our suffix's dot */
+		if (suf[-1] == '.')
 			suf--;
-	}
+	} else
+		suf = fnametmp + length - 1; /* overwrite the leading dot with suffix's dot */
 
 	if (make_unique) {
 		static unsigned counter_limit;
