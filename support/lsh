@@ -7,7 +7,6 @@
 # command.
 
 user=''
-prefix=''
 do_cd=y # Default path is user's home dir, just like ssh.
 
 while : ; do
@@ -22,14 +21,13 @@ while : ; do
 done
 
 if [ "$user" ]; then
-    prefix="sudo -H -u '$user'"
+    prefix=''
     if [ $do_cd = y ]; then
 	home=`perl -e "print((getpwnam('$user'))[7])"`
-	# Yeah, this may fail, but attempts to get sudo to cd are harder.
-	cd $home
+	prefix="cd '$home' ;"
     fi
-elif [ $do_cd = y ]; then
-    cd
+    sudo -H -u "$user" sh -c "$prefix $*"
+else
+    [ $do_cd = y ] && cd
+    eval "${@}"
 fi
-
-eval $prefix "${@}"
