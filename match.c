@@ -238,7 +238,7 @@ static void hash_search(int f,struct sum_struct *s,
 					aligned_offset += s->blength;
 					aligned_i++;
 				}
-				if (offset == aligned_offset) {
+				if (offset == aligned_offset && aligned_i < s->count) {
 					if (i != aligned_i) {
 						if (sum != s->sums[aligned_i].sum1
 						 || l != s->sums[aligned_i].len
