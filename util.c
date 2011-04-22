@@ -1024,8 +1024,9 @@ int change_dir(const char *dir, int set_path_only)
 			errno = ENAMETOOLONG;
 			return 0;
 		}
-		curr_dir[curr_dir_len] = '/';
-		memcpy(curr_dir + curr_dir_len + 1, dir, len + 1);
+		if (!(curr_dir_len && curr_dir[curr_dir_len-1] == '/'))
+			curr_dir[curr_dir_len++] = '/';
+		memcpy(curr_dir + curr_dir_len, dir, len + 1);
 
 		if (!set_path_only && chdir(curr_dir)) {
 			curr_dir[curr_dir_len] = '\0';
