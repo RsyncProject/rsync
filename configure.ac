@@ -130,6 +130,8 @@ AC_DEFINE_UNQUOTED(RSYNC_RSH, "$RSYNC_RSH", [default -e command])
 AC_CHECK_PROG(HAVE_YODL2MAN, yodl2man, 1, 0)
 if test x$HAVE_YODL2MAN = x1; then
     MAKE_MAN=man
+else
+    MAKE_MAN=man-copy
 fi
 
 AC_ARG_WITH(nobody-group,

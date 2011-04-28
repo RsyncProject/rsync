@@ -181,9 +181,11 @@ proto.h: proto.h-tstamp
 proto.h-tstamp: $(srcdir)/*.c $(srcdir)/lib/compat.c config.h
 	perl $(srcdir)/mkproto.pl $(srcdir)/*.c $(srcdir)/lib/compat.c
 
-man: rsync.1 rsyncd.conf.5
-	@if test -f rsync.1; then :; else cp -p $(srcdir)/rsync.1 .; fi
-	@if test -f rsyncd.conf.5; then :; else cp -p $(srcdir)/rsyncd.conf.5 .; fi
+man: rsync.1 rsyncd.conf.5 man-copy
+
+man-copy:
+	@if test -f rsync.1; then :; else echo 'Copying srcdir rsync.1'; cp -p $(srcdir)/rsync.1 .; fi
+	@if test -f rsyncd.conf.5; then :; else echo 'Copying srcdir rsyncd.conf.5'; cp -p $(srcdir)/rsyncd.conf.5 .; fi
 
 rsync.1: rsync.yo
 	yodl2man -o rsync.1 $(srcdir)/rsync.yo
