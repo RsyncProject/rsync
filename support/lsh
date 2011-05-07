@@ -24,10 +24,12 @@ if [ "$user" ]; then
     prefix=''
     if [ $do_cd = y ]; then
 	home=`perl -e "print((getpwnam('$user'))[7])"`
-	prefix="cd '$home' ;"
+	prefix="cd '$home' &&"
     fi
     sudo -H -u "$user" sh -c "$prefix $*"
 else
-    [ $do_cd = y ] && cd
+    if [ $do_cd = y ]; then
+	cd || exit 1
+    fi
     eval "${@}"
 fi
