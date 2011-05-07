@@ -94,6 +94,7 @@ int fd_pair(int fd[2])
 
 void print_child_argv(const char *prefix, char **cmd)
 {
+	int cnt = 0;
 	rprintf(FCLIENT, "%s ", prefix);
 	for (; *cmd; cmd++) {
 		/* Look for characters that ought to be quoted.  This
@@ -107,8 +108,9 @@ void print_child_argv(const char *prefix, char **cmd)
 		} else {
 			rprintf(FCLIENT, "%s ", *cmd);
 		}
+		cnt++;
 	}
-	rprintf(FCLIENT, "\n");
+	rprintf(FCLIENT, " (%d args)\n", cnt);
 }
 
 NORETURN void out_of_memory(const char *str)
