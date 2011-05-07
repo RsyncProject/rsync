@@ -1313,6 +1313,9 @@ static int start_client(int argc, char *argv[])
 		remote_argc = argc = 1;
 	}
 
+	if (!rsync_port && remote_argc && !**remote_argv) /* Turn an empty arg into a dot dir. */
+		*remote_argv = ".";
+
 	if (am_sender) {
 		char *dummy_host;
 		int dummy_port = rsync_port;
@@ -1348,6 +1351,8 @@ static int start_client(int argc, char *argv[])
 					rprintf(FERROR, "All source args must use the same port number.\n");
 				exit_cleanup(RERR_SYNTAX);
 			}
+			if (!rsync_port && !*arg) /* Turn an empty arg into a dot dir. */
+				arg = ".";
 			remote_argv[i] = arg;
 		}
 	}
