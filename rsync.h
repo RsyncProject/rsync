@@ -666,7 +666,9 @@ struct ht_int64_node {
 #endif
 
 #if defined HAVE_FALLOCATE || HAVE_SYS_FALLOCATE
+#ifdef HAVE_LINUX_FALLOC_H
 #include <linux/falloc.h>
+#endif
 #ifdef FALLOC_FL_KEEP_SIZE
 #define SUPPORT_PREALLOCATION 1
 #elif defined HAVE_FTRUNCATE
