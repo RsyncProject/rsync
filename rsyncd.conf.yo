@@ -127,6 +127,12 @@ dit(bf(path)) This parameter specifies the directory in the daemon's
 filesystem to make available in this module.  You must specify this parameter
 for each module in tt(rsyncd.conf).
 
+It is fine if the path includes internal spaces -- they will be retained
+verbatim (which means that you shouldn't try to escape them).  If your final
+directory has a trailing space (and this is somehow not something you wish to
+fix), append a trailing slash to the path to avoid losing the trailing
+whitespace.
+
 dit(bf(use chroot)) If "use chroot" is true, the rsync daemon will chroot
 to the "path" before starting the file transfer with the client.  This has
 the advantage of extra protection against possible implementation security
