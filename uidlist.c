@@ -46,9 +46,14 @@ extern char *groupmap;
 #define NFLAGS_WILD_NAME_MATCH (1<<0)
 #define NFLAGS_NAME_MATCH (1<<1)
 
+union name_or_id {
+    const char *name;
+    id_t max_id;
+};
+
 struct idlist {
 	struct idlist *next;
-	const char *name;
+	union name_or_id u;
 	id_t id, id2;
 	uint16 flags;
 };
@@ -76,14 +81,14 @@ static id_t id_parse(const char *num_str)
 	return num;
 }
 
-static struct idlist *add_to_list(struct idlist **root, id_t id, const char *name,
+static struct idlist *add_to_list(struct idlist **root, id_t id, union name_or_id noiu,
 				  id_t id2, uint16 flags)
 {
 	struct idlist *node = new(struct idlist);
 	if (!node)
 		out_of_memory("add_to_list");
 	node->next = *root;
-	node->name = name;
+	node->u = noiu;
 	node->id = id;
 	node->id2 = id2;
 	node->flags = flags;
@@ -198,21 +203,23 @@ static struct idlist *recv_add_id(struct idlist **idlist_ptr, struct idlist *idm
 				  id_t id, const char *name)
 {
 	struct idlist *node;
+	union name_or_id noiu;
 	int flag;
 	id_t id2;
 
+	noiu.name = name; /* ensure that add_to_list() gets the raw value. */
 	if (!name)
 		name = "";
 
 	for (node = idmap; node; node = node->next) {
 		if (node->flags & NFLAGS_WILD_NAME_MATCH) {
-			if (!wildmatch(node->name, name))
+			if (!wildmatch(node->u.name, name))
 				continue;
 		} else if (node->flags & NFLAGS_NAME_MATCH) {
-			if (strcmp(node->name, name) != 0)
+			if (strcmp(node->u.name, name) != 0)
 				continue;
-		} else if (node->name) {
-			if (id < node->id || (unsigned long)id > (unsigned long)node->name)
+		} else if (node->u.max_id) {
+			if (id < node->id || id > node->u.max_id)
 				continue;
 		} else {
 			if (node->id != id)
@@ -234,7 +241,7 @@ static struct idlist *recv_add_id(struct idlist **idlist_ptr, struct idlist *idm
 		id2 = id;
 
 	flag = idlist_ptr == &gidlist && !am_root && !is_in_group(id2) ? FLAG_SKIP_GROUP : 0;
-	node = add_to_list(idlist_ptr, id, *name ? name : NULL, id2, flag);
+	node = add_to_list(idlist_ptr, id, noiu, id2, flag);
 
 	if (DEBUG_GTE(OWN, 2)) {
 		rprintf(FINFO, "%sid %u(%s) maps to %u\n",
@@ -293,6 +300,7 @@ const char *add_uid(uid_t uid)
 {
 	struct idlist *list;
 	struct idlist *node;
+	union name_or_id noiu;
 
 	if (uid == 0)	/* don't map root */
 		return NULL;
@@ -302,8 +310,9 @@ const char *add_uid(uid_t uid)
 			return NULL;
 	}
 
-	node = add_to_list(&uidlist, uid, uid_to_user(uid), 0, 0);
-	return node->name;
+	noiu.name = uid_to_user(uid);
+	node = add_to_list(&uidlist, uid, noiu, 0, 0);
+	return node->u.name;
 }
 
 /* Add a gid to the list of gids.  Only called on sending side. */
@@ -311,6 +320,7 @@ const char *add_gid(gid_t gid)
 {
 	struct idlist *list;
 	struct idlist *node;
+	union name_or_id noiu;
 
 	if (gid == 0)	/* don't map root */
 		return NULL;
@@ -320,8 +330,9 @@ const char *add_gid(gid_t gid)
 			return NULL;
 	}
 
-	node = add_to_list(&gidlist, gid, gid_to_group(gid), 0, 0);
-	return node->name;
+	noiu.name = gid_to_group(gid);
+	node = add_to_list(&gidlist, gid, noiu, 0, 0);
+	return node->u.name;
 }
 
 /* send a complete uid/gid mapping to the peer */
@@ -333,12 +344,12 @@ void send_id_list(int f)
 		int len;
 		/* we send sequences of uid/byte-length/name */
 		for (list = uidlist; list; list = list->next) {
-			if (!list->name)
+			if (!list->u.name)
 				continue;
-			len = strlen(list->name);
+			len = strlen(list->u.name);
 			write_varint30(f, list->id);
 			write_byte(f, len);
-			write_buf(f, list->name, len);
+			write_buf(f, list->u.name, len);
 		}
 
 		/* terminate the uid list with a 0 uid. We explicitly exclude
@@ -349,12 +360,12 @@ void send_id_list(int f)
 	if (preserve_gid || preserve_acls) {
 		int len;
 		for (list = gidlist; list; list = list->next) {
-			if (!list->name)
+			if (!list->u.name)
 				continue;
-			len = strlen(list->name);
+			len = strlen(list->u.name);
 			write_varint30(f, list->id);
 			write_byte(f, len);
-			write_buf(f, list->name, len);
+			write_buf(f, list->u.name, len);
 		}
 		write_varint30(f, 0);
 	}
@@ -434,7 +445,8 @@ void parse_name_map(char *map, BOOL usernames)
 {
 	struct idlist **idmap_ptr = usernames ? &uidmap : &gidmap;
 	struct idlist **idlist_ptr = usernames ? &uidlist : &gidlist;
-	char *colon, *end, *name, *cp = map + strlen(map);
+	char *colon, *end, *cp = map + strlen(map);
+	union name_or_id noiu;
 	id_t id1;
 	uint16 flags;
 
@@ -463,25 +475,25 @@ void parse_name_map(char *map, BOOL usernames)
 				exit_cleanup(RERR_SYNTAX);
 			}
 			if (dash)
-				name = (char *)id_parse(dash+1);
+				noiu.max_id = id_parse(dash+1);
 			else
-				name = (char *)0;
+				noiu.max_id = 0;
 			flags = 0;
 			id1 = id_parse(cp);
 		} else if (strpbrk(cp, "*[?")) {
 			flags = NFLAGS_WILD_NAME_MATCH;
-			name = cp;
+			noiu.name = cp;
 			id1 = 0;
 		} else {
 			flags = NFLAGS_NAME_MATCH;
-			name = cp;
+			noiu.name = cp;
 			id1 = 0;
 		}
 
 		if (usernames) {
 			uid_t uid;
 			if (user_to_uid(colon+1, &uid, True))
-				add_to_list(idmap_ptr, id1, name, uid, flags);
+				add_to_list(idmap_ptr, id1, noiu, uid, flags);
 			else {
 				rprintf(FERROR,
 				    "Unknown --usermap name on receiver: %s\n",
@@ -490,7 +502,7 @@ void parse_name_map(char *map, BOOL usernames)
 		} else {
 			gid_t gid;
 			if (group_to_gid(colon+1, &gid, True))
-				add_to_list(idmap_ptr, id1, name, gid, flags);
+				add_to_list(idmap_ptr, id1, noiu, gid, flags);
 			else {
 				rprintf(FERROR,
 				    "Unknown --groupmap name on receiver: %s\n",
