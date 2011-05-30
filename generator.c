@@ -1523,6 +1523,14 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			}
 		}
 
+#ifdef SUPPORT_XATTRS
+		if (preserve_xattrs && statret == 1)
+			copy_xattrs(fnamecmpbuf, fname);
+#endif
+		if (set_file_attrs(fname, file, real_ret ? NULL : &real_sx, NULL, 0)
+		    && verbose && code != FNONE && f_out != -1)
+			rprintf(code, "%s/\n", fname);
+
 		/* We need to ensure that the dirs in the transfer have writable
 		 * permissions during the time we are putting files within them.
 		 * This is then fixed after the transfer is done. */
@@ -1537,14 +1545,6 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			need_retouch_dir_perms = 1;
 		}
 #endif
-
-#ifdef SUPPORT_XATTRS
-		if (preserve_xattrs && statret == 1)
-			copy_xattrs(fnamecmpbuf, fname);
-#endif
-		if (set_file_attrs(fname, file, real_ret ? NULL : &real_sx, NULL, 0)
-		    && verbose && code != FNONE && f_out != -1)
-			rprintf(code, "%s/\n", fname);
 
 		if (real_ret != 0 && one_file_system)
 			real_sx.st.st_dev = filesystem_dev;
