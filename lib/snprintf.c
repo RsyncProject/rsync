@@ -141,9 +141,6 @@
  void dummy_snprintf(void) {} 
 #endif /* HAVE_SNPRINTF, etc */
 
-/* yes this really must be a ||. Don't muck with this (tridge) */
-#if !defined(HAVE_VSNPRINTF) || !defined(HAVE_C99_VSNPRINTF)
-
 #ifdef HAVE_LONG_DOUBLE
 #define LDOUBLE long double
 #else
@@ -169,6 +166,10 @@
 #define VA_COPY(dest, src) (dest) = (src)
 #endif
 #endif
+#endif
+
+/* yes this really must be a ||. Don't muck with this (tridge) */
+#if !defined(HAVE_VSNPRINTF) || !defined(HAVE_C99_VSNPRINTF)
 
 /*
  * dopr(): poor man's version of doprintf
@@ -1231,8 +1232,6 @@ int rsync_snprintf(char *str,size_t count,const char *fmt,...)
 }
 #define snprintf rsync_snprintf
 #endif
-
-#endif 
 
 #ifndef HAVE_VASPRINTF
  int vasprintf(char **ptr, const char *format, va_list ap)
