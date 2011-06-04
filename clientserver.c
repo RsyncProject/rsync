@@ -396,9 +396,10 @@ static char *finish_pre_exec(pid_t pid, int write_fd, int read_fd, char *request
 	if (wait_process(pid, &status, 0) < 0
 	 || !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
 		char *e;
-		if (asprintf(&e, "pre-xfer exec returned failure (%d)%s%s\n%s",
+		if (asprintf(&e, "pre-xfer exec returned failure (%d)%s%s%s\n%s",
 			     status, status < 0 ? ": " : "",
-			     status < 0 ? strerror(errno) : "", buf) < 0)
+			     status < 0 ? strerror(errno) : "",
+			     *buf ? ":" : "", buf) < 0)
 			return "out_of_memory in finish_pre_exec\n";
 		return e;
 	}
