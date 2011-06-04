@@ -374,7 +374,14 @@ static char *finish_pre_exec(pid_t pid, int write_fd, int read_fd, char *request
 
 	/* Read the stdout from the pre-xfer exec program.  This it is only
 	 * displayed to the user if the script also returns an error status. */
-	for (bp = buf; msglen > 0 && (j = read(read_fd, bp, msglen)) > 0; msglen -= j) {
+	for (bp = buf; msglen > 0; msglen -= j) {
+		if ((j = read(read_fd, bp, msglen)) <= 0) {
+			if (j == 0)
+				break;
+			if (errno == EINTR)
+				continue;
+			break; /* Just ignore the read error for now... */
+		}
 		bp += j;
 		if (j > 1 && bp[-1] == '\n' && bp[-2] == '\r') {
 			bp--;
