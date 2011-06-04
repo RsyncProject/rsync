@@ -966,7 +966,6 @@ else
 	AC_MSG_RESULT(Using Linux xattrs)
 	AC_DEFINE(HAVE_LINUX_XATTRS, 1, [True if you have Linux xattrs])
 	AC_DEFINE(SUPPORT_XATTRS, 1)
-	AC_DEFINE(NO_SYMLINK_XATTRS, 1, [True if symlinks do not support xattrs])
 	;;
     darwin*)
 	AC_MSG_RESULT(Using OS X xattrs)
@@ -979,6 +978,9 @@ else
 	AC_MSG_RESULT(Using FreeBSD extattrs)
 	AC_DEFINE(HAVE_FREEBSD_XATTRS, 1, [True if you have FreeBSD xattrs])
 	AC_DEFINE(SUPPORT_XATTRS, 1)
+	;;
+    for_some_future_os_need)
+	AC_DEFINE(NO_SYMLINK_XATTRS, 1, [True if symlinks do not support xattrs])
 	;;
     *)
 	if test x"$enable_xattr_support" = x"yes"; then
