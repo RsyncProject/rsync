@@ -288,7 +288,7 @@ static void delete_in_dir(char *fbuf, struct file_struct *file, dev_t *fs_dev)
 	if (allowed_lull)
 		maybe_send_keepalive(time(NULL), MSK_ALLOW_FLUSH);
 
-	if (io_error && !ignore_errors) {
+	if (io_error & IOERR_GENERAL && !ignore_errors) {
 		if (already_warned)
 			return;
 		rprintf(FINFO,
