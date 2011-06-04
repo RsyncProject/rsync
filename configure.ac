@@ -1021,7 +1021,6 @@ else
 	AC_MSG_RESULT(Using Linux xattrs)
 	AC_DEFINE(HAVE_LINUX_XATTRS, 1, [True if you have Linux xattrs])
 	AC_DEFINE(SUPPORT_XATTRS, 1)
-	AC_DEFINE(NO_SYMLINK_XATTRS, 1, [True if symlinks do not support xattrs])
 	;;
     darwin*)
 	AC_MSG_RESULT(Using OS X xattrs)
@@ -1039,7 +1038,7 @@ else
 	AC_MSG_RESULT(Using Solaris xattrs)
 	AC_DEFINE(HAVE_SOLARIS_XATTRS, 1, [True if you have Solaris xattrs])
 	AC_DEFINE(SUPPORT_XATTRS, 1)
-	AC_DEFINE(NO_SYMLINK_XATTRS, 1)
+	AC_DEFINE(NO_SYMLINK_XATTRS, 1, [True if symlinks do not support xattrs])
 	;;
     *)
 	if test x"$enable_xattr_support" = x"yes"; then
