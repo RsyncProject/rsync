@@ -348,36 +348,51 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 	return 0;
 }
 
-static char *finish_pre_exec(pid_t pid, int fd, char *request,
+static char *finish_pre_exec(pid_t pid, int write_fd, int read_fd, char *request,
 			     char **early_argv, char **argv)
 {
-	int j = 0, status = -1;
+	char buf[BIGPATHBUFLEN], *bp;
+	int j = 0, status = -1, msglen = sizeof buf - 1;
 
 	if (!request)
 		request = "(NONE)";
 
-	write_buf(fd, request, strlen(request)+1);
+	write_buf(write_fd, request, strlen(request)+1);
 	if (early_argv) {
 		for ( ; *early_argv; early_argv++)
-			write_buf(fd, *early_argv, strlen(*early_argv)+1);
+			write_buf(write_fd, *early_argv, strlen(*early_argv)+1);
 		j = 1; /* Skip arg0 name in argv. */
 	}
 	for ( ; argv[j]; j++) {
-		write_buf(fd, argv[j], strlen(argv[j])+1);
+		write_buf(write_fd, argv[j], strlen(argv[j])+1);
 		if (argv[j][0] == '.' && argv[j][1] == '\0')
 			break;
 	}
-	write_byte(fd, 0);
+	write_byte(write_fd, 0);
 
-	close(fd);
+	close(write_fd);
+
+	/* Read the stdout from the pre-xfer exec program.  This it is only
+	 * displayed to the user if the script also returns an error status. */
+	for (bp = buf; msglen > 0 && (j = read(read_fd, bp, msglen)) > 0; msglen -= j) {
+		bp += j;
+		if (j > 1 && bp[-1] == '\n' && bp[-2] == '\r') {
+			bp--;
+			j--;
+			bp[-1] = '\n';
+		}
+	}
+	*bp = '\0';
+
+	close(read_fd);
 
 	if (wait_process(pid, &status, 0) < 0
 	 || !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
 		char *e;
-		if (asprintf(&e, "pre-xfer exec returned failure (%d)%s%s\n",
+		if (asprintf(&e, "pre-xfer exec returned failure (%d)%s%s\n%s",
 			     status, status < 0 ? ": " : "",
-			     status < 0 ? strerror(errno) : "") < 0)
-			out_of_memory("finish_pre_exec");
+			     status < 0 ? strerror(errno) : "", buf) < 0)
+			return "out_of_memory in finish_pre_exec\n";
 		return e;
 	}
 	return NULL;
@@ -494,7 +509,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	char *p, *err_msg = NULL;
 	char *name = lp_name(i);
 	int use_chroot = lp_use_chroot(i);
-	int ret, pre_exec_fd = -1;
+	int ret, pre_exec_arg_fd = -1, pre_exec_error_fd = -1;
 	int save_munge_symlinks;
 	pid_t pre_exec_pid = 0;
 	char *request = NULL;
@@ -708,9 +723,9 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 		 * command, though it first waits for the parent process to
 		 * send us the user's request via a pipe. */
 		if (*lp_prexfer_exec(i)) {
-			int fds[2];
+			int arg_fds[2], error_fds[2];
 			set_env_num("RSYNC_PID", (long)getpid());
-			if (pipe(fds) < 0 || (pre_exec_pid = fork()) < 0) {
+			if (pipe(arg_fds) < 0 || pipe(error_fds) < 0 || (pre_exec_pid = fork()) < 0) {
 				rsyserr(FLOG, errno, "pre-xfer exec preparation failed");
 				io_printf(f_out, "@ERROR: pre-xfer exec preparation failed\n");
 				return -1;
@@ -718,14 +733,18 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 			if (pre_exec_pid == 0) {
 				char buf[BIGPATHBUFLEN];
 				int j, len;
-				close(fds[1]);
-				set_blocking(fds[0]);
-				len = read_arg_from_pipe(fds[0], buf, BIGPATHBUFLEN);
+				close(arg_fds[1]);
+				close(error_fds[0]);
+				pre_exec_arg_fd = arg_fds[0];
+				pre_exec_error_fd = error_fds[1];
+				set_blocking(pre_exec_arg_fd);
+				set_blocking(pre_exec_error_fd);
+				len = read_arg_from_pipe(pre_exec_arg_fd, buf, BIGPATHBUFLEN);
 				if (len <= 0)
 					_exit(1);
 				set_env_str("RSYNC_REQUEST", buf);
 				for (j = 0; ; j++) {
-					len = read_arg_from_pipe(fds[0], buf,
+					len = read_arg_from_pipe(pre_exec_arg_fd, buf,
 								 BIGPATHBUFLEN);
 					if (len <= 0) {
 						if (!len)
@@ -735,17 +754,21 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 					if (asprintf(&p, "RSYNC_ARG%d=%s", j, buf) > 0)
 						putenv(p);
 				}
-				close(fds[0]);
+				close(pre_exec_arg_fd);
 				close(STDIN_FILENO);
-				close(STDOUT_FILENO);
+				dup2(pre_exec_error_fd, STDOUT_FILENO);
+				close(pre_exec_error_fd);
 				status = system(lp_prexfer_exec(i));
 				if (!WIFEXITED(status))
 					_exit(1);
 				_exit(WEXITSTATUS(status));
 			}
-			close(fds[0]);
-			set_blocking(fds[1]);
-			pre_exec_fd = fds[1];
+			close(arg_fds[0]);
+			close(error_fds[1]);
+			pre_exec_arg_fd = arg_fds[1];
+			pre_exec_error_fd = error_fds[0];
+			set_blocking(pre_exec_arg_fd);
+			set_blocking(pre_exec_error_fd);
 		}
 	}
 #endif
@@ -859,8 +882,8 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	munge_symlinks = save_munge_symlinks; /* The client mustn't control this. */
 
 	if (pre_exec_pid) {
-		err_msg = finish_pre_exec(pre_exec_pid, pre_exec_fd, request,
-					  orig_early_argv, orig_argv);
+		err_msg = finish_pre_exec(pre_exec_pid, pre_exec_arg_fd, pre_exec_error_fd,
+					  request, orig_early_argv, orig_argv);
 	}
 
 	if (orig_early_argv)
@@ -931,9 +954,15 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	}
 
 	if (!ret || err_msg) {
-		if (err_msg)
-			rwrite(FERROR, err_msg, strlen(err_msg), 0);
-		else
+		if (err_msg) {
+			while ((p = strchr(err_msg, '\n')) != NULL) {
+				int len = p - err_msg + 1;
+				rwrite(FERROR, err_msg, len, 0);
+				err_msg += len;
+			}
+			if (*err_msg)
+				rprintf(FERROR, "%s\n", err_msg);
+		} else
 			option_error();
 		msleep(400);
 		exit_cleanup(RERR_UNSUPPORTED);

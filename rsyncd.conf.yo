@@ -712,7 +712,12 @@ the sender.
 
 dit(bf(pre-xfer exec), bf(post-xfer exec)) You may specify a command to be run
 before and/or after the transfer.  If the bf(pre-xfer exec) command fails, the
-transfer is aborted before it begins.
+transfer is aborted before it begins.  Any output from the script on stdout (up
+to several KB) will be displayed to the user when aborting, but is NOT
+displayed if the script returns success.  Any output from the script on stderr
+goes to the daemon's stderr, which is typically discarded (though see
+--no-detatch option for a way to see the stderr output, which can assist with
+debugging).
 
 The following environment variables will be set, though some are
 specific to the pre-xfer or the post-xfer environment:
