@@ -1,19 +1,10 @@
 #!/usr/bin/perl -i -p
 
-# Make some hyphens unbreakable.
-s{(--\w[-\w]+)}{ $x = $1; $x =~ s/-/\\-/g; $x }eg;
-s/(?<!\\)-(['"\d*])/\\-$1/g;
-s#(['"(= /,])-(?!-)#$1\\-#g;
-s/(\\fB)-/$1\\-/g;
-s/(\[\w)-(\w\])/$1\\-$2/g;
-s{(\\f\(CW.*?\\fP)}{ $x = $1; $x =~ s/(?<!\\)-/\\-/g; $x }eg;
-s/(\.\w+)-/$1\\-/g;
+use strict;
+use warnings;
 
 # We only need to use "\&'" or "\&." at the start of a line.
-s/(?<=.)\\\&(['.])/$1$2/g;
-
-# Use an em-dash where appropriate.
-s/ \\?-{1,2} / \\(em /g;
+s/(?<=.)\\\&(['.])/$1/g;
 
 # Some quotes turn into open/close quotes.
 s/'(.)'/\\(oq$1\\(cq/g;
