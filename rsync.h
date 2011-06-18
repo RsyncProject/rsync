@@ -1044,7 +1044,7 @@ extern int errno;
 
 #ifdef HAVE_READLINK
 #define SUPPORT_LINKS 1
-#ifndef NO_SYMLINK_XATTRS
+#if !defined NO_SYMLINK_XATTRS && !defined NO_SYMLINK_USER_XATTRS
 #define do_readlink(path, buf, bufsiz) readlink(path, buf, bufsiz)
 #endif
 #endif

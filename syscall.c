@@ -82,7 +82,7 @@ int do_symlink(const char *lnk, const char *fname)
 	return symlink(lnk, fname);
 }
 
-#ifdef NO_SYMLINK_XATTRS
+#if defined NO_SYMLINK_XATTRS || defined NO_SYMLINK_USER_XATTRS
 ssize_t do_readlink(const char *path, char *buf, size_t bufsiz)
 {
 	/* For --fake-super, we read the link from the file. */
