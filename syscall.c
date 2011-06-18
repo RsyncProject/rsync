@@ -64,7 +64,7 @@ int do_symlink(const char *lnk, const char *fname)
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
 
-#ifdef NO_SYMLINK_XATTRS
+#if defined NO_SYMLINK_XATTRS || defined NO_SYMLINK_USER_XATTRS
 	/* For --fake-super, we create a normal file with mode 0600
 	 * and write the lnk into it. */
 	if (am_root < 0) {
