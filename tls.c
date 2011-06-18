@@ -53,14 +53,6 @@ int preserve_perms = 0;
 int preserve_executability = 0;
 char number_separator;
 
-#ifdef HAVE_UTIMENSAT
-#ifdef HAVE_STRUCT_STAT_ST_MTIM_TV_NSEC
-#define ST_MTIME_NSEC st_mtim.tv_nsec
-#elif defined(HAVE_STRUCT_STAT_ST_MTIMENSEC)
-#define ST_MTIME_NSEC st_mtimensec
-#endif
-#endif
-
 #ifdef SUPPORT_XATTRS
 
 #ifdef HAVE_LINUX_XATTRS

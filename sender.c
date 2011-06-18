@@ -123,8 +123,10 @@ static struct sum_struct *receive_sums(int f)
 void successful_send(int ndx)
 {
 	char fname[MAXPATHLEN];
+	char *failed_op;
 	struct file_struct *file;
 	struct file_list *flist;
+	STRUCT_STAT st;
 
 	if (!remove_source_files)
 		return;
@@ -135,11 +137,31 @@ void successful_send(int ndx)
 		return;
 	f_name(file, fname);
 
-	if (do_unlink(fname) == 0) {
+	if (do_lstat(fname, &st) < 0) {
+		failed_op = "re-lstat";
+		goto failed;
+	}
+
+	if (st.st_size != F_LENGTH(file) || st.st_mtime != file->modtime
+#ifdef ST_MTIME_NSEC
+	 || (NSEC_BUMP(file) && (uint32)st.ST_MTIME_NSEC != F_MOD_NSEC(file))
+#endif
+	) {
+		rprintf(FERROR, "ERROR: Skipping sender remove for changed file: %s\n", fname);
+		return;
+	}
+
+	if (do_unlink(fname) < 0) {
+		failed_op = "remove";
+	  failed:
+		if (errno == ENOENT)
+			rprintf(FINFO, "sender file already removed: %s\n", fname);
+		else
+			rsyserr(FERROR, errno, "sender failed to %s %s", failed_op, fname);
+	} else {
 		if (INFO_GTE(REMOVE, 1))
 			rprintf(FINFO, "sender removed %s\n", fname);
-	} else
-		rsyserr(FERROR, errno, "sender failed to remove %s", fname);
+	}
 }
 
 static void write_ndx_and_attrs(int f_out, int ndx, int iflags,

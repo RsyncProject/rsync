@@ -383,6 +383,14 @@ enum delret {
 #define CAN_CHMOD_SYMLINK 1
 #endif
 
+#ifdef HAVE_UTIMENSAT
+#ifdef HAVE_STRUCT_STAT_ST_MTIM_TV_NSEC
+#define ST_MTIME_NSEC st_mtim.tv_nsec
+#elif defined(HAVE_STRUCT_STAT_ST_MTIMENSEC)
+#define ST_MTIME_NSEC st_mtimensec
+#endif
+#endif
+
 #ifdef HAVE_SYS_SELECT_H
 #include <sys/select.h>
 #endif

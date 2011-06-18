@@ -86,14 +86,6 @@ extern int filesfrom_convert;
 extern iconv_t ic_send, ic_recv;
 #endif
 
-#ifdef HAVE_UTIMENSAT
-#ifdef HAVE_STRUCT_STAT_ST_MTIM_TV_NSEC
-#define ST_MTIME_NSEC st_mtim.tv_nsec
-#elif defined(HAVE_STRUCT_STAT_ST_MTIMENSEC)
-#define ST_MTIME_NSEC st_mtimensec
-#endif
-#endif
-
 #define PTR_SIZE (sizeof (struct file_struct *))
 
 int io_error;

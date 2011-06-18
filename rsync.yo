@@ -1261,6 +1261,19 @@ dit(bf(--remove-source-files)) This tells rsync to remove from the sending
 side the files (meaning non-directories) that are a part of the transfer
 and have been successfully duplicated on the receiving side.
 
+Note that you should only use this option on source files that are quiescent.
+If you are using this to move files that show up in a particular directory over
+to another host, make sure that the finished files get renamed into the source
+directory, not directly written into it, so that rsync can't possibly transfer
+a file that is not yet fully written.  If you can't first write the files into
+a different directory, you should use a naming idiom that lets rsync avoid
+transferring files that are not yet finished (e.g. name the file "foo.new" when
+it is written, rename it to "foo" when it is done, and then use the option
+bf(--exclude='*.new') for the rsync transfer).
+
+Starting with 3.1.0, rsync will skip the sender-side removal (and output an
+error) if the file's size or modify time has not stayed unchanged.
+
 dit(bf(--delete)) This tells rsync to delete extraneous files from the
 receiving side (ones that aren't on the sending side), but only for the
 directories that are being synchronized.  You must have asked rsync to
