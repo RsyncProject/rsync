@@ -1,3 +1,143 @@
+NEWS for rsync 3.0.8 (26 Mar 2011)
+Protocol: 30 (unchanged)
+Changes since 3.0.7:
+
+  BUG FIXES:
+
+    - Fixed two buffer-overflow issues: one where a directory path that is
+      exactly MAXPATHLEN was not handled correctly, and one handling a
+      --backup-dir that is extra extra large.
+
+    - Fixed a data-corruption issue when preserving hard-links without
+      preserving file ownership, and doing deletions either before or during
+      the transfer (CVE-2011-1097).  This fixes some assert errors in the
+      hard-linking code, and some potential failed checksums (via -c) that
+      should have matched.
+
+    - Fixed a potential crash when an rsync daemon has a filter/exclude list
+      and the transfer is using ACLs or xattrs.
+
+    - Fixed a hang if a really large file is being processed by an rsync that
+      can't handle 64-bit numbers.  Rsync will now complain about the file
+      being too big and skip it.
+
+    - For devices and special files, we now avoid gathering useless ACL and/or
+      xattr information for files that aren't being copied.  (The un-copied
+      files are still put into the file list, but there's no need to gather
+      data that is not going to be used.)  This ensures that if the user uses
+      --no-D, that rsync can't possibly complain about being unable to gather
+      extended information from special files that are in the file list (but
+      not in the transfer).
+
+    - Properly handle requesting remote filenames that start with a dash.  This
+      avoids a potential error where a filename could be interpreted as a
+      (usually invalid) option.
+
+    - Fixed a bug in the comparing of upper-case letters in file suffixes for
+      --skip-compress.
+
+    - If an rsync daemon has a module configured without a path setting, rsync
+      will now disallow access to that module.
+
+    - If the destination arg is an empty string, it will be treated as a
+      reference to the current directory (as 2.x used to do).
+
+    - If rsync was compiled with a newer time-setting function (such as
+      lutimes), rsync will fall-back to an older function (such as utimes) on a
+      system where the newer function is not around.  This helps to make the
+      rsync binary more portable in mixed-OS-release situations.
+
+    - Fixed a batch-file writing bug that would not write out the full set of
+      compatibility flags that the transfer was using.  This fixes a potential
+      protocol problem for a batch file that contains a sender-side I/O error:
+      it would have been sent in a way that the batch-reader wasn't expecting.
+
+    - Some improvements to the hard-linking code to ensure that device-number
+      hashing is working right, and to supply more information if the hard-link
+      code fails.
+
+    - The --inplace code was improved to not search for an impossible checksum
+      position.  The quadruple-verbose chunk[N] message will now mention when
+      an inplace chunk was handled by a seek rather than a read+write.
+
+    - Improved ACL mask handling, e.g. for Solaris.
+
+    - Fixed a bug that prevented --numeric-ids from disabling the translation
+      of user/group IDs for ACLs.
+
+    - Fixed an issue where an xattr and/or ACL transfer that used an alt-dest
+      option (e.g. --link-dest) could output an error trying to itemize the
+      changes against the alt-dest directory's xattr/ACL info but was instead
+      trying to access the not-yet-existing new destination directory.
+
+    - Improved xattr system-error messages to mention the full path to the
+      file.
+
+    - The --link-dest checking for identical symlinks now avoids considering
+      attribute differences that cannot be changed on the receiver.
+
+    - Avoid trying to read/write xattrs on certain file types for certain OSes.
+      Improved configure to set NO_SYMLINK_XATTRS, NO_DEVICE_XATTRS, and/or
+      NO_SPECIAL_XATTRS defines in config.h.
+
+    - Improved the unsafe-symlink errors messages.
+
+    - Fixed a bug setting xattrs on new files that aren't user writable.
+
+    - Avoid re-setting xattrs on a hard-linked file w/the same xattrs.
+
+    - Fixed a bug with --fake-super when copying files and dirs that aren't
+      user writable.
+
+    - Fixed a bug where a sparse file could have its last sparse block turned
+      into a real block when rsync sets the file size (requires ftruncate).
+
+    - If a temp-file name is too long, rsync now avoids truncating the name in
+      the middle of adjacent high-bit characters.  This prevents a potential
+      filename error if the filesystem doesn't allow a name to contain an
+      invalid multi-byte sequence.
+
+    - If a muli-protocol socket connection fails (i.e., when contacting a
+      daemon), we now report all the failures, not just the last one.  This
+      avoids losing a relevant error (e.g. an IPv4 connection-refused error)
+      that happened before the final error (e.g. an IPv6 protocol-not-supported
+      error).
+
+    - Generate a transfer error if we try to call chown with a -1 for a uid or
+      a gid (which is not settable).
+
+    - Fixed the working of --force when used with --one-file-system.
+
+    - Fix the popt arg parsing so that an option that doesn't take an arg will
+      reject an attempt to supply one (can configure --with-included-popt if
+      your system's popt library doesn't yet have this fix).
+
+    - A couple minor option tweaks to the support/rrsync script, and also some
+      regex changes that make vim highlighting happier.
+
+    - Fixed some issues in the support/mnt-excl script.
+
+    - Various manpage improvements.
+
+  ENHANCEMENTS:
+
+    - Added ".hg/" to the default cvs excludes (see -C & --cvs-exclude).
+
+  DEVELOPER RELATED:
+
+    - Use lchmod() whenever it is available (not just on symlinks).
+
+    - A couple fixes to the socketpair_tcp() routine.
+
+    - Updated the helper scripts in the packaging subdirectory.
+
+    - Renamed configure.in to configure.ac.
+
+    - Fixed configure's checking for iconv routines for newer OS X versions.
+
+    - Fixed the testsuite/xattrs.test script on OS X.
+
+
 NEWS for rsync 3.0.7 (31 Dec 2009)
 Protocol: 30 (unchanged)
 Changes since 3.0.6:
@@ -3091,9 +3231,11 @@ Changes since 2.4.6:
     * The existing test.sh script by Phil Hands has been merged into a
       test framework that works from both "make check" and the Samba
       build farm.
+
 
 Partial Protocol History
 	RELEASE DATE	VER.	DATE OF COMMIT*	PROTOCOL
+	?? Jun 2011	3.0.9			30
 	26 Mar 2011	3.0.8			30
 	31 Dec 2009	3.0.7			30
 	08 May 2009	3.0.6			30
