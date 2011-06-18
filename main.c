@@ -526,7 +526,7 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 		if ((*dest_path != '.' || dest_path[1] != '\0')
 		 && (check_filter(&daemon_filter_list, FLOG, dest_path, 0) < 0
 		  || check_filter(&daemon_filter_list, FLOG, dest_path, 1) < 0)) {
-			rprintf(FERROR, "skipping daemon-excluded destination \"%s\"\n",
+			rprintf(FERROR, "ERROR: daemon has excluded destination \"%s\"\n",
 				dest_path);
 			exit_cleanup(RERR_FILESELECT);
 		}

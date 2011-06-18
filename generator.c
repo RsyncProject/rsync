@@ -1355,7 +1355,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				handle_skipped_hlink(file, itemizing, code, f_out);
 #endif
 			rprintf(FERROR_XFER,
-				"skipping daemon-excluded %s \"%s\"\n",
+				"ERROR: daemon refused to receive %s \"%s\"\n",
 				is_dir ? "directory" : "file", fname);
 			if (is_dir)
 				goto skipping_dir_contents;
