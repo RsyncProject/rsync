@@ -979,7 +979,8 @@ else
 	AC_DEFINE(HAVE_FREEBSD_XATTRS, 1, [True if you have FreeBSD xattrs])
 	AC_DEFINE(SUPPORT_XATTRS, 1)
 	;;
-    for_some_future_os_need)
+    solaris*)
+	# Better Solaris support coming in 3.1.0...
 	AC_DEFINE(NO_SYMLINK_XATTRS, 1, [True if symlinks do not support xattrs])
 	;;
     *)
