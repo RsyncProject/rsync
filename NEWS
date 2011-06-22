@@ -6,12 +6,14 @@ Changes since 3.0.8:
 
     - Fix a crash bug in checksum scanning when --inplace is used.
 
-    - Fix preservation of system xattrs (e.g. selinux) on Linux.
+    - Fix preservation of a symlink's system xattrs (e.g. selinux) on Linux.
 
     - Fix a bug with the modifying of unwritable directories.
 
     - Fix --fake-super's interaction with --link-dest same-file comparisons.
 
     - Fix the updating of the curr_dir buffer to avoid a duplicate slash.
+
+    - Make daemon-excluded file errors more error-like.
 
     - Fix some issues with the post-processing of the man pages.
