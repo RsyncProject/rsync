@@ -630,7 +630,7 @@ int unchanged_attrs(const char *fname, struct file_struct *file, stat_x *sxp)
 		if (perms_differ(file, sxp))
 			return 0;
 #endif
-#ifndef CAN_CHOWN_SYMLINK
+#ifdef CAN_CHOWN_SYMLINK
 		if (ownership_differs(file, sxp))
 			return 0;
 #endif
