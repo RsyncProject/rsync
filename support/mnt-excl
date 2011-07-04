@@ -18,7 +18,7 @@
 # easily adapted to read /etc/mtab or similar.
 #
 # ADDENDUM:  The addition of the --filter option (which has support for
-# absolute-anchored excludes) can make this screen unneeded in some
+# absolute-anchored excludes) can make this script unneeded in some
 # scenarios.  If you don't need delete protection on the receiving side
 # (or if the destination path is identical to the source path), then you
 # can exclude some absolute paths from the transfer based on the mount
