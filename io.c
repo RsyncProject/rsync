@@ -177,13 +177,19 @@ static void got_flist_entry_status(enum festatus status, const char *buf)
 	case FES_SUCCESS:
 		if (remove_source_files)
 			send_msg(MSG_SUCCESS, buf, 4, 0);
+		/* FALL THROUGH */
+	case FES_NO_SEND:
+#ifdef SUPPORT_HARD_LINKS
 		if (preserve_hard_links) {
 			struct file_struct *file = flist->files[ndx - flist->ndx_start];
 			if (F_IS_HLINKED(file)) {
+				if (status == FES_NO_SEND)
+					flist_ndx_push(&hlink_list, -2); /* indicates a failure follows */
 				flist_ndx_push(&hlink_list, ndx);
 				flist->in_progress++;
 			}
 		}
+#endif
 		break;
 	case FES_REDO:
 		if (read_batch) {
@@ -194,8 +200,6 @@ static void got_flist_entry_status(enum festatus status, const char *buf)
 		if (inc_recurse)
 			flist->to_redo++;
 		flist_ndx_push(&redo_list, ndx);
-		break;
-	case FES_NO_SEND:
 		break;
 	}
 }
