@@ -6,6 +6,9 @@ Changes since 3.0.8:
 
     - Fix a crash bug in checksum scanning when --inplace is used.
 
+    - Fix a hang if a hard-linked file cannot be opened by the sender (e.g.
+      if it has no read permission).
+
     - Fix preservation of a symlink's system xattrs (e.g. selinux) on Linux.
 
     - Fix a bug with the modifying of unwritable directories.
@@ -15,5 +18,8 @@ Changes since 3.0.8:
     - Fix the updating of the curr_dir buffer to avoid a duplicate slash.
 
     - Make daemon-excluded file errors more error-like.
+
+    - Fix a compilation issue on older C compilers (due to a misplaced var
+      declaration).
 
     - Fix some issues with the post-processing of the man pages.
