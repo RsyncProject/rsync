@@ -299,7 +299,6 @@ int open_socket_out(char *host, int port, const char *bind_addr,
 		}
 		break;
 	}
-	freeaddrinfo(res0);
 
 	if (s < 0) {
 		char buf[2048];
@@ -313,6 +312,7 @@ int open_socket_out(char *host, int port, const char *bind_addr,
 		s = -1;
 	}
 
+	freeaddrinfo(res0);
 	free(errnos);
 
 	return s;
