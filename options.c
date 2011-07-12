@@ -206,7 +206,7 @@ static const char *debug_verbosity[] = {
 	/*0*/ NULL,
 	/*1*/ NULL,
 	/*2*/ "BIND,CMD,CONNECT,DEL,DELTASUM,DUP,FILTER,FLIST,ICONV",
-	/*3*/ "ACL,BACKUP,DELTASUM2,DEL2,EXIT,FILTER2,FLIST2,FUZZY,GENR,OWN,RECV,SEND,TIME",
+	/*3*/ "ACL,BACKUP,CONNECT2,DELTASUM2,DEL2,EXIT,FILTER2,FLIST2,FUZZY,GENR,OWN,RECV,SEND,TIME",
 	/*4*/ "CMD2,DELTASUM3,DEL3,EXIT2,FLIST3,ICONV2,OWN2,PROTO,TIME2",
 	/*5*/ "CHDIR,DELTASUM4,FLIST4,FUZZY2,HASH,HLINK",
 };
@@ -267,7 +267,7 @@ static struct output_struct debug_words[COUNT_DEBUG+1] = {
 	DEBUG_WORD(BACKUP, W_REC, "Debug backup actions (levels 1-2)"),
 	DEBUG_WORD(BIND, W_CLI, "Debug socket bind actions"),
 	DEBUG_WORD(CHDIR, W_CLI|W_SRV, "Debug when the current directory changes"),
-	DEBUG_WORD(CONNECT, W_CLI, "Debug connection events"),
+	DEBUG_WORD(CONNECT, W_CLI, "Debug connection events (levels 1-2)"),
 	DEBUG_WORD(CMD, W_CLI, "Debug commands+options that are issued (levels 1-2)"),
 	DEBUG_WORD(DEL, W_REC, "Debug delete actions (levels 1-3)"),
 	DEBUG_WORD(DELTASUM, W_SND|W_REC, "Debug delta-transfer checksumming (levels 1-4)"),

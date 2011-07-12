@@ -297,10 +297,17 @@ int open_socket_out(char *host, int port, const char *bind_addr,
 			s = -1;
 			continue;
 		}
+		if (DEBUG_GTE(CONNECT, 2)) {
+			char buf[2048];
+			if ((error = getnameinfo(res->ai_addr, res->ai_addrlen, buf, sizeof buf, NULL, 0, NI_NUMERICHOST) != 0))
+				rprintf(FINFO, "error in getnameinfo: %s\n", gai_strerror(error));
+			else
+				rprintf(FINFO, "Connected to %s (%s)\n", h, buf);
+		}
 		break;
 	}
 
-	if (s < 0) {
+	if (s < 0 || DEBUG_GTE(CONNECT, 2)) {
 		char buf[2048];
 		for (res = res0, j = 0; res; res = res->ai_next, j++) {
 			if (errnos[j] == 0)
@@ -309,7 +316,8 @@ int open_socket_out(char *host, int port, const char *bind_addr,
 				strlcpy(buf, "*inet_ntop failed*", sizeof buf);
 			rsyserr(FERROR, errnos[j], "failed to connect to %s (%s)", h, buf);
 		}
-		s = -1;
+		if (s < 0)
+			s = -1;
 	}
 
 	freeaddrinfo(res0);
