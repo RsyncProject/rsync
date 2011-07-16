@@ -300,9 +300,8 @@ int open_socket_out(char *host, int port, const char *bind_addr,
 		if (verbose >= 3) {
 			char buf[2048];
 			if ((error = getnameinfo(res->ai_addr, res->ai_addrlen, buf, sizeof buf, NULL, 0, NI_NUMERICHOST) != 0))
-				rprintf(FINFO, "error in getnameinfo: %s\n", gai_strerror(error));
-			else
-				rprintf(FINFO, "Connected to %s (%s)\n", h, buf);
+				snprintf(buf, sizeof buf, "*getnameinfo failure: %s*", gai_strerror(error));
+			rprintf(FINFO, "Connected to %s (%s)\n", h, buf);
 		}
 		break;
 	}
@@ -312,8 +311,8 @@ int open_socket_out(char *host, int port, const char *bind_addr,
 		for (res = res0, j = 0; res; res = res->ai_next, j++) {
 			if (errnos[j] == 0)
 				continue;
-			if (inet_ntop(res->ai_family, res->ai_addr->sa_data + 2, buf, sizeof buf) == NULL)
-				strlcpy(buf, "*inet_ntop failed*", sizeof buf);
+			if ((error = getnameinfo(res->ai_addr, res->ai_addrlen, buf, sizeof buf, NULL, 0, NI_NUMERICHOST) != 0))
+				snprintf(buf, sizeof buf, "*getnameinfo failure: %s*", gai_strerror(error));
 			rsyserr(FERROR, errnos[j], "failed to connect to %s (%s)", h, buf);
 		}
 		if (s < 0)

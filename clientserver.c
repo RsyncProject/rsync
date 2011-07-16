@@ -1071,7 +1071,7 @@ int daemon_main(void)
 	rprintf(FLOG, "rsyncd version %s starting, listening on port %d\n",
 		RSYNC_VERSION, rsync_port);
 	/* TODO: If listening on a particular address, then show that
-	 * address too.  In fact, why not just do inet_ntop on the
+	 * address too.  In fact, why not just do getnameinfo on the
 	 * local address??? */
 
 	start_accept_loop(rsync_port, start_daemon);
