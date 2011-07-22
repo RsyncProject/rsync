@@ -26,8 +26,12 @@
 
 #include "rsync.h"
 #include "ifuncs.h"
+#ifdef HAVE_NETINET_IN_SYSTM_H
 #include <netinet/in_systm.h>
+#endif
+#ifdef HAVE_NETINET_IP_H
 #include <netinet/ip.h>
+#endif
 #include <netinet/tcp.h>
 
 extern char *bind_address;
@@ -642,7 +646,9 @@ struct
 } socket_options[] = {
   {"SO_KEEPALIVE",      SOL_SOCKET,    SO_KEEPALIVE,    0,                 OPT_BOOL},
   {"SO_REUSEADDR",      SOL_SOCKET,    SO_REUSEADDR,    0,                 OPT_BOOL},
+#ifdef SO_BROADCAST
   {"SO_BROADCAST",      SOL_SOCKET,    SO_BROADCAST,    0,                 OPT_BOOL},
+#endif
 #ifdef TCP_NODELAY
   {"TCP_NODELAY",       IPPROTO_TCP,   TCP_NODELAY,     0,                 OPT_BOOL},
 #endif
