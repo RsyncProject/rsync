@@ -37,7 +37,7 @@
  *    which showed it, so that's been fixed.  Also, formated the code
  *    to mutt conventions, and removed dead code left over from the
  *    original.  Also, there is now a builtin-test, just compile with:
- *           gcc -DTEST_SNPRINTF -o snprintf snprintf.c -lm
+ *           gcc -I.. -DTEST_SNPRINTF -o snprintf snprintf.c -lm
  *    and run snprintf for results.
  * 
  *  Thomas Roessler <roessler@guug.de> 01/27/98 for mutt 0.89i
@@ -103,7 +103,7 @@
  *
  **************************************************************/
 
-#include "../config.h"
+#include "config.h"
 
 #ifdef TEST_SNPRINTF /* need math library headers for testing */
 
@@ -140,6 +140,10 @@
  void dummy_snprintf(void);
  void dummy_snprintf(void) {} 
 #endif /* HAVE_SNPRINTF, etc */
+
+#ifdef STDC_HEADERS
+#include <stddef.h>
+#endif
 
 #ifdef HAVE_LONG_DOUBLE
 #define LDOUBLE long double
