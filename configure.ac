@@ -675,7 +675,11 @@ AC_TRY_RUN([
 
 main() {
        int fd[2];
+#ifdef __CYGWIN__
+       exit(1);
+#else
        exit((socketpair(AF_UNIX, SOCK_STREAM, 0, fd) != -1) ? 0 : 1);
+#endif
 }],
 rsync_cv_HAVE_SOCKETPAIR=yes,rsync_cv_HAVE_SOCKETPAIR=no,rsync_cv_HAVE_SOCKETPAIR=cross)])
 if test x"$rsync_cv_HAVE_SOCKETPAIR" = x"yes"; then
