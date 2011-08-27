@@ -2240,8 +2240,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		}
 
 		if (implied_dot_dir < 0) {
-			send_file_name(f, flist, ".", NULL, (flags | FLAG_IMPLIED_DIR) & ~FLAG_CONTENT_DIR, ALL_FILTERS);
 			implied_dot_dir = 1;
+			send_file_name(f, flist, ".", NULL, (flags | FLAG_IMPLIED_DIR) & ~FLAG_CONTENT_DIR, ALL_FILTERS);
 		}
 
 		if (fn != fbuf)
