@@ -1406,7 +1406,7 @@ static void sleep_for_bwlimit(int bytes_written)
 	if (prior_tv.tv_sec) {
 		elapsed_usec = (start_tv.tv_sec - prior_tv.tv_sec) * ONE_SEC
 			     + (start_tv.tv_usec - prior_tv.tv_usec);
-		total_written -= elapsed_usec * bwlimit / (ONE_SEC/1024);
+		total_written -= (int64)elapsed_usec * bwlimit / (ONE_SEC/1024);
 		if (total_written < 0)
 			total_written = 0;
 	}
