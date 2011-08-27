@@ -451,11 +451,17 @@ accepted: verb(
 
 manpageoptions()
 
-rsync uses the GNU long options package. Many of the command line
-options have two variants, one short and one long.  These are shown
-below, separated by commas. Some options only have a long variant.
-The '=' for options that take a parameter is optional; whitespace
-can be used instead.
+Rsync accepts both long (double-dash + word) and short (single-dash + letter)
+options.  The full list of the available options are described below.  If an
+option can be specified in more than one way, the choices are comma-separated.
+Some options only have a long variant, not a short.  If the option takes a
+parameter, the parameter is only listed after the long variant, even though it
+must also be specified for the short.  When specifying a parameter, you can
+either use the form --option=param or replace the '=' with whitespace.  The
+parameter may need to be quoted in some manner for it to survive the shell's
+command-line parsing.  Keep in mind that a leading tilde (~) in a filename is
+substituted by your shell, so --option=~/foo will not change the tilde into
+your home directory (remove the '=' for that).
 
 startdit()
 dit(bf(--help)) Print a short help page describing the options
