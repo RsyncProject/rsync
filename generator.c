@@ -1362,12 +1362,13 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		    && INFO_GTE(NAME, 1) && code != FNONE && f_out != -1)
 			rprintf(code, "%s/\n", fname);
 
-		/* We need to ensure that the dirs in the transfer have writable
-		 * permissions during the time we are putting files within them.
-		 * This is then fixed after the transfer is done. */
+		/* We need to ensure that the dirs in the transfer have both
+		 * readable and writable permissions during the time we are
+		 * putting files within them.  This is then restored to the
+		 * former permissions after the transfer is done. */
 #ifdef HAVE_CHMOD
-		if (!am_root && !(file->mode & S_IWUSR) && dir_tweaking) {
-			mode_t mode = file->mode | S_IWUSR;
+		if (!am_root && (file->mode & S_IRWXU) != S_IRWXU && dir_tweaking) {
+			mode_t mode = file->mode | S_IRWXU;
 			if (do_chmod(fname, mode) < 0) {
 				rsyserr(FERROR_XFER, errno,
 					"failed to modify permissions on %s",
