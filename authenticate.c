@@ -156,36 +156,27 @@ static const char *getpassf(const char *filename)
 {
 	STRUCT_STAT st;
 	char buffer[512], *p;
-	int fd, n, ok = 1;
-	const char *envpw = getenv("RSYNC_PASSWORD");
+	int fd, n;
 
 	if (!filename)
 		return NULL;
 
 	if ((fd = open(filename,O_RDONLY)) < 0) {
-		rsyserr(FWARNING, errno, "could not open password file \"%s\"",
-			filename);
-		if (envpw)
-			rprintf(FINFO, "falling back to RSYNC_PASSWORD environment variable.\n");
-		return NULL;
+		rsyserr(FERROR, errno, "could not open password file %s", filename);
+		exit_cleanup(RERR_SYNTAX);
 	}
 
 	if (do_stat(filename, &st) == -1) {
-		rsyserr(FWARNING, errno, "stat(%s)", filename);
-		ok = 0;
-	} else if ((st.st_mode & 06) != 0) {
-		rprintf(FWARNING, "password file must not be other-accessible\n");
-		ok = 0;
-	} else if (MY_UID() == 0 && st.st_uid != 0) {
-		rprintf(FWARNING, "password file must be owned by root when running as root\n");
-		ok = 0;
+		rsyserr(FERROR, errno, "stat(%s)", filename);
+		exit_cleanup(RERR_SYNTAX);
 	}
-	if (!ok) {
-		close(fd);
-		rprintf(FWARNING, "continuing without password file\n");
-		if (envpw)
-			rprintf(FINFO, "falling back to RSYNC_PASSWORD environment variable.\n");
-		return NULL;
+	if ((st.st_mode & 06) != 0) {
+		rprintf(FERROR, "ERROR: password file must not be other-accessible\n");
+		exit_cleanup(RERR_SYNTAX);
+	}
+	if (MY_UID() == 0 && st.st_uid != 0) {
+		rprintf(FERROR, "ERROR: password file must be owned by root when running as root\n");
+		exit_cleanup(RERR_SYNTAX);
 	}
 
 	n = read(fd, buffer, sizeof buffer - 1);
@@ -196,7 +187,8 @@ static const char *getpassf(const char *filename)
 			return strdup(p);
 	}
 
-	return NULL;
+	rprintf(FERROR, "ERROR: failed to read a password from %s\n", filename);
+	exit_cleanup(RERR_SYNTAX);
 }
 
 /* Generate an MD4 hash created from the combination of the password
