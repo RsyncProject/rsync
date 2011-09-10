@@ -17,9 +17,35 @@ Changes since 3.0.8:
 
     - Fix the updating of the curr_dir buffer to avoid a duplicate slash.
 
+    - Fix the directory permissions on an implied dot-dir when using --relative
+      (e.g. /outside/path/././send/path).
+
+    - Fixed some too-long sleeping instances when using --bwlimit.
+
+    - Fixed when symlink ownership difference-checking gets compiled into
+      unchanged_attrs().
+
+    - Improved the socket-error reporting when multiple protocols fail.
+
+    - Fixed a case where a socket error could reference just-freed memory.
+
+    - Failing to use a password file that was specified on the command-line is
+      now a fatal error.
+
+    - Fix the non-root updating of directories that don't have the read and/or
+      execute permission.
+
     - Make daemon-excluded file errors more error-like.
 
     - Fix a compilation issue on older C compilers (due to a misplaced var
       declaration).
 
+    - Make configure avoid finding socketpair on cygwin.
+
+    - Avoid trying to reference SO_BROADCAST if the OS doesn't support it.
+
     - Fix some issues with the post-processing of the man pages.
+
+    - Fixed the user home-dir handling in the support/lsh script.
+
+    - Some minor manpage improvements.
