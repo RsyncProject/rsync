@@ -665,6 +665,7 @@ void usage(enum logcode F)
   rprintf(F," -v, --verbose               increase verbosity\n");
   rprintf(F,"     --info=FLAGS            fine-grained informational verbosity\n");
   rprintf(F,"     --debug=FLAGS           fine-grained debug verbosity\n");
+  rprintf(F,"     --msgs2stderr           special output handling for debugging\n");
   rprintf(F," -q, --quiet                 suppress non-error messages\n");
   rprintf(F,"     --no-motd               suppress daemon-mode MOTD (see manpage caveat)\n");
   rprintf(F," -c, --checksum              skip based on checksum, not mod-time & size\n");

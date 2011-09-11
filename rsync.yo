@@ -320,6 +320,7 @@ to the detailed description below for a complete description.  verb(
  -v, --verbose               increase verbosity
      --info=FLAGS            fine-grained informational verbosity
      --debug=FLAGS           fine-grained debug verbosity
+     --msgs2stderr           special output handling for debugging
  -q, --quiet                 suppress non-error messages
      --no-motd               suppress daemon-mode MOTD (see caveat)
  -c, --checksum              skip based on checksum, not mod-time & size
@@ -537,6 +538,16 @@ verb(    rsync -avvv --debug=none src/ dest/
 This option was added to 3.1.0, so an older rsync on the server side might
 reject your attempts at fine-grained control (if one or more flags needed
 to be send to the server and the server was too old to understand them).
+
+dit(bf(--msgs2stderr)) This option changes rsync to send all its output
+directly to stderr rather than to send messages to the client side via the
+protocol (which normally outputs info messages via stdout).  This is mainly
+intended for debugging in order to avoid changing the data sent via the
+protocol, since the extra protocol data can change what is being tested.
+Keep in mind that a daemon connection does not have a stderr channel to send
+messages back to the client side, so if you are doing any daemon-transfer
+debugging using this option, you should start up a daemon using bf(--no-detach)
+so that you can see the stderr output on the daemon side.
 
 dit(bf(-q, --quiet)) This option decreases the amount of information you
 are given during the transfer, notably suppressing information messages
