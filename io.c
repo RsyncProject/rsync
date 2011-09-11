@@ -912,6 +912,9 @@ void noop_io_until_death(void)
 {
 	char buf[1024];
 
+	if (!iobuf.in.buf || !iobuf.out.buf || iobuf.in_fd == -1 || iobuf.out_fd == -1)
+		return;
+
 	kluge_around_eof = 2;
 	/* Setting an I/O timeout ensures that if something inexplicably weird
 	 * happens, we won't hang around forever. */

@@ -809,8 +809,12 @@ static void do_server_sender(int f_in, int f_out, int argc, char *argv[])
 	}
 
 	flist = send_file_list(f_out,argc,argv);
-	if (!flist || flist->used == 0)
+	if (!flist || flist->used == 0) {
+		/* Make sure input buffering is off so we can't hang in noop_io_until_death(). */
+		io_end_buffering_in(0);
+		/* TODO:  we should really exit in a more controlled manner. */
 		exit_cleanup(0);
+	}
 
 	io_start_buffering_in(f_in);
 
