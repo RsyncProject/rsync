@@ -593,7 +593,7 @@ AC_CHECK_FUNCS(waitpid wait4 getcwd strdup chown chmod lchmod mknod mkfifo \
     setlocale setmode open64 lseek64 mkstemp64 mtrace va_copy __va_copy \
     seteuid strerror putenv iconv_open locale_charset nl_langinfo getxattr \
     extattr_get_link sigaction sigprocmask setattrlist getgrouplist \
-    initgroups utimensat posix_fallocate)
+    initgroups utimensat posix_fallocate attropen)
 
 dnl cygwin iconv.h defines iconv_open as libiconv_open
 if test x"$ac_cv_func_iconv_open" != x"yes"; then
@@ -1011,7 +1011,7 @@ AC_MSG_CHECKING(whether to support extended attributes)
 AC_ARG_ENABLE(xattr-support,
     AC_HELP_STRING([--disable-xattr-support],
 	    [disable extended attributes]),
-    [], [case "$ac_cv_func_getxattr$ac_cv_func_extattr_get_link" in
+    [], [case "$ac_cv_func_getxattr$ac_cv_func_extattr_get_link$ac_cv_func_attropen" in
 	*yes*) enable_xattr_support=maybe ;;
 	*) enable_xattr_support=no ;;
 	esac])
