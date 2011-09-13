@@ -729,7 +729,7 @@ void usage(enum logcode F)
   rprintf(F,"     --del                   an alias for --delete-during\n");
   rprintf(F,"     --delete                delete extraneous files from destination dirs\n");
   rprintf(F,"     --delete-before         receiver deletes before transfer, not during\n");
-  rprintf(F,"     --delete-during         receiver deletes during transfer (default)\n");
+  rprintf(F,"     --delete-during         receiver deletes during the transfer\n");
   rprintf(F,"     --delete-delay          find deletions during, delete after\n");
   rprintf(F,"     --delete-after          receiver deletes after transfer, not during\n");
   rprintf(F,"     --delete-excluded       also delete excluded files from destination dirs\n");

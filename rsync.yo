@@ -374,9 +374,9 @@ to the detailed description below for a complete description.  verb(
      --del                   an alias for --delete-during
      --delete                delete extraneous files from dest dirs
      --delete-before         receiver deletes before xfer, not during
-     --delete-during         receiver deletes during transfer (default)
+     --delete-during         receiver deletes during the transfer
      --delete-delay          find deletions during, delete after
-     --delete-after          receiver deletes after transfer, not before
+     --delete-after          receiver deletes after transfer, not during
      --delete-excluded       also delete excluded files from dest dirs
      --ignore-missing-args   ignore missing source args without error
      --delete-missing-args   delete missing source args from destination
@@ -551,7 +551,7 @@ so that you can see the stderr output on the daemon side.
 
 dit(bf(-q, --quiet)) This option decreases the amount of information you
 are given during the transfer, notably suppressing information messages
-from the remote server. This option name is useful when invoking rsync from
+from the remote server. This option is useful when invoking rsync from
 cron.
 
 dit(bf(--no-motd)) This option affects the information that is output
