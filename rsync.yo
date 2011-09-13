@@ -281,6 +281,19 @@ daemon (including stand-alone and inetd configurations).
 If you're using one of the remote-shell transports for the transfer, there is
 no need to manually start an rsync daemon.
 
+manpagesection(SORTED TRANSFER ORDER)
+
+Rsync always sorts the specified filenames into its internal transfer list.
+This handles the merging together of the contents of identically named
+directories, makes it easy to remove duplicate filenames, and may confuse
+someone when the files are transferred in a different order than what was
+given on the command-line.
+
+If you need a particular file to be transferred prior to another, either
+separate the files into different rsync calls, or consider using
+bf(--delay-updates) (which doesn't affect the sorted transfer order, but
+does make the final file-updating phase happen much more rapidly).
+
 manpagesection(EXAMPLES)
 
 Here are some examples of how I use rsync.
