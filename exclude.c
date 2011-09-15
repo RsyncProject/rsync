@@ -901,13 +901,9 @@ static const char *parse_rule_tok(const char *p, uint32 mflags, int xflags,
 		exit_cleanup(RERR_SYNTAX);
 	}
 
-	/* --delete-excluded turns an un-modified include/exclude into a
-	 * sender-side rule.  We also affect per-dir merge files that take
-	 * no prefixes as a simple optimization. */
+	/* --delete-excluded turns an un-modified include/exclude into a sender-side rule. */
 	if (delete_excluded
-	 && !(new_mflags & (MATCHFLG_RECEIVER_SIDE|MATCHFLG_SENDER_SIDE))
-	 && (!(new_mflags & MATCHFLG_PERDIR_MERGE)
-	  || new_mflags & MATCHFLG_NO_PREFIXES))
+	 && !(new_mflags & (MATCHFLG_RECEIVER_SIDE|MATCHFLG_SENDER_SIDE|MATCHFLG_MERGE_FILE|MATCHFLG_PERDIR_MERGE)))
 		new_mflags |= MATCHFLG_SENDER_SIDE;
 
 	*len_ptr = len;
