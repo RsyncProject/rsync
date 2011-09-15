@@ -129,7 +129,10 @@ RUNSHFLAGS='-e'
 export RUNSHFLAGS
 
 # for Solaris
-[ -d /usr/xpg4/bin ] && PATH="/usr/xpg4/bin/:$PATH"
+if [ -d /usr/xpg4/bin ]; then
+    PATH="/usr/xpg4/bin/:$PATH"
+    export PATH
+fi
 
 if [ "x$loglevel" != x ] && [ "$loglevel" -gt 8 ]; then
     if set -x; then
