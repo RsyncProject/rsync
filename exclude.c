@@ -1013,13 +1013,9 @@ static filter_rule *parse_rule_tok(const char **rulestr_ptr,
 		exit_cleanup(RERR_SYNTAX);
 	}
 
-	/* --delete-excluded turns an un-modified include/exclude into a
-	 * sender-side rule.  We also affect per-dir merge files that take
-	 * no prefixes as a simple optimization. */
+	/* --delete-excluded turns an un-modified include/exclude into a sender-side rule.  */
 	if (delete_excluded
-	 && !(rule->rflags & FILTRULES_SIDES)
-	 && (!(rule->rflags & FILTRULE_PERDIR_MERGE)
-	  || rule->rflags & FILTRULE_NO_PREFIXES))
+	 && !(rule->rflags & (FILTRULES_SIDES|FILTRULE_MERGE_FILE|FILTRULE_PERDIR_MERGE)))
 		rule->rflags |= FILTRULE_SENDER_SIDE;
 
 	*pat_ptr = (const char *)s;
