@@ -19,8 +19,8 @@ case $0 in
     $RSYNC --version | grep ", xattrs" >/dev/null || test_skipped "Rsync needs xattrs for fake device tests"
     RSYNC="$RSYNC --fake-super"
     TLS_ARGS="$TLS_ARGS --fake-super"
-    case "`xattr 2>&1 || true`" in
-    *--list:*)
+    case "$HOST_OS" in
+    darwin*)
 	mknod() {
 	    fn="$1"
 	    case "$2" in
@@ -32,6 +32,22 @@ case $0 in
 	    min="${4:-0}"
 	    touch "$fn"
 	    xattr -s 'rsync.%stat' "$mode $maj,$min 0:0" "$fn"
+	}
+	;;
+    solaris*)
+	mknod() {
+	    fn="$1"
+	    case "$2" in
+	    p) mode=10644 ;;
+	    c) mode=20644 ;;
+	    b) mode=60644 ;;
+	    esac
+	    maj="${3:-0}"
+	    min="${4:-0}"
+	    touch "$fn"
+	    runat "$fn" "$SHELL_PATH" <<EOF
+echo "$mode $maj,$min 0:0" > rsync.%stat
+EOF
 	}
 	;;
     *)

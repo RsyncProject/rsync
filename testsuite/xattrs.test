@@ -10,8 +10,8 @@ lnkdir="$tmpdir/lnk"
 
 $RSYNC --version | grep ", xattrs" >/dev/null || test_skipped "Rsync is configured without xattr support"
 
-case "`xattr 2>&1 || true`" in
-*--list:*)
+case "$HOST_OS" in
+darwin*)
     xset() {
 	xnam="$1"
 	xval="$2"
@@ -20,6 +20,27 @@ case "`xattr 2>&1 || true`" in
     }
     xls() {
 	xattr -l "${@}" | sed "s/^[ $tab_ch]*//"
+    }
+    RSYNC_PREFIX='rsync'
+    RUSR='rsync.nonuser'
+    ;;
+solaris*)
+    xset() {
+	xnam="$1"
+	xval="$2"
+	shift 2
+	for fn in "${@}"; do
+	    runat "$fn" "$SHELL_PATH" <<EOF
+echo "${xval}" > "${xnam}"
+EOF
+	done
+    }
+    xls() {
+	for fn in "${@}"; do
+	    runat "$fn" "$SHELL_PATH" <<EOF
+for x in *; do echo "\$x=\`cat \$x\`"; done
+EOF
+       done
     }
     RSYNC_PREFIX='rsync'
     RUSR='rsync.nonuser'
