@@ -447,7 +447,7 @@ int do_fallocate(int fd, OFF_T offset, OFF_T length)
 int do_open_nofollow(const char *pathname, int flags)
 {
 #ifndef O_NOFOLLOW
-	struct stat f_st, l_st;
+	STRUCT_STAT f_st, l_st;
 #endif
 	int fd;
 
