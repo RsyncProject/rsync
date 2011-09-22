@@ -93,11 +93,14 @@ static void rsync_xal_free(item_list *xalp)
 	size_t i;
 	rsync_xa *rxas = xalp->items;
 
+	if (!xalp->malloced)
+		return;
+
 	for (i = 0; i < xalp->count; i++) {
 		free(rxas[i].datum);
 		/*free(rxas[i].name);*/
 	}
-	xalp->count = 0;
+	free(xalp->items);
 }
 
 void free_xattr(stat_x *sxp)
@@ -772,10 +775,8 @@ void uncache_tmp_xattrs(void)
 		item_list *xattr_start = xattr_item + prior_xattr_count;
 		xattr_item += rsync_xal_l.count;
 		rsync_xal_l.count = prior_xattr_count;
-		while (xattr_item-- > xattr_start) {
+		while (xattr_item-- > xattr_start)
 			rsync_xal_free(xattr_item);
-			free(xattr_item->items);
-		}
 		prior_xattr_count = (size_t)-1;
 	}
 }
