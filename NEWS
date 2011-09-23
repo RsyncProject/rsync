@@ -11,6 +11,11 @@ Changes since 3.0.8:
 
     - Fix preservation of a symlink's system xattrs (e.g. selinux) on Linux.
 
+    - Fix a memory leak in the xattr code.
+
+    - Fixed a bug with --delete-excluded when a filter merge file has a rule
+      that specifies a receiver-only side restriction.
+
     - Fix a bug with the modifying of unwritable directories.
 
     - Fix --fake-super's interaction with --link-dest same-file comparisons.
