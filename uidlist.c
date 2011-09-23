@@ -445,14 +445,13 @@ void parse_name_map(char *map, BOOL usernames)
 {
 	struct idlist **idmap_ptr = usernames ? &uidmap : &gidmap;
 	struct idlist **idlist_ptr = usernames ? &uidlist : &gidlist;
-	char *colon, *end, *cp = map + strlen(map);
+	char *colon, *cp = map + strlen(map);
 	union name_or_id noiu;
 	id_t id1;
 	uint16 flags;
 
 	/* Parse the list in reverse, so the order in the struct is right. */
 	while (1) {
-		end = cp;
 		while (cp > map && cp[-1] != ',') cp--;
 		if (!(colon = strchr(cp, ':'))) {
 			rprintf(FERROR, "No colon found in --%smap: %s\n",
