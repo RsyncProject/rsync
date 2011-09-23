@@ -1066,7 +1066,6 @@ static int readfd_unbuffered(int fd, char *buf, size_t len)
 				xbuf outbuf, inbuf;
 				char ibuf[512];
 				int add_null = 0;
-				int pos = 0;
 
 				INIT_CONST_XBUF(outbuf, line);
 				INIT_XBUF(inbuf, ibuf, 0, -1);
@@ -1081,7 +1080,6 @@ static int readfd_unbuffered(int fd, char *buf, size_t len)
 					if (iconvbufs(ic_send, &inbuf, &outbuf,
 					    ICB_INCLUDE_BAD | ICB_INCLUDE_INCOMPLETE) < 0)
 						goto overflow;
-					pos = -1;
 				}
 				if (add_null) {
 					if (outbuf.len == outbuf.size)
