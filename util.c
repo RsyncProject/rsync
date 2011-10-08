@@ -762,7 +762,7 @@ void glob_expand_module(char *base1, char *arg, char ***argv_p, int *argc_p, int
 	if (!(arg = strdup(arg)))
 		out_of_memory("glob_expand_module");
 
-	if (asprintf(&base," %s/", base1) <= 0)
+	if (asprintf(&base," %s/", base1) < 0)
 		out_of_memory("glob_expand_module");
 	base_len++;
 
@@ -1144,7 +1144,7 @@ char *full_fname(const char *fn)
 	} else
 		m1 = m2 = m3 = "";
 
-	if (asprintf(&result, "\"%s%s%s\"%s%s%s", p1, p2, fn, m1, m2, m3) <= 0)
+	if (asprintf(&result, "\"%s%s%s\"%s%s%s", p1, p2, fn, m1, m2, m3) < 0)
 		out_of_memory("full_fname");
 
 	return result;
