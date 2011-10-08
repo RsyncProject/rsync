@@ -1121,7 +1121,7 @@ static void create_pid_file(void)
 		rsyserr(FLOG, errno, "failed to create pid file %s", pid_file);
 		exit_cleanup(RERR_FILEIO);
 	}
-	snprintf(pidbuf, sizeof pidbuf, "%ld\n", (long)pid);
+	snprintf(pidbuf, sizeof pidbuf, "%d\n", (int)pid);
 	len = strlen(pidbuf);
 	if (write(fd, pidbuf, len) != len)
 		goto failure;

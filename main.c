@@ -364,7 +364,7 @@ static void show_malloc_stats(void)
 
 	rprintf(FCLIENT, "\n");
 	rprintf(FINFO, RSYNC_NAME "[%d] (%s%s%s) heap statistics:\n",
-		getpid(), am_server ? "server " : "",
+		(int)getpid(), am_server ? "server " : "",
 		am_daemon ? "daemon " : "", who_am_i());
 	rprintf(FINFO, "  arena:     %10ld   (bytes from sbrk)\n",
 		(long)mi.arena);
@@ -774,10 +774,8 @@ static void do_server_sender(int f_in, int f_out, int argc, char *argv[])
 	struct file_list *flist;
 	char *dir = argv[0];
 
-	if (DEBUG_GTE(SEND, 1)) {
-		rprintf(FINFO, "server_sender starting pid=%ld\n",
-			(long)getpid());
-	}
+	if (DEBUG_GTE(SEND, 1))
+		rprintf(FINFO, "server_sender starting pid=%d\n", (int)getpid());
 
 	if (am_daemon && lp_write_only(module_id)) {
 		rprintf(FERROR, "ERROR: module is write only\n");
@@ -972,10 +970,8 @@ static void do_server_recv(int f_in, int f_out, int argc, char *argv[])
 	} else
 		negated_levels = 0;
 
-	if (DEBUG_GTE(RECV, 1)) {
-		rprintf(FINFO, "server_recv(%d) starting pid=%ld\n",
-			argc, (long)getpid());
-	}
+	if (DEBUG_GTE(RECV, 1))
+		rprintf(FINFO, "server_recv(%d) starting pid=%d\n", argc, (int)getpid());
 
 	if (am_daemon && read_only) {
 		rprintf(FERROR,"ERROR: module is read only\n");
@@ -1491,10 +1487,9 @@ const char *get_panic_action(void)
 static RETSIGTYPE rsync_panic_handler(UNUSED(int whatsig))
 {
 	char cmd_buf[300];
-	int ret;
+	int ret, pid_int = getpid();
 
-	snprintf(cmd_buf, sizeof cmd_buf, get_panic_action(),
-		 getpid(), getpid());
+	snprintf(cmd_buf, sizeof cmd_buf, get_panic_action(), pid_int, pid_int);
 
 	/* Unless we failed to execute gdb, we allow the process to
 	 * continue.  I'm not sure if that's right. */

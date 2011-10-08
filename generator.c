@@ -2124,7 +2124,7 @@ void generate_files(int f_out, const char *local_name)
 	implied_dirs_are_missing = relative_paths && !implied_dirs && protocol_version < 30;
 
 	if (DEBUG_GTE(GENR, 1))
-		rprintf(FINFO, "generator starting pid=%ld\n", (long)getpid());
+		rprintf(FINFO, "generator starting pid=%d\n", (int)getpid());
 
 	if (delete_before && !solo_file && cur_flist->used > 0)
 		do_delete_pass();

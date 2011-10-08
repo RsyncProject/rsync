@@ -1358,11 +1358,13 @@ int cmp_time(time_t file1, time_t file2)
 int _Insure_trap_error(int a1, int a2, int a3, int a4, int a5, int a6)
 {
 	static int (*fn)();
-	int ret;
+	int ret, pid_int = getpid();
 	char *cmd;
 
-	asprintf(&cmd, "/usr/X11R6/bin/xterm -display :0 -T Panic -n Panic -e /bin/sh -c 'cat /tmp/ierrs.*.%d ; gdb /proc/%d/exe %d'",
-		getpid(), getpid(), getpid());
+	if (asprintf(&cmd,
+	    "/usr/X11R6/bin/xterm -display :0 -T Panic -n Panic -e /bin/sh -c 'cat /tmp/ierrs.*.%d ; "
+	    "gdb /proc/%d/exe %d'", pid_int, pid_int, pid_int) < 0)
+		return -1;
 
 	if (!fn) {
 		static void *h;

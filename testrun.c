@@ -46,9 +46,9 @@
 		if (slept++ > timeout_secs) {
 			fprintf(stderr, "TESTRUN TIMEOUT: test took over %d seconds.\n", timeout_secs);
 			if (kill(pid, SIGTERM) < 0)
-				fprintf(stderr, "TESTRUN ERROR: failed to kill pid %ld: %s\n", (long)pid, strerror(errno));
+				fprintf(stderr, "TESTRUN ERROR: failed to kill pid %d: %s\n", (int)pid, strerror(errno));
 			else
-				fprintf(stderr, "TESTRUN INFO: killed pid %ld\n", (long)pid);
+				fprintf(stderr, "TESTRUN INFO: killed pid %d\n", (int)pid);
 			exit(1);
 		}
 		sleep(1);

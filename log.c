@@ -123,8 +123,7 @@ static void logit(int priority, const char *buf)
 	if (logfile_was_closed)
 		logfile_reopen();
 	if (logfile_fp) {
-		fprintf(logfile_fp, "%s [%d] %s",
-			timestring(time(NULL)), (int)getpid(), buf);
+		fprintf(logfile_fp, "%s [%d] %s", timestring(time(NULL)), (int)getpid(), buf);
 		fflush(logfile_fp);
 	} else {
 		syslog(priority, "%s", buf);
@@ -569,9 +568,8 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 			}
 			break;
 		case 'p':
-			strlcat(fmt, "ld", sizeof fmt);
-			snprintf(buf2, sizeof buf2, fmt,
-				 (long)getpid());
+			strlcat(fmt, "d", sizeof fmt);
+			snprintf(buf2, sizeof buf2, fmt, (int)getpid());
 			n = buf2;
 			break;
 		case 'M':
