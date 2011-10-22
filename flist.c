@@ -102,6 +102,7 @@ int flist_eof = 0; /* all the file-lists are now known */
 #define NORMAL_NAME 0
 #define SLASH_ENDING_NAME 1
 #define DOTDIR_NAME 2
+#define MISSING_NAME 3
 
 /* Starting from protocol version 26, we always use 64-bit ino_t and dev_t
  * internally, even if this platform does not allow files to have 64-bit inums.
@@ -1933,7 +1934,9 @@ static void send1extra(int f, struct file_struct *file, struct file_list *flist)
 
 		if (name_type != NORMAL_NAME) {
 			STRUCT_STAT st;
-			if (link_stat(fbuf, &st, 1) != 0) {
+			if (name_type == MISSING_NAME)
+				memset(&st, 0, sizeof st);
+			else if (link_stat(fbuf, &st, 1) != 0) {
 				interpret_stat_error(fbuf, True);
 				continue;
 			}
@@ -2285,7 +2288,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 						p = fn;
 				} else
 					fn = p;
-				send_implied_dirs(f, flist, fbuf, fbuf, p, flags, name_type);
+				send_implied_dirs(f, flist, fbuf, fbuf, p, flags,
+						  st.st_mode == 0 ? MISSING_NAME : name_type);
 				if (fn == p)
 					continue;
 			}
