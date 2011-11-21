@@ -21,7 +21,7 @@ srcdir=@srcdir@
 VPATH=$(srcdir)
 SHELL=/bin/sh
 
-VERSION=@VERSION@
+VERSION=@RSYNC_VERSION@
 
 .SUFFIXES:
 .SUFFIXES: .c .o
