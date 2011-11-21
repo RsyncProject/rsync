@@ -24,6 +24,7 @@
 #include "zlib/zlib.h"
 
 extern int do_compression;
+extern int protocol_version;
 extern int module_id;
 extern int def_compress_level;
 extern char *skip_compress;
@@ -411,6 +412,8 @@ send_deflated_token(int f, int32 token, struct map_struct *buf, OFF_T offset,
 			toklen -= n1;
 			tx_strm.next_in = (Bytef *)map_ptr(buf, offset, n1);
 			tx_strm.avail_in = n1;
+			if (protocol_version >= 31) /* Newer protocols avoid a data-duplicating bug */
+				offset += n1;
 			tx_strm.next_out = (Bytef *) obuf;
 			tx_strm.avail_out = AVAIL_OUT_SIZE(CHUNK_SIZE);
 			r = deflate(&tx_strm, Z_INSERT_ONLY);
@@ -593,6 +596,8 @@ static void see_deflate_token(char *buf, int32 len)
 			} else {
 				rx_strm.next_in = (Bytef *)buf;
 				rx_strm.avail_in = blklen;
+				if (protocol_version >= 31) /* Newer protocols avoid a data-duplicating bug */
+					buf += blklen;
 				len -= blklen;
 				blklen = 0;
 			}
