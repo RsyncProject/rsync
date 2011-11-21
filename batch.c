@@ -20,7 +20,7 @@
  */
 
 #include "rsync.h"
-#include "zlib/zlib.h"
+#include <zlib.h>
 #include <time.h>
 
 extern int eol_nulls;

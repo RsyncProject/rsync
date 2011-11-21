@@ -78,6 +78,9 @@ fi
 AC_ARG_WITH(included-popt,
         AC_HELP_STRING([--with-included-popt], [use bundled popt library, not from system]))
 
+AC_ARG_WITH(included-zlib,
+        AC_HELP_STRING([--with-included-zlib], [use bundled zlib library, not from system]))
+
 AC_ARG_WITH(protected-args,
         AC_HELP_STRING([--with-protected-args], [make --protected-args option the default]))
 if test x"$with_protected_args" = x"yes"; then
@@ -343,7 +346,8 @@ AC_CHECK_HEADERS(sys/fcntl.h sys/select.h fcntl.h sys/time.h sys/unistd.h \
     sys/un.h sys/attr.h mcheck.h arpa/inet.h arpa/nameser.h locale.h \
     netdb.h malloc.h float.h limits.h iconv.h libcharset.h langinfo.h \
     sys/acl.h acl/libacl.h attr/xattr.h sys/xattr.h sys/extattr.h \
-    popt.h popt/popt.h linux/falloc.h netinet/in_systm.h netinet/ip.h)
+    popt.h popt/popt.h linux/falloc.h netinet/in_systm.h netinet/ip.h \
+    zlib.h)
 AC_HEADER_MAJOR
 
 AC_CACHE_CHECK([if makedev takes 3 args],rsync_cv_MAKEDEV_TAKES_3_ARGS,[
@@ -773,6 +777,25 @@ else
     AC_MSG_RESULT(no)
 fi
 
+# We default to using our zlib unless --with-included-zlib=no is given.
+if test x"$with_included_zlib" != x"no"; then
+    with_included_zlib=yes
+elif test x"$ac_cv_header_zlib_h" != x"yes"; then
+    with_included_zlib=yes
+fi
+if test x"$with_included_zlib" != x"yes"; then
+    AC_CHECK_LIB(z, deflateParams, , [with_included_zlib=yes])
+fi
+
+AC_MSG_CHECKING([whether to use included zlib])
+if test x"$with_included_zlib" = x"yes"; then
+    AC_MSG_RESULT($srcdir/zlib)
+    BUILD_ZLIB='$(zlib_OBJS)'
+    CFLAGS="$CFLAGS -I$srcdir/zlib"
+else
+    AC_MSG_RESULT(no)
+fi
+
 AC_CACHE_CHECK([for unsigned char],rsync_cv_SIGNED_CHAR_OK,[
 AC_TRY_COMPILE([],[signed char *s = ""],
 rsync_cv_SIGNED_CHAR_OK=yes,rsync_cv_SIGNED_CHAR_OK=no)])
@@ -926,6 +949,7 @@ AC_SUBST(OBJ_SAVE)
 AC_SUBST(OBJ_RESTORE)
 AC_SUBST(CC_SHOBJ_FLAG)
 AC_SUBST(BUILD_POPT)
+AC_SUBST(BUILD_ZLIB)
 AC_SUBST(MAKE_MAN)
 
 AC_CHECK_FUNCS(_acl __acl _facl __facl)

@@ -22,7 +22,7 @@
 #include "rsync.h"
 #include "itypes.h"
 #include <popt.h>
-#include "zlib/zlib.h"
+#include <zlib.h>
 
 extern int module_id;
 extern int local_server;

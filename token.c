@@ -21,7 +21,11 @@
 
 #include "rsync.h"
 #include "itypes.h"
-#include "zlib/zlib.h"
+#include <zlib.h>
+
+#ifndef Z_INSERT_ONLY
+#define Z_INSERT_ONLY Z_SYNC_FLUSH
+#endif
 
 extern int do_compression;
 extern int protocol_version;
@@ -414,14 +418,16 @@ send_deflated_token(int f, int32 token, struct map_struct *buf, OFF_T offset,
 			tx_strm.avail_in = n1;
 			if (protocol_version >= 31) /* Newer protocols avoid a data-duplicating bug */
 				offset += n1;
-			tx_strm.next_out = (Bytef *) obuf;
-			tx_strm.avail_out = AVAIL_OUT_SIZE(CHUNK_SIZE);
-			r = deflate(&tx_strm, Z_INSERT_ONLY);
-			if (r != Z_OK || tx_strm.avail_in != 0) {
-				rprintf(FERROR, "deflate on token returned %d (%d bytes left)\n",
-					r, tx_strm.avail_in);
-				exit_cleanup(RERR_STREAMIO);
-			}
+			do {
+				tx_strm.next_out = (Bytef *) obuf;
+				tx_strm.avail_out = AVAIL_OUT_SIZE(CHUNK_SIZE);
+				r = deflate(&tx_strm, Z_INSERT_ONLY);
+				if (r != Z_OK) {
+					rprintf(FERROR, "deflate on token returned %d (%d bytes left)\n",
+						r, tx_strm.avail_in);
+					exit_cleanup(RERR_STREAMIO);
+				}
+			} while (tx_strm.avail_in != 0);
 		} while (toklen > 0);
 	}
 }
