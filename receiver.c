@@ -699,21 +699,26 @@ int recv_files(int f_in, int f_out, char *local_name)
 				break;
 			case FNAMECMP_FUZZY:
 				if (file->dirname) {
-					pathjoin(fnamecmpbuf, MAXPATHLEN,
-						 file->dirname, xname);
+					pathjoin(fnamecmpbuf, sizeof fnamecmpbuf, file->dirname, xname);
 					fnamecmp = fnamecmpbuf;
 				} else
 					fnamecmp = xname;
 				break;
 			default:
-				if (fnamecmp_type >= basis_dir_cnt) {
+				if (fnamecmp_type > FNAMECMP_FUZZY && fnamecmp_type-FNAMECMP_FUZZY <= basis_dir_cnt) {
+					fnamecmp_type -= FNAMECMP_FUZZY + 1;
+					if (file->dirname) {
+						stringjoin(fnamecmpbuf, sizeof fnamecmpbuf,
+							   basis_dir[fnamecmp_type], "/", file->dirname, "/", xname, NULL);
+					} else
+						pathjoin(fnamecmpbuf, sizeof fnamecmpbuf, basis_dir[fnamecmp_type], xname);
+				} else if (fnamecmp_type >= basis_dir_cnt) {
 					rprintf(FERROR,
 						"invalid basis_dir index: %d.\n",
 						fnamecmp_type);
 					exit_cleanup(RERR_PROTOCOL);
-				}
-				pathjoin(fnamecmpbuf, sizeof fnamecmpbuf,
-					 basis_dir[fnamecmp_type], fname);
+				} else
+					pathjoin(fnamecmpbuf, sizeof fnamecmpbuf, basis_dir[fnamecmp_type], fname);
 				fnamecmp = fnamecmpbuf;
 				break;
 			}

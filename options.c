@@ -955,7 +955,7 @@ static struct poptOption long_options[] = {
   {"compare-dest",     0,  POPT_ARG_STRING, 0, OPT_COMPARE_DEST, 0, 0 },
   {"copy-dest",        0,  POPT_ARG_STRING, 0, OPT_COPY_DEST, 0, 0 },
   {"link-dest",        0,  POPT_ARG_STRING, 0, OPT_LINK_DEST, 0, 0 },
-  {"fuzzy",           'y', POPT_ARG_VAL,    &fuzzy_basis, 1, 0, 0 },
+  {"fuzzy",           'y', POPT_ARG_NONE,   0, 'y', 0, 0 },
   {"no-fuzzy",         0,  POPT_ARG_VAL,    &fuzzy_basis, 0, 0, 0 },
   {"no-y",             0,  POPT_ARG_VAL,    &fuzzy_basis, 0, 0, 0 },
   {"compress",        'z', POPT_ARG_NONE,   0, 'z', 0, 0 },
@@ -1500,6 +1500,10 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			verbose++;
 			break;
 
+		case 'y':
+			fuzzy_basis++;
+			break;
+
 		case 'q':
 			quiet++;
 			break;
@@ -1844,6 +1848,9 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		return 0;
 	}
 #endif
+
+	if (fuzzy_basis > 1)
+		fuzzy_basis = basis_dir_cnt + 1;
 
 	if (protect_args == 1 && am_server)
 		return 1;
@@ -2342,6 +2349,11 @@ void server_options(char **args, int *argc_p)
 			argstr[x++] = 'O';
 		if (omit_link_times)
 			argstr[x++] = 'J';
+		if (fuzzy_basis) {
+			argstr[x++] = 'y';
+			if (fuzzy_basis > 1)
+				argstr[x++] = 'y';
+		}
 	} else {
 		if (copy_links)
 			argstr[x++] = 'L';
@@ -2679,9 +2691,6 @@ void server_options(char **args, int *argc_p)
 	/* It's OK that this checks the upper-bound of the protocol_version. */
 	if (relative_paths && !implied_dirs && (!am_sender || protocol_version >= 30))
 		args[ac++] = "--no-implied-dirs";
-
-	if (fuzzy_basis && am_sender)
-		args[ac++] = "--fuzzy";
 
 	if (remove_source_files == 1)
 		args[ac++] = "--remove-source-files";

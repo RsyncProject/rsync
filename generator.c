@@ -733,56 +733,75 @@ static int generate_and_send_sums(int fd, OFF_T len, int f_out, int f_copy)
 
 
 /* Try to find a filename in the same dir as "fname" with a similar name. */
-static int find_fuzzy(struct file_struct *file, struct file_list *dirlist)
+static struct file_struct *find_fuzzy(struct file_struct *file, struct file_list *dirlist_array[], uchar *fnamecmp_type_ptr)
 {
 	int fname_len, fname_suf_len;
 	const char *fname_suf, *fname = file->basename;
 	uint32 lowest_dist = 25 << 16; /* ignore a distance greater than 25 */
-	int j, lowest_j = -1;
+	int i, j;
+	struct file_struct *lowest_fp = NULL;
 
 	fname_len = strlen(fname);
 	fname_suf = find_filename_suffix(fname, fname_len, &fname_suf_len);
 
-	for (j = 0; j < dirlist->used; j++) {
-		struct file_struct *fp = dirlist->files[j];
-		const char *suf, *name;
-		int len, suf_len;
-		uint32 dist;
+	/* Try to find an exact size+mtime match first. */
+	for (i = 0; i < fuzzy_basis; i++) {
+		struct file_list *dirlist = dirlist_array[i];
 
-		if (!S_ISREG(fp->mode) || !F_LENGTH(fp)
-		 || fp->flags & FLAG_FILE_SENT)
+		if (!dirlist)
 			continue;
 
-		name = fp->basename;
+		for (j = 0; j < dirlist->used; j++) {
+			struct file_struct *fp = dirlist->files[j];
 
-		if (F_LENGTH(fp) == F_LENGTH(file)
-		    && cmp_time(fp->modtime, file->modtime) == 0) {
-			if (DEBUG_GTE(FUZZY, 2)) {
-				rprintf(FINFO,
-					"fuzzy size/modtime match for %s\n",
-					name);
+			if (!S_ISREG(fp->mode) || !F_LENGTH(fp) || fp->flags & FLAG_FILE_SENT)
+				continue;
+
+			if (F_LENGTH(fp) == F_LENGTH(file) && cmp_time(fp->modtime, file->modtime) == 0) {
+				if (DEBUG_GTE(FUZZY, 2))
+					rprintf(FINFO, "fuzzy size/modtime match for %s\n", f_name(fp, NULL));
+				*fnamecmp_type_ptr = FNAMECMP_FUZZY + i;
+				return fp;
 			}
-			return j;
-		}
 
-		len = strlen(name);
-		suf = find_filename_suffix(name, len, &suf_len);
-
-		dist = fuzzy_distance(name, len, fname, fname_len);
-		/* Add some extra weight to how well the suffixes match. */
-		dist += fuzzy_distance(suf, suf_len, fname_suf, fname_suf_len)
-		      * 10;
-		if (DEBUG_GTE(FUZZY, 2)) {
-			rprintf(FINFO, "fuzzy distance for %s = %d.%05d\n",
-				name, (int)(dist>>16), (int)(dist&0xFFFF));
-		}
-		if (dist <= lowest_dist) {
-			lowest_dist = dist;
-			lowest_j = j;
 		}
 	}
 
-	return lowest_j;
+	for (i = 0; i < fuzzy_basis; i++) {
+		struct file_list *dirlist = dirlist_array[i];
+
+		if (!dirlist)
+			continue;
+
+		for (j = 0; j < dirlist->used; j++) {
+			struct file_struct *fp = dirlist->files[j];
+			const char *suf, *name;
+			int len, suf_len;
+			uint32 dist;
+
+			if (!S_ISREG(fp->mode) || !F_LENGTH(fp) || fp->flags & FLAG_FILE_SENT)
+				continue;
+
+			name = fp->basename;
+			len = strlen(name);
+			suf = find_filename_suffix(name, len, &suf_len);
+
+			dist = fuzzy_distance(name, len, fname, fname_len);
+			/* Add some extra weight to how well the suffixes match. */
+			dist += fuzzy_distance(suf, suf_len, fname_suf, fname_suf_len) * 10;
+			if (DEBUG_GTE(FUZZY, 2)) {
+				rprintf(FINFO, "fuzzy distance for %s = %d.%05d\n",
+					f_name(fp, NULL), (int)(dist>>16), (int)(dist&0xFFFF));
+			}
+			if (dist <= lowest_dist) {
+				lowest_dist = dist;
+				lowest_fp = fp;
+				*fnamecmp_type_ptr = FNAMECMP_FUZZY + i;
+			}
+		}
+	}
+
+	return lowest_fp;
 }
 
 /* Copy a file found in our --copy-dest handling. */
@@ -1128,7 +1147,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	/* Missing dir whose contents are skipped altogether due to
 	 * --ignore-non-existing, daemon exclude, or mkdir failure. */
 	static struct file_struct *skip_dir = NULL;
-	static struct file_list *fuzzy_dirlist = NULL;
+	static struct file_list *fuzzy_dirlist[MAX_BASIS_DIRS+1];
 	static int need_fuzzy_dirlist = 0;
 	struct file_struct *fuzzy_file = NULL;
 	int fd = -1, f_copy = -1;
@@ -1187,10 +1206,13 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	}
 
 	if (dry_run > 1 || (dry_missing_dir && is_below(file, dry_missing_dir))) {
+		int i;
 	  parent_is_dry_missing:
-		if (fuzzy_dirlist) {
-			flist_free(fuzzy_dirlist);
-			fuzzy_dirlist = NULL;
+		for (i = 0; i < fuzzy_basis; i++) {
+			if (fuzzy_dirlist[i]) {
+				flist_free(fuzzy_dirlist[i]);
+				fuzzy_dirlist[i] = NULL;
+			}
 		}
 		parent_dirname = "";
 		statret = -1;
@@ -1209,12 +1231,16 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 						full_fname(dn));
 				}
 			}
-			if (fuzzy_dirlist) {
-				flist_free(fuzzy_dirlist);
-				fuzzy_dirlist = NULL;
-			}
-			if (fuzzy_basis)
+			if (fuzzy_basis) {
+				int i;
+				for (i = 0; i < fuzzy_basis; i++) {
+					if (fuzzy_dirlist[i]) {
+						flist_free(fuzzy_dirlist[i]);
+						fuzzy_dirlist[i] = NULL;
+					}
+				}
 				need_fuzzy_dirlist = 1;
+			}
 #ifdef SUPPORT_ACLS
 			if (!preserve_perms)
 				dflt_perms = default_perms_for_dir(dn);
@@ -1223,8 +1249,17 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		parent_dirname = dn;
 
 		if (need_fuzzy_dirlist && S_ISREG(file->mode)) {
+			int i;
 			strlcpy(fnamecmpbuf, dn, sizeof fnamecmpbuf);
-			fuzzy_dirlist = get_dirlist(fnamecmpbuf, -1, GDL_IGNORE_FILTER_RULES);
+			for (i = 0; i < fuzzy_basis; i++) {
+				if (i && pathjoin(fnamecmpbuf, MAXPATHLEN, basis_dir[i-1], dn) >= MAXPATHLEN)
+					continue;
+				fuzzy_dirlist[i] = get_dirlist(fnamecmpbuf, -1, GDL_IGNORE_FILTER_RULES);
+				if (fuzzy_dirlist[i] && fuzzy_dirlist[i]->used == 0) {
+					flist_free(fuzzy_dirlist[i]);
+					fuzzy_dirlist[i] = NULL;
+				}
+			}
 			need_fuzzy_dirlist = 0;
 		}
 
@@ -1629,10 +1664,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	} else
 		partialptr = NULL;
 
-	if (statret != 0 && fuzzy_dirlist) {
-		int j = find_fuzzy(file, fuzzy_dirlist);
-		if (j >= 0) {
-			fuzzy_file = fuzzy_dirlist->files[j];
+	if (statret != 0 && fuzzy_basis) {
+		/* Sets fnamecmp_type to FNAMECMP_FUZZY or above. */
+		fuzzy_file = find_fuzzy(file, fuzzy_dirlist, &fnamecmp_type);
+		if (fuzzy_file) {
 			f_name(fuzzy_file, fnamecmpbuf);
 			if (DEBUG_GTE(FUZZY, 1)) {
 				rprintf(FINFO, "fuzzy basis selected for %s: %s\n",
@@ -1641,7 +1676,6 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			sx.st.st_size = F_LENGTH(fuzzy_file);
 			statret = 0;
 			fnamecmp = fnamecmpbuf;
-			fnamecmp_type = FNAMECMP_FUZZY;
 		}
 	}
 
@@ -1717,10 +1751,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		goto notify_others;
 	}
 
-	if (fuzzy_dirlist) {
-		int j = flist_find(fuzzy_dirlist, file);
+	if (fuzzy_dirlist[0]) {
+		int j = flist_find(fuzzy_dirlist[0], file);
 		if (j >= 0) /* don't use changing file as future fuzzy basis */
-			fuzzy_dirlist->files[j]->flags |= FLAG_FILE_SENT;
+			fuzzy_dirlist[0]->files[j]->flags |= FLAG_FILE_SENT;
 	}
 
 	/* open the file */
@@ -1790,7 +1824,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			iflags |= ITEM_REPORT_CHANGE;
 		if (fnamecmp_type != FNAMECMP_FNAME)
 			iflags |= ITEM_BASIS_TYPE_FOLLOWS;
-		if (fnamecmp_type == FNAMECMP_FUZZY)
+		if (fnamecmp_type >= FNAMECMP_FUZZY)
 			iflags |= ITEM_XNAME_FOLLOWS;
 		itemize(fnamecmp, file, -1, real_ret, &real_sx, iflags, fnamecmp_type,
 			fuzzy_file ? fuzzy_file->basename : NULL);
