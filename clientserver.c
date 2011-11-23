@@ -759,7 +759,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 							break;
 						_exit(1);
 					}
-					if (asprintf(&p, "RSYNC_ARG%d=%s", j, buf) > 0)
+					if (asprintf(&p, "RSYNC_ARG%d=%s", j, buf) >= 0)
 						putenv(p);
 				}
 				close(pre_exec_arg_fd);
