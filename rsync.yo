@@ -1748,8 +1748,8 @@ looks in the same directory as the destination file for either a file that
 has an identical size and modified-time, or a similarly-named file.  If
 found, rsync uses the fuzzy basis file to try to speed up the transfer.
 
-If the option is repeated, the fuzzy scan will also be done in any alternate
-destination directories that are specified via bf(--compare-dest),
+If the option is repeated, the fuzzy scan will also be done in any matching
+alternate destination directories that are specified via bf(--compare-dest),
 bf(--copy-dest), or bf(--link-dest).
 
 Note that the use of the bf(--delete) option might get rid of any potential
