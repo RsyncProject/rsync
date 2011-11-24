@@ -634,14 +634,14 @@ rsyncstats.)
 The single-character escapes that are understood are as follows:
 
 quote(itemization(
-  it() %a the remote IP address
+  it() %a the remote IP address (only available for a daemon)
   it() %b the number of bytes actually transferred
   it() %B the permission bits of the file (e.g. rwxrwxrwt)
   it() %c the total size of the block checksums received for the basis file (only when sending)
   it() %C the full-file MD5 checksum if bf(--checksum) is enabled or a file was transferred (only for protocol 30 or above).
   it() %f the filename (long form on sender; no trailing "/")
   it() %G the gid of the file (decimal) or "DEFAULT"
-  it() %h the remote host name
+  it() %h the remote host name (only available for a daemon)
   it() %i an itemized list of what is being updated
   it() %l the length of the file in bytes
   it() %L the string " -> SYMLINK", " => HARDLINK", or "" (where bf(SYMLINK) or bf(HARDLINK) is a filename)
