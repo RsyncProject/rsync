@@ -1349,8 +1349,9 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				dry_missing_dir = file;
 			file->flags |= FLAG_MISSING_DIR;
 		}
+		init_stat_x(&real_sx);
+		real_sx.st = sx.st;
 		real_ret = statret;
-		real_sx = sx;
 		if (file->flags & FLAG_DIR_CREATED)
 			statret = -1;
 		if (!preserve_perms) { /* See comment in non-dir code below. */
@@ -1653,8 +1654,9 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		}
 	}
 
+	init_stat_x(&real_sx);
+	real_sx.st = sx.st; /* Don't copy xattr/acl pointers, as they would free wrong. */
 	real_ret = statret;
-	real_sx = sx;
 
 	if (partial_dir && (partialptr = partial_dir_fname(fname)) != NULL
 	    && link_stat(partialptr, &partial_st, 0) == 0
