@@ -480,7 +480,8 @@ static void forward_filesfrom_data(void)
 void reduce_iobuf_size(xbuf *out, size_t new_size)
 {
 	if (new_size < out->size) {
-		if (DEBUG_GTE(IO, 4)) {
+		/* Avoid weird buffer interactions by only outputting this to stderr. */
+		if (msgs2stderr && DEBUG_GTE(IO, 4)) {
 			const char *name = out == &iobuf.out ? "iobuf.out"
 					 : out == &iobuf.msg ? "iobuf.msg"
 					 : NULL;
@@ -497,7 +498,8 @@ void restore_iobuf_size(xbuf *out)
 {
 	if (IOBUF_WAS_REDUCED(out->size)) {
 		size_t new_size = IOBUF_RESTORE_SIZE(out->size);
-		if (DEBUG_GTE(IO, 4)) {
+		/* Avoid weird buffer interactions by only outputting this to stderr. */
+		if (msgs2stderr && DEBUG_GTE(IO, 4)) {
 			const char *name = out == &iobuf.out ? "iobuf.out"
 					 : out == &iobuf.msg ? "iobuf.msg"
 					 : NULL;
@@ -574,7 +576,7 @@ static char *perform_io(size_t needed, int flags)
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
-		if (DEBUG_GTE(IO, 3)) {
+		if (msgs2stderr && DEBUG_GTE(IO, 3)) {
 			rprintf(FINFO, "[%s] perform_io(%ld, %sinput)\n",
 				who_am_i(), (long)needed, flags & PIO_CONSUME_INPUT ? "consume&" : "");
 		}
@@ -588,7 +590,7 @@ static char *perform_io(size_t needed, int flags)
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
-		if (DEBUG_GTE(IO, 3)) {
+		if (msgs2stderr && DEBUG_GTE(IO, 3)) {
 			rprintf(FINFO, "[%s] perform_io(%ld, outroom) needs to flush %ld\n",
 				who_am_i(), (long)needed,
 				iobuf.out.len + needed > iobuf.out.size
@@ -604,7 +606,7 @@ static char *perform_io(size_t needed, int flags)
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
-		if (DEBUG_GTE(IO, 3)) {
+		if (msgs2stderr && DEBUG_GTE(IO, 3)) {
 			rprintf(FINFO, "[%s] perform_io(%ld, msgroom) needs to flush %ld\n",
 				who_am_i(), (long)needed,
 				iobuf.msg.len + needed > iobuf.msg.size
@@ -613,7 +615,7 @@ static char *perform_io(size_t needed, int flags)
 		break;
 
 	case 0:
-		if (DEBUG_GTE(IO, 3))
+		if (msgs2stderr && DEBUG_GTE(IO, 3))
 			rprintf(FINFO, "[%s] perform_io(%ld, %d)\n", who_am_i(), (long)needed, flags);
 		break;
 
@@ -671,7 +673,7 @@ static char *perform_io(size_t needed, int flags)
 					SIVAL(iobuf.out.buf + iobuf.raw_data_header_pos, 0,
 					      ((MPLEX_BASE + (int)MSG_DATA)<<24) + iobuf.out.len - 4);
 
-					if (DEBUG_GTE(IO, 1)) {
+					if (msgs2stderr && DEBUG_GTE(IO, 1)) {
 						rprintf(FINFO, "[%s] send_msg(%d, %ld)\n",
 							who_am_i(), (int)MSG_DATA, (long)iobuf.out.len - 4);
 					}
@@ -732,7 +734,7 @@ static char *perform_io(size_t needed, int flags)
 		}
 
 		if (extra_flist_sending_enabled) {
-			if (file_total - file_old_total < MAX_FILECNT_LOOKAHEAD)
+			if (file_total - file_old_total < MAX_FILECNT_LOOKAHEAD && IN_MULTIPLEXED_AND_READY)
 				tv.tv_sec = 0;
 			else {
 				extra_flist_sending_enabled = False;
@@ -1562,8 +1564,11 @@ static void read_a_msg(void)
 			exit_cleanup(RERR_STREAMIO);
 		}
 		raw_read_buf(data, msg_bytes);
-		iobuf.in_multiplexed = 1;
+		/* We don't set in_multiplexed value back to 1 before writing this message
+		 * because the write might loop back and read yet another message, over and
+		 * over again, while waiting for room to put the message in the msg buffer. */
 		rwrite((enum logcode)tag, data, msg_bytes, !am_generator);
+		iobuf.in_multiplexed = 1;
 		if (first_message) {
 			if (list_only && !am_sender && tag == 1 && msg_bytes < sizeof data) {
 				data[msg_bytes] = '\0';

@@ -535,8 +535,7 @@ reject your attempts at fine-grained control (if one or more flags needed
 to be send to the server and the server was too old to understand them).
 
 dit(bf(--debug=FLAGS))
-This option lets you have fine-grained control over the
-debug
+This option lets you have fine-grained control over the debug
 output you want to see.  An individual flag name may be followed by a level
 number, with 0 meaning to silence that output, 1 being the default output
 level, and higher numbers increasing the output of that flag (for those
@@ -547,6 +546,9 @@ are added for each increase in the verbose level.  Some examples:
 
 verb(    rsync -avvv --debug=none src/ dest/
     rsync -avA --del --debug=del2,acl src/ dest/ )
+
+Note that some debug messages will only be output when bf(--msgs2stderr) is
+specified, especially those pertaining to I/O and buffer debugging.
 
 This option was added to 3.1.0, so an older rsync on the server side might
 reject your attempts at fine-grained control (if one or more flags needed
