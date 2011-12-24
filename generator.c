@@ -1602,7 +1602,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		goto cleanup;
 	}
 
-	if (max_size > 0 && F_LENGTH(file) > max_size) {
+	if (max_size >= 0 && F_LENGTH(file) > max_size) {
 		if (INFO_GTE(SKIP, 1)) {
 			if (solo_file)
 				fname = f_name(file, NULL);
@@ -1610,7 +1610,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		}
 		goto cleanup;
 	}
-	if (min_size > 0 && F_LENGTH(file) < min_size) {
+	if (min_size >= 0 && F_LENGTH(file) < min_size) {
 		if (INFO_GTE(SKIP, 1)) {
 			if (solo_file)
 				fname = f_name(file, NULL);
@@ -2062,9 +2062,11 @@ void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
 #endif
 
 		if (check_redo && (ndx = get_redo_num()) != -1) {
+			OFF_T save_max_size = max_size;
+			OFF_T save_min_size = min_size;
 			csum_length = SUM_LENGTH;
-			max_size = -max_size;
-			min_size = -min_size;
+			max_size = -1;
+			min_size = -1;
 			ignore_existing = -ignore_existing;
 			ignore_non_existing = -ignore_non_existing;
 			update_only = -update_only;
@@ -2088,8 +2090,8 @@ void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
 			cur_flist = flist;
 
 			csum_length = SHORT_SUM_LENGTH;
-			max_size = -max_size;
-			min_size = -min_size;
+			max_size = save_max_size;
+			min_size = save_min_size;
 			ignore_existing = -ignore_existing;
 			ignore_non_existing = -ignore_non_existing;
 			update_only = -update_only;

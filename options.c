@@ -114,8 +114,8 @@ int ignore_existing = 0;
 int ignore_non_existing = 0;
 int need_messages_from_generator = 0;
 int max_delete = INT_MIN;
-OFF_T max_size = 0;
-OFF_T min_size = 0;
+OFF_T max_size = -1;
+OFF_T min_size = -1;
 int ignore_errors = 0;
 int modify_window = 0;
 int blocking_io = -1;
@@ -1590,7 +1590,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			break;
 
 		case OPT_MAX_SIZE:
-			if ((max_size = parse_size_arg(&max_size_arg, 'b')) <= 0) {
+			if ((max_size = parse_size_arg(&max_size_arg, 'b')) < 0) {
 				snprintf(err_buf, sizeof err_buf,
 					"--max-size value is invalid: %s\n",
 					max_size_arg);
@@ -1599,7 +1599,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			break;
 
 		case OPT_MIN_SIZE:
-			if ((min_size = parse_size_arg(&min_size_arg, 'b')) <= 0) {
+			if ((min_size = parse_size_arg(&min_size_arg, 'b')) < 0) {
 				snprintf(err_buf, sizeof err_buf,
 					"--min-size value is invalid: %s\n",
 					min_size_arg);
@@ -2545,11 +2545,11 @@ void server_options(char **args, int *argc_p)
 			args[ac++] = arg;
 		} else if (max_delete == 0)
 			args[ac++] = "--max-delete=-1";
-		if (min_size) {
+		if (min_size >= 0) {
 			args[ac++] = "--min-size";
 			args[ac++] = min_size_arg;
 		}
-		if (max_size) {
+		if (max_size >= 0) {
 			args[ac++] = "--max-size";
 			args[ac++] = max_size_arg;
 		}
