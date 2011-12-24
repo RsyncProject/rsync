@@ -1890,6 +1890,12 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	}
 #endif
 
+	if (block_size > MAX_BLOCK_SIZE) {
+		snprintf(err_buf, sizeof err_buf,
+			 "--block-size=%lu is too large (max: %u)\n", block_size, MAX_BLOCK_SIZE);
+		return 0;
+	}
+
 	if (write_batch && read_batch) {
 		snprintf(err_buf, sizeof err_buf,
 			"--write-batch and --read-batch can not be used together\n");
