@@ -496,7 +496,7 @@ void finish_hard_link(struct file_struct *file, const char *fname, int fin_ndx,
 	int prev_statret, ndx, prev_ndx = F_HL_PREV(file);
 
 	if (stp == NULL && prev_ndx >= 0) {
-		if (link_stat(fname, &st, 0) < 0) {
+		if (link_stat(fname, &st, 0) < 0 && !dry_run) {
 			rsyserr(FERROR_XFER, errno, "stat %s failed",
 				full_fname(fname));
 			return;

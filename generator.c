@@ -81,6 +81,7 @@ extern int link_dest;
 extern int whole_file;
 extern int list_only;
 extern int read_batch;
+extern int write_batch;
 extern int safe_symlinks;
 extern long block_size; /* "long" because popt can't set an int32. */
 extern int unsort_ndx;
@@ -1813,7 +1814,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
   notify_others:
 	if (remove_source_files && !delay_updates && !phase && !dry_run)
 		increment_active_files(ndx, itemizing, code);
-	if (inc_recurse && !dry_run)
+	if (inc_recurse && (!dry_run || write_batch < 0))
 		cur_flist->in_progress++;
 #ifdef SUPPORT_HARD_LINKS
 	if (preserve_hard_links && F_IS_HLINKED(file))

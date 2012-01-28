@@ -681,6 +681,8 @@ int recv_files(int f_in, int f_out, char *local_name)
 			log_item(FCLIENT, file, iflags, NULL);
 			if (!am_server)
 				discard_receive_data(f_in, F_LENGTH(file));
+			if (inc_recurse)
+				send_msg_int(MSG_SUCCESS, ndx);
 			continue;
 		}
 
