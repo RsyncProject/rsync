@@ -303,6 +303,7 @@ static int refused_partial, refused_progress, refused_delete_before;
 static int refused_delete_during;
 static int refused_inplace, refused_no_iconv;
 static BOOL usermap_via_chown, groupmap_via_chown;
+static char *outbuf_mode;
 static char *bwlimit_arg, *max_size_arg, *min_size_arg;
 static char tmp_partialdir[] = ".~tmp~";
 
@@ -789,6 +790,9 @@ void usage(enum logcode F)
   rprintf(F,"     --password-file=FILE    read daemon-access password from FILE\n");
   rprintf(F,"     --list-only             list the files instead of copying them\n");
   rprintf(F,"     --bwlimit=RATE          limit socket I/O bandwidth\n");
+#ifdef HAVE_SETVBUF
+  rprintf(F,"     --outbuf=N|L|B          set output buffering to None, Line, or Block\n");
+#endif
   rprintf(F,"     --write-batch=FILE      write a batched update to FILE\n");
   rprintf(F,"     --only-write-batch=FILE like --write-batch but w/o updating destination\n");
   rprintf(F,"     --read-batch=FILE       read a batched update from FILE\n");
@@ -1025,6 +1029,9 @@ static struct poptOption long_options[] = {
   {"password-file",    0,  POPT_ARG_STRING, &password_file, 0, 0, 0 },
   {"blocking-io",      0,  POPT_ARG_VAL,    &blocking_io, 1, 0, 0 },
   {"no-blocking-io",   0,  POPT_ARG_VAL,    &blocking_io, 0, 0, 0 },
+#ifdef HAVE_SETVBUF
+  {"outbuf",           0,  POPT_ARG_STRING, &outbuf_mode, 0, 0, 0 },
+#endif
   {"remote-option",   'M', POPT_ARG_STRING, 0, 'M', 0, 0 },
   {"protocol",         0,  POPT_ARG_INT,    &protocol_version, 0, 0, 0 },
   {"checksum-seed",    0,  POPT_ARG_INT,    &checksum_seed, 0, 0, 0 },
@@ -1819,6 +1826,33 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		usage(FINFO);
 		exit_cleanup(0);
 	}
+
+#ifdef HAVE_SETVBUF
+	if (outbuf_mode && !am_server) {
+		int mode = *(uchar *)outbuf_mode;
+		if (islower(mode))
+			mode = toupper(mode);
+		fflush(stdout); /* Just in case... */
+		switch (mode) {
+		case 'N': /* None */
+		case 'U': /* Unbuffered */
+			mode = _IONBF;
+			break;
+		case 'L': /* Line */
+			mode = _IOLBF;
+			break;
+		case 'B': /* Block */
+		case 'F': /* Full */
+			mode = _IOFBF;
+			break;
+		default:
+			snprintf(err_buf, sizeof err_buf,
+				"Invalid --outbuf setting -- specify N, L, or B.\n");
+			return 0;
+		}
+		setvbuf(stdout, (char *)NULL, mode, 0);
+	}
+#endif
 
 	set_output_verbosity(verbose, DEFAULT_PRIORITY);
 

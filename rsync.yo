@@ -434,6 +434,7 @@ to the detailed description below for a complete description.  verb(
      --port=PORT             specify double-colon alternate port number
      --sockopts=OPTIONS      specify custom TCP options
      --blocking-io           use blocking I/O for the remote shell
+     --outbuf=N|L|B          set out buffering to None, Line, or Block
      --stats                 give some file-transfer stats
  -8, --8-bit-output          leave high-bit chars unescaped in output
  -h, --human-readable        output numbers in a human-readable format
@@ -2006,6 +2007,13 @@ a remote shell transport.  If the remote shell is either rsh or remsh,
 rsync defaults to using
 blocking I/O, otherwise it defaults to using non-blocking I/O.  (Note that
 ssh prefers non-blocking I/O.)
+
+dit(bf(--outbuf=MODE)) This sets the output buffering mode.  The mode can be
+None (aka Unbuffered), Line, or Block (aka Full).  You may specify as little
+as a single letter for the mode, and use upper or lower case.
+
+The main use of this option is to change Full buffering to Line buffering
+when rsync's output is going to a file or pipe.
 
 dit(bf(-i, --itemize-changes)) Requests a simple itemized list of the
 changes that are being made to each file, including attribute changes.
