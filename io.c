@@ -1046,7 +1046,8 @@ static void got_flist_entry_status(enum festatus status, int ndx)
 				if (status == FES_NO_SEND)
 					flist_ndx_push(&hlink_list, -2); /* indicates a failure follows */
 				flist_ndx_push(&hlink_list, ndx);
-				flist->in_progress++;
+				if (inc_recurse)
+					flist->in_progress++;
 			}
 		}
 #endif
