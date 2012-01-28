@@ -1,0 +1,17 @@
+#!/bin/bash
+# This script can be used as an rsync command-line filter that strips a single
+# trailing slash from each arg.  That treats "src/" the same as "src", thus
+# you need to use "src/." or "src//" for just the contents of the "src" dir.
+# (Note that command-line dir-excludes would need to use "excl//" too.)
+#
+# To use this, name it something like "rs", put it somewhere in your path, and
+# then use "rs" in place of "rsync" when you are typing your copy commands.
+args=()
+for arg in "${@}"; do
+    if [[ "$arg" == / ]]; then
+	args=("${args[@]}" /)
+    else
+	args=("${args[@]}" "${arg%/}")
+    fi
+done
+exec /usr/bin/rsync "${args[@]}"
