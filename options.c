@@ -1852,6 +1852,12 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		}
 		setvbuf(stdout, (char *)NULL, mode, 0);
 	}
+
+	if (msgs2stderr) {
+		/* Make stderr line buffered for better sharing of the stream. */
+		fflush(stderr); /* Just in case... */
+		setvbuf(stderr, (char *)NULL, _IOLBF, 0);
+	}
 #endif
 
 	set_output_verbosity(verbose, DEFAULT_PRIORITY);

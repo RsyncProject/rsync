@@ -565,6 +565,9 @@ messages back to the client side, so if you are doing any daemon-transfer
 debugging using this option, you should start up a daemon using bf(--no-detach)
 so that you can see the stderr output on the daemon side.
 
+This option has the side-effect of making stderr output get line-buffered so
+that the merging of the output of 3 programs happens in a more readable manner.
+
 dit(bf(-q, --quiet)) This option decreases the amount of information you
 are given during the transfer, notably suppressing information messages
 from the remote server. This option is useful when invoking rsync from
