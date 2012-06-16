@@ -35,6 +35,7 @@ extern int preserve_executability;
 extern int preserve_times;
 extern int am_root;
 extern int am_server;
+extern int am_daemon;
 extern int am_sender;
 extern int am_receiver;
 extern int am_generator;
@@ -599,7 +600,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	return updated;
 }
 
-RETSIGTYPE sig_int(UNUSED(int val))
+RETSIGTYPE sig_int(int sig_num)
 {
 	/* KLUGE: if the user hits Ctrl-C while ssh is prompting
 	 * for a password, then our cleanup's sending of a SIGUSR1
@@ -610,6 +611,10 @@ RETSIGTYPE sig_int(UNUSED(int val))
 	 * not ssh waiting for a password, then this tiny delay
 	 * shouldn't hurt anything. */
 	msleep(400);
+	/* If we're an rsync daemon listener (not a daemon server),
+	 * we'll exit with status 0 if we received SIGTERM. */
+	if (am_daemon && !am_server && sig_num == SIGTERM)
+		exit_cleanup(0);
 	exit_cleanup(RERR_SIGNAL);
 }
 
