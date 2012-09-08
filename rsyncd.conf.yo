@@ -730,11 +730,14 @@ quote(itemization(
   it() bf(RSYNC_USER_NAME): The accessing user's name (empty if no user).
   it() bf(RSYNC_PID): A unique number for this transfer.
   it() bf(RSYNC_REQUEST): (pre-xfer only) The module/path info specified
-  by the user (note that the user can specify multiple source files,
-  so the request can be something like "mod/path1 mod/path2", etc.).
+  by the user.  Note that the user can specify multiple source files,
+  so the request can be something like "mod/path1 mod/path2", etc.
   it() bf(RSYNC_ARG#): (pre-xfer only) The pre-request arguments are set
-  in these numbered values. RSYNC_ARG0 is always "rsyncd", and the last
-  value contains a single period.
+  in these numbered values. RSYNC_ARG0 is always "rsyncd", followed by
+  the options that were used in RSYNC_ARG1, and so on.  There will be a
+  value of "." indicating that the options are done and the path args
+  are beginning -- these contain similar information to RSYNC_REQUEST,
+  but with values separated and the module name stripped off.
   it() bf(RSYNC_EXIT_STATUS): (post-xfer only) the server side's exit value.
   This will be 0 for a successful run, a positive value for an error that the
   server generated, or a -1 if rsync failed to exit properly.  Note that an

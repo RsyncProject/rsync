@@ -363,11 +363,8 @@ static char *finish_pre_exec(pid_t pid, int write_fd, int read_fd, char *request
 			write_buf(write_fd, *early_argv, strlen(*early_argv)+1);
 		j = 1; /* Skip arg0 name in argv. */
 	}
-	for ( ; argv[j]; j++) {
+	for ( ; argv[j]; j++)
 		write_buf(write_fd, argv[j], strlen(argv[j])+1);
-		if (argv[j][0] == '.' && argv[j][1] == '\0')
-			break;
-	}
 	write_byte(write_fd, 0);
 
 	close(write_fd);
