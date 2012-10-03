@@ -1238,8 +1238,8 @@ void read_args(int f_in, char *mod_name, char *buf, size_t bufsiz, int rl_nulls,
 	if (mod_name && !protect_args)
 		argv[argc++] = "rsyncd";
 
-        if (request_p)
-                *request_p = NULL;
+	if (request_p)
+		*request_p = NULL;
 
 	while (1) {
 		if (read_line(f_in, buf, bufsiz, rl_flags) == 0)
@@ -1253,13 +1253,13 @@ void read_args(int f_in, char *mod_name, char *buf, size_t bufsiz, int rl_nulls,
 
 		if (dot_pos) {
 			if (request_p && request_len < 1024) {
-                                int len = strlen(buf);
-                                if (request_len)
-                                        request_p[0][request_len++] = ' ';
-                                if (!(*request_p = realloc_array(*request_p, char, request_len + len + 1)))
-                                        out_of_memory("read_args");
-                                memcpy(*request_p + request_len, buf, len + 1);
-                                request_len += len;
+				int len = strlen(buf);
+				if (request_len)
+					request_p[0][request_len++] = ' ';
+				if (!(*request_p = realloc_array(*request_p, char, request_len + len + 1)))
+					out_of_memory("read_args");
+				memcpy(*request_p + request_len, buf, len + 1);
+				request_len += len;
 			}
 			if (mod_name)
 				glob_expand_module(mod_name, buf, &argv, &argc, &maxargs);
