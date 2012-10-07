@@ -1032,7 +1032,7 @@ char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth,
  * Also cleans the path using the clean_fname() function. */
 int change_dir(const char *dir, int set_path_only)
 {
-	static int initialised;
+	static int initialised, skipped_chdir;
 	unsigned int len;
 
 	if (!initialised) {
@@ -1048,7 +1048,7 @@ int change_dir(const char *dir, int set_path_only)
 		return 0;
 
 	len = strlen(dir);
-	if (len == 1 && *dir == '.')
+	if (len == 1 && *dir == '.' && (!skipped_chdir || set_path_only))
 		return 1;
 
 	if (*dir == '/') {
@@ -1058,6 +1058,7 @@ int change_dir(const char *dir, int set_path_only)
 		}
 		if (!set_path_only && chdir(dir))
 			return 0;
+		skipped_chdir = set_path_only;
 		memcpy(curr_dir, dir, len + 1);
 	} else {
 		if (curr_dir_len + 1 + len >= sizeof curr_dir) {
@@ -1072,9 +1073,10 @@ int change_dir(const char *dir, int set_path_only)
 			curr_dir[curr_dir_len] = '\0';
 			return 0;
 		}
+		skipped_chdir = set_path_only;
 	}
 
-	curr_dir_len = clean_fname(curr_dir, CFN_COLLAPSE_DOT_DOT_DIRS);
+	curr_dir_len = clean_fname(curr_dir, CFN_COLLAPSE_DOT_DOT_DIRS | CFN_DROP_TRAILING_DOT_DIR);
 	if (sanitize_paths) {
 		if (module_dirlen > curr_dir_len)
 			module_dirlen = curr_dir_len;
