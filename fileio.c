@@ -26,6 +26,13 @@
 #define ENODATA EAGAIN
 #endif
 
+/* We want all reads to be aligned on 1K boundries. */
+#define ALIGN_BOUNDRY 1024
+/* How far past the boundary is an offset? */
+#define ALIGNED_OVERSHOOT(oft) ((oft) & (ALIGN_BOUNDRY-1))
+/* Round up a length to the next boundary */
+#define ALIGNED_LENGTH(len) ((((len) - 1) | (ALIGN_BOUNDRY-1)) + 1)
+
 extern int sparse_files;
 
 static OFF_T sparse_seek = 0;
@@ -171,7 +178,7 @@ struct map_struct *map_file(int fd, OFF_T len, int32 read_size, int32 blk_size)
 
 	map->fd = fd;
 	map->file_size = len;
-	map->def_window_size = read_size;
+	map->def_window_size = ALIGNED_LENGTH(read_size);
 
 	return map;
 }
@@ -181,7 +188,7 @@ struct map_struct *map_file(int fd, OFF_T len, int32 read_size, int32 blk_size)
 char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
 {
 	OFF_T window_start, read_start;
-	int32 window_size, read_size, read_offset;
+	int32 window_size, read_size, read_offset, align_fudge;
 
 	if (len == 0)
 		return NULL;
@@ -196,12 +203,13 @@ char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
 		return map->p + (offset - map->p_offset);
 
 	/* nope, we are going to have to do a read. Work out our desired window */
-	window_start = offset;
+	align_fudge = (int32)ALIGNED_OVERSHOOT(offset);
+	window_start = offset - align_fudge;
 	window_size = map->def_window_size;
 	if (window_start + window_size > map->file_size)
 		window_size = (int32)(map->file_size - window_start);
-	if (len > window_size)
-		window_size = len;
+	if (window_size < len + align_fudge)
+		window_size = ALIGNED_LENGTH(len + align_fudge);
 
 	/* make sure we have allocated enough memory for the window */
 	if (window_size > map->p_size) {
@@ -257,7 +265,7 @@ char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
 		read_size -= nread;
 	}
 
-	return map->p;
+	return map->p + align_fudge;
 }
 
 
