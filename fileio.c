@@ -159,8 +159,7 @@ int write_file(int f, char *buf, int len)
  * It gives sliding window access to a file.  mmap() is not used because of
  * the possibility of another program (such as a mailer) truncating the
  * file thus giving us a SIGBUS. */
-struct map_struct *map_file(int fd, OFF_T len, int32 read_size,
-			    int32 blk_size)
+struct map_struct *map_file(int fd, OFF_T len, int32 read_size, int32 blk_size)
 {
 	struct map_struct *map;
 
@@ -181,7 +180,6 @@ struct map_struct *map_file(int fd, OFF_T len, int32 read_size,
 /* slide the read window in the file */
 char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
 {
-	int32 nread;
 	OFF_T window_start, read_start;
 	int32 window_size, read_size, read_offset;
 
@@ -213,11 +211,9 @@ char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
 		map->p_size = window_size;
 	}
 
-	/* Now try to avoid re-reading any bytes by reusing any bytes
-	 * from the previous buffer. */
-	if (window_start >= map->p_offset &&
-	    window_start < map->p_offset + map->p_len &&
-	    window_start + window_size >= map->p_offset + map->p_len) {
+	/* Now try to avoid re-reading any bytes by reusing any bytes from the previous buffer. */
+	if (window_start >= map->p_offset && window_start < map->p_offset + map->p_len
+	 && window_start + window_size >= map->p_offset + map->p_len) {
 		read_start = map->p_offset + map->p_len;
 		read_offset = (int32)(read_start - window_start);
 		read_size = window_size - read_offset;
@@ -247,7 +243,7 @@ char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
 	map->p_len = window_size;
 
 	while (read_size > 0) {
-		nread = read(map->fd, map->p + read_offset, read_size);
+		int32 nread = read(map->fd, map->p + read_offset, read_size);
 		if (nread <= 0) {
 			if (!map->status)
 				map->status = nread ? errno : ENODATA;
