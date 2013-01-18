@@ -844,10 +844,14 @@ static int copy_altdest_file(const char *src, const char *dest, struct file_stru
 
 /* This is only called for regular files.  We return -2 if we've finished
  * handling the file, -1 if no dest-linking occurred, or a non-negative
- * value if we found an alternate basis file. */
+ * value if we found an alternate basis file.  If we're called with the
+ * find_exact_for_existing flag, the destination file already exists, so
+ * we only try to find an exact alt-dest match.  In this case, the returns
+ * can be -2 & -1 (both as above) as well as -3, which means that we
+ * removed the dest file but failed to create a hard link for it. */
 static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
-			 char *cmpbuf, stat_x *sxp, int itemizing,
-			 enum logcode code)
+			 char *cmpbuf, stat_x *sxp, int find_exact_for_existing,
+			 int itemizing, enum logcode code)
 {
 	int best_match = -1;
 	int match_level = 0;
@@ -889,10 +893,17 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 	}
 
 	if (match_level == 3 && !copy_dest) {
+		if (find_exact_for_existing) {
+			if (do_unlink(fname) < 0 && errno != ENOENT)
+				return -1;
+		}
 #ifdef SUPPORT_HARD_LINKS
 		if (link_dest) {
-			if (!hard_link_one(file, fname, cmpbuf, 1))
+			if (!hard_link_one(file, fname, cmpbuf, 1)) {
+				if (find_exact_for_existing)
+					return -3;
 				goto try_a_copy;
+			}
 			if (preserve_hard_links && F_IS_HLINKED(file))
 				finish_hard_link(file, fname, ndx, &sxp->st, itemizing, code, j);
 			if (!maybe_ATTRS_REPORT && (INFO_GTE(NAME, 2) || stdout_format_has_i > 1)) {
@@ -902,12 +913,17 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 			}
 		} else
 #endif
-		if (itemizing)
-			itemize(cmpbuf, file, ndx, 0, sxp, 0, 0, NULL);
+		{
+			if (itemizing)
+				itemize(cmpbuf, file, ndx, 0, sxp, 0, 0, NULL);
+		}
 		if (INFO_GTE(NAME, 2) && maybe_ATTRS_REPORT)
 			rprintf(FCLIENT, "%s is uptodate\n", fname);
 		return -2;
 	}
+
+	if (find_exact_for_existing)
+		return -1;
 
 	if (match_level >= 2) {
 #ifdef SUPPORT_HARD_LINKS
@@ -1640,9 +1656,9 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		stat_errno = ENOENT;
 	}
 
-	if (statret != 0 && basis_dir[0] != NULL) {
+	if (basis_dir[0] != NULL && (statret != 0 || !copy_dest)) {
 		int j = try_dests_reg(file, fname, ndx, fnamecmpbuf, &sx,
-				      itemizing, code);
+				      statret == 0, itemizing, code);
 		if (j == -2) {
 			if (remove_source_files == 1)
 				goto return_with_success;
@@ -1652,6 +1668,9 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			fnamecmp = fnamecmpbuf;
 			fnamecmp_type = j;
 			statret = 0;
+		} else if (j == -3) {
+			statret = -1;
+			stat_errno = ENOENT;
 		}
 	}
 

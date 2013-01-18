@@ -1773,6 +1773,8 @@ directory).  If a file is found in em(DIR) that is identical to the
 sender's file, the file will NOT be transferred to the destination
 directory.  This is useful for creating a sparse backup of just files that
 have changed from an earlier backup.
+This option is typically used to copy into an empty (or newly created)
+directory.
 
 Beginning in version 2.6.4, multiple bf(--compare-dest) directories may be
 provided, which will cause rsync to search the list in the order specified
@@ -1784,6 +1786,10 @@ selected to try to speed up the transfer.
 
 If em(DIR) is a relative path, it is relative to the destination directory.
 See also bf(--copy-dest) and bf(--link-dest).
+
+NOTE: beginning with version 3.1.0, rsync will remove a file from a non-empty
+destination hierarchy if an exact match is found in one of the compare-dest
+hierarchies (making the end result more closely match a fresh copy).
 
 dit(bf(--copy-dest=DIR)) This option behaves like bf(--compare-dest), but
 rsync will also copy unchanged files found in em(DIR) to the destination
@@ -1822,10 +1828,11 @@ If a match is not found, a basis file from one of the em(DIR)s will be
 selected to try to speed up the transfer.
 
 This option works best when copying into an empty destination hierarchy, as
-rsync treats existing files as definitive (so it never looks in the link-dest
-dirs when a destination file already exists), and as malleable (so it might
-change the attributes of a destination file, which affects all the hard-linked
-versions).
+existing files may get their attributes tweaked, and that can affect alternate
+destination files via hard-links.  Also, itemizing of changes can get a bit
+muddled.  Note that prior to version 3.1.0, an alternate-directory exact match
+would never be found (nor linked into the destination) when a destination file
+already exists.
 
 Note that if you combine this option with bf(--ignore-times), rsync will not
 link any files together because it only links identical files together as a
