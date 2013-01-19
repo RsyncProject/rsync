@@ -2,7 +2,7 @@
  * Backup handling code.
  *
  * Copyright (C) 1999 Andrew Tridgell
- * Copyright (C) 2003-2009 Wayne Davison
+ * Copyright (C) 2003-2013 Wayne Davison
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
