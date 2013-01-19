@@ -847,8 +847,7 @@ static int copy_altdest_file(const char *src, const char *dest, struct file_stru
  * value if we found an alternate basis file.  If we're called with the
  * find_exact_for_existing flag, the destination file already exists, so
  * we only try to find an exact alt-dest match.  In this case, the returns
- * can be -2 & -1 (both as above) as well as -3, which means that we
- * removed the dest file but failed to create a hard link for it. */
+ * are only -2 & -1 (both as above). */
 static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 			 char *cmpbuf, stat_x *sxp, int find_exact_for_existing,
 			 int itemizing, enum logcode code)
@@ -899,11 +898,8 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 		}
 #ifdef SUPPORT_HARD_LINKS
 		if (link_dest) {
-			if (!hard_link_one(file, fname, cmpbuf, 1)) {
-				if (find_exact_for_existing)
-					return -3;
+			if (!hard_link_one(file, fname, cmpbuf, 1))
 				goto try_a_copy;
-			}
 			if (preserve_hard_links && F_IS_HLINKED(file))
 				finish_hard_link(file, fname, ndx, &sxp->st, itemizing, code, j);
 			if (!maybe_ATTRS_REPORT && (INFO_GTE(NAME, 2) || stdout_format_has_i > 1)) {
@@ -1668,9 +1664,6 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			fnamecmp = fnamecmpbuf;
 			fnamecmp_type = j;
 			statret = 0;
-		} else if (j == -3) {
-			statret = -1;
-			stat_errno = ENOENT;
 		}
 	}
 
