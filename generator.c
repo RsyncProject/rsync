@@ -873,8 +873,10 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 			match_level = 2;
 			/* FALL THROUGH */
 		case 2:
-			if (!unchanged_attrs(cmpbuf, file, sxp))
+			if (!unchanged_attrs(cmpbuf, file, sxp)) {
+				free_stat_x(sxp);
 				continue;
+			}
 			best_match = j;
 			match_level = 3;
 			break;
