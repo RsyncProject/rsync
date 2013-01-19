@@ -1,3 +1,60 @@
+NEWS for rsync 3.0.9 (23 Sep 2011)
+Protocol: 30 (unchanged)
+Changes since 3.0.8:
+
+  BUG FIXES:
+
+    - Fix a crash bug in checksum scanning when --inplace is used.
+
+    - Fix a hang if a hard-linked file cannot be opened by the sender (e.g.
+      if it has no read permission).
+
+    - Fix preservation of a symlink's system xattrs (e.g. selinux) on Linux.
+
+    - Fix a memory leak in the xattr code.
+
+    - Fixed a bug with --delete-excluded when a filter merge file has a rule
+      that specifies a receiver-only side restriction.
+
+    - Fix a bug with the modifying of unwritable directories.
+
+    - Fix --fake-super's interaction with --link-dest same-file comparisons.
+
+    - Fix the updating of the curr_dir buffer to avoid a duplicate slash.
+
+    - Fix the directory permissions on an implied dot-dir when using --relative
+      (e.g. /outside/path/././send/path).
+
+    - Fixed some too-long sleeping instances when using --bwlimit.
+
+    - Fixed when symlink ownership difference-checking gets compiled into
+      unchanged_attrs().
+
+    - Improved the socket-error reporting when multiple protocols fail.
+
+    - Fixed a case where a socket error could reference just-freed memory.
+
+    - Failing to use a password file that was specified on the command-line is
+      now a fatal error.
+
+    - Fix the non-root updating of directories that don't have the read and/or
+      execute permission.
+
+    - Make daemon-excluded file errors more error-like.
+
+    - Fix a compilation issue on older C compilers (due to a misplaced var
+      declaration).
+
+    - Make configure avoid finding socketpair on cygwin.
+
+    - Avoid trying to reference SO_BROADCAST if the OS doesn't support it.
+
+    - Fix some issues with the post-processing of the man pages.
+
+    - Fixed the user home-dir handling in the support/lsh script.
+
+    - Some minor manpage improvements.
+
 NEWS for rsync 3.0.8 (26 Mar 2011)
 Protocol: 30 (unchanged)
 Changes since 3.0.7:
@@ -3233,7 +3290,8 @@ Changes since 2.4.6:
 
 Partial Protocol History
 	RELEASE DATE	VER.	DATE OF COMMIT*	PROTOCOL
-	?? ??? 2011	3.1.0	31 Aug 2008	31
+	?? ??? 2013	3.1.0	31 Aug 2008	31
+	23 Sep 2011	3.0.9			30
 	26 Mar 2011	3.0.8			30
 	31 Dec 2009	3.0.7			30
 	08 May 2009	3.0.6			30
