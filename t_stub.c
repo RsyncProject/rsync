@@ -26,6 +26,7 @@ int preallocate_files = 0;
 int module_id = -1;
 int relative_paths = 0;
 int module_dirlen = 0;
+int preserve_acls = 0;
 int preserve_times = 0;
 int preserve_xattrs = 0;
 char number_separator = ',';
@@ -69,6 +70,16 @@ filter_rule_list daemon_filter_list;
  int copy_xattrs(UNUSED(const char *source), UNUSED(const char *dest))
 {
 	return -1;
+}
+
+ void free_xattr(UNUSED(stat_x *sxp))
+{
+	return;
+}
+
+ void free_acl(UNUSED(stat_x *sxp))
+{
+	return;
 }
 
  char *lp_name(UNUSED(int mod))
