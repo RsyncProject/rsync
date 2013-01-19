@@ -587,16 +587,8 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 			rprintf(FCLIENT, "%s is uptodate\n", fname);
 	}
   cleanup:
-	if (sxp == &sx2) {
-#ifdef SUPPORT_ACLS
-		if (preserve_acls)
-			free_acl(&sx2);
-#endif
-#ifdef SUPPORT_XATTRS
-		if (preserve_xattrs)
-			free_xattr(&sx2);
-#endif
-	}
+	if (sxp == &sx2)
+		free_stat_x(&sx2);
 	return updated;
 }
 

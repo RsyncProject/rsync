@@ -1853,14 +1853,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			iflags |= ITEM_XNAME_FOLLOWS;
 		itemize(fnamecmp, file, -1, real_ret, &real_sx, iflags, fnamecmp_type,
 			fuzzy_file ? fuzzy_file->basename : NULL);
-#ifdef SUPPORT_ACLS
-		if (preserve_acls)
-			free_acl(&real_sx);
-#endif
-#ifdef SUPPORT_XATTRS
-		if (preserve_xattrs)
-			free_xattr(&real_sx);
-#endif
+		free_stat_x(&real_sx);
 	}
 
 	if (!do_xfers) {
@@ -1908,15 +1901,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		unmake_file(back_file);
 	}
 
-#ifdef SUPPORT_ACLS
-	if (preserve_acls)
-		free_acl(&sx);
-#endif
-#ifdef SUPPORT_XATTRS
-	if (preserve_xattrs)
-		free_xattr(&sx);
-#endif
-	return;
+	free_stat_x(&sx);
 }
 
 /* If we are replacing an existing hard link, symlink, device, or special file,

@@ -85,3 +85,17 @@ init_stat_x(stat_x *sx_p)
 	sx_p->xattr = NULL;
 #endif
 }
+
+static inline void
+free_stat_x(stat_x *sx_p)
+{
+	extern int preserve_acls, preserve_xattrs;
+#ifdef SUPPORT_ACLS
+	if (preserve_acls)
+		free_acl(sx_p);
+#endif
+#ifdef SUPPORT_XATTRS
+	if (preserve_xattrs)
+		free_xattr(sx_p);
+#endif
+}

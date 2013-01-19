@@ -441,16 +441,8 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 				}
 			}
 #endif
-		} else {
-#ifdef SUPPORT_ACLS
-			if (preserve_acls)
-				free_acl(&alt_sx);
-#endif
-#ifdef SUPPORT_XATTRS
-			if (preserve_xattrs)
-				free_xattr(&alt_sx);
-#endif
-		}
+		} else
+			free_stat_x(&alt_sx);
 	}
 
 	if (maybe_hard_link(file, ndx, fname, statret, sxp, prev_name, &prev_st,
@@ -527,14 +519,7 @@ void finish_hard_link(struct file_struct *file, const char *fname, int fin_ndx,
 		val = maybe_hard_link(file, ndx, prev_name, prev_statret, &prev_sx,
 				      our_name, stp, fname, itemizing, code);
 		flist->in_progress--;
-#ifdef SUPPORT_ACLS
-		if (preserve_acls)
-			free_acl(&prev_sx);
-#endif
-#ifdef SUPPORT_XATTRS
-		if (preserve_xattrs)
-			free_xattr(&prev_sx);
-#endif
+		free_stat_x(&prev_sx);
 		if (val < 0)
 			continue;
 		if (remove_source_files == 1 && do_xfers)
