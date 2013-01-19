@@ -852,6 +852,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 			 char *cmpbuf, stat_x *sxp, int find_exact_for_existing,
 			 int itemizing, enum logcode code)
 {
+	STRUCT_STAT real_st = sxp->st;
 	int best_match = -1;
 	int match_level = 0;
 	int j = 0;
@@ -893,8 +894,12 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 
 	if (match_level == 3 && !copy_dest) {
 		if (find_exact_for_existing) {
-			if (do_unlink(fname) < 0 && errno != ENOENT)
+			if (link_dest && real_st.st_dev == sxp->st.st_dev && real_st.st_ino == sxp->st.st_ino)
 				return -1;
+			if (do_unlink(fname) < 0 && errno != ENOENT) {
+				sxp->st = real_st;
+				return -1;
+			}
 		}
 #ifdef SUPPORT_HARD_LINKS
 		if (link_dest) {
@@ -918,15 +923,20 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 		return -2;
 	}
 
-	if (find_exact_for_existing)
+	if (find_exact_for_existing) {
+		sxp->st = real_st;
 		return -1;
+	}
 
 	if (match_level >= 2) {
 #ifdef SUPPORT_HARD_LINKS
 	  try_a_copy: /* Copy the file locally. */
 #endif
-		if (!dry_run && copy_altdest_file(cmpbuf, fname, file) < 0)
+		if (!dry_run && copy_altdest_file(cmpbuf, fname, file) < 0) {
+			if (find_exact_for_existing) /* Can get here via hard-link failure */
+				sxp->st = real_st;
 			return -1;
+		}
 		if (itemizing)
 			itemize(cmpbuf, file, ndx, 0, sxp, ITEM_LOCAL_CHANGE, 0, NULL);
 		if (maybe_ATTRS_REPORT
