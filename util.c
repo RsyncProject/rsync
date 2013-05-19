@@ -1320,6 +1320,8 @@ int msleep(int t)
 		select(0,NULL,NULL, NULL, &tval);
 
 		gettimeofday(&t2, NULL);
+		if (t2.tv_sec < t1.tv_sec)
+			t1 = t2; /* Time went backwards, so start over. */
 		tdiff = (t2.tv_sec - t1.tv_sec)*1000 +
 			(t2.tv_usec - t1.tv_usec)/1000;
 	}
