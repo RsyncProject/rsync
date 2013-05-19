@@ -221,7 +221,7 @@ void write_batch_shell_file(int argc, char *argv[], int file_arg_cnt)
 	stringjoin(filename, sizeof filename,
 		   batch_name, ".sh", NULL);
 	fd = do_open(filename, O_WRONLY | O_CREAT | O_TRUNC,
-		     S_IRUSR | S_IWUSR | S_IEXEC);
+		     S_IRUSR | S_IWUSR | S_IXUSR);
 	if (fd < 0) {
 		rsyserr(FERROR, errno, "Batch file %s open error",
 			filename);
