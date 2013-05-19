@@ -1282,6 +1282,10 @@ const char *inet_ntop(int af, const void *src, char *dst, size_t size);
 int inet_pton(int af, const char *src, void *dst);
 #endif
 
+#ifndef HAVE_GETPASS
+char *getpass(const char *prompt);
+#endif
+
 #ifdef MAINTAINER_MODE
 const char *get_panic_action(void);
 #endif
