@@ -210,11 +210,16 @@ int iconvbufs(iconv_t ic, xbuf *in, xbuf *out, int flags)
 			if (errno == EINVAL) {
 				if (!(flags & ICB_INCLUDE_INCOMPLETE))
 					goto finish;
+				if (!ocnt)
+					goto e2big;
 			} else if (errno == EILSEQ) {
 				if (!(flags & ICB_INCLUDE_BAD))
 					goto finish;
+				if (!ocnt)
+					goto e2big;
 			} else if (errno == E2BIG) {
 				size_t siz;
+			  e2big:
 				opos = obuf - out->buf;
 				if (flags & ICB_CIRCULAR_OUT && out->pos > 1 && opos > out->pos) {
 					/* We are in a divided circular buffer at the physical
@@ -242,6 +247,8 @@ int iconvbufs(iconv_t ic, xbuf *in, xbuf *out, int flags)
 			}
 			*obuf++ = *ibuf++;
 			ocnt--, icnt--;
+			if (!icnt)
+				break;
 		}
 	}
 
