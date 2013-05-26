@@ -34,6 +34,7 @@ extern char *partial_dir;
 extern char *logfile_name;
 
 BOOL shutting_down = False;
+BOOL flush_ok_after_signal = False;
 
 #ifdef HAVE_SIGACTION
 static struct sigaction sigact;
@@ -182,7 +183,12 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 #include "case_N.h"
 		switch_step++;
 
-		if (!code || am_server || am_receiver)
+		if (flush_ok_after_signal) {
+			flush_ok_after_signal = False;
+			if (code == RERR_SIGNAL)
+				io_flush(FULL_FLUSH);
+		}
+		if (!code)
 			io_flush(FULL_FLUSH);
 
 		/* FALLTHROUGH */

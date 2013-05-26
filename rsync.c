@@ -42,6 +42,7 @@ extern int am_generator;
 extern int am_starting_up;
 extern int allow_8bit_chars;
 extern int protocol_version;
+extern int got_kill_signal;
 extern int inc_recurse;
 extern int inplace;
 extern int flist_eof;
@@ -599,6 +600,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	return updated;
 }
 
+/* This is only called for SIGINT, SIGHUP, and SIGTERM. */
 RETSIGTYPE sig_int(int sig_num)
 {
 	/* KLUGE: if the user hits Ctrl-C while ssh is prompting
@@ -610,10 +612,23 @@ RETSIGTYPE sig_int(int sig_num)
 	 * not ssh waiting for a password, then this tiny delay
 	 * shouldn't hurt anything. */
 	msleep(400);
+
 	/* If we're an rsync daemon listener (not a daemon server),
 	 * we'll exit with status 0 if we received SIGTERM. */
 	if (am_daemon && !am_server && sig_num == SIGTERM)
 		exit_cleanup(0);
+
+	/* If the signal arrived on the server side (or for the receiver
+	 * process on the client), we want to try to do a controlled shutdown
+	 * that lets the client side (generator process) know what happened.
+	 * To do this, we set a flag and let the normal process handle the
+	 * shutdown.  We only attempt this if multiplexed IO is in effect and
+	 * we didn't already set the flag. */
+	if (!got_kill_signal && (am_server || am_receiver)) {
+		got_kill_signal = sig_num;
+		return;
+	}
+
 	exit_cleanup(RERR_SIGNAL);
 }
 

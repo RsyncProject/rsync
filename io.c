@@ -57,6 +57,7 @@ extern int protocol_version;
 extern int remove_source_files;
 extern int preserve_hard_links;
 extern BOOL extra_flist_sending_enabled;
+extern BOOL flush_ok_after_signal;
 extern struct stats stats;
 extern struct file_list *cur_flist;
 #ifdef ICONV_OPTION
@@ -73,6 +74,7 @@ BOOL flist_receiving_enabled = False;
 
 /* Ignore an EOF error if non-zero. See whine_about_eof(). */
 int kluge_around_eof = 0;
+int got_kill_signal = -1; /* is set to 0 only after multiplexed I/O starts */
 
 int sock_f_in = -1;
 int sock_f_out = -1;
@@ -850,6 +852,12 @@ static char *perform_io(size_t needed, int flags)
 				if (empty_buf_len)
 					iobuf.raw_data_header_pos = 0;
 			}
+		}
+
+		if (got_kill_signal > 0) {
+			got_kill_signal = -1;
+			flush_ok_after_signal = True;
+			exit_cleanup(RERR_SIGNAL);
 		}
 
 		/* We need to help prevent deadlock by doing what reading
@@ -2282,6 +2290,7 @@ void io_start_multiplex_out(int fd)
 
 	iobuf.out_empty_len = 4; /* See also OUT_MULTIPLEXED */
 	io_start_buffering_out(fd);
+	got_kill_signal = 0;
 
 	iobuf.raw_data_header_pos = iobuf.out.pos + iobuf.out.len;
 	iobuf.out.len += 4;
@@ -2329,6 +2338,9 @@ int io_end_multiplex_out(int mode)
 
 	iobuf.out.len = 0;
 	iobuf.out_empty_len = 0;
+	if (got_kill_signal > 0) /* Just in case... */
+		exit_cleanup(RERR_SIGNAL);
+	got_kill_signal = -1;
 
 	return ret;
 }
