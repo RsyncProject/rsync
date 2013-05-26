@@ -102,15 +102,15 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 	static int switch_step = 0;
 	static int exit_code = 0, exit_line = 0;
 	static const char *exit_file = NULL;
-	static int unmodified_code = 0;
+	static int first_code = 0;
 
 	SIGACTION(SIGUSR1, SIG_IGN);
 	SIGACTION(SIGUSR2, SIG_IGN);
 
-	if (exit_code) { /* Preserve first exit info when recursing. */
-		code = exit_code;
-		file = exit_file;
-		line = exit_line;
+	if (!exit_code) { /* Preserve first error exit info when recursing. */
+		exit_code = code;
+		exit_file = file;
+		exit_line = line < 0 ? -line : line;
 	}
 
 	/* If this is the exit at the end of the run, the server side
@@ -124,9 +124,7 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 #include "case_N.h" /* case 0: */
 		switch_step++;
 
-		exit_code = unmodified_code = code;
-		exit_file = file;
-		exit_line = line;
+		first_code = code;
 
 		if (output_needs_newline) {
 			fputc('\n', stdout);
@@ -148,8 +146,8 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 			int pid = wait_process(cleanup_child_pid, &status, WNOHANG);
 			if (pid == cleanup_child_pid) {
 				status = WEXITSTATUS(status);
-				if (status > code)
-					code = exit_code = status;
+				if (status > exit_code)
+					exit_code = status;
 			}
 		}
 
@@ -188,7 +186,7 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 			if (code == RERR_SIGNAL)
 				io_flush(FULL_FLUSH);
 		}
-		if (!code)
+		if (!exit_code && !code)
 			io_flush(FULL_FLUSH);
 
 		/* FALLTHROUGH */
@@ -197,7 +195,7 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 
 		if (cleanup_fname)
 			do_unlink(cleanup_fname);
-		if (code)
+		if (exit_code)
 			kill_all(SIGUSR1);
 		if (cleanup_pid && cleanup_pid == getpid()) {
 			char *pidf = lp_pid_file();
@@ -205,20 +203,22 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 				unlink(lp_pid_file());
 		}
 
-		if (code == 0) {
+		if (exit_code == 0) {
+			if (code)
+				exit_code = code;
 			if (io_error & IOERR_DEL_LIMIT)
-				code = exit_code = RERR_DEL_LIMIT;
+				exit_code = RERR_DEL_LIMIT;
 			if (io_error & IOERR_VANISHED)
-				code = exit_code = RERR_VANISHED;
+				exit_code = RERR_VANISHED;
 			if (io_error & IOERR_GENERAL || got_xfer_error)
-				code = exit_code = RERR_PARTIAL;
+				exit_code = RERR_PARTIAL;
 		}
 
 		/* If line < 0, this exit is after a MSG_ERROR_EXIT event, so
 		 * we don't want to output a duplicate error. */
-		if ((code && line > 0)
+		if ((exit_code && line > 0)
 		 || am_daemon || (logfile_name && (am_server || !INFO_GTE(STATS, 1))))
-			log_exit(code, file, line);
+			log_exit(exit_code, exit_file, exit_line);
 
 		/* FALLTHROUGH */
 #include "case_N.h"
@@ -228,7 +228,7 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 			rprintf(FINFO,
 				"[%s] _exit_cleanup(code=%d, file=%s, line=%d): "
 				"about to call exit(%d)\n",
-				who_am_i(), unmodified_code, file, line, code);
+				who_am_i(), first_code, exit_file, exit_line, exit_code);
 		}
 
 		/* FALLTHROUGH */
@@ -251,7 +251,7 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 #include "case_N.h"
 		switch_step++;
 
-		if (am_server && code)
+		if (am_server && exit_code)
 			msleep(100);
 		close_all();
 
@@ -260,7 +260,7 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 		break;
 	}
 
-	exit(code);
+	exit(exit_code);
 }
 
 void cleanup_disable(void)
