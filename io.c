@@ -1613,7 +1613,7 @@ static void read_a_msg(void)
 				io_flush(FULL_FLUSH);
 			}
 		} else if (protocol_version >= 31) {
-			if (am_generator) {
+			if (am_generator || am_receiver) {
 				if (DEBUG_GTE(EXIT, 3)) {
 					rprintf(FINFO, "[%s] sending MSG_ERROR_EXIT with exit_code %d\n",
 						who_am_i(), val);
