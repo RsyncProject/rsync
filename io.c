@@ -514,6 +514,13 @@ void restore_iobuf_size(xbuf *out)
 	}
 }
 
+static void handle_kill_signal(BOOL flush_ok)
+{
+	got_kill_signal = -1;
+	flush_ok_after_signal = flush_ok;
+	exit_cleanup(RERR_SIGNAL);
+}
+
 /* Perform buffered input and/or output until specified conditions are met.
  * When given a "needed" read or write request, this returns without doing any
  * I/O if the needed input bytes or write space is already available.  Once I/O
@@ -735,6 +742,9 @@ static char *perform_io(size_t needed, int flags)
 			break;
 		}
 
+		if (got_kill_signal > 0)
+			handle_kill_signal(True);
+
 		if (extra_flist_sending_enabled) {
 			if (file_total - file_old_total < MAX_FILECNT_LOOKAHEAD && IN_MULTIPLEXED_AND_READY)
 				tv.tv_sec = 0;
@@ -854,11 +864,8 @@ static char *perform_io(size_t needed, int flags)
 			}
 		}
 
-		if (got_kill_signal > 0) {
-			got_kill_signal = -1;
-			flush_ok_after_signal = True;
-			exit_cleanup(RERR_SIGNAL);
-		}
+		if (got_kill_signal > 0)
+			handle_kill_signal(True);
 
 		/* We need to help prevent deadlock by doing what reading
 		 * we can whenever we are here trying to write. */
@@ -878,6 +885,9 @@ static char *perform_io(size_t needed, int flags)
 		}
 	}
   double_break:
+
+	if (got_kill_signal > 0)
+		handle_kill_signal(True);
 
 	data = iobuf.in.buf + iobuf.in.pos;
 
@@ -2339,7 +2349,7 @@ int io_end_multiplex_out(int mode)
 	iobuf.out.len = 0;
 	iobuf.out_empty_len = 0;
 	if (got_kill_signal > 0) /* Just in case... */
-		exit_cleanup(RERR_SIGNAL);
+		handle_kill_signal(False);
 	got_kill_signal = -1;
 
 	return ret;
