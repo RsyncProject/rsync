@@ -26,6 +26,7 @@
 #include "inums.h"
 
 extern int module_id;
+extern int protect_args;
 extern int modify_window;
 extern int relative_paths;
 extern int preserve_times;
@@ -758,6 +759,11 @@ void glob_expand_module(char *base1, char *arg, char ***argv_p, int *argc_p, int
 
 	if (strncmp(arg, base, base_len) == 0)
 		arg += base_len;
+
+	if (protect_args) {
+		glob_expand(arg, argv_p, argc_p, maxargs_p);
+		return;
+	}
 
 	if (!(arg = strdup(arg)))
 		out_of_memory("glob_expand_module");
