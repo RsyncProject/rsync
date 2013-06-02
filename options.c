@@ -802,6 +802,7 @@ void usage(enum logcode F)
 #ifdef ICONV_OPTION
   rprintf(F,"     --iconv=CONVERT_SPEC    request charset conversion of filenames\n");
 #endif
+  rprintf(F,"     --checksum-seed=NUM     set block/file checksum seed (advanced)\n");
   rprintf(F," -4, --ipv4                  prefer IPv4\n");
   rprintf(F," -6, --ipv6                  prefer IPv6\n");
   rprintf(F,"     --version               print version number\n");
