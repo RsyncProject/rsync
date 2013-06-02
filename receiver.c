@@ -241,7 +241,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 	OFF_T preallocated_len = 0;
 #endif
 
-	if (preallocate_files && fd != -1 && total_size > 0) {
+	if (preallocate_files && fd != -1 && total_size > 0 && (!inplace || total_size > size_r)) {
 		/* Try to preallocate enough space for file's eventual length.  Can
 		 * reduce fragmentation on filesystems like ext4, xfs, and NTFS. */
 		if (do_fallocate(fd, 0, total_size) == 0) {
