@@ -1,6 +1,6 @@
 NEWS for rsync 3.1.0 (UNRELEASED)
 Protocol: 31 (changed)
-Changes since 3.0.4:
+Changes since 3.0.9:
 
   OUTPUT CHANGES:
 
@@ -36,16 +36,41 @@ Changes since 3.0.4:
 
   BUG FIXES:
 
-    - Changed the way --progress overwrites its prior output in order to make
-      it nearly impossible for the progress to get overwritten by an error.
+    - Fixed a bug in the iconv code when EINVAL or EILSEQ is returned with a
+      full output buffer.
 
     - Fixed some rare bugs in --iconv processing that might cause a multibyte
       character to get translated incorrectly.
+
+    - Fixed a bogus "vanished file" error if some files were specified with
+      "./" prefixes and others were not.
+
+    - Changed the way --progress overwrites its prior output in order to make
+      it nearly impossible for the progress to get overwritten by an error.
 
     - Improved the propagation of abnormal-exit error messages.  This should
       help the client side to receive errors from the server when it is exiting
       abnormally, and should also avoid dying with an "connection unexpectedly
       closed" exit when the closed connection is really expected.
+
+    - The sender now checks each file it plans to remove to ensure that it
+      hasn't changed from the first stat's info.  This helps to avoid losing
+      file data when the user is not using the option in a safe manner.
+
+    - Fixed a data-duplication bug in the compress option that made compression
+      less efficient.  This improves protocol 31 onward, while behaving in a
+      compatible (buggy) manner with older rsync protocols.
+
+    - When creating a temp-file, rsync is now a bit smarter about it dot-char
+      choices, which can fix a problem on OS X with names that start with "..".
+
+    - The reads that map_ptr() now does are aligned on 1K boundaries.  This
+      helps some filesystems and/or files that don't like unaligned reads.
+
+    - Fix an issue in the msleep() function if time jumps backwards.
+
+    - Fix daemon-server module-name splitting bug where an arg would get split
+      even if --protect-args was used.
 
   ENHANCEMENTS:
 
@@ -86,6 +111,14 @@ Changes since 3.0.4:
       daemon to complain about an inability to set explicitly-specified uid/gid
       values, even when not run by a super-user.
 
+    - The daemon now tries to send the user the error messages from the
+      pre-xfer exec script when it fails.
+
+    - Improved the use of alt-dest options into an existing hierarchy of files:
+      If a match is found in an alt-dir, it takes precedence over an existing
+      file.  (We'll need to wait for a future version before attribute-changes
+      on otherwise unchanged files are safe when using an existing hierarchy.)
+
     - Added per-user authorization options and group-authorization support to
       the daemon's "auth users" parameter.
 
@@ -108,7 +141,27 @@ Changes since 3.0.4:
     - Added the checking of the RSYNC_PROTECT_ARGS environment variable to allow
       the default for the --protect-args command-line option to be overridden.
 
+    - Added the --preallocate command-line option.
+
+    - Allow --password-file=- to read the password from stdin (filename "-").
+
+    - Added the --outbuf=N|L|B option for chosing the output buffering.
+
+    - Repating the --fuzzy option now causes the code to look for fuzzy matches
+      inside alt-dest directories too.
+
     - Added some Solaris xattr code.
+
+    - Made an rsync daemon (the listening process) exit with a 0 status when
+      it was signalled to die.  This helps launchd.
+
+    - Improved the RSYNC_* environment variables for the pre-xfer exec script:
+      when a daemon is sent multiple request args, they are now joined into a
+      single return value (separated by spaces) so that the RSYNC_REQUEST
+      environment variable is accurate for any "pre-xfer exec".  The values in
+      RSYNC_ARG# vars are no longer truncated at the "." arg (prior to the
+      request dirs/files), so that all the requested values are also listed
+      (separately) in RSYNC_ARG# variables.
 
   EXTRAS:
 
@@ -118,6 +171,14 @@ Changes since 3.0.4:
     - Added the "mapfrom" and "mapto" scripts to the support directory, which
       makes it easier to do user/group mapping in a local transfer based on
       passwd/group files from another machine.
+
+    - There's a new, improved version of the lsh script in the support dir:
+      lsh.pl (perl version).  The old, shell version was also enhanced a bit.
+
+    - There is a helper script named rsync-slash-strip in the support directory
+      for anyone that wants to change the way rsync handles args with trailing
+      slashes.  (e.g. arg/ would get stripped to arg while arg/. would turn into
+      arg/).
 
   INTERNAL:
 
@@ -143,8 +204,13 @@ Changes since 3.0.4:
 
     - Added init_stat_x() function to avoid duplication of acl/xattr init code.
 
+    - Rsync can now be compiled to use an unmodified zlib library instead of
+      the tweaked one that is included with rsync.
+
   DEVELOPER RELATED:
 
     - Added more conditional debug output.
 
     - Changed configure.in to configure.ac.
+
+    - Fixed some build issues for android and minix.
