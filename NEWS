@@ -131,8 +131,10 @@ Changes since 3.0.9:
     - Avoid re-sending xattr info for hard-linked files w/the same xattrs
       (protocol 31).
 
-    - When backing up a file, try to hard-link the file into place so that the
-      upcoming replacement of the destination file will be atomic.
+    - The backup code was improved to use better logic maintaining the backup
+      directory hierarchy.  Also, when a file is being backed up, rsync tries
+      to hard-link it into place so that the upcoming replacement of the
+      destination file will be atomic (for the normal, non-inplace logic).
 
     - Added the ability to synchronize nano-second modified times.
 
@@ -149,6 +151,8 @@ Changes since 3.0.9:
 
     - Repating the --fuzzy option now causes the code to look for fuzzy matches
       inside alt-dest directories too.
+
+    - The --chmod option now supports numeric modes, e.g. --chmod=644,D755
 
     - Added some Solaris xattr code.
 
@@ -173,7 +177,8 @@ Changes since 3.0.9:
       passwd/group files from another machine.
 
     - There's a new, improved version of the lsh script in the support dir:
-      lsh.pl (perl version).  The old, shell version was also enhanced a bit.
+      it's written in perl and supports -u without resorting to using sudo
+      (when run as root).  The old shell version is now named lsh.sh.
 
     - There is a helper script named rsync-slash-strip in the support directory
       for anyone that wants to change the way rsync handles args with trailing
@@ -204,13 +209,13 @@ Changes since 3.0.9:
 
     - Added init_stat_x() function to avoid duplication of acl/xattr init code.
 
+    - The included zlib was upgraded from 1.2.3 to 1.2.8.
+
     - Rsync can now be compiled to use an unmodified zlib library instead of
       the tweaked one that is included with rsync.
 
   DEVELOPER RELATED:
 
     - Added more conditional debug output.
-
-    - Changed configure.in to configure.ac.
 
     - Fixed some build issues for android and minix.
