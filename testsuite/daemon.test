@@ -24,7 +24,7 @@
 chkfile="$scratchdir/rsync.chk"
 outfile="$scratchdir/rsync.out"
 
-SSH="src/support/lsh --no-cd"
+SSH="src/support/lsh.sh --no-cd"
 FILE_REPL='s/^\([^d][^ ]*\) *\(..........[0-9]\) /\1 \2 /'
 DIR_REPL='s/^\(d[^ ]*\)  *[0-9][.,0-9]* /\1         DIR /'
 LS_REPL='s;[0-9][0-9][0-9][0-9]/[0-9][0-9]/[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9];####/##/## ##:##:##;'

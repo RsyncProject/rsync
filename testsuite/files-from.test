@@ -9,7 +9,7 @@
 
 . "$suitedir/rsync.fns"
 
-SSH="$scratchdir/src/support/lsh"
+SSH="$scratchdir/src/support/lsh.sh"
 
 hands_setup
 
