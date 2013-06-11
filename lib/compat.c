@@ -22,7 +22,7 @@
 #include "rsync.h"
 #include "itypes.h"
 
-extern char number_separator;
+static char number_separator;
 
 #ifndef HAVE_STRDUP
  char *strdup(char *s)
@@ -189,6 +189,15 @@ char *do_big_num(int64 num, int human_flag, const char *fract)
 	static unsigned int n;
 	char *s;
 	int len, negated;
+
+	if (human_flag && !number_separator) {
+		char buf[32];
+		snprintf(buf, sizeof buf, "%f", 3.14);
+		if (strchr(buf, '.') != NULL)
+			number_separator = ',';
+		else
+			number_separator = '.';
+	}
 
 	n = (n + 1) % (sizeof bufs / sizeof bufs[0]);
 

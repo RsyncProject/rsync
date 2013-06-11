@@ -31,7 +31,6 @@ int fnmatch_errors = 0;
 #endif
 
 int wildmatch_errors = 0;
-char number_separator = ',';
 
 typedef char bool;
 

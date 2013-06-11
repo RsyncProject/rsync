@@ -123,7 +123,6 @@ int checksum_seed = 0;
 int inplace = 0;
 int delay_updates = 0;
 long block_size = 0; /* "long" because popt can't set an int32. */
-char number_separator;
 char *skip_compress = NULL;
 item_list dparam_list = EMPTY_ITEM_LIST;
 
@@ -1868,15 +1867,6 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	if (do_stats) {
 		parse_output_words(info_words, info_levels,
 			verbose > 1 ? "stats3" : "stats2", DEFAULT_PRIORITY);
-	}
-
-	if (human_readable) {
-		char buf[32];
-		snprintf(buf, sizeof buf, "%f", 3.14);
-		if (strchr(buf, '.') != NULL)
-			number_separator = ',';
-		else
-			number_separator = '.';
 	}
 
 #ifdef ICONV_OPTION

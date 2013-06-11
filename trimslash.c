@@ -28,7 +28,6 @@ int read_only = 1;
 int list_only = 0;
 int preserve_perms = 0;
 int preserve_executability = 0;
-char number_separator = ',';
 
 int
 main(int argc, char **argv)

@@ -51,7 +51,6 @@ int link_owner = 0;
 int nsec_times = 0;
 int preserve_perms = 0;
 int preserve_executability = 0;
-char number_separator;
 
 #ifdef SUPPORT_XATTRS
 
@@ -254,12 +253,6 @@ main(int argc, char *argv[])
 	extra_args = poptGetArgs(pc);
 	if (!extra_args || *extra_args == NULL)
 		tls_usage(1);
-
-	snprintf(buf, sizeof buf, "%f", 3.14);
-	if (strchr(buf, '.') != NULL)
-		number_separator = ',';
-	else
-		number_separator = '.';
 
 	for (; *extra_args; extra_args++)
 		list_file(*extra_args);

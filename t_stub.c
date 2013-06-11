@@ -30,7 +30,6 @@ int module_dirlen = 0;
 int preserve_acls = 0;
 int preserve_times = 0;
 int preserve_xattrs = 0;
-char number_separator = ',';
 char *partial_dir;
 char *module_dir;
 filter_rule_list daemon_filter_list;
