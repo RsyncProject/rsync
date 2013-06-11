@@ -114,18 +114,6 @@ void print_child_argv(const char *prefix, char **cmd)
 	rprintf(FCLIENT, " (%d args)\n", cnt);
 }
 
-NORETURN void out_of_memory(const char *str)
-{
-	rprintf(FERROR, "ERROR: out of memory in %s [%s]\n", str, who_am_i());
-	exit_cleanup(RERR_MALLOC);
-}
-
-NORETURN void overflow_exit(const char *str)
-{
-	rprintf(FERROR, "ERROR: buffer overflow in %s [%s]\n", str, who_am_i());
-	exit_cleanup(RERR_MALLOC);
-}
-
 /* This returns 0 for success, 1 for a symlink if symlink time-setting
  * is not possible, or -1 for any other error. */
 int set_modtime(const char *fname, time_t modtime, uint32 mod_nsec, mode_t mode)
@@ -1305,36 +1293,6 @@ char *timestring(time_t t)
 	return TimeBuf;
 }
 
-/**
- * Sleep for a specified number of milliseconds.
- *
- * Always returns TRUE.  (In the future it might return FALSE if
- * interrupted.)
- **/
-int msleep(int t)
-{
-	int tdiff = 0;
-	struct timeval tval, t1, t2;
-
-	gettimeofday(&t1, NULL);
-
-	while (tdiff < t) {
-		tval.tv_sec = (t-tdiff)/1000;
-		tval.tv_usec = 1000*((t-tdiff)%1000);
-
-		errno = 0;
-		select(0,NULL,NULL, NULL, &tval);
-
-		gettimeofday(&t2, NULL);
-		if (t2.tv_sec < t1.tv_sec)
-			t1 = t2; /* Time went backwards, so start over. */
-		tdiff = (t2.tv_sec - t1.tv_sec)*1000 +
-			(t2.tv_usec - t1.tv_usec)/1000;
-	}
-
-	return True;
-}
-
 /* Determine if two time_t values are equivalent (either exact, or in
  * the modification timestamp window established by --modify-window).
  *
@@ -1391,24 +1349,6 @@ int _Insure_trap_error(int a1, int a2, int a3, int a4, int a5, int a6)
 	return ret;
 }
 #endif
-
-#define MALLOC_MAX 0x40000000
-
-void *_new_array(unsigned long num, unsigned int size, int use_calloc)
-{
-	if (num >= MALLOC_MAX/size)
-		return NULL;
-	return use_calloc ? calloc(num, size) : malloc(num * size);
-}
-
-void *_realloc_array(void *ptr, unsigned int size, size_t num)
-{
-	if (num >= MALLOC_MAX/size)
-		return NULL;
-	if (!ptr)
-		return malloc(size * num);
-	return realloc(ptr, size * num);
-}
 
 /* Take a filename and filename length and return the most significant
  * filename suffix we can find.  This ignores suffixes such as "~",

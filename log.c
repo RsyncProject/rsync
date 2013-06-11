@@ -683,23 +683,14 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 			if (protocol_version >= 30
 			 && (iflags & ITEM_TRANSFER
 			  || (always_checksum && S_ISREG(file->mode)))) {
-				int i, x1, x2;
 				const char *sum = iflags & ITEM_TRANSFER
 						? sender_file_sum : F_SUM(file);
-				c = buf2 + checksum_len*2;
-				*c = '\0';
-				for (i = checksum_len; --i >= 0; ) {
-					x1 = CVAL(sum, i);
-					x2 = x1 >> 4;
-					x1 &= 0xF;
-					*--c = x1 <= 9 ? x1 + '0' : x1 + 'a' - 10;
-					*--c = x2 <= 9 ? x2 + '0' : x2 + 'a' - 10;
-				}
+				n = sum_as_hex(sum);
 			} else {
 				memset(buf2, ' ', checksum_len*2);
 				buf2[checksum_len*2] = '\0';
+				n = buf2;
 			}
-			n = buf2;
 			break;
 		case 'i':
 			if (iflags & ITEM_DELETED) {
