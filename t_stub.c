@@ -25,6 +25,7 @@ int modify_window = 0;
 int preallocate_files = 0;
 int protect_args = 0;
 int module_id = -1;
+int checksum_len = 0;
 int relative_paths = 0;
 int module_dirlen = 0;
 int preserve_acls = 0;
