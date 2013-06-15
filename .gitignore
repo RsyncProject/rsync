@@ -23,6 +23,9 @@ config.status
 /getgroups
 /gmon.out
 /rsync
+/rsync-ssl
+/stunnel-rsync
+/stunnel-rsyncd.conf
 /shconfig
 /testdir
 /tests-dont-exist

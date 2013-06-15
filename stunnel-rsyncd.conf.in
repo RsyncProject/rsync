@@ -1,0 +1,30 @@
+# This config for stunnel will start up rsync for an incoming ssl connection.
+foreground = no
+#output = /var/log/stunnel-rsyncd.log
+pid = /var/run/stunnel-rsyncd.pid
+socket = l:TCP_NODELAY=1
+socket = r:TCP_NODELAY=1
+compression = rle
+# This must be root for rsync to use chroot -- rsync will drop permissions:
+setuid = root
+setgid = root
+
+[rsync]
+accept = 874
+# You can set the cert to a combo *.pem file and omit the key, if you like.
+cert = /etc/rsync-ssl/certs/server.crt
+key  = /etc/rsync-ssl/certs/server.key
+client = no
+
+# To allow anyone to try an ssl connection, use this:
+verify = 0
+CAfile = /etc/ssl/ca-bundle.pem
+
+# To allow only cert-authorized clients, use something like this instead of the above:
+#verify = 3
+#CAfile = /etc/rsync-ssl/certs/allowed-clients.cert.pem
+
+exec = @bindir@/rsync
+# You can either share the same config as a normal daemon, or specify a separate config:
+execargs = rsync --server --daemon
+#execargs = rsync --server --daemon --config=/etc/rsync-ssl/rsyncd.conf

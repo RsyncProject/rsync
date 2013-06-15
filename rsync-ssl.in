@@ -1,0 +1,12 @@
+#!/bin/bash
+# This script supports using stunnel to secure an rsync daemon connection.
+# Note that this requires at least version 4.x of stunnel.
+case "$@" in
+*rsync://*) ;;
+*::*) ;;
+*)
+    echo "You must use rsync-ssl with a daemon-style hostname." 0>&1
+    exit 1
+    ;;
+esac
+exec @bindir@/rsync --rsh=@bindir@/stunnel-rsync "${@}"

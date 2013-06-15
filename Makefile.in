@@ -4,6 +4,7 @@
 prefix=@prefix@
 datarootdir=@datarootdir@
 exec_prefix=@exec_prefix@
+stunnel4=@STUNNEL4@
 bindir=@bindir@
 mandir=@mandir@
 
@@ -18,6 +19,7 @@ INSTALLCMD=@INSTALL@
 INSTALLMAN=@INSTALL@
 
 srcdir=@srcdir@
+MKDIR_P=@MKDIR_P@
 VPATH=$(srcdir)
 SHELL=/bin/sh
 
@@ -60,15 +62,29 @@ CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o trimslash.
 	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) -c $< @CC_SHOBJ_FLAG@
 @OBJ_RESTORE@
 
-all: Makefile rsync$(EXEEXT) @MAKE_MAN@
+all: Makefile rsync$(EXEEXT) rsync-ssl stunnel-rsync stunnel-rsyncd.conf @MAKE_MAN@
 
 install: all
-	-mkdir -p ${DESTDIR}${bindir}
+	-${MKDIR_P} ${DESTDIR}${bindir}
 	${INSTALLCMD} ${INSTALL_STRIP} -m 755 rsync$(EXEEXT) ${DESTDIR}${bindir}
-	-mkdir -p ${DESTDIR}${mandir}/man1
-	-mkdir -p ${DESTDIR}${mandir}/man5
+	-${MKDIR_P} ${DESTDIR}${mandir}/man1
+	-${MKDIR_P} ${DESTDIR}${mandir}/man5
 	if test -f rsync.1; then ${INSTALLMAN} -m 644 rsync.1 ${DESTDIR}${mandir}/man1; fi
 	if test -f rsyncd.conf.5; then ${INSTALLMAN} -m 644 rsyncd.conf.5 ${DESTDIR}${mandir}/man5; fi
+
+install-ssl-client: rsync-ssl stunnel-rsync
+	-${MKDIR_P} ${DESTDIR}${bindir}
+	${INSTALLCMD} ${INSTALL_STRIP} -m 755 rsync-ssl ${DESTDIR}${bindir}
+	${INSTALLCMD} ${INSTALL_STRIP} -m 755 stunnel-rsync ${DESTDIR}${bindir}
+
+install-ssl-daemon: stunnel-rsyncd.conf
+	-${MKDIR_P} ${DESTDIR}/etc/stunnel
+	${INSTALLCMD} ${INSTALL_STRIP} -m 644 stunnel-rsyncd.conf ${DESTDIR}/etc/stunnel/rsyncd.conf
+	@if ! ls /etc/rsync-ssl/certs/server.* >/dev/null 2>/dev/null; then \
+	    echo "Note that you'll need to install the certificate used by /etc/stunnel/rsyncd.conf"; \
+	fi
+
+install-all: install install-ssl-client install-ssl-daemon
 
 install-strip:
 	$(MAKE) INSTALL_STRIP='-s' install
@@ -173,6 +189,17 @@ Makefile: Makefile.in config.status configure.sh config.h.in
 	    fi \
 	fi
 
+rsync-ssl: $(srcdir)/rsync-ssl.in Makefile
+	sed 's;\@bindir\@;$(bindir);g' <$(srcdir)/rsync-ssl.in >rsync-ssl
+	@chmod +x rsync-ssl
+
+stunnel-rsync: $(srcdir)/stunnel-rsync.in Makefile
+	sed 's;\@stunnel4\@;$(stunnel4);g' <$(srcdir)/stunnel-rsync.in >stunnel-rsync
+	@chmod +x stunnel-rsync
+
+stunnel-rsyncd.conf: $(srcdir)/stunnel-rsyncd.conf.in Makefile
+	sed 's;\@bindir\@;$(bindir);g' <$(srcdir)/stunnel-rsyncd.conf.in >stunnel-rsyncd.conf
+
 proto: proto.h-tstamp
 
 proto.h: proto.h-tstamp
@@ -207,6 +234,7 @@ cleantests:
 # the source directory.
 distclean: clean
 	rm -f Makefile config.h config.status
+	rm -f rsync-ssl stunnel-rsync stunnel-rsyncd.conf
 	rm -f lib/dummy popt/dummy zlib/dummy
 	rm -f $(srcdir)/Makefile $(srcdir)/config.h $(srcdir)/config.status
 	rm -f $(srcdir)/lib/dummy $(srcdir)/popt/dummy $(srcdir)/zlib/dummy
