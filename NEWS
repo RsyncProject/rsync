@@ -147,6 +147,13 @@ Changes since 3.0.9:
 
     - Allow --password-file=- to read the password from stdin (filename "-").
 
+    - Rsync now comes packaged with an rsync-ssl helper script that can be
+      used to contact a remote rsync daemon using a piped-stunnel command.
+      It also includes an stunnel config file to run the server side to
+      support ssl daemon connections.  See the packaging/lsb/rsync.spec
+      file for one way to package the resulting files.  (Suggestions for
+      how to make this even easier to install & use are welcomed.)
+
     - Added the --outbuf=N|L|B option for chosing the output buffering.
 
     - Repating the --fuzzy option now causes the code to look for fuzzy matches
@@ -212,7 +219,11 @@ Changes since 3.0.9:
     - The included zlib was upgraded from 1.2.3 to 1.2.8.
 
     - Rsync can now be compiled to use an unmodified zlib library instead of
-      the tweaked one that is included with rsync.
+      the tweaked one that is included with rsync.  This will eventually
+      become the default, at which point we'll start the countdown to removing
+      the included zlib.  Until then, feel free to configure using:
+
+	./configure --with-included-zlib=no
 
   DEVELOPER RELATED:
 
