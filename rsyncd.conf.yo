@@ -897,7 +897,7 @@ This man page is current for version 3.0.3 of rsync.
 
 manpagesection(CREDITS)
 
-rsync is distributed under the GNU public license.  See the file
+rsync is distributed under the GNU General Public License.  See the file
 COPYING for details.
 
 The primary ftp site for rsync is
