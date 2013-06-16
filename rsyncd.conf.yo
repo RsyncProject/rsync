@@ -28,8 +28,9 @@ whitespace in module and parameter names is irrelevant. Leading and
 trailing whitespace in a parameter value is discarded. Internal whitespace
 within a parameter value is retained verbatim.
 
-Any line beginning with a hash (#) is ignored, as are lines containing
-only whitespace.
+Any line bf(beginning) with a hash (#) is ignored, as are lines containing
+only whitespace. (If a hash occurs after anything other than leading
+whitespace, it is considered a part of the line's content.)
 
 Any line ending in a \ is "continued" on the next line in the
 customary UNIX fashion.
