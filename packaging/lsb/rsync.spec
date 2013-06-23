@@ -64,8 +64,7 @@ make
 
 %install
 rm -rf $RPM_BUILD_ROOT
-
-make install install-ssl-client install-ssl-daemon
+make install install-ssl-client install-ssl-daemon DESTDIR=$RPM_BUILD_ROOT
 
 mkdir -p $RPM_BUILD_ROOT/etc/xinetd.d $RPM_BUILD_ROOT/etc/rsync-ssl/certs
 install -m 644 packaging/lsb/rsync.xinetd $RPM_BUILD_ROOT/etc/xinetd.d/rsync
