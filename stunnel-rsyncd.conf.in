@@ -26,5 +26,5 @@ CAfile = /etc/ssl/ca-bundle.pem
 
 exec = @bindir@/rsync
 # You can either share the same config as a normal daemon, or specify a separate config:
-execargs = rsync --server --daemon
-#execargs = rsync --server --daemon --config=/etc/rsync-ssl/rsyncd.conf
+execargs = rsync --server --daemon .
+#execargs = rsync --server --daemon --config=/etc/rsync-ssl/rsyncd.conf .
