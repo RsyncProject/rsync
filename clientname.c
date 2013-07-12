@@ -50,10 +50,10 @@ char *client_addr(int fd)
 	if (am_server) {	/* daemon over --rsh mode */
 		char *env_str;
 		strlcpy(addr_buf, "0.0.0.0", sizeof addr_buf);
-		if ((env_str = getenv("SSH_CONNECTION")) != NULL
+		if ((env_str = getenv("REMOTE_HOST")) != NULL
+		 || (env_str = getenv("SSH_CONNECTION")) != NULL
 		 || (env_str = getenv("SSH_CLIENT")) != NULL
-		 || (env_str = getenv("SSH2_CLIENT")) != NULL
-		 || (env_str = getenv("REMOTE_HOST")) != NULL) {
+		 || (env_str = getenv("SSH2_CLIENT")) != NULL) {
 			char *p;
 			strlcpy(addr_buf, env_str, sizeof addr_buf);
 			/* Truncate the value to just the IP address. */
