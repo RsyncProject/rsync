@@ -154,6 +154,9 @@ Changes since 3.0.9:
       file for one way to package the resulting files.  (Suggestions for
       how to make this even easier to install & use are welcomed.)
 
+    - Improved the speed of some --inplace updates when there are lots of
+      identical checksum blocks that end up being unsuable.
+
     - Added the --outbuf=N|L|B option for chosing the output buffering.
 
     - Repating the --fuzzy option now causes the code to look for fuzzy matches

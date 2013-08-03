@@ -178,7 +178,8 @@ static void hash_search(int f,struct sum_struct *s,
 
 	do {
 		int done_csum2 = 0;
-		int32 i;
+		uint32 hash_entry;
+		int32 i, *prev;
 
 		if (DEBUG_GTE(DELTASUM, 4)) {
 			rprintf(FINFO, "offset=%s sum=%04x%04x\n",
@@ -186,18 +187,31 @@ static void hash_search(int f,struct sum_struct *s,
 		}
 
 		if (tablesize == TRADITIONAL_TABLESIZE) {
-			if ((i = hash_table[SUM2HASH2(s1,s2)]) < 0)
+			hash_entry = SUM2HASH2(s1,s2);
+			if ((i = hash_table[hash_entry]) < 0)
 				goto null_hash;
 			sum = (s1 & 0xffff) | (s2 << 16);
 		} else {
 			sum = (s1 & 0xffff) | (s2 << 16);
-			if ((i = hash_table[BIG_SUM2HASH(sum)]) < 0)
+			hash_entry = BIG_SUM2HASH(sum);
+			if ((i = hash_table[hash_entry]) < 0)
 				goto null_hash;
 		}
+		prev = &hash_table[hash_entry];
 
 		hash_hits++;
 		do {
 			int32 l;
+
+			/* When updating in-place, the chunk's offset must be
+			 * either >= our offset or identical data at that offset.
+			 * Remove any bypassed entries that we can never use. */
+			if (updating_basis_file && s->sums[i].offset < offset
+			    && !(s->sums[i].flags & SUMFLG_SAME_OFFSET)) {
+				*prev = s->sums[i].chain;
+				continue;
+			}
+			prev = &s->sums[i].chain;
 
 			if (sum != s->sums[i].sum1)
 				continue;
@@ -205,12 +219,6 @@ static void hash_search(int f,struct sum_struct *s,
 			/* also make sure the two blocks are the same length */
 			l = (int32)MIN((OFF_T)s->blength, len-offset);
 			if (l != s->sums[i].len)
-				continue;
-
-			/* in-place: ensure chunk's offset is either >= our
-			 * offset or that the data didn't move. */
-			if (updating_basis_file && s->sums[i].offset < offset
-			    && !(s->sums[i].flags & SUMFLG_SAME_OFFSET))
 				continue;
 
 			if (DEBUG_GTE(DELTASUM, 3)) {
