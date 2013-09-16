@@ -45,6 +45,9 @@ Changes since 3.0.9:
     - Fixed a bogus "vanished file" error if some files were specified with
       "./" prefixes and others were not.
 
+    - Fixed a bug in --sparse where an extra gap could get inserted after a
+      partial write.
+
     - Changed the way --progress overwrites its prior output in order to make
       it nearly impossible for the progress to get overwritten by an error.
 
