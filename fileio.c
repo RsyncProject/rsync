@@ -84,11 +84,14 @@ static int write_sparse(int f, char *buf, int len)
 	while ((ret = write(f, buf + l1, len - (l1+l2))) <= 0) {
 		if (ret < 0 && errno == EINTR)
 			continue;
+		sparse_seek = 0;
 		return ret;
 	}
 
-	if (ret != (int)(len - (l1+l2)))
+	if (ret != (int)(len - (l1+l2))) {
+		sparse_seek = 0;
 		return l1+ret;
+	}
 
 	return len;
 }
