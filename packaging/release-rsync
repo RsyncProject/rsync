@@ -278,7 +278,7 @@ system "packaging/patch-update --branch=$master_branch";
 
 if ($ans =~ /^y/i) {
     print "\nVisiting all \"patch/$master_branch/*\" branches ...\n";
-    system "packaging/patch-update --branch=$master_branch --shell";
+    system "packaging/patch-update --branch=$master_branch --skip-check --shell";
 }
 
 if (-d 'patches/.git') {
