@@ -819,7 +819,8 @@ int recv_files(int f_in, int f_out, char *local_name)
 			if (fd2 == -1) {
 				rsyserr(FERROR_XFER, errno, "open %s failed",
 					full_fname(fname));
-			}
+			} else if (updating_basis_or_equiv)
+				cleanup_set(NULL, NULL, file, fd1, fd2);
 		} else {
 			fd2 = open_tmpfile(fnametmp, fname, file);
 			if (fd2 != -1)

@@ -67,6 +67,11 @@ Changes since 3.0.9:
     - When creating a temp-file, rsync is now a bit smarter about it dot-char
       choices, which can fix a problem on OS X with names that start with "..".
 
+    - Rsync now sets a cleanup flag for --inplace and --append transfers that
+      will flush the write buffer if the transfer aborts.  This ensures that
+      more received data gets written out to the disk on an aborted transfer
+      (which is quite helpful on a slow, flaky connection).
+
     - The reads that map_ptr() now does are aligned on 1K boundaries.  This
       helps some filesystems and/or files that don't like unaligned reads.
 
@@ -158,19 +163,19 @@ Changes since 3.0.9:
       how to make this even easier to install & use are welcomed.)
 
     - Improved the speed of some --inplace updates when there are lots of
-      identical checksum blocks that end up being unsuable.
+      identical checksum blocks that end up being unusable.
 
-    - Added the --outbuf=N|L|B option for chosing the output buffering.
+    - Added the --outbuf=N|L|B option for choosing the output buffering.
 
-    - Repating the --fuzzy option now causes the code to look for fuzzy matches
-      inside alt-dest directories too.
+    - Repeating the --fuzzy option now causes the code to look for fuzzy
+      matches inside alt-dest directories too.
 
     - The --chmod option now supports numeric modes, e.g. --chmod=644,D755
 
     - Added some Solaris xattr code.
 
     - Made an rsync daemon (the listening process) exit with a 0 status when
-      it was signalled to die.  This helps launchd.
+      it was signaled to die.  This helps launchd.
 
     - Improved the RSYNC_* environment variables for the pre-xfer exec script:
       when a daemon is sent multiple request args, they are now joined into a
@@ -211,7 +216,7 @@ Changes since 3.0.9:
     - A daemon can now inform a client about a daemon-configured timeout value
       so that the client can assist in the keep-alive activity (protocol 31).
 
-    - The filter code received some refactoring to make it more extendable, to
+    - The filter code received some refactoring to make it more extendible, to
       read better, and do better sanity checking.
 
     - Really big numbers are now output using our own big-num routine rather

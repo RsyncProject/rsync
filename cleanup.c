@@ -87,7 +87,7 @@ int cleanup_got_literal = 0;
 static const char *cleanup_fname;
 static const char *cleanup_new_fname;
 static struct file_struct *cleanup_file;
-static int cleanup_fd_r, cleanup_fd_w;
+static int cleanup_fd_r = -1, cleanup_fd_w = -1;
 static pid_t cleanup_pid = 0;
 
 pid_t cleanup_child_pid = -1;
@@ -155,26 +155,31 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 #include "case_N.h"
 		switch_step++;
 
-		if (cleanup_got_literal && cleanup_fname && cleanup_new_fname
-		 && keep_partial && handle_partial_dir(cleanup_new_fname, PDIR_CREATE)) {
-			int tweak_modtime = 0;
+		if (cleanup_got_literal && (cleanup_fname || cleanup_fd_w != -1)) {
 			const char *fname = cleanup_fname;
 			cleanup_fname = NULL;
-			if (cleanup_fd_r != -1)
+			if (cleanup_fd_r != -1) {
 				close(cleanup_fd_r);
+				cleanup_fd_r = -1;
+			}
 			if (cleanup_fd_w != -1) {
 				flush_write_file(cleanup_fd_w);
 				close(cleanup_fd_w);
+				cleanup_fd_w = -1;
 			}
-			if (!partial_dir) {
-			    /* We don't want to leave a partial file with a modern time or it
-			     * could be skipped via --update.  Setting the time to something
-			     * really old also helps it to stand out as unfinished in an ls. */
-			    tweak_modtime = 1;
-			    cleanup_file->modtime = 0;
+			if (fname && cleanup_new_fname && keep_partial
+			 && handle_partial_dir(cleanup_new_fname, PDIR_CREATE)) {
+				int tweak_modtime = 0;
+				if (!partial_dir) {
+				    /* We don't want to leave a partial file with a modern time or it
+				     * could be skipped via --update.  Setting the time to something
+				     * really old also helps it to stand out as unfinished in an ls. */
+				    tweak_modtime = 1;
+				    cleanup_file->modtime = 0;
+				}
+				finish_transfer(cleanup_new_fname, fname, NULL, NULL,
+						cleanup_file, tweak_modtime, !partial_dir);
 			}
-			finish_transfer(cleanup_new_fname, fname, NULL, NULL,
-					cleanup_file, tweak_modtime, !partial_dir);
 		}
 
 		/* FALLTHROUGH */
@@ -266,6 +271,7 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 void cleanup_disable(void)
 {
 	cleanup_fname = cleanup_new_fname = NULL;
+	cleanup_fd_r = cleanup_fd_w = -1;
 	cleanup_got_literal = 0;
 }
 
