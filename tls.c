@@ -232,7 +232,6 @@ main(int argc, char *argv[])
 {
 	poptContext pc;
 	const char **extra_args;
-	char buf[32];
 	int opt;
 
 	pc = poptGetContext(PROGRAM, argc, (const char **)argv,
