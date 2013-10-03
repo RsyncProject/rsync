@@ -1,3 +1,247 @@
+NEWS for rsync 3.1.0 (28 Sep 2013)
+Protocol: 31 (changed)
+Changes since 3.0.9:
+
+  OUTPUT CHANGES:
+
+    - Output numbers in 3-digit groups by default (e.g. 1,234,567).  See the
+      --human-readable option for a way to turn it off.  See also the daemon's
+      "log format" parameter and related command-line options (including
+      --out-format) for a modifier that can be used to request digit-grouping
+      or human-readable output in log escapes. (Note that log output is
+      unchanged by default.)
+
+    - The --list-only option is now affected by the --human-readable setting.
+      It will display digit groupings by default, and unit suffixes if higher
+      levels of readability are requested.  Also, the column width for the size
+      output has increased from 11 to 14 characters when human readability is
+      enabled.  Use --no-h to get the old-style output and column size.
+
+    - The output of the --progress option has changed:  the string "xfer" was
+      shortened to "xfr", and the string "to-check" was shortened to "to-chk",
+      both designed to make room for the (by default) wider display of file
+      size numbers without making the total line-length longer.  Also, when
+      incremental recursion is enabled, the string "ir-chk" will be used
+      instead of "to-chk" up until the incremental-recursion scan is done,
+      letting you know that the value to check and the total value will still
+      be increasing as new files are found.
+
+    - Enhanced the --stats output: 1) to mention how many files were created
+      (protocol >= 28), 2) to mention how many files were deleted (a new line
+      for protocol 31, but only output when --delete is in effect), and 3) to
+      follow the file-count, created-count, and deleted-count with a subcount
+      list that shows the counts by type.  The wording of the transferred count
+      has also changed so that it is clearer that it is only a count of regular
+      files.
+
+  BUG FIXES:
+
+    - Fixed a bug in the iconv code when EINVAL or EILSEQ is returned with a
+      full output buffer.
+
+    - Fixed some rare bugs in --iconv processing that might cause a multibyte
+      character to get translated incorrectly.
+
+    - Fixed a bogus "vanished file" error if some files were specified with
+      "./" prefixes and others were not.
+
+    - Fixed a bug in --sparse where an extra gap could get inserted after a
+      partial write.
+
+    - Changed the way --progress overwrites its prior output in order to make
+      it nearly impossible for the progress to get overwritten by an error.
+
+    - Improved the propagation of abnormal-exit error messages.  This should
+      help the client side to receive errors from the server when it is exiting
+      abnormally, and should also avoid dying with an "connection unexpectedly
+      closed" exit when the closed connection is really expected.
+
+    - The sender now checks each file it plans to remove to ensure that it
+      hasn't changed from the first stat's info.  This helps to avoid losing
+      file data when the user is not using the option in a safe manner.
+
+    - Fixed a data-duplication bug in the compress option that made compression
+      less efficient.  This improves protocol 31 onward, while behaving in a
+      compatible (buggy) manner with older rsync protocols.
+
+    - When creating a temp-file, rsync is now a bit smarter about it dot-char
+      choices, which can fix a problem on OS X with names that start with "..".
+
+    - Rsync now sets a cleanup flag for --inplace and --append transfers that
+      will flush the write buffer if the transfer aborts.  This ensures that
+      more received data gets written out to the disk on an aborted transfer
+      (which is quite helpful on a slow, flaky connection).
+
+    - The reads that map_ptr() now does are aligned on 1K boundaries.  This
+      helps some filesystems and/or files that don't like unaligned reads.
+
+    - Fix an issue in the msleep() function if time jumps backwards.
+
+    - Fix daemon-server module-name splitting bug where an arg would get split
+      even if --protect-args was used.
+
+  ENHANCEMENTS:
+
+    - Added the --remote-option=OPT (-M OPT) command-line option that is useful
+      for things like sending a remote --log-file=FILE or --fake-super option.
+
+    - Added the --info=FLAGS and --debug=FLAGS options to allow finer-grained
+      control over what is output.  Added an extra type of --progress output
+      using --info=progress2.
+
+    - The --msgs2stderr option can help with debugging rsync by allowing the
+      debug messages to get output to stderr rather than travel via the socket
+      protocol.
+
+    - Added the --delete-missing-args and --ignore-missing-args options to
+      either delete or ignore user-specified files on the receiver that are
+      missing on the sender (normally the absence of user-specified files
+      generates an error).
+
+    - Added a "T" (terabyte) category to the --human-readable size suffixes.
+
+    - Added the --usermap/--groupmap/--chown options for manipulating file
+      ownership during the copy.
+
+    - Added the "%C" escape to the log-output handling, which will output the
+      MD5 checksum of any transferred file, or all files if --checksum was
+      specified (when protocol 30 or above is in effect).
+
+    - Added the "reverse lookup" parameter to the rsync daemon config file to
+      allow reverse-DNS lookups to be disabled.
+
+    - Added a forward-DNS lookup for the daemon's hosts allow/deny config.  Can
+      be disabled via "forward lookup" parameter (defaults to enabled).
+
+    - Added a way for more than one group to be specified in the daemon's
+      config file, including a way to specify that you want all of the
+      specified user's groups without having to name them.  Also changed the
+      daemon to complain about an inability to set explicitly-specified uid/gid
+      values, even when not run by a super-user.
+
+    - The daemon now tries to send the user the error messages from the
+      pre-xfer exec script when it fails.
+
+    - Improved the use of alt-dest options into an existing hierarchy of files:
+      If a match is found in an alt-dir, it takes precedence over an existing
+      file.  (We'll need to wait for a future version before attribute-changes
+      on otherwise unchanged files are safe when using an existing hierarchy.)
+
+    - Added per-user authorization options and group-authorization support to
+      the daemon's "auth users" parameter.
+
+    - Added a way to reference environment variables in a daemon's config file
+      (using %VAR% references).
+
+    - When replacing a non-dir with a symlink/hard-link/device/special-file,
+      the update should now be done in an atomic manner.
+
+    - Avoid re-sending xattr info for hard-linked files w/the same xattrs
+      (protocol 31).
+
+    - The backup code was improved to use better logic maintaining the backup
+      directory hierarchy.  Also, when a file is being backed up, rsync tries
+      to hard-link it into place so that the upcoming replacement of the
+      destination file will be atomic (for the normal, non-inplace logic).
+
+    - Added the ability to synchronize nano-second modified times.
+
+    - Added a few more default suffixes for the "dont compress" settings.
+
+    - Added the checking of the RSYNC_PROTECT_ARGS environment variable to allow
+      the default for the --protect-args command-line option to be overridden.
+
+    - Added the --preallocate command-line option.
+
+    - Allow --password-file=- to read the password from stdin (filename "-").
+
+    - Rsync now comes packaged with an rsync-ssl helper script that can be
+      used to contact a remote rsync daemon using a piped-stunnel command.
+      It also includes an stunnel config file to run the server side to
+      support ssl daemon connections.  See the packaging/lsb/rsync.spec
+      file for one way to package the resulting files.  (Suggestions for
+      how to make this even easier to install & use are welcomed.)
+
+    - Improved the speed of some --inplace updates when there are lots of
+      identical checksum blocks that end up being unusable.
+
+    - Added the --outbuf=N|L|B option for choosing the output buffering.
+
+    - Repeating the --fuzzy option now causes the code to look for fuzzy
+      matches inside alt-dest directories too.
+
+    - The --chmod option now supports numeric modes, e.g. --chmod=644,D755
+
+    - Added some Solaris xattr code.
+
+    - Made an rsync daemon (the listening process) exit with a 0 status when
+      it was signaled to die.  This helps launchd.
+
+    - Improved the RSYNC_* environment variables for the pre-xfer exec script:
+      when a daemon is sent multiple request args, they are now joined into a
+      single return value (separated by spaces) so that the RSYNC_REQUEST
+      environment variable is accurate for any "pre-xfer exec".  The values in
+      RSYNC_ARG# vars are no longer truncated at the "." arg (prior to the
+      request dirs/files), so that all the requested values are also listed
+      (separately) in RSYNC_ARG# variables.
+
+  EXTRAS:
+
+    - Added an "instant-rsyncd" script to the support directory, which makes
+      it easy to configure a simple rsync daemon in the current directory.
+
+    - Added the "mapfrom" and "mapto" scripts to the support directory, which
+      makes it easier to do user/group mapping in a local transfer based on
+      passwd/group files from another machine.
+
+    - There's a new, improved version of the lsh script in the support dir:
+      it's written in perl and supports -u without resorting to using sudo
+      (when run as root).  The old shell version is now named lsh.sh.
+
+    - There is a helper script named rsync-slash-strip in the support directory
+      for anyone that wants to change the way rsync handles args with trailing
+      slashes.  (e.g. arg/ would get stripped to arg while arg/. would turn into
+      arg/).
+
+  INTERNAL:
+
+    - The I/O code was rewritten to be simpler and do bigger buffered reads
+      over the socket.  The I/O between the receiver and the generator was
+      changed to be standard multiplexed-I/O (like that over the socket).
+
+    - The sender tries to use any dead time while the generator is looking for
+      files to transfer in order to do sender-side directory scanning in a more
+      parallel manner.
+
+    - A daemon can now inform a client about a daemon-configured timeout value
+      so that the client can assist in the keep-alive activity (protocol 31).
+
+    - The filter code received some refactoring to make it more extendible, to
+      read better, and do better sanity checking.
+
+    - Really big numbers are now output using our own big-num routine rather
+      than casting them to a double and using a %.0f conversion.
+
+    - The pool_alloc library has received some minor improvements in alignment
+      handling.
+
+    - Added init_stat_x() function to avoid duplication of acl/xattr init code.
+
+    - The included zlib was upgraded from 1.2.3 to 1.2.8.
+
+    - Rsync can now be compiled to use an unmodified zlib library instead of
+      the tweaked one that is included with rsync.  This will eventually
+      become the default, at which point we'll start the countdown to removing
+      the included zlib.  Until then, feel free to configure using:
+
+	./configure --with-included-zlib=no
+
+  DEVELOPER RELATED:
+
+    - Added more conditional debug output.
+
+    - Fixed some build issues for android and minix.
+
 NEWS for rsync 3.0.9 (23 Sep 2011)
 Protocol: 30 (unchanged)
 Changes since 3.0.8:
@@ -3290,6 +3534,7 @@ Changes since 2.4.6:
 
 Partial Protocol History
 	RELEASE DATE	VER.	DATE OF COMMIT*	PROTOCOL
+	?? ??? 2013	3.1.1			31
 	28 Sep 2013	3.1.0	31 Aug 2008	31
 	23 Sep 2011	3.0.9			30
 	26 Mar 2011	3.0.8			30
