@@ -8,7 +8,9 @@ our %short_no_arg;
 our %short_with_num;
 our %long_opt = (
     'daemon' => -1,
+    'debug' => 1,
     'fake-super' => 0,
+    'info' => 1,
     'log-file' => 3,
 );
 our $last_long_opt;
