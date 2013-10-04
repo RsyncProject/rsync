@@ -4,4 +4,4 @@ Changes since 3.1.0:
 
   BUG FIXES:
 
-    - Fixed an issue with sending keep-alive messages to an older sender proc.
+    - Added knowledge of a few new options to rrsync.

@@ -51,7 +51,7 @@ die "$0 -ro: sending to read-only server not allowed\n" if $ro && !$am_sender;
 # To disable a short-named option, add its letter to this string:
 our $short_disabled = 's';
 
-our $short_no_arg = 'ACDEHIKLORSWXbcdgklmnoprstuvxz'; # DO NOT REMOVE ANY
+our $short_no_arg = 'ACDEHIJKLORSWXbcdgklmnoprstuvxyz'; # DO NOT REMOVE ANY
 our $short_with_num = 'B'; # DO NOT REMOVE ANY
 
 # To disable a long-named option, change its value to a -1.  The values mean:
@@ -103,6 +103,7 @@ our %long_opt = (
   'only-write-batch' => 1,
   'partial' => 0,
   'partial-dir' => 2,
+  'preallocate' => 0,
   'remove-sent-files' => $ro ? -1 : 0,
   'remove-source-files' => $ro ? -1 : 0,
   'safe-links' => 0,
