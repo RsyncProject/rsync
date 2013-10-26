@@ -36,6 +36,7 @@ extern int allow_8bit_chars;
 extern int protocol_version;
 extern int always_checksum;
 extern int preserve_times;
+extern int human_readable;
 extern int msgs2stderr;
 extern int stdout_format_has_i;
 extern int stdout_format_has_o_or_i;
@@ -874,9 +875,9 @@ void log_exit(int code, const char *file, int line)
 {
 	if (code == 0) {
 		rprintf(FLOG,"sent %s bytes  received %s bytes  total size %s\n",
-			comma_num(stats.total_written),
-			comma_num(stats.total_read),
-			comma_num(stats.total_size));
+			big_num(stats.total_written),
+			big_num(stats.total_read),
+			big_num(stats.total_size));
 	} else if (am_server != 2) {
 		const char *name;
 
