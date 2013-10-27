@@ -36,7 +36,6 @@ extern int allow_8bit_chars;
 extern int protocol_version;
 extern int always_checksum;
 extern int preserve_times;
-extern int human_readable;
 extern int msgs2stderr;
 extern int stdout_format_has_i;
 extern int stdout_format_has_o_or_i;
