@@ -147,13 +147,13 @@ int do_mknod(const char *pathname, mode_t mode, dev_t dev)
 	if (S_ISSOCK(mode)) {
 		int sock;
 		struct sockaddr_un saddr;
+		unsigned int len = strlcpy(saddr.sun_path, pathname, sizeof saddr.sun_path);
+		if (len >= sizeof saddr.sun_path) {
+			errno = ENAMETOOLONG;
+			return -1;
+		}
 #ifdef HAVE_SOCKADDR_UN_LEN
-		unsigned int len =
-#endif
-		    strlcpy(saddr.sun_path, pathname, sizeof saddr.sun_path);
-#ifdef HAVE_SOCKADDR_UN_LEN
-		saddr.sun_len = len >= sizeof saddr.sun_path
-			      ? sizeof saddr.sun_path : len + 1;
+		saddr.sun_len = len + 1;
 #endif
 		saddr.sun_family = AF_UNIX;
 
