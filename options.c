@@ -2456,7 +2456,9 @@ void server_options(char **args, int *argc_p)
 
 	set_allow_inc_recurse();
 
-	/* Checking the pre-negotiated value allows --protocol=29 override. */
+	/* We don't really know the actual protocol_version at this point,
+	 * but checking the pre-negotiated value allows the user to use a
+	 * --protocol=29 override to avoid the use of this -eFLAGS opt. */
 	if (protocol_version >= 30) {
 		/* We make use of the -e option to let the server know about
 		 * any pre-release protocol version && some behavior flags. */
@@ -2477,6 +2479,7 @@ void server_options(char **args, int *argc_p)
 #ifdef ICONV_OPTION
 		argstr[x++] = 's';
 #endif
+		argstr[x++] = 'f';
 	}
 
 	if (x >= (int)sizeof argstr) { /* Not possible... */
