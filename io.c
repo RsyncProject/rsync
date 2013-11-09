@@ -155,7 +155,7 @@ static void read_a_msg(void);
 static void drain_multiplex_messages(void);
 static void sleep_for_bwlimit(int bytes_written);
 
-static void check_timeout(BOOL allow_keepalive)
+static void check_timeout(BOOL allow_keepalive, int keepalive_flags)
 {
 	time_t t, chk;
 
@@ -177,7 +177,7 @@ static void check_timeout(BOOL allow_keepalive)
 
 	if (allow_keepalive) {
 		/* This may put data into iobuf.msg w/o flushing. */
-		maybe_send_keepalive(t, 0);
+		maybe_send_keepalive(t, keepalive_flags);
 	}
 
 	if (!last_io_in)
@@ -255,8 +255,7 @@ static size_t safe_read(int fd, char *buf, size_t len)
 					who_am_i());
 				exit_cleanup(RERR_FILEIO);
 			}
-			if (io_timeout)
-				maybe_send_keepalive(time(NULL), MSK_ALLOW_FLUSH);
+			check_timeout(1, MSK_ALLOW_FLUSH);
 			continue;
 		}
 
@@ -752,7 +751,7 @@ static char *perform_io(size_t needed, int flags)
 				send_extra_file_list(sock_f_out, -1);
 				extra_flist_sending_enabled = !flist_eof;
 			} else
-				check_timeout((flags & PIO_NEED_INPUT) != 0);
+				check_timeout((flags & PIO_NEED_INPUT) != 0, 0);
 			FD_ZERO(&r_fds); /* Just in case... */
 			FD_ZERO(&w_fds);
 		}
