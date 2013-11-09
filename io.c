@@ -232,27 +232,9 @@ static NORETURN void whine_about_eof(BOOL allow_kluge)
  * the socket except very early in the transfer. */
 static size_t safe_read(int fd, char *buf, size_t len)
 {
-	size_t got;
-	int n;
+	size_t got = 0;
 
 	assert(fd != iobuf.in_fd);
-
-	n = read(fd, buf, len);
-	if ((size_t)n == len || n == 0) {
-		if (DEBUG_GTE(IO, 2))
-			rprintf(FINFO, "[%s] safe_read(%d)=%ld\n", who_am_i(), fd, (long)n);
-		return n;
-	}
-	if (n < 0) {
-		if (errno != EINTR && errno != EWOULDBLOCK && errno != EAGAIN) {
-		  read_failed:
-			rsyserr(FERROR, errno, "safe_read failed to read %ld bytes [%s]",
-				(long)len, who_am_i());
-			exit_cleanup(RERR_STREAMIO);
-		}
-		got = 0;
-	} else
-		got = n;
 
 	while (1) {
 		struct timeval tv;
@@ -282,7 +264,7 @@ static size_t safe_read(int fd, char *buf, size_t len)
 			rprintf(FINFO, "select exception on fd %d\n", fd); */
 
 		if (FD_ISSET(fd, &r_fds)) {
-			n = read(fd, buf + got, len - got);
+			int n = read(fd, buf + got, len - got);
 			if (DEBUG_GTE(IO, 2))
 				rprintf(FINFO, "[%s] safe_read(%d)=%ld\n", who_am_i(), fd, (long)n);
 			if (n == 0)
@@ -290,7 +272,9 @@ static size_t safe_read(int fd, char *buf, size_t len)
 			if (n < 0) {
 				if (errno == EINTR)
 					continue;
-				goto read_failed;
+				rsyserr(FERROR, errno, "safe_read failed to read %ld bytes [%s]",
+					(long)len, who_am_i());
+				exit_cleanup(RERR_STREAMIO);
 			}
 			if ((got += (size_t)n) == len)
 				break;
