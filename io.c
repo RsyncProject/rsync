@@ -1371,6 +1371,14 @@ void maybe_send_keepalive(time_t now, int flags)
 	if (flags & MSK_ACTIVE_RECEIVER)
 		last_io_in = now; /* Fudge things when we're working hard on the files. */
 
+	/* Early in the transfer (before the receiver forks) the receiving side doesn't
+	 * care if it hasn't sent data in a while as long as it is receiving data (in
+	 * fact, a pre-3.1.0 rsync would die if we tried to send it a keep alive during
+	 * this time).  So, if we're an early-receiving proc, just return and let the
+	 * incoming data determine if we timeout. */
+	if (!am_sender && !am_receiver && !am_generator)
+		return;
+
 	if (now - last_io_out >= allowed_lull) {
 		/* The receiver is special:  it only sends keep-alive messages if it is
 		 * actively receiving data.  Otherwise, it lets the generator timeout. */
