@@ -1520,15 +1520,17 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 					goto cleanup;
 				itemizing = 0;
 				code = FNONE;
-			} else if (j >= 0)
+			} else if (j >= 0) {
 				statret = 1;
+				fnamecmp = fnamecmpbuf;
+			}
 		}
 		if (atomic_create(file, fname, sl, MAKEDEV(0, 0), &sx, statret == 0 ? DEL_FOR_SYMLINK : 0)) {
 			set_file_attrs(fname, file, NULL, NULL, 0);
 			if (itemizing) {
 				if (statret == 0 && !S_ISLNK(sx.st.st_mode))
 					statret = -1;
-				itemize(fname, file, ndx, statret, &sx,
+				itemize(fnamecmp, file, ndx, statret, &sx,
 					ITEM_LOCAL_CHANGE|ITEM_REPORT_CHANGE, 0, NULL);
 			}
 			if (code != FNONE && INFO_GTE(NAME, 1))
@@ -1594,8 +1596,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 					goto cleanup;
 				itemizing = 0;
 				code = FNONE;
-			} else if (j >= 0)
+			} else if (j >= 0) {
 				statret = 1;
+				fnamecmp = fnamecmpbuf;
+			}
 		}
 		if (DEBUG_GTE(GENR, 1)) {
 			rprintf(FINFO, "mknod(%s, 0%o, [%ld,%ld])\n",
@@ -1605,7 +1609,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		if (atomic_create(file, fname, NULL, rdev, &sx, del_for_flag)) {
 			set_file_attrs(fname, file, NULL, NULL, 0);
 			if (itemizing) {
-				itemize(fname, file, ndx, statret, &sx,
+				itemize(fnamecmp, file, ndx, statret, &sx,
 					ITEM_LOCAL_CHANGE|ITEM_REPORT_CHANGE, 0, NULL);
 			}
 			if (code != FNONE && INFO_GTE(NAME, 1))
