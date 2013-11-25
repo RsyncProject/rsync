@@ -451,7 +451,7 @@ int send_xattr(int f, stat_x *sxp)
 			if (rxa->datum_len > MAX_FULL_DATUM)
 				write_buf(f, rxa->datum + 1, MAX_DIGEST_LEN);
 			else
-				write_buf(f, rxa->datum, rxa->datum_len);
+				write_bigbuf(f, rxa->datum, rxa->datum_len);
 		}
 		ndx = rsync_xal_l.count; /* pre-incremented count */
 		rsync_xal_store(sxp->xattr); /* adds item to rsync_xal_l */
@@ -579,7 +579,7 @@ void send_xattr_request(const char *fname, struct file_struct *file, int f_out)
 			}
 
 			write_varint(f_out, len); /* length might have changed! */
-			write_buf(f_out, ptr, len);
+			write_bigbuf(f_out, ptr, len);
 			free(ptr);
 		}
 	}
