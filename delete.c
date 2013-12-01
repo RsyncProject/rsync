@@ -199,7 +199,7 @@ enum delret delete_item(char *fbuf, uint16 mode, uint16 flags)
 				fbuf);
 			ret = DR_NOT_EMPTY;
 		} else if (errno != ENOENT) {
-			rsyserr(FERROR, errno, "delete_file: %s(%s) failed",
+			rsyserr(FERROR_XFER, errno, "delete_file: %s(%s) failed",
 				what, fbuf);
 			ret = DR_FAILURE;
 		} else
