@@ -356,7 +356,7 @@ static char *parse_merge_name(const char *merge_file, unsigned int *len_ptr,
 		fn_len = clean_fname(fn, CFN_COLLAPSE_DOT_DOT_DIRS);
 	}
 
-	/* If the name isn't in buf yet, it's wasn't absolute. */
+	/* If the name isn't in buf yet, it wasn't absolute. */
 	if (fn != buf) {
 		int d_len = dirbuf_len - prefix_skip;
 		if (d_len + fn_len >= MAXPATHLEN) {
