@@ -489,31 +489,6 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		get_acl(fname, sxp);
 #endif
 
-#ifdef SUPPORT_XATTRS
-	if (am_root < 0)
-		set_stat_xattr(fname, file, new_mode);
-	if (preserve_xattrs && fnamecmp)
-		set_xattr(fname, file, fnamecmp, sxp);
-#endif
-
-	if (!preserve_times
-	 || (!(preserve_times & PRESERVE_DIR_TIMES) && S_ISDIR(sxp->st.st_mode))
-	 || (!(preserve_times & PRESERVE_LINK_TIMES) && S_ISLNK(sxp->st.st_mode)))
-		flags |= ATTRS_SKIP_MTIME;
-	if (!(flags & ATTRS_SKIP_MTIME)
-	    && cmp_time(sxp->st.st_mtime, file->modtime) != 0) {
-		int ret = set_modtime(fname, file->modtime, F_MOD_NSEC(file), sxp->st.st_mode);
-		if (ret < 0) {
-			rsyserr(FERROR_XFER, errno, "failed to set times on %s",
-				full_fname(fname));
-			goto cleanup;
-		}
-		if (ret == 0) /* ret == 1 if symlink could not be set */
-			updated = 1;
-		else
-			file->flags |= FLAG_TIME_FAILED;
-	}
-
 	change_uid = am_root && uid_ndx && sxp->st.st_uid != (uid_t)F_OWNER(file);
 	change_gid = gid_ndx && !(file->flags & FLAG_SKIP_GROUP)
 		  && sxp->st.st_gid != (gid_t)F_GROUP(file);
@@ -559,6 +534,31 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 			}
 		}
 		updated = 1;
+	}
+
+#ifdef SUPPORT_XATTRS
+	if (am_root < 0)
+		set_stat_xattr(fname, file, new_mode);
+	if (preserve_xattrs && fnamecmp)
+		set_xattr(fname, file, fnamecmp, sxp);
+#endif
+
+	if (!preserve_times
+	 || (!(preserve_times & PRESERVE_DIR_TIMES) && S_ISDIR(sxp->st.st_mode))
+	 || (!(preserve_times & PRESERVE_LINK_TIMES) && S_ISLNK(sxp->st.st_mode)))
+		flags |= ATTRS_SKIP_MTIME;
+	if (!(flags & ATTRS_SKIP_MTIME)
+	    && cmp_time(sxp->st.st_mtime, file->modtime) != 0) {
+		int ret = set_modtime(fname, file->modtime, F_MOD_NSEC(file), sxp->st.st_mode);
+		if (ret < 0) {
+			rsyserr(FERROR_XFER, errno, "failed to set times on %s",
+				full_fname(fname));
+			goto cleanup;
+		}
+		if (ret == 0) /* ret == 1 if symlink could not be set */
+			updated = 1;
+		else
+			file->flags |= FLAG_TIME_FAILED;
 	}
 
 #ifdef SUPPORT_ACLS
