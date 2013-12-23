@@ -25,6 +25,7 @@
 #include "itypes.h"
 #include "inums.h"
 
+extern int dry_run;
 extern int module_id;
 extern int protect_args;
 extern int modify_window;
@@ -197,7 +198,15 @@ int make_path(char *fname, int flags)
 
 	/* Try to find an existing dir, starting from the deepest dir. */
 	for (p = end; ; ) {
-		if (do_mkdir(fname, ACCESSPERMS) == 0) {
+		if (dry_run) {
+			STRUCT_STAT st;
+			if (do_stat(fname, &st) == 0) {
+				if (S_ISDIR(st.st_mode))
+					errno = EEXIST;
+				else
+					errno = ENOTDIR;
+			}
+		} else if (do_mkdir(fname, ACCESSPERMS) == 0) {
 			ret++;
 			break;
 		}
@@ -208,12 +217,14 @@ int make_path(char *fname, int flags)
 		}
 		while (1) {
 			if (p == fname) {
-				ret = -ret - 1;
+				/* We got a relative path that doesn't exist, so assume that '.'
+				 * is there and just break out and create the whole thing. */
+				p = NULL;
 				goto double_break;
 			}
 			if (*--p == '/') {
 				if (p == fname) {
-					ret = -ret - 1; /* impossible... */
+					/* We reached the "/" dir, which we assume is there. */
 					goto double_break;
 				}
 				*p = '\0';
@@ -225,7 +236,10 @@ int make_path(char *fname, int flags)
 
 	/* Make all the dirs that we didn't find on the way here. */
 	while (p != end) {
-		*p = '/';
+		if (p)
+			*p = '/';
+		else
+			p = fname;
 		p += strlen(p);
 		if (ret < 0) /* Skip mkdir on error, but keep restoring the path. */
 			continue;
