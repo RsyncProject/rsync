@@ -423,7 +423,7 @@ static BOOL pack_smb_acl(SMB_ACL_T *smb_acl, const rsync_acl *racl)
 #ifdef ACLS_NEED_MASK
 	mask_bits = racl->mask_obj == NO_ENTRY ? racl->group_obj & ~NO_ENTRY : racl->mask_obj;
 	COE( sys_acl_create_entry,(smb_acl, &entry) );
-	COE( sys_acl_set_info,(entry, SMB_ACL_MASK, mask_bits, NULL) );
+	COE( sys_acl_set_info,(entry, SMB_ACL_MASK, mask_bits, 0) );
 #else
 	if (racl->mask_obj != NO_ENTRY) {
 		COE( sys_acl_create_entry,(smb_acl, &entry) );
