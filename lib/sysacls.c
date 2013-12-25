@@ -873,6 +873,10 @@ int sys_acl_get_tag_type(SMB_ACL_ENTRY_T entry_d, SMB_ACL_TAG_T *type_p)
 
 #define	INITIAL_ACL_SIZE	16
 
+#ifndef NACLENTRIES
+#define NACLENTRIES 0
+#endif
+
 SMB_ACL_T sys_acl_get_file(const char *path_p, SMB_ACL_TYPE_T type)
 {
 	SMB_ACL_T	acl_d;
@@ -909,7 +913,7 @@ SMB_ACL_T sys_acl_get_file(const char *path_p, SMB_ACL_TYPE_T type)
 
 		sys_acl_free_acl(acl_d);
 
-		if ((count = acl(path_p, ACL_CNT, 0, NULL)) < 0) {
+		if ((count = acl(path_p, ACL_CNT, NACLENTRIES, NULL)) < 0) {
 			return NULL;
 		}
 
