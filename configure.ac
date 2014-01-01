@@ -1108,3 +1108,8 @@ AC_OUTPUT
 AC_MSG_RESULT()
 AC_MSG_RESULT([    rsync ${RSYNC_VERSION} configuration successful])
 AC_MSG_RESULT()
+if test x$HAVE_YODL2MAN != x1; then
+    AC_MSG_RESULT([    Note that yodl2man was not found, so pre-existing manpage files will be])
+    AC_MSG_RESULT([    used w/o change (if available) -- no .yo file changes will be used.])
+    AC_MSG_RESULT()
+fi
