@@ -1,0 +1,15 @@
+#!/bin/bash
+
+IGNOREEXIT=24
+IGNOREOUT='^(file has vanished: |rsync warning: some files vanished before they could be transferred)'
+
+set -o pipefail
+
+rsync "${@}" 2>&1 | (egrep -v "$IGNOREOUT" || true)
+ret=$?
+
+if [[ $ret == $IGNOREEXIT ]]; then
+    ret=0
+fi
+
+exit $ret
