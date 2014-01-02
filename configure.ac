@@ -3,7 +3,7 @@ dnl Process this file with autoconf to produce a configure script.
 AC_INIT()
 AC_CONFIG_SRCDIR([byteorder.h])
 AC_CONFIG_HEADER(config.h)
-AC_PREREQ(2.59)
+AC_PREREQ(2.60)
 
 RSYNC_VERSION=3.1.1dev
 AC_SUBST(RSYNC_VERSION)
