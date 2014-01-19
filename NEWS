@@ -4,4 +4,54 @@ Changes since 3.1.0:
 
   BUG FIXES:
 
+    - Fix a failure to remove our partial-transfer temp file when interrupted
+      (and not saving partial files).
+
+    - Change the chown/group/xattr-set order to avoid losing some
+      security-related xattr info (that is cleared on chown).
+
+    - Fixed a bug in the early daemon protocol where a timeout failed to be
+      honored (e.g. if the remote side fails to send us the initial protocol
+      greeting).
+
+    - Fixed unintended inclusion of commas in file numbers in the daemon log.
+
+    - We once again send the 'f' sub-flag (of -e) to the server side so it
+      knows that we can handle incremental-recusion directory errors properly.
+
+    - Fixed an issue with too-agressive keep-alive messages causing a problem
+      for older rsync versions early in the transfer.
+
+    - Fix incorrect --dry-run backup-directory-creation messages when the
+      backup dir is not an absolute path.
+
+    - Fix a bug where a failed deletion might not affect the exit code.
+
+    - Fix a bug that caused a failure when combining --delete-missing-args with
+      --xattrs and/or --acls.
+
+    - Fixed an itemize bug that affected the combo of --link-dest, -X, and -n.
+
+    - Fixed a problem with delete messages not appearing in the log file when
+      the user didn't use --verbose.
+
+    - Improve chunked xattr reading for OS X.
+
+    - Remove an attempted hard-link xattr optimization that was causing a
+      transfer failure.  (If you need to interact with an rsync 3.1.0 using
+      --hard-links & --xattrs, you can specify --protocol=30.)
+
+    - Return an error if a buffer overflows in do_mknod().
+
+    - Fixed a problem reading more than 16 ACLs on some OSes.
+
+    - Try to speed up cygwin by switching back to using socketpair "pipes".
+
     - Added knowledge of a few new options to rrsync.
+
+  ENHANCEMENTS:
+
+    - Added the support/rsync-no-vanished wrapper script.
+
+    - Have configure more prominently mention when we failed to find yodl (in
+      case the user wants to be able to generate manpages from *.yo files).
