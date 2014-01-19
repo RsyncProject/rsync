@@ -308,7 +308,8 @@ int get_xattr(const char *fname, stat_x *sxp)
 		if (!preserve_devices)
 #endif
 			return 0;
-	}
+	} else if (IS_MISSING_FILE(sxp->st))
+		return 0;
 
 	if (rsync_xal_get(fname, sxp->xattr) < 0) {
 		free_xattr(sxp);

@@ -560,7 +560,8 @@ int get_acl(const char *fname, stat_x *sxp)
 		if (!preserve_devices)
 #endif
 			return 0;
-	}
+	} else if (IS_MISSING_FILE(sxp->st))
+		return 0;
 
 	if (get_rsync_acl(fname, sxp->acc_acl, SMB_ACL_TYPE_ACCESS,
 			  sxp->st.st_mode) < 0) {
