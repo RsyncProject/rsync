@@ -1785,7 +1785,7 @@ int64 read_varlong(int f, uchar min_bytes)
 #if SIZEOF_INT64 < 8
 	u.x = IVAL(u.b,0);
 #elif CAREFUL_ALIGNMENT
-	u.x = IVAL(u.b,0) | (((int64)IVAL(u.b,4))<<32);
+	u.x = IVAL64(u.b,0);
 #endif
 	return u.x;
 }
@@ -2037,10 +2037,10 @@ void write_varlong(int f, int64 x, uchar min_bytes)
 	uchar bit;
 	int cnt = 8;
 
-	SIVAL(b, 1, x);
 #if SIZEOF_INT64 >= 8
-	SIVAL(b, 5, x >> 32);
+	SIVAL64(b, 1, x);
 #else
+	SIVAL(b, 1, x);
 	if (x <= 0x7FFFFFFF && x >= 0)
 		memset(b + 5, 0, 4);
 	else {
