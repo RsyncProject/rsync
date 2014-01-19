@@ -156,8 +156,6 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 		switch_step++;
 
 		if (cleanup_got_literal && (cleanup_fname || cleanup_fd_w != -1)) {
-			const char *fname = cleanup_fname;
-			cleanup_fname = NULL;
 			if (cleanup_fd_r != -1) {
 				close(cleanup_fd_r);
 				cleanup_fd_r = -1;
@@ -167,9 +165,11 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 				close(cleanup_fd_w);
 				cleanup_fd_w = -1;
 			}
-			if (fname && cleanup_new_fname && keep_partial
+			if (cleanup_fname && cleanup_new_fname && keep_partial
 			 && handle_partial_dir(cleanup_new_fname, PDIR_CREATE)) {
 				int tweak_modtime = 0;
+				const char *fname = cleanup_fname;
+				cleanup_fname = NULL;
 				if (!partial_dir) {
 				    /* We don't want to leave a partial file with a modern time or it
 				     * could be skipped via --update.  Setting the time to something
