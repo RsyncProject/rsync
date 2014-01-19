@@ -23,7 +23,7 @@
 
 /* We know that the x86 can handle misalignment and has the same
  * byte order (LSB-first) as the 32-bit numbers we transmit. */
-#ifdef __i386__
+#if defined __i386__ || defined __i486__ || defined __i586__ || defined __i686__ || __amd64
 #define CAREFUL_ALIGNMENT 0
 #endif
 
