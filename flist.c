@@ -1156,7 +1156,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	if (sanitize_paths)
 		sanitize_path(thisname, thisname, "", 0, SP_DEFAULT);
 
-	if (stp && (S_ISDIR(stp->st_mode) || stp->st_mode == 0)) {
+	if (stp && (S_ISDIR(stp->st_mode) || IS_MISSING_FILE(*stp))) {
 		/* This is needed to handle a "symlink/." with a --relative
 		 * dir, or a request to delete a specific file. */
 		st = *stp;
@@ -1200,7 +1200,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 				full_fname(thisname));
 		}
 		return NULL;
-	} else if (st.st_mode == 0) {
+	} else if (IS_MISSING_FILE(st)) {
 		io_error |= IOERR_GENERAL;
 		rprintf(FINFO, "skipping file with bogus (zero) st_mode: %s\n",
 			full_fname(thisname));
@@ -2290,7 +2290,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				} else
 					fn = p;
 				send_implied_dirs(f, flist, fbuf, fbuf, p, flags,
-						  st.st_mode == 0 ? MISSING_NAME : name_type);
+						  IS_MISSING_FILE(st) ? MISSING_NAME : name_type);
 				if (fn == p)
 					continue;
 			}

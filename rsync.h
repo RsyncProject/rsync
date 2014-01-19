@@ -787,6 +787,8 @@ extern int xattrs_ndx;
 #define DIR_FIRST_CHILD(a) (a)[1]
 #define DIR_NEXT_SIBLING(a) (a)[2]
 
+#define IS_MISSING_FILE(statbuf) ((statbuf).st_mode == 0)
+
 /*
  * Start the flist array at FLIST_START entries and grow it
  * by doubling until FLIST_LINEAR then grow by FLIST_LINEAR
