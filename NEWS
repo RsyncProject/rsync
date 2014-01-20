@@ -1,5 +1,5 @@
 NEWS for rsync 3.1.1 (UNRELEASED)
-Protocol: 31 (changed)
+Protocol: 31 (unchanged)
 Changes since 3.1.0:
 
   BUG FIXES:
