@@ -45,20 +45,8 @@ while (<PIPE>) {
 close PIPE;
 die "Unable to determine commit hash for master branch: $master_branch\n" unless defined $master_commit;
 
-my @extra_files;
-open(IN, '<', 'Makefile.in') or die "Couldn't open Makefile.in: $!\n";
-while (<IN>) {
-    if (s/^GENFILES=//) {
-	while (s/\\$//) {
-	    $_ .= <IN>;
-	}
-	@extra_files = split(' ', $_);
-	last;
-    }
-}
-close IN;
-
 if ($incl_generated_files) {
+    my @extra_files = get_extra_files();
     die "'$tmp_dir' must not exist in the current directory.\n" if -e $tmp_dir;
     mkdir($tmp_dir, 0700) or die "Unable to mkdir($tmp_dir): $!\n";
     system "$make_gen_cmd && rsync -a @extra_files $tmp_dir/master/" and exit 1;
@@ -171,7 +159,9 @@ sub update_patch
     open(OUT, '>', "$patches_dir/$patch.diff") or die $!;
     print OUT $description{$patch}, "\nbased-on: $based_on\n";
 
+    my @extra_files;
     if ($incl_generated_files) {
+	@extra_files = get_extra_files();
 	system "$make_gen_cmd && rsync -a @extra_files $tmp_dir/$patch/" and exit 1;
     }
     $last_touch = time;
@@ -196,14 +186,15 @@ sub update_patch
 	} else {
 	    ($parent_dir) = $parent =~ m{([^/]+)$};
 	}
-	open(PIPE, '-|', 'diff', '-up', "$tmp_dir/$parent_dir", "$tmp_dir/$patch") or die $!;
+	open(PIPE, '-|', 'diff', '-Nurp', "$tmp_dir/$parent_dir", "$tmp_dir/$patch") or die $!;
 	while (<PIPE>) {
-	    s#^(diff -up) $tmp_dir/[^/]+/(.*?) $tmp_dir/[^/]+/(.*)#$1 a/$2 b/$3#o;
+	    s#^(diff -Nurp) $tmp_dir/[^/]+/(.*?) $tmp_dir/[^/]+/(.*)#$1 a/$2 b/$3#o;
 	    s#^\Q---\E $tmp_dir/[^/]+/([^\t]+)\t.*#--- a/$1#o;
 	    s#^\Q+++\E $tmp_dir/[^/]+/([^\t]+)\t.*#+++ b/$1#o;
 	    print OUT $_;
 	}
 	close PIPE;
+	unlink @extra_files;
     }
 
     close OUT;
@@ -212,6 +203,25 @@ sub update_patch
 }
 
 exit;
+
+sub get_extra_files
+{
+    my @extras;
+
+    open(IN, '<', 'Makefile.in') or die "Couldn't open Makefile.in: $!\n";
+    while (<IN>) {
+	if (s/^GENFILES=//) {
+	    while (s/\\$//) {
+		$_ .= <IN>;
+	    }
+	    @extras = split(' ', $_);
+	    last;
+	}
+    }
+    close IN;
+
+    return @extras;
+}
 
 sub usage
 {
