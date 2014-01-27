@@ -5,21 +5,23 @@ Version: 3.1.1
 Release: 0.1.pre1
 %define srcdir src-previews
 Group: Applications/Internet
+License: GPL
 Source0: http://rsync.samba.org/ftp/rsync/%{srcdir}/rsync-%{fullversion}.tar.gz
 #Source1: http://rsync.samba.org/ftp/rsync/%{srcdir}/rsync-patches-%{fullversion}.tar.gz
 URL: http://rsync.samba.org/
 
 Prefix: %{_prefix}
 BuildRoot: /var/tmp/%{name}-root
-License: GPL
 
 %package ssl-client
 Summary: Provides rsync-ssl
-Requires: stunnel >= 4
+Group: Applications/Internet
+Requires: rsync, stunnel >= 4
 
 %package ssl-daemon
 Summary: An stunnel config file to support ssl rsync daemon connections.
-Requires: stunnel >= 4
+Group: Applications/Internet
+Requires: rsync, stunnel >= 4
 
 %description
 Rsync is a fast and extraordinarily versatile file copying tool.  It can
