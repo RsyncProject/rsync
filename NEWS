@@ -31,6 +31,11 @@ Changes since 3.1.0:
     - Fixed a bug that caused a failure when combining --delete-missing-args
       with --xattrs and/or --acls.
 
+    - Fixed a problem with --info=progress2's output stats where rsync would
+      only update the stats at the end of each file's transfer.  It now uses
+      the data that is flowing for the current file, making the stats more
+      accurate and less jumpy.
+
     - Fixed an itemize bug that affected the combo of --link-dest, -X, and -n.
 
     - Fixed a problem with delete messages not appearing in the log file when
