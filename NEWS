@@ -61,3 +61,7 @@ Changes since 3.1.0:
 
     - Made configure more prominently mention when we failed to find yodl (in
       case the user wants to be able to generate manpages from *.yo files).
+
+  DEVELOPER RELATED:
+
+    - We now include an example systemd file (in packaging/systemd).
