@@ -113,9 +113,12 @@ int get_tmpname(char *fnametmp, const char *fname, BOOL make_unique)
 		}
 	} else
 		f = fname;
-	if (*f == '.') /* avoid an extra leading dot for OS X's sake */
-		f++;
-	fnametmp[length++] = '.';
+
+	if (!tmpdir) { /* using a tmpdir avoids the leading dot on our temp names */
+		if (*f == '.') /* avoid an extra leading dot for OS X's sake */
+			f++;
+		fnametmp[length++] = '.';
+	}
 
 	/* The maxname value is bufsize, and includes space for the '\0'.
 	 * NAME_MAX needs an extra -1 for the name's leading dot. */

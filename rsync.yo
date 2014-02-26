@@ -1726,6 +1726,9 @@ dit(bf(-T, --temp-dir=DIR)) This option instructs rsync to use DIR as a
 scratch directory when creating temporary copies of the files transferred
 on the receiving side.  The default behavior is to create each temporary
 file in the same directory as the associated destination file.
+Beginning with rsync 3.1.1, the temp-file names inside the specified DIR will
+not be prefixed with an extra dot (though they will still have a random suffix
+added).
 
 This option is most often used when the receiving disk partition does not
 have enough free space to hold a copy of the largest file in the transfer.

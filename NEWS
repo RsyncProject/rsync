@@ -57,6 +57,9 @@ Changes since 3.1.0:
 
   ENHANCEMENTS:
 
+    - Tweaked the temp-file naming when --temp-dir=DIR is used: the temp-file
+      names with not get an extra leading '.' prepended.
+
     - Added the support/rsync-no-vanished wrapper script.
 
     - Made configure more prominently mention when we failed to find yodl (in
