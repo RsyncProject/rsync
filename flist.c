@@ -2553,7 +2553,11 @@ struct file_list *recv_file_list(int f)
 			rprintf(FINFO, "[%s] flist_eof=1\n", who_am_i());
 	}
 
-	flist_sort_and_clean(flist, relative_paths);
+	/* The --relative option sends paths with a leading slash, so we need
+	 * to specify the strip_root option here.  We also want to ensure that
+	 * a non-relative transfer doesn't have any leading slashes or it might
+	 * cause the client a security issue. */
+	flist_sort_and_clean(flist, 1);
 
 	if (protocol_version < 30) {
 		/* Recv the io_error flag */
