@@ -513,6 +513,12 @@ fine-grained settings override the implied settings of bf(-v).  Both
 bf(--info) and bf(--debug) have a way to ask for help that tells you
 exactly what flags are set for each increase in verbosity.
 
+However, do keep in mind that a daemon's "max verbosity" setting will limit how
+high of a level the various individual flags can be set on the daemon side.
+For instance, if the max is 2, then any info and/or debug flag that is set to
+a higher value than what would be set by bf(-vv) will be downgraded to the
+bf(-vv) level in the daemon's logging.
+
 dit(bf(--info=FLAGS))
 This option lets you have fine-grained control over the
 information
@@ -534,6 +540,7 @@ information on what is output and when.
 This option was added to 3.1.0, so an older rsync on the server side might
 reject your attempts at fine-grained control (if one or more flags needed
 to be send to the server and the server was too old to understand them).
+See also the "max verbosity" caveat above when dealing with a daemon.
 
 dit(bf(--debug=FLAGS))
 This option lets you have fine-grained control over the debug
@@ -554,6 +561,7 @@ specified, especially those pertaining to I/O and buffer debugging.
 This option was added to 3.1.0, so an older rsync on the server side might
 reject your attempts at fine-grained control (if one or more flags needed
 to be send to the server and the server was too old to understand them).
+See also the "max verbosity" caveat above when dealing with a daemon.
 
 dit(bf(--msgs2stderr)) This option changes rsync to send all its output
 directly to stderr rather than to send messages to the client side via the

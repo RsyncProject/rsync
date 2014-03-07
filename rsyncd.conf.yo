@@ -318,6 +318,13 @@ the maximum amount of verbose information that you'll allow the daemon to
 generate (since the information goes into the log file). The default is 1,
 which allows the client to request one level of verbosity.
 
+This also affects the user's ability to request higher levels of bf(--info) and
+bf(--debug) logging.  If the max value is 2, then no info and/or debug value
+that is higher than what would be set by bf(-vv) will be honored by the daemon
+in its logging.  To see how high of a verbosity level you need to accept for a
+particular info/debug level, refer to "rsync --info=help" and "rsync --debug=help".
+For instance, it takes max-verbosity 4 to be able to output debug TIME2 and FLIST3.
+
 dit(bf(lock file)) This parameter specifies the file to use to
 support the "max connections" parameter. The rsync daemon uses record
 locking on this file to ensure that the max connections limit is not
