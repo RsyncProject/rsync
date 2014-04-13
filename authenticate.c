@@ -102,15 +102,16 @@ static const char *check_secret(int module, const char *user, const char *group,
 	char pass2[MAX_DIGEST_LEN*2];
 	const char *fname = lp_secrets_file(module);
 	STRUCT_STAT st;
-	int fd, ok = 1;
+	int ok = 1;
 	int user_len = strlen(user);
 	int group_len = group ? strlen(group) : 0;
 	char *err;
+	FILE *fh;
 
-	if (!fname || !*fname || (fd = open(fname, O_RDONLY)) < 0)
+	if (!fname || !*fname || (fh = fopen(fname, "r")) == NULL)
 		return "no secrets file";
 
-	if (do_fstat(fd, &st) == -1) {
+	if (do_fstat(fileno(fh), &st) == -1) {
 		rsyserr(FLOG, errno, "fstat(%s)", fname);
 		ok = 0;
 	} else if (lp_strict_modes(module)) {
@@ -123,29 +124,30 @@ static const char *check_secret(int module, const char *user, const char *group,
 		}
 	}
 	if (!ok) {
-		close(fd);
+		fclose(fh);
 		return "ignoring secrets file";
 	}
 
 	if (*user == '#') {
 		/* Reject attempt to match a comment. */
-		close(fd);
+		fclose(fh);
 		return "invalid username";
 	}
 
 	/* Try to find a line that starts with the user (or @group) name and a ':'. */
 	err = "secret not found";
-	while ((user || group) && read_line_old(fd, line, sizeof line, 1)) {
-		const char **ptr, *s;
+	while ((user || group) && fgets(line, sizeof line, fh) != NULL) {
+		const char **ptr, *s = strtok(line, "\n\r");
 		int len;
-		if (*line == '@') {
+		if (!s)
+			continue;
+		if (*s == '@') {
 			ptr = &group;
 			len = group_len;
-			s = line+1;
+			s++;
 		} else {
 			ptr = &user;
 			len = user_len;
-			s = line;
 		}
 		if (!*ptr || strncmp(s, *ptr, len) != 0 || s[len] != ':')
 			continue;
@@ -158,7 +160,7 @@ static const char *check_secret(int module, const char *user, const char *group,
 		*ptr = NULL; /* Don't look for name again. */
 	}
 
-	close(fd);
+	fclose(fh);
 
 	memset(line, 0, sizeof line);
 	memset(pass2, 0, sizeof pass2);
