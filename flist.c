@@ -736,8 +736,11 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 	}
 #endif
 
-	if (*thisname)
-		clean_fname(thisname, 0);
+	if (*thisname
+	 && (clean_fname(thisname, CFN_REFUSE_DOT_DOT_DIRS) < 0 || (!relative_paths && *thisname == '/'))) {
+		rprintf(FERROR, "ABORTING due to unsafe pathname from sender: %s\n", thisname);
+		exit_cleanup(RERR_PROTOCOL);
+	}
 
 	if (sanitize_paths)
 		sanitize_path(thisname, thisname, "", 0, SP_DEFAULT);
@@ -2554,10 +2557,9 @@ struct file_list *recv_file_list(int f)
 	}
 
 	/* The --relative option sends paths with a leading slash, so we need
-	 * to specify the strip_root option here.  We also want to ensure that
-	 * a non-relative transfer doesn't have any leading slashes or it might
-	 * cause the client a security issue. */
-	flist_sort_and_clean(flist, 1);
+	 * to specify the strip_root option here.  We rejected leading slashes
+	 * for a non-relative transfer in recv_file_entry(). */
+	flist_sort_and_clean(flist, relative_paths);
 
 	if (protocol_version < 30) {
 		/* Recv the io_error flag */

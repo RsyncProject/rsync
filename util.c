@@ -872,13 +872,15 @@ int count_dir_elements(const char *p)
  * CFN_KEEP_TRAILING_SLASH is flagged, and will also collapse ".." elements
  * (except at the start) if CFN_COLLAPSE_DOT_DOT_DIRS is flagged.  If the
  * resulting name would be empty, returns ".". */
-unsigned int clean_fname(char *name, int flags)
+int clean_fname(char *name, int flags)
 {
 	char *limit = name - 1, *t = name, *f = name;
 	int anchored;
 
 	if (!name)
 		return 0;
+
+#define DOT_IS_DOT_DOT_DIR(bp) (bp[1] == '.' && (bp[2] == '/' || !bp[2]))
 
 	if ((anchored = *f == '/') != 0) {
 		*t++ = *f++;
@@ -892,7 +894,8 @@ unsigned int clean_fname(char *name, int flags)
 	} else if (flags & CFN_KEEP_DOT_DIRS && *f == '.' && f[1] == '/') {
 		*t++ = *f++;
 		*t++ = *f++;
-	}
+	} else if (flags & CFN_REFUSE_DOT_DOT_DIRS && *f == '.' && DOT_IS_DOT_DOT_DIR(f))
+		return -1;
 	while (*f) {
 		/* discard extra slashes */
 		if (*f == '/') {
@@ -908,9 +911,10 @@ unsigned int clean_fname(char *name, int flags)
 			if (f[1] == '\0' && flags & CFN_DROP_TRAILING_DOT_DIR)
 				break;
 			/* collapse ".." dirs */
-			if (flags & CFN_COLLAPSE_DOT_DOT_DIRS
-			 && f[1] == '.' && (f[2] == '/' || !f[2])) {
+			if (flags & (CFN_COLLAPSE_DOT_DOT_DIRS|CFN_REFUSE_DOT_DOT_DIRS) && DOT_IS_DOT_DOT_DIR(f)) {
 				char *s = t - 1;
+				if (flags & CFN_REFUSE_DOT_DOT_DIRS)
+					return -1;
 				if (s == name && anchored) {
 					f += 2;
 					continue;
@@ -932,6 +936,8 @@ unsigned int clean_fname(char *name, int flags)
 	if (t == name)
 		*t++ = '.';
 	*t = '\0';
+
+#undef DOT_IS_DOT_DOT_DIR
 
 	return t - name;
 }
