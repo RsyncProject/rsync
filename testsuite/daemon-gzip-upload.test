@@ -25,7 +25,7 @@ hands_setup
 # Build chkdir with a normal rsync and an --exclude.
 $RSYNC -av --exclude=foobar.baz "$fromdir/" "$chkdir/"
 
-checkit "'$ignore23' $RSYNC -avvvvz '$fromdir/' localhost::test-to/" "$chkdir" "$todir"
+checkit "'$ignore23' $RSYNC -avvvvzz '$fromdir/' localhost::test-to/" "$chkdir" "$todir"
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0

@@ -23,10 +23,6 @@
 #include "itypes.h"
 #include <zlib.h>
 
-#ifndef Z_INSERT_ONLY
-#define Z_INSERT_ONLY Z_SYNC_FLUSH
-#endif
-
 extern int do_compression;
 extern int protocol_version;
 extern int module_id;
@@ -406,9 +402,10 @@ send_deflated_token(int f, int32 token, struct map_struct *buf, OFF_T offset,
 	if (token == -1) {
 		/* end of file - clean up */
 		write_byte(f, END_FLAG);
-	} else if (token != -2) {
+	} else if (token != -2 && do_compression == 1) {
 		/* Add the data in the current block to the compressor's
 		 * history and hash table. */
+#ifndef EXTERNAL_ZLIB
 		do {
 			/* Break up long sections in the same way that
 			 * see_deflate_token() does. */
@@ -418,17 +415,20 @@ send_deflated_token(int f, int32 token, struct map_struct *buf, OFF_T offset,
 			tx_strm.avail_in = n1;
 			if (protocol_version >= 31) /* Newer protocols avoid a data-duplicating bug */
 				offset += n1;
-			do {
-				tx_strm.next_out = (Bytef *) obuf;
-				tx_strm.avail_out = AVAIL_OUT_SIZE(CHUNK_SIZE);
-				r = deflate(&tx_strm, Z_INSERT_ONLY);
-				if (r != Z_OK) {
-					rprintf(FERROR, "deflate on token returned %d (%d bytes left)\n",
-						r, tx_strm.avail_in);
-					exit_cleanup(RERR_STREAMIO);
-				}
-			} while (tx_strm.avail_in != 0);
+			tx_strm.next_out = (Bytef *) obuf;
+			tx_strm.avail_out = AVAIL_OUT_SIZE(CHUNK_SIZE);
+			r = deflate(&tx_strm, Z_INSERT_ONLY);
+			if (r != Z_OK || tx_strm.avail_in != 0) {
+				rprintf(FERROR, "deflate on token returned %d (%d bytes left)\n",
+					r, tx_strm.avail_in);
+				exit_cleanup(RERR_STREAMIO);
+			}
 		} while (toklen > 0);
+#else
+		toklen++;
+		rprintf(FERROR, "Impossible error in external-zlib code (1).\n");
+		exit_cleanup(RERR_STREAMIO);
+#endif
 	}
 }
 
@@ -579,6 +579,7 @@ static int32 recv_deflated_token(int f, char **data)
  */
 static void see_deflate_token(char *buf, int32 len)
 {
+#ifndef EXTERNAL_ZLIB
 	int r;
 	int32 blklen;
 	unsigned char hdr[5];
@@ -616,6 +617,11 @@ static void see_deflate_token(char *buf, int32 len)
 			exit_cleanup(RERR_STREAMIO);
 		}
 	} while (len || rx_strm.avail_out == 0);
+#else
+	buf++; len++;
+	rprintf(FERROR, "Impossible error in external-zlib code (2).\n");
+	exit_cleanup(RERR_STREAMIO);
+#endif
 }
 
 /**
@@ -655,6 +661,6 @@ int32 recv_token(int f, char **data)
  */
 void see_token(char *data, int32 toklen)
 {
-	if (do_compression)
+	if (do_compression == 1)
 		see_deflate_token(data, toklen);
 }

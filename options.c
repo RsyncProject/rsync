@@ -32,6 +32,8 @@ extern unsigned int module_dirlen;
 extern filter_rule_list filter_list;
 extern filter_rule_list daemon_filter_list;
 
+#define NOT_SPECIFIED (-42)
+
 int make_backups = 0;
 
 /**
@@ -75,7 +77,7 @@ int protocol_version = PROTOCOL_VERSION;
 int sparse_files = 0;
 int preallocate_files = 0;
 int do_compression = 0;
-int def_compress_level = Z_DEFAULT_COMPRESSION;
+int def_compress_level = NOT_SPECIFIED;
 int am_root = 0; /* 0 = normal, 1 = root, 2 = --super, -1 = --fake-super */
 int am_server = 0;
 int am_sender = 0;
@@ -965,10 +967,12 @@ static struct poptOption long_options[] = {
   {"no-fuzzy",         0,  POPT_ARG_VAL,    &fuzzy_basis, 0, 0, 0 },
   {"no-y",             0,  POPT_ARG_VAL,    &fuzzy_basis, 0, 0, 0 },
   {"compress",        'z', POPT_ARG_NONE,   0, 'z', 0, 0 },
+  {"old-compress",     0,  POPT_ARG_VAL,    &do_compression, 1, 0, 0 },
+  {"new-compress",     0,  POPT_ARG_VAL,    &do_compression, 2, 0, 0 },
   {"no-compress",      0,  POPT_ARG_VAL,    &do_compression, 0, 0, 0 },
   {"no-z",             0,  POPT_ARG_VAL,    &do_compression, 0, 0, 0 },
   {"skip-compress",    0,  POPT_ARG_STRING, &skip_compress, 0, 0, 0 },
-  {"compress-level",   0,  POPT_ARG_INT,    &def_compress_level, 'z', 0, 0 },
+  {"compress-level",   0,  POPT_ARG_INT,    &def_compress_level, 0, 0, 0 },
   {0,                 'P', POPT_ARG_NONE,   0, 'P', 0, 0 },
   {"progress",         0,  POPT_ARG_VAL,    &do_progress, 1, 0, 0 },
   {"no-progress",      0,  POPT_ARG_VAL,    &do_progress, 0, 0, 0 },
@@ -1543,18 +1547,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			break;
 
 		case 'z':
-			if (def_compress_level < Z_DEFAULT_COMPRESSION
-			 || def_compress_level > Z_BEST_COMPRESSION) {
-				snprintf(err_buf, sizeof err_buf,
-					"--compress-level value is invalid: %d\n",
-					def_compress_level);
-				return 0;
-			}
-			do_compression = def_compress_level != Z_NO_COMPRESSION;
-			if (do_compression && refused_compress) {
-				create_refuse_error(refused_compress);
-				return 0;
-			}
+			do_compression++;
 			break;
 
 		case 'M':
@@ -1827,6 +1820,33 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		/* Allow the old meaning of 'h' (--help) on its own. */
 		usage(FINFO);
 		exit_cleanup(0);
+	}
+
+	if (do_compression || def_compress_level != NOT_SPECIFIED) {
+		if (def_compress_level == NOT_SPECIFIED)
+			def_compress_level = Z_DEFAULT_COMPRESSION;
+		else if (def_compress_level < Z_DEFAULT_COMPRESSION || def_compress_level > Z_BEST_COMPRESSION) {
+			snprintf(err_buf, sizeof err_buf, "--compress-level value is invalid: %d\n",
+				 def_compress_level);
+			return 0;
+		} else if (def_compress_level == Z_NO_COMPRESSION)
+			do_compression = 0;
+		else if (!do_compression)
+			do_compression = 1;
+		if (do_compression && refused_compress) {
+			create_refuse_error(refused_compress);
+			return 0;
+		}
+#ifdef EXTERNAL_ZLIB
+		if (do_compression == 1) {
+			snprintf(err_buf, sizeof err_buf,
+				"This rsync lacks old-style --compress due to its external zlib.  Try -zz.\n");
+			if (am_server)
+				return 0;
+			fprintf(stderr, "%s" "Continuing without compression.\n\n", err_buf);
+			do_compression = 0;
+		}
+#endif
 	}
 
 #ifdef HAVE_SETVBUF
@@ -2451,7 +2471,7 @@ void server_options(char **args, int *argc_p)
 	}
 	if (sparse_files)
 		argstr[x++] = 'S';
-	if (do_compression)
+	if (do_compression == 1)
 		argstr[x++] = 'z';
 
 	set_allow_inc_recurse();
@@ -2746,6 +2766,9 @@ void server_options(char **args, int *argc_p)
 		rprintf(FERROR, "argc overflow in server_options().\n");
 		exit_cleanup(RERR_MALLOC);
 	}
+
+	if (do_compression > 1)
+		args[ac++] = "--new-compress";
 
 	if (remote_option_cnt) {
 		int j;

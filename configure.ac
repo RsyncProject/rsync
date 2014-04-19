@@ -792,6 +792,7 @@ if test x"$with_included_zlib" = x"yes"; then
     BUILD_ZLIB='$(zlib_OBJS)'
     CFLAGS="$CFLAGS -I$srcdir/zlib"
 else
+    AC_DEFINE(EXTERNAL_ZLIB, 1, [Define to 1 if using external zlib])
     AC_MSG_RESULT(no)
 fi
 

@@ -1867,7 +1867,20 @@ being transmitted -- something that is useful over a slow connection.
 Note that this option typically achieves better compression ratios than can
 be achieved by using a compressing remote shell or a compressing transport
 because it takes advantage of the implicit information in the matching data
-blocks that are not explicitly sent over the connection.
+blocks that are not explicitly sent over the connection.  This matching-data
+compression comes at a cost of CPU, though, and can be disabled by repeating
+the bf(-z) option, but only if both sides are at least version 3.1.1.
+
+Note that if your version of rsync was compiled with an external zlib (instead
+of the zlib that comes packaged with rsync) then it will not support the
+old-style compression, only the new-style (repeated-option) compression.  In
+the future this new-style compression will likely become the default.
+
+The client rsync requests new-style compression on the server via the
+bf(--new-compress) option, so if you see that option rejected it means that
+the server is not new enough to support bf(-zz).  Rsync also accepts the
+bf(--old-compress) option for a future time when new-style compression
+becomes the default.
 
 See the bf(--skip-compress) option for the default list of file suffixes
 that will not be compressed.
