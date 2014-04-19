@@ -2754,6 +2754,10 @@ itemization(
   it() a '[' introduces a character class, such as [a-z] or [[:alpha:]].
   it() in a wildcard pattern, a backslash can be used to escape a wildcard
   character, but it is matched literally when no wildcards are present.
+  This means that there is an extra level of backslash removal when a
+  pattern contains wildcard characters compared to a pattern that has none.
+  e.g. if you add a wildcard to "foo\bar" (which matches the backslash) you
+  would need to use "foo\\bar*" to avoid the "\b" becoming just "b".
   it() if the pattern contains a / (not counting a trailing /) or a "**",
   then it is matched against the full pathname, including any leading
   directories. If the pattern doesn't contain a / or a "**", then it is
