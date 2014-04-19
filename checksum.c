@@ -98,10 +98,10 @@ void get_checksum2(char *buf, int32 len, char *sum)
 	}
 }
 
-void file_checksum(char *fname, char *sum, OFF_T size)
+void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 {
 	struct map_struct *buf;
-	OFF_T i, len = size;
+	OFF_T i, len = st_p->st_size;
 	md_context m;
 	int32 remainder;
 	int fd;
@@ -112,7 +112,7 @@ void file_checksum(char *fname, char *sum, OFF_T size)
 	if (fd == -1)
 		return;
 
-	buf = map_file(fd, size, MAX_MAP_SIZE, CSUM_CHUNK);
+	buf = map_file(fd, len, MAX_MAP_SIZE, CSUM_CHUNK);
 
 	if (protocol_version >= 30) {
 		md5_begin(&m);
