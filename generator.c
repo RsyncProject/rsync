@@ -356,6 +356,9 @@ static void do_delete_pass(void)
 	for (j = 0; j < cur_flist->used; j++) {
 		struct file_struct *file = cur_flist->sorted[j];
 
+		if (!F_IS_ACTIVE(file))
+			continue;
+
 		f_name(file, fbuf);
 
 		if (!(file->flags & FLAG_CONTENT_DIR)) {
@@ -753,6 +756,9 @@ static struct file_struct *find_fuzzy(struct file_struct *file, struct file_list
 		for (j = 0; j < dirlist->used; j++) {
 			struct file_struct *fp = dirlist->files[j];
 
+			if (!F_IS_ACTIVE(fp))
+				continue;
+
 			if (!S_ISREG(fp->mode) || !F_LENGTH(fp) || fp->flags & FLAG_FILE_SENT)
 				continue;
 
@@ -777,6 +783,9 @@ static struct file_struct *find_fuzzy(struct file_struct *file, struct file_list
 			const char *suf, *name;
 			int len, suf_len;
 			uint32 dist;
+
+			if (!F_IS_ACTIVE(fp))
+				continue;
 
 			if (!S_ISREG(fp->mode) || !F_LENGTH(fp) || fp->flags & FLAG_FILE_SENT)
 				continue;
@@ -2016,6 +2025,8 @@ static void touch_up_dirs(struct file_list *flist, int ndx)
 	 * transfer and/or re-set any tweaked modified-time values. */
 	for (i = start; i <= end; i++, counter++) {
 		file = flist->files[i];
+		if (!F_IS_ACTIVE(file))
+			continue;
 		if (!S_ISDIR(file->mode)
 		 || (!implied_dirs && file->flags & FLAG_IMPLIED_DIR))
 			continue;
@@ -2026,8 +2037,7 @@ static void touch_up_dirs(struct file_list *flist, int ndx)
 		}
 		/* Be sure not to retouch permissions with --fake-super. */
 		fix_dir_perms = !am_root && !(file->mode & S_IWUSR);
-		if (!F_IS_ACTIVE(file) || file->flags & FLAG_MISSING_DIR
-		 || !(need_retouch_dir_times || fix_dir_perms))
+		if (file->flags & FLAG_MISSING_DIR || !(need_retouch_dir_times || fix_dir_perms))
 			continue;
 		fname = f_name(file, NULL);
 		if (fix_dir_perms)
