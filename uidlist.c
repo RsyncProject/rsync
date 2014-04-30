@@ -473,12 +473,15 @@ void parse_name_map(char *map, BOOL usernames)
 					usernames ? "user" : "group", cp);
 				exit_cleanup(RERR_SYNTAX);
 			}
-			if (dash)
+			if (dash) {
+				*dash = '\0';
 				noiu.max_id = id_parse(dash+1);
-			else
+			} else
 				noiu.max_id = 0;
 			flags = 0;
 			id1 = id_parse(cp);
+			if (dash)
+				*dash = '-';
 		} else if (strpbrk(cp, "*[?")) {
 			flags = NFLAGS_WILD_NAME_MATCH;
 			noiu.name = cp;
