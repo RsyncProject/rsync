@@ -1007,7 +1007,7 @@ else
     *)
 	AC_MSG_RESULT(running tests:)
 	AC_CHECK_LIB(acl,acl_get_file)
-	    AC_CACHE_CHECK([for ACL support],samba_cv_HAVE_POSIX_ACLS,[
+	AC_CACHE_CHECK([for ACL support],samba_cv_HAVE_POSIX_ACLS,[
 	    AC_TRY_LINK([#include <sys/types.h>
 #include <sys/acl.h>],
 [ acl_t acl; int entry_id; acl_entry_t *entry_p; return acl_get_entry( acl, entry_id, entry_p);],
@@ -1057,6 +1057,7 @@ else
 	AC_DEFINE(HAVE_LINUX_XATTRS, 1, [True if you have Linux xattrs])
 	AC_DEFINE(SUPPORT_XATTRS, 1)
 	AC_DEFINE(NO_SYMLINK_USER_XATTRS, 1, [True if symlinks do not support user xattrs])
+	AC_CHECK_LIB(attr,getxattr)
 	;;
     darwin*)
 	AC_MSG_RESULT(Using OS X xattrs)
