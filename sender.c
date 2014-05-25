@@ -147,7 +147,7 @@ void successful_send(int ndx)
 	 || (NSEC_BUMP(file) && (uint32)st.ST_MTIME_NSEC != F_MOD_NSEC(file))
 #endif
 	) {
-		rprintf(FERROR, "ERROR: Skipping sender remove for changed file: %s\n", fname);
+		rprintf(FERROR_XFER, "ERROR: Skipping sender remove for changed file: %s\n", fname);
 		return;
 	}
 
@@ -157,7 +157,7 @@ void successful_send(int ndx)
 		if (errno == ENOENT)
 			rprintf(FINFO, "sender file already removed: %s\n", fname);
 		else
-			rsyserr(FERROR, errno, "sender failed to %s %s", failed_op, fname);
+			rsyserr(FERROR_XFER, errno, "sender failed to %s %s", failed_op, fname);
 	} else {
 		if (INFO_GTE(REMOVE, 1))
 			rprintf(FINFO, "sender removed %s\n", fname);
