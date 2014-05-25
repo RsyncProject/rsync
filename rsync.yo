@@ -1175,6 +1175,17 @@ it is preserving modification times (see bf(--times)).  If NFS is sharing
 the directories on the receiving side, it is a good idea to use bf(-O).
 This option is inferred if you use bf(--backup) without bf(--backup-dir).
 
+This option also has the side-effect of avoiding early creation of directories
+in incremental recursion copies.  The default bf(--inc-recursive) copying
+normally does an early-create pass of all the sub-directories in a parent
+directory in order for it to be able to then set the modify time of the parent
+directory right away (without having to delay that until a bunch of recursive
+copying has finished).  This early-create idiom is not necessary if directory
+modify times are not being preserved, so it is skipped.  Since early-create
+directories don't have accurate mode, mtime, or ownership, the use of this
+option can help when someone wants to avoid these partially-finished
+directories.
+
 dit(bf(-J, --omit-link-times)) This tells rsync to omit symlinks when
 it is preserving modification times (see bf(--times)).
 

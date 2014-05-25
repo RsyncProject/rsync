@@ -1353,6 +1353,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		} else
 			added_perms = 0;
 		if (is_dir < 0) {
+			if (!(preserve_times & PRESERVE_DIR_TIMES))
+				return;
 			/* In inc_recurse mode we want to make sure any missing
 			 * directories get created while we're still processing
 			 * the parent dir (which allows us to touch the parent
