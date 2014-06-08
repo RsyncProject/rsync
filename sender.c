@@ -258,8 +258,7 @@ void send_files(int f_in, int f_out)
 			rprintf(FINFO, "send_files(%d, %s%s%s)\n", ndx, path,slash,fname);
 
 #ifdef SUPPORT_XATTRS
-		if (preserve_xattrs && iflags & ITEM_REPORT_XATTR && do_xfers
-		 && (protocol_version < 31 || !BITS_SET(iflags, ITEM_XNAME_FOLLOWS|ITEM_LOCAL_CHANGE)))
+		if (preserve_xattrs && iflags & ITEM_REPORT_XATTR && do_xfers)
 			recv_xattr_request(file, f_in);
 #endif
 
