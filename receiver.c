@@ -30,6 +30,7 @@ extern int inc_recurse;
 extern int log_before_transfer;
 extern int stdout_format_has_i;
 extern int logfile_format_has_i;
+extern int want_xattr_optim;
 extern int csum_length;
 extern int read_batch;
 extern int write_batch;
@@ -583,14 +584,16 @@ int recv_files(int f_in, int f_out, char *local_name)
 			rprintf(FINFO, "recv_files(%s)\n", fname);
 
 #ifdef SUPPORT_XATTRS
-		if (preserve_xattrs && iflags & ITEM_REPORT_XATTR && do_xfers)
+		if (preserve_xattrs && iflags & ITEM_REPORT_XATTR && do_xfers
+		 && !(want_xattr_optim && BITS_SET(iflags, ITEM_XNAME_FOLLOWS|ITEM_LOCAL_CHANGE)))
 			recv_xattr_request(file, f_in);
 #endif
 
 		if (!(iflags & ITEM_TRANSFER)) {
 			maybe_log_item(file, iflags, itemizing, xname);
 #ifdef SUPPORT_XATTRS
-			if (preserve_xattrs && iflags & ITEM_REPORT_XATTR && do_xfers)
+			if (preserve_xattrs && iflags & ITEM_REPORT_XATTR && do_xfers
+			 && !BITS_SET(iflags, ITEM_XNAME_FOLLOWS|ITEM_LOCAL_CHANGE))
 				set_file_attrs(fname, file, NULL, fname, 0);
 #endif
 			if (iflags & ITEM_IS_NEW) {

@@ -2494,12 +2494,13 @@ void server_options(char **args, int *argc_p)
 		if (allow_inc_recurse)
 			argstr[x++] = 'i';
 #ifdef CAN_SET_SYMLINK_TIMES
-		argstr[x++] = 'L';
+		argstr[x++] = 'L'; /* symlink time-setting support */
 #endif
 #ifdef ICONV_OPTION
-		argstr[x++] = 's';
+		argstr[x++] = 's'; /* symlink iconv translation support */
 #endif
-		argstr[x++] = 'f';
+		argstr[x++] = 'f'; /* flist I/O-error safety support */
+		argstr[x++] = 'x'; /* xattr hardlink optimization not supported */
 	}
 
 	if (x >= (int)sizeof argstr) { /* Not possible... */

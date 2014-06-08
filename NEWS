@@ -56,8 +56,8 @@ Changes since 3.1.0:
     - Improve chunked xattr reading for OS X.
 
     - Removed an attempted hard-link xattr optimization that was causing a
-      transfer failure.  (If you need to interact with an rsync 3.1.0 using
-      --hard-links & --xattrs, you can specify --protocol=30.)
+      transfer failure.  This removal is flagged in the compatibility code, so
+      if a better fix can be discovered, we have a way to flip it on again.
 
     - We now generate a better error if the buffer overflows in do_mknod().
 

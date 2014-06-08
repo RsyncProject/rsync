@@ -57,6 +57,7 @@ extern int update_only;
 extern int human_readable;
 extern int ignore_existing;
 extern int ignore_non_existing;
+extern int want_xattr_optim;
 extern int inplace;
 extern int append_mode;
 extern int make_backups;
@@ -553,7 +554,9 @@ void itemize(const char *fnamecmp, struct file_struct *file, int ndx, int statre
 #ifdef SUPPORT_XATTRS
 			if (preserve_xattrs && do_xfers
 			 && iflags & (ITEM_REPORT_XATTR|ITEM_TRANSFER)) {
-				int fd = iflags & ITEM_REPORT_XATTR ? sock_f_out : -1;
+				int fd = iflags & ITEM_REPORT_XATTR
+				      && !(want_xattr_optim && BITS_SET(iflags, ITEM_XNAME_FOLLOWS|ITEM_LOCAL_CHANGE))
+				       ? sock_f_out : -1;
 				send_xattr_request(NULL, file, fd);
 			}
 #endif

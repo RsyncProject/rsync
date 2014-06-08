@@ -29,6 +29,7 @@ extern int inc_recurse;
 extern int log_before_transfer;
 extern int stdout_format_has_i;
 extern int logfile_format_has_i;
+extern int want_xattr_optim;
 extern int csum_length;
 extern int append_mode;
 extern int io_error;
@@ -177,7 +178,8 @@ static void write_ndx_and_attrs(int f_out, int ndx, int iflags,
 	if (iflags & ITEM_XNAME_FOLLOWS)
 		write_vstring(f_out, buf, len);
 #ifdef SUPPORT_XATTRS
-	if (preserve_xattrs && iflags & ITEM_REPORT_XATTR && do_xfers)
+	if (preserve_xattrs && iflags & ITEM_REPORT_XATTR && do_xfers
+	 && !(want_xattr_optim && BITS_SET(iflags, ITEM_XNAME_FOLLOWS|ITEM_LOCAL_CHANGE)))
 		send_xattr_request(fname, file, f_out);
 #endif
 }
@@ -258,7 +260,8 @@ void send_files(int f_in, int f_out)
 			rprintf(FINFO, "send_files(%d, %s%s%s)\n", ndx, path,slash,fname);
 
 #ifdef SUPPORT_XATTRS
-		if (preserve_xattrs && iflags & ITEM_REPORT_XATTR && do_xfers)
+		if (preserve_xattrs && iflags & ITEM_REPORT_XATTR && do_xfers
+		 && !(want_xattr_optim && BITS_SET(iflags, ITEM_XNAME_FOLLOWS|ITEM_LOCAL_CHANGE)))
 			recv_xattr_request(file, f_in);
 #endif
 
