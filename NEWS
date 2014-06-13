@@ -59,6 +59,10 @@ Changes since 3.1.0:
       transfer failure.  This removal is flagged in the compatibility code, so
       if a better fix can be discovered, we have a way to flip it on again.
 
+    - Fixed a bug when the receiver is not configured to be able to hard link
+      symlimks/devices/special-file items but the sender sent some of these
+      items flagged as hard-linked.
+
     - We now generate a better error if the buffer overflows in do_mknod().
 
     - Fixed a problem reading more than 16 ACLs on some OSes.

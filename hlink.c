@@ -231,7 +231,7 @@ static int maybe_hard_link(struct file_struct *file, int ndx,
 		}
 	}
 
-	if (atomic_create(file, fname, oldname, MAKEDEV(0, 0), sxp, statret == 0 ? DEL_FOR_FILE : 0)) {
+	if (atomic_create(file, fname, NULL, oldname, MAKEDEV(0, 0), sxp, statret == 0 ? DEL_FOR_FILE : 0)) {
 		if (itemizing) {
 			itemize(fname, file, ndx, statret, sxp,
 				ITEM_LOCAL_CHANGE | ITEM_XNAME_FOLLOWS, 0,

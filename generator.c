@@ -1511,7 +1511,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				set_file_attrs(fname, file, &sx, NULL, maybe_ATTRS_REPORT);
 				if (itemizing)
 					itemize(fname, file, ndx, 0, &sx, 0, 0, NULL);
-#if defined SUPPORT_HARD_LINKS && defined CAN_HARDLINK_SYMLINK
+#ifdef SUPPORT_HARD_LINKS
 				if (preserve_hard_links && F_IS_HLINKED(file))
 					finish_hard_link(file, fname, ndx, &sx.st, itemizing, code, -1);
 #endif
@@ -1537,7 +1537,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				fnamecmp = fnamecmpbuf;
 			}
 		}
-		if (atomic_create(file, fname, sl, MAKEDEV(0, 0), &sx, statret == 0 ? DEL_FOR_SYMLINK : 0)) {
+		if (atomic_create(file, fname, sl, NULL, MAKEDEV(0, 0), &sx, statret == 0 ? DEL_FOR_SYMLINK : 0)) {
 			set_file_attrs(fname, file, NULL, NULL, 0);
 			if (itemizing) {
 				if (statret == 0 && !S_ISLNK(sx.st.st_mode))
@@ -1618,7 +1618,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				fname, (int)file->mode,
 				(long)major(rdev), (long)minor(rdev));
 		}
-		if (atomic_create(file, fname, NULL, rdev, &sx, del_for_flag)) {
+		if (atomic_create(file, fname, NULL, NULL, rdev, &sx, del_for_flag)) {
 			set_file_attrs(fname, file, NULL, NULL, 0);
 			if (itemizing) {
 				itemize(fnamecmp, file, ndx, statret, &sx,
@@ -1923,11 +1923,11 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 }
 
 /* If we are replacing an existing hard link, symlink, device, or special file,
- * create a temp-name item and rename it into place.  Only a symlink or hard
- * link puts a non-NULL value into the lnk arg.  Only a device puts a non-0
- * value into the rdev arg.  Specify 0 for the del_for_flag if there is not a
- * file to replace.  This returns 1 on success and 0 on failure. */
-int atomic_create(struct file_struct *file, char *fname, const char *lnk,
+ * create a temp-name item and rename it into place.  A symlimk specifies slnk,
+ * a hard link specifies hlnk, otherwise we create a device based on rdev.
+ * Specify 0 for the del_for_flag if there is not a file to replace.  This
+ * returns 1 on success and 0 on failure. */
+int atomic_create(struct file_struct *file, char *fname, const char *slnk, const char *hlnk,
 		  dev_t rdev, stat_x *sxp, int del_for_flag)
 {
 	char tmpname[MAXPATHLEN];
@@ -1952,23 +1952,22 @@ int atomic_create(struct file_struct *file, char *fname, const char *lnk,
 
 	create_name = skip_atomic ? fname : tmpname;
 
-	if (lnk) {
+	if (slnk) {
 #ifdef SUPPORT_LINKS
-		if (S_ISLNK(file->mode)
-#ifdef SUPPORT_HARD_LINKS /* The first symlink in a hard-linked cluster is always created. */
-		 && (!F_IS_HLINKED(file) || file->flags & FLAG_HLINK_FIRST)
-#endif
-		 ) {
-			if (do_symlink(lnk, create_name) < 0) {
-				rsyserr(FERROR_XFER, errno, "symlink %s -> \"%s\" failed",
-					full_fname(create_name), lnk);
-				return 0;
-			}
-		} else
-#endif
-#ifdef SUPPORT_HARD_LINKS
-		if (!hard_link_one(file, create_name, lnk, 0))
+		if (do_symlink(slnk, create_name) < 0) {
+			rsyserr(FERROR_XFER, errno, "symlink %s -> \"%s\" failed",
+				full_fname(create_name), slnk);
 			return 0;
+		}
+#else
+		return 0;
+#endif
+	} else if (hlnk) {
+#ifdef SUPPORT_HARD_LINKS
+		if (!hard_link_one(file, create_name, hlnk, 0))
+			return 0;
+#else
+		return 0;
 #endif
 	} else {
 		if (do_mknod(create_name, file->mode, rdev) < 0) {

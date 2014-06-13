@@ -948,7 +948,14 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 	memcpy(bp, basename, basename_len);
 
 #ifdef SUPPORT_HARD_LINKS
-	if (xflags & XMIT_HLINKED)
+	if (xflags & XMIT_HLINKED
+#ifndef CAN_HARDLINK_SYMLINK
+	 && !S_ISLNK(mode)
+#endif
+#ifndef CAN_HARDLINK_SPECIAL
+	 && !IS_SPECIAL(mode) && !IS_DEVICE(mode)
+#endif
+	)
 		file->flags |= FLAG_HLINKED;
 #endif
 	file->modtime = (time_t)modtime;
