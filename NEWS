@@ -107,3 +107,6 @@ Changes since 3.1.0:
   DEVELOPER RELATED:
 
     - We now include an example systemd file (in packaging/systemd).
+
+    - Tweaked configure to make sure that any intended use of the included popt
+      and/or zlib code is put early in the CFLAGS.

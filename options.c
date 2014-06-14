@@ -2500,7 +2500,7 @@ void server_options(char **args, int *argc_p)
 		argstr[x++] = 's'; /* symlink iconv translation support */
 #endif
 		argstr[x++] = 'f'; /* flist I/O-error safety support */
-		argstr[x++] = 'x'; /* xattr hardlink optimization not supported */
+		argstr[x++] = 'x'; /* xattr hardlink optimization not desired */
 	}
 
 	if (x >= (int)sizeof argstr) { /* Not possible... */
