@@ -765,7 +765,7 @@ AC_MSG_CHECKING([whether to use included libpopt])
 if test x"$with_included_popt" = x"yes"; then
     AC_MSG_RESULT($srcdir/popt)
     BUILD_POPT='$(popt_OBJS)'
-    CFLAGS="$CFLAGS -I$srcdir/popt"
+    CFLAGS="-I$srcdir/popt $CFLAGS"
     if test x"$ALLOCA" != x
     then
 	# this can be removed when/if we add an included alloca.c;
@@ -790,7 +790,7 @@ AC_MSG_CHECKING([whether to use included zlib])
 if test x"$with_included_zlib" = x"yes"; then
     AC_MSG_RESULT($srcdir/zlib)
     BUILD_ZLIB='$(zlib_OBJS)'
-    CFLAGS="$CFLAGS -I$srcdir/zlib"
+    CFLAGS="-I$srcdir/zlib $CFLAGS"
 else
     AC_DEFINE(EXTERNAL_ZLIB, 1, [Define to 1 if using external zlib])
     AC_MSG_RESULT(no)
