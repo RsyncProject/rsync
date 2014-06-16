@@ -104,6 +104,9 @@ Changes since 3.1.0:
       inc-recursive copy that is preserving directory times. e.g. using
       --omit-dir-times will avoid these early directories being created.
 
+    - Fix a bug in cmp_time() that would return a wrong result if the 2 times
+      differed by an amount greater than what a time_t can hold.
+
   DEVELOPER RELATED:
 
     - We now include an example systemd file (in packaging/systemd).
