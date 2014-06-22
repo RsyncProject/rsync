@@ -103,7 +103,10 @@ This would transfer all files matching the pattern *.c from the
 current directory to the directory src on the machine foo. If any of
 the files already exist on the remote system then the rsync
 remote-update protocol is used to update the file by sending only the
-differences. See the tech report for details.
+differences in the data.  Note that the expansion of wildcards on the
+commandline (*.c) into a list of files is handled by the shell before
+it runs rsync and not by rsync itself (exactly the same as all other
+posix-style programs).
 
 quote(tt(rsync -avz foo:src/bar /data/tmp))
 
