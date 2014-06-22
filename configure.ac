@@ -705,6 +705,7 @@ AC_CACHE_CHECK([whether link() can hard-link symlinks],rsync_cv_can_hardlink_sym
     main() {
 	unlink(FILENAME);
 	if (symlink("conftest.no-such", FILENAME) < 0) abort();
+	unlink(FILENAME "2");
 	if (link(FILENAME, FILENAME "2") < 0) exit(1);
 	exit(0);
     }],
@@ -724,6 +725,7 @@ AC_CACHE_CHECK([whether link() can hard-link special files],rsync_cv_can_hardlin
     main() {
 	unlink(FILENAME);
 	if (mkfifo(FILENAME, 0777) < 0) abort();
+	unlink(FILENAME "2");
 	if (link(FILENAME, FILENAME "2") < 0) exit(1);
 	exit(0);
     }],
