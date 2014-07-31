@@ -31,7 +31,7 @@ die "$0: Restricted directory does not exist!\n" if $subdir ne '/' && !-d $subdi
 # command="rrsync logs/client" ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAIEAzGhEeNlPr...
 # command="rrsync -ro results" ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAIEAmkHG1WCjC...
 #
-# Format of the envrionment variables set by sshd:
+# Format of the environment variables set by sshd:
 # SSH_ORIGINAL_COMMAND=rsync --server          -vlogDtpr --partial . ARG # push
 # SSH_ORIGINAL_COMMAND=rsync --server --sender -vlogDtpr --partial . ARGS # pull
 # SSH_CONNECTION=client_addr client_port server_port
