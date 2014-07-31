@@ -35,8 +35,8 @@ sub check_git_status
     my($fatal_unless_clean, $subdir) = @_;
     $subdir = '.' unless defined $subdir;
     my $status = `cd '$subdir' && git status`;
-    my $is_clean = $status =~ /\nnothing to commit \(working directory clean\)/;
-    my($cur_branch) = $status =~ /^# On branch (.+)\n/;
+    my $is_clean = $status =~ /\nnothing to commit.+working directory clean/;
+    my($cur_branch) = $status =~ /^(?:# )?On branch (.+)\n/;
     if ($fatal_unless_clean && !$is_clean) {
 	if ($subdir eq '.') {
 	    $subdir = '';

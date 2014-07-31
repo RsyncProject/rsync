@@ -39,7 +39,7 @@ if ($make_tar) {
     open(IN, '-|', 'git status') or die $!;
     my $status = join('', <IN>);
     close IN;
-    die "The checkout is not clean:\n", $status unless $status =~ /\nnothing to commit \(working directory clean\)/;
+    die "The checkout is not clean:\n", $status unless $status =~ /\nnothing to commit.+working directory clean/;
     die "The checkout is not on the master branch.\n" unless $status =~ /^# On branch master\n/;
     system "make $gen_target" and die "make $gen_target failed!\n";
 
