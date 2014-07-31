@@ -74,12 +74,12 @@ install: all
 
 install-ssl-client: rsync-ssl stunnel-rsync
 	-${MKDIR_P} ${DESTDIR}${bindir}
-	${INSTALLCMD} ${INSTALL_STRIP} -m 755 rsync-ssl ${DESTDIR}${bindir}
-	${INSTALLCMD} ${INSTALL_STRIP} -m 755 stunnel-rsync ${DESTDIR}${bindir}
+	${INSTALLCMD} -m 755 rsync-ssl ${DESTDIR}${bindir}
+	${INSTALLCMD} -m 755 stunnel-rsync ${DESTDIR}${bindir}
 
 install-ssl-daemon: stunnel-rsyncd.conf
 	-${MKDIR_P} ${DESTDIR}/etc/stunnel
-	${INSTALLCMD} ${INSTALL_STRIP} -m 644 stunnel-rsyncd.conf ${DESTDIR}/etc/stunnel/rsyncd.conf
+	${INSTALLCMD} -m 644 stunnel-rsyncd.conf ${DESTDIR}/etc/stunnel/rsyncd.conf
 	@if ! ls /etc/rsync-ssl/certs/server.* >/dev/null 2>/dev/null; then \
 	    echo "Note that you'll need to install the certificate used by /etc/stunnel/rsyncd.conf"; \
 	fi
