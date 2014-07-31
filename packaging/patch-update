@@ -23,6 +23,8 @@ my $make_gen_cmd = 'make -f prepare-source.mak conf && ./config.status && make g
 );
 &usage if $help_opt;
 
+$ENV{GIT_MERGE_AUTOEDIT} = 'no';
+
 if (defined $incl_generated_files) {
     $patches_dir = $incl_generated_files if $incl_generated_files ne '';
     $incl_generated_files = 1;
