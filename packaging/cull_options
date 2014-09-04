@@ -6,12 +6,23 @@ use strict;
 
 our %short_no_arg;
 our %short_with_num;
-our %long_opt = (
+our %long_opt = ( # These include some extra long-args that BackupPC uses:
+    'block-size' => 1,
     'daemon' => -1,
     'debug' => 1,
     'fake-super' => 0,
+    'fuzzy' => 0,
+    'group' => 0,
+    'hard-links' => 0,
+    'ignore-times' => 0,
     'info' => 1,
+    'links' => 0,
     'log-file' => 3,
+    'one-file-system' => 0,
+    'owner' => 0,
+    'perms' => 0,
+    'recursive' => 0,
+    'times' => 0,
 );
 our $last_long_opt;
 

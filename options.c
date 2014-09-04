@@ -2480,9 +2480,11 @@ void server_options(char **args, int *argc_p)
 	 * but checking the pre-negotiated value allows the user to use a
 	 * --protocol=29 override to avoid the use of this -eFLAGS opt. */
 	if (protocol_version >= 30) {
+		/* Use "eFlags" alias so that cull_options doesn't think that these are no-arg option letters. */
+#define eFlags argstr
 		/* We make use of the -e option to let the server know about
 		 * any pre-release protocol version && some behavior flags. */
-		argstr[x++] = 'e';
+		eFlags[x++] = 'e';
 #if SUBPROTOCOL_VERSION != 0
 		if (protocol_version == PROTOCOL_VERSION) {
 			x += snprintf(argstr+x, sizeof argstr - x,
@@ -2490,17 +2492,18 @@ void server_options(char **args, int *argc_p)
 				      PROTOCOL_VERSION, SUBPROTOCOL_VERSION);
 		} else
 #endif
-			argstr[x++] = '.';
+			eFlags[x++] = '.';
 		if (allow_inc_recurse)
-			argstr[x++] = 'i';
+			eFlags[x++] = 'i';
 #ifdef CAN_SET_SYMLINK_TIMES
-		argstr[x++] = 'L'; /* symlink time-setting support */
+		eFlags[x++] = 'L'; /* symlink time-setting support */
 #endif
 #ifdef ICONV_OPTION
-		argstr[x++] = 's'; /* symlink iconv translation support */
+		eFlags[x++] = 's'; /* symlink iconv translation support */
 #endif
-		argstr[x++] = 'f'; /* flist I/O-error safety support */
-		argstr[x++] = 'x'; /* xattr hardlink optimization not desired */
+		eFlags[x++] = 'f'; /* flist I/O-error safety support */
+		eFlags[x++] = 'x'; /* xattr hardlink optimization not desired */
+#undef eFlags
 	}
 
 	if (x >= (int)sizeof argstr) { /* Not possible... */
