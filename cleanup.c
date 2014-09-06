@@ -22,6 +22,7 @@
 
 #include "rsync.h"
 
+extern int dry_run;
 extern int am_server;
 extern int am_daemon;
 extern int am_receiver;
@@ -232,8 +233,9 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 		if (DEBUG_GTE(EXIT, 1)) {
 			rprintf(FINFO,
 				"[%s] _exit_cleanup(code=%d, file=%s, line=%d): "
-				"about to call exit(%d)\n",
-				who_am_i(), first_code, exit_file, exit_line, exit_code);
+				"about to call exit(%d)%s\n",
+				who_am_i(), first_code, exit_file, exit_line, exit_code,
+				dry_run ? " (DRY RUN)" : "");
 		}
 
 		/* FALLTHROUGH */
