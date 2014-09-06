@@ -1,3 +1,119 @@
+NEWS for rsync 3.1.1 (22 Jun 2014)
+Protocol: 31 (unchanged)
+Changes since 3.1.0:
+
+  BUG FIXES:
+
+    - If the receiver gets bogus filenames from the sender (an unexpected
+      leading slash or a ".." infix dir), exit with an error.  This prevents a
+      malicious sender from trying to inject filenames that would affect an
+      area outside the destination directories.
+
+    - Fixed a failure to remove the partial-transfer temp file when interrupted
+      (and rsync is not saving the partial files).
+
+    - Changed the chown/group/xattr-set order to avoid losing some security-
+      related xattr info (that would get cleared by a chown).
+
+    - Fixed a bug in the xattr-finding code that could make a non-root-run
+      receiver not able to find some xattr numbers.
+
+    - Fixed a bug in the early daemon protocol where a timeout failed to be
+      honored (e.g. if the remote side fails to send us the initial protocol
+      greeting).
+
+    - Fixed unintended inclusion of commas in file numbers in the daemon log.
+
+    - We once again send the 'f' sub-flag (of -e) to the server side so it
+      knows that we can handle incremental-recursion directory errors properly
+      in older protocols.
+
+    - Fixed an issue with too-aggressive keep-alive messages causing a problem
+      for older rsync versions early in the transfer.
+
+    - Fixed an incorrect message about backup-directory-creation when using
+      --dry-run and the backup dir is not an absolute path.
+
+    - Fixed a bug where a failed deletion and/or a failed sender-side removal
+      would not affect the exit code.
+
+    - Fixed a bug that caused a failure when combining --delete-missing-args
+      with --xattrs and/or --acls.
+
+    - Fixed a strange dir_depth assertion error that was caused by empty-dir
+      removals and/or duplicate files in the transfer.
+
+    - Fixed a problem with --info=progress2's output stats where rsync would
+      only update the stats at the end of each file's transfer.  It now uses
+      the data that is flowing for the current file, making the stats more
+      accurate and less jumpy.
+
+    - Fixed an itemize bug that affected the combo of --link-dest, -X, and -n.
+
+    - Fixed a problem with delete messages not appearing in the log file when
+      the user didn't use --verbose.
+
+    - Improve chunked xattr reading for OS X.
+
+    - Removed an attempted hard-link xattr optimization that was causing a
+      transfer failure.  This removal is flagged in the compatibility code, so
+      if a better fix can be discovered, we have a way to flip it on again.
+
+    - Fixed a bug when the receiver is not configured to be able to hard link
+      symlimks/devices/special-file items but the sender sent some of these
+      items flagged as hard-linked.
+
+    - We now generate a better error if the buffer overflows in do_mknod().
+
+    - Fixed a problem reading more than 16 ACLs on some OSes.
+
+    - Fixed the reading of the secrets file to avoid an infinite wait when
+      the username is missing.
+
+    - Fixed a parsing problem in the --usermap/--groupmap options when using
+      MIN-MAX numbers.
+
+    - Switched Cygwin back to using socketpair "pipes" to try to speed it up.
+
+    - Added knowledge of a few new options to rrsync.
+
+  ENHANCEMENTS:
+
+    - Tweaked the temp-file naming when --temp-dir=DIR is used: the temp-file
+      names will not get a '.' prepended.
+
+    - Added support for a new-compression idiom that does not compress all the
+      matching data in a transfer.  This can help rsync to use less cpu when a
+      transfer has a lot of matching data, and also makes rsync compatible with
+      a non-bundled zlib.  See the --new-compress and --old-compress options in
+      the manpage.
+
+    - Added the support/rsync-no-vanished wrapper script.
+
+    - Made configure more prominently mention when we failed to find yodl (in
+      case the user wants to be able to generate manpages from *.yo files).
+
+    - Have manpage mention how a daemon's max-verbosity setting affects info
+      and debug options.  Also added more clarification on backslash removals
+      for excludes that contain wildcards.
+
+    - Have configure check if for the attr lib (for getxattr) for those systems
+      that need to link against it explicitly.
+
+    - Change the early dir-creation logic to only use that idiom in an
+      inc-recursive copy that is preserving directory times. e.g. using
+      --omit-dir-times will avoid these early directories being created.
+
+    - Fix a bug in cmp_time() that would return a wrong result if the 2 times
+      differed by an amount greater than what a time_t can hold.
+
+  DEVELOPER RELATED:
+
+    - We now include an example systemd file (in packaging/systemd).
+
+    - Tweaked configure to make sure that any intended use of the included popt
+      and/or zlib code is put early in the CFLAGS.
+
 NEWS for rsync 3.1.0 (28 Sep 2013)
 Protocol: 31 (changed)
 Changes since 3.0.9:
