@@ -2449,7 +2449,7 @@ transfer that may be interrupted.
 
 There is also a bf(--info=progress2) option that outputs statistics based
 on the whole transfer, rather than individual files.  Use this flag without
-outputting a filename (e.g. avoid bf(-v) or specify bf(--info=name0) if you
+outputting a filename (e.g. avoid bf(-v) or specify bf(--info=name0)) if you
 want to see how the transfer is doing without scrolling the screen with a
 lot of names.  (You don't need to specify the bf(--progress) option in
 order to use bf(--info=progress2).)
