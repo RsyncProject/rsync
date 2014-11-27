@@ -9,7 +9,9 @@ Changes since 3.1.1:
   ENHANCEMENTS:
 
     - Added "(DRY RUN)" info to the --debug=exit output line.
-    - Added a few extra long options to rrsync script, which will make BackupPC happier.
+    - Use usleep() for our msleep() function if it is available.
+    - Added a few extra long-option names to rrsync script, which will make
+      BackupPC happier.
 
   DEVELOPER RELATED:
 
