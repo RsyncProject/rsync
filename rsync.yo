@@ -864,6 +864,11 @@ Implies bf(--inplace),
 but does not conflict with bf(--sparse) (since it is always extending a
 file's length).
 
+The use of bf(--append) can be dangerous if you aren't 100% sure that the files
+that are longer have only grown by the appending of data onto the end.  You
+should thus use include/exclude/filter rules to ensure that such a transfer is
+only affecting files that you know to be growing via appended data.
+
 dit(bf(--append-verify)) This works just like the bf(--append) option, but
 the existing data on the receiving side is included in the full-file
 checksum verification step, which will cause a file to be resent if the
