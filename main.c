@@ -1009,7 +1009,7 @@ static void do_server_recv(int f_in, int f_out, int argc, char *argv[])
 		filesfrom_fd = -1;
 	}
 
-	flist = recv_file_list(f_in);
+	flist = recv_file_list(f_in, -1);
 	if (!flist) {
 		rprintf(FERROR,"server_recv: recv_file_list error\n");
 		exit_cleanup(RERR_FILESELECT);
@@ -1183,7 +1183,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 
 	if (write_batch && !am_server)
 		start_write_batch(f_in);
-	flist = recv_file_list(f_in);
+	flist = recv_file_list(f_in, -1);
 	if (inc_recurse && file_total == 1)
 		recv_additional_file_list(f_in);
 

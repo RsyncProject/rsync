@@ -1685,7 +1685,7 @@ void wait_for_receiver(void)
 				rprintf(FINFO, "[%s] receiving flist for dir %d\n",
 					who_am_i(), ndx);
 			}
-			flist = recv_file_list(iobuf.in_fd);
+			flist = recv_file_list(iobuf.in_fd, ndx);
 			flist->parent_ndx = ndx;
 #ifdef SUPPORT_HARD_LINKS
 			if (preserve_hard_links)

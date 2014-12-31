@@ -364,7 +364,7 @@ int read_ndx_and_attrs(int f_in, int f_out, int *iflag_ptr, uchar *type_ptr,
 		}
 		/* Send all the data we read for this flist to the generator. */
 		start_flist_forward(ndx);
-		flist = recv_file_list(f_in);
+		flist = recv_file_list(f_in, ndx);
 		flist->parent_ndx = ndx;
 		stop_flist_forward();
 	}

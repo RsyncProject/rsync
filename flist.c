@@ -2435,8 +2435,9 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	return flist;
 }
 
-struct file_list *recv_file_list(int f)
+struct file_list *recv_file_list(int f, int dir_ndx)
 {
+	const char *good_dirname = NULL;
 	struct file_list *flist;
 	int dstart, flags;
 	int64 start_read;
@@ -2491,6 +2492,23 @@ struct file_list *recv_file_list(int f)
 
 		flist_expand(flist, 1);
 		file = recv_file_entry(f, flist, flags);
+
+		if (inc_recurse) {
+			static const char empty_dir[] = "\0";
+			const char *cur_dir = file->dirname ? file->dirname : empty_dir;
+			if (relative_paths && *cur_dir == '/')
+				cur_dir++;
+			if (cur_dir != good_dirname) {
+				const char *d = dir_ndx >= 0 ? f_name(dir_flist->files[dir_ndx], NULL) : empty_dir;
+				if (strcmp(cur_dir, d) != 0) {
+					rprintf(FERROR,
+						"ABORTING due to invalid dir prefix from sender: %s (should be: %s)\n",
+						cur_dir, d);
+					exit_cleanup(RERR_PROTOCOL);
+				}
+				good_dirname = cur_dir;
+			}
+		}
 
 		if (S_ISREG(file->mode)) {
 			/* Already counted */
@@ -2615,7 +2633,7 @@ void recv_additional_file_list(int f)
 			rprintf(FINFO, "[%s] receiving flist for dir %d\n",
 				who_am_i(), ndx);
 		}
-		flist = recv_file_list(f);
+		flist = recv_file_list(f, ndx);
 		flist->parent_ndx = ndx;
 	}
 }
