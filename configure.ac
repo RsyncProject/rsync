@@ -524,9 +524,9 @@ if test x"$rsync_cv_HAVE_GETADDR_DEFINES" = x"yes" -a x"$ac_cv_type_struct_addri
 			AC_DEFINE(HAVE_GETADDRINFO, 1,
 				[Define to 1 if you have the "getaddrinfo" function and required types.])],
 			[AC_MSG_RESULT([no])
-			AC_LIBOBJ(getaddrinfo)])])
+			AC_LIBOBJ([getaddrinfo])])])
 else
-	AC_LIBOBJ(getaddrinfo)
+	AC_LIBOBJ([getaddrinfo])
 fi
 
 AC_CHECK_MEMBER([struct sockaddr.sa_len],
