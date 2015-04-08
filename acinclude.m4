@@ -2,7 +2,7 @@ dnl AC_VALIDATE_CACHE_SYSTEM_TYPE[(cmd)]
 dnl if the cache file is inconsistent with the current host,
 dnl target and build system types, execute CMD or print a default
 dnl error message.
-AC_DEFUN(AC_VALIDATE_CACHE_SYSTEM_TYPE, [
+AC_DEFUN([AC_VALIDATE_CACHE_SYSTEM_TYPE], [
     AC_REQUIRE([AC_CANONICAL_SYSTEM])
     AC_MSG_CHECKING([config.cache system type])
     if { test x"${ac_cv_host_system_type+set}" = x"set" &&
