@@ -47,6 +47,7 @@ AC_PROG_INSTALL
 AC_PROG_MKDIR_P
 AC_PROG_CC_STDC
 AC_SUBST(SHELL)
+AC_PATH_PROG([PERL], [perl])
 
 AC_DEFINE([_GNU_SOURCE], 1,
           [Define _GNU_SOURCE so that we get all necessary prototypes])
