@@ -511,7 +511,7 @@ AC_CACHE_CHECK([whether defines needed by getaddrinfo exist],
 			#endif],
 			rsync_cv_HAVE_GETADDR_DEFINES=yes,
 			rsync_cv_HAVE_GETADDR_DEFINES=no)])
-if test x"$rsync_cv_HAVE_GETADDR_DEFINES" = x"yes" -a x"$ac_cv_type_struct_addrinfo" = x"yes"; then
+AS_IF([test x"$rsync_cv_HAVE_GETADDR_DEFINES" = x"yes" -a x"$ac_cv_type_struct_addrinfo" = x"yes"],[
 	# Tru64 UNIX has getaddrinfo() but has it renamed in libc as
 	# something else so we must include <netdb.h> to get the
 	# redefinition.
@@ -525,9 +525,7 @@ if test x"$rsync_cv_HAVE_GETADDR_DEFINES" = x"yes" -a x"$ac_cv_type_struct_addri
 				[Define to 1 if you have the "getaddrinfo" function and required types.])],
 			[AC_MSG_RESULT([no])
 			AC_LIBOBJ([getaddrinfo])])])
-else
-	AC_LIBOBJ([getaddrinfo])
-fi
+    ],[AC_LIBOBJ([getaddrinfo])])
 
 AC_CHECK_MEMBER([struct sockaddr.sa_len],
 		[ AC_DEFINE(HAVE_SOCKADDR_LEN, 1, [Do we have sockaddr.sa_len?]) ],
