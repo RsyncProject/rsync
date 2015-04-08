@@ -17,6 +17,10 @@ LDFLAGS=${LDFLAGS-""}
 
 AC_CANONICAL_HOST
 
+dnl define the directory for replacement function since AC_LIBOBJ does not
+dnl officially support subdirs and fails with automake
+AC_CONFIG_LIBOBJ_DIR([lib])
+
 # We must decide this before testing the compiler.
 
 # Please allow this to default to yes, so that your users have more
@@ -488,8 +492,7 @@ AC_DEFINE_UNQUOTED(ICONV_CONST, $am_cv_proto_iconv_arg1,
 
 dnl AC_MSG_NOTICE([Looking in libraries: $LIBS])
 
-AC_CHECK_FUNCS(inet_ntop, , [AC_LIBOBJ(lib/inet_ntop)])
-AC_CHECK_FUNCS(inet_pton, , [AC_LIBOBJ(lib/inet_pton)])
+AC_REPLACE_FUNCS([inet_ntop inet_pton])
 
 AC_HAVE_TYPE([struct addrinfo], [#include <netdb.h>])
 AC_HAVE_TYPE([struct sockaddr_storage], [#include <sys/types.h>
@@ -521,9 +524,9 @@ if test x"$rsync_cv_HAVE_GETADDR_DEFINES" = x"yes" -a x"$ac_cv_type_struct_addri
 			AC_DEFINE(HAVE_GETADDRINFO, 1,
 				[Define to 1 if you have the "getaddrinfo" function and required types.])],
 			[AC_MSG_RESULT([no])
-			AC_LIBOBJ(lib/getaddrinfo)])])
+			AC_LIBOBJ(getaddrinfo)])])
 else
-	AC_LIBOBJ(lib/getaddrinfo)
+	AC_LIBOBJ(getaddrinfo)
 fi
 
 AC_CHECK_MEMBER([struct sockaddr.sa_len],
@@ -750,7 +753,7 @@ if test x"$rsync_cv_HAVE_SOCKETPAIR" = x"yes"; then
     AC_DEFINE(HAVE_SOCKETPAIR, 1, [Define to 1 if you have the "socketpair" function])
 fi
 
-AC_CHECK_FUNCS(getpass, , [AC_LIBOBJ(lib/getpass)])
+AC_REPLACE_FUNCS([getpass])
 
 if test x"$with_included_popt" != x"yes"; then
     AC_CHECK_LIB(popt, poptGetContext, , [with_included_popt=yes])
