@@ -12,6 +12,7 @@ config.h.in
 config.h.in.old
 config.log
 config.status
+aclocal.m4
 /proto.h
 /proto.h-tstamp
 /rsync.1
