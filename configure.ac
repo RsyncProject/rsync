@@ -1,17 +1,16 @@
 dnl Process this file with autoconf to produce a configure script.
 
-AC_INIT()
+AC_INIT([rsync], [3.1.2dev], [http://rsync.samba.org/bugzilla.html])
 
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([byteorder.h])
 AC_CONFIG_HEADER(config.h)
 AC_PREREQ(2.60)
 
-RSYNC_VERSION=3.1.2dev
-AC_SUBST(RSYNC_VERSION)
-AC_MSG_NOTICE([Configuring rsync $RSYNC_VERSION])
+AC_SUBST(RSYNC_VERSION, $PACKAGE_VERSION)
+AC_MSG_NOTICE([Configuring rsync $PACKAGE_VERSION])
 
-AC_DEFINE_UNQUOTED(RSYNC_VERSION, ["$RSYNC_VERSION"], [rsync release version])
+AC_DEFINE_UNQUOTED(RSYNC_VERSION, ["$PACKAGE_VERSION"], [rsync release version])
 
 LDFLAGS=${LDFLAGS-""}
 
