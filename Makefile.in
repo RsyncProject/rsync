@@ -307,17 +307,6 @@ installcheck: $(CHECK_PROGS) $(CHECK_SYMLINKS)
 splint:
 	splint +unixlib +gnuextensions -weak rsync.c
 
-
-rsync.dvi: doc/rsync.texinfo
-	texi2dvi -o $@ $<
-
-rsync.ps: rsync.dvi
-	dvips -ta4 -o $@ $<
-
-rsync.pdf: doc/rsync.texinfo
-	texi2dvi -o $@ --pdf $<
-
-
 doxygen:
 	cd $(srcdir) && rm dox/html/* && doxygen
 
