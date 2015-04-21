@@ -2283,7 +2283,7 @@ void io_printf(int fd, const char *format, ...)
 	if (len < 0)
 		exit_cleanup(RERR_PROTOCOL);
 
-	if (len > (int)sizeof buf) {
+	if (len >= (int)sizeof buf) {
 		rprintf(FERROR, "io_printf() was too long for the buffer.\n");
 		exit_cleanup(RERR_PROTOCOL);
 	}
