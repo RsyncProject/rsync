@@ -27,9 +27,9 @@ for action in "${@}"; do
 	;;
     fetch)
 	if perl --version >/dev/null 2>/dev/null; then
-	    files='c*'
+	    files='[ca]*'
 	else
-	    files='[cp]*'
+	    files='[cap]*'
 	fi
 	rsync -pvz rsync://rsync.samba.org/rsyncftp/generated-files/"$files" .
 	;;
