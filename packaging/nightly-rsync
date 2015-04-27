@@ -59,13 +59,13 @@ if ($make_tar) {
     my $confversion;
     open(IN, '<', 'configure.ac') or die "Unable to open configure.ac: $!\n";
     while (<IN>) {
-	if (/^RSYNC_VERSION=(.*)/) {
+	if (/^AC_INIT\(\[rsync\],\s+\[(\d.+?)\]/) {
 	    $confversion = $1;
 	    last;
 	}
     }
     close IN;
-    die "Unable to find RSYNC_VERSION in configure.ac\n" unless defined $confversion;
+    die "Unable to find AC_INIT with version in configure.ac\n" unless defined $confversion;
 
     open(IN, '<', 'OLDNEWS') or die "Unable to open OLDNEWS: $!\n";
     $_ = <IN>;
