@@ -1,7 +1,7 @@
 conf: configure.sh config.h.in
 
 aclocal.m4:
-	aclocal
+	aclocal -I m4
 
 configure.sh: configure.ac aclocal.m4
 	autoconf -o configure.sh

@@ -145,7 +145,7 @@ conf:
 	cd $(srcdir) && $(MAKE) -f prepare-source.mak conf
 
 aclocal.m4: m4/*.m4
-	aclocal
+	aclocal -I $(srcdir)/m4
 
 configure.sh config.h.in: configure.ac aclocal.m4
 	@if test -f configure.sh; then cp -p configure.sh configure.sh.old; else touch configure.sh.old; fi
