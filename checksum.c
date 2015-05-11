@@ -23,6 +23,7 @@
 
 extern int checksum_seed;
 extern int protocol_version;
+extern int proper_seed_order;
 
 /*
   a simple 32 bit checksum that can be upadted from either end
@@ -54,10 +55,18 @@ void get_checksum2(char *buf, int32 len, char *sum)
 	if (protocol_version >= 30) {
 		uchar seedbuf[4];
 		md5_begin(&m);
-		md5_update(&m, (uchar *)buf, len);
-		if (checksum_seed) {
-			SIVALu(seedbuf, 0, checksum_seed);
-			md5_update(&m, seedbuf, 4);
+		if (proper_seed_order) {
+			if (checksum_seed) {
+				SIVALu(seedbuf, 0, checksum_seed);
+				md5_update(&m, seedbuf, 4);
+			}
+			md5_update(&m, (uchar *)buf, len);
+		} else {
+			md5_update(&m, (uchar *)buf, len);
+			if (checksum_seed) {
+				SIVALu(seedbuf, 0, checksum_seed);
+				md5_update(&m, seedbuf, 4);
+			}
 		}
 		md5_result(&m, (uchar *)sum);
 	} else {

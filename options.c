@@ -2503,6 +2503,7 @@ void server_options(char **args, int *argc_p)
 #endif
 		eFlags[x++] = 'f'; /* flist I/O-error safety support */
 		eFlags[x++] = 'x'; /* xattr hardlink optimization not desired */
+		eFlags[x++] = 'C'; /* support checksum seed order fix */
 #undef eFlags
 	}
 
