@@ -333,7 +333,7 @@ void setup_protocol(int f_out,int f_in)
 
 	if (am_server) {
 		if (!checksum_seed)
-			checksum_seed = time(NULL);
+			checksum_seed = time(NULL) ^ (getpid() << 6);
 		write_int(f_out, checksum_seed);
 	} else {
 		checksum_seed = read_int(f_in);
