@@ -27,7 +27,7 @@ mkdir "$fromdir"
 name1="$fromdir/name1"
 name2="$fromdir/name2"
 echo "This is the file" > "$name1"
-ln -s "$name1" "$name2" || fail "can't create symlink"
+ln -s "$name1" "$name2" || test_fail "can't create symlink"
 
 outfile="$scratchdir/rsync.out"
 

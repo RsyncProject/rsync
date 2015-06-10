@@ -29,8 +29,8 @@ name3="$fromdir/name3"
 name4="$fromdir/name4"
 echo "This is the file" > "$name1"
 ln "$name1" "$name2" || test_skipped "Can't create hardlink"
-ln "$name2" "$name3" || fail "Can't create hardlink"
-cp "$name2" "$name4" || fail "Can't copy file"
+ln "$name2" "$name3" || test_fail "Can't create hardlink"
+cp "$name2" "$name4" || test_fail "Can't copy file"
 cat $srcdir/*.c >"$fromdir/text"
 
 checkit "$RSYNC -aHivv --debug=HLINK5 '$fromdir/' '$todir/'" "$fromdir" "$todir"
@@ -67,7 +67,7 @@ checkit "$RSYNC -aHivv --debug=HLINK5 --copy-dest='$todir' '$fromdir/' '$chkdir/
 
 # Create a hard link that has only one part in the hierarchy.
 echo "This is another file" >"$fromdir/solo"
-ln "$fromdir/solo" "$chkdir/solo" || fail "Can't create hardlink"
+ln "$fromdir/solo" "$chkdir/solo" || test_fail "Can't create hardlink"
 
 # Make sure that the checksum data doesn't slide due to an HLINK_BUMP() change.
 $RSYNC -aHivc --debug=HLINK5 "$fromdir/" "$chkdir/" | tee "$outfile"

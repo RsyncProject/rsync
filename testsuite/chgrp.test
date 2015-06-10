@@ -13,14 +13,14 @@
 
 # Build some hardlinks
 
-mygrps="`rsync_getgroups`" || fail "Can't get groups"
+mygrps="`rsync_getgroups`" || test_fail "Can't get groups"
 mkdir "$fromdir"
 
 for g in $mygrps
 do
     name="$fromdir/foo-$g"
     date > "$name"
-    chgrp "$g" "$name" || fail "Can't chgrp"
+    chgrp "$g" "$name" || test_fail "Can't chgrp"
 done
 sleep 2
 
