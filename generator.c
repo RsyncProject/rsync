@@ -1177,6 +1177,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			   int itemizing, enum logcode code, int f_out)
 {
 	static const char *parent_dirname = "";
+	static struct file_struct *prior_dir_file = NULL;
 	/* Missing dir not created due to --dry-run; will still be scanned. */
 	static struct file_struct *dry_missing_dir = NULL;
 	/* Missing dir whose contents are skipped altogether due to
@@ -1256,6 +1257,18 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		const char *dn = file->dirname ? file->dirname : ".";
 		dry_missing_dir = NULL;
 		if (parent_dirname != dn && strcmp(parent_dirname, dn) != 0) {
+			/* Each parent dir must be in the file list or the flist data is bad.
+			 * Optimization: most of the time the parent dir will be the last dir
+			 * this function was asked to process in the file list. */
+			if (!inc_recurse
+			 && (*dn != '.' || dn[1]) /* Avoid an issue with --relative and the "." dir. */
+			 && (prior_dir_file && strcmp(dn, f_name(prior_dir_file, NULL)) != 0)
+			 && flist_find_name(cur_flist, dn, 1) < 0) {
+				rprintf(FERROR,
+					"ABORTING due to invalid path from sender: %s/%s\n",
+					dn, file->basename);
+				exit_cleanup(RERR_PROTOCOL);
+			}
 			if (relative_paths && !implied_dirs
 			 && do_stat(dn, &sx.st) < 0) {
 				if (dry_run)
@@ -1467,6 +1480,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			else
 				change_local_filter_dir(fname, strlen(fname), F_DEPTH(file));
 		}
+		prior_dir_file = file;
 		goto cleanup;
 	}
 

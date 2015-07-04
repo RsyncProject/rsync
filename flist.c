@@ -2502,8 +2502,8 @@ struct file_list *recv_file_list(int f, int dir_ndx)
 				const char *d = dir_ndx >= 0 ? f_name(dir_flist->files[dir_ndx], NULL) : empty_dir;
 				if (strcmp(cur_dir, d) != 0) {
 					rprintf(FERROR,
-						"ABORTING due to invalid dir prefix from sender: %s (should be: %s)\n",
-						cur_dir, d);
+						"ABORTING due to invalid path from sender: %s/%s\n",
+						cur_dir, file->basename);
 					exit_cleanup(RERR_PROTOCOL);
 				}
 				good_dirname = cur_dir;
@@ -2687,6 +2687,34 @@ int flist_find(struct file_list *flist, struct file_struct *f)
 			high = mid - 1;
 	}
 	return -1;
+}
+
+/* Search for a name in the file list.  You must specify want_dir_match as:
+ * 1=match directories, 0=match non-directories, or -1=match either. */
+int flist_find_name(struct file_list *flist, const char *fname, int want_dir_match)
+{
+	struct { /* We have to create a temporary file_struct for the search. */
+		struct file_struct f;
+		char name_space[MAXPATHLEN];
+	} t;
+	char fbuf[MAXPATHLEN];
+	const char *slash = strrchr(fname, '/');
+	const char *basename = slash ? slash+1 : fname;
+
+	memset(&t.f, 0, FILE_STRUCT_LEN);
+	memcpy((void *)t.f.basename, basename, strlen(basename)+1);
+
+	if (slash) {
+		strlcpy(fbuf, fname, slash - fname + 1);
+		t.f.dirname = fbuf;
+	} else
+		t.f.dirname = NULL;
+
+	t.f.mode = want_dir_match > 0 ? S_IFDIR : S_IFREG;
+
+	if (want_dir_match < 0)
+		return flist_find_ignore_dirness(flist, &t.f);
+	return flist_find(flist, &t.f);
 }
 
 /* Search for an identically-named item in the file list.  Differs from
