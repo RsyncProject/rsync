@@ -67,7 +67,7 @@ check_git_state($master_branch, 1, 1);
 my $confversion;
 open(IN, '<', 'configure.ac') or die $!;
 while (<IN>) {
-    if (/^AC_INIT\(\[rsync\],\s+\[(\d.+?)\]/) {
+    if (/^AC_INIT\(\[rsync\],\s*\[(\d.+?)\]/) {
 	$confversion = $1;
 	last;
     }
@@ -202,7 +202,7 @@ foreach my $fn (@tweak_files) {
     undef $/; $_ = <IN>; $/ = "\n";
     close IN;
     if ($fn =~ /configure/) {
-	s/^(AC_INIT\(\[rsync\],\s+\[)\d.+?(\])/$1$version$2/m
+	s/^(AC_INIT\(\[rsync\],\s*\[)\d.+?(\])/$1$version$2/m
 	    or die "Unable to update AC_INIT with version in $fn\n";
     } elsif ($fn =~ /\.spec/) {
 	while (my($str, $val) = each %specvars) {

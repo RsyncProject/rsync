@@ -161,7 +161,7 @@ int try_bind_local(int s, int ai_family, int ai_socktype,
 }
 
 /* connect() timeout handler based on alarm() */
-static RETSIGTYPE contimeout_handler(UNUSED(int val))
+static void contimeout_handler(UNUSED(int val))
 {
 	connect_timeout = -1;
 }
@@ -529,7 +529,7 @@ int is_a_socket(int fd)
 }
 
 
-static RETSIGTYPE sigchld_handler(UNUSED(int val))
+static void sigchld_handler(UNUSED(int val))
 {
 #ifdef WNOHANG
 	while (waitpid(-1, NULL, WNOHANG) > 0) {}

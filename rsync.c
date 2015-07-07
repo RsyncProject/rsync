@@ -605,7 +605,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 }
 
 /* This is only called for SIGINT, SIGHUP, and SIGTERM. */
-RETSIGTYPE sig_int(int sig_num)
+void sig_int(int sig_num)
 {
 	/* KLUGE: if the user hits Ctrl-C while ssh is prompting
 	 * for a password, then our cleanup's sending of a SIGUSR1
