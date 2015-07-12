@@ -74,6 +74,8 @@ manpagesection(GLOBAL PARAMETERS)
 
 The first parameters in the file (before a [module] header) are the
 global parameters.
+Rsync also allows for the use of a "[global]" module name to indicate the
+start of one or more global-parameter sections (the name must be lower case).
 
 You may also include any module parameters in the global part of the
 config file in which case the supplied value will override the
@@ -136,6 +138,8 @@ The module name cannot contain a slash or a closing square bracket.  If the
 name contains whitespace, each internal sequence of whitespace will be
 changed into a single space, while leading or trailing whitespace will be
 discarded.
+Also, the name cannot be "global" as that exact name indicates that
+global parameters follow (see above).
 
 As with GLOBAL PARAMETERS, you may use references to environment variables in
 the values of parameters.  See the GLOBAL PARAMETERS section for more details.
