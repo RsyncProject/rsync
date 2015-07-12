@@ -33,6 +33,8 @@ runtest "basic relative" 'checkit "$RSYNC -avR ./$deepstr \"$todir\"" "$chkdir" 
 
 ln $deepstr/filelist $deepstr/dir
 ln ../chk/$deepstr/filelist ../chk/$deepstr/dir
+# Work around time rounding/truncating issue by touching both dirs.
+touch -r $deepstr/dir $deepstr/dir ../chk/$deepstr/dir
 runtest "hard links" 'checkit "$RSYNC -avHR ./$deepstr/ \"$todir\"" "$chkdir" "$todir"'
 
 cp "$deepdir/text" "$todir/$deepstr/ThisShouldGo"
