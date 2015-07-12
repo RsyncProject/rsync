@@ -571,7 +571,9 @@ directly to stderr rather than to send messages to the client side via the
 protocol (which normally outputs info messages via stdout).  This is mainly
 intended for debugging in order to avoid changing the data sent via the
 protocol, since the extra protocol data can change what is being tested.
-Keep in mind that a daemon connection does not have a stderr channel to send
+The option does not affect the remote side of a transfer without using
+bf(--remote-option) -- e.g. bf(-M--msgs2stderr).
+Also keep in mind that a daemon connection does not have a stderr channel to send
 messages back to the client side, so if you are doing any daemon-transfer
 debugging using this option, you should start up a daemon using bf(--no-detach)
 so that you can see the stderr output on the daemon side.
