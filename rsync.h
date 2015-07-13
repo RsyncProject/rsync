@@ -892,7 +892,6 @@ typedef struct filter_struct {
 typedef struct filter_list_struct {
 	filter_rule *head;
 	filter_rule *tail;
-	filter_rule *parent_dirscan_head;
 	char *debug_type;
 } filter_rule_list;
 

@@ -100,52 +100,44 @@ static int mergelist_size = 0;
 
 static void teardown_mergelist(filter_rule *ex)
 {
+	int j;
+
+	if (!ex->u.mergelist)
+		return;
+
 	if (DEBUG_GTE(FILTER, 2)) {
 		rprintf(FINFO, "[%s] deactivating mergelist #%d%s\n",
 			who_am_i(), mergelist_cnt - 1,
 			ex->u.mergelist->debug_type);
 	}
 
-	/* We should deactivate mergelists in LIFO order. */
-	assert(mergelist_cnt > 0);
-	assert(ex == mergelist_parents[mergelist_cnt - 1]);
-
-	/* The parent_dirscan filters should have been freed. */
-	assert(ex->u.mergelist->parent_dirscan_head == NULL);
-
 	free(ex->u.mergelist->debug_type);
 	free(ex->u.mergelist);
-	mergelist_cnt--;
+
+	for (j = 0; j < mergelist_cnt; j++) {
+		if (mergelist_parents[j] == ex) {
+			mergelist_parents[j] = NULL;
+			break;
+		}
+	}
+	while (mergelist_cnt && mergelist_parents[mergelist_cnt-1] == NULL)
+		mergelist_cnt--;
 }
 
 static void free_filter(filter_rule *ex)
 {
+	if (ex->rflags & FILTRULE_PERDIR_MERGE)
+		teardown_mergelist(ex);
 	free(ex->pattern);
 	free(ex);
 }
 
-static void free_filters(filter_rule *head)
+static void free_filters(filter_rule *ent)
 {
-	filter_rule *rev_head = NULL;
-
-	/* Reverse the list so we deactivate mergelists in the proper LIFO
-	 * order. */
-	while (head) {
-		filter_rule *next = head->next;
-		head->next = rev_head;
-		rev_head = head;
-		head = next;
-	}
-
-	while (rev_head) {
-		filter_rule *prev = rev_head->next;
-		/* Tear down mergelists here, not in free_filter, so that we
-		 * affect only real filter lists and not temporarily allocated
-		 * filters. */
-		if (rev_head->rflags & FILTRULE_PERDIR_MERGE)
-			teardown_mergelist(rev_head);
-		free_filter(rev_head);
-		rev_head = prev;
+	while (ent) {
+		filter_rule *next = ent->next;
+		free_filter(ent);
+		ent = next;
 	}
 }
 
@@ -252,7 +244,10 @@ static void add_rule(filter_rule_list *listp, const char *pat, unsigned int pat_
 		 * add it again. */
 		for (i = 0; i < mergelist_cnt; i++) {
 			filter_rule *ex = mergelist_parents[i];
-			const char *s = strrchr(ex->pattern, '/');
+			const char *s;
+			if (!ex)
+				continue;
+			s = strrchr(ex->pattern, '/');
 			if (s)
 				s++;
 			else
@@ -264,9 +259,8 @@ static void add_rule(filter_rule_list *listp, const char *pat, unsigned int pat_
 			}
 		}
 
-		if (!(lp = new_array(filter_rule_list, 1)))
+		if (!(lp = new_array0(filter_rule_list, 1)))
 			out_of_memory("add_rule");
-		lp->head = lp->tail = lp->parent_dirscan_head = NULL;
 		if (asprintf(&lp->debug_type, " [per-dir %s]", cp) < 0)
 			out_of_memory("add_rule");
 		rule->u.mergelist = lp;
@@ -297,16 +291,23 @@ static void add_rule(filter_rule_list *listp, const char *pat, unsigned int pat_
 	}
 }
 
-static void clear_filter_list(filter_rule_list *listp)
+/* This frees any non-inherited items, leaving just inherited items on the list. */
+static void pop_filter_list(filter_rule_list *listp)
 {
-	if (listp->tail) {
-		/* Truncate any inherited items from the local list. */
-		listp->tail->next = NULL;
-		/* Now free everything that is left. */
-		free_filters(listp->head);
-	}
+	filter_rule *inherited;
 
-	listp->head = listp->tail = NULL;
+	if (!listp->tail)
+		return;
+
+	inherited = listp->tail->next;
+
+	/* Truncate any inherited items from the local list. */
+	listp->tail->next = NULL;
+	/* Now free everything that is left. */
+	free_filters(listp->head);
+
+	listp->head = inherited;
+	listp->tail = NULL;
 }
 
 /* This returns an expanded (absolute) filename for the merge-file name if
@@ -457,8 +458,6 @@ static BOOL setup_merge_file(int mergelist_num, filter_rule *ex,
 		strlcpy(y, save, MAXPATHLEN);
 		while ((*x++ = *y++) != '/') {}
 	}
-	/* Save current head for freeing when the mergelist becomes inactive. */
-	lp->parent_dirscan_head = lp->head;
 	parent_dirscan = False;
 	if (DEBUG_GTE(FILTER, 2)) {
 		rprintf(FINFO, "[%s] completed parent_dirscan for mergelist #%d%s\n",
@@ -501,15 +500,20 @@ void *push_local_filters(const char *dir, unsigned int dirlen)
 
 	push->mergelist_cnt = mergelist_cnt;
 	for (i = 0; i < mergelist_cnt; i++) {
-		memcpy(&push->mergelists[i], mergelist_parents[i]->u.mergelist,
-		       sizeof (filter_rule_list));
+		filter_rule *ex = mergelist_parents[i];
+		if (!ex)
+			continue;
+		memcpy(&push->mergelists[i], ex->u.mergelist, sizeof (filter_rule_list));
 	}
 
 	/* Note: parse_filter_file() might increase mergelist_cnt, so keep
 	 * this loop separate from the above loop. */
 	for (i = 0; i < mergelist_cnt; i++) {
 		filter_rule *ex = mergelist_parents[i];
-		filter_rule_list *lp = ex->u.mergelist;
+		filter_rule_list *lp;
+		if (!ex)
+			continue;
+		lp = ex->u.mergelist;
 
 		if (DEBUG_GTE(FILTER, 2)) {
 			rprintf(FINFO, "[%s] pushing mergelist #%d%s\n",
@@ -553,44 +557,38 @@ void pop_local_filters(void *mem)
 
 	for (i = mergelist_cnt; i-- > 0; ) {
 		filter_rule *ex = mergelist_parents[i];
-		filter_rule_list *lp = ex->u.mergelist;
+		filter_rule_list *lp;
+		if (!ex)
+			continue;
+		lp = ex->u.mergelist;
 
 		if (DEBUG_GTE(FILTER, 2)) {
 			rprintf(FINFO, "[%s] popping mergelist #%d%s\n",
 				who_am_i(), i, lp->debug_type);
 		}
 
-		clear_filter_list(lp);
-
-		if (i >= old_mergelist_cnt) {
-			/* This mergelist does not exist in the state to be
-			 * restored.  Free its parent_dirscan list to clean up
-			 * any per-dir mergelists defined there so we don't
-			 * crash trying to restore nonexistent state for them
-			 * below.  (Counterpart to setup_merge_file call in
-			 * push_local_filters.  Must be done here, not in
-			 * free_filter, for LIFO order.) */
+		pop_filter_list(lp);
+		if (i >= old_mergelist_cnt && lp->head) {
+			/* This mergelist does not exist in the state to be restored, but it
+			 * still has inherited rules.  This can sometimes happen if a per-dir
+			 * merge file calls setup_merge_file() in push_local_filters() and that
+			 * leaves some inherited rules that aren't in the pushed list state. */
 			if (DEBUG_GTE(FILTER, 2)) {
 				rprintf(FINFO, "[%s] freeing parent_dirscan filters of mergelist #%d%s\n",
 					who_am_i(), i, ex->u.mergelist->debug_type);
 			}
-			free_filters(lp->parent_dirscan_head);
-			lp->parent_dirscan_head = NULL;
+			pop_filter_list(lp);
 		}
 	}
 
-	/* If we cleaned things up properly, the only still-active mergelists
-	 * should be those with a state to be restored. */
-	assert(mergelist_cnt == old_mergelist_cnt);
+	if (!pop)
+		return; /* No state to restore. */
 
-	if (!pop) {
-		/* No state to restore. */
-		return;
-	}
-
-	for (i = 0; i < mergelist_cnt; i++) {
-		memcpy(mergelist_parents[i]->u.mergelist, &pop->mergelists[i],
-		       sizeof (filter_rule_list));
+	for (i = 0; i < old_mergelist_cnt; i++) {
+		filter_rule *ex = mergelist_parents[i];
+		if (!ex)
+			continue;
+		memcpy(ex->u.mergelist, &pop->mergelists[i], sizeof (filter_rule_list));
 	}
 
 	free(pop);
@@ -872,7 +870,7 @@ static filter_rule *parse_rule_tok(const char **rulestr_ptr,
 		switch (ch) {
 		case ':':
 			rule->rflags |= FILTRULE_PERDIR_MERGE
-				       | FILTRULE_FINISH_SETUP;
+				      | FILTRULE_FINISH_SETUP;
 			/* FALL THROUGH */
 		case '.':
 			rule->rflags |= FILTRULE_MERGE_FILE;
@@ -1093,7 +1091,8 @@ void parse_filter_str(filter_rule_list *listp, const char *rulestr,
 					"[%s] clearing filter list%s\n",
 					who_am_i(), listp->debug_type);
 			}
-			clear_filter_list(listp);
+			pop_filter_list(listp);
+			listp->head = NULL;
 			goto free_continue;
 		}
 
