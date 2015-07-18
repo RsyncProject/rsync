@@ -16,6 +16,7 @@ use Date::Format;
 
 # Where the local copy of /home/ftp/pub/rsync/dev/nightly should be updated.
 our $dest = $ENV{HOME} . '/samba-rsync-ftp/dev/nightly';
+our $samba_host = $ENV{SAMBA_HOST} || 'samba.org';
 our $nightly_symlink = "$dest/rsync-HEAD.tar.gz";
 
 our($make_tar, $upload, $help_opt);
@@ -156,7 +157,7 @@ if ($upload) {
     if (defined $ENV{RSYNC_PARTIAL_DIR}) {
 	$opt = " -f 'R $ENV{RSYNC_PARTIAL_DIR}'";
     }
-    system "rsync$opt -aviHP --delete-after . samba.org:/home/ftp/pub/rsync/dev/nightly";
+    system "rsync$opt -aviHP --delete-after . $samba_host\:/home/ftp/pub/rsync/dev/nightly";
 }
 
 exit;

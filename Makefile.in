@@ -139,7 +139,7 @@ t_unsafe$(EXEEXT): $(T_UNSAFE_OBJ)
 gen: conf proto.h man
 
 gensend: gen
-	rsync -aivzc $(GENFILES) samba.org:/home/ftp/pub/rsync/generated-files/
+	rsync -aivzc $(GENFILES) $${SAMBA_HOST-samba.org}:/home/ftp/pub/rsync/generated-files/
 
 conf:
 	cd $(srcdir) && $(MAKE) -f prepare-source.mak conf
@@ -313,4 +313,4 @@ doxygen:
 # for maintainers only
 doxygen-upload:
 	rsync -avzv $(srcdir)/dox/html/ --delete \
-	samba.org:/home/httpd/html/rsync/doxygen/head/
+	$${SAMBA_HOST-samba.org}:/home/httpd/html/rsync/doxygen/head/
