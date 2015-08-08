@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007-2014 Wayne Davison
+ * Copyright (C) 2007-2015 Wayne Davison
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

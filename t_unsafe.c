@@ -2,7 +2,7 @@
  * Test harness for unsafe_symlink().  Not linked into rsync itself.
  *
  * Copyright (C) 2002 Martin Pool
- * Copyright (C) 2003-2014 Wayne Davison
+ * Copyright (C) 2003-2015 Wayne Davison
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

@@ -17,7 +17,7 @@
  * and Karl Auer.  Some of the changes are:
  *
  * Copyright (C) 2001, 2002 Martin Pool <mbp@samba.org>
- * Copyright (C) 2003-2014 Wayne Davison <wayned@samba.org>
+ * Copyright (C) 2003-2015 Wayne Davison <wayned@samba.org>
  */
 
 /* Load parameters.

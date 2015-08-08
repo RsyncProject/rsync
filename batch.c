@@ -3,7 +3,7 @@
  *
  * Copyright (C) 1999 Weiss
  * Copyright (C) 2004 Chris Shoemaker
- * Copyright (C) 2004-2014 Wayne Davison
+ * Copyright (C) 2004-2015 Wayne Davison
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

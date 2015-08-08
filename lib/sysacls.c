@@ -2,7 +2,7 @@
  * Unix SMB/CIFS implementation.
  * Based on the Samba ACL support code.
  * Copyright (C) Jeremy Allison 2000.
- * Copyright (C) 2007-2014 Wayne Davison
+ * Copyright (C) 2007-2015 Wayne Davison
  *
  * The permission functions have been changed to get/set all bits via
  * one call.  Some functions that rsync doesn't need were also removed.

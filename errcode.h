@@ -2,7 +2,7 @@
  * Error codes returned by rsync.
  *
  * Copyright (C) 1998-2000 Andrew Tridgell
- * Copyright (C) 2003-2014 Wayne Davison
+ * Copyright (C) 2003-2015 Wayne Davison
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
