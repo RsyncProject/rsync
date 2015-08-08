@@ -2,13 +2,24 @@ NEWS for rsync 3.1.2 (UNRELEASED)
 Protocol: 31 (unchanged)
 Changes since 3.1.1:
 
+  SECURITY FIXES:
+
+    - Make sure that all transferred files use only path names from inside the
+      transfer.  This makes it impossible for a malicious sender to try to make
+      the receiver use an unsafe destination path for a transferred file, such
+      as a just-sent symlink.
+
   BUG FIXES:
 
-    - Make sure that an inc-recursive transfer includes the right directory-
-      name prefixes for each dir.  This makes it impossible for a malicious
-      sender to use a just-sent symlink as a path in a transfer.
+    - Change the checksum seed order in the per-block checksums.  This prevents
+      someone from trying to create checksum blocks that match in sum but not
+      content.
+    - Fixed a with the per-dir filter files (using -FF) that could trigger an
+      assert failure.
     - Only skip set_modtime() on a transferred file if the time is exactly
       right.
+    - Don't create an empty backup dir for a transferred file that doesn't
+      exist yet.
 
   ENHANCEMENTS:
 
@@ -21,4 +32,6 @@ Changes since 3.1.1:
   DEVELOPER RELATED:
 
     - Fixed a bug with the Makefile's use of INSTALL_STRIP.
+    - Improve a test in the suite that could get an erroneous timestamp error.
     - Tweaks for newer versions of git in the packaging tools.
+    - Improved the m4 generation rules and some autoconf idioms.
