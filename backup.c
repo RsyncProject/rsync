@@ -208,23 +208,24 @@ static inline int link_or_rename(const char *from, const char *to,
 	return 0;
 }
 
-/* Hard-link, rename, or copy an item to the backup name.  Returns 2 if item
- * was duplicated into backup area, 1 if item was moved, or 0 for failure.*/
+/* Hard-link, rename, or copy an item to the backup name.  Returns 0 for
+ * failure, 1 if item was moved, 2 if item was duplicated or hard linked
+ * into backup area, or 3 if item doesn't exist or isn't a regular file. */
 int make_backup(const char *fname, BOOL prefer_rename)
 {
 	stat_x sx;
 	struct file_struct *file;
 	int save_preserve_xattrs;
-	char *buf = get_backup_name(fname);
+	char *buf;
 	int ret = 0;
-
-	if (!buf)
-		return 0;
 
 	init_stat_x(&sx);
 	/* Return success if no file to keep. */
 	if (x_lstat(fname, &sx.st, NULL) < 0)
-		return 1;
+		return 3;
+
+	if (!(buf = get_backup_name(fname)))
+		return 0;
 
 	/* Try a hard-link or a rename first.  Using rename is not atomic, but
 	 * is more efficient than forcing a copy for larger files when no hard-
@@ -244,7 +245,7 @@ int make_backup(const char *fname, BOOL prefer_rename)
 
 	/* Fall back to making a copy. */
 	if (!(file = make_file(fname, NULL, &sx.st, 0, NO_FILTERS)))
-		return 1; /* the file could have disappeared */
+		return 3; /* the file could have disappeared */
 
 #ifdef SUPPORT_ACLS
 	if (preserve_acls && !S_ISLNK(file->mode)) {
@@ -299,7 +300,7 @@ int make_backup(const char *fname, BOOL prefer_rename)
 #ifdef SUPPORT_XATTRS
 		uncache_tmp_xattrs();
 #endif
-		return 2;
+		return 3;
 	}
 
 	/* Copy to backup tree if a file. */
