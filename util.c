@@ -190,7 +190,7 @@ int make_path(char *fname, int flags)
 
 	if (flags & MKP_DROP_NAME) {
 		end = strrchr(fname, '/');
-		if (!end)
+		if (!end || end == fname)
 			return 0;
 		*end = '\0';
 	} else
@@ -210,8 +210,10 @@ int make_path(char *fname, int flags)
 			ret++;
 			break;
 		}
+
 		if (errno != ENOENT) {
-			if (errno != EEXIST)
+			STRUCT_STAT st;
+			if (errno != EEXIST || (do_stat(fname, &st) == 0 && !S_ISDIR(st.st_mode)))
 				ret = -ret - 1;
 			break;
 		}
