@@ -76,6 +76,7 @@ extern size_t bwlimit_writemax;
 extern unsigned int module_dirlen;
 extern BOOL flist_receiving_enabled;
 extern BOOL shutting_down;
+extern int backup_dir_len;
 extern int basis_dir_cnt;
 extern struct stats stats;
 extern char *stdout_format;
@@ -850,13 +851,25 @@ static int do_recv(int f_in, int f_out, char *local_name)
 	}
 
 	if (backup_dir) {
-		int ret = make_path(backup_dir_buf, MKP_DROP_NAME); /* drops trailing slash */
-		if (ret < 0)
-			exit_cleanup(RERR_SYNTAX);
-		if (ret)
-			rprintf(FINFO, "Created backup_dir %s\n", backup_dir_buf);
-		else if (INFO_GTE(BACKUP, 1))
+		STRUCT_STAT st;
+		int ret;
+		if (backup_dir_len > 1)
+			backup_dir_buf[backup_dir_len-1] = '\0';
+		ret = do_stat(backup_dir_buf, &st);
+		if (ret != 0 || !S_ISDIR(st.st_mode)) {
+			if (ret == 0) {
+				rprintf(FERROR, "The backup-dir is not a directory: %s\n", backup_dir_buf);
+				exit_cleanup(RERR_SYNTAX);
+			}
+			if (errno != ENOENT) {
+				rprintf(FERROR, "Failed to stat %s: %s\n", backup_dir_buf, strerror(errno));
+				exit_cleanup(RERR_FILEIO);
+			}
+			rprintf(FINFO, "(new) backup_dir is %s\n", backup_dir_buf);
+		} else if (INFO_GTE(BACKUP, 1))
 			rprintf(FINFO, "backup_dir is %s\n", backup_dir_buf);
+		if (backup_dir_len > 1)
+			backup_dir_buf[backup_dir_len-1] = '/';
 	}
 
 	io_flush(FULL_FLUSH);
