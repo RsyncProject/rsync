@@ -60,8 +60,6 @@ extern char *iconv_opt;
 extern iconv_t ic_send, ic_recv;
 #endif
 
-#define MAX_GID_LIST 32
-
 char *auth_user;
 int read_only = 0;
 int module_id = -1;
@@ -81,7 +79,7 @@ static int rl_nulls = 0;
 static struct sigaction sigact;
 #endif
 
-static gid_t gid_list[MAX_GID_LIST];
+static gid_t gid_list[MAX_DAEMON_GID_LIST];
 static int gid_count = 0;
 
 /* Used when "reverse lookup" is off. */
@@ -444,7 +442,7 @@ static int add_a_group(int f_out, const char *gname)
 		io_printf(f_out, "@ERROR: invalid gid %s\n", gname);
 		return -1;
 	}
-	if (gid_count == MAX_GID_LIST) {
+	if (gid_count == MAX_DAEMON_GID_LIST) {
 		rprintf(FLOG, "Too many groups specified via gid parameter.\n");
 		io_printf(f_out, "@ERROR: too many groups\n");
 		return -1;
@@ -457,7 +455,7 @@ static int add_a_group(int f_out, const char *gname)
 static int want_all_groups(int f_out, uid_t uid)
 {
 	const char *err;
-	gid_count = MAX_GID_LIST;
+	gid_count = MAX_DAEMON_GID_LIST;
 	if ((err = getallgroups(uid, gid_list, &gid_count)) != NULL) {
 		rsyserr(FLOG, errno, "%s", err);
 		io_printf(f_out, "@ERROR: %s\n", err);

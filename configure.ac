@@ -98,6 +98,14 @@ AC_ARG_WITH(rsync-path,
 
 AC_DEFINE_UNQUOTED(RSYNC_PATH, "$RSYNC_PATH", [location of rsync on remote machine])
 
+AC_ARG_WITH(max-daemon-gid,
+	AS_HELP_STRING([--with-max-daemon-gid=NUM],
+		       [set maximum number of GIDs in the daemon "gid=LIST" config item (default: 32)]),
+		       [ MAX_DAEMON_GID_LIST=$with_max_daemon_gid ],
+		       [ MAX_DAEMON_GID_LIST=32 ])
+
+AC_DEFINE_UNQUOTED(MAX_DAEMON_GID_LIST, $MAX_DAEMON_GID_LIST, [maximum GIDs in a daemon module gid list])
+
 AC_ARG_WITH(rsyncd-conf,
 	AS_HELP_STRING([--with-rsyncd-conf=PATH],[set configuration file for rsync server to PATH (default: /etc/rsyncd.conf)]),
 	[ if test ! -z "$with_rsyncd_conf" ; then
