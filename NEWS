@@ -20,6 +20,7 @@ Changes since 3.1.1:
       right.
     - Don't create an empty backup dir for a transferred file that doesn't
       exist yet.
+    - Allow more than 32 group IDs per user in the daemon's gid=LIST config.
 
   ENHANCEMENTS:
 
@@ -31,7 +32,6 @@ Changes since 3.1.1:
 
   DEVELOPER RELATED:
 
-    - Added --with-max-daemon-gid=NUM option to configure.
     - Fixed a bug with the Makefile's use of INSTALL_STRIP.
     - Improve a test in the suite that could get an erroneous timestamp error.
     - Tweaks for newer versions of git in the packaging tools.

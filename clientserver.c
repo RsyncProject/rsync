@@ -79,8 +79,7 @@ static int rl_nulls = 0;
 static struct sigaction sigact;
 #endif
 
-static gid_t gid_list[MAX_DAEMON_GID_LIST];
-static int gid_count = 0;
+static item_list gid_list = EMPTY_ITEM_LIST;
 
 /* Used when "reverse lookup" is off. */
 const char undetermined_hostname[] = "UNDETERMINED";
@@ -436,18 +435,14 @@ static int path_failure(int f_out, const char *dir, BOOL was_chdir)
 
 static int add_a_group(int f_out, const char *gname)
 {
-	gid_t gid;
+	gid_t gid, *gid_p;
 	if (!group_to_gid(gname, &gid, True)) {
 		rprintf(FLOG, "Invalid gid %s\n", gname);
 		io_printf(f_out, "@ERROR: invalid gid %s\n", gname);
 		return -1;
 	}
-	if (gid_count == MAX_DAEMON_GID_LIST) {
-		rprintf(FLOG, "Too many groups specified via gid parameter.\n");
-		io_printf(f_out, "@ERROR: too many groups\n");
-		return -1;
-	}
-	gid_list[gid_count++] = gid;
+	gid_p = EXPAND_ITEM_LIST(&gid_list, gid_t, -32);
+	*gid_p = gid;
 	return 0;
 }
 
@@ -455,8 +450,7 @@ static int add_a_group(int f_out, const char *gname)
 static int want_all_groups(int f_out, uid_t uid)
 {
 	const char *err;
-	gid_count = MAX_DAEMON_GID_LIST;
-	if ((err = getallgroups(uid, gid_list, &gid_count)) != NULL) {
+	if ((err = getallgroups(uid, &gid_list)) != NULL) {
 		rsyserr(FLOG, errno, "%s", err);
 		io_printf(f_out, "@ERROR: %s\n", err);
 		return -1;
@@ -467,14 +461,15 @@ static int want_all_groups(int f_out, uid_t uid)
 static struct passwd *want_all_groups(int f_out, uid_t uid)
 {
 	struct passwd *pw;
+	gid_t *gid_p;
 	if ((pw = getpwuid(uid)) == NULL) {
 		rsyserr(FLOG, errno, "getpwuid failed");
 		io_printf(f_out, "@ERROR: getpwuid failed\n");
 		return NULL;
 	}
-	/* Start with the default group and initgroups() will add the reset. */
-	gid_count = 1;
-	gid_list[0] = pw->pw_gid;
+	/* Start with the default group and initgroups() will add the rest. */
+	gid_p = EXPAND_ITEM_LIST(&gid_list, gid_t, -32);
+	*gid_p = pw->pw_gid;
 	return pw;
 }
 #endif
@@ -816,15 +811,16 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 		}
 	}
 
-	if (gid_count) {
-		if (setgid(gid_list[0])) {
-			rsyserr(FLOG, errno, "setgid %ld failed", (long)gid_list[0]);
+	if (gid_list.count) {
+		gid_t *gid_array = gid_list.items;
+		if (setgid(gid_array[0])) {
+			rsyserr(FLOG, errno, "setgid %ld failed", (long)gid_array[0]);
 			io_printf(f_out, "@ERROR: setgid failed\n");
 			return -1;
 		}
 #ifdef HAVE_SETGROUPS
 		/* Set the group(s) we want to be active. */
-		if (setgroups(gid_count, gid_list)) {
+		if (setgroups(gid_list.count, gid_array)) {
 			rsyserr(FLOG, errno, "setgroups failed");
 			io_printf(f_out, "@ERROR: setgroups failed\n");
 			return -1;

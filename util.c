@@ -1615,7 +1615,7 @@ void *expand_item_list(item_list *lp, size_t item_size,
 		if (incr < 0)
 			new_size += -incr; /* increase slowly */
 		else if (new_size < (size_t)incr)
-			new_size += incr;
+			new_size = incr;
 		else
 			new_size *= 2;
 		if (new_size < lp->malloced)
