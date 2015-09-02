@@ -1022,9 +1022,9 @@ if test x"$enable_xattr_support" = x"no"; then
     AC_MSG_RESULT(no)
 else
     case "$host_os" in
-    *linux*)
+    *linux*|*netbsd*)
 	AC_MSG_RESULT(Using Linux xattrs)
-	AC_DEFINE(HAVE_LINUX_XATTRS, 1, [True if you have Linux xattrs])
+	AC_DEFINE(HAVE_LINUX_XATTRS, 1, [True if you have Linux xattrs (or equivalent)])
 	AC_DEFINE(SUPPORT_XATTRS, 1)
 	AC_DEFINE(NO_SYMLINK_USER_XATTRS, 1, [True if symlinks do not support user xattrs])
 	AC_CHECK_LIB(attr,getxattr)
