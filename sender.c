@@ -320,8 +320,7 @@ void send_files(int f_in, int f_out)
 		stats.xferred_files++;
 		stats.total_transferred_size += F_LENGTH(file);
 
-		if (!log_before_transfer)
-			remember_initial_stats();
+		remember_initial_stats();
 
 		if (!do_xfers) { /* log the transfer */
 			log_item(FCLIENT, file, iflags, NULL);

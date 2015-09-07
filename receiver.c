@@ -672,8 +672,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 			}
 		}
 
-		if (!log_before_transfer)
-			remember_initial_stats();
+		remember_initial_stats();
 
 		if (!do_xfers) { /* log the transfer */
 			log_item(FCLIENT, file, iflags, NULL);
