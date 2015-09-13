@@ -32,6 +32,7 @@ Changes since 3.1.1:
       BackupPC happier.
     - Made configure choose to use linux xattrs on netbsd (rather than not
       supporting xattrs).
+    - Added -wo (write-only) option to rrsync support script.
     - Misc. manpage tweaks.
 
   DEVELOPER RELATED:

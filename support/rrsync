@@ -15,11 +15,21 @@ use constant RSYNC => '/usr/bin/rsync';
 use constant LOGFILE => 'rrsync.log';
 
 my $Usage = <<EOM;
-Use 'command="$0 [-ro] SUBDIR"'
+Use 'command="$0 [-ro|-wo] SUBDIR"'
 	in front of lines in $ENV{HOME}/.ssh/authorized_keys
 EOM
 
-our $ro = (@ARGV && $ARGV[0] eq '-ro') ? shift : '';	# -ro = Read-Only
+# Handle the -ro and -wo options.
+our $only = '';
+while (@ARGV && $ARGV[0] =~ /^-([rw])o$/) {
+    my $r_or_w = $1;
+    if ($only && $only ne $r_or_w) {
+	die "$0: the -ro and -wo options conflict.\n";
+    }
+    $only = $r_or_w;
+    shift;
+}
+
 our $subdir = shift;
 die "$0: No subdirectory specified\n$Usage" unless defined $subdir;
 $subdir = abs_path($subdir);
@@ -41,7 +51,8 @@ die "$0: Not invoked via sshd\n$Usage"	unless defined $command;
 die "$0: SSH_ORIGINAL_COMMAND='$command' is not rsync\n" unless $command =~ s/^rsync\s+//;
 die "$0: --server option is not first\n" unless $command =~ /^--server\s/;
 our $am_sender = $command =~ /^--server\s+--sender\s/; # Restrictive on purpose!
-die "$0 -ro: sending to read-only server not allowed\n" if $ro && !$am_sender;
+die "$0 sending to read-only server not allowed\n" if $only eq 'r' && !$am_sender;
+die "$0 reading from write-only server not allowed\n" if $only eq 'w' && $am_sender;
 
 ### START of options data produced by the cull_options script. ###
 
@@ -116,8 +127,8 @@ our %long_opt = (
   'perms' => 0,
   'preallocate' => 0,
   'recursive' => 0,
-  'remove-sent-files' => $ro ? -1 : 0,
-  'remove-source-files' => $ro ? -1 : 0,
+  'remove-sent-files' => $only eq 'r' ? -1 : 0,
+  'remove-source-files' => $only eq 'r' ? -1 : 0,
   'safe-links' => 0,
   'sender' => 0,
   'server' => 0,
