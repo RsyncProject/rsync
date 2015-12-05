@@ -895,23 +895,21 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 	} while (basis_dir[++j] != NULL);
 
 	if (!match_level)
-		return -1;
+		goto got_nothing_for_ya;
 
 	if (j != best_match) {
 		j = best_match;
 		pathjoin(cmpbuf, MAXPATHLEN, basis_dir[j], fname);
 		if (link_stat(cmpbuf, &sxp->st, 0) < 0)
-			return -1;
+			goto got_nothing_for_ya;
 	}
 
 	if (match_level == 3 && !copy_dest) {
 		if (find_exact_for_existing) {
 			if (link_dest && real_st.st_dev == sxp->st.st_dev && real_st.st_ino == sxp->st.st_ino)
 				return -1;
-			if (do_unlink(fname) < 0 && errno != ENOENT) {
-				sxp->st = real_st;
-				return -1;
-			}
+			if (do_unlink(fname) < 0 && errno != ENOENT)
+				goto got_nothing_for_ya;
 		}
 #ifdef SUPPORT_HARD_LINKS
 		if (link_dest) {
@@ -935,10 +933,8 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 		return -2;
 	}
 
-	if (find_exact_for_existing) {
-		sxp->st = real_st;
-		return -1;
-	}
+	if (find_exact_for_existing)
+		goto got_nothing_for_ya;
 
 	if (match_level >= 2) {
 #ifdef SUPPORT_HARD_LINKS
@@ -946,7 +942,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 #endif
 		if (!dry_run && copy_altdest_file(cmpbuf, fname, file) < 0) {
 			if (find_exact_for_existing) /* Can get here via hard-link failure */
-				sxp->st = real_st;
+				goto got_nothing_for_ya;
 			return -1;
 		}
 		if (itemizing)
@@ -966,6 +962,10 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 	}
 
 	return FNAMECMP_BASIS_DIR_LOW + j;
+
+got_nothing_for_ya:
+	sxp->st = real_st;
+	return -1;
 }
 
 /* This is only called for non-regular files.  We return -2 if we've finished
