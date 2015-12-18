@@ -20,9 +20,13 @@ Changes since 3.1.1:
       right.
     - Don't create an empty backup dir for a transferred file that doesn't
       exist yet.
+    - Fixed a bug where --link-dest and --xattrs could cause rsync to exit if
+      a filename had a matching dir of the same name in the alt-dest area.
     - Allow more than 32 group IDs per user in the daemon's gid=LIST config.
     - Fix the logging of %b & %c via --log-file (daemon logging was already
       correct, as was --out-format='%b/%c').
+    - Fix erroneous acceptance of --info=5 & --debug=5 (an empty flag name is
+      not valid).
 
   ENHANCEMENTS:
 

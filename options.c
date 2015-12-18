@@ -411,16 +411,17 @@ static void parse_output_words(struct output_struct *words, short *levels,
 	const char *s;
 	int j, len, lev;
 
-	if (!str)
-		return;
-
-	while (*str) {
+	for ( ; str; str = s) {
 		if ((s = strchr(str, ',')) != NULL)
 			len = s++ - str;
 		else
 			len = strlen(str);
-		while (len && isDigit(str+len-1))
-			len--;
+		if (!len)
+			continue;
+		if (!isDigit(str)) {
+			while (len && isDigit(str+len-1))
+				len--;
+		}
 		lev = isDigit(str+len) ? atoi(str+len) : 1;
 		if (lev > MAX_OUT_LEVEL)
 			lev = MAX_OUT_LEVEL;
@@ -448,9 +449,6 @@ static void parse_output_words(struct output_struct *words, short *levels,
 				words[j].help, len, str);
 			exit_cleanup(RERR_SYNTAX);
 		}
-		if (!s)
-			break;
-		str = s;
 	}
 }
 
