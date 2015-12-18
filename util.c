@@ -1605,6 +1605,12 @@ int flist_ndx_pop(flist_ndx_list *lp)
 	return ndx;
 }
 
+/* Make sure there is room for one more item in the item list.  If there
+ * is not, expand the list as indicated by the value of "incr":
+ *  - if incr < 0 then increase the malloced size by -1 * incr
+ *  - if incr >= 0 then either make the malloced size equal to "incr"
+ *    or (if that's not large enough) double the malloced size
+ */
 void *expand_item_list(item_list *lp, size_t item_size,
 		       const char *desc, int incr)
 {
@@ -1616,9 +1622,11 @@ void *expand_item_list(item_list *lp, size_t item_size,
 			new_size += -incr; /* increase slowly */
 		else if (new_size < (size_t)incr)
 			new_size = incr;
-		else
+		else if (new_size)
 			new_size *= 2;
-		if (new_size < lp->malloced)
+		else
+			new_size = 1;
+		if (new_size <= lp->malloced)
 			overflow_exit("expand_item_list");
 		/* Using _realloc_array() lets us pass the size, not a type. */
 		new_ptr = _realloc_array(lp->items, item_size, new_size);
