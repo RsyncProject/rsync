@@ -144,7 +144,7 @@ gensend: gen
 conf:
 	cd $(srcdir) && $(MAKE) -f prepare-source.mak conf
 
-aclocal.m4: m4/*.m4
+aclocal.m4: $(srcdir)/m4/*.m4
 	aclocal -I $(srcdir)/m4
 
 configure.sh config.h.in: configure.ac aclocal.m4
