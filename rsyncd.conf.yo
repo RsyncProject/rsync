@@ -197,22 +197,16 @@ args if rsync believes they would escape the module hierarchy.
 The default for "use chroot" is true, and is the safer choice (especially
 if the module is not read-only).
 
-When this parameter is enabled, rsync will not attempt to map users and groups
-by name (by default), but instead copy IDs as though bf(--numeric-ids) had
-been specified.  In order to enable name-mapping, rsync needs to be able to
-use the standard library functions for looking up names and IDs (i.e.
-code(getpwuid()), code(getgrgid()), code(getpwname()), and code(getgrnam())).
-This means the rsync
-process in the chroot hierarchy will need to have access to the resources
-used by these library functions (traditionally /etc/passwd and
-/etc/group, but perhaps additional dynamic libraries as well).
+When this parameter is enabled, the "numeric-ids" option will also default to
+being enabled (disabling name lookups).  See below for what a chroot needs in
+order for name lookups to succeed.
 
-If you copy the necessary resources into the module's chroot area, you
+If you copy library resources into the module's chroot area, you
 should protect them through your OS's normal user/group or ACL settings (to
 prevent the rsync module's user from being able to change them), and then
 hide them from the user's view via "exclude" (see how in the discussion of
 that parameter).  At that point it will be safe to enable the mapping of users
-and groups by name using the "numeric ids" daemon parameter (see below).
+and groups by name using this "numeric ids" daemon parameter.
 
 Note also that you are free to setup custom user/group information in the
 chroot area that is different from your normal system.  For example, you
@@ -224,11 +218,16 @@ the daemon from trying to load any user/group-related files or libraries.
 This enabling makes the transfer behave as if the client had passed
 the bf(--numeric-ids) command-line option.  By default, this parameter is
 enabled for chroot modules and disabled for non-chroot modules.
+Also keep in mind that uid/gid preservation requires the module to be
+running as root (see "uid") or for "fake super" to be configured.
 
 A chroot-enabled module should not have this parameter enabled unless you've
 taken steps to ensure that the module has the necessary resources it needs
 to translate names, and that it is not possible for a user to change those
-resources.
+resources.  That includes being the code being able to call functions like
+code(getpwuid()), code(getgrgid()), code(getpwname()), and code(getgrnam())).
+You should test what libraries and config files are required for your OS
+and get those setup before starting to test name mapping in rsync.
 
 dit(bf(munge symlinks)) This parameter tells rsync to modify
 all symlinks in the same way as the (non-daemon-affecting)
