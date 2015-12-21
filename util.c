@@ -1610,6 +1610,8 @@ int flist_ndx_pop(flist_ndx_list *lp)
  *  - if incr < 0 then increase the malloced size by -1 * incr
  *  - if incr >= 0 then either make the malloced size equal to "incr"
  *    or (if that's not large enough) double the malloced size
+ * After the size check, the list's count is incremented by 1 and a pointer
+ * to the "new" list item is returned.
  */
 void *expand_item_list(item_list *lp, size_t item_size,
 		       const char *desc, int incr)
