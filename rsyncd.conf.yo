@@ -206,7 +206,7 @@ should protect them through your OS's normal user/group or ACL settings (to
 prevent the rsync module's user from being able to change them), and then
 hide them from the user's view via "exclude" (see how in the discussion of
 that parameter).  At that point it will be safe to enable the mapping of users
-and groups by name using this "numeric ids" daemon parameter.
+and groups by name using the "numeric ids" daemon parameter (see below).
 
 Note also that you are free to setup custom user/group information in the
 chroot area that is different from your normal system.  For example, you
