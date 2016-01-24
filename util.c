@@ -1324,15 +1324,20 @@ char *timestring(time_t t)
  *
  * @retval -1 if the 2nd is later
  **/
-int cmp_time(time_t file1, time_t file2)
+int cmp_time(time_t f1_sec, unsigned long f1_nsec, time_t f2_sec, unsigned long f2_nsec)
 {
-	if (file2 > file1) {
+	if (f2_sec > f1_sec) {
 		/* The final comparison makes sure that modify_window doesn't overflow a
-		 * time_t, which would mean that file2 must be in the equality window. */
-		if (!modify_window || (file2 > file1 + modify_window && file1 + modify_window > file1))
+		 * time_t, which would mean that f2_sec must be in the equality window. */
+		if (modify_window <= 0 || (f2_sec > f1_sec + modify_window && f1_sec + modify_window > f1_sec))
 			return -1;
-	} else if (file1 > file2) {
-		if (!modify_window || (file1 > file2 + modify_window && file2 + modify_window > file2))
+	} else if (f1_sec > f2_sec) {
+		if (modify_window <= 0 || (f1_sec > f2_sec + modify_window && f2_sec + modify_window > f2_sec))
+			return 1;
+	} else if (modify_window < 0) {
+		if (f2_nsec > f1_nsec)
+			return -1;
+		else if (f1_nsec > f2_nsec)
 			return 1;
 	}
 	return 0;

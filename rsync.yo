@@ -413,7 +413,7 @@ to the detailed description below for a complete description.  verb(
      --contimeout=SECONDS    set daemon connection timeout in seconds
  -I, --ignore-times          don't skip files that match size and time
      --size-only             skip files that match in size
-     --modify-window=NUM     compare mod-times with reduced accuracy
+ -@, --modify-window=NUM     set the accuracy for mod-time comparisons
  -T, --temp-dir=DIR          create temporary files in directory DIR
  -y, --fuzzy                 find similar file for basis if no dest file
      --compare-dest=DIR      also compare received files relative to DIR
@@ -605,13 +605,23 @@ time to just looking for files that have changed in size.  This is useful
 when starting to use rsync after using another mirroring system which may
 not preserve timestamps exactly.
 
-dit(bf(--modify-window)) When comparing two timestamps, rsync treats the
+dit(bf(-@, --modify-window)) When comparing two timestamps, rsync treats the
 timestamps as being equal if they differ by no more than the modify-window
-value.  This is normally 0 (for an exact match), but you may find it useful
-to set this to a larger value in some situations.  In particular, when
-transferring to or from an MS Windows FAT filesystem (which represents
-times with a 2-second resolution), bf(--modify-window=1) is useful
-(allowing times to differ by up to 1 second).
+value.  The default is 0, which matches just integer seconds.  If you specify a
+negative value (and the receiver is at least version 3.1.3) then nanoseconds
+will also be taken into account.  Specifying 1 is useful for copies to/from MS
+Windows FAT filesystems, because FAT represents times with a 2-second
+resolution (allowing times to differ from the original by up to 1 second).
+
+If you want all your transfers to default to comparing nanoseconds, you can
+create a ~/.popt file and put these lines in it:
+
+quote(tt(   rsync alias -a -a@-1))
+quote(tt(   rsync alias -t -t@-1))
+
+With that as the default, you'd need to specify bf(--modify-window=0) (aka
+bf(-@0)) to override it and ignore nanoseconds, e.g. if you're copying between
+ext3 and ext4, or if the receiving rsync is older than 3.1.3.
 
 dit(bf(-c, --checksum)) This changes the way rsync checks if the files have
 been changed and are in need of a transfer.  Without this option, rsync

@@ -755,7 +755,7 @@ void usage(enum logcode F)
   rprintf(F," -I, --ignore-times          don't skip files that match in size and mod-time\n");
   rprintf(F," -M, --remote-option=OPTION  send OPTION to the remote side only\n");
   rprintf(F,"     --size-only             skip files that match in size\n");
-  rprintf(F,"     --modify-window=NUM     compare mod-times with reduced accuracy\n");
+  rprintf(F," -@, --modify-window=NUM     set the accuracy for mod-time comparisons\n");
   rprintf(F," -T, --temp-dir=DIR          create temporary files in directory DIR\n");
   rprintf(F," -y, --fuzzy                 find similar file for basis if no dest file\n");
   rprintf(F,"     --compare-dest=DIR      also compare destination files relative to DIR\n");
@@ -871,7 +871,7 @@ static struct poptOption long_options[] = {
   {"omit-link-times", 'J', POPT_ARG_VAL,    &omit_link_times, 1, 0, 0 },
   {"no-omit-link-times",0, POPT_ARG_VAL,    &omit_link_times, 0, 0, 0 },
   {"no-J",             0,  POPT_ARG_VAL,    &omit_link_times, 0, 0, 0 },
-  {"modify-window",    0,  POPT_ARG_INT,    &modify_window, OPT_MODIFY_WINDOW, 0, 0 },
+  {"modify-window",   '@', POPT_ARG_INT,    &modify_window, OPT_MODIFY_WINDOW, 0, 0 },
   {"super",            0,  POPT_ARG_VAL,    &am_root, 2, 0, 0 },
   {"no-super",         0,  POPT_ARG_VAL,    &am_root, 0, 0, 0 },
   {"fake-super",       0,  POPT_ARG_VAL,    &am_root, -1, 0, 0 },
@@ -2649,8 +2649,9 @@ void server_options(char **args, int *argc_p)
 	else if (missing_args == 1 && !am_sender)
 		args[ac++] = "--ignore-missing-args";
 
-	if (modify_window_set) {
-		if (asprintf(&arg, "--modify-window=%d", modify_window) < 0)
+	if (modify_window_set && am_sender) {
+		char *fmt = modify_window < 0 ? "-@%d" : "--modify-window=%d";
+		if (asprintf(&arg, fmt, modify_window) < 0)
 			goto oom;
 		args[ac++] = arg;
 	}
