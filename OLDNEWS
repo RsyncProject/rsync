@@ -1,3 +1,51 @@
+NEWS for rsync 3.1.2 (21 Dec 2015)
+Protocol: 31 (unchanged)
+Changes since 3.1.1:
+
+  SECURITY FIXES:
+
+    - Make sure that all transferred files use only path names from inside the
+      transfer.  This makes it impossible for a malicious sender to try to make
+      the receiver use an unsafe destination path for a transferred file, such
+      as a just-sent symlink.
+
+  BUG FIXES:
+
+    - Change the checksum seed order in the per-block checksums.  This prevents
+      someone from trying to create checksum blocks that match in sum but not
+      content.
+    - Fixed a with the per-dir filter files (using -FF) that could trigger an
+      assert failure.
+    - Only skip set_modtime() on a transferred file if the time is exactly
+      right.
+    - Don't create an empty backup dir for a transferred file that doesn't
+      exist yet.
+    - Fixed a bug where --link-dest and --xattrs could cause rsync to exit if
+      a filename had a matching dir of the same name in the alt-dest area.
+    - Allow more than 32 group IDs per user in the daemon's gid=LIST config.
+    - Fix the logging of %b & %c via --log-file (daemon logging was already
+      correct, as was --out-format='%b/%c').
+    - Fix erroneous acceptance of --info=5 & --debug=5 (an empty flag name is
+      not valid).
+
+  ENHANCEMENTS:
+
+    - Added "(DRY RUN)" info to the --debug=exit output line.
+    - Use usleep() for our msleep() function if it is available.
+    - Added a few extra long-option names to rrsync script, which will make
+      BackupPC happier.
+    - Made configure choose to use linux xattrs on netbsd (rather than not
+      supporting xattrs).
+    - Added -wo (write-only) option to rrsync support script.
+    - Misc. manpage tweaks.
+
+  DEVELOPER RELATED:
+
+    - Fixed a bug with the Makefile's use of INSTALL_STRIP.
+    - Improve a test in the suite that could get an erroneous timestamp error.
+    - Tweaks for newer versions of git in the packaging tools.
+    - Improved the m4 generation rules and some autoconf idioms.
+
 NEWS for rsync 3.1.1 (22 Jun 2014)
 Protocol: 31 (unchanged)
 Changes since 3.1.0:
