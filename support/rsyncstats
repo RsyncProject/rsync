@@ -270,27 +270,27 @@ foreach $hour (sort keys %xfertbytes) {
 exit(0);
 
 sub datecompare {
-    $a gt $b;
+    $a cmp $b;
 }
 
 sub domnamcompare {
 
    $sdiff = length($a) - length($b);
-   ($sdiff < 0) ? -1 : ($sdiff > 0) ? 1 : ($a lt $b) ? -1 : ($a gt $b) ? 1 : 0;
+   ($sdiff < 0) ? -1 : ($sdiff > 0) ? 1 : $a cmp $b;
 
 }
 
 sub bytecompare {
 
    $bdiff = $groupbytes{$b} - $groupbytes{$a};
-   ($bdiff < 0) ? -1 : ($bdiff > 0) ? 1 : ($a lt $b) ? -1 : ($a gt $b) ? 1 : 0;
+   ($bdiff < 0) ? -1 : ($bdiff > 0) ? 1 : $a cmp $b;
 
 }
 
 sub faccompare {
 
    $fdiff = $fac{$b} - $fac{$a};
-   ($fdiff < 0) ? -1 : ($fdiff > 0) ? 1 : ($a lt $b) ? -1 : ($a gt $b) ? 1 : 0;
+   ($fdiff < 0) ? -1 : ($fdiff > 0) ? 1 : $a cmp $b;
 
 }
 
