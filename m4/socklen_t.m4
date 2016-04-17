@@ -18,15 +18,15 @@ AC_DEFUN([TYPE_SOCKLEN_T],
          rsync_cv_socklen_t_equiv=
          for arg2 in "struct sockaddr" void; do
             for t in int size_t unsigned long "unsigned long"; do
-               AC_TRY_COMPILE([
+               AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 #include <sys/types.h>
 #include <sys/socket.h>
 
                   int getpeername (int, $arg2 *, $t *);
-               ],[
+               ]],[[
                   $t len;
                   getpeername(0,0,&len);
-               ],[
+               ]])],[
                   rsync_cv_socklen_t_equiv="$t"
                   break
                ])
