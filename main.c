@@ -865,7 +865,8 @@ static int do_recv(int f_in, int f_out, char *local_name)
 				rprintf(FERROR, "Failed to stat %s: %s\n", backup_dir_buf, strerror(errno));
 				exit_cleanup(RERR_FILEIO);
 			}
-			rprintf(FINFO, "(new) backup_dir is %s\n", backup_dir_buf);
+			if (INFO_GTE(BACKUP, 1))
+				rprintf(FINFO, "(new) backup_dir is %s\n", backup_dir_buf);
 		} else if (INFO_GTE(BACKUP, 1))
 			rprintf(FINFO, "backup_dir is %s\n", backup_dir_buf);
 		if (backup_dir_len > 1)
