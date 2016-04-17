@@ -592,7 +592,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	} else
 		set_uid = 0;
 
-	p = *lp_gid(i) ? strtok(lp_gid(i), ", ") : NULL;
+	p = *lp_gid(i) ? conf_strtok(lp_gid(i)) : NULL;
 	if (p) {
 		/* The "*" gid must be the first item in the list. */
 		if (strcmp(p, "*") == 0) {
@@ -609,7 +609,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 #endif
 		} else if (add_a_group(f_out, p) < 0)
 			return -1;
-		while ((p = strtok(NULL, ", ")) != NULL) {
+		while ((p = conf_strtok(NULL)) != NULL) {
 #if defined HAVE_INITGROUPS && !defined HAVE_GETGROUPLIST
 			if (pw) {
 				rprintf(FLOG, "This rsync cannot add groups after \"*\".\n");

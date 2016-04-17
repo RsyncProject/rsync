@@ -800,6 +800,41 @@ void strlower(char *s)
 	}
 }
 
+/**
+ * Split a string into tokens based (usually) on whitespace & commas.  If the
+ * string starts with a comma (after skipping any leading whitespace), then
+ * splitting is done only on commas. No empty tokens are ever returned. */
+char *conf_strtok(char *str)
+{
+	static int commas_only = 0;
+
+	if (str) {
+		while (isSpace(str)) str++;
+		if (*str == ',') {
+			commas_only = 1;
+			str++;
+		} else
+			commas_only = 0;
+	}
+
+	while (commas_only) {
+		char *end, *tok = strtok(str, ",");
+		if (!tok)
+			return NULL;
+		/* Trim just leading and trailing whitespace. */
+		while (isSpace(tok))
+			tok++;
+		end = tok + strlen(tok);
+		while (end > tok && isSpace(end-1))
+			*--end = '\0';
+		if (*tok)
+			return tok;
+		str = NULL;
+	}
+
+	return strtok(str, " ,\t\r\n");
+}
+
 /* Join strings p1 & p2 into "dest" with a guaranteed '/' between them.  (If
  * p1 ends with a '/', no extra '/' is inserted.)  Returns the length of both
  * strings + 1 (if '/' was inserted), regardless of whether the null-terminated

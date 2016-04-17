@@ -492,6 +492,13 @@ group "guest").  Any other user who is in group "rsync" will get read-only
 access.  Finally, users susan, joe, and sam get the ro/rw setting of the
 module, but only if the user didn't match an earlier group-matching rule.
 
+If you need to specify a user or group name with a space in it, start your list
+with a comma to indicate that the list should only be split on commas (though
+leading and trailing whitespace will also be removed, and empty entries are
+just ignored).  For example:
+
+verb(  auth users = , joe:deny, @Some Group:deny, admin:rw, @RO Group:ro )
+
 See the description of the secrets file for how you can have per-user passwords
 as well as per-group passwords.  It also explains how a user can authenticate
 using their user password or (when applicable) a group password, depending on
@@ -534,9 +541,9 @@ than the one that the rsync daemon is running under.  If "strict modes" is
 false, the check is not performed.  The default is true.  This parameter
 was added to accommodate rsync running on the Windows operating system.
 
-dit(bf(hosts allow)) This parameter allows you to specify a
-list of patterns that are matched against a connecting clients
-hostname and IP address. If none of the patterns match then the
+dit(bf(hosts allow)) This parameter allows you to specify a list of comma-
+and/or whitespace-separated patterns that are matched against a connecting
+client's hostname and IP address.  If none of the patterns match, then the
 connection is rejected.
 
 Each pattern can be in one of five forms:
@@ -580,9 +587,9 @@ connect.
 
 The default is no "hosts allow" parameter, which means all hosts can connect.
 
-dit(bf(hosts deny)) This parameter allows you to specify a
-list of patterns that are matched against a connecting clients
-hostname and IP address. If the pattern matches then the connection is
+dit(bf(hosts deny)) This parameter allows you to specify a list of comma-
+and/or whitespace-separated patterns that are matched against a connecting
+clients hostname and IP address. If the pattern matches then the connection is
 rejected. See the "hosts allow" parameter for more information.
 
 The default is no "hosts deny" parameter, which means all hosts can connect.
