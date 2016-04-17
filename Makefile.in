@@ -215,8 +215,8 @@ proto.h-tstamp: $(srcdir)/*.c $(srcdir)/lib/compat.c config.h
 man: rsync.1 rsyncd.conf.5 man-copy
 
 man-copy:
-	@-if test -f rsync.1; then :; else echo 'Copying srcdir rsync.1'; cp -p $(srcdir)/rsync.1 .; fi
-	@-if test -f rsyncd.conf.5; then :; else echo 'Copying srcdir rsyncd.conf.5'; cp -p $(srcdir)/rsyncd.conf.5 .; fi
+	@if test -f rsync.1; then :; elif test -f $(srcdir)/rsync.1; then echo 'Copying srcdir rsync.1'; cp -p $(srcdir)/rsync.1 .; else echo "NOTE: rsync.1 cannot be created."; fi
+	@if test -f rsyncd.conf.5; then :; elif test -f $(srcdir)/rsyncd.conf.5; then echo 'Copying srcdir rsyncd.conf.5'; cp -p $(srcdir)/rsyncd.conf.5 .; else echo "NOTE: rsyncd.conf.5 cannot be created."; fi
 
 rsync.1: rsync.yo
 	yodl2man -o rsync.1 $(srcdir)/rsync.yo
