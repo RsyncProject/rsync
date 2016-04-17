@@ -302,6 +302,13 @@ static void output_itemized_counts(const char *prefix, int *counts)
 	rprintf(FINFO, "%s: %s%s\n", prefix, comma_num(total), buf);
 }
 
+static const char *bytes_per_sec_human_dnum(void)
+{
+	if (starttime == (time_t)-1 || endtime == (time_t)-1)
+		return "UNKNOWN";
+	return human_dnum((total_written + total_read) / (0.5 + (endtime - starttime)), 2);
+}
+
 static void output_summary(void)
 {
 	if (INFO_GTE(STATS, 2)) {
@@ -342,7 +349,7 @@ static void output_summary(void)
 		rprintf(FINFO,
 			"sent %s bytes  received %s bytes  %s bytes/sec\n",
 			human_num(total_written), human_num(total_read),
-			human_dnum((total_written + total_read)/(0.5 + (endtime - starttime)), 2));
+			bytes_per_sec_human_dnum());
 		rprintf(FINFO, "total size is %s  speedup is %s%s\n",
 			human_num(stats.total_size),
 			comma_dnum((double)stats.total_size / (total_written+total_read), 2),
