@@ -33,6 +33,7 @@ extern int am_sender;
 extern int am_generator;
 extern int inc_recurse;
 extern int always_checksum;
+extern int checksum_type;
 extern int module_id;
 extern int ignore_errors;
 extern int numeric_ids;
@@ -137,9 +138,8 @@ void init_flist(void)
 		rprintf(FINFO, "FILE_STRUCT_LEN=%d, EXTRA_LEN=%d\n",
 			(int)FILE_STRUCT_LEN, (int)EXTRA_LEN);
 	}
-	checksum_len = protocol_version < 21 ? 2
-		     : protocol_version < 30 ? MD4_DIGEST_LEN
-		     : MD5_DIGEST_LEN;
+	parse_checksum_choice(); /* Sets checksum_type && xfersum_type */
+	checksum_len = csum_len_for_type(checksum_type);
 }
 
 static int show_filelist_p(void)

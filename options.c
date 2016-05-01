@@ -182,6 +182,7 @@ char *dest_option = NULL;
 static int remote_option_alloc = 0;
 int remote_option_cnt = 0;
 const char **remote_options = NULL;
+const char *checksum_choice = NULL;
 
 int quiet = 0;
 int output_motd = 1;
@@ -721,6 +722,7 @@ void usage(enum logcode F)
 #endif
   rprintf(F," -n, --dry-run               perform a trial run with no changes made\n");
   rprintf(F," -W, --whole-file            copy files whole (without delta-xfer algorithm)\n");
+  rprintf(F,"     --checksum-choice=STR   choose the checksum algorithms\n");
   rprintf(F," -x, --one-file-system       don't cross filesystem boundaries\n");
   rprintf(F," -B, --block-size=SIZE       force a fixed checksum block-size\n");
   rprintf(F," -e, --rsh=COMMAND           specify the remote shell to use\n");
@@ -953,6 +955,7 @@ static struct poptOption long_options[] = {
   {"cvs-exclude",     'C', POPT_ARG_NONE,   &cvs_exclude, 0, 0, 0 },
   {"whole-file",      'W', POPT_ARG_VAL,    &whole_file, 1, 0, 0 },
   {"no-whole-file",    0,  POPT_ARG_VAL,    &whole_file, 0, 0, 0 },
+  {"checksum-choice",  0,  POPT_ARG_STRING, &checksum_choice, 0, 0, 0 },
   {"no-W",             0,  POPT_ARG_VAL,    &whole_file, 0, 0, 0 },
   {"checksum",        'c', POPT_ARG_VAL,    &always_checksum, 1, 0, 0 },
   {"no-checksum",      0,  POPT_ARG_VAL,    &always_checksum, 0, 0, 0 },
@@ -1814,6 +1817,15 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		}
 	}
 
+	if (checksum_choice && strcmp(checksum_choice, "auto") != 0 && strcmp(checksum_choice, "auto,auto") != 0) {
+		/* Call this early to verify the args and figure out if we need to force
+		 * --whole-file. Note that the parse function will get called again later,
+		 * just in case an "auto" choice needs to know the protocol_version. */
+		if (parse_checksum_choice())
+			whole_file = 1;
+	} else
+		checksum_choice = NULL;
+
 	if (human_readable > 1 && argc == 2 && !am_server) {
 		/* Allow the old meaning of 'h' (--help) on its own. */
 		usage(FINFO);
@@ -2593,6 +2605,12 @@ void server_options(char **args, int *argc_p)
 	if (strcmp(backup_suffix, backup_dir ? "" : BACKUP_SUFFIX) != 0) {
 		/* We use the following syntax to avoid weirdness with '~'. */
 		if (asprintf(&arg, "--suffix=%s", backup_suffix) < 0)
+			goto oom;
+		args[ac++] = arg;
+	}
+
+	if (checksum_choice) {
+		if (asprintf(&arg, "--checksum-choice=%s", checksum_choice) < 0)
 			goto oom;
 		args[ac++] = arg;
 	}

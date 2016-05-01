@@ -4,9 +4,21 @@ Changes since 3.1.2:
 
   BUG FIXES:
 
-    - ...
+    - Don't output about a new backup dir with appropriate info verbosity.
+    - Fixed some issues with the sort functions in support/rsyncstats.
+    - Added a way to specify group names that contain spaces in daemon config.
+    - If a backup fails (e.g. full disk) rsync exits with an error.
+    - Avoid invalid output in the summary if either the start or end time had
+      an error.
 
   ENHANCEMENTS:
 
-    - Add the ability for rsync to compare nanosecond times in its file-check
+    - Added the ability for rsync to compare nanosecond times in its file-check
       comparisons.  Also added a short-option (-@) for --modify-window.
+    - Added the --checksum-choice=NAME[,NAME] option to choose the checksum
+      algorithms.
+
+  DEVELOPER RELATED:
+
+    - Tweak the "make" output when yodl isn't around to create the man pages.
+    - Changed an obsolete compile macro in configure.

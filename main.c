@@ -1595,8 +1595,6 @@ int main(int argc,char *argv[])
 	 * that implement getcwd that way "pwd" can't be found after chroot. */
 	change_dir(NULL, CD_NORMAL);
 
-	init_flist();
-
 	if ((write_batch || read_batch) && !am_server) {
 		if (write_batch)
 			write_batch_shell_file(orig_argc, orig_argv, argc);

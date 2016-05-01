@@ -31,12 +31,13 @@ extern int am_generator;
 extern int local_server;
 extern int quiet;
 extern int module_id;
-extern int checksum_len;
 extern int allow_8bit_chars;
 extern int protocol_version;
 extern int always_checksum;
 extern int preserve_times;
 extern int msgs2stderr;
+extern int xfersum_type;
+extern int checksum_type;
 extern int stdout_format_has_i;
 extern int stdout_format_has_o_or_i;
 extern int logfile_format_has_i;
@@ -46,6 +47,7 @@ extern int64 total_data_written;
 extern int64 total_data_read;
 extern mode_t orig_umask;
 extern char *auth_user;
+extern char *checksum_choice;
 extern char *stdout_format;
 extern char *logfile_format;
 extern char *logfile_name;
@@ -669,13 +671,15 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 			n = buf2;
 			break;
 		case 'C':
-			if (protocol_version >= 30
-			 && (iflags & ITEM_TRANSFER
-			  || (always_checksum && S_ISREG(file->mode)))) {
-				const char *sum = iflags & ITEM_TRANSFER
-						? sender_file_sum : F_SUM(file);
-				n = sum_as_hex(sum);
-			} else {
+			n = NULL;
+			if (S_ISREG(file->mode)) {
+				if (always_checksum && canonical_checksum(checksum_type))
+					n = sum_as_hex(checksum_type, F_SUM(file));
+				else if (iflags & ITEM_TRANSFER && canonical_checksum(xfersum_type))
+					n = sum_as_hex(xfersum_type, sender_file_sum);
+			}
+			if (!n) {
+				int checksum_len = csum_len_for_type(always_checksum ? checksum_type : xfersum_type);
 				memset(buf2, ' ', checksum_len*2);
 				buf2[checksum_len*2] = '\0';
 				n = buf2;

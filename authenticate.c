@@ -71,7 +71,7 @@ static void gen_challenge(const char *addr, char *challenge)
 	SIVAL(input, 20, tv.tv_usec);
 	SIVAL(input, 24, getpid());
 
-	sum_init(0);
+	sum_init(-1, 0);
 	sum_update(input, sizeof input);
 	len = sum_end(digest);
 
@@ -85,7 +85,7 @@ static void generate_hash(const char *in, const char *challenge, char *out)
 	char buf[MAX_DIGEST_LEN];
 	int len;
 
-	sum_init(0);
+	sum_init(-1, 0);
 	sum_update(in, strlen(in));
 	sum_update(challenge, strlen(challenge));
 	len = sum_end(buf);

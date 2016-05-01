@@ -25,8 +25,6 @@
 #include "itypes.h"
 #include "inums.h"
 
-extern int checksum_len;
-
 /**
  * Sleep for a specified number of milliseconds.
  *
@@ -79,10 +77,11 @@ void *_realloc_array(void *ptr, unsigned int size, size_t num)
 	return realloc(ptr, size * num);
 }
 
-const char *sum_as_hex(const char *sum)
+const char *sum_as_hex(int csum_type, const char *sum)
 {
 	static char buf[MAX_DIGEST_LEN*2+1];
 	int i, x1, x2;
+	int checksum_len = csum_len_for_type(csum_type);
 	char *c = buf + checksum_len*2;
 
 	assert(c - buf < (int)sizeof buf);

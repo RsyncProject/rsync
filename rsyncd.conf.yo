@@ -656,7 +656,7 @@ quote(itemization(
   it() %b the number of bytes actually transferred
   it() %B the permission bits of the file (e.g. rwxrwxrwt)
   it() %c the total size of the block checksums received for the basis file (only when sending)
-  it() %C the full-file MD5 checksum if bf(--checksum) is enabled or a file was transferred (only for protocol 30 or above).
+  it() %C the full-file checksum if it is known for the file. For older rsync protocols/versions, the checksum was salted, and is thus not a useful value (and is not displayed when that is the case). For the checksum to output for a file, either the bf(--checksum) option must be in-effect or the file must have been transferred without a salted checksum being used. See the bf(--checksum-choice) option for a way to choose the algorithm.
   it() %f the filename (long form on sender; no trailing "/")
   it() %G the gid of the file (decimal) or "DEFAULT"
   it() %h the remote host name (only available for a daemon)

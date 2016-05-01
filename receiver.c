@@ -48,11 +48,11 @@ extern int append_mode;
 extern int sparse_files;
 extern int preallocate_files;
 extern int keep_partial;
-extern int checksum_len;
 extern int checksum_seed;
 extern int inplace;
 extern int allowed_lull;
 extern int delay_updates;
+extern int xfersum_type;
 extern mode_t orig_umask;
 extern struct stats stats;
 extern char *tmpdir;
@@ -234,6 +234,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 	static char file_sum1[MAX_DIGEST_LEN];
 	struct map_struct *mapbuf;
 	struct sum_struct sum;
+	int checksum_len;
 	int32 len;
 	OFF_T offset = 0;
 	OFF_T offset2;
@@ -269,7 +270,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 	} else
 		mapbuf = NULL;
 
-	sum_init(checksum_seed);
+	sum_init(xfersum_type, checksum_seed);
 
 	if (append_mode > 0) {
 		OFF_T j;
@@ -393,8 +394,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 		exit_cleanup(RERR_FILEIO);
 	}
 
-	if (sum_end(file_sum1) != checksum_len)
-		overflow_exit("checksum_len"); /* Impossible... */
+	checksum_len = sum_end(file_sum1);
 
 	if (mapbuf)
 		unmap_file(mapbuf);

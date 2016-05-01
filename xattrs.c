@@ -258,7 +258,7 @@ static int rsync_xal_get(const char *fname, item_list *xalp)
 		if (datum_len > MAX_FULL_DATUM) {
 			/* For large datums, we store a flag and a checksum. */
 			name_offset = 1 + MAX_DIGEST_LEN;
-			sum_init(checksum_seed);
+			sum_init(-1, checksum_seed);
 			sum_update(ptr, datum_len);
 			free(ptr);
 
@@ -821,7 +821,7 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 				goto still_abbrev;
 			}
 
-			sum_init(checksum_seed);
+			sum_init(-1, checksum_seed);
 			sum_update(ptr, len);
 			sum_end(sum);
 			if (memcmp(sum, rxas[i].datum + 1, MAX_DIGEST_LEN) != 0) {

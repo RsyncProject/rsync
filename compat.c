@@ -338,4 +338,6 @@ void setup_protocol(int f_out,int f_in)
 	} else {
 		checksum_seed = read_int(f_in);
 	}
+
+	init_flist();
 }

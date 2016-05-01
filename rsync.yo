@@ -380,6 +380,7 @@ to the detailed description below for a complete description.  verb(
      --preallocate           allocate dest files before writing
  -n, --dry-run               perform a trial run with no changes made
  -W, --whole-file            copy files whole (w/o delta-xfer algorithm)
+     --checksum-choice=STR   choose the checksum algorithms
  -x, --one-file-system       don't cross filesystem boundaries
  -B, --block-size=SIZE       force a fixed checksum block-size
  -e, --rsh=COMMAND           specify the remote shell to use
@@ -1280,13 +1281,26 @@ the "bytes sent", "bytes received", "literal data", and "matched data"
 statistics are too small, and the "speedup" value is equivalent to a run
 where no file transfers were needed.
 
-dit(bf(-W, --whole-file)) With this option rsync's delta-transfer algorithm
-is not used and the whole file is sent as-is instead.  The transfer may be
+dit(bf(-W, --whole-file)) This option disables rsync's delta-transfer algorithm,
+which causes all transferred files to be sent whole.  The transfer may be
 faster if this option is used when the bandwidth between the source and
 destination machines is higher than the bandwidth to disk (especially when the
 "disk" is actually a networked filesystem).  This is the default when both
 the source and destination are specified as local paths, but only if no
 batch-writing option is in effect.
+
+dit(bf(--checksum-choice=STR)) This option overrides the checksum algoriths.
+If one algorithm name is specified, it is used for both the transfer checksums
+and (assuming bf(--checksum) is specifed) the pre-transfer checksumming. If two
+comma-separated names are supplied, the first name affects the transfer
+checksums, and the second name affects the pre-transfer checksumming.
+
+The algorithm choices are "auto", "md4", "md5", and "none".  If "none" is
+specified for the first name, the bf(--whole-file) option is forced on and no
+checksum verification is performed on the transferred data.  If "none" is
+specified for the second name, the bf(--checksum) option cannot be used. The
+"auto" option is the default, where rsync bases its algorithm choice on the
+protocol version (for backward compatibility with older rsync versions).
 
 dit(bf(-x, --one-file-system)) This tells rsync to avoid crossing a
 filesystem boundary when recursing.  This does not limit the user's ability

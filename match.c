@@ -24,7 +24,7 @@
 
 extern int checksum_seed;
 extern int append_mode;
-extern int checksum_len;
+extern int xfersum_type;
 
 int updating_basis_file;
 char sender_file_sum[MAX_DIGEST_LEN];
@@ -360,13 +360,15 @@ static void hash_search(int f,struct sum_struct *s,
  **/
 void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 {
+	int checksum_len;
+
 	last_match = 0;
 	false_alarms = 0;
 	hash_hits = 0;
 	matches = 0;
 	data_transfer = 0;
 
-	sum_init(checksum_seed);
+	sum_init(xfersum_type, checksum_seed);
 
 	if (append_mode > 0) {
 		if (append_mode == 2) {
@@ -407,8 +409,7 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 		matched(f, s, buf, len, -1);
 	}
 
-	if (sum_end(sender_file_sum) != checksum_len)
-		overflow_exit("checksum_len"); /* Impossible... */
+	checksum_len = sum_end(sender_file_sum);
 
 	/* If we had a read error, send a bad checksum.  We use all bits
 	 * off as long as the checksum doesn't happen to be that, in
