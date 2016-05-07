@@ -2830,16 +2830,20 @@ itemization(
 )
 
 Note that, when using the bf(--recursive) (bf(-r)) option (which is implied by
-bf(-a)), every subcomponent of every path is visited from the top down, so
-include/exclude patterns get applied recursively to each subcomponent's
-full name (e.g. to include "/foo/bar/baz" the subcomponents "/foo" and
-"/foo/bar" must not be excluded).
-The exclude patterns actually short-circuit the directory traversal stage
-when rsync finds the files to send.  If a pattern excludes a particular
-parent directory, it can render a deeper include pattern ineffectual
-because rsync did not descend through that excluded section of the
-hierarchy.  This is particularly important when using a trailing '*' rule.
-For instance, this won't work:
+bf(-a)), every subdir component of every path is visited left to right, with
+each directory having a chance for exclusion before its content.  In this way
+include/exclude patterns are applied recursively to the pathname of each node
+in the filesystem's tree (those inside the transfer).  The exclude patterns
+short-circuit the directory traversal stage as rsync finds the files to send.
+
+For instance, to include "/foo/bar/baz", the directories "/foo" and "/foo/bar"
+must not be excluded.  Excluding one of those parent directories prevents the
+examination of its content, cutting off rsync's recursion into those paths and
+rendering the include for "/foo/bar/baz" ineffectual (since rsync can't match
+something it never sees in the cut-off section of the directory hierarchy).
+
+The concept path exclusion is particularly important when using a trailing '*'
+rule.  For instance, this won't work:
 
 quote(
 tt(+ /some/path/this-file-will-not-be-found)nl()
