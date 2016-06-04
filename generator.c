@@ -1266,7 +1266,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			 * this function was asked to process in the file list. */
 			if (!inc_recurse
 			 && (*dn != '.' || dn[1]) /* Avoid an issue with --relative and the "." dir. */
-			 && (prior_dir_file && strcmp(dn, f_name(prior_dir_file, NULL)) != 0)
+			 && (!prior_dir_file || strcmp(dn, f_name(prior_dir_file, NULL)) != 0)
 			 && flist_find_name(cur_flist, dn, 1) < 0) {
 				rprintf(FERROR,
 					"ABORTING due to invalid path from sender: %s/%s\n",
