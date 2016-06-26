@@ -611,10 +611,32 @@ int recv_xattr_request(struct file_struct *file, int f_in)
 	num = 0;
 	while ((rel_pos = read_varint(f_in)) != 0) {
 		num += rel_pos;
-		/* Note that the sender-related num values may not be in order on the receiver! */
-		while (cnt && (am_sender ? rxa->num < num : rxa->num != num)) {
-			rxa++;
-			cnt--;
+		if (am_sender) {
+			/* The sender-related num values are only in order on the sender.
+			 * We use that order here to scan foward or backward as needed. */
+			if (rel_pos < 0) {
+				while (cnt < (int)lst->count && rxa->num > num) {
+					rxa--;
+					cnt++;
+				}
+			} else {
+				while (cnt > 1 && rxa->num < num) {
+					rxa++;
+					cnt--;
+				}
+			}
+		} else {
+			int j;
+			/* The receiving side has no known num order, so we just scan
+			 * forward (w/wrap) and hope that the next value is near by. */
+			for (j = lst->count; j > 1 && rxa->num != num; j--) {
+				if (--cnt)
+					rxa++;
+				else {
+					cnt = lst->count;
+					rxa = lst->items;
+				}
+			}
 		}
 		if (!cnt || rxa->num != num) {
 			rprintf(FERROR, "[%s] could not find xattr #%d for %s\n",
