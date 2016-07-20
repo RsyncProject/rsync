@@ -98,7 +98,7 @@ $(CHECK_OBJS): $(HEADERS)
 
 flist.o: rounding.h
 
-rounding.h: rounding.c rsync.h
+rounding.h: rounding.c rsync.h proto.h
 	@for r in 0 1 3; do \
 	    if $(CC) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS) -o rounding -DEXTRA_ROUNDING=$$r -I. $(srcdir)/rounding.c >rounding.out 2>&1; then \
 		echo "#define EXTRA_ROUNDING $$r" >rounding.h; \
