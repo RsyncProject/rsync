@@ -79,7 +79,16 @@ typedef struct {
 	int num;
 } rsync_xa;
 
-typedef struct {
+struct _rsync_xa_list;
+
+typedef struct _rsync_xa_list_ref {
+	struct _rsync_xa_list_ref *next;
+	int ndx;
+} rsync_xa_list_ref;
+
+typedef struct _rsync_xa_list {
+	int ndx;
+	int64 key;
 	item_list xa_items;
 } rsync_xa_list;
 
@@ -91,6 +100,7 @@ static const rsync_xa_list empty_xa_list = {
 };
 static const item_list empty_xattr = EMPTY_ITEM_LIST;
 static item_list rsync_xal_l = EMPTY_ITEM_LIST;
+static struct hashtable *rsync_xal_h = NULL;
 
 static size_t prior_xattr_count = (size_t)-1;
 
@@ -367,19 +377,58 @@ int copy_xattrs(const char *source, const char *dest)
 	return 0;
 }
 
+static int64 xattr_lookup_hash(const item_list *xalp)
+{
+	const rsync_xa *rxas = xalp->items;
+	size_t i;
+	int64 key = hashlittle(&xalp->count, sizeof xalp->count);
+
+	for (i = 0; i < xalp->count; i++) {
+		key += hashlittle(rxas[i].name, rxas[i].name_len);
+		if (rxas[i].datum_len > MAX_FULL_DATUM)
+			key += hashlittle(rxas[i].datum, MAX_DIGEST_LEN);
+		else
+			key += hashlittle(rxas[i].datum, rxas[i].datum_len);
+	}
+
+	if (key == 0) {
+		/* This is very unlikely, but we should never
+		 * return 0 as hashtable_find() doesn't like it. */
+		return 1;
+	}
+
+	return key;
+}
+
 static int find_matching_xattr(const item_list *xalp)
 {
-	const rsync_xa_list *glst = rsync_xal_l.items;
-	size_t i;
+	const struct ht_int64_node *node;
+	const rsync_xa_list_ref *ref;
+	int64 key;
 
-	for (i = 0; i < rsync_xal_l.count; i++) {
-		const item_list *lst = &glst[i].xa_items;
-		const rsync_xa *rxas1 = lst->items;
+	if (rsync_xal_h == NULL)
+		return -1;
+
+	key = xattr_lookup_hash(xalp);
+
+	node = hashtable_find(rsync_xal_h, key, 0);
+	if (node == NULL)
+		return -1;
+
+	if (node->data == NULL)
+		return -1;
+
+	for (ref = node->data; ref != NULL; ref = ref->next) {
+		const rsync_xa_list *ptr = rsync_xal_l.items;
+		const rsync_xa *rxas1;
 		const rsync_xa *rxas2 = xalp->items;
 		size_t j;
 
+		ptr += ref->ndx;
+		rxas1 = ptr->xa_items.items;
+
 		/* Wrong number of elements? */
-		if (lst->count != xalp->count)
+		if (ptr->xa_items.count != xalp->count)
 			continue;
 		/* any elements different? */
 		for (j = 0; j < xalp->count; j++) {
@@ -400,7 +449,7 @@ static int find_matching_xattr(const item_list *xalp)
 		}
 		/* no differences found.  This is The One! */
 		if (j == xalp->count)
-			return i;
+			return ref->ndx;
 	}
 
 	return -1;
@@ -409,8 +458,10 @@ static int find_matching_xattr(const item_list *xalp)
 /* Store *xalp on the end of rsync_xal_l */
 static int rsync_xal_store(item_list *xalp)
 {
+	struct ht_int64_node *node;
 	int ndx = rsync_xal_l.count; /* pre-incremented count */
 	rsync_xa_list *new_list = EXPAND_ITEM_LIST(&rsync_xal_l, rsync_xa_list, RSYNC_XAL_LIST_INITIAL);
+	rsync_xa_list_ref *new_ref;
 	/* Since the following call starts a new list, we know it will hold the
 	 * entire initial-count, not just enough space for one new item. */
 	*new_list = empty_xa_list;
@@ -418,6 +469,40 @@ static int rsync_xal_store(item_list *xalp)
 	memcpy(new_list->xa_items.items, xalp->items, xalp->count * sizeof (rsync_xa));
 	new_list->xa_items.count = xalp->count;
 	xalp->count = 0;
+
+	new_list->ndx = ndx;
+	new_list->key = xattr_lookup_hash(&new_list->xa_items);
+
+	if (rsync_xal_h == NULL)
+		rsync_xal_h = hashtable_create(512, 1);
+	if (rsync_xal_h == NULL)
+		out_of_memory("rsync_xal_h hashtable_create()");
+
+	node = hashtable_find(rsync_xal_h, new_list->key, 1);
+	if (node == NULL)
+		out_of_memory("rsync_xal_h hashtable_find()");
+
+	new_ref = new0(rsync_xa_list_ref);
+	if (new_ref == NULL)
+		out_of_memory("new0(rsync_xa_list_ref)");
+
+	new_ref->ndx = ndx;
+
+	if (node->data != NULL) {
+		rsync_xa_list_ref *ref = node->data;
+
+		while (ref != NULL) {
+			if (ref->next != NULL) {
+				ref = ref->next;
+				continue;
+			}
+
+			ref->next = new_ref;
+			break;
+		}
+	} else
+		node->data = new_ref;
+
 	return ndx;
 }
 
@@ -817,7 +902,41 @@ void uncache_tmp_xattrs(void)
 		xa_list_item += rsync_xal_l.count;
 		rsync_xal_l.count = prior_xattr_count;
 		while (xa_list_item-- > xa_list_start) {
+			struct ht_int64_node *node;
+			rsync_xa_list_ref *ref;
+
 			rsync_xal_free(&xa_list_item->xa_items);
+
+			if (rsync_xal_h == NULL)
+				continue;
+
+			node = hashtable_find(rsync_xal_h, xa_list_item->key, 0);
+			if (node == NULL)
+				continue;
+
+			if (node->data == NULL)
+				continue;
+
+			ref = node->data;
+			if (xa_list_item->ndx == ref->ndx) {
+				/* xa_list_item is the first in the list. */
+				node->data = ref->next;
+				free(ref);
+				continue;
+			}
+
+			while (ref != NULL) {
+				if (ref->next == NULL) {
+					ref = NULL;
+					break;
+				}
+				if (xa_list_item->ndx == ref->next->ndx) {
+					ref->next = ref->next->next;
+					free(ref);
+					break;
+				}
+				ref = ref->next;
+			}
 		}
 		prior_xattr_count = (size_t)-1;
 	}
