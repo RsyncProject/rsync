@@ -398,8 +398,9 @@ static int find_matching_xattr(item_list *xalp)
 }
 
 /* Store *xalp on the end of rsync_xal_l */
-static void rsync_xal_store(item_list *xalp)
+static int rsync_xal_store(item_list *xalp)
 {
+	int ndx = rsync_xal_l.count; /* pre-incremented count */
 	item_list *new_lst = EXPAND_ITEM_LIST(&rsync_xal_l, item_list, RSYNC_XAL_LIST_INITIAL);
 	/* Since the following call starts a new list, we know it will hold the
 	 * entire initial-count, not just enough space for one new item. */
@@ -408,6 +409,7 @@ static void rsync_xal_store(item_list *xalp)
 	memcpy(new_lst->items, xalp->items, xalp->count * sizeof (rsync_xa));
 	new_lst->count = xalp->count;
 	xalp->count = 0;
+	return ndx;
 }
 
 /* Send the make_xattr()-generated xattr list for this flist entry. */
@@ -454,8 +456,7 @@ int send_xattr(int f, stat_x *sxp)
 			else
 				write_bigbuf(f, rxa->datum, rxa->datum_len);
 		}
-		ndx = rsync_xal_l.count; /* pre-incremented count */
-		rsync_xal_store(sxp->xattr); /* adds item to rsync_xal_l */
+		ndx = rsync_xal_store(sxp->xattr); /* adds item to rsync_xal_l */
 	}
 
 	return ndx;
@@ -769,8 +770,7 @@ void receive_xattr(int f, struct file_struct *file)
 	if (need_sort && count > 1)
 		qsort(temp_xattr.items, count, sizeof (rsync_xa), rsync_xal_compare_names);
 
-	ndx = rsync_xal_l.count; /* pre-incremented count */
-	rsync_xal_store(&temp_xattr); /* adds item to rsync_xal_l */
+	ndx = rsync_xal_store(&temp_xattr); /* adds item to rsync_xal_l */
 
 	F_XATTR(file) = ndx;
 }
