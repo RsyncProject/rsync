@@ -79,9 +79,16 @@ typedef struct {
 	int num;
 } rsync_xa;
 
+typedef struct {
+	item_list xa_items;
+} rsync_xa_list;
+
 static size_t namebuf_len = 0;
 static char *namebuf = NULL;
 
+static const rsync_xa_list empty_xa_list = {
+	.xa_items = EMPTY_ITEM_LIST,
+};
 static const item_list empty_xattr = EMPTY_ITEM_LIST;
 static item_list rsync_xal_l = EMPTY_ITEM_LIST;
 
@@ -360,17 +367,19 @@ int copy_xattrs(const char *source, const char *dest)
 	return 0;
 }
 
-static int find_matching_xattr(item_list *xalp)
+static int find_matching_xattr(const item_list *xalp)
 {
-	size_t i, j;
-	item_list *lst = rsync_xal_l.items;
+	const rsync_xa_list *glst = rsync_xal_l.items;
+	size_t i;
 
 	for (i = 0; i < rsync_xal_l.count; i++) {
-		rsync_xa *rxas1 = lst[i].items;
-		rsync_xa *rxas2 = xalp->items;
+		const item_list *lst = &glst[i].xa_items;
+		const rsync_xa *rxas1 = lst->items;
+		const rsync_xa *rxas2 = xalp->items;
+		size_t j;
 
 		/* Wrong number of elements? */
-		if (lst[i].count != xalp->count)
+		if (lst->count != xalp->count)
 			continue;
 		/* any elements different? */
 		for (j = 0; j < xalp->count; j++) {
@@ -401,13 +410,13 @@ static int find_matching_xattr(item_list *xalp)
 static int rsync_xal_store(item_list *xalp)
 {
 	int ndx = rsync_xal_l.count; /* pre-incremented count */
-	item_list *new_lst = EXPAND_ITEM_LIST(&rsync_xal_l, item_list, RSYNC_XAL_LIST_INITIAL);
+	rsync_xa_list *new_list = EXPAND_ITEM_LIST(&rsync_xal_l, rsync_xa_list, RSYNC_XAL_LIST_INITIAL);
 	/* Since the following call starts a new list, we know it will hold the
 	 * entire initial-count, not just enough space for one new item. */
-	*new_lst = empty_xattr;
-	(void)EXPAND_ITEM_LIST(new_lst, rsync_xa, xalp->count);
-	memcpy(new_lst->items, xalp->items, xalp->count * sizeof (rsync_xa));
-	new_lst->count = xalp->count;
+	*new_list = empty_xa_list;
+	(void)EXPAND_ITEM_LIST(&new_list->xa_items, rsync_xa, xalp->count);
+	memcpy(new_list->xa_items.items, xalp->items, xalp->count * sizeof (rsync_xa));
+	new_list->xa_items.count = xalp->count;
 	xalp->count = 0;
 	return ndx;
 }
@@ -467,7 +476,8 @@ int send_xattr(int f, stat_x *sxp)
  * need so that send_xattr_request() can tell the sender about them. */
 int xattr_diff(struct file_struct *file, stat_x *sxp, int find_all)
 {
-	const item_list *lst = rsync_xal_l.items;
+	const rsync_xa_list *glst = rsync_xal_l.items;
+	const item_list *lst;
 	rsync_xa *snd_rxa, *rec_rxa;
 	int snd_cnt, rec_cnt;
 	int cmp, same, xattrs_equal = 1;
@@ -480,9 +490,10 @@ int xattr_diff(struct file_struct *file, stat_x *sxp, int find_all)
 		rec_cnt = 0;
 	}
 
-	if (F_XATTR(file) >= 0)
-		lst += F_XATTR(file);
-	else
+	if (F_XATTR(file) >= 0) {
+		glst += F_XATTR(file);
+		lst = &glst->xa_items;
+	} else
 		lst = &empty_xattr;
 
 	snd_rxa = lst->items;
@@ -541,11 +552,14 @@ int xattr_diff(struct file_struct *file, stat_x *sxp, int find_all)
  * XSTATE_ABBREV states into XSTATE_DONE. */
 void send_xattr_request(const char *fname, struct file_struct *file, int f_out)
 {
-	item_list *lst = rsync_xal_l.items;
+	const rsync_xa_list *glst = rsync_xal_l.items;
+	const item_list *lst;
 	int cnt, prior_req = 0;
 	rsync_xa *rxa;
 
-	lst += F_XATTR(file);
+	glst += F_XATTR(file);
+	lst = &glst->xa_items;
+
 	for (rxa = lst->items, cnt = lst->count; cnt--; rxa++) {
 		if (rxa->datum_len <= MAX_FULL_DATUM)
 			continue;
@@ -596,7 +610,8 @@ void send_xattr_request(const char *fname, struct file_struct *file, int f_out)
  * stores it in place of its checksum. */
 int recv_xattr_request(struct file_struct *file, int f_in)
 {
-	item_list *lst = rsync_xal_l.items;
+	const rsync_xa_list *glst = rsync_xal_l.items;
+	const item_list *lst;
 	char *old_datum, *name;
 	rsync_xa *rxa;
 	int rel_pos, cnt, num, got_xattr_data = 0;
@@ -605,7 +620,8 @@ int recv_xattr_request(struct file_struct *file, int f_in)
 		rprintf(FERROR, "recv_xattr_request: internal data error!\n");
 		exit_cleanup(RERR_PROTOCOL);
 	}
-	lst += F_XATTR(file);
+	glst += F_XATTR(file);
+	lst = &glst->xa_items;
 
 	cnt = lst->count;
 	rxa = lst->items;
@@ -796,12 +812,13 @@ void cache_tmp_xattr(struct file_struct *file, stat_x *sxp)
 void uncache_tmp_xattrs(void)
 {
 	if (prior_xattr_count != (size_t)-1) {
-		item_list *xattr_item = rsync_xal_l.items;
-		item_list *xattr_start = xattr_item + prior_xattr_count;
-		xattr_item += rsync_xal_l.count;
+		rsync_xa_list *xa_list_item = rsync_xal_l.items;
+		rsync_xa_list *xa_list_start = xa_list_item + prior_xattr_count;
+		xa_list_item += rsync_xal_l.count;
 		rsync_xal_l.count = prior_xattr_count;
-		while (xattr_item-- > xattr_start)
-			rsync_xal_free(xattr_item);
+		while (xa_list_item-- > xa_list_start) {
+			rsync_xal_free(&xa_list_item->xa_items);
+		}
 		prior_xattr_count = (size_t)-1;
 	}
 }
@@ -921,8 +938,9 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 int set_xattr(const char *fname, const struct file_struct *file,
 	      const char *fnamecmp, stat_x *sxp)
 {
+	rsync_xa_list *glst = rsync_xal_l.items;
+	item_list *lst;
 	int ndx;
-	item_list *lst = rsync_xal_l.items;
 
 	if (dry_run)
 		return 1; /* FIXME: --dry-run needs to compute this value */
@@ -952,7 +970,9 @@ int set_xattr(const char *fname, const struct file_struct *file,
 #endif
 
 	ndx = F_XATTR(file);
-	return rsync_xal_set(fname, lst + ndx, fnamecmp, sxp);
+	glst += ndx;
+	lst = &glst->xa_items;
+	return rsync_xal_set(fname, lst, fnamecmp, sxp);
 }
 
 #ifdef SUPPORT_ACLS
