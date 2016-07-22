@@ -82,7 +82,7 @@ typedef struct {
 static size_t namebuf_len = 0;
 static char *namebuf = NULL;
 
-static item_list empty_xattr = EMPTY_ITEM_LIST;
+static const item_list empty_xattr = EMPTY_ITEM_LIST;
 static item_list rsync_xal_l = EMPTY_ITEM_LIST;
 
 static size_t prior_xattr_count = (size_t)-1;
@@ -466,7 +466,7 @@ int send_xattr(int f, stat_x *sxp)
  * need so that send_xattr_request() can tell the sender about them. */
 int xattr_diff(struct file_struct *file, stat_x *sxp, int find_all)
 {
-	item_list *lst = rsync_xal_l.items;
+	const item_list *lst = rsync_xal_l.items;
 	rsync_xa *snd_rxa, *rec_rxa;
 	int snd_cnt, rec_cnt;
 	int cmp, same, xattrs_equal = 1;
