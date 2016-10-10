@@ -35,7 +35,10 @@
 
 extern int sparse_files;
 
+OFF_T preallocated_len = 0;
+
 static OFF_T sparse_seek = 0;
+static OFF_T sparse_past_write = 0;
 
 int sparse_end(int f, OFF_T size)
 {
@@ -63,8 +66,10 @@ int sparse_end(int f, OFF_T size)
 	return ret;
 }
 
-
-static int write_sparse(int f, char *buf, int len)
+/* Note that the offset is just the caller letting us know where
+ * the current file position is in the file. The use_seek arg tells
+ * us that we should seek over matching data instead of writing it. */
+static int write_sparse(int f, int use_seek, OFF_T offset, const char *buf, int len)
 {
 	int l1 = 0, l2 = 0;
 	int ret;
@@ -77,9 +82,24 @@ static int write_sparse(int f, char *buf, int len)
 	if (l1 == len)
 		return len;
 
-	if (sparse_seek)
-		do_lseek(f, sparse_seek, SEEK_CUR);
+	if (sparse_seek) {
+		if (sparse_past_write >= preallocated_len) {
+			if (do_lseek(f, sparse_seek, SEEK_CUR) < 0)
+				return -1;
+		} else if (do_punch_hole(f, sparse_past_write, sparse_seek) < 0) {
+			sparse_seek = 0;
+			return -1;
+		}
+	}
 	sparse_seek = l2;
+	sparse_past_write = offset + len - l2;
+
+	if (use_seek) {
+		/* The in-place data already matches. */
+		if (do_lseek(f, len - (l1+l2), SEEK_CUR) < 0)
+			return -1;
+		return len;
+	}
 
 	while ((ret = write(f, buf + l1, len - (l1+l2))) <= 0) {
 		if (ret < 0 && errno == EINTR)
@@ -95,7 +115,6 @@ static int write_sparse(int f, char *buf, int len)
 
 	return len;
 }
-
 
 static char *wf_writeBuf;
 static size_t wf_writeBufSize;
@@ -118,12 +137,10 @@ int flush_write_file(int f)
 	return ret;
 }
 
-
-/*
- * write_file does not allow incomplete writes.  It loops internally
- * until len bytes are written or errno is set.
- */
-int write_file(int f, char *buf, int len)
+/* write_file does not allow incomplete writes.  It loops internally
+ * until len bytes are written or errno is set.  Note that use_seek and
+ * offset are only used in sparse processing (see write_sparse()). */
+int write_file(int f, int use_seek, OFF_T offset, const char *buf, int len)
 {
 	int ret = 0;
 
@@ -131,7 +148,8 @@ int write_file(int f, char *buf, int len)
 		int r1;
 		if (sparse_files > 0) {
 			int len1 = MIN(len, SPARSE_WRITE_SIZE);
-			r1 = write_sparse(f, buf, len1);
+			r1 = write_sparse(f, use_seek, offset, buf, len1);
+			offset += r1;
 		} else {
 			if (!wf_writeBuf) {
 				wf_writeBufSize = WRITE_SIZE * 8;
@@ -164,6 +182,30 @@ int write_file(int f, char *buf, int len)
 	return ret;
 }
 
+/* An in-place update found identical data at an identical location. We either
+ * just seek past it, or (for an in-place sparse update), we give the data to
+ * the sparse processor with the use_seek flag set. */
+int skip_matched(int fd, OFF_T offset, const char *buf, int len)
+{
+	OFF_T pos;
+
+	if (sparse_files > 0) {
+		if (write_file(fd, 1, offset, buf, len) != len)
+			return -1;
+		return 0;
+	}
+
+	if (flush_write_file(fd) < 0)
+		return -1;
+
+	if ((pos = do_lseek(fd, len, SEEK_CUR)) != offset + len) {
+		rsyserr(FERROR_XFER, errno, "lseek returned %s, not %s",
+			big_num(pos), big_num(offset));
+		return -1;
+	}
+
+	return 0;
+}
 
 /* This provides functionality somewhat similar to mmap() but using read().
  * It gives sliding window access to a file.  mmap() is not used because of
@@ -270,7 +312,6 @@ char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
 
 	return map->p + align_fudge;
 }
-
 
 int unmap_file(struct map_struct *map)
 {

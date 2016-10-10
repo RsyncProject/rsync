@@ -323,9 +323,7 @@ int copy_file(const char *source, const char *dest, int ofd, mode_t mode)
 	int ifd;
 	char buf[1024 * 8];
 	int len;   /* Number of bytes read into `buf'. */
-#ifdef PREALLOCATE_NEEDS_TRUNCATE
-	OFF_T preallocated_len = 0, offset = 0;
-#endif
+	OFF_T prealloc_len = 0, offset = 0;
 
 	if ((ifd = do_open(source, O_RDONLY, 0)) < 0) {
 		int save_errno = errno;
@@ -365,11 +363,8 @@ int copy_file(const char *source, const char *dest, int ofd, mode_t mode)
 		if (do_fstat(ifd, &srcst) < 0)
 			rsyserr(FWARNING, errno, "fstat %s", full_fname(source));
 		else if (srcst.st_size > 0) {
-			if (do_fallocate(ofd, 0, srcst.st_size) == 0) {
-#ifdef PREALLOCATE_NEEDS_TRUNCATE
-				preallocated_len = srcst.st_size;
-#endif
-			} else
+			prealloc_len = do_fallocate(ofd, 0, srcst.st_size);
+			if (prealloc_len < 0)
 				rsyserr(FWARNING, errno, "do_fallocate %s", full_fname(dest));
 		}
 	}
@@ -384,9 +379,7 @@ int copy_file(const char *source, const char *dest, int ofd, mode_t mode)
 			errno = save_errno;
 			return -1;
 		}
-#ifdef PREALLOCATE_NEEDS_TRUNCATE
 		offset += len;
-#endif
 	}
 
 	if (len < 0) {
@@ -403,15 +396,13 @@ int copy_file(const char *source, const char *dest, int ofd, mode_t mode)
 			full_fname(source));
 	}
 
-#ifdef PREALLOCATE_NEEDS_TRUNCATE
 	/* Source file might have shrunk since we fstatted it.
 	 * Cut off any extra preallocated zeros from dest file. */
-	if (offset < preallocated_len && do_ftruncate(ofd, offset) < 0) {
+	if (offset < prealloc_len && do_ftruncate(ofd, offset) < 0) {
 		/* If we fail to truncate, the dest file may be wrong, so we
 		 * must trigger the "partial transfer" error. */
 		rsyserr(FERROR_XFER, errno, "ftruncate %s", full_fname(dest));
 	}
-#endif
 
 	if (close(ofd) < 0) {
 		int save_errno = errno;

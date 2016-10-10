@@ -376,7 +376,7 @@ to the detailed description below for a complete description.  verb(
  -J, --omit-link-times       omit symlinks from --times
      --super                 receiver attempts super-user activities
      --fake-super            store/recover privileged attrs using xattrs
- -S, --sparse                handle sparse files efficiently
+ -S, --sparse                turn sequences of nulls into sparse blocks
      --preallocate           allocate dest files before writing
  -n, --dry-run               perform a trial run with no changes made
  -W, --whole-file            copy files whole (w/o delta-xfer algorithm)
@@ -873,9 +873,7 @@ the same or longer than the size on the sender, the file is skipped.  This
 does not interfere with the updating of a file's non-content attributes
 (e.g. permissions, ownership, etc.) when the file does not need to be
 transferred, nor does it affect the updating of any non-regular files.
-Implies bf(--inplace),
-but does not conflict with bf(--sparse) (since it is always extending a
-file's length).
+Implies bf(--inplace).
 
 The use of bf(--append) can be dangerous if you aren't 100% sure that the files
 that are longer have only grown by the appending of data onto the end.  You
@@ -1252,19 +1250,29 @@ This option is overridden by both bf(--super) and bf(--no-super).
 See also the "fake super" setting in the daemon's rsyncd.conf file.
 
 dit(bf(-S, --sparse)) Try to handle sparse files efficiently so they take
-up less space on the destination.  Conflicts with bf(--inplace) because it's
-not possible to overwrite data in a sparse fashion.
+up less space on the destination.  If combined with bf(--inplace) the
+file created might not end up with sparse blocks with some combinations
+of kernel version and/or filesystem type.  If bf(--whole-file) is in
+effect (e.g. for a local copy) then it will always work because rsync
+truncates the file prior to writing out the updated version.
+
+Note that versions of rsync older than 3.1.3 will reject the combination of
+bf(--sparse) and bf(--inplace).
 
 dit(bf(--preallocate)) This tells the receiver to allocate each destination
-file to its eventual size before writing data to the file.  Rsync will only use
-the real filesystem-level preallocation support provided by Linux's
+file to its eventual size before writing data to the file.  Rsync will only
+use the real filesystem-level preallocation support provided by Linux's
 bf(fallocate)(2) system call or Cygwin's bf(posix_fallocate)(3), not the slow
-glibc implementation that writes a zero byte into each block.
+glibc implementation that writes a null byte into each block.
 
 Without this option, larger files may not be entirely contiguous on the
 filesystem, but with this option rsync will probably copy more slowly.  If the
 destination is not an extent-supporting filesystem (such as ext4, xfs, NTFS,
 etc.), this option may have no positive effect at all.
+
+If combined with bf(--sparse), the file will only have sparse blocks (as
+opposed to allocated sequences of null bytes) if the kernel version and
+filesystem type support creating holes in the allocated data.
 
 dit(bf(-n, --dry-run)) This makes rsync perform a trial run that doesn't
 make any changes (and produces mostly the same output as a real run).  It

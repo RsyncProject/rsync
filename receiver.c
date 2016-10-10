@@ -49,6 +49,7 @@ extern int sparse_files;
 extern int preallocate_files;
 extern int keep_partial;
 extern int checksum_seed;
+extern int whole_file;
 extern int inplace;
 extern int allowed_lull;
 extern int delay_updates;
@@ -61,6 +62,9 @@ extern char *basis_dir[MAX_BASIS_DIRS+1];
 extern char sender_file_sum[MAX_DIGEST_LEN];
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern filter_rule_list daemon_filter_list;
+#ifdef SUPPORT_PREALLOCATION
+extern OFF_T preallocated_len;
+#endif
 
 static struct bitbag *delayed_bits = NULL;
 static int phase = 0, redoing = 0;
@@ -241,22 +245,25 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 	char *data;
 	int32 i;
 	char *map = NULL;
-#ifdef SUPPORT_PREALLOCATION
-#ifdef PREALLOCATE_NEEDS_TRUNCATE
-	OFF_T preallocated_len = 0;
-#endif
 
+#ifdef SUPPORT_PREALLOCATION
 	if (preallocate_files && fd != -1 && total_size > 0 && (!inplace || total_size > size_r)) {
 		/* Try to preallocate enough space for file's eventual length.  Can
 		 * reduce fragmentation on filesystems like ext4, xfs, and NTFS. */
-		if (do_fallocate(fd, 0, total_size) == 0) {
-#ifdef PREALLOCATE_NEEDS_TRUNCATE
-			preallocated_len = total_size;
-#endif
-		} else
+		if ((preallocated_len = do_fallocate(fd, 0, total_size)) < 0)
 			rsyserr(FWARNING, errno, "do_fallocate %s", full_fname(fname));
-	}
+	} else
 #endif
+	if (inplace) {
+#ifdef HAVE_FTRUNCATE
+		/* The most compatible way to create a sparse file is to start with no length. */
+		if (sparse_files > 0 && whole_file && fd >= 0 && do_ftruncate(fd, 0) == 0)
+			preallocated_len = 0;
+		else
+#endif
+			preallocated_len = size_r;
+	} else
+		preallocated_len = 0;
 
 	read_sum_head(f_in, &sum);
 
@@ -318,7 +325,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 
 			sum_update(data, i);
 
-			if (fd != -1 && write_file(fd,data,i) != i)
+			if (fd != -1 && write_file(fd, 0, offset, data, i) != i)
 				goto report_write_error;
 			offset += i;
 			continue;
@@ -348,37 +355,33 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 
 		if (updating_basis_or_equiv) {
 			if (offset == offset2 && fd != -1) {
-				OFF_T pos;
-				if (flush_write_file(fd) < 0)
+				if (skip_matched(fd, offset, map, len) < 0)
 					goto report_write_error;
 				offset += len;
-				if ((pos = do_lseek(fd, len, SEEK_CUR)) != offset) {
-					rsyserr(FERROR_XFER, errno,
-						"lseek of %s returned %s, not %s",
-						full_fname(fname),
-						big_num(pos), big_num(offset));
-					exit_cleanup(RERR_FILEIO);
-				}
 				continue;
 			}
 		}
-		if (fd != -1 && map && write_file(fd, map, len) != (int)len)
+		if (fd != -1 && map && write_file(fd, 0, offset, map, len) != (int)len)
 			goto report_write_error;
 		offset += len;
 	}
 
-	if (flush_write_file(fd) < 0)
-		goto report_write_error;
+	if (fd != -1 && offset > 0) {
+		if (sparse_files > 0) {
+			if (sparse_end(fd, offset) != 0)
+				goto report_write_error;
+		} else if (flush_write_file(fd) < 0) {
+		    report_write_error:
+			rsyserr(FERROR_XFER, errno, "write failed on %s", full_fname(fname));
+			exit_cleanup(RERR_FILEIO);
+		}
+	}
 
 #ifdef HAVE_FTRUNCATE
 	/* inplace: New data could be shorter than old data.
 	 * preallocate_files: total_size could have been an overestimate.
 	 *     Cut off any extra preallocated zeros from dest file. */
-	if ((inplace
-#ifdef PREALLOCATE_NEEDS_TRUNCATE
-	  || preallocated_len > offset
-#endif
-	  ) && fd != -1 && do_ftruncate(fd, offset) < 0) {
+	if ((inplace || preallocated_len > offset) && fd != -1 && do_ftruncate(fd, offset) < 0) {
 		rsyserr(FERROR_XFER, errno, "ftruncate failed on %s",
 			full_fname(fname));
 	}
@@ -386,13 +389,6 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 
 	if (INFO_GTE(PROGRESS, 1))
 		end_progress(total_size);
-
-	if (fd != -1 && offset > 0 && sparse_end(fd, offset) != 0) {
-	    report_write_error:
-		rsyserr(FERROR_XFER, errno, "write failed on %s",
-			full_fname(fname));
-		exit_cleanup(RERR_FILEIO);
-	}
 
 	checksum_len = sum_end(file_sum1);
 

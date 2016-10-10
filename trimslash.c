@@ -28,6 +28,8 @@ int read_only = 1;
 int list_only = 0;
 int preserve_perms = 0;
 int preserve_executability = 0;
+int preallocate_files = 0;
+int inplace = 0;
 
 int
 main(int argc, char **argv)

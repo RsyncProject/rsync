@@ -714,7 +714,7 @@ void usage(enum logcode F)
 #ifdef SUPPORT_XATTRS
   rprintf(F,"     --fake-super            store/recover privileged attrs using xattrs\n");
 #endif
-  rprintf(F," -S, --sparse                handle sparse files efficiently\n");
+  rprintf(F," -S, --sparse                turn sequences of nulls into sparse blocks\n");
 #ifdef SUPPORT_PREALLOCATION
   rprintf(F,"     --preallocate           allocate dest files before writing them\n");
 #else
@@ -2235,14 +2235,6 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		bwlimit_writemax = (size_t)bwlimit * 128;
 		if (bwlimit_writemax < 512)
 			bwlimit_writemax = 512;
-	}
-
-	if (sparse_files && inplace) {
-		/* Note: we don't check for this below, because --append is
-		 * OK with --sparse (as long as redos are handled right). */
-		snprintf(err_buf, sizeof err_buf,
-			 "--sparse cannot be used with --inplace\n");
-		return 0;
 	}
 
 	if (append_mode) {

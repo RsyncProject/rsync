@@ -38,6 +38,8 @@ extern int am_root;
 extern int am_sender;
 extern int read_only;
 extern int list_only;
+extern int inplace;
+extern int preallocate_files;
 extern int preserve_perms;
 extern int preserve_executability;
 
@@ -423,26 +425,79 @@ int do_utime(const char *fname, time_t modtime, UNUSED(uint32 mod_nsec))
 #endif
 
 #ifdef SUPPORT_PREALLOCATION
-int do_fallocate(int fd, OFF_T offset, OFF_T length)
-{
 #ifdef FALLOC_FL_KEEP_SIZE
 #define DO_FALLOC_OPTIONS FALLOC_FL_KEEP_SIZE
 #else
 #define DO_FALLOC_OPTIONS 0
 #endif
+
+OFF_T do_fallocate(int fd, OFF_T offset, OFF_T length)
+{
+	int opts = inplace || preallocate_files ? 0 : DO_FALLOC_OPTIONS;
+	int ret;
 	RETURN_ERROR_IF(dry_run, 0);
 	RETURN_ERROR_IF_RO_OR_LO;
+	if (length & 1) /* make the length not match the desired length */
+		length++;
+	else
+		length--;
 #if defined HAVE_FALLOCATE
-	return fallocate(fd, DO_FALLOC_OPTIONS, offset, length);
+	ret = fallocate(fd, opts, offset, length);
 #elif defined HAVE_SYS_FALLOCATE
-	return syscall(SYS_fallocate, fd, DO_FALLOC_OPTIONS, (loff_t)offset, (loff_t)length);
+	ret = syscall(SYS_fallocate, fd, opts, (loff_t)offset, (loff_t)length);
 #elif defined HAVE_EFFICIENT_POSIX_FALLOCATE
-	return posix_fallocate(fd, offset, length);
+	ret = posix_fallocate(fd, offset, length);
 #else
 #error Coding error in SUPPORT_PREALLOCATION logic.
 #endif
+	if (ret < 0)
+		return ret;
+	if (opts == 0) {
+		STRUCT_STAT st;
+		if (do_fstat(fd, &st) < 0)
+			return length;
+		return st.st_blocks * 512;
+	}
+	return 0;
 }
 #endif
+
+/* Punch a hole at pos for len bytes. The current file position must be at pos and will be
+ * changed to be at pos + len. */
+int do_punch_hole(int fd, UNUSED(OFF_T pos), int len)
+{
+#ifdef HAVE_FALLOCATE
+# ifdef HAVE_FALLOC_FL_PUNCH_HOLE
+	if (fallocate(fd, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE, pos, len) == 0) {
+		if (do_lseek(fd, len, SEEK_CUR) != pos + len)
+			return -1;
+		return 0;
+	}
+# endif
+# ifdef HAVE_FALLOC_FL_ZERO_RANGE
+	if (fallocate(fd, FALLOC_FL_ZERO_RANGE, pos, len) == 0) {
+		if (do_lseek(fd, len, SEEK_CUR) != pos + len)
+			return -1;
+		return 0;
+	}
+# endif
+#endif
+	{
+		char zeros[4096];
+		memset(zeros, 0, sizeof zeros);
+		while (len > 0) {
+			int chunk = len > (int)sizeof zeros ? (int)sizeof zeros : len;
+			int wrote = write(fd, zeros, chunk);
+			if (wrote <= 0) {
+				if (wrote < 0 && errno == EINTR)
+					continue;
+				return -1;
+			}
+			len -= wrote;
+		}
+	}
+	return 0;
+}
 
 int do_open_nofollow(const char *pathname, int flags)
 {
