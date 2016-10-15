@@ -43,6 +43,16 @@ extern int preallocate_files;
 extern int preserve_perms;
 extern int preserve_executability;
 
+#ifndef S_BLKSIZE
+# if defined hpux || defined __hpux__ || defined __hpux
+#  define S_BLKSIZE 1024
+# elif defined _AIX && defined _I386
+#  define S_BLKSIZE 4096
+# else
+#  define S_BLKSIZE 512
+# endif
+#endif
+
 #define RETURN_ERROR_IF(x,e) \
 	do { \
 		if (x) { \
@@ -456,7 +466,7 @@ OFF_T do_fallocate(int fd, OFF_T offset, OFF_T length)
 		STRUCT_STAT st;
 		if (do_fstat(fd, &st) < 0)
 			return length;
-		return st.st_blocks * 512;
+		return st.st_blocks * S_BLKSIZE;
 	}
 	return 0;
 }
