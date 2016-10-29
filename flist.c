@@ -156,7 +156,9 @@ static void start_filelist_progress(char *kind)
 
 static void emit_filelist_progress(int count)
 {
+	output_needs_newline = 0; /* avoid a newline in the middle of this filelist-progress output */
 	rprintf(FCLIENT, " %d files...\r", count);
+	output_needs_newline = 1;
 }
 
 static void maybe_emit_filelist_progress(int count)
