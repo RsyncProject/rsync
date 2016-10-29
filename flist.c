@@ -37,6 +37,7 @@ extern int checksum_type;
 extern int module_id;
 extern int ignore_errors;
 extern int numeric_ids;
+extern int quiet;
 extern int recurse;
 extern int use_qsort;
 extern int xfer_dirs;
@@ -128,6 +129,7 @@ static char tmp_sum[MAX_DIGEST_LEN];
 
 static char empty_sum[MAX_DIGEST_LEN];
 static int flist_count_offset; /* for --delete --progress */
+static int show_filelist_progress;
 
 static void flist_sort_and_clean(struct file_list *flist, int strip_root);
 static void output_flist(struct file_list *flist);
@@ -140,15 +142,14 @@ void init_flist(void)
 	}
 	parse_checksum_choice(); /* Sets checksum_type && xfersum_type */
 	checksum_len = csum_len_for_type(checksum_type);
-}
 
-static int show_filelist_p(void)
-{
-	return INFO_GTE(FLIST, 1) && xfer_dirs && !am_server && !inc_recurse;
+	show_filelist_progress = INFO_GTE(FLIST, 1) && xfer_dirs && !am_server && !inc_recurse;
 }
 
 static void start_filelist_progress(char *kind)
 {
+	if (quiet)
+		return;
 	rprintf(FCLIENT, "%s ... ", kind);
 	output_needs_newline = 1;
 	rflush(FINFO);
@@ -156,25 +157,28 @@ static void start_filelist_progress(char *kind)
 
 static void emit_filelist_progress(int count)
 {
-	output_needs_newline = 0; /* avoid a newline in the middle of this filelist-progress output */
+	if (quiet)
+		return;
+	if (output_needs_newline == 2) /* avoid a newline in the middle of this filelist-progress output */
+		output_needs_newline = 0;
 	rprintf(FCLIENT, " %d files...\r", count);
-	output_needs_newline = 1;
+	output_needs_newline = 2;
 }
 
 static void maybe_emit_filelist_progress(int count)
 {
-	if (INFO_GTE(FLIST, 2) && show_filelist_p() && (count % 100) == 0)
+	if (INFO_GTE(FLIST, 2) && show_filelist_progress && (count % 100) == 0)
 		emit_filelist_progress(count);
 }
 
 static void finish_filelist_progress(const struct file_list *flist)
 {
+	output_needs_newline = 0;
 	if (INFO_GTE(FLIST, 2)) {
 		/* This overwrites the progress line */
 		rprintf(FINFO, "%d file%sto consider\n",
 			flist->used, flist->used == 1 ? " " : "s ");
 	} else {
-		output_needs_newline = 0;
 		rprintf(FINFO, "done\n");
 	}
 }
@@ -2089,7 +2093,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	int implied_dot_dir = 0;
 
 	rprintf(FLOG, "building file list\n");
-	if (show_filelist_p())
+	if (show_filelist_progress)
 		start_filelist_progress("building file list");
 	else if (inc_recurse && INFO_GTE(FLIST, 1) && !am_server)
 		rprintf(FCLIENT, "sending incremental file list\n");
@@ -2363,7 +2367,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		idev_destroy();
 #endif
 
-	if (show_filelist_p())
+	if (show_filelist_progress)
 		finish_filelist_progress(flist);
 
 	gettimeofday(&end_tv, NULL);
@@ -2445,7 +2449,7 @@ struct file_list *recv_file_list(int f, int dir_ndx)
 	int64 start_read;
 
 	if (!first_flist) {
-		if (show_filelist_p())
+		if (show_filelist_progress)
 			start_filelist_progress("receiving file list");
 		else if (inc_recurse && INFO_GTE(FLIST, 1) && !am_server)
 			rprintf(FCLIENT, "receiving incremental file list\n");
@@ -2541,7 +2545,7 @@ struct file_list *recv_file_list(int f, int dir_ndx)
 	if (DEBUG_GTE(FLIST, 2))
 		rprintf(FINFO, "received %d names\n", flist->used);
 
-	if (show_filelist_p())
+	if (show_filelist_progress)
 		finish_filelist_progress(flist);
 
 	if (need_unsorted_flist) {
