@@ -62,9 +62,7 @@ extern char *basis_dir[MAX_BASIS_DIRS+1];
 extern char sender_file_sum[MAX_DIGEST_LEN];
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern filter_rule_list daemon_filter_list;
-#ifdef SUPPORT_PREALLOCATION
 extern OFF_T preallocated_len;
-#endif
 
 static struct bitbag *delayed_bits = NULL;
 static int phase = 0, redoing = 0;
