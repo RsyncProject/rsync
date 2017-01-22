@@ -2967,8 +2967,7 @@ static void flist_sort_and_clean(struct file_list *flist, int strip_root)
 					clear_file(fp);
 				}
 				prev_depth = F_DEPTH(file);
-				if (is_excluded(f_name(file, fbuf), 1,
-						       ALL_FILTERS)) {
+				if (is_excluded(f_name(file, fbuf), 1, ALL_FILTERS)) {
 					/* Keep dirs through this dir. */
 					for (j = prev_depth-1; ; j--) {
 						fp = flist->sorted[prev_i];

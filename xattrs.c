@@ -250,16 +250,13 @@ static int rsync_xal_get(const char *fname, item_list *xalp)
 		list_len -= name_len;
 
 #ifdef HAVE_LINUX_XATTRS
-		/* We always ignore the system namespace, and non-root
-		 * ignores everything but the user namespace. */
-		if (user_only ? !HAS_PREFIX(name, USER_PREFIX)
-			      : HAS_PREFIX(name, SYSTEM_PREFIX))
+		/* Choose between ignoring the system namespace or (non-root) ignoring any non-user namespace. */
+		if (user_only ? !HAS_PREFIX(name, USER_PREFIX) : HAS_PREFIX(name, SYSTEM_PREFIX))
 			continue;
 #endif
 
 		/* No rsync.%FOO attributes are copied w/o 2 -X options. */
-		if (name_len > RPRE_LEN && name[RPRE_LEN] == '%'
-		 && HAS_PREFIX(name, RSYNC_PREFIX)) {
+		if (name_len > RPRE_LEN && name[RPRE_LEN] == '%' && HAS_PREFIX(name, RSYNC_PREFIX)) {
 			if ((am_sender && preserve_xattrs < 2)
 			 || (am_root < 0
 			  && (strcmp(name+RPRE_LEN+1, XSTAT_SUFFIX) == 0
@@ -353,10 +350,8 @@ int copy_xattrs(const char *source, const char *dest)
 		list_len -= name_len;
 
 #ifdef HAVE_LINUX_XATTRS
-		/* We always ignore the system namespace, and non-root
-		 * ignores everything but the user namespace. */
-		if (user_only ? !HAS_PREFIX(name, USER_PREFIX)
-			      : HAS_PREFIX(name, SYSTEM_PREFIX))
+		/* Choose between ignoring the system namespace or (non-root) ignoring any non-user namespace. */
+		if (user_only ? !HAS_PREFIX(name, USER_PREFIX) : HAS_PREFIX(name, SYSTEM_PREFIX))
 			continue;
 #endif
 
@@ -860,6 +855,7 @@ void receive_xattr(int f, struct file_struct *file)
 			free(ptr);
 			continue;
 		}
+
 		rxa = EXPAND_ITEM_LIST(&temp_xattr, rsync_xa, 1);
 		rxa->name = name;
 		rxa->datum = ptr;
@@ -1025,14 +1021,11 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 		list_len -= name_len;
 
 #ifdef HAVE_LINUX_XATTRS
-		/* We always ignore the system namespace, and non-root
-		 * ignores everything but the user namespace. */
-		if (user_only ? !HAS_PREFIX(name, USER_PREFIX)
-			      : HAS_PREFIX(name, SYSTEM_PREFIX))
+		/* Choose between ignoring the system namespace or (non-root) ignoring any non-user namespace. */
+		if (user_only ? !HAS_PREFIX(name, USER_PREFIX) : HAS_PREFIX(name, SYSTEM_PREFIX))
 			continue;
 #endif
-		if (am_root < 0 && name_len > RPRE_LEN
-		 && name[RPRE_LEN] == '%' && strcmp(name, XSTAT_ATTR) == 0)
+		if (am_root < 0 && name_len > RPRE_LEN && name[RPRE_LEN] == '%' && strcmp(name, XSTAT_ATTR) == 0)
 			continue;
 
 		for (i = 0; i < xalp->count; i++) {
