@@ -243,16 +243,6 @@ int link_stat(const char *path, STRUCT_STAT *stp, int follow_dirlinks)
 #endif
 }
 
-static inline int is_daemon_excluded(const char *fname, int is_dir)
-{
-	if (daemon_filter_list.head
-	 && check_filter(&daemon_filter_list, FLOG, fname, is_dir) < 0) {
-		errno = ENOENT;
-		return 1;
-	}
-	return 0;
-}
-
 static inline int path_is_daemon_excluded(char *path, int ignore_filename)
 {
 	if (daemon_filter_list.head) {
@@ -279,23 +269,9 @@ static inline int path_is_daemon_excluded(char *path, int ignore_filename)
 	return 0;
 }
 
-/* This function is used to check if a file should be included/excluded
- * from the list of files based on its name and type etc.  The value of
- * filter_level is set to either SERVER_FILTERS or ALL_FILTERS. */
-static int is_excluded(const char *fname, int is_dir, int filter_level)
+static inline int is_excluded(const char *fname, int is_dir, int filter_level)
 {
-#if 0 /* This currently never happens, so avoid a useless compare. */
-	if (filter_level == NO_FILTERS)
-		return 0;
-#endif
-	if (is_daemon_excluded(fname, is_dir))
-		return 1;
-	if (filter_level != ALL_FILTERS)
-		return 0;
-	if (filter_list.head
-	    && check_filter(&filter_list, FINFO, fname, is_dir) < 0)
-		return 1;
-	return 0;
+	return name_is_excluded(fname, is_dir ? NAME_IS_DIR : NAME_IS_FILE, filter_level);
 }
 
 static void send_directory(int f, struct file_list *flist,
@@ -2268,7 +2244,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			memmove(fbuf, fn, len + 1);
 
 		if (link_stat(fbuf, &st, copy_dirlinks || name_type != NORMAL_NAME) != 0
-		 || (name_type != DOTDIR_NAME && is_daemon_excluded(fbuf, S_ISDIR(st.st_mode)))
+		 || (name_type != DOTDIR_NAME && is_excluded(fbuf, S_ISDIR(st.st_mode) != 0, SERVER_FILTERS))
 		 || (relative_paths && path_is_daemon_excluded(fbuf, 1))) {
 			if (errno != ENOENT || missing_args == 0) {
 				/* This is a transfer error, but inhibit deletion

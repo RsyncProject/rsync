@@ -44,6 +44,8 @@ filter_rule_list filter_list = { .debug_type = "" };
 filter_rule_list cvs_filter_list = { .debug_type = " [global CVS]" };
 filter_rule_list daemon_filter_list = { .debug_type = " [daemon]" };
 
+int saw_xattr_filter = 0;
+
 /* Need room enough for ":MODS " prefix plus some room to grow. */
 #define MAX_RULE_PREFIX (16)
 
@@ -622,7 +624,7 @@ void change_local_filter_dir(const char *dname, int dlen, int dir_depth)
 	filt_array[cur_depth] = push_local_filters(dname, dlen);
 }
 
-static int rule_matches(const char *fname, filter_rule *ex, int name_is_dir)
+static int rule_matches(const char *fname, filter_rule *ex, int name_flags)
 {
 	int slash_handling, str_cnt = 0, anchored_match = 0;
 	int ret_match = ex->rflags & FILTRULE_NEGATE ? 0 : 1;
@@ -631,6 +633,9 @@ static int rule_matches(const char *fname, filter_rule *ex, int name_is_dir)
 	const char *name = fname + (*fname == '/');
 
 	if (!*name)
+		return 0;
+
+	if (!(name_flags & NAME_IS_XATTR) ^ !(ex->rflags & FILTRULE_XATTR))
 		return 0;
 
 	if (!ex->u.slash_cnt && !(ex->rflags & FILTRULE_WILD2)) {
@@ -650,7 +655,7 @@ static int rule_matches(const char *fname, filter_rule *ex, int name_is_dir)
 		strings[str_cnt++] = "/";
 	}
 	strings[str_cnt++] = name;
-	if (name_is_dir) {
+	if (name_flags & NAME_IS_DIR) {
 		/* Allow a trailing "/"+"***" to match the directory. */
 		if (ex->rflags & FILTRULE_WILD3_SUFFIX)
 			strings[str_cnt++] = "/";
@@ -702,7 +707,7 @@ static int rule_matches(const char *fname, filter_rule *ex, int name_is_dir)
 
 static void report_filter_result(enum logcode code, char const *name,
 				 filter_rule const *ent,
-				 int name_is_dir, const char *type)
+				 int name_flags, const char *type)
 {
 	/* If a trailing slash is present to match only directories,
 	 * then it is stripped out by add_rule().  So as a special
@@ -712,17 +717,40 @@ static void report_filter_result(enum logcode code, char const *name,
 		static char *actions[2][2]
 		    = { {"show", "hid"}, {"risk", "protect"} };
 		const char *w = who_am_i();
+		const char *t = name_flags & NAME_IS_XATTR ? "xattr"
+			      : name_flags & NAME_IS_DIR ? "directory"
+			      : "file";
 		rprintf(code, "[%s] %sing %s %s because of pattern %s%s%s\n",
 		    w, actions[*w!='s'][!(ent->rflags & FILTRULE_INCLUDE)],
-		    name_is_dir ? "directory" : "file", name, ent->pattern,
+		    t, name, ent->pattern,
 		    ent->rflags & FILTRULE_DIRECTORY ? "/" : "", type);
 	}
+}
+
+/* This function is used to check if a file should be included/excluded
+ * from the list of files based on its name and type etc.  The value of
+ * filter_level is set to either SERVER_FILTERS or ALL_FILTERS. */
+int name_is_excluded(const char *fname, int name_flags, int filter_level)
+{
+	if (daemon_filter_list.head && check_filter(&daemon_filter_list, FLOG, fname, name_flags) < 0) {
+		if (!(name_flags & NAME_IS_XATTR))
+			errno = ENOENT;
+		return 1;
+	}
+
+	if (filter_level != ALL_FILTERS)
+		return 0;
+
+	if (filter_list.head && check_filter(&filter_list, FINFO, fname, name_flags) < 0)
+		return 1;
+
+	return 0;
 }
 
 /* Return -1 if file "name" is defined to be excluded by the specified
  * exclude list, 1 if it is included, and 0 if it was not matched. */
 int check_filter(filter_rule_list *listp, enum logcode code,
-		 const char *name, int name_is_dir)
+		 const char *name, int name_flags)
 {
 	filter_rule *ent;
 
@@ -730,19 +758,19 @@ int check_filter(filter_rule_list *listp, enum logcode code,
 		if (ignore_perishable && ent->rflags & FILTRULE_PERISHABLE)
 			continue;
 		if (ent->rflags & FILTRULE_PERDIR_MERGE) {
-			int rc = check_filter(ent->u.mergelist, code, name, name_is_dir);
+			int rc = check_filter(ent->u.mergelist, code, name, name_flags);
 			if (rc)
 				return rc;
 			continue;
 		}
 		if (ent->rflags & FILTRULE_CVS_IGNORE) {
-			int rc = check_filter(&cvs_filter_list, code, name, name_is_dir);
+			int rc = check_filter(&cvs_filter_list, code, name, name_flags);
 			if (rc)
 				return rc;
 			continue;
 		}
-		if (rule_matches(name, ent, name_is_dir)) {
-			report_filter_result(code, name, ent, name_is_dir, listp->debug_type);
+		if (rule_matches(name, ent, name_flags)) {
+			report_filter_result(code, name, ent, name_flags, listp->debug_type);
 			return ent->rflags & FILTRULE_INCLUDE ? 1 : -1;
 		}
 	}
@@ -966,6 +994,10 @@ static filter_rule *parse_rule_tok(const char **rulestr_ptr,
 				if (!(rule->rflags & FILTRULE_MERGE_FILE))
 					goto invalid;
 				rule->rflags |= FILTRULE_WORD_SPLIT;
+				break;
+			case 'x':
+				rule->rflags |= FILTRULE_XATTR;
+				saw_xattr_filter = 1;
 				break;
 			}
 		}

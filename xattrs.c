@@ -37,6 +37,7 @@ extern int preserve_links;
 extern int preserve_devices;
 extern int preserve_specials;
 extern int checksum_seed;
+extern int saw_xattr_filter;
 
 #define RSYNC_XAL_INITIAL 5
 #define RSYNC_XAL_LIST_INITIAL 100
@@ -249,9 +250,13 @@ static int rsync_xal_get(const char *fname, item_list *xalp)
 		name_len = strlen(name) + 1;
 		list_len -= name_len;
 
+		if (saw_xattr_filter) {
+			if (name_is_excluded(name, NAME_IS_XATTR, ALL_FILTERS))
+				continue;
+		}
 #ifdef HAVE_LINUX_XATTRS
 		/* Choose between ignoring the system namespace or (non-root) ignoring any non-user namespace. */
-		if (user_only ? !HAS_PREFIX(name, USER_PREFIX) : HAS_PREFIX(name, SYSTEM_PREFIX))
+		else if (user_only ? !HAS_PREFIX(name, USER_PREFIX) : HAS_PREFIX(name, SYSTEM_PREFIX))
 			continue;
 #endif
 
@@ -349,9 +354,13 @@ int copy_xattrs(const char *source, const char *dest)
 		name_len = strlen(name) + 1;
 		list_len -= name_len;
 
+		if (saw_xattr_filter) {
+			if (name_is_excluded(name, NAME_IS_XATTR, ALL_FILTERS))
+				continue;
+		}
 #ifdef HAVE_LINUX_XATTRS
 		/* Choose between ignoring the system namespace or (non-root) ignoring any non-user namespace. */
-		if (user_only ? !HAS_PREFIX(name, USER_PREFIX) : HAS_PREFIX(name, SYSTEM_PREFIX))
+		else if (user_only ? !HAS_PREFIX(name, USER_PREFIX) : HAS_PREFIX(name, SYSTEM_PREFIX))
 			continue;
 #endif
 
@@ -821,10 +830,17 @@ void receive_xattr(int f, struct file_struct *file)
 			*ptr = XSTATE_ABBREV;
 			read_buf(f, ptr + 1, MAX_DIGEST_LEN);
 		}
+
+		if (saw_xattr_filter) {
+			if (name_is_excluded(name, NAME_IS_XATTR, ALL_FILTERS)) {
+				free(ptr);
+				continue;
+			}
+		}
 #ifdef HAVE_LINUX_XATTRS
 		/* Non-root can only save the user namespace. */
 		if (am_root <= 0 && !HAS_PREFIX(name, USER_PREFIX)) {
-			if (!am_root) {
+			if (!am_root && !saw_xattr_filter) {
 				free(ptr);
 				continue;
 			}
@@ -1020,9 +1036,13 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 		name_len = strlen(name) + 1;
 		list_len -= name_len;
 
+		if (saw_xattr_filter) {
+			if (name_is_excluded(name, NAME_IS_XATTR, ALL_FILTERS))
+				continue;
+		}
 #ifdef HAVE_LINUX_XATTRS
 		/* Choose between ignoring the system namespace or (non-root) ignoring any non-user namespace. */
-		if (user_only ? !HAS_PREFIX(name, USER_PREFIX) : HAS_PREFIX(name, SYSTEM_PREFIX))
+		else if (user_only ? !HAS_PREFIX(name, USER_PREFIX) : HAS_PREFIX(name, SYSTEM_PREFIX))
 			continue;
 #endif
 		if (am_root < 0 && name_len > RPRE_LEN && name[RPRE_LEN] == '%' && strcmp(name, XSTAT_ATTR) == 0)

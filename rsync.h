@@ -856,6 +856,10 @@ struct map_struct {
 	int status;		/* first errno from read errors		*/
 };
 
+#define NAME_IS_FILE		(0)    /* filter name as a file */
+#define NAME_IS_DIR		(1<<0) /* filter name as a dir */
+#define NAME_IS_XATTR		(1<<2) /* filter name as an xattr */
+
 #define FILTRULE_WILD		(1<<0) /* pattern has '*', '[', and/or '?' */
 #define FILTRULE_WILD2		(1<<1) /* pattern has '**' */
 #define FILTRULE_WILD2_PREFIX	(1<<2) /* pattern starts with "**" */
@@ -876,6 +880,7 @@ struct map_struct {
 #define FILTRULE_RECEIVER_SIDE	(1<<17)/* rule applies to the receiving side */
 #define FILTRULE_CLEAR_LIST	(1<<18)/* this item is the "!" token */
 #define FILTRULE_PERISHABLE	(1<<19)/* perishable if parent dir goes away */
+#define FILTRULE_XATTR		(1<<20)/* rule only applies to xattr names */
 
 #define FILTRULES_SIDES (FILTRULE_SENDER_SIDE | FILTRULE_RECEIVER_SIDE)
 

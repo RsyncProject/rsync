@@ -1118,9 +1118,27 @@ super-user copies all namespaces except system.*.  A normal user only copies
 the user.* namespace.  To be able to backup and restore non-user namespaces as
 a normal user, see the bf(--fake-super) option.
 
-Note that this option does not copy rsyncs special xattr values (e.g. those
-used by bf(--fake-super)) unless you repeat the option (e.g. -XX).  This
-"copy all xattrs" mode cannot be used with bf(--fake-super).
+The above name filtering can be overridden by using one or more filter options
+with the bf(x) modifier. When you specify an xattr-affecting filter rule, rsync
+requires that you do your own system/user filtering, as well as any additional
+filtering for what xattr names are copied and what names are allowed to be
+deleted.  For example, to skip the system namespace, you could specify:
+
+quote(--filter='-x system.*')
+
+To skip all namespaces except the user namespace, you could specify a
+negated-user match:
+
+quote(--filter='-x! user.*')
+
+To prevent any attributes from being deleted, you could specify a receiver-only
+rule that excludes all names:
+
+quote(--filter='-xr *')
+
+Note that the bf(-X) option does not copy rsync's special xattr values (e.g.
+those used by bf(--fake-super)) unless you repeat the option (e.g. -XX).
+This "copy all xattrs" mode cannot be used with bf(--fake-super).
 
 dit(bf(--chmod)) This option tells rsync to apply one or more
 comma-separated "chmod" modes to the permission of the files in the
@@ -2926,6 +2944,10 @@ itemization(
   option's default rules that exclude things like "CVS" and "*.o" are
   marked as perishable, and will not prevent a directory that was removed
   on the source from being deleted on the destination.
+  it() An bf(x) indicates that a rule affects xattr names in xattr copy/delete
+  operations (and is thus ignored when matching file/dir names). If no
+  xattr-matching rules are specified, a default xattr filtering rule is
+  used (see the bf(--xattrs) option).
 )
 
 manpagesection(MERGE-FILE FILTER RULES)

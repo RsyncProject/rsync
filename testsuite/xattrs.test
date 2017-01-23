@@ -127,8 +127,10 @@ esac
 
 xls $dirs $files >"$scratchdir/xattrs.txt"
 
+XFILT='-f-x_system.* -f-x_security.*'
+
 # OK, let's try a simple xattr copy.
-checkit "$RSYNC -avX $dashH --super . '$chkdir/'" "$fromdir" "$chkdir"
+checkit "$RSYNC -avX $XFILT $dashH --super . '$chkdir/'" "$fromdir" "$chkdir"
 
 cd "$chkdir"
 xls $dirs $files | diff $diffopt "$scratchdir/xattrs.txt" -
@@ -142,7 +144,7 @@ if [ "$dashH" ]; then
     done
 fi
 
-checkit "$RSYNC -aiX $dashH --super $altDest=../chk . ../to" "$fromdir" "$todir"
+checkit "$RSYNC -aiX $XFILT $dashH --super $altDest=../chk . ../to" "$fromdir" "$todir"
 
 cd "$todir"
 xls $dirs $files | diff $diffopt "$scratchdir/xattrs.txt" -
@@ -156,7 +158,7 @@ xset user.nice 'this is nice, but different' file1
 
 xls $dirs $files >"$scratchdir/xattrs.txt"
 
-checkit "$RSYNC -aiX $dashH --fake-super --link-dest=../chk . ../to" "$chkdir" "$todir"
+checkit "$RSYNC -aiX $XFILT $dashH --fake-super --link-dest=../chk . ../to" "$chkdir" "$todir"
 
 cd "$todir"
 xls $dirs $files | diff $diffopt "$scratchdir/xattrs.txt" -
@@ -186,7 +188,7 @@ cd "$fromdir"
 rm -rf "$todir"
 
 # When run by a non-root tester, this checks if no-user-perm files/dirs can be copied.
-checkit "$RSYNC -aiX $dashH --fake-super --chmod=a= . ../to" "$chkdir" "$todir" # 2>"$scratchdir/errors.txt"
+checkit "$RSYNC -aiX $XFILT $dashH --fake-super --chmod=a= . ../to" "$chkdir" "$todir" # 2>"$scratchdir/errors.txt"
 
 cd "$todir"
 xls $dirs $files | diff $diffopt "$scratchdir/xattrs.txt" -
@@ -202,7 +204,7 @@ $RSYNC -aX file1 ../lnk/
 
 xls file1 file2 >"$scratchdir/xattrs.txt"
 
-checkit "$RSYNC -aiiX $dashH $altDest=../lnk . ../to" "$chkdir" "$todir"
+checkit "$RSYNC -aiiX $XFILT $dashH $altDest=../lnk . ../to" "$chkdir" "$todir"
 
 [ "$dashH" ] && rm ../lnk/extra-link
 
@@ -215,7 +217,7 @@ rm "$todir/file2"
 echo extra >file1
 $RSYNC -aX . ../chk/
 
-checkit "$RSYNC -aiiX . ../to" "$chkdir" "$todir"
+checkit "$RSYNC -aiiX $XFILT . ../to" "$chkdir" "$todir"
 
 cd "$todir"
 xls file1 file2 | diff $diffopt "$scratchdir/xattrs.txt" -
