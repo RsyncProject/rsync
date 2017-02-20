@@ -1281,6 +1281,22 @@ static void create_refuse_error(int which)
 	}
 }
 
+/* This is used to make sure that --daemon & --server cannot be aliased to
+ * something else. These options have always disabled popt aliases for the
+ * parsing of a daemon or server command-line, but we have to make sure that
+ * these options cannot vanish so that the alias disabling can take effect. */
+static void popt_unalias(poptContext con, const char *opt)
+{
+	struct poptAlias unalias;
+
+	unalias.longName = opt + 2; /* point past the leading "--" */
+	unalias.shortName = '\0';
+	unalias.argc = 1;
+	unalias.argv = new_array(const char*, 1);
+	unalias.argv[0] = strdup(opt);
+
+	poptAddAlias(con, unalias, 0);
+}
 
 /**
  * Process command line arguments.  Called on both local and remote.
@@ -1320,8 +1336,11 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	if (pc)
 		poptFreeContext(pc);
 	pc = poptGetContext(RSYNC_NAME, argc, argv, long_options, 0);
-	if (!am_server)
+	if (!am_server) {
 		poptReadDefaultConfig(pc, 0);
+		popt_unalias(pc, "--daemon");
+		popt_unalias(pc, "--server");
+	}
 
 	while ((opt = poptGetNextOpt(pc)) != -1) {
 		/* most options are handled automatically by popt;
