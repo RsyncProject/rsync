@@ -129,6 +129,7 @@ typedef struct {
 	char *prexfer_exec;
 	char *refuse_options;
 	char *secrets_file;
+	char *syslog_tag;
 	char *temp_dir;
 	char *uid;
 /* NOTE: update this macro if the last char* variable changes! */
@@ -205,6 +206,7 @@ static const all_vars Defaults = {
  /* prexfer_exec; */		NULL,
  /* refuse_options; */		NULL,
  /* secrets_file; */		NULL,
+ /* syslog_tag; */		"rsyncd",
  /* temp_dir; */ 		NULL,
  /* uid; */			NULL,
 
@@ -357,6 +359,7 @@ static struct parm_struct parm_table[] =
  {"secrets file",      P_STRING, P_LOCAL, &Vars.l.secrets_file,        NULL,0},
  {"strict modes",      P_BOOL,   P_LOCAL, &Vars.l.strict_modes,        NULL,0},
  {"syslog facility",   P_ENUM,   P_LOCAL, &Vars.l.syslog_facility,     enum_facilities,0},
+ {"syslog tag",        P_STRING, P_LOCAL, &Vars.l.syslog_tag,          NULL,0},
  {"temp dir",          P_PATH,   P_LOCAL, &Vars.l.temp_dir,            NULL,0},
  {"timeout",           P_INTEGER,P_LOCAL, &Vars.l.timeout,             NULL,0},
  {"transfer logging",  P_BOOL,   P_LOCAL, &Vars.l.transfer_logging,    NULL,0},
@@ -474,6 +477,7 @@ FN_LOCAL_STRING(lp_postxfer_exec, postxfer_exec)
 FN_LOCAL_STRING(lp_prexfer_exec, prexfer_exec)
 FN_LOCAL_STRING(lp_refuse_options, refuse_options)
 FN_LOCAL_STRING(lp_secrets_file, secrets_file)
+FN_LOCAL_STRING(lp_syslog_tag, syslog_tag)
 FN_LOCAL_STRING(lp_temp_dir, temp_dir)
 FN_LOCAL_STRING(lp_uid, uid)
 

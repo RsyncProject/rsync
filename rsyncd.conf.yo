@@ -316,6 +316,17 @@ is daemon.  This setting has no effect if the "log file" setting is a
 non-empty string (either set in the per-modules settings, or inherited
 from the global settings).
 
+dit(bf(syslog tag)) This parameter allows you to specify the syslog
+tag to use when logging messages from the rsync daemon. The default is
+"rsyncd".  This setting has no effect if the "log file" setting is a
+non-empty string (either set in the per-modules settings, or inherited
+from the global settings).
+
+For example, if you wanted each authenticated user's name to be
+included in the syslog tag, you could do something like this:
+
+verb(    syslog tag = rsyncd.%RSYNC_USER_NAME%)
+
 dit(bf(max verbosity)) This parameter allows you to control
 the maximum amount of verbose information that you'll allow the daemon to
 generate (since the information goes into the log file). The default is 1,

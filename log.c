@@ -134,21 +134,16 @@ static void logit(int priority, const char *buf)
 
 static void syslog_init()
 {
-	static int been_here = 0;
 	int options = LOG_PID;
-
-	if (been_here)
-		return;
-	been_here = 1;
 
 #ifdef LOG_NDELAY
 	options |= LOG_NDELAY;
 #endif
 
 #ifdef LOG_DAEMON
-	openlog("rsyncd", options, lp_syslog_facility(module_id));
+	openlog(lp_syslog_tag(module_id), options, lp_syslog_facility(module_id));
 #else
-	openlog("rsyncd", options);
+	openlog(lp_syslog_tag(module_id), options);
 #endif
 
 #ifndef LOG_NDELAY
@@ -168,14 +163,16 @@ static void logfile_open(void)
 		rsyserr(FERROR, fopen_errno,
 			"failed to open log-file %s", logfile_name);
 		rprintf(FINFO, "Ignoring \"log file\" setting.\n");
+		logfile_name = "";
 	}
 }
 
 void log_init(int restart)
 {
 	if (log_initialised) {
-		if (!restart)
+		if (!restart) /* Note: a restart only happens with am_daemon */
 			return;
+		assert(logfile_name); /* all am_daemon procs got at least an empty string */
 		if (strcmp(logfile_name, lp_log_file(module_id)) != 0) {
 			if (logfile_fp) {
 				fclose(logfile_fp);
@@ -185,7 +182,8 @@ void log_init(int restart)
 			logfile_name = NULL;
 		} else if (*logfile_name)
 			return; /* unchanged, non-empty "log file" names */
-		else if (lp_syslog_facility(-1) != lp_syslog_facility(module_id))
+		else if (lp_syslog_facility(-1) != lp_syslog_facility(module_id)
+		      || strcmp(lp_syslog_tag(-1), lp_syslog_tag(module_id)) != 0)
 			closelog();
 		else
 			return; /* unchanged syslog settings */
@@ -207,6 +205,7 @@ void log_init(int restart)
 		syslog_init();
 }
 
+/* Note that this close & reopen idiom intentionally ignores syslog logging. */
 void logfile_close(void)
 {
 	if (logfile_fp) {
