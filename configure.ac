@@ -400,6 +400,7 @@ AC_CHECK_TYPES([mode_t,off_t,size_t,pid_t,id_t])
 AC_TYPE_GETGROUPS
 AC_CHECK_MEMBERS([struct stat.st_rdev,
 		  struct stat.st_mtimensec,
+		  struct stat.st_mtimespec.tv_nsec,
 		  struct stat.st_mtim.tv_nsec],,,[
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>

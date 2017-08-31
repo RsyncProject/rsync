@@ -895,7 +895,7 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 	if (file_length > 0xFFFFFFFFu && S_ISREG(mode))
 		extra_len += EXTRA_LEN;
 #endif
-#ifdef HAVE_UTIMENSAT
+#ifdef CAN_SET_NSEC
 	if (modtime_nsec)
 		extra_len += EXTRA_LEN;
 #endif
@@ -941,7 +941,7 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 		file->flags |= FLAG_HLINKED;
 #endif
 	file->modtime = (time_t)modtime;
-#ifdef HAVE_UTIMENSAT
+#ifdef CAN_SET_NSEC
 	if (modtime_nsec) {
 		file->flags |= FLAG_MOD_NSEC;
 		OPT_EXTRA(file, 0)->unum = modtime_nsec;

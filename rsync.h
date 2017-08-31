@@ -372,7 +372,7 @@ enum delret {
 #include <utime.h>
 #endif
 
-#if defined HAVE_UTIMENSAT || defined HAVE_LUTIMES
+#if defined HAVE_UTIMENSAT || defined HAVE_LUTIMES || defined HAVE_SETATTRLIST
 #define CAN_SET_SYMLINK_TIMES 1
 #endif
 
@@ -384,11 +384,17 @@ enum delret {
 #define CAN_CHMOD_SYMLINK 1
 #endif
 
-#ifdef HAVE_UTIMENSAT
+#if defined HAVE_UTIMENSAT || defined HAVE_SETATTRLIST
+#define CAN_SET_NSEC 1
+#endif
+
+#ifdef CAN_SET_NSEC
 #ifdef HAVE_STRUCT_STAT_ST_MTIM_TV_NSEC
 #define ST_MTIME_NSEC st_mtim.tv_nsec
 #elif defined(HAVE_STRUCT_STAT_ST_MTIMENSEC)
 #define ST_MTIME_NSEC st_mtimensec
+#elif defined(HAVE_STRUCT_STAT_ST_MTIMESPEC_TV_NSEC)
+#define ST_MTIME_NSEC st_mtimespec.tv_nsec
 #endif
 #endif
 

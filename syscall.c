@@ -360,6 +360,25 @@ OFF_T do_lseek(int fd, OFF_T offset, int whence)
 #endif
 }
 
+#ifdef HAVE_SETATTRLIST
+int do_setattrlist_times(const char *fname, time_t modtime, uint32 mod_nsec)
+{
+	struct attrlist attrList;
+	struct timespec ts;
+
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+
+	ts.tv_sec = modtime;
+	ts.tv_nsec = mod_nsec;
+
+	memset(&attrList, 0, sizeof attrList);
+	attrList.bitmapcount = ATTR_BIT_MAP_COUNT;
+	attrList.commonattr = ATTR_CMN_MODTIME;
+	return setattrlist(fname, &attrList, &ts, sizeof ts, FSOPT_NOFOLLOW);
+}
+#endif
+
 #ifdef HAVE_UTIMENSAT
 int do_utimensat(const char *fname, time_t modtime, uint32 mod_nsec)
 {

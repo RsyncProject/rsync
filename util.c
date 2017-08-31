@@ -128,6 +128,16 @@ int set_modtime(const char *fname, time_t modtime, uint32 mod_nsec, mode_t mode)
 	}
 
 	switch (switch_step) {
+#ifdef HAVE_SETATTRLIST
+#include "case_N.h"
+		if (do_setattrlist_times(fname, modtime, mod_nsec) == 0)
+			break;
+		if (errno != ENOSYS)
+			return -1;
+		switch_step++;
+		/* FALLTHROUGH */
+#endif
+
 #ifdef HAVE_UTIMENSAT
 #include "case_N.h"
 		if (do_utimensat(fname, modtime, mod_nsec) == 0)
