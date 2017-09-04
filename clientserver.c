@@ -426,7 +426,7 @@ static int read_arg_from_pipe(int fd, char *buf, int limit)
 static int path_failure(int f_out, const char *dir, BOOL was_chdir)
 {
 	if (was_chdir)
-		rsyserr(FLOG, errno, "chdir %s failed\n", dir);
+		rsyserr(FLOG, errno, "chdir %s failed", dir);
 	else
 		rprintf(FLOG, "normalize_path(%s) failed\n", dir);
 	io_printf(f_out, "@ERROR: chdir failed\n");
@@ -794,7 +794,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 
 	if (!change_dir(module_chdir, CD_NORMAL))
 		return path_failure(f_out, module_chdir, True);
-	if (module_dirlen || !use_chroot)
+	if (module_dirlen || (!use_chroot && !*lp_daemon_chroot()))
 		sanitize_paths = 1;
 
 	if ((munge_symlinks = lp_munge_symlinks(i)) < 0)
@@ -1039,6 +1039,7 @@ int start_daemon(int f_in, int f_out)
 {
 	char line[1024];
 	const char *addr, *host;
+	char *p;
 	int i;
 
 	io_set_sock_fds(f_in, f_out);
@@ -1049,6 +1050,39 @@ int start_daemon(int f_in, int f_out)
 	 * (when rsync is run by init and run by a remote shell). */
 	if (!load_config(0))
 		exit_cleanup(RERR_SYNTAX);
+
+	p = lp_daemon_chroot();
+	if (*p) {
+		log_init(0); /* Make use we've initialized syslog before chrooting. */
+		if (chroot(p) < 0 || chdir("/") < 0) {
+			rsyserr(FLOG, errno, "daemon chroot %s failed", p);
+			return -1;
+		}
+	}
+	p = lp_daemon_gid();
+	if (*p) {
+		gid_t gid;
+		if (!group_to_gid(p, &gid, True)) {
+			rprintf(FLOG, "Invalid daemon gid: %s\n", p);
+			return -1;
+		}
+		if (setgid(gid) < 0) {
+			rsyserr(FLOG, errno, "Unable to set group to daemon gid %ld", (long)gid);
+			return -1;
+		}
+	}
+	p = lp_daemon_uid();
+	if (*p) {
+		uid_t uid;
+		if (!user_to_uid(p, &uid, True)) {
+			rprintf(FLOG, "Invalid daemon uid: %s\n", p);
+			return -1;
+		}
+		if (setuid(uid) < 0) {
+			rsyserr(FLOG, errno, "Unable to set user to daemon uid %ld", (long)uid);
+			return -1;
+		}
+	}
 
 	addr = client_addr(f_in);
 	host = lp_reverse_lookup(-1) ? client_name(f_in) : undetermined_hostname;

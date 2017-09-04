@@ -186,8 +186,8 @@ transfer.  For example, specifying "/var/rsync/./module1" will chroot to the
 had omitted the dot-dir, the chroot would have used the whole path, and the
 inside-chroot path would have been "/".
 
-When "use chroot" is false or the inside-chroot path is not "/", rsync will:
-(1) munge symlinks by
+When both "use chroot" and "daemon chroot" are false, OR the inside-chroot path
+of "use chroot" is not "/", rsync will: (1) munge symlinks by
 default for security reasons (see "munge symlinks" for a way to turn this
 off, but only if you trust your users), (2) substitute leading slashes in
 absolute paths with the module's path (so that options such as
@@ -212,6 +212,14 @@ Note also that you are free to setup custom user/group information in the
 chroot area that is different from your normal system.  For example, you
 could abbreviate the list of users and groups.
 
+dit(bf(daemon chroot)) This parameter specifies a path to which the daemon will
+chroot before beginning communication with clients. Module paths (and any "use
+chroot" settings) will then be related to this one. This lets you choose if you
+want the whole daemon to be chrooted (with this setting), just the transfers to
+be chrooted (with "use chroot"), or both.  Keep in mind that the "daemon chroot"
+area may need various OS/lib/etc files installed to allow the daemon to function.
+By default the daemon runs without any chrooting.
+
 dit(bf(numeric ids)) Enabling this parameter disables the mapping
 of users and groups by name for the current daemon module.  This prevents
 the daemon from trying to load any user/group-related files or libraries.
@@ -234,7 +242,8 @@ all symlinks in the same way as the (non-daemon-affecting)
 bf(--munge-links) command-line option (using a method described below).
 This should help protect your files from user trickery when
 your daemon module is writable.  The default is disabled when "use chroot"
-is on and the inside-chroot path is "/", otherwise it is enabled.
+is on with an inside-chroot path of "/", OR if "daemon chroot" is on,
+otherwise it is enabled.
 
 If you disable this parameter on a daemon that is not read-only, there
 are tricks that a user can play with uploaded symlinks to access
@@ -391,6 +400,14 @@ switch to your OS's "nobody" (or perhaps "nogroup") group with no other
 supplementary groups.  The default for a non-super-user is to not change any
 group attributes (and indeed, your OS may not allow a non-super-user to try to
 change their group settings).
+
+dit(bf(daemon uid)) This parameter specifies a uid under which the daemon will
+run. The daemon usually runs as user root, and when this is left unset the user
+is left unchanged. See also the "uid" parameter.
+
+dit(bf(daemon gid)) This parameter specifies a gid under which the daemon will
+run. The daemon usually runs as group root, and when this is left unset, the
+group is left unchanged. See also the "gid" parameter.
 
 dit(bf(fake super)) Setting "fake super = yes" for a module causes the
 daemon side to behave as if the bf(--fake-super) command-line option had

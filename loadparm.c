@@ -93,6 +93,9 @@ struct parm_struct {
 /* This structure describes global (ie., server-wide) parameters. */
 typedef struct {
 	char *bind_address;
+	char *daemon_chroot;
+	char *daemon_gid;
+	char *daemon_uid;
 	char *motd_file;
 	char *pid_file;
 	char *socket_options;
@@ -173,6 +176,9 @@ static const all_vars Defaults = {
  /* ==== global_vars ==== */
  {
  /* bind_address; */		NULL,
+ /* daemon_chroot; */		NULL,
+ /* daemon_gid; */		NULL,
+ /* daemon_uid; */		NULL,
  /* motd_file; */		NULL,
  /* pid_file; */		NULL,
  /* socket_options; */		NULL,
@@ -315,6 +321,9 @@ static struct enum_list enum_facilities[] = {
 static struct parm_struct parm_table[] =
 {
  {"address",           P_STRING, P_GLOBAL,&Vars.g.bind_address,        NULL,0},
+ {"daemon chroot",     P_STRING, P_GLOBAL,&Vars.g.daemon_chroot,       NULL,0},
+ {"daemon gid",        P_STRING, P_GLOBAL,&Vars.g.daemon_gid,          NULL,0},
+ {"daemon uid",        P_STRING, P_GLOBAL,&Vars.g.daemon_uid,          NULL,0},
  {"listen backlog",    P_INTEGER,P_GLOBAL,&Vars.g.listen_backlog,      NULL,0},
  {"motd file",         P_STRING, P_GLOBAL,&Vars.g.motd_file,           NULL,0},
  {"pid file",          P_STRING, P_GLOBAL,&Vars.g.pid_file,            NULL,0},
@@ -447,6 +456,9 @@ static char *expand_vars(char *str)
  int fn_name(int i) {return LP_SNUM_OK(i)? iSECTION(i).val : Vars.l.val;}
 
 FN_GLOBAL_STRING(lp_bind_address, &Vars.g.bind_address)
+FN_GLOBAL_STRING(lp_daemon_chroot, &Vars.g.daemon_chroot)
+FN_GLOBAL_STRING(lp_daemon_gid, &Vars.g.daemon_gid)
+FN_GLOBAL_STRING(lp_daemon_uid, &Vars.g.daemon_uid)
 FN_GLOBAL_STRING(lp_motd_file, &Vars.g.motd_file)
 FN_GLOBAL_STRING(lp_pid_file, &Vars.g.pid_file)
 FN_GLOBAL_STRING(lp_socket_options, &Vars.g.socket_options)
