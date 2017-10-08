@@ -1755,7 +1755,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 	if (fnamecmp_type <= FNAMECMP_BASIS_DIR_HIGH)
 		;
-	else if (fnamecmp_type == FNAMECMP_FUZZY)
+	else if (fnamecmp_type >= FNAMECMP_FUZZY)
 		;
 	else if (unchanged_file(fnamecmp, file, &sx.st)) {
 		if (partialptr) {
