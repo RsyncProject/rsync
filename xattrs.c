@@ -817,7 +817,7 @@ void receive_xattr(int f, struct file_struct *file)
 		size_t dget_len = datum_len > MAX_FULL_DATUM ? 1 + MAX_DIGEST_LEN : datum_len;
 		size_t extra_len = MIGHT_NEED_RPRE ? RPRE_LEN : 0;
 		if ((dget_len + extra_len < dget_len)
-		 || (dget_len + extra_len + name_len < dget_len))
+		 || (dget_len + extra_len + name_len < dget_len + extra_len))
 			overflow_exit("receive_xattr");
 		ptr = new_array(char, dget_len + extra_len + name_len);
 		if (!ptr)
