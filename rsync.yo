@@ -1905,7 +1905,7 @@ ownership (such as OS X's "Ignore ownership on this volume" option).
 
 Beginning in version 2.6.4, multiple bf(--link-dest) directories may be
 provided, which will cause rsync to search the list in the order specified
-for an exact match.
+for an exact match (there is a limit of 20 such directories).
 If a match is found that differs only in attributes, a local copy is made
 and the attributes updated.
 If a match is not found, a basis file from one of the em(DIR)s will be
