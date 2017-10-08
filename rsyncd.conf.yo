@@ -368,6 +368,9 @@ attempted downloads will fail. If "write only" is false then downloads
 will be possible if file permissions on the daemon side allow them.  The
 default is for this parameter to be disabled.
 
+Helpful hint: you probably want to specify "refuse options = delete" for a
+write-only module.
+
 dit(bf(list)) This parameter determines whether this module is
 listed when the client asks for a listing of available modules.  In addition,
 if this is false, the daemon will pretend the module does not exist
