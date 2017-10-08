@@ -781,7 +781,7 @@ backup file goes and what (if any) suffix gets appended using the
 bf(--backup-dir) and bf(--suffix) options.
 
 Note that if you don't specify bf(--backup-dir), (1) the
-bf(--omit-dir-times) option will be implied, and (2) if bf(--delete) is
+bf(--omit-dir-times) option will be forced on, and (2) if bf(--delete) is
 also in effect (without bf(--delete-excluded)), rsync will add a "protect"
 filter-rule for the backup suffix to the end of all your existing excludes
 (e.g. bf(-f "P *~")).  This will prevent previously backed-up files from being
