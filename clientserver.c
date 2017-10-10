@@ -59,6 +59,8 @@ extern filter_rule_list daemon_filter_list;
 extern char *iconv_opt;
 extern iconv_t ic_send, ic_recv;
 #endif
+extern uid_t our_uid;
+extern gid_t our_gid;
 
 char *auth_user;
 int read_only = 0;
@@ -834,6 +836,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 			return -1;
 		}
 #endif
+		our_gid = MY_GID();
 	}
 
 	if (set_uid) {
@@ -847,7 +850,8 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 			return -1;
 		}
 
-		am_root = (MY_UID() == 0);
+		our_uid = MY_UID();
+		am_root = (our_uid == 0);
 	}
 
 	if (lp_temp_dir(i) && *lp_temp_dir(i)) {
@@ -1070,6 +1074,7 @@ int start_daemon(int f_in, int f_out)
 			rsyserr(FLOG, errno, "Unable to set group to daemon gid %ld", (long)gid);
 			return -1;
 		}
+		our_gid = MY_GID();
 	}
 	p = lp_daemon_uid();
 	if (*p) {
@@ -1082,6 +1087,8 @@ int start_daemon(int f_in, int f_out)
 			rsyserr(FLOG, errno, "Unable to set user to daemon uid %ld", (long)uid);
 			return -1;
 		}
+		our_uid = MY_UID();
+		am_root = (our_uid == 0);
 	}
 
 	addr = client_addr(f_in);
