@@ -27,7 +27,7 @@ extern int proper_seed_order;
 extern char *checksum_choice;
 
 #define CSUM_NONE 0
-#define CSUM_ARCHAIC 1
+#define CSUM_MD4_ARCHAIC 1
 #define CSUM_MD4_BUSTED 2
 #define CSUM_MD4_OLD 3
 #define CSUM_MD4 4
@@ -60,7 +60,7 @@ int parse_csum_name(const char *name, int len)
 			return CSUM_MD4_OLD;
 		if (protocol_version >= 21)
 			return CSUM_MD4_BUSTED;
-		return CSUM_ARCHAIC;
+		return CSUM_MD4_ARCHAIC;
 	}
 	if (len == 3 && strncasecmp(name, "md4", 3) == 0)
 		return CSUM_MD4;
@@ -78,7 +78,7 @@ int csum_len_for_type(int cst)
 	switch (cst) {
 	  case CSUM_NONE:
 		return 1;
-	  case CSUM_ARCHAIC:
+	  case CSUM_MD4_ARCHAIC:
 		return 2;
 	  case CSUM_MD4:
 	  case CSUM_MD4_OLD:
@@ -143,7 +143,8 @@ void get_checksum2(char *buf, int32 len, char *sum)
 	  }
 	  case CSUM_MD4:
 	  case CSUM_MD4_OLD:
-	  case CSUM_MD4_BUSTED: {
+	  case CSUM_MD4_BUSTED:
+	  case CSUM_MD4_ARCHAIC: {
 		int32 i;
 		static char *buf1;
 		static int32 len1;
@@ -174,7 +175,7 @@ void get_checksum2(char *buf, int32 len, char *sum)
 		 * are multiples of 64.  This is fixed by calling mdfour_update()
 		 * even when there are no more bytes.
 		 */
-		if (len - i > 0 || xfersum_type != CSUM_MD4_BUSTED)
+		if (len - i > 0 || xfersum_type > CSUM_MD4_BUSTED)
 			mdfour_update(&m, (uchar *)(buf1+i), len-i);
 
 		mdfour_result(&m, (uchar *)sum);
@@ -217,6 +218,7 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 	  case CSUM_MD4:
 	  case CSUM_MD4_OLD:
 	  case CSUM_MD4_BUSTED:
+	  case CSUM_MD4_ARCHAIC:
 		mdfour_begin(&m);
 
 		for (i = 0; i + CSUM_CHUNK <= len; i += CSUM_CHUNK) {
@@ -229,7 +231,7 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 		 * are multiples of 64.  This is fixed by calling mdfour_update()
 		 * even when there are no more bytes. */
 		remainder = (int32)(len - i);
-		if (remainder > 0 || checksum_type != CSUM_MD4_BUSTED)
+		if (remainder > 0 || checksum_type > CSUM_MD4_BUSTED)
 			mdfour_update(&m, (uchar *)map_ptr(buf, i, remainder), remainder);
 
 		mdfour_result(&m, (uchar *)sum);
@@ -265,6 +267,7 @@ void sum_init(int csum_type, int seed)
 		break;
 	  case CSUM_MD4_OLD:
 	  case CSUM_MD4_BUSTED:
+	  case CSUM_MD4_ARCHAIC:
 		mdfour_begin(&md);
 		sumresidue = 0;
 		SIVAL(s, 0, seed);
@@ -321,6 +324,10 @@ void sum_update(const char *p, int32 len)
 	}
 }
 
+/* NOTE: all the callers of sum_end() pass in a pointer to a buffer that is
+ * MAX_DIGEST_LEN in size, so even if the csum-len is shorter that that (i.e.
+ * CSUM_MD4_ARCHAIC), we don't have to worry about limiting the data we write
+ * into the "sum" buffer. */
 int sum_end(char *sum)
 {
 	switch (cursum_type) {
@@ -333,6 +340,7 @@ int sum_end(char *sum)
 		mdfour_result(&md, (uchar *)sum);
 		break;
 	  case CSUM_MD4_BUSTED:
+	  case CSUM_MD4_ARCHAIC:
 		if (sumresidue)
 			mdfour_update(&md, (uchar *)md.buffer, sumresidue);
 		mdfour_result(&md, (uchar *)sum);
