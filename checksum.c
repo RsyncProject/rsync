@@ -295,6 +295,7 @@ void sum_update(const char *p, int32 len)
 	  case CSUM_MD4:
 	  case CSUM_MD4_OLD:
 	  case CSUM_MD4_BUSTED:
+	  case CSUM_MD4_ARCHAIC:
 		if (len + sumresidue < CSUM_CHUNK) {
 			memcpy(md.buffer + sumresidue, p, len);
 			sumresidue += len;
