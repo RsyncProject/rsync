@@ -783,7 +783,7 @@ static void read_final_goodbye(int f_in, int f_out)
 static void do_server_sender(int f_in, int f_out, int argc, char *argv[])
 {
 	struct file_list *flist;
-	char *dir = argv[0];
+	char *dir;
 
 	if (DEBUG_GTE(SEND, 1))
 		rprintf(FINFO, "server_sender starting pid=%d\n", (int)getpid());
@@ -791,16 +791,19 @@ static void do_server_sender(int f_in, int f_out, int argc, char *argv[])
 	if (am_daemon && lp_write_only(module_id)) {
 		rprintf(FERROR, "ERROR: module is write only\n");
 		exit_cleanup(RERR_SYNTAX);
-		return;
 	}
 	if (am_daemon && read_only && remove_source_files) {
 		rprintf(FERROR,
-		    "ERROR: --remove-%s-files cannot be used with a read-only module\n",
-		    remove_source_files == 1 ? "source" : "sent");
+			"ERROR: --remove-%s-files cannot be used with a read-only module\n",
+			remove_source_files == 1 ? "source" : "sent");
 		exit_cleanup(RERR_SYNTAX);
-		return;
+	}
+	if (argc < 1) {
+		rprintf(FERROR, "ERROR: do_server_sender called without args\n");
+		exit_cleanup(RERR_SYNTAX);
 	}
 
+	dir = argv[0];
 	if (!relative_paths) {
 		if (!change_dir(dir, CD_NORMAL)) {
 			rsyserr(FERROR, errno, "change_dir#3 %s failed",
