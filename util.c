@@ -1009,7 +1009,7 @@ char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth,
 	int rlen = 0, drop_dot_dirs = !relative_paths || !(flags & SP_KEEP_DOT_DIRS);
 
 	if (dest != p) {
-		int plen = strlen(p);
+		int plen = strlen(p); /* the path len INCLUDING any separating slash */
 		if (*p == '/') {
 			if (!rootdir)
 				rootdir = module_dir;
@@ -1020,11 +1020,11 @@ char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth,
 		if (dest) {
 			if (rlen + plen + 1 >= MAXPATHLEN)
 				return NULL;
-		} else if (!(dest = new_array(char, rlen + plen + 1)))
+		} else if (!(dest = new_array(char, MAX(rlen + plen + 1, 2))))
 			out_of_memory("sanitize_path");
-		if (rlen) {
+		if (rlen) { /* only true if p previously started with a slash */
 			memcpy(dest, rootdir, rlen);
-			if (rlen > 1)
+			if (rlen > 1) /* a rootdir of len 1 is "/", so this avoids a 2nd slash */
 				dest[rlen++] = '/';
 		}
 	}
