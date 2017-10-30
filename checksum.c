@@ -86,6 +86,8 @@ int csum_len_for_type(int cst)
 		return MD4_DIGEST_LEN;
 	  case CSUM_MD5:
 		return MD5_DIGEST_LEN;
+	  default: /* paranoia to prevent missing case values */
+		exit_cleanup(RERR_UNSUPPORTED);
 	}
 	return 0;
 }
@@ -181,6 +183,8 @@ void get_checksum2(char *buf, int32 len, char *sum)
 		mdfour_result(&m, (uchar *)sum);
 		break;
 	  }
+	  default: /* paranoia to prevent missing case values */
+		exit_cleanup(RERR_UNSUPPORTED);
 	}
 }
 
@@ -275,6 +279,8 @@ void sum_init(int csum_type, int seed)
 		break;
 	  case CSUM_NONE:
 		break;
+	  default: /* paranoia to prevent missing case values */
+		exit_cleanup(RERR_UNSUPPORTED);
 	}
 }
 
@@ -322,6 +328,8 @@ void sum_update(const char *p, int32 len)
 		break;
 	  case CSUM_NONE:
 		break;
+	  default: /* paranoia to prevent missing case values */
+		exit_cleanup(RERR_UNSUPPORTED);
 	}
 }
 
@@ -349,6 +357,8 @@ int sum_end(char *sum)
 	  case CSUM_NONE:
 		*sum = '\0';
 		break;
+	  default: /* paranoia to prevent missing case values */
+		exit_cleanup(RERR_UNSUPPORTED);
 	}
 
 	return csum_len_for_type(cursum_type);

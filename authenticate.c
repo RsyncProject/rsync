@@ -22,7 +22,6 @@
 #include "itypes.h"
 
 extern int read_only;
-extern int protocol_version;
 extern char *password_file;
 
 /***************************************************************************
@@ -75,6 +74,8 @@ static void gen_challenge(const char *addr, char *challenge)
 	sum_init(-1, 0);
 	sum_update(input, sizeof input);
 	len = sum_end(digest);
+	if (len == 2) /* The archaic checksum is 2 bytes, but sum_end() filled in the full MD4 checksum for us. */
+		len = MD4_DIGEST_LEN;
 
 	base64_encode(digest, len, challenge, 0);
 }
@@ -90,6 +91,8 @@ static void generate_hash(const char *in, const char *challenge, char *out)
 	sum_update(in, strlen(in));
 	sum_update(challenge, strlen(challenge));
 	len = sum_end(buf);
+	if (len == 2) /* The archaic checksum is 2 bytes, but sum_end() filled in the full MD4 checksum for us. */
+		len = MD4_DIGEST_LEN;
 
 	base64_encode(buf, len, out, 0);
 }
@@ -237,11 +240,6 @@ char *auth_server(int f_in, int f_out, int module, const char *host,
 	/* if no auth list then allow anyone in! */
 	if (!users || !*users)
 		return "";
-
-	if (protocol_version < 21) { /* Don't allow a weak checksum for the password. */
-		rprintf(FERROR, "ERROR: protocol version is too old!\n");
-		exit_cleanup(RERR_PROTOCOL);
-	}
 
 	gen_challenge(addr, challenge);
 
