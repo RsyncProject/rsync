@@ -1620,7 +1620,7 @@ When performing a local transfer, the "local" side is the sender and the
 
 Note some versions of the popt option-parsing library have a bug in them that
 prevents you from using an adjacent arg with an equal in it next to a short
-option letter (e.g. tt(-M--log-file=/tmp/foo).  If this bug affects your
+option letter (e.g. tt(-M--log-file=/tmp/foo)).  If this bug affects your
 version of popt, you can use the version of popt that is included with rsync.
 
 dit(bf(-C, --cvs-exclude)) This is a useful shorthand for excluding a
