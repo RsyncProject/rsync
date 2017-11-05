@@ -93,7 +93,8 @@ safety (e.g. expanding a non-existent %VAR% to an empty string in a path could
 result in a very unsafe path).  The safest way to insert a literal % into a
 value is to use %%.
 
-startdit()
+description(
+
 dit(bf(motd file)) This parameter allows you to specify a
 "message of the day" to display to clients on each connect. This
 usually contains site information and any legal notices. The default
@@ -126,7 +127,7 @@ via the bf(--sockopts) command-line option.
 dit(bf(listen backlog)) You can override the default backlog value when the
 daemon listens for connections.  It defaults to 5.
 
-enddit()
+)
 
 manpagesection(MODULE PARAMETERS)
 
@@ -144,7 +145,7 @@ global parameters follow (see above).
 As with GLOBAL PARAMETERS, you may use references to environment variables in
 the values of parameters.  See the GLOBAL PARAMETERS section for more details.
 
-startdit()
+description(
 
 dit(bf(comment)) This parameter specifies a description string
 that is displayed next to the module name when clients obtain a list
@@ -233,7 +234,7 @@ A chroot-enabled module should not have this parameter enabled unless you've
 taken steps to ensure that the module has the necessary resources it needs
 to translate names, and that it is not possible for a user to change those
 resources.  That includes being the code being able to call functions like
-code(getpwuid()), code(getgrgid()), code(getpwname()), and code(getgrnam())).
+code(getpwuid()), code(getgrgid()), code(getpwname()), and code(getgrnam()).
 You should test what libraries and config files are required for your OS
 and get those setup before starting to test name mapping in rsync.
 
@@ -370,6 +371,9 @@ default is for this parameter to be disabled.
 
 Helpful hint: you probably want to specify "refuse options = delete" for a
 write-only module.
+
+)
+description(
 
 dit(bf(list)) This parameter determines whether this module is
 listed when the client asks for a listing of available modules.  In addition,
@@ -572,6 +576,9 @@ than the one that the rsync daemon is running under.  If "strict modes" is
 false, the check is not performed.  The default is true.  This parameter
 was added to accommodate rsync running on the Windows operating system.
 
+)
+description(
+
 dit(bf(hosts allow)) This parameter allows you to specify a list of comma-
 and/or whitespace-separated patterns that are matched against a connecting
 client's hostname and IP address.  If none of the patterns match, then the
@@ -712,6 +719,9 @@ Note that some of the logged output changes when talking with older
 rsync versions.  For instance, deleted files were only output as verbose
 messages prior to rsync 2.6.4.
 
+)
+description(
+
 dit(bf(timeout)) This parameter allows you to override the
 clients choice for I/O timeout for this module. Using this parameter you
 can ensure that rsync won't wait on a dead client forever. The timeout
@@ -759,6 +769,9 @@ of file suffixes that are not compressed by default.  Specifying a value
 for the "dont compress" parameter changes the default when the daemon is
 the sender.
 
+)
+description(
+
 dit(bf(pre-xfer exec), bf(post-xfer exec)) You may specify a command to be run
 before and/or after the transfer.  If the bf(pre-xfer exec) command fails, the
 transfer is aborted before it begins.  Any output from the script on stdout (up
@@ -799,7 +812,7 @@ Even though the commands can be associated with a particular module, they
 are run using the permissions of the user that started the daemon (not the
 module's uid/gid setting) without any chroot restrictions.
 
-enddit()
+)
 
 manpagesection(CONFIG DIRECTIVES)
 
