@@ -824,6 +824,10 @@ void receive_xattr(int f, struct file_struct *file)
 			out_of_memory("receive_xattr");
 		name = ptr + dget_len + extra_len;
 		read_buf(f, name, name_len);
+		if (name_len < 1 || name[name_len-1] != '\0') {
+			rprintf(FERROR, "Invalid xattr name received (missing trailing \\0).\n");
+			exit_cleanup(RERR_FILEIO);
+		}
 		if (dget_len == datum_len)
 			read_buf(f, ptr, dget_len);
 		else {
