@@ -98,7 +98,7 @@ filter_rule_list daemon_filter_list;
 	return "tester";
 }
 
- int csum_len_for_type(int cst)
+ int csum_len_for_type(int cst, int flg)
 {
-	return cst ? 16 : 1;
+	return cst || !flg ? 16 : 1;
 }

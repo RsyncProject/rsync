@@ -360,7 +360,7 @@ static void hash_search(int f,struct sum_struct *s,
  **/
 void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 {
-	int checksum_len;
+	int sum_len;
 
 	last_match = 0;
 	false_alarms = 0;
@@ -409,22 +409,22 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 		matched(f, s, buf, len, -1);
 	}
 
-	checksum_len = sum_end(sender_file_sum);
+	sum_len = sum_end(sender_file_sum);
 
 	/* If we had a read error, send a bad checksum.  We use all bits
 	 * off as long as the checksum doesn't happen to be that, in
 	 * which case we turn the last 0 bit into a 1. */
 	if (buf && buf->status != 0) {
 		int i;
-		for (i = 0; i < checksum_len && sender_file_sum[i] == 0; i++) {}
-		memset(sender_file_sum, 0, checksum_len);
-		if (i == checksum_len)
+		for (i = 0; i < sum_len && sender_file_sum[i] == 0; i++) {}
+		memset(sender_file_sum, 0, sum_len);
+		if (i == sum_len)
 			sender_file_sum[i-1]++;
 	}
 
 	if (DEBUG_GTE(DELTASUM, 2))
 		rprintf(FINFO,"sending file_sum\n");
-	write_buf(f, sender_file_sum, checksum_len);
+	write_buf(f, sender_file_sum, sum_len);
 
 	if (DEBUG_GTE(DELTASUM, 2)) {
 		rprintf(FINFO, "false_alarms=%d hash_hits=%d matches=%d\n",

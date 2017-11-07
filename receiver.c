@@ -236,7 +236,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 	static char file_sum1[MAX_DIGEST_LEN];
 	struct map_struct *mapbuf;
 	struct sum_struct sum;
-	int checksum_len;
+	int sum_len;
 	int32 len;
 	OFF_T offset = 0;
 	OFF_T offset2;
@@ -388,15 +388,15 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 	if (INFO_GTE(PROGRESS, 1))
 		end_progress(total_size);
 
-	checksum_len = sum_end(file_sum1);
+	sum_len = sum_end(file_sum1);
 
 	if (mapbuf)
 		unmap_file(mapbuf);
 
-	read_buf(f_in, sender_file_sum, checksum_len);
+	read_buf(f_in, sender_file_sum, sum_len);
 	if (DEBUG_GTE(DELTASUM, 2))
 		rprintf(FINFO,"got file_sum\n");
-	if (fd != -1 && memcmp(file_sum1, sender_file_sum, checksum_len) != 0)
+	if (fd != -1 && memcmp(file_sum1, sender_file_sum, sum_len) != 0)
 		return 0;
 	return 1;
 }

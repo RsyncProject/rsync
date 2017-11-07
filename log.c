@@ -673,14 +673,15 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 			n = NULL;
 			if (S_ISREG(file->mode)) {
 				if (always_checksum && canonical_checksum(checksum_type))
-					n = sum_as_hex(checksum_type, F_SUM(file));
+					n = sum_as_hex(checksum_type, F_SUM(file), 1);
 				else if (iflags & ITEM_TRANSFER && canonical_checksum(xfersum_type))
-					n = sum_as_hex(xfersum_type, sender_file_sum);
+					n = sum_as_hex(xfersum_type, sender_file_sum, 0);
 			}
 			if (!n) {
-				int checksum_len = csum_len_for_type(always_checksum ? checksum_type : xfersum_type);
-				memset(buf2, ' ', checksum_len*2);
-				buf2[checksum_len*2] = '\0';
+				int sum_len = csum_len_for_type(always_checksum ? checksum_type : xfersum_type,
+								always_checksum);
+				memset(buf2, ' ', sum_len*2);
+				buf2[sum_len*2] = '\0';
 				n = buf2;
 			}
 			break;

@@ -91,7 +91,7 @@ extern iconv_t ic_send, ic_recv;
 #define PTR_SIZE (sizeof (struct file_struct *))
 
 int io_error;
-int checksum_len;
+int flist_csum_len;
 dev_t filesystem_dev; /* used to implement -x */
 
 struct file_list *cur_flist, *first_flist, *dir_flist;
@@ -141,7 +141,7 @@ void init_flist(void)
 			(int)FILE_STRUCT_LEN, (int)EXTRA_LEN);
 	}
 	parse_checksum_choice(); /* Sets checksum_type && xfersum_type */
-	checksum_len = csum_len_for_type(checksum_type);
+	flist_csum_len = csum_len_for_type(checksum_type, 1);
 
 	show_filelist_progress = INFO_GTE(FLIST, 1) && xfer_dirs && !am_server && !inc_recurse;
 }
@@ -638,7 +638,7 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file,
 			/* Prior to 28, we sent a useless set of nulls. */
 			sum = empty_sum;
 		}
-		write_buf(f, sum, checksum_len);
+		write_buf(f, sum, flist_csum_len);
 	}
 
 #ifdef SUPPORT_HARD_LINKS
@@ -1094,9 +1094,9 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 		}
 		if (first_hlink_ndx >= flist->ndx_start) {
 			struct file_struct *first = flist->files[first_hlink_ndx - flist->ndx_start];
-			memcpy(bp, F_SUM(first), checksum_len);
+			memcpy(bp, F_SUM(first), flist_csum_len);
 		} else
-			read_buf(f, bp, checksum_len);
+			read_buf(f, bp, flist_csum_len);
 	}
 
 #ifdef SUPPORT_ACLS
@@ -1384,7 +1384,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	}
 
 	if (sender_keeps_checksum && S_ISREG(st.st_mode))
-		memcpy(F_SUM(file), tmp_sum, checksum_len);
+		memcpy(F_SUM(file), tmp_sum, flist_csum_len);
 
 	if (unsort_ndx)
 		F_NDX(file) = stats.num_dirs;

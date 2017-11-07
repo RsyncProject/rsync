@@ -73,13 +73,15 @@ int parse_csum_name(const char *name, int len)
 	exit_cleanup(RERR_UNSUPPORTED);
 }
 
-int csum_len_for_type(int cst)
+int csum_len_for_type(int cst, int flist_csum)
 {
 	switch (cst) {
 	  case CSUM_NONE:
 		return 1;
 	  case CSUM_MD4_ARCHAIC:
-		return 2;
+		/* The oldest checksum code is rather weird: the file-list code only sent
+		 * 2-byte checksums, but all other checksums were full MD4 length. */
+		return flist_csum ? 2 : MD4_DIGEST_LEN;
 	  case CSUM_MD4:
 	  case CSUM_MD4_OLD:
 	  case CSUM_MD4_BUSTED:
@@ -361,5 +363,5 @@ int sum_end(char *sum)
 		exit_cleanup(RERR_UNSUPPORTED);
 	}
 
-	return csum_len_for_type(cursum_type);
+	return csum_len_for_type(cursum_type, 0);
 }

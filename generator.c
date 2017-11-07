@@ -74,7 +74,7 @@ extern int protocol_version;
 extern int file_total;
 extern int fuzzy_basis;
 extern int always_checksum;
-extern int checksum_len;
+extern int flist_csum_len;
 extern char *partial_dir;
 extern int compare_dest;
 extern int copy_dest;
@@ -583,7 +583,7 @@ int unchanged_file(char *fn, struct file_struct *file, STRUCT_STAT *st)
 	if (always_checksum > 0 && S_ISREG(st->st_mode)) {
 		char sum[MAX_DIGEST_LEN];
 		file_checksum(fn, st, sum);
-		return memcmp(sum, F_SUM(file), checksum_len) == 0;
+		return memcmp(sum, F_SUM(file), flist_csum_len) == 0;
 	}
 
 	if (size_only > 0)
