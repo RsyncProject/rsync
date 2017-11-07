@@ -979,6 +979,7 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 		name = rxas[i].name;
 
 		if (XATTR_ABBREV(rxas[i])) {
+			int sum_len;
 			/* See if the fnamecmp version is identical. */
 			len = name_len = rxas[i].name_len;
 			if ((ptr = get_xattr_data(fnamecmp, name, &len, 1)) == NULL) {
@@ -997,8 +998,8 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 
 			sum_init(-1, checksum_seed);
 			sum_update(ptr, len);
-			sum_end(sum);
-			if (memcmp(sum, rxas[i].datum + 1, MAX_DIGEST_LEN) != 0) {
+			sum_len = sum_end(sum);
+			if (memcmp(sum, rxas[i].datum + 1, sum_len) != 0) {
 				free(ptr);
 				goto still_abbrev;
 			}
