@@ -49,6 +49,7 @@ extern int flist_eof;
 extern int file_old_total;
 extern int keep_dirlinks;
 extern int make_backups;
+extern int sanitize_paths;
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern struct chmod_mode_struct *daemon_chmod_modes;
 #ifdef ICONV_OPTION
@@ -396,6 +397,11 @@ int read_ndx_and_attrs(int f_in, int f_out, int *iflag_ptr, uchar *type_ptr,
 	if (iflags & ITEM_XNAME_FOLLOWS) {
 		if ((len = read_vstring(f_in, buf, MAXPATHLEN)) < 0)
 			exit_cleanup(RERR_PROTOCOL);
+
+		if (sanitize_paths) {
+			sanitize_path(buf, buf, "", 0, SP_DEFAULT);
+			len = strlen(buf);
+		}
 	} else {
 		*buf = '\0';
 		len = -1;
