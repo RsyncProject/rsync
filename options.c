@@ -1313,6 +1313,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	const char *arg, **argv = *argv_p;
 	int argc = *argc_p;
 	int opt;
+	int orig_protect_args = protect_args;
 
 	if (ref && *ref)
 		set_refuse_options(ref);
@@ -1933,6 +1934,10 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 
 	if (fuzzy_basis > 1)
 		fuzzy_basis = basis_dir_cnt + 1;
+
+	/* Don't let the client reset protect_args if it was already processed */
+	if (orig_protect_args == 2 && am_server)
+		protect_args = orig_protect_args;
 
 	if (protect_args == 1 && am_server)
 		return 1;
