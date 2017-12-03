@@ -574,14 +574,14 @@ int recv_files(int f_in, int f_out, char *local_name)
 			file = dir_flist->files[cur_flist->parent_ndx];
 		fname = local_name ? local_name : f_name(file, fbuf);
 
-		if (daemon_filter_list.head
-		    && check_filter(&daemon_filter_list, FLOG, fname, 0) < 0) {
+		if (DEBUG_GTE(RECV, 1))
+			rprintf(FINFO, "recv_files(%s)\n", fname);
+
+		if (daemon_filter_list.head && (*fname != '.' || fname[1] != '\0')
+		 && check_filter(&daemon_filter_list, FLOG, fname, 0) < 0) {
 			rprintf(FERROR, "attempt to hack rsync failed.\n");
 			exit_cleanup(RERR_PROTOCOL);
 		}
-
-		if (DEBUG_GTE(RECV, 1))
-			rprintf(FINFO, "recv_files(%s)\n", fname);
 
 #ifdef SUPPORT_XATTRS
 		if (preserve_xattrs && iflags & ITEM_REPORT_XATTR && do_xfers

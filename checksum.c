@@ -73,7 +73,7 @@ int parse_csum_name(const char *name, int len)
 	exit_cleanup(RERR_UNSUPPORTED);
 }
 
-int csum_len_for_type(int cst, int flist_csum)
+int csum_len_for_type(int cst, BOOL flist_csum)
 {
 	switch (cst) {
 	  case CSUM_NONE:
