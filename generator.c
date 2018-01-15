@@ -99,6 +99,7 @@ extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern filter_rule_list filter_list, daemon_filter_list;
 
 int maybe_ATTRS_REPORT = 0;
+int maybe_ATTRS_SET_NANO = 0;
 
 static dev_t dev_zero;
 static int deldelay_size = 0, deldelay_cnt = 0;
@@ -1214,6 +1215,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		return;
 	}
 
+	maybe_ATTRS_SET_NANO = always_checksum ? ATTRS_SET_NANO : 0;
+
 	if (skip_dir) {
 		if (is_below(file, skip_dir)) {
 			if (is_dir)
@@ -1762,7 +1765,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			do_unlink(partialptr);
 			handle_partial_dir(partialptr, PDIR_DELETE);
 		}
-		set_file_attrs(fname, file, &sx, NULL, maybe_ATTRS_REPORT);
+		set_file_attrs(fname, file, &sx, NULL, maybe_ATTRS_REPORT | maybe_ATTRS_SET_NANO);
 		if (itemizing)
 			itemize(fnamecmp, file, ndx, statret, &sx, 0, 0, NULL);
 #ifdef SUPPORT_HARD_LINKS

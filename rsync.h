@@ -165,6 +165,7 @@
 
 #define ATTRS_REPORT		(1<<0)
 #define ATTRS_SKIP_MTIME	(1<<1)
+#define ATTRS_SET_NANO		(1<<2)
 
 #define FULL_FLUSH	1
 #define NORMAL_FLUSH	0

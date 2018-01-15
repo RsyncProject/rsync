@@ -556,7 +556,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	if (!(flags & ATTRS_SKIP_MTIME)
 	 && (sxp->st.st_mtime != file->modtime
 #ifdef ST_MTIME_NSEC
-	  || (NSEC_BUMP(file) && (uint32)sxp->st.ST_MTIME_NSEC != F_MOD_NSEC(file))
+	  || (flags & ATTRS_SET_NANO && NSEC_BUMP(file) && (uint32)sxp->st.ST_MTIME_NSEC != F_MOD_NSEC(file))
 #endif
 	  )) {
 		int ret = set_modtime(fname, file->modtime, F_MOD_NSEC(file), sxp->st.st_mode);
@@ -672,7 +672,7 @@ int finish_transfer(const char *fname, const char *fnametmp,
 
 	/* Change permissions before putting the file into place. */
 	set_file_attrs(fnametmp, file, NULL, fnamecmp,
-		       ok_to_set_time ? 0 : ATTRS_SKIP_MTIME);
+		       ok_to_set_time ? ATTRS_SET_NANO : ATTRS_SKIP_MTIME);
 
 	/* move tmp file over real file */
 	if (DEBUG_GTE(RECV, 1))
@@ -697,7 +697,7 @@ int finish_transfer(const char *fname, const char *fnametmp,
 
   do_set_file_attrs:
 	set_file_attrs(fnametmp, file, NULL, fnamecmp,
-		       ok_to_set_time ? 0 : ATTRS_SKIP_MTIME);
+		       ok_to_set_time ? ATTRS_SET_NANO : ATTRS_SKIP_MTIME);
 
 	if (temp_copy_name) {
 		if (do_rename(fnametmp, fname) < 0) {
