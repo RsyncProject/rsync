@@ -21,6 +21,8 @@ Changes since 3.1.2:
     - We don't allow a popt alias to affect the --daemon or --server options.
     - Fix daemon exclude code to disallow attribute changes in addition to
       disallowing transfers.
+    - Don't force nanoseconds to match if a non-transferred, non-checksummed
+      file only passed the quick-check w/o comparing nanosecods.
 
   ENHANCEMENTS:
 
