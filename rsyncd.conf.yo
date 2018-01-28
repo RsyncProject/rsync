@@ -1,5 +1,5 @@
 mailto(rsync-bugs@samba.org)
-manpage(rsyncd.conf)(5)(14 Jan 2018)()()
+manpage(rsyncd.conf)(5)(28 Jan 2018)()()
 manpagename(rsyncd.conf)(configuration file for rsync in daemon mode)
 manpagesynopsis()
 
@@ -955,7 +955,7 @@ url(http://rsync.samba.org/)(http://rsync.samba.org/)
 
 manpagesection(VERSION)
 
-This man page is current for version 3.1.3pre1 of rsync.
+This man page is current for version 3.1.3 of rsync.
 
 manpagesection(CREDITS)
 
