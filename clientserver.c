@@ -688,7 +688,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	log_init(1);
 
 #ifdef HAVE_PUTENV
-	if (*lp_prexfer_exec(i) || *lp_postxfer_exec(i)) {
+	if ((*lp_prexfer_exec(i) || *lp_postxfer_exec(i)) && !getenv("RSYNC_NO_XFER_EXEC")) {
 		int status;
 
 		/* For post-xfer exec, fork a new process to run the rsync
@@ -714,7 +714,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 				else
 					status = -1;
 				set_env_num("RSYNC_EXIT_STATUS", status);
-				if (system(lp_postxfer_exec(i)) < 0)
+				if (shell_exec(lp_postxfer_exec(i)) < 0)
 					status = -1;
 				_exit(status);
 			}
@@ -758,7 +758,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 				close(STDIN_FILENO);
 				dup2(pre_exec_error_fd, STDOUT_FILENO);
 				close(pre_exec_error_fd);
-				status = system(lp_prexfer_exec(i));
+				status = shell_exec(lp_prexfer_exec(i));
 				if (!WIFEXITED(status))
 					_exit(1);
 				_exit(WEXITSTATUS(status));

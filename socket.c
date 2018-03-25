@@ -847,7 +847,7 @@ static int sock_exec(const char *prog)
 			fprintf(stderr, "Failed to run \"%s\"\n", prog);
 			exit(1);
 		}
-		exit(system(prog));
+		exit(shell_exec(prog));
 	}
 
 	close(fd[1]);

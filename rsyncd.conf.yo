@@ -812,6 +812,10 @@ Even though the commands can be associated with a particular module, they
 are run using the permissions of the user that started the daemon (not the
 module's uid/gid setting) without any chroot restrictions.
 
+These settings honor 2 environment variables: use RSYNC_SHELL to set a shell to
+use when running the command (which otherwise uses your system() call's default
+shell), and use RSYNC_NO_XFER_EXEC to disable both options completely.
+
 )
 
 manpagesection(CONFIG DIRECTIVES)

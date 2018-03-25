@@ -236,6 +236,10 @@ The command specified above uses ssh to run nc (netcat) on a proxyhost,
 which forwards all data to port 873 (the rsync daemon) on the targethost
 (%H).
 
+Note also that if the RSYNC_SHELL environment varibable is set, that
+program will be used to run the RSYNC_CONNECT_PROG command instead of
+using the default shell of the system() call.
+
 manpagesection(USING RSYNC-DAEMON FEATURES VIA A REMOTE-SHELL CONNECTION)
 
 It is sometimes useful to use various features of an rsync daemon (such as

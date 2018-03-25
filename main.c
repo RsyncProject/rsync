@@ -154,6 +154,27 @@ pid_t wait_process(pid_t pid, int *status_ptr, int flags)
 	return waited_pid;
 }
 
+int shell_exec(const char *cmd)
+{
+	char *shell = getenv("RSYNC_SHELL");
+	int status;
+	pid_t pid;
+
+	if (!shell)
+		return system(cmd);
+
+	if ((pid = fork()) < 0)
+		return -1;
+
+	if (pid == 0) {
+		execlp(shell, shell, "-c", cmd, NULL);
+		_exit(1);
+	}
+
+	int ret = wait_process(pid, &status, 0);
+	return ret < 0 ? -1 : status;
+}
+
 /* Wait for a process to exit, calling io_flush while waiting. */
 static void wait_process_with_flush(pid_t pid, int *exit_code_ptr)
 {
@@ -1497,9 +1518,7 @@ const char *get_panic_action(void)
 
 	if (cmd_fmt)
 		return cmd_fmt;
-	else
-		return "xterm -display :0 -T Panic -n Panic "
-			"-e gdb /proc/%d/exe %d";
+	return "xterm -display :0 -T Panic -n Panic -e gdb /proc/%d/exe %d";
 }
 
 
@@ -1520,7 +1539,7 @@ static void rsync_panic_handler(UNUSED(int whatsig))
 
 	/* Unless we failed to execute gdb, we allow the process to
 	 * continue.  I'm not sure if that's right. */
-	ret = system(cmd_buf);
+	ret = shell_exec(cmd_buf);
 	if (ret)
 		_exit(ret);
 }
