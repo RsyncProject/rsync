@@ -1,3 +1,51 @@
+NEWS for rsync 3.1.3 (28 Jan 2018)
+Protocol: 31 (unchanged)
+Changes since 3.1.2:
+
+  SECURITY FIXES:
+    - Fixed a buffer overrun in the protocol's handling of xattr names and
+      ensure that the received name is null terminated.
+    - Fix an issue with --protect-args where the user could specify the arg in
+      the protected-arg list and short-circuit some of the arg-sanitizing code.
+
+  BUG FIXES:
+
+    - Don't output about a new backup dir without appropriate info verbosity.
+    - Fixed some issues with the sort functions in support/rsyncstats script.
+    - Added a way to specify daemon config lists (e.g. users, groups, etc) that
+      contain spaces (see "auth users" in the latest rsyncd.conf manpage).
+    - If a backup fails (e.g. full disk) rsync exits with an error.
+    - Fixed a problem with a doubled --fuzzy option combined with --link-dest.
+    - Avoid invalid output in the summary if either the start or end time had
+      an error.
+    - We don't allow a popt alias to affect the --daemon or --server options.
+    - Fix daemon exclude code to disallow attribute changes in addition to
+      disallowing transfers.
+    - Don't force nanoseconds to match if a non-transferred, non-checksummed
+      file only passed the quick-check w/o comparing nanosecods.
+
+  ENHANCEMENTS:
+
+    - Added the ability for rsync to compare nanosecond times in its file-check
+      comparisons, and added support nanosecond times on Mac OS X.
+    - Added a short-option (-@) for --modify-window.
+    - Added the --checksum-choice=NAME[,NAME] option to choose the checksum
+      algorithms.
+    - Added hashing of xattr names (with using -X) to improve the handling of
+      files with large numbers of xattrs.
+    - Added a way to filter xattr names using include/exclude/filter rules (see
+      the --xattrs option in the manpage for details).
+    - Added "daemon chroot|uid|gid" to the daemon config (in addition to the
+      old chroot|uid|gid settings that affect the daemon's transfer process).
+    - Added "syslog tag" to the daemon configuration.
+    - Some manpage improvements.
+
+  DEVELOPER RELATED:
+
+    - Tweak the "make" output when yodl isn't around to create the man pages.
+    - Changed an obsolete autoconf compile macro.
+    - Support newer yodl versions when converting man pages.
+
 NEWS for rsync 3.1.2 (21 Dec 2015)
 Protocol: 31 (unchanged)
 Changes since 3.1.1:
