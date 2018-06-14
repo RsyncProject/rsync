@@ -1286,6 +1286,8 @@ char *get_rule_prefix(filter_rule *rule, const char *pat, int for_xfer,
 	}
 	if (rule->rflags & FILTRULE_EXCLUDE_SELF)
 		*op++ = 'e';
+	if (rule->rflags & FILTRULE_XATTR)
+		*op++ = 'x';
 	if (rule->rflags & FILTRULE_SENDER_SIDE
 	    && (!for_xfer || protocol_version >= 29))
 		*op++ = 's';
