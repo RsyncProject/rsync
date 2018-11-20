@@ -1636,6 +1636,7 @@ static void add_dirs_to_tree(int parent_ndx, struct file_list *from_flist,
 	int32 *parent_dp = parent_ndx < 0 ? NULL
 			 : F_DIR_NODE_P(dir_flist->sorted[parent_ndx]);
 
+	/* The sending side is adding entries to dir_flist in sorted order, so sorted & files are the same. */
 	flist_expand(dir_flist, dir_cnt);
 	dir_flist->sorted = dir_flist->files;
 
@@ -1970,7 +1971,7 @@ void send_extra_file_list(int f, int at_least)
 		else
 			dir_ndx = send_dir_ndx;
 		write_ndx(f, NDX_FLIST_OFFSET - dir_ndx);
-		flist->parent_ndx = dir_ndx;
+		flist->parent_ndx = send_dir_ndx; /* the sending side must remember the sorted ndx value */
 
 		send1extra(f, file, flist);
 		prev_flags = file->flags;
