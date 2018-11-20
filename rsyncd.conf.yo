@@ -408,6 +408,12 @@ supplementary groups.  The default for a non-super-user is to not change any
 group attributes (and indeed, your OS may not allow a non-super-user to try to
 change their group settings).
 
+The specified list is normally split into tokens based on spaces and commas.
+However, if the list starts with a comma, then the list is only split on
+commas, which allows a group name to contain a space.  In either case any
+leading and/or trailing whitespace is removed from the tokens and empty tokens
+are ignored.
+
 dit(bf(daemon uid)) This parameter specifies a uid under which the daemon will
 run. The daemon usually runs as user root, and when this is left unset the user
 is left unchanged. See also the "uid" parameter.
