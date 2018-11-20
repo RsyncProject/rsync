@@ -889,7 +889,9 @@ dit(bf(--append-verify)) This works just like the bf(--append) option, but
 the existing data on the receiving side is included in the full-file
 checksum verification step, which will cause a file to be resent if the
 final verification step fails (rsync uses a normal, non-appending
-bf(--inplace) transfer for the resend).
+bf(--inplace) transfer for the resend). It otherwise has the exact same
+caveats for files that have not grown larger, so don't use this for a
+general copy.
 
 Note: prior to rsync 3.0.0, the bf(--append) option worked like
 bf(--append-verify), so if you are interacting with an older rsync (or the
