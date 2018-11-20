@@ -979,7 +979,7 @@ else
 	AC_DEFINE(HAVE_UNIXWARE_ACLS, 1, [true if you have UnixWare ACLs])
 	AC_DEFINE(SUPPORT_ACLS, 1, [Define to 1 to add support for ACLs])
 	;;
-    solaris*|*cygwin*)
+    solaris*)
 	AC_MSG_RESULT(Using solaris ACLs)
 	AC_DEFINE(HAVE_SOLARIS_ACLS, 1, [true if you have solaris ACLs])
 	AC_DEFINE(SUPPORT_ACLS, 1)
