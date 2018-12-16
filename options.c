@@ -1315,6 +1315,10 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	int opt;
 	int orig_protect_args = protect_args;
 
+	if (argc == 0) {
+		strlcpy(err_buf, "argc is zero!\n", sizeof err_buf);
+		return 0;
+	}
 	if (ref && *ref)
 		set_refuse_options(ref);
 	if (am_daemon) {

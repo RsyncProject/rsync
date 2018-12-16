@@ -4,6 +4,9 @@ Changes since 3.1.3:
 
   BUG FIXES:
 
+    - Avoid a potential out-of-bounds read in daemon mode if argc can be made
+      to become 0.
+
     - Fix xattr filter rules losing an 'x' attribute in a non-local transfer.
 
     - Fix a compiler error/warning about shifting a negative value (in the zlib
