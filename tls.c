@@ -214,7 +214,7 @@ static struct poptOption long_options[] = {
   {0,0,0,0,0,0,0}
 };
 
-static void tls_usage(int ret)
+static void NORETURN tls_usage(int ret)
 {
   FILE *F = ret ? stderr : stdout;
   fprintf(F,"usage: " PROGRAM " [OPTIONS] FILE ...\n");

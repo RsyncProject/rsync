@@ -138,7 +138,6 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 				who_am_i(), code, file, line);
 		}
 
-		/* FALLTHROUGH */
 #include "case_N.h"
 		switch_step++;
 
@@ -152,7 +151,6 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 			}
 		}
 
-		/* FALLTHROUGH */
 #include "case_N.h"
 		switch_step++;
 
@@ -183,7 +181,6 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 			}
 		}
 
-		/* FALLTHROUGH */
 #include "case_N.h"
 		switch_step++;
 
@@ -195,7 +192,6 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 		if (!exit_code && !code)
 			io_flush(FULL_FLUSH);
 
-		/* FALLTHROUGH */
 #include "case_N.h"
 		switch_step++;
 
@@ -226,7 +222,6 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 		 || am_daemon || (logfile_name && (am_server || !INFO_GTE(STATS, 1))))
 			log_exit(exit_code, exit_file, exit_line);
 
-		/* FALLTHROUGH */
 #include "case_N.h"
 		switch_step++;
 
@@ -238,7 +233,6 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 				dry_run ? " (DRY RUN)" : "");
 		}
 
-		/* FALLTHROUGH */
 #include "case_N.h"
 		switch_step++;
 
@@ -254,7 +248,6 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 			noop_io_until_death();
 		}
 
-		/* FALLTHROUGH */
 #include "case_N.h"
 		switch_step++;
 

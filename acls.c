@@ -1117,14 +1117,12 @@ int default_perms_for_dir(const char *dir)
 		case ENOSYS:
 			/* No ACLs are available. */
 			break;
-		case ENOENT:
-			if (dry_run) {
+		default:
+			if (dry_run && errno == ENOENT) {
 				/* We're doing a dry run, so the containing directory
 				 * wasn't actually created.  Don't worry about it. */
 				break;
 			}
-			/* Otherwise fall through. */
-		default:
 			rprintf(FWARNING,
 				"default_perms_for_dir: sys_acl_get_file(%s, %s): %s, falling back on umask\n",
 				dir, str_acl_type(SMB_ACL_TYPE_DEFAULT), strerror(errno));

@@ -135,7 +135,6 @@ int set_modtime(const char *fname, time_t modtime, uint32 mod_nsec, mode_t mode)
 		if (errno != ENOSYS)
 			return -1;
 		switch_step++;
-		/* FALLTHROUGH */
 #endif
 
 #ifdef HAVE_UTIMENSAT
@@ -145,7 +144,6 @@ int set_modtime(const char *fname, time_t modtime, uint32 mod_nsec, mode_t mode)
 		if (errno != ENOSYS)
 			return -1;
 		switch_step++;
-		/* FALLTHROUGH */
 #endif
 
 #ifdef HAVE_LUTIMES
@@ -155,7 +153,6 @@ int set_modtime(const char *fname, time_t modtime, uint32 mod_nsec, mode_t mode)
 		if (errno != ENOSYS)
 			return -1;
 		switch_step++;
-		/* FALLTHROUGH */
 #endif
 
 #include "case_N.h"
@@ -165,7 +162,6 @@ int set_modtime(const char *fname, time_t modtime, uint32 mod_nsec, mode_t mode)
 			if (S_ISLNK(mode))
 				return 1;
 		}
-		/* FALLTHROUGH */
 
 #include "case_N.h"
 #ifdef HAVE_UTIMES
