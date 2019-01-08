@@ -1682,3 +1682,11 @@ void *expand_item_list(item_list *lp, size_t item_size,
 	}
 	return (char*)lp->items + (lp->count++ * item_size);
 }
+
+/* This zeroing of memory won't be optimized away by the compiler. */
+void force_memzero(void *buf, size_t len)
+{
+    volatile uchar *z = buf;
+    while (len-- > 0)
+	*z++ = '\0';
+}

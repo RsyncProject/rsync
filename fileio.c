@@ -322,7 +322,9 @@ int unmap_file(struct map_struct *map)
 		map->p = NULL;
 	}
 	ret = map->status;
-	memset(map, 0, sizeof map[0]);
+#if 0 /* I don't think we really need this. */
+	force_memzero(map, sizeof map[0]);
+#endif
 	free(map);
 
 	return ret;
