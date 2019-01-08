@@ -1330,7 +1330,7 @@ batch-writing option is in effect.
 
 dit(bf(--checksum-choice=STR)) This option overrides the checksum algoriths.
 If one algorithm name is specified, it is used for both the transfer checksums
-and (assuming bf(--checksum) is specifed) the pre-transfer checksumming. If two
+and (assuming bf(--checksum) is specified) the pre-transfer checksumming. If two
 comma-separated names are supplied, the first name affects the transfer
 checksums, and the second name affects the pre-transfer checksumming.
 
@@ -2340,7 +2340,7 @@ units of 1024.
 
 The default is human-readable level 1.  Each bf(-h) option increases the level
 by one.  You can take the level down to 0 (to output numbers as pure digits) by
-specifing the bf(--no-human-readable) (bf(--no-h)) option.
+specifying the bf(--no-human-readable) (bf(--no-h)) option.
 
 The unit letters that are appended in levels 2 and 3 are: K (kilo), M (mega),
 G (giga), or T (tera).  For example, a 1234567-byte file would output as 1.23M
