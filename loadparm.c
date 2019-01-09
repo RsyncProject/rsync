@@ -135,8 +135,6 @@ typedef struct {
 	char *syslog_tag;
 	char *temp_dir;
 	char *uid;
-/* NOTE: update this macro if the last char* variable changes! */
-#define LOCAL_STRING_COUNT() (offsetof(local_vars, uid) / sizeof (char*) + 1)
 
 	int max_connections;
 	int max_verbosity;
@@ -391,7 +389,7 @@ static char *expand_vars(char *str)
 	char *buf, *t, *f;
 	int bufsize;
 
-	if (strchr(str, '%') == NULL)
+	if (!str || !strchr(str, '%'))
 		return str;
 
 	bufsize = strlen(str) + 2048;
@@ -525,19 +523,10 @@ static inline void string_set(char **s, const char *v)
 		out_of_memory("string_set");
 }
 
-/* Copy the local_vars, strdup'ing any strings.  NOTE:  this depends on
- * the structure starting with a contiguous list of the char* variables,
- * and having an accurate count in the LOCAL_STRING_COUNT() macro. */
+/* Copy local_vars into a new section. No need to strdup since we don't free. */
 static void copy_section(local_vars *psectionDest, local_vars *psectionSource)
 {
-	int count = LOCAL_STRING_COUNT();
-	char **strings = (char**)psectionDest;
-
 	memcpy(psectionDest, psectionSource, sizeof psectionDest[0]);
-	while (count--) {
-		if (strings[count] && !(strings[count] = strdup(strings[count])))
-			out_of_memory("copy_section");
-	}
 }
 
 /* Initialise a section to the defaults. */
@@ -680,10 +669,10 @@ static BOOL do_parameter(char *parmname, char *parmvalue)
 	switch (parm_table[parmnum].type) {
 	case P_PATH:
 	case P_STRING:
-		/* delay expansion of vars */
+		/* delay expansion of %VAR% strings */
 		break;
 	default:
-		/* expand any %VARS% now */
+		/* expand any %VAR% strings now */
 		parmvalue = expand_vars(parmvalue);
 		break;
 	}
