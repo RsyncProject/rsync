@@ -83,7 +83,7 @@ default for that parameter.
 
 You may use references to environment variables in the values of parameters.
 String parameters will have %VAR% references expanded as late as possible (when
-the string is used in the program), allowing for the use of variables that
+the string is first used in the program), allowing for the use of variables that
 rsync sets at connection time, such as RSYNC_USER_NAME.  Non-string parameters
 (such as true/false settings) are expanded when read from the config file.  If
 a variable does not exist in the environment, or if a sequence of characters is
@@ -819,7 +819,7 @@ are run using the permissions of the user that started the daemon (not the
 module's uid/gid setting) without any chroot restrictions.
 
 These settings honor 2 environment variables: use RSYNC_SHELL to set a shell to
-use when running the command (which otherwise uses your system() call's default
+use when running the command (which otherwise uses your code(system()) call's default
 shell), and use RSYNC_NO_XFER_EXEC to disable both options completely.
 
 )
