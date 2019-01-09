@@ -207,12 +207,15 @@ while ($command =~ /((?:[^\s\\]+|\\.[^\s\\]*)+)/g) {
       s{//+}{/}g;
       s{^/}{};
       s{^$}{.};
-      die "$0: do not use .. in any path!\n" if m{(^|/)\\?\.\\?\.(\\?/|$)};
     }
     push(@args, bsd_glob($_, GLOB_LIMIT|GLOB_NOCHECK|GLOB_BRACE|GLOB_QUOTE));
   }
 }
 die "$0: invalid rsync-command syntax or options\n" if $in_options;
+
+if ($subdir ne '/') {
+    die "$0: do not use .. in any path!\n" if grep m{(^|/)\.\.(/|$)}, @args;
+}
 
 @args = ( '.' ) if !@args;
 
@@ -227,7 +230,7 @@ if ($write_log) {
 }
 
 # Note: This assumes that the rsync protocol will not be maliciously hijacked.
-exec(RSYNC, @opts, @args) or die "exec(rsync @opts @args) failed: $? $!";
+exec(RSYNC, @opts, '--', @args) or die "exec(rsync @opts -- @args) failed: $? $!";
 
 sub check_arg
 {
