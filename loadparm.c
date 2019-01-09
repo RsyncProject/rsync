@@ -100,6 +100,15 @@ typedef struct {
 	char *pid_file;
 	char *socket_options;
 
+	/* Each _EXP var tracks if the associated char* var has been expanded yet or not. */
+	BOOL bind_address_EXP;
+	BOOL daemon_chroot_EXP;
+	BOOL daemon_gid_EXP;
+	BOOL daemon_uid_EXP;
+	BOOL motd_file_EXP;
+	BOOL pid_file_EXP;
+	BOOL socket_options_EXP;
+
 	int listen_backlog;
 	int rsync_port;
 } global_vars;
@@ -135,6 +144,34 @@ typedef struct {
 	char *syslog_tag;
 	char *temp_dir;
 	char *uid;
+
+	/* Each _EXP var tracks if the associated char* var has been expanded yet or not. */
+	BOOL auth_users_EXP;
+	BOOL charset_EXP;
+	BOOL comment_EXP;
+	BOOL dont_compress_EXP;
+	BOOL exclude_EXP;
+	BOOL exclude_from_EXP;
+	BOOL filter_EXP;
+	BOOL gid_EXP;
+	BOOL hosts_allow_EXP;
+	BOOL hosts_deny_EXP;
+	BOOL include_EXP;
+	BOOL include_from_EXP;
+	BOOL incoming_chmod_EXP;
+	BOOL lock_file_EXP;
+	BOOL log_file_EXP;
+	BOOL log_format_EXP;
+	BOOL name_EXP;
+	BOOL outgoing_chmod_EXP;
+	BOOL path_EXP;
+	BOOL postxfer_exec_EXP;
+	BOOL prexfer_exec_EXP;
+	BOOL refuse_options_EXP;
+	BOOL secrets_file_EXP;
+	BOOL syslog_tag_EXP;
+	BOOL temp_dir_EXP;
+	BOOL uid_EXP;
 
 	int max_connections;
 	int max_verbosity;
@@ -181,6 +218,14 @@ static const all_vars Defaults = {
  /* pid_file; */		NULL,
  /* socket_options; */		NULL,
 
+ /* bind_address_EXP; */	False,
+ /* daemon_chroot_EXP; */	False,
+ /* daemon_gid_EXP; */		False,
+ /* daemon_uid_EXP; */		False,
+ /* motd_file_EXP; */		False,
+ /* pid_file_EXP; */		False,
+ /* socket_options_EXP; */	False,
+
  /* listen_backlog; */		5,
  /* rsync_port; */		0,
  },
@@ -213,6 +258,33 @@ static const all_vars Defaults = {
  /* syslog_tag; */		"rsyncd",
  /* temp_dir; */ 		NULL,
  /* uid; */			NULL,
+
+ /* auth_users_EXP; */		False,
+ /* charset_EXP; */		False,
+ /* comment_EXP; */		False,
+ /* dont_compress_EXP; */	False,
+ /* exclude_EXP; */		False,
+ /* exclude_from_EXP; */	False,
+ /* filter_EXP; */		False,
+ /* gid_EXP; */			False,
+ /* hosts_allow_EXP; */		False,
+ /* hosts_deny_EXP; */		False,
+ /* include_EXP; */		False,
+ /* include_from_EXP; */	False,
+ /* incoming_chmod_EXP; */	False,
+ /* lock_file_EXP; */		False,
+ /* log_file_EXP; */		False,
+ /* log_format_EXP; */		False,
+ /* name_EXP; */		False,
+ /* outgoing_chmod_EXP; */	False,
+ /* path_EXP; */		False,
+ /* postxfer_exec_EXP; */	False,
+ /* prexfer_exec_EXP; */	False,
+ /* refuse_options_EXP; */	False,
+ /* secrets_file_EXP; */	False,
+ /* syslog_tag_EXP; */		False,
+ /* temp_dir_EXP; */		False,
+ /* uid_EXP; */			False,
 
  /* max_connections; */		0,
  /* max_verbosity; */		1,
@@ -432,20 +504,23 @@ static char *expand_vars(char *str)
 	return buf;
 }
 
+/* NOTE: use this function and all the FN_{GLOBAL,LOCAL} ones WITHOUT a trailing semicolon! */
+#define RETURN_EXPANDED(val) {if (!val ## _EXP) {val = expand_vars(val); val ## _EXP = True;} return val ? val : "";}
+
 /* In this section all the functions that are used to access the
  * parameters from the rest of the program are defined. */
 
-#define FN_GLOBAL_STRING(fn_name, ptr) \
- char *fn_name(void) {return expand_vars(*(char **)(ptr) ? *(char **)(ptr) : "");}
-#define FN_GLOBAL_BOOL(fn_name, ptr) \
- BOOL fn_name(void) {return *(BOOL *)(ptr);}
-#define FN_GLOBAL_CHAR(fn_name, ptr) \
- char fn_name(void) {return *(char *)(ptr);}
-#define FN_GLOBAL_INTEGER(fn_name, ptr) \
- int fn_name(void) {return *(int *)(ptr);}
+#define FN_GLOBAL_STRING(fn_name, val) \
+ char *fn_name(void) RETURN_EXPANDED(Vars.g.val)
+#define FN_GLOBAL_BOOL(fn_name, val) \
+ BOOL fn_name(void) {return Vars.g.val;}
+#define FN_GLOBAL_CHAR(fn_name, val) \
+ char fn_name(void) {return Vars.g.val;}
+#define FN_GLOBAL_INTEGER(fn_name, val) \
+ int fn_name(void) {return Vars.g.val;}
 
 #define FN_LOCAL_STRING(fn_name, val) \
- char *fn_name(int i) {return expand_vars(LP_SNUM_OK(i) && iSECTION(i).val ? iSECTION(i).val : Vars.l.val ? Vars.l.val : "");}
+ char *fn_name(int i) {if (LP_SNUM_OK(i) && iSECTION(i).val) RETURN_EXPANDED(iSECTION(i).val) else RETURN_EXPANDED(Vars.l.val)}
 #define FN_LOCAL_BOOL(fn_name, val) \
  BOOL fn_name(int i) {return LP_SNUM_OK(i)? iSECTION(i).val : Vars.l.val;}
 #define FN_LOCAL_CHAR(fn_name, val) \
@@ -453,16 +528,16 @@ static char *expand_vars(char *str)
 #define FN_LOCAL_INTEGER(fn_name, val) \
  int fn_name(int i) {return LP_SNUM_OK(i)? iSECTION(i).val : Vars.l.val;}
 
-FN_GLOBAL_STRING(lp_bind_address, &Vars.g.bind_address)
-FN_GLOBAL_STRING(lp_daemon_chroot, &Vars.g.daemon_chroot)
-FN_GLOBAL_STRING(lp_daemon_gid, &Vars.g.daemon_gid)
-FN_GLOBAL_STRING(lp_daemon_uid, &Vars.g.daemon_uid)
-FN_GLOBAL_STRING(lp_motd_file, &Vars.g.motd_file)
-FN_GLOBAL_STRING(lp_pid_file, &Vars.g.pid_file)
-FN_GLOBAL_STRING(lp_socket_options, &Vars.g.socket_options)
+FN_GLOBAL_STRING(lp_bind_address, bind_address)
+FN_GLOBAL_STRING(lp_daemon_chroot, daemon_chroot)
+FN_GLOBAL_STRING(lp_daemon_gid, daemon_gid)
+FN_GLOBAL_STRING(lp_daemon_uid, daemon_uid)
+FN_GLOBAL_STRING(lp_motd_file, motd_file)
+FN_GLOBAL_STRING(lp_pid_file, pid_file)
+FN_GLOBAL_STRING(lp_socket_options, socket_options)
 
-FN_GLOBAL_INTEGER(lp_listen_backlog, &Vars.g.listen_backlog)
-FN_GLOBAL_INTEGER(lp_rsync_port, &Vars.g.rsync_port)
+FN_GLOBAL_INTEGER(lp_listen_backlog, listen_backlog)
+FN_GLOBAL_INTEGER(lp_rsync_port, rsync_port)
 
 FN_LOCAL_STRING(lp_auth_users, auth_users)
 FN_LOCAL_STRING(lp_charset, charset)
