@@ -49,14 +49,14 @@ pool_create(size_t size, size_t quantum, void (*bomb)(const char *), int flags)
 {
 	struct alloc_pool *pool;
 
-	if (!(pool = new0(struct alloc_pool)))
-		return NULL;
-
 	if ((MINALIGN & (MINALIGN - 1)) != 0) {
 		if (bomb)
 			(*bomb)("Compiler error: MINALIGN is not a power of 2\n");
 		return NULL;
 	}
+
+	if (!(pool = new0(struct alloc_pool)))
+		return NULL;
 
 	if (!size)
 		size = POOL_DEF_EXTENT;
