@@ -462,7 +462,7 @@ int do_utime(const char *fname, time_t modtime, UNUSED(uint32 mod_nsec))
 
 OFF_T do_fallocate(int fd, OFF_T offset, OFF_T length)
 {
-	int opts = inplace || preallocate_files ? 0 : DO_FALLOC_OPTIONS;
+	int opts = inplace || preallocate_files ? DO_FALLOC_OPTIONS : 0;
 	int ret;
 	RETURN_ERROR_IF(dry_run, 0);
 	RETURN_ERROR_IF_RO_OR_LO;
