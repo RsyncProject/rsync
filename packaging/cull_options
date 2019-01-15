@@ -5,7 +5,7 @@
 use strict;
 
 our %short_no_arg;
-our %short_with_num;
+our %short_with_num = ( '@' => 1 );
 our %long_opt = ( # These include some extra long-args that BackupPC uses:
     'block-size' => 1,
     'daemon' => -1,
@@ -45,7 +45,7 @@ while (<IN>) {
     } elsif (/dest_option = "--([^"]+)"/) {
 	$long_opt{$1} = 2;
 	undef $last_long_opt;
-    } elsif (/\Qasprintf(\E[^,]+, "--([^"=]+)=/ || /\Qargs[ac++]\E = "--([^"=]+)=/) {
+    } elsif (/\Qasprintf(\E[^,]+, "--([^"=]+)=/ || /\Qargs[ac++]\E = "--([^"=]+)=/ || /fmt = .*: "--([^"=]+)=/) {
 	$long_opt{$1} = 1;
 	undef $last_long_opt;
     }
@@ -76,7 +76,8 @@ foreach my $opt (sort keys %long_opt) {
     my $val = $long_opt{$opt};
     $val = 1 if $opt =~ /^(max-|min-)/;
     $val = 3 if $opt eq 'files-from';
-    $val = '$ro ? -1 : ' . $val if $opt =~ /^remove-/;
+    $val = q"$only eq 'r' ? -1 : " . $val if $opt =~ /^(remove-|log-file)/;
+    $val = q"$only eq 'w' ? -1 : " . $val if $opt eq 'sender';
     print "  '$opt' => $val,\n";
 }
 
