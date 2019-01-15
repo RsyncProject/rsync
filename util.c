@@ -342,6 +342,7 @@ int copy_file(const char *source, const char *dest, int ofd, mode_t mode)
 		if (robust_unlink(dest) && errno != ENOENT) {
 			int save_errno = errno;
 			rsyserr(FERROR_XFER, errno, "unlink %s", full_fname(dest));
+			close(ifd);
 			errno = save_errno;
 			return -1;
 		}
