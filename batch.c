@@ -216,7 +216,7 @@ static void write_filter_rules(int fd)
 void write_batch_shell_file(int argc, char *argv[], int file_arg_cnt)
 {
 	int fd, i, len, err = 0;
-	char *p, filename[MAXPATHLEN];
+	char *p, *p2, filename[MAXPATHLEN];
 
 	stringjoin(filename, sizeof filename,
 		   batch_name, ".sh", NULL);
@@ -267,7 +267,7 @@ void write_batch_shell_file(int argc, char *argv[], int file_arg_cnt)
 				err = 1;
 		}
 	}
-	if (!(p = check_for_hostspec(argv[argc - 1], &p, &i)))
+	if (!(p = check_for_hostspec(argv[argc - 1], &p2, &i)))
 		p = argv[argc - 1];
 	if (write(fd, " ${1:-", 6) != 6
 	 || write_arg(fd, p) < 0)
