@@ -63,7 +63,7 @@ die "$0 reading from write-only server not allowed\n" if $only eq 'w' && $am_sen
 our $short_disabled = 's';
 
 our $short_no_arg = 'ACDEHIJKLORSWXbcdgklmnoprstuvxyz'; # DO NOT REMOVE ANY
-our $short_with_num = 'B'; # DO NOT REMOVE ANY
+our $short_with_num = '@B'; # DO NOT REMOVE ANY
 
 # To disable a long-named option, change its value to a -1.  The values mean:
 # 0 = the option has no arg; 1 = the arg doesn't need any checking; 2 = only
@@ -73,6 +73,7 @@ our %long_opt = (
   'backup-dir' => 2,
   'block-size' => 1,
   'bwlimit' => 1,
+  'checksum-choice' => 1,
   'checksum-seed' => 1,
   'compare-dest' => 2,
   'compress-level' => 1,
@@ -130,7 +131,7 @@ our %long_opt = (
   'remove-sent-files' => $only eq 'r' ? -1 : 0,
   'remove-source-files' => $only eq 'r' ? -1 : 0,
   'safe-links' => 0,
-  'sender' => 0,
+  'sender' => $only eq 'w' ? -1 : 0,
   'server' => 0,
   'size-only' => 0,
   'skip-compress' => 1,
