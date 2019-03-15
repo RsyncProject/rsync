@@ -11,8 +11,14 @@ my %ls;
 my $commit_time;
 my $prefix = @ARGV && $ARGV[0] =~ s/^--prefix=// ? shift : '';
 
+my $top_dir = `git rev-parse --show-toplevel`;
+exit 1 unless $top_dir;
+chomp($top_dir);
+
+chdir $top_dir or die "Failed to chdir to $top_dir\: $!\n";
+
 $/ = "\0";
-open FH, 'git ls-files -z|' or die $!;
+open FH, '-|', qw( git ls-files -z ) or die "Failed to fork: $!";
 while (<FH>) {
     chomp;
     $ls{$_} = $_;
@@ -20,12 +26,12 @@ while (<FH>) {
 close FH;
 
 $/ = "\n";
-open FH, "git log -r --name-only --no-color --pretty=raw -z @ARGV |" or die $!;
+open FH, '-|', qw( git log -r --name-only --no-color --pretty=raw -z ), @ARGV or die "Failed to fork: $!";
 while (<FH>) {
     chomp;
     if (/^committer .*? (\d+) (?:[\-\+]\d+)$/) {
 	$commit_time = $1;
-    } elsif (s/\0\0commit [a-f0-9]{40}$// or s/\0$//) {
+    } elsif (s/\0\0commit [a-f0-9]{40}$// || s/\0$//) {
 	my @files = delete @ls{split(/\0/, $_)};
 	@files = grep { defined $_ } @files;
 	next unless @files;
