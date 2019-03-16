@@ -200,7 +200,9 @@ itemization(
 	list of accessible paths on the daemon will be shown.
 	it() if you specify no local destination then a listing of the
 	specified files on the remote daemon is provided.
-	it() you must not specify the bf(--rsh) (bf(-e)) option.
+	it() you must not specify the bf(--rsh) (bf(-e)) option (since
+	that overrides the daemon connection to use ssh -- see USING
+	RSYNC-DAEMON FEATURES VIA A REMOTE-SHELL CONNECTION below).
 )
 
 An example that copies all the files in a remote module named "src":
@@ -230,7 +232,7 @@ example:
 
 verb(  export RSYNC_CONNECT_PROG='ssh proxyhost nc %H 873'
   rsync -av targethost1::module/src/ /dest/
-  rsync -av rsync:://targethost2/module/src/ /dest/ )
+  rsync -av rsync://targethost2/module/src/ /dest/ )
 
 The command specified above uses ssh to run nc (netcat) on a proxyhost,
 which forwards all data to port 873 (the rsync daemon) on the targethost
@@ -1383,7 +1385,7 @@ It just limits the files that the receiver requests to be transferred.
 This option can be useful for those doing backups using the bf(--link-dest)
 option when they need to continue a backup run that got interrupted.  Since
 a bf(--link-dest) run is copied into a new directory hierarchy (when it is
-used properly), using bf(--ignore existing) will ensure that the
+used properly), using bf(--ignore-existing) will ensure that the
 already-handled files don't get tweaked (which avoids a change in
 permissions on the hard-linked files).  This does mean that this option
 is only looking at the existing files in the destination hierarchy itself.
