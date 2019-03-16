@@ -876,27 +876,22 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 		pathjoin(cmpbuf, MAXPATHLEN, basis_dir[j], fname);
 		if (link_stat(cmpbuf, &sxp->st, 0) < 0 || !S_ISREG(sxp->st.st_mode))
 			continue;
-		switch (match_level) {
-		case 0:
+		if (match_level == 0) {
 			best_match = j;
 			match_level = 1;
-			/* FALL THROUGH */
-		case 1:
-			if (!unchanged_file(cmpbuf, file, &sxp->st))
-				continue;
+		}
+		if (!unchanged_file(cmpbuf, file, &sxp->st))
+			continue;
+		if (match_level == 1) {
 			best_match = j;
 			match_level = 2;
-			/* FALL THROUGH */
-		case 2:
-			if (!unchanged_attrs(cmpbuf, file, sxp)) {
-				free_stat_x(sxp);
-				continue;
-			}
+		}
+		if (unchanged_attrs(cmpbuf, file, sxp)) {
 			best_match = j;
 			match_level = 3;
 			break;
 		}
-		break;
+		free_stat_x(sxp);
 	} while (basis_dir[++j] != NULL);
 
 	if (!match_level)
