@@ -32,6 +32,7 @@ extern int logfile_format_has_i;
 extern int want_xattr_optim;
 extern int csum_length;
 extern int append_mode;
+extern int copy_links;
 extern int io_error;
 extern int flist_eof;
 extern int allowed_lull;
@@ -138,17 +139,16 @@ void successful_send(int ndx)
 		return;
 	f_name(file, fname);
 
-	if (do_lstat(fname, &st) < 0) {
+	if ((copy_links ? do_stat(fname, &st) : do_lstat(fname, &st)) < 0) {
 		failed_op = "re-lstat";
 		goto failed;
 	}
 
-	if (S_ISREG(file->mode) /* Symlinks & devices don't need this check: */
-	 && (st.st_size != F_LENGTH(file) || st.st_mtime != file->modtime
+	if (st.st_size != F_LENGTH(file) || st.st_mtime != file->modtime
 #ifdef ST_MTIME_NSEC
 	 || (NSEC_BUMP(file) && (uint32)st.ST_MTIME_NSEC != F_MOD_NSEC(file))
 #endif
-	)) {
+	) {
 		rprintf(FERROR_XFER, "ERROR: Skipping sender remove for changed file: %s\n", fname);
 		return;
 	}
