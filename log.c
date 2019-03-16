@@ -378,10 +378,13 @@ output_msg:
 				filtered_fwrite(f, convbuf, outbuf.len, 0);
 				outbuf.len = 0;
 			}
-			if (!ierrno || ierrno == E2BIG)
-				continue;
-			fprintf(f, "\\#%03o", CVAL(inbuf.buf, inbuf.pos++));
-			inbuf.len--;
+			/* Log one byte of illegal/incomplete sequence and continue with
+			 * the next character. Check that the buffer is non-empty for the
+			 * sake of robustness. */
+			if ((ierrno == EILSEQ || ierrno == EINVAL) && inbuf.len) {
+				fprintf(f, "\\#%03o", CVAL(inbuf.buf, inbuf.pos++));
+				inbuf.len--;
+			}
 		}
 	} else
 #endif
