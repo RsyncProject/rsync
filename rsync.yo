@@ -939,6 +939,13 @@ are also treated like ordinary files, and so are any symlinks in the
 source path itself when bf(--relative) is used.  This option has no
 additional effect if bf(--copy-links) was also specified.
 
+Note that the cut-off point is the top of the transfer, which is the part of
+the path that rsync isn't mentioning in the verbose output.  If you copy
+"subdir" to "/dest/" then the subdir directory is a name inside the transfer
+tree, not the top of the transfer (its parent directory is the top) so it is
+legal for created relative symlinks to refer to other names inside the /dest
+dir.
+
 dit(bf(--safe-links)) This tells rsync to ignore any symbolic links
 which point outside the copied tree. All absolute symlinks are
 also ignored. Using this option in conjunction with bf(--relative) may
