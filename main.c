@@ -89,6 +89,7 @@ extern char *shell_cmd;
 extern char *batch_name;
 extern char *password_file;
 extern char *backup_dir;
+extern char *copy_as;
 extern char curr_dir[MAXPATHLEN];
 extern char backup_dir_buf[MAXPATHLEN];
 extern char *basis_dir[MAX_BASIS_DIRS+1];
@@ -229,6 +230,74 @@ void read_del_stats(int f)
 	stats.deleted_files += stats.deleted_symlinks = read_varint(f);
 	stats.deleted_files += stats.deleted_devices = read_varint(f);
 	stats.deleted_files += stats.deleted_specials = read_varint(f);
+}
+
+static void become_copy_as_user()
+{
+	char *gname;
+	uid_t uid;
+	gid_t gid;
+
+	if (!copy_as)
+		return;
+
+	if (DEBUG_GTE(CMD, 2))
+		rprintf(FINFO, "[%s] copy_as=%s\n", who_am_i(), copy_as);
+
+	if ((gname = strchr(copy_as, ':')) != NULL)
+		*gname++ = '\0';
+
+	if (!user_to_uid(copy_as, &uid, True)) {
+		rprintf(FERROR, "Invalid copy-as user: %s\n", copy_as);
+		exit_cleanup(RERR_SYNTAX);
+	}
+
+	if (gname) {
+		if (!group_to_gid(gname, &gid, True)) {
+			rprintf(FERROR, "Invalid copy-as group: %s\n", gname);
+			exit_cleanup(RERR_SYNTAX);
+		}
+	} else {
+		struct passwd *pw;
+		if ((pw = getpwuid(uid)) == NULL) {
+			rsyserr(FERROR, errno, "getpwuid failed");
+			exit_cleanup(RERR_SYNTAX);
+		}
+		gid = pw->pw_gid;
+	}
+
+	if (setgid(gid) < 0) {
+		rsyserr(FERROR, errno, "setgid failed");
+		exit_cleanup(RERR_SYNTAX);
+	}
+#ifdef HAVE_SETGROUPS
+	if (setgroups(1, &gid)) {
+		rsyserr(FERROR, errno, "setgroups failed");
+		exit_cleanup(RERR_SYNTAX);
+	}
+#endif
+#ifdef HAVE_INITGROUPS
+	if (!gname && initgroups(copy_as, gid) < 0) {
+		rsyserr(FERROR, errno, "initgroups failed");
+		exit_cleanup(RERR_SYNTAX);
+	}
+#endif
+
+	if (setuid(uid) < 0
+#ifdef HAVE_SETEUID
+	 || seteuid(uid) < 0
+#endif
+	) {
+		rsyserr(FERROR, errno, "setuid failed");
+		exit_cleanup(RERR_SYNTAX);
+	}
+
+	our_uid = MY_UID();
+	our_gid = MY_GID();
+	am_root = (our_uid == 0);
+
+	if (gname)
+		gname[-1] = ':';
 }
 
 /* This function gets called from all 3 processes.  We want the client side
@@ -824,6 +893,8 @@ static void do_server_sender(int f_in, int f_out, int argc, char *argv[])
 		exit_cleanup(RERR_SYNTAX);
 	}
 
+	become_copy_as_user();
+
 	dir = argv[0];
 	if (!relative_paths) {
 		if (!change_dir(dir, CD_NORMAL)) {
@@ -1027,6 +1098,8 @@ static void do_server_recv(int f_in, int f_out, int argc, char *argv[])
 		return;
 	}
 
+	become_copy_as_user();
+
 	if (argc > 0) {
 		char *dir = argv[0];
 		argc--;
@@ -1186,6 +1259,9 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 
 		if (write_batch && !am_server)
 			start_write_batch(f_out);
+
+		become_copy_as_user();
+
 		flist = send_file_list(f_out, argc, argv);
 		if (DEBUG_GTE(FLIST, 3))
 			rprintf(FINFO,"file list sent\n");
@@ -1218,6 +1294,8 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		else
 			io_start_buffering_out(f_out);
 	}
+
+	become_copy_as_user();
 
 	send_filter_list(read_batch ? -1 : f_out);
 

@@ -126,6 +126,7 @@ int inplace = 0;
 int delay_updates = 0;
 long block_size = 0; /* "long" because popt can't set an int32. */
 char *skip_compress = NULL;
+char *copy_as = NULL;
 item_list dparam_list = EMPTY_ITEM_LIST;
 
 /** Network address family. **/
@@ -777,6 +778,7 @@ void usage(enum logcode F)
   rprintf(F,"     --files-from=FILE       read list of source-file names from FILE\n");
   rprintf(F," -0, --from0                 all *-from/filter files are delimited by 0s\n");
   rprintf(F," -s, --protect-args          no space-splitting; only wildcard special-chars\n");
+  rprintf(F,"     --copy-as=USER[:GROUP]  specify user & optional group for the copy\n");
   rprintf(F,"     --address=ADDRESS       bind address for outgoing socket to daemon\n");
   rprintf(F,"     --port=PORT             specify double-colon alternate port number\n");
   rprintf(F,"     --sockopts=OPTIONS      specify custom TCP options\n");
@@ -1030,6 +1032,7 @@ static struct poptOption long_options[] = {
   {"no-8-bit-output",  0,  POPT_ARG_VAL,    &allow_8bit_chars, 0, 0, 0 },
   {"no-8",             0,  POPT_ARG_VAL,    &allow_8bit_chars, 0, 0, 0 },
   {"qsort",            0,  POPT_ARG_NONE,   &use_qsort, 0, 0, 0 },
+  {"copy-as",          0,  POPT_ARG_STRING, &copy_as, 0, 0, 0 },
   {"address",          0,  POPT_ARG_STRING, &bind_address, 0, 0, 0 },
   {"port",             0,  POPT_ARG_INT,    &rsync_port, 0, 0, 0 },
   {"sockopts",         0,  POPT_ARG_STRING, &sockopts, 0, 0, 0 },
