@@ -39,6 +39,7 @@ extern int protocol_version;
 extern int relative_paths;
 extern int preserve_hard_links;
 extern int preserve_perms;
+extern int write_devices;
 extern int preserve_xattrs;
 extern int basis_dir_cnt;
 extern int make_backups;
@@ -231,13 +232,14 @@ int open_tmpfile(char *fnametmp, const char *fname, struct file_struct *file)
 }
 
 static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
-			const char *fname, int fd, OFF_T total_size)
+			const char *fname, int fd, struct file_struct *file)
 {
 	static char file_sum1[MAX_DIGEST_LEN];
 	struct map_struct *mapbuf;
 	struct sum_struct sum;
 	int sum_len;
 	int32 len;
+	OFF_T total_size = F_LENGTH(file);
 	OFF_T offset = 0;
 	OFF_T offset2;
 	char *data;
@@ -379,7 +381,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 	/* inplace: New data could be shorter than old data.
 	 * preallocate_files: total_size could have been an overestimate.
 	 *     Cut off any extra preallocated zeros from dest file. */
-	if ((inplace || preallocated_len > offset) && fd != -1 && do_ftruncate(fd, offset) < 0) {
+	if ((inplace || preallocated_len > offset) && fd != -1 && !IS_DEVICE(file->mode) && do_ftruncate(fd, offset) < 0) {
 		rsyserr(FERROR_XFER, errno, "ftruncate failed on %s",
 			full_fname(fname));
 	}
@@ -402,9 +404,9 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 }
 
 
-static void discard_receive_data(int f_in, OFF_T length)
+static void discard_receive_data(int f_in, struct file_struct *file)
 {
-	receive_data(f_in, NULL, -1, 0, NULL, -1, length);
+	receive_data(f_in, NULL, -1, 0, NULL, -1, file);
 }
 
 static void handle_delayed_updates(char *local_name)
@@ -660,7 +662,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 					"(Skipping batched update for%s \"%s\")\n",
 					redoing ? " resend of" : "",
 					fname);
-				discard_receive_data(f_in, F_LENGTH(file));
+				discard_receive_data(f_in, file);
 				file->flags |= FLAG_FILE_SENT;
 				continue;
 			}
@@ -671,13 +673,13 @@ int recv_files(int f_in, int f_out, char *local_name)
 		if (!do_xfers) { /* log the transfer */
 			log_item(FCLIENT, file, iflags, NULL);
 			if (read_batch)
-				discard_receive_data(f_in, F_LENGTH(file));
+				discard_receive_data(f_in, file);
 			continue;
 		}
 		if (write_batch < 0) {
 			log_item(FCLIENT, file, iflags, NULL);
 			if (!am_server)
-				discard_receive_data(f_in, F_LENGTH(file));
+				discard_receive_data(f_in, file);
 			if (inc_recurse)
 				send_msg_int(MSG_SUCCESS, ndx);
 			continue;
@@ -767,7 +769,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 		} else if (do_fstat(fd1,&st) != 0) {
 			rsyserr(FERROR_XFER, errno, "fstat %s failed",
 				full_fname(fnamecmp));
-			discard_receive_data(f_in, F_LENGTH(file));
+			discard_receive_data(f_in, file);
 			close(fd1);
 			if (inc_recurse)
 				send_msg_int(MSG_NO_SEND, ndx);
@@ -782,16 +784,30 @@ int recv_files(int f_in, int f_out, char *local_name)
 			 */
 			rprintf(FERROR_XFER, "recv_files: %s is a directory\n",
 				full_fname(fnamecmp));
-			discard_receive_data(f_in, F_LENGTH(file));
+			discard_receive_data(f_in, file);
 			close(fd1);
 			if (inc_recurse)
 				send_msg_int(MSG_NO_SEND, ndx);
 			continue;
 		}
 
-		if (fd1 != -1 && !S_ISREG(st.st_mode)) {
+		if (fd1 != -1 && !(S_ISREG(st.st_mode) || (write_devices && IS_DEVICE(st.st_mode)))) {
 			close(fd1);
 			fd1 = -1;
+		}
+
+		/* On Linux systems (at least), st_size is typically 0 for devices.
+		 * If so, try to determine the actual device size. */
+		if (fd1 != -1 && IS_DEVICE(st.st_mode) && st.st_size == 0) {
+			OFF_T off = lseek(fd1, 0, SEEK_END);
+			if (off == (OFF_T) -1)
+				rsyserr(FERROR, errno, "failed to seek to end of %s to determine size", fname);
+			else {
+				st.st_size = off;
+				off = lseek(fd1, 0, SEEK_SET);
+				if (off != 0)
+					rsyserr(FERROR, errno, "failed to seek back to beginning of %s to read it", fname);
+			}
 		}
 
 		/* If we're not preserving permissions, change the file-list's
@@ -825,7 +841,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 		}
 
 		if (fd2 == -1) {
-			discard_receive_data(f_in, F_LENGTH(file));
+			discard_receive_data(f_in, file);
 			if (fd1 != -1)
 				close(fd1);
 			if (inc_recurse)
@@ -840,8 +856,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 			rprintf(FINFO, "%s\n", fname);
 
 		/* recv file data */
-		recv_ok = receive_data(f_in, fnamecmp, fd1, st.st_size,
-				       fname, fd2, F_LENGTH(file));
+		recv_ok = receive_data(f_in, fnamecmp, fd1, st.st_size, fname, fd2, file);
 
 		log_item(log_code, file, iflags, NULL);
 

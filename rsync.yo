@@ -384,6 +384,7 @@ to the detailed description below for a complete description.  verb(
      --fake-super            store/recover privileged attrs using xattrs
  -S, --sparse                turn sequences of nulls into sparse blocks
      --preallocate           allocate dest files before writing
+     --write-devices         write to devices as files (implies --inplace)
  -n, --dry-run               perform a trial run with no changes made
  -W, --whole-file            copy files whole (w/o delta-xfer algorithm)
      --checksum-choice=STR   choose the checksum algorithms
@@ -1220,6 +1221,16 @@ dit(bf(--specials)) This option causes rsync to transfer special files
 such as named sockets and fifos.
 
 dit(bf(-D)) The bf(-D) option is equivalent to bf(--devices) bf(--specials).
+
+dit(bf(--write-devices)) This tells rsync to treat a device on the receiving
+side as a regular file, allowing the writing of file data into a device.
+
+This option implies the bf(--inplace) option.
+
+Be careful using this, as you should know what devices are present on the
+receiving side of the transfer, especially if running rsync as root.
+
+This option is refused by an rsync daemon.
 
 dit(bf(-t, --times)) This tells rsync to transfer modification times along
 with the files and update them on the remote system.  Note that if this

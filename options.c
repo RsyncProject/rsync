@@ -50,6 +50,7 @@ int append_mode = 0;
 int keep_dirlinks = 0;
 int copy_dirlinks = 0;
 int copy_links = 0;
+int write_devices = 0;
 int preserve_links = 0;
 int preserve_hard_links = 0;
 int preserve_acls = 0;
@@ -721,6 +722,7 @@ void usage(enum logcode F)
 #else
   rprintf(F,"     --preallocate           pre-allocate dest files on remote receiver\n");
 #endif
+  rprintf(F,"     --write-devices         write to devices as files (implies --inplace)\n");
   rprintf(F," -n, --dry-run               perform a trial run with no changes made\n");
   rprintf(F," -W, --whole-file            copy files whole (without delta-xfer algorithm)\n");
   rprintf(F,"     --checksum-choice=STR   choose the checksum algorithms\n");
@@ -889,6 +891,8 @@ static struct poptOption long_options[] = {
   {"no-D",             0,  POPT_ARG_NONE,   0, OPT_NO_D, 0, 0 },
   {"devices",          0,  POPT_ARG_VAL,    &preserve_devices, 1, 0, 0 },
   {"no-devices",       0,  POPT_ARG_VAL,    &preserve_devices, 0, 0, 0 },
+  {"write-devices",    0,  POPT_ARG_VAL,    &write_devices, 1, 0, 0 },
+  {"no-write-devices", 0,  POPT_ARG_VAL,    &write_devices, 0, 0, 0 },
   {"specials",         0,  POPT_ARG_VAL,    &preserve_specials, 1, 0, 0 },
   {"no-specials",      0,  POPT_ARG_VAL,    &preserve_specials, 0, 0, 0 },
   {"links",           'l', POPT_ARG_VAL,    &preserve_links, 1, 0, 0 },
@@ -1330,6 +1334,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		if (!*lp_charset(module_id))
 			set_refuse_options("iconv");
 #endif
+		set_refuse_options("write-devices");
 	}
 
 #ifdef ICONV_OPTION
@@ -2288,6 +2293,14 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		inplace = 1;
 	}
 
+	if (write_devices) {
+		if (refused_inplace) {
+			create_refuse_error(refused_inplace);
+			return 0;
+		}
+		inplace = 1;
+	}
+
 	if (delay_updates && !partial_dir)
 		partial_dir = tmp_partialdir;
 
@@ -2805,6 +2818,9 @@ void server_options(char **args, int *argc_p)
 	/* It's OK that this checks the upper-bound of the protocol_version. */
 	if (relative_paths && !implied_dirs && (!am_sender || protocol_version >= 30))
 		args[ac++] = "--no-implied-dirs";
+
+	if (write_devices)
+		args[ac++] = "--write-devices";
 
 	if (remove_source_files == 1)
 		args[ac++] = "--remove-source-files";
