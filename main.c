@@ -39,6 +39,7 @@ extern int blocking_io;
 extern int always_checksum;
 extern int remove_source_files;
 extern int output_needs_newline;
+extern int called_from_signal_handler;
 extern int need_messages_from_generator;
 extern int kluge_around_eof;
 extern int got_xfer_error;
@@ -1536,6 +1537,7 @@ static int start_client(int argc, char *argv[])
 
 static void sigusr1_handler(UNUSED(int val))
 {
+	called_from_signal_handler = 1;
 	exit_cleanup(RERR_SIGNAL1);
 }
 

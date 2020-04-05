@@ -43,6 +43,7 @@ extern int am_starting_up;
 extern int allow_8bit_chars;
 extern int protocol_version;
 extern int got_kill_signal;
+extern int called_from_signal_handler;
 extern int inc_recurse;
 extern int inplace;
 extern int flist_eof;
@@ -613,6 +614,8 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 /* This is only called for SIGINT, SIGHUP, and SIGTERM. */
 void sig_int(int sig_num)
 {
+	called_from_signal_handler = 1;
+
 	/* KLUGE: if the user hits Ctrl-C while ssh is prompting
 	 * for a password, then our cleanup's sending of a SIGUSR1
 	 * signal to all our children may kill ssh before it has a
@@ -636,6 +639,7 @@ void sig_int(int sig_num)
 	 * we didn't already set the flag. */
 	if (!got_kill_signal && (am_server || am_receiver)) {
 		got_kill_signal = sig_num;
+		called_from_signal_handler = 0;
 		return;
 	}
 

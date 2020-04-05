@@ -34,6 +34,7 @@ extern int output_needs_newline;
 extern char *partial_dir;
 extern char *logfile_name;
 
+int called_from_signal_handler = 0;
 BOOL shutting_down = False;
 BOOL flush_ok_after_signal = False;
 
@@ -260,6 +261,8 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 		break;
 	}
 
+	if (called_from_signal_handler)
+		_exit(exit_code);
 	exit(exit_code);
 }
 
