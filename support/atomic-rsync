@@ -59,7 +59,7 @@ if (system($RSYNC_PROG, "--link-dest=$dest_dir", @ARGV)) {
     } else {
 	printf "child exited with value %d\n", $? >> 8;
     }
-    exit $?;
+    exit 1;
 }
 
 if (!defined $old_dir) {
