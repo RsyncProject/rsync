@@ -2819,7 +2819,7 @@ void server_options(char **args, int *argc_p)
 	if (relative_paths && !implied_dirs && (!am_sender || protocol_version >= 30))
 		args[ac++] = "--no-implied-dirs";
 
-	if (write_devices)
+	if (write_devices && am_sender)
 		args[ac++] = "--write-devices";
 
 	if (remove_source_files == 1)
