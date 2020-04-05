@@ -28,13 +28,21 @@
 /**
  * Sleep for a specified number of milliseconds.
  *
- * Always returns TRUE.  (In the future it might return FALSE if
- * interrupted.)
+ * Always returns True.
  **/
 int msleep(int t)
 {
-#ifdef HAVE_USLEEP
+#ifdef HAVE_NANOSLEEP
+	struct timespec ts;
+
+	ts.tv_sec = t / 1000;
+	ts.tv_nsec = (t % 1000) * 1000000L;
+
+	while (nanosleep(&ts, &ts) < 0 && errno == EINTR) {}
+
+#elif defined HAVE_USLEEP
 	usleep(t*1000);
+
 #else
 	int tdiff = 0;
 	struct timeval tval, t1, t2;
