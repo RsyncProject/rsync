@@ -45,6 +45,7 @@ extern int inplace;
 extern int batch_fd;
 extern int write_batch;
 extern int file_old_total;
+extern BOOL want_progress_now;
 extern struct stats stats;
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
 
@@ -206,6 +207,8 @@ void send_files(int f_in, int f_out)
 	if (DEBUG_GTE(SEND, 1))
 		rprintf(FINFO, "send_files starting\n");
 
+	progress_init();
+
 	while (1) {
 		if (inc_recurse) {
 			send_extra_file_list(f_out, MIN_FILECNT_LOOKAHEAD);
@@ -218,9 +221,10 @@ void send_files(int f_in, int f_out)
 		extra_flist_sending_enabled = False;
 
 		if (ndx == NDX_DONE) {
-			if (!am_server && INFO_GTE(PROGRESS, 2) && cur_flist) {
+			if (!am_server && cur_flist) {
 				set_current_file_index(NULL, 0);
-				end_progress(0);
+				if (INFO_GTE(PROGRESS, 2))
+					end_progress(0);
 			}
 			if (inc_recurse && first_flist) {
 				file_old_total -= first_flist->used;
@@ -315,7 +319,7 @@ void send_files(int f_in, int f_out)
 		updating_basis_file = inplace && (protocol_version >= 29
 			? fnamecmp_type == FNAMECMP_FNAME : make_backups <= 0);
 
-		if (!am_server && INFO_GTE(PROGRESS, 1))
+		if (!am_server)
 			set_current_file_index(file, ndx);
 		stats.xferred_files++;
 		stats.total_transferred_size += F_LENGTH(file);
@@ -393,6 +397,8 @@ void send_files(int f_in, int f_out)
 		match_sums(f_xfer, s, mbuf, st.st_size);
 		if (INFO_GTE(PROGRESS, 1))
 			end_progress(st.st_size);
+		else if (want_progress_now)
+			instant_progress(fname);
 
 		log_item(log_code, file, iflags, NULL);
 

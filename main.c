@@ -76,6 +76,7 @@ extern pid_t cleanup_child_pid;
 extern size_t bwlimit_writemax;
 extern unsigned int module_dirlen;
 extern BOOL flist_receiving_enabled;
+extern BOOL want_progress_now;
 extern BOOL shutting_down;
 extern int backup_dir_len;
 extern int basis_dir_cnt;
@@ -1551,6 +1552,12 @@ static void sigusr2_handler(UNUSED(int val))
 	_exit(0);
 }
 
+static void siginfo_handler(UNUSED(int val))
+{
+	if (!am_server && !INFO_GTE(PROGRESS, 1))
+		want_progress_now = True;
+}
+
 void remember_children(UNUSED(int val))
 {
 #ifdef WNOHANG
@@ -1647,6 +1654,12 @@ int main(int argc,char *argv[])
 	SIGACTMASK(SIGFPE, rsync_panic_handler);
 	SIGACTMASK(SIGABRT, rsync_panic_handler);
 	SIGACTMASK(SIGBUS, rsync_panic_handler);
+#endif
+#ifdef SIGINFO
+	SIGACTMASK(SIGINFO, siginfo_handler);
+#endif
+#ifdef SIGVTALRM
+	SIGACTMASK(SIGVTALRM, siginfo_handler);
 #endif
 
 	starttime = time(NULL);

@@ -28,8 +28,11 @@ extern int flist_eof;
 extern int quiet;
 extern int need_unsorted_flist;
 extern int output_needs_newline;
+extern int stdout_format_has_i;
 extern struct stats stats;
 extern struct file_list *cur_flist;
+
+BOOL want_progress_now = False;
 
 #define PROGRESS_HISTORY_SECS 5
 
@@ -134,6 +137,16 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
 	}
 }
 
+void progress_init(void)
+{
+	if (!am_server && !INFO_GTE(PROGRESS, 1)) {
+		struct timeval now;
+		gettimeofday(&now, NULL);
+		ph_start.time.tv_sec = now.tv_sec;
+		ph_start.time.tv_usec = now.tv_usec;
+	}
+}
+
 void set_current_file_index(struct file_struct *file, int ndx)
 {
 	if (!file)
@@ -145,12 +158,21 @@ void set_current_file_index(struct file_struct *file, int ndx)
 	current_file_index -= cur_flist->flist_num;
 }
 
+void instant_progress(const char *fname)
+{
+	/* We only get here if want_progress_now is True */
+	if (!stdout_format_has_i && !INFO_GTE(NAME, 1))
+		rprintf(FINFO, "%s\n", fname);
+	end_progress(0);
+	want_progress_now = False;
+}
+
 void end_progress(OFF_T size)
 {
 	if (!am_server) {
 		struct timeval now;
 		gettimeofday(&now, NULL);
-		if (INFO_GTE(PROGRESS, 2)) {
+		if (INFO_GTE(PROGRESS, 2) || want_progress_now) {
 			rprint_progress(stats.total_transferred_size,
 					stats.total_size, &now, True);
 		} else {

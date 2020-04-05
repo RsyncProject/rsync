@@ -55,6 +55,7 @@ extern int inplace;
 extern int allowed_lull;
 extern int delay_updates;
 extern int xfersum_type;
+extern BOOL want_progress_now;
 extern mode_t orig_umask;
 extern struct stats stats;
 extern char *tmpdir;
@@ -537,6 +538,8 @@ int recv_files(int f_in, int f_out, char *local_name)
 	if (delay_updates)
 		delayed_bits = bitbag_create(cur_flist->used + 1);
 
+	progress_init();
+
 	while (1) {
 		cleanup_disable();
 
@@ -544,9 +547,10 @@ int recv_files(int f_in, int f_out, char *local_name)
 		ndx = read_ndx_and_attrs(f_in, f_out, &iflags, &fnamecmp_type,
 					 xname, &xlen);
 		if (ndx == NDX_DONE) {
-			if (!am_server && INFO_GTE(PROGRESS, 2) && cur_flist) {
+			if (!am_server && cur_flist) {
 				set_current_file_index(NULL, 0);
-				end_progress(0);
+				if (INFO_GTE(PROGRESS, 2))
+					end_progress(0);
 			}
 			if (inc_recurse && first_flist) {
 				if (read_batch) {
@@ -646,7 +650,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 				stats.created_files++;
 		}
 
-		if (!am_server && INFO_GTE(PROGRESS, 1))
+		if (!am_server)
 			set_current_file_index(file, ndx);
 		stats.xferred_files++;
 		stats.total_transferred_size += F_LENGTH(file);
@@ -859,6 +863,8 @@ int recv_files(int f_in, int f_out, char *local_name)
 		recv_ok = receive_data(f_in, fnamecmp, fd1, st.st_size, fname, fd2, file);
 
 		log_item(log_code, file, iflags, NULL);
+		if (want_progress_now)
+			instant_progress(fname);
 
 		if (fd1 != -1)
 			close(fd1);

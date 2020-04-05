@@ -2581,6 +2581,17 @@ want to see how the transfer is doing without scrolling the screen with a
 lot of names.  (You don't need to specify the bf(--progress) option in
 order to use bf(--info=progress2).)
 
+Finally, you can get an instant progress report by sending rsync a signal of
+either SIGINFO or SIGVTALRM On BSD systems a SIGINFO is often generated just by
+typing a Ctrl+T (Linux doesn't currently support a SIGINFO signal). When the
+client-side process receives one of those signals, it will output a single
+progress report when the current file being transferred finishes (so it may
+take a little time if a big file is being handled when the signal arrives).
+A filename is output (if needed) followed by the --info=progress2 format of
+progress info.  You can send the SIGVTALRM signal to all of the rsync processes
+but just the client-side process will respond.  Be careful not to send that
+signal to an older rsync, though, or it will die.
+
 dit(bf(--password-file=FILE)) This option allows you to provide a password for
 accessing an rsync daemon via a file or via standard input if bf(FILE) is
 bf(-).  The file should contain just the password on the first line (all other
