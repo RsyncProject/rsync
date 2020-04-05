@@ -173,6 +173,9 @@ AC_RUN_IFELSE([AC_LANG_SOURCE([[
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#if HAVE_UNISTD_H
+#include <unistd.h>
+#endif
 
 int main(void)
 {
@@ -197,7 +200,7 @@ int main(void)
 	}
 	wait(&status);
 	unlink(tpl);
-	exit(WEXITSTATUS(status));
+	return WEXITSTATUS(status);
 }
 ]])],[rsync_cv_HAVE_BROKEN_LARGEFILE=yes],[rsync_cv_HAVE_BROKEN_LARGEFILE=no],[rsync_cv_HAVE_BROKEN_LARGEFILE=cross])])
 if test x"$rsync_cv_HAVE_BROKEN_LARGEFILE" != x"yes"; then
@@ -366,7 +369,7 @@ int main(void)
 {
 	dev_t dev = makedev(0, 5, 7);
 	if (major(dev) != 5 || minor(dev) != 7)
-		exit(1);
+		return 1;
 	return 0;
 }
 ]])],[rsync_cv_MAKEDEV_TAKES_3_ARGS=yes],[rsync_cv_MAKEDEV_TAKES_3_ARGS=no],[rsync_cv_MAKEDEV_TAKES_3_ARGS=no])])
@@ -647,6 +650,7 @@ AC_PREPROC_IFELSE([AC_LANG_SOURCE([[
 
 AC_CACHE_CHECK([for SYS_fallocate],rsync_cv_have_sys_fallocate,[
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <sys/syscall.h>
+#include <unistd.h>
 #include <sys/types.h>]], [[syscall(SYS_fallocate, 0, 0, (loff_t)0, (loff_t)0);]])],[rsync_cv_have_sys_fallocate=yes],[rsync_cv_have_sys_fallocate=no])])
 if test x"$rsync_cv_have_sys_fallocate" = x"yes"; then
     AC_DEFINE(HAVE_SYS_FALLOCATE, 1, [Define to 1 if you have the SYS_fallocate syscall number])
@@ -703,12 +707,12 @@ AC_CACHE_CHECK([whether chown() modifies symlinks],rsync_cv_chown_modifies_symli
 #endif
 #include <stdlib.h>
 #include <errno.h>
-    main() {
+int main(void) {
 	char const *dangling_symlink = "conftest.dangle";
 	unlink(dangling_symlink);
 	if (symlink("conftest.no-such", dangling_symlink) < 0) abort();
-	if (chown(dangling_symlink, getuid(), getgid()) < 0 && errno == ENOENT) exit(1);
-	exit(0);
+	if (chown(dangling_symlink, getuid(), getgid()) < 0 && errno == ENOENT) return 1;
+	return 0;
     }]])],[rsync_cv_chown_modifies_symlink=yes],[rsync_cv_chown_modifies_symlink=no],[rsync_cv_chown_modifies_symlink=no])])
 if test $rsync_cv_chown_modifies_symlink = yes; then
   AC_DEFINE(CHOWN_MODIFIES_SYMLINK, 1, [Define to 1 if chown modifies symlinks.])
@@ -722,12 +726,12 @@ AC_CACHE_CHECK([whether link() can hard-link symlinks],rsync_cv_can_hardlink_sym
 #include <stdlib.h>
 #include <errno.h>
 #define FILENAME "conftest.dangle"
-    main() {
+int main(void) {
 	unlink(FILENAME);
 	if (symlink("conftest.no-such", FILENAME) < 0) abort();
 	unlink(FILENAME "2");
-	if (link(FILENAME, FILENAME "2") < 0) exit(1);
-	exit(0);
+	if (link(FILENAME, FILENAME "2") < 0) return 1;
+	return 0;
     }]])],[rsync_cv_can_hardlink_symlink=yes],[rsync_cv_can_hardlink_symlink=no],[rsync_cv_can_hardlink_symlink=no])])
 if test $rsync_cv_can_hardlink_symlink = yes; then
   AC_DEFINE(CAN_HARDLINK_SYMLINK, 1, [Define to 1 if link() can hard-link symlinks.])
@@ -738,15 +742,18 @@ AC_CACHE_CHECK([whether link() can hard-link special files],rsync_cv_can_hardlin
 #if HAVE_UNISTD_H
 # include <unistd.h>
 #endif
+#ifdef HAVE_SYS_STAT_H
+#include <sys/stat.h>
+#endif
 #include <stdlib.h>
 #include <errno.h>
 #define FILENAME "conftest.fifi"
-    main() {
+int main(void) {
 	unlink(FILENAME);
 	if (mkfifo(FILENAME, 0777) < 0) abort();
 	unlink(FILENAME "2");
-	if (link(FILENAME, FILENAME "2") < 0) exit(1);
-	exit(0);
+	if (link(FILENAME, FILENAME "2") < 0) return 1;
+	return 0;
     }]])],[rsync_cv_can_hardlink_special=yes],[rsync_cv_can_hardlink_special=no],[rsync_cv_can_hardlink_special=no])])
 if test $rsync_cv_can_hardlink_special = yes; then
     AC_DEFINE(CAN_HARDLINK_SPECIAL, 1, [Define to 1 if link() can hard-link special files.])
@@ -757,9 +764,9 @@ AC_RUN_IFELSE([AC_LANG_SOURCE([[
 #include <sys/types.h>
 #include <sys/socket.h>
 
-main() {
+int main(void) {
        int fd[2];
-       exit((socketpair(AF_UNIX, SOCK_STREAM, 0, fd) != -1) ? 0 : 1);
+       return (socketpair(AF_UNIX, SOCK_STREAM, 0, fd) != -1) ? 0 : 1;
 }]])],[rsync_cv_HAVE_SOCKETPAIR=yes],[rsync_cv_HAVE_SOCKETPAIR=no],[rsync_cv_HAVE_SOCKETPAIR=cross])])
 if test x"$rsync_cv_HAVE_SOCKETPAIR" = x"yes"; then
     AC_DEFINE(HAVE_SOCKETPAIR, 1, [Define to 1 if you have the "socketpair" function])
@@ -824,23 +831,23 @@ fi
 AC_CACHE_CHECK([for broken readdir],rsync_cv_HAVE_BROKEN_READDIR,[
 AC_RUN_IFELSE([AC_LANG_SOURCE([[#include <sys/types.h>
 #include <dirent.h>
-main() { struct dirent *di; DIR *d = opendir("."); di = readdir(d);
+int main(void) { struct dirent *di; DIR *d = opendir("."); di = readdir(d);
 if (di && di->d_name[-2] == '.' && di->d_name[-1] == 0 &&
-di->d_name[0] == 0) exit(0); exit(1);} ]])],[rsync_cv_HAVE_BROKEN_READDIR=yes],[rsync_cv_HAVE_BROKEN_READDIR=no],[rsync_cv_HAVE_BROKEN_READDIR=cross])])
+di->d_name[0] == 0) return 0; return 1;} ]])],[rsync_cv_HAVE_BROKEN_READDIR=yes],[rsync_cv_HAVE_BROKEN_READDIR=no],[rsync_cv_HAVE_BROKEN_READDIR=cross])])
 if test x"$rsync_cv_HAVE_BROKEN_READDIR" = x"yes"; then
     AC_DEFINE(HAVE_BROKEN_READDIR, 1, [Define to 1 if readdir() is broken])
 fi
 
 AC_CACHE_CHECK([for utimbuf],rsync_cv_HAVE_STRUCT_UTIMBUF,[
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <sys/types.h>
-#include <utime.h>]], [[struct utimbuf tbuf;  tbuf.actime = 0; tbuf.modtime = 1; exit(utime("foo.c",&tbuf));]])],[rsync_cv_HAVE_STRUCT_UTIMBUF=yes],[rsync_cv_HAVE_STRUCT_UTIMBUF=no])])
+#include <utime.h>]], [[struct utimbuf tbuf;  tbuf.actime = 0; tbuf.modtime = 1; return utime("foo.c",&tbuf);]])],[rsync_cv_HAVE_STRUCT_UTIMBUF=yes],[rsync_cv_HAVE_STRUCT_UTIMBUF=no])])
 if test x"$rsync_cv_HAVE_STRUCT_UTIMBUF" = x"yes"; then
     AC_DEFINE(HAVE_STRUCT_UTIMBUF, 1, [Define to 1 if you have the "struct utimbuf" type])
 fi
 
 AC_CACHE_CHECK([if gettimeofday takes tz argument],rsync_cv_HAVE_GETTIMEOFDAY_TZ,[
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <sys/time.h>
-#include <unistd.h>]], [[struct timeval tv; exit(gettimeofday(&tv, NULL));]])],[rsync_cv_HAVE_GETTIMEOFDAY_TZ=yes],[rsync_cv_HAVE_GETTIMEOFDAY_TZ=no])])
+#include <unistd.h>]], [[struct timeval tv; return gettimeofday(&tv, NULL);]])],[rsync_cv_HAVE_GETTIMEOFDAY_TZ=yes],[rsync_cv_HAVE_GETTIMEOFDAY_TZ=no])])
 if test x"$rsync_cv_HAVE_GETTIMEOFDAY_TZ" != x"no"; then
     AC_DEFINE(HAVE_GETTIMEOFDAY_TZ, 1, [Define to 1 if gettimeofday() takes a time-zone arg])
 fi
@@ -849,6 +856,9 @@ AC_CACHE_CHECK([for C99 vsnprintf],rsync_cv_HAVE_C99_VSNPRINTF,[
 AC_RUN_IFELSE([AC_LANG_SOURCE([[
 #include <sys/types.h>
 #include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 void foo(const char *format, ...) {
        va_list ap;
        int len;
@@ -860,10 +870,8 @@ void foo(const char *format, ...) {
        if (len != 5) exit(1);
 
        if (snprintf(buf, 3, "hello") != 5 || strcmp(buf, "he") != 0) exit(1);
-
-       exit(0);
 }
-main() { foo("hello"); }
+int main(void) { foo("hello"); return 0; }
 ]])],[rsync_cv_HAVE_C99_VSNPRINTF=yes],[rsync_cv_HAVE_C99_VSNPRINTF=no],[rsync_cv_HAVE_C99_VSNPRINTF=cross])])
 if test x"$rsync_cv_HAVE_C99_VSNPRINTF" = x"yes"; then
     AC_DEFINE(HAVE_C99_VSNPRINTF, 1, [Define to 1 if vsprintf has a C99-compatible return value])
@@ -875,15 +883,15 @@ AC_RUN_IFELSE([AC_LANG_SOURCE([[#include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
-main() {
+int main(void) {
   struct stat st;
   char tpl[20]="/tmp/test.XXXXXX";
   int fd = mkstemp(tpl);
-  if (fd == -1) exit(1);
+  if (fd == -1) return 1;
   unlink(tpl);
-  if (fstat(fd, &st) != 0) exit(1);
-  if ((st.st_mode & 0777) != 0600) exit(1);
-  exit(0);
+  if (fstat(fd, &st) != 0) return 1;
+  if ((st.st_mode & 0777) != 0600) return 1;
+  return 0;
 }]])],[rsync_cv_HAVE_SECURE_MKSTEMP=yes],[rsync_cv_HAVE_SECURE_MKSTEMP=no],[rsync_cv_HAVE_SECURE_MKSTEMP=cross])])
 if test x"$rsync_cv_HAVE_SECURE_MKSTEMP" = x"yes"; then
     case $host_os in
@@ -905,7 +913,10 @@ AC_RUN_IFELSE([AC_LANG_SOURCE([[
 #include <stdio.h>
 #include <sys/stat.h>
 #include <errno.h>
-main() { int rc, ec; char *fn = "fifo-test";
+#if HAVE_UNISTD_H
+# include <unistd.h>
+#endif
+int main(void) { int rc, ec; char *fn = "fifo-test";
 unlink(fn); rc = mknod(fn,S_IFIFO,0600); ec = errno; unlink(fn);
 if (rc) {printf("(%d %d) ",rc,ec); return ec;}
 return 0;}]])],[rsync_cv_MKNOD_CREATES_FIFOS=yes],[rsync_cv_MKNOD_CREATES_FIFOS=no],[rsync_cv_MKNOD_CREATES_FIFOS=cross])])
@@ -918,7 +929,10 @@ AC_RUN_IFELSE([AC_LANG_SOURCE([[
 #include <stdio.h>
 #include <sys/stat.h>
 #include <errno.h>
-main() { int rc, ec; char *fn = "sock-test";
+#if HAVE_UNISTD_H
+# include <unistd.h>
+#endif
+int main(void) { int rc, ec; char *fn = "sock-test";
 unlink(fn); rc = mknod(fn,S_IFSOCK,0600); ec = errno; unlink(fn);
 if (rc) {printf("(%d %d) ",rc,ec); return ec;}
 return 0;}]])],[rsync_cv_MKNOD_CREATES_SOCKETS=yes],[rsync_cv_MKNOD_CREATES_SOCKETS=no],[rsync_cv_MKNOD_CREATES_SOCKETS=cross])])
@@ -932,7 +946,7 @@ fi
 AC_CACHE_CHECK([whether -c -o works],rsync_cv_DASHC_WORKS_WITH_DASHO,[
 rm -rf conftest*
 cat > conftest.$ac_ext <<EOF
-int main() { return 0; }
+int main(void) { return 0; }
 EOF
 ${CC-cc} -c -o conftest..o conftest.$ac_ext
 if test -f conftest..o; then
