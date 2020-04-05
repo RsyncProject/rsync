@@ -1704,6 +1704,8 @@ static void send_directory(int f, struct file_list *flist, char *fbuf, int len,
 				interpret_stat_error(fbuf, True);
 			return;
 		}
+		if (errno == ENOTDIR && (flags & FLAG_PERHAPS_DIR))
+			return;
 		io_error |= IOERR_GENERAL;
 		rsyserr(FERROR_XFER, errno, "opendir %s failed", full_fname(fbuf));
 		return;
@@ -3229,6 +3231,7 @@ struct file_list *get_dirlist(char *dirname, int dlen, int flags)
 	int save_xfer_dirs = xfer_dirs;
 	int save_prune_empty_dirs = prune_empty_dirs;
 	int senddir_fd = flags & GDL_IGNORE_FILTER_RULES ? -2 : -1;
+	int senddir_flags = FLAG_CONTENT_DIR;
 
 	if (dlen < 0) {
 		dlen = strlcpy(dirbuf, dirname, MAXPATHLEN);
@@ -3239,9 +3242,12 @@ struct file_list *get_dirlist(char *dirname, int dlen, int flags)
 
 	dirlist = flist_new(FLIST_TEMP, "get_dirlist");
 
+	if (flags & GDL_PERHAPS_DIR)
+		senddir_flags |= FLAG_PERHAPS_DIR;
+
 	recurse = 0;
 	xfer_dirs = 1;
-	send_directory(senddir_fd, dirlist, dirname, dlen, FLAG_CONTENT_DIR);
+	send_directory(senddir_fd, dirlist, dirname, dlen, senddir_flags);
 	xfer_dirs = save_xfer_dirs;
 	recurse = save_recurse;
 	if (INFO_GTE(PROGRESS, 1))

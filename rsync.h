@@ -87,9 +87,11 @@
 /* These flags are passed to functions but not stored. */
 
 #define FLAG_DIVERT_DIRS (1<<16)   /* sender, but must be unique */
+#define FLAG_PERHAPS_DIR (1<<17)   /* generator */
 
 /* These flags are for get_dirlist(). */
 #define GDL_IGNORE_FILTER_RULES (1<<0)
+#define GDL_PERHAPS_DIR (1<<1)
 
 /* Some helper macros for matching bits. */
 #define BITS_SET(val,bits) (((val) & (bits)) == (bits))

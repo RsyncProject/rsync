@@ -1305,7 +1305,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			for (i = 0; i < fuzzy_basis; i++) {
 				if (i && pathjoin(fnamecmpbuf, MAXPATHLEN, basis_dir[i-1], dn) >= MAXPATHLEN)
 					continue;
-				fuzzy_dirlist[i] = get_dirlist(fnamecmpbuf, -1, GDL_IGNORE_FILTER_RULES);
+				fuzzy_dirlist[i] = get_dirlist(fnamecmpbuf, -1, GDL_IGNORE_FILTER_RULES | GDL_PERHAPS_DIR);
 				if (fuzzy_dirlist[i] && fuzzy_dirlist[i]->used == 0) {
 					flist_free(fuzzy_dirlist[i]);
 					fuzzy_dirlist[i] = NULL;
