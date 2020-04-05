@@ -1984,10 +1984,17 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	}
 #endif
 
-	if (block_size > MAX_BLOCK_SIZE) {
-		snprintf(err_buf, sizeof err_buf,
-			 "--block-size=%lu is too large (max: %u)\n", block_size, MAX_BLOCK_SIZE);
-		return 0;
+	if (block_size) {
+		/* We may not know the real protocol_version at this point if this is the client
+		 * option parsing, but we still want to check it so that the client can specify
+		 * a --protocol=29 option with a larger block size. */
+		int32 max_blength = protocol_version < 30 ? OLD_MAX_BLOCK_SIZE : MAX_BLOCK_SIZE;
+
+		if (block_size > max_blength) {
+			snprintf(err_buf, sizeof err_buf,
+				 "--block-size=%lu is too large (max: %u)\n", block_size, max_blength);
+			return 0;
+		}
 	}
 
 	if (write_batch && read_batch) {
