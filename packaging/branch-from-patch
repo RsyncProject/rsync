@@ -13,6 +13,8 @@ use Getopt::Long;
 );
 &usage if $help_opt;
 
+push @INC, '.';
+
 require 'packaging/git-status.pl';
 check_git_state($master_branch, !$skip_branch_check, 1);
 

@@ -33,6 +33,8 @@ if (defined $incl_generated_files) {
 die "No '$patches_dir' directory was found.\n" unless -d $patches_dir;
 die "No '.git' directory present in the current dir.\n" unless -d '.git';
 
+push @INC, '.';
+
 require 'packaging/git-status.pl';
 my $starting_branch = check_git_state($master_branch, !$skip_branch_check, 1);
 
