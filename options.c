@@ -2926,7 +2926,7 @@ char *check_for_hostspec(char *s, char **host_ptr, int *port_ptr)
 		*host_ptr = parse_hostspec(s + strlen(URL_PREFIX), &path, port_ptr);
 		if (*host_ptr) {
 			if (!*port_ptr)
-				*port_ptr = RSYNC_PORT;
+				*port_ptr = -1; /* -1 indicates they want the default */
 			return path;
 		}
 	}

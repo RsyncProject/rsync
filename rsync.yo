@@ -1594,6 +1594,15 @@ shell connection, rather than through a direct socket connection to a
 running rsync daemon on the remote host.  See the section "USING
 RSYNC-DAEMON FEATURES VIA A REMOTE-SHELL CONNECTION" above.
 
+Beginning with rsync 3.1.4, the RSYNC_PORT environment variable will be
+set when a daemon connection is being made via a remote-shell
+connection.  It is set to 0 if the default daemon port is being assumed,
+or it is set to the value of the rsync port that was specified via
+either the bf(--port) option or a non-empty port value in an rsync://
+URL.  This allows the script to discern if a non-default port is being
+requested, allowing for things such as an SSL or stunnel helper script
+to connect to a default or alternate port.
+
 Command-line arguments are permitted in COMMAND provided that COMMAND is
 presented to rsync as a single argument.  You must use spaces (not tabs
 or other whitespace) to separate the command and args from each other,

@@ -1359,7 +1359,7 @@ static int start_client(int argc, char *argv[])
 {
 	char *p, *shell_machine = NULL, *shell_user = NULL;
 	char **remote_argv;
-	int remote_argc;
+	int remote_argc, env_port = rsync_port;
 	int f_in, f_out;
 	int ret;
 	pid_t pid;
@@ -1425,6 +1425,7 @@ static int start_client(int argc, char *argv[])
 					exit_cleanup(RERR_SYNTAX);
 				}
 				shell_machine = NULL;
+				rsync_port = 0;
 			} else { /* hostspec was found, so dest is remote */
 				argv[argc] = path;
 				if (rsync_port)
@@ -1439,6 +1440,7 @@ static int start_client(int argc, char *argv[])
 		}
 		remote_argv = argv += argc - 1;
 		remote_argc = argc = 1;
+		rsync_port = 0;
 	}
 
 	if (!rsync_port && remote_argc && !**remote_argv) /* Turn an empty arg into a dot dir. */
@@ -1485,6 +1487,11 @@ static int start_client(int argc, char *argv[])
 		}
 	}
 
+	if (rsync_port < 0)
+		rsync_port = RSYNC_PORT;
+	else
+		env_port = rsync_port;
+
 	if (daemon_over_rsh < 0)
 		return start_socket_client(shell_machine, remote_argc, remote_argv, argc, argv);
 
@@ -1514,6 +1521,11 @@ static int start_client(int argc, char *argv[])
 			NS(shell_cmd), NS(shell_machine), NS(shell_user),
 			NS(remote_argv[0]));
 	}
+
+#ifdef HAVE_PUTENV
+	if (daemon_over_rsh)
+		set_env_num("RSYNC_PORT", env_port);
+#endif
 
 	pid = do_cmd(shell_cmd, shell_machine, shell_user, remote_argv, remote_argc,
 		     &f_in, &f_out);

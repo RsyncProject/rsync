@@ -487,7 +487,7 @@ static void set_env_str(const char *var, const char *str)
 }
 
 #ifdef HAVE_PUTENV
-static void set_env_num(const char *var, long num)
+void set_env_num(const char *var, long num)
 {
 	char *mem;
 	if (asprintf(&mem, "%s=%ld", var, num) < 0)
