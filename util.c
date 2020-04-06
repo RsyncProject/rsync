@@ -1523,8 +1523,8 @@ uint32 fuzzy_distance(const char *s1, unsigned len1, const char *s2, unsigned le
 #define BB_PER_SLOT_INTS (BB_SLOT_SIZE / 4) /* Number of int32s per slot */
 
 struct bitbag {
-    uint32 **bits;
-    int slot_cnt;
+	uint32 **bits;
+	int slot_cnt;
 };
 
 struct bitbag *bitbag_create(int max_ndx)
@@ -1687,7 +1687,7 @@ void *expand_item_list(item_list *lp, size_t item_size,
 /* This zeroing of memory won't be optimized away by the compiler. */
 void force_memzero(void *buf, size_t len)
 {
-    volatile uchar *z = buf;
-    while (len-- > 0)
-	*z++ = '\0';
+	volatile uchar *z = buf;
+	while (len-- > 0)
+		*z++ = '\0';
 }

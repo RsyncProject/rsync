@@ -357,12 +357,12 @@ void auth_client(int fd, const char *user, const char *challenge)
 		/* XXX: cyeoh says that getpass is deprecated, because
 		 * it may return a truncated password on some systems,
 		 * and it is not in the LSB.
-                 *
-                 * Andrew Klein says that getpassphrase() is present
-                 * on Solaris and reads up to 256 characters.
-                 *
-                 * OpenBSD has a readpassphrase() that might be more suitable.
-                 */
+		 *
+		 * Andrew Klein says that getpassphrase() is present
+		 * on Solaris and reads up to 256 characters.
+		 *
+		 * OpenBSD has a readpassphrase() that might be more suitable.
+		 */
 		pass = getpass("Password: ");
 	}
 

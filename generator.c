@@ -114,7 +114,7 @@ static int need_retouch_dir_perms;
 static const char *solo_file = NULL;
 
 enum nonregtype {
-    TYPE_DIR, TYPE_SPECIAL, TYPE_DEVICE, TYPE_SYMLINK
+	TYPE_DIR, TYPE_SPECIAL, TYPE_DEVICE, TYPE_SYMLINK
 };
 
 /* Forward declarations. */

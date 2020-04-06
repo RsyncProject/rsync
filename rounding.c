@@ -23,8 +23,8 @@
 #define SIZEOF(x) ((long int)sizeof (x))
 
 struct test {
-    union file_extras extras[ARRAY_LEN];
-    struct file_struct file;
+	union file_extras extras[ARRAY_LEN];
+	struct file_struct file;
 };
 
 #define ACTUAL_SIZE	SIZEOF(struct test)
@@ -32,7 +32,7 @@ struct test {
 
  int main(UNUSED(int argc), UNUSED(char *argv[]))
 {
-    static int test_array[1 - 2 * (ACTUAL_SIZE != EXPECTED_SIZE)];
-    test_array[0] = 0;
-    return 0;
+	static int test_array[1 - 2 * (ACTUAL_SIZE != EXPECTED_SIZE)];
+	test_array[0] = 0;
+	return 0;
 }

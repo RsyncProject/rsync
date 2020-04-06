@@ -1804,7 +1804,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			 * of any more restrictive ACLs, but this is safe
 			 * for now */
 			snprintf(err_buf,sizeof(err_buf),
-                                 "ACLs are not supported on this %s\n",
+				 "ACLs are not supported on this %s\n",
 				 am_server ? "server" : "client");
 			return 0;
 #endif

@@ -47,8 +47,8 @@ extern char *groupmap;
 #define NFLAGS_NAME_MATCH (1<<1)
 
 union name_or_id {
-    const char *name;
-    id_t max_id;
+	const char *name;
+	id_t max_id;
 };
 
 struct idlist {

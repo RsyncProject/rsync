@@ -76,8 +76,8 @@ static int64 initial_data_written;
 static int64 initial_data_read;
 
 struct {
-        int code;
-        char const *name;
+	int code;
+	char const *name;
 } const rerr_names[] = {
 	{ RERR_SYNTAX     , "syntax or usage error" },
 	{ RERR_PROTOCOL   , "protocol incompatibility" },
