@@ -210,7 +210,7 @@ proto.h: proto.h-tstamp
 	@if test -f proto.h; then :; else cp -p $(srcdir)/proto.h .; fi
 
 proto.h-tstamp: $(srcdir)/*.c $(srcdir)/lib/compat.c config.h
-	perl $(srcdir)/mkproto.pl $(srcdir)/*.c $(srcdir)/lib/compat.c
+	awk -f $(srcdir)/mkproto.awk $(srcdir)/*.c $(srcdir)/lib/compat.c
 
 man: rsync.1 rsyncd.conf.5 man-copy
 
