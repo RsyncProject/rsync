@@ -3,7 +3,7 @@ AC_DEFUN([AC_HEADER_MAJOR_FIXED],
 		ac_cv_header_sys_types_h_makedev,
 [AC_LINK_IFELSE([AC_LANG_PROGRAM([[@%:@include <sys/types.h>]],
 				 [[return makedev(0, 0);]])],
-		[if grep 'historical compatibility' conftest.err >/dev/null; then
+		[if grep sys/sysmacros.h conftest.err >/dev/null; then
 		   ac_cv_header_sys_types_h_makedev=no
 		 else
 		   ac_cv_header_sys_types_h_makedev=yes
