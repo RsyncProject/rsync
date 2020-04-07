@@ -351,7 +351,7 @@ AC_CHECK_HEADERS(sys/fcntl.h sys/select.h fcntl.h sys/time.h sys/unistd.h \
     sys/acl.h acl/libacl.h attr/xattr.h sys/xattr.h sys/extattr.h \
     popt.h popt/popt.h linux/falloc.h netinet/in_systm.h netinet/ip.h \
     zlib.h)
-AC_HEADER_MAJOR
+AC_HEADER_MAJOR_FIXED
 
 AC_CACHE_CHECK([if makedev takes 3 args],rsync_cv_MAKEDEV_TAKES_3_ARGS,[
 AC_RUN_IFELSE([AC_LANG_SOURCE([[
