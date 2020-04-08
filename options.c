@@ -2937,7 +2937,7 @@ char *check_for_hostspec(char *s, char **host_ptr, int *port_ptr)
 
 	if (*path == ':') {
 		if (port_ptr && !*port_ptr)
-			*port_ptr = RSYNC_PORT;
+			*port_ptr = -1;
 		return path + 1;
 	}
 	if (port_ptr)
