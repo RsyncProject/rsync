@@ -449,7 +449,7 @@ static struct parm_struct parm_table[] =
 };
 
 /* Initialise the Default all_vars structure. */
-static void reset_all_vars(void)
+void reset_daemon_vars(void)
 {
 	memcpy(&Vars, &Defaults, sizeof Vars);
 }
@@ -872,7 +872,7 @@ int lp_load(char *pszFname, int globals_only)
 {
 	bInGlobalSection = True;
 
-	reset_all_vars();
+	reset_daemon_vars();
 
 	/* We get sections first, so have to start 'behind' to make up. */
 	iSectionIndex = -1;

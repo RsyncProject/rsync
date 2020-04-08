@@ -1681,6 +1681,10 @@ int main(int argc,char *argv[])
 
 	memset(&stats, 0, sizeof(stats));
 
+	/* Even a non-daemon runs needs the default config values to be set, e.g.
+	 * lp_dont_compress() is queried when no --skip-compress option is set. */
+	reset_daemon_vars();
+
 	if (argc < 2) {
 		usage(FERROR);
 		exit_cleanup(RERR_SYNTAX);
