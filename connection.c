@@ -2,6 +2,7 @@
  * Support the max connections option.
  *
  * Copyright (C) 1998 Andrew Tridgell
+ * Copyright (C) 2006-2020 Wayne Davison
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

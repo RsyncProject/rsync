@@ -95,6 +95,7 @@ rsync$(EXEEXT): $(OBJS)
 
 $(OBJS): $(HEADERS)
 $(CHECK_OBJS): $(HEADERS)
+options.o: latest-year.h
 
 flist.o: rounding.h
 

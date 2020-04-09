@@ -11,13 +11,12 @@
  *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, visit the http://fsf.org website.
- */
-
-/* This is based on loadparm.c from Samba, written by Andrew Tridgell
+ *
+ * This is based on loadparm.c from Samba, written by Andrew Tridgell
  * and Karl Auer.  Some of the changes are:
  *
  * Copyright (C) 2001, 2002 Martin Pool <mbp@samba.org>
- * Copyright (C) 2003-2019 Wayne Davison <wayned@samba.org>
+ * Copyright (C) 2003-2020 Wayne Davison
  */
 
 /* Load parameters.

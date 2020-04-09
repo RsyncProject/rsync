@@ -1,43 +1,76 @@
-#!/usr/bin/perl
-use strict;
-use warnings;
+#!/usr/bin/python3
 
-# Sets mtime and atime of files to the latest commit time in git.
-#
-# This is useful after the first clone of the rsync repository BEFORE you
-# do any building.  It is also safe if you have done a "make distclean".
+import os, re, argparse, subprocess
+from datetime import datetime
 
-my %ls;
-my $commit_time;
-my $prefix = @ARGV && $ARGV[0] =~ s/^--prefix=// ? shift : '';
+NULL_COMMIT_RE = re.compile(r'\0\0commit [a-f0-9]{40}$|\0$')
 
-my $top_dir = `git rev-parse --show-toplevel`;
-exit 1 unless $top_dir;
-chomp($top_dir);
+def main():
+    if not args.git_dir:
+        cmd = 'git rev-parse --show-toplevel 2>/dev/null || echo .'
+        top_dir = subprocess.check_output(cmd, shell=True).decode('utf-8').strip()
+        args.git_dir = os.path.join(top_dir, '.git')
+        if not args.prefix:
+            os.chdir(top_dir)
 
-chdir $top_dir or die "Failed to chdir to $top_dir\: $!\n";
+    git = [ 'git', '--git-dir=' + args.git_dir ]
 
-$/ = "\0";
-open FH, '-|', qw( git ls-files -z ) or die "Failed to fork: $!";
-while (<FH>) {
-    chomp;
-    $ls{$_} = $_;
-}
-close FH;
+    if args.tree:
+        cmd = git + 'ls-tree -z -r --name-only'.split() + [ args.tree ]
+    else:
+        cmd = git + 'ls-files -z'.split()
 
-$/ = "\n";
-open FH, '-|', qw( git log -r --name-only --no-color --pretty=raw -z ), @ARGV or die "Failed to fork: $!";
-while (<FH>) {
-    chomp;
-    if (/^committer .*? (\d+) (?:[\-\+]\d+)$/) {
-	$commit_time = $1;
-    } elsif (s/\0\0commit [a-f0-9]{40}$// || s/\0$//) {
-	my @files = delete @ls{split(/\0/, $_)};
-	@files = grep { defined $_ } @files;
-	next unless @files;
-	map { s/^/$prefix/ } @files;
-	utime $commit_time, $commit_time, @files;
-    }
-    last unless %ls;
-}
-close FH;
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+    out = proc.communicate()[0].decode('utf-8')
+    ls = set(out.split('\0'))
+    ls.discard('')
+
+    cmd = git + 'log -r --name-only --no-color --pretty=raw --no-renames -z'.split()
+    if args.tree:
+        cmd.append(args.tree)
+    cmd += ['--'] + args.files
+
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+    for line in proc.stdout:
+        line = line.decode('utf-8').strip()
+        m = re.match(r'^committer .*? (\d+) [-+]\d+$', line)
+        if m:
+            commit_time = int(m[1])
+        elif NULL_COMMIT_RE.search(line):
+            line = NULL_COMMIT_RE.sub('', line)
+            files = set(fn for fn in line.split('\0') if fn in ls)
+            if not files:
+                continue
+            for fn in files:
+                if args.prefix:
+                    fn = args.prefix + fn
+                mtime = os.lstat(fn).st_mtime
+                if args.list:
+                    if args.list > 1:
+                        ts = str(commit_time).rjust(10)
+                    else:
+                        ts = datetime.utcfromtimestamp(commit_time).strftime("%Y-%m-%d %H:%M:%S")
+                    chg = '.' if mtime == commit_time else '*'
+                    print(chg, ts, fn)
+                elif mtime != commit_time:
+                    if not args.quiet:
+                        print(f"Setting {fn}")
+                    os.utime(fn, (commit_time, commit_time), follow_symlinks = False)
+            ls -= files
+            if not ls:
+                break
+    proc.communicate()
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Set the times of the current git checkout to their last-changed time.")
+    parser.add_argument('--git-dir', metavar='GIT_DIR', help="The git dir to query (defaults to affecting the current git checkout).")
+    parser.add_argument('--tree', metavar='TREE-ISH', help="The tree-ish to query (defaults to the current branch).")
+    parser.add_argument('--prefix', metavar='PREFIX_STR', help="Prepend the PREFIX_STR to each filename we tweak.")
+    parser.add_argument('--quiet', '-q', action='store_true', help="Don't output the changed-file information.")
+    parser.add_argument('--list', '-l', action='count', help="List the files and their dates instead of changing them. Repeat for Unix Time instead of human reable.")
+    parser.add_argument('files', metavar='FILE', nargs='*', help="Specify a subset of checked-out files to tweak.")
+    args = parser.parse_args()
+    main()
+
+# vim: sw=4 et
