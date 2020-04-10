@@ -354,7 +354,7 @@ rename('b', "rsync-$version");
 
 print "Creating $srctar_file ...\n";
 system "git archive --format=tar --prefix=rsync-$version/ v$version | tar xf -";
-system "support/git-set-file-times --prefix=rsync-$version/";
+system "support/git-set-file-times --quiet --prefix=rsync-$version/";
 system "fakeroot tar czf $srctar_file rsync-$version; rm -rf rsync-$version";
 
 print "Updating files in \"rsync-$version/patches\" dir ...\n";

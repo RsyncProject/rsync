@@ -112,7 +112,7 @@ if ($make_tar) {
     print "Creating $name.tar.gz\n";
     system "rsync -a @extra_files $name/";
     system "git archive --format=tar --prefix=$name/ HEAD | tar xf -";
-    system "support/git-set-file-times --prefix=$name/";
+    system "support/git-set-file-times --quiet --prefix=$name/";
     system "fakeroot tar czf $dest/$name.tar.gz $name; rm -rf $name";
 
     unlink($nightly_symlink);
