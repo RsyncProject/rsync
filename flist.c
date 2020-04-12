@@ -759,7 +759,7 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 			struct file_struct *first = flist->files[first_hlink_ndx - flist->ndx_start];
 			file_length = F_LENGTH(first);
 			modtime = first->modtime;
-			modtime_nsec = F_MOD_NSEC(first);
+			modtime_nsec = F_MOD_NSEC_or_0(first);
 			mode = first->mode;
 			if (preserve_uid)
 				uid = F_OWNER(first);
@@ -944,7 +944,7 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 #ifdef CAN_SET_NSEC
 	if (modtime_nsec) {
 		file->flags |= FLAG_MOD_NSEC;
-		OPT_EXTRA(file, 0)->unum = modtime_nsec;
+		F_MOD_NSEC(file) = modtime_nsec;
 	}
 #endif
 	file->len32 = (uint32)file_length;
@@ -955,7 +955,7 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 		exit_cleanup(RERR_UNSUPPORTED);
 #else
 		file->flags |= FLAG_LENGTH64;
-		OPT_EXTRA(file, NSEC_BUMP(file))->unum = (uint32)(file_length >> 32);
+		F_HIGH_LEN(file) = (uint32)(file_length >> 32);
 #endif
 	}
 #endif
@@ -1346,14 +1346,14 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 #ifdef ST_MTIME_NSEC
 	if (st.ST_MTIME_NSEC && protocol_version >= 31) {
 		file->flags |= FLAG_MOD_NSEC;
-		OPT_EXTRA(file, 0)->unum = st.ST_MTIME_NSEC;
+		F_MOD_NSEC(file) = st.ST_MTIME_NSEC;
 	}
 #endif
 	file->len32 = (uint32)st.st_size;
 #if SIZEOF_CAPITAL_OFF_T >= 8
 	if (st.st_size > 0xFFFFFFFFu && S_ISREG(st.st_mode)) {
 		file->flags |= FLAG_LENGTH64;
-		OPT_EXTRA(file, NSEC_BUMP(file))->unum = (uint32)(st.st_size >> 32);
+		F_HIGH_LEN(file) = (uint32)(st.st_size >> 32);
 	}
 #endif
 	file->mode = st.st_mode;

@@ -54,10 +54,10 @@
 #define XMIT_SAME_TIME (1<<7)
 #define XMIT_SAME_RDEV_MAJOR (1<<8)	/* protocols 28 - now (devices only) */
 #define XMIT_NO_CONTENT_DIR (1<<8)	/* protocols 30 - now (dirs only) */
-#define XMIT_HLINKED (1<<9)		/* protocols 28 - now */
+#define XMIT_HLINKED (1<<9)		/* protocols 28 - now (non-dirs) */
 #define XMIT_SAME_DEV_pre30 (1<<10)	/* protocols 28 - 29  */
 #define XMIT_USER_NAME_FOLLOWS (1<<10)	/* protocols 30 - now */
-#define XMIT_RDEV_MINOR_8_pre30 (1<<11)	/* protocols 28 - 29  */
+#define XMIT_RDEV_MINOR_8_pre30 (1<<11) /* protocols 28 - 29  */
 #define XMIT_GROUP_NAME_FOLLOWS (1<<11) /* protocols 30 - now */
 #define XMIT_HLINK_FIRST (1<<12)	/* protocols 30 - now (HLINKED files only) */
 #define XMIT_IO_ERROR_ENDLIST (1<<12)	/* protocols 31*- now (w/XMIT_EXTENDED_FLAGS) (also protocol 30 w/'f' compat flag) */
@@ -741,11 +741,12 @@ extern int xattrs_ndx;
 #if SIZEOF_INT64 < 8
 #define F_LENGTH(f) ((int64)(f)->len32)
 #else
-#define F_LENGTH(f) ((int64)(f)->len32 + ((f)->flags & FLAG_LENGTH64 \
-		   ? (int64)OPT_EXTRA(f, NSEC_BUMP(f))->unum << 32 : 0))
+#define F_HIGH_LEN(f) (OPT_EXTRA(f, NSEC_BUMP(f))->unum)
+#define F_LENGTH(f) ((int64)(f)->len32 + ((f)->flags & FLAG_LENGTH64 ? (int64)F_HIGH_LEN(f) << 32 : 0))
 #endif
 
-#define F_MOD_NSEC(f) ((f)->flags & FLAG_MOD_NSEC ? OPT_EXTRA(f, 0)->unum : 0)
+#define F_MOD_NSEC(f) OPT_EXTRA(f, 0)->unum
+#define F_MOD_NSEC_or_0(f) ((f)->flags & FLAG_MOD_NSEC ? F_MOD_NSEC(f) : 0)
 
 /* If there is a symlink string, it is always right after the basename */
 #define F_SYMLINK(f) ((f)->basename + strlen((f)->basename) + 1)

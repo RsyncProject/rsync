@@ -387,7 +387,7 @@ static void do_delete_pass(void)
 static inline int time_diff(STRUCT_STAT *stp, struct file_struct *file)
 {
 #ifdef ST_MTIME_NSEC
-	return cmp_time(stp->st_mtime, stp->ST_MTIME_NSEC, file->modtime, F_MOD_NSEC(file));
+	return cmp_time(stp->st_mtime, stp->ST_MTIME_NSEC, file->modtime, F_MOD_NSEC_or_0(file));
 #else
 	return cmp_time(stp->st_mtime, 0L, file->modtime, 0L);
 #endif
@@ -2065,7 +2065,7 @@ static void touch_up_dirs(struct file_list *flist, int ndx)
 		if (need_retouch_dir_times) {
 			STRUCT_STAT st;
 			if (link_stat(fname, &st, 0) == 0 && time_diff(&st, file))
-				set_modtime(fname, file->modtime, F_MOD_NSEC(file), file->mode);
+				set_modtime(fname, file->modtime, F_MOD_NSEC_or_0(file), file->mode);
 		}
 		if (counter >= loopchk_limit) {
 			if (allowed_lull)
