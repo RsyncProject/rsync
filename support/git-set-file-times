@@ -8,7 +8,7 @@ NULL_COMMIT_RE = re.compile(r'\0\0commit [a-f0-9]{40}$|\0$')
 def main():
     if not args.git_dir:
         cmd = 'git rev-parse --show-toplevel 2>/dev/null || echo .'
-        top_dir = subprocess.check_output(cmd, shell=True).decode('utf-8').strip()
+        top_dir = subprocess.check_output(cmd, shell=True, encoding='utf-8').strip()
         args.git_dir = os.path.join(top_dir, '.git')
         if not args.prefix:
             os.chdir(top_dir)
@@ -20,19 +20,31 @@ def main():
     else:
         cmd = git + 'ls-files -z'.split()
 
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-    out = proc.communicate()[0].decode('utf-8')
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, encoding='utf-8')
+    out = proc.communicate()[0]
     ls = set(out.split('\0'))
     ls.discard('')
+
+    if not args.tree:
+        # All modified files keep their current mtime.
+        proc = subprocess.Popen(git + 'ls-files -m -z'.split(), stdout=subprocess.PIPE, encoding='utf-8')
+        out = proc.communicate()[0]
+        for fn in out.split('\0'):
+            if fn == '':
+                continue
+            if args.list:
+                mtime = os.lstat(fn).st_mtime
+                print_line(fn, mtime, mtime)
+            ls.discard(fn)
 
     cmd = git + 'log -r --name-only --no-color --pretty=raw --no-renames -z'.split()
     if args.tree:
         cmd.append(args.tree)
     cmd += ['--'] + args.files
 
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, encoding='utf-8')
     for line in proc.stdout:
-        line = line.decode('utf-8').strip()
+        line = line.strip()
         m = re.match(r'^committer .*? (\d+) [-+]\d+$', line)
         if m:
             commit_time = int(m[1])
@@ -46,12 +58,7 @@ def main():
                     fn = args.prefix + fn
                 mtime = os.lstat(fn).st_mtime
                 if args.list:
-                    if args.list > 1:
-                        ts = str(commit_time).rjust(10)
-                    else:
-                        ts = datetime.utcfromtimestamp(commit_time).strftime("%Y-%m-%d %H:%M:%S")
-                    chg = '.' if mtime == commit_time else '*'
-                    print(chg, ts, fn)
+                    print_line(fn, mtime, commit_time)
                 elif mtime != commit_time:
                     if not args.quiet:
                         print(f"Setting {fn}")
@@ -62,14 +69,24 @@ def main():
     proc.communicate()
 
 
+def print_line(fn, mtime, commit_time):
+    if args.list > 1:
+        ts = str(commit_time).rjust(10)
+    else:
+        ts = datetime.utcfromtimestamp(commit_time).strftime("%Y-%m-%d %H:%M:%S")
+    chg = '.' if mtime == commit_time else '*'
+    print(chg, ts, fn)
+
+
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Set the times of the current git checkout to their last-changed time.")
+    parser = argparse.ArgumentParser(description="Set the times of the current git checkout to their last-changed time.", add_help=False)
     parser.add_argument('--git-dir', metavar='GIT_DIR', help="The git dir to query (defaults to affecting the current git checkout).")
     parser.add_argument('--tree', metavar='TREE-ISH', help="The tree-ish to query (defaults to the current branch).")
     parser.add_argument('--prefix', metavar='PREFIX_STR', help="Prepend the PREFIX_STR to each filename we tweak.")
     parser.add_argument('--quiet', '-q', action='store_true', help="Don't output the changed-file information.")
-    parser.add_argument('--list', '-l', action='count', help="List the files and their dates instead of changing them. Repeat for Unix Time instead of human reable.")
+    parser.add_argument('--list', '-l', action='count', help="List files & times instead of changing them. Repeat for Unix timestamp instead of human readable.")
     parser.add_argument('files', metavar='FILE', nargs='*', help="Specify a subset of checked-out files to tweak.")
+    parser.add_argument("--help", "-h", action="help", help="Output this help message and exit.")
     args = parser.parse_args()
     main()
 

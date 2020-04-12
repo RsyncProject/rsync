@@ -1,182 +1,174 @@
-#!/usr/bin/perl
+#!/usr/bin/python3 -B
 
-use strict;
-use warnings;
-use Getopt::Long;
+# This script turns one or more diff files in the patches dir (which is
+# expected to be a checkout of the rsync-patches git repo) into a branch
+# in the main rsync git checkout. This allows the applied patch to be
+# merged with the latest rsync changes and tested.  To update the diff
+# with the resulting changes, see the patch-update script.
 
-&Getopt::Long::Configure('bundling');
-&usage if !&GetOptions(
-    'branch|b=s' => \( my $master_branch = 'master' ),
-    'skip-check' => \( my $skip_branch_check ),
-    'delete' => \( my $delete_local_branches ),
-    'help|h' => \( my $help_opt ),
-);
-&usage if $help_opt;
+import os, sys, re, argparse, glob
 
-push @INC, '.';
+sys.path = ['packaging'] + sys.path
 
-require 'packaging/git-status.pl';
-check_git_state($master_branch, !$skip_branch_check, 1);
+from pkglib import *
 
-my %local_branch;
-open PIPE, '-|', 'git branch -l' or die "Unable to fork: $!\n";
-while (<PIPE>) {
-    if (m# patch/\Q$master_branch\E/(.*)#o) {
-	$local_branch{$1} = 1;
-    }
-}
-close PIPE;
+def main():
+    global created, info, local_branch
 
-if ($delete_local_branches) {
-    foreach my $name (sort keys %local_branch) {
-	my $branch = "patch/$master_branch/$name";
-	system 'git', 'branch', '-D', $branch and exit 1;
-    }
-    %local_branch = ( );
-}
+    cur_branch, args.base_branch = check_git_state(args.base_branch, not args.skip_check, args.patches_dir)
 
-my @patch_list;
-foreach (@ARGV) {
-    if (!-f $_) {
-	die "File not found: $_\n";
-    }
-    die "Filename is not a .diff file: $_\n" unless /\.diff$/;
-    push @patch_list, $_;
-}
+    local_branch = get_patch_branches(args.base_branch)
 
-exit unless @patch_list;
+    if args.delete_local_branches:
+        for name in sorted(local_branch):
+            branch = f"patch/{args.base_branch}/{name}"
+            cmd_chk(['git', 'branch', '-D', branch])
+        local_branch = set()
 
-my(%scanned, %created, %info);
+    if args.add_missing:
+        for fn in sorted(glob.glob(f"{args.patches_dir}/*.diff")):
+            name = re.sub(r'\.diff$', '', re.sub(r'.+/', '', fn))
+            if name not in local_branch and fn not in args.patch_files:
+                args.patch_files.append(fn)
 
-foreach my $patch (@patch_list) {
-    my($where, $name) = $patch =~ m{^(.*?)([^/]+)\.diff$};
-    next if $scanned{$name}++;
+    if not args.patch_files:
+        return
 
-    open IN, '<', $patch or die "Unable to open $patch: $!\n";
+    for fn in args.patch_files:
+        if not fn.endswith('.diff'):
+            die(f"Filename is not a .diff file: {fn}")
+        if not os.path.isfile(fn):
+            die(f"File not found: {fn}")
 
-    my $info = '';
-    my $commit;
-    while (<IN>) {
-	if (m#^based-on: (\S+)#) {
-	    $commit = $1;
-	    last;
-	}
-	last if m#^index .*\.\..* \d#;
-	last if m#^diff --git #;
-	last if m#^--- (old|a)/#;
-	$info .= $_;
-    }
-    close IN;
+    scanned = set()
+    info = { }
 
-    $info =~ s/\s+\Z/\n/;
+    patch_list = [ ]
+    for fn in args.patch_files:
+        m = re.match(r'^(?P<dir>.*?)(?P<name>[^/]+)\.diff$', fn)
+        patch = argparse.Namespace(**m.groupdict())
+        if patch.name in scanned:
+            continue
+        patch.fn = fn
 
-    my $parent = $master_branch;
-    my @patches = $info =~ m#patch -p1 <patches/(\S+)\.diff#g;
-    if (@patches) {
-	if ($patches[-1] eq $name) {
-	    pop @patches;
-	} else {
-	    warn "No identity patch line in $patch\n";
-	}
-	if (@patches) {
-	    $parent = pop @patches;
-	    if (!$scanned{$parent}) {
-		unless (-f "$where$parent.diff") {
-		    die "Unknown parent of $patch: $parent\n";
-		}
-		# Add parent to @patch_list so that we will look for the
-		# parent's parent.  Any duplicates will just be ignored.
-		push @patch_list, "$where$parent.diff";
-	    }
-	}
-    } else {
-	warn "No patch lines found in $patch\n";
-    }
+        lines = [ ]
+        commit_hash = None
+        with open(patch.fn, 'r', encoding='utf-8') as fh:
+            for line in fh:
+                m = re.match(r'^based-on: (\S+)', line)
+                if m:
+                    commit_hash = m[1]
+                    break
+                if (re.match(r'^index .*\.\..* \d', line)
+                 or re.match(r'^diff --git ', line)
+                 or re.match(r'^--- (old|a)/', line)):
+                    break
+                lines.append(re.sub(r'\s*\Z', "\n", line))
+        info_txt = ''.join(lines).strip() + "\n"
+        lines = None
 
-    $info{$name} = [ $parent, $info, $commit ];
-}
+        parent = args.base_branch
+        patches = re.findall(r'patch -p1 <%s/(\S+)\.diff' % args.patches_dir, info_txt)
+        if patches:
+            last = patches.pop()
+            if last != patch.name:
+                warn(f"No identity patch line in {patch.fn}")
+                patches.append(last)
+            if patches:
+                parent = patches.pop()
+                if parent not in scanned:
+                    diff_fn = patch.dir + parent + '.diff'
+                    if not os.path.isfile(diff_fn):
+                        die(f"Failed to find parent of {patch.fn}: {parent}")
+                    # Add parent to args.patch_files so that we will look for the
+                    # parent's parent.  Any duplicates will be ignored.
+                    args.patch_files.append(diff_fn)
+        else:
+            warn(f"No patch lines found in {patch.fn}")
 
-foreach my $patch (@patch_list) {
-    create_branch($patch);
-}
+        info[patch.name] = [ parent, info_txt, commit_hash ]
 
-system 'git', 'checkout', $master_branch and exit 1;
+        patch_list.append(patch)
 
-exit;
+    created = set()
+    for patch in patch_list:
+        create_branch(patch)
 
-sub create_branch
-{
-    my($patch) = @_;
-    my($where, $name) = $patch =~ m{^(.*?)([^/]+)\.diff$};
+    cmd_chk(['git', 'checkout', args.base_branch])
 
-    return if $created{$name}++;
 
-    my $ref = $info{$name};
-    my($parent, $info, $commit) = @$ref;
+def create_branch(patch):
+    if patch.name in created:
+        return
+    created.add(patch.name)
 
-    my $parent_branch;
-    if ($parent eq $master_branch) {
-	$parent_branch = $master_branch;
-	$parent_branch = $commit if defined $commit;
-    } else {
-	create_branch("$where/$parent.diff");
-	$parent_branch = "patch/$master_branch/$parent";
-    }
+    parent, info_txt, commit_hash = info[patch.name]
+    parent = argparse.Namespace(dir=patch.dir, name=parent, fn=patch.dir + parent + '.diff')
 
-    my $branch = "patch/$master_branch/$name";
-    print "\n", '=' x 64, "\nProcessing $branch ($parent_branch)\n";
+    if parent.name == args.base_branch:
+        parent_branch = commit_hash if commit_hash else args.base_branch
+    else:
+        create_branch(parent)
+        parent_branch = '/'.join(['patch', args.base_branch, parent.name])
 
-    if ($local_branch{$name}) {
-	system 'git', 'branch', '-D', $branch and exit 1;
-    }
+    branch = '/'.join(['patch', args.base_branch, patch.name])
+    print("\n" + '=' * 64)
+    print(f"Processing {branch} ({parent_branch})")
 
-    system 'git', 'checkout', '-b', $branch, $parent_branch and exit 1;
+    if patch.name in local_branch:
+        cmd_chk(['git', 'branch', '-D', branch])
 
-    open OUT, '>', "PATCH.$name" or die $!;
-    print OUT $info;
-    close OUT;
-    system 'git', 'add', "PATCH.$name" and exit 1;
+    cmd_chk(['git', 'checkout', '-b', branch, parent_branch])
 
-    open IN, '<', $patch or die "Unable to open $patch: $!\n";
-    $_ = join('', <IN>);
-    close IN;
+    info_fn = 'PATCH.' + patch.name
+    with open(info_fn, 'w', encoding='utf-8') as fh:
+        fh.write(info_txt)
+    cmd_chk(['git', 'add', info_fn])
 
-    open PIPE, '|-', 'patch -p1' or die $!;
-    print PIPE $_;
-    close PIPE;
+    with open(patch.fn, 'r', encoding='utf-8') as fh:
+        patch_txt = fh.read()
 
-    system 'rm -f *.orig */*.orig';
+    cmd_run('patch -p1'.split(), input=patch_txt)
 
-    while (m#\nnew file mode (\d+)\s+--- /dev/null\s+\Q+++\E b/(.*)#g) {
-	chmod oct($1), $2;
-	system 'git', 'add', $2;
-    }
+    for fn in glob.glob('*.orig') + glob.glob('*/*.orig'):
+        os.unlink(fn)
 
-    while (1) {
-	system 'git status';
-	print 'Press Enter to commit, Ctrl-C to abort, or type a wild-name to add a new file: ';
-	$_ = <STDIN>;
-	last if /^$/;
-	chomp;
-	system "git add $_";
-    }
+    pos = 0
+    new_file_re = re.compile(r'\nnew file mode (?P<mode>\d+)\s+--- /dev/null\s+\+\+\+ b/(?P<fn>.+)')
+    while True:
+        m = new_file_re.search(patch_txt, pos)
+        if not m:
+            break
+        os.chmod(m['fn'], int(m['mode'], 8))
+        cmd_chk(['git', 'add', m['fn']])
+        pos = m.end()
 
-    while (system 'git', 'commit', '-a', '-m', "Creating branch from $name.diff.") {
-	exit 1 if system '/bin/zsh';
-    }
-}
+    while True:
+        cmd_chk('git status'.split())
+        ans = input('Press Enter to commit, Ctrl-C to abort, or type a wild-name to add a new file: ')
+        if ans == '':
+            break
+        cmd_chk("git add " + ans, shell=True)
 
-sub usage
-{
-    die <<EOT;
-Usage branch-from-patch [OPTIONS] patches/DIFF...
+    while True:
+        s = cmd_run(['git', 'commit', '-a', '-m', f"Creating branch from {patch.name}.diff."])
+        if not s.returncode:
+            break
+        s = cmd_run(['/bin/zsh'])
+        if s.returncode:
+            die('Aborting due to shell error code')
 
-Options:
--b, --branch=BRANCH  Create branches relative to BRANCH if no "based-on"
-                     header was found in the patch file.
-    --skip-check     Skip the check that ensures starting with a clean branch.
-    --delete         Delete all the local patch/BASE/* branches, not just the ones
-                     that are being recreated.
--h, --help           Output this help message.
-EOT
-}
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Create a git patch branch from an rsync patch file.", add_help=False)
+    parser.add_argument('--branch', '-b', dest='base_branch', metavar='BASE_BRANCH', default='master', help="The branch the patch is based on. Default: master.")
+    parser.add_argument('--add-missing', '-a', action='store_true', help="Add a branch for every patches/*.diff that doesn't have a branch.")
+    parser.add_argument('--skip-check', action='store_true', help="Skip the check that ensures starting with a clean branch.")
+    parser.add_argument('--delete', dest='delete_local_branches', action='store_true', help="Delete all the local patch/BASE/* branches, not just the ones that are being recreated.")
+    parser.add_argument('--patches-dir', '-p', metavar='DIR', default='patches', help="Override the location of the rsync-patches dir. Default: patches.")
+    parser.add_argument('patch_files', metavar='patches/DIFF_FILE', nargs='*', help="Specify what patch diff files to process. Default: all of them.")
+    parser.add_argument("--help", "-h", action="help", help="Output this help message and exit.")
+    args = parser.parse_args()
+    main()
+
+# vim: sw=4 et

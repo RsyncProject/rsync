@@ -1,244 +1,210 @@
-#!/usr/bin/perl
+#!/usr/bin/python3 -B
+
 # This script is used to turn one or more of the "patch/BASE/*" branches
 # into one or more diffs in the "patches" directory.  Pass the option
 # --gen if you want generated files in the diffs.  Pass the name of
 # one or more diffs if you want to just update a subset of all the
 # diffs.
 
-use strict;
-use warnings;
-use Getopt::Long;
+import os, sys, re, argparse, time, shutil
 
-my $patches_dir = 'patches';
-my $tmp_dir = "patches.$$";
-my $make_gen_cmd = 'make -f prepare-source.mak conf && ./config.status && make gen';
+sys.path = ['packaging'] + sys.path
 
-&Getopt::Long::Configure('bundling');
-&usage if !&GetOptions(
-    'branch|b=s' => \( my $master_branch = 'master' ),
-    'skip-check' => \( my $skip_branch_check ),
-    'shell|s' => \( my $launch_shell ),
-    'gen:s' => \( my $incl_generated_files ),
-    'help|h' => \( my $help_opt ),
-);
-&usage if $help_opt;
+from pkglib import *
 
-$ENV{GIT_MERGE_AUTOEDIT} = 'no';
+MAKE_GEN_CMDS = [
+        'make -f prepare-source.mak conf'.split(),
+        './config.status'.split(),
+        'make gen'.split(),
+        ]
+TMP_DIR = "patches.gen"
 
-if (defined $incl_generated_files) {
-    $patches_dir = $incl_generated_files if $incl_generated_files ne '';
-    $incl_generated_files = 1;
-}
+os.environ['GIT_MERGE_AUTOEDIT'] = 'no'
 
-die "No '$patches_dir' directory was found.\n" unless -d $patches_dir;
-die "No '.git' directory present in the current dir.\n" unless -d '.git';
+def main():
+    global master_commit, parent_patch, description, completed, last_touch
 
-push @INC, '.';
+    if not os.path.isdir(args.patches_dir):
+        die(f'No "{args.patches_dir}" directory was found.')
+    if not os.path.isdir('.git'):
+        die('No ".git" directory present in the current dir.')
 
-require 'packaging/git-status.pl';
-my $starting_branch = check_git_state($master_branch, !$skip_branch_check, 1);
+    starting_branch, args.base_branch = check_git_state(args.base_branch, not args.skip_check, args.patches_dir)
 
-my $master_commit;
-open PIPE, '-|', "git log -1 --no-color $master_branch" or die $!;
-while (<PIPE>) {
-    if (/^commit (\S+)/) {
-	$master_commit = $1;
-	last;
-    }
-}
-close PIPE;
-die "Unable to determine commit hash for master branch: $master_branch\n" unless defined $master_commit;
+    master_commit = latest_git_hash(args.base_branch)
 
-if ($incl_generated_files) {
-    my @extra_files = get_extra_files();
-    die "'$tmp_dir' must not exist in the current directory.\n" if -e $tmp_dir;
-    mkdir($tmp_dir, 0700) or die "Unable to mkdir($tmp_dir): $!\n";
-    system "$make_gen_cmd && rsync -a @extra_files $tmp_dir/master/" and exit 1;
-}
-our $last_touch = time;
+    if args.gen:
+        if os.path.lexists(TMP_DIR):
+            die(f'"{TMP_DIR}" must not exist in the current directory.')
+        extra_files = get_extra_files()
+        os.mkdir(TMP_DIR, 0o700)
+        for cmd in MAKE_GEN_CMDS:
+            cmd_chk(cmd)
+        cmd_chk(['rsync', '-a', *extra_files, f'{TMP_DIR}/master/'])
 
-my %patches;
+    last_touch = time.time()
 
-# Start by finding all patches so that we can load all possible parents.
-open(PIPE, '-|', 'git', 'branch', '-l') or die $!;
-while (<PIPE>) {
-    if (m# patch/\Q$master_branch\E/(.*)#o) {
-	$patches{$1} = 1;
-    }
-}
-close PIPE;
+    # Start by finding all patches so that we can load all possible parents.
+    patches = sorted(list(get_patch_branches(args.base_branch)))
 
-my @patches = sort keys %patches;
+    parent_patch = { }
+    description = { }
 
-my(%parent, %description);
-foreach my $patch (@patches) {
-    my $branch = "patch/$master_branch/$patch";
-    my $desc = '';
-    open(PIPE, '-|', 'git', 'diff', '-U1000', "$master_branch...$branch", '--', "PATCH.$patch") or die $!;
-    while (<PIPE>) {
-	last if /^@@ /;
-    }
-    while (<PIPE>) {
-	next unless s/^[ +]//;
-	if (m#patch -p1 <patches/(\S+)\.diff# && $1 ne $patch) {
-	    my $parent = $parent{$patch} = $1;
-	    if (!$patches{$parent}) {
-		die "Parent of $patch is not a local branch: $parent\n";
-	    }
-	}
-	$desc .= $_;
-    }
-    close PIPE;
-    $description{$patch} = $desc;
-}
+    for patch in patches:
+        branch = f"patch/{args.base_branch}/{patch}"
+        desc = ''
+        proc = cmd_pipe(['git', 'diff', '-U1000', f"{args.base_branch}...{branch}", '--', f"PATCH.{patch}"])
+        in_diff = False
+        for line in proc.stdout:
+            if in_diff:
+                if not re.match(r'^[ +]', line):
+                    continue
+                line = line[1:]
+                m = re.search(r'patch -p1 <patches/(\S+)\.diff', line)
+                if m and m[1] != patch:
+                    parpat = parent_patch[patch] = m[1]
+                    if not parpat in patches:
+                        die(f"Parent of {patch} is not a local branch: {parpat}")
+                desc += line
+            elif re.match(r'^@@ ', line):
+                in_diff = True
+        description[patch] = desc
+        proc.communicate()
 
-if (@ARGV) {
-    # Limit the list of patches to actually process based on @ARGV.
-    @patches = ( );
-    foreach (@ARGV) {
-	s{^patch(es)?/} {};
-	s{\.diff$} {};
-	if (!$patches{$_}) {
-	    die "Local branch not available for patch: $_\n";
-	}
-	push(@patches, $_);
-    }
-}
+    if args.patch_files: # Limit the list of patches to actually process
+        valid_patches = patches
+        patches = [ ]
+        for fn in args.patch_files:
+            name = re.sub(r'\.diff$', '', re.sub(r'.+/', '', fn))
+            if name not in valid_patches:
+                die(f"Local branch not available for patch: {name}")
+            patches.append(name)
 
-my %completed;
-foreach my $patch (@patches) {
-    next if $completed{$patch}++;
-    last unless update_patch($patch);
-}
+    completed = set()
 
-if ($incl_generated_files) {
-    system "rm -rf $tmp_dir";
-}
+    for patch in patches:
+        if patch in completed:
+            continue
+        if not update_patch(patch):
+            break
 
-sleep 1 while $last_touch >= time;
-system "git checkout $starting_branch" and exit 1;
+    if args.gen:
+        shutil.rmtree(TMP_DIR)
 
-exit;
+    while last_touch >= time.time():
+        time.sleep(1)
+    cmd_chk(['git', 'checkout', starting_branch])
 
 
-sub update_patch
-{
-    my($patch) = @_;
+def update_patch(patch):
+    global last_touch
 
-    my $parent = $parent{$patch};
-    my $based_on;
-    if (defined $parent) {
-	unless ($completed{$parent}++) {
-	    update_patch($parent);
-	}
-	$based_on = $parent = "patch/$master_branch/$parent";
-    } else {
-	$parent = $master_branch;
-	$based_on = $master_commit;
-    }
+    completed.add(patch) # Mark it as completed early to short-circuit any (bogus) dependency loops.
 
-    print "======== $patch ========\n";
+    parent = parent_patch.get(patch, None)
+    if parent:
+        if parent not in completed:
+            if not update_patch(parent):
+                return 0
+        based_on = parent = f"patch/{args.base_branch}/{parent}"
+    else:
+        parent = args.base_branch
+        based_on = master_commit
 
-    sleep 1 while $incl_generated_files && $last_touch >= time;
-    system "git checkout patch/$master_branch/$patch" and return 0;
+    print(f"======== {patch} ========")
 
-    my $ok = system("git merge $based_on") == 0;
-    if (!$ok || $launch_shell) {
-	my($parent_dir) = $parent =~ m{([^/]+)$};
-	print qq|"git merge $based_on" incomplete -- please fix.\n| if !$ok;
-	$ENV{PS1} = "[$parent_dir] $patch: ";
-	while (1) {
-	    if (system($ENV{SHELL}) != 0) {
-		print "Abort? [n/y] ";
-		$_ = <STDIN>;
-		next unless /^y/i;
-		return 0;
-	    }
-	    my($cur_branch, $is_clean, $status) = check_git_status(0);
-	    last if $is_clean;
-	    print $status;
-	}
-    }
+    while args.gen and last_touch >= time.time():
+        time.sleep(1)
+    s = cmd_run(f"git checkout patch/{args.base_branch}/{patch}".split())
+    if s.returncode != 0:
+        return 0
 
-    open(OUT, '>', "$patches_dir/$patch.diff") or die $!;
-    print OUT $description{$patch}, "\nbased-on: $based_on\n";
+    s = cmd_run(['git', 'merge', based_on])
+    ok = s.returncode == 0
+    if not ok or args.shell:
+        m = re.search(r'([^/]+)$', parent)
+        parent_dir = m[1]
+        if not ok:
+            print(f'"git merge {based_on}" incomplete -- please fix.')
+        os.environ['PS1'] = f"[{parent_dir}] {patch}: "
+        while True:
+            s = cmd_run([os.environ.get('SHELL', '/bin/sh')])
+            if s.returncode != 0:
+                ans = input("Abort? [n/y] ")
+                if re.match(r'^y', ans, flags=re.I):
+                    return 0
+                continue
+            cur_branch, is_clean, status_txt = check_git_status(0)
+            if is_clean:
+                break
+            print(status_txt, end='')
 
-    my @extra_files;
-    if ($incl_generated_files) {
-	@extra_files = get_extra_files();
-	system "$make_gen_cmd && rsync -a @extra_files $tmp_dir/$patch/" and exit 1;
-    }
-    $last_touch = time;
+    with open(f"{args.patches_dir}/{patch}.diff", 'w', encoding='utf-8') as fh:
+        fh.write(description[patch])
+        fh.write(f"\nbased-on: {based_on}\n")
 
-    open(PIPE, '-|', 'git', 'diff', $based_on) or die $!;
-    DIFF: while (<PIPE>) {
-	while (m{^diff --git a/PATCH}) {
-	    while (<PIPE>) {
-		last if m{^diff --git a/};
-	    }
-	    last DIFF if !defined $_;
-	}
-	next if /^index /;
-	print OUT $_;
-    }
-    close PIPE;
+        if args.gen:
+            extra_files = get_extra_files()
+            for cmd in MAKE_GEN_CMDS:
+                cmd_chk(cmd)
+            cmd_chk(['rsync', '-a', *extra_files, f"{TMP_DIR}/{patch}/"])
+        else:
+            extra_files = [ ]
+        last_touch = time.time()
 
-    if ($incl_generated_files) {
-	my $parent_dir;
-	if ($parent eq $master_branch) {
-	    $parent_dir = 'master';
-	} else {
-	    ($parent_dir) = $parent =~ m{([^/]+)$};
-	}
-	open(PIPE, '-|', 'diff', '-Nurp', "$tmp_dir/$parent_dir", "$tmp_dir/$patch") or die $!;
-	while (<PIPE>) {
-	    s#^(diff -Nurp) $tmp_dir/[^/]+/(.*?) $tmp_dir/[^/]+/(.*)#$1 a/$2 b/$3#o;
-	    s#^\Q---\E $tmp_dir/[^/]+/([^\t]+)\t.*#--- a/$1#o;
-	    s#^\Q+++\E $tmp_dir/[^/]+/([^\t]+)\t.*#+++ b/$1#o;
-	    print OUT $_;
-	}
-	close PIPE;
-	unlink @extra_files;
-    }
+        proc = cmd_pipe(['git', 'diff', based_on])
+        skipping = False
+        for line in proc.stdout:
+            if skipping:
+                if not re.match(r'^diff --git a/', line):
+                    continue
+                skipping = False
+            elif re.match(r'^diff --git a/PATCH', line):
+                skipping = True
+                continue
+            if not re.match(r'^index ', line):
+                fh.write(line)
+        proc.communicate()
 
-    close OUT;
+        if args.gen:
+            e_tmp_dir = re.escape(TMP_DIR)
+            diff_re  = re.compile(r'^(diff -Nurp) %s/[^/]+/(.*?) %s/[^/]+/(.*)' % (e_tmp_dir, e_tmp_dir))
+            minus_re = re.compile(r'^\-\-\- %s/[^/]+/([^\t]+)\t.*' % e_tmp_dir)
+            plus_re  = re.compile(r'^\+\+\+ %s/[^/]+/([^\t]+)\t.*' % e_tmp_dir)
 
-    1;
-}
+            if parent == args.base_branch:
+                parent_dir = 'master'
+            else:
+                m = re.search(r'([^/]+)$', parent)
+                parent_dir = m[1]
 
-exit;
+            proc = cmd_pipe(['diff', '-Nurp', f"{TMP_DIR}/{parent_dir}", f"{TMP_DIR}/{patch}"])
+            for line in proc.stdout:
+                line = diff_re.sub(r'\1 a/\2 b/\3', line)
+                line = minus_re.sub(r'--- a/\1', line)
+                line =  plus_re.sub(r'+++ b/\1', line)
+                fh.write(line)
+            proc.communicate()
+            for fn in extra_files:
+                os.unlink(fn)
 
-sub get_extra_files
-{
-    my @extras;
+    return 1
 
-    open(IN, '<', 'Makefile.in') or die "Couldn't open Makefile.in: $!\n";
-    while (<IN>) {
-	if (s/^GENFILES=//) {
-	    while (s/\\$//) {
-		$_ .= <IN>;
-	    }
-	    @extras = split(' ', $_);
-	    last;
-	}
-    }
-    close IN;
 
-    return @extras;
-}
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Turn a git branch back into a diff files in the patches dir.", add_help=False)
+    parser.add_argument('--branch', '-b', dest='base_branch', metavar='BASE_BRANCH', default='master', help="The branch the patch is based on. Default: master.")
+    parser.add_argument('--skip-check', action='store_true', help="Skip the check that ensures starting with a clean branch.")
+    parser.add_argument('--shell', '-s', action='store_true', help="Launch a shell for every patch/BASE/* branch updated, not just when a conflict occurs.")
+    parser.add_argument('--gen', metavar='DIR', nargs='?', const='', help='Include generated files. Optional DIR value overrides the default of using the "patches" dir.')
+    parser.add_argument('--patches-dir', '-p', metavar='DIR', default='patches', help="Override the location of the rsync-patches dir. Default: patches.")
+    parser.add_argument('patch_files', metavar='patches/DIFF_FILE', nargs='*', help="Specify what patch diff files to process. Default: all of them.")
+    parser.add_argument("--help", "-h", action="help", help="Output this help message and exit.")
+    args = parser.parse_args()
+    if args.gen == '':
+        args.gen = args.patches_dir
+    elif args.gen is not None:
+        args.patches_dir = args.gen
+    main()
 
-sub usage
-{
-    die <<EOT;
-Usage: patch-update [OPTIONS] [patches/DIFF...]
-
-Options:
--b, --branch=BRANCH  The master branch to merge into the patch/BASE/* branches.
-    --gen[=DIR]      Include generated files.  Optional destination DIR
-                     arg overrides the default of using the "patches" dir.
-    --skip-check     Skip the check that ensures starting with a clean branch.
--s, --shell          Launch a shell for every patch/BASE/* branch updated, not
-                     just when a conflict occurs.
--h, --help           Output this help message.
-EOT
-}
+# vim: sw=4 et

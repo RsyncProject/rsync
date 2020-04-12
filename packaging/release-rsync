@@ -1,183 +1,190 @@
-#!/usr/bin/perl
+#!/usr/bin/python3 -B
+
 # This script expects the directory ~/samba-rsync-ftp to exist and to be a
 # copy of the /home/ftp/pub/rsync dir on samba.org.  When the script is done,
 # the git repository in the current directory will be updated, and the local
 # ~/samba-rsync-ftp dir will be ready to be rsynced to samba.org.
 
-use strict;
-use warnings;
-use Cwd;
-use Getopt::Long;
-use Term::ReadKey;
-use Date::Format;
+import os, sys, re, argparse, glob, time, shutil, atexit, signal
+from datetime import datetime
+from getpass import getpass
 
-my $dest = $ENV{HOME} . '/samba-rsync-ftp';
-my $passfile = $ENV{HOME} . '/.rsyncpass';
-my $path = $ENV{PATH};
-my $make_gen_cmd = 'make -f prepare-source.mak conf && ./config.status && make gen';
+sys.path = ['packaging'] + sys.path
 
-&Getopt::Long::Configure('bundling');
-&usage if !&GetOptions(
-    'branch|b=s' => \( my $master_branch = 'master' ),
-    'help|h' => \( my $help_opt ),
-);
-&usage if $help_opt;
+from pkglib import *
 
-my $now = time;
-my $cl_today = time2str('* %a %b %d %Y', $now);
-my $year = time2str('%Y', $now);
-my $ztoday = time2str('%d %b %Y', $now);
-(my $today = $ztoday) =~ s/^0//;
+dest = os.environ['HOME'] + '/samba-rsync-ftp'
+passfile = os.environ['HOME'] + '/.rsyncpass'
+ORIGINAL_PATH = os.environ['PATH']
+MAKE_GEN_CMDS = [
+        'make -f prepare-source.mak conf'.split(),
+        './config.status'.split(),
+        'make gen'.split(),
+        ]
+REL_RE = re.compile(r'^\s+\S{2}\s\S{3}\s\d{4}\s+(?P<ver>\d+\.\d+\.\d+)\s+(?P<pdate>\d{2} \w{3} \d{4}\s+)?(?P<pver>\d+)$')
 
-my $curdir = Cwd::cwd;
+def main():
+    now = datetime.now()
+    cl_today = now.strftime('* %a %b %d %Y')
+    year = now.strftime('%Y')
+    ztoday = now.strftime('%d %b %Y')
+    today = ztoday.lstrip('0')
 
-END {
-    unlink($passfile);
-}
+    curdir = os.getcwd()
 
-my @extra_files;
-open(IN, '<', 'Makefile.in') or die "Couldn't open Makefile.in: $!\n";
-while (<IN>) {
-    if (s/^GENFILES=//) {
-	while (s/\\$//) {
-	    $_ .= <IN>;
-	}
-	@extra_files = split(' ', $_);
-	last;
-    }
-}
-close IN;
+    atexit.register(remove_passfile)
+    signal.signal(signal.SIGINT, signal_handler)
 
-my $break = <<EOT;
-==========================================================================
-EOT
+    extra_files = get_extra_files()
 
-print $break, <<EOT, $break, "\n";
+    dash_line = '=' * 74
+
+    print(f"""\
+{dash_line}
 == This will release a new version of rsync onto an unsuspecting world. ==
-EOT
+{dash_line}
+""")
 
-die "$dest does not exist\n" unless -d $dest;
-die "There is no .git dir in the current directory.\n" unless -d '.git';
-die "'a' must not exist in the current directory.\n" if -e 'a';
-die "'b' must not exist in the current directory.\n" if -e 'b';
+    if not os.path.isdir(dest):
+        die(dest, "dest does not exist")
+    if not os.path.isdir('.git'):
+        die("There is no .git dir in the current directory.")
+    if os.path.lexists('a'):
+        die('"a" must not exist in the current directory.')
+    if os.path.lexists('b'):
+        die('"b" must not exist in the current directory.')
+    if os.path.lexists('patches.gen'):
+        die('"patches.gen" must not exist in the current directory.')
 
-require 'packaging/git-status.pl';
-check_git_state($master_branch, 1, 1);
+    check_git_state(args.master_branch, True, 'patches')
 
-my $confversion;
-open(IN, '<', 'configure.ac') or die $!;
-while (<IN>) {
-    if (/^AC_INIT\(\[rsync\],\s*\[(\d.+?)\]/) {
-	$confversion = $1;
-	last;
-    }
-}
-close IN;
-die "Unable to find AC_INIT with version in configure.ac\n" unless defined $confversion;
+    confversion = None
+    with open('configure.ac', 'r', encoding='utf-8') as fh:
+        for line in fh:
+            m = re.match(r'^AC_INIT\(\[rsync\],\s*\[(\d.+?)\]', line)
+            if m:
+                confversion = m[1]
+                break
+    if not confversion:
+        die("Unable to find AC_INIT with version in configure.ac")
 
-open(IN, '<', 'OLDNEWS') or die $!;
-$_ = <IN>;
-my($lastversion) = /(\d+\.\d+\.\d+)/;
-my($last_protocol_version, %pdate);
-while (<IN>) {
-    if (my($ver,$pdate,$pver) = /^\s+\S\S\s\S\S\S\s\d\d\d\d\s+(\d+\.\d+\.\d+)\s+(\d\d \w\w\w \d\d\d\d\s+)?(\d+)$/) {
-	$pdate{$ver} = $pdate if defined $pdate;
-	$last_protocol_version = $pver if $ver eq $lastversion;
-    }
-}
-close IN;
-die "Unable to determine protocol_version for $lastversion.\n" unless defined $last_protocol_version;
+    lastversion = last_protocol_version = None
+    pdate = { }
+    with open('OLDNEWS', 'r', encoding='utf-8') as fh:
+        for line in fh:
+            if not lastversion:
+                m = re.search(r'(\d+\.\d+\.\d+)', line)
+                if m:
+                    lastversion = m[1]
+            m = REL_RE.match(line)
+            if m:
+                if m['pdate']:
+                    pdate[m['ver']] = m['pdate']
+                if m['ver'] == lastversion:
+                    last_protocol_version = m['pver']
+    if not last_protocol_version:
+        die(f"Unable to determine protocol_version for {lastversion}.")
 
-my $protocol_version;
-open(IN, '<', 'rsync.h') or die $!;
-while (<IN>) {
-    if (/^#define\s+PROTOCOL_VERSION\s+(\d+)/) {
-	$protocol_version = $1;
-	last;
-    }
-}
-close IN;
-die "Unable to determine the current PROTOCOL_VERSION.\n" unless defined $protocol_version;
+    protocol_version = None
+    with open('rsync.h', 'r', encoding='utf-8') as fh:
+        for line in fh:
+            m = re.match(r'^#define\s+PROTOCOL_VERSION\s+(\d+)', line)
+            if m:
+                protocol_version = m[1]
+                break
+    if not protocol_version:
+        die("Unable to determine the current PROTOCOL_VERSION.")
 
-my $version = $confversion;
-$version =~ s/dev/pre1/ || $version =~ s/pre(\d+)/ 'pre' . ($1 + 1) /e;
+    version = confversion
+    m = re.search(r'pre(\d+)', version)
+    if m:
+        version = re.sub(r'pre\d+', 'pre' + str(int(m[1]) + 1), version)
+    else:
+        version = version.replace('dev', 'pre1')
 
-print "Please enter the version number of this release: [$version] ";
-chomp($_ = <STDIN>);
-if ($_ eq '.') {
-    $version =~ s/pre\d+//;
-} elsif ($_ ne '') {
-    $version = $_;
-}
-die "Invalid version: `$version'\n" unless $version =~ /^[\d.]+(pre\d+)?$/;
+    ans = input(f"Please enter the version number of this release: [{version}] ")
+    if ans == '.':
+        version = re.sub(r'pre\d+', '', version)
+    elif ans != '':
+        version = ans
+    if not re.match(r'^[\d.]+(pre\d+)?$', version):
+        die(f'Invalid version: "{version}"')
 
-if (`git tag -l v$version` ne '') {
-    print "Tag v$version already exists.\n\nDelete tag or quit? [q/del] ";
-    $_ = <STDIN>;
-    exit 1 unless /^del/i;
-    system "git tag -d v$version";
-}
+    v_ver = 'v' + version
+    rsync_ver = 'rsync-' + version
+    rsync_lastver = 'rsync-' + lastversion
 
-if ($version =~ s/[-.]*pre[-.]*/pre/ && $confversion !~ /dev$/) {
-    $lastversion = $confversion;
-}
+    if os.path.lexists(rsync_ver):
+        die(f'"{rsync_ver}" must not exist in the current directory.')
+    if os.path.lexists(rsync_lastver):
+        die(f'"{rsync_lastver}" must not exist in the current directory.')
 
-print "Enter the previous version to produce a patch against: [$lastversion] ";
-chomp($_ = <STDIN>);
-$lastversion = $_ if $_ ne '';
-$lastversion =~ s/[-.]*pre[-.]*/pre/;
+    out = cmd_txt_chk(['git', 'tag', '-l', v_ver])
+    if out != '':
+        print(f"Tag {v_ver} already exists.")
+        ans = input("\nDelete tag or quit? [Q/del] ")
+        if not re.match(r'^del', ans, flags=re.I):
+            die("Aborted")
+        cmd_chk(['git', 'tag', '-d', v_ver])
 
-my $pre = $version =~ /(pre\d+)/ ? $1 : '';
+    version = re.sub(r'[-.]*pre[-.]*', 'pre', version)
+    if 'pre' in version and not confversion.endswith('dev'):
+        lastversion = confversion
 
-my $release = $pre ? '0.1' : '1';
-print "Please enter the RPM release number of this release: [$release] ";
-chomp($_ = <STDIN>);
-$release = $_ if $_ ne '';
-$release .= ".$pre" if $pre;
+    ans = input(f"Enter the previous version to produce a patch against: [{lastversion}] ")
+    if ans != '':
+        lastversion = ans
+    lastversion = re.sub(r'[-.]*pre[-.]*', 'pre', lastversion)
 
-(my $finalversion = $version) =~ s/pre\d+//;
-my($proto_changed,$proto_change_date);
-if ($protocol_version eq $last_protocol_version) {
-    $proto_changed = 'unchanged';
-    $proto_change_date = "\t\t";
-} else {
-    $proto_changed = 'changed';
-    if (!defined($proto_change_date = $pdate{$finalversion})) {
-	while (1) {
-	    print "On what date did the protocol change to $protocol_version get checked in? (dd Mmm yyyy) ";
-	    chomp($_ = <STDIN>);
-	    last if /^\d\d \w\w\w \d\d\d\d$/;
-	}
-	$proto_change_date = "$_\t";
-    }
-}
+    m = re.search(r'(pre\d+)', version)
+    pre = m[1] if m else ''
 
-my($srcdir,$srcdiffdir,$lastsrcdir,$skipping);
-if ($lastversion =~ /pre/) {
-    if (!$pre) {
-	die "You should not diff a release version against a pre-release version.\n";
-    }
-    $srcdir = $srcdiffdir = $lastsrcdir = 'src-previews';
-    $skipping = ' ** SKIPPING **';
-} elsif ($pre) {
-    $srcdir = $srcdiffdir = 'src-previews';
-    $lastsrcdir = 'src';
-    $skipping = ' ** SKIPPING **';
-} else {
-    $srcdir = $lastsrcdir = 'src';
-    $srcdiffdir = 'src-diffs';
-    $skipping = '';
-}
+    release = '0.1' if pre else '1'
+    ans = input(f"Please enter the RPM release number of this release: [{release}] ")
+    if ans != '':
+        release = ans
+    if pre:
+        release += '.' + pre
 
-print "\n", $break, <<EOT;
-\$version is "$version"
-\$lastversion is "$lastversion"
-\$dest is "$dest"
-\$curdir is "$curdir"
-\$srcdir is "$srcdir"
-\$srcdiffdir is "$srcdiffdir"
-\$lastsrcdir is "$lastsrcdir"
-\$release is "$release"
+    finalversion = re.sub(r'pre\d+', '', version)
+    if protocol_version == last_protocol_version:
+        proto_changed = 'unchanged'
+        proto_change_date = "\t\t"
+    else:
+        proto_changed = 'changed'
+        if finalversion in pdate:
+            proto_change_date = pdate[finalversion]
+        else:
+            while True:
+                ans = input("On what date did the protocol change to {protocol_version} get checked in? (dd Mmm yyyy) ")
+                if re.match(r'^\d\d \w\w\w \d\d\d\d$', ans):
+                    break
+            proto_change_date = ans + "\t"
+
+    if 'pre' in lastversion:
+        if not pre:
+            die("You should not diff a release version against a pre-release version.")
+        srcdir = srcdiffdir = lastsrcdir = 'src-previews'
+        skipping = ' ** SKIPPING **'
+    elif pre:
+        srcdir = srcdiffdir = 'src-previews'
+        lastsrcdir = 'src'
+        skipping = ' ** SKIPPING **'
+    else:
+        srcdir = lastsrcdir = 'src'
+        srcdiffdir = 'src-diffs'
+        skipping = ''
+
+    print(f"""
+{dash_line}
+version is "{version}"
+lastversion is "{lastversion}"
+dest is "{dest}"
+curdir is "{curdir}"
+srcdir is "{srcdir}"
+srcdiffdir is "{srcdiffdir}"
+lastsrcdir is "{lastsrcdir}"
+release is "{release}"
 
 About to:
     - tweak SUBPROTOCOL_VERSION in rsync.h, if needed
@@ -186,236 +193,250 @@ About to:
     - tweak the date in the *.yo files and generate the manpages
     - generate configure.sh, config.h.in, and proto.h
     - page through the differences
+""")
+    ans = input("<Press Enter to continue> ")
 
-EOT
-print "<Press Enter to continue> ";
-$_ = <STDIN>;
+    specvars = {
+        'Version:': finalversion,
+        'Release:': release,
+        '%define fullversion': f'%{{version}}{pre}',
+        'Released': version + '.',
+        '%define srcdir': srcdir,
+        }
 
-my %specvars = ( 'Version:' => $finalversion, 'Release:' => $release,
-		 '%define fullversion' => "\%{version}$pre", 'Released' => "$version.",
-		 '%define srcdir' => $srcdir );
-my @tweak_files = ( glob('packaging/*.spec'), glob('packaging/*/*.spec'), glob('*.yo'),
-		    qw( configure.ac rsync.h NEWS OLDNEWS options.c ) );
+    tweak_files = 'configure.ac rsync.h NEWS OLDNEWS'.split()
+    tweak_files += glob.glob('packaging/*.spec')
+    tweak_files += glob.glob('packaging/*/*.spec')
+    tweak_files += glob.glob('*.yo')
 
-foreach my $fn (@tweak_files) {
-    open(IN, '<', $fn) or die $!;
-    undef $/; $_ = <IN>; $/ = "\n";
-    close IN;
-    if ($fn =~ /configure/) {
-	s/^(AC_INIT\(\[rsync\],\s*\[)\d.+?(\])/$1$version$2/m
-	    or die "Unable to update AC_INIT with version in $fn\n";
-    } elsif ($fn =~ /\.spec/) {
-	while (my($str, $val) = each %specvars) {
-	    s/^\Q$str\E .*/$str $val/m
-		or die "Unable to update $str in $fn\n";
-	}
-	s/^\* \w\w\w \w\w\w \d\d \d\d\d\d (.*)/$cl_today $1/m
-	    or die "Unable to update ChangeLog header in $fn\n";
-    } elsif ($fn =~ /\.yo/) {
-	s/^(manpage\([^)]+\)\(\d+\)\()[^)]+(\).*)/$1$today$2/m
-	    or die "Unable to update date in manpage() header in $fn\n";
-	s/^(This man ?page is current for version) \S+ (of rsync)/$1 $version $2/m
-	    or die "Unable to update current version info in $fn\n";
-    } elsif ($fn eq 'rsync.h') {
-	s{(#define\s+SUBPROTOCOL_VERSION)\s+(\d+)}
-	 { $1 . ' ' . get_subprotocol_version($2) }e
-	    or die "Unable to find SUBPROTOCOL_VERSION define in $fn\n";
-    } elsif ($fn eq 'NEWS') {
-	s{^(NEWS for rsync \Q$finalversion\E )(\(UNRELEASED\))\s*(\nProtocol: )(\d+) (\([^)]+\))\n}
-	 { $1 . ($pre ? $2 : "($today)") . "$3$protocol_version ($proto_changed)\n" }ei
-	    or die "The first 2 lines of $fn are not in the right format.  They must be:\n"
-		 . "NEWS for rsync $finalversion (UNRELEASED)\n"
-		 . "Protocol: $protocol_version ($proto_changed)\n";
-    } elsif ($fn eq 'OLDNEWS') {
-	s{^(\t\S\S\s\S\S\S\s\d\d\d\d)(\t\Q$finalversion\E\t).*}
-	 { ($pre ? $1 : "\t$ztoday") . $2 . $proto_change_date . $protocol_version }em
-	    or die "Unable to find \"?? ??? $year\t$finalversion\" line in $fn\n";
-    } elsif ($fn eq 'options.c') {
-	if (s/(Copyright \(C\) 2002-)(\d+)( Wayne Davison)/$1$year$3/
-	 && $2 ne $year) {
-	    die "Copyright comments need to be updated to $year in all files!\n";
-	}
-	# Adjust the year in the --version output.
-	s/(rprintf\(f, "Copyright \(C\) 1996-)(\d+)/$1$year/
-	    or die "Unable to find Copyright string in --version output of $fn\n";
-	next if $2 eq $year;
-    } else {
-	die "Unrecognized file in \@tweak_files: $fn\n";
-    }
-    open(OUT, '>', $fn) or die $!;
-    print OUT $_;
-    close OUT;
-}
+    for fn in tweak_files:
+        with open(fn, 'r', encoding='utf-8') as fh:
+            old_txt = txt = fh.read()
+        if 'configure' in fn:
+            x_re = re.compile(r'^(AC_INIT\(\[rsync\],\s*\[)\d.+?(\])', re.M)
+            txt = replace_or_die(x_re, r'\g<1>%s\2' % version, txt, f"Unable to update AC_INIT with version in {fn}")
+        elif '.spec' in fn:
+            for var, val in specvars.items():
+                x_re = re.compile(r'^%s .*' % re.escape(var), re.M)
+                txt = replace_or_die(x_re, var + ' ' + val, txt, f"Unable to update {var} in {fn}")
+            x_re = re.compile(r'^\* \w\w\w \w\w\w \d\d \d\d\d\d (.*)', re.M)
+            txt = replace_or_die(x_re, r'%s \1' % cl_today, txt, f"Unable to update ChangeLog header in {fn}")
+        elif '.yo' in fn:
+            x_re = re.compile(r'^(manpage\([^)]+\)\(\d+\)\()[^)]+(\).*)', re.M)
+            txt = replace_or_die(x_re, r'\g<1>%s\2' % today, txt, f"Unable to update date in manpage() header in {fn}")
+            x_re = re.compile(r'^(This man ?page is current for version) \S+ (of rsync)', re.M)
+            txt = replace_or_die(x_re, r'\1 %s \2' % version, txt, f"Unable to update current version info in {fn}")
+        elif fn == 'rsync.h':
+            x_re = re.compile('(#define\s+SUBPROTOCOL_VERSION)\s+(\d+)')
+            repl = lambda m: m[1] + ' ' + '0' if not pre or proto_changed != 'changed' else 1 if m[2] == '0' else m[2]
+            txt = replace_or_die(x_re, repl, txt, f"Unable to find SUBPROTOCOL_VERSION define in {fn}")
+        elif fn == 'NEWS':
+            x_re = re.compile(
+                    r'^(NEWS for rsync %s )(\(UNRELEASED\))\s*(\nProtocol: )(\d+) (\([^)]+\))\n' % re.escape(finalversion),
+                    re.I)
+            repl = lambda m: m[1] + (m[2] if pre else f"({today})") + m[3] + f"{protocol_version} ({proto_changed})\n"
+            msg = (f"The first 2 lines of {fn} are not in the right format.  They must be:\n"
+                    + f"NEWS for rsync {finalversion} (UNRELEASED)\n"
+                    + f"Protocol: {protocol_version} ({proto_changed})")
+            txt = replace_or_die(x_re, repl, txt, msg)
+        elif fn == 'OLDNEWS':
+            x_re = re.compile(r'^(\t\S\S\s\S\S\S\s\d\d\d\d)(\t%s\t).*' % re.escape(finalversion), re.M)
+            repl = lambda m: (m[1] if pre else "\t" + ztoday) + m[2] + proto_change_date + protocol_version
+            txt = replace_or_die(x_re, repl, txt, f'Unable to find "?? ??? {year}\t{finalversion}" line in {fn}')
+        else:
+            die(f"Unrecognized file in tweak_files: {fn}")
 
-print $break;
-system "git diff --color | less -p '^diff .*'";
+        if txt != old_txt:
+            print(f"Updating {fn}")
+            with open(fn, 'w', encoding='utf-8') as fh:
+                fh.write(txt)
 
-my $srctar_name = "rsync-$version.tar.gz";
-my $pattar_name = "rsync-patches-$version.tar.gz";
-my $diff_name = "rsync-$lastversion-$version.diffs.gz";
-my $srctar_file = "$dest/$srcdir/$srctar_name";
-my $pattar_file = "$dest/$srcdir/$pattar_name";
-my $diff_file = "$dest/$srcdiffdir/$diff_name";
-my $news_file = "$dest/$srcdir/rsync-$version-NEWS";
-my $lasttar_file = "$dest/$lastsrcdir/rsync-$lastversion.tar.gz";
+    cmd_chk(['packaging/year-tweak'])
 
-print $break, <<EOT;
+    print(dash_line)
+    cmd_run("git diff --color | less -p '^diff .*'")
+
+    srctar_name = f"{rsync_ver}.tar.gz"
+    pattar_name = f"rsync-patches-{version}.tar.gz"
+    diff_name = f"{rsync_lastver}-{version}.diffs.gz"
+    srctar_file = f"{dest}/{srcdir}/{srctar_name}"
+    pattar_file = f"{dest}/{srcdir}/{pattar_name}"
+    diff_file = f"{dest}/{srcdiffdir}/{diff_name}"
+    news_file = f"{dest}/{srcdir}/{rsync_ver}-NEWS"
+    lasttar_file = f"{dest}/{lastsrcdir}/{rsync_lastver}.tar.gz"
+
+    print(f"""\
+{dash_line}
 
 About to:
     - commit all version changes
-    - merge the $master_branch branch into the patch/$master_branch/* branches
+    - merge the {args.master_branch} branch into the patch/{args.master_branch}/* branches
     - update the files in the "patches" dir and OPTIONALLY
       (if you type 'y') to launch a shell for each patch
+""")
+    ans = input("<Press Enter OR 'y' to continue> ")
 
-EOT
-print "<Press Enter OR 'y' to continue> ";
-my $ans = <STDIN>;
+    s = cmd_run(['git', 'commit', '-a', '-m', f'Preparing for release of {version}'])
+    if s.returncode:
+        die('Aborting')
 
-system "git commit -a -m 'Preparing for release of $version'" and exit 1;
+    print(f'Creating any missing patch branches.')
+    s = cmd_run(f'packaging/branch-from-patch --branch={args.master_branch} --add-missing')
+    if s.returncode:
+        die('Aborting')
 
-print "Updating files in \"patches\" dir ...\n";
-system "packaging/patch-update --branch=$master_branch";
+    print('Updating files in "patches" dir ...')
+    s = cmd_run(f'packaging/patch-update --branch={args.master_branch}')
+    if s.returncode:
+        die('Aborting')
 
-if ($ans =~ /^y/i) {
-    print "\nVisiting all \"patch/$master_branch/*\" branches ...\n";
-    system "packaging/patch-update --branch=$master_branch --skip-check --shell";
-}
+    if re.match(r'^y', ans, re.I):
+        print(f'\nVisiting all "patch/{args.master_branch}/*" branches ...')
+        cmd_run(f"packaging/patch-update --branch={args.master_branch} --skip-check --shell")
 
-if (-d 'patches/.git') {
-    system "cd patches && git commit -a -m 'The patches for $version.'" and exit 1;
-}
+    if os.path.isdir('patches/.git'):
+        s = cmd_run(f"cd patches && git commit -a -m 'The patches for {version}.'")
+        if s.returncode:
+            die('Aborting')
 
-print $break, <<EOT;
+    print(f"""\
+{dash_line}
 
 About to:
-    - create signed tag for this release: v$version
-    - create release diffs, "$diff_name"
-    - create release tar, "$srctar_name"
-    - generate rsync-$version/patches/* files
-    - create patches tar, "$pattar_name"
+    - create signed tag for this release: {v_ver}
+    - create release diffs, "{diff_name}"
+    - create release tar, "{srctar_name}"
+    - generate {rsync_ver}/patches/* files
+    - create patches tar, "{pattar_name}"
     - update top-level README, *NEWS, TODO, and ChangeLog
     - update top-level rsync*.html manpages
     - gpg-sign the release files
-    - update hard-linked top-level release files$skipping
+    - update hard-linked top-level release files{skipping}
+""")
+    ans = input("<Press Enter to continue> ")
 
-EOT
-print "<Press Enter to continue> ";
-$_ = <STDIN>;
+    # We want to use our passphrase-providing "gpg" script, so modify the PATH.
+    os.environ['PATH'] = f"{curdir}/packaging/bin:{ORIGINAL_PATH}"
 
-# We want to use our passphrase-providing "gpg" script, so modify the PATH.
-$ENV{PATH} = "$curdir/packaging/bin:$path";
+    while True:
+        passphrase = getpass("\nEnter your GPG pass-phrase: ")
 
-my $passphrase;
-while (1) {
-    ReadMode('noecho');
-    print "\nEnter your GPG pass-phrase: ";
-    chomp($passphrase = <STDIN>);
-    ReadMode(0);
-    print "\n";
+        # Briefly create a temp file with the passphrase for git's tagging use.
+        oldmask = os.umask(0o077)
+        if os.path.lexists(passfile):
+            os.unlink(passfile)
+        with open(passfile, 'w', encoding='utf-8') as fh:
+            fh.write(passphrase + "\n")
+        os.umask(oldmask)
+        os.environ['GPG_PASSFILE'] = passfile
 
-    # Briefly create a temp file with the passphrase for git's tagging use.
-    my $oldmask = umask 077;
-    unlink($passfile);
-    open(OUT, '>', $passfile) or die $!;
-    print OUT $passphrase, "\n";
-    close OUT;
-    umask $oldmask;
-    $ENV{'GPG_PASSFILE'} = $passfile;
+        out = cmd_txt(f"git tag -s -m 'Version {version}.' {v_ver}")[0]
+        print(out, end='')
+        if 'bad passphrase' in out:
+            continue
+        if 'failed' in out:
+            die('Aborting')
 
-    $_ = `git tag -s -m 'Version $version.' v$version 2>&1`;
-    print $_;
-    next if /bad passphrase/;
-    exit 1 if /failed/;
+        if os.path.isdir('patches/.git'):
+            out = cmd_txt(f"cd patches && git tag -s -m 'Version {version}.' {v_ver}")[0]
+            print(out, end='')
+            if 'bad passphrase' in out or 'failed' in out:
+                die('Aborting')
 
-    if (-d 'patches/.git') {
-	$_ = `cd patches && git tag -s -m 'Version $version.' v$version 2>&1`;
-	print $_;
-	exit 1 if /bad passphrase|failed/;
-    }
+        os.unlink(passfile)
+        break
 
-    unlink($passfile);
-    last;
-}
+    os.environ['PATH'] = ORIGINAL_PATH
 
-$ENV{PATH} = $path;
+    # Extract the generated files from the old tar.
+    tweaked_extra_files = [ f"{rsync_lastver}/{x}" for x in extra_files ]
+    cmd_chk(['tar', 'xzf', lasttar_file, *tweaked_extra_files])
+    os.rename(rsync_lastver, 'a')
 
-# Extract the generated files from the old tar.
-@_ = @extra_files;
-map { s#^#rsync-$lastversion/# } @_;
-system "tar xzf $lasttar_file @_";
-rename("rsync-$lastversion", 'a');
+    print(f"Creating {diff_file} ...")
+    for cmd in MAKE_GEN_CMDS:
+        cmd_chk(cmd)
+    cmd_chk(['rsync', '-a', *extra_files, 'b/'])
 
-print "Creating $diff_file ...\n";
-system "$make_gen_cmd && rsync -a @extra_files b/" and exit 1;
-my $sed_script = 's:^((---|\+\+\+) [ab]/[^\t]+)\t.*:\1:';
-system "(git diff v$lastversion v$version; diff -upN a b | sed -r '$sed_script') | gzip -9 >$diff_file";
-system "rm -rf a";
-rename('b', "rsync-$version");
+    sed_script = r's:^((---|\+\+\+) [ab]/[^\t]+)\t.*:\1:' # CAUTION: must not contain any single quotes!
+    cmd_chk(f"(git diff v{lastversion} {v_ver}; diff -upN a b | sed -r '{sed_script}') | gzip -9 >{diff_file}")
+    shutil.rmtree('a')
+    os.rename('b', rsync_ver)
 
-print "Creating $srctar_file ...\n";
-system "git archive --format=tar --prefix=rsync-$version/ v$version | tar xf -";
-system "support/git-set-file-times --quiet --prefix=rsync-$version/";
-system "fakeroot tar czf $srctar_file rsync-$version; rm -rf rsync-$version";
+    print(f"Creating {srctar_file} ...")
+    cmd_chk(f"git archive --format=tar --prefix={rsync_ver}/ {v_ver} | tar xf -")
+    cmd_chk(f"support/git-set-file-times --quiet --prefix={rsync_ver}/")
+    cmd_chk(['fakeroot', 'tar', 'czf', srctar_file, rsync_ver])
+    shutil.rmtree(rsync_ver)
 
-print "Updating files in \"rsync-$version/patches\" dir ...\n";
-mkdir("rsync-$version", 0755);
-mkdir("rsync-$version/patches", 0755);
-system "packaging/patch-update --skip-check --branch=$master_branch --gen=rsync-$version/patches";
+    print(f'Updating files in "{rsync_ver}/patches" dir ...')
+    os.mkdir(rsync_ver, 0o755)
+    os.mkdir(f"{rsync_ver}/patches", 0o755)
+    cmd_chk(f"packaging/patch-update --skip-check --branch={args.master_branch} --gen={rsync_ver}/patches")
 
-print "Creating $pattar_file ...\n";
-system "fakeroot tar chzf $pattar_file rsync-$version/patches; rm -rf rsync-$version";
+    print(f"Creating {pattar_file} ...")
+    cmd_chk(f"fakeroot tar chzf {pattar_file} {rsync_ver}/patches")
+    shutil.rmtree(rsync_ver)
 
-print "Updating the other files in $dest ...\n";
-system "rsync -a README NEWS OLDNEWS TODO $dest";
-unlink($news_file);
-link("$dest/NEWS", $news_file);
-system "git log --name-status | gzip -9 >$dest/ChangeLog.gz";
+    print(f"Updating the other files in {dest} ...")
+    cmd_chk('rsync -a README NEWS OLDNEWS TODO'.split() + [dest])
+    if os.path.lexists(news_file):
+        os.unlink(news_file)
+    os.link(f"{dest}/NEWS", news_file)
+    cmd_chk(f"git log --name-status | gzip -9 >{dest}/ChangeLog.gz")
 
-system "yodl2html -o $dest/rsync.html rsync.yo";
-system "yodl2html -o $dest/rsyncd.conf.html rsyncd.conf.yo";
+    cmd_chk(f"yodl2html -o {dest}/rsync.html rsync.yo")
+    cmd_chk(f"yodl2html -o {dest}/rsyncd.conf.html rsyncd.conf.yo")
 
-foreach my $fn ($srctar_file, $pattar_file, $diff_file) {
-    unlink("$fn.asc");
-    open(GPG, '|-', "gpg --batch --passphrase-fd=0 -ba $fn") or die $!;
-    print GPG $passphrase, "\n";
-    close GPG;
-}
+    for fn in (srctar_file, pattar_file, diff_file):
+        asc_fn = fn + '.asc'
+        if os.path.lexists(asc_fn):
+            os.unlink(asc_fn)
+        cmd_chk(['gpg', '--batch', '--passphrase-fd=0', '-ba', fn], input=passphrase)
 
-if (!$pre) {
-    system "rm $dest/rsync-*.gz $dest/rsync-*.asc $dest/rsync-*-NEWS $dest/src-previews/rsync-*diffs.gz*";
+    if not pre:
+        for find in f'{dest}/rsync-*.gz {dest}/rsync-*.asc {dest}/rsync-*-NEWS {dest}/src-previews/rsync-*diffs.gz*'.split():
+            for fn in glob.glob(find):
+                os.unlink(fn)
+        top_link = [
+                srctar_file, f"{srctar_file}.asc",
+                pattar_file, f"{pattar_file}.asc",
+                diff_file, f"{diff_file}.asc",
+                news_file,
+                ]
+        for fn in top_link:
+            os.link(fn, re.sub(r'/src(-\w+)?/', '/', fn))
 
-    foreach my $fn ($srctar_file, "$srctar_file.asc",
-		    $pattar_file, "$pattar_file.asc",
-		    $diff_file, "$diff_file.asc", $news_file) {
-	(my $top_fn = $fn) =~ s#/src(-\w+)?/#/#;
-	link($fn, $top_fn);
-    }
-}
-
-print $break, <<'EOT';
+    print(f"""\
+{dash_line}
 
 Local changes are done.  When you're satisfied, push the git repository
 and rsync the release files.  Remember to announce the release on *BOTH*
 rsync-announce@lists.samba.org and rsync@lists.samba.org (and the web)!
-EOT
+""")
 
-exit;
 
-sub get_subprotocol_version
-{
-    my($subver) = @_;
-    if ($pre && $proto_changed eq 'changed') {
-	return $subver == 0 ? 1 : $subver;
-    }
-    0;
-}
+def replace_or_die(regex, repl, txt, die_msg):
+    m = regex.search(txt)
+    if not m:
+        die(die_msg)
+    return regex.sub(repl, txt, 1)
 
-sub usage
-{
-    die <<EOT;
-Usage: release-rsync [OPTIONS]
 
--b, --branch=BRANCH   The branch to release (default: master)
--h, --help            Display this help message
-EOT
-}
+def remove_passfile():
+    if passfile and os.path.lexists(passfile):
+        os.unlink(passfile)
+
+
+def signal_handler(sig, frame):
+    die("\nAborting due to SIGINT.")
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Prepare a new release of rsync in the git repo & ftp dir.", add_help=False)
+    parser.add_argument('--branch', '-b', dest='master_branch', default='master', help="The branch to release. Default: master.")
+    parser.add_argument("--help", "-h", action="help", help="Output this help message and exit.")
+    args = parser.parse_args()
+    main()
+
+# vim: sw=4 et
