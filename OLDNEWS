@@ -1265,7 +1265,7 @@ Changes since 2.6.9:
 
     - Ensure that a temporary file always has owner-write permission while we
       are writing to it.  This avoids problems with some network filesystems
-      when transfering read-only files.
+      when transferring read-only files.
 
     - Any errors output about password-file reading no longer cause an error at
       the end of the run about a partial transfer.

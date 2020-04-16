@@ -2912,7 +2912,7 @@ static char *parse_hostspec(char *str, char **path_start_ptr, int *port_ptr)
 	return ret;
 }
 
-/* Look for a HOST specfication of the form "HOST:PATH", "HOST::PATH", or
+/* Look for a HOST specification of the form "HOST:PATH", "HOST::PATH", or
  * "rsync://HOST:PORT/PATH".  If found, *host_ptr will be set to some allocated
  * memory with the HOST.  If a daemon-accessing spec was specified, the value
  * of *port_ptr will contain a non-0 port number, otherwise it will be set to

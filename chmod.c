@@ -44,7 +44,7 @@ struct chmod_mode_struct {
 #define STATE_OCTAL_NUM 3
 
 /* Parse a chmod-style argument, and break it down into one or more AND/OR
- * pairs in a linked list.  We return a pointer to new items on succcess
+ * pairs in a linked list.  We return a pointer to new items on success
  * (appending the items to the specified list), or NULL on error. */
 struct chmod_mode_struct *parse_chmod(const char *modestr,
 				      struct chmod_mode_struct **root_mode_ptr)

@@ -94,7 +94,7 @@ Handling IPv6 on old machines
   platforms that have a half-working implementation, so redefining
   these functions clashes with system headers, and leaving them out
   breaks.  This affects at least OSF/1, RedHat 5, and Cobalt, which
-  are moderately improtant.
+  are moderately important.
 
   Perhaps the simplest solution would be to have two different files
   implementing the same interface, and choose either the new or the
@@ -236,7 +236,7 @@ Memory accounting
 
   At exit, show how much memory was used for the file list, etc.
 
-  Also we do a wierd exponential-growth allocation in flist.c.  I'm
+  We also do a weird exponential-growth allocation in flist.c.  I'm
   not sure this makes sense with modern mallocs.  At any rate it will
   make us allocate a huge amount of memory for large file lists.
 

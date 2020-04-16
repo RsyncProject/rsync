@@ -650,7 +650,7 @@ void sig_int(int sig_num)
  * attributes (e.g. permissions, ownership, etc.).  If the robust_rename()
  * call is forced to copy the temp file and partialptr is both non-NULL and
  * not an absolute path, we stage the file into the partial-dir and then
- * rename it into place.  This returns 1 on succcess or 0 on failure. */
+ * rename it into place.  This returns 1 on success or 0 on failure. */
 int finish_transfer(const char *fname, const char *fnametmp,
 		    const char *fnamecmp, const char *partialptr,
 		    struct file_struct *file, int ok_to_set_time,

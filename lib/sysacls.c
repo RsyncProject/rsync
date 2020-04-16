@@ -450,7 +450,7 @@ SMB_ACL_T sys_acl_get_file(const char *path_p, SMB_ACL_TYPE_T type)
 	 *
 	 * Note: we assume that the acl() system call returned a
 	 * well formed ACL which is sorted so that all of the
-	 * access ACL entries preceed any default ACL entries
+	 * access ACL entries precede any default ACL entries
 	 */
 	for (naccess = 0; naccess < count; naccess++) {
 		if (acl_d->acl[naccess].a_type & ACL_DEFAULT)
@@ -932,7 +932,7 @@ SMB_ACL_T sys_acl_get_file(const char *path_p, SMB_ACL_TYPE_T type)
 	 *
 	 * Note: we assume that the acl() system call returned a
 	 * well formed ACL which is sorted so that all of the
-	 * access ACL entries preceed any default ACL entries
+	 * access ACL entries precede any default ACL entries
 	 */
 	for (naccess = 0; naccess < count; naccess++) {
 		if (acl_d->acl[naccess].a_type & ACL_DEFAULT)
@@ -1095,7 +1095,7 @@ struct hpux_acl_types {
  * structures.
  * Inputs:
  *
- * acl_count      - Count of ACLs in the array of ACL strucutres.
+ * acl_count      - Count of ACLs in the array of ACL structures.
  * aclp           - Array of ACL structures.
  * acl_type_count - Pointer to acl_types structure. Should already be
  *                  allocated.
@@ -1256,7 +1256,7 @@ static int hpux_acl_sort(int acl_count, int calclass, struct acl *aclp)
 {
 #if !defined(HAVE_HPUX_ACLSORT)
 	/*
-	 * The aclsort() system call is availabe on the latest HPUX General
+	 * The aclsort() system call is available on the latest HPUX General
 	 * Patch Bundles. So for HPUX, we developed our version of acl_sort 
 	 * function. Because, we don't want to update to a new 
 	 * HPUX GR bundle just for aclsort() call.
@@ -1311,7 +1311,7 @@ or DEF_USER_OBJ or DEF_GROUP_OBJ or DEF_OTHER_OBJ\n"));
 	 * Sorting crieteria - First sort by ACL type. If there are multiple entries of
 	 * same ACL type, sort by ACL id.
 	 *
-	 * I am using the trival kind of sorting method here because, performance isn't 
+	 * I am using the trivial kind of sorting method here because, performance isn't 
 	 * really effected by the ACLs feature. More over there aren't going to be more
 	 * than 17 entries on HPUX. 
 	 */

@@ -252,7 +252,7 @@ static struct idlist *recv_add_id(struct idlist **idlist_ptr, struct idlist *idm
 	return node;
 }
 
-/* this function is a definate candidate for a faster algorithm */
+/* this function is a definite candidate for a faster algorithm */
 uid_t match_uid(uid_t uid)
 {
 	static struct idlist *last = NULL;

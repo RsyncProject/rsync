@@ -126,7 +126,7 @@
       
       <para><option>-P</option>
 	Display a progress indicator while files are transferred.  This should
-	normally be ommitted if rsync is not run on a terminal.
+	normally be omitted if rsync is not run on a terminal.
       </para>
     </section>
 

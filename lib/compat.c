@@ -79,7 +79,7 @@ static char number_separator;
 
 #ifndef HAVE_STRPBRK
 /**
- * Find the first ocurrence in @p s of any character in @p accept.
+ * Find the first occurrence in @p s of any character in @p accept.
  *
  * Derived from glibc
  **/

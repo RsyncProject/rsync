@@ -238,7 +238,7 @@ The command specified above uses ssh to run nc (netcat) on a proxyhost,
 which forwards all data to port 873 (the rsync daemon) on the targethost
 (%H).
 
-Note also that if the RSYNC_SHELL environment varibable is set, that
+Note also that if the RSYNC_SHELL environment variable is set, that
 program will be used to run the RSYNC_CONNECT_PROG command instead of
 using the default shell of the code(system()) call.
 
@@ -1348,7 +1348,7 @@ destination machines is higher than the bandwidth to disk (especially when the
 the source and destination are specified as local paths, but only if no
 batch-writing option is in effect.
 
-dit(bf(--checksum-choice=STR)) This option overrides the checksum algoriths.
+dit(bf(--checksum-choice=STR)) This option overrides the checksum algorithms.
 If one algorithm name is specified, it is used for both the transfer checksums
 and (assuming bf(--checksum) is specified) the pre-transfer checksumming. If two
 comma-separated names are supplied, the first name affects the transfer
@@ -1654,7 +1654,7 @@ rsync to have a different idea about what data to expect next over the socket,
 and that will make it fail in a cryptic fashion.
 
 Note that it is best to use a separate bf(--remote-option) for each option you
-want to pass.  This makes your useage compatible with the bf(--protect-args)
+want to pass.  This makes your usage compatible with the bf(--protect-args)
 option.  If that option is off, any spaces in your remote options will be split
 by the remote shell unless you take steps to protect them.
 

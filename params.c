@@ -1,5 +1,5 @@
 /* This modules is based on the params.c module from Samba, written by Karl Auer
-   and much modifed by Christopher Hertel. */
+   and much modified by Christopher Hertel. */
 
 /*
  * This program is free software; you can redistribute it and/or modify
@@ -59,7 +59,7 @@
  *  beginning with either a semicolon (';') or a pound sign ('#').
  *
  *  All whitespace in section names and parameter names is compressed
- *  to single spaces.  Leading and trailing whitespace is stipped from
+ *  to single spaces.  Leading and trailing whitespace is stripped from
  *  both names and values.
  *
  *  Only the first equals sign in a parameter line is significant.
@@ -153,7 +153,7 @@ static int EatComment( FILE *InFile )
 
 static int Continuation( char *line, int pos )
   /* ------------------------------------------------------------------------ **
-   * Scan backards within a string to discover if the last non-whitespace
+   * Scan backwards within a string to discover if the last non-whitespace
    * character is a line-continuation character ('\\').
    *
    *  Input:  line  - A pointer to a buffer containing the string to be

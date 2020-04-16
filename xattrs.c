@@ -719,7 +719,7 @@ int recv_xattr_request(struct file_struct *file, int f_in)
 		num += rel_pos;
 		if (am_sender) {
 			/* The sender-related num values are only in order on the sender.
-			 * We use that order here to scan foward or backward as needed. */
+			 * We use that order here to scan forward or backward as needed. */
 			if (rel_pos < 0) {
 				while (cnt < (int)lst->count && rxa->num > num) {
 					rxa--;

@@ -11,7 +11,7 @@
 
 "$TOOLDIR/trimslash" "/usr/local/bin" "/usr/local/bin/" "/usr/local/bin///" \
 	"//a//" "////" \
-        "/Users/Wierd Macintosh Name/// Ooh, translucent plastic/" \
+        "/Users/Weird Macintosh Name/// Ooh, translucent plastic/" \
 	> "$scratchdir/slash.out"
 diff $diffopt "$scratchdir/slash.out" - <<EOF
 /usr/local/bin
@@ -19,7 +19,7 @@ diff $diffopt "$scratchdir/slash.out" - <<EOF
 /usr/local/bin
 //a
 /
-/Users/Wierd Macintosh Name/// Ooh, translucent plastic
+/Users/Weird Macintosh Name/// Ooh, translucent plastic
 EOF
 
 # The script would have aborted on error, so getting here means we've won.

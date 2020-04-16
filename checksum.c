@@ -100,7 +100,7 @@ int canonical_checksum(int csum_type)
 }
 
 /*
-  a simple 32 bit checksum that can be upadted from either end
+  a simple 32 bit checksum that can be updated from either end
   (inspired by Mark Adler's Adler-32 checksum)
   */
 uint32 get_checksum1(char *buf1, int32 len)

@@ -48,7 +48,7 @@ extern int preserve_specials;
 /* When we send the access bits over the wire, we shift them 2 bits to the
  * left and use the lower 2 bits as flags (relevant only to a name entry).
  * This makes the protocol more efficient than sending a value that would
- * be likely to have its hightest bits set. */
+ * be likely to have its highest bits set. */
 #define XFLAG_NAME_FOLLOWS 0x0001u
 #define XFLAG_NAME_IS_USER 0x0002u
 

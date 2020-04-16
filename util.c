@@ -1459,7 +1459,7 @@ const char *find_filename_suffix(const char *fn, int fn_len, int *len_ptr)
 			if (!isDigit(s))
 				return suf;
 		}
-		/* An all-digit suffix may not be that signficant. */
+		/* An all-digit suffix may not be that significant. */
 		s = suf;
 	}
 

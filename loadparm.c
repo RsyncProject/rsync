@@ -30,7 +30,7 @@
  * 1) add it to the global_vars or local_vars structure definition
  * 2) add it to the parm_table
  * 3) add it to the list of available functions (eg: using FN_GLOBAL_STRING())
- * 4) initialise it in the Defaults static stucture
+ * 4) initialise it in the Defaults static structure
  *
  * Notes:
  *   The configuration file is processed sequentially for speed. For this
@@ -115,7 +115,7 @@ typedef struct {
 /* This structure describes a single section.  Their order must match the
  * initializers below, which you can accomplish by keeping each sub-section
  * sorted.  (e.g. in vim, just visually select each subsection and use !sort.)
- * NOTE: the char* variables MUST all remain at the start of the stuct! */
+ * NOTE: the char* variables MUST all remain at the start of the struct! */
 typedef struct {
 	char *auth_users;
 	char *charset;

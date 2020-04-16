@@ -19,7 +19,7 @@ if test x"$rsync_enable_ssh_tests" = xyes; then
 fi
 
 if [ "`$SSH -o'BatchMode yes' localhost echo yes`" != "yes" ]; then
-    test_skipped "Skipping SSH tests because ssh conection to localhost not authorised"
+    test_skipped "Skipping SSH tests because ssh connection to localhost not authorised"
 fi
 
 echo "Using remote shell: $SSH"

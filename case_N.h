@@ -17,7 +17,7 @@
  * with this program; if not, visit the http://fsf.org website.
  */
 
-/* This is included multiple times, once for every segement in a switch statement.
+/* This is included multiple times, once for every segment in a switch statement.
  * This produces the next "case N:" statement in sequence. */
 
 #if !defined CASE_N_STATE_0

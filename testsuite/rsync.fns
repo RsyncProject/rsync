@@ -183,7 +183,7 @@ makepath() {
     for p in "${@}"; do
 	(echo "        makepath $p"
 
-	# Absolut Unix.
+	# Absolute Unix path.
 	if echo $p | grep '^/' >/dev/null
 	then
 	    cd /

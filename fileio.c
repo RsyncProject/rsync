@@ -26,12 +26,12 @@
 #define ENODATA EAGAIN
 #endif
 
-/* We want all reads to be aligned on 1K boundries. */
-#define ALIGN_BOUNDRY 1024
+/* We want all reads to be aligned on 1K boundaries. */
+#define ALIGN_BOUNDARY 1024
 /* How far past the boundary is an offset? */
-#define ALIGNED_OVERSHOOT(oft) ((oft) & (ALIGN_BOUNDRY-1))
+#define ALIGNED_OVERSHOOT(oft) ((oft) & (ALIGN_BOUNDARY-1))
 /* Round up a length to the next boundary */
-#define ALIGNED_LENGTH(len) ((((len) - 1) | (ALIGN_BOUNDRY-1)) + 1)
+#define ALIGNED_LENGTH(len) ((((len) - 1) | (ALIGN_BOUNDARY-1)) + 1)
 
 extern int sparse_files;
 
