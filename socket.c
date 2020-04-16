@@ -3,7 +3,7 @@
  *
  * Copyright (C) 1992-2001 Andrew Tridgell <tridge@samba.org>
  * Copyright (C) 2001, 2002 Martin Pool <mbp@samba.org>
- * Copyright (C) 2003-2019 Wayne Davison
+ * Copyright (C) 2003-2020 Wayne Davison
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -195,7 +195,7 @@ int open_socket_out(char *host, int port, const char *bind_addr,
 	char *proxy_user = NULL, *proxy_pass = NULL;
 
 	/* if we have a RSYNC_PROXY env variable then redirect our
-	 * connetcion via a web proxy at the given address. */
+	 * connection via a web proxy at the given address. */
 	h = getenv("RSYNC_PROXY");
 	proxied = h != NULL && *h != '\0';
 
@@ -820,7 +820,7 @@ static int socketpair_tcp(int fd[2])
  * stdout.  This is used to fake a connection to a daemon for testing -- not
  * for the normal case of running SSH.
  *
- * Retruns a socket which is attached to a subprocess running "prog". stdin and
+ * Returns a socket which is attached to a subprocess running "prog". stdin and
  * stdout are attached. stderr is left attached to the original stderr. */
 static int sock_exec(const char *prog)
 {
