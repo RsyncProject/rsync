@@ -63,7 +63,7 @@ CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o trimslash.
 	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) -c $< @CC_SHOBJ_FLAG@
 @OBJ_RESTORE@
 
-all: Makefile rsync$(EXEEXT) rsync-ssl stunnel-rsync stunnel-rsyncd.conf @MAKE_MAN@
+all: Makefile rsync$(EXEEXT) rsync-ssl stunnel-rsyncd.conf @MAKE_MAN@
 
 install: all
 	-${MKDIR_P} ${DESTDIR}${bindir}
@@ -73,10 +73,10 @@ install: all
 	if test -f rsync.1; then ${INSTALLMAN} -m 644 rsync.1 ${DESTDIR}${mandir}/man1; fi
 	if test -f rsyncd.conf.5; then ${INSTALLMAN} -m 644 rsyncd.conf.5 ${DESTDIR}${mandir}/man5; fi
 
-install-ssl-client: rsync-ssl stunnel-rsync
+install-ssl-client: rsync-ssl
 	-${MKDIR_P} ${DESTDIR}${bindir}
 	${INSTALLCMD} -m 755 rsync-ssl ${DESTDIR}${bindir}
-	${INSTALLCMD} -m 755 stunnel-rsync ${DESTDIR}${bindir}
+	${INSTALLCMD} -m 755 rsh-ssl-rsync ${DESTDIR}${bindir}
 
 install-ssl-daemon: stunnel-rsyncd.conf
 	-${MKDIR_P} ${DESTDIR}/etc/stunnel
@@ -198,10 +198,6 @@ rsync-ssl: $(srcdir)/rsync-ssl.in Makefile
 	sed 's;\@bindir\@;$(bindir);g' <$(srcdir)/rsync-ssl.in >rsync-ssl
 	@chmod +x rsync-ssl
 
-stunnel-rsync: $(srcdir)/stunnel-rsync.in Makefile
-	sed 's;\@stunnel4\@;$(stunnel4);g' <$(srcdir)/stunnel-rsync.in >stunnel-rsync
-	@chmod +x stunnel-rsync
-
 stunnel-rsyncd.conf: $(srcdir)/stunnel-rsyncd.conf.in Makefile
 	sed 's;\@bindir\@;$(bindir);g' <$(srcdir)/stunnel-rsyncd.conf.in >stunnel-rsyncd.conf
 
@@ -239,7 +235,7 @@ cleantests:
 # the source directory.
 distclean: clean
 	rm -f Makefile config.h config.status
-	rm -f rsync-ssl stunnel-rsync stunnel-rsyncd.conf
+	rm -f rsync-ssl stunnel-rsyncd.conf
 	rm -f lib/dummy popt/dummy zlib/dummy
 	rm -f $(srcdir)/Makefile $(srcdir)/config.h $(srcdir)/config.status
 	rm -f $(srcdir)/lib/dummy $(srcdir)/popt/dummy $(srcdir)/zlib/dummy

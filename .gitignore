@@ -25,7 +25,6 @@ aclocal.m4
 /gmon.out
 /rsync
 /rsync-ssl
-/stunnel-rsync
 /stunnel-rsyncd.conf
 /shconfig
 /testdir

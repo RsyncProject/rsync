@@ -4,7 +4,7 @@ foreground = no
 pid = /var/run/stunnel-rsyncd.pid
 socket = l:TCP_NODELAY=1
 socket = r:TCP_NODELAY=1
-compression = rle
+#compression = rle
 # This must be root for rsync to use chroot -- rsync will drop permissions:
 setuid = root
 setgid = root
@@ -18,7 +18,7 @@ client = no
 
 # To allow anyone to try an ssl connection, use this:
 verify = 0
-CAfile = /etc/ssl/ca-bundle.pem
+CAfile = /etc/ssl/certs/ca-certificates.crt
 
 # To allow only cert-authorized clients, use something like this instead of the above:
 #verify = 3

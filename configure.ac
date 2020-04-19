@@ -974,9 +974,6 @@ AC_SUBST(BUILD_POPT)
 AC_SUBST(BUILD_ZLIB)
 AC_SUBST(MAKE_MAN)
 
-AC_PATH_PROG([STUNNEL], [stunnel], [stunnel], [$PATH$PATH_SEPARATOR/usr/sbin$PATH_SEPARATOR/sbin])
-AC_PATH_PROG([STUNNEL4], [stunnel4], [$STUNNEL], [$PATH$PATH_SEPARATOR/usr/sbin$PATH_SEPARATOR/sbin])
-
 AC_CHECK_FUNCS(_acl __acl _facl __facl)
 #################################################
 # check for ACL support

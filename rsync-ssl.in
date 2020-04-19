@@ -1,12 +1,20 @@
 #!/bin/bash
-# This script supports using stunnel to secure an rsync daemon connection.
-# Note that this requires at least version 4.x of stunnel.
+# This script supports using stunnel or openssl to secure an rsync daemon connection.
+# The first option can be --type=stunnel or --type=openssl to choose your connection
+# type (overriding any $RSYNC_SSL_TYPE default value).
+
+if [[ "$1" == --type=* ]]; then
+    export RSYNC_SSL_TYPE="${1/--type=/}"
+    shift
+fi
+
 case "$@" in
 *rsync://*) ;;
 *::*) ;;
 *)
-    echo "You must use rsync-ssl with a daemon-style hostname." 0>&1
+    echo "You must use rsync-ssl with a daemon-style hostname." 1>&2
     exit 1
     ;;
 esac
-exec @bindir@/rsync --rsh=@bindir@/stunnel-rsync "${@}"
+
+exec @bindir@/rsync --rsh=@bindir@/rsh-ssl-rsync "${@}"

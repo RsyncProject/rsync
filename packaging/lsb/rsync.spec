@@ -84,7 +84,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %files ssl-client
 %{_prefix}/bin/rsync-ssl
-%{_prefix}/bin/stunnel-rsync
+%{_prefix}/bin/rsh-ssl-rsync
 
 %files ssl-daemon
 %config(noreplace) /etc/stunnel/rsyncd.conf
