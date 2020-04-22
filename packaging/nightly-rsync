@@ -119,7 +119,7 @@ if ($make_tar) {
     symlink("$name.tar.gz", $nightly_symlink);
 }
 
-foreach my $fn (qw( rsync.yo rsyncd.conf.yo )) {
+foreach my $fn (qw( rsync.yo rsync-ssl.yo rsyncd.conf.yo )) {
     my $yo_tmp = "$dest/$fn";
     (my $html_fn = "$dest/$fn") =~ s/\.yo/.html/;
 

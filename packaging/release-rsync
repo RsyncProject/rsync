@@ -385,8 +385,9 @@ About to:
     os.link(f"{dest}/NEWS", news_file)
     cmd_chk(f"git log --name-status | gzip -9 >{dest}/ChangeLog.gz")
 
-    cmd_chk(f"yodl2html -o {dest}/rsync.html rsync.yo")
-    cmd_chk(f"yodl2html -o {dest}/rsyncd.conf.html rsyncd.conf.yo")
+    for yo_fn in glob.glob('*.yo'):
+        html_fn = yo_fn.replace('.yo', '.html')
+        cmd_chk(['yodl2html', '-o', dest +'/'+ html_fn, yo_fn])
 
     for fn in (srctar_file, pattar_file, diff_file):
         asc_fn = fn + '.asc'

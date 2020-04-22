@@ -1,0 +1,69 @@
+mailto(rsync-bugs@samba.org)
+manpage(rsync-ssl)(1)(22 Apr 2020)()()
+manpagename(rsync-ssl)(a helper script for connecting to an ssl rsync daemon)
+manpagesynopsis()
+
+verb(rsync-ssl [--type=openssl|stunnel] RSYNC_ARGS)
+
+manpagedescription()
+
+The rsync-ssl script helps you to run an rsync copy to/from an rsync daemon
+that requires ssl connections.
+
+If the bf(first) arg is a bf(--type=NAME) option, the script will only use that
+particular program to open an ssl connection instead of trying to find an
+stunnel or openssl executable via a simple heuristic (assuming that the
+bf(RSYNC_SSL_TYPE) environment variable is not set as well -- see below).  This
+option must be one of bf(--type=openssl) or bf(--type=stunnel).  The equal sign
+is required for this particular option.
+
+All the other options are passed through to the rsync command, so consult the
+bf(rsync) manpage for more information on how it works.
+
+Note that the stunnel connection type requires at least version 4 of stunnel,
+which should be the case on modern systems.
+
+manpagesection(ENVIRONMENT VARIABLES)
+
+The ssl helper scripts are affected by the following environment variables:
+
+description(
+
+dit(bf(RSYNC_SSL_TYPE)) Specifies the program type that should be used to open
+the ssl connection.  It must be one of "openssl" or "stunnel".  The
+bf(--type=NAME) option overrides this, if specified.
+
+dit(bf(RSYNC_SSL_PORT)) If specified, the value is the port number that is used
+as the default when the user does not specify a port in their rsync command.
+When not specified, the default port number is 874.  (Note that older rsync
+versions (prior to 3.1.4) did not communicate an overriding port number value
+to the helper script.)
+
+dit(bf(RSYNC_SSL_CERT)) If specified, the value is a filename that contains a
+certificate to use for the connection.
+
+dit(bf(RSYNC_SSL_CA_CERT)) If specified, the value is a filename that contains
+a certificate authority certificate that is used to validate the connection.
+
+dit(bf(RSYNC_SSL_STUNNEL)) Specifies the stunnel executable to run when the
+connection type is set to stunnel.  If unspecified, the $PATH is searched first
+for "stunnel4" and then for "stunnel".
+
+dit(bf(RSYNC_SSL_OPENSSL)) Specifies the openssl executable to run when the
+connection type is set to openssl.  If unspecified, the $PATH is searched for
+"openssl".
+
+)
+
+manpagesection(EXAMPLES)
+
+verb(    rsync-ssl -aiv example.com::src/ dest)
+
+verb(    rsync-ssl --type=openssl -aiv example.com::src/ dest)
+
+manpageauthor()
+
+This manpage was written by Wayne Davison.
+
+Mailing lists for support and development are available at
+url(http://lists.samba.org)(lists.samba.org)

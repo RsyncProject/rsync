@@ -12,38 +12,52 @@
 
 # The environment can override our defaults using RSYNC_SSL_* variables
 
+function path_search {
+    IFS_SAVE="$IFS"
+    IFS=:
+    for prog in "${@}"; do
+	for dir in $PATH; do
+	    [[ -z "$dir" ]] && dir=.
+	    if [[ -f "$dir/$prog" && -x "$dir/$prog" ]]; then
+		echo "$dir/$prog"
+		IFS="$IFS_SAVE"
+		return 0
+	    fi
+	done
+    done
+
+    IFS="$IFS_SAVE"
+    echo "Failed to find on your path: $*" 1>&2
+    echo "See the rsync-ssl manpage for configuration assistance." 1>&2
+    return 1
+}
+
 if [[ -z "$RSYNC_SSL_TYPE" ]]; then
-    RSYNC_SSL_TYPE=stunnel
+    found=`path_search stunnel4 stunnel openssl` || exit 1
+    if [[ "$found" == */openssl ]]; then
+	RSYNC_SSL_TYPE=openssl
+	RSYNC_SSL_OPENSSL="$found"
+    else
+	RSYNC_SSL_TYPE=stunnel
+	RSYNC_SSL_STUNNEL="$found"
+    fi
 fi
 
 case "$RSYNC_SSL_TYPE" in
+    openssl)
+	if [[ -z "$RSYNC_SSL_OPENSSL" ]]; then
+	    RSYNC_SSL_OPENSSL=`path_search openssl` || exit 1
+	fi
+	optsep=' '
+	;;
     stunnel)
 	if [[ -z "$RSYNC_SSL_STUNNEL" ]]; then
-	    IFS_SAVE="$IFS"
-	    IFS=:
-	    for prog in stunnel4 stunnel; do
-		for dir in $PATH; do
-		    [[ -z "$dir" ]] && dir=.
-		    if [[ -f "$dir/$prog" && -x "$dir/$prog" ]]; then
-			RSYNC_SSL_STUNNEL="$dir/$prog"
-			break 2
-		    fi
-		done
-	    done
-	    IFS="$IFS_SAVE"
-	fi
-	if [[ -z "$RSYNC_SSL_STUNNEL" ]]; then
-	    echo "Failed to find stunnel on your path." 1>&2
-	    echo "Maybe export RSYNC_SSL_STUNNEL=/path or RSYNC_SSL_TYPE=openssl." 1>&2
-	    exit 1
+	    RSYNC_SSL_STUNNEL=`path_search stunnel4 stunnel` || exit 1
 	fi
 	optsep=' = '
 	;;
-    openssl)
-	optsep=' '
-	;;
     *)
-	echo "The RSYNC_SSL_TYPE is not set to a known type: $RSYNC_SSL_TYPE" 1>&2
+	echo "The RSYNC_SSL_TYPE specifies an unknown type: $RSYNC_SSL_TYPE" 1>&2
 	exit 1
 	;;
 esac
@@ -97,10 +111,10 @@ if [[ -z "$hostname" || "$1" != rsync || "$2" != --server || "$3" != --daemon ]]
 fi
 
 if [[ $RSYNC_SSL_TYPE == openssl ]]; then
-    exec openssl s_client $caopt $certopt -quiet -verify_quiet -servername $hostname -connect $hostname:$port
+    exec $RSYNC_SSL_OPENSSL s_client $caopt $certopt -quiet -verify_quiet -servername $hostname -connect $hostname:$port
 else
     # devzero@web.de came up with this no-tmpfile calling syntax:
-    exec stunnel -fd 10 11<&0 <<EOF 10<&0 0<&11 11<&-
+    exec $RSYNC_SSL_STUNNEL -fd 10 11<&0 <<EOF 10<&0 0<&11 11<&-
 foreground = yes
 debug = crit
 connect = $hostname:$port
