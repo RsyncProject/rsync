@@ -63,7 +63,7 @@ CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o trimslash.
 	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) -c $< @CC_SHOBJ_FLAG@
 @OBJ_RESTORE@
 
-all: Makefile rsync$(EXEEXT) rsync-ssl stunnel-rsyncd.conf @MAKE_MAN@
+all: Makefile rsync$(EXEEXT) stunnel-rsyncd.conf @MAKE_MAN@
 
 install: all
 	-${MKDIR_P} ${DESTDIR}${bindir}
@@ -192,10 +192,6 @@ Makefile: Makefile.in config.status configure.sh config.h.in
 	    fi \
 	fi
 
-rsync-ssl: $(srcdir)/rsync-ssl.in Makefile
-	sed 's;\@bindir\@;$(bindir);g' <$(srcdir)/rsync-ssl.in >rsync-ssl
-	@chmod +x rsync-ssl
-
 stunnel-rsyncd.conf: $(srcdir)/stunnel-rsyncd.conf.in Makefile
 	sed 's;\@bindir\@;$(bindir);g' <$(srcdir)/stunnel-rsyncd.conf.in >stunnel-rsyncd.conf
 
@@ -245,7 +241,7 @@ cleantests:
 # the source directory.
 distclean: clean
 	rm -f Makefile config.h config.status
-	rm -f rsync-ssl stunnel-rsyncd.conf
+	rm -f stunnel-rsyncd.conf
 	rm -f lib/dummy popt/dummy zlib/dummy
 	rm -f $(srcdir)/Makefile $(srcdir)/config.h $(srcdir)/config.status
 	rm -f $(srcdir)/lib/dummy $(srcdir)/popt/dummy $(srcdir)/zlib/dummy
