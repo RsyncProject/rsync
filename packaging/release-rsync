@@ -5,7 +5,7 @@
 # the git repository in the current directory will be updated, and the local
 # ~/samba-rsync-ftp dir will be ready to be rsynced to samba.org.
 
-import os, sys, re, argparse, glob, time, shutil, atexit, signal
+import os, sys, re, argparse, glob, shutil, atexit, signal
 from datetime import datetime
 from getpass import getpass
 
@@ -21,7 +21,6 @@ MAKE_GEN_CMDS = [
         './config.status'.split(),
         'make gen'.split(),
         ]
-REL_RE = re.compile(r'^\s+\S{2}\s\S{3}\s\d{4}\s+(?P<ver>\d+\.\d+\.\d+)\s+(?P<pdate>\d{2} \w{3} \d{4}\s+)?(?P<pver>\d+)$')
 
 def main():
     now = datetime.now()
@@ -58,42 +57,11 @@ def main():
 
     check_git_state(args.master_branch, True, 'patches')
 
-    confversion = None
-    with open('configure.ac', 'r', encoding='utf-8') as fh:
-        for line in fh:
-            m = re.match(r'^AC_INIT\(\[rsync\],\s*\[(\d.+?)\]', line)
-            if m:
-                confversion = m[1]
-                break
-    if not confversion:
-        die("Unable to find AC_INIT with version in configure.ac")
+    confversion = get_configure_version()
 
-    lastversion = last_protocol_version = None
-    pdate = { }
-    with open('OLDNEWS', 'r', encoding='utf-8') as fh:
-        for line in fh:
-            if not lastversion:
-                m = re.search(r'(\d+\.\d+\.\d+)', line)
-                if m:
-                    lastversion = m[1]
-            m = REL_RE.match(line)
-            if m:
-                if m['pdate']:
-                    pdate[m['ver']] = m['pdate']
-                if m['ver'] == lastversion:
-                    last_protocol_version = m['pver']
-    if not last_protocol_version:
-        die(f"Unable to determine protocol_version for {lastversion}.")
-
-    protocol_version = None
-    with open('rsync.h', 'r', encoding='utf-8') as fh:
-        for line in fh:
-            m = re.match(r'^#define\s+PROTOCOL_VERSION\s+(\d+)', line)
-            if m:
-                protocol_version = m[1]
-                break
-    if not protocol_version:
-        die("Unable to determine the current PROTOCOL_VERSION.")
+    # All version values are strings!
+    last_version, last_protocol_version = get_OLDNEWS_version_info()
+    protocol_version, subprotocol_version = get_protocol_versions()
 
     version = confversion
     m = re.search(r'pre(\d+)', version)
@@ -387,7 +355,7 @@ About to:
 
     for yo_fn in glob.glob('*.yo'):
         html_fn = yo_fn.replace('.yo', '.html')
-        cmd_chk(['yodl2html', '-o', dest +'/'+ html_fn, yo_fn])
+        cmd_chk(['yodl2html', '-o', os.path.join(dest, html_fn), yo_fn])
 
     for fn in (srctar_file, pattar_file, diff_file):
         asc_fn = fn + '.asc'

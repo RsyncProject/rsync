@@ -157,4 +157,61 @@ def get_extra_files():
 
     return extras
 
+
+def get_configure_version():
+    with open('configure.ac', 'r', encoding='utf-8') as fh:
+        for line in fh:
+            m = re.match(r'^AC_INIT\(\[rsync\],\s*\[(\d.+?)\]', line)
+            if m:
+                return m[1]
+    die("Unable to find AC_INIT with version in configure.ac")
+
+
+def get_OLDNEWS_version_info():
+    rel_re = re.compile(r'^\s+\S{2}\s\S{3}\s\d{4}\s+(?P<ver>\d+\.\d+\.\d+)\s+(?P<pdate>\d{2} \w{3} \d{4}\s+)?(?P<pver>\d+)$')
+    last_version = last_protocol_version = None
+    pdate = { }
+
+    with open('OLDNEWS', 'r', encoding='utf-8') as fh:
+        for line in fh:
+            if not last_version:
+                m = re.search(r'(\d+\.\d+\.\d+)', line)
+                if m:
+                    last_version = m[1]
+            m = rel_re.match(line)
+            if m:
+                if m['pdate']:
+                    pdate[m['ver']] = m['pdate']
+                if m['ver'] == last_version:
+                    last_protocol_version = m['pver']
+                    break
+
+    if not last_protocol_version:
+        die(f"Unable to determine protocol_version for {last_version}.")
+
+    return last_version, last_protocol_version
+
+
+def get_protocol_versions():
+    protocol_version = subprotocol_version = None
+
+    with open('rsync.h', 'r', encoding='utf-8') as fh:
+        for line in fh:
+            m = re.match(r'^#define\s+PROTOCOL_VERSION\s+(\d+)', line)
+            if m:
+                protocol_version = m[1]
+                continue
+            m = re.match(r'^#define\s+SUBPROTOCOL_VERSION\s+(\d+)', line)
+            if m:
+                subprotocol_version = m[1]
+                break
+
+    if not protocol_version:
+        die("Unable to determine the current PROTOCOL_VERSION.")
+
+    if not subprotocol_version:
+        die("Unable to determine the current SUBPROTOCOL_VERSION.")
+
+    return protocol_version, subprotocol_version
+
 # vim: sw=4 et

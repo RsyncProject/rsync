@@ -1,174 +1,117 @@
-#!/usr/bin/perl
-use strict;
+#!/usr/bin/python3 -B
 
 # This script expects the directory ~/samba-rsync-ftp to exist and to be a
 # copy of the /home/ftp/pub/rsync dir on samba.org.  It also requires a
 # git checkout of rsync (feel free to use your normal rsync build dir as
 # long as it doesn't have any uncommitted changes).
 #
-# If this is run with -ctu, it will make an updated "nightly" tar file in
+# If this is run with -tu, it will make an updated "nightly" tar file in
 # the nightly dir.  It will also remove any old tar files, regenerate the
 # HTML man pages in the nightly dir, and then rsync the changes to the
 # samba.org server.
 
-use Getopt::Long;
-use Date::Format;
+import os, sys, re, argparse, glob
+from datetime import datetime, timezone
+from getpass import getpass
+
+sys.path = ['packaging'] + sys.path
+
+from pkglib import *
 
 # Where the local copy of /home/ftp/pub/rsync/dev/nightly should be updated.
-our $dest = $ENV{HOME} . '/samba-rsync-ftp/dev/nightly';
-our $samba_host = $ENV{SAMBA_HOST} || 'samba.org';
-our $nightly_symlink = "$dest/rsync-HEAD.tar.gz";
+dest = os.environ['HOME'] + '/samba-rsync-ftp/dev/nightly'
+samba_host = os.environ['SAMBA_HOST']
+nightly_symlink = f"{dest}/rsync-HEAD.tar.gz"
 
-our($make_tar, $upload, $help_opt);
-&Getopt::Long::Configure('bundling');
-&usage if !&GetOptions(
-    'make-tar|t' => \$make_tar,
-    'upload|u' => \$upload,
-    'help|h' => \$help_opt,
-) || $help_opt;
+def main():
+    now = datetime.now(timezone.utc)
+    name = now.strftime('rsync-HEAD-%Y%m%d-%H%MGMT')
+    ztoday = now.strftime('%d %b %Y')
+    today = ztoday.lstrip('0')
+    gen_target = 'gensend' if args.upload else 'gen'
 
-our $name = time2str('rsync-HEAD-%Y%m%d-%H%M%Z', time, 'GMT');
-our $ztoday = time2str('%d %b %Y', time);
-our $today = $ztoday;
-our $gen_target = $upload ? 'gensend' : 'gen';
+    if not os.path.isdir(dest):
+        die("$dest does not exist")
+    if not os.path.isdir('.git'):
+        die("There is no .git dir in the current directory.")
+    if not os.path.exists('rsyncd.conf.yo'):
+        die("There is no rsync checkout in the current directory.")
 
-die "$dest does not exist\n" unless -d $dest;
-die "There is no .git dir in the current directory.\n" unless -d '.git';
-die "There is no rsync checkout in the current directory.\n" unless -f 'rsyncd.conf.yo';
+    if args.make_tar:
+        check_git_state('master')
+        cmd_chk(['make', gen_target])
 
-if ($make_tar) {
-    open(IN, '-|', 'git status') or die $!;
-    my $status = join('', <IN>);
-    close IN;
-    die "The checkout is not clean:\n", $status unless $status =~ /\nnothing to commit.+working (directory|tree) clean/;
-    die "The checkout is not on the master branch.\n" unless $status =~ /^(?:# )?On branch master\n/;
-    system "make $gen_target" and die "make $gen_target failed!\n";
+        extra_files = get_extra_files()
 
-    my @extra_files;
-    open(IN, '<', 'Makefile.in') or die "Couldn't open Makefile.in: $!\n";
-    while (<IN>) {
-	if (s/^GENFILES=//) {
-	    while (s/\\$//) {
-		$_ .= <IN>;
-	    }
-	    @extra_files = split(' ', $_);
-	    last;
-	}
-    }
-    close IN;
+        confversion = get_configure_version()
 
-    my $confversion;
-    open(IN, '<', 'configure.ac') or die "Unable to open configure.ac: $!\n";
-    while (<IN>) {
-	if (/^AC_INIT\(\[rsync\],\s*\[(\d.+?)\]/) {
-	    $confversion = $1;
-	    last;
-	}
-    }
-    close IN;
-    die "Unable to find AC_INIT with version in configure.ac\n" unless defined $confversion;
+        # All version values are strings!
+        last_version, last_protocol_version = get_OLDNEWS_version_info()
+        protocol_version, subprotocol_version = get_protocol_versions()
 
-    open(IN, '<', 'OLDNEWS') or die "Unable to open OLDNEWS: $!\n";
-    $_ = <IN>;
-    my($lastversion) = /(\d+\.\d+\.\d+)/;
-    my $last_protocol_version;
-    while (<IN>) {
-	if (my($ver,$pdate,$pver) = /^\s+\S\S\s\S\S\S\s\d\d\d\d\s+(\d+\.\d+\.\d+)\s+(\d\d \w\w\w \d\d\d\d\s+)?(\d+)$/) {
-	    $last_protocol_version = $pver if $ver eq $lastversion;
-	}
-    }
-    close IN;
-    die "Unable to determine protocol_version for $lastversion.\n" unless defined $last_protocol_version;
+        if 'dev' in confversion or 'pre' in confversion:
+            if last_protocol_version != protocol_version:
+                if subprotocol_version == '0':
+                    die("SUBPROTOCOL_VERSION must not be 0 for a non-final release with a changed PROTOCOL_VERSION.")
+            elif subprotocol_version != '0':
+                die("SUBPROTOCOL_VERSION must be 0 when the PROTOCOL_VERSION hasn't changed from the last release.")
+        elif subprotocol_version != '0':
+            die("SUBPROTOCOL_VERSION must be 0 for a final release.")
 
-    my($protocol_version,$subprotocol_version);
-    open(IN, '<', 'rsync.h') or die "Unable to open rsync.h: $!\n";
-    while (<IN>) {
-	if (/^#define\s+PROTOCOL_VERSION\s+(\d+)/) {
-	    $protocol_version = $1;
-	} elsif (/^#define\s+SUBPROTOCOL_VERSION\s+(\d+)/) {
-	    $subprotocol_version = $1;
-	}
-    }
-    close IN;
-    die "Unable to determine the current PROTOCOL_VERSION.\n" unless defined $protocol_version;
-    die "Unable to determine the current SUBPROTOCOL_VERSION.\n" unless defined $subprotocol_version;
+        name_slash = name + '/'
+        tar_name = f"{name}.tar.gz"
 
-    if ($confversion =~ /dev|pre/) {
-	if ($last_protocol_version ne $protocol_version) {
-	    if ($subprotocol_version == 0) {
-		die "SUBPROTOCOL_VERSION must not be 0 for a non-final release with a changed PROTOCOL_VERSION.\n";
-	    }
-	} else {
-	    if ($subprotocol_version != 0) {
-		die "SUBPROTOCOL_VERSION must be 0 when the PROTOCOL_VERSION hasn't changed from the last release.\n";
-	    }
-	}
-    } else {
-	if ($subprotocol_version != 0) {
-	    die "SUBPROTOCOL_VERSION must be 0 for a final release.\n";
-	}
-    }
+        print('Creating', tar_name)
 
-    print "Creating $name.tar.gz\n";
-    system "rsync -a @extra_files $name/";
-    system "git archive --format=tar --prefix=$name/ HEAD | tar xf -";
-    system "support/git-set-file-times --quiet --prefix=$name/";
-    system "fakeroot tar czf $dest/$name.tar.gz $name; rm -rf $name";
+        cmd_chk(['rsync', '-a', *extra_files, name_slash])
+        cmd_chk(f"git archive --format=tar --prefix={name}/ HEAD | tar xf -")
+        cmd_chk(['support/git-set-file-times', '--quiet', '--prefix', name_slash])
+        cmd_chk(['fakeroot', 'tar', 'czf', os.path.join(dest, tar_name), name])
+        cmd_chk(['rm', '-rf', name])
 
-    unlink($nightly_symlink);
-    symlink("$name.tar.gz", $nightly_symlink);
-}
+        if os.path.lexists(nightly_symlink):
+            os.unlink(nightly_symlink)
+        os.symlink(tar_name, nightly_symlink)
 
-foreach my $fn (qw( rsync.yo rsync-ssl.yo rsyncd.conf.yo )) {
-    my $yo_tmp = "$dest/$fn";
-    (my $html_fn = "$dest/$fn") =~ s/\.yo/.html/;
+    for fn in sorted(glob.glob('*.yo')):
+        yo_tmp = os.path.join(dest, fn)
+        html_fn = yo_tmp.replace('.yo', '.html')
 
-    open(IN, '<', $fn) or die $!;
-    undef $/; $_ = <IN>; $/ = "\n";
-    close IN;
+        with open(fn, 'r', encoding='utf-8') as fh:
+            txt = fh.read()
 
-    s/^(manpage\([^)]+\)\(\d+\)\()[^)]+(\).*)/$1$today$2/m;
-    #s/^(This man ?page is current for version) \S+ (of rsync)/$1 $version $2/m;
+        txt = re.sub(r'^(manpage\([^)]+\)\(\d+\)\()[^)]+(\).*)', r'\1%s\2' % today, txt, flags=re.M)
 
-    open(OUT, '>', $yo_tmp) or die $!;
-    print OUT $_;
-    close OUT;
+        with open(yo_tmp, 'w', encoding='utf-8') as fh:
+            fh.write(txt)
 
-    system 'yodl2html', '-o', $html_fn, $yo_tmp;
+        cmd_chk(['yodl2html', '-o', html_fn, yo_tmp])
+        os.unlink(yo_tmp)
 
-    unlink($yo_tmp);
-}
+    os.chdir(dest)
 
-chdir($dest) or die $!;
+    tar_files = list(reversed(sorted(glob.glob('rsync-HEAD-*'))))
+    if len(tar_files) > 10:
+        for fn in tar_files[10:]:
+            print('Removing', fn)
+            os.unlink(fn)
 
-my $cnt = 0;
-open(PIPE, '-|', 'ls -1t rsync-HEAD-*') or die $!;
-while (<PIPE>) {
-    chomp;
-    next if $cnt++ < 10;
-    unlink($_);
-}
-close PIPE;
+    cmd_run('ls -ltr'.split())
 
-system 'ls -ltr';
+    if args.upload:
+        cmd = 'rsync -aivHP --delete-after'.split()
+        partial_dir = os.environ.get('RSYNC_PARTIAL_DIR', None)
+        if partial_dir:
+            cmd.append('-fR ' + partial_dir)
+        cmd_chk([*cmd, '.', f"{samba_host}:/home/ftp/pub/rsync/dev/nightly"])
 
-if ($upload) {
-    my $opt = '';
-    if (defined $ENV{RSYNC_PARTIAL_DIR}) {
-	$opt = " -f 'R $ENV{RSYNC_PARTIAL_DIR}'";
-    }
-    system "rsync$opt -aviHP --delete-after . $samba_host\:/home/ftp/pub/rsync/dev/nightly";
-}
 
-exit;
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='A helper script for "nightly" tar files.', add_help=False)
+    parser.add_argument('--make-tar', '-t', action='store_true', help=f"Create a new tar file in {dest}.")
+    parser.add_argument('--upload', '-u', action='store_true', help="Upload the revised nightly dir to {samba_host}.")
+    parser.add_argument("--help", "-h", action="help", help="Output this help message and exit.")
+    args = parser.parse_args()
+    main()
 
-sub usage
-{
-    die <<EOT;
-Usage: nightly-rsync [OPTIONS]
-
- -t, --make-tar    create a new tar file in $dest
- -u, --upload      upload the revised nightly dir to samba.org
- -h, --help        display this help
-EOT
-}
+# vim: sw=4 et
