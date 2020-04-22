@@ -1,11 +1,11 @@
 #!/bin/bash
 # This must be called as (note the trailing dot):
 #
-#    rsh-ssl-rsync HOSTNAME rsync --server --daemon .
+#    rsync-ssl-rsh HOSTNAME rsync --server --daemon .
 #
 # ... which is typically done via the rsync-ssl script, which results in something like this:
 #
-#    rsync --rsh=rsh-ssl-rsync -aiv HOSTNAME::module [ARGS]
+#    rsync --rsh=rsync-ssl-rsh -aiv HOSTNAME::module [ARGS]
 #
 # This SSL setup based on the files by:  http://dozzie.jarowit.net/trac/wiki/RsyncSSL
 # Note that an stunnel connection requires at least version 4.x of stunnel.

@@ -17,4 +17,4 @@ case "$@" in
     ;;
 esac
 
-exec @bindir@/rsync --rsh=@bindir@/rsh-ssl-rsync "${@}"
+exec @bindir@/rsync --rsh=@bindir@/rsync-ssl-rsh "${@}"

@@ -76,7 +76,7 @@ install: all
 install-ssl-client: rsync-ssl
 	-${MKDIR_P} ${DESTDIR}${bindir}
 	${INSTALLCMD} -m 755 rsync-ssl ${DESTDIR}${bindir}
-	${INSTALLCMD} -m 755 rsh-ssl-rsync ${DESTDIR}${bindir}
+	${INSTALLCMD} -m 755 rsync-ssl-rsh ${DESTDIR}${bindir}
 
 install-ssl-daemon: stunnel-rsyncd.conf
 	-${MKDIR_P} ${DESTDIR}/etc/stunnel
