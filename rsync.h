@@ -62,6 +62,7 @@
 #define XMIT_HLINK_FIRST (1<<12)	/* protocols 30 - now (HLINKED files only) */
 #define XMIT_IO_ERROR_ENDLIST (1<<12)	/* protocols 31*- now (w/XMIT_EXTENDED_FLAGS) (also protocol 30 w/'f' compat flag) */
 #define XMIT_MOD_NSEC (1<<13)		/* protocols 31 - now */
+#define XMIT_SAME_ATIME (1<<14) 	/* protocols ?? - now */
 
 /* These flags are used in the live flist data. */
 
@@ -168,6 +169,7 @@
 #define ATTRS_REPORT		(1<<0)
 #define ATTRS_SKIP_MTIME	(1<<1)
 #define ATTRS_SET_NANO		(1<<2)
+#define ATTRS_SKIP_ATIME	(1<<3)
 
 #define FULL_FLUSH	1
 #define NORMAL_FLUSH	0
@@ -394,10 +396,13 @@ enum delret {
 #ifdef CAN_SET_NSEC
 #ifdef HAVE_STRUCT_STAT_ST_MTIM_TV_NSEC
 #define ST_MTIME_NSEC st_mtim.tv_nsec
+#define ST_ATIME_NSEC st_atim.tv_nsec
 #elif defined(HAVE_STRUCT_STAT_ST_MTIMENSEC)
 #define ST_MTIME_NSEC st_mtimensec
+#define ST_ATIME_NSEC st_atimensec
 #elif defined(HAVE_STRUCT_STAT_ST_MTIMESPEC_TV_NSEC)
 #define ST_MTIME_NSEC st_mtimespec.tv_nsec
+#define ST_ATIME_NSEC st_atimespec.tv_nsec
 #endif
 #endif
 
@@ -700,9 +705,29 @@ struct ht_int64_node {
 #endif
 #endif
 
+#if SIZEOF_CHARP == 4
+# define PTRS_ARE_32 1
+# define PTR_EXTRA_CNT 1
+#elif SIZEOF_CHARP == 8
+# define PTRS_ARE_64 1
+# define PTR_EXTRA_CNT EXTRA64_CNT
+#else
+# error Character pointers are not 4 or 8 bytes.
+#endif
+
 union file_extras {
 	int32 num;
 	uint32 unum;
+#ifdef PTRS_ARE_32
+	const char* ptr;
+#endif
+};
+
+union file_extras64 {
+	int64 num;
+#ifdef PTRS_ARE_64
+	const char* ptr;
+#endif
 };
 
 struct file_struct {
@@ -716,6 +741,9 @@ struct file_struct {
 
 extern int file_extra_cnt;
 extern int inc_recurse;
+extern int atimes_ndx;
+extern int pathname_ndx;
+extern int depth_ndx;
 extern int uid_ndx;
 extern int gid_ndx;
 extern int acls_ndx;
@@ -723,13 +751,17 @@ extern int xattrs_ndx;
 
 #define FILE_STRUCT_LEN (offsetof(struct file_struct, basename))
 #define EXTRA_LEN (sizeof (union file_extras))
-#define PTR_EXTRA_CNT ((sizeof (char *) + EXTRA_LEN - 1) / EXTRA_LEN)
 #define DEV_EXTRA_CNT 2
 #define DIRNODE_EXTRA_CNT 3
+#define EXTRA64_CNT ((sizeof (union file_extras64) + EXTRA_LEN - 1) / EXTRA_LEN)
 #define SUM_EXTRA_CNT ((MAX_DIGEST_LEN + EXTRA_LEN - 1) / EXTRA_LEN)
 
 #define REQ_EXTRA(f,ndx) ((union file_extras*)(f) - (ndx))
 #define OPT_EXTRA(f,bump) ((union file_extras*)(f) - file_extra_cnt - 1 - (bump))
+
+/* These are guaranteed to be allocated first in the array so that they
+ * are aligned for direct int64-pointer access. */
+#define REQ_EXTRA64(f,ndx) ((union file_extras64*)REQ_EXTRA(f,ndx))
 
 #define NSEC_BUMP(f) ((f)->flags & FLAG_MOD_NSEC ? 1 : 0)
 #define LEN64_BUMP(f) ((f)->flags & FLAG_LENGTH64 ? 1 : 0)
@@ -752,10 +784,14 @@ extern int xattrs_ndx;
 #define F_SYMLINK(f) ((f)->basename + strlen((f)->basename) + 1)
 
 /* The sending side always has this available: */
-#define F_PATHNAME(f) (*(const char**)REQ_EXTRA(f, PTR_EXTRA_CNT))
+#ifdef PTRS_ARE_32
+#define F_PATHNAME(f) REQ_EXTRA(f, pathname_ndx)->ptr
+#else
+#define F_PATHNAME(f) REQ_EXTRA64(f, pathname_ndx)->ptr
+#endif
 
 /* The receiving side always has this available: */
-#define F_DEPTH(f) REQ_EXTRA(f, 1)->num
+#define F_DEPTH(f) REQ_EXTRA(f, depth_ndx)->num
 
 /* When the associated option is on, all entries will have these present: */
 #define F_OWNER(f) REQ_EXTRA(f, uid_ndx)->unum
@@ -763,6 +799,7 @@ extern int xattrs_ndx;
 #define F_ACL(f) REQ_EXTRA(f, acls_ndx)->num
 #define F_XATTR(f) REQ_EXTRA(f, xattrs_ndx)->num
 #define F_NDX(f) REQ_EXTRA(f, unsort_ndx)->num
+#define F_ATIME(f) REQ_EXTRA64(f, atimes_ndx)->num
 
 /* These items are per-entry optional: */
 #define F_HL_GNUM(f) OPT_EXTRA(f, START_BUMP(f))->num /* non-dirs */

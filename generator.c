@@ -506,6 +506,9 @@ void itemize(const char *fnamecmp, struct file_struct *file, int ndx, int statre
 		 : iflags & (ITEM_TRANSFER|ITEM_LOCAL_CHANGE) && !(iflags & ITEM_MATCHED)
 		  && (!(iflags & ITEM_XNAME_FOLLOWS) || *xname))
 			iflags |= ITEM_REPORT_TIME;
+		if (atimes_ndx && !S_ISDIR(file->mode) && !S_ISLNK(file->mode)
+		 && cmp_time(F_ATIME(file), 0, sxp->st.st_atime, 0) != 0)
+			iflags |= ITEM_REPORT_ATIME;
 #if !defined HAVE_LCHMOD && !defined HAVE_SETATTRLIST
 		if (S_ISLNK(file->mode)) {
 			;
@@ -916,6 +919,8 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 		if (link_dest) {
 			if (!hard_link_one(file, fname, cmpbuf, 1))
 				goto try_a_copy;
+			if (atimes_ndx)
+				set_file_attrs(fname, file, sxp, NULL, 0);
 			if (preserve_hard_links && F_IS_HLINKED(file))
 				finish_hard_link(file, fname, ndx, &sxp->st, itemizing, code, j);
 			if (!maybe_ATTRS_REPORT && (INFO_GTE(NAME, 2) || stdout_format_has_i > 1)) {
@@ -1120,35 +1125,40 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 static void list_file_entry(struct file_struct *f)
 {
 	char permbuf[PERMSTRING_SIZE];
-	int64 len;
-	int colwidth = human_readable ? 14 : 11;
+	const char *mtime_str = timestring(f->modtime);
+	int size_width = human_readable ? 14 : 11;
+	int mtime_width = 1 + strlen(mtime_str);
+	int atime_width = atimes_ndx ? mtime_width : 0;
 
 	if (!F_IS_ACTIVE(f)) {
 		/* this can happen if duplicate names were removed */
 		return;
 	}
 
-	permstring(permbuf, f->mode);
-	len = F_LENGTH(f);
-
 	/* TODO: indicate '+' if the entry has an ACL. */
 
-#ifdef SUPPORT_LINKS
-	if (preserve_links && S_ISLNK(f->mode)) {
-		rprintf(FINFO, "%s %*s %s %s -> %s\n",
-			permbuf, colwidth, human_num(len),
-			timestring(f->modtime), f_name(f, NULL),
-			F_SYMLINK(f));
-	} else
-#endif
 	if (missing_args == 2 && f->mode == 0) {
 		rprintf(FINFO, "%-*s %s\n",
-			colwidth + 31, "*missing",
+			10 + 1 + size_width + mtime_width + atime_width, "*missing",
 			f_name(f, NULL));
 	} else {
-		rprintf(FINFO, "%s %*s %s %s\n",
-			permbuf, colwidth, human_num(len),
-			timestring(f->modtime), f_name(f, NULL));
+		const char *atime_str = atimes_ndx && !S_ISDIR(f->mode) ? timestring(F_ATIME(f)) : "";
+		const char *arrow, *lnk;
+
+		permstring(permbuf, f->mode);
+
+#ifdef SUPPORT_LINKS
+		if (preserve_links && S_ISLNK(f->mode)) {
+			arrow = " -> ";
+			lnk = F_SYMLINK(f);
+		} else
+#endif
+			arrow = lnk = "";
+
+		rprintf(FINFO, "%s %*s %s%*s %s%s%s\n",
+			permbuf, size_width, human_num(F_LENGTH(f)),
+			timestring(f->modtime), atime_width, atime_str,
+			f_name(f, NULL), arrow, lnk);
 	}
 }
 
@@ -2064,8 +2074,13 @@ static void touch_up_dirs(struct file_list *flist, int ndx)
 			do_chmod(fname, file->mode);
 		if (need_retouch_dir_times) {
 			STRUCT_STAT st;
-			if (link_stat(fname, &st, 0) == 0 && time_diff(&st, file))
-				set_modtime(fname, file->modtime, F_MOD_NSEC_or_0(file), file->mode);
+			if (link_stat(fname, &st, 0) == 0 && time_diff(&st, file)) {
+				st.st_mtime = file->modtime;
+#ifdef ST_MTIME_NSEC
+				st.ST_MTIME_NSEC = F_MOD_NSEC_or_0(file);
+#endif
+				set_times(fname, &st);
+			}
 		}
 		if (counter >= loopchk_limit) {
 			if (allowed_lull)

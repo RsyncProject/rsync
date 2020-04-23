@@ -117,14 +117,15 @@ void print_child_argv(const char *prefix, char **cmd)
 
 /* This returns 0 for success, 1 for a symlink if symlink time-setting
  * is not possible, or -1 for any other error. */
-int set_modtime(const char *fname, time_t modtime, uint32 mod_nsec, mode_t mode)
+int set_times(const char *fname, STRUCT_STAT *stp)
 {
 	static int switch_step = 0;
 
 	if (DEBUG_GTE(TIME, 1)) {
-		rprintf(FINFO, "set modtime of %s to (%ld) %s",
-			fname, (long)modtime,
-			asctime(localtime(&modtime)));
+		rprintf(FINFO,
+			"set modtime, atime of %s to (%ld) %s, (%ld) %s\n",
+			fname, (long)stp->st_mtime,
+			timestring(stp->st_mtime), (long)stp->st_atime, timestring(stp->st_atime));
 	}
 
 	switch (switch_step) {
@@ -139,7 +140,7 @@ int set_modtime(const char *fname, time_t modtime, uint32 mod_nsec, mode_t mode)
 
 #ifdef HAVE_UTIMENSAT
 #include "case_N.h"
-		if (do_utimensat(fname, modtime, mod_nsec) == 0)
+		if (do_utimensat(fname, stp) == 0)
 			break;
 		if (errno != ENOSYS)
 			return -1;
@@ -148,7 +149,7 @@ int set_modtime(const char *fname, time_t modtime, uint32 mod_nsec, mode_t mode)
 
 #ifdef HAVE_LUTIMES
 #include "case_N.h"
-		if (do_lutimes(fname, modtime, mod_nsec) == 0)
+		if (do_lutimes(fname, stp) == 0)
 			break;
 		if (errno != ENOSYS)
 			return -1;
@@ -159,16 +160,16 @@ int set_modtime(const char *fname, time_t modtime, uint32 mod_nsec, mode_t mode)
 		switch_step++;
 		if (preserve_times & PRESERVE_LINK_TIMES) {
 			preserve_times &= ~PRESERVE_LINK_TIMES;
-			if (S_ISLNK(mode))
+			if (S_ISLNK(stp->st_mode))
 				return 1;
 		}
 
 #include "case_N.h"
 #ifdef HAVE_UTIMES
-		if (do_utimes(fname, modtime, mod_nsec) == 0)
+		if (do_utimes(fname, stp) == 0)
 			break;
 #else
-		if (do_utime(fname, modtime, mod_nsec) == 0)
+		if (do_utime(fname, stp) == 0)
 			break;
 #endif
 
@@ -1332,18 +1333,14 @@ int unsafe_symlink(const char *dest, const char *src)
 /* Return the date and time as a string.  Some callers tweak returned buf. */
 char *timestring(time_t t)
 {
-	static char TimeBuf[200];
+	static int ndx = 0;
+	static char buffers[4][20]; /* We support 4 simultaneous timestring results. */
+	char *TimeBuf = buffers[ndx = (ndx + 1) % 4];
 	struct tm *tm = localtime(&t);
-	char *p;
 
-#ifdef HAVE_STRFTIME
-	strftime(TimeBuf, sizeof TimeBuf - 1, "%Y/%m/%d %H:%M:%S", tm);
-#else
-	strlcpy(TimeBuf, asctime(tm), sizeof TimeBuf);
-#endif
-
-	if ((p = strchr(TimeBuf, '\n')) != NULL)
-		*p = '\0';
+	snprintf(TimeBuf, sizeof buffers[0], "%4d/%02d/%02d %02d:%02d:%02d",
+		 (int)tm->tm_year + 1900, (int)tm->tm_mon + 1, (int)tm->tm_mday,
+		 (int)tm->tm_hour, (int)tm->tm_min, (int)tm->tm_sec);
 
 	return TimeBuf;
 }

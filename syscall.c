@@ -42,6 +42,7 @@ extern int inplace;
 extern int preallocate_files;
 extern int preserve_perms;
 extern int preserve_executability;
+extern int set_noatime;
 
 #ifndef S_BLKSIZE
 # if defined hpux || defined __hpux__ || defined __hpux
@@ -201,6 +202,11 @@ int do_open(const char *pathname, int flags, mode_t mode)
 		RETURN_ERROR_IF(dry_run, 0);
 		RETURN_ERROR_IF_RO_OR_LO;
 	}
+
+#ifdef O_NOATIME
+	if (set_noatime)
+		flags |= O_NOATIME;
+#endif
 
 	return open(pathname, flags | O_BINARY, mode);
 }
@@ -380,54 +386,78 @@ int do_setattrlist_times(const char *fname, time_t modtime, uint32 mod_nsec)
 #endif
 
 #ifdef HAVE_UTIMENSAT
-int do_utimensat(const char *fname, time_t modtime, uint32 mod_nsec)
+int do_utimensat(const char *fname, STRUCT_STAT *stp)
 {
 	struct timespec t[2];
 
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
 
-	t[0].tv_sec = 0;
-	t[0].tv_nsec = UTIME_NOW;
-	t[1].tv_sec = modtime;
-	t[1].tv_nsec = mod_nsec;
+	t[0].tv_sec = stp->st_atime;
+#ifdef ST_ATIME_NSEC
+	t[0].tv_nsec = stp->ST_ATIME_NSEC;
+#else
+	t[0].tv_nsec = 0;
+#endif
+	t[1].tv_sec = stp->st_mtime;
+#ifdef ST_MTIME_NSEC
+	t[1].tv_nsec = stp->ST_MTIME_NSEC;
+#else
+	t[1].tv_nsec = 0;
+#endif
 	return utimensat(AT_FDCWD, fname, t, AT_SYMLINK_NOFOLLOW);
 }
 #endif
 
 #ifdef HAVE_LUTIMES
-int do_lutimes(const char *fname, time_t modtime, uint32 mod_nsec)
+int do_lutimes(const char *fname, STRUCT_STAT *stp)
 {
 	struct timeval t[2];
 
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
 
-	t[0].tv_sec = time(NULL);
+	t[0].tv_sec = stp->st_atime;
+#ifdef ST_ATIME_NSEC
+	t[0].tv_usec = stp->ST_ATIME_NSEC / 1000;
+#else
 	t[0].tv_usec = 0;
-	t[1].tv_sec = modtime;
-	t[1].tv_usec = mod_nsec / 1000;
+#endif
+	t[1].tv_sec = stp->st_mtime;
+#ifdef ST_MTIME_NSEC
+	t[1].tv_usec = stp->ST_MTIME_NSEC / 1000;
+#else
+	t[1].tv_usec = 0;
+#endif
 	return lutimes(fname, t);
 }
 #endif
 
 #ifdef HAVE_UTIMES
-int do_utimes(const char *fname, time_t modtime, uint32 mod_nsec)
+int do_utimes(const char *fname, STRUCT_STAT *stp)
 {
 	struct timeval t[2];
 
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
 
-	t[0].tv_sec = time(NULL);
+	t[0].tv_sec = stp->st_atime;
+#ifdef ST_ATIME_NSEC
+	t[0].tv_usec = stp->ST_ATIME_NSEC / 1000;
+#else
 	t[0].tv_usec = 0;
-	t[1].tv_sec = modtime;
-	t[1].tv_usec = mod_nsec / 1000;
+#endif
+	t[1].tv_sec = stp->st_mtime;
+#ifdef ST_MTIME_NSEC
+	t[1].tv_usec = stp->ST_MTIME_NSEC / 1000;
+#else
+	t[1].tv_usec = 0;
+#endif
 	return utimes(fname, t);
 }
 
 #elif defined HAVE_UTIME
-int do_utime(const char *fname, time_t modtime, UNUSED(uint32 mod_nsec))
+int do_utime(const char *fname, STRUCT_STAT *stp)
 {
 #ifdef HAVE_STRUCT_UTIMBUF
 	struct utimbuf tbuf;
@@ -439,12 +469,12 @@ int do_utime(const char *fname, time_t modtime, UNUSED(uint32 mod_nsec))
 	RETURN_ERROR_IF_RO_OR_LO;
 
 # ifdef HAVE_STRUCT_UTIMBUF
-	tbuf.actime = time(NULL);
-	tbuf.modtime = modtime;
+	tbuf.actime = stp->st_atime;
+	tbuf.modtime = stp->st_mtime;
 	return utime(fname, &tbuf);
 # else
-	t[0] = time(NULL);
-	t[1] = modtime;
+	t[0] = stp->st_atime;
+	t[1] = stp->st_mtime;
 	return utime(fname, t);
 # endif
 }

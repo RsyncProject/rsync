@@ -63,6 +63,15 @@ iconv_t ic_chck = (iconv_t)-1;
 iconv_t ic_send = (iconv_t)-1, ic_recv = (iconv_t)-1;
 # endif
 
+#define UPDATED_OWNER (1<<0)
+#define UPDATED_GROUP (1<<1)
+#define UPDATED_MTIME (1<<2)
+#define UPDATED_ATIME (1<<3)
+#define UPDATED_ACLS  (1<<4)
+#define UPDATED_MODE  (1<<5)
+
+#define UPDATED_TIMES (UPDATED_MTIME|UPDATED_ATIME)
+
 static const char *default_charset(void)
 {
 # if defined HAVE_LIBCHARSET_H && defined HAVE_LOCALE_CHARSET
@@ -540,7 +549,10 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 					  keep_dirlinks && S_ISDIR(sxp->st.st_mode));
 			}
 		}
-		updated = 1;
+		if (change_uid)
+		    updated |= UPDATED_OWNER;
+		if (change_gid)
+		    updated |= UPDATED_GROUP;
 	}
 
 #ifdef SUPPORT_XATTRS
@@ -553,23 +565,44 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	if (!preserve_times
 	 || (!(preserve_times & PRESERVE_DIR_TIMES) && S_ISDIR(sxp->st.st_mode))
 	 || (!(preserve_times & PRESERVE_LINK_TIMES) && S_ISLNK(sxp->st.st_mode)))
-		flags |= ATTRS_SKIP_MTIME;
+		flags |= ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME;
+	else if (sxp != &sx2)
+		memcpy(&sx2.st, &sxp->st, sizeof (sx2.st));
+	if (!atimes_ndx || S_ISDIR(sxp->st.st_mode))
+		flags |= ATTRS_SKIP_ATIME;
 	if (!(flags & ATTRS_SKIP_MTIME)
 	 && (sxp->st.st_mtime != file->modtime
 #ifdef ST_MTIME_NSEC
 	  || (flags & ATTRS_SET_NANO && NSEC_BUMP(file) && (uint32)sxp->st.ST_MTIME_NSEC != F_MOD_NSEC(file))
 #endif
 	  )) {
-		int ret = set_modtime(fname, file->modtime, F_MOD_NSEC_or_0(file), sxp->st.st_mode);
+		sx2.st.st_mtime = file->modtime;
+#ifdef ST_MTIME_NSEC
+		sx2.st.ST_MTIME_NSEC = F_MOD_NSEC_or_0(file);
+#endif
+		updated |= UPDATED_MTIME;
+	}
+	if (!(flags & ATTRS_SKIP_ATIME)) {
+		time_t file_atime = F_ATIME(file);
+		if (cmp_time(sxp->st.st_atime, 0, file_atime, 0) != 0) {
+			sx2.st.st_atime = file_atime;
+#ifdef ST_ATIME_NSEC
+			sx2.st.ST_ATIME_NSEC = 0;
+#endif
+			updated |= UPDATED_ATIME;
+		}
+	}
+	if (updated & UPDATED_TIMES) {
+		int ret = set_times(fname, &sx2.st);
 		if (ret < 0) {
 			rsyserr(FERROR_XFER, errno, "failed to set times on %s",
 				full_fname(fname));
 			goto cleanup;
 		}
-		if (ret == 0) /* ret == 1 if symlink could not be set */
-			updated = 1;
-		else
+		if (ret > 0) { /* ret == 1 if symlink could not be set */
+			updated &= ~UPDATED_TIMES;
 			file->flags |= FLAG_TIME_FAILED;
+		}
 	}
 
 #ifdef SUPPORT_ACLS
@@ -581,7 +614,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	 * need to chmod(). */
 	if (preserve_acls && !S_ISLNK(new_mode)) {
 		if (set_acl(fname, file, sxp, new_mode) > 0)
-			updated = 1;
+			updated |= UPDATED_ACLS;
 	}
 #endif
 
@@ -595,7 +628,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 			goto cleanup;
 		}
 		if (ret == 0) /* ret == 1 if symlink could not be set */
-			updated = 1;
+			updated |= UPDATED_MODE;
 	}
 #endif
 
@@ -676,7 +709,7 @@ int finish_transfer(const char *fname, const char *fnametmp,
 
 	/* Change permissions before putting the file into place. */
 	set_file_attrs(fnametmp, file, NULL, fnamecmp,
-		       ok_to_set_time ? ATTRS_SET_NANO : ATTRS_SKIP_MTIME);
+		       ok_to_set_time ? ATTRS_SET_NANO : ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME);
 
 	/* move tmp file over real file */
 	if (DEBUG_GTE(RECV, 1))
@@ -701,7 +734,7 @@ int finish_transfer(const char *fname, const char *fnametmp,
 
   do_set_file_attrs:
 	set_file_attrs(fnametmp, file, NULL, fnamecmp,
-		       ok_to_set_time ? ATTRS_SET_NANO : ATTRS_SKIP_MTIME);
+		       ok_to_set_time ? ATTRS_SET_NANO : ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME);
 
 	if (temp_copy_name) {
 		if (do_rename(fnametmp, fname) < 0) {

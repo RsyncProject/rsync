@@ -48,6 +48,7 @@ extern int protocol_version;
 extern int protect_args;
 extern int preserve_uid;
 extern int preserve_gid;
+extern int preserve_atimes;
 extern int preserve_acls;
 extern int preserve_xattrs;
 extern int need_messages_from_generator;
@@ -65,7 +66,7 @@ extern char *iconv_opt;
 #endif
 
 /* These index values are for the file-list's extra-attribute array. */
-int uid_ndx, gid_ndx, acls_ndx, xattrs_ndx, unsort_ndx;
+int pathname_ndx, depth_ndx, atimes_ndx, uid_ndx, gid_ndx, acls_ndx, xattrs_ndx, unsort_ndx;
 
 int receiver_symlink_times = 0; /* receiver can set the time on a symlink */
 int sender_symlink_iconv = 0;	/* sender should convert symlink content */
@@ -136,10 +137,17 @@ void set_allow_inc_recurse(void)
 
 void setup_protocol(int f_out,int f_in)
 {
-	if (am_sender)
-		file_extra_cnt += PTR_EXTRA_CNT;
+	assert(file_extra_cnt == 0);
+	assert(EXTRA64_CNT == 2 || EXTRA64_CNT == 1);
+
+	/* All int64 values must be set first so that they are guaranteed to be
+	 * aligned for direct int64-pointer memory access. */
+	if (preserve_atimes)
+		atimes_ndx = (file_extra_cnt += EXTRA64_CNT);
+	if (am_sender) /* This is most likely in the in64 union as well. */
+		pathname_ndx = (file_extra_cnt += PTR_EXTRA_CNT);
 	else
-		file_extra_cnt++;
+		depth_ndx = ++file_extra_cnt;
 	if (preserve_uid)
 		uid_ndx = ++file_extra_cnt;
 	if (preserve_gid)

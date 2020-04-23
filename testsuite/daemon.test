@@ -27,7 +27,7 @@ outfile="$scratchdir/rsync.out"
 SSH="src/support/lsh.sh --no-cd"
 FILE_REPL='s/^\([^d][^ ]*\) *\(..........[0-9]\) /\1 \2 /'
 DIR_REPL='s/^\(d[^ ]*\)  *[0-9][.,0-9]* /\1         DIR /'
-LS_REPL='s;[0-9][0-9][0-9][0-9]/[0-9][0-9]/[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9];####/##/## ##:##:##;'
+LS_REPL='s;[0-9][0-9][0-9][0-9]/[0-9][0-9]/[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9] ;####/##/## ##:##:## ;g'
 
 build_rsyncd_conf
 
@@ -88,6 +88,15 @@ $RSYNC -r localhost::test-from/f* \
 cat <<EOT >"$chkfile"
 drwxr-xr-x         DIR ####/##/## ##:##:## foo
 -rw-r--r--           4 ####/##/## ##:##:## foo/one
+EOT
+diff $diffopt "$chkfile" "$outfile" || test_fail "test 3 failed"
+
+$RSYNC -rU localhost::test-from/f* \
+    | sed "$FILE_REPL" | sed "$DIR_REPL" | sed "$LS_REPL" \
+    | tee "$outfile"
+cat <<EOT >"$chkfile"
+drwxr-xr-x         DIR ####/##/## ##:##:##                     foo
+-rw-r--r--           4 ####/##/## ##:##:## ####/##/## ##:##:## foo/one
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 3 failed"
 

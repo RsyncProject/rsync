@@ -219,6 +219,14 @@ checkit() {
     # We can just write everything to stdout/stderr, because the
     # wrapper hides it unless there is a problem.
 
+    case "x$TLS_ARGS" in
+    *--atimes*)
+	( cd "$2" && rsync_ls_lR . ) > "$tmpdir/ls-from"
+	;;
+    *)
+	;;
+    esac
+
     echo "Running: \"$1\""  
     eval "$1" 
     status=$?
@@ -226,10 +234,17 @@ checkit() {
 	failed="$failed status=$status"
     fi
 
+    case "x$TLS_ARGS" in
+    *--atimes*)
+	;;
+    *)
+	( cd "$2" && rsync_ls_lR . ) > "$tmpdir/ls-from"
+	;;
+    esac
+
     echo "-------------"
     echo "check how the directory listings compare with diff:"
     echo ""
-    ( cd "$2" && rsync_ls_lR . ) > "$tmpdir/ls-from"
     ( cd "$3" && rsync_ls_lR . ) > "$tmpdir/ls-to"
     diff $diffopt "$tmpdir/ls-from" "$tmpdir/ls-to" || failed="$failed dir-diff"
 

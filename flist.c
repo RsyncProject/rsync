@@ -55,6 +55,7 @@ extern int preserve_specials;
 extern int delete_during;
 extern int missing_args;
 extern int eol_nulls;
+extern int atimes_ndx;
 extern int relative_paths;
 extern int implied_dirs;
 extern int ignore_perishable;
@@ -379,7 +380,7 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file,
 #endif
 			    int ndx, int first_ndx)
 {
-	static time_t modtime;
+	static time_t modtime, atime;
 	static mode_t mode;
 #ifdef SUPPORT_HARD_LINKS
 	static int64 dev;
@@ -479,6 +480,12 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file,
 		modtime = file->modtime;
 	if (NSEC_BUMP(file) && protocol_version >= 31)
 		xflags |= XMIT_MOD_NSEC;
+	if (atimes_ndx && !S_ISDIR(mode)) {
+		if (F_ATIME(file) == atime)
+			xflags |= XMIT_SAME_ATIME;
+		else
+			atime = F_ATIME(file);
+	}
 
 #ifdef SUPPORT_HARD_LINKS
 	if (tmp_dev != -1) {
@@ -565,6 +572,8 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file,
 		write_varint(f, F_MOD_NSEC(file));
 	if (!(xflags & XMIT_SAME_MODE))
 		write_int(f, to_wire_mode(mode));
+	if (atimes_ndx && !S_ISDIR(mode) && !(xflags & XMIT_SAME_ATIME))
+		write_varlong(f, atime, 4);
 	if (preserve_uid && !(xflags & XMIT_SAME_UID)) {
 		if (protocol_version < 30)
 			write_int(f, uid);
@@ -652,7 +661,7 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file,
 
 static struct file_struct *recv_file_entry(int f, struct file_list *flist, int xflags)
 {
-	static int64 modtime;
+	static int64 modtime, atime;
 	static mode_t mode;
 #ifdef SUPPORT_HARD_LINKS
 	static int64 dev;
@@ -799,6 +808,16 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 		modtime_nsec = 0;
 	if (!(xflags & XMIT_SAME_MODE))
 		mode = from_wire_mode(read_int(f));
+	if (atimes_ndx && !S_ISDIR(mode) && !(xflags & XMIT_SAME_ATIME)) {
+		atime = read_varlong(f, 4);
+#if SIZEOF_TIME_T < SIZEOF_INT64
+		if (!am_generator && (int64)(time_t)atime != atime) {
+			rprintf(FERROR_XFER,
+				"Access time value of %s truncated on receiver.\n",
+				lastname);
+		}
+#endif
+	}
 
 	if (chmod_modes && !S_ISLNK(mode) && mode)
 		mode = tweak_mode(mode, chmod_modes);
@@ -966,6 +985,8 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 		F_GROUP(file) = gid;
 		file->flags |= gid_flags;
 	}
+	if (atimes_ndx)
+		F_ATIME(file) = atime;
 	if (unsort_ndx)
 		F_NDX(file) = flist->used + flist->ndx_start;
 
@@ -1363,6 +1384,8 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 		F_GROUP(file) = st.st_gid;
 	if (am_generator && st.st_uid == our_uid)
 		file->flags |= FLAG_OWNED_BY_US;
+	if (atimes_ndx)
+		F_ATIME(file) = st.st_atime;
 
 	if (basename != thisname)
 		file->dirname = lastdir;

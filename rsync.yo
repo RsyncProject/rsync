@@ -378,6 +378,8 @@ to the detailed description below for a complete description.  verb(
      --specials              preserve special files
  -D                          same as --devices --specials
  -t, --times                 preserve modification times
+ -U, --atimes                preserve access (use) times
+     --set-noatime           avoid changing the atime on accessed files
  -O, --omit-dir-times        omit directories from --times
  -J, --omit-link-times       omit symlinks from --times
      --super                 receiver attempts super-user activities
@@ -1239,6 +1241,25 @@ modified cannot be effective; in other words, a missing bf(-t) or bf(-a) will
 cause the next transfer to behave as if it used bf(-I), causing all files to be
 updated (though rsync's delta-transfer algorithm will make the update fairly efficient
 if the files haven't actually changed, you're much better off using bf(-t)).
+
+dit(bf(-U, --atimes)) This tells rsync to set the access (use) times of the
+destination files to the same value as the source files.
+
+If repeated, it also sets the bf(--set-noatime) option, which can help you
+to make the sending and receiving systems have the same access times on the
+transferred files without needing to run rsync an extra time after a file is
+transferred.
+
+Note that some older rsync versions (prior to 3.1.4) may have been built with
+a pre-release bf(--atimes) patch that does not imply bf(--set-noatime) when
+this option is repeated.
+
+dit(bf(--set-noatime)) This tells rsync to open files with the O_NOATIME
+flag (on systems that support it) to avoid changing the access time of the
+files that are being transferred. If your OS does not support the O_NOATIME
+flag then rsync will silently ignore this option. Note also that some
+filesystems are mounted to avoid updating the atime on read access even
+without the O_NOATIME flag being set.
 
 dit(bf(-O, --omit-dir-times)) This tells rsync to omit directories when
 it is preserving modification times (see bf(--times)).  If NFS is sharing
@@ -2263,7 +2284,10 @@ quote(itemization(
   sender's value (requires bf(--owner) and super-user privileges).
   it() A bf(g) means the group is different and is being updated to the
   sender's value (requires bf(--group) and the authority to set the group).
-  it() The bf(u) slot is reserved for future use.
+  it() A bf(u) means the access (use) time is different and is being updated to
+  the sender's value (requires bf(--atimes)).  An alternate value of bf(U)
+  means that the access time will be set to the transfer time, which happens
+  when a symlink or directory is updated.
   it() The bf(a) means that the ACL information changed.
   it() The bf(x) means that the extended attribute information changed.
 ))
