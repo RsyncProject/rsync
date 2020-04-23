@@ -32,7 +32,7 @@ Changes since 3.1.3:
 
     - Improved the --atimes patch and promoted it to be in the release.
 
-    - Added --set-noatime option to open files using O_NOATIME.
+    - Added --open-noatime option to open files using O_NOATIME.
 
     - Improved the --write-devices patch and promoted it to be in the release.
 

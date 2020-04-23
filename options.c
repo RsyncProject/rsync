@@ -65,7 +65,7 @@ int preserve_gid = 0;
 int preserve_times = 0;
 int preserve_atimes = 0;
 int update_only = 0;
-int set_noatime = 0;
+int open_noatime = 0;
 int cvs_exclude = 0;
 int dry_run = 0;
 int do_xfers = 1;
@@ -714,7 +714,7 @@ void usage(enum logcode F)
   rprintf(F," -D                          same as --devices --specials\n");
   rprintf(F," -t, --times                 preserve modification times\n");
   rprintf(F," -U, --atimes                preserve access (last-used) times\n");
-  rprintf(F,"     --set-noatime           avoid changing the atime on accessed files\n");
+  rprintf(F,"     --open-noatime          avoid changing the atime on opened files\n");
   rprintf(F," -O, --omit-dir-times        omit directories from --times\n");
   rprintf(F," -J, --omit-link-times       omit symlinks from --times\n");
   rprintf(F,"     --super                 receiver attempts super-user activities\n");
@@ -879,8 +879,8 @@ static struct poptOption long_options[] = {
   {"atimes",          'U', POPT_ARG_NONE,   0, 'U', 0, 0 },
   {"no-atimes",        0,  POPT_ARG_VAL,    &preserve_atimes, 0, 0, 0 },
   {"no-U",             0,  POPT_ARG_VAL,    &preserve_atimes, 0, 0, 0 },
-  {"set-noatime",      0,  POPT_ARG_VAL,    &set_noatime, 1, 0, 0 },
-  {"no-set-noatime",   0,  POPT_ARG_VAL,    &set_noatime, 0, 0, 0 },
+  {"open-noatime",     0,  POPT_ARG_VAL,    &open_noatime, 1, 0, 0 },
+  {"no-open-noatime",  0,  POPT_ARG_VAL,    &open_noatime, 0, 0, 0 },
   {"omit-dir-times",  'O', POPT_ARG_VAL,    &omit_dir_times, 1, 0, 0 },
   {"no-omit-dir-times",0,  POPT_ARG_VAL,    &omit_dir_times, 0, 0, 0 },
   {"no-O",             0,  POPT_ARG_VAL,    &omit_dir_times, 0, 0, 0 },
@@ -1554,7 +1554,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 
 		case 'U':
 			if (++preserve_atimes > 1)
-			    set_noatime = 1;
+			    open_noatime = 1;
 			break;
 
 		case 'v':
@@ -2850,8 +2850,8 @@ void server_options(char **args, int *argc_p)
 	if (preallocate_files && am_sender)
 		args[ac++] = "--preallocate";
 
-	if (set_noatime && preserve_atimes <= 1)
-		args[ac++] = "--set-noatime";
+	if (open_noatime && preserve_atimes <= 1)
+		args[ac++] = "--open-noatime";
 
 	if (ac > MAX_SERVER_ARGS) { /* Not possible... */
 		rprintf(FERROR, "argc overflow in server_options().\n");

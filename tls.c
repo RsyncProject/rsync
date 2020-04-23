@@ -52,7 +52,7 @@ int nsec_times = 0;
 int preserve_perms = 0;
 int preserve_executability = 0;
 int preallocate_files = 0;
-int set_noatime = 0;
+int open_noatime = 0;
 int inplace = 0;
 
 #ifdef SUPPORT_XATTRS

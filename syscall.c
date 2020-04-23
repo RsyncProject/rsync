@@ -42,7 +42,7 @@ extern int inplace;
 extern int preallocate_files;
 extern int preserve_perms;
 extern int preserve_executability;
-extern int set_noatime;
+extern int open_noatime;
 
 #ifndef S_BLKSIZE
 # if defined hpux || defined __hpux__ || defined __hpux
@@ -204,7 +204,7 @@ int do_open(const char *pathname, int flags, mode_t mode)
 	}
 
 #ifdef O_NOATIME
-	if (set_noatime)
+	if (open_noatime)
 		flags |= O_NOATIME;
 #endif
 

@@ -379,7 +379,7 @@ to the detailed description below for a complete description.  verb(
  -D                          same as --devices --specials
  -t, --times                 preserve modification times
  -U, --atimes                preserve access (use) times
-     --set-noatime           avoid changing the atime on accessed files
+     --open-noatime          avoid changing the atime on opened files
  -O, --omit-dir-times        omit directories from --times
  -J, --omit-link-times       omit symlinks from --times
      --super                 receiver attempts super-user activities
@@ -1245,16 +1245,16 @@ if the files haven't actually changed, you're much better off using bf(-t)).
 dit(bf(-U, --atimes)) This tells rsync to set the access (use) times of the
 destination files to the same value as the source files.
 
-If repeated, it also sets the bf(--set-noatime) option, which can help you
+If repeated, it also sets the bf(--open-noatime) option, which can help you
 to make the sending and receiving systems have the same access times on the
 transferred files without needing to run rsync an extra time after a file is
 transferred.
 
 Note that some older rsync versions (prior to 3.1.4) may have been built with
-a pre-release bf(--atimes) patch that does not imply bf(--set-noatime) when
+a pre-release bf(--atimes) patch that does not imply bf(--open-noatime) when
 this option is repeated.
 
-dit(bf(--set-noatime)) This tells rsync to open files with the O_NOATIME
+dit(bf(--open-noatime)) This tells rsync to open files with the O_NOATIME
 flag (on systems that support it) to avoid changing the access time of the
 files that are being transferred. If your OS does not support the O_NOATIME
 flag then rsync will silently ignore this option. Note also that some
