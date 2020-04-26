@@ -36,7 +36,7 @@ bf(--type=NAME) option overrides this, if specified.
 dit(bf(RSYNC_SSL_PORT)) If specified, the value is the port number that is used
 as the default when the user does not specify a port in their rsync command.
 When not specified, the default port number is 874.  (Note that older rsync
-versions (prior to 3.1.4) did not communicate an overriding port number value
+versions (prior to 3.2.0) did not communicate an overriding port number value
 to the helper script.)
 
 dit(bf(RSYNC_SSL_CERT)) If specified, the value is a filename that contains a

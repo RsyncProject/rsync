@@ -1250,7 +1250,7 @@ to make the sending and receiving systems have the same access times on the
 transferred files without needing to run rsync an extra time after a file is
 transferred.
 
-Note that some older rsync versions (prior to 3.1.4) may have been built with
+Note that some older rsync versions (prior to 3.2.0) may have been built with
 a pre-release bf(--atimes) patch that does not imply bf(--open-noatime) when
 this option is repeated.
 
@@ -1615,7 +1615,7 @@ shell connection, rather than through a direct socket connection to a
 running rsync daemon on the remote host.  See the section "USING
 RSYNC-DAEMON FEATURES VIA A REMOTE-SHELL CONNECTION" above.
 
-Beginning with rsync 3.1.4, the RSYNC_PORT environment variable will be
+Beginning with rsync 3.2.0, the RSYNC_PORT environment variable will be
 set when a daemon connection is being made via a remote-shell
 connection.  It is set to 0 if the default daemon port is being assumed,
 or it is set to the value of the rsync port that was specified via
