@@ -49,11 +49,6 @@ int list_only = 0;
 int link_times = 0;
 int link_owner = 0;
 int nsec_times = 0;
-int preserve_perms = 0;
-int preserve_executability = 0;
-int preallocate_files = 0;
-int open_noatime = 0;
-int inplace = 0;
 
 #ifdef SUPPORT_XATTRS
 

@@ -47,7 +47,6 @@ extern int64 total_data_written;
 extern int64 total_data_read;
 extern mode_t orig_umask;
 extern char *auth_user;
-extern char *checksum_choice;
 extern char *stdout_format;
 extern char *logfile_format;
 extern char *logfile_name;
