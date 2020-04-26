@@ -131,7 +131,7 @@ int set_times(const char *fname, STRUCT_STAT *stp)
 	switch (switch_step) {
 #ifdef HAVE_SETATTRLIST
 #include "case_N.h"
-		if (do_setattrlist_times(fname, modtime, mod_nsec) == 0)
+		if (do_setattrlist_times(fname, stp) == 0)
 			break;
 		if (errno != ENOSYS)
 			return -1;

@@ -367,7 +367,7 @@ OFF_T do_lseek(int fd, OFF_T offset, int whence)
 }
 
 #ifdef HAVE_SETATTRLIST
-int do_setattrlist_times(const char *fname, time_t modtime, uint32 mod_nsec)
+int do_setattrlist_times(const char *fname, STRUCT_STAT *stp)
 {
 	struct attrlist attrList;
 	struct timespec ts;
@@ -375,8 +375,8 @@ int do_setattrlist_times(const char *fname, time_t modtime, uint32 mod_nsec)
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
 
-	ts.tv_sec = modtime;
-	ts.tv_nsec = mod_nsec;
+	ts.tv_sec = stp->st_mtime;
+	ts.tv_nsec = stp->ST_MTIME_NSEC;
 
 	memset(&attrList, 0, sizeof attrList);
 	attrList.bitmapcount = ATTR_BIT_MAP_COUNT;
