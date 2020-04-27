@@ -770,6 +770,8 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 			modtime = first->modtime;
 			modtime_nsec = F_MOD_NSEC_or_0(first);
 			mode = first->mode;
+			if (atimes_ndx && !S_ISDIR(mode))
+				atime = F_ATIME(first);
 			if (preserve_uid)
 				uid = F_OWNER(first);
 			if (preserve_gid)
@@ -985,7 +987,7 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 		F_GROUP(file) = gid;
 		file->flags |= gid_flags;
 	}
-	if (atimes_ndx)
+	if (atimes_ndx && !S_ISDIR(mode))
 		F_ATIME(file) = atime;
 	if (unsort_ndx)
 		F_NDX(file) = flist->used + flist->ndx_start;
@@ -1384,7 +1386,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 		F_GROUP(file) = st.st_gid;
 	if (am_generator && st.st_uid == our_uid)
 		file->flags |= FLAG_OWNED_BY_US;
-	if (atimes_ndx)
+	if (atimes_ndx && !S_ISDIR(file->mode))
 		F_ATIME(file) = st.st_atime;
 
 	if (basename != thisname)
