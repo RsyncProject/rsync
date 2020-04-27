@@ -1277,10 +1277,16 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			 && (*dn != '.' || dn[1]) /* Avoid an issue with --relative and the "." dir. */
 			 && (!prior_dir_file || strcmp(dn, f_name(prior_dir_file, NULL)) != 0)
 			 && flist_find_name(cur_flist, dn, 1) < 0) {
-				rprintf(FERROR,
-					"ABORTING due to invalid path from sender: %s/%s\n",
-					dn, file->basename);
-				exit_cleanup(RERR_PROTOCOL);
+				/* The --delete-missing-args option can actually put invalid entries into
+				 * the file list, so if that option was specified, we'll just complain about
+				 * it and allow it. */
+				if (missing_args == 2 && file->mode == 0)
+					rprintf(FERROR, "WARNING: parent dir is absent in the file list: %s\n", dn);
+				else {
+					rprintf(FERROR, "ABORTING due to invalid path from sender: %s/%s\n",
+						dn, file->basename);
+					exit_cleanup(RERR_PROTOCOL);
+				}
 			}
 			if (relative_paths && !implied_dirs
 			 && do_stat(dn, &sx.st) < 0) {
@@ -1383,7 +1389,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			added_perms = 0;
 		if (is_dir < 0) {
 			if (!(preserve_times & PRESERVE_DIR_TIMES))
-				return;
+				goto cleanup;
 			/* In inc_recurse mode we want to make sure any missing
 			 * directories get created while we're still processing
 			 * the parent dir (which allows us to touch the parent
@@ -1525,7 +1531,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 					"ignoring unsafe symlink \"%s\" -> \"%s\"\n",
 					fname, sl);
 			}
-			return;
+			goto cleanup;
 		}
 		if (statret == 0) {
 			char lnk[MAXPATHLEN];
