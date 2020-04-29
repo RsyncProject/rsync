@@ -2459,7 +2459,9 @@ Rsync will create the em(DIR) if it is missing (just the last dir -- not
 the whole path).  This makes it easy to use a relative path (such as
 "bf(--partial-dir=.rsync-partial)") to have rsync create the
 partial-directory in the destination file's directory when needed, and then
-remove it again when the partial file is deleted.
+remove it again when the partial file is deleted.  Note that the directory
+is only removed if it is a relative pathname, as it is expected that an
+absolute path is to a directory that is reserved for partial-dir work.
 
 If the partial-dir value is not an absolute path, rsync will add an exclude
 rule at the end of all your existing excludes.  This will prevent the
@@ -2492,6 +2494,11 @@ environment and then just use the bf(-P) option to turn on the use of the
 option does not look for this environment value are (1) when bf(--inplace) was
 specified (since bf(--inplace) conflicts with bf(--partial-dir)), and (2) when
 bf(--delay-updates) was specified (see below).
+
+When a modern rsync resumes the transfer of a file in the partial-dir, that
+partial file is now updated in-place instead of creating yet another tmp-file
+copy (so it maxes out at dest + tmp instead of dest + partial + tmp).  This
+requires both ends of the transfer to be at least version 3.2.0.
 
 For the purposes of the daemon-config's "refuse options" setting,
 bf(--partial-dir) does em(not) imply bf(--partial).  This is so that a

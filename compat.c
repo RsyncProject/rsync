@@ -28,6 +28,7 @@ int compat_flags = 0;
 int use_safe_inc_flist = 0;
 int want_xattr_optim = 0;
 int proper_seed_order = 0;
+int inplace_partial = 0;
 
 extern int am_server;
 extern int am_sender;
@@ -81,6 +82,7 @@ int filesfrom_convert = 0;
 #define CF_SAFE_FLIST	 (1<<3)
 #define CF_AVOID_XATTR_OPTIM (1<<4)
 #define CF_CHKSUM_SEED_FIX (1<<5)
+#define CF_INPLACE_PARTIAL_DIR (1<<6)
 
 static const char *client_info;
 
@@ -283,6 +285,8 @@ void setup_protocol(int f_out,int f_in)
 				compat_flags |= CF_AVOID_XATTR_OPTIM;
 			if (local_server || strchr(client_info, 'C') != NULL)
 				compat_flags |= CF_CHKSUM_SEED_FIX;
+			if (local_server || strchr(client_info, 'I') != NULL)
+				compat_flags |= CF_INPLACE_PARTIAL_DIR;
 			write_byte(f_out, compat_flags);
 		} else
 			compat_flags = read_byte(f_in);
@@ -313,6 +317,8 @@ void setup_protocol(int f_out,int f_in)
 		}
 		use_safe_inc_flist = (compat_flags & CF_SAFE_FLIST) || protocol_version >= 31;
 		need_messages_from_generator = 1;
+		if (compat_flags & CF_INPLACE_PARTIAL_DIR)
+			inplace_partial = 1;
 #ifdef CAN_SET_SYMLINK_TIMES
 	} else if (!am_sender) {
 		receiver_symlink_times = 1;

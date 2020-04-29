@@ -498,6 +498,11 @@ int robust_rename(const char *from, const char *to, const char *partialptr,
 {
 	int tries = 4;
 
+	/* A resumed in-place partial-dir transfer might call us with from and
+	 * to pointing to the same buf if the transfer failed yet again. */
+	if (from == to)
+		return 0;
+
 	while (tries--) {
 		if (do_rename(from, to) == 0)
 			return 0;

@@ -42,6 +42,7 @@ extern int remove_source_files;
 extern int updating_basis_file;
 extern int make_backups;
 extern int inplace;
+extern int inplace_partial;
 extern int batch_fd;
 extern int write_batch;
 extern int file_old_total;
@@ -316,8 +317,8 @@ void send_files(int f_in, int f_out)
 				stats.created_files++;
 		}
 
-		updating_basis_file = inplace && (protocol_version >= 29
-			? fnamecmp_type == FNAMECMP_FNAME : make_backups <= 0);
+		updating_basis_file = (inplace_partial && fnamecmp_type == FNAMECMP_PARTIAL_DIR)
+		    || (inplace && (protocol_version >= 29 ? fnamecmp_type == FNAMECMP_FNAME : make_backups <= 0));
 
 		if (!am_server)
 			set_current_file_index(file, ndx);

@@ -52,6 +52,7 @@ extern int keep_partial;
 extern int checksum_seed;
 extern int whole_file;
 extern int inplace;
+extern int inplace_partial;
 extern int allowed_lull;
 extern int delay_updates;
 extern int xfersum_type;
@@ -69,7 +70,7 @@ extern OFF_T preallocated_len;
 static struct bitbag *delayed_bits = NULL;
 static int phase = 0, redoing = 0;
 static flist_ndx_list batch_redo_list;
-/* We're either updating the basis file or an identical copy: */
+/* This is non-0 when we are updating the basis file or an identical copy: */
 static int updating_basis_or_equiv;
 
 #define TMPNAME_SUFFIX ".XXXXXX"
@@ -233,7 +234,7 @@ int open_tmpfile(char *fnametmp, const char *fname, struct file_struct *file)
 }
 
 static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
-			const char *fname, int fd, struct file_struct *file)
+			const char *fname, int fd, struct file_struct *file, int inplace_sizing)
 {
 	static char file_sum1[MAX_DIGEST_LEN];
 	struct map_struct *mapbuf;
@@ -248,14 +249,14 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 	char *map = NULL;
 
 #ifdef SUPPORT_PREALLOCATION
-	if (preallocate_files && fd != -1 && total_size > 0 && (!inplace || total_size > size_r)) {
+	if (preallocate_files && fd != -1 && total_size > 0 && (!inplace_sizing || total_size > size_r)) {
 		/* Try to preallocate enough space for file's eventual length.  Can
 		 * reduce fragmentation on filesystems like ext4, xfs, and NTFS. */
 		if ((preallocated_len = do_fallocate(fd, 0, total_size)) < 0)
 			rsyserr(FWARNING, errno, "do_fallocate %s", full_fname(fname));
 	} else
 #endif
-	if (inplace) {
+	if (inplace_sizing) {
 #ifdef HAVE_FTRUNCATE
 		/* The most compatible way to create a sparse file is to start with no length. */
 		if (sparse_files > 0 && whole_file && fd >= 0 && do_ftruncate(fd, 0) == 0)
@@ -382,9 +383,9 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 	/* inplace: New data could be shorter than old data.
 	 * preallocate_files: total_size could have been an overestimate.
 	 *     Cut off any extra preallocated zeros from dest file. */
-	if ((inplace || preallocated_len > offset) && fd != -1 && !IS_DEVICE(file->mode) && do_ftruncate(fd, offset) < 0) {
-		rsyserr(FERROR_XFER, errno, "ftruncate failed on %s",
-			full_fname(fname));
+	if ((inplace_sizing || preallocated_len > offset) && fd != -1 && !IS_DEVICE(file->mode)) {
+		if (do_ftruncate(fd, offset) < 0)
+			rsyserr(FERROR_XFER, errno, "ftruncate failed on %s", full_fname(fname));
 	}
 #endif
 
@@ -407,7 +408,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 
 static void discard_receive_data(int f_in, struct file_struct *file)
 {
-	receive_data(f_in, NULL, -1, 0, NULL, -1, file);
+	receive_data(f_in, NULL, -1, 0, NULL, -1, file, 0);
 }
 
 static void handle_delayed_updates(char *local_name)
@@ -518,7 +519,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 	int iflags, xlen;
 	char *fname, fbuf[MAXPATHLEN];
 	char xname[MAXPATHLEN];
-	char fnametmp[MAXPATHLEN];
+	char *fnametmp, fnametmpbuf[MAXPATHLEN];
 	char *fnamecmp, *partialptr;
 	char fnamecmpbuf[MAXPATHLEN];
 	uchar fnamecmp_type;
@@ -530,7 +531,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 #ifdef SUPPORT_ACLS
 	const char *parent_dirname = "";
 #endif
-	int ndx, recv_ok;
+	int ndx, recv_ok, one_inplace;
 
 	if (DEBUG_GTE(RECV, 1))
 		rprintf(FINFO, "recv_files(%d) starting\n", cur_flist->used);
@@ -752,6 +753,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 		if (fd1 == -1 && protocol_version < 29) {
 			if (fnamecmp != fname) {
 				fnamecmp = fname;
+				fnamecmp_type = FNAMECMP_FNAME;
 				fd1 = do_open(fnamecmp, O_RDONLY, 0);
 			}
 
@@ -760,12 +762,14 @@ int recv_files(int f_in, int f_out, char *local_name)
 				pathjoin(fnamecmpbuf, sizeof fnamecmpbuf,
 					 basis_dir[0], fname);
 				fnamecmp = fnamecmpbuf;
+				fnamecmp_type = FNAMECMP_BASIS_DIR_LOW;
 				fd1 = do_open(fnamecmp, O_RDONLY, 0);
 			}
 		}
 
-		updating_basis_or_equiv = inplace
-		    && (fnamecmp == fname || fnamecmp_type == FNAMECMP_BACKUP);
+		one_inplace = inplace_partial && fnamecmp_type == FNAMECMP_PARTIAL_DIR;
+		updating_basis_or_equiv = one_inplace
+		    || (inplace && (fnamecmp == fname || fnamecmp_type == FNAMECMP_BACKUP));
 
 		if (fd1 == -1) {
 			st.st_mode = 0;
@@ -831,14 +835,16 @@ int recv_files(int f_in, int f_out, char *local_name)
 		}
 
 		/* We now check to see if we are writing the file "inplace" */
-		if (inplace)  {
-			fd2 = do_open(fname, O_WRONLY|O_CREAT, 0600);
+		if (inplace || one_inplace)  {
+			fnametmp = one_inplace ? partialptr : fname;
+			fd2 = do_open(fnametmp, O_WRONLY|O_CREAT, 0600);
 			if (fd2 == -1) {
 				rsyserr(FERROR_XFER, errno, "open %s failed",
-					full_fname(fname));
+					full_fname(fnametmp));
 			} else if (updating_basis_or_equiv)
 				cleanup_set(NULL, NULL, file, fd1, fd2);
 		} else {
+			fnametmp = fnametmpbuf;
 			fd2 = open_tmpfile(fnametmp, fname, file);
 			if (fd2 != -1)
 				cleanup_set(fnametmp, partialptr, file, fd1, fd2);
@@ -860,7 +866,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 			rprintf(FINFO, "%s\n", fname);
 
 		/* recv file data */
-		recv_ok = receive_data(f_in, fnamecmp, fd1, st.st_size, fname, fd2, file);
+		recv_ok = receive_data(f_in, fnamecmp, fd1, st.st_size, fname, fd2, file, inplace || one_inplace);
 
 		log_item(log_code, file, iflags, NULL);
 		if (want_progress_now)
@@ -881,10 +887,11 @@ int recv_files(int f_in, int f_out, char *local_name)
 					     partialptr, file, recv_ok, 1))
 				recv_ok = -1;
 			else if (fnamecmp == partialptr) {
-				do_unlink(partialptr);
+				if (!one_inplace)
+					do_unlink(partialptr);
 				handle_partial_dir(partialptr, PDIR_DELETE);
 			}
-		} else if (keep_partial && partialptr) {
+		} else if (keep_partial && partialptr && !one_inplace) {
 			if (!handle_partial_dir(partialptr, PDIR_CREATE)) {
 				rprintf(FERROR,
 				    "Unable to create partial-dir for %s -- discarding %s.\n",
@@ -900,7 +907,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 				recv_ok = 2;
 			} else
 				partialptr = NULL;
-		} else
+		} else if (!one_inplace)
 			do_unlink(fnametmp);
 
 		cleanup_disable();
