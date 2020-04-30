@@ -2037,9 +2037,9 @@ void send_extra_file_list(int f, int at_least)
 
 		if (io_error == save_io_error || ignore_errors)
 			write_end_of_flist(f, 0);
-		else if (use_safe_inc_flist) {
+		else if (use_safe_inc_flist)
 			write_end_of_flist(f, 1);
-		} else {
+		else {
 			if (delete_during)
 				fatal_unsafe_io_error();
 			write_end_of_flist(f, 0);
