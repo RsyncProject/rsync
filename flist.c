@@ -101,6 +101,7 @@ int flist_cnt = 0; /* how many (non-tmp) file list objects exist */
 int file_total = 0; /* total of all active items over all file-lists */
 int file_old_total = 0; /* total of active items that will soon be gone */
 int flist_eof = 0; /* all the file-lists are now known */
+int xfer_flags_as_varint = 0;
 
 #define NORMAL_NAME 0
 #define SLASH_ENDING_NAME 1
@@ -528,11 +529,14 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file,
 	if (l2 > 255)
 		xflags |= XMIT_LONG_NAME;
 
-	/* We must make sure we don't send a zero flag byte or the
-	 * other end will terminate the flist transfer.  Note that
-	 * the use of XMIT_TOP_DIR on a non-dir has no meaning, so
-	 * it's harmless way to add a bit to the first flag byte. */
-	if (protocol_version >= 28) {
+	/* We must avoid sending a flag value of 0 (or an initial byte of
+	 * 0 for the older xflags protocol) or it will signal the end of
+	 * the list.  Note that the use of XMIT_TOP_DIR on a non-dir has
+	 * no meaning, so it's a harmless way to add a bit to the first
+	 * flag byte. */
+	if (xfer_flags_as_varint)
+		write_varint(f, xflags ? xflags : XMIT_EXTENDED_FLAGS);
+	else if (protocol_version >= 28) {
 		if (!xflags && !S_ISDIR(mode))
 			xflags |= XMIT_TOP_DIR;
 		if ((xflags & 0xFF00) || !xflags) {
@@ -1969,6 +1973,18 @@ static void send1extra(int f, struct file_struct *file, struct file_list *flist)
 	free(relname_list);
 }
 
+static void write_end_of_flist(int f, int send_io_error)
+{
+	if (xfer_flags_as_varint) {
+		write_varint(f, 0);
+		write_varint(f, send_io_error ? io_error : 0);
+	} else if (send_io_error) {
+		write_shortint(f, XMIT_EXTENDED_FLAGS|XMIT_IO_ERROR_ENDLIST);
+		write_varint(f, io_error);
+	} else
+		write_byte(f, 0);
+}
+
 void send_extra_file_list(int f, int at_least)
 {
 	struct file_list *flist;
@@ -2020,14 +2036,13 @@ void send_extra_file_list(int f, int at_least)
 		}
 
 		if (io_error == save_io_error || ignore_errors)
-			write_byte(f, 0);
+			write_end_of_flist(f, 0);
 		else if (use_safe_inc_flist) {
-			write_shortint(f, XMIT_EXTENDED_FLAGS|XMIT_IO_ERROR_ENDLIST);
-			write_varint(f, io_error);
+			write_end_of_flist(f, 1);
 		} else {
 			if (delete_during)
 				fatal_unsafe_io_error();
-			write_byte(f, 0);
+			write_end_of_flist(f, 0);
 		}
 
 		if (need_unsorted_flist) {
@@ -2356,14 +2371,13 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 	/* Indicate end of file list */
 	if (io_error == 0 || ignore_errors)
-		write_byte(f, 0);
-	else if (use_safe_inc_flist) {
-		write_shortint(f, XMIT_EXTENDED_FLAGS|XMIT_IO_ERROR_ENDLIST);
-		write_varint(f, io_error);
-	} else {
+		write_end_of_flist(f, 0);
+	else if (use_safe_inc_flist)
+		write_end_of_flist(f, 1);
+	else {
 		if (delete_during && inc_recurse)
 			fatal_unsafe_io_error();
-		write_byte(f, 0);
+		write_end_of_flist(f, 0);
 	}
 
 #ifdef SUPPORT_HARD_LINKS
@@ -2482,22 +2496,34 @@ struct file_list *recv_file_list(int f, int dir_ndx)
 		dstart = 0;
 	}
 
-	while ((flags = read_byte(f)) != 0) {
+	while (1) {
 		struct file_struct *file;
 
-		if (protocol_version >= 28 && (flags & XMIT_EXTENDED_FLAGS))
-			flags |= read_byte(f) << 8;
-
-		if (flags == (XMIT_EXTENDED_FLAGS|XMIT_IO_ERROR_ENDLIST)) {
-			int err;
-			if (!use_safe_inc_flist) {
-				rprintf(FERROR, "Invalid flist flag: %x\n", flags);
-				exit_cleanup(RERR_PROTOCOL);
+		if (xfer_flags_as_varint) {
+			if ((flags = read_varint(f)) == 0) {
+				int err = read_varint(f);
+				if (!ignore_errors)
+					io_error |= err;
+				break;
 			}
-			err = read_varint(f);
-			if (!ignore_errors)
-				io_error |= err;
-			break;
+		} else {
+			if ((flags = read_byte(f)) == 0)
+				break;
+
+			if (protocol_version >= 28 && (flags & XMIT_EXTENDED_FLAGS))
+				flags |= read_byte(f) << 8;
+
+			if (flags == (XMIT_EXTENDED_FLAGS|XMIT_IO_ERROR_ENDLIST)) {
+				int err;
+				if (!use_safe_inc_flist) {
+					rprintf(FERROR, "Invalid flist flag: %x\n", flags);
+					exit_cleanup(RERR_PROTOCOL);
+				}
+				err = read_varint(f);
+				if (!ignore_errors)
+					io_error |= err;
+				break;
+			}
 		}
 
 		flist_expand(flist, 1);

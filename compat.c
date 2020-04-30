@@ -52,6 +52,7 @@ extern int preserve_gid;
 extern int preserve_atimes;
 extern int preserve_acls;
 extern int preserve_xattrs;
+extern int xfer_flags_as_varint;
 extern int need_messages_from_generator;
 extern int delete_mode, delete_before, delete_during, delete_after;
 extern char *shell_cmd;
@@ -83,6 +84,7 @@ int filesfrom_convert = 0;
 #define CF_AVOID_XATTR_OPTIM (1<<4)
 #define CF_CHKSUM_SEED_FIX (1<<5)
 #define CF_INPLACE_PARTIAL_DIR (1<<6)
+#define CF_VARINT_FLIST_FLAGS (1<<7)
 
 static const char *client_info;
 
@@ -287,6 +289,8 @@ void setup_protocol(int f_out,int f_in)
 				compat_flags |= CF_CHKSUM_SEED_FIX;
 			if (local_server || strchr(client_info, 'I') != NULL)
 				compat_flags |= CF_INPLACE_PARTIAL_DIR;
+			if (local_server || strchr(client_info, 'V') != NULL)
+				compat_flags |= CF_VARINT_FLIST_FLAGS;
 			write_byte(f_out, compat_flags);
 		} else
 			compat_flags = read_byte(f_in);
@@ -294,6 +298,7 @@ void setup_protocol(int f_out,int f_in)
 		inc_recurse = compat_flags & CF_INC_RECURSE ? 1 : 0;
 		want_xattr_optim = protocol_version >= 31 && !(compat_flags & CF_AVOID_XATTR_OPTIM);
 		proper_seed_order = compat_flags & CF_CHKSUM_SEED_FIX ? 1 : 0;
+		xfer_flags_as_varint = compat_flags & CF_VARINT_FLIST_FLAGS ? 1 : 0;
 		if (am_sender) {
 			receiver_symlink_times = am_server
 			    ? strchr(client_info, 'L') != NULL

@@ -52,6 +52,7 @@
 #define XMIT_SAME_NAME (1<<5)
 #define XMIT_LONG_NAME (1<<6)
 #define XMIT_SAME_TIME (1<<7)
+
 #define XMIT_SAME_RDEV_MAJOR (1<<8)	/* protocols 28 - now (devices only) */
 #define XMIT_NO_CONTENT_DIR (1<<8)	/* protocols 30 - now (dirs only) */
 #define XMIT_HLINKED (1<<9)		/* protocols 28 - now (non-dirs) */
@@ -62,7 +63,12 @@
 #define XMIT_HLINK_FIRST (1<<12)	/* protocols 30 - now (HLINKED files only) */
 #define XMIT_IO_ERROR_ENDLIST (1<<12)	/* protocols 31*- now (w/XMIT_EXTENDED_FLAGS) (also protocol 30 w/'f' compat flag) */
 #define XMIT_MOD_NSEC (1<<13)		/* protocols 31 - now */
-#define XMIT_SAME_ATIME (1<<14) 	/* protocols ?? - now */
+#define XMIT_SAME_ATIME (1<<14) 	/* any protocol - restricted by command-line option */
+#define XMIT_RESERVED_15 (1<<15) 	/* reserved for future use */
+
+/* The following XMIT flags require an rsync that uses a varint for the flag values */
+
+#define XMIT_RESERVED_16 (1<<16) 	/* reserved for future use */
 
 /* These flags are used in the live flist data. */
 

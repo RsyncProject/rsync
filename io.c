@@ -2026,7 +2026,7 @@ void write_varint(int f, int32 x)
 	} else if (cnt > 1)
 		*b = b[cnt] | ~(bit*2-1);
 	else
-		*b = b[cnt];
+		*b = b[1];
 
 	write_buf(f, b, cnt);
 }
