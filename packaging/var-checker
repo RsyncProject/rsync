@@ -1,83 +1,87 @@
-#!/usr/bin/perl
+#!/usr/bin/python3 -B
+
 # This script checks the *.c files for extraneous "extern" variables,
 # for vars that are defined but not used, and for inconsistent array
 # sizes.  Run it from inside the main rsync directory.
 
-use strict;
-use warnings;
+import re, argparse, glob
 
-my %add_syscall_c = map { $_ => 1 } qw( t_stub.c t_unsafe.c tls.c trimslash.c );
-my %add_compat_c = map { $_ => 1 } qw( t_stub.c tls.c trimslash.c wildtest.c );
-my %add_util_c = map { $_ => 1 } qw( t_stub.c t_unsafe.c );
-my %sizes;
+VARS_RE = re.compile(r'^(?!(?:extern|enum)\s)([a-zA-Z]\S*\s+.*);', re.M)
+EXTERNS_RE = re.compile(r'^extern\s+(.*);', re.M)
 
-open(IN, '<', 'syscall.c') or die $!;
-undef $/; my $syscall_c = <IN>; $/ = "\n";
-close IN;
-$syscall_c =~ s/^extern\s.*//mg;
+sizes = { }
 
-open(IN, '<', 'lib/compat.c') or die $!;
-undef $/; my $compat_c = <IN>; $/ = "\n";
-close IN;
-$compat_c =~ s/^extern\s.*//mg;
+def main():
+    add_syscall_c = set('t_stub.c t_unsafe.c tls.c trimslash.c'.split())
+    add_util_c = set('t_stub.c t_unsafe.c'.split())
 
-open(IN, '<', 'util.c') or die $!;
-undef $/; my $util_c = <IN>; $/ = "\n";
-close IN;
-$util_c =~ s/^extern\s.*//mg;
+    syscall_c = slurp_file('syscall.c', True)
+    util_c = slurp_file('util.c', True)
 
-my @files = glob('*.c');
+    for fn in sorted(glob.glob('*.c')):
+        txt = slurp_file(fn)
 
-foreach my $fn (@files) {
-    open(IN, '<', $fn) or die $!;
-    undef $/; $_ = <IN>; $/ = "\n";
-    close IN;
+        var_list = parse_vars(fn, VARS_RE.findall(txt))
+        extern_list = parse_vars(fn, EXTERNS_RE.findall(txt))
+        if not var_list and not extern_list:
+            continue
 
-    my @vars = /^(?!(?:extern|enum)\s)([a-zA-Z]\S*\s+.*);/mg;
-    my @externs = /^extern\s+(.*);/mg;
+        if fn in add_syscall_c:
+            txt += syscall_c
+        if fn in add_util_c:
+            txt += util_c
 
-    $_ .= $syscall_c if $add_syscall_c{$fn};
-    $_ .= $compat_c if $add_compat_c{$fn};
-    $_ .= $util_c if $add_util_c{$fn};
-    s/INFO_GTE/info_levels/g;
-    s/DEBUG_GTE/debug_levels/g;
+        txt = re.sub(r'INFO_GTE', 'info_levels ', txt)
+        txt = re.sub(r'DEBUG_GTE', 'debug_levels ', txt)
+        txt = re.sub(r'SIGACTION\(', 'sigact (', txt)
 
-    check_vars($fn, 'var', @vars);
-    check_vars($fn, 'extern', @externs);
-}
+        find = '|'.join([ re.escape(x) for x in var_list + extern_list ])
+        var_re = re.compile(r'(?<!\sstruct )\b(%s)(?!\w)' % find)
 
-exit;
+        found = { x: 0 for x in var_list + extern_list }
+        for var in var_re.findall(txt):
+            found[var] += 1
 
-# The file's contents are in $_.
-sub check_vars
-{
-    my $fn = shift;
-    my $type = shift;
+        for var in sorted(var_list + extern_list):
+            if found[var] == 1:
+                vtype = 'var' if var in var_list else 'extern'
+                print(fn, f'has extraneous {vtype}: "{var}"')
 
-    foreach my $line (@_) {
-	$line =~ s/\s*\{.*\}//;
-	$line =~ s/\s*\(.*\)//;
-	foreach my $item (split(/\s*,\s*/, $line)) {
-	    $item =~ s/\s*=.*//;
-	    my $sz = $item =~ s/(\[.*?\])// ? $1 : '';
-	    my($var) = $item =~ /([^*\s]+)$/;
-	    if (!defined $var) {
-		print "Bogus match? ($item)\n";
-		next;
-	    }
-	    if ($sz) {
-		if (defined $sizes{$var}) {
-		    if ($sizes{$var} ne $sz) {
-			print $fn, ' has inconsistent size for "', $var,
-			    "\": $sizes{$var} vs $sz\n";
-		    }
-		} else {
-		    $sizes{$var} = $sz;
-		}
-	    }
-	    my @matches = /(?<!\sstruct )\b(\Q$var\E)(?!\w)/g;
-	    push(@matches, /(\QSIGACTION(\E)/g) if $var eq 'sigact';
-	    print $fn, " has extraneous $type: \"", $var, "\"\n" if @matches == 1;
-	}
-    }
-}
+
+def slurp_file(fn, drop_externs=False):
+    with open(fn, 'r', encoding='utf-8') as fh:
+        txt = fh.read()
+    if drop_externs:
+        txt = EXTERNS_RE.sub('', txt)
+    return txt
+
+
+def parse_vars(fn, lines):
+    ret = [ ]
+    for line in lines:
+        line = re.sub(r'\s*\{.*\}', '', line)
+        line = re.sub(r'\s*\(.*\)', '', line)
+        for item in re.split(r'\s*,\s*', line):
+            item = re.sub(r'\s*=.*', '', item)
+            m = re.search(r'(?P<var>\w+)(?P<sz>\[.*?\])?$', item)
+            if not m:
+                print(f"Bogus match? ({item})")
+                continue
+            if m['sz']:
+                if m['var'] in sizes:
+                    if sizes[m['var']] != m['sz']:
+                        var = m['var']
+                        print(fn, f'has inconsistent size for "{var}":', m['sz'], 'vs', sizes[var])
+                else:
+                    sizes[m['var']] = m['sz']
+            ret.append(m['var'])
+    return ret
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Check the *.c files for extraneous extern vars.', add_help=False)
+    parser.add_argument("--help", "-h", action="help", help="Output this help message and exit.")
+    args = parser.parse_args()
+    main()
+
+# vim: sw=4 et
