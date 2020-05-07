@@ -80,7 +80,7 @@ def main():
         with open(fn, 'r', encoding='utf-8') as fh:
             txt = fh.read()
 
-        txt = re.sub(r'^(manpage\([^)]+\)\(\d+\)\()[^)]+(\).*)', r'\1%s\2' % today, txt, flags=re.M)
+        txt = re.sub(r'^(manpage\([^)]+\)\(\d+\)\()[^)]+(\).*)', r'\g<1>%s\2' % today, txt, flags=re.M)
 
         with open(yo_tmp, 'w', encoding='utf-8') as fh:
             fh.write(txt)
