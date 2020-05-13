@@ -1875,7 +1875,7 @@ is not specified then the user's default groups are used.
 
 The option only affects one side of the transfer unless the transfer is local,
 in which case it affects both sides. Use the bf(--remote-option) to affect the
-remote side, such as bf(-M--copy-as=joe). For a local transfer, see the "lsh"
+remote side, such as bf(-M--copy-as=joe). For a local transfer, the "lsh"
 support file provides a local-shell helper script that can be used to allow a
 "localhost:" host-spec to be specified without needing to setup any remote
 shells (allowing you to specify remote options that affect the side of the
@@ -1895,7 +1895,7 @@ verb(   sudo rsync -aiv --copy-as=joe host1:backups/joe/ /home/joe/)
 
 This makes all files owned by user "joe", limits the groups to those that are
 available to that user, and makes it impossible for the joe user to do a timed
-exploit of the path to induce a change to a file that the joe use has no
+exploit of the path to induce a change to a file that the joe user has no
 permissions to change.
 
 dit(bf(-T, --temp-dir=DIR)) This option instructs rsync to use DIR as a
