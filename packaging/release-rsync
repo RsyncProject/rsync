@@ -298,7 +298,7 @@ About to:
         os.umask(oldmask)
         os.environ['GPG_PASSFILE'] = passfile
 
-        out = cmd_txt(f"git tag -s -m 'Version {version}.' {v_ver}")[0]
+        out = cmd_txt(f"git tag -s -m 'Version {version}.' {v_ver}")
         print(out, end='')
         if 'bad passphrase' in out:
             continue
@@ -306,7 +306,7 @@ About to:
             die('Aborting')
 
         if os.path.isdir('patches/.git'):
-            out = cmd_txt(f"cd patches && git tag -s -m 'Version {version}.' {v_ver}")[0]
+            out = cmd_txt(f"cd patches && git tag -s -m 'Version {version}.' {v_ver}")
             print(out, end='')
             if 'bad passphrase' in out or 'failed' in out:
                 die('Aborting')

@@ -3,6 +3,8 @@ import os, sys, re, subprocess
 # This python3 library provides a few helpful routines that are
 # used by the latest packaging scripts.
 
+default_encoding = 'utf-8'
+
 # Output the msg args to stderr.  Accepts all the args that print() accepts.
 def warn(*msg):
     print(*msg, file=sys.stderr)
@@ -15,54 +17,82 @@ def die(*msg):
     sys.exit(1)
 
 
-def _tweak_opts(cmd, opts):
+# Set this to an encoding name or set it to None to avoid the default encoding idiom.
+def set_default_encoding(enc):
+    default_encoding = enc
+
+
+# Set shell=True if the cmd is a string; sets a default encoding unless raw=True was specified.
+def _tweak_opts(cmd, opts, **maybe_set):
+    # This sets any maybe_set value that isn't already set AND creates a copy of opts for us.
+    opts = {**maybe_set, **opts}
+
     if type(cmd) == str:
-        opts['shell'] = True
-    if not 'encoding' in opts:
-        if opts.get('raw', False):
-            del opts['raw']
-        else:
-            opts['encoding'] = 'utf-8'
+        opts = {'shell': True, **opts}
+
+    want_raw = opts.pop('raw', False)
+    if default_encoding and not want_raw:
+        opts = {'encoding': default_encoding, **opts}
+
+    capture = opts.pop('capture', None)
+    if capture:
+        if capture == 'stdout':
+            opts = {'stdout': subprocess.PIPE, **opts}
+        elif capture == 'stderr':
+            opts = {'stderr': subprocess.PIPE, **opts}
+        elif capture == 'output':
+            opts = {'stdout': subprocess.PIPE, 'stderr': subprocess.PIPE, **opts}
+        elif capture == 'combined':
+            opts = {'stdout': subprocess.PIPE, 'stderr': subprocess.STDOUT, **opts}
+
+    discard = opts.pop('discard', None)
+    if discard:
+        # We DO want to override any already set stdout|stderr values (unlike above).
+        if discard == 'stdout' or discard == 'output':
+            opts['stdout'] = subprocess.DEVNULL
+        if discard == 'stderr' or discard == 'output':
+            opts['stderr'] = subprocess.DEVNULL
+
+    return opts
 
 
 # This does a normal subprocess.run() with some auto-args added to make life easier.
 def cmd_run(cmd, **opts):
-    _tweak_opts(cmd, opts)
-    return subprocess.run(cmd, **opts)
+    return subprocess.run(cmd, **_tweak_opts(cmd, opts))
 
 
-# Works like cmd_run() with a default check=True specified for you.
+# Like cmd_run() with a default check=True specified.
 def cmd_chk(cmd, **opts):
-    return cmd_run(cmd, check=True, **opts)
+    return subprocess.run(cmd, **_tweak_opts(cmd, opts, check=True))
 
 
-# Captures stdout & stderr together in a string and returns the (output, return-code) tuple.
-def cmd_txt(cmd, **opts):
-    opts['stdout'] = subprocess.PIPE
-    opts['stderr'] = subprocess.STDOUT
-    _tweak_opts(cmd, opts)
-    proc = subprocess.Popen(cmd, **opts)
+# Capture stdout in a string and return the (output, return_code) tuple.
+# Use capture='combined' opt to get both stdout and stderr together.
+def cmd_txt_status(cmd, **opts):
+    proc = subprocess.Popen(cmd, **_tweak_opts(cmd, opts, capture='stdout'))
     out = proc.communicate()[0]
     return (out, proc.returncode)
 
 
-# Captures stdout & stderr together in a string and returns the output if the command has a 0
-# return-code. Otherwise it throws an exception that indicates the return code and all the
-# captured output.
+# Like cmd_txt_status() but just return the output.
+def cmd_txt(cmd, **opts):
+    return cmd_txt_status(cmd, **opts)[0]
+
+
+# Capture stdout in a string and return the output if the command has a 0 return code.
+# Otherwise it throws an exception that indicates the return code and the output.
 def cmd_txt_chk(cmd, **opts):
-    out, rc = cmd_txt(cmd, **opts)
+    out, rc = cmd_txt_status(cmd, **opts)
     if rc != 0:
         cmd_err = f'Command "{cmd}" returned non-zero exit status "{rc}" and output:\n{out}'
         raise Exception(cmd_err)
     return out
 
 
-# Starts a piped-output command of just stdout (by default) and leaves it up to you to do
-# any incremental reading of the output and to call communicate() on the returned object.
+# Starts a piped-output command of stdout (by default) and leaves it up to you to read
+# the output and call communicate() on the returned object.
 def cmd_pipe(cmd, **opts):
-    opts['stdout'] = subprocess.PIPE
-    _tweak_opts(cmd, opts)
-    return subprocess.Popen(cmd, **opts)
+    return subprocess.Popen(cmd, **_tweak_opts(cmd, opts, capture='stdout'))
 
 
 # Runs a "git status" command and dies if the checkout is not clean (the
