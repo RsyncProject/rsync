@@ -1700,8 +1700,6 @@ int main(int argc,char *argv[])
 #endif
 
 	if (!parse_arguments(&argc, (const char ***) &argv)) {
-		/* FIXME: We ought to call the same error-handling
-		 * code here, rather than relying on getopt. */
 		option_error();
 		exit_cleanup(RERR_SYNTAX);
 	}

@@ -1138,6 +1138,7 @@ void option_error(void)
 	}
 
 	rprintf(FERROR, RSYNC_NAME ": %s", err_buf);
+	io_flush(FULL_FLUSH);
 	msleep(20);
 }
 

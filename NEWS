@@ -24,6 +24,9 @@ Changes since 3.1.3:
     - Fixed an issue with --remove-source-files not removing a source symlink
       when combined with --copy-links.
 
+    - Fixed a bug where the daemon would fail to write early fatal error
+      messages to the client, such as refused or unknown command-line options.
+
     - Fixed the block-size validation logic when dealing with older protocols.
 
     - Some rrsync fixes and enhancements to handle the latest options.

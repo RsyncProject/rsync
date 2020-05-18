@@ -965,6 +965,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 			}
 			if (*err_msg)
 				rprintf(FERROR, "%s\n", err_msg);
+			io_flush(FULL_FLUSH);
 		} else
 			option_error();
 		msleep(400);
