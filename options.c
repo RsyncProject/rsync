@@ -1143,75 +1143,145 @@ void option_error(void)
 }
 
 
+static void set_one_refuse_option(int negated, const char *ref, const struct poptOption *list_end)
+{
+	struct poptOption *op;
+	char shortName[2];
+	int is_wild = strpbrk(ref, "*?[") != NULL;
+	int found_match = 0;
+
+	shortName[1] = '\0';
+
+	if (strcmp("a", ref) == 0 || strcmp("archive", ref) == 0) {
+		ref = "[ardlptgoD]";
+		is_wild = 1;
+	}
+
+	for (op = long_options; op != list_end; op++) {
+		*shortName = op->shortName;
+		if ((op->longName && wildmatch(ref, op->longName))
+		 || (*shortName && wildmatch(ref, shortName))) {
+			if (*op->descrip == 'a' || *op->descrip == 'r')
+				op->descrip = negated ? "accepted" : "refused";
+			else if (!is_wild)
+				op->descrip = negated ? "ACCEPTED" : "REFUSED";
+			found_match = 1;
+			if (!is_wild)
+				break;
+		}
+	}
+
+	if (!found_match)
+		rprintf(FLOG, "No match for refuse-options string \"%s\"\n", ref);
+}
+
+
 /**
  * Tweak the option table to disable all options that the rsyncd.conf
  * file has told us to refuse.
  **/
-static void set_refuse_options(char *bp)
+static void set_refuse_options(void)
 {
-	struct poptOption *op;
-	char *cp, shortname[2];
-	int is_wild, found_match;
+	struct poptOption *op, *list_end = NULL;
+	char *cp, *ref = lp_refuse_options(module_id);
+	int negated;
 
-	shortname[1] = '\0';
+	if (!ref)
+		ref = "";
+
+	if (!*ref && !am_daemon) /* A simple optimization */
+		return;
+
+	/* We abuse the descrip field in poptOption to make it easy to flag which options
+	 * are refused (since we don't use it otherwise).  Start by marking all options
+	 * as accepted except for some that are marked as ACCEPTED (non-wild-matched). */
+	for (op = long_options; ; op++) {
+		const char *longName = op->longName ? op->longName : "";
+		if (!op->longName && !op->shortName) {
+			list_end = op;
+			break;
+		}
+		/* These options are protected from wild-card matching, but the user is free to
+		 * shoot themselves in the foot if they specify the option explicitly. */
+		if (op->shortName == 'e'
+		 || op->shortName == '0' /* --from0 just modifies --files-from, so refuse that instead (or not) */
+		 || op->shortName == 's' /* --protect-args is always OK */
+		 || op->shortName == 'n' /* --dry-run is always OK */
+		 || strcmp("server", longName) == 0
+		 || strcmp("sender", longName) == 0
+		 || strcmp("iconv", longName) == 0
+		 || strcmp("no-iconv", longName) == 0
+		 || strcmp("checksum-seed", longName) == 0
+		 || strcmp("write-devices", longName) == 0 /* disable wild-match (it gets refused below) */
+		 || strcmp("log-format", longName) == 0)
+			op->descrip = "ACCEPTED";
+		else
+			op->descrip = "accepted";
+	}
+	assert(list_end != NULL);
+
+	if (am_daemon) /* Refused by default, but can be accepted via "!write-devices" */
+		set_one_refuse_option(0, "write-devices", list_end);
 
 	while (1) {
-		while (*bp == ' ') bp++;
-		if (!*bp)
+		while (*ref == ' ') ref++;
+		if (!*ref)
 			break;
-		if ((cp = strchr(bp, ' ')) != NULL)
-			*cp= '\0';
-		is_wild = strpbrk(bp, "*?[") != NULL;
-		found_match = 0;
-		for (op = long_options; ; op++) {
-			*shortname = op->shortName;
-			if (!op->longName && !*shortname)
-				break;
-			if ((op->longName && wildmatch(bp, op->longName))
-			    || (*shortname && wildmatch(bp, shortname))) {
-				if (op->argInfo == POPT_ARG_VAL)
-					op->argInfo = POPT_ARG_NONE;
-				op->val = (op - long_options) + OPT_REFUSED_BASE;
-				found_match = 1;
-				/* These flags are set to let us easily check
-				 * an implied option later in the code. */
-				switch (*shortname) {
-				case 'r': case 'd': case 'l': case 'p':
-				case 't': case 'g': case 'o': case 'D':
-					refused_archive_part = op->val;
-					break;
-				case 'z':
-					refused_compress = op->val;
-					break;
-				case '\0':
-					if (wildmatch("delete", op->longName))
-						refused_delete = op->val;
-					else if (wildmatch("delete-before", op->longName))
-						refused_delete_before = op->val;
-					else if (wildmatch("delete-during", op->longName))
-						refused_delete_during = op->val;
-					else if (wildmatch("partial", op->longName))
-						refused_partial = op->val;
-					else if (wildmatch("progress", op->longName))
-						refused_progress = op->val;
-					else if (wildmatch("inplace", op->longName))
-						refused_inplace = op->val;
-					else if (wildmatch("no-iconv", op->longName))
-						refused_no_iconv = op->val;
-					break;
-				}
-				if (!is_wild)
-					break;
-			}
-		}
-		if (!found_match) {
-			rprintf(FLOG, "No match for refuse-options string \"%s\"\n",
-				bp);
-		}
+		if ((cp = strchr(ref, ' ')) != NULL)
+			*cp = '\0';
+		negated = *ref == '!';
+		if (negated && ref[1])
+			ref++;
+		set_one_refuse_option(negated, ref, list_end);
 		if (!cp)
 			break;
 		*cp = ' ';
-		bp = cp + 1;
+		ref = cp + 1;
+	}
+
+	if (am_daemon) {
+#ifdef ICONV_OPTION
+		if (!*lp_charset(module_id))
+			set_one_refuse_option(0, "iconv", list_end);
+#endif
+		set_one_refuse_option(0, "log-file", list_end);
+	}
+
+	/* Now we use the descrip values to actually mark the options for refusal. */
+	for (op = long_options; op != list_end; op++) {
+		int refused = *op->descrip == 'r' || *op->descrip == 'R';
+		op->descrip = NULL;
+		if (!refused)
+			continue;
+		if (op->argInfo == POPT_ARG_VAL)
+			op->argInfo = POPT_ARG_NONE;
+		op->val = (op - long_options) + OPT_REFUSED_BASE;
+		/* The following flags are set to let us easily check an implied option later in the code. */
+		switch (op->shortName) {
+		case 'r': case 'd': case 'l': case 'p':
+		case 't': case 'g': case 'o': case 'D':
+			refused_archive_part = op->val;
+			break;
+		case 'z':
+			refused_compress = op->val;
+			break;
+		case '\0':
+			if (strcmp("delete", op->longName) == 0)
+				refused_delete = op->val;
+			else if (strcmp("delete-before", op->longName) == 0)
+				refused_delete_before = op->val;
+			else if (strcmp("delete-during", op->longName) == 0)
+				refused_delete_during = op->val;
+			else if (strcmp("partial", op->longName) == 0)
+				refused_partial = op->val;
+			else if (strcmp("progress", op->longName) == 0)
+				refused_progress = op->val;
+			else if (strcmp("inplace", op->longName) == 0)
+				refused_inplace = op->val;
+			else if (strcmp("no-iconv", op->longName) == 0)
+				refused_no_iconv = op->val;
+			break;
+		}
 	}
 }
 
@@ -1327,7 +1397,6 @@ static void popt_unalias(poptContext con, const char *opt)
 int parse_arguments(int *argc_p, const char ***argv_p)
 {
 	static poptContext pc;
-	char *ref = lp_refuse_options(module_id);
 	const char *arg, **argv = *argv_p;
 	int argc = *argc_p;
 	int opt;
@@ -1337,16 +1406,8 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		strlcpy(err_buf, "argc is zero!\n", sizeof err_buf);
 		return 0;
 	}
-	if (ref && *ref)
-		set_refuse_options(ref);
-	if (am_daemon) {
-		set_refuse_options("log-file*");
-#ifdef ICONV_OPTION
-		if (!*lp_charset(module_id))
-			set_refuse_options("iconv");
-#endif
-		set_refuse_options("write-devices");
-	}
+
+	set_refuse_options();
 
 #ifdef ICONV_OPTION
 	if (!am_daemon && protect_args <= 0 && (arg = getenv("RSYNC_ICONV")) != NULL && *arg)
@@ -1555,7 +1616,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 
 		case 'U':
 			if (++preserve_atimes > 1)
-			    open_noatime = 1;
+				open_noatime = 1;
 			break;
 
 		case 'v':
