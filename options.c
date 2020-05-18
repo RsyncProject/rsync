@@ -1161,10 +1161,10 @@ static void parse_one_refuse_match(int negated, const char *ref, const struct po
 		*shortName = op->shortName;
 		if ((op->longName && wildmatch(ref, op->longName))
 		 || (*shortName && wildmatch(ref, shortName))) {
-			if (*op->descrip == 'a' || *op->descrip == 'r')
-				op->descrip = negated ? "accepted" : "refused";
+			if (op->descrip[1] == '*')
+				op->descrip = negated ? "a*" : "r*";
 			else if (!is_wild)
-				op->descrip = negated ? "ACCEPTED" : "REFUSED";
+				op->descrip = negated ? "a=" : "r=";
 			found_match = 1;
 			if (!is_wild)
 				break;
@@ -1194,29 +1194,27 @@ static void set_refuse_options(void)
 
 	/* We abuse the descrip field in poptOption to make it easy to flag which options
 	 * are refused (since we don't use it otherwise).  Start by marking all options
-	 * as accepted except for some that are marked as ACCEPTED (non-wild-matched). */
+	 * as "a"ccepted with a few options also marked as non-wild. */
 	for (op = long_options; ; op++) {
 		const char *longName = op->longName ? op->longName : "";
 		if (!op->longName && !op->shortName) {
 			list_end = op;
 			break;
 		}
-		/* These options are protected from wild-card matching, but the user is free to
-		 * shoot themselves in the foot if they specify the option explicitly. */
-		if (op->shortName == 'e'
+		if (op->shortName == 'e' /* Required for compatibility flags */
 		 || op->shortName == '0' /* --from0 just modifies --files-from, so refuse that instead (or not) */
 		 || op->shortName == 's' /* --protect-args is always OK */
 		 || op->shortName == 'n' /* --dry-run is always OK */
-		 || strcmp("server", longName) == 0
-		 || strcmp("sender", longName) == 0
 		 || strcmp("iconv", longName) == 0
 		 || strcmp("no-iconv", longName) == 0
 		 || strcmp("checksum-seed", longName) == 0
 		 || strcmp("write-devices", longName) == 0 /* disable wild-match (it gets refused below) */
-		 || strcmp("log-format", longName) == 0)
-			op->descrip = "ACCEPTED";
+		 || strcmp("log-format", longName) == 0 /* aka out-format (NOT log-file-format) */
+		 || strcmp("sender", longName) == 0
+		 || strcmp("server", longName) == 0)
+			op->descrip = "a="; /* exact-match only */
 		else
-			op->descrip = "accepted";
+			op->descrip = "a*"; /* wild-card-able */
 	}
 	assert(list_end != NULL);
 
@@ -1249,7 +1247,7 @@ static void set_refuse_options(void)
 
 	/* Now we use the descrip values to actually mark the options for refusal. */
 	for (op = long_options; op != list_end; op++) {
-		int refused = *op->descrip == 'r' || *op->descrip == 'R';
+		int refused = op->descrip[0] == 'r';
 		op->descrip = NULL;
 		if (!refused)
 			continue;
