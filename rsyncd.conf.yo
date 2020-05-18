@@ -736,7 +736,7 @@ default. A good choice for anonymous rsync daemons may be 600 (giving
 a 10 minute timeout).
 
 dit(bf(refuse options)) This parameter allows you to specify a space-separated
-list of rsync command line options that will be refused by your rsync daemon.
+list of rsync command-line options that will be refused by your rsync daemon.
 You may specify the full option name, its one-letter abbreviation, or a
 wild-card string that matches multiple options. Beginning in 3.2.0, you can
 also negate a match term by starting it with a "!".
@@ -758,13 +758,13 @@ verb(    refuse options = delete-* !delete-during)
 
 Negated matching can also turn your list of refused options into a list of
 accepted options. To do this, begin the list with a "*" (to refuse all options)
-and then specify one or more negated matches to allow.  For example:
+and then specify one or more negated matches to accept.  For example:
 
 verb(    refuse options = * !a !v !compress*)
 
-Don't worry that the "*" will refuse certain vital options such as
+Don't worry that the "*" will refuse certain vital options such as bf(--dry-run),
 bf(--server), bf(--no-iconv), bf(--protect-args), etc. These important options
-are not matched by a wild-card, so they must be overridden by their exact name.
+are not matched by wild-card, so they must be overridden by their exact name.
 For instance, if you're forcing iconv transfers you could use something like
 this:
 
@@ -781,7 +781,7 @@ As an additional safety feature, the refusal of "delete" also refuses
 bf(remove-source-files) when the daemon is the sender; if you want the latter
 without the former, instead refuse "delete-*" as that refuses all the delete
 modes without affecting bf(--remove-source-files). (Keep in mind that the
-client's bf(--delete) option typically enables bf(--delete-during).)
+client's bf(--delete) option typically results in bf(--delete-during).)
 
 When un-refusing delete options, you should either specify "!delete*" (to
 accept all delete options) or specify a limited set that includes "delete",
@@ -794,14 +794,30 @@ verb(    refuse options = * !a !delete !delete-during)
 verb(    refuse options = * !a !delete* delete-after)
 
 A note on refusing "compress" -- it is better to set the "dont compress" daemon
-option to "*" because that disables compression silently instead of returning
+parameter to "*" because that disables compression silently instead of returning
 an error that forces the client to remove the bf(-z) option.
 
 If you are un-refusing the compress option, you probably want to match
-"!compress*" so that you also allow the bf(--compress-level) option.
+"!compress*" so that you also accept the bf(--compress-level) option.
 
-Finally, the "write-devices" option is refused by default, but can be
-explicitly enabled with "!write-devices".
+Note that the "write-devices" option is refused by default, but can be
+explicitly accepted with "!write-devices".
+
+Here are all the options that are not matched by wild-cards:
+
+quote(itemization(
+  it() bf(--server): Required for rsync to even work.
+  it() bf(-e): Required to convey compatibility flags to the server.
+  it() bf(--log-format): This is required to convey things like bf(--itemize-changes) to a remote receiver. Is an older name for bf(--out-format) that is still passed to the server for improved backward compatibility and should not be confused with bf(--log-file-format).
+  it() bf(--sender): Use "write only" parameter instead of refusing this.
+  it() bf(-n, --dry-run): Who would want to disable this?
+  it() bf(-s, --protect-args): This actually makes transfers safer.
+  it() bf(-0, --from0): Make it easier to accept/refuse bf(--files-from) without affecting this modifier.
+  it() bf(--iconv): This is auto-disabled based on "charset" parameter.
+  it() bf(--no-iconv): Most transfers use this option.
+  it() bf(--checksum-seed): Is a fairly rare, safe option.
+  it() bf(--write-devices): Is non-wild but also auto-disabled.
+))
 
 dit(bf(dont compress)) This parameter allows you to select
 filenames based on wildcard patterns that should not be compressed
