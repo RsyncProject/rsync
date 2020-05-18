@@ -1143,7 +1143,7 @@ void option_error(void)
 }
 
 
-static void set_one_refuse_option(int negated, const char *ref, const struct poptOption *list_end)
+static void parse_one_refuse_match(int negated, const char *ref, const struct poptOption *list_end)
 {
 	struct poptOption *op;
 	char shortName[2];
@@ -1221,7 +1221,7 @@ static void set_refuse_options(void)
 	assert(list_end != NULL);
 
 	if (am_daemon) /* Refused by default, but can be accepted via "!write-devices" */
-		set_one_refuse_option(0, "write-devices", list_end);
+		parse_one_refuse_match(0, "write-devices", list_end);
 
 	while (1) {
 		while (*ref == ' ') ref++;
@@ -1232,7 +1232,7 @@ static void set_refuse_options(void)
 		negated = *ref == '!';
 		if (negated && ref[1])
 			ref++;
-		set_one_refuse_option(negated, ref, list_end);
+		parse_one_refuse_match(negated, ref, list_end);
 		if (!cp)
 			break;
 		*cp = ' ';
@@ -1242,9 +1242,9 @@ static void set_refuse_options(void)
 	if (am_daemon) {
 #ifdef ICONV_OPTION
 		if (!*lp_charset(module_id))
-			set_one_refuse_option(0, "iconv", list_end);
+			parse_one_refuse_match(0, "iconv", list_end);
 #endif
-		set_one_refuse_option(0, "log-file", list_end);
+		parse_one_refuse_match(0, "log-file*", list_end);
 	}
 
 	/* Now we use the descrip values to actually mark the options for refusal. */

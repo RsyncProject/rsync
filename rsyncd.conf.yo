@@ -801,7 +801,8 @@ If you are un-refusing the compress option, you probably want to match
 "!compress*" so that you also accept the bf(--compress-level) option.
 
 Note that the "write-devices" option is refused by default, but can be
-explicitly accepted with "!write-devices".
+explicitly accepted with "!write-devices".  The options "log-file" and
+"log-file-format" are forcibly refused and cannot be accepted.
 
 Here are all the options that are not matched by wild-cards:
 
