@@ -12,6 +12,8 @@ LIBS=@LIBS@
 CC=@CC@
 CFLAGS=@CFLAGS@
 CPPFLAGS=@CPPFLAGS@
+CXX=@CXX@
+CXXFLAGS=@CXXFLAGS@
 EXEEXT=@EXEEXT@
 LDFLAGS=@LDFLAGS@
 LIBOBJDIR=lib/
@@ -41,10 +43,11 @@ OBJS1=flist.o rsync.o generator.o receiver.o cleanup.o sender.o exclude.o \
 OBJS2=options.o io.o compat.o hlink.o token.o uidlist.o socket.o hashtable.o \
 	fileio.o batch.o clientname.o chmod.o acls.o xattrs.o
 OBJS3=progress.o pipe.o
+CXXOBJ=@CXXOBJ@
 DAEMON_OBJ = params.o loadparm.o clientserver.o access.o connection.o authenticate.o
 popt_OBJS=popt/findme.o  popt/popt.o  popt/poptconfig.o \
 	popt/popthelp.o popt/poptparse.o
-OBJS=$(OBJS1) $(OBJS2) $(OBJS3) $(DAEMON_OBJ) $(LIBOBJ) @BUILD_ZLIB@ @BUILD_POPT@
+OBJS=$(OBJS1) $(OBJS2) $(OBJS3) $(CXXOBJ) $(DAEMON_OBJ) $(LIBOBJ) @BUILD_ZLIB@ @BUILD_POPT@
 
 TLS_OBJ = tls.o syscall.o t_stub.o lib/compat.o lib/snprintf.o lib/permstring.o lib/sysxattrs.o @BUILD_POPT@
 
@@ -114,6 +117,9 @@ rounding.h: rounding.c rsync.h proto.h
 	    exit 1; \
 	fi
 	@rm -f rounding.out
+
+checksum_sse2.o: checksum_sse2.cpp
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $<
 
 tls$(EXEEXT): $(TLS_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(TLS_OBJ) $(LIBS)

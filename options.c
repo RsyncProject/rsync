@@ -578,6 +578,7 @@ static void print_rsync_version(enum logcode f)
 	char const *links = "no ";
 	char const *iconv = "no ";
 	char const *ipv6 = "no ";
+	char const *sse2 = "no ";
 	STRUCT_STAT *dumstat;
 
 #if SUBPROTOCOL_VERSION != 0
@@ -614,6 +615,9 @@ static void print_rsync_version(enum logcode f)
 #ifdef CAN_SET_SYMLINK_TIMES
 	symtimes = "";
 #endif
+#ifdef ENABLE_SSE2
+	sse2 = "";
+#endif
 
 	rprintf(f, "%s  version %s  protocol version %d%s\n",
 		RSYNC_NAME, RSYNC_VERSION, PROTOCOL_VERSION, subprotocol);
@@ -627,8 +631,8 @@ static void print_rsync_version(enum logcode f)
 		(int)(sizeof (int64) * 8));
 	rprintf(f, "    %ssocketpairs, %shardlinks, %ssymlinks, %sIPv6, batchfiles, %sinplace,\n",
 		got_socketpair, hardlinks, links, ipv6, have_inplace);
-	rprintf(f, "    %sappend, %sACLs, %sxattrs, %siconv, %ssymtimes, %sprealloc\n",
-		have_inplace, acls, xattrs, iconv, symtimes, prealloc);
+	rprintf(f, "    %sappend, %sACLs, %sxattrs, %siconv, %ssymtimes, %sprealloc, %ssse2\n",
+		have_inplace, acls, xattrs, iconv, symtimes, prealloc, sse2);
 
 #ifdef MAINTAINER_MODE
 	rprintf(f, "Panic Action: \"%s\"\n", get_panic_action());

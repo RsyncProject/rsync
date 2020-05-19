@@ -41,6 +41,7 @@ fi
 dnl Checks for programs.
 AC_PROG_CC
 AC_PROG_CPP
+AC_PROG_CXX
 AC_PROG_EGREP
 AC_PROG_INSTALL
 AC_PROG_MKDIR_P
@@ -163,6 +164,25 @@ fi
 
 AC_DEFINE_UNQUOTED(NOBODY_USER, "nobody", [unprivileged user--e.g. nobody])
 AC_DEFINE_UNQUOTED(NOBODY_GROUP, "$NOBODY_GROUP", [unprivileged group for unprivileged user])
+
+# SSE2+ optimizations on x86-64 require g++ support
+AC_MSG_CHECKING([whether to enable SSE2+ optimizations])
+AC_ARG_ENABLE(sse2,
+	AS_HELP_STRING([--disable-sse2],[disable SSE2+ optimizations (req. g++ and x86-64)]))
+
+if test x"$enable_sse2" = x"yes" && test x"$build_cpu" = x"x86_64" && test x"$CXX" = x"g++"; then
+    AC_MSG_RESULT([yes])
+	AC_DEFINE(ENABLE_SSE2, 1, [Define to 1 to enable SSE2+ optimizations (requires g++ and x86-64)])
+	CXXOBJ="$CXXOBJ checksum_sse2.o"
+else
+    AC_MSG_RESULT(no)
+fi
+
+# We only use g++ for its target attribute dispatching, disable unneeded bulky features
+if test x"$CXXOBJ" != x""; then
+    CXXFLAGS="$CXXFLAGS -fno-exceptions -fno-rtti"
+fi
+AC_SUBST(CXXOBJ)
 
 # arrgh. libc in some old debian version screwed up the largefile
 # stuff, getting byte range locking wrong

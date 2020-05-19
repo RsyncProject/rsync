@@ -1061,7 +1061,9 @@ typedef struct {
 #define ACL_READY(sx) ((sx).acc_acl != NULL)
 #define XATTR_READY(sx) ((sx).xattr != NULL)
 
+#ifndef __cplusplus
 #include "proto.h"
+#endif
 
 #ifndef SUPPORT_XATTRS
 #define x_stat(fn,fst,xst) do_stat(fn,fst)
