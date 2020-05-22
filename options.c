@@ -276,6 +276,7 @@ static struct output_struct debug_words[COUNT_DEBUG+1] = {
 	DEBUG_WORD(CHDIR, W_CLI|W_SRV, "Debug when the current directory changes"),
 	DEBUG_WORD(CONNECT, W_CLI, "Debug connection events (levels 1-2)"),
 	DEBUG_WORD(CMD, W_CLI, "Debug commands+options that are issued (levels 1-2)"),
+	DEBUG_WORD(CSUM, W_CLI|W_SRV, "Debug checksum negotiation"),
 	DEBUG_WORD(DEL, W_REC, "Debug delete actions (levels 1-3)"),
 	DEBUG_WORD(DELTASUM, W_SND|W_REC, "Debug delta-transfer checksumming (levels 1-4)"),
 	DEBUG_WORD(DUP, W_REC, "Debug weeding of duplicate names"),
@@ -1932,7 +1933,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		/* Call this early to verify the args and figure out if we need to force
 		 * --whole-file. Note that the parse function will get called again later,
 		 * just in case an "auto" choice needs to know the protocol_version. */
-		parse_checksum_choice();
+		parse_checksum_choice(0);
 	} else
 		checksum_choice = NULL;
 

@@ -367,22 +367,23 @@ void setup_protocol(int f_out,int f_in)
 	}
 #endif
 
+	if (!checksum_choice) {
+		const char *rcl = getenv("RSYNC_CHECKSUM_LIST");
+		int saw_fail = rcl && strstr(rcl, "FAIL");
+		if (csum_exchange)
+			negotiate_checksum(f_in, f_out, rcl, saw_fail);
+		else if (!am_server && saw_fail) {
+			rprintf(FERROR, "Remote rsync is too old for checksum negotation\n");
+			exit_cleanup(RERR_UNSUPPORTED);
+		}
+	}
+
 	if (am_server) {
 		if (!checksum_seed)
 			checksum_seed = time(NULL) ^ (getpid() << 6);
 		write_int(f_out, checksum_seed);
 	} else {
 		checksum_seed = read_int(f_in);
-	}
-
-	if (!checksum_choice) {
-		const char *rcl = getenv("RSYNC_CHECKSUM_LIST");
-		if (csum_exchange)
-			negotiate_checksum(f_in, f_out, rcl);
-		else if (!am_server && rcl && *rcl && strstr(rcl, "FAIL")) {
-			rprintf(FERROR, "Remote rsync is too old for checksum negotation\n");
-			exit_cleanup(RERR_UNSUPPORTED);
-		}
 	}
 
 	init_flist();

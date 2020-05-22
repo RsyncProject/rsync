@@ -37,8 +37,17 @@ extern char *checksum_choice;
 #define CSUM_MD4 4
 #define CSUM_MD5 5
 
-const char *default_checksum_list =
-	"md5 md4";
+#define CSUM_SAW_BUFLEN 10
+
+struct csum_struct {
+	int num;
+	const char *name;
+} valid_checksums[] = {
+	{ CSUM_MD5, "md5" },
+	{ CSUM_MD4, "md4" },
+	{ CSUM_NONE, "none" },
+	{ -1, NULL }
+};
 
 #define MAX_CHECKSUM_LIST 1024
 
@@ -48,6 +57,8 @@ const char *negotiated_csum_name = NULL;
 
 static int parse_csum_name(const char *name, int len, int allow_auto)
 {
+	struct csum_struct *cs;
+
 	if (len < 0 && name)
 		len = strlen(name);
 
@@ -60,12 +71,11 @@ static int parse_csum_name(const char *name, int len, int allow_auto)
 			return CSUM_MD4_BUSTED;
 		return CSUM_MD4_ARCHAIC;
 	}
-	if (len == 3 && strncasecmp(name, "md4", 3) == 0)
-		return CSUM_MD4;
-	if (len == 3 && strncasecmp(name, "md5", 3) == 0)
-		return CSUM_MD5;
-	if (len == 4 && strncasecmp(name, "none", 4) == 0)
-		return CSUM_NONE;
+
+	for (cs = valid_checksums; cs->name; cs++) {
+		if (strncasecmp(name, cs->name, len) == 0 && cs->name[len] == '\0')
+			return cs->num;
+	}
 
 	if (allow_auto) {
 		rprintf(FERROR, "unknown checksum name: %s\n", name);
@@ -75,7 +85,22 @@ static int parse_csum_name(const char *name, int len, int allow_auto)
 	return -1;
 }
 
-void parse_checksum_choice(void)
+static const char *checksum_name(int num)
+{
+	struct csum_struct *cs;
+
+	for (cs = valid_checksums; cs->name; cs++) {
+		if (num == cs->num)
+			return cs->name;
+	}
+
+	if (num < CSUM_MD4)
+		return "MD4";
+
+	return "UNKNOWN";
+}
+
+void parse_checksum_choice(int final_call)
 {
 	if (!negotiated_csum_name) {
 		char *cp = checksum_choice ? strchr(checksum_choice, ',') : NULL;
@@ -85,46 +110,124 @@ void parse_checksum_choice(void)
 		} else
 			xfersum_type = checksum_type = parse_csum_name(checksum_choice, -1, 1);
 	}
+
 	if (xfersum_type == CSUM_NONE)
 		whole_file = 1;
+
+	if (final_call && DEBUG_GTE(CSUM, 1)) {
+		if (negotiated_csum_name)
+			rprintf(FINFO, "[%s] negotiated checksum: %s\n", who_am_i(), negotiated_csum_name);
+		else if (xfersum_type == checksum_type) {
+			rprintf(FINFO, "[%s] %s checksum: %s\n", who_am_i(),
+				checksum_choice ? "chosen" : "protocol-based",
+				checksum_name(xfersum_type));
+		} else {
+			rprintf(FINFO, "[%s] chosen transfer checksum: %s\n",
+				who_am_i(), checksum_name(xfersum_type));
+			rprintf(FINFO, "[%s] chosen pre-transfer checksum: %s\n",
+				who_am_i(), checksum_name(checksum_type));
+		}
+	}
 }
 
-void negotiate_checksum(int f_in, int f_out, const char *csum_list)
+static int parse_checksum_list(const char *from, char *sumbuf, int sumbuf_len, char *saw)
 {
-	char *tok, sumbuf[MAX_CHECKSUM_LIST];
+	char *to = sumbuf, *tok = NULL;
+	int cnt = 0;
+
+	memset(saw, 0, CSUM_SAW_BUFLEN);
+
+	while (1) {
+		if (*from == ' ' || !*from) {
+			if (tok) {
+				int sum_type = parse_csum_name(tok, to - tok, 0);
+				if (sum_type >= 0 && !saw[sum_type])
+					saw[sum_type] = ++cnt;
+				else
+					to = tok - (tok != sumbuf);
+				tok = NULL;
+			}
+			if (!*from++)
+				break;
+			continue;
+		}
+		if (!tok) {
+			if (to != sumbuf)
+				*to++ = ' ';
+			tok = to;
+		}
+		if (to - sumbuf >= sumbuf_len - 1) {
+			to = tok - (tok != sumbuf);
+			break;
+		}
+		*to++ = *from++;
+	}
+	*to = '\0';
+
+	return to - sumbuf;
+}
+
+void negotiate_checksum(int f_in, int f_out, const char *csum_list, int saw_fail)
+{
+	char *tok, sumbuf[MAX_CHECKSUM_LIST], saw[CSUM_SAW_BUFLEN];
 	int sum_type, len;
 
-	if (!am_server || local_server) {
-		if (!csum_list || !*csum_list)
-			csum_list = default_checksum_list;
-		len = strlen(csum_list);
-		if (len >= (int)sizeof sumbuf) {
-			rprintf(FERROR, "The checksum list is too long.\n");
-			exit_cleanup(RERR_UNSUPPORTED);
+	/* Simplify the user-provided string so that it contains valid
+	 * checksum names without any duplicates. The client side also
+	 * makes use of the saw values when scanning the server's list. */
+	if (csum_list && *csum_list && (!am_server || local_server)) {
+		len = parse_checksum_list(csum_list, sumbuf, sizeof sumbuf, saw);
+		if (saw_fail && !len)
+			len = strlcpy(sumbuf, "FAIL", sizeof sumbuf);
+		csum_list = sumbuf;
+	} else
+		csum_list = NULL;
+
+	if (!csum_list || !*csum_list) {
+		struct csum_struct *cs;
+		for (tok = sumbuf, cs = valid_checksums, len = 0; cs->name; cs++) {
+			if (cs->num == CSUM_NONE)
+				continue;
+			if (tok != sumbuf)
+				*tok++ = ' ';
+			tok += strlcpy(tok, cs->name, sizeof sumbuf - (tok - sumbuf));
+			saw[cs->num] = ++len;
 		}
-		if (!local_server)
-			write_vstring(f_out, csum_list, len);
+		*tok = '\0';
+		len = tok - sumbuf;
 	}
 
-	if (local_server && !read_batch)
-		memcpy(sumbuf, csum_list, len+1);
-	else
+	/* Each side sends their list of valid checksum names to the other side and
+	 * then both sides pick the first name in the client's list that is also in
+	 * the server's list. */
+	if (!local_server)
+		write_vstring(f_out, sumbuf, len);
+
+	if (!local_server || read_batch)
 		len = read_vstring(f_in, sumbuf, sizeof sumbuf);
 
 	if (len > 0) {
+		int best = CSUM_SAW_BUFLEN; /* We want best == 1 from the client list */
+		if (am_server)
+			memset(saw, 1, CSUM_SAW_BUFLEN); /* The first client's choice is the best choice */
 		for (tok = strtok(sumbuf, " \t"); tok; tok = strtok(NULL, " \t")) {
-			len = strlen(tok);
-			sum_type = parse_csum_name(tok, len, 0);
-			if (sum_type >= CSUM_NONE) {
-				xfersum_type = checksum_type = sum_type;
-				if (am_server && !local_server)
-					write_vstring(f_out, tok, len);
-				negotiated_csum_name = strdup(tok);
-				return;
-			}
+			sum_type = parse_csum_name(tok, -1, 0);
+			if (sum_type < 0 || !saw[sum_type] || best < saw[sum_type])
+				continue;
+			xfersum_type = checksum_type = sum_type;
+			negotiated_csum_name = tok;
+			best = saw[sum_type];
+			if (best == 1)
+				break;
+		}
+		if (negotiated_csum_name) {
+			negotiated_csum_name = strdup(negotiated_csum_name);
+			return;
 		}
 	}
 
+	if (!am_server)
+		msleep(20);
 	rprintf(FERROR, "Failed to negotiate a common checksum\n");
 	exit_cleanup(RERR_UNSUPPORTED);
 }
