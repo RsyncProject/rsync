@@ -165,24 +165,35 @@ fi
 AC_DEFINE_UNQUOTED(NOBODY_USER, "nobody", [unprivileged user--e.g. nobody])
 AC_DEFINE_UNQUOTED(NOBODY_GROUP, "$NOBODY_GROUP", [unprivileged group for unprivileged user])
 
-# SSE2+ optimizations on x86-64 require g++ support
-AC_MSG_CHECKING([whether to enable SSE2+ optimizations])
-AC_ARG_ENABLE(sse2,
-	AS_HELP_STRING([--disable-sse2],[disable SSE2+ optimizations (req. g++ and x86-64)]))
+# SIMD optimizations
+SIMD=
 
-if test x"$enable_sse2" = x"yes" && test x"$build_cpu" = x"x86_64" && test x"$CXX" = x"g++"; then
-    AC_MSG_RESULT([yes])
-	AC_DEFINE(ENABLE_SSE2, 1, [Define to 1 to enable SSE2+ optimizations (requires g++ and x86-64)])
-	CXXOBJ="$CXXOBJ checksum_sse2.o"
+AC_MSG_CHECKING([whether to enable SIMD optimizations])
+AC_ARG_ENABLE(simd,
+    AS_HELP_STRING([--enable-simd],[enable SIMD optimizations]))
+
+if test x"$enable_simd" = x"yes"; then
+    # For x86-64 SIMD, g++ is also required
+    if test x"$build_cpu" = x"x86_64" && test x"$CXX" = x"g++"; then
+        SIMD="$SIMD x86_64"
+    fi
+fi
+
+if test x"$SIMD" != x""; then
+    SIMD=`echo "$SIMD" | sed -e 's/^ *//'`
+    AC_MSG_RESULT([yes ($SIMD)])
+	AC_DEFINE(HAVE_SIMD, 1, [Define to 1 to enable SIMD optimizations])
+    SIMD=`echo "$SIMD" | sed -e 's/[[^ ]]\+/$(SIMD_&)/g'`
 else
     AC_MSG_RESULT(no)
 fi
+
+AC_SUBST(SIMD)
 
 # We only use g++ for its target attribute dispatching, disable unneeded bulky features
 if test x"$CXXOBJ" != x""; then
     CXXFLAGS="$CXXFLAGS -fno-exceptions -fno-rtti"
 fi
-AC_SUBST(CXXOBJ)
 
 # arrgh. libc in some old debian version screwed up the largefile
 # stuff, getting byte range locking wrong
