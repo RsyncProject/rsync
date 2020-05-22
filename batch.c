@@ -213,7 +213,7 @@ static void write_filter_rules(int fd)
  * understand most of the options, so it uses some overly simple
  * heuristics to munge the command line into something that will
  * (hopefully) work. */
-void write_batch_shell_file(int argc, char *argv[], int file_arg_cnt)
+void write_batch_shell_file(int argc, char *argv[], int file_argc, char *file_argv[])
 {
 	int fd, i, len, err = 0;
 	char *p, *p2, filename[MAXPATHLEN];
@@ -237,8 +237,15 @@ void write_batch_shell_file(int argc, char *argv[], int file_arg_cnt)
 		else
 			write_sbuf(fd, " --exclude-from=-");
 	}
-	for (i = 1; i < argc - file_arg_cnt; i++) {
+	for (i = 1; i < argc; i++) {
 		p = argv[i];
+		if (file_argc && p == file_argv[0]) {
+			if (file_argc > 1) {
+				file_argv++;
+				file_argc--;
+			}
+			continue;
+		}
 		if (strncmp(p, "--files-from", 12) == 0
 		    || strncmp(p, "--filter", 8) == 0
 		    || strncmp(p, "--include", 9) == 0
@@ -267,8 +274,8 @@ void write_batch_shell_file(int argc, char *argv[], int file_arg_cnt)
 				err = 1;
 		}
 	}
-	if (!(p = check_for_hostspec(argv[argc - 1], &p2, &i)))
-		p = argv[argc - 1];
+	if (!(p = check_for_hostspec(file_argv[file_argc - 1], &p2, &i)))
+		p = file_argv[file_argc - 1];
 	if (write(fd, " ${1:-", 6) != 6
 	 || write_arg(fd, p) < 0)
 		err = 1;

@@ -1726,7 +1726,7 @@ int main(int argc,char *argv[])
 
 	if ((write_batch || read_batch) && !am_server) {
 		if (write_batch)
-			write_batch_shell_file(orig_argc, orig_argv, argc);
+			write_batch_shell_file(orig_argc, orig_argv, argc, argv);
 
 		if (read_batch && strcmp(batch_name, "-") == 0)
 			batch_fd = STDIN_FILENO;
