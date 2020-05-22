@@ -21,6 +21,10 @@
 
 #include "rsync.h"
 
+extern int am_server;
+extern int local_server;
+extern int whole_file;
+extern int read_batch;
 extern int checksum_seed;
 extern int protocol_version;
 extern int proper_seed_order;
@@ -33,27 +37,21 @@ extern char *checksum_choice;
 #define CSUM_MD4 4
 #define CSUM_MD5 5
 
+const char *default_checksum_list =
+	"md5 md4";
+
+#define MAX_CHECKSUM_LIST 1024
+
 int xfersum_type = 0; /* used for the file transfer checksums */
 int checksum_type = 0; /* used for the pre-transfer (--checksum) checksums */
+const char *negotiated_csum_name = NULL;
 
-/* Returns 1 if --whole-file must be enabled. */
-int parse_checksum_choice(void)
-{
-	char *cp = checksum_choice ? strchr(checksum_choice, ',') : NULL;
-	if (cp) {
-		xfersum_type = parse_csum_name(checksum_choice, cp - checksum_choice);
-		checksum_type = parse_csum_name(cp+1, -1);
-	} else
-		xfersum_type = checksum_type = parse_csum_name(checksum_choice, -1);
-	return xfersum_type == CSUM_NONE;
-}
-
-int parse_csum_name(const char *name, int len)
+static int parse_csum_name(const char *name, int len, int allow_auto)
 {
 	if (len < 0 && name)
 		len = strlen(name);
 
-	if (!name || (len == 4 && strncasecmp(name, "auto", 4) == 0)) {
+	if (!name || (allow_auto && len == 4 && strncasecmp(name, "auto", 4) == 0)) {
 		if (protocol_version >= 30)
 			return CSUM_MD5;
 		if (protocol_version >= 27)
@@ -69,7 +67,65 @@ int parse_csum_name(const char *name, int len)
 	if (len == 4 && strncasecmp(name, "none", 4) == 0)
 		return CSUM_NONE;
 
-	rprintf(FERROR, "unknown checksum name: %s\n", name);
+	if (allow_auto) {
+		rprintf(FERROR, "unknown checksum name: %s\n", name);
+		exit_cleanup(RERR_UNSUPPORTED);
+	}
+
+	return -1;
+}
+
+void parse_checksum_choice(void)
+{
+	if (!negotiated_csum_name) {
+		char *cp = checksum_choice ? strchr(checksum_choice, ',') : NULL;
+		if (cp) {
+			xfersum_type = parse_csum_name(checksum_choice, cp - checksum_choice, 1);
+			checksum_type = parse_csum_name(cp+1, -1, 1);
+		} else
+			xfersum_type = checksum_type = parse_csum_name(checksum_choice, -1, 1);
+	}
+	if (xfersum_type == CSUM_NONE)
+		whole_file = 1;
+}
+
+void negotiate_checksum(int f_in, int f_out, const char *csum_list)
+{
+	char *tok, sumbuf[MAX_CHECKSUM_LIST];
+	int sum_type, len;
+
+	if (!am_server || local_server) {
+		if (!csum_list || !*csum_list)
+			csum_list = default_checksum_list;
+		len = strlen(csum_list);
+		if (len >= (int)sizeof sumbuf) {
+			rprintf(FERROR, "The checksum list is too long.\n");
+			exit_cleanup(RERR_UNSUPPORTED);
+		}
+		if (!local_server)
+			write_vstring(f_out, csum_list, len);
+	}
+
+	if (local_server && !read_batch)
+		memcpy(sumbuf, csum_list, len+1);
+	else
+		len = read_vstring(f_in, sumbuf, sizeof sumbuf);
+
+	if (len > 0) {
+		for (tok = strtok(sumbuf, " \t"); tok; tok = strtok(NULL, " \t")) {
+			len = strlen(tok);
+			sum_type = parse_csum_name(tok, len, 0);
+			if (sum_type >= CSUM_NONE) {
+				xfersum_type = checksum_type = sum_type;
+				if (am_server && !local_server)
+					write_vstring(f_out, tok, len);
+				negotiated_csum_name = strdup(tok);
+				return;
+			}
+		}
+	}
+
+	rprintf(FERROR, "Failed to negotiate a common checksum\n");
 	exit_cleanup(RERR_UNSUPPORTED);
 }
 
@@ -260,7 +316,7 @@ void sum_init(int csum_type, int seed)
 	char s[4];
 
 	if (csum_type < 0)
-		csum_type = parse_csum_name(NULL, 0);
+		csum_type = parse_csum_name(NULL, 0, 1);
 	cursum_type = csum_type;
 
 	switch (csum_type) {

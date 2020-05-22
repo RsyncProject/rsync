@@ -1928,12 +1928,11 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		}
 	}
 
-	if (checksum_choice && strcmp(checksum_choice, "auto") != 0 && strcmp(checksum_choice, "auto,auto") != 0) {
+	if (checksum_choice && strcasecmp(checksum_choice, "auto") != 0 && strcasecmp(checksum_choice, "auto,auto") != 0) {
 		/* Call this early to verify the args and figure out if we need to force
 		 * --whole-file. Note that the parse function will get called again later,
 		 * just in case an "auto" choice needs to know the protocol_version. */
-		if (parse_checksum_choice())
-			whole_file = 1;
+		parse_checksum_choice();
 	} else
 		checksum_choice = NULL;
 
@@ -2642,7 +2641,8 @@ void server_options(char **args, int *argc_p)
 		eFlags[x++] = 'x'; /* xattr hardlink optimization not desired */
 		eFlags[x++] = 'C'; /* support checksum seed order fix */
 		eFlags[x++] = 'I'; /* support inplace_partial behavior */
-		eFlags[x++] = 'V'; /* use varint for flist flags */
+		eFlags[x++] = 'v'; /* use varint for flist & compat flags; negotiate checksum */
+		/* NOTE: Avoid using 'V' -- it was the high bit of a write_byte() that became write_varint(). */
 #undef eFlags
 	}
 

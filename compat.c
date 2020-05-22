@@ -41,6 +41,7 @@ extern int preallocate_files;
 extern int append_mode;
 extern int fuzzy_basis;
 extern int read_batch;
+extern int write_batch;
 extern int delay_updates;
 extern int checksum_seed;
 extern int basis_dir_cnt;
@@ -60,12 +61,14 @@ extern char *partial_dir;
 extern char *dest_option;
 extern char *files_from;
 extern char *filesfrom_host;
+extern char *checksum_choice;
 extern filter_rule_list filter_list;
 extern int need_unsorted_flist;
 #ifdef ICONV_OPTION
 extern iconv_t ic_send, ic_recv;
 extern char *iconv_opt;
 #endif
+extern const char *negotiated_csum_name;
 
 /* These index values are for the file-list's extra-attribute array. */
 int pathname_ndx, depth_ndx, atimes_ndx, uid_ndx, gid_ndx, acls_ndx, xattrs_ndx, unsort_ndx;
@@ -141,6 +144,8 @@ void set_allow_inc_recurse(void)
 
 void setup_protocol(int f_out,int f_in)
 {
+	int csum_exchange = 0;
+
 	assert(file_extra_cnt == 0);
 	assert(EXTRA64_CNT == 2 || EXTRA64_CNT == 1);
 
@@ -289,11 +294,23 @@ void setup_protocol(int f_out,int f_in)
 				compat_flags |= CF_CHKSUM_SEED_FIX;
 			if (local_server || strchr(client_info, 'I') != NULL)
 				compat_flags |= CF_INPLACE_PARTIAL_DIR;
-			if (local_server || strchr(client_info, 'V') != NULL)
-				compat_flags |= CF_VARINT_FLIST_FLAGS;
-			write_byte(f_out, compat_flags);
-		} else
-			compat_flags = read_byte(f_in);
+			if (local_server || strchr(client_info, 'v') != NULL) {
+				if (!write_batch || protocol_version >= 30) {
+					csum_exchange = 1;
+					compat_flags |= CF_VARINT_FLIST_FLAGS;
+				}
+			}
+			if (strchr(client_info, 'V') != NULL) { /* Support a pre-release 'V' that got superseded */
+				if (!write_batch)
+					compat_flags |= CF_VARINT_FLIST_FLAGS;
+				write_byte(f_out, compat_flags);
+			} else
+				write_varint(f_out, compat_flags);
+		} else { /* read_varint() is compatible with the older write_byte() when the 0x80 bit isn't on. */
+			compat_flags = read_varint(f_in);
+			if  (compat_flags & CF_VARINT_FLIST_FLAGS)
+				csum_exchange = 1;
+		}
 		/* The inc_recurse var MUST be set to 0 or 1. */
 		inc_recurse = compat_flags & CF_INC_RECURSE ? 1 : 0;
 		want_xattr_optim = protocol_version >= 31 && !(compat_flags & CF_AVOID_XATTR_OPTIM);
@@ -358,5 +375,22 @@ void setup_protocol(int f_out,int f_in)
 		checksum_seed = read_int(f_in);
 	}
 
+	if (!checksum_choice) {
+		const char *rcl = getenv("RSYNC_CHECKSUM_LIST");
+		if (csum_exchange)
+			negotiate_checksum(f_in, f_out, rcl);
+		else if (!am_server && rcl && *rcl && strstr(rcl, "FAIL")) {
+			rprintf(FERROR, "Remote rsync is too old for checksum negotation\n");
+			exit_cleanup(RERR_UNSUPPORTED);
+		}
+	}
+
 	init_flist();
+}
+
+void maybe_write_checksum(int batch_fd)
+{
+	assert(negotiated_csum_name != NULL);
+	if (compat_flags & CF_VARINT_FLIST_FLAGS)
+		write_vstring(batch_fd, negotiated_csum_name, strlen(negotiated_csum_name));
 }

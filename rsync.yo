@@ -657,8 +657,9 @@ checksum that is generated as the file is transferred, but that
 automatic after-the-transfer verification has nothing to do with this
 option's before-the-transfer "Does this file need to be updated?" check.
 
-For protocol 30 and beyond (first supported in 3.0.0), the checksum used is
-MD5.  For older protocols, the checksum used is MD4.
+The checksum used is auto-negotiated between the client and the server, but
+can be overridden using either the bf(--checksum-choice) option or an
+environment variable that is discussed in that option's section.
 
 dit(bf(-a, --archive)) This is equivalent to bf(-rlptgoD). It is a quick
 way of saying you want recursion and want to preserve almost
@@ -1371,16 +1372,38 @@ batch-writing option is in effect.
 
 dit(bf(--checksum-choice=STR)) This option overrides the checksum algorithms.
 If one algorithm name is specified, it is used for both the transfer checksums
-and (assuming bf(--checksum) is specified) the pre-transfer checksumming. If two
+and (assuming bf(--checksum) is specified) the pre-transfer checksums. If two
 comma-separated names are supplied, the first name affects the transfer
-checksums, and the second name affects the pre-transfer checksumming.
+checksums, and the second name affects the pre-transfer checksums (bf(-c)).
 
-The algorithm choices are "auto", "md4", "md5", and "none".  If "none" is
-specified for the first name, the bf(--whole-file) option is forced on and no
-checksum verification is performed on the transferred data.  If "none" is
-specified for the second name, the bf(--checksum) option cannot be used. The
-"auto" option is the default, where rsync bases its algorithm choice on the
-protocol version (for backward compatibility with older rsync versions).
+The algorithm choices are "auto", "MD5", "MD4", and "none".
+
+If "none" is specified for the first (or only) name, the bf(--whole-file) option
+is forced on and no checksum verification is performed on the transferred data.
+If "none" is specified for the second (or only) name, the bf(--checksum) option
+cannot be used.
+
+The "auto" option is the default, where rsync bases its algorithm choice on a
+negotation between the client and the server as follows:
+
+If both the client and the server are at least version 3.2.0, they will
+exchange a list of checksum names and choose the first one in the list that
+they have in common.
+This typically means that they will choose MD5.
+If one side of the transfer is not new enough to support this checksum
+negotation, then a value is chosen based on the protocol version (which
+chooses between MD5 and various flavors of MD4 based on protocol age).
+
+You can also override the checksum using the RSYNC_CHECKSUM_LIST environment
+variable by setting it to a space-separated list of checksum names that you
+consider acceptable. If no common checksum is found, the client exits with an
+error. This method does not allow you to specify the transfer checksum
+separately from the pre-transfer checksum, and it ignores "auto" and all
+unknown checksum names.  If the remote rsync is not new enough to handle a
+checksum negotiation list, the list is silently ignored unless it contains the
+string "FAIL" in it.
+
+The use of the bf(--checksum-choice) option overrides this environment list.
 
 dit(bf(-x, --one-file-system)) This tells rsync to avoid crossing a
 filesystem boundary when recursing.  This does not limit the user's ability

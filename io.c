@@ -2368,8 +2368,9 @@ void start_write_batch(int fd)
 	 * is involved. */
 	write_int(batch_fd, protocol_version);
 	if (protocol_version >= 30)
-		write_byte(batch_fd, compat_flags);
+		write_varint(batch_fd, compat_flags);
 	write_int(batch_fd, checksum_seed);
+	maybe_write_checksum(batch_fd);
 
 	if (am_sender)
 		write_batch_monitor_out = fd;
