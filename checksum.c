@@ -316,7 +316,7 @@ uint32 get_checksum1(char *buf1, int32 len)
 void get_checksum2(char *buf, int32 len, char *sum)
 {
 	md_context m;
-#if 0 /* #ifdef USE_OPENSSL */
+#ifdef USE_OPENSSL
 	MD4_CTX m4;
 #endif
 	MD5_CTX m5;
@@ -342,15 +342,15 @@ void get_checksum2(char *buf, int32 len, char *sum)
 		break;
 	  }
 	  case CSUM_MD4:
-#if 0 /* #ifdef USE_OPENSSL -- this doesn't match the old checksums. */
+#ifdef USE_OPENSSL
 	  {
 		MD4_Init(&m4);
+		MD4_Update(&m4, (uchar *)buf, len);
 		if (checksum_seed) {
 			uchar seedbuf[4];
 			SIVALu(seedbuf, 0, checksum_seed);
 			MD4_Update(&m4, seedbuf, 4);
 		}
-		MD4_Update(&m4, (uchar *)buf, len);
 		MD4_Final((uchar *)sum, &m4);
 		break;
 	  }
