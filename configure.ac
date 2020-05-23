@@ -381,8 +381,20 @@ AC_CHECK_HEADERS(sys/fcntl.h sys/select.h fcntl.h sys/time.h sys/unistd.h \
     netdb.h malloc.h float.h limits.h iconv.h libcharset.h langinfo.h \
     sys/acl.h acl/libacl.h attr/xattr.h sys/xattr.h sys/extattr.h \
     popt.h popt/popt.h linux/falloc.h netinet/in_systm.h netinet/ip.h \
-    zlib.h)
+    zlib.h xxhash.h)
 AC_HEADER_MAJOR_FIXED
+
+dnl Do you want to disable use of xxhash checksums
+AC_ARG_ENABLE([xxhash],
+	AS_HELP_STRING([--disable-xxhash],[disable xxhash checksums]))
+AH_TEMPLATE([SUPPORT_XXHASH],
+[Undefine if you do not want xxhash checksums.  By default this is defined.])
+if test x"$enable_xxhash" != x"no"; then
+    if test x"$ac_cv_header_xxhash_h" = x"yes"; then
+	AC_SEARCH_LIBS(XXH64_createState, xxhash)
+	AC_DEFINE(SUPPORT_XXHASH)
+    fi
+fi
 
 AC_CACHE_CHECK([if makedev takes 3 args],rsync_cv_MAKEDEV_TAKES_3_ARGS,[
 AC_RUN_IFELSE([AC_LANG_SOURCE([[

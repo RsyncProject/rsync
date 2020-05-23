@@ -1376,7 +1376,7 @@ and (assuming bf(--checksum) is specified) the pre-transfer checksums. If two
 comma-separated names are supplied, the first name affects the transfer
 checksums, and the second name affects the pre-transfer checksums (bf(-c)).
 
-The algorithm choices are "auto", "MD5", "MD4", and "none".
+The algorithm choices are "auto", "xxhash", "MD5", "MD4", and "none".
 
 If "none" is specified for the first (or only) name, the bf(--whole-file) option
 is forced on and no checksum verification is performed on the transferred data.
@@ -1389,7 +1389,8 @@ negotation between the client and the server as follows:
 If both the client and the server are at least version 3.2.0, they will
 exchange a list of checksum names and choose the first one in the list that
 they have in common.
-This typically means that they will choose MD5.
+This typically means that they will choose xxhash if they both support it
+and fall back to MD5.
 If one side of the transfer is not new enough to support this checksum
 negotation, then a value is chosen based on the protocol version (which
 chooses between MD5 and various flavors of MD4 based on protocol age).

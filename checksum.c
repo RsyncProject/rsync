@@ -20,6 +20,9 @@
  */
 
 #include "rsync.h"
+#ifdef SUPPORT_XXHASH
+#include "xxhash.h"
+#endif
 
 extern int am_server;
 extern int local_server;
@@ -36,6 +39,7 @@ extern char *checksum_choice;
 #define CSUM_MD4_OLD 3
 #define CSUM_MD4 4
 #define CSUM_MD5 5
+#define CSUM_XXHASH 6
 
 #define CSUM_SAW_BUFLEN 10
 
@@ -43,6 +47,9 @@ struct csum_struct {
 	int num;
 	const char *name;
 } valid_checksums[] = {
+#ifdef SUPPORT_XXHASH
+	{ CSUM_XXHASH, "xxhash" },
+#endif
 	{ CSUM_MD5, "md5" },
 	{ CSUM_MD4, "md4" },
 	{ CSUM_NONE, "none" },
@@ -247,6 +254,10 @@ int csum_len_for_type(int cst, BOOL flist_csum)
 		return MD4_DIGEST_LEN;
 	  case CSUM_MD5:
 		return MD5_DIGEST_LEN;
+#ifdef SUPPORT_XXHASH
+	  case CSUM_XXHASH:
+		return sizeof (XXH64_hash_t);
+#endif
 	  default: /* paranoia to prevent missing case values */
 		exit_cleanup(RERR_UNSUPPORTED);
 	}
@@ -345,6 +356,11 @@ void get_checksum2(char *buf, int32 len, char *sum)
 		mdfour_result(&m, (uchar *)sum);
 		break;
 	  }
+#ifdef SUPPORT_XXHASH
+	  case CSUM_XXHASH: 
+		SIVAL64(sum, 0, XXH64(buf, len, checksum_seed));
+		break;
+#endif
 	  default: /* paranoia to prevent missing case values */
 		exit_cleanup(RERR_UNSUPPORTED);
 	}
@@ -401,6 +417,34 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 
 		mdfour_result(&m, (uchar *)sum);
 		break;
+#ifdef SUPPORT_XXHASH
+	  case CSUM_XXHASH: {
+		XXH64_state_t* state = XXH64_createState();
+		if (state == NULL)
+			out_of_memory("file_checksum xx64");
+
+		if (XXH64_reset(state, 0) == XXH_ERROR) {
+			rprintf(FERROR, "error resetting XXH64 seed");
+			exit_cleanup(RERR_STREAMIO);
+		}
+
+		for (i = 0; i + CSUM_CHUNK <= len; i += CSUM_CHUNK) {
+			XXH_errorcode const updateResult =
+			    XXH64_update(state, (uchar *)map_ptr(buf, i, CSUM_CHUNK), CSUM_CHUNK);
+			if (updateResult == XXH_ERROR) {
+				rprintf(FERROR, "error computing XX64 hash");
+				exit_cleanup(RERR_STREAMIO);
+			}
+		}
+		remainder = (int32)(len - i);
+		if (remainder > 0)
+			XXH64_update(state, (uchar *)map_ptr(buf, i, CSUM_CHUNK), remainder);
+		SIVAL64(sum, 0, XXH64_digest(state));
+
+		XXH64_freeState(state);
+		break;
+	  }
+#endif
 	  default:
 		rprintf(FERROR, "invalid checksum-choice for the --checksum option (%d)\n", checksum_type);
 		exit_cleanup(RERR_UNSUPPORTED);
@@ -413,6 +457,9 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 static int32 sumresidue;
 static md_context md;
 static int cursum_type;
+#ifdef SUPPORT_XXHASH
+XXH64_state_t* xxh64_state = NULL;
+#endif
 
 void sum_init(int csum_type, int seed)
 {
@@ -438,6 +485,19 @@ void sum_init(int csum_type, int seed)
 		SIVAL(s, 0, seed);
 		sum_update(s, 4);
 		break;
+#ifdef SUPPORT_XXHASH
+	  case CSUM_XXHASH:
+		if (xxh64_state == NULL) {
+			xxh64_state = XXH64_createState();
+			if (xxh64_state == NULL)
+				out_of_memory("sum_init xxh64");
+		}
+		if (XXH64_reset(xxh64_state, 0) == XXH_ERROR) {
+			rprintf(FERROR, "error resetting XXH64 state");
+			exit_cleanup(RERR_STREAMIO);
+		}
+		break;
+#endif
 	  case CSUM_NONE:
 		break;
 	  default: /* paranoia to prevent missing case values */
@@ -487,6 +547,14 @@ void sum_update(const char *p, int32 len)
 		if (sumresidue)
 			memcpy(md.buffer, p, sumresidue);
 		break;
+#ifdef SUPPORT_XXHASH
+	  case CSUM_XXHASH:
+		if (XXH64_update(xxh64_state, p, len) == XXH_ERROR) {
+			rprintf(FERROR, "error computing XX64 hash");
+			exit_cleanup(RERR_STREAMIO);
+		}
+		break;
+#endif
 	  case CSUM_NONE:
 		break;
 	  default: /* paranoia to prevent missing case values */
@@ -515,6 +583,11 @@ int sum_end(char *sum)
 			mdfour_update(&md, (uchar *)md.buffer, sumresidue);
 		mdfour_result(&md, (uchar *)sum);
 		break;
+#ifdef SUPPORT_XXHASH
+	  case CSUM_XXHASH:
+		SIVAL64(sum, 0, XXH64_digest(xxh64_state));
+		break;
+#endif
 	  case CSUM_NONE:
 		*sum = '\0';
 		break;
