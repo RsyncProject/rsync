@@ -187,21 +187,24 @@ void negotiate_checksum(int f_in, int f_out, const char *csum_list, int saw_fail
 		if (saw_fail && !len)
 			len = strlcpy(sumbuf, "FAIL", sizeof sumbuf);
 		csum_list = sumbuf;
-	} else
+	} else {
+		memset(saw, 0, CSUM_SAW_BUFLEN);
 		csum_list = NULL;
+	}
 
 	if (!csum_list || !*csum_list) {
 		struct csum_struct *cs;
-		for (tok = sumbuf, cs = valid_checksums, len = 0; cs->name; cs++) {
+		int cnt = 0;
+		for (cs = valid_checksums, len = 0; cs->name; cs++) {
 			if (cs->num == CSUM_NONE)
 				continue;
-			if (tok != sumbuf)
-				*tok++ = ' ';
-			tok += strlcpy(tok, cs->name, sizeof sumbuf - (tok - sumbuf));
-			saw[cs->num] = ++len;
+			if (len)
+				sumbuf[len++]= ' ';
+			len += strlcpy(sumbuf+len, cs->name, sizeof sumbuf - len);
+			if (len >= (int)sizeof sumbuf - 1)
+				exit_cleanup(RERR_UNSUPPORTED); /* IMPOSSIBLE... */
+			saw[cs->num] = ++cnt;
 		}
-		*tok = '\0';
-		len = tok - sumbuf;
 	}
 
 	/* Each side sends their list of valid checksum names to the other side and
