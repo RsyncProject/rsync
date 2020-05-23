@@ -69,8 +69,11 @@ def cmd_chk(cmd, **opts):
 # Capture stdout in a string and return the (output, return_code) tuple.
 # Use capture='combined' opt to get both stdout and stderr together.
 def cmd_txt_status(cmd, **opts):
+    input = opts.pop('input', None)
+    if input is not None:
+        opts['stdin'] = subprocess.PIPE
     proc = subprocess.Popen(cmd, **_tweak_opts(cmd, opts, capture='stdout'))
-    out = proc.communicate()[0]
+    out = proc.communicate(input=input)[0]
     return (out, proc.returncode)
 
 
