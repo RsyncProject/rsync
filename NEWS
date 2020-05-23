@@ -33,7 +33,18 @@ Changes since 3.1.3:
 
     - Fixed a crash in the --iconv code.
 
+    - Fixed a bug in the writing of the batch.sh file (w/--write-batch) when
+      the source & destination args were not last on the command-line.
+
   ENHANCEMENTS:
+
+    - Various checksum enhancements, including x86_64 optimizations for the
+      rolling checksum, optimizations for the MD5 checksums, the addition of
+      xxhash checksums, and a simple checksum negotation heuristic that will
+      ensure that it is easier to add improved checksum algorithms in the
+      future.  Currently the x86_64 optimizations require the use of the
+      --enable-simd flag to configure, but they will probably be enabled by
+      default in the near future.
 
     - Improved the --atimes patch and promoted it to be in the release.
 
@@ -42,7 +53,7 @@ Changes since 3.1.3:
     - Improved the --write-devices patch and promoted it to be in the release.
 
     - Added openssl support to the rsync-ssl script via its renamed helper
-      script, rsync-ssl-rsh.  Install both bash scripts by default now
+      script, rsync-ssl-rsh.  Both bash scripts are now installed by default
       (removing the install-ssl-client make target).  Rsync was also enhanced
       to set the RSYNC_PORT environment variable when running a daemon-over-rsh
       script. Its value is the user-specified port number (set via --port or an
