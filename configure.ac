@@ -381,7 +381,7 @@ AC_CHECK_HEADERS(sys/fcntl.h sys/select.h fcntl.h sys/time.h sys/unistd.h \
     netdb.h malloc.h float.h limits.h iconv.h libcharset.h langinfo.h \
     sys/acl.h acl/libacl.h attr/xattr.h sys/xattr.h sys/extattr.h \
     popt.h popt/popt.h linux/falloc.h netinet/in_systm.h netinet/ip.h \
-    zlib.h xxhash.h openssl/md5.h)
+    zlib.h xxhash.h openssl/md4.h openssl/md5.h)
 AC_HEADER_MAJOR_FIXED
 
 AC_MSG_CHECKING([whether to enable use of openssl crypto library])
@@ -389,7 +389,7 @@ AC_ARG_ENABLE([openssl],
 	AS_HELP_STRING([--disable-openssl],[disable openssl crypto library]))
 AH_TEMPLATE([USE_OPENSSL],
 [Undefine if you do not want to use openssl crypto library.  By default this is defined.])
-if test x"$enable_openssl" != x"no" && test x"$ac_cv_header_openssl_md5_h" = x"yes"; then
+if test x"$enable_openssl" != x"no" && test x"$ac_cv_header_openssl_md4_h" = x"yes" && test x"$ac_cv_header_openssl_md5_h" = x"yes"; then
     AC_MSG_RESULT(yes)
     AC_SEARCH_LIBS(MD5_Init, crypto)
     AC_DEFINE(USE_OPENSSL)
