@@ -10,6 +10,13 @@
  * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
+ * In addition, as a special exception, the copyright holders give
+ * permission to dynamically link rsync with the OpenSSL and xxhash
+ * libraries when those libraries are being distributed in compliance
+ * with their license terms, and to distribute a dynamically linked
+ * combination of rsync and these libraries.  This is also considered
+ * to be covered under the GPL's System Libraries exception.
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -22,6 +29,9 @@
 #include "rsync.h"
 #ifdef SUPPORT_XXHASH
 #include "xxhash.h"
+#endif
+#ifdef USE_OPENSSL
+#include "openssl/md5.h"
 #endif
 
 extern int am_server;
@@ -57,6 +67,13 @@ struct csum_struct {
 };
 
 #define MAX_CHECKSUM_LIST 1024
+
+#ifndef USE_OPENSSL
+#define MD5_CTX md_context
+#define MD5_Init md5_begin
+#define MD5_Update md5_update
+#define MD5_Final(digest, cptr) md5_result(cptr, digest)
+#endif
 
 int xfersum_type = 0; /* used for the file transfer checksums */
 int checksum_type = 0; /* used for the pre-transfer (--checksum) checksums */
@@ -298,25 +315,26 @@ uint32 get_checksum1(char *buf1, int32 len)
 void get_checksum2(char *buf, int32 len, char *sum)
 {
 	md_context m;
+	MD5_CTX m5;
 
 	switch (xfersum_type) {
 	  case CSUM_MD5: {
 		uchar seedbuf[4];
-		md5_begin(&m);
+		MD5_Init(&m5);
 		if (proper_seed_order) {
 			if (checksum_seed) {
 				SIVALu(seedbuf, 0, checksum_seed);
-				md5_update(&m, seedbuf, 4);
+				MD5_Update(&m5, seedbuf, 4);
 			}
-			md5_update(&m, (uchar *)buf, len);
+			MD5_Update(&m5, (uchar *)buf, len);
 		} else {
-			md5_update(&m, (uchar *)buf, len);
+			MD5_Update(&m5, (uchar *)buf, len);
 			if (checksum_seed) {
 				SIVALu(seedbuf, 0, checksum_seed);
-				md5_update(&m, seedbuf, 4);
+				MD5_Update(&m5, seedbuf, 4);
 			}
 		}
-		md5_result(&m, (uchar *)sum);
+		MD5_Final((uchar *)sum, &m5);
 		break;
 	  }
 	  case CSUM_MD4:
@@ -374,6 +392,7 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 	struct map_struct *buf;
 	OFF_T i, len = st_p->st_size;
 	md_context m;
+	MD5_CTX m5;
 	int32 remainder;
 	int fd;
 
@@ -387,18 +406,18 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 
 	switch (checksum_type) {
 	  case CSUM_MD5:
-		md5_begin(&m);
+		MD5_Init(&m5);
 
 		for (i = 0; i + CSUM_CHUNK <= len; i += CSUM_CHUNK) {
-			md5_update(&m, (uchar *)map_ptr(buf, i, CSUM_CHUNK),
+			MD5_Update(&m5, (uchar *)map_ptr(buf, i, CSUM_CHUNK),
 				   CSUM_CHUNK);
 		}
 
 		remainder = (int32)(len - i);
 		if (remainder > 0)
-			md5_update(&m, (uchar *)map_ptr(buf, i, remainder), remainder);
+			MD5_Update(&m5, (uchar *)map_ptr(buf, i, remainder), remainder);
 
-		md5_result(&m, (uchar *)sum);
+		MD5_Final((uchar *)sum, &m5);
 		break;
 	  case CSUM_MD4:
 	  case CSUM_MD4_OLD:
@@ -459,6 +478,7 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 
 static int32 sumresidue;
 static md_context md;
+static MD5_CTX m5;
 static int cursum_type;
 #ifdef SUPPORT_XXHASH
 XXH64_state_t* xxh64_state = NULL;
@@ -474,7 +494,7 @@ void sum_init(int csum_type, int seed)
 
 	switch (csum_type) {
 	  case CSUM_MD5:
-		md5_begin(&md);
+		MD5_Init(&m5);
 		break;
 	  case CSUM_MD4:
 		mdfour_begin(&md);
@@ -520,7 +540,7 @@ void sum_update(const char *p, int32 len)
 {
 	switch (cursum_type) {
 	  case CSUM_MD5:
-		md5_update(&md, (uchar *)p, len);
+		MD5_Update(&m5, (uchar *)p, len);
 		break;
 	  case CSUM_MD4:
 	  case CSUM_MD4_OLD:
@@ -573,7 +593,7 @@ int sum_end(char *sum)
 {
 	switch (cursum_type) {
 	  case CSUM_MD5:
-		md5_result(&md, (uchar *)sum);
+		MD5_Final((uchar *)sum, &m5);
 		break;
 	  case CSUM_MD4:
 	  case CSUM_MD4_OLD:

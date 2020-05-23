@@ -381,19 +381,33 @@ AC_CHECK_HEADERS(sys/fcntl.h sys/select.h fcntl.h sys/time.h sys/unistd.h \
     netdb.h malloc.h float.h limits.h iconv.h libcharset.h langinfo.h \
     sys/acl.h acl/libacl.h attr/xattr.h sys/xattr.h sys/extattr.h \
     popt.h popt/popt.h linux/falloc.h netinet/in_systm.h netinet/ip.h \
-    zlib.h xxhash.h)
+    zlib.h xxhash.h openssl/md5.h)
 AC_HEADER_MAJOR_FIXED
 
-dnl Do you want to disable use of xxhash checksums
+AC_MSG_CHECKING([whether to enable use of openssl crypto library])
+AC_ARG_ENABLE([openssl],
+	AS_HELP_STRING([--disable-openssl],[disable openssl crypto library]))
+AH_TEMPLATE([USE_OPENSSL],
+[Undefine if you do not want to use openssl crypto library.  By default this is defined.])
+if test x"$enable_openssl" != x"no" && test x"$ac_cv_header_openssl_md5_h" = x"yes"; then
+    AC_MSG_RESULT(yes)
+    AC_SEARCH_LIBS(MD5_Init, crypto)
+    AC_DEFINE(USE_OPENSSL)
+else
+    AC_MSG_RESULT(no)
+fi
+
+AC_MSG_CHECKING([whether to enable the xxhash support])
 AC_ARG_ENABLE([xxhash],
 	AS_HELP_STRING([--disable-xxhash],[disable xxhash checksums]))
 AH_TEMPLATE([SUPPORT_XXHASH],
 [Undefine if you do not want xxhash checksums.  By default this is defined.])
-if test x"$enable_xxhash" != x"no"; then
-    if test x"$ac_cv_header_xxhash_h" = x"yes"; then
-	AC_SEARCH_LIBS(XXH64_createState, xxhash)
-	AC_DEFINE(SUPPORT_XXHASH)
-    fi
+if test x"$enable_xxhash" != x"no" && test x"$ac_cv_header_xxhash_h" = x"yes"; then
+    AC_MSG_RESULT(yes)
+    AC_SEARCH_LIBS(XXH64_createState, xxhash)
+    AC_DEFINE(SUPPORT_XXHASH)
+else
+    AC_MSG_RESULT(no)
 fi
 
 AC_CACHE_CHECK([if makedev takes 3 args],rsync_cv_MAKEDEV_TAKES_3_ARGS,[

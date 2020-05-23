@@ -17,10 +17,8 @@ void mdfour_begin(md_context *md);
 void mdfour_update(md_context *md, const uchar *in, uint32 length);
 void mdfour_result(md_context *md, uchar digest[MD4_DIGEST_LEN]);
 
-void get_mdfour(uchar digest[MD4_DIGEST_LEN], const uchar *in, int length);
-
+#ifndef USE_OPENSSL
 void md5_begin(md_context *ctx);
 void md5_update(md_context *ctx, const uchar *input, uint32 length);
 void md5_result(md_context *ctx, uchar digest[MD5_DIGEST_LEN]);
-
-void get_md5(uchar digest[MD5_DIGEST_LEN], const uchar *input, int n);
+#endif

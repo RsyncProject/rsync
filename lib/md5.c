@@ -20,6 +20,7 @@
 
 #include "rsync.h"
 
+#ifndef USE_OPENSSL
 void md5_begin(md_context *ctx)
 {
 	ctx->A = 0x67452301;
@@ -220,6 +221,9 @@ void md5_result(md_context *ctx, uchar digest[MD5_DIGEST_LEN])
 	SIVALu(digest, 8, ctx->C);
 	SIVALu(digest, 12, ctx->D);
 }
+#endif
+
+#ifdef TEST_MD5
 
 void get_md5(uchar *out, const uchar *input, int n)
 {
@@ -228,8 +232,6 @@ void get_md5(uchar *out, const uchar *input, int n)
 	md5_update(&ctx, input, n);
 	md5_result(&ctx, out);
 }
-
-#ifdef TEST_MD5
 
 #include <stdlib.h>
 #include <stdio.h>
