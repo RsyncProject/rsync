@@ -89,10 +89,17 @@ int filesfrom_convert = 0;
 
 #define CPRES_NONE 0
 #define CPRES_ZLIB 1
+#define CPRES_ZLIBX 2
 
 struct name_num_obj valid_compressions = {
 	"compress", NULL, NULL, 0, 0, {
+#ifndef EXTERNAL_ZLIB
 		{ CPRES_ZLIB, "zlib", NULL },
+#endif
+		{ CPRES_ZLIBX, "zlibx", NULL },
+#ifdef EXTERNAL_ZLIB
+		{ CPRES_ZLIB, "zlib", NULL },
+#endif
 		{ CPRES_NONE, "none", NULL },
 		{ 0, NULL, NULL }
 	}
@@ -158,6 +165,37 @@ void set_allow_inc_recurse(void)
 	else if (am_server && !local_server
 	 && (strchr(client_info, 'i') == NULL))
 		allow_inc_recurse = 0;
+}
+
+void parse_compress_choice(int final_call)
+{
+	int num;
+
+	if (valid_compressions.negotiated_name)
+		num = valid_compressions.negotiated_num;
+	else if (compress_choice) {
+		struct name_num_item *nni = get_nni_by_name(&valid_compressions, compress_choice, -1);
+		if (!nni) {
+			rprintf(FERROR, "unknown compress name: %s\n", compress_choice);
+			exit_cleanup(RERR_UNSUPPORTED);
+		}
+		num = nni->num;
+	} else
+		num = CPRES_NONE;
+
+	if (num == CPRES_NONE) {
+		do_compression = 0;
+		compress_choice = NULL;
+	} else if (num > 0)
+		do_compression = num != CPRES_ZLIB ? 2 : 1;
+
+	if (final_call && DEBUG_GTE(NSTR, am_server ? 2 : 1)) {
+		const char *c_s = am_server ? "Server" : "Client";
+		if (valid_compressions.negotiated_name)
+			rprintf(FINFO, "%s negotiated compress: %s\n", c_s, valid_compressions.negotiated_name);
+		else
+			rprintf(FINFO, "%s compress: %s\n", c_s, do_compression ? compress_choice : "none");
+	}
 }
 
 struct name_num_item *get_nni_by_name(struct name_num_obj *nno, const char *name, int len)

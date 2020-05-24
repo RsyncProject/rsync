@@ -29,6 +29,10 @@ extern int module_id;
 extern int def_compress_level;
 extern char *skip_compress;
 
+#ifndef Z_INSERT_ONLY
+#define Z_INSERT_ONLY Z_SYNC_FLUSH
+#endif
+
 static int compression_level, per_file_default_level;
 
 struct suffix_tree {
@@ -405,7 +409,6 @@ send_deflated_token(int f, int32 token, struct map_struct *buf, OFF_T offset,
 	} else if (token != -2 && do_compression == 1) {
 		/* Add the data in the current block to the compressor's
 		 * history and hash table. */
-#ifndef EXTERNAL_ZLIB
 		do {
 			/* Break up long sections in the same way that
 			 * see_deflate_token() does. */
@@ -424,11 +427,6 @@ send_deflated_token(int f, int32 token, struct map_struct *buf, OFF_T offset,
 				exit_cleanup(RERR_STREAMIO);
 			}
 		} while (toklen > 0);
-#else
-		toklen++;
-		rprintf(FERROR, "Impossible error in external-zlib code (1).\n");
-		exit_cleanup(RERR_STREAMIO);
-#endif
 	}
 }
 
@@ -579,7 +577,6 @@ static int32 recv_deflated_token(int f, char **data)
  */
 static void see_deflate_token(char *buf, int32 len)
 {
-#ifndef EXTERNAL_ZLIB
 	int r;
 	int32 blklen;
 	unsigned char hdr[5];
@@ -617,11 +614,6 @@ static void see_deflate_token(char *buf, int32 len)
 			exit_cleanup(RERR_STREAMIO);
 		}
 	} while (len || rx_strm.avail_out == 0);
-#else
-	buf++; len++;
-	rprintf(FERROR, "Impossible error in external-zlib code (2).\n");
-	exit_cleanup(RERR_STREAMIO);
-#endif
 }
 
 /**

@@ -840,6 +840,7 @@ enum {OPT_VERSION = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_READ_BATCH, OPT_WRITE_BATCH, OPT_ONLY_WRITE_BATCH, OPT_MAX_SIZE,
       OPT_NO_D, OPT_APPEND, OPT_NO_ICONV, OPT_INFO, OPT_DEBUG,
       OPT_USERMAP, OPT_GROUPMAP, OPT_CHOWN, OPT_BWLIMIT,
+      OPT_OLD_COMPRESS, OPT_NEW_COMPRESS, OPT_NO_COMPRESS,
       OPT_SERVER, OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
@@ -981,11 +982,12 @@ static struct poptOption long_options[] = {
   {"cvs-exclude",     'C', POPT_ARG_NONE,   &cvs_exclude, 0, 0, 0 },
   {"whole-file",      'W', POPT_ARG_VAL,    &whole_file, 1, 0, 0 },
   {"no-whole-file",    0,  POPT_ARG_VAL,    &whole_file, 0, 0, 0 },
-  {"checksum-choice",  0,  POPT_ARG_STRING, &checksum_choice, 0, 0, 0 },
   {"no-W",             0,  POPT_ARG_VAL,    &whole_file, 0, 0, 0 },
   {"checksum",        'c', POPT_ARG_VAL,    &always_checksum, 1, 0, 0 },
   {"no-checksum",      0,  POPT_ARG_VAL,    &always_checksum, 0, 0, 0 },
   {"no-c",             0,  POPT_ARG_VAL,    &always_checksum, 0, 0, 0 },
+  {"checksum-choice",  0,  POPT_ARG_STRING, &checksum_choice, 0, 0, 0 },
+  {"cc",               0,  POPT_ARG_STRING, &checksum_choice, 0, 0, 0 },
   {"block-size",      'B', POPT_ARG_LONG,   &block_size, 0, 0, 0 },
   {"compare-dest",     0,  POPT_ARG_STRING, 0, OPT_COMPARE_DEST, 0, 0 },
   {"copy-dest",        0,  POPT_ARG_STRING, 0, OPT_COPY_DEST, 0, 0 },
@@ -994,10 +996,12 @@ static struct poptOption long_options[] = {
   {"no-fuzzy",         0,  POPT_ARG_VAL,    &fuzzy_basis, 0, 0, 0 },
   {"no-y",             0,  POPT_ARG_VAL,    &fuzzy_basis, 0, 0, 0 },
   {"compress",        'z', POPT_ARG_NONE,   0, 'z', 0, 0 },
-  {"old-compress",     0,  POPT_ARG_VAL,    &do_compression, 1, 0, 0 },
-  {"new-compress",     0,  POPT_ARG_VAL,    &do_compression, 2, 0, 0 },
-  {"no-compress",      0,  POPT_ARG_VAL,    &do_compression, 0, 0, 0 },
-  {"no-z",             0,  POPT_ARG_VAL,    &do_compression, 0, 0, 0 },
+  {"old-compress",     0,  POPT_ARG_NONE,   0, OPT_OLD_COMPRESS, 0, 0 },
+  {"new-compress",     0,  POPT_ARG_NONE,   0, OPT_NEW_COMPRESS, 0, 0 },
+  {"no-compress",      0,  POPT_ARG_NONE,   0, OPT_NO_COMPRESS, 0, 0 },
+  {"no-z",             0,  POPT_ARG_NONE,   0, OPT_NO_COMPRESS, 0, 0 },
+  {"compress-choice",  0,  POPT_ARG_STRING, &compress_choice, 0, 0, 0 },
+  {"zz",               0,  POPT_ARG_STRING, &compress_choice, 0, 0, 0 },
   {"skip-compress",    0,  POPT_ARG_STRING, &skip_compress, 0, 0, 0 },
   {"compress-level",   0,  POPT_ARG_INT,    &def_compress_level, 0, 0, 0 },
   {0,                 'P', POPT_ARG_NONE,   0, 'P', 0, 0 },
@@ -1668,6 +1672,19 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			do_compression++;
 			break;
 
+		case OPT_OLD_COMPRESS:
+			compress_choice = "zlib";
+			break;
+
+		case OPT_NEW_COMPRESS:
+			compress_choice = "zlibx";
+			break;
+
+		case OPT_NO_COMPRESS:
+			do_compression = 0;
+			compress_choice = NULL;
+			break;
+
 		case 'M':
 			arg = poptGetOptArg(pc);
 			if (*arg != '-') {
@@ -1948,6 +1965,13 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		exit_cleanup(0);
 	}
 
+	if (!compress_choice && do_compression > 1)
+		compress_choice = "zlibx";
+	if (compress_choice && strcasecmp(compress_choice, "auto") != 0)
+		parse_compress_choice(0); /* Can twiddle do_compression and possibly NULL-out compress_choice  */
+	else
+		compress_choice = NULL;
+
 	if (do_compression || def_compress_level != NOT_SPECIFIED) {
 		if (def_compress_level == NOT_SPECIFIED)
 			def_compress_level = Z_DEFAULT_COMPRESSION;
@@ -1955,24 +1979,15 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			snprintf(err_buf, sizeof err_buf, "--compress-level value is invalid: %d\n",
 				 def_compress_level);
 			return 0;
-		} else if (def_compress_level == Z_NO_COMPRESSION)
+		} else if (def_compress_level == Z_NO_COMPRESSION) {
 			do_compression = 0;
-		else if (!do_compression)
+			compress_choice = NULL;
+		} else if (!do_compression)
 			do_compression = 1;
 		if (do_compression && refused_compress) {
 			create_refuse_error(refused_compress);
 			return 0;
 		}
-#ifdef EXTERNAL_ZLIB
-		if (do_compression == 1) {
-			snprintf(err_buf, sizeof err_buf,
-				"This rsync lacks old-style --compress due to its external zlib.  Try -zz.\n");
-			if (am_server)
-				return 0;
-			fprintf(stderr, "%s" "Continuing without compression.\n\n", err_buf);
-			do_compression = 0;
-		}
-#endif
 	}
 
 #ifdef HAVE_SETVBUF
@@ -2750,6 +2765,16 @@ void server_options(char **args, int *argc_p)
 		args[ac++] = arg;
 	}
 
+	if ((!compress_choice && do_compression > 1) || (compress_choice && strcasecmp(compress_choice, "zlibx") == 0))
+		args[ac++] = "--new-compress";
+	else if (compress_choice && strcasecmp(compress_choice, "zlib") == 0)
+		args[ac++] = "--old-compress";
+	else if (compress_choice) {
+		if (asprintf(&arg, "--compress-choice=%s", compress_choice) < 0)
+			goto oom;
+		args[ac++] = arg;
+	}
+
 	if (am_sender) {
 		if (max_delete > 0) {
 			if (asprintf(&arg, "--max-delete=%d", max_delete) < 0)
@@ -2929,9 +2954,6 @@ void server_options(char **args, int *argc_p)
 		rprintf(FERROR, "argc overflow in server_options().\n");
 		exit_cleanup(RERR_MALLOC);
 	}
-
-	if (do_compression > 1)
-		args[ac++] = "--new-compress";
 
 	if (remote_option_cnt) {
 		int j;

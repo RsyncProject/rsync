@@ -1370,7 +1370,7 @@ destination machines is higher than the bandwidth to disk (especially when the
 the source and destination are specified as local paths, but only if no
 batch-writing option is in effect.
 
-dit(bf(--checksum-choice=STR)) This option overrides the checksum algorithms.
+dit(bf(--checksum-choice=STR, --cc=STR)) This option overrides the checksum algorithms.
 If one algorithm name is specified, it is used for both the transfer checksums
 and (assuming bf(--checksum) is specified) the pre-transfer checksums. If two
 comma-separated names are supplied, the first name affects the transfer
@@ -1402,7 +1402,7 @@ error. This method does not allow you to specify the transfer checksum
 separately from the pre-transfer checksum, and it ignores "auto" and all
 unknown checksum names.  If the remote rsync is not new enough to handle a
 checksum negotiation list, the list is silently ignored unless it contains the
-string "FAIL" in it.
+string "FAIL".
 
 The use of the bf(--checksum-choice) option overrides this environment list.
 
@@ -2056,26 +2056,53 @@ dit(bf(-z, --compress)) With this option, rsync compresses the file data
 as it is sent to the destination machine, which reduces the amount of data
 being transmitted -- something that is useful over a slow connection.
 
-Note that this option typically achieves better compression ratios than can
-be achieved by using a compressing remote shell or a compressing transport
+The "zlib" compression method typically achieves better compression ratios than
+can be achieved by using a compressing remote shell or a compressing transport
 because it takes advantage of the implicit information in the matching data
 blocks that are not explicitly sent over the connection.  This matching-data
-compression comes at a cost of CPU, though, and can be disabled by repeating
-the bf(-z) option, but only if both sides are at least version 3.1.1.
+compression comes at a cost of CPU, though, and can be disabled by using the
+"zlibx" compresson method instead.  This can be selected by repeating the
+bf(-z) option or specifying bf(--compress-choice=zlibx), but it only works if
+both sides of the transfer are at least version 3.1.1.
 
 Note that if your version of rsync was compiled with an external zlib (instead
-of the zlib that comes packaged with rsync) then it will not support the
-old-style compression, only the new-style (repeated-option) compression.  In
-the future this new-style compression will likely become the default.
+of the zlib that comes packaged with rsync) then it will give preference to
+using the "zlibx" algorithm over the "zlib" algorithm since the external zlib
+code doesn't seem to handle the extra compression properly.  You can try
+forcing the regular algorithm via bf(--zz=zlib) and be on the lookout for
+transfer failures.  If all else fails, disable compression altogether.
 
-The client rsync requests new-style compression on the server via the
-bf(--new-compress) option, so if you see that option rejected it means that
-the server is not new enough to support bf(-zz).  Rsync also accepts the
-bf(--old-compress) option for a future time when new-style compression
-becomes the default.
+Note that if you see an error about an option named bf(--old-compress) or
+bf(--new-compress), this is rsync trying to send the bf(--compress-choice=zlib)
+or bf(--compress-choice=zlibx) option in a backward-compatible manner that more
+rsync versions understand. This error indicates that the older rsync version
+will not allow you to force the compression type.
 
 See the bf(--skip-compress) option for the default list of file suffixes
 that will not be compressed.
+
+dit(bf(--compress-choice=STR, --zz=STR)) This option can be used to override the
+automatic selection of the compression algorithm that is the default when
+bf(--compress) is used.
+
+Currently the STR can be "zlib", "zlibx", or "none".
+
+The "zlib" algorithm is given preference over "zlibx" if your rsync was
+compiled with the internal zlib code, otherwise that preference is reversed.
+These 2 algorithms are the stame except that "zlibx" does not try to include
+matched data that was not transferred in the compression computations.
+
+If "none" is specified, that is equivalent to using bf(--no-compress).
+
+This option implies bf(--compress) unless "none" was specified.
+
+You can also override the compression negotation using the RSYNC_COMPRESS_LIST
+environment variable by setting it to a space-separated list of compression
+names that you consider acceptable. If no common compress choice is found, the
+client exits with an error. It ignores "auto" and all unknown compression
+names.  If the remote rsync is not new enough to handle a compression
+negotiation list, the list is silently ignored unless it contains the string
+"FAIL".
 
 dit(bf(--compress-level=NUM)) Explicitly set the compression level to use
 (see bf(--compress)) instead of letting it default.  If NUM is non-zero,
