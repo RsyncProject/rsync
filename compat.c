@@ -93,7 +93,7 @@ int filesfrom_convert = 0;
 struct name_num_obj valid_compressions = {
 	"compress", NULL, NULL, 0, 0, {
 		{ CPRES_ZLIB, "zlib", NULL },
-		{ CPRES_NONE, "none", "" }, /* The "" prevents us from listing this name by default */
+		{ CPRES_NONE, "none", NULL },
 		{ 0, NULL, NULL }
 	}
 };
@@ -234,8 +234,7 @@ static int parse_nni_str(struct name_num_obj *nno, const char *from, char *tobuf
 							to = tok - 1;
 							break;
 						}
-					} else
-						nni->main_name = NULL; /* Override a "" entry */
+					}
 				} else
 					to = tok - (tok != tobuf);
 				tok = NULL;
@@ -267,8 +266,12 @@ static void recv_negotiate_str(int f_in, struct name_num_obj *nno, char *tmpbuf,
 	if (len < 0)
 		len = read_vstring(f_in, tmpbuf, MAX_NSTR_STRLEN);
 
-	if (DEBUG_GTE(NSTR, am_server ? 4 : 2))
-		rprintf(FINFO, "Server %s list: %s%s\n", nno->type, tmpbuf, am_server ? " (on server)" : "");
+	if (DEBUG_GTE(NSTR, am_server ? 4 : 2)) {
+		if (am_server)
+			rprintf(FINFO, "Client %s list (on server): %s\n", nno->type, tmpbuf);
+		else
+			rprintf(FINFO, "Server %s list (on client): %s\n", nno->type, tmpbuf);
+	}
 
 	if (len > 0) {
 		int best = nno->saw_len; /* We want best == 1 from the client list, so start with a big number. */
@@ -337,8 +340,12 @@ static void send_negotiate_str(int f_out, struct name_num_obj *nno, const char *
 		}
 	}
 
-	if (DEBUG_GTE(NSTR, am_server ? 4 : 2))
-		rprintf(FINFO, "Client %s list: %s%s\n", nno->type, tmpbuf, am_server ? " (on server)" : "");
+	if (DEBUG_GTE(NSTR, am_server ? 4 : 2)) {
+		if (am_server)
+			rprintf(FINFO, "Server %s list (on server): %s\n", nno->type, tmpbuf);
+		else
+			rprintf(FINFO, "Client %s list (on client): %s\n", nno->type, tmpbuf);
+	}
 
 	if (local_server) {
 		/* A local server doesn't bother to send/recv the strings, it just constructs

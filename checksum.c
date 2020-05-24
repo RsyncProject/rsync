@@ -60,7 +60,7 @@ struct name_num_obj valid_checksums = {
 #endif
 		{ CSUM_MD5, "md5", NULL },
 		{ CSUM_MD4, "md4", NULL },
-		{ CSUM_NONE, "none", "" }, /* The "" prevents us from listing this name by default */
+		{ CSUM_NONE, "none", NULL },
 		{ 0, NULL, NULL }
 	}
 };
