@@ -2369,7 +2369,7 @@ void start_write_batch(int fd)
 	write_int(batch_fd, protocol_version);
 	if (protocol_version >= 30)
 		write_varint(batch_fd, compat_flags);
-	maybe_write_checksum(batch_fd);
+	maybe_write_negotiated_strings(batch_fd);
 	write_int(batch_fd, checksum_seed);
 
 	if (am_sender)

@@ -188,6 +188,7 @@ static int remote_option_alloc = 0;
 int remote_option_cnt = 0;
 const char **remote_options = NULL;
 const char *checksum_choice = NULL;
+const char *compress_choice = NULL;
 
 int quiet = 0;
 int output_motd = 1;
@@ -276,7 +277,6 @@ static struct output_struct debug_words[COUNT_DEBUG+1] = {
 	DEBUG_WORD(CHDIR, W_CLI|W_SRV, "Debug when the current directory changes"),
 	DEBUG_WORD(CONNECT, W_CLI, "Debug connection events (levels 1-2)"),
 	DEBUG_WORD(CMD, W_CLI, "Debug commands+options that are issued (levels 1-2)"),
-	DEBUG_WORD(CSUM, W_CLI|W_SRV, "Debug checksum negotiation"),
 	DEBUG_WORD(DEL, W_REC, "Debug delete actions (levels 1-3)"),
 	DEBUG_WORD(DELTASUM, W_SND|W_REC, "Debug delta-transfer checksumming (levels 1-4)"),
 	DEBUG_WORD(DUP, W_REC, "Debug weeding of duplicate names"),
@@ -289,6 +289,7 @@ static struct output_struct debug_words[COUNT_DEBUG+1] = {
 	DEBUG_WORD(HLINK, W_SND|W_REC, "Debug hard-link actions (levels 1-3)"),
 	DEBUG_WORD(ICONV, W_CLI|W_SRV, "Debug iconv character conversions (levels 1-2)"),
 	DEBUG_WORD(IO, W_CLI|W_SRV, "Debug I/O routines (levels 1-4)"),
+	DEBUG_WORD(NSTR, W_CLI|W_SRV, "Debug negotiation strings"),
 	DEBUG_WORD(OWN, W_REC, "Debug ownership changes in users & groups (levels 1-2)"),
 	DEBUG_WORD(PROTO, W_CLI|W_SRV, "Debug protocol information"),
 	DEBUG_WORD(RECV, W_REC, "Debug receiver functions"),
@@ -451,7 +452,7 @@ static void parse_output_words(struct output_struct *words, short *levels,
 					break;
 			}
 		}
-		if (len && !words[j].name) {
+		if (len && !words[j].name && !am_server) {
 			rprintf(FERROR, "Unknown %s item: \"%.*s\"\n",
 				words[j].help, len, str);
 			exit_cleanup(RERR_SYNTAX);

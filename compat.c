@@ -21,15 +21,6 @@
 
 #include "rsync.h"
 
-int remote_protocol = 0;
-int file_extra_cnt = 0; /* count of file-list extras that everyone gets */
-int inc_recurse = 0;
-int compat_flags = 0;
-int use_safe_inc_flist = 0;
-int want_xattr_optim = 0;
-int proper_seed_order = 0;
-int inplace_partial = 0;
-
 extern int am_server;
 extern int am_sender;
 extern int local_server;
@@ -56,19 +47,33 @@ extern int preserve_xattrs;
 extern int xfer_flags_as_varint;
 extern int need_messages_from_generator;
 extern int delete_mode, delete_before, delete_during, delete_after;
+extern int xfersum_type;
+extern int checksum_type;
+extern int do_compression;
 extern char *shell_cmd;
 extern char *partial_dir;
 extern char *dest_option;
 extern char *files_from;
 extern char *filesfrom_host;
 extern char *checksum_choice;
+extern char *compress_choice;
 extern filter_rule_list filter_list;
 extern int need_unsorted_flist;
 #ifdef ICONV_OPTION
 extern iconv_t ic_send, ic_recv;
 extern char *iconv_opt;
 #endif
-extern const char *negotiated_csum_name;
+extern struct name_num_obj valid_checksums;
+
+int remote_protocol = 0;
+int file_extra_cnt = 0; /* count of file-list extras that everyone gets */
+int inc_recurse = 0;
+int compat_flags = 0;
+int use_safe_inc_flist = 0;
+int want_xattr_optim = 0;
+int proper_seed_order = 0;
+int inplace_partial = 0;
+int do_negotiated_strings = 0;
 
 /* These index values are for the file-list's extra-attribute array. */
 int pathname_ndx, depth_ndx, atimes_ndx, uid_ndx, gid_ndx, acls_ndx, xattrs_ndx, unsort_ndx;
@@ -79,6 +84,19 @@ int sender_symlink_iconv = 0;	/* sender should convert symlink content */
 #ifdef ICONV_OPTION
 int filesfrom_convert = 0;
 #endif
+
+#define MAX_NSTR_STRLEN 256
+
+#define CPRES_NONE 0
+#define CPRES_ZLIB 1
+
+struct name_num_obj valid_compressions = {
+	"compress", NULL, NULL, 0, 0, {
+		{ CPRES_ZLIB, "zlib", NULL },
+		{ CPRES_NONE, "none", "" }, /* The "" prevents us from listing this name by default */
+		{ 0, NULL, NULL }
+	}
+};
 
 #define CF_INC_RECURSE	 (1<<0)
 #define CF_SYMLINK_TIMES (1<<1)
@@ -142,10 +160,227 @@ void set_allow_inc_recurse(void)
 		allow_inc_recurse = 0;
 }
 
+struct name_num_item *get_nni_by_name(struct name_num_obj *nno, const char *name, int len)
+{
+	struct name_num_item *nni;
+
+	if (len < 0)
+		len = strlen(name);
+
+	for (nni = nno->list; nni->name; nni++) {
+		if (strncasecmp(name, nni->name, len) == 0 && nni->name[len] == '\0')
+			return nni;
+	}
+
+	return NULL;
+}
+
+struct name_num_item *get_nni_by_num(struct name_num_obj *nno, int num)
+{
+	struct name_num_item *nni;
+
+	for (nni = nno->list; nni->name; nni++) {
+		if (num == nni->num)
+			return nni;
+	}
+
+	return NULL;
+}
+
+static void init_nno_saw(struct name_num_obj *nno, int val)
+{
+	struct name_num_item *nni;
+	int cnt;
+
+	if (!nno->saw_len) {
+		for (nni = nno->list; nni->name; nni++) {
+			if (nni->num >= nno->saw_len)
+				nno->saw_len = nni->num + 1;
+		}
+	}
+
+	if (!nno->saw) {
+		if (!(nno->saw = new_array0(uchar, nno->saw_len)))
+			out_of_memory("init_nno_saw");
+
+		/* We'll take this opportunity to make sure that the main_name values are set right. */
+		for (cnt = 1, nni = nno->list; nni->name; nni++, cnt++) {
+			if (nno->saw[nni->num])
+				nni->main_name = nno->list[nno->saw[nni->num]-1].name;
+			else
+				nno->saw[nni->num] = cnt;
+		}
+	}
+
+	memset(nno->saw, val, nno->saw_len);
+}
+
+/* Simplify the user-provided string so that it contains valid names without any duplicates.
+ * It also sets the "saw" flags to a 1-relative count of which name was seen first. */
+static int parse_nni_str(struct name_num_obj *nno, const char *from, char *tobuf, int tobuf_len)
+{
+	char *to = tobuf, *tok = NULL;
+	int cnt = 0;
+
+	while (1) {
+		if (*from == ' ' || !*from) {
+			if (tok) {
+				struct name_num_item *nni = get_nni_by_name(nno, tok, to - tok);
+				if (nni && !nno->saw[nni->num]) {
+					nno->saw[nni->num] = ++cnt;
+					if (nni->main_name && *nni->main_name) {
+						to = tok + strlcpy(tok, nni->main_name, tobuf_len - (tok - tobuf));
+						if (to - tobuf >= tobuf_len) {
+							to = tok - 1;
+							break;
+						}
+					} else
+						nni->main_name = NULL; /* Override a "" entry */
+				} else
+					to = tok - (tok != tobuf);
+				tok = NULL;
+			}
+			if (!*from++)
+				break;
+			continue;
+		}
+		if (!tok) {
+			if (to != tobuf)
+				*to++ = ' ';
+			tok = to;
+		}
+		if (to - tobuf >= tobuf_len - 1) {
+			to = tok - (tok != tobuf);
+			break;
+		}
+		*to++ = *from++;
+	}
+	*to = '\0';
+
+	return to - tobuf;
+}
+
+static void recv_negotiate_str(int f_in, struct name_num_obj *nno, char *tmpbuf, int len)
+{
+	struct name_num_item *ret = NULL;
+
+	if (len < 0)
+		len = read_vstring(f_in, tmpbuf, MAX_NSTR_STRLEN);
+
+	if (DEBUG_GTE(NSTR, am_server ? 4 : 2))
+		rprintf(FINFO, "Server %s list: %s%s\n", nno->type, tmpbuf, am_server ? " (on server)" : "");
+
+	if (len > 0) {
+		int best = nno->saw_len; /* We want best == 1 from the client list, so start with a big number. */
+		char *tok;
+		if (am_server)
+			init_nno_saw(nno, 1); /* Since we're parsing client names, anything we parse first is #1. */
+		for (tok = strtok(tmpbuf, " \t"); tok; tok = strtok(NULL, " \t")) {
+			struct name_num_item *nni = get_nni_by_name(nno, tok, -1);
+			if (!nni || !nno->saw[nni->num] || best <= nno->saw[nni->num])
+				continue;
+			ret = nni;
+			best = nno->saw[nni->num];
+			if (best == 1)
+				break;
+		}
+		if (ret) {
+			free(nno->saw);
+			nno->saw = NULL;
+			nno->negotiated_name = ret->main_name ? ret->main_name : ret->name;
+			nno->negotiated_num = ret->num;
+			return;
+		}
+	}
+
+	if (!am_server)
+		rprintf(FERROR, "Failed to negotiate a common %s\n", nno->type);
+	exit_cleanup(RERR_UNSUPPORTED);
+}
+
+static void send_negotiate_str(int f_out, struct name_num_obj *nno, const char *env_name)
+{
+	char tmpbuf[MAX_NSTR_STRLEN];
+	struct name_num_item *nni;
+	const char *list_str = getenv(env_name);
+	int len, fail_if_empty = list_str && strstr(list_str, "FAIL");
+
+	if (!do_negotiated_strings) {
+		if (!am_server && fail_if_empty) {
+			rprintf(FERROR, "Remote rsync is too old for %s negotation\n", nno->type);
+			exit_cleanup(RERR_UNSUPPORTED);
+		}
+		return;
+	}
+
+	init_nno_saw(nno, 0);
+
+	if (list_str && *list_str && (!am_server || local_server)) {
+		len = parse_nni_str(nno, list_str, tmpbuf, MAX_NSTR_STRLEN);
+		if (fail_if_empty && !len)
+			len = strlcpy(tmpbuf, "FAIL", MAX_NSTR_STRLEN);
+		list_str = tmpbuf;
+	} else
+		list_str = NULL;
+
+	if (!list_str || !*list_str) {
+		int cnt = 0;
+		for (nni = nno->list, len = 0; nni->name; nni++) {
+			if (nni->main_name)
+				continue;
+			if (len)
+				tmpbuf[len++]= ' ';
+			len += strlcpy(tmpbuf+len, nni->name, MAX_NSTR_STRLEN - len);
+			if (len >= (int)MAX_NSTR_STRLEN - 1)
+				exit_cleanup(RERR_UNSUPPORTED); /* IMPOSSIBLE... */
+			nno->saw[nni->num] = ++cnt;
+		}
+	}
+
+	if (DEBUG_GTE(NSTR, am_server ? 4 : 2))
+		rprintf(FINFO, "Client %s list: %s%s\n", nno->type, tmpbuf, am_server ? " (on server)" : "");
+
+	if (local_server) {
+		/* A local server doesn't bother to send/recv the strings, it just constructs
+		 * and parses the same string on both sides. */
+		if (!read_batch)
+			recv_negotiate_str(-1, nno, tmpbuf, len);
+	} else {
+		/* Each side sends their list of valid names to the other side and then both sides
+		 * pick the first name in the client's list that is also in the server's list. */
+		write_vstring(f_out, tmpbuf, len);
+	}
+}
+
+static void negotiate_the_strings(int f_in, int f_out)
+{
+	/* We send all the negotiation strings before we start to read them to help avoid a slow startup. */
+
+	if (!checksum_choice)
+		send_negotiate_str(f_out, &valid_checksums, "RSYNC_CHECKSUM_LIST");
+
+	if (do_compression && !compress_choice)
+		send_negotiate_str(f_out, &valid_compressions, "RSYNC_COMPRESS_LIST");
+
+	if (valid_checksums.saw) {
+		char tmpbuf[MAX_NSTR_STRLEN];
+		recv_negotiate_str(f_in, &valid_checksums, tmpbuf, -1);
+	}
+	if (valid_checksums.negotiated_name)
+		xfersum_type = checksum_type = valid_checksums.negotiated_num;
+
+	if (valid_compressions.saw) {
+		char tmpbuf[MAX_NSTR_STRLEN];
+		recv_negotiate_str(f_in, &valid_compressions, tmpbuf, -1);
+	}
+#if 0
+	if (valid_compressions.negotiated_name)
+		compress_type = valid_checksums.negotiated_num;
+#endif
+}
+
 void setup_protocol(int f_out,int f_in)
 {
-	int csum_exchange = 0;
-
 	assert(file_extra_cnt == 0);
 	assert(EXTRA64_CNT == 2 || EXTRA64_CNT == 1);
 
@@ -296,7 +531,7 @@ void setup_protocol(int f_out,int f_in)
 				compat_flags |= CF_INPLACE_PARTIAL_DIR;
 			if (local_server || strchr(client_info, 'v') != NULL) {
 				if (!write_batch || protocol_version >= 30) {
-					csum_exchange = 1;
+					do_negotiated_strings = 1;
 					compat_flags |= CF_VARINT_FLIST_FLAGS;
 				}
 			}
@@ -309,7 +544,7 @@ void setup_protocol(int f_out,int f_in)
 		} else { /* read_varint() is compatible with the older write_byte() when the 0x80 bit isn't on. */
 			compat_flags = read_varint(f_in);
 			if  (compat_flags & CF_VARINT_FLIST_FLAGS)
-				csum_exchange = 1;
+				do_negotiated_strings = 1;
 		}
 		/* The inc_recurse var MUST be set to 0 or 1. */
 		inc_recurse = compat_flags & CF_INC_RECURSE ? 1 : 0;
@@ -367,16 +602,7 @@ void setup_protocol(int f_out,int f_in)
 	}
 #endif
 
-	if (!checksum_choice) {
-		const char *rcl = getenv("RSYNC_CHECKSUM_LIST");
-		int saw_fail = rcl && strstr(rcl, "FAIL");
-		if (csum_exchange)
-			negotiate_checksum(f_in, f_out, rcl, saw_fail);
-		else if (!am_server && saw_fail) {
-			rprintf(FERROR, "Remote rsync is too old for checksum negotation\n");
-			exit_cleanup(RERR_UNSUPPORTED);
-		}
-	}
+	negotiate_the_strings(f_in, f_out);
 
 	if (am_server) {
 		if (!checksum_seed)
@@ -389,9 +615,11 @@ void setup_protocol(int f_out,int f_in)
 	init_flist();
 }
 
-void maybe_write_checksum(int batch_fd)
+void maybe_write_negotiated_strings(int batch_fd)
 {
-	assert(negotiated_csum_name != NULL);
-	if (compat_flags & CF_VARINT_FLIST_FLAGS)
-		write_vstring(batch_fd, negotiated_csum_name, strlen(negotiated_csum_name));
+	if (valid_checksums.negotiated_name)
+		write_vstring(batch_fd, valid_checksums.negotiated_name, strlen(valid_checksums.negotiated_name));
+
+	if (valid_compressions.negotiated_name)
+		write_vstring(batch_fd, valid_compressions.negotiated_name, strlen(valid_compressions.negotiated_name));
 }

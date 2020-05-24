@@ -1061,6 +1061,20 @@ typedef struct {
 #define ACL_READY(sx) ((sx).acc_acl != NULL)
 #define XATTR_READY(sx) ((sx).xattr != NULL)
 
+struct name_num_item {
+	int num;
+	const char *name, *main_name;
+};
+
+struct name_num_obj {
+	const char *type;
+	const char *negotiated_name;
+	uchar *saw;
+	int saw_len;
+	int negotiated_num;
+	struct name_num_item list[];
+};
+
 #ifndef __cplusplus
 #include "proto.h"
 #endif
@@ -1089,7 +1103,6 @@ int vsnprintf(char *str, size_t count, const char *fmt, va_list args);
 #define snprintf rsync_snprintf
 int snprintf(char *str, size_t count, const char *fmt,...);
 #endif
-
 
 #ifndef HAVE_STRERROR
 extern char *sys_errlist[];
@@ -1317,8 +1330,7 @@ extern short info_levels[], debug_levels[];
 #define DEBUG_CHDIR (DEBUG_BIND+1)
 #define DEBUG_CONNECT (DEBUG_CHDIR+1)
 #define DEBUG_CMD (DEBUG_CONNECT+1)
-#define DEBUG_CSUM (DEBUG_CMD+1)
-#define DEBUG_DEL (DEBUG_CSUM+1)
+#define DEBUG_DEL (DEBUG_CMD+1)
 #define DEBUG_DELTASUM (DEBUG_DEL+1)
 #define DEBUG_DUP (DEBUG_DELTASUM+1)
 #define DEBUG_EXIT (DEBUG_DUP+1)
@@ -1330,7 +1342,8 @@ extern short info_levels[], debug_levels[];
 #define DEBUG_HLINK (DEBUG_HASH+1)
 #define DEBUG_ICONV (DEBUG_HLINK+1)
 #define DEBUG_IO (DEBUG_ICONV+1)
-#define DEBUG_OWN (DEBUG_IO+1)
+#define DEBUG_NSTR (DEBUG_IO+1)
+#define DEBUG_OWN (DEBUG_NSTR+1)
 #define DEBUG_PROTO (DEBUG_OWN+1)
 #define DEBUG_RECV (DEBUG_PROTO+1)
 #define DEBUG_SEND (DEBUG_RECV+1)
