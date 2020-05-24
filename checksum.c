@@ -59,8 +59,8 @@ struct csum_struct {
 	const char *name, *main_name;
 } valid_checksums[] = {
 #ifdef SUPPORT_XXHASH
-	{ CSUM_XXH64, "xxhash", NULL },
 	{ CSUM_XXH64, "xxh64", NULL },
+	{ CSUM_XXH64, "xxhash", NULL },
 #endif
 	{ CSUM_MD5, "md5", NULL },
 	{ CSUM_MD4, "md4", NULL },
@@ -270,7 +270,7 @@ void negotiate_checksum(int f_in, int f_out, const char *csum_list, int fail_if_
 			if (!cs || !saw[cs->num] || best <= saw[cs->num])
 				continue;
 			xfersum_type = checksum_type = cs->num;
-			negotiated_csum_name = cs->name;
+			negotiated_csum_name = cs->main_name ? cs->main_name : cs->name;
 			best = saw[cs->num];
 			if (best == 1)
 				break;
