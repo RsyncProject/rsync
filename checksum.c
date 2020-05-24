@@ -294,7 +294,7 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 	if (fd == -1)
 		return;
 
-	buf = map_file(fd, len, MAX_MAP_SIZE, CSUM_CHUNK);
+	buf = map_file(fd, len, MAX_MAP_SIZE, CHUNK_SIZE);
 
 	switch (checksum_type) {
 	  case CSUM_MD5: {
@@ -302,8 +302,8 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 
 		MD5_Init(&m5);
 
-		for (i = 0; i + CSUM_CHUNK <= len; i += CSUM_CHUNK)
-			MD5_Update(&m5, (uchar *)map_ptr(buf, i, CSUM_CHUNK), CSUM_CHUNK);
+		for (i = 0; i + CHUNK_SIZE <= len; i += CHUNK_SIZE)
+			MD5_Update(&m5, (uchar *)map_ptr(buf, i, CHUNK_SIZE), CHUNK_SIZE);
 
 		remainder = (int32)(len - i);
 		if (remainder > 0)
@@ -319,8 +319,8 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 
 		MD4_Init(&m4);
 
-		for (i = 0; i + CSUM_CHUNK <= len; i += CSUM_CHUNK)
-			MD4_Update(&m4, (uchar *)map_ptr(buf, i, CSUM_CHUNK), CSUM_CHUNK);
+		for (i = 0; i + CHUNK_SIZE <= len; i += CHUNK_SIZE)
+			MD4_Update(&m4, (uchar *)map_ptr(buf, i, CHUNK_SIZE), CHUNK_SIZE);
 
 		remainder = (int32)(len - i);
 		if (remainder > 0)
@@ -337,8 +337,8 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 
 		mdfour_begin(&m);
 
-		for (i = 0; i + CSUM_CHUNK <= len; i += CSUM_CHUNK)
-			mdfour_update(&m, (uchar *)map_ptr(buf, i, CSUM_CHUNK), CSUM_CHUNK);
+		for (i = 0; i + CHUNK_SIZE <= len; i += CHUNK_SIZE)
+			mdfour_update(&m, (uchar *)map_ptr(buf, i, CHUNK_SIZE), CHUNK_SIZE);
 
 		/* Prior to version 27 an incorrect MD4 checksum was computed
 		 * by failing to call mdfour_tail() for block sizes that
@@ -362,9 +362,9 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 			exit_cleanup(RERR_STREAMIO);
 		}
 
-		for (i = 0; i + CSUM_CHUNK <= len; i += CSUM_CHUNK) {
+		for (i = 0; i + CHUNK_SIZE <= len; i += CHUNK_SIZE) {
 			XXH_errorcode const updateResult =
-			    XXH64_update(state, (uchar *)map_ptr(buf, i, CSUM_CHUNK), CSUM_CHUNK);
+			    XXH64_update(state, (uchar *)map_ptr(buf, i, CHUNK_SIZE), CHUNK_SIZE);
 			if (updateResult == XXH_ERROR) {
 				rprintf(FERROR, "error computing XXH64 hash");
 				exit_cleanup(RERR_STREAMIO);
@@ -373,7 +373,7 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 
 		remainder = (int32)(len - i);
 		if (remainder > 0)
-			XXH64_update(state, (uchar *)map_ptr(buf, i, CSUM_CHUNK), remainder);
+			XXH64_update(state, (uchar *)map_ptr(buf, i, CHUNK_SIZE), remainder);
 		SIVAL64(sum, 0, XXH64_digest(state));
 
 		XXH64_freeState(state);
