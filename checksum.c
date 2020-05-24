@@ -315,14 +315,9 @@ uint32 get_checksum1(char *buf1, int32 len)
 
 void get_checksum2(char *buf, int32 len, char *sum)
 {
-	md_context m;
-#ifdef USE_OPENSSL
-	MD4_CTX m4;
-#endif
-	MD5_CTX m5;
-
 	switch (xfersum_type) {
 	  case CSUM_MD5: {
+		MD5_CTX m5;
 		uchar seedbuf[4];
 		MD5_Init(&m5);
 		if (proper_seed_order) {
@@ -344,6 +339,7 @@ void get_checksum2(char *buf, int32 len, char *sum)
 	  case CSUM_MD4:
 #ifdef USE_OPENSSL
 	  {
+		MD4_CTX m4;
 		MD4_Init(&m4);
 		MD4_Update(&m4, (uchar *)buf, len);
 		if (checksum_seed) {
@@ -358,6 +354,7 @@ void get_checksum2(char *buf, int32 len, char *sum)
 	  case CSUM_MD4_OLD:
 	  case CSUM_MD4_BUSTED:
 	  case CSUM_MD4_ARCHAIC: {
+		md_context m;
 		int32 i;
 		static char *buf1;
 		static int32 len1;
@@ -408,11 +405,6 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 {
 	struct map_struct *buf;
 	OFF_T i, len = st_p->st_size;
-	md_context m;
-#ifdef USE_OPENSSL
-	MD4_CTX m4;
-#endif
-	MD5_CTX m5;
 	int32 remainder;
 	int fd;
 
@@ -425,7 +417,9 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 	buf = map_file(fd, len, MAX_MAP_SIZE, CSUM_CHUNK);
 
 	switch (checksum_type) {
-	  case CSUM_MD5:
+	  case CSUM_MD5: {
+		MD5_CTX m5;
+
 		MD5_Init(&m5);
 
 		for (i = 0; i + CSUM_CHUNK <= len; i += CSUM_CHUNK)
@@ -437,8 +431,12 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 
 		MD5_Final((uchar *)sum, &m5);
 		break;
+	  }
 	  case CSUM_MD4:
 #ifdef USE_OPENSSL
+	  {
+		MD4_CTX m4;
+
 		MD4_Init(&m4);
 
 		for (i = 0; i + CSUM_CHUNK <= len; i += CSUM_CHUNK)
@@ -450,10 +448,13 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 
 		MD4_Final((uchar *)sum, &m4);
 		break;
+	  }
 #endif
 	  case CSUM_MD4_OLD:
 	  case CSUM_MD4_BUSTED:
-	  case CSUM_MD4_ARCHAIC:
+	  case CSUM_MD4_ARCHAIC: {
+		md_context m;
+
 		mdfour_begin(&m);
 
 		for (i = 0; i + CSUM_CHUNK <= len; i += CSUM_CHUNK)
@@ -469,6 +470,7 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 
 		mdfour_result(&m, (uchar *)sum);
 		break;
+	  }
 #ifdef SUPPORT_XXHASH
 	  case CSUM_XXHASH: {
 		XXH64_state_t* state = XXH64_createState();
@@ -507,11 +509,13 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 }
 
 static int32 sumresidue;
-static md_context md;
+static union {
+	md_context md;
 #ifdef USE_OPENSSL
-static MD4_CTX m4;
+	MD4_CTX m4;
 #endif
-static MD5_CTX m5;
+	MD5_CTX m5;
+} ctx;
 static int cursum_type;
 #ifdef SUPPORT_XXHASH
 XXH64_state_t* xxh64_state = NULL;
@@ -527,20 +531,20 @@ void sum_init(int csum_type, int seed)
 
 	switch (csum_type) {
 	  case CSUM_MD5:
-		MD5_Init(&m5);
+		MD5_Init(&ctx.m5);
 		break;
 	  case CSUM_MD4:
 #ifdef USE_OPENSSL
-		MD4_Init(&m4);
+		MD4_Init(&ctx.m4);
 #else
-		mdfour_begin(&md);
+		mdfour_begin(&ctx.md);
 		sumresidue = 0;
 #endif
 		break;
 	  case CSUM_MD4_OLD:
 	  case CSUM_MD4_BUSTED:
 	  case CSUM_MD4_ARCHAIC:
-		mdfour_begin(&md);
+		mdfour_begin(&ctx.md);
 		sumresidue = 0;
 		SIVAL(s, 0, seed);
 		sum_update(s, 4);
@@ -577,39 +581,39 @@ void sum_update(const char *p, int32 len)
 {
 	switch (cursum_type) {
 	  case CSUM_MD5:
-		MD5_Update(&m5, (uchar *)p, len);
+		MD5_Update(&ctx.m5, (uchar *)p, len);
 		break;
 	  case CSUM_MD4:
 #ifdef USE_OPENSSL
-		MD4_Update(&m4, (uchar *)p, len);
+		MD4_Update(&ctx.m4, (uchar *)p, len);
 		break;
 #endif
 	  case CSUM_MD4_OLD:
 	  case CSUM_MD4_BUSTED:
 	  case CSUM_MD4_ARCHAIC:
 		if (len + sumresidue < CSUM_CHUNK) {
-			memcpy(md.buffer + sumresidue, p, len);
+			memcpy(ctx.md.buffer + sumresidue, p, len);
 			sumresidue += len;
 			break;
 		}
 
 		if (sumresidue) {
 			int32 i = CSUM_CHUNK - sumresidue;
-			memcpy(md.buffer + sumresidue, p, i);
-			mdfour_update(&md, (uchar *)md.buffer, CSUM_CHUNK);
+			memcpy(ctx.md.buffer + sumresidue, p, i);
+			mdfour_update(&ctx.md, (uchar *)ctx.md.buffer, CSUM_CHUNK);
 			len -= i;
 			p += i;
 		}
 
 		while (len >= CSUM_CHUNK) {
-			mdfour_update(&md, (uchar *)p, CSUM_CHUNK);
+			mdfour_update(&ctx.md, (uchar *)p, CSUM_CHUNK);
 			len -= CSUM_CHUNK;
 			p += CSUM_CHUNK;
 		}
 
 		sumresidue = len;
 		if (sumresidue)
-			memcpy(md.buffer, p, sumresidue);
+			memcpy(ctx.md.buffer, p, sumresidue);
 		break;
 #ifdef SUPPORT_XXHASH
 	  case CSUM_XXHASH:
@@ -634,22 +638,22 @@ int sum_end(char *sum)
 {
 	switch (cursum_type) {
 	  case CSUM_MD5:
-		MD5_Final((uchar *)sum, &m5);
+		MD5_Final((uchar *)sum, &ctx.m5);
 		break;
 	  case CSUM_MD4:
 #ifdef USE_OPENSSL
-		MD4_Final((uchar *)sum, &m4);
+		MD4_Final((uchar *)sum, &ctx.m4);
 		break;
 #endif
 	  case CSUM_MD4_OLD:
-		mdfour_update(&md, (uchar *)md.buffer, sumresidue);
-		mdfour_result(&md, (uchar *)sum);
+		mdfour_update(&ctx.md, (uchar *)ctx.md.buffer, sumresidue);
+		mdfour_result(&ctx.md, (uchar *)sum);
 		break;
 	  case CSUM_MD4_BUSTED:
 	  case CSUM_MD4_ARCHAIC:
 		if (sumresidue)
-			mdfour_update(&md, (uchar *)md.buffer, sumresidue);
-		mdfour_result(&md, (uchar *)sum);
+			mdfour_update(&ctx.md, (uchar *)ctx.md.buffer, sumresidue);
+		mdfour_result(&ctx.md, (uchar *)sum);
 		break;
 #ifdef SUPPORT_XXHASH
 	  case CSUM_XXHASH:
