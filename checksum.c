@@ -50,22 +50,25 @@ extern char *checksum_choice;
 #define CSUM_MD4_OLD 3
 #define CSUM_MD4 4
 #define CSUM_MD5 5
-#define CSUM_XXHASH 6
+#define CSUM_XXH64 6
 
-#define CSUM_SAW_BUFLEN 10
+#define CSUM_COUNT 7
 
 struct csum_struct {
 	int num;
-	const char *name;
+	const char *name, *main_name;
 } valid_checksums[] = {
 #ifdef SUPPORT_XXHASH
-	{ CSUM_XXHASH, "xxhash" },
+	{ CSUM_XXH64, "xxhash", NULL },
+	{ CSUM_XXH64, "xxh64", NULL },
 #endif
-	{ CSUM_MD5, "md5" },
-	{ CSUM_MD4, "md4" },
-	{ CSUM_NONE, "none" },
-	{ -1, NULL }
+	{ CSUM_MD5, "md5", NULL },
+	{ CSUM_MD4, "md4", NULL },
+	{ CSUM_NONE, "none", NULL },
+	{ 0, NULL, NULL }
 };
+
+struct csum_struct auto_cs = { 0, "auto", NULL };
 
 #define MAX_CHECKSUM_LIST 1024
 
@@ -80,7 +83,7 @@ int xfersum_type = 0; /* used for the file transfer checksums */
 int checksum_type = 0; /* used for the pre-transfer (--checksum) checksums */
 const char *negotiated_csum_name = NULL;
 
-static int parse_csum_name(const char *name, int len, int allow_auto)
+static struct csum_struct *parse_csum_name(const char *name, int len, int allow_auto)
 {
 	struct csum_struct *cs;
 
@@ -88,18 +91,21 @@ static int parse_csum_name(const char *name, int len, int allow_auto)
 		len = strlen(name);
 
 	if (!name || (allow_auto && len == 4 && strncasecmp(name, "auto", 4) == 0)) {
+		cs = &auto_cs;
 		if (protocol_version >= 30)
-			return CSUM_MD5;
-		if (protocol_version >= 27)
-			return CSUM_MD4_OLD;
-		if (protocol_version >= 21)
-			return CSUM_MD4_BUSTED;
-		return CSUM_MD4_ARCHAIC;
+			cs->num = CSUM_MD5;
+		else if (protocol_version >= 27)
+			cs->num = CSUM_MD4_OLD;
+		else if (protocol_version >= 21)
+			cs->num = CSUM_MD4_BUSTED;
+		else
+			cs->num = CSUM_MD4_ARCHAIC;
+		return cs;
 	}
 
 	for (cs = valid_checksums; cs->name; cs++) {
 		if (strncasecmp(name, cs->name, len) == 0 && cs->name[len] == '\0')
-			return cs->num;
+			return cs;
 	}
 
 	if (allow_auto) {
@@ -107,7 +113,7 @@ static int parse_csum_name(const char *name, int len, int allow_auto)
 		exit_cleanup(RERR_UNSUPPORTED);
 	}
 
-	return -1;
+	return NULL;
 }
 
 static const char *checksum_name(int num)
@@ -130,45 +136,51 @@ void parse_checksum_choice(int final_call)
 	if (!negotiated_csum_name) {
 		char *cp = checksum_choice ? strchr(checksum_choice, ',') : NULL;
 		if (cp) {
-			xfersum_type = parse_csum_name(checksum_choice, cp - checksum_choice, 1);
-			checksum_type = parse_csum_name(cp+1, -1, 1);
+			xfersum_type = parse_csum_name(checksum_choice, cp - checksum_choice, 1)->num;
+			checksum_type = parse_csum_name(cp+1, -1, 1)->num;
 		} else
-			xfersum_type = checksum_type = parse_csum_name(checksum_choice, -1, 1);
+			xfersum_type = checksum_type = parse_csum_name(checksum_choice, -1, 1)->num;
 	}
 
 	if (xfersum_type == CSUM_NONE)
 		whole_file = 1;
 
-	if (final_call && DEBUG_GTE(CSUM, 1)) {
+	if (final_call && DEBUG_GTE(CSUM, am_server ? 2 : 1)) {
+		const char *c_s = am_server ? "Server" : "Client";
 		if (negotiated_csum_name)
-			rprintf(FINFO, "[%s] negotiated checksum: %s\n", who_am_i(), negotiated_csum_name);
+			rprintf(FINFO, "%s negotiated checksum: %s\n", c_s, negotiated_csum_name);
 		else if (xfersum_type == checksum_type) {
-			rprintf(FINFO, "[%s] %s checksum: %s\n", who_am_i(),
+			rprintf(FINFO, "%s %s checksum: %s\n", c_s,
 				checksum_choice ? "chosen" : "protocol-based",
 				checksum_name(xfersum_type));
 		} else {
-			rprintf(FINFO, "[%s] chosen transfer checksum: %s\n",
-				who_am_i(), checksum_name(xfersum_type));
-			rprintf(FINFO, "[%s] chosen pre-transfer checksum: %s\n",
-				who_am_i(), checksum_name(checksum_type));
+			rprintf(FINFO, "%s chosen transfer checksum: %s\n",
+				c_s, checksum_name(xfersum_type));
+			rprintf(FINFO, "%s chosen pre-transfer checksum: %s\n",
+				c_s, checksum_name(checksum_type));
 		}
 	}
 }
 
-static int parse_checksum_list(const char *from, char *sumbuf, int sumbuf_len, char *saw)
+static int parse_checksum_list(const char *from, char *sumbuf, int sumbuf_len, uchar *saw)
 {
 	char *to = sumbuf, *tok = NULL;
 	int cnt = 0;
 
-	memset(saw, 0, CSUM_SAW_BUFLEN);
-
 	while (1) {
 		if (*from == ' ' || !*from) {
 			if (tok) {
-				int sum_type = parse_csum_name(tok, to - tok, 0);
-				if (sum_type >= 0 && !saw[sum_type])
-					saw[sum_type] = ++cnt;
-				else
+				struct csum_struct *cs = parse_csum_name(tok, to - tok, 0);
+				if (cs && !saw[cs->num]) {
+					saw[cs->num] = ++cnt;
+					if (cs->main_name) {
+						to = tok + strlcpy(tok, cs->main_name, sumbuf_len - (tok - sumbuf));
+						if (to - sumbuf >= sumbuf_len) {
+							to = tok - 1;
+							break;
+						}
+					}
+				} else
 					to = tok - (tok != sumbuf);
 				tok = NULL;
 			}
@@ -192,29 +204,38 @@ static int parse_checksum_list(const char *from, char *sumbuf, int sumbuf_len, c
 	return to - sumbuf;
 }
 
-void negotiate_checksum(int f_in, int f_out, const char *csum_list, int saw_fail)
+void negotiate_checksum(int f_in, int f_out, const char *csum_list, int fail_if_empty)
 {
-	char *tok, sumbuf[MAX_CHECKSUM_LIST], saw[CSUM_SAW_BUFLEN];
-	int sum_type, len;
+	char *tok, sumbuf[MAX_CHECKSUM_LIST];
+	uchar saw[CSUM_COUNT];
+	struct csum_struct *cs;
+	int len;
+
+	memset(saw, 0, sizeof saw);
+	for (len = 1, cs = valid_checksums; cs->name; len++, cs++) {
+		assert(len <= CSUM_COUNT);
+		if (saw[cs->num])
+			cs->main_name = valid_checksums[saw[cs->num]-1].name;
+		else
+			saw[cs->num] = len;
+	}
+	memset(saw, 0, sizeof saw);
 
 	/* Simplify the user-provided string so that it contains valid
 	 * checksum names without any duplicates. The client side also
 	 * makes use of the saw values when scanning the server's list. */
 	if (csum_list && *csum_list && (!am_server || local_server)) {
 		len = parse_checksum_list(csum_list, sumbuf, sizeof sumbuf, saw);
-		if (saw_fail && !len)
+		if (fail_if_empty && !len)
 			len = strlcpy(sumbuf, "FAIL", sizeof sumbuf);
 		csum_list = sumbuf;
-	} else {
-		memset(saw, 0, CSUM_SAW_BUFLEN);
+	} else
 		csum_list = NULL;
-	}
 
 	if (!csum_list || !*csum_list) {
-		struct csum_struct *cs;
 		int cnt = 0;
 		for (cs = valid_checksums, len = 0; cs->name; cs++) {
-			if (cs->num == CSUM_NONE)
+			if (cs->num == CSUM_NONE || cs->main_name)
 				continue;
 			if (len)
 				sumbuf[len++]= ' ';
@@ -225,6 +246,9 @@ void negotiate_checksum(int f_in, int f_out, const char *csum_list, int saw_fail
 		}
 	}
 
+	if (!am_server && DEBUG_GTE(CSUM, 2))
+		rprintf(FINFO, "Client checksum list: %s\n", sumbuf);
+
 	/* Each side sends their list of valid checksum names to the other side and
 	 * then both sides pick the first name in the client's list that is also in
 	 * the server's list. */
@@ -234,29 +258,29 @@ void negotiate_checksum(int f_in, int f_out, const char *csum_list, int saw_fail
 	if (!local_server || read_batch)
 		len = read_vstring(f_in, sumbuf, sizeof sumbuf);
 
+	if (!am_server && DEBUG_GTE(CSUM, 2))
+		rprintf(FINFO, "Server checksum list: %s\n", sumbuf);
+
 	if (len > 0) {
-		int best = CSUM_SAW_BUFLEN; /* We want best == 1 from the client list */
+		int best = CSUM_COUNT+1; /* We want best == 1 from the client list, so start with a big number. */
 		if (am_server)
-			memset(saw, 1, CSUM_SAW_BUFLEN); /* The first client's choice is the best choice */
+			memset(saw, 1, sizeof saw); /* Since we're parsing client names, anything we parse first is #1. */
 		for (tok = strtok(sumbuf, " \t"); tok; tok = strtok(NULL, " \t")) {
-			sum_type = parse_csum_name(tok, -1, 0);
-			if (sum_type < 0 || !saw[sum_type] || best < saw[sum_type])
+			cs = parse_csum_name(tok, -1, 0);
+			if (!cs || !saw[cs->num] || best <= saw[cs->num])
 				continue;
-			xfersum_type = checksum_type = sum_type;
-			negotiated_csum_name = tok;
-			best = saw[sum_type];
+			xfersum_type = checksum_type = cs->num;
+			negotiated_csum_name = cs->name;
+			best = saw[cs->num];
 			if (best == 1)
 				break;
 		}
-		if (negotiated_csum_name) {
-			negotiated_csum_name = strdup(negotiated_csum_name);
+		if (negotiated_csum_name)
 			return;
-		}
 	}
 
 	if (!am_server)
-		msleep(20);
-	rprintf(FERROR, "Failed to negotiate a common checksum\n");
+		rprintf(FERROR, "Failed to negotiate a common checksum\n");
 	exit_cleanup(RERR_UNSUPPORTED);
 }
 
@@ -276,8 +300,8 @@ int csum_len_for_type(int cst, BOOL flist_csum)
 	  case CSUM_MD5:
 		return MD5_DIGEST_LEN;
 #ifdef SUPPORT_XXHASH
-	  case CSUM_XXHASH:
-		return sizeof (XXH64_hash_t);
+	  case CSUM_XXH64:
+		return 64/8;
 #endif
 	  default: /* paranoia to prevent missing case values */
 		exit_cleanup(RERR_UNSUPPORTED);
@@ -392,7 +416,7 @@ void get_checksum2(char *buf, int32 len, char *sum)
 		break;
 	  }
 #ifdef SUPPORT_XXHASH
-	  case CSUM_XXHASH: 
+	  case CSUM_XXH64:
 		SIVAL64(sum, 0, XXH64(buf, len, checksum_seed));
 		break;
 #endif
@@ -472,10 +496,10 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 		break;
 	  }
 #ifdef SUPPORT_XXHASH
-	  case CSUM_XXHASH: {
+	  case CSUM_XXH64: {
 		XXH64_state_t* state = XXH64_createState();
 		if (state == NULL)
-			out_of_memory("file_checksum xx64");
+			out_of_memory("file_checksum XXH64");
 
 		if (XXH64_reset(state, 0) == XXH_ERROR) {
 			rprintf(FERROR, "error resetting XXH64 seed");
@@ -486,10 +510,11 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 			XXH_errorcode const updateResult =
 			    XXH64_update(state, (uchar *)map_ptr(buf, i, CSUM_CHUNK), CSUM_CHUNK);
 			if (updateResult == XXH_ERROR) {
-				rprintf(FERROR, "error computing XX64 hash");
+				rprintf(FERROR, "error computing XXH64 hash");
 				exit_cleanup(RERR_STREAMIO);
 			}
 		}
+
 		remainder = (int32)(len - i);
 		if (remainder > 0)
 			XXH64_update(state, (uchar *)map_ptr(buf, i, CSUM_CHUNK), remainder);
@@ -516,17 +541,17 @@ static union {
 #endif
 	MD5_CTX m5;
 } ctx;
-static int cursum_type;
 #ifdef SUPPORT_XXHASH
-XXH64_state_t* xxh64_state = NULL;
+static XXH64_state_t* xxh64_state;
 #endif
+static int cursum_type;
 
 void sum_init(int csum_type, int seed)
 {
 	char s[4];
 
 	if (csum_type < 0)
-		csum_type = parse_csum_name(NULL, 0, 1);
+		csum_type = parse_csum_name(NULL, 0, 1)->num;
 	cursum_type = csum_type;
 
 	switch (csum_type) {
@@ -550,7 +575,7 @@ void sum_init(int csum_type, int seed)
 		sum_update(s, 4);
 		break;
 #ifdef SUPPORT_XXHASH
-	  case CSUM_XXHASH:
+	  case CSUM_XXH64:
 		if (xxh64_state == NULL) {
 			xxh64_state = XXH64_createState();
 			if (xxh64_state == NULL)
@@ -616,9 +641,9 @@ void sum_update(const char *p, int32 len)
 			memcpy(ctx.md.buffer, p, sumresidue);
 		break;
 #ifdef SUPPORT_XXHASH
-	  case CSUM_XXHASH:
+	  case CSUM_XXH64:
 		if (XXH64_update(xxh64_state, p, len) == XXH_ERROR) {
-			rprintf(FERROR, "error computing XX64 hash");
+			rprintf(FERROR, "error computing XXH64 hash");
 			exit_cleanup(RERR_STREAMIO);
 		}
 		break;
@@ -656,7 +681,7 @@ int sum_end(char *sum)
 		mdfour_result(&ctx.md, (uchar *)sum);
 		break;
 #ifdef SUPPORT_XXHASH
-	  case CSUM_XXHASH:
+	  case CSUM_XXH64:
 		SIVAL64(sum, 0, XXH64_digest(xxh64_state));
 		break;
 #endif
