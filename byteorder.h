@@ -56,14 +56,14 @@ SIVALu(uchar *buf, int pos, uint32 val)
 static inline int64
 IVAL64(const char *buf, int pos)
 {
-	return IVALu(buf, pos) | (int64)IVALu(buf, pos + 4) << 32;
+	return IVALu((uchar*)buf, pos) | (int64)IVALu((uchar*)buf, pos + 4) << 32;
 }
 
 static inline void
 SIVAL64(char *buf, int pos, int64 val)
 {
-	SIVALu(buf, pos, val);
-	SIVALu(buf, pos + 4, val >> 32);
+	SIVALu((uchar*)buf, pos, val);
+	SIVALu((uchar*)buf, pos + 4, val >> 32);
 }
 
 #else /* !CAREFUL_ALIGNMENT */
