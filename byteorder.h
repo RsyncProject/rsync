@@ -19,7 +19,6 @@
  */
 
 #undef CAREFUL_ALIGNMENT
-#undef AVOID_BYTEORDER_INLINE
 
 /* We know that the x86 can handle misalignment and has the same
  * byte order (LSB-first) as the 32-bit numbers we transmit. */
@@ -36,32 +35,42 @@
 
 #if CAREFUL_ALIGNMENT
 
-#define PVAL(buf,pos) (UVAL(buf,pos)|UVAL(buf,(pos)+1)<<8)
-#define IVAL(buf,pos) (PVAL(buf,pos)|PVAL(buf,(pos)+2)<<16)
-#define IVAL64(buf,pos) (IVAL(buf,pos)|(int64)IVAL(buf,(pos)+4)<<32)
-#define SSVALX(buf,pos,val) (CVAL(buf,pos)=(val)&0xFF,CVAL(buf,pos+1)=(val)>>8)
-#define SIVALX(buf,pos,val) (SSVALX(buf,pos,val&0xFFFF),SSVALX(buf,pos+2,val>>16))
-#define SIVAL(buf,pos,val) SIVALX(buf,pos,(uint32)(val))
-#define SIVAL64(buf,pos,val) (SIVAL(buf,pos,val),SIVAL(buf,(pos)+4,(val)>>32))
+static inline uint32
+IVALu(const uchar *buf, int pos)
+{
+	return UVAL(buf, pos)
+	     | UVAL(buf, pos + 1) << 8
+	     | UVAL(buf, pos + 2) << 16
+	     | UVAL(buf, pos + 3) << 24;
+}
 
-#define IVALu(buf,pos) IVAL(buf,pos)
-#define SIVALu(buf,pos,val) SIVAL(buf,pos,val)
+static inline void
+SIVALu(uchar *buf, int pos, uint32 val)
+{
+	CVAL(buf, pos)     = val;
+	CVAL(buf, pos + 1) = val >> 8;
+	CVAL(buf, pos + 2) = val >> 16;
+	CVAL(buf, pos + 3) = val >> 24;
+}
+
+static inline int64
+IVAL64(const char *buf, int pos)
+{
+	return IVALu(buf, pos) | (int64)IVALu(buf, pos + 4) << 32;
+}
+
+static inline void
+SIVAL64(char *buf, int pos, int64 val)
+{
+	SIVALu(buf, pos, val);
+	SIVALu(buf, pos + 4, val >> 32);
+}
 
 #else /* !CAREFUL_ALIGNMENT */
 
 /* This handles things for architectures like the 386 that can handle alignment errors.
  * WARNING: This section is dependent on the length of an int32 (and thus a uint32)
  * being correct (4 bytes)!  Set CAREFUL_ALIGNMENT if it is not. */
-
-# ifdef AVOID_BYTEORDER_INLINE
-
-#define IVAL(buf,pos) (*(uint32 *)((char *)(buf) + (pos)))
-#define SIVAL(buf,pos,val) IVAL(buf,pos)=((uint32)(val))
-
-#define IVALu(buf,pos) IVAL(buf,pos)
-#define SIVALu(buf,pos,val) SIVAL(buf,pos,val)
-
-# else /* !AVOID_BYTEORDER_INLINE */
 
 static inline uint32
 IVALu(const uchar *buf, int pos)
@@ -83,18 +92,6 @@ SIVALu(uchar *buf, int pos, uint32 val)
 	} u;
 	u.b = buf + pos;
 	*u.num = val;
-}
-
-static inline uint32
-IVAL(const char *buf, int pos)
-{
-	return IVALu((uchar*)buf, pos);
-}
-
-static inline void
-SIVAL(char *buf, int pos, uint32 val)
-{
-	SIVALu((uchar*)buf, pos, val);
 }
 
 static inline int64
@@ -119,6 +116,17 @@ SIVAL64(char *buf, int pos, int64 val)
 	*u.num = val;
 }
 
-# endif /* !AVOID_BYTEORDER_INLINE */
-
 #endif /* !CAREFUL_ALIGNMENT */
+
+static inline uint32
+IVAL(const char *buf, int pos)
+{
+	return IVALu((uchar*)buf, pos);
+}
+
+static inline void
+SIVAL(char *buf, int pos, uint32 val)
+{
+	SIVALu((uchar*)buf, pos, val);
+}
+
