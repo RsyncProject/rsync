@@ -222,25 +222,26 @@ void logfile_reopen(void)
 	}
 }
 
-static void filtered_fwrite(FILE *f, const char *buf, int len, int use_isprint)
+static void filtered_fwrite(FILE *f, const char *in_buf, int in_len, int use_isprint, char end_char)
 {
-	const char *s, *end = buf + len;
-	for (s = buf; s < end; s++) {
-		if ((s < end - 4
-		  && *s == '\\' && s[1] == '#'
-		  && isDigit(s + 2)
-		  && isDigit(s + 3)
-		  && isDigit(s + 4))
-		 || (*s != '\t'
-		  && ((use_isprint && !isPrint(s))
-		   || *(uchar*)s < ' '))) {
-			if (s != buf && fwrite(buf, s - buf, 1, f) != 1)
+	char outbuf[1024], *ob = outbuf;
+	const char *end = in_buf + in_len;
+	while (in_buf < end) {
+		if (ob - outbuf >= (int)sizeof outbuf - 10) {
+			if (fwrite(outbuf, ob - outbuf, 1, f) != 1)
 				exit_cleanup(RERR_MESSAGEIO);
-			fprintf(f, "\\#%03o", *(uchar*)s);
-			buf = s + 1;
+			ob = outbuf;
 		}
+		if ((in_buf < end - 4 && *in_buf == '\\' && in_buf[1] == '#'
+		  && isDigit(in_buf + 2) && isDigit(in_buf + 3) && isDigit(in_buf + 4))
+		 || (*in_buf != '\t' && ((use_isprint && !isPrint(in_buf)) || *(uchar*)in_buf < ' ')))
+			ob += snprintf(ob, 6, "\\#%03o", *(uchar*)in_buf++);
+		else
+			*ob++ = *in_buf++;
 	}
-	if (buf != end && fwrite(buf, end - buf, 1, f) != 1)
+	if (end_char) /* The "- 10" above means that there is always room for one more char here. */
+		*ob++ = end_char;
+	if (ob != outbuf && fwrite(outbuf, ob - outbuf, 1, f) != 1)
 		exit_cleanup(RERR_MESSAGEIO);
 }
 
@@ -249,7 +250,7 @@ static void filtered_fwrite(FILE *f, const char *buf, int len, int use_isprint)
  * can happen with certain fatal conditions. */
 void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 {
-	int trailing_CR_or_NL;
+	char trailing_CR_or_NL;
 	FILE *f = msgs2stderr ? stderr : stdout;
 #ifdef ICONV_OPTION
 	iconv_t ic = is_utf8 && ic_recv != (iconv_t)-1 ? ic_recv : ic_chck;
@@ -374,7 +375,7 @@ output_msg:
 			iconvbufs(ic, &inbuf, &outbuf, inbuf.pos ? 0 : ICB_INIT);
 			ierrno = errno;
 			if (outbuf.len) {
-				filtered_fwrite(f, convbuf, outbuf.len, 0);
+				filtered_fwrite(f, convbuf, outbuf.len, 0, 0);
 				outbuf.len = 0;
 			}
 			/* Log one byte of illegal/incomplete sequence and continue with
@@ -385,13 +386,17 @@ output_msg:
 				inbuf.len--;
 			}
 		}
+
+		if (trailing_CR_or_NL) {
+			fputc(trailing_CR_or_NL, f);
+			fflush(f);
+		}
 	} else
 #endif
-		filtered_fwrite(f, buf, len, !allow_8bit_chars);
-
-	if (trailing_CR_or_NL) {
-		fputc(trailing_CR_or_NL, f);
-		fflush(f);
+	{
+		filtered_fwrite(f, buf, len, !allow_8bit_chars, trailing_CR_or_NL);
+		if (trailing_CR_or_NL)
+			fflush(f);
 	}
 }
 
