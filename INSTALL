@@ -1,13 +1,13 @@
 To build and install rsync:
 
-  $ ./configure
-  $ make
-  # make install
+    $ ./configure
+    $ make
+    # make install
 
 You may set the installation directory and other parameters by options
 to ./configure.  To see them, use:
 
-  $ ./configure --help
+    $ ./configure --help
 
 Configure tries to figure out if the local system uses group "nobody" or
 "nogroup" by looking in the /etc/group file.  (This is only used for the
