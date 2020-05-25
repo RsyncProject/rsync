@@ -30,10 +30,6 @@
 #ifdef SUPPORT_XXHASH
 #include "xxhash.h"
 #endif
-#ifdef USE_OPENSSL
-#include "openssl/md4.h"
-#include "openssl/md5.h"
-#endif
 
 extern int am_server;
 extern int whole_file;
@@ -62,13 +58,6 @@ struct name_num_obj valid_checksums = {
 		{ 0, NULL, NULL }
 	}
 };
-
-#ifndef USE_OPENSSL
-#define MD5_CTX md_context
-#define MD5_Init md5_begin
-#define MD5_Update md5_update
-#define MD5_Final(digest, cptr) md5_result(cptr, digest)
-#endif
 
 int xfersum_type = 0; /* used for the file transfer checksums */
 int checksum_type = 0; /* used for the pre-transfer (--checksum) checksums */
