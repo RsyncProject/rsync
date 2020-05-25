@@ -89,13 +89,8 @@ int filesfrom_convert = 0;
 
 struct name_num_obj valid_compressions = {
 	"compress", NULL, NULL, 0, 0, {
-#ifndef EXTERNAL_ZLIB
-		{ CPRES_ZLIB, "zlib", NULL },
-#endif
 		{ CPRES_ZLIBX, "zlibx", NULL },
-#ifdef EXTERNAL_ZLIB
 		{ CPRES_ZLIB, "zlib", NULL },
-#endif
 		{ CPRES_NONE, "none", NULL },
 		{ 0, NULL, NULL }
 	}

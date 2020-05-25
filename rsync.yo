@@ -2069,13 +2069,6 @@ compression comes at a cost of CPU, though, and can be disabled by using the
 bf(-z) option or specifying bf(--compress-choice=zlibx), but it only works if
 both sides of the transfer are at least version 3.1.1.
 
-Note that if your version of rsync was compiled with an external zlib (instead
-of the zlib that comes packaged with rsync) then it will give preference to
-using the "zlibx" algorithm over the "zlib" algorithm since the external zlib
-code doesn't seem to handle the extra compression properly.  You can try
-forcing the regular algorithm via bf(--zz=zlib) and be on the lookout for
-transfer failures.  If all else fails, disable compression altogether.
-
 Note that if you see an error about an option named bf(--old-compress) or
 bf(--new-compress), this is rsync trying to send the bf(--compress-choice=zlib)
 or bf(--compress-choice=zlibx) option in a backward-compatible manner that more
@@ -2089,12 +2082,13 @@ dit(bf(--compress-choice=STR, --zz=STR)) This option can be used to override the
 automatic selection of the compression algorithm that is the default when
 bf(--compress) is used.
 
-Currently the STR can be "zlib", "zlibx", or "none".
+Currently the STR can be "zlibx", "zlib", or "none".
 
-The "zlib" algorithm is given preference over "zlibx" if your rsync was
-compiled with the internal zlib code, otherwise that preference is reversed.
-These 2 algorithms are the stame except that "zlibx" does not try to include
-matched data that was not transferred in the compression computations.
+The "zlibx" algorithm is given preference over "zlib" if both sides of the
+transfer are at least version 3.2.0, otherwise it will choose "zlib" unless you
+override it via something like bf(-zz).  These 2 algorithms are the stame
+except that "zlibx" does not try to include matched data that was not
+transferred in the compression computations.
 
 If "none" is specified, that is equivalent to using bf(--no-compress).
 
