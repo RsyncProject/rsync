@@ -41,17 +41,25 @@ Changes since 3.1.3:
     - Various checksum enhancements, including the optional use of openssl's
       MD4 & MD5 checksum algorithms, some x86_64 optimizations for the rolling
       checksum, some x86_64 optimizations for the (non-openssl) MD5 checksum,
-      the addition of xxhash checksum support, and a simple checksum negotation
-      heuristic that ensures that it is easier to add new checksum algorithms
-      in the future.  Currently the x86_64 optimizations require the use of the
-      --enable-simd flag to configure, but they will probably be enabled by
-      default in the near future.
+      the addition of xxhash checksum support, and a negotiation heuristic that
+      ensures that it is easier to add new checksum algorithms in the future.
+      Currently the x86_64 optimizations require the use of the --enable-simd
+      flag to configure, but they will probably be enabled by default in the
+      near future.  The environment variable RSYNC_CHECKSUM_LIST can be used
+      to customize the preference order of the negotiation.
 
-    - Improved the --atimes patch and promoted it to be in the release.
+    - Various compression enhancements, including a negotiation heuristic that
+      tries to pick the best compression option supported by both sides.  The
+      environment variable RSYNC_COMPRESS_LIST can be used to customize the
+      preference order of the heuristic (which will be more useful when new
+      compression options are added).
+
+    - Added the --atimes option based on the long-standing patch (just with
+      some fixes that the patch has been needing).
 
     - Added --open-noatime option to open files using O_NOATIME.
 
-    - Improved the --write-devices patch and promoted it to be in the release.
+    - Added the --write-devices option based on the long-standing patch.
 
     - Added openssl support to the rsync-ssl script via its renamed helper
       script, rsync-ssl-rsh.  Both bash scripts are now installed by default
@@ -63,7 +71,7 @@ Changes since 3.1.3:
     - Added negated matching to the daemon's "refuse options" setting by using
       match strings that start with a "!" (such as "!compress*").
 
-    - Added a status output based on a signal (via both SIGINFO & SIGVTALRM).
+    - Added status output in response to a signal (via both SIGINFO & SIGVTALRM).
 
     - Added a --copy-as=USER option to give some extra security to root-run
       rsync commands into/from untrusted directories (such as backups and
@@ -90,6 +98,14 @@ Changes since 3.1.3:
 
     - Improved some configure checks to work better with strict C99 compilers.
 
+    - The --debug=FOO options are no longer auto-forwarded to the server side,
+      allowing more control over what is output & the ability to request debug
+      data from divergent rsync versions.
+
     - Some perl scripts were recoded into awk and python3.
+
+    - Some defines in byteorder.h were changed into static inline functions
+      that will help to ensure that the args don't get evaluated multiple times
+      on "careful alignment" hosts.
 
     - Some code typos were fixed (as pointed out by a Fossies run).
