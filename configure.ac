@@ -391,8 +391,7 @@ AH_TEMPLATE([USE_OPENSSL],
 [Undefine if you do not want to use openssl crypto library.  By default this is defined.])
 if test x"$enable_openssl" != x"no" && test x"$ac_cv_header_openssl_md4_h" = x"yes" && test x"$ac_cv_header_openssl_md5_h" = x"yes"; then
     AC_MSG_RESULT(yes)
-    AC_SEARCH_LIBS(MD5_Init, crypto)
-    AC_DEFINE(USE_OPENSSL)
+    AC_SEARCH_LIBS(MD5_Init, crypto, [AC_DEFINE(USE_OPENSSL)])
 else
     AC_MSG_RESULT(no)
 fi
@@ -404,8 +403,7 @@ AH_TEMPLATE([SUPPORT_XXHASH],
 [Undefine if you do not want xxhash checksums.  By default this is defined.])
 if test x"$enable_xxhash" != x"no" && test x"$ac_cv_header_xxhash_h" = x"yes"; then
     AC_MSG_RESULT(yes)
-    AC_SEARCH_LIBS(XXH64_createState, xxhash)
-    AC_DEFINE(SUPPORT_XXHASH)
+    AC_SEARCH_LIBS(XXH64_createState, xxhash, [AC_DEFINE(SUPPORT_XXHASH)])
 else
     AC_MSG_RESULT(no)
 fi
