@@ -167,6 +167,8 @@ static void hash_search(int f,struct sum_struct *s,
 	if (DEBUG_GTE(DELTASUM, 3))
 		rprintf(FINFO, "sum=%.8x k=%ld\n", sum, (long)k);
 
+	checksum2_enable_prefetch(buf, len, s->blength);
+
 	offset = aligned_offset = aligned_i = 0;
 
 	end = len + 1 - s->sums[s->count-1].len;
@@ -229,7 +231,7 @@ static void hash_search(int f,struct sum_struct *s,
 
 			if (!done_csum2) {
 				map = (schar *)map_ptr(buf,offset,l);
-				get_checksum2((char *)map,l,sum2);
+				get_checksum2((char *)map, l, sum2, offset);
 				done_csum2 = 1;
 			}
 
@@ -271,7 +273,7 @@ static void hash_search(int f,struct sum_struct *s,
 						sum = get_checksum1((char *)map, l);
 						if (sum != s->sums[i].sum1)
 							goto check_want_i;
-						get_checksum2((char *)map, l, sum2);
+						get_checksum2((char *)map, l, sum2, aligned_offset);
 						if (memcmp(sum2, s->sums[i].sum2, s->s2length) != 0)
 							goto check_want_i;
 						/* OK, we have a re-alignment match.  Bump the offset
@@ -338,6 +340,8 @@ static void hash_search(int f,struct sum_struct *s,
 		if (backup >= s->blength+CHUNK_SIZE && end-offset > CHUNK_SIZE)
 			matched(f, s, buf, offset - s->blength, -2);
 	} while (++offset < end);
+
+    checksum2_disable_prefetch();
 
 	matched(f, s, buf, len, -1);
 	map_ptr(buf, len-1, 1);

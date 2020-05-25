@@ -197,9 +197,19 @@ uint32 get_checksum1(char *buf1, int32 len)
 	}
 	return (s1 & 0xffff) + (s2 << 16);
 }
-#endif
 
-void get_checksum2(char *buf, int32 len, char *sum)
+void checksum2_enable_prefetch(UNUSED(struct map_struct *map), UNUSED(OFF_T len), UNUSED(int32 blocklen))
+{
+}
+
+void checksum2_disable_prefetch()
+{
+}
+
+void get_checksum2(char *buf, int32 len, char *sum, UNUSED(OFF_T prefetch_offset))
+#else
+void get_checksum2_nosimd(char *buf, int32 len, char *sum, UNUSED(OFF_T prefetch_offset))
+#endif
 {
 	switch (xfersum_type) {
 #ifdef SUPPORT_XXHASH

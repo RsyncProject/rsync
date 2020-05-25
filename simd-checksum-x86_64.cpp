@@ -48,6 +48,22 @@
  * This file is compiled using GCC 4.8+'s C++ front end to allow the use of
  * the target attribute, selecting the fastest code path based on runtime
  * detection of CPU capabilities.
+ *
+ * ----
+ *
+ * get_checksum2() is optimized for the case where the selected transfer
+ * checksum is MD5. MD5 can't be made significantly faster with SIMD
+ * instructions than the assembly version already included but SIMD
+ * instructions can be used to hash multiple streams in parallel (see
+ * simd-md5-parallel-x86_64.cpp for details and benchmarks). As rsync's
+ * block-matching algorithm hashes the blocks independently (in contrast to
+ * the whole-file checksum) this method can be employed here.
+ *
+ * To prevent needing to modify the core rsync sources significantly, a
+ * prefetching strategy is used. When a checksum2 is requested, the code
+ * reads ahead several blocks, creates the MD5 hashes for each block in
+ * parallel, returns the hash for the first block, and caches the results
+ * for the other blocks to return in future calls to get_checksum2().
  */
 
 #ifdef __x86_64__
@@ -407,6 +423,169 @@ uint32 get_checksum1(char *buf1, int32 len) {
     i = get_checksum1_default_1((schar*)buf1, len, i, &s1, &s2);
 
     return (s1 & 0xffff) + (s2 << 16);
+}
+
+#define PREFETCH_ENABLE // debugging
+
+#if 0 // debugging
+#define PREFETCH_PRINTF(f_, ...) printf((f_), ##__VA_ARGS__)
+#else
+#define PREFETCH_PRINTF(f_, ...) (void)0;
+#endif
+
+#define PREFETCH_MIN_LEN 1024 // the overhead is unlikely to be worth the gain for small blocks
+#define PREFETCH_MAX_BLOCKS 8
+#define CSUM_MD5 5
+
+typedef struct {
+    int in_use;
+    OFF_T offset;
+    int32 len;
+    char sum[SUM_LENGTH];
+} prefetch_sum_t;
+
+typedef struct {
+    struct map_struct *map;
+    OFF_T len;
+    OFF_T last;
+    int32 blocklen;
+    int blocks;
+    prefetch_sum_t sums[PREFETCH_MAX_BLOCKS];
+} prefetch_t;
+
+prefetch_t *prefetch;
+
+extern int xfersum_type;
+extern int checksum_seed;
+extern int proper_seed_order;
+extern void get_checksum2_nosimd(char *buf, int32 len, char *sum, OFF_T prefetch_offset);
+
+extern char *map_ptr(struct map_struct *map, OFF_T offset, int32 len);
+
+// see simd-md5-parallel-x86_64.cpp
+extern int md5_parallel_slots();
+extern int md5_parallel(int streams, char** buf, int* len, char** sum, char* pre4, char* post4);
+
+void checksum2_disable_prefetch() {
+    if (prefetch) {
+        PREFETCH_PRINTF("checksum2_disable_prefetch\n");
+        free(prefetch);
+        prefetch = NULL;
+    }
+}
+
+void checksum2_enable_prefetch(struct map_struct *map, OFF_T len, int32 blocklen) {
+#ifdef PREFETCH_ENABLE
+    checksum2_disable_prefetch();
+    int slots = md5_parallel_slots();
+    if ((xfersum_type == CSUM_MD5) && (slots > 1) && (len >= blocklen * PREFETCH_MAX_BLOCKS) && (blocklen >= PREFETCH_MIN_LEN)) {
+        prefetch = (prefetch_t*)malloc(sizeof(prefetch_t));
+        memset(prefetch, 0, sizeof(prefetch_t));
+        prefetch->map = map;
+        prefetch->len = len;
+        prefetch->last = 0;
+        prefetch->blocklen = blocklen;
+        prefetch->blocks = MIN(PREFETCH_MAX_BLOCKS, slots);
+        PREFETCH_PRINTF("checksum2_enable_prefetch len:%ld blocklen:%d blocks:%d\n", prefetch->len, prefetch->blocklen, prefetch->blocks);
+    }
+#else
+    (void)map;
+    (void)len;
+    (void)blocklen;
+#endif
+}
+
+static inline void checksum2_reset_prefetch() {
+    for (int i = 0; i < PREFETCH_MAX_BLOCKS; i++) {
+        prefetch->sums[i].in_use = 0;
+    }
+}
+
+static int get_checksum2_prefetched(int32 len, char* sum, OFF_T prefetch_offset) {
+    if (prefetch->sums[0].in_use) {
+        if ((prefetch->sums[0].offset == prefetch_offset) && (prefetch->sums[0].len == len)) {
+            memcpy(sum, prefetch->sums[0].sum, SUM_LENGTH);
+            for (int i = 0; i < PREFETCH_MAX_BLOCKS - 1; i++) {
+                prefetch->sums[i] = prefetch->sums[i + 1];
+            }
+            prefetch->sums[PREFETCH_MAX_BLOCKS - 1].in_use = 0;
+            PREFETCH_PRINTF("checksum2_prefetch HIT len:%d offset:%ld\n", len, prefetch_offset);
+            return 1;
+        } else {
+            // unexpected access, reset cache
+            PREFETCH_PRINTF("checksum2_prefetch MISS len:%d offset:%ld\n", len, prefetch_offset);
+            checksum2_reset_prefetch();
+        }
+    }
+    return 0;
+}
+
+static int checksum2_perform_prefetch(OFF_T prefetch_offset) {
+    int blocks = MIN(MAX(1, (prefetch->len + prefetch->blocklen - 1) / prefetch->blocklen), prefetch->blocks);
+    if (blocks < 2) return 0; // fall through to non-simd, probably faster
+
+    int32 total = 0;
+    int i;
+    for (i = 0; i < blocks; i++) {
+        prefetch->sums[i].offset = prefetch_offset + total;
+        prefetch->sums[i].len = MIN(prefetch->blocklen, prefetch->len - prefetch_offset - total);
+        prefetch->sums[i].in_use = 0;
+        total += prefetch->sums[i].len;
+    }
+    for (; i < PREFETCH_MAX_BLOCKS; i++) {
+        prefetch->sums[i].in_use = 0;
+    }
+
+    uchar seedbuf[4];
+    SIVALu(seedbuf, 0, checksum_seed);
+
+    PREFETCH_PRINTF("checksum2_perform_prefetch pos:%ld len:%d blocks:%d\n", prefetch_offset, total, blocks);
+    char* mapbuf = map_ptr(prefetch->map, prefetch_offset, total);
+    char* bufs[PREFETCH_MAX_BLOCKS] = {0};
+    int lens[PREFETCH_MAX_BLOCKS] = {0};
+    char* sums[PREFETCH_MAX_BLOCKS] = {0};
+    for (i = 0; i < blocks; i++) {
+        bufs[i] = mapbuf + prefetch->sums[i].offset - prefetch_offset;
+        lens[i] = prefetch->sums[i].len;
+        sums[i] = prefetch->sums[i].sum;
+    }
+    if (md5_parallel(blocks, bufs, lens, sums, (proper_seed_order && checksum_seed) ? (char*)seedbuf : NULL, (!proper_seed_order && checksum_seed) ? (char*)seedbuf : NULL)) {
+        for (i = 0; i < blocks; i++) {
+            prefetch->sums[i].in_use = 1;
+        }
+        return 1;
+    } else {
+        // this should never be, abort
+        PREFETCH_PRINTF("checksum2_perform_prefetch PMD5 ABORT\n");
+        checksum2_disable_prefetch();
+    }
+    return 0;
+}
+
+void get_checksum2(char *buf, int32 len, char *sum, OFF_T prefetch_offset) {
+    if (prefetch) {
+        PREFETCH_PRINTF("get_checksum2 %d @ %ld\n", len, prefetch_offset);
+        OFF_T last = prefetch->last;
+        prefetch->last = prefetch_offset;
+        if ((prefetch_offset != 0) && (prefetch_offset != last + prefetch->blocklen)) {
+            // we're looking around trying to align blocks, prefetching will slow things down
+            PREFETCH_PRINTF("get_checksum2 SEEK\n");
+            checksum2_reset_prefetch();
+        } else if (get_checksum2_prefetched(len, sum, prefetch_offset)) {
+            // hit
+            return;
+        } else if (checksum2_perform_prefetch(prefetch_offset)) {
+            if (get_checksum2_prefetched(len, sum, prefetch_offset)) {
+                // hit; should always be as we just fetched this data
+                return;
+            } else {
+                // this should never be, abort
+                PREFETCH_PRINTF("get_checksum2 MISSING DATA ABORT\n");
+                checksum2_disable_prefetch();
+            }
+        }
+    }
+    get_checksum2_nosimd(buf, len, sum, prefetch_offset);
 }
 
 }

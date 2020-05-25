@@ -31,7 +31,7 @@ VERSION=@RSYNC_VERSION@
 .SUFFIXES:
 .SUFFIXES: .c .o
 
-SIMD_x86_64=simd-checksum-x86_64.o lib/md5-asm-x86_64.o
+SIMD_x86_64=simd-checksum-x86_64.o simd-md5-parallel-x86_64.o lib/md5-asm-x86_64.o
 
 GENFILES=configure.sh aclocal.m4 config.h.in proto.h proto.h-tstamp rsync.1 rsync-ssl.1 rsyncd.conf.5
 HEADERS=byteorder.h config.h errcode.h proto.h rsync.h ifuncs.h itypes.h inums.h \
@@ -120,6 +120,9 @@ rounding.h: rounding.c rsync.h proto.h
 	@rm -f rounding.out
 
 simd-checksum-x86_64.o: simd-checksum-x86_64.cpp
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $<
+
+simd-md5-parallel-x86_64.o: simd-md5-parallel-x86_64.cpp
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $<
 
 lib/md5-asm-x86_64.o: lib/md5-asm-x86_64.s
