@@ -381,7 +381,7 @@ AC_CHECK_HEADERS(sys/fcntl.h sys/select.h fcntl.h sys/time.h sys/unistd.h \
     netdb.h malloc.h float.h limits.h iconv.h libcharset.h langinfo.h \
     sys/acl.h acl/libacl.h attr/xattr.h sys/xattr.h sys/extattr.h \
     popt.h popt/popt.h linux/falloc.h netinet/in_systm.h netinet/ip.h \
-    zlib.h xxhash.h openssl/md4.h openssl/md5.h)
+    zlib.h xxhash.h openssl/md4.h openssl/md5.h zstd.h)
 AC_HEADER_MAJOR_FIXED
 
 AC_MSG_CHECKING([whether to enable use of openssl crypto library])
@@ -404,6 +404,18 @@ AH_TEMPLATE([SUPPORT_XXHASH],
 if test x"$enable_xxhash" != x"no" && test x"$ac_cv_header_xxhash_h" = x"yes"; then
     AC_MSG_RESULT(yes)
     AC_SEARCH_LIBS(XXH64_createState, xxhash, [AC_DEFINE(SUPPORT_XXHASH)])
+else
+    AC_MSG_RESULT(no)
+fi
+
+AC_MSG_CHECKING([whether to enable zstd compression])
+AC_ARG_ENABLE([zstd],
+        AC_HELP_STRING([--disable-zstd], [disable zstd compression]))
+AH_TEMPLATE([SUPPORT_ZSTD],
+[Undefine if you do not want zstd compression.  By default this is defined.])
+if test x"$enable_zstd" != x"no" && test x"$ac_cv_header_zstd_h" = x"yes"; then
+    AC_MSG_RESULT(yes)
+    AC_SEARCH_LIBS(ZSTD_minCLevel, zstd, [AC_DEFINE(SUPPORT_ZSTD)])
 else
     AC_MSG_RESULT(no)
 fi

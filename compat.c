@@ -90,6 +90,10 @@ struct name_num_obj valid_compressions = {
 	"compress", NULL, NULL, 0, 0, {
 		{ CPRES_ZLIBX, "zlibx", NULL },
 		{ CPRES_ZLIB, "zlib", NULL },
+#ifdef SUPPORT_ZSTD
+		/* TODO decide where in the default preference order this should go. */
+		{ CPRES_ZSTD, "zstd", NULL },
+#endif
 		{ CPRES_NONE, "none", NULL },
 		{ 0, NULL, NULL }
 	}
