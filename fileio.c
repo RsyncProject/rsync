@@ -44,6 +44,8 @@ int sparse_end(int f, OFF_T size)
 {
 	int ret;
 
+	sparse_past_write = 0;
+
 	if (!sparse_seek)
 		return 0;
 
