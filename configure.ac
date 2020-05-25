@@ -397,7 +397,7 @@ else
     AC_MSG_RESULT(no)
 fi
 
-AC_MSG_CHECKING([whether to enable the xxhash support])
+AC_MSG_CHECKING([whether to enable xxhash checksum support])
 AC_ARG_ENABLE([xxhash],
 	AS_HELP_STRING([--disable-xxhash],[disable xxhash checksums]))
 AH_TEMPLATE([SUPPORT_XXHASH],

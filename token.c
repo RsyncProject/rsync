@@ -300,8 +300,8 @@ static void
 send_deflated_token(int f, int32 token, struct map_struct *buf, OFF_T offset,
 		    int32 nb, int32 toklen)
 {
-	int32 n, r;
 	static int init_done, flush_pending;
+	int32 n, r;
 
 	if (last_token == -1) {
 		/* initialization */
@@ -406,7 +406,7 @@ send_deflated_token(int f, int32 token, struct map_struct *buf, OFF_T offset,
 	if (token == -1) {
 		/* end of file - clean up */
 		write_byte(f, END_FLAG);
-	} else if (token != -2 && do_compression == 1) {
+	} else if (token != -2 && do_compression == CPRES_ZLIB) {
 		/* Add the data in the current block to the compressor's
 		 * history and hash table. */
 		do {
@@ -640,11 +640,10 @@ int32 recv_token(int f, char **data)
 {
 	int tok;
 
-	if (!do_compression) {
+	if (!do_compression)
 		tok = simple_recv_token(f,data);
-	} else {
+	else /* CPRES_ZLIB & CPRES_ZLIBX */
 		tok = recv_deflated_token(f, data);
-	}
 	return tok;
 }
 
@@ -653,6 +652,6 @@ int32 recv_token(int f, char **data)
  */
 void see_token(char *data, int32 toklen)
 {
-	if (do_compression == 1)
+	if (do_compression == CPRES_ZLIB)
 		see_deflate_token(data, toklen);
 }

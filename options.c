@@ -1968,7 +1968,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	if (!compress_choice && do_compression > 1)
 		compress_choice = "zlibx";
 	if (compress_choice && strcasecmp(compress_choice, "auto") != 0)
-		parse_compress_choice(0); /* Can twiddle do_compression and possibly NULL-out compress_choice  */
+		parse_compress_choice(0); /* Twiddles do_compression and can possibly NULL-out compress_choice. */
 	else
 		compress_choice = NULL;
 
@@ -1983,7 +1983,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			do_compression = 0;
 			compress_choice = NULL;
 		} else if (!do_compression)
-			do_compression = 1;
+			do_compression = CPRES_ZLIB;
 		if (do_compression && refused_compress) {
 			create_refuse_error(refused_compress);
 			return 0;
@@ -2628,7 +2628,7 @@ void server_options(char **args, int *argc_p)
 	}
 	if (sparse_files)
 		argstr[x++] = 'S';
-	if (do_compression == 1)
+	if (do_compression == CPRES_ZLIB)
 		argstr[x++] = 'z';
 
 	set_allow_inc_recurse();
@@ -2765,9 +2765,9 @@ void server_options(char **args, int *argc_p)
 		args[ac++] = arg;
 	}
 
-	if ((!compress_choice && do_compression > 1) || (compress_choice && strcasecmp(compress_choice, "zlibx") == 0))
+	if (do_compression == CPRES_ZLIBX)
 		args[ac++] = "--new-compress";
-	else if (compress_choice && strcasecmp(compress_choice, "zlib") == 0)
+	else if (compress_choice && do_compression == CPRES_ZLIB)
 		args[ac++] = "--old-compress";
 	else if (compress_choice) {
 		if (asprintf(&arg, "--compress-choice=%s", compress_choice) < 0)
