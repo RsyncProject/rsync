@@ -23,7 +23,6 @@
 #include "itypes.h"
 #include "latest-year.h"
 #include <popt.h>
-#include <zlib.h>
 
 extern int module_id;
 extern int local_server;
@@ -32,8 +31,6 @@ extern int daemon_over_rsh;
 extern unsigned int module_dirlen;
 extern filter_rule_list filter_list;
 extern filter_rule_list daemon_filter_list;
-
-#define NOT_SPECIFIED (-42)
 
 int make_backups = 0;
 
@@ -81,7 +78,7 @@ int protocol_version = PROTOCOL_VERSION;
 int sparse_files = 0;
 int preallocate_files = 0;
 int do_compression = 0;
-int def_compress_level = NOT_SPECIFIED;
+int do_compression_level = CLVL_NOT_SPECIFIED;
 int am_root = 0; /* 0 = normal, 1 = root, 2 = --super, -1 = --fake-super */
 int am_server = 0;
 int am_sender = 0;
@@ -1003,7 +1000,7 @@ static struct poptOption long_options[] = {
   {"compress-choice",  0,  POPT_ARG_STRING, &compress_choice, 0, 0, 0 },
   {"zz",               0,  POPT_ARG_STRING, &compress_choice, 0, 0, 0 },
   {"skip-compress",    0,  POPT_ARG_STRING, &skip_compress, 0, 0, 0 },
-  {"compress-level",   0,  POPT_ARG_INT,    &def_compress_level, 0, 0, 0 },
+  {"compress-level",   0,  POPT_ARG_INT,    &do_compression_level, 0, 0, 0 },
   {0,                 'P', POPT_ARG_NONE,   0, 'P', 0, 0 },
   {"progress",         0,  POPT_ARG_VAL,    &do_progress, 1, 0, 0 },
   {"no-progress",      0,  POPT_ARG_VAL,    &do_progress, 0, 0, 0 },
@@ -1972,18 +1969,9 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	else
 		compress_choice = NULL;
 
-	if (do_compression || def_compress_level != NOT_SPECIFIED) {
-		if (def_compress_level == NOT_SPECIFIED)
-			def_compress_level = Z_DEFAULT_COMPRESSION;
-		else if (def_compress_level < Z_DEFAULT_COMPRESSION || def_compress_level > Z_BEST_COMPRESSION) {
-			snprintf(err_buf, sizeof err_buf, "--compress-level value is invalid: %d\n",
-				 def_compress_level);
-			return 0;
-		} else if (def_compress_level == Z_NO_COMPRESSION) {
-			do_compression = 0;
-			compress_choice = NULL;
-		} else if (!do_compression)
-			do_compression = CPRES_ZLIB;
+	if (do_compression || do_compression_level != CLVL_NOT_SPECIFIED) {
+		if (!do_compression)
+			do_compression = CPRES_AUTO;
 		if (do_compression && refused_compress) {
 			create_refuse_error(refused_compress);
 			return 0;
@@ -2701,8 +2689,8 @@ void server_options(char **args, int *argc_p)
 	if (xfer_dirs && !recurse && delete_mode && am_sender)
 		args[ac++] = "--no-r";
 
-	if (do_compression && def_compress_level != Z_DEFAULT_COMPRESSION) {
-		if (asprintf(&arg, "--compress-level=%d", def_compress_level) < 0)
+	if (do_compression && do_compression_level != CLVL_NOT_SPECIFIED) {
+		if (asprintf(&arg, "--compress-level=%d", do_compression_level) < 0)
 			goto oom;
 		args[ac++] = arg;
 	}

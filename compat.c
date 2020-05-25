@@ -48,6 +48,7 @@ extern int xfer_flags_as_varint;
 extern int need_messages_from_generator;
 extern int delete_mode, delete_before, delete_during, delete_after;
 extern int do_compression;
+extern int do_compression_level;
 extern char *shell_cmd;
 extern char *partial_dir;
 extern char *dest_option;
@@ -172,16 +173,22 @@ void parse_compress_choice(int final_call)
 	else
 		do_compression = CPRES_NONE;
 
+	if (do_compression != CPRES_NONE && final_call)
+		init_compression_level(); /* There's a chance this might turn compression off! */
+
 	if (do_compression == CPRES_NONE)
 		compress_choice = NULL;
 
-	if (final_call && DEBUG_GTE(NSTR, am_server ? 2 : 1)) {
+	if (final_call && DEBUG_GTE(NSTR, am_server ? 3 : 1)
+	 && (do_compression != CPRES_NONE || do_compression_level != CLVL_NOT_SPECIFIED)) {
 		const char *c_s = am_server ? "Server" : "Client";
-		if (valid_compressions.negotiated_name)
-			rprintf(FINFO, "%s negotiated compress: %s\n", c_s, valid_compressions.negotiated_name);
-		else {
+		if (do_compression != CPRES_NONE && valid_compressions.negotiated_name) {
+			rprintf(FINFO, "%s negotiated compress: %s (level %d)\n",
+				c_s, valid_compressions.negotiated_name, do_compression_level);
+		} else {
 			struct name_num_item *nni = get_nni_by_num(&valid_compressions, do_compression);
-			rprintf(FINFO, "%s compress: %s\n", c_s, nni ? nni->name : "UNKNOWN");
+			rprintf(FINFO, "%s compress: %s (level %d)\n",
+				c_s, nni ? nni->name : "UNKNOWN", do_compression_level);
 		}
 	}
 }

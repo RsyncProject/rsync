@@ -26,7 +26,7 @@
 extern int do_compression;
 extern int protocol_version;
 extern int module_id;
-extern int def_compress_level;
+extern int do_compression_level;
 extern char *skip_compress;
 
 #ifndef Z_INSERT_ONLY
@@ -43,6 +43,38 @@ struct suffix_tree {
 
 static char *match_list;
 static struct suffix_tree *suftree;
+
+void init_compression_level(void)
+{
+	int min_level, max_level, def_level, off_level;
+
+	switch (do_compression) {
+	case CPRES_ZLIB:
+	case CPRES_ZLIBX:
+		min_level = 1;
+		max_level = Z_BEST_COMPRESSION;
+		def_level = 6; /* Z_DEFAULT_COMPRESSION is -1, so set it to the real default */
+		off_level = Z_NO_COMPRESSION;
+		if (do_compression_level == Z_DEFAULT_COMPRESSION)
+			do_compression_level = def_level;
+		break;
+	default: /* paranoia to prevent missing case values */
+		exit_cleanup(RERR_UNSUPPORTED);
+	}
+
+	if (do_compression_level == off_level) {
+		do_compression = CPRES_NONE;
+		return;
+	}
+
+	/* We don't bother with any errors or warnings -- just make sure that the values are valid. */
+	if (do_compression_level == CLVL_NOT_SPECIFIED)
+		do_compression_level = def_level;
+	else if (do_compression_level < min_level)
+		do_compression_level = min_level;
+	else if (do_compression_level > max_level)
+		do_compression_level = max_level;
+}
 
 static void add_suffix(struct suffix_tree **prior, char ltr, const char *str)
 {
@@ -129,7 +161,7 @@ static void init_set_compression(void)
 	if (!(match_list = t = new_array(char, strlen(f) + 2)))
 		out_of_memory("set_compression");
 
-	per_file_default_level = def_compress_level;
+	per_file_default_level = do_compression_level;
 
 	while (*f) {
 		if (*f == ' ') {

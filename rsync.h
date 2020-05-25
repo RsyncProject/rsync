@@ -1061,9 +1061,14 @@ typedef struct {
 #define ACL_READY(sx) ((sx).acc_acl != NULL)
 #define XATTR_READY(sx) ((sx).xattr != NULL)
 
+#define CLVL_NOT_SPECIFIED INT_MIN
+
+#define CPRES_AUTO (-1)
 #define CPRES_NONE 0
 #define CPRES_ZLIB 1
 #define CPRES_ZLIBX 2
+#define CPRES_LZ4 3
+#define CPRES_ZSTD 4
 
 struct name_num_item {
 	int num;

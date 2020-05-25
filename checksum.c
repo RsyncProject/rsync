@@ -123,7 +123,7 @@ void parse_checksum_choice(int final_call)
 	if (xfersum_type == CSUM_NONE)
 		whole_file = 1;
 
-	if (final_call && DEBUG_GTE(NSTR, am_server ? 2 : 1)) {
+	if (final_call && DEBUG_GTE(NSTR, am_server ? 3 : 1)) {
 		const char *c_s = am_server ? "Server" : "Client";
 		if (valid_checksums.negotiated_name)
 			rprintf(FINFO, "%s negotiated checksum: %s\n", c_s, valid_checksums.negotiated_name);
