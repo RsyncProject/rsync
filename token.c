@@ -62,15 +62,15 @@ void init_compression_level(void)
 		exit_cleanup(RERR_UNSUPPORTED);
 	}
 
-	if (do_compression_level == off_level) {
+	if (do_compression_level == CLVL_NOT_SPECIFIED)
+		do_compression_level = def_level;
+	else if (do_compression_level == off_level) {
 		do_compression = CPRES_NONE;
 		return;
 	}
 
 	/* We don't bother with any errors or warnings -- just make sure that the values are valid. */
-	if (do_compression_level == CLVL_NOT_SPECIFIED)
-		do_compression_level = def_level;
-	else if (do_compression_level < min_level)
+	if (do_compression_level < min_level)
 		do_compression_level = min_level;
 	else if (do_compression_level > max_level)
 		do_compression_level = max_level;
