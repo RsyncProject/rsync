@@ -47,8 +47,6 @@ extern int preserve_xattrs;
 extern int xfer_flags_as_varint;
 extern int need_messages_from_generator;
 extern int delete_mode, delete_before, delete_during, delete_after;
-extern int xfersum_type;
-extern int checksum_type;
 extern int do_compression;
 extern char *shell_cmd;
 extern char *partial_dir;
@@ -256,7 +254,7 @@ static int parse_nni_str(struct name_num_obj *nno, const char *from, char *tobuf
 				struct name_num_item *nni = get_nni_by_name(nno, tok, to - tok);
 				if (nni && !nno->saw[nni->num]) {
 					nno->saw[nni->num] = ++cnt;
-					if (nni->main_name && *nni->main_name) {
+					if (nni->main_name) {
 						to = tok + strlcpy(tok, nni->main_name, tobuf_len - (tok - tobuf));
 						if (to - tobuf >= tobuf_len) {
 							to = tok - 1;
@@ -294,7 +292,7 @@ static void recv_negotiate_str(int f_in, struct name_num_obj *nno, char *tmpbuf,
 	if (len < 0)
 		len = read_vstring(f_in, tmpbuf, MAX_NSTR_STRLEN);
 
-	if (DEBUG_GTE(NSTR, am_server ? 4 : 2)) {
+	if (DEBUG_GTE(NSTR, am_server ? 3 : 2)) {
 		if (am_server)
 			rprintf(FINFO, "Client %s list (on server): %s\n", nno->type, tmpbuf);
 		else
@@ -368,7 +366,7 @@ static void send_negotiate_str(int f_out, struct name_num_obj *nno, const char *
 		}
 	}
 
-	if (DEBUG_GTE(NSTR, am_server ? 4 : 2)) {
+	if (DEBUG_GTE(NSTR, am_server ? 3 : 2)) {
 		if (am_server)
 			rprintf(FINFO, "Server %s list (on server): %s\n", nno->type, tmpbuf);
 		else
@@ -401,17 +399,11 @@ static void negotiate_the_strings(int f_in, int f_out)
 		char tmpbuf[MAX_NSTR_STRLEN];
 		recv_negotiate_str(f_in, &valid_checksums, tmpbuf, -1);
 	}
-	if (valid_checksums.negotiated_name)
-		xfersum_type = checksum_type = valid_checksums.negotiated_num;
 
 	if (valid_compressions.saw) {
 		char tmpbuf[MAX_NSTR_STRLEN];
 		recv_negotiate_str(f_in, &valid_compressions, tmpbuf, -1);
 	}
-#if 0
-	if (valid_compressions.negotiated_name)
-		compress_type = valid_checksums.negotiated_num;
-#endif
 }
 
 void setup_protocol(int f_out,int f_in)

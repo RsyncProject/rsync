@@ -36,9 +36,7 @@
 #endif
 
 extern int am_server;
-extern int local_server;
 extern int whole_file;
-extern int read_batch;
 extern int checksum_seed;
 extern int protocol_version;
 extern int proper_seed_order;
@@ -111,7 +109,9 @@ static const char *checksum_name(int num)
 
 void parse_checksum_choice(int final_call)
 {
-	if (!valid_checksums.negotiated_name) {
+	if (valid_checksums.negotiated_name)
+		xfersum_type = checksum_type = valid_checksums.negotiated_num;
+	else {
 		char *cp = checksum_choice ? strchr(checksum_choice, ',') : NULL;
 		if (cp) {
 			xfersum_type = parse_csum_name(checksum_choice, cp - checksum_choice);
@@ -132,10 +132,8 @@ void parse_checksum_choice(int final_call)
 				checksum_choice ? "chosen" : "protocol-based",
 				checksum_name(xfersum_type));
 		} else {
-			rprintf(FINFO, "%s chosen transfer checksum: %s\n",
-				c_s, checksum_name(xfersum_type));
-			rprintf(FINFO, "%s chosen pre-transfer checksum: %s\n",
-				c_s, checksum_name(checksum_type));
+			rprintf(FINFO, "%s chosen transfer checksum: %s\n", c_s, checksum_name(xfersum_type));
+			rprintf(FINFO, "%s chosen pre-transfer checksum: %s\n", c_s, checksum_name(checksum_type));
 		}
 	}
 }
