@@ -29,6 +29,8 @@ extern int local_server;
 extern int sanitize_paths;
 extern int daemon_over_rsh;
 extern unsigned int module_dirlen;
+extern struct name_num_obj valid_checksums;
+extern struct name_num_obj valid_compressions;
 extern filter_rule_list filter_list;
 extern filter_rule_list daemon_filter_list;
 
@@ -566,6 +568,7 @@ void negate_output_levels(void)
 
 static void print_rsync_version(enum logcode f)
 {
+	char tmpbuf[256];
 	char *subprotocol = "";
 	char const *got_socketpair = "no ";
 	char const *have_inplace = "no ";
@@ -636,6 +639,14 @@ static void print_rsync_version(enum logcode f)
 		got_socketpair, hardlinks, links, ipv6, have_inplace);
 	rprintf(f, "    %sappend, %sACLs, %sxattrs, %siconv, %ssymtimes, %sprealloc, %sSIMD, %sxxhash\n",
 		have_inplace, acls, xattrs, iconv, symtimes, prealloc, simd, xxhash);
+
+	rprintf(f,"\n");
+	
+	get_default_nno_list(&valid_checksums, tmpbuf, sizeof tmpbuf, '(');
+	rprintf(f, "Checksum list: %s\n", tmpbuf);
+
+	get_default_nno_list(&valid_compressions, tmpbuf, sizeof tmpbuf, '(');
+	rprintf(f, "Compress list: %s\n", tmpbuf);
 
 #ifdef MAINTAINER_MODE
 	rprintf(f, "Panic Action: \"%s\"\n", get_panic_action());

@@ -334,10 +334,52 @@ static void recv_negotiate_str(int f_in, struct name_num_obj *nno, char *tmpbuf,
 	exit_cleanup(RERR_UNSUPPORTED);
 }
 
+/* The saw buffer is initialized and used to store ordinal values from 1 to N
+ * for the order of the args in the array.  If dup_markup == '\0', duplicates
+ * are removed otherwise the char is prefixed to the duplicate term and, if it
+ * is an opening paren/bracket/brace, the matching closing char is suffixed. */
+int get_default_nno_list(struct name_num_obj *nno, char *to_buf, int to_buf_len, char dup_markup)
+{
+	struct name_num_item *nni;
+	int len = 0, cnt = 0;
+	char pre_char = '\0', post_char = '\0';
+
+	init_nno_saw(nno, 0);
+
+	for (nni = nno->list, len = 0; nni->name; nni++) {
+		if (nni->main_name) {
+			if (!dup_markup)
+				continue;
+			pre_char = dup_markup;
+			switch (pre_char) {
+			case '(': post_char = ')'; break;
+			case '[': post_char = ']'; break;
+			case '{': post_char = '}'; break;
+			default: break;
+			}
+		}
+		if (len)
+			to_buf[len++]= ' ';
+		if (pre_char) {
+			to_buf[len++]= pre_char;
+			pre_char = '\0';
+		}
+		len += strlcpy(to_buf+len, nni->name, to_buf_len - len);
+		if (len >= to_buf_len - 3)
+			exit_cleanup(RERR_UNSUPPORTED); /* IMPOSSIBLE... */
+		if (post_char) {
+			to_buf[len++]= post_char;
+			post_char = '\0';
+		}
+		nno->saw[nni->num] = ++cnt;
+	}
+
+	return len;
+}
+
 static void send_negotiate_str(int f_out, struct name_num_obj *nno, const char *env_name)
 {
 	char tmpbuf[MAX_NSTR_STRLEN];
-	struct name_num_item *nni;
 	const char *list_str = getenv(env_name);
 	int len, fail_if_empty = list_str && strstr(list_str, "FAIL");
 
@@ -349,9 +391,8 @@ static void send_negotiate_str(int f_out, struct name_num_obj *nno, const char *
 		return;
 	}
 
-	init_nno_saw(nno, 0);
-
 	if (list_str && *list_str && (!am_server || local_server)) {
+		init_nno_saw(nno, 0);
 		len = parse_nni_str(nno, list_str, tmpbuf, MAX_NSTR_STRLEN);
 		if (fail_if_empty && !len)
 			len = strlcpy(tmpbuf, "FAIL", MAX_NSTR_STRLEN);
@@ -360,17 +401,7 @@ static void send_negotiate_str(int f_out, struct name_num_obj *nno, const char *
 		list_str = NULL;
 
 	if (!list_str || !*list_str) {
-		int cnt = 0;
-		for (nni = nno->list, len = 0; nni->name; nni++) {
-			if (nni->main_name)
-				continue;
-			if (len)
-				tmpbuf[len++]= ' ';
-			len += strlcpy(tmpbuf+len, nni->name, MAX_NSTR_STRLEN - len);
-			if (len >= (int)MAX_NSTR_STRLEN - 1)
-				exit_cleanup(RERR_UNSUPPORTED); /* IMPOSSIBLE... */
-			nno->saw[nni->num] = ++cnt;
-		}
+		len = get_default_nno_list(nno, tmpbuf, sizeof tmpbuf, '\0');
 	}
 
 	if (DEBUG_GTE(NSTR, am_server ? 3 : 2)) {
