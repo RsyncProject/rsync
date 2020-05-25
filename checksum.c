@@ -373,7 +373,7 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 
 		remainder = (int32)(len - i);
 		if (remainder > 0)
-			XXH64_update(state, (uchar *)map_ptr(buf, i, CHUNK_SIZE), remainder);
+			XXH64_update(state, (uchar *)map_ptr(buf, i, remainder), remainder);
 		SIVAL64(sum, 0, XXH64_digest(state));
 
 		XXH64_freeState(state);
