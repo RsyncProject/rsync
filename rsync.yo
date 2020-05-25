@@ -76,7 +76,7 @@ server, but a server can be either a daemon or a remote-shell spawned process.
 
 manpagesection(SETUP)
 
-See the file README for installation instructions.
+See the file README.md for installation instructions.
 
 Once installed, you can use rsync to any machine that you can access via
 a remote shell (as well as some that you can access using the rsync

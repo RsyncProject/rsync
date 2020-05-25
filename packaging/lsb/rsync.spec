@@ -66,7 +66,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(-,root,root)
-%doc COPYING NEWS OLDNEWS README support/ tech_report.tex
+%doc COPYING NEWS OLDNEWS README.md support/ tech_report.tex
 %config(noreplace) /etc/xinetd.d/rsync
 %{_prefix}/bin/rsync
 %{_prefix}/bin/rsync-ssl

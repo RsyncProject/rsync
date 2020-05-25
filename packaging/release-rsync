@@ -276,7 +276,7 @@ About to:
     - create release tar, "{srctar_name}"
     - generate {rsync_ver}/patches/* files
     - create patches tar, "{pattar_name}"
-    - update top-level README, *NEWS, TODO, and ChangeLog
+    - update top-level README.md, *NEWS, TODO, and ChangeLog
     - update top-level rsync*.html manpages
     - gpg-sign the release files
     - update hard-linked top-level release files{skipping}
@@ -347,7 +347,7 @@ About to:
     shutil.rmtree(rsync_ver)
 
     print(f"Updating the other files in {dest} ...")
-    cmd_chk('rsync -a README NEWS OLDNEWS TODO'.split() + [dest])
+    cmd_chk('rsync -a README.md NEWS OLDNEWS TODO'.split() + [dest])
     if os.path.lexists(news_file):
         os.unlink(news_file)
     os.link(f"{dest}/NEWS", news_file)

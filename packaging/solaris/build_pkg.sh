@@ -41,7 +41,7 @@ mkdir -p $FAKE_ROOT/man/man5
 cp ../../../rsync $FAKE_ROOT/bin/rsync
 cp ../../../rsync.1 $FAKE_ROOT/man/man1/rsync.1
 cp ../../../rsyncd.conf.5 $FAKE_ROOT/man/man5/rsyncd.conf.5
-cp ../../../README $FAKE_ROOT/doc/rsync/README
+cp ../../../README.md $FAKE_ROOT/doc/rsync/README.md
 cp ../../../COPYING $FAKE_ROOT/doc/rsync/COPYING
 cp ../../../tech_report.pdf $FAKE_ROOT/doc/rsync/tech_report.pdf
 cp ../../../COPYING $FAKE_ROOT/COPYING
@@ -68,7 +68,7 @@ d none bin 0755 bin bin
 f none bin/rsync 0755 bin bin
 d none doc 0755 bin bin
 d none doc/$NAME 0755 bin bin
-f none doc/$NAME/README 0644 bin bin
+f none doc/$NAME/README.md 0644 bin bin
 f none doc/$NAME/COPYING 0644 bin bin
 f none doc/$NAME/tech_report.pdf 0644 bin bin
 d none man 0755 bin bin
