@@ -573,10 +573,14 @@ verb(    rsync -avvv --debug=none src/ dest/
 Note that some debug messages will only be output when bf(--msgs2stderr) is
 specified, especially those pertaining to I/O and buffer debugging.
 
-This option was added to 3.1.0, so an older rsync on the server side might
-reject your attempts at fine-grained control (if one or more flags needed
-to be send to the server and the server was too old to understand them).
-See also the "max verbosity" caveat above when dealing with a daemon.
+Beginning in 3.2.0, this option is no longer auto-forwared to the server side
+in order to allow you to specify different debug values for each side of the
+transfer, as well as to specify a new debug option that is only present in one
+of the rsync versions.  If you want to duplicate the same option on both sides,
+using brace expansion is an easy way to save you some typing. This works in
+zsh and bash:
+
+verb(    rsync -aiv {-M,}--debug=del2 src/ dest/ )
 
 dit(bf(--msgs2stderr)) This option changes rsync to send all its output
 directly to stderr rather than to send messages to the client side via the

@@ -2908,10 +2908,6 @@ void server_options(char **args, int *argc_p)
 	if (arg)
 		args[ac++] = arg;
 
-	arg = make_output_option(debug_words, debug_levels, where);
-	if (arg)
-		args[ac++] = arg;
-
 	if (append_mode) {
 		if (append_mode > 1)
 			args[ac++] = "--append";
