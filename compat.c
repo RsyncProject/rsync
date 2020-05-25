@@ -174,7 +174,9 @@ void parse_compress_choice(int final_call)
 			exit_cleanup(RERR_UNSUPPORTED);
 		}
 		do_compression = nni->num;
-	} else
+	} else if (do_compression)
+		do_compression = CPRES_ZLIB;
+	else
 		do_compression = CPRES_NONE;
 
 	if (do_compression == CPRES_NONE)
@@ -184,8 +186,10 @@ void parse_compress_choice(int final_call)
 		const char *c_s = am_server ? "Server" : "Client";
 		if (valid_compressions.negotiated_name)
 			rprintf(FINFO, "%s negotiated compress: %s\n", c_s, valid_compressions.negotiated_name);
-		else
-			rprintf(FINFO, "%s compress: %s\n", c_s, do_compression ? compress_choice : "none");
+		else {
+			struct name_num_item *nni = get_nni_by_num(&valid_compressions, do_compression);
+			rprintf(FINFO, "%s compress: %s\n", c_s, nni ? nni->name : "UNKNOWN");
+		}
 	}
 }
 
