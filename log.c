@@ -873,12 +873,11 @@ void log_delete(const char *fname, int mode)
  */
 void log_exit(int code, const char *file, int line)
 {
-	if (code == 0) {
-		rprintf(FLOG,"sent %s bytes  received %s bytes  total size %s\n",
-			big_num(stats.total_written),
-			big_num(stats.total_read),
-			big_num(stats.total_size));
-	} else if (am_server != 2) {
+	rprintf(FLOG,"sent %s bytes  received %s bytes  total size %s\n",
+		big_num(stats.total_written),
+		big_num(stats.total_read),
+		big_num(stats.total_size));
+	if (code != 0 && am_server != 2) {
 		const char *name;
 
 		name = rerr_name(code);
