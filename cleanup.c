@@ -246,7 +246,7 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 				}
 				send_msg_int(MSG_ERROR_EXIT, exit_code);
 			}
-			noop_io_until_death();
+			/* noop_io_until_death(); */
 		}
 
 #include "case_N.h"
