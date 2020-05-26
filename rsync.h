@@ -178,6 +178,7 @@
 #define ATTRS_SET_NANO		(1<<2)
 #define ATTRS_SKIP_ATIME	(1<<3)
 
+#define MSG_FLUSH	2
 #define FULL_FLUSH	1
 #define NORMAL_FLUSH	0
 
