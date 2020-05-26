@@ -1315,21 +1315,6 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		}
 		parent_dirname = dn;
 
-		if (need_fuzzy_dirlist && S_ISREG(file->mode)) {
-			int i;
-			strlcpy(fnamecmpbuf, dn, sizeof fnamecmpbuf);
-			for (i = 0; i < fuzzy_basis; i++) {
-				if (i && pathjoin(fnamecmpbuf, MAXPATHLEN, basis_dir[i-1], dn) >= MAXPATHLEN)
-					continue;
-				fuzzy_dirlist[i] = get_dirlist(fnamecmpbuf, -1, GDL_IGNORE_FILTER_RULES | GDL_PERHAPS_DIR);
-				if (fuzzy_dirlist[i] && fuzzy_dirlist[i]->used == 0) {
-					flist_free(fuzzy_dirlist[i]);
-					fuzzy_dirlist[i] = NULL;
-				}
-			}
-			need_fuzzy_dirlist = 0;
-		}
-
 		statret = link_stat(fname, &sx.st, keep_dirlinks && is_dir);
 		stat_errno = errno;
 	}
@@ -1740,6 +1725,22 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		partialptr = NULL;
 
 	if (statret != 0 && fuzzy_basis) {
+		if (need_fuzzy_dirlist && S_ISREG(file->mode)) {
+			const char *dn = file->dirname ? file->dirname : ".";
+			int i;
+			strlcpy(fnamecmpbuf, dn, sizeof fnamecmpbuf);
+			for (i = 0; i < fuzzy_basis; i++) {
+				if (i && pathjoin(fnamecmpbuf, MAXPATHLEN, basis_dir[i-1], dn) >= MAXPATHLEN)
+					continue;
+				fuzzy_dirlist[i] = get_dirlist(fnamecmpbuf, -1, GDL_IGNORE_FILTER_RULES | GDL_PERHAPS_DIR);
+				if (fuzzy_dirlist[i] && fuzzy_dirlist[i]->used == 0) {
+					flist_free(fuzzy_dirlist[i]);
+					fuzzy_dirlist[i] = NULL;
+				}
+			}
+			need_fuzzy_dirlist = 0;
+		}
+
 		/* Sets fnamecmp_type to FNAMECMP_FUZZY or above. */
 		fuzzy_file = find_fuzzy(file, fuzzy_dirlist, &fnamecmp_type);
 		if (fuzzy_file) {
