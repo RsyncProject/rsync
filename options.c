@@ -566,83 +566,146 @@ void negate_output_levels(void)
 		debug_levels[j] *= -1;
 }
 
+static char *istring(const char *fmt, int val)
+{
+	char *str;
+	if (asprintf(&str, fmt, val) < 0)
+		out_of_memory("istring");
+	return str;
+}
+
+static void print_capabilities(enum logcode f)
+{
+	char *capabilities[256]; /* Just overallocate this so it's impossible to overflow... */
+	char line_buf[75];
+	STRUCT_STAT *dumstat;
+	int line_len, cnt = 0;
+
+#define add(str,val) capabilities[cnt++] = istring(str, val)
+
+	add("%d-bit files", (int)(sizeof (OFF_T) * 8));
+	add("%d-bit inums", (int)(sizeof dumstat->st_ino * 8)); /* Don't check ino_t! */
+	add("%d-bit timestamps", (int)(sizeof (time_t) * 8));
+	add("%d-bit long ints", (int)(sizeof (int64) * 8));
+
+#undef add
+#define add(str) capabilities[cnt++] = str
+
+	add(
+#ifndef HAVE_SOCKETPAIR
+	 "no "
+#endif
+	 "socketpairs");
+
+	add(
+#ifndef SUPPORT_HARD_LINKS
+	 "no "
+#endif
+	 "hardlinks");
+
+	add(
+#ifndef SUPPORT_LINKS
+	 "no "
+#endif
+	 "symlinks");
+
+	add(
+#ifndef INET6
+	 "no "
+#endif
+	 "IPv6");
+
+	add("batchfiles");
+
+	add(
+#ifndef HAVE_FTRUNCATE
+	 "no "
+#endif
+	 "inplace");
+
+	add(
+#ifndef HAVE_FTRUNCATE
+	 "no "
+#endif
+	 "append");
+
+	add(
+#ifndef SUPPORT_ACLS
+	 " no"
+#endif
+	 "ACLs");
+
+	add(
+#ifndef SUPPORT_XATTRS
+	 " no"
+#endif
+	 "xattrs");
+
+	add(
+#ifndef ICONV_OPTION
+	 " no"
+#endif
+	 "iconv");
+
+	add(
+#ifndef CAN_SET_SYMLINK_TIMES
+	 " no"
+#endif
+	 "symtimes");
+
+	add(
+#ifndef SUPPORT_PREALLOCATION
+	 "no "
+#endif
+	 "prealloc");
+
+	add(
+#ifndef HAVE_SIMD
+	 "no "
+#endif
+	 "SIMD");
+
+	add(NULL);
+
+#undef add
+
+	for (line_len = 0, cnt = 0; ; cnt++) {
+		char *cap = capabilities[cnt];
+		int cap_len = cap ? strlen(cap) : 1000;
+		int need_comma = cap && capabilities[cnt+1] != NULL ? 1 : 0;
+		if (line_len + 1 + cap_len + need_comma >= (int)sizeof line_buf) {
+			rprintf(f, "    %s\n", line_buf);
+			line_len = 0;
+		}
+		if (!cap)
+			break;
+		line_len += snprintf(line_buf+line_len, sizeof line_buf - line_len, " %s%s", cap, need_comma ? "," : "");
+	}
+}
+
 static void print_rsync_version(enum logcode f)
 {
-	char tmpbuf[256];
-	char *subprotocol = "";
-	char const *got_socketpair = "no ";
-	char const *have_inplace = "no ";
-	char const *hardlinks = "no ";
-	char const *prealloc = "no ";
-	char const *symtimes = "no ";
-	char const *acls = "no ";
-	char const *xattrs = "no ";
-	char const *links = "no ";
-	char const *iconv = "no ";
-	char const *ipv6 = "no ";
-	char const *simd = "no ";
-	STRUCT_STAT *dumstat;
+	char tmpbuf[256], *subprotocol = "";
 
 #if SUBPROTOCOL_VERSION != 0
-	if (asprintf(&subprotocol, ".PR%d", SUBPROTOCOL_VERSION) < 0)
-		out_of_memory("print_rsync_version");
+	subprotocol = istring(".PR%d", SUBPROTOCOL_VERSION);
 #endif
-#ifdef HAVE_SOCKETPAIR
-	got_socketpair = "";
-#endif
-#ifdef HAVE_FTRUNCATE
-	have_inplace = "";
-#endif
-#ifdef SUPPORT_HARD_LINKS
-	hardlinks = "";
-#endif
-#ifdef SUPPORT_PREALLOCATION
-	prealloc = "";
-#endif
-#ifdef SUPPORT_ACLS
-	acls = "";
-#endif
-#ifdef SUPPORT_XATTRS
-	xattrs = "";
-#endif
-#ifdef SUPPORT_LINKS
-	links = "";
-#endif
-#ifdef INET6
-	ipv6 = "";
-#endif
-#ifdef ICONV_OPTION
-	iconv = "";
-#endif
-#ifdef CAN_SET_SYMLINK_TIMES
-	symtimes = "";
-#endif
-#ifdef HAVE_SIMD
-	simd = "";
-#endif
-
 	rprintf(f, "%s  version %s  protocol version %d%s\n",
 		RSYNC_NAME, RSYNC_VERSION, PROTOCOL_VERSION, subprotocol);
+
 	rprintf(f, "Copyright (C) 1996-" LATEST_YEAR " by Andrew Tridgell, Wayne Davison, and others.\n");
 	rprintf(f, "Web site: http://rsync.samba.org/\n");
+
 	rprintf(f, "Capabilities:\n");
-	rprintf(f, "    %d-bit files, %d-bit inums, %d-bit timestamps, %d-bit long ints,\n",
-		(int)(sizeof (OFF_T) * 8),
-		(int)(sizeof dumstat->st_ino * 8), /* Don't check ino_t! */
-		(int)(sizeof (time_t) * 8),
-		(int)(sizeof (int64) * 8));
-	rprintf(f, "    %ssocketpairs, %shardlinks, %ssymlinks, %sIPv6, batchfiles, %sinplace,\n",
-		got_socketpair, hardlinks, links, ipv6, have_inplace);
-	rprintf(f, "    %sappend, %sACLs, %sxattrs, %siconv, %ssymtimes, %sprealloc, %sSIMD\n",
-		have_inplace, acls, xattrs, iconv, symtimes, prealloc, simd);
+	print_capabilities(f);
 
-	rprintf(f,"\n");
-	
+	rprintf(f, "Checksum list:\n");
 	get_default_nno_list(&valid_checksums, tmpbuf, sizeof tmpbuf, '(');
-	rprintf(f, "Checksum list: %s\n", tmpbuf);
+	rprintf(f, "    %s\n", tmpbuf);
 
+	rprintf(f, "Compress list:\n");
 	get_default_nno_list(&valid_compressions, tmpbuf, sizeof tmpbuf, '(');
-	rprintf(f, "Compress list: %s\n", tmpbuf);
+	rprintf(f, "    %s\n", tmpbuf);
 
 #ifdef MAINTAINER_MODE
 	rprintf(f, "Panic Action: \"%s\"\n", get_panic_action());
