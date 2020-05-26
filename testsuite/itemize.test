@@ -40,7 +40,7 @@ case "$RSYNC" in
     T=.T
     ;;
 *)
-    if $RSYNC --version | grep ", symtimes" >/dev/null; then
+    if $RSYNC --version | grep "[, ] symtimes" >/dev/null; then
 	T=.t
     else
 	T=.T
