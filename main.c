@@ -1006,6 +1006,7 @@ static int do_recv(int f_in, int f_out, char *local_name)
 		io_start_multiplex_out(f_out);
 
 		recv_files(f_in, f_out, local_name);
+		sync(); /* data consistency, force completion of pending disk writes */
 		io_flush(FULL_FLUSH);
 		handle_stats(f_in);
 
