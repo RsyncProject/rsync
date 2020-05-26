@@ -674,7 +674,7 @@ static void print_capabilities(enum logcode f)
 		int cap_len = cap ? strlen(cap) : 1000;
 		int need_comma = cap && capabilities[cnt+1] != NULL ? 1 : 0;
 		if (line_len + 1 + cap_len + need_comma >= (int)sizeof line_buf) {
-			rprintf(f, "    %s\n", line_buf);
+			rprintf(f, "   %s\n", line_buf);
 			line_len = 0;
 		}
 		if (!cap)
