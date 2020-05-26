@@ -54,8 +54,8 @@ extern char *partial_dir;
 extern char *dest_option;
 extern char *files_from;
 extern char *filesfrom_host;
-extern char *checksum_choice;
-extern char *compress_choice;
+extern const char *checksum_choice;
+extern const char *compress_choice;
 extern filter_rule_list filter_list;
 extern int need_unsorted_flist;
 #ifdef ICONV_OPTION
@@ -187,17 +187,20 @@ void parse_compress_choice(int final_call)
 	if (do_compression == CPRES_NONE)
 		compress_choice = NULL;
 
+	/* Snag the compression name for both write_batch's option output & the following debug output. */
+	if (valid_compressions.negotiated_name)
+		compress_choice = valid_compressions.negotiated_name;
+	else if (compress_choice == NULL) {
+		struct name_num_item *nni = get_nni_by_num(&valid_compressions, do_compression);
+		compress_choice = nni ? nni->name : "UNKNOWN";
+	}
+
 	if (final_call && DEBUG_GTE(NSTR, am_server ? 3 : 1)
 	 && (do_compression != CPRES_NONE || do_compression_level != CLVL_NOT_SPECIFIED)) {
-		const char *c_s = am_server ? "Server" : "Client";
-		if (do_compression != CPRES_NONE && valid_compressions.negotiated_name) {
-			rprintf(FINFO, "%s negotiated compress: %s (level %d)\n",
-				c_s, valid_compressions.negotiated_name, do_compression_level);
-		} else {
-			struct name_num_item *nni = get_nni_by_num(&valid_compressions, do_compression);
-			rprintf(FINFO, "%s compress: %s (level %d)\n",
-				c_s, nni ? nni->name : "UNKNOWN", do_compression_level);
-		}
+		rprintf(FINFO, "%s%s compress: %s (level %d)\n",
+			am_server ? "Server" : "Client",
+			valid_compressions.negotiated_name ? " negotiated" : "",
+			compress_choice, do_compression_level);
 	}
 }
 
@@ -422,8 +425,7 @@ static void send_negotiate_str(int f_out, struct name_num_obj *nno, const char *
 	if (local_server) {
 		/* A local server doesn't bother to send/recv the strings, it just constructs
 		 * and parses the same string on both sides. */
-		if (!read_batch)
-			recv_negotiate_str(-1, nno, tmpbuf, len);
+		recv_negotiate_str(-1, nno, tmpbuf, len);
 	} else {
 		/* Each side sends their list of valid names to the other side and then both sides
 		 * pick the first name in the client's list that is also in the server's list. */
@@ -685,14 +687,11 @@ void setup_protocol(int f_out,int f_in)
 		checksum_seed = read_int(f_in);
 	}
 
+	parse_checksum_choice(1); /* Sets checksum_type & xfersum_type */
+	parse_compress_choice(1); /* Sets do_compression */
+
+	if (write_batch && !am_server)
+		write_batch_shell_file();
+
 	init_flist();
-}
-
-void maybe_write_negotiated_strings(int batch_fd)
-{
-	if (valid_checksums.negotiated_name)
-		write_vstring(batch_fd, valid_checksums.negotiated_name, strlen(valid_checksums.negotiated_name));
-
-	if (valid_compressions.negotiated_name)
-		write_vstring(batch_fd, valid_compressions.negotiated_name, strlen(valid_compressions.negotiated_name));
 }

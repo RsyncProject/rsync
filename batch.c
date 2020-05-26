@@ -37,14 +37,21 @@ extern int always_checksum;
 extern int do_compression;
 extern int inplace;
 extern int append_mode;
+extern int write_batch;
 extern int protocol_version;
+extern int raw_argc, cooked_argc;
+extern char **raw_argv, **cooked_argv;
 extern char *batch_name;
+extern const char *checksum_choice;
+extern const char *compress_choice;
 #ifdef ICONV_OPTION
 extern char *iconv_opt;
 #endif
 
 extern filter_rule_list filter_list;
 
+int batch_fd = -1;
+int batch_sh_fd = -1;
 int batch_stream_flags;
 
 static int tweaked_append;
@@ -156,37 +163,45 @@ void check_batch_flags(void)
 		append_mode = 2;
 }
 
-static int write_arg(int fd, char *arg)
+static int write_arg(const char *arg)
 {
-	char *x, *s;
-	int len, ret = 0;
+	const char *x, *s;
+	int len, err = 0;
 
 	if (*arg == '-' && (x = strchr(arg, '=')) != NULL) {
-		if (write(fd, arg, x - arg + 1) != x - arg + 1)
-			ret = -1;
+		err |= write(batch_sh_fd, arg, x - arg + 1) != x - arg + 1;
 		arg += x - arg + 1;
 	}
 
 	if (strpbrk(arg, " \"'&;|[]()$#!*?^\\") != NULL) {
-		if (write(fd, "'", 1) != 1)
-			ret = -1;
+		err |= write(batch_sh_fd, "'", 1) != 1;
 		for (s = arg; (x = strchr(s, '\'')) != NULL; s = x + 1) {
-			if (write(fd, s, x - s + 1) != x - s + 1
-			 || write(fd, "'", 1) != 1)
-				ret = -1;
+			err |= write(batch_sh_fd, s, x - s + 1) != x - s + 1;
+			err |= write(batch_sh_fd, "'", 1) != 1;
 		}
 		len = strlen(s);
-		if (write(fd, s, len) != len
-		 || write(fd, "'", 1) != 1)
-			ret = -1;
-		return ret;
+		err |= write(batch_sh_fd, s, len) != len;
+		err |= write(batch_sh_fd, "'", 1) != 1;
+		return err;
 	}
 
 	len = strlen(arg);
-	if (write(fd, arg, len) != len)
-		ret = -1;
+	err |= write(batch_sh_fd, arg, len) != len;
 
-	return ret;
+	return err;
+}
+
+/* Writes out a space and then an option (or other string) with an optional "=" + arg suffix. */
+static int write_opt(const char *opt, const char *arg)
+{
+	int len = strlen(opt);
+	int err = write(batch_sh_fd, " ", 1) != 1;
+	err = write(batch_sh_fd, opt, len) != len ? 1 : 0; 
+	if (arg) {
+		err |= write(batch_sh_fd, "=", 1) != 1;
+		err |= write_arg(arg);
+	}
+	return err;
 }
 
 static void write_filter_rules(int fd)
@@ -208,42 +223,63 @@ static void write_filter_rules(int fd)
 	write_sbuf(fd, "#E#");
 }
 
+/* This sets batch_fd and (for --write-batch) batch_sh_fd. */
+void open_batch_files(void)
+{
+	if (write_batch) {
+		char filename[MAXPATHLEN];
+
+		stringjoin(filename, sizeof filename, batch_name, ".sh", NULL);
+
+		batch_sh_fd = do_open(filename, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IXUSR);
+		if (batch_sh_fd < 0) {
+			rsyserr(FERROR, errno, "Batch file %s open error", full_fname(filename));
+			exit_cleanup(RERR_FILESELECT);
+		}
+
+		batch_fd = do_open(batch_name, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+	} else if (strcmp(batch_name, "-") == 0)
+		batch_fd = STDIN_FILENO;
+	else
+		batch_fd = do_open(batch_name, O_RDONLY, S_IRUSR | S_IWUSR);
+
+	if (batch_fd < 0) {
+		rsyserr(FERROR, errno, "Batch file %s open error", full_fname(batch_name));
+		exit_cleanup(RERR_FILEIO);
+	}
+}
+
 /* This routine tries to write out an equivalent --read-batch command
  * given the user's --write-batch args.  However, it doesn't really
  * understand most of the options, so it uses some overly simple
  * heuristics to munge the command line into something that will
  * (hopefully) work. */
-void write_batch_shell_file(int argc, char *argv[], int file_argc, char *file_argv[])
+void write_batch_shell_file(void)
 {
-	int fd, i, len, err = 0;
-	char *p, *p2, filename[MAXPATHLEN];
-
-	stringjoin(filename, sizeof filename,
-		   batch_name, ".sh", NULL);
-	fd = do_open(filename, O_WRONLY | O_CREAT | O_TRUNC,
-		     S_IRUSR | S_IWUSR | S_IXUSR);
-	if (fd < 0) {
-		rsyserr(FERROR, errno, "Batch file %s open error",
-			filename);
-		exit_cleanup(RERR_FILESELECT);
-	}
+	int i, len, err = 0;
+	char *p, *p2;
 
 	/* Write argvs info to BATCH.sh file */
-	if (write_arg(fd, argv[0]) < 0)
-		err = 1;
+	err |= write_arg(raw_argv[0]);
 	if (filter_list.head) {
 		if (protocol_version >= 29)
-			write_sbuf(fd, " --filter=._-");
+			err |= write_opt("--filter", "._-");
 		else
-			write_sbuf(fd, " --exclude-from=-");
+			err |= write_opt("--exclude-from", "-");
 	}
-	for (i = 1; i < argc; i++) {
-		p = argv[i];
-		if (file_argc && p == file_argv[0]) {
-			if (file_argc > 1) {
-				file_argv++;
-				file_argc--;
-			}
+
+	/* We need to make sure that any protocol-based or negotiated choices get accurately
+	 * reflected in the options we save AND that we avoid any need for --read-batch to
+	 * do a string-based negotation (since we don't write them into the file). */
+	if (do_compression)
+		err |= write_opt("--compress-choice", compress_choice);
+	err |= write_opt("--checksum-choice", checksum_choice);
+
+	for (i = 1; i < raw_argc; i++) {
+		p = raw_argv[i];
+		if (cooked_argc && p[0] == cooked_argv[0][0] && strcmp(p, cooked_argv[0]) == 0) {
+			cooked_argv++;
+			cooked_argc--;
 			continue;
 		}
 		if (strncmp(p, "--files-from", 12) == 0
@@ -258,33 +294,24 @@ void write_batch_shell_file(int argc, char *argv[], int file_argc, char *file_ar
 			i++;
 			continue;
 		}
-		if (write(fd, " ", 1) != 1)
-			err = 1;
 		if (strncmp(p, "--write-batch", len = 13) == 0
-		 || strncmp(p, "--only-write-batch", len = 18) == 0) {
-			if (write(fd, "--read-batch", 12) != 12)
-				err = 1;
-			if (p[len] == '=') {
-				if (write(fd, "=", 1) != 1
-				 || write_arg(fd, p + len + 1) < 0)
-					err = 1;
-			}
-		} else {
-			if (write_arg(fd, p) < 0)
-				err = 1;
+		 || strncmp(p, "--only-write-batch", len = 18) == 0)
+			err |= write_opt("--read-batch", p[len] == '=' ? p + len + 1 : NULL);
+		else {
+			err |= write(batch_sh_fd, " ", 1) != 1;
+			err |= write_arg(p);
 		}
 	}
-	if (!(p = check_for_hostspec(file_argv[file_argc - 1], &p2, &i)))
-		p = file_argv[file_argc - 1];
-	if (write(fd, " ${1:-", 6) != 6
-	 || write_arg(fd, p) < 0)
-		err = 1;
-	write_byte(fd, '}');
+	if (!(p = check_for_hostspec(cooked_argv[cooked_argc - 1], &p2, &i)))
+		p = cooked_argv[cooked_argc - 1];
+	err |= write_opt("${1:-", NULL);
+	err |= write_arg(p);
+	err |= write(batch_sh_fd, "}", 1) != 1;
 	if (filter_list.head)
-		write_filter_rules(fd);
-	if (write(fd, "\n", 1) != 1 || close(fd) < 0 || err) {
-		rsyserr(FERROR, errno, "Batch file %s write error",
-			filename);
+		write_filter_rules(batch_sh_fd);
+	if (write(batch_sh_fd, "\n", 1) != 1 || close(batch_sh_fd) < 0 || err) {
+		rsyserr(FERROR, errno, "Batch file %s.sh write error", batch_name);
 		exit_cleanup(RERR_FILEIO);
 	}
+	batch_sh_fd = -1;
 }

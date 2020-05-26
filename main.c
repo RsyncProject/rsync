@@ -107,6 +107,8 @@ int daemon_over_rsh = 0;
 mode_t orig_umask = 0;
 int batch_gen_fd = -1;
 int sender_keeps_checksum = 0;
+int raw_argc, cooked_argc;
+char **raw_argv, **cooked_argv;
 
 /* There's probably never more than at most 2 outstanding child processes,
  * but set it higher, just in case. */
@@ -1648,8 +1650,10 @@ static void rsync_panic_handler(UNUSED(int whatsig))
 int main(int argc,char *argv[])
 {
 	int ret;
-	int orig_argc = argc;
-	char **orig_argv = argv;
+
+	raw_argc = argc;
+	raw_argv = argv;
+
 #ifdef HAVE_SIGACTION
 # ifdef HAVE_SIGPROCMASK
 	sigset_t sigmask;
@@ -1703,6 +1707,8 @@ int main(int argc,char *argv[])
 		option_error();
 		exit_cleanup(RERR_SYNTAX);
 	}
+	cooked_argc = argc;
+	cooked_argv = argv;
 
 	SIGACTMASK(SIGINT, sig_int);
 	SIGACTMASK(SIGHUP, sig_int);
@@ -1725,21 +1731,7 @@ int main(int argc,char *argv[])
 	change_dir(NULL, CD_NORMAL);
 
 	if ((write_batch || read_batch) && !am_server) {
-		if (write_batch)
-			write_batch_shell_file(orig_argc, orig_argv, argc, argv);
-
-		if (read_batch && strcmp(batch_name, "-") == 0)
-			batch_fd = STDIN_FILENO;
-		else {
-			batch_fd = do_open(batch_name,
-				   write_batch ? O_WRONLY | O_CREAT | O_TRUNC
-				   : O_RDONLY, S_IRUSR | S_IWUSR);
-		}
-		if (batch_fd < 0) {
-			rsyserr(FERROR, errno, "Batch file %s open error",
-				full_fname(batch_name));
-			exit_cleanup(RERR_FILEIO);
-		}
+		open_batch_files(); /* sets batch_fd */
 		if (read_batch)
 			read_stream_flags(batch_fd);
 		else

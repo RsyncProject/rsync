@@ -142,8 +142,6 @@ void init_flist(void)
 		rprintf(FINFO, "FILE_STRUCT_LEN=%d, EXTRA_LEN=%d\n",
 			(int)FILE_STRUCT_LEN, (int)EXTRA_LEN);
 	}
-	parse_checksum_choice(1); /* Sets checksum_type & xfersum_type */
-	parse_compress_choice(1); /* Sets do_compression */
 	flist_csum_len = csum_len_for_type(checksum_type, 1);
 
 	show_filelist_progress = INFO_GTE(FLIST, 1) && xfer_dirs && !am_server && !inc_recurse;

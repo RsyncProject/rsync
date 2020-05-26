@@ -44,6 +44,7 @@ extern int am_generator;
 extern int msgs2stderr;
 extern int inc_recurse;
 extern int io_error;
+extern int batch_fd;
 extern int eol_nulls;
 extern int flist_eof;
 extern int file_total;
@@ -67,7 +68,6 @@ extern iconv_t ic_send, ic_recv;
 
 int csum_length = SHORT_SUM_LENGTH; /* initial value */
 int allowed_lull = 0;
-int batch_fd = -1;
 int msgdone_cnt = 0;
 int forward_flist_data = 0;
 BOOL flist_receiving_enabled = False;
@@ -2369,7 +2369,6 @@ void start_write_batch(int fd)
 	write_int(batch_fd, protocol_version);
 	if (protocol_version >= 30)
 		write_varint(batch_fd, compat_flags);
-	maybe_write_negotiated_strings(batch_fd);
 	write_int(batch_fd, checksum_seed);
 
 	if (am_sender)

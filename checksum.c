@@ -40,7 +40,7 @@ extern int whole_file;
 extern int checksum_seed;
 extern int protocol_version;
 extern int proper_seed_order;
-extern char *checksum_choice;
+extern const char *checksum_choice;
 
 #define CSUM_NONE 0
 #define CSUM_MD4_ARCHAIC 1
@@ -123,18 +123,17 @@ void parse_checksum_choice(int final_call)
 	if (xfersum_type == CSUM_NONE)
 		whole_file = 1;
 
+	/* Snag the checksum name for both write_batch's option output & the following debug output. */
+	if (valid_checksums.negotiated_name)
+		checksum_choice = valid_checksums.negotiated_name;
+	else if (checksum_choice == NULL)
+		checksum_choice = checksum_name(xfersum_type);
+
 	if (final_call && DEBUG_GTE(NSTR, am_server ? 3 : 1)) {
-		const char *c_s = am_server ? "Server" : "Client";
-		if (valid_checksums.negotiated_name)
-			rprintf(FINFO, "%s negotiated checksum: %s\n", c_s, valid_checksums.negotiated_name);
-		else if (xfersum_type == checksum_type) {
-			rprintf(FINFO, "%s %s checksum: %s\n", c_s,
-				checksum_choice ? "chosen" : "protocol-based",
-				checksum_name(xfersum_type));
-		} else {
-			rprintf(FINFO, "%s chosen transfer checksum: %s\n", c_s, checksum_name(xfersum_type));
-			rprintf(FINFO, "%s chosen pre-transfer checksum: %s\n", c_s, checksum_name(checksum_type));
-		}
+		rprintf(FINFO, "%s%s checksum: %s\n",
+			am_server ? "Server" : "Client",
+			valid_checksums.negotiated_name ? " negotiated" : "",
+			checksum_choice);
 	}
 }
 
