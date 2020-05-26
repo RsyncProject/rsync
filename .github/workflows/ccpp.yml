@@ -13,11 +13,15 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: prepare-packages
+      run: sudo apt-get install fakeroot acl libacl-dev attr libattr-dev liblz4-dev
     - name: prepare-source
       run: ./prepare-source
     - name: configure
       run: ./configure --with-included-popt --with-protected-args --with-included-zlib --enable-simd
     - name: make
       run: make
+    - name: version-summary
+      run: ./rsync --version
     - name: make check
       run: make check
