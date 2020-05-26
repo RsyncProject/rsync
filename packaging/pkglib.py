@@ -201,11 +201,11 @@ def get_configure_version():
 
 
 def get_OLDNEWS_version_info():
-    rel_re = re.compile(r'^\s+\S{2}\s\S{3}\s\d{4}\s+(?P<ver>\d+\.\d+\.\d+)\s+(?P<pdate>\d{2} \w{3} \d{4}\s+)?(?P<pver>\d+)$')
+    rel_re = re.compile(r'^\| \d{2} \w{3} \d{4}\s+\|\s+(?P<ver>\d+\.\d+\.\d+)\s+\|\s+(?P<pdate>\d{2} \w{3} \d{4}\s+)?\|\s+(?P<pver>\d+)\s+\|')
     last_version = last_protocol_version = None
     pdate = { }
 
-    with open('OLDNEWS', 'r', encoding='utf-8') as fh:
+    with open('OLDNEWS.md', 'r', encoding='utf-8') as fh:
         for line in fh:
             if not last_version:
                 m = re.search(r'(\d+\.\d+\.\d+)', line)
