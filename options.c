@@ -576,103 +576,82 @@ static char *istring(const char *fmt, int val)
 
 static void print_capabilities(enum logcode f)
 {
-	char *capabilities[256]; /* Just overallocate this so it's impossible to overflow... */
-	char line_buf[75];
 	STRUCT_STAT *dumstat;
-	int line_len, cnt = 0;
+	char line_buf[75];
+	int line_len, j;
+	char *capabilities[] = {
+		istring("%d-bit files", (int)(sizeof (OFF_T) * 8)),
+		istring("%d-bit inums", (int)(sizeof dumstat->st_ino * 8)), /* Don't check ino_t! */
+		istring("%d-bit timestamps", (int)(sizeof (time_t) * 8)),
+		istring("%d-bit long ints", (int)(sizeof (int64) * 8)),
 
-#define add(str,val) capabilities[cnt++] = istring(str, val)
-
-	add("%d-bit files", (int)(sizeof (OFF_T) * 8));
-	add("%d-bit inums", (int)(sizeof dumstat->st_ino * 8)); /* Don't check ino_t! */
-	add("%d-bit timestamps", (int)(sizeof (time_t) * 8));
-	add("%d-bit long ints", (int)(sizeof (int64) * 8));
-
-#undef add
-#define add(str) capabilities[cnt++] = str
-
-	add(
 #ifndef HAVE_SOCKETPAIR
-	 "no "
+		"no "
 #endif
-	 "socketpairs");
+			"socketpairs",
 
-	add(
 #ifndef SUPPORT_HARD_LINKS
-	 "no "
+		"no "
 #endif
-	 "hardlinks");
+			"hardlinks",
 
-	add(
 #ifndef SUPPORT_LINKS
-	 "no "
+		"no "
 #endif
-	 "symlinks");
+			"symlinks",
 
-	add(
 #ifndef INET6
-	 "no "
+		"no "
 #endif
-	 "IPv6");
+			"IPv6",
 
-	add("batchfiles");
-
-	add(
 #ifndef HAVE_FTRUNCATE
-	 "no "
+		"no "
 #endif
-	 "inplace");
+			"inplace",
 
-	add(
 #ifndef HAVE_FTRUNCATE
-	 "no "
+		"no "
 #endif
-	 "append");
+			"append",
 
-	add(
 #ifndef SUPPORT_ACLS
-	 " no"
+		"no "
 #endif
-	 "ACLs");
+			"ACLs",
 
-	add(
 #ifndef SUPPORT_XATTRS
-	 " no"
+		"no "
 #endif
-	 "xattrs");
+			"xattrs",
 
-	add(
 #ifndef ICONV_OPTION
-	 " no"
+		"no "
 #endif
-	 "iconv");
+			"iconv",
 
-	add(
 #ifndef CAN_SET_SYMLINK_TIMES
-	 " no"
+		"no "
 #endif
-	 "symtimes");
+			"symtimes",
 
-	add(
 #ifndef SUPPORT_PREALLOCATION
-	 "no "
+		"no "
 #endif
-	 "prealloc");
+			"prealloc",
 
-	add(
 #ifndef HAVE_SIMD
-	 "no "
+		"no "
 #endif
-	 "SIMD");
+			"SIMD",
 
-	add(NULL);
+		NULL
+	};
 
-#undef add
-
-	for (line_len = 0, cnt = 0; ; cnt++) {
-		char *cap = capabilities[cnt];
+	for (line_len = 0, j = 0; ; j++) {
+		char *cap = capabilities[j];
 		int cap_len = cap ? strlen(cap) : 1000;
-		int need_comma = cap && capabilities[cnt+1] != NULL ? 1 : 0;
+		int need_comma = cap && capabilities[j+1] != NULL ? 1 : 0;
 		if (line_len + 1 + cap_len + need_comma >= (int)sizeof line_buf) {
 			rprintf(f, "   %s\n", line_buf);
 			line_len = 0;
