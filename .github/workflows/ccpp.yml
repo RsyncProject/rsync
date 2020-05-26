@@ -14,7 +14,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: prepare-packages
-      run: sudo apt-get install fakeroot acl libacl1-dev attr libattr1-dev liblz4-dev
+      run: sudo apt-get install fakeroot acl libacl1-dev attr libattr1-dev liblz4-dev yodl
     - name: prepare-source
       run: ./prepare-source
     - name: configure
