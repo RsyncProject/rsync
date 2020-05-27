@@ -605,6 +605,8 @@ static void print_capabilities(enum logcode f)
 #endif
 			"IPv6",
 
+		"batchfiles",
+
 #ifndef HAVE_FTRUNCATE
 		"no "
 #endif
