@@ -26,6 +26,7 @@ extern int dry_run;
 extern int am_server;
 extern int am_daemon;
 extern int am_receiver;
+extern int am_sender;
 extern int io_error;
 extern int keep_partial;
 extern int got_xfer_error;
@@ -238,15 +239,21 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 		switch_step++;
 
 		if (exit_code && exit_code != RERR_SOCKETIO && exit_code != RERR_STREAMIO && exit_code != RERR_SIGNAL1
-		 && exit_code != RERR_TIMEOUT && !shutting_down && (protocol_version >= 31 || am_receiver)) {
-			if (line > 0) {
-				if (DEBUG_GTE(EXIT, 3)) {
-					rprintf(FINFO, "[%s] sending MSG_ERROR_EXIT with exit_code %d\n",
-						who_am_i(), exit_code);
+		 && exit_code != RERR_TIMEOUT && !shutting_down) {
+			if (protocol_version >= 31 || am_receiver) {
+				if (line > 0) {
+					if (DEBUG_GTE(EXIT, 3)) {
+						rprintf(FINFO, "[%s] sending MSG_ERROR_EXIT with exit_code %d\n",
+							who_am_i(), exit_code);
+					}
+					send_msg_int(MSG_ERROR_EXIT, exit_code);
 				}
-				send_msg_int(MSG_ERROR_EXIT, exit_code);
+				if (!am_sender)
+					io_flush(MSG_FLUSH); /* Be sure to send all messages */
+				/* noop_io_until_death(); */
 			}
-			/* noop_io_until_death(); */
+			else if (!am_sender)
+				io_flush(MSG_FLUSH); /* Be sure to send all messages */
 		}
 
 #include "case_N.h"

@@ -353,7 +353,14 @@ int get_default_nno_list(struct name_num_obj *nno, char *to_buf, int to_buf_len,
 {
 	struct name_num_item *nni;
 	int len = 0, cnt = 0;
-	char pre_char = '\0', post_char = '\0';
+	char delim = '\0', post_delim;
+
+	switch (dup_markup) {
+	case '(': post_delim = ')'; break;
+	case '[': post_delim = ']'; break;
+	case '{': post_delim = '}'; break;
+	default: post_delim = '\0'; break;
+	}
 
 	init_nno_saw(nno, 0);
 
@@ -361,26 +368,20 @@ int get_default_nno_list(struct name_num_obj *nno, char *to_buf, int to_buf_len,
 		if (nni->main_name) {
 			if (!dup_markup)
 				continue;
-			pre_char = dup_markup;
-			switch (pre_char) {
-			case '(': post_char = ')'; break;
-			case '[': post_char = ']'; break;
-			case '{': post_char = '}'; break;
-			default: break;
-			}
+			delim = dup_markup;
 		}
 		if (len)
 			to_buf[len++]= ' ';
-		if (pre_char) {
-			to_buf[len++]= pre_char;
-			pre_char = '\0';
+		if (delim) {
+			to_buf[len++]= delim;
+			delim = post_delim;
 		}
 		len += strlcpy(to_buf+len, nni->name, to_buf_len - len);
 		if (len >= to_buf_len - 3)
 			exit_cleanup(RERR_UNSUPPORTED); /* IMPOSSIBLE... */
-		if (post_char) {
-			to_buf[len++]= post_char;
-			post_char = '\0';
+		if (delim) {
+			to_buf[len++]= delim;
+			delim = '\0';
 		}
 		nno->saw[nni->num] = ++cnt;
 	}
@@ -411,9 +412,8 @@ static void send_negotiate_str(int f_out, struct name_num_obj *nno, const char *
 	} else
 		list_str = NULL;
 
-	if (!list_str || !*list_str) {
-		len = get_default_nno_list(nno, tmpbuf, sizeof tmpbuf, '\0');
-	}
+	if (!list_str || !*list_str)
+		len = get_default_nno_list(nno, tmpbuf, MAX_NSTR_STRLEN, '\0');
 
 	if (DEBUG_GTE(NSTR, am_server ? 3 : 2)) {
 		if (am_server)
