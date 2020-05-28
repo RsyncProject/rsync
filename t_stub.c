@@ -104,3 +104,8 @@ filter_rule_list daemon_filter_list;
 {
 	return cst || !flg ? 16 : 1;
 }
+
+ int canonical_checksum(int cst)
+{
+	return cst ? 0 : 0;
+}
