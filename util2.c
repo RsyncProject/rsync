@@ -89,20 +89,25 @@ const char *sum_as_hex(int csum_type, const char *sum, int flist_csum)
 {
 	static char buf[MAX_DIGEST_LEN*2+1];
 	int i, x1, x2;
+	int canonical = canonical_checksum(csum_type);
 	int sum_len = csum_len_for_type(csum_type, flist_csum);
-	char *c = buf + sum_len*2;
+	char *c;
 
-	assert(c - buf < (int)sizeof buf);
+	if (!canonical)
+		return NULL;
+
+	assert(sum_len*2 < (int)sizeof buf);
+
+	for (i = sum_len, c = buf; --i >= 0; ) {
+		int ndx = canonical < 0 ? sum_len - i - 1 : i;
+		x2 = CVAL(sum, ndx);
+		x1 = x2 >> 4;
+		x2 &= 0xF;
+		*c++ = x1 <= 9 ? x1 + '0' : x1 + 'a' - 10;
+		*c++ = x2 <= 9 ? x2 + '0' : x2 + 'a' - 10;
+	}
 
 	*c = '\0';
-
-	for (i = sum_len; --i >= 0; ) {
-		x1 = CVAL(sum, i);
-		x2 = x1 >> 4;
-		x1 &= 0xF;
-		*--c = x1 <= 9 ? x1 + '0' : x1 + 'a' - 10;
-		*--c = x2 <= 9 ? x2 + '0' : x2 + 'a' - 10;
-	}
 
 	return buf;
 }

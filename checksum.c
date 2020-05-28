@@ -162,9 +162,29 @@ int csum_len_for_type(int cst, BOOL flist_csum)
 	return 0;
 }
 
+/* Returns 0 if the checksum is not canonical (i.e. it includes a seed value).
+ * Returns 1 if the public sum order matches our internal sum order.
+ * Returns -1 if the public sum order is the reverse of our internal sum order.
+ */
 int canonical_checksum(int csum_type)
 {
-	return csum_type >= CSUM_MD4 ? 1 : 0;
+	switch (csum_type) {
+	  case CSUM_NONE:
+	  case CSUM_MD4_ARCHAIC:
+	  case CSUM_MD4_OLD:
+	  case CSUM_MD4_BUSTED:
+		break;
+	  case CSUM_MD4:
+	  case CSUM_MD5:
+		return -1;
+#ifdef SUPPORT_XXHASH
+	  case CSUM_XXH64:
+		return 1;
+#endif
+	  default: /* paranoia to prevent missing case values */
+		exit_cleanup(RERR_UNSUPPORTED);
+	}
+	return 0;
 }
 
 #ifndef HAVE_SIMD /* See simd-checksum-*.cpp. */

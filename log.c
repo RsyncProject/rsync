@@ -679,9 +679,9 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 		case 'C':
 			n = NULL;
 			if (S_ISREG(file->mode)) {
-				if (always_checksum && canonical_checksum(checksum_type))
+				if (always_checksum)
 					n = sum_as_hex(checksum_type, F_SUM(file), 1);
-				else if (iflags & ITEM_TRANSFER && canonical_checksum(xfersum_type))
+				else if (iflags & ITEM_TRANSFER)
 					n = sum_as_hex(xfersum_type, sender_file_sum, 0);
 			}
 			if (!n) {
