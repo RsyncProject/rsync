@@ -692,7 +692,7 @@ static void send_zstd_token(int f, int32 token, struct map_struct *buf,
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
-		obuf = new_array(char, MAX_DATA_COUNT + 2);
+		obuf = new_array(char, OBUF_SIZE);
 		if (!obuf)
 			out_of_memory("send_deflated_token");
 
@@ -946,7 +946,7 @@ send_compressed_token(int f, int32 token, struct map_struct *buf, OFF_T offset, 
 			} else
 				available_in /= 2;
 
-			available_out = LZ4_compress(next_in, next_out, available_in);
+			available_out = LZ4_compress_default(next_in, next_out, available_in, size - 2);
 			if (!available_out) {
 				rprintf(FERROR, "compress returned %d\n", available_out);
 				exit_cleanup(RERR_STREAMIO);

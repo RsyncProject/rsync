@@ -427,7 +427,7 @@ AH_TEMPLATE([SUPPORT_LZ4],
 [Undefine if you do not want LZ4 compression.  By default this is defined.])
 if test x"$enable_lz4" != x"no" && test x"$ac_cv_header_lz4_h" = x"yes"; then
     AC_MSG_RESULT(yes)
-    AC_SEARCH_LIBS(LZ4_compress, lz4, [AC_DEFINE(SUPPORT_LZ4)])
+    AC_SEARCH_LIBS(LZ4_compress_default, lz4, [AC_DEFINE(SUPPORT_LZ4)])
 else
     AC_MSG_RESULT(no)
 fi
