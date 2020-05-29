@@ -111,12 +111,13 @@ __attribute__ ((target("ssse3"))) static inline __m128i sse_maddubs_epi16(__m128
     return _mm_maddubs_epi16(a, b);
 }
 
-__attribute__ ((target("default"))) static inline __m128i sse_interleave_odd_epi16(__m128i a, __m128i b) { }
-__attribute__ ((target("default"))) static inline __m128i sse_interleave_even_epi16(__m128i a, __m128i b) { }
-__attribute__ ((target("default"))) static inline __m128i sse_mulu_odd_epi8(__m128i a, __m128i b) { }
-__attribute__ ((target("default"))) static inline __m128i sse_mulu_even_epi8(__m128i a, __m128i b) { }
-__attribute__ ((target("default"))) static inline __m128i sse_hadds_epi16(__m128i a, __m128i b) { }
-__attribute__ ((target("default"))) static inline __m128i sse_maddubs_epi16(__m128i a, __m128i b) { }
+/* These don't actually get called, but we need to define them. */
+__attribute__ ((target("default"))) static inline __m128i sse_interleave_odd_epi16(__m128i a, __m128i b) { return a; }
+__attribute__ ((target("default"))) static inline __m128i sse_interleave_even_epi16(__m128i a, __m128i b) { return a; }
+__attribute__ ((target("default"))) static inline __m128i sse_mulu_odd_epi8(__m128i a, __m128i b) { return a; }
+__attribute__ ((target("default"))) static inline __m128i sse_mulu_even_epi8(__m128i a, __m128i b) { return a; }
+__attribute__ ((target("default"))) static inline __m128i sse_hadds_epi16(__m128i a, __m128i b) { return a; }
+__attribute__ ((target("default"))) static inline __m128i sse_maddubs_epi16(__m128i a, __m128i b) { return a; }
 
 /*
   Original loop per 4 bytes:
