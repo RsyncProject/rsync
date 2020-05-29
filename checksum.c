@@ -213,6 +213,11 @@ uint32 get_checksum1(char *buf1, int32 len)
 void get_checksum2(char *buf, int32 len, char *sum)
 {
 	switch (xfersum_type) {
+#ifdef SUPPORT_XXHASH
+	  case CSUM_XXH64:
+		SIVAL64(sum, 0, XXH64(buf, len, checksum_seed));
+		break;
+#endif
 	  case CSUM_MD5: {
 		MD5_CTX m5;
 		uchar seedbuf[4];
@@ -288,11 +293,6 @@ void get_checksum2(char *buf, int32 len, char *sum)
 		mdfour_result(&m, (uchar *)sum);
 		break;
 	  }
-#ifdef SUPPORT_XXHASH
-	  case CSUM_XXH64:
-		SIVAL64(sum, 0, XXH64(buf, len, checksum_seed));
-		break;
-#endif
 	  default: /* paranoia to prevent missing case values */
 		exit_cleanup(RERR_UNSUPPORTED);
 	}
@@ -314,6 +314,25 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 	buf = map_file(fd, len, MAX_MAP_SIZE, CHUNK_SIZE);
 
 	switch (checksum_type) {
+#ifdef SUPPORT_XXHASH
+	  case CSUM_XXH64: {
+		static XXH64_state_t* state = NULL;
+		if (!state && !(state = XXH64_createState()))
+			out_of_memory("file_checksum");
+
+		XXH64_reset(state, 0);
+
+		for (i = 0; i + CHUNK_SIZE <= len; i += CHUNK_SIZE)
+			XXH64_update(state, (uchar *)map_ptr(buf, i, CHUNK_SIZE), CHUNK_SIZE);
+
+		remainder = (int32)(len - i);
+		if (remainder > 0)
+			XXH64_update(state, (uchar *)map_ptr(buf, i, remainder), remainder);
+
+		SIVAL64(sum, 0, XXH64_digest(state));
+		break;
+	  }
+#endif
 	  case CSUM_MD5: {
 		MD5_CTX m5;
 
@@ -368,35 +387,6 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 		mdfour_result(&m, (uchar *)sum);
 		break;
 	  }
-#ifdef SUPPORT_XXHASH
-	  case CSUM_XXH64: {
-		XXH64_state_t* state = XXH64_createState();
-		if (state == NULL)
-			out_of_memory("file_checksum XXH64");
-
-		if (XXH64_reset(state, 0) == XXH_ERROR) {
-			rprintf(FERROR, "error resetting XXH64 seed");
-			exit_cleanup(RERR_STREAMIO);
-		}
-
-		for (i = 0; i + CHUNK_SIZE <= len; i += CHUNK_SIZE) {
-			XXH_errorcode const updateResult =
-			    XXH64_update(state, (uchar *)map_ptr(buf, i, CHUNK_SIZE), CHUNK_SIZE);
-			if (updateResult == XXH_ERROR) {
-				rprintf(FERROR, "error computing XXH64 hash");
-				exit_cleanup(RERR_STREAMIO);
-			}
-		}
-
-		remainder = (int32)(len - i);
-		if (remainder > 0)
-			XXH64_update(state, (uchar *)map_ptr(buf, i, remainder), remainder);
-		SIVAL64(sum, 0, XXH64_digest(state));
-
-		XXH64_freeState(state);
-		break;
-	  }
-#endif
 	  default:
 		rprintf(FERROR, "Invalid checksum-choice for --checksum: %s (%d)\n",
 			checksum_name(checksum_type), checksum_type);
@@ -429,6 +419,13 @@ void sum_init(int csum_type, int seed)
 	cursum_type = csum_type;
 
 	switch (csum_type) {
+#ifdef SUPPORT_XXHASH
+	  case CSUM_XXH64:
+		if (!xxh64_state && !(xxh64_state = XXH64_createState()))
+			out_of_memory("sum_init");
+		XXH64_reset(xxh64_state, 0);
+		break;
+#endif
 	  case CSUM_MD5:
 		MD5_Init(&ctx.m5);
 		break;
@@ -448,19 +445,6 @@ void sum_init(int csum_type, int seed)
 		SIVAL(s, 0, seed);
 		sum_update(s, 4);
 		break;
-#ifdef SUPPORT_XXHASH
-	  case CSUM_XXH64:
-		if (xxh64_state == NULL) {
-			xxh64_state = XXH64_createState();
-			if (xxh64_state == NULL)
-				out_of_memory("sum_init xxh64");
-		}
-		if (XXH64_reset(xxh64_state, 0) == XXH_ERROR) {
-			rprintf(FERROR, "error resetting XXH64 state");
-			exit_cleanup(RERR_STREAMIO);
-		}
-		break;
-#endif
 	  case CSUM_NONE:
 		break;
 	  default: /* paranoia to prevent missing case values */
@@ -479,6 +463,11 @@ void sum_init(int csum_type, int seed)
 void sum_update(const char *p, int32 len)
 {
 	switch (cursum_type) {
+#ifdef SUPPORT_XXHASH
+	  case CSUM_XXH64:
+		XXH64_update(xxh64_state, p, len);
+		break;
+#endif
 	  case CSUM_MD5:
 		MD5_Update(&ctx.m5, (uchar *)p, len);
 		break;
@@ -514,14 +503,6 @@ void sum_update(const char *p, int32 len)
 		if (sumresidue)
 			memcpy(ctx.md.buffer, p, sumresidue);
 		break;
-#ifdef SUPPORT_XXHASH
-	  case CSUM_XXH64:
-		if (XXH64_update(xxh64_state, p, len) == XXH_ERROR) {
-			rprintf(FERROR, "error computing XXH64 hash");
-			exit_cleanup(RERR_STREAMIO);
-		}
-		break;
-#endif
 	  case CSUM_NONE:
 		break;
 	  default: /* paranoia to prevent missing case values */
@@ -536,6 +517,11 @@ void sum_update(const char *p, int32 len)
 int sum_end(char *sum)
 {
 	switch (cursum_type) {
+#ifdef SUPPORT_XXHASH
+	  case CSUM_XXH64:
+		SIVAL64(sum, 0, XXH64_digest(xxh64_state));
+		break;
+#endif
 	  case CSUM_MD5:
 		MD5_Final((uchar *)sum, &ctx.m5);
 		break;
@@ -554,11 +540,6 @@ int sum_end(char *sum)
 			mdfour_update(&ctx.md, (uchar *)ctx.md.buffer, sumresidue);
 		mdfour_result(&ctx.md, (uchar *)sum);
 		break;
-#ifdef SUPPORT_XXHASH
-	  case CSUM_XXH64:
-		SIVAL64(sum, 0, XXH64_digest(xxh64_state));
-		break;
-#endif
 	  case CSUM_NONE:
 		*sum = '\0';
 		break;
