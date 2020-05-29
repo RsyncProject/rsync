@@ -73,9 +73,8 @@ static int establish_proxy_connection(int fd, char *host, int port,
 		authhdr = "";
 	}
 
-	snprintf(buffer, sizeof buffer, "CONNECT %s:%d HTTP/1.0%s%s\r\n\r\n",
-		 host, port, authhdr, authbuf);
-	len = strlen(buffer);
+	len = snprintf(buffer, sizeof buffer, "CONNECT %s:%d HTTP/1.0%s%s\r\n\r\n", host, port, authhdr, authbuf);
+	assert(len > 0 && len < (int)sizeof buffer);
 	if (write(fd, buffer, len) != len) {
 		rsyserr(FERROR, errno, "failed to write to proxy");
 		return -1;
