@@ -436,6 +436,7 @@ uint32 get_checksum1(char *buf1, int32 len) {
 #define PREFETCH_MIN_LEN 1024 // the overhead is unlikely to be worth the gain for small blocks
 #define PREFETCH_MAX_BLOCKS 8
 #define CSUM_MD5 5
+#define CSUM_MD5P8 7
 
 typedef struct {
     int in_use;
@@ -478,7 +479,7 @@ void checksum2_enable_prefetch(struct map_struct *map, OFF_T len, int32 blocklen
 #ifdef PREFETCH_ENABLE
     checksum2_disable_prefetch();
     int slots = md5_parallel_slots();
-    if ((xfersum_type == CSUM_MD5) && (slots > 1) && (len >= blocklen * PREFETCH_MAX_BLOCKS) && (blocklen >= PREFETCH_MIN_LEN)) {
+    if (((xfersum_type == CSUM_MD5) || (xfersum_type == CSUM_MD5P8)) && (slots > 1) && (len >= blocklen * PREFETCH_MAX_BLOCKS) && (blocklen >= PREFETCH_MIN_LEN)) {
         prefetch = (prefetch_t*)malloc(sizeof(prefetch_t));
         memset(prefetch, 0, sizeof(prefetch_t));
         prefetch->map = map;

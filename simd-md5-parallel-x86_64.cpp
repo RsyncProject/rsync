@@ -17,7 +17,8 @@
 /*
  * Nicolas' original code has been extended to add AVX2 support, all non-SIMD
  * MD5 code has been removed and those code paths rerouted to use the MD5
- * code already present in rsync, and wrapper functions have been added.
+ * code already present in rsync, and wrapper functions have been added. The
+ * MD5P8 code is also new, and is the reason for the new stride parameter.
  *
  * This code allows multiple independent MD5 streams to be processed in
  * parallel, 4 with SSE2, 8 with AVX2. While single-stream performance is
@@ -755,7 +756,6 @@ static pmd5_status pmd5_to_md5(const pmd5_context * pctx, MD5_CTX * ctx, int slo
     uint32_t a, b, c, d;
     pmd5_status ret = pmd5_get_slot(pctx, slot, &a, &b, &c, &d);
     if (ret == PMD5_SUCCESS) {
-        // OpenSSL may be using 64-bit types so we couldn't pass them directly
         ctx->A = a;
         ctx->B = b;
         ctx->C = c;
@@ -908,6 +908,158 @@ int md5_parallel(int streams, char** buf, int* len, char** sum, char* pre4, char
             }
         }
     }
+
+    return 1;
+}
+
+// each pmd5_context needs to be 32-byte aligned
+#define MD5P8_Contexts(ctx, index) ((pmd5_context*)((((uintptr_t)((ctx)->context_storage) + 31) & ~31) + (index)*((sizeof(pmd5_context) + 31) & ~31)))
+
+int MD5P8_Init(MD5P8_CTX *ctx) {
+    int i;
+    for (i = 0; i < (pmd5_slots() == PMD5_SLOTS_AVX2 ? 1 : 2); i++) {
+        pmd5_init_all(MD5P8_Contexts(ctx, i));
+    }
+    ctx->used = 0;
+    ctx->next = 0;
+    return 1;
+}
+
+int MD5P8_Update(MD5P8_CTX *ctx, const uchar *input, uint32 length) {
+    int slots = pmd5_slots();
+    uint32 pos = 0;
+
+    if ((ctx->used) || (length < 512)) {
+        int cpy = MIN(length, 512 - ctx->used);
+        memcpy(&ctx->buffer[ctx->used], input, cpy);
+        ctx->used += cpy;
+        length -= cpy;
+        pos += cpy;
+
+        if (ctx->used == 512) {
+            if (slots == PMD5_SLOTS_AVX2) {
+                const uint8_t* ptrs[PMD5_SLOTS_MAX] = {
+                    (uint8_t*)ctx->buffer,
+                    (uint8_t*)(ctx->buffer + 64),
+                    (uint8_t*)(ctx->buffer + 128),
+                    (uint8_t*)(ctx->buffer + 192),
+                    (uint8_t*)(ctx->buffer + 256),
+                    (uint8_t*)(ctx->buffer + 320),
+                    (uint8_t*)(ctx->buffer + 384),
+                    (uint8_t*)(ctx->buffer + 448)
+                };
+                pmd5_update_all_simple(MD5P8_Contexts(ctx, 0), ptrs, 64, 0);
+            } else {
+                const uint8_t* ptrs1[PMD5_SLOTS_MAX] = {
+                    (uint8_t*)ctx->buffer,
+                    (uint8_t*)(ctx->buffer + 64),
+                    (uint8_t*)(ctx->buffer + 128),
+                    (uint8_t*)(ctx->buffer + 192)
+                };
+                const uint8_t* ptrs2[PMD5_SLOTS_MAX] = {
+                    (uint8_t*)(ctx->buffer + 256),
+                    (uint8_t*)(ctx->buffer + 320),
+                    (uint8_t*)(ctx->buffer + 384),
+                    (uint8_t*)(ctx->buffer + 448)
+                };
+                pmd5_update_all_simple(MD5P8_Contexts(ctx, 0), ptrs1, 64, 0);
+                pmd5_update_all_simple(MD5P8_Contexts(ctx, 1), ptrs2, 64, 0);
+            }
+            ctx->used = 0;
+        }
+    }
+
+    if (length >= 512) {
+        uint32 blocks = length / 512;
+        if (slots == PMD5_SLOTS_AVX2) {
+            const uint8_t* ptrs[8] = {
+                (uint8_t*)(input + pos),
+                (uint8_t*)(input + pos + 64),
+                (uint8_t*)(input + pos + 128),
+                (uint8_t*)(input + pos + 192),
+                (uint8_t*)(input + pos + 256),
+                (uint8_t*)(input + pos + 320),
+                (uint8_t*)(input + pos + 384),
+                (uint8_t*)(input + pos + 448)
+            };
+            pmd5_update_all_simple(MD5P8_Contexts(ctx, 0), ptrs, blocks * 64, 512);
+        } else {
+            const uint8_t* ptrs1[4] = {
+                (uint8_t*)(input + pos),
+                (uint8_t*)(input + pos + 64),
+                (uint8_t*)(input + pos + 128),
+                (uint8_t*)(input + pos + 192)
+            };
+            const uint8_t* ptrs2[4] = {
+                (uint8_t*)(input + pos + 256),
+                (uint8_t*)(input + pos + 320),
+                (uint8_t*)(input + pos + 384),
+                (uint8_t*)(input + pos + 448)
+            };
+            pmd5_update_all_simple(MD5P8_Contexts(ctx, 0), ptrs1, blocks * 64, 512);
+            pmd5_update_all_simple(MD5P8_Contexts(ctx, 1), ptrs2, blocks * 64, 512);
+        }
+        pos += blocks * 512;
+        length -= blocks * 512;
+    }
+
+    if (length) {
+        memcpy(ctx->buffer, &input[pos], length);
+        ctx->used = length;
+    }
+}
+
+int MD5P8_Final(uchar digest[MD5_DIGEST_LEN], MD5P8_CTX *ctx) {
+    int i;
+    uint32 low = 0, high = 0, sub = ctx->used ? 512 - ctx->used : 0;
+    if (ctx->used) {
+        uchar tmp[512];
+        memset(tmp, 0, 512);
+        MD5P8_Update(ctx, tmp, 512 - ctx->used);
+    }
+
+    uchar state[34*4] = {0};
+
+    MD5_CTX tmp;
+    for (i = 0; i < 8; i++) {
+        if (pmd5_slots() == PMD5_SLOTS_AVX2) {
+            pmd5_to_md5(MD5P8_Contexts(ctx, 0), &tmp, i);
+        } else if (i < 4) {
+            pmd5_to_md5(MD5P8_Contexts(ctx, 0), &tmp, i);
+        } else {
+            pmd5_to_md5(MD5P8_Contexts(ctx, 1), &tmp, i - 4);
+        }
+#ifdef USE_OPENSSL
+        if (low + tmp.Nl < low) high++;
+        low += tmp.Nl;
+        high += tmp.Nh;
+#else
+        if (low + tmp.totalN < low) high++;
+        low += tmp.totalN;
+        high += tmp.totalN2;
+#endif
+        SIVALu(state, i*16, tmp.A);
+        SIVALu(state, i*16 + 4, tmp.B);
+        SIVALu(state, i*16 + 8, tmp.C);
+        SIVALu(state, i*16 + 12, tmp.D);
+    }
+
+#ifndef USE_OPENSSL
+	high = (low >> 29) | (high << 3);
+	low = (low << 3);
+#endif
+
+    sub <<= 3;
+    if (low - sub > low) high--;
+    low -= sub;
+
+    SIVALu(state, 32*4, low);
+    SIVALu(state, 33*4, high);
+
+    MD5_CTX md;
+    MD5_Init(&md);
+    MD5_Update(&md, state, 34*4);
+    MD5_Final(digest, &md);
 
     return 1;
 }

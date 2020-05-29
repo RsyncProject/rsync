@@ -32,3 +32,14 @@ void md5_begin(md_context *ctx);
 void md5_update(md_context *ctx, const uchar *input, uint32 length);
 void md5_result(md_context *ctx, uchar digest[MD5_DIGEST_LEN]);
 #endif
+
+typedef struct {
+    uchar context_storage[1024];
+    uchar buffer[512];
+    int used;
+    int next;
+} MD5P8_CTX;
+
+int MD5P8_Init(MD5P8_CTX *ctx);
+int MD5P8_Update(MD5P8_CTX *ctx, const uchar *input, uint32 length);
+int MD5P8_Final(uchar digest[MD5_DIGEST_LEN], MD5P8_CTX *ctx);
