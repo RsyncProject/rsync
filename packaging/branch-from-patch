@@ -63,7 +63,7 @@ def main():
                  or re.match(r'^diff --git ', line)
                  or re.match(r'^--- (old|a)/', line)):
                     break
-                lines.append(re.sub(r'\s*\Z', "\n", line))
+                lines.append(re.sub(r'\s*\Z', "\n", line, 1))
         info_txt = ''.join(lines).strip() + "\n"
         lines = None
 
