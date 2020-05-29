@@ -943,7 +943,7 @@ AC_RUN_IFELSE([AC_LANG_SOURCE([[
 void foo(const char *format, ...) {
        va_list ap;
        int len;
-       char buf[5];
+       static char buf[] = "12345678901234567890";
 
        va_start(ap, format);
        len = vsnprintf(0, 0, format, ap);
