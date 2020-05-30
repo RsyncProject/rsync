@@ -35,6 +35,13 @@ Protocol: 31 (unchanged)
 
  - Fixed a crash in the `--iconv` code.
 
+ - Fixed a problem with the `--link-dest`|`--copy-dest` code when `--xattrs`
+   was specified along with multiple alternate-destination directories (it
+   could possibly choose a bad file match while trying to find a better xattr
+   match).
+
+ - Fixed a couple bugs in the handling of files with the `--sparse` option.
+
  - Fixed a bug in the writing of the batch.sh file (w/--write-batch) when the
    source & destination args were not last on the command-line.
 
@@ -50,11 +57,11 @@ Protocol: 31 (unchanged)
    The environment variable `RSYNC_CHECKSUM_LIST` can be used to customize the
    preference order of the negotiation.
 
- - Various compression enhancements, including a negotiation heuristic that
-   tries to pick the best compression option supported by both sides.  The
-   environment variable `RSYNC_COMPRESS_LIST` can be used to customize the
-   preference order of the heuristic (which will be more useful when new
-   compression options are added).
+ - Various compression enhancements, including the addition of zstd and lz4
+   compression algorithms and a negotiation heuristic that picks the best
+   compression option supported by both sides.  The environment variable
+   `RSYNC_COMPRESS_LIST` can be used to customize the preference order of the
+   heuristic when speaking to another rsync 3.2.0 version.
 
  - Added the `--atimes` option based on the long-standing patch (just with some
    fixes that the patch has been needing).
@@ -86,10 +93,11 @@ Protocol: 31 (unchanged)
  - Added support for `RSYNC_SHELL` & `RSYNC_NO_XFER_EXEC` environment variables
    that affect the pre-xfer exec and post-xfer exec rsync daemon options.
 
- - Fixed a problem with the `--link-dest`|`--copy-dest` code when `--xattrs`
-   was specified along with multiple alternate-destination directories (it
-   could possibly choose a bad file match while trying to find a better xattr
-   match).
+ - Optimize the `--fuzzy` `--fuzzy` heuristic to avoid the fuzzy directory scan
+   until all other basis-file options are exhausted (such as `--link-dest`).
+
+ - Have a daemon that is logging include the normal-exit sent/received stats
+   even when the transfer exited with an error.
 
  - Various manpage improvements.
 
