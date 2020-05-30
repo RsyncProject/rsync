@@ -915,7 +915,7 @@ void noop_io_until_death(void)
 {
 	char buf[1024];
 
-	if (!iobuf.in.buf || !iobuf.out.buf || iobuf.in_fd < 0 || iobuf.out_fd < 0 || kluge_around_eof)
+	if (!iobuf.in.buf || !iobuf.out.buf || iobuf.in_fd < 0 || iobuf.out_fd < 0 || kluge_around_eof || msgs2stderr)
 		return;
 
 	kluge_around_eof = 2;
