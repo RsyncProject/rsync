@@ -30,6 +30,7 @@ extern int am_sender;
 extern int am_server;
 extern int am_daemon;
 extern int am_root;
+extern int msgs2stderr;
 extern int rsync_port;
 extern int protect_args;
 extern int ignore_errors;
@@ -543,7 +544,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 		return -1;
 	}
 
-	if (am_daemon && am_server) {
+	if (am_daemon > 0) {
 		rprintf(FLOG, "rsync allowed access on module %s from %s (%s)\n",
 			name, host, addr);
 	}
@@ -883,6 +884,8 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 		orig_early_argv = NULL;
 
 	munge_symlinks = save_munge_symlinks; /* The client mustn't control this. */
+	if (am_daemon > 0)
+		msgs2stderr = 0; /* A non-rsh-run daemon doesn't have stderr for msgs. */
 
 	if (pre_exec_pid) {
 		err_msg = finish_pre_exec(pre_exec_pid, pre_exec_arg_fd, pre_exec_error_fd,
@@ -1029,7 +1032,7 @@ static void send_listing(int fd)
 static int load_config(int globals_only)
 {
 	if (!config_file) {
-		if (am_server && am_root <= 0)
+		if (am_daemon < 0 && am_root <= 0)
 			config_file = RSYNCD_USERCONF;
 		else
 			config_file = RSYNCD_SYSCONF;
@@ -1046,6 +1049,13 @@ int start_daemon(int f_in, int f_out)
 	const char *addr, *host;
 	char *p;
 	int i;
+
+	/* At this point, am_server is only set for a daemon started via rsh.
+	 * Because am_server gets forced on soon, we'll set am_daemon to -1 as
+	 * a flag that can be checked later on to distinguish a normal daemon
+	 * from an rsh-run daemon. */
+	if (am_server)
+		am_daemon = -1;
 
 	io_set_sock_fds(f_in, f_out);
 
@@ -1096,7 +1106,7 @@ int start_daemon(int f_in, int f_out)
 	host = lp_reverse_lookup(-1) ? client_name(f_in) : undetermined_hostname;
 	rprintf(FLOG, "connect from %s (%s)\n", host, addr);
 
-	if (!am_server) {
+	if (am_daemon > 0) {
 		set_socket_options(f_in, "SO_KEEPALIVE");
 		set_nonblocking(f_in);
 	}

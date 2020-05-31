@@ -264,14 +264,13 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 		exit_cleanup(RERR_MESSAGEIO);
 
 	if (msgs2stderr) {
-		if (!am_daemon) {
-			if (code == FLOG)
-				return;
-			goto output_msg;
-		}
-		if (code == FCLIENT)
-			return;
-		code = FLOG;
+		/* A normal daemon can get msgs2stderr set if the socket is busted, so we
+		 * change the message destination into an FLOG message in order to try to
+		 * get some info about an abnormal-exit into the log file. An rsh daemon
+		 * can have this set via user request, so we'll leave the code alone so
+		 * that the msg gets logged and then sent to stderr after that. */
+		if (am_daemon > 0 && code != FCLIENT)
+			code = FLOG;
 	} else if (send_msgs_to_gen) {
 		assert(!is_utf8);
 		/* Pass the message to our sibling in native charset. */
@@ -307,10 +306,28 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 	} else if (code == FLOG)
 		return;
 
-	if (quiet && code == FINFO)
-		return;
+	switch (code) {
+	case FERROR_XFER:
+		got_xfer_error = 1;
+		/* FALL THROUGH */
+	case FERROR:
+	case FWARNING:
+		f = stderr;
+		break;
+	case FINFO:
+		if (quiet)
+			return;
+		break;
+	//case FLOG:
+	//case FCLIENT:
+	//case FERROR_UTF8:
+	//case FERROR_SOCKET:
+	default:
+		fprintf(stderr, "Bad logcode in rwrite(): %d [%s]\n", (int)code, who_am_i());
+		exit_cleanup(RERR_MESSAGEIO);
+	}
 
-	if (am_server) {
+	if (am_server && !msgs2stderr) {
 		enum msgcode msg = (enum msgcode)code;
 		if (protocol_version < 30) {
 			if (msg == MSG_ERROR)
@@ -321,31 +338,11 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 		/* Pass the message to the non-server side. */
 		if (send_msg(msg, buf, len, !is_utf8))
 			return;
-		if (am_daemon) {
+		if (am_daemon > 0) {
 			/* TODO: can we send the error to the user somehow? */
 			return;
 		}
 		f = stderr;
-	}
-
-output_msg:
-	switch (code) {
-	case FERROR_XFER:
-		got_xfer_error = 1;
-		/* FALL THROUGH */
-	case FERROR:
-	case FERROR_UTF8:
-	case FERROR_SOCKET:
-	case FWARNING:
-		f = stderr;
-		break;
-	case FLOG:
-	case FINFO:
-	case FCLIENT:
-		break;
-	default:
-		fprintf(stderr, "Unknown logcode in rwrite(): %d [%s]\n", (int)code, who_am_i());
-		exit_cleanup(RERR_MESSAGEIO);
 	}
 
 	if (output_needs_newline) {

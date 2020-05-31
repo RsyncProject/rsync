@@ -342,7 +342,7 @@ to the detailed description below for a complete description.  verb(
  -v, --verbose               increase verbosity
      --info=FLAGS            fine-grained informational verbosity
      --debug=FLAGS           fine-grained debug verbosity
-     --msgs2stderr           special output handling for debugging
+     --msgs2stderr           output messages directly to stderr 
  -q, --quiet                 suppress non-error messages
      --no-motd               suppress daemon-mode MOTD (see caveat)
  -c, --checksum              skip based on checksum, not mod-time & size
@@ -584,15 +584,20 @@ verb(    rsync -aiv {-M,}--debug=del2 src/ dest/ )
 
 dit(bf(--msgs2stderr)) This option changes rsync to send all its output
 directly to stderr rather than to send messages to the client side via the
-protocol (which normally outputs info messages via stdout).  This is mainly
-intended for debugging in order to avoid changing the data sent via the
-protocol, since the extra protocol data can change what is being tested.
+protocol. The protocol allows rsync to output normal messages via stdout and
+errors via stderr, but it can delay messages behind a slew of data.
+
+One case where this is helpful is when sending really large files, since errors
+that happen on a remote receiver tend to get delayed until afer the file's data
+is fully sent.  It is also helpful for debugging, since it helps to avoid
+overpopulating the protocol data with extra message data.
+
 The option does not affect the remote side of a transfer without using
-bf(--remote-option) -- e.g. bf(-M--msgs2stderr).
-Also keep in mind that a daemon connection does not have a stderr channel to send
-messages back to the client side, so if you are doing any daemon-transfer
-debugging using this option, you should start up a daemon using bf(--no-detach)
-so that you can see the stderr output on the daemon side.
+bf(--remote-option) -- e.g. bf(-M--msgs2stderr) or bf({-M,}--msgs2stderr).
+
+Also keep in mind that connecting to a normal (non-remote-shell) daemon does
+not have a stderr channel to send messages back to the client side, so a modern
+rsync only allows the option on a remote-shell-run daemon.
 
 This option has the side-effect of making stderr output get line-buffered so
 that the merging of the output of 3 programs happens in a more readable manner.

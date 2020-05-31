@@ -731,7 +731,7 @@ void usage(enum logcode F)
   rprintf(F," -v, --verbose               increase verbosity\n");
   rprintf(F,"     --info=FLAGS            fine-grained informational verbosity\n");
   rprintf(F,"     --debug=FLAGS           fine-grained debug verbosity\n");
-  rprintf(F,"     --msgs2stderr           special output handling for debugging\n");
+  rprintf(F,"     --msgs2stderr           output messages directly to stderr\n");
   rprintf(F," -q, --quiet                 suppress non-error messages\n");
   rprintf(F,"     --no-motd               suppress daemon-mode MOTD (see manpage caveat)\n");
   rprintf(F," -c, --checksum              skip based on checksum, not mod-time & size\n");
@@ -901,6 +901,7 @@ static struct poptOption long_options[] = {
   {"info",             0,  POPT_ARG_STRING, 0, OPT_INFO, 0, 0 },
   {"debug",            0,  POPT_ARG_STRING, 0, OPT_DEBUG, 0, 0 },
   {"msgs2stderr",      0,  POPT_ARG_NONE,   &msgs2stderr, 0, 0, 0 },
+  {"no-msgs2stderr",   0,  POPT_ARG_VAL,    &msgs2stderr, 0, 0, 0 },
   {"quiet",           'q', POPT_ARG_NONE,   0, 'q', 0, 0 },
   {"motd",             0,  POPT_ARG_VAL,    &output_motd, 1, 0, 0 },
   {"no-motd",          0,  POPT_ARG_VAL,    &output_motd, 0, 0, 0 },
@@ -2578,7 +2579,8 @@ void server_options(char **args, int *argc_p)
 	for (i = 0; i < verbose; i++)
 		argstr[x++] = 'v';
 
-	/* the -q option is intentionally left out */
+	if (quiet && msgs2stderr)
+		argstr[x++] = 'q';
 	if (make_backups)
 		argstr[x++] = 'b';
 	if (update_only)
