@@ -5,7 +5,7 @@
 # the git repository in the current directory will be updated, and the local
 # ~/samba-rsync-ftp dir will be ready to be rsynced to samba.org.
 
-import os, sys, re, argparse, glob, shutil, atexit, signal
+import os, sys, re, argparse, glob, shutil, signal
 from datetime import datetime
 from getpass import getpass
 
@@ -14,7 +14,6 @@ sys.path = ['packaging'] + sys.path
 from pkglib import *
 
 dest = os.environ['HOME'] + '/samba-rsync-ftp'
-passfile = os.environ['HOME'] + '/.rsyncpass'
 ORIGINAL_PATH = os.environ['PATH']
 MAKE_GEN_CMDS = [
         'make -f prepare-source.mak conf'.split(),
@@ -31,7 +30,6 @@ def main():
 
     curdir = os.getcwd()
 
-    atexit.register(remove_passfile)
     signal.signal(signal.SIGINT, signal_handler)
 
     extra_files = get_extra_files()
@@ -60,7 +58,7 @@ def main():
     confversion = get_configure_version()
 
     # All version values are strings!
-    last_version, last_protocol_version = get_OLDNEWS_version_info()
+    lastversion, last_protocol_version = get_OLDNEWS_version_info()
     protocol_version, subprotocol_version = get_protocol_versions()
 
     version = confversion
@@ -117,7 +115,7 @@ def main():
     finalversion = re.sub(r'pre\d+', '', version)
     if protocol_version == last_protocol_version:
         proto_changed = 'unchanged'
-        proto_change_date = "\t\t"
+        proto_change_date = ' ' * 11
     else:
         proto_changed = 'changed'
         if finalversion in pdate:
@@ -127,7 +125,7 @@ def main():
                 ans = input("On what date did the protocol change to {protocol_version} get checked in? (dd Mmm yyyy) ")
                 if re.match(r'^\d\d \w\w\w \d\d\d\d$', ans):
                     break
-            proto_change_date = ans + "\t"
+            proto_change_date = ans
 
     if 'pre' in lastversion:
         if not pre:
@@ -208,9 +206,10 @@ About to:
                     + f"Protocol: {protocol_version} ({proto_changed})")
             txt = replace_or_die(x_re, repl, txt, msg)
         elif fn == 'OLDNEWS.md':
-            x_re = re.compile(r'^(\t\S\S\s\S\S\S\s\d\d\d\d)(\t%s\t).*' % re.escape(finalversion), re.M)
-            repl = lambda m: (m[1] if pre else "\t" + ztoday) + m[2] + proto_change_date + protocol_version
-            txt = replace_or_die(x_re, repl, txt, f'Unable to find "?? ??? {year}\t{finalversion}" line in {fn}')
+            efv = re.escape(finalversion)
+            x_re = re.compile(r'^(\| )(\S{2} \S{3} \d{4})(\s+\|\s+%s\s+\| ).{11}(\s+\| )\S{2}(\s+\|+)$' % efv, re.M)
+            repl = lambda m: m[1] + (m[2] if pre else ztoday) + m[3] + proto_change_date + m[4] + protocol_version + m[5]
+            txt = replace_or_die(x_re, repl, txt, f'Unable to find "| ?? ??? {year} | {finalversion} | ... |" line in {fn}')
         else:
             die(f"Unrecognized file in tweak_files: {fn}")
 
@@ -283,42 +282,25 @@ About to:
 """)
     ans = input("<Press Enter to continue> ")
 
-    # We want to use our passphrase-providing "gpg" script, so modify the PATH.
-    os.environ['PATH'] = f"{curdir}/packaging/bin:{ORIGINAL_PATH}"
+    # TODO: is there a better way to ensure that our passphrase is in the agent?
+    cmd_run("touch TeMp; gpg --sign TeMp; rm TeMp*")
 
-    while True:
-        passphrase = getpass("\nEnter your GPG pass-phrase: ")
+    out = cmd_txt(f"git tag -s -m 'Version {version}.' {v_ver}", capture='combined')
+    print(out, end='')
+    if 'bad passphrase' in out or 'failed' in out:
+        die('Aborting')
 
-        # Briefly create a temp file with the passphrase for git's tagging use.
-        oldmask = os.umask(0o077)
-        if os.path.lexists(passfile):
-            os.unlink(passfile)
-        with open(passfile, 'w', encoding='utf-8') as fh:
-            fh.write(passphrase + "\n")
-        os.umask(oldmask)
-        os.environ['GPG_PASSFILE'] = passfile
-
-        out = cmd_txt(f"git tag -s -m 'Version {version}.' {v_ver}")
+    if os.path.isdir('patches/.git'):
+        out = cmd_txt(f"cd patches && git tag -s -m 'Version {version}.' {v_ver}", capture='combined')
         print(out, end='')
-        if 'bad passphrase' in out:
-            continue
-        if 'failed' in out:
+        if 'bad passphrase' in out or 'failed' in out:
             die('Aborting')
-
-        if os.path.isdir('patches/.git'):
-            out = cmd_txt(f"cd patches && git tag -s -m 'Version {version}.' {v_ver}")
-            print(out, end='')
-            if 'bad passphrase' in out or 'failed' in out:
-                die('Aborting')
-
-        os.unlink(passfile)
-        break
 
     os.environ['PATH'] = ORIGINAL_PATH
 
     # Extract the generated files from the old tar.
     tweaked_extra_files = [ f"{rsync_lastver}/{x}" for x in extra_files ]
-    cmd_chk(['tar', 'xzf', lasttar_file, *tweaked_extra_files])
+    cmd_run(['tar', 'xzf', lasttar_file, *tweaked_extra_files])
     os.rename(rsync_lastver, 'a')
 
     print(f"Creating {diff_file} ...")
@@ -327,23 +309,23 @@ About to:
     cmd_chk(['rsync', '-a', *extra_files, 'b/'])
 
     sed_script = r's:^((---|\+\+\+) [ab]/[^\t]+)\t.*:\1:' # CAUTION: must not contain any single quotes!
-    cmd_chk(f"(git diff v{lastversion} {v_ver}; diff -upN a b | sed -r '{sed_script}') | gzip -9 >{diff_file}")
+    cmd_chk(f"(git diff v{lastversion} {v_ver} -- ':!.github'; diff -upN a b | sed -r '{sed_script}') | gzip -9 >{diff_file}")
     shutil.rmtree('a')
     os.rename('b', rsync_ver)
 
     print(f"Creating {srctar_file} ...")
     cmd_chk(f"git archive --format=tar --prefix={rsync_ver}/ {v_ver} | tar xf -")
     cmd_chk(f"support/git-set-file-times --quiet --prefix={rsync_ver}/")
-    cmd_chk(['fakeroot', 'tar', 'czf', srctar_file, rsync_ver])
+    cmd_chk(['fakeroot', 'tar', 'czf', srctar_file, '--exclude=.github', rsync_ver])
     shutil.rmtree(rsync_ver)
 
     print(f'Updating files in "{rsync_ver}/patches" dir ...')
     os.mkdir(rsync_ver, 0o755)
     os.mkdir(f"{rsync_ver}/patches", 0o755)
-    cmd_chk(f"packaging/patch-update --skip-check --branch={args.master_branch} --gen={rsync_ver}/patches")
+    cmd_chk(f"packaging/patch-update --skip-check --branch={args.master_branch} --gen={rsync_ver}/patches".split())
 
     print(f"Creating {pattar_file} ...")
-    cmd_chk(f"fakeroot tar chzf {pattar_file} {rsync_ver}/patches")
+    cmd_chk(['fakeroot', 'tar', 'chzf', pattar_file, rsync_ver + '/patches'])
     shutil.rmtree(rsync_ver)
 
     print(f"Updating the other files in {dest} ...")
@@ -361,7 +343,9 @@ About to:
         asc_fn = fn + '.asc'
         if os.path.lexists(asc_fn):
             os.unlink(asc_fn)
-        cmd_chk(['gpg', '--batch', '--passphrase-fd=0', '-ba', fn], input=passphrase)
+        res = cmd_run(['gpg', '--batch', '-ba', fn])
+        if res.returncode != 0 and res.returncode != 2:
+            die("gpg signing failed")
 
     if not pre:
         for find in f'{dest}/rsync-*.gz {dest}/rsync-*.asc {dest}/rsync-*-NEWS.md {dest}/src-previews/rsync-*diffs.gz*'.split():
@@ -390,11 +374,6 @@ def replace_or_die(regex, repl, txt, die_msg):
     if not m:
         die(die_msg)
     return regex.sub(repl, txt, 1)
-
-
-def remove_passfile():
-    if passfile and os.path.lexists(passfile):
-        os.unlink(passfile)
 
 
 def signal_handler(sig, frame):

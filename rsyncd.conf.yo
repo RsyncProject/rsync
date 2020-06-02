@@ -1016,9 +1016,7 @@ manpagefiles()
 
 manpageseealso()
 
-bf(rsync)(1)
-
-manpagediagnostics()
+bf(rsync)(1), bf(rsync-ssl)(1)
 
 manpagebugs()
 

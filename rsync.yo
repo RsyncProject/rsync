@@ -3634,7 +3634,7 @@ manpagefiles()
 
 manpageseealso()
 
-bf(rsyncd.conf)(5)
+bf(rsync-ssl)(1), bf(rsyncd.conf)(5)
 
 manpagebugs()
 

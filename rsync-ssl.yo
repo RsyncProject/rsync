@@ -23,6 +23,10 @@ bf(rsync) manpage for more information on how it works.
 Note that the stunnel connection type requires at least version 4 of stunnel,
 which should be the case on modern systems.
 
+This script requires that a helper script named bf(rsync-ssl-rsh) be installed
+in the same directory as this bf(rsync-ssl) script so that rsync can use it as
+its remote-shell command.
+
 manpagesection(ENVIRONMENT VARIABLES)
 
 The ssl helper scripts are affected by the following environment variables:
@@ -60,6 +64,33 @@ manpagesection(EXAMPLES)
 verb(    rsync-ssl -aiv example.com::src/ dest)
 
 verb(    rsync-ssl --type=openssl -aiv example.com::src/ dest)
+
+manpagefiles()
+
+rsync-ssl-rsh
+
+manpageseealso()
+
+bf(rsync)(1), bf(rsyncd.conf)(5)
+
+manpagebugs()
+
+Please report bugs! See the web site at
+url(http://rsync.samba.org/)(http://rsync.samba.org/)
+
+manpagesection(VERSION)
+
+This man page is current for version 3.1.3 of rsync.
+
+manpagesection(CREDITS)
+
+rsync is distributed under the GNU General Public License.  See the file
+COPYING for details.
+
+A WEB site is available at
+url(http://rsync.samba.org/)(http://rsync.samba.org/).  The site
+includes an FAQ-O-Matic which may cover questions unanswered by this
+manual page.
 
 manpageauthor()
 
