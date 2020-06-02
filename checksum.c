@@ -38,14 +38,6 @@ extern int protocol_version;
 extern int proper_seed_order;
 extern const char *checksum_choice;
 
-#define CSUM_NONE 0
-#define CSUM_MD4_ARCHAIC 1
-#define CSUM_MD4_BUSTED 2
-#define CSUM_MD4_OLD 3
-#define CSUM_MD4 4
-#define CSUM_MD5 5
-#define CSUM_XXH64 6
-
 struct name_num_obj valid_checksums = {
 	"checksum", NULL, NULL, 0, 0, {
 #ifdef SUPPORT_XXHASH

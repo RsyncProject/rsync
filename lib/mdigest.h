@@ -11,6 +11,14 @@
 
 #define CSUM_CHUNK 64
 
+#define CSUM_NONE 0
+#define CSUM_MD4_ARCHAIC 1
+#define CSUM_MD4_BUSTED 2
+#define CSUM_MD4_OLD 3
+#define CSUM_MD4 4
+#define CSUM_MD5 5
+#define CSUM_XXH64 6
+
 typedef struct {
 	uint32 A, B, C, D;
 	uint32 totalN;          /* bit count, lower 32 bits */
