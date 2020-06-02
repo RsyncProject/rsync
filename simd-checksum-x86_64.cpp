@@ -61,53 +61,61 @@
 
 /* Compatibility functions to let our SSSE3 algorithm run on SSE2 */
 
-__attribute__ ((target("sse2"))) static inline __m128i sse_interleave_odd_epi16(__m128i a, __m128i b) {
+__attribute__ ((target("sse2"))) static inline __m128i sse_interleave_odd_epi16(__m128i a, __m128i b)
+{
     return _mm_packs_epi32(
         _mm_srai_epi32(a, 16),
         _mm_srai_epi32(b, 16)
     );
 }
 
-__attribute__ ((target("sse2"))) static inline __m128i sse_interleave_even_epi16(__m128i a, __m128i b) {
+__attribute__ ((target("sse2"))) static inline __m128i sse_interleave_even_epi16(__m128i a, __m128i b)
+{
     return sse_interleave_odd_epi16(
         _mm_slli_si128(a, 2),
         _mm_slli_si128(b, 2)
     );
 }
 
-__attribute__ ((target("sse2"))) static inline __m128i sse_mulu_odd_epi8(__m128i a, __m128i b) {
+__attribute__ ((target("sse2"))) static inline __m128i sse_mulu_odd_epi8(__m128i a, __m128i b)
+{
     return _mm_mullo_epi16(
         _mm_srli_epi16(a, 8),
         _mm_srai_epi16(b, 8)
     );
 }
 
-__attribute__ ((target("sse2"))) static inline __m128i sse_mulu_even_epi8(__m128i a, __m128i b) {
+__attribute__ ((target("sse2"))) static inline __m128i sse_mulu_even_epi8(__m128i a, __m128i b)
+{
     return _mm_mullo_epi16(
         _mm_and_si128(a, _mm_set1_epi16(0xFF)),
         _mm_srai_epi16(_mm_slli_si128(b, 1), 8)
     );
 }
 
-__attribute__ ((target("sse2"))) static inline __m128i sse_hadds_epi16(__m128i a, __m128i b) {
+__attribute__ ((target("sse2"))) static inline __m128i sse_hadds_epi16(__m128i a, __m128i b)
+{
     return _mm_adds_epi16(
         sse_interleave_even_epi16(a, b),
         sse_interleave_odd_epi16(a, b)
     );
 }
 
-__attribute__ ((target("ssse3"))) static inline __m128i sse_hadds_epi16(__m128i a, __m128i b) {
+__attribute__ ((target("ssse3"))) static inline __m128i sse_hadds_epi16(__m128i a, __m128i b)
+{
     return _mm_hadds_epi16(a, b);
 }
 
-__attribute__ ((target("sse2"))) static inline __m128i sse_maddubs_epi16(__m128i a, __m128i b) {
+__attribute__ ((target("sse2"))) static inline __m128i sse_maddubs_epi16(__m128i a, __m128i b)
+{
     return _mm_adds_epi16(
         sse_mulu_even_epi8(a, b),
         sse_mulu_odd_epi8(a, b)
     );
 }
 
-__attribute__ ((target("ssse3"))) static inline __m128i sse_maddubs_epi16(__m128i a, __m128i b) {
+__attribute__ ((target("ssse3"))) static inline __m128i sse_maddubs_epi16(__m128i a, __m128i b)
+{
     return _mm_maddubs_epi16(a, b);
 }
 
@@ -143,7 +151,8 @@ __attribute__ ((target("default"))) static inline __m128i sse_maddubs_epi16(__m1
   performance, possibly due to not unrolling+inlining the called targeted
   functions.
  */
-__attribute__ ((target("sse2", "ssse3"))) static int32 get_checksum1_sse2_32(schar* buf, int32 len, int32 i, uint32* ps1, uint32* ps2) {
+__attribute__ ((target("sse2", "ssse3"))) static int32 get_checksum1_sse2_32(schar* buf, int32 len, int32 i, uint32* ps1, uint32* ps2)
+{
     if (len > 32) {
         int aligned = ((uintptr_t)buf & 15) == 0;
 
@@ -261,7 +270,8 @@ __attribute__ ((target("sse2", "ssse3"))) static int32 get_checksum1_sse2_32(sch
     s1 += (uint32)(t1[0] + t1[1] + t1[2] + t1[3] + t1[4] + t1[5] + t1[6] + t1[7] + t1[8] + t1[9] + t1[10] + t1[11] + t1[12] + t1[13] + t1[14] + t1[15]) +
           64*CHAR_OFFSET;
  */
-__attribute__ ((target("avx2"))) static int32 get_checksum1_avx2_64(schar* buf, int32 len, int32 i, uint32* ps1, uint32* ps2) {
+__attribute__ ((target("avx2"))) static int32 get_checksum1_avx2_64(schar* buf, int32 len, int32 i, uint32* ps1, uint32* ps2)
+{
     if (len > 64) {
         // Instructions reshuffled compared to SSE2 for slightly better performance
         int aligned = ((uintptr_t)buf & 31) == 0;
@@ -367,32 +377,36 @@ __attribute__ ((target("avx2"))) static int32 get_checksum1_avx2_64(schar* buf, 
     return i;
 }
 
-__attribute__ ((target("default"))) static int32 get_checksum1_avx2_64(schar* buf, int32 len, int32 i, uint32* ps1, uint32* ps2) {
+__attribute__ ((target("default"))) static int32 get_checksum1_avx2_64(schar* buf, int32 len, int32 i, uint32* ps1, uint32* ps2)
+{
     return i;
 }
 
-__attribute__ ((target("default"))) static int32 get_checksum1_sse2_32(schar* buf, int32 len, int32 i, uint32* ps1, uint32* ps2) {
+__attribute__ ((target("default"))) static int32 get_checksum1_sse2_32(schar* buf, int32 len, int32 i, uint32* ps1, uint32* ps2)
+{
     return i;
 }
 
-static inline int32 get_checksum1_default_1(schar* buf, int32 len, int32 i, uint32* ps1, uint32* ps2) {
-	uint32 s1 = *ps1;
-	uint32 s2 = *ps2;
-	for (; i < (len-4); i+=4) {
-		s2 += 4*(s1 + buf[i]) + 3*buf[i+1] + 2*buf[i+2] + buf[i+3] + 10*CHAR_OFFSET;
-		s1 += (buf[i+0] + buf[i+1] + buf[i+2] + buf[i+3] + 4*CHAR_OFFSET);
-	}
-	for (; i < len; i++) {
-		s1 += (buf[i]+CHAR_OFFSET); s2 += s1;
-	}
-	*ps1 = s1;
-	*ps2 = s2;
+static inline int32 get_checksum1_default_1(schar* buf, int32 len, int32 i, uint32* ps1, uint32* ps2)
+{
+    uint32 s1 = *ps1;
+    uint32 s2 = *ps2;
+    for (; i < (len-4); i+=4) {
+        s2 += 4*(s1 + buf[i]) + 3*buf[i+1] + 2*buf[i+2] + buf[i+3] + 10*CHAR_OFFSET;
+        s1 += (buf[i+0] + buf[i+1] + buf[i+2] + buf[i+3] + 4*CHAR_OFFSET);
+    }
+    for (; i < len; i++) {
+        s1 += (buf[i]+CHAR_OFFSET); s2 += s1;
+    }
+    *ps1 = s1;
+    *ps2 = s2;
     return i;
 }
 
 extern "C" {
 
-uint32 get_checksum1(char *buf1, int32 len) {
+uint32 get_checksum1(char *buf1, int32 len)
+{
     int32 i = 0;
     uint32 s1 = 0;
     uint32 s2 = 0;
@@ -409,7 +423,8 @@ uint32 get_checksum1(char *buf1, int32 len) {
     return (s1 & 0xffff) + (s2 << 16);
 }
 
-}
+} // "C"
+
 #endif /* HAVE_SIMD */
 #endif /* __cplusplus */
 #endif /* __x86_64__ */
