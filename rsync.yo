@@ -1413,6 +1413,8 @@ unknown checksum names.  If the remote rsync is not new enough to handle a
 checksum negotiation list, the list is silently ignored unless it contains the
 string "FAIL".
 
+Use bf(rsync --version) to see the default checksum list.
+
 The use of the bf(--checksum-choice) option overrides this environment list.
 
 dit(bf(-x, --one-file-system)) This tells rsync to avoid crossing a
@@ -2106,6 +2108,8 @@ client exits with an error. It ignores "auto" and all unknown compression
 names.  If the remote rsync is not new enough to handle a compression
 negotiation list, the list is silently ignored unless it contains the string
 "FAIL".
+
+Use bf(rsync --version) to see the default compress list.
 
 dit(bf(--compress-level=NUM)) Explicitly set the compression level to use
 (see bf(--compress)) instead of letting it default.  If NUM is non-zero,
