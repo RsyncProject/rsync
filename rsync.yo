@@ -2116,10 +2116,15 @@ dit(bf(--compress-level=NUM)) Explicitly set the compression level to use
 the bf(--compress) option is implied.
 
 dit(bf(--skip-compress=LIST)) Override the list of file suffixes that will
-not be compressed.  The bf(LIST) should be one or more file suffixes
-(without the dot) separated by slashes (/).
+be compressed as little as possible. Rsync sets the compression level on a
+per-file basis based on the file's suffix.
+If the compression algorithm has an "off" level (such as zlib/zlibx) then no
+compression occurs for those files.  Other algorithms have the level minimized
+to reduces the CPU usage as much as possible.
 
-You may specify an empty string to indicate that no file should be skipped.
+The bf(LIST) should be one or more file suffixes (without the dot) separated by
+slashes (/). You may specify an empty string to indicate that no files should
+be skipped.
 
 Simple character-class matching is supported: each must consist of a list
 of letters inside the square brackets (e.g. no special classes, such as
@@ -2132,8 +2137,7 @@ matches 2 suffixes):
 
 verb(    --skip-compress=gz/jpg/mp[34]/7z/bz2)
 
-The default list of suffixes that will not be compressed is this (in this
-version of rsync):
+The default file suffixes in the skip-compress list in this version of rsync are:
 
 bf(7z)
 bf(ace)

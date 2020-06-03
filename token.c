@@ -39,7 +39,9 @@ extern char *skip_compress;
 #define Z_INSERT_ONLY Z_SYNC_FLUSH
 #endif
 
-static int compression_level, per_file_default_level;
+static int compression_level; /* The compression level for the current file. */
+static int skip_compression_level; /* The least possible compressing for handling skip-compress files. */
+static int per_file_default_level; /* The default level that each new file gets prior to checking its suffix. */
 
 struct suffix_tree {
 	struct suffix_tree *sibling;
@@ -60,13 +62,13 @@ void init_compression_level(void)
 		min_level = 1;
 		max_level = Z_BEST_COMPRESSION;
 		def_level = 6; /* Z_DEFAULT_COMPRESSION is -1, so set it to the real default */
-		off_level = Z_NO_COMPRESSION;
+		off_level = skip_compression_level = Z_NO_COMPRESSION;
 		if (do_compression_level == Z_DEFAULT_COMPRESSION)
 			do_compression_level = def_level;
 		break;
 #ifdef SUPPORT_ZSTD
 	case CPRES_ZSTD:
-		min_level = ZSTD_minCLevel();
+		min_level = skip_compression_level = ZSTD_minCLevel();
 		max_level = ZSTD_maxCLevel();
 		def_level = 3;
 		off_level = CLVL_NOT_SPECIFIED;
@@ -74,7 +76,7 @@ void init_compression_level(void)
 #endif
 #ifdef SUPPORT_LZ4
 	case CPRES_LZ4:
-		min_level = 0;
+		min_level = skip_compression_level = 0;
 		max_level = 0;
 		def_level = 0;
 		off_level = CLVL_NOT_SPECIFIED;
@@ -204,7 +206,7 @@ static void init_set_compression(void)
 			/* Optimize a match-string of "*". */
 			*match_list = '\0';
 			suftree = NULL;
-			per_file_default_level = 0;
+			per_file_default_level = skip_compression_level;
 			break;
 		}
 
@@ -241,7 +243,7 @@ void set_compression(const char *fname)
 
 	for (s = match_list; *s; s += strlen(s) + 1) {
 		if (iwildmatch(s, fname)) {
-			compression_level = 0;
+			compression_level = skip_compression_level;
 			return;
 		}
 	}
@@ -261,7 +263,7 @@ void set_compression(const char *fname)
 		}
 		if ((ltr = *++s) == '\0') {
 			if (node->word_end)
-				compression_level = 0;
+				compression_level = skip_compression_level;
 			return;
 		}
 		if (!(node = node->child))

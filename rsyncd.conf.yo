@@ -824,13 +824,17 @@ dit(bf(dont compress)) This parameter allows you to select
 filenames based on wildcard patterns that should not be compressed
 when pulling files from the daemon (no analogous parameter exists to
 govern the pushing of files to a daemon).
-Compression is expensive in terms of CPU usage, so it
+Compression can be expensive in terms of CPU usage, so it
 is usually good to not try to compress files that won't compress well,
 such as already compressed files.
 
 The "dont compress" parameter takes a space-separated list of
 case-insensitive wildcard patterns. Any source filename matching one
-of the patterns will not be compressed during transfer.
+of the patterns will be compressed as little as possible during the
+transfer.
+If the compression algorithm has an "off" level (such as zlib/zlibx) then no
+compression occurs for those files.  Other algorithms have the level minimized
+to reduces the CPU usage as much as possible.
 
 See the bf(--skip-compress) parameter in the bf(rsync)(1) manpage for the list
 of file suffixes that are not compressed by default.  Specifying a value
