@@ -1910,11 +1910,12 @@ is not specified then the user's default groups are used.
 
 The option only affects one side of the transfer unless the transfer is local,
 in which case it affects both sides. Use the bf(--remote-option) to affect the
-remote side, such as bf(-M--copy-as=joe). For a local transfer, the "lsh"
+remote side, such as bf(-M--copy-as=joe). For a local transfer, the lsh (or lsh.sh)
 support file provides a local-shell helper script that can be used to allow a
-"localhost:" host-spec to be specified without needing to setup any remote
-shells (allowing you to specify remote options that affect the side of the
-transfer that is using the host-spec, and local options for the other side).
+"localhost:" or "lh:" host-spec to be specified without needing to setup any
+remote shells, allowing you to specify remote options that affect the side of
+the transfer that is using the host-spec (and using hostname "lh" avoids the
+overriding of the remote directory to the user's home dir).
 
 This option can help to reduce the risk of an rsync being run as root into or
 out of a directory that might have live changes happening to it and you want to
