@@ -470,7 +470,7 @@ to the detailed description below for a complete description.  verb(
      --checksum-seed=NUM     set block/file checksum seed (advanced)
  -4, --ipv4                  prefer IPv4
  -6, --ipv6                  prefer IPv6
-     --version               print version number
+ -V, --version               print the version & other info and exit
 (-h) --help                  show this help (see below for -h comment))
 
 Rsync can also be run as a daemon, in which case the following options are
@@ -511,7 +511,11 @@ available in rsync and exit.  For backward-compatibility with older
 versions of rsync, the help will also be output if you use the bf(-h)
 option without any other args.
 
-dit(bf(--version)) print the rsync version number and exit.
+dit(bf(-V, --version)) print the rsync version & other info and exit.
+
+The output includes the default list of checksum algorithms, the default list
+of compression algorithms, a list of compiled-in capabilities, a link to the
+rsync web site, and some license/copyright info.
 
 dit(bf(-v, --verbose)) This option increases the amount of information you
 are given during the transfer.  By default, rsync works silently. A
@@ -1413,7 +1417,7 @@ unknown checksum names.  If the remote rsync is not new enough to handle a
 checksum negotiation list, the list is silently ignored unless it contains the
 string "FAIL".
 
-Use bf(rsync --version) to see the default checksum list.
+Use bf(rsync -V) to see the default checksum list.
 
 The use of the bf(--checksum-choice) option overrides this environment list.
 
@@ -2115,7 +2119,7 @@ names.  If the remote rsync is not new enough to handle a compression
 negotiation list, the list is silently ignored unless it contains the string
 "FAIL".
 
-Use bf(rsync --version) to see the default compress list.
+Use bf(rsync -V) to see the default compress list.
 
 dit(bf(--compress-level=NUM)) Explicitly set the compression level to use
 (see bf(--compress)) instead of letting it default.  If NUM is non-zero,

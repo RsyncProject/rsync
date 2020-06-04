@@ -873,7 +873,7 @@ void usage(enum logcode F)
   rprintf(F,"     --checksum-seed=NUM     set block/file checksum seed (advanced)\n");
   rprintf(F," -4, --ipv4                  prefer IPv4\n");
   rprintf(F," -6, --ipv6                  prefer IPv6\n");
-  rprintf(F,"     --version               print version number\n");
+  rprintf(F," -V, --version               print the version & other info and exit\n");
   rprintf(F,"(-h) --help                  show this help (-h is --help only if used alone)\n");
 
   rprintf(F,"\n");
@@ -882,19 +882,19 @@ void usage(enum logcode F)
   rprintf(F,"See http://rsync.samba.org/ for updates, bug reports, and answers\n");
 }
 
-enum {OPT_VERSION = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
+enum {OPT_SERVER = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_FILTER, OPT_COMPARE_DEST, OPT_COPY_DEST, OPT_LINK_DEST, OPT_HELP,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_MODIFY_WINDOW, OPT_MIN_SIZE, OPT_CHMOD,
       OPT_READ_BATCH, OPT_WRITE_BATCH, OPT_ONLY_WRITE_BATCH, OPT_MAX_SIZE,
       OPT_NO_D, OPT_APPEND, OPT_NO_ICONV, OPT_INFO, OPT_DEBUG,
       OPT_USERMAP, OPT_GROUPMAP, OPT_CHOWN, OPT_BWLIMIT,
       OPT_OLD_COMPRESS, OPT_NEW_COMPRESS, OPT_NO_COMPRESS,
-      OPT_SERVER, OPT_REFUSED_BASE = 9000};
+      OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
   /* longName, shortName, argInfo, argPtr, value, descrip, argDesc */
   {"help",             0,  POPT_ARG_NONE,   0, OPT_HELP, 0, 0 },
-  {"version",          0,  POPT_ARG_NONE,   0, OPT_VERSION, 0, 0},
+  {"version",         'V', POPT_ARG_NONE,   0, 'V', 0, 0},
   {"verbose",         'v', POPT_ARG_NONE,   0, 'v', 0, 0 },
   {"no-verbose",       0,  POPT_ARG_VAL,    &verbose, 0, 0, 0 },
   {"no-v",             0,  POPT_ARG_VAL,    &verbose, 0, 0, 0 },
@@ -1493,7 +1493,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		 * only special cases are returned and listed here. */
 
 		switch (opt) {
-		case OPT_VERSION:
+		case 'V':
 			print_rsync_version(FINFO);
 			exit_cleanup(0);
 
