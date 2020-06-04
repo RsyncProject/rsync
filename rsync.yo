@@ -1908,6 +1908,14 @@ dit(bf(--copy-as=USER[:GROUP])) This option instructs rsync to use the USER and
 if the user that is running rsync has the ability to change users. If the group
 is not specified then the user's default groups are used.
 
+This option can help to reduce the risk of an rsync being run as root into or
+out of a directory that might have live changes happening to it and you want to
+make sure that root-level read or write actions of system files are not
+possible. While you could alternatively run all of rsync as the specified user,
+sometimes you need the root-level host-access credentials to be used, so this
+allows rsync to drop root for the copying part of the operation after the
+remote-shell or daemon connection is established.
+
 The option only affects one side of the transfer unless the transfer is local,
 in which case it affects both sides. Use the bf(--remote-option) to affect the
 remote side, such as bf(-M--copy-as=joe). For a local transfer, the lsh (or lsh.sh)
@@ -1917,14 +1925,6 @@ remote shells, allowing you to specify remote options that affect the side of
 the transfer that is using the host-spec (and using hostname "lh" avoids the
 overriding of the remote directory to the user's home dir).
 
-This option can help to reduce the risk of an rsync being run as root into or
-out of a directory that might have live changes happening to it and you want to
-make sure that root-level read or write actions of system files are not
-possible. While you could alternatively run all of rsync as the specified user,
-sometimes you need the root-level host-access credentials to be used, so this
-allows rsync to drop root for the copying part of the operation after the
-remote-shell or daemon connection is established.
-
 For example, the following rsync writes the local files as user "joe":
 
 verb(   sudo rsync -aiv --copy-as=joe host1:backups/joe/ /home/joe/)
@@ -1933,6 +1933,11 @@ This makes all files owned by user "joe", limits the groups to those that are
 available to that user, and makes it impossible for the joe user to do a timed
 exploit of the path to induce a change to a file that the joe user has no
 permissions to change.
+
+The following command does a local copy into the "dest/" dir as user "joe"
+(assumimg you've installed support/lsh into a dir on your $PATH):
+
+verb(   sudo rsync -aive lsh -M--copy-as=joe src/ lh:dest/)
 
 dit(bf(-T, --temp-dir=DIR)) This option instructs rsync to use DIR as a
 scratch directory when creating temporary copies of the files transferred
