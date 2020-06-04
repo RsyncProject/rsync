@@ -57,6 +57,8 @@ void init_compression_level(void)
 	int min_level, max_level, def_level, off_level;
 
 	switch (do_compression) {
+	case CPRES_NONE:
+		break;
 	case CPRES_ZLIB:
 	case CPRES_ZLIBX:
 		min_level = 1;
@@ -83,7 +85,7 @@ void init_compression_level(void)
 		break;
 #endif
 	default: /* paranoia to prevent missing case values */
-		exit_cleanup(RERR_UNSUPPORTED);
+		assert(0);
 	}
 
 	if (do_compression_level == CLVL_NOT_SPECIFIED)
@@ -1105,18 +1107,27 @@ static void see_uncompressed_token(char *buf, int32 len)
 void send_token(int f, int32 token, struct map_struct *buf, OFF_T offset,
 		int32 n, int32 toklen)
 {
-	if (!do_compression)
+	switch (do_compression) {
+	case CPRES_NONE:
 		simple_send_token(f, token, buf, offset, n);
+		break;
+	case CPRES_ZLIB:
+	case CPRES_ZLIBX:
+		send_deflated_token(f, token, buf, offset, n, toklen);
+		break;
 #ifdef SUPPORT_ZSTD
-	else if (do_compression == CPRES_ZSTD)
+	case CPRES_ZSTD:
 		send_zstd_token(f, token, buf, offset, n);
+		break;
 #endif
 #ifdef SUPPORT_LZ4
-	else if (do_compression == CPRES_LZ4)
+	case CPRES_LZ4:
 		send_compressed_token(f, token, buf, offset, n);
+		break;
 #endif
-	else
-		send_deflated_token(f, token, buf, offset, n, toklen);
+	default:
+		assert(0);
+	}
 }
 
 /*
@@ -1129,18 +1140,27 @@ int32 recv_token(int f, char **data)
 {
 	int tok;
 
-	if (!do_compression)
+	switch (do_compression) {
+	case CPRES_NONE:
 		tok = simple_recv_token(f,data);
+		break;
+	case CPRES_ZLIB:
+	case CPRES_ZLIBX:
+		tok = recv_deflated_token(f, data);
+		break;
 #ifdef SUPPORT_ZSTD
-	else if (do_compression == CPRES_ZSTD)
+	case CPRES_ZSTD:
 		tok = recv_zstd_token(f, data);
+		break;
 #endif
 #ifdef SUPPORT_LZ4
-	else if (do_compression == CPRES_LZ4)
+	case CPRES_LZ4:
 		tok = recv_compressed_token(f, data);
+		break;
 #endif
-	else /* CPRES_ZLIB & CPRES_ZLIBX */
-		tok = recv_deflated_token(f, data);
+	default:
+		assert(0);
+	}
 	return tok;
 }
 
@@ -1149,12 +1169,24 @@ int32 recv_token(int f, char **data)
  */
 void see_token(char *data, int32 toklen)
 {
-	if (do_compression == CPRES_ZLIB)
+	switch (do_compression) {
+	case CPRES_NONE:
+		break;
+	case CPRES_ZLIB:
 		see_deflate_token(data, toklen);
+		break;
+	case CPRES_ZLIBX:
+		break;
 #ifdef SUPPORT_LZ4
-# if 0
-	else if (do_compression == CPRES_LZ4)
-		see_uncompressed_token(data, toklen);
-# endif
+	case CPRES_LZ4:
+		/*see_uncompressed_token(data, toklen);*/
+		break;
 #endif
+#ifdef SUPPORT_LZ4
+	case CPRES_ZSTD:
+		break;
+#endif
+	default:
+		assert(0);
+	}
 }
