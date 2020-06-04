@@ -954,8 +954,17 @@ int send_msg(enum msgcode code, const char *buf, size_t len, int convert)
 	} else
 #endif
 		needed = len + 4 + 3;
-	if (iobuf.msg.len + needed > iobuf.msg.size)
-		perform_io(needed, PIO_NEED_MSGROOM);
+	if (iobuf.msg.len + needed > iobuf.msg.size) {
+		if (!am_receiver)
+			perform_io(needed, PIO_NEED_MSGROOM);
+		else { /* We allow the receiver to increase their iobuf.msg size to avoid a deadlock. */
+			size_t old_size = iobuf.msg.size;
+			restore_iobuf_size(&iobuf.msg);
+			realloc_xbuf(&iobuf.msg, iobuf.msg.size * 2);
+			if (iobuf.msg.pos + iobuf.msg.len > old_size)
+				memcpy(iobuf.msg.buf + old_size, iobuf.msg.buf, iobuf.msg.pos + iobuf.msg.len - old_size);
+		}
+	}
 
 	pos = iobuf.msg.pos + iobuf.msg.len; /* Must be set after any flushing. */
 	if (pos >= iobuf.msg.size)
@@ -1176,7 +1185,7 @@ int read_line(int fd, char *buf, size_t bufsiz, int flags)
 
 #ifdef ICONV_OPTION
 	if (flags & RL_CONVERT && iconv_buf.size < bufsiz)
-		realloc_xbuf(&iconv_buf, bufsiz + 1024);
+		realloc_xbuf(&iconv_buf, ROUND_UP_1024(bufsiz) + 1024);
 #endif
 
   start:
