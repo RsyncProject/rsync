@@ -1116,6 +1116,7 @@ int change_dir(const char *dir, int set_path_only)
 		skipped_chdir = set_path_only;
 		memcpy(curr_dir, dir, len + 1);
 	} else {
+		unsigned int save_dir_len = curr_dir_len;
 		if (curr_dir_len + 1 + len >= sizeof curr_dir) {
 			errno = ENAMETOOLONG;
 			return 0;
@@ -1125,6 +1126,7 @@ int change_dir(const char *dir, int set_path_only)
 		memcpy(curr_dir + curr_dir_len, dir, len + 1);
 
 		if (!set_path_only && chdir(curr_dir)) {
+			curr_dir_len = save_dir_len;
 			curr_dir[curr_dir_len] = '\0';
 			return 0;
 		}
