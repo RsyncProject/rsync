@@ -1157,11 +1157,17 @@ static void create_pid_file(void)
 	if (!pid_file || !*pid_file)
 		return;
 
+#ifdef O_NOFOLLOW
+#define SAFE_OPEN_FLAGS (O_CREAT|O_NOFOLLOW)
+#else
+#define SAFE_OPEN_FLAGS (O_CREAT)
+#endif
+
 	/* These tests make sure that a temp-style lock dir is handled safely. */
 	st1.st_mode = 0;
 	if (do_lstat(pid_file, &st1) == 0 && !S_ISREG(st1.st_mode) && unlink(pid_file) < 0)
 		fail = "unlink";
-	else if ((pid_file_fd = do_open(pid_file, O_RDWR|O_CREAT, 0664)) < 0)
+	else if ((pid_file_fd = do_open(pid_file, O_RDWR|SAFE_OPEN_FLAGS, 0664)) < 0)
 		fail = S_ISREG(st1.st_mode) ? "open" : "create";
 	else if (!lock_range(pid_file_fd, 0, 4))
 		fail = "lock";
