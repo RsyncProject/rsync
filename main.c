@@ -88,7 +88,6 @@ extern char *partial_dir;
 extern char *dest_option;
 extern char *rsync_path;
 extern char *shell_cmd;
-extern char *batch_name;
 extern char *password_file;
 extern char *backup_dir;
 extern char *copy_as;
