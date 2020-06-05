@@ -45,6 +45,8 @@ Protocol: 31 (unchanged)
  - Fixed a bug in the writing of the batch.sh file (w/--write-batch) when the
    source & destination args were not last on the command-line.
 
+ - Avoid a hang when an overabundance of messages clogs up all the I/O buffers.
+
 ### ENHANCEMENTS:
 
  - Various checksum enhancements, including the optional use of openssl's MD4 &
@@ -62,6 +64,19 @@ Protocol: 31 (unchanged)
    compression option supported by both sides.  The environment variable
    `RSYNC_COMPRESS_LIST` can be used to customize the preference order of the
    heuristic when speaking to another rsync 3.2.0 version.
+
+ - Added a --debug=NSTR option that outputs details of the new negotiation
+   strings (for checksums and compression).  The first level just outputs the
+   result of each negotiation on the client, level 2 outputs the values of the
+   strings that were sent to and received from the server, and level 3 outputs
+   all those values on the server side too.
+
+ - The --debug=OPTS command-line option is no longer auto-forwarded to the
+   remote rsync which allows for the client and server to have different levels
+   of debug specified. This also allows for newer debug options to be
+   specified, such as using --debug=NSTR to see the negotiated hash result,
+   without having the command fail if the server version is too old to handle
+   that debug item. Use -M--debug=OPTS to send the options to the remote side.
 
  - Added the `--atimes` option based on the long-standing patch (just with some
    fixes that the patch has been needing).
@@ -99,7 +114,12 @@ Protocol: 31 (unchanged)
  - Have a daemon that is logging include the normal-exit sent/received stats
    even when the transfer exited with an error.
 
- - Various manpage improvements.
+ - The daemon now locks its pid file (when configured to use one) so that it
+   will not fail to start when the file exists and it is unlocked.
+
+ - Various man page improvements.
+
+ - Made -V the short option for --version.
 
 ### DEVELOPER RELATED:
 
