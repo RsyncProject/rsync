@@ -1190,7 +1190,7 @@ static void create_pid_file(void)
 		int len = snprintf(pidbuf, sizeof pidbuf, "%d\n", (int)pid);
 #ifndef HAVE_FTRUNCATE
 		/* What can we do with a too-long file and no truncate? I guess we'll add extra newlines. */
-		while (len < st1.st_size) /* We already verfified that size+1 chars fits in the buffer. */
+		while (len < st1.st_size) /* We already verified that st_size+1 chars fits in the buffer. */
 			pidbuf[len++] = '\n';
 		/* We don't need the buffer to end in a '\0' (and we may not have room to add it). */
 #endif

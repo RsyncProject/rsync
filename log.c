@@ -870,10 +870,14 @@ void log_delete(const char *fname, int mode)
  */
 void log_exit(int code, const char *file, int line)
 {
-	rprintf(FLOG,"sent %s bytes  received %s bytes  total size %s\n",
-		big_num(stats.total_written),
-		big_num(stats.total_read),
-		big_num(stats.total_size));
+	/* The receiving side's stats are split between 2 procs until the
+	 * end of the run, so only the sender can output non-final info. */
+	if (code == 0 || am_sender) {
+		rprintf(FLOG,"sent %s bytes  received %s bytes  total size %s\n",
+			big_num(stats.total_written),
+			big_num(stats.total_read),
+			big_num(stats.total_size));
+	}
 	if (code != 0 && am_server != 2) {
 		const char *name;
 
