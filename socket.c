@@ -38,6 +38,7 @@ extern char *bind_address;
 extern char *sockopts;
 extern int default_af_hint;
 extern int connect_timeout;
+extern int pid_file_fd;
 
 #ifdef HAVE_SIGACTION
 static struct sigaction sigact;
@@ -609,6 +610,8 @@ void start_accept_loop(int port, int (*fn)(int, int))
 
 		if ((pid = fork()) == 0) {
 			int ret;
+			if (pid_file_fd >= 0)
+				close(pid_file_fd);
 			for (i = 0; sp[i] >= 0; i++)
 				close(sp[i]);
 			/* Re-open log file in child before possibly giving

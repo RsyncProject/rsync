@@ -66,6 +66,7 @@ extern gid_t our_gid;
 char *auth_user;
 int read_only = 0;
 int module_id = -1;
+int pid_file_fd = -1;
 struct chmod_mode_struct *daemon_chmod_modes;
 
 /* module_dirlen is the length of the module_dir string when in daemon
@@ -1149,26 +1150,59 @@ int start_daemon(int f_in, int f_out)
 static void create_pid_file(void)
 {
 	char *pid_file = lp_pid_file();
-	char pidbuf[16];
-	pid_t pid = getpid();
-	int fd, len;
+	char pidbuf[32];
+	STRUCT_STAT st1, st2;
+	char *fail = NULL;
 
 	if (!pid_file || !*pid_file)
 		return;
 
-	cleanup_set_pid(pid);
-	if ((fd = do_open(pid_file, O_WRONLY|O_CREAT|O_EXCL, 0666)) == -1) {
-	  failure:
-		cleanup_set_pid(0);
-		fprintf(stderr, "failed to create pid file %s: %s\n", pid_file, strerror(errno));
-		rsyserr(FLOG, errno, "failed to create pid file %s", pid_file);
+	/* These tests make sure that a temp-style lock dir is handled safely. */
+	st1.st_mode = 0;
+	if (do_lstat(pid_file, &st1) == 0 && !S_ISREG(st1.st_mode) && unlink(pid_file) < 0)
+		fail = "unlink";
+	else if ((pid_file_fd = do_open(pid_file, O_RDWR|O_CREAT, 0664)) < 0)
+		fail = S_ISREG(st1.st_mode) ? "open" : "create";
+	else if (!lock_range(pid_file_fd, 0, 4))
+		fail = "lock";
+	else if (do_fstat(pid_file_fd, &st1) < 0)
+		fail = "fstat opened";
+	else if (st1.st_size >= (int)sizeof pidbuf)
+		fail = "find small";
+	else if (do_lstat(pid_file, &st2) < 0)
+		fail = "lstat";
+	else if (!S_ISREG(st1.st_mode))
+		fail = "avoid file overwrite race for";
+	else if (st1.st_dev != st2.st_dev || st1.st_ino != st2.st_ino)
+		fail = "verify stat info for";
+#ifdef HAVE_FTRUNCATE
+	else if (do_ftruncate(pid_file_fd, 0) < 0)
+		fail = "truncate";
+#endif
+	else {
+		pid_t pid = getpid();
+		int len = snprintf(pidbuf, sizeof pidbuf, "%d\n", (int)pid);
+#ifndef HAVE_FTRUNCATE
+		/* What can we do with a too-long file and no truncate? I guess we'll add extra newlines. */
+		while (len < st1.st_size) /* We already verfified that size+1 chars fits in the buffer. */
+			pidbuf[len++] = '\n';
+		/* We don't need the buffer to end in a '\0' (and we may not have room to add it). */
+#endif
+		if (write(pid_file_fd, pidbuf, len) != len)
+			 fail = "write";
+		cleanup_set_pid(pid); /* Mark the file for removal on exit, even if the write failed. */
+	}
+
+	if (fail) {
+		char msg[1024];
+		snprintf(msg, sizeof msg, "failed to %s pid file %s: %s\n",
+			fail, pid_file, strerror(errno));
+		fputs(msg, stderr);
+		rprintf(FLOG, "%s", msg);
 		exit_cleanup(RERR_FILEIO);
 	}
-	snprintf(pidbuf, sizeof pidbuf, "%d\n", (int)pid);
-	len = strlen(pidbuf);
-	if (write(fd, pidbuf, len) != len)
-		goto failure;
-	close(fd);
+
+	/* The file is left open so that the lock remains valid. It is closed in our forked child procs. */
 }
 
 /* Become a daemon, discarding the controlling terminal. */

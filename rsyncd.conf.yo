@@ -103,9 +103,10 @@ This can be overridden by the bf(--dparam=motdfile=FILE)
 command-line option when starting the daemon.
 
 dit(bf(pid file)) This parameter tells the rsync daemon to write
-its process ID to that file.  If the file already exists, the rsync
-daemon will abort rather than overwrite the file.
-This can be overridden by the bf(--dparam=pidfile=FILE)
+its process ID to that file.  The rsync keeps the file locked so that
+it can know when it is safe to overwrite an existing file.
+
+The filename can be overridden by the bf(--dparam=pidfile=FILE)
 command-line option when starting the daemon.
 
 dit(bf(port)) You can override the default port the daemon will listen on
