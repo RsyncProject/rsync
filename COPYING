@@ -672,3 +672,12 @@ may consider it more useful to permit linking proprietary applications with
 the library.  If this is what you want to do, use the GNU Lesser General
 Public License instead of this License.  But first, please read
 <http://www.gnu.org/philosophy/why-not-lgpl.html>.
+
+REGARDING OPENSSL
+
+In addition, as a special exception, the copyright holders give
+permission to dynamically link rsync with the OpenSSL and xxhash
+libraries when those libraries are being distributed in compliance
+with their license terms, and to distribute a dynamically linked
+combination of rsync and these libraries.  This is also considered
+to be covered under the GPL's System Libraries exception.
