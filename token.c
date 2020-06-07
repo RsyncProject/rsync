@@ -72,7 +72,7 @@ void init_compression_level(void)
 	case CPRES_ZSTD:
 		min_level = skip_compression_level = ZSTD_minCLevel();
 		max_level = ZSTD_maxCLevel();
-		def_level = 3;
+		def_level = 0;
 		off_level = CLVL_NOT_SPECIFIED;
 		break;
 #endif
