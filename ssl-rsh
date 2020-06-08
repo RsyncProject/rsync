@@ -1,16 +1,16 @@
 #!/bin/bash
 # This must be called as (note the trailing dot):
 #
-#    rsync-ssl-rsh HOSTNAME rsync --server --daemon .
+#    ssl-rsh HOSTNAME rsync --server --daemon .
 #
 # ... which is typically done via the rsync-ssl script, which results in something like this:
 #
-#    rsync --rsh=rsync-ssl-rsh -aiv HOSTNAME::module [ARGS]
+#    rsync --rsh=/usr/lib/rsync/ssl-rsh -aiv HOSTNAME::module [ARGS]
 #
 # This SSL setup based on the files by:  http://dozzie.jarowit.net/trac/wiki/RsyncSSL
 # Note that an stunnel connection requires at least version 4.x of stunnel.
 
-# The environment can override our defaults using RSYNC_SSL_* variables
+# The environment can override our defaults using RSYNC_SSL_* variables. See `man rsync-ssl`.
 
 function path_search {
     IFS_SAVE="$IFS"
@@ -106,7 +106,7 @@ hostname="$1"
 shift
 
 if [[ -z "$hostname" || "$1" != rsync || "$2" != --server || "$3" != --daemon ]]; then
-    echo "Usage: rsync-ssl-helper HOSTNAME rsync --server --daemon ." 1>&2
+    echo "Usage: ssl-rsh HOSTNAME rsync --server --daemon ." 1>&2
     exit 1
 fi
 

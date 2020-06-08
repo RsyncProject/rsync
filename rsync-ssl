@@ -18,5 +18,6 @@ case "$@" in
 esac
 
 mydir="${0%/*}"
+libdir="$mydir/../lib/rsync"
 
-exec "$mydir/rsync" --rsh="$mydir/rsync-ssl-rsh" "${@}"
+exec "$mydir/rsync" --rsh="$libdir/ssl-rsh" "${@}"

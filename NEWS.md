@@ -85,9 +85,9 @@ Protocol: 31 (unchanged)
 
  - Added the `--write-devices` option based on the long-standing patch.
 
- - Added openssl support to the rsync-ssl script via its renamed helper script,
-   rsync-ssl-rsh.  Both bash scripts are now installed by default (removing the
-   install-ssl-client make target).  Rsync was also enhanced to set the
+ - Added openssl support to the rsync-ssl script via a (lib installed) helper
+   script, ssl-rsh.  Both bash scripts are now installed by default, removing
+   the install-ssl-client make target.  Rsync was also enhanced to set the
    `RSYNC_PORT` environment variable when running a daemon-over-rsh script. Its
    value is the user-specified port number (set via `--port` or an rsync://
    URL) or 0 if the user didn't override the port.

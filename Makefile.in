@@ -4,8 +4,8 @@
 prefix=@prefix@
 datarootdir=@datarootdir@
 exec_prefix=@exec_prefix@
-stunnel4=@STUNNEL4@
 bindir=@bindir@
+libdir=@libdir@/rsync
 mandir=@mandir@
 
 LIBS=@LIBS@
@@ -71,9 +71,10 @@ all: Makefile rsync$(EXEEXT) stunnel-rsyncd.conf @MAKE_MAN@
 
 install: all
 	-${MKDIR_P} ${DESTDIR}${bindir}
+	-${MKDIR_P} ${DESTDIR}${libdir}
 	${INSTALLCMD} ${INSTALL_STRIP} -m 755 rsync$(EXEEXT) ${DESTDIR}${bindir}
 	${INSTALLCMD} -m 755 rsync-ssl ${DESTDIR}${bindir}
-	${INSTALLCMD} -m 755 rsync-ssl-rsh ${DESTDIR}${bindir}
+	${INSTALLCMD} -m 755 ssl-rsh ${DESTDIR}${libdir}
 	-${MKDIR_P} ${DESTDIR}${mandir}/man1
 	-${MKDIR_P} ${DESTDIR}${mandir}/man5
 	if test -f rsync.1; then ${INSTALLMAN} -m 644 rsync.1 ${DESTDIR}${mandir}/man1; fi
@@ -227,15 +228,15 @@ man-copy:
 	    fi ; \
 	done
 
-rsync.1: rsync.yo
+rsync.1: rsync.yo $(srcdir)/tweak_manpage
 	yodl2man -o rsync.1 $(srcdir)/rsync.yo
 	-$(srcdir)/tweak_manpage rsync.1
 
-rsync-ssl.1: rsync-ssl.yo
+rsync-ssl.1: rsync-ssl.yo $(srcdir)/tweak_manpage
 	yodl2man -o rsync-ssl.1 $(srcdir)/rsync-ssl.yo
 	-$(srcdir)/tweak_manpage rsync-ssl.1
 
-rsyncd.conf.5: rsyncd.conf.yo
+rsyncd.conf.5: rsyncd.conf.yo $(srcdir)/tweak_manpage
 	yodl2man -o rsyncd.conf.5 $(srcdir)/rsyncd.conf.yo
 	-$(srcdir)/tweak_manpage rsyncd.conf.5
 

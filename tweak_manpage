@@ -3,6 +3,20 @@
 use strict;
 use warnings;
 
+our %subs;
+
+BEGIN {
+    open IN, '<', 'Makefile' or die $!;
+    while (<IN>) {
+	my ($var, $val) = /^(\w+)=(.+)/;
+	next unless defined $val;
+	$val =~ s/\$\{(\w+)\}/$subs{$1}/ while $val =~ /\$\{/;
+	$subs{$var} = $val;
+	last if $var eq 'libdir';
+    }
+    close IN;
+}
+
 # We only need to use "\&'" or "\&." at the start of a line.
 s/(?<=.)\\\&(['.])/$1/g;
 
@@ -18,6 +32,8 @@ s/^([. ])(.*)/ $1 . realquotes($2) /egm;
 s/(\\f(B|\(CW).*?\\fP)/ realquotes($1) /egs;
 
 s/^\\\&(\\\(oq)/$1/gm;
+
+s/\@libdir\@/$subs{libdir}/g;
 
 sub realquotes
 {
