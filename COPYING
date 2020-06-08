@@ -673,7 +673,7 @@ the library.  If this is what you want to do, use the GNU Lesser General
 Public License instead of this License.  But first, please read
 <http://www.gnu.org/philosophy/why-not-lgpl.html>.
 
-REGARDING OPENSSL
+REGARDING OPENSSL AND XXHASH
 
 In addition, as a special exception, the copyright holders give
 permission to dynamically link rsync with the OpenSSL and xxhash
