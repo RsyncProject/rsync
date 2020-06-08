@@ -58,7 +58,7 @@ void init_compression_level(void)
 
 	switch (do_compression) {
 	case CPRES_NONE:
-		break;
+		return;
 	case CPRES_ZLIB:
 	case CPRES_ZLIBX:
 		min_level = 1;
@@ -72,8 +72,10 @@ void init_compression_level(void)
 	case CPRES_ZSTD:
 		min_level = skip_compression_level = ZSTD_minCLevel();
 		max_level = ZSTD_maxCLevel();
-		def_level = 3;
+		def_level = ZSTD_CLEVEL_DEFAULT;
 		off_level = CLVL_NOT_SPECIFIED;
+		if (do_compression_level == 0)
+			do_compression_level = def_level;
 		break;
 #endif
 #ifdef SUPPORT_LZ4
