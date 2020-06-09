@@ -104,77 +104,71 @@ def main():
         print("The test was successful.")
         return
 
-    fn = fi.name + '.html'
-    print("Outputing HTML page:", fn)
-    with open(fn, 'w', encoding='utf-8') as fh:
-        fh.write(fi.html_out)
-
-    fn = fi.name
-    print("Outputing man  page:", fn)
-    with open(fn, 'w', encoding='utf-8') as fh:
-        fh.write(fi.man_out)
+    for fn, txt in ((fi.name + '.html', fi.html_out), (fi.name, fi.man_out)):
+        print("Wrote:", fn)
+        with open(fn, 'w', encoding='utf-8') as fh:
+            fh.write(txt)
 
 
 class HtmlToManPage(HTMLParser):
     def __init__(self, fi):
         HTMLParser.__init__(self, convert_charrefs=True)
 
-        self.state = argparse.Namespace(
+        st = self.state = argparse.Namespace(
                 list_state = [ ],
                 p_macro = ".P\n",
                 at_first_tag_in_li = False,
                 at_first_tag_in_dd = False,
                 dt_from = None,
                 in_pre = False,
+                html_out = [ HTML_START % fi.title ],
+                man_out = [ MAN_START % (fi.prog, fi.sect, fi.date) ],
                 txt = '',
                 )
-
-        self.html_out = [ HTML_START % fi.title ]
-        self.man_out = [ MAN_START % (fi.prog, fi.sect, fi.date) ]
 
         self.feed(fi.html_in)
         fi.html_in = None
 
-        self.html_out.append(HTML_END % fi.date)
-        self.man_out.append(MAN_END)
+        st.html_out.append(HTML_END % fi.date)
+        st.man_out.append(MAN_END)
 
-        fi.html_out = ''.join(self.html_out)
-        self.html_out = None
+        fi.html_out = ''.join(st.html_out)
+        st.html_out = None
 
-        fi.man_out = ''.join(self.man_out)
-        self.man_out = None
+        fi.man_out = ''.join(st.man_out)
+        st.man_out = None
 
 
     def handle_starttag(self, tag, attrs_list):
         st = self.state
         if args.debug:
-            print('START', tag, attrs_list, st)
+            self.output_debug('START', (tag, attrs_list))
         if st.at_first_tag_in_li:
             if st.list_state[-1] == 'dl':
                 st.dt_from = tag
                 if tag == 'p':
                     tag = 'dt'
                 else:
-                    self.html_out.append('<dt>')
+                    st.html_out.append('<dt>')
             st.at_first_tag_in_li = False
         if tag == 'p':
             if not st.at_first_tag_in_dd:
-                self.man_out.append(st.p_macro)
+                st.man_out.append(st.p_macro)
         elif tag == 'li':
             st.at_first_tag_in_li = True
             lstate = st.list_state[-1]
             if lstate == 'dl':
                 return
             if lstate == 'o':
-                self.man_out.append(".IP o\n")
+                st.man_out.append(".IP o\n")
             else:
-                self.man_out.append(".IP " + str(lstate) + ".\n")
+                st.man_out.append(".IP " + str(lstate) + ".\n")
                 st.list_state[-1] += 1
         elif tag == 'blockquote':
-            self.man_out.append(".RS 4\n")
+            st.man_out.append(".RS 4\n")
         elif tag == 'pre':
             st.in_pre = True
-            self.man_out.append(st.p_macro + ".nf\n")
+            st.man_out.append(st.p_macro + ".nf\n")
         elif tag == 'code' and not st.in_pre:
             st.txt += BOLD_FONT[0]
         elif tag == 'strong' or tag == 'bold':
@@ -188,29 +182,29 @@ class HtmlToManPage(HTMLParser):
                     start = int(val) # We only support integers.
                     break
             if st.list_state:
-                self.man_out.append(".RS\n")
+                st.man_out.append(".RS\n")
             if start == 0:
                 tag = 'dl'
                 attrs_list = [ ]
                 st.list_state.append('dl')
             else:
                 st.list_state.append(start)
-            self.man_out.append(st.p_macro)
+            st.man_out.append(st.p_macro)
             st.p_macro = ".IP\n"
         elif tag == 'ul':
-            self.man_out.append(st.p_macro)
+            st.man_out.append(st.p_macro)
             if st.list_state:
-                self.man_out.append(".RS\n")
+                st.man_out.append(".RS\n")
                 st.p_macro = ".IP\n"
             st.list_state.append('o')
-        self.html_out.append('<' + tag + ' '.join( ' ' + var + '="' + safeText(val) + '"' for var, val in attrs_list) + '>')
+        st.html_out.append('<' + tag + ' '.join( ' ' + var + '="' + safeText(val) + '"' for var, val in attrs_list) + '>')
         st.at_first_tag_in_dd = False
 
 
     def handle_endtag(self, tag):
         st = self.state
         if args.debug:
-            print('  END', tag, st)
+            self.output_debug('END', (tag,))
         if tag in CONSUMES_TXT or st.dt_from == tag:
             txt = st.txt.strip()
             st.txt = ''
@@ -218,27 +212,29 @@ class HtmlToManPage(HTMLParser):
             txt = None
         add_to_txt = None
         if tag == 'h1':
-            self.man_out.append(st.p_macro + '.SH "' + manify(txt) + '"\n')
+            st.man_out.append(st.p_macro + '.SH "' + manify(txt) + '"\n')
+        elif tag == 'h2':
+            st.man_out.append(st.p_macro + '.SS "' + manify(txt) + '"\n')
         elif tag == 'p':
             if st.dt_from == 'p':
                 tag = 'dt'
-                self.man_out.append('.IP "' + manify(txt) + '"\n')
+                st.man_out.append('.IP "' + manify(txt) + '"\n')
                 st.dt_from = None
-            else:
-                self.man_out.append(manify(txt) + "\n")
+            elif txt != '':
+                st.man_out.append(manify(txt) + "\n")
         elif tag == 'li':
             if st.list_state[-1] == 'dl':
                 if st.at_first_tag_in_li:
                     die("Invalid 0. -> td translation")
                 tag = 'dd'
             if txt != '':
-                self.man_out.append(manify(txt) + "\n")
+                st.man_out.append(manify(txt) + "\n")
             st.at_first_tag_in_li = False
         elif tag == 'blockquote':
-            self.man_out.append(".RE\n")
+            st.man_out.append(".RE\n")
         elif tag == 'pre':
             st.in_pre = False
-            self.man_out.append(manify(txt) + "\n.fi\n")
+            st.man_out.append(manify(txt) + "\n.fi\n")
         elif tag == 'code' and not st.in_pre:
              add_to_txt = NORM_FONT[0]
         elif tag == 'strong' or tag == 'bold':
@@ -249,32 +245,44 @@ class HtmlToManPage(HTMLParser):
             if st.list_state.pop() == 'dl':
                 tag = 'dl'
             if st.list_state:
-                self.man_out.append(".RE\n")
+                st.man_out.append(".RE\n")
             else:
                 st.p_macro = ".P\n"
             st.at_first_tag_in_dd = False
-        self.html_out.append('</' + tag + '>')
+        st.html_out.append('</' + tag + '>')
         if add_to_txt:
             if txt is None:
                 st.txt += add_to_txt
             else:
                 txt += add_to_txt
         if st.dt_from == tag:
-            self.man_out.append('.IP "' + manify(txt) + '"\n')
-            self.html_out.append('</dt><dd>')
+            st.man_out.append('.IP "' + manify(txt) + '"\n')
+            st.html_out.append('</dt><dd>')
             st.at_first_tag_in_dd = True
             st.dt_from = None
         elif tag == 'dt':
-            self.html_out.append('<dd>')
+            st.html_out.append('<dd>')
             st.at_first_tag_in_dd = True
 
 
     def handle_data(self, data):
         st = self.state
         if args.debug:
-            print(' DATA', [data], st)
-        self.html_out.append(safeText(data))
+            self.output_debug('DATA', (data,))
+        st.html_out.append(safeText(data))
         st.txt += data
+
+
+    def output_debug(self, event, extra):
+        import pprint
+        st = self.state
+        if args.debug < 2:
+            if len(st.html_out) > 2:
+                st.html_out = ['...'] + st.html_out[-2:]
+            if len(st.man_out) > 2:
+                st.man_out = ['...'] + st.man_out[-2:]
+        print(event, extra)
+        pprint.PrettyPrinter(indent=2).pprint(vars(st))
 
 
 def manify(txt):

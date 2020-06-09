@@ -7,15 +7,18 @@ fi
 
 srcdir="$1"
 inname="$2"
+flagfile="$srcdir/.md2man-works"
 
 if [ ! -d "$srcdir" ]; then
     echo "The specified SRC_DIR is not a directory: $srcdir" 1>&2
     exit 1
 fi
 
-if [ ! x"$RSYNC_ALWAYS_BUILD" ]; then
+if [ ! -f "$flagfile" ]; then
     # We test our smallest manpage just to see if the python setup works.
-    if ! "$srcdir/md2man" --test "$srcdir/rsync-ssl.1.md" >/dev/null 2>&1; then
+    if "$srcdir/md2man" --test "$srcdir/rsync-ssl.1.md" >/dev/null 2>&1; then
+	touch $flagfile
+    else
 	outname=`echo "$inname" | sed 's/\.md$//'`
 	if [ -f "$outname" ]; then
 	    exit 0

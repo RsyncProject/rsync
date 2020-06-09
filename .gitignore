@@ -18,6 +18,7 @@ aclocal.m4
 /rsync*.1
 /rsync*.5
 /rsync*.html
+/.md2man-works
 /autom4te*.cache
 /confdefs.h
 /conftest*
