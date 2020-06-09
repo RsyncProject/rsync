@@ -1092,7 +1092,7 @@ The /etc/rsyncd.secrets file would look something like this:
 # BUGS
 
 Please report bugs! The rsync bug tracking system is online at
-http://rsync.samba.org/ .
+<http://rsync.samba.org/>.
 
 # VERSION
 
@@ -1103,9 +1103,9 @@ This man page is current for version @VERSION@ of rsync.
 rsync is distributed under the GNU General Public License.  See the file
 COPYING for details.
 
-The primary ftp site for rsync is ftp://rsync.samba.org/pub/rsync .
+The primary ftp site for rsync is <ftp://rsync.samba.org/pub/rsync>
 
-A WEB site is available at http://rsync.samba.org/ .
+A web site is available at <http://rsync.samba.org/>.
 
 We would be delighted to hear from you if you like this program.
 
@@ -1123,4 +1123,4 @@ rsync was written by Andrew Tridgell and Paul Mackerras.  Many people have
 later contributed to it.
 
 Mailing lists for support and development are available at
-http://lists.samba.org .
+<http://lists.samba.org/>.

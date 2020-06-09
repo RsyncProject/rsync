@@ -126,6 +126,10 @@ Protocol: 31 (unchanged)
  - Silenced some annoying warnings about major()|minor() due to the autoconf
    include-file check not being smart enough.
 
+ - Converted the man pages from yodl to markdown. They are now processed via a
+   simple python3 script using the cmarkgfm OR commonmark library.  This should
+   make it easier for packaging rsync, since yodl has gotten obscure.
+
  - Improved some configure checks to work better with strict C99 compilers.
 
  - The `--debug=FOO` options are no longer auto-forwarded to the server side,

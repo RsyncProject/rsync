@@ -68,7 +68,7 @@ The ssl helper scripts are affected by the following environment variables:
 
 # BUGS
 
-Please report bugs! See the web site at http://rsync.samba.org/
+Please report bugs! See the web site at <http://rsync.samba.org/>.
 
 # VERSION
 
@@ -79,7 +79,7 @@ This man page is current for version @VERSION@ of rsync.
 rsync is distributed under the GNU General Public License.  See the file
 COPYING for details.
 
-A WEB site is available at http://rsync.samba.org/ .  The site includes an
+A web site is available at <http://rsync.samba.org/>.  The site includes an
 FAQ-O-Matic which may cover questions unanswered by this manual page.
 
 # AUTHOR
@@ -87,4 +87,4 @@ FAQ-O-Matic which may cover questions unanswered by this manual page.
 This manpage was written by Wayne Davison.
 
 Mailing lists for support and development are available at
-http://lists.samba.org .
+<http://lists.samba.org/>.

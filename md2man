@@ -1,15 +1,15 @@
 #!/usr/bin/python3
 
-# This script takes a manpage written in github-flavored markdown and turns it
-# into a html web page and a nroff man page.  The input file must have the name
-# of the program and the section in the format: NAME.NUM.md. The output files
-# are written into the current directory named NAME.NUM.html and NAME.NUM.  The
-# input format has one extra extension: if a numbered list starts at 0, it is
-# turned into a description list. The dl's dt tag is taken from the contents of
-# the first tag inside the li, which is usually a p tag or a code tag.  The
-# cmarkgfm lib is used to transforms the input file into html. The html.parser
-# is used as a state machine that both tweaks the html and outputs the nroff
-# data based on the html tags.
+# This script takes a manpage written in markdown and turns it into an html web
+# page and a nroff man page.  The input file must have the name of the program
+# and the section in this format: NAME.NUM.md.  The output files are written
+# into the current directory named NAME.NUM.html and NAME.NUM.  The input
+# format has one extra extension: if a numbered list starts at 0, it is turned
+# into a description list. The dl's dt tag is taken from the contents of the
+# first tag inside the li, which is usually a p, code, or strong tag.  The
+# cmarkgfm or commonmark lib is used to transforms the input file into html.
+# The html.parser is used as a state machine that both tweaks the html and
+# outputs the nroff data based on the html tags.
 #
 # Copyright (C) 2020 Wayne Davison
 #
@@ -23,16 +23,26 @@ CONSUMES_TXT = set('h1 h2 p li pre'.split())
 HTML_START = """\
 <html><head>
 <title>%s</title>
-<link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Roboto&family=Roboto+Mono&display=swap" rel="stylesheet">
 <style>
 body {
-  max-width: 40em;
+  max-width: 50em;
   margin: auto;
   font-size: 1.2em;
+}
+body, b, strong, u {
   font-family: 'Roboto', sans-serif;
 }
+code {
+  font-family: 'Roboto Mono', monospace;
+  font-weight: bold;
+}
+pre code {
+  display: block;
+  font-weight: normal;
+}
 blockquote pre code {
-  background: #eee;
+  background: #f1f1f1;
 }
 dd p:first-of-type {
   margin-block-start: 0em;
@@ -47,7 +57,7 @@ HTML_END = """\
 """
 
 MAN_START = r"""
-.TH "%s" "%s" "%s" "" ""
+.TH "%s" "%s" "%s" "%s" "User Commands"
 """.lstrip()
 
 MAN_END = """\
@@ -56,6 +66,8 @@ MAN_END = """\
 NORM_FONT = ('\1', r"\fP")
 BOLD_FONT = ('\2', r"\fB")
 ULIN_FONT = ('\3', r"\fI")
+
+md_parser = None
 
 def main():
     fi = re.match(r'^(?P<fn>(?P<srcdir>.+/)?(?P<name>(?P<prog>[^/]+)\.(?P<sect>\d+))\.md)$', args.mdfile)
@@ -93,10 +105,14 @@ def main():
                 break
 
     with open(fi.fn, 'r', encoding='utf-8') as fh:
-        txt = re.sub(r'@VERSION@', env_subs['VERSION'], fh.read())
-        txt = re.sub(r'@LIBDIR@', env_subs['libdir'], txt)
-        fi.html_in = cmarkgfm.github_flavored_markdown_to_html(txt)
-        txt = None
+        txt = fh.read()
+
+    txt = re.sub(r'@VERSION@', env_subs['VERSION'], txt)
+    txt = re.sub(r'@LIBDIR@', env_subs['libdir'], txt)
+    fi.html_in = md_parser(txt)
+    txt = None
+
+    fi.man_headings = (fi.prog, fi.sect, fi.date, fi.prog + ' ' + env_subs['VERSION'])
 
     HtmlToManPage(fi)
 
@@ -108,6 +124,13 @@ def main():
         print("Wrote:", fn)
         with open(fn, 'w', encoding='utf-8') as fh:
             fh.write(txt)
+
+def html_via_cmarkgfm(txt):
+    return cmarkgfm.markdown_to_html(txt)
+
+
+def html_via_commonmark(txt):
+    return commonmark.HtmlRenderer().render(commonmark.Parser().parse(txt))
 
 
 class HtmlToManPage(HTMLParser):
@@ -122,7 +145,7 @@ class HtmlToManPage(HTMLParser):
                 dt_from = None,
                 in_pre = False,
                 html_out = [ HTML_START % fi.title ],
-                man_out = [ MAN_START % (fi.prog, fi.sect, fi.date) ],
+                man_out = [ MAN_START % fi.man_headings ],
                 txt = '',
                 )
 
@@ -171,9 +194,10 @@ class HtmlToManPage(HTMLParser):
             st.man_out.append(st.p_macro + ".nf\n")
         elif tag == 'code' and not st.in_pre:
             st.txt += BOLD_FONT[0]
-        elif tag == 'strong' or tag == 'bold':
+        elif tag == 'strong' or tag == 'b':
             st.txt += BOLD_FONT[0]
-        elif tag == 'i' or tag == 'em':
+        elif tag == 'em' or  tag == 'i':
+            tag = 'u' # Change it into underline to be more like the man page
             st.txt += ULIN_FONT[0]
         elif tag == 'ol':
             start = 1
@@ -236,11 +260,12 @@ class HtmlToManPage(HTMLParser):
             st.in_pre = False
             st.man_out.append(manify(txt) + "\n.fi\n")
         elif tag == 'code' and not st.in_pre:
-             add_to_txt = NORM_FONT[0]
-        elif tag == 'strong' or tag == 'bold':
-             add_to_txt = NORM_FONT[0]
-        elif tag == 'i' or tag == 'em':
-             add_to_txt = NORM_FONT[0]
+            add_to_txt = NORM_FONT[0]
+        elif tag == 'strong' or tag == 'b':
+            add_to_txt = NORM_FONT[0]
+        elif tag == 'em' or  tag == 'i':
+            tag = 'u' # Change it into underline to be more like the man page
+            add_to_txt = NORM_FONT[0]
         elif tag == 'ol' or tag == 'ul':
             if st.list_state.pop() == 'dl':
                 tag = 'dl'
@@ -315,7 +340,12 @@ if __name__ == '__main__':
 
     try:
         import cmarkgfm
+        md_parser = html_via_cmarkgfm
     except:
-        die("The cmarkgfm library is not available for python3.")
+        try:
+            import commonmark
+            md_parser = html_via_commonmark
+        except:
+            die("Failed to find cmarkgfm or commonmark for python3.")
 
     main()

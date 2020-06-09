@@ -3854,7 +3854,7 @@ values
 
 see also the comments on the `--delete` option
 
-Please report bugs! See the web site at http://rsync.samba.org/
+Please report bugs! See the web site at <http://rsync.samba.org/>.
 
 # VERSION
 
@@ -3874,17 +3874,16 @@ that can be used with a restricted ssh login.
 rsync is distributed under the GNU General Public License.  See the file
 COPYING for details.
 
-A WEB site is available at http://rsync.samba.org/ . The
-site includes an FAQ-O-Matic which may cover questions unanswered by this
-manual page.
+A web site is available at <http://rsync.samba.org/>.  The site includes an
+FAQ-O-Matic which may cover questions unanswered by this manual page.
 
-The primary ftp site for rsync is ftp://rsync.samba.org/pub/rsync .
+The primary ftp site for rsync is <ftp://rsync.samba.org/pub/rsync>
 
-We would be delighted to hear from you if you like this program.
-Please contact the mailing-list at rsync@lists.samba.org.
+We would be delighted to hear from you if you like this program.  Please
+contact the mailing-list at <rsync@lists.samba.org>.
 
-This program uses the excellent zlib compression library written by
-Jean-loup Gailly and Mark Adler.
+This program uses the excellent zlib compression library written by Jean-loup
+Gailly and Mark Adler.
 
 # THANKS
 
@@ -3892,14 +3891,14 @@ Special thanks go out to: John Van Essen, Matt McCutchen, Wesley W. Terpstra,
 David Dykstra, Jos Backus, Sebastian Krahmer, Martin Pool, and our
 gone-but-not-forgotten compadre, J.W. Schultz.
 
-Thanks also to Richard Brent, Brendan Mackay, Bill Waite, Stephen Rothwell
-and David Bell. I've probably missed some people, my apologies if I have.
+Thanks also to Richard Brent, Brendan Mackay, Bill Waite, Stephen Rothwell and
+David Bell.  I've probably missed some people, my apologies if I have.
 
 # AUTHOR
 
-rsync was originally written by Andrew Tridgell and Paul Mackerras.
-Many people have later contributed to it. It is currently maintained
-by Wayne Davison.
+rsync was originally written by Andrew Tridgell and Paul Mackerras.  Many
+people have later contributed to it. It is currently maintained by Wayne
+Davison.
 
 Mailing lists for support and development are available at
-http://lists.samba.org .
+<http://lists.samba.org/>.
