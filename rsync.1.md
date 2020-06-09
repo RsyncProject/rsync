@@ -430,7 +430,7 @@ detailed description below for a complete description.
 --include=PATTERN           don't exclude files matching PATTERN
 --include-from=FILE         read include patterns from FILE
 --files-from=FILE           read list of source-file names from FILE
---from0, -0                 all \*from/filter files are delimited by 0s
+--from0, -0                 all *from/filter files are delimited by 0s
 --protect-args, -s          no space-splitting; wildcard chars only
 --copy-as=USER[:GROUP]      specify user & optional group for the copy
 --address=ADDRESS           bind address for outgoing socket to daemon
@@ -663,9 +663,9 @@ your home directory (remove the '=' for that).
     between the sender and receiver.  This option changes this to compare a
     128-bit checksum for each file that has a matching size.  Generating the
     checksums means that both sides will expend a lot of disk I/O reading all
-    the data in the files in the transfer (and this is prior to any reading
-    that will be done to transfer changed files), so this can slow things down
-    significantly.
+    the data in the files in the transfer, so this can slow things down
+    significantly (and this is prior to any reading that will be done to
+    transfer changed files)
 
     The sending side generates its checksums while it is doing the file-system
     scan that builds the list of the available files.  The receiver generates
