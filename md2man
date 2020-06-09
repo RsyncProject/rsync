@@ -122,7 +122,7 @@ class MarkdownToManPage(HTMLParser):
         else:
             self.html_fn = fi.name + '.html'
             self.html_fh = open(self.html_fn, 'w', encoding='utf-8')
-            self.html_fh.write(HTML_START % fi.prog + '(' + fi.sect + ') man page')
+            self.html_fh.write(HTML_START % (fi.prog + '(' + fi.sect + ') man page'))
 
             self.man_fn = fi.name
             self.man_fh = open(self.man_fn, 'w', encoding='utf-8')
