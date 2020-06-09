@@ -135,13 +135,6 @@ else
 fi
 AC_DEFINE_UNQUOTED(RSYNC_RSH, "$RSYNC_RSH", [default -e command])
 
-AC_CHECK_PROG(HAVE_YODL2MAN, yodl2man, 1, 0)
-if test x$HAVE_YODL2MAN = x1; then
-    MAKE_MAN=man
-else
-    MAKE_MAN=man-copy
-fi
-
 # Some programs on solaris are only found in /usr/xpg4/bin (or work better than others versions).
 AC_PATH_PROG(SHELL_PATH, sh, /bin/sh, [/usr/xpg4/bin$PATH_SEPARATOR$PATH])
 AC_PATH_PROG(FAKEROOT_PATH, fakeroot, /usr/bin/fakeroot, [/usr/xpg4/bin$PATH_SEPARATOR$PATH])
@@ -1203,8 +1196,3 @@ AC_OUTPUT
 AC_MSG_RESULT()
 AC_MSG_RESULT([    rsync ${RSYNC_VERSION} configuration successful])
 AC_MSG_RESULT()
-if test x$HAVE_YODL2MAN != x1; then
-    AC_MSG_RESULT([    Note that yodl2man was not found, so pre-existing manpage files will be])
-    AC_MSG_RESULT([    used w/o change (if available) -- no .yo file changes will be used.])
-    AC_MSG_RESULT()
-fi

@@ -1,0 +1,314 @@
+#!/usr/bin/python3
+
+# This script takes a manpage written in github-flavored markdown and turns it
+# into a html web page and a nroff man page.  The input file must have the name
+# of the program and the section in the format: NAME.NUM.md. The output files
+# are written into the current directory named NAME.NUM.html and NAME.NUM.  The
+# input format has one extra extension: if a numbered list starts at 0, it is
+# turned into a description list. The dl's dt tag is taken from the contents of
+# the first tag inside the li, which is usually a p tag or a code tag.  The
+# cmarkgfm lib is used to transforms the input file into html. The html.parser
+# is used as a state machine that both tweaks the html and outputs the nroff
+# data based on the html tags.
+#
+# Copyright (C) 2020 Wayne Davison
+#
+# This program is freely redistributable.
+
+import sys, os, re, argparse, time
+from html.parser import HTMLParser
+
+CONSUMES_TXT = set('h1 h2 p li pre'.split())
+
+HTML_START = """\
+<html><head>
+<title>%s</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+<style>
+body {
+  max-width: 40em;
+  margin: auto;
+  font-size: 1.2em;
+  font-family: 'Roboto', sans-serif;
+}
+blockquote pre code {
+  background: #eee;
+}
+dd p:first-of-type {
+  margin-block-start: 0em;
+}
+</style>
+</head><body>
+"""
+
+HTML_END = """\
+<div style="float: right"><p><i>%s</i></p></div>
+</body></html>
+"""
+
+MAN_START = r"""
+.TH "%s" "%s" "%s" "" ""
+""".lstrip()
+
+MAN_END = """\
+"""
+
+NORM_FONT = ('\1', r"\fP")
+BOLD_FONT = ('\2', r"\fB")
+ULIN_FONT = ('\3', r"\fI")
+
+env_subs = { }
+
+def main():
+    mtime = None
+
+    fi = re.match(r'^(?P<fn>(?P<srcdir>.+/)?(?P<name>(?P<prog>[^/]+)\.(?P<sect>\d+))\.md)$', args.mdfile)
+    if not fi:
+        die('Failed to parse NAME.NUM.md out of input file:', args.mdfile)
+    fi = argparse.Namespace(**fi.groupdict())
+    if not fi.srcdir:
+        fi.srcdir = './'
+
+    chk_files = 'latest-year.h Makefile'.split()
+    for fn in chk_files:
+        try:
+            st = os.lstat(fi.srcdir + fn)
+        except:
+            die('Failed to find', fi.srcdir + fn)
+        if not mtime:
+            mtime = st.st_mtime
+
+    with open(fi.srcdir + 'Makefile', 'r', encoding='utf-8') as fh:
+        for line in fh:
+            m = re.match(r'^(\w+)=(.+)', line)
+            if not m:
+                continue
+            var, val = (m[1], m[2])
+            while re.search(r'\$\{', val):
+                val = re.sub(r'\$\{(\w+)\}', lambda m: env_subs[m[1]], val)
+            env_subs[var] = val
+            if var == 'VERSION':
+                break
+
+    MarkdownToManPage(fi, mtime)
+
+
+class MarkdownToManPage(HTMLParser):
+    def __init__(self, fi, mtime):
+        HTMLParser.__init__(self, convert_charrefs=True)
+
+        self.man_fh = self.html_fh = None
+        self.state = argparse.Namespace(
+                list_state = [ ],
+                p_macro = ".P\n",
+                first_li_tag = False,
+                first_dd_tag = False,
+                dt_from = None,
+                in_pre = False,
+                txt = '',
+                )
+
+        self.date = time.strftime('%d %b %Y', time.localtime(mtime))
+
+        with open(fi.fn, 'r', encoding='utf-8') as fh:
+            txt = re.sub(r'@VERSION@', env_subs['VERSION'], fh.read())
+            txt = re.sub(r'@LIBDIR@', env_subs['libdir'], txt)
+            html = cmarkgfm.github_flavored_markdown_to_html(txt)
+            txt = None
+
+        if args.test:
+            self.html_fh = open(os.devnull, 'w', encoding='utf-8')
+            self.man_fh = self.html_fh
+        else:
+            self.html_fn = fi.name + '.html'
+            self.html_fh = open(self.html_fn, 'w', encoding='utf-8')
+            self.html_fh.write(HTML_START % fi.prog + '(' + fi.sect + ') man page')
+
+            self.man_fn = fi.name
+            self.man_fh = open(self.man_fn, 'w', encoding='utf-8')
+            self.man_fh.write(MAN_START % (fi.prog, fi.sect, self.date))
+
+        self.feed(html)
+
+    def __del__(self):
+        if args.test:
+            print("The test was successful.")
+            return
+
+        if self.html_fh:
+            self.html_fh.write(HTML_END % self.date)
+            self.html_fh.close()
+            print("Output HTML page: ", self.html_fn)
+
+        if self.man_fh:
+            self.man_fh.write(MAN_END)
+            self.man_fh.close()
+            print("Output man page:  ", self.man_fn)
+
+    def handle_starttag(self, tag, attrs_list):
+        st = self.state
+        if args.debug:
+            print('START', tag, attrs_list, st)
+        if st.first_li_tag:
+            if st.list_state[-1] == 'dl':
+                st.dt_from = tag
+                if tag == 'p':
+                    tag = 'dt'
+                else:
+                    self.html_fh.write('<dt>')
+            st.first_li_tag = False
+        if tag == 'p':
+            if not st.first_dd_tag:
+                self.man_fh.write(st.p_macro)
+        elif tag == 'li':
+            st.first_li_tag = True
+            lstate = st.list_state[-1]
+            if lstate == 'dl':
+                return
+            if lstate == 'o':
+                self.man_fh.write(".IP o\n")
+            else:
+                self.man_fh.write(".IP " + str(lstate) + ".\n")
+                st.list_state[-1] += 1
+        elif tag == 'blockquote':
+            self.man_fh.write(".RS 4\n")
+        elif tag == 'pre':
+            st.in_pre = True
+            self.man_fh.write(st.p_macro + ".nf\n")
+        elif tag == 'code' and not st.in_pre:
+            st.txt += BOLD_FONT[0]
+        elif tag == 'strong' or tag == 'bold':
+            st.txt += BOLD_FONT[0]
+        elif tag == 'i' or tag == 'em':
+            st.txt += ULIN_FONT[0]
+        elif tag == 'ol':
+            start = 1
+            for var, val in attrs_list:
+                if var == 'start':
+                    start = int(val) # We only support integers.
+                    break
+            if st.list_state:
+                self.man_fh.write(".RS\n")
+            if start == 0:
+                tag = 'dl'
+                attrs_list = [ ]
+                st.list_state.append('dl')
+            else:
+                st.list_state.append(start)
+            self.man_fh.write(st.p_macro)
+            st.p_macro = ".IP\n"
+        elif tag == 'ul':
+            self.man_fh.write(st.p_macro)
+            if st.list_state:
+                self.man_fh.write(".RS\n")
+                st.p_macro = ".IP\n"
+            st.list_state.append('o')
+        outer_tag = '<' + tag
+        for var, val in attrs_list:
+            outer_tag += ' ' + var + '=' + safeText(val) + '"'
+        self.html_fh.write(outer_tag + '>')
+        st.first_dd_tag = False
+
+    def handle_endtag(self, tag):
+        st = self.state
+        if args.debug:
+            print('  END', tag, st)
+        if tag in CONSUMES_TXT or st.dt_from == tag:
+            txt = st.txt.strip()
+            st.txt = ''
+        else:
+            txt = None
+        add_to_txt = None
+        if tag == 'h1':
+            self.man_fh.write(st.p_macro + '.SH "' + manify(txt) + '"\n')
+        elif tag == 'p':
+            if st.dt_from == 'p':
+                tag = 'dt'
+                self.man_fh.write('.IP "' + manify(txt) + '"\n')
+                st.dt_from = None
+            else:
+                self.man_fh.write(manify(txt) + "\n")
+        elif tag == 'li':
+            if st.list_state[-1] == 'dl':
+                if st.first_li_tag:
+                    die("Invalid 0. -> td translation")
+                tag = 'dd'
+            if txt != '':
+                self.man_fh.write(manify(txt) + "\n")
+            st.first_li_tag = False
+        elif tag == 'blockquote':
+            self.man_fh.write(".RE\n")
+        elif tag == 'pre':
+            st.in_pre = False
+            self.man_fh.write(manify(txt) + "\n.fi\n")
+        elif tag == 'code' and not st.in_pre:
+             add_to_txt = NORM_FONT[0]
+        elif tag == 'strong' or tag == 'bold':
+             add_to_txt = NORM_FONT[0]
+        elif tag == 'i' or tag == 'em':
+             add_to_txt = NORM_FONT[0]
+        elif tag == 'ol' or tag == 'ul':
+            if st.list_state.pop() == 'dl':
+                tag = 'dl'
+            if st.list_state:
+                self.man_fh.write(".RE\n")
+            else:
+                st.p_macro = ".P\n"
+            st.first_dd_tag = False
+        self.html_fh.write('</' + tag + '>')
+        if add_to_txt:
+            if txt is None:
+                st.txt += add_to_txt
+            else:
+                txt += add_to_txt
+        if st.dt_from == tag:
+            self.man_fh.write('.IP "' + manify(txt) + '"\n')
+            self.html_fh.write('</dt><dd>')
+            st.first_dd_tag = True
+            st.dt_from = None
+        elif tag == 'dt':
+            self.html_fh.write('<dd>')
+            st.first_dd_tag = True
+
+    def handle_data(self, data):
+        st = self.state
+        if args.debug:
+            print(' DATA', [data], st)
+        self.html_fh.write(safeText(data))
+        st.txt += data
+
+
+def manify(txt):
+    return re.sub(r"^(['.])", r'\&\1', txt.replace('\\', '\\\\')
+            .replace(NORM_FONT[0], NORM_FONT[1])
+            .replace(BOLD_FONT[0], BOLD_FONT[1])
+            .replace(ULIN_FONT[0], ULIN_FONT[1]), flags=re.M)
+
+
+def safeText(txt):
+    return txt.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
+
+
+def warn(*msg):
+    print(*msg, file=sys.stderr)
+
+
+def die(*msg):
+    warn(*msg)
+    sys.exit(1)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Transform a NAME.NUM.md markdown file into a NAME.NUM.html web page & a NAME.NUM man page.', add_help=False)
+    parser.add_argument('--test', action='store_true', help='Test if we can parse the input w/o updating any files.')
+    parser.add_argument('--debug', '-D', action='count', default=0, help='Output copious info on the html parsing.')
+    parser.add_argument("--help", "-h", action="help", help="Output this help message and exit.")
+    parser.add_argument('mdfile', help="The NAME.NUM.md file to parse.")
+    args = parser.parse_args()
+
+    try:
+        import cmarkgfm
+    except:
+        die("The cmarkgfm library is not available for python3.")
+
+    main()

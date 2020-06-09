@@ -34,11 +34,12 @@ def main():
         die("$dest does not exist")
     if not os.path.isdir('.git'):
         die("There is no .git dir in the current directory.")
-    if not os.path.exists('rsyncd.conf.yo'):
+    if not os.path.exists('rsyncd.conf.5.md'):
         die("There is no rsync checkout in the current directory.")
 
     if args.make_tar:
         check_git_state('master')
+        cmd_chk(['touch', 'latest-year.h'])
         cmd_chk(['make', gen_target])
 
         extra_files = get_extra_files()
@@ -73,20 +74,13 @@ def main():
             os.unlink(nightly_symlink)
         os.symlink(tar_name, nightly_symlink)
 
-    for fn in sorted(glob.glob('*.yo')):
-        yo_tmp = os.path.join(dest, fn)
-        html_fn = yo_tmp.replace('.yo', '.html')
+    for fn in sorted(glob.glob('*.[1-9].md')):
+        cmd_chk(['./md2man', fn])
 
-        with open(fn, 'r', encoding='utf-8') as fh:
-            txt = fh.read()
+        html_src = fn.replace('.md', '.html')
+        html_dest = os.path.join(dest, html_src)
 
-        txt = re.sub(r'^(manpage\([^)]+\)\(\d+\)\()[^)]+(\).*)', r'\g<1>%s\2' % today, txt, flags=re.M)
-
-        with open(yo_tmp, 'w', encoding='utf-8') as fh:
-            fh.write(txt)
-
-        cmd_chk(['yodl2html', '-o', html_fn, yo_tmp])
-        os.unlink(yo_tmp)
+        cmd_chk(['rsync', '-a', html_src, html_dest])
 
     os.chdir(dest)
 

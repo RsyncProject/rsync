@@ -15,8 +15,9 @@ config.status
 aclocal.m4
 /proto.h
 /proto.h-tstamp
-/*.1
-/*.5
+/rsync*.1
+/rsync*.5
+/rsync*.html
 /autom4te*.cache
 /confdefs.h
 /conftest*

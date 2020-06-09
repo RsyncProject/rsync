@@ -33,7 +33,8 @@ VERSION=@RSYNC_VERSION@
 
 SIMD_x86_64=simd-checksum-x86_64.o lib/md5-asm-x86_64.o
 
-GENFILES=configure.sh aclocal.m4 config.h.in proto.h proto.h-tstamp rsync.1 rsync-ssl.1 rsyncd.conf.5
+GENFILES=configure.sh aclocal.m4 config.h.in proto.h proto.h-tstamp rsync.1 rsync.1.html \
+	 rsync-ssl.1 rsync-ssl.1.html rsyncd.conf.5 rsyncd.conf.5.html
 HEADERS=byteorder.h config.h errcode.h proto.h rsync.h ifuncs.h itypes.h inums.h \
 	lib/pool_alloc.h
 LIBOBJ=lib/wildmatch.o lib/compat.o lib/snprintf.o lib/mdfour.o lib/md5.o \
@@ -67,7 +68,7 @@ CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o trimslash.
 	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) -c $< @CC_SHOBJ_FLAG@
 @OBJ_RESTORE@
 
-all: Makefile rsync$(EXEEXT) stunnel-rsyncd.conf @MAKE_MAN@
+all: Makefile rsync$(EXEEXT) stunnel-rsyncd.conf man
 
 install: all
 	-${MKDIR_P} ${DESTDIR}${bindir}
@@ -214,31 +215,16 @@ proto.h: proto.h-tstamp
 proto.h-tstamp: $(srcdir)/*.c $(srcdir)/lib/compat.c config.h
 	awk -f $(srcdir)/mkproto.awk $(srcdir)/*.c $(srcdir)/lib/compat.c
 
-man: rsync.1 rsync-ssl.1 rsyncd.conf.5 man-copy
+man: rsync.1 rsync-ssl.1 rsyncd.conf.5
 
-man-copy:
-	@for fn in rsync.1 rsync-ssl.1 rsyncd.conf.5; do \
-	    if test -f $$fn; then \
-		: ; \
-	    elif test -f $(srcdir)/$$fn; then \
-		echo "Copying srcdir $$fn" ; \
-		cp -p $(srcdir)/$$fn . ; \
-	    else \
-		echo "NOTE: $$fn cannot be created." ; \
-	    fi ; \
-	done
+rsync.1: rsync.1.md md2man latest-year.h Makefile
+	@$(srcdir)/maybe-make-man $(srcdir) rsync.1.md
 
-rsync.1: rsync.yo $(srcdir)/tweak_manpage
-	yodl2man -o rsync.1 $(srcdir)/rsync.yo
-	-$(srcdir)/tweak_manpage rsync.1
+rsync-ssl.1: rsync-ssl.1.md md2man latest-year.h Makefile
+	@$(srcdir)/maybe-make-man $(srcdir) rsync-ssl.1.md
 
-rsync-ssl.1: rsync-ssl.yo $(srcdir)/tweak_manpage
-	yodl2man -o rsync-ssl.1 $(srcdir)/rsync-ssl.yo
-	-$(srcdir)/tweak_manpage rsync-ssl.1
-
-rsyncd.conf.5: rsyncd.conf.yo $(srcdir)/tweak_manpage
-	yodl2man -o rsyncd.conf.5 $(srcdir)/rsyncd.conf.yo
-	-$(srcdir)/tweak_manpage rsyncd.conf.5
+rsyncd.conf.5: rsyncd.conf.5.md md2man latest-year.h Makefile
+	@$(srcdir)/maybe-make-man $(srcdir) rsyncd.conf.5.md
 
 clean: cleantests
 	rm -f *~ $(OBJS) $(CHECK_PROGS) $(CHECK_OBJS) $(CHECK_SYMLINKS) \

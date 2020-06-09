@@ -156,8 +156,8 @@ About to:
     - tweak SUBPROTOCOL_VERSION in rsync.h, if needed
     - tweak the version in configure.ac and the spec files
     - tweak NEWS.md and OLDNEWS.md to ensure header values are correct
-    - tweak the date in the *.yo files and generate the manpages
     - generate configure.sh, config.h.in, and proto.h
+    - touch the latest-year.h file and generate the manpages
     - page through the differences
 """)
     ans = input("<Press Enter to continue> ")
@@ -173,7 +173,6 @@ About to:
     tweak_files = 'configure.ac rsync.h NEWS.md OLDNEWS.md'.split()
     tweak_files += glob.glob('packaging/*.spec')
     tweak_files += glob.glob('packaging/*/*.spec')
-    tweak_files += glob.glob('*.yo')
 
     for fn in tweak_files:
         with open(fn, 'r', encoding='utf-8') as fh:
@@ -187,11 +186,6 @@ About to:
                 txt = replace_or_die(x_re, var + ' ' + val, txt, f"Unable to update {var} in {fn}")
             x_re = re.compile(r'^\* \w\w\w \w\w\w \d\d \d\d\d\d (.*)', re.M)
             txt = replace_or_die(x_re, r'%s \1' % cl_today, txt, f"Unable to update ChangeLog header in {fn}")
-        elif '.yo' in fn:
-            x_re = re.compile(r'^(manpage\([^)]+\)\(\d+\)\()[^)]+(\).*)', re.M)
-            txt = replace_or_die(x_re, r'\g<1>%s\2' % today, txt, f"Unable to update date in manpage() header in {fn}")
-            x_re = re.compile(r'^(This man ?page is current for version) \S+ (of rsync)', re.M)
-            txt = replace_or_die(x_re, r'\1 %s \2' % version, txt, f"Unable to update current version info in {fn}")
         elif fn == 'rsync.h':
             x_re = re.compile('(#define\s+SUBPROTOCOL_VERSION)\s+(\d+)')
             repl = lambda m: m[1] + ' ' + '0' if not pre or proto_changed != 'changed' else 1 if m[2] == '0' else m[2]
@@ -219,6 +213,9 @@ About to:
                 fh.write(txt)
 
     cmd_chk(['packaging/year-tweak'])
+    cmd_chk([touch, 'latest-year.h']) # This file's date is put in the generated manpages.
+    cmd_chk(['make', 'reconfigure'])
+    cmd_chk(['make', 'man'])
 
     print(dash_line)
     cmd_run("git diff --color | less -p '^diff .*'")
@@ -335,9 +332,9 @@ About to:
     os.link(f"{dest}/NEWS.md", news_file)
     cmd_chk(f"git log --name-status | gzip -9 >{dest}/ChangeLog.gz")
 
-    for yo_fn in glob.glob('*.yo'):
-        html_fn = yo_fn.replace('.yo', '.html')
-        cmd_chk(['yodl2html', '-o', os.path.join(dest, html_fn), yo_fn])
+    for md_fn in glob.glob('*.[1-9].md'):
+        html_fn = md_fn.replace('.md', '.html')
+        cmd_chk(['rsync', '-a', html_fn, os.path.join(dest, html_fn)])
 
     for fn in (srctar_file, pattar_file, diff_file):
         asc_fn = fn + '.asc'

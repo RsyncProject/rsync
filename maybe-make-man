@@ -1,0 +1,37 @@
+#!/bin/sh
+
+if [ x"$2" = x ]; then
+    echo "Usage: $0 SRC_DIR NAME.NUM.md" 1>&2
+    exit 1
+fi
+
+srcdir="$1"
+inname="$2"
+
+if [ ! -d "$srcdir" ]; then
+    echo "The specified SRC_DIR is not a directory: $srcdir" 1>&2
+    exit 1
+fi
+
+if [ ! x"$RSYNC_ALWAYS_BUILD" ]; then
+    # We test our smallest manpage just to see if the python setup works.
+    if ! "$srcdir/md2man" --test "$srcdir/rsync-ssl.1.md" >/dev/null 2>&1; then
+	outname=`echo "$inname" | sed 's/\.md$//'`
+	if [ -f "$outname" ]; then
+	    exit 0
+	elif [ -f "$srcdir/$outname" ]; then
+	    echo "Copying $srcdir/$outname"
+	    cp -p "$srcdir/$outname" .
+	    exit 0
+	else
+	    echo "ERROR: $outname cannot be created."
+	    if [ -f "$HOME/build_farm/build_test.fns" ]; then
+		exit 0 # No exit errorno to avoid a build failure in the samba build farm
+	    else
+		exit 1
+	    fi
+	fi
+    fi
+fi
+
+"$srcdir/md2man" "$srcdir/$inname"
