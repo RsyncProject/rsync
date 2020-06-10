@@ -54,7 +54,7 @@ struct name_num_obj valid_checksums = {
 int xfersum_type = 0; /* used for the file transfer checksums */
 int checksum_type = 0; /* used for the pre-transfer (--checksum) checksums */
 
-static int parse_csum_name(const char *name, int len)
+int parse_csum_name(const char *name, int len)
 {
 	struct name_num_item *nni;
 

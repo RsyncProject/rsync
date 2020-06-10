@@ -1706,8 +1706,13 @@ int main(int argc,char *argv[])
 		option_error();
 		exit_cleanup(RERR_SYNTAX);
 	}
-	cooked_argc = argc;
-	cooked_argv = argv;
+	if (write_batch) {
+		int j;
+		cooked_argc = argc;
+		cooked_argv = new_array(char*, argc+1);
+		for (j = 0; j <= argc; j++)
+			cooked_argv[j] = argv[j];
+	}
 
 	SIGACTMASK(SIGINT, sig_int);
 	SIGACTMASK(SIGHUP, sig_int);

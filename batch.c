@@ -38,6 +38,7 @@ extern int do_compression;
 extern int inplace;
 extern int append_mode;
 extern int write_batch;
+extern int xfersum_type;
 extern int protocol_version;
 extern int raw_argc, cooked_argc;
 extern char **raw_argv, **cooked_argv;
@@ -256,7 +257,7 @@ void open_batch_files(void)
  * (hopefully) work. */
 void write_batch_shell_file(void)
 {
-	int i, len, err = 0;
+	int i, j, len, err = 0;
 	char *p, *p2;
 
 	/* Write argvs info to BATCH.sh file */
@@ -273,15 +274,20 @@ void write_batch_shell_file(void)
 	 * do a string-based negotation (since we don't write them into the file). */
 	if (do_compression)
 		err |= write_opt("--compress-choice", compress_choice);
-	err |= write_opt("--checksum-choice", checksum_choice);
+	if (strchr(checksum_choice, ',') || xfersum_type != parse_csum_name(NULL, -1))
+		err |= write_opt("--checksum-choice", checksum_choice);
+
+	/* Elide the filename args from the option list, but scan for them in reverse. */
+	for (i = raw_argc-1, j = cooked_argc-1; i > 0 && j >= 0; i--) {
+		if (strcmp(raw_argv[i], cooked_argv[j]) == 0) {
+			raw_argv[i] = NULL;
+			j--;
+		}
+	}
 
 	for (i = 1; i < raw_argc; i++) {
-		p = raw_argv[i];
-		if (cooked_argc && p[0] == cooked_argv[0][0] && strcmp(p, cooked_argv[0]) == 0) {
-			cooked_argv++;
-			cooked_argc--;
+		if (!(p = raw_argv[i]))
 			continue;
-		}
 		if (strncmp(p, "--files-from", 12) == 0
 		    || strncmp(p, "--filter", 8) == 0
 		    || strncmp(p, "--include", 9) == 0
