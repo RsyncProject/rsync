@@ -41,6 +41,7 @@ def main():
         check_git_state('master')
         cmd_chk(['touch', 'latest-year.h'])
         cmd_chk(['make', gen_target])
+        cmd_chk(['rsync', '-a', *glob.glob('*.[1-9].html'), dest])
 
         extra_files = get_extra_files()
 
@@ -73,14 +74,6 @@ def main():
         if os.path.lexists(nightly_symlink):
             os.unlink(nightly_symlink)
         os.symlink(tar_name, nightly_symlink)
-
-    for fn in sorted(glob.glob('*.[1-9].md')):
-        cmd_chk(['./md2man', fn])
-
-        html_src = fn.replace('.md', '.html')
-        html_dest = os.path.join(dest, html_src)
-
-        cmd_chk(['rsync', '-a', html_src, html_dest])
 
     os.chdir(dest)
 
