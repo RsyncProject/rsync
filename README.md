@@ -65,7 +65,7 @@ WEB SITE
 
 The main rsync web site is here:
 
-    http://rsync.samba.org/
+>  http://rsync.samba.org/
 
 You'll find a FAQ list, downloads, resources, HTML versions of the
 manpages, etc.
@@ -80,7 +80,7 @@ list, and there is also an announcement-only mailing list for those that
 want official announcements.  See the mailing-list page for full
 details:
 
-    http://rsync.samba.org/lists.html
+>  http://rsync.samba.org/lists.html
 
 
 BUG REPORTS
@@ -88,34 +88,38 @@ BUG REPORTS
 
 To visit this web page for full the details on bug reporting:
 
-    http://rsync.samba.org/bugzilla.html
+>  http://rsync.samba.org/bugzilla.html
 
 That page contains links to the current bug list, and information on how
 to report a bug well.  You might also like to try searching the Internet
 for the error message you've received, or looking in the mailing list
 archives at:
 
-    http://mail-archive.com/rsync@lists.samba.org/
+>  http://mail-archive.com/rsync@lists.samba.org/
 
 To send a bug report, follow the instructions on the bug-tracking
 page of the web site.
 
-Alternately, email your bug report to rsync@lists.samba.org .
+Alternately, email your bug report to <rsync@lists.samba.org>.
 
 
 GIT REPOSITORY
 --------------
 
 If you want to get the very latest version of rsync direct from the
-source code repository then you can use git:
+source code repository, then you will need to use git.  The git repo
+is hosted on github and on samba's site.  Feel free to access it here:
+
+>  https://github.com/WayneD/rsync
+
+or clone it from its samba repo:
 
     git clone git://git.samba.org/rsync.git
 
 See the download page for full details on all the ways to grab the
-source, including nightly tar files, web-browsing of the git repository,
-etc.:
+source:
 
-    http://rsync.samba.org/download.html
+>  http://rsync.samba.org/download.html
 
 
 COPYRIGHT
@@ -129,7 +133,7 @@ Rsync may be used, modified and redistributed only under the terms of
 the GNU General Public License, found in the file COPYING in this
 distribution, or at:
 
-    http://www.fsf.org/licenses/gpl.html
+>  http://www.fsf.org/licenses/gpl.html
 
 
 AVAILABILITY

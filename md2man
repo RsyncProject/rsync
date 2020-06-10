@@ -28,7 +28,6 @@ HTML_START = """\
 body {
   max-width: 50em;
   margin: auto;
-  font-size: 1.2em;
 }
 body, b, strong, u {
   font-family: 'Roboto', sans-serif;
