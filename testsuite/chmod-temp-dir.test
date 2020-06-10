@@ -13,21 +13,16 @@
 
 hands_setup
 
-tmpdir2=$RSYNC_TEST_TMP
-if [ x"$tmpdir2" = x ]; then
-    tmpdir2=/tmp
-fi
 sdev=`$TOOLDIR/getfsdev $scratchdir`
-tdev=`$TOOLDIR/getfsdev $tmpdir2`
-if [ x$sdev = x$tdev ]; then
-    tmpdir2=/var/tmp
-    if [ -d $tmpdir2 ]; then
-	tdev=`$TOOLDIR/getfsdev $tmpdir2`
-    else
-	tdev="$sdev"
-    fi
-    [ x$sdev = x$tdev ] && test_skipped "Can't find a tmp dir on a different file system"
-fi
+tdev=$sdev
+
+for tmpdir2 in "${RSYNC_TEST_TMP:-/override-tmp-not-specified}" /run/shm/tmp /var/tmp /tmp; do
+    [ -d "$tmpdir2" ] || continue
+    tdev=`$TOOLDIR/getfsdev "$tmpdir2"`
+    [ x$sdev != x$tdev ] && break
+done
+
+[ x$sdev = x$tdev ] && test_skipped "Can't find a tmp dir on a different file system"
 
 chmod 440 "$fromdir/text"
 chmod 500 "$fromdir/dir/text"
