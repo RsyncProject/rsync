@@ -1,7 +1,7 @@
 #! /bin/sh
 
 # Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
-# Copyright (C) 2003, 2004, 2005, 2006 Wayne Davison
+# Copyright (C) 2003-2020 Wayne Davison
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version
@@ -11,16 +11,22 @@
 # WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 # Lesser General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU Lesser General Public
 # License along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+# -------------------------------------------------------------------------
 
 # rsync top-level test script -- this invokes all the other more
 # detailed tests in order.  This script can either be called by `make
 # check' or `make installcheck'.  `check' runs against the copies of
 # the program and other files in the build directory, and
-# `installcheck' against the installed copy of the program.  
+# `installcheck' against the installed copy of the program.
+
+# It can also be called on a single test file using a run like this:
+#
+#  preserve_scratch=yes whichtests=itemize.test ./runtests.sh
 
 # In either case we need to also be able to find the source directory,
 # since we read test scripts and possibly other information from
@@ -47,7 +53,7 @@
 # build scripts.  At the moment we assume we are invoked from the
 # source directory.
 
-# This script must be invoked from the build directory.  
+# This script must be invoked from the build directory.
 
 # A scratch directory, 'testtmp', is used in the build directory to
 # hold per-test subdirectories.
@@ -57,10 +63,11 @@
 # Make command line.  It's also set by the build farm to give more
 # detail for failing builds.
 
+# -------------------------------------------------------------------------
 
 # NOTES FOR TEST CASES:
 
-# Each test case runs in its own shell. 
+# Each test case runs in its own shell.
 
 # Exit codes from tests:
 
@@ -75,6 +82,7 @@
 
 # rsync.fns contains some general setup functions and definitions.
 
+# -------------------------------------------------------------------------
 
 # NOTES ON PORTABILITY:
 
@@ -103,6 +111,7 @@
 # Don't rely on grep -q, as that doesn't work everywhere -- just redirect
 # stdout to /dev/null to keep it quiet.
 
+# -------------------------------------------------------------------------
 
 # STILL TO DO:
 
@@ -141,7 +150,7 @@ if [ "x$loglevel" != x ] && [ "$loglevel" -gt 8 ]; then
     fi
 fi
 
-POSIXLY_CORRECT=1 
+POSIXLY_CORRECT=1
 if test x"$TOOLDIR" = x; then
     TOOLDIR=`pwd`
 fi
@@ -191,7 +200,7 @@ if [ "x$preserve_scratch" = xyes ]; then
     echo "    preserve_scratch=yes"
 else
     echo "    preserve_scratch=no"
-fi    
+fi
 
 # Check if setacl/setfacl is around and if it supports the -k or -s option.
 if setacl -k u::7,g::5,o:5 testsuite 2>/dev/null; then
@@ -301,7 +310,7 @@ do
 	maybe_discard_scratch
 	;;
     78)
-        # It failed, but we expected that.  don't dump out error logs, 
+        # It failed, but we expected that.  don't dump out error logs,
 	# because most users won't want to see them.  But do leave
 	# the working directory around.
 	echo "XFAIL   $testbase"
