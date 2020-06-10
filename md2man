@@ -15,7 +15,7 @@
 #
 # This program is freely redistributable.
 
-import sys, os, re, argparse, time
+import sys, os, re, argparse, subprocess, time
 from html.parser import HTMLParser
 
 CONSUMES_TXT = set('h1 h2 p li pre'.split())
@@ -78,16 +78,21 @@ def main():
         fi.srcdir = './'
 
     fi.title = fi.prog + '(' + fi.sect + ') man page'
-    fi.date = None
+    fi.mtime = None
 
-    chk_files = 'latest-year.h Makefile'.split()
+    if os.path.lexists(fi.srcdir + '.git'):
+        fi.mtime = int(subprocess.check_output('git log -1 --format=%at'.split()))
+
+    chk_files = 'NEWS.md Makefile'.split()
     for fn in chk_files:
         try:
             st = os.lstat(fi.srcdir + fn)
         except:
             die('Failed to find', fi.srcdir + fn)
-        if not fi.date:
-            fi.date = time.strftime('%d %b %Y', time.localtime(st.st_mtime))
+        if not fi.mtime:
+            fi.mtime = st.st_mtime
+
+    fi.date = time.strftime('%d %b %Y', time.localtime(fi.mtime))
 
     env_subs = { }
 

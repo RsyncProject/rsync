@@ -150,7 +150,7 @@ t_unsafe$(EXEEXT): $(T_UNSAFE_OBJ)
 gen: conf proto.h man
 
 gensend: gen
-	rsync -aivzc $(GENFILES) $${SAMBA_HOST-samba.org}:/home/ftp/pub/rsync/generated-files/
+	rsync -aic $(GENFILES) $${SAMBA_HOST-samba.org}:/home/ftp/pub/rsync/generated-files/
 
 conf:
 	cd $(srcdir) && $(MAKE) -f prepare-source.mak conf
@@ -217,13 +217,13 @@ proto.h-tstamp: $(srcdir)/*.c $(srcdir)/lib/compat.c config.h
 
 man: rsync.1 rsync-ssl.1 rsyncd.conf.5
 
-rsync.1: rsync.1.md md2man latest-year.h Makefile
+rsync.1: rsync.1.md md2man NEWS.md Makefile
 	@$(srcdir)/maybe-make-man $(srcdir) rsync.1.md
 
-rsync-ssl.1: rsync-ssl.1.md md2man latest-year.h Makefile
+rsync-ssl.1: rsync-ssl.1.md md2man NEWS.md Makefile
 	@$(srcdir)/maybe-make-man $(srcdir) rsync-ssl.1.md
 
-rsyncd.conf.5: rsyncd.conf.5.md md2man latest-year.h Makefile
+rsyncd.conf.5: rsyncd.conf.5.md md2man NEWS.md Makefile
 	@$(srcdir)/maybe-make-man $(srcdir) rsyncd.conf.5.md
 
 clean: cleantests

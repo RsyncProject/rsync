@@ -1,0 +1,3 @@
+#!/bin/sh
+cat >/dev/null # Just discard stdin data
+make gensend

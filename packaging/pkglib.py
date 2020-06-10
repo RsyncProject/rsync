@@ -169,6 +169,17 @@ def get_patch_branches(base_branch):
     return branches
 
 
+def mandate_gensend_hook():
+    hook = '.git/hooks/pre-push'
+    if not os.path.exists(hook):
+        print('Creating hook file:', hook)
+        cmd_chk(['./rsync', '-a', 'packaging/pre-push', hook])
+    else:
+        out, rc = cmd_txt_status(['fgrep', 'make gensend', hook], discard='output')
+        if rc:
+            die('Please add a "make gensend" into your', hook, 'script.')
+
+
 # Snag the GENFILES values out of the Makefile.in file and return them as a list.
 def get_extra_files():
     cont_re = re.compile(r'\\\n')

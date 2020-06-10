@@ -37,9 +37,11 @@ def main():
     if not os.path.exists('rsyncd.conf.5.md'):
         die("There is no rsync checkout in the current directory.")
 
+    mandate_gensend_hook()
+
     if args.make_tar:
         check_git_state('master')
-        cmd_chk(['touch', 'latest-year.h'])
+        cmd_chk(['touch', 'NEWS.md'])
         cmd_chk(['make', gen_target])
         cmd_chk(['rsync', '-a', *glob.glob('*.[1-9].html'), dest])
 

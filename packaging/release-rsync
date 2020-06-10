@@ -15,11 +15,6 @@ from pkglib import *
 
 dest = os.environ['HOME'] + '/samba-rsync-ftp'
 ORIGINAL_PATH = os.environ['PATH']
-MAKE_GEN_CMDS = [
-        'make -f prepare-source.mak conf'.split(),
-        './config.status'.split(),
-        'make gen'.split(),
-        ]
 
 def main():
     now = datetime.now()
@@ -27,6 +22,8 @@ def main():
     year = now.strftime('%Y')
     ztoday = now.strftime('%d %b %Y')
     today = ztoday.lstrip('0')
+
+    mandate_gensend_hook()
 
     curdir = os.getcwd()
 
@@ -157,7 +154,6 @@ About to:
     - tweak the version in configure.ac and the spec files
     - tweak NEWS.md and OLDNEWS.md to ensure header values are correct
     - generate configure.sh, config.h.in, and proto.h
-    - touch the latest-year.h file and generate the manpages
     - page through the differences
 """)
     ans = input("<Press Enter to continue> ")
@@ -213,9 +209,6 @@ About to:
                 fh.write(txt)
 
     cmd_chk(['packaging/year-tweak'])
-    cmd_chk([touch, 'latest-year.h']) # This file's date is put in the generated manpages.
-    cmd_chk(['make', 'reconfigure'])
-    cmd_chk(['make', 'man'])
 
     print(dash_line)
     cmd_run("git diff --color | less -p '^diff .*'")
@@ -233,7 +226,8 @@ About to:
 {dash_line}
 
 About to:
-    - commit all version changes
+    - git commit all changes
+    - generate the manpages
     - merge the {args.master_branch} branch into the patch/{args.master_branch}/* branches
     - update the files in the "patches" dir and OPTIONALLY
       (if you type 'y') to launch a shell for each patch
@@ -243,6 +237,9 @@ About to:
     s = cmd_run(['git', 'commit', '-a', '-m', f'Preparing for release of {version}'])
     if s.returncode:
         die('Aborting')
+
+    cmd_chk(['make', 'reconfigure'])
+    cmd_chk(['make', 'gen'])
 
     print(f'Creating any missing patch branches.')
     s = cmd_run(f'packaging/branch-from-patch --branch={args.master_branch} --add-missing')
@@ -301,8 +298,6 @@ About to:
     os.rename(rsync_lastver, 'a')
 
     print(f"Creating {diff_file} ...")
-    for cmd in MAKE_GEN_CMDS:
-        cmd_chk(cmd)
     cmd_chk(['rsync', '-a', *extra_files, 'b/'])
 
     sed_script = r's:^((---|\+\+\+) [ab]/[^\t]+)\t.*:\1:' # CAUTION: must not contain any single quotes!
