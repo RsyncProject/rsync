@@ -124,6 +124,7 @@ def main():
         with open(fn, 'w', encoding='utf-8') as fh:
             fh.write(txt)
 
+
 def html_via_cmarkgfm(txt):
     return cmarkgfm.markdown_to_html(txt)
 
@@ -220,7 +221,7 @@ class HtmlToManPage(HTMLParser):
                 st.man_out.append(".RS\n")
                 st.p_macro = ".IP\n"
             st.list_state.append('o')
-        st.html_out.append('<' + tag + ' '.join( ' ' + var + '="' + safeText(val) + '"' for var, val in attrs_list) + '>')
+        st.html_out.append('<' + tag + ''.join(' ' + var + '="' + htmlify(val) + '"' for var, val in attrs_list) + '>')
         st.at_first_tag_in_dd = False
 
 
@@ -258,9 +259,7 @@ class HtmlToManPage(HTMLParser):
         elif tag == 'pre':
             st.in_pre = False
             st.man_out.append(manify(txt) + "\n.fi\n")
-        elif tag == 'code' and not st.in_pre:
-            add_to_txt = NORM_FONT[0]
-        elif tag == 'strong' or tag == 'b':
+        elif (tag == 'code' and not st.in_pre) or tag == 'strong' or tag == 'b':
             add_to_txt = NORM_FONT[0]
         elif tag == 'em' or  tag == 'i':
             tag = 'u' # Change it into underline to be more like the man page
@@ -293,7 +292,7 @@ class HtmlToManPage(HTMLParser):
         st = self.state
         if args.debug:
             self.output_debug('DATA', (data,))
-        st.html_out.append(safeText(data))
+        st.html_out.append(htmlify(data))
         st.txt += data
 
 
@@ -301,6 +300,7 @@ class HtmlToManPage(HTMLParser):
         import pprint
         st = self.state
         if args.debug < 2:
+            st = argparse.Namespace(**vars(st))
             if len(st.html_out) > 2:
                 st.html_out = ['...'] + st.html_out[-2:]
             if len(st.man_out) > 2:
@@ -316,7 +316,7 @@ def manify(txt):
             .replace(ULIN_FONT[0], ULIN_FONT[1]), flags=re.M)
 
 
-def safeText(txt):
+def htmlify(txt):
     return txt.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
 
 
@@ -332,7 +332,7 @@ def die(*msg):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Transform a NAME.NUM.md markdown file into a NAME.NUM.html web page & a NAME.NUM man page.', add_help=False)
     parser.add_argument('--test', action='store_true', help='Test if we can parse the input w/o updating any files.')
-    parser.add_argument('--debug', '-D', action='count', default=0, help='Output copious info on the html parsing.')
+    parser.add_argument('--debug', '-D', action='count', default=0, help='Output copious info on the html parsing. Repeat for even more.')
     parser.add_argument("--help", "-h", action="help", help="Output this help message and exit.")
     parser.add_argument('mdfile', help="The NAME.NUM.md file to parse.")
     args = parser.parse_args()
