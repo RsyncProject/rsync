@@ -68,8 +68,10 @@ CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o trimslash.
 	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) -c $< @CC_SHOBJ_FLAG@
 @OBJ_RESTORE@
 
+.PHONY: all
 all: Makefile rsync$(EXEEXT) stunnel-rsyncd.conf man
 
+.PHONY: install
 install: all
 	-${MKDIR_P} ${DESTDIR}${bindir}
 	-${MKDIR_P} ${DESTDIR}${libdir}
@@ -147,13 +149,15 @@ T_UNSAFE_OBJ = t_unsafe.o syscall.o util.o util2.o t_stub.o lib/compat.o lib/snp
 t_unsafe$(EXEEXT): $(T_UNSAFE_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_UNSAFE_OBJ) $(LIBS)
 
+.PHONY: conf
+conf: configure.sh config.h.in
+
+.PHONY: gen
 gen: conf proto.h man
 
+.PHONY: gensend
 gensend: gen
 	rsync -aic $(GENFILES) $${SAMBA_HOST-samba.org}:/home/ftp/pub/rsync/generated-files/
-
-conf:
-	cd $(srcdir) && $(MAKE) -f prepare-source.mak conf
 
 aclocal.m4: $(srcdir)/m4/*.m4
 	aclocal -I $(srcdir)/m4
@@ -185,6 +189,7 @@ configure.sh config.h.in: configure.ac aclocal.m4
 	    fi \
 	fi
 
+.PHONY: reconfigure
 reconfigure: configure.sh
 	./config.status --recheck
 	./config.status
@@ -207,6 +212,7 @@ Makefile: Makefile.in config.status configure.sh config.h.in
 stunnel-rsyncd.conf: $(srcdir)/stunnel-rsyncd.conf.in Makefile
 	sed 's;\@bindir\@;$(bindir);g' <$(srcdir)/stunnel-rsyncd.conf.in >stunnel-rsyncd.conf
 
+.PHONY: proto
 proto: proto.h-tstamp
 
 proto.h: proto.h-tstamp
@@ -215,6 +221,7 @@ proto.h: proto.h-tstamp
 proto.h-tstamp: $(srcdir)/*.c $(srcdir)/lib/compat.c config.h
 	awk -f $(srcdir)/mkproto.awk $(srcdir)/*.c $(srcdir)/lib/compat.c
 
+.PHONY: man
 man: rsync.1 rsync-ssl.1 rsyncd.conf.5
 
 rsync.1: rsync.1.md md2man NEWS.md Makefile
@@ -226,16 +233,19 @@ rsync-ssl.1: rsync-ssl.1.md md2man NEWS.md Makefile
 rsyncd.conf.5: rsyncd.conf.5.md md2man NEWS.md Makefile
 	@$(srcdir)/maybe-make-man $(srcdir) rsyncd.conf.5.md
 
+.PHONY: clean
 clean: cleantests
 	rm -f *~ $(OBJS) $(CHECK_PROGS) $(CHECK_OBJS) $(CHECK_SYMLINKS) \
 		rounding rounding.h *.old
 
+.PHONY: cleantests
 cleantests:
 	rm -rf ./testtmp*
 
 # We try to delete built files from both the source and build
 # directories, just in case somebody previously configured things in
 # the source directory.
+.PHONY: distclean
 distclean: clean
 	rm -f Makefile config.h config.status
 	rm -f stunnel-rsyncd.conf
@@ -251,14 +261,14 @@ distclean: clean
 # this target is really just for my use. It only works on a limited
 # range of machines and is used to produce a list of potentially
 # dead (ie. unused) functions in the code. (tridge)
+.PHONY: finddead
 finddead:
 	nm *.o */*.o |grep 'U ' | awk '{print $$2}' | sort -u > nmused.txt
 	nm *.o */*.o |grep 'T ' | awk '{print $$3}' | sort -u > nmfns.txt
 	comm -13 nmused.txt nmfns.txt
 
 # 'check' is the GNU name, 'test' is the name for everybody else :-)
-.PHONY: check test
-
+.PHONY: test
 test: check
 
 # There seems to be no standard way to specify some variables as
@@ -271,12 +281,15 @@ test: check
 # catch Bash-isms earlier even if we're running on GNU.  Of course, we
 # might lose in the future where POSIX diverges from old sh.
 
+.PHONY: check
 check: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	rsync_bin=`pwd`/rsync$(EXEEXT) $(srcdir)/runtests.sh
 
+.PHONY: check29
 check29: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	rsync_bin=`pwd`/rsync$(EXEEXT) $(srcdir)/runtests.sh --protocol=29
 
+.PHONY: check30
 check30: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	rsync_bin=`pwd`/rsync$(EXEEXT) $(srcdir)/runtests.sh --protocol=30
 
@@ -297,6 +310,7 @@ testsuite/xattrs-hlink.test:
 # check a version installed from a binary or some other source tree,
 # if you want.
 
+.PHONY: installcheck
 installcheck: $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	POSIXLY_CORRECT=1 TOOLDIR=`pwd` rsync_bin="$(bindir)/rsync$(EXEEXT)" srcdir="$(srcdir)" $(srcdir)/runtests.sh
 
@@ -307,10 +321,12 @@ installcheck: $(CHECK_PROGS) $(CHECK_SYMLINKS)
 splint:
 	splint +unixlib +gnuextensions -weak rsync.c
 
+.PHONY: doxygen
 doxygen:
 	cd $(srcdir) && rm dox/html/* && doxygen
 
 # for maintainers only
+.PHONY: doxygen-upload
 doxygen-upload:
 	rsync -avzv $(srcdir)/dox/html/ --delete \
 	$${SAMBA_HOST-samba.org}:/home/httpd/html/rsync/doxygen/head/
