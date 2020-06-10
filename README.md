@@ -136,5 +136,10 @@ AVAILABILITY
 ------------
 
 The main web site for rsync is http://rsync.samba.org/
+
 The main ftp site is ftp://rsync.samba.org/pub/rsync/
-This is also available as rsync://rsync.samba.org/rsyncftp/
+
+This is also available as rsync://download.samba.org/rsyncftp/ if you
+connect via ssl. Use the `rsync-ssl` script if you have it, otherwise
+connect to the rsync server via a normal rsync command and it will
+output some instructions for how to connect.
