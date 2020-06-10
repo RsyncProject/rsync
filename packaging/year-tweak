@@ -22,7 +22,7 @@ def main():
         m = argparse.Namespace(**m.groupdict())
         if m.year > latest_year:
             latest_year = m.year
-        if not re.search(r'\.(c|h|[1-9])$', m.fn) or m.fn.startswith('zlib/'):
+        if not re.search(r'\.(c|h|sh)$', m.fn) or m.fn.startswith('zlib/'):
             continue
         maybe_edit_copyright_year(m.fn, m.year)
     proc.communicate()
@@ -43,9 +43,9 @@ def maybe_edit_copyright_year(fn, year):
     copyright_line = None
 
     with open(fn, 'r', encoding='utf-8') as fh:
-        for line in fh:
+        for lineno, line in enumerate(fh):
             opening_lines.append(line)
-            if not re.search(r'\S', line):
+            if lineno > 3 and not re.search(r'\S', line):
                 break
             m = re.match(r'^(?P<pre>.*Copyright\s+\S+\s+)(?P<year>\d\d\d\d(?:-\d\d\d\d)?(,\s+\d\d\d\d)*)(?P<suf>.+)', line)
             if not m:
