@@ -236,17 +236,23 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
 
 0.  `haproxy header`
 
-    This parameter indicates that all incoming connections must start with a V1
-    or V2 haproxy header. If the header is not found, the connection is closed.
+    When this parameter is enabled, all incoming connections must start with a
+    V1 or V2 haproxy header.  If the header is not found, the connection is
+    closed.
 
-    Setting this allows a proxy server to forward the source IP information to
-    rsync, allowing you to make use of IP restrictions that don't all match the
-    source IP of the proxy server.
+    Setting this to `true` requires a proxy server to forward source IP
+    information to rsync, allowing you to log proper IP/host info and make use
+    of client-oriented IP restrictions.  The default of `false` means that the
+    IP information comes directly from the socket's metadata.  If rsync is not
+    behind a proxy, this should be disabled.
 
-    _CAUTION_: when using this option you _must_ make sure that only the proxy
-    is allowed to connect to the rsync port via some kind of firewall rules
-    (such as iptables).  If any non-proxied connections are allowed through,
-    the client will be able to spoof any remote IP address that they desire.
+    _CAUTION_: using this option can be dangerous if you do not ensure that
+    only the proxy is allowed to connect to the rsync port.  If any non-proxied
+    connections are allowed through, the client will be able to use a modified
+    rsync to spoof any remote IP address that they desire.  You can lock this
+    down using something like iptables `-uid-owner root` rules (for strict
+    localhost access), various firewall rules, or you can require password
+    authorization so that any spoofing by users will not grant extra access.
 
     This setting is global.  If you need some modules to require this and not
     others, then you will need to setup multiple rsync daemon processes on
