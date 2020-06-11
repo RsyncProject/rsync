@@ -15,8 +15,6 @@ jobs:
     - uses: actions/checkout@v2
     - name: prepare-packages
       run: sudo apt-get install fakeroot acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev python3-cmarkgfm
-    - name: add other-filesystem tmp dir
-      run: mkdir -m 1777 /run/shm/tmp
     - name: prepare-source
       run: ./prepare-source
     - name: configure
