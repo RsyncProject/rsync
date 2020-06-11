@@ -1420,6 +1420,20 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	return file;
 }
 
+OFF_T get_device_size(int fd, const char *fname)
+{
+	OFF_T off = lseek(fd, 0, SEEK_END);
+
+	if (off == (OFF_T) -1) {
+		rsyserr(FERROR, errno, "failed to get device size via seek: %s", fname);
+		return 0;
+	}
+	if (lseek(fd, 0, SEEK_SET) != 0)
+		rsyserr(FERROR, errno, "failed to seek device back to start: %s", fname);
+
+	return off;
+}
+
 /* Only called for temporary file_struct entries created by make_file(). */
 void unmake_file(struct file_struct *file)
 {

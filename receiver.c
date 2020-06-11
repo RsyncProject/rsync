@@ -804,19 +804,8 @@ int recv_files(int f_in, int f_out, char *local_name)
 			fd1 = -1;
 		}
 
-		/* On Linux systems (at least), st_size is typically 0 for devices.
-		 * If so, try to determine the actual device size. */
-		if (fd1 != -1 && IS_DEVICE(st.st_mode) && st.st_size == 0) {
-			OFF_T off = lseek(fd1, 0, SEEK_END);
-			if (off == (OFF_T) -1)
-				rsyserr(FERROR, errno, "failed to seek to end of %s to determine size", fname);
-			else {
-				st.st_size = off;
-				off = lseek(fd1, 0, SEEK_SET);
-				if (off != 0)
-					rsyserr(FERROR, errno, "failed to seek back to beginning of %s to read it", fname);
-			}
-		}
+		if (fd1 != -1 && IS_DEVICE(st.st_mode) && st.st_size == 0)
+			st.st_size = get_device_size(fd1, fname);
 
 		/* If we're not preserving permissions, change the file-list's
 		 * mode based on the local permissions and some heuristics. */
