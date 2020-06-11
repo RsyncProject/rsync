@@ -122,6 +122,7 @@ typedef struct {
 	char *charset;
 	char *comment;
 	char *dont_compress;
+	char *early_exec;
 	char *exclude;
 	char *exclude_from;
 	char *filter;
@@ -150,6 +151,7 @@ typedef struct {
 	BOOL charset_EXP;
 	BOOL comment_EXP;
 	BOOL dont_compress_EXP;
+	BOOL early_exec_EXP;
 	BOOL exclude_EXP;
 	BOOL exclude_from_EXP;
 	BOOL filter_EXP;
@@ -236,7 +238,8 @@ static const all_vars Defaults = {
  /* charset; */ 		NULL,
  /* comment; */ 		NULL,
  /* dont_compress; */		DEFAULT_DONT_COMPRESS,
- /* exclude; */			NULL,
+ /* early_exec; */		NULL,
+ /* exclude; */ 		NULL,
  /* exclude_from; */		NULL,
  /* filter; */			NULL,
  /* gid; */			NULL,
@@ -263,6 +266,7 @@ static const all_vars Defaults = {
  /* charset_EXP; */		False,
  /* comment_EXP; */		False,
  /* dont_compress_EXP; */	False,
+ /* early_exec_EXP; */		False,
  /* exclude_EXP; */		False,
  /* exclude_from_EXP; */	False,
  /* filter_EXP; */		False,
@@ -404,6 +408,7 @@ static struct parm_struct parm_table[] =
  {"charset",           P_STRING, P_LOCAL, &Vars.l.charset,             NULL,0},
  {"comment",           P_STRING, P_LOCAL, &Vars.l.comment,             NULL,0},
  {"dont compress",     P_STRING, P_LOCAL, &Vars.l.dont_compress,       NULL,0},
+ {"early exec",        P_STRING, P_LOCAL, &Vars.l.early_exec,          NULL,0},
  {"exclude from",      P_STRING, P_LOCAL, &Vars.l.exclude_from,        NULL,0},
  {"exclude",           P_STRING, P_LOCAL, &Vars.l.exclude,             NULL,0},
  {"fake super",        P_BOOL,   P_LOCAL, &Vars.l.fake_super,          NULL,0},
@@ -543,6 +548,7 @@ FN_LOCAL_STRING(lp_auth_users, auth_users)
 FN_LOCAL_STRING(lp_charset, charset)
 FN_LOCAL_STRING(lp_comment, comment)
 FN_LOCAL_STRING(lp_dont_compress, dont_compress)
+FN_LOCAL_STRING(lp_early_exec, early_exec)
 FN_LOCAL_STRING(lp_exclude, exclude)
 FN_LOCAL_STRING(lp_exclude_from, exclude_from)
 FN_LOCAL_STRING(lp_filter, filter)

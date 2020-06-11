@@ -47,6 +47,9 @@ Protocol: 31 (unchanged)
 
  - Avoid a hang when an overabundance of messages clogs up all the I/O buffers.
 
+ - Fixed a mismatch in the RSYNC_PID values when running both a `pre-xfer exec`
+   and a `post-xfer exec`.
+
 ### ENHANCEMENTS:
 
  - Various checksum enhancements, including the optional use of openssl's MD4 &
@@ -94,6 +97,10 @@ Protocol: 31 (unchanged)
 
  - Added negated matching to the daemon's `refuse options` setting by using
    match strings that start with a `!` (such as `!compress*`).
+
+ - Added an `early exec` daemon parameter that runs a script before the
+   transfer parameters are known, allowing some early setup based on module
+   name.
 
  - Added status output in response to a signal (via both SIGINFO & SIGVTALRM).
 

@@ -917,15 +917,28 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     for the "dont compress" parameter changes the default when the daemon is
     the sender.
 
-0.  `pre-xfer exec`, `post-xfer exec`
+0.  `early exec`, `pre-xfer exec`, `post-xfer exec`
 
-    You may specify a command to be run before and/or after the transfer.  If
-    the `pre-xfer exec` command fails, the transfer is aborted before it
-    begins.  Any output from the script on stdout (up to several KB) will be
-    displayed to the user when aborting, but is NOT displayed if the script
-    returns success.  Any output from the script on stderr goes to the daemon's
-    stderr, which is typically discarded (though see --no-detatch option for a
-    way to see the stderr output, which can assist with debugging).
+    You may specify a command to be run in the early stages of the connection,
+    or right before and/or after the transfer.  If the `early exec` or
+    `pre-xfer exec` command returns an error code, the transfer is aborted
+    before it begins.  Any output from the `pre-xfer exec` command on stdout
+    (up to several KB) will be displayed to the user when aborting, but is
+    _not_ displayed if the script returns success.  The other programs cannot
+    send any text to the user.  All output except for the `pre-xfer exec`
+    stdout goes to the corresponding daemon's stdout/stderr, which is typically
+    discarded.  See the `--no-detatch` option for a way to see the daemon's
+    output, which can assist with debugging.
+
+    Note that the `early exec` command runs before any part of the transfer
+    request is known except for the module name.  This helper script can be
+    used to setup a disk mount or decrypt some data into a module dir, but you
+    may need to use `lock file` and `max connections` to avoid concurrency
+    issues.
+
+    Note that the `post-xfer exec` command is still run even if one of the
+    other scripts returns an error code. The `pre-xfer exec` command will _not_
+    be run, however, if the `early exec` command fails.
 
     The following environment variables will be set, though some are specific
     to the pre-xfer or the post-xfer environment:

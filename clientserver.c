@@ -349,61 +349,6 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 	return 0;
 }
 
-static char *finish_pre_exec(pid_t pid, int write_fd, int read_fd, char *request,
-			     char **early_argv, char **argv)
-{
-	char buf[BIGPATHBUFLEN], *bp;
-	int j = 0, status = -1, msglen = sizeof buf - 1;
-
-	if (!request)
-		request = "(NONE)";
-
-	write_buf(write_fd, request, strlen(request)+1);
-	if (early_argv) {
-		for ( ; *early_argv; early_argv++)
-			write_buf(write_fd, *early_argv, strlen(*early_argv)+1);
-		j = 1; /* Skip arg0 name in argv. */
-	}
-	for ( ; argv[j]; j++)
-		write_buf(write_fd, argv[j], strlen(argv[j])+1);
-	write_byte(write_fd, 0);
-
-	close(write_fd);
-
-	/* Read the stdout from the pre-xfer exec program.  This it is only
-	 * displayed to the user if the script also returns an error status. */
-	for (bp = buf; msglen > 0; msglen -= j) {
-		if ((j = read(read_fd, bp, msglen)) <= 0) {
-			if (j == 0)
-				break;
-			if (errno == EINTR)
-				continue;
-			break; /* Just ignore the read error for now... */
-		}
-		bp += j;
-		if (j > 1 && bp[-1] == '\n' && bp[-2] == '\r') {
-			bp--;
-			j--;
-			bp[-1] = '\n';
-		}
-	}
-	*bp = '\0';
-
-	close(read_fd);
-
-	if (wait_process(pid, &status, 0) < 0
-	 || !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
-		char *e;
-		if (asprintf(&e, "pre-xfer exec returned failure (%d)%s%s%s\n%s",
-			     status, status < 0 ? ": " : "",
-			     status < 0 ? strerror(errno) : "",
-			     *buf ? ":" : "", buf) < 0)
-			return "out_of_memory in finish_pre_exec\n";
-		return e;
-	}
-	return NULL;
-}
-
 #ifdef HAVE_PUTENV
 static int read_arg_from_pipe(int fd, char *buf, int limit)
 {
@@ -426,6 +371,168 @@ static int read_arg_from_pipe(int fd, char *buf, int limit)
 	return bp - buf;
 }
 #endif
+
+static void set_env_str(const char *var, const char *str)
+{
+#ifdef HAVE_PUTENV
+	char *mem;
+	if (asprintf(&mem, "%s=%s", var, str) < 0)
+		out_of_memory("set_env_str");
+	putenv(mem);
+#endif
+}
+
+#ifdef HAVE_PUTENV
+void set_env_num(const char *var, long num)
+{
+	char *mem;
+	if (asprintf(&mem, "%s=%ld", var, num) < 0)
+		out_of_memory("set_env_num");
+	putenv(mem);
+}
+#endif
+
+/* Used for both early exec & pre-xfer exec */
+static pid_t start_pre_exec(const char *cmd, int *arg_fd_ptr, int *error_fd_ptr)
+{
+	int arg_fds[2], error_fds[2], arg_fd, error_fd;
+	pid_t pid;
+
+	if ((error_fd_ptr && pipe(error_fds) < 0) || (arg_fd_ptr && pipe(arg_fds) < 0) || (pid = fork()) < 0)
+		return (pid_t)-1;
+
+	if (pid == 0) {
+		char buf[BIGPATHBUFLEN];
+		int j, len, status;
+
+		if (error_fd_ptr) {
+			close(error_fds[0]);
+			error_fd = error_fds[1];
+			set_blocking(error_fd);
+		}
+
+		if (arg_fd_ptr) {
+			close(arg_fds[1]);
+			arg_fd = arg_fds[0];
+			set_blocking(arg_fd);
+
+			len = read_arg_from_pipe(arg_fd, buf, BIGPATHBUFLEN);
+			if (len <= 0)
+				_exit(1);
+			set_env_str("RSYNC_REQUEST", buf);
+
+			for (j = 0; ; j++) {
+				char *p;
+				len = read_arg_from_pipe(arg_fd, buf, BIGPATHBUFLEN);
+				if (len <= 0) {
+					if (!len)
+						break;
+					_exit(1);
+				}
+				if (asprintf(&p, "RSYNC_ARG%d=%s", j, buf) >= 0)
+					putenv(p);
+			}
+			close(arg_fd);
+		}
+
+		if (error_fd_ptr) {
+			close(STDIN_FILENO);
+			dup2(error_fd, STDOUT_FILENO);
+			close(error_fd);
+		}
+
+		status = shell_exec(cmd);
+
+		if (!WIFEXITED(status))
+			_exit(1);
+		_exit(WEXITSTATUS(status));
+	}
+
+	if (error_fd_ptr) {
+		close(error_fds[1]);
+		error_fd = *error_fd_ptr = error_fds[0];
+		set_blocking(error_fd);
+	}
+
+	if (arg_fd_ptr) {
+		close(arg_fds[0]);
+		arg_fd = *arg_fd_ptr = arg_fds[1];
+		set_blocking(arg_fd);
+	}
+
+	return pid;
+}
+
+static void write_pre_exec_args(int write_fd, char *request, char **early_argv, char **argv)
+{
+	int j = 0;
+
+	if (!request)
+		request = "(NONE)";
+
+	write_buf(write_fd, request, strlen(request)+1);
+	if (early_argv) {
+		for ( ; *early_argv; early_argv++)
+			write_buf(write_fd, *early_argv, strlen(*early_argv)+1);
+		j = 1; /* Skip arg0 name in argv. */
+	}
+	for ( ; argv[j]; j++)
+		write_buf(write_fd, argv[j], strlen(argv[j])+1);
+	write_byte(write_fd, 0);
+
+	close(write_fd);
+}
+
+static char *finish_pre_exec(const char *desc, pid_t pid, int read_fd)
+{
+	char buf[BIGPATHBUFLEN], *bp, *cr;
+	int j, status = -1, msglen = sizeof buf - 1;
+
+	if (read_fd >= 0) {
+		/* Read the stdout from the program.  This it is only displayed
+		 * to the user if the script also returns an error status. */
+		for (bp = buf, cr = buf; msglen > 0; msglen -= j) {
+			if ((j = read(read_fd, bp, msglen)) <= 0) {
+				if (j == 0)
+					break;
+				if (errno == EINTR)
+					continue;
+				break; /* Just ignore the read error for now... */
+			}
+			bp[j] = '\0';
+			while (1) {
+				if ((cr = strchr(cr, '\r')) == NULL) {
+					cr = bp + j;
+					break;
+				}
+				if (!cr[1])
+					break; /* wait for more data before we decide what to do */
+				if (cr[1] == '\n') {
+					memmove(cr, cr+1, j - (cr - bp));
+					j--;
+				} else
+					cr++;
+			}
+			bp += j;
+		}
+		*bp = '\0';
+
+		close(read_fd);
+	} else
+		*buf = '\0';
+
+	if (wait_process(pid, &status, 0) < 0
+	 || !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+		char *e;
+		if (asprintf(&e, "%s returned failure (%d)%s%s%s\n%s",
+			     desc, status, status < 0 ? ": " : "",
+			     status < 0 ? strerror(errno) : "",
+			     *buf ? ":" : "", buf) < 0)
+			return "out_of_memory in finish_pre_exec\n";
+		return e;
+	}
+	return NULL;
+}
 
 static int path_failure(int f_out, const char *dir, BOOL was_chdir)
 {
@@ -475,26 +582,6 @@ static struct passwd *want_all_groups(int f_out, uid_t uid)
 	gid_p = EXPAND_ITEM_LIST(&gid_list, gid_t, -32);
 	*gid_p = pw->pw_gid;
 	return pw;
-}
-#endif
-
-static void set_env_str(const char *var, const char *str)
-{
-#ifdef HAVE_PUTENV
-	char *mem;
-	if (asprintf(&mem, "%s=%s", var, str) < 0)
-		out_of_memory("set_env_str");
-	putenv(mem);
-#endif
-}
-
-#ifdef HAVE_PUTENV
-void set_env_num(const char *var, long num)
-{
-	char *mem;
-	if (asprintf(&mem, "%s=%ld", var, num) < 0)
-		out_of_memory("set_env_num");
-	putenv(mem);
 }
 #endif
 
@@ -690,8 +777,9 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	log_init(1);
 
 #ifdef HAVE_PUTENV
-	if ((*lp_prexfer_exec(i) || *lp_postxfer_exec(i)) && !getenv("RSYNC_NO_XFER_EXEC")) {
-		int status;
+	if ((*lp_early_exec(i) || *lp_prexfer_exec(i) || *lp_postxfer_exec(i))
+	 && !getenv("RSYNC_NO_XFER_EXEC")) {
+		set_env_num("RSYNC_PID", (long)getpid());
 
 		/* For post-xfer exec, fork a new process to run the rsync
 		 * daemon while this process waits for the exit status and
@@ -704,10 +792,10 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 				return -1;
 			}
 			if (pid) {
+				int status;
 				close(f_in);
 				if (f_out != f_in)
 					close(f_out);
-				set_env_num("RSYNC_PID", (long)pid);
 				if (wait_process(pid, &status, 0) < 0)
 					status = -1;
 				set_env_num("RSYNC_RAW_STATUS", status);
@@ -721,56 +809,33 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 				_exit(status);
 			}
 		}
+
+		/* For early exec, fork a child process to run the indicated
+		 * command and wait for it to exit. */
+		if (*lp_early_exec(i)) {
+			pid_t pid = start_pre_exec(lp_early_exec(i), NULL, NULL);
+			if (pid == (pid_t)-1) {
+				rsyserr(FLOG, errno, "early exec preparation failed");
+				io_printf(f_out, "@ERROR: early exec preparation failed\n");
+				return -1;
+			}
+			if (finish_pre_exec("early exec", pid, -1) != NULL) {
+				rsyserr(FLOG, errno, "early exec failed");
+				io_printf(f_out, "@ERROR: early exec failed\n");
+				return -1;
+			}
+		}
+
 		/* For pre-xfer exec, fork a child process to run the indicated
 		 * command, though it first waits for the parent process to
 		 * send us the user's request via a pipe. */
 		if (*lp_prexfer_exec(i)) {
-			int arg_fds[2], error_fds[2];
-			set_env_num("RSYNC_PID", (long)getpid());
-			if (pipe(arg_fds) < 0 || pipe(error_fds) < 0 || (pre_exec_pid = fork()) < 0) {
+			pre_exec_pid = start_pre_exec(lp_prexfer_exec(i), &pre_exec_arg_fd, &pre_exec_error_fd);
+			if (pre_exec_pid == (pid_t)-1) {
 				rsyserr(FLOG, errno, "pre-xfer exec preparation failed");
 				io_printf(f_out, "@ERROR: pre-xfer exec preparation failed\n");
 				return -1;
 			}
-			if (pre_exec_pid == 0) {
-				char buf[BIGPATHBUFLEN];
-				int j, len;
-				close(arg_fds[1]);
-				close(error_fds[0]);
-				pre_exec_arg_fd = arg_fds[0];
-				pre_exec_error_fd = error_fds[1];
-				set_blocking(pre_exec_arg_fd);
-				set_blocking(pre_exec_error_fd);
-				len = read_arg_from_pipe(pre_exec_arg_fd, buf, BIGPATHBUFLEN);
-				if (len <= 0)
-					_exit(1);
-				set_env_str("RSYNC_REQUEST", buf);
-				for (j = 0; ; j++) {
-					len = read_arg_from_pipe(pre_exec_arg_fd, buf,
-								 BIGPATHBUFLEN);
-					if (len <= 0) {
-						if (!len)
-							break;
-						_exit(1);
-					}
-					if (asprintf(&p, "RSYNC_ARG%d=%s", j, buf) >= 0)
-						putenv(p);
-				}
-				close(pre_exec_arg_fd);
-				close(STDIN_FILENO);
-				dup2(pre_exec_error_fd, STDOUT_FILENO);
-				close(pre_exec_error_fd);
-				status = shell_exec(lp_prexfer_exec(i));
-				if (!WIFEXITED(status))
-					_exit(1);
-				_exit(WEXITSTATUS(status));
-			}
-			close(arg_fds[0]);
-			close(error_fds[1]);
-			pre_exec_arg_fd = arg_fds[1];
-			pre_exec_error_fd = error_fds[0];
-			set_blocking(pre_exec_arg_fd);
-			set_blocking(pre_exec_error_fd);
 		}
 	}
 #endif
@@ -889,8 +954,8 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 		msgs2stderr = 0; /* A non-rsh-run daemon doesn't have stderr for msgs. */
 
 	if (pre_exec_pid) {
-		err_msg = finish_pre_exec(pre_exec_pid, pre_exec_arg_fd, pre_exec_error_fd,
-					  request, orig_early_argv, orig_argv);
+		write_pre_exec_args(pre_exec_arg_fd, request, orig_early_argv, orig_argv);
+		err_msg = finish_pre_exec("pre-xfer exec", pre_exec_pid, pre_exec_error_fd);
 	}
 
 	if (orig_early_argv)
