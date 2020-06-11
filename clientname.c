@@ -3,7 +3,7 @@
  *
  * Copyright (C) 1992-2001 Andrew Tridgell <tridge@samba.org>
  * Copyright (C) 2001, 2002 Martin Pool <mbp@samba.org>
- * Copyright (C) 2002-2019 Wayne Davison
+ * Copyright (C) 2002-2020 Wayne Davison
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,52 +27,60 @@
  */
 
 #include "rsync.h"
+#include "itypes.h"
+
+extern int am_daemon;
 
 static const char default_name[] = "UNKNOWN";
-extern int am_server;
+static const char proxyv2sig[] = "\r\n\r\n\0\r\nQUIT\n";
 
+static char ipaddr_buf[100];
 
-/**
- * Return the IP addr of the client as a string
- **/
+#define PROXY_V2_SIG_SIZE ((int)sizeof proxyv2sig - 1)
+#define PROXY_V2_HEADER_SIZE (PROXY_V2_SIG_SIZE + 1 + 1 + 2)
+
+#define CMD_LOCAL 0
+#define CMD_PROXY 1
+
+#define PROXY_FAM_TCPv4 0x11
+#define PROXY_FAM_TCPv6 0x21
+
+#define GET_SOCKADDR_FAMILY(ss) ((struct sockaddr*)ss)->sa_family
+
+static void client_sockaddr(int fd, struct sockaddr_storage *ss, socklen_t *ss_len);
+static int check_name(const char *ipaddr, const struct sockaddr_storage *ss, char *name_buf, size_t name_buf_size);
+static int valid_ipaddr(const char *s);
+
+/* Return the IP addr of the client as a string. */
 char *client_addr(int fd)
 {
-	static char addr_buf[100];
-	static int initialised;
 	struct sockaddr_storage ss;
 	socklen_t length = sizeof ss;
 
-	if (initialised)
-		return addr_buf;
+	if (*ipaddr_buf)
+		return ipaddr_buf;
 
-	initialised = 1;
-
-	if (am_server) {	/* daemon over --rsh mode */
+	if (am_daemon < 0) {	/* daemon over --rsh mode */
 		char *env_str;
-		strlcpy(addr_buf, "0.0.0.0", sizeof addr_buf);
+		strlcpy(ipaddr_buf, "0.0.0.0", sizeof ipaddr_buf);
 		if ((env_str = getenv("REMOTE_HOST")) != NULL
 		 || (env_str = getenv("SSH_CONNECTION")) != NULL
 		 || (env_str = getenv("SSH_CLIENT")) != NULL
 		 || (env_str = getenv("SSH2_CLIENT")) != NULL) {
 			char *p;
-			strlcpy(addr_buf, env_str, sizeof addr_buf);
+			strlcpy(ipaddr_buf, env_str, sizeof ipaddr_buf);
 			/* Truncate the value to just the IP address. */
-			if ((p = strchr(addr_buf, ' ')) != NULL)
+			if ((p = strchr(ipaddr_buf, ' ')) != NULL)
 				*p = '\0';
 		}
-	} else {
-		client_sockaddr(fd, &ss, &length);
-		getnameinfo((struct sockaddr *)&ss, length,
-			    addr_buf, sizeof addr_buf, NULL, 0, NI_NUMERICHOST);
+		if (valid_ipaddr(ipaddr_buf))
+			return ipaddr_buf;
 	}
 
-	return addr_buf;
-}
+	client_sockaddr(fd, &ss, &length);
+	getnameinfo((struct sockaddr *)&ss, length, ipaddr_buf, sizeof ipaddr_buf, NULL, 0, NI_NUMERICHOST);
 
-
-static int get_sockaddr_family(const struct sockaddr_storage *ss)
-{
-	return ((struct sockaddr *) ss)->sa_family;
+	return ipaddr_buf;
 }
 
 
@@ -89,70 +97,215 @@ static int get_sockaddr_family(const struct sockaddr_storage *ss)
  * After translation from sockaddr to name we do a forward lookup to
  * make sure nobody is spoofing PTR records.
  **/
-char *client_name(int fd)
+char *client_name(const char *ipaddr)
 {
 	static char name_buf[100];
-	static char port_buf[100];
-	static int initialised;
+	char port_buf[100];
 	struct sockaddr_storage ss;
 	socklen_t ss_len;
+	struct addrinfo hint, *answer;
+	int err;
 
-	if (initialised)
+	if (*name_buf)
 		return name_buf;
 
 	strlcpy(name_buf, default_name, sizeof name_buf);
-	initialised = 1;
+
+	if (strcmp(ipaddr, "0.0.0.0") == 0)
+		return name_buf;
 
 	memset(&ss, 0, sizeof ss);
-
-	if (am_server) {	/* daemon over --rsh mode */
-		char *addr = client_addr(fd);
-		struct addrinfo hint, *answer;
-		int err;
-
-		if (strcmp(addr, "0.0.0.0") == 0)
-			return name_buf;
-
-		memset(&hint, 0, sizeof hint);
+	memset(&hint, 0, sizeof hint);
 
 #ifdef AI_NUMERICHOST
-		hint.ai_flags = AI_NUMERICHOST;
+	hint.ai_flags = AI_NUMERICHOST;
 #endif
-		hint.ai_socktype = SOCK_STREAM;
+	hint.ai_socktype = SOCK_STREAM;
 
-		if ((err = getaddrinfo(addr, NULL, &hint, &answer)) != 0) {
-			rprintf(FLOG, "malformed address %s: %s\n",
-			        addr, gai_strerror(err));
-			return name_buf;
-		}
-
-		switch (answer->ai_family) {
-		case AF_INET:
-			ss_len = sizeof (struct sockaddr_in);
-			memcpy(&ss, answer->ai_addr, ss_len);
-			break;
-#ifdef INET6
-		case AF_INET6:
-			ss_len = sizeof (struct sockaddr_in6);
-			memcpy(&ss, answer->ai_addr, ss_len);
-			break;
-#endif
-		default:
-			exit_cleanup(RERR_SOCKETIO);
-		}
-		freeaddrinfo(answer);
-	} else {
-		ss_len = sizeof ss;
-		client_sockaddr(fd, &ss, &ss_len);
+	if ((err = getaddrinfo(ipaddr, NULL, &hint, &answer)) != 0) {
+		rprintf(FLOG, "malformed address %s: %s\n", ipaddr, gai_strerror(err));
+		return name_buf;
 	}
 
-	if (lookup_name(fd, &ss, ss_len, name_buf, sizeof name_buf,
-			port_buf, sizeof port_buf) == 0)
-		check_name(fd, &ss, name_buf, sizeof name_buf);
+	switch (answer->ai_family) {
+	case AF_INET:
+		ss_len = sizeof (struct sockaddr_in);
+		memcpy(&ss, answer->ai_addr, ss_len);
+		break;
+#ifdef INET6
+	case AF_INET6:
+		ss_len = sizeof (struct sockaddr_in6);
+		memcpy(&ss, answer->ai_addr, ss_len);
+		break;
+#endif
+	default:
+		assert(0);
+	}
+	freeaddrinfo(answer);
+
+	/* reverse lookup */
+	err = getnameinfo((struct sockaddr*)&ss, ss_len, name_buf, sizeof name_buf,
+			  port_buf, sizeof port_buf, NI_NAMEREQD | NI_NUMERICSERV);
+	if (err) {
+		strlcpy(name_buf, default_name, sizeof name_buf);
+		rprintf(FLOG, "name lookup failed for %s: %s\n", ipaddr, gai_strerror(err));
+	} else
+		check_name(ipaddr, &ss, name_buf, sizeof name_buf);
 
 	return name_buf;
 }
 
+
+/* Try to read an haproxy header (V1 or V2). Returns 1 on success or 0 on failure. */
+int read_haproxy_header(int fd)
+{
+	union {
+		struct {
+			char line[108];
+		} v1;
+		struct {
+			char sig[PROXY_V2_SIG_SIZE];
+			char ver_cmd;
+			char fam;
+			char len[2];
+			union {
+				struct {
+					char src_addr[4];
+					char dst_addr[4];
+					char src_port[2];
+					char dst_port[2];
+				} ip4;
+				struct {
+					char src_addr[16];
+					char dst_addr[16];
+					char src_port[2];
+					char dst_port[2];
+				} ip6;
+				struct {
+					char src_addr[108];
+					char dst_addr[108];
+				} unx;
+			} addr;
+		} v2;
+	} hdr;
+
+	read_buf(fd, (char*)&hdr, PROXY_V2_SIG_SIZE);
+
+	if (memcmp(hdr.v2.sig, proxyv2sig, PROXY_V2_SIG_SIZE) == 0) { /* Proxy V2 */
+		int ver, cmd, size;
+
+		read_buf(fd, (char*)&hdr + PROXY_V2_SIG_SIZE, PROXY_V2_HEADER_SIZE - PROXY_V2_SIG_SIZE);
+
+		ver = (hdr.v2.ver_cmd & 0xf0) >> 4;
+		cmd = (hdr.v2.ver_cmd & 0x0f);
+		size = (hdr.v2.len[0] << 8) + hdr.v2.len[1];
+
+		if (ver != 2 || size + PROXY_V2_HEADER_SIZE > (int)sizeof hdr)
+			return 0;
+
+		/* Grab all the remaining data in the binary request. */
+		read_buf(fd, (char*)&hdr + PROXY_V2_HEADER_SIZE, size);
+
+		switch (cmd) {
+		case CMD_PROXY:
+			switch (hdr.v2.fam) {
+			case PROXY_FAM_TCPv4:
+				if (size != sizeof hdr.v2.addr.ip4)
+					return 0;
+				inet_ntop(AF_INET, hdr.v2.addr.ip4.src_addr, ipaddr_buf, sizeof ipaddr_buf);
+				return valid_ipaddr(ipaddr_buf);
+			case PROXY_FAM_TCPv6:
+				if (size != sizeof hdr.v2.addr.ip6)
+					return 0;
+				inet_ntop(AF_INET6, hdr.v2.addr.ip6.src_addr, ipaddr_buf, sizeof ipaddr_buf);
+				return valid_ipaddr(ipaddr_buf);
+			default:
+				break;
+			}
+			/* For an unsupported protocol we'll ignore the proxy data (leaving ipaddr_buf unset)
+			 * and accept the connection, which will get handled as a normal socket addr. */
+			return 1;
+		case CMD_LOCAL:
+			return 1;
+		default:
+			break;
+		}
+
+		return 0;
+	}
+
+	if (memcmp(hdr.v1.line, "PROXY", 5) == 0) { /* Proxy V1 */
+		char *endc, *sp, *p = hdr.v1.line + PROXY_V2_SIG_SIZE;
+		int port_chk;
+
+		*p = '\0';
+		if (!strchr(hdr.v1.line, '\n')) {
+			while (1) {
+				read_buf(fd, p, 1);
+				if (*p++ == '\n')
+					break;
+				if (p - hdr.v1.line >= (int)sizeof hdr.v1.line - 1)
+					return 0;
+			}
+			*p = '\0';
+		}
+
+		endc = strchr(hdr.v1.line, '\r');
+		if (!endc || endc[1] != '\n' || endc[2])
+			return 0;
+		*endc = '\0';
+
+		p = hdr.v1.line + 5;
+
+		if (!isSpace(p++))
+			return 0;
+		if (strncmp(p, "TCP4", 4) == 0)
+			p += 4;
+		else if (strncmp(p, "TCP6", 4) == 0)
+			p += 4;
+		else if (strncmp(p, "UNKNOWN", 7) == 0)
+			return 1;
+		else
+			return 0;
+
+		if (!isSpace(p++))
+			return 0;
+
+		if ((sp = strchr(p, ' ')) == NULL)
+			return 0;
+		*sp = '\0';
+		if (!valid_ipaddr(p))
+			return 0;
+		strlcpy(ipaddr_buf, p, sizeof ipaddr_buf); /* It will always fit when valid. */
+
+		p = sp + 1;
+		if ((sp = strchr(p, ' ')) == NULL)
+			return 0;
+		*sp = '\0';
+		if (!valid_ipaddr(p))
+			return 0;
+		/* Ignore destination address. */
+
+		p = sp + 1;
+		if ((sp = strchr(p, ' ')) == NULL)
+			return 0;
+		*sp = '\0';
+		port_chk = strtol(p, &endc, 10);
+		if (*endc || port_chk == 0)
+			return 0;
+		/* Ignore source port. */
+
+		p = sp + 1;
+		port_chk = strtol(p, &endc, 10);
+		if (*endc || port_chk == 0)
+			return 0;
+		/* Ignore destination port. */
+
+		return 1;
+	}
+
+	return 0;
+}
 
 
 /**
@@ -161,9 +314,7 @@ char *client_name(int fd)
  * If it comes in as an ipv4 address mapped into IPv6 format then we
  * convert it back to a regular IPv4.
  **/
-void client_sockaddr(int fd,
-		     struct sockaddr_storage *ss,
-		     socklen_t *ss_len)
+static void client_sockaddr(int fd, struct sockaddr_storage *ss, socklen_t *ss_len)
 {
 	memset(ss, 0, sizeof *ss);
 
@@ -174,7 +325,7 @@ void client_sockaddr(int fd,
 	}
 
 #ifdef INET6
-	if (get_sockaddr_family(ss) == AF_INET6 &&
+	if (GET_SOCKADDR_FAMILY(ss) == AF_INET6 &&
 	    IN6_IS_ADDR_V4MAPPED(&((struct sockaddr_in6 *)ss)->sin6_addr)) {
 		/* OK, so ss is in the IPv6 family, but it is really
 		 * an IPv4 address: something like
@@ -206,43 +357,13 @@ void client_sockaddr(int fd,
 
 
 /**
- * Look up a name from @p ss into @p name_buf.
- *
- * @param fd file descriptor for client socket.
- **/
-int lookup_name(int fd, const struct sockaddr_storage *ss,
-		socklen_t ss_len,
-		char *name_buf, size_t name_buf_size,
-		char *port_buf, size_t port_buf_size)
-{
-	int name_err;
-
-	/* reverse lookup */
-	name_err = getnameinfo((struct sockaddr *) ss, ss_len,
-			       name_buf, name_buf_size,
-			       port_buf, port_buf_size,
-			       NI_NAMEREQD | NI_NUMERICSERV);
-	if (name_err != 0) {
-		strlcpy(name_buf, default_name, name_buf_size);
-		rprintf(FLOG, "name lookup failed for %s: %s\n",
-			client_addr(fd), gai_strerror(name_err));
-		return name_err;
-	}
-
-	return 0;
-}
-
-
-
-/**
  * Compare an addrinfo from the resolver to a sockinfo.
  *
  * Like strcmp, returns 0 for identical.
  **/
-int compare_addrinfo_sockaddr(const struct addrinfo *ai,
-			      const struct sockaddr_storage *ss)
+static int compare_addrinfo_sockaddr(const struct addrinfo *ai, const struct sockaddr_storage *ss)
 {
-	int ss_family = get_sockaddr_family(ss);
+	int ss_family = GET_SOCKADDR_FAMILY(ss);
 	const char fn[] = "compare_addrinfo_sockaddr";
 
 	if (ai->ai_family != ss_family) {
@@ -302,13 +423,11 @@ int compare_addrinfo_sockaddr(const struct addrinfo *ai,
  * because it doesn't seem that it could be spoofed in any way, and
  * getaddrinfo on random service names seems to cause problems on AIX.
  **/
-int check_name(int fd,
-	       const struct sockaddr_storage *ss,
-	       char *name_buf, size_t name_buf_size)
+static int check_name(const char *ipaddr, const struct sockaddr_storage *ss, char *name_buf, size_t name_buf_size)
 {
 	struct addrinfo hints, *res, *res0;
 	int error;
-	int ss_family = get_sockaddr_family(ss);
+	int ss_family = GET_SOCKADDR_FAMILY(ss);
 
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = ss_family;
@@ -339,10 +458,74 @@ int check_name(int fd,
 		/* We hit the end of the list without finding an
 		 * address that was the same as ss. */
 		rprintf(FLOG, "%s is not a known address for \"%s\": "
-			"spoofed address?\n", client_addr(fd), name_buf);
+			"spoofed address?\n", ipaddr, name_buf);
 		strlcpy(name_buf, default_name, name_buf_size);
 	}
 
 	freeaddrinfo(res0);
 	return 0;
+}
+
+/* Returns 1 for a valid IPv4 or IPv6 addr, or 0 for a bad one. */
+static int valid_ipaddr(const char *s)
+{
+	int i;
+
+	if (strchr(s, ':') != NULL) { /* Only IPv6 has a colon. */
+		int count, saw_double_colon = 0;
+		int ipv4_at_end = 0;
+
+		if (*s == ':') { /* A colon at the start must be a :: */
+			if (*++s != ':')
+				return 0;
+			saw_double_colon = 1;
+			s++;
+		}
+
+		for (count = 0; count < 8; count++) {
+			if (!*s)
+				return saw_double_colon && count < 7;
+
+			if (strchr(s, ':') == NULL && strchr(s, '.') != NULL) {
+				if ((!saw_double_colon && count != 6) || (saw_double_colon && count > 6))
+					return 0;
+				ipv4_at_end = 1;
+				break;
+			}
+
+			if (!isHexDigit(s++)) /* Need 1-4 hex digits */
+				return 0;
+			if (isHexDigit(s) && isHexDigit(++s) && isHexDigit(++s) && isHexDigit(++s))
+				return 0;
+
+			if (*s == ':') {
+				if (!*++s)
+					return 0;
+				if (*s == ':') {
+					if (saw_double_colon)
+						return 0;
+					saw_double_colon = 1;
+					s++;
+				}
+			}
+		}
+
+		if (!ipv4_at_end)
+			return !*s;
+	}
+
+	/* IPv4 */
+	for (i = 0; i < 4; i++) {
+		long n;
+		char *end;
+
+		if (i && *s++ != '.')
+			return 0;
+		n = strtol(s, &end, 10);
+		if (n > 255 || n < 0 || end <= s || end > s+3)
+			return 0;
+		s = end;
+	}
+
+	return !*s;
 }

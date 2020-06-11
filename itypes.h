@@ -1,6 +1,6 @@
 /* Inline functions for rsync.
  *
- * Copyright (C) 2007-2019 Wayne Davison
+ * Copyright (C) 2007-2020 Wayne Davison
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,6 +20,12 @@ static inline int
 isDigit(const char *ptr)
 {
 	return isdigit(*(unsigned char *)ptr);
+}
+
+static inline int
+isHexDigit(const char *ptr)
+{
+	return isxdigit(*(unsigned char *)ptr);
 }
 
 static inline int

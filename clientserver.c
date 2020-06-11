@@ -615,7 +615,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	/* If reverse lookup is disabled globally but enabled for this module,
 	 * we need to do it now before the access check. */
 	if (host == undetermined_hostname && lp_reverse_lookup(i))
-		host = client_name(f_in);
+		host = client_name(client_addr(f_in));
 	set_env_str("RSYNC_HOST_NAME", host);
 	set_env_str("RSYNC_HOST_ADDR", addr);
 
@@ -1132,6 +1132,9 @@ int start_daemon(int f_in, int f_out)
 	if (!load_config(0))
 		exit_cleanup(RERR_SYNTAX);
 
+	if (lp_haproxy_header() && !read_haproxy_header(f_in))
+		return -1;
+
 	p = lp_daemon_chroot();
 	if (*p) {
 		log_init(0); /* Make use we've initialized syslog before chrooting. */
@@ -1169,7 +1172,7 @@ int start_daemon(int f_in, int f_out)
 	}
 
 	addr = client_addr(f_in);
-	host = lp_reverse_lookup(-1) ? client_name(f_in) : undetermined_hostname;
+	host = lp_reverse_lookup(-1) ? client_name(addr) : undetermined_hostname;
 	rprintf(FLOG, "connect from %s (%s)\n", host, addr);
 
 	if (am_daemon > 0) {

@@ -234,6 +234,24 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     allow the daemon to function.  By default the daemon runs without any
     chrooting.
 
+0.  `haproxy header`
+
+    This parameter indicates that all incoming connections must start with a V1
+    or V2 haproxy header. If the header is not found, the connection is closed.
+
+    Setting this allows a proxy server to forward the source IP information to
+    rsync, allowing you to make use of IP restrictions that don't all match the
+    source IP of the proxy server.
+
+    _CAUTION_: when using this option you _must_ make sure that only the proxy
+    is allowed to connect to the rsync port via some kind of firewall rules
+    (such as iptables).  If any non-proxied connections are allowed through,
+    the client will be able to spoof any remote IP address that they desire.
+
+    This setting is global.  If you need some modules to require this and not
+    others, then you will need to setup multiple rsync daemon processes on
+    different ports.
+
 0.  `numeric ids`
 
     Enabling this parameter disables the mapping of users and groups by name

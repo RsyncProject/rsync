@@ -95,10 +95,13 @@ Protocol: 31 (unchanged)
    value is the user-specified port number (set via `--port` or an rsync://
    URL) or 0 if the user didn't override the port.
 
+ - Added the `haproxy header` daemon parameter that allows your rsyncd to know
+   the real remote IP when it is being proxied.
+
  - Added negated matching to the daemon's `refuse options` setting by using
    match strings that start with a `!` (such as `!compress*`).
 
- - Added an `early exec` daemon parameter that runs a script before the
+ - Added the `early exec` daemon parameter that runs a script before the
    transfer parameters are known, allowing some early setup based on module
    name.
 
