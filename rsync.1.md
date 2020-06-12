@@ -1463,8 +1463,15 @@ your home directory (remove the '=' for that).
     comma-separated names are supplied, the first name affects the transfer
     checksums, and the second name affects the pre-transfer checksums (`-c`).
 
-    The algorithm choices are "auto", "xxh64" (aka "xxhash"), "MD5", "MD4", and
-    "none".
+    The checksum options that you may be able to use are:
+
+    - `auto` (the default)
+    - `xxh64` (aka xxhash)
+    - `md5`
+    - `md4`
+    - `none`
+
+    Run `rsync -V` to see the default checksum list compiled into your version.
 
     If "none" is specified for the first (or only) name, the `--whole-file`
     option is forced on and no checksum verification is performed on the
@@ -1490,8 +1497,6 @@ your home directory (remove the '=' for that).
     "auto" and all unknown checksum names.  If the remote rsync is not new
     enough to handle a checksum negotiation list, the list is silently ignored
     unless it contains the string "FAIL".
-
-    Use "rsync -V" to see the default checksum list.
 
     The use of the `--checksum-choice` option overrides this environment list.
 
@@ -2266,7 +2271,15 @@ your home directory (remove the '=' for that).
     This option can be used to override the automatic selection of the
     compression algorithm that is the default when `--compress` is used.
 
-    Currently the STR can be "zlibx", "zlib", or "none".
+    The compression options that you may be able to use are:
+
+    - `zstd`
+    - `lz4`
+    - `zlibx`
+    - `zlib`
+    - `none`
+
+    Run `rsync -V` to see the compress list compiled into your version.
 
     The "zlibx" algorithm is given preference over "zlib" if both sides of the
     transfer are at least version 3.2.0, otherwise it will choose "zlib" unless
@@ -2285,8 +2298,6 @@ your home directory (remove the '=' for that).
     "auto" and all unknown compression names.  If the remote rsync is not new
     enough to handle a compression negotiation list, the list is silently
     ignored unless it contains the string "FAIL".
-
-    Use "rsync -V" to see the default compress list.
 
 0.  `--compress-level=NUM`
 
