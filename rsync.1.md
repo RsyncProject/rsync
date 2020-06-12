@@ -322,11 +322,12 @@ I mirror a directory between my "old" and "new" ftp sites with the command:
 
 This is launched from cron every few hours.
 
-# OPTIONS SUMMARY
+# OPTION SUMMARY
 
 Here is a short summary of the options available in rsync.  Please refer to the
 detailed description below for a complete description.
 
+[comment]: # (help-rsync.h)
 [comment]: # (Keep these short enough that they'll be under 80 chars when indented by 8 chars.)
 
 ```
@@ -467,6 +468,8 @@ detailed description below for a complete description.
 
 Rsync can also be run as a daemon, in which case the following options are
 accepted:
+
+[comment]: # (help-rsyncd.h)
 
 ```
 --daemon                 run as an rsync daemon
