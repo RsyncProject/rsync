@@ -163,9 +163,9 @@ SIMD=
 
 AC_MSG_CHECKING([whether to enable SIMD optimizations])
 AC_ARG_ENABLE(simd,
-    AS_HELP_STRING([--enable-simd],[enable SIMD optimizations]))
+    AS_HELP_STRING([--disable-simd],[disable SIMD optimizations (requires g++)]))
 
-if test x"$enable_simd" = x"yes"; then
+if test x"$enable_simd" != x"no"; then
     # For x86-64 SIMD, g++ is also required
     if test x"$build_cpu" = x"x86_64" && test x"$CXX" = x"g++"; then
         SIMD="$SIMD x86_64"
@@ -236,7 +236,7 @@ ipv6lib=none
 ipv6trylibc=yes
 
 AC_ARG_ENABLE(ipv6,
-	AS_HELP_STRING([--disable-ipv6],[do not even try to use IPv6]))
+	AS_HELP_STRING([--disable-ipv6],[turn off IPv6 support]))
 if test x"$enable_ipv6" != x"no"; then
 	AC_MSG_CHECKING([ipv6 stack type])
 	for i in inria kame linux-glibc linux-inet6 solaris toshiba v6d zeta cygwin; do

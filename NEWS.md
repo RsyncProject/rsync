@@ -148,15 +148,18 @@ Protocol: 31 (unchanged)
    target -- rsync-ssl should be considered to be mainstream now that Samba
    requires SSL for its rsync daemon).
 
- - Add _build_ dependency for liblz4-devel, libxxhash-devel, & libzstd-devel.
-   These development libraries will give rsync extra compression and checksum
-   algorithms.
+ - Add _build_ dependency for liblz4-dev, libxxhash-dev, libzstd-dev, and
+   libssl-dev.  These development libraries will give rsync extra compression
+   algorithms, extra checksum algorithms, and allow use of openssl's crypto
+   lib for MD4/MD5 checksums.
 
- - Remove yodl _build_ dependency (if you listed it).
+ - Add _build_ dependency for g++ to enable the SIMD checksum optimizations.
 
  - Add _build_ dependency for _either_ python3-cmarkcfm or python3-commonmark
    to allow for patching of man pages or building a git release.  Note that
    cmarkcfm is faster than commonmark, but they generate the same data.
+
+ - Remove yodl _build_ dependency (if you listed it).
 
 ### DEVELOPER RELATED:
 
