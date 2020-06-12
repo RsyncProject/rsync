@@ -146,7 +146,7 @@ function path_search {
 }
 
 if [[ "$#" == 0 ]]; then
-    echo "Usage: rsync-ssl [--type=openssl|stunnel] RSYNC_OPTION [...]" 1>&2
+    echo "Usage: rsync-ssl [--type=openssl|stunnel] RSYNC_ARG [...]" 1>&2
     exit 1
 fi
 
