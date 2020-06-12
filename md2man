@@ -94,7 +94,7 @@ def main():
 
     fi.date = time.strftime('%d %b %Y', time.localtime(fi.mtime))
 
-    env_subs = { }
+    env_subs = { 'prefix': os.environ.get('RSYNC_OVERRIDE_PREFIX', None) }
 
     with open(fi.srcdir + 'Makefile', 'r', encoding='utf-8') as fh:
         for line in fh:
@@ -102,6 +102,8 @@ def main():
             if not m:
                 continue
             var, val = (m[1], m[2])
+            if var == 'prefix' and env_subs[var] is not None:
+                continue
             while re.search(r'\$\{', val):
                 val = re.sub(r'\$\{(\w+)\}', lambda m: env_subs[m[1]], val)
             env_subs[var] = val
