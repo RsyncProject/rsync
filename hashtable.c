@@ -66,9 +66,19 @@ void hashtable_destroy(struct hashtable *tbl)
 	free(tbl);
 }
 
-/* This returns the node for the indicated key, either newly created or
- * already existing.  Returns NULL if not allocating and not found. */
-void *hashtable_find(struct hashtable *tbl, int64 key, int allocate_if_missing)
+/* Returns the node that holds the indicated key if it exists. When it does not
+ * exist, it returns either NULL (when data_when_new is NULL), or it returns a
+ * new node with its node->data set to the indicated value.
+ *
+ * If your code doesn't know the data value for a new node in advance (usually
+ * because it doesn't know if a node is new or not) you should pass in a unique
+ * (non-0) value that you can use to check if the returned node is new. You can
+ * then overwrite the data with any value you want (even 0) since it only needs
+ * to be different than whatever data_when_new value you use later on.
+ *
+ * This return is a void* just because it might be pointing at a ht_int32_node
+ * or a ht_int64_node, and that makes the caller's assignment a little easier. */
+void *hashtable_find(struct hashtable *tbl, int64 key, void *data_when_new)
 {
 	int key64 = tbl->key64;
 	struct ht_int32_node *node;
@@ -79,7 +89,7 @@ void *hashtable_find(struct hashtable *tbl, int64 key, int allocate_if_missing)
 		exit_cleanup(RERR_MESSAGEIO);
 	}
 
-	if (allocate_if_missing && tbl->entries > HASH_LOAD_LIMIT(tbl->size)) {
+	if (data_when_new && tbl->entries > HASH_LOAD_LIMIT(tbl->size)) {
 		void *old_nodes = tbl->nodes;
 		int size = tbl->size * 2;
 		int i;
@@ -99,8 +109,12 @@ void *hashtable_find(struct hashtable *tbl, int64 key, int allocate_if_missing)
 			int64 move_key = HT_KEY(move_node, key64);
 			if (move_key == 0)
 				continue;
-			node = hashtable_find(tbl, move_key, 1);
-			node->data = move_node->data;
+			if (move_node->data)
+				hashtable_find(tbl, move_key, move_node->data);
+			else {
+				node = hashtable_find(tbl, move_key, "");
+				node->data = 0;
+			}
 		}
 
 		free(old_nodes);
@@ -155,7 +169,7 @@ void *hashtable_find(struct hashtable *tbl, int64 key, int allocate_if_missing)
 		if (nkey == key)
 			return node;
 		if (nkey == 0) {
-			if (!allocate_if_missing)
+			if (!data_when_new)
 				return NULL;
 			break;
 		}
@@ -167,6 +181,7 @@ void *hashtable_find(struct hashtable *tbl, int64 key, int allocate_if_missing)
 		((struct ht_int64_node*)node)->key = key;
 	else
 		node->key = (int32)key;
+	node->data = data_when_new;
 	tbl->entries++;
 	return node;
 }

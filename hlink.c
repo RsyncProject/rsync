@@ -48,6 +48,8 @@ extern struct file_list *cur_flist;
  * we can avoid the pool of dev+inode data.  For incremental recursion mode,
  * the receiver will use a ndx hash to remember old pathnames. */
 
+static void *data_when_new = "";
+
 static struct hashtable *dev_tbl;
 
 static struct hashtable *prior_hlinks;
@@ -57,32 +59,30 @@ static struct file_list *hlink_flist;
 void init_hard_links(void)
 {
 	if (am_sender || protocol_version < 30)
-		dev_tbl = hashtable_create(16, 1);
+		dev_tbl = hashtable_create(16, HT_KEY64);
 	else if (inc_recurse)
-		prior_hlinks = hashtable_create(1024, 0);
+		prior_hlinks = hashtable_create(1024, HT_KEY32);
 }
 
 struct ht_int64_node *idev_find(int64 dev, int64 ino)
 {
 	static struct ht_int64_node *dev_node = NULL;
-	struct hashtable *tbl;
 
 	/* Note that some OSes have a dev == 0, so increment to avoid storing a 0. */
 	if (!dev_node || dev_node->key != dev+1) {
 		/* We keep a separate hash table of inodes for every device. */
-		dev_node = hashtable_find(dev_tbl, dev+1, 1);
-		if (!(tbl = dev_node->data)) {
-			tbl = dev_node->data = hashtable_create(512, 1);
+		dev_node = hashtable_find(dev_tbl, dev+1, data_when_new);
+		if (dev_node->data == data_when_new) {
+			dev_node->data = hashtable_create(512, HT_KEY64);
 			if (DEBUG_GTE(HLINK, 3)) {
 				rprintf(FINFO,
 				    "[%s] created hashtable for dev %s\n",
 				    who_am_i(), big_num(dev));
 			}
 		}
-	} else
-		tbl = dev_node->data;
+	}
 
-	return hashtable_find(tbl, ino, 1);
+	return hashtable_find(dev_node->data, ino, (void*)-1L);
 }
 
 void idev_destroy(void)
@@ -125,8 +125,8 @@ static void match_gnums(int32 *ndx_list, int ndx_count)
 		file = hlink_flist->sorted[ndx_list[from]];
 		gnum = F_HL_GNUM(file);
 		if (inc_recurse) {
-			node = hashtable_find(prior_hlinks, gnum, 1);
-			if (!node->data) {
+			node = hashtable_find(prior_hlinks, gnum, data_when_new);
+			if (node->data == data_when_new) {
 				if (!(node->data = new_array0(char, 5)))
 					out_of_memory("match_gnums");
 				assert(gnum >= hlink_flist->ndx_start);
@@ -269,7 +269,7 @@ static char *check_prior(struct file_struct *file, int gnum,
 	}
 
 	if (inc_recurse
-	 && (node = hashtable_find(prior_hlinks, gnum, 0)) != NULL) {
+	 && (node = hashtable_find(prior_hlinks, gnum, NULL)) != NULL) {
 		assert(node->data != NULL);
 		if (CVAL(node->data, 0) != 0) {
 			*prev_ndx_p = -1;
@@ -528,7 +528,7 @@ void finish_hard_link(struct file_struct *file, const char *fname, int fin_ndx,
 
 	if (inc_recurse) {
 		int gnum = F_HL_GNUM(file);
-		struct ht_int32_node *node = hashtable_find(prior_hlinks, gnum, 0);
+		struct ht_int32_node *node = hashtable_find(prior_hlinks, gnum, NULL);
 		if (node == NULL) {
 			rprintf(FERROR, "Unable to find a hlink node for %d (%s)\n", gnum, f_name(file, prev_name));
 			exit_cleanup(RERR_MESSAGEIO);

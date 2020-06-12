@@ -415,7 +415,7 @@ static int find_matching_xattr(const item_list *xalp)
 
 	key = xattr_lookup_hash(xalp);
 
-	node = hashtable_find(rsync_xal_h, key, 0);
+	node = hashtable_find(rsync_xal_h, key, NULL);
 	if (node == NULL)
 		return -1;
 
@@ -478,21 +478,17 @@ static int rsync_xal_store(item_list *xalp)
 	new_list->key = xattr_lookup_hash(&new_list->xa_items);
 
 	if (rsync_xal_h == NULL)
-		rsync_xal_h = hashtable_create(512, 1);
+		rsync_xal_h = hashtable_create(512, HT_KEY64);
 	if (rsync_xal_h == NULL)
 		out_of_memory("rsync_xal_h hashtable_create()");
-
-	node = hashtable_find(rsync_xal_h, new_list->key, 1);
-	if (node == NULL)
-		out_of_memory("rsync_xal_h hashtable_find()");
 
 	new_ref = new0(rsync_xa_list_ref);
 	if (new_ref == NULL)
 		out_of_memory("new0(rsync_xa_list_ref)");
-
 	new_ref->ndx = ndx;
 
-	if (node->data != NULL) {
+	node = hashtable_find(rsync_xal_h, new_list->key, new_ref);
+	if (node->data != (void*)new_ref) {
 		rsync_xa_list_ref *ref = node->data;
 
 		while (ref != NULL) {
@@ -504,8 +500,7 @@ static int rsync_xal_store(item_list *xalp)
 			ref->next = new_ref;
 			break;
 		}
-	} else
-		node->data = new_ref;
+	}
 
 	return ndx;
 }
@@ -926,7 +921,7 @@ void uncache_tmp_xattrs(void)
 			if (rsync_xal_h == NULL)
 				continue;
 
-			node = hashtable_find(rsync_xal_h, xa_list_item->key, 0);
+			node = hashtable_find(rsync_xal_h, xa_list_item->key, NULL);
 			if (node == NULL)
 				continue;
 

@@ -491,9 +491,9 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file,
 	if (tmp_dev != -1) {
 		if (protocol_version >= 30) {
 			struct ht_int64_node *np = idev_find(tmp_dev, tmp_ino);
-			first_hlink_ndx = (int32)(long)np->data - 1;
+			first_hlink_ndx = (int32)(long)np->data; /* is -1 when new */
 			if (first_hlink_ndx < 0) {
-				np->data = (void*)(long)(first_ndx + ndx + 1);
+				np->data = (void*)(long)(first_ndx + ndx);
 				xflags |= XMIT_HLINK_FIRST;
 			}
 			if (DEBUG_GTE(HLINK, 1)) {
@@ -1101,10 +1101,10 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 				ino = read_longint(f);
 			}
 			np = idev_find(dev, ino);
-			ndx = (int32)(long)np->data - 1;
+			ndx = (int32)(long)np->data; /* is -1 when new */
 			if (ndx < 0) {
-				ndx = cnt++;
 				np->data = (void*)(long)cnt;
+				ndx = cnt++;
 			}
 			F_HL_GNUM(file) = ndx;
 		}
