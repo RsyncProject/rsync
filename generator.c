@@ -277,6 +277,7 @@ static void do_delayed_deletions(char *delbuf)
 static void delete_in_dir(char *fbuf, struct file_struct *file, dev_t *fs_dev)
 {
 	static int already_warned = 0;
+	static struct hashtable *dev_tbl;
 	struct file_list *dirlist;
 	char delbuf[MAXPATHLEN];
 	int dlen, i;
@@ -305,10 +306,16 @@ static void delete_in_dir(char *fbuf, struct file_struct *file, dev_t *fs_dev)
 	change_local_filter_dir(fbuf, dlen, F_DEPTH(file));
 
 	if (one_file_system) {
-		if (file->flags & FLAG_TOP_DIR)
+		if (!dev_tbl)
+			dev_tbl = hashtable_create(16, HT_KEY64);
+		if (file->flags & FLAG_TOP_DIR) {
+			hashtable_find(dev_tbl, *fs_dev+1, "");
 			filesystem_dev = *fs_dev;
-		else if (filesystem_dev != *fs_dev)
-			return;
+		} else if (filesystem_dev != *fs_dev) {
+			if (!hashtable_find(dev_tbl, *fs_dev+1, NULL))
+				return;
+			filesystem_dev = *fs_dev; /* it's a prior top-dir dev */
+		}
 	}
 
 	dirlist = get_dirlist(fbuf, dlen, 0);
