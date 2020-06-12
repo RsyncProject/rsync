@@ -132,6 +132,32 @@ Protocol: 31 (unchanged)
 
  - Made -V the short option for --version.
 
+### PACKAGING RELATED:
+
+ - Add installed binary: /usr/bin/rsync-sll
+
+ - Add installed man page: /usr/man/man1/rsync-ssl.1
+
+ - The rsync-ssl script wants to run either openssl or stunnel4, so consider
+   adding a dependency for openssl (though it's probably fine to just let it
+   complain about being unable to find either program and let the user decide
+   if they want to install one or the other).
+
+ - If you packaged rsync + rsync-ssl + rsync-ssl-daemon as separate packages,
+   the rsync-ssl package is now gone (along with its install-ssl-client make
+   target -- rsync-ssl should be considered to be mainstream now that Samba
+   requires SSL for its rsync daemon).
+
+ - Add _build_ dependency for liblz4-devel, libxxhash-devel, & libzstd-devel.
+   These development libraries will give rsync extra compression and checksum
+   algorithms.
+
+ - Remove yodl _build_ dependency (if you listed it).
+
+ - Add _build_ dependency for _either_ python3-cmarkcfm or python3-commonmark
+   to allow for patching of man pages or building a git release.  Note that
+   cmarkcfm is faster than commonmark, but they generate the same data.
+
 ### DEVELOPER RELATED:
 
  - Silenced some annoying warnings about major()|minor() due to the autoconf
