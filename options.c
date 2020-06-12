@@ -952,10 +952,8 @@ static struct poptOption long_options[] = {
   {"rsh",             'e', POPT_ARG_STRING, &shell_cmd, 0, 0, 0 },
   {"rsync-path",       0,  POPT_ARG_STRING, &rsync_path, 0, 0, 0 },
   {"temp-dir",        'T', POPT_ARG_STRING, &tmpdir, 0, 0, 0 },
-#ifdef ICONV_OPTION
   {"iconv",            0,  POPT_ARG_STRING, &iconv_opt, 0, 0, 0 },
   {"no-iconv",         0,  POPT_ARG_NONE,   0, OPT_NO_ICONV, 0, 0 },
-#endif
   {"ipv4",            '4', POPT_ARG_VAL,    &default_af_hint, AF_INET, 0, 0 },
   {"ipv6",            '6', POPT_ARG_VAL,    &default_af_hint, AF_INET6, 0, 0 },
   {"8-bit-output",    '8', POPT_ARG_VAL,    &allow_8bit_chars, 1, 0, 0 },
@@ -969,9 +967,7 @@ static struct poptOption long_options[] = {
   {"password-file",    0,  POPT_ARG_STRING, &password_file, 0, 0, 0 },
   {"blocking-io",      0,  POPT_ARG_VAL,    &blocking_io, 1, 0, 0 },
   {"no-blocking-io",   0,  POPT_ARG_VAL,    &blocking_io, 0, 0, 0 },
-#ifdef HAVE_SETVBUF
   {"outbuf",           0,  POPT_ARG_STRING, &outbuf_mode, 0, 0, 0 },
-#endif
   {"remote-option",   'M', POPT_ARG_STRING, 0, 'M', 0, 0 },
   {"protocol",         0,  POPT_ARG_INT,    &protocol_version, 0, 0, 0 },
   {"checksum-seed",    0,  POPT_ARG_INT,    &checksum_seed, 0, 0, 0 },
@@ -1092,8 +1088,8 @@ static void set_refuse_options(void)
 	if (!ref)
 		ref = "";
 
-	if (!*ref && !am_daemon) /* A simple optimization */
-		return;
+	if (!am_daemon)
+		ref = "";
 
 	/* We abuse the descrip field in poptOption to make it easy to flag which options
 	 * are refused (since we don't use it otherwise).  Start by marking all options
@@ -1104,7 +1100,8 @@ static void set_refuse_options(void)
 			list_end = op;
 			break;
 		}
-		if (op->shortName == 'e' /* Required for compatibility flags */
+		if (!am_daemon
+		 || op->shortName == 'e' /* Required for compatibility flags */
 		 || op->shortName == '0' /* --from0 just modifies --files-from, so refuse that instead (or not) */
 		 || op->shortName == 's' /* --protect-args is always OK */
 		 || op->shortName == 'n' /* --dry-run is always OK */
@@ -1121,8 +1118,9 @@ static void set_refuse_options(void)
 	}
 	assert(list_end != NULL);
 
-	if (am_daemon) /* Refused by default, but can be accepted via "!write-devices" */
+	if (am_daemon) { /* Refused by default, but can be accepted via a negated exact match. */
 		parse_one_refuse_match(0, "write-devices", list_end);
+	}
 
 	while (1) {
 		while (*ref == ' ') ref++;
@@ -1147,6 +1145,13 @@ static void set_refuse_options(void)
 #endif
 		parse_one_refuse_match(0, "log-file*", list_end);
 	}
+
+#ifndef ICONV_OPTION
+	parse_one_refuse_match(0, "iconv", list_end);
+#endif
+#ifndef HAVE_SETVBUF
+	parse_one_refuse_match(0, "outbuf", list_end);
+#endif
 
 	/* Now we use the descrip values to actually mark the options for refusal. */
 	for (op = long_options; op != list_end; op++) {
@@ -1259,15 +1264,19 @@ static OFF_T parse_size_arg(char **size_arg, char def_suf)
 
 static void create_refuse_error(int which)
 {
+	const char *msg;
+	if (am_daemon)
+		msg = "The server is configured to refuse";
+	else if (am_server)
+		msg = "The server does not support";
+	else
+		msg = "This rsync does not support";
+
 	/* The "which" value is the index + OPT_REFUSED_BASE. */
 	struct poptOption *op = &long_options[which - OPT_REFUSED_BASE];
-	int n = snprintf(err_buf, sizeof err_buf,
-			 "The server is configured to refuse --%s\n",
-			 op->longName) - 1;
-	if (op->shortName) {
-		snprintf(err_buf + n, sizeof err_buf - n,
-			 " (-%c)\n", op->shortName);
-	}
+	int n = snprintf(err_buf, sizeof err_buf, "%s --%s\n", msg, op->longName) - 1;
+	if (op->shortName)
+		snprintf(err_buf + n, sizeof err_buf - n, " (-%c)\n", op->shortName);
 }
 
 /* This is used to make sure that --daemon & --server cannot be aliased to
