@@ -12,8 +12,8 @@
 # The script stops after the first successful action.
 
 dir=`dirname $0`
-if test x"$dir" != x -a x"$dir" != x.; then
-    cd "$dir"
+if test x"$dir" = x; then
+    dir=.
 fi
 
 if test $# = 0; then
@@ -23,21 +23,20 @@ fi
 for action in "${@}"; do
     case "$action" in
     build|make)
-	make -f prepare-source.mak
+	(cd $dir && make -f prepare-source.mak)
 	;;
     fetch)
-	if perl --version >/dev/null 2>/dev/null; then
-	    files='[ca]*'
-	else
-	    files='[cap]*'
+	$dir/rsync-ssl -iip --no-motd rsync://download.samba.org/rsyncftp/generated-files/'[ca]*' $dir
+	if ! perl --version >/dev/null 2>/dev/null; then
+	    $dir/rsync-ssl -iip --no-motd rsync://download.samba.org/rsyncftp/generated-files/'p*' .
 	fi
-	./rsync-ssl -ip rsync://download.samba.org/rsyncftp/generated-files/"$files" .
 	;;
     fetchgen)
-	./rsync-ssl -ip rsync://download.samba.org/rsyncftp/generated-files/'*' .
+	$dir/rsync-ssl -iip --no-motd rsync://download.samba.org/rsyncftp/generated-files/'[ca]*' $dir
+	$dir/rsync-ssl -iip --no-motd rsync://download.samba.org/rsyncftp/generated-files/'[^ca]*' .
 	;;
     fetchSRC)
-	./rsync-ssl -ipr --exclude=/.git/ rsync://download.samba.org/ftp/pub/unpacked/rsync/ .
+	./rsync-ssl -iipr --no-motd --exclude=/.git/ rsync://download.samba.org/ftp/pub/unpacked/rsync/ .
 	;;
     *)
 	echo "Unknown action: $action"
