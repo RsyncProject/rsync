@@ -70,7 +70,6 @@ rm -rf $RPM_BUILD_ROOT
 %config(noreplace) /etc/xinetd.d/rsync
 %{_prefix}/bin/rsync
 %{_prefix}/bin/rsync-ssl
-%{_prefix}/lib/rsync/ssl-rsh
 %{_mandir}/man1/rsync.1*
 %{_mandir}/man1/rsync-ssl.1*
 %{_mandir}/man5/rsyncd.conf.5*

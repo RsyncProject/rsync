@@ -26,9 +26,6 @@ All the other options are passed through to the rsync command, so consult the
 Note that the stunnel connection type requires at least version 4 of stunnel,
 which should be the case on modern systems.
 
-This script requires that a helper script named **ssl-rsh** be installed the
-@LIBDIR@ dir so that rsync can use it as its remote-shell command.
-
 # ENVIRONMENT VARIABLES
 
 The ssl helper scripts are affected by the following environment variables:
@@ -57,10 +54,6 @@ The ssl helper scripts are affected by the following environment variables:
 >     rsync-ssl -aiv example.com::src/ dest
 
 >     rsync-ssl --type=openssl -aiv example.com::src/ dest
-
-# FILES
-
-@LIBDIR@/ssl-rsh
 
 # SEE ALSO
 

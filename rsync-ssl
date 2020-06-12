@@ -1,23 +1,167 @@
 #!/bin/bash
+
 # This script supports using stunnel or openssl to secure an rsync daemon connection.
-# The first option can be --type=stunnel or --type=openssl to choose your connection
-# type (overriding any $RSYNC_SSL_TYPE default value).
+
+# By default this script takes rsync args and hands them off to the actual
+# rsync command with an --rsh option that makes it open an SSL connection to an
+# rsync daemon.  See the rsync-ssl manpage for usage details and env variables.
+
+# When the first arg is --HELPER, we are being used by rsync as an --rsh helper
+# script, and the args are (note the trailing dot):
+#
+#    rsync-ssl --HELPER HOSTNAME rsync --server --daemon .
+#
+# --HELPER is not a user-facing option, so it is not documented in the manpage.
+
+# The first SSL setup was based on:  http://dozzie.jarowit.net/trac/wiki/RsyncSSL
+# Note that an stunnel connection requires at least version 4.x of stunnel.
+
+function rsync_ssl_run {
+    case "$*" in
+    *rsync://*) ;;
+    *::*) ;;
+    *)
+	echo "You must use rsync-ssl with a daemon-style hostname." 1>&2
+	exit 1
+	;;
+    esac
+
+    exec rsync --rsh="$0 --HELPER" "${@}"
+}
+
+function rsync_ssl_helper {
+    if [[ -z "$RSYNC_SSL_TYPE" ]]; then
+	found=`path_search stunnel4 stunnel openssl` || exit 1
+	if [[ "$found" == */openssl ]]; then
+	    RSYNC_SSL_TYPE=openssl
+	    RSYNC_SSL_OPENSSL="$found"
+	else
+	    RSYNC_SSL_TYPE=stunnel
+	    RSYNC_SSL_STUNNEL="$found"
+	fi
+    fi
+
+    case "$RSYNC_SSL_TYPE" in
+	openssl)
+	    if [[ -z "$RSYNC_SSL_OPENSSL" ]]; then
+		RSYNC_SSL_OPENSSL=`path_search openssl` || exit 1
+	    fi
+	    optsep=' '
+	    ;;
+	stunnel)
+	    if [[ -z "$RSYNC_SSL_STUNNEL" ]]; then
+		RSYNC_SSL_STUNNEL=`path_search stunnel4 stunnel` || exit 1
+	    fi
+	    optsep=' = '
+	    ;;
+	*)
+	    echo "The RSYNC_SSL_TYPE specifies an unknown type: $RSYNC_SSL_TYPE" 1>&2
+	    exit 1
+	    ;;
+    esac
+
+    if [[ -z "$RSYNC_SSL_CERT" ]]; then
+	certopt=""
+    else
+	certopt="cert$optsep$RSYNC_SSL_CERT"
+    fi
+
+    if [[ -z ${RSYNC_SSL_CA_CERT+x} ]]; then
+	# RSYNC_SSL_CA_CERT unset - default CA set AND verify:
+	# openssl:
+	caopt="-verify_return_error -verify 4"
+	# stunnel:
+	cafile=""
+	verify=0
+    elif [[ "$RSYNC_SSL_CA_CERT" == "" ]]; then
+	# RSYNC_SSL_CA_CERT set but empty -do NO verifications:
+	# openssl:
+	caopt="-verify 1"
+	# stunnel:
+	cafile=""
+	verify=0
+    else
+	# RSYNC_SSL_CA_CERT set - use CA AND verify:
+	# openssl:
+	caopt="-CAfile $RSYNC_SSL_CA_CERT -verify_return_error -verify 4"
+	# stunnel:
+	cafile="CAfile = $RSYNC_SSL_CA_CERT"
+	verify=3
+    fi
+
+    port="${RSYNC_PORT:-0}"
+    if [[ "$port" == 0 ]]; then
+	port="${RSYNC_SSL_PORT:-874}"
+    fi
+
+    # If the user specified USER@HOSTNAME::module, then rsync passes us
+    # the -l USER option too, so we must be prepared to ignore it.
+    if [[ "$1" == "-l" ]]; then
+	shift 2
+    fi
+
+    hostname="$1"
+    shift
+
+    if [[ -z "$hostname" || "$1" != rsync || "$2" != --server || "$3" != --daemon ]]; then
+	echo "Usage: rsync-ssl --HELPER HOSTNAME rsync --server --daemon ." 1>&2
+	exit 1
+    fi
+
+    if [[ $RSYNC_SSL_TYPE == openssl ]]; then
+	exec $RSYNC_SSL_OPENSSL s_client $caopt $certopt -quiet -verify_quiet -servername $hostname -connect $hostname:$port
+    else
+	# devzero@web.de came up with this no-tmpfile calling syntax:
+	exec $RSYNC_SSL_STUNNEL -fd 10 11<&0 <<EOF 10<&0 0<&11 11<&-
+foreground = yes
+debug = crit
+connect = $hostname:$port
+client = yes
+TIMEOUTclose = 0
+verify = $verify
+$certopt
+$cafile
+EOF
+    fi
+}
+
+function path_search {
+    IFS_SAVE="$IFS"
+    IFS=:
+    for prog in "${@}"; do
+	for dir in $PATH; do
+	    [[ -z "$dir" ]] && dir=.
+	    if [[ -f "$dir/$prog" && -x "$dir/$prog" ]]; then
+		echo "$dir/$prog"
+		IFS="$IFS_SAVE"
+		return 0
+	    fi
+	done
+    done
+
+    IFS="$IFS_SAVE"
+    echo "Failed to find on your path: $*" 1>&2
+    echo "See the rsync-ssl manpage for configuration assistance." 1>&2
+    return 1
+}
+
+if [[ "$#" == 0 ]]; then
+    echo "Usage: rsync-ssl [--type=openssl|stunnel] RSYNC_OPTION [...]" 1>&2
+    exit 1
+fi
+
+if [[ "$1" = --help || "$1" = -h ]]; then
+    exec rsync --help
+fi
+
+if [[ "$1" == --HELPER ]]; then
+    shift
+    rsync_ssl_helper "${@}"
+fi
 
 if [[ "$1" == --type=* ]]; then
     export RSYNC_SSL_TYPE="${1/--type=/}"
     shift
 fi
 
-case "$@" in
-*rsync://*) ;;
-*::*) ;;
-*)
-    echo "You must use rsync-ssl with a daemon-style hostname." 1>&2
-    exit 1
-    ;;
-esac
-
-mydir="${0%/*}"
-libdir="$mydir/../lib/rsync"
-
-exec "$mydir/rsync" --rsh="$libdir/ssl-rsh" "${@}"
+rsync_ssl_run "${@}"

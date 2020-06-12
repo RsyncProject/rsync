@@ -74,10 +74,8 @@ all: Makefile rsync$(EXEEXT) stunnel-rsyncd.conf man
 .PHONY: install
 install: all
 	-${MKDIR_P} ${DESTDIR}${bindir}
-	-${MKDIR_P} ${DESTDIR}${libdir}
 	${INSTALLCMD} ${INSTALL_STRIP} -m 755 rsync$(EXEEXT) ${DESTDIR}${bindir}
 	${INSTALLCMD} -m 755 rsync-ssl ${DESTDIR}${bindir}
-	${INSTALLCMD} -m 755 ssl-rsh ${DESTDIR}${libdir}
 	-${MKDIR_P} ${DESTDIR}${mandir}/man1
 	-${MKDIR_P} ${DESTDIR}${mandir}/man5
 	if test -f rsync.1; then ${INSTALLMAN} -m 644 rsync.1 ${DESTDIR}${mandir}/man1; fi
