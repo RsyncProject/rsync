@@ -99,9 +99,29 @@ rsync$(EXEEXT): $(OBJS)
 
 $(OBJS): $(HEADERS)
 $(CHECK_OBJS): $(HEADERS)
-options.o: latest-year.h
+options.o: latest-year.h help-rsync.h help-rsyncd.h
 
 flist.o: rounding.h
+
+help-rsync.h: rsync.1.md
+	@sed -e '1,/^# OPTIONS SUMMARY/d' \
+	    -e '1,/^```/d' \
+	    -e '/^```/,$$d' \
+	    -e 's/"/\\"/g' \
+	    -e 's/^/  rprintf(F,"/' \
+	    -e 's/$$/\\n");/' \
+	    <"$(srcdir)/$<" >$@
+
+help-rsyncd.h: rsync.1.md
+	@sed -e '1,/^# OPTIONS SUMMARY/d' \
+	    -e '1,/^```/d' \
+	    -e '1,/^```/d' \
+	    -e '1,/^```/d' \
+	    -e '/^```/,$$d' \
+	    -e 's/"/\\"/g' \
+	    -e 's/^/  rprintf(F,"/' \
+	    -e 's/$$/\\n");/' \
+	    <"$(srcdir)/$<" >$@
 
 rounding.h: rounding.c rsync.h proto.h
 	@for r in 0 1 3; do \
