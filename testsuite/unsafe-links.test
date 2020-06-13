@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# Originally by Vladimír Michl <Vladimir.Michl@hlubocky.del.cz>
+# Originally by VladimÃ­r Michl <Vladimir.Michl@hlubocky.del.cz>
 
 . "$suitedir/rsync.fns"
 

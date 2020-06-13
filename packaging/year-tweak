@@ -22,9 +22,10 @@ def main():
         m = argparse.Namespace(**m.groupdict())
         if m.year > latest_year:
             latest_year = m.year
-        if not re.search(r'\.(c|h|sh)$', m.fn) or m.fn.startswith('zlib/'):
+        if m.fn.startswith('zlib/') or m.fn.startswith('popt/'):
             continue
-        maybe_edit_copyright_year(m.fn, m.year)
+        if re.search(r'\.(c|h|sh|test)$', m.fn):
+            maybe_edit_copyright_year(m.fn, m.year)
     proc.communicate()
 
     fn = 'latest-year.h'
@@ -71,7 +72,7 @@ def maybe_edit_copyright_year(fn, year):
                 return
             opening_lines[copyright_line.lineno - 1] = txt
         else:
-            if fn.startswith('lib/'):
+            if fn.startswith('lib/') or fn.startswith('testsuite/'):
                 return
             txt = copyright_line.pre + year + MAINTAINER_SUF
             opening_lines[copyright_line.lineno - 1] += txt

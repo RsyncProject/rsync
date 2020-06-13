@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Copyright (C) 2008 by Wayne Davison <wayned@samba.org>
+# Copyright (C) 2008-2020 Wayne Davison
 
 # This program is distributable under the terms of the GNU GPL (see
 # COPYING).
