@@ -121,11 +121,11 @@ ssize_t do_readlink(const char *path, char *buf, size_t bufsiz)
 #endif
 
 #ifdef HAVE_LINK
-int do_link(const char *fname1, const char *fname2)
+int do_link(const char *old_path, const char *new_path)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
-	return link(fname1, fname2);
+	return link(old_path, new_path);
 }
 #endif
 
@@ -241,11 +241,11 @@ int do_chmod(const char *path, mode_t mode)
 }
 #endif
 
-int do_rename(const char *fname1, const char *fname2)
+int do_rename(const char *old_path, const char *new_path)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
-	return rename(fname1, fname2);
+	return rename(old_path, new_path);
 }
 
 #ifdef HAVE_FTRUNCATE
