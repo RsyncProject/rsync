@@ -392,7 +392,7 @@ static void do_delete_pass(void)
 		rprintf(FINFO, "                    \r");
 }
 
-static inline int time_differs(STRUCT_STAT *stp, struct file_struct *file)
+static inline int mtime_differs(STRUCT_STAT *stp, struct file_struct *file)
 {
 #ifdef ST_MTIME_NSEC
 	return !same_time(stp->st_mtime, stp->ST_MTIME_NSEC, file->modtime, F_MOD_NSEC_or_0(file));
@@ -455,7 +455,7 @@ int unchanged_attrs(const char *fname, struct file_struct *file, stat_x *sxp)
 {
 	if (S_ISLNK(file->mode)) {
 #ifdef CAN_SET_SYMLINK_TIMES
-		if (preserve_times & PRESERVE_LINK_TIMES && time_differs(&sxp->st, file))
+		if (preserve_times & PRESERVE_LINK_TIMES && mtime_differs(&sxp->st, file))
 			return 0;
 #endif
 #ifdef CAN_CHMOD_SYMLINK
@@ -475,7 +475,7 @@ int unchanged_attrs(const char *fname, struct file_struct *file, stat_x *sxp)
 			return 0;
 #endif
 	} else {
-		if (preserve_times && time_differs(&sxp->st, file))
+		if (preserve_times && mtime_differs(&sxp->st, file))
 			return 0;
 		if (perms_differ(file, sxp))
 			return 0;
@@ -510,7 +510,7 @@ void itemize(const char *fnamecmp, struct file_struct *file, int ndx, int statre
 			if (iflags & ITEM_LOCAL_CHANGE)
 				iflags |= symlink_timeset_failed_flags;
 		} else if (keep_time
-		 ? time_differs(&sxp->st, file)
+		 ? mtime_differs(&sxp->st, file)
 		 : iflags & (ITEM_TRANSFER|ITEM_LOCAL_CHANGE) && !(iflags & ITEM_MATCHED)
 		  && (!(iflags & ITEM_XNAME_FOLLOWS) || *xname))
 			iflags |= ITEM_REPORT_TIME;
@@ -605,7 +605,7 @@ int unchanged_file(char *fn, struct file_struct *file, STRUCT_STAT *st)
 	if (ignore_times)
 		return 0;
 
-	return !time_differs(st, file);
+	return !mtime_differs(st, file);
 }
 
 
@@ -2089,7 +2089,7 @@ static void touch_up_dirs(struct file_list *flist, int ndx)
 			do_chmod(fname, file->mode);
 		if (need_retouch_dir_times) {
 			STRUCT_STAT st;
-			if (link_stat(fname, &st, 0) == 0 && time_differs(&st, file)) {
+			if (link_stat(fname, &st, 0) == 0 && mtime_differs(&st, file)) {
 				st.st_mtime = file->modtime;
 #ifdef ST_MTIME_NSEC
 				st.ST_MTIME_NSEC = F_MOD_NSEC_or_0(file);
