@@ -86,7 +86,6 @@ extern char *stdout_format;
 extern char *logfile_format;
 extern char *filesfrom_host;
 extern char *partial_dir;
-extern char *dest_option;
 extern char *rsync_path;
 extern char *shell_cmd;
 extern char *password_file;
@@ -834,9 +833,9 @@ static void check_alt_basis_dirs(void)
 			basis_dir[j] = bdir = new;
 		}
 		if (do_stat(bdir, &st) < 0)
-			rprintf(FWARNING, "%s arg does not exist: %s\n", dest_option, bdir);
+			rprintf(FWARNING, "%s arg does not exist: %s\n", alt_dest_name(0), bdir);
 		else if (!S_ISDIR(st.st_mode))
-			rprintf(FWARNING, "%s arg is not a dir: %s\n", dest_option, bdir);
+			rprintf(FWARNING, "%s arg is not a dir: %s\n", alt_dest_name(0), bdir);
 	}
 }
 

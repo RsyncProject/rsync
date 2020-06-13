@@ -78,9 +78,7 @@ extern int fuzzy_basis;
 extern int always_checksum;
 extern int flist_csum_len;
 extern char *partial_dir;
-extern int compare_dest;
-extern int copy_dest;
-extern int link_dest;
+extern int alt_dest_type;
 extern int whole_file;
 extern int list_only;
 extern int read_batch;
@@ -916,15 +914,15 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 			goto got_nothing_for_ya;
 	}
 
-	if (match_level == 3 && !copy_dest) {
+	if (match_level == 3 && alt_dest_type != COPY_DEST) {
 		if (find_exact_for_existing) {
-			if (link_dest && real_st.st_dev == sxp->st.st_dev && real_st.st_ino == sxp->st.st_ino)
+			if (alt_dest_type == LINK_DEST && real_st.st_dev == sxp->st.st_dev && real_st.st_ino == sxp->st.st_ino)
 				return -1;
 			if (do_unlink(fname) < 0 && errno != ENOENT)
 				goto got_nothing_for_ya;
 		}
 #ifdef SUPPORT_HARD_LINKS
-		if (link_dest) {
+		if (alt_dest_type == LINK_DEST) {
 			if (!hard_link_one(file, fname, cmpbuf, 1))
 				goto try_a_copy;
 			if (atimes_ndx)
@@ -1094,7 +1092,7 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 
 	if (match_level == 3) {
 #ifdef SUPPORT_HARD_LINKS
-		if (link_dest
+		if (alt_dest_type == LINK_DEST
 #ifndef CAN_HARDLINK_SYMLINK
 		 && !S_ISLNK(file->mode)
 #endif
@@ -1115,7 +1113,7 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 			match_level = 2;
 		if (itemizing && stdout_format_has_i
 		 && (INFO_GTE(NAME, 2) || stdout_format_has_i > 1)) {
-			int chg = compare_dest && type != TYPE_DIR ? 0
+			int chg = alt_dest_type == COMPARE_DEST && type != TYPE_DIR ? 0
 			    : ITEM_LOCAL_CHANGE + (match_level == 3 ? ITEM_XNAME_FOLLOWS : 0);
 			char *lp = match_level == 3 ? "" : NULL;
 			itemize(cmpbuf, file, ndx, 0, sxp, chg + ITEM_MATCHED, 0, lp);
@@ -1550,11 +1548,11 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 					      itemizing, code);
 			if (j == -2) {
 #ifndef CAN_HARDLINK_SYMLINK
-				if (link_dest) {
+				if (alt_dest_type == LINK_DEST) {
 					/* Resort to --copy-dest behavior. */
 				} else
 #endif
-				if (!copy_dest)
+				if (alt_dest_type != COPY_DEST)
 					goto cleanup;
 				itemizing = 0;
 				code = FNONE;
@@ -1626,11 +1624,11 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 					      itemizing, code);
 			if (j == -2) {
 #ifndef CAN_HARDLINK_SPECIAL
-				if (link_dest) {
+				if (alt_dest_type == LINK_DEST) {
 					/* Resort to --copy-dest behavior. */
 				} else
 #endif
-				if (!copy_dest)
+				if (alt_dest_type != COPY_DEST)
 					goto cleanup;
 				itemizing = 0;
 				code = FNONE;
@@ -1705,7 +1703,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		stat_errno = ENOENT;
 	}
 
-	if (basis_dir[0] != NULL && (statret != 0 || !copy_dest)) {
+	if (basis_dir[0] != NULL && (statret != 0 || alt_dest_type != COPY_DEST)) {
 		int j = try_dests_reg(file, fname, ndx, fnamecmpbuf, &sx,
 				      statret == 0, itemizing, code);
 		if (j == -2) {

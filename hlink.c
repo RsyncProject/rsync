@@ -29,7 +29,7 @@ extern int list_only;
 extern int am_sender;
 extern int inc_recurse;
 extern int do_xfers;
-extern int link_dest;
+extern int alt_dest_type;
 extern int preserve_acls;
 extern int preserve_xattrs;
 extern int protocol_version;
@@ -396,7 +396,7 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 			pathjoin(cmpbuf, MAXPATHLEN, basis_dir[j], fname);
 			if (link_stat(cmpbuf, &alt_sx.st, 0) < 0)
 				continue;
-			if (link_dest) {
+			if (alt_dest_type == LINK_DEST) {
 				if (prev_st.st_dev != alt_sx.st.st_dev
 				 || prev_st.st_ino != alt_sx.st.st_ino)
 					continue;

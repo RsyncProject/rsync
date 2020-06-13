@@ -177,11 +177,8 @@ char *sockopts = NULL;
 char *usermap = NULL;
 char *groupmap = NULL;
 int rsync_port = 0;
-int compare_dest = 0;
-int copy_dest = 0;
-int link_dest = 0;
+int alt_dest_type = 0;
 int basis_dir_cnt = 0;
-char *dest_option = NULL;
 
 static int remote_option_alloc = 0;
 int remote_option_cnt = 0;
@@ -1146,6 +1143,9 @@ static void set_refuse_options(void)
 		parse_one_refuse_match(0, "log-file*", list_end);
 	}
 
+#ifndef SUPPORT_HARD_LINKS
+	parse_one_refuse_match(0, "link-dest", list_end);
+#endif
 #ifndef ICONV_OPTION
 	parse_one_refuse_match(0, "iconv", list_end);
 #endif
@@ -1297,6 +1297,23 @@ static void popt_unalias(poptContext con, const char *opt)
 	poptAddAlias(con, unalias, 0);
 }
 
+char *alt_dest_name(int type)
+{
+	if (!type)
+		type = alt_dest_type;
+
+	switch (type) {
+	case COMPARE_DEST:
+		return "--compare-dest";
+	case COPY_DEST:
+		return "--copy-dest";
+	case LINK_DEST:
+		return "--link-dest";
+	default:
+		assert(0);
+	}
+}
+
 /**
  * Process command line arguments.  Called on both local and remote.
  *
@@ -1310,7 +1327,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	static poptContext pc;
 	const char *arg, **argv = *argv_p;
 	int argc = *argc_p;
-	int opt;
+	int opt, want_dest_type;
 	int orig_protect_args = protect_args;
 
 	if (argc == 0) {
@@ -1668,30 +1685,29 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			break;
 
 		case OPT_LINK_DEST:
-#ifdef SUPPORT_HARD_LINKS
-			link_dest = 1;
-			dest_option = "--link-dest";
+			want_dest_type = LINK_DEST;
 			goto set_dest_dir;
-#else
-			snprintf(err_buf, sizeof err_buf,
-				 "hard links are not supported on this %s\n",
-				 am_server ? "server" : "client");
-			return 0;
-#endif
 
 		case OPT_COPY_DEST:
-			copy_dest = 1;
-			dest_option = "--copy-dest";
+			want_dest_type = COPY_DEST;
 			goto set_dest_dir;
 
 		case OPT_COMPARE_DEST:
-			compare_dest = 1;
-			dest_option = "--compare-dest";
+			want_dest_type = COMPARE_DEST;
+
 		set_dest_dir:
+			if (alt_dest_type && alt_dest_type != want_dest_type) {
+				snprintf(err_buf, sizeof err_buf,
+					"ERROR: the %s option conflicts with the %s option\n",
+					alt_dest_name(want_dest_type), alt_dest_name(0));
+				return 0;
+			}
+			alt_dest_type = want_dest_type;
+
 			if (basis_dir_cnt >= MAX_BASIS_DIRS) {
 				snprintf(err_buf, sizeof err_buf,
 					"ERROR: at most %d %s args may be specified\n",
-					MAX_BASIS_DIRS, dest_option);
+					MAX_BASIS_DIRS, alt_dest_name(0));
 				return 0;
 			}
 			/* We defer sanitizing this arg until we know what
@@ -2037,12 +2053,6 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	if (max_delete < 0 && max_delete != INT_MIN) {
 		/* Negative numbers are treated as "no deletions". */
 		max_delete = 0;
-	}
-
-	if (compare_dest + copy_dest + link_dest > 1) {
-		snprintf(err_buf, sizeof err_buf,
-			"You may not mix --compare-dest, --copy-dest, and --link-dest.\n");
-		return 0;
 	}
 
 	if (files_from) {
@@ -2787,7 +2797,7 @@ void server_options(char **args, int *argc_p)
 			 *   option, so don't send it if client is the sender.
 			 */
 			for (i = 0; i < basis_dir_cnt; i++) {
-				args[ac++] = dest_option;
+				args[ac++] = alt_dest_name(0);
 				args[ac++] = basis_dir[i];
 			}
 		}

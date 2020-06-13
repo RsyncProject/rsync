@@ -51,7 +51,6 @@ extern int do_compression;
 extern int do_compression_level;
 extern char *shell_cmd;
 extern char *partial_dir;
-extern char *dest_option;
 extern char *files_from;
 extern char *filesfrom_host;
 extern const char *checksum_choice;
@@ -566,7 +565,7 @@ void setup_protocol(int f_out,int f_in)
 			rprintf(FERROR,
 			    "%s with --inplace requires protocol 29 or higher"
 			    " (negotiated %d).\n",
-			    dest_option, protocol_version);
+			    alt_dest_name(0), protocol_version);
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
@@ -574,7 +573,7 @@ void setup_protocol(int f_out,int f_in)
 			rprintf(FERROR,
 			    "Using more than one %s option requires protocol"
 			    " 29 or higher (negotiated %d).\n",
-			    dest_option, protocol_version);
+			    alt_dest_name(0), protocol_version);
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
