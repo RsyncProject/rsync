@@ -175,7 +175,7 @@
 
 #define ATTRS_REPORT		(1<<0)
 #define ATTRS_SKIP_MTIME	(1<<1)
-#define ATTRS_SET_NANO		(1<<2)
+#define ATTRS_ACCURATE_TIME	(1<<2)
 #define ATTRS_SKIP_ATIME	(1<<3)
 
 #define MSG_FLUSH	2

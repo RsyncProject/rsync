@@ -59,6 +59,7 @@ extern int human_readable;
 extern int ignore_existing;
 extern int ignore_non_existing;
 extern int want_xattr_optim;
+extern int modify_window;
 extern int inplace;
 extern int append_mode;
 extern int make_backups;
@@ -100,7 +101,7 @@ extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern filter_rule_list filter_list, daemon_filter_list;
 
 int maybe_ATTRS_REPORT = 0;
-int maybe_ATTRS_SET_NANO = 0;
+int maybe_ATTRS_ACCURATE_TIME = 0;
 
 static dev_t dev_zero;
 static int deldelay_size = 0, deldelay_cnt = 0;
@@ -391,12 +392,12 @@ static void do_delete_pass(void)
 		rprintf(FINFO, "                    \r");
 }
 
-static inline int time_diff(STRUCT_STAT *stp, struct file_struct *file)
+static inline int time_differs(STRUCT_STAT *stp, struct file_struct *file)
 {
 #ifdef ST_MTIME_NSEC
-	return cmp_time(stp->st_mtime, stp->ST_MTIME_NSEC, file->modtime, F_MOD_NSEC_or_0(file));
+	return !same_time(stp->st_mtime, stp->ST_MTIME_NSEC, file->modtime, F_MOD_NSEC_or_0(file));
 #else
-	return cmp_time(stp->st_mtime, 0L, file->modtime, 0L);
+	return !same_time(stp->st_mtime, 0, file->modtime, 0);
 #endif
 }
 
@@ -454,7 +455,7 @@ int unchanged_attrs(const char *fname, struct file_struct *file, stat_x *sxp)
 {
 	if (S_ISLNK(file->mode)) {
 #ifdef CAN_SET_SYMLINK_TIMES
-		if (preserve_times & PRESERVE_LINK_TIMES && time_diff(&sxp->st, file))
+		if (preserve_times & PRESERVE_LINK_TIMES && time_differs(&sxp->st, file))
 			return 0;
 #endif
 #ifdef CAN_CHMOD_SYMLINK
@@ -474,7 +475,7 @@ int unchanged_attrs(const char *fname, struct file_struct *file, stat_x *sxp)
 			return 0;
 #endif
 	} else {
-		if (preserve_times && time_diff(&sxp->st, file))
+		if (preserve_times && time_differs(&sxp->st, file))
 			return 0;
 		if (perms_differ(file, sxp))
 			return 0;
@@ -509,12 +510,12 @@ void itemize(const char *fnamecmp, struct file_struct *file, int ndx, int statre
 			if (iflags & ITEM_LOCAL_CHANGE)
 				iflags |= symlink_timeset_failed_flags;
 		} else if (keep_time
-		 ? time_diff(&sxp->st, file)
+		 ? time_differs(&sxp->st, file)
 		 : iflags & (ITEM_TRANSFER|ITEM_LOCAL_CHANGE) && !(iflags & ITEM_MATCHED)
 		  && (!(iflags & ITEM_XNAME_FOLLOWS) || *xname))
 			iflags |= ITEM_REPORT_TIME;
 		if (atimes_ndx && !S_ISDIR(file->mode) && !S_ISLNK(file->mode)
-		 && cmp_time(F_ATIME(file), 0, sxp->st.st_atime, 0) != 0)
+		 && !same_time(F_ATIME(file), 0, sxp->st.st_atime, 0))
 			iflags |= ITEM_REPORT_ATIME;
 #if !defined HAVE_LCHMOD && !defined HAVE_SETATTRLIST
 		if (S_ISLNK(file->mode)) {
@@ -604,7 +605,7 @@ int unchanged_file(char *fn, struct file_struct *file, STRUCT_STAT *st)
 	if (ignore_times)
 		return 0;
 
-	return time_diff(st, file) == 0;
+	return !time_differs(st, file);
 }
 
 
@@ -781,7 +782,7 @@ static struct file_struct *find_fuzzy(struct file_struct *file, struct file_list
 			if (!S_ISREG(fp->mode) || !F_LENGTH(fp) || fp->flags & FLAG_FILE_SENT)
 				continue;
 
-			if (F_LENGTH(fp) == F_LENGTH(file) && cmp_time(fp->modtime, 0L, file->modtime, 0L) == 0) {
+			if (F_LENGTH(fp) == F_LENGTH(file) && same_time(fp->modtime, 0, file->modtime, 0)) {
 				if (DEBUG_GTE(FUZZY, 2))
 					rprintf(FINFO, "fuzzy size/modtime match for %s\n", f_name(fp, NULL));
 				*fnamecmp_type_ptr = FNAMECMP_FUZZY + i;
@@ -1228,7 +1229,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		return;
 	}
 
-	maybe_ATTRS_SET_NANO = always_checksum ? ATTRS_SET_NANO : 0;
+	maybe_ATTRS_ACCURATE_TIME = always_checksum ? ATTRS_ACCURATE_TIME : 0;
 
 	if (skip_dir) {
 		if (is_below(file, skip_dir)) {
@@ -1685,7 +1686,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		goto cleanup;
 	}
 
-	if (update_only > 0 && statret == 0 && time_diff(&sx.st, file) > 0) {
+	if (update_only > 0 && statret == 0 && file->modtime - sx.st.st_mtime <= modify_window) {
 		if (INFO_GTE(SKIP, 1))
 			rprintf(FINFO, "%s is newer\n", fname);
 #ifdef SUPPORT_HARD_LINKS
@@ -1785,7 +1786,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			do_unlink(partialptr);
 			handle_partial_dir(partialptr, PDIR_DELETE);
 		}
-		set_file_attrs(fname, file, &sx, NULL, maybe_ATTRS_REPORT | maybe_ATTRS_SET_NANO);
+		set_file_attrs(fname, file, &sx, NULL, maybe_ATTRS_REPORT | maybe_ATTRS_ACCURATE_TIME);
 		if (itemizing)
 			itemize(fnamecmp, file, ndx, statret, &sx, 0, 0, NULL);
 #ifdef SUPPORT_HARD_LINKS
@@ -2088,7 +2089,7 @@ static void touch_up_dirs(struct file_list *flist, int ndx)
 			do_chmod(fname, file->mode);
 		if (need_retouch_dir_times) {
 			STRUCT_STAT st;
-			if (link_stat(fname, &st, 0) == 0 && time_diff(&st, file)) {
+			if (link_stat(fname, &st, 0) == 0 && time_differs(&st, file)) {
 				st.st_mtime = file->modtime;
 #ifdef ST_MTIME_NSEC
 				st.ST_MTIME_NSEC = F_MOD_NSEC_or_0(file);

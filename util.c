@@ -1354,30 +1354,17 @@ char *timestring(time_t t)
 
 /* Determine if two time_t values are equivalent (either exact, or in
  * the modification timestamp window established by --modify-window).
- *
- * @retval 0 if the times should be treated as the same
- *
- * @retval +1 if the first is later
- *
- * @retval -1 if the 2nd is later
- **/
-int cmp_time(time_t f1_sec, unsigned long f1_nsec, time_t f2_sec, unsigned long f2_nsec)
+ * Returns 1 if the times the "same", or 0 if they are different. */
+int same_time(time_t f1_sec, unsigned long f1_nsec, time_t f2_sec, unsigned long f2_nsec)
 {
-	if (f2_sec > f1_sec) {
-		/* The final comparison makes sure that modify_window doesn't overflow a
-		 * time_t, which would mean that f2_sec must be in the equality window. */
-		if (modify_window <= 0 || (f2_sec > f1_sec + modify_window && f1_sec + modify_window > f1_sec))
-			return -1;
-	} else if (f1_sec > f2_sec) {
-		if (modify_window <= 0 || (f1_sec > f2_sec + modify_window && f2_sec + modify_window > f2_sec))
-			return 1;
-	} else if (modify_window < 0) {
-		if (f2_nsec > f1_nsec)
-			return -1;
-		else if (f1_nsec > f2_nsec)
-			return 1;
-	}
-	return 0;
+	if (modify_window == 0)
+		return f1_sec == f2_sec;
+	if (modify_window < 0)
+		return f1_sec == f2_sec && f1_nsec == f2_nsec;
+	/* The nano seconds doesn't figure into these checks -- time windows don't care about that. */
+	if (f2_sec > f1_sec)
+		return f2_sec - f1_sec <= modify_window;
+	return f1_sec - f2_sec <= modify_window;
 }
 
 #ifdef __INSURE__XX

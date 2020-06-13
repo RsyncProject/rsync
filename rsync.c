@@ -468,6 +468,21 @@ mode_t dest_mode(mode_t flist_mode, mode_t stat_mode, int dflt_perms,
 	return new_mode;
 }
 
+static int same_mtime(struct file_struct *file, STRUCT_STAT *st, int extra_accuracy)
+{
+#ifdef ST_MTIME_NSEC
+	uint32 f1_nsec = F_MOD_NSEC_or_0(file);
+	uint32 f2_nsec = (uint32)st->ST_MTIME_NSEC;
+#else
+	uint32 f1_nsec = 0, f2_nsec = 0;
+#endif
+
+	if (extra_accuracy) /* ignore modify_window when setting the time after a transfer or checksum check */
+		return file->modtime == st->st_mtime && f1_nsec == f2_nsec;
+
+	return same_time(file->modtime, f1_nsec, st->st_mtime , f2_nsec);
+}
+
 int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		   const char *fnamecmp, int flags)
 {
@@ -570,12 +585,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		memcpy(&sx2.st, &sxp->st, sizeof (sx2.st));
 	if (!atimes_ndx || S_ISDIR(sxp->st.st_mode))
 		flags |= ATTRS_SKIP_ATIME;
-	if (!(flags & ATTRS_SKIP_MTIME)
-	 && (sxp->st.st_mtime != file->modtime
-#ifdef ST_MTIME_NSEC
-	  || (flags & ATTRS_SET_NANO && NSEC_BUMP(file) && (uint32)sxp->st.ST_MTIME_NSEC != F_MOD_NSEC(file))
-#endif
-	  )) {
+	if (!(flags & ATTRS_SKIP_MTIME) && !same_mtime(file, &sxp->st, flags & ATTRS_ACCURATE_TIME)) {
 		sx2.st.st_mtime = file->modtime;
 #ifdef ST_MTIME_NSEC
 		sx2.st.ST_MTIME_NSEC = F_MOD_NSEC_or_0(file);
@@ -584,7 +594,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	}
 	if (!(flags & ATTRS_SKIP_ATIME)) {
 		time_t file_atime = F_ATIME(file);
-		if (cmp_time(sxp->st.st_atime, 0, file_atime, 0) != 0) {
+		if (flags & ATTRS_ACCURATE_TIME || !same_time(sxp->st.st_atime, 0, file_atime, 0)) {
 			sx2.st.st_atime = file_atime;
 #ifdef ST_ATIME_NSEC
 			sx2.st.ST_ATIME_NSEC = 0;
@@ -709,7 +719,7 @@ int finish_transfer(const char *fname, const char *fnametmp,
 
 	/* Change permissions before putting the file into place. */
 	set_file_attrs(fnametmp, file, NULL, fnamecmp,
-		       ok_to_set_time ? ATTRS_SET_NANO : ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME);
+		       ok_to_set_time ? ATTRS_ACCURATE_TIME : ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME);
 
 	/* move tmp file over real file */
 	if (DEBUG_GTE(RECV, 1))
@@ -734,7 +744,7 @@ int finish_transfer(const char *fname, const char *fnametmp,
 
   do_set_file_attrs:
 	set_file_attrs(fnametmp, file, NULL, fnamecmp,
-		       ok_to_set_time ? ATTRS_SET_NANO : ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME);
+		       ok_to_set_time ? ATTRS_ACCURATE_TIME : ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME);
 
 	if (temp_copy_name) {
 		if (do_rename(fnametmp, fname) < 0) {
