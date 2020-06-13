@@ -33,8 +33,6 @@ Protocol: 31 (unchanged)
 
  - Some rrsync fixes and enhancements to handle the latest options.
 
- - Fixed a crash in the `--iconv` code.
-
  - Fixed a problem with the `--link-dest`|`--copy-dest` code when `--xattrs`
    was specified along with multiple alternate-destination directories (it
    could possibly choose a bad file match while trying to find a better xattr
@@ -49,6 +47,10 @@ Protocol: 31 (unchanged)
 
  - Fixed a mismatch in the RSYNC_PID values when running both a `pre-xfer exec`
    and a `post-xfer exec`.
+
+ - Fixed a crash in the `--iconv` code.
+
+ - Fixed a rare crash in the popt_unalias() code.
 
 ### ENHANCEMENTS:
 
