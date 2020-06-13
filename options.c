@@ -1297,7 +1297,7 @@ static void popt_unalias(poptContext con, const char *opt)
 	poptAddAlias(con, unalias, 0);
 }
 
-char *alt_dest_name(int type)
+char *alt_dest_opt(int type)
 {
 	if (!type)
 		type = alt_dest_type;
@@ -1699,7 +1699,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			if (alt_dest_type && alt_dest_type != want_dest_type) {
 				snprintf(err_buf, sizeof err_buf,
 					"ERROR: the %s option conflicts with the %s option\n",
-					alt_dest_name(want_dest_type), alt_dest_name(0));
+					alt_dest_opt(want_dest_type), alt_dest_opt(0));
 				return 0;
 			}
 			alt_dest_type = want_dest_type;
@@ -1707,7 +1707,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			if (basis_dir_cnt >= MAX_BASIS_DIRS) {
 				snprintf(err_buf, sizeof err_buf,
 					"ERROR: at most %d %s args may be specified\n",
-					MAX_BASIS_DIRS, alt_dest_name(0));
+					MAX_BASIS_DIRS, alt_dest_opt(0));
 				return 0;
 			}
 			/* We defer sanitizing this arg until we know what
@@ -2797,7 +2797,7 @@ void server_options(char **args, int *argc_p)
 			 *   option, so don't send it if client is the sender.
 			 */
 			for (i = 0; i < basis_dir_cnt; i++) {
-				args[ac++] = alt_dest_name(0);
+				args[ac++] = alt_dest_opt(0);
 				args[ac++] = basis_dir[i];
 			}
 		}

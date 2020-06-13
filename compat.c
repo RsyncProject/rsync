@@ -565,7 +565,7 @@ void setup_protocol(int f_out,int f_in)
 			rprintf(FERROR,
 			    "%s with --inplace requires protocol 29 or higher"
 			    " (negotiated %d).\n",
-			    alt_dest_name(0), protocol_version);
+			    alt_dest_opt(0), protocol_version);
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
@@ -573,7 +573,7 @@ void setup_protocol(int f_out,int f_in)
 			rprintf(FERROR,
 			    "Using more than one %s option requires protocol"
 			    " 29 or higher (negotiated %d).\n",
-			    alt_dest_name(0), protocol_version);
+			    alt_dest_opt(0), protocol_version);
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
