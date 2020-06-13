@@ -26,6 +26,7 @@
 #if defined CONFIG_LOCALE && defined HAVE_LOCALE_H
 #include <locale.h>
 #endif
+#include <popt.h>
 
 extern int dry_run;
 extern int list_only;
@@ -1706,13 +1707,9 @@ int main(int argc,char *argv[])
 		option_error();
 		exit_cleanup(RERR_SYNTAX);
 	}
-	if (write_batch) {
-		int j;
-		cooked_argc = argc;
-		cooked_argv = new_array(char*, argc+1);
-		for (j = 0; j <= argc; j++)
-			cooked_argv[j] = argv[j];
-	}
+	if (write_batch
+	 && poptDupArgv(argc, (const char **)argv, &cooked_argc, (const char ***)&cooked_argv) != 0)
+		out_of_memory("main");
 
 	SIGACTMASK(SIGINT, sig_int);
 	SIGACTMASK(SIGHUP, sig_int);
