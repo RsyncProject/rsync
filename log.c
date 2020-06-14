@@ -318,10 +318,10 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 		if (quiet)
 			return;
 		break;
-	//case FLOG:
-	//case FCLIENT:
-	//case FERROR_UTF8:
-	//case FERROR_SOCKET:
+	/*case FLOG:*/
+	/*case FCLIENT:*/
+	/*case FERROR_UTF8:*/
+	/*case FERROR_SOCKET:*/
 	default:
 		fprintf(stderr, "Bad logcode in rwrite(): %d [%s]\n", (int)code, who_am_i());
 		exit_cleanup(RERR_MESSAGEIO);
