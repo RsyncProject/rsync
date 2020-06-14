@@ -62,7 +62,7 @@ die "$0 reading from write-only server not allowed\n" if $only eq 'w' && $am_sen
 # To disable a short-named option, add its letter to this string:
 our $short_disabled = 's';
 
-our $short_no_arg = 'ACDEHIJKLORSUWXbcdgklmnoprstuvxyz'; # DO NOT REMOVE ANY
+our $short_no_arg = 'ACDEHIJKLORSUWXbcdgklmnopqrstuvxyz'; # DO NOT REMOVE ANY
 our $short_with_num = '@B'; # DO NOT REMOVE ANY
 
 # To disable a long-named option, change its value to a -1.  The values mean:
@@ -76,6 +76,7 @@ our %long_opt = (
   'checksum-choice' => 1,
   'checksum-seed' => 1,
   'compare-dest' => 2,
+  'compress-choice' => 1,
   'compress-level' => 1,
   'copy-dest' => 2,
   'copy-unsafe-links' => 0,
@@ -120,6 +121,7 @@ our %long_opt = (
   'no-relative' => 0,
   'no-specials' => 0,
   'numeric-ids' => 0,
+  'old-compress' => 0,
   'one-file-system' => 0,
   'only-write-batch' => 1,
   'open-noatime' => 0,

@@ -23,6 +23,7 @@ our %long_opt = ( # These include some extra long-args that BackupPC uses:
     'perms' => 0,
     'recursive' => 0,
     'times' => 0,
+    'write-devices' => -1,
 );
 our $last_long_opt;
 
@@ -39,10 +40,10 @@ while (<IN>) {
 	$last_long_opt = $1;
 	$long_opt{$1} = 0 unless exists $long_opt{$1};
     } elsif (defined($last_long_opt)
-	&& /\Qargs[ac++]\E = ([^["\s]+);/ && $1 ne 'dest_option') {
+	&& /\Qargs[ac++]\E = ([^["\s]+);/) {
 	$long_opt{$last_long_opt} = 2;
 	undef $last_long_opt;
-    } elsif (/dest_option = "--([^"]+)"/) {
+    } elsif (/return "--([^"]+-dest)";/) {
 	$long_opt{$1} = 2;
 	undef $last_long_opt;
     } elsif (/\Qasprintf(\E[^,]+, "--([^"=]+)=/ || /\Qargs[ac++]\E = "--([^"=]+)=/ || /fmt = .*: "--([^"=]+)=/) {
