@@ -70,14 +70,14 @@ RSYNC-DAEMON FEATURES VIA A REMOTE-SHELL CONNECTION" section for an exception
 to this latter rule).
 
 As a special case, if a single source arg is specified without a destination,
-the files are listed in an output format similar to "ls -l".
+the files are listed in an output format similar to "`ls -l`".
 
 As expected, if neither the source or destination path specify a remote host,
 the copy occurs locally (see also the `--list-only` option).
 
-Rsync refers to the local side as the "client" and the remote side as the
-"server".  Don't confuse "server" with an rsync daemon -- a daemon is always a
-server, but a server can be either a daemon or a remote-shell spawned process.
+Rsync refers to the local side as the client and the remote side as the server.
+Don't confuse server with an rsync daemon.  A daemon is always a server, but a
+server can be either a daemon or a remote-shell spawned process.
 
 # SETUP
 
@@ -115,7 +115,7 @@ same as all other posix-style programs).
 
 This would recursively transfer all files from the directory src/bar on the
 machine foo into the /data/tmp/bar directory on the local machine.  The files
-are transferred in "archive" mode, which ensures that symbolic links, devices,
+are transferred in archive mode, which ensures that symbolic links, devices,
 attributes, permissions, ownerships, etc. are preserved in the transfer.
 Additionally, compression will be used to reduce the size of data portions of
 the transfer.
@@ -507,8 +507,8 @@ your home directory (remove the '=' for that).
 0.  `--help`, `-h` `(*)`
 
     Print a short help page describing the options available in rsync and exit.
-    For backward-compatibility with older versions of rsync, the help will also
-    be output if you use the `-h` option without any other args.
+    (*) The `-h` short option will only invoke `--help` when used without other
+    options since it normally means `--human-readable`.
 
 0.  `--version`, `-V`
 
@@ -534,7 +534,7 @@ your home directory (remove the '=' for that).
     and `--debug` have a way to ask for help that tells you exactly what flags
     are set for each increase in verbosity.
 
-    However, do keep in mind that a daemon's "max verbosity" setting will limit
+    However, do keep in mind that a daemon's "`max verbosity`" setting will limit
     how high of a level the various individual flags can be set on the daemon
     side.  For instance, if the max is 2, then any info and/or debug flag that
     is set to a higher value than what would be set by `-vv` will be downgraded
@@ -560,7 +560,7 @@ your home directory (remove the '=' for that).
     This option was added to 3.1.0, so an older rsync on the server side might
     reject your attempts at fine-grained control (if one or more flags needed
     to be send to the server and the server was too old to understand them).
-    See also the "max verbosity" caveat above when dealing with a daemon.
+    See also the "`max verbosity`" caveat above when dealing with a daemon.
 
 0.  `--debug=FLAGS`
 
@@ -1023,7 +1023,7 @@ your home directory (remove the '=' for that).
     local transfer, the client side is the sender.)
 
     This option has no affect on a daemon, since the daemon configures whether
-    it wants munged symlinks via its "munge symlinks" parameter.  See also the
+    it wants munged symlinks via its "`munge symlinks`" parameter.  See also the
     "munge-symlinks" perl script in the support directory of the source code.
 
 0.  `--copy-dirlinks`, `-k`
@@ -1400,7 +1400,7 @@ your home directory (remove the '=' for that).
 
     This option is overridden by both `--super` and `--no-super`.
 
-    See also the "fake super" setting in the daemon's rsyncd.conf file.
+    See also the "`fake super`" setting in the daemon's rsyncd.conf file.
 
 0.  `--sparse`, `-S`
 
@@ -2385,7 +2385,7 @@ your home directory (remove the '=' for that).
 
     If a user or group has no name on the source system or it has no match on
     the destination system, then the numeric ID from the source system is used
-    instead.  See also the comments on the "use chroot" setting in the
+    instead.  See also the comments on the "`use chroot`" setting in the
     rsyncd.conf manpage for information on how the chroot setting affects
     rsync's ability to look up the names of the users and groups and what you
     can do about it.
@@ -2441,7 +2441,7 @@ your home directory (remove the '=' for that).
     will occur.  If GROUP is empty, the trailing colon may be omitted, but if
     USER is empty, a leading colon must be supplied.
 
-    If you specify "--chown=foo:bar, this is exactly the same as specifying
+    If you specify "`--chown=foo:bar`", this is exactly the same as specifying
     "`--usermap=*:foo --groupmap=*:bar`", only easier.
 
 0.  `--timeout=TIMEOUT`
@@ -2578,7 +2578,7 @@ your home directory (remove the '=' for that).
     character.  A default format of "%n%L" is assumed if either `--info=name`
     or `-v` is specified (this tells you just the name of the file and, if the
     item is a link, where it points).  For a full list of the possible escape
-    characters, see the "log format" setting in the rsyncd.conf manpage.
+    characters, see the "`log format`" setting in the rsyncd.conf manpage.
 
     Specifying the `--out-format` option implies the `--info=name` option,
     which will mention each file, dir, etc. that gets updated in a significant
@@ -2619,7 +2619,7 @@ your home directory (remove the '=' for that).
     file specified by the `--log-file` option (which must also be specified for
     this option to have any effect).  If you specify an empty string, updated
     files will not be mentioned in the log file.  For a list of the possible
-    escape characters, see the "log format" setting in the rsyncd.conf manpage.
+    escape characters, see the "`log format`" setting in the rsyncd.conf manpage.
 
     The default FORMAT used if `--log-file` is specified and this option is not
     is '%i %n%L'.
@@ -2685,8 +2685,8 @@ your home directory (remove the '=' for that).
     tabs) are always escaped, regardless of this option's setting.
 
     The escape idiom that started in 2.6.7 is to output a literal backslash
-    (\\) and a hash (#), followed by exactly 3 octal digits.  For example, a
-    newline would output as "\\#012".  A literal backslash that is in a
+    (`\`) and a hash (`#`), followed by exactly 3 octal digits.  For example, a
+    newline would output as "`\\#012`".  A literal backslash that is in a
     filename is not escaped unless it is followed by a hash and 3 digits (0-9).
 
 0.  `--human-readable`, `-h`
@@ -2756,10 +2756,10 @@ your home directory (remove the '=' for that).
     rule may be ineffective at the end of your other rules, or (2) you may wish
     to override rsync's exclude choice.  For instance, if you want to make
     rsync clean-up any left-over partial-dirs that may be lying around, you
-    should specify `--delete-after` and add a "risk" filter rule, e.g. `-f 'R
-    .rsync-partial/'`. (Avoid using `--delete-before` or `--delete-during`
-    unless you don't need rsync to use any of the left-over partial-dir data
-    during the current run.)
+    should specify `--delete-after` and add a "risk" filter rule, e.g.
+    `-f 'R .rsync-partial/'`. (Avoid using `--delete-before` or
+    `--delete-during` unless you don't need rsync to use any of the left-over
+    partial-dir data during the current run.)
 
     IMPORTANT: the `--partial-dir` should not be writable by other users or it
     is a security risk.  E.g. AVOID "/tmp".
@@ -2781,7 +2781,7 @@ your home directory (remove the '=' for that).
     tmp).  This requires both ends of the transfer to be at least version
     3.2.0.
 
-    For the purposes of the daemon-config's "refuse options" setting,
+    For the purposes of the daemon-config's "`refuse options`" setting,
     `--partial-dir` does _not_ imply `--partial`.  This is so that a refusal of
     the `--partial` option can be used to disallow the overwriting of
     destination files with a partial transfer, while still allowing the safer
@@ -2983,7 +2983,7 @@ your home directory (remove the '=' for that).
 
     Rsync writes data over the socket in blocks, and this option both limits
     the size of the blocks that rsync writes, and tries to keep the average
-    transfer rate at the requested limit.  Some "burstiness" may be seen where
+    transfer rate at the requested limit.  Some burstiness may be seen where
     rsync writes out a block of data and then sleeps to bring the average rate
     into compliance.
 
@@ -3079,7 +3079,7 @@ your home directory (remove the '=' for that).
     These options also exist in the `--daemon` mode section.
 
     If rsync was complied without support for IPv6, the `--ipv6` option will
-    have no effect.  The `rsync -V` output will contain "no IPv6" if is the
+    have no effect.  The `rsync -V` output will contain "`no IPv6`" if is the
     case.
 
     See also these options in the `--daemon` mode section.
@@ -3162,13 +3162,13 @@ The options allowed when starting an rsync daemon are as follows:
 0. `--log-file=FILE`
 
     This option tells the rsync daemon to use the given log-file name instead
-    of using the "log file" setting in the config file.
+    of using the "`log file`" setting in the config file.
 
 0. `--log-file-format=FORMAT`
 
     This option tells the rsync daemon to use the given FORMAT string instead
-    of using the "log format" setting in the config file.  It also enables
-    "transfer logging" unless the string is empty, in which case transfer
+    of using the "`log format`" setting in the config file.  It also enables
+    "`transfer logging`" unless the string is empty, in which case transfer
     logging is turned off.
 
 0. `--sockopts`
@@ -3180,8 +3180,8 @@ The options allowed when starting an rsync daemon are as follows:
 
     This option increases the amount of information the daemon logs during its
     startup phase.  After the client connects, the daemon's verbosity level
-    will be controlled by the options that the client used and the "max
-    verbosity" setting in the module's config section.
+    will be controlled by the options that the client used and the
+    "`max verbosity`" setting in the module's config section.
 
 0. `--ipv4`, `-4` or `--ipv6`, `-6`
 
@@ -3195,7 +3195,7 @@ The options allowed when starting an rsync daemon are as follows:
     These options also exist in the regular rsync options section.
 
     If rsync was complied without support for IPv6, the `--ipv6` option will
-    have no effect.  The `rsync -V` output will contain "no IPv6" if is the
+    have no effect.  The `rsync -V` output will contain "`no IPv6`" if is the
     case.
 
 0. `--help`, `-h`
@@ -3241,19 +3241,23 @@ available rule prefixes:
 When rules are being read from a file, empty lines are ignored, as are comment
 lines that start with a "#".
 
-Note that the `--include`/`--exclude` command-line options do not allow the
+[comment]: # (Remember that markdown strips spaces from start/end of ` ... ` sequences!)
+[comment]: # (Thus, the `x ` sequences below use a literal non-breakable space!)
+
+Note that the `--include` & `--exclude` command-line options do not allow the
 full range of rule parsing as described above -- they only allow the
-specification of include/exclude patterns plus a "!" token to clear the list
-(and the normal comment parsing when rules are read from a file).  If a pattern
-does not begin with "- " (dash, space) or "+ " (plus, space), then the rule
-will be interpreted as if "+ " (for an include option) or "- " (for an exclude
-option) were prefixed to the string.  A `--filter` option, on the other hand,
-must always contain either a short or long rule name at the start of the rule.
+specification of include / exclude patterns plus a "`!`" token to clear the
+list (and the normal comment parsing when rules are read from a file).  If a
+pattern does not begin with "`- `" (dash, space) or "`+ `" (plus, space), then
+the rule will be interpreted as if "`+ `" (for an include option) or "`- `"
+(for an exclude option) were prefixed to the string.  A `--filter` option, on
+the other hand, must always contain either a short or long rule name at the
+start of the rule.
 
 Note also that the `--filter`, `--include`, and `--exclude` options take one
 rule/pattern each.  To add multiple ones, you can repeat the options on the
 command-line, use the merge-file syntax of the `--filter` option, or the
-`--include-from`/`--exclude-from` options.
+`--include-from` / `--exclude-from` options.
 
 # INCLUDE/EXCLUDE PATTERN RULES
 
@@ -3266,9 +3270,9 @@ forms:
 - if the pattern starts with a / then it is anchored to a particular spot in
   the hierarchy of files, otherwise it is matched against the end of the
   pathname.  This is similar to a leading ^ in regular expressions.  Thus
-  "/foo" would match a name of "foo" at either the "root of the transfer" (for
+  `/foo` would match a name of "foo" at either the "root of the transfer" (for
   a global rule) or in the merge-file's directory (for a per-directory rule).
-  An unqualified "foo" would match a name of "foo" anywhere in the tree because
+  An unqualified `foo` would match a name of "foo" anywhere in the tree because
   the algorithm is applied recursively from the top down; it behaves as if each
   path component gets a turn at being the end of the filename.  Even the
   unanchored "sub/foo" would match at any point in the hierarchy where a "foo"

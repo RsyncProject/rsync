@@ -720,7 +720,7 @@ Protocol: 30 (unchanged)
    that hasn't really been created.
 
  - Fixed a problem with `--compress` (`-z`) where the receiving side could
-   return the error `inflate (token) returned `-5``.
+   return the error "inflate (token) returned -5".
 
  - Fixed a bug where `--delete-during` could delete in a directory before it
    noticed that the sending side sent an I/O error for that directory (both
@@ -739,7 +739,7 @@ Protocol: 30 (unchanged)
  - An absolute-path filter rule (i.e. with a '/' modifier) no longer loses its
    modifier when sending the filter rules to the remote rsync.
 
- - Improved the `--delete does not work without -r or -d` message.
+ - Improved the "--delete does not work without -r or -d" message.
 
  - Improved rsync's handling of `--timeout` to avoid a weird timeout case where
    the sender could timeout even though it has recently written data to the
@@ -1248,7 +1248,7 @@ Protocol: 30 (changed)
    either turn off `-d` (`--no-d`), or specify `-r --exclude='/*/*'` manually.
 
  - In `--dry-run` mode, the last line of the verbose summary text is output
-   with a `(DRY RUN)` suffix to help remind you that no updates were made.
+   with a "(DRY RUN)" suffix to help remind you that no updates were made.
    Similarly, `--only-write-batch` outputs `(BATCH ONLY)`.
 
  - A writable rsync daemon with `use chroot` disabled now defaults to a
@@ -1348,7 +1348,7 @@ Protocol: 30 (changed)
  - Using `--only-write-batch` to a daemon receiver now works properly (older
    versions would update some files while writing the batch).
 
- - Avoid outputting a `file has vanished` message when the file is a broken
+ - Avoid outputting a "file has vanished" message when the file is a broken
    symlink and `--copy-unsafe-links` or `--copy-dirlinks` is used (the code
    already handled this for `--copy-links`).
 
@@ -1426,8 +1426,8 @@ Protocol: 30 (changed)
  - Added the `--skip-compress=LIST` option to override the default list of file
    suffixes that will not be compressed when using `--compress` (`-z`).
 
- - The daemon's default for `dont compress` was extended to include: `*.7z
-   *.mp[34] *.mov *.avi *.ogg *.jpg *.jpeg` The name-matching routine was also
+ - The daemon's default for `dont compress` was extended to include: `*.7z`
+   `*.mp[34]` `*.mov` `*.avi` `*.ogg` `*.jpg` `*.jpeg` and the name-matching routine was also
    optimized to run more quickly.
 
  - The `--max-delete` option now outputs a warning if it skipped any file
@@ -1788,7 +1788,7 @@ Protocol: 29 (unchanged)
 
  - Removed the unused function `write_int_named()`, the unused variable
    `io_read_phase`, and the rarely used variable `io_write_phase`. This also
-   elides the confusing `phase "unknown"` part of one error message.
+   elides the confusing 'phase "unknown"' part of one error message.
 
  - Removed two unused configure checks and two related (also unused)
    compatibility functions.
@@ -3563,7 +3563,7 @@ Protocol: 26 (unchanged)
    int64` in rsync.h.
 
  - Fixed problem on systems such as Sunos4 that do not support realloc on a
-   NULL pointer; error was `out of memory in "flist_expand"`.
+   NULL pointer; error was 'out of memory in "flist_expand"'.
 
  - Fix for rsync server processes hanging around after the client unexpectedly
    disconnects. (Colin Walters) (Debian bug #128632)
@@ -3623,7 +3623,7 @@ Protocol: 26 (changed)
  - `--statistics` now shows memory heap usage on platforms that support
    mallinfo().
 
- - `The Ted T'so school of program optimization`: make progress visible and
+ - "The Ted T'so school of program optimization": make progress visible and
    people will think it's faster. (With `--progress`, rsync will show you how
    many files it has seen as it builds the `file_list`, giving some indication
    that it has not hung.)

@@ -45,8 +45,8 @@ Protocol: 31 (unchanged)
 
  - Avoid a hang when an overabundance of messages clogs up all the I/O buffers.
 
- - Fixed a mismatch in the RSYNC_PID values when running both a `pre-xfer exec`
-   and a `post-xfer exec`.
+ - Fixed a mismatch in the RSYNC_PID values put into the environment of
+   `pre-xfer exec` and a `post-xfer exec`.
 
  - Fixed a crash in the `--iconv` code.
 
@@ -135,7 +135,7 @@ Protocol: 31 (unchanged)
  - Made -V the short option for --version.
 
  - Forward -4 & -6 options to the ssh command, making them easier to type than
-   "--rsh='ssh -4'" (or -6).
+   `--rsh='ssh -4'` (or -6).
 
 ### PACKAGING RELATED:
 
@@ -143,7 +143,7 @@ Protocol: 31 (unchanged)
 
  - Add installed man page: /usr/man/man1/rsync-ssl.1
 
- - Some "readme" files have changed names to be .md files, such as: README.md,
+ - Some readme files have changed names to be .md files, such as: README.md,
    INSTALL.md, NEWS.md, & OLDNEWS.md.
 
  - The rsync-ssl script wants to run either openssl or stunnel4, so consider

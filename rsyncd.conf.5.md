@@ -18,7 +18,7 @@ modules.
 
 The file consists of modules and parameters. A module begins with the name of
 the module in square brackets and continues until the next module begins.
-Modules contain parameters of the form "name = value".
+Modules contain parameters of the form `name = value`.
 
 The file is line-based -- that is, each newline-terminated line represents
 either a comment, a module name or a parameter.
@@ -282,9 +282,9 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     This parameter tells rsync to modify all symlinks in the same way as the
     (non-daemon-affecting) `--munge-links` command-line option (using a method
     described below).  This should help protect your files from user trickery
-    when your daemon module is writable.  The default is disabled when "use
-    chroot" is on with an inside-chroot path of "/", OR if "daemon chroot" is
-    on, otherwise it is enabled.
+    when your daemon module is writable.  The default is disabled when
+    "use chroot" is on with an inside-chroot path of "/", OR if "daemon chroot"
+    is on, otherwise it is enabled.
 
     If you disable this parameter on a daemon that is not read-only, there are
     tricks that a user can play with uploaded symlinks to access
@@ -393,8 +393,8 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     and `--debug` logging.  If the max value is 2, then no info and/or debug
     value that is higher than what would be set by `-vv` will be honored by the
     daemon in its logging.  To see how high of a verbosity level you need to
-    accept for a particular info/debug level, refer to "rsync --info=help" and
-    "rsync --debug=help".  For instance, it takes max-verbosity 4 to be able to
+    accept for a particular info/debug level, refer to `rsync --info=help` and
+    `rsync --debug=help`.  For instance, it takes max-verbosity 4 to be able to
     output debug TIME2 and FLIST3.
 
 0.  `lock file`
@@ -407,12 +407,11 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
 0.  `read only`
 
     This parameter determines whether clients will be able to upload files or
-    not. If "read only" is true then any attempted uploads will fail. If "read
-    only" is false then uploads will be possible if file permissions on the
-    daemon side allow them. The default is for all modules to be read only.
+    not. If "read only" is true then any attempted uploads will fail. If
+    "read only" is false then uploads will be possible if file permissions on
+    the daemon side allow them. The default is for all modules to be read only.
 
-    Note that "auth users" can override this setting on a
-    per-user basis.
+    Note that "auth users" can override this setting on a per-user basis.
 
 0.  `write only`
 
@@ -511,7 +510,7 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
 
     The "filter" parameter takes a space-separated list of daemon filter rules,
     though it is smart enough to know not to split a token at an internal space
-    in a rule (e.g. "- /foo  - /bar" is parsed as two rules).  You may specify
+    in a rule (e.g. "`- /foo  - /bar`" is parsed as two rules).  You may specify
     one or more merge-file rules using the normal syntax.  Only one "filter"
     parameter can apply to a given module in the config file, so put all the
     rules you want in a single parameter.  Note that per-directory merge-file
@@ -523,8 +522,8 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
 0.  `exclude`
 
     This parameter takes a space-separated list of daemon exclude patterns.  As
-    with the client `--exclude` option, patterns can be qualified with "- " or
-    "+ " to explicitly indicate exclude/include.  Only one "exclude" parameter
+    with the client `--exclude` option, patterns can be qualified with "`- `" or
+    "`+ `" to explicitly indicate exclude/include.  Only one "exclude" parameter
     can apply to a given module.  See the "filter" parameter for a description
     of how excluded files affect the daemon.
 
@@ -580,9 +579,9 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     authentication. If "auth users" is set then the client will be challenged
     to supply a username and password to connect to the module. A challenge
     response authentication protocol is used for this exchange. The plain text
-    usernames and passwords are stored in the file specified by the "secrets
-    file" parameter. The default is for all users to be able to connect without
-    a password (this is called "anonymous rsync").
+    usernames and passwords are stored in the file specified by the
+    "secrets file" parameter. The default is for all users to be able to
+    connect without a password (this is called "anonymous rsync").
 
     In addition to username matching, you can specify groupname matching via a
     '@' prefix.  When using groupname matching, the authenticating username
@@ -702,8 +701,8 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     If both parameters are specified then the "hosts allow" parameter is
     checked first and a match results in the client being able to connect. The
     "hosts deny" parameter is then checked and a match means that the host is
-    rejected. If the host does not match either the "hosts allow" or the "hosts
-    deny" patterns then it is allowed to connect.
+    rejected. If the host does not match either the "hosts allow" or the
+    "hosts deny" patterns then it is allowed to connect.
 
     The default is no "hosts allow" parameter, which means all hosts can
     connect.
@@ -721,11 +720,11 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
 0.  `reverse lookup`
 
     Controls whether the daemon performs a reverse lookup on the client's IP
-    address to determine its hostname, which is used for "hosts allow"/"hosts
-    deny" checks and the "%h" log escape.  This is enabled by default, but you
-    may wish to disable it to save time if you know the lookup will not return
-    a useful result, in which case the daemon will use the name "UNDETERMINED"
-    instead.
+    address to determine its hostname, which is used for "hosts allow" &
+    "hosts deny" checks and the "%h" log escape.  This is enabled by default,
+    but you may wish to disable it to save time if you know the lookup will not
+    return a useful result, in which case the daemon will use the name
+    "UNDETERMINED" instead.
 
     If this parameter is enabled globally (even by default), rsync performs the
     lookup as soon as a client connects, so disabling it for a module will not
@@ -770,18 +769,18 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     transfers when transfer logging is enabled.  The format is a text string
     containing embedded single-character escape sequences prefixed with a
     percent (%) character.  An optional numeric field width may also be
-    specified between the percent and the escape letter (e.g. "`%-50n %8l
-    %07p`").  In addition, one or more apostrophes may be specified prior to a
-    numerical escape to indicate that the numerical value should be made more
-    human-readable.  The 3 supported levels are the same as for the
+    specified between the percent and the escape letter (e.g.
+    "`%-50n %8l %07p`").  In addition, one or more apostrophes may be specified
+    prior to a numerical escape to indicate that the numerical value should be
+    made more human-readable.  The 3 supported levels are the same as for the
     `--human-readable` command-line option, though the default is for
     human-readability to be off.  Each added apostrophe increases the level
     (e.g. "`%''l %'b %f`").
 
-    The default log format is "%o %h [%a] %m (%u) %f %l", and a "%t [%p] " is
-    always prefixed when using the "log file" parameter.  (A perl script that
-    will summarize this default log format is included in the rsync source code
-    distribution in the "support" subdirectory: rsyncstats.)
+    The default log format is "`%o %h [%a] %m (%u) %f %l`", and a "`%t [%p] `"
+    is always prefixed when using the "log file" parameter.  (A perl script
+    that will summarize this default log format is included in the rsync source
+    code distribution in the "support" subdirectory: rsyncstats.)
 
     The single-character escapes that are understood are as follows:
 
@@ -801,8 +800,8 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     - %h the remote host name (only available for a daemon)
     - %i an itemized list of what is being updated
     - %l the length of the file in bytes
-    - %L the string " -> SYMLINK", " => HARDLINK", or "" (where `SYMLINK` or
-      `HARDLINK` is a filename)
+    - %L the string "` -> SYMLINK`", "` => HARDLINK`", or "" (where `SYMLINK`
+      or `HARDLINK` is a filename)
     - %m the module name
     - %M the last-modified time of the file
     - %n the filename (short form; trailing "/" on dir)
@@ -867,7 +866,7 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
 
     >     refuse options = * no-iconv !a !v
 
-    As an additional aid (beginning in 3.2.0), refusing (or "!refusing") the
+    As an additional aid (beginning in 3.2.0), refusing (or "`!refusing`") the
     "a" or "archive"  option also affects all the options that the `--archive`
     option implies (`-rdlptgoD`), but only if the option  is matched explicitly
     (not using a wildcard). If you want to do something tricky, you can use
@@ -899,21 +898,21 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     "`!compress*`" so that you also accept the `--compress-level` option.
 
     Note that the "write-devices" option is refused by default, but can be
-    explicitly accepted with "!write-devices".  The options "log-file" and
+    explicitly accepted with "`!write-devices`".  The options "log-file" and
     "log-file-format" are forcibly refused and cannot be accepted.
 
     Here are all the options that are not matched by wild-cards:
 
     - `--server`: Required for rsync to even work.
-    - `-e`: Required to convey compatibility flags to the server.
+    - `--rsh`, `-e`: Required to convey compatibility flags to the server.
     - `--log-format`: This is required to convey things like
       `--itemize-changes` to a remote receiver. Is an older name for
       `--out-format` that is still passed to the server for improved backward
       compatibility and should not be confused with `--log-file-format`.
     - `--sender`: Use "write only" parameter instead of refusing this.
-    - `-n, --dry-run`: Who would want to disable this?
-    - `-s, --protect-args`: This actually makes transfers safer.
-    - `-0, --from0`: Make it easier to accept/refuse `--files-from` without
+    - `--dry-run`, `-n`: Who would want to disable this?
+    - `--protect-args`, `-n`: This actually makes transfers safer.
+    - `--from0`, `-0`: Make it easier to accept/refuse `--files-from` without
       affecting this modifier.
     - `--iconv`: This is auto-disabled based on "charset" parameter.
     - `--no-iconv`: Most transfers use this option.
@@ -936,10 +935,10 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     compression occurs for those files.  Other algorithms have the level
     minimized to reduces the CPU usage as much as possible.
 
-    See the `--skip-compress` parameter in the `rsync`(1) manpage for the list
-    of file suffixes that are not compressed by default.  Specifying a value
-    for the "dont compress" parameter changes the default when the daemon is
-    the sender.
+    See the `--skip-compress` parameter in the **rsync**(1) manpage for the
+    list of file suffixes that are not compressed by default.  Specifying a
+    value for the "dont compress" parameter changes the default when the daemon
+    is the sender.
 
 0.  `early exec`, `pre-xfer exec`, `post-xfer exec`
 
