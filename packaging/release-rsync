@@ -329,13 +329,18 @@ About to:
     shutil.rmtree(rsync_ver)
 
     print(f"Updating the other files in {dest} ...")
-    cmd_chk('rsync -a README.md NEWS.md OLDNEWS.md TODO'.split() + [dest])
-    if os.path.lexists(news_file):
-        os.unlink(news_file)
-    os.link(f"{dest}/NEWS.md", news_file)
-    cmd_chk(f"git log --name-status | gzip -9 >{dest}/ChangeLog.gz")
+    md_files = 'README.md NEWS.md OLDNEWS.md'.split()
+    html_files = [ fn for fn in gen_files if fn.endswith('.html') ]
+    cmd_chk(['rsync', '-a', *md_files, *html_files, dest])
+    cmd_chk(["packaging/md2html"] + [ dest +'/'+ fn for fn in md_files ])
 
-    cmd_chk(['rsync', '-a', *glob.glob('*.[1-9].html'), os.path.join(dest, html_fn)])
+    for topfn, verfn in (('NEWS.md', news_file), ('NEWS.html', news_file.replace('.md', '.html'))):
+        topfn = dest + '/' + topfn
+        if os.path.lexists(verfn):
+            os.unlink(verfn)
+        os.link(topfn, verfn)
+
+    cmd_chk(f"git log --name-status | gzip -9 >{dest}/ChangeLog.gz")
 
     for fn in (srctar_file, pattar_file, diff_file):
         asc_fn = fn + '.asc'

@@ -1,0 +1,87 @@
+#!/usr/bin/python3
+
+# Copyright (C) 2020 Wayne Davison
+#
+# This program is freely redistributable.
+
+import re, argparse
+
+HTML_START = """\
+<html><head>
+<title>%s</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto&family=Roboto+Mono&display=swap" rel="stylesheet">
+<style>
+body {
+  max-width: 50em;
+  margin: auto;
+}
+body, b, strong, u {
+  font-family: 'Roboto', sans-serif;
+}
+code {
+  font-family: 'Roboto Mono', monospace;
+  font-weight: bold;
+}
+pre code {
+  display: block;
+  font-weight: normal;
+}
+blockquote pre code {
+  background: #f1f1f1;
+}
+dd p:first-of-type {
+  margin-block-start: 0em;
+}
+</style>
+</head><body>
+"""
+
+HTML_END = """\
+</body></html>
+"""
+
+md_parser = None
+
+def main():
+    for mdfn in args.mdfiles:
+        title = re.sub(r'.*/', '', mdfn).replace('.md', '')
+        htfn = mdfn.replace('.md', '.html')
+
+        print("Parsing", mdfn, '->', htfn)
+
+        with open(mdfn, 'r', encoding='utf-8') as fh:
+            txt = fh.read()
+
+        html = md_parser(txt)
+
+        with open(htfn, 'w', encoding='utf-8') as fh:
+            fh.write(HTML_START % title)
+            fh.write(html)
+            fh.write(HTML_END)
+
+
+def html_via_cmarkgfm(txt):
+    return cmarkgfm.markdown_to_html(txt)
+
+
+def html_via_commonmark(txt):
+    return commonmark.HtmlRenderer().render(commonmark.Parser().parse(txt))
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Output html for md pages.', add_help=False)
+    parser.add_argument("--help", "-h", action="help", help="Output this help message and exit.")
+    parser.add_argument("mdfiles", nargs='+', help="The .md files to turn into .html files.")
+    args = parser.parse_args()
+
+    try:
+        import cmarkgfm
+        md_parser = html_via_cmarkgfm
+    except:
+        try:
+            import commonmark
+            md_parser = html_via_commonmark
+        except:
+            die("Failed to find cmarkgfm or commonmark for python3.")
+
+    main()
