@@ -114,7 +114,7 @@ is hosted on github and on samba's site.  Feel free to access it here:
 
 or clone it from its samba repo:
 
-    git clone git://git.samba.org/rsync.git
+>     git clone git://git.samba.org/rsync.git
 
 See the download page for full details on all the ways to grab the
 source:
