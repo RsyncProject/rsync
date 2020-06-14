@@ -254,10 +254,9 @@ About to:
     if re.match(r'^y', ans, re.I):
         print(f'\nVisiting all "patch/{args.master_branch}/*" branches ...')
         cmd_run(f"packaging/patch-update --branch={args.master_branch} --skip-check --shell")
-        cmd_run("rm -f *.[o15] *.html")
-        cmd_chk('rsync -a SaVeDiR/ .'.split())
-        shutil.rmtree('SaVeDiR')
-        cmd_chk('make gen'.split())
+
+    cmd_run("rm -f *.[o15] *.html")
+    cmd_chk('rsync -a SaVeDiR/ .'.split())
 
     if os.path.isdir('patches/.git'):
         s = cmd_run(f"cd patches && git commit -a -m 'The patches for {version}.'")
@@ -320,6 +319,11 @@ About to:
     os.mkdir(f"{rsync_ver}/patches", 0o755)
     cmd_chk(f"packaging/patch-update --skip-check --branch={args.master_branch} --gen={rsync_ver}/patches".split())
 
+    cmd_run("rm -f *.[o15] *.html")
+    cmd_chk('rsync -a SaVeDiR/ .'.split())
+    shutil.rmtree('SaVeDiR')
+    cmd_chk('make gen'.split())
+
     print(f"Creating {pattar_file} ...")
     cmd_chk(['fakeroot', 'tar', 'chzf', pattar_file, rsync_ver + '/patches'])
     shutil.rmtree(rsync_ver)
@@ -331,9 +335,7 @@ About to:
     os.link(f"{dest}/NEWS.md", news_file)
     cmd_chk(f"git log --name-status | gzip -9 >{dest}/ChangeLog.gz")
 
-    for md_fn in glob.glob('*.[1-9].md'):
-        html_fn = md_fn.replace('.md', '.html')
-        cmd_chk(['rsync', '-a', html_fn, os.path.join(dest, html_fn)])
+    cmd_chk(['rsync', '-a', *glob.glob('*.[1-9].html'), os.path.join(dest, html_fn)])
 
     for fn in (srctar_file, pattar_file, diff_file):
         asc_fn = fn + '.asc'
