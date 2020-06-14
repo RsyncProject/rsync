@@ -81,6 +81,7 @@ extern BOOL want_progress_now;
 extern BOOL shutting_down;
 extern int backup_dir_len;
 extern int basis_dir_cnt;
+extern int default_af_hint;
 extern struct stats stats;
 extern char *stdout_format;
 extern char *logfile_format;
@@ -547,8 +548,13 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char **remote_argv, in
 			*t++ = '\0';
 		}
 
-		/* check to see if we've already been given '-l user' in
-		 * the remote-shell command */
+		/* NOTE: must preserve t == start of command name until the end of the args handling! */
+		if ((t = strrchr(cmd, '/')) != NULL)
+			t++;
+		else
+			t = cmd;
+
+		/* Check to see if we've already been given '-l user' in the remote-shell command. */
 		for (i = 0; i < argc-1; i++) {
 			if (!strcmp(args[i], "-l") && args[i+1][0] != '-')
 				dash_l_set = 1;
@@ -566,22 +572,23 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char **remote_argv, in
 			args[argc++] = "-l";
 			args[argc++] = user;
 		}
+#ifdef AF_INET
+		if (default_af_hint == AF_INET && strcmp(t, "ssh") == 0)
+			args[argc++] = "-4"; /* we're using ssh so we can add a -4 option */
+#endif
+#ifdef AF_INET6
+		if (default_af_hint == AF_INET6 && strcmp(t, "ssh") == 0)
+			args[argc++] = "-6"; /* we're using ssh so we can add a -6 option */
+#endif
 		args[argc++] = machine;
 #endif
 
 		args[argc++] = rsync_path;
 
-		if (blocking_io < 0) {
-			char *cp;
-			if ((cp = strrchr(cmd, '/')) != NULL)
-				cp++;
-			else
-				cp = cmd;
-			if (strcmp(cp, "rsh") == 0 || strcmp(cp, "remsh") == 0)
-				blocking_io = 1;
-		}
+		if (blocking_io < 0 && (strcmp(t, "rsh") == 0 || strcmp(t, "remsh") == 0))
+			blocking_io = 1;
 
-		server_options(args,&argc);
+		server_options(args, &argc);
 
 		if (argc >= MAX_ARGS - 2)
 			goto arg_overflow;

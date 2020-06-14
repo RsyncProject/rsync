@@ -3068,13 +3068,21 @@ your home directory (remove the '=' for that).
 
 0. `--ipv4`, `-4` or `--ipv6`, `-6`
 
-    Tells rsync to prefer IPv4/IPv6 when creating sockets.  This only affects
-    sockets that rsync has direct control over, such as the outgoing socket
-    when directly contacting an rsync daemon.  See also these options in the
-    `--daemon` mode section.
+    Tells rsync to prefer IPv4/IPv6 when creating sockets or running ssh.  This
+    affects sockets that rsync has direct control over, such as the outgoing
+    socket when directly contacting an rsync daemon, as well as the forwaring
+    of the `-4` or `-6` option to ssh when rsync can deduce that ssh is being
+    used as the remote shell.  For other remote shells you'll need to specify
+    the "`--rsh SHELL -4`" option directly (or whatever ipv4/ipv6 hint options
+    it uses).
+
+    These options also exist in the `--daemon` mode section.
 
     If rsync was complied without support for IPv6, the `--ipv6` option will
-    have no effect.  The `--version` output will tell you if this is the case.
+    have no effect.  The `rsync -V` output will contain "no IPv6" if is the
+    case.
+
+    See also these options in the `--daemon` mode section.
 
 0. `--checksum-seed=NUM`
 
@@ -3184,8 +3192,11 @@ The options allowed when starting an rsync daemon are as follows:
     using the port, try specifying `--ipv6` or `--ipv4` when starting the
     daemon).
 
+    These options also exist in the regular rsync options section.
+
     If rsync was complied without support for IPv6, the `--ipv6` option will
-    have no effect.  The `--version` output will tell you if this is the case.
+    have no effect.  The `rsync -V` output will contain "no IPv6" if is the
+    case.
 
 0. `--help`, `-h`
 

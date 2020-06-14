@@ -134,6 +134,9 @@ Protocol: 31 (unchanged)
 
  - Made -V the short option for --version.
 
+ - Forward -4 & -6 options to the ssh command, making them easier to type than
+   "--rsh='ssh -4'" (or -6).
+
 ### PACKAGING RELATED:
 
  - Add installed binary: /usr/bin/rsync-sll
