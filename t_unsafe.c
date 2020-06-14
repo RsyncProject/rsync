@@ -38,8 +38,7 @@ main(int argc, char **argv)
 		return 1;
 	}
 
-	printf("%s\n",
-	       unsafe_symlink(argv[1], argv[2]) ? "unsafe" : "safe");
+	printf("%s\n", unsafe_symlink(argv[1], argv[2]) ? "unsafe" : "safe");
 
 	return 0;
 }

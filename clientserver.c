@@ -123,8 +123,7 @@ int start_socket_client(char *host, int remote_argc, char *remote_argv[],
 		*p = '\0';
 	}
 
-	fd = open_socket_out_wrapped(host, rsync_port, bind_address,
-				     default_af_hint);
+	fd = open_socket_out_wrapped(host, rsync_port, bind_address, default_af_hint);
 	if (fd == -1)
 		exit_cleanup(RERR_SOCKETIO);
 
@@ -755,24 +754,24 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 
 	p = lp_filter(i);
 	parse_filter_str(&daemon_filter_list, p, rule_template(FILTRULE_WORD_SPLIT),
-		   XFLG_ABS_IF_SLASH | XFLG_DIR2WILD3);
+		XFLG_ABS_IF_SLASH | XFLG_DIR2WILD3);
 
 	p = lp_include_from(i);
 	parse_filter_file(&daemon_filter_list, p, rule_template(FILTRULE_INCLUDE),
-	    XFLG_ABS_IF_SLASH | XFLG_DIR2WILD3 | XFLG_OLD_PREFIXES | XFLG_FATAL_ERRORS);
+		XFLG_ABS_IF_SLASH | XFLG_DIR2WILD3 | XFLG_OLD_PREFIXES | XFLG_FATAL_ERRORS);
 
 	p = lp_include(i);
 	parse_filter_str(&daemon_filter_list, p,
-		   rule_template(FILTRULE_INCLUDE | FILTRULE_WORD_SPLIT),
-		   XFLG_ABS_IF_SLASH | XFLG_DIR2WILD3 | XFLG_OLD_PREFIXES);
+		rule_template(FILTRULE_INCLUDE | FILTRULE_WORD_SPLIT),
+		XFLG_ABS_IF_SLASH | XFLG_DIR2WILD3 | XFLG_OLD_PREFIXES);
 
 	p = lp_exclude_from(i);
 	parse_filter_file(&daemon_filter_list, p, rule_template(0),
-	    XFLG_ABS_IF_SLASH | XFLG_DIR2WILD3 | XFLG_OLD_PREFIXES | XFLG_FATAL_ERRORS);
+		XFLG_ABS_IF_SLASH | XFLG_DIR2WILD3 | XFLG_OLD_PREFIXES | XFLG_FATAL_ERRORS);
 
 	p = lp_exclude(i);
 	parse_filter_str(&daemon_filter_list, p, rule_template(FILTRULE_WORD_SPLIT),
-		   XFLG_ABS_IF_SLASH | XFLG_DIR2WILD3 | XFLG_OLD_PREFIXES);
+		XFLG_ABS_IF_SLASH | XFLG_DIR2WILD3 | XFLG_OLD_PREFIXES);
 
 	log_init(1);
 
@@ -996,8 +995,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	limit_output_verbosity(lp_max_verbosity(i));
 #endif
 
-	if (protocol_version < 23
-	    && (protocol_version == 22 || am_sender))
+	if (protocol_version < 23 && (protocol_version == 22 || am_sender))
 		io_start_multiplex_out(f_out);
 	else if (!ret || err_msg) {
 		/* We have to get I/O multiplexing started so that we can

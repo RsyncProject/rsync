@@ -75,9 +75,8 @@ struct ht_int64_node *idev_find(int64 dev, int64 ino)
 		if (dev_node->data == data_when_new) {
 			dev_node->data = hashtable_create(512, HT_KEY64);
 			if (DEBUG_GTE(HLINK, 3)) {
-				rprintf(FINFO,
-				    "[%s] created hashtable for dev %s\n",
-				    who_am_i(), big_num(dev));
+				rprintf(FINFO, "[%s] created hashtable for dev %s\n",
+					who_am_i(), big_num(dev));
 			}
 		}
 	}
@@ -118,8 +117,7 @@ static void match_gnums(int32 *ndx_list, int ndx_count)
 	struct ht_int32_node *node = NULL;
 	int32 gnum, gnum_next;
 
-	qsort(ndx_list, ndx_count, sizeof ndx_list[0],
-	     (int (*)()) hlink_compare_gnum);
+	qsort(ndx_list, ndx_count, sizeof ndx_list[0], (int (*)()) hlink_compare_gnum);
 
 	for (from = 0; from < ndx_count; from++) {
 		file = hlink_flist->sorted[ndx_list[from]];

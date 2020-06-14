@@ -525,8 +525,8 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char **remote_argv, in
 				if (!*f) {
 					if (in_quote) {
 						rprintf(FERROR,
-						    "Missing trailing-%c in remote-shell command.\n",
-						    in_quote);
+							"Missing trailing-%c in remote-shell command.\n",
+							in_quote);
 						exit_cleanup(RERR_SYNTAX);
 					}
 					f--;
@@ -685,7 +685,7 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 
 	/* Treat an empty string as a copy into the current directory. */
 	if (!*dest_path)
-	    dest_path = ".";
+		dest_path = ".";
 
 	if (daemon_filter_list.head) {
 		char *slash = strrchr(dest_path, '/');
@@ -746,8 +746,7 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 			*cp = '\0';
 
 		if (statret == 0) {
-			rprintf(FERROR,
-			    "ERROR: destination path is not a directory\n");
+			rprintf(FERROR, "ERROR: destination path is not a directory\n");
 			exit_cleanup(RERR_SYNTAX);
 		}
 
@@ -821,15 +820,15 @@ static void check_alt_basis_dirs(void)
 			if (!new)
 				out_of_memory("check_alt_basis_dirs");
 			if (slash && strncmp(bdir, "../", 3) == 0) {
-			    /* We want to remove only one leading "../" prefix for
-			     * the directory we couldn't create in dry-run mode:
-			     * this ensures that any other ".." references get
-			     * evaluated the same as they would for a live copy. */
-			    *slash = '\0';
-			    pathjoin(new, len, curr_dir, bdir + 3);
-			    *slash = '/';
+				/* We want to remove only one leading "../" prefix for
+				 * the directory we couldn't create in dry-run mode:
+				 * this ensures that any other ".." references get
+				 * evaluated the same as they would for a live copy. */
+				*slash = '\0';
+				pathjoin(new, len, curr_dir, bdir + 3);
+				*slash = '/';
 			} else
-			    pathjoin(new, len, curr_dir, bdir);
+				pathjoin(new, len, curr_dir, bdir);
 			basis_dir[j] = bdir = new;
 		}
 		if (do_stat(bdir, &st) < 0)
@@ -1169,8 +1168,7 @@ static void do_server_recv(int f_in, int f_out, int argc, char *argv[])
 		if (partial_dir && *partial_dir == '/'
 		 && check_filter(elp, FLOG, partial_dir + module_dirlen, 1) < 0) {
 		    options_rejected:
-			rprintf(FERROR,
-				"Your options have been rejected by the server.\n");
+			rprintf(FERROR, "Your options have been rejected by the server.\n");
 			exit_cleanup(RERR_SYNTAX);
 		}
 	}
@@ -1389,8 +1387,7 @@ static int start_client(int argc, char *argv[])
 				remote_argc--; /* don't count dest */
 				argc = 1;
 			}
-			if (filesfrom_host && *filesfrom_host
-			    && strcmp(filesfrom_host, shell_machine) != 0) {
+			if (filesfrom_host && *filesfrom_host && strcmp(filesfrom_host, shell_machine) != 0) {
 				rprintf(FERROR,
 					"--files-from hostname is not the same as the transfer hostname\n");
 				exit_cleanup(RERR_SYNTAX);
@@ -1412,8 +1409,7 @@ static int start_client(int argc, char *argv[])
 			remote_argc = 1;
 
 			path = check_for_hostspec(p, &shell_machine, &rsync_port);
-			if (path && filesfrom_host && *filesfrom_host
-			    && strcmp(filesfrom_host, shell_machine) != 0) {
+			if (path && filesfrom_host && *filesfrom_host && strcmp(filesfrom_host, shell_machine) != 0) {
 				rprintf(FERROR,
 					"--files-from hostname is not the same as the transfer hostname\n");
 				exit_cleanup(RERR_SYNTAX);
@@ -1528,8 +1524,7 @@ static int start_client(int argc, char *argv[])
 		set_env_num("RSYNC_PORT", env_port);
 #endif
 
-	pid = do_cmd(shell_cmd, shell_machine, shell_user, remote_argv, remote_argc,
-		     &f_in, &f_out);
+	pid = do_cmd(shell_cmd, shell_machine, shell_user, remote_argv, remote_argc, &f_in, &f_out);
 
 	/* if we're running an rsync server on the remote host over a
 	 * remote shell command, we need to do the RSYNCD protocol first */

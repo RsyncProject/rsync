@@ -273,8 +273,7 @@ void send_files(int f_in, int f_out)
 
 		if (!(iflags & ITEM_TRANSFER)) {
 			maybe_log_item(file, iflags, itemizing, xname);
-			write_ndx_and_attrs(f_out, ndx, iflags, fname, file,
-					    fnamecmp_type, xname, xlen);
+			write_ndx_and_attrs(f_out, ndx, iflags, fname, file, fnamecmp_type, xname, xlen);
 			if (iflags & ITEM_IS_NEW) {
 				stats.created_files++;
 				if (S_ISREG(file->mode)) {
@@ -329,8 +328,7 @@ void send_files(int f_in, int f_out)
 
 		if (!do_xfers) { /* log the transfer */
 			log_item(FCLIENT, file, iflags, NULL);
-			write_ndx_and_attrs(f_out, ndx, iflags, fname, file,
-					    fnamecmp_type, xname, xlen);
+			write_ndx_and_attrs(f_out, ndx, iflags, fname, file, fnamecmp_type, xname, xlen);
 			continue;
 		}
 
@@ -343,9 +341,7 @@ void send_files(int f_in, int f_out)
 		fd = do_open(fname, O_RDONLY, 0);
 		if (fd == -1) {
 			if (errno == ENOENT) {
-				enum logcode c = am_daemon
-				    && protocol_version < 28 ? FERROR
-							     : FWARNING;
+				enum logcode c = am_daemon && protocol_version < 28 ? FERROR : FWARNING;
 				io_error |= IOERR_VANISHED;
 				rprintf(c, "file has vanished: %s\n",
 					full_fname(fname));
@@ -381,8 +377,7 @@ void send_files(int f_in, int f_out)
 				path,slash,fname, big_num(st.st_size));
 		}
 
-		write_ndx_and_attrs(f_out, ndx, iflags, fname, file,
-				    fnamecmp_type, xname, xlen);
+		write_ndx_and_attrs(f_out, ndx, iflags, fname, file, fnamecmp_type, xname, xlen);
 		write_sum_head(f_xfer, s);
 
 		if (DEBUG_GTE(DELTASUM, 2))

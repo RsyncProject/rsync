@@ -409,8 +409,7 @@ static char *make_output_option(struct output_struct *words, short *levels, ucha
 	return buf;
 }
 
-static void parse_output_words(struct output_struct *words, short *levels,
-			       const char *str, uchar priority)
+static void parse_output_words(struct output_struct *words, short *levels, const char *str, uchar priority)
 {
 	const char *s;
 	int j, len, lev;
@@ -1369,8 +1368,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 				/* Disable popt aliases on the server side and
 				 * then start parsing the options again. */
 				poptFreeContext(pc);
-				pc = poptGetContext(RSYNC_NAME, argc, argv,
-						    long_options, 0);
+				pc = poptGetContext(RSYNC_NAME, argc, argv, long_options, 0);
 				am_server = 1;
 			}
 #ifdef ICONV_OPTION
@@ -1398,8 +1396,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 #endif
 			protect_args = 0;
 			poptFreeContext(pc);
-			pc = poptGetContext(RSYNC_NAME, argc, argv,
-					    long_daemon_options, 0);
+			pc = poptGetContext(RSYNC_NAME, argc, argv, long_daemon_options, 0);
 			while ((opt = poptGetNextOpt(pc)) != -1) {
 				char **cpp;
 				switch (opt) {
@@ -1411,8 +1408,8 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 					arg = poptGetOptArg(pc);
 					if (!strchr(arg, '=')) {
 						rprintf(FERROR,
-						    "--dparam value is missing an '=': %s\n",
-						    arg);
+							"--dparam value is missing an '=': %s\n",
+							arg);
 						goto daemon_error;
 					}
 					cpp = EXPAND_ITEM_LIST(&dparam_list, char *, 4);
@@ -1425,9 +1422,9 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 
 				default:
 					rprintf(FERROR,
-					    "rsync: %s: %s (in daemon mode)\n",
-					    poptBadOption(pc, POPT_BADOPTION_NOALIAS),
-					    poptStrerror(opt));
+						"rsync: %s: %s (in daemon mode)\n",
+						poptBadOption(pc, POPT_BADOPTION_NOALIAS),
+						poptStrerror(opt));
 					goto daemon_error;
 				}
 			}
@@ -1444,8 +1441,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			if (!daemon_opt) {
 				rprintf(FERROR, "Daemon option(s) used without --daemon.\n");
 			    daemon_error:
-				rprintf(FERROR,
-				    "(Type \"rsync --daemon --help\" for assistance with daemon mode.)\n");
+				rprintf(FERROR, "(Type \"rsync --daemon --help\" for assistance with daemon mode.)\n");
 				exit_cleanup(RERR_SYNTAX);
 			}
 
@@ -1576,8 +1572,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 
 		case 'P':
 			if (refused_partial || refused_progress) {
-				create_refuse_error(refused_partial
-				    ? refused_partial : refused_progress);
+				create_refuse_error(refused_partial ? refused_partial : refused_progress);
 				return 0;
 			}
 			do_progress = 1;
@@ -1719,8 +1714,8 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			arg = poptGetOptArg(pc);
 			if (!parse_chmod(arg, &chmod_modes)) {
 				snprintf(err_buf, sizeof err_buf,
-				    "Invalid argument passed to --chmod (%s)\n",
-				    arg);
+					"Invalid argument passed to --chmod (%s)\n",
+					arg);
 				return 0;
 			}
 			break;
@@ -1739,11 +1734,11 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			if (usermap) {
 				if (usermap_via_chown) {
 					snprintf(err_buf, sizeof err_buf,
-					    "--usermap conflicts with prior --chown.\n");
+						"--usermap conflicts with prior --chown.\n");
 					return 0;
 				}
 				snprintf(err_buf, sizeof err_buf,
-				    "You can only specify --usermap once.\n");
+					"You can only specify --usermap once.\n");
 				return 0;
 			}
 			usermap = (char *)poptGetOptArg(pc);
@@ -1754,11 +1749,11 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			if (groupmap) {
 				if (groupmap_via_chown) {
 					snprintf(err_buf, sizeof err_buf,
-					    "--groupmap conflicts with prior --chown.\n");
+						"--groupmap conflicts with prior --chown.\n");
 					return 0;
 				}
 				snprintf(err_buf, sizeof err_buf,
-				    "You can only specify --groupmap once.\n");
+					"You can only specify --groupmap once.\n");
 				return 0;
 			}
 			groupmap = (char *)poptGetOptArg(pc);
@@ -1776,11 +1771,11 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 				if (usermap) {
 					if (!usermap_via_chown) {
 						snprintf(err_buf, sizeof err_buf,
-						    "--chown conflicts with prior --usermap.\n");
+							"--chown conflicts with prior --usermap.\n");
 						return 0;
 					}
 					snprintf(err_buf, sizeof err_buf,
-					    "You can only specify a user-affecting --chown once.\n");
+						"You can only specify a user-affecting --chown once.\n");
 					return 0;
 				}
 				if (asprintf(&usermap, "*:%.*s", len, chown) < 0)
@@ -1791,11 +1786,11 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 				if (groupmap) {
 					if (!groupmap_via_chown) {
 						snprintf(err_buf, sizeof err_buf,
-						    "--chown conflicts with prior --groupmap.\n");
+							"--chown conflicts with prior --groupmap.\n");
 						return 0;
 					}
 					snprintf(err_buf, sizeof err_buf,
-					    "You can only specify a group-affecting --chown once.\n");
+						"You can only specify a group-affecting --chown once.\n");
 					return 0;
 				}
 				if (asprintf(&groupmap, "*:%s", arg) < 0)

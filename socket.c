@@ -49,8 +49,7 @@ static int sock_exec(const char *prog);
 /* Establish a proxy connection on an open socket to a web proxy by using the
  * CONNECT method.  If proxy_user and proxy_pass are not NULL, they are used to
  * authenticate to the proxy using the "Basic" proxy-authorization protocol. */
-static int establish_proxy_connection(int fd, char *host, int port,
-				      char *proxy_user, char *proxy_pass)
+static int establish_proxy_connection(int fd, char *host, int port, char *proxy_user, char *proxy_pass)
 {
 	char *cp, buffer[1024];
 	char *authhdr, authbuf[1024];
@@ -182,8 +181,7 @@ static void contimeout_handler(UNUSED(int val))
  * bind_addr: local address to use.  Normally NULL to bind the wildcard address.
  *
  * af_hint: address family, e.g. AF_INET or AF_INET6. */
-int open_socket_out(char *host, int port, const char *bind_addr,
-		    int af_hint)
+int open_socket_out(char *host, int port, const char *bind_addr, int af_hint)
 {
 	int type = SOCK_STREAM;
 	int error, s, j, addr_cnt, *errnos;
@@ -294,9 +292,7 @@ int open_socket_out(char *host, int port, const char *bind_addr,
 			continue;
 		}
 
-		if (proxied
-		 && establish_proxy_connection(s, host, port,
-					       proxy_user, proxy_pass) != 0) {
+		if (proxied && establish_proxy_connection(s, host, port, proxy_user, proxy_pass) != 0) {
 			close(s);
 			s = -1;
 			continue;
@@ -340,8 +336,7 @@ int open_socket_out(char *host, int port, const char *bind_addr,
  * This is based on the Samba LIBSMB_PROG feature.
  *
  * bind_addr: local address to use.  Normally NULL to get the stack default. */
-int open_socket_out_wrapped(char *host, int port, const char *bind_addr,
-			    int af_hint)
+int open_socket_out_wrapped(char *host, int port, const char *bind_addr, int af_hint)
 {
 	char *prog = getenv("RSYNC_CONNECT_PROG");
 
@@ -458,9 +453,8 @@ static int *open_socket_in(int type, int port, const char *bind_addr,
 
 #ifdef IPV6_V6ONLY
 		if (resp->ai_family == AF_INET6) {
-			if (setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY,
-				       (char *)&one, sizeof one) < 0
-			    && default_af_hint != AF_INET6) {
+			if (setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, (char *)&one, sizeof one) < 0
+			 && default_af_hint != AF_INET6) {
 				close(s);
 				continue;
 			}
@@ -561,8 +555,7 @@ void start_accept_loop(int port, int (*fn)(int, int))
 			rsyserr(FERROR, errno, "listen() on socket failed");
 #ifdef INET6
 			if (errno == EADDRINUSE && i > 0) {
-				rprintf(FINFO,
-				    "Try using --ipv4 or --ipv6 to avoid this listen() error.\n");
+				rprintf(FINFO, "Try using --ipv4 or --ipv6 to avoid this listen() error.\n");
 			}
 #endif
 			exit_cleanup(RERR_SOCKETIO);
@@ -597,8 +590,7 @@ void start_accept_loop(int port, int (*fn)(int, int))
 
 		for (i = 0, fd = -1; sp[i] >= 0; i++) {
 			if (FD_ISSET(sp[i], &fds)) {
-				fd = accept(sp[i], (struct sockaddr *)&addr,
-					    &addrlen);
+				fd = accept(sp[i], (struct sockaddr *)&addr, &addrlen);
 				break;
 			}
 		}
@@ -799,8 +791,7 @@ static int socketpair_tcp(int fd[2])
 	set_blocking(fd[1]);
 
 	if (connect_done == 0) {
-		if (connect(fd[1], (struct sockaddr *)&sock, sizeof sock) != 0
-		    && errno != EISCONN)
+		if (connect(fd[1], (struct sockaddr *)&sock, sizeof sock) != 0 && errno != EISCONN)
 			goto failed;
 	}
 

@@ -66,8 +66,7 @@ static unsigned long msdiff(struct timeval *t1, struct timeval *t2)
  * printed for this file, so we should output a newline.  (Not
  * necessarily the same as all bytes being received.)
  **/
-static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
-			    int is_last)
+static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now, int is_last)
 {
 	char rembuf[64], eol[128];
 	const char *units;
@@ -92,8 +91,7 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
 			is_last = 0;
 		}
 		/* Compute stats based on the starting info. */
-		if (!ph_start.time.tv_sec
-		    || !(diff = msdiff(&ph_start.time, now)))
+		if (!ph_start.time.tv_sec || !(diff = msdiff(&ph_start.time, now)))
 			diff = 1;
 		rate = (double) (ofs - ph_start.ofs) * 1000.0 / diff / 1024.0;
 		/* Switch to total time taken for our last update. */
@@ -103,8 +101,7 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
 		/* Compute stats based on recent progress. */
 		if (!(diff = msdiff(&ph_list[oldest_hpos].time, now)))
 			diff = 1;
-		rate = (double) (ofs - ph_list[oldest_hpos].ofs) * 1000.0
-		     / diff / 1024.0;
+		rate = (double) (ofs - ph_list[oldest_hpos].ofs) * 1000.0 / diff / 1024.0;
 		remain = rate ? (double) (size - ofs) / rate / 1000.0 : 0.0;
 	}
 

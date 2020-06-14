@@ -3,7 +3,7 @@
  *
  * Copyright (C) 1996 Andrew Tridgell
  * Copyright (C) 1996 Paul Mackerras
- * Copyright (C) 2003-2019 Wayne Davison
+ * Copyright (C) 2003-2020 Wayne Davison
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -102,8 +102,7 @@ static OFF_T last_match;
  * If i >= 0, the number of a matched token.  If < 0, indicates we have
  * only literal data.  A -1 will send a 0-token-int too, and a -2 sends
  * only literal data, w/o any token-int. */
-static void matched(int f, struct sum_struct *s, struct map_struct *buf,
-		    OFF_T offset, int32 i)
+static void matched(int f, struct sum_struct *s, struct map_struct *buf, OFF_T offset, int32 i)
 {
 	int32 n = (int32)(offset - last_match); /* max value: block_size (int32) */
 	int32 j;
@@ -207,7 +206,7 @@ static void hash_search(int f,struct sum_struct *s,
 			 * either >= our offset or identical data at that offset.
 			 * Remove any bypassed entries that we can never use. */
 			if (updating_basis_file && s->sums[i].offset < offset
-			    && !(s->sums[i].flags & SUMFLG_SAME_OFFSET)) {
+			 && !(s->sums[i].flags & SUMFLG_SAME_OFFSET)) {
 				*prev = s->sums[i].chain;
 				continue;
 			}
@@ -288,10 +287,10 @@ static void hash_search(int f,struct sum_struct *s,
 			/* we've found a match, but now check to see
 			 * if want_i can hint at a better match. */
 			if (i != want_i && want_i < s->count
-			    && (!updating_basis_file || s->sums[want_i].offset >= offset
-			     || s->sums[want_i].flags & SUMFLG_SAME_OFFSET)
-			    && sum == s->sums[want_i].sum1
-			    && memcmp(sum2, s->sums[want_i].sum2, s->s2length) == 0) {
+			 && (!updating_basis_file || s->sums[want_i].offset >= offset
+			  || s->sums[want_i].flags & SUMFLG_SAME_OFFSET)
+			 && sum == s->sums[want_i].sum1
+			 && memcmp(sum2, s->sums[want_i].sum2, s->s2length) == 0) {
 				/* we've found an adjacent match - the RLL coder
 				 * will be happy */
 				i = want_i;
@@ -317,8 +316,7 @@ static void hash_search(int f,struct sum_struct *s,
 
 		/* Trim off the first byte from the checksum */
 		more = offset + k < len;
-		map = (schar *)map_ptr(buf, offset - backup, k + more + backup)
-		    + backup;
+		map = (schar *)map_ptr(buf, offset - backup, k + more + backup) + backup;
 		s1 -= map[0] + CHAR_OFFSET;
 		s2 -= k * (map[0]+CHAR_OFFSET);
 

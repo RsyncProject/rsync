@@ -171,10 +171,8 @@ static int remember_delete(struct file_struct *file, const char *fname, int flag
 		deldelay_buf[deldelay_cnt++] = '!';
 
 	while (1) {
-		len = snprintf(deldelay_buf + deldelay_cnt,
-			       deldelay_size - deldelay_cnt,
-			       "%x %s%c",
-			       (int)file->mode, fname, '\0');
+		len = snprintf(deldelay_buf + deldelay_cnt, deldelay_size - deldelay_cnt,
+			       "%x %s%c", (int)file->mode, fname, '\0');
 		if ((deldelay_cnt += len) <= deldelay_size)
 			break;
 		deldelay_cnt -= len;
@@ -211,8 +209,7 @@ static int read_delay_line(char *buf, int *flags_p)
 			   deldelay_size - deldelay_cnt);
 		if (len == 0) {
 			if (deldelay_cnt) {
-				rprintf(FERROR,
-				    "ERROR: unexpected EOF in delete-delay file.\n");
+				rprintf(FERROR, "ERROR: unexpected EOF in delete-delay file.\n");
 			}
 			return -1;
 		}
@@ -528,8 +525,7 @@ void itemize(const char *fnamecmp, struct file_struct *file, int ndx, int statre
 			iflags |= ITEM_REPORT_PERMS;
 		if (uid_ndx && am_root && (uid_t)F_OWNER(file) != sxp->st.st_uid)
 			iflags |= ITEM_REPORT_OWNER;
-		if (gid_ndx && !(file->flags & FLAG_SKIP_GROUP)
-		    && sxp->st.st_gid != (gid_t)F_GROUP(file))
+		if (gid_ndx && !(file->flags & FLAG_SKIP_GROUP) && sxp->st.st_gid != (gid_t)F_GROUP(file))
 			iflags |= ITEM_REPORT_GROUP;
 #ifdef SUPPORT_ACLS
 		if (preserve_acls && !S_ISLNK(file->mode)) {
@@ -648,14 +644,14 @@ static void sum_sizes_sqroot(struct sum_struct *sum, int64 len)
 		if (c < 0 || c >= max_blength)
 			blength = max_blength;
 		else {
-		    blength = 0;
-		    do {
-			    blength |= c;
-			    if (len < (int64)blength * blength)
-				    blength &= ~c;
-			    c >>= 1;
-		    } while (c >= 8);	/* round to multiple of 8 */
-		    blength = MAX(blength, BLOCK_SIZE);
+			blength = 0;
+			do {
+				blength |= c;
+				if (len < (int64)blength * blength)
+					blength &= ~c;
+				c >>= 1;
+			} while (c >= 8);	/* round to multiple of 8 */
+			blength = MAX(blength, BLOCK_SIZE);
 		}
 	}
 
@@ -1415,12 +1411,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		if (file->flags & FLAG_DIR_CREATED)
 			statret = -1;
 		if (!preserve_perms) { /* See comment in non-dir code below. */
-			file->mode = dest_mode(file->mode, sx.st.st_mode,
-					       dflt_perms, statret == 0);
+			file->mode = dest_mode(file->mode, sx.st.st_mode, dflt_perms, statret == 0);
 		}
 		if (statret != 0 && basis_dir[0] != NULL) {
-			int j = try_dests_non(file, fname, ndx, fnamecmpbuf, &sx,
-					      itemizing, code);
+			int j = try_dests_non(file, fname, ndx, fnamecmpbuf, &sx, itemizing, code);
 			if (j == -2) {
 				itemizing = 0;
 				code = FNONE;
@@ -1442,8 +1436,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 					"recv_generator: mkdir %s failed",
 					full_fname(fname));
 			  skipping_dir_contents:
-				rprintf(FERROR,
-				    "*** Skipping any contents from this failed directory ***\n");
+				rprintf(FERROR, "*** Skipping any contents from this failed directory ***\n");
 				skip_dir = file;
 				file->flags |= FLAG_MISSING_DIR;
 				goto cleanup;
@@ -1455,7 +1448,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			copy_xattrs(fnamecmpbuf, fname);
 #endif
 		if (set_file_attrs(fname, file, real_ret ? NULL : &real_sx, NULL, 0)
-		    && INFO_GTE(NAME, 1) && code != FNONE && f_out != -1)
+		 && INFO_GTE(NAME, 1) && code != FNONE && f_out != -1)
 			rprintf(code, "%s/\n", fname);
 
 		/* We need to ensure that the dirs in the transfer have both
@@ -1498,8 +1491,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	 * mode based on the local permissions and some heuristics. */
 	if (!preserve_perms) {
 		int exists = statret == 0 && !S_ISDIR(sx.st.st_mode);
-		file->mode = dest_mode(file->mode, sx.st.st_mode, dflt_perms,
-				       exists);
+		file->mode = dest_mode(file->mode, sx.st.st_mode, dflt_perms, exists);
 	}
 
 #ifdef SUPPORT_HARD_LINKS
@@ -1544,8 +1536,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				goto cleanup;
 			}
 		} else if (basis_dir[0] != NULL) {
-			int j = try_dests_non(file, fname, ndx, fnamecmpbuf, &sx,
-					      itemizing, code);
+			int j = try_dests_non(file, fname, ndx, fnamecmpbuf, &sx, itemizing, code);
 			if (j == -2) {
 #ifndef CAN_HARDLINK_SYMLINK
 				if (alt_dest_type == LINK_DEST) {
@@ -1620,8 +1611,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				goto cleanup;
 			}
 		} else if (basis_dir[0] != NULL) {
-			int j = try_dests_non(file, fname, ndx, fnamecmpbuf, &sx,
-					      itemizing, code);
+			int j = try_dests_non(file, fname, ndx, fnamecmpbuf, &sx, itemizing, code);
 			if (j == -2) {
 #ifndef CAN_HARDLINK_SPECIAL
 				if (alt_dest_type == LINK_DEST) {
@@ -1704,8 +1694,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	}
 
 	if (basis_dir[0] != NULL && (statret != 0 || alt_dest_type != COPY_DEST)) {
-		int j = try_dests_reg(file, fname, ndx, fnamecmpbuf, &sx,
-				      statret == 0, itemizing, code);
+		int j = try_dests_reg(file, fname, ndx, fnamecmpbuf, &sx, statret == 0, itemizing, code);
 		if (j == -2) {
 			if (remove_source_files == 1)
 				goto return_with_success;
@@ -1723,8 +1712,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	real_ret = statret;
 
 	if (partial_dir && (partialptr = partial_dir_fname(fname)) != NULL
-	    && link_stat(partialptr, &partial_st, 0) == 0
-	    && S_ISREG(partial_st.st_mode)) {
+	 && link_stat(partialptr, &partial_st, 0) == 0
+	 && S_ISREG(partial_st.st_mode)) {
 		if (statret != 0)
 			goto prepare_to_open;
 	} else
@@ -1931,8 +1920,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	} else {
 		if (generate_and_send_sums(fd, sx.st.st_size, f_out, f_copy) < 0) {
 			rprintf(FWARNING,
-			    "WARNING: file is too large for checksum sending: %s\n",
-			    fnamecmp);
+				"WARNING: file is too large for checksum sending: %s\n",
+				fnamecmp);
 			write_sum_head(f_out, NULL);
 		}
 		close(fd);

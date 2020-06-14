@@ -722,9 +722,7 @@ int glob_expand(const char *arg, char ***argv_p, int *argc_p, int *maxargs_p)
 		s = strdup(arg);
 		if (!s)
 			out_of_memory("glob_expand");
-		clean_fname(s, CFN_KEEP_DOT_DIRS
-			     | CFN_KEEP_TRAILING_SLASH
-			     | CFN_COLLAPSE_DOT_DOT_DIRS);
+		clean_fname(s, CFN_KEEP_DOT_DIRS | CFN_KEEP_TRAILING_SLASH | CFN_COLLAPSE_DOT_DOT_DIRS);
 	}
 
 	ENSURE_MEMSPACE(glob.arg_buf, char, glob.absize, MAXPATHLEN);
@@ -1005,8 +1003,7 @@ int clean_fname(char *name, int flags)
  * ALWAYS collapses ".." elements (except for those at the start of the
  * string up to "depth" deep).  If the resulting name would be empty,
  * change it into a ".". */
-char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth,
-		    int flags)
+char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth, int flags)
 {
 	char *start, *sanp;
 	int rlen = 0, drop_dot_dirs = !relative_paths || !(flags & SP_KEEP_DOT_DIRS);
@@ -1438,8 +1435,7 @@ const char *find_filename_suffix(const char *fn, int fn_len, int *len_ptr)
 		} else if (s_len == 5) {
 			if (strcmp(s+1, "orig") == 0)
 				continue;
-		} else if (s_len > 2 && had_tilde
-		    && s[1] == '~' && isDigit(s + 2))
+		} else if (s_len > 2 && had_tilde && s[1] == '~' && isDigit(s + 2))
 			continue;
 		*len_ptr = s_len;
 		suf = s;
@@ -1642,8 +1638,7 @@ int flist_ndx_pop(flist_ndx_list *lp)
  * After the size check, the list's count is incremented by 1 and a pointer
  * to the "new" list item is returned.
  */
-void *expand_item_list(item_list *lp, size_t item_size,
-		       const char *desc, int incr)
+void *expand_item_list(item_list *lp, size_t item_size, const char *desc, int incr)
 {
 	/* First time through, 0 <= 0, so list is expanded. */
 	if (lp->malloced <= lp->count) {

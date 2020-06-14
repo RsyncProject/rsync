@@ -176,8 +176,7 @@ static int is_in_group(gid_t gid)
 			char *gidbuf = new_array(char, ngroups*21+32);
 			if (!gidbuf)
 				out_of_memory("is_in_group");
-			pos = snprintf(gidbuf, 32, "process has %d gid%s: ",
-				       ngroups, ngroups == 1? "" : "s");
+			pos = snprintf(gidbuf, 32, "process has %d gid%s: ", ngroups, ngroups == 1? "" : "s");
 			for (n = 0; n < ngroups; n++) {
 				pos += snprintf(gidbuf+pos, 21, " %d", (int)gidset[n]);
 			}
@@ -435,8 +434,7 @@ void recv_id_list(int f, struct file_list *flist)
 	}
 	if (preserve_gid && (!am_root || !numeric_ids || groupmap)) {
 		for (i = 0; i < flist->used; i++) {
-			F_GROUP(flist->files[i]) = match_gid(F_GROUP(flist->files[i]),
-							     &flist->files[i]->flags);
+			F_GROUP(flist->files[i]) = match_gid(F_GROUP(flist->files[i]), &flist->files[i]->flags);
 		}
 	}
 }
@@ -497,18 +495,14 @@ void parse_name_map(char *map, BOOL usernames)
 			if (user_to_uid(colon+1, &uid, True))
 				add_to_list(idmap_ptr, id1, noiu, uid, flags);
 			else {
-				rprintf(FERROR,
-				    "Unknown --usermap name on receiver: %s\n",
-				    colon+1);
+				rprintf(FERROR, "Unknown --usermap name on receiver: %s\n", colon+1);
 			}
 		} else {
 			gid_t gid;
 			if (group_to_gid(colon+1, &gid, True))
 				add_to_list(idmap_ptr, id1, noiu, gid, flags);
 			else {
-				rprintf(FERROR,
-				    "Unknown --groupmap name on receiver: %s\n",
-				    colon+1);
+				rprintf(FERROR, "Unknown --groupmap name on receiver: %s\n", colon+1);
 			}
 		}
 
@@ -519,8 +513,7 @@ void parse_name_map(char *map, BOOL usernames)
 	}
 
 	/* The 0 user/group doesn't get its name sent, so add it explicitly. */
-	recv_add_id(idlist_ptr, *idmap_ptr, 0,
-		    numeric_ids ? NULL : usernames ? uid_to_user(0) : gid_to_group(0));
+	recv_add_id(idlist_ptr, *idmap_ptr, 0, numeric_ids ? NULL : usernames ? uid_to_user(0) : gid_to_group(0));
 }
 
 #ifdef HAVE_GETGROUPLIST

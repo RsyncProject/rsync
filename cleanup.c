@@ -172,11 +172,11 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 				const char *fname = cleanup_fname;
 				cleanup_fname = NULL;
 				if (!partial_dir) {
-				    /* We don't want to leave a partial file with a modern time or it
-				     * could be skipped via --update.  Setting the time to something
-				     * really old also helps it to stand out as unfinished in an ls. */
-				    tweak_modtime = 1;
-				    cleanup_file->modtime = 0;
+					/* We don't want to leave a partial file with a modern time or it
+					 * could be skipped via --update.  Setting the time to something
+					 * really old also helps it to stand out as unfinished in an ls. */
+					tweak_modtime = 1;
+					cleanup_file->modtime = 0;
 				}
 				finish_transfer(cleanup_new_fname, fname, NULL, NULL,
 						cleanup_file, tweak_modtime, !partial_dir);

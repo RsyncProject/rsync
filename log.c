@@ -696,7 +696,7 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 			}
 			n  = c = buf2 + MAXPATHLEN - 32;
 			c[0] = iflags & ITEM_LOCAL_CHANGE
-			      ? iflags & ITEM_XNAME_FOLLOWS ? 'h' : 'c'
+			     ? iflags & ITEM_XNAME_FOLLOWS ? 'h' : 'c'
 			     : !(iflags & ITEM_TRANSFER) ? '.'
 			     : !local_server && *op == 's' ? '<' : '>';
 			if (S_ISLNK(file->mode)) {
@@ -815,8 +815,7 @@ void log_item(enum logcode code, struct file_struct *file, int iflags, const cha
 		log_formatted(FLOG, logfile_format, s_or_r, file, NULL, iflags, hlink);
 }
 
-void maybe_log_item(struct file_struct *file, int iflags, int itemizing,
-		    const char *buf)
+void maybe_log_item(struct file_struct *file, int iflags, int itemizing, const char *buf)
 {
 	int significant_flags = iflags & SIGNIFICANT_ITEM_FLAGS;
 	int see_item = itemizing && (significant_flags || *buf

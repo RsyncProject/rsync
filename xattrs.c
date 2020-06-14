@@ -44,8 +44,7 @@ extern int saw_xattr_filter;
 
 #define MAX_FULL_DATUM 32
 
-#define HAS_PREFIX(str, prfx) (*(str) == *(prfx) \
-			    && strncmp(str, prfx, sizeof (prfx) - 1) == 0)
+#define HAS_PREFIX(str, prfx) (*(str) == *(prfx) && strncmp(str, prfx, sizeof (prfx) - 1) == 0)
 
 #define XATTR_ABBREV(x) ((size_t)((x).name - (x).datum) < (x).datum_len)
 
@@ -185,8 +184,7 @@ static ssize_t get_xattr_names(const char *fname)
 /* On entry, the *len_ptr parameter contains the size of the extra space we
  * should allocate when we create a buffer for the data.  On exit, it contains
  * the length of the datum. */
-static char *get_xattr_data(const char *fname, const char *name, size_t *len_ptr,
-			    int no_missing_error)
+static char *get_xattr_data(const char *fname, const char *name, size_t *len_ptr, int no_missing_error)
 {
 	size_t datum_len = sys_lgetxattr(fname, name, NULL, 0);
 	size_t extra_len = *len_ptr;
@@ -215,13 +213,13 @@ static char *get_xattr_data(const char *fname, const char *name, size_t *len_ptr
 		if (len != datum_len) {
 			if (len == (size_t)-1) {
 				rsyserr(FERROR_XFER, errno,
-				    "get_xattr_data: lgetxattr(%s,\"%s\",%ld) failed",
-				    full_fname(fname), name, (long)datum_len);
+					"get_xattr_data: lgetxattr(%s,\"%s\",%ld) failed",
+					full_fname(fname), name, (long)datum_len);
 			} else {
 				rprintf(FERROR_XFER,
-				    "get_xattr_data: lgetxattr(%s,\"%s\",%ld) returned %ld\n",
-				    full_fname(fname), name,
-				    (long)datum_len, (long)len);
+					"get_xattr_data: lgetxattr(%s,\"%s\",%ld) returned %ld\n",
+					full_fname(fname), name,
+					(long)datum_len, (long)len);
 			}
 			free(ptr);
 			return NULL;
@@ -1067,8 +1065,7 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 }
 
 /* Set extended attributes on indicated filename. */
-int set_xattr(const char *fname, const struct file_struct *file,
-	      const char *fnamecmp, stat_x *sxp)
+int set_xattr(const char *fname, const struct file_struct *file, const char *fnamecmp, stat_x *sxp)
 {
 	rsync_xa_list *glst = rsync_xal_l.items;
 	item_list *lst;

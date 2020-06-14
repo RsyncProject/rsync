@@ -171,8 +171,8 @@ int do_mknod(const char *pathname, mode_t mode, dev_t dev)
 		saddr.sun_family = AF_UNIX;
 
 		if ((sock = socket(PF_UNIX, SOCK_STREAM, 0)) < 0
-		    || (unlink(pathname) < 0 && errno != ENOENT)
-		    || (bind(sock, (struct sockaddr*)&saddr, sizeof saddr)) < 0)
+		 || (unlink(pathname) < 0 && errno != ENOENT)
+		 || (bind(sock, (struct sockaddr*)&saddr, sizeof saddr)) < 0)
 			return -1;
 		close(sock);
 #ifdef HAVE_CHMOD

@@ -4,7 +4,7 @@
  * Copyright (C) 1996-2000 Andrew Tridgell
  * Copyright (C) 1996 Paul Mackerras
  * Copyright (C) 2002 Martin Pool <mbp@samba.org>
- * Copyright (C) 2003-2019 Wayne Davison
+ * Copyright (C) 2003-2020 Wayne Davison
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -89,8 +89,8 @@ static enum delret delete_dir_contents(char *fname, uint16 flags)
 		if (fp->flags & FLAG_MOUNT_DIR && S_ISDIR(fp->mode)) {
 			if (DEBUG_GTE(DEL, 1)) {
 				rprintf(FINFO,
-				    "mount point, %s, pins parent directory\n",
-				    f_name(fp, NULL));
+					"mount point, %s, pins parent directory\n",
+					f_name(fp, NULL));
 			}
 			ret = DR_NOT_EMPTY;
 			continue;

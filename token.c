@@ -303,8 +303,7 @@ static int32 simple_recv_token(int f, char **data)
 }
 
 /* non-compressing send token */
-static void simple_send_token(int f, int32 token, struct map_struct *buf,
-			      OFF_T offset, int32 n)
+static void simple_send_token(int f, int32 token, struct map_struct *buf, OFF_T offset, int32 n)
 {
 	if (n > 0) {
 		int32 len = 0;
@@ -357,8 +356,7 @@ static char *obuf;
 
 /* Send a deflated token */
 static void
-send_deflated_token(int f, int32 token, struct map_struct *buf, OFF_T offset,
-		    int32 nb, int32 toklen)
+send_deflated_token(int f, int32 token, struct map_struct *buf, OFF_T offset, int32 nb, int32 toklen)
 {
 	static int init_done, flush_pending;
 	int32 n, r;
@@ -430,8 +428,7 @@ send_deflated_token(int f, int32 token, struct map_struct *buf, OFF_T offset,
 					 * buffer, in case they are the
 					 * last 4.  Move them to the front.
 					 */
-					memcpy(tx_strm.next_out,
-					       obuf+MAX_DATA_COUNT-2, 4);
+					memcpy(tx_strm.next_out, obuf+MAX_DATA_COUNT-2, 4);
 					tx_strm.next_out += 4;
 					tx_strm.avail_out -= 4;
 				}
@@ -522,7 +519,7 @@ static int32 recv_deflated_token(int f, char **data)
 					exit_cleanup(RERR_PROTOCOL);
 				}
 				if (!(cbuf = new_array(char, MAX_DATA_COUNT))
-				    || !(dbuf = new_array(char, AVAIL_OUT_SIZE(CHUNK_SIZE))))
+				 || !(dbuf = new_array(char, AVAIL_OUT_SIZE(CHUNK_SIZE))))
 					out_of_memory("recv_deflated_token");
 				init_done = 1;
 			} else {
@@ -682,8 +679,7 @@ static ZSTD_inBuffer zstd_in_buff;
 static ZSTD_outBuffer zstd_out_buff;
 static ZSTD_CCtx *zstd_cctx;
 
-static void send_zstd_token(int f, int32 token, struct map_struct *buf,
-			    OFF_T offset, int32 nb)
+static void send_zstd_token(int f, int32 token, struct map_struct *buf, OFF_T offset, int32 nb)
 {
 	static int comp_init_done, flush_pending;
 	ZSTD_EndDirective flush = ZSTD_e_continue;
@@ -702,8 +698,7 @@ static void send_zstd_token(int f, int32 token, struct map_struct *buf,
 		if (!obuf)
 			out_of_memory("send_deflated_token");
 
-		ZSTD_CCtx_setParameter(zstd_cctx, ZSTD_c_compressionLevel,
-				       do_compression_level);
+		ZSTD_CCtx_setParameter(zstd_cctx, ZSTD_c_compressionLevel, do_compression_level);
 		zstd_out_buff.dst = obuf + 2;
 
 		comp_init_done = 1;
@@ -990,7 +985,7 @@ static int32 recv_compressed_token(int f, char **data)
 		case r_init:
 			if (!init_done) {
 				if (!(cbuf = new_array(char, MAX_DATA_COUNT))
-				    || !(dbuf = new_array(char, size)))
+				 || !(dbuf = new_array(char, size)))
 					out_of_memory("recv_compressed_token");
 				init_done = 1;
 			}

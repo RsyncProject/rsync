@@ -4,7 +4,7 @@
  * Copyright (C) 1996-2001 Andrew Tridgell <tridge@samba.org>
  * Copyright (C) 1996 Paul Mackerras
  * Copyright (C) 2002 Martin Pool
- * Copyright (C) 2003-2019 Wayne Davison
+ * Copyright (C) 2003-2020 Wayne Davison
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -1406,8 +1406,7 @@ void recv_filter_list(int f_in)
 	char line[BIGPATHBUFLEN];
 	int xflags = protocol_version >= 29 ? 0 : XFLG_OLD_PREFIXES;
 	int receiver_wants_list = prune_empty_dirs
-	    || (delete_mode
-	     && (!delete_excluded || protocol_version >= 29));
+	    || (delete_mode && (!delete_excluded || protocol_version >= 29));
 	unsigned int len;
 
 	if (!local_server && (am_sender || receiver_wants_list)) {

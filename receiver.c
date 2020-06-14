@@ -819,8 +819,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 				parent_dirname = dn;
 			}
 #endif
-			file->mode = dest_mode(file->mode, st.st_mode,
-					       dflt_perms, exists);
+			file->mode = dest_mode(file->mode, st.st_mode, dflt_perms, exists);
 		}
 
 		/* We now check to see if we are writing the file "inplace" */
@@ -872,8 +871,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 		if ((recv_ok && (!delay_updates || !partialptr)) || inplace) {
 			if (partialptr == fname)
 				partialptr = NULL;
-			if (!finish_transfer(fname, fnametmp, fnamecmp,
-					     partialptr, file, recv_ok, 1))
+			if (!finish_transfer(fname, fnametmp, fnamecmp, partialptr, file, recv_ok, 1))
 				recv_ok = -1;
 			else if (fnamecmp == partialptr) {
 				if (!one_inplace)
@@ -883,9 +881,9 @@ int recv_files(int f_in, int f_out, char *local_name)
 		} else if (keep_partial && partialptr && !one_inplace) {
 			if (!handle_partial_dir(partialptr, PDIR_CREATE)) {
 				rprintf(FERROR,
-				    "Unable to create partial-dir for %s -- discarding %s.\n",
-				    local_name ? local_name : f_name(file, NULL),
-				    recv_ok ? "completed file" : "partial file");
+					"Unable to create partial-dir for %s -- discarding %s.\n",
+					local_name ? local_name : f_name(file, NULL),
+					recv_ok ? "completed file" : "partial file");
 				do_unlink(fnametmp);
 				recv_ok = -1;
 			} else if (!finish_transfer(partialptr, fnametmp, fnamecmp, NULL,
@@ -943,7 +941,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 			} else if (inc_recurse)
 				send_msg_int(MSG_NO_SEND, ndx);
 			break;
-		    }
+		}
 		case -1:
 			if (inc_recurse)
 				send_msg_int(MSG_NO_SEND, ndx);

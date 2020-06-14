@@ -325,8 +325,8 @@ static void client_sockaddr(int fd, struct sockaddr_storage *ss, socklen_t *ss_l
 	}
 
 #ifdef INET6
-	if (GET_SOCKADDR_FAMILY(ss) == AF_INET6 &&
-	    IN6_IS_ADDR_V4MAPPED(&((struct sockaddr_in6 *)ss)->sin6_addr)) {
+	if (GET_SOCKADDR_FAMILY(ss) == AF_INET6
+	 && IN6_IS_ADDR_V4MAPPED(&((struct sockaddr_in6 *)ss)->sin6_addr)) {
 		/* OK, so ss is in the IPv6 family, but it is really
 		 * an IPv4 address: something like
 		 * "::ffff:10.130.1.2".  If we use it as-is, then the
@@ -349,8 +349,7 @@ static void client_sockaddr(int fd, struct sockaddr_storage *ss, socklen_t *ss_l
 		/* There is a macro to extract the mapped part
 		 * (IN6_V4MAPPED_TO_SINADDR ?), but it does not seem
 		 * to be present in the Linux headers. */
-		memcpy(&sin->sin_addr, &sin6.sin6_addr.s6_addr[12],
-		    sizeof sin->sin_addr);
+		memcpy(&sin->sin_addr, &sin6.sin6_addr.s6_addr[12], sizeof sin->sin_addr);
 	}
 #endif
 }
@@ -379,8 +378,7 @@ static int compare_addrinfo_sockaddr(const struct addrinfo *ai, const struct soc
 		sin1 = (const struct sockaddr_in *) ss;
 		sin2 = (const struct sockaddr_in *) ai->ai_addr;
 
-		return memcmp(&sin1->sin_addr, &sin2->sin_addr,
-			      sizeof sin1->sin_addr);
+		return memcmp(&sin1->sin_addr, &sin2->sin_addr, sizeof sin1->sin_addr);
 	}
 
 #ifdef INET6
@@ -396,8 +394,7 @@ static int compare_addrinfo_sockaddr(const struct addrinfo *ai, const struct soc
 			return 1;
 		}
 
-		if (memcmp(&sin1->sin6_addr, &sin2->sin6_addr,
-			   sizeof sin1->sin6_addr))
+		if (memcmp(&sin1->sin6_addr, &sin2->sin6_addr, sizeof sin1->sin6_addr))
 			return 1;
 
 #ifdef HAVE_SOCKADDR_IN6_SCOPE_ID

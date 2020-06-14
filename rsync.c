@@ -318,8 +318,7 @@ void send_protected_args(int fd, char *args[])
 #endif
 }
 
-int read_ndx_and_attrs(int f_in, int f_out, int *iflag_ptr, uchar *type_ptr,
-		       char *buf, int *len_ptr)
+int read_ndx_and_attrs(int f_in, int f_out, int *iflag_ptr, uchar *type_ptr, char *buf, int *len_ptr)
 {
 	int len, iflags = 0;
 	struct file_list *flist;
@@ -548,8 +547,8 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 				/* We shouldn't have attempted to change uid
 				 * or gid unless have the privilege. */
 				rsyserr(FERROR_XFER, errno, "%s %s failed",
-				    change_uid ? "chown" : "chgrp",
-				    full_fname(fname));
+					change_uid ? "chown" : "chgrp",
+					full_fname(fname));
 				goto cleanup;
 			}
 			if (uid == (uid_t)-1 && sxp->st.st_uid != (uid_t)-1)
@@ -565,9 +564,9 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 			}
 		}
 		if (change_uid)
-		    updated |= UPDATED_OWNER;
+			updated |= UPDATED_OWNER;
 		if (change_gid)
-		    updated |= UPDATED_GROUP;
+			updated |= UPDATED_GROUP;
 	}
 
 #ifdef SUPPORT_XATTRS

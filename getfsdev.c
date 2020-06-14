@@ -15,8 +15,7 @@
 			fprintf(stderr, "Unable to stat `%s'\n", *argv);
 			exit(1);
 		}
-		printf("%ld/%ld\n", (long)major(st.st_dev),
-				    (long)minor(st.st_dev));
+		printf("%ld/%ld\n", (long)major(st.st_dev), (long)minor(st.st_dev));
 	}
 
 	return 0;

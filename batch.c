@@ -289,9 +289,9 @@ void write_batch_shell_file(void)
 		if (!(p = raw_argv[i]))
 			continue;
 		if (strncmp(p, "--files-from", 12) == 0
-		    || strncmp(p, "--filter", 8) == 0
-		    || strncmp(p, "--include", 9) == 0
-		    || strncmp(p, "--exclude", 9) == 0) {
+		 || strncmp(p, "--filter", 8) == 0
+		 || strncmp(p, "--include", 9) == 0
+		 || strncmp(p, "--exclude", 9) == 0) {
 			if (strchr(p, '=') == NULL)
 				i++;
 			continue;

@@ -2,7 +2,7 @@
  * Routines to authenticate access to a daemon (hosts allow/deny).
  *
  * Copyright (C) 1998 Andrew Tridgell
- * Copyright (C) 2004-2019 Wayne Davison
+ * Copyright (C) 2004-2020 Wayne Davison
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -158,8 +158,7 @@ static int match_address(const char *addr, const char *tok)
 		break;
 
 #ifdef INET6
-	case PF_INET6:
-	    {
+	case PF_INET6: {
 		struct sockaddr_in6 *sin6a, *sin6t;
 
 		sin6a = (struct sockaddr_in6 *)resa->ai_addr;
@@ -171,20 +170,19 @@ static int match_address(const char *addr, const char *tok)
 		addrlen = 16;
 
 #ifdef HAVE_SOCKADDR_IN6_SCOPE_ID
-		if (sin6t->sin6_scope_id &&
-		    sin6a->sin6_scope_id != sin6t->sin6_scope_id) {
+		if (sin6t->sin6_scope_id && sin6a->sin6_scope_id != sin6t->sin6_scope_id) {
 			ret = 0;
 			goto out;
 		}
 #endif
 
 		break;
-	    }
+	}
 #endif
 	default:
-	    rprintf(FLOG, "unknown family %u\n", rest->ai_family);
-	    ret = 0;
-	    goto out;
+		rprintf(FLOG, "unknown family %u\n", rest->ai_family);
+		ret = 0;
+		goto out;
 	}
 
 	bits = -1;

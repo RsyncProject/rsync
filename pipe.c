@@ -4,7 +4,7 @@
  * Copyright (C) 1996-2000 Andrew Tridgell
  * Copyright (C) 1996 Paul Mackerras
  * Copyright (C) 2001, 2002 Martin Pool <mbp@samba.org>
- * Copyright (C) 2004-2019 Wayne Davison
+ * Copyright (C) 2004-2020 Wayne Davison
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -66,10 +66,10 @@ pid_t piped_child(char **command, int *f_in, int *f_out)
 	}
 
 	if (pid == 0) {
-		if (dup2(to_child_pipe[0], STDIN_FILENO) < 0 ||
-		    close(to_child_pipe[1]) < 0 ||
-		    close(from_child_pipe[0]) < 0 ||
-		    dup2(from_child_pipe[1], STDOUT_FILENO) < 0) {
+		if (dup2(to_child_pipe[0], STDIN_FILENO) < 0
+		 || close(to_child_pipe[1]) < 0
+		 || close(from_child_pipe[0]) < 0
+		 || dup2(from_child_pipe[1], STDOUT_FILENO) < 0) {
 			rsyserr(FERROR, errno, "Failed to dup/close");
 			exit_cleanup(RERR_IPC);
 		}
@@ -116,8 +116,7 @@ pid_t local_child(int argc, char **argv, int *f_in, int *f_out,
 	/* The parent process is always the sender for a local rsync. */
 	assert(am_sender);
 
-	if (fd_pair(to_child_pipe) < 0 ||
-	    fd_pair(from_child_pipe) < 0) {
+	if (fd_pair(to_child_pipe) < 0 || fd_pair(from_child_pipe) < 0) {
 		rsyserr(FERROR, errno, "pipe");
 		exit_cleanup(RERR_IPC);
 	}
@@ -150,10 +149,10 @@ pid_t local_child(int argc, char **argv, int *f_in, int *f_out,
 			}
 		}
 
-		if (dup2(to_child_pipe[0], STDIN_FILENO) < 0 ||
-		    close(to_child_pipe[1]) < 0 ||
-		    close(from_child_pipe[0]) < 0 ||
-		    dup2(from_child_pipe[1], STDOUT_FILENO) < 0) {
+		if (dup2(to_child_pipe[0], STDIN_FILENO) < 0
+		 || close(to_child_pipe[1]) < 0
+		 || close(from_child_pipe[0]) < 0
+		 || dup2(from_child_pipe[1], STDOUT_FILENO) < 0) {
 			rsyserr(FERROR, errno, "Failed to dup/close");
 			exit_cleanup(RERR_IPC);
 		}
@@ -167,8 +166,7 @@ pid_t local_child(int argc, char **argv, int *f_in, int *f_out,
 		child_main(argc, argv);
 	}
 
-	if (close(from_child_pipe[1]) < 0 ||
-	    close(to_child_pipe[0]) < 0) {
+	if (close(from_child_pipe[1]) < 0 || close(to_child_pipe[0]) < 0) {
 		rsyserr(FERROR, errno, "Failed to close");
 		exit_cleanup(RERR_IPC);
 	}

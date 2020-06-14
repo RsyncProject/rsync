@@ -531,16 +531,16 @@ void setup_protocol(int f_out,int f_in)
 			append_mode = 2;
 		if (preserve_acls && !local_server) {
 			rprintf(FERROR,
-			    "--acls requires protocol 30 or higher"
-			    " (negotiated %d).\n",
-			    protocol_version);
+				"--acls requires protocol 30 or higher"
+				" (negotiated %d).\n",
+				protocol_version);
 			exit_cleanup(RERR_PROTOCOL);
 		}
 		if (preserve_xattrs && !local_server) {
 			rprintf(FERROR,
-			    "--xattrs requires protocol 30 or higher"
-			    " (negotiated %d).\n",
-			    protocol_version);
+				"--xattrs requires protocol 30 or higher"
+				" (negotiated %d).\n",
+				protocol_version);
 			exit_cleanup(RERR_PROTOCOL);
 		}
 	}
@@ -555,33 +555,33 @@ void setup_protocol(int f_out,int f_in)
 	if (protocol_version < 29) {
 		if (fuzzy_basis) {
 			rprintf(FERROR,
-			    "--fuzzy requires protocol 29 or higher"
-			    " (negotiated %d).\n",
-			    protocol_version);
+				"--fuzzy requires protocol 29 or higher"
+				" (negotiated %d).\n",
+				protocol_version);
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
 		if (basis_dir_cnt && inplace) {
 			rprintf(FERROR,
-			    "%s with --inplace requires protocol 29 or higher"
-			    " (negotiated %d).\n",
-			    alt_dest_opt(0), protocol_version);
+				"%s with --inplace requires protocol 29 or higher"
+				" (negotiated %d).\n",
+				alt_dest_opt(0), protocol_version);
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
 		if (basis_dir_cnt > 1) {
 			rprintf(FERROR,
-			    "Using more than one %s option requires protocol"
-			    " 29 or higher (negotiated %d).\n",
-			    alt_dest_opt(0), protocol_version);
+				"Using more than one %s option requires protocol"
+				" 29 or higher (negotiated %d).\n",
+				alt_dest_opt(0), protocol_version);
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
 		if (prune_empty_dirs) {
 			rprintf(FERROR,
-			    "--prune-empty-dirs requires protocol 29 or higher"
-			    " (negotiated %d).\n",
-			    protocol_version);
+				"--prune-empty-dirs requires protocol 29 or higher"
+				" (negotiated %d).\n",
+				protocol_version);
 			exit_cleanup(RERR_PROTOCOL);
 		}
 	} else if (protocol_version >= 30) {
@@ -640,8 +640,8 @@ void setup_protocol(int f_out,int f_in)
 		if (inc_recurse && !allow_inc_recurse) {
 			/* This should only be able to happen in a batch. */
 			fprintf(stderr,
-			    "Incompatible options specified for inc-recursive %s.\n",
-			    read_batch ? "batch file" : "connection");
+				"Incompatible options specified for inc-recursive %s.\n",
+				read_batch ? "batch file" : "connection");
 			exit_cleanup(RERR_SYNTAX);
 		}
 		use_safe_inc_flist = (compat_flags & CF_SAFE_FLIST) || protocol_version >= 31;

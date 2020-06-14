@@ -200,9 +200,7 @@ static void list_file(const char *fname)
 	printf("%s ", permbuf);
 
 	if (S_ISCHR(buf.st_mode) || S_ISBLK(buf.st_mode)) {
-		printf("%5ld,%6ld",
-		    (long)major(buf.st_rdev),
-		    (long)minor(buf.st_rdev));
+		printf("%5ld,%6ld", (long)major(buf.st_rdev), (long)minor(buf.st_rdev));
 	} else
 		printf("%15s", do_big_num(buf.st_size, 1, NULL));
 
@@ -249,15 +247,13 @@ main(int argc, char *argv[])
 	const char **extra_args;
 	int opt;
 
-	pc = poptGetContext(PROGRAM, argc, (const char **)argv,
-			    long_options, 0);
+	pc = poptGetContext(PROGRAM, argc, (const char **)argv, long_options, 0);
 	while ((opt = poptGetNextOpt(pc)) != -1) {
 		switch (opt) {
 		case 'h':
 			tls_usage(0);
 		default:
-			fprintf(stderr,
-			        "%s: %s\n",
+			fprintf(stderr, "%s: %s\n",
 				poptBadOption(pc, POPT_BADOPTION_NOALIAS),
 				poptStrerror(opt));
 			tls_usage(1);
