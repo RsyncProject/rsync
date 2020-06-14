@@ -29,7 +29,7 @@ def main():
 
     signal.signal(signal.SIGINT, signal_handler)
 
-    extra_files = get_extra_files()
+    gen_files = get_gen_files()
 
     dash_line = '=' * 74
 
@@ -238,8 +238,8 @@ About to:
     if s.returncode:
         die('Aborting')
 
-    cmd_chk(['make', 'reconfigure'])
-    cmd_chk(['make', 'gen'])
+    cmd_chk('make reconfigure ; make gen')
+    cmd_chk(['rsync', '-a', *gen_files, 'SaVeDiR/'])
 
     print(f'Creating any missing patch branches.')
     s = cmd_run(f'packaging/branch-from-patch --branch={args.master_branch} --add-missing')
@@ -254,6 +254,10 @@ About to:
     if re.match(r'^y', ans, re.I):
         print(f'\nVisiting all "patch/{args.master_branch}/*" branches ...')
         cmd_run(f"packaging/patch-update --branch={args.master_branch} --skip-check --shell")
+        cmd_run("rm -f *.[o15] *.html")
+        cmd_chk('rsync -a SaVeDiR/ .'.split())
+        shutil.rmtree('SaVeDiR')
+        cmd_chk('make gen'.split())
 
     if os.path.isdir('patches/.git'):
         s = cmd_run(f"cd patches && git commit -a -m 'The patches for {version}.'")
@@ -293,12 +297,12 @@ About to:
     os.environ['PATH'] = ORIGINAL_PATH
 
     # Extract the generated files from the old tar.
-    tweaked_extra_files = [ f"{rsync_lastver}/{x}" for x in extra_files ]
-    cmd_run(['tar', 'xzf', lasttar_file, *tweaked_extra_files])
+    tweaked_gen_files = [ f"{rsync_lastver}/{x}" for x in gen_files ]
+    cmd_run(['tar', 'xzf', lasttar_file, *tweaked_gen_files])
     os.rename(rsync_lastver, 'a')
 
     print(f"Creating {diff_file} ...")
-    cmd_chk(['rsync', '-a', *extra_files, 'b/'])
+    cmd_chk(['rsync', '-a', *gen_files, 'b/'])
 
     sed_script = r's:^((---|\+\+\+) [ab]/[^\t]+)\t.*:\1:' # CAUTION: must not contain any single quotes!
     cmd_chk(f"(git diff v{lastversion} {v_ver} -- ':!.github'; diff -upN a b | sed -r '{sed_script}') | gzip -9 >{diff_file}")

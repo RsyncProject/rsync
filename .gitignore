@@ -46,4 +46,5 @@ aclocal.m4
 /testsuite/devices-fake.test
 /testsuite/xattrs-hlink.test
 /patches
+/SaVeDiR
 .deps

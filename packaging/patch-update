@@ -36,11 +36,11 @@ def main():
     if args.gen:
         if os.path.lexists(TMP_DIR):
             die(f'"{TMP_DIR}" must not exist in the current directory.')
-        extra_files = get_extra_files()
+        gen_files = get_gen_files()
         os.mkdir(TMP_DIR, 0o700)
         for cmd in MAKE_GEN_CMDS:
             cmd_chk(cmd)
-        cmd_chk(['rsync', '-a', *extra_files, f'{TMP_DIR}/master/'])
+        cmd_chk(['rsync', '-a', *gen_files, f'{TMP_DIR}/master/'])
 
     last_touch = time.time()
 
@@ -144,12 +144,12 @@ def update_patch(patch):
         fh.write(f"\nbased-on: {based_on}\n")
 
         if args.gen:
-            extra_files = get_extra_files()
+            gen_files = get_gen_files()
             for cmd in MAKE_GEN_CMDS:
                 cmd_chk(cmd)
-            cmd_chk(['rsync', '-a', *extra_files, f"{TMP_DIR}/{patch}/"])
+            cmd_chk(['rsync', '-a', *gen_files, f"{TMP_DIR}/{patch}/"])
         else:
-            extra_files = [ ]
+            gen_files = [ ]
         last_touch = time.time()
 
         proc = cmd_pipe(['git', 'diff', based_on])
@@ -185,7 +185,7 @@ def update_patch(patch):
                 line =  plus_re.sub(r'+++ b/\1', line)
                 fh.write(line)
             proc.communicate()
-            for fn in extra_files:
+            for fn in gen_files:
                 os.unlink(fn)
 
     return 1

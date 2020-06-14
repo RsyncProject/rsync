@@ -181,7 +181,7 @@ def mandate_gensend_hook():
 
 
 # Snag the GENFILES values out of the Makefile.in file and return them as a list.
-def get_extra_files():
+def get_gen_files():
     cont_re = re.compile(r'\\\n')
 
     extras = [ ]

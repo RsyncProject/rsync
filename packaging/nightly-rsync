@@ -45,7 +45,7 @@ def main():
         cmd_chk(['make', gen_target])
         cmd_chk(['rsync', '-a', *glob.glob('*.[1-9].html'), dest])
 
-        extra_files = get_extra_files()
+        gen_files = get_gen_files()
 
         confversion = get_configure_version()
 
@@ -67,7 +67,7 @@ def main():
 
         print('Creating', tar_name)
 
-        cmd_chk(['rsync', '-a', *extra_files, name_slash])
+        cmd_chk(['rsync', '-a', *gen_files, name_slash])
         cmd_chk(f"git archive --format=tar --prefix={name}/ HEAD | tar xf -")
         cmd_chk(['support/git-set-file-times', '--quiet', '--prefix', name_slash])
         cmd_chk(['fakeroot', 'tar', 'czf', os.path.join(dest, tar_name), name])
