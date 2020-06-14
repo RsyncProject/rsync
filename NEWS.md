@@ -143,6 +143,9 @@ Protocol: 31 (unchanged)
 
  - Add installed man page: /usr/man/man1/rsync-ssl.1
 
+ - Some "readme" files have changed names to be .md files, such as: README.md,
+   INSTALL.md, NEWS.md, & OLDNEWS.md.
+
  - The rsync-ssl script wants to run either openssl or stunnel4, so consider
    adding a dependency for openssl (though it's probably fine to just let it
    complain about being unable to find either program and let the user decide
