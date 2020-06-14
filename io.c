@@ -251,8 +251,7 @@ static size_t safe_read(int fd, char *buf, size_t len)
 		cnt = select(fd+1, &r_fds, NULL, &e_fds, &tv);
 		if (cnt <= 0) {
 			if (cnt < 0 && errno == EBADF) {
-				rsyserr(FERROR, errno, "safe_read select failed [%s]",
-					who_am_i());
+				rsyserr(FERROR, errno, "safe_read select failed");
 				exit_cleanup(RERR_FILEIO);
 			}
 			check_timeout(1, MSK_ALLOW_FLUSH);
@@ -271,8 +270,7 @@ static size_t safe_read(int fd, char *buf, size_t len)
 			if (n < 0) {
 				if (errno == EINTR)
 					continue;
-				rsyserr(FERROR, errno, "safe_read failed to read %ld bytes [%s]",
-					(long)len, who_am_i());
+				rsyserr(FERROR, errno, "safe_read failed to read %ld bytes", (long)len);
 				exit_cleanup(RERR_STREAMIO);
 			}
 			if ((got += (size_t)n) == len)
@@ -315,8 +313,8 @@ static void safe_write(int fd, const char *buf, size_t len)
 		if (errno != EINTR && errno != EWOULDBLOCK && errno != EAGAIN) {
 		  write_failed:
 			rsyserr(FERROR, errno,
-				"safe_write failed to write %ld bytes to %s [%s]",
-				(long)len, what_fd_is(fd), who_am_i());
+				"safe_write failed to write %ld bytes to %s",
+				(long)len, what_fd_is(fd));
 			exit_cleanup(RERR_STREAMIO);
 		}
 	} else {
@@ -337,8 +335,7 @@ static void safe_write(int fd, const char *buf, size_t len)
 		cnt = select(fd + 1, NULL, &w_fds, NULL, &tv);
 		if (cnt <= 0) {
 			if (cnt < 0 && errno == EBADF) {
-				rsyserr(FERROR, errno, "safe_write select failed on %s [%s]",
-					what_fd_is(fd), who_am_i());
+				rsyserr(FERROR, errno, "safe_write select failed on %s", what_fd_is(fd));
 				exit_cleanup(RERR_FILEIO);
 			}
 			if (io_timeout)
@@ -815,7 +812,7 @@ static char *perform_io(size_t needed, int flags)
 					msgs2stderr = 1;
 					iobuf.out_fd = -2;
 					iobuf.out.len = iobuf.msg.len = iobuf.raw_flushing_ends_before = 0;
-					rsyserr(FERROR_SOCKET, errno, "[%s] write error", who_am_i());
+					rsyserr(FERROR_SOCKET, errno, "write error");
 					drain_multiplex_messages();
 					exit_cleanup(RERR_SOCKETIO);
 				}

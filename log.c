@@ -452,8 +452,7 @@ void rsyserr(enum logcode code, int errcode, const char *format, ...)
 	char buf[BIGPATHBUFLEN];
 	size_t len;
 
-	strlcpy(buf, RSYNC_NAME ": ", sizeof buf);
-	len = (sizeof RSYNC_NAME ": ") - 1;
+	len = snprintf(buf, sizeof buf, RSYNC_NAME ": [%s] ", who_am_i());
 
 	va_start(ap, format);
 	len += vsnprintf(buf + len, sizeof buf - len, format, ap);
