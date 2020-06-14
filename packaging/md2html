@@ -52,7 +52,12 @@ def main():
         with open(mdfn, 'r', encoding='utf-8') as fh:
             txt = fh.read()
 
+        txt = re.sub(r'\s--\s', '\xa0-- ', txt)
+
         html = md_parser(txt)
+
+        html = re.sub(r'(<code>)([\s\S]*?)(</code>)', lambda m: m[1] + re.sub(r'\s', '\xa0', m[2]) + m[3], html)
+        html = html.replace("\xa0", '&nbsp;')
 
         with open(htfn, 'w', encoding='utf-8') as fh:
             fh.write(HTML_START % title)

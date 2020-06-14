@@ -151,6 +151,7 @@ class HtmlToManPage(HTMLParser):
                 at_first_tag_in_dd = False,
                 dt_from = None,
                 in_pre = False,
+                in_code = False,
                 html_out = [ HTML_START % fi.title ],
                 man_out = [ MAN_START % fi.man_headings ],
                 txt = '',
@@ -200,6 +201,7 @@ class HtmlToManPage(HTMLParser):
             st.in_pre = True
             st.man_out.append(st.p_macro + ".nf\n")
         elif tag == 'code' and not st.in_pre:
+            st.in_code = True
             st.txt += BOLD_FONT[0]
         elif tag == 'strong' or tag == 'b':
             st.txt += BOLD_FONT[0]
@@ -266,7 +268,10 @@ class HtmlToManPage(HTMLParser):
         elif tag == 'pre':
             st.in_pre = False
             st.man_out.append(manify(txt) + "\n.fi\n")
-        elif (tag == 'code' and not st.in_pre) or tag == 'strong' or tag == 'b':
+        elif (tag == 'code' and not st.in_pre):
+            st.in_code = False
+            add_to_txt = NORM_FONT[0]
+        elif tag == 'strong' or tag == 'b':
             add_to_txt = NORM_FONT[0]
         elif tag == 'em' or  tag == 'i':
             tag = 'u' # Change it into underline to be more like the man page
@@ -299,6 +304,9 @@ class HtmlToManPage(HTMLParser):
         st = self.state
         if args.debug:
             self.output_debug('DATA', (data,))
+        if st.in_code:
+            data = re.sub(r'\s', '\xa0', data) # nbsp in non-pre code
+        data = re.sub(r'\s--\s', '\xa0-- ', data)
         st.html_out.append(htmlify(data))
         st.txt += data
 
@@ -318,13 +326,15 @@ class HtmlToManPage(HTMLParser):
 
 def manify(txt):
     return re.sub(r"^(['.])", r'\&\1', txt.replace('\\', '\\\\')
+            .replace("\xa0", r'\ ') # non-breaking space
+            .replace('--', r'\-\-') # non-breaking double dash
             .replace(NORM_FONT[0], NORM_FONT[1])
             .replace(BOLD_FONT[0], BOLD_FONT[1])
             .replace(ULIN_FONT[0], ULIN_FONT[1]), flags=re.M)
 
 
 def htmlify(txt):
-    return txt.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
+    return txt.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;').replace("\xa0", '&nbsp;')
 
 
 def warn(*msg):
