@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# This script supports using openssl or stunnel to secure an rsync daemon connection.
+# This script uses openssl, gnutls, or stunnel to secure an rsync daemon connection.
 
 # By default this script takes rsync args and hands them off to the actual
 # rsync command with an --rsh option that makes it open an SSL connection to an
@@ -35,6 +35,9 @@ function rsync_ssl_helper {
 	if [[ "$found" == */openssl ]]; then
 	    RSYNC_SSL_TYPE=openssl
 	    RSYNC_SSL_OPENSSL="$found"
+	elif [[ "$found" == */gnutls-cli ]]; then
+	    RSYNC_SSL_TYPE=gnutls
+	    RSYNC_SSL_GNUTLS="$found"
 	else
 	    RSYNC_SSL_TYPE=stunnel
 	    RSYNC_SSL_STUNNEL="$found"
@@ -45,6 +48,12 @@ function rsync_ssl_helper {
 	openssl)
 	    if [[ -z "$RSYNC_SSL_OPENSSL" ]]; then
 		RSYNC_SSL_OPENSSL=`path_search openssl` || exit 1
+	    fi
+	    optsep=' '
+	    ;;
+	gnutls)
+	    if [[ -z "$RSYNC_SSL_GNUTLS" ]]; then
+		RSYNC_SSL_GNUTLS=`path_search gnutls-cli` || exit 1
 	    fi
 	    optsep=' '
 	    ;;
@@ -62,14 +71,18 @@ function rsync_ssl_helper {
 
     if [[ -z "$RSYNC_SSL_CERT" ]]; then
 	certopt=""
+	gnutls_cert_opt=""
     else
 	certopt="cert$optsep$RSYNC_SSL_CERT"
+	gnutls_cert_opt="--x509keyfile=$RSYNC_SSL_CERT"
     fi
 
     if [[ -z ${RSYNC_SSL_CA_CERT+x} ]]; then
 	# RSYNC_SSL_CA_CERT unset - default CA set AND verify:
 	# openssl:
 	caopt="-verify_return_error -verify 4"
+	# gnutls:
+	gnutls_opts=""
 	# stunnel:
 	# Since there is no way of using the default CA certificate collection,
 	# we cannot do any verification. Thus, stunnel should really only be
@@ -80,6 +93,8 @@ function rsync_ssl_helper {
 	# RSYNC_SSL_CA_CERT set but empty -do NO verifications:
 	# openssl:
 	caopt="-verify 1"
+	# gnutls:
+	gnutls_opts="--insecure"
 	# stunnel:
 	cafile=""
 	verify="verifyChain = no"
@@ -87,6 +102,8 @@ function rsync_ssl_helper {
 	# RSYNC_SSL_CA_CERT set - use CA AND verify:
 	# openssl:
 	caopt="-CAfile $RSYNC_SSL_CA_CERT -verify_return_error -verify 4"
+	# gnutls:
+	gnutls_opts="--x509cafile=$RSYNC_SSL_CA_CERT"
 	# stunnel:
 	cafile="CAfile = $RSYNC_SSL_CA_CERT"
 	verify="verifyChain = yes"
@@ -113,6 +130,8 @@ function rsync_ssl_helper {
 
     if [[ $RSYNC_SSL_TYPE == openssl ]]; then
 	exec $RSYNC_SSL_OPENSSL s_client $caopt $certopt -quiet -verify_quiet -servername $hostname -connect $hostname:$port
+    elif [[ $RSYNC_SSL_TYPE == gnutls ]]; then
+	exec $RSYNC_SSL_GNUTLS --logfile=/dev/null $gnutls_cert_opt $gnutls_opts $hostname:$port
     else
 	# devzero@web.de came up with this no-tmpfile calling syntax:
 	exec $RSYNC_SSL_STUNNEL -fd 10 11<&0 <<EOF 10<&0 0<&11 11<&-

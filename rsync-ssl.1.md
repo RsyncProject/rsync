@@ -44,6 +44,9 @@ The ssl helper scripts are affected by the following environment variables:
 0.  `RSYNC_SSL_OPENSSL` Specifies the openssl executable to run when the
     connection type is set to openssl.  If unspecified, the $PATH is searched
     for "openssl".
+0.  `RSYNC_SSL_GNUTLS` Specifies the gnutls-cli executable to run when the
+    connection type is set to gnutls.  If unspecified, the $PATH is searched
+    for "gnutls-cli".
 0.  `RSYNC_SSL_STUNNEL` Specifies the stunnel executable to run when the
     connection type is set to stunnel.  If unspecified, the $PATH is searched
     first for "stunnel4" and then for "stunnel".
@@ -65,6 +68,11 @@ which should be the case on modern systems.  Also, it does not verify a
 connection against the CA certificate collection, so it only encrypts the
 connection without any cert validation unless you have specified the
 certificate environment options.
+
+This script also supports a `--type=gnutls` option, but at the time of this
+release the gnutls-cli command was dropping output, making it unusable.  If
+that bug has been fixed in your version, feel free to put gnutls into the
+RSYNC_SSL_TYPE environment variable if you want to make its use the default.
 
 # BUGS
 

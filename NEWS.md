@@ -88,9 +88,12 @@ Protocol: 31 (unchanged)
 
  - Added the `--write-devices` option based on the long-standing patch.
 
- - Added openssl support to the rsync-ssl script, which is now installed by
-   default.  This script was unified with the stunnel-rsync helper script to
-   simplify packaging.
+ - Added openssl & preliminary gnutls support to the rsync-ssl script, which is
+   now installed by default.  This was unified with the old stunnel-rsync
+   helper script to simplify packaging.  Note that the script accepts the use
+   of --type=gnutls for gnutls testing, but does not look for gnutls-cli on the
+   path yet.  The use of type=gnutls will not work right until gnutls-cli no
+   longer drops data.
 
  - Rsync was enhanced to set the `RSYNC_PORT` environment variable when running
    a daemon-over-rsh script. Its value is the user-specified port number (set
@@ -145,9 +148,9 @@ Protocol: 31 (unchanged)
  - Tweak auxilliary doc file names, such as: README.md, INSTALL.md, NEWS.md, &
    OLDNEWS.md.
 
- - The rsync-ssl script wants to run either openssl or stunnel4, so consider
-   adding a dependency for openssl (though it's probably fine to just let it
-   complain about being unable to find either program and let the user decide
+ - The rsync-ssl script wants to run openssl or stunnel4, so consider adding a
+   dependency for one of those options (though it's probably fine to just let
+   it complain about being unable to find the program and let the user decide
    if they want to install one or the other).
 
  - If you packaged rsync + rsync-ssl + rsync-ssl-daemon as separate packages,
