@@ -10,13 +10,12 @@ helpfile="$2"
 newfile="$helpfile.new"
 findfile="${helpfile/./\\.}"
 
-sed -e '1,/^\[comment\].*'"$findfile"'/d' \
-    -e '1,/^```/d' \
-    -e '/^```/,$d' \
-    -e 's/"/\\"/g' \
-    -e 's/^/  rprintf(F,"/' \
-    -e 's/$/\\n");/' \
-    <"$mdfile" >"$newfile"
+sed '1,/^\[comment\].*'"$findfile"'/d' <"$mdfile" | \
+    sed '1,/^```/d' | \
+    sed '/^```/,$d' | \
+    sed 's/"/\\"/g' | \
+    sed 's/^/  rprintf(F,"/' | \
+    sed 's/$/\\n");/' >"$newfile"
 
 if [[ ! -s "$newfile" ]]; then
     rm "$newfile"
