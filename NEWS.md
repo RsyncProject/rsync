@@ -141,7 +141,7 @@ Protocol: 31 (unchanged)
 
 ### PACKAGING RELATED:
 
- - Add installed binary: /usr/bin/rsync-sll
+ - Add installed binary: /usr/bin/rsync-ssl
 
  - Add installed man page: /usr/man/man1/rsync-ssl.1
 
