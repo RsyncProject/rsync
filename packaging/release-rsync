@@ -75,12 +75,9 @@ def main():
 
     v_ver = 'v' + version
     rsync_ver = 'rsync-' + version
-    rsync_lastver = 'rsync-' + lastversion
 
     if os.path.lexists(rsync_ver):
         die(f'"{rsync_ver}" must not exist in the current directory.')
-    if os.path.lexists(rsync_lastver):
-        die(f'"{rsync_lastver}" must not exist in the current directory.')
 
     out = cmd_txt_chk(['git', 'tag', '-l', v_ver])
     if out != '':
@@ -98,6 +95,10 @@ def main():
     if ans != '':
         lastversion = ans
     lastversion = re.sub(r'[-.]*pre[-.]*', 'pre', lastversion)
+
+    rsync_lastver = 'rsync-' + lastversion
+    if os.path.lexists(rsync_lastver):
+        die(f'"{rsync_lastver}" must not exist in the current directory.')
 
     m = re.search(r'(pre\d+)', version)
     pre = m[1] if m else ''
