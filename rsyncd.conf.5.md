@@ -1065,8 +1065,54 @@ Also note that the rsync daemon protocol does not currently provide any
 encryption of the data that is transferred over the connection. Only
 authentication is provided. Use ssh as the transport if you want encryption.
 
-Future versions of rsync may support SSL for better authentication and
-encryption, but that is still being investigated.
+You can also make use of SSL/TLS encryption if you put rsync behind an
+SSL proxy.
+
+# SSL/TLS Daemon Setup
+
+When setting up an rsync daemon for access via SSL/TLS, you will need to
+configure a proxy (such as haproxy or nginx) as the front-end that handles the
+encryption.
+
+- You should limit the access to the backend-rsyncd port to only allow the
+  proxy to connect.  If it is on the same host as the proxy, then configuring
+  it to only listen on localhost is a good idea.
+
+- You should consider turning on the `proxy protocol` parameter if your proxy
+  supports sending that information.  The examples below assume that this is
+  enabled.
+
+An example haproxy setup is as follows:
+
+> ```
+> frontend fe_rsync-ssl
+>    bind :::874 ssl crt /etc/letsencrypt/example.com/combined.pem
+>    mode tcp
+>    use_backend be_rsync
+>
+> backend be_rsync
+>    mode tcp
+>    server local-rsync 127.0.0.1:873 check send-proxy
+> ```
+
+An example nginx proxy setup is as follows:
+
+> ```
+> stream {
+>    server {
+>        listen 874 ssl;
+>        listen [::]:874 ssl;
+>
+>        ssl_certificate /etc/letsencrypt/example.com/fullchain.pem;
+>        ssl_certificate_key /etc/letsencrypt/example.com/privkey.pem
+>
+>        proxy_pass localhost:873;
+>        proxy_protocol on; # Requires "proxy protocol = true"
+>        proxy_timeout 1m;
+>        proxy_connect_timeout 5s;
+>    }
+> }
+> ```
 
 # EXAMPLES
 
@@ -1088,23 +1134,23 @@ A more sophisticated example would be:
 > max connections = 4
 > syslog facility = local5
 > pid file = /var/run/rsyncd.pid
-> 
+>
 > [ftp]
 >         path = /var/ftp/./pub
 >         comment = whole ftp area (approx 6.1 GB)
-> 
+>
 > [sambaftp]
 >         path = /var/ftp/./pub/samba
 >         comment = Samba ftp area (approx 300 MB)
-> 
+>
 > [rsyncftp]
 >         path = /var/ftp/./pub/rsync
 >         comment = rsync ftp area (approx 6 MB)
-> 
+>
 > [sambawww]
 >         path = /public_html/samba
 >         comment = Samba WWW pages (approx 240 MB)
-> 
+>
 > [cvs]
 >         path = /data/cvs
 >         comment = CVS repository (requires authentication)
