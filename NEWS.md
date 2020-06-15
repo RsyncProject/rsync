@@ -58,23 +58,21 @@ Protocol: 31 (unchanged)
    MD5 checksum algorithms, some x86-64 optimizations for the rolling checksum,
    some x86-64 optimizations for the (non-openssl) MD5 checksum, the addition
    of xxhash checksum support, and a negotiation heuristic that ensures that it
-   is easier to add new checksum algorithms in the future.  Currently the
-   x86-64 optimizations require the use of the `--enable-simd` flag to
-   configure, but they will probably be enabled by default in the near future.
-   The environment variable `RSYNC_CHECKSUM_LIST` can be used to customize the
-   preference order of the negotiation.
+   is easier to add new checksum algorithms in the future.  The environment
+   variable `RSYNC_CHECKSUM_LIST` can be used to customize the preference order
+   of the negotiation, or use `--checksum-choice` (`--cc`) to force a choice.
 
  - Various compression enhancements, including the addition of zstd and lz4
    compression algorithms and a negotiation heuristic that picks the best
    compression option supported by both sides.  The environment variable
    `RSYNC_COMPRESS_LIST` can be used to customize the preference order of the
-   heuristic when speaking to another rsync 3.2.0 version.
+   negotiation, or use `--compress-choice` (`--zc`) to force a choice.
 
  - Added a --debug=NSTR option that outputs details of the new negotiation
    strings (for checksums and compression).  The first level just outputs the
    result of each negotiation on the client, level 2 outputs the values of the
    strings that were sent to and received from the server, and level 3 outputs
-   all those values on the server side too.
+   all those values on the server side too (when given the debug option).
 
  - The --debug=OPTS command-line option is no longer auto-forwarded to the
    remote rsync which allows for the client and server to have different levels
@@ -99,10 +97,11 @@ Protocol: 31 (unchanged)
    via `--port` or an rsync:// URL) or 0 if the user didn't override the port.
 
  - Added the `haproxy header` daemon parameter that allows your rsyncd to know
-   the real remote IP when it is being proxied.
+   the real remote IP when it is setup behind a proxy.
 
  - Added negated matching to the daemon's `refuse options` setting by using
-   match strings that start with a `!` (such as `!compress*`).
+   match strings that start with a `!` (such as `!compress*`).  This lets you
+   refuse all options except for a particular approved list, for example.
 
  - Added the `early exec` daemon parameter that runs a script before the
    transfer parameters are known, allowing some early setup based on module
@@ -110,9 +109,8 @@ Protocol: 31 (unchanged)
 
  - Added status output in response to a signal (via both SIGINFO & SIGVTALRM).
 
- - Added a `--copy-as=USER` option to give some extra security to root-run
-   rsync commands into/from untrusted directories (such as backups and
-   restores).
+ - Added `--copy-as=USER` option to give some extra security to root-run rsync
+   commands into/from untrusted directories (such as backups and restores).
 
  - When resuming the transfer of a file in the `--partial-dir`, rsync will now
    update that partial file in-place instead of creating yet another tmp file
@@ -121,20 +119,21 @@ Protocol: 31 (unchanged)
  - Added support for `RSYNC_SHELL` & `RSYNC_NO_XFER_EXEC` environment variables
    that affect the pre-xfer exec and post-xfer exec rsync daemon options.
 
- - Optimize the `--fuzzy` `--fuzzy` heuristic to avoid the fuzzy directory scan
+ - Optimize the `--fuzzy --fuzzy` heuristic to avoid the fuzzy directory scan
    until all other basis-file options are exhausted (such as `--link-dest`).
 
- - Have a daemon that is logging include the normal-exit sent/received stats
-   even when the transfer exited with an error.
+ - Have the daemon log include the normal-exit sent/received stats when the
+   transfer exited with an error when possible (i.e. if it is the sender).
 
  - The daemon now locks its pid file (when configured to use one) so that it
    will not fail to start when the file exists and it is unlocked.
 
- - Various man page improvements.
+ - Various man page improvements, including some html representations (that
+   aren't installed by default).
 
- - Made -V the short option for --version.
+ - Made -V the short option for --version and improved its information.
 
- - Forward -4 & -6 options to the ssh command, making them easier to type than
+ - Forward -4 or -6 to the ssh command, making it easier to type than
    `--rsh='ssh -4'` (or -6).
 
 ### PACKAGING RELATED:
@@ -143,8 +142,8 @@ Protocol: 31 (unchanged)
 
  - Add installed man page: /usr/man/man1/rsync-ssl.1
 
- - Some readme files have changed names to be .md files, such as: README.md,
-   INSTALL.md, NEWS.md, & OLDNEWS.md.
+ - Tweak auxilliary doc file names, such as: README.md, INSTALL.md, NEWS.md, &
+   OLDNEWS.md.
 
  - The rsync-ssl script wants to run either openssl or stunnel4, so consider
    adding a dependency for openssl (though it's probably fine to just let it
@@ -152,14 +151,13 @@ Protocol: 31 (unchanged)
    if they want to install one or the other).
 
  - If you packaged rsync + rsync-ssl + rsync-ssl-daemon as separate packages,
-   the rsync-ssl package is now gone (along with its install-ssl-client make
-   target -- rsync-ssl should be considered to be mainstream now that Samba
-   requires SSL for its rsync daemon).
+   the rsync-ssl package is now gone (rsync-ssl should be considered to be
+   mainstream now that Samba requires SSL for its rsync daemon).
 
  - Add _build_ dependency for liblz4-dev, libxxhash-dev, libzstd-dev, and
    libssl-dev.  These development libraries will give rsync extra compression
    algorithms, extra checksum algorithms, and allow use of openssl's crypto
-   lib for MD4/MD5 checksums.
+   lib for (potentially) faster MD4/MD5 checksums.
 
  - Add _build_ dependency for g++ to enable the SIMD checksum optimizations.
 
@@ -167,28 +165,24 @@ Protocol: 31 (unchanged)
    to allow for patching of man pages or building a git release.  Note that
    cmarkcfm is faster than commonmark, but they generate the same data.
 
- - Remove yodl _build_ dependency (if you listed it).
+ - Remove yodl _build_ dependency (if it was even listed before).
 
 ### DEVELOPER RELATED:
 
- - Silenced some annoying warnings about major()|minor() due to the autoconf
-   include-file check not being smart enough.
+ - Silenced some annoying warnings about major() & minor() by improving an
+   autoconf include-file check.
 
  - Converted the man pages from yodl to markdown. They are now processed via a
    simple python3 script using the cmarkgfm OR commonmark library.  This should
-   make it easier for packaging rsync, since yodl has gotten obscure.
+   make it easier to package rsync, since yodl has gotten obscure.
 
  - Improved some configure checks to work better with strict C99 compilers.
 
- - The `--debug=FOO` options are no longer auto-forwarded to the server side,
-   allowing more control over what is output & the ability to request debug
-   data from divergent rsync versions.
-
- - Some perl scripts were recoded into awk and python3.
+ - Some perl building/packaging scripts were recoded into awk and python3.
 
  - Some defines in byteorder.h were changed into static inline functions that
    will help to ensure that the args don't get evaluated multiple times on
-   `careful alignment` hosts.
+   "careful alignment" hosts.
 
  - Some code typos were fixed (as pointed out by a Fossies run).
 
