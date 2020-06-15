@@ -1077,7 +1077,6 @@ encryption.
 - You should limit the access to the backend-rsyncd port to only allow the
   proxy to connect.  If it is on the same host as the proxy, then configuring
   it to only listen on localhost is a good idea.
-
 - You should consider turning on the `proxy protocol` parameter if your proxy
   supports sending that information.  The examples below assume that this is
   enabled.

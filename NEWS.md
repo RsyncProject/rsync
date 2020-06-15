@@ -72,7 +72,8 @@ Protocol: 31 (unchanged)
    strings (for checksums and compression).  The first level just outputs the
    result of each negotiation on the client, level 2 outputs the values of the
    strings that were sent to and received from the server, and level 3 outputs
-   all those values on the server side too (when given the debug option).
+   all those values on the server side too (when the server was given the debug
+   option).
 
  - The --debug=OPTS command-line option is no longer auto-forwarded to the
    remote rsync which allows for the client and server to have different levels
@@ -139,9 +140,12 @@ Protocol: 31 (unchanged)
  - Forward -4 or -6 to the ssh command, making it easier to type than
    `--rsh='ssh -4'` (or -6).
 
+ - More errors messages now mention if the error is coming from the sender or
+   the receiver.
+
 ### PACKAGING RELATED:
 
- - Add installed binary: /usr/bin/rsync-sll
+ - Add installed binary: /usr/bin/rsync-ssl
 
  - Add installed man page: /usr/man/man1/rsync-ssl.1
 

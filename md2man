@@ -181,6 +181,8 @@ class HtmlToManPage(HTMLParser):
                     tag = 'dt'
                 else:
                     st.html_out.append('<dt>')
+            elif tag == 'p':
+                st.at_first_tag_in_dd = True # Kluge to suppress a .P at the start of an li.
             st.at_first_tag_in_li = False
         if tag == 'p':
             if not st.at_first_tag_in_dd:
