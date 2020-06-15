@@ -5,7 +5,7 @@ rsync-ssl - a helper script for connecting to an ssl rsync daemon
 # SYNOPSIS
 
 ```
-rsync-ssl [--type=openssl|stunnel] RSYNC_ARGS
+rsync-ssl [--type=SSL_TYPE] RSYNC_ARGS
 ```
 
 # DESCRIPTION
@@ -13,26 +13,25 @@ rsync-ssl [--type=openssl|stunnel] RSYNC_ARGS
 The rsync-ssl script helps you to run an rsync copy to/from an rsync daemon
 that requires ssl connections.
 
-If the **first** arg is a `--type=NAME` option, the script will only use that
-particular program to open an ssl connection instead of trying to find an
+# OPTIONS
+
+If the **first** arg is a `--type=SSL_TYPE` option, the script will only use
+that particular program to open an ssl connection instead of trying to find an
 stunnel or openssl executable via a simple heuristic (assuming that the
 `RSYNC_SSL_TYPE` environment variable is not set as well -- see below).  This
-option must be one of `--type=openssl` or `--type=stunnel`.  The equal sign is
+option must specify one of `openssl` or `stunnel`.  The equal sign is
 required for this particular option.
 
 All the other options are passed through to the rsync command, so consult the
 **rsync** manpage for more information on how it works.
-
-Note that the stunnel connection type requires at least version 4 of stunnel,
-which should be the case on modern systems.
 
 # ENVIRONMENT VARIABLES
 
 The ssl helper scripts are affected by the following environment variables:
 
 0.  `RSYNC_SSL_TYPE` Specifies the program type that should be used to open the
-    ssl connection.  It must be one of "openssl" or "stunnel".  The
-    `--type=NAME` option overrides this, if specified.
+    ssl connection.  It must be one of `openssl` or `stunnel`.  The
+    `--type=SSL_TYPE` option overrides this, when specified.
 0.  `RSYNC_SSL_PORT` If specified, the value is the port number that is used as
     the default when the user does not specify a port in their rsync command.
     When not specified, the default port number is 874.  (Note that older rsync
@@ -48,6 +47,11 @@ The ssl helper scripts are affected by the following environment variables:
 0.  `RSYNC_SSL_OPENSSL` Specifies the openssl executable to run when the
     connection type is set to openssl.  If unspecified, the $PATH is searched
     for "openssl".
+
+# CAVEATS
+
+Note that using an stunnel connection requires at least version 4 of stunnel,
+which should be the case on modern systems.
 
 # EXAMPLES
 

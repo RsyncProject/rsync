@@ -72,21 +72,21 @@ function rsync_ssl_helper {
 	caopt="-verify_return_error -verify 4"
 	# stunnel:
 	cafile=""
-	verify=0
+	verify=""
     elif [[ "$RSYNC_SSL_CA_CERT" == "" ]]; then
 	# RSYNC_SSL_CA_CERT set but empty -do NO verifications:
 	# openssl:
 	caopt="-verify 1"
 	# stunnel:
 	cafile=""
-	verify=0
+	verify="verifyChain = no"
     else
 	# RSYNC_SSL_CA_CERT set - use CA AND verify:
 	# openssl:
 	caopt="-CAfile $RSYNC_SSL_CA_CERT -verify_return_error -verify 4"
 	# stunnel:
 	cafile="CAfile = $RSYNC_SSL_CA_CERT"
-	verify=3
+	verify="verifyChain = yes"
     fi
 
     port="${RSYNC_PORT:-0}"
@@ -118,7 +118,7 @@ debug = crit
 connect = $hostname:$port
 client = yes
 TIMEOUTclose = 0
-verify = $verify
+$verify
 $certopt
 $cafile
 EOF
@@ -146,7 +146,8 @@ function path_search {
 }
 
 if [[ "$#" == 0 ]]; then
-    echo "Usage: rsync-ssl [--type=openssl|stunnel] RSYNC_ARG [...]" 1>&2
+    echo "Usage: rsync-ssl [--type=SSL_TYPE] RSYNC_ARG [...]" 1>&2
+    echo "The SSL_TYPE can be stunnel or openssl"
     exit 1
 fi
 
