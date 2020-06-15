@@ -173,8 +173,8 @@ Protocol: 31 (unchanged)
    autoconf include-file check.
 
  - Converted the man pages from yodl to markdown. They are now processed via a
-   simple python3 script using the cmarkgfm OR commonmark library.  This should
-   make it easier to package rsync, since yodl has gotten obscure.
+   simple python3 script using the cmarkgfm **or** commonmark library.  This
+   should make it easier to package rsync, since yodl has gotten obscure.
 
  - Improved some configure checks to work better with strict C99 compilers.
 
