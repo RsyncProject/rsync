@@ -1130,7 +1130,7 @@ int start_daemon(int f_in, int f_out)
 	if (!load_config(0))
 		exit_cleanup(RERR_SYNTAX);
 
-	if (lp_haproxy_header() && !read_haproxy_header(f_in))
+	if (lp_proxy_protocol() && !read_proxy_protocol_header(f_in))
 		return -1;
 
 	p = lp_daemon_chroot();

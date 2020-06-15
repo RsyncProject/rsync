@@ -71,8 +71,8 @@ certificate environment options.
 
 This script also supports a `--type=gnutls` option, but at the time of this
 release the gnutls-cli command was dropping output, making it unusable.  If
-that bug has been fixed in your version, feel free to put gnutls into the
-RSYNC_SSL_TYPE environment variable if you want to make its use the default.
+that bug has been fixed in your version, feel free to put gnutls into an
+exported RSYNC_SSL_TYPE environment variable to make its use the default.
 
 # BUGS
 

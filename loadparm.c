@@ -112,7 +112,7 @@ typedef struct {
 	int listen_backlog;
 	int rsync_port;
 
-	BOOL haproxy_header;
+	BOOL proxy_protocol;
 } global_vars;
 
 /* This structure describes a single section.  Their order must match the
@@ -233,7 +233,7 @@ static const all_vars Defaults = {
  /* listen_backlog; */		5,
  /* rsync_port; */		0,
 
- /* haproxy_header; */		False,
+ /* proxy_protocol; */		False,
  },
 
  /* ==== local_vars ==== */
@@ -406,8 +406,8 @@ static struct parm_struct parm_table[] =
  {"motd file",         P_STRING, P_GLOBAL,&Vars.g.motd_file,           NULL,0},
  {"pid file",          P_STRING, P_GLOBAL,&Vars.g.pid_file,            NULL,0},
  {"port",              P_INTEGER,P_GLOBAL,&Vars.g.rsync_port,          NULL,0},
+ {"proxy protocol",    P_BOOL,   P_LOCAL, &Vars.g.proxy_protocol,      NULL,0},
  {"socket options",    P_STRING, P_GLOBAL,&Vars.g.socket_options,      NULL,0},
- {"haproxy header",    P_BOOL,   P_LOCAL, &Vars.g.haproxy_header,      NULL,0},
 
  {"auth users",        P_STRING, P_LOCAL, &Vars.l.auth_users,          NULL,0},
  {"charset",           P_STRING, P_LOCAL, &Vars.l.charset,             NULL,0},
@@ -549,7 +549,7 @@ FN_GLOBAL_STRING(lp_socket_options, socket_options)
 FN_GLOBAL_INTEGER(lp_listen_backlog, listen_backlog)
 FN_GLOBAL_INTEGER(lp_rsync_port, rsync_port)
 
-FN_GLOBAL_BOOL(lp_haproxy_header, haproxy_header)
+FN_GLOBAL_BOOL(lp_proxy_protocol, proxy_protocol)
 
 FN_LOCAL_STRING(lp_auth_users, auth_users)
 FN_LOCAL_STRING(lp_charset, charset)

@@ -99,7 +99,7 @@ Protocol: 31 (unchanged)
    a daemon-over-rsh script. Its value is the user-specified port number (set
    via `--port` or an rsync:// URL) or 0 if the user didn't override the port.
 
- - Added the `haproxy header` daemon parameter that allows your rsyncd to know
+ - Added the `proxy protocol` daemon parameter that allows your rsyncd to know
    the real remote IP when it is setup behind a proxy.
 
  - Added negated matching to the daemon's `refuse options` setting by using

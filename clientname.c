@@ -156,8 +156,8 @@ char *client_name(const char *ipaddr)
 }
 
 
-/* Try to read an haproxy header (V1 or V2). Returns 1 on success or 0 on failure. */
-int read_haproxy_header(int fd)
+/* Try to read an proxy protocol header (V1 or V2). Returns 1 on success or 0 on failure. */
+int read_proxy_protocol_header(int fd)
 {
 	union {
 		struct {

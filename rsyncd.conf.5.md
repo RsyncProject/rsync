@@ -234,11 +234,11 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     allow the daemon to function.  By default the daemon runs without any
     chrooting.
 
-0.  `haproxy header`
+0.  `proxy protocol`
 
     When this parameter is enabled, all incoming connections must start with a
-    V1 or V2 haproxy header.  If the header is not found, the connection is
-    closed.
+    V1 or V2 proxy protocol header.  If the header is not found, the connection
+    is closed.
 
     Setting this to `true` requires a proxy server to forward source IP
     information to rsync, allowing you to log proper IP/host info and make use
