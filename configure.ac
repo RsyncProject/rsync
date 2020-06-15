@@ -1,6 +1,6 @@
 dnl Process this file with autoconf to produce a configure script.
 
-AC_INIT([rsync],[3.2.0pre1],[http://rsync.samba.org/bugzilla.html])
+AC_INIT([rsync],[3.2.0pre2],[http://rsync.samba.org/bugzilla.html])
 
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([byteorder.h])
