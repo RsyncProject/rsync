@@ -17,7 +17,7 @@ that requires ssl connections.
 
 If the **first** arg is a `--type=SSL_TYPE` option, the script will only use
 that particular program to open an ssl connection instead of trying to find an
-stunnel or openssl executable via a simple heuristic (assuming that the
+openssl or stunnel executable via a simple heuristic (assuming that the
 `RSYNC_SSL_TYPE` environment variable is not set as well -- see below).  This
 option must specify one of `openssl` or `stunnel`.  The equal sign is
 required for this particular option.
@@ -41,17 +41,12 @@ The ssl helper scripts are affected by the following environment variables:
     certificate to use for the connection.
 0.  `RSYNC_SSL_CA_CERT` If specified, the value is a filename that contains a
     certificate authority certificate that is used to validate the connection.
-0.  `RSYNC_SSL_STUNNEL` Specifies the stunnel executable to run when the
-    connection type is set to stunnel.  If unspecified, the $PATH is searched
-    first for "stunnel4" and then for "stunnel".
 0.  `RSYNC_SSL_OPENSSL` Specifies the openssl executable to run when the
     connection type is set to openssl.  If unspecified, the $PATH is searched
     for "openssl".
-
-# CAVEATS
-
-Note that using an stunnel connection requires at least version 4 of stunnel,
-which should be the case on modern systems.
+0.  `RSYNC_SSL_STUNNEL` Specifies the stunnel executable to run when the
+    connection type is set to stunnel.  If unspecified, the $PATH is searched
+    first for "stunnel4" and then for "stunnel".
 
 # EXAMPLES
 
@@ -62,6 +57,14 @@ which should be the case on modern systems.
 # SEE ALSO
 
 **rsync**(1), **rsyncd.conf**(5)
+
+# CAVEATS
+
+Note that using an stunnel connection requires at least version 4 of stunnel,
+which should be the case on modern systems.  Also, it does not verify a
+connection against the CA certificate collection, so it only encrypts the
+connection without any cert validation unless you have specified the
+certificate environment options.
 
 # BUGS
 

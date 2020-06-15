@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# This script supports using stunnel or openssl to secure an rsync daemon connection.
+# This script supports using openssl or stunnel to secure an rsync daemon connection.
 
 # By default this script takes rsync args and hands them off to the actual
 # rsync command with an --rsh option that makes it open an SSL connection to an
@@ -31,7 +31,7 @@ function rsync_ssl_run {
 
 function rsync_ssl_helper {
     if [[ -z "$RSYNC_SSL_TYPE" ]]; then
-	found=`path_search stunnel4 stunnel openssl` || exit 1
+	found=`path_search openssl stunnel4 stunnel` || exit 1
 	if [[ "$found" == */openssl ]]; then
 	    RSYNC_SSL_TYPE=openssl
 	    RSYNC_SSL_OPENSSL="$found"
@@ -71,6 +71,9 @@ function rsync_ssl_helper {
 	# openssl:
 	caopt="-verify_return_error -verify 4"
 	# stunnel:
+	# Since there is no way of using the default CA certificate collection,
+	# we cannot do any verification. Thus, stunnel should really only be
+	# used if nothing else is available.
 	cafile=""
 	verify=""
     elif [[ "$RSYNC_SSL_CA_CERT" == "" ]]; then
@@ -147,7 +150,7 @@ function path_search {
 
 if [[ "$#" == 0 ]]; then
     echo "Usage: rsync-ssl [--type=SSL_TYPE] RSYNC_ARG [...]" 1>&2
-    echo "The SSL_TYPE can be stunnel or openssl"
+    echo "The SSL_TYPE can be openssl or stunnel"
     exit 1
 fi
 
