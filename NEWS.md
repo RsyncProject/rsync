@@ -140,6 +140,8 @@ Protocol: 31 (unchanged)
  - Forward -4 or -6 to the ssh command, making it easier to type than
    `--rsh='ssh -4'` (or -6).
 
+ - Added example config for rsyncd SSL proxy configs to rsyncd.conf.
+
  - More errors messages now mention if the error is coming from the sender or
    the receiver.
 
