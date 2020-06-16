@@ -89,8 +89,7 @@ def main():
         env_subs['VERSION'] = '1.0.0'
         env_subs['libdir'] = '/usr'
     else:
-        chk_files = 'NEWS.md Makefile'.split()
-        for fn in chk_files:
+        for fn in 'NEWS.md Makefile'.split():
             try:
                 st = os.lstat(fi.srcdir + fn)
             except:
@@ -112,16 +111,16 @@ def main():
                 if var == 'VERSION':
                     break
 
-    fi.date = time.strftime('%d %b %Y', time.localtime(fi.mtime))
-
     with open(fi.fn, 'r', encoding='utf-8') as fh:
         txt = fh.read()
 
     txt = re.sub(r'@VERSION@', env_subs['VERSION'], txt)
     txt = re.sub(r'@LIBDIR@', env_subs['libdir'], txt)
+
     fi.html_in = md_parser(txt)
     txt = None
 
+    fi.date = time.strftime('%d %b %Y', time.localtime(fi.mtime))
     fi.man_headings = (fi.prog, fi.sect, fi.date, fi.prog + ' ' + env_subs['VERSION'])
 
     HtmlToManPage(fi)
