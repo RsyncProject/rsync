@@ -177,16 +177,13 @@ if test x"$SIMD" != x""; then
     AC_MSG_RESULT([yes ($SIMD)])
 	AC_DEFINE(HAVE_SIMD, 1, [Define to 1 to enable SIMD optimizations])
     SIMD=`echo "$SIMD" | sed -e 's/[[^ ]]\+/$(SIMD_&)/g'`
+    # We only use g++ for its target attribute dispatching, disable unneeded bulky features
+    CXXFLAGS="$CXXFLAGS -fno-exceptions -fno-rtti"
 else
     AC_MSG_RESULT(no)
 fi
 
 AC_SUBST(SIMD)
-
-# We only use g++ for its target attribute dispatching, disable unneeded bulky features
-if test x"$CXXOBJ" != x""; then
-    CXXFLAGS="$CXXFLAGS -fno-exceptions -fno-rtti"
-fi
 
 # arrgh. libc in some old debian version screwed up the largefile
 # stuff, getting byte range locking wrong
