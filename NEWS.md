@@ -105,7 +105,9 @@ Protocol: 31 (unchanged)
 
  - Added negated matching to the daemon's `refuse options` setting by using
    match strings that start with a `!` (such as `!compress*`).  This lets you
-   refuse all options except for a particular approved list, for example.
+   refuse all options except for a particular approved list, for example.  It
+   also lets rsync refuse certain options by default (such as `write-devices`)
+   while allowing the config to override that, as desired.
 
  - Added the `early exec` daemon parameter that runs a script before the
    transfer parameters are known, allowing some early setup based on module
@@ -121,7 +123,7 @@ Protocol: 31 (unchanged)
    copy.  This requires both sender & receiver to be at least v3.2.0.
 
  - Added support for `RSYNC_SHELL` & `RSYNC_NO_XFER_EXEC` environment variables
-   that affect the pre-xfer exec and post-xfer exec rsync daemon options.
+   that affect the early, pre-xfer, and post-xfer exec rsync daemon parameters.
 
  - Optimize the `--fuzzy --fuzzy` heuristic to avoid the fuzzy directory scan
    until all other basis-file options are exhausted (such as `--link-dest`).
@@ -130,14 +132,14 @@ Protocol: 31 (unchanged)
    transfer exited with an error when possible (i.e. if it is the sender).
 
  - The daemon now locks its pid file (when configured to use one) so that it
-   will not fail to start when the file exists and it is unlocked.
+   will not fail to start when the file exists but no daemon is running.
 
  - Various man page improvements, including some html representations (that
    aren't installed by default).
 
  - Made -V the short option for --version and improved its information.
 
- - Forward -4 or -6 to the ssh command, making it easier to type than
+ - Pass the -4 or -6 option to the ssh command, making it easier to type than
    `--rsh='ssh -4'` (or -6).
 
  - Added example config for rsyncd SSL proxy configs to rsyncd.conf.
@@ -168,11 +170,16 @@ Protocol: 31 (unchanged)
    algorithms, extra checksum algorithms, and allow use of openssl's crypto
    lib for (potentially) faster MD4/MD5 checksums.
 
- - Add _build_ dependency for g++ to enable the SIMD checksum optimizations.
+ - Add _build_ dependency for g++ (on x86_64 systems) to enable the SIMD
+   checksum optimizations.  This is auto-disabled on non-x86_64 build_cpu, or
+   if g++ isn't found on non-Linux systems.  Run configure with
+   `--disable-simd` if you run into a build problem.
 
  - Add _build_ dependency for _either_ python3-cmarkcfm or python3-commonmark
-   to allow for patching of man pages or building a git release.  Note that
-   cmarkcfm is faster than commonmark, but they generate the same data.
+   to allow for patching of man pages or building a git release.  This is not
+   required for a release-tar build, since it comes with pre-built man pages.
+   (Note that cmarkcfm is faster than commonmark, but they generate the same
+   data.)
 
  - Remove yodl _build_ dependency (if it was even listed before).
 
