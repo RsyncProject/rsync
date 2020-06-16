@@ -2,7 +2,7 @@
 # Name: /usr/local/bin/rrsync (should also have a symlink in /usr/bin)
 # Purpose: Restricts rsync to subdirectory declared in .ssh/authorized_keys
 # Author: Joe Smith <js-cgi@inwap.com> 30-Sep-2004
-# Modified by: Wayne Davison <wayned@samba.org>
+# Modified by: Wayne Davison <wayne@opencoder.net>
 use strict;
 
 use Socket;

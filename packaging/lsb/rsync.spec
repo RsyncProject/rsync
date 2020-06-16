@@ -79,9 +79,9 @@ rm -rf $RPM_BUILD_ROOT
 %dir /etc/rsync-ssl/certs
 
 %changelog
-* Mon Jun 15 2020 Wayne Davison <wayned@samba.org>
+* Mon Jun 15 2020 Wayne Davison <wayne@opencoder.net>
 Released 3.2.0pre2.
 
-* Fri Mar 21 2008 Wayne Davison <wayned@samba.org>
+* Fri Mar 21 2008 Wayne Davison <wayne@opencoder.net>
 Added installation of /etc/xinetd.d/rsync file and some commented-out
 lines that demonstrate how to use the rsync-patches tar file.
