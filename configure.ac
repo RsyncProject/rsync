@@ -48,6 +48,7 @@ AC_PROG_MKDIR_P
 AC_PROG_CC_STDC
 AC_SUBST(SHELL)
 AC_PATH_PROG([PERL], [perl])
+AC_PATH_PROG([PYTHON3], [python3])
 
 AC_DEFINE([_GNU_SOURCE], 1,
           [Define _GNU_SOURCE so that we get all necessary prototypes])
@@ -62,6 +63,34 @@ if test x"$enable_profile" = x"yes"; then
 	CFLAGS="$CFLAGS -pg"
 fi
 
+AC_MSG_CHECKING([if md2man can create man pages])
+if test x"$ac_cv_path_PYTHON3" = x; then
+    AC_MSG_RESULT(no - python3 not found)
+    md2man_works=no
+elif "$srcdir/md2man" --test "$srcdir/rsync.1.md" >/dev/null 2>&1; then
+    AC_MSG_RESULT(yes)
+    md2man_works=yes
+else
+    AC_MSG_RESULT(no - need cmarkgfm or commonmark python3 lib installed)
+    md2man_works=no
+fi
+
+AC_MSG_CHECKING([if we require man-page building])
+AC_ARG_ENABLE([md2man],
+	AS_HELP_STRING([--disable-md2man],[disable md2man for man page creation]))
+if test x"$enable_md2man" != x"no"; then
+    if test -f "$srcdir/rsync.1"; then
+	AC_MSG_RESULT(optional)
+    else
+	AC_MSG_RESULT(required)
+	if test x"$md2man_works" = x"no"; then
+	    AC_MSG_ERROR(You need python3 and the cmarkgfm OR commonmark python3 lib in order to build man pages.
+You can specify --disable-md2man if you want to skip building them.)
+	fi
+    fi
+else
+    AC_MSG_RESULT(no)
+fi
 
 # Specifically, this turns on panic_action handling.
 AC_ARG_ENABLE(maintainer-mode,
@@ -69,7 +98,6 @@ AC_ARG_ENABLE(maintainer-mode,
 if test x"$enable_maintainer_mode" = x"yes"; then
 	CFLAGS="$CFLAGS -DMAINTAINER_MODE"
 fi
-
 
 # This is needed for our included version of popt.  Kind of silly, but
 # I don't want our version too far out of sync.
@@ -401,10 +429,12 @@ if test x"$enable_xxhash" != x"no"; then
 	AC_MSG_RESULT(yes)
 	AC_SEARCH_LIBS(XXH64_createState, xxhash,
 	    [AC_DEFINE(SUPPORT_XXHASH)],
-	    [AC_MSG_ERROR(Failed to find XXH64_createState function in xxhash lib. Use --disable-xxhash to continue without xxhash checksums.)])
+	    [AC_MSG_ERROR(Failed to find XXH64_createState function in xxhash lib.
+Use --disable-xxhash to continue without xxhash checksums.)])
     else
 	AC_MSG_RESULT(no)
-	AC_MSG_ERROR(Failed to find xxhash.h for xxhash checksum support. Use --disable-xxhash to continue without it.)
+	AC_MSG_ERROR(Failed to find xxhash.h for xxhash checksum support.
+Use --disable-xxhash to continue without it.)
     fi
 else
     AC_MSG_RESULT(no)
@@ -420,10 +450,12 @@ if test x"$enable_zstd" != x"no"; then
 	AC_MSG_RESULT(yes)
 	AC_SEARCH_LIBS(ZSTD_minCLevel, zstd,
 	    [AC_DEFINE(SUPPORT_ZSTD)],
-	    [AC_MSG_ERROR(Failed to find ZSTD_minCLevel function in zstd lib. Use --disable-zstd to continue without zstd compression.)])
+	    [AC_MSG_ERROR(Failed to find ZSTD_minCLevel function in zstd lib.
+Use --disable-zstd to continue without zstd compression.)])
     else
 	AC_MSG_RESULT(no)
-	AC_MSG_ERROR(Failed to find zstd.h for zstd compression support. Use --disable-zstd to continue without it.)
+	AC_MSG_ERROR(Failed to find zstd.h for zstd compression support.
+Use --disable-zstd to continue without it.)
     fi
 else
     AC_MSG_RESULT(no)
@@ -439,10 +471,12 @@ if test x"$enable_lz4" != x"no"; then
 	AC_MSG_RESULT(yes)
 	AC_SEARCH_LIBS(LZ4_compress_default, lz4,
 	    [AC_DEFINE(SUPPORT_LZ4)],
-	    [AC_MSG_ERROR(Failed to find LZ4_compress_default function in lz4 lib. Use --disable-lz4 to continue without lz4 compression.)])
+	    [AC_MSG_ERROR(Failed to find LZ4_compress_default function in lz4 lib.
+Use --disable-lz4 to continue without lz4 compression.)])
     else
 	AC_MSG_RESULT(no)
-	AC_MSG_ERROR(Failed to find lz4.h for lz4 compression support. Use --disable-lz4 to continue without it.)
+	AC_MSG_ERROR(Failed to find lz4.h for lz4 compression support.
+Use --disable-lz4 to continue without it.)
     fi
 else
     AC_MSG_RESULT(no)
