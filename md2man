@@ -78,37 +78,41 @@ def main():
         fi.srcdir = './'
 
     fi.title = fi.prog + '(' + fi.sect + ') man page'
-    fi.mtime = None
+    fi.mtime = 0
 
     if os.path.lexists(fi.srcdir + '.git'):
         fi.mtime = int(subprocess.check_output('git log -1 --format=%at'.split()))
 
-    chk_files = 'NEWS.md Makefile'.split()
-    for fn in chk_files:
-        try:
-            st = os.lstat(fi.srcdir + fn)
-        except:
-            die('Failed to find', fi.srcdir + fn)
-        if not fi.mtime:
-            fi.mtime = st.st_mtime
-
-    fi.date = time.strftime('%d %b %Y', time.localtime(fi.mtime))
-
     env_subs = { 'prefix': os.environ.get('RSYNC_OVERRIDE_PREFIX', None) }
 
-    with open(fi.srcdir + 'Makefile', 'r', encoding='utf-8') as fh:
-        for line in fh:
-            m = re.match(r'^(\w+)=(.+)', line)
-            if not m:
-                continue
-            var, val = (m[1], m[2])
-            if var == 'prefix' and env_subs[var] is not None:
-                continue
-            while re.search(r'\$\{', val):
-                val = re.sub(r'\$\{(\w+)\}', lambda m: env_subs[m[1]], val)
-            env_subs[var] = val
-            if var == 'VERSION':
-                break
+    if args.test:
+        env_subs['VERSION'] = '1.0.0'
+        env_subs['libdir'] = '/usr'
+    else:
+        chk_files = 'NEWS.md Makefile'.split()
+        for fn in chk_files:
+            try:
+                st = os.lstat(fi.srcdir + fn)
+            except:
+                die('Failed to find', fi.srcdir + fn)
+            if not fi.mtime:
+                fi.mtime = st.st_mtime
+
+        with open(fi.srcdir + 'Makefile', 'r', encoding='utf-8') as fh:
+            for line in fh:
+                m = re.match(r'^(\w+)=(.+)', line)
+                if not m:
+                    continue
+                var, val = (m[1], m[2])
+                if var == 'prefix' and env_subs[var] is not None:
+                    continue
+                while re.search(r'\$\{', val):
+                    val = re.sub(r'\$\{(\w+)\}', lambda m: env_subs[m[1]], val)
+                env_subs[var] = val
+                if var == 'VERSION':
+                    break
+
+    fi.date = time.strftime('%d %b %Y', time.localtime(fi.mtime))
 
     with open(fi.fn, 'r', encoding='utf-8') as fh:
         txt = fh.read()

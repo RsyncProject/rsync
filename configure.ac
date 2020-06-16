@@ -67,12 +67,16 @@ AC_MSG_CHECKING([if md2man can create man pages])
 if test x"$ac_cv_path_PYTHON3" = x; then
     AC_MSG_RESULT(no - python3 not found)
     md2man_works=no
-elif "$srcdir/md2man" --test "$srcdir/rsync.1.md" >/dev/null 2>&1; then
-    AC_MSG_RESULT(yes)
-    md2man_works=yes
 else
-    AC_MSG_RESULT(no - need cmarkgfm or commonmark python3 lib installed)
-    md2man_works=no
+    md2man_out=`"$srcdir/md2man" --test "$srcdir/rsync.1.md" 2>&1`
+    if test $? = 0; then
+	AC_MSG_RESULT(yes)
+	md2man_works=yes
+    else
+	AC_MSG_RESULT(no)
+	md2man_works=no
+	echo "$md2man_out"
+    fi
 fi
 
 AC_MSG_CHECKING([if we require man-page building])
