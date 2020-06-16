@@ -197,10 +197,17 @@ if test x"$enable_simd" != x"no"; then
     # For x86-64 SIMD, g++ is also required
     if test x"$build_cpu" = x"x86_64"; then
 	if test x"$CXX" = x"g++"; then
+	    # AC_MSG_RESULT() called below
 	    SIMD="$SIMD x86_64"
 	else
 	    AC_MSG_RESULT(no)
-	    AC_MSG_ERROR(Failed to find g++ for SIMD speedups. Use --disable-simd to continue without it.)
+	    case "$host_os" in
+	    *linux*)
+		AC_MSG_ERROR(Failed to find g++ for SIMD speedups. Use --disable-simd to continue without it.)
+		;;
+	    *)
+		;;
+	    esac
 	fi
     fi
 fi
@@ -208,7 +215,7 @@ fi
 if test x"$SIMD" != x""; then
     SIMD=`echo "$SIMD" | sed -e 's/^ *//'`
     AC_MSG_RESULT([yes ($SIMD)])
-	AC_DEFINE(HAVE_SIMD, 1, [Define to 1 to enable SIMD optimizations])
+    AC_DEFINE(HAVE_SIMD, 1, [Define to 1 to enable SIMD optimizations])
     SIMD=`echo "$SIMD" | sed -e 's/[[^ ]]\+/$(SIMD_&)/g'`
     # We only use g++ for its target attribute dispatching, disable unneeded bulky features
     CXXFLAGS="$CXXFLAGS -fno-exceptions -fno-rtti"
