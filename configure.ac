@@ -423,9 +423,18 @@ AC_ARG_ENABLE([openssl],
 	AS_HELP_STRING([--disable-openssl],[disable openssl crypto library]))
 AH_TEMPLATE([USE_OPENSSL],
 [Undefine if you do not want to use openssl crypto library.  By default this is defined.])
-if test x"$enable_openssl" != x"no" && test x"$ac_cv_header_openssl_md4_h" = x"yes" && test x"$ac_cv_header_openssl_md5_h" = x"yes"; then
-    AC_MSG_RESULT(yes)
-    AC_SEARCH_LIBS(MD5_Init, crypto, [AC_DEFINE(USE_OPENSSL)])
+if test x"$enable_openssl" != x"no"; then
+    if test x"$ac_cv_header_openssl_md4_h" = x"yes" && test x"$ac_cv_header_openssl_md5_h" = x"yes"; then
+      AC_MSG_RESULT(yes)
+      AC_SEARCH_LIBS(MD5_Init, crypto,
+          [AC_DEFINE(USE_OPENSSL)],
+          [AC_MSG_ERROR(Failed to find MD5_Init function in openssl crypto lib.
+Use --disable-openssl to continue without openssl crypto lib support.)])
+    else
+        AC_MSG_RESULT(no)
+        AC_MSG_ERROR(Failed to find openssl/md4.h and openssl/md5.h for openssl crypto lib support.
+Use --disable-openssl to continue without it.)
+    fi
 else
     AC_MSG_RESULT(no)
 fi
