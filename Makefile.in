@@ -103,8 +103,8 @@ options.o: latest-year.h help-rsync.h help-rsyncd.h
 
 flist.o: rounding.h
 
-help-rsync.h help-rsyncd.h: rsync.1.md
-	awk -f $(srcdir)/help-from-md.awk -v helpfile=$@ $(srcdir)/$<
+help-rsync.h help-rsyncd.h: rsync.1.md help-from-md.awk
+	awk -f $(srcdir)/help-from-md.awk -v helpfile=$@ $(srcdir)/rsync.1.md
 
 rounding.h: rounding.c rsync.h proto.h
 	@for r in 0 1 3; do \
@@ -125,10 +125,10 @@ rounding.h: rounding.c rsync.h proto.h
 	@rm -f rounding.out
 
 simd-checksum-x86_64.o: simd-checksum-x86_64.cpp
-	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $(srcdir)/simd-checksum-x86_64.cpp
 
 lib/md5-asm-x86_64.o: lib/md5-asm-x86_64.s
-	$(CC) -c -o $@ $<
+	$(CC) -c -o $@ $(srcdir)/lib/md5-asm-x86_64.s
 
 tls$(EXEEXT): $(TLS_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(TLS_OBJ) $(LIBS)
