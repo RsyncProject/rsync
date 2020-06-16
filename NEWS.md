@@ -149,7 +149,7 @@ Protocol: 31 (unchanged)
 
  - Add installed man page: /usr/man/man1/rsync-ssl.1
 
- - Tweak auxilliary doc file names, such as: README.md, INSTALL.md, NEWS.md, &
+ - Tweak auxiliary doc file names, such as: README.md, INSTALL.md, NEWS.md, &
    OLDNEWS.md.
 
  - The rsync-ssl script wants to run openssl or stunnel4, so consider adding a

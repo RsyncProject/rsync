@@ -595,9 +595,9 @@ your home directory (remove the '=' for that).
     but it can delay messages behind a slew of data.
 
     One case where this is helpful is when sending really large files, since
-    errors that happen on a remote receiver tend to get delayed until afer the
-    file's data is fully sent.  It is also helpful for debugging, since it helps
-    to avoid overpopulating the protocol data with extra message data.
+    errors that happen on a remote receiver tend to get delayed until after the
+    file's data is fully sent.  It is also helpful for debugging, since it
+    helps to avoid overpopulating the protocol data with extra message data.
 
     The option does not affect the remote side of a transfer without using
     `--remote-option` -- e.g. `-M--msgs2stderr` or `{-M,}--msgs2stderr`.
@@ -1482,13 +1482,13 @@ your home directory (remove the '=' for that).
     the `--checksum` option cannot be used.
 
     The "auto" option is the default, where rsync bases its algorithm choice on
-    a negotation between the client and the server as follows:
+    a negotiation between the client and the server as follows:
 
     If both the client and the server are at least version 3.2.0, they will
     exchange a list of checksum names and choose the first one in the list that
     they have in common.  This typically means that they will choose xxh64 if
     they both support it and fall back to MD5.  If one side of the transfer is
-    not new enough to support this checksum negotation, then a value is chosen
+    not new enough to support this checksum negotiation, then a value is chosen
     based on the protocol version (which chooses between MD5 and various
     flavors of MD4 based on protocol age).
 
@@ -2294,7 +2294,7 @@ your home directory (remove the '=' for that).
 
     This option implies `--compress` unless "none" was specified.
 
-    You can also override the compression negotation using the
+    You can also override the compression negotiation using the
     RSYNC_COMPRESS_LIST environment variable by setting it to a space-separated
     list of compression names that you consider acceptable.  If no common
     compress choice is found, the client exits with an error.  It ignores
@@ -3070,7 +3070,7 @@ your home directory (remove the '=' for that).
 
     Tells rsync to prefer IPv4/IPv6 when creating sockets or running ssh.  This
     affects sockets that rsync has direct control over, such as the outgoing
-    socket when directly contacting an rsync daemon, as well as the forwaring
+    socket when directly contacting an rsync daemon, as well as the forwarding
     of the `-4` or `-6` option to ssh when rsync can deduce that ssh is being
     used as the remote shell.  For other remote shells you'll need to specify
     the "`--rsh SHELL -4`" option directly (or whatever ipv4/ipv6 hint options

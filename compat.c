@@ -394,7 +394,7 @@ static void send_negotiate_str(int f_out, struct name_num_obj *nno, const char *
 
 	if (!do_negotiated_strings) {
 		if (!am_server && fail_if_empty) {
-			rprintf(FERROR, "Remote rsync is too old for %s negotation\n", nno->type);
+			rprintf(FERROR, "Remote rsync is too old for %s negotiation\n", nno->type);
 			exit_cleanup(RERR_UNSUPPORTED);
 		}
 		return;

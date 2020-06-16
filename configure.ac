@@ -763,7 +763,7 @@ AC_ARG_ENABLE(iconv,
     AS_HELP_STRING([--disable-iconv],[disable rsync's --iconv option]),
     [], [enable_iconv=$enable_iconv_open])
 AH_TEMPLATE([ICONV_OPTION],
-[Define if you want the --iconv option.  Specifing a value will set the
+[Define if you want the --iconv option.  Specifying a value will set the
 default iconv setting (a NULL means no --iconv processing by default).])
 if test x"$enable_iconv" != x"no"; then
 	if test x"$enable_iconv" = x"yes"; then
