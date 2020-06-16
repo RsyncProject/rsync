@@ -167,8 +167,13 @@ AC_ARG_ENABLE(simd,
 
 if test x"$enable_simd" != x"no"; then
     # For x86-64 SIMD, g++ is also required
-    if test x"$build_cpu" = x"x86_64" && test x"$CXX" = x"g++"; then
-        SIMD="$SIMD x86_64"
+    if test x"$build_cpu" = x"x86_64"; then
+	if test x"$CXX" = x"g++"; then
+	    SIMD="$SIMD x86_64"
+	else
+	    AC_MSG_RESULT(no)
+	    AC_MSG_ERROR(Failed to find g++ for SIMD speedups. Use --disable-simd to continue without it.)
+	fi
     fi
 fi
 
@@ -391,9 +396,16 @@ AC_ARG_ENABLE([xxhash],
 	AS_HELP_STRING([--disable-xxhash],[disable xxhash checksums]))
 AH_TEMPLATE([SUPPORT_XXHASH],
 [Undefine if you do not want xxhash checksums.  By default this is defined.])
-if test x"$enable_xxhash" != x"no" && test x"$ac_cv_header_xxhash_h" = x"yes"; then
-    AC_MSG_RESULT(yes)
-    AC_SEARCH_LIBS(XXH64_createState, xxhash, [AC_DEFINE(SUPPORT_XXHASH)])
+if test x"$enable_xxhash" != x"no"; then
+    if test x"$ac_cv_header_xxhash_h" = x"yes"; then
+	AC_MSG_RESULT(yes)
+	AC_SEARCH_LIBS(XXH64_createState, xxhash,
+	    [AC_DEFINE(SUPPORT_XXHASH)],
+	    [AC_MSG_ERROR(Failed to find XXH64_createState function in xxhash lib. Use --disable-xxhash to continue without xxhash checksums.)])
+    else
+	AC_MSG_RESULT(no)
+	AC_MSG_ERROR(Failed to find xxhash.h for xxhash checksum support. Use --disable-xxhash to continue without it.)
+    fi
 else
     AC_MSG_RESULT(no)
 fi
@@ -403,9 +415,16 @@ AC_ARG_ENABLE([zstd],
         AC_HELP_STRING([--disable-zstd], [disable zstd compression]))
 AH_TEMPLATE([SUPPORT_ZSTD],
 [Undefine if you do not want zstd compression.  By default this is defined.])
-if test x"$enable_zstd" != x"no" && test x"$ac_cv_header_zstd_h" = x"yes"; then
-    AC_MSG_RESULT(yes)
-    AC_SEARCH_LIBS(ZSTD_minCLevel, zstd, [AC_DEFINE(SUPPORT_ZSTD)])
+if test x"$enable_zstd" != x"no"; then
+    if test x"$ac_cv_header_zstd_h" = x"yes"; then
+	AC_MSG_RESULT(yes)
+	AC_SEARCH_LIBS(ZSTD_minCLevel, zstd,
+	    [AC_DEFINE(SUPPORT_ZSTD)],
+	    [AC_MSG_ERROR(Failed to find ZSTD_minCLevel function in zstd lib. Use --disable-zstd to continue without zstd compression.)])
+    else
+	AC_MSG_RESULT(no)
+	AC_MSG_ERROR(Failed to find zstd.h for zstd compression support. Use --disable-zstd to continue without it.)
+    fi
 else
     AC_MSG_RESULT(no)
 fi
@@ -415,9 +434,16 @@ AC_ARG_ENABLE([lz4],
         AC_HELP_STRING([--disable-lz4], [disable LZ4 compression]))
 AH_TEMPLATE([SUPPORT_LZ4],
 [Undefine if you do not want LZ4 compression.  By default this is defined.])
-if test x"$enable_lz4" != x"no" && test x"$ac_cv_header_lz4_h" = x"yes"; then
-    AC_MSG_RESULT(yes)
-    AC_SEARCH_LIBS(LZ4_compress_default, lz4, [AC_DEFINE(SUPPORT_LZ4)])
+if test x"$enable_lz4" != x"no"; then
+    if test x"$ac_cv_header_lz4_h" = x"yes"; then
+	AC_MSG_RESULT(yes)
+	AC_SEARCH_LIBS(LZ4_compress_default, lz4,
+	    [AC_DEFINE(SUPPORT_LZ4)],
+	    [AC_MSG_ERROR(Failed to find LZ4_compress_default function in lz4 lib. Use --disable-lz4 to continue without lz4 compression.)])
+    else
+	AC_MSG_RESULT(no)
+	AC_MSG_ERROR(Failed to find lz4.h for lz4 compression support. Use --disable-lz4 to continue without it.)
+    fi
 else
     AC_MSG_RESULT(no)
 fi

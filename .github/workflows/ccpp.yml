@@ -18,7 +18,7 @@ jobs:
     - name: prepare-source
       run: ./prepare-source
     - name: configure
-      run: ./configure --with-included-popt --with-protected-args --with-included-zlib --enable-simd
+      run: ./configure --with-included-popt --with-included-zlib
     - name: make
       run: make
     - name: version-summary
