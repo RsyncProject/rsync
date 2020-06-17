@@ -197,9 +197,9 @@ SIMD=
 
 AC_MSG_CHECKING([whether to enable SIMD optimizations])
 AC_ARG_ENABLE(simd,
-    AS_HELP_STRING([--disable-simd],[disable SIMD optimizations (requires g++)]))
+    AS_HELP_STRING([--enable-simd],[enable SIMD optimizations (requires g++)]))
 
-if test x"$enable_simd" != x"no"; then
+if test x"$enable_simd" = x"yes"; then
     # For x86-64 SIMD, g++ is also required
     if test x"$build_cpu" = x"x86_64"; then
 	if test x"$CXX" = x"g++"; then
@@ -207,13 +207,8 @@ if test x"$enable_simd" != x"no"; then
 	    SIMD="$SIMD x86_64"
 	else
 	    AC_MSG_RESULT(no)
-	    case "$host_os" in
-	    *linux*)
-		AC_MSG_ERROR(Failed to find g++ for SIMD speedups. Use --disable-simd to continue without it.)
-		;;
-	    *)
-		;;
-	    esac
+	    AC_MSG_ERROR(Failed to find g++ for SIMD speedups.
+Omit --enable-simd to continue without it.)
 	fi
     fi
 fi
