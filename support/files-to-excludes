@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 # This script takes an input of filenames and outputs a set of
 # include/exclude directives that can be used by rsync to copy
 # just the indicated files using an --exclude-from=FILE option.

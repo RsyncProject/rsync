@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 # This script can be used as a "remote shell" command that is only
 # capable of pretending to connect to "localhost".  This is useful
 # for testing or for running a local copy where the sender and the

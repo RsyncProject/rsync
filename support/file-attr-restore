@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 # This script will parse the output of "find ARG [ARG...] -ls" and
 # apply (at your discretion) the permissions, owner, and group info
 # it reads onto any existing files and dirs (it doesn't try to affect

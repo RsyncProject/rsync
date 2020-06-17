@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # This script can be used as an rsync command-line filter that strips a single
 # trailing slash from each arg.  That treats "src/" the same as "src", thus
 # you need to use "src/." or "src//" for just the contents of the "src" dir.

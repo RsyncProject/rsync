@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 #
 # This script parses the default logfile format produced by rsync when running
 # as a daemon with transfer logging enabled.  It also parses a slightly tweaked

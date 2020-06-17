@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 # This helper script makes it easy to use a passwd or group file to map
 # values in a LOCAL transfer.  For instance, if you mount a backup that
 # does not have the same passwd setup as the local machine, you can do

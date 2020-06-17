@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 # This script will either prefix all symlink values with the string
 # "/rsyncd-munged/" or remove that prefix.
 

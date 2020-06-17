@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 #
 # This script lets you update a hierarchy of files in an atomic way by
 # first creating a new hierarchy using rsync's --link-dest option, and

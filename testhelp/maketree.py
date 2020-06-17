@@ -1,4 +1,4 @@
-#! /usr/bin/python2.2
+#!/usr/bin/env python2
 
 # Copyright (C) 2002 by Martin Pool <mbp@samba.org>
 

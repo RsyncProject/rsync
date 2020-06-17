@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 # Filter the rsync daemon log messages by module name.  The log file can be
 # in either syslog format or rsync's own log-file format.  Note that the
 # MODULE_NAME parameter is used in a regular-expression match in order to

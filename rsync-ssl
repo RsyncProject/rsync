@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # This script uses openssl, gnutls, or stunnel to secure an rsync daemon connection.
 

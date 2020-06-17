@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 #
 # This script finds all CVS/Entries files in the current directory and below
 # and creates a local .cvsinclude file with non-inherited rules including each

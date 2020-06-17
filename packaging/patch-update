@@ -1,4 +1,4 @@
-#!/usr/bin/python3 -B
+#!/usr/bin/env python3 -B
 
 # This script is used to turn one or more of the "patch/BASE/*" branches
 # into one or more diffs in the "patches" directory.  Pass the option

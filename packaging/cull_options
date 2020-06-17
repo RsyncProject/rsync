@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 # This script outputs some perl code that parses all possible options
 # that the code in options.c might send to the server.  This perl code
 # is included in the rrsync script.

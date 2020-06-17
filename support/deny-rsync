@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Send an error message via the rsync-protocol to a non-daemon client rsync.
 #
 # Usage:  deny-rsync "message"

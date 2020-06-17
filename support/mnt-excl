@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 # This script takes a command-line arg of a source directory
 # that will be passed to rsync, and generates a set of excludes
 # that will exclude all mount points from the list.  This is

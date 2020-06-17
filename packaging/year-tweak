@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 
 # This uses the output from "support/git-set-file-times --list" to discern
 # the last-modified year of each *.c & *.h file and updates the copyright

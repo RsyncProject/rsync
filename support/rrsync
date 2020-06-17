@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 # Name: /usr/local/bin/rrsync (should also have a symlink in /usr/bin)
 # Purpose: Restricts rsync to subdirectory declared in .ssh/authorized_keys
 # Author: Joe Smith <js-cgi@inwap.com> 30-Sep-2004

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # instant-rsyncd lets you quickly set up and start a simple, unprivileged rsync
 # daemon with a single module in the current directory.  I've found it
