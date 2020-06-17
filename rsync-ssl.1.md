@@ -13,6 +13,13 @@ rsync-ssl [--type=SSL_TYPE] RSYNC_ARGS
 The rsync-ssl script helps you to run an rsync copy to/from an rsync daemon
 that requires ssl connections.
 
+The script requires that you specify an rsync-daemon arg in the style of either
+`hostname::` (with 2 colons) or `rsync://hostname/`.  The default port used for
+connecting is 874 (one higher than the normal 873) unless overridden in the
+environment.  You can specify an overriding port via `--port` or by including
+it in the normal spot in the URL format, though both of those require your
+rsync version to be at least 3.2.0.
+
 # OPTIONS
 
 If the **first** arg is a `--type=SSL_TYPE` option, the script will only use
@@ -23,7 +30,7 @@ option must specify one of `openssl` or `stunnel`.  The equal sign is
 required for this particular option.
 
 All the other options are passed through to the rsync command, so consult the
-**rsync** manpage for more information on how it works.
+**rsync**(1) manpage for more information on how it works.
 
 # ENVIRONMENT VARIABLES
 
@@ -53,9 +60,13 @@ The ssl helper scripts are affected by the following environment variables:
 
 # EXAMPLES
 
->     rsync-ssl -aiv example.com::src/ dest
+>     rsync-ssl -aiv example.com::mod/ dest
 
->     rsync-ssl --type=openssl -aiv example.com::src/ dest
+>     rsync-ssl --type=openssl -aiv example.com::mod/ dest
+
+>     rsync-ssl -aiv --port 9874 example.com::mod/ dest
+
+>     rsync-ssl -aiv rsync://example.com:9874/mod/ dest
 
 # SEE ALSO
 
