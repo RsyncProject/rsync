@@ -92,8 +92,10 @@ if test x"$enable_md2man" != x"no"; then
 You can specify --disable-md2man if you want to skip building them.)
 	fi
     fi
+    MAKE_MAN=man
 else
     AC_MSG_RESULT(no)
+    MAKE_MAN=''
 fi
 
 # Specifically, this turns on panic_action handling.

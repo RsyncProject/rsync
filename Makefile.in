@@ -69,7 +69,7 @@ CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o trimslash.
 @OBJ_RESTORE@
 
 .PHONY: all
-all: Makefile rsync$(EXEEXT) stunnel-rsyncd.conf man
+all: Makefile rsync$(EXEEXT) stunnel-rsyncd.conf @MAKE_MAN@
 
 .PHONY: install
 install: all
