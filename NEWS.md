@@ -170,16 +170,16 @@ Protocol: 31 (unchanged)
    algorithms, extra checksum algorithms, and allow use of openssl's crypto
    lib for (potentially) faster MD4/MD5 checksums.
 
- - Add _build_ dependency for g++ (on x86_64 systems) to enable the SIMD
-   checksum optimizations.  This is auto-disabled on non-x86_64 build_cpu, or
-   if g++ isn't found on non-Linux systems.  Run configure with
-   `--disable-simd` if you run into a build problem.
+ - Add _build_ dependency for g++ on x86_64 systems **if** you want to enable
+   the SIMD checksum optimizations (via `configure --enable-simd`).
 
  - Add _build_ dependency for _either_ python3-cmarkcfm or python3-commonmark
    to allow for patching of man pages or building a git release.  This is not
    required for a release-tar build, since it comes with pre-built man pages.
-   (Note that cmarkcfm is faster than commonmark, but they generate the same
-   data.)
+   Note that cmarkcfm is faster than commonmark, but they generate the same
+   data.  The commonmark dependency is easiest to install since it's native
+   python, and can be installed via `pip3 install --user commonmark` if you
+   want to just install it for the build user (or omit `--user`).
 
  - Remove yodl _build_ dependency (if it was even listed before).
 
