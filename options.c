@@ -200,8 +200,11 @@ int list_only = 0;
 char *batch_name = NULL;
 
 int need_unsorted_flist = 0;
+char *iconv_opt =
 #ifdef ICONV_OPTION
-char *iconv_opt = ICONV_OPTION;
+		ICONV_OPTION;
+#else
+		NULL;
 #endif
 
 struct chmod_mode_struct *chmod_modes = NULL;
@@ -308,9 +311,7 @@ static int refused_partial, refused_progress, refused_delete_before;
 static int refused_delete_during;
 static int refused_inplace, refused_no_iconv;
 static BOOL usermap_via_chown, groupmap_via_chown;
-#ifdef HAVE_SETVBUF
 static char *outbuf_mode;
-#endif
 static char *bwlimit_arg, *max_size_arg, *min_size_arg;
 static char tmp_partialdir[] = ".~tmp~";
 

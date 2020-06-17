@@ -57,12 +57,6 @@ extern struct chmod_mode_struct *daemon_chmod_modes;
 extern char *iconv_opt;
 #endif
 
-#ifdef ICONV_CONST
-iconv_t ic_chck = (iconv_t)-1;
-# ifdef ICONV_OPTION
-iconv_t ic_send = (iconv_t)-1, ic_recv = (iconv_t)-1;
-# endif
-
 #define UPDATED_OWNER (1<<0)
 #define UPDATED_GROUP (1<<1)
 #define UPDATED_MTIME (1<<2)
@@ -71,6 +65,12 @@ iconv_t ic_send = (iconv_t)-1, ic_recv = (iconv_t)-1;
 #define UPDATED_MODE  (1<<5)
 
 #define UPDATED_TIMES (UPDATED_MTIME|UPDATED_ATIME)
+
+#ifdef ICONV_CONST
+iconv_t ic_chck = (iconv_t)-1;
+# ifdef ICONV_OPTION
+iconv_t ic_send = (iconv_t)-1, ic_recv = (iconv_t)-1;
+# endif
 
 static const char *default_charset(void)
 {
