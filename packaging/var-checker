@@ -1,4 +1,4 @@
-#!/usr/bin/env python3 -B
+#!/usr/bin/env -S python3 -B
 
 # This script checks the *.c files for extraneous "extern" variables,
 # for vars that are defined but not used, and for inconsistent array
