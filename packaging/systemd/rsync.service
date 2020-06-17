@@ -16,7 +16,10 @@ RestartSec=1
 #
 # So let's assume some extra security is more than welcome here. We do full
 # system protection (which makes it read-only) and hide users' homes and
-# devices. See systemd.unit(5) and search for "drop-in" to override.
+# devices. To override these defaults, it's best to do so in the drop-in
+# directory, often done via `systemctl edit rsync.service`. The file needs
+# just the bare minimum of the right [heading] and override values.
+# See systemd.unit(5) and search for "drop-in" for full details.
 
 ProtectSystem=full
 ProtectHome=on
