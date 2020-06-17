@@ -102,11 +102,11 @@ def main():
                 m = re.match(r'^(\w+)=(.+)', line)
                 if not m:
                     continue
-                var, val = (m[1], m[2])
+                var, val = (m.group(1), m.group(2))
                 if var == 'prefix' and env_subs[var] is not None:
                     continue
                 while re.search(r'\$\{', val):
-                    val = re.sub(r'\$\{(\w+)\}', lambda m: env_subs[m[1]], val)
+                    val = re.sub(r'\$\{(\w+)\}', lambda m: env_subs[m.group(1)], val)
                 env_subs[var] = val
                 if var == 'VERSION':
                     break
