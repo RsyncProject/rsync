@@ -1,9 +1,27 @@
 [Unit]
 Description=fast remote file copy program daemon
 ConditionPathExists=/etc/rsyncd.conf
+After=network.target
 
 [Service]
 ExecStart=/usr/bin/rsync --daemon --no-detach
+RestartSec=1
+
+# Citing README.md:
+#
+#   [...] Using ssh is recommended for its security features.
+#
+#   Alternatively, rsync can run in `daemon' mode, listening on a socket.
+#   This is generally used for public file distribution, [...]
+#
+# So let's assume some extra security is more than welcome here. We do full
+# system protection (which makes it read-only) and hide users' homes and
+# devices. See systemd.unit(5) and search for "drop-in" to override.
+
+ProtectSystem=full
+ProtectHome=on
+PrivateDevices=on
+NoNewPrivileges=on
 
 [Install]
 WantedBy=multi-user.target
