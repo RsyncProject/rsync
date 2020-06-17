@@ -1,0 +1,10 @@
+[Unit]
+Description=socket for fast remote file copy program daemon
+Conflicts=rsync.service
+
+[Socket]
+ListenStream=873
+Accept=true
+
+[Install]
+WantedBy=sockets.target
