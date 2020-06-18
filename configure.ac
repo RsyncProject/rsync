@@ -212,7 +212,7 @@ if test x"$enable_simd" = x"yes"; then
 		    CXX_OK=yes
 		fi
 		;;
-	    clang*)
+	    *clang*)
 		# $CXX -dumpversion would have been ideal, but is broken on older clang
 		CXX_VERSION=`echo "$CXX_VERSION" | sed 's/.*version //g' | sed 's/\..*//g'`
 		if test "$CXX_VERSION" -ge "7"; then
