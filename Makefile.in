@@ -10,6 +10,7 @@ mandir=@mandir@
 
 LIBS=@LIBS@
 CC=@CC@
+AWK=@AWK@
 CFLAGS=@CFLAGS@
 CPPFLAGS=@CPPFLAGS@
 CXX=@CXX@
@@ -106,10 +107,10 @@ loadparm.o: default-dont-compress.h
 flist.o: rounding.h
 
 default-cvsignore.h default-dont-compress.h: rsync.1.md define-from-md.awk
-	awk -f $(srcdir)/define-from-md.awk -v hfile=$@ $(srcdir)/rsync.1.md
+	$(AWK) -f $(srcdir)/define-from-md.awk -v hfile=$@ $(srcdir)/rsync.1.md
 
 help-rsync.h help-rsyncd.h: rsync.1.md help-from-md.awk
-	awk -f $(srcdir)/help-from-md.awk -v hfile=$@ $(srcdir)/rsync.1.md
+	$(AWK) -f $(srcdir)/help-from-md.awk -v hfile=$@ $(srcdir)/rsync.1.md
 
 rounding.h: rounding.c rsync.h proto.h
 	@for r in 0 1 3; do \
@@ -225,7 +226,7 @@ proto.h: proto.h-tstamp
 	@if test -f proto.h; then :; else cp -p $(srcdir)/proto.h .; fi
 
 proto.h-tstamp: $(srcdir)/*.c $(srcdir)/lib/compat.c config.h
-	awk -f $(srcdir)/mkproto.awk $(srcdir)/*.c $(srcdir)/lib/compat.c
+	$(AWK) -f $(srcdir)/mkproto.awk $(srcdir)/*.c $(srcdir)/lib/compat.c
 
 .PHONY: man
 man: rsync.1 rsync-ssl.1 rsyncd.conf.5
