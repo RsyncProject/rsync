@@ -21,6 +21,7 @@
  */
 
 #include "rsync.h"
+#include "default-cvsignore.h"
 
 extern int am_server;
 extern int am_sender;
@@ -1051,16 +1052,6 @@ static filter_rule *parse_rule_tok(const char **rulestr_ptr,
 	return rule;
 }
 
-static char default_cvsignore[] =
-	/* These default ignored items come from the CVS manual. */
-	"RCS SCCS CVS CVS.adm RCSLOG cvslog.* tags TAGS"
-	" .make.state .nse_depinfo *~ #* .#* ,* _$* *$"
-	" *.old *.bak *.BAK *.orig *.rej .del-*"
-	" *.a *.olb *.o *.obj *.so *.exe"
-	" *.Z *.elc *.ln core"
-	/* The rest we added to suit ourself. */
-	" .svn/ .git/ .hg/ .bzr/";
-
 static void get_cvs_excludes(uint32 rflags)
 {
 	static int initialized = 0;
@@ -1070,7 +1061,7 @@ static void get_cvs_excludes(uint32 rflags)
 		return;
 	initialized = 1;
 
-	parse_filter_str(&cvs_filter_list, default_cvsignore,
+	parse_filter_str(&cvs_filter_list, DEFAULT_CVSIGNORE,
 			 rule_template(rflags | (protocol_version >= 30 ? FILTRULE_PERISHABLE : 0)),
 			 0);
 

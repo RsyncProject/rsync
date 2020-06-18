@@ -1852,6 +1852,8 @@ your home directory (remove the '=' for that).
     The exclude list is initialized to exclude the following items (these
     initial items are marked as perishable -- see the FILTER RULES section):
 
+[comment]: # (This list gets used for the default-cvsignore.h file.)
+
     > `RCS`
     > `SCCS`
     > `CVS`
@@ -2335,38 +2337,68 @@ your home directory (remove the '=' for that).
     The default file suffixes in the skip-compress list in this version of
     rsync are:
 
+[comment]: # (This list gets used for the default-dont-compress.h file.)
+
     > 7z
     > ace
+    > apk
     > avi
     > bz2
     > deb
+    > flac
     > gpg
     > gz
     > iso
+    > jar
     > jpeg
     > jpg
     > lz
+    > lz4
     > lzma
     > lzo
+    > mkv
     > mov
     > mp3
     > mp4
+    > odb
+    > odf
+    > odg
+    > odi
+    > odm
+    > odp
+    > ods
+    > odt
     > ogg
     > ogv
+    > opus
+    > otg
+    > oth
+    > otp
+    > ots
+    > ott
+    > oxt
     > png
     > rar
     > rpm
+    > rz
     > rzip
     > squashfs
+    > sxc
+    > sxd
+    > sxg
+    > sxm
+    > sxw
     > tbz
     > tgz
     > tlz
     > txz
+    > tzo
     > webm
     > webp
     > xz
     > z
     > zip
+    > zst
 
     This list will be replaced by your `--skip-compress` list in all but one
     situation: a copy from a daemon rsync will add your skipped suffixes to its
