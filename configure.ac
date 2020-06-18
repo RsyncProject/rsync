@@ -197,31 +197,48 @@ SIMD=
 
 AC_MSG_CHECKING([whether to enable SIMD optimizations])
 AC_ARG_ENABLE(simd,
-    AS_HELP_STRING([--enable-simd],[enable SIMD optimizations (requires g++)]))
+    AS_HELP_STRING([--enable-simd],[enable SIMD optimizations (requires c++)]))
 
 if test x"$enable_simd" = x"yes"; then
-    # For x86-64 SIMD, g++ is also required
+    # For x86-64 SIMD, g++ >=5 or clang++ >=7 is required
     if test x"$build_cpu" = x"x86_64"; then
-	case "$CXX" in
-	*g++)
-	    # AC_MSG_RESULT() is called below.
-	    SIMD="$SIMD x86_64"
-	    ;;
-	*)
-	    AC_MSG_RESULT(no)
-	    AC_MSG_ERROR(Failed to find g++ for SIMD speedups.
-Omit --enable-simd to continue without it.)
-	    ;;
-	esac
+	if test x"$CXX" != x""; then
+	    CXX_OK=
+	    CXX_VERSION=`$CXX --version | head -n 1`
+	    case "$CXX_VERSION" in
+	    g++*)
+		CXX_VERSION=`$CXX -dumpversion | sed 's/\..*//g'`
+		if test "$CXX_VERSION" -ge "5"; then
+		    CXX_OK=yes
+		fi
+		;;
+	    clang*)
+		# $CXX -dumpversion would have been ideal, but is broken on older clang
+		CXX_VERSION=`echo "$CXX_VERSION" | sed 's/.*version //g' | sed 's/\..*//g'`
+		if test "$CXX_VERSION" -ge "7"; then
+		    CXX_OK=yes
+		fi
+		;;
+	    esac
+
+	    if test x"$CXX_OK" = x"yes"; then
+		# AC_MSG_RESULT() is called below.
+		SIMD="$SIMD x86_64"
+	    else
+		AC_MSG_RESULT(error)
+		AC_MSG_ERROR([Failed to find g++ >=5 or clang++ >=7 for SIMD optimizations.
+Omit --enable-simd to continue without it. ($CXX, $CXX_VERSION)])
+	    fi
+	fi
     fi
 fi
 
 if test x"$SIMD" != x""; then
-    SIMD=`echo "$SIMD" | sed -e 's/^ *//'`
+    SIMD=`echo "$SIMD" | sed 's/^ *//'`
     AC_MSG_RESULT([yes ($SIMD)])
     AC_DEFINE(HAVE_SIMD, 1, [Define to 1 to enable SIMD optimizations])
-    SIMD=`echo "$SIMD" | sed -e 's/[[^ ]]\+/$(SIMD_&)/g'`
-    # We only use g++ for its target attribute dispatching, disable unneeded bulky features
+    SIMD=`echo "\\\$(SIMD_$SIMD)" | sed 's/ /) $(SIMD_/g'`
+    # We only use c++ for its target attribute dispatching, disable unneeded bulky features
     CXXFLAGS="$CXXFLAGS -fno-exceptions -fno-rtti"
 else
     AC_MSG_RESULT(no)
