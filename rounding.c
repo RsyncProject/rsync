@@ -24,11 +24,11 @@
 
 struct test {
 	union file_extras extras[ARRAY_LEN];
-	struct file_struct file;
+	int64 test;
 };
 
 #define ACTUAL_SIZE	SIZEOF(struct test)
-#define EXPECTED_SIZE	(SIZEOF(union file_extras) * ARRAY_LEN + SIZEOF(struct file_struct))
+#define EXPECTED_SIZE	(SIZEOF(union file_extras) * ARRAY_LEN + SIZEOF(int64))
 
  int main(UNUSED(int argc), UNUSED(char *argv[]))
 {
