@@ -230,6 +230,10 @@ if test x"$enable_simd" = x"yes"; then
 Omit --enable-simd to continue without it. ($CXX, $CXX_VERSION)])
 	    fi
 	fi
+    else
+        AC_MSG_RESULT(unavailable)
+        AC_MSG_ERROR(The SIMD optimizations are currently x86_64 only.
+Omit --enable-simd to continue.)
     fi
 fi
 
