@@ -650,7 +650,7 @@ size_t iconv();
 #endif
 ]], [[]])],[am_cv_proto_iconv_arg1=""],[am_cv_proto_iconv_arg1="const"])
       am_cv_proto_iconv="extern size_t iconv (iconv_t cd, $am_cv_proto_iconv_arg1 char * *inbuf, size_t *inbytesleft, char * *outbuf, size_t *outbytesleft);"])
-    am_cv_proto_iconv=`echo "[$]am_cv_proto_iconv" | tr -s ' ' | sed -e 's/( /(/'`
+    am_cv_proto_iconv=`echo "[$]am_cv_proto_iconv" | tr -s ' ' | sed 's/( /(/'`
 AC_MSG_RESULT([$]{ac_t:-
          }[$]am_cv_proto_iconv)
 AC_DEFINE_UNQUOTED(ICONV_CONST, $am_cv_proto_iconv_arg1,
