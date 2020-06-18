@@ -170,8 +170,8 @@ Protocol: 31 (unchanged)
    algorithms, extra checksum algorithms, and allow use of openssl's crypto
    lib for (potentially) faster MD4/MD5 checksums.
 
- - Add _build_ dependency for g++ on x86_64 systems **if** you want to enable
-   the SIMD checksum optimizations (via `configure --enable-simd`).
+ - Add _build_ dependency for g++ or clang++ on x86_64 systems to enable the
+   SIMD checksum optimizations.
 
  - Add _build_ dependency for _either_ python3-cmarkcfm or python3-commonmark
    to allow for patching of man pages or building a git release.  This is not
