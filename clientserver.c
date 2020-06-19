@@ -394,7 +394,7 @@ void set_env_num(const char *var, long num)
 /* Used for both early exec & pre-xfer exec */
 static pid_t start_pre_exec(const char *cmd, int *arg_fd_ptr, int *error_fd_ptr)
 {
-	int arg_fds[2], error_fds[2], arg_fd, error_fd;
+	int arg_fds[2], error_fds[2], arg_fd;
 	pid_t pid;
 
 	if ((error_fd_ptr && pipe(error_fds) < 0) || (arg_fd_ptr && pipe(arg_fds) < 0) || (pid = fork()) < 0)
@@ -406,8 +406,7 @@ static pid_t start_pre_exec(const char *cmd, int *arg_fd_ptr, int *error_fd_ptr)
 
 		if (error_fd_ptr) {
 			close(error_fds[0]);
-			error_fd = error_fds[1];
-			set_blocking(error_fd);
+			set_blocking(error_fds[1]);
 		}
 
 		if (arg_fd_ptr) {
@@ -436,8 +435,8 @@ static pid_t start_pre_exec(const char *cmd, int *arg_fd_ptr, int *error_fd_ptr)
 
 		if (error_fd_ptr) {
 			close(STDIN_FILENO);
-			dup2(error_fd, STDOUT_FILENO);
-			close(error_fd);
+			dup2(error_fds[1], STDOUT_FILENO);
+			close(error_fds[1]);
 		}
 
 		status = shell_exec(cmd);
@@ -449,8 +448,8 @@ static pid_t start_pre_exec(const char *cmd, int *arg_fd_ptr, int *error_fd_ptr)
 
 	if (error_fd_ptr) {
 		close(error_fds[1]);
-		error_fd = *error_fd_ptr = error_fds[0];
-		set_blocking(error_fd);
+		*error_fd_ptr = error_fds[0];
+		set_blocking(error_fds[0]);
 	}
 
 	if (arg_fd_ptr) {
