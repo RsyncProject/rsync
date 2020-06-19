@@ -339,9 +339,9 @@ def manify(txt):
 
 
 def htmlify(txt):
-    return re.sub(r'(\W)-', r'\1&#8209;',
+    return re.sub(r'(^|\W)-', r'\1-&#8288;',
             txt.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
-            .replace('--', '&#8209;&#8209;').replace("\xa0-", '&nbsp;&#8209;').replace("\xa0", '&nbsp;'))
+            .replace("\xa0", '&nbsp;').replace('--', '\4\4')).replace('\4', '-&#8288;')
 
 
 def warn(*msg):
