@@ -1135,30 +1135,23 @@ void send_token(int f, int32 token, struct map_struct *buf, OFF_T offset,
  */
 int32 recv_token(int f, char **data)
 {
-	int tok;
-
 	switch (do_compression) {
 	case CPRES_NONE:
-		tok = simple_recv_token(f,data);
-		break;
+		return simple_recv_token(f,data);
 	case CPRES_ZLIB:
 	case CPRES_ZLIBX:
-		tok = recv_deflated_token(f, data);
-		break;
+		return recv_deflated_token(f, data);
 #ifdef SUPPORT_ZSTD
 	case CPRES_ZSTD:
-		tok = recv_zstd_token(f, data);
-		break;
+		return recv_zstd_token(f, data);
 #endif
 #ifdef SUPPORT_LZ4
 	case CPRES_LZ4:
-		tok = recv_compressed_token(f, data);
-		break;
+		return recv_compressed_token(f, data);
 #endif
 	default:
 		assert(0);
 	}
-	return tok;
 }
 
 /*
