@@ -1,4 +1,4 @@
-# NEWS for rsync 3.2.0 (UNRELEASED)
+# NEWS for rsync 3.2.0 (19 Jun 2020)
 
 Protocol: 31 (unchanged)
 
