@@ -100,6 +100,7 @@ rsync$(EXEEXT): $(OBJS)
 
 $(OBJS): $(HEADERS)
 $(CHECK_OBJS): $(HEADERS)
+tls.o xattrs.o: lib/sysxattrs.h
 options.o: latest-year.h help-rsync.h help-rsyncd.h
 exclude.o: default-cvsignore.h
 loadparm.o: default-dont-compress.h
