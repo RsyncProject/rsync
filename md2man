@@ -35,6 +35,7 @@ body, b, strong, u {
 code {
   font-family: 'Roboto Mono', monospace;
   font-weight: bold;
+  white-space: pre;
 }
 pre code {
   display: block;
@@ -64,7 +65,9 @@ MAN_END = """\
 
 NORM_FONT = ('\1', r"\fP")
 BOLD_FONT = ('\2', r"\fB")
-ULIN_FONT = ('\3', r"\fI")
+UNDR_FONT = ('\3', r"\fI")
+NBR_DASH = ('\4', r"\-")
+NBR_SPACE = ('\xa0', r"\ ")
 
 md_parser = None
 
@@ -212,7 +215,7 @@ class HtmlToManPage(HTMLParser):
             st.txt += BOLD_FONT[0]
         elif tag == 'em' or  tag == 'i':
             tag = 'u' # Change it into underline to be more like the man page
-            st.txt += ULIN_FONT[0]
+            st.txt += UNDR_FONT[0]
         elif tag == 'ol':
             start = 1
             for var, val in attrs_list:
@@ -305,15 +308,21 @@ class HtmlToManPage(HTMLParser):
             st.at_first_tag_in_dd = True
 
 
-    def handle_data(self, data):
+    def handle_data(self, txt):
         st = self.state
         if args.debug:
-            self.output_debug('DATA', (data,))
-        if st.in_code:
-            data = re.sub(r'\s', '\xa0', data) # nbsp in non-pre code
-        data = re.sub(r'\s--\s', '\xa0-- ', data)
-        st.html_out.append(htmlify(data))
-        st.txt += data
+            self.output_debug('DATA', (txt,))
+        if st.in_pre:
+            html = htmlify(txt)
+        else:
+            txt = re.sub(r'\s--(\s)', NBR_SPACE[0] + r'--\1', txt).replace('--', NBR_DASH[0]*2)
+            txt = re.sub(r'(^|\W)-', r'\1' + NBR_DASH[0], txt)
+            html = htmlify(txt)
+            if st.in_code:
+                txt = re.sub(r'\s', NBR_SPACE[0], txt)
+                html = html.replace(NBR_DASH[0], '-').replace(NBR_SPACE[0], ' ') # <code> is non-breaking in CSS
+        st.html_out.append(html.replace(NBR_SPACE[0], '&nbsp;').replace(NBR_DASH[0], '-&#8288;'))
+        st.txt += txt
 
 
     def output_debug(self, event, extra):
@@ -331,17 +340,15 @@ class HtmlToManPage(HTMLParser):
 
 def manify(txt):
     return re.sub(r"^(['.])", r'\&\1', txt.replace('\\', '\\\\')
-            .replace("\xa0", r'\ ') # non-breaking space
-            .replace('--', r'\-\-') # non-breaking double dash
+            .replace(NBR_SPACE[0], NBR_SPACE[1])
+            .replace(NBR_DASH[0], NBR_DASH[1])
             .replace(NORM_FONT[0], NORM_FONT[1])
             .replace(BOLD_FONT[0], BOLD_FONT[1])
-            .replace(ULIN_FONT[0], ULIN_FONT[1]), flags=re.M)
+            .replace(UNDR_FONT[0], UNDR_FONT[1]), flags=re.M)
 
 
 def htmlify(txt):
-    return re.sub(r'(^|\W)-', r'\1-&#8288;',
-            txt.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
-            .replace("\xa0", '&nbsp;').replace('--', '\4\4')).replace('\4', '-&#8288;')
+    return txt.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
 
 
 def warn(*msg):
