@@ -203,9 +203,9 @@ AC_ARG_ENABLE(simd,
 if test x"$enable_simd" != x"no"; then
     # For x86-64 SIMD, g++ >=5 or clang++ >=7 is required
     if test x"$build_cpu" = x"x86_64"; then
+	CXX_OK=
 	if test x"$CXX" != x""; then
-	    CXX_OK=
-	    CXX_VERSION=`$CXX --version | head -n 1`
+	    CXX_VERSION=`$CXX --version 2>/dev/null | head -n 1`
 	    case "$CXX_VERSION" in
 	    g++*)
 		CXX_VERSION=`$CXX -dumpversion | sed 's/\..*//g'`
@@ -220,16 +220,21 @@ if test x"$enable_simd" != x"no"; then
 		    CXX_OK=yes
 		fi
 		;;
+	    *)
+		CXX_VERSION='Unknown'
+		;;
 	    esac
-
-	    if test x"$CXX_OK" = x"yes"; then
-		# AC_MSG_RESULT() is called below.
-		SIMD="$SIMD x86_64"
-	    else
-		AC_MSG_RESULT(error)
-		AC_MSG_ERROR([Failed to find g++ >=5 or clang++ >=7 for SIMD optimizations.
+	else
+	    CXX='No c++'
+	    CXX_VERSION='Unknown'
+	fi
+	if test x"$CXX_OK" = x"yes"; then
+	    # AC_MSG_RESULT() is called below.
+	    SIMD="$SIMD x86_64"
+	else
+	    AC_MSG_RESULT(error)
+	    AC_MSG_ERROR([Failed to find g++ >=5 or clang++ >=7 for SIMD optimizations.
 Specify --disable-simd to continue without it. ($CXX, $CXX_VERSION)])
-	    fi
 	fi
     elif test x"$enable_simd" = x"yes"; then
         AC_MSG_RESULT(unavailable)
