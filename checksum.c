@@ -44,6 +44,7 @@ struct name_num_obj valid_checksums = {
 		{ CSUM_XXH64, "xxh64", NULL },
 		{ CSUM_XXH64, "xxhash", NULL },
 #endif
+		{ CSUM_MD5P8, "md5p8", NULL },
 		{ CSUM_MD5, "md5", NULL },
 		{ CSUM_MD4, "md4", NULL },
 		{ CSUM_NONE, "none", NULL },
@@ -131,6 +132,7 @@ int csum_len_for_type(int cst, BOOL flist_csum)
 	  case CSUM_MD4_OLD:
 	  case CSUM_MD4_BUSTED:
 		return MD4_DIGEST_LEN;
+	  case CSUM_MD5P8:
 	  case CSUM_MD5:
 		return MD5_DIGEST_LEN;
 #ifdef SUPPORT_XXHASH
@@ -156,6 +158,7 @@ int canonical_checksum(int csum_type)
 	  case CSUM_MD4_BUSTED:
 		break;
 	  case CSUM_MD4:
+	  case CSUM_MD5P8:
 	  case CSUM_MD5:
 		return -1;
 #ifdef SUPPORT_XXHASH
@@ -168,7 +171,9 @@ int canonical_checksum(int csum_type)
 	return 0;
 }
 
-#ifndef HAVE_SIMD /* See simd-checksum-*.cpp. */
+#ifdef HAVE_SIMD /* See simd-checksum-*.cpp. */
+#define get_checksum2 get_checksum2_nosimd
+#else
 /*
   a simple 32 bit checksum that can be updated from either end
   (inspired by Mark Adler's Adler-32 checksum)
@@ -189,9 +194,18 @@ uint32 get_checksum1(char *buf1, int32 len)
 	}
 	return (s1 & 0xffff) + (s2 << 16);
 }
+
+void checksum2_enable_prefetch(UNUSED(struct map_struct *map), UNUSED(OFF_T len), UNUSED(int32 blocklen))
+{
+}
+
+void checksum2_disable_prefetch()
+{
+}
 #endif
 
-void get_checksum2(char *buf, int32 len, char *sum)
+/* Renamed to get_checksum2_nosimd() with HAVE_SIMD */
+void get_checksum2(char *buf, int32 len, char *sum, UNUSED(OFF_T prefetch_offset))
 {
 	switch (xfersum_type) {
 #ifdef SUPPORT_XXHASH
@@ -199,6 +213,7 @@ void get_checksum2(char *buf, int32 len, char *sum)
 		SIVAL64(sum, 0, XXH64(buf, len, checksum_seed));
 		break;
 #endif
+	  case CSUM_MD5P8:  // == CSUM_MD5 for checksum2
 	  case CSUM_MD5: {
 		MD5_CTX m5;
 		uchar seedbuf[4];
@@ -314,6 +329,21 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 		break;
 	  }
 #endif
+	  case CSUM_MD5P8: {
+		MD5P8_CTX m5p8;
+
+		MD5P8_Init(&m5p8);
+
+		for (i = 0; i + CHUNK_SIZE <= len; i += CHUNK_SIZE)
+			MD5P8_Update(&m5p8, (uchar *)map_ptr(buf, i, CHUNK_SIZE), CHUNK_SIZE);
+
+		remainder = (int32)(len - i);
+		if (remainder > 0)
+			MD5P8_Update(&m5p8, (uchar *)map_ptr(buf, i, remainder), remainder);
+
+		MD5P8_Final((uchar *)sum, &m5p8);
+		break;
+	  }
 	  case CSUM_MD5: {
 		MD5_CTX m5;
 
@@ -389,6 +419,7 @@ static union {
 #ifdef SUPPORT_XXHASH
 static XXH64_state_t* xxh64_state;
 #endif
+static MD5P8_CTX m5p8;
 static int cursum_type;
 
 void sum_init(int csum_type, int seed)
@@ -407,6 +438,9 @@ void sum_init(int csum_type, int seed)
 		XXH64_reset(xxh64_state, 0);
 		break;
 #endif
+	  case CSUM_MD5P8:
+		MD5P8_Init(&m5p8);
+		break;
 	  case CSUM_MD5:
 		MD5_Init(&ctx.m5);
 		break;
@@ -449,6 +483,9 @@ void sum_update(const char *p, int32 len)
 		XXH64_update(xxh64_state, p, len);
 		break;
 #endif
+	  case CSUM_MD5P8:
+		MD5P8_Update(&m5p8, (uchar *)p, len);
+		break;
 	  case CSUM_MD5:
 		MD5_Update(&ctx.m5, (uchar *)p, len);
 		break;
@@ -503,6 +540,9 @@ int sum_end(char *sum)
 		SIVAL64(sum, 0, XXH64_digest(xxh64_state));
 		break;
 #endif
+	  case CSUM_MD5P8:
+		MD5P8_Final((uchar *)sum, &m5p8);
+		break;
 	  case CSUM_MD5:
 		MD5_Final((uchar *)sum, &ctx.m5);
 		break;

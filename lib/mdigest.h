@@ -18,6 +18,7 @@
 #define CSUM_MD4 4
 #define CSUM_MD5 5
 #define CSUM_XXH64 6
+#define CSUM_MD5P8 7
 
 typedef struct {
 	uint32 A, B, C, D;
@@ -40,3 +41,14 @@ void md5_begin(md_context *ctx);
 void md5_update(md_context *ctx, const uchar *input, uint32 length);
 void md5_result(md_context *ctx, uchar digest[MD5_DIGEST_LEN]);
 #endif
+
+typedef struct {
+    uchar context_storage[1024];
+    uchar buffer[512];
+    unsigned int used;
+    unsigned int next;
+} MD5P8_CTX;
+
+void MD5P8_Init(MD5P8_CTX *ctx);
+void MD5P8_Update(MD5P8_CTX *ctx, const uchar *input, uint32 length);
+void MD5P8_Final(uchar digest[MD5_DIGEST_LEN], MD5P8_CTX *ctx);

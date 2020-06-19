@@ -49,12 +49,32 @@
  * use of the target attribute, selecting the fastest code path based on
  * dispatch priority (GCC 5) or runtime detection of CPU capabilities (GCC 6+).
  * GCC 4.x are not supported to ease configure.ac logic.
+ *
+ * ----
+ *
+ * get_checksum2() is optimized for the case where the selected transfer
+ * checksum is MD5. MD5 can't be made significantly faster with SIMD
+ * instructions than the assembly version already included but SIMD
+ * instructions can be used to hash multiple streams in parallel (see
+ * simd-md5-parallel-x86_64.cpp for details and benchmarks). As rsync's
+ * block-matching algorithm hashes the blocks independently (in contrast to
+ * the whole-file checksum) this method can be employed here.
+ *
+ * To prevent needing to modify the core rsync sources significantly, a
+ * prefetching strategy is used. When a checksum2 is requested, the code
+ * reads ahead several blocks, creates the MD5 hashes for each block in
+ * parallel, returns the hash for the first block, and caches the results
+ * for the other blocks to return in future calls to get_checksum2().
  */
 
 #ifdef __x86_64__
 #ifdef __cplusplus
 
+extern "C" {
+
 #include "rsync.h"
+
+}
 
 #ifdef HAVE_SIMD
 
@@ -480,9 +500,235 @@ uint32 get_checksum1(char *buf1, int32 len)
     return get_checksum1_cpp(buf1, len);
 }
 
-} // extern "C"
+#if !defined(BENCHMARK_SIMD_CHECKSUM1)
 
-#ifdef BENCHMARK_SIMD_CHECKSUM1
+// see simd-md5-parallel-x86_64.cpp
+extern int md5_parallel_slots();
+extern int md5_parallel(int streams, char** buf, int* len, char** sum, char* pre4, char* post4);
+
+#endif /* !BENCHMARK_SIMD_CHECKSUM1 */
+
+#if !defined(BENCHMARK_SIMD_CHECKSUM1) && !defined(BENCHMARK_SIMD_CHECKSUM2)
+
+#define PREFETCH_ENABLE 1 // debugging
+
+#if 0 // debugging
+#define PREFETCH_PRINTF(f_, ...) printf((f_), ##__VA_ARGS__)
+#else
+#define PREFETCH_PRINTF(f_, ...) (void)0;
+#endif
+
+#define PREFETCH_MIN_LEN 1024 // the overhead is unlikely to be worth the gain for small blocks
+#define PREFETCH_MAX_BLOCKS 8
+
+typedef struct {
+    int in_use;
+    OFF_T offset;
+    int32 len;
+    char sum[SUM_LENGTH];
+} prefetch_sum_t;
+
+typedef struct {
+    struct map_struct *map;
+    OFF_T len;
+    OFF_T last;
+    int32 blocklen;
+    int blocks;
+    prefetch_sum_t sums[PREFETCH_MAX_BLOCKS];
+} prefetch_t;
+
+prefetch_t *prefetch;
+
+extern int xfersum_type;
+extern int checksum_seed;
+extern int proper_seed_order;
+extern void get_checksum2_nosimd(char *buf, int32 len, char *sum, OFF_T prefetch_offset);
+
+extern char *map_ptr(struct map_struct *map, OFF_T offset, int32 len);
+
+void checksum2_disable_prefetch()
+{
+    if (prefetch) {
+        PREFETCH_PRINTF("checksum2_disable_prefetch\n");
+        free(prefetch);
+        prefetch = NULL;
+    }
+}
+
+void checksum2_enable_prefetch(UNUSED(struct map_struct *map), UNUSED(OFF_T len), UNUSED(int32 blocklen))
+{
+#ifdef PREFETCH_ENABLE
+    checksum2_disable_prefetch();
+    int slots = md5_parallel_slots();
+    if ((xfersum_type == CSUM_MD5 || xfersum_type == CSUM_MD5P8) && slots > 1 && len >= blocklen * PREFETCH_MAX_BLOCKS && blocklen >= PREFETCH_MIN_LEN) {
+        prefetch = (prefetch_t*)malloc(sizeof(prefetch_t));
+        memset(prefetch, 0, sizeof(prefetch_t));
+        prefetch->map = map;
+        prefetch->len = len;
+        prefetch->last = 0;
+        prefetch->blocklen = blocklen;
+        prefetch->blocks = MIN(PREFETCH_MAX_BLOCKS, slots);
+        PREFETCH_PRINTF("checksum2_enable_prefetch len:%ld blocklen:%d blocks:%d\n", prefetch->len, prefetch->blocklen, prefetch->blocks);
+    }
+#endif
+}
+
+static inline void checksum2_reset_prefetch()
+{
+    for (int i = 0; i < PREFETCH_MAX_BLOCKS; i++) {
+        prefetch->sums[i].in_use = 0;
+    }
+}
+
+static int get_checksum2_prefetched(int32 len, char* sum, OFF_T prefetch_offset)
+{
+    if (prefetch->sums[0].in_use) {
+        if ((prefetch->sums[0].offset == prefetch_offset) && (prefetch->sums[0].len == len)) {
+            memcpy(sum, prefetch->sums[0].sum, SUM_LENGTH);
+            for (int i = 0; i < PREFETCH_MAX_BLOCKS - 1; i++) {
+                prefetch->sums[i] = prefetch->sums[i + 1];
+            }
+            prefetch->sums[PREFETCH_MAX_BLOCKS - 1].in_use = 0;
+            PREFETCH_PRINTF("checksum2_prefetch HIT len:%d offset:%ld\n", len, prefetch_offset);
+            return 1;
+        } else {
+            // unexpected access, reset cache
+            PREFETCH_PRINTF("checksum2_prefetch MISS len:%d offset:%ld\n", len, prefetch_offset);
+            checksum2_reset_prefetch();
+        }
+    }
+    return 0;
+}
+
+static int checksum2_perform_prefetch(OFF_T prefetch_offset)
+{
+    int blocks = MIN(MAX(1, (prefetch->len + prefetch->blocklen - 1) / prefetch->blocklen), prefetch->blocks);
+    if (blocks < 2) return 0; // fall through to non-simd, probably faster
+
+    int32 total = 0;
+    int i;
+    for (i = 0; i < blocks; i++) {
+        prefetch->sums[i].offset = prefetch_offset + total;
+        prefetch->sums[i].len = MIN(prefetch->blocklen, prefetch->len - prefetch_offset - total);
+        prefetch->sums[i].in_use = 0;
+        total += prefetch->sums[i].len;
+    }
+    for (; i < PREFETCH_MAX_BLOCKS; i++) {
+        prefetch->sums[i].in_use = 0;
+    }
+
+    uchar seedbuf[4];
+    SIVALu(seedbuf, 0, checksum_seed);
+
+    PREFETCH_PRINTF("checksum2_perform_prefetch pos:%ld len:%d blocks:%d\n", prefetch_offset, total, blocks);
+    char* mapbuf = map_ptr(prefetch->map, prefetch_offset, total);
+    char* bufs[PREFETCH_MAX_BLOCKS] = {0};
+    int lens[PREFETCH_MAX_BLOCKS] = {0};
+    char* sums[PREFETCH_MAX_BLOCKS] = {0};
+    for (i = 0; i < blocks; i++) {
+        bufs[i] = mapbuf + prefetch->sums[i].offset - prefetch_offset;
+        lens[i] = prefetch->sums[i].len;
+        sums[i] = prefetch->sums[i].sum;
+    }
+    if (md5_parallel(blocks, bufs, lens, sums, (proper_seed_order && checksum_seed) ? (char*)seedbuf : NULL, (!proper_seed_order && checksum_seed) ? (char*)seedbuf : NULL)) {
+        for (i = 0; i < blocks; i++) {
+            prefetch->sums[i].in_use = 1;
+        }
+        return 1;
+    } else {
+        // this should never be, abort
+        PREFETCH_PRINTF("checksum2_perform_prefetch PMD5 ABORT\n");
+        checksum2_disable_prefetch();
+    }
+    return 0;
+}
+
+void get_checksum2(char *buf, int32 len, char *sum, OFF_T prefetch_offset)
+{
+    if (prefetch) {
+        PREFETCH_PRINTF("get_checksum2 %d @ %ld\n", len, prefetch_offset);
+        OFF_T last = prefetch->last;
+        prefetch->last = prefetch_offset;
+        if ((prefetch_offset != 0) && (prefetch_offset != last + prefetch->blocklen)) {
+            // we're looking around trying to align blocks, prefetching will slow things down
+            PREFETCH_PRINTF("get_checksum2 SEEK\n");
+            checksum2_reset_prefetch();
+        } else if (get_checksum2_prefetched(len, sum, prefetch_offset)) {
+            // hit
+            return;
+        } else if (checksum2_perform_prefetch(prefetch_offset)) {
+            if (get_checksum2_prefetched(len, sum, prefetch_offset)) {
+                // hit; should always be as we just fetched this data
+                return;
+            } else {
+                // this should never be, abort
+                PREFETCH_PRINTF("get_checksum2 MISSING DATA ABORT\n");
+                checksum2_disable_prefetch();
+            }
+        }
+    }
+    get_checksum2_nosimd(buf, len, sum, prefetch_offset);
+}
+#endif /* !BENCHMARK_SIMD_CHECKSUM1 && !BENCHMARK_SIMD_CHECKSUM2 */
+
+} // "C"
+
+/* Benchmark compilation
+
+  The get_checksum1() benchmark runs through all available code paths in a
+  single execution, the get_checksum2()/MD5 and MD5P8 benchmark needs to be
+  recompiled for each code path (it always uses the fastest path available
+  on the current CPU otherwise). Note that SSE2/AVX2 MD5 optimizations will
+  be used when applicable regardless of rsync being built with OpenSSL.
+
+  Something like the following should compile and run the benchmarks:
+
+  # if gcc
+  export CC=gcc
+  export CXX=g++
+  export CXX_BASE="-g -O3 -fno-exceptions -fno-rtti"
+
+  # else if clang
+  export CC=clang
+  export CXX=clang++
+  export CXX_BASE="-g -O3 -fno-exceptions -fno-rtti -fno-slp-vectorize"
+
+  # /if
+
+  export CONF_EXTRA="--disable-md2man --disable-zstd --disable-lz4 --disable-xxhash"
+  export CXX_CSUM1="$CXX_BASE simd-checksum-x86_64.cpp"
+  export CXX_MD5P="$CXX_BASE -c -o simd-md5-parallel-x86_64.o simd-md5-parallel-x86_64.cpp"
+  export CXX_CSUM2="$CXX_BASE simd-checksum-x86_64.cpp simd-md5-parallel-x86_64.o lib/md5.o lib/md5p8.o lib/md5-asm-x86_64.o"
+
+  rm bench_csum*
+
+  ./configure --disable-openssl --enable-simd $CONF_EXTRA && make clean && make -j4
+
+  $CXX -DBENCHMARK_SIMD_CHECKSUM1 $CXX_CSUM1 -o bench_csum1.all
+
+  $CXX -DBENCHMARK_SIMD_CHECKSUM2 $CXX_MD5P
+  $CXX -DBENCHMARK_SIMD_CHECKSUM2 $CXX_CSUM2 -o bench_csum2.asm
+
+  $CXX -DBENCHMARK_SIMD_CHECKSUM2 -DPMD5_ALLOW_SSE2 $CXX_MD5P
+  $CXX -DBENCHMARK_SIMD_CHECKSUM2 $CXX_CSUM2 -o bench_csum2.sse2
+
+  $CXX -DBENCHMARK_SIMD_CHECKSUM2 -DPMD5_ALLOW_AVX2 $CXX_MD5P
+  $CXX -DBENCHMARK_SIMD_CHECKSUM2 $CXX_CSUM2 -o bench_csum2.avx2
+
+  ./configure --enable-openssl --enable-simd $CONF_EXTRA && make clean && make -j4
+
+  $CXX -DBENCHMARK_SIMD_CHECKSUM2 $CXX_MD5P
+  $CXX -DBENCHMARK_SIMD_CHECKSUM2 $CXX_CSUM2 -o bench_csum2.openssl -lcrypto
+
+  ./bench_csum1.all
+  ./bench_csum2.asm
+  ./bench_csum2.openssl
+  ./bench_csum2.sse2
+  ./bench_csum2.avx2
+
+ */
+
+#if defined(BENCHMARK_SIMD_CHECKSUM1) || defined(BENCHMARK_SIMD_CHECKSUM2)
 #pragma clang optimize off
 #pragma GCC push_options
 #pragma GCC optimize ("O0")
@@ -493,7 +739,9 @@ uint32 get_checksum1(char *buf1, int32 len)
 #ifndef CLOCK_MONOTONIC_RAW
 #define CLOCK_MONOTONIC_RAW CLOCK_MONOTONIC
 #endif
+#endif /* BENCHMARK_SIMD_CHECKSUM1 || BENCHMARK_SIMD_CHECKSUM2 */
 
+#ifdef BENCHMARK_SIMD_CHECKSUM1
 static void benchmark(const char* desc, int32 (*func)(schar* buf, int32 len, int32 i, uint32* ps1, uint32* ps2), schar* buf, int32 len) {
     struct timespec start, end;
     uint64_t us;
@@ -509,7 +757,7 @@ static void benchmark(const char* desc, int32 (*func)(schar* buf, int32 len, int
     clock_gettime(CLOCK_MONOTONIC_RAW, &end);
     us = next == 0 ? 0 : (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_nsec - start.tv_nsec) / 1000;
     cs = next == 0 ? 0 : (s1 & 0xffff) + (s2 << 16);
-    printf("%-5s :: %5.0f MB/s :: %08x\n", desc, us ? (float)(len / (1024 * 1024) * ROUNDS) / ((float)us / 1000000.0f) : 0, cs);
+    printf("CSUM1 :: %-5s :: %5.0f MB/s :: %08x\n", desc, us ? (float)(len / (1024 * 1024) * ROUNDS) / ((float)us / 1000000.0f) : 0, cs);
 }
 
 static int32 get_checksum1_auto(schar* buf, int32 len, int32 i, uint32* ps1, uint32* ps2) {
@@ -533,10 +781,108 @@ int main() {
     free(buf);
     return 0;
 }
+#endif /* BENCHMARK_SIMD_CHECKSUM1 */
 
+#ifdef BENCHMARK_SIMD_CHECKSUM2
+static void benchmark(const char* desc, void (*func)(char* buf, int32 len, char* sum_out), void (*func2)(char* buf, int32 len, char* sum_out), char* buf, int32 len, int streams) {
+    struct timespec start, end;
+    uint64_t us;
+    unsigned char cs1[16];
+    unsigned char cs2[16];
+    int i;
+
+    clock_gettime(CLOCK_MONOTONIC_RAW, &start);
+    for (i = 0; i < ROUNDS; i++) {
+        func(buf, len, (char*)cs1);
+    }
+    clock_gettime(CLOCK_MONOTONIC_RAW, &end);
+    us = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_nsec - start.tv_nsec) / 1000;
+
+    func2(buf, len, (char*)cs2);
+
+    float perf = us ? (float)(len / (1024 * 1024) * ROUNDS) / ((float)us / 1000000.0f) : 0;
+    printf("CSUM2 :: %-7s :: %5.0f to %5.0f MB/s :: ", desc, perf, perf * streams);
+    for (i = 0; i < 16; i++) {
+        printf("%02x", cs1[i] & 0xFF);
+    }
+    printf(" :: ");
+    for (i = 0; i < 16; i++) {
+        printf("%02x", cs2[i] & 0xFF);
+    }
+    printf("\n");
+}
+
+static void benchmark_inner(char* buf, int32 len, char* sum_out) {
+    // This should produce the same output for different optimizations
+    // levels, not the same as sanity_check()
+
+    char* bufs[8] = {0};
+    int lens[8] = {0};
+    char* sums[8] = {0};
+
+    bufs[0] = buf;
+    lens[0] = len;
+    sums[0] = sum_out;
+    md5_parallel(1, bufs, lens, sums, NULL, NULL);
+}
+
+extern "C" {
+extern void MD5P8_Init_c(MD5P8_CTX *ctx);
+extern void MD5P8_Update_c(MD5P8_CTX *ctx, const uchar *input, uint32 length);
+extern void MD5P8_Final_c(uchar digest[MD5_DIGEST_LEN], MD5P8_CTX *ctx);
+}
+
+static void sanity_check(char* buf, int32 len, char* sum_out) {
+    // This should produce the same output for different optimizations
+    // levels, not the same as benchmark_inner()
+    if (md5_parallel_slots() <= 1) {
+        MD5P8_CTX m5p8;
+        MD5P8_Init_c(&m5p8);
+        MD5P8_Update_c(&m5p8, (uchar *)buf, len);
+        MD5P8_Final_c((uchar *)sum_out, &m5p8);
+    } else {
+        MD5P8_CTX m5p8;
+        MD5P8_Init(&m5p8);
+        MD5P8_Update(&m5p8, (uchar *)buf, len);
+        MD5P8_Final((uchar *)sum_out, &m5p8);
+    }
+}
+
+int main() {
+    // This benchmarks the parallel MD5 checksum rather than get_checksum2()
+    // as the latter would require compiling in a lot of rsync's code, but
+    // it touches all the same internals so the performance should be nearly
+    // identical.
+
+    int i;
+    char* buf = (char*)malloc(BLOCK_LEN);
+    for (i = 0; i < BLOCK_LEN; i++) buf[i] = (i + (i % 3) + (i % 11)) % 256;
+
+    const char* method = "?";
+    switch (md5_parallel_slots()) {
+        case 8: method = "AVX2"; break;
+        case 4: method = "SSE2"; break;
+#ifdef USE_OPENSSL
+        case 1: method = "OpenSSL"; break;
+#elif (CSUM_CHUNK == 64)
+        case 1: method = "ASM"; break;
+#else
+        // this won't happen unless you modified code somewhere
+        case 1: method = "Raw-C"; break;
+#endif
+    }
+
+    benchmark(method, benchmark_inner, sanity_check, buf, BLOCK_LEN, md5_parallel_slots());
+
+    free(buf);
+    return 0;
+}
+#endif /* BENCHMARK_SIMD_CHECKSUM2 */
+
+#if defined(BENCHMARK_SIMD_CHECKSUM1) || defined(BENCHMARK_SIMD_CHECKSUM2)
 #pragma GCC pop_options
 #pragma clang optimize on
-#endif /* BENCHMARK_SIMD_CHECKSUM1 */
+#endif /* BENCHMARK_SIMD_CHECKSUM1 || BENCHMARK_SIMD_CHECKSUM2 */
 
 #endif /* HAVE_SIMD */
 #endif /* __cplusplus */

@@ -218,6 +218,9 @@ if test x"$enable_simd" != x"no"; then
 		CXX_VERSION=`echo "$CXX_VERSION" | sed 's/.*version //g' | sed 's/\..*//g'`
 		if test "$CXX_VERSION" -ge "7"; then
 		    CXX_OK=yes
+
+		    # or clang 10 will halve AVX2 performance
+		    CXXFLAGS="$CXXFLAGS -fno-slp-vectorize"
 		fi
 		;;
 	    *)

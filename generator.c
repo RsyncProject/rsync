@@ -708,10 +708,12 @@ static int generate_and_send_sums(int fd, OFF_T len, int f_out, int f_copy)
 	if (append_mode > 0 && f_copy < 0)
 		return 0;
 
-	if (len > 0)
+	if (len > 0) {
 		mapbuf = map_file(fd, len, MAX_MAP_SIZE, sum.blength);
-	else
+		checksum2_enable_prefetch(mapbuf, len, sum.blength);
+	} else {
 		mapbuf = NULL;
+	}
 
 	for (i = 0; i < sum.count; i++) {
 		int32 n1 = (int32)MIN(len, (OFF_T)sum.blength);
@@ -729,7 +731,7 @@ static int generate_and_send_sums(int fd, OFF_T len, int f_out, int f_copy)
 		}
 
 		sum1 = get_checksum1(map, n1);
-		get_checksum2(map, n1, sum2);
+		get_checksum2(map, n1, sum2, offset - n1);
 
 		if (DEBUG_GTE(DELTASUM, 3)) {
 			rprintf(FINFO,
@@ -741,8 +743,10 @@ static int generate_and_send_sums(int fd, OFF_T len, int f_out, int f_copy)
 		write_buf(f_out, sum2, sum.s2length);
 	}
 
-	if (mapbuf)
+	if (mapbuf) {
 		unmap_file(mapbuf);
+		checksum2_disable_prefetch();
+	}
 
 	return 0;
 }
