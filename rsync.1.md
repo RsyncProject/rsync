@@ -1852,7 +1852,7 @@ your home directory (remove the '=' for that).
     The exclude list is initialized to exclude the following items (these
     initial items are marked as perishable -- see the FILTER RULES section):
 
-[comment]: # (This list gets used for the default-cvsignore.h file.)
+    [comment]: # (This list gets used for the default-cvsignore.h file.)
 
     > `RCS`
     > `SCCS`
@@ -2337,7 +2337,7 @@ your home directory (remove the '=' for that).
     The default file suffixes in the skip-compress list in this version of
     rsync are:
 
-[comment]: # (This list gets used for the default-dont-compress.h file.)
+    [comment]: # (This list gets used for the default-dont-compress.h file.)
 
     > 7z
     > ace
