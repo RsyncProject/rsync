@@ -527,14 +527,14 @@ const char *getallgroups(uid_t uid, item_list *gid_list)
 		return "getpwuid failed";
 
 	gid_list->count = 0; /* We're overwriting any items in the list */
-	EXPAND_ITEM_LIST(gid_list, gid_t, 32);
+	(void)EXPAND_ITEM_LIST(gid_list, gid_t, 32);
 	size = gid_list->malloced;
 
 	/* Get all the process's groups, with the pw_gid group first. */
 	if (getgrouplist(pw->pw_name, pw->pw_gid, gid_list->items, &size) < 0) {
 		if (size > (int)gid_list->malloced) {
 			gid_list->count = gid_list->malloced;
-			EXPAND_ITEM_LIST(gid_list, gid_t, size);
+			(void)EXPAND_ITEM_LIST(gid_list, gid_t, size);
 			if (getgrouplist(pw->pw_name, pw->pw_gid, gid_list->items, &size) < 0)
 				size = -1;
 		} else
@@ -553,7 +553,7 @@ const char *getallgroups(uid_t uid, item_list *gid_list)
 				break;
 		}
 		if (j == size) { /* The default group wasn't found! */
-			EXPAND_ITEM_LIST(gid_list, gid_t, size+1);
+			(void)EXPAND_ITEM_LIST(gid_list, gid_t, size+1);
 			gid_array = gid_list->items;
 		}
 		gid_array[j] = gid_array[0];
