@@ -498,7 +498,7 @@ parameter, the parameter is only listed after the long variant, even though it
 must also be specified for the short.  When specifying a parameter, you can
 either use the form `--option=param` or replace the '=' with whitespace.  The
 parameter may need to be quoted in some manner for it to survive the shell's
-command-line parsing.  Keep in mind that a leading tilde (\~) in a filename is
+command-line parsing.  Keep in mind that a leading tilde (`~`) in a filename is
 substituted by your shell, so `--option=~/foo` will not change the tilde into
 your home directory (remove the '=' for that).
 
@@ -2320,14 +2320,14 @@ your home directory (remove the '=' for that).
     possible.
 
     The **LIST** should be one or more file suffixes (without the dot) separated
-    by slashes (/).  You may specify an empty string to indicate that no files
+    by slashes (`/`).  You may specify an empty string to indicate that no files
     should be skipped.
 
     Simple character-class matching is supported: each must consist of a list
     of letters inside the square brackets (e.g. no special classes, such as
     "[:alpha:]", are supported, and '-' has no special meaning).
 
-    The characters asterisk (\*) and question-mark (?) have no special meaning.
+    The characters asterisk (`*`) and question-mark (`?`) have no special meaning.
 
     Here's an example that specifies 6 suffixes to skip (since 1 of the 5 rules
     matches 2 suffixes):
@@ -2431,7 +2431,7 @@ your home directory (remove the '=' for that).
     You may specify usernames or user IDs for the **FROM** and **TO** values,
     and the **FROM** value may also be a wild-card string, which will be
     matched against the sender's names (wild-cards do NOT match against ID
-    numbers, though see below for why a '\*' matches everything).  You may
+    numbers, though see below for why a '`*`' matches everything).  You may
     instead specify a range of ID numbers via an inclusive range: LOW-HIGH.
     For example:
 
@@ -2449,7 +2449,7 @@ your home directory (remove the '=' for that).
 
     Any IDs that do not have a name on the sending side are treated as having
     an empty name for the purpose of matching.  This allows them to be matched
-    via a "\*" or using an empty name.  For instance:
+    via a "`*`" or using an empty name.  For instance:
 
     >     --usermap=:nobody --groupmap=*:nobody
 
@@ -2510,8 +2510,9 @@ your home directory (remove the '=' for that).
     which may make transfers faster (or slower!).  Read the man page for the
     `setsockopt()` system call for details on some of the options you may be
     able to set.  By default no special socket options are set.  This only
-    affects direct socket connections to a remote rsync daemon.  This option
-    also exists in the `--daemon` mode section.
+    affects direct socket connections to a remote rsync daemon.
+
+    This option also exists in the `--daemon` mode section.
 
 0.  `--blocking-io`
 
@@ -2718,7 +2719,7 @@ your home directory (remove the '=' for that).
 
     The escape idiom that started in 2.6.7 is to output a literal backslash
     (`\`) and a hash (`#`), followed by exactly 3 octal digits.  For example, a
-    newline would output as "`\\#012`".  A literal backslash that is in a
+    newline would output as "`\#012`".  A literal backslash that is in a
     filename is not escaped unless it is followed by a hash and 3 digits (0-9).
 
 0.  `--human-readable`, `-h`
@@ -3114,8 +3115,6 @@ your home directory (remove the '=' for that).
     have no effect.  The `rsync -V` output will contain "`no IPv6`" if is the
     case.
 
-    See also these options in the `--daemon` mode section.
-
 0. `--checksum-seed=NUM`
 
     Set the checksum seed to the integer NUM.  This 4 byte checksum seed is
@@ -3299,9 +3298,9 @@ include/exclude rules each specify a pattern that is matched against the names
 of the files that are going to be transferred.  These patterns can take several
 forms:
 
-- if the pattern starts with a / then it is anchored to a particular spot in
+- if the pattern starts with a `/` then it is anchored to a particular spot in
   the hierarchy of files, otherwise it is matched against the end of the
-  pathname.  This is similar to a leading ^ in regular expressions.  Thus
+  pathname.  This is similar to a leading `^` in regular expressions.  Thus
   `/foo` would match a name of "foo" at either the "root of the transfer" (for
   a global rule) or in the merge-file's directory (for a per-directory rule).
   An unqualified `foo` would match a name of "foo" anywhere in the tree because
@@ -3311,24 +3310,24 @@ forms:
   was found within a directory named "sub".  See the section on ANCHORING
   INCLUDE/EXCLUDE PATTERNS for a full discussion of how to specify a pattern
   that matches at the root of the transfer.
-- if the pattern ends with a / then it will only match a directory, not a
+- if the pattern ends with a `/` then it will only match a directory, not a
   regular file, symlink, or device.
 - rsync chooses between doing a simple string match and wildcard matching by
   checking if the pattern contains one of these three wildcard characters:
   '`*`', '`?`', and '`[`' .
 - a '`*`' matches any path component, but it stops at slashes.
 - use '`**`' to match anything, including slashes.
-- a '?' matches any character except a slash (/).
-- a '[' introduces a character class, such as [a-z] or [[:alpha:]].
+- a '`?`' matches any character except a slash (`/`).
+- a '`[`' introduces a character class, such as `[a-z]` or `[[:alpha:]]`.
 - in a wildcard pattern, a backslash can be used to escape a wildcard
   character, but it is matched literally when no wildcards are present.  This
   means that there is an extra level of backslash removal when a pattern
   contains wildcard characters compared to a pattern that has none.  e.g. if
   you add a wildcard to "`foo\bar`" (which matches the backslash) you would
   need to use "`foo\\bar*`" to avoid the "`\b`" becoming just "b".
-- if the pattern contains a / (not counting a trailing /) or a "`**`", then it
+- if the pattern contains a `/` (not counting a trailing /) or a "`**`", then it
   is matched against the full pathname, including any leading directories.  If
-  the pattern doesn't contain a / or a "`**`", then it is matched only against
+  the pattern doesn't contain a `/` or a "`**`", then it is matched only against
   the final component of the filename. (Remember that the algorithm is applied
   recursively so "full filename" can actually be any portion of a path from the
   starting directory on down.)
@@ -3343,20 +3342,20 @@ include/exclude patterns are applied recursively to the pathname of each node
 in the filesystem's tree (those inside the transfer).  The exclude patterns
 short-circuit the directory traversal stage as rsync finds the files to send.
 
-For instance, to include "/foo/bar/baz", the directories "/foo" and "/foo/bar"
+For instance, to include "`/foo/bar/baz`", the directories "`/foo`" and "`/foo/bar`"
 must not be excluded.  Excluding one of those parent directories prevents the
 examination of its content, cutting off rsync's recursion into those paths and
-rendering the include for "/foo/bar/baz" ineffectual (since rsync can't match
+rendering the include for "`/foo/bar/baz`" ineffectual (since rsync can't match
 something it never sees in the cut-off section of the directory hierarchy).
 
-The concept path exclusion is particularly important when using a trailing '\*'
+The concept path exclusion is particularly important when using a trailing '`*`'
 rule.  For instance, this won't work:
 
 >     + /some/path/this-file-will-not-be-found
 >     + /file-is-included
 >     - *
 
-This fails because the parent directory "some" is excluded by the '\*' rule, so
+This fails because the parent directory "some" is excluded by the '`*`' rule, so
 rsync never visits any of the files in the "some" or "some/path" directories.
 One solution is to ask for all directories in the hierarchy to be included by
 using a single rule: "`+ */`" (put it somewhere before the "`- *`" rule), and
