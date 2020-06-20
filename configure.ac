@@ -69,7 +69,7 @@ if test x"$ac_cv_path_PYTHON3" = x; then
     AC_MSG_RESULT(no - python3 not found)
     md2man_works=no
 else
-    md2man_out=`"$srcdir/md2man" --test "$srcdir/rsync.1.md" 2>&1`
+    md2man_out=`"$srcdir/md2man" --test "$srcdir/rsync-ssl.1.md" 2>&1`
     if test $? = 0; then
 	AC_MSG_RESULT(yes)
 	md2man_works=yes
@@ -203,36 +203,21 @@ AC_ARG_ENABLE(simd,
 if test x"$enable_simd" != x"no"; then
     # For x86-64 SIMD, g++ >=5 or clang++ >=7 is required
     if test x"$build_cpu" = x"x86_64"; then
-	CXX_OK=
-	case "$CXX" in
-	g++|*-g++)
-	    CXX_VERSION=`$CXX -dumpversion | sed 's/\..*//'`
-	    if test "$CXX_VERSION" -ge "5"; then
-		CXX_OK=yes
-	    fi
-	    ;;
-	*clang*)
-	    # -dumpversion is broken on older clang versions, so we need a fallback.
-	    CXX_VERSION=`$CXX -dumpversion 2>/dev/null | sed 's/\..*//'`
-	    if test x"$CXX_VERSION" = x; then
-		CXX_VERSION=`$CXX --version | head -n 1 | sed 's/.*version //' | sed 's/\..*//'`
-	    fi
-	    if test "$CXX_VERSION" -ge "7"; then
-		CXX_OK=yes
-	    fi
-	    ;;
-	*)
-	    CXX='No c++'
-	    CXX_VERSION='Unknown'
-	    ;;
-	esac
+	AC_LANG(C++)
+	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <stdio.h>
+#include <immintrin.h>
+__attribute__ ((target("default"))) static int testing(int x) { return x; }
+__attribute__ ((target("sse3"))) static int testing(int x) { return x; }
+__attribute__ ((target("sse2"))) static int testing(int x) { return x; }
+]], [[if (testing(42)) printf("HERE\n");]])],[CXX_OK=yes],[CXX_OK=no])
+	AC_LANG(C)
 	if test x"$CXX_OK" = x"yes"; then
 	    # AC_MSG_RESULT() is called below.
 	    SIMD="$SIMD x86_64"
-	else
+	elif test x"$enable_simd" = x"yes"; then
 	    AC_MSG_RESULT(error)
-	    AC_MSG_ERROR([Failed to find g++ >=5 or clang++ >=7 for SIMD optimizations.
-Specify --disable-simd to continue without it. ($CXX, $CXX_VERSION)])
+	    AC_MSG_ERROR(The SIMD compilation test failed.
+Omit --enable-simd to continue without it.)
 	fi
     elif test x"$enable_simd" = x"yes"; then
         AC_MSG_RESULT(unavailable)
