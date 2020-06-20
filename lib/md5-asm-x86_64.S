@@ -25,8 +25,9 @@
  */
 
 #include "config.h"
+#include "md-defines.h"
 
-#ifndef USE_OPENSSL
+#if !defined USE_OPENSSL && CSUM_CHUNK == 64
 
 .text
 .align 16
@@ -705,4 +706,4 @@ _md5_process_asm:
 L_md5_process_asm_end:
 #endif
 
-#endif /* !USE_OPENSSL */
+#endif /* !USE_OPENSSL ... */
