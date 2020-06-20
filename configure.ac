@@ -230,7 +230,7 @@ if test x"$SIMD" != x""; then
     SIMD=`echo "$SIMD" | sed 's/^ *//'`
     AC_MSG_RESULT([yes ($SIMD)])
     AC_DEFINE(HAVE_SIMD, 1, [Define to 1 to enable SIMD optimizations])
-    SIMD=`echo "\\\$(SIMD_$SIMD)" | sed 's/ /) $(SIMD_/g'`
+    SIMD=`echo '$(SIMD_'"$SIMD)" | sed 's/ /) $(SIMD_/g'`
     # We only use c++ for its target attribute dispatching, disable unneeded bulky features
     CXXFLAGS="$CXXFLAGS -fno-exceptions -fno-rtti"
 else
