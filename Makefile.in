@@ -135,7 +135,7 @@ simd-checksum-x86_64.o: simd-checksum-x86_64.cpp
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $(srcdir)/simd-checksum-x86_64.cpp
 
 lib/md5-asm-x86_64.o: lib/md5-asm-x86_64.s
-	$(CC) -c -o $@ $(srcdir)/lib/md5-asm-x86_64.s
+	$(CC) -Wa,--noexecstack -c -o $@ $(srcdir)/lib/md5-asm-x86_64.s
 
 tls$(EXEEXT): $(TLS_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(TLS_OBJ) $(LIBS)
