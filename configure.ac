@@ -207,7 +207,7 @@ if test x"$enable_simd" != x"no"; then
 	if test x"$CXX" != x""; then
 	    CXX_VERSION=`$CXX --version 2>/dev/null | head -n 1`
 	    case "$CXX_VERSION" in
-	    g++*)
+	    *g++*)
 		CXX_VERSION=`$CXX -dumpversion | sed 's/\..*//g'`
 		if test "$CXX_VERSION" -ge "5"; then
 		    CXX_OK=yes
