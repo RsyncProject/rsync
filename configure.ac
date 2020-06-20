@@ -204,13 +204,19 @@ if test x"$enable_simd" != x"no"; then
     # For x86-64 SIMD, g++ >=5 or clang++ >=7 is required
     if test x"$build_cpu" = x"x86_64"; then
 	AC_LANG(C++)
-	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <stdio.h>
+	SAVE_FLAGS="$CXXFLAGS"
+	CXXFLAGS="$CXXFLAGS -fno-exceptions -fno-rtti"
+	AC_RUN_IFELSE([AC_LANG_PROGRAM([[#include <stdio.h>
 #include <immintrin.h>
-__attribute__ ((target("default"))) static int testing(int x) { return x; }
-__attribute__ ((target("sse3"))) static int testing(int x) { return x; }
-__attribute__ ((target("sse2"))) static int testing(int x) { return x; }
-]], [[if (testing(42)) printf("HERE\n");]])],[CXX_OK=yes],[CXX_OK=no])
+__attribute__ ((target("default"))) int test_ssse3(int x) { return x; }
+__attribute__ ((target("default"))) int test_sse2(int x) { return x; }
+__attribute__ ((target("default"))) int test_avx2(int x) { return x; }
+__attribute__ ((target("ssse3"))) int test_ssse3(int x) { return x; }
+__attribute__ ((target("sse2"))) int test_sse2(int x) { return x; }
+__attribute__ ((target("avx2"))) int test_avx2(int x) { return x; }
+]], [[if (test_ssse3(42) != 42 || test_sse2(42) != 42 || test_avx2(42) != 42) exit(1);]])],[CXX_OK=yes],[CXX_OK=no])
 	AC_LANG(C)
+	CXXFLAGS="$SAVE_FLAGS"
 	if test x"$CXX_OK" = x"yes"; then
 	    # AC_MSG_RESULT() is called below.
 	    SIMD="$SIMD x86_64"
