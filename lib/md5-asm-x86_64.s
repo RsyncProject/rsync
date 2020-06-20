@@ -24,6 +24,10 @@
  * show any significant difference in performance, though.
  */
 
+#include "config.h"
+
+#ifndef USE_OPENSSL
+
 .text
 .align 16
 
@@ -700,3 +704,5 @@ _md5_process_asm:
 #else
 L_md5_process_asm_end:
 #endif
+
+#endif /* !USE_OPENSSL */
