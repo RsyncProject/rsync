@@ -204,30 +204,28 @@ if test x"$enable_simd" != x"no"; then
     # For x86-64 SIMD, g++ >=5 or clang++ >=7 is required
     if test x"$build_cpu" = x"x86_64"; then
 	CXX_OK=
-	if test x"$CXX" != x""; then
-	    CXX_VERSION=`$CXX --version 2>/dev/null | head -n 1`
-	    case "$CXX_VERSION" in
-	    g++*)
-		CXX_VERSION=`$CXX -dumpversion | sed 's/\..*//g'`
-		if test "$CXX_VERSION" -ge "5"; then
-		    CXX_OK=yes
-		fi
-		;;
-	    *clang*)
-		# $CXX -dumpversion would have been ideal, but is broken on older clang
-		CXX_VERSION=`echo "$CXX_VERSION" | sed 's/.*version //g' | sed 's/\..*//g'`
-		if test "$CXX_VERSION" -ge "7"; then
-		    CXX_OK=yes
-		fi
-		;;
-	    *)
-		CXX_VERSION='Unknown'
-		;;
-	    esac
-	else
+	case "$CXX" in
+	g++|*-g++)
+	    CXX_VERSION=`$CXX -dumpversion | sed 's/\..*//'`
+	    if test "$CXX_VERSION" -ge "5"; then
+		CXX_OK=yes
+	    fi
+	    ;;
+	*clang*)
+	    # -dumpversion is broken on older clang versions, so we need a fallback.
+	    CXX_VERSION=`$CXX -dumpversion 2>/dev/null | sed 's/\..*//'`
+	    if test x"$CXX_VERSION" = x; then
+		CXX_VERSION=`$CXX --version | head -n 1 | sed 's/.*version //' | sed 's/\..*//'`
+	    fi
+	    if test "$CXX_VERSION" -ge "7"; then
+		CXX_OK=yes
+	    fi
+	    ;;
+	*)
 	    CXX='No c++'
 	    CXX_VERSION='Unknown'
-	fi
+	    ;;
+	esac
 	if test x"$CXX_OK" = x"yes"; then
 	    # AC_MSG_RESULT() is called below.
 	    SIMD="$SIMD x86_64"
