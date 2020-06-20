@@ -32,14 +32,8 @@
 .text
 .align 16
 
-#ifndef __apple_build_version__
 .globl md5_process_asm
-.type md5_process_asm,@function
 md5_process_asm:
-#else
-.globl _md5_process_asm
-_md5_process_asm:
-#endif
 	push	%rbp
 	push	%rbx
 	push	%r12
@@ -699,11 +693,5 @@ _md5_process_asm:
 	pop	%rbx
 	pop	%rbp
 	ret
-#ifndef __apple_build_version__
-.L_md5_process_asm_end:
-.size md5_process_asm,.L_md5_process_asm_end-md5_process_asm
-#else
-L_md5_process_asm_end:
-#endif
 
 #endif /* !USE_OPENSSL ... */
