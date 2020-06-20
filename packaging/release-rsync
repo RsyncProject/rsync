@@ -221,6 +221,7 @@ About to:
     pattar_file = f"{dest}/{srcdir}/{pattar_name}"
     diff_file = f"{dest}/{srcdiffdir}/{diff_name}"
     news_file = f"{dest}/{srcdir}/{rsync_ver}-NEWS.md"
+    newshtml_file = f"{dest}/{srcdir}/{rsync_ver}-NEWS.html"
     lasttar_file = f"{dest}/{lastsrcdir}/{rsync_lastver}.tar.gz"
 
     print(f"""\
@@ -335,7 +336,7 @@ About to:
     cmd_chk(['rsync', '-a', *md_files, *html_files, dest])
     cmd_chk(["packaging/md2html"] + [ dest +'/'+ fn for fn in md_files ])
 
-    for topfn, verfn in (('NEWS.md', news_file), ('NEWS.html', news_file.replace('.md', '.html'))):
+    for topfn, verfn in (('NEWS.md', news_file), ('NEWS.html', newshtml_file)):
         topfn = dest + '/' + topfn
         if os.path.lexists(verfn):
             os.unlink(verfn)
@@ -352,14 +353,14 @@ About to:
             die("gpg signing failed")
 
     if not pre:
-        for find in f'{dest}/rsync-*.gz {dest}/rsync-*.asc {dest}/rsync-*-NEWS.md {dest}/src-previews/rsync-*diffs.gz*'.split():
+        for find in f'{dest}/rsync-*.gz {dest}/rsync-*.asc {dest}/rsync-*-NEWS.* {dest}/src-previews/rsync-*diffs.gz*'.split():
             for fn in glob.glob(find):
                 os.unlink(fn)
         top_link = [
                 srctar_file, f"{srctar_file}.asc",
                 pattar_file, f"{pattar_file}.asc",
                 diff_file, f"{diff_file}.asc",
-                news_file,
+                news_file, newshtml_file,
                 ]
         for fn in top_link:
             os.link(fn, re.sub(r'/src(-\w+)?/', '/', fn))
