@@ -29,8 +29,6 @@ for action in "${@}"; do
 	$dir/rsync-ssl -iip --no-motd rsync://download.samba.org/rsyncftp/generated-files/'[ca]*' $dir
 	if test "$action" = fetchgen; then
 	    $dir/rsync-ssl -iip --no-motd rsync://download.samba.org/rsyncftp/generated-files/'[^ca]*' .
-	elif ! perl --version >/dev/null 2>/dev/null; then
-	    $dir/rsync-ssl -iip --no-motd rsync://download.samba.org/rsyncftp/generated-files/'p*' .
 	fi
 	sleep 1 # The following files need to be newer than aclocal.m4
 	touch configure.sh config.h.in
