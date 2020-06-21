@@ -1229,7 +1229,7 @@ int start_daemon(int f_in, int f_out)
 
 	if (strncmp(line, EARLY_INPUT_CMD, EARLY_INPUT_CMDLEN) == 0) {
 		early_input_len = strtol(line + EARLY_INPUT_CMDLEN, NULL, 10);
-		if (early_input_len <= 0 || early_input_len >= BIGPATHBUFLEN) {
+		if (early_input_len <= 0 || early_input_len > BIGPATHBUFLEN) {
 			io_printf(f_out, "@ERROR: invalid early_input length\n");
 			return -1;
 		}
