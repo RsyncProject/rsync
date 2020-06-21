@@ -148,7 +148,7 @@ static void md5_process(md_context *ctx, const uchar data[CSUM_CHUNK])
 	ctx->D += D;
 }
 
-#if defined(HAVE_SIMD) && (CSUM_CHUNK == 64)
+#if defined HAVE_ASM && CSUM_CHUNK == 64
 extern void md5_process_asm(md_context *ctx, const void *data, size_t num);
 #endif
 
@@ -176,7 +176,7 @@ void md5_update(md_context *ctx, const uchar *input, uint32 length)
 		left = 0;
 	}
 
-#if defined(HAVE_SIMD) && (CSUM_CHUNK == 64)
+#if defined HAVE_ASM && CSUM_CHUNK == 64
 	if (length >= CSUM_CHUNK) {
 		uint32 chunks = length / CSUM_CHUNK;
 		md5_process_asm(ctx, input, chunks);

@@ -253,6 +253,41 @@ fi
 
 AC_SUBST(SIMD)
 
+AC_MSG_CHECKING([if assembler accepts noexecstack])
+OLD_CFLAGS="$CFLAGS"
+CFLAGS="$CFLAGS -Wa,--noexecstack"
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[ ]], [[return 0;]])],
+[ NOEXECSTACK='-Wa,--noexecstack' ; AC_MSG_RESULT(yes) ],
+[ NOEXECSTACK='' ; AC_MSG_RESULT(no) ])
+CFLAGS="$OLD_CFLAGS"
+AC_SUBST(NOEXECSTACK)
+
+ASM=
+
+AC_MSG_CHECKING([whether to enable ASM optimizations])
+AC_ARG_ENABLE(asm,
+    AS_HELP_STRING([--disable-asm],[disable ASM optimizations]))
+
+if test x"$enable_asm" != x"no"; then
+    if test x"$build_cpu" = x"x86_64"; then
+	ASM="$build_cpu"
+    elif test x"$enable_asm" = x"yes"; then
+        AC_MSG_RESULT(unavailable)
+        AC_MSG_ERROR(The ASM optimizations are currently x86_64 only.
+Omit --enable-asm to continue without it.)
+    fi
+fi
+
+if test x"$ASM" != x""; then
+    AC_MSG_RESULT([yes ($ASM)])
+    AC_DEFINE(HAVE_ASM, 1, [Define to 1 to enable ASM optimizations])
+    ASM='$(ASM_'"$ASM)"
+else
+    AC_MSG_RESULT(no)
+fi
+
+AC_SUBST(ASM)
+
 # arrgh. libc in some old debian version screwed up the largefile
 # stuff, getting byte range locking wrong
 AC_CACHE_CHECK([for broken largefile support],rsync_cv_HAVE_BROKEN_LARGEFILE,[
