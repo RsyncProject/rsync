@@ -249,6 +249,9 @@ if test x"$SIMD" != x""; then
     SIMD='$(SIMD_'"$SIMD)"
     # We only use c++ for its target attribute dispatching, disable unneeded bulky features
     CXXFLAGS="$CXXFLAGS -fno-exceptions -fno-rtti"
+    case "$CXX" in
+    *clang*) CXXFLAGS="$CXXFLAGS -fno-slp-vectorize" ;; # avoid a performance hit
+    esac
 else
     AC_MSG_RESULT(no)
 fi
