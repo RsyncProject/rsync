@@ -180,6 +180,7 @@ int rsync_port = 0;
 int alt_dest_type = 0;
 int basis_dir_cnt = 0;
 
+static int version_opt_cnt = 0;
 static int remote_option_alloc = 0;
 int remote_option_cnt = 0;
 const char **remote_options = NULL;
@@ -582,6 +583,18 @@ static void print_capabilities(enum logcode f)
 		istring("%d-bit timestamps", (int)(sizeof (time_t) * 8)),
 		istring("%d-bit long ints", (int)(sizeof (int64) * 8)),
 
+	"*"
+#ifndef HAVE_SIMD
+		"no "
+#endif
+			"SIMD",
+
+	"*"
+#ifndef HAVE_ASM
+		"no "
+#endif
+			"ASM",
+
 #ifndef HAVE_SOCKETPAIR
 		"no "
 #endif
@@ -639,11 +652,6 @@ static void print_capabilities(enum logcode f)
 #endif
 			"prealloc",
 
-#ifndef HAVE_SIMD
-		"no "
-#endif
-			"SIMD",
-
 		NULL
 	};
 
@@ -651,6 +659,12 @@ static void print_capabilities(enum logcode f)
 		char *cap = capabilities[j];
 		int cap_len = cap ? strlen(cap) : 1000;
 		int need_comma = cap && capabilities[j+1] != NULL ? 1 : 0;
+		if (cap && *cap == '*') {
+			if (version_opt_cnt < 2)
+				continue;
+			cap++;
+			cap_len--;
+		}
 		if (line_len + 1 + cap_len + need_comma >= (int)sizeof line_buf) {
 			rprintf(f, "   %s\n", line_buf);
 			line_len = 0;
@@ -1361,8 +1375,8 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 
 		switch (opt) {
 		case 'V':
-			print_rsync_version(FINFO);
-			exit_cleanup(0);
+			version_opt_cnt++;
+			break;
 
 		case OPT_SERVER:
 			if (!am_server) {
@@ -1846,6 +1860,11 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 				 poptStrerror(opt));
 			return 0;
 		}
+	}
+
+	if (version_opt_cnt) {
+		print_rsync_version(FINFO);
+		exit_cleanup(0);
 	}
 
 	if (protect_args < 0) {
