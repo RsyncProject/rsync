@@ -54,6 +54,7 @@ extern char *config_file;
 extern char *logfile_format;
 extern char *files_from;
 extern char *tmpdir;
+extern char *early_input_file;
 extern struct chmod_mode_struct *chmod_modes;
 extern filter_rule_list daemon_filter_list;
 #ifdef ICONV_OPTION
@@ -67,7 +68,12 @@ char *auth_user;
 int read_only = 0;
 int module_id = -1;
 int pid_file_fd = -1;
+int early_input_len = 0;
+char *early_input = NULL;
 struct chmod_mode_struct *daemon_chmod_modes;
+
+#define EARLY_INPUT_CMD "#early_input="
+#define EARLY_INPUT_CMDLEN (sizeof EARLY_INPUT_CMD - 1)
 
 /* module_dirlen is the length of the module_dir string when in daemon
  * mode and module_dir is not "/"; otherwise 0.  (Note that a chroot-
@@ -144,14 +150,12 @@ static int exchange_protocols(int f_in, int f_out, char *buf, size_t bufsiz, int
 #else
 	int our_sub = 0;
 #endif
-	char *motd;
 
 	io_printf(f_out, "@RSYNCD: %d.%d\n", protocol_version, our_sub);
-
 	if (!am_client) {
-		motd = lp_motd_file();
+		char *motd = lp_motd_file();
 		if (motd && *motd) {
-			FILE *f = fopen(motd,"r");
+			FILE *f = fopen(motd, "r");
 			while (f && !feof(f)) {
 				int len = fread(buf, 1, bufsiz - 1, f);
 				if (len > 0)
@@ -244,6 +248,36 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 
 	if (exchange_protocols(f_in, f_out, line, sizeof line, 1) < 0)
 		return -1;
+
+	if (early_input_file) {
+		STRUCT_STAT st;
+		FILE *f = fopen(early_input_file, "rb");
+		if (!f || do_fstat(fileno(f), &st) < 0) {
+			rsyserr(FERROR, errno, "failed to open %s", early_input_file);
+			return -1;
+		}
+		early_input_len = st.st_size;
+		if (early_input_len >= (int)sizeof line) {
+			rprintf(FERROR, "%s is >= %d bytes.\n", early_input_file, (int)sizeof line);
+			return -1;
+		}
+		if (early_input_len > 0) {
+			io_printf(f_out, EARLY_INPUT_CMD "%d\n", early_input_len);
+			while (early_input_len > 0) {
+				int len;
+				if (feof(f)) {
+					rprintf(FERROR, "Early EOF in %s\n", early_input_file);
+					return -1;
+				}
+				len = fread(line, 1, early_input_len / 2 + 1, f);
+				if (len > 0) {
+					write_buf(f_out, line, len);
+					early_input_len -= len;
+				}
+			}
+		}
+		fclose(f);
+	}
 
 	/* set daemon_over_rsh to false since we need to build the
 	 * true set of args passed through the rsh/ssh connection;
@@ -397,7 +431,7 @@ static pid_t start_pre_exec(const char *cmd, int *arg_fd_ptr, int *error_fd_ptr)
 	int arg_fds[2], error_fds[2], arg_fd;
 	pid_t pid;
 
-	if ((error_fd_ptr && pipe(error_fds) < 0) || (arg_fd_ptr && pipe(arg_fds) < 0) || (pid = fork()) < 0)
+	if ((error_fd_ptr && pipe(error_fds) < 0) || pipe(arg_fds) < 0 || (pid = fork()) < 0)
 		return (pid_t)-1;
 
 	if (pid == 0) {
@@ -409,36 +443,34 @@ static pid_t start_pre_exec(const char *cmd, int *arg_fd_ptr, int *error_fd_ptr)
 			set_blocking(error_fds[1]);
 		}
 
-		if (arg_fd_ptr) {
-			close(arg_fds[1]);
-			arg_fd = arg_fds[0];
-			set_blocking(arg_fd);
+		close(arg_fds[1]);
+		arg_fd = arg_fds[0];
+		set_blocking(arg_fd);
 
+		len = read_arg_from_pipe(arg_fd, buf, BIGPATHBUFLEN);
+		if (len <= 0)
+			_exit(1);
+		set_env_str("RSYNC_REQUEST", buf);
+
+		for (j = 0; ; j++) {
+			char *p;
 			len = read_arg_from_pipe(arg_fd, buf, BIGPATHBUFLEN);
-			if (len <= 0)
+			if (len <= 0) {
+				if (!len)
+					break;
 				_exit(1);
-			set_env_str("RSYNC_REQUEST", buf);
-
-			for (j = 0; ; j++) {
-				char *p;
-				len = read_arg_from_pipe(arg_fd, buf, BIGPATHBUFLEN);
-				if (len <= 0) {
-					if (!len)
-						break;
-					_exit(1);
-				}
-				if (asprintf(&p, "RSYNC_ARG%d=%s", j, buf) >= 0)
-					putenv(p);
 			}
-			close(arg_fd);
+			if (asprintf(&p, "RSYNC_ARG%d=%s", j, buf) >= 0)
+				putenv(p);
 		}
+
+		dup2(arg_fd, STDIN_FILENO);
+		close(arg_fd);
 
 		if (error_fd_ptr) {
 			dup2(error_fds[1], STDOUT_FILENO);
 			close(error_fds[1]);
 		}
-
-		close(STDIN_FILENO);
 
 		status = shell_exec(cmd);
 
@@ -453,16 +485,14 @@ static pid_t start_pre_exec(const char *cmd, int *arg_fd_ptr, int *error_fd_ptr)
 		set_blocking(error_fds[0]);
 	}
 
-	if (arg_fd_ptr) {
-		close(arg_fds[0]);
-		arg_fd = *arg_fd_ptr = arg_fds[1];
-		set_blocking(arg_fd);
-	}
+	close(arg_fds[0]);
+	arg_fd = *arg_fd_ptr = arg_fds[1];
+	set_blocking(arg_fd);
 
 	return pid;
 }
 
-static void write_pre_exec_args(int write_fd, char *request, char **early_argv, char **argv)
+static void write_pre_exec_args(int write_fd, char *request, char **early_argv, char **argv, int am_early)
 {
 	int j = 0;
 
@@ -475,9 +505,14 @@ static void write_pre_exec_args(int write_fd, char *request, char **early_argv, 
 			write_buf(write_fd, *early_argv, strlen(*early_argv)+1);
 		j = 1; /* Skip arg0 name in argv. */
 	}
-	for ( ; argv[j]; j++)
-		write_buf(write_fd, argv[j], strlen(argv[j])+1);
+	if (argv) {
+		for ( ; argv[j]; j++)
+			write_buf(write_fd, argv[j], strlen(argv[j])+1);
+	}
 	write_byte(write_fd, 0);
+
+	if (am_early && early_input_len)
+		write_buf(write_fd, early_input, early_input_len);
 
 	close(write_fd);
 }
@@ -812,12 +847,14 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 		/* For early exec, fork a child process to run the indicated
 		 * command and wait for it to exit. */
 		if (*lp_early_exec(i)) {
-			pid_t pid = start_pre_exec(lp_early_exec(i), NULL, NULL);
+			int arg_fd;
+			pid_t pid = start_pre_exec(lp_early_exec(i), &arg_fd, NULL);
 			if (pid == (pid_t)-1) {
 				rsyserr(FLOG, errno, "early exec preparation failed");
 				io_printf(f_out, "@ERROR: early exec preparation failed\n");
 				return -1;
 			}
+			write_pre_exec_args(arg_fd, NULL, NULL, NULL, 1);
 			if (finish_pre_exec("early exec", pid, -1) != NULL) {
 				rsyserr(FLOG, errno, "early exec failed");
 				io_printf(f_out, "@ERROR: early exec failed\n");
@@ -838,6 +875,11 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 		}
 	}
 #endif
+
+	if (early_input) {
+		free(early_input);
+		early_input = NULL;
+	}
 
 	if (use_chroot) {
 		/*
@@ -953,7 +995,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 		msgs2stderr = 0; /* A non-rsh-run daemon doesn't have stderr for msgs. */
 
 	if (pre_exec_pid) {
-		write_pre_exec_args(pre_exec_arg_fd, request, orig_early_argv, orig_argv);
+		write_pre_exec_args(pre_exec_arg_fd, request, orig_early_argv, orig_argv, 0);
 		err_msg = finish_pre_exec("pre-xfer exec", pre_exec_pid, pre_exec_error_fd);
 	}
 
@@ -1184,6 +1226,20 @@ int start_daemon(int f_in, int f_out)
 	line[0] = 0;
 	if (!read_line_old(f_in, line, sizeof line, 0))
 		return -1;
+
+	if (strncmp(line, EARLY_INPUT_CMD, EARLY_INPUT_CMDLEN) == 0) {
+		early_input_len = strtol(line + EARLY_INPUT_CMDLEN, NULL, 10);
+		if (early_input_len <= 0 || early_input_len >= BIGPATHBUFLEN) {
+			io_printf(f_out, "@ERROR: invalid early_input length\n");
+			return -1;
+		}
+		if (!(early_input = new_array(char, early_input_len)))
+			out_of_memory("exchange_protocols");
+		read_buf(f_in, early_input, early_input_len);
+
+		if (!read_line_old(f_in, line, sizeof line, 0))
+			return -1;
+	}
 
 	if (!*line || strcmp(line, "#list") == 0) {
 		rprintf(FLOG, "module-list request from %s (%s)\n",

@@ -452,6 +452,7 @@ detailed description below for a complete description.
 --log-file=FILE          log what we're doing to the specified FILE
 --log-file-format=FMT    log updates using the specified FMT
 --password-file=FILE     read daemon-access password from FILE
+--early-input=FILE       use FILE for daemon's early exec input
 --list-only              list the files instead of copying them
 --bwlimit=RATE           limit socket I/O bandwidth
 --write-batch=FILE       write a batched update to FILE
@@ -2976,6 +2977,15 @@ your home directory (remove the '=' for that).
     option only comes into effect after the remote shell finishes its
     authentication (i.e. if you have also specified a password in the daemon's
     config file).
+
+0. `--early-input=FILE`
+
+    This option allows rsync to send up to 5K of data to the "early exec"
+    script on its stdin.  One possible use of this data is to give the script a
+    secret that can be used to mount an encrypted filesystem (which you should
+    unmount in the the "post-xfer exec" script).
+
+    The daemon must be at least version 3.2.1.
 
 0. `--list-only`
 

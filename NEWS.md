@@ -23,6 +23,9 @@ Protocol: 31 (unchanged)
 
 ### ENHANCEMENTS:
 
+ - Added `--early-input=FILE` option that allows the client to send some
+   data to the "early exec" daemon script on its stdin.
+
  - Added "atimes" to the capabilities list that `--version` outputs.
 
  - Mention either "default protect-args" or "optional protect-args" in the

@@ -170,6 +170,7 @@ char *logfile_name = NULL;
 char *logfile_format = NULL;
 char *stdout_format = NULL;
 char *password_file = NULL;
+char *early_input_file = NULL;
 char *rsync_path = RSYNC_PATH;
 char *backup_dir = NULL;
 char backup_dir_buf[MAXPATHLEN];
@@ -996,6 +997,7 @@ static struct poptOption long_options[] = {
   {"port",             0,  POPT_ARG_INT,    &rsync_port, 0, 0, 0 },
   {"sockopts",         0,  POPT_ARG_STRING, &sockopts, 0, 0, 0 },
   {"password-file",    0,  POPT_ARG_STRING, &password_file, 0, 0, 0 },
+  {"early-input",      0,  POPT_ARG_STRING, &early_input_file, 0, 0, 0 },
   {"blocking-io",      0,  POPT_ARG_VAL,    &blocking_io, 1, 0, 0 },
   {"no-blocking-io",   0,  POPT_ARG_VAL,    &blocking_io, 0, 0, 0 },
   {"outbuf",           0,  POPT_ARG_STRING, &outbuf_mode, 0, 0, 0 },
