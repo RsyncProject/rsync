@@ -583,18 +583,6 @@ static void print_capabilities(enum logcode f)
 		istring("%d-bit timestamps", (int)(sizeof (time_t) * 8)),
 		istring("%d-bit long ints", (int)(sizeof (int64) * 8)),
 
-	"*"
-#ifndef HAVE_SIMD
-		"no "
-#endif
-			"SIMD",
-
-	"*"
-#ifndef HAVE_ASM
-		"no "
-#endif
-			"ASM",
-
 #ifndef HAVE_SOCKETPAIR
 		"no "
 #endif
@@ -652,19 +640,44 @@ static void print_capabilities(enum logcode f)
 #endif
 			"prealloc",
 
+	"*"
+#ifndef HAVE_SIMD
+		"no "
+#endif
+			"SIMD",
+
+	"*"
+#ifndef HAVE_ASM
+		"no "
+#endif
+			"ASM",
+
+	"*"
+#ifndef USE_OPENSSL
+		"no "
+#endif
+			"openssl-crypto",
+
 		NULL
 	};
 
 	for (line_len = 0, j = 0; ; j++) {
 		char *cap = capabilities[j];
+		if (!cap)
+			break;
+		if (*cap == '*') {
+			if (version_opt_cnt < 2) {
+				capabilities[j] = NULL;
+				break;
+			}
+			capabilities[j]++;
+		}
+	}
+
+	for (line_len = 0, j = 0; ; j++) {
+		char *cap = capabilities[j];
 		int cap_len = cap ? strlen(cap) : 1000;
 		int need_comma = cap && capabilities[j+1] != NULL ? 1 : 0;
-		if (cap && *cap == '*') {
-			if (version_opt_cnt < 2)
-				continue;
-			cap++;
-			cap_len--;
-		}
 		if (line_len + 1 + cap_len + need_comma >= (int)sizeof line_buf) {
 			rprintf(f, "   %s\n", line_buf);
 			line_len = 0;
