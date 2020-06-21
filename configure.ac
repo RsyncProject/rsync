@@ -200,6 +200,9 @@ AC_MSG_CHECKING([whether to enable SIMD optimizations])
 AC_ARG_ENABLE(simd,
     AS_HELP_STRING([--disable-simd],[disable SIMD optimizations (requires c++)]))
 
+# Clag is crashing with -g -O2, so we'll get rid of -g for now.
+CXXFLAGS=`echo "$CXXFLAGS" | sed 's/-g //'`
+
 if test x"$enable_simd" != x"no"; then
     # For x86-64 SIMD, g++ >=5 or clang++ >=7 is required
     if test x"$build_cpu" = x"x86_64"; then
@@ -244,8 +247,6 @@ if test x"$SIMD" != x""; then
     AC_MSG_RESULT([yes ($SIMD)])
     AC_DEFINE(HAVE_SIMD, 1, [Define to 1 to enable SIMD optimizations])
     SIMD='$(SIMD_'"$SIMD)"
-    # Clag is crashing with -g -O2, so we'll get rid of -g (just for the one file).
-    CXXFLAGS=`echo "'$CXXFLAGS'" | sed 's/-g //'`
     # We only use c++ for its target attribute dispatching, disable unneeded bulky features
     CXXFLAGS="$CXXFLAGS -fno-exceptions -fno-rtti"
 else
