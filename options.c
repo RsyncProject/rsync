@@ -603,6 +603,8 @@ static void print_capabilities(enum logcode f)
 #endif
 			"IPv6",
 
+		"atimes",
+
 		"batchfiles",
 
 #ifndef HAVE_FTRUNCATE
@@ -624,6 +626,13 @@ static void print_capabilities(enum logcode f)
 		"no "
 #endif
 			"xattrs",
+
+#ifdef RSYNC_USE_PROTECTED_ARGS
+		"default "
+#else
+		"optional "
+#endif
+			"protected-args",
 
 #ifndef ICONV_OPTION
 		"no "
