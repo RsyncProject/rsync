@@ -650,7 +650,7 @@ static void print_capabilities(enum logcode f)
 #ifndef HAVE_ASM
 		"no "
 #endif
-			"ASM",
+			"asm",
 
 	"*"
 #ifndef USE_OPENSSL
