@@ -19,6 +19,8 @@ Protocol: 31 (unchanged)
 
  - Fix an issue with the md2man code when building in an external dir.
 
+ - Make sure "early exec" gets no stdin.
+
 ### ENHANCEMENTS:
 
  - Added "atimes" to the capabilities list that `--version` outputs.

@@ -434,10 +434,11 @@ static pid_t start_pre_exec(const char *cmd, int *arg_fd_ptr, int *error_fd_ptr)
 		}
 
 		if (error_fd_ptr) {
-			close(STDIN_FILENO);
 			dup2(error_fds[1], STDOUT_FILENO);
 			close(error_fds[1]);
 		}
+
+		close(STDIN_FILENO);
 
 		status = shell_exec(cmd);
 
