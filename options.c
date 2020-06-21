@@ -188,6 +188,10 @@ const char **remote_options = NULL;
 const char *checksum_choice = NULL;
 const char *compress_choice = NULL;
 
+#ifndef __APPLE__ /* Do we need a configure check for this? */
+#define SUPPORT_ATIMES 1
+#endif
+
 int quiet = 0;
 int output_motd = 1;
 int log_before_transfer = 0;
@@ -604,7 +608,10 @@ static void print_capabilities(enum logcode f)
 #endif
 			"IPv6",
 
-		"atimes",
+#ifndef SUPPORT_ATIMES
+		"no "
+#endif
+			"atimes",
 
 		"batchfiles",
 
@@ -1179,6 +1186,9 @@ static void set_refuse_options(void)
 		parse_one_refuse_match(0, "log-file*", list_end);
 	}
 
+#ifndef SUPPORT_ATIMES
+	parse_one_refuse_match(0, "atimes", list_end);
+#endif
 #ifndef SUPPORT_HARD_LINKS
 	parse_one_refuse_match(0, "link-dest", list_end);
 #endif
