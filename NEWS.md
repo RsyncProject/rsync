@@ -21,6 +21,14 @@ Protocol: 31 (unchanged)
 
 ### ENHANCEMENTS:
 
- - None.
+ - Added "atimes" to the capabilities list that `--version` outputs.
+
+ - Mention either "default protect-args" or "optional protect-args" in the
+   `--version` capabilities depending on how rsync was configured.
+
+ - Some info on optimizations was elided from the `--version` capabilities
+   since they aren't really user-facing capabilities.  You can get the info
+   back (plus the status of a couple extra optimizations) by repeating the
+   `--version` option (e.g. `-VV`).
 
 ------------------------------------------------------------------------------

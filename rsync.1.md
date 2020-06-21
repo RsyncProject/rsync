@@ -518,6 +518,9 @@ your home directory (remove the '=' for that).
     list of compression algorithms, a list of compiled-in capabilities, a link
     to the rsync web site, and some license/copyright info.
 
+    Repeat the option (`-VV`) to include some optimization info at the end of
+    the capabilities list.
+
 0.  `--verbose`, `-v`
 
     This option increases the amount of information you are given during the
@@ -2068,6 +2071,9 @@ your home directory (remove the '=' for that).
 
     Rsync can also be configured (at build time) to have this option enabled by
     default (with is overridden by both the environment and the command-line).
+    Run `rsync -V` to check if this is the case, as it will display "default
+    protect-args" or "optional protect-args" depending on how it was compiled.
+
     This option will eventually become a new default setting at some
     as-yet-undetermined point in the future.
 

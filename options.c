@@ -632,7 +632,7 @@ static void print_capabilities(enum logcode f)
 #else
 		"optional "
 #endif
-			"protected-args",
+			"protect-args",
 
 #ifndef ICONV_OPTION
 		"no "
