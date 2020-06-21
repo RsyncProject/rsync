@@ -217,7 +217,7 @@ __attribute__ ((target("sse2"))) int test_sse2(int x) { return x; }
 __attribute__ ((target("avx2"))) int test_avx2(int x) { return x; }
 typedef long long __m128i_u __attribute__((__vector_size__(16), __may_alias__, __aligned__(1)));
 typedef long long __m256i_u __attribute__((__vector_size__(32), __may_alias__, __aligned__(1)));
-inline void more_testing(char* buf, int len)
+__attribute__ ((target("ssse3"))) void more_testing(char* buf, int len)
 {
     int i;
     for (i = 0; i < (len-32); i+=32) {
