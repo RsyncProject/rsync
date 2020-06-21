@@ -65,7 +65,7 @@ WEB SITE
 
 The main rsync web site is here:
 
->  http://rsync.samba.org/
+>  https://rsync.samba.org/
 
 You'll find a FAQ list, downloads, resources, HTML versions of the
 manpages, etc.
@@ -80,7 +80,7 @@ list, and there is also an announcement-only mailing list for those that
 want official announcements.  See the mailing-list page for full
 details:
 
->  http://rsync.samba.org/lists.html
+>  https://rsync.samba.org/lists.html
 
 
 BUG REPORTS
@@ -88,14 +88,14 @@ BUG REPORTS
 
 To visit this web page for full the details on bug reporting:
 
->  http://rsync.samba.org/bugzilla.html
+>  https://rsync.samba.org/bugtracking.html
 
 That page contains links to the current bug list, and information on how
 to report a bug well.  You might also like to try searching the Internet
 for the error message you've received, or looking in the mailing list
 archives at:
 
->  http://mail-archive.com/rsync@lists.samba.org/
+>  https://mail-archive.com/rsync@lists.samba.org/
 
 To send a bug report, follow the instructions on the bug-tracking
 page of the web site.
@@ -112,38 +112,31 @@ is hosted on github and on samba's site.  Feel free to access it here:
 
 >  https://github.com/WayneD/rsync
 
-or clone it from its samba repo:
+A backup git repo is available on the samba site:
 
 >     git clone git://git.samba.org/rsync.git
 
 See the download page for full details on all the ways to grab the
 source:
 
->  http://rsync.samba.org/download.html
+>  https://rsync.samba.org/download.html
 
 
 COPYRIGHT
 ---------
 
 Rsync was originally written by Andrew Tridgell and is currently
-maintained by Wayne Davison.   It has been improved by many developers
+maintained by Wayne Davison.  It has been improved by many developers
 from around the world.
 
 Rsync may be used, modified and redistributed only under the terms of
 the GNU General Public License, found in the file COPYING in this
 distribution, or at:
 
->  http://www.fsf.org/licenses/gpl.html
+>  https://www.fsf.org/licenses/gpl.html
 
 
 AVAILABILITY
 ------------
 
-The main web site for rsync is http://rsync.samba.org/
-
-The main ftp site is ftp://rsync.samba.org/pub/rsync/
-
-This is also available as rsync://download.samba.org/rsyncftp/ if you
-connect via ssl. Use the `rsync-ssl` script if you have it, otherwise
-connect to the rsync server via a normal rsync command and it will
-output some instructions for how to connect.
+The main web site for rsync is https://rsync.samba.org/

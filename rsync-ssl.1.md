@@ -87,7 +87,7 @@ exported RSYNC_SSL_TYPE environment variable to make its use the default.
 
 # BUGS
 
-Please report bugs! See the web site at <http://rsync.samba.org/>.
+Please report bugs! See the web site at <https://rsync.samba.org/>.
 
 # VERSION
 
@@ -98,7 +98,7 @@ This man page is current for version @VERSION@ of rsync.
 rsync is distributed under the GNU General Public License.  See the file
 COPYING for details.
 
-A web site is available at <http://rsync.samba.org/>.  The site includes an
+A web site is available at <https://rsync.samba.org/>.  The site includes an
 FAQ-O-Matic which may cover questions unanswered by this manual page.
 
 # AUTHOR
@@ -106,4 +106,4 @@ FAQ-O-Matic which may cover questions unanswered by this manual page.
 This manpage was written by Wayne Davison.
 
 Mailing lists for support and development are available at
-<http://lists.samba.org/>.
+<https://lists.samba.org/>.

@@ -3916,7 +3916,7 @@ values
 
 see also the comments on the `--delete` option
 
-Please report bugs! See the web site at <http://rsync.samba.org/>.
+Please report bugs! See the web site at <https://rsync.samba.org/>.
 
 # VERSION
 
@@ -3936,10 +3936,8 @@ that can be used with a restricted ssh login.
 rsync is distributed under the GNU General Public License.  See the file
 COPYING for details.
 
-A web site is available at <http://rsync.samba.org/>.  The site includes an
+A web site is available at <https://rsync.samba.org/>.  The site includes an
 FAQ-O-Matic which may cover questions unanswered by this manual page.
-
-The primary ftp site for rsync is <ftp://rsync.samba.org/pub/rsync>
 
 We would be delighted to hear from you if you like this program.  Please
 contact the mailing-list at <rsync@lists.samba.org>.
@@ -3963,4 +3961,4 @@ people have later contributed to it. It is currently maintained by Wayne
 Davison.
 
 Mailing lists for support and development are available at
-<http://lists.samba.org/>.
+<https://lists.samba.org/>.
