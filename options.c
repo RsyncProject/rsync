@@ -640,19 +640,17 @@ static void print_capabilities(enum logcode f)
 #endif
 			"prealloc",
 
-	"*"
+	"*" /* All options after this point are hidden w/o -V -V */
 #ifndef HAVE_SIMD
 		"no "
 #endif
 			"SIMD",
 
-	"*"
 #ifndef HAVE_ASM
 		"no "
 #endif
 			"asm",
 
-	"*"
 #ifndef USE_OPENSSL
 		"no "
 #endif
@@ -666,11 +664,11 @@ static void print_capabilities(enum logcode f)
 		if (!cap)
 			break;
 		if (*cap == '*') {
-			if (version_opt_cnt < 2) {
+			if (version_opt_cnt >= 2)
+				capabilities[j]++;
+			else
 				capabilities[j] = NULL;
-				break;
-			}
-			capabilities[j]++;
+			break;
 		}
 	}
 
