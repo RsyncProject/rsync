@@ -35,8 +35,6 @@ for action in "${@}"; do
 	sleep 1 # The following files need to be newer than aclocal.m4
 	touch configure.sh config.h.in
 	;;
-    fetchgen)
-	;;
     fetchSRC)
 	./rsync-ssl -iipr --no-motd --exclude=/.git/ rsync://download.samba.org/ftp/pub/unpacked/rsync/ .
 	;;
