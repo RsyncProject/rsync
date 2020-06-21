@@ -257,8 +257,8 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 			return -1;
 		}
 		early_input_len = st.st_size;
-		if (early_input_len >= (int)sizeof line) {
-			rprintf(FERROR, "%s is >= %d bytes.\n", early_input_file, (int)sizeof line);
+		if (early_input_len > (int)sizeof line) {
+			rprintf(FERROR, "%s is > %d bytes.\n", early_input_file, (int)sizeof line);
 			return -1;
 		}
 		if (early_input_len > 0) {
@@ -269,7 +269,7 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 					rprintf(FERROR, "Early EOF in %s\n", early_input_file);
 					return -1;
 				}
-				len = fread(line, 1, early_input_len / 2 + 1, f);
+				len = fread(line, 1, early_input_len, f);
 				if (len > 0) {
 					write_buf(f_out, line, len);
 					early_input_len -= len;
