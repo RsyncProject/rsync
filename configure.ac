@@ -227,7 +227,7 @@ inline void more_testing(char* buf, int len)
 	AC_LANG(C)
 	if test x"$CXX_OK" = x"yes"; then
 	    # AC_MSG_RESULT() is called below.
-	    SIMD="$SIMD x86_64"
+	    SIMD="x86_64"
 	elif test x"$enable_simd" = x"yes"; then
 	    AC_MSG_RESULT(error)
 	    AC_MSG_ERROR(The SIMD compilation test failed.
@@ -241,10 +241,11 @@ Omit --enable-simd to continue without it.)
 fi
 
 if test x"$SIMD" != x""; then
-    SIMD=`echo "$SIMD" | sed 's/^ *//'`
     AC_MSG_RESULT([yes ($SIMD)])
     AC_DEFINE(HAVE_SIMD, 1, [Define to 1 to enable SIMD optimizations])
-    SIMD=`echo '$(SIMD_'"$SIMD)" | sed 's/ /) $(SIMD_/g'`
+    SIMD='$(SIMD_'"$SIMD)"
+    # Clag is crashing with -g -O2, so we'll get rid of -g (just for the one file).
+    CXXFLAGS=`echo "'$CXXFLAGS'" | sed 's/-g //'`
     # We only use c++ for its target attribute dispatching, disable unneeded bulky features
     CXXFLAGS="$CXXFLAGS -fno-exceptions -fno-rtti"
 else
