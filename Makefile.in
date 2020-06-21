@@ -32,7 +32,7 @@ VERSION=@RSYNC_VERSION@
 .SUFFIXES:
 .SUFFIXES: .c .o
 
-SIMD_x86_64=simd-checksum-x86_64.o lib/md5-asm-x86_64.o
+SIMD_x86_64=simd-checksum-x86_64.o
 
 GENFILES=configure.sh aclocal.m4 config.h.in proto.h proto.h-tstamp rsync.1 rsync.1.html \
 	 rsync-ssl.1 rsync-ssl.1.html rsyncd.conf.5 rsyncd.conf.5.html
@@ -46,7 +46,7 @@ OBJS1=flist.o rsync.o generator.o receiver.o cleanup.o sender.o exclude.o \
 	util.o util2.o main.o checksum.o match.o syscall.o log.o backup.o delete.o
 OBJS2=options.o io.o compat.o hlink.o token.o uidlist.o socket.o hashtable.o \
 	fileio.o batch.o clientname.o chmod.o acls.o xattrs.o
-OBJS3=progress.o pipe.o
+OBJS3=progress.o pipe.o lib/md5-asm-x86_64.o
 DAEMON_OBJ = params.o loadparm.o clientserver.o access.o connection.o authenticate.o
 popt_OBJS=popt/findme.o  popt/popt.o  popt/poptconfig.o \
 	popt/popthelp.o popt/poptparse.o
