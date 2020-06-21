@@ -204,8 +204,6 @@ if test x"$enable_simd" != x"no"; then
     # For x86-64 SIMD, g++ >=5 or clang++ >=7 is required
     if test x"$build_cpu" = x"x86_64"; then
 	AC_LANG(C++)
-	SAVE_FLAGS="$CXXFLAGS"
-	CXXFLAGS="$CXXFLAGS -fno-exceptions -fno-rtti"
 	AC_RUN_IFELSE([AC_LANG_PROGRAM([[#include <stdio.h>
 #include <immintrin.h>
 __attribute__ ((target("default"))) int test_ssse3(int x) { return x; }
@@ -214,9 +212,19 @@ __attribute__ ((target("default"))) int test_avx2(int x) { return x; }
 __attribute__ ((target("ssse3"))) int test_ssse3(int x) { return x; }
 __attribute__ ((target("sse2"))) int test_sse2(int x) { return x; }
 __attribute__ ((target("avx2"))) int test_avx2(int x) { return x; }
+typedef long long __m128i_u __attribute__((__vector_size__(16), __may_alias__, __aligned__(1)));
+typedef long long __m256i_u __attribute__((__vector_size__(32), __may_alias__, __aligned__(1)));
+inline void more_testing(char* buf, int len)
+{
+    int i;
+    for (i = 0; i < (len-32); i+=32) {
+	__m128i in8_1, in8_2;
+	in8_1 = _mm_lddqu_si128((__m128i_u*)&buf[i]);
+	in8_2 = _mm_lddqu_si128((__m128i_u*)&buf[i + 16]);
+    }
+}
 ]], [[if (test_ssse3(42) != 42 || test_sse2(42) != 42 || test_avx2(42) != 42) exit(1);]])],[CXX_OK=yes],[CXX_OK=no])
 	AC_LANG(C)
-	CXXFLAGS="$SAVE_FLAGS"
 	if test x"$CXX_OK" = x"yes"; then
 	    # AC_MSG_RESULT() is called below.
 	    SIMD="$SIMD x86_64"
