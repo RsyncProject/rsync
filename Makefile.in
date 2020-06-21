@@ -133,11 +133,10 @@ rounding.h: rounding.c rsync.h proto.h
 	@rm -f rounding.out
 
 simd-checksum-x86_64.o: simd-checksum-x86_64.cpp
-	@echo "If this fails to compile and you can't fix it, re-run $(srcdir)/configure with --disable-simd."
-	$(CXX) -I. $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $(srcdir)/simd-checksum-x86_64.cpp
+	@$(srcdir)/cmdormsg disable-simd $(CXX) -I. $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $(srcdir)/simd-checksum-x86_64.cpp
 
 lib/md5-asm-x86_64.o: lib/md5-asm-x86_64.S config.h lib/md-defines.h
-	$(CC) -I. @NOEXECSTACK@ -c -o $@ $(srcdir)/lib/md5-asm-x86_64.S
+	@$(srcdir)/cmdormsg disable-asm $(CC) -I. @NOEXECSTACK@ -c -o $@ $(srcdir)/lib/md5-asm-x86_64.S
 
 tls$(EXEEXT): $(TLS_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(TLS_OBJ) $(LIBS)

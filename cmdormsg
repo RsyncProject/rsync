@@ -1,0 +1,11 @@
+#!/bin/sh
+
+srcdir=`dirname $0`
+opt="$1"
+shift
+
+echo "$*"
+if ! "${@}"; then
+    echo "If you can't fix the issue, re-run $srcdir/configure with --$opt."
+    exit 1
+fi
