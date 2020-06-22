@@ -26,7 +26,7 @@ Protocol: 31 (unchanged)
 
  - Fix an issue in the md2man script when building from an external dir.
 
- - Disable --atimes on macOS (it apparently just ignores the atime change).
+ - Disable `--atimes` on macOS (it apparently just ignores the atime change).
 
 ### ENHANCEMENTS:
 
@@ -43,11 +43,11 @@ Protocol: 31 (unchanged)
    info (plus the status of a couple extra optimizations) by repeating the
    `--version` option (e.g. `-VV`).
 
- - Updated various documentation URLs to be https instead of http.
+ - Updated various URLs in the documentation to be https instead of http.
 
 ### PACKAGING RELATED:
 
- - If you had to use --disable-simd for 3.2.0, you might want to try removing
+ - If you had to use `--disable-simd` for 3.2.0, you might want to try removing
    that and see if it will succeed or auto-disable.  Some buggy clang++
    compilers are still not auto disabled, though.
 
@@ -130,17 +130,17 @@ Protocol: 31 (unchanged)
    `RSYNC_COMPRESS_LIST` can be used to customize the preference order of the
    negotiation, or use `--compress-choice` (`--zc`) to force a choice.
 
- - Added a --debug=NSTR option that outputs details of the new negotiation
+ - Added a `--debug=NSTR` option that outputs details of the new negotiation
    strings (for checksums and compression).  The first level just outputs the
    result of each negotiation on the client, level 2 outputs the values of the
    strings that were sent to and received from the server, and level 3 outputs
    all those values on the server side too (when the server was given the debug
    option).
 
- - The --debug=OPTS command-line option is no longer auto-forwarded to the
+ - The `--debug=OPTS` command-line option is no longer auto-forwarded to the
    remote rsync which allows for the client and server to have different levels
    of debug specified. This also allows for newer debug options to be
-   specified, such as using --debug=NSTR to see the negotiated hash result,
+   specified, such as using `--debug=NSTR` to see the negotiated hash result,
    without having the command fail if the server version is too old to handle
    that debug item. Use -M--debug=OPTS to send the options to the remote side.
 
@@ -154,9 +154,9 @@ Protocol: 31 (unchanged)
  - Added openssl & preliminary gnutls support to the rsync-ssl script, which is
    now installed by default.  This was unified with the old stunnel-rsync
    helper script to simplify packaging.  Note that the script accepts the use
-   of --type=gnutls for gnutls testing, but does not look for gnutls-cli on the
-   path yet.  The use of type=gnutls will not work right until gnutls-cli no
-   longer drops data.
+   of `--type=gnutls` for gnutls testing, but does not look for gnutls-cli on
+   the path yet.  The use of `--type=gnutls` will not work right until
+   gnutls-cli no longer drops data.
 
  - Rsync was enhanced to set the `RSYNC_PORT` environment variable when running
    a daemon-over-rsh script. Its value is the user-specified port number (set
@@ -199,10 +199,10 @@ Protocol: 31 (unchanged)
  - Various man page improvements, including some html representations (that
    aren't installed by default).
 
- - Made -V the short option for --version and improved its information.
+ - Made `-V` the short option for `--version` and improved its information.
 
- - Pass the -4 or -6 option to the ssh command, making it easier to type than
-   `--rsh='ssh -4'` (or -6).
+ - Pass the `-4` or `-6` option to the ssh command, making it easier to type
+   than `--rsh='ssh -4'` (or the `-6` equivalent).
 
  - Added example config for rsyncd SSL proxy configs to rsyncd.conf.
 
@@ -239,8 +239,8 @@ Protocol: 31 (unchanged)
    required for a release-tar build, since it comes with pre-built man pages.
    Note that cmarkcfm is faster than commonmark, but they generate the same
    data.  The commonmark dependency is easiest to install since it's native
-   python, and can be installed via `pip3 install --user commonmark` if you
-   want to just install it for the build user (or omit `--user`).
+   python, and can even be installed via `pip3 install --user commonmark` if
+   you want to just install it for the build user.
 
  - Remove yodl _build_ dependency (if it was even listed before).
 
