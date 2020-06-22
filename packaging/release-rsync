@@ -189,11 +189,11 @@ About to:
             txt = replace_or_die(x_re, repl, txt, f"Unable to find SUBPROTOCOL_VERSION define in {fn}")
         elif fn == 'NEWS.md':
             efv = re.escape(finalversion)
-            # The following refuses to match a 1.2.3 version without suffix because it was already released.
-            x_re = re.compile(r'^<.+>\s+# NEWS for rsync \d+\.\d+\.\d+[a-z].+\s+Protocol: .+\n')
-            repl = (f'<a name="{version}"></a>\n\n# NEWS for rsync {version} ({today})\n\n'
+            x_re = re.compile(r'^<.+>\s+# NEWS for rsync %s \(UNRELEASED\)\s+Protocol: .+\n' % efv)
+            rel_day = 'UNRELEASED' if pre else today
+            repl = (f'<a name="{finalversion}"></a>\n\n# NEWS for rsync {finalversion} ({rel_day})\n\n'
                 + f"Protocol: {protocol_version} ({proto_changed})\n")
-            good_top = repl.replace(version, version + 'dev')
+            good_top = re.sub(r'\(.*?\)', '(UNRELEASED)', repl, 1)
             msg = f"The top lines of {fn} are not in the right format.  It should be:\n" + good_top
             txt = replace_or_die(x_re, repl, txt, msg)
             x_re = re.compile(r'^(\| )(\S{2} \S{3} \d{4})(\s+\|\s+%s\s+\| ).{11}(\s+\| )\S{2}(\s+\|+)$' % efv, re.M)

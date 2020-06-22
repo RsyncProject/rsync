@@ -1,6 +1,6 @@
-<a name="3.2.1pre1"></a>
+<a name="3.2.1"></a>
 
-# NEWS for rsync 3.2.1pre1 (21 Jun 2020)
+# NEWS for rsync 3.2.1 (UNRELEASED)
 
 Protocol: 31 (unchanged)
 
@@ -46,7 +46,9 @@ Protocol: 31 (unchanged)
    info (plus the status of a couple extra optimizations) by repeating the
    `--version` option (e.g. `-VV`).
 
- - Updated various URLs in the documentation to be https instead of http.
+ - Updated various URLs to be https instead of http.
+
+ - Some documentation improvements.
 
 ### PACKAGING RELATED:
 
