@@ -29,6 +29,10 @@ Protocol: 31 (unchanged)
 
 ### ENHANCEMENTS:
 
+ - The use of `--backup-dir=STR` now implies `--backup`.
+
+ - Added `--zl=NUM` as a short-hand for `--compress-level=NUM`.
+
  - Added `--early-input=FILE` option that allows the client to send some
    data to a daemon's (optional) "early exec" script on its stdin.
 

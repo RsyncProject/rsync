@@ -945,6 +945,7 @@ static struct poptOption long_options[] = {
   {"zc",               0,  POPT_ARG_STRING, &compress_choice, 0, 0, 0 },
   {"skip-compress",    0,  POPT_ARG_STRING, &skip_compress, 0, 0, 0 },
   {"compress-level",   0,  POPT_ARG_INT,    &do_compression_level, 0, 0, 0 },
+  {"zl",               0,  POPT_ARG_INT,    &do_compression_level, 0, 0, 0 },
   {0,                 'P', POPT_ARG_NONE,   0, 'P', 0, 0 },
   {"progress",         0,  POPT_ARG_VAL,    &do_progress, 1, 0, 0 },
   {"no-progress",      0,  POPT_ARG_VAL,    &do_progress, 0, 0, 0 },

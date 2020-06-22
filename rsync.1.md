@@ -2311,11 +2311,40 @@ your home directory (remove the '=' for that).
     enough to handle a compression negotiation list, the list is silently
     ignored unless it contains the string "FAIL".
 
-0.  `--compress-level=NUM`
+0.  `--compress-level=NUM`, `--zl=NUM`
 
-    Explicitly set the compression level to use (see `--compress`) instead of
-    letting it default.  If NUM is non-zero, the `--compress` option is
-    implied.
+    Explicitly set the compression level to use (see `--compress`, `-z`)
+    instead of letting it default.  The `--compress` option is implied as long
+    as the level chosen is not a "don't compress" level for the compression
+    algorithm that is in effect (e.g. zlib compression treats level 0 as
+    "off").
+
+    The level values vary depending on the checksum in effect.  Because rsync
+    will negotiate a checksum choice by default when the remote rsync is new
+    enough, it can be good to combine this option with a `--compress-choice`
+    (`--zc`) option unless you're sure of the choice in effect.  For example:
+
+    >     rsync -aiv --zc=zstd --zl=22 host:src/ dest/
+
+    For zlib & zlibx compression, the valid values are from 1 to 9 with 6 being
+    the default.  Specifying 0 turns compression off, and specifying -1 chooses
+    the default of 6.
+
+    For zstd compression, the valid values are from -131072 to 22 with 3 being
+    the default. Specifying 0 chooses the default of 3.
+
+    For lz4 compression, there are no levels available, so the level is always
+    0.
+
+    If you specify a too-large or too-small value, the number is silently
+    limited to a valid value.  This allows you to specify something like
+    `--zl=999999999` and be assured that you'll end up with the maximum
+    compression level no matter what algorithm was chosen.
+
+    If you want to know the compression level that is in effect, specify the
+    `--debug=nstr` to see the "negotiated string" results.  This will report
+    something like "`Client compress: zstd (level 3)`" (along with the checksum
+    choice in effect).
 
 0.  `--skip-compress=LIST`
 
