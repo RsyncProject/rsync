@@ -481,7 +481,7 @@ static int valid_ipaddr(const char *s)
 
 		for (count = 0; count < 8; count++) {
 			if (!*s)
-				return saw_double_colon && count < 7;
+				return saw_double_colon;
 
 			if (strchr(s, ':') == NULL && strchr(s, '.') != NULL) {
 				if ((!saw_double_colon && count != 6) || (saw_double_colon && count > 6))
