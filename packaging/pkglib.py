@@ -211,15 +211,15 @@ def get_configure_version():
     die("Unable to find AC_INIT with version in configure.ac")
 
 
-def get_OLDNEWS_version_info():
+def get_NEWS_version_info():
     rel_re = re.compile(r'^\| \d{2} \w{3} \d{4}\s+\|\s+(?P<ver>\d+\.\d+\.\d+)\s+\|\s+(?P<pdate>\d{2} \w{3} \d{4}\s+)?\|\s+(?P<pver>\d+)\s+\|')
     last_version = last_protocol_version = None
     pdate = { }
 
-    with open('OLDNEWS.md', 'r', encoding='utf-8') as fh:
+    with open('NEWS.md', 'r', encoding='utf-8') as fh:
         for line in fh:
             if not last_version:
-                m = re.search(r'(\d+\.\d+\.\d+)', line)
+                m = re.search(r'rsync (\d+\.\d+\.\d+).*\d\d\d\d', line)
                 if m:
                     last_version = m[1]
             m = rel_re.match(line)

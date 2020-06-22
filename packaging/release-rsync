@@ -55,7 +55,7 @@ def main():
     confversion = get_configure_version()
 
     # All version values are strings!
-    lastversion, last_protocol_version = get_OLDNEWS_version_info()
+    lastversion, last_protocol_version = get_NEWS_version_info()
     protocol_version, subprotocol_version = get_protocol_versions()
 
     version = confversion
@@ -153,7 +153,7 @@ release is "{release}"
 About to:
     - tweak SUBPROTOCOL_VERSION in rsync.h, if needed
     - tweak the version in configure.ac and the spec files
-    - tweak NEWS.md and OLDNEWS.md to ensure header values are correct
+    - tweak NEWS.md to ensure header values are correct
     - generate configure.sh, config.h.in, and proto.h
     - page through the differences
 """)
@@ -167,7 +167,7 @@ About to:
         '%define srcdir': srcdir,
         }
 
-    tweak_files = 'configure.ac rsync.h NEWS.md OLDNEWS.md'.split()
+    tweak_files = 'configure.ac rsync.h NEWS.md'.split()
     tweak_files += glob.glob('packaging/*.spec')
     tweak_files += glob.glob('packaging/*/*.spec')
 
@@ -188,16 +188,13 @@ About to:
             repl = lambda m: m[1] + ' ' + '0' if not pre or proto_changed != 'changed' else 1 if m[2] == '0' else m[2]
             txt = replace_or_die(x_re, repl, txt, f"Unable to find SUBPROTOCOL_VERSION define in {fn}")
         elif fn == 'NEWS.md':
-            x_re = re.compile(
-                    r'^(# NEWS for rsync %s )(\(UNRELEASED\))\s*(\n\nProtocol: )(\d+) (\([^)]+\))\n' % re.escape(finalversion),
-                    re.I)
-            repl = lambda m: m[1] + (m[2] if pre else f"({today})") + m[3] + f"{protocol_version} ({proto_changed})\n"
-            msg = (f"The first 3 lines of {fn} are not in the right format.  They must be:\n"
-                    + f"# NEWS for rsync {finalversion} (UNRELEASED)\n\n"
-                    + f"Protocol: {protocol_version} ({proto_changed})")
-            txt = replace_or_die(x_re, repl, txt, msg)
-        elif fn == 'OLDNEWS.md':
             efv = re.escape(finalversion)
+            x_re = re.compile(r'^---+\n<.+>\s+# NEWS .+\s+Protocol: .+\n')
+            rel_day = 'UNRELEASED' if pre else today
+            repl = ('-'*78 + f'\n<a name="{version}"></a>\n\n# NEWS for rsync {version} ({rel_day})\n\n'
+                + f"Protocol: {protocol_version} ({proto_changed})\n")
+            msg = f"The top lines of {fn} are not in the right format.  They must be:\n" + repl
+            txt = replace_or_die(x_re, repl, txt, msg)
             x_re = re.compile(r'^(\| )(\S{2} \S{3} \d{4})(\s+\|\s+%s\s+\| ).{11}(\s+\| )\S{2}(\s+\|+)$' % efv, re.M)
             repl = lambda m: m[1] + (m[2] if pre else ztoday) + m[3] + proto_change_date + m[4] + protocol_version + m[5]
             txt = replace_or_die(x_re, repl, txt, f'Unable to find "| ?? ??? {year} | {finalversion} | ... |" line in {fn}')
@@ -220,8 +217,6 @@ About to:
     srctar_file = f"{dest}/{srcdir}/{srctar_name}"
     pattar_file = f"{dest}/{srcdir}/{pattar_name}"
     diff_file = f"{dest}/{srcdiffdir}/{diff_name}"
-    news_file = f"{dest}/{srcdir}/{rsync_ver}-NEWS.md"
-    newshtml_file = f"{dest}/{srcdir}/{rsync_ver}-NEWS.html"
     lasttar_file = f"{dest}/{lastsrcdir}/{rsync_lastver}.tar.gz"
 
     print(f"""\
@@ -274,7 +269,7 @@ About to:
     - create release tar, "{srctar_name}"
     - generate {rsync_ver}/patches/* files
     - create patches tar, "{pattar_name}"
-    - update top-level README.md, *NEWS.md, TODO, and ChangeLog
+    - update top-level README.md, NEWS.md, TODO, and ChangeLog
     - update top-level rsync*.html manpages
     - gpg-sign the release files
     - update hard-linked top-level release files{skipping}
@@ -331,16 +326,10 @@ About to:
     shutil.rmtree(rsync_ver)
 
     print(f"Updating the other files in {dest} ...")
-    md_files = 'README.md NEWS.md OLDNEWS.md'.split()
+    md_files = 'README.md NEWS.md'.split()
     html_files = [ fn for fn in gen_files if fn.endswith('.html') ]
     cmd_chk(['rsync', '-a', *md_files, *html_files, dest])
     cmd_chk(["packaging/md2html"] + [ dest +'/'+ fn for fn in md_files ])
-
-    for topfn, verfn in (('NEWS.md', news_file), ('NEWS.html', newshtml_file)):
-        topfn = dest + '/' + topfn
-        if os.path.lexists(verfn):
-            os.unlink(verfn)
-        os.link(topfn, verfn)
 
     cmd_chk(f"git log --name-status | gzip -9 >{dest}/ChangeLog.gz")
 
@@ -353,14 +342,13 @@ About to:
             die("gpg signing failed")
 
     if not pre:
-        for find in f'{dest}/rsync-*.gz {dest}/rsync-*.asc {dest}/rsync-*-NEWS.* {dest}/src-previews/rsync-*diffs.gz*'.split():
+        for find in f'{dest}/rsync-*.gz {dest}/rsync-*.asc {dest}/src-previews/rsync-*diffs.gz*'.split():
             for fn in glob.glob(find):
                 os.unlink(fn)
         top_link = [
                 srctar_file, f"{srctar_file}.asc",
                 pattar_file, f"{pattar_file}.asc",
                 diff_file, f"{diff_file}.asc",
-                news_file, newshtml_file,
                 ]
         for fn in top_link:
             os.link(fn, re.sub(r'/src(-\w+)?/', '/', fn))
