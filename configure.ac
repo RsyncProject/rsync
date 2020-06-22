@@ -250,7 +250,9 @@ if test x"$SIMD" != x""; then
     SIMD='$(SIMD_'"$SIMD)"
     # We only use c++ for its target attribute dispatching, disable unneeded bulky features
     CXXFLAGS="$CXXFLAGS -fno-exceptions -fno-rtti"
-    case "$CXX" in
+    # Apple often has "g++" as a symlink for clang. Try to find out the truth.
+    CXX_VERSION=`$CXX --version 2>/dev/null | head -n 2`
+    case "$CXX_VERSION" in
     *clang*) CXXFLAGS="$CXXFLAGS -fno-slp-vectorize" ;; # avoid a performance hit
     esac
 else
