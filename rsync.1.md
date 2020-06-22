@@ -381,7 +381,7 @@ detailed description below for a complete description.
 --write-devices          write to devices as files (implies --inplace)
 --dry-run, -n            perform a trial run with no changes made
 --whole-file, -W         copy files whole (w/o delta-xfer algorithm)
---checksum-choice=STR    choose the checksum algorithms
+--checksum-choice=STR    choose the checksum algorithms (aka --cc)
 --one-file-system, -x    don't cross filesystem boundaries
 --block-size=SIZE, -B    force a fixed checksum block-size
 --rsh=COMMAND, -e        specify the remote shell to use
@@ -422,7 +422,8 @@ detailed description below for a complete description.
 --copy-dest=DIR          ... and include copies of unchanged files
 --link-dest=DIR          hardlink to files in DIR when unchanged
 --compress, -z           compress file data during the transfer
---compress-level=NUM     explicitly set compression level
+--compress-choice=STR    choose the compression algorithm (aka --zc)
+--compress-level=NUM     explicitly set compression level (aka --zl)
 --skip-compress=LIST     skip compressing files with suffix in LIST
 --cvs-exclude, -C        auto-ignore files in the same way CVS does
 --filter=RULE, -f        add a file-filtering RULE
@@ -644,7 +645,7 @@ your home directory (remove the '=' for that).
     after using another mirroring system which may not preserve timestamps
     exactly.
 
-0.  `--modify-window`, `-@`
+0.  `--modify-window=NUM`, `-@`
 
     When comparing two timestamps, rsync treats the timestamps as being equal
     if they differ by no more than the modify-window value.  The default is 0,
@@ -1225,7 +1226,7 @@ your home directory (remove the '=' for that).
     those used by `--fake-super`) unless you repeat the option (e.g. `-XX`).
     This "copy all xattrs" mode cannot be used with `--fake-super`.
 
-0.  `--chmod`
+0.  `--chmod=CHMOD`
 
     This option tells rsync to apply one or more comma-separated "chmod" modes
     to the permission of the files in the transfer.  The resulting value is
@@ -1750,7 +1751,7 @@ your home directory (remove the '=' for that).
 
     Note that rsync versions prior to 3.1.0 did not allow `--min-size=0`.
 
-0.  `--block-size=BLOCKSIZE`, `-B`
+0.  `--block-size=SIZE`, `-B`
 
     This forces the block size used in rsync's delta-transfer algorithm to a
     fixed value.  It is normally selected based on the size of each file being
@@ -2512,19 +2513,19 @@ your home directory (remove the '=' for that).
     If you specify "`--chown=foo:bar`", this is exactly the same as specifying
     "`--usermap=*:foo --groupmap=*:bar`", only easier.
 
-0.  `--timeout=TIMEOUT`
+0.  `--timeout=SECONDS`
 
     This option allows you to set a maximum I/O timeout in seconds.  If no data
     is transferred for the specified time then rsync will exit.  The default is
     0, which means no timeout.
 
-0.  `--contimeout`
+0.  `--contimeout=SECONDS`
 
     This option allows you to set the amount of time that rsync will wait for
     its connection to an rsync daemon to succeed.  If the timeout is reached,
     rsync exits with an error.
 
-0.  `--address`
+0.  `--address=ADDRESS`
 
     By default rsync will bind to the wildcard address when connecting to an
     rsync daemon.  The `--address` option allows you to specify a specific IP
@@ -2539,7 +2540,7 @@ your home directory (remove the '=' for that).
     the port as a part of the URL).  See also this option in the `--daemon`
     mode section.
 
-0.  `--sockopts`
+0.  `--sockopts=OPTIONS`
 
     This option can provide endless fun for people who like to tune their
     systems to the utmost degree.  You can set all sorts of socket options
@@ -2992,7 +2993,7 @@ your home directory (remove the '=' for that).
 
     CAUTION: sending SIGVTALRM to an older rsync (pre-3.2.0) will kill it.
 
-0. `--password-file=FILE`
+0.  `--password-file=FILE`
 
     This option allows you to provide a password for accessing an rsync daemon
     via a file or via standard input if **FILE** is `-`.  The file should
@@ -3007,7 +3008,7 @@ your home directory (remove the '=' for that).
     authentication (i.e. if you have also specified a password in the daemon's
     config file).
 
-0. `--early-input=FILE`
+0.  `--early-input=FILE`
 
     This option allows rsync to send up to 5K of data to the "early exec"
     script on its stdin.  One possible use of this data is to give the script a
@@ -3016,7 +3017,7 @@ your home directory (remove the '=' for that).
 
     The daemon must be at least version 3.2.1.
 
-0. `--list-only`
+0.  `--list-only`
 
     This option will cause the source files to be listed instead of
     transferred.  This option is inferred if there is a single source arg and
@@ -3045,7 +3046,7 @@ your home directory (remove the '=' for that).
     need to expand a directory's content), or turn on recursion and exclude the
     content of subdirectories: `-r --exclude='/*/*'`.
 
-0. `--bwlimit=RATE`
+0.  `--bwlimit=RATE`
 
     This option allows you to specify the maximum transfer rate for the data
     sent over the socket, specified in units per second.  The RATE value can be
@@ -3071,13 +3072,13 @@ your home directory (remove the '=' for that).
     buffered, while other can show up as very slow when the flushing of the
     output buffer occurs.  This may be fixed in a future version.
 
-0. `--write-batch=FILE`
+0.  `--write-batch=FILE`
 
     Record a file that can later be applied to another identical destination
     with `--read-batch`.  See the "BATCH MODE" section for details, and also
     the `--only-write-batch` option.
 
-0. `--only-write-batch=FILE`
+0.  `--only-write-batch=FILE`
 
     Works like `--write-batch`, except that no updates are made on the
     destination system when creating the batch.  This lets you transport the
@@ -3096,13 +3097,13 @@ your home directory (remove the '=' for that).
     into the batch file without having to flow over the wire to the receiver
     (when pulling, the sender is remote, and thus can't write the batch).
 
-0. `--read-batch=FILE`
+0.  `--read-batch=FILE`
 
     Apply all of the changes stored in FILE, a file previously generated by
     `--write-batch`.  If _FILE_ is `-`, the batch data will be read from
     standard input. See the "BATCH MODE" section for details.
 
-0. `--protocol=NUM`
+0.  `--protocol=NUM`
 
     Force an older protocol version to be used.  This is useful for creating a
     batch file that is compatible with an older version of rsync.  For
@@ -3112,7 +3113,7 @@ your home directory (remove the '=' for that).
     protocol version to be used in the batch file (assuming you can't upgrade
     the rsync on the reading system).
 
-0. `--iconv=CONVERT_SPEC`
+0.  `--iconv=CONVERT_SPEC`
 
     Rsync can convert filenames between character sets using this option.
     Using a CONVERT_SPEC of "." tells rsync to look up the default
@@ -3144,7 +3145,7 @@ your home directory (remove the '=' for that).
     free to specify just the local charset for a daemon transfer (e.g.
     `--iconv=utf8`).
 
-0. `--ipv4`, `-4` or `--ipv6`, `-6`
+0.  `--ipv4`, `-4` or `--ipv6`, `-6`
 
     Tells rsync to prefer IPv4/IPv6 when creating sockets or running ssh.  This
     affects sockets that rsync has direct control over, such as the outgoing
@@ -3160,7 +3161,7 @@ your home directory (remove the '=' for that).
     have no effect.  The `rsync -V` output will contain "`no IPv6`" if is the
     case.
 
-0. `--checksum-seed=NUM`
+0.  `--checksum-seed=NUM`
 
     Set the checksum seed to the integer NUM.  This 4 byte checksum seed is
     included in each block and MD4 file checksum calculation (the more modern
@@ -3175,7 +3176,7 @@ your home directory (remove the '=' for that).
 
 The options allowed when starting an rsync daemon are as follows:
 
-0. `--daemon`
+0.  `--daemon`
 
     This tells rsync that it is to run as a daemon.  The daemon you start
     running may be accessed using an rsync client using the `host::module` or
@@ -3187,7 +3188,7 @@ The options allowed when starting an rsync daemon are as follows:
     each connect made by a client and respond to requests accordingly.  See the
     **rsyncd.conf**(5) man page for more details.
 
-0. `--address`
+0.  `--address=ADDRESS`
 
     By default rsync will bind to the wildcard address when run as a daemon
     with the `--daemon` option.  The `--address` option allows you to specify a
@@ -3195,14 +3196,14 @@ The options allowed when starting an rsync daemon are as follows:
     possible in conjunction with the `--config` option.  See also the "address"
     global option in the rsyncd.conf manpage.
 
-0. `--bwlimit=RATE`
+0.  `--bwlimit=RATE`
 
     This option allows you to specify the maximum transfer rate for the data
     the daemon sends over the socket.  The client can still specify a smaller
     `--bwlimit` value, but no larger value will be allowed.  See the client
     version of this option (above) for some extra details.
 
-0. `--config=FILE`
+0.  `--config=FILE`
 
     This specifies an alternate config file than the default.  This is only
     relevant when `--daemon` is specified.  The default is /etc/rsyncd.conf
@@ -3210,7 +3211,7 @@ The options allowed when starting an rsync daemon are as follows:
     user is not the super-user; in that case the default is rsyncd.conf in the
     current directory (typically $HOME).
 
-0. `--dparam=OVERRIDE`, `-M`
+0.  `--dparam=OVERRIDE`, `-M`
 
     This option can be used to set a daemon-config parameter when starting up
     rsync in daemon mode.  It is equivalent to adding the parameter at the end
@@ -3220,7 +3221,7 @@ The options allowed when starting an rsync daemon are as follows:
 
     >     rsync --daemon -M pidfile=/path/rsync.pid
 
-0. `--no-detach`
+0.  `--no-detach`
 
     When running as a daemon, this option instructs rsync to not detach itself
     and become a background process.  This option is required when running as a
@@ -3229,37 +3230,37 @@ The options allowed when starting an rsync daemon are as follows:
     `--no-detach` is also recommended when rsync is run under a debugger.  This
     option has no effect if rsync is run from inetd or sshd.
 
-0. `--port=PORT`
+0.  `--port=PORT`
 
     This specifies an alternate TCP port number for the daemon to listen on
     rather than the default of 873.  See also the "port" global option in the
     rsyncd.conf manpage.
 
-0. `--log-file=FILE`
+0.  `--log-file=FILE`
 
     This option tells the rsync daemon to use the given log-file name instead
     of using the "`log file`" setting in the config file.
 
-0. `--log-file-format=FORMAT`
+0.  `--log-file-format=FORMAT`
 
     This option tells the rsync daemon to use the given FORMAT string instead
     of using the "`log format`" setting in the config file.  It also enables
     "`transfer logging`" unless the string is empty, in which case transfer
     logging is turned off.
 
-0. `--sockopts`
+0.  `--sockopts`
 
     This overrides the `socket options` setting in the rsyncd.conf file and has
     the same syntax.
 
-0. `--verbose`, `-v`
+0.  `--verbose`, `-v`
 
     This option increases the amount of information the daemon logs during its
     startup phase.  After the client connects, the daemon's verbosity level
     will be controlled by the options that the client used and the
     "`max verbosity`" setting in the module's config section.
 
-0. `--ipv4`, `-4` or `--ipv6`, `-6`
+0.  `--ipv4`, `-4` or `--ipv6`, `-6`
 
     Tells rsync to prefer IPv4/IPv6 when creating the incoming sockets that the
     rsync daemon will use to listen for connections.  One of these options may
@@ -3274,7 +3275,7 @@ The options allowed when starting an rsync daemon are as follows:
     have no effect.  The `rsync -V` output will contain "`no IPv6`" if is the
     case.
 
-0. `--help`, `-h`
+0.  `--help`, `-h`
 
     When specified after `--daemon`, print a short help page describing the
     options available for starting an rsync daemon.
