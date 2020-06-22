@@ -957,7 +957,9 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     request is known except for the module name.  This helper script can be
     used to setup a disk mount or decrypt some data into a module dir, but you
     may need to use `lock file` and `max connections` to avoid concurrency
-    issues.
+    issues.  If the client rsync specified the `--early-input=FILE` option, it
+    can send up to about 5K of data to the stdin of the early script.  The
+    stdin will otherwise be empty.
 
     Note that the `post-xfer exec` command is still run even if one of the
     other scripts returns an error code. The `pre-xfer exec` command will _not_
