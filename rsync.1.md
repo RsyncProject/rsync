@@ -842,7 +842,7 @@ your home directory (remove the '=' for that).
 
 0.  `--backup-dir=DIR`
 
-    In combination with the `--backup` option, this tells rsync to store all
+    This implies the `--backup` option, and tells rsync to store all
     backups in the specified directory on the receiving side.  This can be used
     for incremental backups.  You can additionally specify a backup suffix
     using the `--suffix` option (otherwise the files backed up in the specified
