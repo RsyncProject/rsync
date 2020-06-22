@@ -1,4 +1,3 @@
-------------------------------------------------------------------------------
 <a name="3.2.1pre1"></a>
 
 # NEWS for rsync 3.2.1pre1 (21 Jun 2020)
@@ -31,7 +30,7 @@ Protocol: 31 (unchanged)
 ### ENHANCEMENTS:
 
  - Added `--early-input=FILE` option that allows the client to send some
-   data to the (optional) "early exec" daemon script on its stdin.
+   data to a daemon's (optional) "early exec" script on its stdin.
 
  - Mention atimes in the capabilities list that `--version` outputs.
 
@@ -102,7 +101,7 @@ Protocol: 31 (unchanged)
 
  - Fixed a couple bugs in the handling of files with the `--sparse` option.
 
- - Fixed a bug in the writing of the batch.sh file (w/--write-batch) when the
+ - Fixed a bug in the writing of the batch.sh file (w/`--write-batch`) when the
    source & destination args were not last on the command-line.
 
  - Avoid a hang when an overabundance of messages clogs up all the I/O buffers.
@@ -142,7 +141,7 @@ Protocol: 31 (unchanged)
    of debug specified. This also allows for newer debug options to be
    specified, such as using `--debug=NSTR` to see the negotiated hash result,
    without having the command fail if the server version is too old to handle
-   that debug item. Use -M--debug=OPTS to send the options to the remote side.
+   that debug item. Use `-M--debug=OPTS` to send the options to the remote side.
 
  - Added the `--atimes` option based on the long-standing patch (just with some
    fixes that the patch has been needing).
@@ -3271,8 +3270,8 @@ Protocol: 28 (unchanged)
  - If `make proto` doesn't find some changes in the prototypes, the proto.h
    file is left untouched (its time-stamp used to always be updated).
 
- - The variable $STRIP (that is optionally set by the install-strip target's
-   rule) was changed to `$INSTALL_STRIP` because some systems have $STRIP
+ - The variable `$STRIP` (that is optionally set by the install-strip target's
+   rule) was changed to `$INSTALL_STRIP` because some systems have `$STRIP`
    already set in the environment.
 
  - Fixed a build problem when `SUPPORT_HARD_LINKS` isn't defined.
