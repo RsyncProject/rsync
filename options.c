@@ -714,7 +714,7 @@ static void print_rsync_version(enum logcode f)
 		RSYNC_NAME, RSYNC_VERSION, PROTOCOL_VERSION, subprotocol);
 
 	rprintf(f, "Copyright (C) 1996-" LATEST_YEAR " by Andrew Tridgell, Wayne Davison, and others.\n");
-	rprintf(f, "Web site: http://rsync.samba.org/\n");
+	rprintf(f, "Web site: https://rsync.samba.org/\n");
 
 	rprintf(f, "Capabilities:\n");
 	print_capabilities(f);
@@ -771,7 +771,7 @@ void usage(enum logcode F)
   rprintf(F,"\n");
   rprintf(F,"Use \"rsync --daemon --help\" to see the daemon-mode command-line options.\n");
   rprintf(F,"Please see the rsync(1) and rsyncd.conf(5) man pages for full documentation.\n");
-  rprintf(F,"See http://rsync.samba.org/ for updates, bug reports, and answers\n");
+  rprintf(F,"See https://rsync.samba.org/ for updates, bug reports, and answers\n");
 }
 
 enum {OPT_SERVER = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
