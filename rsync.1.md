@@ -2314,8 +2314,9 @@ your home directory (remove the '=' for that).
 0.  `--compress-level=NUM`
 
     Explicitly set the compression level to use (see `--compress`) instead of
-    letting it default.  If NUM is non-zero, the `--compress` option is
-    implied.
+    letting it default.  Allowed values for NUM are between 0 and 9; default
+    when --compress option is specified is 6. If NUM is non-zero, the
+    --compress option is implied.
 
 0.  `--skip-compress=LIST`
 
