@@ -44,7 +44,8 @@ Protocol: 31 (unchanged)
 ### PACKAGING RELATED:
 
  - If you had to use --disable-simd for 3.2.0, you should be able to remove
-   that and let it auto-disable.
+   that and let it either succeed (e.g. if clang++ was core dumping) or
+   auto-disable.
 
  - The MD5 asm code is now under its own configure flag (not shared with the
    SIMD setting), so if you have any issues compiling it, re-run configure with
