@@ -17,8 +17,12 @@ Protocol: 31 (unchanged)
 
  - Avoid the stack getting set to executable when including the asm code.
 
- - Avoid some build issues with the SIMD code, including avoiding a clang++
-   core dump when `-g` is combined with `-O2`.
+ - Some improvements in the SIMD configure testing to try to avoid build
+   issues, such as avoiding a clang++ core dump when `-g` is combined with
+   `-O2`.  Note that clang++ is quite buggy in this area, and it does still
+   crash for some folks, so just use `--disable-simd` if you need to avoid
+   their buggy compiler (since the configuration test is apparently not
+   managing to find all crashing compilers).
 
  - Fix an issue with the md2man code when building in an external dir.
 
