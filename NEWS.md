@@ -21,7 +21,7 @@ Protocol: 31 (unchanged)
    `-O2`.  Note that clang++ is quite buggy in this area, and it does still
    crash for some folks, so just use `--disable-simd` if you need to avoid
    their buggy compiler (since the configure test is apparently not finding
-   all the compilers that plan to crash and burn).
+   all the compilers that will to crash and burn).
 
  - Fix an issue in the md2man script when building from an external dir.
 
@@ -37,7 +37,7 @@ Protocol: 31 (unchanged)
  - Mention either "default protect-args" or "optional protect-args" in the
    `--version` capabilities depending on how rsync was configured.
 
- - Some info on optimizations was elided from the `--version` capabilities
+ - Some info on optimizations is now elided from the `--version` capabilities
    since they aren't really user-facing capabilities.  You can still see the
    info (plus the status of a couple extra optimizations) by repeating the
    `--version` option (e.g. `-VV`).
@@ -79,7 +79,8 @@ Protocol: 31 (unchanged)
 
  - Make the atomic-rsync helper script have a more consistent error-exit.
 
- - Make sure that a signal handler calls `_exit()` instead of exit().
+ - Make sure that a signal handler's use of exit_cleanup() calls `_exit()`
+   instead of exit().
 
  - Various zlib fixes, including security fixes for CVE-2016-9843,
    CVE-2016-9842, CVE-2016-9841, and CVE-2016-9840.
