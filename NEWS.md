@@ -1,7 +1,7 @@
 ------------------------------------------------------------------------------
 <a name="3.2.1pre1"></a>
 
-# NEWS for rsync 3.2.1pre1 (UNRELEASED)
+# NEWS for rsync 3.2.1pre1 (21 Jun 2020)
 
 Protocol: 31 (unchanged)
 
@@ -9,8 +9,8 @@ Protocol: 31 (unchanged)
 
 ### BUG FIXES:
 
- - Fixed a build issue with the MD5 assembly-language code by removing some
-   non-portable directives.
+ - Fixed a potential build issue with the MD5 assembly-language code by
+   removing some non-portable directives.
 
  - Use the preprocessor with the asm file to ensure that if the code is
    unneeded, it doesn't get built.
@@ -21,35 +21,35 @@ Protocol: 31 (unchanged)
    issues, such as avoiding a clang++ core dump when `-g` is combined with
    `-O2`.  Note that clang++ is quite buggy in this area, and it does still
    crash for some folks, so just use `--disable-simd` if you need to avoid
-   their buggy compiler (since the configuration test is apparently not
-   managing to find all crashing compilers).
+   their buggy compiler (since the configure test is apparently not finding
+   all the compilers that plan to crash and burn).
 
- - Fix an issue with the md2man code when building in an external dir.
+ - Fix an issue in the md2man script when building from an external dir.
 
- - Disable --atimes on macOS (it apparently doesn't work).
+ - Disable --atimes on macOS (it apparently just ignores the atime change).
 
 ### ENHANCEMENTS:
 
  - Added `--early-input=FILE` option that allows the client to send some
-   data to the "early exec" daemon script on its stdin.
+   data to the (optional) "early exec" daemon script on its stdin.
 
- - Added "atimes" to the capabilities list that `--version` outputs.
+ - Mention atimes in the capabilities list that `--version` outputs.
 
  - Mention either "default protect-args" or "optional protect-args" in the
    `--version` capabilities depending on how rsync was configured.
 
  - Some info on optimizations was elided from the `--version` capabilities
-   since they aren't really user-facing capabilities.  You can get the info
-   back (plus the status of a couple extra optimizations) by repeating the
+   since they aren't really user-facing capabilities.  You can still see the
+   info (plus the status of a couple extra optimizations) by repeating the
    `--version` option (e.g. `-VV`).
 
- - Updated various documented links to be https instead of http.
+ - Updated various documentation URLs to be https instead of http.
 
 ### PACKAGING RELATED:
 
- - If you had to use --disable-simd for 3.2.0, you should be able to remove
-   that and let it either succeed (e.g. if clang++ was core dumping) or
-   auto-disable.
+ - If you had to use --disable-simd for 3.2.0, you might want to try removing
+   that and see if it will succeed or auto-disable.  Some buggy clang++
+   compilers are still not auto disabled, though.
 
  - The MD5 asm code is now under its own configure flag (not shared with the
    SIMD setting), so if you have any issues compiling it, re-run configure with
