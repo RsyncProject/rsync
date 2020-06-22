@@ -49,7 +49,7 @@ Create test makefile target for some tests
 
 RELATED PROJECTS -----------------------------------------------------
 rsyncsh
-http://rsync.samba.org/rsync-and-debian/
+https://rsync.samba.org/rsync-and-debian/
 rsyncable gzip patch
 rsyncsplit as alternative to real integration with gzip?
 reverse rsync over HTTP Range
@@ -66,8 +66,8 @@ Use chroot only if supported
   If running as non-root, then don't fail, just give a warning.
   (There was a thread about this a while ago?)
 
-    http://lists.samba.org/pipermail/rsync/2001-August/thread.html
-    http://lists.samba.org/pipermail/rsync/2001-September/thread.html
+    https://lists.samba.org/pipermail/rsync/2001-August/thread.html
+    https://lists.samba.org/pipermail/rsync/2001-September/thread.html
 
                       --          --
 
@@ -204,7 +204,7 @@ Create more granular verbosity					2003/05/15
   fine grained selection of statistical reporting and what
   actions are logged.
 
-  http://lists.samba.org/archive/rsync/2003-May/006059.html
+  https://lists.samba.org/archive/rsync/2003-May/006059.html
 
                       --          --
 
@@ -287,7 +287,7 @@ Perhaps flush stdout like syslog
 
   Perhaps flush stdout after each filename, so that people trying to
   monitor progress in a log file can do so more easily.  See
-  http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=48108
+  https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=48108
 
                       --          --
 
@@ -495,7 +495,7 @@ rsyncsh
                       --          --
 
 
-http://rsync.samba.org/rsync-and-debian/
+https://rsync.samba.org/rsync-and-debian/
 
 
                       --          --

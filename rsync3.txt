@@ -396,7 +396,7 @@ Conflict resolution:
     would be useful.
 
 
-Moved files: <http://rsync.samba.org/cgi-bin/rsync.fom?file=44>
+Moved files:
 
   - There's no trivial way to detect renamed files, especially if they
     move between directories.
@@ -457,13 +457,11 @@ Streaming:
 
 Related work:
 
-  - mirror.pl http://freshmeat.net/project/mirror/
+  - mirror.pl
 
   - ProFTPd
 
   - Apache
-
-  - http://freshmeat.net/search/?site=Freshmeat&q=mirror&section=projects
 
   - BitTorrent -- p2p mirroring
     http://bitconjurer.org/BitTorrent/

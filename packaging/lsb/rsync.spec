@@ -6,9 +6,9 @@ Release: 0.1.pre1
 %define srcdir src-previews
 Group: Applications/Internet
 License: GPL
-Source0: http://rsync.samba.org/ftp/rsync/%{srcdir}/rsync-%{fullversion}.tar.gz
-#Source1: http://rsync.samba.org/ftp/rsync/%{srcdir}/rsync-patches-%{fullversion}.tar.gz
-URL: http://rsync.samba.org/
+Source0: https://rsync.samba.org/ftp/rsync/%{srcdir}/rsync-%{fullversion}.tar.gz
+#Source1: https://rsync.samba.org/ftp/rsync/%{srcdir}/rsync-patches-%{fullversion}.tar.gz
+URL: https://rsync.samba.org/
 
 Prefix: %{_prefix}
 BuildRoot: /var/tmp/%{name}-root
