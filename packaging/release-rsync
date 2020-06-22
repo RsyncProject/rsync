@@ -190,8 +190,7 @@ About to:
         elif fn == 'NEWS.md':
             efv = re.escape(finalversion)
             x_re = re.compile(r'^---+\n<.+>\s+# NEWS .+\s+Protocol: .+\n')
-            rel_day = 'UNRELEASED' if pre else today
-            repl = ('-'*78 + f'\n<a name="{version}"></a>\n\n# NEWS for rsync {version} ({rel_day})\n\n'
+            repl = ('-'*78 + f'\n<a name="{version}"></a>\n\n# NEWS for rsync {version} ({today})\n\n'
                 + f"Protocol: {protocol_version} ({proto_changed})\n")
             msg = f"The top lines of {fn} are not in the right format.  They must be:\n" + repl
             txt = replace_or_die(x_re, repl, txt, msg)

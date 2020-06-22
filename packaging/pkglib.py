@@ -218,8 +218,8 @@ def get_NEWS_version_info():
 
     with open('NEWS.md', 'r', encoding='utf-8') as fh:
         for line in fh:
-            if not last_version:
-                m = re.search(r'rsync (\d+\.\d+\.\d+).*\d\d\d\d', line)
+            if not last_version: # Find the first non-dev|pre version with a release date.
+                m = re.search(r'rsync (\d+\.\d+\.\d+) .*\d\d\d\d', line)
                 if m:
                     last_version = m[1]
             m = rel_re.match(line)
