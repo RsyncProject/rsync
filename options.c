@@ -2222,6 +2222,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	}
 	if (backup_dir) {
 		size_t len;
+		make_backups = 1; /* --backup-dir implies --backup */
 		while (*backup_dir == '.' && backup_dir[1] == '/')
 			backup_dir += 2;
 		if (*backup_dir == '.' && backup_dir[1] == '\0')
