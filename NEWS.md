@@ -1,7 +1,7 @@
 ------------------------------------------------------------------------------
-<a name="3.2.1"></a>
+<a name="3.2.1pre1"></a>
 
-# NEWS for rsync 3.2.1 (UNRELEASED)
+# NEWS for rsync 3.2.1pre1 (UNRELEASED)
 
 Protocol: 31 (unchanged)
 
