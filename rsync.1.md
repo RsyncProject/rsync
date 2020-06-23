@@ -381,7 +381,7 @@ detailed description below for a complete description.
 --write-devices          write to devices as files (implies --inplace)
 --dry-run, -n            perform a trial run with no changes made
 --whole-file, -W         copy files whole (w/o delta-xfer algorithm)
---checksum-choice=STR    choose the checksum algorithms (aka --cc)
+--checksum-choice=STR    choose the checksum algorithm (aka --cc)
 --one-file-system, -x    don't cross filesystem boundaries
 --block-size=SIZE, -B    force a fixed checksum block-size
 --rsh=COMMAND, -e        specify the remote shell to use
