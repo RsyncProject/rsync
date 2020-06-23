@@ -29,6 +29,10 @@
 
 #if !defined USE_OPENSSL && CSUM_CHUNK == 64
 
+#ifdef __APPLE__
+#define md5_process_asm _md5_process_asm
+#endif
+
 .text
 .align 16
 
