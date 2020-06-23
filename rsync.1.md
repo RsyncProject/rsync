@@ -2327,22 +2327,21 @@ your home directory (remove the '=' for that).
 
     >     rsync -aiv --zc=zstd --zl=22 host:src/ dest/
 
-    For zlib & zlibx compression, the valid values are from 1 to 9 with 6 being
+    For zlib & zlibx compression the valid values are from 1 to 9 with 6 being
     the default.  Specifying 0 turns compression off, and specifying -1 chooses
     the default of 6.
 
-    For zstd compression, the valid values are from -131072 to 22 with 3 being
+    For zstd compression the valid values are from -131072 to 22 with 3 being
     the default. Specifying 0 chooses the default of 3.
 
-    For lz4 compression, there are no levels available, so the level is always
-    0.
+    For lz4 compression there are no levels, so the value is always 0.
 
     If you specify a too-large or too-small value, the number is silently
     limited to a valid value.  This allows you to specify something like
     `--zl=999999999` and be assured that you'll end up with the maximum
     compression level no matter what algorithm was chosen.
 
-    If you want to know the compression level that is in effect, specify the
+    If you want to know the compression level that is in effect, specify
     `--debug=nstr` to see the "negotiated string" results.  This will report
     something like "`Client compress: zstd (level 3)`" (along with the checksum
     choice in effect).
