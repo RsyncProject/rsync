@@ -1,6 +1,6 @@
 <a name="3.2.1"></a>
 
-# NEWS for rsync 3.2.1 (UNRELEASED)
+# NEWS for rsync 3.2.1 (22 Jun 2020)
 
 Protocol: 31 (unchanged)
 
@@ -4099,7 +4099,7 @@ Protocol: 25 (changed)
 
 | RELEASE DATE | VER.   | DATE OF COMMIT\* | PROTOCOL    |
 |--------------|--------|------------------|-------------|
-| ?? Jun 2020  | 3.2.1  |                  | 31          |
+| 22 Jun 2020  | 3.2.1  |                  | 31          |
 | 19 Jun 2020  | 3.2.0  |                  | 31          |
 | 28 Jan 2018  | 3.1.3  |                  | 31          |
 | 21 Dec 2015  | 3.1.2  |                  | 31          |
