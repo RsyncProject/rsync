@@ -91,12 +91,13 @@ drwxr-xr-x         DIR ####/##/## ##:##:## foo
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 3 failed"
 
-$RSYNC -rU localhost::test-from/f* \
-    | sed "$FILE_REPL" | sed "$DIR_REPL" | sed "$LS_REPL" \
-    | tee "$outfile"
-cat <<EOT >"$chkfile"
+if $RSYNC --version | grep "[, ] atimes" >/dev/null; then
+    $RSYNC -rU localhost::test-from/f* \
+	| sed "$FILE_REPL" | sed "$DIR_REPL" | sed "$LS_REPL" \
+	| tee "$outfile"
+    cat <<EOT >"$chkfile"
 drwxr-xr-x         DIR ####/##/## ##:##:##                     foo
 -rw-r--r--           4 ####/##/## ##:##:## ####/##/## ##:##:## foo/one
 EOT
-diff $diffopt "$chkfile" "$outfile" || test_fail "test 3 failed"
-
+    diff $diffopt "$chkfile" "$outfile" || test_fail "test 3 failed"
+fi
