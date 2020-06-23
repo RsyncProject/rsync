@@ -2260,24 +2260,29 @@ your home directory (remove the '=' for that).
     destination machine, which reduces the amount of data being transmitted --
     something that is useful over a slow connection.
 
-    The "zlib" compression method typically achieves better compression ratios
-    than can be achieved by using a compressing remote shell or a compressing
-    transport because it takes advantage of the implicit information in the
-    matching data blocks that are not explicitly sent over the connection.
-    This matching-data compression comes at a cost of CPU, though, and can be
-    disabled by using the "zlibx" compresson method instead.  This can be
-    selected by repeating the `-z` option or specifying
-    `--compress-choice=zlibx`, but it only works if both sides of the transfer
-    are at least version 3.1.1.
+    Rsync supports multiple compression methods and will choose one for you
+    unless you force the choice using the `--compress-choice` option.
 
-    Note that if you see an error about an option named `--old-compress` or
-    `--new-compress`, this is rsync trying to send the `--compress-choice=zlib`
-    or `--compress-choice=zlibx` option in a backward-compatible manner that
-    more rsync versions understand.  This error indicates that the older rsync
-    version will not allow you to force the compression type.
+    Run `rsync -V` to see the compress list compiled into your version.
 
-    See the `--skip-compress` option for the default list of file suffixes that
-    will not be compressed.
+    When both sides of the transfer are at least 3.2.0, rsync chooses the first
+    algorithm in the client's list of choices that is also in the server's list
+    of choices.  You default order can be customized by setting the environment
+    variable RSYNC_COMPRESS_LIST to a space-separated list of acceptable
+    compression names.  If no common compress choice is found, the client exits
+    with an error.  The one exception to this is that the list is ignored when
+    talking with an old rsync that doesn't support the checksum negotiation.
+    Include the string "FAIL" in your list if you want rsync to fail in such a
+    case.
+
+    There are some older rsync versions that were configured to reject a `-z`
+    option and require the use of `-zz` because their compression library was
+    not compatible with the default zlib compression method.  You can usually
+    ignore this weirdness unless the rsync server complains and tells you to
+    specify `-zz`.
+
+    See also the `--skip-compress` option for the default list of file suffixes
+    that will trasnferred with no (or minimal) compression.
 
 0.  `--compress-choice=STR`, `--zc=STR`
 
@@ -2292,25 +2297,19 @@ your home directory (remove the '=' for that).
     - `zlib`
     - `none`
 
-    Run `rsync -V` to see the compress list compiled into your version.
+    Note that if you see an error about an option named `--old-compress` or
+    `--new-compress`, this is rsync trying to send the `--compress-choice=zlib`
+    or `--compress-choice=zlibx` option in a backward-compatible manner that
+    more rsync versions understand.  This error indicates that the older rsync
+    version on the server will not allow you to force the compression type.
 
-    The "zlibx" algorithm is given preference over "zlib" if both sides of the
-    transfer are at least version 3.2.0, otherwise it will choose "zlib" unless
-    you override it via something like `-zz`.  These 2 algorithms are the stame
-    except that "zlibx" does not try to include matched data that was not
-    transferred in the compression computations.
+    Note that the "zlibx" compression algorithm is just the "zlib" algorithm
+    with matched data excluded from the compression stream (to try to make it
+    more compatible with an external zlib implementation).
 
     If "none" is specified, that is equivalent to using `--no-compress`.
 
     This option implies `--compress` unless "none" was specified.
-
-    You can also override the compression negotiation using the
-    RSYNC_COMPRESS_LIST environment variable by setting it to a space-separated
-    list of compression names that you consider acceptable.  If no common
-    compress choice is found, the client exits with an error.  It ignores
-    "auto" and all unknown compression names.  If the remote rsync is not new
-    enough to handle a compression negotiation list, the list is silently
-    ignored unless it contains the string "FAIL".
 
 0.  `--compress-level=NUM`, `--zl=NUM`
 
