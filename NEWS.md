@@ -1,3 +1,30 @@
+<a name="3.2.2"></a>
+
+# NEWS for rsync 3.2.2 (UNRELEASED)
+
+Protocol: 31 (unchanged)
+
+## Changes since 3.2.1:
+
+### BUG FIXES:
+
+ - Fix installing rsync-ssl script from an alternate build dir.
+
+ - Apple requires the asm function name to begin with an underscore.
+
+ - Avoid a test failure in the daemon test when --atimes is disabled.
+
+### ENHANCEMENTS:
+
+ - Allow the server side to restrict checksum & compression choices via
+   the environment variables.
+
+ - Simplify how the negotiation environment variables apply to older rsync
+   versions.
+
+ - Improved the man page a bit more.
+
+------------------------------------------------------------------------------
 <a name="3.2.1"></a>
 
 # NEWS for rsync 3.2.1 (22 Jun 2020)
