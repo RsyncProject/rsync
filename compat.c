@@ -390,20 +390,12 @@ static void send_negotiate_str(int f_out, struct name_num_obj *nno, const char *
 {
 	char tmpbuf[MAX_NSTR_STRLEN];
 	const char *list_str = getenv(env_name);
-	int len, fail_if_empty = list_str && strstr(list_str, "FAIL");
+	int len;
 
-	if (!do_negotiated_strings) {
-		if (!am_server && fail_if_empty) {
-			rprintf(FERROR, "Remote rsync is too old for %s negotiation\n", nno->type);
-			exit_cleanup(RERR_UNSUPPORTED);
-		}
-		return;
-	}
-
-	if (list_str && *list_str && (!am_server || local_server)) {
+	if (list_str && *list_str) {
 		init_nno_saw(nno, 0);
 		len = parse_nni_str(nno, list_str, tmpbuf, MAX_NSTR_STRLEN);
-		if (fail_if_empty && !len)
+		if (!len)
 			len = strlcpy(tmpbuf, "FAIL", MAX_NSTR_STRLEN);
 		list_str = tmpbuf;
 	} else
@@ -423,7 +415,7 @@ static void send_negotiate_str(int f_out, struct name_num_obj *nno, const char *
 		/* A local server doesn't bother to send/recv the strings, it just constructs
 		 * and parses the same string on both sides. */
 		recv_negotiate_str(-1, nno, tmpbuf, len);
-	} else {
+	} else if (do_negotiated_strings) {
 		/* Each side sends their list of valid names to the other side and then both sides
 		 * pick the first name in the client's list that is also in the server's list. */
 		write_vstring(f_out, tmpbuf, len);
@@ -442,13 +434,28 @@ static void negotiate_the_strings(int f_in, int f_out)
 
 	if (valid_checksums.saw) {
 		char tmpbuf[MAX_NSTR_STRLEN];
-		recv_negotiate_str(f_in, &valid_checksums, tmpbuf, -1);
+		int len;
+		if (do_negotiated_strings)
+			len = -1;
+		else
+			len = strlcpy(tmpbuf, protocol_version >= 30 ? "md5" : "md4", MAX_NSTR_STRLEN);
+		recv_negotiate_str(f_in, &valid_checksums, tmpbuf, len);
 	}
 
 	if (valid_compressions.saw) {
 		char tmpbuf[MAX_NSTR_STRLEN];
-		recv_negotiate_str(f_in, &valid_compressions, tmpbuf, -1);
+		int len;
+		if (do_negotiated_strings)
+			len = -1;
+		else
+			len = strlcpy(tmpbuf, "zlib", MAX_NSTR_STRLEN);
+		recv_negotiate_str(f_in, &valid_compressions, tmpbuf, len);
 	}
+
+	/* If the other side is too old to negotiate, the above steps just made sure that
+	 * the env didn't disallow the old algorithm. Mark things as non-negotiated. */
+	if (!do_negotiated_strings)
+		valid_checksums.negotiated_name = valid_compressions.negotiated_name = NULL;
 }
 
 void setup_protocol(int f_out,int f_in)

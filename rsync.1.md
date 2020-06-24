@@ -1490,7 +1490,8 @@ your home directory (remove the '=' for that).
     a negotiation between the client and the server as follows:
 
     If both the client and the server are at least version 3.2.0, they will
-    exchange a list of checksum names and choose the first one in the list that
+    exchange a list of checksum names and choose the first one in the client's
+    list that
     they have in common.  This typically means that they will choose xxh64 if
     they both support it and fall back to MD5.  If one side of the transfer is
     not new enough to support this checksum negotiation, then a value is chosen
@@ -1503,8 +1504,8 @@ your home directory (remove the '=' for that).
     client exits with an error.  This method does not allow you to specify the
     transfer checksum separately from the pre-transfer checksum, and it ignores
     "auto" and all unknown checksum names.  If the remote rsync is not new
-    enough to handle a checksum negotiation list, the list is silently ignored
-    unless it contains the string "FAIL".
+    enough to handle a checksum negotiation list, its list is assumed to
+    consist of a single "md5" or "md4" item based on the protocol version.
 
     The use of the `--checksum-choice` option overrides this environment list.
 
@@ -2267,13 +2268,11 @@ your home directory (remove the '=' for that).
 
     When both sides of the transfer are at least 3.2.0, rsync chooses the first
     algorithm in the client's list of choices that is also in the server's list
-    of choices.  You default order can be customized by setting the environment
+    of choices.  Your default order can be customized by setting the environment
     variable RSYNC_COMPRESS_LIST to a space-separated list of acceptable
     compression names.  If no common compress choice is found, the client exits
-    with an error.  The one exception to this is that the list is ignored when
-    talking with an old rsync that doesn't support the checksum negotiation.
-    Include the string "FAIL" in your list if you want rsync to fail in such a
-    case.
+    with an error.  If the remote rsync is too old to support checksum negotiation,
+    its list is assumed to be "zlib".
 
     There are some older rsync versions that were configured to reject a `-z`
     option and require the use of `-zz` because their compression library was
@@ -2296,6 +2295,8 @@ your home directory (remove the '=' for that).
     - `zlibx`
     - `zlib`
     - `none`
+
+    Run `rsync -V` to see the compress list compiled into your version.
 
     Note that if you see an error about an option named `--old-compress` or
     `--new-compress`, this is rsync trying to send the `--compress-choice=zlib`

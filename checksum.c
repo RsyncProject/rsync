@@ -85,7 +85,7 @@ static const char *checksum_name(int num)
 {
 	struct name_num_item *nni = get_nni_by_num(&valid_checksums, num);
 
-	return nni ? nni->name : num < CSUM_MD4 ? "MD4" : "UNKNOWN";
+	return nni ? nni->name : num < CSUM_MD4 ? "md4" : "UNKNOWN";
 }
 
 void parse_checksum_choice(int final_call)
