@@ -379,7 +379,8 @@ void validate_choice_vs_env(int num1, int num2)
 /* The saw buffer is initialized and used to store ordinal values from 1 to N
  * for the order of the args in the array.  If dup_markup == '\0', duplicates
  * are removed otherwise the char is prefixed to the duplicate term and, if it
- * is an opening paren/bracket/brace, the matching closing char is suffixed. */
+ * is an opening paren/bracket/brace, the matching closing char is suffixed.
+ * "none" is removed on the client side unless dup_markup != '\0'. */
 int get_default_nno_list(struct name_num_obj *nno, char *to_buf, int to_buf_len, char dup_markup)
 {
 	struct name_num_item *nni;
@@ -401,6 +402,8 @@ int get_default_nno_list(struct name_num_obj *nno, char *to_buf, int to_buf_len,
 				continue;
 			delim = dup_markup;
 		}
+		if (nni->num == 0 && !am_server && !dup_markup)
+			continue;
 		if (len)
 			to_buf[len++]= ' ';
 		if (delim) {
