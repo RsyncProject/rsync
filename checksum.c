@@ -99,6 +99,8 @@ void parse_checksum_choice(int final_call)
 			checksum_type = parse_csum_name(cp+1, -1);
 		} else
 			xfersum_type = checksum_type = parse_csum_name(checksum_choice, -1);
+		if (am_server && checksum_choice)
+			validate_choice_vs_env(xfersum_type, checksum_type);
 	}
 
 	if (xfersum_type == CSUM_NONE)

@@ -173,6 +173,8 @@ void parse_compress_choice(int final_call)
 			exit_cleanup(RERR_UNSUPPORTED);
 		}
 		do_compression = nni->num;
+		if (am_server)
+			validate_choice_vs_env(do_compression, -1);
 	} else if (do_compression)
 		do_compression = CPRES_ZLIB;
 	else
@@ -317,8 +319,14 @@ static void recv_negotiate_str(int f_in, struct name_num_obj *nno, char *tmpbuf,
 	if (len > 0) {
 		int best = nno->saw_len; /* We want best == 1 from the client list, so start with a big number. */
 		char *tok;
-		if (am_server)
-			init_nno_saw(nno, 1); /* Since we're parsing client names, anything we parse first is #1. */
+		if (am_server) {
+			int j;
+			/* Since we're parsing client names, anything in our list that we parse first is #1. */
+			for (j = 0; j < nno->saw_len; j++) {
+				if (nno->saw[j])
+					nno->saw[j] = 1;
+			}
+		}
 		for (tok = strtok(tmpbuf, " \t"); tok; tok = strtok(NULL, " \t")) {
 			struct name_num_item *nni = get_nni_by_name(nno, tok, -1);
 			if (!nni || !nno->saw[nni->num] || best <= nno->saw[nni->num])
@@ -337,9 +345,35 @@ static void recv_negotiate_str(int f_in, struct name_num_obj *nno, char *tmpbuf,
 		}
 	}
 
-	if (!am_server)
-		rprintf(FERROR, "Failed to negotiate a common %s\n", nno->type);
+	if (!am_server || !do_negotiated_strings)
+		rprintf(FERROR, "Failed to negotiate a %s choice.\n", nno->type);
 	exit_cleanup(RERR_UNSUPPORTED);
+}
+
+/* If num2 < 0 then the caller is checking compress values, otherwise checksum values. */
+void validate_choice_vs_env(int num1, int num2)
+{
+	struct name_num_obj *nno = num2 < 0 ? &valid_compressions : &valid_checksums;
+	const char *list_str = getenv(num2 < 0 ? "RSYNC_COMPRESS_LIST" : "RSYNC_CHECKSUM_LIST");
+	char tmpbuf[MAX_NSTR_STRLEN];
+
+	if (!list_str || !*list_str)
+		return;
+
+	init_nno_saw(nno, 0);
+	parse_nni_str(nno, list_str, tmpbuf, MAX_NSTR_STRLEN);
+
+	if (num2 >= 0) // If "md4" is in the env list, all the old MD4 choices are OK too.
+		nno->saw[CSUM_MD4_ARCHAIC] = nno->saw[CSUM_MD4_BUSTED] = nno->saw[CSUM_MD4_OLD] = nno->saw[CSUM_MD4];
+
+	if (!nno->saw[num1] || (num2 >= 0 && !nno->saw[num2])) {
+		rprintf(FERROR, "Your --%s-choice value (%s) was refused by the server.\n", 
+			num2 < 0 ? "compress" : "checksum", num2 < 0 ? compress_choice : checksum_choice);
+		exit_cleanup(RERR_UNSUPPORTED);
+	}
+
+	free(nno->saw);
+	nno->saw = NULL;
 }
 
 /* The saw buffer is initialized and used to store ordinal values from 1 to N
