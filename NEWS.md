@@ -17,10 +17,13 @@ Protocol: 31 (unchanged)
 ### ENHANCEMENTS:
 
  - Allow the server side to restrict checksum & compression choices via
-   the environment variables.
+   the same environment variables the client uses.
 
  - Simplify how the negotiation environment variables apply to older rsync
    versions.
+
+ - Do not allow a negotiated checksum or compression choice of "none" unless
+   the user authorized it via an environment variable or command-line option.
 
  - Improved the man page a bit more.
 
