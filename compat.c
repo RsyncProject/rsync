@@ -363,7 +363,7 @@ void validate_choice_vs_env(int num1, int num2)
 	init_nno_saw(nno, 0);
 	parse_nni_str(nno, list_str, tmpbuf, MAX_NSTR_STRLEN);
 
-	if (num2 >= 0) // If "md4" is in the env list, all the old MD4 choices are OK too.
+	if (num2 >= 0) /* If "md4" is in the env list, all the old MD4 choices are OK too. */
 		nno->saw[CSUM_MD4_ARCHAIC] = nno->saw[CSUM_MD4_BUSTED] = nno->saw[CSUM_MD4_OLD] = nno->saw[CSUM_MD4];
 
 	if (!nno->saw[num1] || (num2 >= 0 && !nno->saw[num2])) {
