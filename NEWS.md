@@ -27,6 +27,9 @@ Protocol: 31 (unchanged)
 
  - Improved the man page a bit more.
 
+ - Preparing for an upcoming xxHash release that provides new XXH3 & XXH128
+   hashing routines (disabled until their code is finalized).
+
 ------------------------------------------------------------------------------
 <a name="3.2.1"></a>
 
@@ -155,7 +158,7 @@ Protocol: 31 (unchanged)
  - Various checksum enhancements, including the optional use of openssl's MD4 &
    MD5 checksum algorithms, some x86-64 optimizations for the rolling checksum,
    some x86-64 optimizations for the (non-openssl) MD5 checksum, the addition
-   of xxhash checksum support, and a negotiation heuristic that ensures that it
+   of xxHash checksum support, and a negotiation heuristic that ensures that it
    is easier to add new checksum algorithms in the future.  The environment
    variable `RSYNC_CHECKSUM_LIST` can be used to customize the preference order
    of the negotiation, or use `--checksum-choice` (`--cc`) to force a choice.

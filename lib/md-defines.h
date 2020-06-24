@@ -13,3 +13,5 @@
 #define CSUM_MD4 4
 #define CSUM_MD5 5
 #define CSUM_XXH64 6
+#define CSUM_XXH3_64 7
+#define CSUM_XXH3_128 8
