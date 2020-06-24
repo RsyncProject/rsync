@@ -1105,7 +1105,7 @@ An example nginx proxy setup is as follows:
 >        listen [::]:874 ssl;
 >
 >        ssl_certificate /etc/letsencrypt/example.com/fullchain.pem;
->        ssl_certificate_key /etc/letsencrypt/example.com/privkey.pem
+>        ssl_certificate_key /etc/letsencrypt/example.com/privkey.pem;
 >
 >        proxy_pass localhost:873;
 >        proxy_protocol on; # Requires "proxy protocol = true"
