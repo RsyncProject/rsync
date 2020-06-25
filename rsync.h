@@ -1267,7 +1267,7 @@ extern int errno;
 #define new0(type) ((type*)calloc(1, sizeof (type)))
 #define new_array(type, num) ((type*)_new_array((num), sizeof (type), 0))
 #define new_array0(type, num) ((type*)_new_array((num), sizeof (type), 1))
-#define realloc_array(ptr, type, num) ((type*)_realloc_array((ptr), sizeof(type), (num)))
+#define realloc_array(ptr, type, num) ((type*)_realloc_array((ptr), (num), sizeof (type)))
 
 /* use magic gcc attributes to catch format errors */
  void rprintf(enum logcode , const char *, ...)

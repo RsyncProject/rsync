@@ -69,14 +69,14 @@ int msleep(int t)
 
 #define MALLOC_MAX 0x40000000
 
-void *_new_array(unsigned long num, unsigned int size, int use_calloc)
+void *_new_array(size_t num, size_t size, int use_calloc)
 {
 	if (num >= MALLOC_MAX/size)
 		return NULL;
 	return use_calloc ? calloc(num, size) : malloc(num * size);
 }
 
-void *_realloc_array(void *ptr, unsigned int size, size_t num)
+void *_realloc_array(void *ptr, size_t num, size_t size)
 {
 	if (num >= MALLOC_MAX/size)
 		return NULL;

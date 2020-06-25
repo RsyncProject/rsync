@@ -1655,7 +1655,7 @@ void *expand_item_list(item_list *lp, size_t item_size, const char *desc, int in
 		if (new_size <= lp->malloced)
 			overflow_exit("expand_item_list");
 		/* Using _realloc_array() lets us pass the size, not a type. */
-		new_ptr = _realloc_array(lp->items, item_size, new_size);
+		new_ptr = _realloc_array(lp->items, new_size, item_size);
 		if (DEBUG_GTE(FLIST, 3)) {
 			rprintf(FINFO, "[%s] expand %s to %s bytes, did%s move\n",
 				who_am_i(), desc, big_num(new_size * item_size),
