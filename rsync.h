@@ -1265,13 +1265,13 @@ extern int errno;
 extern char *do_malloc;
 
 /* Convenient wrappers for malloc and realloc.  Use them. */
-#define new(type) ((type*)_my_alloc(do_malloc, 1, sizeof (type), __FILE__, __LINE__))
-#define new0(type) ((type*)_my_alloc(NULL, 1, sizeof (type), __FILE__, __LINE__))
-#define realloc_buf(ptr, num) _my_alloc((ptr), (num), 1, __FILE__, __LINE__)
+#define new(type) ((type*)my_alloc(do_malloc, sizeof (type), 1, __FILE__, __LINE__))
+#define new0(type) ((type*)my_alloc(NULL, sizeof (type), 1, __FILE__, __LINE__))
+#define realloc_buf(ptr, num) my_alloc((ptr), (num), 1, __FILE__, __LINE__)
 
-#define new_array(type, num) ((type*)_my_alloc(do_malloc, (num), sizeof (type), __FILE__, __LINE__))
-#define new_array0(type, num) ((type*)_my_alloc(NULL, (num), sizeof (type), __FILE__, __LINE__))
-#define realloc_array(ptr, type, num) ((type*)_my_alloc((ptr), (num), sizeof (type), __FILE__, __LINE__))
+#define new_array(type, num) ((type*)my_alloc(do_malloc, (num), sizeof (type), __FILE__, __LINE__))
+#define new_array0(type, num) ((type*)my_alloc(NULL, (num), sizeof (type), __FILE__, __LINE__))
+#define realloc_array(ptr, type, num) ((type*)my_alloc((ptr), (num), sizeof (type), __FILE__, __LINE__))
 
 #define strdup(s) my_strdup(s, __FILE__, __LINE__)
 

@@ -71,7 +71,7 @@ int msleep(int t)
 	return True;
 }
 
-/* We convert a num manually because need %lld precision, and that's not a portable sprintf() escape. */
+/* Convert a num manually because the needed %lld precision is not a portable sprintf() escape. */
 char *num_to_byte_string(ssize_t num)
 {
 	char buf[128], *s = buf + sizeof buf - 1;
@@ -84,7 +84,7 @@ char *num_to_byte_string(ssize_t num)
 	return strdup(s);
 }
 
-void *_my_alloc(void *ptr, size_t num, size_t size, const char *file, int line)
+void *my_alloc(void *ptr, size_t num, size_t size, const char *file, int line)
 {
 	if (num >= max_alloc/size) {
 		if (!file)

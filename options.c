@@ -1301,7 +1301,7 @@ static ssize_t parse_size_arg(char *size_arg, char def_suf, const char *opt_name
 	while (reps--)
 		size *= mult;
 	size *= atof(size_arg);
-	if ((*arg == '+' || *arg == '-') && arg[1] == '1')
+	if ((*arg == '+' || *arg == '-') && arg[1] == '1' && arg != size_arg)
 		size += atoi(arg), arg += 2;
 	if (*arg)
 		goto failure;

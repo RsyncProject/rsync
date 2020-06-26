@@ -1740,7 +1740,7 @@ your home directory (remove the '=' for that).
     multiples of 1024.  If you use a two-letter suffix that ends with a "B"
     (e.g. "kb") then you get units that are multiples of 1000.
 
-    Finally, if the value ends with either "+1" or "-1", it will be offset by
+    Finally, if the string ends with either "+1" or "-1", it will be offset by
     one byte in the indicated direction.  The largest possible value is
     `8192P-1`.
 
