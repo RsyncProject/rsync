@@ -1262,12 +1262,18 @@ extern int errno;
 /* handler for null strings in printf format */
 #define NS(s) ((s)?(s):"<NULL>")
 
+extern char *do_malloc;
+
 /* Convenient wrappers for malloc and realloc.  Use them. */
-#define new(type) ((type*)malloc(sizeof (type)))
-#define new0(type) ((type*)calloc(1, sizeof (type)))
-#define new_array(type, num) ((type*)_new_array((num), sizeof (type), 0))
-#define new_array0(type, num) ((type*)_new_array((num), sizeof (type), 1))
-#define realloc_array(ptr, type, num) ((type*)_realloc_array((ptr), (num), sizeof (type)))
+#define new(type) ((type*)_my_alloc(do_malloc, 1, sizeof (type), __FILE__, __LINE__))
+#define new0(type) ((type*)_my_alloc(NULL, 1, sizeof (type), __FILE__, __LINE__))
+#define realloc_buf(ptr, num) _my_alloc((ptr), (num), 1, __FILE__, __LINE__)
+
+#define new_array(type, num) ((type*)_my_alloc(do_malloc, (num), sizeof (type), __FILE__, __LINE__))
+#define new_array0(type, num) ((type*)_my_alloc(NULL, (num), sizeof (type), __FILE__, __LINE__))
+#define realloc_array(ptr, type, num) ((type*)_my_alloc((ptr), (num), sizeof (type), __FILE__, __LINE__))
+
+#define strdup(s) my_strdup(s, __FILE__, __LINE__)
 
 /* use magic gcc attributes to catch format errors */
  void rprintf(enum logcode , const char *, ...)

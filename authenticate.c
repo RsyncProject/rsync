@@ -20,6 +20,7 @@
 
 #include "rsync.h"
 #include "itypes.h"
+#include "ifuncs.h"
 
 extern int read_only;
 extern char *password_file;
@@ -250,8 +251,7 @@ char *auth_server(int f_in, int f_out, int module, const char *host,
 	}
 	*pass++ = '\0';
 
-	if (!(users = strdup(users)))
-		out_of_memory("auth_server");
+	users = strdup(users);
 
 	for (tok = strtok(users, " ,\t"); tok; tok = strtok(NULL, " ,\t")) {
 		char *opts;
@@ -287,8 +287,7 @@ char *auth_server(int f_in, int f_out, int module, const char *host,
 				else {
 					gid_t *gid_array = gid_list.items;
 					auth_uid_groups_cnt = gid_list.count;
-					if ((auth_uid_groups = new_array(char *, auth_uid_groups_cnt)) == NULL)
-						out_of_memory("auth_server");
+					auth_uid_groups = new_array(char *, auth_uid_groups_cnt);
 					for (j = 0; j < auth_uid_groups_cnt; j++)
 						auth_uid_groups[j] = gid_to_group(gid_array[j]);
 				}

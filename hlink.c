@@ -125,8 +125,7 @@ static void match_gnums(int32 *ndx_list, int ndx_count)
 		if (inc_recurse) {
 			node = hashtable_find(prior_hlinks, gnum, data_when_new);
 			if (node->data == data_when_new) {
-				if (!(node->data = new_array0(char, 5)))
-					out_of_memory("match_gnums");
+				node->data = new_array0(char, 5);
 				assert(gnum >= hlink_flist->ndx_start);
 				file->flags |= FLAG_HLINK_FIRST;
 				prev = -1;
@@ -190,8 +189,7 @@ void match_hard_links(struct file_list *flist)
 		int i, ndx_count = 0;
 		int32 *ndx_list;
 
-		if (!(ndx_list = new_array(int32, flist->used)))
-			out_of_memory("match_hard_links");
+		ndx_list = new_array(int32, flist->used);
 
 		for (i = 0; i < flist->used; i++) {
 			if (F_IS_HLINKED(flist->sorted[i]))
@@ -541,8 +539,7 @@ void finish_hard_link(struct file_struct *file, const char *fname, int fin_ndx,
 			exit_cleanup(RERR_MESSAGEIO);
 		}
 		free(node->data);
-		if (!(node->data = strdup(our_name)))
-			out_of_memory("finish_hard_link");
+		node->data = strdup(our_name);
 	}
 }
 

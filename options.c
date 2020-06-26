@@ -21,6 +21,7 @@
 
 #include "rsync.h"
 #include "itypes.h"
+#include "ifuncs.h"
 #include "latest-year.h"
 #include <popt.h>
 
@@ -180,6 +181,10 @@ char *groupmap = NULL;
 int rsync_port = 0;
 int alt_dest_type = 0;
 int basis_dir_cnt = 0;
+
+#define DEFAULT_MAX_ALLOC (1024L * 1024 * 1024)
+size_t max_alloc = DEFAULT_MAX_ALLOC;
+char *max_alloc_arg;
 
 static int version_opt_cnt = 0;
 static int remote_option_alloc = 0;
@@ -382,8 +387,7 @@ static char *make_output_option(struct output_struct *words, short *levels, ucha
 		return NULL;
 
 	len++;
-	if (!(buf = new_array(char, len)))
-		out_of_memory("make_output_option");
+	buf = new_array(char, len);
 	pos = 0;
 
 	if (skipped || max < 5)
@@ -889,6 +893,7 @@ static struct poptOption long_options[] = {
   {"ignore-existing",  0,  POPT_ARG_NONE,   &ignore_existing, 0, 0, 0 },
   {"max-size",         0,  POPT_ARG_STRING, &max_size_arg, OPT_MAX_SIZE, 0, 0 },
   {"min-size",         0,  POPT_ARG_STRING, &min_size_arg, OPT_MIN_SIZE, 0, 0 },
+  {"max-alloc",        0,  POPT_ARG_STRING, &max_alloc_arg, 0, 0, 0 },
   {"sparse",          'S', POPT_ARG_VAL,    &sparse_files, 1, 0, 0 },
   {"no-sparse",        0,  POPT_ARG_VAL,    &sparse_files, 0, 0, 0 },
   {"no-S",             0,  POPT_ARG_VAL,    &sparse_files, 0, 0, 0 },
@@ -1251,14 +1256,16 @@ static int count_args(const char **argv)
 	return i;
 }
 
-
-static OFF_T parse_size_arg(char **size_arg, char def_suf)
+/* If the size_arg is an invalid string or the value is < min_value, an error
+ * is put into err_buf & the return is -1.  Note that this parser does NOT
+ * support negative numbers, so a min_value < 0 doesn't make any sense. */
+static ssize_t parse_size_arg(char *size_arg, char def_suf, const char *opt_name, ssize_t min_value)
 {
-	int reps, mult, make_compatible = 0;
-	const char *arg;
-	OFF_T size = 1;
+	int reps, mult;
+	const char *arg, *err = "invalid";
+	ssize_t size = 1;
 
-	for (arg = *size_arg; isDigit(arg); arg++) {}
+	for (arg = size_arg; isDigit(arg); arg++) {}
 	if (*arg == '.')
 		for (arg++; isDigit(arg); arg++) {}
 	switch (*arg && *arg != '+' && *arg != '-' ? *arg++ : def_suf) {
@@ -1274,40 +1281,40 @@ static OFF_T parse_size_arg(char **size_arg, char def_suf)
 	case 'g': case 'G':
 		reps = 3;
 		break;
+	case 't': case 'T':
+		reps = 4;
+		break;
+	case 'p': case 'P':
+		reps = 5;
+		break;
 	default:
-		return -1;
+		goto failure;
 	}
 	if (*arg == 'b' || *arg == 'B')
-		mult = 1000, make_compatible = 1, arg++;
+		mult = 1000, arg++;
 	else if (!*arg || *arg == '+' || *arg == '-')
 		mult = 1024;
 	else if (strncasecmp(arg, "ib", 2) == 0)
 		mult = 1024, arg += 2;
 	else
-		return -1;
+		goto failure;
 	while (reps--)
 		size *= mult;
-	size *= atof(*size_arg);
+	size *= atof(size_arg);
 	if ((*arg == '+' || *arg == '-') && arg[1] == '1')
-		size += atoi(arg), make_compatible = 1, arg += 2;
+		size += atoi(arg), arg += 2;
 	if (*arg)
-		return -1;
-	if (size > 0 && make_compatible && def_suf == 'b') {
-		/* We convert this manually because we may need %lld precision,
-		 * and that's not a portable sprintf() escape. */
-		char buf[128], *s = buf + sizeof buf - 1;
-		OFF_T num = size;
-		*s = '\0';
-		while (num) {
-			*--s = (char)(num % 10) + '0';
-			num /= 10;
-		}
-		if (!(*size_arg = strdup(s)))
-			out_of_memory("parse_size_arg");
+		goto failure;
+	if (size < min_value) {
+		err = size < 0 ? "too big" : "too small";
+		goto failure;
 	}
 	return size;
-}
 
+failure:
+	snprintf(err_buf, sizeof err_buf, "--%s value is %s: %s\n", opt_name, err, size_arg);
+	return -1;
+}
 
 static void create_refuse_error(int which)
 {
@@ -1530,8 +1537,6 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			if (daemon_filter_list.head) {
 				int rej;
 				char *cp = strdup(arg);
-				if (!cp)
-					out_of_memory("parse_arguments");
 				if (!*cp)
 					rej = 1;
 				else {
@@ -1655,8 +1660,6 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 				remote_option_alloc += 16;
 				remote_options = realloc_array(remote_options,
 							const char *, remote_option_alloc);
-				if (!remote_options)
-					out_of_memory("parse_arguments");
 				if (!remote_option_cnt)
 					remote_options[0] = "ARG0";
 			}
@@ -1686,39 +1689,25 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			break;
 
 		case OPT_MAX_SIZE:
-			if ((max_size = parse_size_arg(&max_size_arg, 'b')) < 0) {
-				snprintf(err_buf, sizeof err_buf,
-					"--max-size value is invalid: %s\n",
-					max_size_arg);
+			if ((max_size = parse_size_arg(max_size_arg, 'b', "max-size", 0)) < 0)
 				return 0;
-			}
+			max_size_arg = num_to_byte_string(max_size);
 			break;
 
 		case OPT_MIN_SIZE:
-			if ((min_size = parse_size_arg(&min_size_arg, 'b')) < 0) {
-				snprintf(err_buf, sizeof err_buf,
-					"--min-size value is invalid: %s\n",
-					min_size_arg);
+			if ((min_size = parse_size_arg(min_size_arg, 'b', "min-size", 0)) < 0)
 				return 0;
-			}
+			min_size_arg = num_to_byte_string(min_size);
 			break;
 
-		case OPT_BWLIMIT:
-			{
-				OFF_T limit = parse_size_arg(&bwlimit_arg, 'K');
-				if (limit < 0) {
-					snprintf(err_buf, sizeof err_buf,
-						"--bwlimit value is invalid: %s\n", bwlimit_arg);
-					return 0;
-				}
-				bwlimit = (limit + 512) / 1024;
-				if (limit && !bwlimit) {
-					snprintf(err_buf, sizeof err_buf,
-						"--bwlimit value is too small: %s\n", bwlimit_arg);
-					return 0;
-				}
-			}
+		case OPT_BWLIMIT: {
+			ssize_t size = parse_size_arg(bwlimit_arg, 'K', "bwlimit", 512);
+			if (size < 0)
+				return 0;
+			bwlimit_arg = num_to_byte_string(size);
+			bwlimit = (size + 512) / 1024;
 			break;
+		}
 
 		case OPT_APPEND:
 			if (am_server)
@@ -1898,6 +1887,18 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	if (version_opt_cnt) {
 		print_rsync_version(FINFO);
 		exit_cleanup(0);
+	}
+
+	if (!max_alloc_arg) {
+		max_alloc_arg = getenv("RSYNC_MAX_ALLOC");
+		if (max_alloc_arg && !*max_alloc_arg)
+			max_alloc_arg = NULL;
+	}
+	if (max_alloc_arg) {
+		ssize_t size = parse_size_arg(max_alloc_arg, 'B', "max-alloc", 1024*1024);
+		if (size < 0)
+			return 0;
+		max_alloc = size;
 	}
 
 	if (protect_args < 0) {
@@ -2768,6 +2769,11 @@ void server_options(char **args, int *argc_p)
 				goto oom;
 			args[ac++] = arg;
 		}
+	}
+
+	if (max_alloc_arg && max_alloc != DEFAULT_MAX_ALLOC) {
+		args[ac++] = "--max-alloc";
+		args[ac++] = max_alloc_arg;
 	}
 
 	/* --delete-missing-args needs the cooperation of both sides, but

@@ -22,6 +22,7 @@
 
 #include "rsync.h"
 #include "inums.h"
+#include "ifuncs.h"
 #include "io.h"
 #if defined CONFIG_LOCALE && defined HAVE_LOCALE_H
 #include <locale.h>
@@ -512,8 +513,6 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char **remote_argv, in
 		if (!cmd)
 			cmd = RSYNC_RSH;
 		cmd = need_to_free = strdup(cmd);
-		if (!cmd)
-			goto oom;
 
 		for (t = f = cmd; *f; f++) {
 			if (*f == ' ')
@@ -657,10 +656,6 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char **remote_argv, in
 		free(need_to_free);
 
 	return pid;
-
-  oom:
-	out_of_memory("do_cmd");
-	return 0; /* not reached */
 }
 
 /* The receiving side operates in one of two modes:
@@ -824,8 +819,6 @@ static void check_alt_basis_dirs(void)
 		if (dry_run > 1 && *bdir != '/') {
 			int len = curr_dir_len + 1 + bd_len + 1;
 			char *new = new_array(char, len);
-			if (!new)
-				out_of_memory("check_alt_basis_dirs");
 			if (slash && strncmp(bdir, "../", 3) == 0) {
 				/* We want to remove only one leading "../" prefix for
 				 * the directory we couldn't create in dry-run mode:
@@ -1339,19 +1332,12 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 	return MAX(exit_code, exit_code2);
 }
 
-static int copy_argv(char *argv[])
+static void dup_argv(char *argv[])
 {
 	int i;
 
-	for (i = 0; argv[i]; i++) {
-		if (!(argv[i] = strdup(argv[i]))) {
-			rprintf (FERROR, "out of memory at %s(%d)\n",
-				 __FILE__, __LINE__);
-			return RERR_MALLOC;
-		}
-	}
-
-	return 0;
+	for (i = 0; argv[i]; i++)
+		argv[i] = strdup(argv[i]);
 }
 
 
@@ -1372,8 +1358,7 @@ static int start_client(int argc, char *argv[])
 
 	/* Don't clobber argv[] so that ps(1) can still show the right
 	 * command line. */
-	if ((ret = copy_argv(argv)) != 0)
-		return ret;
+	dup_argv(argv);
 
 	if (!read_batch) { /* for read_batch, NO source is specified */
 		char *path = check_for_hostspec(argv[0], &shell_machine, &rsync_port);

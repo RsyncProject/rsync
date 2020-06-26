@@ -19,6 +19,7 @@
  */
 
 #include "rsync.h"
+#include "ifuncs.h"
 
 static int allow_forward_dns;
 
@@ -52,10 +53,8 @@ static int match_hostname(const char **host_ptr, const char *addr, const char *t
 		if (strcmp(addr, inet_ntoa(*(struct in_addr*)(hp->h_addr_list[i]))) == 0) {
 			/* If reverse lookups are off, we'll use the conf-specified
 			 * hostname in preference to UNDETERMINED. */
-			if (host == undetermined_hostname) {
-				if (!(*host_ptr = strdup(tok)))
-					*host_ptr = undetermined_hostname;
-			}
+			if (host == undetermined_hostname)
+				*host_ptr = strdup(tok);
 			return 1;
 		}
 	}
@@ -240,9 +239,6 @@ static int access_match(const char *list, const char *addr, const char **host_pt
 {
 	char *tok;
 	char *list2 = strdup(list);
-
-	if (!list2)
-		out_of_memory("access_match");
 
 	strlower(list2);
 

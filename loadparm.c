@@ -42,6 +42,7 @@
 
 #include "rsync.h"
 #include "itypes.h"
+#include "ifuncs.h"
 #include "default-dont-compress.h"
 
 extern item_list dparam_list;
@@ -471,8 +472,7 @@ static char *expand_vars(char *str)
 		return str;
 
 	bufsize = strlen(str) + 2048;
-	if ((buf = new_array(char, bufsize+1)) == NULL) /* +1 for trailing '\0' */
-		out_of_memory("expand_vars");
+	buf = new_array(char, bufsize+1); /* +1 for trailing '\0' */
 
 	for (t = buf, f = str; bufsize && *f; ) {
 		if (*f == '%' && *++f != '%') {
@@ -601,10 +601,7 @@ FN_LOCAL_BOOL(lp_write_only, write_only)
  * the start, so any lost memory is inconsequential. */
 static inline void string_set(char **s, const char *v)
 {
-	if (!v)
-		*s = NULL;
-	else if (!(*s = strdup(v)))
-		out_of_memory("string_set");
+	*s = v ? strdup(v) : NULL;
 }
 
 /* Copy local_vars into a new section. No need to strdup since we don't free. */

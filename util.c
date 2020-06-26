@@ -592,8 +592,7 @@ int lock_range(int fd, int offset, int len)
 }
 
 #define ENSURE_MEMSPACE(buf, type, sz, req) \
-	if ((req) > sz && !(buf = realloc_array(buf, type, sz = MAX(sz * 2, req)))) \
-		out_of_memory("glob_expand")
+	do { if ((req) > sz) buf = realloc_array(buf, type, sz = MAX(sz * 2, req)); } while(0)
 
 static inline void call_glob_match(const char *name, int len, int from_glob,
 				   char *arg, int abpos, int fbpos);
@@ -695,8 +694,7 @@ static inline void call_glob_match(const char *name, int len, int from_glob,
 		glob_match(arg, abpos, fbpos);
 	} else {
 		ENSURE_MEMSPACE(glob.argv, char *, glob.maxargs, glob.argc + 1);
-		if (!(glob.argv[glob.argc++] = strdup(glob.arg_buf)))
-			out_of_memory("glob_match");
+		glob.argv[glob.argc++] = strdup(glob.arg_buf);
 	}
 }
 
@@ -720,8 +718,6 @@ int glob_expand(const char *arg, char ***argv_p, int *argc_p, int *maxargs_p)
 		s = sanitize_path(NULL, arg, "", 0, SP_KEEP_DOT_DIRS);
 	else {
 		s = strdup(arg);
-		if (!s)
-			out_of_memory("glob_expand");
 		clean_fname(s, CFN_KEEP_DOT_DIRS | CFN_KEEP_TRAILING_SLASH | CFN_COLLAPSE_DOT_DOT_DIRS);
 	}
 
@@ -771,8 +767,7 @@ void glob_expand_module(char *base1, char *arg, char ***argv_p, int *argc_p, int
 		return;
 	}
 
-	if (!(arg = strdup(arg)))
-		out_of_memory("glob_expand_module");
+	arg = strdup(arg);
 
 	if (asprintf(&base," %s/", base1) < 0)
 		out_of_memory("glob_expand_module");
@@ -1017,11 +1012,10 @@ char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth, i
 			depth = 0;
 			p++;
 		}
-		if (dest) {
-			if (rlen + plen + 1 >= MAXPATHLEN)
-				return NULL;
-		} else if (!(dest = new_array(char, MAX(rlen + plen + 1, 2))))
-			out_of_memory("sanitize_path");
+		if (!dest)
+			dest = new_array(char, MAX(rlen + plen + 1, 2));
+		else if (rlen + plen + 1 >= MAXPATHLEN)
+			return NULL;
 		if (rlen) { /* only true if p previously started with a slash */
 			memcpy(dest, rootdir, rlen);
 			if (rlen > 1) /* a rootdir of len 1 is "/", so this avoids a 2nd slash */
@@ -1155,13 +1149,10 @@ char *normalize_path(char *path, BOOL force_newbuf, unsigned int *len_ptr)
 			return NULL;
 		curr_dir[curr_dir_len] = '/';
 		memcpy(curr_dir + curr_dir_len + 1, path, len + 1);
-		if (!(path = strdup(curr_dir)))
-			out_of_memory("normalize_path");
+		path = strdup(curr_dir);
 		curr_dir[curr_dir_len] = '\0';
-	} else if (force_newbuf) {
-		if (!(path = strdup(path)))
-			out_of_memory("normalize_path");
-	}
+	} else if (force_newbuf)
+		path = strdup(path);
 
 	len = clean_fname(path, CFN_COLLAPSE_DOT_DOT_DIRS | CFN_DROP_TRAILING_DOT_DIR);
 
@@ -1519,8 +1510,7 @@ struct bitbag *bitbag_create(int max_ndx)
 	struct bitbag *bb = new(struct bitbag);
 	bb->slot_cnt = (max_ndx + BB_PER_SLOT_BITS - 1) / BB_PER_SLOT_BITS;
 
-	if (!(bb->bits = (uint32**)calloc(bb->slot_cnt, sizeof (uint32*))))
-		out_of_memory("bitbag_create");
+	bb->bits = (uint32**)calloc(bb->slot_cnt, sizeof (uint32*));
 
 	return bb;
 }
@@ -1601,8 +1591,7 @@ void flist_ndx_push(flist_ndx_list *lp, int ndx)
 {
 	struct flist_ndx_item *item;
 
-	if (!(item = new(struct flist_ndx_item)))
-		out_of_memory("flist_ndx_push");
+	item = new(struct flist_ndx_item);
 	item->next = NULL;
 	item->ndx = ndx;
 	if (lp->tail)
@@ -1654,8 +1643,7 @@ void *expand_item_list(item_list *lp, size_t item_size, const char *desc, int in
 			new_size = 1;
 		if (new_size <= lp->malloced)
 			overflow_exit("expand_item_list");
-		/* Using _realloc_array() lets us pass the size, not a type. */
-		new_ptr = _realloc_array(lp->items, new_size, item_size);
+		new_ptr = realloc_buf(lp->items, new_size * item_size);
 		if (DEBUG_GTE(FLIST, 3)) {
 			rprintf(FINFO, "[%s] expand %s to %s bytes, did%s move\n",
 				who_am_i(), desc, big_num(new_size * item_size),

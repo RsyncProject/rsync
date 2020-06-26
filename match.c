@@ -65,8 +65,6 @@ static void build_hash_table(struct sum_struct *s)
 		if (hash_table)
 			free(hash_table);
 		hash_table = new_array(int32, tablesize);
-		if (!hash_table)
-			out_of_memory("build_hash_table");
 		alloc_size = tablesize;
 	}
 

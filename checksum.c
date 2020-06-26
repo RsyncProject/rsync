@@ -271,8 +271,6 @@ void get_checksum2(char *buf, int32 len, char *sum)
 				free(buf1);
 			buf1 = new_array(char, len+4);
 			len1 = len;
-			if (!buf1)
-				out_of_memory("get_checksum2");
 		}
 
 		memcpy(buf1, buf, len);

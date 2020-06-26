@@ -35,9 +35,8 @@ struct hashtable *hashtable_create(int size, int key64)
 			size *= 2;
 	}
 
-	if (!(tbl = new(struct hashtable))
-	 || !(tbl->nodes = new_array0(char, size * node_size)))
-		out_of_memory("hashtable_create");
+	tbl = new(struct hashtable);
+	tbl->nodes = new_array0(char, size * node_size);
 	tbl->size = size;
 	tbl->entries = 0;
 	tbl->node_size = node_size;
@@ -94,8 +93,7 @@ void *hashtable_find(struct hashtable *tbl, int64 key, void *data_when_new)
 		int size = tbl->size * 2;
 		int i;
 
-		if (!(tbl->nodes = new_array0(char, size * tbl->node_size)))
-			out_of_memory("hashtable_node");
+		tbl->nodes = new_array0(char, size * tbl->node_size);
 		tbl->size = size;
 		tbl->entries = 0;
 

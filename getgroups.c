@@ -20,8 +20,7 @@
 
 #include "rsync.h"
 
-int
-main(UNUSED(int argc), UNUSED(char *argv[]))
+ int main(UNUSED(int argc), UNUSED(char *argv[]))
 {
 	int n, i;
 	gid_t *list;

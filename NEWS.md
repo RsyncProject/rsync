@@ -25,10 +25,21 @@ Protocol: 31 (unchanged)
  - Do not allow a negotiated checksum or compression choice of "none" unless
    the user authorized it via an environment variable or command-line option.
 
- - Improved the man page a bit more.
+ - Added the `--max-alloc=SIZE` option to be able to override the memory
+   allocator's sanity-check limit.  It defaults to 1G (as before) but the error
+   message when exceeding it specifically mentions the new option so that you
+   can differentiate an out-of-memory error from a failure of this limit.  It
+   also allows you to specify the value via the RSYNC_MAX_ALLOC environment
+   variable.
+
+ - The memory allocation functions now automatically check for a failure and
+   die when out of memory.  This eliminated some caller-side check-and-die
+   code and added some missing sanity-checking of allocations.
 
  - Preparing for an upcoming xxHash release that provides new XXH3 & XXH128
    hashing routines (disabled until their code is finalized).
+
+ - Improved the man page a bit more.
 
 ------------------------------------------------------------------------------
 <a name="3.2.1"></a>

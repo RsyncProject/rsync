@@ -85,8 +85,6 @@ static struct idlist *add_to_list(struct idlist **root, id_t id, union name_or_i
 				  id_t id2, uint16 flags)
 {
 	struct idlist *node = new(struct idlist);
-	if (!node)
-		out_of_memory("add_to_list");
 	node->next = *root;
 	node->u = noiu;
 	node->id = id;
@@ -160,8 +158,6 @@ static int is_in_group(gid_t gid)
 		if ((ngroups = getgroups(0, NULL)) < 0)
 			ngroups = 0;
 		gidset = new_array(GETGROUPS_T, ngroups+1);
-		if (!gidset)
-			out_of_memory("is_in_group");
 		if (ngroups > 0)
 			ngroups = getgroups(ngroups, gidset);
 		/* The default gid might not be in the list on some systems. */
@@ -174,8 +170,6 @@ static int is_in_group(gid_t gid)
 		if (DEBUG_GTE(OWN, 2)) {
 			int pos;
 			char *gidbuf = new_array(char, ngroups*21+32);
-			if (!gidbuf)
-				out_of_memory("is_in_group");
 			pos = snprintf(gidbuf, 32, "process has %d gid%s: ", ngroups, ngroups == 1? "" : "s");
 			for (n = 0; n < ngroups; n++) {
 				pos += snprintf(gidbuf+pos, 21, " %d", (int)gidset[n]);
@@ -375,8 +369,6 @@ uid_t recv_user_name(int f, uid_t uid)
 	struct idlist *node;
 	int len = read_byte(f);
 	char *name = new_array(char, len+1);
-	if (!name)
-		out_of_memory("recv_user_name");
 	read_sbuf(f, name, len);
 	if (numeric_ids < 0) {
 		free(name);
@@ -391,8 +383,6 @@ gid_t recv_group_name(int f, gid_t gid, uint16 *flags_ptr)
 	struct idlist *node;
 	int len = read_byte(f);
 	char *name = new_array(char, len+1);
-	if (!name)
-		out_of_memory("recv_group_name");
 	read_sbuf(f, name, len);
 	if (numeric_ids < 0) {
 		free(name);

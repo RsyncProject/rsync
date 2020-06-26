@@ -129,8 +129,7 @@ static void add_suffix(struct suffix_tree **prior, char ltr, const char *str)
 		if (node->letter > ltr)
 			break;
 	}
-	if (!(newnode = new(struct suffix_tree)))
-		out_of_memory("add_suffix");
+	newnode = new(struct suffix_tree);
 	newnode->sibling = node;
 	newnode->child = NULL;
 	newnode->letter = ltr;
@@ -147,8 +146,7 @@ static void add_nocompress_suffixes(const char *str)
 	char *buf, *t;
 	const char *f = str;
 
-	if (!(buf = new_array(char, strlen(f) + 1)))
-		out_of_memory("add_nocompress_suffixes");
+	buf = new_array(char, strlen(f) + 1);
 
 	while (*f) {
 		if (*f == '/') {
@@ -186,8 +184,7 @@ static void init_set_compression(void)
 	else
 		f = lp_dont_compress(module_id);
 
-	if (!(match_list = t = new_array(char, strlen(f) + 2)))
-		out_of_memory("set_compression");
+	match_list = t = new_array(char, strlen(f) + 2);
 
 	per_file_default_level = do_compression_level;
 
@@ -282,11 +279,8 @@ static int32 simple_recv_token(int f, char **data)
 	static char *buf;
 	int32 n;
 
-	if (!buf) {
+	if (!buf)
 		buf = new_array(char, CHUNK_SIZE);
-		if (!buf)
-			out_of_memory("simple_recv_token");
-	}
 
 	if (residue == 0) {
 		int32 i = read_int(f);
@@ -373,8 +367,7 @@ send_deflated_token(int f, int32 token, struct map_struct *buf, OFF_T offset, in
 				rprintf(FERROR, "compression init failed\n");
 				exit_cleanup(RERR_PROTOCOL);
 			}
-			if ((obuf = new_array(char, OBUF_SIZE)) == NULL)
-				out_of_memory("send_deflated_token");
+			obuf = new_array(char, OBUF_SIZE);
 			init_done = 1;
 		} else
 			deflateReset(&tx_strm);
@@ -518,9 +511,8 @@ static int32 recv_deflated_token(int f, char **data)
 					rprintf(FERROR, "inflate init failed\n");
 					exit_cleanup(RERR_PROTOCOL);
 				}
-				if (!(cbuf = new_array(char, MAX_DATA_COUNT))
-				 || !(dbuf = new_array(char, AVAIL_OUT_SIZE(CHUNK_SIZE))))
-					out_of_memory("recv_deflated_token");
+				cbuf = new_array(char, MAX_DATA_COUNT);
+				dbuf = new_array(char, AVAIL_OUT_SIZE(CHUNK_SIZE));
 				init_done = 1;
 			} else {
 				inflateReset(&rx_strm);
@@ -695,8 +687,6 @@ static void send_zstd_token(int f, int32 token, struct map_struct *buf, OFF_T of
 		}
 
 		obuf = new_array(char, OBUF_SIZE);
-		if (!obuf)
-			out_of_memory("send_deflated_token");
 
 		ZSTD_CCtx_setParameter(zstd_cctx, ZSTD_c_compressionLevel, do_compression_level);
 		zstd_out_buff.dst = obuf + 2;
@@ -806,8 +796,6 @@ static int32 recv_zstd_token(int f, char **data)
 		out_buffer_size = ZSTD_DStreamOutSize() * 2;
 		cbuf = new_array(char, MAX_DATA_COUNT);
 		dbuf = new_array(char, out_buffer_size);
-		if (!cbuf || !dbuf)
-			out_of_memory("recv_zstd_token");
 
 		zstd_in_buff.src = cbuf;
 		zstd_out_buff.dst = dbuf;
@@ -903,8 +891,7 @@ send_compressed_token(int f, int32 token, struct map_struct *buf, OFF_T offset, 
 
 	if (last_token == -1) {
 		if (!init_done) {
-			if ((obuf = new_array(char, size)) == NULL)
-				out_of_memory("send_compressed_token");
+			obuf = new_array(char, size);
 			init_done = 1;
 		}
 		last_run_end = 0;
@@ -984,9 +971,8 @@ static int32 recv_compressed_token(int f, char **data)
 		switch (recv_state) {
 		case r_init:
 			if (!init_done) {
-				if (!(cbuf = new_array(char, MAX_DATA_COUNT))
-				 || !(dbuf = new_array(char, size)))
-					out_of_memory("recv_compressed_token");
+				cbuf = new_array(char, MAX_DATA_COUNT);
+				dbuf = new_array(char, size);
 				init_done = 1;
 			}
 			recv_state = r_idle;

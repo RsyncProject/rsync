@@ -235,8 +235,7 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 	else
 		modlen = p - *argv;
 
-	if (!(modname = new_array(char, modlen+1+1))) /* room for '/' & '\0' */
-		out_of_memory("start_inband_exchange");
+	modname = new_array(char, modlen+1+1); /* room for '/' & '\0' */
 	strlcpy(modname, *argv, modlen + 1);
 	modname[modlen] = '/';
 	modname[modlen+1] = '\0';
@@ -1233,8 +1232,7 @@ int start_daemon(int f_in, int f_out)
 			io_printf(f_out, "@ERROR: invalid early_input length\n");
 			return -1;
 		}
-		if (!(early_input = new_array(char, early_input_len)))
-			out_of_memory("exchange_protocols");
+		early_input = new_array(char, early_input_len);
 		read_buf(f_in, early_input, early_input_len);
 
 		if (!read_line_old(f_in, line, sizeof line, 0))

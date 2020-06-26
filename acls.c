@@ -168,8 +168,6 @@ static rsync_acl *create_racl(void)
 {
 	rsync_acl *racl = new(rsync_acl);
 
-	if (!racl)
-		out_of_memory("create_racl");
 	*racl = empty_rsync_acl;
 
 	return racl;
@@ -335,8 +333,7 @@ static BOOL unpack_smb_acl(SMB_ACL_T sacl, rsync_acl *racl)
 			qsort(temp_ida_list.items, temp_ida_list.count, sizeof (id_access), id_access_sorter);
 		}
 #endif
-		if (!(racl->names.idas = new_array(id_access, temp_ida_list.count)))
-			out_of_memory("unpack_smb_acl");
+		racl->names.idas = new_array(id_access, temp_ida_list.count);
 		memcpy(racl->names.idas, temp_ida_list.items, temp_ida_list.count * sizeof (id_access));
 	} else
 		racl->names.idas = NULL;
@@ -505,9 +502,7 @@ static int get_rsync_acl(const char *fname, rsync_acl *racl,
 
 		if (cnt) {
 			char *bp = buf + 4*4;
-			id_access *ida;
-			if (!(ida = racl->names.idas = new_array(id_access, cnt)))
-				out_of_memory("get_rsync_acl");
+			id_access *ida = racl->names.idas = new_array(id_access, cnt);
 			racl->names.count = cnt;
 			for ( ; cnt--; ida++, bp += 4+4) {
 				ida->id = IVAL(bp, 0);
@@ -703,12 +698,7 @@ static uchar recv_ida_entries(int f, ida_entries *ent)
 	uchar computed_mask_bits = 0;
 	int i, count = read_varint(f);
 
-	if (count) {
-		if (!(ent->idas = new_array(id_access, count)))
-			out_of_memory("recv_ida_entries");
-	} else
-		ent->idas = NULL;
-
+	ent->idas = count ? new_array(id_access, count) : NULL;
 	ent->count = count;
 
 	for (i = 0; i < count; i++) {

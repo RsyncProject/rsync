@@ -243,8 +243,7 @@ static void init_nno_saw(struct name_num_obj *nno, int val)
 	}
 
 	if (!nno->saw) {
-		if (!(nno->saw = new_array0(uchar, nno->saw_len)))
-			out_of_memory("init_nno_saw");
+		nno->saw = new_array0(uchar, nno->saw_len);
 
 		/* We'll take this opportunity to make sure that the main_name values are set right. */
 		for (cnt = 1, nni = nno->list; nni->name; nni++, cnt++) {

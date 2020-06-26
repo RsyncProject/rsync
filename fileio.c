@@ -157,8 +157,6 @@ int write_file(int f, int use_seek, OFF_T offset, const char *buf, int len)
 				wf_writeBufSize = WRITE_SIZE * 8;
 				wf_writeBufCnt  = 0;
 				wf_writeBuf = new_array(char, wf_writeBufSize);
-				if (!wf_writeBuf)
-					out_of_memory("write_file");
 			}
 			r1 = (int)MIN((size_t)len, wf_writeBufSize - wf_writeBufCnt);
 			if (r1) {
@@ -217,8 +215,7 @@ struct map_struct *map_file(int fd, OFF_T len, int32 read_size, int32 blk_size)
 {
 	struct map_struct *map;
 
-	if (!(map = new0(struct map_struct)))
-		out_of_memory("map_file");
+	map = new0(struct map_struct);
 
 	if (blk_size && (read_size % blk_size))
 		read_size += blk_size - (read_size % blk_size);
@@ -261,8 +258,6 @@ char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
 	/* make sure we have allocated enough memory for the window */
 	if (window_size > map->p_size) {
 		map->p = realloc_array(map->p, char, window_size);
-		if (!map->p)
-			out_of_memory("map_ptr");
 		map->p_size = window_size;
 	}
 

@@ -22,6 +22,7 @@
 
 #include "rsync.h"
 #include "default-cvsignore.h"
+#include "ifuncs.h"
 
 extern int am_server;
 extern int am_sender;
@@ -200,8 +201,7 @@ static void add_rule(filter_rule_list *listp, const char *pat, unsigned int pat_
 	} else
 		suf_len = 0;
 
-	if (!(rule->pattern = new_array(char, pre_len + pat_len + suf_len + 1)))
-		out_of_memory("add_rule");
+	rule->pattern = new_array(char, pre_len + pat_len + suf_len + 1);
 	if (pre_len) {
 		memcpy(rule->pattern, dirbuf + module_dirlen, pre_len);
 		for (cp = rule->pattern; cp < rule->pattern + pre_len; cp++) {
@@ -262,19 +262,14 @@ static void add_rule(filter_rule_list *listp, const char *pat, unsigned int pat_
 			}
 		}
 
-		if (!(lp = new_array0(filter_rule_list, 1)))
-			out_of_memory("add_rule");
+		lp = new_array0(filter_rule_list, 1);
 		if (asprintf(&lp->debug_type, " [per-dir %s]", cp) < 0)
 			out_of_memory("add_rule");
 		rule->u.mergelist = lp;
 
 		if (mergelist_cnt == mergelist_size) {
 			mergelist_size += 5;
-			mergelist_parents = realloc_array(mergelist_parents,
-						filter_rule *,
-						mergelist_size);
-			if (!mergelist_parents)
-				out_of_memory("add_rule");
+			mergelist_parents = realloc_array(mergelist_parents, filter_rule *, mergelist_size);
 		}
 		if (DEBUG_GTE(FILTER, 2)) {
 			rprintf(FINFO, "[%s] activating mergelist #%d%s\n",
@@ -498,8 +493,6 @@ void *push_local_filters(const char *dir, unsigned int dirlen)
 	push = (struct local_filter_state *)new_array(char,
 			  sizeof (struct local_filter_state)
 			+ (mergelist_cnt-1) * sizeof (filter_rule_list));
-	if (!push)
-		out_of_memory("push_local_filters");
 
 	push->mergelist_cnt = mergelist_cnt;
 	for (i = 0; i < mergelist_cnt; i++) {
@@ -822,8 +815,7 @@ static filter_rule *parse_rule_tok(const char **rulestr_ptr,
 	if (!*s)
 		return NULL;
 
-	if (!(rule = new0(filter_rule)))
-		out_of_memory("parse_rule_tok");
+	rule = new0(filter_rule);
 
 	/* Inherit from the template.  Don't inherit FILTRULES_SIDES; we check
 	 * that later. */
@@ -1125,8 +1117,7 @@ void parse_filter_str(filter_rule_list *listp, const char *rulestr,
 				const char *name;
 				filter_rule *excl_self;
 
-				if (!(excl_self = new0(filter_rule)))
-					out_of_memory("parse_filter_str");
+				excl_self = new0(filter_rule);
 				/* Find the beginning of the basename and add an exclude for it. */
 				for (name = pat + pat_len; name > pat && name[-1] != '/'; name--) {}
 				add_rule(listp, name, (pat + pat_len) - name, excl_self, 0);

@@ -301,8 +301,7 @@ static void flist_expand(struct file_list *flist, int extra)
 	if (flist->malloced < flist->used + extra)
 		flist->malloced = flist->used + extra;
 
-	new_ptr = realloc_array(flist->files, struct file_struct *,
-				flist->malloced);
+	new_ptr = realloc_array(flist->files, struct file_struct *, flist->malloced);
 
 	if (DEBUG_GTE(FLIST, 1) && flist->malloced != FLIST_START) {
 		rprintf(FCLIENT, "[%s] expand file_list pointer array to %s bytes, did%s move\n",
@@ -1335,10 +1334,8 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 		  + linkname_len;
 	if (pool)
 		bp = pool_alloc(pool, alloc_len, "make_file");
-	else {
-		if (!(bp = new_array(char, alloc_len)))
-			out_of_memory("make_file");
-	}
+	else
+		bp = new_array(char, alloc_len);
 
 	memset(bp, 0, extra_len + FILE_STRUCT_LEN);
 	bp += extra_len;
@@ -1661,8 +1658,7 @@ static void fsort(struct file_struct **fp, size_t num)
 	if (use_qsort)
 		qsort(fp, num, PTR_SIZE, file_compare);
 	else {
-		struct file_struct **tmp = new_array(struct file_struct *,
-						     (num+1) / 2);
+		struct file_struct **tmp = new_array(struct file_struct *, (num+1) / 2);
 		fsort_tmp(fp, num, tmp);
 		free(tmp);
 	}
@@ -1895,13 +1891,11 @@ static void send_implied_dirs(int f, struct file_list *flist, char *fname,
 	len = strlen(limit+1);
 	memcpy(&relname_list, F_DIR_RELNAMES_P(lastpath_struct), sizeof relname_list);
 	if (!relname_list) {
-		if (!(relname_list = new0(item_list)))
-			out_of_memory("send_implied_dirs");
+		relname_list = new0(item_list);
 		memcpy(F_DIR_RELNAMES_P(lastpath_struct), &relname_list, sizeof relname_list);
 	}
 	rnpp = EXPAND_ITEM_LIST(relname_list, relnamecache *, 32);
-	if (!(*rnpp = (relnamecache*)new_array(char, sizeof (relnamecache) + len)))
-		out_of_memory("send_implied_dirs");
+	*rnpp = (relnamecache*)new_array(char, sizeof (relnamecache) + len);
 	(*rnpp)->name_type = name_type;
 	strlcpy((*rnpp)->fname, limit+1, len + 1);
 
@@ -2059,8 +2053,7 @@ void send_extra_file_list(int f, int at_least)
 		}
 
 		if (need_unsorted_flist) {
-			if (!(flist->sorted = new_array(struct file_struct *, flist->used)))
-				out_of_memory("send_extra_file_list");
+			flist->sorted = new_array(struct file_struct *, flist->used);
 			memcpy(flist->sorted, flist->files,
 			       flist->used * sizeof (struct file_struct*));
 		} else
@@ -2414,8 +2407,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	 * recursion mode, the sender marks duplicate dirs so that it can
 	 * send them together in a single file-list. */
 	if (need_unsorted_flist) {
-		if (!(flist->sorted = new_array(struct file_struct *, flist->used)))
-			out_of_memory("send_file_list");
+		flist->sorted = new_array(struct file_struct *, flist->used);
 		memcpy(flist->sorted, flist->files,
 		       flist->used * sizeof (struct file_struct*));
 	} else
@@ -2597,8 +2589,7 @@ struct file_list *recv_file_list(int f, int dir_ndx)
 		 * order and for calling flist_find()).  We keep the "files"
 		 * list unsorted for our exchange of index numbers with the
 		 * other side (since their names may not sort the same). */
-		if (!(flist->sorted = new_array(struct file_struct *, flist->used)))
-			out_of_memory("recv_file_list");
+		flist->sorted = new_array(struct file_struct *, flist->used);
 		memcpy(flist->sorted, flist->files,
 		       flist->used * sizeof (struct file_struct*));
 		if (inc_recurse && dir_flist->used > dstart) {
@@ -2808,8 +2799,7 @@ struct file_list *flist_new(int flags, char *msg)
 {
 	struct file_list *flist;
 
-	if (!(flist = new0(struct file_list)))
-		out_of_memory(msg);
+	flist = new0(struct file_list);
 
 	if (flags & FLIST_TEMP) {
 		if (!(flist->file_pool = pool_create(SMALL_EXTENT, 0,

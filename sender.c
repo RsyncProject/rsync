@@ -65,13 +65,10 @@ BOOL extra_flist_sending_enabled;
  **/
 static struct sum_struct *receive_sums(int f)
 {
-	struct sum_struct *s;
-	int32 i;
+	struct sum_struct *s = new(struct sum_struct);
 	int lull_mod = protocol_version >= 31 ? 0 : allowed_lull * 5;
 	OFF_T offset = 0;
-
-	if (!(s = new(struct sum_struct)))
-		out_of_memory("receive_sums");
+	int32 i;
 
 	read_sum_head(f, s);
 
@@ -92,8 +89,7 @@ static struct sum_struct *receive_sums(int f)
 	if (s->count == 0)
 		return(s);
 
-	if (!(s->sums = new_array(struct sum_buf, s->count)))
-		out_of_memory("receive_sums");
+	s->sums = new_array(struct sum_buf, s->count);
 
 	for (i = 0; i < s->count; i++) {
 		s->sums[i].sum1 = read_int(f);

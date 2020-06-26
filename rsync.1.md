@@ -403,6 +403,7 @@ detailed description below for a complete description.
 --max-delete=NUM         don't delete more than NUM files
 --max-size=SIZE          don't transfer any file larger than SIZE
 --min-size=SIZE          don't transfer any file smaller than SIZE
+--max-alloc=SIZE         change a limit relating to memory alloc
 --partial                keep partially transferred files
 --partial-dir=DIR        put a partially transferred file into DIR
 --delay-updates          put all updated files into place at end
@@ -605,7 +606,7 @@ your home directory (remove the '=' for that).
     helps to avoid overpopulating the protocol data with extra message data.
 
     The option does not affect the remote side of a transfer without using
-    `--remote-option` -- e.g. `-M--msgs2stderr` or `{-M,}--msgs2stderr`.
+    `--remote-option`, e.g. `-M--msgs2stderr` or `{-M,}--msgs2stderr`.
 
     Also keep in mind that connecting to a normal (non-remote-shell) daemon
     does not have a stderr channel to send messages back to the client side, so
@@ -1732,12 +1733,16 @@ your home directory (remove the '=' for that).
     data that goes into the file-lists, and thus it doesn't affect deletions.
     It just limits the files that the receiver requests to be transferred.
 
-    The suffixes are as follows: "K" (or "KiB") is a kibibyte (1024), "M" (or
-    "MiB") is a mebibyte (1024\*1024), and "G" (or "GiB") is a gibibyte
-    (1024\*1024\*1024).  If you want the multiplier to be 1000 instead of 1024,
-    use "KB", "MB", or "GB". (Note: lower-case is also accepted for all
-    values.) Finally, if the suffix ends in either "+1" or "-1", the value will
-    be offset by one byte in the indicated direction.
+    The suffix letters are (in upper/lower-case): `B`, `K`, `G`, `T`, and `P`
+    for bytes, kilobytes/kibibytes, megabytes/mebibytes, gigabytes/gibibytes,
+    terabytes/tebibytes, and petabytes/pebibytes.  If you use a single-char
+    suffix or add-on "ib" to it (e.g. "G" or "GiB") then you get units that are
+    multiples of 1024.  If you use a two-letter suffix that ends with a "B"
+    (e.g. "kb") then you get units that are multiples of 1000.
+
+    Finally, if the value ends with either "+1" or "-1", it will be offset by
+    one byte in the indicated direction.  The largest possible value is
+    `8192P-1`.
 
     Examples: `--max-size=1.5mb-1` is 1499999 bytes, and `--max-size=2g+1` is
     2147483649 bytes.
@@ -1751,6 +1756,28 @@ your home directory (remove the '=' for that).
     the `--max-size` option for a description of SIZE and other information.
 
     Note that rsync versions prior to 3.1.0 did not allow `--min-size=0`.
+
+0.  `--max-alloc=SIZE`
+
+    By default rsync limits an individual malloc/realloc to about 1GB in size.
+    For most people this limit works just fine and prevents a code issue
+    causing rsync to request massive amounts of memory.  However, if you have
+    many millions of files in a transfer, a huge amount of server memory, and
+    you don't want to split up your transfer into multiple parts, you can
+    increase the per-allocation limit to something larger and rsync will
+    consume more memory.
+
+    Keep in mind that this is not a limit on the total size of allocated
+    memory.  It is a sanity-check value for individual allocations.
+
+    See the `--max-size` option for a description of how SIZE can be specified.
+    The default suffix if none is given is bytes.
+
+    You can set a default value using the environment variable RSYNC_MAX_ALLOC
+    using the same SIZE values as supported by this option.  If the remote
+    rsync doesn't understand the `--max-alloc` option, you can override the
+    setting by specifying `--max-alloc=1g` (because rsync will not send the
+    option to the remote side when the value is the default).
 
 0.  `--block-size=SIZE`, `-B`
 

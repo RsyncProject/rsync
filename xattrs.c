@@ -145,8 +145,6 @@ static ssize_t get_xattr_names(const char *fname)
 	if (!namebuf) {
 		namebuf_len = 1024;
 		namebuf = new_array(char, namebuf_len);
-		if (!namebuf)
-			out_of_memory("get_xattr_names");
 	}
 
 	while (1) {
@@ -174,8 +172,6 @@ static ssize_t get_xattr_names(const char *fname)
 			free(namebuf);
 		namebuf_len = list_len + 1024;
 		namebuf = new_array(char, namebuf_len);
-		if (!namebuf)
-			out_of_memory("get_xattr_names");
 	}
 
 	return list_len;
@@ -205,8 +201,7 @@ static char *get_xattr_data(const char *fname, const char *name, size_t *len_ptr
 		extra_len = 1; /* request non-zero amount of memory */
 	if (datum_len + extra_len < datum_len)
 		overflow_exit("get_xattr_data");
-	if (!(ptr = new_array(char, datum_len + extra_len)))
-		out_of_memory("get_xattr_data");
+	ptr = new_array(char, datum_len + extra_len);
 
 	if (datum_len) {
 		size_t len = sys_lgetxattr(fname, name, ptr, datum_len);
@@ -279,8 +274,7 @@ static int rsync_xal_get(const char *fname, item_list *xalp)
 			sum_update(ptr, datum_len);
 			free(ptr);
 
-			if (!(ptr = new_array(char, name_offset + name_len)))
-				out_of_memory("rsync_xal_get");
+			ptr = new_array(char, name_offset + name_len);
 			*ptr = XSTATE_ABBREV;
 			sum_end(ptr + 1);
 		} else
@@ -481,8 +475,6 @@ static int rsync_xal_store(item_list *xalp)
 		out_of_memory("rsync_xal_h hashtable_create()");
 
 	new_ref = new0(rsync_xa_list_ref);
-	if (new_ref == NULL)
-		out_of_memory("new0(rsync_xa_list_ref)");
 	new_ref->ndx = ndx;
 
 	node = hashtable_find(rsync_xal_h, new_list->key, new_ref);
@@ -759,8 +751,6 @@ int recv_xattr_request(struct file_struct *file, int f_in)
 		if (rxa->name_len + rxa->datum_len < rxa->name_len)
 			overflow_exit("recv_xattr_request");
 		rxa->datum = new_array(char, rxa->datum_len + rxa->name_len);
-		if (!rxa->datum)
-			out_of_memory("recv_xattr_request");
 		name = rxa->datum + rxa->datum_len;
 		memcpy(name, rxa->name, rxa->name_len);
 		rxa->name = name;
@@ -813,8 +803,6 @@ void receive_xattr(int f, struct file_struct *file)
 		 || (dget_len + extra_len + name_len < dget_len + extra_len))
 			overflow_exit("receive_xattr");
 		ptr = new_array(char, dget_len + extra_len + name_len);
-		if (!ptr)
-			out_of_memory("receive_xattr");
 		name = ptr + dget_len + extra_len;
 		read_buf(f, name, name_len);
 		if (name_len < 1 || name[name_len-1] != '\0') {

@@ -25,6 +25,10 @@
 #include "itypes.h"
 #include "inums.h"
 
+extern size_t max_alloc;
+
+char *do_malloc = "42";
+
 /**
  * Sleep for a specified number of milliseconds.
  *
@@ -67,22 +71,39 @@ int msleep(int t)
 	return True;
 }
 
-#define MALLOC_MAX 0x40000000
-
-void *_new_array(size_t num, size_t size, int use_calloc)
+/* We convert a num manually because need %lld precision, and that's not a portable sprintf() escape. */
+char *num_to_byte_string(ssize_t num)
 {
-	if (num >= MALLOC_MAX/size)
-		return NULL;
-	return use_calloc ? calloc(num, size) : malloc(num * size);
+	char buf[128], *s = buf + sizeof buf - 1;
+
+	*s = '\0';
+	while (num) {
+		*--s = (char)(num % 10) + '0';
+		num /= 10;
+	}
+	return strdup(s);
 }
 
-void *_realloc_array(void *ptr, size_t num, size_t size)
+void *_my_alloc(void *ptr, size_t num, size_t size, const char *file, int line)
 {
-	if (num >= MALLOC_MAX/size)
-		return NULL;
+	if (num >= max_alloc/size) {
+		if (!file)
+			return NULL;
+		rprintf(FERROR, "[%s] exceeded --max-alloc=%s setting (file=%s, line=%d)\n",
+			who_am_i(), num_to_byte_string(max_alloc), file, line);
+		exit_cleanup(RERR_MALLOC);
+	}
 	if (!ptr)
-		return malloc(size * num);
-	return realloc(ptr, size * num);
+		ptr = calloc(num, size);
+	else if (ptr == do_malloc)
+		ptr = malloc(num * size);
+	else
+		ptr = realloc(ptr, num * size);
+	if (!ptr && file) {
+		rprintf(FERROR, "[%s] out of memory (file=%s, line=%d)\n", who_am_i(), file, line);
+		exit_cleanup(RERR_MALLOC);
+	}
+	return ptr;
 }
 
 const char *sum_as_hex(int csum_type, const char *sum, int flist_csum)

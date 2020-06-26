@@ -26,6 +26,7 @@
 
 #include "rsync.h"
 #include "itypes.h"
+#include "ifuncs.h"
 #ifdef HAVE_NETINET_IN_SYSTM_H
 #include <netinet/in_systm.h>
 #endif
@@ -248,8 +249,6 @@ int open_socket_out(char *host, int port, const char *bind_addr, int af_hint)
 
 	for (res = res0, addr_cnt = 0; res; res = res->ai_next, addr_cnt++) {}
 	errnos = new_array0(int, addr_cnt);
-	if (!errnos)
-		out_of_memory("open_socket_out");
 
 	s = -1;
 	/* Try to connect to all addresses for this machine until we get
@@ -354,8 +353,7 @@ int open_socket_out_wrapped(char *host, int port, const char *bind_addr, int af_
 				len += hlen;
 		}
 		f = prog;
-		if (!(prog = new_array(char, len)))
-			out_of_memory("open_socket_out_wrapped");
+		prog = new_array(char, len);
 		for (t = prog; *f; f++) {
 			if (*f == '%') {
 				switch (*++f) {
@@ -423,8 +421,6 @@ static int *open_socket_in(int type, int port, const char *bind_addr,
 
 	socks = new_array(int, maxs + 1);
 	errmsgs = new_array(char *, maxs);
-	if (!socks || !errmsgs)
-		out_of_memory("open_socket_in");
 
 	/* We may not be able to create the socket, if for example the
 	 * machine knows about IPv6 in the C library, but not in the
@@ -683,9 +679,6 @@ void set_socket_options(int fd, char *options)
 		return;
 
 	options = strdup(options);
-
-	if (!options)
-		out_of_memory("set_socket_options");
 
 	for (tok = strtok(options, " \t,"); tok; tok = strtok(NULL," \t,")) {
 		int ret=0,i;

@@ -2227,8 +2227,6 @@ void generate_files(int f_out, const char *local_name)
 	if (delete_during == 2) {
 		deldelay_size = BIGPATHBUFLEN * 4;
 		deldelay_buf = new_array(char, deldelay_size);
-		if (!deldelay_buf)
-			out_of_memory("delete-delay");
 	}
 	info_levels[INFO_FLIST] = info_levels[INFO_PROGRESS] = 0;
 

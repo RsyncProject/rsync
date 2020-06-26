@@ -1239,8 +1239,7 @@ void read_args(int f_in, char *mod_name, char *buf, size_t bufsiz, int rl_nulls,
 	rl_flags |= (protect_args && ic_recv != (iconv_t)-1 ? RL_CONVERT : 0);
 #endif
 
-	if (!(argv = new_array(char *, maxargs)))
-		out_of_memory("read_args");
+	argv = new_array(char *, maxargs);
 	if (mod_name && !protect_args)
 		argv[argc++] = "rsyncd";
 
@@ -1253,8 +1252,7 @@ void read_args(int f_in, char *mod_name, char *buf, size_t bufsiz, int rl_nulls,
 
 		if (argc == maxargs-1) {
 			maxargs += MAX_ARGS;
-			if (!(argv = realloc_array(argv, char *, maxargs)))
-				out_of_memory("read_args");
+			argv = realloc_array(argv, char *, maxargs);
 		}
 
 		if (dot_pos) {
@@ -1262,8 +1260,7 @@ void read_args(int f_in, char *mod_name, char *buf, size_t bufsiz, int rl_nulls,
 				int len = strlen(buf);
 				if (request_len)
 					request_p[0][request_len++] = ' ';
-				if (!(*request_p = realloc_array(*request_p, char, request_len + len + 1)))
-					out_of_memory("read_args");
+				*request_p = realloc_array(*request_p, char, request_len + len + 1);
 				memcpy(*request_p + request_len, buf, len + 1);
 				request_len += len;
 			}
@@ -1272,8 +1269,7 @@ void read_args(int f_in, char *mod_name, char *buf, size_t bufsiz, int rl_nulls,
 			else
 				glob_expand(buf, &argv, &argc, &maxargs);
 		} else {
-			if (!(p = strdup(buf)))
-				out_of_memory("read_args");
+			p = strdup(buf);
 			argv[argc++] = p;
 			if (*p == '.' && p[1] == '\0')
 				dot_pos = argc;

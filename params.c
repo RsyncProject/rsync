@@ -212,11 +212,6 @@ static BOOL Section( FILE *InFile, BOOL (*sfunc)(char *) )
       {
       bSize += BUFR_INC;
       bufr   = realloc_array( bufr, char, bSize );
-      if( NULL == bufr )
-        {
-        rprintf(FLOG, "%s Memory re-allocation failure.", func);
-        return( False );
-        }
       }
 
     /* Handle a single character. */
@@ -306,11 +301,6 @@ static BOOL Parameter( FILE *InFile, BOOL (*pfunc)(char *, char *), int c )
       {
       bSize += BUFR_INC;
       bufr   = realloc_array( bufr, char, bSize );
-      if( NULL == bufr )
-        {
-        rprintf(FLOG, "%s Memory re-allocation failure.", func) ;
-        return( False );
-        }
       }
 
     switch( c )
@@ -382,11 +372,6 @@ static BOOL Parameter( FILE *InFile, BOOL (*pfunc)(char *, char *), int c )
       {
       bSize += BUFR_INC;
       bufr   = realloc_array( bufr, char, bSize );
-      if( NULL == bufr )
-        {
-        rprintf(FLOG, "%s Memory re-allocation failure.", func) ;
-        return( False );
-        }
       }
 
     switch( c )
@@ -639,12 +624,6 @@ int pm_process( char *FileName,
     {                                         /* allocate one, then parse,   */
     bSize = BUFR_INC;                         /* then free.                  */
     bufr = new_array( char, bSize );
-    if( NULL == bufr )
-      {
-      rprintf(FLOG, "%s memory allocation failure.\n", func);
-      fclose(InFile);
-      return( False );
-      }
     result = Parse( InFile, sfunc, pfunc );
     free( bufr );
     bufr  = NULL;

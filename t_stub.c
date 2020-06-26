@@ -33,6 +33,7 @@ int preserve_xattrs = 0;
 int preserve_perms = 0;
 int preserve_executability = 0;
 int open_noatime = 0;
+size_t max_alloc = 1024*1024*1024;
 char *partial_dir;
 char *module_dir;
 filter_rule_list daemon_filter_list;
