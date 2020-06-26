@@ -8,7 +8,7 @@ Protocol: 31 (unchanged)
 
 ### BUG FIXES:
 
- - Fix installing rsync-ssl script from an alternate build dir.
+ - Fixed installing rsync-ssl script from an alternate build dir.
 
  - Apple requires the asm function name to begin with an underscore.
 
@@ -67,7 +67,7 @@ Protocol: 31 (unchanged)
    their buggy compiler (since the configure test is apparently not finding
    all the compilers that will to crash and burn).
 
- - Fix an issue in the md2man script when building from an external dir.
+ - Fixed an issue in the md2man script when building from an alternate dir.
 
  - Disable `--atimes` on macOS (it apparently just ignores the atime change).
 

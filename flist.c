@@ -311,9 +311,6 @@ static void flist_expand(struct file_list *flist, int extra)
 	}
 
 	flist->files = new_ptr;
-
-	if (!flist->files)
-		out_of_memory("flist_expand");
 }
 
 static void flist_done_allocating(struct file_list *flist)
