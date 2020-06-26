@@ -269,14 +269,6 @@ void write_batch_shell_file(void)
 			err |= write_opt("--exclude-from", "-");
 	}
 
-	/* We need to make sure that any protocol-based or negotiated choices get accurately
-	 * reflected in the options we save AND that we avoid any need for --read-batch to
-	 * do a string-based negotiation (since we don't write them into the file). */
-	if (do_compression)
-		err |= write_opt("--compress-choice", compress_choice);
-	if (strchr(checksum_choice, ',') || xfersum_type != parse_csum_name(NULL, -1))
-		err |= write_opt("--checksum-choice", checksum_choice);
-
 	/* Elide the filename args from the option list, but scan for them in reverse. */
 	for (i = raw_argc-1, j = cooked_argc-1; i > 0 && j >= 0; i--) {
 		if (strcmp(raw_argv[i], cooked_argv[j]) == 0) {

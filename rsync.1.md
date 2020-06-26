@@ -1506,7 +1506,10 @@ your home directory (remove the '=' for that).
     transfer checksum separately from the pre-transfer checksum, and it ignores
     "auto" and all unknown checksum names.  If the remote rsync is not new
     enough to handle a checksum negotiation list, its list is assumed to
-    consist of a single "md5" or "md4" item based on the protocol version.
+    consist of a single "md5" or "md4" item based on the protocol version.  If
+    the environment variable contains a "`&`" character, the string is
+    separated into the client list & server list, either one of which can be
+    empty (giving that side the default list).
 
     The use of the `--checksum-choice` option overrides this environment list.
 
@@ -2295,11 +2298,14 @@ your home directory (remove the '=' for that).
 
     When both sides of the transfer are at least 3.2.0, rsync chooses the first
     algorithm in the client's list of choices that is also in the server's list
-    of choices.  Your default order can be customized by setting the environment
+    of choices.  The default order can be customized by setting the environment
     variable RSYNC_COMPRESS_LIST to a space-separated list of acceptable
     compression names.  If no common compress choice is found, the client exits
-    with an error.  If the remote rsync is too old to support checksum negotiation,
-    its list is assumed to be "zlib".
+    with an error.  If the remote rsync is too old to support checksum
+    negotiation, its list is assumed to be "zlib".  If the environment variable
+    contains a "`&`" character, the string is separated into the client list &
+    server list, either one of which can be empty (giving that side the default
+    list).
 
     There are some older rsync versions that were configured to reject a `-z`
     option and require the use of `-zz` because their compression library was
@@ -3103,6 +3109,11 @@ your home directory (remove the '=' for that).
     Record a file that can later be applied to another identical destination
     with `--read-batch`.  See the "BATCH MODE" section for details, and also
     the `--only-write-batch` option.
+
+    This option overrides the negotiated checksum & compress lists and always
+    negotiates a choice based on old-school md5/md4/zlib choices.  If you want
+    a more modern choice, use the `--checksum-choice` (`--cc`) and/or
+    `--compress-choice` (`--zc`) options.
 
 0.  `--only-write-batch=FILE`
 

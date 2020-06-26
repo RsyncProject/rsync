@@ -20,6 +20,7 @@
  */
 
 #include "rsync.h"
+#include "itypes.h"
 
 extern int am_server;
 extern int am_sender;
@@ -108,6 +109,9 @@ struct name_num_obj valid_compressions = {
 #define CF_CHKSUM_SEED_FIX (1<<5)
 #define CF_INPLACE_PARTIAL_DIR (1<<6)
 #define CF_VARINT_FLIST_FLAGS (1<<7)
+
+#define ENV_CHECKSUM 0
+#define ENV_COMPRESS 1
 
 static const char *client_info;
 
@@ -262,10 +266,14 @@ static void init_nno_saw(struct name_num_obj *nno, int val)
 static int parse_nni_str(struct name_num_obj *nno, const char *from, char *tobuf, int tobuf_len)
 {
 	char *to = tobuf, *tok = NULL;
-	int cnt = 0;
+	int saw_tok = 0, cnt = 0;
 
 	while (1) {
-		if (*from == ' ' || !*from) {
+		int at_space = isSpace(from);
+		char ch = *from++;
+		if (ch == '&')
+			ch = '\0';
+		if (!ch || at_space) {
 			if (tok) {
 				struct name_num_item *nni = get_nni_by_name(nno, tok, to - tok);
 				if (nni && !nno->saw[nni->num]) {
@@ -279,9 +287,10 @@ static int parse_nni_str(struct name_num_obj *nno, const char *from, char *tobuf
 					}
 				} else
 					to = tok - (tok != tobuf);
+				saw_tok = 1;
 				tok = NULL;
 			}
-			if (!*from++)
+			if (!ch)
 				break;
 			continue;
 		}
@@ -294,9 +303,12 @@ static int parse_nni_str(struct name_num_obj *nno, const char *from, char *tobuf
 			to = tok - (tok != tobuf);
 			break;
 		}
-		*to++ = *from++;
+		*to++ = ch;
 	}
 	*to = '\0';
+
+	if (saw_tok && to == tobuf)
+		return strlcpy(tobuf, "INVALID", MAX_NSTR_STRLEN);
 
 	return to - tobuf;
 }
@@ -349,14 +361,36 @@ static void recv_negotiate_str(int f_in, struct name_num_obj *nno, char *tmpbuf,
 	exit_cleanup(RERR_UNSUPPORTED);
 }
 
+static const char *getenv_nstr(int etype)
+{
+	const char *env_str = getenv(etype == ENV_COMPRESS ? "RSYNC_COMPRESS_LIST" : "RSYNC_CHECKSUM_LIST");
+
+	/* When writing a batch file, we always negotiate an old-style choice. */
+	if (write_batch) 
+		env_str = etype == ENV_COMPRESS ? "zlib" : protocol_version >= 30 ? "md5" : "md4";
+
+	if (am_server && env_str) {
+		char *cp = strchr(env_str, '&');
+		if (cp)
+			env_str = cp + 1;
+	}
+
+	return env_str;
+}
+
 /* If num2 < 0 then the caller is checking compress values, otherwise checksum values. */
 void validate_choice_vs_env(int num1, int num2)
 {
 	struct name_num_obj *nno = num2 < 0 ? &valid_compressions : &valid_checksums;
-	const char *list_str = getenv(num2 < 0 ? "RSYNC_COMPRESS_LIST" : "RSYNC_CHECKSUM_LIST");
+	const char *list_str = getenv_nstr(num2 < 0 ? ENV_COMPRESS : ENV_CHECKSUM);
 	char tmpbuf[MAX_NSTR_STRLEN];
 
-	if (!list_str || !*list_str)
+	if (!list_str)
+		return;
+
+	while (isSpace(list_str)) list_str++;
+
+	if (!*list_str)
 		return;
 
 	init_nno_saw(nno, 0);
@@ -422,17 +456,15 @@ int get_default_nno_list(struct name_num_obj *nno, char *to_buf, int to_buf_len,
 	return len;
 }
 
-static void send_negotiate_str(int f_out, struct name_num_obj *nno, const char *env_name)
+static void send_negotiate_str(int f_out, struct name_num_obj *nno, int etype)
 {
 	char tmpbuf[MAX_NSTR_STRLEN];
-	const char *list_str = getenv(env_name);
+	const char *list_str = getenv_nstr(etype);
 	int len;
 
 	if (list_str && *list_str) {
 		init_nno_saw(nno, 0);
 		len = parse_nni_str(nno, list_str, tmpbuf, MAX_NSTR_STRLEN);
-		if (!len)
-			len = strlcpy(tmpbuf, "FAIL", MAX_NSTR_STRLEN);
 		list_str = tmpbuf;
 	} else
 		list_str = NULL;
@@ -447,15 +479,10 @@ static void send_negotiate_str(int f_out, struct name_num_obj *nno, const char *
 			rprintf(FINFO, "Client %s list (on client): %s\n", nno->type, tmpbuf);
 	}
 
-	if (local_server) {
-		/* A local server doesn't bother to send/recv the strings, it just constructs
-		 * and parses the same string on both sides. */
-		recv_negotiate_str(-1, nno, tmpbuf, len);
-	} else if (do_negotiated_strings) {
-		/* Each side sends their list of valid names to the other side and then both sides
-		 * pick the first name in the client's list that is also in the server's list. */
+	/* Each side sends their list of valid names to the other side and then both sides
+	 * pick the first name in the client's list that is also in the server's list. */
+	if (do_negotiated_strings)
 		write_vstring(f_out, tmpbuf, len);
-	}
 }
 
 static void negotiate_the_strings(int f_in, int f_out)
@@ -463,10 +490,10 @@ static void negotiate_the_strings(int f_in, int f_out)
 	/* We send all the negotiation strings before we start to read them to help avoid a slow startup. */
 
 	if (!checksum_choice)
-		send_negotiate_str(f_out, &valid_checksums, "RSYNC_CHECKSUM_LIST");
+		send_negotiate_str(f_out, &valid_checksums, ENV_CHECKSUM);
 
 	if (do_compression && !compress_choice)
-		send_negotiate_str(f_out, &valid_compressions, "RSYNC_COMPRESS_LIST");
+		send_negotiate_str(f_out, &valid_compressions, ENV_COMPRESS);
 
 	if (valid_checksums.saw) {
 		char tmpbuf[MAX_NSTR_STRLEN];
@@ -645,10 +672,8 @@ void setup_protocol(int f_out,int f_in)
 			if (local_server || strchr(client_info, 'I') != NULL)
 				compat_flags |= CF_INPLACE_PARTIAL_DIR;
 			if (local_server || strchr(client_info, 'v') != NULL) {
-				if (!write_batch || protocol_version >= 30) {
-					do_negotiated_strings = 1;
-					compat_flags |= CF_VARINT_FLIST_FLAGS;
-				}
+				do_negotiated_strings = 1;
+				compat_flags |= CF_VARINT_FLIST_FLAGS;
 			}
 			if (strchr(client_info, 'V') != NULL) { /* Support a pre-release 'V' that got superseded */
 				if (!write_batch)
@@ -696,6 +721,9 @@ void setup_protocol(int f_out,int f_in)
 		receiver_symlink_times = 1;
 #endif
 	}
+
+	if (read_batch)
+		do_negotiated_strings = 0;
 
 	if (need_unsorted_flist && (!am_sender || inc_recurse))
 		unsort_ndx = ++file_extra_cnt;
