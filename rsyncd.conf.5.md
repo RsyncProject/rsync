@@ -905,15 +905,15 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
 
     - `--server`: Required for rsync to even work.
     - `--rsh`, `-e`: Required to convey compatibility flags to the server.
-    - `--log-format`: This is required to convey things like
-      `--itemize-changes` to a remote receiver. Is an older name for
-      `--out-format` that is still passed to the server for improved backward
-      compatibility and should not be confused with `--log-file-format`.
+    - `--out-format`: This is required to convey output behavior to a remote
+      receiver.  While rsync passes the older alias `--log-format` for
+      compatibility reasons, this options should not be confused with
+      `--log-file-format`.
     - `--sender`: Use "write only" parameter instead of refusing this.
     - `--dry-run`, `-n`: Who would want to disable this?
-    - `--protect-args`, `-n`: This actually makes transfers safer.
-    - `--from0`, `-0`: Make it easier to accept/refuse `--files-from` without
-      affecting this modifier.
+    - `--protect-args`, `-s`: This actually makes transfers safer.
+    - `--from0`, `-0`: Makes it easier to accept/refuse `--files-from` without
+      affecting this helpful modifier.
     - `--iconv`: This is auto-disabled based on "charset" parameter.
     - `--no-iconv`: Most transfers use this option.
     - `--checksum-seed`: Is a fairly rare, safe option.
