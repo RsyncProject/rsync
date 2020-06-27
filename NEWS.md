@@ -20,8 +20,8 @@ Protocol: 31 (unchanged)
    the same environment variables the client uses.  Allow the env vars
    to be divided into "client list & server list" by the "`&`" char.
 
- - Simplify how the negotiation environment variables apply to older rsync
-   versions.
+ - Simplify how the negotiation environment variables apply when interacting
+   with an older rsync version.
 
  - Do not allow a negotiated checksum or compression choice of "none" unless
    the user authorized it via an environment variable or command-line option.
@@ -37,10 +37,16 @@ Protocol: 31 (unchanged)
    die when out of memory.  This eliminated some caller-side check-and-die
    code and added some missing sanity-checking of allocations.
 
- - Preparing for an upcoming xxHash release that provides new XXH3 & XXH128
-   hashing routines (disabled until their code is finalized).
-
  - Improved the man page a bit more.
+
+### PACKAGING RELATED:
+
+ - Prepared the checksum code for an upcoming xxHash release that provides new
+   XXH3 & XXH128 checksum routines.  These will not be compiled into rsync
+   until the xxhash v0.8.0 include files are installed on the build host, and
+   that release is a few weeks away at the time this was written.  So, if it's
+   now the future and you have packaged and installed xxhash-0.8.0-devel, a
+   fresh rebuild of rsync 3.2.2 will give you the new checksum routines.
 
 ------------------------------------------------------------------------------
 <a name="3.2.1"></a>
@@ -4144,6 +4150,7 @@ Protocol: 25 (changed)
 
 | RELEASE DATE | VER.   | DATE OF COMMIT\* | PROTOCOL    |
 |--------------|--------|------------------|-------------|
+| ?? Jun 2020  | 3.2.2  |                  | 31          |
 | 22 Jun 2020  | 3.2.1  |                  | 31          |
 | 19 Jun 2020  | 3.2.0  |                  | 31          |
 | 28 Jan 2018  | 3.1.3  |                  | 31          |

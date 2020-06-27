@@ -1475,6 +1475,8 @@ your home directory (remove the '=' for that).
     The checksum options that you may be able to use are:
 
     - `auto` (the default)
+    - `xxh128`
+    - `xxh3`
     - `xxh64` (aka xxhash)
     - `md5`
     - `md4`
