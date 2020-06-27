@@ -381,4 +381,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
     main()
 
-# vim: sw=4 et
+# vim: sw=4 et ft=python
