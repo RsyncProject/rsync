@@ -313,6 +313,9 @@ static int parse_nni_str(struct name_num_obj *nno, const char *from, char *tobuf
 	return to - tobuf;
 }
 
+/* This routine is always called with a tmpbuf of MAX_NSTR_STRLEN length, but the
+ * buffer may be pre-populated with a "len" length string to use OR a len of -1
+ * to tell us to read a string from the fd. */
 static void recv_negotiate_str(int f_in, struct name_num_obj *nno, char *tmpbuf, int len)
 {
 	struct name_num_item *ret = NULL;
@@ -328,23 +331,26 @@ static void recv_negotiate_str(int f_in, struct name_num_obj *nno, char *tmpbuf,
 	}
 
 	if (len > 0) {
+		struct name_num_item *nni;
 		int best = nno->saw_len; /* We want best == 1 from the client list, so start with a big number. */
-		char *tok;
-		if (am_server) {
-			int j;
-			/* Since we're parsing client names, anything in our list that we parse first is #1. */
-			for (j = 0; j < nno->saw_len; j++) {
-				if (nno->saw[j])
-					nno->saw[j] = 1;
-			}
-		}
-		for (tok = strtok(tmpbuf, " \t"); tok; tok = strtok(NULL, " \t")) {
-			struct name_num_item *nni = get_nni_by_name(nno, tok, -1);
+		char *space, *tok = tmpbuf;
+		while (tok) {
+			while (*tok == ' ') tok++; /* Should be unneeded... */
+			if (!*tok)
+				break;
+			if ((space = strchr(tok, ' ')) != NULL)
+				*space = '\0';
+			nni = get_nni_by_name(nno, tok, -1);
+			if (space) {
+				*space = ' ';
+				tok = space + 1;
+			} else
+				tok = NULL;
 			if (!nni || !nno->saw[nni->num] || best <= nno->saw[nni->num])
 				continue;
 			ret = nni;
 			best = nno->saw[nni->num];
-			if (best == 1)
+			if (best == 1 || am_server) /* The server side stops at the first acceptable client choice */
 				break;
 		}
 		if (ret) {
@@ -356,8 +362,26 @@ static void recv_negotiate_str(int f_in, struct name_num_obj *nno, char *tmpbuf,
 		}
 	}
 
-	if (!am_server || !do_negotiated_strings)
+	if (!am_server || !do_negotiated_strings) {
+		char *cp = tmpbuf;
+		int j;
 		rprintf(FERROR, "Failed to negotiate a %s choice.\n", nno->type);
+		rprintf(FERROR, "%s list: %s\n", am_server ? "Client" : "Server", tmpbuf);
+		/* Recreate our original list from the saw values. This can't overflow our huge
+		 * buffer because we don't have enough valid entries to get anywhere close. */
+		for (j = 1; j <= nno->saw_len; j++) {
+			struct name_num_item *nni;
+			for (nni = nno->list; nni->name; nni++) {
+				if (nno->saw[nni->num] == j) {
+					*cp++ = ' ';
+					cp += strlcpy(cp, nni->name, MAX_NSTR_STRLEN - (cp - tmpbuf));
+					break;
+				}
+			}
+		}
+		rprintf(FERROR, "%s list:%s\n", am_server ? "Server" : "Client", tmpbuf);
+	}
+
 	exit_cleanup(RERR_UNSUPPORTED);
 }
 

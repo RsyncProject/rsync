@@ -221,8 +221,13 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 		/* If line < 0, this exit is after a MSG_ERROR_EXIT event, so
 		 * we don't want to output a duplicate error. */
 		if ((exit_code && line > 0)
-		 || am_daemon || (logfile_name && (am_server || !INFO_GTE(STATS, 1))))
+		 || am_daemon || (logfile_name && (am_server || !INFO_GTE(STATS, 1)))) {
+#ifdef HAVE_USLEEP /* Try for a teeny delay if both sender & receiver are sending a msg at the same time. */
+			if (am_server && exit_code)
+				usleep(50);
+#endif
 			log_exit(exit_code, exit_file, exit_line);
+		}
 
 #include "case_N.h"
 		switch_step++;
