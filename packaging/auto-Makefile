@@ -1,0 +1,8 @@
+TARGETS := all install install-ssl-daemon install-all install-strip conf gen gensend reconfigure restatus \
+	proto man clean cleantests distclean test check check29 check30 installcheck splint doxygen doxygen-upload
+
+.PHONY: $(TARGETS)
+
+$(TARGETS):
+	@if test x`packaging/prep-auto-dir` = x; then echo "auto-build-save is not setup"; exit 1; fi
+	make -C build $@

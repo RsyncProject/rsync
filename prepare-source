@@ -16,13 +16,12 @@ if test x"$dir" = x; then
     dir=.
 fi
 
-# Support automatic switching to build/$BRANCH subdirs.  It's also good
-# to put packaging/make somewhere early in your $PATH if you use this!
-if test "$dir" = . -a ! -f Makefile -a -d build/master -a -d .git; then
-    builddir=build/`git rev-parse --abbrev-ref HEAD | tr / %`
-    test -d "$builddir" || mkdir "$builddir"
-    cd "$builddir" || exit 1
-    dir=../..
+if test "$dir" = '.'; then
+    branch=`packaging/prep-auto-dir` || exit 1
+    if test x"$branch" != x; then
+	cd build || exit 1
+	dir=..
+    fi
 fi
 
 if test "$dir" != '.'; then

@@ -30,8 +30,11 @@ def main():
 
     signal.signal(signal.SIGINT, signal_handler)
 
-    builddir, gen_files = get_gen_files(True)
-    gen_pathnames = [ os.path.join(builddir, fn) for fn in gen_files ]
+    if cmd_txt_chk(['packaging/prep-auto-dir']) == '':
+        die('You must setup an auto-build-save dir to use this script.');
+
+    auto_dir, gen_files = get_gen_files(True)
+    gen_pathnames = [ os.path.join(auto_dir, fn) for fn in gen_files ]
 
     dash_line = '=' * 74
 
@@ -54,13 +57,13 @@ def main():
 
     check_git_state(args.master_branch, True, 'patches')
 
-    confversion = get_configure_version()
+    curversion = get_rsync_version()
 
     # All version values are strings!
     lastversion, last_protocol_version = get_NEWS_version_info()
     protocol_version, subprotocol_version = get_protocol_versions()
 
-    version = confversion
+    version = curversion
     m = re.search(r'pre(\d+)', version)
     if m:
         version = re.sub(r'pre\d+', 'pre' + str(int(m[1]) + 1), version)
@@ -90,8 +93,8 @@ def main():
         cmd_chk(['git', 'tag', '-d', v_ver])
 
     version = re.sub(r'[-.]*pre[-.]*', 'pre', version)
-    if 'pre' in version and not confversion.endswith('dev'):
-        lastversion = confversion
+    if 'pre' in version and not curversion.endswith('dev'):
+        lastversion = curversion
 
     ans = input(f"Enter the previous version to produce a patch against: [{lastversion}] ")
     if ans != '':
@@ -177,7 +180,7 @@ About to:
         with open(fn, 'r', encoding='utf-8') as fh:
             old_txt = txt = fh.read()
         if fn == 'version.h':
-            txt = f"#define RSYNC_VERSION {version}\n"
+            txt = f'#define RSYNC_VERSION "{version}"\n'
         elif '.spec' in fn:
             for var, val in specvars.items():
                 x_re = re.compile(r'^%s .*' % re.escape(var), re.M)
@@ -238,7 +241,6 @@ About to:
         die('Aborting')
 
     cmd_chk('make gen')
-    cmd_chk(['rsync', '-a', *gen_pathnames, 'SaVeDiR/'])
 
     print(f'Creating any missing patch branches.')
     s = cmd_run(f'packaging/branch-from-patch --branch={args.master_branch} --add-missing')
@@ -253,9 +255,6 @@ About to:
     if re.match(r'^y', ans, re.I):
         print(f'\nVisiting all "patch/{args.master_branch}/*" branches ...')
         cmd_run(f"packaging/patch-update --branch={args.master_branch} --skip-check --shell")
-
-    cmd_run("rm -f *.[o15] *.html")
-    cmd_chk('rsync -a SaVeDiR/ .'.split())
 
     if os.path.isdir('patches/.git'):
         s = cmd_run(f"cd patches && git commit -a -m 'The patches for {version}.'")
@@ -317,11 +316,6 @@ About to:
     os.mkdir(rsync_ver, 0o755)
     os.mkdir(f"{rsync_ver}/patches", 0o755)
     cmd_chk(f"packaging/patch-update --skip-check --branch={args.master_branch} --gen={rsync_ver}/patches".split())
-
-    cmd_run("rm -f *.[o15] *.html")
-    cmd_chk('rsync -a SaVeDiR/ .'.split())
-    shutil.rmtree('SaVeDiR')
-    cmd_chk('make gen'.split())
 
     print(f"Creating {pattar_file} ...")
     cmd_chk(['fakeroot', 'tar', 'chzf', pattar_file, rsync_ver + '/patches'])

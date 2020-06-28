@@ -14,7 +14,8 @@ from pkglib import *
 
 MAKE_GEN_CMDS = [
         './prepare-source'.split(),
-        'make restatus gen'.split(),
+        'cd build && if test -f config.status ; then ./config.status ; else ../configure ; fi',
+        'make -C build gen'.split(),
         ]
 TMP_DIR = "patches.gen"
 
@@ -32,6 +33,9 @@ def main():
 
     master_commit = latest_git_hash(args.base_branch)
 
+    if cmd_txt_chk(['packaging/prep-auto-dir']) == '':
+        die('You must setup an auto-build-save dir to use this script.')
+
     if args.gen:
         if os.path.lexists(TMP_DIR):
             die(f'"{TMP_DIR}" must not exist in the current directory.')
@@ -41,7 +45,7 @@ def main():
             cmd_chk(cmd)
         cmd_chk(['rsync', '-a', *gen_files, f'{TMP_DIR}/master/'])
 
-    last_touch = time.time()
+    last_touch = int(time.time())
 
     # Start by finding all patches so that we can load all possible parents.
     patches = sorted(list(get_patch_branches(args.base_branch)))
@@ -90,9 +94,10 @@ def main():
     if args.gen:
         shutil.rmtree(TMP_DIR)
 
-    while last_touch >= time.time():
+    while last_touch >= int(time.time()):
         time.sleep(1)
     cmd_chk(['git', 'checkout', starting_branch])
+    cmd_chk(['packaging/prep-auto-dir'], discard='output')
 
 
 def update_patch(patch):
@@ -112,7 +117,7 @@ def update_patch(patch):
 
     print(f"======== {patch} ========")
 
-    while args.gen and last_touch >= time.time():
+    while args.gen and last_touch >= int(time.time()):
         time.sleep(1)
 
     branch = f"patch/{args.base_branch}/{patch}"
@@ -123,6 +128,7 @@ def update_patch(patch):
     s = cmd_run(['git', 'merge', based_on])
     ok = s.returncode == 0
     if not ok or args.shell:
+        cmd_chk(['packaging/prep-auto-dir'], discard='output')
         m = re.search(r'([^/]+)$', parent)
         parent_dir = m[1]
         if not ok:
@@ -139,6 +145,7 @@ def update_patch(patch):
             if is_clean:
                 break
             print(status_txt, end='')
+        cmd_run('rm -f build/*.o build/*/*.o')
 
     with open(f"{args.patches_dir}/{patch}.diff", 'w', encoding='utf-8') as fh:
         fh.write(description[patch])
@@ -151,7 +158,7 @@ def update_patch(patch):
             cmd_chk(['rsync', '-a', *gen_files, f"{TMP_DIR}/{patch}/"])
         else:
             gen_files = [ ]
-        last_touch = time.time()
+        last_touch = int(time.time())
 
         proc = cmd_pipe(['git', 'diff', based_on])
         skipping = False

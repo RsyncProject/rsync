@@ -53,6 +53,11 @@ Protocol: 31 (unchanged)
    checksum routines.  Just make sure that the new rsync package depends on
    xxhash >= 0.8.0.
 
+### DEVELOPER RELATED:
+
+ - Moved the version number out of configure.ac into its own version.h file so
+   that we don't need to reconfigure just because the version number changes.
+
 ------------------------------------------------------------------------------
 <a name="3.2.1"></a>
 

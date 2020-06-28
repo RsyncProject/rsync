@@ -186,7 +186,7 @@ def get_gen_files(want_dir_plus_list=False):
 
     gen_files = [ ]
 
-    builddir = os.path.join('build', cmd_txt('git rev-parse --abbrev-ref HEAD').replace('/', '%'))
+    auto_dir = os.path.join('auto-build-save', cmd_txt('git rev-parse --abbrev-ref HEAD').strip().replace('/', '%'))
 
     with open('Makefile.in', 'r', encoding='utf-8') as fh:
         for line in fh:
@@ -202,18 +202,18 @@ def get_gen_files(want_dir_plus_list=False):
                 break
 
     if want_dir_plus_list:
-        return (builddir, gen_files)
+        return (auto_dir, gen_files)
 
-    return [ os.path.join(builddir, fn) for fn in gen_files ]
+    return [ os.path.join(auto_dir, fn) for fn in gen_files ]
 
 
-def get_configure_version():
-    with open('configure.ac', 'r', encoding='utf-8') as fh:
-        for line in fh:
-            m = re.match(r'^AC_INIT\(\[rsync\],\s*\[(\d.+?)\]', line)
-            if m:
-                return m[1]
-    die("Unable to find AC_INIT with version in configure.ac")
+def get_rsync_version():
+    with open('version.h', 'r', encoding='utf-8') as fh:
+        txt = fh.read()
+    m = re.match(r'^#define\s+RSYNC_VERSION\s+"(\d.+?)"', txt)
+    if m:
+        return m[1]
+    die("Unable to find RSYNC_VERSION define in version.h")
 
 
 def get_NEWS_version_info():

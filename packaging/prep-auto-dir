@@ -1,0 +1,39 @@
+#!/bin/sh -e
+
+# This script will setup the build dir based on the current git branch and the
+# directory auto-build-save/$BRANCH.  We don't use a symlink for the build dir
+# because we want to maximize the ccache reuse, so all builds must happen in
+# the same real dir.  When a dir is moved out of auto-build-save/$BRANCH to the
+# build dir, it is replaced with a symlink so that it can still be found under
+# that dir.  The build dir also gets a .branch -> $BRANCH symlink so that we
+# can figure out the current build dir's branch.
+
+# To get started, just clone the rsync git repo and create the auto-build-save
+# dir.  If you have an existing git checkout and it is not in a pristine state,
+# run "make distclean" before creating the auto-build-save dir.
+
+auto_top='auto-build-save'
+if test -d $auto_top -a -d .git; then
+    desired_branch=`git rev-parse --abbrev-ref HEAD | tr / %`
+    auto_dir="$auto_top/$desired_branch"
+    if test -d build; then
+	cur_branch=`readlink build/.branch`
+    else
+	cur_branch='/'
+    fi
+    if test "$desired_branch" != "$cur_branch"; then
+	if test "$cur_branch" != /; then
+	    rm -f "$auto_top/$cur_branch"
+	    mv build "$auto_top/$cur_branch"
+	fi
+	test -d "$auto_dir" || mkdir "$auto_dir"
+	test -h "$auto_dir/.branch" || ln -s "$desired_branch" "$auto_dir/.branch"
+	mv "$auto_dir" build
+	ln -s ../build "$auto_dir"
+    fi
+    if test ! -h Makefile; then
+	rm -f Makefile
+	ln -s packaging/auto-Makefile Makefile
+    fi
+    echo $desired_branch
+fi
