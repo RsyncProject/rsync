@@ -16,9 +16,10 @@ Protocol: 31 (unchanged)
 
 ### ENHANCEMENTS:
 
- - Allow the server side to restrict checksum & compression choices via
-   the same environment variables the client uses.  Allow the env vars
-   to be divided into "client list & server list" by the "`&`" char.
+ - Allow the server side to restrict checksum & compression choices via the
+   same environment variables the client uses.  The env vars can be divided
+   into "client list & server list" by the "`&`" char or the same list can
+   apply to both.
 
  - Simplify how the negotiation environment variables apply when interacting
    with an older rsync version.
