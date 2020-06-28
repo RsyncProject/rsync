@@ -1,16 +1,15 @@
 dnl Process this file with autoconf to produce a configure script.
 
-AC_INIT([rsync],[3.2.2pre1],[https://rsync.samba.org/bugtracking.html])
+AC_INIT([rsync],[],[https://rsync.samba.org/bugtracking.html])
 
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([byteorder.h])
 AC_CONFIG_HEADER(config.h)
 AC_PREREQ([2.69])
 
-AC_SUBST(RSYNC_VERSION, $PACKAGE_VERSION)
-AC_MSG_NOTICE([Configuring rsync $PACKAGE_VERSION])
+PACKAGE_VERSION=`sed 's/.*"\(.*\)".*/\1/' <$srcdir/version.h`
 
-AC_DEFINE_UNQUOTED(RSYNC_VERSION, ["$PACKAGE_VERSION"], [rsync release version])
+AC_MSG_NOTICE([Configuring rsync $PACKAGE_VERSION])
 
 LDFLAGS=${LDFLAGS-""}
 
@@ -1338,5 +1337,5 @@ AC_CONFIG_FILES([Makefile lib/dummy zlib/dummy popt/dummy shconfig])
 AC_OUTPUT
 
 AC_MSG_RESULT()
-AC_MSG_RESULT([    rsync ${RSYNC_VERSION} configuration successful])
+AC_MSG_RESULT([    rsync $PACKAGE_VERSION configuration successful])
 AC_MSG_RESULT()

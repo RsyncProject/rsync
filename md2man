@@ -93,13 +93,18 @@ def main():
         env_subs['VERSION'] = '1.0.0'
         env_subs['libdir'] = '/usr'
     else:
-        for fn in (fi.srcdir + 'NEWS.md', 'Makefile'):
+        for fn in (fi.srcdir + 'version.h', 'Makefile'):
             try:
                 st = os.lstat(fn)
             except:
                 die('Failed to find', fi.srcdir + fn)
             if not fi.mtime:
                 fi.mtime = st.st_mtime
+
+        with open(fi.srcdir + 'version.h', 'r', encoding='utf-8') as fh:
+            txt = fh.read()
+        m = re.search(r'"(.+?)"', txt)
+        env_subs['VERSION'] = m.group(1)
 
         with open('Makefile', 'r', encoding='utf-8') as fh:
             for line in fh:
@@ -112,7 +117,7 @@ def main():
                 while re.search(r'\$\{', val):
                     val = re.sub(r'\$\{(\w+)\}', lambda m: env_subs[m.group(1)], val)
                 env_subs[var] = val
-                if var == 'VERSION':
+                if var == 'srcdir':
                     break
 
     with open(fi.fn, 'r', encoding='utf-8') as fh:
