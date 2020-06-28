@@ -13,6 +13,7 @@ sys.path = ['packaging'] + sys.path
 
 from pkglib import *
 
+os.environ['LESS'] = 'mqeiXR'; # Make sure that -F is turned off and -R is turned on.
 dest = os.environ['HOME'] + '/samba-rsync-ftp'
 ORIGINAL_PATH = os.environ['PATH']
 

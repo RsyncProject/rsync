@@ -38,13 +38,10 @@ extern int do_compression;
 extern int inplace;
 extern int append_mode;
 extern int write_batch;
-extern int xfersum_type;
 extern int protocol_version;
 extern int raw_argc, cooked_argc;
 extern char **raw_argv, **cooked_argv;
 extern char *batch_name;
-extern const char *checksum_choice;
-extern const char *compress_choice;
 #ifdef ICONV_OPTION
 extern char *iconv_opt;
 #endif
