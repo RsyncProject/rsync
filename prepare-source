@@ -16,6 +16,27 @@ if test x"$dir" = x; then
     dir=.
 fi
 
+# Support automatic switching to build/$BRANCH subdirs.  It's also good
+# to put packaging/make somewhere early in your $PATH if you use this!
+if test "$dir" = . -a ! -f Makefile -a -d build/master -a -d .git; then
+    builddir=build/`git rev-parse --abbrev-ref HEAD | tr / %`
+    test -d "$builddir" || mkdir "$builddir"
+    cd "$builddir" || exit 1
+    dir=../..
+fi
+
+if test "$dir" != '.'; then
+    for lnk in configure.ac m4; do
+	if test ! -h $lnk; then
+	    rm -f $lnk # Just in case
+	    ln -s "$dir/$lnk" $lnk
+	fi
+    done
+    for fn in configure.sh config.h.in aclocal.m4; do
+	test ! -f $fn -a -f "$dir/$fn" && cp -p "$dir/$fn" $fn
+    done
+fi
+
 if test $# = 0; then
     set -- build
 fi
@@ -23,13 +44,16 @@ fi
 for action in "${@}"; do
     case "$action" in
     build|make)
-	(cd $dir && make -f prepare-source.mak)
+	make -f "$dir/prepare-source.mak"
 	;;
     fetch|fetchgen)
-	$dir/rsync-ssl -iip --no-motd rsync://download.samba.org/rsyncftp/generated-files/'[ca]*' $dir
 	if test "$action" = fetchgen; then
-	    $dir/rsync-ssl -iip --no-motd rsync://download.samba.org/rsyncftp/generated-files/'[^ca]*' .
+	    match='*'
+	else
+	    match='[ca]*'
 	fi
+	$dir/rsync-ssl -iipc --no-motd "rsync://download.samba.org/rsyncftp/generated-files/$match" ./
+	test $? != 0 && continue
 	sleep 1 # The following files need to be newer than aclocal.m4
 	touch configure.sh config.h.in
 	;;
@@ -39,6 +63,7 @@ for action in "${@}"; do
     *)
 	echo "Unknown action: $action"
 	exit 1
+	;;
     esac
     if test $? = 0; then
 	exit

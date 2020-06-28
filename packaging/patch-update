@@ -13,9 +13,8 @@ sys.path = ['packaging'] + sys.path
 from pkglib import *
 
 MAKE_GEN_CMDS = [
-        'make -f prepare-source.mak conf'.split(),
-        './config.status'.split(),
-        'make gen'.split(),
+        './prepare-source'.split(),
+        'make restatus gen'.split(),
         ]
 TMP_DIR = "patches.gen"
 
@@ -30,12 +29,6 @@ def main():
         die('No ".git" directory present in the current dir.')
 
     starting_branch, args.base_branch = check_git_state(args.base_branch, not args.skip_check, args.patches_dir)
-
-    if not os.path.isdir('.gen-stash'):
-        os.mkdir('.gen-stash', 0o700)
-    gen_stash(starting_branch)
-    if starting_branch == 'master':
-        cmd_chk('md5sum configure.ac >.gen-stash/configure.ac.sum')
 
     master_commit = latest_git_hash(args.base_branch)
 
@@ -101,8 +94,6 @@ def main():
         time.sleep(1)
     cmd_chk(['git', 'checkout', starting_branch])
 
-    gen_unstash(starting_branch)
-
 
 def update_patch(patch):
     global last_touch
@@ -132,7 +123,6 @@ def update_patch(patch):
     s = cmd_run(['git', 'merge', based_on])
     ok = s.returncode == 0
     if not ok or args.shell:
-        gen_unstash(branch)
         m = re.search(r'([^/]+)$', parent)
         parent_dir = m[1]
         if not ok:
@@ -149,7 +139,6 @@ def update_patch(patch):
             if is_clean:
                 break
             print(status_txt, end='')
-        gen_stash(branch)
 
     with open(f"{args.patches_dir}/{patch}.diff", 'w', encoding='utf-8') as fh:
         fh.write(description[patch])
@@ -201,32 +190,6 @@ def update_patch(patch):
                 os.unlink(fn)
 
     return 1
-
-
-# The autoconf cache dir can totally mess up if 2 different *.ac files have the same mtime!
-def gen_stash_prep(branch):
-    if os.path.isdir('autom4te.cache'):
-        shutil.rmtree('autom4te.cache')
-    return '.gen-stash/' + branch.replace('/', '%') + '.tar.gz'
-
-
-def gen_stash(branch):
-    files = 'configure.sh config.h.in Makefile'.split()
-    for fn in files:
-        if not os.path.exists(fn):
-            return
-    tar_fn = gen_stash_prep(branch)
-    cmd_run(['./prepare-source'])
-    cmd_chk(['tar', 'czf', tar_fn, *files])
-
-
-def gen_unstash(branch):
-    tar_fn = gen_stash_prep(branch)
-    if os.path.exists(tar_fn):
-        cmd_chk(['tar', 'xf', tar_fn])
-    out, rc = cmd_txt_status('md5sum --status -c .gen-stash/configure.ac.sum'.split())
-    if rc:
-        print('*' * 10, "configure.ac differs from master version", '*' * 10)
 
 
 if __name__ == '__main__':

@@ -49,5 +49,5 @@ aclocal.m4
 /testsuite/xattrs-hlink.test
 /patches
 /SaVeDiR
-/.gen-stash
+/build
 .deps

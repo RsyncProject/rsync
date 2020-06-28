@@ -18,7 +18,7 @@ outfile="$scratchdir/rsync.out"
 makepath "$fromdir/foo"
 makepath "$fromdir/bar/baz"
 cp -p "$srcdir/configure.ac" "$fromdir/foo/config1"
-cp -p "$srcdir/config.h.in" "$fromdir/foo/config2"
+cp -p "$srcdir/config.sub" "$fromdir/foo/config2"
 cp -p "$srcdir/rsync.h" "$fromdir/bar/baz/rsync"
 chmod 600 "$fromdir"/foo/config? "$fromdir/bar/baz/rsync"
 umask 0
@@ -84,7 +84,7 @@ rm "$todir/foo/sym"
 umask 0
 ln -s ../bar/baz "$todir/foo/sym"
 umask 022
-cp -p "$srcdir/config.h.in" "$fromdir/foo/config2"
+cp -p "$srcdir/config.sub" "$fromdir/foo/config2"
 chmod 600 "$fromdir/foo/config2"
 chmod 777 "$todir/bar/baz/rsync"
 

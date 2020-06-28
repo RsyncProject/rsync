@@ -4,24 +4,22 @@
 # then transfer control to the configure.sh script to do the real work.
 
 dir=`dirname $0`
-realconfigure="$dir/configure.sh"
 
-if test ! -f "$realconfigure"; then
-    if test -f "$HOME/build_farm/build_test.fns"; then
-	# Test the included popt
-	set -- --with-included-popt "${@}"
-	# Allow the build farm to grab latest files via rsync.
-	actions='build fetch'
-    else
-	actions='build'
-    fi
-    if "$dir/prepare-source" $actions; then
-	:
-    else
+# Support automatic switching to build/$BRANCH subdirs.  It's also good
+# to put packaging/make somewhere early in your $PATH if you use this!
+if test "$dir" = '.' -a ! -f Makefile -a -d build/master -a -d .git; then
+    builddir=build/`git rev-parse --abbrev-ref HEAD | tr / %`
+    test -d "$builddir" || mkdir "$builddir"
+    cd "$builddir" || exit 1
+    dir=../..
+fi
+
+if test ! -f configure.sh; then
+    if ! "$dir/prepare-source" build; then
 	echo 'Failed to build configure.sh and/or config.h.in -- giving up.' >&2
-	rm -f "$realconfigure"
+	rm -f configure.sh
 	exit 1
     fi
 fi
 
-exec "$realconfigure" "${@}"
+exec ./configure.sh --srcdir="$dir" "${@}"

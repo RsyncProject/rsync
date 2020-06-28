@@ -169,16 +169,17 @@ aclocal.m4: $(srcdir)/m4/*.m4
 	aclocal -I $(srcdir)/m4
 
 configure.sh config.h.in: configure.ac aclocal.m4
-	@test -f "$(srcdir)/configure.sh" && cp -p "$(srcdir)/configure.sh" configure.sh.old || touch configure.sh.old
-	@test -f "$(srcdir)/config.h.in" && cp -p "$(srcdir)/config.h.in" config.h.in.old || touch config.h.in.old
-	(cd "$(srcdir)" && autoconf -o configure.sh && autoheader && touch config.h.in)
-	@if diff "$(srcdir)/configure.sh" configure.sh.old >/dev/null 2>&1; then \
+	@if test -f configure.sh; then cp -p configure.sh configure.sh.old; else touch configure.sh.old; fi
+	@if test -f config.h.in; then cp -p config.h.in config.h.in.old; else touch config.h.in.old; fi
+	autoconf -o configure.sh
+	autoheader && touch config.h.in
+	@if diff configure.sh configure.sh.old >/dev/null 2>&1; then \
 	    echo "configure.sh is unchanged."; \
 	    rm configure.sh.old; \
 	else \
 	    echo "configure.sh has CHANGED."; \
 	fi
-	@if diff "$(srcdir)/config.h.in" config.h.in.old >/dev/null 2>&1; then \
+	@if diff config.h.in config.h.in.old >/dev/null 2>&1; then \
 	    echo "config.h.in is unchanged."; \
 	    rm config.h.in.old; \
 	else \

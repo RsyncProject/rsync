@@ -181,25 +181,30 @@ def mandate_gensend_hook():
 
 
 # Snag the GENFILES values out of the Makefile.in file and return them as a list.
-def get_gen_files():
+def get_gen_files(want_dir_plus_list=False):
     cont_re = re.compile(r'\\\n')
 
-    extras = [ ]
+    gen_files = [ ]
+
+    builddir = os.path.join('build', cmd_txt('git rev-parse --abbrev-ref HEAD').replace('/', '%'))
 
     with open('Makefile.in', 'r', encoding='utf-8') as fh:
         for line in fh:
-            if not extras:
+            if not gen_files:
                 chk = re.sub(r'^GENFILES=', '', line)
                 if line == chk:
                     continue
                 line = chk
             m = re.search(r'\\$', line)
             line = re.sub(r'^\s+|\s*\\\n?$|\s+$', '', line)
-            extras += line.split()
+            gen_files += line.split()
             if not m:
                 break
 
-    return extras
+    if want_dir_plus_list:
+        return (builddir, gen_files)
+
+    return [ os.path.join(builddir, fn) for fn in gen_files ]
 
 
 def get_configure_version():

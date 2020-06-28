@@ -30,7 +30,8 @@ def main():
 
     signal.signal(signal.SIGINT, signal_handler)
 
-    gen_files = get_gen_files()
+    builddir, gen_files = get_gen_files(True)
+    gen_pathnames = [ os.path.join(builddir, fn) for fn in gen_files ]
 
     dash_line = '=' * 74
 
@@ -215,10 +216,10 @@ About to:
     srctar_name = f"{rsync_ver}.tar.gz"
     pattar_name = f"rsync-patches-{version}.tar.gz"
     diff_name = f"{rsync_lastver}-{version}.diffs.gz"
-    srctar_file = f"{dest}/{srcdir}/{srctar_name}"
-    pattar_file = f"{dest}/{srcdir}/{pattar_name}"
-    diff_file = f"{dest}/{srcdiffdir}/{diff_name}"
-    lasttar_file = f"{dest}/{lastsrcdir}/{rsync_lastver}.tar.gz"
+    srctar_file = os.path.join(dest, srcdir, srctar_name)
+    pattar_file = os.path.join(dest, srcdir, pattar_name)
+    diff_file = os.path.join(dest, srcdiffdir, diff_name)
+    lasttar_file = os.path.join(dest, lastsrcdir, rsync_lastver + '.tar.gz')
 
     print(f"""\
 {dash_line}
@@ -237,7 +238,7 @@ About to:
         die('Aborting')
 
     cmd_chk('make gen')
-    cmd_chk(['rsync', '-a', *gen_files, 'SaVeDiR/'])
+    cmd_chk(['rsync', '-a', *gen_pathnames, 'SaVeDiR/'])
 
     print(f'Creating any missing patch branches.')
     s = cmd_run(f'packaging/branch-from-patch --branch={args.master_branch} --add-missing')
@@ -294,12 +295,12 @@ About to:
     os.environ['PATH'] = ORIGINAL_PATH
 
     # Extract the generated files from the old tar.
-    tweaked_gen_files = [ f"{rsync_lastver}/{x}" for x in gen_files ]
+    tweaked_gen_files = [ os.path.join(rsync_lastver, fn) for fn in gen_files ]
     cmd_run(['tar', 'xzf', lasttar_file, *tweaked_gen_files])
     os.rename(rsync_lastver, 'a')
 
     print(f"Creating {diff_file} ...")
-    cmd_chk(['rsync', '-a', *gen_files, 'b/'])
+    cmd_chk(['rsync', '-a', *gen_pathnames, 'b/'])
 
     sed_script = r's:^((---|\+\+\+) [ab]/[^\t]+)\t.*:\1:' # CAUTION: must not contain any single quotes!
     cmd_chk(f"(git diff v{lastversion} {v_ver} -- ':!.github'; diff -upN a b | sed -r '{sed_script}') | gzip -9 >{diff_file}")
@@ -328,7 +329,7 @@ About to:
 
     print(f"Updating the other files in {dest} ...")
     md_files = 'README.md NEWS.md'.split()
-    html_files = [ fn for fn in gen_files if fn.endswith('.html') ]
+    html_files = [ fn for fn in gen_pathnames if fn.endswith('.html') ]
     cmd_chk(['rsync', '-a', *md_files, *html_files, dest])
     cmd_chk(["packaging/md2html"] + [ dest +'/'+ fn for fn in md_files ])
 
