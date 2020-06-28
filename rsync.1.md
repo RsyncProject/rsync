@@ -1495,7 +1495,7 @@ your home directory (remove the '=' for that).
 
     When both sides of the transfer are at least 3.2.0, rsync chooses the first
     algorithm in the client's list of choices that is also in the server's list
-    of choices.  If no common checksum choice is found, the client exits with
+    of choices.  If no common checksum choice is found, rsync exits with
     an error.  If the remote rsync is too old to support checksum negotiation,
     a value is chosen based on the protocol version (which chooses between MD5
     and various flavors of MD4 based on protocol age).
@@ -1503,12 +1503,12 @@ your home directory (remove the '=' for that).
     The default order can be customized by setting the environment variable
     RSYNC_CHECKSUM_LIST to a space-separated list of acceptable checksum names.
     If the environment variable contains a "`&`" character, the string is
-    separated into the "client list & server list".  If the resulting string is
-    empty (or contains only whitespace) the default checksum list is used.
-    This method does not allow you to specify the transfer checksum separately
-    from the pre-transfer checksum, and it discards "auto" and all unknown
-    checksum names.  A list with only invalid names will result in a failed
-    negotiation.
+    separated into the "client list & server list" otherwise the same string
+    applies to both.  If the string (or string portion) contains no
+    non-whitespace characters, the default checksum list is used.  This method
+    does not allow you to specify the transfer checksum separately from the
+    pre-transfer checksum, and it discards "auto" and all unknown checksum
+    names.  A list with only invalid names results in a failed negotiation.
 
     The use of the `--checksum-choice` option overrides this environment list.
 
@@ -2297,17 +2297,18 @@ your home directory (remove the '=' for that).
 
     When both sides of the transfer are at least 3.2.0, rsync chooses the first
     algorithm in the client's list of choices that is also in the server's list
-    of choices.  If no common compress choice is found, the client exits with
+    of choices.  If no common compress choice is found, rsync exits with
     an error.  If the remote rsync is too old to support checksum negotiation,
     its list is assumed to be "zlib".
 
     The default order can be customized by setting the environment variable
     RSYNC_COMPRESS_LIST to a space-separated list of acceptable compression
     names.  If the environment variable contains a "`&`" character, the string
-    is separated into the "client list & server list".  If the resulting string
-    is empty (or contains only whitespace) the default compress list is used.
-    Any unknown compression names are discarded from the list, but a list with
-    only invalid names will result in a failed negotiation.
+    is separated into the "client list & server list" otherwise the same string
+    applies to both.  If the string (or string portion) contains no
+    non-whitespace characters, the default compress list is used.  Any unknown
+    compression names are discarded from the list, but a list with only invalid
+    names results in a failed negotiation.
 
     There are some older rsync versions that were configured to reject a `-z`
     option and require the use of `-zz` because their compression library was

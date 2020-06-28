@@ -22,7 +22,7 @@ Protocol: 31 (unchanged)
    apply to both.
 
  - Simplify how the negotiation environment variables apply when interacting
-   with an older rsync version.
+   with an older rsync version and when they contain only invalid names.
 
  - Do not allow a negotiated checksum or compression choice of "none" unless
    the user authorized it via an environment variable or command-line option.
@@ -43,11 +43,13 @@ Protocol: 31 (unchanged)
 ### PACKAGING RELATED:
 
  - Prepared the checksum code for an upcoming xxHash release that provides new
-   XXH3 & XXH128 checksum routines.  These will not be compiled into rsync
-   until the xxhash v0.8.0 include files are installed on the build host, and
-   that release is a few weeks away at the time this was written.  So, if it's
-   now the future and you have packaged and installed xxhash-0.8.0-devel, a
-   fresh rebuild of rsync 3.2.2 will give you the new checksum routines.
+   XXH3 (64-bit) & XXH128 (128-bit) checksum routines.  These will not be
+   compiled into rsync until the xxhash v0.8.0 include files are installed on
+   the build host, and that release is a few weeks away at the time this was
+   written.  So, if it's now the future and you have packaged and installed
+   xxhash-0.8.0-devel, a fresh rebuild of rsync 3.2.2 will give you the new
+   checksum routines.  Just make sure that the new rsync package depends on
+   xxhash >= 0.8.0.
 
 ------------------------------------------------------------------------------
 <a name="3.2.1"></a>
