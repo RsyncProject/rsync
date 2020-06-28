@@ -366,7 +366,7 @@ static void recv_negotiate_str(int f_in, struct name_num_obj *nno, char *tmpbuf,
 		rprintf(FERROR, "%s list: %s\n", am_server ? "Client" : "Server", tmpbuf);
 		/* Recreate our original list from the saw values. This can't overflow our huge
 		 * buffer because we don't have enough valid entries to get anywhere close. */
-		for (j = 1; j <= nno->saw_len; j++) {
+		for (j = 1, *cp = '\0'; j <= nno->saw_len; j++) {
 			struct name_num_item *nni;
 			for (nni = nno->list; nni->name; nni++) {
 				if (nno->saw[nni->num] == j) {
@@ -376,6 +376,8 @@ static void recv_negotiate_str(int f_in, struct name_num_obj *nno, char *tmpbuf,
 				}
 			}
 		}
+		if (!*tmpbuf)
+			strlcpy(cp, " INVALID", MAX_NSTR_STRLEN);
 		rprintf(FERROR, "%s list:%s\n", am_server ? "Server" : "Client", tmpbuf);
 	}
 
