@@ -31,9 +31,11 @@ def main():
 
     starting_branch, args.base_branch = check_git_state(args.base_branch, not args.skip_check, args.patches_dir)
 
+    if not os.path.isdir('.gen-stash'):
+        os.mkdir('.gen-stash', 0o700)
     gen_stash(starting_branch)
     if starting_branch == 'master':
-        cmd_run('md5sum configure.ac >.gen-stash/configure.ac.sum')
+        cmd_chk('md5sum configure.ac >.gen-stash/configure.ac.sum')
 
     master_commit = latest_git_hash(args.base_branch)
 
@@ -213,8 +215,6 @@ def gen_stash(branch):
     for fn in files:
         if not os.path.exists(fn):
             return
-    if not os.path.isdir('.gen-stash'):
-        os.mkdir('.gen-stash', 0o700)
     tar_fn = gen_stash_prep(branch)
     cmd_run(['./prepare-source'])
     cmd_chk(['tar', 'czf', tar_fn, *files])

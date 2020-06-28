@@ -10,6 +10,8 @@ Protocol: 31 (unchanged)
 
  - Fixed installing rsync-ssl script from an alternate build dir.
 
+ - Fixed the updating of configure.sh from an alternate build dir.
+
  - Apple requires the asm function name to begin with an underscore.
 
  - Avoid a test failure in the daemon test when --atimes is disabled.
