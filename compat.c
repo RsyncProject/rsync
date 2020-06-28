@@ -110,9 +110,6 @@ struct name_num_obj valid_compressions = {
 #define CF_INPLACE_PARTIAL_DIR (1<<6)
 #define CF_VARINT_FLIST_FLAGS (1<<7)
 
-#define ENV_CHECKSUM 0
-#define ENV_COMPRESS 1
-
 static const char *client_info;
 
 /* The server makes sure that if either side only supports a pre-release
@@ -178,7 +175,7 @@ void parse_compress_choice(int final_call)
 		}
 		do_compression = nni->num;
 		if (am_server)
-			validate_choice_vs_env(do_compression, -1);
+			validate_choice_vs_env(NSTR_COMPRESS, do_compression, -1);
 	} else if (do_compression)
 		do_compression = CPRES_ZLIB;
 	else
@@ -385,13 +382,13 @@ static void recv_negotiate_str(int f_in, struct name_num_obj *nno, char *tmpbuf,
 	exit_cleanup(RERR_UNSUPPORTED);
 }
 
-static const char *getenv_nstr(int etype)
+static const char *getenv_nstr(int ntype)
 {
-	const char *env_str = getenv(etype == ENV_COMPRESS ? "RSYNC_COMPRESS_LIST" : "RSYNC_CHECKSUM_LIST");
+	const char *env_str = getenv(ntype == NSTR_COMPRESS ? "RSYNC_COMPRESS_LIST" : "RSYNC_CHECKSUM_LIST");
 
 	/* When writing a batch file, we always negotiate an old-style choice. */
 	if (write_batch) 
-		env_str = etype == ENV_COMPRESS ? "zlib" : protocol_version >= 30 ? "md5" : "md4";
+		env_str = ntype == NSTR_COMPRESS ? "zlib" : protocol_version >= 30 ? "md5" : "md4";
 
 	if (am_server && env_str) {
 		char *cp = strchr(env_str, '&');
@@ -402,11 +399,10 @@ static const char *getenv_nstr(int etype)
 	return env_str;
 }
 
-/* If num2 < 0 then the caller is checking compress values, otherwise checksum values. */
-void validate_choice_vs_env(int num1, int num2)
+void validate_choice_vs_env(int ntype, int num1, int num2)
 {
-	struct name_num_obj *nno = num2 < 0 ? &valid_compressions : &valid_checksums;
-	const char *list_str = getenv_nstr(num2 < 0 ? ENV_COMPRESS : ENV_CHECKSUM);
+	struct name_num_obj *nno = ntype == NSTR_COMPRESS ? &valid_compressions : &valid_checksums;
+	const char *list_str = getenv_nstr(ntype);
 	char tmpbuf[MAX_NSTR_STRLEN];
 
 	if (!list_str)
@@ -420,12 +416,13 @@ void validate_choice_vs_env(int num1, int num2)
 	init_nno_saw(nno, 0);
 	parse_nni_str(nno, list_str, tmpbuf, MAX_NSTR_STRLEN);
 
-	if (num2 >= 0) /* If "md4" is in the env list, all the old MD4 choices are OK too. */
+	if (ntype == NSTR_CHECKSUM) /* If "md4" is in the env list, all the old MD4 choices are OK too. */
 		nno->saw[CSUM_MD4_ARCHAIC] = nno->saw[CSUM_MD4_BUSTED] = nno->saw[CSUM_MD4_OLD] = nno->saw[CSUM_MD4];
 
 	if (!nno->saw[num1] || (num2 >= 0 && !nno->saw[num2])) {
 		rprintf(FERROR, "Your --%s-choice value (%s) was refused by the server.\n", 
-			num2 < 0 ? "compress" : "checksum", num2 < 0 ? compress_choice : checksum_choice);
+			ntype == NSTR_COMPRESS ? "compress" : "checksum",
+			ntype == NSTR_COMPRESS ? compress_choice : checksum_choice);
 		exit_cleanup(RERR_UNSUPPORTED);
 	}
 
@@ -480,10 +477,10 @@ int get_default_nno_list(struct name_num_obj *nno, char *to_buf, int to_buf_len,
 	return len;
 }
 
-static void send_negotiate_str(int f_out, struct name_num_obj *nno, int etype)
+static void send_negotiate_str(int f_out, struct name_num_obj *nno, int ntype)
 {
 	char tmpbuf[MAX_NSTR_STRLEN];
-	const char *list_str = getenv_nstr(etype);
+	const char *list_str = getenv_nstr(ntype);
 	int len;
 
 	if (list_str && *list_str) {
@@ -514,10 +511,10 @@ static void negotiate_the_strings(int f_in, int f_out)
 	/* We send all the negotiation strings before we start to read them to help avoid a slow startup. */
 
 	if (!checksum_choice)
-		send_negotiate_str(f_out, &valid_checksums, ENV_CHECKSUM);
+		send_negotiate_str(f_out, &valid_checksums, NSTR_CHECKSUM);
 
 	if (do_compression && !compress_choice)
-		send_negotiate_str(f_out, &valid_compressions, ENV_COMPRESS);
+		send_negotiate_str(f_out, &valid_compressions, NSTR_COMPRESS);
 
 	if (valid_checksums.saw) {
 		char tmpbuf[MAX_NSTR_STRLEN];

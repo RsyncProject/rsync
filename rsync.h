@@ -1078,6 +1078,9 @@ typedef struct {
 #define CPRES_LZ4 3
 #define CPRES_ZSTD 4
 
+#define NSTR_CHECKSUM 0
+#define NSTR_COMPRESS 1
+
 struct name_num_item {
 	int num;
 	const char *name, *main_name;
