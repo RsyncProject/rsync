@@ -1277,6 +1277,7 @@ extern char *do_malloc;
 #define new_array0(type, num) ((type*)my_alloc(NULL, (num), sizeof (type), __FILE__, __LINE__))
 #define realloc_array(ptr, type, num) ((type*)my_alloc((ptr), (num), sizeof (type), __FILE__, __LINE__))
 
+#undef strdup
 #define strdup(s) my_strdup(s, __FILE__, __LINE__)
 
 /* use magic gcc attributes to catch format errors */
