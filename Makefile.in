@@ -1,4 +1,4 @@
-# The input file that configure uses to create the Makefile for rsync.
+# The Makefile for rsync (configure creates it from Makefile.in).
 
 prefix=@prefix@
 datarootdir=@datarootdir@

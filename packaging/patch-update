@@ -127,25 +127,20 @@ def update_patch(patch):
 
     s = cmd_run(['git', 'merge', based_on])
     ok = s.returncode == 0
-    if not ok or args.shell:
+    if not ok or args.cmd or args.shell:
         cmd_chk(['packaging/prep-auto-dir'], discard='output')
-        m = re.search(r'([^/]+)$', parent)
-        parent_dir = m[1]
-        if not ok:
-            print(f'"git merge {based_on}" incomplete -- please fix.')
-        os.environ['PS1'] = f"[{parent_dir}] {patch}: "
-        while True:
-            s = cmd_run([os.environ.get('SHELL', '/bin/sh')])
-            if s.returncode != 0:
-                ans = input("Abort? [n/y] ")
-                if re.match(r'^y', ans, flags=re.I):
-                    return 0
-                continue
-            cur_branch, is_clean, status_txt = check_git_status(0)
-            if is_clean:
-                break
-            print(status_txt, end='')
-        cmd_run('rm -f build/*.o build/*/*.o')
+    if not ok:
+        print(f'"git merge {based_on}" incomplete -- please fix.')
+        if not run_a_shell(parent, patch):
+            return 0
+    if args.cmd:
+        if cmd_run(args.cmd).returncode != 0:
+            if not run_a_shell(parent, patch):
+                return 0
+            ok = False
+    if ok and args.shell:
+        if not run_a_shell(parent, patch):
+            return 0
 
     with open(f"{args.patches_dir}/{patch}.diff", 'w', encoding='utf-8') as fh:
         fh.write(description[patch])
@@ -193,10 +188,30 @@ def update_patch(patch):
                 line =  plus_re.sub(r'+++ b/\1', line)
                 fh.write(line)
             proc.communicate()
-            for fn in gen_files:
-                os.unlink(fn)
 
     return 1
+
+
+def run_a_shell(parent, patch):
+    m = re.search(r'([^/]+)$', parent)
+    parent_dir = m[1]
+    os.environ['PS1'] = f"[{parent_dir}] {patch}: "
+
+    while True:
+        s = cmd_run([os.environ.get('SHELL', '/bin/sh')])
+        if s.returncode != 0:
+            ans = input("Abort? [n/y] ")
+            if re.match(r'^y', ans, flags=re.I):
+                return False
+            continue
+        cur_branch, is_clean, status_txt = check_git_status(0)
+        if is_clean:
+            break
+        print(status_txt, end='')
+
+    cmd_run('rm -f build/*.o build/*/*.o')
+
+    return True
 
 
 if __name__ == '__main__':
@@ -204,6 +219,7 @@ if __name__ == '__main__':
     parser.add_argument('--branch', '-b', dest='base_branch', metavar='BASE_BRANCH', default='master', help="The branch the patch is based on. Default: master.")
     parser.add_argument('--skip-check', action='store_true', help="Skip the check that ensures starting with a clean branch.")
     parser.add_argument('--shell', '-s', action='store_true', help="Launch a shell for every patch/BASE/* branch updated, not just when a conflict occurs.")
+    parser.add_argument('--cmd', '-c', help="Run a command in every patch branch.")
     parser.add_argument('--gen', metavar='DIR', nargs='?', const='', help='Include generated files. Optional DIR value overrides the default of using the "patches" dir.')
     parser.add_argument('--patches-dir', '-p', metavar='DIR', default='patches', help="Override the location of the rsync-patches dir. Default: patches.")
     parser.add_argument('patch_files', metavar='patches/DIFF_FILE', nargs='*', help="Specify what patch diff files to process. Default: all of them.")
