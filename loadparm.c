@@ -463,25 +463,25 @@ void reset_daemon_vars(void)
 
 /* Expand %VAR% references.  Any unknown vars or unrecognized
  * syntax leaves the raw chars unchanged. */
-static char *expand_vars(char *str)
+static char *expand_vars(const char *str)
 {
-	char *buf, *t, *f;
+	char *buf, *t;
+	const char *f;
 	int bufsize;
 
 	if (!str || !strchr(str, '%'))
-		return str;
+		return (char *)str; /* TODO change return value to const char* at some point. */
 
 	bufsize = strlen(str) + 2048;
 	buf = new_array(char, bufsize+1); /* +1 for trailing '\0' */
 
 	for (t = buf, f = str; bufsize && *f; ) {
-		if (*f == '%' && *++f != '%') {
-			char *percent = strchr(f, '%');
-			if (percent) {
+		if (*f == '%' && isUpper(f+1)) {
+			char *percent = strchr(f+1, '%');
+			if (percent && percent - f < bufsize) {
 				char *val;
-				*percent = '\0';
-				val = getenv(f);
-				*percent = '%';
+				strlcpy(t, f+1, percent - f);
+				val = getenv(t);
 				if (val) {
 					int len = strlcpy(t, val, bufsize+1);
 					if (len > bufsize)
@@ -492,7 +492,6 @@ static char *expand_vars(char *str)
 					continue;
 				}
 			}
-			f--;
 		}
 		*t++ = *f++;
 		bufsize--;

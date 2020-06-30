@@ -8,6 +8,9 @@ Protocol: 31 (unchanged)
 
 ### BUG FIXES:
 
+ - Avoid a crash when a daemon module enables `transfer logging` without
+   setting a `log format` value.
+
  - Fixed installing rsync-ssl script from an alternate build dir.
 
  - Fixed the updating of configure.sh from an alternate build dir.
