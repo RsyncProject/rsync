@@ -3,9 +3,9 @@ TARGETS := all install install-ssl-daemon install-all install-strip conf gen gen
 
 .PHONY: $(TARGETS) auto-prep
 
+$(TARGETS): auto-prep
+	make -C build $@
+
 auto-prep:
 	@if test x`packaging/prep-auto-dir` = x; then echo "auto-build-save is not setup"; exit 1; fi
 	@echo 'Build branch: '`readlink build/.branch | tr % /`
-
-$(TARGETS): auto-prep
-	make -C build $@
