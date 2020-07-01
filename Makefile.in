@@ -101,7 +101,7 @@ $(CHECK_OBJS): $(HEADERS)
 tls.o xattrs.o: lib/sysxattrs.h
 options.o: latest-year.h help-rsync.h help-rsyncd.h
 exclude.o: default-cvsignore.h
-loadparm.o: default-dont-compress.h
+loadparm.o: default-dont-compress.h daemon-parm.h
 
 flist.o: rounding.h
 
@@ -110,6 +110,9 @@ default-cvsignore.h default-dont-compress.h: rsync.1.md define-from-md.awk
 
 help-rsync.h help-rsyncd.h: rsync.1.md help-from-md.awk
 	$(AWK) -f $(srcdir)/help-from-md.awk -v hfile=$@ $(srcdir)/rsync.1.md
+
+daemon-parm.h: daemon-parm.txt daemon-parm.awk
+	$(AWK) -f $(srcdir)/daemon-parm.awk $(srcdir)/daemon-parm.txt
 
 rounding.h: rounding.c rsync.h proto.h
 	@for r in 0 1 3; do \
@@ -228,8 +231,8 @@ proto: proto.h-tstamp
 proto.h: proto.h-tstamp
 	@if test -f proto.h; then :; else cp -p $(srcdir)/proto.h .; fi
 
-proto.h-tstamp: $(srcdir)/*.c $(srcdir)/lib/compat.c config.h
-	$(AWK) -f $(srcdir)/mkproto.awk $(srcdir)/*.c $(srcdir)/lib/compat.c
+proto.h-tstamp: $(srcdir)/*.c $(srcdir)/lib/compat.c config.h daemon-parm.h
+	$(AWK) -f $(srcdir)/mkproto.awk $(srcdir)/*.c $(srcdir)/lib/compat.c daemon-parm.h
 
 .PHONY: man
 man: rsync.1 rsync-ssl.1 rsyncd.conf.5

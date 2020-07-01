@@ -21,6 +21,7 @@ aclocal.m4
 /help-rsync*.h
 /default-cvsignore.h
 /default-dont-compress.h
+/daemon-parm.h
 /.md2man-works
 /autom4te*.cache
 /confdefs.h

@@ -1,0 +1,65 @@
+Globals: ================================================================
+
+STRING	bind_address		NULL
+STRING	daemon_chroot		NULL
+STRING	daemon_gid		NULL
+STRING	daemon_uid		NULL
+STRING	motd_file		NULL
+STRING	pid_file		NULL
+STRING	socket_options		NULL
+
+INTEGER	listen_backlog		5
+INTEGER	rsync_port		0
+
+BOOL	proxy_protocol		False
+
+Locals: =================================================================
+
+STRING	auth_users		NULL
+STRING	charset			NULL
+STRING	comment			NULL
+STRING	dont_compress		DEFAULT_DONT_COMPRESS
+STRING	early_exec		NULL
+STRING	exclude			NULL
+STRING	exclude_from		NULL
+STRING	filter			NULL
+STRING	gid			NULL
+STRING	hosts_allow		NULL
+STRING	hosts_deny		NULL
+STRING	include			NULL
+STRING	include_from		NULL
+STRING	incoming_chmod		NULL
+STRING	lock_file		DEFAULT_LOCK_FILE
+STRING	log_file		NULL
+STRING	log_format		"%o %h [%a] %m (%u) %f %l"
+STRING	name			NULL
+STRING	outgoing_chmod		NULL
+STRING	post-xfer_exec		NULL
+STRING	pre-xfer_exec		NULL
+STRING	refuse_options		NULL
+STRING	secrets_file		NULL
+STRING	syslog_tag		"rsyncd"
+STRING	uid			NULL
+
+PATH	path			NULL
+PATH	temp_dir		NULL
+
+INTEGER	max_connections		0
+INTEGER	max_verbosity		1
+INTEGER	timeout			0
+
+ENUM	syslog_facility		LOG_DAEMON
+
+BOOL	fake_super		False
+BOOL	forward_lookup		True
+BOOL	ignore_errors		False
+BOOL	ignore_nonreadable	False
+BOOL	list			True
+BOOL	munge_symlinks		(BOOL)-1
+BOOL	numeric_ids		(BOOL)-1
+BOOL	read_only		True
+BOOL	reverse_lookup		True
+BOOL	strict_modes		True
+BOOL	transfer_logging	False
+BOOL	use_chroot		True
+BOOL	write_only		False

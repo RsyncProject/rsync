@@ -61,6 +61,9 @@ Protocol: 31 (unchanged)
  - Moved the version number out of configure.ac into its own version.h file so
    that we don't need to reconfigure just because the version number changes.
 
+ - Moved the daemon parameter list into daemon-parm.txt so that an awk script
+   can create the interrelated structs and accessors that loadparm.c needs.
+
 ------------------------------------------------------------------------------
 <a name="3.2.1"></a>
 

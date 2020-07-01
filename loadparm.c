@@ -87,234 +87,6 @@ struct parm_struct {
 #define LP_SNUM_OK(i) ((i) >= 0 && (i) < (int)section_list.count)
 #define SECTION_PTR(s, p) (((char*)(s)) + (ptrdiff_t)(((char*)(p))-(char*)&Vars.l))
 
-/* This structure describes global (ie., server-wide) parameters. */
-typedef struct {
-	char *bind_address;
-	char *daemon_chroot;
-	char *daemon_gid;
-	char *daemon_uid;
-	char *motd_file;
-	char *pid_file;
-	char *socket_options;
-
-	/* Each _EXP var tracks if the associated char* var has been expanded yet or not. */
-	BOOL bind_address_EXP;
-	BOOL daemon_chroot_EXP;
-	BOOL daemon_gid_EXP;
-	BOOL daemon_uid_EXP;
-	BOOL motd_file_EXP;
-	BOOL pid_file_EXP;
-	BOOL socket_options_EXP;
-
-	int listen_backlog;
-	int rsync_port;
-
-	BOOL proxy_protocol;
-} global_vars;
-
-/* This structure describes a single section.  Their order must match the
- * initializers below, which you can accomplish by keeping each sub-section
- * sorted.  (e.g. in vim, just visually select each subsection and use !sort.)
- * NOTE: the char* variables MUST all remain at the start of the struct! */
-typedef struct {
-	char *auth_users;
-	char *charset;
-	char *comment;
-	char *dont_compress;
-	char *early_exec;
-	char *exclude;
-	char *exclude_from;
-	char *filter;
-	char *gid;
-	char *hosts_allow;
-	char *hosts_deny;
-	char *include;
-	char *include_from;
-	char *incoming_chmod;
-	char *lock_file;
-	char *log_file;
-	char *log_format;
-	char *name;
-	char *outgoing_chmod;
-	char *path;
-	char *postxfer_exec;
-	char *prexfer_exec;
-	char *refuse_options;
-	char *secrets_file;
-	char *syslog_tag;
-	char *temp_dir;
-	char *uid;
-
-	/* Each _EXP var tracks if the associated char* var has been expanded yet or not. */
-	BOOL auth_users_EXP;
-	BOOL charset_EXP;
-	BOOL comment_EXP;
-	BOOL dont_compress_EXP;
-	BOOL early_exec_EXP;
-	BOOL exclude_EXP;
-	BOOL exclude_from_EXP;
-	BOOL filter_EXP;
-	BOOL gid_EXP;
-	BOOL hosts_allow_EXP;
-	BOOL hosts_deny_EXP;
-	BOOL include_EXP;
-	BOOL include_from_EXP;
-	BOOL incoming_chmod_EXP;
-	BOOL lock_file_EXP;
-	BOOL log_file_EXP;
-	BOOL log_format_EXP;
-	BOOL name_EXP;
-	BOOL outgoing_chmod_EXP;
-	BOOL path_EXP;
-	BOOL postxfer_exec_EXP;
-	BOOL prexfer_exec_EXP;
-	BOOL refuse_options_EXP;
-	BOOL secrets_file_EXP;
-	BOOL syslog_tag_EXP;
-	BOOL temp_dir_EXP;
-	BOOL uid_EXP;
-
-	int max_connections;
-	int max_verbosity;
-	int syslog_facility;
-	int timeout;
-
-	BOOL fake_super;
-	BOOL forward_lookup;
-	BOOL ignore_errors;
-	BOOL ignore_nonreadable;
-	BOOL list;
-	BOOL munge_symlinks;
-	BOOL numeric_ids;
-	BOOL read_only;
-	BOOL reverse_lookup;
-	BOOL strict_modes;
-	BOOL transfer_logging;
-	BOOL use_chroot;
-	BOOL write_only;
-} local_vars;
-
-/* This structure describes the global variables (g) as well as the globally
- * specified values of the local variables (l), which are used when modules
- * don't specify their own values. */
-typedef struct {
-	global_vars g;
-	local_vars l;
-} all_vars;
-
-/* The application defaults for all the variables.  "Defaults" is
- * used to re-initialize "Vars" before each config-file read.
- *
- * In order to keep these sorted in the same way as the structure
- * above, use the variable name in the leading comment, including a
- * trailing ';' (to avoid a sorting problem with trailing digits). */
-static const all_vars Defaults = {
- /* ==== global_vars ==== */
- {
- /* bind_address; */		NULL,
- /* daemon_chroot; */		NULL,
- /* daemon_gid; */		NULL,
- /* daemon_uid; */		NULL,
- /* motd_file; */		NULL,
- /* pid_file; */		NULL,
- /* socket_options; */		NULL,
-
- /* bind_address_EXP; */	False,
- /* daemon_chroot_EXP; */	False,
- /* daemon_gid_EXP; */		False,
- /* daemon_uid_EXP; */		False,
- /* motd_file_EXP; */		False,
- /* pid_file_EXP; */		False,
- /* socket_options_EXP; */	False,
-
- /* listen_backlog; */		5,
- /* rsync_port; */		0,
-
- /* proxy_protocol; */		False,
- },
-
- /* ==== local_vars ==== */
- {
- /* auth_users; */		NULL,
- /* charset; */ 		NULL,
- /* comment; */ 		NULL,
- /* dont_compress; */		DEFAULT_DONT_COMPRESS,
- /* early_exec; */		NULL,
- /* exclude; */ 		NULL,
- /* exclude_from; */		NULL,
- /* filter; */			NULL,
- /* gid; */			NULL,
- /* hosts_allow; */		NULL,
- /* hosts_deny; */		NULL,
- /* include; */			NULL,
- /* include_from; */		NULL,
- /* incoming_chmod; */		NULL,
- /* lock_file; */		DEFAULT_LOCK_FILE,
- /* log_file; */		NULL,
- /* log_format; */		"%o %h [%a] %m (%u) %f %l",
- /* name; */			NULL,
- /* outgoing_chmod; */		NULL,
- /* path; */			NULL,
- /* postxfer_exec; */		NULL,
- /* prexfer_exec; */		NULL,
- /* refuse_options; */		NULL,
- /* secrets_file; */		NULL,
- /* syslog_tag; */		"rsyncd",
- /* temp_dir; */ 		NULL,
- /* uid; */			NULL,
-
- /* auth_users_EXP; */		False,
- /* charset_EXP; */		False,
- /* comment_EXP; */		False,
- /* dont_compress_EXP; */	False,
- /* early_exec_EXP; */		False,
- /* exclude_EXP; */		False,
- /* exclude_from_EXP; */	False,
- /* filter_EXP; */		False,
- /* gid_EXP; */			False,
- /* hosts_allow_EXP; */		False,
- /* hosts_deny_EXP; */		False,
- /* include_EXP; */		False,
- /* include_from_EXP; */	False,
- /* incoming_chmod_EXP; */	False,
- /* lock_file_EXP; */		False,
- /* log_file_EXP; */		False,
- /* log_format_EXP; */		False,
- /* name_EXP; */		False,
- /* outgoing_chmod_EXP; */	False,
- /* path_EXP; */		False,
- /* postxfer_exec_EXP; */	False,
- /* prexfer_exec_EXP; */	False,
- /* refuse_options_EXP; */	False,
- /* secrets_file_EXP; */	False,
- /* syslog_tag_EXP; */		False,
- /* temp_dir_EXP; */		False,
- /* uid_EXP; */			False,
-
- /* max_connections; */		0,
- /* max_verbosity; */		1,
- /* syslog_facility; */		LOG_DAEMON,
- /* timeout; */			0,
-
- /* fake_super; */		False,
- /* forward_lookup; */		True,
- /* ignore_errors; */		False,
- /* ignore_nonreadable; */	False,
- /* list; */			True,
- /* munge_symlinks; */		(BOOL)-1,
- /* numeric_ids; */		(BOOL)-1,
- /* read_only; */		True,
- /* reverse_lookup; */		True,
- /* strict_modes; */		True,
- /* transfer_logging; */	False,
- /* use_chroot; */		True,
- /* write_only; */		False,
- }
-};
-
-/* The currently configured values for all the variables. */
-static all_vars Vars;
-
 /* Stack of "Vars" values used by the &include directive. */
 static item_list Vars_stack = EMPTY_ITEM_LIST;
 
@@ -324,9 +96,7 @@ static item_list section_list = EMPTY_ITEM_LIST;
 static int iSectionIndex = -1;
 static BOOL bInGlobalSection = True;
 
-#define NUMPARAMETERS (sizeof (parm_table) / sizeof (struct parm_struct))
-
-static struct enum_list enum_facilities[] = {
+static struct enum_list enum_syslog_facility[] = {
 #ifdef LOG_AUTH
 	{ LOG_AUTH, "auth" },
 #endif
@@ -393,74 +163,6 @@ static struct enum_list enum_facilities[] = {
 	{ -1, NULL }
 };
 
-static struct parm_struct parm_table[] =
-{
- {"address",           P_STRING, P_GLOBAL,&Vars.g.bind_address,        NULL,0},
- {"daemon chroot",     P_STRING, P_GLOBAL,&Vars.g.daemon_chroot,       NULL,0},
- {"daemon gid",        P_STRING, P_GLOBAL,&Vars.g.daemon_gid,          NULL,0},
- {"daemon uid",        P_STRING, P_GLOBAL,&Vars.g.daemon_uid,          NULL,0},
- {"listen backlog",    P_INTEGER,P_GLOBAL,&Vars.g.listen_backlog,      NULL,0},
- {"motd file",         P_STRING, P_GLOBAL,&Vars.g.motd_file,           NULL,0},
- {"pid file",          P_STRING, P_GLOBAL,&Vars.g.pid_file,            NULL,0},
- {"port",              P_INTEGER,P_GLOBAL,&Vars.g.rsync_port,          NULL,0},
- {"proxy protocol",    P_BOOL,   P_LOCAL, &Vars.g.proxy_protocol,      NULL,0},
- {"socket options",    P_STRING, P_GLOBAL,&Vars.g.socket_options,      NULL,0},
-
- {"auth users",        P_STRING, P_LOCAL, &Vars.l.auth_users,          NULL,0},
- {"charset",           P_STRING, P_LOCAL, &Vars.l.charset,             NULL,0},
- {"comment",           P_STRING, P_LOCAL, &Vars.l.comment,             NULL,0},
- {"dont compress",     P_STRING, P_LOCAL, &Vars.l.dont_compress,       NULL,0},
- {"early exec",        P_STRING, P_LOCAL, &Vars.l.early_exec,          NULL,0},
- {"exclude from",      P_STRING, P_LOCAL, &Vars.l.exclude_from,        NULL,0},
- {"exclude",           P_STRING, P_LOCAL, &Vars.l.exclude,             NULL,0},
- {"fake super",        P_BOOL,   P_LOCAL, &Vars.l.fake_super,          NULL,0},
- {"filter",            P_STRING, P_LOCAL, &Vars.l.filter,              NULL,0},
- {"forward lookup",    P_BOOL,   P_LOCAL, &Vars.l.forward_lookup,      NULL,0},
- {"gid",               P_STRING, P_LOCAL, &Vars.l.gid,                 NULL,0},
- {"hosts allow",       P_STRING, P_LOCAL, &Vars.l.hosts_allow,         NULL,0},
- {"hosts deny",        P_STRING, P_LOCAL, &Vars.l.hosts_deny,          NULL,0},
- {"ignore errors",     P_BOOL,   P_LOCAL, &Vars.l.ignore_errors,       NULL,0},
- {"ignore nonreadable",P_BOOL,   P_LOCAL, &Vars.l.ignore_nonreadable,  NULL,0},
- {"include from",      P_STRING, P_LOCAL, &Vars.l.include_from,        NULL,0},
- {"include",           P_STRING, P_LOCAL, &Vars.l.include,             NULL,0},
- {"incoming chmod",    P_STRING, P_LOCAL, &Vars.l.incoming_chmod,      NULL,0},
- {"list",              P_BOOL,   P_LOCAL, &Vars.l.list,                NULL,0},
- {"lock file",         P_STRING, P_LOCAL, &Vars.l.lock_file,           NULL,0},
- {"log file",          P_STRING, P_LOCAL, &Vars.l.log_file,            NULL,0},
- {"log format",        P_STRING, P_LOCAL, &Vars.l.log_format,          NULL,0},
- {"max connections",   P_INTEGER,P_LOCAL, &Vars.l.max_connections,     NULL,0},
- {"max verbosity",     P_INTEGER,P_LOCAL, &Vars.l.max_verbosity,       NULL,0},
- {"munge symlinks",    P_BOOL,   P_LOCAL, &Vars.l.munge_symlinks,      NULL,0},
- {"name",              P_STRING, P_LOCAL, &Vars.l.name,                NULL,0},
- {"numeric ids",       P_BOOL,   P_LOCAL, &Vars.l.numeric_ids,         NULL,0},
- {"outgoing chmod",    P_STRING, P_LOCAL, &Vars.l.outgoing_chmod,      NULL,0},
- {"path",              P_PATH,   P_LOCAL, &Vars.l.path,                NULL,0},
-#ifdef HAVE_PUTENV
- {"post-xfer exec",    P_STRING, P_LOCAL, &Vars.l.postxfer_exec,       NULL,0},
- {"pre-xfer exec",     P_STRING, P_LOCAL, &Vars.l.prexfer_exec,        NULL,0},
-#endif
- {"read only",         P_BOOL,   P_LOCAL, &Vars.l.read_only,           NULL,0},
- {"refuse options",    P_STRING, P_LOCAL, &Vars.l.refuse_options,      NULL,0},
- {"reverse lookup",    P_BOOL,   P_LOCAL, &Vars.l.reverse_lookup,      NULL,0},
- {"secrets file",      P_STRING, P_LOCAL, &Vars.l.secrets_file,        NULL,0},
- {"strict modes",      P_BOOL,   P_LOCAL, &Vars.l.strict_modes,        NULL,0},
- {"syslog facility",   P_ENUM,   P_LOCAL, &Vars.l.syslog_facility,     enum_facilities,0},
- {"syslog tag",        P_STRING, P_LOCAL, &Vars.l.syslog_tag,          NULL,0},
- {"temp dir",          P_PATH,   P_LOCAL, &Vars.l.temp_dir,            NULL,0},
- {"timeout",           P_INTEGER,P_LOCAL, &Vars.l.timeout,             NULL,0},
- {"transfer logging",  P_BOOL,   P_LOCAL, &Vars.l.transfer_logging,    NULL,0},
- {"uid",               P_STRING, P_LOCAL, &Vars.l.uid,                 NULL,0},
- {"use chroot",        P_BOOL,   P_LOCAL, &Vars.l.use_chroot,          NULL,0},
- {"write only",        P_BOOL,   P_LOCAL, &Vars.l.write_only,          NULL,0},
- {NULL,                P_BOOL,   P_NONE,  NULL,                        NULL,0}
-};
-
-/* Initialise the Default all_vars structure. */
-void reset_daemon_vars(void)
-{
-	memcpy(&Vars, &Defaults, sizeof Vars);
-}
-
 /* Expand %VAR% references.  Any unknown vars or unrecognized
  * syntax leaves the raw chars unchanged. */
 static char *expand_vars(const char *str)
@@ -509,6 +211,8 @@ static char *expand_vars(const char *str)
 	return buf;
 }
 
+/* Each "char* foo" has an associated "BOOL foo_EXP" that tracks if the string has been expanded yet or not. */
+
 /* NOTE: use this function and all the FN_{GLOBAL,LOCAL} ones WITHOUT a trailing semicolon! */
 #define RETURN_EXPANDED(val) {if (!val ## _EXP) {val = expand_vars(val); val ## _EXP = True;} return val ? val : "";}
 
@@ -533,65 +237,24 @@ static char *expand_vars(const char *str)
 #define FN_LOCAL_INTEGER(fn_name, val) \
  int fn_name(int i) {return LP_SNUM_OK(i)? iSECTION(i).val : Vars.l.val;}
 
-FN_GLOBAL_STRING(lp_bind_address, bind_address)
-FN_GLOBAL_STRING(lp_daemon_chroot, daemon_chroot)
-FN_GLOBAL_STRING(lp_daemon_gid, daemon_gid)
-FN_GLOBAL_STRING(lp_daemon_uid, daemon_uid)
-FN_GLOBAL_STRING(lp_motd_file, motd_file)
-FN_GLOBAL_STRING(lp_pid_file, pid_file)
-FN_GLOBAL_STRING(lp_socket_options, socket_options)
+/* The following include file contains:
+ *
+ * typedef global_vars - describes global (ie., server-wide) parameters.
+ * typedef local_vars - describes a single section.
+ * typedef all_vars - a combination of global_vars & local_vars.
+ * all_vars Defaults - the default values for all the variables.
+ * all_vars Vars - tThe currently configured values for all the variables.
+ * struct parm_struct parm_table - the strings & variables for the parser.
+ * FN_{LOCAL,GLOBAL}_{TYPE}() definition for all the lp_var_name() accessors.
+ */
 
-FN_GLOBAL_INTEGER(lp_listen_backlog, listen_backlog)
-FN_GLOBAL_INTEGER(lp_rsync_port, rsync_port)
+#include "daemon-parm.h"
 
-FN_GLOBAL_BOOL(lp_proxy_protocol, proxy_protocol)
-
-FN_LOCAL_STRING(lp_auth_users, auth_users)
-FN_LOCAL_STRING(lp_charset, charset)
-FN_LOCAL_STRING(lp_comment, comment)
-FN_LOCAL_STRING(lp_dont_compress, dont_compress)
-FN_LOCAL_STRING(lp_early_exec, early_exec)
-FN_LOCAL_STRING(lp_exclude, exclude)
-FN_LOCAL_STRING(lp_exclude_from, exclude_from)
-FN_LOCAL_STRING(lp_filter, filter)
-FN_LOCAL_STRING(lp_gid, gid)
-FN_LOCAL_STRING(lp_hosts_allow, hosts_allow)
-FN_LOCAL_STRING(lp_hosts_deny, hosts_deny)
-FN_LOCAL_STRING(lp_include, include)
-FN_LOCAL_STRING(lp_include_from, include_from)
-FN_LOCAL_STRING(lp_incoming_chmod, incoming_chmod)
-FN_LOCAL_STRING(lp_lock_file, lock_file)
-FN_LOCAL_STRING(lp_log_file, log_file)
-FN_LOCAL_STRING(lp_log_format, log_format)
-FN_LOCAL_STRING(lp_name, name)
-FN_LOCAL_STRING(lp_outgoing_chmod, outgoing_chmod)
-FN_LOCAL_STRING(lp_path, path)
-FN_LOCAL_STRING(lp_postxfer_exec, postxfer_exec)
-FN_LOCAL_STRING(lp_prexfer_exec, prexfer_exec)
-FN_LOCAL_STRING(lp_refuse_options, refuse_options)
-FN_LOCAL_STRING(lp_secrets_file, secrets_file)
-FN_LOCAL_STRING(lp_syslog_tag, syslog_tag)
-FN_LOCAL_STRING(lp_temp_dir, temp_dir)
-FN_LOCAL_STRING(lp_uid, uid)
-
-FN_LOCAL_INTEGER(lp_max_connections, max_connections)
-FN_LOCAL_INTEGER(lp_max_verbosity, max_verbosity)
-FN_LOCAL_INTEGER(lp_syslog_facility, syslog_facility)
-FN_LOCAL_INTEGER(lp_timeout, timeout)
-
-FN_LOCAL_BOOL(lp_fake_super, fake_super)
-FN_LOCAL_BOOL(lp_forward_lookup, forward_lookup)
-FN_LOCAL_BOOL(lp_ignore_errors, ignore_errors)
-FN_LOCAL_BOOL(lp_ignore_nonreadable, ignore_nonreadable)
-FN_LOCAL_BOOL(lp_list, list)
-FN_LOCAL_BOOL(lp_munge_symlinks, munge_symlinks)
-FN_LOCAL_BOOL(lp_numeric_ids, numeric_ids)
-FN_LOCAL_BOOL(lp_read_only, read_only)
-FN_LOCAL_BOOL(lp_reverse_lookup, reverse_lookup)
-FN_LOCAL_BOOL(lp_strict_modes, strict_modes)
-FN_LOCAL_BOOL(lp_transfer_logging, transfer_logging)
-FN_LOCAL_BOOL(lp_use_chroot, use_chroot)
-FN_LOCAL_BOOL(lp_write_only, write_only)
+/* Initialise the Default all_vars structure. */
+void reset_daemon_vars(void)
+{
+	memcpy(&Vars, &Defaults, sizeof Vars);
+}
 
 /* Assign a copy of v to *s.  Handles NULL strings.  We don't worry
  * about overwriting a malloc'd string because the long-running
