@@ -43,6 +43,8 @@ Protocol: 31 (unchanged)
    die when out of memory.  This eliminated some caller-side check-and-die
    code and added some missing sanity-checking of allocations.
 
+ - Put optimizations into their own list in the `--version` output.
+
  - Improved the man page a bit more.
 
 ### PACKAGING RELATED:

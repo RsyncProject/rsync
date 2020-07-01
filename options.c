@@ -581,12 +581,15 @@ static char *istring(const char *fmt, int val)
 	return str;
 }
 
-static void print_capabilities(enum logcode f)
+static void print_info_flags(enum logcode f)
 {
 	STRUCT_STAT *dumstat;
 	char line_buf[75];
 	int line_len, j;
 	char *capabilities[] = {
+
+	"*Capabilities",
+
 		istring("%d-bit files", (int)(sizeof (OFF_T) * 8)),
 		istring("%d-bit inums", (int)(sizeof dumstat->st_ino * 8)), /* Don't check ino_t! */
 		istring("%d-bit timestamps", (int)(sizeof (time_t) * 8)),
@@ -661,7 +664,8 @@ static void print_capabilities(enum logcode f)
 #endif
 			"prealloc",
 
-	"*" /* All options after this point are hidden w/o -V -V */
+	"*Optimizations",
+
 #ifndef HAVE_SIMD
 		"no "
 #endif
@@ -681,28 +685,19 @@ static void print_capabilities(enum logcode f)
 	};
 
 	for (line_len = 0, j = 0; ; j++) {
-		char *cap = capabilities[j];
-		if (!cap)
-			break;
-		if (*cap == '*') {
-			if (version_opt_cnt >= 2)
-				capabilities[j]++;
-			else
-				capabilities[j] = NULL;
-			break;
-		}
-	}
-
-	for (line_len = 0, j = 0; ; j++) {
-		char *cap = capabilities[j];
-		int cap_len = cap ? strlen(cap) : 1000;
-		int need_comma = cap && capabilities[j+1] != NULL ? 1 : 0;
-		if (line_len + 1 + cap_len + need_comma >= (int)sizeof line_buf) {
+		char *cap = capabilities[j], *next_cap = cap ? capabilities[j+1] : NULL;
+		int cap_len = cap && *cap != '*' ? strlen(cap) : 1000;
+		int need_comma = next_cap && *next_cap != '*' ? 1 : 0;
+		if (line_len && line_len + 1 + cap_len + need_comma >= (int)sizeof line_buf) {
 			rprintf(f, "   %s\n", line_buf);
 			line_len = 0;
 		}
 		if (!cap)
 			break;
+		if (*cap == '*') {
+			rprintf(f, "%s:\n", cap+1);
+			continue;
+		}
 		line_len += snprintf(line_buf+line_len, sizeof line_buf - line_len, " %s%s", cap, need_comma ? "," : "");
 	}
 }
@@ -720,8 +715,7 @@ static void print_rsync_version(enum logcode f)
 	rprintf(f, "Copyright (C) 1996-" LATEST_YEAR " by Andrew Tridgell, Wayne Davison, and others.\n");
 	rprintf(f, "Web site: https://rsync.samba.org/\n");
 
-	rprintf(f, "Capabilities:\n");
-	print_capabilities(f);
+	print_info_flags(f);
 
 	rprintf(f, "Checksum list:\n");
 	get_default_nno_list(&valid_checksums, tmpbuf, sizeof tmpbuf, '(');

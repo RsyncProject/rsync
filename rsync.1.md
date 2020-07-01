@@ -521,9 +521,6 @@ your home directory (remove the '=' for that).
     list of compression algorithms, a list of compiled-in capabilities, a link
     to the rsync web site, and some license/copyright info.
 
-    Repeat the option (`-VV`) to include some optimization info at the end of
-    the capabilities list.
-
 0.  `--verbose`, `-v`
 
     This option increases the amount of information you are given during the
