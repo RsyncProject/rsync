@@ -16,14 +16,14 @@ RestartSec=1
 #   This is generally used for public file distribution, [...]
 #
 # So let's assume some extra security is more than welcome here. We do full
-# system protection (which makes it read-only) and hide users' homes and
+# system protection (which makes /usr, /boot, & /etc read-only) and hide
 # devices. To override these defaults, it's best to do so in the drop-in
 # directory, often done via `systemctl edit rsync.service`. The file needs
 # just the bare minimum of the right [heading] and override values.
 # See systemd.unit(5) and search for "drop-in" for full details.
 
 ProtectSystem=full
-#ProtectHome=on
+#ProtectHome=on|off|read-only
 PrivateDevices=on
 NoNewPrivileges=on
 

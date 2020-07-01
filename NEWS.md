@@ -40,9 +40,10 @@ Protocol: 31 (unchanged)
    variable.
 
  - The default systemd config was changed to remove the `ProtectHome=on`
-   setting since rsync is often used to serve files in /home and this seemed a
-   bit too strict.  Feel free to use `systemctl edit rsync` to add that
-   restriction to your own setup, if you like.
+   setting since rsync is often used to serve files in /home and /root and this
+   seemed a bit too strict.  Feel free to use `systemctl edit rsync` to add
+   that restriction (or maybe `ProtectHome=read-only`), if you like.  See the
+   3.2.0 NEWS for the other restrictions that were added compared to 3.1.3.
 
  - The memory allocation functions now automatically check for a failure and
    die when out of memory.  This eliminated some caller-side check-and-die
@@ -102,11 +103,6 @@ Protocol: 31 (unchanged)
  - Disable `--atimes` on macOS (it apparently just ignores the atime change).
 
 ### ENHANCEMENTS:
-
- - The default systemd config was made a bit stricter by default.  For
-   instance, `ProtectHome=on` was added.  You can override this using the
-   standard `systemctl edit rsync` and add a line to turn that off under a
-   `[Service]` heading.
 
  - The use of `--backup-dir=STR` now implies `--backup`.
 
@@ -200,6 +196,13 @@ Protocol: 31 (unchanged)
  - Fixed a rare crash in the popt_unalias() code.
 
 ### ENHANCEMENTS:
+
+ - The default systemd config was made stricter by default.  For instance,
+   `ProtectHome=on` (which hides content in /root and /home/USER dirs),
+   `ProtectSystem=full` (which makes /usr, /boot, & /etc dirs read-only), and
+   `PrivateDevices=on` (which hides devices).  You can override any of these
+   using the standard `systemctl edit rsync` and add one or more directives
+   under a `[Service]` heading (and restart the rsync service).
 
  - Various checksum enhancements, including the optional use of openssl's MD4 &
    MD5 checksum algorithms, some x86-64 optimizations for the rolling checksum,
