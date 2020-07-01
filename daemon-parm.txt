@@ -1,6 +1,6 @@
 Globals: ================================================================
 
-STRING	bind_address		NULL
+STRING	bind_address|address	NULL
 STRING	daemon_chroot		NULL
 STRING	daemon_gid		NULL
 STRING	daemon_uid		NULL
@@ -9,7 +9,7 @@ STRING	pid_file		NULL
 STRING	socket_options		NULL
 
 INTEGER	listen_backlog		5
-INTEGER	rsync_port		0
+INTEGER	rsync_port|port		0
 
 BOOL	proxy_protocol		False
 

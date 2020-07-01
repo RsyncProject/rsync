@@ -69,16 +69,12 @@ BEGIN {
 	vtype = "int"
     }
 
-    # We have 2 variables that don't match their conf string. Oh well...
-    if (name == "bind_address")
-	spname = "address"
-    else if (name == "rsync_port")
-	spname = "port"
-    else {
-	spname = name
-	gsub(/_/, " ", spname)
-	gsub(/-/, "", name)
-    }
+    # The name might be var_name|public_name
+    pubname = name
+    sub(/\|.*/, "", name)
+    sub(/.*\|/, "", pubname)
+    gsub(/_/, " ", pubname)
+    gsub(/-/, "", name)
 
     if (ptype == "ENUM")
 	enum = "enum_" name
@@ -87,7 +83,7 @@ BEGIN {
 
     defines = defines "\t" vtype " " name ";\n"
     values = values "\t" $0 ", /* " name " */\n"
-    params = params " {\"" spname "\", P_" ptype psect name ", " enum ", 0},\n"
+    params = params " {\"" pubname "\", P_" ptype psect name ", " enum ", 0},\n"
     accessors = accessors "FN_" sect "_" atype "(lp_" name ", " name ")\n"
 
     if (vtype == "char*") {
