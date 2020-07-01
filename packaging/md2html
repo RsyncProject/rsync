@@ -32,6 +32,20 @@ blockquote pre code {
 dd p:first-of-type {
   margin-block-start: 0em;
 }
+table {
+  border-color: grey;
+  border-spacing: 0;
+  width: 100%%;
+}
+tr {
+  border-top: 1px solid grey;
+}
+tr:nth-child(2n) {
+  background-color: #f6f8fa;
+}
+th, td {
+  border: 1px solid #dfe2e5;
+}
 </style>
 </head><body>
 """
@@ -73,11 +87,8 @@ def main():
 
 
 def html_via_cmarkgfm(txt):
-    return cmarkgfm.markdown_to_html(txt)
-
-
-def html_via_commonmark(txt):
-    return commonmark.HtmlRenderer().render(commonmark.Parser().parse(txt))
+    # Our NEWS.md file has a gfm table in it.
+    return cmarkgfm.github_flavored_markdown_to_html(txt)
 
 
 if __name__ == '__main__':
@@ -90,10 +101,6 @@ if __name__ == '__main__':
         import cmarkgfm
         md_parser = html_via_cmarkgfm
     except:
-        try:
-            import commonmark
-            md_parser = html_via_commonmark
-        except:
-            die("Failed to find cmarkgfm or commonmark for python3.")
+        die("Failed to find cmarkgfm for python3.")
 
     main()

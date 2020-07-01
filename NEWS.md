@@ -2,9 +2,7 @@
 
 # NEWS for rsync 3.2.2 (UNRELEASED)
 
-Protocol: 31 (unchanged)
-
-## Changes since 3.2.1:
+## Changes in this version:
 
 ### BUG FIXES:
 
@@ -77,9 +75,7 @@ Protocol: 31 (unchanged)
 
 # NEWS for rsync 3.2.1 (22 Jun 2020)
 
-Protocol: 31 (unchanged)
-
-## Changes since 3.2.0:
+## Changes in this version:
 
 ### BUG FIXES:
 
@@ -142,9 +138,7 @@ Protocol: 31 (unchanged)
 
 # NEWS for rsync 3.2.0 (19 Jun 2020)
 
-Protocol: 31 (unchanged)
-
-## Changes since 3.1.3:
+## Changes in this version:
 
 ### BUG FIXES:
 
@@ -356,9 +350,7 @@ Protocol: 31 (unchanged)
 
 # NEWS for rsync 3.1.3 (28 Jan 2018)
 
-Protocol: 31 (unchanged)
-
-## Changes since 3.1.2:
+## Changes in this version:
 
 ### SECURITY FIXES:
 
@@ -428,9 +420,7 @@ Protocol: 31 (unchanged)
 
 # NEWS for rsync 3.1.2 (21 Dec 2015)
 
-Protocol: 31 (unchanged)
-
-## Changes since 3.1.1:
+## Changes in this version:
 
 ### SECURITY FIXES:
 
@@ -496,9 +486,7 @@ Protocol: 31 (unchanged)
 
 # NEWS for rsync 3.1.1 (22 Jun 2014)
 
-Protocol: 31 (unchanged)
-
-## Changes since 3.1.0:
+## Changes in this version:
 
 ### BUG FIXES:
 
@@ -618,9 +606,11 @@ Protocol: 31 (unchanged)
 
 # NEWS for rsync 3.1.0 (28 Sep 2013)
 
-Protocol: 31 (changed)
+## Changes in this version:
 
-## Changes since 3.0.9:
+### PROTOCOL NUMBER:
+
+ - The protocol number was changed to 31.
 
 ### OUTPUT CHANGES:
 
@@ -867,9 +857,7 @@ Protocol: 31 (changed)
 
 # NEWS for rsync 3.0.9 (23 Sep 2011)
 
-Protocol: 30 (unchanged)
-
-## Changes since 3.0.8:
+## Changes in this version:
 
 ### BUG FIXES:
 
@@ -929,9 +917,7 @@ Protocol: 30 (unchanged)
 
 # NEWS for rsync 3.0.8 (26 Mar 2011)
 
-Protocol: 30 (unchanged)
-
-## Changes since 3.0.7:
+## Changes in this version:
 
 ### BUG FIXES:
 
@@ -1070,9 +1056,7 @@ Protocol: 30 (unchanged)
 
 # NEWS for rsync 3.0.7 (31 Dec 2009)
 
-Protocol: 30 (unchanged)
-
-## Changes since 3.0.6:
+## Changes in this version:
 
 ### BUG FIXES:
 
@@ -1140,9 +1124,7 @@ Protocol: 30 (unchanged)
 
 # NEWS for rsync 3.0.6 (8 May 2009)
 
-Protocol: 30 (unchanged)
-
-## Changes since 3.0.5:
+## Changes in this version:
 
 ### BUG FIXES:
 
@@ -1201,9 +1183,7 @@ Protocol: 30 (unchanged)
 
 # NEWS for rsync 3.0.5 (28 Dec 2008)
 
-Protocol: 30 (unchanged)
-
-## Changes since 3.0.4:
+## Changes in this version:
 
 ### BUG FIXES:
 
@@ -1268,9 +1248,7 @@ Protocol: 30 (unchanged)
 
 # NEWS for rsync 3.0.4 (6 Sep 2008)
 
-Protocol: 30 (unchanged)
-
-## Changes since 3.0.3:
+## Changes in this version:
 
 ### BUG FIXES:
 
@@ -1338,9 +1316,7 @@ Protocol: 30 (unchanged)
 
 # NEWS for rsync 3.0.3 (29 Jun 2008)
 
-Protocol: 30 (unchanged)
-
-## Changes since 3.0.2:
+## Changes in this version:
 
 ### BUG FIXES:
 
@@ -1431,9 +1407,7 @@ Protocol: 30 (unchanged)
 
 # NEWS for rsync 3.0.2 (8 Apr 2008)
 
-Protocol: 30 (unchanged)
-
-## Changes since 3.0.1:
+## Changes in this version:
 
 ### BUG FIXES:
 
@@ -1455,9 +1429,7 @@ Protocol: 30 (unchanged)
 
 # NEWS for rsync 3.0.1 (3 Apr 2008)
 
-Protocol: 30 (unchanged)
-
-## Changes since 3.0.0:
+## Changes in this version:
 
 ### NOTABLE CHANGES IN BEHAVIOR:
 
@@ -1595,9 +1567,11 @@ Protocol: 30 (unchanged)
 
 # NEWS for rsync 3.0.0 (1 Mar 2008)
 
-Protocol: 30 (changed)
+## Changes in this version:
 
-## Changes since 2.6.9:
+### PROTOCOL NUMBER:
+
+ - The protocol number was changed to 30.
 
 ### NOTABLE CHANGES IN BEHAVIOR:
 
@@ -1944,9 +1918,7 @@ Protocol: 30 (changed)
 
 # NEWS for rsync 2.6.9 (6 Nov 2006)
 
-Protocol: 29 (unchanged)
-
-## Changes since 2.6.8:
+## Changes in this version:
 
 ### BUG FIXES:
 
@@ -2106,9 +2078,7 @@ Protocol: 29 (unchanged)
 
 # NEWS for rsync 2.6.8 (22 Apr 2006)
 
-Protocol: 29 (unchanged)
-
-## Changes since 2.6.7:
+## Changes in this version:
 
 ### BUG FIXES:
 
@@ -2178,9 +2148,7 @@ Protocol: 29 (unchanged)
 
 # NEWS for rsync 2.6.7 (11 Mar 2006)
 
-Protocol: 29 (unchanged)
-
-## Changes since 2.6.6:
+## Changes in this version:
 
 ### OUTPUT CHANGES:
 
@@ -2504,9 +2472,7 @@ Protocol: 29 (unchanged)
 
 # NEWS for rsync 2.6.6 (28 Jul 2005)
 
-Protocol: 29 (unchanged)
-
-## Changes since 2.6.5:
+## Changes in this version:
 
 ### SECURITY FIXES:
 
@@ -2572,9 +2538,7 @@ Protocol: 29 (unchanged)
 
 # NEWS for rsync 2.6.5 (1 Jun 2005)
 
-Protocol: 29 (unchanged)
-
-## Changes since 2.6.4:
+## Changes in this version:
 
 ### OUTPUT CHANGES:
 
@@ -2755,9 +2719,11 @@ Protocol: 29 (unchanged)
 
 # NEWS for rsync 2.6.4 (30 March 2005)
 
-Protocol: 29 (changed)
+## Changes in this version:
 
-## Changes since 2.6.3:
+### PROTOCOL NUMBER:
+
+ - The protocol number was changed to 29.
 
 ### OUTPUT CHANGES:
 
@@ -3135,9 +3101,7 @@ Protocol: 29 (changed)
 
 # NEWS for rsync 2.6.3 (30 Sep 2004)
 
-Protocol: 28 (unchanged)
-
-## Changes since 2.6.2:
+## Changes in this version:
 
 ### SECURITY FIXES:
 
@@ -3381,9 +3345,7 @@ Protocol: 28 (unchanged)
 
 # NEWS for rsync 2.6.2 (30 Apr 2004)
 
-Protocol: 28 (unchanged)
-
-## Changes since 2.6.1:
+## Changes in this version:
 
 ### BUG FIXES:
 
@@ -3425,9 +3387,11 @@ Protocol: 28 (unchanged)
 
 # NEWS for rsync 2.6.1 (26 Apr 2004)
 
-Protocol: 28 (changed)
+## Changes in this version:
 
-## Changes since 2.6.0:
+### PROTOCOL NUMBER:
+
+ - The protocol number was changed to 28.
 
 ### SECURITY FIXES:
 
@@ -3615,9 +3579,12 @@ Protocol: 28 (changed)
 
 # NEWS for rsync 2.6.0 (1 Jan 2004)
 
-Protocol: 27 (changed)
+## Changes in this version:
 
-## Changes since 2.5.7:
+### PROTOCOL NUMBER:
+
+ - The protocol number was changed to 27.  The maximum accepted protocol number
+   was increased from 30 to 40.
 
 ### ENHANCEMENTS:
 
@@ -3752,9 +3719,7 @@ Protocol: 27 (changed)
 
 # NEWS for rsync 2.5.7 (4 Dec 2003)
 
-Protocol: 26 (unchanged)
-
-## Changes since 2.5.6:
+## Changes in this version:
 
 ### SECURITY FIXES:
 
@@ -3766,9 +3731,7 @@ Protocol: 26 (unchanged)
 
 # NEWS for rsync 2.5.6, aka "the dwd-between-jobs release" (26 Jan 2003)
 
-Protocol: 26 (unchanged)
-
-## Changes since 2.5.5:
+## Changes in this version:
 
 ### ENHANCEMENTS:
 
@@ -3863,9 +3826,7 @@ Protocol: 26 (unchanged)
 
 # NEWS for rsync 2.5.5, aka Snowy River (2 Apr 2002)
 
-Protocol: 26 (unchanged)
-
-## Changes since 2.5.4:
+## Changes in this version:
 
 ### ENHANCEMENTS:
 
@@ -3904,9 +3865,7 @@ Protocol: 26 (unchanged)
 
 # NEWS for rsync 2.5.4, aka "Imitation lizard skin" (13 Mar 2002)
 
-Protocol: 26 (unchanged)
-
-## Changes since 2.5.3:
+## Changes in this version:
 
 ### BUG FIXES:
 
@@ -3926,9 +3885,7 @@ Protocol: 26 (unchanged)
 
 # NEWS for rsync 2.5.3, aka "Happy 26" (11 Mar 2002)
 
-Protocol: 26 (unchanged)
-
-## Changes since 2.5.2:
+## Changes in this version:
 
 ### SECURITY FIXES:
 
@@ -3977,15 +3934,17 @@ Protocol: 26 (unchanged)
 
 # NEWS for rsync 2.5.2 (26 Jan 2002)
 
-Protocol: 26 (changed)
-
-## Changes since 2.5.1:
+## Changes in this version:
 
 ### SECURITY FIXES:
 
  - Signedness security patch from Sebastian Krahmer <krahmer@suse.de> -- in
    some cases we were not sufficiently careful about reading integers from the
    network.
+
+### PROTOCOL NUMBER:
+
+ - The protocol number was changed to 26.
 
 ### BUG FIXES:
 
@@ -4024,9 +3983,7 @@ Protocol: 26 (changed)
 
 # NEWS for rsync 2.5.1 (3 Jan 2002)
 
-Protocol: 25 (unchanged)
-
-## Changes since 2.5.0:
+## Changes in this version:
 
 ### BUG FIXES:
 
@@ -4061,9 +4018,11 @@ Protocol: 25 (unchanged)
 
 # NEWS for rsync 2.5.0 (30 Nov 2001)
 
-Protocol: 25 (changed)
+## Changes in this version:
 
-## Changes since 2.4.6:
+### PROTOCOL NUMBER:
+
+ - The protocol number was changed to 25.
 
 ### ANNOUNCEMENTS:
 
