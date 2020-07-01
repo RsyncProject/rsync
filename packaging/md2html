@@ -35,7 +35,6 @@ dd p:first-of-type {
 table {
   border-color: grey;
   border-spacing: 0;
-  width: 100%%;
 }
 tr {
   border-top: 1px solid grey;
@@ -45,6 +44,9 @@ tr:nth-child(2n) {
 }
 th, td {
   border: 1px solid #dfe2e5;
+  text-align: center;
+  padding-left: 1em;
+  padding-right: 1em;
 }
 </style>
 </head><body>
