@@ -39,6 +39,11 @@ Protocol: 31 (unchanged)
    also allows you to specify the value via the RSYNC_MAX_ALLOC environment
    variable.
 
+ - The default systemd config was changed to remove the `ProtectHome=on`
+   setting since rsync is often used to serve files in /home and this seemed a
+   bit too strict.  Feel free to use `systemctl edit rsync` to add that
+   restriction to your own setup, if you like.
+
  - The memory allocation functions now automatically check for a failure and
    die when out of memory.  This eliminated some caller-side check-and-die
    code and added some missing sanity-checking of allocations.
@@ -97,6 +102,11 @@ Protocol: 31 (unchanged)
  - Disable `--atimes` on macOS (it apparently just ignores the atime change).
 
 ### ENHANCEMENTS:
+
+ - The default systemd config was made a bit stricter by default.  For
+   instance, `ProtectHome=on` was added.  You can override this using the
+   standard `systemctl edit rsync` and add a line to turn that off under a
+   `[Service]` heading.
 
  - The use of `--backup-dir=STR` now implies `--backup`.
 

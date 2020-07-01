@@ -23,7 +23,7 @@ RestartSec=1
 # See systemd.unit(5) and search for "drop-in" for full details.
 
 ProtectSystem=full
-ProtectHome=on
+#ProtectHome=on
 PrivateDevices=on
 NoNewPrivileges=on
 
