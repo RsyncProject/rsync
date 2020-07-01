@@ -8,7 +8,7 @@ BEGIN {
     sect = psect = defines = accessors = prior_ptype = ""
     values = "\nstatic const all_vars Defaults = {\n    { /* Globals: */\n"
     params = "\nstatic struct parm_struct parm_table[] = {"
-    exp_line = "\n/********** EXP **********/\n"
+    comment_fmt = "\n/********** %s **********/\n"
     tdstruct = "typedef struct {"
 }
 
@@ -22,7 +22,7 @@ BEGIN {
 	exit
     }
     defines = tdstruct
-    exps = exp_values = exp_line
+    exps = exp_values = sprintf(comment_fmt, "EXP")
     sect = "GLOBAL"
     psect = ", P_GLOBAL, &Vars.g."
     next
@@ -35,21 +35,22 @@ BEGIN {
     }
     defines = defines exps "} global_vars;\n\n" tdstruct
     values = values exp_values "\n    }, { /* Locals: */\n"
-    exps = exp_values = exp_line
+    exps = exp_values = sprintf(comment_fmt, "EXP")
     sect = "LOCAL"
     psect = ", P_LOCAL, &Vars.l."
     next
 }
 
-/^(STRING|PATH|INTEGER|ENUM|BOOL)/ {
+/^(STRING|CHAR|PATH|INTEGER|ENUM|OCTAL|BOOL|BOOLREV)[ \t]/ {
     ptype = $1
     name = $2
     $1 = $2 = ""
     sub(/^[ \t]+/, "")
 
     if (ptype != prior_ptype) {
-	defines = defines "\n/********** " ptype " **********/\n"
-	values = values "\n/********** " ptype " **********/\n"
+	comment = sprintf(comment_fmt, ptype)
+	defines = defines comment
+	values = values comment
 	params = params "\n"
 	accessors = accessors "\n"
 	prior_ptype = ptype
@@ -58,8 +59,11 @@ BEGIN {
     if (ptype == "STRING" || ptype == "PATH") {
 	atype = "STRING"
 	vtype = "char*"
-    } else if (ptype == "BOOL") {
+    } else if (ptype == "BOOL" || ptype == "BOOLREV") {
 	atype = vtype = "BOOL"
+    } else if (ptype == "CHAR") {
+	atype = "CHAR"
+	vtype = "char"
     } else {
 	atype = "INTEGER"
 	vtype = "int"
