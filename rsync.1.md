@@ -2386,8 +2386,10 @@ your home directory (remove the '=' for that).
     possible.  Rsync sets the compression level on a per-file basis based on
     the file's suffix.  If the compression algorithm has an "off" level (such
     as zlib/zlibx) then no compression occurs for those files.  Other
-    algorithms have the level minimized to reduces the CPU usage as much as
-    possible.
+    algorithms that support changing the streaming level on-the-fly will have
+    the level minimized to reduces the CPU usage as much as possible for a
+    matching file.  At this time, only zlib & zlibx compression support this
+    changing of levels on a per-file basis.
 
     The **LIST** should be one or more file suffixes (without the dot) separated
     by slashes (`/`).  You may specify an empty string to indicate that no files
