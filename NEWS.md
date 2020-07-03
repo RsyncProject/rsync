@@ -25,7 +25,7 @@
    apply to both.
 
  - Simplify how the negotiation environment variables apply when interacting
-   with an older rsync version and when they contain only invalid names.
+   with an older rsync and also when a list contains only invalid names.
 
  - Do not allow a negotiated checksum or compression choice of "none" unless
    the user authorized it via an environment variable or command-line option.

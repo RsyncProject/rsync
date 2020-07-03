@@ -688,7 +688,7 @@ your home directory (remove the '=' for that).
     before-the-transfer "Does this file need to be updated?" check.
 
     The checksum used is auto-negotiated between the client and the server, but
-    can be overridden using either the `--checksum-choice` option or an
+    can be overridden using either the `--checksum-choice` (`--cc`) option or an
     environment variable that is discussed in that option's section.
 
 0.  `--archive`, `-a`
@@ -1479,8 +1479,8 @@ your home directory (remove the '=' for that).
     - `md4`
     - `none`
 
-    Run `rsync -V` to see the default checksum list compiled into your version
-    (which may differ from the above list).
+    Run `rsync --version` to see the default checksum list compiled into your
+    version (which may differ from the list above).
 
     If "none" is specified for the first (or only) name, the `--whole-file`
     option is forced on and no checksum verification is performed on the
@@ -1499,8 +1499,8 @@ your home directory (remove the '=' for that).
 
     The default order can be customized by setting the environment variable
     RSYNC_CHECKSUM_LIST to a space-separated list of acceptable checksum names.
-    If the environment variable contains a "`&`" character, the string is
-    separated into the "client list & server list" otherwise the same string
+    If the string contains a "`&`" character, it is separated into the "client
+    string & server string", otherwise the same string
     applies to both.  If the string (or string portion) contains no
     non-whitespace characters, the default checksum list is used.  This method
     does not allow you to specify the transfer checksum separately from the
@@ -2100,8 +2100,9 @@ your home directory (remove the '=' for that).
 
     Rsync can also be configured (at build time) to have this option enabled by
     default (with is overridden by both the environment and the command-line).
-    Run `rsync -V` to check if this is the case, as it will display "default
-    protect-args" or "optional protect-args" depending on how it was compiled.
+    Run `rsync --version` to check if this is the case, as it will display
+    "default protect-args" or "optional protect-args" depending on how it was
+    compiled.
 
     This option will eventually become a new default setting at some
     as-yet-undetermined point in the future.
@@ -2288,9 +2289,10 @@ your home directory (remove the '=' for that).
     something that is useful over a slow connection.
 
     Rsync supports multiple compression methods and will choose one for you
-    unless you force the choice using the `--compress-choice` option.
+    unless you force the choice using the `--compress-choice` (`--zc`) option.
 
-    Run `rsync -V` to see the default compress list compiled into your version.
+    Run `rsync --version` to see the default compress list compiled into your
+    version.
 
     When both sides of the transfer are at least 3.2.0, rsync chooses the first
     algorithm in the client's list of choices that is also in the server's list
@@ -2300,9 +2302,9 @@ your home directory (remove the '=' for that).
 
     The default order can be customized by setting the environment variable
     RSYNC_COMPRESS_LIST to a space-separated list of acceptable compression
-    names.  If the environment variable contains a "`&`" character, the string
-    is separated into the "client list & server list" otherwise the same string
-    applies to both.  If the string (or string portion) contains no
+    names.  If the string contains a "`&`" character, it is separated into the
+    "client string & server string", otherwise the same string applies to both.
+    If the string (or string portion) contains no
     non-whitespace characters, the default compress list is used.  Any unknown
     compression names are discarded from the list, but a list with only invalid
     names results in a failed negotiation.
@@ -2331,8 +2333,8 @@ your home directory (remove the '=' for that).
     - `zlib`
     - `none`
 
-    Run `rsync -V` to see the default compress list compiled into your version
-    (which may differ from the above list).
+    Run `rsync --version` to see the default compress list compiled into your
+    version (which may differ from the list above).
 
     Note that if you see an error about an option named `--old-compress` or
     `--new-compress`, this is rsync trying to send the `--compress-choice=zlib`
@@ -2353,8 +2355,8 @@ your home directory (remove the '=' for that).
     "off").
 
     The level values vary depending on the checksum in effect.  Because rsync
-    will negotiate a checksum choice by default when the remote rsync is new
-    enough, it can be good to combine this option with a `--compress-choice`
+    will negotiate a checksum choice by default (when the remote rsync is new
+    enough), it can be good to combine this option with a `--compress-choice`
     (`--zc`) option unless you're sure of the choice in effect.  For example:
 
     >     rsync -aiv --zc=zstd --zl=22 host:src/ dest/
@@ -3194,8 +3196,8 @@ your home directory (remove the '=' for that).
     These options also exist in the `--daemon` mode section.
 
     If rsync was complied without support for IPv6, the `--ipv6` option will
-    have no effect.  The `rsync -V` output will contain "`no IPv6`" if is the
-    case.
+    have no effect.  The `rsync --version` output will contain "`no IPv6`" if
+    is the case.
 
 0.  `--checksum-seed=NUM`
 
@@ -3308,8 +3310,8 @@ The options allowed when starting an rsync daemon are as follows:
     These options also exist in the regular rsync options section.
 
     If rsync was complied without support for IPv6, the `--ipv6` option will
-    have no effect.  The `rsync -V` output will contain "`no IPv6`" if is the
-    case.
+    have no effect.  The `rsync --version` output will contain "`no IPv6`" if
+    is the case.
 
 0.  `--help`, `-h`
 
