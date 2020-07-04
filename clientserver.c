@@ -990,8 +990,11 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	} else
 		orig_early_argv = NULL;
 
+	/* The default is to use the user's setting unless the module sets True or False. */
+	if (lp_open_noatime(module_id) >= 0)
+		open_noatime = lp_open_noatime(module_id);
+
 	munge_symlinks = save_munge_symlinks; /* The client mustn't control this. */
-	open_noatime = lp_open_noatime(module_id);
 
 	if (am_daemon > 0)
 		msgs2stderr = 0; /* A non-rsh-run daemon doesn't have stderr for msgs. */

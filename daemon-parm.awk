@@ -41,7 +41,7 @@ BEGIN {
     next
 }
 
-/^(STRING|CHAR|PATH|INTEGER|ENUM|OCTAL|BOOL|BOOLREV)[ \t]/ {
+/^(STRING|CHAR|PATH|INTEGER|ENUM|OCTAL|BOOL|BOOLREV|BOOL3)[ \t]/ {
     ptype = $1
     name = $2
     $1 = $2 = ""
@@ -59,7 +59,7 @@ BEGIN {
     if (ptype == "STRING" || ptype == "PATH") {
 	atype = "STRING"
 	vtype = "char*"
-    } else if (ptype == "BOOL" || ptype == "BOOLREV") {
+    } else if (ptype ~ /BOOL/) {
 	atype = vtype = "BOOL"
     } else if (ptype == "CHAR") {
 	atype = "CHAR"

@@ -20,6 +20,7 @@
 
 #define False 0
 #define True 1
+#define Unset (-1) /* Our BOOL values are always an int. */
 
 #define BLOCK_SIZE 700
 #define RSYNC_RSH_ENV "RSYNC_RSH"

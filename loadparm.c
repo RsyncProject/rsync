@@ -48,7 +48,6 @@
 extern item_list dparam_list;
 
 #define strequal(a, b) (strcasecmp(a, b)==0)
-#define BOOLSTR(b) ((b) ? "Yes" : "No")
 
 #ifndef LOG_DAEMON
 #define LOG_DAEMON 0
@@ -56,7 +55,7 @@ extern item_list dparam_list;
 
 /* the following are used by loadparm for option lists */
 typedef enum {
-	P_BOOL, P_BOOLREV, P_CHAR, P_INTEGER,
+	P_BOOL, P_BOOLREV, P_BOOL3, P_CHAR, P_INTEGER,
 	P_OCTAL, P_PATH, P_STRING, P_ENUM
 } parm_type;
 
@@ -279,19 +278,14 @@ static void init_section(local_vars *psection)
 	copy_section(psection, &Vars.l);
 }
 
-/* Do a case-insensitive, whitespace-ignoring string compare. */
-static int strwicmp(char *psz1, char *psz2)
+/* Do a case-insensitive, whitespace-ignoring string equality check. */
+static int strwiEQ(char *psz1, char *psz2)
 {
-	/* if BOTH strings are NULL, return TRUE, if ONE is NULL return */
-	/* appropriate value. */
+	/* If one or both strings are NULL, we return equality right away. */
 	if (psz1 == psz2)
-		return 0;
-
-	if (psz1 == NULL)
-		return -1;
-
-	if (psz2 == NULL)
 		return 1;
+	if (psz1 == NULL || psz2 == NULL)
+		return 0;
 
 	/* sync the strings on first non-whitespace */
 	while (1) {
@@ -299,12 +293,14 @@ static int strwicmp(char *psz1, char *psz2)
 			psz1++;
 		while (isSpace(psz2))
 			psz2++;
-		if (toUpper(psz1) != toUpper(psz2) || *psz1 == '\0' || *psz2 == '\0')
+		if (*psz1 == '\0' || *psz2 == '\0')
+			break;
+		if (toUpper(psz1) != toUpper(psz2))
 			break;
 		psz1++;
 		psz2++;
 	}
-	return *psz1 - *psz2;
+	return *psz1 == *psz2;
 }
 
 /* Find a section by name. Otherwise works like get_section. */
@@ -313,7 +309,7 @@ static int getsectionbyname(char *name)
 	int i;
 
 	for (i = section_list.count - 1; i >= 0; i--) {
-		if (strwicmp(iSECTION(i).name, name) == 0)
+		if (strwiEQ(iSECTION(i).name, name))
 			break;
 	}
 
@@ -353,7 +349,7 @@ static int map_parameter(char *parmname)
 		return -1;
 
 	for (iIndex = 0; parm_table[iIndex].label; iIndex++) {
-		if (strwicmp(parm_table[iIndex].label, parmname) == 0)
+		if (strwiEQ(parm_table[iIndex].label, parmname))
 			return iIndex;
 	}
 
@@ -364,16 +360,14 @@ static int map_parameter(char *parmname)
 /* Set a boolean variable from the text value stored in the passed string.
  * Returns True in success, False if the passed string does not correctly
  * represent a boolean. */
-static BOOL set_boolean(BOOL *pb, char *parmvalue)
+static BOOL set_boolean(BOOL *pb, char *parmvalue, int allow_unset)
 {
-	if (strwicmp(parmvalue, "yes") == 0
-	 || strwicmp(parmvalue, "true") == 0
-	 || strwicmp(parmvalue, "1") == 0)
+	if (strwiEQ(parmvalue, "yes") || strwiEQ(parmvalue, "true") || strwiEQ(parmvalue, "1"))
 		*pb = True;
-	else if (strwicmp(parmvalue, "no") == 0
-	      || strwicmp(parmvalue, "False") == 0
-	      || strwicmp(parmvalue, "0") == 0)
+	else if (strwiEQ(parmvalue, "no") || strwiEQ(parmvalue, "false") || strwiEQ(parmvalue, "0"))
 		*pb = False;
+	else if (allow_unset && (strwiEQ(parmvalue, "unset") || strwiEQ(parmvalue, "-1")))
+		*pb = Unset;
 	else {
 		rprintf(FLOG, "Badly formed boolean in configuration file: \"%s\".\n", parmvalue);
 		return False;
@@ -422,11 +416,15 @@ static BOOL do_parameter(char *parmname, char *parmvalue)
 
 	switch (parm_table[parmnum].type) {
 	case P_BOOL:
-		set_boolean(parm_ptr, parmvalue);
+		set_boolean(parm_ptr, parmvalue, False);
+		break;
+
+	case P_BOOL3:
+		set_boolean(parm_ptr, parmvalue, True);
 		break;
 
 	case P_BOOLREV:
-		set_boolean(parm_ptr, parmvalue);
+		set_boolean(parm_ptr, parmvalue, False);
 		*(BOOL *)parm_ptr = ! *(BOOL *)parm_ptr;
 		break;
 
@@ -496,7 +494,7 @@ static BOOL do_section(char *sectionname)
 		return True;
 	}
 
-	isglobal = strwicmp(sectionname, GLOBAL_NAME) == 0;
+	isglobal = strwiEQ(sectionname, GLOBAL_NAME);
 
 	/* At the end of the global section, add any --dparam items. */
 	if (bInGlobalSection && !isglobal) {

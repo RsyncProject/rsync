@@ -37,6 +37,9 @@
    also allows you to specify the value via the RSYNC_MAX_ALLOC environment
    variable.
 
+ - Add the "open atime" daemon parameter to allow a daemon to always enable or
+   disable the use of O_NOATIME (the default is to let the user control it).
+
  - The default systemd config was changed to remove the `ProtectHome=on`
    setting since rsync is often used to serve files in /home and /root and this
    seemed a bit too strict.  Feel free to use `systemctl edit rsync` to add
