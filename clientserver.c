@@ -696,8 +696,8 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 
 	module_id = i;
 
-	if (lp_transfer_logging(i) && !logfile_format)
-		logfile_format = lp_log_format(i);
+	if (lp_transfer_logging(module_id) && !logfile_format)
+		logfile_format = lp_log_format(module_id);
 	if (log_format_has(logfile_format, 'i'))
 		logfile_format_has_i = 1;
 	if (logfile_format_has_i || log_format_has(logfile_format, 'o'))
@@ -706,7 +706,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	uid = MY_UID();
 	am_root = (uid == 0);
 
-	p = *lp_uid(i) ? lp_uid(i) : am_root ? NOBODY_USER : NULL;
+	p = *lp_uid(module_id) ? lp_uid(module_id) : am_root ? NOBODY_USER : NULL;
 	if (p) {
 		if (!user_to_uid(p, &uid, True)) {
 			rprintf(FLOG, "Invalid uid %s\n", p);
@@ -717,7 +717,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	} else
 		set_uid = 0;
 
-	p = *lp_gid(i) ? conf_strtok(lp_gid(i)) : NULL;
+	p = *lp_gid(module_id) ? conf_strtok(lp_gid(module_id)) : NULL;
 	if (p) {
 		/* The "*" gid must be the first item in the list. */
 		if (strcmp(p, "*") == 0) {
@@ -750,7 +750,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 			return -1;
 	}
 
-	module_dir = lp_path(i);
+	module_dir = lp_path(module_id);
 	if (*module_dir == '\0') {
 		rprintf(FLOG, "No path specified for module %s\n", name);
 		io_printf(f_out, "@ERROR: no path setting.\n");
@@ -787,38 +787,38 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	} else
 		set_filter_dir(module_dir, module_dirlen);
 
-	p = lp_filter(i);
+	p = lp_filter(module_id);
 	parse_filter_str(&daemon_filter_list, p, rule_template(FILTRULE_WORD_SPLIT),
 		XFLG_ABS_IF_SLASH | XFLG_DIR2WILD3);
 
-	p = lp_include_from(i);
+	p = lp_include_from(module_id);
 	parse_filter_file(&daemon_filter_list, p, rule_template(FILTRULE_INCLUDE),
 		XFLG_ABS_IF_SLASH | XFLG_DIR2WILD3 | XFLG_OLD_PREFIXES | XFLG_FATAL_ERRORS);
 
-	p = lp_include(i);
+	p = lp_include(module_id);
 	parse_filter_str(&daemon_filter_list, p,
 		rule_template(FILTRULE_INCLUDE | FILTRULE_WORD_SPLIT),
 		XFLG_ABS_IF_SLASH | XFLG_DIR2WILD3 | XFLG_OLD_PREFIXES);
 
-	p = lp_exclude_from(i);
+	p = lp_exclude_from(module_id);
 	parse_filter_file(&daemon_filter_list, p, rule_template(0),
 		XFLG_ABS_IF_SLASH | XFLG_DIR2WILD3 | XFLG_OLD_PREFIXES | XFLG_FATAL_ERRORS);
 
-	p = lp_exclude(i);
+	p = lp_exclude(module_id);
 	parse_filter_str(&daemon_filter_list, p, rule_template(FILTRULE_WORD_SPLIT),
 		XFLG_ABS_IF_SLASH | XFLG_DIR2WILD3 | XFLG_OLD_PREFIXES);
 
 	log_init(1);
 
 #ifdef HAVE_PUTENV
-	if ((*lp_early_exec(i) || *lp_prexfer_exec(i) || *lp_postxfer_exec(i))
+	if ((*lp_early_exec(module_id) || *lp_prexfer_exec(module_id) || *lp_postxfer_exec(module_id))
 	 && !getenv("RSYNC_NO_XFER_EXEC")) {
 		set_env_num("RSYNC_PID", (long)getpid());
 
 		/* For post-xfer exec, fork a new process to run the rsync
 		 * daemon while this process waits for the exit status and
 		 * runs the indicated command at that point. */
-		if (*lp_postxfer_exec(i)) {
+		if (*lp_postxfer_exec(module_id)) {
 			pid_t pid = fork();
 			if (pid < 0) {
 				rsyserr(FLOG, errno, "fork failed");
@@ -838,7 +838,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 				else
 					status = -1;
 				set_env_num("RSYNC_EXIT_STATUS", status);
-				if (shell_exec(lp_postxfer_exec(i)) < 0)
+				if (shell_exec(lp_postxfer_exec(module_id)) < 0)
 					status = -1;
 				_exit(status);
 			}
@@ -846,9 +846,9 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 
 		/* For early exec, fork a child process to run the indicated
 		 * command and wait for it to exit. */
-		if (*lp_early_exec(i)) {
+		if (*lp_early_exec(module_id)) {
 			int arg_fd;
-			pid_t pid = start_pre_exec(lp_early_exec(i), &arg_fd, NULL);
+			pid_t pid = start_pre_exec(lp_early_exec(module_id), &arg_fd, NULL);
 			if (pid == (pid_t)-1) {
 				rsyserr(FLOG, errno, "early exec preparation failed");
 				io_printf(f_out, "@ERROR: early exec preparation failed\n");
@@ -865,8 +865,8 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 		/* For pre-xfer exec, fork a child process to run the indicated
 		 * command, though it first waits for the parent process to
 		 * send us the user's request via a pipe. */
-		if (*lp_prexfer_exec(i)) {
-			pre_exec_pid = start_pre_exec(lp_prexfer_exec(i), &pre_exec_arg_fd, &pre_exec_error_fd);
+		if (*lp_prexfer_exec(module_id)) {
+			pre_exec_pid = start_pre_exec(lp_prexfer_exec(module_id), &pre_exec_arg_fd, &pre_exec_error_fd);
 			if (pre_exec_pid == (pid_t)-1) {
 				rsyserr(FLOG, errno, "pre-xfer exec preparation failed");
 				io_printf(f_out, "@ERROR: pre-xfer exec preparation failed\n");
@@ -907,7 +907,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	if (module_dirlen || (!use_chroot && !*lp_daemon_chroot()))
 		sanitize_paths = 1;
 
-	if ((munge_symlinks = lp_munge_symlinks(i)) < 0)
+	if ((munge_symlinks = lp_munge_symlinks(module_id)) < 0)
 		munge_symlinks = !use_chroot || module_dirlen;
 	if (munge_symlinks) {
 		STRUCT_STAT st;
@@ -962,8 +962,8 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 		am_root = (our_uid == 0);
 	}
 
-	if (lp_temp_dir(i) && *lp_temp_dir(i)) {
-		tmpdir = lp_temp_dir(i);
+	if (lp_temp_dir(module_id) && *lp_temp_dir(module_id)) {
+		tmpdir = lp_temp_dir(module_id);
 		if (strlen(tmpdir) >= MAXPATHLEN - 10) {
 			rprintf(FLOG,
 				"the 'temp dir' value for %s is WAY too long -- ignoring.\n",
@@ -1014,7 +1014,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	if (write_batch < 0)
 		dry_run = 1;
 
-	if (lp_fake_super(i)) {
+	if (lp_fake_super(module_id)) {
 		if (preserve_xattrs > 1)
 			preserve_xattrs = 1;
 		am_root = -1;
@@ -1039,7 +1039,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 
 #ifndef DEBUG
 	/* don't allow the logs to be flooded too fast */
-	limit_output_verbosity(lp_max_verbosity(i));
+	limit_output_verbosity(lp_max_verbosity(module_id));
 #endif
 
 	if (protocol_version < 23 && (protocol_version == 22 || am_sender))
@@ -1100,20 +1100,20 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 #endif
 
 	if (!numeric_ids
-	 && (use_chroot ? lp_numeric_ids(i) != False : lp_numeric_ids(i) == True))
+	 && (use_chroot ? lp_numeric_ids(module_id) != False : lp_numeric_ids(module_id) == True))
 		numeric_ids = -1; /* Set --numeric-ids w/o breaking protocol. */
 
-	if (lp_timeout(i) && (!io_timeout || lp_timeout(i) < io_timeout))
-		set_io_timeout(lp_timeout(i));
+	if (lp_timeout(module_id) && (!io_timeout || lp_timeout(module_id) < io_timeout))
+		set_io_timeout(lp_timeout(module_id));
 
 	/* If we have some incoming/outgoing chmod changes, append them to
 	 * any user-specified changes (making our changes have priority).
 	 * We also get a pointer to just our changes so that a receiver
 	 * process can use them separately if --perms wasn't specified. */
 	if (am_sender)
-		p = lp_outgoing_chmod(i);
+		p = lp_outgoing_chmod(module_id);
 	else
-		p = lp_incoming_chmod(i);
+		p = lp_incoming_chmod(module_id);
 	if (*p && !(daemon_chmod_modes = parse_chmod(p, &chmod_modes))) {
 		rprintf(FLOG, "Invalid \"%sing chmod\" directive: %s\n",
 			am_sender ? "outgo" : "incom", p);
