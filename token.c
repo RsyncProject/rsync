@@ -376,8 +376,7 @@ send_deflated_token(int f, int32 token, struct map_struct *buf, OFF_T offset, in
 		flush_pending = 0;
 	} else if (last_token == -2) {
 		run_start = token;
-	} else if (nb != 0 || token != last_token + 1
-		   || token >= run_start + 65536) {
+	} else if (nb != 0 || token != last_token + 1 || token >= run_start + 65536) {
 		/* output previous run */
 		r = run_start - last_run_end;
 		n = last_token - run_start;
@@ -679,7 +678,6 @@ static void send_zstd_token(int f, int32 token, struct map_struct *buf, OFF_T of
 
 	/* initialization */
 	if (!comp_init_done) {
-
 		zstd_cctx = ZSTD_createCCtx();
 		if (!zstd_cctx) {
 			rprintf(FERROR, "compression init failed\n");
@@ -700,10 +698,7 @@ static void send_zstd_token(int f, int32 token, struct map_struct *buf, OFF_T of
 		flush_pending = 0;
 	} else if (last_token == -2) {
 		run_start = token;
-
-	} else if (nb != 0 || token != last_token + 1
-		   || token >= run_start + 65536) {
-
+	} else if (nb != 0 || token != last_token + 1 || token >= run_start + 65536) {
 		/* output previous run */
 		r = run_start - last_run_end;
 		n = last_token - run_start;
@@ -785,7 +780,6 @@ static int32 recv_zstd_token(int f, char **data)
 	int r;
 
 	if (!decomp_init_done) {
-
 		zstd_dctx = ZSTD_createDCtx();
 		if (!zstd_dctx) {
 			rprintf(FERROR, "ZSTD_createDStream failed\n");
@@ -803,30 +797,31 @@ static int32 recv_zstd_token(int f, char **data)
 		decomp_init_done = 1;
 	}
 
-	do {
-	switch (recv_state) {
-	case r_init:
-		recv_state = r_idle;
-		rx_token = 0;
-		break;
+	for (;;) {
+		switch (recv_state) {
+		case r_init:
+			recv_state = r_idle;
+			rx_token = 0;
+			break;
 
-	case r_idle:
-		flag = read_byte(f);
-		if ((flag & 0xC0) == DEFLATED_DATA) {
-			n = ((flag & 0x3f) << 8) + read_byte(f);
-			read_buf(f, cbuf, n);
+		case r_idle:
+			flag = read_byte(f);
+			if ((flag & 0xC0) == DEFLATED_DATA) {
+				n = ((flag & 0x3f) << 8) + read_byte(f);
+				read_buf(f, cbuf, n);
 
-			zstd_in_buff.size = n;
-			zstd_in_buff.pos = 0;
+				zstd_in_buff.size = n;
+				zstd_in_buff.pos = 0;
 
-			recv_state = r_inflating;
+				recv_state = r_inflating;
+				break;
+			}
 
-		} else if (flag == END_FLAG) {
-			/* that's all folks */
-			recv_state = r_init;
-			return 0;
-
-		} else {
+			if (flag == END_FLAG) {
+				/* that's all folks */
+				recv_state = r_init;
+				return 0;
+			}
 			/* here we have a token of some kind */
 			if (flag & TOKEN_REL) {
 				rx_token += flag & 0x3f;
@@ -839,45 +834,42 @@ static int32 recv_zstd_token(int f, char **data)
 				recv_state = r_running;
 			}
 			return -1 - rx_token;
+
+		case r_inflated: /* zstd doesn't get into this state */
+			break;
+
+		case r_inflating:
+			zstd_out_buff.size = out_buffer_size;
+			zstd_out_buff.pos = 0;
+
+			r = ZSTD_decompressStream(zstd_dctx, &zstd_out_buff, &zstd_in_buff);
+			n = zstd_out_buff.pos;
+			if (ZSTD_isError(r)) {
+				rprintf(FERROR, "ZSTD decomp returned %d (%d bytes)\n", r, n);
+				exit_cleanup(RERR_STREAMIO);
+			}
+
+			/*
+			 * If the input buffer is fully consumed and the output
+			 * buffer is not full then next step is to read more
+			 * data.
+			 */
+			if (zstd_in_buff.size == zstd_in_buff.pos && n < out_buffer_size)
+				recv_state = r_idle;
+
+			if (n != 0) {
+				*data = dbuf;
+				return n;
+			}
+			break;
+
+		case r_running:
+			++rx_token;
+			if (--rx_run == 0)
+				recv_state = r_idle;
+			return -1 - rx_token;
 		}
-		break;
-
-	case r_inflating:
-		zstd_out_buff.size = out_buffer_size;
-		zstd_out_buff.pos = 0;
-
-		r = ZSTD_decompressStream(zstd_dctx, &zstd_out_buff, &zstd_in_buff);
-		n = zstd_out_buff.pos;
-		if (ZSTD_isError(r)) {
-			rprintf(FERROR, "ZSTD decomp returned %d (%d bytes)\n", r, n);
-			exit_cleanup(RERR_STREAMIO);
-		}
-
-		/*
-		 * If the input buffer is fully consumed and the output
-		 * buffer is not full then next step is to read more
-		 * data.
-		 */
-		if (zstd_in_buff.size == zstd_in_buff.pos && n < out_buffer_size)
-			recv_state = r_idle;
-
-		if (n != 0) {
-			*data = dbuf;
-			return n;
-		}
-		break;
-
-	case r_running:
-		++rx_token;
-		if (--rx_run == 0)
-			recv_state = r_idle;
-		return -1 - rx_token;
-		break;
-
-	case r_inflated:
-		break;
 	}
-	} while (1);
 }
 #endif /* SUPPORT_ZSTD */
 
@@ -899,8 +891,7 @@ send_compressed_token(int f, int32 token, struct map_struct *buf, OFF_T offset, 
 		flush_pending = 0;
 	} else if (last_token == -2) {
 		run_start = token;
-	} else if (nb != 0 || token != last_token + 1
-		   || token >= run_start + 65536) {
+	} else if (nb != 0 || token != last_token + 1 || token >= run_start + 65536) {
 		/* output previous run */
 		r = run_start - last_run_end;
 		n = last_token - run_start;
