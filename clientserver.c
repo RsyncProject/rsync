@@ -38,6 +38,7 @@ extern int preserve_xattrs;
 extern int kluge_around_eof;
 extern int daemon_over_rsh;
 extern int munge_symlinks;
+extern int open_noatime;
 extern int sanitize_paths;
 extern int numeric_ids;
 extern int filesfrom_fd;
@@ -990,6 +991,8 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 		orig_early_argv = NULL;
 
 	munge_symlinks = save_munge_symlinks; /* The client mustn't control this. */
+	open_noatime = lp_open_noatime(module_id);
+
 	if (am_daemon > 0)
 		msgs2stderr = 0; /* A non-rsh-run daemon doesn't have stderr for msgs. */
 
