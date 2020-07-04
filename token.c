@@ -916,7 +916,6 @@ send_compressed_token(int f, int32 token, struct map_struct *buf, OFF_T offset, 
 		const char *next_in;
 
 		do {
-			char *ptr = obuf;
 			char *next_out = obuf + 2;
 
 			if (available_out == 0) {
@@ -931,10 +930,10 @@ send_compressed_token(int f, int32 token, struct map_struct *buf, OFF_T offset, 
 				exit_cleanup(RERR_STREAMIO);
 			}
 			if (available_out <= MAX_DATA_COUNT) {
-				ptr[0] = DEFLATED_DATA + (available_out >> 8);
-				ptr[1] = available_out;
+				obuf[0] = DEFLATED_DATA + (available_out >> 8);
+				obuf[1] = available_out;
 
-				write_buf(f, ptr, available_out + 2);
+				write_buf(f, obuf, available_out + 2);
 
 				available_out = 0;
 				nb -= available_in;
@@ -943,14 +942,14 @@ send_compressed_token(int f, int32 token, struct map_struct *buf, OFF_T offset, 
 		} while (nb != 0);
 		flush_pending = token == -2;
 	}
-	if (token == -1)
+	if (token == -1) {
 		/* end of file - clean up */
 		write_byte(f, END_FLAG);
+	}
 }
 
 static int32 recv_compressed_token(int f, char **data)
 {
-	static int32 saved_flag;
 	static int init_done;
 	int32 n, flag;
 	int size = MAX(LZ4_compressBound(CHUNK_SIZE), MAX_DATA_COUNT+2);
@@ -969,13 +968,9 @@ static int32 recv_compressed_token(int f, char **data)
 			recv_state = r_idle;
 			rx_token = 0;
 			break;
+
 		case r_idle:
-		case r_inflated:
-			if (saved_flag) {
-				flag = saved_flag & 0xff;
-				saved_flag = 0;
-			} else
-				flag = read_byte(f);
+			flag = read_byte(f);
 			if ((flag & 0xC0) == DEFLATED_DATA) {
 				n = ((flag & 0x3f) << 8) + read_byte(f);
 				read_buf(f, cbuf, n);
@@ -984,9 +979,6 @@ static int32 recv_compressed_token(int f, char **data)
 				recv_state = r_inflating;
 				break;
 			}
-
-			if (recv_state == r_inflated)
-				recv_state = r_idle;
 
 			if (flag == END_FLAG) {
 				/* that's all folks */
@@ -1013,9 +1005,12 @@ static int32 recv_compressed_token(int f, char **data)
 				rprintf(FERROR, "uncompress failed: %d\n", avail_out);
 				exit_cleanup(RERR_STREAMIO);
 			}
-			recv_state = r_inflated;
+			recv_state = r_idle;
 			*data = dbuf;
 			return avail_out;
+
+		case r_inflated: /* lz4 doesn't get into this state */
+			break;
 
 		case r_running:
 			++rx_token;
@@ -1024,53 +1019,7 @@ static int32 recv_compressed_token(int f, char **data)
 			return -1 - rx_token;
 		}
 	}
-
 }
-
-# if 0
-static void see_uncompressed_token(char *buf, int32 len)
-{
-	static const char *next_in;
-	static int avail_in;
-	int avail_out;
-
-	int32 blklen;
-	char hdr[5];
-
-	avail_in = 0;
-	blklen = 0;
-	hdr[0] = 0;
-	do {
-		if (avail_in == 0 && len != 0) {
-			if (blklen == 0) {
-				/* Give it a fake stored-block header. */
-				next_in = hdr;
-				avail_in = 5;
-				blklen = len;
-				if (blklen > 0xffff)
-					blklen = 0xffff;
-				hdr[1] = blklen;
-				hdr[2] = blklen >> 8;
-				hdr[3] = ~hdr[1];
-				hdr[4] = ~hdr[2];
-			} else {
-				next_in = (char *)buf;
-				avail_in = blklen;
-				if (protocol_version >= 31) /* Newer protocols avoid a data-duplicating bug */
-					buf += blklen;
-				len -= blklen;
-				blklen = 0;
-			}
-		}
-		avail_out = LZ4_decompress_safe(next_in, dbuf, avail_in, LZ4_compressBound(CHUNK_SIZE));
-		if (avail_out < 0) {
-			rprintf(FERROR, "uncompress failed: %d\n", avail_out);
-			exit_cleanup(RERR_STREAMIO);
-		}
-
-	} while (len);
-}
-# endif /* 0 */
 #endif /* SUPPORT_LZ4 */
 
 /**
