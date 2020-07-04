@@ -424,6 +424,15 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     Helpful hint: you probably want to specify "refuse options = delete" for a
     write-only module.
 
+0.  `open noatime`
+
+    This parameter tells the rsync daemon to open files with the O_NOATIME flag
+    (on systems that support it) to avoid changing the access time of the files
+    that are being transferred.  If your OS does not support the O_NOATIME flag
+    then rsync will silently ignore this option.  Note also that some
+    filesystems are mounted to avoid updating the atime on read access even
+    without the O_NOATIME flag being set.
+
 0.  `list`
 
     This parameter determines whether this module is listed when the client
