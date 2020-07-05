@@ -586,7 +586,7 @@ static void print_info_flags(enum logcode f)
 	STRUCT_STAT *dumstat;
 	char line_buf[75];
 	int line_len, j;
-	char *capabilities[] = {
+	char *info_flags[] = {
 
 	"*Capabilities",
 
@@ -685,20 +685,20 @@ static void print_info_flags(enum logcode f)
 	};
 
 	for (line_len = 0, j = 0; ; j++) {
-		char *cap = capabilities[j], *next_cap = cap ? capabilities[j+1] : NULL;
-		int cap_len = cap && *cap != '*' ? strlen(cap) : 1000;
-		int need_comma = next_cap && *next_cap != '*' ? 1 : 0;
-		if (line_len && line_len + 1 + cap_len + need_comma >= (int)sizeof line_buf) {
+		char *str = info_flags[j], *next_nfo = str ? info_flags[j+1] : NULL;
+		int str_len = str && *str != '*' ? strlen(str) : 1000;
+		int need_comma = next_nfo && *next_nfo != '*' ? 1 : 0;
+		if (line_len && line_len + 1 + str_len + need_comma >= (int)sizeof line_buf) {
 			rprintf(f, "   %s\n", line_buf);
 			line_len = 0;
 		}
-		if (!cap)
+		if (!str)
 			break;
-		if (*cap == '*') {
-			rprintf(f, "%s:\n", cap+1);
+		if (*str == '*') {
+			rprintf(f, "%s:\n", str+1);
 			continue;
 		}
-		line_len += snprintf(line_buf+line_len, sizeof line_buf - line_len, " %s%s", cap, need_comma ? "," : "");
+		line_len += snprintf(line_buf+line_len, sizeof line_buf - line_len, " %s%s", str, need_comma ? "," : "");
 	}
 }
 
