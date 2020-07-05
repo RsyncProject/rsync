@@ -217,7 +217,7 @@ def get_rsync_version():
 
 
 def get_NEWS_version_info():
-    rel_re = re.compile(r'^\| \d{2} \w{3} \d{4}\s+\|\s+(?P<ver>\d+\.\d+\.\d+)\s+\|\s+(?P<pdate>\d{2} \w{3} \d{4}\s+)?\|\s+(?P<pver>\d+)\s+\|')
+    rel_re = re.compile(r'^\| \S{2} \w{3} \d{4}\s+\|\s+(?P<ver>\d+\.\d+\.\d+)\s+\|\s+(?P<pdate>\d{2} \w{3} \d{4})?\s+\|\s+(?P<pver>\d+)\s+\|')
     last_version = last_protocol_version = None
     pdate = { }
 
@@ -233,12 +233,11 @@ def get_NEWS_version_info():
                     pdate[m['ver']] = m['pdate']
                 if m['ver'] == last_version:
                     last_protocol_version = m['pver']
-                    break
 
     if not last_protocol_version:
         die(f"Unable to determine protocol_version for {last_version}.")
 
-    return last_version, last_protocol_version
+    return last_version, last_protocol_version, pdate
 
 
 def get_protocol_versions():

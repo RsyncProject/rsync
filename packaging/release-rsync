@@ -60,7 +60,7 @@ def main():
     curversion = get_rsync_version()
 
     # All version values are strings!
-    lastversion, last_protocol_version = get_NEWS_version_info()
+    lastversion, last_protocol_version, pdate = get_NEWS_version_info()
     protocol_version, subprotocol_version = get_protocol_versions()
 
     version = curversion
@@ -116,11 +116,8 @@ def main():
         release += '.' + pre
 
     finalversion = re.sub(r'pre\d+', '', version)
-    if protocol_version == last_protocol_version:
-        proto_changed = 'unchanged'
-        proto_change_date = ' ' * 11
-    else:
-        proto_changed = 'changed'
+    proto_changed = protocol_version != last_protocol_version
+    if proto_changed:
         if finalversion in pdate:
             proto_change_date = pdate[finalversion]
         else:
@@ -129,6 +126,8 @@ def main():
                 if re.match(r'^\d\d \w\w\w \d\d\d\d$', ans):
                     break
             proto_change_date = ans
+    else:
+        proto_change_date = ' ' * 11
 
     if 'pre' in lastversion:
         if not pre:
@@ -189,14 +188,17 @@ About to:
             txt = replace_or_die(x_re, r'%s \1' % cl_today, txt, f"Unable to update ChangeLog header in {fn}")
         elif fn == 'rsync.h':
             x_re = re.compile('(#define\s+SUBPROTOCOL_VERSION)\s+(\d+)')
-            repl = lambda m: m[1] + ' ' + '0' if not pre or proto_changed != 'changed' else 1 if m[2] == '0' else m[2]
+            repl = lambda m: m[1] + ' ' + ('0' if not pre or proto_changed else 1 if m[2] == '0' else m[2])
             txt = replace_or_die(x_re, repl, txt, f"Unable to find SUBPROTOCOL_VERSION define in {fn}")
         elif fn == 'NEWS.md':
             efv = re.escape(finalversion)
-            x_re = re.compile(r'^<.+>\s+# NEWS for rsync %s \(UNRELEASED\)\s+Protocol: .+\n' % efv)
+            x_re = re.compile(r'^<.+>\s+# NEWS for rsync %s \(UNRELEASED\)\s+## Changes in this version:\n' % efv
+                    + r'(\n### PROTOCOL NUMBER:\s+- The protocol number was changed to \d+\.\n)?')
             rel_day = 'UNRELEASED' if pre else today
             repl = (f'<a name="{finalversion}"></a>\n\n# NEWS for rsync {finalversion} ({rel_day})\n\n'
-                + f"Protocol: {protocol_version} ({proto_changed})\n")
+                + '## Changes in this version:\n')
+            if proto_changed:
+                repl += f'\n### PROTOCOL NUMBER:\n\n - The protocol number was changed to {protocol_version}.\n'
             good_top = re.sub(r'\(.*?\)', '(UNRELEASED)', repl, 1)
             msg = f"The top lines of {fn} are not in the right format.  It should be:\n" + good_top
             txt = replace_or_die(x_re, repl, txt, msg)
