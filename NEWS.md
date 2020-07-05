@@ -1,3 +1,18 @@
+<a name="3.2.3"></a>
+
+# NEWS for rsync 3.2.3 (UNRELEASED)
+
+## Changes in this version:
+
+### BUG FIXES:
+
+ - None
+
+### ENHANCEMENTS:
+
+ - None
+
+------------------------------------------------------------------------------
 <a name="3.2.2"></a>
 
 # NEWS for rsync 3.2.2 (4 Jul 2020)

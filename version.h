@@ -1,1 +1,1 @@
-#define RSYNC_VERSION "3.2.2"
+#define RSYNC_VERSION "3.2.3dev"
