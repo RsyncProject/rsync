@@ -28,6 +28,9 @@
 #include <locale.h>
 #endif
 #include <popt.h>
+#ifdef __TANDEM
+#include <floss.h(floss_execlp)>
+#endif
 
 extern int dry_run;
 extern int list_only;
