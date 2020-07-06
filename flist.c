@@ -1892,7 +1892,7 @@ static void send_implied_dirs(int f, struct file_list *flist, char *fname,
 		memcpy(F_DIR_RELNAMES_P(lastpath_struct), &relname_list, sizeof relname_list);
 	}
 	rnpp = EXPAND_ITEM_LIST(relname_list, relnamecache *, 32);
-	*rnpp = (relnamecache*)new_array(char, sizeof (relnamecache) + len);
+	*rnpp = (relnamecache*)new_array(char, RELNAMECACHE_LEN + len + 1);
 	(*rnpp)->name_type = name_type;
 	strlcpy((*rnpp)->fname, limit+1, len + 1);
 
@@ -2051,8 +2051,7 @@ void send_extra_file_list(int f, int at_least)
 
 		if (need_unsorted_flist) {
 			flist->sorted = new_array(struct file_struct *, flist->used);
-			memcpy(flist->sorted, flist->files,
-			       flist->used * sizeof (struct file_struct*));
+			memcpy(flist->sorted, flist->files, flist->used * PTR_SIZE);
 		} else
 			flist->sorted = flist->files;
 
@@ -2405,8 +2404,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	 * send them together in a single file-list. */
 	if (need_unsorted_flist) {
 		flist->sorted = new_array(struct file_struct *, flist->used);
-		memcpy(flist->sorted, flist->files,
-		       flist->used * sizeof (struct file_struct*));
+		memcpy(flist->sorted, flist->files, flist->used * PTR_SIZE);
 	} else
 		flist->sorted = flist->files;
 	flist_sort_and_clean(flist, 0);
@@ -2587,8 +2585,7 @@ struct file_list *recv_file_list(int f, int dir_ndx)
 		 * list unsorted for our exchange of index numbers with the
 		 * other side (since their names may not sort the same). */
 		flist->sorted = new_array(struct file_struct *, flist->used);
-		memcpy(flist->sorted, flist->files,
-		       flist->used * sizeof (struct file_struct*));
+		memcpy(flist->sorted, flist->files, flist->used * PTR_SIZE);
 		if (inc_recurse && dir_flist->used > dstart) {
 			static int dir_flist_malloced = 0;
 			if (dir_flist_malloced < dir_flist->malloced) {
@@ -2598,7 +2595,7 @@ struct file_list *recv_file_list(int f, int dir_ndx)
 				dir_flist_malloced = dir_flist->malloced;
 			}
 			memcpy(dir_flist->sorted + dstart, dir_flist->files + dstart,
-			       (dir_flist->used - dstart) * sizeof (struct file_struct*));
+			       (dir_flist->used - dstart) * PTR_SIZE);
 			fsort(dir_flist->sorted + dstart, dir_flist->used - dstart);
 		}
 	} else {

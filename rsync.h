@@ -732,6 +732,10 @@ struct ht_int64_node {
 # error Character pointers are not 4 or 8 bytes.
 #endif
 
+#if defined __STDC_VERSION__ && __STDC_VERSION__ >= 199901L
+#define USE_FLEXIBLE_ARRAY 1
+#endif
+
 union file_extras {
 	int32 num;
 	uint32 unum;
@@ -753,7 +757,11 @@ struct file_struct {
 	uint32 len32;		/* Lowest 32 bits of the file's length */
 	uint16 mode;		/* The item's type and permissions */
 	uint16 flags;		/* The FLAG_* bits for this item */
-	const char basename[1];	/* The basename (AKA filename) follows */
+#ifdef USE_FLEXIBLE_ARRAY
+	const char basename[];	/* The basename (AKA filename) follows */
+#else
+	const char basename[1];	/* A kluge that should work like a flexible array */
+#endif
 };
 
 extern int file_extra_cnt;
@@ -766,7 +774,11 @@ extern int gid_ndx;
 extern int acls_ndx;
 extern int xattrs_ndx;
 
+#ifdef USE_FLEXIBLE_ARRAY
+#define FILE_STRUCT_LEN (sizeof (struct file_struct))
+#else
 #define FILE_STRUCT_LEN (offsetof(struct file_struct, basename))
+#endif
 #define EXTRA_LEN (sizeof (union file_extras))
 #define DEV_EXTRA_CNT 2
 #define DIRNODE_EXTRA_CNT 3
@@ -1035,8 +1047,18 @@ typedef struct {
 
 typedef struct {
 	char name_type;
-	char fname[1]; /* has variable size */
+#ifdef USE_FLEXIBLE_ARRAY
+	char fname[]; /* has variable size */
+#else
+	char fname[1]; /* A kluge that should work like a flexible array */
+#endif
 } relnamecache;
+
+#ifdef USE_FLEXIBLE_ARRAY
+#define RELNAMECACHE_LEN (sizeof (relnamecache))
+#else
+#define RELNAMECACHE_LEN (offsetof(relnamecache, fname))
+#endif
 
 #include "byteorder.h"
 #include "lib/mdigest.h"
@@ -1094,7 +1116,7 @@ struct name_num_obj {
 	uchar *saw;
 	int saw_len;
 	int negotiated_num;
-	struct name_num_item list[];
+	struct name_num_item list[8]; /* A big-enough len (we'll get a compile error if it is ever too small) */
 };
 
 #ifndef __cplusplus
