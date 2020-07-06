@@ -488,7 +488,7 @@ AC_CHECK_HEADERS(sys/fcntl.h sys/select.h fcntl.h sys/time.h sys/unistd.h \
     sys/ioctl.h sys/filio.h string.h stdlib.h sys/socket.h sys/mode.h \
     sys/un.h sys/attr.h mcheck.h arpa/inet.h arpa/nameser.h locale.h \
     netdb.h malloc.h float.h limits.h iconv.h libcharset.h langinfo.h \
-    sys/acl.h acl/libacl.h attr/xattr.h sys/xattr.h sys/extattr.h \
+    sys/acl.h acl/libacl.h attr/xattr.h sys/xattr.h sys/extattr.h dl.h \
     popt.h popt/popt.h linux/falloc.h netinet/in_systm.h netinet/ip.h \
     zlib.h xxhash.h openssl/md4.h openssl/md5.h zstd.h lz4.h sys/file.h)
 AC_HEADER_MAJOR_FIXED
@@ -1221,11 +1221,6 @@ else
 	AC_DEFINE(HAVE_SOLARIS_ACLS, 1, [true if you have solaris ACLs])
 	AC_DEFINE(SUPPORT_ACLS, 1)
 	;;
-    *hpux*)
-	AC_MSG_RESULT(Using HPUX ACLs)
-	AC_DEFINE(HAVE_HPUX_ACLS, 1, [true if you have HPUX ACLs])
-	AC_DEFINE(SUPPORT_ACLS, 1)
-	;;
     *irix*)
 	AC_MSG_RESULT(Using IRIX ACLs)
 	AC_DEFINE(HAVE_IRIX_ACLS, 1, [true if you have IRIX ACLs])
@@ -1245,6 +1240,11 @@ else
     darwin*)
 	AC_MSG_RESULT(Using OS X ACLs)
 	AC_DEFINE(HAVE_OSX_ACLS, 1, [true if you have Mac OS X ACLs])
+	AC_DEFINE(SUPPORT_ACLS, 1)
+	;;
+    *hpux*|*nsk*)
+	AC_MSG_RESULT(Using HPUX ACLs)
+	AC_DEFINE(HAVE_HPUX_ACLS, 1, [true if you have HPUX ACLs])
 	AC_DEFINE(SUPPORT_ACLS, 1)
 	;;
     *)

@@ -767,7 +767,9 @@ int sys_acl_free_acl(SMB_ACL_T acl_d)
 
 #elif defined(HAVE_HPUX_ACLS) /*---------------------------------------------*/
 
+#ifdef HAVE_DL_H
 #include <dl.h>
+#endif
 
 /*
  * Based on the Solaris/SCO code - with modifications.
