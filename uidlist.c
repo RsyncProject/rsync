@@ -95,7 +95,7 @@ static struct idlist *add_to_list(struct idlist **root, id_t id, union name_or_i
 }
 
 /* turn a uid into a user name */
-char *uid_to_user(uid_t uid)
+const char *uid_to_user(uid_t uid)
 {
 	struct passwd *pass = getpwuid(uid);
 	if (pass)
@@ -104,7 +104,7 @@ char *uid_to_user(uid_t uid)
 }
 
 /* turn a gid into a group name */
-char *gid_to_group(gid_t gid)
+const char *gid_to_group(gid_t gid)
 {
 	struct group *grp = getgrgid(gid);
 	if (grp)

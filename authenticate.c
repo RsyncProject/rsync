@@ -227,7 +227,7 @@ char *auth_server(int f_in, int f_out, int module, const char *host,
 	char *users = lp_auth_users(module);
 	char challenge[MAX_DIGEST_LEN*2];
 	char line[BIGPATHBUFLEN];
-	char **auth_uid_groups = NULL;
+	const char **auth_uid_groups = NULL;
 	int auth_uid_groups_cnt = -1;
 	const char *err = NULL;
 	int group_match = -1;
@@ -287,7 +287,7 @@ char *auth_server(int f_in, int f_out, int module, const char *host,
 				else {
 					gid_t *gid_array = gid_list.items;
 					auth_uid_groups_cnt = gid_list.count;
-					auth_uid_groups = new_array(char *, auth_uid_groups_cnt);
+					auth_uid_groups = new_array(const char *, auth_uid_groups_cnt);
 					for (j = 0; j < auth_uid_groups_cnt; j++)
 						auth_uid_groups[j] = gid_to_group(gid_array[j]);
 				}
@@ -313,7 +313,7 @@ char *auth_server(int f_in, int f_out, int module, const char *host,
 	else if (opt_ch == 'd')
 		err = "denied by rule";
 	else {
-		char *group = group_match >= 0 ? auth_uid_groups[group_match] : NULL;
+		const char *group = group_match >= 0 ? auth_uid_groups[group_match] : NULL;
 		err = check_secret(module, line, group, challenge, pass);
 	}
 
@@ -324,7 +324,7 @@ char *auth_server(int f_in, int f_out, int module, const char *host,
 		int j;
 		for (j = 0; j < auth_uid_groups_cnt; j++) {
 			if (auth_uid_groups[j])
-				free(auth_uid_groups[j]);
+				free((char*)auth_uid_groups[j]);
 		}
 		free(auth_uid_groups);
 	}
