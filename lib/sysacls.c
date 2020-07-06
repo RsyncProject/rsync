@@ -797,9 +797,17 @@ int sys_acl_free_acl(SMB_ACL_T acl_d)
 /* so it is important to check this and avoid acl()    */
 /* calls if it isn't there.                            */
 
+#ifdef __TANDEM
+inline do_acl(const char *path_p, int cmd, int nentries, struct acl *aclbufp)
+{
+	return acl((char*)path_p, cmd, nentries, aclbufp);
+}
+#define acl(p,c,n,a) do_acl(p,c,n,a)
+#endif
+
 static BOOL hpux_acl_call_presence(void)
 {
-
+#ifndef __TANDEM
 	shl_t handle = NULL;
 	void *value;
 	int ret_val=0;
@@ -820,6 +828,7 @@ static BOOL hpux_acl_call_presence(void)
 	DEBUG(10, ("hpux_acl_call_presence: acl() system call is present. We have JFS 3.3 or above \n"));
 
 	already_checked = True;
+#endif
 	return True;
 }
 

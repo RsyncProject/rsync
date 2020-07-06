@@ -139,7 +139,9 @@ typedef struct acl *SMB_ACL_ENTRY_T;
 
 /* Based on the Solaris & UnixWare code. */
 
+#ifndef __TANDEM
 #undef GROUP
+#endif
 #include <sys/aclv.h>
 
 /* SVR4.2 ES/MP ACLs */
