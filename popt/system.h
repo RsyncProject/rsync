@@ -11,6 +11,10 @@ extern __const __int32_t *__ctype_toupper;
 /*@=declundef@*/
 #endif
 
+#ifdef __TANDEM
+# include <floss.h(floss_execvp,floss_read)>
+#endif
+
 #include <ctype.h>
 
 #include <errno.h>

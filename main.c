@@ -299,7 +299,7 @@ static void become_copy_as_user()
 
 	our_uid = MY_UID();
 	our_gid = MY_GID();
-	am_root = (our_uid == 0);
+	am_root = (our_uid == ROOT_UID);
 
 	if (gname)
 		gname[-1] = ':';
@@ -1667,7 +1667,7 @@ int main(int argc,char *argv[])
 	starttime = time(NULL);
 	our_uid = MY_UID();
 	our_gid = MY_GID();
-	am_root = our_uid == 0;
+	am_root = our_uid == ROOT_UID;
 
 	memset(&stats, 0, sizeof(stats));
 

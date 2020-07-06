@@ -473,7 +473,23 @@ enum delret {
 #ifdef MAKEDEV_TAKES_3_ARGS
 #define MAKEDEV(devmajor,devminor) makedev(0,devmajor,devminor)
 #else
+#ifndef __TANDEM
 #define MAKEDEV(devmajor,devminor) makedev(devmajor,devminor)
+#else
+# include <sys/stat.h>
+# define major DEV_TO_MAJOR
+# define minor DEV_TO_MINOR
+# define MAKEDEV MAJORMINOR_TO_DEV
+#endif
+#endif
+
+#ifdef __TANDEM
+# include <floss.h(floss_read,floss_write,floss_fork,floss_execvp)>
+# include <floss.h(floss_getpwuid,floss_select,floss_seteuid)>
+# define S_IEXEC S_IXUSR
+# define ROOT_UID 65535
+#else
+# define ROOT_UID 0
 #endif
 
 #ifdef HAVE_COMPAT_H

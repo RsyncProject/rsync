@@ -41,14 +41,14 @@ cd "$scratchdir"
 
 ln -s test-rsyncd.conf rsyncd.conf
 
+my_uid=`get_testuid`
+root_uid=`get_rootuid`
 confopt=''
-case `get_testuid` in
-0)
+if test x"$my_uid" = x"$root_uid"; then
     # Root needs to specify the config file, or it uses /etc/rsyncd.conf.
     echo "Forcing --config=$conf"
     confopt=" --config=$conf"
-    ;;
-esac
+fi
 
 # These have a space-padded 15-char name, then a tab, then a comment.
 sed 's/NOCOMMENT//' <<EOT >"$chkfile"

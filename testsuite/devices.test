@@ -67,16 +67,17 @@ EOF
     esac
     ;;
 *)
-    case `get_testuid` in
-    '') ;; # If "id" failed, try to continue...
-    0)  ;;
-    *)  if [ -e "$FAKEROOT_PATH" ]; then
+    my_uid=`get_testuid`
+    root_uid=`get_rootuid`
+    if test x"$my_uid" = x; then
+	: # If "id" failed, try to continue...
+    elif test x"$my_uid" != x"$root_uid"; then
+	if [ -e "$FAKEROOT_PATH" ]; then
 	    echo "Let's try re-running the script under fakeroot..."
 	    exec "$FAKEROOT_PATH" "$SHELL_PATH" $RUNSHFLAGS "$0"
 	fi
 	test_skipped "Rsync needs root/fakeroot for device tests"
-	;;
-    esac
+    fi
     ;;
 esac
 

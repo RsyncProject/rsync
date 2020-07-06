@@ -704,7 +704,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 		logfile_format_has_o_or_i = 1;
 
 	uid = MY_UID();
-	am_root = (uid == 0);
+	am_root = (uid == ROOT_UID);
 
 	p = *lp_uid(module_id) ? lp_uid(module_id) : am_root ? NOBODY_USER : NULL;
 	if (p) {
@@ -959,7 +959,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 		}
 
 		our_uid = MY_UID();
-		am_root = (our_uid == 0);
+		am_root = (our_uid == ROOT_UID);
 	}
 
 	if (lp_temp_dir(module_id) && *lp_temp_dir(module_id)) {
@@ -1213,7 +1213,7 @@ int start_daemon(int f_in, int f_out)
 			return -1;
 		}
 		our_uid = MY_UID();
-		am_root = (our_uid == 0);
+		am_root = (our_uid == ROOT_UID);
 	}
 
 	addr = client_addr(f_in);

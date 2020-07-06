@@ -119,7 +119,7 @@ static const char *check_secret(int module, const char *user, const char *group,
 		if ((st.st_mode & 06) != 0) {
 			rprintf(FLOG, "secrets file must not be other-accessible (see strict modes option)\n");
 			ok = 0;
-		} else if (MY_UID() == 0 && st.st_uid != 0) {
+		} else if (MY_UID() == ROOT_UID && st.st_uid != ROOT_UID) {
 			rprintf(FLOG, "secrets file must be owned by root when running as root (see strict modes)\n");
 			ok = 0;
 		}
@@ -196,7 +196,7 @@ static const char *getpassf(const char *filename)
 			rprintf(FERROR, "ERROR: password file must not be other-accessible\n");
 			exit_cleanup(RERR_SYNTAX);
 		}
-		if (MY_UID() == 0 && st.st_uid != 0) {
+		if (MY_UID() == ROOT_UID && st.st_uid != ROOT_UID) {
 			rprintf(FERROR, "ERROR: password file must be owned by root when running as root\n");
 			exit_cleanup(RERR_SYNTAX);
 		}
