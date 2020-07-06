@@ -2608,6 +2608,7 @@ void server_options(char **args, int *argc_p)
 		eFlags[x++] = 'C'; /* support checksum seed order fix */
 		eFlags[x++] = 'I'; /* support inplace_partial behavior */
 		eFlags[x++] = 'v'; /* use varint for flist & compat flags; negotiate checksum */
+		eFlags[x++] = 'u'; /* include name of uid 0 & gid 0 in the id map */
 		/* NOTE: Avoid using 'V' -- it was the high bit of a write_byte() that became write_varint(). */
 #undef eFlags
 	}

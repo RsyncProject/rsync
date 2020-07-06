@@ -73,6 +73,7 @@ int want_xattr_optim = 0;
 int proper_seed_order = 0;
 int inplace_partial = 0;
 int do_negotiated_strings = 0;
+int xmit_id0_names = 0;
 
 /* These index values are for the file-list's extra-attribute array. */
 int pathname_ndx, depth_ndx, atimes_ndx, uid_ndx, gid_ndx, acls_ndx, xattrs_ndx, unsort_ndx;
@@ -109,6 +110,7 @@ struct name_num_obj valid_compressions = {
 #define CF_CHKSUM_SEED_FIX (1<<5)
 #define CF_INPLACE_PARTIAL_DIR (1<<6)
 #define CF_VARINT_FLIST_FLAGS (1<<7)
+#define CF_ID0_NAMES (1<<8)
 
 static const char *client_info;
 
@@ -694,6 +696,8 @@ void setup_protocol(int f_out,int f_in)
 				compat_flags |= CF_CHKSUM_SEED_FIX;
 			if (local_server || strchr(client_info, 'I') != NULL)
 				compat_flags |= CF_INPLACE_PARTIAL_DIR;
+			if (local_server || strchr(client_info, 'u') != NULL)
+				compat_flags |= CF_ID0_NAMES;
 			if (local_server || strchr(client_info, 'v') != NULL) {
 				do_negotiated_strings = 1;
 				compat_flags |= CF_VARINT_FLIST_FLAGS;
@@ -714,6 +718,7 @@ void setup_protocol(int f_out,int f_in)
 		want_xattr_optim = protocol_version >= 31 && !(compat_flags & CF_AVOID_XATTR_OPTIM);
 		proper_seed_order = compat_flags & CF_CHKSUM_SEED_FIX ? 1 : 0;
 		xfer_flags_as_varint = compat_flags & CF_VARINT_FLIST_FLAGS ? 1 : 0;
+		xmit_id0_names = compat_flags & CF_ID0_NAMES ? 1 : 0;
 		if (am_sender) {
 			receiver_symlink_times = am_server
 			    ? strchr(client_info, 'L') != NULL

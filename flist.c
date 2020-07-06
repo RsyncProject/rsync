@@ -2412,7 +2412,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	file_old_total += flist->used;
 
 	if (numeric_ids <= 0 && !inc_recurse)
-		send_id_list(f);
+		send_id_lists(f);
 
 	/* send the io_error flag */
 	if (protocol_version < 30)

@@ -33,6 +33,7 @@ extern int preserve_uid;
 extern int preserve_gid;
 extern int preserve_acls;
 extern int numeric_ids;
+extern int xmit_id0_names;
 extern gid_t our_gid;
 extern char *usermap;
 extern char *groupmap;
@@ -295,9 +296,6 @@ const char *add_uid(uid_t uid)
 	struct idlist *node;
 	union name_or_id noiu;
 
-	if (uid == 0)	/* don't map root */
-		return NULL;
-
 	for (list = uidlist; list; list = list->next) {
 		if (list->id == uid)
 			return NULL;
@@ -315,9 +313,6 @@ const char *add_gid(gid_t gid)
 	struct idlist *node;
 	union name_or_id noiu;
 
-	if (gid == 0)	/* don't map root */
-		return NULL;
-
 	for (list = gidlist; list; list = list->next) {
 		if (list->id == gid)
 			return NULL;
@@ -328,40 +323,43 @@ const char *add_gid(gid_t gid)
 	return node->u.name;
 }
 
-/* send a complete uid/gid mapping to the peer */
-void send_id_list(int f)
+static void send_one_name(int f, id_t id, const char *name)
+{
+	int len = strlen(name);
+	if (len > 255) /* Impossible? */
+		len = 255;
+
+	write_varint30(f, id);
+	write_byte(f, len);
+	write_buf(f, name, len);
+}
+
+static void send_one_list(int f, struct idlist *idlist, int usernames)
 {
 	struct idlist *list;
 
-	if (preserve_uid || preserve_acls) {
-		int len;
-		/* we send sequences of uid/byte-length/name */
-		for (list = uidlist; list; list = list->next) {
-			if (!list->u.name)
-				continue;
-			len = strlen(list->u.name);
-			write_varint30(f, list->id);
-			write_byte(f, len);
-			write_buf(f, list->u.name, len);
-		}
-
-		/* terminate the uid list with a 0 uid. We explicitly exclude
-		 * 0 from the list */
-		write_varint30(f, 0);
+	/* we send sequences of id/byte-len/name */
+	for (list = idlist; list; list = list->next) {
+		if (list->id && list->u.name)
+			send_one_name(f, list->id, list->u.name);
 	}
 
-	if (preserve_gid || preserve_acls) {
-		int len;
-		for (list = gidlist; list; list = list->next) {
-			if (!list->u.name)
-				continue;
-			len = strlen(list->u.name);
-			write_varint30(f, list->id);
-			write_byte(f, len);
-			write_buf(f, list->u.name, len);
-		}
+	/* Terminate the uid list with 0 (which was excluded above).
+	 * A modern rsync also sends the name of id 0. */
+	if (xmit_id0_names)
+		send_one_name(f, 0, usernames ? uid_to_user(0) : gid_to_group(0));
+	else
 		write_varint30(f, 0);
-	}
+}
+
+/* send a complete uid/gid mapping to the peer */
+void send_id_lists(int f)
+{
+	if (preserve_uid || preserve_acls)
+		send_one_list(f, uidlist, 1);
+
+	if (preserve_gid || preserve_acls)
+		send_one_list(f, gidlist, 0);
 }
 
 uid_t recv_user_name(int f, uid_t uid)
@@ -405,12 +403,16 @@ void recv_id_list(int f, struct file_list *flist)
 		/* read the uid list */
 		while ((id = read_varint30(f)) != 0)
 			recv_user_name(f, id);
+		if (xmit_id0_names)
+			recv_user_name(f, 0);
 	}
 
 	if ((preserve_gid || preserve_acls) && numeric_ids <= 0) {
 		/* read the gid list */
 		while ((id = read_varint30(f)) != 0)
 			recv_group_name(f, id, NULL);
+		if (xmit_id0_names)
+			recv_group_name(f, 0, NULL);
 	}
 
 	/* Now convert all the uids/gids from sender values to our values. */
@@ -502,8 +504,9 @@ void parse_name_map(char *map, BOOL usernames)
 		*--cp = '\0'; /* replace comma */
 	}
 
-	/* The 0 user/group doesn't get its name sent, so add it explicitly. */
-	recv_add_id(idlist_ptr, *idmap_ptr, 0, numeric_ids ? NULL : usernames ? uid_to_user(0) : gid_to_group(0));
+	/* If the sender isn't going to xmit the id0 name, we assume it's "root". */
+	if (!xmit_id0_names)
+		recv_add_id(idlist_ptr, *idmap_ptr, 0, numeric_ids ? NULL : "root");
 }
 
 #ifdef HAVE_GETGROUPLIST
