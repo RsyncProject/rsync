@@ -29,7 +29,7 @@
 #ifdef DEBUG
 #undef DEBUG
 #endif
-#define DEBUG(x,y)
+#define DEBUG(x, y)
 
 void SAFE_FREE(void *mem)
 {
@@ -44,18 +44,18 @@ void SAFE_FREE(void *mem)
 
  The interfaces that each ACL implementation must support are as follows :
 
- int sys_acl_get_entry( SMB_ACL_T theacl, int entry_id, SMB_ACL_ENTRY_T *entry_p)
- int sys_acl_get_tag_type( SMB_ACL_ENTRY_T entry_d, SMB_ACL_TAG_T *tag_type_p)
+ int sys_acl_get_entry(SMB_ACL_T theacl, int entry_id, SMB_ACL_ENTRY_T *entry_p)
+ int sys_acl_get_tag_type(SMB_ACL_ENTRY_T entry_d, SMB_ACL_TAG_T *tag_type_p)
  int sys_acl_get_info(SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T *tag_type_p, uint32 *bits_p, id_t *u_g_id_p)
- SMB_ACL_T sys_acl_get_file( const char *path_p, SMB_ACL_TYPE_T type)
+ SMB_ACL_T sys_acl_get_file(const char *path_p, SMB_ACL_TYPE_T type)
  SMB_ACL_T sys_acl_get_fd(int fd)
- SMB_ACL_T sys_acl_init( int count)
- int sys_acl_create_entry( SMB_ACL_T *pacl, SMB_ACL_ENTRY_T *pentry)
+ SMB_ACL_T sys_acl_init(int count)
+ int sys_acl_create_entry(SMB_ACL_T *pacl, SMB_ACL_ENTRY_T *pentry)
  int sys_acl_set_info(SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T tag_type, uint32 bits, id_t u_g_id)
  int sys_acl_set_access_bits(SMB_ACL_ENTRY_T entry, uint32 bits)
- int sys_acl_valid( SMB_ACL_T theacl )
- int sys_acl_set_file( const char *name, SMB_ACL_TYPE_T acltype, SMB_ACL_T theacl)
- int sys_acl_set_fd( int fd, SMB_ACL_T theacl)
+ int sys_acl_valid(SMB_ACL_T theacl)
+ int sys_acl_set_file(const char *name, SMB_ACL_TYPE_T acltype, SMB_ACL_T theacl)
+ int sys_acl_set_fd(int fd, SMB_ACL_T theacl)
  int sys_acl_delete_def_file(const char *path)
  int sys_acl_free_acl(SMB_ACL_T posix_acl)
 
@@ -65,19 +65,19 @@ void SAFE_FREE(void *mem)
 
 /* Identity mapping - easy. */
 
-int sys_acl_get_entry( SMB_ACL_T the_acl, int entry_id, SMB_ACL_ENTRY_T *entry_p)
+int sys_acl_get_entry(SMB_ACL_T the_acl, int entry_id, SMB_ACL_ENTRY_T *entry_p)
 {
-	return acl_get_entry( the_acl, entry_id, entry_p);
+	return acl_get_entry(the_acl, entry_id, entry_p);
 }
 
-int sys_acl_get_tag_type( SMB_ACL_ENTRY_T entry_d, SMB_ACL_TAG_T *tag_type_p)
+int sys_acl_get_tag_type(SMB_ACL_ENTRY_T entry_d, SMB_ACL_TAG_T *tag_type_p)
 {
-	return acl_get_tag_type( entry_d, tag_type_p);
+	return acl_get_tag_type(entry_d, tag_type_p);
 }
 
-SMB_ACL_T sys_acl_get_file( const char *path_p, SMB_ACL_TYPE_T type)
+SMB_ACL_T sys_acl_get_file(const char *path_p, SMB_ACL_TYPE_T type)
 {
-	return acl_get_file( path_p, type);
+	return acl_get_file(path_p, type);
 }
 
 #if 0
@@ -114,12 +114,12 @@ int sys_acl_get_info(SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T *tag_type_p, uint32 *b
 	return 0;
 }
 
-SMB_ACL_T sys_acl_init( int count)
+SMB_ACL_T sys_acl_init(int count)
 {
 	return acl_init(count);
 }
 
-int sys_acl_create_entry( SMB_ACL_T *pacl, SMB_ACL_ENTRY_T *pentry)
+int sys_acl_create_entry(SMB_ACL_T *pacl, SMB_ACL_ENTRY_T *pentry)
 {
 	return acl_create_entry(pacl, pentry);
 }
@@ -153,7 +153,7 @@ int sys_acl_set_access_bits(SMB_ACL_ENTRY_T entry, uint32 bits)
 	return acl_set_permset(entry, permset);
 }
 
-int sys_acl_valid( SMB_ACL_T theacl )
+int sys_acl_valid(SMB_ACL_T theacl)
 {
 	return acl_valid(theacl);
 }
@@ -164,7 +164,7 @@ int sys_acl_set_file(const char *name, SMB_ACL_TYPE_T acltype, SMB_ACL_T theacl)
 }
 
 #if 0
-int sys_acl_set_fd( int fd, SMB_ACL_T theacl)
+int sys_acl_set_fd(int fd, SMB_ACL_T theacl)
 {
 	return acl_set_fd(fd, theacl);
 }
@@ -191,7 +191,7 @@ int sys_acl_free_acl(SMB_ACL_T the_acl)
  * to be broken on Tru64 so we have to manipulate
  * the permission bits in the permset directly.
  */
-int sys_acl_get_entry( SMB_ACL_T the_acl, int entry_id, SMB_ACL_ENTRY_T *entry_p)
+int sys_acl_get_entry(SMB_ACL_T the_acl, int entry_id, SMB_ACL_ENTRY_T *entry_p)
 {
 	SMB_ACL_ENTRY_T	entry;
 
@@ -208,12 +208,12 @@ int sys_acl_get_entry( SMB_ACL_T the_acl, int entry_id, SMB_ACL_ENTRY_T *entry_p
 	return errno ? -1 : 0;
 }
 
-int sys_acl_get_tag_type( SMB_ACL_ENTRY_T entry_d, SMB_ACL_TAG_T *tag_type_p)
+int sys_acl_get_tag_type(SMB_ACL_ENTRY_T entry_d, SMB_ACL_TAG_T *tag_type_p)
 {
-	return acl_get_tag_type( entry_d, tag_type_p);
+	return acl_get_tag_type(entry_d, tag_type_p);
 }
 
-SMB_ACL_T sys_acl_get_file( const char *path_p, SMB_ACL_TYPE_T type)
+SMB_ACL_T sys_acl_get_file(const char *path_p, SMB_ACL_TYPE_T type)
 {
 	return acl_get_file((char *)path_p, type);
 }
@@ -246,12 +246,12 @@ int sys_acl_get_info(SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T *tag_type_p, uint32 *b
 	return 0;
 }
 
-SMB_ACL_T sys_acl_init( int count)
+SMB_ACL_T sys_acl_init(int count)
 {
 	return acl_init(count);
 }
 
-int sys_acl_create_entry( SMB_ACL_T *pacl, SMB_ACL_ENTRY_T *pentry)
+int sys_acl_create_entry(SMB_ACL_T *pacl, SMB_ACL_ENTRY_T *pentry)
 {
 	SMB_ACL_ENTRY_T entry;
 
@@ -286,20 +286,20 @@ int sys_acl_set_access_bits(SMB_ACL_ENTRY_T entry, uint32 bits)
 	return acl_set_permset(entry, permset);
 }
 
-int sys_acl_valid( SMB_ACL_T theacl )
+int sys_acl_valid(SMB_ACL_T theacl)
 {
 	acl_entry_t	entry;
 
 	return acl_valid(theacl, &entry);
 }
 
-int sys_acl_set_file( const char *name, SMB_ACL_TYPE_T acltype, SMB_ACL_T theacl)
+int sys_acl_set_file(const char *name, SMB_ACL_TYPE_T acltype, SMB_ACL_T theacl)
 {
 	return acl_set_file((char *)name, acltype, theacl);
 }
 
 #if 0
-int sys_acl_set_fd( int fd, SMB_ACL_T theacl)
+int sys_acl_set_fd(int fd, SMB_ACL_T theacl)
 {
 	return acl_set_fd(fd, ACL_TYPE_ACCESS, theacl);
 }
@@ -702,10 +702,10 @@ int sys_acl_set_file(const char *name, SMB_ACL_TYPE_T type, SMB_ACL_T acl_d)
 		 * copy the access control and default entries into the buffer
 		 */
 		memcpy(&acl_buf[0], &acc_acl->acl[0],
-			acc_acl->count * sizeof(acl_buf[0]));
+			acc_acl->count * sizeof acl_buf[0]);
 
 		memcpy(&acl_buf[acc_acl->count], &def_acl->acl[0],
-			def_acl->count * sizeof(acl_buf[0]));
+			def_acl->count * sizeof acl_buf[0]);
 
 		/*
 		 * set the ACL_DEFAULT flag on the default entries
@@ -805,20 +805,19 @@ static BOOL hpux_acl_call_presence(void)
 	int ret_val=0;
 	static BOOL already_checked=0;
 
-	if(already_checked)
+	if (already_checked)
 		return True;
-
 
 	ret_val = shl_findsym(&handle, "acl", TYPE_PROCEDURE, &value);
 
-	if(ret_val != 0) {
+	if (ret_val != 0) {
 		DEBUG(5, ("hpux_acl_call_presence: shl_findsym() returned %d, errno = %d, error %s\n",
 			ret_val, errno, strerror(errno)));
-		DEBUG(5,("hpux_acl_call_presence: acl() system call is not present. Check if you have JFS 3.3 and above?\n"));
+		DEBUG(5, ("hpux_acl_call_presence: acl() system call is not present. Check if you have JFS 3.3 and above?\n"));
 		return False;
 	}
 
-	DEBUG(10,("hpux_acl_call_presence: acl() system call is present. We have JFS 3.3 or above \n"));
+	DEBUG(10, ("hpux_acl_call_presence: acl() system call is present. We have JFS 3.3 or above \n"));
 
 	already_checked = True;
 	return True;
@@ -886,7 +885,7 @@ SMB_ACL_T sys_acl_get_file(const char *path_p, SMB_ACL_TYPE_T type)
 	int		naccess;	/* # of access ACL entries	*/
 	int		ndefault;	/* # of default ACL entries	*/
 
-	if(hpux_acl_call_presence() == False) {
+	if (hpux_acl_call_presence() == False) {
 		/* Looks like we don't have the acl() system call on HPUX. 
 		 * May be the system doesn't have the latest version of JFS.
 		 */
@@ -1013,7 +1012,7 @@ SMB_ACL_T sys_acl_init(int count)
 	 * acl[] array, this actually allocates an ACL with room
 	 * for (count+1) entries
 	 */
-	if ((a = (SMB_ACL_T)SMB_MALLOC(sizeof a[0] + count * sizeof(struct acl))) == NULL) {
+	if ((a = (SMB_ACL_T)SMB_MALLOC(sizeof a[0] + count * sizeof (struct acl))) == NULL) {
 		errno = ENOMEM;
 		return NULL;
 	}
@@ -1111,10 +1110,10 @@ static void hpux_count_obj(int acl_count, struct acl *aclp, struct hpux_acl_type
 {
 	int i;
 
-	memset(acl_type_count, 0, sizeof(struct hpux_acl_types));
+	memset(acl_type_count, 0, sizeof (struct hpux_acl_types));
 
-	for(i=0;i<acl_count;i++) {
-		switch(aclp[i].a_type) {
+	for (i = 0; i < acl_count; i++) {
+		switch (aclp[i].a_type) {
 		case USER: 
 			acl_type_count->n_user++;
 			break;
@@ -1196,14 +1195,14 @@ static void hpux_swap_acl_entries(struct acl *aclp0, struct acl *aclp1)
 
 static BOOL hpux_prohibited_duplicate_type(int acl_type)
 {
-	switch(acl_type) {
-		case USER:
-		case GROUP:
-		case DEF_USER: 
-		case DEF_GROUP:
-			return True;
-		default:
-			return False;
+	switch (acl_type) {
+	case USER:
+	case GROUP:
+	case DEF_USER: 
+	case DEF_GROUP:
+		return True;
+	default:
+		return False;
 	}
 }
 
@@ -1217,19 +1216,19 @@ static BOOL hpux_prohibited_duplicate_type(int acl_type)
 
 static int hpux_get_needed_class_perm(struct acl *aclp)
 {
-	switch(aclp->a_type) {
-		case USER: 
-		case GROUP_OBJ: 
-		case GROUP: 
-		case DEF_USER_OBJ: 
-		case DEF_USER:
-		case DEF_GROUP_OBJ: 
-		case DEF_GROUP:
-		case DEF_CLASS_OBJ:
-		case DEF_OTHER_OBJ: 
-			return aclp->a_perm;
-		default: 
-			return 0;
+	switch (aclp->a_type) {
+	case USER: 
+	case GROUP_OBJ: 
+	case GROUP: 
+	case DEF_USER_OBJ: 
+	case DEF_USER:
+	case DEF_GROUP_OBJ: 
+	case DEF_GROUP:
+	case DEF_CLASS_OBJ:
+	case DEF_OTHER_OBJ: 
+		return aclp->a_perm;
+	default: 
+		return 0;
 	}
 }
 
@@ -1268,13 +1267,13 @@ static int hpux_acl_sort(int acl_count, int calclass, struct acl *aclp)
 	int n_class_obj_perm = 0;
 	int i, j;
  
-	if(!acl_count) {
-		DEBUG(10,("Zero acl count passed. Returning Success\n"));
+	if (!acl_count) {
+		DEBUG(10, ("Zero acl count passed. Returning Success\n"));
 		return 0;
 	}
 
-	if(aclp == NULL) {
-		DEBUG(0,("Null ACL pointer in hpux_acl_sort. Returning Failure. \n"));
+	if (aclp == NULL) {
+		DEBUG(0, ("Null ACL pointer in hpux_acl_sort. Returning Failure. \n"));
 		return -1;
 	}
 
@@ -1286,12 +1285,11 @@ static int hpux_acl_sort(int acl_count, int calclass, struct acl *aclp)
 	 * CLASS_OBJ and OTHER_OBJ 
 	 */
 
-	if( (acl_obj_count.n_user_obj  != 1) || 
-		(acl_obj_count.n_group_obj != 1) || 
-		(acl_obj_count.n_class_obj != 1) ||
-		(acl_obj_count.n_other_obj != 1) 
-	) {
-		DEBUG(0,("hpux_acl_sort: More than one entry or no entries for \
+	if (acl_obj_count.n_user_obj != 1
+	 || acl_obj_count.n_group_obj != 1
+	 || acl_obj_count.n_class_obj != 1
+	 || acl_obj_count.n_other_obj != 1) {
+		DEBUG(0, ("hpux_acl_sort: More than one entry or no entries for \
 USER OBJ or GROUP_OBJ or OTHER_OBJ or CLASS_OBJ\n"));
 		return -1;
 	}
@@ -1299,10 +1297,9 @@ USER OBJ or GROUP_OBJ or OTHER_OBJ or CLASS_OBJ\n"));
 	/* If any of the default objects are present, there should be only
 	 * one of them each.
 	 */
-
-	if( (acl_obj_count.n_def_user_obj  > 1) || (acl_obj_count.n_def_group_obj > 1) || 
-			(acl_obj_count.n_def_other_obj > 1) || (acl_obj_count.n_def_class_obj > 1) ) {
-		DEBUG(0,("hpux_acl_sort: More than one entry for DEF_CLASS_OBJ \
+	if (acl_obj_count.n_def_user_obj > 1 || acl_obj_count.n_def_group_obj > 1
+	 || acl_obj_count.n_def_other_obj > 1 || acl_obj_count.n_def_class_obj > 1) {
+		DEBUG(0, ("hpux_acl_sort: More than one entry for DEF_CLASS_OBJ \
 or DEF_USER_OBJ or DEF_GROUP_OBJ or DEF_OTHER_OBJ\n"));
 		return -1;
 	}
@@ -1318,40 +1315,34 @@ or DEF_USER_OBJ or DEF_GROUP_OBJ or DEF_OTHER_OBJ\n"));
 	 * than 17 entries on HPUX. 
 	 */
 
-	for(i=0; i<acl_count;i++) {
-		for (j=i+1; j<acl_count; j++) {
-			if( aclp[i].a_type > aclp[j].a_type ) {
+	for (i = 0; i < acl_count; i++) {
+		for (j = i+1; j < acl_count; j++) {
+			if (aclp[i].a_type > aclp[j].a_type) {
 				/* ACL entries out of order, swap them */
-
 				hpux_swap_acl_entries((aclp+i), (aclp+j));
-
-			} else if ( aclp[i].a_type == aclp[j].a_type ) {
-
+			} else if (aclp[i].a_type == aclp[j].a_type) {
 				/* ACL entries of same type, sort by id */
-
-				if(aclp[i].a_id > aclp[j].a_id) {
+				if (aclp[i].a_id > aclp[j].a_id) {
 					hpux_swap_acl_entries((aclp+i), (aclp+j));
 				} else if (aclp[i].a_id == aclp[j].a_id) {
 					/* We have a duplicate entry. */
-					if(hpux_prohibited_duplicate_type(aclp[i].a_type)) {
+					if (hpux_prohibited_duplicate_type(aclp[i].a_type)) {
 						DEBUG(0, ("hpux_acl_sort: Duplicate entry: Type(hex): %x Id: %d\n",
 							aclp[i].a_type, aclp[i].a_id));
 						return -1;
 					}
 				}
-
 			}
 		}
 	}
 
 	/* set the class obj permissions to the computed one. */
-	if(calclass) {
+	if (calclass) {
 		int n_class_obj_index = -1;
 
-		for(i=0;i<acl_count;i++) {
+		for (i = 0;i < acl_count; i++) {
 			n_class_obj_perm |= hpux_get_needed_class_perm((aclp+i));
-
-			if(aclp[i].a_type == CLASS_OBJ)
+			if (aclp[i].a_type == CLASS_OBJ)
 				n_class_obj_index = i;
 		}
 		aclp[n_class_obj_index].a_perm = n_class_obj_perm;
@@ -1404,7 +1395,7 @@ int sys_acl_set_file(const char *name, SMB_ACL_TYPE_T type, SMB_ACL_T acl_d)
 	struct acl	*acl_buf	= NULL;
 	int		ret;
 
-	if(hpux_acl_call_presence() == False) {
+	if (hpux_acl_call_presence() == False) {
 		/* Looks like we don't have the acl() system call on HPUX. 
 		 * May be the system doesn't have the latest version of JFS.
 		 */
@@ -1467,10 +1458,10 @@ int sys_acl_set_file(const char *name, SMB_ACL_TYPE_T type, SMB_ACL_T acl_d)
 		 * copy the access control and default entries into the buffer
 		 */
 		memcpy(&acl_buf[0], &acc_acl->acl[0],
-			acc_acl->count * sizeof(acl_buf[0]));
+			acc_acl->count * sizeof acl_buf[0]);
 
 		memcpy(&acl_buf[acc_acl->count], &def_acl->acl[0],
-			def_acl->count * sizeof(acl_buf[0]));
+			def_acl->count * sizeof acl_buf[0]);
 
 		/*
 		 * set the ACL_DEFAULT flag on the default entries
@@ -1736,7 +1727,7 @@ int sys_acl_free_acl(SMB_ACL_T acl_d)
 
 /* Donated by Medha Date, mdate@austin.ibm.com, for IBM */
 
-int sys_acl_get_entry( SMB_ACL_T theacl, int entry_id, SMB_ACL_ENTRY_T *entry_p)
+int sys_acl_get_entry(SMB_ACL_T theacl, int entry_id, SMB_ACL_ENTRY_T *entry_p)
 {
 	struct acl_entry_link *link;
 	struct new_acl_entry *entry;
@@ -1749,45 +1740,45 @@ int sys_acl_get_entry( SMB_ACL_T theacl, int entry_id, SMB_ACL_ENTRY_T *entry_p)
 		return -1;
 	}
 
-	DEBUG(10,("This is the count: %d\n",theacl->count));
+	DEBUG(10, ("This is the count: %d\n", theacl->count));
 
 	/* Check if count was previously set to -1. *
 	 * If it was, that means we reached the end *
 	 * of the acl last time.                    */
-	if(theacl->count == -1)
-		return(0);
+	if (theacl->count == -1)
+		return 0;
 
 	link = theacl;
 	/* To get to the next acl, traverse linked list until index *
 	 * of acl matches the count we are keeping.  This count is  *
 	 * incremented each time we return an acl entry.            */
 
-	for(keep_going = 0; keep_going < theacl->count; keep_going++)
+	for (keep_going = 0; keep_going < theacl->count; keep_going++)
 		link = link->nextp;
 
 	entry = *entry_p =  link->entryp;
 
-	DEBUG(10,("*entry_p is %d\n",entry_p));
-	DEBUG(10,("*entry_p->ace_access is %d\n",entry->ace_access));
+	DEBUG(10, ("*entry_p is %d\n", entry_p));
+	DEBUG(10, ("*entry_p->ace_access is %d\n", entry->ace_access));
 
 	/* Increment count */
 	theacl->count++;
-	if(link->nextp == NULL)
+	if (link->nextp == NULL)
 		theacl->count = -1;
 
-	return(1);
+	return 1;
 }
 
-int sys_acl_get_tag_type( SMB_ACL_ENTRY_T entry_d, SMB_ACL_TAG_T *tag_type_p)
+int sys_acl_get_tag_type(SMB_ACL_ENTRY_T entry_d, SMB_ACL_TAG_T *tag_type_p)
 {
 	/* Initialize tag type */
 
 	*tag_type_p = -1;
-	DEBUG(10,("the tagtype is %d\n",entry_d->ace_id->id_type));
+	DEBUG(10, ("the tagtype is %d\n", entry_d->ace_id->id_type));
 
 	/* Depending on what type of entry we have, *
 	 * return tag type.                         */
-	switch(entry_d->ace_id->id_type) {
+	switch (entry_d->ace_id->id_type) {
 	case ACEID_USER:
 		*tag_type_p = SMB_ACL_USER;
 		break;
@@ -1802,13 +1793,13 @@ int sys_acl_get_tag_type( SMB_ACL_ENTRY_T entry_d, SMB_ACL_TAG_T *tag_type_p)
 		break;
 
 	default:
-		return(-1);
+		return -1;
 	}
 
-	return(0);
+	return 0;
 }
 
-SMB_ACL_T sys_acl_get_file( const char *path_p, SMB_ACL_TYPE_T type)
+SMB_ACL_T sys_acl_get_file(const char *path_p, SMB_ACL_TYPE_T type)
 {
 	struct acl *file_acl = (struct acl *)NULL;
 	struct acl_entry *acl_entry;
@@ -1820,7 +1811,7 @@ SMB_ACL_T sys_acl_get_file( const char *path_p, SMB_ACL_TYPE_T type)
 	int rc = 0;
 
 	/* AIX has no DEFAULT */
-	if  ( type == SMB_ACL_TYPE_DEFAULT ) {
+	if  (type == SMB_ACL_TYPE_DEFAULT) {
 #ifdef ENOTSUP
 		errno = ENOTSUP;
 #else
@@ -1831,27 +1822,27 @@ SMB_ACL_T sys_acl_get_file( const char *path_p, SMB_ACL_TYPE_T type)
 
 	/* Get the acl using statacl */
  
-	DEBUG(10,("Entering sys_acl_get_file\n"));
-	DEBUG(10,("path_p is %s\n",path_p));
+	DEBUG(10, ("Entering sys_acl_get_file\n"));
+	DEBUG(10, ("path_p is %s\n", path_p));
 
 	file_acl = (struct acl *)SMB_MALLOC(BUFSIZ);
  
-	if(file_acl == NULL) {
+	if (file_acl == NULL) {
 		errno=ENOMEM;
-		DEBUG(0,("Error in AIX sys_acl_get_file: %d\n",errno));
-		return(NULL);
+		DEBUG(0, ("Error in AIX sys_acl_get_file: %d\n", errno));
+		return NULL;
 	}
 
-	memset(file_acl,0,BUFSIZ);
+	memset(file_acl, 0, BUFSIZ);
 
-	rc = statacl((char *)path_p,0,file_acl,BUFSIZ);
-	if(rc == -1) {
-		DEBUG(0,("statacl returned %d with errno %d\n",rc,errno));
+	rc = statacl((char *)path_p, 0, file_acl, BUFSIZ);
+	if (rc == -1) {
+		DEBUG(0, ("statacl returned %d with errno %d\n", rc, errno));
 		SAFE_FREE(file_acl);
-		return(NULL);
+		return NULL;
 	}
 
-	DEBUG(10,("Got facl and returned it\n"));
+	DEBUG(10, ("Got facl and returned it\n"));
 
 	/* Point to the first acl entry in the acl */
 	acl_entry =  file_acl->acl_ext;
@@ -1862,35 +1853,35 @@ SMB_ACL_T sys_acl_get_file( const char *path_p, SMB_ACL_TYPE_T type)
 	 * code.                                          */
 
 	acl_entry_link_head = acl_entry_link = sys_acl_init(0);
-	if(acl_entry_link_head == NULL)
-		return(NULL);
+	if (acl_entry_link_head == NULL)
+		return NULL;
 
 	acl_entry_link->entryp = SMB_MALLOC_P(struct new_acl_entry);
-	if(acl_entry_link->entryp == NULL) {
+	if (acl_entry_link->entryp == NULL) {
 		SAFE_FREE(file_acl);
 		errno = ENOMEM;
-		DEBUG(0,("Error in AIX sys_acl_get_file is %d\n",errno));
-		return(NULL);
+		DEBUG(0, ("Error in AIX sys_acl_get_file is %d\n", errno));
+		return NULL;
 	}
 
-	DEBUG(10,("acl_entry is %d\n",acl_entry));
-	DEBUG(10,("acl_last(file_acl) id %d\n",acl_last(file_acl)));
+	DEBUG(10, ("acl_entry is %d\n", acl_entry));
+	DEBUG(10, ("acl_last(file_acl) id %d\n", acl_last(file_acl)));
 
 	/* Check if the extended acl bit is on.   *
 	 * If it isn't, do not show the           *
 	 * contents of the acl since AIX intends *
 	 * the extended info to remain unused     */
 
-	if(file_acl->acl_mode & S_IXACL){
+	if (file_acl->acl_mode & S_IXACL){
 		/* while we are not pointing to the very end */
-		while(acl_entry < acl_last(file_acl)) {
+		while (acl_entry < acl_last(file_acl)) {
 			/* before we malloc anything, make sure this is  */
 			/* a valid acl entry and one that we want to map */
 			idp = id_nxt(acl_entry->ace_id);
-			if((acl_entry->ace_type == ACC_SPECIFY ||
-				(acl_entry->ace_type == ACC_PERMIT)) && (idp != id_last(acl_entry))) {
-					acl_entry = acl_nxt(acl_entry);
-					continue;
+			if ((acl_entry->ace_type == ACC_SPECIFY || acl_entry->ace_type == ACC_PERMIT)
+			 && idp != id_last(acl_entry)) {
+				acl_entry = acl_nxt(acl_entry);
+				continue;
 			}
 
 			idp = acl_entry->ace_id;
@@ -1899,24 +1890,24 @@ SMB_ACL_T sys_acl_get_file( const char *path_p, SMB_ACL_TYPE_T type)
 			 * The first entry needs to keep prevp pointing to NULL *
 			 * and already has entryp allocated.                  */
 
-			if(acl_entry_link_head->count != 0) {
+			if (acl_entry_link_head->count != 0) {
 				acl_entry_link->nextp = SMB_MALLOC_P(struct acl_entry_link);
 
-				if(acl_entry_link->nextp == NULL) {
+				if (acl_entry_link->nextp == NULL) {
 					SAFE_FREE(file_acl);
 					errno = ENOMEM;
-					DEBUG(0,("Error in AIX sys_acl_get_file is %d\n",errno));
-					return(NULL);
+					DEBUG(0, ("Error in AIX sys_acl_get_file is %d\n", errno));
+					return NULL;
 				}
 
 				acl_entry_link->nextp->prevp = acl_entry_link;
 				acl_entry_link = acl_entry_link->nextp;
 				acl_entry_link->entryp = SMB_MALLOC_P(struct new_acl_entry);
-				if(acl_entry_link->entryp == NULL) {
+				if (acl_entry_link->entryp == NULL) {
 					SAFE_FREE(file_acl);
 					errno = ENOMEM;
-					DEBUG(0,("Error in AIX sys_acl_get_file is %d\n",errno));
-					return(NULL);
+					DEBUG(0, ("Error in AIX sys_acl_get_file is %d\n", errno));
+					return NULL;
 				}
 				acl_entry_link->nextp = NULL;
 			}
@@ -1930,13 +1921,13 @@ SMB_ACL_T sys_acl_get_file( const char *path_p, SMB_ACL_TYPE_T type)
  
 			acl_entry_link->entryp->ace_access = acl_entry->ace_access;
  
-			memcpy(acl_entry_link->entryp->ace_id,idp,sizeof(struct ace_id));
+			memcpy(acl_entry_link->entryp->ace_id, idp, sizeof (struct ace_id));
 
 			/* The access in the acl entries must be left shifted by *
 			 * three bites, because they will ultimately be compared *
 			 * to S_IRUSR, S_IWUSR, and S_IXUSR.                  */
 
-			switch(acl_entry->ace_type){
+			switch (acl_entry->ace_type){
 			case ACC_PERMIT:
 			case ACC_SPECIFY:
 				acl_entry_link->entryp->ace_access = acl_entry->ace_access;
@@ -1946,18 +1937,18 @@ SMB_ACL_T sys_acl_get_file( const char *path_p, SMB_ACL_TYPE_T type)
 			case ACC_DENY:
 				/* Since there is no way to return a DENY acl entry *
 				 * change to PERMIT and then shift.                 */
-				DEBUG(10,("acl_entry->ace_access is %d\n",acl_entry->ace_access));
+				DEBUG(10, ("acl_entry->ace_access is %d\n", acl_entry->ace_access));
 				acl_entry_link->entryp->ace_access = ~acl_entry->ace_access & 7;
-				DEBUG(10,("acl_entry_link->entryp->ace_access is %d\n",acl_entry_link->entryp->ace_access));
+				DEBUG(10, ("acl_entry_link->entryp->ace_access is %d\n", acl_entry_link->entryp->ace_access));
 				acl_entry_link->entryp->ace_access <<= 6;
 				acl_entry_link_head->count++;
 				break;
 			default:
-				return(0);
+				return 0;
 			}
 
-			DEBUG(10,("acl_entry = %d\n",acl_entry));
-			DEBUG(10,("The ace_type is %d\n",acl_entry->ace_type));
+			DEBUG(10, ("acl_entry = %d\n", acl_entry));
+			DEBUG(10, ("The ace_type is %d\n", acl_entry->ace_type));
  
 			acl_entry = acl_nxt(acl_entry);
 		}
@@ -1967,25 +1958,25 @@ SMB_ACL_T sys_acl_get_file( const char *path_p, SMB_ACL_TYPE_T type)
 	 * part of the acl entries in an acl, they must  *
 	 * be dummied up to become part of the list.     */
 
-	for( i = 1; i < 4; i++) {
-		DEBUG(10,("i is %d\n",i));
-		if(acl_entry_link_head->count != 0) {
+	for (i = 1; i < 4; i++) {
+		DEBUG(10, ("i is %d\n", i));
+		if (acl_entry_link_head->count != 0) {
 			acl_entry_link->nextp = SMB_MALLOC_P(struct acl_entry_link);
-			if(acl_entry_link->nextp == NULL) {
+			if (acl_entry_link->nextp == NULL) {
 				SAFE_FREE(file_acl);
 				errno = ENOMEM;
-				DEBUG(0,("Error in AIX sys_acl_get_file is %d\n",errno));
-				return(NULL);
+				DEBUG(0, ("Error in AIX sys_acl_get_file is %d\n", errno));
+				return NULL;
 			}
 
 			acl_entry_link->nextp->prevp = acl_entry_link;
 			acl_entry_link = acl_entry_link->nextp;
 			acl_entry_link->entryp = SMB_MALLOC_P(struct new_acl_entry);
-			if(acl_entry_link->entryp == NULL) {
+			if (acl_entry_link->entryp == NULL) {
 				SAFE_FREE(file_acl);
 				errno = ENOMEM;
-				DEBUG(0,("Error in AIX sys_acl_get_file is %d\n",errno));
-				return(NULL);
+				DEBUG(0, ("Error in AIX sys_acl_get_file is %d\n", errno));
+				return NULL;
 			}
 		}
 
@@ -1994,13 +1985,13 @@ SMB_ACL_T sys_acl_get_file( const char *path_p, SMB_ACL_TYPE_T type)
 		new_acl_entry = acl_entry_link->entryp;
 		idp = new_acl_entry->ace_id;
 
-		new_acl_entry->ace_len = sizeof(struct acl_entry);
+		new_acl_entry->ace_len = sizeof (struct acl_entry);
 		new_acl_entry->ace_type = ACC_PERMIT;
-		idp->id_len = sizeof(struct ace_id);
-		DEBUG(10,("idp->id_len = %d\n",idp->id_len));
-		memset(idp->id_data,0,sizeof(uid_t));
+		idp->id_len = sizeof (struct ace_id);
+		DEBUG(10, ("idp->id_len = %d\n", idp->id_len));
+		memset(idp->id_data, 0, sizeof (uid_t));
 
-		switch(i) {
+		switch (i) {
 		case 2:
 			new_acl_entry->ace_access = file_acl->g_access << 6;
 			idp->id_type = SMB_ACL_GROUP_OBJ;
@@ -2017,18 +2008,18 @@ SMB_ACL_T sys_acl_get_file( const char *path_p, SMB_ACL_TYPE_T type)
 			break;
  
 		default:
-			return(NULL);
+			return NULL;
 
 		}
 
 		acl_entry_link_head->count++;
-		DEBUG(10,("new_acl_entry->ace_access = %d\n",new_acl_entry->ace_access));
+		DEBUG(10, ("new_acl_entry->ace_access = %d\n", new_acl_entry->ace_access));
 	}
 
 	acl_entry_link_head->count = 0;
 	SAFE_FREE(file_acl);
 
-	return(acl_entry_link_head);
+	return acl_entry_link_head;
 }
 
 #if 0
@@ -2045,26 +2036,26 @@ SMB_ACL_T sys_acl_get_fd(int fd)
 
 	/* Get the acl using fstatacl */
    
-	DEBUG(10,("Entering sys_acl_get_fd\n"));
-	DEBUG(10,("fd is %d\n",fd));
+	DEBUG(10, ("Entering sys_acl_get_fd\n"));
+	DEBUG(10, ("fd is %d\n", fd));
 	file_acl = (struct acl *)SMB_MALLOC(BUFSIZ);
 
-	if(file_acl == NULL) {
+	if (file_acl == NULL) {
 		errno=ENOMEM;
-		DEBUG(0,("Error in sys_acl_get_fd is %d\n",errno));
-		return(NULL);
+		DEBUG(0, ("Error in sys_acl_get_fd is %d\n", errno));
+		return NULL;
 	}
 
-	memset(file_acl,0,BUFSIZ);
+	memset(file_acl, 0, BUFSIZ);
 
-	rc = fstatacl(fd,0,file_acl,BUFSIZ);
-	if(rc == -1) {
-		DEBUG(0,("The fstatacl call returned %d with errno %d\n",rc,errno));
+	rc = fstatacl(fd, 0, file_acl, BUFSIZ);
+	if (rc == -1) {
+		DEBUG(0, ("The fstatacl call returned %d with errno %d\n", rc, errno));
 		SAFE_FREE(file_acl);
-		return(NULL);
+		return NULL;
 	}
 
-	DEBUG(10,("Got facl and returned it\n"));
+	DEBUG(10, ("Got facl and returned it\n"));
 
 	/* Point to the first acl entry in the acl */
 
@@ -2075,36 +2066,36 @@ SMB_ACL_T sys_acl_get_fd(int fd)
 	 * code.                                        */
 
 	acl_entry_link_head = acl_entry_link = sys_acl_init(0);
-	if(acl_entry_link_head == NULL){
+	if (acl_entry_link_head == NULL){
 		SAFE_FREE(file_acl);
-		return(NULL);
+		return NULL;
 	}
 
 	acl_entry_link->entryp = SMB_MALLOC_P(struct new_acl_entry);
 
-	if(acl_entry_link->entryp == NULL) {
+	if (acl_entry_link->entryp == NULL) {
 		errno = ENOMEM;
-		DEBUG(0,("Error in sys_acl_get_fd is %d\n",errno));
+		DEBUG(0, ("Error in sys_acl_get_fd is %d\n", errno));
 		SAFE_FREE(file_acl);
-		return(NULL);
+		return NULL;
 	}
 
-	DEBUG(10,("acl_entry is %d\n",acl_entry));
-	DEBUG(10,("acl_last(file_acl) id %d\n",acl_last(file_acl)));
+	DEBUG(10, ("acl_entry is %d\n", acl_entry));
+	DEBUG(10, ("acl_last(file_acl) id %d\n", acl_last(file_acl)));
  
 	/* Check if the extended acl bit is on.   *
 	 * If it isn't, do not show the           *
 	 * contents of the acl since AIX intends  *
 	 * the extended info to remain unused     */
  
-	if(file_acl->acl_mode & S_IXACL){
+	if (file_acl->acl_mode & S_IXACL){
 		/* while we are not pointing to the very end */
-		while(acl_entry < acl_last(file_acl)) {
+		while (acl_entry < acl_last(file_acl)) {
 			/* before we malloc anything, make sure this is  */
 			/* a valid acl entry and one that we want to map */
 
 			idp = id_nxt(acl_entry->ace_id);
-			if((acl_entry->ace_type == ACC_SPECIFY ||
+			if ((acl_entry->ace_type == ACC_SPECIFY ||
 				(acl_entry->ace_type == ACC_PERMIT)) && (idp != id_last(acl_entry))) {
 					acl_entry = acl_nxt(acl_entry);
 					continue;
@@ -2116,22 +2107,22 @@ SMB_ACL_T sys_acl_get_fd(int fd)
 			 * The first entry needs to keep prevp pointing to NULL *
 			 * and already has entryp allocated.                 */
 
-			if(acl_entry_link_head->count != 0) {
+			if (acl_entry_link_head->count != 0) {
 				acl_entry_link->nextp = SMB_MALLOC_P(struct acl_entry_link);
-				if(acl_entry_link->nextp == NULL) {
+				if (acl_entry_link->nextp == NULL) {
 					errno = ENOMEM;
-					DEBUG(0,("Error in sys_acl_get_fd is %d\n",errno));
+					DEBUG(0, ("Error in sys_acl_get_fd is %d\n", errno));
 					SAFE_FREE(file_acl);
-					return(NULL);
+					return NULL;
 				}
 				acl_entry_link->nextp->prevp = acl_entry_link;
 				acl_entry_link = acl_entry_link->nextp;
 				acl_entry_link->entryp = SMB_MALLOC_P(struct new_acl_entry);
-				if(acl_entry_link->entryp == NULL) {
+				if (acl_entry_link->entryp == NULL) {
 					errno = ENOMEM;
-					DEBUG(0,("Error in sys_acl_get_fd is %d\n",errno));
+					DEBUG(0, ("Error in sys_acl_get_fd is %d\n", errno));
 					SAFE_FREE(file_acl);
-					return(NULL);
+					return NULL;
 				}
 
 				acl_entry_link->nextp = NULL;
@@ -2145,13 +2136,13 @@ SMB_ACL_T sys_acl_get_fd(int fd)
 			acl_entry_link->entryp->ace_type = acl_entry->ace_type;
 			acl_entry_link->entryp->ace_access = acl_entry->ace_access;
 
-			memcpy(acl_entry_link->entryp->ace_id, idp, sizeof(struct ace_id));
+			memcpy(acl_entry_link->entryp->ace_id, idp, sizeof (struct ace_id));
 
 			/* The access in the acl entries must be left shifted by *
 			 * three bites, because they will ultimately be compared *
 			 * to S_IRUSR, S_IWUSR, and S_IXUSR.                  */
 
-			switch(acl_entry->ace_type){
+			switch (acl_entry->ace_type){
 			case ACC_PERMIT:
 			case ACC_SPECIFY:
 				acl_entry_link->entryp->ace_access = acl_entry->ace_access;
@@ -2161,18 +2152,18 @@ SMB_ACL_T sys_acl_get_fd(int fd)
 			case ACC_DENY:
 				/* Since there is no way to return a DENY acl entry *
 				 * change to PERMIT and then shift.                 */
-				DEBUG(10,("acl_entry->ace_access is %d\n",acl_entry->ace_access));
+				DEBUG(10, ("acl_entry->ace_access is %d\n", acl_entry->ace_access));
 				acl_entry_link->entryp->ace_access = ~acl_entry->ace_access & 7;
-				DEBUG(10,("acl_entry_link->entryp->ace_access is %d\n",acl_entry_link->entryp->ace_access));
+				DEBUG(10, ("acl_entry_link->entryp->ace_access is %d\n", acl_entry_link->entryp->ace_access));
 				acl_entry_link->entryp->ace_access <<= 6;
 				acl_entry_link_head->count++;
 				break;
 			default:
-				return(0);
+				return 0;
 			}
 
-			DEBUG(10,("acl_entry = %d\n",acl_entry));
-			DEBUG(10,("The ace_type is %d\n",acl_entry->ace_type));
+			DEBUG(10, ("acl_entry = %d\n", acl_entry));
+			DEBUG(10, ("The ace_type is %d\n", acl_entry->ace_type));
  
 			acl_entry = acl_nxt(acl_entry);
 		}
@@ -2182,26 +2173,26 @@ SMB_ACL_T sys_acl_get_fd(int fd)
 	 * part of the acl entries in an acl, they must  *
 	 * be dummied up to become part of the list.     */
 
-	for( i = 1; i < 4; i++) {
-		DEBUG(10,("i is %d\n",i));
-		if(acl_entry_link_head->count != 0){
+	for (i = 1; i < 4; i++) {
+		DEBUG(10, ("i is %d\n", i));
+		if (acl_entry_link_head->count != 0){
 			acl_entry_link->nextp = SMB_MALLOC_P(struct acl_entry_link);
-			if(acl_entry_link->nextp == NULL) {
+			if (acl_entry_link->nextp == NULL) {
 				errno = ENOMEM;
-				DEBUG(0,("Error in sys_acl_get_fd is %d\n",errno));
+				DEBUG(0, ("Error in sys_acl_get_fd is %d\n", errno));
 				SAFE_FREE(file_acl);
-				return(NULL);
+				return NULL;
 			}
 
 			acl_entry_link->nextp->prevp = acl_entry_link;
 			acl_entry_link = acl_entry_link->nextp;
 			acl_entry_link->entryp = SMB_MALLOC_P(struct new_acl_entry);
 
-			if(acl_entry_link->entryp == NULL) {
+			if (acl_entry_link->entryp == NULL) {
 				SAFE_FREE(file_acl);
 				errno = ENOMEM;
-				DEBUG(0,("Error in sys_acl_get_fd is %d\n",errno));
-				return(NULL);
+				DEBUG(0, ("Error in sys_acl_get_fd is %d\n", errno));
+				return NULL;
 			}
 		}
 
@@ -2210,13 +2201,13 @@ SMB_ACL_T sys_acl_get_fd(int fd)
 		new_acl_entry = acl_entry_link->entryp;
 		idp = new_acl_entry->ace_id;
  
-		new_acl_entry->ace_len = sizeof(struct acl_entry);
+		new_acl_entry->ace_len = sizeof (struct acl_entry);
 		new_acl_entry->ace_type = ACC_PERMIT;
-		idp->id_len = sizeof(struct ace_id);
-		DEBUG(10,("idp->id_len = %d\n",idp->id_len));
-		memset(idp->id_data,0,sizeof(uid_t));
+		idp->id_len = sizeof (struct ace_id);
+		DEBUG(10, ("idp->id_len = %d\n", idp->id_len));
+		memset(idp->id_data, 0, sizeof (uid_t));
  
-		switch(i) {
+		switch (i) {
 		case 2:
 			new_acl_entry->ace_access = file_acl->g_access << 6;
 			idp->id_type = SMB_ACL_GROUP_OBJ;
@@ -2233,17 +2224,17 @@ SMB_ACL_T sys_acl_get_fd(int fd)
 			break;
  
 		default:
-			return(NULL);
+			return NULL;
 		}
  
 		acl_entry_link_head->count++;
-		DEBUG(10,("new_acl_entry->ace_access = %d\n",new_acl_entry->ace_access));
+		DEBUG(10, ("new_acl_entry->ace_access = %d\n", new_acl_entry->ace_access));
 	}
 
 	acl_entry_link_head->count = 0;
 	SAFE_FREE(file_acl);
  
-	return(acl_entry_link_head);
+	return acl_entry_link_head;
 }
 #endif
 
@@ -2259,7 +2250,7 @@ int sys_acl_get_info(SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T *tag_type_p, uint32 *b
 
 	permset = &entry->ace_access;
 
-	DEBUG(10,("*permset is %d\n",*permset));
+	DEBUG(10, ("*permset is %d\n", *permset));
 	*bits_p = (*permset & S_IRUSR ? 4 : 0)
 		| (*permset & S_IWUSR ? 2 : 0)
 		| (*permset & S_IXUSR ? 1 : 0);
@@ -2267,7 +2258,7 @@ int sys_acl_get_info(SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T *tag_type_p, uint32 *b
 	return 0;
 }
 
-SMB_ACL_T sys_acl_init( int count)
+SMB_ACL_T sys_acl_init(int count)
 {
 	struct acl_entry_link *theacl = NULL;
  
@@ -2276,117 +2267,117 @@ SMB_ACL_T sys_acl_init( int count)
 		return NULL;
 	}
 
-	DEBUG(10,("Entering sys_acl_init\n"));
+	DEBUG(10, ("Entering sys_acl_init\n"));
 
 	theacl = SMB_MALLOC_P(struct acl_entry_link);
-	if(theacl == NULL) {
+	if (theacl == NULL) {
 		errno = ENOMEM;
-		DEBUG(0,("Error in sys_acl_init is %d\n",errno));
-		return(NULL);
+		DEBUG(0, ("Error in sys_acl_init is %d\n", errno));
+		return NULL;
 	}
 
 	theacl->count = 0;
 	theacl->nextp = NULL;
 	theacl->prevp = NULL;
 	theacl->entryp = NULL;
-	DEBUG(10,("Exiting sys_acl_init\n"));
-	return(theacl);
+	DEBUG(10, ("Exiting sys_acl_init\n"));
+	return theacl;
 }
 
-int sys_acl_create_entry( SMB_ACL_T *pacl, SMB_ACL_ENTRY_T *pentry)
+int sys_acl_create_entry(SMB_ACL_T *pacl, SMB_ACL_ENTRY_T *pentry)
 {
 	struct acl_entry_link *theacl;
 	struct acl_entry_link *acl_entryp;
 	struct acl_entry_link *temp_entry;
 	int counting;
 
-	DEBUG(10,("Entering the sys_acl_create_entry\n"));
+	DEBUG(10, ("Entering the sys_acl_create_entry\n"));
 
 	theacl = acl_entryp = *pacl;
 
 	/* Get to the end of the acl before adding entry */
 
-	for(counting=0; counting < theacl->count; counting++){
-		DEBUG(10,("The acl_entryp is %d\n",acl_entryp));
+	for (counting = 0; counting < theacl->count; counting++){
+		DEBUG(10, ("The acl_entryp is %d\n", acl_entryp));
 		temp_entry = acl_entryp;
 		acl_entryp = acl_entryp->nextp;
 	}
 
-	if(theacl->count != 0){
+	if (theacl->count != 0){
 		temp_entry->nextp = acl_entryp = SMB_MALLOC_P(struct acl_entry_link);
-		if(acl_entryp == NULL) {
+		if (acl_entryp == NULL) {
 			errno = ENOMEM;
-			DEBUG(0,("Error in sys_acl_create_entry is %d\n",errno));
-			return(-1);
+			DEBUG(0, ("Error in sys_acl_create_entry is %d\n", errno));
+			return -1;
 		}
 
-		DEBUG(10,("The acl_entryp is %d\n",acl_entryp));
+		DEBUG(10, ("The acl_entryp is %d\n", acl_entryp));
 		acl_entryp->prevp = temp_entry;
-		DEBUG(10,("The acl_entryp->prevp is %d\n",acl_entryp->prevp));
+		DEBUG(10, ("The acl_entryp->prevp is %d\n", acl_entryp->prevp));
 	}
 
 	*pentry = acl_entryp->entryp = SMB_MALLOC_P(struct new_acl_entry);
-	if(*pentry == NULL) {
+	if (*pentry == NULL) {
 		errno = ENOMEM;
-		DEBUG(0,("Error in sys_acl_create_entry is %d\n",errno));
-		return(-1);
+		DEBUG(0, ("Error in sys_acl_create_entry is %d\n", errno));
+		return -1;
 	}
 
-	memset(*pentry,0,sizeof(struct new_acl_entry));
-	acl_entryp->entryp->ace_len = sizeof(struct acl_entry);
+	memset(*pentry, 0, sizeof (struct new_acl_entry));
+	acl_entryp->entryp->ace_len = sizeof (struct acl_entry);
 	acl_entryp->entryp->ace_type = ACC_PERMIT;
-	acl_entryp->entryp->ace_id->id_len = sizeof(struct ace_id);
+	acl_entryp->entryp->ace_id->id_len = sizeof (struct ace_id);
 	acl_entryp->nextp = NULL;
 	theacl->count++;
-	DEBUG(10,("Exiting sys_acl_create_entry\n"));
-	return(0);
+	DEBUG(10, ("Exiting sys_acl_create_entry\n"));
+	return 0;
 }
 
 int sys_acl_set_info(SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T tag_type, uint32 bits, id_t u_g_id)
 {
 	entry->ace_id->id_type = tag_type;
-	DEBUG(10,("The tag type is %d\n",entry->ace_id->id_type));
+	DEBUG(10, ("The tag type is %d\n", entry->ace_id->id_type));
 
 	if (tag_type == SMB_ACL_USER || tag_type == SMB_ACL_GROUP)
 		memcpy(entry->ace_id->id_data, &u_g_id, sizeof (id_t));
 
 	entry->ace_access = bits;
-	DEBUG(10,("entry->ace_access = %d\n",entry->ace_access));
+	DEBUG(10, ("entry->ace_access = %d\n", entry->ace_access));
 
 	return 0;
 }
 
 int sys_acl_set_access_bits(SMB_ACL_ENTRY_T entry, uint32 bits)
 {
-	DEBUG(10,("Starting AIX sys_acl_set_permset\n"));
+	DEBUG(10, ("Starting AIX sys_acl_set_permset\n"));
 	entry->ace_access = bits;
-	DEBUG(10,("entry->ace_access = %d\n",entry->ace_access));
-	DEBUG(10,("Ending AIX sys_acl_set_permset\n"));
-	return(0);
+	DEBUG(10, ("entry->ace_access = %d\n", entry->ace_access));
+	DEBUG(10, ("Ending AIX sys_acl_set_permset\n"));
+	return 0;
 }
 
-int sys_acl_valid( SMB_ACL_T theacl )
+int sys_acl_valid(SMB_ACL_T theacl)
 {
 	int user_obj = 0;
 	int group_obj = 0;
 	int other_obj = 0;
 	struct acl_entry_link *acl_entry;
 
-	for(acl_entry=theacl; acl_entry != NULL; acl_entry = acl_entry->nextp) {
+	for (acl_entry=theacl; acl_entry != NULL; acl_entry = acl_entry->nextp) {
 		user_obj += (acl_entry->entryp->ace_id->id_type == SMB_ACL_USER_OBJ);
 		group_obj += (acl_entry->entryp->ace_id->id_type == SMB_ACL_GROUP_OBJ);
 		other_obj += (acl_entry->entryp->ace_id->id_type == SMB_ACL_OTHER);
 	}
 
-	DEBUG(10,("user_obj=%d, group_obj=%d, other_obj=%d\n",user_obj,group_obj,other_obj));
+	DEBUG(10, ("user_obj=%d, group_obj=%d, other_obj=%d\n", user_obj, group_obj, other_obj));
  
-	if(user_obj != 1 || group_obj != 1 || other_obj != 1)
-		return(-1); 
+	if (user_obj != 1 || group_obj != 1 || other_obj != 1)
+		return -1; 
 
-	return(0);
+	return 0;
 }
 
-int sys_acl_set_file( const char *name, SMB_ACL_TYPE_T acltype, SMB_ACL_T theacl)
+int sys_acl_set_file(const char *name, SMB_ACL_TYPE_T acltype, SMB_ACL_T theacl)
 {
 	struct acl_entry_link *acl_entry_link = NULL;
 	struct acl *file_acl = NULL;
@@ -2398,32 +2389,32 @@ int sys_acl_set_file( const char *name, SMB_ACL_TYPE_T acltype, SMB_ACL_T theacl
 	uint acl_length;
 	uint rc;
 
-	DEBUG(10,("Entering sys_acl_set_file\n"));
-	DEBUG(10,("File name is %s\n",name));
+	DEBUG(10, ("Entering sys_acl_set_file\n"));
+	DEBUG(10, ("File name is %s\n", name));
  
 	/* AIX has no default ACL */
-	if(acltype == SMB_ACL_TYPE_DEFAULT)
-		return(0);
+	if (acltype == SMB_ACL_TYPE_DEFAULT)
+		return 0;
 
 	acl_length = BUFSIZ;
 	file_acl = (struct acl *)SMB_MALLOC(BUFSIZ);
 
-	if(file_acl == NULL) {
+	if (file_acl == NULL) {
 		errno = ENOMEM;
-		DEBUG(0,("Error in sys_acl_set_file is %d\n",errno));
-		return(-1);
+		DEBUG(0, ("Error in sys_acl_set_file is %d\n", errno));
+		return -1;
 	}
 
-	memset(file_acl,0,BUFSIZ);
+	memset(file_acl, 0, BUFSIZ);
 
 	file_acl->acl_len = ACL_SIZ;
 	file_acl->acl_mode = S_IXACL;
 
-	for(acl_entry_link=theacl; acl_entry_link != NULL; acl_entry_link = acl_entry_link->nextp) {
+	for (acl_entry_link=theacl; acl_entry_link != NULL; acl_entry_link = acl_entry_link->nextp) {
 		acl_entry_link->entryp->ace_access >>= 6;
 		id_type = acl_entry_link->entryp->ace_id->id_type;
 
-		switch(id_type) {
+		switch (id_type) {
 		case SMB_ACL_USER_OBJ:
 			file_acl->u_access = acl_entry_link->entryp->ace_access;
 			continue;
@@ -2437,51 +2428,51 @@ int sys_acl_set_file( const char *name, SMB_ACL_TYPE_T acltype, SMB_ACL_T theacl
 			continue;
 		}
 
-		if((file_acl->acl_len + sizeof(struct acl_entry)) > acl_length) {
-			acl_length += sizeof(struct acl_entry);
+		if ((file_acl->acl_len + sizeof (struct acl_entry)) > acl_length) {
+			acl_length += sizeof (struct acl_entry);
 			file_acl_temp = (struct acl *)SMB_MALLOC(acl_length);
-			if(file_acl_temp == NULL) {
+			if (file_acl_temp == NULL) {
 				SAFE_FREE(file_acl);
 				errno = ENOMEM;
-				DEBUG(0,("Error in sys_acl_set_file is %d\n",errno));
-				return(-1);
+				DEBUG(0, ("Error in sys_acl_set_file is %d\n", errno));
+				return -1;
 			}  
 
-			memcpy(file_acl_temp,file_acl,file_acl->acl_len);
+			memcpy(file_acl_temp, file_acl, file_acl->acl_len);
 			SAFE_FREE(file_acl);
 			file_acl = file_acl_temp;
 		}
 
 		acl_entry = (struct acl_entry *)((char *)file_acl + file_acl->acl_len);
-		file_acl->acl_len += sizeof(struct acl_entry);
+		file_acl->acl_len += sizeof (struct acl_entry);
 		acl_entry->ace_len = acl_entry_link->entryp->ace_len;
 		acl_entry->ace_access = acl_entry_link->entryp->ace_access;
  
 		/* In order to use this, we'll need to wait until we can get denies */
-		/* if(!acl_entry->ace_access && acl_entry->ace_type == ACC_PERMIT)
-		acl_entry->ace_type = ACC_SPECIFY; */
+		/* if (!acl_entry->ace_access && acl_entry->ace_type == ACC_PERMIT)
+			acl_entry->ace_type = ACC_SPECIFY; */
 
 		acl_entry->ace_type = ACC_SPECIFY;
  
 		ace_id = acl_entry->ace_id;
  
 		ace_id->id_type = acl_entry_link->entryp->ace_id->id_type;
-		DEBUG(10,("The id type is %d\n",ace_id->id_type));
+		DEBUG(10, ("The id type is %d\n", ace_id->id_type));
 		ace_id->id_len = acl_entry_link->entryp->ace_id->id_len;
-		memcpy(&user_id, acl_entry_link->entryp->ace_id->id_data, sizeof(uid_t));
-		memcpy(acl_entry->ace_id->id_data, &user_id, sizeof(uid_t));
+		memcpy(&user_id, acl_entry_link->entryp->ace_id->id_data, sizeof (uid_t));
+		memcpy(acl_entry->ace_id->id_data, &user_id, sizeof (uid_t));
 	}
 
-	rc = chacl((char*)name,file_acl,file_acl->acl_len);
-	DEBUG(10,("errno is %d\n",errno));
-	DEBUG(10,("return code is %d\n",rc));
+	rc = chacl((char*)name, file_acl, file_acl->acl_len);
+	DEBUG(10, ("errno is %d\n", errno));
+	DEBUG(10, ("return code is %d\n", rc));
 	SAFE_FREE(file_acl);
-	DEBUG(10,("Exiting the sys_acl_set_file\n"));
-	return(rc);
+	DEBUG(10, ("Exiting the sys_acl_set_file\n"));
+	return rc;
 }
 
 #if 0
-int sys_acl_set_fd( int fd, SMB_ACL_T theacl)
+int sys_acl_set_fd(int fd, SMB_ACL_T theacl)
 {
 	struct acl_entry_link *acl_entry_link = NULL;
 	struct acl *file_acl = NULL;
@@ -2493,27 +2484,27 @@ int sys_acl_set_fd( int fd, SMB_ACL_T theacl)
 	uint acl_length;
 	uint rc;
  
-	DEBUG(10,("Entering sys_acl_set_fd\n"));
+	DEBUG(10, ("Entering sys_acl_set_fd\n"));
 	acl_length = BUFSIZ;
 	file_acl = (struct acl *)SMB_MALLOC(BUFSIZ);
 
-	if(file_acl == NULL) {
+	if (file_acl == NULL) {
 		errno = ENOMEM;
-		DEBUG(0,("Error in sys_acl_set_fd is %d\n",errno));
-		return(-1);
+		DEBUG(0, ("Error in sys_acl_set_fd is %d\n", errno));
+		return -1;
 	}
 
-	memset(file_acl,0,BUFSIZ);
+	memset(file_acl, 0, BUFSIZ);
  
 	file_acl->acl_len = ACL_SIZ;
 	file_acl->acl_mode = S_IXACL;
 
-	for(acl_entry_link=theacl; acl_entry_link != NULL; acl_entry_link = acl_entry_link->nextp) {
+	for (acl_entry_link=theacl; acl_entry_link != NULL; acl_entry_link = acl_entry_link->nextp) {
 		acl_entry_link->entryp->ace_access >>= 6;
 		id_type = acl_entry_link->entryp->ace_id->id_type;
-		DEBUG(10,("The id_type is %d\n",id_type));
+		DEBUG(10, ("The id_type is %d\n", id_type));
 
-		switch(id_type) {
+		switch (id_type) {
 		case SMB_ACL_USER_OBJ:
 			file_acl->u_access = acl_entry_link->entryp->ace_access;
 			continue;
@@ -2527,28 +2518,28 @@ int sys_acl_set_fd( int fd, SMB_ACL_T theacl)
 			continue;
 		}
 
-		if((file_acl->acl_len + sizeof(struct acl_entry)) > acl_length) {
-			acl_length += sizeof(struct acl_entry);
+		if ((file_acl->acl_len + sizeof (struct acl_entry)) > acl_length) {
+			acl_length += sizeof (struct acl_entry);
 			file_acl_temp = (struct acl *)SMB_MALLOC(acl_length);
-			if(file_acl_temp == NULL) {
+			if (file_acl_temp == NULL) {
 				SAFE_FREE(file_acl);
 				errno = ENOMEM;
-				DEBUG(0,("Error in sys_acl_set_fd is %d\n",errno));
-				return(-1);
+				DEBUG(0, ("Error in sys_acl_set_fd is %d\n", errno));
+				return -1;
 			}
 
-			memcpy(file_acl_temp,file_acl,file_acl->acl_len);
+			memcpy(file_acl_temp, file_acl, file_acl->acl_len);
 			SAFE_FREE(file_acl);
 			file_acl = file_acl_temp;
 		}
 
 		acl_entry = (struct acl_entry *)((char *)file_acl + file_acl->acl_len);
-		file_acl->acl_len += sizeof(struct acl_entry);
+		file_acl->acl_len += sizeof (struct acl_entry);
 		acl_entry->ace_len = acl_entry_link->entryp->ace_len;
 		acl_entry->ace_access = acl_entry_link->entryp->ace_access;
  
 		/* In order to use this, we'll need to wait until we can get denies */
-		/* if(!acl_entry->ace_access && acl_entry->ace_type == ACC_PERMIT)
+		/* if (!acl_entry->ace_access && acl_entry->ace_type == ACC_PERMIT)
 			acl_entry->ace_type = ACC_SPECIFY; */
  
 		acl_entry->ace_type = ACC_SPECIFY;
@@ -2556,18 +2547,18 @@ int sys_acl_set_fd( int fd, SMB_ACL_T theacl)
 		ace_id = acl_entry->ace_id;
  
 		ace_id->id_type = acl_entry_link->entryp->ace_id->id_type;
-		DEBUG(10,("The id type is %d\n",ace_id->id_type));
+		DEBUG(10, ("The id type is %d\n", ace_id->id_type));
 		ace_id->id_len = acl_entry_link->entryp->ace_id->id_len;
-		memcpy(&user_id, acl_entry_link->entryp->ace_id->id_data, sizeof(uid_t));
-		memcpy(ace_id->id_data, &user_id, sizeof(uid_t));
+		memcpy(&user_id, acl_entry_link->entryp->ace_id->id_data, sizeof (uid_t));
+		memcpy(ace_id->id_data, &user_id, sizeof (uid_t));
 	}
  
-	rc = fchacl(fd,file_acl,file_acl->acl_len);
-	DEBUG(10,("errno is %d\n",errno));
-	DEBUG(10,("return code is %d\n",rc));
+	rc = fchacl(fd, file_acl, file_acl->acl_len);
+	DEBUG(10, ("errno is %d\n", errno));
+	DEBUG(10, ("return code is %d\n", rc));
 	SAFE_FREE(file_acl);
-	DEBUG(10,("Exiting sys_acl_set_fd\n"));
-	return(rc);
+	DEBUG(10, ("Exiting sys_acl_set_fd\n"));
+	return rc;
 }
 #endif
 
@@ -2581,7 +2572,7 @@ int sys_acl_free_acl(SMB_ACL_T posix_acl)
 {
 	struct acl_entry_link *acl_entry_link;
 
-	for(acl_entry_link = posix_acl->nextp; acl_entry_link->nextp != NULL; acl_entry_link = acl_entry_link->nextp) {
+	for (acl_entry_link = posix_acl->nextp; acl_entry_link->nextp != NULL; acl_entry_link = acl_entry_link->nextp) {
 		SAFE_FREE(acl_entry_link->prevp->entryp);
 		SAFE_FREE(acl_entry_link->prevp);
 	}
@@ -2591,7 +2582,7 @@ int sys_acl_free_acl(SMB_ACL_T posix_acl)
 	SAFE_FREE(acl_entry_link->entryp);
 	SAFE_FREE(acl_entry_link);
  
-	return(0);
+	return 0;
 }
 
 #elif defined(HAVE_OSX_ACLS) /*----------------------------------------------*/
