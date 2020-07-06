@@ -346,7 +346,7 @@ AC_ARG_ENABLE(ipv6,
 	AS_HELP_STRING([--disable-ipv6],[turn off IPv6 support]))
 if test x"$enable_ipv6" != x"no"; then
 	AC_MSG_CHECKING([ipv6 stack type])
-	for i in inria kame linux-glibc linux-inet6 solaris toshiba v6d zeta cygwin; do
+	for i in inria kame linux-glibc linux-inet6 solaris toshiba v6d zeta cygwin TANDEM; do
 		case $i in
 		inria)
 			# http://www.kame.net/
@@ -442,6 +442,15 @@ yes
 				[ipv6type=$i;
 				AC_DEFINE(INET6, 1, [true if you have IPv6])])
 			;;
+		TANDEM)
+			AC_EGREP_CPP(yes, [
+#include <netinet/ip6.h>
+#ifdef __TANDEM
+yes
+#endif],
+				[ipv6type=$i;
+				AC_DEFINE(INET6, 1, [true if you have IPv6])])
+			;;
 		esac
 		if test "$ipv6type" != "unknown"; then
 			break
@@ -481,7 +490,7 @@ AC_CHECK_HEADERS(sys/fcntl.h sys/select.h fcntl.h sys/time.h sys/unistd.h \
     netdb.h malloc.h float.h limits.h iconv.h libcharset.h langinfo.h \
     sys/acl.h acl/libacl.h attr/xattr.h sys/xattr.h sys/extattr.h \
     popt.h popt/popt.h linux/falloc.h netinet/in_systm.h netinet/ip.h \
-    zlib.h xxhash.h openssl/md4.h openssl/md5.h zstd.h lz4.h)
+    zlib.h xxhash.h openssl/md4.h openssl/md5.h zstd.h lz4.h sys/file.h)
 AC_HEADER_MAJOR_FIXED
 
 AC_MSG_CHECKING([whether to enable use of openssl crypto library])

@@ -442,7 +442,9 @@ enum delret {
 #include <netdb.h>
 #endif
 #include <syslog.h>
+#ifdef HAVE_SYS_FILE_H
 #include <sys/file.h>
+#endif
 
 #ifdef HAVE_DIRENT_H
 # include <dirent.h>
