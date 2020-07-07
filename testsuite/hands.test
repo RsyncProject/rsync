@@ -16,7 +16,7 @@ DEBUG_OPTS="--debug=all0,deltasum0"
 runtest "basic operation" 'checkit "$RSYNC -av \"$fromdir/\" \"$todir\"" "$fromdir/" "$todir"'
 
 ln "$fromdir/filelist" "$fromdir/dir"
-runtest "hard links" 'checkit "$RSYNC -avH $DEBUG_OPTS \"$fromdir/\" \"$todir\"" "$fromdir/" "$todir"'
+runtest "hard links" 'checkit "$RSYNC -avH --bwlimit=0 $DEBUG_OPTS \"$fromdir/\" \"$todir\"" "$fromdir/" "$todir"'
 
 rm "$todir/text"
 runtest "one file" 'checkit "$RSYNC -avH $DEBUG_OPTS \"$fromdir/\" \"$todir\"" "$fromdir/" "$todir"'

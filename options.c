@@ -1253,7 +1253,7 @@ static int count_args(const char **argv)
 /* If the size_arg is an invalid string or the value is < min_value, an error
  * is put into err_buf & the return is -1.  Note that this parser does NOT
  * support negative numbers, so a min_value < 0 doesn't make any sense. */
-static ssize_t parse_size_arg(char *size_arg, char def_suf, const char *opt_name, ssize_t min_value)
+static ssize_t parse_size_arg(char *size_arg, char def_suf, const char *opt_name, ssize_t min_value, BOOL allow_0)
 {
 	int reps, mult;
 	const char *arg, *err = "invalid";
@@ -1299,7 +1299,7 @@ static ssize_t parse_size_arg(char *size_arg, char def_suf, const char *opt_name
 		size += atoi(arg), arg += 2;
 	if (*arg)
 		goto failure;
-	if (size < min_value) {
+	if (size < min_value && (!allow_0 || size != 0)) {
 		err = size < 0 ? "too big" : "too small";
 		goto failure;
 	}
@@ -1683,19 +1683,19 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			break;
 
 		case OPT_MAX_SIZE:
-			if ((max_size = parse_size_arg(max_size_arg, 'b', "max-size", 0)) < 0)
+			if ((max_size = parse_size_arg(max_size_arg, 'b', "max-size", 0, True)) < 0)
 				return 0;
 			max_size_arg = num_to_byte_string(max_size);
 			break;
 
 		case OPT_MIN_SIZE:
-			if ((min_size = parse_size_arg(min_size_arg, 'b', "min-size", 0)) < 0)
+			if ((min_size = parse_size_arg(min_size_arg, 'b', "min-size", 0, True)) < 0)
 				return 0;
 			min_size_arg = num_to_byte_string(min_size);
 			break;
 
 		case OPT_BWLIMIT: {
-			ssize_t size = parse_size_arg(bwlimit_arg, 'K', "bwlimit", 512);
+			ssize_t size = parse_size_arg(bwlimit_arg, 'K', "bwlimit", 512, True);
 			if (size < 0)
 				return 0;
 			bwlimit_arg = num_to_byte_string(size);
@@ -1889,7 +1889,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			max_alloc_arg = NULL;
 	}
 	if (max_alloc_arg) {
-		ssize_t size = parse_size_arg(max_alloc_arg, 'B', "max-alloc", 1024*1024);
+		ssize_t size = parse_size_arg(max_alloc_arg, 'B', "max-alloc", 1024*1024, False);
 		if (size < 0)
 			return 0;
 		max_alloc = size;
