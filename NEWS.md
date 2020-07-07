@@ -6,11 +6,23 @@
 
 ### BUG FIXES:
 
- - None
+ - Fixed the specifying of --bwlimit=0 for the default (unlimited).
 
 ### ENHANCEMENTS:
 
- - None
+ - Allow `--max-alloc=0` to specify no limit.
+
+ - The user/group name of id 0 is now shared along with the other user/group
+   names in a transfer instead of assuming that both sides have the same name
+   for id 0.
+
+ - Added some portability support for HPE NonStop platforms.
+
+### INTERNAL:
+
+ - Use a C99 Flexible Array for a variable-size filename in a struct when
+   possible (with a fallback to the old 1-char string kluge for older
+   compilers).
 
 ------------------------------------------------------------------------------
 <a name="3.2.2"></a>
