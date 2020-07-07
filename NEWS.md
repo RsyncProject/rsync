@@ -8,6 +8,9 @@
 
  - Fixed the specifying of --bwlimit=0 for the default (unlimited).
 
+ - Fixed a bug in the xattr code that was freeing the wrong object when trying
+   to cleanup the xattr list.
+
 ### ENHANCEMENTS:
 
  - Allow `--max-alloc=0` to specify no limit.

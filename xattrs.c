@@ -922,17 +922,16 @@ void uncache_tmp_xattrs(void)
 				continue;
 			}
 
-			while (ref != NULL) {
-				if (ref->next == NULL) {
-					ref = NULL;
+			while (1) {
+				rsync_xa_list_ref *next = ref->next;
+				if (next == NULL)
+					break;
+				if (xa_list_item->ndx == next->ndx) {
+					ref->next = next->next;
+					free(next);
 					break;
 				}
-				if (xa_list_item->ndx == ref->next->ndx) {
-					ref->next = ref->next->next;
-					free(ref);
-					break;
-				}
-				ref = ref->next;
+				ref = next;
 			}
 		}
 		prior_xattr_count = (size_t)-1;
