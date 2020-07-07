@@ -523,7 +523,7 @@ OFF_T do_fallocate(int fd, OFF_T offset, OFF_T length)
 
 /* Punch a hole at pos for len bytes. The current file position must be at pos and will be
  * changed to be at pos + len. */
-int do_punch_hole(int fd, UNUSED(OFF_T pos), OFF_T len)
+int do_punch_hole(int fd, OFF_T pos, OFF_T len)
 {
 #ifdef HAVE_FALLOCATE
 # ifdef HAVE_FALLOC_FL_PUNCH_HOLE
@@ -540,6 +540,8 @@ int do_punch_hole(int fd, UNUSED(OFF_T pos), OFF_T len)
 		return 0;
 	}
 # endif
+#else
+	(void)pos;
 #endif
 	{
 		char zeros[4096];
