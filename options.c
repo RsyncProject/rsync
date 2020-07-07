@@ -1889,7 +1889,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			max_alloc_arg = NULL;
 	}
 	if (max_alloc_arg) {
-		ssize_t size = parse_size_arg(max_alloc_arg, 'B', "max-alloc", 1024*1024, False);
+		ssize_t size = parse_size_arg(max_alloc_arg, 'B', "max-alloc", 1024*1024, True);
 		if (size < 0)
 			return 0;
 		max_alloc = size;

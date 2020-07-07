@@ -86,7 +86,7 @@ char *num_to_byte_string(ssize_t num)
 
 void *my_alloc(void *ptr, size_t num, size_t size, const char *file, int line)
 {
-	if (num >= max_alloc/size) {
+	if (max_alloc && num >= max_alloc/size) {
 		if (!file)
 			return NULL;
 		rprintf(FERROR, "[%s] exceeded --max-alloc=%s setting (file=%s, line=%d)\n",

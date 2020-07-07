@@ -1741,7 +1741,8 @@ your home directory (remove the '=' for that).
     letters can be any mix of upper and lower-case that you want to use.
 
     Finally, if the string ends with either "+1" or "-1", it is offset by one
-    byte in the indicated direction.  The largest possible value is `8192P-1`.
+    byte in the indicated direction.  The largest possible value is usually
+    `8192P-1`.
 
     Examples: `--max-size=1.5mb-1` is 1499999 bytes, and `--max-size=2g+1` is
     2147483649 bytes.
@@ -1771,6 +1772,8 @@ your home directory (remove the '=' for that).
 
     See the `--max-size` option for a description of how SIZE can be specified.
     The default suffix if none is given is bytes.
+
+    Beginning in 3.2.3, a value of 0 specifies no limit.
 
     You can set a default value using the environment variable RSYNC_MAX_ALLOC
     using the same SIZE values as supported by this option.  If the remote
@@ -3089,7 +3092,7 @@ your home directory (remove the '=' for that).
     fractional value (e.g. "`--bwlimit=1.5m`").  If no suffix is specified, the
     value will be assumed to be in units of 1024 bytes (as if "K" or "KiB" had
     been appended).  See the `--max-size` option for a description of all the
-    available suffixes.  A value of zero specifies no limit.
+    available suffixes.  A value of 0 specifies no limit.
 
     For backward-compatibility reasons, the rate limit will be rounded to the
     nearest KiB unit, so no rate smaller than 1024 bytes per second is
