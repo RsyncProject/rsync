@@ -87,7 +87,7 @@ void init_compression_level(void)
 		break;
 #endif
 	default: /* paranoia to prevent missing case values */
-		assert(0);
+		NOISY_DEATH("Unknown do_compression value");
 	}
 
 	if (do_compression_level == CLVL_NOT_SPECIFIED)
@@ -1049,7 +1049,7 @@ void send_token(int f, int32 token, struct map_struct *buf, OFF_T offset,
 		break;
 #endif
 	default:
-		assert(0);
+		NOISY_DEATH("Unknown do_compression value");
 	}
 }
 
@@ -1076,7 +1076,7 @@ int32 recv_token(int f, char **data)
 		return recv_compressed_token(f, data);
 #endif
 	default:
-		assert(0);
+		NOISY_DEATH("Unknown do_compression value");
 	}
 }
 
@@ -1103,6 +1103,6 @@ void see_token(char *data, int32 toklen)
 		break;
 #endif
 	default:
-		assert(0);
+		NOISY_DEATH("Unknown do_compression value");
 	}
 }

@@ -1555,11 +1555,13 @@ static void sigusr2_handler(UNUSED(int val))
 	_exit(0);
 }
 
+#if defined SIGINFO || defined SIGVTALRM
 static void siginfo_handler(UNUSED(int val))
 {
 	if (!am_server && !INFO_GTE(PROGRESS, 1))
 		want_progress_now = True;
 }
+#endif
 
 void remember_children(UNUSED(int val))
 {

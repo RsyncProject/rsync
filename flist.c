@@ -680,7 +680,9 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 	int extra_len = file_extra_cnt * EXTRA_LEN;
 	int first_hlink_ndx = -1;
 	int64 file_length;
+#ifdef CAN_SET_NSEC
 	uint32 modtime_nsec;
+#endif
 	const char *basename;
 	struct file_struct *file;
 	alloc_pool_t *pool;
@@ -767,7 +769,9 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 			struct file_struct *first = flist->files[first_hlink_ndx - flist->ndx_start];
 			file_length = F_LENGTH(first);
 			modtime = first->modtime;
+#ifdef CAN_SET_NSEC
 			modtime_nsec = F_MOD_NSEC_or_0(first);
+#endif
 			mode = first->mode;
 			if (atimes_ndx && !S_ISDIR(mode))
 				atime = F_ATIME(first);
@@ -803,10 +807,12 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 		} else
 			modtime = read_int(f);
 	}
+#ifdef CAN_SET_NSEC
 	if (xflags & XMIT_MOD_NSEC)
 		modtime_nsec = read_varint(f);
 	else
 		modtime_nsec = 0;
+#endif
 	if (!(xflags & XMIT_SAME_MODE))
 		mode = from_wire_mode(read_int(f));
 	if (atimes_ndx && !S_ISDIR(mode) && !(xflags & XMIT_SAME_ATIME)) {

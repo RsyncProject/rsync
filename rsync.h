@@ -1435,3 +1435,8 @@ char *getpass(const char *prompt);
 #ifdef MAINTAINER_MODE
 const char *get_panic_action(void);
 #endif
+
+#define NOISY_DEATH(msg) do { \
+    fprintf(stderr, "%s in %s at line %d\n", msg, __FILE__, __LINE__); \
+    exit_cleanup(RERR_UNSUPPORTED); \
+} while (0)

@@ -798,7 +798,7 @@ int sys_acl_free_acl(SMB_ACL_T acl_d)
 /* calls if it isn't there.                            */
 
 #ifdef __TANDEM
-inline do_acl(const char *path_p, int cmd, int nentries, struct acl *aclbufp)
+inline int do_acl(const char *path_p, int cmd, int nentries, struct acl *aclbufp)
 {
 	return acl((char*)path_p, cmd, nentries, aclbufp);
 }

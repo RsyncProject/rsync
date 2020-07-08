@@ -1358,7 +1358,7 @@ char *alt_dest_opt(int type)
 	case LINK_DEST:
 		return "--link-dest";
 	default:
-		assert(0);
+		NOISY_DEATH("Unknown alt_dest_opt type");
 	}
 }
 

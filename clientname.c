@@ -139,7 +139,7 @@ char *client_name(const char *ipaddr)
 		break;
 #endif
 	default:
-		assert(0);
+		NOISY_DEATH("Unknown ai_family value");
 	}
 	freeaddrinfo(answer);
 
