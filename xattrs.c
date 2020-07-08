@@ -58,7 +58,7 @@ extern int saw_xattr_filter;
 #define SPRE_LEN ((int)sizeof SYSTEM_PREFIX - 1)
 
 #ifdef HAVE_LINUX_XATTRS
-#define MIGHT_NEED_RPRE (am_root < 0)
+#define MIGHT_NEED_RPRE (am_root <= 0)
 #define RSYNC_PREFIX USER_PREFIX "rsync."
 #else
 #define MIGHT_NEED_RPRE am_root
