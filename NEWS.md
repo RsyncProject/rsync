@@ -6,26 +6,25 @@
 
 ### BUG FIXES:
 
- - Fixed the specifying of --bwlimit=0 for the default (unlimited).
-
  - Fixed a bug in the xattr code that was freeing the wrong object when trying
    to cleanup the xattr list.
 
+ - Fixed the specifying of --bwlimit=0 for unlimited (the default).
+
 ### ENHANCEMENTS:
 
- - Allow `--max-alloc=0` to specify no limit.
+ - Allow `--max-alloc=0` to specify unlimited.
 
- - The user/group name of id 0 is now shared along with the other user/group
-   names in a transfer instead of assuming that both sides have the same name
-   for id 0.
+ - The name of the id 0 user & group is now sent to the receiver along with the
+   other uer/group names in the transfer instead of assuming that both sides
+   have the same id-0 names.
 
- - Added some portability support for HPE NonStop platforms.
+ - Added some compatibility code for HPE NonStop platforms.
 
 ### INTERNAL:
 
- - Use a C99 Flexible Array for a variable-size filename in a struct when
-   possible (with a fallback to the old 1-char string kluge for older
-   compilers).
+ - Use a C99 Flexible Array for a trailing variable-size filename in a struct
+   with a fallback to the old 1-char string kluge for older compilers.
 
 ------------------------------------------------------------------------------
 <a name="3.2.2"></a>
