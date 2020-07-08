@@ -79,12 +79,12 @@ EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 2 failed"
 
 $RSYNC -a -f '-! */' "$fromdir/" "$todir"
+cp -p "$srcdir/config.sub" "$fromdir/foo/config2"
 sleep 1 # For directory mod below to ensure time difference
 rm "$todir/foo/sym"
 umask 0
 ln -s ../bar/baz "$todir/foo/sym"
 umask 022
-cp -p "$srcdir/config.sub" "$fromdir/foo/config2"
 chmod 600 "$fromdir/foo/config2"
 chmod 777 "$todir/bar/baz/rsync"
 
