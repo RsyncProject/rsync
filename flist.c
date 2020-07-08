@@ -807,8 +807,10 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 		} else
 			modtime = read_int(f);
 	}
-#ifdef CAN_SET_NSEC
 	if (xflags & XMIT_MOD_NSEC)
+#ifndef CAN_SET_NSEC
+		(void)read_varint(f);
+#else
 		modtime_nsec = read_varint(f);
 	else
 		modtime_nsec = 0;
