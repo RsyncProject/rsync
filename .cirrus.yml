@@ -1,0 +1,10 @@
+task:
+  name: FreeBSD
+  freebsd_instance:
+    image: freebsd-12-1-release-amd64
+  install_script:
+    - ln -s /usr/local/bin/bash /bin/bash
+  script:
+    - CPPFLAGS=-I/usr/local/include/ LDFLAGS=-L/usr/local/lib/ ./configure
+    - make
+    - ./rsync --version
