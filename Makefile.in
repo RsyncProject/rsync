@@ -249,7 +249,8 @@ rsyncd.conf.5: rsyncd.conf.5.md md2man version.h Makefile
 .PHONY: clean
 clean: cleantests
 	rm -f *~ $(OBJS) $(CHECK_PROGS) $(CHECK_OBJS) $(CHECK_SYMLINKS) \
-		rounding rounding.h *.old rsync*.1 rsync*.5 rsync*.html
+		rounding rounding.h *.old rsync*.1 rsync*.5 rsync*.html \
+		daemon-parm.h help-*.h default-*.h
 
 .PHONY: cleantests
 cleantests:
