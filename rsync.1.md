@@ -1725,15 +1725,16 @@ your home directory (remove the '=' for that).
 0.  `--max-size=SIZE`
 
     This tells rsync to avoid transferring any file that is larger than the
-    specified SIZE.  The SIZE value can be suffixed with a string to indicate a
-    size multiplier, and may be a fractional value (e.g. `--max-size=1.5m`).
+    specified SIZE.  A numeric value can be suffixed with a string to indicate
+    a size multiplier or left unqualified to specify bytes.  Feel free to use a
+    fractional value along with a suffix, such as `--max-size=1.5m`.
 
     This option is a transfer rule, not an exclude, so it doesn't affect the
     data that goes into the file-lists, and thus it doesn't affect deletions.
     It just limits the files that the receiver requests to be transferred.
 
-    The accepted suffix letters are: `B`, `K`, `G`, `T`, and `P` for bytes,
-    kilobytes/kibibytes, megabytes/mebibytes, gigabytes/gibibytes,
+    The accepted suffix letters are: `B`, `K`, `M`, `G`, `T`, and `P` for
+    bytes, kilobytes/kibibytes, megabytes/mebibytes, gigabytes/gibibytes,
     terabytes/tebibytes, and petabytes/pebibytes.  If you use a single-char
     suffix or add-on "ib" to it (e.g. "G" or "GiB") then you get units that are
     multiples of 1024.  If you use a two-letter suffix that ends with a "B"
