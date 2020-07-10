@@ -1725,8 +1725,9 @@ your home directory (remove the '=' for that).
 0.  `--max-size=SIZE`
 
     This tells rsync to avoid transferring any file that is larger than the
-    specified SIZE.  The SIZE value can be suffixed with a string to indicate a
-    size multiplier, and may be a fractional value (e.g. `--max-size=1.5m`).
+    specified SIZE in bytes.  The SIZE value can be suffixed with a string to
+    indicate a size multiplier, and may be a fractional value (e.g.
+    `--max-size=1.5m`).
 
     This option is a transfer rule, not an exclude, so it doesn't affect the
     data that goes into the file-lists, and thus it doesn't affect deletions.
