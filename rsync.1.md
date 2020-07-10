@@ -1788,6 +1788,9 @@ your home directory (remove the '=' for that).
     fixed value.  It is normally selected based on the size of each file being
     updated.  See the technical report for details.
 
+    Beginning in 3.2.3 the SIZE can be specified with a suffix as detailed in
+    the `--max-size` option.  Older versions only accepted a byte count.
+
 0.  `--rsh=COMMAND`, `-e`
 
     This option allows you to choose an alternative remote shell program to use

@@ -128,7 +128,7 @@ int blocking_io = -1;
 int checksum_seed = 0;
 int inplace = 0;
 int delay_updates = 0;
-long block_size = 0; /* "long" because popt can't set an int32. */
+int32 block_size = 0;
 char *skip_compress = NULL;
 char *copy_as = NULL;
 item_list dparam_list = EMPTY_ITEM_LIST;
@@ -776,7 +776,7 @@ enum {OPT_SERVER = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_FILTER, OPT_COMPARE_DEST, OPT_COPY_DEST, OPT_LINK_DEST, OPT_HELP,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_MODIFY_WINDOW, OPT_MIN_SIZE, OPT_CHMOD,
       OPT_READ_BATCH, OPT_WRITE_BATCH, OPT_ONLY_WRITE_BATCH, OPT_MAX_SIZE,
-      OPT_NO_D, OPT_APPEND, OPT_NO_ICONV, OPT_INFO, OPT_DEBUG,
+      OPT_NO_D, OPT_APPEND, OPT_NO_ICONV, OPT_INFO, OPT_DEBUG, OPT_BLOCK_SIZE,
       OPT_USERMAP, OPT_GROUPMAP, OPT_CHOWN, OPT_BWLIMIT,
       OPT_OLD_COMPRESS, OPT_NEW_COMPRESS, OPT_NO_COMPRESS,
       OPT_REFUSED_BASE = 9000};
@@ -928,7 +928,7 @@ static struct poptOption long_options[] = {
   {"no-c",             0,  POPT_ARG_VAL,    &always_checksum, 0, 0, 0 },
   {"checksum-choice",  0,  POPT_ARG_STRING, &checksum_choice, 0, 0, 0 },
   {"cc",               0,  POPT_ARG_STRING, &checksum_choice, 0, 0, 0 },
-  {"block-size",      'B', POPT_ARG_LONG,   &block_size, 0, 0, 0 },
+  {"block-size",      'B', POPT_ARG_STRING, 0, OPT_BLOCK_SIZE, 0, 0 },
   {"compare-dest",     0,  POPT_ARG_STRING, 0, OPT_COMPARE_DEST, 0, 0 },
   {"copy-dest",        0,  POPT_ARG_STRING, 0, OPT_COPY_DEST, 0, 0 },
   {"link-dest",        0,  POPT_ARG_STRING, 0, OPT_LINK_DEST, 0, 0 },
@@ -1253,11 +1253,12 @@ static int count_args(const char **argv)
 /* If the size_arg is an invalid string or the value is < min_value, an error
  * is put into err_buf & the return is -1.  Note that this parser does NOT
  * support negative numbers, so a min_value < 0 doesn't make any sense. */
-static ssize_t parse_size_arg(char *size_arg, char def_suf, const char *opt_name, ssize_t min_value, BOOL allow_0)
+static ssize_t parse_size_arg(const char *size_arg, char def_suf, const char *opt_name,
+			      ssize_t min_value, ssize_t max_value, BOOL unlimited_0)
 {
-	int reps, mult;
-	const char *arg, *err = "invalid";
-	ssize_t size = 1;
+	int reps, mult, len;
+	const char *arg, *err = "invalid", *min_max = NULL;
+	ssize_t limit = -1, size = 1;
 
 	for (arg = size_arg; isDigit(arg); arg++) {}
 	if (*arg == '.')
@@ -1299,14 +1300,29 @@ static ssize_t parse_size_arg(char *size_arg, char def_suf, const char *opt_name
 		size += atoi(arg), arg += 2;
 	if (*arg)
 		goto failure;
-	if (size < min_value && (!allow_0 || size != 0)) {
-		err = size < 0 ? "too big" : "too small";
+	if (size < 0 || (max_value >= 0 && size > max_value)) {
+		err = "too large";
+		min_max = "max";
+		limit = max_value;
+		goto failure;
+	}
+	if (size < min_value && (!unlimited_0 || size != 0)) {
+		err = "too small";
+		min_max = "min";
+		limit = min_value;
 		goto failure;
 	}
 	return size;
 
 failure:
-	snprintf(err_buf, sizeof err_buf, "--%s value is %s: %s\n", opt_name, err, size_arg);
+	len = snprintf(err_buf, sizeof err_buf - 1, "--%s=%s is %s", opt_name, size_arg, err);
+	if (min_max && limit >= 0 && len < (int)sizeof err_buf - 10) {
+		len += snprintf(err_buf + len, sizeof err_buf - len - 1, " (%s: %s%s)",
+			min_max, do_big_num(limit, 3, NULL),
+			unlimited_0 && min_max[1] == 'i' ? " or 0 for unlimited" : "");
+	}
+	err_buf[len] = '\n';
+	err_buf[len+1] = '\0';
 	return -1;
 }
 
@@ -1682,20 +1698,33 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 #endif
 			break;
 
+		case OPT_BLOCK_SIZE: {
+			/* We may not know the real protocol_version at this point if this is the client
+			 * option parsing, but we still want to check it so that the client can specify
+			 * a --protocol=29 option with a larger block size. */
+			int max_blength = protocol_version < 30 ? OLD_MAX_BLOCK_SIZE : MAX_BLOCK_SIZE;
+			ssize_t size;
+			arg = poptGetOptArg(pc);
+			if ((size = parse_size_arg(arg, 'b', "block-size", 0, max_blength, False)) < 0)
+				return 0;
+			block_size = (int32)size;
+			break;
+		}
+
 		case OPT_MAX_SIZE:
-			if ((max_size = parse_size_arg(max_size_arg, 'b', "max-size", 0, True)) < 0)
+			if ((max_size = parse_size_arg(max_size_arg, 'b', "max-size", 0, -1, False)) < 0)
 				return 0;
 			max_size_arg = num_to_byte_string(max_size);
 			break;
 
 		case OPT_MIN_SIZE:
-			if ((min_size = parse_size_arg(min_size_arg, 'b', "min-size", 0, True)) < 0)
+			if ((min_size = parse_size_arg(min_size_arg, 'b', "min-size", 0, -1, False)) < 0)
 				return 0;
 			min_size_arg = num_to_byte_string(min_size);
 			break;
 
 		case OPT_BWLIMIT: {
-			ssize_t size = parse_size_arg(bwlimit_arg, 'K', "bwlimit", 512, True);
+			ssize_t size = parse_size_arg(bwlimit_arg, 'K', "bwlimit", 512, -1, True);
 			if (size < 0)
 				return 0;
 			bwlimit_arg = num_to_byte_string(size);
@@ -1889,7 +1918,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			max_alloc_arg = NULL;
 	}
 	if (max_alloc_arg) {
-		ssize_t size = parse_size_arg(max_alloc_arg, 'B', "max-alloc", 1024*1024, True);
+		ssize_t size = parse_size_arg(max_alloc_arg, 'B', "max-alloc", 1024*1024, -1, True);
 		if (size < 0)
 			return 0;
 		max_alloc = size;
@@ -2036,19 +2065,6 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		return 0;
 	}
 #endif
-
-	if (block_size) {
-		/* We may not know the real protocol_version at this point if this is the client
-		 * option parsing, but we still want to check it so that the client can specify
-		 * a --protocol=29 option with a larger block size. */
-		int32 max_blength = protocol_version < 30 ? OLD_MAX_BLOCK_SIZE : MAX_BLOCK_SIZE;
-
-		if (block_size > max_blength) {
-			snprintf(err_buf, sizeof err_buf,
-				 "--block-size=%lu is too large (max: %u)\n", block_size, max_blength);
-			return 0;
-		}
-	}
 
 	if (write_batch && read_batch) {
 		snprintf(err_buf, sizeof err_buf,
@@ -2675,7 +2691,7 @@ void server_options(char **args, int *argc_p)
 	}
 
 	if (block_size) {
-		if (asprintf(&arg, "-B%lu", block_size) < 0)
+		if (asprintf(&arg, "-B%u", block_size) < 0)
 			goto oom;
 		args[ac++] = arg;
 	}

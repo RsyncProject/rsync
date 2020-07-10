@@ -15,6 +15,8 @@
 
  - Allow `--max-alloc=0` to specify unlimited.
 
+ - Allow `--block-size=SIZE` to specify the size using a suffix such as "K".
+
  - The name of the id 0 user & group is now sent to the receiver along with the
    other uer/group names in the transfer instead of assuming that both sides
    have the same id-0 names.

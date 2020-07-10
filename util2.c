@@ -77,6 +77,8 @@ char *num_to_byte_string(ssize_t num)
 	char buf[128], *s = buf + sizeof buf - 1;
 
 	*s = '\0';
+	if (!num)
+		*--s = '0';
 	while (num) {
 		*--s = (char)(num % 10) + '0';
 		num /= 10;

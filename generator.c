@@ -84,7 +84,7 @@ extern int list_only;
 extern int read_batch;
 extern int write_batch;
 extern int safe_symlinks;
-extern long block_size; /* "long" because popt can't set an int32. */
+extern int32 block_size;
 extern int unsort_ndx;
 extern int max_delete;
 extern int force_delete;
