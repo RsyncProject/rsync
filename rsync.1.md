@@ -1732,7 +1732,7 @@ your home directory (remove the '=' for that).
     data that goes into the file-lists, and thus it doesn't affect deletions.
     It just limits the files that the receiver requests to be transferred.
 
-    The accepted suffix letters are: `B`, `K`, `G`, `T`, and `P` for bytes,
+    The accepted suffix letters are: `B`, `K`, `M`, `G`, `T`, and `P` for bytes,
     kilobytes/kibibytes, megabytes/mebibytes, gigabytes/gibibytes,
     terabytes/tebibytes, and petabytes/pebibytes.  If you use a single-char
     suffix or add-on "ib" to it (e.g. "G" or "GiB") then you get units that are
