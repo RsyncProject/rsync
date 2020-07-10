@@ -1093,13 +1093,13 @@ void see_token(char *data, int32 toklen)
 		break;
 	case CPRES_ZLIBX:
 		break;
-#ifdef SUPPORT_LZ4
-	case CPRES_LZ4:
-		/*see_uncompressed_token(data, toklen);*/
+#ifdef SUPPORT_ZSTD
+	case CPRES_ZSTD:
 		break;
 #endif
 #ifdef SUPPORT_LZ4
-	case CPRES_ZSTD:
+	case CPRES_LZ4:
+		/*see_uncompressed_token(data, toklen);*/
 		break;
 #endif
 	default:
