@@ -9,3 +9,6 @@ task:
     - CPPFLAGS=-I/usr/local/include/ LDFLAGS=-L/usr/local/lib/ ./configure --disable-md2man
     - make
     - ./rsync --version
+    - make check
+    - make check30
+    - make check29
