@@ -3,8 +3,8 @@ task:
   freebsd_instance:
     image: freebsd-12-1-release-amd64
   prep_script:
+    - pkg install -y autotools xxhash zstd liblz4 openssl bash
     - ln -s /usr/local/bin/bash /bin/bash
-    - pkg install -y autotools xxhash zstd liblz4 openssl
   configure_script:
     - CPPFLAGS=-I/usr/local/include/ LDFLAGS=-L/usr/local/lib/ ./configure --disable-md2man
   build_script:
