@@ -24,16 +24,24 @@
 
 static char number_separator;
 
-#ifndef HAVE_STRDUP
- char *strdup(char *s)
+char get_number_separator(void)
 {
-	int len = strlen(s) + 1;
-	char *ret = (char *)malloc(len);
-	if (ret)
-		memcpy(ret, s, len);
-	return ret;
+	if (!number_separator) {
+		char buf[32];
+		snprintf(buf, sizeof buf, "%f", 3.14);
+		if (strchr(buf, '.') != NULL)
+			number_separator = ',';
+		else
+			number_separator = '.';
+	}
+
+	return number_separator;
 }
-#endif
+
+char get_decimal_point(void)
+{
+	return get_number_separator() == ',' ? '.' : ',';
+}
 
 #ifndef HAVE_GETCWD
  char *getcwd(char *buf, int size)
@@ -155,30 +163,6 @@ int sys_gettimeofday(struct timeval *tv)
 #endif
 }
 
-#define HUMANIFY(mult) \
-	do { \
-		if (num >= mult || num <= -mult) { \
-			double dnum = (double)num / mult; \
-			char units; \
-			if (num < 0) \
-				dnum = -dnum; \
-			if (dnum < mult) \
-				units = 'K'; \
-			else if ((dnum /= mult) < mult) \
-				units = 'M'; \
-			else if ((dnum /= mult) < mult) \
-				units = 'G'; \
-			else { \
-				dnum /= mult; \
-				units = 'T'; \
-			} \
-			if (num < 0) \
-				dnum = -dnum; \
-			snprintf(bufs[n], sizeof bufs[0], "%.2f%c", dnum, units); \
-			return bufs[n]; \
-		} \
-	} while (0)
-
 /* Return the int64 number as a string.  If the human_flag arg is non-zero,
  * we may output the number in K, M, G, or T units.  If we don't add a unit
  * suffix, we will append the fract string, if it is non-NULL.  We can
@@ -190,22 +174,35 @@ char *do_big_num(int64 num, int human_flag, const char *fract)
 	char *s;
 	int len, negated;
 
-	if (human_flag && !number_separator) {
-		char buf[32];
-		snprintf(buf, sizeof buf, "%f", 3.14);
-		if (strchr(buf, '.') != NULL)
-			number_separator = ',';
-		else
-			number_separator = '.';
-	}
+	if (human_flag && !number_separator)
+		(void)get_number_separator();
 
 	n = (n + 1) % (sizeof bufs / sizeof bufs[0]);
 
 	if (human_flag > 1) {
-		if (human_flag == 2)
-			HUMANIFY(1000);
-		else
-			HUMANIFY(1024);
+		int mult = human_flag == 2 ? 1000 : 1024;
+		if (num >= mult || num <= -mult) {
+			double dnum = (double)num / mult;
+			char units;
+			if (num < 0)
+				dnum = -dnum;
+			if (dnum < mult)
+				units = 'K';
+			else if ((dnum /= mult) < mult)
+				units = 'M';
+			else if ((dnum /= mult) < mult)
+				units = 'G';
+			else if ((dnum /= mult) < mult)
+				units = 'T';
+			else {
+				dnum /= mult;
+				units = 'P';
+			}
+			if (num < 0)
+				dnum = -dnum;
+			snprintf(bufs[n], sizeof bufs[0], "%.2f%c", dnum, units);
+			return bufs[n];
+		}
 	}
 
 	s = bufs[n] + sizeof bufs[0] - 1;

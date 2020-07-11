@@ -1261,7 +1261,7 @@ static ssize_t parse_size_arg(const char *size_arg, char def_suf, const char *op
 	ssize_t limit = -1, size = 1;
 
 	for (arg = size_arg; isDigit(arg); arg++) {}
-	if (*arg == '.')
+	if (*arg == '.' || *arg == get_decimal_point()) /* backward compatibility: always allow '.' */
 		for (arg++; isDigit(arg); arg++) {}
 	switch (*arg && *arg != '+' && *arg != '-' ? *arg++ : def_suf) {
 	case 'b': case 'B':
@@ -1714,20 +1714,20 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		case OPT_MAX_SIZE:
 			if ((max_size = parse_size_arg(max_size_arg, 'b', "max-size", 0, -1, False)) < 0)
 				return 0;
-			max_size_arg = num_to_byte_string(max_size);
+			max_size_arg = strdup(do_big_num(max_size, 0, NULL));
 			break;
 
 		case OPT_MIN_SIZE:
 			if ((min_size = parse_size_arg(min_size_arg, 'b', "min-size", 0, -1, False)) < 0)
 				return 0;
-			min_size_arg = num_to_byte_string(min_size);
+			min_size_arg = strdup(do_big_num(min_size, 0, NULL));
 			break;
 
 		case OPT_BWLIMIT: {
 			ssize_t size = parse_size_arg(bwlimit_arg, 'K', "bwlimit", 512, -1, True);
 			if (size < 0)
 				return 0;
-			bwlimit_arg = num_to_byte_string(size);
+			bwlimit_arg = strdup(do_big_num(size, 0, NULL));
 			bwlimit = (size + 512) / 1024;
 			break;
 		}
@@ -2691,7 +2691,7 @@ void server_options(char **args, int *argc_p)
 	}
 
 	if (block_size) {
-		if (asprintf(&arg, "-B%u", block_size) < 0)
+		if (asprintf(&arg, "-B%u", (int)block_size) < 0)
 			goto oom;
 		args[ac++] = arg;
 	}

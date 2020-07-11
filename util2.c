@@ -21,7 +21,6 @@
  */
 
 #include "rsync.h"
-#include "ifuncs.h"
 #include "itypes.h"
 #include "inums.h"
 
@@ -71,28 +70,13 @@ int msleep(int t)
 	return True;
 }
 
-/* Convert a num manually because the needed %lld precision is not a portable sprintf() escape. */
-char *num_to_byte_string(ssize_t num)
-{
-	char buf[128], *s = buf + sizeof buf - 1;
-
-	*s = '\0';
-	if (!num)
-		*--s = '0';
-	while (num) {
-		*--s = (char)(num % 10) + '0';
-		num /= 10;
-	}
-	return strdup(s);
-}
-
 void *my_alloc(void *ptr, size_t num, size_t size, const char *file, int line)
 {
 	if (max_alloc && num >= max_alloc/size) {
 		if (!file)
 			return NULL;
 		rprintf(FERROR, "[%s] exceeded --max-alloc=%s setting (file=%s, line=%d)\n",
-			who_am_i(), num_to_byte_string(max_alloc), file, line);
+			who_am_i(), do_big_num(max_alloc, 0, NULL), file, line);
 		exit_cleanup(RERR_MALLOC);
 	}
 	if (!ptr)

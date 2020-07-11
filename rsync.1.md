@@ -1726,19 +1726,18 @@ your home directory (remove the '=' for that).
 
     This tells rsync to avoid transferring any file that is larger than the
     specified SIZE.  A numeric value can be suffixed with a string to indicate
-    a size multiplier or left unqualified to specify bytes.  Feel free to use a
-    fractional value along with a suffix, such as `--max-size=1.5m`.
+    the numeric units or left unqualified to specify bytes.  Feel free to use a
+    fractional value along with the units, such as `--max-size=1.5m`.
 
     This option is a transfer rule, not an exclude, so it doesn't affect the
     data that goes into the file-lists, and thus it doesn't affect deletions.
     It just limits the files that the receiver requests to be transferred.
 
-    The accepted suffix letters are: `B`, `K`, `M`, `G`, `T`, and `P` for
-    bytes, kilobytes/kibibytes, megabytes/mebibytes, gigabytes/gibibytes,
-    terabytes/tebibytes, and petabytes/pebibytes.  If you use a single-char
-    suffix or add-on "ib" to it (e.g. "G" or "GiB") then you get units that are
+    The first letter of a units string can be `B` (bytes), `K` (kilo), `M`
+    (mega), `G` (giga), `T` (tera), or `P` (peta).  If the string is a single
+    char or has "ib" added to it (e.g. "G" or "GiB") then the units are
     multiples of 1024.  If you use a two-letter suffix that ends with a "B"
-    (e.g. "kb") then you get units that are multiples of 1000.  The suffix
+    (e.g. "kb") then you get units that are multiples of 1000.  The string's
     letters can be any mix of upper and lower-case that you want to use.
 
     Finally, if the string ends with either "+1" or "-1", it is offset by one
@@ -2814,10 +2813,10 @@ your home directory (remove the '=' for that).
     level by one.  You can take the level down to 0 (to output numbers as pure
     digits) by specifying the `--no-human-readable` (`--no-h`) option.
 
-    The unit letters that are appended in levels 2 and 3 are: K (kilo), M
-    (mega), G (giga), or T (tera).  For example, a 1234567-byte file would
-    output as 1.23M in level-2 (assuming that a period is your local decimal
-    point).
+    The unit letters that are appended in levels 2 and 3 are: `K` (kilo), `M`
+    (mega), `G` (giga), `T` (tera), or `P` (peta).  For example, a 1234567-byte
+    file would output as 1.23M in level-2 (assuming that a period is your local
+    decimal point).
 
     Backward compatibility note: versions of rsync prior to 3.1.0 do not
     support human-readable level 1, and they default to level 0.  Thus,

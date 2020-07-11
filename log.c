@@ -350,8 +350,7 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 		output_needs_newline = 0;
 	}
 
-	trailing_CR_or_NL = len && (buf[len-1] == '\n' || buf[len-1] == '\r')
-			  ? buf[--len] : 0;
+	trailing_CR_or_NL = len && (buf[len-1] == '\n' || buf[len-1] == '\r') ? buf[--len] : '\0';
 
 	if (len && buf[0] == '\r') {
 		fputc('\r', f);
@@ -372,7 +371,12 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 			iconvbufs(ic, &inbuf, &outbuf, inbuf.pos ? 0 : ICB_INIT);
 			ierrno = errno;
 			if (outbuf.len) {
-				filtered_fwrite(f, convbuf, outbuf.len, 0, 0);
+				char trailing = inbuf.len ? '\0' : trailing_CR_or_NL;
+				filtered_fwrite(f, convbuf, outbuf.len, 0, trailing);
+				if (trailing) {
+					trailing_CR_or_NL = '\0';
+					fflush(f);
+				}
 				outbuf.len = 0;
 			}
 			/* Log one byte of illegal/incomplete sequence and continue with
