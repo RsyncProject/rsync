@@ -2,7 +2,7 @@ name: build
 
 on:
   push:
-    branches: [ b3.0.x ]
+    branches: [ master ]
   pull_request:
     branches: [ master ]
 
