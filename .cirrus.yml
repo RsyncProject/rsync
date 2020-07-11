@@ -4,9 +4,8 @@ task:
     image: freebsd-12-1-release-amd64
   install_script:
     - ln -s /usr/local/bin/bash /bin/bash
-    - pkg install -y autotools xxhash zstd liblz4 python36 py36-CommonMark
-
+    - pkg install -y autotools xxhash zstd liblz4
   script:
-    - CPPFLAGS=-I/usr/local/include/ LDFLAGS=-L/usr/local/lib/ ./configure
+    - CPPFLAGS=-I/usr/local/include/ LDFLAGS=-L/usr/local/lib/ ./configure --disable-md2man
     - make
     - ./rsync --version
