@@ -14,18 +14,23 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: prepare-packages
-      run: sudo apt-get install fakeroot acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev python3-cmarkgfm
+      run: sudo apt-get install fakeroot acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev \
+            libxxhash-dev python3-cmarkgfm openssl
     - name: prepare-source
       run: ./prepare-source
     - name: configure
       run: ./configure --with-included-popt --with-included-zlib
     - name: make
       run: make
-    - name: version-summary
-      run: ./rsync --version
+    - name: install
+      run: sudo make install
+    - name: info
+      run: /usr/local/bin/rsync --version
     - name: make check
       run: make check
     - name: make check30
       run: make check30
     - name: make check29
       run: make check29
+    - name: ssl file list
+      run: /usr/local/bin/rsync-ssl --no-motd download.samba.org::rsyncftp/ || true

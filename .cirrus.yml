@@ -7,7 +7,7 @@ task:
     - ln -s /usr/local/bin/bash /bin/bash
   configure_script:
     - CPPFLAGS=-I/usr/local/include/ LDFLAGS=-L/usr/local/lib/ ./configure --disable-md2man
-  build_script:
+  make_script:
     - make
   install_script:
     - make install
@@ -15,5 +15,5 @@ task:
     - /usr/local/bin/rsync --version
   test_script:
     - make check
-  ssl_script:
-    - /usr/local/bin/rsync-ssl --no-motd download.samba.org::rsyncftp/
+  ssl_file_list_script:
+    - /usr/local/bin/rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
