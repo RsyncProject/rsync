@@ -242,7 +242,7 @@ static char *expand_vars(const char *str)
  * typedef local_vars - describes a single section.
  * typedef all_vars - a combination of global_vars & local_vars.
  * all_vars Defaults - the default values for all the variables.
- * all_vars Vars - tThe currently configured values for all the variables.
+ * all_vars Vars - the currently configured values for all the variables.
  * struct parm_struct parm_table - the strings & variables for the parser.
  * FN_{LOCAL,GLOBAL}_{TYPE}() definition for all the lp_var_name() accessors.
  */

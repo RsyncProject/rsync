@@ -15,11 +15,11 @@
 
  - Allow `--max-alloc=0` to specify unlimited.
 
- - Allow `--block-size=SIZE` to specify the size using a suffix such as "K".
+ - Allow `--block-size=SIZE` to specify the size using units such as "100K".
 
  - The name of the id 0 user & group is now sent to the receiver along with the
-   other uer/group names in the transfer instead of assuming that both sides
-   have the same id-0 names.
+   other user/group names in the transfer (instead of assuming that both sides
+   have the same id-0 names).
 
  - Added some compatibility code for HPE NonStop platforms.
 
@@ -327,7 +327,7 @@
 
 ### PACKAGING RELATED:
 
- - Add installed binary: /usr/bin/rsync-ssl
+ - Add installed bash script: /usr/bin/rsync-ssl
 
  - Add installed man page: /usr/man/man1/rsync-ssl.1
 
@@ -367,7 +367,7 @@
 
  - Converted the man pages from yodl to markdown. They are now processed via a
    simple python3 script using the cmarkgfm **or** commonmark library.  This
-   should make it easier to package rsync, since yodl has gotten obscure.
+   should make it easier to package rsync, since yodl is rather obscure.
 
  - Improved some configure checks to work better with strict C99 compilers.
 
