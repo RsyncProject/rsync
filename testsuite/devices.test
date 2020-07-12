@@ -50,6 +50,20 @@ echo "$mode $maj,$min 0:0" > rsync.%stat
 EOF
 	}
 	;;
+    freebsd*)
+	mknod() {
+	    fn="$1"
+	    case "$2" in
+	    p) mode=10644 ;;
+	    c) mode=20644 ;;
+	    b) mode=60644 ;;
+	    esac
+	    maj="${3:-0}"
+	    min="${4:-0}"
+	    touch "$fn"
+	    setextattr -h user "rsync.%stat" "$mode $maj,$min 0:0" "$fn"
+	}
+	;;
     *)
 	mknod() {
 	    fn="$1"
