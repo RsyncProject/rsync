@@ -37,6 +37,13 @@ EOF
 	    done
 	}
 	;;
+    freebsd*)
+	chown() {
+	    own=$1
+	    shift
+	    setextattr -h user "rsync.%stat" "100644 0,0 $own" "${@}"
+	}
+	;;
     *)
 	chown() {
 	    own=$1
