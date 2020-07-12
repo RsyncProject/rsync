@@ -45,6 +45,19 @@ EOF
     RSYNC_PREFIX='rsync'
     RUSR='rsync.nonuser'
     ;;
+freebsd*)
+    xset() {
+	xnam="$1"
+	xval="$2"
+	shift 2
+	setextattr -h user "$xnam" "$xval" "${@}"
+    }
+    xls() {
+	lsextattr -h -q user "${@}" | tr '[[:space:]]' '\n' | xargs -I % getextattr -q user % "${@}"
+    }
+    RSYNC_PREFIX='rsync'
+    RUSR='rsync'
+    ;;
 *)
     xset() {
 	xnam="$1"
