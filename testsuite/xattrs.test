@@ -53,7 +53,7 @@ freebsd*)
 	setextattr -h user "$xnam" "$xval" "${@}"
     }
     xls() {
-	lsextattr -h -q user "${@}" | tr '[[:space:]]' '\n' | xargs -I % getextattr -q user % "${@}"
+	for f in "${@}"; do lsextattr -h -q user "$f" | tr '[[:space:]]' '\n' | sort | xargs -I % getextattr user % "$f"; done
     }
     RSYNC_PREFIX='rsync'
     RUSR='rsync'
