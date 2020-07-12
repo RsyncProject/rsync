@@ -3,7 +3,8 @@ task:
   freebsd_instance:
     image: freebsd-12-1-release-amd64
   prep_script:
-    - mount -t tmpfs -o size=128m tmpfs /var/tmp
+    - dd if=/dev/zero of=/tmp/zpool bs=1M count=1024
+    - zpool create -m `pwd`/testtmp zpool /tmp/zpool
     - pkg install -y autotools xxhash zstd liblz4 openssl bash
     - ln -s /usr/local/bin/bash /bin/bash
   configure_script:
