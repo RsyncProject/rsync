@@ -5,10 +5,9 @@ task:
   prep_script:
     - dd if=/dev/zero of=/tmp/zpool bs=1M count=1024
     - zpool create -m `pwd`/testtmp zpool /tmp/zpool
-    - pkg install -y autotools xxhash zstd liblz4 openssl bash py37-cmarkgfm
-    - ln -s /usr/local/bin/bash /bin/bash
+    - pkg install -y autotools xxhash zstd liblz4
   configure_script:
-    - CPPFLAGS=-I/usr/local/include/ LDFLAGS=-L/usr/local/lib/ ./configure
+    - CPPFLAGS=-I/usr/local/include/ LDFLAGS=-L/usr/local/lib/ ./configure --disable-md2man
   make_script:
     - make
   install_script:
@@ -17,5 +16,3 @@ task:
     - /usr/local/bin/rsync --version
   test_script:
     - make check
-  ssl_file_list_script:
-    - /usr/local/bin/rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
