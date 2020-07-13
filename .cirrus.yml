@@ -7,6 +7,7 @@ task:
     - zpool create -m `pwd`/testtmp zpool /tmp/zpool
     - pkg install -y autotools xxhash zstd liblz4 openssl bash
     - ln -s /usr/local/bin/bash /bin/bash
+    - pkg search commonmark
   configure_script:
     - CPPFLAGS=-I/usr/local/include/ LDFLAGS=-L/usr/local/lib/ ./configure --disable-md2man
   make_script:
