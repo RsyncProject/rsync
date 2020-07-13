@@ -457,6 +457,8 @@ detailed description below for a complete description.
 --early-input=FILE       use FILE for daemon's early exec input
 --list-only              list the files instead of copying them
 --bwlimit=RATE           limit socket I/O bandwidth
+--stop-after=MINS        Stop rsync after MINS minutes have elapsed
+--stop-at=y-m-dTh:m      Stop rsync at the specified moment in time
 --write-batch=FILE       write a batched update to FILE
 --only-write-batch=FILE  like --write-batch but w/o updating dest
 --read-batch=FILE        read a batched update from FILE
@@ -3112,6 +3114,45 @@ your home directory (remove the '=' for that).
     some files can show up as being rapidly sent when the data is quickly
     buffered, while other can show up as very slow when the flushing of the
     output buffer occurs.  This may be fixed in a future version.
+
+0.  `--stop-after=MINS
+
+    This option tells rsync to stop copying when the specified number of
+    minutes has elapsed.
+
+    Rsync also accepts an earlier version of this option: `--time-limit=MINS`.
+
+    For maximal flexibility, rsync does not communicate this option to the
+    remote rsync since it is usually enough that one side of the connection
+    quits as specified.  This allows the option's use even when only one side
+    of the connection supports it.  You can tell the remote side about the time
+    limit using `--remote-option` (`-M`), should the need arise.
+
+0.  `--stop-at=y-m-dTh:m
+
+    This option tells rsync to stop copying when the specified point in time
+    has been reached. The date & time can be fully specified in a numeric
+    format of year-month-dayThour:minute (e.g. 2000-12-31T23:59) in the local
+    timezone.  You may choose to separate the date numbers using slashes
+    instead of dashes.
+
+    The value can also be abbreviated in a variety of ways, such as specifying
+    a 2-digit year and/or leaving off various values.  In all cases, the value
+    will be taken to be the next possible future moment where the supplied
+    information matches.  If the value specifies the current time or a past
+    time, rsync exits with an error.
+
+    For example, "1-30" specifies the next January 30th (at midnight local
+    time), "14:00" specifies the next 2 P.M., "1" specifies the next 1st of the
+    month at midnight, and ":59" specifies the next 59th minute after the hour.
+
+    For maximal flexibility, rsync does not communicate this option to the
+    remote rsync since it is usually enough that one side of the connection
+    quits as specified.  This allows the option's use even when only one side
+    of the connection supports it.  You can tell the remote side about the time
+    limit using `--remote-option` (`-M`), should the need arise.  Do keep in
+    mind that the remote host may have a different default timezone than your
+    local host.
 
 0.  `--write-batch=FILE`
 

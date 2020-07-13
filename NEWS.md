@@ -21,6 +21,10 @@
    other user/group names in the transfer (instead of assuming that both sides
    have the same id-0 names).
 
+ - Added the `--stop-after=MINS` and `--stop-at=DATE_TIME` options (with the
+   `--time-limit=MINS` option accepted as an alias for `--stop-after`).  This
+   is an enhanced version of the time-limit patch from the patches repo.
+
  - Added some compatibility code for HPE NonStop platforms.
 
 ### INTERNAL:

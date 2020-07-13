@@ -119,6 +119,7 @@ size_t bwlimit_writemax = 0;
 int ignore_existing = 0;
 int ignore_non_existing = 0;
 int need_messages_from_generator = 0;
+time_t stop_at_utime = 0;
 int max_delete = INT_MIN;
 OFF_T max_size = -1;
 OFF_T min_size = -1;
@@ -664,6 +665,11 @@ static void print_info_flags(enum logcode f)
 #endif
 			"prealloc",
 
+#ifndef HAVE_MKTIME
+		"no "
+#endif
+			"stop-at",
+
 	"*Optimizations",
 
 #ifndef HAVE_SIMD
@@ -779,6 +785,7 @@ enum {OPT_SERVER = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_NO_D, OPT_APPEND, OPT_NO_ICONV, OPT_INFO, OPT_DEBUG, OPT_BLOCK_SIZE,
       OPT_USERMAP, OPT_GROUPMAP, OPT_CHOWN, OPT_BWLIMIT,
       OPT_OLD_COMPRESS, OPT_NEW_COMPRESS, OPT_NO_COMPRESS,
+      OPT_STOP_AFTER, OPT_STOP_AT,
       OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
@@ -988,6 +995,9 @@ static struct poptOption long_options[] = {
   {"no-timeout",       0,  POPT_ARG_VAL,    &io_timeout, 0, 0, 0 },
   {"contimeout",       0,  POPT_ARG_INT,    &connect_timeout, 0, 0, 0 },
   {"no-contimeout",    0,  POPT_ARG_VAL,    &connect_timeout, 0, 0, 0 },
+  {"stop-after",       0,  POPT_ARG_STRING, 0, OPT_STOP_AFTER, 0, 0 },
+  {"time-limit",       0,  POPT_ARG_STRING, 0, OPT_STOP_AFTER, 0, 0 }, /* earlier stop-after name */
+  {"stop-at",          0,  POPT_ARG_STRING, 0, OPT_STOP_AT, 0, 0 },
   {"rsh",             'e', POPT_ARG_STRING, &shell_cmd, 0, 0, 0 },
   {"rsync-path",       0,  POPT_ARG_STRING, &rsync_path, 0, 0, 0 },
   {"temp-dir",        'T', POPT_ARG_STRING, &tmpdir, 0, 0, 0 },
@@ -1192,6 +1202,9 @@ static void set_refuse_options(void)
 #ifndef SUPPORT_HARD_LINKS
 	parse_one_refuse_match(0, "link-dest", list_end);
 #endif
+#ifndef HAVE_MKTIME
+	parse_one_refuse_match(0, "stop-at", list_end);
+#endif
 #ifndef ICONV_OPTION
 	parse_one_refuse_match(0, "iconv", list_end);
 #endif
@@ -1325,6 +1338,148 @@ failure:
 	err_buf[len+1] = '\0';
 	return -1;
 }
+
+#ifdef HAVE_MKTIME
+/* Allow the user to specify a time in the format yyyy-mm-ddThh:mm while
+ * also allowing abbreviated data.  For instance, if the time is omitted,
+ * it defaults to midnight.  If the date is omitted, it defaults to the
+ * next possible date in the future with the specified time.  Even the
+ * year or year-month can be omitted, again defaulting to the next date
+ * in the future that matches the specified information.  A 2-digit year
+ * is also OK, as is using '/' instead of '-'. */
+static time_t parse_time(const char *arg)
+{
+	const char *cp;
+	time_t val, now = time(NULL);
+	struct tm t, *today = localtime(&now);
+	int in_date, old_mday, n;
+
+	memset(&t, 0, sizeof t);
+	t.tm_year = t.tm_mon = t.tm_mday = -1;
+	t.tm_hour = t.tm_min = t.tm_isdst = -1;
+	cp = arg;
+	if (*cp == 'T' || *cp == 't' || *cp == ':') {
+		in_date = *cp == ':' ? 0 : -1;
+		cp++;
+	} else
+		in_date = 1;
+	for ( ; ; cp++) {
+		if (!isDigit(cp))
+			return (time_t)-1;
+		n = 0;
+		do {
+			n = n * 10 + *cp++ - '0';
+		} while (isDigit(cp));
+		if (*cp == ':')
+			in_date = 0;
+		if (in_date > 0) {
+			if (t.tm_year != -1)
+				return (time_t)-1;
+			t.tm_year = t.tm_mon;
+			t.tm_mon = t.tm_mday;
+			t.tm_mday = n;
+			if (!*cp)
+				break;
+			if (*cp == 'T' || *cp == 't') {
+				if (!cp[1])
+					break;
+				in_date = -1;
+			} else if (*cp != '-' && *cp != '/')
+				return (time_t)-1;
+			continue;
+		}
+		if (t.tm_hour != -1)
+			return (time_t)-1;
+		t.tm_hour = t.tm_min;
+		t.tm_min = n;
+		if (!*cp) {
+			if (in_date < 0)
+				return (time_t)-1;
+			break;
+		}
+		if (*cp != ':')
+			return (time_t)-1;
+		in_date = 0;
+	}
+
+	in_date = 0;
+	if (t.tm_year < 0) {
+		t.tm_year = today->tm_year;
+		in_date = 1;
+	} else if (t.tm_year < 100) {
+		while (t.tm_year < today->tm_year)
+			t.tm_year += 100;
+	} else
+		t.tm_year -= 1900;
+	if (t.tm_mon < 0) {
+		t.tm_mon = today->tm_mon;
+		in_date = 2;
+	} else
+		t.tm_mon--;
+	if (t.tm_mday < 0) {
+		t.tm_mday = today->tm_mday;
+		in_date = 3;
+	}
+
+	n = 0;
+	if (t.tm_min < 0) {
+		t.tm_hour = t.tm_min = 0;
+	} else if (t.tm_hour < 0) {
+		if (in_date != 3)
+			return (time_t)-1;
+		in_date = 0;
+		t.tm_hour = today->tm_hour;
+		n = 60*60;
+	}
+
+	/* Note that mktime() might change a too-large tm_mday into the start of
+	 * the following month which we need to undo in the following code! */
+	old_mday = t.tm_mday;
+	if (t.tm_hour > 23 || t.tm_min > 59
+	    || t.tm_mon < 0 || t.tm_mon >= 12
+	    || t.tm_mday < 1 || t.tm_mday > 31
+	    || (val = mktime(&t)) == (time_t)-1)
+		return (time_t)-1;
+
+	while (in_date && (val <= now || t.tm_mday < old_mday)) {
+		switch (in_date) {
+		case 3:
+			old_mday = ++t.tm_mday;
+			break;
+		case 2:
+			if (t.tm_mday < old_mday)
+				t.tm_mday = old_mday; /* The month already got bumped forward */
+			else if (++t.tm_mon == 12) {
+				t.tm_mon = 0;
+				t.tm_year++;
+			}
+			break;
+		case 1:
+			if (t.tm_mday < old_mday) {
+				/* mon==1 mday==29 got bumped to mon==2 */
+				if (t.tm_mon != 2 || old_mday != 29)
+					return (time_t)-1;
+				t.tm_mon = 1;
+				t.tm_mday = 29;
+			}
+			t.tm_year++;
+			break;
+		}
+		if ((val = mktime(&t)) == (time_t)-1) {
+			/* This code shouldn't be needed, as mktime() should auto-round to the next month. */
+			if (in_date != 3 || t.tm_mday <= 28)
+				return (time_t)-1;
+			t.tm_mday = old_mday = 1;
+			in_date = 2;
+		}
+	}
+	if (n) {
+		while (val <= now)
+			val += n;
+	}
+	return val;
+}
+#endif
 
 static void create_refuse_error(int which)
 {
@@ -1890,6 +2045,32 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 				 "extended attributes are not supported on this %s\n",
 				 am_server ? "server" : "client");
 			return 0;
+#endif
+
+		case OPT_STOP_AFTER: {
+			long val;
+			arg = poptGetOptArg(pc);
+			stop_at_utime = time(NULL);
+			if ((val = atol(arg) * 60) <= 0 || val + (long)stop_at_utime < 0) {
+				snprintf(err_buf, sizeof err_buf, "invalid --stop-after value: %s\n", arg);
+				return 0;
+			}
+			stop_at_utime += val;
+			break;
+		}
+
+#ifdef HAVE_MKTIME
+		case OPT_STOP_AT:
+			arg = poptGetOptArg(pc);
+			if ((stop_at_utime = parse_time(arg)) == (time_t)-1) {
+				snprintf(err_buf, sizeof err_buf, "invalid --stop-at format: %s\n", arg);
+				return 0;
+			}
+			if (stop_at_utime <= time(NULL)) {
+				snprintf(err_buf, sizeof err_buf, "--stop-at time is not in the future: %s\n", arg);
+				return 0;
+			}
+			break;
 #endif
 
 		default:

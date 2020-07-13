@@ -60,6 +60,7 @@ extern int preserve_hard_links;
 extern BOOL extra_flist_sending_enabled;
 extern BOOL flush_ok_after_signal;
 extern struct stats stats;
+extern time_t stop_at_utime;
 extern struct file_list *cur_flist;
 #ifdef ICONV_OPTION
 extern int filesfrom_convert;
@@ -785,9 +786,13 @@ static char *perform_io(size_t needed, int flags)
 			if (msgs2stderr && DEBUG_GTE(IO, 2))
 				rprintf(FINFO, "[%s] recv=%ld\n", who_am_i(), (long)n);
 
-			if (io_timeout) {
+			if (io_timeout || stop_at_utime) {
 				last_io_in = time(NULL);
-				if (flags & PIO_NEED_INPUT)
+				if (stop_at_utime && last_io_in >= stop_at_utime) {
+					rprintf(FERROR, "stopping at requested limit\n");
+					exit_cleanup(RERR_TIMEOUT);
+				}
+				if (io_timeout && flags & PIO_NEED_INPUT)
 					maybe_send_keepalive(last_io_in, 0);
 			}
 			stats.total_read += n;
