@@ -711,6 +711,10 @@ struct ht_int64_node {
 #define NAME_MAX 255
 #endif
 
+#ifndef SIZE_MAX
+#define SIZE_MAX ((size_t)-1)
+#endif
+
 #ifndef INADDR_NONE
 #define INADDR_NONE 0xffffffff
 #endif

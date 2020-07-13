@@ -119,7 +119,6 @@ size_t bwlimit_writemax = 0;
 int ignore_existing = 0;
 int ignore_non_existing = 0;
 int need_messages_from_generator = 0;
-time_t stop_at_utime = 0;
 int max_delete = INT_MIN;
 OFF_T max_size = -1;
 OFF_T min_size = -1;
@@ -130,6 +129,7 @@ int checksum_seed = 0;
 int inplace = 0;
 int delay_updates = 0;
 int32 block_size = 0;
+time_t stop_at_utime = 0;
 char *skip_compress = NULL;
 char *copy_as = NULL;
 item_list dparam_list = EMPTY_ITEM_LIST;
@@ -2051,7 +2051,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			long val;
 			arg = poptGetOptArg(pc);
 			stop_at_utime = time(NULL);
-			if ((val = atol(arg) * 60) <= 0 || val + (long)stop_at_utime < 0) {
+			if ((val = atol(arg) * 60) <= 0 || LONG_MAX - val < stop_at_utime || (long)(time_t)val != val) {
 				snprintf(err_buf, sizeof err_buf, "invalid --stop-after value: %s\n", arg);
 				return 0;
 			}
