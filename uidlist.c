@@ -325,13 +325,17 @@ const char *add_gid(gid_t gid)
 
 static void send_one_name(int f, id_t id, const char *name)
 {
-	int len = strlen(name);
-	if (len > 255) /* Impossible? */
+	int len;
+
+	if (!name)
+		name = "";
+	if ((len = strlen(name)) > 255) /* Impossible? */
 		len = 255;
 
 	write_varint30(f, id);
 	write_byte(f, len);
-	write_buf(f, name, len);
+	if (len)
+		write_buf(f, name, len);
 }
 
 static void send_one_list(int f, struct idlist *idlist, int usernames)
@@ -366,12 +370,18 @@ uid_t recv_user_name(int f, uid_t uid)
 {
 	struct idlist *node;
 	int len = read_byte(f);
-	char *name = new_array(char, len+1);
-	read_sbuf(f, name, len);
-	if (numeric_ids < 0) {
-		free(name);
+	char *name;
+
+	if (len) {
+		name = new_array(char, len+1);
+		read_sbuf(f, name, len);
+		if (numeric_ids < 0) {
+			free(name);
+			name = NULL;
+		}
+	} else
 		name = NULL;
-	}
+
 	node = recv_add_id(&uidlist, uidmap, uid, name); /* node keeps name's memory */
 	return node->id2;
 }
