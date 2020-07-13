@@ -33,7 +33,7 @@ pool_alloc, pool_free, pool_free_old, pool_talloc, pool_tfree, pool_create, pool
 .SH SYNOPSIS
 .B #include "pool_alloc.h"
 
-\fBstruct alloc_pool *pool_create(size_t \fIsize\fB, size_t \fIquantum\fB, void (*\fIbomb\fB)(char *), int \fIflags\fB);
+\fBstruct alloc_pool *pool_create(size_t \fIsize\fB, size_t \fIquantum\fB, void (*\fIbomb\fB)(char*,char*,int), int \fIflags\fB);
 
 \fBvoid pool_destroy(struct alloc_pool *\fIpool\fB);
 

@@ -133,6 +133,7 @@ static char empty_sum[MAX_DIGEST_LEN];
 static int flist_count_offset; /* for --delete --progress */
 static int show_filelist_progress;
 
+static struct file_list *flist_new(int flags, const char *msg);
 static void flist_sort_and_clean(struct file_list *flist, int strip_root);
 static void output_flist(struct file_list *flist);
 
@@ -2797,25 +2798,20 @@ void clear_file(struct file_struct *file)
 }
 
 /* Allocate a new file list. */
-struct file_list *flist_new(int flags, char *msg)
+static struct file_list *flist_new(int flags, const char *msg)
 {
 	struct file_list *flist;
 
 	flist = new0(struct file_list);
 
 	if (flags & FLIST_TEMP) {
-		if (!(flist->file_pool = pool_create(SMALL_EXTENT, 0,
-						     out_of_memory,
-						     POOL_INTERN)))
+		if (!(flist->file_pool = pool_create(SMALL_EXTENT, 0, _out_of_memory, POOL_INTERN)))
 			out_of_memory(msg);
 	} else {
 		/* This is a doubly linked list with prev looping back to
 		 * the end of the list, but the last next pointer is NULL. */
 		if (!first_flist) {
-			flist->file_pool = pool_create(NORMAL_EXTENT, 0,
-						       out_of_memory,
-						       POOL_INTERN);
-			if (!flist->file_pool)
+			if (!(flist->file_pool = pool_create(NORMAL_EXTENT, 0, _out_of_memory, POOL_INTERN)))
 				out_of_memory(msg);
 
 			flist->ndx_start = flist->flist_num = inc_recurse ? 1 : 0;

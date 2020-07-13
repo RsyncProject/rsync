@@ -890,10 +890,10 @@ void log_exit(int code, const char *file, int line)
 		/* VANISHED is not an error, only a warning */
 		if (code == RERR_VANISHED) {
 			rprintf(FWARNING, "rsync warning: %s (code %d) at %s(%d) [%s=%s]\n",
-				name, code, file, line, who_am_i(), RSYNC_VERSION);
+				name, code, src_file(file), line, who_am_i(), RSYNC_VERSION);
 		} else {
 			rprintf(FERROR, "rsync error: %s (code %d) at %s(%d) [%s=%s]\n",
-				name, code, file, line, who_am_i(), RSYNC_VERSION);
+				name, code, src_file(file), line, who_am_i(), RSYNC_VERSION);
 		}
 	}
 }

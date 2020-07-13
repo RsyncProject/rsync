@@ -137,7 +137,7 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 		if (DEBUG_GTE(EXIT, 2)) {
 			rprintf(FINFO,
 				"[%s] _exit_cleanup(code=%d, file=%s, line=%d): entered\n",
-				who_am_i(), code, file, line);
+				who_am_i(), code, src_file(file), line);
 		}
 
 #include "case_N.h"

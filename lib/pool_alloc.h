@@ -7,7 +7,7 @@
 
 typedef void *alloc_pool_t;
 
-alloc_pool_t pool_create(size_t size, size_t quantum, void (*bomb)(const char *), int flags);
+alloc_pool_t pool_create(size_t size, size_t quantum, void (*bomb)(const char*, const char*, int), int flags);
 void pool_destroy(alloc_pool_t pool);
 void *pool_alloc(alloc_pool_t pool, size_t size, const char *bomb_msg);
 void pool_free(alloc_pool_t pool, size_t size, void *addr);

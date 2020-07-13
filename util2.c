@@ -76,7 +76,7 @@ void *my_alloc(void *ptr, size_t num, size_t size, const char *file, int line)
 		if (!file)
 			return NULL;
 		rprintf(FERROR, "[%s] exceeded --max-alloc=%s setting (file=%s, line=%d)\n",
-			who_am_i(), do_big_num(max_alloc, 0, NULL), file, line);
+			who_am_i(), do_big_num(max_alloc, 0, NULL), src_file(file), line);
 		exit_cleanup(RERR_MALLOC);
 	}
 	if (!ptr)
@@ -85,10 +85,8 @@ void *my_alloc(void *ptr, size_t num, size_t size, const char *file, int line)
 		ptr = malloc(num * size);
 	else
 		ptr = realloc(ptr, num * size);
-	if (!ptr && file) {
-		rprintf(FERROR, "[%s] out of memory (file=%s, line=%d)\n", who_am_i(), file, line);
-		exit_cleanup(RERR_MALLOC);
-	}
+	if (!ptr && file)
+		_out_of_memory("my_alloc caller", file, line);
 	return ptr;
 }
 
@@ -119,14 +117,32 @@ const char *sum_as_hex(int csum_type, const char *sum, int flist_csum)
 	return buf;
 }
 
-NORETURN void out_of_memory(const char *str)
+NORETURN void _out_of_memory(const char *msg, const char *file, int line)
 {
-	rprintf(FERROR, "ERROR: out of memory in %s [%s]\n", str, who_am_i());
+	rprintf(FERROR, "[%s] out of memory: %s (file=%s, line=%d)\n", who_am_i(), msg, src_file(file), line);
 	exit_cleanup(RERR_MALLOC);
 }
 
-NORETURN void overflow_exit(const char *str)
+NORETURN void _overflow_exit(const char *msg, const char *file, int line)
 {
-	rprintf(FERROR, "ERROR: buffer overflow in %s [%s]\n", str, who_am_i());
+	rprintf(FERROR, "[%s] buffer overflow: %s (file=%s, line=%d)\n", who_am_i(), msg, src_file(file), line);
 	exit_cleanup(RERR_MALLOC);
+}
+
+const char *src_file(const char *file)
+{
+	static const char *util2 = __FILE__;
+	static int prefix = -1;
+
+	if (prefix < 0) {
+		const char *cp;
+		for (cp = util2, prefix = 0; *cp; cp++) {
+			if (*cp == '/')
+				prefix = cp - util2 + 1;
+		}
+	}
+
+	if (prefix && strncmp(file, util2, prefix) == 0)
+		return file + prefix;
+	return file;
 }

@@ -1325,6 +1325,9 @@ extern char *do_malloc;
 #undef strdup
 #define strdup(s) my_strdup(s, __FILE__, __LINE__)
 
+#define out_of_memory(msg) _out_of_memory(msg, __FILE__, __LINE__)
+#define overflow_exit(msg) _overflow_exit(msg, __FILE__, __LINE__)
+
 /* use magic gcc attributes to catch format errors */
  void rprintf(enum logcode , const char *, ...)
      __attribute__((format (printf, 2, 3)))
