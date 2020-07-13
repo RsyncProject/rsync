@@ -34,6 +34,11 @@ static int match_hostname(const char **host_ptr, const char *addr, const char *t
 	if (!host || !*host)
 		return 0;
 
+#ifdef HAVE_INNETGR
+	if (*tok == '@' && tok[1])
+		return innetgr(tok + 1, host, NULL, NULL);
+#endif
+
 	/* First check if the reverse-DNS-determined hostname matches. */
 	if (iwildmatch(tok, host))
 		return 1;

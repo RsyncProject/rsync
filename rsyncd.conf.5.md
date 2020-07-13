@@ -685,7 +685,7 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     client's hostname and IP address.  If none of the patterns match, then the
     connection is rejected.
 
-    Each pattern can be in one of five forms:
+    Each pattern can be in one of six forms:
 
     - a dotted decimal IPv4 address of the form a.b.c.d, or an IPv6 address of
       the form a:b:c::d:e:f. In this case the incoming machine's IP address
@@ -705,6 +705,8 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
       connecting IP (if "reverse lookup" is enabled), and/or the IP of the
       given hostname is matched against the connecting IP (if "forward lookup"
       is enabled, as it is by default).  Any match will be allowed in.
+    - an '@' followed by a netgroup name, which will match if the reverse DNS
+      of the connecting IP is in the specified netgroup.
 
     Note IPv6 link-local addresses can have a scope in the address
     specification:
@@ -713,12 +715,12 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     >     fe80::%link1/64
     >     fe80::%link1/ffff:ffff:ffff:ffff::
 
-    You can also combine "hosts allow" with a separate "hosts deny" parameter.
-    If both parameters are specified then the "hosts allow" parameter is
-    checked first and a match results in the client being able to connect. The
-    "hosts deny" parameter is then checked and a match means that the host is
-    rejected. If the host does not match either the "hosts allow" or the
-    "hosts deny" patterns then it is allowed to connect.
+    You can also combine "hosts allow" with "hosts deny" as a way to add
+    exceptions to your deny list.  When both parameters are specified, the
+    "hosts allow" parameter is checked first and a match results in the client
+    being able to connect.  A non-allowed host is then matched against the
+    "hosts deny" list to see if it should be rejected.  A host that does not
+    match either list is allowed to connect.
 
     The default is no "hosts allow" parameter, which means all hosts can
     connect.

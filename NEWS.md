@@ -25,6 +25,9 @@
    `--time-limit=MINS` option accepted as an alias for `--stop-after`).  This
    is an enhanced version of the time-limit patch from the patches repo.
 
+ - Added the ability to specify "@netgroup" names to the `hosts allow` and
+   `hosts deny` daemon parameters.
+
  - Added some compatibility code for HPE NonStop platforms.
 
 ### INTERNAL:
