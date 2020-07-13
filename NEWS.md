@@ -33,11 +33,16 @@
    `hosts deny` daemon parameters.  This is a finalized version of the
    netgroup-auth patch from the patches repo.
 
+ - Output file+line info on out-of-memory & overflow errors while also avoiding
+   the output of alternate build-dir path info that is not useful to the user.
+
  - Improved the testsuite on FreeBSD.
 
  - Added some compatibility code for HPE NonStop platforms.
 
 ### INTERNAL:
+
+ - Use a simpler overflow check idiom in a few spots.
 
  - Use a C99 Flexible Array for a trailing variable-size filename in a struct
    (with a fallback to the old 1-char string kluge for older compilers).
