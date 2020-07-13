@@ -33,7 +33,7 @@
    `hosts deny` daemon parameters.  This is a finalized version of the
    netgroup-auth patch from the patches repo.
 
- - Improved the testsuite on OpenBSD.
+ - Improved the testsuite on FreeBSD.
 
  - Added some compatibility code for HPE NonStop platforms.
 
