@@ -7,7 +7,7 @@ task:
     - zpool create -m `pwd`/testtmp zpool /tmp/zpool
     - pkg install -y autotools xxhash zstd liblz4 openssl bash py37-pip
     - ln -s /usr/local/bin/bash /bin/bash
-    - pip3 install commonmark
+    - pip install --user commonmark
   configure_script:
     - CPPFLAGS=-I/usr/local/include/ LDFLAGS=-L/usr/local/lib/ ./configure
   make_script:
