@@ -19,3 +19,22 @@ task:
     - make check
   ssl_file_list_script:
     - /usr/local/bin/rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
+
+task:
+  name: MacOS
+  osx_instance:
+    image: catalina-xcode-11.5
+  prep_script:
+    - brew install automake openssl xxhash zstd lz4
+  configure_script:
+    - CPPFLAGS=-I/usr/local/opt/openssl/include/ LDFLAGS=-L/usr/local/opt/openssl/lib/ ./configure --disable-md2man
+  make_script:
+    - make
+  install_script:
+    - make install
+  info_script:
+    - /usr/local/bin/rsync --version
+  test_script:
+    - make check
+  ssl_file_list_script:
+    - /usr/local/bin/rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
