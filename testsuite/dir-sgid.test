@@ -23,12 +23,19 @@ testit() {
     check_perms "$todir/to/program" $4 "Target $1"
 }
 
+mkdir "$scratchdir/dir"
+# Cygwin has a persistent default dir ACL that ruins this test.
+case `getfacl "$scratchdir/dir" 2>/dev/null || true` in
+*default:user::*) test_skipped "The default ACL mode interferes with this test" ;;
+esac
+
 echo "File!" >"$scratchdir/file"
 echo "#!/bin/sh" >"$scratchdir/program"
-mkdir "$scratchdir/dir"
+
 chmod u=rwx,g=rw,g+s,o=r "$scratchdir/dir" || test_skipped "Can't chmod"
 chmod 664 "$scratchdir/file"
 chmod 775 "$scratchdir/program"
+
 [ -g "$scratchdir/dir" ] || test_skipped "The directory setgid bit vanished!"
 mkdir "$scratchdir/dir/blah"
 [ -g "$scratchdir/dir/blah" ] || test_skipped "Your filesystem doesn't use directory setgid; maybe it's BSD."
