@@ -7,17 +7,14 @@ on:
     branches: [ master ]
 
 jobs:
-  build:
 
+  linux-build:
     runs-on: ubuntu-20.04
-
     steps:
     - uses: actions/checkout@v2
-    - name: prepare-packages
-      run: sudo apt-get install fakeroot acl libacl1-dev attr libattr1-dev
+    - name: prep
+      run: sudo apt-get install acl libacl1-dev attr libattr1-dev
         liblz4-dev libzstd-dev libxxhash-dev python3-cmarkgfm openssl
-    - name: prepare-source
-      run: ./prepare-source
     - name: configure
       run: ./configure --with-included-popt --with-included-zlib
     - name: make
@@ -26,11 +23,32 @@ jobs:
       run: sudo make install
     - name: info
       run: /usr/local/bin/rsync --version
-    - name: make check
-      run: make check
-    - name: make check30
-      run: make check30
-    - name: make check29
-      run: make check29
+    - name: check
+      run: sudo make check
+    - name: check30
+      run: sudo make check30
+    - name: check29
+      run: sudo make check29
+    - name: ssl file list
+      run: /usr/local/bin/rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
+
+  macos-build:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: prep
+      run: |
+        sudo brew install automake openssl xxhash zstd lz4
+        sudo pip3 install commonmark
+    - name: configure
+      run: CPPFLAGS=-I/usr/local/opt/openssl/include/ LDFLAGS=-L/usr/local/opt/openssl/lib/ ./configure
+    - name: make
+      run: make
+    - name: install
+      run: sudo make install
+    - name: info
+      run: /usr/local/bin/rsync --version
+    - name: check
+      run: sudo make check
     - name: ssl file list
       run: /usr/local/bin/rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
