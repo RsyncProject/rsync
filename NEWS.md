@@ -9,15 +9,19 @@
  - Fixed a bug in the xattr code that was freeing the wrong object when trying
    to cleanup the xattr list.
 
- - Fixed the specifying of --bwlimit=0 for unlimited (the default).
+ - Fixed a bug in the xattr code that was not leaving room for the "rsync."
+   prefix in some instances where it needed to be added.
+
+ - Restored the ability to use --bwlimit=0 to specify no bandwidth limit.  (It
+   was accidentally broken in 3.2.2.)
 
 ### ENHANCEMENTS:
 
- - Allow `--max-alloc=0` to specify unlimited.
+ - Allow `--max-alloc=0` to specify no limit to the alloc sanity check.
 
  - Allow `--block-size=SIZE` to specify the size using units such as "100K".
 
- - The name of the id 0 user & group is now sent to the receiver along with the
+ - The name of the id-0 user & group is now sent to the receiver along with the
    other user/group names in the transfer (instead of assuming that both sides
    have the same id-0 names).
 
@@ -26,14 +30,17 @@
    is an enhanced version of the time-limit patch from the patches repo.
 
  - Added the ability to specify "@netgroup" names to the `hosts allow` and
-   `hosts deny` daemon parameters.
+   `hosts deny` daemon parameters.  This is a finalized version of the
+   netgroup-auth patch from the patches repo.
+
+ - Improved the testsuite on OpenBSD.
 
  - Added some compatibility code for HPE NonStop platforms.
 
 ### INTERNAL:
 
  - Use a C99 Flexible Array for a trailing variable-size filename in a struct
-   with a fallback to the old 1-char string kluge for older compilers.
+   (with a fallback to the old 1-char string kluge for older compilers).
 
 ------------------------------------------------------------------------------
 <a name="3.2.2"></a>
