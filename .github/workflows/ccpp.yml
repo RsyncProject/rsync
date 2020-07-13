@@ -38,7 +38,7 @@ jobs:
     - uses: actions/checkout@v2
     - name: prep
       run: |
-        sudo brew install automake openssl xxhash zstd lz4
+        brew install automake openssl xxhash zstd lz4
         sudo pip3 install commonmark
     - name: configure
       run: CPPFLAGS=-I/usr/local/opt/openssl/include/ LDFLAGS=-L/usr/local/opt/openssl/lib/ ./configure
