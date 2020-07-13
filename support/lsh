@@ -1,10 +1,6 @@
 #!/usr/bin/env perl
-# This script can be used as a "remote shell" command that is only
-# capable of pretending to connect to "localhost".  This is useful
-# for testing or for running a local copy where the sender and the
-# receiver needs to use different options (e.g. --fake-super).  If
-# we get -l USER, we try to become the USER, either directly (must
-# be root) or by using "sudo -H -u USER" (requires --sudo option).
+# This is a "local shell" command that works like a remote shell but only for
+# the local host.  See the usage message for more details.
 
 use strict;
 use warnings;
@@ -78,9 +74,15 @@ die "Failed to exec: $!\n";
 sub usage
 {
     die <<EOT;
-Usage: lsh [-l user] [--sudo] [--no-cd] localhost COMMAND [...]
+Usage: lsh [-l USER] [--sudo] [--no-cd] localhost COMMAND [...]
 
-Note that if you pass hostname "lh" instead of "localhost" that
-the --no-cd option is implied.
+This is a "local shell" command that works like a remote shell but only for the
+local host.  This is useful for rsync testing or for running a local copy where
+the sender and the receiver need to use different options (e.g. --fake-super).
+If the -l option is used, we try to become the USER, either directly (when
+root) or by using "sudo -H -u USER" (requires --sudo option).
+
+Note that if you pass hostname "lh" instead of "localhost" that the --no-cd
+option is implied.  The default is to "cd \$HOME" to simulate ssh behavior.
 EOT
 }
