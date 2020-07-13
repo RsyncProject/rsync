@@ -5,10 +5,11 @@ task:
   prep_script:
     - dd if=/dev/zero of=/tmp/zpool bs=1M count=1024
     - zpool create -m `pwd`/testtmp zpool /tmp/zpool
-    - pkg install -y autotools xxhash zstd liblz4 openssl bash
+    - pkg install -y autotools xxhash zstd liblz4 openssl bash python python3 git
+    - pkg install -y py`python -V | sed 's/.* \([0-9]\)\.\([0-9]\).*/\1\2/'`-CommonMark
     - ln -s /usr/local/bin/bash /bin/bash
   configure_script:
-    - CPPFLAGS=-I/usr/local/include/ LDFLAGS=-L/usr/local/lib/ ./configure --disable-md2man
+    - CPPFLAGS=-I/usr/local/include/ LDFLAGS=-L/usr/local/lib/ ./configure
   make_script:
     - make
   install_script:
