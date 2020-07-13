@@ -36,7 +36,7 @@
  - Output file+line info on out-of-memory & overflow errors while also avoiding
    the output of alternate build-dir path info that is not useful to the user.
 
- - Improved the testsuite on FreeBSD.
+ - Improved the testsuite on FreeBSD & Cygwin.
 
  - Added some compatibility code for HPE NonStop platforms.
 

@@ -458,7 +458,7 @@ detailed description below for a complete description.
 --list-only              list the files instead of copying them
 --bwlimit=RATE           limit socket I/O bandwidth
 --stop-after=MINS        Stop rsync after MINS minutes have elapsed
---stop-at=y-m-dTh:m      Stop rsync at the specified moment in time
+--stop-at=y-m-dTh:m      Stop rsync at the specified point in time
 --write-batch=FILE       write a batched update to FILE
 --only-write-batch=FILE  like --write-batch but w/o updating dest
 --read-batch=FILE        read a batched update from FILE
@@ -3138,13 +3138,14 @@ your home directory (remove the '=' for that).
 
     The value can also be abbreviated in a variety of ways, such as specifying
     a 2-digit year and/or leaving off various values.  In all cases, the value
-    will be taken to be the next possible future moment where the supplied
+    will be taken to be the next possible point in time where the supplied
     information matches.  If the value specifies the current time or a past
     time, rsync exits with an error.
 
     For example, "1-30" specifies the next January 30th (at midnight local
     time), "14:00" specifies the next 2 P.M., "1" specifies the next 1st of the
-    month at midnight, and ":59" specifies the next 59th minute after the hour.
+    month at midnight, "31" specifies the next month where we can stop on its
+    31st day, and ":59" specifies the next 59th minute after the hour.
 
     For maximal flexibility, rsync does not communicate this option to the
     remote rsync since it is usually enough that one side of the connection
