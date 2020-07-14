@@ -85,7 +85,10 @@ def main():
 
     git_dir = fi.srcdir + '.git'
     if os.path.lexists(git_dir):
-        fi.mtime = int(subprocess.check_output(['git', '--git-dir', git_dir, 'log', '-1', '--format=%at']))
+        try:
+            fi.mtime = int(subprocess.check_output(['git', '--git-dir', git_dir, 'log', '-1', '--format=%at']))
+        except:
+            fi.mtime = 0
 
     env_subs = { 'prefix': os.environ.get('RSYNC_OVERRIDE_PREFIX', None) }
 
