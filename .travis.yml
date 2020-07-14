@@ -1,0 +1,15 @@
+matrix:
+  include:
+    - language: bash
+      os: windows
+      script:
+      - choco uninstall -y mingw
+      - choco install -y cyg-get
+      - cyg-get.bat make automake gcc-g++ libssl-devel libzstd-devel liblz4-devel
+      - export CHERE_INVOKING=1
+      - cmd.exe /c "/C/tools/cygwin/bin/bash.exe --login -c './configure --disable-md2man --disable-xxhash'"
+      - cmd.exe /c "/C/tools/cygwin/bin/bash.exe --login -c 'make'"
+      - cmd.exe /c "/C/tools/cygwin/bin/bash.exe --login -c 'make install'"
+      - cmd.exe /c "/C/tools/cygwin/bin/bash.exe --login -c '/usr/local/bin/rsync --version'"
+      - cmd.exe /c "/C/tools/cygwin/bin/bash.exe --login -c 'make check'"
+      - cmd.exe /c "/C/tools/cygwin/bin/bash.exe --login -c '/usr/local/bin/rsync-ssl --no-motd download.samba.org::rsyncftp/'" || true
