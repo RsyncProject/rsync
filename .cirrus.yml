@@ -16,3 +16,5 @@ task:
     - /usr/local/bin/rsync --version
   test_script:
     - make check
+  ssl_file_list_script:
+    - /usr/local/bin/rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
