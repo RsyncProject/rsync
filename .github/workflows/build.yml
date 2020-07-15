@@ -52,3 +52,27 @@ jobs:
       run: sudo make check
     - name: ssl file list
       run: /usr/local/bin/rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
+
+  cygwin-build:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: crazy-max/ghaction-chocolatey@v1.2.2
+      with:
+        args: install -y --no-progress cygwin cyg-get
+    - name: prep
+      run: |
+        cyg-get make autoconf automake gcc-core gcc-g++ libssl-devel libzstd-devel liblz4-devel
+        echo "::add-path::C:/tools/cygwin/bin"
+    - name: configure
+      run: c:/tools/cygwin/bin/bash -c './configure --disable-md2man --disable-xxhash'
+    - name: make
+      run: c:/tools/cygwin/bin/bash -c 'make'
+    - name: install
+      run: bash -c 'make install'
+    - name: info
+      run: bash -c '/usr/local/bin/rsync --version'
+    - name: check
+      run: bash -c 'make check'
+    - name: ssl file list
+      run: bash -c '/usr/local/bin/rsync-ssl --no-motd download.samba.org::rsyncftp/ || true'
