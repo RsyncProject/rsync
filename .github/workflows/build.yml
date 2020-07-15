@@ -65,7 +65,7 @@ jobs:
         args: install -y --no-progress cygwin cyg-get
     - name: prep
       run: |
-        cyg-get make autoconf automake gcc-core gcc-g++ libssl-devel libzstd-devel liblz4-devel
+        cyg-get make autoconf automake gcc-core libssl-devel libzstd-devel liblz4-devel
         echo "::add-path::C:/tools/cygwin/bin"
     - name: configure
       run: bash -c './configure --disable-md2man --disable-xxhash'
