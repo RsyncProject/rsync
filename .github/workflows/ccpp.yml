@@ -63,11 +63,11 @@ jobs:
     - name: prep
       run: |
         cyg-get make autoconf automake gcc-core gcc-g++ libssl-devel libzstd-devel liblz4-devel
-        echo "::add-path::.C:/tools/cygwin/bin"
+        echo "::add-path::C:/tools/cygwin/bin"
     - name: configure
-      run: bash -c './configure --disable-md2man --disable-xxhash'
+      run: c:/tools/cygwin/bin/bash -c './configure --disable-md2man --disable-xxhash'
     - name: make
-      run: bash -c 'make'
+      run: c:/tools/cygwin/bin/bash -c 'make'
     - name: install
       run: bash -c 'make install'
     - name: info
