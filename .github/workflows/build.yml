@@ -3,10 +3,8 @@ name: build
 on:
   push:
     branches: [ master ]
-    paths-ignore: [ .github/workflows/cygwin-save.yml ]
   pull_request:
     branches: [ master ]
-    paths-ignore: [ .github/workflows/cygwin-save.yml ]
 
 jobs:
 
