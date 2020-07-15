@@ -25,6 +25,18 @@ If you configure using --enable-maintainer-mode, then rsync will try
 to pop up an xterm on DISPLAY=:0 if it crashes.  You might find this
 useful, but it should be turned off for production builds.
 
+If you want to automatically use a separate "build" directory based on
+the current git branch name, start with a pristine git checkout and run
+"mkdir auto-build-save" before you run the first ./configure command.
+That will cause a fresh build dir to spring into existence along with a
+special Makefile symlink that allows you to run "make" and "./configure"
+from the source dir (the "build" dir gets auto switched based on branch).
+This is helpful when using the branch-from-patch and patch-update scripts
+to maintain the official rsync patches.  If you ever need to build from
+a "detached head" git position then you'll need to manually chdir into
+the build dir to run make.  I also like to create 2 more symlinks in the
+sourc dir:  ln -s build/rsync . ; ln -s build/testtmp .
+
 MAKE COMPATIBILITY
 ------------------
 
