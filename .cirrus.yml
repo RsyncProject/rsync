@@ -2,6 +2,8 @@ freebsd_task:
   name: FreeBSD
   freebsd_instance:
     image: freebsd-12-1-release-amd64
+  env:
+    PATH: /usr/local/bin:$PATH
   prep_script:
     - dd if=/dev/zero of=/tmp/zpool bs=1M count=1024
     - zpool create -m `pwd`/testtmp zpool /tmp/zpool
@@ -13,8 +15,8 @@ freebsd_task:
   install_script:
     - make install
   info_script:
-    - /usr/local/bin/rsync --version
+    - rsync --version
   test_script:
     - make check
   ssl_file_list_script:
-    - /usr/local/bin/rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
+    - rsync-ssl --no-motd download.samba.org::rsyncftp/ || true

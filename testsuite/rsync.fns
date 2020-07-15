@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/sh
 
 # Copyright (C) 2001 by Martin Pool <mbp@samba.org>
 
@@ -62,7 +62,7 @@ set_cp_destdir() {
 # Perform a "cp -p", making sure that timestamps are really the same,
 # even if the copy rounded microsecond times on the destination file.
 cp_touch() {
-    cp -p "${@}" || test_fail "cp -p failed"
+    cp_p "${@}"
     if test $# -gt 2 -o -d "$2"; then
 	set_cp_destdir "${@}" # sets destdir var
 	while test $# -gt 1; do
@@ -123,6 +123,20 @@ get_rootgid() {
 	[0-9]*) echo "$gid" ;;
 	*) echo 0 ;;
     esac
+}
+
+# When copying via "cp -p", we want to ensure that a non-root user does not
+# preserve ownership (we want our files to be created as the testing user).
+# For instance, a Cygwin CI run might have git files owned by a different
+# user than the (admin) user running the tests.
+cp_cmd="cp -p"
+if test x`get_testuid` != x0; then
+    case `cp --help 2>/dev/null` in
+	*--no-preserve=*) cp_cmd="cp -p --no-preserve=ownership" ;;
+    esac
+fi
+cp_p() {
+    $cp_cmd "${@}" || test_fail "$cp_cmd failed"
 }
 
 check_perms() {

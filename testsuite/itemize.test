@@ -17,9 +17,9 @@ outfile="$scratchdir/rsync.out"
 
 makepath "$fromdir/foo"
 makepath "$fromdir/bar/baz"
-cp -p "$srcdir/configure.ac" "$fromdir/foo/config1"
-cp -p "$srcdir/config.sub" "$fromdir/foo/config2"
-cp -p "$srcdir/rsync.h" "$fromdir/bar/baz/rsync"
+cp_p "$srcdir/configure.ac" "$fromdir/foo/config1"
+cp_p "$srcdir/config.sub" "$fromdir/foo/config2"
+cp_p "$srcdir/rsync.h" "$fromdir/bar/baz/rsync"
 chmod 600 "$fromdir"/foo/config? "$fromdir/bar/baz/rsync"
 umask 0
 ln -s ../bar/baz/rsync "$fromdir/foo/sym"
@@ -66,7 +66,7 @@ diff $diffopt "$chkfile" "$outfile" || test_fail "test 1 failed"
 # Ensure there are no accidental directory-time problems.
 $RSYNC -a -f '-! */' "$fromdir/" "$todir"
 
-cp -p "$srcdir/configure.ac" "$fromdir/foo/config2"
+cp_p "$srcdir/configure.ac" "$fromdir/foo/config2"
 chmod 601 "$fromdir/foo/config2"
 $RSYNC -iplrH "$fromdir/" "$todir/" \
     | tee "$outfile"
@@ -79,7 +79,7 @@ EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 2 failed"
 
 $RSYNC -a -f '-! */' "$fromdir/" "$todir"
-cp -p "$srcdir/config.sub" "$fromdir/foo/config2"
+cp_p "$srcdir/config.sub" "$fromdir/foo/config2"
 sleep 1 # For directory mod below to ensure time difference
 rm "$todir/foo/sym"
 umask 0
@@ -99,7 +99,7 @@ cLc$T.$dots foo/sym -> ../bar/baz/rsync
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 3 failed"
 
-cp -p "$srcdir/configure.ac" "$fromdir/foo/config2"
+cp_p "$srcdir/configure.ac" "$fromdir/foo/config2"
 chmod 600 "$fromdir/foo/config2"
 # Lack of -t is for unchanged hard-link stress-test!
 $RSYNC -vvplrH "$fromdir/" "$todir/" \
