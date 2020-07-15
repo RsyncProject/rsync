@@ -2,7 +2,8 @@ name: cygwin-save
 
 on:
   push:
-    branches: [ cygwin-artifact ]
+    branches: [ master ]
+    paths: [ .github/workflows/cygwin-save.yml ]
 
 jobs:
 
