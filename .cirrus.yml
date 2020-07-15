@@ -1,4 +1,4 @@
-task:
+freebsd_task:
   name: FreeBSD
   freebsd_instance:
     image: freebsd-12-1-release-amd64
@@ -18,3 +18,26 @@ task:
     - make check
   ssl_file_list_script:
     - /usr/local/bin/rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
+
+cygwin_task:
+  name: Cygwin
+  windows_container:
+    image: cirrusci/windowsservercore:2019
+    os_version: 2019
+  env:
+    PATH: C:\tools\cygwin\bin;$PATH
+  prep_script:
+    - choco install -y --no-progress cygwin cyg-get
+    - cyg-get make autoconf automake gcc-core gcc-g++ libssl-devel libzstd-devel liblz4-devel
+  configure_script:
+    - bash -c './configure --disable-md2man --disable-xxhash'
+  make_script:
+    - bash -c 'make'
+  install_script:
+    - bash -c 'make install'
+  info_script:
+    - bash -c '/usr/local/bin/rsync --version'
+  test_script:
+    - bash -c 'make check'
+  ssl_file_list_script:
+    - bash -c '/usr/local/bin/rsync-ssl --no-motd download.samba.org::rsyncftp/ || true'
