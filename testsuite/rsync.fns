@@ -127,6 +127,8 @@ get_rootgid() {
 
 # When copying via "cp -p", we want to ensure that a non-root user does not
 # preserve ownership (we want our files to be created as the testing user).
+# For instance, a Cygwin CI run might have git files owned by a different
+# user than the (admin) user running the tests.
 cp_cmd="cp -p"
 if test x`get_testuid` != x0; then
     case `cp --help 2>/dev/null` in
