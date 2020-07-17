@@ -34,6 +34,7 @@ extern int preserve_gid;
 extern int preserve_acls;
 extern int numeric_ids;
 extern int xmit_id0_names;
+extern pid_t namecvt_pid;
 extern gid_t our_gid;
 extern char *usermap;
 extern char *groupmap;
@@ -98,50 +99,86 @@ static struct idlist *add_to_list(struct idlist **root, id_t id, union name_or_i
 /* turn a uid into a user name */
 const char *uid_to_user(uid_t uid)
 {
-	struct passwd *pass = getpwuid(uid);
-	if (pass)
-		return strdup(pass->pw_name);
-	return NULL;
+	const char *name = NULL;
+
+	if (namecvt_pid) {
+		id_t id = uid;
+		namecvt_call("uid", &name, &id);
+	} else {
+		struct passwd *pass = getpwuid(uid);
+		if (pass)
+			name = strdup(pass->pw_name);
+	}
+
+	return name;
 }
 
 /* turn a gid into a group name */
 const char *gid_to_group(gid_t gid)
 {
-	struct group *grp = getgrgid(gid);
-	if (grp)
-		return strdup(grp->gr_name);
-	return NULL;
+	const char *name = NULL;
+
+	if (namecvt_pid) {
+		id_t id = gid;
+		namecvt_call("gid", &name, &id);
+	} else {
+		struct group *grp = getgrgid(gid);
+		if (grp)
+			name = strdup(grp->gr_name);
+	}
+
+	return name;
 }
 
 /* Parse a user name or (optionally) a number into a uid */
 int user_to_uid(const char *name, uid_t *uid_p, BOOL num_ok)
 {
-	struct passwd *pass;
 	if (!name || !*name)
 		return 0;
+
 	if (num_ok && name[strspn(name, "0123456789")] == '\0') {
 		*uid_p = id_parse(name);
 		return 1;
 	}
-	if (!(pass = getpwnam(name)))
-		return 0;
-	*uid_p = pass->pw_uid;
+
+	if (namecvt_pid) {
+		id_t id;
+		if (!namecvt_call("usr", &name, &id))
+			return 0;
+		*uid_p = id;
+	} else {
+		struct passwd *pass = getpwnam(name);
+		if (!pass)
+			return 0;
+		*uid_p = pass->pw_uid;
+	}
+
 	return 1;
 }
 
 /* Parse a group name or (optionally) a number into a gid */
 int group_to_gid(const char *name, gid_t *gid_p, BOOL num_ok)
 {
-	struct group *grp;
 	if (!name || !*name)
 		return 0;
+
 	if (num_ok && name[strspn(name, "0123456789")] == '\0') {
 		*gid_p = id_parse(name);
 		return 1;
 	}
-	if (!(grp = getgrnam(name)))
-		return 0;
-	*gid_p = grp->gr_gid;
+
+	if (namecvt_pid) {
+		id_t id;
+		if (!namecvt_call("grp", &name, &id))
+			return 0;
+		*gid_p = id;
+	} else {
+		struct group *grp = getgrnam(name);
+		if (!grp)
+			return 0;
+		*gid_p = grp->gr_gid;
+	}
+
 	return 1;
 }
 

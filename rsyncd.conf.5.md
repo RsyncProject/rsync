@@ -207,21 +207,18 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     they would escape the module hierarchy.  The default for "use chroot" is
     true, and is the safer choice (especially if the module is not read-only).
 
-    When this parameter is enabled, the "numeric-ids" option will also default
-    to being enabled (disabling name lookups).  See below for what a chroot
-    needs in order for name lookups to succeed.
+    When this parameter is enabled *and* the "name converter" parameter is
+    *not* set, the "numeric ids" parameter will default to being enabled
+    (disabling name lookups).  This means that if you manually setup
+    name-lookup libraries in your chroot (instead of using a name converter)
+    that you need to explicitly set `numeric ids = false` for rsync to do name
+    lookups.
 
     If you copy library resources into the module's chroot area, you should
     protect them through your OS's normal user/group or ACL settings (to
     prevent the rsync module's user from being able to change them), and then
     hide them from the user's view via "exclude" (see how in the discussion of
-    that parameter).  At that point it will be safe to enable the mapping of
-    users and groups by name using the "numeric ids" daemon parameter (see
-    below).
-
-    Note also that you are free to setup custom user/group information in the
-    chroot area that is different from your normal system.  For example, you
-    could abbreviate the list of users and groups.
+    that parameter).  However, it's easier and safer to setup a name converter.
 
 0.  `daemon chroot`
 
@@ -258,6 +255,27 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     others, then you will need to setup multiple rsync daemon processes on
     different ports.
 
+0.  `name converter`
+
+    This parameter lets you specify a program that will be run by the rsync
+    daemon to do user & group conversions between names & ids.  This script
+    is started prior to any chroot being setup, and runs as the daemon user
+    (not the transfer user).  You can specify a fully qualified pathname or
+    a program name that is on the $PATH.
+
+    The program can be used to do normal user & group lookups without having to
+    put any extra files into the chroot area of the module *or* you can do
+    customized conversions.
+
+    The nameconvert program has access to all of the environment variables that
+    are described in the section on `pre-xfer exec`.  This is useful if you
+    want to customize the conversion using information about the module and/or
+    the copy request.
+
+    There is a sample python script in the support dir named "nameconvert" that
+    implements the normal user & group lookups.  Feel free to customize it or
+    just use it as documentation to implement your own.
+
 0.  `numeric ids`
 
     Enabling this parameter disables the mapping of users and groups by name
@@ -269,13 +287,10 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     uid/gid preservation requires the module to be running as root (see "uid")
     or for "fake super" to be configured.
 
-    A chroot-enabled module should not have this parameter enabled unless
-    you've taken steps to ensure that the module has the necessary resources it
-    needs to translate names, and that it is not possible for a user to change
-    those resources.  That includes being the code being able to call functions
-    like **getpwuid()**, **getgrgid()**, **getpwname()**, and **getgrnam()**.
-    You should test what libraries and config files are required for your OS
-    and get those setup before starting to test name mapping in rsync.
+    A chroot-enabled module should not have this parameter set to false unless
+    you're using a "name converter" program *or* you've taken steps to ensure
+    that the module has the necessary resources it needs to translate names and
+    that it is not possible for a user to change those resources.
 
 0.  `munge symlinks`
 

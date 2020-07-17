@@ -21,6 +21,7 @@
 
 #include "rsync.h"
 #include "itypes.h"
+#include "ifuncs.h"
 
 extern int quiet;
 extern int dry_run;
@@ -71,6 +72,7 @@ int module_id = -1;
 int pid_file_fd = -1;
 int early_input_len = 0;
 char *early_input = NULL;
+pid_t namecvt_pid = 0;
 struct chmod_mode_struct *daemon_chmod_modes;
 
 #define EARLY_INPUT_CMD "#early_input="
@@ -85,6 +87,7 @@ unsigned int module_dirlen = 0;
 char *full_module_path;
 
 static int rl_nulls = 0;
+static int namecvt_fd_req = -1, namecvt_fd_ans = -1;
 
 #ifdef HAVE_SIGACTION
 static struct sigaction sigact;
@@ -425,7 +428,7 @@ void set_env_num(const char *var, long num)
 }
 #endif
 
-/* Used for both early exec & pre-xfer exec */
+/* Used for "early exec", "pre-xfer exec", and the "name converter" script. */
 static pid_t start_pre_exec(const char *cmd, int *arg_fd_ptr, int *error_fd_ptr)
 {
 	int arg_fds[2], error_fds[2], arg_fd;
@@ -492,7 +495,7 @@ static pid_t start_pre_exec(const char *cmd, int *arg_fd_ptr, int *error_fd_ptr)
 	return pid;
 }
 
-static void write_pre_exec_args(int write_fd, char *request, char **early_argv, char **argv, int am_early)
+static void write_pre_exec_args(int write_fd, char *request, char **early_argv, char **argv, int exec_type)
 {
 	int j = 0;
 
@@ -511,10 +514,11 @@ static void write_pre_exec_args(int write_fd, char *request, char **early_argv, 
 	}
 	write_byte(write_fd, 0);
 
-	if (am_early && early_input_len)
+	if (exec_type == 1 && early_input_len)
 		write_buf(write_fd, early_input, early_input_len);
 
-	close(write_fd);
+	if (exec_type != 2) /* the name converter needs this left open */
+		close(write_fd);
 }
 
 static char *finish_pre_exec(const char *desc, pid_t pid, int read_fd)
@@ -811,7 +815,8 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	log_init(1);
 
 #ifdef HAVE_PUTENV
-	if ((*lp_early_exec(module_id) || *lp_prexfer_exec(module_id) || *lp_postxfer_exec(module_id))
+	if ((*lp_early_exec(module_id) || *lp_prexfer_exec(module_id)
+	  || *lp_postxfer_exec(module_id) || *lp_name_converter(module_id))
 	 && !getenv("RSYNC_NO_XFER_EXEC")) {
 		set_env_num("RSYNC_PID", (long)getpid());
 
@@ -870,6 +875,15 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 			if (pre_exec_pid == (pid_t)-1) {
 				rsyserr(FLOG, errno, "pre-xfer exec preparation failed");
 				io_printf(f_out, "@ERROR: pre-xfer exec preparation failed\n");
+				return -1;
+			}
+		}
+
+		if (*lp_name_converter(module_id)) {
+			namecvt_pid = start_pre_exec(lp_name_converter(module_id), &namecvt_fd_req, &namecvt_fd_ans);
+			if (namecvt_pid == (pid_t)-1) {
+				rsyserr(FLOG, errno, "name-converter exec preparation failed");
+				io_printf(f_out, "@ERROR: name-converter exec preparation failed\n");
 				return -1;
 			}
 		}
@@ -1004,6 +1018,9 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 		err_msg = finish_pre_exec("pre-xfer exec", pre_exec_pid, pre_exec_error_fd);
 	}
 
+	if (namecvt_pid)
+		write_pre_exec_args(namecvt_fd_req, request, orig_early_argv, orig_argv, 2);
+
 	if (orig_early_argv)
 		free(orig_early_argv);
 
@@ -1100,7 +1117,8 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 #endif
 
 	if (!numeric_ids
-	 && (use_chroot ? lp_numeric_ids(module_id) != False : lp_numeric_ids(module_id) == True))
+	 && (use_chroot ? lp_numeric_ids(module_id) != False && !*lp_name_converter(module_id)
+		        : lp_numeric_ids(module_id) == True))
 		numeric_ids = -1; /* Set --numeric-ids w/o breaking protocol. */
 
 	if (lp_timeout(module_id) && (!io_timeout || lp_timeout(module_id) < io_timeout))
@@ -1122,6 +1140,38 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	start_server(f_in, f_out, argc, argv);
 
 	return 0;
+}
+
+BOOL namecvt_call(const char *cmd, const char **name_p, id_t *id_p)
+{
+	char buf[1024];
+	int got, len;
+
+	if (*name_p)
+		len = snprintf(buf, sizeof buf, "%s %s\n", cmd, *name_p);
+	else
+		len = snprintf(buf, sizeof buf, "%s %ld\n", cmd, (long)*id_p);
+	if (len >= (int)sizeof buf) {
+		rprintf(FERROR, "namecvt_call() request was too large.\n");
+		exit_cleanup(RERR_UNSUPPORTED);
+	}
+
+	while ((got = write(namecvt_fd_req, buf, len)) != len) {
+		if (got < 0 && errno == EINTR)
+			continue;
+		rprintf(FERROR, "Connection to name-converter failed.\n");
+		exit_cleanup(RERR_SOCKETIO);
+	}
+
+	if (!read_line_old(namecvt_fd_ans, buf, sizeof buf, 0))
+		return False;
+
+	if (*name_p)
+		*id_p = (id_t)atol(buf);
+	else
+		*name_p = strdup(buf);
+
+	return True;
 }
 
 /* send a list of available modules to the client. Don't list those

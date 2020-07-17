@@ -33,6 +33,7 @@ STRING	lock_file		DEFAULT_LOCK_FILE
 STRING	log_file		NULL
 STRING	log_format		"%o %h [%a] %m (%u) %f %l"
 STRING	name			NULL
+STRING	name_converter		NULL
 STRING	outgoing_chmod		NULL
 STRING	post-xfer_exec		NULL
 STRING	pre-xfer_exec		NULL

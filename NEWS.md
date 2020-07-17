@@ -19,15 +19,21 @@
 
  - Allow `--max-alloc=0` to specify no limit to the alloc sanity check.
 
- - Allow `--block-size=SIZE` to specify the size using units such as "100K".
+ - Allow `--block-size=SIZE` to specify the size using units (e.g. "100K").
 
- - The name of the id-0 user & group is now sent to the receiver along with the
-   other user/group names in the transfer (instead of assuming that both sides
-   have the same id-0 names).
+ - The name of the id-0 user & group are now sent to the receiver along with
+   the other user/group names in the transfer (instead of assuming that both
+   sides have the same id-0 names).
 
  - Added the `--stop-after=MINS` and `--stop-at=DATE_TIME` options (with the
    `--time-limit=MINS` option accepted as an alias for `--stop-after`).  This
    is an enhanced version of the time-limit patch from the patches repo.
+
+ - Added the `name converter` daemon parameter to make it easier to convert
+   user & group names inside a chrooted daemon module.  This is based on the
+   nameconverter patch with some improvements, including a tweak to the request
+   protocol (so if you used this patch in the past, be sure to update your
+   converter script).
 
  - Added the ability to specify "@netgroup" names to the `hosts allow` and
    `hosts deny` daemon parameters.  This is a finalized version of the

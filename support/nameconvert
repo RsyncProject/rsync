@@ -1,0 +1,50 @@
+#!/usr/bin/env python3
+
+# This implements a simple protocol to do user & group conversions between
+# names & ids.  All input and output consists of simple strings with a
+# terminating newline.
+#
+# The requests can be:
+#
+#   uid ID_NUM\n  ->  NAME\n
+#   gid ID_NUM\n  ->  NAME\n
+#   usr NAME\n    ->  ID_NUM\n
+#   grp NAME\n    ->  ID_NUM\n
+#
+# An unknown ID_NUM or NAME results in an empty return value.
+#
+# This is used by an rsync daemon when configured with the "name converter" and
+# "use chroot = true".  While this converter uses real user & group lookups you
+# could change it to use any mapping idiom you'd like.
+
+import sys, argparse, pwd, grp
+
+def main():
+    for line in sys.stdin:
+        try:
+            req, arg = line.rstrip().split(' ', 1)
+        except:
+            req = None
+        try:
+            if req == 'uid':
+                ans = pwd.getpwuid(int(arg)).pw_name
+            elif req == 'gid':
+                ans = grp.getgrgid(int(arg)).gr_name
+            elif req == 'usr':
+                ans = pwd.getpwnam(arg).pw_uid
+            elif req == 'grp':
+                ans = grp.getgrnam(arg).gr_gid
+            else:
+                print("Invalid request", file=sys.stderr)
+                sys.exit(1)
+        except KeyError:
+            ans = ''
+        print(ans, flush=True)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Convert users & groups between names & numbers for an rsync daemon.")
+    args = parser.parse_args()
+    main()
+
+# vim: sw=4 et
