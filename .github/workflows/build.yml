@@ -27,11 +27,11 @@ jobs:
     - name: info
       run: rsync --version
     - name: check
-      run: sudo make check
+      run: sudo make strict_check
     - name: check30
-      run: sudo make check30
+      run: sudo make strict_check30
     - name: check29
-      run: sudo make check29
+      run: sudo make strict_check29
     - name: ssl file list
       run: rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
 

@@ -162,6 +162,13 @@ if test x"$rsync_bin" = x; then
     rsync_bin="$TOOLDIR/rsync"
 fi
 
+if test $# -ge 1; then
+    case "$1" in
+	strict*) RSYNC_FAIL_ON_SKIPPED=yes ; shift ;;
+	check*) shift ;;
+    esac
+fi
+
 # This allows the user to specify extra rsync options -- use carefully!
 RSYNC="$rsync_bin $*"
 #RSYNC="valgrind $rsync_bin $*"
@@ -338,6 +345,10 @@ echo '------------------------------------------------------------'
 # we want, and if we just call expr then this script will always fail,
 # because -e is set.
 
-result=`expr $failed + $missing || true`
+if test -z "$RSYNC_FAIL_ON_SKIPPED"; then
+    result=`expr $failed + $missing || true`
+else
+    result=`expr $failed + $missing + $skipped || true`
+fi
 echo "overall result is $result"
 exit $result
