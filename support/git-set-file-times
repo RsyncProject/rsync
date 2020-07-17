@@ -79,10 +79,10 @@ def print_line(fn, mtime, commit_time):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Set the times of the current git checkout to their last-changed time.", add_help=False)
+    parser = argparse.ArgumentParser(description="Set the times of the files in the current git checkout to their last-changed time.", add_help=False)
     parser.add_argument('--git-dir', metavar='GIT_DIR', help="The git dir to query (defaults to affecting the current git checkout).")
     parser.add_argument('--tree', metavar='TREE-ISH', help="The tree-ish to query (defaults to the current branch).")
-    parser.add_argument('--prefix', metavar='PREFIX_STR', help="Prepend the PREFIX_STR to each filename we tweak.")
+    parser.add_argument('--prefix', metavar='PREFIX_STR', help="Prepend the PREFIX_STR to each filename we tweak (defaults to the top of current checkout).")
     parser.add_argument('--quiet', '-q', action='store_true', help="Don't output the changed-file information.")
     parser.add_argument('--list', '-l', action='count', help="List files & times instead of changing them. Repeat for Unix timestamp instead of human readable.")
     parser.add_argument('files', metavar='FILE', nargs='*', help="Specify a subset of checked-out files to tweak.")
