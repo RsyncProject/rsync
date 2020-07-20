@@ -10,7 +10,7 @@ on:
 
 jobs:
 
-  linux-build:
+  ubuntu-build:
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v2
@@ -34,6 +34,16 @@ jobs:
       run: sudo make strict_check29
     - name: ssl file list
       run: rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
+    - name: save artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: ubuntu-bin
+        path: |
+          rsync
+          rsync-ssl
+          rsync.1
+          rsync-ssl.1
+          rsyncd.conf.5
 
   macos-build:
     runs-on: macos-latest
@@ -56,6 +66,16 @@ jobs:
       run: sudo make check
     - name: ssl file list
       run: rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
+    - name: save artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: macos-bin
+        path: |
+          rsync
+          rsync-ssl
+          rsync.1
+          rsync-ssl.1
+          rsyncd.conf.5
 
   cygwin-build:
     runs-on: windows-latest
@@ -81,3 +101,13 @@ jobs:
       run: bash -c 'make check'
     - name: ssl file list
       run: bash -c 'PATH="/usr/local/bin:$PATH" rsync-ssl --no-motd download.samba.org::rsyncftp/ || true'
+    - name: save artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: cygwin-bin
+        path: |
+          rsync.exe
+          rsync-ssl.exe
+          rsync.1
+          rsync-ssl.1
+          rsyncd.conf.5
