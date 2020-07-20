@@ -72,23 +72,23 @@ all: Makefile rsync$(EXEEXT) stunnel-rsyncd.conf @MAKE_MAN@
 
 .PHONY: install
 install: all
-	-${MKDIR_P} ${DESTDIR}${bindir}
-	${INSTALLCMD} ${INSTALL_STRIP} -m 755 rsync$(EXEEXT) ${DESTDIR}${bindir}
-	${INSTALLCMD} -m 755 $(srcdir)/rsync-ssl ${DESTDIR}${bindir}
-	-${MKDIR_P} ${DESTDIR}${mandir}/man1
-	-${MKDIR_P} ${DESTDIR}${mandir}/man5
-	if test -f rsync.1; then ${INSTALLMAN} -m 644 rsync.1 ${DESTDIR}${mandir}/man1; fi
-	if test -f rsync-ssl.1; then ${INSTALLMAN} -m 644 rsync-ssl.1 ${DESTDIR}${mandir}/man1; fi
-	if test -f rsyncd.conf.5; then ${INSTALLMAN} -m 644 rsyncd.conf.5 ${DESTDIR}${mandir}/man5; fi
+	-$(MKDIR_P) $(DESTDIR)$(bindir)
+	$(INSTALLCMD) $(INSTALL_STRIP) -m 755 rsync$(EXEEXT) $(DESTDIR)$(bindir)
+	$(INSTALLCMD) -m 755 $(srcdir)/rsync-ssl $(DESTDIR)$(bindir)
+	-$(MKDIR_P) $(DESTDIR)$(mandir)/man1
+	-$(MKDIR_P) $(DESTDIR)$(mandir)/man5
+	if test -f rsync.1; then $(INSTALLMAN) -m 644 rsync.1 $(DESTDIR)$(mandir)/man1; fi
+	if test -f rsync-ssl.1; then $(INSTALLMAN) -m 644 rsync-ssl.1 $(DESTDIR)$(mandir)/man1; fi
+	if test -f rsyncd.conf.5; then $(INSTALLMAN) -m 644 rsyncd.conf.5 $(DESTDIR)$(mandir)/man5; fi
 
 install-ssl-daemon: stunnel-rsyncd.conf
-	-${MKDIR_P} ${DESTDIR}/etc/stunnel
-	${INSTALLCMD} -m 644 stunnel-rsyncd.conf ${DESTDIR}/etc/stunnel/rsyncd.conf
+	-$(MKDIR_P) $(DESTDIR)/etc/stunnel
+	$(INSTALLCMD) -m 644 stunnel-rsyncd.conf $(DESTDIR)/etc/stunnel/rsyncd.conf
 	@if ! ls /etc/rsync-ssl/certs/server.* >/dev/null 2>/dev/null; then \
 	    echo "Note that you'll need to install the certificate used by /etc/stunnel/rsyncd.conf"; \
 	fi
 
-install-all: install install-ssl-client install-ssl-daemon
+install-all: install install-ssl-daemon
 
 install-strip:
 	$(MAKE) INSTALL_STRIP='-s' install
