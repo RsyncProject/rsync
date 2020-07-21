@@ -1277,14 +1277,19 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			 * this function was asked to process in the file list. */
 			if (!inc_recurse
 			 && (*dn != '.' || dn[1]) /* Avoid an issue with --relative and the "." dir. */
-			 && (!prior_dir_file || strcmp(dn, f_name(prior_dir_file, NULL)) != 0)
-			 && flist_find_name(cur_flist, dn, 1) < 0) {
+			 && (!prior_dir_file || strcmp(dn, f_name(prior_dir_file, NULL)) != 0)) {
+				int ok = 0, j = flist_find_name(cur_flist, dn, -1);
+				if (j >= 0) {
+					struct file_struct *f = cur_flist->sorted[j];
+					if (S_ISDIR(f->mode) || (missing_args == 2 && !file->mode && !f->mode))
+						ok = 1;
+				}
 				/* The --delete-missing-args option can actually put invalid entries into
 				 * the file list, so if that option was specified, we'll just complain about
 				 * it and allow it. */
-				if (missing_args == 2 && file->mode == 0)
+				if (!ok && missing_args == 2 && file->mode == 0 && j < 0)
 					rprintf(FERROR, "WARNING: parent dir is absent in the file list: %s\n", dn);
-				else {
+				else if (!ok) {
 					rprintf(FERROR, "ABORTING due to invalid path from sender: %s/%s\n",
 						dn, file->basename);
 					exit_cleanup(RERR_PROTOCOL);
