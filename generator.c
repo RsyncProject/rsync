@@ -1290,7 +1290,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 					exit_cleanup(RERR_PROTOCOL);
 				}
 			}
-			if (relative_paths && !implied_dirs
+			if (relative_paths && !implied_dirs && file->mode != 0
 			 && do_stat(dn, &sx.st) < 0) {
 				if (dry_run)
 					goto parent_is_dry_missing;
