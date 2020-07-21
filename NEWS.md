@@ -15,6 +15,10 @@
  - Restored the ability to use --bwlimit=0 to specify no bandwidth limit.  (It
    was accidentally broken in 3.2.2.)
 
+ - Fix a bug when combining `--delete-missing-args` with `--no-implied-dirs` &
+   `-R` where rsync might create the destination path of a missing arg.  The
+   code also avoids some superfluous warnings for nested paths of removed args.
+
 ### ENHANCEMENTS:
 
  - Allow `--max-alloc=0` to specify no limit to the alloc sanity check.
@@ -33,7 +37,7 @@
    user & group names inside a chrooted daemon module.  This is based on the
    nameconverter patch with some improvements, including a tweak to the request
    protocol (so if you used this patch in the past, be sure to update your
-   converter script).
+   converter script to use newlines instead of null chars).
 
  - Added the ability to specify "@netgroup" names to the `hosts allow` and
    `hosts deny` daemon parameters.  This is a finalized version of the
