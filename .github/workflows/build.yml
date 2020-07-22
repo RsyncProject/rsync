@@ -27,11 +27,11 @@ jobs:
     - name: info
       run: rsync --version
     - name: check
-      run: sudo RSYNC_MAX_SKIPPED=0 make check
+      run: sudo RSYNC_MAX_SKIPPED=1 make check
     - name: check30
-      run: sudo RSYNC_MAX_SKIPPED=0 make check30
+      run: sudo RSYNC_MAX_SKIPPED=1 make check30
     - name: check29
-      run: sudo RSYNC_MAX_SKIPPED=0 make check29
+      run: sudo RSYNC_MAX_SKIPPED=1 make check29
     - name: ssl file list
       run: rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
     - name: save artifact

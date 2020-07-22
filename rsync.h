@@ -70,7 +70,7 @@
 /* The following XMIT flags require an rsync that uses a varint for the flag values */
 
 #define XMIT_RESERVED_16 (1<<16) 	/* reserved for future fileflags use */
-#define XMIT_RESERVED_17 (1<<17) 	/* reserved for future crtimes use */
+#define XMIT_CRTIME_EQ_MTIME (1<<17)	/* any protocol - restricted by command-line option */
 
 /* These flags are used in the live flist data. */
 
@@ -182,6 +182,7 @@
 #define ATTRS_SKIP_MTIME	(1<<1)
 #define ATTRS_ACCURATE_TIME	(1<<2)
 #define ATTRS_SKIP_ATIME	(1<<3)
+#define ATTRS_SKIP_CRTIME	(1<<5)
 
 #define MSG_FLUSH	2
 #define FULL_FLUSH	1
@@ -209,6 +210,7 @@
 #define ITEM_REPORT_GROUP (1<<6)
 #define ITEM_REPORT_ACL (1<<7)
 #define ITEM_REPORT_XATTR (1<<8)
+#define ITEM_REPORT_CRTIME (1<<10)
 #define ITEM_BASIS_TYPE_FOLLOWS (1<<11)
 #define ITEM_XNAME_FOLLOWS (1<<12)
 #define ITEM_IS_NEW (1<<13)
@@ -568,6 +570,10 @@ typedef unsigned int size_t;
 #endif
 #endif
 
+#ifdef HAVE_GETATTRLIST
+#define SUPPORT_CRTIMES 1
+#endif
+
 /* Find a variable that is either exactly 32-bits or longer.
  * If some code depends on 32-bit truncation, it will need to
  * take special action in a "#if SIZEOF_INT32 > 4" section. */
@@ -789,6 +795,7 @@ struct file_struct {
 extern int file_extra_cnt;
 extern int inc_recurse;
 extern int atimes_ndx;
+extern int crtimes_ndx;
 extern int pathname_ndx;
 extern int depth_ndx;
 extern int uid_ndx;
@@ -851,6 +858,7 @@ extern int xattrs_ndx;
 #define F_XATTR(f) REQ_EXTRA(f, xattrs_ndx)->num
 #define F_NDX(f) REQ_EXTRA(f, unsort_ndx)->num
 #define F_ATIME(f) REQ_EXTRA64(f, atimes_ndx)->num
+#define F_CRTIME(f) REQ_EXTRA64(f, crtimes_ndx)->num
 
 /* These items are per-entry optional: */
 #define F_HL_GNUM(f) OPT_EXTRA(f, START_BUMP(f))->num /* non-dirs */
@@ -1103,6 +1111,7 @@ typedef struct {
 
 typedef struct {
     STRUCT_STAT st;
+    time_t crtime;
 #ifdef SUPPORT_ACLS
     struct rsync_acl *acc_acl; /* access ACL */
     struct rsync_acl *def_acl; /* default ACL */

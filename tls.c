@@ -108,6 +108,9 @@ static int stat_xattr(const char *fname, STRUCT_STAT *fst)
 #endif
 
 static int display_atimes = 0;
+#ifdef SUPPORT_CRTIMES
+static int display_crtimes = 0;
+#endif
 
 static void failed(char const *what, char const *where)
 {
@@ -143,14 +146,22 @@ static void storetime(char *dest, size_t destsize, time_t t, int nsecs)
 static void list_file(const char *fname)
 {
 	STRUCT_STAT buf;
+#ifdef SUPPORT_CRTIMES
+	time_t crtime = 0;
+#endif
 	char permbuf[PERMSTRING_SIZE];
 	char mtimebuf[50];
 	char atimebuf[50];
+	char crtimebuf[50];
 	char linkbuf[4096];
 	int nsecs;
 
 	if (do_lstat(fname, &buf) < 0)
 		failed("stat", fname);
+#ifdef SUPPORT_CRTIMES
+	if (display_crtimes && (crtime = get_create_time(fname)) == 0)
+		failed("get_create_time", fname);
+#endif
 #ifdef SUPPORT_XATTRS
 	if (am_root < 0)
 		stat_xattr(fname, &buf);
@@ -195,6 +206,12 @@ static void list_file(const char *fname)
 		storetime(atimebuf, sizeof atimebuf, S_ISDIR(buf.st_mode) ? 0 : buf.st_atime, -1);
 	else
 		atimebuf[0] = '\0';
+#ifdef SUPPORT_CRTIMES
+	if (display_crtimes)
+		storetime(crtimebuf, sizeof crtimebuf, crtime, -1);
+	else
+#endif
+		crtimebuf[0] = '\0';
 
 	/* TODO: Perhaps escape special characters in fname? */
 	printf("%s ", permbuf);
@@ -204,14 +221,17 @@ static void list_file(const char *fname)
 	} else
 		printf("%15s", do_big_num(buf.st_size, 1, NULL));
 
-	printf(" %6ld.%-6ld %6ld%s%s %s%s\n",
+	printf(" %6ld.%-6ld %6ld%s%s%s %s%s\n",
 	       (long)buf.st_uid, (long)buf.st_gid, (long)buf.st_nlink,
-	       mtimebuf, atimebuf, fname, linkbuf);
+	       mtimebuf, atimebuf, crtimebuf, fname, linkbuf);
 }
 
 static struct poptOption long_options[] = {
   /* longName, shortName, argInfo, argPtr, value, descrip, argDesc */
   {"atimes",          'U', POPT_ARG_NONE,   &display_atimes, 0, 0, 0},
+#ifdef SUPPORT_CRTIMES
+  {"crtimes",         'N', POPT_ARG_NONE,   &display_crtimes, 0, 0, 0},
+#endif
   {"link-times",      'l', POPT_ARG_NONE,   &link_times, 0, 0, 0 },
   {"link-owner",      'L', POPT_ARG_NONE,   &link_owner, 0, 0, 0 },
 #ifdef SUPPORT_XATTRS
@@ -231,6 +251,9 @@ static void NORETURN tls_usage(int ret)
   fprintf(F,"Trivial file listing program for portably checking rsync\n");
   fprintf(F,"\nOptions:\n");
   fprintf(F," -U, --atimes                display access (last-used) times\n");
+#ifdef SUPPORT_CRTIMES
+  fprintf(F," -N, --crtimes               display create times (newness)\n");
+#endif
   fprintf(F," -l, --link-times            display the time on a symlink\n");
   fprintf(F," -L, --link-owner            display the owner+group on a symlink\n");
 #ifdef SUPPORT_XATTRS

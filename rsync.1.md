@@ -372,6 +372,7 @@ detailed description below for a complete description.
 --times, -t              preserve modification times
 --atimes, -U             preserve access (use) times
 --open-noatime           avoid changing the atime on opened files
+--crtimes, -N            preserve create times (newness)
 --omit-dir-times, -O     omit directories from --times
 --omit-link-times, -J    omit symlinks from --times
 --super                  receiver attempts super-user activities
@@ -1340,6 +1341,11 @@ your home directory (remove the '=' for that).
     will silently ignore this option.  Note also that some filesystems are
     mounted to avoid updating the atime on read access even without the
     O_NOATIME flag being set.
+
+0.  `--crtimes`, `-N,`
+
+    This tells rsync to set the create times (newness) of +the destination
+    files to the same value as the source files.
 
 0.  `--omit-dir-times`, `-O`
 
@@ -2673,10 +2679,11 @@ your home directory (remove the '=' for that).
       value (requires `--owner` and super-user privileges).
     - A `g` means the group is different and is being updated to the sender's
       value (requires `--group` and the authority to set the group).
-    - A `u` means the access (use) time is different and is being updated to
-      the sender's value (requires `--atimes`).  An alternate value of `U`
-      means that the access time will be set to the transfer time, which
-      happens when a symlink or directory is updated.
+    - A `u`|`n`|`b` indicates the following information: `u`  means the access
+      (use) time is different and is being updated to the sender's value
+      (requires `--atimes`); `n` means the create time (newness) is different
+      and is being updated to the sender's value (requires `--crtimes`); `b`
+      means that both the access and create times are being updated.
     - The `a` means that the ACL information is being changed.
     - The `x` means that the extended attribute information is being changed.
 

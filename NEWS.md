@@ -39,6 +39,9 @@
    protocol (so if you used this patch in the past, be sure to update your
    converter script to use newlines instead of null chars).
 
+ - Added `--crtimes` (`-N`) option for preserving the file's create time (on
+   an OS that supports that, such as macOS).
+
  - Added the ability to specify "@netgroup" names to the `hosts allow` and
    `hosts deny` daemon parameters.  This is a finalized version of the
    netgroup-auth patch from the patches repo.

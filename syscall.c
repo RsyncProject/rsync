@@ -54,6 +54,15 @@ extern int open_noatime;
 # endif
 #endif
 
+#ifdef SUPPORT_CRTIMES
+#pragma pack(push, 4)
+struct create_time {
+	uint32 length;
+	struct timespec crtime;
+};
+#pragma pack(pop)
+#endif
+
 #define RETURN_ERROR_IF(x,e) \
 	do { \
 		if (x) { \
@@ -382,6 +391,40 @@ int do_setattrlist_times(const char *fname, STRUCT_STAT *stp)
 	attrList.bitmapcount = ATTR_BIT_MAP_COUNT;
 	attrList.commonattr = ATTR_CMN_MODTIME;
 	return setattrlist(fname, &attrList, &ts, sizeof ts, FSOPT_NOFOLLOW);
+}
+#endif
+
+#ifdef SUPPORT_CRTIMES
+time_t get_create_time(const char *path)
+{
+	static struct create_time attrBuf;
+	struct attrlist attrList;
+
+	memset(&attrList, 0, sizeof attrList);
+	attrList.bitmapcount = ATTR_BIT_MAP_COUNT;
+	attrList.commonattr = ATTR_CMN_CRTIME;
+	if (getattrlist(path, &attrList, &attrBuf, sizeof attrBuf, FSOPT_NOFOLLOW) < 0)
+		return 0;
+	return attrBuf.crtime.tv_sec;
+}
+#endif
+
+#ifdef SUPPORT_CRTIMES
+int set_create_time(const char *path, time_t crtime)
+{
+	struct attrlist attrList;
+	struct timespec ts;
+
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+
+	ts.tv_sec = crtime;
+	ts.tv_nsec = 0;
+
+	memset(&attrList, 0, sizeof attrList);
+	attrList.bitmapcount = ATTR_BIT_MAP_COUNT;
+	attrList.commonattr = ATTR_CMN_CRTIME;
+	return setattrlist(path, &attrList, &ts, sizeof ts, FSOPT_NOFOLLOW);
 }
 #endif
 

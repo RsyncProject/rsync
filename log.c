@@ -720,8 +720,9 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 			c[5] = !(iflags & ITEM_REPORT_PERMS) ? '.' : 'p';
 			c[6] = !(iflags & ITEM_REPORT_OWNER) ? '.' : 'o';
 			c[7] = !(iflags & ITEM_REPORT_GROUP) ? '.' : 'g';
-			c[8] = !(iflags & ITEM_REPORT_ATIME) ? '.'
-			     : S_ISLNK(file->mode) ? 'U' : 'u';
+			c[8] = !(iflags & (ITEM_REPORT_ATIME|ITEM_REPORT_CRTIME)) ? '.'
+			     : BITS_SET(iflags, ITEM_REPORT_ATIME|ITEM_REPORT_CRTIME) ? 'b'
+			     : iflags & ITEM_REPORT_ATIME ? 'u' : 'n';
 			c[9] = !(iflags & ITEM_REPORT_ACL) ? '.' : 'a';
 			c[10] = !(iflags & ITEM_REPORT_XATTR) ? '.' : 'x';
 			c[11] = '\0';

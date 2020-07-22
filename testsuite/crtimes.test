@@ -1,0 +1,26 @@
+#! /bin/sh
+
+# Test rsync copying create times
+
+. "$suitedir/rsync.fns"
+
+$RSYNC --version | grep "[, ] crtimes" >/dev/null || test_skipped "Rsync is configured without crtimes support"
+
+# Setting an older time via touch sets the create time to the mtime.
+# Setting it to a newer time affects just the mtime.
+
+mkdir "$fromdir"
+echo hiho "$fromdir/foo"
+
+touch -t 200101011111.11 "$fromdir"
+touch -t 200202022222.22 "$fromdir"
+
+touch -t 200111111111.11 "$fromdir/foo"
+touch -t 200212122222.22 "$fromdir/foo"
+
+TLS_ARGS=--crtimes
+
+checkit "$RSYNC -rtgvvv --crtimes \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0

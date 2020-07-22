@@ -396,6 +396,19 @@ static inline int mtime_differs(STRUCT_STAT *stp, struct file_struct *file)
 #endif
 }
 
+static inline int any_time_differs(stat_x *sxp, struct file_struct *file, UNUSED(const char *fname))
+{
+	int differs = mtime_differs(&sxp->st, file);
+#ifdef SUPPORT_CRTIMES
+	if (!differs && crtimes_ndx) {
+		if (sxp->crtime == 0)
+			sxp->crtime = get_create_time(fname);
+		differs = !same_time(sxp->crtime, 0, F_CRTIME(file), 0);
+	}
+#endif
+	return differs;
+}
+
 static inline int perms_differ(struct file_struct *file, stat_x *sxp)
 {
 	if (preserve_perms)
@@ -450,7 +463,7 @@ int unchanged_attrs(const char *fname, struct file_struct *file, stat_x *sxp)
 {
 	if (S_ISLNK(file->mode)) {
 #ifdef CAN_SET_SYMLINK_TIMES
-		if (preserve_times & PRESERVE_LINK_TIMES && mtime_differs(&sxp->st, file))
+		if (preserve_times & PRESERVE_LINK_TIMES && any_time_differs(sxp, file, fname))
 			return 0;
 #endif
 #ifdef CAN_CHMOD_SYMLINK
@@ -470,7 +483,7 @@ int unchanged_attrs(const char *fname, struct file_struct *file, stat_x *sxp)
 			return 0;
 #endif
 	} else {
-		if (preserve_times && mtime_differs(&sxp->st, file))
+		if (preserve_times && any_time_differs(sxp, file, fname))
 			return 0;
 		if (perms_differ(file, sxp))
 			return 0;
@@ -512,6 +525,14 @@ void itemize(const char *fnamecmp, struct file_struct *file, int ndx, int statre
 		if (atimes_ndx && !S_ISDIR(file->mode) && !S_ISLNK(file->mode)
 		 && !same_time(F_ATIME(file), 0, sxp->st.st_atime, 0))
 			iflags |= ITEM_REPORT_ATIME;
+#ifdef SUPPORT_CRTIMES
+		if (crtimes_ndx) {
+			if (sxp->crtime == 0)
+				sxp->crtime = get_create_time(fnamecmp);
+			if (!same_time(sxp->crtime, 0, F_CRTIME(file), 0))
+				iflags |= ITEM_REPORT_CRTIME;
+		}
+#endif
 #if !defined HAVE_LCHMOD && !defined HAVE_SETATTRLIST
 		if (S_ISLNK(file->mode)) {
 			;
@@ -1131,6 +1152,7 @@ static void list_file_entry(struct file_struct *f)
 	int size_width = human_readable ? 14 : 11;
 	int mtime_width = 1 + strlen(mtime_str);
 	int atime_width = atimes_ndx ? mtime_width : 0;
+	int crtime_width = crtimes_ndx ? mtime_width : 0;
 
 	if (!F_IS_ACTIVE(f)) {
 		/* this can happen if duplicate names were removed */
@@ -1141,10 +1163,11 @@ static void list_file_entry(struct file_struct *f)
 
 	if (missing_args == 2 && f->mode == 0) {
 		rprintf(FINFO, "%-*s %s\n",
-			10 + 1 + size_width + mtime_width + atime_width, "*missing",
+			10 + 1 + size_width + mtime_width + atime_width + crtime_width, "*missing",
 			f_name(f, NULL));
 	} else {
 		const char *atime_str = atimes_ndx && !S_ISDIR(f->mode) ? timestring(F_ATIME(f)) : "";
+		const char *crtime_str = crtimes_ndx ? timestring(F_CRTIME(f)) : "";
 		const char *arrow, *lnk;
 
 		permstring(permbuf, f->mode);
@@ -1157,9 +1180,9 @@ static void list_file_entry(struct file_struct *f)
 #endif
 			arrow = lnk = "";
 
-		rprintf(FINFO, "%s %*s %s%*s %s%s%s\n",
+		rprintf(FINFO, "%s %*s %s%*s%*s %s%s%s\n",
 			permbuf, size_width, human_num(F_LENGTH(f)),
-			timestring(f->modtime), atime_width, atime_str,
+			timestring(f->modtime), atime_width, atime_str, crtime_width, crtime_str,
 			f_name(f, NULL), arrow, lnk);
 	}
 }
@@ -1255,6 +1278,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			return;
 		}
 	}
+	sx.crtime = 0;
 
 	if (dry_run > 1 || (dry_missing_dir && is_below(file, dry_missing_dir))) {
 		int i;

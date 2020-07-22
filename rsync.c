@@ -584,6 +584,9 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		memcpy(&sx2.st, &sxp->st, sizeof (sx2.st));
 	if (!atimes_ndx || S_ISDIR(sxp->st.st_mode))
 		flags |= ATTRS_SKIP_ATIME;
+	/* Don't set the creation date on the root folder of an HFS+ volume. */
+	if (sxp->st.st_ino == 2 && S_ISDIR(sxp->st.st_mode))
+		flags |= ATTRS_SKIP_CRTIME;
 	if (!(flags & ATTRS_SKIP_MTIME) && !same_mtime(file, &sxp->st, flags & ATTRS_ACCURATE_TIME)) {
 		sx2.st.st_mtime = file->modtime;
 #ifdef ST_MTIME_NSEC
@@ -613,6 +616,16 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 			file->flags |= FLAG_TIME_FAILED;
 		}
 	}
+#ifdef SUPPORT_CRTIMES
+	if (crtimes_ndx && !(flags & ATTRS_SKIP_CRTIME)) {
+		time_t file_crtime = F_CRTIME(file);
+		if (sxp->crtime == 0)
+			sxp->crtime = get_create_time(fname);
+		if (!same_time(sxp->crtime, 0L, file_crtime, 0L)
+		 && set_create_time(fname, file_crtime) == 0)
+			updated = 1;
+	}
+#endif
 
 #ifdef SUPPORT_ACLS
 	/* It's OK to call set_acl() now, even for a dir, as the generator
@@ -718,7 +731,7 @@ int finish_transfer(const char *fname, const char *fnametmp,
 
 	/* Change permissions before putting the file into place. */
 	set_file_attrs(fnametmp, file, NULL, fnamecmp,
-		       ok_to_set_time ? ATTRS_ACCURATE_TIME : ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME);
+		       ok_to_set_time ? ATTRS_ACCURATE_TIME : ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME | ATTRS_SKIP_CRTIME);
 
 	/* move tmp file over real file */
 	if (DEBUG_GTE(RECV, 1))
@@ -743,7 +756,7 @@ int finish_transfer(const char *fname, const char *fnametmp,
 
   do_set_file_attrs:
 	set_file_attrs(fnametmp, file, NULL, fnamecmp,
-		       ok_to_set_time ? ATTRS_ACCURATE_TIME : ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME);
+		       ok_to_set_time ? ATTRS_ACCURATE_TIME : ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME | ATTRS_SKIP_CRTIME);
 
 	if (temp_copy_name) {
 		if (do_rename(fnametmp, fname) < 0) {

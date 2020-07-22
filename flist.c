@@ -56,6 +56,7 @@ extern int delete_during;
 extern int missing_args;
 extern int eol_nulls;
 extern int atimes_ndx;
+extern int crtimes_ndx;
 extern int relative_paths;
 extern int implied_dirs;
 extern int ignore_perishable;
@@ -378,6 +379,9 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file,
 			    int ndx, int first_ndx)
 {
 	static time_t modtime, atime;
+#ifdef SUPPORT_CRTIMES
+	static time_t crtime;
+#endif
 	static mode_t mode;
 #ifdef SUPPORT_HARD_LINKS
 	static int64 dev;
@@ -483,6 +487,13 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file,
 		else
 			atime = F_ATIME(file);
 	}
+#ifdef SUPPORT_CRTIMES
+	if (crtimes_ndx) {
+		crtime = F_CRTIME(file);
+		if (crtime == modtime)
+			xflags |= XMIT_CRTIME_EQ_MTIME;
+	}
+#endif
 
 #ifdef SUPPORT_HARD_LINKS
 	if (tmp_dev != -1) {
@@ -570,6 +581,10 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file,
 	}
 	if (xflags & XMIT_MOD_NSEC)
 		write_varint(f, F_MOD_NSEC(file));
+#ifdef SUPPORT_CRTIMES
+	if (crtimes_ndx && !(xflags & XMIT_CRTIME_EQ_MTIME))
+		write_varlong(f, crtime, 4);
+#endif
 	if (!(xflags & XMIT_SAME_MODE))
 		write_int(f, to_wire_mode(mode));
 	if (atimes_ndx && !S_ISDIR(mode) && !(xflags & XMIT_SAME_ATIME))
@@ -662,6 +677,9 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file,
 static struct file_struct *recv_file_entry(int f, struct file_list *flist, int xflags)
 {
 	static int64 modtime, atime;
+#ifdef SUPPORT_CRTIMES
+	static time_t crtime;
+#endif
 	static mode_t mode;
 #ifdef SUPPORT_HARD_LINKS
 	static int64 dev;
@@ -776,6 +794,10 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 			mode = first->mode;
 			if (atimes_ndx && !S_ISDIR(mode))
 				atime = F_ATIME(first);
+#ifdef SUPPORT_CRTIMES
+			if (crtimes_ndx)
+				crtime = F_CRTIME(first);
+#endif
 			if (preserve_uid)
 				uid = F_OWNER(first);
 			if (preserve_gid)
@@ -815,6 +837,21 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 		modtime_nsec = read_varint(f);
 	else
 		modtime_nsec = 0;
+#endif
+#ifdef SUPPORT_CRTIMES
+	if (crtimes_ndx) {
+		if (xflags & XMIT_CRTIME_EQ_MTIME)
+			crtime = modtime;
+		else
+			crtime = read_varlong(f, 4);
+#if SIZEOF_TIME_T < SIZEOF_INT64
+		if (!am_generator && (int64)(time_t)crtime != crtime) {
+			rprintf(FERROR_XFER,
+				"Create time value of %s truncated on receiver.\n",
+				lastname);
+		}
+#endif
+	}
 #endif
 	if (!(xflags & XMIT_SAME_MODE))
 		mode = from_wire_mode(read_int(f));
@@ -997,6 +1034,10 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 	}
 	if (atimes_ndx && !S_ISDIR(mode))
 		F_ATIME(file) = atime;
+#ifdef SUPPORT_CRTIMES
+	if (crtimes_ndx)
+		F_CRTIME(file) = crtime;
+#endif
 	if (unsort_ndx)
 		F_NDX(file) = flist->used + flist->ndx_start;
 
@@ -1394,6 +1435,10 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 		file->flags |= FLAG_OWNED_BY_US;
 	if (atimes_ndx && !S_ISDIR(file->mode))
 		F_ATIME(file) = st.st_atime;
+#ifdef SUPPORT_CRTIMES
+	if (crtimes_ndx)
+		F_CRTIME(file) = get_create_time(fname);
+#endif
 
 	if (basename != thisname)
 		file->dirname = lastdir;

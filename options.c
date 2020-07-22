@@ -64,6 +64,7 @@ int preserve_uid = 0;
 int preserve_gid = 0;
 int preserve_times = 0;
 int preserve_atimes = 0;
+int preserve_crtimes = 0;
 int update_only = 0;
 int open_noatime = 0;
 int cvs_exclude = 0;
@@ -670,6 +671,11 @@ static void print_info_flags(enum logcode f)
 #endif
 			"stop-at",
 
+#ifndef SUPPORT_CRTIMES
+		"no "
+#endif
+			"crtimes",
+
 	"*Optimizations",
 
 #ifndef HAVE_SIMD
@@ -838,6 +844,9 @@ static struct poptOption long_options[] = {
   {"no-U",             0,  POPT_ARG_VAL,    &preserve_atimes, 0, 0, 0 },
   {"open-noatime",     0,  POPT_ARG_VAL,    &open_noatime, 1, 0, 0 },
   {"no-open-noatime",  0,  POPT_ARG_VAL,    &open_noatime, 0, 0, 0 },
+  {"crtimes",         'N', POPT_ARG_VAL,    &preserve_crtimes, 1, 0, 0 },
+  {"no-crtimes",       0,  POPT_ARG_VAL,    &preserve_crtimes, 0, 0, 0 },
+  {"no-N",             0,  POPT_ARG_VAL,    &preserve_crtimes, 0, 0, 0 },
   {"omit-dir-times",  'O', POPT_ARG_VAL,    &omit_dir_times, 1, 0, 0 },
   {"no-omit-dir-times",0,  POPT_ARG_VAL,    &omit_dir_times, 0, 0, 0 },
   {"no-O",             0,  POPT_ARG_VAL,    &omit_dir_times, 0, 0, 0 },
@@ -1210,6 +1219,9 @@ static void set_refuse_options(void)
 #endif
 #ifndef HAVE_SETVBUF
 	parse_one_refuse_match(0, "outbuf", list_end);
+#endif
+#ifndef SUPPORT_CRTIMES
+	parse_one_refuse_match(0, "crtimes", list_end);
 #endif
 
 	/* Now we use the descrip values to actually mark the options for refusal. */
@@ -2738,6 +2750,10 @@ void server_options(char **args, int *argc_p)
 		if (preserve_atimes > 1)
 			argstr[x++] = 'U';
 	}
+#ifdef SUPPORT_CRTIMES
+	if (preserve_crtimes)
+		argstr[x++] = 'N';
+#endif
 	if (preserve_perms)
 		argstr[x++] = 'p';
 	else if (preserve_executability && am_sender)

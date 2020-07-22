@@ -43,6 +43,7 @@ extern int protect_args;
 extern int preserve_uid;
 extern int preserve_gid;
 extern int preserve_atimes;
+extern int preserve_crtimes;
 extern int preserve_acls;
 extern int preserve_xattrs;
 extern int xfer_flags_as_varint;
@@ -76,7 +77,7 @@ int do_negotiated_strings = 0;
 int xmit_id0_names = 0;
 
 /* These index values are for the file-list's extra-attribute array. */
-int pathname_ndx, depth_ndx, atimes_ndx, uid_ndx, gid_ndx, acls_ndx, xattrs_ndx, unsort_ndx;
+int pathname_ndx, depth_ndx, atimes_ndx, crtimes_ndx, uid_ndx, gid_ndx, acls_ndx, xattrs_ndx, unsort_ndx;
 
 int receiver_symlink_times = 0; /* receiver can set the time on a symlink */
 int sender_symlink_iconv = 0;	/* sender should convert symlink content */
@@ -555,6 +556,8 @@ void setup_protocol(int f_out,int f_in)
 	 * aligned for direct int64-pointer memory access. */
 	if (preserve_atimes)
 		atimes_ndx = (file_extra_cnt += EXTRA64_CNT);
+	if (preserve_crtimes)
+		crtimes_ndx = (file_extra_cnt += EXTRA64_CNT);
 	if (am_sender) /* This is most likely in the in64 union as well. */
 		pathname_ndx = (file_extra_cnt += PTR_EXTRA_CNT);
 	else
@@ -719,6 +722,10 @@ void setup_protocol(int f_out,int f_in)
 		proper_seed_order = compat_flags & CF_CHKSUM_SEED_FIX ? 1 : 0;
 		xfer_flags_as_varint = compat_flags & CF_VARINT_FLIST_FLAGS ? 1 : 0;
 		xmit_id0_names = compat_flags & CF_ID0_NAMES ? 1 : 0;
+		if (!xfer_flags_as_varint && preserve_crtimes) {
+			fprintf(stderr, "Both rsync versions must be at least 3.2.0 for --crtimes.\n");
+			exit_cleanup(RERR_PROTOCOL);
+		}
 		if (am_sender) {
 			receiver_symlink_times = am_server
 			    ? strchr(client_info, 'L') != NULL
