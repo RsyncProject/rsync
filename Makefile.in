@@ -295,17 +295,17 @@ test: check
 # catch Bash-isms earlier even if we're running on GNU.  Of course, we
 # might lose in the future where POSIX diverges from old sh.
 
-.PHONY: check strict_check
-check strict_check: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
-	rsync_bin=`pwd`/rsync$(EXEEXT) $(srcdir)/runtests.sh $@
+.PHONY: check
+check: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
+	rsync_bin=`pwd`/rsync$(EXEEXT) $(srcdir)/runtests.sh
 
-.PHONY: check29 strict_check29
-check29 strict_check29: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
-	rsync_bin=`pwd`/rsync$(EXEEXT) $(srcdir)/runtests.sh $@ --protocol=29
+.PHONY: check29
+check29: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
+	rsync_bin=`pwd`/rsync$(EXEEXT) $(srcdir)/runtests.sh --protocol=29
 
-.PHONY: check30 strict_check30
-check30 strict_check30: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
-	rsync_bin=`pwd`/rsync$(EXEEXT) $(srcdir)/runtests.sh $@ --protocol=30
+.PHONY: check30
+check30: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
+	rsync_bin=`pwd`/rsync$(EXEEXT) $(srcdir)/runtests.sh --protocol=30
 
 wildtest.o: wildtest.c t_stub.o lib/wildmatch.c rsync.h config.h
 wildtest$(EXEEXT): wildtest.o lib/compat.o lib/snprintf.o @BUILD_POPT@
