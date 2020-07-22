@@ -2642,12 +2642,14 @@ your home directory (remove the '=' for that).
     directory, an `L` for a symlink, a `D` for a device, and a `S` for a
     special file (e.g. named sockets and fifos).
 
-    The other letters in the string above are the actual letters that will be
-    output if the associated attribute for the item is being updated or a "."
-    for no change.  Three exceptions to this are: (1) a newly created item
-    replaces each letter with a "+", (2) an identical item replaces the dots
-    with spaces, and (3) an unknown attribute replaces each letter with a "?"
-    (this can happen when talking to an older rsync).
+    The other letters in the string indicate if some attributes of the file
+    have changed, as follows:
+
+    - "`.`" - the attribute is unchanged.
+    - "`+`" - the file is newly created.
+    - "` `" - all the attributes are unchanged (all dots turn to spaces).
+    - "`?`" - the change is unknown (when the remote rsync is old).
+    - A letter indicates an attribute is being updated.
 
     The attribute that is associated with each letter is as follows:
 
@@ -2675,8 +2677,8 @@ your home directory (remove the '=' for that).
       the sender's value (requires `--atimes`).  An alternate value of `U`
       means that the access time will be set to the transfer time, which
       happens when a symlink or directory is updated.
-    - The `a` means that the ACL information changed.
-    - The `x` means that the extended attribute information changed.
+    - The `a` means that the ACL information is being changed.
+    - The `x` means that the extended attribute information is being changed.
 
     One other output is possible: when deleting files, the "%i" will output the
     string "`*deleting`" for each item that is being removed (assuming that you
