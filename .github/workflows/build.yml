@@ -21,7 +21,7 @@ jobs:
         sudo apt-get install acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev python3-cmarkgfm openssl
         echo "::add-path::/usr/local/bin"
     - name: configure
-      run: ./configure --with-included-popt --with-included-zlib
+      run: ./configure
     - name: make
       run: make
     - name: install
