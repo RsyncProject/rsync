@@ -49,6 +49,14 @@
  - Output file+line info on out-of-memory & overflow errors while also avoiding
    the output of alternate build-dir path info that is not useful to the user.
 
+ - Improve the error handling for local and remote-shell transfers by sending
+   error messages directly to stderr, even on the remote side (instead of
+   having an error wind its way through the pipelined backlog).  This also
+   allows rsync to exit quickly when a receiver failure occurs, since rsync
+   doesn't need to try to keep the connection alive long enough for the fatal
+   error to go from the receiver to the generator to the sender.  To disable
+   this new default you can use the `--no-msgs2stderr` option.
+
  - Improved the testsuite on FreeBSD & Cygwin.
 
  - Added some compatibility code for HPE NonStop platforms.

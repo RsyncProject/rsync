@@ -1086,7 +1086,7 @@ static void do_server_recv(int f_in, int f_out, int argc, char *argv[])
 	char *local_name = NULL;
 	int negated_levels;
 
-	if (filesfrom_fd >= 0 && !msgs2stderr && protocol_version < 31) {
+	if (filesfrom_fd >= 0 && msgs2stderr != 1 && protocol_version < 31) {
 		/* We can't mix messages with files-from data on the socket,
 		 * so temporarily turn off info/debug messages. */
 		negate_output_levels();

@@ -251,7 +251,7 @@ static void filtered_fwrite(FILE *f, const char *in_buf, int in_len, int use_isp
 void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 {
 	char trailing_CR_or_NL;
-	FILE *f = msgs2stderr ? stderr : stdout;
+	FILE *f = msgs2stderr == 1 ? stderr : stdout;
 #ifdef ICONV_OPTION
 	iconv_t ic = is_utf8 && ic_recv != (iconv_t)-1 ? ic_recv : ic_chck;
 #else
@@ -263,7 +263,7 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 	if (len < 0)
 		exit_cleanup(RERR_MESSAGEIO);
 
-	if (msgs2stderr) {
+	if (msgs2stderr == 1) {
 		/* A normal daemon can get msgs2stderr set if the socket is busted, so we
 		 * change the message destination into an FLOG message in order to try to
 		 * get some info about an abnormal-exit into the log file. An rsh daemon
@@ -327,7 +327,7 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 		exit_cleanup(RERR_MESSAGEIO);
 	}
 
-	if (am_server && !msgs2stderr) {
+	if (am_server && msgs2stderr != 1 && (msgs2stderr != 2 || f != stderr)) {
 		enum msgcode msg = (enum msgcode)code;
 		if (protocol_version < 30) {
 			if (msg == MSG_ERROR)

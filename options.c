@@ -91,7 +91,7 @@ int relative_paths = -1;
 int implied_dirs = 1;
 int missing_args = 0; /* 0 = FERROR_XFER, 1 = ignore, 2 = delete */
 int numeric_ids = 0;
-int msgs2stderr = 0;
+int msgs2stderr = -1;
 int allow_8bit_chars = 0;
 int force_delete = 0;
 int io_timeout = 0;
@@ -803,7 +803,7 @@ static struct poptOption long_options[] = {
   {"no-v",             0,  POPT_ARG_VAL,    &verbose, 0, 0, 0 },
   {"info",             0,  POPT_ARG_STRING, 0, OPT_INFO, 0, 0 },
   {"debug",            0,  POPT_ARG_STRING, 0, OPT_DEBUG, 0, 0 },
-  {"msgs2stderr",      0,  POPT_ARG_NONE,   &msgs2stderr, 0, 0, 0 },
+  {"msgs2stderr",      0,  POPT_ARG_VAL,    &msgs2stderr, 1, 0, 0 },
   {"no-msgs2stderr",   0,  POPT_ARG_VAL,    &msgs2stderr, 0, 0, 0 },
   {"quiet",           'q', POPT_ARG_NONE,   0, 'q', 0, 0 },
   {"motd",             0,  POPT_ARG_VAL,    &output_motd, 1, 0, 0 },
@@ -2187,7 +2187,9 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		setvbuf(stdout, (char *)NULL, mode, 0);
 	}
 
-	if (msgs2stderr) {
+	if (msgs2stderr < 0)
+		msgs2stderr = am_daemon > 0 ? 0 : 2;
+	if (msgs2stderr == 1) {
 		/* Make stderr line buffered for better sharing of the stream. */
 		fflush(stderr); /* Just in case... */
 		setvbuf(stderr, (char *)NULL, _IOLBF, 0);
@@ -2886,6 +2888,11 @@ void server_options(char **args, int *argc_p)
 		else if (!verbose)
 			args[ac++] = "--log-format=X";
 	}
+
+	if (msgs2stderr == 1)
+		args[ac++] = "--msgs2stderr";
+	else if (msgs2stderr == 0)
+		args[ac++] = "--no-msgs2stderr";
 
 	if (block_size) {
 		if (asprintf(&arg, "-B%u", (int)block_size) < 0)

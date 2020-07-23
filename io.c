@@ -464,7 +464,7 @@ void reduce_iobuf_size(xbuf *out, size_t new_size)
 {
 	if (new_size < out->size) {
 		/* Avoid weird buffer interactions by only outputting this to stderr. */
-		if (msgs2stderr && DEBUG_GTE(IO, 4)) {
+		if (msgs2stderr == 1 && DEBUG_GTE(IO, 4)) {
 			const char *name = out == &iobuf.out ? "iobuf.out"
 					 : out == &iobuf.msg ? "iobuf.msg"
 					 : NULL;
@@ -482,7 +482,7 @@ void restore_iobuf_size(xbuf *out)
 	if (IOBUF_WAS_REDUCED(out->size)) {
 		size_t new_size = IOBUF_RESTORE_SIZE(out->size);
 		/* Avoid weird buffer interactions by only outputting this to stderr. */
-		if (msgs2stderr && DEBUG_GTE(IO, 4)) {
+		if (msgs2stderr == 1 && DEBUG_GTE(IO, 4)) {
 			const char *name = out == &iobuf.out ? "iobuf.out"
 					 : out == &iobuf.msg ? "iobuf.msg"
 					 : NULL;
@@ -566,7 +566,7 @@ static char *perform_io(size_t needed, int flags)
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
-		if (msgs2stderr && DEBUG_GTE(IO, 3)) {
+		if (msgs2stderr == 1 && DEBUG_GTE(IO, 3)) {
 			rprintf(FINFO, "[%s] perform_io(%ld, %sinput)\n",
 				who_am_i(), (long)needed, flags & PIO_CONSUME_INPUT ? "consume&" : "");
 		}
@@ -580,7 +580,7 @@ static char *perform_io(size_t needed, int flags)
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
-		if (msgs2stderr && DEBUG_GTE(IO, 3)) {
+		if (msgs2stderr == 1 && DEBUG_GTE(IO, 3)) {
 			rprintf(FINFO, "[%s] perform_io(%ld, outroom) needs to flush %ld\n",
 				who_am_i(), (long)needed,
 				iobuf.out.len + needed > iobuf.out.size
@@ -596,7 +596,7 @@ static char *perform_io(size_t needed, int flags)
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
-		if (msgs2stderr && DEBUG_GTE(IO, 3)) {
+		if (msgs2stderr == 1 && DEBUG_GTE(IO, 3)) {
 			rprintf(FINFO, "[%s] perform_io(%ld, msgroom) needs to flush %ld\n",
 				who_am_i(), (long)needed,
 				iobuf.msg.len + needed > iobuf.msg.size
@@ -605,7 +605,7 @@ static char *perform_io(size_t needed, int flags)
 		break;
 
 	case 0:
-		if (msgs2stderr && DEBUG_GTE(IO, 3))
+		if (msgs2stderr == 1 && DEBUG_GTE(IO, 3))
 			rprintf(FINFO, "[%s] perform_io(%ld, %d)\n", who_am_i(), (long)needed, flags);
 		break;
 
@@ -663,7 +663,7 @@ static char *perform_io(size_t needed, int flags)
 					SIVAL(iobuf.out.buf + iobuf.raw_data_header_pos, 0,
 					      ((MPLEX_BASE + (int)MSG_DATA)<<24) + iobuf.out.len - 4);
 
-					if (msgs2stderr && DEBUG_GTE(IO, 1)) {
+					if (msgs2stderr == 1 && DEBUG_GTE(IO, 1)) {
 						rprintf(FINFO, "[%s] send_msg(%d, %ld)\n",
 							who_am_i(), (int)MSG_DATA, (long)iobuf.out.len - 4);
 					}
@@ -783,7 +783,7 @@ static char *perform_io(size_t needed, int flags)
 					exit_cleanup(RERR_SOCKETIO);
 				}
 			}
-			if (msgs2stderr && DEBUG_GTE(IO, 2))
+			if (msgs2stderr == 1 && DEBUG_GTE(IO, 2))
 				rprintf(FINFO, "[%s] recv=%ld\n", who_am_i(), (long)n);
 
 			if (io_timeout || stop_at_utime) {
@@ -822,7 +822,7 @@ static char *perform_io(size_t needed, int flags)
 					exit_cleanup(RERR_SOCKETIO);
 				}
 			}
-			if (msgs2stderr && DEBUG_GTE(IO, 2)) {
+			if (msgs2stderr == 1 && DEBUG_GTE(IO, 2)) {
 				rprintf(FINFO, "[%s] %s sent=%ld\n",
 					who_am_i(), out == &iobuf.out ? "out" : "msg", (long)n);
 			}
@@ -935,7 +935,7 @@ int send_msg(enum msgcode code, const char *buf, size_t len, int convert)
 {
 	char *hdr;
 	size_t needed, pos;
-	BOOL want_debug = DEBUG_GTE(IO, 1) && convert >= 0 && (msgs2stderr || code != MSG_INFO);
+	BOOL want_debug = DEBUG_GTE(IO, 1) && convert >= 0 && (msgs2stderr == 1 || code != MSG_INFO);
 
 	if (!OUT_MULTIPLEXED)
 		return 0;
@@ -1290,7 +1290,7 @@ void read_args(int f_in, char *mod_name, char *buf, size_t bufsiz, int rl_nulls,
 
 BOOL io_start_buffering_out(int f_out)
 {
-	if (msgs2stderr && DEBUG_GTE(IO, 2))
+	if (msgs2stderr == 1 && DEBUG_GTE(IO, 2))
 		rprintf(FINFO, "[%s] io_start_buffering_out(%d)\n", who_am_i(), f_out);
 
 	if (iobuf.out.buf) {
@@ -1309,7 +1309,7 @@ BOOL io_start_buffering_out(int f_out)
 
 BOOL io_start_buffering_in(int f_in)
 {
-	if (msgs2stderr && DEBUG_GTE(IO, 2))
+	if (msgs2stderr == 1 && DEBUG_GTE(IO, 2))
 		rprintf(FINFO, "[%s] io_start_buffering_in(%d)\n", who_am_i(), f_in);
 
 	if (iobuf.in.buf) {
@@ -1328,7 +1328,7 @@ BOOL io_start_buffering_in(int f_in)
 
 void io_end_buffering_in(BOOL free_buffers)
 {
-	if (msgs2stderr && DEBUG_GTE(IO, 2)) {
+	if (msgs2stderr == 1 && DEBUG_GTE(IO, 2)) {
 		rprintf(FINFO, "[%s] io_end_buffering_in(IOBUF_%s_BUFS)\n",
 			who_am_i(), free_buffers ? "FREE" : "KEEP");
 	}
@@ -1343,7 +1343,7 @@ void io_end_buffering_in(BOOL free_buffers)
 
 void io_end_buffering_out(BOOL free_buffers)
 {
-	if (msgs2stderr && DEBUG_GTE(IO, 2)) {
+	if (msgs2stderr == 1 && DEBUG_GTE(IO, 2)) {
 		rprintf(FINFO, "[%s] io_end_buffering_out(IOBUF_%s_BUFS)\n",
 			who_am_i(), free_buffers ? "FREE" : "KEEP");
 	}
@@ -1431,7 +1431,7 @@ static void read_a_msg(void)
 	msg_bytes = tag & 0xFFFFFF;
 	tag = (tag >> 24) - MPLEX_BASE;
 
-	if (DEBUG_GTE(IO, 1) && msgs2stderr)
+	if (msgs2stderr == 1 && DEBUG_GTE(IO, 1))
 		rprintf(FINFO, "[%s] got msg=%d, len=%ld\n", who_am_i(), (int)tag, (long)msg_bytes);
 
 	switch (tag) {
@@ -2303,7 +2303,7 @@ void io_start_multiplex_out(int fd)
 {
 	io_flush(FULL_FLUSH);
 
-	if (msgs2stderr && DEBUG_GTE(IO, 2))
+	if (msgs2stderr == 1 && DEBUG_GTE(IO, 2))
 		rprintf(FINFO, "[%s] io_start_multiplex_out(%d)\n", who_am_i(), fd);
 
 	if (!iobuf.msg.buf)
@@ -2320,7 +2320,7 @@ void io_start_multiplex_out(int fd)
 /* Setup for multiplexing a MSG_* stream with the data stream. */
 void io_start_multiplex_in(int fd)
 {
-	if (msgs2stderr && DEBUG_GTE(IO, 2))
+	if (msgs2stderr == 1 && DEBUG_GTE(IO, 2))
 		rprintf(FINFO, "[%s] io_start_multiplex_in(%d)\n", who_am_i(), fd);
 
 	iobuf.in_multiplexed = 1; /* See also IN_MULTIPLEXED */
@@ -2331,7 +2331,7 @@ int io_end_multiplex_in(int mode)
 {
 	int ret = iobuf.in_multiplexed ? iobuf.in_fd : -1;
 
-	if (msgs2stderr && DEBUG_GTE(IO, 2))
+	if (msgs2stderr == 1 && DEBUG_GTE(IO, 2))
 		rprintf(FINFO, "[%s] io_end_multiplex_in(mode=%d)\n", who_am_i(), mode);
 
 	iobuf.in_multiplexed = 0;
@@ -2349,7 +2349,7 @@ int io_end_multiplex_out(int mode)
 {
 	int ret = iobuf.out_empty_len ? iobuf.out_fd : -1;
 
-	if (msgs2stderr && DEBUG_GTE(IO, 2))
+	if (msgs2stderr == 1 && DEBUG_GTE(IO, 2))
 		rprintf(FINFO, "[%s] io_end_multiplex_out(mode=%d)\n", who_am_i(), mode);
 
 	if (mode != MPLX_TO_BUFFERED)
