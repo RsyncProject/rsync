@@ -3,8 +3,10 @@ name: build
 on:
   push:
     branches: [ master ]
+    paths-ignore: [ .cirrus.yml ]
   pull_request:
     branches: [ master ]
+    paths-ignore: [ .cirrus.yml ]
   schedule:
     - cron: '42 8 * * *'
 
@@ -107,7 +109,7 @@ jobs:
         name: cygwin-bin
         path: |
           rsync.exe
-          rsync-ssl.exe
+          rsync-ssl
           rsync.1
           rsync-ssl.1
           rsyncd.conf.5
