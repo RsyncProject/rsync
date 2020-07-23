@@ -75,7 +75,7 @@ def main():
 
         html = md_parser(txt)
 
-        html = re.sub(r'(<code>)([\s\S]*?)(</code>)', lambda m: m[1] + re.sub(r'\s', '\xa0', m[2]) + m[3], html)
+        html = re.sub(r'(?<!<pre>)(<code>)([\s\S]*?)(</code>)', lambda m: m[1] + re.sub(r'\s', '\xa0', m[2]) + m[3], html)
         html = html.replace('--', '&#8209;&#8209;').replace("\xa0-", '&nbsp;&#8209;').replace("\xa0", '&nbsp;')
         html = re.sub(r'(\W)-', r'\1&#8209;', html)
 
