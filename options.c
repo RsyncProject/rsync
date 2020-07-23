@@ -91,7 +91,7 @@ int relative_paths = -1;
 int implied_dirs = 1;
 int missing_args = 0; /* 0 = FERROR_XFER, 1 = ignore, 2 = delete */
 int numeric_ids = 0;
-int msgs2stderr = -1;
+int msgs2stderr = 2; /* Default: send errors to stderr for local & remote-shell transfers */
 int allow_8bit_chars = 0;
 int force_delete = 0;
 int io_timeout = 0;
@@ -2187,9 +2187,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		setvbuf(stdout, (char *)NULL, mode, 0);
 	}
 
-	if (msgs2stderr < 0)
-		msgs2stderr = am_daemon > 0 ? 0 : 2;
-	if (msgs2stderr == 1) {
+	if (msgs2stderr == 1) { /* Are all messages going to stderr? */
 		/* Make stderr line buffered for better sharing of the stream. */
 		fflush(stderr); /* Just in case... */
 		setvbuf(stderr, (char *)NULL, _IOLBF, 0);
