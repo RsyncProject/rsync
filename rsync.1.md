@@ -1344,7 +1344,7 @@ your home directory (remove the '=' for that).
 
 0.  `--crtimes`, `-N,`
 
-    This tells rsync to set the create times (newness) of +the destination
+    This tells rsync to set the create times (newness) of the destination
     files to the same value as the source files.
 
 0.  `--omit-dir-times`, `-O`
