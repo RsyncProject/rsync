@@ -608,6 +608,11 @@ static void print_info_flags(enum logcode f)
 #endif
 			"hardlinks",
 
+#ifndef CAN_HARDLINK_SPECIAL
+		"no "
+#endif
+			"hardlink-special",
+
 #ifndef SUPPORT_LINKS
 		"no "
 #endif

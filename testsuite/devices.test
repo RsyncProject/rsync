@@ -97,6 +97,8 @@ esac
 
 # TODO: Need to test whether hardlinks are possible on this OS/filesystem
 
+$RSYNC --version | grep "[, ] hardlink-special" >/dev/null && CAN_HLINK_SPECIAL=yes || CAN_HLINK_SPECIAL=no
+
 mkdir "$fromdir"
 mkdir "$todir"
 mknod "$fromdir/char" c 41 67  || test_skipped "Can't create char device node"
@@ -105,7 +107,11 @@ mknod "$fromdir/char3" c 42 69  || test_skipped "Can't create char device node"
 mknod "$fromdir/block" b 42 69 || test_skipped "Can't create block device node"
 mknod "$fromdir/block2" b 42 73 || test_skipped "Can't create block device node"
 mknod "$fromdir/block3" b 105 73 || test_skipped "Can't create block device node"
-ln "$fromdir/block3" "$fromdir/block3.5" || echo "Skipping hard-linked device test..."
+if test "$CAN_HLINK_SPECIAL" = yes; then
+    ln "$fromdir/block3" "$fromdir/block3.5"
+else
+    echo "Skipping hard-linked device test..."
+fi
 mkfifo "$fromdir/fifo" || mknod "$fromdir/fifo" p || test_skipped "Can't run mkfifo"
 # Work around time rounding/truncating issue by touching both files.
 touch -r "$fromdir/block" "$fromdir/block" "$fromdir/block2"
@@ -147,7 +153,7 @@ cD$all_plus char2
 cD$all_plus char3
 cS$all_plus fifo
 EOT
-if test ! -r "$fromdir/block3.5"; then
+if test "$CAN_HLINK_SPECIAL" = no; then
     grep -v block3.5 <"$chkfile" >"$chkfile.new"
     mv "$chkfile.new" "$chkfile"
 fi
@@ -159,7 +165,7 @@ echo ""
 ( cd "$todir" && rsync_ls_lR . ) > "$tmpdir/ls-to"
 diff $diffopt "$tmpdir/ls-from" "$tmpdir/ls-to"
 
-if test -r "$fromdir/block3.5"; then
+if test "$CAN_HLINK_SPECIAL" = yes; then
     set -x
     $RSYNC -aii --link-dest="$todir" "$fromdir/" "$chkdir/" \
 	| tee "$outfile"
