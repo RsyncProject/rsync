@@ -1,7 +1,7 @@
 # How to build and install rsync
 
 When building rsync, you'll want to install various libraries in order to get
-all the new features enabled.  The configure script will alert you when the
+all the features enabled.  The configure script will alert you when the
 newest libraries are missing and tell you the appropriate `--disable-LIB`
 option to use if you want to just skip that feature.  What follows are various
 support libraries that you may want to install to build rsync with the maximum
@@ -69,33 +69,32 @@ To sum up, here are some package install commands for various OSes:
  -  For Debian and Ubuntu (Debian Buster users may want to briefly(?) enable
     buster-backports to update zstd from 1.3 to 1.4):
 
-    >     sudo apt install gcc g++ autoconf automake python3-cmarkgfm
-    >     sudo apt install acl libacl1-dev
-    >     sudo apt install attr libattr1-dev
-    >     sudo apt install libxxhash-dev
-    >     sudo apt install libzstd-dev
-    >     sudo apt install libzlz4-dev
-    >     sudo apt install libssl-dev
+    >     sudo apt install -y gcc g++ autoconf automake python3-cmarkgfm
+    >     sudo apt install -y acl libacl1-dev
+    >     sudo apt install -y attr libattr1-dev
+    >     sudo apt install -y libxxhash-dev
+    >     sudo apt install -y libzstd-dev
+    >     sudo apt install -y libzlz4-dev
+    >     sudo apt install -y libssl-dev
 
  -  For CentOS (use EPEL for python3-pip):
 
-    >     sudo yum install epel-release
-    >     sudo yum install gcc g++ autoconf automake python3-pip
-    >     sudo yum install acl libacl-devel
-    >     sudo yum install attr libattr-devel
-    >     sudo yum install xxhash-devel
-    >     sudo yum install libzstd-devel
-    >     sudo yum install lz4-devel
-    >     sudo yum install openssl-devel
+    >     sudo yum -y install epel-release
+    >     sudo yum -y install gcc g++ autoconf automake python3-pip
+    >     sudo yum -y install acl libacl-devel
+    >     sudo yum -y install attr libattr-devel
+    >     sudo yum -y install xxhash-devel
+    >     sudo yum -y install libzstd-devel
+    >     sudo yum -y install lz4-devel
+    >     sudo yum -y install openssl-devel
     >     pip3 install --user commonmark
 
  -  For FreeBSD (this assumes that the python3 version is 3.7):
 
-    >     sudo pkg install -y gcc g++ autotools python3
+    >     sudo pkg install -y autotools python3 py37-CommonMark
     >     sudo pkg install -y xxhash
     >     sudo pkg install -y zstd
     >     sudo pkg install -y liblz4
-    >     sudo pkg install -y py37-CommonMark
 
  -  For macOS:
 
@@ -114,8 +113,8 @@ install the source:
 >      make
 >      sudo make install
 
-You may set the installation directory and other parameters by options
-to ./configure.  To see them, use:
+The default install path is /usr/local/bin, but you can set the installation
+directory and other parameters using options to ./configure.  To see them, use:
 
 >     ./configure --help
 
