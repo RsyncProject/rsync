@@ -88,11 +88,6 @@ def main():
             fh.write(HTML_END)
 
 
-def html_via_cmarkgfm(txt):
-    # Our NEWS.md file has a gfm table in it.
-    return cmarkgfm.github_flavored_markdown_to_html(txt)
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Output html for md pages.', add_help=False)
     parser.add_argument("--help", "-h", action="help", help="Output this help message and exit.")
@@ -101,7 +96,8 @@ if __name__ == '__main__':
 
     try:
         import cmarkgfm
-        md_parser = html_via_cmarkgfm
+        # Our NEWS.md file has a gfm table in it.
+        md_parser = cmarkgfm.github_flavored_markdown_to_html
     except:
         die("Failed to find cmarkgfm for python3.")
 

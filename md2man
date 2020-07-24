@@ -144,10 +144,6 @@ def main():
             fh.write(txt)
 
 
-def html_via_cmarkgfm(txt):
-    return cmarkgfm.markdown_to_html(txt)
-
-
 def html_via_commonmark(txt):
     return commonmark.HtmlRenderer().render(commonmark.Parser().parse(txt))
 
@@ -376,7 +372,7 @@ if __name__ == '__main__':
 
     try:
         import cmarkgfm
-        md_parser = html_via_cmarkgfm
+        md_parser = cmarkgfm.markdown_to_html
     except:
         try:
             import commonmark
