@@ -351,6 +351,7 @@ detailed description below for a complete description.
 --append                 append data onto shorter files
 --append-verify          --append w/old data in file checksum
 --dirs, -d               transfer directories without recursing
+--mkpath                 create the destination's path component
 --links, -l              copy symlinks as symlinks
 --copy-links, -L         transform symlink into referent file/dir
 --copy-unsafe-links      only "unsafe" symlinks are transformed
@@ -976,6 +977,26 @@ your home directory (remove the '=' for that).
     There is also a backward-compatibility helper option, `--old-dirs` (or
     `--old-d`) that tells rsync to use a hack of `-r --exclude='/*/*'` to get
     an older rsync to list a single directory without recursing.
+
+0.  `--mkpath`
+
+    Create a missing path component of the destination arg.  This allows rsync
+    to create multiple levels of missing destination dirs and to create a path
+    in which to put a single renamed file.  Keep in mind that you'll need to
+    supply a trailing slash if you want the entire destination path to be
+    treated as a directory when copying a single arg (making rsync behave the
+    same way that it would if the path component of the destination had already
+    existed).
+
+    For example, the following creates a copy of file foo as bar in the sub/dir
+    directory, creating dirs "sub" and "sub/dir" if either do not yet exist:
+
+    >     rsync -ai --mkpath foo sub/dir/bar
+
+    If you instead ran the following, it would have created file foo in the
+    sub/dir/bar directory:
+
+    >     rsync -ai --mkpath foo sub/dir/bar/
 
 0.  `--links`, `-l`
 

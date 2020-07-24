@@ -57,6 +57,7 @@ extern int copy_unsafe_links;
 extern int keep_dirlinks;
 extern int preserve_hard_links;
 extern int protocol_version;
+extern int mkpath_dest_arg;
 extern int file_total;
 extern int recurse;
 extern int xfer_dirs;
@@ -677,7 +678,7 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char **remote_argv, in
 static char *get_local_name(struct file_list *flist, char *dest_path)
 {
 	STRUCT_STAT st;
-	int statret;
+	int statret, trailing_slash;
 	char *cp;
 
 	if (DEBUG_GTE(RECV, 1)) {
@@ -710,7 +711,26 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 	}
 
 	/* See what currently exists at the destination. */
-	if ((statret = do_stat(dest_path, &st)) == 0) {
+	statret = do_stat(dest_path, &st);
+	cp = strrchr(dest_path, '/');
+	trailing_slash = cp && !cp[1];
+
+	if (mkpath_dest_arg && statret < 0 && (cp || file_total > 1)) {
+		int ret = make_path(dest_path, file_total > 1 && !trailing_slash ? 0 : MKP_DROP_NAME);
+		if (ret < 0)
+			goto mkdir_error;
+		if (INFO_GTE(NAME, 1)) {
+			if (file_total == 1 || trailing_slash)
+				*cp = '\0';
+			rprintf(FINFO, "created %s %s\n", ret == 1 ? "directory" : "path", dest_path);
+			if (file_total == 1 || trailing_slash)
+				*cp = '/';
+		}
+		if (file_total > 1 || trailing_slash)
+			statret = do_stat(dest_path, &st);
+	}
+
+	if (statret == 0) {
 		/* If the destination is a dir, enter it and use mode 1. */
 		if (S_ISDIR(st.st_mode)) {
 			if (!change_dir(dest_path, CD_NORMAL)) {
@@ -740,15 +760,12 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 		exit_cleanup(RERR_FILESELECT);
 	}
 
-	cp = strrchr(dest_path, '/');
-
 	/* If we need a destination directory because the transfer is not
 	 * of a single non-directory or the user has requested one via a
 	 * destination path ending in a slash, create one and use mode 1. */
-	if (file_total > 1 || (cp && !cp[1])) {
-		/* Lop off the final slash (if any). */
-		if (cp && !cp[1])
-			*cp = '\0';
+	if (file_total > 1 || trailing_slash) {
+		if (trailing_slash)
+			*cp = '\0'; /* Lop off the final slash (if any). */
 
 		if (statret == 0) {
 			rprintf(FERROR, "ERROR: destination path is not a directory\n");
@@ -756,6 +773,7 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 		}
 
 		if (do_mkdir(dest_path, ACCESSPERMS) != 0) {
+		    mkdir_error:
 			rsyserr(FERROR, errno, "mkdir %s failed",
 				full_fname(dest_path));
 			exit_cleanup(RERR_FILEIO);

@@ -1,0 +1,43 @@
+#!/bin/sh
+
+. "$suitedir/rsync.fns"
+
+makepath "$fromdir"
+makepath "$todir"
+
+cp_p "$srcdir/rsync.h" "$fromdir/text"
+cp_p "$srcdir/configure.ac" "$fromdir/extra"
+
+cd "$tmpdir"
+
+deep_dir=to/foo/bar/baz/down/deep
+
+# Check that we can create several levels of dest dir
+$RSYNC -aiv --mkpath from/text $deep_dir/new
+test -f $deep_dir/new || test_fail "'new' file not found in $deep_dir dir"
+rm -rf to/foo
+
+$RSYNC -aiv --mkpath from/text $deep_dir/
+test -f $deep_dir/text || test_fail "'text' file not found in $deep_dir dir"
+rm $deep_dir/text
+
+# Make sure we can handle an existing path
+mkdir $deep_dir/new
+$RSYNC -aiv --mkpath from/text $deep_dir/new
+test -f $deep_dir/new/text || test_fail "'text' file not found in $deep_dir/new dir"
+rm -rf to/foo
+
+# Try the tests again with multiple source args
+$RSYNC -aiv --mkpath from/ $deep_dir
+test -f $deep_dir/extra || test_fail "'extra' file not found in $deep_dir dir"
+rm -rf to/foo
+
+$RSYNC -aiv --mkpath from/ $deep_dir/
+test -f $deep_dir/text || test_fail "'text' file not found in $deep_dir dir"
+
+# Make sure that we can handle no path
+$RSYNC -aiv --mkpath from/text to_text
+test -f to_text || test_fail "'to_text' file not found in current dir"
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0

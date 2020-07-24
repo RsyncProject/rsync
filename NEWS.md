@@ -42,6 +42,9 @@
  - Added `--crtimes` (`-N`) option for preserving the file's create time (on
    an OS that supports that, such as macOS).
 
+ - Added `--mkpath` option to tell rsync that it should create a non-existing
+   path component of the destination arg.
+
  - Added the ability to specify "@netgroup" names to the `hosts allow` and
    `hosts deny` daemon parameters.  This is a finalized version of the
    netgroup-auth patch from the patches repo.

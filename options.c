@@ -104,6 +104,7 @@ int eol_nulls = 0;
 int protect_args = -1;
 int human_readable = 1;
 int recurse = 0;
+int mkpath_dest_arg = 0;
 int allow_inc_recurse = 1;
 int xfer_dirs = -1;
 int am_daemon = 0;
@@ -1017,6 +1018,8 @@ static struct poptOption long_options[] = {
   {"8-bit-output",    '8', POPT_ARG_VAL,    &allow_8bit_chars, 1, 0, 0 },
   {"no-8-bit-output",  0,  POPT_ARG_VAL,    &allow_8bit_chars, 0, 0, 0 },
   {"no-8",             0,  POPT_ARG_VAL,    &allow_8bit_chars, 0, 0, 0 },
+  {"mkpath",           0,  POPT_ARG_VAL,    &mkpath_dest_arg, 1, 0, 0 },
+  {"no-mkpath",        0,  POPT_ARG_VAL,    &mkpath_dest_arg, 0, 0, 0 },
   {"qsort",            0,  POPT_ARG_NONE,   &use_qsort, 0, 0, 0 },
   {"copy-as",          0,  POPT_ARG_STRING, &copy_as, 0, 0, 0 },
   {"address",          0,  POPT_ARG_STRING, &bind_address, 0, 0, 0 },
@@ -3114,6 +3117,9 @@ void server_options(char **args, int *argc_p)
 
 	if (open_noatime && preserve_atimes <= 1)
 		args[ac++] = "--open-noatime";
+
+	if (mkpath_dest_arg && am_sender)
+		args[ac++] = "--mkpath";
 
 	if (ac > MAX_SERVER_ARGS) { /* Not possible... */
 		rprintf(FERROR, "argc overflow in server_options().\n");
