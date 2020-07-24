@@ -35,32 +35,40 @@ installed to manipulate xattrs and to run the rsync testsuite.
 
 ## xxhash
 
-The [xxHash library](https://cyan4973.github.io/xxHash/) provides extremely
-fast checksum functions that can make the "rsync algorithm" run much more
-quickly, especially when matching blocks in large files.  Installing this
-development library adds xxhash checksums as the default checksum algorithm.
+The [xxHash library][1] provides extremely fast checksum functions that can
+make the "rsync algorithm" run much more quickly, especially when matching
+blocks in large files.  Installing this development library adds xxhash
+checksums as the default checksum algorithm.
+
+[1]: https://cyan4973.github.io/xxHash/
 
 ## zstd
 
-The [zstd library](http://facebook.github.io/zstd/) compression algorithm that
-uses a lot less CPU than the default zlib algorithm at the same compression
-level.  Note that you need at least version 1.4, so you might need to skip the
-zstd compression if you can only install a 1.3 release.  Installing this
-development library adds zstd compression as the default compression algorithm.
+The [zstd library][2] compression algorithm that uses a lot less CPU than
+the default zlib algorithm at the same compression level.  Note that you
+need at least version 1.4, so you might need to skip the zstd compression if
+you can only install a 1.3 release.  Installing this development library
+adds zstd compression as the default compression algorithm.
+
+[2]: http://facebook.github.io/zstd/
 
 ## lz4
 
-The [lz4 library](https://lz4.github.io/lz4/) compression algorithm that uses
-very little CPU, though it also has the smallest compression ratio of other
-algorithms.  Installing this development library adds lz4 compression as an
-available compression algorithm.
+The [lz4 library][3] compression algorithm that uses very little CPU, though
+it also has the smallest compression ratio of other algorithms.  Installing
+this development library adds lz4 compression as an available compression
+algorithm.
+
+[3]: https://lz4.github.io/lz4/
 
 ## openssl crypto
 
-The [openssl crypto library](https://www.openssl.org/docs/man1.0.2/man3/crypto.html)
-provides some hardware accelerated checksum algorithms for MD4 and MD5.
-Installing this development library makes rsync use the (potentially) faster
-checksum routines when computing MD4 & MD5 checksums.
+The [openssl crypto library][4] provides some hardware accelerated checksum
+algorithms for MD4 and MD5.  Installing this development library makes rsync
+use the (potentially) faster checksum routines when computing MD4 & MD5
+checksums.
+
+[4]: https://www.openssl.org/docs/man1.0.2/man3/crypto.html
 
 ## Package summary
 
@@ -188,9 +196,10 @@ Install gcc or HP's "ANSI/C Compiler".
 Some versions of Mac OS X (Darwin) seem to have an IPv6 stack, but do
 not completely implement the "New Sockets" API.
 
-[This site](http://www.ipv6.org/impl/mac.html) says that Apple started to
-support IPv6 in 10.2 (Jaguar).  If your build fails, try again after running
-configure with --disable-ipv6.
+[This site][5] says that Apple started to support IPv6 in 10.2 (Jaguar).  If
+your build fails, try again after running configure with --disable-ipv6.
+
+[5]: http://www.ipv6.org/impl/mac.html
 
 ## IBM AIX notes
 

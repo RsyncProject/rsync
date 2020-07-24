@@ -26,6 +26,15 @@ options.  To get a complete list of supported options type:
 See the manpage for more detailed information.
 
 
+BUILDING AND INSTALLING
+-----------------------
+
+If you need to build rsync yourself, check out the [INSTALL][1] page for
+information on what libraries and packages you can use to get the maximum
+features in your build.
+
+[1]: https://download.samba.org/pub/rsync/INSTALL
+
 SETUP
 -----
 
@@ -63,9 +72,9 @@ connect to an rsync daemon.
 WEB SITE
 --------
 
-The main rsync web site is here:
+For more information, visit the [main rsync web site][2].
 
->  https://rsync.samba.org/
+[2]: https://rsync.samba.org/
 
 You'll find a FAQ list, downloads, resources, HTML versions of the
 manpages, etc.
@@ -77,25 +86,25 @@ MAILING LISTS
 There is a mailing list for the discussion of rsync and its applications
 that is open to anyone to join.  New releases are announced on this
 list, and there is also an announcement-only mailing list for those that
-want official announcements.  See the mailing-list page for full
-details:
+want official announcements.  See the [mailing-list page][3] for full
+details.
 
->  https://rsync.samba.org/lists.html
+[3]: https://rsync.samba.org/lists.html
 
 
 BUG REPORTS
 -----------
 
-To visit this web page for full the details on bug reporting:
+The [bug-tracking web page][4] has full details on bug reporting.
 
->  https://rsync.samba.org/bugtracking.html
+[4]: https://rsync.samba.org/bug-tracking.html
 
-That page contains links to the current bug list, and information on how
-to report a bug well.  You might also like to try searching the Internet
-for the error message you've received, or looking in the mailing list
-archives at:
+That page contains links to the current bug list, and information on how to
+do a good job when reporting a bug.  You might also like to try searching
+the Internet for the error message you've received, or looking in the
+[mailing list archives][5].
 
->  https://mail-archive.com/rsync@lists.samba.org/
+[5]: https://mail-archive.com/rsync@lists.samba.org/
 
 To send a bug report, follow the instructions on the bug-tracking
 page of the web site.
@@ -108,18 +117,15 @@ GIT REPOSITORY
 
 If you want to get the very latest version of rsync direct from the
 source code repository, then you will need to use git.  The git repo
-is hosted on github and on samba's site.  Feel free to access it here:
+is hosted [on GitHub][6] and [on Samba's site][7].
 
->  https://github.com/WayneD/rsync
+[6]: https://github.com/WayneD/rsync
+[7]: https://git.samba.org/?p=rsync.git;a=summary
 
-A backup git repo is available on the samba site:
+See [the download page][8] for full details on all the ways to grab the
+source.
 
->     git clone git://git.samba.org/rsync.git
-
-See the download page for full details on all the ways to grab the
-source:
-
->  https://rsync.samba.org/download.html
+[8]: https://rsync.samba.org/download.html
 
 
 COPYRIGHT
@@ -130,13 +136,8 @@ maintained by Wayne Davison.  It has been improved by many developers
 from around the world.
 
 Rsync may be used, modified and redistributed only under the terms of
-the GNU General Public License, found in the file COPYING in this
-distribution, or at:
+the GNU General Public License, found in the file [COPYING][9] in this
+distribution, or at [the Free Software Foundation][10].
 
->  https://www.fsf.org/licenses/gpl.html
-
-
-AVAILABILITY
-------------
-
-The main web site for rsync is https://rsync.samba.org/
+[9]: https://download.samba.org/pub/rsync/COPYING
+[10]: https://www.fsf.org/licenses/gpl.html

@@ -39,8 +39,8 @@
    protocol (so if you used this patch in the past, be sure to update your
    converter script to use newlines instead of null chars).
 
- - Added `--crtimes` (`-N`) option for preserving the file's create time (on
-   an OS that supports that, such as macOS).
+ - Added `--crtimes` (`-N`) option for preserving the file's create time (I
+   believe that this is macOS only at the moment).
 
  - Added `--mkpath` option to tell rsync that it should create a non-existing
    path component of the destination arg.
@@ -59,6 +59,8 @@
    doesn't need to try to keep the connection alive long enough for the fatal
    error to go from the receiver to the generator to the sender.  To disable
    this new default you can use the `--no-msgs2stderr` option.
+
+ - Change configure to know that Cywin supports Linux xattrs.
 
  - Improved the testsuite on FreeBSD & Cygwin.
 
