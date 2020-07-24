@@ -324,7 +324,7 @@ About to:
     shutil.rmtree(rsync_ver)
 
     print(f"Updating the other files in {dest} ...")
-    md_files = 'README.md NEWS.md'.split()
+    md_files = 'README.md NEWS.md INSTALL.md'.split()
     html_files = [ fn for fn in gen_pathnames if fn.endswith('.html') ]
     cmd_chk(['rsync', '-a', *md_files, *html_files, dest])
     cmd_chk(["packaging/md2html"] + [ dest +'/'+ fn for fn in md_files ])
