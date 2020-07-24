@@ -89,7 +89,7 @@ jobs:
         args: install -y --no-progress cygwin cyg-get
     - name: prep
       run: |
-        cyg-get make autoconf automake gcc-core libssl-devel libzstd-devel liblz4-devel python36-commonmark
+        cyg-get make autoconf automake gcc-core libssl-devel libzstd-devel liblz4-devel python36 python36-commonmark
         echo "::add-path::C:/tools/cygwin/bin"
     - name: configure
       run: bash -c './configure --disable-xxhash'
