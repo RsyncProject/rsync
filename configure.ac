@@ -1290,7 +1290,7 @@ if test x"$enable_xattr_support" = x"no"; then
     AC_MSG_RESULT(no)
 else
     case "$host_os" in
-    *linux*|*netbsd*)
+    *linux*|*netbsd*|*cygwin*)
 	AC_MSG_RESULT(Using Linux xattrs)
 	AC_DEFINE(HAVE_LINUX_XATTRS, 1, [True if you have Linux xattrs (or equivalent)])
 	AC_DEFINE(SUPPORT_XATTRS, 1)
