@@ -1,6 +1,8 @@
-#!/bin/sh -e
+#!/bin/sh
+ 
+set -e
 
-make=`which make || which gmake`
+make=`which make 2>/dev/null` || make=`which gmake 2>/dev/null`
 
 branch=`packaging/prep-auto-dir`
 if test x"$branch" = x; then
