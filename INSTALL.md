@@ -64,7 +64,10 @@ checksum routines when computing MD4 & MD5 checksums.
 
 ## Package summary
 
-To sum up, here are some package install commands for various OSes:
+To help you get the libraries installed, here are some package install commands
+for various OSes.  The commands are split up to correspond with the above
+items, but feel free to combine the package names into a single install, if you
+like.
 
  -  For Debian and Ubuntu (Debian Buster users may want to briefly(?) enable
     buster-backports to update zstd from 1.3 to 1.4):
@@ -103,6 +106,14 @@ To sum up, here are some package install commands for various OSes:
     >     brew install zstd
     >     brew install lz4
     >     brew install openssl
+
+ -  For Cygwin (with all cygwin programs stopped, run the appropriate setup program from a cmd shell):
+
+    >     .\setup-x86_64.exe --quiet-mode -P make,autoconf,automake,gcc-core,python3,python36-commonmark
+    >     .\setup-x86_64.exe --quiet-mode -P attr,libattr-devel
+    >     .\setup-x86_64.exe --quiet-mode -P libzstd-devel
+    >     .\setup-x86_64.exe --quiet-mode -P liblz4-devel
+    >     .\setup-x86_64.exe --quiet-mode -P libssl-devel
 
 ## Build and install
 
