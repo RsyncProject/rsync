@@ -1,0 +1,39 @@
+#!/bin/sh -e
+
+make=`which make || which gmake`
+
+branch=`packaging/prep-auto-dir`
+if test x"$branch" = x; then
+    srcdir=.
+else
+    cd build
+    srcdir=..
+fi
+
+if test -f configure.sh; then
+    cp -p configure.sh configure.sh.old
+else
+    touch configure.sh.old
+fi
+
+if test -f .fetch; then
+    $srcdir/prepare-source fetch
+else
+    $srcdir/prepare-source
+fi
+
+if diff configure.sh configure.sh.old >/dev/null 2>&1; then
+    echo "configure.sh is unchanged."
+    rm configure.sh.old
+else
+    echo "configure.sh has CHANGED."
+    ./config.status --recheck
+fi
+
+./config.status
+
+$make all
+
+if test x"$1" = x"check"; then
+    $make check
+fi
