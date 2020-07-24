@@ -33,7 +33,7 @@ If you need to build rsync yourself, check out the [INSTALL][1] page for
 information on what libraries and packages you can use to get the maximum
 features in your build.
 
-[1]: https://download.samba.org/pub/rsync/INSTALL
+[1]: https://github.com/WayneD/rsync/blob/master/INSTALL.md
 
 SETUP
 -----
@@ -139,5 +139,5 @@ Rsync may be used, modified and redistributed only under the terms of
 the GNU General Public License, found in the file [COPYING][9] in this
 distribution, or at [the Free Software Foundation][10].
 
-[9]: https://download.samba.org/pub/rsync/COPYING
+[9]: https://github.com/WayneD/rsync/blob/master/COPYING
 [10]: https://www.fsf.org/licenses/gpl.html
