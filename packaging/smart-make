@@ -2,7 +2,7 @@
  
 set -e
 
-make=`which make 2>/dev/null` || make=`which gmake 2>/dev/null`
+make=`which gmake 2>/dev/null` || make=`which make 2>/dev/null`
 
 branch=`packaging/prep-auto-dir`
 if test x"$branch" = x; then
@@ -29,7 +29,11 @@ if diff configure.sh configure.sh.old >/dev/null 2>&1; then
     rm configure.sh.old
 else
     echo "configure.sh has CHANGED."
-    ./config.status --recheck
+    if test -f config.status; then
+	./config.status --recheck
+    else
+	$srcdir/configure
+    fi
 fi
 
 ./config.status
