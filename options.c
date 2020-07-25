@@ -794,7 +794,7 @@ enum {OPT_SERVER = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_MODIFY_WINDOW, OPT_MIN_SIZE, OPT_CHMOD,
       OPT_READ_BATCH, OPT_WRITE_BATCH, OPT_ONLY_WRITE_BATCH, OPT_MAX_SIZE,
       OPT_NO_D, OPT_APPEND, OPT_NO_ICONV, OPT_INFO, OPT_DEBUG, OPT_BLOCK_SIZE,
-      OPT_USERMAP, OPT_GROUPMAP, OPT_CHOWN, OPT_BWLIMIT,
+      OPT_USERMAP, OPT_GROUPMAP, OPT_CHOWN, OPT_BWLIMIT, OPT_STDERR,
       OPT_OLD_COMPRESS, OPT_NEW_COMPRESS, OPT_NO_COMPRESS,
       OPT_STOP_AFTER, OPT_STOP_AT,
       OPT_REFUSED_BASE = 9000};
@@ -808,9 +808,8 @@ static struct poptOption long_options[] = {
   {"no-v",             0,  POPT_ARG_VAL,    &verbose, 0, 0, 0 },
   {"info",             0,  POPT_ARG_STRING, 0, OPT_INFO, 0, 0 },
   {"debug",            0,  POPT_ARG_STRING, 0, OPT_DEBUG, 0, 0 },
-  {"errors2stderr",    0,  POPT_ARG_VAL,    &msgs2stderr, 2, 0, 0 },
+  {"stderr",           0,  POPT_ARG_STRING, 0, OPT_STDERR, 0, 0 },
   {"msgs2stderr",      0,  POPT_ARG_VAL,    &msgs2stderr, 1, 0, 0 },
-  {"msgs2protocol",    0,  POPT_ARG_VAL,    &msgs2stderr, 0, 0, 0 },
   {"no-msgs2stderr",   0,  POPT_ARG_VAL,    &msgs2stderr, 0, 0, 0 },
   {"quiet",           'q', POPT_ARG_NONE,   0, 'q', 0, 0 },
   {"motd",             0,  POPT_ARG_VAL,    &output_motd, 1, 0, 0 },
@@ -2093,6 +2092,24 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			}
 			break;
 #endif
+
+		case OPT_STDERR: {
+			int len;
+			arg = poptGetOptArg(pc);
+			len = strlen(arg);
+			if (len && strncmp("errors", arg, len) == 0)
+				msgs2stderr = 2;
+			else if (len && strncmp("all", arg, len) == 0)
+				msgs2stderr = 1;
+			else if (len && strncmp("client", arg, len) == 0)
+				msgs2stderr = 0;
+			else {
+				snprintf(err_buf, sizeof err_buf,
+					"--stderr mode \"%s\" is not one of errors, all, or client\n", arg);
+				return 0;
+			}
+			break;
+		}
 
 		default:
 			/* A large opt value means that set_refuse_options()

@@ -45,9 +45,18 @@
  - Added `--mkpath` option to tell rsync that it should create a non-existing
    path component of the destination arg.
 
- - Added `--errors2stdout` (the new default) and `--msgs2protocol` (the old
-   default).  The new output idiom should help error messages get to the user
-   more quickly when doing a push (which includes local copying).
+ - Added `--stderr=errors|all|client` to replace the `--msgs2stderr` and
+   `--no-msgs2stderr` options (which are still accepted).  The default use of
+   stderr was changed to be `--stderr=errors` where all the processes that have
+   stderr available output directly to stderr, which should help error messages
+   get to the user more quickly, especially when doing a push (which includes
+   local copying).  This also allows rsync to exit quickly when a receiver
+   failure occurs, since rsync doesn't need to try to keep the connection alive
+   long enough for the fatal error to go from the receiver to the generator to
+   the sender.  The old default can be requested via `--stderr=client`.  Also
+   changed is that a non-default stderr mode is conveyed to the remote rsync
+   (using the older option names) instead of requiring the user to use
+   `--remote-option` (`-M`) to tell the remote rsync what to do.
 
  - Added the ability to specify "@netgroup" names to the `hosts allow` and
    `hosts deny` daemon parameters.  This is a finalized version of the
@@ -55,14 +64,6 @@
 
  - Output file+line info on out-of-memory & overflow errors while also avoiding
    the output of alternate build-dir path info that is not useful to the user.
-
- - Improve the error handling for local and remote-shell transfers by sending
-   error messages directly to stderr, even on the remote side (instead of
-   having an error wind its way through the pipelined backlog).  This also
-   allows rsync to exit quickly when a receiver failure occurs, since rsync
-   doesn't need to try to keep the connection alive long enough for the fatal
-   error to go from the receiver to the generator to the sender.  To disable
-   this new default you can use the `--no-msgs2stderr` option.
 
  - Change configure to know that Cywin supports Linux xattrs.
 
