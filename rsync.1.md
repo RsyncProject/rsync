@@ -328,13 +328,15 @@ Here is a short summary of the options available in rsync.  Please refer to the
 detailed description below for a complete description.
 
 [comment]: # (help-rsync.h)
-[comment]: # (Keep these short enough that they'll be under 80 chars when indented by 8 chars.)
+[comment]: # (Keep these short enough that they'll be under 80 chars when indented by 7 chars.)
 
 ```
 --verbose, -v            increase verbosity
 --info=FLAGS             fine-grained informational verbosity
 --debug=FLAGS            fine-grained debug verbosity
+--errors2stderr          output errors directly to stderr (the default)
 --msgs2stderr            output all messages directly to stderr
+--msgs2protocol          forward all messages via the protocol stream
 --quiet, -q              suppress non-error messages
 --no-motd                suppress daemon-mode MOTD
 --checksum, -c           skip based on checksum, not mod-time & size
@@ -594,32 +596,37 @@ your home directory (remove the '=' for that).
 
     >     rsync -aiv {-M,}--debug=del2 src/ dest/
 
-0.  `--msgs2stderr`
+0.  `--errors2stderr`, `--msgs2stderr`, `--msgs2protocol`
 
-    This option tells rsync to send all the messages directly to stderr rather
-    than to send messages to the client side via the protocol.  The protocol
-    allows rsync to output normal messages via stdout and errors via stderr,
-    but it can delay messages behind a slew of data.
+    Rsync handles messages in 3 possible ways:
 
-    This option helps to avoid putting a lot of data into the pipe if you are
-    outputting debugging information via several `-v` options or the `--debug`
-    options.
+    - `--errors2stderr` (the default) causes all the rsync processes to send an
+      error directly to stderr, even if the process is on the remote side of
+      the transfer.  Info messages are sent to the client side via the protocol
+      stream.  If stderr is not available (i.e. when directly connecting with a
+      daemon via a socket) errors fall back to being sent via the protocol
+      stream.  This option and the default are new for version 3.2.3.
 
-    Also keep in mind that connecting to a normal (non-remote-shell) daemon
-    does not have a stderr channel to send messages back to the client side, so
-    a modern rsync only allows the option on a remote-shell-run daemon.
+    - `--msgs2stderr` causes all rsync messages (info and error) to get written
+      directly to stderr from all (possible) processes.  This causes stderr to
+      become line-buffered (instead of raw) and eliminates the ability to
+      divide up the info and error messages by file handle.  For those doing
+      debugging or using several levels of verbosity, this option can help to
+      avoid clogging up the transfer stream (which should prevent any chance of
+      a deadlock bug hanging things up).  It also enables the outputting of some
+      I/O related debug messages.
 
-    This option has the side-effect of making stderr output get line-buffered
-    so that the merging of the output of 3 programs happens in a more readable
-    manner.
+    - `--msgs2protocol` causes all rsync messages to be sent to the client side
+      via the protocol stream.  One client process outputs all messages, with
+      errors on stderr and info messages on stdout.  This **was** the default
+      in older rsync versions, but can cause error delays when a lot of
+      transfer data is ahead of the messages.  If you're pushing files to an
+      older rsync, you may want to use `--msgs2stderr` since that option has
+      been around for several releases.
 
-    Starting with rsync 3.2.3 rsync will send **errors** directly to stderr for
-    a non-daemon transfer, so you no longer need to specify this option just to
-    try to improve rsync's behavior when a remote receiver encounters an error.
-    You can override this new default by specifying `--no-msgs2stderr`.
-
-    Also starting with rsync 3.2.3 rsync will forward the `--msgs2stderr` or
-    `--no-msgs2stderr` option to the remote rsync.
+    Starting with rsync 3.2.3, the `--msgs2stderr` and `--msgs2protocol`
+    options are forwarded to the remote rsync, though the latter is conveyed
+    using the backward-compatible `--no-msgs2stderr` option.
 
 0.  `--quiet`, `-q`
 

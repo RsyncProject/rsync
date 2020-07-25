@@ -611,7 +611,7 @@ static void print_info_flags(enum logcode f)
 #ifndef CAN_HARDLINK_SPECIAL
 		"no "
 #endif
-			"hardlink-special",
+			"hardlink-specials",
 
 #ifndef SUPPORT_LINKS
 		"no "
@@ -809,7 +809,9 @@ static struct poptOption long_options[] = {
   {"no-v",             0,  POPT_ARG_VAL,    &verbose, 0, 0, 0 },
   {"info",             0,  POPT_ARG_STRING, 0, OPT_INFO, 0, 0 },
   {"debug",            0,  POPT_ARG_STRING, 0, OPT_DEBUG, 0, 0 },
+  {"errors2stderr",    0,  POPT_ARG_VAL,    &msgs2stderr, 2, 0, 0 },
   {"msgs2stderr",      0,  POPT_ARG_VAL,    &msgs2stderr, 1, 0, 0 },
+  {"msgs2protocol",    0,  POPT_ARG_VAL,    &msgs2stderr, 0, 0, 0 },
   {"no-msgs2stderr",   0,  POPT_ARG_VAL,    &msgs2stderr, 0, 0, 0 },
   {"quiet",           'q', POPT_ARG_NONE,   0, 'q', 0, 0 },
   {"motd",             0,  POPT_ARG_VAL,    &output_motd, 1, 0, 0 },
