@@ -128,16 +128,16 @@ def update_patch(patch):
     s = cmd_run(['git', 'merge', based_on])
     ok = s.returncode == 0
     skip_shell = False
-    if not ok or args.cmd or args.rebuild or args.shell:
+    if not ok or args.cmd or args.make or args.shell:
         cmd_chk(['packaging/prep-auto-dir'], discard='output')
     if not ok:
         print(f'"git merge {based_on}" incomplete -- please fix.')
         if not run_a_shell(parent, patch):
             return 0
-        if not args.rebuild and not args.cmd:
+        if not args.make and not args.cmd:
             skip_shell = True
-    if args.rebuild:
-        if cmd_run(['packaging/smart-rebuild']).returncode != 0:
+    if args.make:
+        if cmd_run(['packaging/smart-make']).returncode != 0:
             if not run_a_shell(parent, patch):
                 return 0
             if not args.cmd:
@@ -227,9 +227,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Turn a git branch back into a diff files in the patches dir.", add_help=False)
     parser.add_argument('--branch', '-b', dest='base_branch', metavar='BASE_BRANCH', default='master', help="The branch the patch is based on. Default: master.")
     parser.add_argument('--skip-check', action='store_true', help="Skip the check that ensures starting with a clean branch.")
-    parser.add_argument('--shell', '-s', action='store_true', help="Launch a shell for every patch/BASE/* branch updated, not just when a conflict occurs.")
+    parser.add_argument('--make', '-m', action='store_true', help="Run the smart-make script in every patch branch.")
     parser.add_argument('--cmd', '-c', help="Run a command in every patch branch.")
-    parser.add_argument('--rebuild', '-r', help="Run the smart-rebuild script in every patch branch.")
+    parser.add_argument('--shell', '-s', action='store_true', help="Launch a shell for every patch/BASE/* branch updated, not just when a conflict occurs.")
     parser.add_argument('--gen', metavar='DIR', nargs='?', const='', help='Include generated files. Optional DIR value overrides the default of using the "patches" dir.')
     parser.add_argument('--patches-dir', '-p', metavar='DIR', default='patches', help="Override the location of the rsync-patches dir. Default: patches.")
     parser.add_argument('patch_files', metavar='patches/DIFF_FILE', nargs='*', help="Specify what patch diff files to process. Default: all of them.")
