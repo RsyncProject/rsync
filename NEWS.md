@@ -70,6 +70,8 @@
 
  - Added some compatibility code for HPE NonStop platforms.
 
+ - Improved the INSTALL.md info.
+
 ### INTERNAL:
 
  - Use a simpler overflow check idiom in a few spots.

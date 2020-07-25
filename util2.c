@@ -135,11 +135,8 @@ const char *src_file(const char *file)
 	static int prefix = -1;
 
 	if (prefix < 0) {
-		const char *cp;
-		for (cp = util2, prefix = 0; *cp; cp++) {
-			if (*cp == '/')
-				prefix = cp - util2 + 1;
-		}
+		const char *cp = strrchr(util2, '/');
+		prefix = cp ? cp - util2 + 1 : 0;
 	}
 
 	if (prefix && strncmp(file, util2, prefix) == 0)
