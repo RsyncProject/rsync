@@ -108,7 +108,7 @@ gid_t our_gid;
 int am_receiver = 0;  /* Only set to 1 after the receiver/generator fork. */
 int am_generator = 0; /* Only set to 1 after the receiver/generator fork. */
 int local_server = 0;
-int daemon_over_rsh = 0;
+int daemon_connection = 0; /* 0 = no daemon, 1 = daemon via remote shell, -1 = daemon via socket */
 mode_t orig_umask = 0;
 int batch_gen_fd = -1;
 int sender_keeps_checksum = 0;
@@ -566,12 +566,12 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char **remote_argv, in
 #ifdef HAVE_REMSH
 		/* remsh (on HPUX) takes the arguments the other way around */
 		args[argc++] = machine;
-		if (user && !(daemon_over_rsh && dash_l_set)) {
+		if (user && !(daemon_connection && dash_l_set)) {
 			args[argc++] = "-l";
 			args[argc++] = user;
 		}
 #else
-		if (user && !(daemon_over_rsh && dash_l_set)) {
+		if (user && !(daemon_connection && dash_l_set)) {
 			args[argc++] = "-l";
 			args[argc++] = user;
 		}
@@ -591,7 +591,11 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char **remote_argv, in
 		if (blocking_io < 0 && (strcmp(t, "rsh") == 0 || strcmp(t, "remsh") == 0))
 			blocking_io = 1;
 
-		server_options(args, &argc);
+		if (daemon_connection > 0) {
+			args[argc++] = "--server";
+			args[argc++] = "--daemon";
+		} else
+			server_options(args, &argc);
 
 		if (argc >= MAX_ARGS - 2)
 			goto arg_overflow;
@@ -599,7 +603,7 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char **remote_argv, in
 
 	args[argc++] = ".";
 
-	if (!daemon_over_rsh) {
+	if (!daemon_connection) {
 		while (remote_argc > 0) {
 			if (argc >= MAX_ARGS - 1) {
 			  arg_overflow:
@@ -652,7 +656,7 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char **remote_argv, in
 #ifdef ICONV_CONST
 		setup_iconv();
 #endif
-		if (protect_args && !daemon_over_rsh)
+		if (protect_args && !daemon_connection)
 			send_protected_args(*f_out_p, args);
 	}
 
@@ -1407,7 +1411,7 @@ static int start_client(int argc, char *argv[])
 			}
 			am_sender = 0;
 			if (rsync_port)
-				daemon_over_rsh = shell_cmd ? 1 : -1;
+				daemon_connection = shell_cmd ? 1 : -1;
 		} else { /* source is local, check dest arg */
 			am_sender = 1;
 
@@ -1439,7 +1443,7 @@ static int start_client(int argc, char *argv[])
 			} else { /* hostspec was found, so dest is remote */
 				argv[argc] = path;
 				if (rsync_port)
-					daemon_over_rsh = shell_cmd ? 1 : -1;
+					daemon_connection = shell_cmd ? 1 : -1;
 			}
 		}
 	} else {  /* read_batch */
@@ -1502,10 +1506,10 @@ static int start_client(int argc, char *argv[])
 	else
 		env_port = rsync_port;
 
-	if (daemon_over_rsh < 0)
+	if (daemon_connection < 0)
 		return start_socket_client(shell_machine, remote_argc, remote_argv, argc, argv);
 
-	if (password_file && !daemon_over_rsh) {
+	if (password_file && !daemon_connection) {
 		rprintf(FERROR, "The --password-file option may only be "
 				"used when accessing an rsync daemon.\n");
 		exit_cleanup(RERR_SYNTAX);
@@ -1533,7 +1537,7 @@ static int start_client(int argc, char *argv[])
 	}
 
 #ifdef HAVE_PUTENV
-	if (daemon_over_rsh)
+	if (daemon_connection)
 		set_env_num("RSYNC_PORT", env_port);
 #endif
 
@@ -1541,7 +1545,7 @@ static int start_client(int argc, char *argv[])
 
 	/* if we're running an rsync server on the remote host over a
 	 * remote shell command, we need to do the RSYNCD protocol first */
-	if (daemon_over_rsh) {
+	if (daemon_connection) {
 		int tmpret;
 		tmpret = start_inband_exchange(f_in, f_out, shell_user, remote_argc, remote_argv);
 		if (tmpret < 0)

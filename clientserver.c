@@ -37,7 +37,6 @@ extern int protect_args;
 extern int ignore_errors;
 extern int preserve_xattrs;
 extern int kluge_around_eof;
-extern int daemon_over_rsh;
 extern int munge_symlinks;
 extern int open_noatime;
 extern int sanitize_paths;
@@ -282,10 +281,6 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 		fclose(f);
 	}
 
-	/* set daemon_over_rsh to false since we need to build the
-	 * true set of args passed through the rsh/ssh connection;
-	 * this is a no-op for direct-socket-connection mode */
-	daemon_over_rsh = 0;
 	server_options(sargs, &sargc);
 
 	if (sargc >= MAX_ARGS - 2)

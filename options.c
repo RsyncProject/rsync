@@ -28,7 +28,6 @@
 extern int module_id;
 extern int local_server;
 extern int sanitize_paths;
-extern int daemon_over_rsh;
 extern unsigned int module_dirlen;
 extern struct name_num_obj valid_checksums;
 extern struct name_num_obj valid_compressions;
@@ -2682,13 +2681,6 @@ void server_options(char **args, int *argc_p)
 
 	/* This should always remain first on the server's command-line. */
 	args[ac++] = "--server";
-
-	if (daemon_over_rsh > 0) {
-		args[ac++] = "--daemon";
-		*argc_p = ac;
-		/* if we're passing --daemon, we're done */
-		return;
-	}
 
 	if (!am_sender)
 		args[ac++] = "--sender";

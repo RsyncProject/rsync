@@ -54,6 +54,7 @@ extern int read_batch;
 extern int compat_flags;
 extern int protect_args;
 extern int checksum_seed;
+extern int daemon_connection;
 extern int protocol_version;
 extern int remove_source_files;
 extern int preserve_hard_links;
@@ -917,7 +918,11 @@ void noop_io_until_death(void)
 {
 	char buf[1024];
 
-	if (!iobuf.in.buf || !iobuf.out.buf || iobuf.in_fd < 0 || iobuf.out_fd < 0 || kluge_around_eof || msgs2stderr)
+	if (!iobuf.in.buf || !iobuf.out.buf || iobuf.in_fd < 0 || iobuf.out_fd < 0 || kluge_around_eof)
+		return;
+
+	/* If we're talking to a daemon over a socket, don't short-circuit this logic */
+	if (msgs2stderr && daemon_connection >= 0)
 		return;
 
 	kluge_around_eof = 2;
