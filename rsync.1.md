@@ -2364,7 +2364,7 @@ your home directory (remove the '=' for that).
     specify `-zz`.
 
     See also the `--skip-compress` option for the default list of file suffixes
-    that will transferred with no (or minimal) compression.
+    that will be transferred with no (or minimal) compression.
 
 0.  `--compress-choice=STR`, `--zc=STR`
 
