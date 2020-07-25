@@ -163,7 +163,7 @@ This is helpful when using the branch-from-patch and patch-update scripts
 to maintain the official rsync patches.  If you ever need to build from
 a "detached head" git position then you'll need to manually chdir into
 the build dir to run make.  I also like to create 2 more symlinks in the
-sourc dir:  ln -s build/rsync . ; ln -s build/testtmp .
+source dir:  ln -s build/rsync . ; ln -s build/testtmp .
 
 ## Make compatibility
 
