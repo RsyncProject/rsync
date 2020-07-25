@@ -107,9 +107,9 @@ This would transfer all files matching the pattern `*.c` from the current
 directory to the directory src on the machine foo.  If any of the files already
 exist on the remote system then the rsync remote-update protocol is used to
 update the file by sending only the differences in the data.  Note that the
-expansion of wildcards on the commandline (`*.c`) into a list of files is
+expansion of wildcards on the command-line (`*.c`) into a list of files is
 handled by the shell before it runs rsync and not by rsync itself (exactly the
-same as all other posix-style programs).
+same as all other Posix-style programs).
 
 >     rsync -avz foo:src/bar /data/tmp
 
@@ -585,7 +585,7 @@ your home directory (remove the '=' for that).
     Note that some debug messages will only be output when `--stderr=all` is
     specified, especially those pertaining to I/O and buffer debugging.
 
-    Beginning in 3.2.0, this option is no longer auto-forwared to the server
+    Beginning in 3.2.0, this option is no longer auto-forwarded to the server
     side in order to allow you to specify different debug values for each side
     of the transfer, as well as to specify a new debug option that is only
     present in one of the rsync versions.  If you want to duplicate the same
@@ -597,7 +597,7 @@ your home directory (remove the '=' for that).
 0.  `--stderr=errors|all|client`
 
     This option controls which processes output to stderr and if info messages
-    are also changed to stderr.  The mode strings can be abbreviaated, so feel
+    are also changed to stderr.  The mode strings can be abbreviated, so feel
     free to use a single letter value.  The 3 possible choices are:
 
     - `errors` - (the default) causes all the rsync processes to send an
@@ -2190,7 +2190,7 @@ your home directory (remove the '=' for that).
     has no permissions to change.
 
     The following command does a local copy into the "dest/" dir as user "joe"
-    (assumimg you've installed support/lsh into a dir on your $PATH):
+    (assuming you've installed support/lsh into a dir on your $PATH):
 
     >     sudo rsync -aive lsh -M--copy-as=joe src/ lh:dest/
 
@@ -2364,7 +2364,7 @@ your home directory (remove the '=' for that).
     specify `-zz`.
 
     See also the `--skip-compress` option for the default list of file suffixes
-    that will trasnferred with no (or minimal) compression.
+    that will transferred with no (or minimal) compression.
 
 0.  `--compress-choice=STR`, `--zc=STR`
 
