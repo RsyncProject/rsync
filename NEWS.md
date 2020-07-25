@@ -45,7 +45,7 @@
  - Added `--mkpath` option to tell rsync that it should create a non-existing
    path component of the destination arg.
 
- - Added `--errors2stdout` (the new default) and `--msgs2protocol` (the old
+ - Added `--errors2stderr` (the new default) and `--msgs2protocol` (the old
    default).  The new output idiom should help error messages get to the user
    more quickly when doing a push (which includes local copying).
 
