@@ -233,8 +233,8 @@ About to:
     - git commit all changes
     - generate the manpages
     - merge the {args.master_branch} branch into the patch/{args.master_branch}/* branches
-    - update the files in the "patches" dir and OPTIONALLY
-      (if you type 'y') to launch a shell for each patch
+    - update the files in the "patches" dir and OPTIONALLY (if you type 'y') to
+      run patch-update with the --make option (which opens a shell on error)
 """)
     ans = input("<Press Enter OR 'y' to continue> ")
 
@@ -255,8 +255,8 @@ About to:
         die('Aborting')
 
     if re.match(r'^y', ans, re.I):
-        print(f'\nVisiting all "patch/{args.master_branch}/*" branches ...')
-        cmd_run(f"packaging/patch-update --branch={args.master_branch} --skip-check --shell")
+        print(f'\nRunning smart-make on all "patch/{args.master_branch}/*" branches ...')
+        cmd_run(f"packaging/patch-update --branch={args.master_branch} --skip-check --make")
 
     if os.path.isdir('patches/.git'):
         s = cmd_run(f"cd patches && git commit -a -m 'The patches for {version}.'")
