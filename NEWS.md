@@ -12,12 +12,16 @@
  - Fixed a bug in the xattr code that was not leaving room for the "rsync."
    prefix in some instances where it needed to be added.
 
- - Restored the ability to use --bwlimit=0 to specify no bandwidth limit.  (It
+ - Restored the ability to use `--bwlimit=0` to specify no bandwidth limit.  (It
    was accidentally broken in 3.2.2.)
 
  - Fix a bug when combining `--delete-missing-args` with `--no-implied-dirs` &
    `-R` where rsync might create the destination path of a missing arg.  The
    code also avoids some superfluous warnings for nested paths of removed args.
+
+ - Fixed an issue where hard-linked devices could cause the rdev_major value to
+   get out of sync between the sender and the receiver, which could cause a
+   device to get created with the wrong major value in its major,minor pair.
 
 ### ENHANCEMENTS:
 
@@ -98,7 +102,7 @@
 
  - Apple requires the asm function name to begin with an underscore.
 
- - Avoid a test failure in the daemon test when --atimes is disabled.
+ - Avoid a test failure in the daemon test when `--atimes` is disabled.
 
 ### ENHANCEMENTS:
 

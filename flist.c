@@ -448,7 +448,7 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file,
 		if (protocol_version < 28)
 			xflags |= XMIT_SAME_RDEV_pre28;
 		else {
-			rdev = MAKEDEV(major(rdev), 0);
+			rdev = MAKEDEV(rdev_major, 0);
 			xflags |= XMIT_SAME_RDEV_MAJOR;
 			if (protocol_version < 30)
 				xflags |= XMIT_RDEV_MINOR_8_pre30;
@@ -804,7 +804,8 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 				gid = F_GROUP(first);
 			if (preserve_devices && IS_DEVICE(mode)) {
 				uint32 *devp = F_RDEV_P(first);
-				rdev = MAKEDEV(DEV_MAJOR(devp), DEV_MINOR(devp));
+				rdev_major = DEV_MAJOR(devp);
+				rdev = MAKEDEV(rdev_major, DEV_MINOR(devp));
 				extra_len += DEV_EXTRA_CNT * EXTRA_LEN;
 			}
 			if (preserve_links && S_ISLNK(mode))
