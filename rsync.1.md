@@ -2584,6 +2584,8 @@ your home directory (remove the '=' for that).
     option to have any effect, the `-g` (`--groups`) option must be used (or
     implied), and the receiver will need to have permissions to set that group.
 
+    If your shell complains about the wildcards, use `--protect-args` (`-s`).
+
 0.  `--chown=USER:GROUP`
 
     This option forces all files to be owned by USER with group GROUP.  This is
@@ -2594,7 +2596,8 @@ your home directory (remove the '=' for that).
     USER is empty, a leading colon must be supplied.
 
     If you specify "`--chown=foo:bar`", this is exactly the same as specifying
-    "`--usermap=*:foo --groupmap=*:bar`", only easier.
+    "`--usermap=*:foo --groupmap=*:bar`", only easier.  If your shell complains
+    about the wildcards, use `--protect-args` (`-s`).
 
 0.  `--timeout=SECONDS`
 
