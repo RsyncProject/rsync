@@ -231,7 +231,7 @@ proto: proto.h-tstamp
 proto.h: proto.h-tstamp
 	@if test -f proto.h; then :; else cp -p $(srcdir)/proto.h .; fi
 
-proto.h-tstamp: $(srcdir)/*.c $(srcdir)/lib/compat.c config.h daemon-parm.h
+proto.h-tstamp: $(srcdir)/*.c $(srcdir)/lib/compat.c daemon-parm.h
 	$(AWK) -f $(srcdir)/mkproto.awk $(srcdir)/*.c $(srcdir)/lib/compat.c daemon-parm.h
 
 .PHONY: man
