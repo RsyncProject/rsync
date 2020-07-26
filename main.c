@@ -97,6 +97,7 @@ extern char *shell_cmd;
 extern char *password_file;
 extern char *backup_dir;
 extern char *copy_as;
+extern char *tmpdir;
 extern char curr_dir[MAXPATHLEN];
 extern char backup_dir_buf[MAXPATHLEN];
 extern char *basis_dir[MAX_BASIS_DIRS+1];
@@ -1000,6 +1001,23 @@ static int do_recv(int f_in, int f_out, char *local_name)
 			rprintf(FINFO, "backup_dir is %s\n", backup_dir_buf);
 		if (backup_dir_len > 1)
 			backup_dir_buf[backup_dir_len-1] = '/';
+	}
+
+	if (tmpdir) {
+		STRUCT_STAT st;
+		int ret = do_stat(tmpdir, &st);
+		if (ret < 0 || !S_ISDIR(st.st_mode)) {
+			if (ret == 0) {
+				rprintf(FERROR, "The temp-dir is not a directory: %s\n", tmpdir);
+				exit_cleanup(RERR_SYNTAX);
+			}
+			if (errno == ENOENT) {
+				rprintf(FERROR, "The temp-dir does not exist: %s\n", tmpdir);
+				exit_cleanup(RERR_SYNTAX);
+			}
+			rprintf(FERROR, "Failed to stat temp-dir %s: %s\n", tmpdir, strerror(errno));
+			exit_cleanup(RERR_FILEIO);
+		}
 	}
 
 	io_flush(FULL_FLUSH);

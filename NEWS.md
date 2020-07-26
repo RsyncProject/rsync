@@ -23,6 +23,9 @@
    get out of sync between the sender and the receiver, which could cause a
    device to get created with the wrong major value in its major,minor pair.
 
+ - Rsync now complains about a missing `--temp-dir` before starting any file
+   transfers.
+
 ### ENHANCEMENTS:
 
  - Allow `--max-alloc=0` to specify no limit to the alloc sanity check.
