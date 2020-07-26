@@ -10,11 +10,12 @@ features (the impatient can skip down to the package summary):
 ## The basic setup
 
 You need to have a C compiler installed and optionally a C++ compiler in order
-to try to build some hardware-accelerated checksum routines.  If you're
-installing from the git repo (instead of a release tar file) you'll also need
-the GNU autotools (autoconf & automake) and your choice of 2 python3 markdown
-libraries: cmarkgfm or commonmark (needed to generate the man pages).
+to try to build some hardware-accelerated checksum routines.  Rsync also needs
+a modern awk, which might be provides via gawk or nawk on some OSes.
 
+If you're installing from the git repo (instead of a release tar file) you'll
+also need the GNU autotools (autoconf & automake) and your choice of 2 python3
+markdown libraries: cmarkgfm or commonmark (needed to generate the man pages).
 If your OS doesn't provide a python3-cmarkgfm or python3-commonmark package,
 you can run the following to install the commonmark python library for your
 build user (after installing python3's pip package):
@@ -80,7 +81,7 @@ like.
  -  For Debian and Ubuntu (Debian Buster users may want to briefly(?) enable
     buster-backports to update zstd from 1.3 to 1.4):
 
-    >     sudo apt install -y gcc g++ autoconf automake python3-cmarkgfm
+    >     sudo apt install -y gcc g++ gawk autoconf automake python3-cmarkgfm
     >     sudo apt install -y acl libacl1-dev
     >     sudo apt install -y attr libattr1-dev
     >     sudo apt install -y libxxhash-dev
@@ -91,7 +92,7 @@ like.
  -  For CentOS (use EPEL for python3-pip):
 
     >     sudo yum -y install epel-release
-    >     sudo yum -y install gcc g++ autoconf automake python3-pip
+    >     sudo yum -y install gcc g++ gawk autoconf automake python3-pip
     >     sudo yum -y install acl libacl-devel
     >     sudo yum -y install attr libattr-devel
     >     sudo yum -y install xxhash-devel
@@ -117,7 +118,7 @@ like.
 
  -  For Cygwin (with all cygwin programs stopped, run the appropriate setup program from a cmd shell):
 
-    >     .\setup-x86_64.exe --quiet-mode -P make,autoconf,automake,gcc-core,python3,python36-commonmark
+    >     .\setup-x86_64.exe --quiet-mode -P make,gawk,autoconf,automake,gcc-core,python3,python36-commonmark
     >     .\setup-x86_64.exe --quiet-mode -P attr,libattr-devel
     >     .\setup-x86_64.exe --quiet-mode -P libzstd-devel
     >     .\setup-x86_64.exe --quiet-mode -P liblz4-devel
