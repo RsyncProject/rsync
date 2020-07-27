@@ -938,30 +938,31 @@ your home directory (remove the '=' for that).
 
 0.  `--append`
 
-    This causes rsync to update a file by appending data onto the end of the
-    file, which presumes that the data that already exists on the receiving
-    side is identical with the start of the file on the sending side.  If a
-    file needs to be transferred and its size on the receiver is the same or
-    longer than the size on the sender, the file is skipped.  This does not
-    interfere with the updating of a file's non-content attributes (e.g.
-    permissions, ownership, etc.) when the file does not need to be
-    transferred, nor does it affect the updating of any non-regular files.
-    Implies `--inplace`.
+    This special copy mode only works to efficiently update files that are
+    known to be growing larger where any existing content on the receiving side
+    is also known to be the same as the content on the sender.  The use of
+    `--append` **can be dangerous** if you aren't 100% sure that all the files
+    in the transfer are shared, growing files.  You should thus use filter
+    rules to ensure that you weed out any files that do not fit this criteria.
 
-    The use of `--append` can be dangerous if you aren't 100% sure that the
-    files that are longer have only grown by the appending of data onto the
-    end.  You should thus use include/exclude/filter rules to ensure that such
-    a transfer is only affecting files that you know to be growing via appended
-    data.
+    Rsync updates these growing file in-place without verifying any of the
+    existing content in the file (it only verifies the content that it is
+    appending).  Rsync skips any files that exist on the receiving side that
+    are not shorter than the associated file on the sending side (which means
+    that new files are trasnferred).
+
+    This does not interfere with the updating of a file's non-content
+    attributes (e.g.  permissions, ownership, etc.) when the file does not need
+    to be transferred, nor does it affect the updating of any directories or
+    non-regular files.
 
 0.  `--append-verify`
 
-    This works just like the `--append` option, but the existing data on the
-    receiving side is included in the full-file checksum verification step,
-    which will cause a file to be resent if the final verification step fails
-    (rsync uses a normal, non-appending `--inplace` transfer for the resend).
-    It otherwise has the exact same caveats for files that have not grown
-    larger, so don't use this for a general copy.
+    This special copy mode works like `--append` except that all the data in
+    the file is included in the checksum verification (making it much less
+    efficient but also potentially safer).  This option **can be dangerous** if
+    you aren't 100% sure that all the files in the transfer are shared, growing
+    files.  See the `--append` option for more details.
 
     Note: prior to rsync 3.0.0, the `--append` option worked like
     `--append-verify`, so if you are interacting with an older rsync (or the
