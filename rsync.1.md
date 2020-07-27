@@ -2959,6 +2959,9 @@ your home directory (remove the '=' for that).
     can do if you want rsync to cleanup old `.~tmp~` dirs that might be lying
     around.  Conflicts with `--inplace` and `--append`.
 
+    This option implies `--no-inc-recursive` since it needs the full file list
+    in memory in order to be able to iterate over it at the end.
+
     This option uses more memory on the receiving side (one bit per file
     transferred) and also requires enough free disk space on the receiving side
     to hold an additional copy of all the updated files.  Note also that you
