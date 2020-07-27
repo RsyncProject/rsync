@@ -822,7 +822,7 @@ AC_FUNC_UTIME_NULL
 AC_FUNC_ALLOCA
 AC_CHECK_FUNCS(waitpid wait4 getcwd chown chmod lchmod mknod mkfifo \
     fchmod fstat ftruncate strchr readlink link utime utimes lutimes strftime \
-    chflags getattrlist mktime innetgr \
+    chflags getattrlist mktime innetgr linkat \
     memmove lchown vsnprintf snprintf vasprintf asprintf setsid strpbrk \
     strlcat strlcpy strtol mallinfo getgroups setgroups geteuid getegid \
     setlocale setmode open64 lseek64 mkstemp64 mtrace va_copy __va_copy \
@@ -946,6 +946,11 @@ fi
 
 AC_CACHE_CHECK([whether link() can hard-link symlinks],rsync_cv_can_hardlink_symlink,[
   AC_RUN_IFELSE([AC_LANG_SOURCE([[
+#ifdef HAVE_FCNTL_H
+# include <fcntl.h>
+#elif defined HAVE_SYS_FCNTL_H
+# include <sys/fcntl.h>
+#endif
 #if HAVE_UNISTD_H
 # include <unistd.h>
 #endif
@@ -956,7 +961,11 @@ int main(void) {
 	unlink(FILENAME);
 	if (symlink("conftest.no-such", FILENAME) < 0) abort();
 	unlink(FILENAME "2");
+#ifdef HAVE_LINKAT
+	if (linkat(AT_FDCWD, FILENAME, AT_FDCWD, FILENAME "2", 0) < 0) return 1;
+#else
 	if (link(FILENAME, FILENAME "2") < 0) return 1;
+#endif
 	return 0;
     }]])],[rsync_cv_can_hardlink_symlink=yes],[rsync_cv_can_hardlink_symlink=no],[rsync_cv_can_hardlink_symlink=no])])
 if test $rsync_cv_can_hardlink_symlink = yes; then

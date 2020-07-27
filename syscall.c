@@ -129,12 +129,16 @@ ssize_t do_readlink(const char *path, char *buf, size_t bufsiz)
 #endif
 #endif
 
-#ifdef HAVE_LINK
+#if defined HAVE_LINK || defined HAVE_LINKAT
 int do_link(const char *old_path, const char *new_path)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
+#ifdef HAVE_LINKAT
+	return linkat(AT_FDCWD, old_path, AT_FDCWD, new_path, 0);
+#else
 	return link(old_path, new_path);
+#endif
 }
 #endif
 
