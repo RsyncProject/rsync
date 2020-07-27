@@ -1510,7 +1510,7 @@ struct bitbag *bitbag_create(int max_ndx)
 	struct bitbag *bb = new(struct bitbag);
 	bb->slot_cnt = (max_ndx + BB_PER_SLOT_BITS - 1) / BB_PER_SLOT_BITS;
 
-	bb->bits = (uint32**)calloc(bb->slot_cnt, sizeof (uint32*));
+	bb->bits = new_array0(uint32*, bb->slot_cnt);
 
 	return bb;
 }
@@ -1520,10 +1520,8 @@ void bitbag_set_bit(struct bitbag *bb, int ndx)
 	int slot = ndx / BB_PER_SLOT_BITS;
 	ndx %= BB_PER_SLOT_BITS;
 
-	if (!bb->bits[slot]) {
-		if (!(bb->bits[slot] = (uint32*)calloc(BB_PER_SLOT_INTS, 4)))
-			out_of_memory("bitbag_set_bit");
-	}
+	if (!bb->bits[slot])
+		bb->bits[slot] = new_array0(uint32, BB_PER_SLOT_INTS);
 
 	bb->bits[slot][ndx/32] |= 1u << (ndx % 32);
 }
