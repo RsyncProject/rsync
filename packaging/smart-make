@@ -2,6 +2,8 @@
  
 set -e
 
+export LANG=C
+
 make=`which gmake 2>/dev/null` || make=`which make 2>/dev/null`
 
 branch=`packaging/prep-auto-dir`
