@@ -72,6 +72,9 @@
    `hosts deny` daemon parameters.  This is a finalized version of the
    netgroup-auth patch from the patches repo.
 
+ - Rsync can now hard-link symlinks on FreeBSD due to it making ues of the
+   linkat() function when it is available.
+
  - Output file+line info on out-of-memory & overflow errors while also avoiding
    the output of alternate build-dir path info that is not useful to the user.
 
@@ -82,6 +85,8 @@
  - Added some compatibility code for HPE NonStop platforms.
 
  - Improved the INSTALL.md info.
+
+ - Added a few more suffixes to the default skip-compress list.
 
 ### INTERNAL:
 
