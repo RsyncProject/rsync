@@ -26,6 +26,9 @@
  - Rsync now complains about a missing `--temp-dir` before starting any file
    transfers.
 
+ - A completely empty source arg is now a fatal error.  This doesn't change
+   the handling of implied dot-dir args such as "localhost:" and such.
+
 ### ENHANCEMENTS:
 
  - Allow `--max-alloc=0` to specify no limit to the alloc sanity check.

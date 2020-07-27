@@ -1482,8 +1482,15 @@ static int start_client(int argc, char *argv[])
 		char *dummy_host;
 		int dummy_port = rsync_port;
 		int i;
+		if (!argv[0][0])
+			goto invalid_empty;
 		/* For local source, extra source args must not have hostspec. */
 		for (i = 1; i < argc; i++) {
+			if (!argv[i][0]) {
+			    invalid_empty:
+				rprintf(FERROR, "Empty source arg specified.\n");
+				exit_cleanup(RERR_SYNTAX);
+			}
 			if (check_for_hostspec(argv[i], &dummy_host, &dummy_port)) {
 				rprintf(FERROR, "Unexpected remote arg: %s\n", argv[i]);
 				exit_cleanup(RERR_SYNTAX);
