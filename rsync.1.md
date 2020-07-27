@@ -2460,27 +2460,53 @@ your home directory (remove the '=' for that).
 
     [comment]: # (This list gets used for the default-dont-compress.h file.)
 
+    > 3g2
+    > 3gp
     > 7z
+    > aac
     > ace
     > apk
     > avi
     > bz2
     > deb
+    > dmg
+    > ear
+    > f4v
     > flac
+    > flv
     > gpg
     > gz
     > iso
     > jar
     > jpeg
     > jpg
+    > lrz
     > lz
     > lz4
     > lzma
     > lzo
+    > m1a
+    > m1v
+    > m2a
+    > m2ts
+    > m2v
+    > m4a
+    > m4b
+    > m4p
+    > m4r
+    > m4v
+    > mka
     > mkv
     > mov
+    > mp1
+    > mp2
     > mp3
     > mp4
+    > mpa
+    > mpeg
+    > mpg
+    > mpv
+    > mts
     > odb
     > odf
     > odg
@@ -2489,8 +2515,11 @@ your home directory (remove the '=' for that).
     > odp
     > ods
     > odt
+    > oga
     > ogg
+    > ogm
     > ogv
+    > ogx
     > opus
     > otg
     > oth
@@ -2499,21 +2528,28 @@ your home directory (remove the '=' for that).
     > ott
     > oxt
     > png
+    > qt
     > rar
     > rpm
     > rz
     > rzip
+    > spx
     > squashfs
     > sxc
     > sxd
     > sxg
     > sxm
     > sxw
+    > sz
     > tbz
+    > tbz2
     > tgz
     > tlz
+    > ts
     > txz
     > tzo
+    > vob
+    > war
     > webm
     > webp
     > xz
