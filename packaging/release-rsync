@@ -188,7 +188,7 @@ About to:
             txt = replace_or_die(x_re, r'%s \1' % cl_today, txt, f"Unable to update ChangeLog header in {fn}")
         elif fn == 'rsync.h':
             x_re = re.compile('(#define\s+SUBPROTOCOL_VERSION)\s+(\d+)')
-            repl = lambda m: m[1] + ' ' + ('0' if not pre or proto_changed else 1 if m[2] == '0' else m[2])
+            repl = lambda m: m[1] + ' ' + ('0' if not pre or not proto_changed else '1' if m[2] == '0' else m[2])
             txt = replace_or_die(x_re, repl, txt, f"Unable to find SUBPROTOCOL_VERSION define in {fn}")
         elif fn == 'NEWS.md':
             efv = re.escape(finalversion)
