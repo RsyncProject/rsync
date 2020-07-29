@@ -11,7 +11,7 @@ features (the impatient can skip down to the package summary):
 
 You need to have a C compiler installed and optionally a C++ compiler in order
 to try to build some hardware-accelerated checksum routines.  Rsync also needs
-a modern awk, which might be provides via gawk or nawk on some OSes.
+a modern awk, which might be provided via gawk or nawk on some OSes.
 
 If you're installing from the git repo (instead of a release tar file) you'll
 also need the GNU autotools (autoconf & automake) and your choice of 2 python3
@@ -30,7 +30,7 @@ installed to manipulate ACLs and to run the rsync testsuite.
 
 ## Xattr support
 
-To support copying xattr file information, make sure you have an xattr
+To support copying xattr file information, make sure you have an attr
 development library installed. It also helps to have the helper programs
 installed to manipulate xattrs and to run the rsync testsuite.
 
@@ -45,7 +45,7 @@ checksums as the default checksum algorithm.
 
 ## zstd
 
-The [zstd library][2] compression algorithm that uses a lot less CPU than
+The [zstd library][2] compression algorithm that uses less CPU than
 the default zlib algorithm at the same compression level.  Note that you
 need at least version 1.4, so you might need to skip the zstd compression if
 you can only install a 1.3 release.  Installing this development library
@@ -101,6 +101,15 @@ like.
     >     sudo yum -y install openssl-devel
     >     pip3 install --user commonmark
 
+ -  For Fedora 33:
+
+    >     sudo dnf -y install acl libacl-devel
+    >     sudo dnf -y install attr libattr-devel
+    >     sudo dnf -y install xxhash-devel
+    >     sudo dnf -y install libzstd-devel
+    >     sudo dnf -y install lz4-devel
+    >     sudo dnf -y install openssl-devel
+
  -  For FreeBSD (this assumes that the python3 version is 3.7):
 
     >     sudo pkg install -y autotools python3 py37-CommonMark
@@ -118,11 +127,11 @@ like.
 
  -  For Cygwin (with all cygwin programs stopped, run the appropriate setup program from a cmd shell):
 
-    >     .\setup-x86_64.exe --quiet-mode -P make,gawk,autoconf,automake,gcc-core,python3,python36-commonmark
-    >     .\setup-x86_64.exe --quiet-mode -P attr,libattr-devel
-    >     .\setup-x86_64.exe --quiet-mode -P libzstd-devel
-    >     .\setup-x86_64.exe --quiet-mode -P liblz4-devel
-    >     .\setup-x86_64.exe --quiet-mode -P libssl-devel
+    >     setup-x86_64 --quiet-mode -P make,gawk,autoconf,automake,gcc-core,python3,python36-commonmark
+    >     setup-x86_64 --quiet-mode -P attr,libattr-devel
+    >     setup-x86_64 --quiet-mode -P libzstd-devel
+    >     setup-x86_64 --quiet-mode -P liblz4-devel
+    >     setup-x86_64 --quiet-mode -P libssl-devel
 
 ## Build and install
 
