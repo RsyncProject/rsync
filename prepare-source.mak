@@ -1,7 +1,7 @@
 SHELL=/bin/sh
 
-.PHONY: conf
 conf: configure.sh config.h.in
+.PHONY: conf
 
 aclocal.m4: m4/*.m4
 	aclocal -I m4
