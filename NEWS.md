@@ -88,6 +88,9 @@
 
  - Added a few more suffixes to the default skip-compress list.
 
+ - Improved configure's error handling to notify about several issues at once
+   instead of one by one (for the newest optional features).
+
 ### INTERNAL:
 
  - Use a simpler overflow check idiom in a few spots.

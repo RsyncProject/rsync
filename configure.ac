@@ -57,6 +57,11 @@ if test x"$ac_cv_prog_cc_stdc" = x"no"; then
 	AC_MSG_WARN([rsync requires an ANSI C compiler and you do not seem to have one])
 fi
 
+no_lib=''
+err_msg=''
+nl='
+'
+
 AC_ARG_ENABLE(profile,
 	AS_HELP_STRING([--enable-profile],[turn on CPU profiling]))
 if test x"$enable_profile" = x"yes"; then
@@ -88,8 +93,10 @@ if test x"$enable_md2man" != x"no"; then
     else
 	AC_MSG_RESULT(required)
 	if test x"$md2man_works" = x"no"; then
-	    AC_MSG_ERROR(You need python3 and the cmarkgfm OR commonmark python3 lib in order to build man pages.
-You can specify --disable-md2man if you want to skip building them.)
+	    err_msg="$err_msg$nl- You need python3 and either the cmarkgfm OR commonmark python3 lib in order"
+	    err_msg="$err_msg$nl  to build man pages based on the git source (man pages are included in the"
+	    err_msg="$err_msg$nl  official release tar files)."
+	    no_lib="$no_lib md2man"
 	fi
     fi
     MAKE_MAN=man
@@ -503,12 +510,12 @@ if test x"$enable_openssl" != x"no"; then
       AC_MSG_RESULT(yes)
       AC_SEARCH_LIBS(MD5_Init, crypto,
           [AC_DEFINE(USE_OPENSSL)],
-          [AC_MSG_ERROR(Failed to find MD5_Init function in openssl crypto lib.
-Use --disable-openssl to continue without openssl crypto lib support.)])
+          [err_msg="$err_msg$nl- Failed to find MD5_Init function in openssl crypto lib.";
+	   no_lib="$no_lib openssl"])
     else
         AC_MSG_RESULT(no)
-        AC_MSG_ERROR(Failed to find openssl/md4.h and openssl/md5.h for openssl crypto lib support.
-Use --disable-openssl to continue without it.)
+	err_msg="$err_msg$nl- Failed to find openssl/md4.h and openssl/md5.h for openssl crypto lib support."
+	no_lib="$no_lib openssl"
     fi
 else
     AC_MSG_RESULT(no)
@@ -524,12 +531,12 @@ if test x"$enable_xxhash" != x"no"; then
 	AC_MSG_RESULT(yes)
 	AC_SEARCH_LIBS(XXH64_createState, xxhash,
 	    [AC_DEFINE(SUPPORT_XXHASH)],
-	    [AC_MSG_ERROR(Failed to find XXH64_createState function in xxhash lib.
-Use --disable-xxhash to continue without xxhash checksums.)])
+	    [err_msg="$err_msg$nl- Failed to find XXH64_createState function in xxhash lib.";
+	     no_lib="$no_lib xxhash"])
     else
 	AC_MSG_RESULT(no)
-	AC_MSG_ERROR(Failed to find xxhash.h for xxhash checksum support.
-Use --disable-xxhash to continue without it.)
+	err_msg="$err_msg$nl- Failed to find xxhash.h for xxhash checksum support.";
+	no_lib="$no_lib xxhash"
     fi
 else
     AC_MSG_RESULT(no)
@@ -545,12 +552,12 @@ if test x"$enable_zstd" != x"no"; then
 	AC_MSG_RESULT(yes)
 	AC_SEARCH_LIBS(ZSTD_minCLevel, zstd,
 	    [AC_DEFINE(SUPPORT_ZSTD)],
-	    [AC_MSG_ERROR(Failed to find ZSTD_minCLevel function in zstd lib.
-Use --disable-zstd to continue without zstd compression.)])
+	    [err_msg="$err_msg$nl- Failed to find ZSTD_minCLevel function in zstd lib.";
+	     no_lib="$no_lib zstd"])
     else
 	AC_MSG_RESULT(no)
-	AC_MSG_ERROR(Failed to find zstd.h for zstd compression support.
-Use --disable-zstd to continue without it.)
+	err_msg="$err_msg$nl- Failed to find zstd.h for zstd compression support.";
+	no_lib="$no_lib zstd"
     fi
 else
     AC_MSG_RESULT(no)
@@ -566,15 +573,32 @@ if test x"$enable_lz4" != x"no"; then
 	AC_MSG_RESULT(yes)
 	AC_SEARCH_LIBS(LZ4_compress_default, lz4,
 	    [AC_DEFINE(SUPPORT_LZ4)],
-	    [AC_MSG_ERROR(Failed to find LZ4_compress_default function in lz4 lib.
-Use --disable-lz4 to continue without lz4 compression.)])
+	    [err_msg="$err_msg$nl- Failed to find LZ4_compress_default function in lz4 lib.";
+	     no_lib="$no_lib lz4"])
     else
 	AC_MSG_RESULT(no)
-	AC_MSG_ERROR(Failed to find lz4.h for lz4 compression support.
-Use --disable-lz4 to continue without it.)
+	err_msg="$err_msg$nl- Failed to find lz4.h for lz4 compression support."
+	no_lib="$no_lib lz4"
     fi
 else
     AC_MSG_RESULT(no)
+fi
+
+if test x"$no_lib" != x; then
+    echo ""
+    echo "Configure found the following issues:"
+    echo "$err_msg"
+    echo ""
+    echo "See the INSTALL file for hints on how to install the missing libraries and/or"
+    echo "how to generate (or fetch) man pages:"
+    echo "    https://github.com/WayneD/rsync/blob/master/INSTALL.md"
+    echo ""
+    echo "To disable one or more features, the relevant configure options are:"
+    for lib in $no_lib; do
+	echo "    --disable-$lib"
+    done
+    echo ""
+    AC_MSG_ERROR(Aborting configure run)
 fi
 
 AC_CACHE_CHECK([if makedev takes 3 args],rsync_cv_MAKEDEV_TAKES_3_ARGS,[
