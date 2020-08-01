@@ -1,0 +1,10 @@
+#!/bin/sh
+
+srcdir=`dirname $0`
+
+if test -d "$srcdir/.git"; then
+    gitver=\"`git describe --tags`\" || exit 1
+else
+    gitver=RSYNC_VERSION
+fi
+echo "#define RSYNC_GITVER $gitver" >git-version.h

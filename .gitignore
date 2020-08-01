@@ -32,6 +32,7 @@ aclocal.m4
 /rsync
 /stunnel-rsyncd.conf
 /shconfig
+/git-version.h
 /testdir
 /tests-dont-exist
 /testtmp

@@ -23,6 +23,7 @@
 #include "itypes.h"
 #include "ifuncs.h"
 #include "latest-year.h"
+#include "git-version.h"
 #include <popt.h>
 
 extern int module_id;
@@ -727,7 +728,7 @@ static void print_rsync_version(enum logcode f)
 	subprotocol = istring(".PR%d", SUBPROTOCOL_VERSION);
 #endif
 	rprintf(f, "%s  version %s  protocol version %d%s\n",
-		RSYNC_NAME, RSYNC_VERSION, PROTOCOL_VERSION, subprotocol);
+		RSYNC_NAME, RSYNC_GITVER, PROTOCOL_VERSION, subprotocol);
 
 	rprintf(f, "Copyright (C) 1996-" LATEST_YEAR " by Andrew Tridgell, Wayne Davison, and others.\n");
 	rprintf(f, "Web site: https://rsync.samba.org/\n");

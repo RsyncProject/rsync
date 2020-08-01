@@ -99,7 +99,7 @@ rsync$(EXEEXT): $(OBJS)
 $(OBJS): $(HEADERS)
 $(CHECK_OBJS): $(HEADERS)
 tls.o xattrs.o: lib/sysxattrs.h
-options.o: latest-year.h help-rsync.h help-rsyncd.h
+options.o: latest-year.h help-rsync.h help-rsyncd.h git-version.h
 exclude.o: default-cvsignore.h
 loadparm.o: default-dont-compress.h daemon-parm.h
 
@@ -131,6 +131,12 @@ rounding.h: rounding.c rsync.h proto.h
 	    exit 1; \
 	fi
 	@rm -f rounding.out
+
+# While $(wildcard ...) is a GNU make idiom, at least other makes should just turn it into an
+# empty string (we need something that will vanish if we're not building a git checkout).
+# If you want an updated git version w/o GNU make, remove git-version.h after a pull.
+git-version.h: mkgitver $(wildcard $(srcdir)/.git/logs/HEAD)
+	$(srcdir)/mkgitver
 
 simd-checksum-x86_64.o: simd-checksum-x86_64.cpp
 	@$(srcdir)/cmdormsg disable-simd $(CXX) -I. $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $(srcdir)/simd-checksum-x86_64.cpp
