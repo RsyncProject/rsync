@@ -1,9 +1,10 @@
 #!/bin/sh
 
 srcdir=`dirname $0`
+gitver=`git describe --abbrev=8 --always 2>/dev/null`
 
-if test -e "$srcdir/.git"; then
-    gitver=\"`git describe --abbrev=8 --always`\" || exit 1
+if test x"$gitver" != x; then
+    gitver=\""$gitver"\"
 else
     gitver=RSYNC_VERSION
 fi
