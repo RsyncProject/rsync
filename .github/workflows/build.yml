@@ -16,6 +16,8 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
     - name: prep
       run: |
         sudo apt-get install acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev python3-cmarkgfm openssl
