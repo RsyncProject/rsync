@@ -21,7 +21,6 @@
  */
 
 #include "rsync.h"
-#include "default-cvsignore.h"
 #include "ifuncs.h"
 
 extern int am_server;
@@ -1053,7 +1052,7 @@ static void get_cvs_excludes(uint32 rflags)
 		return;
 	initialized = 1;
 
-	parse_filter_str(&cvs_filter_list, DEFAULT_CVSIGNORE,
+	parse_filter_str(&cvs_filter_list, default_cvsignore(),
 			 rule_template(rflags | (protocol_version >= 30 ? FILTRULE_PERISHABLE : 0)),
 			 0);
 

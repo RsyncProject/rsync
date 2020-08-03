@@ -43,7 +43,7 @@ zlib_OBJS=zlib/deflate.o zlib/inffast.o zlib/inflate.o zlib/inftrees.o \
 OBJS1=flist.o rsync.o generator.o receiver.o cleanup.o sender.o exclude.o \
 	util.o util2.o main.o checksum.o match.o syscall.o log.o backup.o delete.o
 OBJS2=options.o io.o compat.o hlink.o token.o uidlist.o socket.o hashtable.o \
-	fileio.o batch.o clientname.o chmod.o acls.o xattrs.o
+	usage.o fileio.o batch.o clientname.o chmod.o acls.o xattrs.o
 OBJS3=progress.o pipe.o @ASM@
 DAEMON_OBJ = params.o loadparm.o clientserver.o access.o connection.o authenticate.o
 popt_OBJS=popt/findme.o  popt/popt.o  popt/poptconfig.o \
@@ -99,8 +99,7 @@ rsync$(EXEEXT): $(OBJS)
 $(OBJS): $(HEADERS)
 $(CHECK_OBJS): $(HEADERS)
 tls.o xattrs.o: lib/sysxattrs.h
-options.o: latest-year.h help-rsync.h help-rsyncd.h git-version.h
-exclude.o: default-cvsignore.h
+usage.o: latest-year.h help-rsync.h help-rsyncd.h git-version.h default-cvsignore.h
 loadparm.o: default-dont-compress.h daemon-parm.h
 
 flist.o: rounding.h
