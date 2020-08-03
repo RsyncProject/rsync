@@ -36,5 +36,5 @@ inheader {
 
 END {
     if (old_protos != protos) print protos > "proto.h"
-    printf "" > "proto.h-tstamp"
+    system("touch proto.h-tstamp")
 }
