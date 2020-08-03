@@ -720,6 +720,11 @@ static void print_info_flags(enum logcode f)
 	}
 }
 
+const char *rsync_version(void)
+{
+	return RSYNC_GITVER;
+}
+
 static void print_rsync_version(enum logcode f)
 {
 	char tmpbuf[256], *subprotocol = "";
@@ -728,7 +733,7 @@ static void print_rsync_version(enum logcode f)
 	subprotocol = istring(".PR%d", SUBPROTOCOL_VERSION);
 #endif
 	rprintf(f, "%s  version %s  protocol version %d%s\n",
-		RSYNC_NAME, RSYNC_GITVER, PROTOCOL_VERSION, subprotocol);
+		RSYNC_NAME, rsync_version(), PROTOCOL_VERSION, subprotocol);
 
 	rprintf(f, "Copyright (C) 1996-" LATEST_YEAR " by Andrew Tridgell, Wayne Davison, and others.\n");
 	rprintf(f, "Web site: https://rsync.samba.org/\n");

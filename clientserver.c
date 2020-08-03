@@ -1451,7 +1451,7 @@ int daemon_main(void)
 	log_init(0);
 
 	rprintf(FLOG, "rsyncd version %s starting, listening on port %d\n",
-		RSYNC_VERSION, rsync_port);
+		rsync_version(), rsync_port);
 	/* TODO: If listening on a particular address, then show that
 	 * address too.  In fact, why not just do getnameinfo on the
 	 * local address??? */
