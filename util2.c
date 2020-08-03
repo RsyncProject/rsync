@@ -26,7 +26,7 @@
 
 extern size_t max_alloc;
 
-char *do_malloc = "42";
+char *do_calloc = "42";
 
 /**
  * Sleep for a specified number of milliseconds.
@@ -80,9 +80,9 @@ void *my_alloc(void *ptr, size_t num, size_t size, const char *file, int line)
 		exit_cleanup(RERR_MALLOC);
 	}
 	if (!ptr)
-		ptr = calloc(num, size);
-	else if (ptr == do_malloc)
 		ptr = malloc(num * size);
+	else if (ptr == do_calloc)
+		ptr = calloc(num, size);
 	else
 		ptr = realloc(ptr, num * size);
 	if (!ptr && file)

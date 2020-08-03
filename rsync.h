@@ -1324,15 +1324,15 @@ extern int errno;
 /* handler for null strings in printf format */
 #define NS(s) ((s)?(s):"<NULL>")
 
-extern char *do_malloc;
+extern char *do_calloc;
 
 /* Convenient wrappers for malloc and realloc.  Use them. */
-#define new(type) ((type*)my_alloc(do_malloc, sizeof (type), 1, __FILE__, __LINE__))
-#define new0(type) ((type*)my_alloc(NULL, sizeof (type), 1, __FILE__, __LINE__))
+#define new(type) ((type*)my_alloc(NULL, sizeof (type), 1, __FILE__, __LINE__))
+#define new0(type) ((type*)my_alloc(do_calloc, sizeof (type), 1, __FILE__, __LINE__))
 #define realloc_buf(ptr, num) my_alloc((ptr), (num), 1, __FILE__, __LINE__)
 
-#define new_array(type, num) ((type*)my_alloc(do_malloc, (num), sizeof (type), __FILE__, __LINE__))
-#define new_array0(type, num) ((type*)my_alloc(NULL, (num), sizeof (type), __FILE__, __LINE__))
+#define new_array(type, num) ((type*)my_alloc(NULL, (num), sizeof (type), __FILE__, __LINE__))
+#define new_array0(type, num) ((type*)my_alloc(do_calloc, (num), sizeof (type), __FILE__, __LINE__))
 #define realloc_array(ptr, type, num) ((type*)my_alloc((ptr), (num), sizeof (type), __FILE__, __LINE__))
 
 #undef strdup
