@@ -570,6 +570,10 @@ typedef unsigned int size_t;
 #endif
 #endif
 
+#ifndef __APPLE__ /* Do we need a configure check for this? */
+#define SUPPORT_ATIMES 1
+#endif
+
 #ifdef HAVE_GETATTRLIST
 #define SUPPORT_CRTIMES 1
 #endif

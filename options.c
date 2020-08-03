@@ -192,10 +192,6 @@ const char **remote_options = NULL;
 const char *checksum_choice = NULL;
 const char *compress_choice = NULL;
 
-#ifndef __APPLE__ /* Do we need a configure check for this? */
-#define SUPPORT_ATIMES 1
-#endif
-
 int quiet = 0;
 int output_motd = 1;
 int log_before_transfer = 0;
