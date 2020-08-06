@@ -14,8 +14,8 @@
 # An unknown ID_NUM or NAME results in an empty return value.
 #
 # This is used by an rsync daemon when configured with the "name converter" and
-# "use chroot = true".  While this converter uses real user & group lookups you
-# could change it to use any mapping idiom you'd like.
+# (often) "use chroot = true".  While this converter uses real user & group
+# lookups you could change it to use any mapping idiom you'd like.
 
 import sys, argparse, pwd, grp
 
