@@ -108,12 +108,22 @@
 #define BITS_EQUAL(b1,b2,mask) (((unsigned)(b1) & (unsigned)(mask)) \
 			     == ((unsigned)(b2) & (unsigned)(mask)))
 
-/* update this if you make incompatible changes */
+/* Update this if you make incompatible changes and ALSO update the
+ * SUBPROTOCOL_VERSION if it is not a final (offical) release. */
 #define PROTOCOL_VERSION 31
 
-/* This is used when working on a new protocol version in CVS, and should
- * be a new non-zero value for each CVS change that affects the protocol.
- * It must ALWAYS be 0 when the protocol goes final (and NEVER before)! */
+/* This is used when working on a new protocol version or for any unofficial
+ * protocol tweaks.  It should be a non-zero value for each pre-release repo
+ * change that affects the protocol. The official pre-release versions should
+ * start with 1 (after incrementing the PROTOCOL_VERSION) and go up by 1 for
+ * each new protocol change.  For unofficial changes, pick a fairly large
+ * random number that will hopefully not collide with anyone else's unofficial
+ * protocol.  It must ALWAYS be 0 when the protocol goes final (and official)
+ * and NEVER before!  When rsync negotiates a protocol match, it will only
+ * allow the newest protocol to be used if the SUBPROTOCOL_VERSION matches.
+ * All older protocol versions MUST be compatible with the final, official
+ * release of the protocol, so don't tweak the code to change the protocol
+ * behavior for an older protocol version. */
 #define SUBPROTOCOL_VERSION 0
 
 /* We refuse to interoperate with versions that are not in this range.
