@@ -300,7 +300,6 @@ enum delret {
 #include "errcode.h"
 
 #include "config.h"
-#include "version.h"
 
 /* The default RSYNC_RSH is always set in config.h. */
 

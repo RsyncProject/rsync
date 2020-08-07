@@ -35,7 +35,7 @@ ASM_x86_64=lib/md5-asm-x86_64.o
 GENFILES=configure.sh aclocal.m4 config.h.in rsync.1 rsync.1.html \
 	 rsync-ssl.1 rsync-ssl.1.html rsyncd.conf.5 rsyncd.conf.5.html
 HEADERS=byteorder.h config.h errcode.h proto.h rsync.h ifuncs.h itypes.h inums.h \
-	lib/pool_alloc.h lib/mdigest.h lib/md-defines.h version.h
+	lib/pool_alloc.h lib/mdigest.h lib/md-defines.h
 LIBOBJ=lib/wildmatch.o lib/compat.o lib/snprintf.o lib/mdfour.o lib/md5.o \
 	lib/permstring.o lib/pool_alloc.o lib/sysacls.o lib/sysxattrs.o @LIBOBJS@
 zlib_OBJS=zlib/deflate.o zlib/inffast.o zlib/inflate.o zlib/inftrees.o \
@@ -99,7 +99,7 @@ rsync$(EXEEXT): $(OBJS)
 $(OBJS): $(HEADERS)
 $(CHECK_OBJS): $(HEADERS)
 tls.o xattrs.o: lib/sysxattrs.h
-usage.o: latest-year.h help-rsync.h help-rsyncd.h git-version.h default-cvsignore.h
+usage.o: version.h latest-year.h help-rsync.h help-rsyncd.h git-version.h default-cvsignore.h
 loadparm.o: default-dont-compress.h daemon-parm.h
 
 flist.o: rounding.h

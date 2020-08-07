@@ -18,6 +18,7 @@
  */
 
 #include "rsync.h"
+#include "version.h"
 #include "latest-year.h"
 #include "git-version.h"
 #include "default-cvsignore.h"
