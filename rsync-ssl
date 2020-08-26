@@ -129,7 +129,7 @@ function rsync_ssl_helper {
     fi
 
     if [[ $RSYNC_SSL_TYPE == openssl ]]; then
-	exec $RSYNC_SSL_OPENSSL s_client $caopt $certopt -quiet -verify_quiet -servername $hostname -connect $hostname:$port
+	exec $RSYNC_SSL_OPENSSL s_client $caopt $certopt -quiet -verify_quiet -servername $hostname -verify_hostname $hostname -connect $hostname:$port
     elif [[ $RSYNC_SSL_TYPE == gnutls ]]; then
 	exec $RSYNC_SSL_GNUTLS --logfile=/dev/null $gnutls_cert_opt $gnutls_opts $hostname:$port
     else
