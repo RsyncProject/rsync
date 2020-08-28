@@ -1,3 +1,17 @@
+<a name="3.2.4"></a>
+
+# NEWS for rsync 3.2.4 (UNRELEASED)
+
+## Changes in this version:
+
+### BUG FIXES:
+
+ - Use openssl's `-verify_hostname` option in the rsync-ssl script.
+
+ - Avoid a weird failure if you run a local copy with an `--rsh` option that
+   contained a `V`.
+
+------------------------------------------------------------------------------
 <a name="3.2.3"></a>
 
 # NEWS for rsync 3.2.3 (6 Aug 2020)
@@ -4244,6 +4258,7 @@
 
 | RELEASE DATE | VER.   | DATE OF COMMIT\* | PROTOCOL    |
 |--------------|--------|------------------|-------------|
+| ?? Sep 2020  | 3.2.4  |                  | 31          |
 | 06 Aug 2020  | 3.2.3  |                  | 31          |
 | 04 Jul 2020  | 3.2.2  |                  | 31          |
 | 22 Jun 2020  | 3.2.1  |                  | 31          |
