@@ -21,6 +21,7 @@
 
 #include "rsync.h"
 #include "itypes.h"
+#include "ifuncs.h"
 
 extern int am_server;
 extern int am_sender;
@@ -153,7 +154,13 @@ static void check_sub_protocol(void)
 
 void set_allow_inc_recurse(void)
 {
-	client_info = shell_cmd ? shell_cmd : "";
+	if (!local_server)
+		client_info = shell_cmd ? shell_cmd : "";
+	else if (am_server) {
+		char buf[64];
+		maybe_add_e_option(buf, sizeof buf);
+		client_info = *buf ? strdup(buf+1) : ""; /* The +1 skips the leading "e". */
+	}
 
 	if (!recurse || use_qsort)
 		allow_inc_recurse = 0;
@@ -161,8 +168,7 @@ void set_allow_inc_recurse(void)
 	 && (delete_before || delete_after
 	  || delay_updates || prune_empty_dirs))
 		allow_inc_recurse = 0;
-	else if (am_server && !local_server
-	 && (strchr(client_info, 'i') == NULL))
+	else if (am_server && strchr(client_info, 'i') == NULL)
 		allow_inc_recurse = 0;
 }
 
@@ -558,7 +564,7 @@ void setup_protocol(int f_out,int f_in)
 		atimes_ndx = (file_extra_cnt += EXTRA64_CNT);
 	if (preserve_crtimes)
 		crtimes_ndx = (file_extra_cnt += EXTRA64_CNT);
-	if (am_sender) /* This is most likely in the in64 union as well. */
+	if (am_sender) /* This is most likely in the file_extras64 union as well. */
 		pathname_ndx = (file_extra_cnt += PTR_EXTRA_CNT);
 	else
 		depth_ndx = ++file_extra_cnt;
@@ -691,17 +697,17 @@ void setup_protocol(int f_out,int f_in)
 #ifdef ICONV_OPTION
 			compat_flags |= CF_SYMLINK_ICONV;
 #endif
-			if (local_server || strchr(client_info, 'f') != NULL)
+			if (strchr(client_info, 'f') != NULL)
 				compat_flags |= CF_SAFE_FLIST;
-			if (local_server || strchr(client_info, 'x') != NULL)
+			if (strchr(client_info, 'x') != NULL)
 				compat_flags |= CF_AVOID_XATTR_OPTIM;
-			if (local_server || strchr(client_info, 'C') != NULL)
+			if (strchr(client_info, 'C') != NULL)
 				compat_flags |= CF_CHKSUM_SEED_FIX;
-			if (local_server || strchr(client_info, 'I') != NULL)
+			if (strchr(client_info, 'I') != NULL)
 				compat_flags |= CF_INPLACE_PARTIAL_DIR;
-			if (local_server || strchr(client_info, 'u') != NULL)
+			if (strchr(client_info, 'u') != NULL)
 				compat_flags |= CF_ID0_NAMES;
-			if (local_server || strchr(client_info, 'v') != NULL) {
+			if (strchr(client_info, 'v') != NULL) {
 				do_negotiated_strings = 1;
 				compat_flags |= CF_VARINT_FLIST_FLAGS;
 			}
@@ -737,7 +743,7 @@ void setup_protocol(int f_out,int f_in)
 #endif
 #ifdef ICONV_OPTION
 		sender_symlink_iconv = iconv_opt && (am_server
-		    ? local_server || strchr(client_info, 's') != NULL
+		    ? strchr(client_info, 's') != NULL
 		    : !!(compat_flags & CF_SYMLINK_ICONV));
 #endif
 		if (inc_recurse && !allow_inc_recurse) {

@@ -2577,47 +2577,8 @@ void server_options(char **args, int *argc_p)
 
 	set_allow_inc_recurse();
 
-	/* We don't really know the actual protocol_version at this point,
-	 * but checking the pre-negotiated value allows the user to use a
-	 * --protocol=29 override to avoid the use of this -eFLAGS opt. */
-	if (protocol_version >= 30) {
-		/* Use "eFlags" alias so that cull_options doesn't think that these are no-arg option letters. */
-#define eFlags argstr
-		/* We make use of the -e option to let the server know about
-		 * any pre-release protocol version && some behavior flags. */
-		eFlags[x++] = 'e';
-#if SUBPROTOCOL_VERSION != 0
-		if (protocol_version == PROTOCOL_VERSION) {
-			x += snprintf(argstr+x, sizeof argstr - x,
-				      "%d.%d",
-				      PROTOCOL_VERSION, SUBPROTOCOL_VERSION);
-		} else
-#endif
-			eFlags[x++] = '.';
-		if (allow_inc_recurse)
-			eFlags[x++] = 'i';
-#ifdef CAN_SET_SYMLINK_TIMES
-		eFlags[x++] = 'L'; /* symlink time-setting support */
-#endif
-#ifdef ICONV_OPTION
-		eFlags[x++] = 's'; /* symlink iconv translation support */
-#endif
-		eFlags[x++] = 'f'; /* flist I/O-error safety support */
-		eFlags[x++] = 'x'; /* xattr hardlink optimization not desired */
-		eFlags[x++] = 'C'; /* support checksum seed order fix */
-		eFlags[x++] = 'I'; /* support inplace_partial behavior */
-		eFlags[x++] = 'v'; /* use varint for flist & compat flags; negotiate checksum */
-		eFlags[x++] = 'u'; /* include name of uid 0 & gid 0 in the id map */
-		/* NOTE: Avoid using 'V' -- it was the high bit of a write_byte() that became write_varint(). */
-#undef eFlags
-	}
-
-	if (x >= (int)sizeof argstr) { /* Not possible... */
-		rprintf(FERROR, "argstr overflow in server_options().\n");
-		exit_cleanup(RERR_MALLOC);
-	}
-
-	argstr[x] = '\0';
+	/* This '\0'-terminates argstr and makes sure it didn't overflow. */
+	x += maybe_add_e_option(argstr + x, (int)sizeof argstr - x);
 
 	if (x > 1)
 		args[ac++] = argstr;
@@ -2924,6 +2885,52 @@ void server_options(char **args, int *argc_p)
 
     oom:
 	out_of_memory("server_options");
+}
+
+int maybe_add_e_option(char *buf, int buf_len)
+{
+	int x = 0;
+
+	/* We don't really know the actual protocol_version at this point,
+	 * but checking the pre-negotiated value allows the user to use a
+	 * --protocol=29 override to avoid the use of this -eFLAGS opt. */
+	if (protocol_version >= 30 && buf_len > 0) {
+		/* We make use of the -e option to let the server know about
+		 * any pre-release protocol version && some behavior flags. */
+		buf[x++] = 'e';
+
+#if SUBPROTOCOL_VERSION != 0
+		if (protocol_version == PROTOCOL_VERSION)
+			x += snprintf(buf + x, buf_len - x, "%d.%d", PROTOCOL_VERSION, SUBPROTOCOL_VERSION);
+		else
+#endif
+			buf[x++] = '.';
+		if (allow_inc_recurse)
+			buf[x++] = 'i';
+#ifdef CAN_SET_SYMLINK_TIMES
+		buf[x++] = 'L'; /* symlink time-setting support */
+#endif
+#ifdef ICONV_OPTION
+		buf[x++] = 's'; /* symlink iconv translation support */
+#endif
+		buf[x++] = 'f'; /* flist I/O-error safety support */
+		buf[x++] = 'x'; /* xattr hardlink optimization not desired */
+		buf[x++] = 'C'; /* support checksum seed order fix */
+		buf[x++] = 'I'; /* support inplace_partial behavior */
+		buf[x++] = 'v'; /* use varint for flist & compat flags; negotiate checksum */
+		buf[x++] = 'u'; /* include name of uid 0 & gid 0 in the id map */
+
+		/* NOTE: Avoid using 'V' -- it was represented with the high bit of a write_byte() that became a write_varint(). */
+	}
+
+	if (x >= buf_len) { /* Not possible... */
+		rprintf(FERROR, "overflow in add_e_flags().\n");
+		exit_cleanup(RERR_MALLOC);
+	}
+
+	buf[x] = '\0';
+
+	return x;
 }
 
 /* If str points to a valid hostspec, return allocated memory containing the
