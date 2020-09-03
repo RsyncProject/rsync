@@ -233,7 +233,7 @@ __attribute__ ((target("ssse3"))) void more_testing(char* buf, int len)
 	in8_2 = _mm_lddqu_si128((__m128i_u*)&buf[i + 16]);
     }
 }
-]], [[if (test_ssse3(42) != 42 || test_sse2(42) != 42 || test_avx2(42) != 42) exit(1);]])],[CXX_OK=yes],[CXX_OK=no])
+]], [[if (test_ssse3(42) != 42 || test_sse2(42) != 42 || test_avx2(42) != 42) exit(1);]])],[CXX_OK=yes],[CXX_OK=no],[CXX_OK=no])
 	AC_LANG(C)
 	if test x"$CXX_OK" = x"yes"; then
 	    # AC_MSG_RESULT() is called below.
