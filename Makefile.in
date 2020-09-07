@@ -32,7 +32,7 @@ SHELL=/bin/sh
 SIMD_x86_64=simd-checksum-x86_64.o
 ASM_x86_64=lib/md5-asm-x86_64.o
 
-GENFILES=configure.sh aclocal.m4 config.h.in git-version.h rsync.1 rsync.1.html \
+GENFILES=configure.sh aclocal.m4 config.h.in rsync.1 rsync.1.html \
 	 rsync-ssl.1 rsync-ssl.1.html rsyncd.conf.5 rsyncd.conf.5.html
 HEADERS=byteorder.h config.h errcode.h proto.h rsync.h ifuncs.h itypes.h inums.h \
 	lib/pool_alloc.h lib/mdigest.h lib/md-defines.h
@@ -171,7 +171,7 @@ gen: conf proto.h man
 
 .PHONY: gensend
 gensend: gen
-	rsync -aic $(GENFILES) $${SAMBA_HOST-samba.org}:/home/ftp/pub/rsync/generated-files/
+	rsync -aic $(GENFILES) git-version.h $${SAMBA_HOST-samba.org}:/home/ftp/pub/rsync/generated-files/
 
 aclocal.m4: $(srcdir)/m4/*.m4
 	aclocal -I $(srcdir)/m4
