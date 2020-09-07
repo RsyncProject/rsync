@@ -253,7 +253,11 @@ void daemon_usage(enum logcode F)
 
 const char *rsync_version(void)
 {
+#ifdef RSYNC_GITVER
 	return RSYNC_GITVER;
+#else
+	return RSYNC_VERSION;
+#endif
 }
 
 const char *default_cvsignore(void)

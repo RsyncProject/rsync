@@ -3,9 +3,12 @@
 srcdir=`dirname $0`
 gitver=`git describe --abbrev=8 2>/dev/null`
 
-if test x"$gitver" != x; then
-    gitver=\""$gitver"\"
-else
-    gitver=RSYNC_VERSION
-fi
-echo "#define RSYNC_GITVER $gitver" >git-version.h
+case "$gitver" in
+    *.*)
+	echo "#define RSYNC_GITVER \"$gitver\"" >git-version.h
+	;;
+    *)
+	# We either create an empty file or update the time on what the user gave us.
+	touch git-version.h
+	;;
+esac
