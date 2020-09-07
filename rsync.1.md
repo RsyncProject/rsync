@@ -613,8 +613,8 @@ your home directory (remove the '=' for that).
       divide up the info and error messages by file handle.  For those doing
       debugging or using several levels of verbosity, this option can help to
       avoid clogging up the transfer stream (which should prevent any chance of
-      a deadlock bug hanging things up).  It also enables the outputting of some
-      I/O related debug messages.
+      a deadlock bug hanging things up).  It also allows `--debug` to enable
+      some extra I/O related messages.
 
     - `client` - causes all rsync messages to be sent to the client side
       via the protocol stream.  One client process outputs all messages, with
