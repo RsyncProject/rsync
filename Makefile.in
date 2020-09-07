@@ -167,7 +167,7 @@ t_unsafe$(EXEEXT): $(T_UNSAFE_OBJ)
 conf: configure.sh config.h.in
 
 .PHONY: gen
-gen: conf proto.h man
+gen: conf proto.h man git-version.h
 
 .PHONY: gensend
 gensend: gen
