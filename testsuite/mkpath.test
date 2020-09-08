@@ -25,6 +25,10 @@ rm $deep_dir/text
 mkdir $deep_dir/new
 $RSYNC -aiv --mkpath from/text $deep_dir/new
 test -f $deep_dir/new/text || test_fail "'text' file not found in $deep_dir/new dir"
+
+# ... and an existing path when an alternate dest filename is specified
+$RSYNC -aiv --mkpath from/text $deep_dir/new/text2
+test -f $deep_dir/new/text2 || test_fail "'text2' file not found in $deep_dir/new dir"
 rm -rf to/foo
 
 # Try the tests again with multiple source args

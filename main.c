@@ -721,18 +721,21 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 	trailing_slash = cp && !cp[1];
 
 	if (mkpath_dest_arg && statret < 0 && (cp || file_total > 1)) {
+		int save_errno = errno;
 		int ret = make_path(dest_path, file_total > 1 && !trailing_slash ? 0 : MKP_DROP_NAME);
 		if (ret < 0)
 			goto mkdir_error;
-		if (INFO_GTE(NAME, 1)) {
+		if (ret && INFO_GTE(NAME, 1)) {
 			if (file_total == 1 || trailing_slash)
 				*cp = '\0';
 			rprintf(FINFO, "created %d director%s for %s\n", ret, ret == 1 ? "y" : "ies", dest_path);
 			if (file_total == 1 || trailing_slash)
 				*cp = '/';
 		}
-		if (file_total > 1 || trailing_slash)
+		if (ret)
 			statret = do_stat(dest_path, &st);
+		else
+			errno = save_errno;
 	}
 
 	if (statret == 0) {
