@@ -6,10 +6,27 @@
 
 ### BUG FIXES:
 
+ - Fix a bug with `--mkpath` if a single-file copy specifies an existing
+   destination dir with a non-existing destination filename.
+
+ - Avoid a weird failure if you run a local copy with a (useless) `--rsh`
+   option that contains a `V`.
+
+### ENHANCEMENTS:
+
  - Use openssl's `-verify_hostname` option in the rsync-ssl script.
 
- - Avoid a weird failure if you run a local copy with an `--rsh` option that
-   contained a `V`.
+### PACKAGING RELATED:
+
+ - When creating a package from a non-release version (w/o a git checkout), the
+   packager can elect to create git-version.h and define RSYNC_GITVER to the
+   string they want `--version` to output.  (The file is still auto-generated
+   using the output of `git describe` when building inside a non-shallow git
+   checkout, though.)
+
+ - Fixed configure to not fail at the SIMD check when cross-compiling.
+
+ - Added a SECURITY.md file.
 
 ------------------------------------------------------------------------------
 <a name="3.2.3"></a>
