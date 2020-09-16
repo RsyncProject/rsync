@@ -362,6 +362,13 @@ void send_files(int f_in, int f_out)
 			exit_cleanup(RERR_FILEIO);
 		}
 
+		if (append_mode > 0 && st.st_size < file->len32) {
+			rprintf(FWARNING, "skipping file %s because it got truncated\n", full_fname(fname));
+			free_sums(s);
+			close(fd);
+			continue;
+		}
+
 		if (st.st_size) {
 			int32 read_size = MAX(s->blength * 3, MAX_MAP_SIZE);
 			mbuf = map_file(fd, st.st_size, read_size, s->blength);
