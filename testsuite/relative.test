@@ -20,8 +20,6 @@ echo wowza >"$extrafile"
 
 $RSYNC -av --existing --include='*/' --exclude='*' "$fromdir/" "$extradir/"
 
-outfile="$scratchdir/rsync.out"
-
 cd "$fromdir"
 
 # Main script starts here

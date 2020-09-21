@@ -15,8 +15,6 @@ makepath "$fromdir/deep" "$bakdir/dname"
 name1="$fromdir/deep/name1"
 name2="$fromdir/deep/name2"
 
-outfile="$scratchdir/rsync.out"
-
 cat "$srcdir"/[gr]*.[ch] > "$name1"
 cat "$srcdir"/[et]*.[ch] > "$name2"
 
@@ -26,8 +24,7 @@ checkit "$RSYNC -ai --info=backup '$fromdir/' '$chkdir/'" "$fromdir" "$chkdir"
 cat "$srcdir"/[fgpr]*.[ch] > "$name1"
 cat "$srcdir"/[etw]*.[ch] > "$name2"
 
-$RSYNC -ai --info=backup --no-whole-file --backup "$fromdir/" "$todir/" \
-    | tee "$outfile"
+checktee "$RSYNC -ai --info=backup --no-whole-file --backup '$fromdir/' '$todir/'"
 for fn in deep/name1 deep/name2; do
     grep "backed up $fn to $fn~" "$outfile" >/dev/null || test_fail "no backup message output for $fn"
     diff $diffopt "$fromdir/$fn" "$todir/$fn" || test_fail "copy of $fn failed"
