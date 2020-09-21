@@ -225,9 +225,9 @@ checkit "$RSYNC -avv $relative_opts --exclude='$fromdir/foo/down' \
     '$fromdir/foo' '$todir'" "$chkdir$fromdir/foo" "$todir$fromdir/foo"
 
 # Now we'll test the --update option.
-checkdiff "$RSYNC -aiiO --update --info=skip '$scratchdir/up1/' '$scratchdir/up2/'" <<EOT
+checkdiff "$RSYNC -aiiO --update --info=skip '$scratchdir/up1/' '$scratchdir/up2/'" \
+	"grep -v '^\.d$allspace'" <<EOT
 dst-newness is newer
-.d          ./
 >f$all_plus extra-src
 .f$allspace same-newness
 >f..t.$dots src-newness
