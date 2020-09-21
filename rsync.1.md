@@ -338,7 +338,7 @@ detailed description below for a complete description.
 --quiet, -q              suppress non-error messages
 --no-motd                suppress daemon-mode MOTD
 --checksum, -c           skip based on checksum, not mod-time & size
---archive, -a            archive mode; equals -rlptgoD (no -H,-A,-X)
+--archive, -a            archive mode; equals -rlptgoD (no -H,-A,-X,-U)
 --no-OPTION              turn off an implied OPTION (e.g. --no-D)
 --recursive, -r          recurse into directories
 --relative, -R           use relative path names
@@ -711,8 +711,8 @@ your home directory (remove the '=' for that).
 0.  `--archive`, `-a`
 
     This is equivalent to `-rlptgoD`.  It is a quick way of saying you want
-    recursion and want to preserve almost everything (with `-H` being a notable
-    omission).  The only exception to the above equivalence is when
+    recursion and want to preserve almost everything (with `-H` and `-U` being
+    notable omissions).  The only exception to the above equivalence is when
     `--files-from` is specified, in which case `-r` is not implied.
 
     Note that `-a` **does not preserve hardlinks**, because finding
