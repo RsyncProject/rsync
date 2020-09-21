@@ -326,108 +326,101 @@ __attribute__ ((target("sse2"))) MVSTATIC int32 get_checksum1_sse2_32(schar* buf
     s1 += (uint32)(t1[0] + t1[1] + t1[2] + t1[3] + t1[4] + t1[5] + t1[6] + t1[7] + t1[8] + t1[9] + t1[10] + t1[11] + t1[12] + t1[13] + t1[14] + t1[15]) +
           64*CHAR_OFFSET;
  */
+
 __attribute__ ((target("avx2"))) MVSTATIC int32 get_checksum1_avx2_64(schar* buf, int32 len, int32 i, uint32* ps1, uint32* ps2)
 {
     if (len > 64) {
-        // Instructions reshuffled compared to SSE2 for slightly better performance
-        int aligned = ((uintptr_t)buf & 31) == 0;
 
-        uint32 x[8] = {0};
-        x[0] = *ps1;
-        __m256i ss1 = _mm256_lddqu_si256((__m256i_u*)x);
-        x[0] = *ps2;
-        __m256i ss2 = _mm256_lddqu_si256((__m256i_u*)x);
+        uint32 x[4] = {0};
+        __m128i ss1 = _mm_cvtsi32_si128(*ps1);
+        __m128i ss2 = _mm_cvtsi32_si128(*ps2);
 
-        // The order gets shuffled compared to SSE2
-        const int16 mul_t1_buf[16] = {60, 56, 52, 48, 28, 24, 20, 16, 44, 40, 36, 32, 12, 8, 4, 0};
-        __m256i mul_t1 = _mm256_lddqu_si256((__m256i_u*)mul_t1_buf);
+        const char mul_t1_buf[16] = {60, 56, 52, 48, 44, 40, 36, 32, 28, 24, 20, 16, 12, 8, 4, 0};
+	__m128i tmp = _mm_load_si128((__m128i*) mul_t1_buf);
+        __m256i mul_t1 = _mm256_cvtepu8_epi16(tmp);
+	__m256i mul_const = _mm256_broadcastd_epi32(_mm_cvtsi32_si128(4 | (3 << 8) | (2 << 16) | (1 << 24)));
+        __m256i mul_one;
+       	    mul_one = _mm256_abs_epi8(_mm256_cmpeq_epi16(mul_one,mul_one)); // set all vector elements to 1
 
         for (; i < (len-64); i+=64) {
-            // Load ... 2*[int8*32]
+            // Load ... 4*[int8*16]
             __m256i in8_1, in8_2;
-            if (!aligned) {
-                in8_1 = _mm256_lddqu_si256((__m256i_u*)&buf[i]);
-                in8_2 = _mm256_lddqu_si256((__m256i_u*)&buf[i + 32]);
-            } else {
-                in8_1 = _mm256_load_si256((__m256i_u*)&buf[i]);
-                in8_2 = _mm256_load_si256((__m256i_u*)&buf[i + 32]);
-            }
+	    __m128i in8_1_low, in8_2_low, in8_1_high, in8_2_high;
+	    in8_1_low = _mm_loadu_si128((__m128i_u*)&buf[i]);
+	    in8_2_low = _mm_loadu_si128((__m128i_u*)&buf[i+16]);
+	    in8_1_high = _mm_loadu_si128((__m128i_u*)&buf[i+32]);
+	    in8_2_high = _mm_loadu_si128((__m128i_u*)&buf[i+48]);
+	    in8_1 = _mm256_inserti128_si256(_mm256_castsi128_si256(in8_1_low), in8_1_high,1);
+	    in8_2 = _mm256_inserti128_si256(_mm256_castsi128_si256(in8_2_low), in8_2_high,1);
+            
 
-            // Prefetch for next loops. This has no observable effect on the
-            // tested AMD but makes as much as 20% difference on the Intel.
-            // Curiously that same Intel sees no benefit from this with SSE2
-            // or SSSE3.
-            _mm_prefetch(&buf[i + 64], _MM_HINT_T0);
-            _mm_prefetch(&buf[i + 96], _MM_HINT_T0);
-            _mm_prefetch(&buf[i + 128], _MM_HINT_T0);
-            _mm_prefetch(&buf[i + 160], _MM_HINT_T0);
-
-            // (1*buf[i] + 1*buf[i+1]), (1*buf[i+2], 1*buf[i+3]), ... 2*[int16*16]
+            // (1*buf[i] + 1*buf[i+1]), (1*buf[i+2], 1*buf[i+3]), ... 2*[int16*8]
             // Fastest, even though multiply by 1
-            __m256i mul_one = _mm256_set1_epi8(1);
             __m256i add16_1 = _mm256_maddubs_epi16(mul_one, in8_1);
             __m256i add16_2 = _mm256_maddubs_epi16(mul_one, in8_2);
 
-            // (4*buf[i] + 3*buf[i+1]), (2*buf[i+2], buf[i+3]), ... 2*[int16*16]
-            __m256i mul_const = _mm256_set1_epi32(4 + (3 << 8) + (2 << 16) + (1 << 24));
+            // (4*buf[i] + 3*buf[i+1]), (2*buf[i+2], buf[i+3]), ... 2*[int16*8]
             __m256i mul_add16_1 = _mm256_maddubs_epi16(mul_const, in8_1);
             __m256i mul_add16_2 = _mm256_maddubs_epi16(mul_const, in8_2);
 
             // s2 += 64*s1
-            ss2 = _mm256_add_epi32(ss2, _mm256_slli_epi32(ss1, 6));
+            ss2 = _mm_add_epi32(ss2, _mm_slli_epi32(ss1, 6));
 
-            // [t1[0] + t1[1], t1[2] + t1[3] ...] [int16*16]
+            // [sum(t1[0]..t1[7]), X, X, X] [int32*4]; faster than multiple _mm_hadds_epi16
+            __m256i sum_add32 = _mm256_add_epi16(add16_1, add16_2);
+            sum_add32 = _mm256_add_epi16(sum_add32, _mm256_srli_epi32(sum_add32, 16));
+            sum_add32 = _mm256_add_epi16(sum_add32, _mm256_srli_si256(sum_add32, 4));
+            sum_add32 = _mm256_add_epi16(sum_add32, _mm256_srli_si256(sum_add32, 8));
+
+            // [sum(t2[0]..t2[7]), X, X, X] [int32*4]; faster than multiple _mm_hadds_epi16
+            __m256i sum_mul_add32 = _mm256_add_epi16(mul_add16_1, mul_add16_2);
+            sum_mul_add32 = _mm256_add_epi16(sum_mul_add32, _mm256_srli_epi32(sum_mul_add32, 16));
+            sum_mul_add32 = _mm256_add_epi16(sum_mul_add32, _mm256_srli_si256(sum_mul_add32, 4));
+            sum_mul_add32 = _mm256_add_epi16(sum_mul_add32, _mm256_srli_si256(sum_mul_add32, 8));
+
+            // s1 += t1[0] + t1[1] + t1[2] + t1[3] + t1[4] + t1[5] + t1[6] + t1[7]
+	    __m128i sum_add32_hi = _mm256_extracti128_si256(sum_add32, 0x1);
+            ss1 = _mm_add_epi32(ss1, _mm256_castsi256_si128(sum_add32));
+            ss1 = _mm_add_epi32(ss1, sum_add32_hi);
+
+            // s2 += t2[0] + t2[1] + t2[2] + t2[3] + t2[4] + t2[5] + t2[6] + t2[7]
+	    __m128i sum_mul_add32_hi = _mm256_extracti128_si256(sum_mul_add32, 0x1);
+            ss2 = _mm_add_epi32(ss2, _mm256_castsi256_si128(sum_mul_add32));
+            ss2 = _mm_add_epi32(ss2, sum_mul_add32_hi);
+
+            // [t1[0] + t1[1], t1[2] + t1[3] ...] [int16*8]
+            // We could've combined this with generating sum_add32 above and
+            // save an instruction but benchmarking shows that as being slower
             __m256i add16 = _mm256_hadds_epi16(add16_1, add16_2);
 
-            // [t1[0], t1[1], ...] -> [t1[0]*60 + t1[1]*56, ...] [int32*8]
+            // [t1[0], t1[1], ...] -> [t1[0]*28 + t1[1]*24, ...] [int32*4]
             __m256i mul32 = _mm256_madd_epi16(add16, mul_t1);
 
-            // [sum(t1[0]..t1[15]), X, X, X, X, X, X, X] [int32*8]
-            __m256i sum_add32 = _mm256_add_epi16(add16_1, add16_2);
-            sum_add32 = _mm256_add_epi16(sum_add32, _mm256_permute4x64_epi64(sum_add32, 2 + (3 << 2) + (0 << 4) + (1 << 6)));
-            sum_add32 = _mm256_add_epi16(sum_add32, _mm256_slli_si256(sum_add32, 2));
-            sum_add32 = _mm256_add_epi16(sum_add32, _mm256_slli_si256(sum_add32, 4));
-            sum_add32 = _mm256_add_epi16(sum_add32, _mm256_slli_si256(sum_add32, 8));
-            sum_add32 = _mm256_srai_epi32(sum_add32, 16);
-            sum_add32 = _mm256_shuffle_epi32(sum_add32, 3);
-
-            // s1 += t1[0] + t1[1] + t1[2] + t1[3] + t1[4] + t1[5] + t1[6] + t1[7] + t1[8] + t1[9] + t1[10] + t1[11] + t1[12] + t1[13] + t1[14] + t1[15]
-            ss1 = _mm256_add_epi32(ss1, sum_add32);
-
-            // [sum(t2[0]..t2[15]), X, X, X, X, X, X, X] [int32*8]
-            __m256i sum_mul_add32 = _mm256_add_epi16(mul_add16_1, mul_add16_2);
-            sum_mul_add32 = _mm256_add_epi16(sum_mul_add32, _mm256_permute4x64_epi64(sum_mul_add32, 2 + (3 << 2) + (0 << 4) + (1 << 6)));
-            sum_mul_add32 = _mm256_add_epi16(sum_mul_add32, _mm256_slli_si256(sum_mul_add32, 2));
-            sum_mul_add32 = _mm256_add_epi16(sum_mul_add32, _mm256_slli_si256(sum_mul_add32, 4));
-            sum_mul_add32 = _mm256_add_epi16(sum_mul_add32, _mm256_slli_si256(sum_mul_add32, 8));
-            sum_mul_add32 = _mm256_srai_epi32(sum_mul_add32, 16);
-            sum_mul_add32 = _mm256_shuffle_epi32(sum_mul_add32, 3);
-
-            // s2 += t2[0] + t2[1] + t2[2] + t2[3] + t2[4] + t2[5] + t2[6] + t2[7] + t2[8] + t2[9] + t2[10] + t2[11] + t2[12] + t2[13] + t2[14] + t2[15]
-            ss2 = _mm256_add_epi32(ss2, sum_mul_add32);
-
-            // [sum(mul32), X, X, X, X, X, X, X] [int32*8]
-            mul32 = _mm256_add_epi32(mul32, _mm256_permute2x128_si256(mul32, mul32, 1));
+            // [sum(mul32), X, X, X] [int32*4]; faster than multiple _mm_hadd_epi32
             mul32 = _mm256_add_epi32(mul32, _mm256_srli_si256(mul32, 4));
             mul32 = _mm256_add_epi32(mul32, _mm256_srli_si256(mul32, 8));
+	    // prefetch 2 cacheline ahead
+            _mm_prefetch(&buf[i + 160], _MM_HINT_T0);
 
-            // s2 += 60*t1[0] + 56*t1[1] + 52*t1[2] + 48*t1[3] + 44*t1[4] + 40*t1[5] + 36*t1[6] + 32*t1[7] + 28*t1[8] + 24*t1[9] + 20*t1[10] + 16*t1[11] + 12*t1[12] + 8*t1[13] + 4*t1[14]
-            ss2 = _mm256_add_epi32(ss2, mul32);
+            // s2 += 28*t1[0] + 24*t1[1] + 20*t1[2] + 16*t1[3] + 12*t1[4] + 8*t1[5] + 4*t1[6]
+	    __m128i mul32_hi = _mm256_extracti128_si256(mul32, 0x1);
+            ss2 = _mm_add_epi32(ss2, _mm256_castsi256_si128(mul32));
+            ss2 = _mm_add_epi32(ss2, mul32_hi);
 
 #if CHAR_OFFSET != 0
-            // s1 += 64*CHAR_OFFSET
-            __m256i char_offset_multiplier = _mm256_set1_epi32(64 * CHAR_OFFSET);
-            ss1 = _mm256_add_epi32(ss1, char_offset_multiplier);
+            // s1 += 32*CHAR_OFFSET
+            __m128i char_offset_multiplier = _mm_set1_epi32(32 * CHAR_OFFSET);
+            ss1 = _mm_add_epi32(ss1, char_offset_multiplier);
 
-            // s2 += 2080*CHAR_OFFSET
-            char_offset_multiplier = _mm256_set1_epi32(2080 * CHAR_OFFSET);
-            ss2 = _mm256_add_epi32(ss2, char_offset_multiplier);
+            // s2 += 528*CHAR_OFFSET
+            char_offset_multiplier = _mm_set1_epi32(528 * CHAR_OFFSET);
+            ss2 = _mm_add_epi32(ss2, char_offset_multiplier);
 #endif
         }
 
-        _mm256_store_si256((__m256i_u*)x, ss1);
+        _mm_store_si128((__m128i_u*)x, ss1);
         *ps1 = x[0];
-        _mm256_store_si256((__m256i_u*)x, ss2);
+        _mm_store_si128((__m128i_u*)x, ss2);
         *ps2 = x[0];
     }
     return i;
