@@ -13,6 +13,10 @@
    for files that are being skipped due to an identical modify time.  (This
    was a new output quirk in 3.2.3.)
 
+ - When doing an append transfer, the sending side's file must not get shorter
+   or it is skipped. Fixes a crash that could occur when the size changes to 0
+   in the middle of the send negotiations.
+
  - Avoid a weird failure if you run a local copy with a (useless) `--rsh`
    option that contains a `V`.
 

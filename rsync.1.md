@@ -949,7 +949,9 @@ your home directory (remove the '=' for that).
     existing content in the file (it only verifies the content that it is
     appending).  Rsync skips any files that exist on the receiving side that
     are not shorter than the associated file on the sending side (which means
-    that new files are trasnferred).
+    that new files are trasnferred).  It also skips any files whose size on the
+    sending side gets shorter during the send negotiations (rsync warns about a
+    "diminished" file when this happens).
 
     This does not interfere with the updating of a file's non-content
     attributes (e.g.  permissions, ownership, etc.) when the file does not need
