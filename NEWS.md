@@ -9,6 +9,10 @@
  - Fix a bug with `--mkpath` if a single-file copy specifies an existing
    destination dir with a non-existing destination filename.
 
+ - Fix `--update -vv` to output "is uptodate" instead of "is newer" messages
+   for files that are being skipped due to an identical modify time.  (This
+   was a new output quirk in 3.2.3.)
+
  - Avoid a weird failure if you run a local copy with a (useless) `--rsh`
    option that contains a `V`.
 
