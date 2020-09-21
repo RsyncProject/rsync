@@ -53,6 +53,16 @@ static void print_info_flags(enum logcode f)
 #endif
 			"socketpairs",
 
+#ifndef SUPPORT_LINKS
+		"no "
+#endif
+			"symlinks",
+
+#ifndef CAN_SET_SYMLINK_TIMES
+		"no "
+#endif
+			"symtimes",
+
 #ifndef SUPPORT_HARD_LINKS
 		"no "
 #endif
@@ -63,10 +73,10 @@ static void print_info_flags(enum logcode f)
 #endif
 			"hardlink-specials",
 
-#ifndef SUPPORT_LINKS
+#ifndef CAN_HARDLINK_SYMLINK
 		"no "
 #endif
-			"symlinks",
+			"hardlink-symlinks",
 
 #ifndef INET6
 		"no "
@@ -111,11 +121,6 @@ static void print_info_flags(enum logcode f)
 		"no "
 #endif
 			"iconv",
-
-#ifndef CAN_SET_SYMLINK_TIMES
-		"no "
-#endif
-			"symtimes",
 
 #ifndef SUPPORT_PREALLOCATION
 		"no "
