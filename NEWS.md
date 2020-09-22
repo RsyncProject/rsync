@@ -4,16 +4,6 @@
 
 ## Changes in this version:
 
-### OUTPUT CHANGES:
-
- - Added a parenthetic suffix to the "FILENAME exists" output of
-   `--ignore-existing --info=skip` (note that `-vv` implies `--info=skip`).
-   The skip message is now "FILENAME exists (INFO)" where the INFO is one of
-   uptodate, type differs, or differs.  The suffix may be omitted when using
-   `--checksum` unless `--info=skip2` was used (since we don't want to slow
-   down rsync with extra checksum operations unless the user really wants to
-   see the full difference info).
-
 ### BUG FIXES:
 
  - Fix a bug with `--mkpath` if a single-file copy specifies an existing
@@ -39,6 +29,10 @@
  - Use openssl's `-verify_hostname` option in the rsync-ssl script.
 
  - Optimize the AVX2 checksum code a bit more.
+
+ - Added extra info to the "FILENAME exists" output of `--ignore-existing` when
+   `--info=skip2` is used.  The skip message becomes "FILENAME exists (INFO)"
+   where the INFO is one of uptodate, type differs, or differs.
 
  - Some manpage improvements.
 

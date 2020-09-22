@@ -1378,15 +1378,15 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	if (ignore_existing > 0 && statret == 0
 	 && (!is_dir || stype != FT_DIR)) {
 		if (INFO_GTE(SKIP, 1) && is_dir >= 0) {
-			const char *suf;
-			if (ftype != stype)
-				suf = " (type differs)";
-			else if (ftype == FT_REG && always_checksum > 0 && !INFO_GTE(SKIP, 2))
-				suf = ""; /* skip quick-check checksum unless SKIP2 was specified */
-			else if (quick_check_ok(ftype, fname, file, &sx.st))
-				suf = " (uptodate)";
-			else
-				suf = " (differs)";
+			const char *suf = "";
+			if (INFO_GTE(SKIP, 2)) {
+				if (ftype != stype)
+					suf = " (type differs)";
+				else if (quick_check_ok(ftype, fname, file, &sx.st))
+					suf = " (uptodate)";
+				else
+					suf = " (differs)";
+			}
 			rprintf(FINFO, "%s exists%s\n", fname, suf);
 		}
 #ifdef SUPPORT_HARD_LINKS

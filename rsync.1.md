@@ -1606,14 +1606,10 @@ your home directory (remove the '=' for that).
     permissions on the hard-linked files).  This does mean that this option is
     only looking at the existing files in the destination hierarchy itself.
 
-    If `--info=skip` was specified (which is implied by `-vv`) then rsync
-    outputs a "FILENAME exists (INFO)" message where the INFO indicates one of
-    "uptodate", "type differs", or "differs".  However, if you specified the
-    `--checksum` option, you must have specified `--info-skip2` to get the
-    "differs" or "uptodate" info since rsync will not take the extra time to
-    checksum these skipped files unless you really want it to (a parenthetical
-    suffix that is not "type differs" is elided if we are skipping the checksum
-    check for an existing file).
+    When `--info=skip2` is used rsync will output "FILENAME exists (INFO)"
+    messages where the INFO indicates one of "uptodate", "type differs", or
+    "differs".  The first level of skip messages (which is also implied by
+    `-vv`) outputs the exists message without the "(INFO)" suffix.
 
 0.  `--remove-source-files`
 
