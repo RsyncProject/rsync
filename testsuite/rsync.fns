@@ -239,7 +239,6 @@ makepath() {
 }
 
 
-
 ###########################
 # Run a test (in '$1') then compare directories $2 and $3 to see if
 # there are any difference.  If there are, explain them.
@@ -347,7 +346,7 @@ checkdiff2() {
     diff $diffopt "$chkfile" "$outfile" || failed="$failed output differs"
 
     if [ "$failed" ] ; then
-	echo "Failed: $failed"
+	echo "Failed:$failed"
 	return 1
     fi
     return 0
