@@ -24,6 +24,10 @@
 
  - Use openssl's `-verify_hostname` option in the rsync-ssl script.
 
+ - Optimize the AVX2 checksum code a bit more.
+
+ - Some manpage improvements.
+
 ### PACKAGING RELATED:
 
  - When creating a package from a non-release version (w/o a git checkout), the
@@ -35,6 +39,11 @@
  - Fixed configure to not fail at the SIMD check when cross-compiling.
 
  - Added a SECURITY.md file.
+
+### DEVELOPER RELATED:
+
+ - Made it easier to write rsync tests that diff the output while also checking
+   the status code, and used the idiom to improve the existing tests.
 
 ------------------------------------------------------------------------------
 <a name="3.2.3"></a>
