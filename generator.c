@@ -112,10 +112,6 @@ static int need_retouch_dir_times;
 static int need_retouch_dir_perms;
 static const char *solo_file = NULL;
 
-enum nonregtype {
-	TYPE_DIR, TYPE_SPECIAL, TYPE_DEVICE, TYPE_SYMLINK
-};
-
 /* Forward declarations. */
 #ifdef SUPPORT_HARD_LINKS
 static void handle_skipped_hlink(struct file_struct *file, int itemizing,
@@ -599,30 +595,77 @@ void itemize(const char *fnamecmp, struct file_struct *file, int ndx, int statre
 	}
 }
 
-
-/* Perform our quick-check heuristic for determining if a file is unchanged. */
-int unchanged_file(char *fn, struct file_struct *file, STRUCT_STAT *st)
+static enum filetype get_file_type(mode_t mode)
 {
-	if (st->st_size != F_LENGTH(file))
-		return 0;
-
-	/* if always checksum is set then we use the checksum instead
-	   of the file time to determine whether to sync */
-	if (always_checksum > 0 && S_ISREG(st->st_mode)) {
-		char sum[MAX_DIGEST_LEN];
-		file_checksum(fn, st, sum);
-		return memcmp(sum, F_SUM(file), flist_csum_len) == 0;
-	}
-
-	if (size_only > 0)
-		return 1;
-
-	if (ignore_times)
-		return 0;
-
-	return !mtime_differs(st, file);
+	if (S_ISREG(mode))
+		return FT_REG;
+	if (S_ISLNK(mode))
+		return FT_SYMLINK;
+	if (S_ISDIR(mode))
+		return FT_DIR;
+	if (IS_SPECIAL(mode))
+		return FT_SPECIAL;
+	if (IS_DEVICE(mode))
+		return FT_DEVICE;
+	return FT_UNSUPPORTED;
 }
 
+/* Perform our quick-check heuristic for determining if a file is unchanged. */
+int quick_check_ok(enum filetype ftype, const char *fn, struct file_struct *file, STRUCT_STAT *st)
+{
+	switch (ftype) {
+	  case FT_REG:
+		if (st->st_size != F_LENGTH(file))
+			return 0;
+
+		/* If always_checksum is set then we use the checksum instead
+		 * of the file mtime to determine whether to sync. */
+		if (always_checksum > 0) {
+			char sum[MAX_DIGEST_LEN];
+			file_checksum(fn, st, sum);
+			return memcmp(sum, F_SUM(file), flist_csum_len) == 0;
+		}
+
+		if (size_only > 0)
+			return 1;
+
+		if (ignore_times)
+			return 0;
+
+		if (mtime_differs(st, file))
+			return 0;
+		break;
+	  case FT_DIR:
+		break;
+	  case FT_SYMLINK: {
+#ifdef SUPPORT_LINKS
+		char lnk[MAXPATHLEN];
+		int len = do_readlink(fn, lnk, MAXPATHLEN-1);
+		if (len <= 0)
+			return 0;
+		lnk[len] = '\0';
+		if (strcmp(lnk, F_SYMLINK(file)) != 0)
+			return 0;
+		break;
+#else
+		return -1;
+#endif
+	  }
+	  case FT_SPECIAL:
+		if (!BITS_EQUAL(file->mode, st->st_mode, _S_IFMT))
+			return 0;
+		break;
+	  case FT_DEVICE: {
+		uint32 *devp = F_RDEV_P(file);
+		if (st->st_rdev != MAKEDEV(DEV_MAJOR(devp), DEV_MINOR(devp)))
+			return 0;
+		break;
+	  }
+	  case FT_UNSUPPORTED:
+		return -1;
+	}
+	return 1;
+}
 
 /*
  * set (initialize) the size entries in the per-file sum_struct
@@ -907,7 +950,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 			best_match = j;
 			match_level = 1;
 		}
-		if (!unchanged_file(cmpbuf, file, &sxp->st))
+		if (!quick_check_ok(FT_REG, cmpbuf, file, &sxp->st))
 			continue;
 		if (match_level == 1) {
 			best_match = j;
@@ -1006,29 +1049,14 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 {
 	int best_match = -1;
 	int match_level = 0;
-	enum nonregtype type;
-	uint32 *devp;
-#ifdef SUPPORT_LINKS
-	char lnk[MAXPATHLEN];
-	int len;
-#endif
+	enum filetype ftype = get_file_type(file->mode);
 	int j = 0;
 
 #ifndef SUPPORT_LINKS
-	if (S_ISLNK(file->mode))
+	if (ftype == FT_SYMLINK)
 		return -1;
 #endif
-	if (S_ISDIR(file->mode)) {
-		type = TYPE_DIR;
-	} else if (IS_SPECIAL(file->mode))
-		type = TYPE_SPECIAL;
-	else if (IS_DEVICE(file->mode))
-		type = TYPE_DEVICE;
-#ifdef SUPPORT_LINKS
-	else if (S_ISLNK(file->mode))
-		type = TYPE_SYMLINK;
-#endif
-	else {
+	if (ftype == FT_REG || ftype == FT_UNSUPPORTED) {
 		rprintf(FERROR,
 			"internal: try_dests_non() called with invalid mode (%o)\n",
 			(int)file->mode);
@@ -1039,53 +1067,14 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 		pathjoin(cmpbuf, MAXPATHLEN, basis_dir[j], fname);
 		if (link_stat(cmpbuf, &sxp->st, 0) < 0)
 			continue;
-		switch (type) {
-		case TYPE_DIR:
-			if (!S_ISDIR(sxp->st.st_mode))
-				continue;
-			break;
-		case TYPE_SPECIAL:
-			if (!IS_SPECIAL(sxp->st.st_mode))
-				continue;
-			break;
-		case TYPE_DEVICE:
-			if (!IS_DEVICE(sxp->st.st_mode))
-				continue;
-			break;
-		case TYPE_SYMLINK:
-#ifdef SUPPORT_LINKS
-			if (!S_ISLNK(sxp->st.st_mode))
-				continue;
-			break;
-#else
-			return -1;
-#endif
-		}
+		if (ftype != get_file_type(sxp->st.st_mode))
+			continue;
 		if (match_level < 1) {
 			match_level = 1;
 			best_match = j;
 		}
-		switch (type) {
-		case TYPE_DIR:
-		case TYPE_SPECIAL:
-			break;
-		case TYPE_DEVICE:
-			devp = F_RDEV_P(file);
-			if (sxp->st.st_rdev != MAKEDEV(DEV_MAJOR(devp), DEV_MINOR(devp)))
-				continue;
-			break;
-		case TYPE_SYMLINK:
-#ifdef SUPPORT_LINKS
-			if ((len = do_readlink(cmpbuf, lnk, MAXPATHLEN-1)) <= 0)
-				continue;
-			lnk[len] = '\0';
-			if (strcmp(lnk, F_SYMLINK(file)) != 0)
-				continue;
-			break;
-#else
-			return -1;
-#endif
-		}
+		if (!quick_check_ok(ftype, cmpbuf, file, &sxp->st))
+			continue;
 		if (match_level < 2) {
 			match_level = 2;
 			best_match = j;
@@ -1130,14 +1119,14 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 			match_level = 2;
 		if (itemizing && stdout_format_has_i
 		 && (INFO_GTE(NAME, 2) || stdout_format_has_i > 1)) {
-			int chg = alt_dest_type == COMPARE_DEST && type != TYPE_DIR ? 0
+			int chg = alt_dest_type == COMPARE_DEST && ftype != FT_DIR ? 0
 			    : ITEM_LOCAL_CHANGE + (match_level == 3 ? ITEM_XNAME_FOLLOWS : 0);
 			char *lp = match_level == 3 ? "" : NULL;
 			itemize(cmpbuf, file, ndx, 0, sxp, chg + ITEM_MATCHED, 0, lp);
 		}
 		if (INFO_GTE(NAME, 2) && maybe_ATTRS_REPORT) {
 			rprintf(FCLIENT, "%s%s is uptodate\n",
-				fname, type == TYPE_DIR ? "/" : "");
+				fname, ftype == FT_DIR ? "/" : "");
 		}
 		return -2;
 	}
@@ -1231,7 +1220,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	char fnamecmpbuf[MAXPATHLEN];
 	uchar fnamecmp_type;
 	int del_opts = delete_mode || force_delete ? DEL_RECURSE : 0;
-	int is_dir = !S_ISDIR(file->mode) ? 0
+	enum filetype stype, ftype = get_file_type(file->mode);
+	int is_dir = ftype != FT_DIR ? 0
 		   : inc_recurse && ndx != cur_flist->ndx_start - 1 ? -1
 		   : 1;
 
@@ -1380,10 +1370,25 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	 && !am_root && sx.st.st_uid == our_uid)
 		del_opts |= DEL_NO_UID_WRITE;
 
+	if (statret == 0)
+		stype = get_file_type(sx.st.st_mode);
+	else
+		stype = FT_UNSUPPORTED;
+
 	if (ignore_existing > 0 && statret == 0
-	 && (!is_dir || !S_ISDIR(sx.st.st_mode))) {
-		if (INFO_GTE(SKIP, 1) && is_dir >= 0)
-			rprintf(FINFO, "%s exists\n", fname);
+	 && (!is_dir || stype != FT_DIR)) {
+		if (INFO_GTE(SKIP, 1) && is_dir >= 0) {
+			const char *suf;
+			if (ftype != stype)
+				suf = " (type differs)";
+			else if (ftype == FT_REG && always_checksum > 0 && !INFO_GTE(SKIP, 2))
+				suf = ""; /* skip quick-check checksum unless SKIP2 was specified */
+			else if (quick_check_ok(ftype, fname, file, &sx.st))
+				suf = " (uptodate)";
+			else
+				suf = " (differs)";
+			rprintf(FINFO, "%s exists%s\n", fname, suf);
+		}
 #ifdef SUPPORT_HARD_LINKS
 		if (F_IS_HLINKED(file))
 			handle_skipped_hlink(file, itemizing, code, f_out);
@@ -1412,7 +1417,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			 * dir's mtime right away).  We will handle the dir in
 			 * full later (right before we handle its contents). */
 			if (statret == 0
-			 && (S_ISDIR(sx.st.st_mode)
+			 && (stype == FT_DIR
 			  || delete_item(fname, sx.st.st_mode, del_opts | DEL_FOR_DIR) != 0))
 				goto cleanup; /* Any errors get reported later. */
 			if (do_mkdir(fname, (file->mode|added_perms) & 0700) == 0)
@@ -1424,7 +1429,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		 * file of that name and it is *not* a directory, then
 		 * we need to delete it.  If it doesn't exist, then
 		 * (perhaps recursively) create it. */
-		if (statret == 0 && !S_ISDIR(sx.st.st_mode)) {
+		if (statret == 0 && stype != FT_DIR) {
 			if (delete_item(fname, sx.st.st_mode, del_opts | DEL_FOR_DIR) != 0)
 				goto skipping_dir_contents;
 			statret = -1;
@@ -1519,7 +1524,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	/* If we're not preserving permissions, change the file-list's
 	 * mode based on the local permissions and some heuristics. */
 	if (!preserve_perms) {
-		int exists = statret == 0 && !S_ISDIR(sx.st.st_mode);
+		int exists = statret == 0 && stype != FT_DIR;
 		file->mode = dest_mode(file->mode, sx.st.st_mode, dflt_perms, exists);
 	}
 
@@ -1529,7 +1534,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		goto cleanup;
 #endif
 
-	if (preserve_links && S_ISLNK(file->mode)) {
+	if (preserve_links && ftype == FT_SYMLINK) {
 #ifdef SUPPORT_LINKS
 		const char *sl = F_SYMLINK(file);
 		if (safe_symlinks && unsafe_symlink(sl, fname)) {
@@ -1546,12 +1551,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			goto cleanup;
 		}
 		if (statret == 0) {
-			char lnk[MAXPATHLEN];
-			int len;
-
-			if (S_ISLNK(sx.st.st_mode)
-			 && (len = do_readlink(fname, lnk, MAXPATHLEN-1)) > 0
-			 && strncmp(lnk, sl, len) == 0 && sl[len] == '\0') {
+			if (stype == FT_SYMLINK && quick_check_ok(stype, fname, file, &sx.st)) {
 				/* The link is pointing to the right place. */
 				set_file_attrs(fname, file, &sx, NULL, maybe_ATTRS_REPORT);
 				if (itemizing)
@@ -1584,7 +1584,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		if (atomic_create(file, fname, sl, NULL, MAKEDEV(0, 0), &sx, statret == 0 ? DEL_FOR_SYMLINK : 0)) {
 			set_file_attrs(fname, file, NULL, NULL, 0);
 			if (itemizing) {
-				if (statret == 0 && !S_ISLNK(sx.st.st_mode))
+				if (statret == 0 && stype != FT_SYMLINK)
 					statret = -1;
 				itemize(fnamecmp, file, ndx, statret, &sx,
 					ITEM_LOCAL_CHANGE|ITEM_REPORT_CHANGE, 0, NULL);
@@ -1605,28 +1605,22 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		goto cleanup;
 	}
 
-	if ((am_root && preserve_devices && IS_DEVICE(file->mode))
-	 || (preserve_specials && IS_SPECIAL(file->mode))) {
+	if ((am_root && preserve_devices && ftype == FT_DEVICE)
+	 || (preserve_specials && ftype == FT_SPECIAL)) {
 		dev_t rdev;
-		int del_for_flag = 0;
-		if (IS_DEVICE(file->mode)) {
+		int del_for_flag;
+		if (ftype == FT_DEVICE) {
 			uint32 *devp = F_RDEV_P(file);
 			rdev = MAKEDEV(DEV_MAJOR(devp), DEV_MINOR(devp));
-		} else
+			del_for_flag = DEL_FOR_DEVICE;
+		} else {
 			rdev = 0;
+			del_for_flag = DEL_FOR_SPECIAL;
+		}
 		if (statret == 0) {
-			if (IS_DEVICE(file->mode)) {
-				if (!IS_DEVICE(sx.st.st_mode))
-					statret = -1;
-				del_for_flag = DEL_FOR_DEVICE;
-			} else {
-				if (!IS_SPECIAL(sx.st.st_mode))
-					statret = -1;
-				del_for_flag = DEL_FOR_SPECIAL;
-			}
-			if (statret == 0
-			 && BITS_EQUAL(sx.st.st_mode, file->mode, _S_IFMT)
-			 && (IS_SPECIAL(sx.st.st_mode) || sx.st.st_rdev == rdev)) {
+			if (ftype != stype)
+				statret = -1;
+			else if (quick_check_ok(ftype, fname, file, &sx.st)) {
 				/* The device or special file is identical. */
 				set_file_attrs(fname, file, &sx, NULL, maybe_ATTRS_REPORT);
 				if (itemizing)
@@ -1679,7 +1673,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		goto cleanup;
 	}
 
-	if (!S_ISREG(file->mode)) {
+	if (ftype != FT_REG) {
 		if (solo_file)
 			fname = f_name(file, NULL);
 		rprintf(FINFO, "skipping non-regular file \"%s\"\n", fname);
@@ -1715,7 +1709,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 	fnamecmp_type = FNAMECMP_FNAME;
 
-	if (statret == 0 && !(S_ISREG(sx.st.st_mode) || (write_devices && IS_DEVICE(sx.st.st_mode)))) {
+	if (statret == 0 && !(stype == FT_REG || (write_devices && stype == FT_DEVICE))) {
 		if (delete_item(fname, sx.st.st_mode, del_opts | DEL_FOR_FILE) != 0)
 			goto cleanup;
 		statret = -1;
@@ -1749,7 +1743,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		partialptr = NULL;
 
 	if (statret != 0 && fuzzy_basis) {
-		if (need_fuzzy_dirlist && S_ISREG(file->mode)) {
+		if (need_fuzzy_dirlist) {
 			const char *dn = file->dirname ? file->dirname : ".";
 			int i;
 			strlcpy(fnamecmpbuf, dn, sizeof fnamecmpbuf);
@@ -1797,7 +1791,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		;
 	else if (fnamecmp_type >= FNAMECMP_FUZZY)
 		;
-	else if (unchanged_file(fnamecmp, file, &sx.st)) {
+	else if (quick_check_ok(FT_REG, fnamecmp, file, &sx.st)) {
 		if (partialptr) {
 			do_unlink(partialptr);
 			handle_partial_dir(partialptr, PDIR_DELETE);

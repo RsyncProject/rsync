@@ -277,6 +277,10 @@ enum msgcode {
 	MSG_NO_SEND=102,/* sender failed to open a file we wanted */
 };
 
+enum filetype {
+	FT_UNSUPPORTED, FT_REG, FT_DIR, FT_SYMLINK, FT_SPECIAL, FT_DEVICE
+};
+
 #define NDX_DONE -1
 #define NDX_FLIST_EOF -2
 #define NDX_DEL_STATS -3

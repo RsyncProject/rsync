@@ -651,6 +651,10 @@ your home directory (remove the '=' for that).
     the same modification timestamp.  This option turns off this "quick check"
     behavior, causing all files to be updated.
 
+    This option can be a little confusing compared to `--ignore-existing` and
+    `--ignore-non-existing` in that that they cause rsync to transfer fewer
+    files, while this option causes rsync to transfer more files.
+
 0.  `--size-only`
 
     This modifies rsync's "quick check" algorithm for finding files that need
@@ -1601,6 +1605,15 @@ your home directory (remove the '=' for that).
     already-handled files don't get tweaked (which avoids a change in
     permissions on the hard-linked files).  This does mean that this option is
     only looking at the existing files in the destination hierarchy itself.
+
+    If `--info=skip` was specified (which is implied by `-vv`) then rsync
+    outputs a "FILENAME exists (INFO)" message where the INFO indicates one of
+    "uptodate", "type differs", or "differs".  However, if you specified the
+    `--checksum` option, you must have specified `--info-skip2` to get the
+    "differs" or "uptodate" info since rsync will not take the extra time to
+    checksum these skipped files unless you really want it to (a parenthetical
+    suffix that is not "type differs" is elided if we are skipping the checksum
+    check for an existing file).
 
 0.  `--remove-source-files`
 

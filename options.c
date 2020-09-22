@@ -267,7 +267,7 @@ static struct output_struct info_words[COUNT_INFO+1] = {
 	INFO_WORD(NAME, W_SND|W_REC, "Mention 1) updated file/dir names, 2) unchanged names"),
 	INFO_WORD(PROGRESS, W_CLI, "Mention 1) per-file progress or 2) total transfer progress"),
 	INFO_WORD(REMOVE, W_SND, "Mention files removed on the sending side"),
-	INFO_WORD(SKIP, W_REC, "Mention files that are skipped due to options used"),
+	INFO_WORD(SKIP, W_REC, "Mention files that are skipped due to options used (levels 1-2)"),
 	INFO_WORD(STATS, W_CLI|W_SRV, "Mention statistics at end of run (levels 1-3)"),
 	INFO_WORD(SYMSAFE, W_SND|W_REC, "Mention symlinks that are unsafe"),
 	{ NULL, "--info", 0, 0, 0, 0 }
