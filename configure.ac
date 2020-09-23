@@ -211,7 +211,7 @@ CXXFLAGS=`echo "$CXXFLAGS" | sed 's/-g //'`
 
 if test x"$enable_simd" != x"no"; then
     # For x86-64 SIMD, g++ >=5 or clang++ >=7 is required
-    if test x"$build_cpu" = x"x86_64"; then
+    if test x"$host_cpu" = x"x86_64"; then
 	AC_LANG(C++)
 	AC_RUN_IFELSE([AC_LANG_PROGRAM([[#include <stdio.h>
 #include <immintrin.h>
@@ -283,8 +283,8 @@ AC_ARG_ENABLE(asm,
     AS_HELP_STRING([--disable-asm],[disable ASM optimizations]))
 
 if test x"$enable_asm" != x"no"; then
-    if test x"$build_cpu" = x"x86_64"; then
-	ASM="$build_cpu"
+    if test x"$host_cpu" = x"x86_64"; then
+	ASM="$host_cpu"
     elif test x"$enable_asm" = x"yes"; then
         AC_MSG_RESULT(unavailable)
         AC_MSG_ERROR(The ASM optimizations are currently x86_64 only.
