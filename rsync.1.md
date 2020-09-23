@@ -1607,9 +1607,10 @@ your home directory (remove the '=' for that).
     only looking at the existing files in the destination hierarchy itself.
 
     When `--info=skip2` is used rsync will output "FILENAME exists (INFO)"
-    messages where the INFO indicates one of "uptodate", "type differs", or
-    "differs".  The first level of skip messages (which is also implied by
-    `-vv`) outputs the exists message without the "(INFO)" suffix.
+    messages where the INFO indicates one of "type change", "sum change"
+    (requires `-c`), "file change" (based on the quick check), "attr change",
+    or "uptodate".  Using `--info=skip1` (which is also implied by `-vv`)
+    outputs the exists message without the INFO suffix.
 
 0.  `--remove-source-files`
 

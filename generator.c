@@ -1381,11 +1381,13 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			const char *suf = "";
 			if (INFO_GTE(SKIP, 2)) {
 				if (ftype != stype)
-					suf = " (type differs)";
-				else if (quick_check_ok(ftype, fname, file, &sx.st))
-					suf = " (uptodate)";
+					suf = " (type change)";
+				else if (!quick_check_ok(ftype, fname, file, &sx.st))
+					suf = always_checksum ? " (sum change)" : " (file change)";
+				else if (!unchanged_attrs(fname, file, &sx))
+					suf = " (attr change)";
 				else
-					suf = " (differs)";
+					suf = " (uptodate)";
 			}
 			rprintf(FINFO, "%s exists%s\n", fname, suf);
 		}

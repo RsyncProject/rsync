@@ -32,7 +32,8 @@
 
  - Added extra info to the "FILENAME exists" output of `--ignore-existing` when
    `--info=skip2` is used.  The skip message becomes "FILENAME exists (INFO)"
-   where the INFO is one of uptodate, type differs, or differs.
+   where the INFO is one of "type change", "sum change" (requires `-c`), "file
+   change" (based on the quick check), "attr change", or "uptodate".
 
  - Some manpage improvements.
 
