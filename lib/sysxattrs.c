@@ -67,7 +67,7 @@ ssize_t sys_lgetxattr(const char *path, const char *name, void *value, size_t si
 		u_int32_t offset = len;
 		size_t data_retrieved = len;
 		while (data_retrieved < size) {
-			len = getxattr(path, name, value + offset, size - data_retrieved, offset, XATTR_NOFOLLOW);
+			len = getxattr(path, name, (char*)value + offset, size - data_retrieved, offset, XATTR_NOFOLLOW);
 			if (len <= 0)
 				break;
 			data_retrieved += len;
@@ -167,7 +167,7 @@ static ssize_t read_xattr(int attrfd, void *buf, size_t buflen)
 	} else {
 		size_t bufpos;
 		for (bufpos = 0; bufpos < sb.st_size; ) {
-			ssize_t cnt = read(attrfd, buf + bufpos, sb.st_size - bufpos);
+			ssize_t cnt = read(attrfd, (char*)buf + bufpos, sb.st_size - bufpos);
 			if (cnt <= 0) {
 				if (cnt < 0 && errno == EINTR)
 					continue;
@@ -218,7 +218,7 @@ int sys_lsetxattr(const char *path, const char *name, const void *value, size_t 
 		return -1;
 
 	for (bufpos = 0; bufpos < size; ) {
-		ssize_t cnt = write(attrfd, value+bufpos, size);
+		ssize_t cnt = write(attrfd, (char*)value + bufpos, size);
 		if (cnt <= 0) {
 			if (cnt < 0 && errno == EINTR)
 				continue;
@@ -274,7 +274,8 @@ ssize_t sys_llistxattr(const char *path, char *list, size_t size)
 		 && (dp->d_name[10] == 'o' || dp->d_name[10] == 'w'))
 			continue;
 
-		if ((ret += len+1) > size) {
+		ret += len + 1;
+		if ((size_t)ret > size) {
 			if (size == 0)
 				continue;
 			ret = -1;
