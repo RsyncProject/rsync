@@ -1164,7 +1164,7 @@ struct name_num_obj {
 	uchar *saw;
 	int saw_len;
 	int negotiated_num;
-	struct name_num_item list[8]; /* A big-enough len (we'll get a compile error if it is ever too small) */
+	struct name_num_item list[10]; /* we'll get a compile error/warning if this is ever too small */
 };
 
 #ifndef __cplusplus
