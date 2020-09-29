@@ -1053,9 +1053,10 @@ if test x"$GCC" = x"yes"; then
     else
 	# Our internal popt code cannot be compiled with pedantic warnings as errors, so try to
 	# turn off pedantic warnings (which will not lose the error for array-init overflow).
-	case `$CC -dumpversion 2>/dev/null` in
-	    4.*) ;; # Early gcc doesn't understand -Wno-pedantic
-	    *) CFLAGS="$CFLAGS -pedantic-errors -Wno-pedantic" ;;
+	# Older gcc versions don't understand -Wno-pedantic, so check if --help=warnings lists
+	# -Wpedantic and use that as a flag.
+	case `$CC --help=warnings 2>/dev/null | grep Wpedantic` in
+	    *-Wpedantic*) CFLAGS="$CFLAGS -pedantic-errors -Wno-pedantic" ;;
 	esac
     fi
 fi
