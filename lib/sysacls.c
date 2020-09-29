@@ -1739,7 +1739,6 @@ int sys_acl_free_acl(SMB_ACL_T acl_d)
 int sys_acl_get_entry(SMB_ACL_T theacl, int entry_id, SMB_ACL_ENTRY_T *entry_p)
 {
 	struct acl_entry_link *link;
-	struct new_acl_entry *entry;
 	int keep_going;
 
 	if (entry_id == SMB_ACL_FIRST_ENTRY)
@@ -1765,10 +1764,15 @@ int sys_acl_get_entry(SMB_ACL_T theacl, int entry_id, SMB_ACL_ENTRY_T *entry_p)
 	for (keep_going = 0; keep_going < theacl->count; keep_going++)
 		link = link->nextp;
 
-	entry = *entry_p =  link->entryp;
+	*entry_p =  link->entryp;
 
-	DEBUG(10, ("*entry_p is %d\n", entry_p));
-	DEBUG(10, ("*entry_p->ace_access is %d\n", entry->ace_access));
+#if 0
+	{
+		struct new_acl_entry *entry = *entry_p;
+		DEBUG(10, ("*entry_p is %lx\n", (long)entry));
+		DEBUG(10, ("*entry_p->ace_access is %d\n", entry->ace_access));
+	}
+#endif
 
 	/* Increment count */
 	theacl->count++;
@@ -2297,7 +2301,7 @@ int sys_acl_create_entry(SMB_ACL_T *pacl, SMB_ACL_ENTRY_T *pentry)
 {
 	struct acl_entry_link *theacl;
 	struct acl_entry_link *acl_entryp;
-	struct acl_entry_link *temp_entry;
+	struct acl_entry_link *temp_entry = NULL;
 	int counting;
 
 	DEBUG(10, ("Entering the sys_acl_create_entry\n"));
