@@ -116,9 +116,9 @@ fi
 # I don't want our version too far out of sync.
 CFLAGS="$CFLAGS -DHAVE_CONFIG_H"
 
-# If GCC, turn on warnings.
+# If GCC, turn on warnings and turn pedantic warnings into errors to ensure an array-init overflow is an error.
 if test x"$GCC" = x"yes"; then
-	CFLAGS="$CFLAGS -Wall -W"
+	CFLAGS="$CFLAGS -Wall -W -pedantic-errors"
 fi
 
 AC_ARG_WITH(included-popt,
@@ -1044,6 +1044,12 @@ if test x"$ac_cv_header_popt_popt_h" = x"yes"; then
     with_included_popt=yes
 elif test x"$ac_cv_header_popt_h" != x"yes"; then
     with_included_popt=yes
+fi
+
+if test x"$with_included_popt" = x"yes" -a x"$GCC" = x"yes"; then
+	# Our internal popt code cannot be compiled with pedantic warnings as errors, so turn off
+	# pedantic warnings.  This does not affect the array-init overflow as an error, though.
+	CFLAGS="$CFLAGS -Wno-pedantic"
 fi
 
 AC_MSG_CHECKING([whether to use included libpopt])

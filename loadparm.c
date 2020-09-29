@@ -437,7 +437,7 @@ static BOOL do_parameter(char *parmname, char *parmvalue)
 		break;
 
 	case P_OCTAL:
-		sscanf(parmvalue, "%o", (int *)parm_ptr);
+		sscanf(parmvalue, "%o", (unsigned int *)parm_ptr);
 		break;
 
 	case P_PATH:

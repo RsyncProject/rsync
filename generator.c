@@ -182,7 +182,8 @@ static int remember_delete(struct file_struct *file, const char *fname, int flag
 static int read_delay_line(char *buf, int *flags_p)
 {
 	static int read_pos = 0;
-	int j, len, mode;
+	unsigned int mode;
+	int j, len;
 	char *bp, *past_space;
 
 	while (1) {

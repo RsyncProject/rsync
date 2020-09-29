@@ -838,14 +838,24 @@ void maybe_log_item(struct file_struct *file, int iflags, int itemizing, const c
 
 void log_delete(const char *fname, int mode)
 {
-	static struct {
-		union file_extras ex[4]; /* just in case... */
-		struct file_struct file;
-	} x; /* Zero-initialized due to static declaration. */
+	static struct file_struct *file = NULL;
 	int len = strlen(fname);
 	const char *fmt;
 
-	x.file.mode = mode;
+	if (!file) {
+		int extra_len = (file_extra_cnt + 2) * EXTRA_LEN;
+		char *bp;
+#if EXTRA_ROUNDING > 0
+		if (extra_len & (EXTRA_ROUNDING * EXTRA_LEN))
+			extra_len = (extra_len | (EXTRA_ROUNDING * EXTRA_LEN)) + EXTRA_LEN;
+#endif
+
+		bp = new_array0(char, FILE_STRUCT_LEN + extra_len + 1);
+		bp += extra_len;
+		file = (struct file_struct *)bp;
+	}
+
+	file->mode = mode;
 
 	if (am_server && protocol_version >= 29 && len < MAXPATHLEN) {
 		if (S_ISDIR(mode))
@@ -855,14 +865,14 @@ void log_delete(const char *fname, int mode)
 		;
 	else {
 		fmt = stdout_format_has_o_or_i ? stdout_format : "deleting %n";
-		log_formatted(FCLIENT, fmt, "del.", &x.file, fname, ITEM_DELETED, NULL);
+		log_formatted(FCLIENT, fmt, "del.", file, fname, ITEM_DELETED, NULL);
 	}
 
 	if (!logfile_name || dry_run || !logfile_format)
 		return;
 
 	fmt = logfile_format_has_o_or_i ? logfile_format : "deleting %n";
-	log_formatted(FLOG, fmt, "del.", &x.file, fname, ITEM_DELETED, NULL);
+	log_formatted(FLOG, fmt, "del.", file, fname, ITEM_DELETED, NULL);
 }
 
 /*
