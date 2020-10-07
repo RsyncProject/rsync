@@ -93,7 +93,7 @@ jobs:
       run: |
         cyg-get make autoconf automake gcc-core attr libattr-devel python3 python36-commonmark libzstd-devel liblz4-devel libssl-devel libxxhash0 libxxhash-devel
         curl.exe -o git-version.h https://download.samba.org/pub/rsync/generated-files/git-version.h
-        echo "C:/tools/cygwin/bin" >>$GITHUB_PATH
+        echo "C:/tools/cygwin/bin" >>$Env:GITHUB_PATH
     - name: configure
       run: bash -c './configure'
     - name: make
