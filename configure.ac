@@ -208,12 +208,7 @@ AC_ARG_ENABLE(simd,
 
 # Clag is crashing with -g -O2, so we'll get rid of -g for now.
 CXXFLAGS=`echo "$CXXFLAGS" | sed 's/-g //'`
-
-if test x"$enable_simd" != x"no"; then
-    # For x86-64 SIMD, g++ >=5 or clang++ >=7 is required
-    if test x"$host_cpu" = x"x86_64"; then
-	AC_LANG(C++)
-	AC_RUN_IFELSE([AC_LANG_PROGRAM([[#include <stdio.h>
+m4_define(SIMD_X86_64_TEST, [[#include <stdio.h>
 #include <immintrin.h>
 __attribute__ ((target("default"))) int test_ssse3(int x) { return x; }
 __attribute__ ((target("default"))) int test_sse2(int x) { return x; }
@@ -233,7 +228,18 @@ __attribute__ ((target("ssse3"))) void more_testing(char* buf, int len)
 	in8_2 = _mm_lddqu_si128((__m128i_u*)&buf[i + 16]);
     }
 }
-]], [[if (test_ssse3(42) != 42 || test_sse2(42) != 42 || test_avx2(42) != 42) exit(1);]])],[CXX_OK=yes],[CXX_OK=no],[CXX_OK=no])
+]])
+
+if test x"$enable_simd" != x"no"; then
+    # For x86-64 SIMD, g++ >=5 or clang++ >=7 is required
+    if test x"$host_cpu" = x"x86_64"; then
+	AC_LANG(C++)
+	if test x"$host_cpu" = x"$build_cpu"; then
+	    AC_RUN_IFELSE([AC_LANG_PROGRAM([SIMD_X86_64_TEST],[[if (test_ssse3(42) != 42 || test_sse2(42) != 42 || test_avx2(42) != 42) exit(1);]])],
+		[CXX_OK=yes],[CXX_OK=no])
+	else
+	    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([SIMD_X86_64_TEST])],[CXX_OK=yes],[CXX_OK=no])
+	fi
 	AC_LANG(C)
 	if test x"$CXX_OK" = x"yes"; then
 	    # AC_MSG_RESULT() is called below.
