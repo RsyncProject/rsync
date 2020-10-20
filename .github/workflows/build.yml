@@ -1,6 +1,7 @@
 name: build
 
 on:
+  repository_dispatch:
   push:
     branches: [ master ]
     paths-ignore: [ .cirrus.yml ]
