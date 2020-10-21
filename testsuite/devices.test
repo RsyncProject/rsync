@@ -9,9 +9,6 @@
 
 . "$suitedir/rsync.fns"
 
-chkfile="$scratchdir/rsync.chk"
-outfile="$scratchdir/rsync.out"
-
 # Build some hardlinks
 
 case $0 in
@@ -116,33 +113,21 @@ mkfifo "$fromdir/fifo" || mknod "$fromdir/fifo" p || test_skipped "Can't run mkf
 # Work around time rounding/truncating issue by touching both files.
 touch -r "$fromdir/block" "$fromdir/block" "$fromdir/block2"
 
-$RSYNC -ai "$fromdir/block" "$todir/block2" \
-    | tee "$outfile"
-cat <<EOT >"$chkfile"
+checkdiff "$RSYNC -ai '$fromdir/block' '$todir/block2'" <<EOT
 cD$all_plus block
 EOT
-diff $diffopt "$chkfile" "$outfile" || test_fail "test 1 failed"
 
-$RSYNC -ai "$fromdir/block2" "$todir/block" \
-    | tee "$outfile"
-cat <<EOT >"$chkfile"
+checkdiff "$RSYNC -ai '$fromdir/block2' '$todir/block'" <<EOT
 cD$all_plus block2
 EOT
-diff $diffopt "$chkfile" "$outfile" || test_fail "test 2 failed"
 
 sleep 1
 
-$RSYNC -Di "$fromdir/block3" "$todir/block" \
-    | tee "$outfile"
-cat <<EOT >"$chkfile"
+checkdiff "$RSYNC -Di '$fromdir/block3' '$todir/block'" <<EOT
 cDc.T.$dots block3
 EOT
-diff $diffopt "$chkfile" "$outfile" || test_fail "test 3 failed"
 
-$RSYNC -aiHvv "$fromdir/" "$todir/" \
-    | tee "$outfile"
-filter_outfile
-cat <<EOT >"$chkfile"
+cat >"$chkfile" <<EOT
 .d..t.$dots ./
 cDc.t.$dots block
 cDc...$dots block2
@@ -157,7 +142,8 @@ if test "$CAN_HLINK_SPECIAL" = no; then
     grep -v block3.5 <"$chkfile" >"$chkfile.new"
     mv "$chkfile.new" "$chkfile"
 fi
-diff $diffopt "$chkfile" "$outfile" || test_fail "test 4 failed"
+
+checkdiff2 "$RSYNC -aiHvv '$fromdir/' '$todir/'" v_filt
 
 echo "check how the directory listings compare with diff:"
 echo ""
@@ -167,9 +153,7 @@ diff $diffopt "$tmpdir/ls-from" "$tmpdir/ls-to"
 
 if test "$CAN_HLINK_SPECIAL" = yes; then
     set -x
-    $RSYNC -aii --link-dest="$todir" "$fromdir/" "$chkdir/" \
-	| tee "$outfile"
-    cat <<EOT >"$chkfile"
+    checkdiff "$RSYNC -aii --link-dest='$todir' '$fromdir/' '$chkdir/'" <<EOT
 cd$allspace ./
 hD$allspace block
 hD$allspace block2
@@ -180,7 +164,6 @@ hD$allspace char2
 hD$allspace char3
 hS$allspace fifo
 EOT
-    diff $diffopt "$chkfile" "$outfile" || test_fail "test 5 failed"
 fi
 
 # The script would have aborted on error, so getting here means we've won.

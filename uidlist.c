@@ -63,6 +63,16 @@ struct idlist {
 static struct idlist *uidlist, *uidmap;
 static struct idlist *gidlist, *gidmap;
 
+static inline int id_eq_uid(id_t id, uid_t uid)
+{
+	return id == (id_t)uid;
+}
+
+static inline int id_eq_gid(id_t id, gid_t gid)
+{
+	return id == (id_t)gid;
+}
+
 static id_t id_parse(const char *num_str)
 {
 	id_t tmp, num = 0;
@@ -263,10 +273,10 @@ static struct idlist *recv_add_id(struct idlist **idlist_ptr, struct idlist *idm
 	else if (*name && id) {
 		if (idlist_ptr == &uidlist) {
 			uid_t uid;
-			id2 = user_to_uid(name, &uid, False) ? uid : id;
+			id2 = user_to_uid(name, &uid, False) ? (id_t)uid : id;
 		} else {
 			gid_t gid;
-			id2 = group_to_gid(name, &gid, False) ? gid : id;
+			id2 = group_to_gid(name, &gid, False) ? (id_t)gid : id;
 		}
 	} else
 		id2 = id;
@@ -289,11 +299,11 @@ uid_t match_uid(uid_t uid)
 	static struct idlist *last = NULL;
 	struct idlist *list;
 
-	if (last && uid == last->id)
+	if (last && id_eq_uid(last->id, uid))
 		return last->id2;
 
 	for (list = uidlist; list; list = list->next) {
-		if (list->id == uid)
+		if (id_eq_uid(list->id, uid))
 			break;
 	}
 
@@ -309,11 +319,11 @@ gid_t match_gid(gid_t gid, uint16 *flags_ptr)
 	static struct idlist *last = NULL;
 	struct idlist *list;
 
-	if (last && gid == last->id)
+	if (last && id_eq_gid(last->id, gid))
 		list = last;
 	else {
 		for (list = gidlist; list; list = list->next) {
-			if (list->id == gid)
+			if (id_eq_gid(list->id, gid))
 				break;
 		}
 		if (!list)
@@ -334,7 +344,7 @@ const char *add_uid(uid_t uid)
 	union name_or_id noiu;
 
 	for (list = uidlist; list; list = list->next) {
-		if (list->id == uid)
+		if (id_eq_uid(list->id, uid))
 			return NULL;
 	}
 
@@ -351,7 +361,7 @@ const char *add_gid(gid_t gid)
 	union name_or_id noiu;
 
 	for (list = gidlist; list; list = list->next) {
-		if (list->id == gid)
+		if (id_eq_gid(list->id, gid))
 			return NULL;
 	}
 

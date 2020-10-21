@@ -570,7 +570,7 @@ static int32 recv_deflated_token(int f, char **data)
 				rx_strm.avail_in = 4;
 				rx_strm.next_in = (Bytef *)cbuf;
 				cbuf[0] = cbuf[1] = 0;
-				cbuf[2] = cbuf[3] = 0xff;
+				cbuf[2] = cbuf[3] = (char)0xff;
 				inflate(&rx_strm, Z_SYNC_FLUSH);
 				recv_state = r_idle;
 			}

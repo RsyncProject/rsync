@@ -12,7 +12,7 @@
 # WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 # Lesser General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU Lesser General Public
 # License along with this program; if not, write to the Free Software
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
@@ -21,6 +21,9 @@ tmpdir="$scratchdir"
 fromdir="$tmpdir/from"
 todir="$tmpdir/to"
 chkdir="$tmpdir/chk"
+
+chkfile="$scratchdir/rsync.chk"
+outfile="$scratchdir/rsync.out"
 
 # For itemized output:
 all_plus='+++++++++'
@@ -75,10 +78,10 @@ cp_touch() {
     fi
 }
 
-# Call this if you want to filter out verbose messages (-v or -vv) from
-# the output of an rsync run (whittling the output down to just the file
-# messages).  This isn't needed if you use -i without -v.
-filter_outfile() {
+# Call this if you want to filter (stdin -> stdout) verbose messages (-v or
+# -vv) from an rsync run (whittling the output down to just the file messages).
+# This isn't needed if you use -i without -v.
+v_filt() {
     sed -e '/^building file list /d' \
 	-e '/^sending incremental file list/d' \
 	-e '/^created directory /d' \
@@ -87,9 +90,7 @@ filter_outfile() {
 	-e '/^total: /d' \
 	-e '/^client charset: /d' \
 	-e '/^server charset: /d' \
-	-e '/^$/,$d' \
-	<"$outfile" >"$outfile.new"
-    mv "$outfile.new" "$outfile"
+	-e '/^$/,$d'
 }
 
 printmsg() {
@@ -149,7 +150,7 @@ check_perms() {
     test_fail "failed test $3"
 }
 
-rsync_getgroups() { 
+rsync_getgroups() {
     "$TOOLDIR/getgroups"
 }
 
@@ -171,7 +172,7 @@ hands_setup() {
     # the links behave in the future, and it cannot be changed using
     # chmod!  rsync always sets its umask to 000 so that it can
     # accurately recreate permissions, but this script is probably run
-    # with a different umask. 
+    # with a different umask.
 
     # This causes a little problem that "ls -l" of the two will not be
     # the same.  So, we need to set our umask before doing any creations.
@@ -213,7 +214,7 @@ hands_setup() {
 
 ####################
 # Many machines do not have "mkdir -p", so we have to build up long paths.
-# How boring.  
+# How boring.
 makepath() {
     for p in "${@}"; do
 	(echo "        makepath $p"
@@ -223,11 +224,11 @@ makepath() {
 	then
 	    cd /
 	fi
-    
+
 	# This will break if $p contains a space.
 	for c in `echo $p | tr '/' ' '`
-	do 
-	    if [ -d "$c" ] || mkdir "$c" 
+	do
+	    if [ -d "$c" ] || mkdir "$c"
 	    then
 		cd "$c" || return $?
 	    else
@@ -236,7 +237,6 @@ makepath() {
 	done)
     done
 }
-
 
 
 ###########################
@@ -262,8 +262,8 @@ checkit() {
 	;;
     esac
 
-    echo "Running: \"$1\""  
-    eval "$1" 
+    echo "Running: \"$1\""
+    eval "$1"
     status=$?
     if [ $status != 0 ]; then
 	failed="$failed status=$status"
@@ -299,6 +299,57 @@ checkit() {
 
     echo "Failed: $failed"
     return 1
+}
+
+
+# Run a test in $1 and make sure it has a zero exit status.  Capture the
+# output into $outfile and echo it to stdout.
+checktee() {
+    echo "Running: \"$1\""
+    eval "$1" >"$outfile"
+    status=$?
+    cat "$outfile"
+    if [ $status != 0 ]; then
+	echo "Failed: status=$status"
+	return 1
+    fi
+    return 0
+}
+
+
+# Slurp stdin into $chkfile and then call checkdiff2().
+checkdiff() {
+    cat >"$chkfile" # Save off stdin
+    checkdiff2 "${@}"
+}
+
+
+# Run a test in $1 and make sure it has a zero exit status.  Capture the output
+# into $outfile.  If $2 is set, use it to filter the outfile.  If resulting
+# outfile differs from the chkfile data, fail with an error.
+checkdiff2() {
+    failed=
+
+    echo "Running: \"$1\""
+    eval "$1" >"$outfile"
+    status=$?
+    cat "$outfile"
+    if [ $status != 0 ]; then
+	failed="$failed status=$status"
+    fi
+
+    if [ "$2" ]; then
+	eval "cat '$outfile' | $2 >'$outfile.new'"
+	mv "$outfile.new" "$outfile"
+    fi
+
+    diff $diffopt "$chkfile" "$outfile" || failed="$failed output differs"
+
+    if [ "$failed" ] ; then
+	echo "Failed:$failed"
+	return 1
+    fi
+    return 0
 }
 
 
@@ -404,7 +455,7 @@ test_skipped() {
     exit 77
 }
 
-# It failed, but we expected that.  don't dump out error logs, 
+# It failed, but we expected that.  Don't dump out error logs,
 # because most users won't want to see them.  But do leave
 # the working directory around.
 test_xfail() {
@@ -437,7 +488,7 @@ then
 else
     echo "Testing for symlinks using '$TEST_SYMLINK_CMD'"
 fi
-	
+
 
 # Test whether something is a link, allowing for shell peculiarities
 is_a_link() {
@@ -451,5 +502,5 @@ is_a_link() {
 # directory has to be writable by the nobody user in some cases.  The
 # best thing is probably to explicitly chmod those directories after
 # creation.
- 
+
 umask 022

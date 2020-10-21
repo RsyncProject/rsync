@@ -9,12 +9,33 @@
  - Fix a bug with `--mkpath` if a single-file copy specifies an existing
    destination dir with a non-existing destination filename.
 
+ - Fix `--update -vv` to output "is uptodate" instead of "is newer" messages
+   for files that are being skipped due to an identical modify time.  (This
+   was a new output quirk in 3.2.3.)
+
+ - When doing an append transfer, the sending side's file must not get shorter
+   or it is skipped. Fixes a crash that could occur when the size changes to 0
+   in the middle of the send negotiations.
+
+ - When dealing with a special file in an alt-dest hierarchy, rsync now checks
+   the non-permissions mode bits to ensure that the 2 special files are really
+   the same.
+
  - Avoid a weird failure if you run a local copy with a (useless) `--rsh`
    option that contains a `V`.
 
 ### ENHANCEMENTS:
 
  - Use openssl's `-verify_hostname` option in the rsync-ssl script.
+
+ - Optimize the AVX2 checksum code a bit more.
+
+ - Added extra info to the "FILENAME exists" output of `--ignore-existing` when
+   `--info=skip2` is used.  The skip message becomes "FILENAME exists (INFO)"
+   where the INFO is one of "type change", "sum change" (requires `-c`), "file
+   change" (based on the quick check), "attr change", or "uptodate".
+
+ - Some manpage improvements.
 
 ### PACKAGING RELATED:
 
@@ -27,6 +48,11 @@
  - Fixed configure to not fail at the SIMD check when cross-compiling.
 
  - Added a SECURITY.md file.
+
+### DEVELOPER RELATED:
+
+ - Made it easier to write rsync tests that diff the output while also checking
+   the status code, and used the idiom to improve the existing tests.
 
 ------------------------------------------------------------------------------
 <a name="3.2.3"></a>

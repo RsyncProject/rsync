@@ -338,7 +338,7 @@ detailed description below for a complete description.
 --quiet, -q              suppress non-error messages
 --no-motd                suppress daemon-mode MOTD
 --checksum, -c           skip based on checksum, not mod-time & size
---archive, -a            archive mode; equals -rlptgoD (no -H,-A,-X)
+--archive, -a            archive mode is -rlptgoD (no -A,-X,-U,-N,-H)
 --no-OPTION              turn off an implied OPTION (e.g. --no-D)
 --recursive, -r          recurse into directories
 --relative, -R           use relative path names
@@ -651,6 +651,10 @@ your home directory (remove the '=' for that).
     the same modification timestamp.  This option turns off this "quick check"
     behavior, causing all files to be updated.
 
+    This option can be a little confusing compared to `--ignore-existing` and
+    `--ignore-non-existing` in that that they cause rsync to transfer fewer
+    files, while this option causes rsync to transfer more files.
+
 0.  `--size-only`
 
     This modifies rsync's "quick check" algorithm for finding files that need
@@ -711,12 +715,12 @@ your home directory (remove the '=' for that).
 0.  `--archive`, `-a`
 
     This is equivalent to `-rlptgoD`.  It is a quick way of saying you want
-    recursion and want to preserve almost everything (with `-H` being a notable
-    omission).  The only exception to the above equivalence is when
-    `--files-from` is specified, in which case `-r` is not implied.
+    recursion and want to preserve almost everything.  Be aware that it does
+    **not** include preserving ACLs (`-A`), xattrs (`-X`), atimes (`-U`),
+    crtimes (`-N`), nor the finding and preserving of hardlinks (`-H`).
 
-    Note that `-a` **does not preserve hardlinks**, because finding
-    multiply-linked files is expensive.  You must separately specify `-H`.
+    The only exception to the above equivalence is when
+    `--files-from` is specified, in which case `-r` is not implied.
 
 0.  `--no-OPTION`
 
@@ -949,7 +953,9 @@ your home directory (remove the '=' for that).
     existing content in the file (it only verifies the content that it is
     appending).  Rsync skips any files that exist on the receiving side that
     are not shorter than the associated file on the sending side (which means
-    that new files are trasnferred).
+    that new files are trasnferred).  It also skips any files whose size on the
+    sending side gets shorter during the send negotiations (rsync warns about a
+    "diminished" file when this happens).
 
     This does not interfere with the updating of a file's non-content
     attributes (e.g.  permissions, ownership, etc.) when the file does not need
@@ -1599,6 +1605,12 @@ your home directory (remove the '=' for that).
     already-handled files don't get tweaked (which avoids a change in
     permissions on the hard-linked files).  This does mean that this option is
     only looking at the existing files in the destination hierarchy itself.
+
+    When `--info=skip2` is used rsync will output "FILENAME exists (INFO)"
+    messages where the INFO indicates one of "type change", "sum change"
+    (requires `-c`), "file change" (based on the quick check), "attr change",
+    or "uptodate".  Using `--info=skip1` (which is also implied by `-vv`)
+    outputs the exists message without the INFO suffix.
 
 0.  `--remove-source-files`
 

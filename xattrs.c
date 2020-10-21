@@ -1118,7 +1118,8 @@ int del_def_xattr_acl(const char *fname)
 
 int get_stat_xattr(const char *fname, int fd, STRUCT_STAT *fst, STRUCT_STAT *xst)
 {
-	int mode, rdev_major, rdev_minor, uid, gid, len;
+	unsigned int mode;
+	int rdev_major, rdev_minor, uid, gid, len;
 	char buf[256];
 
 	if (am_root >= 0 || IS_DEVICE(fst->st_mode) || IS_SPECIAL(fst->st_mode))

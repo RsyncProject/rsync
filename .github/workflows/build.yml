@@ -20,7 +20,7 @@ jobs:
       run: |
         sudo apt-get install acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev python3-cmarkgfm openssl wget
         wget https://download.samba.org/pub/rsync/generated-files/git-version.h
-        echo "::add-path::/usr/local/bin"
+        echo "/usr/local/bin" >>$GITHUB_PATH
     - name: configure
       run: ./configure
     - name: make
@@ -57,7 +57,7 @@ jobs:
         brew install automake openssl xxhash zstd lz4 wget
         sudo pip3 install commonmark
         wget https://download.samba.org/pub/rsync/generated-files/git-version.h
-        echo "::add-path::/usr/local/bin"
+        echo "/usr/local/bin" >>$GITHUB_PATH
     - name: configure
       run: CPPFLAGS=-I/usr/local/opt/openssl/include/ LDFLAGS=-L/usr/local/opt/openssl/lib/ ./configure
     - name: make
@@ -93,7 +93,7 @@ jobs:
       run: |
         cyg-get make autoconf automake gcc-core attr libattr-devel python3 python36-commonmark libzstd-devel liblz4-devel libssl-devel libxxhash0 libxxhash-devel
         curl.exe -o git-version.h https://download.samba.org/pub/rsync/generated-files/git-version.h
-        echo "::add-path::C:/tools/cygwin/bin"
+        echo "C:/tools/cygwin/bin" >>$Env:GITHUB_PATH
     - name: configure
       run: bash -c './configure'
     - name: make

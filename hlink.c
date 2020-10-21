@@ -406,7 +406,7 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 				}
 				break;
 			}
-			if (!unchanged_file(cmpbuf, file, &alt_sx.st))
+			if (!quick_check_ok(FT_REG, cmpbuf, file, &alt_sx.st))
 				continue;
 			statret = 1;
 			if (unchanged_attrs(cmpbuf, file, &alt_sx))

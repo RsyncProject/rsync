@@ -277,6 +277,10 @@ enum msgcode {
 	MSG_NO_SEND=102,/* sender failed to open a file we wanted */
 };
 
+enum filetype {
+	FT_UNSUPPORTED, FT_REG, FT_DIR, FT_SYMLINK, FT_SPECIAL, FT_DEVICE
+};
+
 #define NDX_DONE -1
 #define NDX_FLIST_EOF -2
 #define NDX_DEL_STATS -3
@@ -1160,7 +1164,7 @@ struct name_num_obj {
 	uchar *saw;
 	int saw_len;
 	int negotiated_num;
-	struct name_num_item list[8]; /* A big-enough len (we'll get a compile error if it is ever too small) */
+	struct name_num_item list[10]; /* we'll get a compile error/warning if this is ever too small */
 };
 
 #ifndef __cplusplus

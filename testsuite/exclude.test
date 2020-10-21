@@ -12,9 +12,6 @@
 
 . "$suitedir/rsync.fns"
 
-chkfile="$scratchdir/rsync.chk"
-outfile="$scratchdir/rsync.out"
-
 CVSIGNORE='*.junk'
 export CVSIGNORE
 
@@ -118,7 +115,8 @@ ln -s too "$fromdir/bar/down/to/foo/sym"
 
 # Start to prep an --update test dir
 mkdir "$scratchdir/up1" "$scratchdir/up2"
-touch "$scratchdir/up1/older" "$scratchdir/up2/newer"
+touch "$scratchdir/up1/dst-newness" "$scratchdir/up2/src-newness"
+touch "$scratchdir/up1/same-newness" "$scratchdir/up2/same-newness"
 touch "$scratchdir/up1/extra-src" "$scratchdir/up2/extra-dest"
 
 # Create chkdir with what we expect to be excluded.
@@ -133,7 +131,7 @@ rm "$chkdir"/bar/down/to/foo/to "$chkdir"/bar/down/to/foo/file[235-9]
 rm "$chkdir"/mid/for/foo/extra
 
 # Finish prep for the --update test (run last)
-touch "$scratchdir/up1/newer" "$scratchdir/up2/older"
+touch "$scratchdir/up1/src-newness" "$scratchdir/up2/dst-newness"
 
 # Un-tweak the directory times in our first (weak) exclude test (though
 # it's a good test of the --existing option).
@@ -227,13 +225,13 @@ checkit "$RSYNC -avv $relative_opts --exclude='$fromdir/foo/down' \
     '$fromdir/foo' '$todir'" "$chkdir$fromdir/foo" "$todir$fromdir/foo"
 
 # Now we'll test the --update option.
-$RSYNC -aiO --update touch "$scratchdir/up1/" "$scratchdir/up2/" \
-    | tee "$outfile"
-cat <<EOT >"$chkfile"
+checkdiff "$RSYNC -aiiO --update --info=skip '$scratchdir/up1/' '$scratchdir/up2/'" \
+	"grep -v '^\.d$allspace'" <<EOT
+dst-newness is newer
 >f$all_plus extra-src
->f..t.$dots newer
+.f$allspace same-newness
+>f..t.$dots src-newness
 EOT
-diff $diffopt "$chkfile" "$outfile" || test_fail "--update test failed"
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0

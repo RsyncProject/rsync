@@ -29,8 +29,6 @@ name2="$fromdir/name2"
 echo "This is the file" > "$name1"
 ln -s "$name1" "$name2" || test_fail "can't create symlink"
 
-outfile="$scratchdir/rsync.out"
-
 checkit "$RSYNC -avv '$fromdir/' '$fromdir/' '$fromdir/' '$fromdir/' '$fromdir/' '$fromdir/' '$fromdir/' '$fromdir/' '$fromdir/' '$fromdir/' '$todir/'" "$fromdir" "$todir" \
     | tee "$outfile"
 

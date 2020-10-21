@@ -362,6 +362,16 @@ void send_files(int f_in, int f_out)
 			exit_cleanup(RERR_FILEIO);
 		}
 
+		if (append_mode > 0 && st.st_size < F_LENGTH(file)) {
+			rprintf(FWARNING, "skipped diminished file: %s\n",
+				full_fname(fname));
+			free_sums(s);
+			close(fd);
+			if (protocol_version >= 30)
+				send_msg_int(MSG_NO_SEND, ndx);
+			continue;
+		}
+
 		if (st.st_size) {
 			int32 read_size = MAX(s->blength * 3, MAX_MAP_SIZE);
 			mbuf = map_file(fd, st.st_size, read_size, s->blength);
