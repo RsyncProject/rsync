@@ -860,6 +860,14 @@ AC_CHECK_FUNCS(waitpid wait4 getcwd chown chmod lchmod mknod mkfifo \
     extattr_get_link sigaction sigprocmask setattrlist getgrouplist \
     initgroups utimensat posix_fallocate attropen setvbuf nanosleep usleep)
 
+case "$host_os" in
+*linux*) # Work around a glibc bug. TODO eventually remove this?
+    ac_cv_func_lchmod=no
+    grep -v HAVE_LCHMOD confdefs.h >confdefs.h.new
+    mv confdefs.h.new confdefs.h
+    ;;
+esac
+
 dnl cygwin iconv.h defines iconv_open as libiconv_open
 if test x"$ac_cv_func_iconv_open" != x"yes"; then
     AC_CHECK_FUNC(libiconv_open, [ac_cv_func_iconv_open=yes; AC_DEFINE(HAVE_ICONV_OPEN, 1)])
