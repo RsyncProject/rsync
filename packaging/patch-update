@@ -33,7 +33,7 @@ def main():
 
     master_commit = latest_git_hash(args.base_branch)
 
-    if cmd_txt_chk(['packaging/prep-auto-dir']) == '':
+    if cmd_txt_chk(['packaging/prep-auto-dir']).out == '':
         die('You must setup an auto-build-save dir to use this script.')
 
     if args.gen:
