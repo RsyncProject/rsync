@@ -100,7 +100,7 @@ like.
     >     sudo apt install -y attr libattr1-dev
     >     sudo apt install -y libxxhash-dev
     >     sudo apt install -y libzstd-dev
-    >     sudo apt install -y libzlz4-dev
+    >     sudo apt install -y liblz4-dev
     >     sudo apt install -y libssl-dev
 
  -  For CentOS (use EPEL for python3-pip):
