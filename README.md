@@ -23,7 +23,7 @@ options.  To get a complete list of supported options type:
 
     rsync --help
 
-See the manpage for more detailed information.
+See the [manpage](https://github.com/WayneD/rsync/blob/master/rsync.1.md) for more detailed information.
 
 
 BUILDING AND INSTALLING
