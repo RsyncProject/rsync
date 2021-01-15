@@ -194,6 +194,11 @@ AC_DEFINE_UNQUOTED(RSYNC_RSH, "$RSYNC_RSH", [default -e command])
 AC_PATH_PROG(SHELL_PATH, sh, /bin/sh, [/usr/xpg4/bin$PATH_SEPARATOR$PATH])
 AC_PATH_PROG(FAKEROOT_PATH, fakeroot, /usr/bin/fakeroot, [/usr/xpg4/bin$PATH_SEPARATOR$PATH])
 
+AC_ARG_WITH(nobody-user,
+    AS_HELP_STRING([--with-nobody-user=USER],[set the default unprivileged user (default nobody)]),
+    [ NOBODY_USER="$with_nobody_user" ],
+    [ NOBODY_USER="nobody" ])
+
 AC_ARG_WITH(nobody-group,
     AS_HELP_STRING([--with-nobody-group=GROUP],[set the default unprivileged group (default nobody or nogroup)]),
     [ NOBODY_GROUP="$with_nobody_group" ])
@@ -210,7 +215,7 @@ if test x"$with_nobody_group" = x; then
     AC_MSG_RESULT($NOBODY_GROUP)
 fi
 
-AC_DEFINE_UNQUOTED(NOBODY_USER, "nobody", [unprivileged user--e.g. nobody])
+AC_DEFINE_UNQUOTED(NOBODY_USER, "$NOBODY_USER", [unprivileged user--e.g. nobody])
 AC_DEFINE_UNQUOTED(NOBODY_GROUP, "$NOBODY_GROUP", [unprivileged group for unprivileged user])
 
 # SIMD optimizations
