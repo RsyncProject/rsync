@@ -23,8 +23,9 @@ options.  To get a complete list of supported options type:
 
     rsync --help
 
-See the manpage for more detailed information.
+See the [manpage][0] for more detailed information.
 
+[0]: https://download.samba.org/pub/rsync/rsync.1
 
 BUILDING AND INSTALLING
 -----------------------
