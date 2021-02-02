@@ -20,6 +20,9 @@
 
 #include "rsync.h"
 #include "ifuncs.h"
+#ifdef HAVE_NETGROUP_H
+#include <netgroup.h>
+#endif
 
 static int allow_forward_dns;
 
