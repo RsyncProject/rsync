@@ -1,4 +1,4 @@
-import os, sys, re, subprocess
+import os, sys, re, subprocess, argparse
 
 # This python3 library provides a few helpful routines that are
 # used by the latest packaging scripts.
@@ -23,27 +23,32 @@ def set_default_encoding(enc):
 
 
 # Set shell=True if the cmd is a string; sets a default encoding unless raw=True was specified.
-def _tweak_opts(cmd, opts, **maybe_set):
-    # This sets any maybe_set value that isn't already set AND creates a copy of opts for us.
-    opts = {**maybe_set, **opts}
+def _tweak_opts(cmd, opts, **maybe_set_args):
+    def _maybe_set(o, **msa): # Only set a value if the user didn't already set it.
+        for var, val in msa.items():
+            if var not in o:
+                o[var] = val
+
+    opts = opts.copy()
+    _maybe_set(opts, **maybe_set_args)
 
     if type(cmd) == str:
-        opts = {'shell': True, **opts}
+        _maybe_set(opts, shell=True)
 
     want_raw = opts.pop('raw', False)
     if default_encoding and not want_raw:
-        opts = {'encoding': default_encoding, **opts}
+        _maybe_set(opts, encoding=default_encoding)
 
     capture = opts.pop('capture', None)
     if capture:
         if capture == 'stdout':
-            opts = {'stdout': subprocess.PIPE, **opts}
+            _maybe_set(opts, stdout=subprocess.PIPE)
         elif capture == 'stderr':
-            opts = {'stderr': subprocess.PIPE, **opts}
+            _maybe_set(opts, stderr=subprocess.PIPE)
         elif capture == 'output':
-            opts = {'stdout': subprocess.PIPE, 'stderr': subprocess.PIPE, **opts}
+            _maybe_set(opts, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         elif capture == 'combined':
-            opts = {'stdout': subprocess.PIPE, 'stderr': subprocess.STDOUT, **opts}
+            _maybe_set(opts, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
     discard = opts.pop('discard', None)
     if discard:
@@ -66,30 +71,26 @@ def cmd_chk(cmd, **opts):
     return subprocess.run(cmd, **_tweak_opts(cmd, opts, check=True))
 
 
-# Capture stdout in a string and return the (output, return_code) tuple.
-# Use capture='combined' opt to get both stdout and stderr together.
-def cmd_txt_status(cmd, **opts):
+# Capture stdout in a string and return an object with out, err, and rc (return code).
+# It defaults to capture='stdout' (so err is empty) but can be overridden using
+# capture='combined' or capture='output' (the latter populates the err value).
+def cmd_txt(cmd, **opts):
     input = opts.pop('input', None)
     if input is not None:
         opts['stdin'] = subprocess.PIPE
     proc = subprocess.Popen(cmd, **_tweak_opts(cmd, opts, capture='stdout'))
-    out = proc.communicate(input=input)[0]
-    return (out, proc.returncode)
+    out, err = proc.communicate(input=input)
+    return argparse.Namespace(out=out, err=err, rc=proc.returncode)
 
 
-# Like cmd_txt_status() but just return the output.
-def cmd_txt(cmd, **opts):
-    return cmd_txt_status(cmd, **opts)[0]
-
-
-# Capture stdout in a string and return the output if the command has a 0 return code.
-# Otherwise it throws an exception that indicates the return code and the output.
+# Just like calling cmd_txt() except that it raises an error if the command has a non-0 return code.
+# The raised error includes the cmd, the return code, and the captured output.
 def cmd_txt_chk(cmd, **opts):
-    out, rc = cmd_txt_status(cmd, **opts)
-    if rc != 0:
-        cmd_err = f'Command "{cmd}" returned non-zero exit status "{rc}" and output:\n{out}'
+    ct = cmd_txt(cmd, **opts)
+    if ct.rc != 0:
+        cmd_err = f'Command "{cmd}" returned non-0 exit status "{ct.rc}" and output:\n{ct.out}{ct.err}'
         raise Exception(cmd_err)
-    return out
+    return ct
 
 
 # Starts a piped-output command of stdout (by default) and leaves it up to you to read
@@ -102,7 +103,7 @@ def cmd_pipe(cmd, **opts):
 # arg fatal_unless_clean can be used to make that non-fatal.  Returns a
 # tuple of the current branch, the is_clean flag, and the status text.
 def check_git_status(fatal_unless_clean=True, subdir='.'):
-    status_txt = cmd_txt_chk(f"cd '{subdir}' && git status")
+    status_txt = cmd_txt_chk(f"cd '{subdir}' && git status").out
     is_clean = re.search(r'\nnothing to commit.+working (directory|tree) clean', status_txt) != None
 
     if not is_clean and fatal_unless_clean:
@@ -149,7 +150,7 @@ def check_git_state(master_branch, fatal_unless_clean=True, check_extra_dir=None
 
 # Return the git hash of the most recent commit.
 def latest_git_hash(branch):
-    out = cmd_txt_chk(['git', 'log', '-1', '--no-color', branch])
+    out = cmd_txt_chk(['git', 'log', '-1', '--no-color', branch]).out
     m = re.search(r'^commit (\S+)', out, flags=re.M)
     if not m:
         die(f"Unable to determine commit hash for master branch: {branch}")
@@ -175,8 +176,8 @@ def mandate_gensend_hook():
         print('Creating hook file:', hook)
         cmd_chk(['./rsync', '-a', 'packaging/pre-push', hook])
     else:
-        out, rc = cmd_txt_status(['fgrep', 'make gensend', hook], discard='output')
-        if rc:
+        ct = cmd_txt(['fgrep', 'make gensend', hook], discard='output')
+        if ct.rc:
             die('Please add a "make gensend" into your', hook, 'script.')
 
 
@@ -186,7 +187,7 @@ def get_gen_files(want_dir_plus_list=False):
 
     gen_files = [ ]
 
-    auto_dir = os.path.join('auto-build-save', cmd_txt('git rev-parse --abbrev-ref HEAD').strip().replace('/', '%'))
+    auto_dir = os.path.join('auto-build-save', cmd_txt('git rev-parse --abbrev-ref HEAD').out.strip().replace('/', '%'))
 
     with open('Makefile.in', 'r', encoding='utf-8') as fh:
         for line in fh:

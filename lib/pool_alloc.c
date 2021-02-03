@@ -9,8 +9,7 @@ struct alloc_pool
 	size_t			size;		/* extent size		*/
 	size_t			quantum;	/* allocation quantum	*/
 	struct pool_extent	*extents;	/* top extent is "live" */
-	void			(*bomb)();	/* function to call if
-						 * malloc fails		*/
+	void			(*bomb)();	/* called if malloc fails */
 	int			flags;
 
 	/* statistical data */
@@ -49,7 +48,7 @@ pool_create(size_t size, size_t quantum, void (*bomb)(const char*, const char*, 
 {
 	struct alloc_pool *pool;
 
-	if ((MINALIGN & (MINALIGN - 1)) != 0) {
+	if ((MINALIGN & (MINALIGN - 1)) != (0)) {
 		if (bomb)
 			(*bomb)("Compiler error: MINALIGN is not a power of 2", __FILE__, __LINE__);
 		return NULL;

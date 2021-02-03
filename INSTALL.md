@@ -22,9 +22,9 @@ If your OS doesn't provide a python3-cmarkgfm or python3-commonmark package,
 you can run the following to install the commonmark python library for your
 build user (after installing python3's pip package):
 
->     pip3 install --user commonmark
+>     python3 -mpip install --user commonmark
 
-You can test if you've got it fixed by running (from the src dir):
+You can test if you've got it fixed by running (from the rsync checkout):
 
 >     ./md2man --test rsync-ssl.1.md
 
@@ -53,7 +53,8 @@ installed to manipulate xattrs and to run the rsync testsuite.
 The [xxHash library][1] provides extremely fast checksum functions that can
 make the "rsync algorithm" run much more quickly, especially when matching
 blocks in large files.  Installing this development library adds xxhash
-checksums as the default checksum algorithm.
+checksums as the default checksum algorithm.  You'll need at least v0.8.0
+if you want rsync to include the full range of its checksum algorithms.
 
 [1]: https://cyan4973.github.io/xxHash/
 
@@ -100,7 +101,7 @@ like.
     >     sudo apt install -y attr libattr1-dev
     >     sudo apt install -y libxxhash-dev
     >     sudo apt install -y libzstd-dev
-    >     sudo apt install -y libzlz4-dev
+    >     sudo apt install -y liblz4-dev
     >     sudo apt install -y libssl-dev
 
  -  For CentOS (use EPEL for python3-pip):
@@ -113,7 +114,7 @@ like.
     >     sudo yum -y install libzstd-devel
     >     sudo yum -y install lz4-devel
     >     sudo yum -y install openssl-devel
-    >     pip3 install --user commonmark
+    >     python3 -mpip install --user commonmark
 
  -  For Fedora 33:
 
@@ -141,11 +142,17 @@ like.
 
  -  For Cygwin (with all cygwin programs stopped, run the appropriate setup program from a cmd shell):
 
-    >     setup-x86_64 --quiet-mode -P make,gawk,autoconf,automake,gcc-core,python3,python36-commonmark
+    >     setup-x86_64 --quiet-mode -P make,gawk,autoconf,automake,gcc-core,python3,python38-pip
     >     setup-x86_64 --quiet-mode -P attr,libattr-devel
     >     setup-x86_64 --quiet-mode -P libzstd-devel
     >     setup-x86_64 --quiet-mode -P liblz4-devel
     >     setup-x86_64 --quiet-mode -P libssl-devel
+
+    Sometimes cygwin has commonmark packaged and sometimes it doesn't. Now that
+    its python38 has stabilized, you could install python38-commonmark. Or just
+    avoid the issue by running this from a bash shell as your build user:
+
+    >     python3 -mpip install --user commonmark
 
 ## Build and install
 

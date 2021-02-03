@@ -30,7 +30,7 @@ def main():
 
     signal.signal(signal.SIGINT, signal_handler)
 
-    if cmd_txt_chk(['packaging/prep-auto-dir']) == '':
+    if cmd_txt_chk(['packaging/prep-auto-dir']).out == '':
         die('You must setup an auto-build-save dir to use this script.');
 
     auto_dir, gen_files = get_gen_files(True)
@@ -84,7 +84,7 @@ def main():
     if os.path.lexists(rsync_ver):
         die(f'"{rsync_ver}" must not exist in the current directory.')
 
-    out = cmd_txt_chk(['git', 'tag', '-l', v_ver])
+    out = cmd_txt_chk(['git', 'tag', '-l', v_ver]).out
     if out != '':
         print(f"Tag {v_ver} already exists.")
         ans = input("\nDelete tag or quit? [Q/del] ")
@@ -282,13 +282,13 @@ About to:
     # TODO: is there a better way to ensure that our passphrase is in the agent?
     cmd_run("touch TeMp; gpg --sign TeMp; rm TeMp*")
 
-    out = cmd_txt(f"git tag -s -m 'Version {version}.' {v_ver}", capture='combined')
+    out = cmd_txt(f"git tag -s -m 'Version {version}.' {v_ver}", capture='combined').out
     print(out, end='')
     if 'bad passphrase' in out or 'failed' in out:
         die('Aborting')
 
     if os.path.isdir('patches/.git'):
-        out = cmd_txt(f"cd patches && git tag -s -m 'Version {version}.' {v_ver}", capture='combined')
+        out = cmd_txt(f"cd patches && git tag -s -m 'Version {version}.' {v_ver}", capture='combined').out
         print(out, end='')
         if 'bad passphrase' in out or 'failed' in out:
             die('Aborting')

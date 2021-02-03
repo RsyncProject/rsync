@@ -2,6 +2,21 @@ dnl Process this file with autoconf to produce a configure script.
 
 AC_INIT([rsync],[ ],[https://rsync.samba.org/bug-tracking.html])
 
+AC_C_BIGENDIAN
+AC_HEADER_DIRENT
+AC_HEADER_TIME
+AC_HEADER_SYS_WAIT
+AC_CHECK_HEADERS(sys/fcntl.h sys/select.h fcntl.h sys/time.h sys/unistd.h \
+    unistd.h utime.h compat.h sys/param.h ctype.h sys/wait.h sys/stat.h \
+    sys/ioctl.h sys/filio.h string.h stdlib.h sys/socket.h sys/mode.h grp.h \
+    sys/un.h sys/attr.h arpa/inet.h arpa/nameser.h locale.h sys/types.h \
+    netdb.h malloc.h float.h limits.h iconv.h libcharset.h langinfo.h mcheck.h \
+    sys/acl.h acl/libacl.h attr/xattr.h sys/xattr.h sys/extattr.h dl.h \
+    popt.h popt/popt.h linux/falloc.h netinet/in_systm.h netgroup.h \
+    zlib.h xxhash.h openssl/md4.h openssl/md5.h zstd.h lz4.h sys/file.h)
+AC_CHECK_HEADERS([netinet/ip.h], [], [], [[#include <netinet/in.h>]])
+AC_HEADER_MAJOR_FIXED
+
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([byteorder.h])
 AC_CONFIG_HEADER(config.h)
@@ -180,6 +195,11 @@ AC_DEFINE_UNQUOTED(RSYNC_RSH, "$RSYNC_RSH", [default -e command])
 AC_PATH_PROG(SHELL_PATH, sh, /bin/sh, [/usr/xpg4/bin$PATH_SEPARATOR$PATH])
 AC_PATH_PROG(FAKEROOT_PATH, fakeroot, /usr/bin/fakeroot, [/usr/xpg4/bin$PATH_SEPARATOR$PATH])
 
+AC_ARG_WITH(nobody-user,
+    AS_HELP_STRING([--with-nobody-user=USER],[set the default unprivileged user (default nobody)]),
+    [ NOBODY_USER="$with_nobody_user" ],
+    [ NOBODY_USER="nobody" ])
+
 AC_ARG_WITH(nobody-group,
     AS_HELP_STRING([--with-nobody-group=GROUP],[set the default unprivileged group (default nobody or nogroup)]),
     [ NOBODY_GROUP="$with_nobody_group" ])
@@ -196,7 +216,7 @@ if test x"$with_nobody_group" = x; then
     AC_MSG_RESULT($NOBODY_GROUP)
 fi
 
-AC_DEFINE_UNQUOTED(NOBODY_USER, "nobody", [unprivileged user--e.g. nobody])
+AC_DEFINE_UNQUOTED(NOBODY_USER, "$NOBODY_USER", [unprivileged user--e.g. nobody])
 AC_DEFINE_UNQUOTED(NOBODY_GROUP, "$NOBODY_GROUP", [unprivileged group for unprivileged user])
 
 # SIMD optimizations
@@ -209,6 +229,9 @@ AC_ARG_ENABLE(simd,
 # Clag is crashing with -g -O2, so we'll get rid of -g for now.
 CXXFLAGS=`echo "$CXXFLAGS" | sed 's/-g //'`
 m4_define(SIMD_X86_64_TEST, [[#include <stdio.h>
+#if HAVE_STDLIB_H
+#include <stdlib.h>
+#endif
 #include <immintrin.h>
 __attribute__ ((target("default"))) int test_ssse3(int x) { return x; }
 __attribute__ ((target("default"))) int test_sse2(int x) { return x; }
@@ -315,7 +338,9 @@ AC_RUN_IFELSE([AC_LANG_SOURCE([[
 #define _FILE_OFFSET_BITS 64
 #include <stdio.h>
 #include <fcntl.h>
+#ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
+#endif
 #include <sys/wait.h>
 #if HAVE_UNISTD_H
 #include <unistd.h>
@@ -492,20 +517,6 @@ case $host_os in
 	       * ) AC_MSG_RESULT(no);;
 esac
 
-AC_C_BIGENDIAN
-AC_HEADER_DIRENT
-AC_HEADER_TIME
-AC_HEADER_SYS_WAIT
-AC_CHECK_HEADERS(sys/fcntl.h sys/select.h fcntl.h sys/time.h sys/unistd.h \
-    unistd.h utime.h grp.h compat.h sys/param.h ctype.h sys/wait.h \
-    sys/ioctl.h sys/filio.h string.h stdlib.h sys/socket.h sys/mode.h \
-    sys/un.h sys/attr.h mcheck.h arpa/inet.h arpa/nameser.h locale.h \
-    netdb.h malloc.h float.h limits.h iconv.h libcharset.h langinfo.h \
-    sys/acl.h acl/libacl.h attr/xattr.h sys/xattr.h sys/extattr.h dl.h \
-    popt.h popt/popt.h linux/falloc.h netinet/in_systm.h netinet/ip.h \
-    zlib.h xxhash.h openssl/md4.h openssl/md5.h zstd.h lz4.h sys/file.h)
-AC_HEADER_MAJOR_FIXED
-
 AC_MSG_CHECKING([whether to enable use of openssl crypto library])
 AC_ARG_ENABLE([openssl],
 	AS_HELP_STRING([--disable-openssl],[disable openssl crypto library]))
@@ -609,7 +620,9 @@ fi
 
 AC_CACHE_CHECK([if makedev takes 3 args],rsync_cv_MAKEDEV_TAKES_3_ARGS,[
 AC_RUN_IFELSE([AC_LANG_SOURCE([[
+#ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
+#endif
 #ifdef MAJOR_IN_MKDEV
 #include <sys/mkdev.h>
 # if !defined makedev && (defined mkdev || defined _WIN32 || defined __WIN32__)
@@ -725,7 +738,9 @@ AC_SEARCH_LIBS(libiconv_open, iconv)
 AC_MSG_CHECKING([for iconv declaration])
 AC_CACHE_VAL(am_cv_proto_iconv, [
     AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+#if HAVE_STDLIB_H
 #include <stdlib.h>
+#endif
 #include <iconv.h>
 extern
 #ifdef __cplusplus
@@ -749,20 +764,31 @@ dnl AC_MSG_NOTICE([Looking in libraries: $LIBS])
 AC_REPLACE_FUNCS([inet_ntop inet_pton])
 
 AC_HAVE_TYPE([struct addrinfo], [#include <netdb.h>])
-AC_HAVE_TYPE([struct sockaddr_storage], [#include <sys/types.h>
-#include <sys/socket.h>])
+AC_HAVE_TYPE([struct sockaddr_storage], [
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+#ifdef HAVE_SYS_SOCKET_H
+#include <sys/socket.h>
+#endif])
 
 # Irix 6.5 has getaddrinfo but not the corresponding defines, so use
 #   builtin getaddrinfo if one of the defines don't exist
 AC_CACHE_CHECK([whether defines needed by getaddrinfo exist],
                rsync_cv_HAVE_GETADDR_DEFINES,[
 			AC_EGREP_CPP(yes, [
-			#include <sys/types.h>
-			#include <sys/socket.h>
-			#include <netdb.h>
-			#ifdef AI_PASSIVE
-			yes
-			#endif],
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+#ifdef HAVE_SYS_SOCKET_H
+#include <sys/socket.h>
+#endif
+#ifdef HAVE_NETDB_H
+#include <netdb.h>
+#endif
+#ifdef AI_PASSIVE
+yes
+#endif],
 			rsync_cv_HAVE_GETADDR_DEFINES=yes,
 			rsync_cv_HAVE_GETADDR_DEFINES=no)])
 AS_IF([test x"$rsync_cv_HAVE_GETADDR_DEFINES" = x"yes" -a x"$ac_cv_type_struct_addrinfo" = x"yes"],[
@@ -771,9 +797,14 @@ AS_IF([test x"$rsync_cv_HAVE_GETADDR_DEFINES" = x"yes" -a x"$ac_cv_type_struct_a
 	# redefinition.
 	AC_CHECK_FUNCS(getaddrinfo, ,
 		[AC_MSG_CHECKING([for getaddrinfo by including <netdb.h>])
-		AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <sys/types.h>
-		#include <sys/socket.h>
-		#include <netdb.h>]], [[getaddrinfo(NULL, NULL, NULL, NULL);]])],[AC_MSG_RESULT([yes])
+		AC_LINK_IFELSE([AC_LANG_PROGRAM([[
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+#ifdef HAVE_SYS_SOCKET_H
+#include <sys/socket.h>
+#endif
+#include <netdb.h>]], [[getaddrinfo(NULL, NULL, NULL, NULL);]])],[AC_MSG_RESULT([yes])
 			AC_DEFINE(HAVE_GETADDRINFO, 1,
 				[Define to 1 if you have the "getaddrinfo" function and required types.])],[AC_MSG_RESULT([no])
 			AC_LIBOBJ([getaddrinfo])])])
@@ -783,16 +814,24 @@ AC_CHECK_MEMBER([struct sockaddr.sa_len],
 		[ AC_DEFINE(HAVE_SOCKADDR_LEN, 1, [Do we have sockaddr.sa_len?]) ],
 		[],
 		[
+#ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
+#endif
+#ifdef HAVE_SYS_SOCKET_H
 #include <sys/socket.h>
+#endif
 ])
 
 AC_CHECK_MEMBER([struct sockaddr_in.sin_len],
 		[ AC_DEFINE(HAVE_SOCKADDR_IN_LEN, 1, [Do we have sockaddr_in.sin_len?]) ],
 		[],
 		[
+#ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
+#endif
+#ifdef HAVE_SYS_SOCKET_H
 #include <sys/socket.h>
+#endif
 #include <netinet/in.h>
 ])
 
@@ -800,8 +839,12 @@ AC_CHECK_MEMBER([struct sockaddr_un.sun_len],
 		[ AC_DEFINE(HAVE_SOCKADDR_UN_LEN, 1, [Do we have sockaddr_un.sun_len?]) ],
 		[],
 		[
+#ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
+#endif
+#ifdef HAVE_SYS_SOCKET_H
 #include <sys/socket.h>
+#endif
 #include <netinet/in.h>
 ])
 
@@ -809,8 +852,12 @@ AC_CHECK_MEMBER([struct sockaddr_in6.sin6_scope_id],
 		[ AC_DEFINE(HAVE_SOCKADDR_IN6_SCOPE_ID, 1, [Do we have sockaddr_in6.sin6_scope_id?]) ],
 		[],
 		[
+#ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
+#endif
+#ifdef HAVE_SYS_SOCKET_H
 #include <sys/socket.h>
+#endif
 #include <netinet/in.h>
 ])
 
@@ -869,7 +916,9 @@ dnl Preallocation stuff (also fallocate, posix_fallocate function tests above):
 
 AC_CACHE_CHECK([for useable fallocate],rsync_cv_have_fallocate,[
 AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <fcntl.h>
-#include <sys/types.h>]], [[fallocate(0, 0, 0, 0);]])],[rsync_cv_have_fallocate=yes],[rsync_cv_have_fallocate=no])])
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif]], [[fallocate(0, 0, 0, 0);]])],[rsync_cv_have_fallocate=yes],[rsync_cv_have_fallocate=no])])
 if test x"$rsync_cv_have_fallocate" = x"yes"; then
     AC_DEFINE(HAVE_FALLOCATE, 1, [Define to 1 if you have the fallocate function and it compiles and links without error])
 fi
@@ -906,8 +955,12 @@ AC_PREPROC_IFELSE([AC_LANG_SOURCE([[
 
 AC_CACHE_CHECK([for SYS_fallocate],rsync_cv_have_sys_fallocate,[
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <sys/syscall.h>
+#ifdef HAVE_UNISTD_H
 #include <unistd.h>
-#include <sys/types.h>]], [[syscall(SYS_fallocate, 0, 0, (loff_t)0, (loff_t)0);]])],[rsync_cv_have_sys_fallocate=yes],[rsync_cv_have_sys_fallocate=no])])
+#endif
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif]], [[syscall(SYS_fallocate, 0, 0, (loff_t)0, (loff_t)0);]])],[rsync_cv_have_sys_fallocate=yes],[rsync_cv_have_sys_fallocate=no])])
 if test x"$rsync_cv_have_sys_fallocate" = x"yes"; then
     AC_DEFINE(HAVE_SYS_FALLOCATE, 1, [Define to 1 if you have the SYS_fallocate syscall number])
 fi
@@ -1026,8 +1079,12 @@ fi
 
 AC_CACHE_CHECK([for working socketpair],rsync_cv_HAVE_SOCKETPAIR,[
 AC_RUN_IFELSE([AC_LANG_SOURCE([[
+#ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
+#endif
+#ifdef HAVE_SYS_SOCKET_H
 #include <sys/socket.h>
+#endif
 
 int main(void) {
        int fd[2];
@@ -1109,7 +1166,10 @@ if test x"$rsync_cv_SIGNED_CHAR_OK" = x"yes"; then
 fi
 
 AC_CACHE_CHECK([for broken readdir],rsync_cv_HAVE_BROKEN_READDIR,[
-AC_RUN_IFELSE([AC_LANG_SOURCE([[#include <sys/types.h>
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
 #include <dirent.h>
 int main(void) { struct dirent *di; DIR *d = opendir("."); di = readdir(d);
 if (di && di->d_name[-2] == '.' && di->d_name[-1] == 0 &&
@@ -1119,7 +1179,10 @@ if test x"$rsync_cv_HAVE_BROKEN_READDIR" = x"yes"; then
 fi
 
 AC_CACHE_CHECK([for utimbuf],rsync_cv_HAVE_STRUCT_UTIMBUF,[
-AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <sys/types.h>
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
 #include <utime.h>]], [[struct utimbuf tbuf;  tbuf.actime = 0; tbuf.modtime = 1; return utime("foo.c",&tbuf);]])],[rsync_cv_HAVE_STRUCT_UTIMBUF=yes],[rsync_cv_HAVE_STRUCT_UTIMBUF=no])])
 if test x"$rsync_cv_HAVE_STRUCT_UTIMBUF" = x"yes"; then
     AC_DEFINE(HAVE_STRUCT_UTIMBUF, 1, [Define to 1 if you have the "struct utimbuf" type])
@@ -1127,17 +1190,23 @@ fi
 
 AC_CACHE_CHECK([if gettimeofday takes tz argument],rsync_cv_HAVE_GETTIMEOFDAY_TZ,[
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <sys/time.h>
-#include <unistd.h>]], [[struct timeval tv; return gettimeofday(&tv, NULL);]])],[rsync_cv_HAVE_GETTIMEOFDAY_TZ=yes],[rsync_cv_HAVE_GETTIMEOFDAY_TZ=no])])
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif]], [[struct timeval tv; return gettimeofday(&tv, NULL);]])],[rsync_cv_HAVE_GETTIMEOFDAY_TZ=yes],[rsync_cv_HAVE_GETTIMEOFDAY_TZ=no])])
 if test x"$rsync_cv_HAVE_GETTIMEOFDAY_TZ" != x"no"; then
     AC_DEFINE(HAVE_GETTIMEOFDAY_TZ, 1, [Define to 1 if gettimeofday() takes a time-zone arg])
 fi
 
 AC_CACHE_CHECK([for C99 vsnprintf],rsync_cv_HAVE_C99_VSNPRINTF,[
 AC_RUN_IFELSE([AC_LANG_SOURCE([[
+#ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
+#endif
 #include <stdarg.h>
 #include <stdio.h>
+#if HAVE_STDLIB_H
 #include <stdlib.h>
+#endif
 #include <string.h>
 void foo(const char *format, ...) {
        va_list ap;
@@ -1160,9 +1229,13 @@ fi
 
 AC_CACHE_CHECK([for secure mkstemp],rsync_cv_HAVE_SECURE_MKSTEMP,[
 AC_RUN_IFELSE([AC_LANG_SOURCE([[#include <stdlib.h>
+#ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
+#endif
 #include <sys/stat.h>
+#ifdef HAVE_UNISTD_H
 #include <unistd.h>
+#endif
 int main(void) {
   struct stat st;
   char tpl[20]="/tmp/test.XXXXXX";
@@ -1305,16 +1378,26 @@ else
 	AC_MSG_RESULT(running tests:)
 	AC_CHECK_LIB(acl,acl_get_file)
 	AC_CACHE_CHECK([for ACL support],samba_cv_HAVE_POSIX_ACLS,[
-	    AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <sys/types.h>
-#include <sys/acl.h>]], [[ acl_t acl; int entry_id; acl_entry_t *entry_p; return acl_get_entry( acl, entry_id, entry_p);]])],[samba_cv_HAVE_POSIX_ACLS=yes],[samba_cv_HAVE_POSIX_ACLS=no])])
+	    AC_LINK_IFELSE([AC_LANG_PROGRAM([[
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+#ifdef HAVE_SYS_ACL_H
+#include <sys/acl.h>
+#endif]], [[ acl_t acl; int entry_id; acl_entry_t *entry_p; return acl_get_entry( acl, entry_id, entry_p);]])],[samba_cv_HAVE_POSIX_ACLS=yes],[samba_cv_HAVE_POSIX_ACLS=no])])
 	AC_MSG_CHECKING(ACL test results)
 	if test x"$samba_cv_HAVE_POSIX_ACLS" = x"yes"; then
 	    AC_MSG_RESULT(Using posix ACLs)
 	    AC_DEFINE(HAVE_POSIX_ACLS, 1, [true if you have posix ACLs])
 	    AC_DEFINE(SUPPORT_ACLS, 1)
 	    AC_CACHE_CHECK([for acl_get_perm_np],samba_cv_HAVE_ACL_GET_PERM_NP,[
-		AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <sys/types.h>
-#include <sys/acl.h>]], [[ acl_permset_t permset_d; acl_perm_t perm; return acl_get_perm_np( permset_d, perm);]])],[samba_cv_HAVE_ACL_GET_PERM_NP=yes],[samba_cv_HAVE_ACL_GET_PERM_NP=no])])
+		AC_LINK_IFELSE([AC_LANG_PROGRAM([[
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+#ifdef HAVE_SYS_ACL_H
+#include <sys/acl.h>
+#endif]], [[ acl_permset_t permset_d; acl_perm_t perm; return acl_get_perm_np( permset_d, perm);]])],[samba_cv_HAVE_ACL_GET_PERM_NP=yes],[samba_cv_HAVE_ACL_GET_PERM_NP=no])])
 	    if test x"$samba_cv_HAVE_ACL_GET_PERM_NP" = x"yes"; then
 		AC_DEFINE(HAVE_ACL_GET_PERM_NP, 1, [true if you have acl_get_perm_np])
 	    fi

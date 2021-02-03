@@ -43,7 +43,8 @@ fi
 for action in "${@}"; do
     case "$action" in
     build|make)
-	make -f "$dir/prepare-source.mak"
+	make=`which gmake 2>/dev/null` || make=make
+	$make -f "$dir/prepare-source.mak"
 	;;
     fetch|fetchgen)
 	if test "$action" = fetchgen; then
