@@ -329,9 +329,8 @@ __attribute__ ((target("sse2"))) MVSTATIC int32 get_checksum1_sse2_32(schar* buf
 
 __attribute__ ((target("avx2"))) MVSTATIC int32 get_checksum1_avx2_64(schar* buf, int32 len, int32 i, uint32* ps1, uint32* ps2)
 {
-    if (len > 64) {
+    if (len >= 64) {
 
-        uint32 x[4] = {0};
         __m128i ss1 = _mm_cvtsi32_si128(*ps1);
         __m128i ss2 = _mm_cvtsi32_si128(*ps2);
 
@@ -399,8 +398,8 @@ __attribute__ ((target("avx2"))) MVSTATIC int32 get_checksum1_avx2_64(schar* buf
             // [sum(mul32), X, X, X] [int32*4]; faster than multiple _mm_hadd_epi32
             mul32 = _mm256_add_epi32(mul32, _mm256_srli_si256(mul32, 4));
             mul32 = _mm256_add_epi32(mul32, _mm256_srli_si256(mul32, 8));
-	    // prefetch 2 cacheline ahead
-            _mm_prefetch(&buf[i + 160], _MM_HINT_T0);
+	    // prefetch 6 cacheline ahead
+            _mm_prefetch(&buf[i + 384], _MM_HINT_T0);
 
             // s2 += 28*t1[0] + 24*t1[1] + 20*t1[2] + 16*t1[3] + 12*t1[4] + 8*t1[5] + 4*t1[6]
 	    __m128i mul32_hi = _mm256_extracti128_si256(mul32, 0x1);
@@ -418,10 +417,8 @@ __attribute__ ((target("avx2"))) MVSTATIC int32 get_checksum1_avx2_64(schar* buf
 #endif
         }
 
-        _mm_store_si128((__m128i_u*)x, ss1);
-        *ps1 = x[0];
-        _mm_store_si128((__m128i_u*)x, ss2);
-        *ps2 = x[0];
+        *ps1 = _mm_cvtsi128_si32(ss1);
+        *ps2 = _mm_cvtsi128_si32(ss2);
     }
     return i;
 }
