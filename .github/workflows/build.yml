@@ -91,11 +91,11 @@ jobs:
         args: install -y --no-progress cygwin cyg-get
     - name: prep
       run: |
-        cyg-get make autoconf automake gcc-core attr libattr-devel python3 python38-pip libzstd-devel liblz4-devel libssl-devel libxxhash0 libxxhash-devel
+        cyg-get make autoconf automake gcc-core attr libattr-devel python38 python38-pip libzstd-devel liblz4-devel libssl-devel libxxhash0 libxxhash-devel
         curl.exe -o git-version.h https://download.samba.org/pub/rsync/generated-files/git-version.h
         echo "C:/tools/cygwin/bin" >>$Env:GITHUB_PATH
-    - name: pip3
-      run: bash -c 'pip3 install --user commonmark'
+    - name: commonmark
+      run: bash -c 'python3 -mpip install --user commonmark'
     - name: configure
       run: bash -c './configure'
     - name: make
