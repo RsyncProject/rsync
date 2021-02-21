@@ -26,6 +26,12 @@ MKDIR_P=@MKDIR_P@
 VPATH=$(srcdir)
 SHELL=/bin/sh
 
+# We use globbing in commands, need to be deterministic about output
+# regardless of locale setting
+unexport LC_ALL
+LC_COLLATE=C
+export LC_COLLATE
+
 .SUFFIXES:
 .SUFFIXES: .c .o
 
