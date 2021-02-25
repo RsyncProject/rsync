@@ -962,9 +962,9 @@ int send_msg(enum msgcode code, const char *buf, size_t len, int convert)
 #endif
 		needed = len + 4 + 3;
 	if (iobuf.msg.len + needed > iobuf.msg.size) {
-		if (!am_receiver)
+		if (am_sender)
 			perform_io(needed, PIO_NEED_MSGROOM);
-		else { /* We allow the receiver to increase their iobuf.msg size to avoid a deadlock. */
+		else { /* We sometimes allow the iobuf.msg size to increase to avoid a deadlock. */
 			size_t old_size = iobuf.msg.size;
 			restore_iobuf_size(&iobuf.msg);
 			realloc_xbuf(&iobuf.msg, iobuf.msg.size * 2);
