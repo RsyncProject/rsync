@@ -142,7 +142,7 @@ like.
 
  -  For Cygwin (with all cygwin programs stopped, run the appropriate setup program from a cmd shell):
 
-    >     setup-x86_64 --quiet-mode -P make,gawk,autoconf,automake,gcc-core,python3,python38-pip
+    >     setup-x86_64 --quiet-mode -P make,gawk,autoconf,automake,gcc-core,python38,python38-pip
     >     setup-x86_64 --quiet-mode -P attr,libattr-devel
     >     setup-x86_64 --quiet-mode -P libzstd-devel
     >     setup-x86_64 --quiet-mode -P liblz4-devel

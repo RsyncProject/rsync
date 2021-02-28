@@ -4,8 +4,6 @@ set -e
 
 export LANG=C
 
-make=`which gmake 2>/dev/null` || make=make
-
 branch=`packaging/prep-auto-dir`
 if test x"$branch" = x; then
     srcdir=.
@@ -40,8 +38,8 @@ fi
 
 ./config.status
 
-$make all
+make all
 
 if test x"$1" = x"check"; then
-    $make check
+    make check
 fi

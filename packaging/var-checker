@@ -16,7 +16,7 @@ def main():
     add_util_c = set('t_stub.c t_unsafe.c'.split())
 
     syscall_c = slurp_file('syscall.c', True)
-    util_c = slurp_file('util.c', True)
+    util_c = slurp_file('util1.c', True)
 
     for fn in sorted(glob.glob('*.c')):
         txt = slurp_file(fn)
