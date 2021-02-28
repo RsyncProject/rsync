@@ -329,7 +329,7 @@ __attribute__ ((target("sse2"))) MVSTATIC int32 get_checksum1_sse2_32(schar* buf
 
 __attribute__ ((target("avx2"))) MVSTATIC int32 get_checksum1_avx2_64(schar* buf, int32 len, int32 i, uint32* ps1, uint32* ps2)
 {
-    if (len >= 64) {
+    if (len > 64) {
 
         __m128i ss1 = _mm_cvtsi32_si128(*ps1);
         __m128i ss2 = _mm_cvtsi32_si128(*ps2);
