@@ -336,7 +336,7 @@ __attribute__ ((target("avx2"))) MVSTATIC int32 get_checksum1_avx2_64(schar* buf
 	__m256i ymm_ss2 = _mm256_castsi128_si256(ss2);
 	__m256i ymm_ss1 = _mm256_castsi128_si256(ss1);
 
-        const char mul_t1_buf[16] = {60, 56, 52, 48, 28, 24, 20, 16, 44, 40, 36, 32, 12, 8, 4, 0};
+        const char mul_t1_buf[16] = {60, 56, 52, 48, 28, 24, 20, 16, 44, 40, 36, 32, 12, 8, 4, 0}; // swapped order for horizonal add 
 	__m128i tmp = _mm_load_si128((__m128i*) mul_t1_buf);
         __m256i mul_t1 = _mm256_cvtepu8_epi16(tmp);
 	__m256i mul_const = _mm256_broadcastd_epi32(_mm_cvtsi32_si128(4 | (3 << 8) | (2 << 16) | (1 << 24)));
