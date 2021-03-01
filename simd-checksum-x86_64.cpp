@@ -336,7 +336,7 @@ __attribute__ ((target("avx2"))) MVSTATIC int32 get_checksum1_avx2_64(schar* buf
 	__m256i ymm_ss2 = _mm256_castsi128_si256(ss2);
 	__m256i ymm_ss1 = _mm256_castsi128_si256(ss1);
 
-        const char mul_t1_buf[16] = {60, 56, 52, 48, 44, 40, 36, 32, 28, 24, 20, 16, 12, 8, 4, 0};
+        const char mul_t1_buf[16] = {60, 56, 52, 48, 28, 24, 20, 16, 44, 40, 36, 32, 12, 8, 4, 0};
 	__m128i tmp = _mm_load_si128((__m128i*) mul_t1_buf);
         __m256i mul_t1 = _mm256_cvtepu8_epi16(tmp);
 	__m256i mul_const = _mm256_broadcastd_epi32(_mm_cvtsi32_si128(4 | (3 << 8) | (2 << 16) | (1 << 24)));
@@ -346,13 +346,8 @@ __attribute__ ((target("avx2"))) MVSTATIC int32 get_checksum1_avx2_64(schar* buf
         for (; i < (len-64); i+=64) {
             // Load ... 4*[int8*16]
             __m256i in8_1, in8_2;
-	    __m128i in8_1_low, in8_2_low, in8_1_high, in8_2_high;
-	    in8_1_low = _mm_loadu_si128((__m128i_u*)&buf[i]);
-	    in8_2_low = _mm_loadu_si128((__m128i_u*)&buf[i+16]);
-	    in8_1_high = _mm_loadu_si128((__m128i_u*)&buf[i+32]);
-	    in8_2_high = _mm_loadu_si128((__m128i_u*)&buf[i+48]);
-	    in8_1 = _mm256_inserti128_si256(_mm256_castsi128_si256(in8_1_low), in8_1_high,1);
-	    in8_2 = _mm256_inserti128_si256(_mm256_castsi128_si256(in8_2_low), in8_2_high,1);
+	    in8_1 = _mm256_loadu_si256((__m256i_u*)&buf[i]);
+	    in8_2 = _mm256_loadu_si256((__m256i_u*)&buf[i+32]);
             
 
             // (1*buf[i] + 1*buf[i+1]), (1*buf[i+2], 1*buf[i+3]), ... 2*[int16*8]
