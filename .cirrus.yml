@@ -1,7 +1,7 @@
 freebsd_task:
   name: FreeBSD
   freebsd_instance:
-    image: freebsd-12-1-release-amd64
+    image: freebsd-12-2-release-amd64
   env:
     PATH: /usr/local/bin:$PATH
   prep_script:
@@ -10,7 +10,6 @@ freebsd_task:
     - pkg install -y autotools m4 xxhash zstd liblz4 wget
     - wget https://download.samba.org/pub/rsync/generated-files/git-version.h
   configure_script:
-    - /usr/local/bin/gm4 --version
     - CPPFLAGS=-I/usr/local/include/ LDFLAGS=-L/usr/local/lib/ ./configure --disable-md2man
   make_script:
     - make
