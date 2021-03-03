@@ -1,7 +1,7 @@
 freebsd_task:
   name: FreeBSD
   freebsd_instance:
-    image: freebsd-12-2-release-amd64
+    image_family: freebsd-12-2
   env:
     PATH: /usr/local/bin:$PATH
   prep_script:
