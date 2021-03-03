@@ -7,7 +7,7 @@ freebsd_task:
   prep_script:
     - dd if=/dev/zero of=/tmp/zpool bs=1M count=1024
     - zpool create -m `pwd`/testtmp zpool /tmp/zpool
-    - pkg install -y autotools m4 xxhash zstd liblz4 wget
+    - pkg install -y bash autotools m4 xxhash zstd liblz4 wget
     - wget https://download.samba.org/pub/rsync/generated-files/git-version.h
   configure_script:
     - CPPFLAGS=-I/usr/local/include/ LDFLAGS=-L/usr/local/lib/ ./configure --disable-md2man
