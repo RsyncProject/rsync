@@ -383,9 +383,6 @@ __attribute__ ((target("avx2"))) MVSTATIC int32 get_checksum1_avx2_64(schar* buf
             // [t1[0], t1[1], ...] -> [t1[0]*28 + t1[1]*24, ...] [int32*4]
             __m256i mul32 = _mm256_madd_epi16(add16, mul_t1);
 	    acc = _mm256_add_epi32(acc, mul32);
-            // [sum(mul32), X, X, X] [int32*4]; faster than multiple _mm_hadd_epi32
-            mul32 = _mm256_add_epi32(mul32, _mm256_srli_si256(mul32, 4));
-            mul32 = _mm256_add_epi32(mul32, _mm256_srli_si256(mul32, 8));
 	    // prefetch 6 cachelines ahead
             _mm_prefetch(&buf[i + 384], _MM_HINT_T0);
 
