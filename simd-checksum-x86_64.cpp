@@ -364,8 +364,6 @@ __attribute__ ((target("avx2"))) MVSTATIC int32 get_checksum1_avx2_64(schar* buf
             // [sum(t1[0]..t1[7]), X, X, X] [int32*4]; faster than multiple _mm_hadds_epi16
             __m256i sum_add32 = _mm256_add_epi16(add16_1, add16_2);
             sum_add32 = _mm256_add_epi16(sum_add32, _mm256_srli_epi32(sum_add32, 16));
-            sum_add32 = _mm256_add_epi16(sum_add32, _mm256_srli_si256(sum_add32, 4));
-            sum_add32 = _mm256_add_epi16(sum_add32, _mm256_srli_si256(sum_add32, 8));
 
             // [sum(t2[0]..t2[7]), X, X, X] [int32*4]; faster than multiple _mm_hadds_epi16
             __m256i sum_mul_add32 = _mm256_add_epi16(mul_add16_1, mul_add16_2);
@@ -397,13 +395,15 @@ __attribute__ ((target("avx2"))) MVSTATIC int32 get_checksum1_avx2_64(schar* buf
             ss2 = _mm_add_epi32(ss2, char_offset_multiplier);
 #endif
         }
+            ss1 = _mm256_add_epi32(ss1, _mm256_srli_si256(ss1, 4));
+            ss1 = _mm256_add_epi32(ss1, _mm256_srli_si256(ss1, 8));
         __m128i ss1_hi = _mm256_extracti128_si256(ss1, 0x1);
         __m128i ss1_lo = _mm256_extracti128_si256(ss1, 0x0); // seems the only way to avoid GCC
 							     // emitting useless vmovdqa before using
 							     // the lower 128bit
-            acc = _mm256_add_epi32(acc, _mm256_srli_si256(acc, 4));
-            acc = _mm256_add_epi32(acc, _mm256_srli_si256(acc, 8));
 	    ss2 = _mm256_add_epi32(acc,ss2);
+            ss2 = _mm256_add_epi32(ss2, _mm256_srli_si256(ss2, 4));
+            ss2 = _mm256_add_epi32(ss2, _mm256_srli_si256(ss2, 8));
         ss1_hi = _mm_add_epi32(ss1_hi, ss1_lo);
         __m128i ss2_hi = _mm256_extracti128_si256(ss2, 0x1);
         __m128i ss2_lo = _mm256_extracti128_si256(ss2, 0x0);
