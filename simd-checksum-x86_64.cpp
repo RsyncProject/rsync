@@ -339,7 +339,8 @@ __attribute__ ((target("avx2"))) MVSTATIC int32 get_checksum1_avx2_64(schar* buf
         __m256i mul_t1 = _mm256_cvtepu8_epi16(tmp);
 	__m256i mul_const = _mm256_broadcastd_epi32(_mm_cvtsi32_si128(4 | (3 << 8) | (2 << 16) | (1 << 24)));
         __m256i mul_one;
-	__m256i acc = _mm256_setzero_si256(); // ss2 partial sums accumulator
+	__m256i acc1 = _mm256_setzero_si256();  // ss1 partial sums accumulator
+	__m256i acc2  = _mm256_setzero_si256(); // ss2 partial sums accumulator
        	    mul_one = _mm256_abs_epi8(_mm256_cmpeq_epi16(mul_one,mul_one)); // set all vector elements to 1
 
         for (; i < (len-64); i+=64) {
@@ -359,7 +360,7 @@ __attribute__ ((target("avx2"))) MVSTATIC int32 get_checksum1_avx2_64(schar* buf
             __m256i mul_add16_2 = _mm256_maddubs_epi16(mul_const, in8_2);
 
             // s2 += 64*s1
-	    ss2 = _mm256_add_epi32(ss2,_mm256_slli_epi32(ss1, 6));
+	    acc1 = _mm256_add_epi32(acc1,ss1);
 
             // [sum(t1[0]..t1[7]), X, X, X] [int32*4]; faster than multiple _mm_hadds_epi16
             __m256i sum_add32 = _mm256_add_epi16(add16_1, add16_2);
@@ -368,7 +369,7 @@ __attribute__ ((target("avx2"))) MVSTATIC int32 get_checksum1_avx2_64(schar* buf
             // [sum(t2[0]..t2[7]), X, X, X] [int32*4]; faster than multiple _mm_hadds_epi16
             __m256i sum_mul_add32 = _mm256_add_epi16(mul_add16_1, mul_add16_2);
             sum_mul_add32 = _mm256_add_epi16(sum_mul_add32, _mm256_srli_epi32(sum_mul_add32, 16));
-	    acc = _mm256_add_epi32(acc, sum_mul_add32);
+	    acc2 = _mm256_add_epi32(acc2, sum_mul_add32);
 
             // s1 += t1[0] + t1[1] + t1[2] + t1[3] + t1[4] + t1[5] + t1[6] + t1[7]
 	    ss1 = _mm256_add_epi32(ss1, sum_add32);
@@ -380,7 +381,7 @@ __attribute__ ((target("avx2"))) MVSTATIC int32 get_checksum1_avx2_64(schar* buf
 
             // [t1[0], t1[1], ...] -> [t1[0]*28 + t1[1]*24, ...] [int32*4]
             __m256i mul32 = _mm256_madd_epi16(add16, mul_t1);
-	    acc = _mm256_add_epi32(acc, mul32);
+	    acc2 = _mm256_add_epi32(acc2, mul32);
 	    // prefetch 6 cachelines ahead
             _mm_prefetch(&buf[i + 384], _MM_HINT_T0);
 
@@ -395,13 +396,15 @@ __attribute__ ((target("avx2"))) MVSTATIC int32 get_checksum1_avx2_64(schar* buf
             ss2 = _mm_add_epi32(ss2, char_offset_multiplier);
 #endif
         }
+	    acc1 = _mm256_slli_epi32(acc1,6);
+	    ss2 = _mm256_add_epi32(ss2, acc1);
             ss1 = _mm256_add_epi32(ss1, _mm256_srli_si256(ss1, 4));
             ss1 = _mm256_add_epi32(ss1, _mm256_srli_si256(ss1, 8));
         __m128i ss1_hi = _mm256_extracti128_si256(ss1, 0x1);
         __m128i ss1_lo = _mm256_extracti128_si256(ss1, 0x0); // seems the only way to avoid GCC
 							     // emitting useless vmovdqa before using
 							     // the lower 128bit
-	    ss2 = _mm256_add_epi32(acc,ss2);
+	    ss2 = _mm256_add_epi32(acc2,ss2);
             ss2 = _mm256_add_epi32(ss2, _mm256_srli_si256(ss2, 4));
             ss2 = _mm256_add_epi32(ss2, _mm256_srli_si256(ss2, 8));
         ss1_hi = _mm_add_epi32(ss1_hi, ss1_lo);
@@ -504,7 +507,7 @@ static int32 get_checksum1_auto(schar* buf, int32 len, int32 i, uint32* ps1, uin
 
 int main() {
     int i;
-    unsigned char* buf = (unsigned char*)malloc(BLOCK_LEN);
+    unsigned char* buf = (unsigned char*)aligned_alloc(64,BLOCK_LEN);
     for (i = 0; i < BLOCK_LEN; i++) buf[i] = (i + (i % 3) + (i % 11)) % 256;
 
     benchmark("Auto", get_checksum1_auto, (schar*)buf, BLOCK_LEN);
