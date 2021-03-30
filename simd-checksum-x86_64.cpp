@@ -387,13 +387,13 @@ __attribute__ ((target("avx2"))) MVSTATIC int32 get_checksum1_avx2_64(schar* buf
 
 
 #if CHAR_OFFSET != 0
-            // s1 += 32*CHAR_OFFSET
-            __m256i char_offset_multiplier = _mm256_set1_epi32(32 * CHAR_OFFSET);
-            ss1 = _mm256_add_epi32(ss1, char_offset_multiplier);
+            // s1 += 64*CHAR_OFFSET
+            __m128i char_offset_multiplier1 = _mm_cvtsi32_si128(64 * CHAR_OFFSET);
+            ss1 = _mm256_add_epi32(ss1, _mm256_castsi128_si256(char_offset_multiplier1));
 
-            // s2 += 528*CHAR_OFFSET
-            char_offset_multiplier = _mm256_set1_epi32(528 * CHAR_OFFSET);
-            ss2 = _mm_add_epi32(ss2, char_offset_multiplier);
+            // s2 += 2048*CHAR_OFFSET
+            __m128i char_offset_multiplier2 = _mm_cvtsi32_si128(2080 * CHAR_OFFSET);
+            acc2 = _mm256_add_epi32(acc2, _mm256_castsi128_si256(char_offset_multiplier2));
 #endif
         }
 	    acc1 = _mm256_slli_epi32(acc1,6);
