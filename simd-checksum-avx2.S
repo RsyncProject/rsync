@@ -1,4 +1,3 @@
-#define ASM_CHAR_OFFSET  CHAR_OFFSET
 .intel_syntax noprefix
 .text
 	.p2align 5
@@ -14,10 +13,10 @@ get_checksum1_avx2:
 	cmp	edx, eax
 	jge	.exit
 	mov	eax, 0x01020304
-	vmovd	xmm5, eax
-	vpbroadcastd	ymm5, xmm5
+	vmovd	xmm12, eax
+	vpbroadcastd	ymm12, xmm12
 
-#if ASM_CHAR_OFFSET != 0
+#if CHAR_OFFSET != 0
 	mov	eax, 32*CHAR_OFFSET
 	vmovd	xmm10, eax
 	vpbroadcastd	ymm10, xmm10
@@ -28,7 +27,7 @@ get_checksum1_avx2:
 	vpabsb	ymm4, ymm4
 	lea	rax, [rdi+rdx]
 	sub	esi, 65
-	vmovdqu ymm8, [rax]
+	vmovdqu ymm2, [rax]
 	vmovdqu ymm3, [rax+32]
 	sub	esi, edx
 	lea	r9, [rax+128]
@@ -44,55 +43,54 @@ get_checksum1_avx2:
 	.byte 0x64, 0x67, 0x90
 #endif
 .loop:
-	vpmaddubsw	ymm0, ymm4, ymm8
+	vpmaddubsw	ymm0, ymm4, ymm2
 	vpmaddubsw	ymm9, ymm4, ymm3
 	vmovdqu	ymm14, [rax]
-	vmovdqu	ymm2,  [rax+32]
+	vmovdqu	ymm8,  [rax+32]
 	vpaddd	ymm15, ymm15, ymm6
 	add	rax, 64
-	vpaddw	ymm11, ymm0, ymm9
-	vpsrld	ymm12, ymm11, 16
-	vpaddw	ymm11, ymm11, ymm12
-	vpaddd	ymm6, ymm6, ymm11
-	vphaddsw	ymm9, ymm0, ymm9
-	vpmaddubsw	ymm8, ymm5, ymm8
-	vpmaddubsw	ymm3, ymm5, ymm3
+	vpaddw	ymm5, ymm9, ymm0
+	vpsrld	ymm11, ymm5, 16
+	vpaddw	ymm5, ymm11, ymm5
+	vpaddd	ymm6, ymm5, ymm6
+	vphaddsw	ymm0, ymm0, ymm9
+	vpmaddubsw	ymm2, ymm12, ymm2
+	vpmaddubsw	ymm3, ymm12, ymm3
 	prefetcht0	[rax+384]
-	vpaddw	ymm3, ymm3, ymm8
-	vpsrld	ymm8, ymm3, 16
-	vpmaddwd	ymm0, ymm9, ymm7
-	vpaddd	ymm8, ymm8, ymm0
-	vpaddd	ymm3, ymm3, ymm8
+	vpaddw	ymm3, ymm2, ymm3
+	vpsrld	ymm2, ymm3, 16
+	vpmaddwd	ymm0, ymm0, ymm7
+	vpaddd	ymm2, ymm0, ymm2
+	vpaddd	ymm3, ymm2, ymm3
 	vpaddd	ymm1, ymm1, ymm3
-#if ASM_CHAR_OFFSET != 0
-	vpaddd ymm6, ymm6, ymm10  // 32*CHAR_OFFSET
-	vpaddd ymm1, ymm1, ymm13  //528*CHAR_OFFSET
+#if CHAR_OFFSET != 0
+	vpaddd ymm6, ymm10, ymm6  // 32*CHAR_OFFSET
+	vpaddd ymm1, ymm13, ymm1  //528*CHAR_OFFSET
 #endif
-	vmovdqa ymm8, ymm14
-	vmovdqa ymm3, ymm2
+	vmovdqa ymm2, ymm14
+	vmovdqa ymm3, ymm8
 	cmp	r9, rax
 	jne	.loop
 
-	nop //alignment
 #ifdef IACA
 	mov 	ebx, 222
 	.byte 0x64, 0x67, 0x90
 #endif
 
-	vpslld	ymm15, ymm15, 6
-	vpsrldq	ymm11, ymm6, 4
+	vpslld	ymm3, ymm15, 6
+	vpsrldq	ymm2, ymm6, 4
 	lea	rax, [rdx+64]
 	add	rax, rsi
 	
-	vpaddd  ymm0, ymm1, ymm15
-	vpaddd	ymm6, ymm11, ymm6
+	vpaddd  ymm0, ymm3, ymm1
+	vpaddd	ymm6, ymm2, ymm6
 	vpsrldq	ymm10, ymm0, 4
 	
-	vpsrldq	ymm11, ymm6, 8
-	vpaddd	ymm0, ymm0, ymm10
+	vpsrldq	ymm2, ymm6, 8
+	vpaddd	ymm0, ymm10, ymm0
 	vpsrldq	ymm10, ymm0, 8
-	vpaddd	ymm6, ymm6, ymm11
-	vpaddd	ymm0, ymm0, ymm10
+	vpaddd	ymm6, ymm2, ymm6
+	vpaddd	ymm0, ymm10, ymm0
 	vextracti128	xmm2, ymm6, 0x1
 	vextracti128	xmm1, ymm0, 0x1
 	vpaddd	xmm6, xmm2, xmm6

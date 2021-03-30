@@ -245,7 +245,7 @@ __attribute__ ((target("sse2"))) MVSTATIC int32 get_checksum1_sse2_32(schar* buf
 
             // (4*buf[i] + 3*buf[i+1]), (2*buf[i+2], buf[i+3]), ... 2*[int16*8]
             __m128i mul_const = _mm_set1_epi32(4 + (3 << 8) + (2 << 16) + (1 << 24));
-            __m128i mul_add16_1 = SSE2_MADDUBS_EPI16(mul_const, in8_1);
+            __m128i mul_add16_1 = SSE2_MADDUBS_EPI16(mul_const, in8_1);
             __m128i mul_add16_2 = SSE2_MADDUBS_EPI16(mul_const, in8_2);
 
             // s2 += 32*s1
@@ -310,7 +310,7 @@ __attribute__ ((target("sse2"))) MVSTATIC int32 get_checksum1_sse2_32(schar* buf
     return i;
 }
 
-extern "C"  int32 get_checksum1_avx2(schar* buf, int32 len, int32 i, uint32* ps1, uint32* ps2);
+extern "C" __attribute__ ((target("avx2"))) int32 get_checksum1_avx2(schar* buf, int32 len, int32 i, uint32* ps1, uint32* ps2);
 
 static int32 get_checksum1_default_1(schar* buf, int32 len, int32 i, uint32* ps1, uint32* ps2)
 {
