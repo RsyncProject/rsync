@@ -1,12 +1,14 @@
+#define ASM_CHAR_OFFSET  CHAR_OFFSET
 .intel_syntax noprefix
 .text
 	.p2align 5
 	.globl get_checksum1_avx2
 
+// rdi=*buf, rsi=len, edx=i, rcx= *ps1, r8= *ps2
 get_checksum1_avx2:
 	vmovntdqa xmm7, XMMWORD PTR .mul_T1[rip]
 	vpmovzxbw	ymm7, xmm7 //XMMWORD PTR .mul_T1[rip] // load T1 multiplication constants
-	vmovd	xmm6,[rcx]
+	vmovd	xmm6,[rcx] // *ps1
 	lea	eax, [rsi-128]
 	vpcmpeqd	ymm4, ymm4, ymm4
 	cmp	edx, eax
@@ -14,11 +16,20 @@ get_checksum1_avx2:
 	mov	eax, 0x01020304
 	vmovd	xmm5, eax
 	vpbroadcastd	ymm5, xmm5
+
+#if ASM_CHAR_OFFSET != 0
+	mov	eax, 32*CHAR_OFFSET
+	vmovd	xmm10, eax
+	vpbroadcastd	ymm10, xmm10
+	mov	eax, 528*CHAR_OFFSET
+	vmovd	xmm13, eax
+	vpbroadcastd ymm13, xmm13
+#endif
 	vpabsb	ymm4, ymm4
 	lea	rax, [rdi+rdx]
 	sub	esi, 65
-	vmovdqu ymm8,  [rax]
-	vmovdqu ymm13, [rax+32]
+	vmovdqu ymm8, [rax]
+	vmovdqu ymm3, [rax+32]
 	sub	esi, edx
 	lea	r9, [rax+128]
 	and	esi, ~63
@@ -34,7 +45,7 @@ get_checksum1_avx2:
 #endif
 .loop:
 	vpmaddubsw	ymm0, ymm4, ymm8
-	vpmaddubsw	ymm9, ymm4, ymm13
+	vpmaddubsw	ymm9, ymm4, ymm3
 	vmovdqu	ymm14, [rax]
 	vmovdqu	ymm2,  [rax+32]
 	vpaddd	ymm15, ymm15, ymm6
@@ -43,18 +54,22 @@ get_checksum1_avx2:
 	vpsrld	ymm12, ymm11, 16
 	vpaddw	ymm11, ymm11, ymm12
 	vpaddd	ymm6, ymm6, ymm11
-	vphaddsw	ymm10, ymm0, ymm9
+	vphaddsw	ymm9, ymm0, ymm9
 	vpmaddubsw	ymm8, ymm5, ymm8
-	vpmaddubsw	ymm3, ymm5, ymm13
+	vpmaddubsw	ymm3, ymm5, ymm3
 	prefetcht0	[rax+384]
 	vpaddw	ymm3, ymm3, ymm8
 	vpsrld	ymm8, ymm3, 16
-	vpmaddwd	ymm0, ymm10, ymm7
+	vpmaddwd	ymm0, ymm9, ymm7
 	vpaddd	ymm8, ymm8, ymm0
 	vpaddd	ymm3, ymm3, ymm8
 	vpaddd	ymm1, ymm1, ymm3
+#if ASM_CHAR_OFFSET != 0
+	vpaddd ymm6, ymm6, ymm10  // 32*CHAR_OFFSET
+	vpaddd ymm1, ymm1, ymm13  //528*CHAR_OFFSET
+#endif
 	vmovdqa ymm8, ymm14
-	vmovdqa ymm13, ymm2
+	vmovdqa ymm3, ymm2
 	cmp	r9, rax
 	jne	.loop
 

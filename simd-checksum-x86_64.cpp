@@ -85,7 +85,6 @@ typedef long long __m256i_u __attribute__((__vector_size__(32), __may_alias__, _
 #define SSE2_HADDS_EPI16(a, b) _mm_adds_epi16(SSE2_INTERLEAVE_EVEN_EPI16(a, b), SSE2_INTERLEAVE_ODD_EPI16(a, b))
 #define SSE2_MADDUBS_EPI16(a, b) _mm_adds_epi16(SSE2_MULU_EVEN_EPI8(a, b), SSE2_MULU_ODD_EPI8(a, b))
 
-//__attribute__ ((target("default"))) MVSTATIC int32 get_checksum1_avx2_64(schar* buf, int32 len, int32 i, uint32* ps1, uint32* ps2) { return i; }
 __attribute__ ((target("default"))) MVSTATIC int32 get_checksum1_ssse3_32(schar* buf, int32 len, int32 i, uint32* ps1, uint32* ps2) { return i; }
 __attribute__ ((target("default"))) MVSTATIC int32 get_checksum1_sse2_32(schar* buf, int32 len, int32 i, uint32* ps1, uint32* ps2) { return i; }
 
