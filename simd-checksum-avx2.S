@@ -4,7 +4,8 @@
 	.globl get_checksum1_avx2
 
 get_checksum1_avx2:
-	vpmovzxbw	ymm7, XMMWORD PTR .mul_T1[rip]
+	vmovntdqa xmm7, XMMWORD PTR .mul_T1[rip]
+	vpmovzxbw	ymm7, xmm7 //XMMWORD PTR .mul_T1[rip] // load T1 multiplication constants
 	vmovd	xmm6,[rcx]
 	lea	eax, [rsi-128]
 	vpcmpeqd	ymm4, ymm4, ymm4
@@ -57,6 +58,7 @@ get_checksum1_avx2:
 	cmp	r9, rax
 	jne	.loop
 
+	nop //alignment
 #ifdef IACA
 	mov 	ebx, 222
 	.byte 0x64, 0x67, 0x90
