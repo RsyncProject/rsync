@@ -9,7 +9,7 @@ get_checksum1_avx2:
 	vpmovzxbw	ymm7, xmm7 //XMMWORD PTR .mul_T1[rip] // load T1 multiplication constants
 	vmovd	xmm6,[rcx] // *ps1
 	lea	eax, [rsi-128]
-	vpcmpeqd	ymm4, ymm4, ymm4
+	vpcmpeqd	ymm15, ymm15, ymm15
 	cmp	edx, eax
 	jge	.exit
 	mov	eax, 0x01020304
@@ -24,7 +24,7 @@ get_checksum1_avx2:
 	vmovd	xmm13, eax
 	vpbroadcastd ymm13, xmm13
 #endif
-	vpabsb	ymm4, ymm4
+	vpabsb	ymm15, ymm15
 	lea	rax, [rdi+rdx]
 	sub	esi, 65
 	vmovdqu ymm2, [rax]
@@ -35,7 +35,7 @@ get_checksum1_avx2:
 	add	r9, rsi
 	add	rax, 64
 	vpxor	xmm1, xmm1, xmm1
-	vpxor	xmm15,xmm15,xmm15
+	vpxor	xmm4,xmm4,xmm4
 	.p2align 5
 
 #ifdef IACA
@@ -43,11 +43,11 @@ get_checksum1_avx2:
 	.byte 0x64, 0x67, 0x90
 #endif
 .loop:
-	vpmaddubsw	ymm0, ymm4, ymm2
-	vpmaddubsw	ymm9, ymm4, ymm3
+	vpmaddubsw	ymm0, ymm15, ymm2
+	vpmaddubsw	ymm9, ymm15, ymm3
 	vmovdqu	ymm14, [rax]
 	vmovdqu	ymm8,  [rax+32]
-	vpaddd	ymm15, ymm15, ymm6
+	vpaddd	ymm4, ymm4, ymm6
 	add	rax, 64
 	vpaddw	ymm5, ymm9, ymm0
 	vpsrld	ymm11, ymm5, 16
@@ -77,7 +77,7 @@ get_checksum1_avx2:
 	.byte 0x64, 0x67, 0x90
 #endif
 
-	vpslld	ymm3, ymm15, 6
+	vpslld	ymm3, ymm4, 6
 	vpsrldq	ymm2, ymm6, 4
 	lea	rax, [rdx+64]
 	add	rax, rsi
