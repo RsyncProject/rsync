@@ -80,25 +80,25 @@ get_checksum1_avx2:
 	vpslld	ymm3, ymm4, 6
 	vpsrldq	ymm2, ymm6, 4
 	lea	rax, [rdx+64]
-	add	rax, rsi
+	vmovd	xmm4, [r8] // ps2
 	
 	vpaddd  ymm0, ymm3, ymm1
 	vpaddd	ymm6, ymm2, ymm6
-	vpsrldq	ymm10, ymm0, 4
+	vpsrlq	ymm3, ymm0, 32
+	add	rax, rsi
 	
 	vpsrldq	ymm2, ymm6, 8
-	vpaddd	ymm0, ymm10, ymm0
-	vpsrldq	ymm10, ymm0, 8
+	vpaddd	ymm0, ymm3, ymm0
+	vpsrldq	ymm3, ymm0, 8
 	vpaddd	ymm6, ymm2, ymm6
-	vpaddd	ymm0, ymm10, ymm0
+	vpaddd	ymm0, ymm3, ymm0
 	vextracti128	xmm2, ymm6, 0x1
 	vextracti128	xmm1, ymm0, 0x1
 	vpaddd	xmm6, xmm2, xmm6
-	vpaddd	xmm1, xmm1, xmm0
 	vmovd	[rcx], xmm6
-	vmovd	edx, xmm1
-	add	edx, [r8]
-	mov	[r8], edx
+	vpaddd	xmm4, xmm4, xmm0
+	vpaddd	xmm1, xmm1, xmm4
+	vmovd	[r8], xmm1
 	vzeroupper
 	ret
 .exit:
