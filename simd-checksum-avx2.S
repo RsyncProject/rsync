@@ -6,12 +6,13 @@
 // rdi=*buf, rsi=len, edx=i, rcx= *ps1, r8= *ps2
 get_checksum1_avx2:
 	vmovntdqa xmm7, XMMWORD PTR .mul_T1[rip]
-	vpmovzxbw	ymm7, xmm7 //XMMWORD PTR .mul_T1[rip] // load T1 multiplication constants
-	vmovd	xmm6,[rcx] // *ps1
+	vmovd	xmm6,[rcx] # *ps1
 	lea	eax, [rsi-128]
-	vpcmpeqd	ymm15, ymm15, ymm15
+	vpmovzxbw	ymm7, xmm7
+	
 	cmp	edx, eax
 	jge	.exit
+	vpcmpeqd	ymm15, ymm15, ymm15
 	mov	eax, 0x01020304
 	vmovd	xmm12, eax
 	vpbroadcastd	ymm12, xmm12
@@ -30,9 +31,9 @@ get_checksum1_avx2:
 	vmovdqu ymm2, [rax]
 	vmovdqu ymm3, [rax+32]
 	sub	esi, edx
-	lea	r9, [rax+128]
+	lea	rdi, [rax+128]
 	and	esi, ~63
-	add	r9, rsi
+	add	rdi, rsi
 	add	rax, 64
 	vpxor	xmm1, xmm1, xmm1
 	vpxor	xmm4,xmm4,xmm4
@@ -69,7 +70,7 @@ get_checksum1_avx2:
 #endif
 	vmovdqa ymm2, ymm14
 	vmovdqa ymm3, ymm8
-	cmp	r9, rax
+	cmp	rdi, rax
 	jne	.loop
 
 #ifdef IACA
