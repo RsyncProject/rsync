@@ -1416,7 +1416,7 @@ your home directory (remove the '=' for that).
     This tells the receiving side to attempt super-user activities even if the
     receiving rsync wasn't run by the super-user.  These activities include:
     preserving users via the `--owner` option, preserving all groups (not just
-    the current user's groups) via the `--groups` option, and copying devices
+    the current user's groups) via the `--group` option, and copying devices
     via the `--devices` option.  This is useful for systems that allow such
     activities without being the super-user, and also for ensuring that you
     will get errors if the receiving side isn't being run as the super-user.
@@ -2630,7 +2630,7 @@ your home directory (remove the '=' for that).
     For the `--usermap` option to have any effect, the `-o` (`--owner`) option
     must be used (or implied), and the receiver will need to be running as a
     super-user (see also the `--fake-super` option).  For the `--groupmap`
-    option to have any effect, the `-g` (`--groups`) option must be used (or
+    option to have any effect, the `-g` (`--group`) option must be used (or
     implied), and the receiver will need to have permissions to set that group.
 
     If your shell complains about the wildcards, use `--protect-args` (`-s`).

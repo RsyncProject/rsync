@@ -27,11 +27,12 @@ def main():
 
     if not args.tree:
         # All modified files keep their current mtime.
-        proc = subprocess.Popen(git + 'ls-files -m -z'.split(), stdout=subprocess.PIPE, encoding='utf-8')
+        proc = subprocess.Popen(git + 'status -z --no-renames'.split(), stdout=subprocess.PIPE, encoding='utf-8')
         out = proc.communicate()[0]
         for fn in out.split('\0'):
-            if fn == '':
+            if fn == '' or (fn[0] != 'M' and fn[1] != 'M'):
                 continue
+            fn = fn[3:]
             if args.list:
                 mtime = os.lstat(fn).st_mtime
                 print_line(fn, mtime, mtime)
