@@ -5,7 +5,7 @@
 
 # rdi=*buf, rsi=len, edx=i, rcx= *ps1, r8= *ps2
 get_checksum1_avx2:
-	vmovntdqa xmm7, XMMWORD PTR .mul_T1[rip]
+	vmovntdqa xmm7, XMMWORD PTR .mul_T1[rip] # load T1 multiplication constants
 	vmovd	xmm6,[rcx] # load *ps1
 	lea	eax, [rsi-128]
 	vpmovzxbw	ymm7, xmm7
@@ -28,22 +28,22 @@ get_checksum1_avx2:
 	vpabsb	ymm15, ymm15  # set all byte size elements to 1.
 	lea	rax, [rdi+rdx]
 	sub	esi, 65
-	vmovdqu ymm2, [rax]
+	vmovdqu ymm2, [rax]   # preload the first 64 bytes.
 	vmovdqu ymm3, [rax+32]
 	sub	esi, edx
 	lea	rdi, [rax+128]
 	and	esi, ~63
 	add	rdi, rsi
 	add	rax, 64
-	vpxor	xmm1, xmm1, xmm1 #reset both partial sums accumulators.
+	vpxor	xmm1, xmm1, xmm1 # reset both partial sums accumulators.
 	vpxor	xmm4, xmm4, xmm4
 	.p2align 5 	# 32 byte align to maximize uops cache utilization.
 			# already aligned if CHAR_OFFSET = 0
 .loop:
 	vpmaddubsw	ymm0, ymm15, ymm2
 	vpmaddubsw	ymm9, ymm15, ymm3
-	vmovdqu	ymm14, [rax]
-	vmovdqu	ymm8,  [rax+32]
+	vmovdqu	ymm14, [rax]	# preload the next 
+	vmovdqu	ymm8,  [rax+32] # 64 bytes.
 	vpaddd	ymm4, ymm4, ymm6
 	add	rax, 64
 	vpaddw	ymm5, ymm9, ymm0
@@ -53,7 +53,7 @@ get_checksum1_avx2:
 	vphaddsw	ymm0, ymm0, ymm9
 	vpmaddubsw	ymm2, ymm12, ymm2
 	vpmaddubsw	ymm3, ymm12, ymm3
-	prefetcht0	[rax+384]
+	prefetcht0	[rax+384] # prefetch 6 cacheline ahead.
 	vpaddw	ymm3, ymm2, ymm3
 	vpsrld	ymm2, ymm3, 16
 	vpmaddwd	ymm0, ymm0, ymm7
@@ -62,15 +62,15 @@ get_checksum1_avx2:
 	vpaddd	ymm1, ymm1, ymm3
 
 #if CHAR_OFFSET != 0
-	vpaddd ymm6, ymm10, ymm6  # 32*CHAR_OFFSET
-	vpaddd ymm1, ymm13, ymm1  #528*CHAR_OFFSET
+	vpaddd ymm6, ymm10, ymm6  #  32*CHAR_OFFSET
+	vpaddd ymm1, ymm13, ymm1  # 528*CHAR_OFFSET
 #endif
-	vmovdqa ymm2, ymm14
-	vmovdqa ymm3, ymm8
+	vmovdqa ymm2, ymm14  # move the next 64 bytes 
+	vmovdqa ymm3, ymm8   # into the right registers
 	cmp	rdi, rax
 	jne	.loop
 
-	#onyl now we reduce the partial sums.
+	# only now we reduce the partial sums.
 	vpslld	ymm3, ymm4, 6
 	vpsrldq	ymm2, ymm6, 4
 	lea	rax, [rdx+64]
