@@ -3,17 +3,17 @@
 	.p2align 5
 	.globl get_checksum1_avx2
 
-// rdi=*buf, rsi=len, edx=i, rcx= *ps1, r8= *ps2
+# rdi=*buf, rsi=len, edx=i, rcx= *ps1, r8= *ps2
 get_checksum1_avx2:
 	vmovntdqa xmm7, XMMWORD PTR .mul_T1[rip]
-	vmovd	xmm6,[rcx] # *ps1
+	vmovd	xmm6,[rcx] # load *ps1
 	lea	eax, [rsi-128]
 	vpmovzxbw	ymm7, xmm7
 	
 	cmp	edx, eax
 	jge	.exit
-	vpcmpeqd	ymm15, ymm15, ymm15
-	mov	eax, 0x01020304
+	vpcmpeqd	ymm15, ymm15, ymm15 #set all elements to -1.
+	mov	eax, 0x01020304   # byte multiplication constants.
 	vmovd	xmm12, eax
 	vpbroadcastd	ymm12, xmm12
 
@@ -25,7 +25,7 @@ get_checksum1_avx2:
 	vmovd	xmm13, eax
 	vpbroadcastd ymm13, xmm13
 #endif
-	vpabsb	ymm15, ymm15
+	vpabsb	ymm15, ymm15  # set all byte size elements to 1.
 	lea	rax, [rdi+rdx]
 	sub	esi, 65
 	vmovdqu ymm2, [rax]
@@ -35,14 +35,10 @@ get_checksum1_avx2:
 	and	esi, ~63
 	add	rdi, rsi
 	add	rax, 64
-	vpxor	xmm1, xmm1, xmm1
-	vpxor	xmm4,xmm4,xmm4
-	.p2align 5
-
-#ifdef IACA
-	mov 	ebx, 111
-	.byte 0x64, 0x67, 0x90
-#endif
+	vpxor	xmm1, xmm1, xmm1 #reset both partial sums accumulators.
+	vpxor	xmm4, xmm4, xmm4
+	.p2align 5 	# 32 byte align to maximize uops cache utilization.
+			# already aligned if CHAR_OFFSET = 0
 .loop:
 	vpmaddubsw	ymm0, ymm15, ymm2
 	vpmaddubsw	ymm9, ymm15, ymm3
@@ -64,24 +60,21 @@ get_checksum1_avx2:
 	vpaddd	ymm2, ymm0, ymm2
 	vpaddd	ymm3, ymm2, ymm3
 	vpaddd	ymm1, ymm1, ymm3
+
 #if CHAR_OFFSET != 0
-	vpaddd ymm6, ymm10, ymm6  // 32*CHAR_OFFSET
-	vpaddd ymm1, ymm13, ymm1  //528*CHAR_OFFSET
+	vpaddd ymm6, ymm10, ymm6  # 32*CHAR_OFFSET
+	vpaddd ymm1, ymm13, ymm1  #528*CHAR_OFFSET
 #endif
 	vmovdqa ymm2, ymm14
 	vmovdqa ymm3, ymm8
 	cmp	rdi, rax
 	jne	.loop
 
-#ifdef IACA
-	mov 	ebx, 222
-	.byte 0x64, 0x67, 0x90
-#endif
-
+	#onyl now we reduce the partial sums.
 	vpslld	ymm3, ymm4, 6
 	vpsrldq	ymm2, ymm6, 4
 	lea	rax, [rdx+64]
-	vmovd	xmm4, [r8] // ps2
+	vmovd	xmm4, [r8] # load from *ps2
 	
 	vpaddd  ymm0, ymm3, ymm1
 	vpaddd	ymm6, ymm2, ymm6
@@ -108,9 +101,9 @@ get_checksum1_avx2:
 
 
 .section	.rodata
-	.align 128
+	.align 128 
 
-.mul_T1:
+.mul_T1:  # swapped coefficents order to support vphaddsw.
 	.byte	60
 	.byte	56
 	.byte	52
