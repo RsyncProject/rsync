@@ -5,17 +5,14 @@
 
 # rdi=*buf, rsi=len, edx=i, rcx= *ps1, r8= *ps2
 get_checksum1_avx2:
-	vmovntdqa xmm7, XMMWORD PTR .mul_T1[rip] # load T1 multiplication constants
+	lea	rax, .mul_T2[rip]
+	vmovntdqa ymm7, [rax]# load T1 multiplication constants
+	vmovntdqa ymm12,[rax+32]# load T1 multiplication constants
 	vmovd	xmm6,[rcx] # load *ps1
 	lea	eax, [rsi-128]
-	vpmovzxbw	ymm7, xmm7
-	
 	cmp	edx, eax
 	jge	.exit
 	vpcmpeqd	ymm15, ymm15, ymm15 #set all elements to -1.
-	mov	eax, 0x01020304   # byte multiplication constants.
-	vmovd	xmm12, eax
-	vpbroadcastd	ymm12, xmm12
 
 #if CHAR_OFFSET != 0
 	mov	eax, 32*CHAR_OFFSET
@@ -39,6 +36,10 @@ get_checksum1_avx2:
 	vpxor	xmm4, xmm4, xmm4
 	.p2align 5 	# 32 byte align to maximize uops cache utilization.
 			# already aligned if CHAR_OFFSET = 0
+#ifdef IACA
+	mov ebx, 111
+	.byte 0x64, 0x67, 0x90
+#endif
 .loop:
 	vpmaddubsw	ymm0, ymm15, ymm2
 	vpmaddubsw	ymm9, ymm15, ymm3
@@ -50,14 +51,11 @@ get_checksum1_avx2:
 	vpsrld	ymm11, ymm5, 16
 	vpaddw	ymm5, ymm11, ymm5
 	vpaddd	ymm6, ymm5, ymm6
-	vphaddsw	ymm0, ymm0, ymm9
-	vpmaddubsw	ymm2, ymm12, ymm2
+	vpmaddubsw	ymm2, ymm7, ymm2
 	vpmaddubsw	ymm3, ymm12, ymm3
-	prefetcht0	[rax+384] # prefetch 6 cacheline ahead.
+	prefetcht0	[rax+384] # prefetch 6 cachelines ahead.
 	vpaddw	ymm3, ymm2, ymm3
-	vpsrld	ymm2, ymm3, 16
-	vpmaddwd	ymm0, ymm0, ymm7
-	vpaddd	ymm2, ymm0, ymm2
+	vpsrldq	ymm2, ymm3, 2
 	vpaddd	ymm3, ymm2, ymm3
 	vpaddd	ymm1, ymm1, ymm3
 
@@ -69,6 +67,10 @@ get_checksum1_avx2:
 	vmovdqa ymm3, ymm8   # into the right registers
 	cmp	rdi, rax
 	jne	.loop
+#ifdef IACA
+	mov ebx, 222
+	.byte 0x64, 0x67, 0x90
+#endif
 
 	# only now we reduce the partial sums.
 	vpslld	ymm3, ymm4, 6
@@ -103,20 +105,68 @@ get_checksum1_avx2:
 .section	.rodata
 	.align 128 
 
-.mul_T1:  # swapped coefficents order to support vphaddsw.
-	.byte	60
-	.byte	56
-	.byte	52
-	.byte	48
-	.byte	28
-	.byte	24
-	.byte	20
-	.byte	16
-	.byte	44
-	.byte	40
-	.byte	36
-	.byte	32
-	.byte	12
-	.byte	8
-	.byte	4
-	.byte	0
+.mul_T2: 
+	.byte 64
+	.byte 63
+	.byte 62
+	.byte 61
+	.byte 60
+	.byte 59
+	.byte 58
+	.byte 57
+	.byte 56
+	.byte 55
+	.byte 54
+	.byte 53
+	.byte 52
+	.byte 51
+	.byte 50
+	.byte 49
+	.byte 48
+	.byte 47
+	.byte 46
+	.byte 45
+	.byte 44
+	.byte 43
+	.byte 42
+	.byte 41
+	.byte 40
+	.byte 39
+	.byte 38
+	.byte 37
+	.byte 36
+	.byte 35
+	.byte 34
+	.byte 33
+	.byte 32
+	.byte 31
+	.byte 30
+	.byte 29
+	.byte 28
+	.byte 27
+	.byte 26
+	.byte 25
+	.byte 24
+	.byte 23
+	.byte 22
+	.byte 21
+	.byte 20
+	.byte 19
+	.byte 18
+	.byte 17
+	.byte 16
+	.byte 15
+	.byte 14
+	.byte 13
+	.byte 12
+	.byte 11
+	.byte 10
+	.byte 9
+	.byte 8
+	.byte 7
+	.byte 6
+	.byte 5
+	.byte 4
+	.byte 3
+	.byte 2
+	.byte 1
