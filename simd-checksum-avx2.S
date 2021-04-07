@@ -5,13 +5,13 @@
 
 # rdi=*buf, rsi=len, edx=i, rcx= *ps1, r8= *ps2
 get_checksum1_avx2:
-	lea	rax, .mul_T2[rip]
-	vmovntdqa ymm7, [rax]# load T1 multiplication constants
-	vmovntdqa ymm12,[rax+32]# load T1 multiplication constants
 	vmovd	xmm6,[rcx] # load *ps1
 	lea	eax, [rsi-128]
 	cmp	edx, eax
 	jge	.exit
+	lea	rax, .mul_T2[rip]
+	vmovntdqa ymm7, [rax]# load T1 multiplication constants
+	vmovntdqa ymm12,[rax+32]# load T1 multiplication constants
 	vpcmpeqd	ymm15, ymm15, ymm15 #set all elements to -1.
 
 #if CHAR_OFFSET != 0
@@ -29,9 +29,10 @@ get_checksum1_avx2:
 	vmovdqu ymm3, [rax+32]
 	sub	esi, edx
 	lea	rdi, [rax+128]
-	and	esi, ~63
-	add	rdi, rsi
 	add	rax, 64
+	and	rsi, ~63
+	add	rdi, rsi
+	prefetcht0 [rax+256]
 	vpxor	xmm1, xmm1, xmm1 # reset both partial sums accumulators.
 	vpxor	xmm4, xmm4, xmm4
 	.p2align 5 	# 32 byte align to maximize uops cache utilization.
