@@ -10,8 +10,8 @@ get_checksum1_avx2:
 	cmp	edx, eax
 	jge	.exit
 	lea	rax, .mul_T2[rip]
-	vmovntdqa ymm7, [rax]# load T1 multiplication constants
-	vmovntdqa ymm12,[rax+32]# load T1 multiplication constants
+	vmovntdqa ymm7, [rax]   # load T2 multiplication constants
+	vmovntdqa ymm12,[rax+32]# from memory.
 	vpcmpeqd	ymm15, ymm15, ymm15 #set all elements to -1.
 
 #if CHAR_OFFSET != 0
@@ -36,23 +36,19 @@ get_checksum1_avx2:
 	vpxor	xmm1, xmm1, xmm1 # reset both partial sums accumulators.
 	vpxor	xmm4, xmm4, xmm4
 	.p2align 5 	# 32 byte align to maximize uops cache utilization.
-			# already aligned if CHAR_OFFSET = 0
-#ifdef IACA
-	mov ebx, 111
-	.byte 0x64, 0x67, 0x90
-#endif
+			# should fit into the LSD allocation queue.
 .loop:
-	vpmaddubsw	ymm0, ymm15, ymm2
-	vpmaddubsw	ymm9, ymm15, ymm3
-	vmovdqu	ymm14, [rax]	# preload the next 
-	vmovdqu	ymm8,  [rax+32] # 64 bytes.
-	vpaddd	ymm4, ymm4, ymm6
+	vpmaddubsw	ymm0, ymm15, ymm2  # s1 partial sums
+	vpmaddubsw	ymm5, ymm15, ymm3 
+	vmovdqu	ymm8,  [rax]	# preload the next 
+	vmovdqu	ymm9,  [rax+32] # 64 bytes.
 	add	rax, 64
-	vpaddw	ymm5, ymm9, ymm0
-	vpsrld	ymm11, ymm5, 16
-	vpaddw	ymm5, ymm11, ymm5
+	vpaddd	ymm4, ymm4, ymm6
+	vpaddw	ymm5, ymm5, ymm0
+	vpsrld	ymm0, ymm5, 16
+	vpaddw	ymm5, ymm0, ymm5
 	vpaddd	ymm6, ymm5, ymm6
-	vpmaddubsw	ymm2, ymm7, ymm2
+	vpmaddubsw	ymm2, ymm7, ymm2  # s2 partial sums
 	vpmaddubsw	ymm3, ymm12, ymm3
 	prefetcht0	[rax+384] # prefetch 6 cachelines ahead.
 	vpaddw	ymm3, ymm2, ymm3
@@ -64,20 +60,16 @@ get_checksum1_avx2:
 	vpaddd ymm6, ymm10, ymm6  #  32*CHAR_OFFSET
 	vpaddd ymm1, ymm13, ymm1  # 528*CHAR_OFFSET
 #endif
-	vmovdqa ymm2, ymm14  # move the next 64 bytes 
-	vmovdqa ymm3, ymm8   # into the right registers
+	vmovdqa ymm2, ymm8   # move the next 64 bytes 
+	vmovdqa ymm3, ymm9   # into the right registers
 	cmp	rdi, rax
 	jne	.loop
-#ifdef IACA
-	mov ebx, 222
-	.byte 0x64, 0x67, 0x90
-#endif
 
-	# only now we reduce the partial sums.
+	# now we reduce the partial sums.
 	vpslld	ymm3, ymm4, 6
 	vpsrldq	ymm2, ymm6, 4
 	lea	rax, [rdx+64]
-	vmovd	xmm4, [r8] # load from *ps2
+	mov	edx, [r8] # load from *ps2
 	
 	vpaddd  ymm0, ymm3, ymm1
 	vpaddd	ymm6, ymm2, ymm6
@@ -93,9 +85,10 @@ get_checksum1_avx2:
 	vextracti128	xmm1, ymm0, 0x1
 	vpaddd	xmm6, xmm2, xmm6
 	vmovd	[rcx], xmm6
-	vpaddd	xmm4, xmm4, xmm0
-	vpaddd	xmm1, xmm1, xmm4
-	vmovd	[r8], xmm1
+	vpaddd	xmm1, xmm1, xmm0
+	vmovd	ecx, xmm1
+	add	edx, ecx
+	mov	[r8], edx
 	vzeroupper
 	ret
 .exit:
@@ -104,7 +97,7 @@ get_checksum1_avx2:
 
 
 .section	.rodata
-	.align 128 
+	.align 64 
 
 .mul_T2: 
 	.byte 64
