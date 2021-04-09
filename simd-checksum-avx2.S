@@ -1,3 +1,8 @@
+
+#ifdef __APPLE__
+#define get_checksum1_avx2  _get_checksum1_avx2
+#endif
+
 .intel_syntax noprefix
 .text
 	.p2align 5
