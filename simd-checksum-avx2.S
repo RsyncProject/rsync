@@ -102,9 +102,10 @@ get_checksum1_avx2:
 
 #ifdef __APPLE__
 .data
+	.balign 64
 #else
 .section	.rodata
-	.align 64 
+	.p2align 6 
 #endif
 .mul_T2: 
 	.byte 64
