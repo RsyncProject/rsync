@@ -101,8 +101,8 @@ get_checksum1_avx2:
 	ret
 
 #ifdef __APPLE__
-.data
-	.balign 64
+.const_data
+	.align 6
 #else
 .section	.rodata
 	.p2align 6 
