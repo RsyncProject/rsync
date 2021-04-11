@@ -411,7 +411,7 @@ yes
 			# http://www.v6.linux.or.jp/
 			AC_EGREP_CPP(yes, [
 #include <features.h>
-#if defined(__GLIBC__) && __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 1
+#if defined(__GLIBC__) && (__GLIBC__ > 2 || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 1))
 yes
 #endif],
 				[ipv6type=$i;
