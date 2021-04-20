@@ -454,7 +454,7 @@ detailed description below for a complete description.
 --remote-option=OPT, -M  send OPTION to the remote side only
 --out-format=FORMAT      output updates using the specified FORMAT
 --log-file=FILE          log what we're doing to the specified FILE
---log-file-format=FMT    log updates using the specified FMT
+--log-file-format=FORMAT log updates using the specified FORMAT
 --password-file=FILE     read daemon-access password from FILE
 --early-input=FILE       use FILE for daemon's early exec input
 --list-only              list the files instead of copying them
@@ -487,7 +487,7 @@ accepted:
 --no-detach              do not detach from the parent
 --port=PORT              listen on alternate port number
 --log-file=FILE          override the "log file" setting
---log-file-format=FMT    override the "log format" setting
+--log-file-format=FORMAT override the "log format" setting
 --sockopts=OPTIONS       specify custom TCP options
 --verbose, -v            increase verbosity
 --ipv4, -4               prefer IPv4
@@ -4052,6 +4052,58 @@ contain output statements for non-interactive logins.
 If you are having trouble debugging filter patterns, then try specifying the
 `-vv` option.  At this level of verbosity rsync will show why each individual
 file is included or excluded.
+
+# FORMAT STRINGS
+
+The following forrmat strings are supported for options accepting a `FORMAT`
+parameter:
+
+0.  `%l` File length
+
+0.  `%U` File owner username
+
+0.  `%G` File owner group
+
+0.  `%p` PID
+
+0.  `%M` File modification time string
+
+0.  `%B` File mode
+
+0.  `%o` Operation
+
+0.  `%f` File name (with full path, if available)
+
+0.  `%n` File name
+
+0.  `%L` Link destination (or empty string, if not a link).
+    Hard link destinations will be prefixed with` => `, and symbolic link
+    destinations will be prefixed with ` -> `.
+
+0.  `%m` Module name
+
+0.  `%P` Full module path
+
+0.  `%t` Time string
+
+0.  `%u` Authorized user
+
+0.  `%b` Total data written
+
+0.  `%c` Total data read
+
+0.  `%c` Checksum
+
+0.  `%i` Itemized changes string (see description of `--itemize-changes`).
+
+# DAEMON FORMAT STRINGS
+
+The following forrmat strings are supported for options accepting a `FORMAT`
+parameter when running as a daemon:
+
+0.  `%h` Client hostname (based on reverse lookup).
+
+0.  `%a` Client address
 
 # EXIT VALUES
 
