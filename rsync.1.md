@@ -4055,7 +4055,7 @@ file is included or excluded.
 
 # FORMAT STRINGS
 
-The following forrmat strings are supported for options accepting a `FORMAT`
+The following format strings are supported for options accepting a `FORMAT`
 parameter:
 
 0.  `%l` File length
@@ -4098,7 +4098,7 @@ parameter:
 
 # DAEMON FORMAT STRINGS
 
-The following forrmat strings are supported for options accepting a `FORMAT`
+The following format strings are supported for options accepting a `FORMAT`
 parameter when running as a daemon:
 
 0.  `%h` Client hostname (based on reverse lookup).
