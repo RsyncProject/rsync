@@ -380,7 +380,7 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 	return 0;
 }
 
-#ifdef HAVE_PUTENV
+#if defined HAVE_SETENV || defined HAVE_PUTENV
 static int read_arg_from_pipe(int fd, char *buf, int limit)
 {
 	char *bp = buf, *eob = buf + limit - 1;
@@ -405,23 +405,57 @@ static int read_arg_from_pipe(int fd, char *buf, int limit)
 
 static void set_env_str(const char *var, const char *str)
 {
+#ifdef HAVE_SETENV
+	if (setenv(var, str, 1) < 0)
+		out_of_memory("set_env_str");
+#else
 #ifdef HAVE_PUTENV
 	char *mem;
 	if (asprintf(&mem, "%s=%s", var, str) < 0)
 		out_of_memory("set_env_str");
 	putenv(mem);
+#else
+	(void)var;
+	(void)str;
+#endif
 #endif
 }
 
+#if defined HAVE_SETENV || defined HAVE_PUTENV
+
+static void set_envN_str(const char *var, int num, const char *str)
+{
+#ifdef HAVE_SETENV
+	char buf[128];
+	(void)snprintf(buf, sizeof buf, "%s%d", var, num);
+	if (setenv(buf, str, 1) < 0)
+		out_of_memory("set_env_str");
+#else
 #ifdef HAVE_PUTENV
+	char *mem;
+	if (asprintf(&mem, "%s%d=%s", var, num, str) < 0)
+		out_of_memory("set_envN_str");
+	putenv(mem);
+#endif
+#endif
+}
+
 void set_env_num(const char *var, long num)
 {
+#ifdef HAVE_SETENV
+	char val[64];
+	(void)snprintf(val, sizeof val, "%ld", num);
+	if (setenv(var, val, 1) < 0)
+		out_of_memory("set_env_str");
+#else
+#ifdef HAVE_PUTENV
 	char *mem;
 	if (asprintf(&mem, "%s=%ld", var, num) < 0)
 		out_of_memory("set_env_num");
 	putenv(mem);
-}
 #endif
+#endif
+}
 
 /* Used for "early exec", "pre-xfer exec", and the "name converter" script. */
 static pid_t start_pre_exec(const char *cmd, int *arg_fd_ptr, int *error_fd_ptr)
@@ -451,15 +485,13 @@ static pid_t start_pre_exec(const char *cmd, int *arg_fd_ptr, int *error_fd_ptr)
 		set_env_str("RSYNC_REQUEST", buf);
 
 		for (j = 0; ; j++) {
-			char *p;
 			len = read_arg_from_pipe(arg_fd, buf, BIGPATHBUFLEN);
 			if (len <= 0) {
 				if (!len)
 					break;
 				_exit(1);
 			}
-			if (asprintf(&p, "RSYNC_ARG%d=%s", j, buf) >= 0)
-				putenv(p);
+			set_envN_str("RSYNC_ARG", j, buf);
 		}
 
 		dup2(arg_fd, STDIN_FILENO);
@@ -489,6 +521,8 @@ static pid_t start_pre_exec(const char *cmd, int *arg_fd_ptr, int *error_fd_ptr)
 
 	return pid;
 }
+
+#endif
 
 static void write_pre_exec_args(int write_fd, char *request, char **early_argv, char **argv, int exec_type)
 {
@@ -809,7 +843,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 
 	log_init(1);
 
-#ifdef HAVE_PUTENV
+#if defined HAVE_SETENV || defined HAVE_PUTENV
 	if ((*lp_early_exec(module_id) || *lp_prexfer_exec(module_id)
 	  || *lp_postxfer_exec(module_id) || *lp_name_converter(module_id))
 	 && !getenv("RSYNC_NO_XFER_EXEC")) {

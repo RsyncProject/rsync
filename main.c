@@ -1567,6 +1567,8 @@ static int start_client(int argc, char *argv[])
 #ifdef HAVE_PUTENV
 	if (daemon_connection)
 		set_env_num("RSYNC_PORT", env_port);
+#else
+	(void)env_port;
 #endif
 
 	pid = do_cmd(shell_cmd, shell_machine, shell_user, remote_argv, remote_argc, &f_in, &f_out);
@@ -1639,7 +1641,6 @@ void remember_children(UNUSED(int val))
 #endif
 }
 
-
 /**
  * This routine catches signals and tries to send them to gdb.
  *
@@ -1663,7 +1664,6 @@ const char *get_panic_action(void)
 	return "xterm -display :0 -T Panic -n Panic -e gdb /proc/%d/exe %d";
 }
 
-
 /**
  * Handle a fatal signal by launching a debugger, controlled by $RSYNC_PANIC_ACTION.
  *
@@ -1686,6 +1686,22 @@ static void rsync_panic_handler(UNUSED(int whatsig))
 		_exit(ret);
 }
 #endif
+
+static void unset_env_var(const char *var)
+{
+#ifdef HAVE_UNSETENV
+	unsetenv(var);
+#else
+#ifdef HAVE_PUTENV
+	char *mem;
+	if (asprintf(&mem, "%s=", var) < 0)
+		out_of_memory("unset_env_var");
+	putenv(mem);
+#else
+	(void)var;
+#endif
+#endif
+}
 
 
 int main(int argc,char *argv[])
@@ -1723,6 +1739,8 @@ int main(int argc,char *argv[])
 	our_uid = MY_UID();
 	our_gid = MY_GID();
 	am_root = our_uid == ROOT_UID;
+
+	unset_env_var("DISPLAY");
 
 	memset(&stats, 0, sizeof(stats));
 
