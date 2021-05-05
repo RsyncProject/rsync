@@ -5,19 +5,19 @@
 
 .intel_syntax noprefix
 .text
-	.p2align 5
+	.p2align 4
 	.globl get_checksum1_avx2
 
 # rdi=*buf, rsi=len, edx=i, rcx= *ps1, r8= *ps2
 get_checksum1_avx2:
 	vmovd	xmm6,[rcx] # load *ps1
-	lea	eax, [rsi-128]
+	lea	eax, [rsi-128] # at least 128 to process?
 	cmp	edx, eax
 	jge	.exit
 	lea	rax, .mul_T2[rip]
 	vmovntdqa ymm7, [rax]   # load T2 multiplication constants
 	vmovntdqa ymm12,[rax+32]# from memory.
-	vpcmpeqd	ymm15, ymm15, ymm15 #set all elements to -1.
+	vpcmpeqd  ymm15, ymm15, ymm15 # set all elements to -1.
 
 #if CHAR_OFFSET != 0
 	mov	eax, 32*CHAR_OFFSET
@@ -29,19 +29,17 @@ get_checksum1_avx2:
 #endif
 	vpabsb	ymm15, ymm15  # set all byte size elements to 1.
 	lea	rax, [rdi+rdx]
-	sub	esi, 65
 	vmovdqu ymm2, [rax]   # preload the first 64 bytes.
 	vmovdqu ymm3, [rax+32]
-	sub	esi, edx
-	lea	rdi, [rax+128]
+	mov 	rdi, rsi
+	shr	rdi, 6     # loop counter
 	add	rax, 64
-	and	rsi, ~63
-	add	rdi, rsi
-	prefetcht0 [rax+256]
+	and	rsi, ~63   # only needed during final reduction, 
+			   # done here to avoid a longer nop for 
+			   # alignment below.
 	vpxor	xmm1, xmm1, xmm1 # reset both partial sums accumulators.
 	vpxor	xmm4, xmm4, xmm4
-	.p2align 5 	# 32 byte align to maximize uops cache utilization.
-			# should fit into the LSD allocation queue.
+	.p2align 4 		# should fit into the LSD allocation queue.
 .loop:
 	vpmaddubsw	ymm0, ymm15, ymm2  # s1 partial sums
 	vpmaddubsw	ymm5, ymm15, ymm3 
@@ -67,19 +65,18 @@ get_checksum1_avx2:
 #endif
 	vmovdqa ymm2, ymm8   # move the next 64 bytes 
 	vmovdqa ymm3, ymm9   # into the right registers
-	cmp	rdi, rax
-	jne	.loop
+	sub	rdi, 1
+	jnz	.loop
 
 	# now we reduce the partial sums.
+	mov	edx, [r8] # load from *ps2
 	vpslld	ymm3, ymm4, 6
 	vpsrldq	ymm2, ymm6, 4
-	lea	rax, [rdx+64]
-	mov	edx, [r8] # load from *ps2
+	lea	rax, [rdx+rsi]
 	
 	vpaddd  ymm0, ymm3, ymm1
 	vpaddd	ymm6, ymm2, ymm6
 	vpsrlq	ymm3, ymm0, 32
-	add	rax, rsi
 	
 	vpsrldq	ymm2, ymm6, 8
 	vpaddd	ymm0, ymm3, ymm0
