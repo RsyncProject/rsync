@@ -98,7 +98,7 @@ get_checksum1_avx2:
 	ret
 
 #ifdef __APPLE__
-.const_data
+.data
 	.align 6
 #else
 .section	.rodata
