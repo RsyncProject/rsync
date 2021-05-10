@@ -69,10 +69,10 @@ get_checksum1_avx2:
 	jnz	.loop
 
 	# now we reduce the partial sums.
+	lea	rax, [rdx+rsi]
 	mov	edx, [r8] # load from *ps2
 	vpslld	ymm3, ymm4, 6
 	vpsrldq	ymm2, ymm6, 4
-	lea	rax, [rdx+rsi]
 	
 	vpaddd  ymm0, ymm3, ymm1
 	vpaddd	ymm6, ymm2, ymm6
