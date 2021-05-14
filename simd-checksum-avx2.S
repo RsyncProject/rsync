@@ -8,10 +8,10 @@
 	.p2align 4
 	.globl get_checksum1_avx2
 
-# rdi=*buf, rsi=len, edx=i, rcx= *ps1, r8= *ps2
+# rdi=*buf, esi=len, edx=i, rcx= *ps1, r8= *ps2
 get_checksum1_avx2:
 	vmovd	xmm6,[rcx] # load *ps1
-	lea	eax, [rsi-128] # at least 128 to process?
+	lea	eax, [rsi-128] # at least 128 bytes to process?
 	cmp	edx, eax
 	jge	.exit
 	lea	rax, .mul_T2[rip]
@@ -28,24 +28,25 @@ get_checksum1_avx2:
 	vpbroadcastd ymm13, xmm13
 #endif
 	vpabsb	ymm15, ymm15  # set all byte size elements to 1.
-	lea	rax, [rdi+rdx]
-	vmovdqu ymm2, [rax]   # preload the first 64 bytes.
-	vmovdqu ymm3, [rax+32]
-	mov 	rdi, rsi
-	shr	rdi, 6     # loop counter
-	add	rax, 64
-	and	rsi, ~63   # only needed during final reduction, 
+	add	rdi, rdx
+	vmovdqu ymm2, [rdi]   # preload the first 64 bytes.
+	vmovdqu ymm3, [rdi+32]
+	and	esi, ~63   # only needed during final reduction, 
 			   # done here to avoid a longer nop for 
 			   # alignment below.
+	add	edx, esi
+	shr	rsi, 6	   # longer opcode for alignment
+	add	rdi, 64
 	vpxor	xmm1, xmm1, xmm1 # reset both partial sums accumulators.
 	vpxor	xmm4, xmm4, xmm4
+	mov	eax, [r8]
 	.p2align 4 		# should fit into the LSD allocation queue.
 .loop:
 	vpmaddubsw	ymm0, ymm15, ymm2  # s1 partial sums
 	vpmaddubsw	ymm5, ymm15, ymm3 
-	vmovdqu	ymm8,  [rax]	# preload the next 
-	vmovdqu	ymm9,  [rax+32] # 64 bytes.
-	add	rax, 64
+	vmovdqu	ymm8,  [rdi]	# preload the next 
+	vmovdqu	ymm9,  [rdi+32] # 64 bytes.
+	add	rdi, 64
 	vpaddd	ymm4, ymm4, ymm6
 	vpaddw	ymm5, ymm5, ymm0
 	vpsrld	ymm0, ymm5, 16
@@ -53,7 +54,7 @@ get_checksum1_avx2:
 	vpaddd	ymm6, ymm5, ymm6
 	vpmaddubsw	ymm2, ymm7, ymm2  # s2 partial sums
 	vpmaddubsw	ymm3, ymm12, ymm3
-	prefetcht0	[rax+384] # prefetch 6 cachelines ahead.
+	prefetcht0	[rdi+384] # prefetch 6 cachelines ahead.
 	vpaddw	ymm3, ymm2, ymm3
 	vpsrldq	ymm2, ymm3, 2
 	vpaddd	ymm3, ymm2, ymm3
@@ -65,12 +66,10 @@ get_checksum1_avx2:
 #endif
 	vmovdqa ymm2, ymm8   # move the next 64 bytes 
 	vmovdqa ymm3, ymm9   # into the right registers
-	sub	rdi, 1
+	sub	esi, 1
 	jnz	.loop
 
 	# now we reduce the partial sums.
-	lea	rax, [rdx+rsi]
-	mov	edx, [r8] # load from *ps2
 	vpslld	ymm3, ymm4, 6
 	vpsrldq	ymm2, ymm6, 4
 	
@@ -89,11 +88,10 @@ get_checksum1_avx2:
 	vmovd	[rcx], xmm6
 	vpaddd	xmm1, xmm1, xmm0
 	vmovd	ecx, xmm1
-	add	edx, ecx
-	mov	[r8], edx
-	vzeroupper
-	ret
+	add	eax, ecx
+	mov	[r8], eax
 .exit:
+	vzeroupper
 	mov	eax, edx
 	ret
 
