@@ -13,7 +13,7 @@ get_checksum1_avx2:
 	vmovd	xmm6,[rcx] # load *ps1
 	lea	eax, [rsi-128] # at least 128 bytes to process?
 	cmp	edx, eax
-	jge	.exit
+	jg	.exit
 	lea	rax, .mul_T2[rip]
 	vmovntdqa ymm7, [rax]   # load T2 multiplication constants
 	vmovntdqa ymm12,[rax+32]# from memory.
