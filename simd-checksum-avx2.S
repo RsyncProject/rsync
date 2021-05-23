@@ -5,7 +5,11 @@
 
 .intel_syntax noprefix
 .text
-	.p2align 4
+#ifdef __APPLE__
+	.align 5
+#else
+	.p2align 5
+#endif
 	.globl get_checksum1_avx2
 
 # rdi=*buf, esi=len, edx=i, rcx= *ps1, r8= *ps2
