@@ -2852,7 +2852,7 @@ your home directory (remove the '=' for that).
       sense) were created (as opposed to updated).  The total count will be
       followed by a list of counts by filetype (if the total is non-zero).
     - `Number of deleted files` is the count of how many "files" (generic
-      sense) were created (as opposed to updated).  The total count will be
+      sense) were deleted.  The total count will be
       followed by a list of counts by filetype (if the total is non-zero).
       Note that this line is only output if deletions are in effect, and only
       if protocol 31 is being used (the default for rsync 3.1.x).
