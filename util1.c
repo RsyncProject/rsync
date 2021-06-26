@@ -406,10 +406,15 @@ int copy_file(const char *source, const char *dest, int ofd, mode_t mode)
 
 	/* Source file might have shrunk since we fstatted it.
 	 * Cut off any extra preallocated zeros from dest file. */
-	if (offset < prealloc_len && do_ftruncate(ofd, offset) < 0) {
+	if (offset < prealloc_len) {
+#ifdef HAVE_FTRUNCATE
 		/* If we fail to truncate, the dest file may be wrong, so we
 		 * must trigger the "partial transfer" error. */
-		rsyserr(FERROR_XFER, errno, "ftruncate %s", full_fname(dest));
+		if (do_ftruncate(ofd, offset) < 0)
+			rsyserr(FERROR_XFER, errno, "ftruncate %s", full_fname(dest));
+#else
+		rprintf(FERROR_XFER, "no ftruncate for over-long pre-alloc: %s", full_fname(dest));
+#endif
 	}
 
 	if (close(ofd) < 0) {
