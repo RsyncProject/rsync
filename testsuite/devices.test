@@ -154,6 +154,7 @@ diff $diffopt "$tmpdir/ls-from" "$tmpdir/ls-to"
 if test "$CAN_HLINK_SPECIAL" = yes; then
     set -x
     checkdiff "$RSYNC -aii --link-dest='$todir' '$fromdir/' '$chkdir/'" <<EOT
+created directory $chkdir
 cd$allspace ./
 hD$allspace block
 hD$allspace block2

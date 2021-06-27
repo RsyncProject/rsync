@@ -912,7 +912,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 			break;
 		case 0: {
 			enum logcode msgtype = redoing ? FERROR_XFER : FWARNING;
-			if (msgtype == FERROR_XFER || INFO_GTE(NAME, 1)) {
+			if (msgtype == FERROR_XFER || INFO_GTE(NAME, 1) || stdout_format_has_i) {
 				char *errstr, *redostr, *keptstr;
 				if (!(keep_partial && partialptr) && !inplace)
 					keptstr = "discarded";

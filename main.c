@@ -87,6 +87,7 @@ extern BOOL shutting_down;
 extern int backup_dir_len;
 extern int basis_dir_cnt;
 extern int default_af_hint;
+extern int stdout_format_has_i;
 extern struct stats stats;
 extern char *stdout_format;
 extern char *logfile_format;
@@ -725,7 +726,7 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 		int ret = make_path(dest_path, file_total > 1 && !trailing_slash ? 0 : MKP_DROP_NAME);
 		if (ret < 0)
 			goto mkdir_error;
-		if (ret && INFO_GTE(NAME, 1)) {
+		if (ret && (INFO_GTE(NAME, 1) || stdout_format_has_i)) {
 			if (file_total == 1 || trailing_slash)
 				*cp = '\0';
 			rprintf(FINFO, "created %d director%s for %s\n", ret, ret == 1 ? "y" : "ies", dest_path);
@@ -791,7 +792,7 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 		 && strcmp(flist->files[flist->low]->basename, ".") == 0)
 			flist->files[0]->flags |= FLAG_DIR_CREATED;
 
-		if (INFO_GTE(NAME, 1))
+		if (INFO_GTE(NAME, 1) || stdout_format_has_i)
 			rprintf(FINFO, "created directory %s\n", dest_path);
 
 		if (dry_run) {
