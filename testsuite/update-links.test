@@ -13,13 +13,15 @@ set_os_opts(){
   Linux)
     stat_opt=-c
     size=%s
+    # ctime is not normally modifiable by user, defaults to mtime
+    ctime=%Y
     mtime=%Y
-    ctime=%Z
   ;;
   FreeBSD)
     stat_opt=-f
     size=%z
-    ctime=%Sc
+    # ctime is not normally modifiable by user, defaults to mtime
+    ctime=%Sm
     mtime=%Sm
     bsd="-t %s"
   ;;
