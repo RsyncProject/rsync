@@ -1077,18 +1077,19 @@ expand it.
 
 0.  `--allow-link-update-dir`
 
-    Enabling this option allows rsync to replace a less recent directory on the
-    destination with a more recent symbolic link from the source.  This option
-    extends the [`--update-links`](#opt) option, which by default preserves any
-    existing directory on the destination from being replaced by a more recent
-    symbolic link.  The modification time of the symbolic link on the source
-    needs to be more recent than the modification time of the directory
-    existing on the destination for this option to take effect.  An exisitng
-    directory with a more recent modification time on the destination than the
-    symlink on the source will not be removed and replaced by the symlink.  A
-    destination directory with an identical modification time as the source
-    symbolic link will be removed and a symlink will be recreated with same
-    referent as the source symlink.
+    Enabling this option allows rsync to replace a less recent empty directory 
+    on the destination with a more recent symbolic link from the source.  This
+    option extends the [`--update-links`](#opt) option, which by default
+    preserves any existing directory on the destination from being replaced
+    by a more recent symbolic link.  The modification time of the symbolic link
+    on the source needs to be more recent than the modification time of the
+    directory existing on the destination for this option to take effect.  An
+    exisitng directory with a more recent modification time on the destination
+    than the symlink on the source will not be removed and replaced by
+    the symlink.  A destination directory with an identical modification time
+    as the source symbolic link will be removed and a symlink will be recreated
+    with same referent as the source symlink.  Non-empty directories are not
+    unlinked under any circumstances.
 
     This option requires the [`--update-links`](#opt) option to be enabled.
 
