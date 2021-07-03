@@ -7,6 +7,28 @@ DSELF="$(dirname "$LSRC")"
 
 . "${testsuite:-${DSELF}}/rsync.fns"
 
+set_os_opts(){
+  os=$(uname -s) 
+  case ${os} in
+  Linux)
+    stat_opt=-c
+    size=%s
+    mtime=%Y
+    ctime=%Z
+  ;;
+  FreeBSD)
+    stat_opt=-f
+    size=%z
+    ctime=%Sc
+    mtime=%Sm
+    bsd="-t %s"
+  ;;
+  *)
+    test_fail "OS ${os} unsupported"
+  ;;
+  esac
+}
+
 log(){
   echo "${SELF}: $@"
 }
@@ -20,15 +42,15 @@ error(){
 }
 
 get_ctime(){
-  stat -c "%Y" "$1" || test_fail "Unable to get ctime of $1"
+  stat ${stat_opt} ${ctime} ${bsd} "$1" || test_fail "Unable to get ctime of $1"
 }
 
 get_mtime(){
-  stat -c "%Y" "$1" || test_fail "Unable to get mtime of $1"
+  stat ${stat_opt} ${mtime} ${bsd} "$1" || test_fail "Unable to get mtime of $1"
 }
 
 get_size(){
-  stat -c "%s" "$1" || test_fail "Unable to get size of $1"
+  stat ${stat_opt} ${size} "$1" || test_fail "Unable to get size of $1"
 }
 
 get_referent(){
@@ -154,13 +176,15 @@ shift_mtime(){
   local f
   local epoch
   local rc
+  local time
   offset=$1
   shift
   for f in $@; do
-    epoch=$(stat -c%Y "$f")
+    epoch=$(stat ${stat_opt} ${mtime} ${bsd} "$f")
     rc=$?
     debug "shift_mtime: $f; offset = $offset; rc = $rc; touch -hd @$((epoch${offset})) $f"
-    [ $rc -eq 0 ] && touch -hd @$((epoch${offset})) "$f" || error "Unable to stat $f"
+    case ${os} in FreeBSD) time=$(date -r $((epoch${offset})) +%Y-%m-%dT%H:%M:%S) ;; *) time=@$((epoch${offset})) ;; esac
+    [ $rc -eq 0 ] && touch -hd "${time}" "$f" || error "Unable to stat $f"
   done
 }
 
@@ -173,7 +197,7 @@ take_a_second(){
 }
 
 show_files(){
-  stat -c "%Y %Z %N" $@ 1>&2 || test_fail "Unable to stat $@"
+  stat ${stat_opt} "${mtime} ${ctime} %N" ${bsd} $@ 1>&2 || test_fail "Unable to stat $@"
 }
 
 count_words(){
@@ -257,7 +281,7 @@ list_contains(){
 $@
 _EOT_
   debug "list_contains: opt = $opt; opts = $opts"
-  echo "$opts" | grep -qPo -- "${opt}(?=$|\s)" 1>/dev/null
+  echo "$opts" | egrep -q -- " ${opt} |^${opt} | ${opt}$" 1>/dev/null
 }
 
 # Various scenarios that modify either side before re-running rsync & performing a check
@@ -571,4 +595,5 @@ RSYNC=${RSYNC:-${DSELF}/../rsync}
 [ -n "$DEBUG" ] && RSYNC_COMMON_OPTS=${RSYNC_COMMON_OPTS:--i}
 RSYNC_OPTS="--update-links --times --allow-link-update-dir"
 
+set_os_opts
 process_all_opts $fromdir $todir ${RSYNC_OPTS}
