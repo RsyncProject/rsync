@@ -59,8 +59,12 @@ points_to_pipe(){
   is_a_link "$1" && is_a_pipe "$1"
 }
 
-is_a_directory(){
+is_a_dir(){
   ! is_a_link "$1" && [ -d "$1" ]
+}
+
+is_empty_dir(){
+  is_a_dir && [ $(find "$1" | wc -l) -eq 1 ]
 }
 
 points_to_dir(){
@@ -220,6 +224,9 @@ build_symlinks(){
   rm -rf "$fromdir"
   mkdir "$fromdir"
   mkdir "$fromdir/emptydir"
+  mkdir "$fromdir/nonemptydir"
+  touch "$fromdir/nonemptydir/file"
+  mkfifo "$fromdir/fifo"
   mkfifo "$fromdir/fifo"
   date >"$fromdir/referent"
   ln -s referent "$fromdir/relative"
@@ -427,10 +434,17 @@ _EOT_
   if list_contains "--update-links" "$opts"; then
     if list_contains "--allow-link-update-dir" "$opts"; then
       if is_a_link $todir/$file; then
-        # Newer source links are supposed to be transfered
-        run_checks same $fromdir $todir $file $scenario $opts
+        case $file in
+        nonemptydir)
+          error "$file should never be replaced by a link"
+        ;;
+        *)
+          # Newer source links are supposed to be transfered
+          run_checks same $fromdir $todir $file $scenario $opts
+        ;;
+        esac
       else
-        is_a_directory $todir/$file && error "$todir/$file has not been updated by a source link in spite of --allow-link-update-dir"
+        is_empty_dir $todir/$file && error "$todir/$file has not been updated by a source link in spite of --allow-link-update-dir"
       fi
     fi
   fi
