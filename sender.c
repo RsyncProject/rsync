@@ -35,6 +35,7 @@ extern int append_mode;
 extern int copy_links;
 extern int io_error;
 extern int flist_eof;
+extern int whole_file;
 extern int allowed_lull;
 extern int preserve_xattrs;
 extern int protocol_version;
@@ -203,6 +204,9 @@ void send_files(int f_in, int f_out)
 
 	if (DEBUG_GTE(SEND, 1))
 		rprintf(FINFO, "send_files starting\n");
+
+	if (whole_file < 0)
+		whole_file = 0;
 
 	progress_init();
 

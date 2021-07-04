@@ -539,6 +539,9 @@ int recv_files(int f_in, int f_out, char *local_name)
 	if (delay_updates)
 		delayed_bits = bitbag_create(cur_flist->used + 1);
 
+	if (whole_file < 0)
+		whole_file = 0;
+
 	progress_init();
 
 	while (1) {
