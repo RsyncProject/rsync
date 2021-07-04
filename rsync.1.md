@@ -2049,9 +2049,11 @@ your home directory (remove the '=' for that).
 0.  `--exclude-from=FILE`
 
     This option is related to the `--exclude` option, but it specifies a FILE
-    that contains exclude patterns (one per line).  Blank lines in the file and
-    lines starting with '`;`' or '`#`' are ignored.  If _FILE_ is '`-`', the
-    list will be read from standard input.
+    that contains exclude patterns (one per line).  Blank lines in the file are
+    ignored, as are whole-line comments that start with '`;`' or '`#`'
+    (filename rules that contain those characters are unaffected).
+
+    If _FILE_ is '`-`', the list will be read from standard input.
 
 0.  `--include=PATTERN`
 
@@ -2064,9 +2066,11 @@ your home directory (remove the '=' for that).
 0.  `--include-from=FILE`
 
     This option is related to the `--include` option, but it specifies a FILE
-    that contains include patterns (one per line).  Blank lines in the file and
-    lines starting with '`;`' or '`#`' are ignored.  If _FILE_ is '`-`', the
-    list will be read from standard input.
+    that contains include patterns (one per line).  Blank lines in the file are
+    ignored, as are whole-line comments that start with '`;`' or '`#`'
+    (filename rules that contain those characters are unaffected).
+
+    If _FILE_ is '`-`', the list will be read from standard input.
 
 0.  `--files-from=FILE`
 
@@ -3501,8 +3505,9 @@ available rule prefixes:
 0.  `risk, 'R'` files that match the pattern are not protected.
 0.  `clear, '!'` clears the current include/exclude list (takes no arg)
 
-When rules are being read from a file, empty lines are ignored, as are comment
-lines that start with a "#".
+When rules are being read from a file, empty lines are ignored, as are
+whole-line comments that start with a '`#`' (filename rules that contain a hash
+are unaffected).
 
 [comment]: # (Remember that markdown strips spaces from start/end of ` ... ` sequences!)
 [comment]: # (Thus, the `x ` sequences below use a literal non-breakable space!)
