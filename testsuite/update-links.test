@@ -88,7 +88,7 @@ is_a_dir(){
 }
 
 is_empty_dir(){
-  is_a_dir && [ $(find "$1" | wc -l) -eq 1 ]
+  is_a_dir "$1" && [ $(find "$1" | wc -l) -eq 1 ]
 }
 
 points_to_dir(){
@@ -348,12 +348,17 @@ link_update_dir(){
   read fromdir todir file scenario opts << _EOT_
 $@
 _EOT_
-  debug "link_update_dir: $todir/$f"
-  # Make all target links directories
+  # Make all target files directories
   local f
   for f in $FILES; do
+    debug "link_update_dir: $todir/$f"
     rm $todir/$f 2>/dev/null || log "${scenario}: $f didn't exist"
     mkdir -p $todir/$f
+    case $f in
+    nonemptydir)
+      touch $todir/$f/testfile
+    ;;
+    esac
     # Make source link more recent than dir just created
     add_a_second $fromdir/$f
     show_files $todir/$f
@@ -457,22 +462,26 @@ check_link_update_dir(){
   read fromdir todir file scenario opts << _EOT_
 $@
 _EOT_
-  if list_contains "--update-links" "$opts"; then
-    if list_contains "--allow-link-update-dir" "$opts"; then
-      if is_a_link $todir/$file; then
-        case $file in
+  if is_a_link $todir/$file; then
+    if list_contains "--update-links" "$opts"; then
+      if list_contains "--allow-link-update-dir" "$opts"; then
+	case $file in
         nonemptydir)
-          error "$file should never be replaced by a link"
-        ;;
-        *)
-          # Newer source links are supposed to be transfered
-          run_checks same $fromdir $todir $file $scenario $opts
+          error "$file should not have been replaced by a link"
         ;;
         esac
       else
-        is_empty_dir $todir/$file && error "$todir/$file has not been updated by a source link in spite of --allow-link-update-dir"
+	case $file in
+	*dir)
+	  error "$file should not have been replaced by a link without --allow-link-update-dir enabled"
+	;;
+	esac
       fi
+    else
+      error "$file should not have been replaced by a link without --update-links enabled"
     fi
+    # Newer source links are supposed to be transfered
+    run_checks same $fromdir $todir $file $scenario $opts
   fi
 }
 
@@ -589,12 +598,12 @@ _EOT_
 }
 
 # All of the following variables may be overriden at command line
-FILES="${FILES:-relative dangling absolute unsafe devlink dirlink}"
+FILES="${FILES:-relative dangling absolute unsafe devlink dirlink emptydir nonemptydir}"
 # For sanity testing only
 #SCENARIOS="test_success test_failure"
 SCENARIOS="${SCENARIOS:-default newer_source_link newer_dest_link cycle_dest_link cycle_dest_newer_source_link link_update_dir}"
 RSYNC=${RSYNC:-${DSELF}/../rsync}
-[ -n "$DEBUG" ] && RSYNC_COMMON_OPTS=${RSYNC_COMMON_OPTS:--i}
+[ -n "$DEBUG" ] && RSYNC_COMMON_OPTS=${RSYNC_COMMON_OPTS:--r -i}
 RSYNC_OPTS="--update-links --times --allow-link-update-dir"
 
 set_os_opts
