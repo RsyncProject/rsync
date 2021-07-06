@@ -1196,6 +1196,19 @@ static BOOL is_below(struct file_struct *file, struct file_struct *subtree)
 		&& (!implied_dirs_are_missing || f_name_has_prefix(file, subtree));
 }
 
+static BOOL dir_empty(char *dirname) {
+	int n = 3;
+	DIR *dir = opendir(dirname);
+	if (dir == NULL)
+		return -1;
+	while (readdir(dir)) {
+		if (!--n)
+			break;
+	}
+	closedir(dir);
+	return n;
+}
+
 /* Acts on the indicated item in cur_flist whose name is fname.  If a dir,
  * make sure it exists, and has the right permissions/timestamp info.  For
  * all other non-regular files (symlinks, etc.) we create them here.  For
@@ -1621,6 +1634,12 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 						goto cleanup;
 					}
 					else if (mtime_offset < modify_window) {
+						if (S_ISDIR(sx.st.st_mode)) {
+							if (!dir_empty(fname)) {
+								rprintf(FINFO, "directory %s not empty, skipping\n", fname);
+								goto cleanup;
+							}
+						}
 						if (INFO_GTE(SKIP, 1))
 							rprintf(FINFO, "%s \"%s\" is older by %d sec, updating\n", st_mode, fname, - mtime_offset - modify_window);
 					}
