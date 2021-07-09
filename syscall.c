@@ -55,12 +55,16 @@ extern int open_noatime;
 #endif
 
 #ifdef SUPPORT_CRTIMES
+#ifdef HAVE_GETATTRLIST
 #pragma pack(push, 4)
 struct create_time {
 	uint32 length;
 	struct timespec crtime;
 };
 #pragma pack(pop)
+#elif defined __CYGWIN__
+#include <windows.h>
+#endif
 #endif
 
 #define RETURN_ERROR_IF(x,e) \
@@ -407,23 +411,30 @@ int do_setattrlist_times(const char *fname, STRUCT_STAT *stp)
 #endif
 
 #ifdef SUPPORT_CRTIMES
-time_t get_create_time(const char *path)
+time_t get_create_time(const char *path, STRUCT_STAT *stp)
 {
+#ifdef HAVE_GETATTRLIST
 	static struct create_time attrBuf;
 	struct attrlist attrList;
 
+	(void)stp;
 	memset(&attrList, 0, sizeof attrList);
 	attrList.bitmapcount = ATTR_BIT_MAP_COUNT;
 	attrList.commonattr = ATTR_CMN_CRTIME;
 	if (getattrlist(path, &attrList, &attrBuf, sizeof attrBuf, FSOPT_NOFOLLOW) < 0)
 		return 0;
 	return attrBuf.crtime.tv_sec;
-}
+#elif defined __CYGWIN__
+	(void)path;
+	return stp->st_birthtime;
+#else
+#error Unknown crtimes implementation
 #endif
+}
 
-#ifdef SUPPORT_CRTIMES
 int set_create_time(const char *path, time_t crtime)
 {
+#ifdef HAVE_GETATTRLIST
 	struct attrlist attrList;
 	struct timespec ts;
 
@@ -437,6 +448,27 @@ int set_create_time(const char *path, time_t crtime)
 	attrList.bitmapcount = ATTR_BIT_MAP_COUNT;
 	attrList.commonattr = ATTR_CMN_CRTIME;
 	return setattrlist(path, &attrList, &ts, sizeof ts, FSOPT_NOFOLLOW);
+#elif defined __CYGWIN__
+	int cnt = MultiByteToWideChar(CP_UTF8, 0, path, -1, NULL, 0);
+	if (cnt == 0)
+	    return -1;
+	WCHAR *pathw = new_array(WCHAR, cnt);
+	if (!pathw)
+	    return -1;
+	MultiByteToWideChar(CP_UTF8, 0, path, -1, pathw, cnt);
+	HANDLE handle = CreateFileW(pathw, FILE_WRITE_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+				    NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+	free(pathw);
+	if (handle == INVALID_HANDLE_VALUE)
+	    return -1;
+	int64 temp_time = Int32x32To64(crtime, 10000000) + 116444736000000000LL;
+	FILETIME birth_time;
+	birth_time.dwLowDateTime = (DWORD)temp_time;
+	birth_time.dwHighDateTime = (DWORD)(temp_time >> 32);
+	int ok = SetFileTime(handle, &birth_time, NULL, NULL);
+	CloseHandle(handle);
+	return ok ? 0 : -1;
+#endif
 }
 #endif
 

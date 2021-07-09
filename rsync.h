@@ -587,7 +587,7 @@ typedef unsigned int size_t;
 #define SUPPORT_ATIMES 1
 #endif
 
-#ifdef HAVE_GETATTRLIST
+#if defined HAVE_GETATTRLIST || defined __CYGWIN__
 #define SUPPORT_CRTIMES 1
 #endif
 
