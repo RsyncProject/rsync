@@ -881,7 +881,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 					do_unlink(partialptr);
 				handle_partial_dir(partialptr, PDIR_DELETE);
 			}
-		} else if (keep_partial && partialptr && !one_inplace) {
+		} else if (keep_partial && partialptr && (!one_inplace || delay_updates)) {
 			if (!handle_partial_dir(partialptr, PDIR_CREATE)) {
 				rprintf(FERROR,
 					"Unable to create partial-dir for %s -- discarding %s.\n",
