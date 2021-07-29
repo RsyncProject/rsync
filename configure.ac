@@ -376,128 +376,35 @@ if test x"$rsync_cv_HAVE_BROKEN_LARGEFILE" != x"yes"; then
    AC_SYS_LARGEFILE
 fi
 
-ipv6type=unknown
-ipv6lib=none
-ipv6trylibc=yes
-
+AC_MSG_CHECKING([whether to enable ipv6])
 AC_ARG_ENABLE(ipv6,
-	AS_HELP_STRING([--disable-ipv6],[turn off IPv6 support]))
-if test x"$enable_ipv6" != x"no"; then
-	AC_MSG_CHECKING([ipv6 stack type])
-	for i in inria kame linux-glibc linux-inet6 solaris toshiba v6d zeta cygwin TANDEM; do
-		case $i in
-		inria)
-			# http://www.kame.net/
-			AC_EGREP_CPP(yes, [
-#include <netinet/in.h>
-#ifdef IPV6_INRIA_VERSION
-yes
-#endif],
-				[ipv6type=$i;
-				AC_DEFINE(INET6, 1, [true if you have IPv6])
-				])
-			;;
-		kame)
-			# http://www.kame.net/
-			AC_EGREP_CPP(yes, [
-#include <netinet/in.h>
-#ifdef __KAME__
-yes
-#endif],
-				[ipv6type=$i;
-				AC_DEFINE(INET6, 1, [true if you have IPv6])])
-			;;
-		linux-glibc)
-			# http://www.v6.linux.or.jp/
-			AC_EGREP_CPP(yes, [
-#include <features.h>
-#if defined(__GLIBC__) && (__GLIBC__ > 2 || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 1))
-yes
-#endif],
-				[ipv6type=$i;
-AC_DEFINE(INET6, 1, [true if you have IPv6])])
-			;;
-		linux-inet6)
-			# http://www.v6.linux.or.jp/
-			if test -d /usr/inet6 -o -f /usr/inet6/lib/libinet6.a; then
-				ipv6type=$i
-				ipv6lib=inet6
-				ipv6libdir=/usr/inet6/lib
-				ipv6trylibc=yes;
-				AC_DEFINE(INET6, 1, [true if you have IPv6])
-				CFLAGS="-I/usr/inet6/include $CFLAGS"
-			fi
-			;;
-		solaris)
-			# http://www.sun.com
-			AC_EGREP_CPP(yes, [
-#include <netinet/ip6.h>
-#ifdef __sun
-yes
-#endif],
-				[ipv6type=$i;
-				AC_DEFINE(INET6, 1, [true if you have IPv6])])
-			;;
-		toshiba)
-			AC_EGREP_CPP(yes, [
-#include <sys/param.h>
-#ifdef _TOSHIBA_INET6
-yes
-#endif],
-				[ipv6type=$i;
-				ipv6lib=inet6;
-				ipv6libdir=/usr/local/v6/lib;
-				AC_DEFINE(INET6, 1, [true if you have IPv6])])
-			;;
-		v6d)
-			AC_EGREP_CPP(yes, [
-#include </usr/local/v6/include/sys/v6config.h>
-#ifdef __V6D__
-yes
-#endif],
-				[ipv6type=$i;
-				ipv6lib=v6;
-				ipv6libdir=/usr/local/v6/lib;
-				AC_DEFINE(INET6, 1, [true if you have IPv6])])
-			;;
-		zeta)
-			AC_EGREP_CPP(yes, [
-#include <sys/param.h>
-#ifdef _ZETA_MINAMI_INET6
-yes
-#endif],
-				[ipv6type=$i;
-				ipv6lib=inet6;
-				ipv6libdir=/usr/local/v6/lib;
-				AC_DEFINE(INET6, 1, [true if you have IPv6])])
-			;;
-		cygwin)
-			AC_EGREP_CPP(yes, [
-#include <netinet/in.h>
-#ifdef _CYGWIN_IN6_H
-yes
-#endif],
-				[ipv6type=$i;
-				AC_DEFINE(INET6, 1, [true if you have IPv6])])
-			;;
-		TANDEM)
-			AC_EGREP_CPP(yes, [
-#include <netinet/ip6.h>
-#ifdef __TANDEM
-yes
-#endif],
-				[ipv6type=$i;
-				AC_DEFINE(INET6, 1, [true if you have IPv6])])
-			;;
-		esac
-		if test "$ipv6type" != "unknown"; then
-			break
-		fi
-	done
-	AC_MSG_RESULT($ipv6type)
+[  --disable-ipv6          disable ipv6 support],
+[ case "$enableval" in
+  no)
+	AC_MSG_RESULT(no)
+	;;
+  *)	AC_MSG_RESULT(yes)
+	AC_DEFINE(INET6, 1, [true if you have IPv6])
+	;;
+  esac ],
 
-	AC_SEARCH_LIBS(getaddrinfo, inet6)
-fi
+  AC_TRY_RUN([ /* AF_INET6 avalable check */
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+main()
+{
+   if (socket(AF_INET6, SOCK_STREAM, 0) < 0)
+     exit(1);
+   else
+     exit(0);
+}
+],
+  AC_MSG_RESULT(yes)
+  AC_DEFINE(INET6, 1, [true if you have IPv6]),
+  AC_MSG_RESULT(no),
+  AC_MSG_RESULT(no)
+))
 
 dnl Do you want to disable use of locale functions
 AC_ARG_ENABLE([locale],
