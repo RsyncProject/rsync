@@ -73,7 +73,7 @@ function rsync_ssl_helper {
 	certopt=""
 	gnutls_cert_opt=""
     else
-	certopt="cert$optsep$RSYNC_SSL_CERT"
+	certopt="-cert$optsep$RSYNC_SSL_CERT"
 	gnutls_cert_opt="--x509keyfile=$RSYNC_SSL_CERT"
     fi
 
