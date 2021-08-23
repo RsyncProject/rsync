@@ -13,7 +13,7 @@
 SSH="$scratchdir/src/support/lsh.sh"
 
 if test x"$rsync_enable_ssh_tests" = xyes; then
-    if type ssh >/dev/null ; then
+    if type ssh >/dev/null; then
 	SSH=ssh
     fi
 fi

@@ -26,5 +26,3 @@ you could include the log messages when reporting a failure.
 
 These tests also run automatically on the build farm, and you can see
 the results on http://build.samba.org/.
-
-
