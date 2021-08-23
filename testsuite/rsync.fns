@@ -338,14 +338,14 @@ checkdiff2() {
 	failed="$failed status=$status"
     fi
 
-    if [ "$2" ]; then
+    if [ -n "$2" ]; then
 	eval "cat '$outfile' | $2 >'$outfile.new'"
 	mv "$outfile.new" "$outfile"
     fi
 
     diff $diffopt "$chkfile" "$outfile" || failed="$failed output differs"
 
-    if [ "$failed" ] ; then
+    if [ -n "$failed" ]; then
 	echo "Failed:$failed"
 	return 1
     fi
