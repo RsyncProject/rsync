@@ -177,7 +177,7 @@ cd "$todir"
 xls $dirs $files | diff $diffopt "$scratchdir/xattrs.txt" -
 
 sed -n -e '/^[^d ][^ ]*  *[^ ][^ ]*  *[^ ][^ ]*  *1 /p' "$scratchdir/ls-to" >"$scratchdir/ls-diff-all"
-fgrep -v './file1' "$scratchdir/ls-diff-all" >"$scratchdir/ls-diff" || :
+grep -F -v './file1' "$scratchdir/ls-diff-all" >"$scratchdir/ls-diff" || :
 if [ -s "$scratchdir/ls-diff" ]; then
     echo "Missing hard links on:"
     cat "$scratchdir/ls-diff"

@@ -17,7 +17,7 @@ files='foo file1 file2'
 
 case "$setfacl_nodef" in
 true)
-    if ! chmod --help 2>&1 | fgrep +a >/dev/null; then
+    if ! chmod --help 2>&1 | grep -F +a >/dev/null; then
 	test_skipped "I don't know how to use setfacl or chmod for ACLs"
     fi
     chmod +a "root allow read,write,execute" "$fromdir/foo" || test_skipped "Your filesystem has ACLs disabled"
