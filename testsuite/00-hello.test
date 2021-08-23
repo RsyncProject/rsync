@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/sh
 
 test_fail() {
     echo "$@" >&2
