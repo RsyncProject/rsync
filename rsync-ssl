@@ -74,7 +74,15 @@ function rsync_ssl_helper {
 	gnutls_cert_opt=""
     else
 	certopt="-cert$optsep$RSYNC_SSL_CERT"
-	gnutls_cert_opt="--x509keyfile=$RSYNC_SSL_CERT"
+	gnutls_cert_opt="--x509certfile=$RSYNC_SSL_CERT"
+    fi
+
+    if [[ -z "$RSYNC_SSL_KEY" ]]; then
+	keyopt=""
+	gnutls_key_opt=""
+    else
+	keyopt="-key$optsep$RSYNC_SSL_KEY"
+	gnutls_key_opt="--x509keyfile=$RSYNC_SSL_KEY"
     fi
 
     if [[ -z ${RSYNC_SSL_CA_CERT+x} ]]; then
@@ -129,9 +137,9 @@ function rsync_ssl_helper {
     fi
 
     if [[ $RSYNC_SSL_TYPE == openssl ]]; then
-	exec $RSYNC_SSL_OPENSSL s_client $caopt $certopt -quiet -verify_quiet -servername $hostname -verify_hostname $hostname -connect $hostname:$port
+	exec $RSYNC_SSL_OPENSSL s_client $caopt $certopt $keyopt -quiet -verify_quiet -servername $hostname -verify_hostname $hostname -connect $hostname:$port
     elif [[ $RSYNC_SSL_TYPE == gnutls ]]; then
-	exec $RSYNC_SSL_GNUTLS --logfile=/dev/null $gnutls_cert_opt $gnutls_opts $hostname:$port
+	exec $RSYNC_SSL_GNUTLS --logfile=/dev/null $gnutls_cert_opt $gnutls_key_opt $gnutls_opts $hostname:$port
     else
 	# devzero@web.de came up with this no-tmpfile calling syntax:
 	exec $RSYNC_SSL_STUNNEL -fd 10 11<&0 <<EOF 10<&0 0<&11 11<&-

@@ -46,6 +46,8 @@ The ssl helper scripts are affected by the following environment variables:
     value to the helper script.)
 0.  `RSYNC_SSL_CERT` If specified, the value is a filename that contains a
     certificate to use for the connection.
+0.  `RSYNC_SSL_KEY` If specified, the value is a filename that contains a
+    key for the provided certificate to use for the connection.
 0.  `RSYNC_SSL_CA_CERT` If specified, the value is a filename that contains a
     certificate authority certificate that is used to validate the connection.
 0.  `RSYNC_SSL_OPENSSL` Specifies the openssl executable to run when the
