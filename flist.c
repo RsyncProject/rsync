@@ -305,7 +305,7 @@ static void flist_expand(struct file_list *flist, int extra)
 
 	new_ptr = realloc_array(flist->files, struct file_struct *, flist->malloced);
 
-	if (DEBUG_GTE(FLIST, 1) && flist->malloced != FLIST_START) {
+	if (DEBUG_GTE(FLIST, 1) && flist->files) {
 		rprintf(FCLIENT, "[%s] expand file_list pointer array to %s bytes, did%s move\n",
 		    who_am_i(),
 		    big_num(sizeof flist->files[0] * flist->malloced),
@@ -2186,8 +2186,10 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 #endif
 
 	flist = cur_flist = flist_new(0, "send_file_list");
+	flist_expand(flist, FLIST_START_LARGE);
 	if (inc_recurse) {
 		dir_flist = flist_new(FLIST_TEMP, "send_file_list");
+		flist_expand(dir_flist, FLIST_START_LARGE);
 		flags |= FLAG_DIVERT_DIRS;
 	} else
 		dir_flist = cur_flist;
@@ -2541,10 +2543,13 @@ struct file_list *recv_file_list(int f, int dir_ndx)
 #endif
 
 	flist = flist_new(0, "recv_file_list");
+	flist_expand(flist, FLIST_START_LARGE);
 
 	if (inc_recurse) {
-		if (flist->ndx_start == 1)
+		if (flist->ndx_start == 1) {
 			dir_flist = flist_new(FLIST_TEMP, "recv_file_list");
+			flist_expand(dir_flist, FLIST_START_LARGE);
+		}
 		dstart = dir_flist->used;
 	} else {
 		dir_flist = flist;
