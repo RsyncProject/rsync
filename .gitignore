@@ -4,7 +4,6 @@ dummy
 ID
 Makefile
 Makefile.old
-bench
 configure.sh
 configure.sh.old
 config.cache
