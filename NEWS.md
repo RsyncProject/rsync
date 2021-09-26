@@ -915,7 +915,7 @@
    hard-link it into place so that the upcoming replacement of the destination
    file will be atomic (for the normal, non-inplace logic).
 
- - Added the ability to synchronize nano-second modified times.
+ - Added the ability to synchronize nanosecond modified times.
 
  - Added a few more default suffixes for the `dont compress` settings.
 
