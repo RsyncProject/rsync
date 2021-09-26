@@ -45,13 +45,12 @@ export HOME
 
 runtest() {
     echo $ECHO_N "Test $1: $ECHO_C"
-    if eval "$2"
-    then
-	echo "$ECHO_T	done."
-	return 0
+    if eval "$2"; then
+        echo "$ECHO_T	done."
+        return 0
     else
-	echo "$ECHO_T failed!"
-	return 1
+        echo "$ECHO_T failed!"
+        return 1
     fi
 }
 
@@ -220,16 +219,13 @@ makepath() {
 	(echo "        makepath $p"
 
 	# Absolute Unix path.
-	if echo $p | grep '^/' >/dev/null
-	then
+	if echo $p | grep '^/' >/dev/null; then
 	    cd /
 	fi
 
 	# This will break if $p contains a space.
-	for c in `echo $p | tr '/' ' '`
-	do
-	    if [ -d "$c" ] || mkdir "$c"
-	    then
+	for c in `echo $p | tr '/' ' '`; do
+	    if [ -d "$c" ] || mkdir "$c"; then
 		cd "$c" || return $?
 	    else
 		echo "failed to create $c" >&2; return $?
@@ -293,7 +289,7 @@ checkit() {
     fi
 
     echo "-------------"
-    if [ -z "$failed" ] ; then
+    if [ -z "$failed" ]; then
 	return 0
     fi
 
@@ -338,14 +334,14 @@ checkdiff2() {
 	failed="$failed status=$status"
     fi
 
-    if [ "$2" ]; then
+    if [ -n "$2" ]; then
 	eval "cat '$outfile' | $2 >'$outfile.new'"
 	mv "$outfile.new" "$outfile"
     fi
 
     diff $diffopt "$chkfile" "$outfile" || failed="$failed output differs"
 
-    if [ "$failed" ] ; then
+    if [ -n "$failed" ]; then
 	echo "Failed:$failed"
 	return 1
     fi
@@ -465,25 +461,21 @@ test_xfail() {
 
 # Determine what shell command will appropriately test for links.
 ln -s foo "$scratchdir/testlink"
-for cmd in test /bin/test /usr/bin/test /usr/ucb/bin/test /usr/ucb/test
-do
-    for switch in -h -L
-    do
-        if $cmd $switch "$scratchdir/testlink" 2>/dev/null
-	then
-	    # how nice
-	    TEST_SYMLINK_CMD="$cmd $switch"
-	    # i wonder if break 2 is portable?
-	    break 2
-	fi
-   done
+for cmd in test /bin/test /usr/bin/test /usr/ucb/bin/test /usr/ucb/test; do
+    for switch in -h -L; do
+        if $cmd $switch "$scratchdir/testlink" 2>/dev/null; then
+            # how nice
+            TEST_SYMLINK_CMD="$cmd $switch"
+            # i wonder if break 2 is portable?
+            break 2
+        fi
+    done
 done
 # ok, now get rid of it
 rm "$scratchdir/testlink"
 
 
-if [ "x$TEST_SYMLINK_CMD" = 'x' ]
-then
+if [ "x$TEST_SYMLINK_CMD" = 'x' ]; then
     test_fail "Couldn't determine how to test for symlinks"
 else
     echo "Testing for symlinks using '$TEST_SYMLINK_CMD'"

@@ -1,11 +1,11 @@
-#! /bin/sh
+#!/bin/sh
 
 # Copyright (C) 2005-2020 Wayne Davison
 
 # This program is distributable under the terms of the GNU GPL (see
 # COPYING).
 
-# Test rsync handling of various delete directives.  
+# Test rsync handling of various delete directives.
 
 . "$suitedir/rsync.fns"
 
@@ -23,12 +23,12 @@ echo extra >"$todir"/emptydir/subdir/remove4
 # Also, make sure that --dry-run --del doesn't output anything extraneous.
 $RSYNC -av "$fromdir/" "$chkdir/copy/" >"$tmpdir/copy.out" 2>&1
 cat "$tmpdir/copy.out"
-egrep -v '^(created directory|sent|total size) ' "$tmpdir/copy.out" >"$tmpdir/copy.new"
+grep -E -v '^(created directory|sent|total size) ' "$tmpdir/copy.out" >"$tmpdir/copy.new"
 mv "$tmpdir/copy.new" "$tmpdir/copy.out"
 
 $RSYNC -avn --del "$fromdir/" "$chkdir/copy2/" >"$tmpdir/copy2.out" 2>&1 || true
 cat "$tmpdir/copy2.out"
-egrep -v '^(created directory|sent|total size) ' "$tmpdir/copy2.out" >"$tmpdir/copy2.new"
+grep -E -v '^(created directory|sent|total size) ' "$tmpdir/copy2.out" >"$tmpdir/copy2.new"
 mv "$tmpdir/copy2.new" "$tmpdir/copy2.out"
 
 diff $diffopt "$tmpdir/copy.out" "$tmpdir/copy2.out"

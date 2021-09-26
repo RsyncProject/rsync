@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/sh
 
 # Copyright (C) 2001 by Martin Pool <mbp@samba.org>
 
@@ -18,18 +18,15 @@ $RSYNC -r "$fromdir/" "$todir" || test_fail "$RSYNC returned $?"
 
 [ -f "$todir/referent" ] || test_fail "referent was not copied"
 [ -d "$todir/from" ] && test_fail "extra level of directories"
-if is_a_link "$todir/dangling" 
-then 
+if is_a_link "$todir/dangling"; then
     test_fail "dangling symlink was copied"
 fi
 
-if is_a_link "$todir/relative" 
-then
-    test_fail "relative symlink was copied" 
+if is_a_link "$todir/relative"; then
+    test_fail "relative symlink was copied"
 fi
 
-if is_a_link "$todir/absolute" 
-then
+if is_a_link "$todir/absolute"; then
     test_fail "absolute symlink was copied"
 fi
 

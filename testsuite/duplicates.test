@@ -1,11 +1,11 @@
-#! /bin/sh
+#!/bin/sh
 
 # Copyright (C) 2002 by Martin Pool <mbp@samba.org>
 
 # This program is distributable under the terms of the GNU GPL (see
 # COPYING).
 
-# Test rsync handling of duplicate filenames.  
+# Test rsync handling of duplicate filenames.
 
 # It's quite possible that the user might specify the same source file
 # more than once on the command line, perhaps through shell variables
@@ -33,12 +33,10 @@ checkit "$RSYNC -avv '$fromdir/' '$fromdir/' '$fromdir/' '$fromdir/' '$fromdir/'
     | tee "$outfile"
 
 # Make sure each file was only copied once...
-if [ `grep -c '^name1$' "$outfile"` != 1 ]
-then
+if [ `grep -c '^name1$' "$outfile"` != 1 ]; then
     test_fail "name1 was not copied exactly once"
 fi
-if [ `grep -c '^name2 -> ' "$outfile"` != 1 ]
-then
+if [ `grep -c '^name2 -> ' "$outfile"` != 1 ]; then
     test_fail "name2 was not copied exactly once"
 fi
 

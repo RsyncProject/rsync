@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/sh
 
 # Copyright (C) 2002 by Martin Pool <mbp@samba.org>
 
@@ -16,8 +16,7 @@
 mygrps="`rsync_getgroups`" || test_fail "Can't get groups"
 mkdir "$fromdir"
 
-for g in $mygrps
-do
+for g in $mygrps; do
     name="$fromdir/foo-$g"
     date > "$name"
     chgrp "$g" "$name" || test_fail "Can't chgrp"

@@ -5,7 +5,7 @@ IGNOREOUT='^(file has vanished: |rsync warning: some files vanished before they 
 
 set -o pipefail
 
-rsync "${@}" 2>&1 | (egrep -v "$IGNOREOUT" || true)
+rsync "${@}" 2>&1 | (grep -E -v "$IGNOREOUT" || true)
 ret=$?
 
 if [[ $ret == $IGNOREEXIT ]]; then

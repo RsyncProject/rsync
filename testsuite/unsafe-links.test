@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/sh
 
 # Originally by Vladimír Michl <Vladimir.Michl@hlubocky.del.cz>
 
@@ -6,13 +6,13 @@
 
 test_symlink() {
 	is_a_link "$1" || test_fail "File $1 is not a symlink"
-};
+}
 
 test_regular() {
 	if [ ! -f "$1" ]; then
-		test_fail "File $1 is not regular file or not exists";
-	fi;
-};
+		test_fail "File $1 is not regular file or not exists"
+	fi
+}
 
 cd "$tmpdir"
 
@@ -32,7 +32,7 @@ ln -s ../files/file1 "from/safe/links/"
 ln -s ../files/file2 "from/safe/links/"
 ln -s ../../unsafe/unsafefile "from/safe/links/"
 
-echo "rsync with relative path and just -a";
+echo "rsync with relative path and just -a"
 $RSYNC -avv from/safe/ to
 test_symlink to/links/file1
 test_symlink to/links/file2
@@ -44,23 +44,22 @@ test_regular to/links/file1
 test_regular to/links/file2
 test_regular to/links/unsafefile
 
-echo "rsync with relative path and --copy-unsafe-links";
+echo "rsync with relative path and --copy-unsafe-links"
 $RSYNC -avv --copy-unsafe-links from/safe/ to
 test_symlink to/links/file1
 test_symlink to/links/file2
 test_regular to/links/unsafefile
 
 rm -rf to
-echo "rsync with relative2 path";
+echo "rsync with relative2 path"
 (cd from; $RSYNC -avv --copy-unsafe-links safe/ ../to)
 test_symlink to/links/file1
 test_symlink to/links/file2
 test_regular to/links/unsafefile
 
 rm -rf to
-echo "rsync with absolute path";
+echo "rsync with absolute path"
 $RSYNC -avv --copy-unsafe-links `pwd`/from/safe/ to
 test_symlink to/links/file1
 test_symlink to/links/file2
 test_regular to/links/unsafefile
-

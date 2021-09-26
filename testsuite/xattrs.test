@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/sh
 
 # This program is distributable under the terms of the GNU GPL (see
 # COPYING).
@@ -150,7 +150,7 @@ xls $dirs $files | diff $diffopt "$scratchdir/xattrs.txt" -
 
 cd "$fromdir"
 
-if [ "$dashH" ]; then
+if [ -n "$dashH" ]; then
     for fn in $files; do
 	name=`basename $fn`
 	ln $fn ../lnk/$name
@@ -162,7 +162,7 @@ checkit "$RSYNC -aiX $XFILT $dashH --super $altDest=../chk . ../to" "$fromdir" "
 cd "$todir"
 xls $dirs $files | diff $diffopt "$scratchdir/xattrs.txt" -
 
-[ "$dashH" ] && rm -rf "$lnkdir"
+[ -n "$dashH" ] && rm -rf "$lnkdir"
 
 cd "$fromdir"
 rm -rf "$todir"
@@ -177,7 +177,7 @@ cd "$todir"
 xls $dirs $files | diff $diffopt "$scratchdir/xattrs.txt" -
 
 sed -n -e '/^[^d ][^ ]*  *[^ ][^ ]*  *[^ ][^ ]*  *1 /p' "$scratchdir/ls-to" >"$scratchdir/ls-diff-all"
-fgrep -v './file1' "$scratchdir/ls-diff-all" >"$scratchdir/ls-diff" || :
+grep -F -v './file1' "$scratchdir/ls-diff-all" >"$scratchdir/ls-diff" || :
 if [ -s "$scratchdir/ls-diff" ]; then
     echo "Missing hard links on:"
     cat "$scratchdir/ls-diff"
@@ -213,13 +213,13 @@ $RSYNC -aX file1 file2
 $RSYNC -aX file1 file2 ../chk/
 $RSYNC -aX --del ../chk/ .
 $RSYNC -aX file1 ../lnk/
-[ "$dashH" ] && ln "$chkdir/file1" ../lnk/extra-link
+[ -n "$dashH" ] && ln "$chkdir/file1" ../lnk/extra-link
 
 xls file1 file2 >"$scratchdir/xattrs.txt"
 
 checkit "$RSYNC -aiiX $XFILT $dashH $altDest=../lnk . ../to" "$chkdir" "$todir"
 
-[ "$dashH" ] && rm ../lnk/extra-link
+[ -n "$dashH" ] && rm ../lnk/extra-link
 
 cd "$todir"
 xls file1 file2 | diff $diffopt "$scratchdir/xattrs.txt" -

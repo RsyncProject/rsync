@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/sh
 
 # This program is distributable under the terms of the GNU GPL (see
 # COPYING).
@@ -21,7 +21,7 @@ testit() {
     todir="$scratchdir/$1"
     mkdir "$todir"
     $setfacl_nodef "$todir"
-    if [ "$2" ]; then
+    if [ -n "$2" ]; then
 	case "$setfacl_nodef" in
 	*-k*) opts="-dm $2" ;;
 	*) opts="-m `echo $2 | sed 's/\([ugom]:\)/d:\1/g'`"

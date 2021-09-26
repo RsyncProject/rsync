@@ -109,7 +109,7 @@
 			     == ((unsigned)(b2) & (unsigned)(mask)))
 
 /* Update this if you make incompatible changes and ALSO update the
- * SUBPROTOCOL_VERSION if it is not a final (offical) release. */
+ * SUBPROTOCOL_VERSION if it is not a final (official) release. */
 #define PROTOCOL_VERSION 31
 
 /* This is used when working on a new protocol version or for any unofficial

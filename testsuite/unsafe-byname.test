@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/sh
 
 # Copyright (C) 2002 by Martin Pool
 
@@ -13,9 +13,8 @@ test_unsafe() {
     # or "unsafe" otherwise
 
     result=`"$TOOLDIR/t_unsafe" "$1" "$2"` || test_fail "Failed to check $1 $2"
-    if [ "$result" != "$3" ]
-    then
-	test_fail "t_unsafe $1 $2 returned \"$result\", expected \"$3\""
+    if [ "$result" != "$3" ]; then
+        test_fail "t_unsafe $1 $2 returned \"$result\", expected \"$3\""
     fi
 }
 

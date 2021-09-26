@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/sh
 
 # This program is distributable under the terms of the GNU GPL (see
 # COPYING).
@@ -17,8 +17,8 @@ files='foo file1 file2'
 
 case "$setfacl_nodef" in
 true)
-    if ! chmod --help 2>&1 | fgrep +a >/dev/null; then
-	test_skipped "I don't know how to use setfacl or chmod for ACLs"
+    if ! chmod --help 2>&1 | grep -F +a >/dev/null; then
+        test_skipped "I don't know how to use setfacl or chmod for ACLs"
     fi
     chmod +a "root allow read,write,execute" "$fromdir/foo" || test_skipped "Your filesystem has ACLs disabled"
     chmod +a "root allow read,execute" "$fromdir/file1"
@@ -27,7 +27,7 @@ true)
     chmod +a "root allow read,execute" "$fromdir/file2"
 
     see_acls() {
-	ls -le "${@}"
+        ls -le "${@}"
     }
     ;;
 *)
@@ -45,7 +45,7 @@ true)
     setfacl -m u:0:5 "$fromdir/file2"
 
     see_acls() {
-	getfacl "${@}"
+        getfacl "${@}"
     }
     ;;
 esac
