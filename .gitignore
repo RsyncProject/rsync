@@ -28,6 +28,7 @@ aclocal.m4
 /conftest*
 /dox
 /getgroups
+/gists
 /gmon.out
 /rsync
 /stunnel-rsyncd.conf
