@@ -19,7 +19,7 @@ jobs:
     - name: prep
       run: |
         sudo apt-get install acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev python3-cmarkgfm openssl wget
-        wget https://download.samba.org/pub/rsync/generated-files/git-version.h
+        wget -O git-version.h https://gist.githubusercontent.com/WayneD/c11243fa374fc64d4e42f2855c8e3827/raw/rsync-git-version.h
         echo "/usr/local/bin" >>$GITHUB_PATH
     - name: configure
       run: ./configure
@@ -56,7 +56,7 @@ jobs:
       run: |
         brew install automake openssl xxhash zstd lz4 wget
         sudo pip3 install commonmark
-        wget https://download.samba.org/pub/rsync/generated-files/git-version.h
+        wget -O git-version.h https://gist.githubusercontent.com/WayneD/c11243fa374fc64d4e42f2855c8e3827/raw/rsync-git-version.h
         echo "/usr/local/bin" >>$GITHUB_PATH
     - name: configure
       run: CPPFLAGS=-I/usr/local/opt/openssl/include/ LDFLAGS=-L/usr/local/opt/openssl/lib/ ./configure
