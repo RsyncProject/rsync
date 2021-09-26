@@ -214,11 +214,13 @@ int read_proxy_protocol_header(int fd)
 					return 0;
 				inet_ntop(AF_INET, hdr.v2.addr.ip4.src_addr, ipaddr_buf, sizeof ipaddr_buf);
 				return valid_ipaddr(ipaddr_buf);
+#ifdef INET6
 			case PROXY_FAM_TCPv6:
 				if (size != sizeof hdr.v2.addr.ip6)
 					return 0;
 				inet_ntop(AF_INET6, hdr.v2.addr.ip6.src_addr, ipaddr_buf, sizeof ipaddr_buf);
 				return valid_ipaddr(ipaddr_buf);
+#endif
 			default:
 				break;
 			}
