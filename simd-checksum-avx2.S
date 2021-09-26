@@ -13,8 +13,13 @@ get_checksum1_avx2:
 	vmovd	xmm6,[rcx] # load *ps1
 	lea	eax, [rsi-128] # at least 128 bytes to process?
 	cmp	edx, eax
-	jg	.exit
-	lea	rax, .mul_T2[rip]
+#ifdef __APPLE__
+	jg	L__exit
+	lea	rax, L__mul_T2[rip]
+#else
+	jg	.L__exit
+	lea	rax, .L__mul_T2[rip]
+#endif
 	vmovntdqa ymm7, [rax]   # load T2 multiplication constants
 	vmovntdqa ymm12,[rax+32]# from memory.
 	vpcmpeqd  ymm15, ymm15, ymm15 # set all elements to -1.
@@ -41,7 +46,11 @@ get_checksum1_avx2:
 	vpxor	xmm4, xmm4, xmm4
 	mov	eax, [r8]
 	.p2align 4 		# should fit into the LSD allocation queue.
-.loop
+#ifdef __APPLE__
+L__loop:
+#else
+.L__loop:
+#endif
 	vpmaddubsw	ymm0, ymm15, ymm2  # s1 partial sums
 	vpmaddubsw	ymm5, ymm15, ymm3 
 	vmovdqu	ymm8,  [rdi]	# preload the next 
@@ -67,7 +76,11 @@ get_checksum1_avx2:
 	vmovdqa ymm2, ymm8   # move the next 64 bytes 
 	vmovdqa ymm3, ymm9   # into the right registers
 	sub	esi, 1
-	jnz	.loop
+#ifdef __APPLE__
+	jnz	L__loop
+#else
+	jnz	.L__loop
+#endif
 
 	# now we reduce the partial sums.
 	vpslld	ymm3, ymm4, 6
@@ -90,7 +103,11 @@ get_checksum1_avx2:
 	vmovd	ecx, xmm1
 	add	eax, ecx
 	mov	[r8], eax
-.exit
+#ifdef __APPLE__
+L__exit:
+#else
+.L__exit:
+#endif
 	vzeroupper
 	mov	eax, edx
 	ret
@@ -101,7 +118,11 @@ get_checksum1_avx2:
 .section	.rodata
 #endif
 	.p2align 6 
-.mul_T2
+#ifdef __APPLE__
+L__mul_T2:
+#else
+.L__mul_T2:
+#endif
 	.byte 64
 	.byte 63
 	.byte 62
