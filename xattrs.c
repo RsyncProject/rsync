@@ -1056,7 +1056,6 @@ int set_xattr(const char *fname, const struct file_struct *file, const char *fna
 	rsync_xa_list *glst = rsync_xal_l.items;
 	item_list *lst;
 	int ndx, added_write_perm = 0;
-	STRUCT_STAT current_stat;
 
 	if (dry_run)
 		return 1; /* FIXME: --dry-run needs to compute this value */
@@ -1085,31 +1084,22 @@ int set_xattr(const char *fname, const struct file_struct *file, const char *fna
 	}
 #endif
 
-	/* If the target file has not write permission then add it
-	 * temporarily so we can change extended attributes. */
-	if (access(fname, W_OK) != 0) {
-		if (do_stat(fname, &current_stat) != 0) {
-			rsyserr(FERROR_XFER, errno, "set_xattr: was not able to access file %s",
-				full_fname(fname));
-		}
-		if (current_stat.st_uid == (uid_t)F_OWNER(file)) {
-			do_chmod(fname, current_stat.st_mode | S_IWUSR);
-			added_write_perm = 1;
-		} else if (current_stat.st_gid == (gid_t)F_GROUP(file)) {
-			do_chmod(fname, current_stat.st_mode | S_IWGRP);
-			added_write_perm = 1;
-		} else {
-			rprintf(FERROR_XFER, "set_xattr: file %s is not accessible for writing",
-				full_fname(fname));
-		}
-	}
+	/* If the target file lacks write permission, we try to add it
+	 * temporarily so we can change the extended attributes. */
+	if (!am_root
+#ifdef SUPPORT_LINKS
+	 && !S_ISLNK(sxp->st.st_mode)
+#endif
+	 && access(fname, W_OK) < 0
+	 && do_chmod(fname, (sxp->st.st_mode & CHMOD_BITS) | S_IWUSR) == 0)
+		added_write_perm = 1;
 
 	ndx = F_XATTR(file);
 	glst += ndx;
 	lst = &glst->xa_items;
 	int return_value = rsync_xal_set(fname, lst, fnamecmp, sxp);
 	if (added_write_perm) /* remove the temporary write permission */
-		do_chmod(fname, current_stat.st_mode);
+		do_chmod(fname, sxp->st.st_mode);
 	return return_value;
 }
 
