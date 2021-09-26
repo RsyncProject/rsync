@@ -23,8 +23,6 @@
 #include "ifuncs.h"
 #include "inums.h"
 #include "lib/sysxattrs.h"
-#include <unistd.h>
-#include <sys/stat.h>
 
 #ifdef SUPPORT_XATTRS
 
@@ -1057,9 +1055,8 @@ int set_xattr(const char *fname, const struct file_struct *file, const char *fna
 {
 	rsync_xa_list *glst = rsync_xal_l.items;
 	item_list *lst;
-	int ndx;
-	int added_write_perm = 0;
-	struct stat current_stat;
+	int ndx, added_write_perm = 0;
+	STRUCT_STAT current_stat;
 
 	if (dry_run)
 		return 1; /* FIXME: --dry-run needs to compute this value */
@@ -1088,8 +1085,8 @@ int set_xattr(const char *fname, const struct file_struct *file, const char *fna
 	}
 #endif
 
-	// if target file has not write permission
-	// then add it temporarily so we can change extended attributes
+	/* If the target file has not write permission then add it
+	 * temporarily so we can change extended attributes. */
 	if (access(fname, W_OK) != 0) {
 		if (do_stat(fname, &current_stat) != 0) {
 			rsyserr(FERROR_XFER, errno, "set_xattr: was not able to access file %s",
@@ -1111,10 +1108,8 @@ int set_xattr(const char *fname, const struct file_struct *file, const char *fna
 	glst += ndx;
 	lst = &glst->xa_items;
 	int return_value = rsync_xal_set(fname, lst, fnamecmp, sxp);
-	if (added_write_perm) {
-		// remove the temporary write permission
+	if (added_write_perm) /* remove the temporary write permission */
 		do_chmod(fname, current_stat.st_mode);
-	}
 	return return_value;
 }
 
