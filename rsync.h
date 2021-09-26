@@ -491,7 +491,6 @@ enum delret {
 #ifndef __TANDEM
 #define MAKEDEV(devmajor,devminor) makedev(devmajor,devminor)
 #else
-# include <sys/stat.h>
 # define major DEV_TO_MAJOR
 # define minor DEV_TO_MINOR
 # define MAKEDEV MAJORMINOR_TO_DEV
