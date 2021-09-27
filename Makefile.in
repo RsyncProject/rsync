@@ -29,7 +29,7 @@ SHELL=/bin/sh
 .SUFFIXES:
 .SUFFIXES: .c .o
 
-SIMD_x86_64=simd-checksum-x86_64.o
+SIMD_x86_64=simd-checksum-x86_64.o simd-checksum-avx2.o
 ASM_x86_64=lib/md5-asm-x86_64.o
 
 GENFILES=configure.sh aclocal.m4 config.h.in rsync.1 rsync.1.html \
@@ -139,6 +139,9 @@ git-version.h: mkgitver $(wildcard $(srcdir)/.git/logs/HEAD)
 
 simd-checksum-x86_64.o: simd-checksum-x86_64.cpp
 	@$(srcdir)/cmdormsg disable-simd $(CXX) -I. $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $(srcdir)/simd-checksum-x86_64.cpp
+
+simd-checksum-avx2.o: simd-checksum-avx2.S
+	@$(srcdir)/cmdormsg disable-asm $(CC) $(CFLAGS) --include=$(srcdir)/rsync.h -DAVX2_ASM -I. @NOEXECSTACK@ -c -o $@ $(srcdir)/simd-checksum-avx2.S
 
 lib/md5-asm-x86_64.o: lib/md5-asm-x86_64.S config.h lib/md-defines.h
 	@$(srcdir)/cmdormsg disable-asm $(CC) -I. @NOEXECSTACK@ -c -o $@ $(srcdir)/lib/md5-asm-x86_64.S
