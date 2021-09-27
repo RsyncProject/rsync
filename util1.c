@@ -27,6 +27,7 @@
 
 extern int dry_run;
 extern int module_id;
+extern int do_fsync;
 extern int protect_args;
 extern int modify_window;
 extern int relative_paths;
@@ -417,10 +418,17 @@ int copy_file(const char *source, const char *dest, int ofd, mode_t mode)
 #endif
 	}
 
+	if (do_fsync && fsync(ofd) < 0) {
+		int save_errno = errno;
+		rsyserr(FERROR, errno, "fsync failed on %s", full_fname(dest));
+		close(ofd);
+		errno = save_errno;
+		return -1;
+	}
+
 	if (close(ofd) < 0) {
 		int save_errno = errno;
-		rsyserr(FERROR_XFER, errno, "close failed on %s",
-			full_fname(dest));
+		rsyserr(FERROR_XFER, errno, "close failed on %s", full_fname(dest));
 		errno = save_errno;
 		return -1;
 	}

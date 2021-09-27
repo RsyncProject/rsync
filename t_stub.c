@@ -21,6 +21,7 @@
 
 #include "rsync.h"
 
+int do_fsync = 0;
 int inplace = 0;
 int modify_window = 0;
 int preallocate_files = 0;

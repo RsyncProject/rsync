@@ -66,6 +66,7 @@ int open_noatime = 0;
 int cvs_exclude = 0;
 int dry_run = 0;
 int do_xfers = 1;
+int do_fsync = 0;
 int ignore_times = 0;
 int delete_mode = 0;
 int delete_during = 0;
@@ -789,6 +790,7 @@ static struct poptOption long_options[] = {
   {"no-timeout",       0,  POPT_ARG_VAL,    &io_timeout, 0, 0, 0 },
   {"contimeout",       0,  POPT_ARG_INT,    &connect_timeout, 0, 0, 0 },
   {"no-contimeout",    0,  POPT_ARG_VAL,    &connect_timeout, 0, 0, 0 },
+  {"fsync",            0,  POPT_ARG_NONE,   &do_fsync, 0, 0, 0 },
   {"stop-after",       0,  POPT_ARG_STRING, 0, OPT_STOP_AFTER, 0, 0 },
   {"time-limit",       0,  POPT_ARG_STRING, 0, OPT_STOP_AFTER, 0, 0 }, /* earlier stop-after name */
   {"stop-at",          0,  POPT_ARG_STRING, 0, OPT_STOP_AT, 0, 0 },
@@ -2805,6 +2807,9 @@ void server_options(char **args, int *argc_p)
 			args[ac++] = "--temp-dir";
 			args[ac++] = tmpdir;
 		}
+
+		if (do_fsync)
+			args[ac++] = "--fsync";
 
 		if (basis_dir[0]) {
 			/* the server only needs this option if it is not the sender,

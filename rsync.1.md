@@ -461,6 +461,7 @@ detailed description below for a complete description.
 --bwlimit=RATE           limit socket I/O bandwidth
 --stop-after=MINS        Stop rsync after MINS minutes have elapsed
 --stop-at=y-m-dTh:m      Stop rsync at the specified point in time
+--fsync                  fsync every written file
 --write-batch=FILE       write a batched update to FILE
 --only-write-batch=FILE  like --write-batch but w/o updating dest
 --read-batch=FILE        read a batched update from FILE
@@ -3256,6 +3257,12 @@ your home directory (remove the '=' for that).
     limit using `--remote-option` (`-M`), should the need arise.  Do keep in
     mind that the remote host may have a different default timezone than your
     local host.
+
+0.  `--fsync`
+
+    Cause the receiving side to fsync each finished file.  This may slow down
+    the transfer, but can help to provide peace of mind when updating critical
+    files.
 
 0.  `--write-batch=FILE`
 
