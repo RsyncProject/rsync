@@ -41,7 +41,7 @@ AC_CONFIG_LIBOBJ_DIR([lib])
 
 AC_MSG_CHECKING([whether to include debugging symbols])
 AC_ARG_ENABLE(debug,
-	AS_HELP_STRING([--disable-debug],[disable debugging symbols and features]))
+	AS_HELP_STRING([--disable-debug],[disable to omit debugging symbols and features]))
 
 if test x"$enable_debug" = x"no"; then
     AC_MSG_RESULT(no)
@@ -78,7 +78,7 @@ nl='
 '
 
 AC_ARG_ENABLE(profile,
-	AS_HELP_STRING([--enable-profile],[turn on CPU profiling]))
+	AS_HELP_STRING([--enable-profile],[enable to turn on CPU profiling]))
 if test x"$enable_profile" = x"yes"; then
 	CFLAGS="$CFLAGS -pg"
 fi
@@ -101,7 +101,7 @@ fi
 
 AC_MSG_CHECKING([if we require man-page building])
 AC_ARG_ENABLE([md2man],
-	AS_HELP_STRING([--disable-md2man],[disable md2man for man page creation]))
+	AS_HELP_STRING([--disable-md2man],[disable to omit man page creation]))
 if test x"$enable_md2man" != x"no"; then
     if test -f "$srcdir/rsync.1"; then
 	AC_MSG_RESULT(optional)
@@ -122,7 +122,7 @@ fi
 
 # Specifically, this turns on panic_action handling.
 AC_ARG_ENABLE(maintainer-mode,
-	AS_HELP_STRING([--enable-maintainer-mode],[turn on extra debug features]))
+	AS_HELP_STRING([--enable-maintainer-mode],[enable to turn on extra debug features]))
 if test x"$enable_maintainer_mode" = x"yes"; then
 	CFLAGS="$CFLAGS -DMAINTAINER_MODE"
 fi
@@ -224,7 +224,7 @@ SIMD=
 
 AC_MSG_CHECKING([whether to enable SIMD optimizations])
 AC_ARG_ENABLE(simd,
-    AS_HELP_STRING([--disable-simd],[disable SIMD optimizations (requires c++)]))
+    AS_HELP_STRING([--enable-simd],[enable/disable to control SIMD optimizations (requires c++)]))
 
 # Clag is crashing with -g -O2, so we'll get rid of -g for now.
 CXXFLAGS=`echo "$CXXFLAGS" | sed 's/-g //'`
@@ -252,6 +252,13 @@ __attribute__ ((target("ssse3"))) void more_testing(char* buf, int len)
     }
 }
 ]])
+
+if test x"$enable_simd" = x""; then
+    case "$host_os" in
+	*linux*) simd_enable=yes ;;
+	*) simd_enable=no ;;
+    esac
+fi
 
 if test x"$enable_simd" != x"no"; then
     # For x86-64 SIMD, g++ >=5 or clang++ >=7 is required
@@ -309,7 +316,14 @@ ASM=
 
 AC_MSG_CHECKING([whether to enable ASM optimizations])
 AC_ARG_ENABLE(asm,
-    AS_HELP_STRING([--disable-asm],[disable ASM optimizations]))
+    AS_HELP_STRING([--enable-asm],[enable/disable to control ASM optimizations]))
+
+if test x"$enable_asm" = x""; then
+    case "$host_os" in
+	*linux*) asm_enable=yes ;;
+	*) asm_enable=no ;;
+    esac
+fi
 
 if test x"$enable_asm" != x"no"; then
     if test x"$host_cpu" = x"x86_64"; then
@@ -378,7 +392,7 @@ fi
 
 AC_MSG_CHECKING([whether to enable ipv6])
 AC_ARG_ENABLE(ipv6,
-[  --disable-ipv6          disable ipv6 support],
+AS_HELP_STRING([--disable-ipv6],[disable to omit ipv6 support]),
 [ case "$enableval" in
   no)
 	AC_MSG_RESULT(no)
@@ -408,7 +422,7 @@ main()
 
 dnl Do you want to disable use of locale functions
 AC_ARG_ENABLE([locale],
-	AS_HELP_STRING([--disable-locale],[disable locale features]))
+	AS_HELP_STRING([--disable-locale],[disable to omit locale features]))
 AH_TEMPLATE([CONFIG_LOCALE],
 [Undefine if you do not want locale features.  By default this is defined.])
 if test x"$enable_locale" != x"no"; then
@@ -426,7 +440,7 @@ esac
 
 AC_MSG_CHECKING([whether to enable use of openssl crypto library])
 AC_ARG_ENABLE([openssl],
-	AS_HELP_STRING([--disable-openssl],[disable openssl crypto library]))
+	AS_HELP_STRING([--disable-openssl],[disable to omit openssl crypto library]))
 AH_TEMPLATE([USE_OPENSSL],
 [Undefine if you do not want to use openssl crypto library.  By default this is defined.])
 if test x"$enable_openssl" != x"no"; then
@@ -447,7 +461,7 @@ fi
 
 AC_MSG_CHECKING([whether to enable xxhash checksum support])
 AC_ARG_ENABLE([xxhash],
-	AS_HELP_STRING([--disable-xxhash],[disable xxhash checksums]))
+	AS_HELP_STRING([--disable-xxhash],[disable to omit xxhash checksums]))
 AH_TEMPLATE([SUPPORT_XXHASH],
 [Undefine if you do not want xxhash checksums.  By default this is defined.])
 if test x"$enable_xxhash" != x"no"; then
@@ -468,7 +482,7 @@ fi
 
 AC_MSG_CHECKING([whether to enable zstd compression])
 AC_ARG_ENABLE([zstd],
-        AC_HELP_STRING([--disable-zstd], [disable zstd compression]))
+        AC_HELP_STRING([--disable-zstd], [disable to omit zstd compression]))
 AH_TEMPLATE([SUPPORT_ZSTD],
 [Undefine if you do not want zstd compression.  By default this is defined.])
 if test x"$enable_zstd" != x"no"; then
@@ -489,7 +503,7 @@ fi
 
 AC_MSG_CHECKING([whether to enable LZ4 compression])
 AC_ARG_ENABLE([lz4],
-        AC_HELP_STRING([--disable-lz4], [disable LZ4 compression]))
+        AC_HELP_STRING([--disable-lz4], [disable to omit LZ4 compression]))
 AH_TEMPLATE([SUPPORT_LZ4],
 [Undefine if you do not want LZ4 compression.  By default this is defined.])
 if test x"$enable_lz4" != x"no"; then
@@ -895,7 +909,7 @@ if test $ac_cv_func_getpgrp = yes; then
 fi
 
 AC_ARG_ENABLE(iconv-open,
-    AS_HELP_STRING([--disable-iconv-open],[disable all use of iconv_open() function]),
+    AS_HELP_STRING([--disable-iconv-open],[disable to avoid all use of iconv_open()]),
     [], [enable_iconv_open=$ac_cv_func_iconv_open])
 
 if test x"$enable_iconv_open" != x"no"; then
@@ -903,7 +917,7 @@ if test x"$enable_iconv_open" != x"no"; then
 fi
 
 AC_ARG_ENABLE(iconv,
-    AS_HELP_STRING([--disable-iconv],[disable rsync's --iconv option]),
+    AS_HELP_STRING([--disable-iconv],[disable to omit the --iconv option]),
     [], [enable_iconv=$enable_iconv_open])
 AH_TEMPLATE([ICONV_OPTION],
 [Define if you want the --iconv option.  Specifying a value will set the
@@ -1240,7 +1254,7 @@ AC_CHECK_FUNCS(_acl __acl _facl __facl)
 
 AC_MSG_CHECKING([whether to support ACLs])
 AC_ARG_ENABLE(acl-support,
-	AS_HELP_STRING([--disable-acl-support],[disable ACL support]))
+	AS_HELP_STRING([--disable-acl-support],[disable to omit ACL support]))
 
 if test x"$enable_acl_support" = x"no"; then
     AC_MSG_RESULT(no)
@@ -1324,7 +1338,7 @@ fi
 # check for extended attribute support
 AC_MSG_CHECKING(whether to support extended attributes)
 AC_ARG_ENABLE(xattr-support,
-    AS_HELP_STRING([--disable-xattr-support],[disable extended attributes]),
+    AS_HELP_STRING([--disable-xattr-support],[disable to omit extended attributes]),
     [], [case "$ac_cv_func_getxattr$ac_cv_func_extattr_get_link$ac_cv_func_attropen" in
 	*yes*) enable_xattr_support=maybe ;;
 	*) enable_xattr_support=no ;;
