@@ -2314,7 +2314,7 @@ your home directory (remove the '=' for that).
 
     >     rsync -av --link-dest=$PWD/prior_dir host:src_dir/ new_dir/
 
-    If file's aren't linking, double-check their attributes.  Also check if
+    If files aren't linking, double-check their attributes.  Also check if
     some attributes are getting forced outside of rsync's control, such a mount
     option that squishes root to a single user, or mounts a removable drive
     with generic ownership (such as OS X's "Ignore ownership on this volume"
