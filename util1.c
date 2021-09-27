@@ -1354,7 +1354,7 @@ int same_time(time_t f1_sec, unsigned long f1_nsec, time_t f2_sec, unsigned long
 		return f1_sec == f2_sec;
 	if (modify_window < 0)
 		return f1_sec == f2_sec && f1_nsec == f2_nsec;
-	/* The nano seconds doesn't figure into these checks -- time windows don't care about that. */
+	/* The nanoseconds do not figure into these checks -- time windows don't care about that. */
 	if (f2_sec > f1_sec)
 		return f2_sec - f1_sec <= modify_window;
 	return f1_sec - f2_sec <= modify_window;
