@@ -2828,8 +2828,12 @@ void server_options(char **args, int *argc_p)
 		if (append_mode > 1)
 			args[ac++] = "--append";
 		args[ac++] = "--append";
-	} else if (inplace)
+	} else if (inplace) {
 		args[ac++] = "--inplace";
+		/* Work around a bug in older rsync versions (on the remote side) for --inplace --sparse */
+		if (sparse_files && !whole_file)
+			args[ac++] = "--no-W";
+	}
 
 	if (files_from && (!am_sender || filesfrom_host)) {
 		if (filesfrom_host) {
