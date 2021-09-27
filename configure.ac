@@ -262,7 +262,7 @@ fi
 
 if test x"$enable_simd" != x"no"; then
     # For x86-64 SIMD, g++ >=5 or clang++ >=7 is required
-    if test x"$host_cpu" = x"x86_64"; then
+    if test x"$host_cpu" = x"x86_64" -o x"$host_cpu" = x"amd64"; then
 	AC_LANG(C++)
 	if test x"$host_cpu" = x"$build_cpu"; then
 	    AC_RUN_IFELSE([AC_LANG_PROGRAM([SIMD_X86_64_TEST],[[if (test_ssse3(42) != 42 || test_sse2(42) != 42 || test_avx2(42) != 42) exit(1);]])],
@@ -273,7 +273,7 @@ if test x"$enable_simd" != x"no"; then
 	AC_LANG(C)
 	if test x"$CXX_OK" = x"yes"; then
 	    # AC_MSG_RESULT() is called below.
-	    SIMD="x86_64"
+	    SIMD="$host_cpu"
 	elif test x"$enable_simd" = x"yes"; then
 	    AC_MSG_RESULT(error)
 	    AC_MSG_ERROR(The SIMD compilation test failed.
@@ -281,7 +281,7 @@ Omit --enable-simd to continue without it.)
 	fi
     elif test x"$enable_simd" = x"yes"; then
         AC_MSG_RESULT(unavailable)
-        AC_MSG_ERROR(The SIMD optimizations are currently x86_64 only.
+        AC_MSG_ERROR(The SIMD optimizations are currently x86_64|amd64 only.
 Omit --enable-simd to continue without it.)
     fi
 fi
@@ -326,11 +326,11 @@ if test x"$enable_asm" = x""; then
 fi
 
 if test x"$enable_asm" != x"no"; then
-    if test x"$host_cpu" = x"x86_64"; then
+    if test x"$host_cpu" = x"x86_64" -o x"$host_cpu" = x"amd64"; then
 	ASM="$host_cpu"
     elif test x"$enable_asm" = x"yes"; then
         AC_MSG_RESULT(unavailable)
-        AC_MSG_ERROR(The ASM optimizations are currently x86_64 only.
+        AC_MSG_ERROR(The ASM optimizations are currently x86_64|amd64 only.
 Omit --enable-asm to continue without it.)
     fi
 fi
