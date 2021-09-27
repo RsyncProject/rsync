@@ -92,7 +92,7 @@ jobs:
     - name: prep
       run: |
         cyg-get make autoconf automake gcc-core attr libattr-devel python38 python38-pip libzstd-devel liblz4-devel libssl-devel libxxhash0 libxxhash-devel
-        curl.exe -o git-version.h https://download.samba.org/pub/rsync/generated-files/git-version.h
+        curl.exe -o git-version.h https://gist.githubusercontent.com/WayneD/c11243fa374fc64d4e42f2855c8e3827/raw/rsync-git-version.h
         echo "C:/tools/cygwin/bin" >>$Env:GITHUB_PATH
     - name: commonmark
       run: bash -c 'python3 -mpip install --user commonmark'
