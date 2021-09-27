@@ -138,13 +138,13 @@ git-version.h: mkgitver $(wildcard $(srcdir)/.git/logs/HEAD)
 	$(srcdir)/mkgitver
 
 simd-checksum-x86_64.o: simd-checksum-x86_64.cpp
-	@$(srcdir)/cmdormsg disable-simd $(CXX) -I. $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $(srcdir)/simd-checksum-x86_64.cpp
+	@$(srcdir)/cmd-or-msg disable-simd $(CXX) -I. $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $(srcdir)/simd-checksum-x86_64.cpp
 
 simd-checksum-avx2.o: simd-checksum-avx2.S
-	@$(srcdir)/cmdormsg disable-asm $(CC) $(CFLAGS) --include=$(srcdir)/rsync.h -DAVX2_ASM -I. @NOEXECSTACK@ -c -o $@ $(srcdir)/simd-checksum-avx2.S
+	@$(srcdir)/cmd-or-msg disable-asm $(CC) $(CFLAGS) --include=$(srcdir)/rsync.h -DAVX2_ASM -I. @NOEXECSTACK@ -c -o $@ $(srcdir)/simd-checksum-avx2.S
 
 lib/md5-asm-x86_64.o: lib/md5-asm-x86_64.S config.h lib/md-defines.h
-	@$(srcdir)/cmdormsg disable-asm $(CC) -I. @NOEXECSTACK@ -c -o $@ $(srcdir)/lib/md5-asm-x86_64.S
+	@$(srcdir)/cmd-or-msg disable-asm $(CC) -I. @NOEXECSTACK@ -c -o $@ $(srcdir)/lib/md5-asm-x86_64.S
 
 tls$(EXEEXT): $(TLS_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(TLS_OBJ) $(LIBS)
