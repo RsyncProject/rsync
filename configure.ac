@@ -255,8 +255,8 @@ __attribute__ ((target("ssse3"))) void more_testing(char* buf, int len)
 
 if test x"$enable_simd" = x""; then
     case "$host_os" in
-	*linux*) simd_enable=yes ;;
-	*) simd_enable=no ;;
+	*linux*) enable_simd=yes ;;
+	*) enable_simd=no ;;
     esac
 fi
 
@@ -320,8 +320,8 @@ AC_ARG_ENABLE(asm,
 
 if test x"$enable_asm" = x""; then
     case "$host_os" in
-	*linux*) asm_enable=yes ;;
-	*) asm_enable=no ;;
+	*linux*) enable_asm=yes ;;
+	*) enable_asm=no ;;
     esac
 fi
 
