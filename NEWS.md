@@ -6,6 +6,12 @@
 
 ### BUG FIXES:
 
+ - Fixed a bug with `--inplace` + `--sparse` where the destination file could
+   get reconstructed with bogus data.  This bug can be worked-around in older
+   rsync versions by also specifying `--no-W -M--no-W`.  When running 3.2.4 or
+   newer for your copy, rsync now sends `--no-W` to the remote rsync in such a
+   scenario (just in case the remote rsync is a version with this bug).
+
  - Fix a bug with `--mkpath` if a single-file copy specifies an existing
    destination dir with a non-existing destination filename.
 
@@ -21,6 +27,12 @@
    the non-permissions mode bits to ensure that the 2 special files are really
    the same.
 
+ - Fixed a bug where `--delay-updates` with stale partial data could cause a
+   file to fail to update.
+
+ - Fixed a few places that would output an INFO message with `--info=NAME` that
+   should only have been output given `--verbose` or `--itemize-changes`.
+
  - Avoid a weird failure if you run a local copy with a (useless) `--rsh`
    option that contains a `V`.
 
@@ -28,12 +40,26 @@
 
  - Use openssl's `-verify_hostname` option in the rsync-ssl script.
 
- - Optimize the AVX2 checksum code a bit more.
-
  - Added extra info to the "FILENAME exists" output of `--ignore-existing` when
    `--info=skip2` is used.  The skip message becomes "FILENAME exists (INFO)"
    where the INFO is one of "type change", "sum change" (requires `-c`), "file
-   change" (based on the quick check), "attr change", or "uptodate".
+   change" (based on the quick check), "attr change", or "uptodate". Prior
+   versions only supported `--info=skip1`.
+
+ - Added the `--fsync` option (promoted from the patches repo).
+
+ - Reduced memory usage for an incremental transfer that has a bunch of small
+   diretories.
+
+ - Rsync can now update the xattrs on a read-only file when your user can
+   temporarily add user-write permission to the file. (It always worked for a
+   root transfer.)
+
+ - More ASM optimizations from Shark64.
+
+ - Make rrsync handle the latest options.
+
+ - Work around a glibc bug where lchmod() breaks in a chroot w/o /proc mounted.
 
  - Some manpage improvements.
 
@@ -45,7 +71,16 @@
    using the output of `git describe` when building inside a non-shallow git
    checkout, though.)
 
+ - Improved the IPv6 determination in configure.
+
+ - Made SIMD & ASM configure default to "no" on non-linux hosts due to various
+   reports of problems on NetBSD & macOS hosts.  These tests were also tweaked
+   to support a host_cpu of amd64 in addition to x86_64.
+
  - Fixed configure to not fail at the SIMD check when cross-compiling.
+
+ - Compile the C files with `-pedantic-errors` when possible so that we get
+   warned about an overflowed static initialization (among other things).
 
  - Added a SECURITY.md file.
 
@@ -53,6 +88,17 @@
 
  - Made it easier to write rsync tests that diff the output while also checking
    the status code, and used the idiom to improve the existing tests.
+
+ - The packaging scripts & related python lib got some minor enhancements.
+
+### INTERNAL
+
+ - Use setenv() instead of putenv() when it is available.
+
+ - Improve the logic in compat.c so that we don't need to try to remember to
+   sprinkle `!local_server` exceptions throughout the protocol logic.
+
+ - One more C99 Flexible Array improvement (started in the last release).
 
 ------------------------------------------------------------------------------
 <a name="3.2.3"></a>
