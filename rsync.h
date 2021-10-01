@@ -918,8 +918,9 @@ extern int xattrs_ndx;
  * Start the flist array at FLIST_START entries and grow it
  * by doubling until FLIST_LINEAR then grow by FLIST_LINEAR
  */
-#define FLIST_START	(32 * 1024)
-#define FLIST_LINEAR	(FLIST_START * 512)
+#define FLIST_START		(32)
+#define FLIST_START_LARGE	(32 * 1024)
+#define FLIST_LINEAR		(FLIST_START_LARGE * 512)
 
 /*
  * Extent size for allocation pools: A minimum size of 128KB
