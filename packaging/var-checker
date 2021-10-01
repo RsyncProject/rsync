@@ -4,7 +4,7 @@
 # for vars that are defined but not used, and for inconsistent array
 # sizes.  Run it from inside the main rsync directory.
 
-import re, argparse, glob
+import os, sys, re, argparse, glob
 
 VARS_RE = re.compile(r'^(?!(?:extern|enum)\s)([a-zA-Z]\S*\s+.*);', re.M)
 EXTERNS_RE = re.compile(r'^extern\s+(.*);', re.M)
@@ -14,6 +14,13 @@ sizes = { }
 def main():
     add_syscall_c = set('t_stub.c t_unsafe.c tls.c trimslash.c'.split())
     add_util_c = set('t_stub.c t_unsafe.c'.split())
+
+    if not os.path.exists('syscall.c'):
+        if os.path.exists('var-checker'):
+            os.chdir('..')
+        else:
+            print("Couldn't find the source dir.")
+            sys.exit(1)
 
     syscall_c = slurp_file('syscall.c', True)
     util_c = slurp_file('util1.c', True)
