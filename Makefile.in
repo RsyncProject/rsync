@@ -131,11 +131,11 @@ rounding.h: rounding.c rsync.h proto.h
 	fi
 	@rm -f rounding.out
 
-# While $(wildcard ...) is a GNU make idiom, at least other makes should just turn it into an
-# empty string (we need something that will vanish if we're not building a git checkout).
-# If you want an updated git version w/o GNU make, remove git-version.h after a pull.
-git-version.h: mkgitver $(wildcard $(srcdir)/.git/logs/HEAD)
+git-version.h: ALWAYS_RUN
 	$(srcdir)/mkgitver
+
+.PHONY: ALWAYS_RUN
+ALWAYS_RUN:
 
 simd-checksum-x86_64.o: simd-checksum-x86_64.cpp
 	@$(srcdir)/cmd-or-msg disable-simd $(CXX) -I. $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $(srcdir)/simd-checksum-x86_64.cpp

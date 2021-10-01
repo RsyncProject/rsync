@@ -3,12 +3,18 @@
 srcdir=`dirname $0`
 gitver=`git describe --abbrev=8 2>/dev/null`
 
+if [ ! -f git-version.h ]; then
+    touch git-version.h
+fi
+
 case "$gitver" in
     *.*)
-	echo "#define RSYNC_GITVER \"$gitver\"" >git-version.h
-	;;
-    *)
-	# We either create an empty file or update the time on what the user gave us.
-	touch git-version.h
+	echo "#define RSYNC_GITVER \"$gitver\"" >git-version.h.new
+	if ! diff git-version.h.new git-version.h >/dev/null; then
+	    echo "Updating git-version.h"
+	    mv git-version.h.new git-version.h
+	else
+	    rm git-version.h.new
+	fi
 	;;
 esac
