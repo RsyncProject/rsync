@@ -295,6 +295,8 @@ static void flist_expand(struct file_list *flist, int extra)
 		flist->malloced = FLIST_START;
 	else if (flist->malloced >= FLIST_LINEAR)
 		flist->malloced += FLIST_LINEAR;
+	else if (flist->malloced < FLIST_START_LARGE/16)
+		flist->malloced *= 4;
 	else
 		flist->malloced *= 2;
 
