@@ -267,7 +267,7 @@ static void do_delayed_deletions(char *delbuf)
  * MAXPATHLEN buffer with the name of the directory in it (the functions we
  * call will append names onto the end, but the old dir value will be restored
  * on exit). */
-static void delete_in_dir(char *fbuf, struct file_struct *file, dev_t *fs_dev)
+static void delete_in_dir(char *fbuf, struct file_struct *file, dev_t fs_dev)
 {
 	static int already_warned = 0;
 	static struct hashtable *dev_tbl;
@@ -302,12 +302,12 @@ static void delete_in_dir(char *fbuf, struct file_struct *file, dev_t *fs_dev)
 		if (!dev_tbl)
 			dev_tbl = hashtable_create(16, HT_KEY64);
 		if (file->flags & FLAG_TOP_DIR) {
-			hashtable_find(dev_tbl, *fs_dev+1, "");
-			filesystem_dev = *fs_dev;
-		} else if (filesystem_dev != *fs_dev) {
-			if (!hashtable_find(dev_tbl, *fs_dev+1, NULL))
+			hashtable_find(dev_tbl, fs_dev+1, "");
+			filesystem_dev = fs_dev;
+		} else if (filesystem_dev != fs_dev) {
+			if (!hashtable_find(dev_tbl, fs_dev+1, NULL))
 				return;
-			filesystem_dev = *fs_dev; /* it's a prior top-dir dev */
+			filesystem_dev = fs_dev; /* it's a prior top-dir dev */
 		}
 	}
 
@@ -376,9 +376,9 @@ static void do_delete_pass(void)
 		 || !S_ISDIR(st.st_mode))
 			continue;
 
-		delete_in_dir(fbuf, file, &st.st_dev);
+		delete_in_dir(fbuf, file, st.st_dev);
 	}
-	delete_in_dir(NULL, NULL, &dev_zero);
+	delete_in_dir(NULL, NULL, dev_zero);
 
 	if (INFO_GTE(FLIST, 2) && !am_server)
 		rprintf(FINFO, "                    \r");
@@ -1516,7 +1516,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		else if (delete_during && f_out != -1 && !phase
 		    && !(file->flags & FLAG_MISSING_DIR)) {
 			if (file->flags & FLAG_CONTENT_DIR)
-				delete_in_dir(fname, file, &real_sx.st.st_dev);
+				delete_in_dir(fname, file, real_sx.st.st_dev);
 			else
 				change_local_filter_dir(fname, strlen(fname), F_DEPTH(file));
 		}
@@ -2292,7 +2292,7 @@ void generate_files(int f_out, const char *local_name)
 						dirdev = MAKEDEV(DEV_MAJOR(devp), DEV_MINOR(devp));
 					} else
 						dirdev = MAKEDEV(0, 0);
-					delete_in_dir(fbuf, fp, &dirdev);
+					delete_in_dir(fbuf, fp, dirdev);
 				} else
 					change_local_filter_dir(fbuf, strlen(fbuf), F_DEPTH(fp));
 			}
@@ -2339,7 +2339,7 @@ void generate_files(int f_out, const char *local_name)
 	} while ((cur_flist = cur_flist->next) != NULL);
 
 	if (delete_during)
-		delete_in_dir(NULL, NULL, &dev_zero);
+		delete_in_dir(NULL, NULL, dev_zero);
 	phase++;
 	if (DEBUG_GTE(GENR, 1))
 		rprintf(FINFO, "generate_files phase=%d\n", phase);
