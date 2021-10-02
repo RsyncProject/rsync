@@ -427,12 +427,13 @@ time_t get_create_time(const char *path, STRUCT_STAT *stp)
 
 int set_create_time(const char *path, time_t crtime)
 {
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+
+    {
 #ifdef HAVE_GETATTRLIST
 	struct attrlist attrList;
 	struct timespec ts;
-
-	if (dry_run) return 0;
-	RETURN_ERROR_IF_RO_OR_LO;
 
 	ts.tv_sec = crtime;
 	ts.tv_nsec = 0;
@@ -462,6 +463,7 @@ int set_create_time(const char *path, time_t crtime)
 	CloseHandle(handle);
 	return ok ? 0 : -1;
 #endif
+    }
 }
 #endif
 
