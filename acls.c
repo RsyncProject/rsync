@@ -763,6 +763,7 @@ static int recv_rsync_acl(int f, item_list *racl_list, SMB_ACL_TYPE_T type, mode
 #ifdef HAVE_OSX_ACLS
 	/* If we received a superfluous mask, throw it away. */
 	duo_item->racl.mask_obj = NO_ENTRY;
+	(void)mode;
 #else
 	if (duo_item->racl.names.count && duo_item->racl.mask_obj == NO_ENTRY) {
 		/* Mask must be non-empty with lists. */

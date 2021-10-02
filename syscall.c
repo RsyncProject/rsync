@@ -388,18 +388,22 @@ OFF_T do_lseek(int fd, OFF_T offset, int whence)
 int do_setattrlist_times(const char *fname, STRUCT_STAT *stp)
 {
 	struct attrlist attrList;
-	struct timespec ts;
+	struct timespec ts[2];
 
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
 
-	ts.tv_sec = stp->st_mtime;
-	ts.tv_nsec = stp->ST_MTIME_NSEC;
+	/* Yes, this is in the opposite order of utime and similar. */
+	ts[0].tv_sec = stp->st_mtime;
+	ts[0].tv_nsec = stp->ST_MTIME_NSEC;
+
+	ts[1].tv_sec = stp->st_atime;
+	ts[1].tv_nsec = stp->ST_ATIME_NSEC;
 
 	memset(&attrList, 0, sizeof attrList);
 	attrList.bitmapcount = ATTR_BIT_MAP_COUNT;
-	attrList.commonattr = ATTR_CMN_MODTIME;
-	return setattrlist(fname, &attrList, &ts, sizeof ts, FSOPT_NOFOLLOW);
+	attrList.commonattr = ATTR_CMN_MODTIME | ATTR_CMN_ACCTIME;
+	return setattrlist(fname, &attrList, ts, sizeof ts, FSOPT_NOFOLLOW);
 }
 #endif
 
@@ -465,7 +469,7 @@ int set_create_time(const char *path, time_t crtime)
 #endif
     }
 }
-#endif
+#endif /* SUPPORT_CRTIMES */
 
 #ifdef HAVE_UTIMENSAT
 int do_utimensat(const char *fname, STRUCT_STAT *stp)

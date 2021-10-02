@@ -51,6 +51,8 @@
  - Reduced memory usage for an incremental transfer that has a bunch of small
    diretories.
 
+ - Add support for `--atimes` on macOS.
+
  - Rsync can now update the xattrs on a read-only file when your user can
    temporarily add user-write permission to the file. (It always worked for a
    root transfer.)
