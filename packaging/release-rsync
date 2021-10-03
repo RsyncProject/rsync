@@ -18,6 +18,9 @@ dest = os.environ['HOME'] + '/samba-rsync-ftp'
 ORIGINAL_PATH = os.environ['PATH']
 
 def main():
+    if not os.path.isfile('packaging/release-rsync'):
+        die('You must run this script from the top of your rsync checkout.')
+
     now = datetime.now()
     cl_today = now.strftime('* %a %b %d %Y')
     year = now.strftime('%Y')
@@ -43,6 +46,17 @@ def main():
 == This will release a new version of rsync onto an unsuspecting world. ==
 {dash_line}
 """)
+
+    with open('build/rsync.1') as fh:
+        for line in fh:
+            if line.startswith(r'.\" prefix='):
+                doc_prefix = line.split('=')[1].strip()
+                if doc_prefix != '/usr':
+                    warn(f"*** The documentation was built with prefix {doc_prefix} instead of /usr ***")
+                    warn("*** Read the md2man script for a way to override this. ***\n")
+                break
+            if line.startswith('.P'):
+                die("Failed to find the prefix comment at the start of the rsync.1 manpage.")
 
     if not os.path.isdir(dest):
         die(dest, "dest does not exist")

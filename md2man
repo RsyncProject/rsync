@@ -11,6 +11,13 @@
 # The html.parser is used as a state machine that both tweaks the html and
 # outputs the nroff data based on the html tags.
 #
+# We normally grab the prefix from the generated Makefile, which is then used
+# in the various other grabbed values (see the Makefile for its ${prefix}
+# paths).  However, the maintainer can choose to override this prefix by
+# exporting RSYNC_OVERRIDE_PREFIX=/usr.  This allows the man pages to refer to
+# /usr paths (and are thus compatible with the release-rsync script) while
+# still having the built rsync get installed into /usr/local for local testing.
+#
 # Copyright (C) 2020 Wayne Davison
 #
 # This program is freely redistributable.
@@ -58,6 +65,7 @@ HTML_END = """\
 
 MAN_START = r"""
 .TH "%s" "%s" "%s" "%s" "User Commands"
+.\" prefix=%s
 """.lstrip()
 
 MAN_END = """\
@@ -91,7 +99,8 @@ def main():
 
     if args.test:
         env_subs['VERSION'] = '1.0.0'
-        env_subs['libdir'] = '/usr'
+        env_subs['bindir'] = '/usr/bin'
+        env_subs['libdir'] = '/usr/lib/rsync'
     else:
         for fn in (fi.srcdir + 'version.h', 'Makefile'):
             try:
@@ -124,13 +133,14 @@ def main():
         txt = fh.read()
 
     txt = re.sub(r'@VERSION@', env_subs['VERSION'], txt)
+    txt = re.sub(r'@BINDIR@', env_subs['bindir'], txt)
     txt = re.sub(r'@LIBDIR@', env_subs['libdir'], txt)
 
     fi.html_in = md_parser(txt)
     txt = None
 
     fi.date = time.strftime('%d %b %Y', time.localtime(fi.mtime))
-    fi.man_headings = (fi.prog, fi.sect, fi.date, fi.prog + ' ' + env_subs['VERSION'])
+    fi.man_headings = (fi.prog, fi.sect, fi.date, fi.prog + ' ' + env_subs['VERSION'], env_subs['prefix'])
 
     HtmlToManPage(fi)
 
