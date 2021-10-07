@@ -36,6 +36,8 @@
  - Avoid a weird failure if you run a local copy with a (useless) `--rsh`
    option that contains a `V`.
 
+ - Stop rrsync escaping restricted folder, by forcing --munge-links.
+
 ### ENHANCEMENTS:
 
  - Use openssl's `-verify_hostname` option in the rsync-ssl script.

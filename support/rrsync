@@ -13,6 +13,7 @@ use File::Glob ':glob';
 # of options if you want to disable any options that rsync accepts.
 use constant RSYNC => '/usr/bin/rsync';
 use constant LOGFILE => 'rrsync.log';
+use constant FORCE_OPT => ('--munge-links');
 
 my $Usage = <<EOM;
 Use 'command="$0 [-ro|-wo] SUBDIR"'
@@ -223,6 +224,8 @@ while ($command =~ /((?:[^\s\\]+|\\.[^\s\\]*)+)/g) {
   }
 }
 die "$0: invalid rsync-command syntax or options\n" if $in_options;
+
+push(@opts, FORCE_OPT);
 
 if ($subdir ne '/') {
     die "$0: do not use .. in any path!\n" if grep m{(^|/)\.\.(/|$)}, @args;
