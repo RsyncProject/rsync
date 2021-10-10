@@ -587,7 +587,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	/* Don't set the creation date on the root folder of an HFS+ volume. */
 	if (sxp->st.st_ino == 2 && S_ISDIR(sxp->st.st_mode))
 		flags |= ATTRS_SKIP_CRTIME;
-	if (sxp != &sx2 && !(flags & (ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME)))
+	if (sxp != &sx2)
 		memcpy(&sx2.st, &sxp->st, sizeof sx2.st);
 	if (!(flags & ATTRS_SKIP_MTIME) && !same_mtime(file, &sxp->st, flags & ATTRS_ACCURATE_TIME)) {
 		sx2.st.st_mtime = file->modtime;
