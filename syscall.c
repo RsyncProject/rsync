@@ -233,8 +233,10 @@ int do_chmod(const char *path, mode_t mode)
 {
 	static int switch_step = 0;
 	int code;
+
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
+
 	switch (switch_step) {
 #ifdef HAVE_LCHMOD
 	case 0:
@@ -415,7 +417,26 @@ int do_setattrlist_times(const char *path, STRUCT_STAT *stp)
 	attrList.commonattr = ATTR_CMN_MODTIME | ATTR_CMN_ACCTIME;
 	return setattrlist(path, &attrList, ts, sizeof ts, FSOPT_NOFOLLOW);
 }
+
+#ifdef SUPPORT_CRTIMES
+int do_setattrlist_crtime(const char *path, time_t crtime)
+{
+	struct attrlist attrList;
+	struct timespec ts;
+
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+
+	ts.tv_sec = crtime;
+	ts.tv_nsec = 0;
+
+	memset(&attrList, 0, sizeof attrList);
+	attrList.bitmapcount = ATTR_BIT_MAP_COUNT;
+	attrList.commonattr = ATTR_CMN_CRTIME;
+	return setattrlist(path, &attrList, &ts, sizeof ts, FSOPT_NOFOLLOW);
+}
 #endif
+#endif /* HAVE_SETATTRLIST */
 
 #ifdef SUPPORT_CRTIMES
 time_t get_create_time(const char *path, STRUCT_STAT *stp)
@@ -439,24 +460,12 @@ time_t get_create_time(const char *path, STRUCT_STAT *stp)
 #endif
 }
 
-int set_create_time(const char *path, time_t crtime)
+#if defined __CYGWIN__
+int do_SetFileTime(const char *path, time_t crtime)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
 
-    {
-#ifdef HAVE_GETATTRLIST
-	struct attrlist attrList;
-	struct timespec ts;
-
-	ts.tv_sec = crtime;
-	ts.tv_nsec = 0;
-
-	memset(&attrList, 0, sizeof attrList);
-	attrList.bitmapcount = ATTR_BIT_MAP_COUNT;
-	attrList.commonattr = ATTR_CMN_CRTIME;
-	return setattrlist(path, &attrList, &ts, sizeof ts, FSOPT_NOFOLLOW);
-#elif defined __CYGWIN__
 	int cnt = MultiByteToWideChar(CP_UTF8, 0, path, -1, NULL, 0);
 	if (cnt == 0)
 	    return -1;
@@ -476,9 +485,8 @@ int set_create_time(const char *path, time_t crtime)
 	int ok = SetFileTime(handle, &birth_time, NULL, NULL);
 	CloseHandle(handle);
 	return ok ? 0 : -1;
-#endif
-    }
 }
+#endif
 #endif /* SUPPORT_CRTIMES */
 
 #ifdef HAVE_UTIMENSAT

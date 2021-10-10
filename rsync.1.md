@@ -1391,8 +1391,8 @@ your home directory (remove the '=' for that).
 
 0.  `--omit-dir-times`, `-O`
 
-    This tells rsync to omit directories when it is preserving modification
-    times (see `--times`).  If NFS is sharing the directories on the receiving
+    This tells rsync to omit directories when it is preserving modification,
+    access, and create times.  If NFS is sharing the directories on the receiving
     side, it is a good idea to use `-O`.  This option is inferred if you use
     `--backup` without `--backup-dir`.
 
@@ -1409,8 +1409,8 @@ your home directory (remove the '=' for that).
 
 0.  `--omit-link-times`, `-J`
 
-    This tells rsync to omit symlinks when it is preserving modification times
-    (see `--times`).
+    This tells rsync to omit symlinks when it is preserving modification,
+    access, and create times.
 
 0.  `--super`
 

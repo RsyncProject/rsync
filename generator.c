@@ -1269,7 +1269,6 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			return;
 		}
 	}
-	sx.crtime = 0;
 
 	if (dry_run > 1 || (dry_missing_dir && is_below(file, dry_missing_dir))) {
 		int i;
