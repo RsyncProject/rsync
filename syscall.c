@@ -237,7 +237,7 @@ int do_chmod(const char *path, mode_t mode)
 	RETURN_ERROR_IF_RO_OR_LO;
 	switch (switch_step) {
 #ifdef HAVE_LCHMOD
-#include "case_N.h"
+	case 0:
 		if ((code = lchmod(path, mode & CHMOD_BITS)) == 0)
 			break;
 		if (errno == ENOSYS)
@@ -246,7 +246,7 @@ int do_chmod(const char *path, mode_t mode)
 			break;
 #endif
 
-#include "case_N.h"
+	default:
 		if (S_ISLNK(mode)) {
 # if defined HAVE_SETATTRLIST
 			struct attrlist attrList;
