@@ -31,8 +31,9 @@ extern int do_fsync;
 extern int protect_args;
 extern int modify_window;
 extern int relative_paths;
-extern int preserve_times;
+extern int preserve_mtimes;
 extern int preserve_xattrs;
+extern int omit_link_times;
 extern int preallocate_files;
 extern char *module_dir;
 extern unsigned int module_dirlen;
@@ -159,8 +160,8 @@ int set_times(const char *fname, STRUCT_STAT *stp)
 
 #include "case_N.h"
 		switch_step++;
-		if (preserve_times & PRESERVE_LINK_TIMES) {
-			preserve_times &= ~PRESERVE_LINK_TIMES;
+		if (!omit_link_times) {
+			omit_link_times = 1;
 			if (S_ISLNK(stp->st_mode))
 				return 1;
 		}

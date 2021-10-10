@@ -32,7 +32,9 @@ extern int preserve_acls;
 extern int preserve_xattrs;
 extern int preserve_perms;
 extern int preserve_executability;
-extern int preserve_times;
+extern int preserve_mtimes;
+extern int omit_dir_times;
+extern int omit_link_times;
 extern int am_root;
 extern int am_server;
 extern int am_daemon;
@@ -575,18 +577,18 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		set_xattr(fname, file, fnamecmp, sxp);
 #endif
 
-	if (!preserve_times)
-		flags |= ATTRS_SKIP_MTIME | (atimes_ndx ? 0 : ATTRS_SKIP_ATIME) | (crtimes_ndx ? 0 : ATTRS_SKIP_CRTIME);
-	else if ((!(preserve_times & PRESERVE_DIR_TIMES) && S_ISDIR(sxp->st.st_mode))
-	      || (!(preserve_times & PRESERVE_LINK_TIMES) && S_ISLNK(sxp->st.st_mode)))
+	if ((omit_dir_times && S_ISDIR(sxp->st.st_mode))
+	 || (omit_link_times && S_ISLNK(sxp->st.st_mode)))
 		flags |= ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME | ATTRS_SKIP_CRTIME;
-	else if (sxp != &sx2)
-		memcpy(&sx2.st, &sxp->st, sizeof (sx2.st));
+	if (!preserve_mtimes)
+		flags |= ATTRS_SKIP_MTIME;
 	if (!atimes_ndx || S_ISDIR(sxp->st.st_mode))
 		flags |= ATTRS_SKIP_ATIME;
 	/* Don't set the creation date on the root folder of an HFS+ volume. */
 	if (sxp->st.st_ino == 2 && S_ISDIR(sxp->st.st_mode))
 		flags |= ATTRS_SKIP_CRTIME;
+	if (sxp != &sx2 && !(flags & (ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME)))
+		memcpy(&sx2.st, &sxp->st, sizeof sx2.st);
 	if (!(flags & ATTRS_SKIP_MTIME) && !same_mtime(file, &sxp->st, flags & ATTRS_ACCURATE_TIME)) {
 		sx2.st.st_mtime = file->modtime;
 #ifdef ST_MTIME_NSEC

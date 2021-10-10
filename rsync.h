@@ -1327,10 +1327,6 @@ extern int errno;
 #define IS_SPECIAL(mode) (S_ISSOCK(mode) || S_ISFIFO(mode))
 #define IS_DEVICE(mode) (S_ISCHR(mode) || S_ISBLK(mode))
 
-#define PRESERVE_FILE_TIMES	(1<<0)
-#define PRESERVE_DIR_TIMES	(1<<1)
-#define PRESERVE_LINK_TIMES	(1<<2)
-
 /* Initial mask on permissions given to temporary files.  Mask off setuid
      bits and group access because of potential race-condition security
      holes, and mask other access because mode 707 is bizarre */

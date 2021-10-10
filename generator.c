@@ -44,7 +44,9 @@ extern int preserve_specials;
 extern int preserve_hard_links;
 extern int preserve_executability;
 extern int preserve_perms;
-extern int preserve_times;
+extern int preserve_mtimes;
+extern int omit_dir_times;
+extern int omit_link_times;
 extern int delete_mode;
 extern int delete_before;
 extern int delete_during;
@@ -460,7 +462,7 @@ int unchanged_attrs(const char *fname, struct file_struct *file, stat_x *sxp)
 {
 	if (S_ISLNK(file->mode)) {
 #ifdef CAN_SET_SYMLINK_TIMES
-		if (preserve_times & PRESERVE_LINK_TIMES && any_time_differs(sxp, file, fname))
+		if (preserve_mtimes && !omit_link_times && any_time_differs(sxp, file, fname))
 			return 0;
 #endif
 #ifdef CAN_CHMOD_SYMLINK
@@ -480,7 +482,7 @@ int unchanged_attrs(const char *fname, struct file_struct *file, stat_x *sxp)
 			return 0;
 #endif
 	} else {
-		if (preserve_times && any_time_differs(sxp, file, fname))
+		if (preserve_mtimes && any_time_differs(sxp, file, fname))
 			return 0;
 		if (perms_differ(file, sxp))
 			return 0;
@@ -504,9 +506,9 @@ void itemize(const char *fnamecmp, struct file_struct *file, int ndx, int statre
 	     const char *xname)
 {
 	if (statret >= 0) { /* A from-dest-dir statret can == 1! */
-		int keep_time = !preserve_times ? 0
-		    : S_ISDIR(file->mode) ? preserve_times & PRESERVE_DIR_TIMES
-		    : S_ISLNK(file->mode) ? preserve_times & PRESERVE_LINK_TIMES
+		int keep_time = !preserve_mtimes ? 0
+		    : S_ISDIR(file->mode) ? !omit_dir_times
+		    : S_ISLNK(file->mode) ? !omit_link_times
 		    : 1;
 
 		if (S_ISREG(file->mode) && F_LENGTH(file) != sxp->st.st_size)
@@ -1411,7 +1413,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		} else
 			added_perms = 0;
 		if (is_dir < 0) {
-			if (!(preserve_times & PRESERVE_DIR_TIMES))
+			if (!preserve_mtimes || omit_dir_times)
 				goto cleanup;
 			/* In inc_recurse mode we want to make sure any missing
 			 * directories get created while we're still processing
@@ -2238,7 +2240,7 @@ void generate_files(int f_out, const char *local_name)
 	}
 	solo_file = local_name;
 	dir_tweaking = !(list_only || solo_file || dry_run);
-	need_retouch_dir_times = preserve_times & PRESERVE_DIR_TIMES;
+	need_retouch_dir_times = preserve_mtimes && !omit_dir_times;
 	loopchk_limit = allowed_lull ? allowed_lull * 5 : 200;
 	symlink_timeset_failed_flags = ITEM_REPORT_TIME
 	    | (protocol_version >= 30 || !am_server ? ITEM_REPORT_TIMEFAIL : 0);

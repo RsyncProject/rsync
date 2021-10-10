@@ -29,10 +29,11 @@ int protect_args = 0;
 int module_id = -1;
 int relative_paths = 0;
 int module_dirlen = 0;
-int preserve_times = 0;
+int preserve_mtimes = 0;
 int preserve_xattrs = 0;
 int preserve_perms = 0;
 int preserve_executability = 0;
+int omit_link_times = 0;
 int open_noatime = 0;
 size_t max_alloc = 0; /* max_alloc is needed when combined with util2.o */
 char *partial_dir;

@@ -34,7 +34,7 @@ extern int module_id;
 extern int allow_8bit_chars;
 extern int protocol_version;
 extern int always_checksum;
-extern int preserve_times;
+extern int preserve_mtimes;
 extern int msgs2stderr;
 extern int xfersum_type;
 extern int checksum_type;
@@ -706,7 +706,7 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 				c[1] = 'L';
 				c[3] = '.';
 				c[4] = !(iflags & ITEM_REPORT_TIME) ? '.'
-				     : !preserve_times || !receiver_symlink_times
+				     : !preserve_mtimes || !receiver_symlink_times
 				    || (iflags & ITEM_REPORT_TIMEFAIL) ? 'T' : 't';
 			} else {
 				c[1] = S_ISDIR(file->mode) ? 'd'
@@ -714,7 +714,7 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 				     : IS_DEVICE(file->mode) ? 'D' : 'f';
 				c[3] = !(iflags & ITEM_REPORT_SIZE) ? '.' : 's';
 				c[4] = !(iflags & ITEM_REPORT_TIME) ? '.'
-				     : !preserve_times ? 'T' : 't';
+				     : !preserve_mtimes ? 'T' : 't';
 			}
 			c[2] = !(iflags & ITEM_REPORT_CHANGE) ? '.' : 'c';
 			c[5] = !(iflags & ITEM_REPORT_PERMS) ? '.' : 'p';

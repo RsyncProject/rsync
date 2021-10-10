@@ -58,9 +58,11 @@ int preserve_devices = 0;
 int preserve_specials = 0;
 int preserve_uid = 0;
 int preserve_gid = 0;
-int preserve_times = 0;
+int preserve_mtimes = 0;
 int preserve_atimes = 0;
 int preserve_crtimes = 0;
+int omit_dir_times = 0;
+int omit_link_times = 0;
 int update_only = 0;
 int open_noatime = 0;
 int cvs_exclude = 0;
@@ -308,8 +310,6 @@ static int verbose = 0;
 static int do_stats = 0;
 static int do_progress = 0;
 static int daemon_opt;   /* sets am_daemon after option error-reporting */
-static int omit_dir_times = 0;
-static int omit_link_times = 0;
 static int F_option_cnt = 0;
 static int modify_window_set;
 static int itemize_changes = 0;
@@ -622,9 +622,9 @@ static struct poptOption long_options[] = {
   {"xattrs",          'X', POPT_ARG_NONE,   0, 'X', 0, 0 },
   {"no-xattrs",        0,  POPT_ARG_VAL,    &preserve_xattrs, 0, 0, 0 },
   {"no-X",             0,  POPT_ARG_VAL,    &preserve_xattrs, 0, 0, 0 },
-  {"times",           't', POPT_ARG_VAL,    &preserve_times, 1, 0, 0 },
-  {"no-times",         0,  POPT_ARG_VAL,    &preserve_times, 0, 0, 0 },
-  {"no-t",             0,  POPT_ARG_VAL,    &preserve_times, 0, 0, 0 },
+  {"times",           't', POPT_ARG_VAL,    &preserve_mtimes, 1, 0, 0 },
+  {"no-times",         0,  POPT_ARG_VAL,    &preserve_mtimes, 0, 0, 0 },
+  {"no-t",             0,  POPT_ARG_VAL,    &preserve_mtimes, 0, 0, 0 },
   {"atimes",          'U', POPT_ARG_NONE,   0, 'U', 0, 0 },
   {"no-atimes",        0,  POPT_ARG_VAL,    &preserve_atimes, 0, 0, 0 },
   {"no-U",             0,  POPT_ARG_VAL,    &preserve_atimes, 0, 0, 0 },
@@ -1518,7 +1518,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			preserve_links = 1;
 #endif
 			preserve_perms = 1;
-			preserve_times = 1;
+			preserve_mtimes = 1;
 			preserve_gid = 1;
 			preserve_uid = 1;
 			preserve_devices = 1;
@@ -2257,20 +2257,8 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		parse_filter_str(&filter_list, backup_dir_buf, rule_template(0), 0);
 	}
 
-	if (preserve_times) {
-		preserve_times = PRESERVE_FILE_TIMES;
-		if (!omit_dir_times)
-			preserve_times |= PRESERVE_DIR_TIMES;
-#ifdef CAN_SET_SYMLINK_TIMES
-		if (!omit_link_times)
-			preserve_times |= PRESERVE_LINK_TIMES;
-#endif
-	}
-
-	if (make_backups && !backup_dir) {
-		omit_dir_times = 0; /* Implied, so avoid -O to sender. */
-		preserve_times &= ~PRESERVE_DIR_TIMES;
-	}
+	if (make_backups && !backup_dir)
+		omit_dir_times = -1; /* Implied, so avoid -O to sender. */
 
 	if (stdout_format) {
 		if (am_server && log_format_has(stdout_format, 'I'))
@@ -2498,7 +2486,7 @@ void server_options(char **args, int *argc_p)
 			argstr[x++] = 'K';
 		if (prune_empty_dirs)
 			argstr[x++] = 'm';
-		if (omit_dir_times)
+		if (omit_dir_times > 0)
 			argstr[x++] = 'O';
 		if (omit_link_times)
 			argstr[x++] = 'J';
@@ -2531,7 +2519,7 @@ void server_options(char **args, int *argc_p)
 		argstr[x++] = 'g';
 	if (preserve_devices) /* ignore preserve_specials here */
 		argstr[x++] = 'D';
-	if (preserve_times)
+	if (preserve_mtimes)
 		argstr[x++] = 't';
 	if (preserve_atimes) {
 		argstr[x++] = 'U';

@@ -12,10 +12,10 @@
    newer for your copy, rsync now sends `--no-W` to the remote rsync in such a
    scenario (just in case the remote rsync is a version with this bug).
 
- - Fix a bug with `--mkpath` if a single-file copy specifies an existing
+ - Fixed a bug with `--mkpath` if a single-file copy specifies an existing
    destination dir with a non-existing destination filename.
 
- - Fix `--update -vv` to output "is uptodate" instead of "is newer" messages
+ - Fixed `--update -vv` to output "is uptodate" instead of "is newer" messages
    for files that are being skipped due to an identical modify time.  (This
    was a new output quirk in 3.2.3.)
 
@@ -51,7 +51,7 @@
  - Reduced memory usage for an incremental transfer that has a bunch of small
    diretories.
 
- - Added support for `--atimes` on macOS and fix using using it without -t.
+ - Added support for `--atimes` on macOS and fixed using using it without -t.
 
  - Rsync can now update the xattrs on a read-only file when your user can
    temporarily add user-write permission to the file. (It always worked for a
@@ -120,7 +120,7 @@
  - Restored the ability to use `--bwlimit=0` to specify no bandwidth limit.  (It
    was accidentally broken in 3.2.2.)
 
- - Fix a bug when combining `--delete-missing-args` with `--no-implied-dirs` &
+ - Fixed a bug when combining `--delete-missing-args` with `--no-implied-dirs` &
    `-R` where rsync might create the destination path of a missing arg.  The
    code also avoids some superfluous warnings for nested paths of removed args.
 
