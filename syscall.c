@@ -77,15 +77,15 @@ struct create_time {
 
 #define RETURN_ERROR_IF_RO_OR_LO RETURN_ERROR_IF(read_only || list_only, EROFS)
 
-int do_unlink(const char *fname)
+int do_unlink(const char *path)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
-	return unlink(fname);
+	return unlink(path);
 }
 
 #ifdef SUPPORT_LINKS
-int do_symlink(const char *lnk, const char *fname)
+int do_symlink(const char *lnk, const char *path)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
@@ -95,7 +95,7 @@ int do_symlink(const char *lnk, const char *fname)
 	 * and write the lnk into it. */
 	if (am_root < 0) {
 		int ok, len = strlen(lnk);
-		int fd = open(fname, O_WRONLY|O_CREAT|O_TRUNC, S_IWUSR|S_IRUSR);
+		int fd = open(path, O_WRONLY|O_CREAT|O_TRUNC, S_IWUSR|S_IRUSR);
 		if (fd < 0)
 			return -1;
 		ok = write(fd, lnk, len) == len;
@@ -105,7 +105,7 @@ int do_symlink(const char *lnk, const char *fname)
 	}
 #endif
 
-	return symlink(lnk, fname);
+	return symlink(lnk, path);
 }
 
 #if defined NO_SYMLINK_XATTRS || defined NO_SYMLINK_USER_XATTRS
@@ -310,12 +310,12 @@ void trim_trailing_slashes(char *name)
 	}
 }
 
-int do_mkdir(char *fname, mode_t mode)
+int do_mkdir(char *path, mode_t mode)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
-	trim_trailing_slashes(fname);
-	return mkdir(fname, mode);
+	trim_trailing_slashes(path);
+	return mkdir(path, mode);
 }
 
 /* like mkstemp but forces permissions */
@@ -349,25 +349,25 @@ int do_mkstemp(char *template, mode_t perms)
 #endif
 }
 
-int do_stat(const char *fname, STRUCT_STAT *st)
+int do_stat(const char *path, STRUCT_STAT *st)
 {
 #ifdef USE_STAT64_FUNCS
-	return stat64(fname, st);
+	return stat64(path, st);
 #else
-	return stat(fname, st);
+	return stat(path, st);
 #endif
 }
 
-int do_lstat(const char *fname, STRUCT_STAT *st)
+int do_lstat(const char *path, STRUCT_STAT *st)
 {
 #ifdef SUPPORT_LINKS
 # ifdef USE_STAT64_FUNCS
-	return lstat64(fname, st);
+	return lstat64(path, st);
 # else
-	return lstat(fname, st);
+	return lstat(path, st);
 # endif
 #else
-	return do_stat(fname, st);
+	return do_stat(path, st);
 #endif
 }
 
@@ -395,7 +395,7 @@ OFF_T do_lseek(int fd, OFF_T offset, int whence)
 }
 
 #ifdef HAVE_SETATTRLIST
-int do_setattrlist_times(const char *fname, STRUCT_STAT *stp)
+int do_setattrlist_times(const char *path, STRUCT_STAT *stp)
 {
 	struct attrlist attrList;
 	struct timespec ts[2];
@@ -413,7 +413,7 @@ int do_setattrlist_times(const char *fname, STRUCT_STAT *stp)
 	memset(&attrList, 0, sizeof attrList);
 	attrList.bitmapcount = ATTR_BIT_MAP_COUNT;
 	attrList.commonattr = ATTR_CMN_MODTIME | ATTR_CMN_ACCTIME;
-	return setattrlist(fname, &attrList, ts, sizeof ts, FSOPT_NOFOLLOW);
+	return setattrlist(path, &attrList, ts, sizeof ts, FSOPT_NOFOLLOW);
 }
 #endif
 
@@ -482,7 +482,7 @@ int set_create_time(const char *path, time_t crtime)
 #endif /* SUPPORT_CRTIMES */
 
 #ifdef HAVE_UTIMENSAT
-int do_utimensat(const char *fname, STRUCT_STAT *stp)
+int do_utimensat(const char *path, STRUCT_STAT *stp)
 {
 	struct timespec t[2];
 
@@ -501,12 +501,12 @@ int do_utimensat(const char *fname, STRUCT_STAT *stp)
 #else
 	t[1].tv_nsec = 0;
 #endif
-	return utimensat(AT_FDCWD, fname, t, AT_SYMLINK_NOFOLLOW);
+	return utimensat(AT_FDCWD, path, t, AT_SYMLINK_NOFOLLOW);
 }
 #endif
 
 #ifdef HAVE_LUTIMES
-int do_lutimes(const char *fname, STRUCT_STAT *stp)
+int do_lutimes(const char *path, STRUCT_STAT *stp)
 {
 	struct timeval t[2];
 
@@ -525,12 +525,12 @@ int do_lutimes(const char *fname, STRUCT_STAT *stp)
 #else
 	t[1].tv_usec = 0;
 #endif
-	return lutimes(fname, t);
+	return lutimes(path, t);
 }
 #endif
 
 #ifdef HAVE_UTIMES
-int do_utimes(const char *fname, STRUCT_STAT *stp)
+int do_utimes(const char *path, STRUCT_STAT *stp)
 {
 	struct timeval t[2];
 
@@ -549,11 +549,11 @@ int do_utimes(const char *fname, STRUCT_STAT *stp)
 #else
 	t[1].tv_usec = 0;
 #endif
-	return utimes(fname, t);
+	return utimes(path, t);
 }
 
 #elif defined HAVE_UTIME
-int do_utime(const char *fname, STRUCT_STAT *stp)
+int do_utime(const char *path, STRUCT_STAT *stp)
 {
 #ifdef HAVE_STRUCT_UTIMBUF
 	struct utimbuf tbuf;
@@ -567,11 +567,11 @@ int do_utime(const char *fname, STRUCT_STAT *stp)
 # ifdef HAVE_STRUCT_UTIMBUF
 	tbuf.actime = stp->st_atime;
 	tbuf.modtime = stp->st_mtime;
-	return utime(fname, &tbuf);
+	return utime(path, &tbuf);
 # else
 	t[0] = stp->st_atime;
 	t[1] = stp->st_mtime;
-	return utime(fname, t);
+	return utime(path, t);
 # endif
 }
 
