@@ -231,13 +231,22 @@ int do_open(const char *pathname, int flags, mode_t mode)
 #ifdef HAVE_CHMOD
 int do_chmod(const char *path, mode_t mode)
 {
+	static int switch_step = 0;
 	int code;
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
+	switch (switch_step) {
 #ifdef HAVE_LCHMOD
-	if ((code = lchmod(path, mode & CHMOD_BITS)) < 0 && errno == ENOTSUP)
+#include "case_N.h"
+		if ((code = lchmod(path, mode & CHMOD_BITS)) == 0)
+			break;
+		if (errno == ENOSYS)
+			switch_step++;
+		else if (errno != ENOTSUP)
+			break;
 #endif
-	{
+
+#include "case_N.h"
 		if (S_ISLNK(mode)) {
 # if defined HAVE_SETATTRLIST
 			struct attrlist attrList;
@@ -252,6 +261,7 @@ int do_chmod(const char *path, mode_t mode)
 # endif
 		} else
 			code = chmod(path, mode & CHMOD_BITS); /* DISCOURAGED FUNCTION */
+		break;
 	}
 	if (code != 0 && (preserve_perms || preserve_executability))
 		return code;
