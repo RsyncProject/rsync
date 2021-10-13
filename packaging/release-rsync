@@ -53,7 +53,7 @@ def main():
                 doc_prefix = line.split('=')[1].strip()
                 if doc_prefix != '/usr':
                     warn(f"*** The documentation was built with prefix {doc_prefix} instead of /usr ***")
-                    warn("*** Read the md2man script for a way to override this. ***\n")
+                    die("*** Read the md2man script for a way to override this. ***")
                 break
             if line.startswith('.P'):
                 die("Failed to find the prefix comment at the start of the rsync.1 manpage.")

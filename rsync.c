@@ -580,13 +580,15 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	if ((omit_dir_times && S_ISDIR(sxp->st.st_mode))
 	 || (omit_link_times && S_ISLNK(sxp->st.st_mode)))
 		flags |= ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME | ATTRS_SKIP_CRTIME;
-	if (!preserve_mtimes)
-		flags |= ATTRS_SKIP_MTIME;
-	if (!atimes_ndx || S_ISDIR(sxp->st.st_mode))
-		flags |= ATTRS_SKIP_ATIME;
-	/* Don't set the creation date on the root folder of an HFS+ volume. */
-	if (sxp->st.st_ino == 2 && S_ISDIR(sxp->st.st_mode))
-		flags |= ATTRS_SKIP_CRTIME;
+	else {
+		if (!preserve_mtimes)
+			flags |= ATTRS_SKIP_MTIME;
+		if (!atimes_ndx || S_ISDIR(sxp->st.st_mode))
+			flags |= ATTRS_SKIP_ATIME;
+		/* Don't set the creation date on the root folder of an HFS+ volume. */
+		if (sxp->st.st_ino == 2 && S_ISDIR(sxp->st.st_mode))
+			flags |= ATTRS_SKIP_CRTIME;
+	}
 	if (sxp != &sx2)
 		memcpy(&sx2.st, &sxp->st, sizeof sx2.st);
 	if (!(flags & ATTRS_SKIP_MTIME) && !same_mtime(file, &sxp->st, flags & ATTRS_ACCURATE_TIME)) {
