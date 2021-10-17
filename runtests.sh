@@ -226,6 +226,7 @@ if [ ! -d "$srcdir" ]; then
     exit 2
 fi
 
+skipped_list=''
 skipped=0
 missing=0
 passed=0
@@ -265,10 +266,12 @@ maybe_discard_scratch() {
 
 if [ "x$whichtests" = x ]; then
     whichtests="*.test"
+    full_run=yes
+else
+    full_run=no
 fi
 
-for testscript in $suitedir/$whichtests
-do
+for testscript in $suitedir/$whichtests; do
     testbase=`echo $testscript | sed -e 's!.*/!!' -e 's/.test\$//'`
     scratchdir="$scratchbase/$testbase"
 
@@ -306,6 +309,7 @@ do
 	# backticks will fill the whole file onto one line, which is a feature
 	whyskipped=`cat "$scratchdir/whyskipped"`
 	echo "SKIP    $testbase ($whyskipped)"
+	skipped_list="$skipped_list,$testbase"
 	skipped=`expr $skipped + 1`
 	maybe_discard_scratch
 	;;
@@ -339,8 +343,14 @@ echo '------------------------------------------------------------'
 # because -e is set.
 
 result=`expr $failed + $missing || true`
-if [ "$result" = 0 -a "$skipped" -gt "${RSYNC_MAX_SKIPPED:-9999}" ]; then
-    result=1
+if [ "$result$full_run" = 0yes ]; then
+    expect_skipped="${RSYNC_EXPECT_SKIPPED:-IGNORE}"
+    skipped_list=`echo "$skipped_list" | sed 's/^,//'`
+    if [ "$expect_skipped" != IGNORE -a "$skipped_list" != "$expect_skipped" ]; then
+	echo "Skips expected: $expect_skipped"
+	echo "Skips got:      $skipped_list"
+	result=1
+    fi
 fi
 echo "overall result is $result"
 exit $result
