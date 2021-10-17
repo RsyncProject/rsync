@@ -837,7 +837,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 			fd2 = do_open(fnametmp, O_WRONLY|O_CREAT, 0600);
 #ifdef linux
 			if (fd2 == -1 && errno == EACCES) {
-				/* Handle errors due to protected_regular setting */
+				/* Maybe the error was due to protected_regular setting? */
 				fd2 = do_open(fname, O_WRONLY, 0600);
 			}
 #endif
