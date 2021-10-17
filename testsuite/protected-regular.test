@@ -1,0 +1,31 @@
+#!/bin/sh
+
+# Copyright (C) 2021 by Achim Leitner <aleitner@lis-engineering.de>
+# This program is distributable under the terms of the GNU GPL (see COPYING)
+#
+# Modern linux systems have the protected_regular feature set to 1 or 2
+# See https://www.kernel.org/doc/Documentation/sysctl/fs.txt
+# Make sure we can still write these files in --inplace mode
+
+. "$suitedir/rsync.fns"
+
+test -f /proc/sys/fs/protected_regular || test_skipped "Can't find protected_regular setting (only available on Linux)"
+pr_lvl=`cat /proc/sys/fs/protected_regular 2>/dev/null` || test_skipped "Can't check if fs.protected_regular is enabled (probably need root)"
+test "$pr_lvl" != 0 || test_skipped "fs.protected_regular is not enabled"
+
+workdir="$tmpdir/files"
+mkdir "$workdir"
+chmod 1777 "$workdir"
+
+echo "Source" > "$workdir/src"
+echo ""       > "$workdir/dst"
+chown 5001 "$workdir/dst" || test_skipped "Can't chown (probably need root)"
+
+# Output is only shown in case of an error
+echo "Contents of $workdir:"
+ls -al "$workdir"
+
+$RSYNC --inplace "$workdir/src" "$workdir/dst" || test_fail
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0

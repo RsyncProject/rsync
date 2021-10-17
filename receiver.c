@@ -835,6 +835,12 @@ int recv_files(int f_in, int f_out, char *local_name)
 		if (inplace || one_inplace)  {
 			fnametmp = one_inplace ? partialptr : fname;
 			fd2 = do_open(fnametmp, O_WRONLY|O_CREAT, 0600);
+#ifdef linux
+			if (fd2 == -1 && errno == EACCES) {
+				/* Maybe the error was due to protected_regular setting? */
+				fd2 = do_open(fname, O_WRONLY, 0600);
+			}
+#endif
 			if (fd2 == -1) {
 				rsyserr(FERROR_XFER, errno, "open %s failed",
 					full_fname(fnametmp));
