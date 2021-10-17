@@ -226,6 +226,7 @@ if [ ! -d "$srcdir" ]; then
     exit 2
 fi
 
+expect_skipped="${RSYNC_EXPECT_SKIPPED-IGNORE}"
 skipped_list=''
 skipped=0
 missing=0
@@ -335,6 +336,15 @@ echo "      $passed passed"
 [ "$failed" -gt 0 ]  && echo "      $failed failed"
 [ "$skipped" -gt 0 ] && echo "      $skipped skipped"
 [ "$missing" -gt 0 ] && echo "      $missing missing"
+if [ "$full_run" = yes -a "$expect_skipped" != IGNORE ]; then
+    skipped_list=`echo "$skipped_list" | sed 's/^,//'`
+    echo "----- skipped results:"
+    echo "      expected: $expect_skipped"
+    echo "      got:      $skipped_list"
+else
+    skipped_list=''
+    expect_skipped=''
+fi
 echo '------------------------------------------------------------'
 
 # OK, so expr exits with 0 if the result is neither null nor zero; and
@@ -343,14 +353,8 @@ echo '------------------------------------------------------------'
 # because -e is set.
 
 result=`expr $failed + $missing || true`
-if [ "$result$full_run" = 0yes ]; then
-    expect_skipped="${RSYNC_EXPECT_SKIPPED:-IGNORE}"
-    skipped_list=`echo "$skipped_list" | sed 's/^,//'`
-    if [ "$expect_skipped" != IGNORE -a "$skipped_list" != "$expect_skipped" ]; then
-	echo "Skips expected: $expect_skipped"
-	echo "Skips got:      $skipped_list"
-	result=1
-    fi
+if [ "$result" = 0 -a "$skipped_list" != "$expect_skipped" ]; then
+    result=1
 fi
 echo "overall result is $result"
 exit $result
