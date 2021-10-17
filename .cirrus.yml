@@ -18,6 +18,6 @@ freebsd_task:
   info_script:
     - rsync --version
   test_script:
-    - RSYNC_MAX_SKIPPED=3 make check
+    - RSYNC_EXPECT_SKIPPED=acls-default,acls,crtimes make check
   ssl_file_list_script:
     - rsync-ssl --no-motd download.samba.org::rsyncftp/ || true

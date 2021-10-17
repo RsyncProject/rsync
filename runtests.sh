@@ -226,6 +226,8 @@ if [ ! -d "$srcdir" ]; then
     exit 2
 fi
 
+expect_skipped="${RSYNC_EXPECT_SKIPPED-IGNORE}"
+skipped_list=''
 skipped=0
 missing=0
 passed=0
@@ -265,10 +267,12 @@ maybe_discard_scratch() {
 
 if [ "x$whichtests" = x ]; then
     whichtests="*.test"
+    full_run=yes
+else
+    full_run=no
 fi
 
-for testscript in $suitedir/$whichtests
-do
+for testscript in $suitedir/$whichtests; do
     testbase=`echo $testscript | sed -e 's!.*/!!' -e 's/.test\$//'`
     scratchdir="$scratchbase/$testbase"
 
@@ -306,6 +310,7 @@ do
 	# backticks will fill the whole file onto one line, which is a feature
 	whyskipped=`cat "$scratchdir/whyskipped"`
 	echo "SKIP    $testbase ($whyskipped)"
+	skipped_list="$skipped_list,$testbase"
 	skipped=`expr $skipped + 1`
 	maybe_discard_scratch
 	;;
@@ -331,6 +336,15 @@ echo "      $passed passed"
 [ "$failed" -gt 0 ]  && echo "      $failed failed"
 [ "$skipped" -gt 0 ] && echo "      $skipped skipped"
 [ "$missing" -gt 0 ] && echo "      $missing missing"
+if [ "$full_run" = yes -a "$expect_skipped" != IGNORE ]; then
+    skipped_list=`echo "$skipped_list" | sed 's/^,//'`
+    echo "----- skipped results:"
+    echo "      expected: $expect_skipped"
+    echo "      got:      $skipped_list"
+else
+    skipped_list=''
+    expect_skipped=''
+fi
 echo '------------------------------------------------------------'
 
 # OK, so expr exits with 0 if the result is neither null nor zero; and
@@ -339,7 +353,7 @@ echo '------------------------------------------------------------'
 # because -e is set.
 
 result=`expr $failed + $missing || true`
-if [ "$result" = 0 -a "$skipped" -gt "${RSYNC_MAX_SKIPPED:-9999}" ]; then
+if [ "$result" = 0 -a "$skipped_list" != "$expect_skipped" ]; then
     result=1
 fi
 echo "overall result is $result"
