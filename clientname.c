@@ -49,7 +49,7 @@ static char ipaddr_buf[100];
 
 static void client_sockaddr(int fd, struct sockaddr_storage *ss, socklen_t *ss_len);
 static int check_name(const char *ipaddr, const struct sockaddr_storage *ss, char *name_buf, size_t name_buf_size);
-static int valid_ipaddr(const char *s);
+static int valid_ipaddr(const char *s, int allow_scope);
 
 /* Return the IP addr of the client as a string. */
 char *client_addr(int fd)
@@ -73,7 +73,7 @@ char *client_addr(int fd)
 			if ((p = strchr(ipaddr_buf, ' ')) != NULL)
 				*p = '\0';
 		}
-		if (valid_ipaddr(ipaddr_buf))
+		if (valid_ipaddr(ipaddr_buf, True))
 			return ipaddr_buf;
 	}
 
@@ -213,13 +213,13 @@ int read_proxy_protocol_header(int fd)
 				if (size != sizeof hdr.v2.addr.ip4)
 					return 0;
 				inet_ntop(AF_INET, hdr.v2.addr.ip4.src_addr, ipaddr_buf, sizeof ipaddr_buf);
-				return valid_ipaddr(ipaddr_buf);
+				return valid_ipaddr(ipaddr_buf, False);
 #ifdef INET6
 			case PROXY_FAM_TCPv6:
 				if (size != sizeof hdr.v2.addr.ip6)
 					return 0;
 				inet_ntop(AF_INET6, hdr.v2.addr.ip6.src_addr, ipaddr_buf, sizeof ipaddr_buf);
-				return valid_ipaddr(ipaddr_buf);
+				return valid_ipaddr(ipaddr_buf, False);
 #endif
 			default:
 				break;
@@ -276,7 +276,7 @@ int read_proxy_protocol_header(int fd)
 		if ((sp = strchr(p, ' ')) == NULL)
 			return 0;
 		*sp = '\0';
-		if (!valid_ipaddr(p))
+		if (!valid_ipaddr(p, False))
 			return 0;
 		strlcpy(ipaddr_buf, p, sizeof ipaddr_buf); /* It will always fit when valid. */
 
@@ -284,7 +284,7 @@ int read_proxy_protocol_header(int fd)
 		if ((sp = strchr(p, ' ')) == NULL)
 			return 0;
 		*sp = '\0';
-		if (!valid_ipaddr(p))
+		if (!valid_ipaddr(p, False))
 			return 0;
 		/* Ignore destination address. */
 
@@ -466,7 +466,7 @@ static int check_name(const char *ipaddr, const struct sockaddr_storage *ss, cha
 }
 
 /* Returns 1 for a valid IPv4 or IPv6 addr, or 0 for a bad one. */
-static int valid_ipaddr(const char *s)
+static int valid_ipaddr(const char *s, int allow_scope)
 {
 	int i;
 
@@ -484,6 +484,11 @@ static int valid_ipaddr(const char *s)
 		for (count = 0; count < 8; count++) {
 			if (!*s)
 				return saw_double_colon;
+			if (allow_scope && *s == '%') {
+				if (saw_double_colon)
+					break;
+				return 0;
+			}
 
 			if (strchr(s, ':') == NULL && strchr(s, '.') != NULL) {
 				if ((!saw_double_colon && count != 6) || (saw_double_colon && count > 6))
@@ -509,8 +514,11 @@ static int valid_ipaddr(const char *s)
 			}
 		}
 
-		if (!ipv4_at_end)
-			return !*s;
+		if (!ipv4_at_end) {
+			if (allow_scope && *s == '%')
+				for (s++; isAlNum(s); s++) { }
+			return !*s && s[-1] != '%';
+		}
 	}
 
 	/* IPv4 */

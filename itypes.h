@@ -41,6 +41,12 @@ isSpace(const char *ptr)
 }
 
 static inline int
+isAlNum(const char *ptr)
+{
+	return isalnum(*(unsigned char *)ptr);
+}
+
+static inline int
 isLower(const char *ptr)
 {
 	return islower(*(unsigned char *)ptr);
