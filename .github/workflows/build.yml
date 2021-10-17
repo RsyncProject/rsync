@@ -105,7 +105,7 @@ jobs:
     - name: info
       run: bash -c '/usr/local/bin/rsync --version'
     - name: check
-      run: bash -c 'RSYNC_EXPECT_SKIPPED=acls-default,acls,chown,devices,dir-sgid make check'
+      run: bash -c 'RSYNC_EXPECT_SKIPPED=acls-default,acls,chown,devices,dir-sgid,protected-regular make check'
     - name: ssl file list
       run: bash -c 'PATH="/usr/local/bin:$PATH" rsync-ssl --no-motd download.samba.org::rsyncftp/ || true'
     - name: save artifact
