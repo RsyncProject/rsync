@@ -10,6 +10,9 @@
 . "$suitedir/rsync.fns"
 
 test -f /proc/sys/fs/protected_regular || test_skipped "Can't find protected_regular setting (only available on Linux)"
+pr_lvl=`cat /proc/sys/fs/protected_regular 2>/dev/null`
+test -n "$pr_lvl" || test_skipped "Can't check if fs.protected_regular is enabled (probably need root)"
+test "$pr_lvl" != 0 || test_skipped "fs.protected_regular is not enabled"
 
 workdir="$tmpdir/files"
 mkdir "$workdir"
