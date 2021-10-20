@@ -51,11 +51,20 @@
  - Reduced memory usage for an incremental transfer that has a bunch of small
    diretories.
 
+ - The rsync daemon can now handle a client address with an implied "%scope"
+   suffix.
+
  - Added support for `--atimes` on macOS and fixed using using it without -t.
 
  - Rsync can now update the xattrs on a read-only file when your user can
    temporarily add user-write permission to the file. (It always worked for a
    root transfer.)
+
+ - Rsync can now work around an `--inplace` update of a file that is being
+   refused due to the Linux fs.protected_regular sysctl setting.
+
+ - When `--chown`, `--usermap`, or `--groupmap` is used, rsync now implies
+   the appropriate `--owner` and/or `--group` option.
 
  - More ASM optimizations from Shark64.
 
