@@ -1747,6 +1747,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			}
 			usermap = (char *)poptGetOptArg(pc);
 			usermap_via_chown = False;
+			preserve_uid = 1;
 			break;
 
 		case OPT_GROUPMAP:
@@ -1762,6 +1763,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			}
 			groupmap = (char *)poptGetOptArg(pc);
 			groupmap_via_chown = False;
+			preserve_gid = 1;
 			break;
 
 		case OPT_CHOWN: {
@@ -1785,6 +1787,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 				if (asprintf(&usermap, "*:%.*s", len, chown) < 0)
 					out_of_memory("parse_arguments");
 				usermap_via_chown = True;
+				preserve_uid = 1;
 			}
 			if (arg && *arg) {
 				if (groupmap) {
@@ -1800,6 +1803,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 				if (asprintf(&groupmap, "*:%s", arg) < 0)
 					out_of_memory("parse_arguments");
 				groupmap_via_chown = True;
+				preserve_gid = 1;
 			}
 			break;
 		}

@@ -2638,6 +2638,9 @@ your home directory (remove the '=' for that).
     option to have any effect, the `-g` (`--group`) option must be used (or
     implied), and the receiver will need to have permissions to set that group.
 
+    The `--usermap` option implies the `--owner` option while the `--groupmap`
+    option implies the `--group` option.
+
     If your shell complains about the wildcards, use `--protect-args` (`-s`).
 
 0.  `--chown=USER:GROUP`
@@ -2650,8 +2653,10 @@ your home directory (remove the '=' for that).
     USER is empty, a leading colon must be supplied.
 
     If you specify "`--chown=foo:bar`", this is exactly the same as specifying
-    "`--usermap=*:foo --groupmap=*:bar`", only easier.  If your shell complains
-    about the wildcards, use `--protect-args` (`-s`).
+    "`--usermap=*:foo --groupmap=*:bar`", only easier (with the same implied
+    `--owner` and/or `--group` option).
+
+    If your shell complains about the wildcards, use `--protect-args` (`-s`).
 
 0.  `--timeout=SECONDS`
 
