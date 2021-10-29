@@ -22,25 +22,9 @@
 #include "rsync.h"
 #include "itypes.h"
 
-static char number_separator;
-
-char get_number_separator(void)
-{
-	if (!number_separator) {
-		char buf[32];
-		snprintf(buf, sizeof buf, "%f", 3.14);
-		if (strchr(buf, '.') != NULL)
-			number_separator = ',';
-		else
-			number_separator = '.';
-	}
-
-	return number_separator;
-}
-
 char get_decimal_point(void)
 {
-	return get_number_separator() == ',' ? '.' : ',';
+	return '.';
 }
 
 #ifndef HAVE_GETCWD
@@ -174,9 +158,6 @@ char *do_big_num(int64 num, int human_flag, const char *fract)
 	char *s;
 	int len, negated;
 
-	if (human_flag && !number_separator)
-		(void)get_number_separator();
-
 	n = (n + 1) % (sizeof bufs / sizeof bufs[0]);
 
 	if (human_flag > 1) {
@@ -230,7 +211,7 @@ char *do_big_num(int64 num, int human_flag, const char *fract)
 	while (num) {
 		if (human_flag) {
 			if (len == 3) {
-				*--s = number_separator;
+				*--s = ',';
 				len = 1;
 			} else
 				len++;
