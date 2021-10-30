@@ -1761,6 +1761,7 @@ int main(int argc,char *argv[])
 
 #if defined CONFIG_LOCALE && defined HAVE_SETLOCALE
 	setlocale(LC_CTYPE, "");
+	setlocale(LC_NUMERIC, "");
 #endif
 
 	if (!parse_arguments(&argc, (const char ***) &argv)) {
