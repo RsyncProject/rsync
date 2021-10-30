@@ -4,6 +4,30 @@
 
 ## Changes in this version:
 
+### OUTPUT CHANGES:
+
+ - A long-standing bug was preventing rsync from figuring out the current
+   locale's decimal point character, which made rsync always output numbers
+   using the "C" locale.  Since this is now fixed in 3.2.4, a script that
+   parses rsync's decimal numbers (e.g. from the verbose footer) should be sure
+   to setup the environment in a way that the output continues to be in the C
+   locale.  For instance, one of the following should work fine:
+
+   ```shell
+       export LC_ALL=C.UTF-8
+   ```
+
+   or maybe:
+
+   ```shell
+       if [ "${LC_ALL:-}" ]; then
+           export LANG="$LC_ALL"
+           export LC_CTYPE="$LC_ALL"
+           unset LC_ALL
+       fi
+       export LC_NUMERIC=C.UTF-8
+   ```
+
 ### BUG FIXES:
 
  - Fixed a bug with `--inplace` + `--sparse` where the destination file could
@@ -49,7 +73,7 @@
  - Added the `--fsync` option (promoted from the patches repo).
 
  - Reduced memory usage for an incremental transfer that has a bunch of small
-   diretories.
+   directories.
 
  - The rsync daemon can now handle a client address with an implied "%scope"
    suffix.
@@ -84,7 +108,7 @@
 
  - Improved the IPv6 determination in configure.
 
- - Made SIMD & ASM configure default to "no" on non-linux hosts due to various
+ - Made SIMD & ASM configure default to "no" on non-Linux hosts due to various
    reports of problems on NetBSD & macOS hosts.  These tests were also tweaked
    to support a host_cpu of amd64 in addition to x86_64.
 
@@ -186,7 +210,7 @@
    `hosts deny` daemon parameters.  This is a finalized version of the
    netgroup-auth patch from the patches repo.
 
- - Rsync can now hard-link symlinks on FreeBSD due to it making ues of the
+ - Rsync can now hard-link symlinks on FreeBSD due to it making use of the
    linkat() function when it is available.
 
  - Output file+line info on out-of-memory & overflow errors while also avoiding
@@ -866,7 +890,7 @@
  - Fixed a bug in the iconv code when EINVAL or EILSEQ is returned with a full
    output buffer.
 
- - Fixed some rare bugs in `--iconv` processing that might cause a multibyte
+ - Fixed some rare bugs in `--iconv` processing that might cause a multi-byte
    character to get translated incorrectly.
 
  - Fixed a bogus `vanished file` error if some files were specified with `./`
@@ -2377,7 +2401,7 @@
    option, below.
 
  - The way rsync escapes unreadable characters has changed. First, rsync now
-   has support for recognizing valid multibyte character sequences in your
+   has support for recognizing valid multi-byte character sequences in your
    current locale, allowing it to escape fewer characters than before for a
    locale such as UTF-8. Second, it now uses an escape idiom of `\#123`, which
    is the literal string `\#` followed by exactly 3 octal digits. Rsync no
