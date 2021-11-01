@@ -155,7 +155,7 @@ if test x"$TOOLDIR" = x; then
     TOOLDIR=`pwd`
 fi
 srcdir=`dirname $0`
-if test x"$srcdir" = x -o x"$srcdir" = x.; then
+if test x"$srcdir" = x || test x"$srcdir" = x.; then
     srcdir="$TOOLDIR"
 fi
 if test x"$rsync_bin" = x; then
@@ -288,7 +288,7 @@ for testscript in $suitedir/$whichtests; do
     result=$?
     set -e
 
-    if [ "x$always_log" = xyes -o \( $result != 0 -a $result != 77 -a $result != 78 \) ]
+    if [ "x$always_log" = xyes ] || ( [ $result != 0 ] && [ $result != 77 ] && [ $result != 78 ] )
     then
 	echo "----- $testbase log follows"
 	cat "$scratchdir/test.log"
@@ -336,7 +336,7 @@ echo "      $passed passed"
 [ "$failed" -gt 0 ]  && echo "      $failed failed"
 [ "$skipped" -gt 0 ] && echo "      $skipped skipped"
 [ "$missing" -gt 0 ] && echo "      $missing missing"
-if [ "$full_run" = yes -a "$expect_skipped" != IGNORE ]; then
+if [ "$full_run" = yes ] && [ "$expect_skipped" != IGNORE ]; then
     skipped_list=`echo "$skipped_list" | sed 's/^,//'`
     echo "----- skipped results:"
     echo "      expected: $expect_skipped"
@@ -353,7 +353,7 @@ echo '------------------------------------------------------------'
 # because -e is set.
 
 result=`expr $failed + $missing || true`
-if [ "$result" = 0 -a "$skipped_list" != "$expect_skipped" ]; then
+if [ "$result" = 0 ] && [ "$skipped_list" != "$expect_skipped" ]; then
     result=1
 fi
 echo "overall result is $result"

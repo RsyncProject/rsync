@@ -13,7 +13,7 @@
 # run "make distclean" before creating the auto-build-save dir.
 
 auto_top='auto-build-save'
-if test -d $auto_top -a -d .git; then
+if test -d $auto_top && test -d .git; then
     desired_branch=`git rev-parse --abbrev-ref HEAD | tr / %`
     if test "$desired_branch" = HEAD; then
 	echo "ERROR: switch to the right build dir manually when in detached HEAD mode." 1>&2
