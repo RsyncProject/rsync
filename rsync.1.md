@@ -1019,6 +1019,10 @@ your home directory (remove the '=' for that).
 
     When symlinks are encountered, recreate the symlink on the destination.
 
+    By default, rsync generates a "non-regular file" warning for each symlink
+    encountered when this option is not set.  You can silence the warning by
+    specifying ``--info=nonreg0``.
+
 0.  `--copy-links`, `-L`
 
     When symlinks are encountered, the item that they point to (the referent)
@@ -1325,14 +1329,24 @@ your home directory (remove the '=' for that).
 0.  `--devices`
 
     This option causes rsync to transfer character and block device files to
-    the remote system to recreate these devices.  This option has no effect if
-    the receiving rsync is not run as the super-user (see also the `--super`
-    and `--fake-super` options).
+    the remote system to recreate these devices.  If the receiving rsync is not
+    being run as the super-user, rsync silently skips creating the device files
+    (see also the `--super` and `--fake-super` options).
+
+    By default, rsync generates a "non-regular file" warning for each device
+    file encountered when this option is not set.  You can silence the warning
+    by specifying ``--info=nonreg0``.
 
 0.  `--specials`
 
-    This option causes rsync to transfer special files such as named sockets
-    and fifos.
+    This option causes rsync to transfer special files, such as named sockets
+    and fifos.  If the receiving rsync is not being run as the super-user,
+    rsync silently skips creating the special files (see also the `--super` and
+    `--fake-super` options).
+
+    By default, rsync generates a "non-regular file" warning for each special
+    file encountered when this option is not set.  You can silence the warning
+    by specifying ``--info=nonreg0``.
 
 0.  `-D`
 

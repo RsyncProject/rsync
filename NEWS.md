@@ -90,6 +90,11 @@
  - When `--chown`, `--usermap`, or `--groupmap` is used, rsync now implies
    the appropriate `--owner` and/or `--group` option.
 
+ - Added the `--info=NONREG` setting to control if rsync should warn about
+   non-regular files in the transfer.  This is enabled by default (keeping the
+   behavior the same as before), so specifying `--info=nonreg0` can be used to
+   turn the warnings off.
+
  - More ASM optimizations from Shark64.
 
  - Make rrsync handle the latest options.

@@ -1678,9 +1678,11 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	}
 
 	if (ftype != FT_REG) {
-		if (solo_file)
-			fname = f_name(file, NULL);
-		rprintf(FINFO, "skipping non-regular file \"%s\"\n", fname);
+		if (INFO_GTE(NONREG, 1)) {
+			if (solo_file)
+				fname = f_name(file, NULL);
+			rprintf(FINFO, "skipping non-regular file \"%s\"\n", fname);
+		}
 		goto cleanup;
 	}
 
