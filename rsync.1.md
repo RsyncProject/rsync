@@ -3237,7 +3237,7 @@ your home directory (remove the '=' for that).
     buffered, while other can show up as very slow when the flushing of the
     output buffer occurs.  This may be fixed in a future version.
 
-0.  `--stop-after=MINS
+0.  `--stop-after=MINS`
 
     This option tells rsync to stop copying when the specified number of
     minutes has elapsed.
@@ -3250,7 +3250,7 @@ your home directory (remove the '=' for that).
     of the connection supports it.  You can tell the remote side about the time
     limit using `--remote-option` (`-M`), should the need arise.
 
-0.  `--stop-at=y-m-dTh:m
+0.  `--stop-at=y-m-dTh:m`
 
     This option tells rsync to stop copying when the specified point in time
     has been reached. The date & time can be fully specified in a numeric
