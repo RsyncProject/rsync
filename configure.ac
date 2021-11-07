@@ -264,7 +264,7 @@ if test x"$enable_simd" != x"no"; then
     # For x86-64 SIMD, g++ >=5 or clang++ >=7 is required
     if test x"$host_cpu" = x"x86_64" || test x"$host_cpu" = x"amd64"; then
 	AC_LANG(C++)
-	if test x"$host_cpu" = x"$build_cpu"; then
+	if test x"$host" = x"$build"; then
 	    AC_RUN_IFELSE([AC_LANG_PROGRAM([SIMD_X86_64_TEST],[[if (test_ssse3(42) != 42 || test_sse2(42) != 42 || test_avx2(42) != 42) exit(1);]])],
 		[CXX_OK=yes],[CXX_OK=no])
 	else
