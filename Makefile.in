@@ -200,7 +200,7 @@ configure.sh config.h.in: configure.ac aclocal.m4
 	else \
 	    echo "config.h.in has CHANGED."; \
 	fi
-	@if test -f configure.sh.old -o -f config.h.in.old; then \
+	@if test -f configure.sh.old || test -f config.h.in.old; then \
 	    if test "$(MAKECMDGOALS)" = reconfigure; then \
 		echo 'Continuing with "make reconfigure".'; \
 	    else \

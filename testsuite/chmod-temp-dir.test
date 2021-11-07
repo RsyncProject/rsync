@@ -17,7 +17,7 @@ sdev=`$TOOLDIR/getfsdev $scratchdir`
 tdev=$sdev
 
 for tmpdir2 in "${RSYNC_TEST_TMP:-/override-tmp-not-specified}" /run/shm /var/tmp /tmp; do
-    [ -d "$tmpdir2" -a -w "$tmpdir2" ] || continue
+    [ -d "$tmpdir2" ] && [ -w "$tmpdir2" ] || continue
     tdev=`$TOOLDIR/getfsdev "$tmpdir2"`
     [ x$sdev != x$tdev ] && break
 done

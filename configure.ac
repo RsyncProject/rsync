@@ -262,7 +262,7 @@ fi
 
 if test x"$enable_simd" != x"no"; then
     # For x86-64 SIMD, g++ >=5 or clang++ >=7 is required
-    if test x"$host_cpu" = x"x86_64" -o x"$host_cpu" = x"amd64"; then
+    if test x"$host_cpu" = x"x86_64" || test x"$host_cpu" = x"amd64"; then
 	AC_LANG(C++)
 	if test x"$host_cpu" = x"$build_cpu"; then
 	    AC_RUN_IFELSE([AC_LANG_PROGRAM([SIMD_X86_64_TEST],[[if (test_ssse3(42) != 42 || test_sse2(42) != 42 || test_avx2(42) != 42) exit(1);]])],
@@ -326,7 +326,7 @@ if test x"$enable_asm" = x""; then
 fi
 
 if test x"$enable_asm" != x"no"; then
-    if test x"$host_cpu" = x"x86_64" -o x"$host_cpu" = x"amd64"; then
+    if test x"$host_cpu" = x"x86_64" || test x"$host_cpu" = x"amd64"; then
 	ASM="$host_cpu"
     elif test x"$enable_asm" = x"yes"; then
         AC_MSG_RESULT(unavailable)
@@ -712,7 +712,7 @@ yes
 #endif],
 			rsync_cv_HAVE_GETADDR_DEFINES=yes,
 			rsync_cv_HAVE_GETADDR_DEFINES=no)])
-AS_IF([test x"$rsync_cv_HAVE_GETADDR_DEFINES" = x"yes" -a x"$ac_cv_type_struct_addrinfo" = x"yes"],[
+AS_IF([test x"$rsync_cv_HAVE_GETADDR_DEFINES" = x"yes" && test x"$ac_cv_type_struct_addrinfo" = x"yes"],[
 	# Tru64 UNIX has getaddrinfo() but has it renamed in libc as
 	# something else so we must include <netdb.h> to get the
 	# redefinition.
@@ -1384,7 +1384,7 @@ else
     esac
 fi
 
-if test x"$enable_acl_support" = x"no" -o x"$enable_xattr_support" = x"no" -o x"$enable_iconv" = x"no"; then
+if test x"$enable_acl_support" = x"no" || test x"$enable_xattr_support" = x"no" || test x"$enable_iconv" = x"no"; then
     AC_MSG_CHECKING([whether $CC supports -Wno-unused-parameter])
     OLD_CFLAGS="$CFLAGS"
     CFLAGS="$CFLAGS -Wno-unused-parameter"

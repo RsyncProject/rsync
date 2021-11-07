@@ -32,7 +32,7 @@ if test "$dir" != '.'; then
 	fi
     done
     for fn in configure.sh config.h.in aclocal.m4; do
-	test ! -f $fn -a -f "$dir/$fn" && cp -p "$dir/$fn" $fn
+	test ! -f $fn && test -f "$dir/$fn" && cp -p "$dir/$fn" $fn
     done
 fi
 

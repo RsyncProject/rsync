@@ -65,7 +65,7 @@ set_cp_destdir() {
 # even if the copy rounded microsecond times on the destination file.
 cp_touch() {
     cp_p "${@}"
-    if test $# -gt 2 -o -d "$2"; then
+    if test $# -gt 2 || test -d "$2"; then
 	set_cp_destdir "${@}" # sets destdir var
 	while test $# -gt 1; do
 	    destname="$destdir/`basename $1`"
