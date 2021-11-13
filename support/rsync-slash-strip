@@ -6,12 +6,19 @@
 #
 # To use this, name it something like "rs", put it somewhere in your path, and
 # then use "rs" in place of "rsync" when you are typing your copy commands.
+
+REAL_RSYNC=/usr/bin/rsync
+
 args=()
 for arg in "${@}"; do
+    if [[ "$arg" == --server ]]; then
+	exec $REAL_RSYNC "${@}"
+	exit $? # Not reached
+    fi
     if [[ "$arg" == / ]]; then
 	args=("${args[@]}" /)
     else
 	args=("${args[@]}" "${arg%/}")
     fi
 done
-exec /usr/bin/rsync "${args[@]}"
+exec $REAL_RSYNC "${args[@]}"
