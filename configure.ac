@@ -312,38 +312,9 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[ ]], [[return 0;]])],
 CFLAGS="$OLD_CFLAGS"
 AC_SUBST(NOEXECSTACK)
 
-ASM=
-
 AC_MSG_CHECKING([whether to enable ASM optimizations])
 AC_ARG_ENABLE(asm,
     AS_HELP_STRING([--enable-asm],[enable/disable to control ASM optimizations]))
-
-if test x"$enable_asm" = x""; then
-    case "$host_os" in
-	*linux*) ;;
-	*) enable_asm=no ;;
-    esac
-fi
-
-if test x"$enable_asm" != x"no"; then
-    if test x"$host_cpu" = x"x86_64" || test x"$host_cpu" = x"amd64"; then
-	ASM="$host_cpu"
-    elif test x"$enable_asm" = x"yes"; then
-        AC_MSG_RESULT(unavailable)
-        AC_MSG_ERROR(The ASM optimizations are currently x86_64|amd64 only.
-Omit --enable-asm to continue without it.)
-    fi
-fi
-
-if test x"$ASM" != x""; then
-    AC_MSG_RESULT([yes ($ASM)])
-    AC_DEFINE(HAVE_ASM, 1, [Define to 1 to enable ASM optimizations])
-    ASM='$(ASM_'"$ASM)"
-else
-    AC_MSG_RESULT(no)
-fi
-
-AC_SUBST(ASM)
 
 # arrgh. libc in some old debian version screwed up the largefile
 # stuff, getting byte range locking wrong
