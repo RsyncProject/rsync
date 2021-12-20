@@ -15,19 +15,26 @@ use constant RSYNC => '/usr/bin/rsync';
 use constant LOGFILE => 'rrsync.log';
 
 my $Usage = <<EOM;
-Use 'command="$0 [-ro|-wo] SUBDIR"'
-	in front of lines in $ENV{HOME}/.ssh/authorized_keys
+Use 'command="$0 [-ro|-wo|-no-munge] SUBDIR"'
+        in front of lines in $ENV{HOME}/.ssh/authorized_keys
 EOM
 
-# Handle the -ro and -wo options.
+# Handle the -ro, -wo, & -no-munge options.
 our $only = '';
-while (@ARGV && $ARGV[0] =~ /^-([rw])o$/) {
+our $force_munge = 1;
+while (@ARGV) {
+  if ($ARGV[0] =~ /^-([rw])o$/) {
     my $r_or_w = $1;
     if ($only && $only ne $r_or_w) {
-	die "$0: the -ro and -wo options conflict.\n";
+      die "$0: the -ro and -wo options conflict.\n";
     }
     $only = $r_or_w;
-    shift;
+  } elsif ($ARGV[0] eq '-no-munge') {
+    $force_munge = 0;
+  } else {
+    last;
+  }
+  shift;
 }
 
 our $subdir = shift;
@@ -47,7 +54,7 @@ die "$0: Restricted directory does not exist!\n" if $subdir ne '/' && !-d $subdi
 # SSH_CONNECTION=client_addr client_port server_port
 
 my $command = $ENV{SSH_ORIGINAL_COMMAND};
-die "$0: Not invoked via sshd\n$Usage"	unless defined $command;
+die "$0: Not invoked via sshd\n$Usage" unless defined $command;
 die "$0: SSH_ORIGINAL_COMMAND='$command' is not rsync\n" unless $command =~ s/^rsync\s+//;
 die "$0: --server option is not first\n" unless $command =~ /^--server\s/;
 our $am_sender = $command =~ /^--server\s+--sender\s/; # Restrictive on purpose!
@@ -110,7 +117,7 @@ our %long_opt = (
   'link-dest' => 2,
   'links' => 0,
   'list-only' => 0,
-  'log-file' => $only eq 'r' ? -1 : 3,
+  'log-file' => 3,
   'log-format' => 1,
   'max-alloc' => 1,
   'max-delete' => 1,
@@ -119,10 +126,12 @@ our %long_opt = (
   'mkpath' => 0,
   'modify-window' => 1,
   'msgs2stderr' => 0,
+  'munge-links' => 0,
   'new-compress' => 0,
   'no-W' => 0,
   'no-implied-dirs' => 0,
   'no-msgs2stderr' => 0,
+  'no-munge-links' => -1,
   'no-r' => 0,
   'no-relative' => 0,
   'no-specials' => 0,
@@ -137,10 +146,10 @@ our %long_opt = (
   'perms' => 0,
   'preallocate' => 0,
   'recursive' => 0,
-  'remove-sent-files' => $only eq 'r' ? -1 : 0,
-  'remove-source-files' => $only eq 'r' ? -1 : 0,
+  'remove-sent-files' => 0,
+  'remove-source-files' => 0,
   'safe-links' => 0,
-  'sender' => $only eq 'w' ? -1 : 0,
+  'sender' => 0,
   'server' => 0,
   'size-only' => 0,
   'skip-compress' => 1,
@@ -157,6 +166,16 @@ our %long_opt = (
 );
 
 ### END of options data produced by the cull_options script. ###
+
+if ($only eq 'r') {
+  foreach my $opt (keys %long_opt) {
+    if ($opt =~ /^(remove-|log-file)/) {
+      $long_opt{$opt} = -1;
+    }
+  }
+} elsif ($only eq 'w') {
+  $long_opt{'sender'} = -1;
+}
 
 if ($short_disabled ne '') {
     $short_no_arg =~ s/[$short_disabled]//go;
@@ -179,11 +198,11 @@ while ($command =~ /((?:[^\s\\]+|\\.[^\s\\]*)+)/g) {
     push(@opts, check_arg($last_opt, $_, $check_type));
     $check_type = 0;
   } elsif ($in_options) {
-    push(@opts, $_);
     if ($_ eq '.') {
       $in_options = 0;
     } else {
       die "$0: invalid option: '-'\n" if $_ eq '-';
+      push(@opts, $_);
       next if /^-$short_no_arg*(e\d*\.\w*)?$/o || /^-$short_with_num\d+$/o;
 
       my($opt,$arg) = /^--([^=]+)(?:=(.*))?$/;
@@ -225,7 +244,11 @@ while ($command =~ /((?:[^\s\\]+|\\.[^\s\\]*)+)/g) {
 die "$0: invalid rsync-command syntax or options\n" if $in_options;
 
 if ($subdir ne '/') {
-    die "$0: do not use .. in any path!\n" if grep m{(^|/)\.\.(/|$)}, @args;
+  die "$0: do not use .. in any path!\n" if grep m{(^|/)\.\.(/|$)}, @args;
+}
+
+if ($force_munge) {
+  push(@opts, '--munge-links');
 }
 
 @args = ( '.' ) if !@args;
@@ -241,7 +264,7 @@ if ($write_log) {
 }
 
 # Note: This assumes that the rsync protocol will not be maliciously hijacked.
-exec(RSYNC, @opts, '--', @args) or die "exec(rsync @opts -- @args) failed: $? $!";
+exec(RSYNC, @opts, '--', '.', @args) or die "exec(rsync @opts -- . @args) failed: $? $!";
 
 sub check_arg
 {
@@ -255,3 +278,5 @@ sub check_arg
   }
   $arg;
 }
+
+# vim: sw=2

@@ -97,7 +97,9 @@
 
  - More ASM optimizations from Shark64.
 
- - Make rrsync handle the latest options.
+ - Make rrsync pass --munge-links to rsync by default to make the restricted
+   dir extra safe (with an option to turn it off if you trust your users).
+   Also updated the known options list.
 
  - Work around a glibc bug where lchmod() breaks in a chroot w/o /proc mounted.
 
