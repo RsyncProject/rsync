@@ -15,6 +15,9 @@ GetOptions(
     'b|c|D|e|F|i|L|m|O|o|p|R|S|w=s' => sub { }, # Ignore
     'no-cd' => \( my $no_chdir ),
     'sudo' => \( my $use_sudo ),
+    'rrsync=s' => \( my $rrsync_dir ),
+    'ro' => \( my $rrsync_ro = '' ),
+    'wo' => \( my $rrsync_wo = '' ),
 ) or &usage;
 &usage unless @ARGV > 1;
 
@@ -67,22 +70,42 @@ unless ($no_chdir) {
     chdir $home_dir or die "Unable to chdir to $home_dir: $!\n";
 }
 
-push @cmd, '/bin/sh', '-c', "@ARGV";
+if ($rrsync_dir) {
+    my $cmd = '';
+    foreach (@ARGV) {
+	(my $arg = $_) =~ s/(['";|()\[\]{}\$!*?<> \t&~\\])/\\$1/g;
+	$cmd .= ' ' . $arg;
+    }
+    $cmd =~ s/^\s+//;
+    $ENV{SSH_ORIGINAL_COMMAND} = $cmd;
+    push @cmd, 'rrsync';
+    push @cmd, '-ro' if $rrsync_ro;
+    push @cmd, '-wo' if $rrsync_wo;
+    push @cmd, $rrsync_dir;
+} else {
+    push @cmd, '/bin/sh', '-c', "@ARGV";
+}
 exec @cmd;
 die "Failed to exec: $!\n";
 
 sub usage
 {
     die <<EOT;
-Usage: lsh [-l USER] [--sudo] [--no-cd] localhost COMMAND [...]
+Usage: lsh [OPTIONS] localhost|lh COMMAND [...]
 
 This is a "local shell" command that works like a remote shell but only for the
 local host.  This is useful for rsync testing or for running a local copy where
 the sender and the receiver need to use different options (e.g. --fake-super).
-If the -l option is used, we try to become the USER, either directly (when
-root) or by using "sudo -H -u USER" (requires --sudo option).
 
-Note that if you pass hostname "lh" instead of "localhost" that the --no-cd
-option is implied.  The default is to "cd \$HOME" to simulate ssh behavior.
+Options:
+
+-l USER        Choose the USER that lsh tries to become.
+--no-cd        Skip the chdir \$HOME (the default with hostname "lh")
+--sudo         Use sudo -H -l USER to become root or the specified USER.
+--rrsync=DIR   Test rrsync restricted copying without using ssh.
+--ro           Passes -ro to rrsync (when --rrsync is specified).
+--wo           Passes -wo to rrsync (when --rrsync is specified.
+
+The script also ignores a bunch of single-letter ssh options.
 EOT
 }
