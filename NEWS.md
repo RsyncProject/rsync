@@ -97,15 +97,27 @@
 
  - More ASM optimizations from Shark64.
 
- - Make rrsync pass --munge-links to rsync by default to make the restricted
-   dir extra safe (with an option to turn it off if you trust your users).
-   Also updated the known options list.
+ - Transformed rrsync into a python script with improvements: security has been
+   beefed up; the known rsync options were updated to include recent additions;
+   rrsync rejects `-L` (`--copy-links`) by default to make it harder to exploit
+   any out-of-subdir symlinks; a new rrsync option of `-munge` tells rrsync to
+   always enable the `--munge-links` rsync option on the server side; a new
+   rrsync option of `-no-del` disables all `--remove*` and `--delete*` rsync
+   options on the server side; the log format has been tweaked slightly to add
+   seconds to the timestamp and output the command executed as a tuple; an
+   rrsync.1 manpage is now created.
 
  - Work around a glibc bug where lchmod() breaks in a chroot w/o /proc mounted.
 
  - Some manpage improvements.
 
 ### PACKAGING RELATED:
+
+ - Give configure the --with-rrsync option if you want `make install` to
+   install the (now python3) rrsync script and its (new) man page.
+
+ - If the rrsync script is installed, make its package depend on python3 and
+   (suggested but not required) the python3 braceexpand lib.
 
  - When creating a package from a non-release version (w/o a git checkout), the
    packager can elect to create git-version.h and define RSYNC_GITVER to the

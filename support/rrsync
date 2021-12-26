@@ -1,282 +1,353 @@
-#!/usr/bin/env perl
-# Name: /usr/local/bin/rrsync (should also have a symlink in /usr/bin)
-# Purpose: Restricts rsync to subdirectory declared in .ssh/authorized_keys
-# Author: Joe Smith <js-cgi@inwap.com> 30-Sep-2004
-# Modified by: Wayne Davison <wayne@opencoder.net>
-use strict;
+#!/usr/bin/env python3
 
-use Socket;
-use Cwd 'abs_path';
-use File::Glob ':glob';
+# Restricts rsync to subdirectory declared in .ssh/authorized_keys.  See
+# the rrsync man page for details of how to make use of this script.
 
-# You may configure these values to your liking.  See also the section
-# of options if you want to disable any options that rsync accepts.
-use constant RSYNC => '/usr/bin/rsync';
-use constant LOGFILE => 'rrsync.log';
+# NOTE: install python3 braceexpand to support brace expansion in the args!
 
-my $Usage = <<EOM;
-Use 'command="$0 [-ro|-wo|-no-munge] SUBDIR"'
-        in front of lines in $ENV{HOME}/.ssh/authorized_keys
-EOM
+# Originally a perl script by: Joe Smith <js-cgi@inwap.com> 30-Sep-2004
+# Python version by: Wayne Davison <wayne@opencoder.net>
 
-# Handle the -ro, -wo, & -no-munge options.
-our $only = '';
-our $force_munge = 1;
-while (@ARGV) {
-  if ($ARGV[0] =~ /^-([rw])o$/) {
-    my $r_or_w = $1;
-    if ($only && $only ne $r_or_w) {
-      die "$0: the -ro and -wo options conflict.\n";
-    }
-    $only = $r_or_w;
-  } elsif ($ARGV[0] eq '-no-munge') {
-    $force_munge = 0;
-  } else {
-    last;
-  }
-  shift;
-}
+# You may configure these 2 values to your liking.  See also the section of
+# short & long options if you want to disable any options that rsync accepts.
+RSYNC = '/usr/bin/rsync'
+LOGFILE = 'rrsync.log' # NOTE: the file must exist for a line to be appended!
 
-our $subdir = shift;
-die "$0: No subdirectory specified\n$Usage" unless defined $subdir;
-$subdir = abs_path($subdir);
-die "$0: Restricted directory does not exist!\n" if $subdir ne '/' && !-d $subdir;
+# The following options are mainly the options that a client rsync can send
+# to the server, and usually just in the one option format that the stock
+# rsync produces. However, there are some additional convenience options
+# added as well, and thus a few options are present in both the short and
+# long lists (such as --group, --owner, and --perms).
 
-# The client uses "rsync -av -e ssh src/ server:dir/", and sshd on the server
-# executes this program when .ssh/authorized_keys has 'command="..."'.
-# For example:
-# command="rrsync logs/client" ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAIEAzGhEeNlPr...
-# command="rrsync -ro results" ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAIEAmkHG1WCjC...
-#
-# Format of the environment variables set by sshd:
-# SSH_ORIGINAL_COMMAND=rsync --server          -vlogDtpr --partial . ARG # push
-# SSH_ORIGINAL_COMMAND=rsync --server --sender -vlogDtpr --partial . ARGS # pull
-# SSH_CONNECTION=client_addr client_port server_port
-
-my $command = $ENV{SSH_ORIGINAL_COMMAND};
-die "$0: Not invoked via sshd\n$Usage" unless defined $command;
-die "$0: SSH_ORIGINAL_COMMAND='$command' is not rsync\n" unless $command =~ s/^rsync\s+//;
-die "$0: --server option is not first\n" unless $command =~ /^--server\s/;
-our $am_sender = $command =~ /^--server\s+--sender\s/; # Restrictive on purpose!
-die "$0 sending to read-only server not allowed\n" if $only eq 'r' && !$am_sender;
-die "$0 reading from write-only server not allowed\n" if $only eq 'w' && $am_sender;
+# NOTE when disabling: check for both a short & long version of the option!
 
 ### START of options data produced by the cull_options script. ###
 
-# These options are the only options that rsync might send to the server,
-# and only in the option format that the stock rsync produces.
-
 # To disable a short-named option, add its letter to this string:
-our $short_disabled = 's';
+short_disabled = 'Ls'
 
-our $short_no_arg = 'ACDEHIJKLNORSUWXbcdgklmnopqrstuvxyz'; # DO NOT REMOVE ANY
-our $short_with_num = '@B'; # DO NOT REMOVE ANY
+short_no_arg = 'ACDEHIJKLNORSUWXbcdgklmnopqrstuvxyz' # DO NOT REMOVE ANY
+short_with_num = '@B' # DO NOT REMOVE ANY
 
 # To disable a long-named option, change its value to a -1.  The values mean:
 # 0 = the option has no arg; 1 = the arg doesn't need any checking; 2 = only
 # check the arg when receiving; and 3 = always check the arg.
-our %long_opt = (
-  'append' => 0,
-  'backup-dir' => 2,
-  'block-size' => 1,
-  'bwlimit' => 1,
-  'checksum-choice' => 1,
-  'checksum-seed' => 1,
-  'compare-dest' => 2,
-  'compress-choice' => 1,
-  'compress-level' => 1,
-  'copy-dest' => 2,
-  'copy-unsafe-links' => 0,
-  'daemon' => -1,
-  'debug' => 1,
-  'delay-updates' => 0,
-  'delete' => 0,
-  'delete-after' => 0,
-  'delete-before' => 0,
-  'delete-delay' => 0,
-  'delete-during' => 0,
-  'delete-excluded' => 0,
-  'delete-missing-args' => 0,
-  'existing' => 0,
-  'fake-super' => 0,
-  'files-from' => 3,
-  'force' => 0,
-  'from0' => 0,
-  'fsync' => 2,
-  'fuzzy' => 0,
-  'group' => 0,
-  'groupmap' => 1,
-  'hard-links' => 0,
-  'iconv' => 1,
-  'ignore-errors' => 0,
-  'ignore-existing' => 0,
-  'ignore-missing-args' => 0,
-  'ignore-times' => 0,
-  'info' => 1,
-  'inplace' => 0,
-  'link-dest' => 2,
-  'links' => 0,
-  'list-only' => 0,
-  'log-file' => 3,
-  'log-format' => 1,
-  'max-alloc' => 1,
-  'max-delete' => 1,
-  'max-size' => 1,
-  'min-size' => 1,
-  'mkpath' => 0,
-  'modify-window' => 1,
-  'msgs2stderr' => 0,
-  'munge-links' => 0,
-  'new-compress' => 0,
-  'no-W' => 0,
-  'no-implied-dirs' => 0,
-  'no-msgs2stderr' => 0,
-  'no-munge-links' => -1,
-  'no-r' => 0,
-  'no-relative' => 0,
-  'no-specials' => 0,
-  'numeric-ids' => 0,
-  'old-compress' => 0,
-  'one-file-system' => 0,
-  'only-write-batch' => 1,
-  'open-noatime' => 0,
-  'owner' => 0,
-  'partial' => 0,
-  'partial-dir' => 2,
-  'perms' => 0,
-  'preallocate' => 0,
-  'recursive' => 0,
-  'remove-sent-files' => 0,
-  'remove-source-files' => 0,
-  'safe-links' => 0,
-  'sender' => 0,
-  'server' => 0,
-  'size-only' => 0,
-  'skip-compress' => 1,
-  'specials' => 0,
-  'stats' => 0,
-  'suffix' => 1,
-  'super' => 0,
-  'temp-dir' => 2,
-  'timeout' => 1,
-  'times' => 0,
-  'use-qsort' => 0,
-  'usermap' => 1,
-  'write-devices' => -1,
-);
+long_opts = {
+  'append': 0,
+  'backup-dir': 2,
+  'block-size': 1,
+  'bwlimit': 1,
+  'checksum-choice': 1,
+  'checksum-seed': 1,
+  'compare-dest': 2,
+  'compress-choice': 1,
+  'compress-level': 1,
+  'copy-dest': 2,
+  'copy-unsafe-links': 0,
+  'daemon': -1,
+  'debug': 1,
+  'delay-updates': 0,
+  'delete': 0,
+  'delete-after': 0,
+  'delete-before': 0,
+  'delete-delay': 0,
+  'delete-during': 0,
+  'delete-excluded': 0,
+  'delete-missing-args': 0,
+  'existing': 0,
+  'fake-super': 0,
+  'files-from': 3,
+  'force': 0,
+  'from0': 0,
+  'fsync': 2,
+  'fuzzy': 0,
+  'group': 0,
+  'groupmap': 1,
+  'hard-links': 0,
+  'iconv': 1,
+  'ignore-errors': 0,
+  'ignore-existing': 0,
+  'ignore-missing-args': 0,
+  'ignore-times': 0,
+  'info': 1,
+  'inplace': 0,
+  'link-dest': 2,
+  'links': 0,
+  'list-only': 0,
+  'log-file': 3,
+  'log-format': 1,
+  'max-alloc': 1,
+  'max-delete': 1,
+  'max-size': 1,
+  'min-size': 1,
+  'mkpath': 0,
+  'modify-window': 1,
+  'msgs2stderr': 0,
+  'munge-links': 0,
+  'new-compress': 0,
+  'no-W': 0,
+  'no-implied-dirs': 0,
+  'no-msgs2stderr': 0,
+  'no-munge-links': -1,
+  'no-r': 0,
+  'no-relative': 0,
+  'no-specials': 0,
+  'numeric-ids': 0,
+  'old-compress': 0,
+  'one-file-system': 0,
+  'only-write-batch': 1,
+  'open-noatime': 0,
+  'owner': 0,
+  'partial': 0,
+  'partial-dir': 2,
+  'perms': 0,
+  'preallocate': 0,
+  'recursive': 0,
+  'remove-sent-files': 0,
+  'remove-source-files': 0,
+  'safe-links': 0,
+  'sender': 0,
+  'server': 0,
+  'size-only': 0,
+  'skip-compress': 1,
+  'specials': 0,
+  'stats': 0,
+  'stderr': 1,
+  'suffix': 1,
+  'super': 0,
+  'temp-dir': 2,
+  'timeout': 1,
+  'times': 0,
+  'use-qsort': 0,
+  'usermap': 1,
+  'write-devices': -1,
+}
 
 ### END of options data produced by the cull_options script. ###
 
-if ($only eq 'r') {
-  foreach my $opt (keys %long_opt) {
-    if ($opt =~ /^(remove-|log-file)/) {
-      $long_opt{$opt} = -1;
-    }
-  }
-} elsif ($only eq 'w') {
-  $long_opt{'sender'} = -1;
-}
+import os, sys, re, argparse, glob, socket, time
+from argparse import RawTextHelpFormatter
 
-if ($short_disabled ne '') {
-    $short_no_arg =~ s/[$short_disabled]//go;
-    $short_with_num =~ s/[$short_disabled]//go;
-}
-$short_no_arg = "[$short_no_arg]" if length($short_no_arg) > 1;
-$short_with_num = "[$short_with_num]" if length($short_with_num) > 1;
+try:
+    from braceexpand import braceexpand
+except:
+    braceexpand = lambda x: [ DE_BACKSLASH_RE.sub(r'\1', x) ]
 
-my $write_log = -f LOGFILE && open(LOG, '>>', LOGFILE);
+HAS_DOT_DOT_RE = re.compile(r'(^|/)\.\.(/|$)')
+LONG_OPT_RE = re.compile(r'^--([^=]+)(?:=(.*))?$')
+DE_BACKSLASH_RE = re.compile(r'\\(.)')
 
-chdir($subdir) or die "$0: Unable to chdir to restricted dir: $!\n";
+def main():
+    if not os.path.isdir(args.dir):
+        die("Restricted directory does not exist!")
 
-my(@opts, @args);
-my $in_options = 1;
-my $last_opt = '';
-my $check_type;
-while ($command =~ /((?:[^\s\\]+|\\.[^\s\\]*)+)/g) {
-  $_ = $1;
-  if ($check_type) {
-    push(@opts, check_arg($last_opt, $_, $check_type));
-    $check_type = 0;
-  } elsif ($in_options) {
-    if ($_ eq '.') {
-      $in_options = 0;
-    } else {
-      die "$0: invalid option: '-'\n" if $_ eq '-';
-      push(@opts, $_);
-      next if /^-$short_no_arg*(e\d*\.\w*)?$/o || /^-$short_with_num\d+$/o;
+    # The format of the environment variables set by sshd:
+    #   SSH_ORIGINAL_COMMAND:
+    #     rsync --server          -vlogDtpre.iLsfxCIvu --etc . ARG  # push
+    #     rsync --server --sender -vlogDtpre.iLsfxCIvu --etc . ARGS # pull
+    #   SSH_CONNECTION (client_ip client_port server_ip server_port):
+    #     192.168.1.100 64106 192.168.1.2 22
 
-      my($opt,$arg) = /^--([^=]+)(?:=(.*))?$/;
-      my $disabled;
-      if (defined $opt) {
-	my $ct = $long_opt{$opt};
-	last unless defined $ct;
-	next if $ct == 0;
-	if ($ct > 0) {
-	  if (!defined $arg) {
-	    $check_type = $ct;
-	    $last_opt = $opt;
-	    next;
-	  }
-	  $arg = check_arg($opt, $arg, $ct);
-	  $opts[-1] =~ s/=.*/=$arg/;
-	  next;
-	}
-	$disabled = 1;
-	$opt = "--$opt";
-      } elsif ($short_disabled ne '') {
-	$disabled = /^-$short_no_arg*([$short_disabled])/o;
-	$opt = "-$1";
-      }
+    command = os.environ.get('SSH_ORIGINAL_COMMAND', None)
+    if not command:
+        die("Not invoked via sshd")
+    command = command.split(' ', 2)
+    if command[0:1] != ['rsync']:
+        die("SSH_ORIGINAL_COMMAND does not run rsync")
+    if command[1:2] != ['--server']:
+        die("--server option is not the first arg")
+    command = '' if len(command) < 3 else command[2]
 
-      last unless $disabled; # Generate generic failure
-      die "$0: option $opt has been disabled on this server.\n";
-    }
-  } else {
-    if ($subdir ne '/') {
-      # Validate args to ensure they don't try to leave our restricted dir.
-      s{//+}{/}g;
-      s{^/}{};
-      s{^$}{.};
-    }
-    push(@args, bsd_glob($_, GLOB_LIMIT|GLOB_NOCHECK|GLOB_BRACE|GLOB_QUOTE));
-  }
-}
-die "$0: invalid rsync-command syntax or options\n" if $in_options;
+    global am_sender
+    am_sender = command.startswith("--sender ") # Restrictive on purpose!
+    if args.ro and not am_sender:
+        die("sending to read-only server is not allowed")
+    if args.wo and am_sender:
+        die("reading from write-only server is not allowed")
 
-if ($subdir ne '/') {
-  die "$0: do not use .. in any path!\n" if grep m{(^|/)\.\.(/|$)}, @args;
-}
+    if args.wo or not am_sender:
+        long_opts['sender'] = -1
+    if args.no_del:
+        for opt in long_opts:
+            if opt.startswith(('remove', 'delete')):
+                long_opts[opt] = -1
+    if args.ro:
+        long_opts['log-file'] = -1
 
-if ($force_munge) {
-  push(@opts, '--munge-links');
-}
+    short_no_arg_re = short_no_arg
+    short_with_num_re = short_with_num
+    if short_disabled:
+        for ltr in short_disabled:
+            short_no_arg_re = short_no_arg_re.replace(ltr, '')
+            short_with_num_re = short_with_num_re.replace(ltr, '')
+        short_disabled_re = re.compile(r'^-[%s]*([%s])' % (short_no_arg_re, short_disabled))
+    short_no_arg_re = re.compile(r'^-(?=.)[%s]*(e\d*\.\w*)?$' % short_no_arg_re)
+    short_with_num_re = re.compile(r'^-[%s]\d+$' % short_with_num_re)
 
-@args = ( '.' ) if !@args;
+    log_fh = open(LOGFILE, 'a') if os.path.isfile(LOGFILE) else None
 
-if ($write_log) {
-  my ($mm,$hh) = (localtime)[1,2];
-  my $host = $ENV{SSH_CONNECTION} || 'unknown';
-  $host =~ s/ .*//; # Keep only the client's IP addr
-  $host =~ s/^::ffff://;
-  $host = gethostbyaddr(inet_aton($host),AF_INET) || $host;
-  printf LOG "%02d:%02d %-13s [%s]\n", $hh, $mm, $host, "@opts @args";
-  close LOG;
-}
+    try:
+        os.chdir(args.dir)
+    except OSError as e:
+        die('unable to chdir to restricted dir:', str(e))
 
-# Note: This assumes that the rsync protocol will not be maliciously hijacked.
-exec(RSYNC, @opts, '--', '.', @args) or die "exec(rsync @opts -- . @args) failed: $? $!";
+    rsync_opts = [ '--server' ]
+    rsync_args = [ ]
+    saw_the_dot_arg = False
+    last_opt = check_type = None
 
-sub check_arg
-{
-  my($opt, $arg, $type) = @_;
-  $arg =~ s/\\(.)/$1/g;
-  if ($subdir ne '/' && ($type == 3 || ($type == 2 && !$am_sender))) {
-    $arg =~ s{//}{/}g;
-    die "Do not use .. in --$opt; anchor the path at the root of your restricted dir.\n"
-      if $arg =~ m{(^|/)\.\.(/|$)};
-    $arg =~ s{^/}{$subdir/};
-  }
-  $arg;
-}
+    for arg in re.findall(r'(?:[^\s\\]+|\\.[^\s\\]*)+', command):
+        if check_type:
+            rsync_opts.append(validated_arg(last_opt, arg, check_type))
+            check_type = None
+        elif saw_the_dot_arg:
+            # NOTE: an arg that starts with a '-' is safe due to our use of "--" in the cmd tuple.
+            try:
+                b_e = braceexpand(arg) # Also removes backslashes
+            except: # Handle errors such as unbalanced braces by just de-backslashing the arg:
+                b_e = [ DE_BACKSLASH_RE.sub(r'\1', arg) ]
+            for xarg in b_e:
+                rsync_args += validated_arg('arg', xarg, wild=True)
+        else: # parsing the option args
+            if arg == '.':
+                saw_the_dot_arg = True
+                continue
+            rsync_opts.append(arg)
+            if short_no_arg_re.match(arg) or short_with_num_re.match(arg):
+                continue
+            disabled = False
+            m = LONG_OPT_RE.match(arg)
+            if m:
+                opt = m.group(1)
+                opt_arg = m.group(2)
+                ct = long_opts.get(opt, None)
+                if ct is None:
+                    break # Generate generic failure due to unfinished arg parsing
+                if ct == 0:
+                    continue
+                opt = '--' + opt
+                if ct > 0:
+                    if opt_arg is not None:
+                        rsync_opts[-1] = opt + '=' + validated_arg(opt, opt_arg, ct)
+                    else:
+                        check_type = ct
+                        last_opt = opt
+                    continue
+                disabled = True
+            elif short_disabled:
+                m = short_disabled_re.match(arg)
+                if m:
+                    disabled = True
+                    opt = '-' + m.group(1)
 
-# vim: sw=2
+            if disabled:
+                die("option", opt, "has been disabled on this server.")
+            break # Generate a generic failure
+
+    if not saw_the_dot_arg:
+        die("invalid rsync-command syntax or options")
+
+    if args.munge:
+        rsync_opts.append('--munge-links')
+
+    if not rsync_args:
+        rsync_args = [ '.' ]
+
+    cmd = (RSYNC, *rsync_opts, '--', '.', *rsync_args)
+
+    if log_fh:
+        now = time.localtime()
+        host = os.environ.get('SSH_CONNECTION', 'unknown').split()[0] # Drop everything after the IP addr
+        if host.startswith('::ffff:'):
+            host = host[7:]
+        try:
+            host = socket.gethostbyaddr(socket.inet_aton(host))
+        except:
+            pass
+        log_fh.write("%02d:%02d:%02d %-16s %s\n" % (now.tm_hour, now.tm_min, now.tm_sec, host, str(cmd)))
+        log_fh.close()
+
+    # NOTE: This assumes that the rsync protocol will not be maliciously hijacked.
+    os.execlp(RSYNC, *cmd)
+    die("execlp(", RSYNC, *cmd, ')  failed')
+
+
+def validated_arg(opt, arg, typ=3, wild=False):
+    if opt != 'arg': # arg values already have their backslashes removed.
+        arg = DE_BACKSLASH_RE.sub(r'\1', arg)
+
+    orig_arg = arg
+    if arg.startswith('./'):
+        arg = arg[1:]
+    arg = arg.replace('//', '/')
+    if args.dir != '/':
+        if HAS_DOT_DOT_RE.search(arg):
+            die("do not use .. in", opt, "(anchor the path at the root of your restricted dir)")
+        if arg.startswith('/'):
+            arg = args.dir + arg
+
+    if wild:
+        got = glob.glob(arg)
+        if not got:
+            got = [ arg ]
+    else:
+        got = [ arg ]
+
+    ret = [ ]
+    for arg in got:
+        if args.dir != '/' and arg != '.' and (typ == 3 or (typ == 2 and not am_sender)):
+            arg_has_trailing_slash = arg.endswith('/')
+            if arg_has_trailing_slash:
+                arg = arg[:-1]
+            else:
+                arg_has_trailing_slash_dot = arg.endswith('/.')
+                if arg_has_trailing_slash_dot:
+                    arg = arg[:-2]
+            real_arg = os.path.realpath(arg)
+            if arg != real_arg and not real_arg.startswith(args.dir_slash):
+                die('unsafe arg:', orig_arg, [arg, real_arg])
+            if arg_has_trailing_slash:
+                arg += '/'
+            elif arg_has_trailing_slash_dot:
+                arg += '/.'
+            if opt == 'arg' and arg.startswith(args.dir_slash):
+                arg = arg[args.dir_slash_len:]
+                if arg == '':
+                    arg = '.'
+        ret.append(arg)
+
+    return ret if wild else ret[0]
+
+
+def die(*msg):
+    print(sys.argv[0], 'error:', *msg, file=sys.stderr)
+    if sys.stdin.isatty():
+        arg_parser.print_help(sys.stderr)
+    sys.exit(1)
+
+
+# This class displays the --help to the user on argparse error IFF they're running it interactively.
+class OurArgParser(argparse.ArgumentParser):
+    def error(self, msg):
+        die(msg)
+
+
+if __name__ == '__main__':
+    our_desc = """Use "man rrsync" to learn how to restrict ssh users to using a restricted rsync command."""
+    arg_parser = OurArgParser(description=our_desc, add_help=False)
+    only_group = arg_parser.add_mutually_exclusive_group()
+    only_group.add_argument('-ro', action='store_true', help="Allow only reading from the DIR. Implies -no-del.")
+    only_group.add_argument('-wo', action='store_true', help="Allow only writing to the DIR.")
+    arg_parser.add_argument('-no-del', action='store_true', help="Disable rsync's --delete* and --remove* options.")
+    arg_parser.add_argument('-munge', action='store_true', help="Enable rsync's --munge-links on the server side.")
+    arg_parser.add_argument('-help', '-h', action='help', help="Output this help message and exit.")
+    arg_parser.add_argument('dir', metavar='DIR', help="The restricted directory to use.")
+    args = arg_parser.parse_args()
+    args.dir = os.path.realpath(args.dir)
+    args.dir_slash = args.dir + '/'
+    args.dir_slash_len = len(args.dir)
+    if args.ro:
+        args.no_del = True
+    main()
+
+# vim: sw=4 et

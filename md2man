@@ -85,7 +85,9 @@ def main():
         die('Failed to parse NAME.NUM.md out of input file:', args.mdfile)
     fi = argparse.Namespace(**fi.groupdict())
 
-    if not fi.srcdir:
+    if args.srcdir:
+        fi.srcdir = args.srcdir + '/'
+    elif not fi.srcdir:
         fi.srcdir = './'
 
     fi.title = fi.prog + '(' + fi.sect + ') man page'
@@ -105,7 +107,7 @@ def main():
         for fn in (fi.srcdir + 'version.h', 'Makefile'):
             try:
                 st = os.lstat(fn)
-            except:
+            except OSError:
                 die('Failed to find', fi.srcdir + fn)
             if not fi.mtime:
                 fi.mtime = st.st_mtime
@@ -129,6 +131,10 @@ def main():
                 if var == 'srcdir':
                     break
 
+    fi.prog_ver = 'rsync ' + env_subs['VERSION']
+    if fi.prog != 'rsync':
+        fi.prog_ver = fi.prog + ' from ' + fi.prog_ver
+
     with open(fi.fn, 'r', encoding='utf-8') as fh:
         txt = fh.read()
 
@@ -140,7 +146,7 @@ def main():
     txt = None
 
     fi.date = time.strftime('%d %b %Y', time.localtime(fi.mtime))
-    fi.man_headings = (fi.prog, fi.sect, fi.date, fi.prog + ' ' + env_subs['VERSION'], env_subs['prefix'])
+    fi.man_headings = (fi.prog, fi.sect, fi.date, fi.prog_ver, env_subs['prefix'])
 
     HtmlToManPage(fi)
 
@@ -374,6 +380,7 @@ def die(*msg):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Transform a NAME.NUM.md markdown file into a NAME.NUM.html web page & a NAME.NUM man page.', add_help=False)
+    parser.add_argument('--srcdir', '-s', help='Specify the source dir if the input file is not in it.')
     parser.add_argument('--test', action='store_true', help='Test if we can parse the input w/o updating any files.')
     parser.add_argument('--debug', '-D', action='count', default=0, help='Output copious info on the html parsing. Repeat for even more.')
     parser.add_argument("--help", "-h", action="help", help="Output this help message and exit.")

@@ -136,6 +136,13 @@ if test x"$GCC" = x"yes"; then
 	CFLAGS="$CFLAGS -Wall -W"
 fi
 
+AC_ARG_WITH(rrsync,
+        AS_HELP_STRING([--with-rrsync],[also install the rrsync script and its man page]))
+if test x"$with_rrsync" != x"yes"; then
+    with_rrsync=no
+fi
+AC_SUBST(with_rrsync)
+
 AC_ARG_WITH(included-popt,
         AS_HELP_STRING([--with-included-popt],[use bundled popt library, not from system]))
 

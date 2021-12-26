@@ -37,4 +37,4 @@ if [ ! -f "$flagfile" ]; then
     fi
 fi
 
-"$srcdir/md2man" "$srcdir/$inname"
+"$srcdir/md2man" -s "$srcdir" "$srcdir/$inname"

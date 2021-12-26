@@ -18,6 +18,8 @@ GetOptions(
     'rrsync=s' => \( my $rrsync_dir ),
     'ro' => \( my $rrsync_ro = '' ),
     'wo' => \( my $rrsync_wo = '' ),
+    'munge' => \( my $rrsync_munge = '' ),
+    'no-del' => \( my $rrsync_no_del = '' ),
 ) or &usage;
 &usage unless @ARGV > 1;
 
@@ -71,16 +73,12 @@ unless ($no_chdir) {
 }
 
 if ($rrsync_dir) {
-    my $cmd = '';
-    foreach (@ARGV) {
-	(my $arg = $_) =~ s/(['";|()\[\]{}\$!*?<> \t&~\\])/\\$1/g;
-	$cmd .= ' ' . $arg;
-    }
-    $cmd =~ s/^\s+//;
-    $ENV{SSH_ORIGINAL_COMMAND} = $cmd;
+    $ENV{SSH_ORIGINAL_COMMAND} = join(' ', @ARGV);
     push @cmd, 'rrsync';
     push @cmd, '-ro' if $rrsync_ro;
     push @cmd, '-wo' if $rrsync_wo;
+    push @cmd, '-munge' if $rrsync_munge;
+    push @cmd, '-no-del' if $rrsync_no_del;
     push @cmd, $rrsync_dir;
 } else {
     push @cmd, '/bin/sh', '-c', "@ARGV";

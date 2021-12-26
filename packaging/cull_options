@@ -7,7 +7,7 @@ import re, argparse
 
 short_no_arg = { }
 short_with_num = { '@': 1 };
-long_opt = { # These include some extra long-args that BackupPC uses:
+long_opts = { # These include some extra long-args that BackupPC uses:
         'block-size': 1,
         'daemon': -1,
         'debug': 1,
@@ -25,6 +25,7 @@ long_opt = { # These include some extra long-args that BackupPC uses:
         'owner': 0,
         'perms': 0,
         'recursive': 0,
+        'stderr': 1,
         'times': 0,
         'write-devices': -1,
         }
@@ -49,8 +50,8 @@ def main():
             m = re.search(r'args\[ac\+\+\] = "--([^"=]+)"', line)
             if m:
                 last_long_opt = m.group(1)
-                if last_long_opt not in long_opt:
-                    long_opt[last_long_opt] = 0
+                if last_long_opt not in long_opts:
+                    long_opts[last_long_opt] = 0
                 else:
                     last_long_opt = None
                 continue
@@ -58,13 +59,13 @@ def main():
             if last_long_opt:
                 m = re.search(r'args\[ac\+\+\] = ([^["\s]+);', line)
                 if m:
-                    long_opt[last_long_opt] = 2
+                    long_opts[last_long_opt] = 2
                     last_long_opt = None
                     continue
 
             m = re.search(r'return "--([^"]+-dest)";', line)
             if m:
-                long_opt[m.group(1)] = 2
+                long_opts[m.group(1)] = 2
                 last_long_opt = None
                 continue
 
@@ -74,19 +75,18 @@ def main():
                 if not m:
                     m = re.search(r'fmt = .*: "--([^"=]+)=', line)
             if m:
-                long_opt[m.group(1)] = 1
+                long_opts[m.group(1)] = 1
                 last_long_opt = None
 
-    long_opt['files-from'] = 3
+    long_opts['files-from'] = 3
 
-    txt = """
-# These options are the only options that rsync might send to the server,
-# and only in the option format that the stock rsync produces.
+    txt = """\
+### START of options data produced by the cull_options script. ###
 
 # To disable a short-named option, add its letter to this string:
 """
 
-    txt += str_assign('short_disabled', 's') + "\n"
+    txt += str_assign('short_disabled', 'Ls') + "\n"
     txt += str_assign('short_no_arg', ''.join(sorted(short_no_arg)), 'DO NOT REMOVE ANY')
     txt += str_assign('short_with_num', ''.join(sorted(short_with_num)), 'DO NOT REMOVE ANY')
    
@@ -99,24 +99,24 @@ def main():
     print(txt, end='')
 
     if args.python:
-        print("long_opt = {")
+        print("long_opts = {")
         sep = ':'
     else:
         print("our %long_opt = (")
         sep = ' =>'
 
-    for opt in sorted(long_opt):
+    for opt in sorted(long_opts):
         if opt.startswith(('min-', 'max-')):
             val = 1
         else:
-            val = long_opt[opt]
+            val = long_opts[opt]
         print(' ', repr(opt) + sep, str(val) + ',')
 
     if args.python:
         print("}")
     else:
         print(");")
-    print('')
+    print("\n### END of options data produced by the cull_options script. ###")
 
 
 def str_assign(name, val, comment=None):
@@ -129,10 +129,12 @@ def str_assign(name, val, comment=None):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Output culled rsync options for rrsync.", add_help=False)
     out_group = parser.add_mutually_exclusive_group()
-    out_group.add_argument('--perl', action='store_true', help="Output perl code (the default).")
-    out_group.add_argument('--python', action='store_true', help="Output python code.")
+    out_group.add_argument('--perl', action='store_true', help="Output perl code.")
+    out_group.add_argument('--python', action='store_true', help="Output python code (the default).")
     parser.add_argument('--help', '-h', action='help', help="Output this help message and exit.")
     args = parser.parse_args()
+    if not args.perl:
+        args.python = True
     main()
 
 # vim: sw=4 et
