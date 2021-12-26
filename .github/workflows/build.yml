@@ -22,9 +22,9 @@ jobs:
         wget -O git-version.h https://gist.githubusercontent.com/WayneD/c11243fa374fc64d4e42f2855c8e3827/raw/rsync-git-version.h
         echo "/usr/local/bin" >>$GITHUB_PATH
     - name: configure
-      run: ./configure
+      run: ./configure --with-rrsync
     - name: make
-      run: make
+      run: make all rrsync
     - name: install
       run: sudo make install
     - name: info
@@ -47,6 +47,8 @@ jobs:
           rsync.1
           rsync-ssl.1
           rsyncd.conf.5
+          rrsync.1
+          rrsync
 
   macos-build:
     runs-on: macos-latest
@@ -59,9 +61,9 @@ jobs:
         wget -O git-version.h https://gist.githubusercontent.com/WayneD/c11243fa374fc64d4e42f2855c8e3827/raw/rsync-git-version.h
         echo "/usr/local/bin" >>$GITHUB_PATH
     - name: configure
-      run: CPPFLAGS=-I/usr/local/opt/openssl/include/ LDFLAGS=-L/usr/local/opt/openssl/lib/ ./configure
+      run: CPPFLAGS=-I/usr/local/opt/openssl/include/ LDFLAGS=-L/usr/local/opt/openssl/lib/ ./configure --with-rrsync
     - name: make
-      run: make
+      run: make all rrsync
     - name: install
       run: sudo make install
     - name: info
@@ -80,6 +82,8 @@ jobs:
           rsync.1
           rsync-ssl.1
           rsyncd.conf.5
+          rrsync.1
+          rrsync
 
   cygwin-build:
     runs-on: windows-latest
@@ -97,9 +101,9 @@ jobs:
     - name: commonmark
       run: bash -c 'python3 -mpip install --user commonmark'
     - name: configure
-      run: bash -c './configure'
+      run: bash -c './configure --with-rrsync'
     - name: make
-      run: bash -c 'make'
+      run: bash -c 'make all rrsync'
     - name: install
       run: bash -c 'make install'
     - name: info
@@ -118,3 +122,5 @@ jobs:
           rsync.1
           rsync-ssl.1
           rsyncd.conf.5
+          rrsync.1
+          rrsync

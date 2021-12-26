@@ -101,6 +101,9 @@ install-strip:
 rsync$(EXEEXT): $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
 
+rrsync: support/rrsync
+	cp -p $(srcdir)/support/rrsync rrsync
+
 $(OBJS): $(HEADERS)
 $(CHECK_OBJS): $(HEADERS)
 tls.o xattrs.o: lib/sysxattrs.h
