@@ -780,6 +780,11 @@ struct ht_int64_node {
 
 #if defined __STDC_VERSION__ && __STDC_VERSION__ >= 199901L
 #define USE_FLEXIBLE_ARRAY 1
+#define SIZE_T_FMT_MOD "z" /* printf supports %zd */
+#define SIZE_T_FMT_CAST size_t
+#else
+#define SIZE_T_FMT_MOD "l" /* printf supports %ld */
+#define SIZE_T_FMT_CAST long
 #endif
 
 union file_extras {
@@ -1473,3 +1478,9 @@ const char *get_panic_action(void);
     exit_cleanup(RERR_UNSUPPORTED); \
 } while (0)
 #endif  /* AVX2_ASM */
+
+#ifdef HAVE_MALLINFO2
+#define MEM_ALLOC_INFO mallinfo2
+#elif defined HAVE_MALLINFO
+#define MEM_ALLOC_INFO mallinfo
+#endif
