@@ -467,38 +467,44 @@ static void output_summary(void)
  **/
 static void show_malloc_stats(void)
 {
-#ifdef HAVE_MALLINFO
+#if defined(HAVE_MALLINFO2)
+	struct mallinfo2 mi;
+
+	mi = mallinfo2();
+#elif defined(HAVE_MALLINFO)
 	struct mallinfo mi;
 
 	mi = mallinfo();
-
-	rprintf(FCLIENT, "\n");
-	rprintf(FINFO, RSYNC_NAME "[%d] (%s%s%s) heap statistics:\n",
-		(int)getpid(), am_server ? "server " : "",
-		am_daemon ? "daemon " : "", who_am_i());
-	rprintf(FINFO, "  arena:     %10ld   (bytes from sbrk)\n",
-		(long)mi.arena);
-	rprintf(FINFO, "  ordblks:   %10ld   (chunks not in use)\n",
-		(long)mi.ordblks);
-	rprintf(FINFO, "  smblks:    %10ld\n",
-		(long)mi.smblks);
-	rprintf(FINFO, "  hblks:     %10ld   (chunks from mmap)\n",
-		(long)mi.hblks);
-	rprintf(FINFO, "  hblkhd:    %10ld   (bytes from mmap)\n",
-		(long)mi.hblkhd);
-	rprintf(FINFO, "  allmem:    %10ld   (bytes from sbrk + mmap)\n",
-		(long)mi.arena + mi.hblkhd);
-	rprintf(FINFO, "  usmblks:   %10ld\n",
-		(long)mi.usmblks);
-	rprintf(FINFO, "  fsmblks:   %10ld\n",
-		(long)mi.fsmblks);
-	rprintf(FINFO, "  uordblks:  %10ld   (bytes used)\n",
-		(long)mi.uordblks);
-	rprintf(FINFO, "  fordblks:  %10ld   (bytes free)\n",
-		(long)mi.fordblks);
-	rprintf(FINFO, "  keepcost:  %10ld   (bytes in releasable chunk)\n",
-		(long)mi.keepcost);
 #endif /* HAVE_MALLINFO */
+
+#if defined(HAVE_MALLINFO) || defined(HAVE_MALLINFO2)
+	rprintf(FCLIENT, "\n");
+	rprintf(FINFO, RSYNC_NAME "[%ld] (%s%s%s) heap statistics:\n",
+		(long)getpid(), am_server ? "server " : "",
+		am_daemon ? "daemon " : "", who_am_i());
+	rprintf(FINFO, "  arena:     %10zd   (bytes from sbrk)\n",
+		(size_t)mi.arena);
+	rprintf(FINFO, "  ordblks:   %10zd   (chunks not in use)\n",
+		(size_t)mi.ordblks);
+	rprintf(FINFO, "  smblks:    %10zd\n",
+		(size_t)mi.smblks);
+	rprintf(FINFO, "  hblks:     %10zd   (chunks from mmap)\n",
+		(size_t)mi.hblks);
+	rprintf(FINFO, "  hblkhd:    %10zd   (bytes from mmap)\n",
+		(size_t)mi.hblkhd);
+	rprintf(FINFO, "  allmem:    %10zd   (bytes from sbrk + mmap)\n",
+		(size_t)mi.arena + mi.hblkhd);
+	rprintf(FINFO, "  usmblks:   %10zd\n",
+		(size_t)mi.usmblks);
+	rprintf(FINFO, "  fsmblks:   %10zd\n",
+		(size_t)mi.fsmblks);
+	rprintf(FINFO, "  uordblks:  %10zd   (bytes used)\n",
+		(size_t)mi.uordblks);
+	rprintf(FINFO, "  fordblks:  %10zd   (bytes free)\n",
+		(size_t)mi.fordblks);
+	rprintf(FINFO, "  keepcost:  %10zd   (bytes in releasable chunk)\n",
+		(size_t)mi.keepcost);
+#endif /* HAVE_MALLINFO || HAVE_MALLINFO2 */
 }
 
 
