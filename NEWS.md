@@ -4472,3 +4472,5 @@
 
 \* DATE OF COMMIT is the date the protocol change was committed to version
 control.
+
+@USE_GFM_PARSER@

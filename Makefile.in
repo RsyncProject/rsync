@@ -257,16 +257,16 @@ proto.h-tstamp: $(srcdir)/*.c $(srcdir)/lib/compat.c daemon-parm.h
 .PHONY: man
 man: rsync.1 rsync-ssl.1 rsyncd.conf.5 rrsync.1
 
-rsync.1: rsync.1.md md2man version.h Makefile
+rsync.1: rsync.1.md md-convert version.h Makefile
 	@$(srcdir)/maybe-make-man $(srcdir) rsync.1.md
 
-rsync-ssl.1: rsync-ssl.1.md md2man version.h Makefile
+rsync-ssl.1: rsync-ssl.1.md md-convert version.h Makefile
 	@$(srcdir)/maybe-make-man $(srcdir) rsync-ssl.1.md
 
-rsyncd.conf.5: rsyncd.conf.5.md md2man version.h Makefile
+rsyncd.conf.5: rsyncd.conf.5.md md-convert version.h Makefile
 	@$(srcdir)/maybe-make-man $(srcdir) rsyncd.conf.5.md
 
-rrsync.1: support/rrsync.1.md md2man Makefile
+rrsync.1: support/rrsync.1.md md-convert Makefile
 	@$(srcdir)/maybe-make-man $(srcdir) support/rrsync.1.md
 
 .PHONY: clean

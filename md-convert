@@ -1,28 +1,35 @@
 #!/usr/bin/env python3
 
-# This script takes a manpage written in markdown and turns it into an html web
-# page and a nroff man page.  The input file must have the name of the program
-# and the section in this format: NAME.NUM.md.  The output files are written
-# into the current directory named NAME.NUM.html and NAME.NUM.  The input
-# format has one extra extension: if a numbered list starts at 0, it is turned
-# into a description list. The dl's dt tag is taken from the contents of the
-# first tag inside the li, which is usually a p, code, or strong tag.  The
-# cmarkgfm or commonmark lib is used to transforms the input file into html.
-# The html.parser is used as a state machine that both tweaks the html and
-# outputs the nroff data based on the html tags.
+# This script transforms markdown files into html and (optionally) nroff. The
+# output files are written into the current directory named for the input file
+# without the .md suffix and either the .html suffix or no suffix.
 #
-# We normally grab the prefix from the generated Makefile, which is then used
-# in the various other grabbed values (see the Makefile for its ${prefix}
-# paths).  However, the maintainer can choose to override this prefix by
-# exporting RSYNC_OVERRIDE_PREFIX=/usr.  This allows the man pages to refer to
-# /usr paths (and are thus compatible with the release-rsync script) while
-# still having the built rsync get installed into /usr/local for local testing.
+# If the input .md file has a section number at the end of the name (e.g.,
+# rsync.1.md) a nroff file is also output (PROJ.NUM.md -> PROJ.NUM).
 #
-# Copyright (C) 2020 Wayne Davison
+# The markdown input format has one extra extension: if a numbered list starts
+# at 0, it is turned into a description list. The dl's dt tag is taken from the
+# contents of the first tag inside the li, which is usually a p, code, or
+# strong tag.
+#
+# The cmarkgfm or commonmark lib is used to transforms the input file into
+# html.  Then, the html.parser is used as a state machine that lets us tweak
+# the html and (optionally) output nroff data based on the html tags.
+#
+# If the string @USE_GFM_PARSER@ exists in the file, the string is removed and
+# a github-flavored-markup parser is used to parse the file.
+#
+# The man-page .md files also get the vars @VERSION@, @BINDIR@, and @LIBDIR@
+# substituted.  Some of these values depend on the Makefile $(prefix) (see the
+# generated Makefile).  If the maintainer wants to build files for /usr/local
+# while creating release-ready man-page files for /usr, use the environment to
+# set RSYNC_OVERRIDE_PREFIX=/usr.
+
+# Copyright (C) 2020 - 2021 Wayne Davison
 #
 # This program is freely redistributable.
 
-import sys, os, re, argparse, subprocess, time
+import os, sys, re, argparse, subprocess, time
 from html.parser import HTMLParser
 
 CONSUMES_TXT = set('h1 h2 p li pre'.split())
@@ -58,8 +65,30 @@ dd p:first-of-type {
 </head><body>
 """
 
-HTML_END = """\
+TABLE_STYLE = """\
+table {
+  border-color: grey;
+  border-spacing: 0;
+}
+tr {
+  border-top: 1px solid grey;
+}
+tr:nth-child(2n) {
+  background-color: #f6f8fa;
+}
+th, td {
+  border: 1px solid #dfe2e5;
+  text-align: center;
+  padding-left: 1em;
+  padding-right: 1em;
+}
+"""
+
+MAN_HTML_END = """\
 <div style="float: right"><p><i>%s</i></p></div>
+"""
+
+HTML_END = """\
 </body></html>
 """
 
@@ -78,41 +107,96 @@ NBR_DASH = ('\4', r"\-")
 NBR_SPACE = ('\xa0', r"\ ")
 
 md_parser = None
+env_subs = { }
 
 def main():
-    fi = re.match(r'^(?P<fn>(?P<srcdir>.+/)?(?P<name>(?P<prog>[^/]+)\.(?P<sect>\d+))\.md)$', args.mdfile)
+    for mdfn in args.mdfiles:
+        parse_md_file(mdfn)
+
+    if args.test:
+        print("The test was successful.")
+
+
+def parse_md_file(mdfn):
+    fi = re.match(r'^(?P<fn>(?P<srcdir>.+/)?(?P<name>(?P<prog>[^/]+?)(\.(?P<sect>\d+))?)\.md)$', mdfn)
     if not fi:
-        die('Failed to parse NAME.NUM.md out of input file:', args.mdfile)
+        die('Failed to parse a md input file name:', mdfn)
     fi = argparse.Namespace(**fi.groupdict())
+    fi.want_manpage = not not fi.sect
+    if fi.want_manpage:
+        fi.title = fi.prog + '(' + fi.sect + ') man page'
+    else:
+        fi.title = fi.prog
 
-    if args.srcdir:
-        fi.srcdir = args.srcdir + '/'
-    elif not fi.srcdir:
-        fi.srcdir = './'
+    if fi.want_manpage:
+        if not env_subs:
+            find_man_substitutions()
+        prog_ver = 'rsync ' + env_subs['VERSION']
+        if fi.prog != 'rsync':
+            prog_ver = fi.prog + ' from ' + prog_ver
+        fi.man_headings = (fi.prog, fi.sect, env_subs['date'], prog_ver, env_subs['prefix'])
 
-    fi.title = fi.prog + '(' + fi.sect + ') man page'
-    fi.mtime = 0
+    with open(mdfn, 'r', encoding='utf-8') as fh:
+        txt = fh.read()
 
-    git_dir = fi.srcdir + '.git'
+    use_gfm_parser = '@USE_GFM_PARSER@' in txt
+    if use_gfm_parser:
+        txt = txt.replace('@USE_GFM_PARSER@', '')
+
+    if fi.want_manpage:
+        txt = (txt.replace('@VERSION@', env_subs['VERSION'])
+                  .replace('@BINDIR@', env_subs['bindir'])
+                  .replace('@LIBDIR@', env_subs['libdir']))
+
+    if use_gfm_parser:
+        if not gfm_parser:
+            die('Input file requires cmarkgfm parser:', mdfn)
+        fi.html_in = gfm_parser(txt)
+    else:
+        fi.html_in = md_parser(txt)
+    txt = None
+
+    TransformHtml(fi)
+
+    if args.test:
+        return
+
+    output_list = [ (fi.name + '.html', fi.html_out) ]
+    if fi.want_manpage:
+        output_list += [ (fi.name, fi.man_out) ]
+    for fn, txt in output_list:
+        if os.path.lexists(fn):
+            os.unlink(fn)
+        print("Wrote:", fn)
+        with open(fn, 'w', encoding='utf-8') as fh:
+            fh.write(txt)
+
+
+def find_man_substitutions():
+    srcdir = os.path.dirname(sys.argv[0]) + '/'
+    mtime = 0
+
+    git_dir = srcdir + '.git'
     if os.path.lexists(git_dir):
-        fi.mtime = int(subprocess.check_output(['git', '--git-dir', git_dir, 'log', '-1', '--format=%at']))
+        mtime = int(subprocess.check_output(['git', '--git-dir', git_dir, 'log', '-1', '--format=%at']))
 
-    env_subs = { 'prefix': os.environ.get('RSYNC_OVERRIDE_PREFIX', None) }
+    # Allow "prefix" to be overridden via the environment:
+    env_subs['prefix'] = os.environ.get('RSYNC_OVERRIDE_PREFIX', None)
 
     if args.test:
         env_subs['VERSION'] = '1.0.0'
         env_subs['bindir'] = '/usr/bin'
         env_subs['libdir'] = '/usr/lib/rsync'
     else:
-        for fn in (fi.srcdir + 'version.h', 'Makefile'):
+        for fn in (srcdir + 'version.h', 'Makefile'):
             try:
                 st = os.lstat(fn)
             except OSError:
-                die('Failed to find', fi.srcdir + fn)
-            if not fi.mtime:
-                fi.mtime = st.st_mtime
+                die('Failed to find', srcdir + fn)
+            if not mtime:
+                mtime = st.st_mtime
 
-        with open(fi.srcdir + 'version.h', 'r', encoding='utf-8') as fh:
+        with open(srcdir + 'version.h', 'r', encoding='utf-8') as fh:
             txt = fh.read()
         m = re.search(r'"(.+?)"', txt)
         env_subs['VERSION'] = m.group(1)
@@ -131,40 +215,14 @@ def main():
                 if var == 'srcdir':
                     break
 
-    fi.prog_ver = 'rsync ' + env_subs['VERSION']
-    if fi.prog != 'rsync':
-        fi.prog_ver = fi.prog + ' from ' + fi.prog_ver
-
-    with open(fi.fn, 'r', encoding='utf-8') as fh:
-        txt = fh.read()
-
-    txt = re.sub(r'@VERSION@', env_subs['VERSION'], txt)
-    txt = re.sub(r'@BINDIR@', env_subs['bindir'], txt)
-    txt = re.sub(r'@LIBDIR@', env_subs['libdir'], txt)
-
-    fi.html_in = md_parser(txt)
-    txt = None
-
-    fi.date = time.strftime('%d %b %Y', time.localtime(fi.mtime))
-    fi.man_headings = (fi.prog, fi.sect, fi.date, fi.prog_ver, env_subs['prefix'])
-
-    HtmlToManPage(fi)
-
-    if args.test:
-        print("The test was successful.")
-        return
-
-    for fn, txt in ((fi.name + '.html', fi.html_out), (fi.name, fi.man_out)):
-        print("Wrote:", fn)
-        with open(fn, 'w', encoding='utf-8') as fh:
-            fh.write(txt)
+    env_subs['date'] = time.strftime('%d %b %Y', time.localtime(mtime))
 
 
 def html_via_commonmark(txt):
     return commonmark.HtmlRenderer().render(commonmark.Parser().parse(txt))
 
 
-class HtmlToManPage(HTMLParser):
+class TransformHtml(HTMLParser):
     def __init__(self, fi):
         HTMLParser.__init__(self, convert_charrefs=True)
 
@@ -177,14 +235,23 @@ class HtmlToManPage(HTMLParser):
                 in_pre = False,
                 in_code = False,
                 html_out = [ HTML_START % fi.title ],
-                man_out = [ MAN_START % fi.man_headings ],
+                man_out = [ ],
                 txt = '',
+                want_manpage = fi.want_manpage,
                 )
+
+        if st.want_manpage:
+            st.man_out.append(MAN_START % fi.man_headings)
+
+        if '</table>' in fi.html_in:
+            st.html_out[0] = st.html_out[0].replace('</style>', TABLE_STYLE + '</style>')
 
         self.feed(fi.html_in)
         fi.html_in = None
 
-        st.html_out.append(HTML_END % fi.date)
+        if st.want_manpage:
+            st.html_out.append(MAN_HTML_END % env_subs['date'])
+        st.html_out.append(HTML_END)
         st.man_out.append(MAN_END)
 
         fi.html_out = ''.join(st.html_out)
@@ -232,8 +299,9 @@ class HtmlToManPage(HTMLParser):
         elif tag == 'strong' or tag == 'b':
             st.txt += BOLD_FONT[0]
         elif tag == 'em' or  tag == 'i':
-            tag = 'u' # Change it into underline to be more like the man page
-            st.txt += UNDR_FONT[0]
+            if st.want_manpage:
+                tag = 'u' # Change it into underline to be more like the man page
+                st.txt += UNDR_FONT[0]
         elif tag == 'ol':
             start = 1
             for var, val in attrs_list:
@@ -256,6 +324,10 @@ class HtmlToManPage(HTMLParser):
                 st.man_out.append(".RS\n")
                 st.p_macro = ".IP\n"
             st.list_state.append('o')
+        elif tag == 'hr':
+            st.man_out.append(".l\n")
+            st.html_out.append("<hr />")
+            return
         st.html_out.append('<' + tag + ''.join(' ' + var + '="' + htmlify(val) + '"' for var, val in attrs_list) + '>')
         st.at_first_tag_in_dd = False
 
@@ -300,8 +372,9 @@ class HtmlToManPage(HTMLParser):
         elif tag == 'strong' or tag == 'b':
             add_to_txt = NORM_FONT[0]
         elif tag == 'em' or  tag == 'i':
-            tag = 'u' # Change it into underline to be more like the man page
-            add_to_txt = NORM_FONT[0]
+            if st.want_manpage:
+                tag = 'u' # Change it into underline to be more like the man page
+                add_to_txt = NORM_FONT[0]
         elif tag == 'ol' or tag == 'ul':
             if st.list_state.pop() == 'dl':
                 tag = 'dl'
@@ -310,6 +383,8 @@ class HtmlToManPage(HTMLParser):
             else:
                 st.p_macro = ".P\n"
             st.at_first_tag_in_dd = False
+        elif tag == 'hr':
+            return
         st.html_out.append('</' + tag + '>')
         if add_to_txt:
             if txt is None:
@@ -379,22 +454,23 @@ def die(*msg):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Transform a NAME.NUM.md markdown file into a NAME.NUM.html web page & a NAME.NUM man page.', add_help=False)
-    parser.add_argument('--srcdir', '-s', help='Specify the source dir if the input file is not in it.')
-    parser.add_argument('--test', action='store_true', help='Test if we can parse the input w/o updating any files.')
+    parser = argparse.ArgumentParser(description="Output html and (optionally) nroff for markdown pages.", add_help=False)
+    parser.add_argument('--test', action='store_true', help="Just test the parsing without outputting any files.")
     parser.add_argument('--debug', '-D', action='count', default=0, help='Output copious info on the html parsing. Repeat for even more.')
     parser.add_argument("--help", "-h", action="help", help="Output this help message and exit.")
-    parser.add_argument('mdfile', help="The NAME.NUM.md file to parse.")
+    parser.add_argument("mdfiles", nargs='+', help="The source .md files to convert.")
     args = parser.parse_args()
 
     try:
         import cmarkgfm
         md_parser = cmarkgfm.markdown_to_html
+        gfm_parser = cmarkgfm.github_flavored_markdown_to_html
     except:
         try:
             import commonmark
             md_parser = html_via_commonmark
         except:
             die("Failed to find cmarkgfm or commonmark for python3.")
+        gfm_parser = None
 
     main()
