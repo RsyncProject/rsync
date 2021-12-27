@@ -45,11 +45,11 @@ OBJS1=flist.o rsync.o generator.o receiver.o cleanup.o sender.o exclude.o \
 	util1.o util2.o main.o checksum.o match.o syscall.o log.o backup.o delete.o
 OBJS2=options.o io.o compat.o hlink.o token.o uidlist.o socket.o hashtable.o \
 	usage.o fileio.o batch.o clientname.o chmod.o acls.o xattrs.o
-OBJS3=progress.o pipe.o @ASM@
+OBJS3=progress.o pipe.o @ASM@ @SIMD@
 DAEMON_OBJ = params.o loadparm.o clientserver.o access.o connection.o authenticate.o
 popt_OBJS=popt/findme.o  popt/popt.o  popt/poptconfig.o \
 	popt/popthelp.o popt/poptparse.o
-OBJS=$(OBJS1) $(OBJS2) $(OBJS3) @SIMD@ $(DAEMON_OBJ) $(LIBOBJ) @BUILD_ZLIB@ @BUILD_POPT@
+OBJS=$(OBJS1) $(OBJS2) $(OBJS3) $(DAEMON_OBJ) $(LIBOBJ) @BUILD_ZLIB@ @BUILD_POPT@
 
 TLS_OBJ = tls.o syscall.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/permstring.o lib/sysxattrs.o @BUILD_POPT@
 
@@ -68,7 +68,7 @@ CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o trimslash.
 	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) -c $< @CC_SHOBJ_FLAG@
 @OBJ_RESTORE@
 
-all: Makefile rsync$(EXEEXT) stunnel-rsyncd.conf @MAKE_MAN@
+all: Makefile rsync$(EXEEXT) stunnel-rsyncd.conf @MAKE_RRSYNC@ @MAKE_MAN@
 .PHONY: all
 
 .PHONY: install
@@ -255,7 +255,7 @@ proto.h-tstamp: $(srcdir)/*.c $(srcdir)/lib/compat.c daemon-parm.h
 	$(AWK) -f $(srcdir)/mkproto.awk $(srcdir)/*.c $(srcdir)/lib/compat.c daemon-parm.h
 
 .PHONY: man
-man: rsync.1 rsync-ssl.1 rsyncd.conf.5 rrsync.1
+man: rsync.1 rsync-ssl.1 rsyncd.conf.5 @MAKE_RRSYNC_1@
 
 rsync.1: rsync.1.md md-convert version.h Makefile
 	@$(srcdir)/maybe-make-man $(srcdir) rsync.1.md

@@ -117,7 +117,6 @@ if test x"$enable_md2man" != x"no"; then
     MAKE_MAN=man
 else
     AC_MSG_RESULT(no)
-    MAKE_MAN=''
 fi
 
 # Specifically, this turns on panic_action handling.
@@ -140,6 +139,9 @@ AC_ARG_WITH(rrsync,
         AS_HELP_STRING([--with-rrsync],[also install the rrsync script and its man page]))
 if test x"$with_rrsync" != x"yes"; then
     with_rrsync=no
+else
+    MAKE_RRSYNC='rrsync'
+    MAKE_RRSYNC_1='rrsync.1'
 fi
 AC_SUBST(with_rrsync)
 
@@ -1253,6 +1255,8 @@ AC_SUBST(OBJ_RESTORE)
 AC_SUBST(CC_SHOBJ_FLAG)
 AC_SUBST(BUILD_POPT)
 AC_SUBST(BUILD_ZLIB)
+AC_SUBST(MAKE_RRSYNC)
+AC_SUBST(MAKE_RRSYNC_1)
 AC_SUBST(MAKE_MAN)
 
 AC_CHECK_FUNCS(_acl __acl _facl __facl)
