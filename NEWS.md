@@ -78,7 +78,7 @@
  - The rsync daemon can now handle a client address with an implied "%scope"
    suffix.
 
- - Added support for `--atimes` on macOS and fixed using using it without -t.
+ - Added support for `--atimes` on macOS and fixed using using it without `-t`.
 
  - Rsync can now update the xattrs on a read-only file when your user can
    temporarily add user-write permission to the file. (It always worked for a
@@ -113,7 +113,7 @@
 
 ### PACKAGING RELATED:
 
- - Give configure the --with-rrsync option if you want `make install` to
+ - Give configure the `--with-rrsync` option if you want `make install` to
    install the (now python3) rrsync script and its (new) man page.
 
  - If the rrsync script is installed, make its package depend on python3 and
@@ -1327,7 +1327,7 @@
    that hasn't really been created.
 
  - Fixed a problem with `--compress` (`-z`) where the receiving side could
-   return the error "inflate (token) returned -5".
+   return the error "`inflate (token) returned -5`".
 
  - Fixed a bug where `--delete-during` could delete in a directory before it
    noticed that the sending side sent an I/O error for that directory (both
@@ -1346,7 +1346,7 @@
  - An absolute-path filter rule (i.e. with a '/' modifier) no longer loses its
    modifier when sending the filter rules to the remote rsync.
 
- - Improved the "--delete does not work without -r or -d" message.
+ - Improved the "`--delete does not work without -r or -d`" message.
 
  - Improved rsync's handling of `--timeout` to avoid a weird timeout case where
    the sender could timeout even though it has recently written data to the
@@ -1657,8 +1657,8 @@
    of a proto.h-tstamp rule that could make the binaries get rebuild without
    cause.
 
- - Improved the testsuite to work around a problem with some utilities (e.g. cp
-   -p & touch -r) rounding sub-second timestamps.
+ - Improved the testsuite to work around a problem with some utilities (e.g.
+   `cp -p` & `touch -r`) rounding sub-second timestamps.
 
  - Ensure that the early patches don't cause any generated-file hunks to
    bleed-over into patches that follow.
@@ -4367,7 +4367,7 @@
    - HP PA-RISC HP-UX 11.11 cc
    - IRIX 6.5 MIPS cc
    - IRIX 6.5 MIPS gcc
-   - Mac OS X PPC (--disable-ipv6) cc
+   - Mac OS X PPC (`--disable-ipv6`) cc
    - NetBSD 1.5 i386 gcc
    - NetBSD Current i386 cc
    - OpenBSD 2.5 Sparc gcc

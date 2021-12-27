@@ -178,9 +178,9 @@ config.h, or just override them in your /etc/rsyncd.conf file.
 As of 2.4.7, rsync uses Eric Troan's popt option-parsing library.  A
 cut-down copy of a recent release is included in the rsync distribution,
 and will be used if there is no popt library on your build host, or if
-the --with-included-popt option is passed to ./configure.
+the `--with-included-popt` option is passed to ./configure.
 
-If you configure using --enable-maintainer-mode, then rsync will try
+If you configure using `--enable-maintainer-mode`, then rsync will try
 to pop up an xterm on DISPLAY=:0 if it crashes.  You might find this
 useful, but it should be turned off for production builds.
 
@@ -194,7 +194,7 @@ This is helpful when using the branch-from-patch and patch-update scripts
 to maintain the official rsync patches.  If you ever need to build from
 a "detached head" git position then you'll need to manually chdir into
 the build dir to run make.  I also like to create 2 more symlinks in the
-source dir:  ln -s build/rsync . ; ln -s build/testtmp .
+source dir:  `ln -s build/rsync . ; ln -s build/testtmp .`
 
 ## Make compatibility
 
@@ -228,7 +228,7 @@ Some versions of Mac OS X (Darwin) seem to have an IPv6 stack, but do
 not completely implement the "New Sockets" API.
 
 [This site][5] says that Apple started to support IPv6 in 10.2 (Jaguar).  If
-your build fails, try again after running configure with --disable-ipv6.
+your build fails, try again after running configure with `--disable-ipv6`.
 
 [5]: http://www.ipv6.org/impl/mac.html
 
