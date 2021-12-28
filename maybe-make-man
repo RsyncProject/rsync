@@ -1,18 +1,13 @@
 #!/bin/sh
 
-if [ x"$2" = x ]; then
-    echo "Usage: $0 SRC_DIR NAME.NUM.md" 1>&2
+if [ $# != 1 ]; then
+    echo "Usage: $0 NAME.NUM.md" 1>&2
     exit 1
 fi
 
-srcdir="$1"
-inname="$2"
+inname="$1"
+srcdir=`dirname "$0"`
 flagfile="$srcdir/.md2man-works"
-
-if [ ! -d "$srcdir" ]; then
-    echo "The specified SRC_DIR is not a directory: $srcdir" 1>&2
-    exit 1
-fi
 
 if [ ! -f "$flagfile" ]; then
     # We test our smallest manpage just to see if the python setup works.
