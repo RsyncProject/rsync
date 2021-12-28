@@ -86,7 +86,10 @@ def main():
 # To disable a short-named option, add its letter to this string:
 """
 
-    txt += str_assign('short_disabled', 'Ls') + "\n"
+    txt += str_assign('short_disabled', 's') + "\n"
+    txt += '# These are also disabled when the restricted dir is not "/":\n'
+    txt += str_assign('short_disabled_subdir', 'KLk') + "\n"
+    txt += '# These are all possible short options that we will accept (when not disabled above):\n'
     txt += str_assign('short_no_arg', ''.join(sorted(short_no_arg)), 'DO NOT REMOVE ANY')
     txt += str_assign('short_with_num', ''.join(sorted(short_with_num)), 'DO NOT REMOVE ANY')
    

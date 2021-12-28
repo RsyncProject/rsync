@@ -24,8 +24,12 @@ LOGFILE = 'rrsync.log' # NOTE: the file must exist for a line to be appended!
 ### START of options data produced by the cull_options script. ###
 
 # To disable a short-named option, add its letter to this string:
-short_disabled = 'Ls'
+short_disabled = 's'
 
+# These are also disabled when the restricted dir is not "/":
+short_disabled_subdir = 'KLk'
+
+# These are all possible short options that we will accept (when not disabled above):
 short_no_arg = 'ACDEHIJKLNORSUWXbcdgklmnopqrstuvxyz' # DO NOT REMOVE ANY
 short_with_num = '@B' # DO NOT REMOVE ANY
 
@@ -125,7 +129,7 @@ long_opts = {
 
 ### END of options data produced by the cull_options script. ###
 
-import os, sys, re, argparse, glob, socket, time
+import os, sys, re, argparse, glob, socket, time, subprocess
 from argparse import RawTextHelpFormatter
 
 try:
@@ -173,6 +177,10 @@ def main():
                 long_opts[opt] = -1
     if args.ro:
         long_opts['log-file'] = -1
+
+    if args.dir != '/':
+        global short_disabled
+        short_disabled += short_disabled_subdir
 
     short_no_arg_re = short_no_arg
     short_with_num_re = short_with_num
@@ -268,8 +276,12 @@ def main():
         log_fh.close()
 
     # NOTE: This assumes that the rsync protocol will not be maliciously hijacked.
-    os.execlp(RSYNC, *cmd)
-    die("execlp(", RSYNC, *cmd, ')  failed')
+    if args.no_lock:
+        os.execlp(RSYNC, *cmd)
+        die("execlp(", RSYNC, *cmd, ')  failed')
+    child = subprocess.run(cmd)
+    if child.returncode != 0:
+        sys.exit(child.returncode)
 
 
 def validated_arg(opt, arg, typ=3, wild=False):
@@ -319,6 +331,16 @@ def validated_arg(opt, arg, typ=3, wild=False):
     return ret if wild else ret[0]
 
 
+def lock_or_die(dirname):
+    import fcntl
+    global lock_handle
+    lock_handle = os.open(dirname, os.O_RDONLY)
+    try:
+        fcntl.flock(lock_handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except:
+        die('Another instance of rrsync is already accessing this directory.')
+
+
 def die(*msg):
     print(sys.argv[0], 'error:', *msg, file=sys.stderr)
     if sys.stdin.isatty():
@@ -336,9 +358,10 @@ if __name__ == '__main__':
     our_desc = """Use "man rrsync" to learn how to restrict ssh users to using a restricted rsync command."""
     arg_parser = OurArgParser(description=our_desc, add_help=False)
     only_group = arg_parser.add_mutually_exclusive_group()
-    only_group.add_argument('-ro', action='store_true', help="Allow only reading from the DIR. Implies -no-del.")
+    only_group.add_argument('-ro', action='store_true', help="Allow only reading from the DIR. Implies -no-del and -no-lock.")
     only_group.add_argument('-wo', action='store_true', help="Allow only writing to the DIR.")
     arg_parser.add_argument('-no-del', action='store_true', help="Disable rsync's --delete* and --remove* options.")
+    arg_parser.add_argument('-no-lock', action='store_true', help="Avoid the single-run (per-user) lock check.")
     arg_parser.add_argument('-munge', action='store_true', help="Enable rsync's --munge-links on the server side.")
     arg_parser.add_argument('-help', '-h', action='help', help="Output this help message and exit.")
     arg_parser.add_argument('dir', metavar='DIR', help="The restricted directory to use.")
@@ -348,6 +371,8 @@ if __name__ == '__main__':
     args.dir_slash_len = len(args.dir)
     if args.ro:
         args.no_del = True
+    elif not args.no_lock:
+        lock_or_die(args.dir)
     main()
 
 # vim: sw=4 et

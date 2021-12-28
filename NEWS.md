@@ -97,15 +97,20 @@
 
  - More ASM optimizations from Shark64.
 
- - Transformed rrsync into a python script with improvements: security has been
-   beefed up; the known rsync options were updated to include recent additions;
-   rrsync rejects `-L` (`--copy-links`) by default to make it harder to exploit
-   any out-of-subdir symlinks; a new rrsync option of `-munge` tells rrsync to
-   always enable the `--munge-links` rsync option on the server side; a new
-   rrsync option of `-no-del` disables all `--remove*` and `--delete*` rsync
-   options on the server side; the log format has been tweaked slightly to add
-   seconds to the timestamp and output the command executed as a tuple; an
-   rrsync.1 manpage is now created.
+ - Transformed rrsync into a python script with improvements:
+   - Security has been beefed up.
+   - The known rsync options were updated to include recent additions.
+   - Make rrsync reject `-L`, `-K`, & `-k` by default to make it harder to
+     exploit any out-of-subdir symlinks.
+   - A new rrsync option of `-munge` tells rrsync to always enable rsync's
+     `--munge-links` option on the server side.
+   - A new rrsync option of `-no-lock` disables a new single-use locking idiom
+     that is the default when `-ro` is not used (useful with `-munge`).
+   - A new rrsync option of `-no-del` disables all `--remove*` and `--delete*`
+     options on the server side.
+   - The log format has been tweaked slightly to add seconds to the timestamp
+     and to output the command executed as a tuple (making the args clearer).
+   - An rrsync.1 manpage was added.
 
  - Work around a glibc bug where lchmod() breaks in a chroot w/o /proc mounted.
 
