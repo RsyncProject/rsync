@@ -253,8 +253,9 @@ enum logcode {
     FERROR_XFER=1, FINFO=2, /* sent over socket for any protocol */
     FERROR=3, FWARNING=4, /* sent over socket for protocols >= 30 */
     FERROR_SOCKET=5, FLOG=6, /* only sent via receiver -> generator pipe */
+    FCLIENT=7,     /* never transmitted (e.g. server converts to FINFO) */
     FERROR_UTF8=8, /* only sent via receiver -> generator pipe */
-    FCLIENT=7 /* never transmitted (e.g. server converts to FINFO) */
+    FLOG_AFTER=9,  /* receiver logs directly to log file */
 };
 
 /* Messages types that are sent over the message channel.  The logcode

@@ -47,6 +47,7 @@ extern mode_t orig_umask;
 extern char *auth_user;
 extern char *stdout_format;
 extern char *logfile_format;
+extern char *logafter_format;
 extern char *logfile_name;
 #ifdef ICONV_CONST
 extern iconv_t ic_chck;
@@ -271,6 +272,8 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 		 * that the msg gets logged and then sent to stderr after that. */
 		if (am_daemon > 0 && code != FCLIENT)
 			code = FLOG;
+	} else if (code == FLOG_AFTER) {
+		code = FLOG;
 	} else if (send_msgs_to_gen) {
 		assert(!is_utf8);
 		/* Pass the message to our sibling in native charset. */
@@ -812,6 +815,12 @@ int log_format_has(const char *format, char esc)
 void log_item(enum logcode code, struct file_struct *file, int iflags, const char *hlink)
 {
 	const char *s_or_r = am_sender ? "send" : "recv";
+
+	if (code == FLOG_AFTER) {
+		if (logafter_format && *logafter_format)
+			log_formatted(FLOG_AFTER, logafter_format, s_or_r, file, NULL, iflags, hlink);
+		return;
+	}
 
 	if (code != FLOG && stdout_format && !am_server)
 		log_formatted(FCLIENT, stdout_format, s_or_r, file, NULL, iflags, hlink);

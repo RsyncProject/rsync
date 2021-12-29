@@ -543,6 +543,7 @@ has its own detailed description later in this manpage.
 --out-format=FORMAT      output updates using the specified FORMAT
 --log-file=FILE          log what we're doing to the specified FILE
 --log-file-format=FMT    log updates using the specified FMT
+--log-after              log updates after moving file into place
 --password-file=FILE     read daemon-access password from FILE
 --early-input=FILE       use FILE for daemon's early exec input
 --list-only              list the files instead of copying them
