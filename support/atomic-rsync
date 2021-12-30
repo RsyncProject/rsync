@@ -29,6 +29,13 @@ def main():
     if bad_args:
         die("You cannot use the", ' or '.join(bad_args), "option with atomic-rsync.\nUse --help for help.")
 
+    # We ignore exit-code 24 (file vanished) by default.
+    allowed_exit_codes = '0 ' + os.environ.get('ATOMIC_RSYNC_OK_CODES', '24')
+    try:
+        allowed_exit_codes = set(int(num) for num in re.split(r'[, ]+', allowed_exit_codes) if num != '')
+    except ValueError:
+        die('Invalid integer in ATOMIC_RSYNC_OK_CODES:', allowed_exit_codes[2:])
+
     symlink_content = os.readlink(dest_dir) if os.path.islink(dest_dir) else None
 
     dest_arg = dest_dir
@@ -55,14 +62,18 @@ def main():
     if os.path.isdir(new_dir):
         shutil.rmtree(new_dir)
 
-    subprocess.run([RSYNC_PROG, '--link-dest=' + dest_dir, *cmd_args], check=True)
+    child = subprocess.run([RSYNC_PROG, '--link-dest=' + dest_dir, *cmd_args])
+    if child.returncode not in allowed_exit_codes:
+        die('The rsync copy failed with code', child.returncode, exitcode=child.returncode)
+
+    if not os.path.isdir(new_dir):
+        die('The rsync copy failed to create:', new_dir)
 
     if old_dir is None:
         atomic_symlink(symlink_content, dest_arg)
-        return
-
-    os.rename(dest_dir, old_dir)
-    os.rename(new_dir, dest_dir)
+    else:
+        os.rename(dest_dir, old_dir)
+        os.rename(new_dir, dest_dir)
 
 
 def atomic_symlink(target, link):
@@ -89,22 +100,24 @@ to a local directory, and that directory must already exist.  For example:
     ln -s files-1 /local/files
     atomic-rsync -aiv host:/remote/files/ /local/files/
 
-If /local/files is a symlink to a directory that ends in -1 or -2, the
-copy will go to the alternate suffix and the symlink will be changed to
-point to the new dir.  This is a fully atomic update.  If the destination
-is not a symlink (or not a symlink to a *-1 or a *-2 directory), this
-will instead create a directory with "~new~" suffixed, move the current
-directory to a name with "~old~" suffixed, and then move the ~new~
-directory to the original destination name (this double rename is not
-fully atomic, but is rapid).  In both cases, the prior destintaion
-directory will be preserved until the next update, at which point it
-will be deleted.
+If /local/files is a symlink to a directory that ends in -1 or -2, the copy
+will go to the alternate suffix and the symlink will be changed to point to
+the new dir.  This is a fully atomic update.  If the destination is not a
+symlink (or not a symlink to a *-1 or a *-2 directory), this will instead
+create a directory with "~new~" suffixed, move the current directory to a
+name with "~old~" suffixed, and then move the ~new~ directory to the original
+destination name (this double rename is not fully atomic, but is rapid).  In
+both cases, the prior destintaion directory will be preserved until the next
+update, at which point it will be deleted.
 
-In all likelihood, you do NOT want to specify this command:
+By default, rsync exit-code 24 (file vanished) is allowed without halting the
+atomic update.  If you want to change that, specify the environment variable
+ATOMIC_RSYNC_OK_CODES with numeric values separated by spaces and/or commas.
+Specify an empty string to only allow a successful copy.  An override example:
 
-    atomic-rsync -aiv host:/remote/files /local/
+    ATOMIC_RSYNC_OK_CODES='23 24' atomic-rsync -aiv host:src/ dest/
 
-... UNLESS you want the entire /local dir to be swapped out!
+See the errcode.h file for a list of all the exit codes.
 
 See the "rsync" command for its list of options.  You may not use the
 --link-dest, --compare-dest, or --copy-dest options (since this script
@@ -114,9 +127,9 @@ uses --link-dest to make the transfer efficient).
     sys.exit(1 if use_stderr else 0)
 
 
-def die(*args):
+def die(*args, exitcode=1):
     print(*args, file=sys.stderr)
-    sys.exit(1)
+    sys.exit(exitcode)
 
 
 if __name__ == '__main__':

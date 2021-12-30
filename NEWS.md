@@ -97,7 +97,7 @@
 
  - More ASM optimizations from Shark64.
 
- - Transformed rrsync into a python script with improvements:
+ - Transformed support/rrsync into a python script with improvements:
    - Security has been beefed up.
    - The known rsync options were updated to include recent additions.
    - Make rrsync reject `-L`, `-K`, & `-k` by default to make it harder to
@@ -111,6 +111,17 @@
    - The log format has been tweaked slightly to add seconds to the timestamp
      and to output the command executed as a tuple (making the args clearer).
    - An rrsync.1 manpage was added.
+
+  - Added options to support/lsh to allow the rrsync script to be easily tested.
+
+  - Transformed support/atomic-rsync into a python script and added the ability
+    to ignore one or more non-zero exit codes. By default, it now ignores code
+    24 (file vanished).
+
+  - Improved support/rsync-no-vanished wrapper script to not join stdout &
+    stderr together.
+
+  - Transformed support/munge-symlinks into a python script.
 
  - Work around a glibc bug where lchmod() breaks in a chroot w/o /proc mounted.
 
