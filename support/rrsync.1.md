@@ -14,9 +14,9 @@ A user's ssh login can be restricted to only allow the running of an rsync
 transfer in one of two easy ways: forcing the running of the rrsync script
 or forcing the running of an rsync daemon-over-ssh command.
 
-To use the rrsync script, add a prefix like one of the following (followed by a
-space) in front of each ssh-key line in the user's `~/.ssh/authorized_keys`
-file that should be restricted:
+To use the rrsync script, edit the user's `~/.ssh/authorized_keys` file and add
+a prefix like one of the following (followed by a space) in front of each
+ssh-key line that should be restricted:
 
 > ```
 > command="rrsync DIR"
@@ -29,9 +29,9 @@ may want to copy the script to a local bin dir with a unique name if you want
 to have multiple configurations. One or more rrsync options can be specified
 prior to the `DIR` if you want to further restrict the transfer.
 
-To use an rsync daemon setup, add one of the following prefixes (followed by a
-space) in front of each ssh-key line in the user's `~/.ssh/authorized_keys`
-file that should be restricted:
+To use an rsync daemon setup, edit the user's `~/.ssh/authorized_keys` file and
+add a prefix like one of the following (followed by a space) in front of each
+ssh-key line that should be restricted:
 
 > ```
 > command="rsync --server --daemon ."
@@ -42,6 +42,10 @@ Then, ensure that the rsyncd.conf file is created with one or more module names
 with the appropriate path and option restrictions.  If the `--config` option is
 omitted, it defaults to `~/rsyncd.conf`.  See the `rsyncd.conf` man page for
 details of how to configure an rsync daemon.
+
+When using rrsync, there can be just one restricted dir per authorized key.  A
+daemon setup, on the other hand, allows multiple module names inside the config
+file, each one with its own path setting.
 
 The remainder of this man page is dedicated to using the rrsync script.
 
