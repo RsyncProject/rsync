@@ -368,7 +368,7 @@ if __name__ == '__main__':
     args = arg_parser.parse_args()
     args.dir = os.path.realpath(args.dir)
     args.dir_slash = args.dir + '/'
-    args.dir_slash_len = len(args.dir)
+    args.dir_slash_len = len(args.dir_slash)
     if args.ro:
         args.no_del = True
     elif not args.no_lock:
