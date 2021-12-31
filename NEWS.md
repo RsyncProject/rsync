@@ -17,7 +17,7 @@
        export LC_ALL=C.UTF-8
    ```
 
-   or maybe:
+   or if iconv translations are needed:
 
    ```shell
        if [ "${LC_ALL:-}" ]; then
@@ -59,6 +59,11 @@
 
  - Avoid a weird failure if you run a local copy with a (useless) `--rsh`
    option that contains a `V`.
+
+ - Fixed a long-standing compression bug where the compression level of the
+   first file transferred affected the level for all future files.  Also, the
+   per-file compression skipping has apparently not worked in a very long time
+   (I checked back to 2.6.4), so it is now documented as being ineffective.
 
 ### ENHANCEMENTS:
 

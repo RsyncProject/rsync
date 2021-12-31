@@ -2395,9 +2395,6 @@ your home directory (remove the '=' for that).
     ignore this weirdness unless the rsync server complains and tells you to
     specify `-zz`.
 
-    See also the `--skip-compress` option for the default list of file suffixes
-    that will be transferred with no (or minimal) compression.
-
 0.  `--compress-choice=STR`, `--zc=STR`
 
     This option can be used to override the automatic negotiation of the
@@ -2442,8 +2439,8 @@ your home directory (remove the '=' for that).
     >     rsync -aiv --zc=zstd --zl=22 host:src/ dest/
 
     For zlib & zlibx compression the valid values are from 1 to 9 with 6 being
-    the default.  Specifying 0 turns compression off, and specifying -1 chooses
-    the default of 6.
+    the default.  Specifying `--zl=0` turns compression off, and specifying
+    `--zl=-1` chooses the default level of 6.
 
     For zstd compression the valid values are from -131072 to 22 with 3 being
     the default. Specifying 0 chooses the default of 3.
@@ -2462,14 +2459,15 @@ your home directory (remove the '=' for that).
 
 0.  `--skip-compress=LIST`
 
+    **NOTE:** no compression method currently supports per-file compression
+    changes, so this option has no effect.
+
     Override the list of file suffixes that will be compressed as little as
     possible.  Rsync sets the compression level on a per-file basis based on
-    the file's suffix.  If the compression algorithm has an "off" level (such
-    as zlib/zlibx) then no compression occurs for those files.  Other
-    algorithms that support changing the streaming level on-the-fly will have
-    the level minimized to reduces the CPU usage as much as possible for a
-    matching file.  At this time, only zlib & zlibx compression support this
-    changing of levels on a per-file basis.
+    the file's suffix.  If the compression algorithm has an "off" level, then
+    no compression occurs for those files.  Other algorithms that support
+    changing the streaming level on-the-fly will have the level minimized to
+    reduces the CPU usage as much as possible for a matching file.
 
     The **LIST** should be one or more file suffixes (without the dot) separated
     by slashes (`/`).  You may specify an empty string to indicate that no files
