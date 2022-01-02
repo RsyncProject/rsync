@@ -1,7 +1,7 @@
 #! /bin/sh
 
 # Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
-# Copyright (C) 2003-2020 Wayne Davison
+# Copyright (C) 2003-2021 Wayne Davison
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version

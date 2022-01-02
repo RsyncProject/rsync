@@ -1,1 +1,1 @@
-#define LATEST_YEAR "2020"
+#define LATEST_YEAR "2022"
