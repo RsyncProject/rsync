@@ -535,6 +535,18 @@ your home directory (remove the '=' for that).
     being skipped and slightly more information at the end.  More than two `-v`
     options should only be used if you are debugging rsync.
 
+    The end-of-run summary tells you the number of bytes sent to the remote
+    rsync (which is the receiving side on a local copy), the number of bytes
+    received from the remote host, and the average bytes per second of the
+    transferred data computed over the entire length of the rsync run. The
+    second line shows the total size (in bytes), which is the sum of all the
+    file sizes that rsync considered transferring.  It also shows a "speedup"
+    value, which is a ratio of the total file size divided by the sum of the
+    sent and received bytes (which is really just a feel-good bigger-is-better
+    number).  Note that these byte values can be made more (or less)
+    human-readable by using the `--human-readable` (or `--no-human-readable`)
+    options.
+
     In a modern rsync, the `-v` option is equivalent to the setting of groups
     of `--info` and `--debug` options.  You can choose to use these newer
     options in addition to, or in place of using `--verbose`, as any
@@ -898,6 +910,13 @@ your home directory (remove the '=' for that).
     This option is a transfer rule, not an exclude, so it doesn't affect the
     data that goes into the file-lists, and thus it doesn't affect deletions.
     It just limits the files that the receiver requests to be transferred.
+
+    A caution for those that choose to combine `--inplace` with `--update`: an
+    interrupted transfer will leave behind a partial file on the receiving side
+    that has a very recent modified time, so re-running the transfer will
+    probably **not** continue the interrutped file.  As such, it is usually
+    best to avoid combining this with `--inplace` unless you have implemented
+    manual steps to handle any interrutped in-progress files.
 
 0.  `--inplace`
 
