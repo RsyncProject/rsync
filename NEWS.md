@@ -130,6 +130,9 @@
 
  - Work around a glibc bug where lchmod() breaks in a chroot w/o /proc mounted.
 
+ - Try to support a client that sent a remote rsync a wacko stderr file handle
+   (such as an older File::RsyncP perl library used by BackupPC).
+
  - Some manpage improvements.
 
 ### PACKAGING RELATED:
