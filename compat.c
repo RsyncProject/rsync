@@ -52,6 +52,8 @@ extern int need_messages_from_generator;
 extern int delete_mode, delete_before, delete_during, delete_after;
 extern int do_compression;
 extern int do_compression_level;
+extern int saw_stderr_opt;
+extern int msgs2stderr;
 extern char *shell_cmd;
 extern char *partial_dir;
 extern char *files_from;
@@ -621,6 +623,9 @@ void setup_protocol(int f_out,int f_in)
 	}
 	if (read_batch)
 		check_batch_flags();
+
+	if (!saw_stderr_opt && protocol_version <= 28 && am_server)
+		msgs2stderr = 0; /* The client side may not have stderr setup for us. */
 
 #ifndef SUPPORT_PREALLOCATION
 	if (preallocate_files && !am_sender) {

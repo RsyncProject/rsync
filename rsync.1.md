@@ -535,6 +535,18 @@ your home directory (remove the '=' for that).
     being skipped and slightly more information at the end.  More than two `-v`
     options should only be used if you are debugging rsync.
 
+    The end-of-run summary tells you the number of bytes sent to the remote
+    rsync (which is the receiving side on a local copy), the number of bytes
+    received from the remote host, and the average bytes per second of the
+    transferred data computed over the entire length of the rsync run. The
+    second line shows the total size (in bytes), which is the sum of all the
+    file sizes that rsync considered transferring.  It also shows a "speedup"
+    value, which is a ratio of the total file size divided by the sum of the
+    sent and received bytes (which is really just a feel-good bigger-is-better
+    number).  Note that these byte values can be made more (or less)
+    human-readable by using the `--human-readable` (or `--no-human-readable`)
+    options.
+
     In a modern rsync, the `-v` option is equivalent to the setting of groups
     of `--info` and `--debug` options.  You can choose to use these newer
     options in addition to, or in place of using `--verbose`, as any
@@ -898,6 +910,13 @@ your home directory (remove the '=' for that).
     This option is a transfer rule, not an exclude, so it doesn't affect the
     data that goes into the file-lists, and thus it doesn't affect deletions.
     It just limits the files that the receiver requests to be transferred.
+
+    A caution for those that choose to combine `--inplace` with `--update`: an
+    interrupted transfer will leave behind a partial file on the receiving side
+    that has a very recent modified time, so re-running the transfer will
+    probably **not** continue the interrutped file.  As such, it is usually
+    best to avoid combining this with `--inplace` unless you have implemented
+    manual steps to handle any interrutped in-progress files.
 
 0.  `--inplace`
 
@@ -2395,9 +2414,6 @@ your home directory (remove the '=' for that).
     ignore this weirdness unless the rsync server complains and tells you to
     specify `-zz`.
 
-    See also the `--skip-compress` option for the default list of file suffixes
-    that will be transferred with no (or minimal) compression.
-
 0.  `--compress-choice=STR`, `--zc=STR`
 
     This option can be used to override the automatic negotiation of the
@@ -2442,8 +2458,8 @@ your home directory (remove the '=' for that).
     >     rsync -aiv --zc=zstd --zl=22 host:src/ dest/
 
     For zlib & zlibx compression the valid values are from 1 to 9 with 6 being
-    the default.  Specifying 0 turns compression off, and specifying -1 chooses
-    the default of 6.
+    the default.  Specifying `--zl=0` turns compression off, and specifying
+    `--zl=-1` chooses the default level of 6.
 
     For zstd compression the valid values are from -131072 to 22 with 3 being
     the default. Specifying 0 chooses the default of 3.
@@ -2462,14 +2478,15 @@ your home directory (remove the '=' for that).
 
 0.  `--skip-compress=LIST`
 
+    **NOTE:** no compression method currently supports per-file compression
+    changes, so this option has no effect.
+
     Override the list of file suffixes that will be compressed as little as
     possible.  Rsync sets the compression level on a per-file basis based on
-    the file's suffix.  If the compression algorithm has an "off" level (such
-    as zlib/zlibx) then no compression occurs for those files.  Other
-    algorithms that support changing the streaming level on-the-fly will have
-    the level minimized to reduces the CPU usage as much as possible for a
-    matching file.  At this time, only zlib & zlibx compression support this
-    changing of levels on a per-file basis.
+    the file's suffix.  If the compression algorithm has an "off" level, then
+    no compression occurs for those files.  Other algorithms that support
+    changing the streaming level on-the-fly will have the level minimized to
+    reduces the CPU usage as much as possible for a matching file.
 
     The **LIST** should be one or more file suffixes (without the dot) separated
     by slashes (`/`).  You may specify an empty string to indicate that no files

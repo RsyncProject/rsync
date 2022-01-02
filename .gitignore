@@ -15,9 +15,10 @@ config.status
 aclocal.m4
 /proto.h
 /proto.h-tstamp
-/rsync*.1
-/rsync*.5
+/rsync*.[15]
+/rrsync*.1
 /rsync*.html
+/rrsync*.html
 /help-rsync*.h
 /default-cvsignore.h
 /default-dont-compress.h

@@ -17,7 +17,7 @@
        export LC_ALL=C.UTF-8
    ```
 
-   or maybe:
+   or if iconv translations are needed:
 
    ```shell
        if [ "${LC_ALL:-}" ]; then
@@ -60,6 +60,11 @@
  - Avoid a weird failure if you run a local copy with a (useless) `--rsh`
    option that contains a `V`.
 
+ - Fixed a long-standing compression bug where the compression level of the
+   first file transferred affected the level for all future files.  Also, the
+   per-file compression skipping has apparently not worked in a very long time
+   (I checked back to 2.6.4), so it is now documented as being ineffective.
+
 ### ENHANCEMENTS:
 
  - Use openssl's `-verify_hostname` option in the rsync-ssl script.
@@ -78,7 +83,7 @@
  - The rsync daemon can now handle a client address with an implied "%scope"
    suffix.
 
- - Added support for `--atimes` on macOS and fixed using using it without -t.
+ - Added support for `--atimes` on macOS and fixed using using it without `-t`.
 
  - Rsync can now update the xattrs on a read-only file when your user can
    temporarily add user-write permission to the file. (It always worked for a
@@ -97,13 +102,46 @@
 
  - More ASM optimizations from Shark64.
 
- - Make rrsync handle the latest options.
+ - Transformed support/rrsync into a python script with improvements:
+   - Security has been beefed up.
+   - The known rsync options were updated to include recent additions.
+   - Make rrsync reject `-L`, `-K`, & `-k` by default to make it harder to
+     exploit any out-of-subdir symlinks.
+   - A new rrsync option of `-munge` tells rrsync to always enable rsync's
+     `--munge-links` option on the server side.
+   - A new rrsync option of `-no-lock` disables a new single-use locking idiom
+     that is the default when `-ro` is not used (useful with `-munge`).
+   - A new rrsync option of `-no-del` disables all `--remove*` and `--delete*`
+     options on the server side.
+   - The log format has been tweaked slightly to add seconds to the timestamp
+     and to output the command executed as a tuple (making the args clearer).
+   - An rrsync.1 manpage was added.
+
+  - Added options to support/lsh to allow the rrsync script to be easily tested.
+
+  - Transformed support/atomic-rsync into a python script and added the ability
+    to ignore one or more non-zero exit codes. By default, it now ignores code
+    24 (file vanished).
+
+  - Improved support/rsync-no-vanished wrapper script to not join stdout &
+    stderr together.
+
+  - Transformed support/munge-symlinks into a python script.
 
  - Work around a glibc bug where lchmod() breaks in a chroot w/o /proc mounted.
+
+ - Try to support a client that sent a remote rsync a wacko stderr file handle
+   (such as an older File::RsyncP perl library used by BackupPC).
 
  - Some manpage improvements.
 
 ### PACKAGING RELATED:
+
+ - Give configure the `--with-rrsync` option if you want `make install` to
+   install the (now python3) rrsync script and its (new) man page.
+
+ - If the rrsync script is installed, make its package depend on python3 and
+   (suggested but not required) the python3 braceexpand lib.
 
  - When creating a package from a non-release version (w/o a git checkout), the
    packager can elect to create git-version.h and define RSYNC_GITVER to the
@@ -1313,7 +1351,7 @@
    that hasn't really been created.
 
  - Fixed a problem with `--compress` (`-z`) where the receiving side could
-   return the error "inflate (token) returned -5".
+   return the error "`inflate (token) returned -5`".
 
  - Fixed a bug where `--delete-during` could delete in a directory before it
    noticed that the sending side sent an I/O error for that directory (both
@@ -1332,7 +1370,7 @@
  - An absolute-path filter rule (i.e. with a '/' modifier) no longer loses its
    modifier when sending the filter rules to the remote rsync.
 
- - Improved the "--delete does not work without -r or -d" message.
+ - Improved the "`--delete does not work without -r or -d`" message.
 
  - Improved rsync's handling of `--timeout` to avoid a weird timeout case where
    the sender could timeout even though it has recently written data to the
@@ -1643,8 +1681,8 @@
    of a proto.h-tstamp rule that could make the binaries get rebuild without
    cause.
 
- - Improved the testsuite to work around a problem with some utilities (e.g. cp
-   -p & touch -r) rounding sub-second timestamps.
+ - Improved the testsuite to work around a problem with some utilities (e.g.
+   `cp -p` & `touch -r`) rounding sub-second timestamps.
 
  - Ensure that the early patches don't cause any generated-file hunks to
    bleed-over into patches that follow.
@@ -4353,7 +4391,7 @@
    - HP PA-RISC HP-UX 11.11 cc
    - IRIX 6.5 MIPS cc
    - IRIX 6.5 MIPS gcc
-   - Mac OS X PPC (--disable-ipv6) cc
+   - Mac OS X PPC (`--disable-ipv6`) cc
    - NetBSD 1.5 i386 gcc
    - NetBSD Current i386 cc
    - OpenBSD 2.5 Sparc gcc
@@ -4458,3 +4496,5 @@
 
 \* DATE OF COMMIT is the date the protocol change was committed to version
 control.
+
+@USE_GFM_PARSER@

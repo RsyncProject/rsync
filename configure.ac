@@ -117,7 +117,6 @@ if test x"$enable_md2man" != x"no"; then
     MAKE_MAN=man
 else
     AC_MSG_RESULT(no)
-    MAKE_MAN=''
 fi
 
 # Specifically, this turns on panic_action handling.
@@ -135,6 +134,16 @@ CFLAGS="$CFLAGS -DHAVE_CONFIG_H"
 if test x"$GCC" = x"yes"; then
 	CFLAGS="$CFLAGS -Wall -W"
 fi
+
+AC_ARG_WITH(rrsync,
+        AS_HELP_STRING([--with-rrsync],[also install the rrsync script and its man page]))
+if test x"$with_rrsync" != x"yes"; then
+    with_rrsync=no
+else
+    MAKE_RRSYNC='rrsync'
+    MAKE_RRSYNC_1='rrsync.1'
+fi
+AC_SUBST(with_rrsync)
 
 AC_ARG_WITH(included-popt,
         AS_HELP_STRING([--with-included-popt],[use bundled popt library, not from system]))
@@ -793,7 +802,7 @@ AC_CHECK_FUNCS(waitpid wait4 getcwd chown chmod lchmod mknod mkfifo \
     fchmod fstat ftruncate strchr readlink link utime utimes lutimes strftime \
     chflags getattrlist mktime innetgr linkat \
     memmove lchown vsnprintf snprintf vasprintf asprintf setsid strpbrk \
-    strlcat strlcpy strtol mallinfo getgroups setgroups geteuid getegid \
+    strlcat strlcpy strtol mallinfo mallinfo2 getgroups setgroups geteuid getegid \
     setlocale setmode open64 lseek64 mkstemp64 mtrace va_copy __va_copy \
     seteuid strerror putenv iconv_open locale_charset nl_langinfo getxattr \
     extattr_get_link sigaction sigprocmask setattrlist getgrouplist \
@@ -1217,6 +1226,8 @@ AC_SUBST(OBJ_RESTORE)
 AC_SUBST(CC_SHOBJ_FLAG)
 AC_SUBST(BUILD_POPT)
 AC_SUBST(BUILD_ZLIB)
+AC_SUBST(MAKE_RRSYNC)
+AC_SUBST(MAKE_RRSYNC_1)
 AC_SUBST(MAKE_MAN)
 
 AC_CHECK_FUNCS(_acl __acl _facl __facl)

@@ -467,38 +467,33 @@ static void output_summary(void)
  **/
 static void show_malloc_stats(void)
 {
-#ifdef HAVE_MALLINFO
-	struct mallinfo mi;
-
-	mi = mallinfo();
+#ifdef MEM_ALLOC_INFO
+	struct MEM_ALLOC_INFO mi = MEM_ALLOC_INFO(); /* mallinfo or mallinfo2 */
 
 	rprintf(FCLIENT, "\n");
 	rprintf(FINFO, RSYNC_NAME "[%d] (%s%s%s) heap statistics:\n",
 		(int)getpid(), am_server ? "server " : "",
 		am_daemon ? "daemon " : "", who_am_i());
-	rprintf(FINFO, "  arena:     %10ld   (bytes from sbrk)\n",
-		(long)mi.arena);
-	rprintf(FINFO, "  ordblks:   %10ld   (chunks not in use)\n",
-		(long)mi.ordblks);
-	rprintf(FINFO, "  smblks:    %10ld\n",
-		(long)mi.smblks);
-	rprintf(FINFO, "  hblks:     %10ld   (chunks from mmap)\n",
-		(long)mi.hblks);
-	rprintf(FINFO, "  hblkhd:    %10ld   (bytes from mmap)\n",
-		(long)mi.hblkhd);
-	rprintf(FINFO, "  allmem:    %10ld   (bytes from sbrk + mmap)\n",
-		(long)mi.arena + mi.hblkhd);
-	rprintf(FINFO, "  usmblks:   %10ld\n",
-		(long)mi.usmblks);
-	rprintf(FINFO, "  fsmblks:   %10ld\n",
-		(long)mi.fsmblks);
-	rprintf(FINFO, "  uordblks:  %10ld   (bytes used)\n",
-		(long)mi.uordblks);
-	rprintf(FINFO, "  fordblks:  %10ld   (bytes free)\n",
-		(long)mi.fordblks);
-	rprintf(FINFO, "  keepcost:  %10ld   (bytes in releasable chunk)\n",
-		(long)mi.keepcost);
-#endif /* HAVE_MALLINFO */
+
+#define PRINT_ALLOC_NUM(title, descr, num) \
+	rprintf(FINFO, "  %-11s%10" SIZE_T_FMT_MOD "d   (" descr ")\n", \
+	       title ":", (SIZE_T_FMT_CAST)(num));
+
+	PRINT_ALLOC_NUM("arena", "bytes from sbrk", mi.arena);
+	PRINT_ALLOC_NUM("ordblks", "chunks not in use", mi.ordblks);
+	PRINT_ALLOC_NUM("smblks", "free fastbin blocks", mi.smblks);
+	PRINT_ALLOC_NUM("hblks", "chunks from mmap", mi.hblks);
+	PRINT_ALLOC_NUM("hblkhd", "bytes from mmap", mi.hblkhd);
+	PRINT_ALLOC_NUM("allmem", "bytes from sbrk + mmap", mi.arena + mi.hblkhd);
+	PRINT_ALLOC_NUM("usmblks", "always 0", mi.usmblks);
+	PRINT_ALLOC_NUM("fsmblks", "bytes in freed fastbin blocks", mi.fsmblks);
+	PRINT_ALLOC_NUM("uordblks", "bytes used", mi.uordblks);
+	PRINT_ALLOC_NUM("fordblks", "bytes free", mi.fordblks);
+	PRINT_ALLOC_NUM("keepcost", "bytes in releasable chunk", mi.keepcost);
+
+#undef PRINT_ALLOC_NUM
+
+#endif /* MEM_ALLOC_INFO */
 }
 
 

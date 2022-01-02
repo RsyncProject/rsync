@@ -922,13 +922,14 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
 
     >     refuse options = * !a !delete* delete-after
 
-    A note on refusing "compress" -- it is better to set the "dont compress"
-    daemon parameter to "`*`" because that disables compression silently
+    A note on refusing "compress": it may be better to set the "dont compress"
+    daemon parameter to "`*`" and ensure that `RSYNC_COMPRESS_LIST=zlib` is set
+    in the environment of the daemon in order to disable compression silently
     instead of returning an error that forces the client to remove the `-z`
     option.
 
-    If you are un-refusing the compress option, you probably want to match
-    "`!compress*`" so that you also accept the `--compress-level` option.
+    If you are un-refusing the compress option, you may want to match
+    "`!compress*`" if you also want to allow the `--compress-level` option.
 
     Note that the "write-devices" option is refused by default, but can be
     explicitly accepted with "`!write-devices`".  The options "log-file" and
@@ -954,6 +955,10 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
 
 0.  `dont compress`
 
+    **NOTE:** This parameter currently has no effect except in one instance: if
+    it is set to "`*`" then it minimizes or disables compression for all files
+    (for those that don't want to refuse the `--compress` option completely).
+
     This parameter allows you to select filenames based on wildcard patterns
     that should not be compressed when pulling files from the daemon (no
     analogous parameter exists to govern the pushing of files to a daemon).
@@ -964,14 +969,14 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     The "dont compress" parameter takes a space-separated list of
     case-insensitive wildcard patterns. Any source filename matching one of the
     patterns will be compressed as little as possible during the transfer.  If
-    the compression algorithm has an "off" level (such as zlib/zlibx) then no
-    compression occurs for those files.  Other algorithms have the level
-    minimized to reduces the CPU usage as much as possible.
+    the compression algorithm has an "off" level, then no compression occurs
+    for those files.  If an algorithms has the ability to change the level in
+    mid-stream, it will be minimized to reduce the CPU usage as much as
+    possible.
 
     See the `--skip-compress` parameter in the **rsync**(1) manpage for the
-    list of file suffixes that are not compressed by default.  Specifying a
-    value for the "dont compress" parameter changes the default when the daemon
-    is the sender.
+    list of file suffixes that are skipped by default if this parameter is not
+    set.
 
 0.  `early exec`, `pre-xfer exec`, `post-xfer exec`
 

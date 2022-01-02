@@ -1,92 +1,94 @@
-#!/usr/bin/env perl
-#
+#!/usr/bin/env python3
 # This script lets you update a hierarchy of files in an atomic way by
 # first creating a new hierarchy using rsync's --link-dest option, and
 # then swapping the hierarchy into place.  **See the usage message for
 # more details and some important caveats!**
 
-use strict;
-use warnings;
-use Cwd 'abs_path';
+import os, sys, re, subprocess, shutil
 
-my $RSYNC_PROG = '/usr/bin/rsync';
-my $RM_PROG = '/bin/rm';
+ALT_DEST_ARG_RE = re.compile('^--[a-z][^ =]+-dest(=|$)')
 
-my $dest_dir = $ARGV[-1];
-&usage if !defined $dest_dir || $dest_dir =~ /(^-|^$)/ || grep(/^--help/, @ARGV);
-$dest_dir =~ s{(?<=.)/+$} {};
+RSYNC_PROG = '/usr/bin/rsync'
 
-if (!-d $dest_dir) {
-    die "$dest_dir is not a directory.\nUse --help for help.\n";
-}
+def main():
+    cmd_args = sys.argv[1:]
+    if '--help' in cmd_args:
+        usage_and_exit()
 
-if (@_ = grep(/^--[a-z]+-dest\b/, @ARGV)) {
-    $_ = join(' or ', @_);
-    die "You cannot use the $_ option with atomic-rsync.\nUse --help for help.\n";
-}
+    if len(cmd_args) < 2:
+        usage_and_exit(True)
 
-my $symlink_content = readlink $dest_dir; # undef when a real dir
+    dest_dir = cmd_args[-1].rstrip('/')
+    if dest_dir == '' or dest_dir.startswith('-'):
+        usage_and_exit(True)
 
-my $dest_arg = $dest_dir;
-# This gives us the real destination dir, with all symlinks dereferenced.
-$dest_dir = abs_path($dest_dir);
-if ($dest_dir eq '/') {
-    die qq|You must not use "/" as the destination directory.\nUse --help for help.\n|;
-}
+    if not os.path.isdir(dest_dir):
+        die(dest_dir, "is not a directory or a symlink to a dir.\nUse --help for help.")
 
-my($old_dir, $new_dir);
-if (defined $symlink_content && $dest_dir =~ /-([12])$/) {
-    my $num = 3 - $1;
-    $old_dir = undef;
-    ($new_dir = $dest_dir) =~ s/-[12]$/-$num/;
-    $symlink_content =~ s/-[12]$/-$num/;
-} else {
-    $old_dir = "$dest_dir~old~";
-    $new_dir = "$dest_dir~new~";
-}
+    bad_args = [ arg for arg in cmd_args if ALT_DEST_ARG_RE.match(arg) ]
+    if bad_args:
+        die("You cannot use the", ' or '.join(bad_args), "option with atomic-rsync.\nUse --help for help.")
 
-$ARGV[-1] = "$new_dir/";
+    # We ignore exit-code 24 (file vanished) by default.
+    allowed_exit_codes = '0 ' + os.environ.get('ATOMIC_RSYNC_OK_CODES', '24')
+    try:
+        allowed_exit_codes = set(int(num) for num in re.split(r'[, ]+', allowed_exit_codes) if num != '')
+    except ValueError:
+        die('Invalid integer in ATOMIC_RSYNC_OK_CODES:', allowed_exit_codes[2:])
 
-system($RM_PROG, '-rf', $old_dir) if defined $old_dir && -d $old_dir;
-system($RM_PROG, '-rf', $new_dir) if -d $new_dir;
+    symlink_content = os.readlink(dest_dir) if os.path.islink(dest_dir) else None
 
-if (system($RSYNC_PROG, "--link-dest=$dest_dir", @ARGV)) {
-    if ($? == -1) {
-	print "failed to execute $RSYNC_PROG: $!\n";
-    } elsif ($? & 127) {
-	printf "child died with signal %d, %s coredump\n",
-	    ($? & 127),  ($? & 128) ? 'with' : 'without';
-    } else {
-	printf "child exited with value %d\n", $? >> 8;
-    }
-    exit 1;
-}
+    dest_arg = dest_dir
+    dest_dir = os.path.realpath(dest_dir) # The real destination dir with all symlinks dereferenced
+    if dest_dir == '/':
+        die('You must not use "/" as the destination directory.\nUse --help for help.')
 
-if (!defined $old_dir) {
-    atomic_symlink($symlink_content, $dest_arg);
-    exit;
-}
+    old_dir = new_dir = None
+    if symlink_content is not None and dest_dir.endswith(('-1','-2')):
+        if not symlink_content.endswith(dest_dir[-2:]):
+            die("Symlink suffix out of sync with dest_dir name:", symlink_content, 'vs', dest_dir)
+        num = 3 - int(dest_dir[-1]);
+        old_dir = None
+        new_dir = dest_dir[:-1] + str(num)
+        symlink_content = symlink_content[:-1] + str(num)
+    else:
+        old_dir = dest_dir + '~old~'
+        new_dir = dest_dir + '~new~'
 
-rename($dest_dir, $old_dir) or die "Unable to rename $dest_dir to $old_dir: $!";
-rename($new_dir, $dest_dir) or die "Unable to rename $new_dir to $dest_dir: $!";
+    cmd_args[-1] = new_dir + '/'
 
-exit;
+    if old_dir is not None and os.path.isdir(old_dir):
+        shutil.rmtree(old_dir)
+    if os.path.isdir(new_dir):
+        shutil.rmtree(new_dir)
 
-sub atomic_symlink
-{
-    my($target, $link) = @_;
-    my $newlink = "$link~new~";
+    child = subprocess.run([RSYNC_PROG, '--link-dest=' + dest_dir, *cmd_args])
+    if child.returncode not in allowed_exit_codes:
+        die('The rsync copy failed with code', child.returncode, exitcode=child.returncode)
 
-    unlink($newlink); # Just in case
-    symlink($target, $newlink) or die "Unable to symlink $newlink -> $target: $!\n";
-    rename($newlink, $link) or die "Unable to rename $newlink to $link: $!\n";
-}
+    if not os.path.isdir(new_dir):
+        die('The rsync copy failed to create:', new_dir)
+
+    if old_dir is None:
+        atomic_symlink(symlink_content, dest_arg)
+    else:
+        os.rename(dest_dir, old_dir)
+        os.rename(new_dir, dest_dir)
 
 
-sub usage
-{
-    die <<EOT;
-Usage: atomic-rsync [RSYNC-OPTIONS] HOST:/SOURCE/DIR/ /DEST/DIR/
+def atomic_symlink(target, link):
+    newlink = link + "~new~"
+    try:
+        os.unlink(newlink); # Just in case
+    except OSError:
+        pass
+    os.symlink(target, newlink)
+    os.rename(newlink, link)
+
+
+def usage_and_exit(use_stderr=False):
+    usage_msg = """\
+Usage: atomic-rsync [RSYNC-OPTIONS] [HOST:]/SOURCE/DIR/ /DEST/DIR/
        atomic-rsync [RSYNC-OPTIONS] HOST::MOD/DIR/ /DEST/DIR/
 
 This script lets you update a hierarchy of files in an atomic way by first
@@ -96,27 +98,41 @@ to a local directory, and that directory must already exist.  For example:
 
     mkdir /local/files-1
     ln -s files-1 /local/files
-    atomic-rsync -av host:/remote/files/ /local/files/
+    atomic-rsync -aiv host:/remote/files/ /local/files/
 
-If /local/files is a symlink to a directory that ends in -1 or -2, the
-copy will go to the alternate suffix and the symlink will be changed to
-point to the new dir.  This is a fully atomic update.  If the destination
-is not a symlink (or not a symlink to a *-1 or a *-2 directory), this
-will instead create a directory with "~new~" suffixed, move the current
-directory to a name with "~old~" suffixed, and then move the ~new~
-directory to the original destination name (this double rename is not
-fully atomic, but is rapid).  In both cases, the prior destintaion
-directory will be preserved until the next update, at which point it
-will be deleted.
+If /local/files is a symlink to a directory that ends in -1 or -2, the copy
+will go to the alternate suffix and the symlink will be changed to point to
+the new dir.  This is a fully atomic update.  If the destination is not a
+symlink (or not a symlink to a *-1 or a *-2 directory), this will instead
+create a directory with "~new~" suffixed, move the current directory to a
+name with "~old~" suffixed, and then move the ~new~ directory to the original
+destination name (this double rename is not fully atomic, but is rapid).  In
+both cases, the prior destintaion directory will be preserved until the next
+update, at which point it will be deleted.
 
-In all likelihood, you do NOT want to specify this command:
+By default, rsync exit-code 24 (file vanished) is allowed without halting the
+atomic update.  If you want to change that, specify the environment variable
+ATOMIC_RSYNC_OK_CODES with numeric values separated by spaces and/or commas.
+Specify an empty string to only allow a successful copy.  An override example:
 
-    atomic-rsync -av host:/remote/files /local/
+    ATOMIC_RSYNC_OK_CODES='23 24' atomic-rsync -aiv host:src/ dest/
 
-... UNLESS you want the entire /local dir to be swapped out!
+See the errcode.h file for a list of all the exit codes.
 
 See the "rsync" command for its list of options.  You may not use the
 --link-dest, --compare-dest, or --copy-dest options (since this script
 uses --link-dest to make the transfer efficient).
-EOT
-}
+"""
+    print(usage_msg, file=sys.stderr if use_stderr else sys.stdout)
+    sys.exit(1 if use_stderr else 0)
+
+
+def die(*args, exitcode=1):
+    print(*args, file=sys.stderr)
+    sys.exit(exitcode)
+
+
+if __name__ == '__main__':
+    main()
+
+# vim: sw=4 et

@@ -1,22 +1,17 @@
 #!/bin/sh
 
-if [ x"$2" = x ]; then
-    echo "Usage: $0 SRC_DIR NAME.NUM.md" 1>&2
+if [ $# != 1 ]; then
+    echo "Usage: $0 NAME.NUM.md" 1>&2
     exit 1
 fi
 
-srcdir="$1"
-inname="$2"
+inname="$1"
+srcdir=`dirname "$0"`
 flagfile="$srcdir/.md2man-works"
-
-if [ ! -d "$srcdir" ]; then
-    echo "The specified SRC_DIR is not a directory: $srcdir" 1>&2
-    exit 1
-fi
 
 if [ ! -f "$flagfile" ]; then
     # We test our smallest manpage just to see if the python setup works.
-    if "$srcdir/md2man" --test "$srcdir/rsync-ssl.1.md" >/dev/null 2>&1; then
+    if "$srcdir/md-convert" --test "$srcdir/rsync-ssl.1.md" >/dev/null 2>&1; then
 	touch $flagfile
     else
 	outname=`echo "$inname" | sed 's/\.md$//'`
@@ -37,4 +32,4 @@ if [ ! -f "$flagfile" ]; then
     fi
 fi
 
-"$srcdir/md2man" "$srcdir/$inname"
+"$srcdir/md-convert" "$srcdir/$inname"

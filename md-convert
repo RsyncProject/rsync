@@ -1,0 +1,476 @@
+#!/usr/bin/env python3
+
+# This script transforms markdown files into html and (optionally) nroff. The
+# output files are written into the current directory named for the input file
+# without the .md suffix and either the .html suffix or no suffix.
+#
+# If the input .md file has a section number at the end of the name (e.g.,
+# rsync.1.md) a nroff file is also output (PROJ.NUM.md -> PROJ.NUM).
+#
+# The markdown input format has one extra extension: if a numbered list starts
+# at 0, it is turned into a description list. The dl's dt tag is taken from the
+# contents of the first tag inside the li, which is usually a p, code, or
+# strong tag.
+#
+# The cmarkgfm or commonmark lib is used to transforms the input file into
+# html.  Then, the html.parser is used as a state machine that lets us tweak
+# the html and (optionally) output nroff data based on the html tags.
+#
+# If the string @USE_GFM_PARSER@ exists in the file, the string is removed and
+# a github-flavored-markup parser is used to parse the file.
+#
+# The man-page .md files also get the vars @VERSION@, @BINDIR@, and @LIBDIR@
+# substituted.  Some of these values depend on the Makefile $(prefix) (see the
+# generated Makefile).  If the maintainer wants to build files for /usr/local
+# while creating release-ready man-page files for /usr, use the environment to
+# set RSYNC_OVERRIDE_PREFIX=/usr.
+
+# Copyright (C) 2020 - 2021 Wayne Davison
+#
+# This program is freely redistributable.
+
+import os, sys, re, argparse, subprocess, time
+from html.parser import HTMLParser
+
+CONSUMES_TXT = set('h1 h2 p li pre'.split())
+
+HTML_START = """\
+<html><head>
+<title>%s</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto&family=Roboto+Mono&display=swap" rel="stylesheet">
+<style>
+body {
+  max-width: 50em;
+  margin: auto;
+}
+body, b, strong, u {
+  font-family: 'Roboto', sans-serif;
+}
+code {
+  font-family: 'Roboto Mono', monospace;
+  font-weight: bold;
+  white-space: pre;
+}
+pre code {
+  display: block;
+  font-weight: normal;
+}
+blockquote pre code {
+  background: #f1f1f1;
+}
+dd p:first-of-type {
+  margin-block-start: 0em;
+}
+</style>
+</head><body>
+"""
+
+TABLE_STYLE = """\
+table {
+  border-color: grey;
+  border-spacing: 0;
+}
+tr {
+  border-top: 1px solid grey;
+}
+tr:nth-child(2n) {
+  background-color: #f6f8fa;
+}
+th, td {
+  border: 1px solid #dfe2e5;
+  text-align: center;
+  padding-left: 1em;
+  padding-right: 1em;
+}
+"""
+
+MAN_HTML_END = """\
+<div style="float: right"><p><i>%s</i></p></div>
+"""
+
+HTML_END = """\
+</body></html>
+"""
+
+MAN_START = r"""
+.TH "%s" "%s" "%s" "%s" "User Commands"
+.\" prefix=%s
+""".lstrip()
+
+MAN_END = """\
+"""
+
+NORM_FONT = ('\1', r"\fP")
+BOLD_FONT = ('\2', r"\fB")
+UNDR_FONT = ('\3', r"\fI")
+NBR_DASH = ('\4', r"\-")
+NBR_SPACE = ('\xa0', r"\ ")
+
+md_parser = None
+env_subs = { }
+
+def main():
+    for mdfn in args.mdfiles:
+        parse_md_file(mdfn)
+
+    if args.test:
+        print("The test was successful.")
+
+
+def parse_md_file(mdfn):
+    fi = re.match(r'^(?P<fn>(?P<srcdir>.+/)?(?P<name>(?P<prog>[^/]+?)(\.(?P<sect>\d+))?)\.md)$', mdfn)
+    if not fi:
+        die('Failed to parse a md input file name:', mdfn)
+    fi = argparse.Namespace(**fi.groupdict())
+    fi.want_manpage = not not fi.sect
+    if fi.want_manpage:
+        fi.title = fi.prog + '(' + fi.sect + ') man page'
+    else:
+        fi.title = fi.prog
+
+    if fi.want_manpage:
+        if not env_subs:
+            find_man_substitutions()
+        prog_ver = 'rsync ' + env_subs['VERSION']
+        if fi.prog != 'rsync':
+            prog_ver = fi.prog + ' from ' + prog_ver
+        fi.man_headings = (fi.prog, fi.sect, env_subs['date'], prog_ver, env_subs['prefix'])
+
+    with open(mdfn, 'r', encoding='utf-8') as fh:
+        txt = fh.read()
+
+    use_gfm_parser = '@USE_GFM_PARSER@' in txt
+    if use_gfm_parser:
+        txt = txt.replace('@USE_GFM_PARSER@', '')
+
+    if fi.want_manpage:
+        txt = (txt.replace('@VERSION@', env_subs['VERSION'])
+                  .replace('@BINDIR@', env_subs['bindir'])
+                  .replace('@LIBDIR@', env_subs['libdir']))
+
+    if use_gfm_parser:
+        if not gfm_parser:
+            die('Input file requires cmarkgfm parser:', mdfn)
+        fi.html_in = gfm_parser(txt)
+    else:
+        fi.html_in = md_parser(txt)
+    txt = None
+
+    TransformHtml(fi)
+
+    if args.test:
+        return
+
+    output_list = [ (fi.name + '.html', fi.html_out) ]
+    if fi.want_manpage:
+        output_list += [ (fi.name, fi.man_out) ]
+    for fn, txt in output_list:
+        if os.path.lexists(fn):
+            os.unlink(fn)
+        print("Wrote:", fn)
+        with open(fn, 'w', encoding='utf-8') as fh:
+            fh.write(txt)
+
+
+def find_man_substitutions():
+    srcdir = os.path.dirname(sys.argv[0]) + '/'
+    mtime = 0
+
+    git_dir = srcdir + '.git'
+    if os.path.lexists(git_dir):
+        mtime = int(subprocess.check_output(['git', '--git-dir', git_dir, 'log', '-1', '--format=%at']))
+
+    # Allow "prefix" to be overridden via the environment:
+    env_subs['prefix'] = os.environ.get('RSYNC_OVERRIDE_PREFIX', None)
+
+    if args.test:
+        env_subs['VERSION'] = '1.0.0'
+        env_subs['bindir'] = '/usr/bin'
+        env_subs['libdir'] = '/usr/lib/rsync'
+    else:
+        for fn in (srcdir + 'version.h', 'Makefile'):
+            try:
+                st = os.lstat(fn)
+            except OSError:
+                die('Failed to find', srcdir + fn)
+            if not mtime:
+                mtime = st.st_mtime
+
+        with open(srcdir + 'version.h', 'r', encoding='utf-8') as fh:
+            txt = fh.read()
+        m = re.search(r'"(.+?)"', txt)
+        env_subs['VERSION'] = m.group(1)
+
+        with open('Makefile', 'r', encoding='utf-8') as fh:
+            for line in fh:
+                m = re.match(r'^(\w+)=(.+)', line)
+                if not m:
+                    continue
+                var, val = (m.group(1), m.group(2))
+                if var == 'prefix' and env_subs[var] is not None:
+                    continue
+                while re.search(r'\$\{', val):
+                    val = re.sub(r'\$\{(\w+)\}', lambda m: env_subs[m.group(1)], val)
+                env_subs[var] = val
+                if var == 'srcdir':
+                    break
+
+    env_subs['date'] = time.strftime('%d %b %Y', time.localtime(mtime))
+
+
+def html_via_commonmark(txt):
+    return commonmark.HtmlRenderer().render(commonmark.Parser().parse(txt))
+
+
+class TransformHtml(HTMLParser):
+    def __init__(self, fi):
+        HTMLParser.__init__(self, convert_charrefs=True)
+
+        st = self.state = argparse.Namespace(
+                list_state = [ ],
+                p_macro = ".P\n",
+                at_first_tag_in_li = False,
+                at_first_tag_in_dd = False,
+                dt_from = None,
+                in_pre = False,
+                in_code = False,
+                html_out = [ HTML_START % fi.title ],
+                man_out = [ ],
+                txt = '',
+                want_manpage = fi.want_manpage,
+                )
+
+        if st.want_manpage:
+            st.man_out.append(MAN_START % fi.man_headings)
+
+        if '</table>' in fi.html_in:
+            st.html_out[0] = st.html_out[0].replace('</style>', TABLE_STYLE + '</style>')
+
+        self.feed(fi.html_in)
+        fi.html_in = None
+
+        if st.want_manpage:
+            st.html_out.append(MAN_HTML_END % env_subs['date'])
+        st.html_out.append(HTML_END)
+        st.man_out.append(MAN_END)
+
+        fi.html_out = ''.join(st.html_out)
+        st.html_out = None
+
+        fi.man_out = ''.join(st.man_out)
+        st.man_out = None
+
+
+    def handle_starttag(self, tag, attrs_list):
+        st = self.state
+        if args.debug:
+            self.output_debug('START', (tag, attrs_list))
+        if st.at_first_tag_in_li:
+            if st.list_state[-1] == 'dl':
+                st.dt_from = tag
+                if tag == 'p':
+                    tag = 'dt'
+                else:
+                    st.html_out.append('<dt>')
+            elif tag == 'p':
+                st.at_first_tag_in_dd = True # Kluge to suppress a .P at the start of an li.
+            st.at_first_tag_in_li = False
+        if tag == 'p':
+            if not st.at_first_tag_in_dd:
+                st.man_out.append(st.p_macro)
+        elif tag == 'li':
+            st.at_first_tag_in_li = True
+            lstate = st.list_state[-1]
+            if lstate == 'dl':
+                return
+            if lstate == 'o':
+                st.man_out.append(".IP o\n")
+            else:
+                st.man_out.append(".IP " + str(lstate) + ".\n")
+                st.list_state[-1] += 1
+        elif tag == 'blockquote':
+            st.man_out.append(".RS 4\n")
+        elif tag == 'pre':
+            st.in_pre = True
+            st.man_out.append(st.p_macro + ".nf\n")
+        elif tag == 'code' and not st.in_pre:
+            st.in_code = True
+            st.txt += BOLD_FONT[0]
+        elif tag == 'strong' or tag == 'b':
+            st.txt += BOLD_FONT[0]
+        elif tag == 'em' or  tag == 'i':
+            if st.want_manpage:
+                tag = 'u' # Change it into underline to be more like the man page
+                st.txt += UNDR_FONT[0]
+        elif tag == 'ol':
+            start = 1
+            for var, val in attrs_list:
+                if var == 'start':
+                    start = int(val) # We only support integers.
+                    break
+            if st.list_state:
+                st.man_out.append(".RS\n")
+            if start == 0:
+                tag = 'dl'
+                attrs_list = [ ]
+                st.list_state.append('dl')
+            else:
+                st.list_state.append(start)
+            st.man_out.append(st.p_macro)
+            st.p_macro = ".IP\n"
+        elif tag == 'ul':
+            st.man_out.append(st.p_macro)
+            if st.list_state:
+                st.man_out.append(".RS\n")
+                st.p_macro = ".IP\n"
+            st.list_state.append('o')
+        elif tag == 'hr':
+            st.man_out.append(".l\n")
+            st.html_out.append("<hr />")
+            return
+        st.html_out.append('<' + tag + ''.join(' ' + var + '="' + htmlify(val) + '"' for var, val in attrs_list) + '>')
+        st.at_first_tag_in_dd = False
+
+
+    def handle_endtag(self, tag):
+        st = self.state
+        if args.debug:
+            self.output_debug('END', (tag,))
+        if tag in CONSUMES_TXT or st.dt_from == tag:
+            txt = st.txt.strip()
+            st.txt = ''
+        else:
+            txt = None
+        add_to_txt = None
+        if tag == 'h1':
+            st.man_out.append(st.p_macro + '.SH "' + manify(txt) + '"\n')
+        elif tag == 'h2':
+            st.man_out.append(st.p_macro + '.SS "' + manify(txt) + '"\n')
+        elif tag == 'p':
+            if st.dt_from == 'p':
+                tag = 'dt'
+                st.man_out.append('.IP "' + manify(txt) + '"\n')
+                st.dt_from = None
+            elif txt != '':
+                st.man_out.append(manify(txt) + "\n")
+        elif tag == 'li':
+            if st.list_state[-1] == 'dl':
+                if st.at_first_tag_in_li:
+                    die("Invalid 0. -> td translation")
+                tag = 'dd'
+            if txt != '':
+                st.man_out.append(manify(txt) + "\n")
+            st.at_first_tag_in_li = False
+        elif tag == 'blockquote':
+            st.man_out.append(".RE\n")
+        elif tag == 'pre':
+            st.in_pre = False
+            st.man_out.append(manify(txt) + "\n.fi\n")
+        elif (tag == 'code' and not st.in_pre):
+            st.in_code = False
+            add_to_txt = NORM_FONT[0]
+        elif tag == 'strong' or tag == 'b':
+            add_to_txt = NORM_FONT[0]
+        elif tag == 'em' or  tag == 'i':
+            if st.want_manpage:
+                tag = 'u' # Change it into underline to be more like the man page
+                add_to_txt = NORM_FONT[0]
+        elif tag == 'ol' or tag == 'ul':
+            if st.list_state.pop() == 'dl':
+                tag = 'dl'
+            if st.list_state:
+                st.man_out.append(".RE\n")
+            else:
+                st.p_macro = ".P\n"
+            st.at_first_tag_in_dd = False
+        elif tag == 'hr':
+            return
+        st.html_out.append('</' + tag + '>')
+        if add_to_txt:
+            if txt is None:
+                st.txt += add_to_txt
+            else:
+                txt += add_to_txt
+        if st.dt_from == tag:
+            st.man_out.append('.IP "' + manify(txt) + '"\n')
+            st.html_out.append('</dt><dd>')
+            st.at_first_tag_in_dd = True
+            st.dt_from = None
+        elif tag == 'dt':
+            st.html_out.append('<dd>')
+            st.at_first_tag_in_dd = True
+
+
+    def handle_data(self, txt):
+        st = self.state
+        if args.debug:
+            self.output_debug('DATA', (txt,))
+        if st.in_pre:
+            html = htmlify(txt)
+        else:
+            txt = re.sub(r'\s--(\s)', NBR_SPACE[0] + r'--\1', txt).replace('--', NBR_DASH[0]*2)
+            txt = re.sub(r'(^|\W)-', r'\1' + NBR_DASH[0], txt)
+            html = htmlify(txt)
+            if st.in_code:
+                txt = re.sub(r'\s', NBR_SPACE[0], txt)
+                html = html.replace(NBR_DASH[0], '-').replace(NBR_SPACE[0], ' ') # <code> is non-breaking in CSS
+        st.html_out.append(html.replace(NBR_SPACE[0], '&nbsp;').replace(NBR_DASH[0], '-&#8288;'))
+        st.txt += txt
+
+
+    def output_debug(self, event, extra):
+        import pprint
+        st = self.state
+        if args.debug < 2:
+            st = argparse.Namespace(**vars(st))
+            if len(st.html_out) > 2:
+                st.html_out = ['...'] + st.html_out[-2:]
+            if len(st.man_out) > 2:
+                st.man_out = ['...'] + st.man_out[-2:]
+        print(event, extra)
+        pprint.PrettyPrinter(indent=2).pprint(vars(st))
+
+
+def manify(txt):
+    return re.sub(r"^(['.])", r'\&\1', txt.replace('\\', '\\\\')
+            .replace(NBR_SPACE[0], NBR_SPACE[1])
+            .replace(NBR_DASH[0], NBR_DASH[1])
+            .replace(NORM_FONT[0], NORM_FONT[1])
+            .replace(BOLD_FONT[0], BOLD_FONT[1])
+            .replace(UNDR_FONT[0], UNDR_FONT[1]), flags=re.M)
+
+
+def htmlify(txt):
+    return txt.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
+
+
+def warn(*msg):
+    print(*msg, file=sys.stderr)
+
+
+def die(*msg):
+    warn(*msg)
+    sys.exit(1)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Output html and (optionally) nroff for markdown pages.", add_help=False)
+    parser.add_argument('--test', action='store_true', help="Just test the parsing without outputting any files.")
+    parser.add_argument('--debug', '-D', action='count', default=0, help='Output copious info on the html parsing. Repeat for even more.')
+    parser.add_argument("--help", "-h", action="help", help="Output this help message and exit.")
+    parser.add_argument("mdfiles", nargs='+', help="The source .md files to convert.")
+    args = parser.parse_args()
+
+    try:
+        import cmarkgfm
+        md_parser = cmarkgfm.markdown_to_html
+        gfm_parser = cmarkgfm.github_flavored_markdown_to_html
+    except:
+        try:
+            import commonmark
+            md_parser = html_via_commonmark
+        except:
+            die("Failed to find cmarkgfm or commonmark for python3.")
+        gfm_parser = None
+
+    main()

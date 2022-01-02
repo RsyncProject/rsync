@@ -91,6 +91,7 @@ int implied_dirs = 1;
 int missing_args = 0; /* 0 = FERROR_XFER, 1 = ignore, 2 = delete */
 int numeric_ids = 0;
 int msgs2stderr = 2; /* Default: send errors to stderr for local & remote-shell transfers */
+int saw_stderr_opt = 0;
 int allow_8bit_chars = 0;
 int force_delete = 0;
 int io_timeout = 0;
@@ -1882,6 +1883,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 					"--stderr mode \"%s\" is not one of errors, all, or client\n", arg);
 				return 0;
 			}
+			saw_stderr_opt = 1;
 			break;
 		}
 
@@ -1899,6 +1901,9 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			return 0;
 		}
 	}
+
+	if (msgs2stderr != 2)
+		saw_stderr_opt = 1;
 
 	if (version_opt_cnt) {
 		print_rsync_version(FINFO);

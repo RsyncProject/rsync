@@ -39,7 +39,6 @@ extern char *skip_compress;
 #define Z_INSERT_ONLY Z_SYNC_FLUSH
 #endif
 
-static int compression_level; /* The compression level for the current file. */
 static int skip_compression_level; /* The least possible compressing for handling skip-compress files. */
 static int per_file_default_level; /* The default level that each new file gets prior to checking its suffix. */
 
@@ -224,9 +223,11 @@ static void init_set_compression(void)
 /* determine the compression level based on a wildcard filename list */
 void set_compression(const char *fname)
 {
+#if 0 /* No compression algorithms currently allow mid-stream changing of the level. */
 	const struct suffix_tree *node;
 	const char *s;
 	char ltr;
+#endif
 
 	if (!do_compression)
 		return;
@@ -234,6 +235,7 @@ void set_compression(const char *fname)
 	if (!match_list)
 		init_set_compression();
 
+#if 0
 	compression_level = per_file_default_level;
 
 	if (!*match_list && !suftree)
@@ -270,6 +272,9 @@ void set_compression(const char *fname)
 		if (!(node = node->child))
 			return;
 	}
+#else
+	(void)fname;
+#endif
 }
 
 /* non-compressing recv token */
@@ -361,7 +366,7 @@ send_deflated_token(int f, int32 token, struct map_struct *buf, OFF_T offset, in
 			tx_strm.next_in = NULL;
 			tx_strm.zalloc = NULL;
 			tx_strm.zfree = NULL;
-			if (deflateInit2(&tx_strm, compression_level,
+			if (deflateInit2(&tx_strm, per_file_default_level,
 					 Z_DEFLATED, -15, 8,
 					 Z_DEFAULT_STRATEGY) != Z_OK) {
 				rprintf(FERROR, "compression init failed\n");
