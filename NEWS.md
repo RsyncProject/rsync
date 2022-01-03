@@ -30,11 +30,14 @@
 
 ### BUG FIXES:
 
- - Fixed a bug with `--inplace` + `--sparse` where the destination file could
-   get reconstructed with bogus data.  This bug can be worked-around in older
-   rsync versions by also specifying `--no-W -M--no-W`.  When running 3.2.4 or
-   newer for your copy, rsync now sends `--no-W` to the remote rsync in such a
-   scenario (just in case the remote rsync is a version with this bug).
+ - Fixed a bug with `--inplace` + `--sparse` (and a lack of `--whole-file`)
+   where the destination file could get reconstructed with bogus data.  Since
+   the bug can also be avoided by using (the seemingly redundant) `--no-W` on
+   the receiving side, the latest rsync will now send `--no-W` to a remote
+   receiver when this option combination occurs.  If your client rsync is not
+   new enough to do this for you (or if you're just paranoid), you can manually
+   specify `--no-W -M--no-W` (when not using `--whole-file`) to make sure the
+   bug is avoided.
 
  - Fixed a bug with `--mkpath` if a single-file copy specifies an existing
    destination dir with a non-existing destination filename.
@@ -47,9 +50,9 @@
    or it is skipped. Fixes a crash that could occur when the size changes to 0
    in the middle of the send negotiations.
 
- - When dealing with a special file in an alt-dest hierarchy, rsync now checks
-   the non-permissions mode bits to ensure that the 2 special files are really
-   the same.
+ - When dealing with special files (see `--specials`) in an alt-dest hierarchy,
+   rsync now checks the non-permission mode bits to ensure that the 2 special
+   files are really the same before hard-linking them together.
 
  - Fixed a bug where `--delay-updates` with stale partial data could cause a
    file to fail to update.
@@ -58,12 +61,16 @@
    should only have been output given `--verbose` or `--itemize-changes`.
 
  - Avoid a weird failure if you run a local copy with a (useless) `--rsh`
-   option that contains a `V`.
+   option that contains a `V` in the command.
 
  - Fixed a long-standing compression bug where the compression level of the
    first file transferred affected the level for all future files.  Also, the
-   per-file compression skipping has apparently not worked in a very long time
-   (I checked back to 2.6.4), so it is now documented as being ineffective.
+   per-file compression skipping has apparently never worked, so it is now
+   documented as being ineffective.
+
+ - Improved how the `--stop-at`, `--stop-after`, and `--time-limit` options
+   check to see if the allowed time is over, which should make rsync exit more
+   consistently.
 
 ### ENHANCEMENTS:
 
@@ -83,7 +90,8 @@
  - The rsync daemon can now handle a client address with an implied "%scope"
    suffix.
 
- - Added support for `--atimes` on macOS and fixed using using it without `-t`.
+ - Added support for `--atimes` on macOS and fixed a bug where it wouldn't work
+   without `--times`.
 
  - Rsync can now update the xattrs on a read-only file when your user can
    temporarily add user-write permission to the file. (It always worked for a
@@ -92,8 +100,8 @@
  - Rsync can now work around an `--inplace` update of a file that is being
    refused due to the Linux fs.protected_regular sysctl setting.
 
- - When `--chown`, `--usermap`, or `--groupmap` is used, rsync now implies
-   the appropriate `--owner` and/or `--group` option.
+ - When `--chown`, `--usermap`, or `--groupmap` is specified, rsync now makes
+   sure that the appropriate `--owner` and/or `--group` option is enabled.
 
  - Added the `--info=NONREG` setting to control if rsync should warn about
    non-regular files in the transfer.  This is enabled by default (keeping the
@@ -102,7 +110,7 @@
 
  - More ASM optimizations from Shark64.
 
- - Transformed support/rrsync into a python script with improvements:
+ - Transformed rrsync (in support dir) into a python script with improvements:
    - Security has been beefed up.
    - The known rsync options were updated to include recent additions.
    - Make rrsync reject `-L`, `-K`, & `-k` by default to make it harder to
@@ -115,33 +123,34 @@
      options on the server side.
    - The log format has been tweaked slightly to add seconds to the timestamp
      and to output the command executed as a tuple (making the args clearer).
-   - An rrsync.1 manpage was added.
+   - An rrsync.1 man page was added.
 
-  - Added options to support/lsh to allow the rrsync script to be easily tested.
+ - Added options to the lsh script (in the support dir) to facilitate rrsync
+   testing.
 
-  - Transformed support/atomic-rsync into a python script and added the ability
-    to ignore one or more non-zero exit codes. By default, it now ignores code
-    24 (file vanished).
+ - Transformed the atomic-rsync script (in the support dir) into a python
+   script and added the ability to ignore one or more non-zero exit codes.
+   By default, it now ignores code 24 (file vanished).
 
-  - Improved support/rsync-no-vanished wrapper script to not join stdout &
-    stderr together.
+ - Transformed the munge-symlinks script (in the support dir) into python.
 
-  - Transformed support/munge-symlinks into a python script.
+ - Improved the rsync-no-vanished script (in the support dir) to not join
+   stdout & stderr together.
 
  - Work around a glibc bug where lchmod() breaks in a chroot w/o /proc mounted.
 
  - Try to support a client that sent a remote rsync a wacko stderr file handle
    (such as an older File::RsyncP perl library used by BackupPC).
 
- - Some manpage improvements.
+ - Some man page improvements.
 
 ### PACKAGING RELATED:
 
  - Give configure the `--with-rrsync` option if you want `make install` to
-   install the (now python3) rrsync script and its (new) man page.
+   install the (now python3) rrsync script and its new man page.
 
- - If the rrsync script is installed, make its package depend on python3 and
-   (suggested but not required) the python3 braceexpand lib.
+ - If the rrsync script is installed, its package should be changed to depend
+   on python3 and the (suggested but not mandatory) python3 braceexpand lib.
 
  - When creating a package from a non-release version (w/o a git checkout), the
    packager can elect to create git-version.h and define RSYNC_GITVER to the
@@ -153,19 +162,21 @@
 
  - Made SIMD & ASM configure default to "no" on non-Linux hosts due to various
    reports of problems on NetBSD & macOS hosts.  These tests were also tweaked
-   to support a host_cpu of amd64 in addition to x86_64.
+   to allow enabling the feature on a host_cpu of amd64 (was only x86_64).
 
  - Fixed configure to not fail at the SIMD check when cross-compiling.
 
- - Compile the C files with `-pedantic-errors` when possible so that we get
-   warned about an overflowed static initialization (among other things).
+ - Compile the C files with `-pedantic-errors` (when possible) so that we will
+   get warned if a static initialization overflows in the future (among other
+   things).
 
  - Added a SECURITY.md file.
 
 ### DEVELOPER RELATED:
 
  - Made it easier to write rsync tests that diff the output while also checking
-   the status code, and used the idiom to improve the existing tests.
+   the status code, and used the idiom to improve the existing tests. (See the
+   `checkdiff` and `checkdiff2` idioms in the `testsuite/*.test` files.
 
  - The packaging scripts & related python lib got some minor enhancements.
 
@@ -176,7 +187,12 @@
  - Improve the logic in compat.c so that we don't need to try to remember to
    sprinkle `!local_server` exceptions throughout the protocol logic.
 
- - One more C99 Flexible Array improvement (started in the last release).
+ - One more C99 Flexible Array improvement (started in the last release) and
+   make use of the C99 `%zd` format string when printing size_t values (when
+   possible).
+
+ - Use mallinfo2() instead of mallinfo(), when available.
+
 
 ------------------------------------------------------------------------------
 <a name="3.2.3"></a>
@@ -649,7 +665,8 @@
 
  - Don't output about a new backup dir without appropriate info verbosity.
 
- - Fixed some issues with the sort functions in support/rsyncstats script.
+ - Fixed some issues with the sort functions in the rsyncstats script (in the
+   support dir).
 
  - Added a way to specify daemon config lists (e.g. users, groups, etc) that
    contain spaces (see `auth users` in the latest rsyncd.conf manpage).
@@ -860,7 +877,7 @@
    non-bundled zlib. See the `--new-compress` and `--old-compress` options in
    the manpage.
 
- - Added the support/rsync-no-vanished wrapper script.
+ - Added the rsync-no-vanished shell script (in the support dir).
 
  - Made configure more prominently mention when we failed to find yodl (in case
    the user wants to be able to generate manpages from `*.yo` files).
@@ -1193,7 +1210,7 @@
 
  - Fix some issues with the post-processing of the man pages.
 
- - Fixed the user home-dir handling in the support/lsh script.
+ - Fixed the user home-dir handling in the lsh script (in the support dir).
 
  - Some minor manpage improvements.
 
@@ -1311,10 +1328,10 @@
    reject an attempt to supply one (can configure `--with-included-popt` if
    your system's popt library doesn't yet have this fix).
 
- - A couple minor option tweaks to the support/rrsync script, and also some
-   regex changes that make vim highlighting happier.
+ - A couple minor option tweaks to the rrsync script (in the support dir), and
+   also some regex changes that make vim highlighting happier.
 
- - Fixed some issues in the support/mnt-excl script.
+ - Fixed some issues in the mnt-excl script (in the support dir).
 
  - Various manpage improvements.
 
@@ -1524,9 +1541,9 @@
 
 ### ENHANCEMENTS:
 
- - Made the support/atomic-rsync script able to perform a fully atomic update
-   of the copied hierarchy when the destination is setup using a particular
-   symlink idiom.
+ - Made the atomic-rsync script (in the support dir) able to perform a fully
+   atomic update of the copied hierarchy when the destination is setup using a
+   particular symlink idiom.
 
 ------------------------------------------------------------------------------
 <a name="3.0.4"></a>
@@ -1794,8 +1811,8 @@
 
  - Fixed the inclusion of per-dir merge files from implied dirs.
 
- - Fixed the support/rrsync script to work with the latest options that rsync
-   sends (including its flag-specifying use of `-e` to the server).
+ - Fixed the rrsync script (in the support dir) to work with the latest options
+   that rsync sends (including its flag-specifying use of `-e` to the server).
 
 ### ENHANCEMENTS:
 
@@ -2799,10 +2816,10 @@
  - Made the `max verbosity` setting in the rsyncd.conf file settable on a
    per-module basis (which now matches the documentation).
 
- - The support/rrsync script has been upgraded to verify the args of options
-   that take args (instead of rejecting any such options). The script was also
-   changed to try to be more secure and to fix a problem in the parsing of a
-   pull operation that has multiple sources.
+ - The rrsync script (in the support dir) has been upgraded to verify the args
+   of options that take args (instead of rejecting any such options). It was
+   also changed to try to be more secure and to fix a problem in the parsing
+   of a pull operation that has multiple source args.
 
  - Improved the documentation that explains the difference between a normal
    daemon transfer and a daemon-over remote-shell transfer.
@@ -4425,7 +4442,7 @@
 
 | RELEASE DATE | VER.   | DATE OF COMMIT\* | PROTOCOL    |
 |--------------|--------|------------------|-------------|
-| ?? Sep 2020  | 3.2.4  |                  | 31          |
+| ?? Jan 2022  | 3.2.4  |                  | 31          |
 | 06 Aug 2020  | 3.2.3  |                  | 31          |
 | 04 Jul 2020  | 3.2.2  |                  | 31          |
 | 22 Jun 2020  | 3.2.1  |                  | 31          |
