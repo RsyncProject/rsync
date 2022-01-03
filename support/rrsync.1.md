@@ -5,7 +5,7 @@ rrsync - a script to setup restricted rsync users via ssh logins
 # SYNOPSIS
 
 ```
-rrsync [-ro|-rw] [-munge] [-no-del] DIR
+rrsync [-ro|-rw] [-munge] [-no-del] [-no-lock] DIR
 ```
 
 # DESCRIPTION
@@ -52,10 +52,11 @@ The remainder of this man page is dedicated to using the rrsync script.
 # OPTION SUMMARY
 
 ```
--ro        Allow only reading from the DIR. Implies -no-del.
+-ro        Allow only reading from the DIR. Implies -no-del and -no-lock.
 -wo        Allow only writing to the DIR.
--no-del    Disable rsync's --delete* and --remove* options.
 -munge     Enable rsync's --munge-links on the server side.
+-no-del    Disable rsync's --delete* and --remove* options.
+-no-lock   Avoid the single-run (per-user) lock check.
 -help, -h  Output this help message and exit.
 ```
 

@@ -110,7 +110,7 @@
 
  - More ASM optimizations from Shark64.
 
- - Transformed rrsync (in support dir) into a python script with improvements:
+ - Transformed rrsync into a python script with improvements:
    - Security has been beefed up.
    - The known rsync options were updated to include recent additions.
    - Make rrsync reject `-L`, `-K`, & `-k` by default to make it harder to
@@ -123,19 +123,19 @@
      options on the server side.
    - The log format has been tweaked slightly to add seconds to the timestamp
      and to output the command executed as a tuple (making the args clearer).
-   - An rrsync.1 man page was added.
+   - An rrsync.1 man page was added (in the support dir with rrsync).
 
- - Added options to the lsh script (in the support dir) to facilitate rrsync
-   testing.
+ - Added options to the lsh script to facilitate rrsync testing. (See the
+   support dir.)
 
- - Transformed the atomic-rsync script (in the support dir) into a python
-   script and added the ability to ignore one or more non-zero exit codes.
-   By default, it now ignores code 24 (file vanished).
+ - Transformed the atomic-rsync script into a python script and added the
+   ability to ignore one or more non-zero exit codes.  By default, it now
+   ignores code 24, the file-vanished exit code. (See the support dir.)
 
- - Transformed the munge-symlinks script (in the support dir) into python.
+ - Transformed the munge-symlinks script into python. (See the support dir.)
 
- - Improved the rsync-no-vanished script (in the support dir) to not join
-   stdout & stderr together.
+ - Improved the rsync-no-vanished script to not join stdout & stderr together.
+   (See the support dir.)
 
  - Work around a glibc bug where lchmod() breaks in a chroot w/o /proc mounted.
 
@@ -877,7 +877,7 @@
    non-bundled zlib. See the `--new-compress` and `--old-compress` options in
    the manpage.
 
- - Added the rsync-no-vanished shell script (in the support dir).
+ - Added the rsync-no-vanished shell script. (See the support dir.)
 
  - Made configure more prominently mention when we failed to find yodl (in case
    the user wants to be able to generate manpages from `*.yo` files).
@@ -1210,7 +1210,7 @@
 
  - Fix some issues with the post-processing of the man pages.
 
- - Fixed the user home-dir handling in the lsh script (in the support dir).
+ - Fixed the user home-dir handling in the lsh script. (See the support dir.)
 
  - Some minor manpage improvements.
 
@@ -1328,10 +1328,10 @@
    reject an attempt to supply one (can configure `--with-included-popt` if
    your system's popt library doesn't yet have this fix).
 
- - A couple minor option tweaks to the rrsync script (in the support dir), and
-   also some regex changes that make vim highlighting happier.
+ - A couple minor option tweaks to the rrsync script, and also some regex
+   changes that make vim highlighting happier. (See the support dir.)
 
- - Fixed some issues in the mnt-excl script (in the support dir).
+ - Fixed some issues in the mnt-excl script. (See the support dir.)
 
  - Various manpage improvements.
 
@@ -1541,9 +1541,9 @@
 
 ### ENHANCEMENTS:
 
- - Made the atomic-rsync script (in the support dir) able to perform a fully
-   atomic update of the copied hierarchy when the destination is setup using a
-   particular symlink idiom.
+ - Made the atomic-rsync script able to perform a fully atomic update of the
+   copied hierarchy when the destination is setup using a particular symlink
+   idiom. (See the support dir.)
 
 ------------------------------------------------------------------------------
 <a name="3.0.4"></a>
@@ -1811,8 +1811,9 @@
 
  - Fixed the inclusion of per-dir merge files from implied dirs.
 
- - Fixed the rrsync script (in the support dir) to work with the latest options
-   that rsync sends (including its flag-specifying use of `-e` to the server).
+ - Fixed the rrsync script to work with the latest options that rsync sends,
+   including its flag-specifying use of `-e` to the server. (See the support
+   dir.)
 
 ### ENHANCEMENTS:
 
@@ -2816,10 +2817,10 @@
  - Made the `max verbosity` setting in the rsyncd.conf file settable on a
    per-module basis (which now matches the documentation).
 
- - The rrsync script (in the support dir) has been upgraded to verify the args
-   of options that take args (instead of rejecting any such options). It was
-   also changed to try to be more secure and to fix a problem in the parsing
-   of a pull operation that has multiple source args.
+ - The rrsync script has been upgraded to verify the args of options that take
+   args (instead of rejecting any such options). It was also changed to try to
+   be more secure and to fix a problem in the parsing of a pull operation that
+   has multiple source args. (See the support dir.)
 
  - Improved the documentation that explains the difference between a normal
    daemon transfer and a daemon-over remote-shell transfer.
