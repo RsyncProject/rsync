@@ -2834,7 +2834,7 @@ void server_options(char **args, int *argc_p)
 	} else if (inplace) {
 		args[ac++] = "--inplace";
 		/* Work around a bug in older rsync versions (on the remote side) for --inplace --sparse */
-		if (sparse_files && !whole_file)
+		if (sparse_files && !whole_file && am_sender)
 			args[ac++] = "--no-W";
 	}
 
