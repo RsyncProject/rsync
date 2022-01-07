@@ -2783,13 +2783,13 @@ void server_options(char **args, int *argc_p)
 
 	if (am_sender) {
 		if (usermap) {
-			if (asprintf(&arg, "--usermap=%s", usermap) < 0)
+			if (asprintf(&arg, "--usermap='%s'", usermap) < 0)
 				goto oom;
 			args[ac++] = arg;
 		}
 
 		if (groupmap) {
-			if (asprintf(&arg, "--groupmap=%s", groupmap) < 0)
+			if (asprintf(&arg, "--groupmap='%s'", groupmap) < 0)
 				goto oom;
 			args[ac++] = arg;
 		}
