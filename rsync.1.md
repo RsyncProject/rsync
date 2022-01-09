@@ -1044,14 +1044,21 @@ your home directory (remove the '=' for that).
 
 0.  `--copy-links`, `-L`
 
-    When symlinks are encountered, the item that they point to (the referent)
-    is copied, rather than the symlink.  In older versions of rsync, this
-    option also had the side-effect of telling the receiving side to follow
-    symlinks, such as symlinks to directories.  In a modern rsync such as this
-    one, you'll need to specify `--keep-dirlinks` (`-K`) to get this extra
-    behavior.  The only exception is when sending files to an rsync that is too
-    old to understand `-K` -- in that case, the `-L` option will still have the
-    side-effect of `-K` on that older receiving rsync.
+    The sender transforms each symlink encountered in the transfer into the
+    referent item, following the symlink chain to the file or directory that it
+    references.  If a symlink chain is broken, an error is output and the file
+    is dropped from the transfer.  On the receiving side, any existing symlinks
+    in the destination directories are replaced with the non-symlinks that the
+    sender specifies (though any destination filenames that do not match a name
+    in the transfer can remain as symlinks if rsync is not deleting files).
+
+    In versions of rsync prior to 2.6.3, this option also had the side-effect
+    of telling the receiving side to follow symlinks, such as a symlink to a
+    directory.  A modern rsync does not do this, though you can choose to
+    specify `--keep-dirlinks` (`-K`) if you want rsync to treat a symlink to a
+    directory on the receiving side as if it were a real directory.  Remember
+    that it's the version of rsync on the receiving side that determines how it
+    reacts to existing destination symlinks when this option is in effect.
 
 0.  `--copy-unsafe-links`
 
