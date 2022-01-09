@@ -238,7 +238,7 @@ failed=0
 # failure to aid investigation.  We don't remove the testtmp subdir at
 # the end so that it can be configured as a symlink to a filesystem that
 # has ACLs and xattr support enabled (if desired).
-scratchbase="$TOOLDIR"/testtmp
+scratchbase="${scratchbase:-$TOOLDIR}"/testtmp
 echo "    scratchbase=$scratchbase"
 [ -d "$scratchbase" ] || mkdir "$scratchbase"
 
