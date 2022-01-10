@@ -2187,14 +2187,16 @@ your home directory (remove the '=' for that).
     even wildcards escaped).  The only active wildcard characters on the remote
     side are: `*`, `?`, `[`, & `]`.
 
-    If you have a script that wants to use old-style arg splitting, this option
-    should get it going.
+    If you have a script that wants to use old-style arg splitting in the
+    filenames, specify this option once.  If the remote shell has a problem
+    with any backslash escapes, specify the option twice.
 
     You may also control this setting via the RSYNC_OLD_ARGS environment
-    variable.  If this variable has a non-zero value, this setting will be
-    enabled by default, otherwise it will be disabled by default.  Either state
-    is overridden by a manually specified positive or negative version of this
-    option (the negative is `--no-old-args`).
+    variable.  If it has the value "1", rsync will default to a single-option
+    setting.  If it has the value "2" (or more), rsync will default to a
+    repeated-option setting.  If it is "0", you'll get the default escaping
+    behavior.  The environment is always overridden by manually specified
+    positive or negative options (the negative is `--no-old-args`).
 
 0.  `--protect-args`, `-s`
 
@@ -2212,7 +2214,7 @@ your home directory (remove the '=' for that).
     `--files-from` option.
 
     You may also control this setting via the RSYNC_PROTECT_ARGS environment
-    variable.  If this variable has a non-zero value, this setting will be
+    variable.  If it has a non-zero value, this setting will be
     enabled by default, otherwise it will be disabled by default.  Either state
     is overridden by a manually specified positive or negative version of this
     option (note that `--no-s` and `--no-protect-args` are the negative
@@ -4162,9 +4164,10 @@ file is included or excluded.
 
 0.  `RSYNC_OLD_ARGS`
 
-    Specify a non-zero numeric value if you want the `--old-args` option to be
-    enabled by default, or a zero value to make sure that it is disabled by
-    default. (First supported in 3.2.4.)
+    Specify a "1" if you want the `--old-args` option to be enabled by default,
+    a "2" (or more) if you want it to be enabled in the option-repeated state,
+    or a "0" to make sure that it is disabled by default. (First supported in
+    3.2.4.)
 
 0.  `RSYNC_PROTECT_ARGS`
 

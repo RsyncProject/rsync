@@ -578,7 +578,7 @@ enum {OPT_SERVER = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_READ_BATCH, OPT_WRITE_BATCH, OPT_ONLY_WRITE_BATCH, OPT_MAX_SIZE,
       OPT_NO_D, OPT_APPEND, OPT_NO_ICONV, OPT_INFO, OPT_DEBUG, OPT_BLOCK_SIZE,
       OPT_USERMAP, OPT_GROUPMAP, OPT_CHOWN, OPT_BWLIMIT, OPT_STDERR,
-      OPT_OLD_COMPRESS, OPT_NEW_COMPRESS, OPT_NO_COMPRESS,
+      OPT_OLD_COMPRESS, OPT_NEW_COMPRESS, OPT_NO_COMPRESS, OPT_OLD_ARGS,
       OPT_STOP_AFTER, OPT_STOP_AT,
       OPT_REFUSED_BASE = 9000};
 
@@ -781,7 +781,7 @@ static struct poptOption long_options[] = {
   {"files-from",       0,  POPT_ARG_STRING, &files_from, 0, 0, 0 },
   {"from0",           '0', POPT_ARG_VAL,    &eol_nulls, 1, 0, 0},
   {"no-from0",         0,  POPT_ARG_VAL,    &eol_nulls, 0, 0, 0},
-  {"old-args",         0,  POPT_ARG_VAL,    &old_style_args, 1, 0, 0},
+  {"old-args",         0,  POPT_ARG_NONE,   0, OPT_OLD_ARGS, 0, 0},
   {"no-old-args",      0,  POPT_ARG_VAL,    &old_style_args, 0, 0, 0},
   {"protect-args",    's', POPT_ARG_VAL,    &protect_args, 1, 0, 0},
   {"no-protect-args",  0,  POPT_ARG_VAL,    &protect_args, 0, 0, 0},
@@ -1608,6 +1608,13 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			compress_choice = NULL;
 			break;
 
+		case OPT_OLD_ARGS:
+			if (old_style_args <= 0)
+				old_style_args = 1;
+			else
+				old_style_args++;
+			break;
+
 		case 'M':
 			arg = poptGetOptArg(pc);
 			if (*arg != '-') {
@@ -1927,7 +1934,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 
 	if (old_style_args < 0) {
 		if (!am_server && (arg = getenv("RSYNC_OLD_ARGS")) != NULL && *arg)
-			old_style_args = atoi(arg) ? 1 : 0;
+			old_style_args = atoi(arg);
 		else
 			old_style_args = 0;
 	}
@@ -2477,7 +2484,7 @@ char *safe_arg(const char *opt, const char *arg)
 	int len2 = strlen(arg);
 	int extras = escape_leading_dash ? 2 : 0;
 	char *ret;
-	if (!protect_args && (!old_style_args || (!is_filename_arg && opt != SPLIT_ARG_WHEN_OLD))) {
+	if (!protect_args && old_style_args < 2 && (!old_style_args || (!is_filename_arg && opt != SPLIT_ARG_WHEN_OLD))) {
 		const char *f;
 		for (f = arg; *f; f++) {
 			if (strchr(escapes, *f))
