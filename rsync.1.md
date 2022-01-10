@@ -159,22 +159,16 @@ the hostname omitted.  For instance, all these work:
 
 >     rsync -av host:file1 :file2 host:file{3,4} /dest/
 >     rsync -av host::modname/file{1,2} host::modname/file3 /dest/
->     rsync -av host::modname/file1 ::modname/file{3,4}
+>     rsync -av host::modname/file1 ::modname/file{3,4} /dest/
 
-Older versions of rsync required using quoted spaces in the SRC, like these
+**Older versions of rsync** required using quoted spaces in the SRC, like these
 examples:
 
 >     rsync -av host:'dir1/file1 dir2/file2' /dest
 >     rsync host::'modname/dir1/file1 modname/dir2/file2' /dest
 
-This word-splitting still works (by default) in the latest rsync, but is not as
-easy to use as the first method.
-
-If you need to transfer a filename that contains whitespace, you can either
-specify the `--protect-args` (`-s`) option, or you'll need to escape the
-whitespace in a way that the remote shell will understand.  For instance:
-
->     rsync -av host:'file\ name\ with\ spaces' /dest
+This word-splitting only works in a modern rsync by using `--old-args` (or its
+environment variable) and making sure that `--protect-args` is not enabled.
 
 # CONNECTING TO AN RSYNC DAEMON
 
@@ -351,6 +345,7 @@ detailed description below for a complete description.
 --append                 append data onto shorter files
 --append-verify          --append w/old data in file checksum
 --dirs, -d               transfer directories without recursing
+--old-dirs, --old-d      works like --dirs when talking to old rsync
 --mkpath                 create the destination's path component
 --links, -l              copy symlinks as symlinks
 --copy-links, -L         transform symlink into referent file/dir
@@ -438,6 +433,7 @@ detailed description below for a complete description.
 --include-from=FILE      read include patterns from FILE
 --files-from=FILE        read list of source-file names from FILE
 --from0, -0              all *-from/filter files are delimited by 0s
+--old-args               disable the modern arg-protection idiom
 --protect-args, -s       no space-splitting; wildcard chars only
 --copy-as=USER[:GROUP]   specify user & optional group for the copy
 --address=ADDRESS        bind address for outgoing socket to daemon
@@ -1962,11 +1958,10 @@ your home directory (remove the '=' for that).
     cause rsync to have a different idea about what data to expect next over
     the socket, and that will make it fail in a cryptic fashion.
 
-    Note that it is best to use a separate `--remote-option` for each option
-    you want to pass.  This makes your usage compatible with the
-    `--protect-args` option.  If that option is off, any spaces in your remote
-    options will be split by the remote shell unless you take steps to protect
-    them.
+    Note that you should use a separate `-M` option for each remote option you
+    want to pass.  On older rsync versions, the presence of any spaces in the
+    remote-option arg could cause it to be split into separate remote args, but
+    this requires the use of `--old-args` in a modern rsync.
 
     When performing a local transfer, the "local" side is the sender and the
     "remote" side is the receiver.
@@ -2182,36 +2177,52 @@ your home directory (remove the '=' for that).
     files specified in a `--filter` rule.  It does not affect `--cvs-exclude`
     (since all names read from a .cvsignore file are split on whitespace).
 
+0. `--old-args`
+
+    This option tells rsync to stop trying to protect the arg values from
+    unintended word-splitting or other misinterpretation by using its new
+    backslash-escape idiom.  The newest default is for remote filenames to only
+    allow wildcards characters to be interpretated by the shell while
+    protecting other shell-interpreted characters (and the args of options get
+    even wildcards escaped).  The only active wildcard characters on the remote
+    side are: `*`, `?`, `[`, & `]`.
+
+    If you have a script that wants to use old-style arg splitting, this option
+    should get it going.
+
+    You may also control this setting via the RSYNC_OLD_ARGS environment
+    variable.  If this variable has a non-zero value, this setting will be
+    enabled by default, otherwise it will be disabled by default.  Either state
+    is overridden by a manually specified positive or negative version of this
+    option (the negative is `--no-old-args`).
+
 0.  `--protect-args`, `-s`
 
     This option sends all filenames and most options to the remote rsync
-    without allowing the remote shell to interpret them.  This means that
-    spaces are not split in names, and any non-wildcard special characters are
-    not translated (such as `~`, `$`, `;`, `&`, etc.).  Wildcards are expanded
-    on the remote host by rsync (instead of the shell doing it).
+    without allowing the remote shell to interpret them.  Wildcards are
+    expanded on the remote host by rsync instead of the shell doing it.
+
+    This is similar to the new-style backslash-escaping of args that was added
+    in 3.2.4, but supports some extra features and doesn't rely on backslash
+    escaping in the remote shell.
 
     If you use this option with `--iconv`, the args related to the remote side
     will also be translated from the local to the remote character-set.  The
     translation happens before wild-cards are expanded.  See also the
     `--files-from` option.
 
-    You may also control this option via the RSYNC_PROTECT_ARGS environment
-    variable.  If this variable has a non-zero value, this option will be
+    You may also control this setting via the RSYNC_PROTECT_ARGS environment
+    variable.  If this variable has a non-zero value, this setting will be
     enabled by default, otherwise it will be disabled by default.  Either state
     is overridden by a manually specified positive or negative version of this
     option (note that `--no-s` and `--no-protect-args` are the negative
-    versions).  Since this option was first introduced in 3.0.0, you'll need to
-    make sure it's disabled if you ever need to interact with a remote rsync
-    that is older than that.
+    versions).
 
-    Rsync can also be configured (at build time) to have this option enabled by
-    default (with is overridden by both the environment and the command-line).
-    Run `rsync --version` to check if this is the case, as it will display
-    "default protect-args" or "optional protect-args" depending on how it was
-    compiled.
+    You may need to disable this option when interacting with an older rsync
+    (one prior to 3.0.0).
 
-    This option will eventually become a new default setting at some
-    as-yet-undetermined point in the future.
+    Note that this option is incompatible with the use of the restricted rsync
+    script (`rrsync`) since it hides options from the script's inspection.
 
 0.  `--copy-as=USER[:GROUP]`
 
@@ -2679,7 +2690,9 @@ your home directory (remove the '=' for that).
     The `--usermap` option implies the `--owner` option while the `--groupmap`
     option implies the `--group` option.
 
-    If your shell complains about the wildcards, use `--protect-args` (`-s`).
+    An older rsync client may need to use `--protect-args` (`-s`) to avoid a
+    complaint about wildcard characters, but a modern rsync handles this
+    automatically.
 
 0.  `--chown=USER:GROUP`
 
@@ -2694,7 +2707,9 @@ your home directory (remove the '=' for that).
     "`--usermap=*:foo --groupmap=*:bar`", only easier (with the same implied
     `--owner` and/or `--group` option).
 
-    If your shell complains about the wildcards, use `--protect-args` (`-s`).
+    An older rsync client may need to use `--protect-args` (`-s`) to avoid a
+    complaint about wildcard characters, but a modern rsync handles this
+    automatically.
 
 0.  `--timeout=SECONDS`
 
@@ -4144,6 +4159,12 @@ file is included or excluded.
 
     Specify a default `--iconv` setting using this environment variable. (First
     supported in 3.0.0.)
+
+0.  `RSYNC_OLD_ARGS`
+
+    Specify a non-zero numeric value if you want the `--old-args` option to be
+    enabled by default, or a zero value to make sure that it is disabled by
+    default. (First supported in 3.2.4.)
 
 0.  `RSYNC_PROTECT_ARGS`
 

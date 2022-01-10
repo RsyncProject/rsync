@@ -4,7 +4,23 @@
 
 ## Changes in this version:
 
-### OUTPUT CHANGES:
+### BEHAVIOR CHANGES:
+
+ - A new form of arg protection was added that works similarly to the older
+   `--protect-args` (`-s`) option but in a way that avoids breaking things like
+   rrsync (the restricted rsync script): rsync now uses backslash escaping for
+   sending "shell-active" characters to the remote shell. This includes spaces,
+   so fetching a remote file via a simple quoted filename value now works by
+   default without any extra quoting:
+
+   ```shell
+       rsync -aiv host:'a simple file.pdf' .
+   ```
+
+   Wildcards are not escaped in filename args, but they are escaped in options
+   like the `--suffix` and `--usermap` values.  If your rsync script depends on
+   the old arg-splitting behavior, either run it with the `--old-args` option
+   or `export RSYNC_OLD_ARGS=1` in the script's environment.
 
  - A long-standing bug was preventing rsync from figuring out the current
    locale's decimal point character, which made rsync always output numbers

@@ -102,6 +102,7 @@ int filesfrom_fd = -1;
 char *filesfrom_host = NULL;
 int eol_nulls = 0;
 int protect_args = -1;
+int old_style_args = -1;
 int human_readable = 1;
 int recurse = 0;
 int mkpath_dest_arg = 0;
@@ -780,6 +781,8 @@ static struct poptOption long_options[] = {
   {"files-from",       0,  POPT_ARG_STRING, &files_from, 0, 0, 0 },
   {"from0",           '0', POPT_ARG_VAL,    &eol_nulls, 1, 0, 0},
   {"no-from0",         0,  POPT_ARG_VAL,    &eol_nulls, 0, 0, 0},
+  {"old-args",         0,  POPT_ARG_VAL,    &old_style_args, 1, 0, 0},
+  {"no-old-args",      0,  POPT_ARG_VAL,    &old_style_args, 0, 0, 0},
   {"protect-args",    's', POPT_ARG_VAL,    &protect_args, 1, 0, 0},
   {"no-protect-args",  0,  POPT_ARG_VAL,    &protect_args, 0, 0, 0},
   {"no-s",             0,  POPT_ARG_VAL,    &protect_args, 0, 0, 0},
@@ -1922,6 +1925,13 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		max_alloc = size;
 	}
 
+	if (old_style_args < 0) {
+		if (!am_server && (arg = getenv("RSYNC_OLD_ARGS")) != NULL && *arg)
+			old_style_args = atoi(arg) ? 1 : 0;
+		else
+			old_style_args = 0;
+	}
+
 	if (protect_args < 0) {
 		if (am_server)
 			protect_args = 0;
@@ -2447,6 +2457,61 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 }
 
 
+static char SPLIT_ARG_WHEN_OLD[1];
+
+/**
+ * Do backslash quoting of any weird chars in "arg", append the resulting
+ * string to the end of the "opt" (which gets a "=" appended if it is not
+ * an empty or NULL string), and return the (perhaps malloced) result.
+ * If opt is NULL, arg is considered a filename arg that allows wildcards.
+ * If it is "" or any other value, it is considered an option.
+ **/
+char *safe_arg(const char *opt, const char *arg)
+{
+#define SHELL_CHARS "!#$&;|<>(){}\"' \t\\"
+#define WILD_CHARS  "*?[]" /* We don't allow remote brace expansion */
+	BOOL is_filename_arg = !opt;
+	char *escapes = is_filename_arg ? SHELL_CHARS : WILD_CHARS SHELL_CHARS;
+	BOOL escape_leading_dash = is_filename_arg && *arg == '-';
+	int len1 = opt && *opt ? strlen(opt) + 1 : 0;
+	int len2 = strlen(arg);
+	int extras = escape_leading_dash ? 2 : 0;
+	char *ret;
+	if (!protect_args && (!old_style_args || (!is_filename_arg && opt != SPLIT_ARG_WHEN_OLD))) {
+		const char *f;
+		for (f = arg; *f; f++) {
+			if (strchr(escapes, *f))
+				extras++;
+		}
+	}
+	if (!len1 && !extras)
+		return (char*)arg;
+	ret = new_array(char, len1 + len2 + extras + 1);
+	if (len1) {
+		memcpy(ret, opt, len1-1);
+		ret[len1-1] = '=';
+	}
+	if (escape_leading_dash) {
+		ret[len1++] = '.';
+		ret[len1++] = '/';
+		extras -= 2;
+	}
+	if (!extras)
+		memcpy(ret + len1, arg, len2);
+	else {
+		const char *f = arg;
+		char *t = ret + len1;
+		while (*f) {
+			if (strchr(escapes, *f))
+				*t++ = '\\';
+			*t++ = *f++;
+		}
+	}
+	ret[len1+len2+extras] = '\0';
+	return ret;
+}
+
+
 /**
  * Construct a filtered list of options to pass through from the
  * client to the server.
@@ -2590,9 +2655,7 @@ void server_options(char **args, int *argc_p)
 			set++;
 		else
 			set = iconv_opt;
-		if (asprintf(&arg, "--iconv=%s", set) < 0)
-			goto oom;
-		args[ac++] = arg;
+		args[ac++] = safe_arg("--iconv", set);
 	}
 #endif
 
@@ -2658,33 +2721,24 @@ void server_options(char **args, int *argc_p)
 	}
 
 	if (backup_dir) {
+		/* This split idiom allows for ~/path expansion via the shell. */
 		args[ac++] = "--backup-dir";
-		args[ac++] = backup_dir;
+		args[ac++] = safe_arg("", backup_dir);
 	}
 
 	/* Only send --suffix if it specifies a non-default value. */
-	if (strcmp(backup_suffix, backup_dir ? "" : BACKUP_SUFFIX) != 0) {
-		/* We use the following syntax to avoid weirdness with '~'. */
-		if (asprintf(&arg, "--suffix=%s", backup_suffix) < 0)
-			goto oom;
-		args[ac++] = arg;
-	}
+	if (strcmp(backup_suffix, backup_dir ? "" : BACKUP_SUFFIX) != 0)
+		args[ac++] = safe_arg("--suffix", backup_suffix);
 
-	if (checksum_choice) {
-		if (asprintf(&arg, "--checksum-choice=%s", checksum_choice) < 0)
-			goto oom;
-		args[ac++] = arg;
-	}
+	if (checksum_choice)
+		args[ac++] = safe_arg("--checksum-choice", checksum_choice);
 
 	if (do_compression == CPRES_ZLIBX)
 		args[ac++] = "--new-compress";
 	else if (compress_choice && do_compression == CPRES_ZLIB)
 		args[ac++] = "--old-compress";
-	else if (compress_choice) {
-		if (asprintf(&arg, "--compress-choice=%s", compress_choice) < 0)
-			goto oom;
-		args[ac++] = arg;
-	}
+	else if (compress_choice)
+		args[ac++] = safe_arg("--compress-choice", compress_choice);
 
 	if (am_sender) {
 		if (max_delete > 0) {
@@ -2693,14 +2747,10 @@ void server_options(char **args, int *argc_p)
 			args[ac++] = arg;
 		} else if (max_delete == 0)
 			args[ac++] = "--max-delete=-1";
-		if (min_size >= 0) {
-			args[ac++] = "--min-size";
-			args[ac++] = min_size_arg;
-		}
-		if (max_size >= 0) {
-			args[ac++] = "--max-size";
-			args[ac++] = max_size_arg;
-		}
+		if (min_size >= 0)
+			args[ac++] = safe_arg("--min-size", min_size_arg);
+		if (max_size >= 0)
+			args[ac++] = safe_arg("--max-size", max_size_arg);
 		if (delete_before)
 			args[ac++] = "--delete-before";
 		else if (delete_during == 2)
@@ -2724,17 +2774,12 @@ void server_options(char **args, int *argc_p)
 		if (do_stats)
 			args[ac++] = "--stats";
 	} else {
-		if (skip_compress) {
-			if (asprintf(&arg, "--skip-compress=%s", skip_compress) < 0)
-				goto oom;
-			args[ac++] = arg;
-		}
+		if (skip_compress)
+			args[ac++] = safe_arg("--skip-compress", skip_compress);
 	}
 
-	if (max_alloc_arg && max_alloc != DEFAULT_MAX_ALLOC) {
-		args[ac++] = "--max-alloc";
-		args[ac++] = max_alloc_arg;
-	}
+	if (max_alloc_arg && max_alloc != DEFAULT_MAX_ALLOC)
+		args[ac++] = safe_arg("--max-alloc", max_alloc_arg);
 
 	/* --delete-missing-args needs the cooperation of both sides, but
 	 * the sender can handle --ignore-missing-args by itself. */
@@ -2759,7 +2804,7 @@ void server_options(char **args, int *argc_p)
 	if (partial_dir && am_sender) {
 		if (partial_dir != tmp_partialdir) {
 			args[ac++] = "--partial-dir";
-			args[ac++] = partial_dir;
+			args[ac++] = safe_arg("", partial_dir);
 		}
 		if (delay_updates)
 			args[ac++] = "--delay-updates";
@@ -2782,17 +2827,11 @@ void server_options(char **args, int *argc_p)
 		args[ac++] = "--use-qsort";
 
 	if (am_sender) {
-		if (usermap) {
-			if (asprintf(&arg, "--usermap=%s", usermap) < 0)
-				goto oom;
-			args[ac++] = arg;
-		}
+		if (usermap)
+			args[ac++] = safe_arg("--usermap", usermap);
 
-		if (groupmap) {
-			if (asprintf(&arg, "--groupmap=%s", groupmap) < 0)
-				goto oom;
-			args[ac++] = arg;
-		}
+		if (groupmap)
+			args[ac++] = safe_arg("--groupmap", groupmap);
 
 		if (ignore_existing)
 			args[ac++] = "--ignore-existing";
@@ -2803,7 +2842,7 @@ void server_options(char **args, int *argc_p)
 
 		if (tmpdir) {
 			args[ac++] = "--temp-dir";
-			args[ac++] = tmpdir;
+			args[ac++] = safe_arg("", tmpdir);
 		}
 
 		if (do_fsync)
@@ -2816,7 +2855,7 @@ void server_options(char **args, int *argc_p)
 			 */
 			for (i = 0; i < basis_dir_cnt; i++) {
 				args[ac++] = alt_dest_opt(0);
-				args[ac++] = basis_dir[i];
+				args[ac++] = safe_arg("", basis_dir[i]);
 			}
 		}
 	}
@@ -2841,7 +2880,7 @@ void server_options(char **args, int *argc_p)
 	if (files_from && (!am_sender || filesfrom_host)) {
 		if (filesfrom_host) {
 			args[ac++] = "--files-from";
-			args[ac++] = files_from;
+			args[ac++] = safe_arg("", files_from);
 			if (eol_nulls)
 				args[ac++] = "--from0";
 		} else {
@@ -2884,7 +2923,7 @@ void server_options(char **args, int *argc_p)
 			exit_cleanup(RERR_SYNTAX);
 		}
 		for (j = 1; j <= remote_option_cnt; j++)
-			args[ac++] = (char*)remote_options[j];
+			args[ac++] = safe_arg(SPLIT_ARG_WHEN_OLD, remote_options[j]);
 	}
 
 	*argc_p = ac;

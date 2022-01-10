@@ -21,7 +21,7 @@ LOGFILE = 'rrsync.log' # NOTE: the file must exist for a line to be appended!
 
 # NOTE when disabling: check for both a short & long version of the option!
 
-### START of options data produced by the cull_options script. ###
+### START of options data produced by the cull-options script. ###
 
 # To disable a short-named option, add its letter to this string:
 short_disabled = 's'
@@ -63,7 +63,7 @@ long_opts = {
   'files-from': 3,
   'force': 0,
   'from0': 0,
-  'fsync': 2,
+  'fsync': 0,
   'fuzzy': 0,
   'group': 0,
   'groupmap': 1,
@@ -127,7 +127,7 @@ long_opts = {
   'write-devices': -1,
 }
 
-### END of options data produced by the cull_options script. ###
+### END of options data produced by the cull-options script. ###
 
 import os, sys, re, argparse, glob, socket, time, subprocess
 from argparse import RawTextHelpFormatter

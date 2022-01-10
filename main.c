@@ -607,11 +607,7 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char **remote_argv, in
 				rprintf(FERROR, "internal: args[] overflowed in do_cmd()\n");
 				exit_cleanup(RERR_SYNTAX);
 			}
-			if (**remote_argv == '-') {
-				if (asprintf(args + argc++, "./%s", *remote_argv++) < 0)
-					out_of_memory("do_cmd");
-			} else
-				args[argc++] = *remote_argv++;
+			args[argc++] = safe_arg(NULL, *remote_argv++);
 			remote_argc--;
 		}
 	}
