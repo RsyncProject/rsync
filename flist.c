@@ -242,7 +242,7 @@ int link_stat(const char *path, STRUCT_STAT *stp, int follow_dirlinks)
 	if (update_links && S_ISLNK(stp->st_mode)) {
 		STRUCT_STAT st;
 		if (x_stat(path, &st, NULL) == 0 && !S_ISDIR(st.st_mode))
-			return x_lstat(path, stp, NULL);
+			return 0;
 	}
 	if (follow_dirlinks && S_ISLNK(stp->st_mode)) {
 		STRUCT_STAT st;
