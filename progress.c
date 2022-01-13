@@ -118,10 +118,10 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now, int is_l
 	if (remain < 0)
 		strlcpy(rembuf, "  ??:??:??", sizeof rembuf);
 	else {
-		snprintf(rembuf, sizeof rembuf, "%4d:%02d:%02d",
-			 (int) (remain / 3600.0),
-			 (int) (remain / 60.0) % 60,
-			 (int) remain % 60);
+		snprintf(rembuf, sizeof rembuf, "%4lu:%02u:%02u",
+			 (unsigned long) (remain / 3600.0),
+			 (unsigned int) (remain / 60.0) % 60,
+			 (unsigned int) remain % 60);
 	}
 
 	output_needs_newline = 0;

@@ -88,6 +88,11 @@
    check to see if the allowed time is over, which should make rsync exit more
    consistently.
 
+ - Tweak the snprintf() in progress.c that turns the remaining time into a
+   HHHH:MM:SS value to avoid putting a -8 into the SS or MM spots when the
+   remaining seconds is so large that it overflows the integer arithmetic
+   trying to perform a modulus.
+
 ### ENHANCEMENTS:
 
  - Use openssl's `-verify_hostname` option in the rsync-ssl script.
