@@ -115,11 +115,11 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now, int is_l
 		units = "kB/s";
 	}
 
-	if (remain < 0)
+	if (remain < 0 || remain > 9999.0 * 3600.0)
 		strlcpy(rembuf, "  ??:??:??", sizeof rembuf);
 	else {
-		snprintf(rembuf, sizeof rembuf, "%4lu:%02u:%02u",
-			 (unsigned long) (remain / 3600.0),
+		snprintf(rembuf, sizeof rembuf, "%4u:%02u:%02u",
+			 (unsigned int) (remain / 3600.0),
 			 (unsigned int) (remain / 60.0) % 60,
 			 (unsigned int) remain % 60);
 	}
