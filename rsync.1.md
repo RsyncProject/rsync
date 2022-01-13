@@ -1032,37 +1032,44 @@ your home directory (remove the '=' for that).
 
 0.  `--links`, `-l`
 
-    When symlinks are encountered, recreate the symlink on the destination.
+    Add symlinks to the transferred files instead of noisily ignoring them with
+    a "non-regular file" warning for each symlink encountered.  You can
+    alternately silence the warning by specifying ``--info=nonreg0``.
 
-    By default, rsync generates a "non-regular file" warning for each symlink
-    encountered when this option is not set.  You can silence the warning by
-    specifying ``--info=nonreg0``.
+    The default handling of symlinks is to recreate each symlink's unchanged
+    value on the receiving side.
+
+    See the [SYMBOLIC LINKS](#SYMBOLIC-LINKS) section for multi-option info.
 
 0.  `--copy-links`, `-L`
 
     The sender transforms each symlink encountered in the transfer into the
     referent item, following the symlink chain to the file or directory that it
     references.  If a symlink chain is broken, an error is output and the file
-    is dropped from the transfer.  On the receiving side, any existing symlinks
-    in the destination directories are replaced with the non-symlinks that the
-    sender specifies (though any destination filenames that do not match a name
-    in the transfer can remain as symlinks if rsync is not deleting files).
+    is dropped from the transfer.
 
-    In versions of rsync prior to 2.6.3, this option also had the side-effect
-    of telling the receiving side to follow symlinks, such as a symlink to a
-    directory.  A modern rsync does not do this, though you can choose to
-    specify `--keep-dirlinks` (`-K`) if you want rsync to treat a symlink to a
-    directory on the receiving side as if it were a real directory.  Remember
-    that it's the version of rsync on the receiving side that determines how it
-    reacts to existing destination symlinks when this option is in effect.
+    This option supersedes any other options that affect symlinks in the
+    transfer, since there are no symlinks left in the transfer.
+
+    This option does not change the handling of existing symlinks on the
+    receiving side, unlike versions of rsync prior to 2.6.3 which had the
+    side-effect of telling the receiving side to also follow symlinks.  A
+    modern rsync won't forward this option to a remote receiver (since only the
+    sender needs to know about it), so this caveat should only affect someone
+    using an rsync client older than 2.6.7 (which is when `-L` stopped being
+    forwarded to the receiver).
+
+    See the `--keep-dirlinks` (`-K`) if you need a symlink to a directory to be
+    treated as a real directory on the receiving side.
+
+    See the [SYMBOLIC LINKS](#SYMBOLIC-LINKS) section for multi-option info.
 
 0.  `--copy-unsafe-links`
 
     This tells rsync to copy the referent of symbolic links that point outside
     the copied tree.  Absolute symlinks are also treated like ordinary files,
     and so are any symlinks in the source path itself when `--relative` is
-    used.  This option has no additional effect if `--copy-links` was also
-    specified.
+    used.
 
     Note that the cut-off point is the top of the transfer, which is the part
     of the path that rsync isn't mentioning in the verbose output.  If you copy
@@ -1073,32 +1080,68 @@ your home directory (remove the '=' for that).
     slash) to "/dest/subdir" that would not allow symlinks to any files outside
     of "subdir".
 
+    This option has no additional effect if `--copy-links` was also specified.
+    The safe symlinks are only copied if `--links` was also specified or
+    implied by `--archive` (`-a`).
+
+    See the [SYMBOLIC LINKS](#SYMBOLIC-LINKS) section for multi-option info.
+
 0.  `--safe-links`
 
-    This tells rsync to ignore any symbolic links which point outside the
-    copied tree.  All absolute symlinks are also ignored. Using this option in
-    conjunction with `--relative` may give unexpected results.
+    This tells the receiving rsync to ignore any symbolic links in the transfer
+    which point outside the copied tree.  All absolute symlinks are also
+    ignored.
+
+    Since this ignoring is happening on the receiving side, it will still be
+    effective even when the sending side has munged symlinks (when it is using
+    `--munge-links`). It also affects deletions, since the file being present
+    in the transfer prevents any matching file on the receiver from being
+    deleted when the symlink is deemed to be unsafe and is skipped.
+
+    This option must be combined with `--links` (or `--archive`) to have any
+    symlinks in the transfer to conditionally ignore. Its effect is superseded
+    by `--copy-unsafe-links`.
+
+    Using this option in conjunction with `--relative` may give unexpected
+    results.
+
+    See the [SYMBOLIC LINKS](#SYMBOLIC-LINKS) section for multi-option info.
 
 0.  `--munge-links`
 
-    This option tells rsync to (1) modify all symlinks on the receiving side in
-    a way that makes them unusable but recoverable (see below), or (2) to
-    unmunge symlinks on the sending side that had been stored in a munged
-    state.  This is useful if you don't quite trust the source of the data to
-    not try to slip in a symlink to a unexpected place.
+    This option affects just one side of the transfer and tells rsync to munge
+    symlink values when it is receiving files or unmunge symlink values when it
+    is sending files.  The munged values make the symlinks unusable on disk but
+    allows the original contents of the symlinks to be recovered.
 
-    The way rsync disables the use of symlinks is to prefix each one with the
-    string "/rsyncd-munged/".  This prevents the links from being used as long
-    as that directory does not exist.  When this option is enabled, rsync will
-    refuse to run if that path is a directory or a symlink to a directory.
+    The server-side rsync often enables this option without the client's
+    knowledge, such as in an rsync daemon's configuration file or by an option
+    given to the rrsync (restricted rsync) script.  When specified on the
+    client side, specify the option normally if it is the client side that
+    has/needs the munged symlinks, or use `-M--munge-links` to give the option
+    to the server when it has/needs the munged symlinks.  Note that on a local
+    transfer, the client is the sender, so specifying the option directly
+    unmunges symlinks while specifying it as a remote option munges symlinks.
 
-    The option only affects the client side of the transfer, so if you need it
-    to affect the server, specify it via `--remote-option`. (Note that in a
-    local transfer, the client side is the sender.)
+    This option has no affect when sent to a daemon via `--remote-option`
+    because the daemon configures whether it wants munged symlinks via its
+    "`munge symlinks`" parameter.
 
-    This option has no affect on a daemon, since the daemon configures whether
-    it wants munged symlinks via its "`munge symlinks`" parameter.  See also the
-    "munge-symlinks" perl script in the support directory of the source code.
+    The symlink value is munged/unmunged once it is in the transfer, so any
+    option that transforms symlinks into non-symlinks occurs prior to the
+    munging/unmunging **except** for `--safe-links`, which is a choice that the
+    receiver makes, so it bases its decision on the munged/unmunged value.
+    This does mean that if a receiver has munging enabled, that using
+    `--safe-links` will cause all symlinks to be ignored (since they are all
+    absolute).
+
+    The method that rsync uses to munge the symlinks is to prefix each one's
+    value with the string "/rsyncd-munged/".  This prevents the links from
+    being used as long as the directory does not exist.  When this option is
+    enabled, rsync will refuse to run if that path is a directory or a symlink
+    to a directory (though it only checks at startup).  See also the
+    "munge-symlinks" python script in the support directory of the source code
+    for a way to munge/unmunge one or more symlinks in-place.
 
 0.  `--copy-dirlinks`, `-k`
 
@@ -1125,6 +1168,8 @@ your home directory (remove the '=' for that).
     directory in the file-list which overrides the symlink found during the
     scan of "src/./".
 
+    See the [SYMBOLIC LINKS](#SYMBOLIC-LINKS) section for multi-option info.
+
 0.  `--keep-dirlinks`, `-K`
 
     This option causes the receiving side to treat a symlink to a directory as
@@ -1140,14 +1185,17 @@ your home directory (remove the '=' for that).
     "bar".
 
     One note of caution: if you use `--keep-dirlinks`, you must trust all the
-    symlinks in the copy! If it is possible for an untrusted user to create
-    their own symlink to any directory, the user could then (on a subsequent
+    symlinks in the copy or enable the `--munge-symlinks` option on the
+    receiving side!  If it is possible for an untrusted user to create their
+    own symlink to any real directory, the user could then (on a subsequent
     copy) replace the symlink with a real directory and affect the content of
     whatever directory the symlink references.  For backup copies, you are
     better off using something like a bind mount instead of a symlink to modify
     your receiving hierarchy.
 
     See also `--copy-dirlinks` for an analogous option for the sending side.
+
+    See the [SYMBOLIC LINKS](#SYMBOLIC-LINKS) section for multi-option info.
 
 0.  `--hard-links`, `-H`
 
@@ -3085,7 +3133,7 @@ your home directory (remove the '=' for that).
     absolute) and (2) there are no mount points in the hierarchy (since the
     delayed updates will fail if they can't be renamed into place).
 
-    See also the "atomic-rsync" perl script in the "support" subdir for an
+    See also the "atomic-rsync" python script in the "support" subdir for an
     update algorithm that is even more atomic (it uses `--link-dest` and a
     parallel hierarchy of files).
 
@@ -4071,8 +4119,9 @@ link in the source directory.
 By default, symbolic links are not transferred at all.  A message "skipping
 non-regular" file is emitted for any symlinks that exist.
 
-If `--links` is specified, then symlinks are recreated with the same target on
-the destination.  Note that `--archive` implies `--links`.
+If `--links` is specified, then symlinks are added to the transfer (instead of
+being noisily ignored), and the default handling is to recreate them with the
+same target on the destination.  Note that `--archive` implies `--links`.
 
 If `--copy-links` is specified, then symlinks are "collapsed" by
 copying their referent, rather than the symlink.
@@ -4082,25 +4131,35 @@ where this might be used is a web site mirror that wishes to ensure that the
 rsync module that is copied does not include symbolic links to `/etc/passwd` in
 the public section of the site.  Using `--copy-unsafe-links` will cause any
 links to be copied as the file they point to on the destination.  Using
-`--safe-links` will cause unsafe links to be omitted altogether. (Note that you
-must specify `--links` for `--safe-links` to have any effect.)
+`--safe-links` will cause unsafe links to be omitted by the receiver. (Note
+that you must specify or imply `--links` for `--safe-links` to have any
+effect.)
 
-Symbolic links are considered unsafe if they are absolute symlinks
-(start with `/`), empty, or if they contain enough ".."
-components to ascend from the directory being copied.
+Symbolic links are considered unsafe if they are absolute symlinks (start with
+`/`), empty, or if they contain enough ".." components to ascend from the top
+of the transfer.
 
 Here's a summary of how the symlink options are interpreted.  The list is in
 order of precedence, so if your combination of options isn't mentioned, use the
 first line that is a complete subset of your options:
 
-0.  `--copy-links` Turn all symlinks into normal files (leaving no symlinks for
-    any other options to affect).
+0.  `--copy-links` Turn all symlinks into normal files and directories (leaving
+    no symlinks in the transfer for any other options to affect).
+0.  `--copy-dirlinks` Turn just symlinks to directories into real directories,
+    leaving all other symlinks to be handled as described below.
 0.  `--links --copy-unsafe-links` Turn all unsafe symlinks into files and
-    duplicate all safe symlinks.
+    create all safe symlinks.
 0.  `--copy-unsafe-links` Turn all unsafe symlinks into files, noisily skip all
     safe symlinks.
-0.  `--links --safe-links` Duplicate safe symlinks and skip unsafe ones.
-0.  `--links` Duplicate all symlinks.
+0.  `--links --safe-links` The receiver skips creating unsafe symlinks found in
+    the transfer and creates the safe ones.
+0.  `--links` Create all symlinks.
+
+For the effect of `--munge-links`, see the discussion in that option's section.
+
+Note that the `--keep-dirlinks` option does not effect symlinks in the transfer
+but instead affects how rsync treats a symlink to a directory that already
+exists on the receiving side.  See that option's section for a warning.
 
 ## DIAGNOSTICS
 
