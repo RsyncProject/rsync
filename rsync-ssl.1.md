@@ -1,14 +1,14 @@
-# NAME
+## NAME
 
 rsync-ssl - a helper script for connecting to an ssl rsync daemon
 
-# SYNOPSIS
+## SYNOPSIS
 
 ```
 rsync-ssl [--type=SSL_TYPE] RSYNC_ARGS
 ```
 
-# DESCRIPTION
+## DESCRIPTION
 
 The rsync-ssl script helps you to run an rsync copy to/from an rsync daemon
 that requires ssl connections.
@@ -20,7 +20,7 @@ environment.  You can specify an overriding port via `--port` or by including
 it in the normal spot in the URL format, though both of those require your
 rsync version to be at least 3.2.0.
 
-# OPTIONS
+## OPTIONS
 
 If the **first** arg is a `--type=SSL_TYPE` option, the script will only use
 that particular program to open an ssl connection instead of trying to find an
@@ -32,7 +32,7 @@ required for this particular option.
 All the other options are passed through to the rsync command, so consult the
 **rsync**(1) manpage for more information on how it works.
 
-# ENVIRONMENT VARIABLES
+## ENVIRONMENT VARIABLES
 
 The ssl helper scripts are affected by the following environment variables:
 
@@ -60,7 +60,7 @@ The ssl helper scripts are affected by the following environment variables:
     connection type is set to stunnel.  If unspecified, the $PATH is searched
     first for "stunnel4" and then for "stunnel".
 
-# EXAMPLES
+## EXAMPLES
 
 >     rsync-ssl -aiv example.com::mod/ dest
 
@@ -70,11 +70,11 @@ The ssl helper scripts are affected by the following environment variables:
 
 >     rsync-ssl -aiv rsync://example.com:9874/mod/ dest
 
-# SEE ALSO
+## SEE ALSO
 
 **rsync**(1), **rsyncd.conf**(5)
 
-# CAVEATS
+## CAVEATS
 
 Note that using an stunnel connection requires at least version 4 of stunnel,
 which should be the case on modern systems.  Also, it does not verify a
@@ -87,15 +87,15 @@ release the gnutls-cli command was dropping output, making it unusable.  If
 that bug has been fixed in your version, feel free to put gnutls into an
 exported RSYNC_SSL_TYPE environment variable to make its use the default.
 
-# BUGS
+## BUGS
 
 Please report bugs! See the web site at <https://rsync.samba.org/>.
 
-# VERSION
+## VERSION
 
 This man page is current for version @VERSION@ of rsync.
 
-# CREDITS
+## CREDITS
 
 rsync is distributed under the GNU General Public License.  See the file
 COPYING for details.
@@ -103,7 +103,7 @@ COPYING for details.
 A web site is available at <https://rsync.samba.org/>.  The site includes an
 FAQ-O-Matic which may cover questions unanswered by this manual page.
 
-# AUTHOR
+## AUTHOR
 
 This manpage was written by Wayne Davison.
 

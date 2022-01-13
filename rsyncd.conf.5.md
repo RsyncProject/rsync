@@ -1,12 +1,12 @@
-# NAME
+## NAME
 
 rsyncd.conf - configuration file for rsync in daemon mode
 
-# SYNOPSIS
+## SYNOPSIS
 
 rsyncd.conf
 
-# DESCRIPTION
+## DESCRIPTION
 
 The rsyncd.conf file is the runtime configuration file for rsync when run as an
 rsync daemon.
@@ -14,7 +14,7 @@ rsync daemon.
 The rsyncd.conf file controls authentication, access, logging and available
 modules.
 
-# FILE FORMAT
+## FILE FORMAT
 
 The file consists of modules and parameters. A module begins with the name of
 the module in square brackets and continues until the next module begins.
@@ -40,7 +40,7 @@ The values following the equals sign in parameters are all either a string (no
 quotes needed) or a boolean, which may be given as yes/no, 0/1 or true/false.
 Case is not significant in boolean values, but is preserved in string values.
 
-# LAUNCHING THE RSYNC DAEMON
+## LAUNCHING THE RSYNC DAEMON
 
 The rsync daemon is launched by specifying the `--daemon` option to
 rsync.
@@ -69,7 +69,7 @@ reread its config file.
 Note that you should **not** send the rsync daemon a HUP signal to force it to
 reread the `rsyncd.conf` file. The file is re-read on each client connection.
 
-# GLOBAL PARAMETERS
+## GLOBAL PARAMETERS
 
 The first parameters in the file (before a [module] header) are the global
 parameters.  Rsync also allows for the use of a "[global]" module name to
@@ -136,7 +136,7 @@ a literal % into a value is to use %%.
     You can override the default backlog value when the daemon listens for
     connections.  It defaults to 5.
 
-# MODULE PARAMETERS
+## MODULE PARAMETERS
 
 After the global parameters you should define a number of modules, each module
 exports a directory tree as a symbolic name. Modules are exported by specifying
@@ -1038,7 +1038,7 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     **system()** call's default shell), and use RSYNC_NO_XFER_EXEC to disable
     both options completely.
 
-# CONFIG DIRECTIVES
+## CONFIG DIRECTIVES
 
 There are currently two config directives available that allow a config file to
 incorporate the contents of other files:  `&include` and `&merge`.  Both allow
@@ -1093,7 +1093,7 @@ This would merge any `/etc/rsyncd.d/*.inc` files (for global values that should
 stay in effect), and then include any `/etc/rsyncd.d/*.conf` files (defining
 modules without any global-value cross-talk).
 
-# AUTHENTICATION STRENGTH
+## AUTHENTICATION STRENGTH
 
 The authentication protocol used in rsync is a 128 bit MD4 based challenge
 response system. This is fairly weak protection, though (with at least one
@@ -1108,7 +1108,7 @@ authentication is provided. Use ssh as the transport if you want encryption.
 You can also make use of SSL/TLS encryption if you put rsync behind an
 SSL proxy.
 
-# SSL/TLS Daemon Setup
+## SSL/TLS Daemon Setup
 
 When setting up an rsync daemon for access via SSL/TLS, you will need to
 configure a proxy (such as haproxy or nginx) as the front-end that handles the
@@ -1153,7 +1153,7 @@ An example nginx proxy setup is as follows:
 > }
 > ```
 
-# EXAMPLES
+## EXAMPLES
 
 A simple rsyncd.conf file that allow anonymous rsync to a ftp area at
 `/home/ftp` would be:
@@ -1202,24 +1202,24 @@ The /etc/rsyncd.secrets file would look something like this:
 >     tridge:mypass
 >     susan:herpass
 
-# FILES
+## FILES
 
 /etc/rsyncd.conf or rsyncd.conf
 
-# SEE ALSO
+## SEE ALSO
 
 **rsync**(1), **rsync-ssl**(1)
 
-# BUGS
+## BUGS
 
 Please report bugs! The rsync bug tracking system is online at
 <https://rsync.samba.org/>.
 
-# VERSION
+## VERSION
 
 This man page is current for version @VERSION@ of rsync.
 
-# CREDITS
+## CREDITS
 
 rsync is distributed under the GNU General Public License.  See the file
 COPYING for details.
@@ -1233,12 +1233,12 @@ We would be delighted to hear from you if you like this program.
 This program uses the zlib compression library written by Jean-loup Gailly and
 Mark Adler.
 
-# THANKS
+## THANKS
 
 Thanks to Warren Stanley for his original idea and patch for the rsync daemon.
 Thanks to Karsten Thygesen for his many suggestions and documentation!
 
-# AUTHOR
+## AUTHOR
 
 rsync was written by Andrew Tridgell and Paul Mackerras.  Many people have
 later contributed to it.

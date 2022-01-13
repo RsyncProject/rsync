@@ -1,8 +1,8 @@
-# NAME
+## NAME
 
 rsync - a fast, versatile, remote (and local) file-copying tool
 
-# SYNOPSIS
+## SYNOPSIS
 
 ```
 Local:
@@ -26,7 +26,7 @@ Access via rsync daemon:
 Usages with just one SRC arg and no DEST arg will list the source files instead
 of copying.
 
-# DESCRIPTION
+## DESCRIPTION
 
 Rsync is a fast and extraordinarily versatile file copying tool.  It can copy
 locally, to/from another host over any remote shell, or to/from a remote rsync
@@ -54,7 +54,7 @@ Some of the additional features of rsync are:
 - pipelining of file transfers to minimize latency costs
 - support for anonymous or authenticated rsync daemons (ideal for mirroring)
 
-# GENERAL
+## GENERAL
 
 Rsync copies files either to or from a remote host, or locally on the current
 host (it does not support copying files between two remote hosts).
@@ -79,7 +79,7 @@ Rsync refers to the local side as the client and the remote side as the server.
 Don't confuse server with an rsync daemon.  A daemon is always a server, but a
 server can be either a daemon or a remote-shell spawned process.
 
-# SETUP
+## SETUP
 
 See the file README.md for installation instructions.
 
@@ -94,7 +94,7 @@ command line option, or by setting the RSYNC_RSH environment variable.
 
 Note that rsync must be installed on both the source and destination machines.
 
-# USAGE
+## USAGE
 
 You use rsync in the same way you use rcp.  You must specify a source and a
 destination, one of which may be remote.
@@ -151,7 +151,7 @@ rsync daemon by leaving off the module name:
 
 See the following section for more details.
 
-# ADVANCED USAGE
+## ADVANCED USAGE
 
 The syntax for requesting multiple files from a remote host is done by
 specifying additional remote-host args in the same style as the first, or with
@@ -170,7 +170,7 @@ examples:
 This word-splitting only works in a modern rsync by using `--old-args` (or its
 environment variable) and making sure that `--protect-args` is not enabled.
 
-# CONNECTING TO AN RSYNC DAEMON
+## CONNECTING TO AN RSYNC DAEMON
 
 It is also possible to use rsync without a remote shell as the transport.  In
 this case you will directly connect to a remote rsync daemon, typically using
@@ -227,7 +227,7 @@ Note also that if the RSYNC_SHELL environment variable is set, that program
 will be used to run the RSYNC_CONNECT_PROG command instead of using the default
 shell of the **system()** call.
 
-# USING RSYNC-DAEMON FEATURES VIA A REMOTE-SHELL CONNECTION
+## USING RSYNC-DAEMON FEATURES VIA A REMOTE-SHELL CONNECTION
 
 It is sometimes useful to use various features of an rsync daemon (such as
 named modules) without actually allowing any new socket connections into a
@@ -260,7 +260,7 @@ example that uses the short version of the `--rsh` option:
 The "ssh-user" will be used at the ssh level; the "rsync-user" will be used to
 log-in to the "module".
 
-# STARTING AN RSYNC DAEMON TO ACCEPT CONNECTIONS
+## STARTING AN RSYNC DAEMON TO ACCEPT CONNECTIONS
 
 In order to connect to an rsync daemon, the remote system needs to have a
 daemon already running (or it needs to have configured something like inetd to
@@ -273,7 +273,7 @@ the daemon, and it contains the full details for how to run the daemon
 If you're using one of the remote-shell transports for the transfer, there is
 no need to manually start an rsync daemon.
 
-# SORTED TRANSFER ORDER
+## SORTED TRANSFER ORDER
 
 Rsync always sorts the specified filenames into its internal transfer list.
 This handles the merging together of the contents of identically named
@@ -286,7 +286,7 @@ separate the files into different rsync calls, or consider using
 `--delay-updates` (which doesn't affect the sorted transfer order, but does
 make the final file-updating phase happen much more rapidly).
 
-# EXAMPLES
+## EXAMPLES
 
 Here are some examples of how I use rsync.
 
@@ -316,7 +316,7 @@ I mirror a directory between my "old" and "new" ftp sites with the command:
 
 This is launched from cron every few hours.
 
-# OPTION SUMMARY
+## OPTION SUMMARY
 
 Here is a short summary of the options available in rsync.  Please refer to the
 detailed description below for a complete description.
@@ -492,7 +492,7 @@ accepted:
 --help, -h               show this help (when used with --daemon)
 ```
 
-# OPTIONS
+## OPTIONS
 
 Rsync accepts both long (double-dash + word) and short (single-dash + letter)
 options.  The full list of the available options are described below.  If an
@@ -3429,7 +3429,7 @@ your home directory (remove the '=' for that).
     user wants a more random checksum seed.  Setting NUM to 0 causes rsync to
     use the default of **time**() for checksum seed.
 
-# DAEMON OPTIONS
+## DAEMON OPTIONS
 
 The options allowed when starting an rsync daemon are as follows:
 
@@ -3537,7 +3537,7 @@ The options allowed when starting an rsync daemon are as follows:
     When specified after `--daemon`, print a short help page describing the
     options available for starting an rsync daemon.
 
-# FILTER RULES
+## FILTER RULES
 
 The filter rules allow for flexible selection of which files to transfer
 (include) and which files to skip (exclude).  The rules either directly specify
@@ -3594,7 +3594,7 @@ rule/pattern each.  To add multiple ones, you can repeat the options on the
 command-line, use the merge-file syntax of the `--filter` option, or the
 `--include-from` / `--exclude-from` options.
 
-# INCLUDE/EXCLUDE PATTERN RULES
+## INCLUDE/EXCLUDE PATTERN RULES
 
 You can include and exclude files by specifying patterns using the "+", "-",
 etc. filter rules (as introduced in the FILTER RULES section above).  The
@@ -3722,7 +3722,7 @@ The following modifiers are accepted after a "`+`" or "`-`":
   xattr-matching rules are specified, a default xattr filtering rule is used
   (see the `--xattrs` option).
 
-# MERGE-FILE FILTER RULES
+## MERGE-FILE FILTER RULES
 
 You can merge whole files into your filter rules by specifying either a merge
 (.) or a dir-merge (:) filter rule (as introduced in the FILTER RULES section
@@ -3856,7 +3856,7 @@ $HOME/.cvsignore, and the value of $CVSIGNORE) you should omit the `-C`
 command-line option and instead insert a "-C" rule into your filter rules; e.g.
 "`--filter=-C`".
 
-# LIST-CLEARING FILTER RULE
+## LIST-CLEARING FILTER RULE
 
 You can clear the current include/exclude list by using the "!" filter rule (as
 introduced in the FILTER RULES section above).  The "current" list is either
@@ -3864,7 +3864,7 @@ the global list of rules (if the rule is encountered while parsing the filter
 options) or a set of per-directory rules (which are inherited in their own
 sub-list, so a subdirectory can use this to clear out the parent's rules).
 
-# ANCHORING INCLUDE/EXCLUDE PATTERNS
+## ANCHORING INCLUDE/EXCLUDE PATTERNS
 
 As mentioned earlier, global include/exclude patterns are anchored at the "root
 of the transfer" (as opposed to per-directory patterns, which are anchored at
@@ -3919,7 +3919,7 @@ The easiest way to see what name you should filter is to just
 look at the output when using `--verbose` and put a / in front of the name
 (use the `--dry-run` option if you're not yet ready to copy any files).
 
-# PER-DIRECTORY RULES AND DELETE
+## PER-DIRECTORY RULES AND DELETE
 
 Without a delete option, per-directory rules are only relevant on the sending
 side, so you can feel free to exclude the merge files themselves without
@@ -3965,7 +3965,7 @@ one of these commands:
 > rsync -avFF --delete host:src/dir /dest
 > ```
 
-# BATCH MODE
+## BATCH MODE
 
 Batch mode can be used to apply the same set of updates to many identical
 systems.  Suppose one has a tree which is replicated on a number of hosts.  Now
@@ -4063,7 +4063,7 @@ this detail and just use the shell script as an easy way to run the appropriate
 The original batch mode in rsync was based on "rsync+", but the latest
 version uses a new implementation.
 
-# SYMBOLIC LINKS
+## SYMBOLIC LINKS
 
 Three basic behaviors are possible when rsync encounters a symbolic
 link in the source directory.
@@ -4102,7 +4102,7 @@ first line that is a complete subset of your options:
 0.  `--links --safe-links` Duplicate safe symlinks and skip unsafe ones.
 0.  `--links` Duplicate all symlinks.
 
-# DIAGNOSTICS
+## DIAGNOSTICS
 
 rsync occasionally produces error messages that may seem a little cryptic.  The
 one that seems to cause the most confusion is "protocol version mismatch -- is
@@ -4125,7 +4125,7 @@ If you are having trouble debugging filter patterns, then try specifying the
 `-vv` option.  At this level of verbosity rsync will show why each individual
 file is included or excluded.
 
-# EXIT VALUES
+## EXIT VALUES
 
 0.  **0** Success
 0.  **1** Syntax or usage error
@@ -4150,7 +4150,7 @@ file is included or excluded.
 0.  **30** Timeout in data send/receive
 0.  **35** Timeout waiting for daemon connection
 
-# ENVIRONMENT VARIABLES
+## ENVIRONMENT VARIABLES
 
 0.  `CVSIGNORE`
 
@@ -4206,15 +4206,15 @@ file is included or excluded.
     The HOME environment variable is used to find the user's default .cvsignore
     file.
 
-# FILES
+## FILES
 
 /etc/rsyncd.conf or rsyncd.conf
 
-# SEE ALSO
+## SEE ALSO
 
 **rsync-ssl**(1), **rsyncd.conf**(5)
 
-# BUGS
+## BUGS
 
 times are transferred as \*nix time_t values
 
@@ -4229,11 +4229,11 @@ see also the comments on the `--delete` option
 
 Please report bugs! See the web site at <https://rsync.samba.org/>.
 
-# VERSION
+## VERSION
 
 This man page is current for version @VERSION@ of rsync.
 
-# INTERNAL OPTIONS
+## INTERNAL OPTIONS
 
 The options `--server` and `--sender` are used internally by rsync, and should
 never be typed by a user under normal circumstances.  Some awareness of these
@@ -4242,7 +4242,7 @@ that can only run an rsync command.  For instance, the support directory of the
 rsync distribution has an example script named rrsync (for restricted rsync)
 that can be used with a restricted ssh login.
 
-# CREDITS
+## CREDITS
 
 rsync is distributed under the GNU General Public License.  See the file
 COPYING for details.
@@ -4256,7 +4256,7 @@ contact the mailing-list at <rsync@lists.samba.org>.
 This program uses the excellent zlib compression library written by Jean-loup
 Gailly and Mark Adler.
 
-# THANKS
+## THANKS
 
 Special thanks go out to: John Van Essen, Matt McCutchen, Wesley W. Terpstra,
 David Dykstra, Jos Backus, Sebastian Krahmer, Martin Pool, and our
@@ -4265,7 +4265,7 @@ gone-but-not-forgotten compadre, J.W. Schultz.
 Thanks also to Richard Brent, Brendan Mackay, Bill Waite, Stephen Rothwell and
 David Bell.  I've probably missed some people, my apologies if I have.
 
-# AUTHOR
+## AUTHOR
 
 rsync was originally written by Andrew Tridgell and Paul Mackerras.  Many
 people have later contributed to it. It is currently maintained by Wayne

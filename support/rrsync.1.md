@@ -1,14 +1,14 @@
-# NAME
+## NAME
 
 rrsync - a script to setup restricted rsync users via ssh logins
 
-# SYNOPSIS
+## SYNOPSIS
 
 ```
 rrsync [-ro|-rw] [-munge] [-no-del] [-no-lock] DIR
 ```
 
-# DESCRIPTION
+## DESCRIPTION
 
 A user's ssh login can be restricted to only allow the running of an rsync
 transfer in one of two easy ways: forcing the running of the rrsync script
@@ -49,7 +49,7 @@ file, each one with its own path setting.
 
 The remainder of this man page is dedicated to using the rrsync script.
 
-# OPTION SUMMARY
+## OPTION SUMMARY
 
 ```
 -ro        Allow only reading from the DIR. Implies -no-del and -no-lock.
@@ -63,7 +63,7 @@ The remainder of this man page is dedicated to using the rrsync script.
 A single non-option argument specifies the restricted DIR to use. It can be
 relative to the user's home directory or an absolute path.
 
-# SECURITY RESTRICTIONS
+## SECURITY RESTRICTIONS
 
 The rrsync script validates the path arguments it is sent to try to restrict
 them to staying within the specified DIR.
@@ -84,7 +84,7 @@ overrides.
 The script (or a copy of it) can be manually edited if you want it to customize
 the option handling.
 
-# EXAMPLES
+## EXAMPLES
 
 The `.ssh/authorized_keys` file might have lines in it like this:
 

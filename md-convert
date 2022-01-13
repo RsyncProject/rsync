@@ -32,7 +32,7 @@
 import os, sys, re, argparse, subprocess, time
 from html.parser import HTMLParser
 
-CONSUMES_TXT = set('h1 h2 p li pre'.split())
+CONSUMES_TXT = set('h1 h2 h3 p li pre'.split())
 
 HTML_START = """\
 <html><head>
@@ -332,6 +332,12 @@ class TransformHtml(HTMLParser):
         st.at_first_tag_in_dd = False
 
 
+    def add_anchor(self, txt):
+        st = self.state
+        txt = txt.lower().replace(' ', '-')
+        st.html_out.append('<span id="' + txt + '"></span>')
+
+
     def handle_endtag(self, tag):
         st = self.state
         if args.debug:
@@ -342,10 +348,12 @@ class TransformHtml(HTMLParser):
         else:
             txt = None
         add_to_txt = None
-        if tag == 'h1':
+        if tag == 'h1' or tag == 'h2':
             st.man_out.append(st.p_macro + '.SH "' + manify(txt) + '"\n')
-        elif tag == 'h2':
+            self.add_anchor(txt)
+        elif tag == 'h3':
             st.man_out.append(st.p_macro + '.SS "' + manify(txt) + '"\n')
+            self.add_anchor(txt)
         elif tag == 'p':
             if st.dt_from == 'p':
                 tag = 'dt'
