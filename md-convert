@@ -36,7 +36,8 @@ CONSUMES_TXT = set('h1 h2 h3 p li pre'.split())
 
 HTML_START = """\
 <html><head>
-<title>%s</title>
+<title>%TITLE%</title>
+<meta charset="UTF-8"/>
 <link href="https://fonts.googleapis.com/css2?family=Roboto&family=Roboto+Mono&display=swap" rel="stylesheet">
 <style>
 body {
@@ -46,6 +47,10 @@ body {
 body, b, strong, u {
   font-family: 'Roboto', sans-serif;
 }
+a.tgt { font-face: symbol; font-weight: 400; font-size: 70%; visibility: hidden; text-decoration: none; color: #ddd; padding: 0 4px; border: 0; }
+a.tgt:after { content: '🔗'; }
+a.tgt:hover { color: #444; background-color: #eaeaea; }
+h1:hover > a.tgt, h2:hover > a.tgt, h3:hover > a.tgt, dt:hover > a.tgt { visibility: visible; }
 code {
   font-family: 'Roboto Mono', monospace;
   font-weight: bold;
@@ -234,7 +239,7 @@ class TransformHtml(HTMLParser):
                 dt_from = None,
                 in_pre = False,
                 in_code = False,
-                html_out = [ HTML_START % fi.title ],
+                html_out = [ HTML_START.replace('%TITLE%', fi.title) ],
                 man_out = [ ],
                 txt = '',
                 want_manpage = fi.want_manpage,
@@ -343,7 +348,7 @@ class TransformHtml(HTMLParser):
         else:
             txt = re.sub(r'^([^A-Za-z])', r't\1', txt)
         if txt:
-            st.html_out.append('<span id="' + txt + '"></span>')
+            st.html_out.append('<a id="' + txt + '" href="#' + txt + '" class="tgt"></a>')
 
 
     def handle_endtag(self, tag):
