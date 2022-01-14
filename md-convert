@@ -332,10 +332,18 @@ class TransformHtml(HTMLParser):
         st.at_first_tag_in_dd = False
 
 
-    def add_anchor(self, txt):
+    def add_target(self, txt):
         st = self.state
-        txt = txt.lower().replace(' ', '-')
-        st.html_out.append('<span id="' + txt + '"></span>')
+        txt = re.sub(r'[%s](.+?)[=%s].*' % (BOLD_FONT[0], NORM_FONT[0]), r'\1', txt.strip())
+        txt = re.sub(r'[%s]' % NBR_DASH[0], '-', txt)
+        txt = re.sub(r'[\1-\7]+', '', txt)
+        txt = re.sub(r'[^-A-Za-z0-9._]', '_', txt)
+        if txt.startswith('-'):
+            txt = 'opt' + txt
+        else:
+            txt = re.sub(r'^([^A-Za-z])', r't\1', txt)
+        if txt:
+            st.html_out.append('<span id="' + txt + '"></span>')
 
 
     def handle_endtag(self, tag):
@@ -350,14 +358,16 @@ class TransformHtml(HTMLParser):
         add_to_txt = None
         if tag == 'h1' or tag == 'h2':
             st.man_out.append(st.p_macro + '.SH "' + manify(txt) + '"\n')
-            self.add_anchor(txt)
+            self.add_target(txt)
         elif tag == 'h3':
             st.man_out.append(st.p_macro + '.SS "' + manify(txt) + '"\n')
-            self.add_anchor(txt)
+            self.add_target(txt)
         elif tag == 'p':
             if st.dt_from == 'p':
                 tag = 'dt'
                 st.man_out.append('.IP "' + manify(txt) + '"\n')
+                if txt.startswith(BOLD_FONT[0]):
+                    self.add_target(txt)
                 st.dt_from = None
             elif txt != '':
                 st.man_out.append(manify(txt) + "\n")
