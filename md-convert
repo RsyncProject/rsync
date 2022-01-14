@@ -47,7 +47,7 @@ body {
 body, b, strong, u {
   font-family: 'Roboto', sans-serif;
 }
-a.tgt { font-face: symbol; font-weight: 400; font-size: 70%; visibility: hidden; text-decoration: none; color: #ddd; padding: 0 4px; border: 0; }
+a.tgt { font-face: symbol; font-weight: 400; font-size: 70%; visibility: hidden; text-decoration: none; color: #ddd; padding: 0 4px; border: 0; vertical-align: top; }
 a.tgt:after { content: '🔗'; }
 a.tgt:hover { color: #444; background-color: #eaeaea; }
 h1:hover > a.tgt, h2:hover > a.tgt, h3:hover > a.tgt, dt:hover > a.tgt { visibility: visible; }
