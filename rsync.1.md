@@ -1080,9 +1080,9 @@ your home directory (remove the '=' for that).
     slash) to "/dest/subdir" that would not allow symlinks to any files outside
     of "subdir".
 
-    This option has no additional effect if `--copy-links` was also specified.
-    The safe symlinks are only copied if `--links` was also specified or
-    implied by `--archive` (`-a`).
+    Note that safe symlinks are only copied if `--links` was also specified or
+    implied. The `--copy-unsafe-links` option has no extra effect when combined
+    with `--copy-links`.
 
     See the [SYMBOLIC LINKS](#SYMBOLIC-LINKS) section for multi-option info.
 
