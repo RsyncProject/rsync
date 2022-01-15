@@ -8,6 +8,9 @@ rsync-ssl - a helper script for connecting to an ssl rsync daemon
 rsync-ssl [--type=SSL_TYPE] RSYNC_ARGS
 ```
 
+The online version of this man page (that includes cross-linking of topics)
+is available at <https://download.samba.org/pub/rsync/rsync.1>.
+
 ## DESCRIPTION
 
 The rsync-ssl script helps you to run an rsync copy to/from an rsync daemon
@@ -93,7 +96,7 @@ The ssl helper scripts are affected by the following environment variables:
 
 ## SEE ALSO
 
-**rsync**(1), **rsyncd.conf**(5)
+[**rsync**(1)](./rsync.1), [**rsyncd.conf**(5)](./rsyncd.conf.5)
 
 ## CAVEATS
 
@@ -119,7 +122,7 @@ This man page is current for version @VERSION@ of rsync.
 ## CREDITS
 
 rsync is distributed under the GNU General Public License.  See the file
-COPYING for details.
+[COPYING](./COPYING) for details.
 
 A web site is available at <https://rsync.samba.org/>.  The site includes an
 FAQ-O-Matic which may cover questions unanswered by this manual page.

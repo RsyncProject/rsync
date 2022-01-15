@@ -8,6 +8,9 @@ rrsync - a script to setup restricted rsync users via ssh logins
 rrsync [-ro|-rw] [-munge] [-no-del] [-no-lock] DIR
 ```
 
+The online version of this man page (that includes cross-linking of topics)
+is available at <https://download.samba.org/pub/rsync/rrsync.1>.
+
 ## DESCRIPTION
 
 A user's ssh login can be restricted to only allow the running of an rsync
@@ -92,3 +95,24 @@ The `.ssh/authorized_keys` file might have lines in it like this:
 > command="rrsync client/logs" ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAIEAzG...
 > command="rrsync -ro results" ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAIEAmk...
 > ```
+
+## SEE ALSO
+
+[**rsync**(1)](./rsync.1)
+
+## VERSION
+
+This man page is current for version @VERSION@ of rsync.
+
+## CREDITS
+
+rsync is distributed under the GNU General Public License.  See the file
+[COPYING](./COPYING) for details.
+
+An rsync web site is available at <https://rsync.samba.org/> and its github
+project is <https://github.com/WayneD/rsync>.
+
+## AUTHOR
+
+The original rrsync perl script was written by Joe Smith.  Many people have
+later contributed to it.  The python version was created by Wayne Davison.

@@ -6,6 +6,9 @@ rsyncd.conf - configuration file for rsync in daemon mode
 
 rsyncd.conf
 
+The online version of this man page (that includes cross-linking of topics)
+is available at <https://download.samba.org/pub/rsync/rsyncd.conf.5>.
+
 ## DESCRIPTION
 
 The rsyncd.conf file is the runtime configuration file for rsync when run as an
@@ -177,7 +180,7 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
 
 0.  `use chroot`
 
-    If "use chroot" is true, the rsync daemon will chroot to the "path" before
+    If "use chroot" is true, the rsync daemon will chroot to the "[path](#)" before
     starting the file transfer with the client.  This has the advantage of
     extra protection against possible implementation security holes, but it has
     the disadvantages of requiring super-user privileges, of not being able to
@@ -186,7 +189,7 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     below).
 
     As an additional safety feature, you can specify a dot-dir in the module's
-    "path" to indicate the point where the chroot should occur.  This allows
+    "[path](#)" to indicate the point where the chroot should occur.  This allows
     rsync to run in a chroot with a non-"/" path for the top of the transfer
     hierarchy.  Doing this guards against unintended library loading (since
     those absolute paths will not be inside the transfer hierarchy unless you
@@ -197,18 +200,18 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     chroot would have used the whole path, and the inside-chroot path would
     have been "/".
 
-    When both "use chroot" and "daemon chroot" are false, OR the inside-chroot
+    When both "use chroot" and "[daemon chroot](#)" are false, OR the inside-chroot
     path of "use chroot" is not "/", rsync will: (1) munge symlinks by default
-    for security reasons (see "munge symlinks" for a way to turn this off, but
+    for security reasons (see "[munge symlinks](#)" for a way to turn this off, but
     only if you trust your users), (2) substitute leading slashes in absolute
     paths with the module's path (so that options such as `--backup-dir`,
     `--compare-dest`, etc. interpret an absolute path as rooted in the module's
-    "path" dir), and (3) trim ".." path elements from args if rsync believes
+    "[path](#)" dir), and (3) trim ".." path elements from args if rsync believes
     they would escape the module hierarchy.  The default for "use chroot" is
     true, and is the safer choice (especially if the module is not read-only).
 
-    When this parameter is enabled *and* the "name converter" parameter is
-    *not* set, the "numeric ids" parameter will default to being enabled
+    When this parameter is enabled *and* the "[name converter](#)" parameter is
+    *not* set, the "[numeric ids](#)" parameter will default to being enabled
     (disabling name lookups).  This means that if you manually setup
     name-lookup libraries in your chroot (instead of using a name converter)
     that you need to explicitly set `numeric ids = false` for rsync to do name
@@ -217,16 +220,16 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     If you copy library resources into the module's chroot area, you should
     protect them through your OS's normal user/group or ACL settings (to
     prevent the rsync module's user from being able to change them), and then
-    hide them from the user's view via "exclude" (see how in the discussion of
+    hide them from the user's view via "[exclude](#)" (see how in the discussion of
     that parameter).  However, it's easier and safer to setup a name converter.
 
 0.  `daemon chroot`
 
     This parameter specifies a path to which the daemon will chroot before
-    beginning communication with clients. Module paths (and any "use chroot"
+    beginning communication with clients. Module paths (and any "[use chroot](#)"
     settings) will then be related to this one. This lets you choose if you
     want the whole daemon to be chrooted (with this setting), just the
-    transfers to be chrooted (with "use chroot"), or both.  Keep in mind that
+    transfers to be chrooted (with "[use chroot](#)"), or both.  Keep in mind that
     the "daemon chroot" area may need various OS/lib/etc files installed to
     allow the daemon to function.  By default the daemon runs without any
     chrooting.
@@ -284,11 +287,11 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     transfer behave as if the client had passed the `--numeric-ids`
     command-line option.  By default, this parameter is enabled for chroot
     modules and disabled for non-chroot modules.  Also keep in mind that
-    uid/gid preservation requires the module to be running as root (see "uid")
-    or for "fake super" to be configured.
+    uid/gid preservation requires the module to be running as root (see "[uid](#)")
+    or for "[fake super](#)" to be configured.
 
     A chroot-enabled module should not have this parameter set to false unless
-    you're using a "name converter" program *or* you've taken steps to ensure
+    you're using a "[name converter](#)" program *or* you've taken steps to ensure
     that the module has the necessary resources it needs to translate names and
     that it is not possible for a user to change those resources.
 
@@ -298,12 +301,12 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     (non-daemon-affecting) `--munge-links` command-line option (using a method
     described below).  This should help protect your files from user trickery
     when your daemon module is writable.  The default is disabled when
-    "use chroot" is on with an inside-chroot path of "/", OR if "daemon chroot"
+    "[use chroot](#)" is on with an inside-chroot path of "/", OR if "[daemon chroot](#)"
     is on, otherwise it is enabled.
 
     If you disable this parameter on a daemon that is not read-only, there are
     tricks that a user can play with uploaded symlinks to access
-    daemon-excluded items (if your module has any), and, if "use chroot" is
+    daemon-excluded items (if your module has any), and, if "[use chroot](#)" is
     off, rsync can even be tricked into showing or changing data that is
     outside the module's path (as access-permissions allow).
 
@@ -324,7 +327,7 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     the source code named "munge-symlinks" that can be used to add or remove
     this prefix from your symlinks.
 
-    When this parameter is disabled on a writable module and "use chroot" is
+    When this parameter is disabled on a writable module and "[use chroot](#)" is
     off (or the inside-chroot path is not "/"), incoming symlinks will be
     modified to drop a leading slash and to remove ".." path elements that
     rsync believes will allow a symlink to escape the module's hierarchy.
@@ -340,10 +343,10 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     conversion in a chroot module without extra files in the chroot area, and
     also ensures that name-translation is done in a consistent manner.  If the
     "charset" parameter is not set, the `--iconv` option is refused, just as if
-    "iconv" had been specified via "refuse options".
+    "iconv" had been specified via "[refuse options](#)".
 
     If you wish to force users to always use `--iconv` for a particular module,
-    add "no-iconv" to the "refuse options" parameter.  Keep in mind that this
+    add "no-iconv" to the "[refuse options](#)" parameter.  Keep in mind that this
     will restrict access to your module to very new rsync clients.
 
 0.  `max connections`
@@ -352,7 +355,7 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     connections you will allow.  Any clients connecting when the maximum has
     been reached will receive a message telling them to try later.  The default
     is 0, which means no limit.  A negative value disables the module.  See
-    also the "lock file" parameter.
+    also the "[lock file](#)" parameter.
 
 0.  `log file`
 
@@ -381,7 +384,7 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     facility name which is defined on your system. Common names are auth,
     authpriv, cron, daemon, ftp, kern, lpr, mail, news, security, syslog, user,
     uucp, local0, local1, local2, local3, local4, local5, local6 and local7.
-    The default is daemon.  This setting has no effect if the "log file"
+    The default is daemon.  This setting has no effect if the "[log file](#)"
     setting is a non-empty string (either set in the per-modules settings, or
     inherited from the global settings).
 
@@ -389,7 +392,7 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
 
     This parameter allows you to specify the syslog tag to use when logging
     messages from the rsync daemon. The default is "rsyncd".  This setting has
-    no effect if the "log file" setting is a non-empty string (either set in
+    no effect if the "[log file](#)" setting is a non-empty string (either set in
     the per-modules settings, or inherited from the global settings).
 
     For example, if you wanted each authenticated user's name to be included in
@@ -414,7 +417,7 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
 
 0.  `lock file`
 
-    This parameter specifies the file to use to support the "max connections"
+    This parameter specifies the file to use to support the "[max connections](#)"
     parameter. The rsync daemon uses record locking on this file to ensure that
     the max connections limit is not exceeded for the modules sharing the lock
     file.  The default is `/var/run/rsyncd.lock`.
@@ -426,7 +429,7 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     "read only" is false then uploads will be possible if file permissions on
     the daemon side allow them. The default is for all modules to be read only.
 
-    Note that "auth users" can override this setting on a per-user basis.
+    Note that "[auth users](#)" can override this setting on a per-user basis.
 
 0.  `write only`
 
@@ -460,8 +463,8 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     This parameter determines whether this module is listed when the client
     asks for a listing of available modules.  In addition, if this is false,
     the daemon will pretend the module does not exist when a client denied by
-    "hosts allow" or "hosts deny" attempts to access it.  Realize that if
-    "reverse lookup" is disabled globally but enabled for the module, the
+    "[hosts allow](#)" or "[hosts deny](#)" attempts to access it.  Realize that if
+    "[reverse lookup](#)" is disabled globally but enabled for the module, the
     resulting reverse lookup to a potentially client-controlled DNS server may
     still reveal to the client that it hit an existing module.  The default is
     for modules to be listable.
@@ -470,10 +473,10 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
 
     This parameter specifies the user name or user ID that file transfers to
     and from that module should take place as when the daemon was run as root.
-    In combination with the "gid" parameter this determines what file
+    In combination with the "[gid](#)" parameter this determines what file
     permissions are available. The default when run by a super-user is to
     switch to the system's "nobody" user.  The default for a non-super-user is
-    to not try to change the user.  See also the "gid" parameter.
+    to not try to change the user.  See also the "[gid](#)" parameter.
 
     The RSYNC_USER_NAME environment variable may be used to request that rsync
     run as the authorizing user.  For example, if you want a rsync to run as
@@ -489,7 +492,7 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     accessing the module.  The first one will be the default group, and any
     extra ones be set as supplemental groups.  You may also specify a "`*`" as
     the first gid in the list, which will be replaced by all the normal groups
-    for the transfer's user (see "uid").  The default when run by a super-user
+    for the transfer's user (see "[uid](#)").  The default when run by a super-user
     is to switch to your OS's "nobody" (or perhaps "nogroup") group with no
     other supplementary groups.  The default for a non-super-user is to not
     change any group attributes (and indeed, your OS may not allow a
@@ -505,13 +508,13 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
 
     This parameter specifies a uid under which the daemon will run. The daemon
     usually runs as user root, and when this is left unset the user is left
-    unchanged. See also the "uid" parameter.
+    unchanged. See also the "[uid](#)" parameter.
 
 0.  `daemon gid`
 
     This parameter specifies a gid under which the daemon will run. The daemon
     usually runs as group root, and when this is left unset, the group is left
-    unchanged. See also the "gid" parameter.
+    unchanged. See also the "[gid](#)" parameter.
 
 0.  `fake super`
 
@@ -532,8 +535,8 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     or tampering with private administrative files, such as files you may add
     to support uid/gid name translations.
 
-    The daemon filter chain is built from the "filter", "include from",
-    "include", "exclude from", and "exclude" parameters, in that order of
+    The daemon filter chain is built from the "filter", "[include from](#)",
+    "[include](#)", "[exclude from](#)", and "[exclude](#)" parameters, in that order of
     priority.  Anchored patterns are anchored at the root of the module.  To
     prevent access to an entire subtree, for example, "`/secret`", you **must**
     exclude everything in the subtree; the easiest way to do this is with a
@@ -560,8 +563,8 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
 
 0.  `include`
 
-    Use an "include" to override the effects of the "exclude" parameter.  Only
-    one "include" parameter can apply to a given module.  See the "filter"
+    Use an "include" to override the effects of the "[exclude](#)" parameter.  Only
+    one "include" parameter can apply to a given module.  See the "[filter](#)"
     parameter for a description of how excluded files affect the daemon.
 
 0.  `exclude from`
@@ -569,14 +572,14 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     This parameter specifies the name of a file on the daemon that contains
     daemon exclude patterns, one per line.  Only one "exclude from" parameter
     can apply to a given module; if you have multiple exclude-from files, you
-    can specify them as a merge file in the "filter" parameter.  See the
-    "filter" parameter for a description of how excluded files affect the
+    can specify them as a merge file in the "[filter](#)" parameter.  See the
+    "[filter](#)" parameter for a description of how excluded files affect the
     daemon.
 
 0.  `include from`
 
-    Analogue of "exclude from" for a file of daemon include patterns.  Only one
-    "include from" parameter can apply to a given module.  See the "filter"
+    Analogue of "[exclude from](#)" for a file of daemon include patterns.  Only one
+    "include from" parameter can apply to a given module.  See the "[filter](#)"
     parameter for a description of how excluded files affect the daemon.
 
 0.  `incoming chmod`
@@ -611,7 +614,7 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     to supply a username and password to connect to the module. A challenge
     response authentication protocol is used for this exchange. The plain text
     usernames and passwords are stored in the file specified by the
-    "secrets file" parameter. The default is for all users to be able to
+    "[secrets file](#)" parameter. The default is for all users to be able to
     connect without a password (this is called "anonymous rsync").
 
     In addition to username matching, you can specify groupname matching via a
@@ -623,7 +626,7 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     Finally, options may be specified after a colon (:).  The options allow you
     to "deny" a user or a group, set the access to "ro" (read-only), or set the
     access to "rw" (read/write).  Setting an auth-rule-specific ro/rw setting
-    overrides the module's "read only" setting.
+    overrides the module's "[read only](#)" setting.
 
     Be sure to put the rules in the order you want them to be matched, because
     the checking stops at the first matching user or group, and that is the
@@ -661,7 +664,7 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
 
     This parameter specifies the name of a file that contains the
     username:password and/or @groupname:password pairs used for authenticating
-    this module. This file is only consulted if the "auth users" parameter is
+    this module. This file is only consulted if the "[auth users](#)" parameter is
     specified.  The file is line-based and contains one name:password pair per
     line.  Any line has a hash (#) as the very first character on the line is
     considered a comment and is skipped.  The passwords can contain any
@@ -675,14 +678,14 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     "@groupname:password" line for the group that triggered the authentication.
 
     It is up to you what kind of password entries you want to include, either
-    users, groups, or both.  The use of group rules in "auth users" does not
+    users, groups, or both.  The use of group rules in "[auth users](#)" does not
     require that you specify a group password if you do not want to use shared
     passwords.
 
     There is no default for the "secrets file" parameter, you must choose a
     name (such as `/etc/rsyncd.secrets`).  The file must normally not be
-    readable by "other"; see "strict modes".  If the file is not found or is
-    rejected, no logins for a "user auth" module will be possible.
+    readable by "other"; see "[strict modes](#)".  If the file is not found or is
+    rejected, no logins for an "[auth users](#)" module will be possible.
 
 0.  `strict modes`
 
@@ -715,10 +718,10 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     - a hostname pattern using wildcards. If the hostname of the connecting IP
       (as determined by a reverse lookup) matches the wildcarded name (using
       the same rules as normal unix filename matching), the client is allowed
-      in.  This only works if "reverse lookup" is enabled (the default).
+      in.  This only works if "[reverse lookup](#)" is enabled (the default).
     - a hostname. A plain hostname is matched against the reverse DNS of the
-      connecting IP (if "reverse lookup" is enabled), and/or the IP of the
-      given hostname is matched against the connecting IP (if "forward lookup"
+      connecting IP (if "[reverse lookup](#)" is enabled), and/or the IP of the
+      given hostname is matched against the connecting IP (if "[forward lookup](#)"
       is enabled, as it is by default).  Any match will be allowed in.
     - an '@' followed by a netgroup name, which will match if the reverse DNS
       of the connecting IP is in the specified netgroup.
@@ -730,11 +733,11 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     >     fe80::%link1/64
     >     fe80::%link1/ffff:ffff:ffff:ffff::
 
-    You can also combine "hosts allow" with "hosts deny" as a way to add
+    You can also combine "hosts allow" with "[hosts deny](#)" as a way to add
     exceptions to your deny list.  When both parameters are specified, the
     "hosts allow" parameter is checked first and a match results in the client
     being able to connect.  A non-allowed host is then matched against the
-    "hosts deny" list to see if it should be rejected.  A host that does not
+    "[hosts deny](#)" list to see if it should be rejected.  A host that does not
     match either list is allowed to connect.
 
     The default is no "hosts allow" parameter, which means all hosts can
@@ -745,7 +748,7 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     This parameter allows you to specify a list of comma- and/or
     whitespace-separated patterns that are matched against a connecting clients
     hostname and IP address. If the pattern matches then the connection is
-    rejected. See the "hosts allow" parameter for more information.
+    rejected. See the "[hosts allow](#)" parameter for more information.
 
     The default is no "hosts deny" parameter, which means all hosts can
     connect.
@@ -753,8 +756,8 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
 0.  `reverse lookup`
 
     Controls whether the daemon performs a reverse lookup on the client's IP
-    address to determine its hostname, which is used for "hosts allow" &
-    "hosts deny" checks and the "%h" log escape.  This is enabled by default,
+    address to determine its hostname, which is used for "[hosts allow](#)" &
+    "[hosts deny](#)" checks and the "%h" log escape.  This is enabled by default,
     but you may wish to disable it to save time if you know the lookup will not
     return a useful result, in which case the daemon will use the name
     "UNDETERMINED" instead.
@@ -794,7 +797,7 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     logs the transfer at the end, so if a transfer is aborted, no mention will
     be made in the log file.
 
-    If you want to customize the log lines, see the "log format" parameter.
+    If you want to customize the log lines, see the "[log format](#)" parameter.
 
 0.  `log format`
 
@@ -811,7 +814,7 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     (e.g. "`%''l %'b %f`").
 
     The default log format is "`%o %h [%a] %m (%u) %f %l`", and a "`%t [%p] `"
-    is always prefixed when using the "log file" parameter.  (A perl script
+    is always prefixed when using the "[log file](#)" parameter.  (A perl script
     that will summarize this default log format is included in the rsync source
     code distribution in the "support" subdirectory: rsyncstats.)
 
@@ -922,7 +925,7 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
 
     >     refuse options = * !a !delete* delete-after
 
-    A note on refusing "compress": it may be better to set the "dont compress"
+    A note on refusing "compress": it may be better to set the "[dont compress](#)"
     daemon parameter to "`*`" and ensure that `RSYNC_COMPRESS_LIST=zlib` is set
     in the environment of the daemon in order to disable compression silently
     instead of returning an error that forces the client to remove the `-z`
@@ -943,12 +946,12 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
       receiver.  While rsync passes the older alias `--log-format` for
       compatibility reasons, this options should not be confused with
       `--log-file-format`.
-    - `--sender`: Use "write only" parameter instead of refusing this.
+    - `--sender`: Use "[write only](#)" parameter instead of refusing this.
     - `--dry-run`, `-n`: Who would want to disable this?
     - `--protect-args`, `-s`: This actually makes transfers safer.
     - `--from0`, `-0`: Makes it easier to accept/refuse `--files-from` without
       affecting this helpful modifier.
-    - `--iconv`: This is auto-disabled based on "charset" parameter.
+    - `--iconv`: This is auto-disabled based on "[charset](#)" parameter.
     - `--no-iconv`: Most transfers use this option.
     - `--checksum-seed`: Is a fairly rare, safe option.
     - `--write-devices`: Is non-wild but also auto-disabled.
@@ -1208,7 +1211,7 @@ The /etc/rsyncd.secrets file would look something like this:
 
 ## SEE ALSO
 
-**rsync**(1), **rsync-ssl**(1)
+[**rsync**(1)](./rsync.1), [**rsync-ssl**(1)](./rsync-ssl.1)
 
 ## BUGS
 
@@ -1222,16 +1225,10 @@ This man page is current for version @VERSION@ of rsync.
 ## CREDITS
 
 rsync is distributed under the GNU General Public License.  See the file
-COPYING for details.
+[COPYING](./COPYING) for details.
 
-The primary ftp site for rsync is <ftp://rsync.samba.org/pub/rsync>
-
-A web site is available at <https://rsync.samba.org/>.
-
-We would be delighted to hear from you if you like this program.
-
-This program uses the zlib compression library written by Jean-loup Gailly and
-Mark Adler.
+An rsync web site is available at <https://rsync.samba.org/> and its github
+project is <https://github.com/WayneD/rsync>.
 
 ## THANKS
 

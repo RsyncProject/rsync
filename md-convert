@@ -114,6 +114,8 @@ NBR_SPACE = ('\xa0', r"\ ")
 md_parser = None
 env_subs = { }
 
+warning_count = 0
+
 def main():
     for mdfn in args.mdfiles:
         parse_md_file(mdfn)
@@ -231,6 +233,8 @@ class TransformHtml(HTMLParser):
     def __init__(self, fi):
         HTMLParser.__init__(self, convert_charrefs=True)
 
+        self.fn = fi.fn
+
         st = self.state = argparse.Namespace(
                 list_state = [ ],
                 p_macro = ".P\n",
@@ -243,6 +247,13 @@ class TransformHtml(HTMLParser):
                 man_out = [ ],
                 txt = '',
                 want_manpage = fi.want_manpage,
+                created_hashtags = set(),
+                derived_hashtags = set(),
+                referenced_hashtags = set(),
+                bad_hashtags = set(),
+                prior_target = None,
+                opt_prefix = 'opt',
+                a_txt_start = None,
                 )
 
         if st.want_manpage:
@@ -265,6 +276,20 @@ class TransformHtml(HTMLParser):
         fi.man_out = ''.join(st.man_out)
         st.man_out = None
 
+        for href, txt in st.derived_hashtags:
+            derived = txt2target(txt, href[1:])
+            if derived not in st.created_hashtags:
+                txt = re.sub(r'[\1-\7]+', '', txt.replace(NBR_DASH[0], '-').replace(NBR_SPACE[0], ' '))
+                warn('Unknown derived hashtag link in', self.fn, 'based on:', (href, txt))
+
+        for bad in st.bad_hashtags:
+            if bad in st.created_hashtags:
+                warn('Missing "#" in hashtag link in', self.fn + ':', bad)
+            else:
+                warn('Unknown non-hashtag link in', self.fn + ':', bad)
+
+        for bad in st.referenced_hashtags - st.created_hashtags:
+            warn('Unknown hashtag link in', self.fn + ':', '#' + bad)
 
     def handle_starttag(self, tag, attrs_list):
         st = self.state
@@ -333,22 +358,21 @@ class TransformHtml(HTMLParser):
             st.man_out.append(".l\n")
             st.html_out.append("<hr />")
             return
+        elif tag == 'a':
+            st.a_href = None
+            for var, val in attrs_list:
+                if var == 'href':
+                    if val in ('#', '#opt', '#daemon-opt'):
+                        st.a_href = val
+                    elif val.startswith('#'):
+                        st.referenced_hashtags.add(val[1:])
+                        if val[1:] == st.prior_target:
+                            warn('Found link to the current section in', self.fn + ':', val)
+                    elif not val.startswith(('https://', 'http://', 'mailto:', 'ftp:', './')):
+                        st.bad_hashtags.add(val)
+            st.a_txt_start = len(st.txt)
         st.html_out.append('<' + tag + ''.join(' ' + var + '="' + htmlify(val) + '"' for var, val in attrs_list) + '>')
         st.at_first_tag_in_dd = False
-
-
-    def add_target(self, txt):
-        st = self.state
-        txt = re.sub(r'[%s](.+?)[=%s].*' % (BOLD_FONT[0], NORM_FONT[0]), r'\1', txt.strip())
-        txt = re.sub(r'[%s]' % NBR_DASH[0], '-', txt)
-        txt = re.sub(r'[\1-\7]+', '', txt)
-        txt = re.sub(r'[^-A-Za-z0-9._]', '_', txt)
-        if txt.startswith('-'):
-            txt = 'opt' + txt
-        else:
-            txt = re.sub(r'^([^A-Za-z])', r't\1', txt)
-        if txt:
-            st.html_out.append('<a id="' + txt + '" href="#' + txt + '" class="tgt"></a>')
 
 
     def handle_endtag(self, tag):
@@ -364,6 +388,7 @@ class TransformHtml(HTMLParser):
         if tag == 'h1' or tag == 'h2':
             st.man_out.append(st.p_macro + '.SH "' + manify(txt) + '"\n')
             self.add_target(txt)
+            st.opt_prefix = 'daemon-opt' if txt == 'DAEMON OPTIONS' else 'opt'
         elif tag == 'h3':
             st.man_out.append(st.p_macro + '.SS "' + manify(txt) + '"\n')
             self.add_target(txt)
@@ -408,6 +433,20 @@ class TransformHtml(HTMLParser):
             st.at_first_tag_in_dd = False
         elif tag == 'hr':
             return
+        elif tag == 'a':
+            if st.a_href:
+                atxt = st.txt[st.a_txt_start:]
+                find = 'href="' + st.a_href + '"'
+                for j in range(len(st.html_out)-1, 0, -1):
+                    if find in st.html_out[j]:
+                        derived = txt2target(atxt, st.a_href[1:])
+                        if derived == st.prior_target:
+                            warn('Found link to the current section in', self.fn + ':', derived)
+                        st.derived_hashtags.add((st.a_href, atxt))
+                        st.html_out[j] = st.html_out[j].replace(find, 'href="#' + derived + '"')
+                        break
+                else:
+                    die('INTERNAL ERROR: failed to find href in html data:', find)
         st.html_out.append('</' + tag + '>')
         if add_to_txt:
             if txt is None:
@@ -426,6 +465,8 @@ class TransformHtml(HTMLParser):
 
     def handle_data(self, txt):
         st = self.state
+        if '](' in txt:
+            warn('Malformed link in', self.fn + ':', txt)
         if args.debug:
             self.output_debug('DATA', (txt,))
         if st.in_pre:
@@ -441,6 +482,15 @@ class TransformHtml(HTMLParser):
         st.txt += txt
 
 
+    def add_target(self, txt):
+        st = self.state
+        txt = txt2target(txt, st.opt_prefix)
+        if txt:
+            st.html_out.append('<a id="' + txt + '" href="#' + txt + '" class="tgt"></a>')
+            st.created_hashtags.add(txt)
+            st.prior_target = txt
+
+
     def output_debug(self, event, extra):
         import pprint
         st = self.state
@@ -452,6 +502,18 @@ class TransformHtml(HTMLParser):
                 st.man_out = ['...'] + st.man_out[-2:]
         print(event, extra)
         pprint.PrettyPrinter(indent=2).pprint(vars(st))
+
+
+def txt2target(txt, opt_prefix):
+    txt = re.sub(r'[%s](.+?)[=%s].*' % (BOLD_FONT[0], NORM_FONT[0]), r'\1', txt.strip())
+    txt = re.sub(r'[%s]' % NBR_DASH[0], '-', txt)
+    txt = re.sub(r'[\1-\7]+', '', txt)
+    txt = re.sub(r'[^-A-Za-z0-9._]', '_', txt)
+    if opt_prefix and txt.startswith('-'):
+        txt = opt_prefix + txt
+    else:
+        txt = re.sub(r'^([^A-Za-z])', r't\1', txt)
+    return txt
 
 
 def manify(txt):
@@ -469,6 +531,8 @@ def htmlify(txt):
 
 def warn(*msg):
     print(*msg, file=sys.stderr)
+    global warning_count
+    warning_count += 1
 
 
 def die(*msg):
@@ -497,3 +561,5 @@ if __name__ == '__main__':
         gfm_parser = None
 
     main()
+    if warning_count:
+        sys.exit(1)
