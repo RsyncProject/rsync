@@ -121,7 +121,7 @@ This man page is current for version @VERSION@ of rsync.
 
 ## CREDITS
 
-rsync is distributed under the GNU General Public License.  See the file
+Rsync is distributed under the GNU General Public License.  See the file
 [COPYING](./COPYING) for details.
 
 A web site is available at <https://rsync.samba.org/>.  The site includes an

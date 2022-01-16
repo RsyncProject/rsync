@@ -45,8 +45,7 @@ Case is not significant in boolean values, but is preserved in string values.
 
 ## LAUNCHING THE RSYNC DAEMON
 
-The rsync daemon is launched by specifying the `--daemon` option to
-rsync.
+The rsync daemon is launched by specifying the `--daemon` option to rsync.
 
 The daemon must run with root privileges if you wish to use chroot, to bind to
 a port numbered under 1024 (as is the default 873), or to set file ownership.
@@ -1224,7 +1223,7 @@ This man page is current for version @VERSION@ of rsync.
 
 ## CREDITS
 
-rsync is distributed under the GNU General Public License.  See the file
+Rsync is distributed under the GNU General Public License.  See the file
 [COPYING](./COPYING) for details.
 
 An rsync web site is available at <https://rsync.samba.org/> and its github
@@ -1237,7 +1236,7 @@ Thanks to Karsten Thygesen for his many suggestions and documentation!
 
 ## AUTHOR
 
-rsync was written by Andrew Tridgell and Paul Mackerras.  Many people have
+Rsync was written by Andrew Tridgell and Paul Mackerras.  Many people have
 later contributed to it.
 
 Mailing lists for support and development are available at

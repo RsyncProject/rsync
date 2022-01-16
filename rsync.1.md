@@ -4260,7 +4260,7 @@ already exists on the receiving side.  See that option's section for a warning.
 
 ## DIAGNOSTICS
 
-rsync occasionally produces error messages that may seem a little cryptic.  The
+Rsync occasionally produces error messages that may seem a little cryptic.  The
 one that seems to cause the most confusion is "protocol version mismatch -- is
 your shell clean?".
 
@@ -4395,7 +4395,7 @@ that can be used with a restricted ssh login.
 
 ## CREDITS
 
-rsync is distributed under the GNU General Public License.  See the file
+Rsync is distributed under the GNU General Public License.  See the file
 [COPYING](./COPYING) for details.
 
 An rsync web site is available at <https://rsync.samba.org/>.  The site
@@ -4421,7 +4421,7 @@ David Bell.  I've probably missed some people, my apologies if I have.
 
 ## AUTHOR
 
-rsync was originally written by Andrew Tridgell and Paul Mackerras.  Many
+Rsync was originally written by Andrew Tridgell and Paul Mackerras.  Many
 people have later contributed to it. It is currently maintained by Wayne
 Davison.
 
