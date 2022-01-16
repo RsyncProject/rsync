@@ -3536,7 +3536,7 @@ your home directory (remove the '=' for that).
 
     See also [the daemon version of these options](#daemon-opt--ipv4).
 
-    If rsync was complied without support for IPv6, the `--ipv6` option will
+    If rsync was compiled without support for IPv6, the `--ipv6` option will
     have no effect.  The `rsync --version` output will contain "`no IPv6`" if
     is the case.
 
@@ -3667,7 +3667,7 @@ The options allowed when starting an rsync daemon are as follows:
 
     See also [the client version of these options](#opt--ipv4).
 
-    If rsync was complied without support for IPv6, the `--ipv6` option will
+    If rsync was compiled without support for IPv6, the `--ipv6` option will
     have no effect.  The `rsync --version` output will contain "`no IPv6`" if
     is the case.
 

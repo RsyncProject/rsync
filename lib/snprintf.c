@@ -20,7 +20,7 @@
  * for string length.  This covers a nasty loophole.
  *
  * The other functions are there to prevent NULL pointers from
- * causing nast effects.
+ * causing nasty effects.
  *
  * More Recently:
  *  Brandon Long <blong@fiction.net> 9/15/96 for mutt 0.43

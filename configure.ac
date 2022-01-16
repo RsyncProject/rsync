@@ -411,7 +411,7 @@ AS_HELP_STRING([--disable-ipv6],[disable to omit ipv6 support]),
 	;;
   esac ],
 
-  AC_TRY_RUN([ /* AF_INET6 avalable check */
+  AC_TRY_RUN([ /* AF_INET6 availability check */
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/socket.h>
