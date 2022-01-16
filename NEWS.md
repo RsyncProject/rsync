@@ -6,20 +6,21 @@
 ### BEHAVIOR CHANGES:
 
  - A new form of arg protection was added that works similarly to the older
-   `--protect-args` (`-s`) option but in a way that avoids breaking things like
-   rrsync (the restricted rsync script): rsync now uses backslash escaping for
-   sending "shell-active" characters to the remote shell. This includes spaces,
-   so fetching a remote file via a simple quoted filename value now works by
-   default without any extra quoting:
+   [`--protect-args`](rsync.1#opt) (`-s`) option but in a way that avoids
+   breaking things like rrsync (the restricted rsync script): rsync now uses
+   backslash escaping for sending "shell-active" characters to the remote
+   shell. This includes spaces, so fetching a remote file via a simple quoted
+   filename value now works by default without any extra quoting:
 
    ```shell
        rsync -aiv host:'a simple file.pdf' .
    ```
 
    Wildcards are not escaped in filename args, but they are escaped in options
-   like the `--suffix` and `--usermap` values.  If your rsync script depends on
-   the old arg-splitting behavior, either run it with the `--old-args` option
-   or `export RSYNC_OLD_ARGS=1` in the script's environment.
+   like the [`--suffix`](rsync.1#opt) and [`--usermap`](rsync.1#opt) values.
+   If your rsync script depends on the old arg-splitting behavior, either run
+   it with the [`--old-args`](rsync.1#opt) option or `export RSYNC_OLD_ARGS=1`
+   in the script's environment.
 
  - A long-standing bug was preventing rsync from figuring out the current
    locale's decimal point character, which made rsync always output numbers
@@ -45,62 +46,66 @@
 
 ### BUG FIXES:
 
- - Fixed a bug with `--inplace` + `--sparse` (and a lack of `--whole-file`)
-   where the destination file could get reconstructed with bogus data.  Since
-   the bug can also be avoided by using (the seemingly redundant) `--no-W` on
-   the receiving side, the latest rsync will now send `--no-W` to a remote
-   receiver when this option combination occurs.  If your client rsync is not
-   new enough to do this for you (or if you're just paranoid), you can manually
-   specify `--no-W -M--no-W` (when not using `--whole-file`) to make sure the
+ - Fixed a bug with [`--inplace`](rsync.1#opt) + [`--sparse`](rsync.1#opt) (and
+   a lack of [`--whole-file`](rsync.1#opt)) where the destination file could
+   get reconstructed with bogus data.  Since the bug can also be avoided by
+   using (the seemingly redundant) [`--no-W`](rsync.1#opt) on the receiving
+   side, the latest rsync will now send `--no-W` to a remote receiver when this
+   option combination occurs.  If your client rsync is not new enough to do
+   this for you (or if you're just paranoid), you can manually specify `--no-W
+   -M--no-W` (when not using [`--whole-file`](rsync.1#opt)) to make sure the
    bug is avoided.
 
- - Fixed a bug with `--mkpath` if a single-file copy specifies an existing
-   destination dir with a non-existing destination filename.
+ - Fixed a bug with [`--mkpath`](rsync.1#opt) if a single-file copy specifies
+   an existing destination dir with a non-existing destination filename.
 
  - Fixed `--update -vv` to output "is uptodate" instead of "is newer" messages
-   for files that are being skipped due to an identical modify time.  (This
-   was a new output quirk in 3.2.3.)
+   for files that are being skipped due to an identical modify time.  (This was
+   a new output quirk in 3.2.3.)
 
  - When doing an append transfer, the sending side's file must not get shorter
    or it is skipped. Fixes a crash that could occur when the size changes to 0
    in the middle of the send negotiations.
 
- - When dealing with special files (see `--specials`) in an alt-dest hierarchy,
-   rsync now checks the non-permission mode bits to ensure that the 2 special
-   files are really the same before hard-linking them together.
+ - When dealing with special files (see [`--specials`](rsync.1#opt)) in an
+   alt-dest hierarchy, rsync now checks the non-permission mode bits to ensure
+   that the 2 special files are really the same before hard-linking them
+   together.
 
- - Fixed a bug where `--delay-updates` with stale partial data could cause a
-   file to fail to update.
+ - Fixed a bug where [`--delay-updates`](rsync.1#opt) with stale partial data
+   could cause a file to fail to update.
 
- - Fixed a few places that would output an INFO message with `--info=NAME` that
-   should only have been output given `--verbose` or `--itemize-changes`.
+ - Fixed a few places that would output an INFO message with
+   [`--info=NAME`](rsync.1#opt) that should only have been output given
+   [`--verbose`](rsync.1#opt) or [`--itemize-changes`](rsync.1#opt).
 
- - Avoid a weird failure if you run a local copy with a (useless) `--rsh`
-   option that contains a `V` in the command.
+ - Avoid a weird failure if you run a local copy with a (useless)
+   [`--rsh`](rsync.1#opt) option that contains a `V` in the command.
 
  - Fixed a long-standing compression bug where the compression level of the
    first file transferred affected the level for all future files.  Also, the
    per-file compression skipping has apparently never worked, so it is now
    documented as being ineffective.
 
- - Improved how the `--stop-at`, `--stop-after`, and `--time-limit` options
-   check to see if the allowed time is over, which should make rsync exit more
-   consistently.
+ - Improved how the [`--stop-at`](rsync.1#opt), [`--stop-after`](rsync.1#opt),
+   and (the deprecated) [`--time-limit`](rsync.1#opt) options check to see if
+   the allowed time is over, which should make rsync exit more consistently.
 
- - Tweak --progress to display "??:??:??" when the time-remaining value is
-   so large as to be meaningless.
+ - Tweak --progress to display "`??:??:??`" when the time-remaining value is so
+   large as to be meaningless.
 
 ### ENHANCEMENTS:
 
  - Use openssl's `-verify_hostname` option in the rsync-ssl script.
 
- - Added extra info to the "FILENAME exists" output of `--ignore-existing` when
-   `--info=skip2` is used.  The skip message becomes "FILENAME exists (INFO)"
-   where the INFO is one of "type change", "sum change" (requires `-c`), "file
-   change" (based on the quick check), "attr change", or "uptodate". Prior
-   versions only supported `--info=skip1`.
+ - Added extra info to the "FILENAME exists" output of
+   [`--ignore-existing`](rsync.1#opt) when [`--info=skip2`](rsync.1#opt) is
+   used.  The skip message becomes "FILENAME exists (INFO)" where the INFO is
+   one of "type change", "sum change" (requires [`--checksum`](rsync.1#opt)),
+   "file change" (based on the quick check), "attr change", or "uptodate".
+   Prior versions only supported `--info=skip1`.
 
- - Added the `--fsync` option (promoted from the patches repo).
+ - Added the [`--fsync`](rsync.1#opt) option (promoted from the patches repo).
 
  - Reduced memory usage for an incremental transfer that has a bunch of small
    directories.
@@ -108,37 +113,42 @@
  - The rsync daemon can now handle a client address with an implied "%scope"
    suffix.
 
- - Added support for `--atimes` on macOS and fixed a bug where it wouldn't work
-   without `--times`.
+ - Added support for [`--atimes`](rsync.1#opt) on macOS and fixed a bug where
+   it wouldn't work without [`--times`](rsync.1#opt).
 
  - Rsync can now update the xattrs on a read-only file when your user can
    temporarily add user-write permission to the file. (It always worked for a
    root transfer.)
 
- - Rsync can now work around an `--inplace` update of a file that is being
-   refused due to the Linux fs.protected_regular sysctl setting.
+ - Rsync can now work around an [`--inplace`](rsync.1#opt) update of a file
+   that is being refused due to the Linux fs.protected_regular sysctl setting.
 
- - When `--chown`, `--usermap`, or `--groupmap` is specified, rsync now makes
-   sure that the appropriate `--owner` and/or `--group` option is enabled.
+ - When [`--chown`](rsync.1#opt), [`--usermap`](rsync.1#opt), or
+   [`--groupmap`](rsync.1#opt), is specified, rsync now makes sure that the
+   appropriate [`--owner`](rsync.1#opt) and/or [`--group`](rsync.1#opt) options
+   are enabled.
 
- - Added the `--info=NONREG` setting to control if rsync should warn about
-   non-regular files in the transfer.  This is enabled by default (keeping the
-   behavior the same as before), so specifying `--info=nonreg0` can be used to
-   turn the warnings off.
+ - Added the [`--info=NONREG`](rsync.1#opt) setting to control if rsync should
+   warn about non-regular files in the transfer.  This is enabled by default
+   (keeping the behavior the same as before), so specifying `--info=nonreg0`
+   can be used to turn the warnings off.
 
  - More ASM optimizations from Shark64.
 
  - Transformed rrsync into a python script with improvements:
    - Security has been beefed up.
    - The known rsync options were updated to include recent additions.
-   - Make rrsync reject `-L`, `-K`, & `-k` by default to make it harder to
+   - Make rrsync reject [`--copy-links`](rsync.1#opt) (`-L`),
+     [`--copy-dirlinks`](rsync.1#opt) (`-k`), &
+     [`--keep-dirlinks`](rsync.1#opt) (`-K`) by default to make it harder to
      exploit any out-of-subdir symlinks.
-   - A new rrsync option of `-munge` tells rrsync to always enable rsync's
-     `--munge-links` option on the server side.
-   - A new rrsync option of `-no-lock` disables a new single-use locking idiom
-     that is the default when `-ro` is not used (useful with `-munge`).
-   - A new rrsync option of `-no-del` disables all `--remove*` and `--delete*`
-     options on the server side.
+   - A new rrsync option of [`-munge`](rrsync.1#opt) tells rrsync to always
+     enable rsync's [`--munge-links`](rsync.1#opt) option on the server side.
+   - A new rrsync option of [`-no-lock`](rrsync.1#opt) disables a new
+     single-use locking idiom that is the default when [`-ro`](rrsync.1#opt) is
+     not used (useful with [`-munge`](rrsync.1#opt)).
+   - A new rrsync option of [`-no-del`](rrsync.1#opt) disables all `--remove*`
+     and `--delete*` rsync options on the server side.
    - The log format has been tweaked slightly to add seconds to the timestamp
      and to output the command executed as a tuple (making the args clearer).
    - An rrsync.1 man page was added (in the support dir with rrsync).
@@ -226,65 +236,70 @@
  - Fixed a bug in the xattr code that was not leaving room for the "rsync."
    prefix in some instances where it needed to be added.
 
- - Restored the ability to use `--bwlimit=0` to specify no bandwidth limit.  (It
-   was accidentally broken in 3.2.2.)
+ - Restored the ability to use [`--bwlimit=0`](rsync.1#opt) to specify no
+   bandwidth limit.  (It was accidentally broken in 3.2.2.)
 
- - Fixed a bug when combining `--delete-missing-args` with `--no-implied-dirs` &
-   `-R` where rsync might create the destination path of a missing arg.  The
-   code also avoids some superfluous warnings for nested paths of removed args.
+ - Fixed a bug when combining [`--delete-missing-args`](rsync.1#opt) with
+   [`--no-implied-dirs`](rsync.1#opt) & [`-R`](rsync.1#opt) where rsync might
+   create the destination path of a missing arg.  The code also avoids some
+   superfluous warnings for nested paths of removed args.
 
  - Fixed an issue where hard-linked devices could cause the rdev_major value to
    get out of sync between the sender and the receiver, which could cause a
    device to get created with the wrong major value in its major,minor pair.
 
- - Rsync now complains about a missing `--temp-dir` before starting any file
-   transfers.
+ - Rsync now complains about a missing [`--temp-dir`](rsync.1#opt) before
+   starting any file transfers.
 
  - A completely empty source arg is now a fatal error.  This doesn't change
    the handling of implied dot-dir args such as "localhost:" and such.
 
 ### ENHANCEMENTS:
 
- - Allow `--max-alloc=0` to specify no limit to the alloc sanity check.
+ - Allow [`--max-alloc=0`](rsync.1#opt) to specify no limit to the alloc sanity
+   check.
 
- - Allow `--block-size=SIZE` to specify the size using units (e.g. "100K").
+ - Allow [`--block-size=SIZE`](rsync.1#opt) to specify the size using units
+   (e.g. "100K").
 
  - The name of the id-0 user & group are now sent to the receiver along with
    the other user/group names in the transfer (instead of assuming that both
    sides have the same id-0 names).
 
- - Added the `--stop-after=MINS` and `--stop-at=DATE_TIME` options (with the
-   `--time-limit=MINS` option accepted as an alias for `--stop-after`).  This
-   is an enhanced version of the time-limit patch from the patches repo.
+ - Added the [`--stop-after`](rsync.1#opt) and [`--stop-at`](rsync.1#opt)
+   options (with a [`--time-limit`](rsync.1#opt) alias for `--stop-after`).
+   This is an enhanced version of the time-limit patch from the patches repo.
 
- - Added the `name converter` daemon parameter to make it easier to convert
-   user & group names inside a chrooted daemon module.  This is based on the
-   nameconverter patch with some improvements, including a tweak to the request
-   protocol (so if you used this patch in the past, be sure to update your
-   converter script to use newlines instead of null chars).
+ - Added the [`name converter`](rsyncd.conf.5#opt) daemon parameter to make it
+   easier to convert user & group names inside a chrooted daemon module.  This
+   is based on the nameconverter patch with some improvements, including a
+   tweak to the request protocol (so if you used this patch in the past, be
+   sure to update your converter script to use newlines instead of null chars).
 
- - Added `--crtimes` (`-N`) option for preserving the file's create time (I
-   believe that this is macOS only at the moment).
+ - Added [`--crtimes`](rsync.1#opt) (`-N`) option for preserving the file's
+   create time (I believe that this is macOS only at the moment).
 
- - Added `--mkpath` option to tell rsync that it should create a non-existing
-   path component of the destination arg.
+ - Added [`--mkpath`](rsync.1#opt) option to tell rsync that it should create a
+   non-existing path component of the destination arg.
 
- - Added `--stderr=errors|all|client` to replace the `--msgs2stderr` and
-   `--no-msgs2stderr` options (which are still accepted).  The default use of
-   stderr was changed to be `--stderr=errors` where all the processes that have
-   stderr available output directly to stderr, which should help error messages
-   get to the user more quickly, especially when doing a push (which includes
-   local copying).  This also allows rsync to exit quickly when a receiver
-   failure occurs, since rsync doesn't need to try to keep the connection alive
-   long enough for the fatal error to go from the receiver to the generator to
-   the sender.  The old default can be requested via `--stderr=client`.  Also
-   changed is that a non-default stderr mode is conveyed to the remote rsync
-   (using the older option names) instead of requiring the user to use
-   `--remote-option` (`-M`) to tell the remote rsync what to do.
+ - Added [`--stderr=errors|all|client`](rsync.1#opt) to replace the
+   `--msgs2stderr` and `--no-msgs2stderr` options (which are still accepted).
+   The default use of stderr was changed to be `--stderr=errors` where all the
+   processes that have stderr available output directly to stderr, which should
+   help error messages get to the user more quickly, especially when doing a
+   push (which includes local copying).  This also allows rsync to exit quickly
+   when a receiver failure occurs, since rsync doesn't need to try to keep the
+   connection alive long enough for the fatal error to go from the receiver to
+   the generator to the sender.  The old default can be requested via
+   `--stderr=client`.  Also changed is that a non-default stderr mode is
+   conveyed to the remote rsync (using the older option names) instead of
+   requiring the user to use [`--remote-option`](rsync.1#opt) (`-M`) to tell
+   the remote rsync what to do.
 
- - Added the ability to specify "@netgroup" names to the `hosts allow` and
-   `hosts deny` daemon parameters.  This is a finalized version of the
-   netgroup-auth patch from the patches repo.
+ - Added the ability to specify "@netgroup" names to the [`hosts
+   allow`](rsyncd.conf.5#opt) and [`hosts deny`](rsyncd.conf.5#opt) daemon
+   parameters.  This is a finalized version of the netgroup-auth patch from the
+   patches repo.
 
  - Rsync can now hard-link symlinks on FreeBSD due to it making use of the
    linkat() function when it is available.

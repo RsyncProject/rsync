@@ -1210,7 +1210,7 @@ The /etc/rsyncd.secrets file would look something like this:
 
 ## SEE ALSO
 
-[**rsync**(1)](./rsync.1), [**rsync-ssl**(1)](./rsync-ssl.1)
+[**rsync**(1)](rsync.1), [**rsync-ssl**(1)](rsync-ssl.1)
 
 ## BUGS
 
@@ -1224,7 +1224,7 @@ This man page is current for version @VERSION@ of rsync.
 ## CREDITS
 
 Rsync is distributed under the GNU General Public License.  See the file
-[COPYING](./COPYING) for details.
+[COPYING](COPYING) for details.
 
 An rsync web site is available at <https://rsync.samba.org/> and its github
 project is <https://github.com/WayneD/rsync>.

@@ -92,7 +92,7 @@ protocol).  For remote transfers, a modern rsync uses ssh for its
 communications, but it may have been configured to use a different remote shell
 by default, such as rsh or remsh.
 
-You can also specify any remote shell you like, either by using the [`-e`](#opt--rsh)
+You can also specify any remote shell you like, either by using the [`-e`](#opt)
 command line option, or by setting the RSYNC_RSH environment variable.
 
 Note that rsync must be installed on both the source and destination machines.
@@ -270,7 +270,7 @@ In order to connect to an rsync daemon, the remote system needs to have a
 daemon already running (or it needs to have configured something like inetd to
 spawn an rsync daemon for incoming connections on a particular port).  For full
 information on how to start a daemon that will handling incoming socket
-connections, see the [**rsyncd.conf**(5)](./rsyncd.conf.5) man page -- that is
+connections, see the [**rsyncd.conf**(5)](rsyncd.conf.5) man page -- that is
 the config file for the daemon, and it contains the full details for how to run
 the daemon (including stand-alone and inetd configurations).
 
@@ -512,11 +512,11 @@ your home directory (remove the '=' for that).
 
 [comment]: # (An OL starting at 0 is converted into a DL by the parser.)
 
-0.  `--help`, `-h` `(*)`
+0.  `--help`
 
     Print a short help page describing the options available in rsync and exit.
-    (*) The `-h` short option will only invoke `--help` when used without other
-    options since it normally means [`--human-readable`](#opt).
+    You can also use `-h` for `--help` when it is used without any other
+    options (since it normally means [`--human-readable`](#opt)).
 
 0.  `--version`, `-V`
 
@@ -734,28 +734,28 @@ your home directory (remove the '=' for that).
     crtimes (`-N`), nor the finding and preserving of hardlinks (`-H`).
 
     The only exception to the above equivalence is when [`--files-from`](#opt)
-    is specified, in which case [`-r`](#opt--recursive) is not implied.
+    is specified, in which case [`-r`](#opt) is not implied.
 
 0.  `--no-OPTION`
 
     You may turn off one or more implied options by prefixing the option name
-    with "no-".  Not all options may be prefixed with a "no-": only options that
-    are implied by other options (e.g. `--no-D`, `--no-perms`) or have
-    different defaults in various circumstances (e.g. `--no-whole-file`,
-    `--no-blocking-io`, `--no-dirs`).  You may specify either the short or the
-    long option name after the "no-" prefix (e.g. `--no-R` is the same as
-    `--no-relative`).
+    with "no-".  Not all positive options have a negated opposite, but a lot
+    do, including those that can be used to disable an implied option (e.g.
+    `--no-D`, `--no-perms`) or have different defaults in various circumstances
+    (e.g. [`--no-whole-file`](#opt), `--no-blocking-io`, `--no-dirs`).  Every
+    valid negated option accepts both the short and the long option name after
+    the "no-" prefix (e.g. `--no-R` is the same as `--no-relative`).
 
-    For example: if you want to use [`--archive`](#opt) (`-a`) but don't want
+    As an example, if you want to use [`--archive`](#opt) (`-a`) but don't want
     [`--owner`](#opt) (`-o`), instead of converting `-a` into `-rlptgD`, you
-    could specify `-a --no-o` (or `-a --no-owner`).
+    can specify `-a --no-o` (aka `--archive --no-owner`).
 
     The order of the options is important: if you specify `--no-r -a`, the `-r`
     option would end up being turned on, the opposite of `-a --no-r`.  Note
     also that the side-effects of the [`--files-from`](#opt) option are NOT
     positional, as it affects the default state of several options and slightly
-    changes the meaning of [`-a`](#opt--archive) (see the
-    [`--files-from`](#opt) option for more details).
+    changes the meaning of [`-a`](#opt) (see the [`--files-from`](#opt) option
+    for more details).
 
 0.  `--recursive`, `-r`
 
@@ -892,16 +892,20 @@ your home directory (remove the '=' for that).
     what (if any) suffix gets appended using the [`--backup-dir`](#opt) and
     [`--suffix`](#opt) options.
 
-    Note that if you don't specify [`--backup-dir`](#opt), (1) the
-    [`--omit-dir-times`](#opt) option will be forced on, and (2) if
-    [`--delete`](#opt) is also in effect (without [`--delete-excluded`](#opt)),
-    rsync will add a "protect" filter-rule for the backup suffix to the end of
-    all your existing excludes (e.g. `-f "P *~"`).  This will prevent
-    previously backed-up files from being deleted.  Note that if you are
-    supplying your own filter rules, you may need to manually insert your own
-    exclude/protect rule somewhere higher up in the list so that it has a high
-    enough priority to be effective (e.g., if your rules specify a trailing
-    inclusion/exclusion of `*`, the auto-added rule would never be reached).
+    If you don't specify [`--backup-dir`](#opt):
+
+    1. the [`--omit-dir-times`](#opt) option will be forced on
+    2. the use of [`--delete`](#opt) (without [`--delete-excluded`](#opt)),
+       causes rsync to add a "protect" [filter-rule](#FILTER_RULES) for the
+       backup suffix to the end of all your existing filters that looks like
+       this: `-f "P *~"`.  This rule prevents previously backed-up files from
+       being deleted.
+
+    Note that if you are supplying your own filter rules, you may need to
+    manually insert your own exclude/protect rule somewhere higher up in the
+    list so that it has a high enough priority to be effective (e.g. if your
+    rules specify a trailing inclusion/exclusion of `*`, the auto-added rule
+    would never be reached).
 
 0.  `--backup-dir=DIR`
 
@@ -1480,11 +1484,11 @@ your home directory (remove the '=' for that).
     This tells rsync to transfer modification times along with the files and
     update them on the remote system.  Note that if this option is not used,
     the optimization that excludes files that have not been modified cannot be
-    effective; in other words, a missing `-t` (or [`-a`](#opt--archive)) will
-    cause the next transfer to behave as if it used [`--ignore-times`](#opt)
-    (`-I`), causing all files to be updated (though rsync's delta-transfer
-    algorithm will make the update fairly efficient if the files haven't
-    actually changed, you're much better off using `-t`).
+    effective; in other words, a missing `-t` (or [`-a`](#opt)) will cause the
+    next transfer to behave as if it used [`--ignore-times`](#opt) (`-I`),
+    causing all files to be updated (though rsync's delta-transfer algorithm
+    will make the update fairly efficient if the files haven't actually
+    changed, you're much better off using `-t`).
 
 0.  `--atimes`, `-U`
 
@@ -1572,7 +1576,7 @@ your home directory (remove the '=' for that).
 
     This option is overridden by both [`--super`](#opt) and `--no-super`.
 
-    See also the [`fake super`](./rsyncd.conf.5#fake_super) setting in the
+    See also the [`fake super`](rsyncd.conf.5#fake_super) setting in the
     daemon's rsyncd.conf file.
 
 0.  `--sparse`, `-S`
@@ -1630,6 +1634,15 @@ your home directory (remove the '=' for that).
     is actually a networked filesystem).  This is the default when both the
     source and destination are specified as local paths, but only if no
     batch-writing option is in effect.
+
+0. `--no-whole-file`, `--no-W`
+
+    Disable whole-file updating when it is enaled by default for a local
+    transfer.  This usually slows rsync down, but it can be useful if you are
+    trying to minimize the writes to the destination file (if combined with
+    [`--inplace`](#opt)) or for testing the checksum-based update algorithm.
+
+    See also the [`--whole-file`](#opt) option.
 
 0.  `--checksum-choice=STR`, `--cc=STR`
 
@@ -1730,10 +1743,10 @@ your home directory (remove the '=' for that).
 
     When [`--info=skip2`](#opt) is used rsync will output "FILENAME exists
     (INFO)" messages where the INFO indicates one of "type change", "sum
-    change" (requires [`-c`](#opt--checksum)), "file change" (based on the
-    quick check), "attr change", or "uptodate".  Using [`--info=skip1`](#opt)
-    (which is also implied by 2 [`-v`](#opt--verbose) options) outputs the
-    exists message without the INFO suffix.
+    change" (requires [`-c`](#opt)), "file change" (based on the quick check),
+    "attr change", or "uptodate".  Using [`--info=skip1`](#opt) (which is also
+    implied by 2 [`-v`](#opt) options) outputs the exists message without the
+    INFO suffix.
 
 0.  `--remove-source-files`
 
@@ -2219,8 +2232,8 @@ your home directory (remove the '=' for that).
       [`--recursive`](#opt) (`-r`), so specify it explicitly, if you want it.
     - These side-effects change the default state of rsync, so the position of
       the `--files-from` option on the command-line has no bearing on how other
-      options are parsed (e.g. [`-a`](#opt--archive) works the same before or
-      after `--files-from`, as does `--no-R` and all other options).
+      options are parsed (e.g. [`-a`](#opt) works the same before or after
+      `--files-from`, as does `--no-R` and all other options).
 
     The filenames that are read from the FILE are all relative to the source
     dir -- any leading slashes are removed and no ".." references are allowed
@@ -2233,13 +2246,12 @@ your home directory (remove the '=' for that).
     contains "bin/" (note the trailing slash), the immediate contents of the
     directory would also be sent (without needing to be explicitly mentioned in
     the file -- this began in version 2.6.4).  In both cases, if the
-    [`-r`](#opt--recursive) option was enabled, that dir's entire hierarchy
-    would also be transferred (keep in mind that [`-r`](#opt--recursive) needs
-    to be specified explicitly with `--files-from`, since it is not implied by
-    [`-a`](#opt--archive).  Also note that the effect of the (enabled by
-    default) [`-r`](#opt--relative) option is to duplicate only the path info
-    that is read from the file -- it does not force the duplication of the
-    source-spec path (/usr in this case).
+    [`-r`](#opt) option was enabled, that dir's entire hierarchy would also be
+    transferred (keep in mind that [`-r`](#opt) needs to be specified
+    explicitly with `--files-from`, since it is not implied by [`-a`](#opt).
+    Also note that the effect of the (enabled by default) [`-r`](#opt) option
+    is to duplicate only the path info that is read from the file -- it does
+    not force the duplication of the source-spec path (/usr in this case).
 
     In addition, the `--files-from` file can be read from the remote host
     instead of the local host if you specify a "host:" in front of the file
@@ -2741,7 +2753,7 @@ your home directory (remove the '=' for that).
 
     If a user or group has no name on the source system or it has no match on
     the destination system, then the numeric ID from the source system is used
-    instead.  See also the [`use chroot`](./rsyncd.conf.5#use_chroot) setting
+    instead.  See also the [`use chroot`](rsyncd.conf.5#use_chroot) setting
     in the rsyncd.conf manpage for some comments on how the chroot setting
     affects rsync's ability to look up the names of the users and groups and
     what you can do about it.
@@ -2799,7 +2811,7 @@ your home directory (remove the '=' for that).
 0.  `--chown=USER:GROUP`
 
     This option forces all files to be owned by USER with group GROUP.  This is
-    a simpler interface than using [`--usermap` & `--groupmap`](#opt--usermap)
+    a simpler interface than using [`--usermap`](#opt) & [`--groupmap`](#opt)
     directly, but it is implemented using those options internally so they
     cannot be mixed.  If either the USER or GROUP is empty, no mapping for the
     omitted user/group will occur.  If GROUP is empty, the trailing colon may
@@ -2831,8 +2843,7 @@ your home directory (remove the '=' for that).
     rsync daemon.  The `--address` option allows you to specify a specific IP
     address (or hostname) to bind to.
 
-    See also [the daemon version of the `--address`
-    option](#daemon-opt--address).
+    See also [the daemon version of the `--address` option](#dopt--address).
 
 0.  `--port=PORT`
 
@@ -2841,7 +2852,7 @@ your home directory (remove the '=' for that).
     to connect with an rsync daemon (since the URL syntax has a way to specify
     the port as a part of the URL).
 
-    See also [the daemon version of the `--port` option](#daemon-opt--port).
+    See also [the daemon version of the `--port` option](#dopt--port).
 
 0.  `--sockopts=OPTIONS`
 
@@ -2852,8 +2863,7 @@ your home directory (remove the '=' for that).
     able to set.  By default no special socket options are set.  This only
     affects direct socket connections to a remote rsync daemon.
 
-    See also [the daemon version of the `--sockopts`
-    option](#daemon-opt--sockopts).
+    See also [the daemon version of the `--sockopts` option](#dopt--sockopts).
 
 0.  `--blocking-io`
 
@@ -2955,11 +2965,10 @@ your home directory (remove the '=' for that).
     user on a per-update basis.  The format is a text string containing
     embedded single-character escape sequences prefixed with a percent (%)
     character.  A default format of "%n%L" is assumed if either
-    [`--info=name`](#opt) or [`-v`](#opt--verbose) is specified (this tells you
-    just the name of the file and, if the item is a link, where it points).
-    For a full list of the possible escape characters, see the
-    [`log format`](./rsyncd.conf.5#log_format) setting in the rsyncd.conf
-    manpage.
+    [`--info=name`](#opt) or [`-v`](#opt) is specified (this tells you just the
+    name of the file and, if the item is a link, where it points).  For a full
+    list of the possible escape characters, see the [`log
+    format`](rsyncd.conf.5#log_format) setting in the rsyncd.conf manpage.
 
     Specifying the `--out-format` option implies the [`--info=name`](#opt)
     option, which will mention each file, dir, etc. that gets updated in a
@@ -2994,8 +3003,7 @@ your home directory (remove the '=' for that).
     This is very useful if you need to debug why a connection is closing
     unexpectedly.
 
-    See also [the daemon version of the `--log-file`
-    option](#daemon-opt--log-file).
+    See also [the daemon version of the `--log-file` option](#dopt--log-file).
 
 0.  `--log-file-format=FORMAT`
 
@@ -3003,23 +3011,22 @@ your home directory (remove the '=' for that).
     file specified by the [`--log-file`](#opt) option (which must also be
     specified for this option to have any effect).  If you specify an empty
     string, updated files will not be mentioned in the log file.  For a list of
-    the possible escape characters, see the [`log format`](./rsyncd.conf.5#log_format)
+    the possible escape characters, see the [`log format`](rsyncd.conf.5#log_format)
     setting in the rsyncd.conf manpage.
 
     The default FORMAT used if [`--log-file`](#opt) is specified and this
     option is not is '%i %n%L'.
 
     See also [the daemon version of the `--log-file-format`
-    option](#daemon-opt--log-file-format).
+    option](#dopt--log-file-format).
 
 0.  `--stats`
 
     This tells rsync to print a verbose set of statistics on the file transfer,
     allowing you to tell how effective rsync's delta-transfer algorithm is for
     your data.  This option is equivalent to [`--info=stats2`](#opt) if
-    combined with 0 or 1 [`-v`](#opt--verbose) options, or
-    [`--info=stats3`](#opt) if combined with 2 or more [`-v`](#opt--verbose)
-    options.
+    combined with 0 or 1 [`-v`](#opt) options, or [`--info=stats3`](#opt) if
+    combined with 2 or more [`-v`](#opt) options.
 
     The current statistics are as follows:
 
@@ -3080,12 +3087,14 @@ your home directory (remove the '=' for that).
 
 0.  `--human-readable`, `-h`
 
-    Output numbers in a more human-readable format.  There are 3 possible
-    levels: (1) output numbers with a separator between each set of 3 digits
-    (either a comma or a period, depending on if the decimal point is
-    represented by a period or a comma); (2) output numbers in units of 1000
-    (with a character suffix for larger units -- see below); (3) output
-    numbers in units of 1024.
+    Output numbers in a more human-readable format.  There are 3 possible levels:
+
+    1. output numbers with a separator between each set of 3 digits (either a
+       comma or a period, depending on if the decimal point is represented by a
+       period or a comma).
+    2. output numbers in units of 1000 (with a character suffix for larger
+       units -- see below).
+    3. output numbers in units of 1024.
 
     The default is human-readable level 1.  Each `-h` option increases the
     level by one.  You can take the level down to 0 (to output numbers as pure
@@ -3141,14 +3150,17 @@ your home directory (remove the '=' for that).
     rules.
 
     If you are supplying your own exclude rules, you may need to add your own
-    exclude/hide/protect rule for the partial-dir because (1) the auto-added
-    rule may be ineffective at the end of your other rules, or (2) you may wish
-    to override rsync's exclude choice.  For instance, if you want to make
-    rsync clean-up any left-over partial-dirs that may be lying around, you
-    should specify [`--delete-after`](#opt) and add a "risk" filter rule, e.g.
-    `-f 'R .rsync-partial/'`. (Avoid using [`--delete-before`](#opt) or
-    [`--delete-during`](#opt) unless you don't need rsync to use any of the
-    left-over partial-dir data during the current run.)
+    exclude/hide/protect rule for the partial-dir because:
+
+    1. the auto-added rule may be ineffective at the end of your other rules, or
+    2. you may wish to override rsync's exclude choice.
+
+    For instance, if you want to make rsync clean-up any left-over partial-dirs
+    that may be lying around, you should specify [`--delete-after`](#opt) and
+    add a "risk" filter rule, e.g.  `-f 'R .rsync-partial/'`. Avoid using
+    [`--delete-before`](#opt) or [`--delete-during`](#opt) unless you don't
+    need rsync to use any of the left-over partial-dir data during the current
+    run.
 
     IMPORTANT: the `--partial-dir` should not be writable by other users or it
     is a security risk.  E.g. AVOID "/tmp".
@@ -3161,9 +3173,11 @@ your home directory (remove the '=' for that).
     set RSYNC_PARTIAL_DIR=.rsync-tmp in your environment and then just use the
     [`-P`](#opt) option to turn on the use of the .rsync-tmp dir for partial
     transfers.  The only times that the [`--partial`](#opt) option does not
-    look for this environment value are (1) when [`--inplace`](#opt) was
-    specified (since [`--inplace`](#opt) conflicts with `--partial-dir`), and
-    (2) when [`--delay-updates`](#opt) was specified (see below).
+    look for this environment value are:
+
+    1. when [`--inplace`](#opt) was specified (since [`--inplace`](#opt)
+       conflicts with `--partial-dir`), and
+    2. when [`--delay-updates`](#opt) was specified (see below).
 
     When a modern rsync resumes the transfer of a file in the partial-dir, that
     partial file is now updated in-place instead of creating yet another
@@ -3197,11 +3211,13 @@ your home directory (remove the '=' for that).
     This option uses more memory on the receiving side (one bit per file
     transferred) and also requires enough free disk space on the receiving side
     to hold an additional copy of all the updated files.  Note also that you
-    should not use an absolute path to [`--partial-dir`](#opt) unless (1) there
-    is no chance of any of the files in the transfer having the same name
-    (since all the updated files will be put into a single directory if the
-    path is absolute) and (2) there are no mount points in the hierarchy (since
-    the delayed updates will fail if they can't be renamed into place).
+    should not use an absolute path to [`--partial-dir`](#opt) unless:
+
+    1. there is no chance of any of the files in the transfer having the same
+       name (since all the updated files will be put into a single directory if
+       the path is absolute), and
+    2. there are no mount points in the hierarchy (since the delayed updates
+       will fail if they can't be renamed into place).
 
     See also the "atomic-rsync" python script in the "support" subdir for an
     update algorithm that is even more atomic (it uses [`--link-dest`](#opt)
@@ -3346,12 +3362,16 @@ your home directory (remove the '=' for that).
 
     This option will cause the source files to be listed instead of
     transferred.  This option is inferred if there is a single source arg and
-    no destination specified, so its main uses are: (1) to turn a copy command
-    that includes a destination arg into a file-listing command, or (2) to be
-    able to specify more than one source arg (note: be sure to include the
-    destination).  Caution: keep in mind that a source arg with a wild-card is
-    expanded by the shell into multiple args, so it is never safe to try to
-    list such an arg without using this option. For example:
+    no destination specified, so its main uses are:
+
+    1. to turn a copy command that includes a destination arg into a
+       file-listing command, or
+    2. to be able to specify more than one source arg.  Note: be sure to
+       include the destination.
+
+    CAUTION: keep in mind that a source arg with a wild-card is expanded by the
+    shell into multiple args, so it is never safe to try to list such an arg
+    without using this option. For example:
 
     >     rsync -av --list-only foo* dest/
 
@@ -3397,21 +3417,20 @@ your home directory (remove the '=' for that).
     quickly buffered, while other can show up as very slow when the flushing of
     the output buffer occurs.  This may be fixed in a future version.
 
-    See also [the daemon version of the `--bwlimit`
-    option](#daemon-opt--bwlimit).
+    See also [the daemon version of the `--bwlimit` option](#dopt--bwlimit).
 
-0.  `--stop-after=MINS`
+0.  `--stop-after=MINS`, (`--time-limit=MINS`)
 
     This option tells rsync to stop copying when the specified number of
     minutes has elapsed.
-
-    Rsync also accepts an earlier version of this option: `--time-limit=MINS`.
 
     For maximal flexibility, rsync does not communicate this option to the
     remote rsync since it is usually enough that one side of the connection
     quits as specified.  This allows the option's use even when only one side
     of the connection supports it.  You can tell the remote side about the time
     limit using [`--remote-option`](#opt) (`-M`), should the need arise.
+
+    The `--time-limit` version of this option is deprecated.
 
 0.  `--stop-at=y-m-dTh:m`
 
@@ -3534,7 +3553,7 @@ your home directory (remove the '=' for that).
     the "`--rsh SHELL -4`" option directly (or whatever ipv4/ipv6 hint options
     it uses).
 
-    See also [the daemon version of these options](#daemon-opt--ipv4).
+    See also [the daemon version of these options](#dopt--ipv4).
 
     If rsync was compiled without support for IPv6, the `--ipv6` option will
     have no effect.  The `rsync --version` output will contain "`no IPv6`" if
@@ -3566,7 +3585,7 @@ The options allowed when starting an rsync daemon are as follows:
     background daemon.  The daemon will read the config file (rsyncd.conf) on
     each connect made by a client and respond to requests accordingly.
 
-    See the [**rsyncd.conf**(5)](./rsyncd.conf.5) man page for more details.
+    See the [**rsyncd.conf**(5)](rsyncd.conf.5) man page for more details.
 
 0.  `--address=ADDRESS`
 
@@ -3575,7 +3594,7 @@ The options allowed when starting an rsync daemon are as follows:
     specific IP address (or hostname) to bind to.  This makes virtual hosting
     possible in conjunction with the `--config` option.
 
-    See also the [address](./rsyncd.conf.5#address) global option in the
+    See also the [address](rsyncd.conf.5#address) global option in the
     rsyncd.conf manpage and the [client version of the `--address`
     option](#opt--address).
 
@@ -3591,7 +3610,7 @@ The options allowed when starting an rsync daemon are as follows:
 0.  `--config=FILE`
 
     This specifies an alternate config file than the default.  This is only
-    relevant when [`--daemon`](#daemon-opt) is specified.  The default is
+    relevant when [`--daemon`](#dopt) is specified.  The default is
     /etc/rsyncd.conf unless the daemon is running over a remote shell program
     and the remote user is not the super-user; in that case the default is
     rsyncd.conf in the current directory (typically $HOME).
@@ -3621,7 +3640,7 @@ The options allowed when starting an rsync daemon are as follows:
     rather than the default of 873.
 
     See also [the client version of the `--port` option](#opt--port) and the
-    [port](./rsyncd.conf.5#port) global setting in the rsyncd.conf manpage.
+    [port](rsyncd.conf.5#port) global setting in the rsyncd.conf manpage.
 
 0.  `--log-file=FILE`
 
@@ -3642,7 +3661,7 @@ The options allowed when starting an rsync daemon are as follows:
 
 0.  `--sockopts`
 
-    This overrides the [`socket options`](./rsyncd.conf.5#socket_options)
+    This overrides the [`socket options`](rsyncd.conf.5#socket_options)
     setting in the rsyncd.conf file and has the same syntax.
 
     See also [the client version of the `--sockopts` option](#opt--sockopts).
@@ -3780,8 +3799,8 @@ forms:
   had been specified).  This behavior was added in version 2.6.7.
 
 Note that, when using the [`--recursive`](#opt) (`-r`) option (which is implied
-by [`-a`](#opt--archive)), every subdir component of every path is visited left
-to right, with each directory having a chance for exclusion before its content.
+by [`-a`](#opt)), every subdir component of every path is visited left to
+right, with each directory having a chance for exclusion before its content.
 In this way include/exclude patterns are applied recursively to the pathname of
 each node in the filesystem's tree (those inside the transfer).  The exclude
 patterns short-circuit the directory traversal stage as rsync finds the files
@@ -4175,10 +4194,10 @@ already) or the file-update may be attempted and then, if the file fails to
 verify, the update discarded with an error.  This means that it should be safe
 to re-run a read-batch operation if the command got interrupted.  If you wish
 to force the batched-update to always be attempted regardless of the file's
-size and date, use the [`-I`](#opt--ignore-times) option (when reading the
-batch).  If an error occurs, the destination tree will probably be in a
-partially updated state.  In that case, rsync can be used in its regular
-(non-batch) mode of operation to fix up the destination tree.
+size and date, use the [`-I`](#opt) option (when reading the batch).  If an
+error occurs, the destination tree will probably be in a partially updated
+state.  In that case, rsync can be used in its regular (non-batch) mode of
+operation to fix up the destination tree.
 
 The rsync version used on all destinations must be at least as new as the one
 used to generate the batch file.  Rsync will die with an error if the protocol
@@ -4368,7 +4387,7 @@ file is included or excluded.
 
 ## SEE ALSO
 
-[**rsync-ssl**(1)](./rsync-ssl.1), [**rsyncd.conf**(5)](./rsyncd.conf.5), [**rrsync**(1)](./rrsync.1)
+[**rsync-ssl**(1)](rsync-ssl.1), [**rsyncd.conf**(5)](rsyncd.conf.5), [**rrsync**(1)](rrsync.1)
 
 ## BUGS
 
@@ -4396,7 +4415,7 @@ that can be used with a restricted ssh login.
 ## CREDITS
 
 Rsync is distributed under the GNU General Public License.  See the file
-[COPYING](./COPYING) for details.
+[COPYING](COPYING) for details.
 
 An rsync web site is available at <https://rsync.samba.org/>.  The site
 includes an FAQ-O-Matic which may cover questions unanswered by this manual

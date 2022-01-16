@@ -32,6 +32,8 @@
 import os, sys, re, argparse, subprocess, time
 from html.parser import HTMLParser
 
+VALID_PAGES = 'README INSTALL COPYING rsync.1 rrsync.1 rsync-ssl.1 rsyncd.conf.5'.split()
+
 CONSUMES_TXT = set('h1 h2 h3 p li pre'.split())
 
 HTML_START = """\
@@ -120,7 +122,7 @@ BIN_CHARS_RE = re.compile(r'[\1-\7]+')
 SPACE_DOUBLE_DASH_RE = re.compile(r'\s--(\s)')
 NON_SPACE_SINGLE_DASH_RE = re.compile(r'(^|\W)-')
 WHITESPACE_RE = re.compile(r'\s')
-CODE_BLOCK_RE = re.compile(r'[%s](.+?)[=%s].*' % (BOLD_FONT[0], NORM_FONT[0]))
+CODE_BLOCK_RE = re.compile(r'[%s]([^=%s]+)[=%s]' % (BOLD_FONT[0], NORM_FONT[0], NORM_FONT[0]))
 NBR_DASH_RE = re.compile(r'[%s]' % NBR_DASH[0])
 INVALID_TARGET_CHARS_RE = re.compile(r'[^-A-Za-z0-9._]')
 INVALID_START_CHAR_RE = re.compile(r'^([^A-Za-z0-9])')
@@ -148,7 +150,7 @@ def parse_md_file(mdfn):
     if fi.want_manpage:
         fi.title = fi.prog + '(' + fi.sect + ') man page'
     else:
-        fi.title = fi.prog
+        fi.title = fi.prog + ' for rsync'
 
     if fi.want_manpage:
         if not env_subs:
@@ -268,7 +270,7 @@ class TransformHtml(HTMLParser):
                 derived_hashtags = set(),
                 referenced_hashtags = set(),
                 bad_hashtags = set(),
-                prior_target = None,
+                latest_targets = [ ],
                 opt_prefix = 'opt',
                 a_txt_start = None,
                 target_suf = '',
@@ -294,11 +296,11 @@ class TransformHtml(HTMLParser):
         fi.man_out = ''.join(st.man_out)
         st.man_out = None
 
-        for href, txt in st.derived_hashtags:
-            derived = txt2target(txt, href[1:])
+        for tgt, txt in st.derived_hashtags:
+            derived = txt2target(txt, tgt)
             if derived not in st.created_hashtags:
                 txt = BIN_CHARS_RE.sub('', txt.replace(NBR_DASH[0], '-').replace(NBR_SPACE[0], ' '))
-                warn('Unknown derived hashtag link in', self.fn, 'based on:', (href, txt))
+                warn('Unknown derived hashtag link in', self.fn, 'based on:', (tgt, txt))
 
         for bad in st.bad_hashtags:
             if bad in st.created_hashtags:
@@ -380,13 +382,19 @@ class TransformHtml(HTMLParser):
             st.a_href = None
             for var, val in attrs_list:
                 if var == 'href':
-                    if val in ('#', '#opt', '#daemon-opt'):
-                        st.a_href = val
-                    elif val.startswith('#'):
-                        st.referenced_hashtags.add(val[1:])
-                        if val[1:] == st.prior_target:
-                            warn('Found link to the current section in', self.fn + ':', val)
-                    elif not val.startswith(('https://', 'http://', 'mailto:', 'ftp:', './')):
+                    if val.startswith(('https://', 'http://', 'mailto:', 'ftp:')):
+                        pass # nothing to check
+                    elif '#' in val:
+                        pg, tgt = val.split('#', 2)
+                        if pg and pg not in VALID_PAGES or '#' in tgt:
+                            st.bad_hashtags.add(val)
+                        elif tgt in ('', 'opt', 'dopt'):
+                            st.a_href = val
+                        elif pg == '':
+                            st.referenced_hashtags.add(tgt)
+                            if tgt in st.latest_targets:
+                                warn('Found link to the current section in', self.fn + ':', val)
+                    elif val not in VALID_PAGES:
                         st.bad_hashtags.add(val)
             st.a_txt_start = len(st.txt)
         st.html_out.append('<' + tag + ''.join(' ' + var + '="' + htmlify(val) + '"' for var, val in attrs_list) + '>')
@@ -411,20 +419,20 @@ class TransformHtml(HTMLParser):
                 if m:
                     tgt = m.group(1)
                     st.target_suf = '-' + tgt
-            self.add_target(tgt)
+            self.add_targets(tgt)
         elif tag == 'h2':
             st.man_out.append(st.p_macro + '.SH "' + manify(txt) + '"\n')
-            self.add_target(txt, st.target_suf)
-            st.opt_prefix = 'daemon-opt' if txt == 'DAEMON OPTIONS' else 'opt'
+            self.add_targets(txt, st.target_suf)
+            st.opt_prefix = 'dopt' if txt == 'DAEMON OPTIONS' else 'opt'
         elif tag == 'h3':
             st.man_out.append(st.p_macro + '.SS "' + manify(txt) + '"\n')
-            self.add_target(txt, st.target_suf)
+            self.add_targets(txt, st.target_suf)
         elif tag == 'p':
             if st.dt_from == 'p':
                 tag = 'dt'
                 st.man_out.append('.IP "' + manify(txt) + '"\n')
                 if txt.startswith(BOLD_FONT[0]):
-                    self.add_target(txt)
+                    self.add_targets(txt)
                 st.dt_from = None
             elif txt != '':
                 st.man_out.append(manify(txt) + "\n")
@@ -466,11 +474,13 @@ class TransformHtml(HTMLParser):
                 find = 'href="' + st.a_href + '"'
                 for j in range(len(st.html_out)-1, 0, -1):
                     if find in st.html_out[j]:
-                        derived = txt2target(atxt, st.a_href[1:])
-                        if derived == st.prior_target:
-                            warn('Found link to the current section in', self.fn + ':', derived)
-                        st.derived_hashtags.add((st.a_href, atxt))
-                        st.html_out[j] = st.html_out[j].replace(find, 'href="#' + derived + '"')
+                        pg, tgt = st.a_href.split('#', 2)
+                        derived = txt2target(atxt, tgt)
+                        if pg == '':
+                            if derived in st.latest_targets:
+                                warn('Found link to the current section in', self.fn + ':', st.a_href)
+                            st.derived_hashtags.add((tgt, atxt))
+                        st.html_out[j] = st.html_out[j].replace(find, 'href="' + pg + '#' + derived + '"')
                         break
                 else:
                     die('INTERNAL ERROR: failed to find href in html data:', find)
@@ -509,10 +519,16 @@ class TransformHtml(HTMLParser):
         st.txt += txt
 
 
-    def add_target(self, txt, suf=None):
+    def add_targets(self, txt, suf=None):
         st = self.state
-        txt = txt2target(txt, st.opt_prefix)
-        if txt:
+        targets = CODE_BLOCK_RE.findall(txt)
+        if not targets:
+            targets = [ txt ]
+        first_one = True
+        for txt in targets:
+            txt = txt2target(txt, st.opt_prefix)
+            if not txt:
+                continue
             if suf:
                 txt += suf
             if txt in st.created_hashtags:
@@ -522,9 +538,13 @@ class TransformHtml(HTMLParser):
                         print('Made link target unique:', chk)
                         txt = chk
                         break
-            st.html_out.append('<a id="' + txt + '" href="#' + txt + '" class="tgt"></a>')
+            if first_one:
+                st.html_out.append('<a id="' + txt + '" href="#' + txt + '" class="tgt"></a>')
+                first_one = False
+            else:
+                st.html_out.append('<span id="' + txt + '"></span>')
             st.created_hashtags.add(txt)
-            st.prior_target = txt
+        st.latest_targets = targets
 
 
     def output_debug(self, event, extra):
@@ -541,7 +561,10 @@ class TransformHtml(HTMLParser):
 
 
 def txt2target(txt, opt_prefix):
-    txt = CODE_BLOCK_RE.sub(r'\1', txt.strip().rstrip(':'))
+    txt = txt.strip().rstrip(':')
+    m = CODE_BLOCK_RE.search(txt)
+    if m:
+        txt = m.group(1)
     txt = NBR_DASH_RE.sub('-', txt)
     txt = BIN_CHARS_RE.sub('', txt)
     txt = INVALID_TARGET_CHARS_RE.sub('_', txt)
