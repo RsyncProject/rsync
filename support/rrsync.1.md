@@ -42,9 +42,10 @@ ssh-key line that should be restricted:
 > ```
 
 Then, ensure that the rsyncd.conf file is created with one or more module names
-with the appropriate path and option restrictions.  If the `--config` option is
-omitted, it defaults to `~/rsyncd.conf`.  See the `rsyncd.conf` man page for
-details of how to configure an rsync daemon.
+with the appropriate path and option restrictions.  If rsync's
+[`--config`](./rsync.1#daemon-opt--config) option is omitted, it defaults to
+`~/rsyncd.conf`.  See the `rsyncd.conf` man page for details of how to
+configure an rsync daemon.
 
 When using rrsync, there can be just one restricted dir per authorized key.  A
 daemon setup, on the other hand, allows multiple module names inside the config
@@ -71,13 +72,14 @@ relative to the user's home directory or an absolute path.
 The rrsync script validates the path arguments it is sent to try to restrict
 them to staying within the specified DIR.
 
-The rrsync script rejects rsync's `--copy-links`` option (by default) so that a
-copy cannot dereference a symlink within the DIR to get to a file outside the
-DIR.
+The rrsync script rejects rsync's [`--copy-links`](./rsync.1#opt--copy-links)
+option (by default) so that a copy cannot dereference a symlink within the DIR
+to get to a file outside the DIR.
 
-The rrsync script rejects rsync's `--protect-args` (`-s`) option because it
-would allow options to be sent to the server-side that the script could not
-check.  If you want to support `--protect-args`, use a daemon-over-ssh setup.
+The rrsync script rejects rsync's
+[`--protect-args`](./rsync.1#opt--protect-args) (`-s`) option because it would
+allow options to be sent to the server-side that the script cannot check.  If
+you want to support `--protect-args`, use a daemon-over-ssh setup.
 
 The rrsync script accepts just a subset of rsync's options that the real rsync
 uses when running the server command.  A few extra convenience options are also
@@ -89,12 +91,16 @@ the option handling.
 
 ## EXAMPLES
 
-The `.ssh/authorized_keys` file might have lines in it like this:
+The `~/.ssh/authorized_keys` file might have lines in it like this:
 
 > ```
 > command="rrsync client/logs" ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAIEAzG...
 > command="rrsync -ro results" ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAIEAmk...
 > ```
+
+## FILES
+
+~/.ssh/authorized_keys
 
 ## SEE ALSO
 

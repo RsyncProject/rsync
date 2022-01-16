@@ -270,9 +270,9 @@ In order to connect to an rsync daemon, the remote system needs to have a
 daemon already running (or it needs to have configured something like inetd to
 spawn an rsync daemon for incoming connections on a particular port).  For full
 information on how to start a daemon that will handling incoming socket
-connections, see the **rsyncd.conf**(5) man page -- that is the config file for
-the daemon, and it contains the full details for how to run the daemon
-(including stand-alone and inetd configurations).
+connections, see the [**rsyncd.conf**(5)](./rsyncd.conf.5) man page -- that is
+the config file for the daemon, and it contains the full details for how to run
+the daemon (including stand-alone and inetd configurations).
 
 If you're using one of the remote-shell transports for the transfer, there is
 no need to manually start an rsync daemon.
@@ -774,21 +774,19 @@ your home directory (remove the '=' for that).
 
     Incremental recursion uses much less memory than non-incremental, while
     also beginning the transfer more quickly (since it doesn't need to scan the
-    entire transfer hierarchy before it starts working).  If no recursion is
-    enabled in the source files, this option has no effect.
+    entire transfer hierarchy before it starts transferring files).  If no
+    recursion is enabled in the source files, this option has no effect.
 
     Some options require rsync to know the full file list, so these options
     disable the incremental recursion mode.  These include:
-    - [`--delete-before`](#opt) (the old default of [`--delete`](#opt)
-    - [`--delete-after`[#opt]
-    - [`--prune-empty-dirs`[#opt]
-    - [`--delay-updates`[#opt]
+    - [`--delete-before`](#opt) (the old default of [`--delete`](#opt))
+    - [`--delete-after`](#opt)
+    - [`--prune-empty-dirs`](#opt)
+    - [`--delay-updates`](#opt)
 
     In order to make [`--delete`](#opt) compatible with incremental recursion,
-    the default [`--delete`](#opt) mode is now [`--delete-during`](#opt) (when
-    both ends of the connection are at least rsync 3.0.0).  Manually specifying
-    [`--delete-during`](#opt) (`--del`) will turn on this improved deletion
-    mode even when incremental recursion is not being used.
+    rsync 3.0.0 made [`--delete-during`](#opt) the default delete mode (which
+    was first first added in 2.6.4).
 
     One side-effect of incremental recursion is that any missing
     sub-directories inside a recursively-scanned directory are (by default)
@@ -796,10 +794,10 @@ your home directory (remove the '=' for that).
     (commpared to a non-incremental recursion) allows rsync to then set the
     modify time of the finished directory right away (without having to delay
     that until a bunch of recursive copying has finished).  However, these
-    early-create directories don't yet have their completed mode, mtime, or
-    ownership -- they have more restrictive rights until the subdirectory's
-    copying actually begins.  This early-create idiom can be avoiding by using
-    the [`--omit-dir-times`](#opt) option.
+    early directories don't yet have their completed mode, mtime, or ownership
+    set -- they have more restrictive rights until the subdirectory's copying
+    actually begins.  This early-creation idiom can be avoiding by using the
+    [`--omit-dir-times`](#opt) option.
 
     Incremental recursion can be disabled using the
     [`--no-inc-recursive`](#opt) (`--no-i-r`) option.
@@ -1574,7 +1572,8 @@ your home directory (remove the '=' for that).
 
     This option is overridden by both [`--super`](#opt) and `--no-super`.
 
-    See also the "`fake super`" setting in the daemon's rsyncd.conf file.
+    See also the [`fake super`](./rsyncd.conf.5#fake_super) setting in the
+    daemon's rsyncd.conf file.
 
 0.  `--sparse`, `-S`
 
@@ -2742,10 +2741,10 @@ your home directory (remove the '=' for that).
 
     If a user or group has no name on the source system or it has no match on
     the destination system, then the numeric ID from the source system is used
-    instead.  See also the comments on the "`use chroot`" setting in the
-    rsyncd.conf manpage for information on how the chroot setting affects
-    rsync's ability to look up the names of the users and groups and what you
-    can do about it.
+    instead.  See also the [`use chroot`](./rsyncd.conf.5#use_chroot) setting
+    in the rsyncd.conf manpage for some comments on how the chroot setting
+    affects rsync's ability to look up the names of the users and groups and
+    what you can do about it.
 
 0.  `--usermap=STRING`, `--groupmap=STRING`
 
@@ -2958,8 +2957,9 @@ your home directory (remove the '=' for that).
     character.  A default format of "%n%L" is assumed if either
     [`--info=name`](#opt) or [`-v`](#opt--verbose) is specified (this tells you
     just the name of the file and, if the item is a link, where it points).
-    For a full list of the possible escape characters, see the "`log format`"
-    setting in the rsyncd.conf manpage.
+    For a full list of the possible escape characters, see the
+    [`log format`](./rsyncd.conf.5#log_format) setting in the rsyncd.conf
+    manpage.
 
     Specifying the `--out-format` option implies the [`--info=name`](#opt)
     option, which will mention each file, dir, etc. that gets updated in a
@@ -3003,8 +3003,8 @@ your home directory (remove the '=' for that).
     file specified by the [`--log-file`](#opt) option (which must also be
     specified for this option to have any effect).  If you specify an empty
     string, updated files will not be mentioned in the log file.  For a list of
-    the possible escape characters, see the "`log format`" setting in the
-    rsyncd.conf manpage.
+    the possible escape characters, see the [`log format`](./rsyncd.conf.5#log_format)
+    setting in the rsyncd.conf manpage.
 
     The default FORMAT used if [`--log-file`](#opt) is specified and this
     option is not is '%i %n%L'.
@@ -3564,17 +3564,20 @@ The options allowed when starting an rsync daemon are as follows:
     If standard input is a socket then rsync will assume that it is being run
     via inetd, otherwise it will detach from the current terminal and become a
     background daemon.  The daemon will read the config file (rsyncd.conf) on
-    each connect made by a client and respond to requests accordingly.  See the
-    **rsyncd.conf**(5) man page for more details.
+    each connect made by a client and respond to requests accordingly.
+
+    See the [**rsyncd.conf**(5)](./rsyncd.conf.5) man page for more details.
 
 0.  `--address=ADDRESS`
 
     By default rsync will bind to the wildcard address when run as a daemon
     with the `--daemon` option.  The `--address` option allows you to specify a
     specific IP address (or hostname) to bind to.  This makes virtual hosting
-    possible in conjunction with the `--config` option.  See also the "address"
-    global option in the rsyncd.conf manpage and the [client version of the
-    `--address` option](#opt--address).
+    possible in conjunction with the `--config` option.
+
+    See also the [address](./rsyncd.conf.5#address) global option in the
+    rsyncd.conf manpage and the [client version of the `--address`
+    option](#opt--address).
 
 0.  `--bwlimit=RATE`
 
@@ -3618,7 +3621,7 @@ The options allowed when starting an rsync daemon are as follows:
     rather than the default of 873.
 
     See also [the client version of the `--port` option](#opt--port) and the
-    "port" global setting in the rsyncd.conf manpage.
+    [port](./rsyncd.conf.5#port) global setting in the rsyncd.conf manpage.
 
 0.  `--log-file=FILE`
 
@@ -3639,8 +3642,8 @@ The options allowed when starting an rsync daemon are as follows:
 
 0.  `--sockopts`
 
-    This overrides the `socket options` setting in the rsyncd.conf file and has
-    the same syntax.
+    This overrides the [`socket options`](./rsyncd.conf.5#socket_options)
+    setting in the rsyncd.conf file and has the same syntax.
 
     See also [the client version of the `--sockopts` option](#opt--sockopts).
 
