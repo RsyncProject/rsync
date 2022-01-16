@@ -111,6 +111,21 @@ UNDR_FONT = ('\3', r"\fI")
 NBR_DASH = ('\4', r"\-")
 NBR_SPACE = ('\xa0', r"\ ")
 
+FILENAME_RE = re.compile(r'^(?P<fn>(?P<srcdir>.+/)?(?P<name>(?P<prog>[^/]+?)(\.(?P<sect>\d+))?)\.md)$')
+ASSIGNMENT_RE = re.compile(r'^(\w+)=(.+)')
+QUOTED_RE = re.compile(r'"(.+?)"')
+VAR_REF_RE = re.compile(r'\$\{(\w+)\}')
+VERSION_RE = re.compile(r' (\d[.\d]+)[, ]')
+BIN_CHARS_RE = re.compile(r'[\1-\7]+')
+SPACE_DOUBLE_DASH_RE = re.compile(r'\s--(\s)')
+NON_SPACE_SINGLE_DASH_RE = re.compile(r'(^|\W)-')
+WHITESPACE_RE = re.compile(r'\s')
+CODE_BLOCK_RE = re.compile(r'[%s](.+?)[=%s].*' % (BOLD_FONT[0], NORM_FONT[0]))
+NBR_DASH_RE = re.compile(r'[%s]' % NBR_DASH[0])
+INVALID_TARGET_CHARS_RE = re.compile(r'[^-A-Za-z0-9._]')
+INVALID_START_CHAR_RE = re.compile(r'^([^A-Za-z0-9])')
+MANIFY_LINESTART_RE = re.compile(r"^(['.])", flags=re.M)
+
 md_parser = None
 env_subs = { }
 
@@ -125,7 +140,7 @@ def main():
 
 
 def parse_md_file(mdfn):
-    fi = re.match(r'^(?P<fn>(?P<srcdir>.+/)?(?P<name>(?P<prog>[^/]+?)(\.(?P<sect>\d+))?)\.md)$', mdfn)
+    fi = FILENAME_RE.match(mdfn)
     if not fi:
         die('Failed to parse a md input file name:', mdfn)
     fi = argparse.Namespace(**fi.groupdict())
@@ -207,19 +222,19 @@ def find_man_substitutions():
 
         with open(srcdir + 'version.h', 'r', encoding='utf-8') as fh:
             txt = fh.read()
-        m = re.search(r'"(.+?)"', txt)
+        m = QUOTED_RE.search(txt)
         env_subs['VERSION'] = m.group(1)
 
         with open('Makefile', 'r', encoding='utf-8') as fh:
             for line in fh:
-                m = re.match(r'^(\w+)=(.+)', line)
+                m = ASSIGNMENT_RE.match(line)
                 if not m:
                     continue
                 var, val = (m.group(1), m.group(2))
                 if var == 'prefix' and env_subs[var] is not None:
                     continue
-                while re.search(r'\$\{', val):
-                    val = re.sub(r'\$\{(\w+)\}', lambda m: env_subs[m.group(1)], val)
+                while VAR_REF_RE.search(val):
+                    val = VAR_REF_RE.sub(lambda m: env_subs[m.group(1)], val)
                 env_subs[var] = val
                 if var == 'srcdir':
                     break
@@ -256,6 +271,7 @@ class TransformHtml(HTMLParser):
                 prior_target = None,
                 opt_prefix = 'opt',
                 a_txt_start = None,
+                target_suf = '',
                 )
 
         if st.want_manpage:
@@ -281,7 +297,7 @@ class TransformHtml(HTMLParser):
         for href, txt in st.derived_hashtags:
             derived = txt2target(txt, href[1:])
             if derived not in st.created_hashtags:
-                txt = re.sub(r'[\1-\7]+', '', txt.replace(NBR_DASH[0], '-').replace(NBR_SPACE[0], ' '))
+                txt = BIN_CHARS_RE.sub('', txt.replace(NBR_DASH[0], '-').replace(NBR_SPACE[0], ' '))
                 warn('Unknown derived hashtag link in', self.fn, 'based on:', (href, txt))
 
         for bad in st.bad_hashtags:
@@ -387,13 +403,22 @@ class TransformHtml(HTMLParser):
         else:
             txt = None
         add_to_txt = None
-        if tag == 'h1' or tag == 'h2':
+        if tag == 'h1':
+            tgt = txt
+            target_suf = ''
+            if tgt.startswith('NEWS for '):
+                m = VERSION_RE.search(tgt)
+                if m:
+                    tgt = m.group(1)
+                    st.target_suf = '-' + tgt
+            self.add_target(tgt)
+        elif tag == 'h2':
             st.man_out.append(st.p_macro + '.SH "' + manify(txt) + '"\n')
-            self.add_target(txt)
+            self.add_target(txt, st.target_suf)
             st.opt_prefix = 'daemon-opt' if txt == 'DAEMON OPTIONS' else 'opt'
         elif tag == 'h3':
             st.man_out.append(st.p_macro + '.SS "' + manify(txt) + '"\n')
-            self.add_target(txt)
+            self.add_target(txt, st.target_suf)
         elif tag == 'p':
             if st.dt_from == 'p':
                 tag = 'dt'
@@ -474,20 +499,29 @@ class TransformHtml(HTMLParser):
         if st.in_pre:
             html = htmlify(txt)
         else:
-            txt = re.sub(r'\s--(\s)', NBR_SPACE[0] + r'--\1', txt).replace('--', NBR_DASH[0]*2)
-            txt = re.sub(r'(^|\W)-', r'\1' + NBR_DASH[0], txt)
+            txt = SPACE_DOUBLE_DASH_RE.sub(NBR_SPACE[0] + r'--\1', txt).replace('--', NBR_DASH[0]*2)
+            txt = NON_SPACE_SINGLE_DASH_RE.sub(r'\1' + NBR_DASH[0], txt)
             html = htmlify(txt)
             if st.in_code:
-                txt = re.sub(r'\s', NBR_SPACE[0], txt)
+                txt = WHITESPACE_RE.sub(NBR_SPACE[0], txt)
                 html = html.replace(NBR_DASH[0], '-').replace(NBR_SPACE[0], ' ') # <code> is non-breaking in CSS
         st.html_out.append(html.replace(NBR_SPACE[0], '&nbsp;').replace(NBR_DASH[0], '-&#8288;'))
         st.txt += txt
 
 
-    def add_target(self, txt):
+    def add_target(self, txt, suf=None):
         st = self.state
         txt = txt2target(txt, st.opt_prefix)
         if txt:
+            if suf:
+                txt += suf
+            if txt in st.created_hashtags:
+                for j in range(2, 1000):
+                    chk = txt + '-' + str(j)
+                    if chk not in st.created_hashtags:
+                        print('Made link target unique:', chk)
+                        txt = chk
+                        break
             st.html_out.append('<a id="' + txt + '" href="#' + txt + '" class="tgt"></a>')
             st.created_hashtags.add(txt)
             st.prior_target = txt
@@ -507,24 +541,24 @@ class TransformHtml(HTMLParser):
 
 
 def txt2target(txt, opt_prefix):
-    txt = re.sub(r'[%s](.+?)[=%s].*' % (BOLD_FONT[0], NORM_FONT[0]), r'\1', txt.strip())
-    txt = re.sub(r'[%s]' % NBR_DASH[0], '-', txt)
-    txt = re.sub(r'[\1-\7]+', '', txt)
-    txt = re.sub(r'[^-A-Za-z0-9._]', '_', txt)
+    txt = CODE_BLOCK_RE.sub(r'\1', txt.strip().rstrip(':'))
+    txt = NBR_DASH_RE.sub('-', txt)
+    txt = BIN_CHARS_RE.sub('', txt)
+    txt = INVALID_TARGET_CHARS_RE.sub('_', txt)
     if opt_prefix and txt.startswith('-'):
         txt = opt_prefix + txt
     else:
-        txt = re.sub(r'^([^A-Za-z])', r't\1', txt)
+        txt = INVALID_START_CHAR_RE.sub(r't\1', txt)
     return txt
 
 
 def manify(txt):
-    return re.sub(r"^(['.])", r'\&\1', txt.replace('\\', '\\\\')
+    return MANIFY_LINESTART_RE.sub(r'\&\1', txt.replace('\\', '\\\\')
             .replace(NBR_SPACE[0], NBR_SPACE[1])
             .replace(NBR_DASH[0], NBR_DASH[1])
             .replace(NORM_FONT[0], NORM_FONT[1])
             .replace(BOLD_FONT[0], BOLD_FONT[1])
-            .replace(UNDR_FONT[0], UNDR_FONT[1]), flags=re.M)
+            .replace(UNDR_FONT[0], UNDR_FONT[1]))
 
 
 def htmlify(txt):
