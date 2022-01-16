@@ -230,7 +230,7 @@ About to:
     cmd_chk(['packaging/year-tweak'])
 
     print(dash_line)
-    cmd_run("git diff --color | less -p '^diff .*'")
+    cmd_run("git diff")
 
     srctar_name = f"{rsync_ver}.tar.gz"
     pattar_name = f"rsync-patches-{version}.tar.gz"
