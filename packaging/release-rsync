@@ -341,7 +341,7 @@ About to:
     md_files = 'README.md NEWS.md INSTALL.md'.split()
     html_files = [ fn for fn in gen_pathnames if fn.endswith('.html') ]
     cmd_chk(['rsync', '-a', *md_files, *html_files, dest])
-    cmd_chk(["./md-convert"] + [ dest +'/'+ fn for fn in md_files ])
+    cmd_chk(["./md-convert", "--dest", dest, *md_files])
 
     cmd_chk(f"git log --name-status | gzip -9 >{dest}/ChangeLog.gz")
 

@@ -172,6 +172,8 @@ def parse_md_file(mdfn):
     if fi.want_manpage:
         output_list += [ (fi.name, fi.man_out) ]
     for fn, txt in output_list:
+        if args.dest and args.dest != '.':
+            fn = os.path.join(args.dest, fn)
         if os.path.lexists(fn):
             os.unlink(fn)
         print("Wrote:", fn)
@@ -543,6 +545,7 @@ def die(*msg):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Output html and (optionally) nroff for markdown pages.", add_help=False)
     parser.add_argument('--test', action='store_true', help="Just test the parsing without outputting any files.")
+    parser.add_argument('--dest', metavar='DIR', help="Put files into DIR instead of the current directory.")
     parser.add_argument('--debug', '-D', action='count', default=0, help='Output copious info on the html parsing. Repeat for even more.')
     parser.add_argument("--help", "-h", action="help", help="Output this help message and exit.")
     parser.add_argument("mdfiles", nargs='+', help="The source .md files to convert.")
