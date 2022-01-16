@@ -1,4 +1,3 @@
-<a name="3.2.4"></a>
 
 # NEWS for rsync 3.2.4 (UNRELEASED)
 
@@ -214,7 +213,6 @@
 
 
 ------------------------------------------------------------------------------
-<a name="3.2.3"></a>
 
 # NEWS for rsync 3.2.3 (6 Aug 2020)
 
@@ -315,7 +313,6 @@
    (with a fallback to the old 1-char string kluge for older compilers).
 
 ------------------------------------------------------------------------------
-<a name="3.2.2"></a>
 
 # NEWS for rsync 3.2.2 (4 Jul 2020)
 
@@ -391,7 +388,6 @@
    can create the interrelated structs and accessors that loadparm.c needs.
 
 ------------------------------------------------------------------------------
-<a name="3.2.1"></a>
 
 # NEWS for rsync 3.2.1 (22 Jun 2020)
 
@@ -454,7 +450,6 @@
  - Merged the OLDNEWS.md file into NEWS.md.
 
 ------------------------------------------------------------------------------
-<a name="3.2.0"></a>
 
 # NEWS for rsync 3.2.0 (19 Jun 2020)
 
@@ -666,7 +661,6 @@
  - Some code typos were fixed (as pointed out by a Fossies run).
 
 ------------------------------------------------------------------------------
-<a name="3.1.3"></a>
 
 # NEWS for rsync 3.1.3 (28 Jan 2018)
 
@@ -737,7 +731,6 @@
  - Support newer yodl versions when converting man pages.
 
 ------------------------------------------------------------------------------
-<a name="3.1.2"></a>
 
 # NEWS for rsync 3.1.2 (21 Dec 2015)
 
@@ -803,7 +796,6 @@
  - Improved the m4 generation rules and some autoconf idioms.
 
 ------------------------------------------------------------------------------
-<a name="3.1.1"></a>
 
 # NEWS for rsync 3.1.1 (22 Jun 2014)
 
@@ -923,7 +915,6 @@
    and/or zlib code is put early in the CFLAGS.
 
 ------------------------------------------------------------------------------
-<a name="3.1.0"></a>
 
 # NEWS for rsync 3.1.0 (28 Sep 2013)
 
@@ -1174,7 +1165,6 @@
  - Fixed some build issues for Android and Minix.
 
 ------------------------------------------------------------------------------
-<a name="3.0.9"></a>
 
 # NEWS for rsync 3.0.9 (23 Sep 2011)
 
@@ -1234,7 +1224,6 @@
  - Some minor manpage improvements.
 
 ------------------------------------------------------------------------------
-<a name="3.0.8"></a>
 
 # NEWS for rsync 3.0.8 (26 Mar 2011)
 
@@ -1373,7 +1362,6 @@
  - Fixed the testsuite/xattrs.test script on OS X.
 
 ------------------------------------------------------------------------------
-<a name="3.0.7"></a>
 
 # NEWS for rsync 3.0.7 (31 Dec 2009)
 
@@ -1441,7 +1429,6 @@
  - The testsuite no longer uses `id -u`, so it works better on Solaris.
 
 ------------------------------------------------------------------------------
-<a name="3.0.6"></a>
 
 # NEWS for rsync 3.0.6 (8 May 2009)
 
@@ -1500,7 +1487,6 @@
  - Fixed an failure transferring special files from Solaris to Linux.
 
 ------------------------------------------------------------------------------
-<a name="3.0.5"></a>
 
 # NEWS for rsync 3.0.5 (28 Dec 2008)
 
@@ -1565,7 +1551,6 @@
    idiom. (See the support dir.)
 
 ------------------------------------------------------------------------------
-<a name="3.0.4"></a>
 
 # NEWS for rsync 3.0.4 (6 Sep 2008)
 
@@ -1633,7 +1618,6 @@
    even more consistency checks on the files.
 
 ------------------------------------------------------------------------------
-<a name="3.0.3"></a>
 
 # NEWS for rsync 3.0.3 (29 Jun 2008)
 
@@ -1724,7 +1708,6 @@
    bleed-over into patches that follow.
 
 ------------------------------------------------------------------------------
-<a name="3.0.2"></a>
 
 # NEWS for rsync 3.0.2 (8 Apr 2008)
 
@@ -1746,7 +1729,6 @@
    packaging dir.
 
 ------------------------------------------------------------------------------
-<a name="3.0.1"></a>
 
 # NEWS for rsync 3.0.1 (3 Apr 2008)
 
@@ -1885,7 +1867,6 @@
  - Updated the build scripts to work with a revised FTP directory structure.
 
 ------------------------------------------------------------------------------
-<a name="3.0.0"></a>
 
 # NEWS for rsync 3.0.0 (1 Mar 2008)
 
@@ -2236,7 +2217,6 @@
    the 3.0.0 release.
 
 ------------------------------------------------------------------------------
-<a name="2.6.9"></a>
 
 # NEWS for rsync 2.6.9 (6 Nov 2006)
 
@@ -2396,7 +2376,6 @@
    consistent opening comments.
 
 ------------------------------------------------------------------------------
-<a name="2.6.8"></a>
 
 # NEWS for rsync 2.6.8 (22 Apr 2006)
 
@@ -2466,7 +2445,6 @@
    actions to a file (something that only a daemon supports at present).
 
 ------------------------------------------------------------------------------
-<a name="2.6.7"></a>
 
 # NEWS for rsync 2.6.7 (11 Mar 2006)
 
@@ -2790,7 +2768,6 @@
    ~/.popt.
 
 ------------------------------------------------------------------------------
-<a name="2.6.6"></a>
 
 # NEWS for rsync 2.6.6 (28 Jul 2005)
 
@@ -2856,7 +2833,6 @@
    (log-format w/%i) and some double-verbose messages.
 
 ------------------------------------------------------------------------------
-<a name="2.6.5"></a>
 
 # NEWS for rsync 2.6.5 (1 Jun 2005)
 
@@ -3037,7 +3013,6 @@
    enables the optional copying of extended attributes.
 
 ------------------------------------------------------------------------------
-<a name="2.6.4"></a>
 
 # NEWS for rsync 2.6.4 (30 March 2005)
 
@@ -3419,7 +3394,6 @@
  - Improved configure to better handle cross-compiling.
 
 ------------------------------------------------------------------------------
-<a name="2.6.3"></a>
 
 # NEWS for rsync 2.6.3 (30 Sep 2004)
 
@@ -3663,7 +3637,6 @@
    removed.
 
 ------------------------------------------------------------------------------
-<a name="2.6.2"></a>
 
 # NEWS for rsync 2.6.2 (30 Apr 2004)
 
@@ -3705,7 +3678,6 @@
  - Two new diffs were added to the patches dir.
 
 ------------------------------------------------------------------------------
-<a name="2.6.1"></a>
 
 # NEWS for rsync 2.6.1 (26 Apr 2004)
 
@@ -3897,7 +3869,6 @@
    applied, and rebuilt the rest.
 
 ------------------------------------------------------------------------------
-<a name="2.6.0"></a>
 
 # NEWS for rsync 2.6.0 (1 Jan 2004)
 
@@ -4037,7 +4008,6 @@
    other side (primarily for testing purposes).  (Wayne Davison)
 
 ------------------------------------------------------------------------------
-<a name="2.5.7"></a>
 
 # NEWS for rsync 2.5.7 (4 Dec 2003)
 
@@ -4049,7 +4019,6 @@
    Andrea Barisani)
 
 ------------------------------------------------------------------------------
-<a name="2.5.6"></a>
 
 # NEWS for rsync 2.5.6, aka "the dwd-between-jobs release" (26 Jan 2003)
 
@@ -4144,7 +4113,6 @@
    should build on more platforms. (Paul Green)
 
 ------------------------------------------------------------------------------
-<a name="2.5.5"></a>
 
 # NEWS for rsync 2.5.5, aka Snowy River (2 Apr 2002)
 
@@ -4183,7 +4151,6 @@
  - Improved network error handling. (Greg A. Woods)
 
 ------------------------------------------------------------------------------
-<a name="2.5.4"></a>
 
 # NEWS for rsync 2.5.4, aka "Imitation lizard skin" (13 Mar 2002)
 
@@ -4203,7 +4170,6 @@
  - Additional test cases for `--compress`. (Martin Pool)
 
 ------------------------------------------------------------------------------
-<a name="2.5.3"></a>
 
 # NEWS for rsync 2.5.3, aka "Happy 26" (11 Mar 2002)
 
@@ -4252,7 +4218,6 @@
    error message. (Colin Walters)
 
 ------------------------------------------------------------------------------
-<a name="2.5.2"></a>
 
 # NEWS for rsync 2.5.2 (26 Jan 2002)
 
@@ -4301,7 +4266,6 @@
    Razor. (Debian #124286)
 
 ------------------------------------------------------------------------------
-<a name="2.5.1"></a>
 
 # NEWS for rsync 2.5.1 (3 Jan 2002)
 
@@ -4336,7 +4300,6 @@
  - Clearer error messages for some conditions.
 
 ------------------------------------------------------------------------------
-<a name="2.5.0"></a>
 
 # NEWS for rsync 2.5.0 (30 Nov 2001)
 
