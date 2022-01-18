@@ -34,7 +34,8 @@ SIMD_x86_64=simd-checksum-x86_64.o simd-checksum-avx2.o
 ASM_x86_64=lib/md5-asm-x86_64.o
 
 GENFILES=configure.sh aclocal.m4 config.h.in rsync.1 rsync.1.html \
-	 rsync-ssl.1 rsync-ssl.1.html rsyncd.conf.5 rsyncd.conf.5.html
+	 rsync-ssl.1 rsync-ssl.1.html rsyncd.conf.5 rsyncd.conf.5.html \
+	 rrsync.1 rrsync.1.html
 HEADERS=byteorder.h config.h errcode.h proto.h rsync.h ifuncs.h itypes.h inums.h \
 	lib/pool_alloc.h lib/mdigest.h lib/md-defines.h
 LIBOBJ=lib/wildmatch.o lib/compat.o lib/snprintf.o lib/mdfour.o lib/md5.o \
@@ -271,9 +272,9 @@ rrsync.1: support/rrsync.1.md md-convert Makefile
 
 .PHONY: clean
 clean: cleantests
-	rm -f *~ $(OBJS) $(CHECK_PROGS) $(CHECK_OBJS) $(CHECK_SYMLINKS) \
-		git-version.h rounding rounding.h *.old rsync*.1 rsync*.5 rsync*.html \
-		daemon-parm.h help-*.h default-*.h proto.h proto.h-tstamp
+	rm -f *~ $(OBJS) $(CHECK_PROGS) $(CHECK_OBJS) $(CHECK_SYMLINKS) @MAKE_RRSYNC@ \
+		git-version.h rounding rounding.h *.old rsync*.1 rsync*.5 @MAKE_RRSYNC_1@ \
+		*.html daemon-parm.h help-*.h default-*.h proto.h proto.h-tstamp
 
 .PHONY: cleantests
 cleantests:
