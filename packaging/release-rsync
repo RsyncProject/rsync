@@ -206,10 +206,10 @@ About to:
             txt = replace_or_die(x_re, repl, txt, f"Unable to find SUBPROTOCOL_VERSION define in {fn}")
         elif fn == 'NEWS.md':
             efv = re.escape(finalversion)
-            x_re = re.compile(r'^<.+>\s+# NEWS for rsync %s \(UNRELEASED\)\s+## Changes in this version:\n' % efv
+            x_re = re.compile(r'^# NEWS for rsync %s \(UNRELEASED\)\s+## Changes in this version:\n' % efv
                     + r'(\n### PROTOCOL NUMBER:\s+- The protocol number was changed to \d+\.\n)?')
             rel_day = 'UNRELEASED' if pre else today
-            repl = (f'<a name="{finalversion}"></a>\n\n# NEWS for rsync {finalversion} ({rel_day})\n\n'
+            repl = (f'# NEWS for rsync {finalversion} ({rel_day})\n\n'
                 + '## Changes in this version:\n')
             if proto_changed:
                 repl += f'\n### PROTOCOL NUMBER:\n\n - The protocol number was changed to {protocol_version}.\n'

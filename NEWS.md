@@ -1,4 +1,3 @@
-
 # NEWS for rsync 3.2.4 (UNRELEASED)
 
 ## Changes in this version:
@@ -221,7 +220,6 @@
    possible).
 
  - Use mallinfo2() instead of mallinfo(), when available.
-
 
 ------------------------------------------------------------------------------
 
