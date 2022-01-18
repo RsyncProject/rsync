@@ -20,7 +20,8 @@
    like the [`--suffix`](rsync.1#opt) and [`--usermap`](rsync.1#opt) values.
    If your rsync script depends on the old arg-splitting behavior, either run
    it with the [`--old-args`](rsync.1#opt) option or `export RSYNC_OLD_ARGS=1`
-   in the script's environment.
+   in the script's environment.  See also the [ADVANCED USAGE](rsync.1#)
+   section of rsync's man page.
 
  - A long-standing bug was preventing rsync from figuring out the current
    locale's decimal point character, which made rsync always output numbers

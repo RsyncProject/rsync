@@ -9,7 +9,7 @@ rsync-ssl [--type=SSL_TYPE] RSYNC_ARGS
 ```
 
 The online version of this man page (that includes cross-linking of topics)
-is available at <https://download.samba.org/pub/rsync/rsync.1>.
+is available at <https://download.samba.org/pub/rsync/rsync-ssl.1>.
 
 ## DESCRIPTION
 

@@ -93,7 +93,7 @@ communications, but it may have been configured to use a different remote shell
 by default, such as rsh or remsh.
 
 You can also specify any remote shell you like, either by using the [`-e`](#opt)
-command line option, or by setting the RSYNC_RSH environment variable.
+command line option, or by setting the [`RSYNC_RSH`](#) environment variable.
 
 Note that rsync must be installed on both the source and destination machines.
 
@@ -160,19 +160,24 @@ The syntax for requesting multiple files from a remote host is done by
 specifying additional remote-host args in the same style as the first, or with
 the hostname omitted.  For instance, all these work:
 
->     rsync -av host:file1 :file2 host:file{3,4} /dest/
->     rsync -av host::modname/file{1,2} host::modname/file3 /dest/
->     rsync -av host::modname/file1 ::modname/file{3,4} /dest/
+>     rsync -aiv host:file1 :file2 host:file{3,4} /dest/
+>     rsync -aiv host::modname/file{1,2} host::modname/extra /dest/
+>     rsync -aiv host::modname/first ::modname/extra{1,2} /dest/
 
-**Older versions of rsync** required using quoted spaces in the SRC, like these
-examples:
+In a modern rsync, you only need to quote or backslash-escape things like
+spaces from the local shell but not also from the remote shell:
 
->     rsync -av host:'dir1/file1 dir2/file2' /dest
->     rsync host::'modname/dir1/file1 modname/dir2/file2' /dest
+>     rsync -aiv host:'a simple file.pdf' /dest/
 
-This word-splitting only works in a modern rsync by using [`--old-args`](#opt)
-(or its environment variable) and making sure that [`--protect-args`](#opt) is
-not enabled.
+Older versions of rsync only allowed specifying one remote-source arg, so it
+required the remote side to split the args at a space.  You can still get this
+old-style arg splitting by using the [`--old-args`](#opt) option:
+
+>     rsync -ai --old-args host:'dir1/file1 dir2/file2' /dest
+>     rsync -ai --old-args host::'modname/dir1/file1 modname/dir2/file2' /dest
+
+See that option's section for an environment variable that can be exported to
+help old scripts.
 
 ## CONNECTING TO AN RSYNC DAEMON
 
@@ -203,22 +208,23 @@ An example that copies all the files in a remote module named "src":
 
 Some modules on the remote daemon may require authentication.  If so, you will
 receive a password prompt when you connect.  You can avoid the password prompt
-by setting the environment variable RSYNC_PASSWORD to the password you want to
-use or using the [`--password-file`](#opt) option.  This may be useful when
-scripting rsync.
+by setting the environment variable [`RSYNC_PASSWORD`](#) to the password you
+want to use or using the [`--password-file`](#opt) option.  This may be useful
+when scripting rsync.
 
 WARNING: On some systems environment variables are visible to all users.  On
 those systems using [`--password-file`](#opt) is recommended.
 
 You may establish the connection via a web proxy by setting the environment
-variable RSYNC_PROXY to a hostname:port pair pointing to your web proxy.  Note
-that your web proxy's configuration must support proxy connections to port 873.
+variable [`RSYNC_PROXY`](#) to a hostname:port pair pointing to your web proxy.
+Note that your web proxy's configuration must support proxy connections to port
+873.
 
 You may also establish a daemon connection using a program as a proxy by
-setting the environment variable RSYNC_CONNECT_PROG to the commands you wish to
-run in place of making a direct socket connection.  The string may contain the
-escape "%H" to represent the hostname specified in the rsync command (so use
-"%%" if you need a single "%" in your string).  For example:
+setting the environment variable [`RSYNC_CONNECT_PROG`](#) to the commands you
+wish to run in place of making a direct socket connection.  The string may
+contain the escape "%H" to represent the hostname specified in the rsync
+command (so use "%%" if you need a single "%" in your string).  For example:
 
 >     export RSYNC_CONNECT_PROG='ssh proxyhost nc %H 873'
 >     rsync -av targethost1::module/src/ /dest/
@@ -227,9 +233,9 @@ escape "%H" to represent the hostname specified in the rsync command (so use
 The command specified above uses ssh to run nc (netcat) on a proxyhost, which
 forwards all data to port 873 (the rsync daemon) on the targethost (%H).
 
-Note also that if the RSYNC_SHELL environment variable is set, that program
-will be used to run the RSYNC_CONNECT_PROG command instead of using the default
-shell of the **system()** call.
+Note also that if the [`RSYNC_SHELL`](#) environment variable is set, that
+program will be used to run the `RSYNC_CONNECT_PROG` command instead of using
+the default shell of the **system()** call.
 
 ## USING RSYNC-DAEMON FEATURES VIA A REMOTE-SHELL CONNECTION
 
@@ -1681,14 +1687,14 @@ your home directory (remove the '=' for that).
     and various flavors of MD4 based on protocol age).
 
     The default order can be customized by setting the environment variable
-    RSYNC_CHECKSUM_LIST to a space-separated list of acceptable checksum names.
-    If the string contains a "`&`" character, it is separated into the "client
-    string & server string", otherwise the same string
-    applies to both.  If the string (or string portion) contains no
-    non-whitespace characters, the default checksum list is used.  This method
-    does not allow you to specify the transfer checksum separately from the
-    pre-transfer checksum, and it discards "auto" and all unknown checksum
-    names.  A list with only invalid names results in a failed negotiation.
+    [`RSYNC_CHECKSUM_LIST`](#) to a space-separated list of acceptable checksum
+    names.  If the string contains a "`&`" character, it is separated into the
+    "client string & server string", otherwise the same string applies to both.
+    If the string (or string portion) contains no non-whitespace characters,
+    the default checksum list is used.  This method does not allow you to
+    specify the transfer checksum separately from the pre-transfer checksum,
+    and it discards "auto" and all unknown checksum names.  A list with only
+    invalid names results in a failed negotiation.
 
     The use of the `--checksum-choice` option overrides this environment list.
 
@@ -1972,11 +1978,12 @@ your home directory (remove the '=' for that).
 
     Beginning in 3.2.3, a value of 0 specifies no limit.
 
-    You can set a default value using the environment variable RSYNC_MAX_ALLOC
-    using the same SIZE values as supported by this option.  If the remote
-    rsync doesn't understand the `--max-alloc` option, you can override an
-    environmental value by specifying `--max-alloc=1g`, which will make rsync
-    avoid sending the option to the remote side (because "1G" is the default).
+    You can set a default value using the environment variable
+    [`RSYNC_MAX_ALLOC`](#) using the same SIZE values as supported by this
+    option.  If the remote rsync doesn't understand the `--max-alloc` option,
+    you can override an environmental value by specifying `--max-alloc=1g`,
+    which will make rsync avoid sending the option to the remote side (because
+    "1G" is the default).
 
 0.  `--block-size=SIZE`, `-B`
 
@@ -2001,10 +2008,10 @@ your home directory (remove the '=' for that).
     remote host.  See the [USING RSYNC-DAEMON FEATURES VIA A REMOTE-SHELL
     CONNECTION](#) section above.
 
-    Beginning with rsync 3.2.0, the RSYNC_PORT environment variable will be set
-    when a daemon connection is being made via a remote-shell connection.  It
-    is set to 0 if the default daemon port is being assumed, or it is set to
-    the value of the rsync port that was specified via either the
+    Beginning with rsync 3.2.0, the [`RSYNC_PORT`](#) environment variable will
+    be set when a daemon connection is being made via a remote-shell
+    connection.  It is set to 0 if the default daemon port is being assumed, or
+    it is set to the value of the rsync port that was specified via either the
     [`--port`](#opt) option or a non-empty port value in an `rsync://` URL.
     This allows the script to discern if a non-default port is being requested,
     allowing for things such as an SSL or stunnel helper script to connect to a
@@ -2025,7 +2032,7 @@ your home directory (remove the '=' for that).
     (Note that ssh users can alternately customize site-specific connect
     options in their .ssh/config file.)
 
-    You can also choose the remote shell program using the RSYNC_RSH
+    You can also choose the remote shell program using the [`RSYNC_RSH`](#)
     environment variable, which accepts the same range of values as `-e`.
 
     See also the [`--blocking-io`](#opt) option which is affected by this
@@ -2287,24 +2294,27 @@ your home directory (remove the '=' for that).
 
 0. `--old-args`
 
-    This option tells rsync to stop trying to protect the arg values from
-    unintended word-splitting or other misinterpretation by using its new
-    backslash-escape idiom.  The newest default is for remote filenames to only
-    allow wildcards characters to be interpretated by the shell while
-    protecting other shell-interpreted characters (and the args of options get
-    even wildcards escaped).  The only active wildcard characters on the remote
-    side are: `*`, `?`, `[`, & `]`.
+    This option tells rsync to stop trying to protect the arg values on the
+    remote side from unintended word-splitting or other misinterpretation.
 
-    If you have a script that wants to use old-style arg splitting in the
+    The default in a modern rsync is for "shell-active" characters (including
+    spaces) to be backslash-escaped in the args that are sent to the remote
+    shell.  The wildcard characters `*`, `?`, `[`, & `]` are not escaped in
+    filename args (allowing them to expand into multiple filenames) while being
+    protected in option args, such as [`--usermap`](#opt).
+
+    If you have a script that wants to use old-style arg splitting in its
     filenames, specify this option once.  If the remote shell has a problem
-    with any backslash escapes, specify the option twice.
+    with any backslash escapes at all, specify this option twice.
 
-    You may also control this setting via the RSYNC_OLD_ARGS environment
+    You may also control this setting via the [`RSYNC_OLD_ARGS`](#) environment
     variable.  If it has the value "1", rsync will default to a single-option
     setting.  If it has the value "2" (or more), rsync will default to a
     repeated-option setting.  If it is "0", you'll get the default escaping
     behavior.  The environment is always overridden by manually specified
     positive or negative options (the negative is `--no-old-args`).
+
+    This option conflicts with the [`--protect-args`](#opt) option.
 
 0.  `--protect-args`, `-s`
 
@@ -2321,15 +2331,18 @@ your home directory (remove the '=' for that).
     character-set.  The translation happens before wild-cards are expanded.
     See also the [`--files-from`](#opt) option.
 
-    You may also control this setting via the RSYNC_PROTECT_ARGS environment
-    variable.  If it has a non-zero value, this setting will be
+    You may also control this setting via the [`RSYNC_PROTECT_ARGS`)(#)
+    environment variable.  If it has a non-zero value, this setting will be
     enabled by default, otherwise it will be disabled by default.  Either state
     is overridden by a manually specified positive or negative version of this
     option (note that `--no-s` and `--no-protect-args` are the negative
-    versions).
+    versions).  This environment variable is also superseded by a non-zero
+    [`RSYNC_OLD_ARGS`](#) export.
 
     You may need to disable this option when interacting with an older rsync
     (one prior to 3.0.0).
+
+    This option conflicts with the [`--old-args`](#opt) option.
 
     Note that this option is incompatible with the use of the restricted rsync
     script (`rrsync`) since it hides options from the script's inspection.
@@ -2530,10 +2543,10 @@ your home directory (remove the '=' for that).
     its list is assumed to be "zlib".
 
     The default order can be customized by setting the environment variable
-    RSYNC_COMPRESS_LIST to a space-separated list of acceptable compression
-    names.  If the string contains a "`&`" character, it is separated into the
-    "client string & server string", otherwise the same string applies to both.
-    If the string (or string portion) contains no
+    [`RSYNC_COMPRESS_LIST`](#) to a space-separated list of acceptable
+    compression names.  If the string contains a "`&`" character, it is
+    separated into the "client string & server string", otherwise the same
+    string applies to both.  If the string (or string portion) contains no
     non-whitespace characters, the default compress list is used.  Any unknown
     compression names are discarded from the list, but a list with only invalid
     names results in a failed negotiation.
@@ -3122,32 +3135,34 @@ your home directory (remove the '=' for that).
 
 0.  `--partial-dir=DIR`
 
-    A better way to keep partial files than the [`--partial`](#opt) option is
-    to specify a _DIR_ that will be used to hold the partial data (instead of
-    writing it out to the destination file).  On the next transfer, rsync will
-    use a file found in this dir as data to speed up the resumption of the
+    This option modifies the behavior of the [`--partial`](#opt) option while
+    also implying that it be enabled.  This enhanced partial-file method puts
+    any partially transferred files into the specified _DIR_ instead of writing
+    the partial file out to the destination file.  On the next transfer, rsync
+    will use a file found in this dir as data to speed up the resumption of the
     transfer and then delete it after it has served its purpose.
 
     Note that if [`--whole-file`](#opt) is specified (or implied), any
-    partial-dir file that is found for a file that is being updated will simply
-    be removed (since rsync is sending files without using rsync's
+    partial-dir files that are found for a file that is being updated will
+    simply be removed (since rsync is sending files without using rsync's
     delta-transfer algorithm).
 
-    Rsync will create the _DIR_ if it is missing (just the last dir -- not the
-    whole path).  This makes it easy to use a relative path (such as
+    Rsync will create the _DIR_ if it is missing, but just the last dir -- not
+    the whole path.  This makes it easy to use a relative path (such as
     "`--partial-dir=.rsync-partial`") to have rsync create the
-    partial-directory in the destination file's directory when needed, and then
-    remove it again when the partial file is deleted.  Note that the directory
-    is only removed if it is a relative pathname, as it is expected that an
-    absolute path is to a directory that is reserved for partial-dir work.
+    partial-directory in the destination file's directory when it is needed,
+    and then remove it again when the partial file is deleted.  Note that this
+    directory removal is only done for a relative pathname, as it is expected
+    that an absolute path is to a directory that is reserved for partial-dir
+    work.
 
     If the partial-dir value is not an absolute path, rsync will add an exclude
     rule at the end of all your existing excludes.  This will prevent the
     sending of any partial-dir files that may exist on the sending side, and
     will also prevent the untimely deletion of partial-dir items on the
     receiving side.  An example: the above `--partial-dir` option would add the
-    equivalent of "`-f '-p .rsync-partial/'`" at the end of any other filter
-    rules.
+    equivalent of this "perishable" exclude at the end of any other filter
+    rules: `-f '-p .rsync-partial/'`
 
     If you are supplying your own exclude rules, you may need to add your own
     exclude/hide/protect rule for the partial-dir because:
@@ -3163,17 +3178,17 @@ your home directory (remove the '=' for that).
     run.
 
     IMPORTANT: the `--partial-dir` should not be writable by other users or it
-    is a security risk.  E.g. AVOID "/tmp".
+    is a security risk!  E.g. AVOID "/tmp"!
 
-    You can also set the partial-dir value the RSYNC_PARTIAL_DIR environment
-    variable.  Setting this in the environment does not force
+    You can also set the partial-dir value the [`RSYNC_PARTIAL_DIR`](#)
+    environment variable.  Setting this in the environment does not force
     [`--partial`](#opt) to be enabled, but rather it affects where partial
     files go when [`--partial`](#opt) is specified.  For instance, instead of
     using `--partial-dir=.rsync-tmp` along with [`--progress`](#opt), you could
-    set RSYNC_PARTIAL_DIR=.rsync-tmp in your environment and then just use the
-    [`-P`](#opt) option to turn on the use of the .rsync-tmp dir for partial
-    transfers.  The only times that the [`--partial`](#opt) option does not
-    look for this environment value are:
+    set [`RSYNC_PARTIAL_DIR=.rsync-tmp`](#) in your environment and then use
+    the [`-P`](#opt) option to turn on the use of the .rsync-tmp dir for
+    partial transfers.  The only times that the [`--partial`](#opt) option does
+    not look for this environment value are:
 
     1. when [`--inplace`](#opt) was specified (since [`--inplace`](#opt)
        conflicts with `--partial-dir`), and
@@ -3521,8 +3536,8 @@ your home directory (remove the '=' for that).
     This order ensures that the option will stay the same whether you're
     pushing or pulling files.  Finally, you can specify either `--no-iconv` or
     a CONVERT_SPEC of "-" to turn off any conversion.  The default setting of
-    this option is site-specific, and can also be affected via the RSYNC_ICONV
-    environment variable.
+    this option is site-specific, and can also be affected via the
+    [`RSYNC_ICONV`](#) environment variable.
 
     For a list of what charset names your local iconv library supports, you can
     run "`iconv --list`".
@@ -4341,45 +4356,101 @@ file is included or excluded.
 
     Specify a "1" if you want the [`--old-args`](#opt) option to be enabled by
     default, a "2" (or more) if you want it to be enabled in the
-    option-repeated state, or a "0" to make sure that it is disabled by
-    default. First supported in 3.2.4.
+    repeated-option state, or a "0" to make sure that it is disabled by
+    default. When this environment variable is set to a non-zero value, it
+    supersedes the [`RSYNC_PROTECT_ARGS`](#) variable.
+
+    This variable is ignored if [`--old-args`](#opt), `--no-old-args`, or
+    [`--protect-args`](#opt) is specified on the command line.
+
+    First supported in 3.2.4.
 
 0.  `RSYNC_PROTECT_ARGS`
 
     Specify a non-zero numeric value if you want the [`--protect-args`](#opt)
     option to be enabled by default, or a zero value to make sure that it is
-    disabled by default. First supported in 3.1.0.
+    disabled by default.
+
+    This variable is ignored if [`--protect-args`](#opt), `--no-protect-args`,
+    or [`--old-args`](#opt) is specified on the command line.
+
+    First supported in 3.1.0.  Starting in 3.2.4, this variable is ignored if
+    [`RSYNC_OLD_ARGS`](#) is set to a non-zero value.
 
 0.  `RSYNC_RSH`
 
-    The RSYNC_RSH environment variable allows you to override the default shell
-    used as the transport for rsync.  Command line options are permitted after
-    the command name, just as in the [`--rsh`](#opt) (`-e`) option.
+    This environment variable allows you to override the default shell used as
+    the transport for rsync.  Command line options are permitted after the
+    command name, just as in the [`--rsh`](#opt) (`-e`) option.
 
 0.  `RSYNC_PROXY`
 
-    The RSYNC_PROXY environment variable allows you to redirect your rsync
-    client to use a web proxy when connecting to a rsync daemon.  You should
-    set RSYNC_PROXY to a hostname:port pair.
+    This environment variable allows you to redirect your rsync
+    client to use a web proxy when connecting to an rsync daemon.  You should
+    set `RSYNC_PROXY` to a hostname:port pair.
 
 0.  `RSYNC_PASSWORD`
 
-    Setting RSYNC_PASSWORD to the required password allows you to run
-    authenticated rsync connections to an rsync daemon without user
-    intervention.  Note that this does not supply a password to a remote shell
-    transport such as ssh; to learn how to do that, consult the remote shell's
-    documentation.
+    This environment variable allows you to set the password for an rsync
+    **daemon** connection, which avoids the password prompt.  Note that this
+    does **not** supply a password to a remote shell transport such as ssh
+    (consult its documentation for how to do that).
 
 0.  `USER` or `LOGNAME`
 
     The USER or LOGNAME environment variables are used to determine the default
     username sent to an rsync daemon.  If neither is set, the username defaults
-    to "nobody".
+    to "nobody".  If both are set, `USER` takes precedence.
+
+0. `RSYNC_PARTIAL_DIR`
+
+    This environment variable specifies the directory to use for a
+    [`--partial`](#opt) transfer without implying that partial transfers be
+    enabled.  See the [`--partial-dir`](#opt) option for full details.
+
+0. `RSYNC_COMPRESS_LIST`
+
+    This environment variable allows you to customize the negotiation of the
+    compression algorithm by specifying an alternate order or a reduced list of
+    names.  Use the command `rsync --version` to see the available compression
+    names.  See the [`--compress`](#opt) option for full details.
+
+0. `RSYNC_CHECKSUM_LIST`
+
+    This environment variable allows you to customize the negotiation of the
+    checksum algorithm by specifying an alternate order or a reduced list of
+    names.  Use the command `rsync --version` to see the available checksum
+    names.  See the [`--checksum-choice`](#opt) option for full details.
+
+0. `RSYNC_MAX_ALLOC`
+
+    This environment variable sets an allocation maximum as if you had used the
+    [`--max-alloc`](#opt) option.
+
+0. `RSYNC_PORT`
+
+    This environment variable does is not read by rsync, but is instead set in
+    its sub-environment when rsync is running the remote shell in combination
+    with a daemon connection.  This allows a script such as
+    [`rsync-ssl`](rsync-ssl.1) to be able to know the port number that the user
+    specified on the command line.
 
 0.  `HOME`
 
-    The HOME environment variable is used to find the user's default .cvsignore
+    This environment variable is used to find the user's default .cvsignore
     file.
+
+0. `RSYNC_CONNECT_PROG`
+
+    This environment variable is mainly used in debug setups to set the program
+    to use when making a daemon connection.  See [CONNECTING TO AN RSYNC
+    DAEMON](#) for full details.
+
+0. `RSYNC_SHELL`
+
+    This environment variable is mainly used in debug setups to set the program
+    to use to run the program specified by [`RSYNC_CONNECT_PROG`].  See
+    [CONNECTING TO AN RSYNC DAEMON](#) for full details.
 
 ## FILES
 
