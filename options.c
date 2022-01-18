@@ -1933,10 +1933,18 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	}
 
 	if (old_style_args < 0) {
-		if (!am_server && (arg = getenv("RSYNC_OLD_ARGS")) != NULL && *arg)
+		if (!am_server && protect_args <= 0 && (arg = getenv("RSYNC_OLD_ARGS")) != NULL && *arg) {
+			protect_args = 0;
 			old_style_args = atoi(arg);
-		else
+		} else
 			old_style_args = 0;
+	} else if (old_style_args) {
+		if (protect_args > 0) {
+			snprintf(err_buf, sizeof err_buf,
+				 "--protect-args conflicts with --old-args.\n");
+			return 0;
+		}
+		protect_args = 0;
 	}
 
 	if (protect_args < 0) {
