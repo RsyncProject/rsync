@@ -169,15 +169,15 @@ spaces from the local shell but not also from the remote shell:
 
 >     rsync -aiv host:'a simple file.pdf' /dest/
 
-Older versions of rsync only allowed specifying one remote-source arg, so it
-required the remote side to split the args at a space.  You can still get this
-old-style arg splitting by using the [`--old-args`](#opt) option:
+Really old versions of rsync only allowed specifying one remote-source arg, so
+it required the remote side to split the args at a space.  You can still get
+this old-style arg splitting by using the [`--old-args`](#opt) option:
 
 >     rsync -ai --old-args host:'dir1/file1 dir2/file2' /dest
 >     rsync -ai --old-args host::'modname/dir1/file1 modname/dir2/file2' /dest
 
-See that option's section for an environment variable that can be exported to
-help old scripts.
+See that option's section for an [environment variable](#RSYNC_OLD_ARGS) that
+can be exported to help old scripts.
 
 ## CONNECTING TO AN RSYNC DAEMON
 
@@ -2331,7 +2331,7 @@ your home directory (remove the '=' for that).
     character-set.  The translation happens before wild-cards are expanded.
     See also the [`--files-from`](#opt) option.
 
-    You may also control this setting via the [`RSYNC_PROTECT_ARGS`)(#)
+    You may also control this setting via the [`RSYNC_PROTECT_ARGS`](#)
     environment variable.  If it has a non-zero value, this setting will be
     enabled by default, otherwise it will be disabled by default.  Either state
     is overridden by a manually specified positive or negative version of this
