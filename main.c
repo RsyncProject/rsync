@@ -477,7 +477,7 @@ static void show_malloc_stats(void)
 
 #define PRINT_ALLOC_NUM(title, descr, num) \
 	rprintf(FINFO, "  %-11s%10" SIZE_T_FMT_MOD "d   (" descr ")\n", \
-	       title ":", (SIZE_T_FMT_CAST)(num));
+		title ":", (SIZE_T_FMT_CAST)(num));
 
 	PRINT_ALLOC_NUM("arena", "bytes from sbrk", mi.arena);
 	PRINT_ALLOC_NUM("ordblks", "chunks not in use", mi.ordblks);

@@ -47,6 +47,7 @@ extern int protocol_version;
 extern int io_timeout;
 extern int no_detach;
 extern int write_batch;
+extern int old_style_args;
 extern int default_af_hint;
 extern int logfile_format_has_i;
 extern int logfile_format_has_o_or_i;
@@ -288,20 +289,45 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 
 	sargs[sargc++] = ".";
 
+	if (!old_style_args)
+		snprintf(line, sizeof line, " %.*s/", modlen, modname);
+
 	while (argc > 0) {
 		if (sargc >= MAX_ARGS - 1) {
 		  arg_overflow:
 			rprintf(FERROR, "internal: args[] overflowed in do_cmd()\n");
 			exit_cleanup(RERR_SYNTAX);
 		}
-		if (strncmp(*argv, modname, modlen) == 0
-		 && argv[0][modlen] == '\0')
+		if (strncmp(*argv, modname, modlen) == 0 && argv[0][modlen] == '\0')
 			sargs[sargc++] = modname; /* we send "modname/" */
-		else if (**argv == '-') {
-			if (asprintf(sargs + sargc++, "./%s", *argv) < 0)
-				out_of_memory("start_inband_exchange");
-		} else
-			sargs[sargc++] = *argv;
+		else {
+			char *arg = *argv;
+			int extra_chars = *arg == '-' ? 2 : 0; /* a leading dash needs a "./" prefix. */
+			/* If --old-args was not specified, make sure that the arg won't split at a mod name! */
+			if (!old_style_args && (p = strstr(arg, line)) != NULL) {
+				do {
+					extra_chars += 2;
+				} while ((p = strstr(p+1, line)) != NULL);
+			}
+			if (extra_chars) {
+				char *f = arg;
+				char *t = arg = new_array(char, strlen(arg) + extra_chars + 1);
+				if (*f == '-') {
+					*t++ = '.';
+					*t++ = '/';
+				}
+				while (*f) {
+					if (*f == ' ' && strncmp(f, line, modlen+2) == 0) {
+						*t++ = '[';
+						*t++ = *f++;
+						*t++ = ']';
+					} else
+						*t++ = *f++;
+				}
+				*t = '\0';
+			}
+			sargs[sargc++] = arg;
+		}
 		argv++;
 		argc--;
 	}
