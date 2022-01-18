@@ -94,6 +94,9 @@
  - Tweak --progress to display "`??:??:??`" when the time-remaining value is so
    large as to be meaningless.
 
+ - Silence some chmod warnings about symlinks when it looks like we have a
+   function to set their permissions but they can't really be set.
+
 ### ENHANCEMENTS:
 
  - Use openssl's `-verify_hostname` option in the rsync-ssl script.
@@ -170,7 +173,7 @@
  - Try to support a client that sent a remote rsync a wacko stderr file handle
    (such as an older File::RsyncP perl library used by BackupPC).
 
- - Some man page improvements.
+ - Lots of man page improvements, including better html versions.
 
 ### PACKAGING RELATED:
 

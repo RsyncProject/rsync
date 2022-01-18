@@ -257,7 +257,10 @@ int do_chmod(const char *path, mode_t mode)
 			memset(&attrList, 0, sizeof attrList);
 			attrList.bitmapcount = ATTR_BIT_MAP_COUNT;
 			attrList.commonattr = ATTR_CMN_ACCESSMASK;
-			code = setattrlist(path, &attrList, &m, sizeof m, FSOPT_NOFOLLOW);
+			if ((code = setattrlist(path, &attrList, &m, sizeof m, FSOPT_NOFOLLOW)) == 0)
+				break;
+			if (errno == ENOTSUP)
+				code = 1;
 # else
 			code = 1;
 # endif

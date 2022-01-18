@@ -532,7 +532,7 @@ void itemize(const char *fnamecmp, struct file_struct *file, int ndx, int statre
 				iflags |= ITEM_REPORT_CRTIME;
 		}
 #endif
-#if !defined HAVE_LCHMOD && !defined HAVE_SETATTRLIST
+#ifndef CAN_CHMOD_SYMLINK
 		if (S_ISLNK(file->mode)) {
 			;
 		} else
