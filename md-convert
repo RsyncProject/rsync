@@ -49,7 +49,7 @@ body {
 body, b, strong, u {
   font-family: 'Roboto', sans-serif;
 }
-a.tgt { font-face: symbol; font-weight: 400; font-size: 70%; visibility: hidden; text-decoration: none; color: #ddd; padding: 0 4px; border: 0; vertical-align: top; }
+a.tgt { font-face: symbol; font-weight: 400; font-size: 70%; visibility: hidden; text-decoration: none; color: #ddd; padding: 0 4px; border: 0; }
 a.tgt:after { content: '🔗'; }
 a.tgt:hover { color: #444; background-color: #eaeaea; }
 h1:hover > a.tgt, h2:hover > a.tgt, h3:hover > a.tgt, dt:hover > a.tgt { visibility: visible; }
@@ -419,20 +419,20 @@ class TransformHtml(HTMLParser):
                 if m:
                     tgt = m.group(1)
                     st.target_suf = '-' + tgt
-            self.add_targets(tgt)
+            self.add_targets(tag, tgt)
         elif tag == 'h2':
             st.man_out.append(st.p_macro + '.SH "' + manify(txt) + '"\n')
-            self.add_targets(txt, st.target_suf)
+            self.add_targets(tag, txt, st.target_suf)
             st.opt_prefix = 'dopt' if txt == 'DAEMON OPTIONS' else 'opt'
         elif tag == 'h3':
             st.man_out.append(st.p_macro + '.SS "' + manify(txt) + '"\n')
-            self.add_targets(txt, st.target_suf)
+            self.add_targets(tag, txt, st.target_suf)
         elif tag == 'p':
             if st.dt_from == 'p':
                 tag = 'dt'
                 st.man_out.append('.IP "' + manify(txt) + '"\n')
                 if txt.startswith(BOLD_FONT[0]):
-                    self.add_targets(txt)
+                    self.add_targets(tag, txt)
                 st.dt_from = None
             elif txt != '':
                 st.man_out.append(manify(txt) + "\n")
@@ -519,12 +519,13 @@ class TransformHtml(HTMLParser):
         st.txt += txt
 
 
-    def add_targets(self, txt, suf=None):
+    def add_targets(self, tag, txt, suf=None):
         st = self.state
+        tag = '<' + tag + '>'
         targets = CODE_BLOCK_RE.findall(txt)
         if not targets:
             targets = [ txt ]
-        first_one = True
+        tag_pos = 0
         for txt in targets:
             txt = txt2target(txt, st.opt_prefix)
             if not txt:
@@ -538,11 +539,15 @@ class TransformHtml(HTMLParser):
                         print('Made link target unique:', chk)
                         txt = chk
                         break
-            if first_one:
-                st.html_out.append('<a id="' + txt + '" href="#' + txt + '" class="tgt"></a>')
-                first_one = False
+            if tag_pos == 0:
+                tag_pos -= 1
+                while st.html_out[tag_pos] != tag:
+                    tag_pos -= 1
+                st.html_out[tag_pos] = tag[:-1] + ' id="' + txt + '">'
+                st.html_out.append('<a href="#' + txt + '" class="tgt"></a>')
+                tag_pos -= 1 # take into account the append
             else:
-                st.html_out.append('<span id="' + txt + '"></span>')
+                st.html_out[tag_pos] = '<span id="' + txt + '"></span>' + st.html_out[tag_pos]
             st.created_hashtags.add(txt)
         st.latest_targets = targets
 
