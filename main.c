@@ -48,6 +48,7 @@ extern int called_from_signal_handler;
 extern int need_messages_from_generator;
 extern int kluge_around_eof;
 extern int got_xfer_error;
+extern int old_style_args;
 extern int msgs2stderr;
 extern int module_id;
 extern int read_only;
@@ -1469,6 +1470,10 @@ static int start_client(int argc, char *argv[])
 		remote_argc = argc = 1;
 		rsync_port = 0;
 	}
+
+	/* A local transfer doesn't unbackslash anything, so leave the args alone. */
+	if (local_server)
+		old_style_args = 2;
 
 	if (!rsync_port && remote_argc && !**remote_argv) /* Turn an empty arg into a dot dir. */
 		*remote_argv = ".";
