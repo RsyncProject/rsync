@@ -142,6 +142,7 @@ if test x"$with_rrsync" != x"yes"; then
 else
     MAKE_RRSYNC='rrsync'
     MAKE_RRSYNC_1='rrsync.1'
+    GEN_RRSYNC='rrsync.1 rrsync.1.html'
 fi
 AC_SUBST(with_rrsync)
 
@@ -1257,6 +1258,7 @@ AC_SUBST(BUILD_POPT)
 AC_SUBST(BUILD_ZLIB)
 AC_SUBST(MAKE_RRSYNC)
 AC_SUBST(MAKE_RRSYNC_1)
+AC_SUBST(GEN_RRSYNC)
 AC_SUBST(MAKE_MAN)
 
 AC_CHECK_FUNCS(_acl __acl _facl __facl)

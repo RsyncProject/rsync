@@ -181,7 +181,7 @@ def mandate_gensend_hook():
             die('Please add a "make gensend" into your', hook, 'script.')
 
 
-# Snag the GENFILES values out of the Makefile.in file and return them as a list.
+# Snag the GENFILES values out of the Makefile file and return them as a list.
 def get_gen_files(want_dir_plus_list=False):
     cont_re = re.compile(r'\\\n')
 
@@ -189,7 +189,7 @@ def get_gen_files(want_dir_plus_list=False):
 
     auto_dir = os.path.join('auto-build-save', cmd_txt('git rev-parse --abbrev-ref HEAD').out.strip().replace('/', '%'))
 
-    with open('Makefile.in', 'r', encoding='utf-8') as fh:
+    with open(auto_dir + '/Makefile', 'r', encoding='utf-8') as fh:
         for line in fh:
             if not gen_files:
                 chk = re.sub(r'^GENFILES=', '', line)
