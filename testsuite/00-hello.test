@@ -47,7 +47,7 @@ copy_weird '-ais' '' 'lh:'
 echo test6
 
 touch "$fromdir/one" "$fromdir/two"
-(cd "$fromdir" && $RSYNC -ai --old-args lh:'one two' "$todir/")
+(cd "$fromdir" && $RSYNC -ai --old-args --rsync-path="$RSYNC" lh:'one two' "$todir/")
 if [ ! -f "$todir/one" ] || [ ! -f "$todir/two" ]; then
     test_fail "old-args copy of 'one two' failed"
 fi
@@ -55,7 +55,7 @@ fi
 echo test7
 
 rm "$todir/one" "$todir/two"
-(cd "$fromdir" && RSYNC_OLD_ARGS=1 $RSYNC -ai lh:'one two' "$todir/")
+(cd "$fromdir" && RSYNC_OLD_ARGS=1 $RSYNC -ai --rsync-path="$RSYNC" lh:'one two' "$todir/")
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0
