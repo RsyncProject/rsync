@@ -29,7 +29,7 @@ append_line test1
 checkit "$RSYNC -ai '$fromdir/' '$todir/'" "$fromdir" "$todir"
 
 copy_weird() {
-    checkit "$RSYNC $1 \"$2$fromdir/$weird_name/\" \"$3$todir/$weird_name\"" "$fromdir" "$todir"
+    checkit "$RSYNC $1 --rsync-path='$RSYNC' '$2$fromdir/$weird_name/' '$3$todir/$weird_name'" "$fromdir" "$todir"
 }
 
 append_line test2
