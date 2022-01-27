@@ -138,6 +138,9 @@
 
  - More ASM optimizations from Shark64.
 
+ - Using `--debug=FILTER` now outputs a caution message if a filter rule
+   has trailing whitespace.
+
  - Transformed rrsync into a python script with improvements:
    - Security has been beefed up.
    - The known rsync options were updated to include recent additions.

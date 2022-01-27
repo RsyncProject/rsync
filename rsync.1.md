@@ -3723,6 +3723,14 @@ first matching pattern is acted on: if it is an exclude pattern, then that file
 is skipped; if it is an include pattern then that filename is not skipped; if
 no matching pattern is found, then the filename is not skipped.
 
+Aside: because the interactions of filter rules can be complex, it is useful to
+use the `--debug=FILTER` option if things aren't working they way you expect.
+The level-1 output (the default if no level number is specified) mentions the
+filter rule that is first matched by each file in the transfer.  It also warns
+if a filter rule has trailing whitespace.  The level-2 output mentions a lot
+more filter events, including the definition of each rule and the handling of
+per-directory filter files.
+
 Rsync builds an ordered list of filter rules as specified on the command-line.
 Filter rules have the following syntax:
 

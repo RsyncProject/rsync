@@ -152,13 +152,17 @@ static void add_rule(filter_rule_list *listp, const char *pat, unsigned int pat_
 {
 	const char *cp;
 	unsigned int pre_len, suf_len, slash_cnt = 0;
+	char *mention_rule_suffix;
 
-	if (DEBUG_GTE(FILTER, 2)) {
-		rprintf(FINFO, "[%s] add_rule(%s%.*s%s)%s\n",
+	if (DEBUG_GTE(FILTER, 1) && pat_len && (pat[pat_len-1] == ' ' || pat[pat_len-1] == '\t'))
+		mention_rule_suffix = " -- CAUTION: trailing whitespace!";
+	else
+		mention_rule_suffix = DEBUG_GTE(FILTER, 2) ? "" : NULL;
+	if (mention_rule_suffix) {
+		rprintf(FINFO, "[%s] add_rule(%s%.*s%s)%s%s\n",
 			who_am_i(), get_rule_prefix(rule, pat, 0, NULL),
-			(int)pat_len, pat,
-			(rule->rflags & FILTRULE_DIRECTORY) ? "/" : "",
-			listp->debug_type);
+			(int)pat_len, pat, (rule->rflags & FILTRULE_DIRECTORY) ? "/" : "",
+			listp->debug_type, mention_rule_suffix);
 	}
 
 	/* These flags also indicate that we're reading a list that
