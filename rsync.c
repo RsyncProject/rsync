@@ -420,7 +420,13 @@ int read_ndx_and_attrs(int f_in, int f_out, int *iflag_ptr, uchar *type_ptr, cha
 
 	if (iflags & ITEM_TRANSFER) {
 		int i = ndx - cur_flist->ndx_start;
-		if (i < 0 || !S_ISREG(cur_flist->files[i]->mode)) {
+		if (i < 0) {
+			rprintf(FERROR,
+				"received request to transfer non-regular file: %d [%s]\n",
+				ndx, who_am_i());
+			exit_cleanup(RERR_PROTOCOL);
+		}
+		if (!S_ISREG(cur_flist->files[i]->mode)) {
 			rprintf(FERROR,
 				"received request to transfer non-regular file: %d [%s]\n",
 				ndx, who_am_i());
