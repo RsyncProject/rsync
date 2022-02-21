@@ -4437,7 +4437,7 @@ file is included or excluded.
 
 0. `RSYNC_PORT`
 
-    This environment variable does is not read by rsync, but is instead set in
+    This environment variable is not read by rsync, but is instead set in
     its sub-environment when rsync is running the remote shell in combination
     with a daemon connection.  This allows a script such as
     [`rsync-ssl`](rsync-ssl.1) to be able to know the port number that the user
