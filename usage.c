@@ -144,7 +144,7 @@ static void print_info_flags(enum logcode f)
 #endif
 			"SIMD",
 
-#ifndef HAVE_ASM
+#if !defined HAVE_ASM || defined USE_OPENSSL
 		"no "
 #endif
 			"asm",

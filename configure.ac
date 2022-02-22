@@ -322,39 +322,6 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[ ]], [[return 0;]])],
 CFLAGS="$OLD_CFLAGS"
 AC_SUBST(NOEXECSTACK)
 
-ASM=
-
-AC_MSG_CHECKING([whether to enable ASM optimizations])
-AC_ARG_ENABLE(asm,
-    AS_HELP_STRING([--enable-asm],[enable/disable to control ASM optimizations]))
-
-if test x"$enable_asm" = x""; then
-    case "$host_os" in
-	*linux*) ;;
-	*) enable_asm=no ;;
-    esac
-fi
-
-if test x"$enable_asm" != x"no"; then
-    if test x"$host_cpu" = x"x86_64" || test x"$host_cpu" = x"amd64"; then
-	ASM="$host_cpu"
-    elif test x"$enable_asm" = x"yes"; then
-        AC_MSG_RESULT(unavailable)
-        AC_MSG_ERROR(The ASM optimizations are currently x86_64|amd64 only.
-Omit --enable-asm to continue without it.)
-    fi
-fi
-
-if test x"$ASM" != x""; then
-    AC_MSG_RESULT([yes ($ASM)])
-    AC_DEFINE(HAVE_ASM, 1, [Define to 1 to enable ASM optimizations])
-    ASM='$(ASM_'"$ASM)"
-else
-    AC_MSG_RESULT(no)
-fi
-
-AC_SUBST(ASM)
-
 # arrgh. libc in some old debian version screwed up the largefile
 # stuff, getting byte range locking wrong
 AC_CACHE_CHECK([for broken largefile support],rsync_cv_HAVE_BROKEN_LARGEFILE,[
@@ -457,7 +424,8 @@ if test x"$enable_openssl" != x"no"; then
     if test x"$ac_cv_header_openssl_md4_h" = x"yes" && test x"$ac_cv_header_openssl_md5_h" = x"yes"; then
       AC_MSG_RESULT(yes)
       AC_SEARCH_LIBS(MD5_Init, crypto,
-          [AC_DEFINE(USE_OPENSSL)],
+          [AC_DEFINE(USE_OPENSSL)
+	   enable_openssl=yes],
           [err_msg="$err_msg$nl- Failed to find MD5_Init function in openssl crypto lib.";
 	   no_lib="$no_lib openssl"])
     else
@@ -465,9 +433,45 @@ if test x"$enable_openssl" != x"no"; then
 	err_msg="$err_msg$nl- Failed to find openssl/md4.h and openssl/md5.h for openssl crypto lib support."
 	no_lib="$no_lib openssl"
     fi
+    if test x"$enable_asm" != x"yes"; then
+	enable_asm=no
+    fi
 else
     AC_MSG_RESULT(no)
 fi
+
+ASM=
+
+AC_MSG_CHECKING([whether to enable ASM optimizations])
+AC_ARG_ENABLE(asm,
+    AS_HELP_STRING([--enable-asm],[enable/disable to control ASM optimizations]))
+
+if test x"$enable_asm" = x""; then
+    case "$host_os" in
+	*linux*) ;;
+	*) enable_asm=no ;;
+    esac
+fi
+
+if test x"$enable_asm" != x"no"; then
+    if test x"$host_cpu" = x"x86_64" || test x"$host_cpu" = x"amd64"; then
+	ASM="$host_cpu"
+    elif test x"$enable_asm" = x"yes"; then
+        AC_MSG_RESULT(unavailable)
+        AC_MSG_ERROR(The ASM optimizations are currently x86_64|amd64 only.
+Omit --enable-asm to continue without it.)
+    fi
+fi
+
+if test x"$ASM" != x""; then
+    AC_MSG_RESULT([yes ($ASM)])
+    AC_DEFINE(HAVE_ASM, 1, [Define to 1 to enable ASM optimizations])
+    ASM='$(ASM_'"$ASM)"
+else
+    AC_MSG_RESULT(no)
+fi
+
+AC_SUBST(ASM)
 
 AC_MSG_CHECKING([whether to enable xxhash checksum support])
 AC_ARG_ENABLE([xxhash],
@@ -1416,6 +1420,10 @@ esac
 
 AC_CONFIG_FILES([Makefile lib/dummy zlib/dummy popt/dummy shconfig])
 AC_OUTPUT
+
+if test "$enable_openssl" = yes && test "$enable_asm" = yes; then
+    echo "*** Ignoring --enable-asm option -- using openssl for MD5 checksums ***"
+fi
 
 AC_MSG_RESULT()
 AC_MSG_RESULT([    rsync $PACKAGE_VERSION configuration successful])
