@@ -320,16 +320,48 @@ static int safe_read(int desc, char *ptr, size_t len)
 	return n_chars;
 }
 
-/* Copy a file.  If ofd < 0, copy_file unlinks and opens the "dest" file.
- * Otherwise, it just writes to and closes the provided file descriptor.
+/* Remove existing file @dest and reopen, creating a new file with @mode */
+static int unlink_and_reopen(const char *dest, mode_t mode)
+{
+	int ofd;
+
+	if (robust_unlink(dest) && errno != ENOENT) {
+		int save_errno = errno;
+		rsyserr(FERROR_XFER, errno, "unlink %s", full_fname(dest));
+		errno = save_errno;
+		return -1;
+	}
+
+#ifdef SUPPORT_XATTRS
+	if (preserve_xattrs)
+		mode |= S_IWUSR;
+#endif
+	mode &= INITACCESSPERMS;
+	if ((ofd = do_open(dest, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, mode)) < 0) {
+		int save_errno = errno;
+		rsyserr(FERROR_XFER, save_errno, "open %s", full_fname(dest));
+		errno = save_errno;
+		return -1;
+	}
+	return ofd;
+}
+
+/* Copy contents of file @source to file @dest with mode @mode.
+ *
+ * If @tmpfilefd is <0, copy_file unlinks @dest and then opens a new
+ * file with name @dest.
+ *
+ * Otherwise, copy_file writes to and closes the provided file
+ * descriptor.
+ *
  * In either case, if --xattrs are being preserved, the dest file will
  * have its xattrs set from the source file.
  *
  * This is used in conjunction with the --temp-dir, --backup, and
  * --copy-dest options. */
-int copy_file(const char *source, const char *dest, int ofd, mode_t mode)
+int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
 {
-	int ifd;
+	int ifd, ofd;
 	char buf[1024 * 8];
 	int len;   /* Number of bytes read into `buf'. */
 	OFF_T prealloc_len = 0, offset = 0;
@@ -341,23 +373,12 @@ int copy_file(const char *source, const char *dest, int ofd, mode_t mode)
 		return -1;
 	}
 
-	if (ofd < 0) {
-		if (robust_unlink(dest) && errno != ENOENT) {
+	if (tmpfilefd >= 0) {
+		ofd = tmpfilefd;
+	} else {
+		ofd = unlink_and_reopen(dest, mode);
+		if (ofd < 0) {
 			int save_errno = errno;
-			rsyserr(FERROR_XFER, errno, "unlink %s", full_fname(dest));
-			close(ifd);
-			errno = save_errno;
-			return -1;
-		}
-
-#ifdef SUPPORT_XATTRS
-		if (preserve_xattrs)
-			mode |= S_IWUSR;
-#endif
-		mode &= INITACCESSPERMS;
-		if ((ofd = do_open(dest, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, mode)) < 0) {
-			int save_errno = errno;
-			rsyserr(FERROR_XFER, save_errno, "open %s", full_fname(dest));
 			close(ifd);
 			errno = save_errno;
 			return -1;
