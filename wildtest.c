@@ -105,13 +105,68 @@ run_test(int line, bool matches,
     }
 }
 
+static int
+parse_line(char ** argv, int line, char * buf, int * flag, char ** end, char ** string)
+{
+    int i;
+    char * s;
+
+    if (*buf == '#' || *buf == '\n')
+        return 0;
+
+    for (s = buf, i = 0; i <= 1; i++) {
+        if (*s == '1')
+	   flag[i] = 1;
+	else if (*s == '0')
+	    flag[i] = 0;
+	else
+	    flag[i] = -1;
+	if (*++s != ' ' && *s != '\t')
+	    flag[i] = -1;
+	if (flag[i] < 0) {
+	    fprintf(stderr, "Invalid flag syntax on line %d of %s:\n%s",
+		    line, *argv, buf);
+	    exit(1);
+	}
+	while (*++s == ' ' || *s == '\t') {}
+    }
+
+    for (i = 0; i <= 1; i++) {
+	if (*s == '\'' || *s == '"' || *s == '`') {
+	    char quote = *s++;
+	    string[i] = s;
+	    while (*s && *s != quote) s++;
+	    if (!*s) {
+		fprintf(stderr, "Unmatched quote on line %d of %s:\n%s",
+			line, *argv, buf);
+		exit(1);
+	    }
+	    end[i] = s;
+	}
+	else {
+	    if (!*s || *s == '\n') {
+		fprintf(stderr, "Not enough strings on line %d of %s:\n%s",
+			line, *argv, buf);
+		exit(1);
+	    }
+	    string[i] = s;
+	    while (*++s && *s != ' ' && *s != '\t' && *s != '\n') {}
+	    end[i] = s;
+	}
+	while (*++s == ' ' || *s == '\t') {}
+    }
+    *end[0] = *end[1] = '\0';
+
+    return 1;
+}
+
 int
 main(int argc, char **argv)
 {
-    char buf[2048], *s, *string[2], *end[2];
+    char buf[2048], *string[2], *end[2];
     const char *arg;
     FILE *fp;
-    int opt, line, i, flag[2];
+    int opt, line, flag[2];
     poptContext pc = poptGetContext("wildtest", argc, (const char**)argv,
 				    long_options, 0);
 
@@ -152,49 +207,10 @@ main(int argc, char **argv)
     line = 0;
     while (fgets(buf, sizeof buf, fp)) {
 	line++;
-	if (*buf == '#' || *buf == '\n')
-	    continue;
-	for (s = buf, i = 0; i <= 1; i++) {
-	    if (*s == '1')
-		flag[i] = 1;
-	    else if (*s == '0')
-		flag[i] = 0;
-	    else
-		flag[i] = -1;
-	    if (*++s != ' ' && *s != '\t')
-		flag[i] = -1;
-	    if (flag[i] < 0) {
-		fprintf(stderr, "Invalid flag syntax on line %d of %s:\n%s",
-			line, *argv, buf);
-		exit(1);
-	    }
-	    while (*++s == ' ' || *s == '\t') {}
-	}
-	for (i = 0; i <= 1; i++) {
-	    if (*s == '\'' || *s == '"' || *s == '`') {
-		char quote = *s++;
-		string[i] = s;
-		while (*s && *s != quote) s++;
-		if (!*s) {
-		    fprintf(stderr, "Unmatched quote on line %d of %s:\n%s",
-			    line, *argv, buf);
-		    exit(1);
-		}
-		end[i] = s;
-	    }
-	    else {
-		if (!*s || *s == '\n') {
-		    fprintf(stderr, "Not enough strings on line %d of %s:\n%s",
-			    line, *argv, buf);
-		    exit(1);
-		}
-		string[i] = s;
-		while (*++s && *s != ' ' && *s != '\t' && *s != '\n') {}
-		end[i] = s;
-	    }
-	    while (*++s == ' ' || *s == '\t') {}
-	}
-	*end[0] = *end[1] = '\0';
+
+	if (parse_line(argv, line, buf, flag, end, string) == 0)
+	  continue;
+
 	run_test(line, flag[0],
 #ifdef COMPARE_WITH_FNMATCH
 		 flag[1],
