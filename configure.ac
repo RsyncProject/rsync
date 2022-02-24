@@ -201,6 +201,16 @@ else
 fi
 AC_DEFINE_UNQUOTED(RSYNC_RSH, "$RSYNC_RSH", [default -e command])
 
+AC_ARG_WITH(check,
+	AS_HELP_STRING([--with-check],[enable unit tests with libcheck (default: no)]))
+
+if test x"$with_check" != x; then
+	RSYNC_CHECK_UNIT="check_unit"
+else
+	RSYNC_CHECK_UNIT=""
+fi
+AC_SUBST(RSYNC_CHECK_UNIT)
+
 # Some programs on solaris are only found in /usr/xpg4/bin (or work better than others versions).
 AC_PATH_PROG(SHELL_PATH, sh, /bin/sh, [/usr/xpg4/bin$PATH_SEPARATOR$PATH])
 AC_PATH_PROG(FAKEROOT_PATH, fakeroot, /usr/bin/fakeroot, [/usr/xpg4/bin$PATH_SEPARATOR$PATH])

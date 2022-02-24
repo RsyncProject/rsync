@@ -54,9 +54,13 @@ OBJS=$(OBJS1) $(OBJS2) $(OBJS3) $(DAEMON_OBJ) $(LIBOBJ) @BUILD_ZLIB@ @BUILD_POPT
 
 TLS_OBJ = tls.o syscall.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/permstring.o lib/sysxattrs.o @BUILD_POPT@
 
+# Programs we must have to run unit tests
+UNIT_EXES=check/wildtest$(EXEEXT)
+
 # Programs we must have to run the test cases
 CHECK_PROGS = rsync$(EXEEXT) tls$(EXEEXT) getgroups$(EXEEXT) getfsdev$(EXEEXT) \
-	testrun$(EXEEXT) trimslash$(EXEEXT) t_unsafe$(EXEEXT) wildtest$(EXEEXT)
+	testrun$(EXEEXT) trimslash$(EXEEXT) t_unsafe$(EXEEXT) wildtest$(EXEEXT) \
+	$(UNIT_EXES)
 
 CHECK_SYMLINKS = testsuite/chown-fake.test testsuite/devices-fake.test testsuite/xattrs-hlink.test
 
@@ -316,15 +320,15 @@ test: check
 # might lose in the future where POSIX diverges from old sh.
 
 .PHONY: check
-check: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
+check: all @RSYNC_CHECK_UNIT@ $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	rsync_bin=`pwd`/rsync$(EXEEXT) $(srcdir)/runtests.sh
 
 .PHONY: check29
-check29: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
+check29: all @RSYNC_CHECK_UNIT@ $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	rsync_bin=`pwd`/rsync$(EXEEXT) $(srcdir)/runtests.sh --protocol=29
 
 .PHONY: check30
-check30: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
+check30: all @RSYNC_CHECK_UNIT@ $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	rsync_bin=`pwd`/rsync$(EXEEXT) $(srcdir)/runtests.sh --protocol=30
 
 wildtest.o: wildtest.c t_stub.o lib/wildmatch.c rsync.h config.h
@@ -339,6 +343,15 @@ testsuite/devices-fake.test:
 
 testsuite/xattrs-hlink.test:
 	ln -s xattrs.test $(srcdir)/testsuite/xattrs-hlink.test
+
+.PHONY: check_unit
+check_unit: $(UNIT_EXES)
+	@for unit in $(UNIT_EXES); do \
+	  $${unit} ;\
+	done
+
+check/wildtest$(EXEEXT): check/wildtest.c wildtest.c lib/wildmatch.c rsync.h config.h Makefile
+	$(CC) -ggdb $(CFLAGS) $(LDFLAGS) -I.. -I. -Wno-unused-parameter -Wno-unused-function -o $@ check/wildtest.c $(LIBS) -lcheck
 
 # This does *not* depend on building or installing: you can use it to
 # check a version installed from a binary or some other source tree,
