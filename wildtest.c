@@ -160,6 +160,7 @@ parse_line(char ** argv, int line, char * buf, int * flag, char ** end, char ** 
     return 1;
 }
 
+#ifndef RSYNC_WILDTEST_NO_MAIN
 int
 main(int argc, char **argv)
 {
@@ -235,3 +236,4 @@ main(int argc, char **argv)
 
     return 0;
 }
+#endif /* RSYNC_WILDTEST_NO_MAIN */
