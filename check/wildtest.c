@@ -115,6 +115,98 @@ START_TEST(wildtest_fnmatch) {
     ck_assert_int_eq(line, 165);
 }
 
+struct mode {
+    int explode_mod;
+    int empty_at_start;
+    int empty_at_end;
+    int empties_mod;
+};
+
+/* modes extracted from testsuite/wildmatch.txt */
+struct mode modes[] = {
+    /* -x1           : */ {1, 0, 0, 1024},
+    /* -x1 -e1       : */ {1, 0, 0, 1},
+    /* -x1 -e1se     : */ {1, 1, 1, 1},
+    /* -x2           : */ {2, 0, 0, 1024},
+    /* -x2 -ese      : */ {2, 1, 1, 1024},
+    /* -x3           : */ {3, 0, 0, 1024},
+    /* -x3 -e1       : */ {3, 0, 0, 1},
+    /* -x4           : */ {4, 0, 0, 1024},
+    /* -x4 -e2e      : */ {4, 0, 1, 2},
+    /* -x5           : */ {5, 0, 0, 1024},
+    /* -x5 -es       : */ {5, 1, 0, 1024},
+};
+const int mode_count = sizeof(modes) / sizeof(modes[0]);
+
+static void explode(const char *text, char *buf, char **texts,
+                    struct mode *mode) {
+    int pos = 0, cnt = 0, ndx = 0, len = strlen(text);
+
+    int explode_mod = mode->explode_mod;
+    int empty_at_start = mode->empty_at_start;
+    int empty_at_end = mode->empty_at_end;
+    int empties_mod = mode->empties_mod;
+
+    if (empty_at_start)
+	texts[ndx++] = "";
+    /* An empty string must turn into at least one empty array item. */
+    while (1) {
+	texts[ndx] = buf + ndx * (explode_mod + 1);
+	strlcpy(texts[ndx++], text + pos, explode_mod + 1);
+	if (pos + explode_mod >= len)
+	    break;
+	pos += explode_mod;
+	if (!(++cnt % empties_mod))
+	    texts[ndx++] = "";
+    }
+    if (empty_at_end)
+	texts[ndx++] = "";
+    texts[ndx] = NULL;
+}
+
+START_TEST(wildtest_exploded) {
+    FILE *fp = NULL;
+
+    char *file = "./wildtest.txt";
+
+    char buf[2048], *string[2], *end[2];
+    int flag[2];
+
+    if ((fp = fopen(file, "r")) == NULL) {
+        ck_assert_msg(fp != NULL, "Unable to open %s", file);
+        return;
+    }
+
+    int line = 0;
+    while (fgets(buf, sizeof buf, fp)) {
+        line++;
+
+        if (parse_line(&file, line, buf, flag, end, string) == 0)
+            continue;
+
+        char *text = string[0];
+        char *pattern = string[1];
+        int matches = flag[0];
+
+        int mode = 0;
+        for (mode = 0; mode < mode_count; mode++) {
+
+            char explodebuf[MAXPATHLEN * 2], *texts[MAXPATHLEN];
+            explode(text, explodebuf, texts, &modes[mode]);
+
+            bool matched = wildmatch_array(pattern, (const char **)texts, 0);
+
+            ck_assert_msg(matched == matches,
+                          "wildmatch (explode mode %d) failure on line %d:\n  "
+                          "%s\n  %s\n  expected %s match\n",
+                          mode, line, text, pattern, matches ? "a" : "NO");
+        }
+    }
+
+    fclose(fp);
+    ck_assert_int_eq(line, 165);
+}
+
 Suite *wildtest_suite() {
     Suite *s;
     TCase *tcase;
@@ -130,6 +222,10 @@ Suite *wildtest_suite() {
 
     tcase = tcase_create("wildtest (fnmatch) - wildtest_fnmatch.txt");
     tcase_add_test(tcase, wildtest_fnmatch);
+    suite_add_tcase(s, tcase);
+
+    tcase = tcase_create("wildtest (exploded) - wildtest.txt");
+    tcase_add_test(tcase, wildtest_exploded);
     suite_add_tcase(s, tcase);
 
     return s;
