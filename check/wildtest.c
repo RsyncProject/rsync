@@ -148,19 +148,19 @@ static void explode(const char *text, char *buf, char **texts,
     int empties_mod = mode->empties_mod;
 
     if (empty_at_start)
-	texts[ndx++] = "";
+        texts[ndx++] = "";
     /* An empty string must turn into at least one empty array item. */
     while (1) {
-	texts[ndx] = buf + ndx * (explode_mod + 1);
-	strlcpy(texts[ndx++], text + pos, explode_mod + 1);
-	if (pos + explode_mod >= len)
-	    break;
-	pos += explode_mod;
-	if (!(++cnt % empties_mod))
-	    texts[ndx++] = "";
+        texts[ndx] = buf + ndx * (explode_mod + 1);
+        strlcpy(texts[ndx++], text + pos, explode_mod + 1);
+        if (pos + explode_mod >= len)
+            break;
+        pos += explode_mod;
+        if (!(++cnt % empties_mod))
+            texts[ndx++] = "";
     }
     if (empty_at_end)
-	texts[ndx++] = "";
+        texts[ndx++] = "";
     texts[ndx] = NULL;
 }
 
