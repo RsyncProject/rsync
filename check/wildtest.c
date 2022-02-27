@@ -246,6 +246,32 @@ START_TEST(wildtest_trailing_N_elements) {
     result = trailing_N_elements(&a, 3);
     ck_assert_ptr_eq(result, NULL);
 }
+
+START_TEST(wildtest_array) {
+    const char * const texts[] = { "foo", "bar", NULL };
+
+    ck_assert_int_eq(wildmatch_array("foobar", texts, 0), 1);
+    ck_assert_int_eq(wildmatch_array("foobaz", texts, 0), 0);
+    ck_assert_int_eq(wildmatch_array("fobbar", texts, 0), 0);
+
+    ck_assert_int_eq(wildmatch_array("foobar", texts, 2), 0);
+
+    const char * const texts_2[] = { "foo/", "bar/", "baz/", "bletch", NULL };
+    ck_assert_int_eq(wildmatch_array("baz/bletch", texts_2, 2), 1);
+    ck_assert_int_eq(wildmatch_array("*/bletch", texts_2, 2), 1);
+
+    const char * const texts_3[] = { "foo/", "bar/", "baz/", "bletch", NULL };
+    ck_assert_int_eq(wildmatch_array("bar/baz/bletch", texts_3, -1), 1);
+    ck_assert_int_eq(wildmatch_array("**/baz/*", texts_3, -1), 1);
+
+    const char * const texts_4[] = { "foo/", "bar/", "", "", "", "baz/", "bletch", "", "", NULL };
+    ck_assert_int_eq(wildmatch_array("bar/**/bletch", texts_4, -1), 1);
+    ck_assert_int_eq(wildmatch_array("baz/bletch/**", texts_4, -1), 0);
+
+    const char * const texts_5[] = { "foo", NULL };
+    ck_assert_int_eq(wildmatch_array("bletch/**", texts_5, -1), 0);
+}
+
 Suite *wildtest_suite() {
     Suite *s;
     TCase *tcase;
