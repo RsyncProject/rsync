@@ -293,6 +293,10 @@ Suite *wildtest_suite() {
     tcase_add_test(tcase, wildtest_exploded);
     suite_add_tcase(s, tcase);
 
+    tcase = tcase_create("wildtest doliteral");
+    tcase_add_test(tcase, wildtest_doliteral);
+    suite_add_tcase(s, tcase);
+
     return s;
 }
 
