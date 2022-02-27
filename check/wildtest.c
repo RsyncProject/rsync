@@ -219,6 +219,33 @@ START_TEST(wildtest_doliteral) {
     ck_assert_int_eq(doliteral((uchar *)"fooabc", (uchar *)"foo", (const uchar * const *)abcd), 0);
 }
 
+START_TEST(wildtest_trailing_N_elements) {
+    char path1[] = "foo/bar/baz/bletch";
+    char * path1_bletch = path1+12;
+
+    const char * const texts[] = { path1, NULL };
+    const uchar * const * a = (const uchar*const*)texts;
+
+    ck_assert_ptr_eq(trailing_N_elements(&a, 1), path1_bletch);
+
+    char path2_a[] = "foobarbaz";
+    char path2_b[] = "";
+
+    const char * const texts_2[] = { path2_a, path2_b, NULL };
+    a = (const uchar*const*)texts_2;
+
+    const uchar *result = trailing_N_elements(&a, 1);
+    ck_assert_str_eq((const char *)result, path2_a);
+
+    char path3_a[] = "foobarbaz";
+    char path3_b[] = "";
+
+    const char * const texts_3[] = { path3_a, path3_b, NULL };
+    a = (const uchar*const*)texts_3;
+
+    result = trailing_N_elements(&a, 3);
+    ck_assert_ptr_eq(result, NULL);
+}
 Suite *wildtest_suite() {
     Suite *s;
     TCase *tcase;
