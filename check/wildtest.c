@@ -7,7 +7,7 @@
 START_TEST(wildtest_legacyfile) {
     FILE *fp = NULL;
 
-    char *file = "./wildtest.txt";
+    char *file = "./check/wildtest.txt";
 
     char buf[2048], *string[2], *end[2];
     int flag[2];
@@ -37,7 +37,6 @@ START_TEST(wildtest_legacyfile) {
     }
 
     fclose(fp);
-    ck_assert_int_eq(line, 165);
 }
 
 START_TEST(wildtest_insensitive) {
@@ -112,7 +111,6 @@ START_TEST(wildtest_fnmatch) {
     }
 
     fclose(fp);
-    ck_assert_int_eq(line, 165);
 }
 
 struct mode {
