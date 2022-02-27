@@ -272,6 +272,18 @@ START_TEST(wildtest_array) {
     ck_assert_int_eq(wildmatch_array("bletch/**", texts_5, -1), 0);
 }
 
+START_TEST(test_litmatch_array) {
+    const char * const texts[] = { "foo/", "bar", NULL };
+
+    ck_assert_int_eq(litmatch_array("bar", texts, 1), 1);
+    ck_assert_int_eq(litmatch_array("foo/bar", texts, 0), 1);
+    ck_assert_int_eq(litmatch_array("foo/baz", texts, 0), 0);
+
+    const char * const texts_2[] = { NULL };
+
+    ck_assert_int_eq(litmatch_array("foo/bar", texts_2, -1), 0);
+}
+
 Suite *wildtest_suite() {
     Suite *s;
     TCase *tcase;
@@ -303,6 +315,10 @@ Suite *wildtest_suite() {
 
     tcase = tcase_create("wildtest_array");
     tcase_add_test(tcase, wildtest_array);
+    suite_add_tcase(s, tcase);
+
+    tcase = tcase_create("litmatch_array");
+    tcase_add_test(tcase, test_litmatch_array);
     suite_add_tcase(s, tcase);
 
     return s;
