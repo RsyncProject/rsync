@@ -297,6 +297,10 @@ Suite *wildtest_suite() {
     tcase_add_test(tcase, wildtest_doliteral);
     suite_add_tcase(s, tcase);
 
+    tcase = tcase_create("wildtest trailing_N_elements");
+    tcase_add_test(tcase, wildtest_trailing_N_elements);
+    suite_add_tcase(s, tcase);
+
     return s;
 }
 
