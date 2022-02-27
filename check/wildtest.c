@@ -205,6 +205,20 @@ START_TEST(wildtest_exploded) {
     ck_assert_int_eq(line, 165);
 }
 
+START_TEST(wildtest_doliteral) {
+    char* nulls[] = { NULL, NULL, NULL, NULL };
+    char* abc[] = { "ab", "", "c", NULL };
+    char* abcd[] = { "ab", "", "c", "d", NULL };
+
+    ck_assert_int_eq(doliteral((uchar *)"foo", (uchar *)"foo", (const uchar * const *)nulls), 1);
+    ck_assert_int_eq(doliteral((uchar *)"foo", (uchar *)"roo", (const uchar * const *)nulls), 0);
+
+    ck_assert_int_eq(doliteral((uchar *)"fooabc", (uchar *)"foo", (const uchar * const *)abc), 1);
+
+    ck_assert_int_eq(doliteral((uchar *)"fooabcd", (uchar *)"foo", (const uchar * const *)abc), 0);
+    ck_assert_int_eq(doliteral((uchar *)"fooabc", (uchar *)"foo", (const uchar * const *)abcd), 0);
+}
+
 Suite *wildtest_suite() {
     Suite *s;
     TCase *tcase;
