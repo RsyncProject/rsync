@@ -1,15 +1,21 @@
+#include "config.h"
+
+#ifdef USE_ROLL_ASM /* { */
+
+#define CHAR_OFFSET 0 /* Keep this the same as rsync.h, which isn't likely to change. */
+
 #ifdef __APPLE__
-#define get_checksum1_avx2  _get_checksum1_avx2
+#define get_checksum1_avx2_asm  _get_checksum1_avx2_asm
 #endif
 
 .intel_syntax noprefix
 .text
 
 	.p2align 5
-	.globl get_checksum1_avx2
+	.globl get_checksum1_avx2_asm
 
 # rdi=*buf, esi=len, edx=i, rcx= *ps1, r8= *ps2
-get_checksum1_avx2:
+get_checksum1_avx2_asm:
 	vmovd	xmm6,[rcx] # load *ps1
 	lea	eax, [rsi-128] # at least 128 bytes to process?
 	cmp	edx, eax
@@ -167,3 +173,5 @@ get_checksum1_avx2:
 	.byte 3
 	.byte 2
 	.byte 1
+
+#endif /* } USE_ROLL_ASM */

@@ -179,7 +179,7 @@ int canonical_checksum(int csum_type)
 	return 0;
 }
 
-#ifndef HAVE_SIMD /* See simd-checksum-*.cpp. */
+#ifndef USE_ROLL_SIMD /* See simd-checksum-*.cpp. */
 /*
   a simple 32 bit checksum that can be updated from either end
   (inspired by Mark Adler's Adler-32 checksum)
@@ -222,23 +222,23 @@ void get_checksum2(char *buf, int32 len, char *sum)
 	  }
 #endif
 	  case CSUM_MD5: {
-		MD5_CTX m5;
+		md5_context m5;
 		uchar seedbuf[4];
-		MD5_Init(&m5);
+		md5_begin(&m5);
 		if (proper_seed_order) {
 			if (checksum_seed) {
 				SIVALu(seedbuf, 0, checksum_seed);
-				MD5_Update(&m5, seedbuf, 4);
+				md5_update(&m5, seedbuf, 4);
 			}
-			MD5_Update(&m5, (uchar *)buf, len);
+			md5_update(&m5, (uchar *)buf, len);
 		} else {
-			MD5_Update(&m5, (uchar *)buf, len);
+			md5_update(&m5, (uchar *)buf, len);
 			if (checksum_seed) {
 				SIVALu(seedbuf, 0, checksum_seed);
-				MD5_Update(&m5, seedbuf, 4);
+				md5_update(&m5, seedbuf, 4);
 			}
 		}
-		MD5_Final((uchar *)sum, &m5);
+		md5_result(&m5, (uchar *)sum);
 		break;
 	  }
 	  case CSUM_MD4:
@@ -374,18 +374,18 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 	  }
 #endif
 	  case CSUM_MD5: {
-		MD5_CTX m5;
+		md5_context m5;
 
-		MD5_Init(&m5);
+		md5_begin(&m5);
 
 		for (i = 0; i + CHUNK_SIZE <= len; i += CHUNK_SIZE)
-			MD5_Update(&m5, (uchar *)map_ptr(buf, i, CHUNK_SIZE), CHUNK_SIZE);
+			md5_update(&m5, (uchar *)map_ptr(buf, i, CHUNK_SIZE), CHUNK_SIZE);
 
 		remainder = (int32)(len - i);
 		if (remainder > 0)
-			MD5_Update(&m5, (uchar *)map_ptr(buf, i, remainder), remainder);
+			md5_update(&m5, (uchar *)map_ptr(buf, i, remainder), remainder);
 
-		MD5_Final((uchar *)sum, &m5);
+		md5_result(&m5, (uchar *)sum);
 		break;
 	  }
 	  case CSUM_MD4:
@@ -443,7 +443,7 @@ static union {
 #ifdef USE_OPENSSL
 	MD4_CTX m4;
 #endif
-	MD5_CTX m5;
+	md5_context m5;
 } ctx;
 #ifdef SUPPORT_XXHASH
 static XXH64_state_t* xxh64_state;
@@ -482,7 +482,7 @@ void sum_init(int csum_type, int seed)
 		break;
 #endif
 	  case CSUM_MD5:
-		MD5_Init(&ctx.m5);
+		md5_begin(&ctx.m5);
 		break;
 	  case CSUM_MD4:
 #ifdef USE_OPENSSL
@@ -532,7 +532,7 @@ void sum_update(const char *p, int32 len)
 		break;
 #endif
 	  case CSUM_MD5:
-		MD5_Update(&ctx.m5, (uchar *)p, len);
+		md5_update(&ctx.m5, (uchar *)p, len);
 		break;
 	  case CSUM_MD4:
 #ifdef USE_OPENSSL
@@ -597,7 +597,7 @@ int sum_end(char *sum)
 	  }
 #endif
 	  case CSUM_MD5:
-		MD5_Final((uchar *)sum, &ctx.m5);
+		md5_result(&ctx.m5, (uchar *)sum);
 		break;
 	  case CSUM_MD4:
 #ifdef USE_OPENSSL

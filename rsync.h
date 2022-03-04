@@ -18,11 +18,6 @@
  * with this program; if not, visit the http://fsf.org website.
  */
 
-/* a non-zero CHAR_OFFSET makes the rolling sum stronger, but is
-   incompatible with older versions :-( */
-#define CHAR_OFFSET 0
-
-#ifndef AVX2_ASM /* do not include the rest of file for assembly */
 #define False 0
 #define True 1
 #define Unset (-1) /* Our BOOL values are always an int. */
@@ -43,6 +38,9 @@
 
 #define BACKUP_SUFFIX "~"
 
+/* a non-zero CHAR_OFFSET makes the rolling sum stronger, but is
+   incompatible with older versions :-( */
+#define CHAR_OFFSET 0
 
 /* These flags are only used during the flist transfer. */
 
@@ -1477,7 +1475,6 @@ const char *get_panic_action(void);
     fprintf(stderr, "%s in %s at line %d\n", msg, __FILE__, __LINE__); \
     exit_cleanup(RERR_UNSUPPORTED); \
 } while (0)
-#endif  /* AVX2_ASM */
 
 #ifdef HAVE_MALLINFO2
 #define MEM_ALLOC_INFO mallinfo2

@@ -27,7 +27,7 @@
 #include "config.h"
 #include "md-defines.h"
 
-#if !defined USE_OPENSSL && CSUM_CHUNK == 64
+#ifdef USE_MD5_ASM /* { */
 
 #ifdef __APPLE__
 #define md5_process_asm _md5_process_asm
@@ -698,4 +698,4 @@ md5_process_asm:
 	pop	%rbp
 	ret
 
-#endif /* !USE_OPENSSL ... */
+#endif /* } USE_MD5_ASM */

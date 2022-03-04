@@ -139,20 +139,25 @@ static void print_info_flags(enum logcode f)
 
 	"*Optimizations",
 
-#ifndef HAVE_SIMD
+#ifndef USE_ROLL_SIMD
 		"no "
 #endif
-			"SIMD",
+			"SIMD-roll",
 
-#if !defined HAVE_ASM || defined USE_OPENSSL
+#ifndef USE_ROLL_ASM
 		"no "
 #endif
-			"asm",
+			"asm-roll",
 
 #ifndef USE_OPENSSL
 		"no "
 #endif
 			"openssl-crypto",
+
+#ifndef USE_MD5_ASM
+		"no "
+#endif
+			"asm-MD5",
 
 		NULL
 	};

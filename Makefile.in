@@ -30,8 +30,9 @@ SHELL=/bin/sh
 .SUFFIXES:
 .SUFFIXES: .c .o
 
-SIMD_x86_64=simd-checksum-x86_64.o simd-checksum-avx2.o
-ASM_x86_64=lib/md5-asm-x86_64.o
+ROLL_SIMD_x86_64=simd-checksum-x86_64.o
+ROLL_ASM_x86_64=simd-checksum-avx2.o
+MD5_ASM_x86_64=lib/md5-asm-x86_64.o
 
 GENFILES=configure.sh aclocal.m4 config.h.in rsync.1 rsync.1.html \
 	 rsync-ssl.1 rsync-ssl.1.html rsyncd.conf.5 rsyncd.conf.5.html \
@@ -46,7 +47,7 @@ OBJS1=flist.o rsync.o generator.o receiver.o cleanup.o sender.o exclude.o \
 	util1.o util2.o main.o checksum.o match.o syscall.o log.o backup.o delete.o
 OBJS2=options.o io.o compat.o hlink.o token.o uidlist.o socket.o hashtable.o \
 	usage.o fileio.o batch.o clientname.o chmod.o acls.o xattrs.o
-OBJS3=progress.o pipe.o @ASM@ @SIMD@
+OBJS3=progress.o pipe.o @MD5_ASM@ @ROLL_SIMD@ @ROLL_ASM@
 DAEMON_OBJ = params.o loadparm.o clientserver.o access.o connection.o authenticate.o
 popt_OBJS=popt/findme.o  popt/popt.o  popt/poptconfig.o \
 	popt/popthelp.o popt/poptparse.o
@@ -147,13 +148,13 @@ git-version.h: ALWAYS_RUN
 ALWAYS_RUN:
 
 simd-checksum-x86_64.o: simd-checksum-x86_64.cpp
-	@$(srcdir)/cmd-or-msg disable-simd $(CXX) -I. $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $(srcdir)/simd-checksum-x86_64.cpp
+	@$(srcdir)/cmd-or-msg disable-roll-simd $(CXX) -I. $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $(srcdir)/simd-checksum-x86_64.cpp
 
 simd-checksum-avx2.o: simd-checksum-avx2.S
-	@$(srcdir)/cmd-or-msg disable-asm $(CC) $(CFLAGS) --include=$(srcdir)/rsync.h -DAVX2_ASM -I. @NOEXECSTACK@ -c -o $@ $(srcdir)/simd-checksum-avx2.S
+	@$(srcdir)/cmd-or-msg disable-roll-asm $(CC) $(CFLAGS) -I. @NOEXECSTACK@ -c -o $@ $(srcdir)/simd-checksum-avx2.S
 
-lib/md5-asm-x86_64.o: lib/md5-asm-x86_64.S config.h lib/md-defines.h
-	@$(srcdir)/cmd-or-msg disable-asm $(CC) -I. @NOEXECSTACK@ -c -o $@ $(srcdir)/lib/md5-asm-x86_64.S
+lib/md5-asm-x86_64.o: lib/md5-asm-x86_64.S lib/md-defines.h
+	@$(srcdir)/cmd-or-msg disable-md5-asm $(CC) -I. @NOEXECSTACK@ -c -o $@ $(srcdir)/lib/md5-asm-x86_64.S
 
 tls$(EXEEXT): $(TLS_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(TLS_OBJ) $(LIBS)

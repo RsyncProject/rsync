@@ -136,7 +136,8 @@
    (keeping the behavior the same as before), so specifying `--info=nonreg0`
    can be used to turn the warnings off.
 
- - More ASM optimizations from Shark64.
+ - An optional asm optimization for the rolling checksum from Shark64. Enable
+   it with `./configure --enable-roll-asm`.
 
  - Using `--debug=FILTER` now outputs a caution message if a filter rule
    has trailing whitespace.
@@ -192,13 +193,23 @@
    using the output of `git describe` when building inside a non-shallow git
    checkout, though.)
 
- - Improved the IPv6 determination in configure.
+ - Renamed configure's `--enable-simd` option to `--enable-roll-simd` and added
+   the option `--enable-roll-asm` to use the new asm version of the code.  Both
+   are x86_64/amd64 only.
 
- - Made SIMD & ASM configure default to "no" on non-Linux hosts due to various
-   reports of problems on NetBSD & macOS hosts.  These tests were also tweaked
-   to allow enabling the feature on a host_cpu of amd64 (was only x86_64).
+ - Renamed configure's `--enable-asm` option to `--enable-md5-asm` to avoid
+   confusion with the asm option for the rolling checksum.  It is also honored
+   even when openssl crypto is in use.  This allows: normal MD4 & MD5, normal
+   MD4 + asm MD5, openssl MD4 & MD5, or openssl MD4 + asm MD5.
+
+ - Made SIMD & asm configure checks default to "no" on non-Linux hosts due to
+   various reports of problems on NetBSD & macOS hosts.  These were also
+   tweaked to allow enabling the feature on a host_cpu of amd64 (was only
+   allowed on x86_64 before).
 
  - Fixed configure to not fail at the SIMD check when cross-compiling.
+
+ - Improved the IPv6 determination in configure.
 
  - Compile the C files with `-pedantic-errors` (when possible) so that we will
    get warned if a static initialization overflows in the future (among other

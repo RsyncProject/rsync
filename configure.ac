@@ -229,12 +229,12 @@ fi
 AC_DEFINE_UNQUOTED(NOBODY_USER, "$NOBODY_USER", [unprivileged user--e.g. nobody])
 AC_DEFINE_UNQUOTED(NOBODY_GROUP, "$NOBODY_GROUP", [unprivileged group for unprivileged user])
 
-# SIMD optimizations
-SIMD=
+# rolling-checksum SIMD optimizations
+ROLL_SIMD=
 
-AC_MSG_CHECKING([whether to enable SIMD optimizations])
-AC_ARG_ENABLE(simd,
-    AS_HELP_STRING([--enable-simd],[enable/disable to control SIMD optimizations (requires c++)]))
+AC_MSG_CHECKING([whether to enable rolling-checksum SIMD optimizations])
+AC_ARG_ENABLE(roll-simd,
+    AS_HELP_STRING([--enable-roll-simd],[enable/disable to control rolling-checksum SIMD optimizations (requires c++)]))
 
 # Clag is crashing with -g -O2, so we'll get rid of -g for now.
 CXXFLAGS=`echo "$CXXFLAGS" | sed 's/-g //'`
@@ -263,14 +263,14 @@ __attribute__ ((target("ssse3"))) void more_testing(char* buf, int len)
 }
 ]])
 
-if test x"$enable_simd" = x""; then
+if test x"$enable_roll_simd" = x""; then
     case "$host_os" in
 	*linux*) ;;
-	*) enable_simd=no ;;
+	*) enable_roll_simd=no ;;
     esac
 fi
 
-if test x"$enable_simd" != x"no"; then
+if test x"$enable_roll_simd" != x"no"; then
     # For x86-64 SIMD, g++ >=5 or clang++ >=7 is required
     if test x"$host_cpu" = x"x86_64" || test x"$host_cpu" = x"amd64"; then
 	AC_LANG(C++)
@@ -283,23 +283,23 @@ if test x"$enable_simd" != x"no"; then
 	AC_LANG(C)
 	if test x"$CXX_OK" = x"yes"; then
 	    # AC_MSG_RESULT() is called below.
-	    SIMD="$host_cpu"
-	elif test x"$enable_simd" = x"yes"; then
+	    ROLL_SIMD="$host_cpu"
+	elif test x"$enable_roll_simd" = x"yes"; then
 	    AC_MSG_RESULT(error)
-	    AC_MSG_ERROR(The SIMD compilation test failed.
-Omit --enable-simd to continue without it.)
+	    AC_MSG_ERROR(The rolling-checksum SIMD compilation test failed.
+Omit --enable-roll-simd to continue without it.)
 	fi
-    elif test x"$enable_simd" = x"yes"; then
+    elif test x"$enable_roll_simd" = x"yes"; then
         AC_MSG_RESULT(unavailable)
-        AC_MSG_ERROR(The SIMD optimizations are currently x86_64|amd64 only.
-Omit --enable-simd to continue without it.)
+        AC_MSG_ERROR(The rolling-checksum SIMD optimizations are currently x86_64|amd64 only.
+Omit --enable-roll-simd to continue without it.)
     fi
 fi
 
-if test x"$SIMD" != x""; then
-    AC_MSG_RESULT([yes ($SIMD)])
-    AC_DEFINE(HAVE_SIMD, 1, [Define to 1 to enable SIMD optimizations])
-    SIMD='$(SIMD_'"$SIMD)"
+if test x"$ROLL_SIMD" != x""; then
+    AC_MSG_RESULT([yes ($ROLL_SIMD)])
+    AC_DEFINE(USE_ROLL_SIMD, 1, [Define to 1 to enable rolling-checksum SIMD optimizations])
+    ROLL_SIMD='$(ROLL_SIMD_'"$ROLL_SIMD)"
     # We only use c++ for its target attribute dispatching, disable unneeded bulky features
     CXXFLAGS="$CXXFLAGS -fno-exceptions -fno-rtti"
     # Apple often has "g++" as a symlink for clang. Try to find out the truth.
@@ -311,7 +311,7 @@ else
     AC_MSG_RESULT(no)
 fi
 
-AC_SUBST(SIMD)
+AC_SUBST(ROLL_SIMD)
 
 AC_MSG_CHECKING([if assembler accepts noexecstack])
 OLD_CFLAGS="$CFLAGS"
@@ -433,45 +433,66 @@ if test x"$enable_openssl" != x"no"; then
 	err_msg="$err_msg$nl- Failed to find openssl/md4.h and openssl/md5.h for openssl crypto lib support."
 	no_lib="$no_lib openssl"
     fi
-    if test x"$enable_asm" != x"yes"; then
-	enable_asm=no
+    if test x"$enable_md5_asm" != x"yes"; then
+	enable_md5_asm=no
     fi
 else
     AC_MSG_RESULT(no)
 fi
 
-ASM=
+MD5_ASM=
 
-AC_MSG_CHECKING([whether to enable ASM optimizations])
-AC_ARG_ENABLE(asm,
-    AS_HELP_STRING([--enable-asm],[enable/disable to control ASM optimizations]))
+AC_MSG_CHECKING([whether to enable MD5 ASM optimizations])
+AC_ARG_ENABLE(md5-asm,
+    AS_HELP_STRING([--enable-md5-asm],[enable/disable to control MD5 ASM optimizations]))
 
-if test x"$enable_asm" = x""; then
+if test x"$enable_md5_asm" = x""; then
     case "$host_os" in
 	*linux*) ;;
-	*) enable_asm=no ;;
+	*) enable_md5_asm=no ;;
     esac
 fi
 
-if test x"$enable_asm" != x"no"; then
+if test x"$enable_md5_asm" != x"no"; then
     if test x"$host_cpu" = x"x86_64" || test x"$host_cpu" = x"amd64"; then
-	ASM="$host_cpu"
-    elif test x"$enable_asm" = x"yes"; then
+	MD5_ASM="$host_cpu"
+    elif test x"$enable_md5_asm" = x"yes"; then
         AC_MSG_RESULT(unavailable)
         AC_MSG_ERROR(The ASM optimizations are currently x86_64|amd64 only.
-Omit --enable-asm to continue without it.)
+Omit --enable-md5-asm to continue without it.)
     fi
 fi
 
-if test x"$ASM" != x""; then
-    AC_MSG_RESULT([yes ($ASM)])
-    AC_DEFINE(HAVE_ASM, 1, [Define to 1 to enable ASM optimizations])
-    ASM='$(ASM_'"$ASM)"
+if test x"$MD5_ASM" != x""; then
+    AC_MSG_RESULT([yes ($MD5_ASM)])
+    AC_DEFINE(USE_MD5_ASM, 1, [Define to 1 to enable MD5 ASM optimizations])
+    MD5_ASM='$(MD5_ASM_'"$MD5_ASM)"
 else
     AC_MSG_RESULT(no)
 fi
 
-AC_SUBST(ASM)
+AC_SUBST(MD5_ASM)
+
+ROLL_ASM=
+
+AC_MSG_CHECKING([whether to enable rolling-checksum ASM optimizations])
+AC_ARG_ENABLE(roll-asm,
+    AS_HELP_STRING([--enable-roll-asm],[enable/disable to control rolling-checksum ASM optimizations (requires --enable-roll-simd)]))
+
+if test x"$ROLL_SIMD" = x""; then
+    enable_roll_asm=no
+fi
+
+if test x"$enable_roll_asm" = x"yes"; then
+    ROLL_ASM="$host_cpu"
+    AC_MSG_RESULT([yes ($ROLL_ASM)])
+    AC_DEFINE(USE_ROLL_ASM, 1, [Define to 1 to enable rolling-checksum ASM optimizations (requires --enable-roll-simd)])
+    ROLL_ASM='$(ROLL_ASM_'"$ROLL_ASM)"
+else
+    AC_MSG_RESULT(no)
+fi
+
+AC_SUBST(ROLL_ASM)
 
 AC_MSG_CHECKING([whether to enable xxhash checksum support])
 AC_ARG_ENABLE([xxhash],
@@ -1420,10 +1441,6 @@ esac
 
 AC_CONFIG_FILES([Makefile lib/dummy zlib/dummy popt/dummy shconfig])
 AC_OUTPUT
-
-if test "$enable_openssl" = yes && test "$enable_asm" = yes; then
-    echo "*** Ignoring --enable-asm option -- using openssl for MD5 checksums ***"
-fi
 
 AC_MSG_RESULT()
 AC_MSG_RESULT([    rsync $PACKAGE_VERSION configuration successful])

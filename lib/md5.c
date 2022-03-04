@@ -20,7 +20,7 @@
 
 #include "rsync.h"
 
-#ifndef USE_OPENSSL
+#if !defined USE_OPENSSL || USE_MD5_ASM /* { */
 void md5_begin(md_context *ctx)
 {
 	ctx->A = 0x67452301;
@@ -148,7 +148,10 @@ static void md5_process(md_context *ctx, const uchar data[CSUM_CHUNK])
 	ctx->D += D;
 }
 
-#if defined HAVE_ASM && CSUM_CHUNK == 64
+#ifdef USE_MD5_ASM
+#if CSUM_CHUNK != 64
+#error The MD5 ASM code does not support CSUM_CHUNK != 64
+#endif
 extern void md5_process_asm(md_context *ctx, const void *data, size_t num);
 #endif
 
@@ -176,20 +179,20 @@ void md5_update(md_context *ctx, const uchar *input, uint32 length)
 		left = 0;
 	}
 
-#if defined HAVE_ASM && CSUM_CHUNK == 64
+#ifdef USE_MD5_ASM /* { */
 	if (length >= CSUM_CHUNK) {
 		uint32 chunks = length / CSUM_CHUNK;
 		md5_process_asm(ctx, input, chunks);
 		length -= chunks * CSUM_CHUNK;
 		input += chunks * CSUM_CHUNK;
 	}
-#else
+#else /* } { */
 	while (length >= CSUM_CHUNK) {
 		md5_process(ctx, input);
 		length -= CSUM_CHUNK;
 		input  += CSUM_CHUNK;
 	}
-#endif
+#endif /* } */
 
 	if (length)
 		memcpy(ctx->buffer + left, input, length);
@@ -221,9 +224,9 @@ void md5_result(md_context *ctx, uchar digest[MD5_DIGEST_LEN])
 	SIVALu(digest, 8, ctx->C);
 	SIVALu(digest, 12, ctx->D);
 }
-#endif
+#endif /* } */
 
-#ifdef TEST_MD5
+#ifdef TEST_MD5 /* { */
 
 void get_md5(uchar *out, const uchar *input, int n)
 {
@@ -317,4 +320,4 @@ int main(int argc, char *argv[])
 	return 0;
 }
 
-#endif
+#endif /* } */
