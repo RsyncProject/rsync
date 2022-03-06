@@ -329,6 +329,9 @@ AC_RUN_IFELSE([AC_LANG_SOURCE([[
 #define _FILE_OFFSET_BITS 64
 #include <stdio.h>
 #include <fcntl.h>
+#if HAVE_STRING_H
+#include <string.h>
+#endif
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
 #endif
