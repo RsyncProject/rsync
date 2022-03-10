@@ -327,14 +327,14 @@ AC_SUBST(NOEXECSTACK)
 AC_CACHE_CHECK([for broken largefile support],rsync_cv_HAVE_BROKEN_LARGEFILE,[
 AC_RUN_IFELSE([AC_LANG_SOURCE([[
 #define _FILE_OFFSET_BITS 64
-#include <stdio.h>
-#include <fcntl.h>
-#ifdef HAVE_SYS_TYPES_H
-#include <sys/types.h>
+$ac_includes_default
+#ifdef HAVE_FCNTL_H
+# include <fcntl.h>
+#elif defined HAVE_SYS_FCNTL_H
+# include <sys/fcntl.h>
 #endif
+#ifdef HAVE_SYS_WAIT_H
 #include <sys/wait.h>
-#if HAVE_UNISTD_H
-#include <unistd.h>
 #endif
 
 int main(void)
