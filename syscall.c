@@ -247,7 +247,7 @@ int do_chmod(const char *path, mode_t mode)
 		else if (errno != ENOTSUP)
 			break;
 #endif
-
+		/* FALLTHROUGH */
 	default:
 		if (S_ISLNK(mode)) {
 # if defined HAVE_SETATTRLIST
