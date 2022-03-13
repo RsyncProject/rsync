@@ -16,6 +16,7 @@ aclocal.m4
 /proto.h
 /proto.h-tstamp
 /rsync*.[15]
+/rrsync
 /rrsync*.1
 /rsync*.html
 /rrsync*.html
