@@ -348,7 +348,7 @@ static int unlink_and_reopen(const char *dest, mode_t mode)
 
 /* Copy contents of file @source to file @dest with mode @mode.
  *
- * If @tmpfilefd is <0, copy_file unlinks @dest and then opens a new
+ * If @tmpfilefd is < 0, copy_file unlinks @dest and then opens a new
  * file with name @dest.
  *
  * Otherwise, copy_file writes to and closes the provided file
