@@ -65,8 +65,8 @@ RSYNC DAEMONS
 -------------
 
 Rsync can also talk to "rsync daemons" which can provide anonymous or
-authenticated rsync.  See the rsyncd.conf(5) man page for details on how
-to setup an rsync daemon.  See the rsync(1) man page for info on how to
+authenticated rsync.  See the rsyncd.conf(5) manpage for details on how
+to setup an rsync daemon.  See the rsync(1) manpage for info on how to
 connect to an rsync daemon.
 
 

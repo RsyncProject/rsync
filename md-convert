@@ -148,7 +148,7 @@ def parse_md_file(mdfn):
     fi = argparse.Namespace(**fi.groupdict())
     fi.want_manpage = not not fi.sect
     if fi.want_manpage:
-        fi.title = fi.prog + '(' + fi.sect + ') man page'
+        fi.title = fi.prog + '(' + fi.sect + ') manpage'
     else:
         fi.title = fi.prog + ' for rsync'
 
@@ -350,7 +350,7 @@ class TransformHtml(HTMLParser):
             st.txt += BOLD_FONT[0]
         elif tag == 'em' or  tag == 'i':
             if st.want_manpage:
-                tag = 'u' # Change it into underline to be more like the man page
+                tag = 'u' # Change it into underline to be more like the manpage
                 st.txt += UNDR_FONT[0]
         elif tag == 'ol':
             start = 1
@@ -456,7 +456,7 @@ class TransformHtml(HTMLParser):
             add_to_txt = NORM_FONT[0]
         elif tag == 'em' or  tag == 'i':
             if st.want_manpage:
-                tag = 'u' # Change it into underline to be more like the man page
+                tag = 'u' # Change it into underline to be more like the manpage
                 add_to_txt = NORM_FONT[0]
         elif tag == 'ol' or tag == 'ul':
             if st.list_state.pop() == 'dl':

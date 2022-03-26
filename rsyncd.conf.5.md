@@ -6,7 +6,7 @@ rsyncd.conf - configuration file for rsync in daemon mode
 
 rsyncd.conf
 
-The online version of this man page (that includes cross-linking of topics)
+The online version of this manpage (that includes cross-linking of topics)
 is available at <https://download.samba.org/pub/rsync/rsyncd.conf.5>.
 
 ## DESCRIPTION
@@ -98,9 +98,9 @@ a literal % into a value is to use %%.
 
 0.  `motd file`
 
-    This parameter allows you to specify a "message of the day" to display to
-    clients on each connect. This usually contains site information and any
-    legal notices. The default is no motd file.  This can be overridden by the
+    This parameter allows you to specify a "message of the day" (MOTD) to display
+    to clients on each connect. This usually contains site information and any
+    legal notices. The default is no MOTD file.  This can be overridden by the
     `--dparam=motdfile=FILE` command-line option when starting the daemon.
 
 0.  `pid file`
@@ -128,7 +128,7 @@ a literal % into a value is to use %%.
 
     This parameter can provide endless fun for people who like to tune their
     systems to the utmost degree. You can set all sorts of socket options which
-    may make transfers faster (or slower!). Read the man page for the
+    may make transfers faster (or slower!). Read the manpage for the
     **setsockopt()** system call for details on some of the options you may be
     able to set. By default no special socket options are set.  These settings
     can also be specified via the `--sockopts` command-line option.
@@ -716,7 +716,7 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
       addresses which match the masked IP address will be allowed in.
     - a hostname pattern using wildcards. If the hostname of the connecting IP
       (as determined by a reverse lookup) matches the wildcarded name (using
-      the same rules as normal unix filename matching), the client is allowed
+      the same rules as normal Unix filename matching), the client is allowed
       in.  This only works if "[reverse lookup](#)" is enabled (the default).
     - a hostname. A plain hostname is matched against the reverse DNS of the
       connecting IP (if "[reverse lookup](#)" is enabled), and/or the IP of the
@@ -1219,7 +1219,7 @@ Please report bugs! The rsync bug tracking system is online at
 
 ## VERSION
 
-This man page is current for version @VERSION@ of rsync.
+This manpage is current for version @VERSION@ of rsync.
 
 ## CREDITS
 

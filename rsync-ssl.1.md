@@ -8,7 +8,7 @@ rsync-ssl - a helper script for connecting to an ssl rsync daemon
 rsync-ssl [--type=SSL_TYPE] RSYNC_ARGS
 ```
 
-The online version of this man page (that includes cross-linking of topics)
+The online version of this manpage (that includes cross-linking of topics)
 is available at <https://download.samba.org/pub/rsync/rsync-ssl.1>.
 
 ## DESCRIPTION
@@ -117,7 +117,7 @@ Please report bugs! See the web site at <https://rsync.samba.org/>.
 
 ## VERSION
 
-This man page is current for version @VERSION@ of rsync.
+This manpage is current for version @VERSION@ of rsync.
 
 ## CREDITS
 

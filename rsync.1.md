@@ -26,7 +26,7 @@ Access via rsync daemon:
 Usages with just one SRC arg and no DEST arg will list the source files instead
 of copying.
 
-The online version of this man page (that includes cross-linking of topics)
+The online version of this manpage (that includes cross-linking of topics)
 is available at <https://download.samba.org/pub/rsync/rsync.1>.
 
 ## DESCRIPTION
@@ -276,7 +276,7 @@ In order to connect to an rsync daemon, the remote system needs to have a
 daemon already running (or it needs to have configured something like inetd to
 spawn an rsync daemon for incoming connections on a particular port).  For full
 information on how to start a daemon that will handling incoming socket
-connections, see the [**rsyncd.conf**(5)](rsyncd.conf.5) man page -- that is
+connections, see the [**rsyncd.conf**(5)](rsyncd.conf.5) manpage -- that is
 the config file for the daemon, and it contains the full details for how to run
 the daemon (including stand-alone and inetd configurations).
 
@@ -329,7 +329,7 @@ This is launched from cron every few hours.
 ## OPTION SUMMARY
 
 Here is a short summary of the options available in rsync.  Each option also
-has its own detailed description later in this man page.
+has its own detailed description later in this manpage.
 
 [comment]: # (help-rsync.h)
 [comment]: # (Keep these short enough that they'll be under 80 chars when indented by 7 chars.)
@@ -797,7 +797,7 @@ your home directory (remove the '=' for that).
     One side-effect of incremental recursion is that any missing
     sub-directories inside a recursively-scanned directory are (by default)
     created prior to recursing into the sub-dirs.  This earlier creation point
-    (commpared to a non-incremental recursion) allows rsync to then set the
+    (compared to a non-incremental recursion) allows rsync to then set the
     modify time of the finished directory right away (without having to delay
     that until a bunch of recursive copying has finished).  However, these
     early directories don't yet have their completed mode, mtime, or ownership
@@ -954,9 +954,9 @@ your home directory (remove the '=' for that).
     A caution for those that choose to combine [`--inplace`](#opt) with
     `--update`: an interrupted transfer will leave behind a partial file on the
     receiving side that has a very recent modified time, so re-running the
-    transfer will probably **not** continue the interrutped file.  As such, it
+    transfer will probably **not** continue the interrupted file.  As such, it
     is usually best to avoid combining this with[ `--inplace`](#opt) unless you
-    have implemented manual steps to handle any interrutped in-progress files.
+    have implemented manual steps to handle any interrupted in-progress files.
 
 0.  `--inplace`
 
@@ -1643,7 +1643,7 @@ your home directory (remove the '=' for that).
 
 0. `--no-whole-file`, `--no-W`
 
-    Disable whole-file updating when it is enaled by default for a local
+    Disable whole-file updating when it is enabled by default for a local
     transfer.  This usually slows rsync down, but it can be useful if you are
     trying to minimize the writes to the destination file (if combined with
     [`--inplace`](#opt)) or for testing the checksum-based update algorithm.
@@ -2871,7 +2871,7 @@ your home directory (remove the '=' for that).
 
     This option can provide endless fun for people who like to tune their
     systems to the utmost degree.  You can set all sorts of socket options
-    which may make transfers faster (or slower!).  Read the man page for the
+    which may make transfers faster (or slower!).  Read the manpage for the
     `setsockopt()` system call for details on some of the options you may be
     able to set.  By default no special socket options are set.  This only
     affects direct socket connections to a remote rsync daemon.
@@ -3565,7 +3565,7 @@ your home directory (remove the '=' for that).
     socket when directly contacting an rsync daemon, as well as the forwarding
     of the `-4` or `-6` option to ssh when rsync can deduce that ssh is being
     used as the remote shell.  For other remote shells you'll need to specify
-    the "`--rsh SHELL -4`" option directly (or whatever ipv4/ipv6 hint options
+    the "`--rsh SHELL -4`" option directly (or whatever IPv4/IPv6 hint options
     it uses).
 
     See also [the daemon version of these options](#dopt--ipv4).
@@ -3600,7 +3600,7 @@ The options allowed when starting an rsync daemon are as follows:
     background daemon.  The daemon will read the config file (rsyncd.conf) on
     each connect made by a client and respond to requests accordingly.
 
-    See the [**rsyncd.conf**(5)](rsyncd.conf.5) man page for more details.
+    See the [**rsyncd.conf**(5)](rsyncd.conf.5) manpage for more details.
 
 0.  `--address=ADDRESS`
 
@@ -3724,7 +3724,7 @@ is skipped; if it is an include pattern then that filename is not skipped; if
 no matching pattern is found, then the filename is not skipped.
 
 Aside: because the interactions of filter rules can be complex, it is useful to
-use the `--debug=FILTER` option if things aren't working they way you expect.
+use the `--debug=FILTER` option if things aren't working the way you expect.
 The level-1 output (the default if no level number is specified) mentions the
 filter rule that is first matched by each file in the transfer.  It also warns
 if a filter rule has trailing whitespace.  The level-2 output mentions a lot
@@ -4480,7 +4480,7 @@ Please report bugs! See the web site at <https://rsync.samba.org/>.
 
 ## VERSION
 
-This man page is current for version @VERSION@ of rsync.
+This manpage is current for version @VERSION@ of rsync.
 
 ## INTERNAL OPTIONS
 

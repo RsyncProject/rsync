@@ -13,11 +13,11 @@ You need to have a C compiler installed and optionally a C++ compiler in order
 to try to build some hardware-accelerated checksum routines.  Rsync also needs
 a modern awk, which might be provided via gawk or nawk on some OSes.
 
-## Autoconf & man pages
+## Autoconf & manpages
 
 If you're installing from the git repo (instead of a release tar file) you'll
 also need the GNU autotools (autoconf & automake) and your choice of 2 python3
-markdown libraries: cmarkgfm or commonmark (needed to generate the man pages).
+markdown libraries: cmarkgfm or commonmark (needed to generate the manpages).
 If your OS doesn't provide a python3-cmarkgfm or python3-commonmark package,
 you can run the following to install the commonmark python library for your
 build user (after installing python3's pip package):
@@ -28,7 +28,7 @@ You can test if you've got it fixed by running (from the rsync checkout):
 
 >     ./md2man --test rsync-ssl.1.md
 
-Alternately, you can avoid generating the man pages by fetching the very latest
+Alternately, you can avoid generating the manpages by fetching the very latest
 versions (that match the latest git source) from the [generated-files][6] dir.
 One way to do that is to run:
 

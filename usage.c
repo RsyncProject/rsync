@@ -245,7 +245,7 @@ void usage(enum logcode F)
 #include "help-rsync.h"
   rprintf(F,"\n");
   rprintf(F,"Use \"rsync --daemon --help\" to see the daemon-mode command-line options.\n");
-  rprintf(F,"Please see the rsync(1) and rsyncd.conf(5) man pages for full documentation.\n");
+  rprintf(F,"Please see the rsync(1) and rsyncd.conf(5) manpages for full documentation.\n");
   rprintf(F,"See https://rsync.samba.org/ for updates, bug reports, and answers\n");
 }
 
@@ -258,7 +258,7 @@ void daemon_usage(enum logcode F)
 #include "help-rsyncd.h"
   rprintf(F,"\n");
   rprintf(F,"If you were not trying to invoke rsync as a daemon, avoid using any of the\n");
-  rprintf(F,"daemon-specific rsync options.  See also the rsyncd.conf(5) man page.\n");
+  rprintf(F,"daemon-specific rsync options.  See also the rsyncd.conf(5) manpage.\n");
 }
 
 const char *rsync_version(void)

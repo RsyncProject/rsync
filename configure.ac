@@ -83,7 +83,7 @@ if test x"$enable_profile" = x"yes"; then
 	CFLAGS="$CFLAGS -pg"
 fi
 
-AC_MSG_CHECKING([if md2man can create man pages])
+AC_MSG_CHECKING([if md2man can create manpages])
 if test x"$ac_cv_path_PYTHON3" = x; then
     AC_MSG_RESULT(no - python3 not found)
     md2man_works=no
@@ -101,7 +101,7 @@ fi
 
 AC_MSG_CHECKING([if we require man-page building])
 AC_ARG_ENABLE([md2man],
-	AS_HELP_STRING([--disable-md2man],[disable to omit man page creation]))
+	AS_HELP_STRING([--disable-md2man],[disable to omit manpage creation]))
 if test x"$enable_md2man" != x"no"; then
     if test -f "$srcdir/rsync.1"; then
 	AC_MSG_RESULT(optional)
@@ -109,7 +109,7 @@ if test x"$enable_md2man" != x"no"; then
 	AC_MSG_RESULT(required)
 	if test x"$md2man_works" = x"no"; then
 	    err_msg="$err_msg$nl- You need python3 and either the cmarkgfm OR commonmark python3 lib in order"
-	    err_msg="$err_msg$nl  to build man pages based on the git source (man pages are included in the"
+	    err_msg="$err_msg$nl  to build manpages based on the git source (manpages are included in the"
 	    err_msg="$err_msg$nl  official release tar files)."
 	    no_lib="$no_lib md2man"
 	fi
@@ -136,7 +136,7 @@ if test x"$GCC" = x"yes"; then
 fi
 
 AC_ARG_WITH(rrsync,
-        AS_HELP_STRING([--with-rrsync],[also install the rrsync script and its man page]))
+        AS_HELP_STRING([--with-rrsync],[also install the rrsync script and its manpage]))
 if test x"$with_rrsync" != x"yes"; then
     with_rrsync=no
 else
@@ -563,7 +563,7 @@ if test x"$no_lib" != x; then
     echo "$err_msg"
     echo ""
     echo "See the INSTALL file for hints on how to install the missing libraries and/or"
-    echo "how to generate (or fetch) man pages:"
+    echo "how to generate (or fetch) manpages:"
     echo "    https://github.com/WayneD/rsync/blob/master/INSTALL.md"
     echo ""
     echo "To disable one or more features, the relevant configure options are:"

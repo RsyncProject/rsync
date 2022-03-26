@@ -20,7 +20,7 @@
    If your rsync script depends on the old arg-splitting behavior, either run
    it with the [`--old-args`](rsync.1#opt) option or `export RSYNC_OLD_ARGS=1`
    in the script's environment.  See also the [ADVANCED USAGE](rsync.1#)
-   section of rsync's man page.
+   section of rsync's manpage.
 
  - A long-standing bug was preventing rsync from figuring out the current
    locale's decimal point character, which made rsync always output numbers
@@ -158,7 +158,7 @@
      and `--delete*` rsync options on the server side.
    - The log format has been tweaked slightly to add seconds to the timestamp
      and to output the command executed as a tuple (making the args clearer).
-   - An rrsync.1 man page was added (in the support dir with rrsync).
+   - An rrsync.1 manpage was added (in the support dir with rrsync).
 
  - Added options to the lsh script to facilitate rrsync testing. (See the
    support dir.)
@@ -177,12 +177,12 @@
  - Try to support a client that sent a remote rsync a wacko stderr file handle
    (such as an older File::RsyncP perl library used by BackupPC).
 
- - Lots of man page improvements, including better html versions.
+ - Lots of manpage improvements, including better HTML versions.
 
 ### PACKAGING RELATED:
 
  - Give configure the `--with-rrsync` option if you want `make install` to
-   install the (now python3) rrsync script and its new man page.
+   install the (now python3) rrsync script and its new manpage.
 
  - If the rrsync script is installed, its package should be changed to depend
    on python3 and the (suggested but not mandatory) python3 braceexpand lib.
@@ -397,7 +397,7 @@
 
  - Put optimizations into their own list in the `--version` output.
 
- - Improved the man page a bit more.
+ - Improved the manpage a bit more.
 
 ### PACKAGING RELATED:
 
@@ -624,7 +624,7 @@
  - The daemon now locks its pid file (when configured to use one) so that it
    will not fail to start when the file exists but no daemon is running.
 
- - Various man page improvements, including some html representations (that
+ - Various manpage improvements, including some html representations (that
    aren't installed by default).
 
  - Made `-V` the short option for `--version` and improved its information.
@@ -641,7 +641,7 @@
 
  - Add installed bash script: /usr/bin/rsync-ssl
 
- - Add installed man page: /usr/man/man1/rsync-ssl.1
+ - Add installed manpage: /usr/man/man1/rsync-ssl.1
 
  - Tweak auxiliary doc file names, such as: README.md, INSTALL.md, & NEWS.md.
 
@@ -663,8 +663,8 @@
    SIMD checksum optimizations.
 
  - Add _build_ dependency for _either_ python3-cmarkcfm or python3-commonmark
-   to allow for patching of man pages or building a git release.  This is not
-   required for a release-tar build, since it comes with pre-built man pages.
+   to allow for patching of manpages or building a git release.  This is not
+   required for a release-tar build, since it comes with pre-built manpages.
    Note that cmarkcfm is faster than commonmark, but they generate the same
    data.  The commonmark dependency is easiest to install since it's native
    python, and can even be installed via `pip3 install --user commonmark` if
@@ -677,7 +677,7 @@
  - Silenced some annoying warnings about major() & minor() by improving an
    autoconf include-file check.
 
- - Converted the man pages from yodl to markdown. They are now processed via a
+ - Converted the manpages from yodl to markdown. They are now processed via a
    simple python3 script using the cmarkgfm **or** commonmark library.  This
    should make it easier to package rsync, since yodl is rather obscure.
 
@@ -755,11 +755,11 @@
 
 ### DEVELOPER RELATED:
 
- - Tweak the `make` output when yodl isn't around to create the man pages.
+ - Tweak the `make` output when yodl isn't around to create the manpages.
 
  - Changed an obsolete autoconf compile macro.
 
- - Support newer yodl versions when converting man pages.
+ - Support newer yodl versions when converting manpages.
 
 ------------------------------------------------------------------------------
 
@@ -1248,7 +1248,7 @@
 
  - Avoid trying to reference `SO_BROADCAST` if the OS doesn't support it.
 
- - Fix some issues with the post-processing of the man pages.
+ - Fix some issues with the post-processing of the manpages.
 
  - Fixed the user home-dir handling in the lsh script. (See the support dir.)
 
@@ -1728,7 +1728,7 @@
    of files, and the ensuring that daemon excludes can't affect a dot-dir arg.
 
  - Improved some build rules for those that build in a separate directory from
-   the source, including better install rules for the man pages, and the fixing
+   the source, including better install rules for the manpages, and the fixing
    of a proto.h-tstamp rule that could make the binaries get rebuild without
    cause.
 
@@ -2336,7 +2336,7 @@
 
  - Added the `--log-file=FILE` and `--log-file-format=FORMAT` options. These
    can be used to tell any rsync to output what it is doing to a log file.
-   They work with a client rsync, a non-daemon server rsync (see the man page
+   They work with a client rsync, a non-daemon server rsync (see the manpage
    for instructions), and also allows the overriding of rsyncd.conf settings
    when starting a daemon.
 
@@ -2630,7 +2630,7 @@
  - Added two config items to the rsyncd.conf parsing: `pre-xfer exec` and
    `post-xfer exec`. These allow a command to be specified on a per-module
    basis that will be run before and/or after a daemon-mode transfer. (See the
-   man page for a list of the environment variables that are set with
+   manpage for a list of the environment variables that are set with
    information about the transfer.)
 
  - When using the `--relative` option, you can now insert a dot dir in the
@@ -2998,7 +2998,7 @@
    usually run with the `--no-detach` option that was necessary to see the
    error on stderr).
 
- - The man pages now consistently refer to an rsync daemon as a `daemon`
+ - The manpages now consistently refer to an rsync daemon as a `daemon`
    instead of a `server` (to distinguish it from the server process in a
    non-daemon transfer).
 
@@ -3565,12 +3565,12 @@
    without using a temporary file. The matching of existing data in the
    destination file can be severely limited by this, but there are also cases
    where this is more efficient (such as appending data).  Use only when needed
-   (see the man page for more details).
+   (see the manpage for more details).
 
  - Added the `write only` option for the daemon's config file.
 
  - Added long-option names for `-4` and `-6` (namely `--ipv4` and `--ipv6`) and
-   documented all these options in the man page.
+   documented all these options in the manpage.
 
  - Improved the handling of the `--bwlimit` option so that it's less bursty,
    more accurate, and works properly over a larger range of values.
@@ -3645,7 +3645,7 @@
 ### BUILD CHANGES:
 
  - Added a `gen` target to rebuild most of the generated files, including
-   configure, config.h.in, the man pages, and proto.h.
+   configure, config.h.in, the manpages, and proto.h.
 
  - If `make proto` doesn't find some changes in the prototypes, the proto.h
    file is left untouched (its time-stamp used to always be updated).
@@ -4243,7 +4243,7 @@
  - Added `--no-whole-file` and `--no-blocking-io` options (Dave Dykstra)
 
  - Made the `--write-batch` and `--read-batch` options actually work and added
-   documentation in the man page (Jos Backus)
+   documentation in the manpage (Jos Backus)
 
  - If the daemon is unable to fork a child to accept a connection, print an
    error message. (Colin Walters)

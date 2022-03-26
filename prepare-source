@@ -6,7 +6,7 @@
 #
 #   build     build the config files [the default w/no arg]
 #   fetch     fetch the latest dev autoconfig files
-#   fetchgen  fetch all the latest dev generated files (including man pages)
+#   fetchgen  fetch all the latest dev generated files (including manpages)
 #   fetchSRC  fetch the latest dev source files [NON-GENERATED FILES]
 #
 # The script stops after the first successful action.
