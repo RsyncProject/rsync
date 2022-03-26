@@ -272,6 +272,39 @@ START_TEST(wildtest_array) {
     ck_assert_int_eq(wildmatch_array("bletch/**", texts_5, -1), 0);
 }
 
+START_TEST(wildtest_star) {
+    int result;
+
+    const char * const texts[] = { "f/", "/b/b/f/", "", "bab", NULL };
+    result = dowild((const uchar *)"*/a/**/bab", (const uchar *)"f/", (const uchar * const *)texts);
+    ck_assert_int_eq(result, ABORT_TO_STARSTAR);
+
+    const char * const texts_2[] = { "f/", "/b/b/f/", "", "bab", NULL };
+    result = dowild((const uchar *)"*/a/**/babx", (const uchar *)"f/", (const uchar * const *)texts_2);
+    ck_assert_int_eq(result, ABORT_TO_STARSTAR);
+
+    const char * const texts_3[] = { "", NULL };
+    result = dowild((const uchar *)"*", (const uchar *)"", (const uchar * const *)texts_3);
+    ck_assert_int_eq(result, TRUE);
+
+    result = dowild((const uchar *)"b", (const uchar *)"", (const uchar * const *)texts_3);
+    ck_assert_int_eq(result, ABORT_ALL);
+
+    result = wildmatch_array("b", texts_3, -1);
+    ck_assert_int_eq(result, FALSE);
+
+    const char * const texts_4[] = { "f/", "babx", "/", "", NULL };
+    result = wildmatch_array("**/babx", texts_4, -1);
+    ck_assert_int_eq(result, FALSE);
+
+    const char * const texts_5[] = { "f/", "a/", "a/", "babx", "/", "", NULL };
+    result = wildmatch_array("*/a/**/babx", texts_5, -1);
+    ck_assert_int_eq(result, FALSE);
+
+    const char * const texts_6[] = { "foo/a/foo/ooo", NULL };
+    ck_assert_int_eq(wildmatch_array("*/foo/**/oo", texts_6, -1), 0);
+}
+
 START_TEST(test_litmatch_array) {
     const char * const texts[] = { "foo/", "bar", NULL };
 
@@ -315,6 +348,10 @@ Suite *wildtest_suite() {
 
     tcase = tcase_create("wildtest_array");
     tcase_add_test(tcase, wildtest_array);
+    suite_add_tcase(s, tcase);
+
+    tcase = tcase_create("wildtest_star");
+    tcase_add_test(tcase, wildtest_star);
     suite_add_tcase(s, tcase);
 
     tcase = tcase_create("litmatch_array");
