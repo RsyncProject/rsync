@@ -1,0 +1,45 @@
+#!/bin/sh
+
+# Copyright (C) 2008-2022 Wayne Davison
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Test that copy_file works correctly with tmpfiles
+
+. "$suitedir/rsync.fns"
+
+SSH="$scratchdir/src/support/lsh.sh"
+
+hands_setup
+
+# Create a side dir where there is a candidate destfile of the same name as a sourcefile
+cat >"$scratchdir/from/likely" <<EOF
+This is a test file
+EOF
+
+mkdir "$scratchdir/demo"
+cat >"$scratchdir/demo/likely" <<EOF
+This is a test file
+EOF
+
+# Create a chkdir
+$RSYNC -a "$fromdir/" "$chkdir/"
+
+checkit "$RSYNC -av --inplace --copy-dest='$scratchdir/demo' '$fromdir/' '$todir/'" "$chkdir" "$todir"
+
+for filehost in '' 'localhost:'; do
+    for srchost in '' 'localhost:'; do
+	if [ -z "$srchost" ]; then
+	    desthost='localhost:'
+	else
+	    desthost=''
+	fi
+
+	rm -rf "$todir"
+	checkit "$RSYNC -avse '$SSH' --rsync-path='$RSYNC' --inplace --copy-dest='$desthost$scratchdir/demo' '$srchost$fromdir/' '$desthost$todir/'" "$chkdir" "$todir"
+    done
+done
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0
