@@ -1,7 +1,7 @@
 /*
  * Some usage & version related functions.
  *
- * Copyright (C) 2002-2020 Wayne Davison
+ * Copyright (C) 2002-2022 Wayne Davison
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
