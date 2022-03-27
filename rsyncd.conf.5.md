@@ -933,9 +933,10 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     If you are un-refusing the compress option, you may want to match
     "`!compress*`" if you also want to allow the `--compress-level` option.
 
-    Note that the "write-devices" option is refused by default, but can be
-    explicitly accepted with "`!write-devices`".  The options "log-file" and
-    "log-file-format" are forcibly refused and cannot be accepted.
+    Note that the "copy-devices" & "write-devices" options are refused by
+    default, but they can be explicitly accepted with "`!copy-devices`" and/or
+    "`!write-devices`".  The options "log-file" and "log-file-format" are
+    forcibly refused and cannot be accepted.
 
     Here are all the options that are not matched by wild-cards:
 

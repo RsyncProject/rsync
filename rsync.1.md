@@ -373,6 +373,8 @@ has its own detailed description later in this manpage.
 --owner, -o              preserve owner (super-user only)
 --group, -g              preserve group
 --devices                preserve device files (super-user only)
+--copy-devices           copy device contents as a regular file
+--write-devices          write to devices as files (implies --inplace)
 --specials               preserve special files
 -D                       same as --devices --specials
 --times, -t              preserve modification times
@@ -385,7 +387,6 @@ has its own detailed description later in this manpage.
 --fake-super             store/recover privileged attrs using xattrs
 --sparse, -S             turn sequences of nulls into sparse blocks
 --preallocate            allocate dest files before writing them
---write-devices          write to devices as files (implies --inplace)
 --dry-run, -n            perform a trial run with no changes made
 --whole-file, -W         copy files whole (w/o delta-xfer algorithm)
 --checksum-choice=STR    choose the checksum algorithm (aka --cc)
@@ -1472,6 +1473,14 @@ your home directory (remove the '=' for that).
 
     The `-D` option is equivalent to "[`--devices`](#opt)
     [`--specials`](#opt)".
+
+0.  `--copy-devices`
+
+    This tells rsync to treat a device on the sending side as a regular file,
+    allowing it to be copied to a normal destination file (or another device
+    if `--write-devices` was also specifed).
+
+    This option is refused by default by an rsync daemon.
 
 0.  `--write-devices`
 

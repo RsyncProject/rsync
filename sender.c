@@ -37,6 +37,7 @@ extern int io_error;
 extern int flist_eof;
 extern int whole_file;
 extern int allowed_lull;
+extern int copy_devices;
 extern int preserve_xattrs;
 extern int protocol_version;
 extern int remove_source_files;
@@ -364,6 +365,15 @@ void send_files(int f_in, int f_out)
 			free_sums(s);
 			close(fd);
 			exit_cleanup(RERR_FILEIO);
+		}
+
+		if (IS_DEVICE(st.st_mode)) {
+			if (!copy_devices) {
+				rprintf(FERROR, "attempt to copy device contents without --copy-devices\n");
+				exit_cleanup(RERR_PROTOCOL);
+			}
+			if (st.st_size == 0)
+				st.st_size = get_device_size(fd, fname);
 		}
 
 		if (append_mode > 0 && st.st_size < F_LENGTH(file)) {

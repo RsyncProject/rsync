@@ -47,6 +47,7 @@ int append_mode = 0;
 int keep_dirlinks = 0;
 int copy_dirlinks = 0;
 int copy_links = 0;
+int copy_devices = 0;
 int write_devices = 0;
 int preserve_links = 0;
 int preserve_hard_links = 0;
@@ -656,6 +657,7 @@ static struct poptOption long_options[] = {
   {"no-D",             0,  POPT_ARG_NONE,   0, OPT_NO_D, 0, 0 },
   {"devices",          0,  POPT_ARG_VAL,    &preserve_devices, 1, 0, 0 },
   {"no-devices",       0,  POPT_ARG_VAL,    &preserve_devices, 0, 0, 0 },
+  {"copy-devices",     0,  POPT_ARG_NONE,   &copy_devices, 0, 0, 0 },
   {"write-devices",    0,  POPT_ARG_VAL,    &write_devices, 1, 0, 0 },
   {"no-write-devices", 0,  POPT_ARG_VAL,    &write_devices, 0, 0, 0 },
   {"specials",         0,  POPT_ARG_VAL,    &preserve_specials, 1, 0, 0 },
@@ -949,6 +951,7 @@ static void set_refuse_options(void)
 		 || strcmp("iconv", longName) == 0
 		 || strcmp("no-iconv", longName) == 0
 		 || strcmp("checksum-seed", longName) == 0
+		 || strcmp("copy-devices", longName) == 0 /* disable wild-match (it gets refused below) */
 		 || strcmp("write-devices", longName) == 0 /* disable wild-match (it gets refused below) */
 		 || strcmp("log-format", longName) == 0 /* aka out-format (NOT log-file-format) */
 		 || strcmp("sender", longName) == 0
@@ -960,6 +963,7 @@ static void set_refuse_options(void)
 	assert(list_end != NULL);
 
 	if (am_daemon) { /* Refused by default, but can be accepted via a negated exact match. */
+		parse_one_refuse_match(0, "copy-devices", list_end);
 		parse_one_refuse_match(0, "write-devices", list_end);
 	}
 
@@ -2916,6 +2920,9 @@ void server_options(char **args, int *argc_p)
 		args[ac++] = "--remove-source-files";
 	else if (remove_source_files)
 		args[ac++] = "--remove-sent-files";
+
+	if (copy_devices && !am_sender)
+		args[ac++] = "--copy-devices";
 
 	if (preallocate_files && am_sender)
 		args[ac++] = "--preallocate";

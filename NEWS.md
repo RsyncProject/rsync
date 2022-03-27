@@ -116,6 +116,12 @@
 
  - Added the [`--fsync`](rsync.1#opt) option (promoted from the patches repo).
 
+ - Added the [`--copy-devices`](rsync.1#opt) option.  Compared to the
+   historical version from the rsync-patches repo, this version: properly
+   handles `--checksum`; fixes a truncation bug when doing an `--inplace` copy
+   onto a longer file; fixes several bugs in the `--itemize` output; and only
+   the sending side needs the enhanced rsync for the copy to work.
+
  - Reduced memory usage for an incremental transfer that has a bunch of small
    directories.
 

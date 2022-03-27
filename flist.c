@@ -43,6 +43,7 @@ extern int use_qsort;
 extern int xfer_dirs;
 extern int filesfrom_fd;
 extern int one_file_system;
+extern int copy_devices;
 extern int copy_dirlinks;
 extern int preserve_uid;
 extern int preserve_gid;
@@ -700,6 +701,7 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 	int alloc_len, basename_len, linkname_len;
 	int extra_len = file_extra_cnt * EXTRA_LEN;
 	int first_hlink_ndx = -1;
+	char real_ISREG_entry;
 	int64 file_length;
 #ifdef CAN_SET_NSEC
 	uint32 modtime_nsec;
@@ -814,6 +816,7 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 				linkname_len = strlen(F_SYMLINK(first)) + 1;
 			else
 				linkname_len = 0;
+			real_ISREG_entry = S_ISREG(mode) ? 1 : 0;
 			goto create_object;
 		}
 	}
@@ -941,10 +944,20 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 #endif
 		linkname_len = 0;
 
+	if (copy_devices && IS_DEVICE(mode)) {
+		/* This is impossible in the official release, but some pre-release patches
+		 * didn't convert the device into a file before sending, so we'll do it here
+		 * (even though the length is typically 0 and any checksum data is zeros). */
+		mode = S_IFREG | (mode & ACCESSPERMS);
+		modtime = time(NULL); /* The mtime on the device is not up-to-date, so set it to "now". */
+		real_ISREG_entry = 0;
+	} else
+		real_ISREG_entry = S_ISREG(mode) ? 1 : 0;
+
 #ifdef SUPPORT_HARD_LINKS
   create_object:
 	if (preserve_hard_links) {
-		if (protocol_version < 28 && S_ISREG(mode))
+		if (protocol_version < 28 && real_ISREG_entry)
 			xflags |= XMIT_HLINKED;
 		if (xflags & XMIT_HLINKED)
 			extra_len += (inc_recurse+1) * EXTRA_LEN;
@@ -1160,8 +1173,8 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 	}
 #endif
 
-	if (always_checksum && (S_ISREG(mode) || protocol_version < 28)) {
-		if (S_ISREG(mode))
+	if (always_checksum && (real_ISREG_entry || protocol_version < 28)) {
+		if (real_ISREG_entry)
 			bp = F_SUM(file);
 		else {
 			/* Prior to 28, we get a useless set of nulls. */
@@ -1359,6 +1372,18 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 #else
 	linkname_len = 0;
 #endif
+
+	if (copy_devices && am_sender && IS_DEVICE(st.st_mode)) {
+		if (st.st_size == 0) {
+			int fd = do_open(fname, O_RDONLY, 0);
+			if (fd >= 0) {
+				st.st_size = get_device_size(fd, fname);
+				close(fd);
+			}
+		}
+		st.st_mode = S_IFREG | (st.st_mode & ACCESSPERMS);
+		st.st_mtime = time(NULL); /* The mtime on the device is not up-to-date, so set it to "now". */
+	}
 
 #ifdef ST_MTIME_NSEC
 	if (st.ST_MTIME_NSEC && protocol_version >= 31)
