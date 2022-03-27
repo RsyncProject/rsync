@@ -87,6 +87,12 @@
    per-file compression skipping has apparently never worked, so it is now
    documented as being ineffective.
 
+ - Fixed a truncate error when a `--write-devices` copy wrote a file onto a
+   device that was shorter than the device.
+
+ - Made `--write-devices` support both `--checksum` and `--no-whole-file` when
+   copying to a device.
+
  - Improved how the [`--stop-at`](rsync.1#opt), [`--stop-after`](rsync.1#opt),
    and (the deprecated) [`--time-limit`](rsync.1#opt) options check to see if
    the allowed time is over, which should make rsync exit more consistently.

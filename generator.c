@@ -35,11 +35,11 @@ extern int inc_recurse;
 extern int relative_paths;
 extern int implied_dirs;
 extern int keep_dirlinks;
+extern int write_devices;
 extern int preserve_acls;
 extern int preserve_xattrs;
 extern int preserve_links;
 extern int preserve_devices;
-extern int write_devices;
 extern int preserve_specials;
 extern int preserve_hard_links;
 extern int preserve_executability;
@@ -1793,6 +1793,12 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		goto cleanup;
 	}
 
+	if (write_devices && IS_DEVICE(sx.st.st_mode) && sx.st.st_size == 0) {
+		/* This early open into fd skips the regular open below. */
+		if ((fd = do_open(fnamecmp, O_RDONLY, 0)) >= 0)
+			real_sx.st.st_size = sx.st.st_size = get_device_size(fd, fnamecmp);
+	}
+
 	if (fnamecmp_type <= FNAMECMP_BASIS_DIR_HIGH)
 		;
 	else if (fnamecmp_type >= FNAMECMP_FUZZY)
@@ -1858,7 +1864,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	}
 
 	/* open the file */
-	if ((fd = do_open(fnamecmp, O_RDONLY, 0)) < 0) {
+	if (fd < 0 && (fd = do_open(fnamecmp, O_RDONLY, 0)) < 0) {
 		rsyserr(FERROR, errno, "failed to open %s, continuing",
 			full_fname(fnamecmp));
 	  pretend_missing:
@@ -1875,11 +1881,9 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 	if (inplace && make_backups > 0 && fnamecmp_type == FNAMECMP_FNAME) {
 		if (!(backupptr = get_backup_name(fname))) {
-			close(fd);
 			goto cleanup;
 		}
 		if (!(back_file = make_file(fname, NULL, NULL, 0, NO_FILTERS))) {
-			close(fd);
 			goto pretend_missing;
 		}
 		if (robust_unlink(backupptr) && errno != ENOENT) {
@@ -1887,14 +1891,12 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				full_fname(backupptr));
 			unmake_file(back_file);
 			back_file = NULL;
-			close(fd);
 			goto cleanup;
 		}
 		if ((f_copy = do_open(backupptr, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, 0600)) < 0) {
 			rsyserr(FERROR_XFER, errno, "open %s", full_fname(backupptr));
 			unmake_file(back_file);
 			back_file = NULL;
-			close(fd);
 			goto cleanup;
 		}
 		fnamecmp_type = FNAMECMP_BACKUP;
@@ -1945,7 +1947,6 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		write_sum_head(f_out, NULL);
 	else if (sx.st.st_size <= 0) {
 		write_sum_head(f_out, NULL);
-		close(fd);
 	} else {
 		if (generate_and_send_sums(fd, sx.st.st_size, f_out, f_copy) < 0) {
 			rprintf(FWARNING,
@@ -1953,10 +1954,11 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				fnamecmp);
 			write_sum_head(f_out, NULL);
 		}
-		close(fd);
 	}
 
   cleanup:
+	if (fd >= 0)
+		close(fd);
 	if (back_file) {
 		int save_preserve_xattrs = preserve_xattrs;
 		if (f_copy >= 0)

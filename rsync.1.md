@@ -1481,9 +1481,9 @@ your home directory (remove the '=' for that).
     This option implies the [`--inplace`](#opt) option.
 
     Be careful using this, as you should know what devices are present on the
-    receiving side of the transfer, especially if running rsync as root.
+    receiving side of the transfer, especially when running rsync as root.
 
-    This option is refused by an rsync daemon.
+    This option is refused by default by an rsync daemon.
 
 0.  `--times`, `-t`
 

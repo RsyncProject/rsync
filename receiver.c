@@ -808,13 +808,15 @@ int recv_files(int f_in, int f_out, char *local_name)
 			continue;
 		}
 
-		if (fd1 != -1 && !(S_ISREG(st.st_mode) || (write_devices && IS_DEVICE(st.st_mode)))) {
+		if (write_devices && IS_DEVICE(st.st_mode)) {
+			if (fd1 != -1 && st.st_size == 0)
+				st.st_size = get_device_size(fd1, fname);
+			/* Mark the file entry as a device so that we don't try to truncate it later on. */
+			file->mode = S_IFBLK | (file->mode & ACCESSPERMS);
+		} else if (fd1 != -1 && !(S_ISREG(st.st_mode))) {
 			close(fd1);
 			fd1 = -1;
 		}
-
-		if (fd1 != -1 && IS_DEVICE(st.st_mode) && st.st_size == 0)
-			st.st_size = get_device_size(fd1, fname);
 
 		/* If we're not preserving permissions, change the file-list's
 		 * mode based on the local permissions and some heuristics. */
