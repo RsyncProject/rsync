@@ -7,6 +7,7 @@ Documentation=man:rsync(1) man:rsyncd.conf(5)
 [Service]
 ExecStart=/usr/bin/rsync --daemon --no-detach
 RestartSec=1
+Restart=on-failure
 
 # Citing README.md:
 #
