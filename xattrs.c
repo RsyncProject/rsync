@@ -755,7 +755,7 @@ int recv_xattr_request(struct file_struct *file, int f_in)
 		memcpy(name, rxa->name, rxa->name_len);
 		rxa->name = name;
 		free(old_datum);
-		read_buf(f_in, rxa->datum, rxa->datum_len);
+		rsync_read_buf(f_in, rxa->datum, rxa->datum_len);
 		got_xattr_data = 1;
 	}
 
@@ -803,16 +803,16 @@ void receive_xattr(int f, struct file_struct *file)
 			overflow_exit("receive_xattr");
 		ptr = new_array(char, dget_len + extra_len + name_len);
 		name = ptr + dget_len + extra_len;
-		read_buf(f, name, name_len);
+		rsync_read_buf(f, name, name_len);
 		if (name_len < 1 || name[name_len-1] != '\0') {
 			rprintf(FERROR, "Invalid xattr name received (missing trailing \\0).\n");
 			exit_cleanup(RERR_FILEIO);
 		}
 		if (dget_len == datum_len)
-			read_buf(f, ptr, dget_len);
+			rsync_read_buf(f, ptr, dget_len);
 		else {
 			*ptr = XSTATE_ABBREV;
-			read_buf(f, ptr + 1, MAX_DIGEST_LEN);
+			rsync_read_buf(f, ptr + 1, MAX_DIGEST_LEN);
 		}
 
 		if (saw_xattr_filter) {

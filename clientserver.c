@@ -1344,7 +1344,7 @@ int start_daemon(int f_in, int f_out)
 			return -1;
 		}
 		early_input = new_array(char, early_input_len);
-		read_buf(f_in, early_input, early_input_len);
+		rsync_read_buf(f_in, early_input, early_input_len);
 
 		if (!read_line_old(f_in, line, sizeof line, 0))
 			return -1;

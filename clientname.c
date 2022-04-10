@@ -189,12 +189,12 @@ int read_proxy_protocol_header(int fd)
 		} v2;
 	} hdr;
 
-	read_buf(fd, (char*)&hdr, PROXY_V2_SIG_SIZE);
+	rsync_read_buf(fd, (char*)&hdr, PROXY_V2_SIG_SIZE);
 
 	if (memcmp(hdr.v2.sig, proxyv2sig, PROXY_V2_SIG_SIZE) == 0) { /* Proxy V2 */
 		int ver, cmd, size;
 
-		read_buf(fd, (char*)&hdr + PROXY_V2_SIG_SIZE, PROXY_V2_HEADER_SIZE - PROXY_V2_SIG_SIZE);
+		rsync_read_buf(fd, (char*)&hdr + PROXY_V2_SIG_SIZE, PROXY_V2_HEADER_SIZE - PROXY_V2_SIG_SIZE);
 
 		ver = (hdr.v2.ver_cmd & 0xf0) >> 4;
 		cmd = (hdr.v2.ver_cmd & 0x0f);
@@ -204,7 +204,7 @@ int read_proxy_protocol_header(int fd)
 			return 0;
 
 		/* Grab all the remaining data in the binary request. */
-		read_buf(fd, (char*)&hdr + PROXY_V2_HEADER_SIZE, size);
+		rsync_read_buf(fd, (char*)&hdr + PROXY_V2_HEADER_SIZE, size);
 
 		switch (cmd) {
 		case CMD_PROXY:
@@ -243,7 +243,7 @@ int read_proxy_protocol_header(int fd)
 		*p = '\0';
 		if (!strchr(hdr.v1.line, '\n')) {
 			while (1) {
-				read_buf(fd, p, 1);
+				rsync_read_buf(fd, p, 1);
 				if (*p++ == '\n')
 					break;
 				if (p - hdr.v1.line >= (int)sizeof hdr.v1.line - 1)

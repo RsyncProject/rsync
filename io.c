@@ -947,7 +947,7 @@ void noop_io_until_death(void)
 		set_io_timeout(60);
 
 	while (1)
-		read_buf(iobuf.in_fd, buf, sizeof buf);
+		rsync_read_buf(iobuf.in_fd, buf, sizeof buf);
 }
 
 /* Buffer a message for the multiplexed output stream.  Is not used for (normal) MSG_DATA. */
@@ -1733,7 +1733,7 @@ void wait_for_receiver(void)
 unsigned short read_shortint(int f)
 {
 	char b[2];
-	read_buf(f, b, 2);
+	rsync_read_buf(f, b, 2);
 	return (UVAL(b, 1) << 8) + UVAL(b, 0);
 }
 
@@ -1742,7 +1742,7 @@ int32 read_int(int f)
 	char b[4];
 	int32 num;
 
-	read_buf(f, b, 4);
+	rsync_read_buf(f, b, 4);
 	num = IVAL(b, 0);
 #if SIZEOF_INT32 > 4
 	if (num & (int32)0x80000000)
@@ -1769,7 +1769,7 @@ int32 read_varint(int f)
 			rprintf(FERROR, "Overflow in read_varint()\n");
 			exit_cleanup(RERR_STREAMIO);
 		}
-		read_buf(f, u.b, extra);
+		rsync_read_buf(f, u.b, extra);
 		u.b[extra] = ch & (bit-1);
 	} else
 		u.b[0] = ch;
@@ -1797,7 +1797,7 @@ int64 read_varlong(int f, uchar min_bytes)
 #else
 	u.x = 0;
 #endif
-	read_buf(f, b2, min_bytes);
+	rsync_read_buf(f, b2, min_bytes);
 	memcpy(u.b, b2+1, min_bytes-1);
 	extra = int_byte_extra[CVAL(b2, 0) / 4];
 	if (extra) {
@@ -1806,7 +1806,7 @@ int64 read_varlong(int f, uchar min_bytes)
 			rprintf(FERROR, "Overflow in read_varlong()\n");
 			exit_cleanup(RERR_STREAMIO);
 		}
-		read_buf(f, u.b + min_bytes - 1, extra);
+		rsync_read_buf(f, u.b + min_bytes - 1, extra);
 		u.b[min_bytes + extra - 1] = CVAL(b2, 0) & (bit-1);
 #if SIZEOF_INT64 < 8
 		if (min_bytes + extra > 5 || u.b[4] || CVAL(u.b,3) & 0x80) {
@@ -1838,12 +1838,12 @@ int64 read_longint(int f)
 	rprintf(FERROR, "Integer overflow: attempted 64-bit offset\n");
 	exit_cleanup(RERR_UNSUPPORTED);
 #else
-	read_buf(f, b, 8);
+	rsync_read_buf(f, b, 8);
 	return IVAL(b,0) | (((int64)IVAL(b,4))<<32);
 #endif
 }
 
-void read_buf(int f, char *buf, size_t len)
+void rsync_read_buf(int f, char *buf, size_t len)
 {
 	if (f != iobuf.in_fd) {
 		if (safe_read(f, buf, len) != len)
@@ -1888,14 +1888,14 @@ void read_buf(int f, char *buf, size_t len)
 
 void read_sbuf(int f, char *buf, size_t len)
 {
-	read_buf(f, buf, len);
+	rsync_read_buf(f, buf, len);
 	buf[len] = '\0';
 }
 
 uchar read_byte(int f)
 {
 	uchar c;
-	read_buf(f, (char*)&c, 1);
+	rsync_read_buf(f, (char*)&c, 1);
 	return c;
 }
 
@@ -1913,7 +1913,7 @@ int read_vstring(int f, char *buf, int bufsize)
 	}
 
 	if (len)
-		read_buf(f, buf, len);
+		rsync_read_buf(f, buf, len);
 	buf[len] = '\0';
 	return len;
 }
@@ -2254,20 +2254,20 @@ int32 read_ndx(int f)
 	if (protocol_version < 30)
 		return read_int(f);
 
-	read_buf(f, b, 1);
+	rsync_read_buf(f, b, 1);
 	if (CVAL(b, 0) == 0xFF) {
-		read_buf(f, b, 1);
+		rsync_read_buf(f, b, 1);
 		prev_ptr = &prev_negative;
 	} else if (CVAL(b, 0) == 0)
 		return NDX_DONE;
 	else
 		prev_ptr = &prev_positive;
 	if (CVAL(b, 0) == 0xFE) {
-		read_buf(f, b, 2);
+		rsync_read_buf(f, b, 2);
 		if (CVAL(b, 0) & 0x80) {
 			b[3] = CVAL(b, 0) & ~0x80;
 			b[0] = b[1];
-			read_buf(f, b+1, 2);
+			rsync_read_buf(f, b+1, 2);
 			num = IVAL(b, 0);
 		} else
 			num = (UVAL(b,0)<<8) + UVAL(b,1) + *prev_ptr;

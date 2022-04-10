@@ -403,7 +403,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 	if (mapbuf)
 		unmap_file(mapbuf);
 
-	read_buf(f_in, sender_file_sum, sum_len);
+	rsync_read_buf(f_in, sender_file_sum, sum_len);
 	if (DEBUG_GTE(DELTASUM, 2))
 		rprintf(FINFO,"got file_sum\n");
 	if (fd != -1 && memcmp(file_sum1, sender_file_sum, sum_len) != 0)

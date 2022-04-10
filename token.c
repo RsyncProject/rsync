@@ -297,7 +297,7 @@ static int32 simple_recv_token(int f, char **data)
 	*data = buf;
 	n = MIN(CHUNK_SIZE,residue);
 	residue -= n;
-	read_buf(f,buf,n);
+	rsync_read_buf(f,buf,n);
 	return n;
 }
 
@@ -534,7 +534,7 @@ static int32 recv_deflated_token(int f, char **data)
 				flag = read_byte(f);
 			if ((flag & 0xC0) == DEFLATED_DATA) {
 				n = ((flag & 0x3f) << 8) + read_byte(f);
-				read_buf(f, cbuf, n);
+				rsync_read_buf(f, cbuf, n);
 				rx_strm.next_in = (Bytef *)cbuf;
 				rx_strm.avail_in = n;
 				recv_state = r_inflating;
@@ -813,7 +813,7 @@ static int32 recv_zstd_token(int f, char **data)
 			flag = read_byte(f);
 			if ((flag & 0xC0) == DEFLATED_DATA) {
 				n = ((flag & 0x3f) << 8) + read_byte(f);
-				read_buf(f, cbuf, n);
+				rsync_read_buf(f, cbuf, n);
 
 				zstd_in_buff.size = n;
 				zstd_in_buff.pos = 0;
@@ -978,7 +978,7 @@ static int32 recv_compressed_token(int f, char **data)
 			flag = read_byte(f);
 			if ((flag & 0xC0) == DEFLATED_DATA) {
 				n = ((flag & 0x3f) << 8) + read_byte(f);
-				read_buf(f, cbuf, n);
+				rsync_read_buf(f, cbuf, n);
 				next_in = (char *)cbuf;
 				avail_in = n;
 				recv_state = r_inflating;

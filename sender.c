@@ -95,7 +95,7 @@ static struct sum_struct *receive_sums(int f)
 
 	for (i = 0; i < s->count; i++) {
 		s->sums[i].sum1 = read_int(f);
-		read_buf(f, s->sums[i].sum2, s->s2length);
+		rsync_read_buf(f, s->sums[i].sum2, s->s2length);
 
 		s->sums[i].offset = offset;
 		s->sums[i].flags = 0;

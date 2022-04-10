@@ -1184,7 +1184,7 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 			struct file_struct *first = flist->files[first_hlink_ndx - flist->ndx_start];
 			memcpy(bp, F_SUM(first), flist_csum_len);
 		} else
-			read_buf(f, bp, flist_csum_len);
+			rsync_read_buf(f, bp, flist_csum_len);
 	}
 
 #ifdef SUPPORT_ACLS
