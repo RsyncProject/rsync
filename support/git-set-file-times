@@ -38,7 +38,7 @@ def main():
                 print_line(fn, mtime, mtime)
             ls.discard(fn)
 
-    cmd = git + 'log -r --name-only --no-color --pretty=raw --no-renames -z'.split()
+    cmd = git + 'log -r --name-only --format=%x00commit%x20%H%n%x00commit_time%x20%ct%n --no-renames -z'.split()
     if args.tree:
         cmd.append(args.tree)
     cmd += ['--'] + args.files
@@ -46,7 +46,7 @@ def main():
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, encoding='utf-8')
     for line in proc.stdout:
         line = line.strip()
-        m = re.match(r'^committer .*? (\d+) [-+]\d+$', line)
+        m = re.match(r'^\0commit_time (\d+)$', line)
         if m:
             commit_time = int(m[1])
         elif NULL_COMMIT_RE.search(line):
