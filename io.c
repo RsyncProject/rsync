@@ -1843,6 +1843,7 @@ int64 read_longint(int f)
 #endif
 }
 
+/* Debugging note: this will be named read_buf_() when using an external zlib. */
 void read_buf(int f, char *buf, size_t len)
 {
 	if (f != iobuf.in_fd) {
