@@ -20,13 +20,13 @@
    If your rsync script depends on the old arg-splitting behavior, either run
    it with the [`--old-args`](rsync.1#opt) option or `export RSYNC_OLD_ARGS=1`
    in the script's environment.  See also the [ADVANCED USAGE](rsync.1#)
-   section of rsync's manpage.
+   section of rsync's manpage for how to use a more modern arg style.
 
  - A long-standing bug was preventing rsync from figuring out the current
    locale's decimal point character, which made rsync always output numbers
    using the "C" locale.  Since this is now fixed in 3.2.4, a script that
-   parses rsync's decimal numbers (e.g. from the verbose footer) should be sure
-   to setup the environment in a way that the output continues to be in the C
+   parses rsync's decimal numbers (e.g. from the verbose footer) may want to
+   setup the environment in a way that the output continues to be in the C
    locale.  For instance, one of the following should work fine:
 
    ```shell
@@ -43,6 +43,10 @@
        fi
        export LC_NUMERIC=C.UTF-8
    ```
+
+### SECURITY FIXES:
+
+ - A fix for CVE-2018-25032 in the bundled zlib (memory corruption issue).
 
 ### BUG FIXES:
 
@@ -103,6 +107,12 @@
  - Silence some chmod warnings about symlinks when it looks like we have a
    function to set their permissions but they can't really be set.
 
+ - Fixed a potential issue in git-set-file-times when handling commits with
+   high-bit characters in the description & when handling a description that
+   might mimick the git raw-commit deliniators.  (See the support dir.)
+
+ - The bundled systemd/rsync.service file now includes `Restart=on-failure`.
+
 ### ENHANCEMENTS:
 
  - Use openssl's `-verify_hostname` option in the rsync-ssl script.
@@ -139,7 +149,7 @@
    that is being refused due to the Linux fs.protected_regular sysctl setting.
 
  - When [`--chown`](rsync.1#opt), [`--usermap`](rsync.1#opt), or
-   [`--groupmap`](rsync.1#opt), is specified, rsync now makes sure that the
+   [`--groupmap`](rsync.1#opt) is specified, rsync now makes sure that the
    appropriate [`--owner`](rsync.1#opt) and/or [`--group`](rsync.1#opt) options
    are enabled.
 
@@ -212,7 +222,8 @@
  - Renamed configure's `--enable-asm` option to `--enable-md5-asm` to avoid
    confusion with the asm option for the rolling checksum.  It is also honored
    even when openssl crypto is in use.  This allows: normal MD4 & MD5, normal
-   MD4 + asm MD5, openssl MD4 & MD5, or openssl MD4 + asm MD5.
+   MD4 + asm MD5, openssl MD4 & MD5, or openssl MD4 + asm MD5 depending on the
+   configure options selected.
 
  - Made SIMD & asm configure checks default to "no" on non-Linux hosts due to
    various reports of problems on NetBSD & macOS hosts.  These were also
@@ -226,6 +237,9 @@
  - Compile the C files with `-pedantic-errors` (when possible) so that we will
    get warned if a static initialization overflows in the future (among other
    things).
+
+ - When linking with an external zlib, rsync renames its `read_buf()` function
+   to `read_buf_()` to avoid a symbol clash on an unpatched zlib.
 
  - Added a SECURITY.md file.
 
