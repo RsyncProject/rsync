@@ -1172,6 +1172,10 @@ struct name_num_obj {
 	struct name_num_item list[10]; /* we'll get a compile error/warning if this is ever too small */
 };
 
+#ifdef EXTERNAL_ZLIB
+#define read_buf read_buf_
+#endif
+
 #ifndef __cplusplus
 #include "proto.h"
 #endif
