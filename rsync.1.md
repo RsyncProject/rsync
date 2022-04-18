@@ -1478,7 +1478,7 @@ your home directory (remove the '=' for that).
 
     This tells rsync to treat a device on the sending side as a regular file,
     allowing it to be copied to a normal destination file (or another device
-    if `--write-devices` was also specifed).
+    if `--write-devices` was also specified).
 
     This option is refused by default by an rsync daemon.
 
