@@ -241,7 +241,7 @@ def find_man_substitutions():
                 if var == 'srcdir':
                     break
 
-    env_subs['date'] = time.strftime('%d %b %Y', time.localtime(mtime))
+    env_subs['date'] = time.strftime('%d %b %Y', time.gmtime(int(os.environ.get('SOURCE_DATE_EPOCH', time.time()))))
 
 
 def html_via_commonmark(txt):
