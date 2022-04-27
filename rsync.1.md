@@ -1075,6 +1075,9 @@ expand it.
     ([`-u`](#opt)) option mentioned above, which acts on regular source files
     only.
 
+    If specified in tandem, `--update-links` prevails over
+    [`--copy-links`](#opt) and [`--links`](#opt).
+
 0.  `--allow-link-update-dir`
 
     Enabling this option allows rsync to replace a less recent empty directory 
@@ -1226,6 +1229,9 @@ expand it.
     files from being replaced by a link, refer to the [`--update-links`](#opt)
     option.
 
+    If specified in tandem, [`--update-links`](#opt) or [`--copy-links`](#opt)
+    prevail over `--links`.
+
     See the [SYMBOLIC LINKS](#) section for multi-option info.
 
 0.  `--copy-links`, `-L`
@@ -1235,8 +1241,8 @@ expand it.
     references.  If a symlink chain is broken, an error is output and the file
     is dropped from the transfer.
 
-    This option supersedes any other options that affect symlinks in the
-    transfer, since there are no symlinks left in the transfer.
+    This option supersedes any other option that affect symlinks in the
+    transfer but [`--update-links`](#opt), which takes precedence.
 
     This option does not change the handling of existing symlinks on the
     receiving side, unlike versions of rsync prior to 2.6.3 which had the
@@ -4672,6 +4678,14 @@ first line that is a complete subset of your options:
 0.  `--update-links --allow-link-update-dir` Create symlinks, skip any more
     recent files existing on the destination, allow a less recent
     directory to be replaced by a more recent symlink.
+
+Note that some options are mutually exclusive.  The first option listed
+below prevails over the others, when multiple symlink mode options are
+specified.
+
+0.  `--update-links`
+0.  `--copy-links`
+0.  `--links`
 
 For the effect of [`--munge-links`](#opt), see the discussion in that option's
 section.
