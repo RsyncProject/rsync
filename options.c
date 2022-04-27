@@ -1384,6 +1384,8 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		 * only special cases are returned and listed here. */
 
 		switch (opt) {
+		case 'L':
+			break;
 		case 'V':
 			version_opt_cnt++;
 			break;
