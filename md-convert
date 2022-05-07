@@ -115,7 +115,8 @@ NBR_SPACE = ('\xa0', r"\ ")
 
 FILENAME_RE = re.compile(r'^(?P<fn>(?P<srcdir>.+/)?(?P<name>(?P<prog>[^/]+?)(\.(?P<sect>\d+))?)\.md)$')
 ASSIGNMENT_RE = re.compile(r'^(\w+)=(.+)')
-QUOTED_RE = re.compile(r'"(.+?)"')
+VER_RE = re.compile(r'^#define\s+RSYNC_VERSION\s+"(\d.+?)"', re.M)
+TZ_RE = re.compile(r'^#define\s+MAINTAINER_TZ_OFFSET\s+(-?\d+(\.\d+)?)', re.M)
 VAR_REF_RE = re.compile(r'\$\{(\w+)\}')
 VERSION_RE = re.compile(r' (\d[.\d]+)[, ]')
 BIN_CHARS_RE = re.compile(r'[\1-\7]+')
@@ -224,8 +225,10 @@ def find_man_substitutions():
 
         with open(srcdir + 'version.h', 'r', encoding='utf-8') as fh:
             txt = fh.read()
-        m = QUOTED_RE.search(txt)
+        m = VER_RE.search(txt)
         env_subs['VERSION'] = m.group(1)
+        m = TZ_RE.search(txt) # the tzdata lib may not be installed, so we use a simple hour offset
+        tz_offset = float(m.group(1)) * 60 * 60
 
         with open('Makefile', 'r', encoding='utf-8') as fh:
             for line in fh:
@@ -241,7 +244,7 @@ def find_man_substitutions():
                 if var == 'srcdir':
                     break
 
-    env_subs['date'] = time.strftime('%d %b %Y', time.localtime(mtime))
+    env_subs['date'] = time.strftime('%d %b %Y', time.gmtime(mtime + tz_offset)).lstrip('0')
 
 
 def html_via_commonmark(txt):
