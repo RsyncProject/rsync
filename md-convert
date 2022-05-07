@@ -214,6 +214,7 @@ def find_man_substitutions():
         env_subs['VERSION'] = '1.0.0'
         env_subs['bindir'] = '/usr/bin'
         env_subs['libdir'] = '/usr/lib/rsync'
+        tz_offset = 0
     else:
         for fn in (srcdir + 'version.h', 'Makefile'):
             try:
