@@ -154,6 +154,19 @@ rsync daemon by leaving off the module name:
 
 See the following section for more details.
 
+## SORTED TRANSFER ORDER
+
+Rsync always sorts the specified filenames into its internal transfer list.
+This handles the merging together of the contents of identically named
+directories, makes it easy to remove duplicate filenames. It can, however,
+confuse someone when the files are transferred in a different order than what
+was given on the command-line.
+
+If you need a particular file to be transferred prior to another, either
+separate the files into different rsync calls, or consider using
+[`--delay-updates`](#opt) (which doesn't affect the sorted transfer order, but
+does make the final file-updating phase happen much more rapidly).
+
 ## ADVANCED USAGE
 
 The syntax for requesting multiple files from a remote host is done by
@@ -270,6 +283,10 @@ example that uses the short version of the [`--rsh`](#opt) option:
 The "ssh-user" will be used at the ssh level; the "rsync-user" will be used to
 log-in to the "module".
 
+In this setup, the daemon is started by the ssh command that is accessing the
+system (which can be forced via the `~/.ssh/authorized_keys` file, if desired).
+However, when accessing a daemon directly, it needs to be started beforehand.
+
 ## STARTING AN RSYNC DAEMON TO ACCEPT CONNECTIONS
 
 In order to connect to an rsync daemon, the remote system needs to have a
@@ -283,48 +300,18 @@ the daemon (including stand-alone and inetd configurations).
 If you're using one of the remote-shell transports for the transfer, there is
 no need to manually start an rsync daemon.
 
-## SORTED TRANSFER ORDER
-
-Rsync always sorts the specified filenames into its internal transfer list.
-This handles the merging together of the contents of identically named
-directories, makes it easy to remove duplicate filenames, and may confuse
-someone when the files are transferred in a different order than what was given
-on the command-line.
-
-If you need a particular file to be transferred prior to another, either
-separate the files into different rsync calls, or consider using
-[`--delay-updates`](#opt) (which doesn't affect the sorted transfer order, but
-does make the final file-updating phase happen much more rapidly).
-
 ## EXAMPLES
 
-Here are some examples of how I use rsync.
+Here are some examples of how rsync can be used.
 
-To backup my wife's home directory, which consists of large MS Word files and
-mail folders, I use a cron job that runs
+To backup a home directory, which consists of large MS Word files and mail
+folders, a per-user cron job can be used that runs this each day:
 
->     rsync -Cavz . arvidsjaur:backup
+>     rsync -aiz . bkhost:backup/joe/
 
-each night over a PPP connection to a duplicate directory on my machine
-"arvidsjaur".
+To move some files from a remote host to the local host, you could run:
 
-To synchronize my samba source trees I use the following Makefile targets:
-
->     get:
->         rsync -avuzb --exclude '*~' samba:samba/ .
->     put:
->         rsync -Cavuzb . samba:samba/
->     sync: get put
-
-This allows me to sync with a CVS directory at the other end of the connection.
-I then do CVS operations on the remote machine, which saves a lot of time as
-the remote CVS protocol isn't very efficient.
-
-I mirror a directory between my "old" and "new" ftp sites with the command:
-
->     rsync -az -e ssh --delete ~ftp/pub/samba nimbus:"~ftp/pub/tridge"
-
-This is launched from cron every few hours.
+>     rsync -aiv --remove-source-files rhost:/tmp/{file1,file2}.c ~/src/
 
 ## OPTION SUMMARY
 
@@ -508,14 +495,18 @@ accepted:
 Rsync accepts both long (double-dash + word) and short (single-dash + letter)
 options.  The full list of the available options are described below.  If an
 option can be specified in more than one way, the choices are comma-separated.
-Some options only have a long variant, not a short.  If the option takes a
-parameter, the parameter is only listed after the long variant, even though it
-must also be specified for the short.  When specifying a parameter, you can
-either use the form `--option=param` or replace the '=' with whitespace.  The
-parameter may need to be quoted in some manner for it to survive the shell's
-command-line parsing.  Keep in mind that a leading tilde (`~`) in a filename is
-substituted by your shell, so `--option=~/foo` will not change the tilde into
-your home directory (remove the '=' for that).
+Some options only have a long variant, not a short.
+
+If the option takes a parameter, the parameter is only listed after the long
+variant, even though it must also be specified for the short.  When specifying
+a parameter, you can either use the form `--option=param`, `--option param`,
+`-o=param`, `-o param`, or `-oparam` (the latter choices assume that your
+option has a short variant).
+
+The parameter may need to be quoted in some manner for it to survive the
+shell's command-line parsing.  Also keep in mind that a leading tilde (`~`) in
+a pathname is substituted by your shell, so make sure that you separate the
+option name from the pathname using a space if you want the shell to expand it.
 
 [comment]: # (An OL starting at 0 is converted into a DL by the parser.)
 
@@ -1478,7 +1469,7 @@ your home directory (remove the '=' for that).
 
     This tells rsync to treat a device on the sending side as a regular file,
     allowing it to be copied to a normal destination file (or another device
-    if `--write-devices` was also specifed).
+    if `--write-devices` was also specified).
 
     This option is refused by default by an rsync daemon.
 
@@ -4466,7 +4457,7 @@ file is included or excluded.
 0. `RSYNC_SHELL`
 
     This environment variable is mainly used in debug setups to set the program
-    to use to run the program specified by [`RSYNC_CONNECT_PROG`].  See
+    to use to run the program specified by [`RSYNC_CONNECT_PROG`](#).  See
     [CONNECTING TO AN RSYNC DAEMON](#) for full details.
 
 ## FILES

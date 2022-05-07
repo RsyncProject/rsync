@@ -11,14 +11,16 @@ rrsync [-ro|-rw] [-munge] [-no-del] [-no-lock] DIR
 The single non-option argument specifies the restricted _DIR_ to use. It can be
 relative to the user's home directory or an absolute path.
 
-The online version of this man page (that includes cross-linking of topics)
+The online version of this manpage (that includes cross-linking of topics)
 is available at <https://download.samba.org/pub/rsync/rrsync.1>.
 
 ## DESCRIPTION
 
 A user's ssh login can be restricted to only allow the running of an rsync
-transfer in one of two easy ways: forcing the running of the rrsync script
-or forcing the running of an rsync daemon-over-ssh command.
+transfer in one of two easy ways:
+
+* forcing the running of the rrsync script
+* forcing the running of an rsync daemon-over-ssh command.
 
 To use the rrsync script, edit the user's `~/.ssh/authorized_keys` file and add
 a prefix like one of the following (followed by a space) in front of each
@@ -47,13 +49,14 @@ ssh-key line that should be restricted:
 Then, ensure that the rsyncd.conf file is created with one or more module names
 with the appropriate path and option restrictions.  If rsync's
 [`--config`](rsync.1#dopt) option is omitted, it defaults to `~/rsyncd.conf`.
-See the `rsyncd.conf` man page for details of how to configure an rsync daemon.
+See the [**rsyncd.conf**(5)](rsyncd.conf.5) manpage for details of how to
+configure an rsync daemon.
 
 When using rrsync, there can be just one restricted dir per authorized key.  A
 daemon setup, on the other hand, allows multiple module names inside the config
 file, each one with its own path setting.
 
-The remainder of this man page is dedicated to using the rrsync script.
+The remainder of this manpage is dedicated to using the rrsync script.
 
 ## OPTIONS
 
@@ -119,11 +122,11 @@ The `~/.ssh/authorized_keys` file might have lines in it like this:
 
 ## SEE ALSO
 
-[**rsync**(1)](rsync.1)
+[**rsync**(1)](rsync.1), [**rsyncd.conf**(5)](rsyncd.conf.5)
 
 ## VERSION
 
-This man page is current for version @VERSION@ of rsync.
+This manpage is current for version @VERSION@ of rsync.
 
 ## CREDITS
 
