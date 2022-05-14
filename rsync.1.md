@@ -177,20 +177,24 @@ the hostname omitted.  For instance, all these work:
 >     rsync -aiv host::modname/file{1,2} host::modname/extra /dest/
 >     rsync -aiv host::modname/first ::modname/extra{1,2} /dest/
 
-In a modern rsync, you only need to quote or backslash-escape things like
-spaces from the local shell but not also from the remote shell:
+Really old versions of rsync (2.6.9 and before) only allowed specifying one
+remote-source arg, so some people have instead relied on the remote-shell
+performing space splitting to break up an arg into multiple paths. Such
+unintuitive behavior is no longer supported by default (though you can request
+it, as described below).
 
->     rsync -aiv host:'a simple file.pdf' /dest/
+Starting in 3.2.4, filenames are passed to a remote shell in such a way as to
+preserve the characters you give it. Thus, if you ask for a file with spaces
+in the name, that's what the remote rsync looks for:
 
-Really old versions of rsync only allowed specifying one remote-source arg, so
-it required the remote side to split the args at a space.  You can still get
-this old-style arg splitting by using the [`--old-args`](#opt) option:
+>     rsync -aiv host:'a simple file.pdf' /dest/                                                                                
 
->     rsync -ai --old-args host:'dir1/file1 dir2/file2' /dest
->     rsync -ai --old-args host::'modname/dir1/file1 modname/dir2/file2' /dest
-
-See that option's section for an [environment variable](#RSYNC_OLD_ARGS) that
-can be exported to help old scripts.
+If you use scripts that have been written to manually apply extra quoting to
+the remote rsync args (or to require remote arg splitting), you can ask rsync
+to let your script handle the extra escaping.  This is done by either adding
+the [`--old-args`](#opt) option to the rsync runs in the script (which requires
+a new rsync) or exporting [RSYNC_OLD_ARGS](#)=1 and [RSYNC_PROTECT_ARGS](#)=0
+(which works with old or new rsync versions).
 
 ## CONNECTING TO AN RSYNC DAEMON
 
