@@ -182,7 +182,7 @@ spaces from the local shell but not also from the remote shell:
 
 >     rsync -aiv host:'a simple file.pdf' /dest/
 
-Really old versions of rsync only allowed specifying one remote-source arg, so
+Pre 3.2.4 versions of rsync only allowed specifying one remote-source arg, so
 it required the remote side to split the args at a space.  You can still get
 this old-style arg splitting by using the [`--old-args`](#opt) option:
 
