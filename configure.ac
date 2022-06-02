@@ -22,7 +22,7 @@ AC_CONFIG_SRCDIR([byteorder.h])
 AC_CONFIG_HEADER(config.h)
 AC_PREREQ([2.69])
 
-PACKAGE_VERSION=`sed 's/.*"\(.*\)".*/\1/' <$srcdir/version.h`
+PACKAGE_VERSION=`sed -n 's/.*RSYNC_VERSION.*"\(.*\)".*/\1/p' <$srcdir/version.h`
 
 AC_MSG_NOTICE([Configuring rsync $PACKAGE_VERSION])
 
