@@ -574,7 +574,7 @@ void sum_update(const char *p, int32 len)
 }
 
 /* NOTE: all the callers of sum_end() pass in a pointer to a buffer that is
- * MAX_DIGEST_LEN in size, so even if the csum-len is shorter that that (i.e.
+ * MAX_DIGEST_LEN in size, so even if the csum-len is shorter than that (i.e.
  * CSUM_MD4_ARCHAIC), we don't have to worry about limiting the data we write
  * into the "sum" buffer. */
 int sum_end(char *sum)
