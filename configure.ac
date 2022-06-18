@@ -1066,11 +1066,7 @@ elif test x"$ac_cv_header_popt_h" != x"yes"; then
     with_included_popt=yes
 fi
 
-# Some arm systems compute the checksums wrong when -pedantic-errors is set, so we
-# limit this to x86 for the moment (since this should ensure that the main purpose
-# of finding a static-list overflow will still occur on a large number of hosts).
-case "$GCC,$host_cpu" in
-yes,x86_64|yes,amd64)
+if test x"$GCC" = x"yes"; then
     if test x"$with_included_popt" != x"yes"; then
 	# Turn pedantic warnings into errors to ensure an array-init overflow is an error.
 	CFLAGS="$CFLAGS -pedantic-errors"
@@ -1083,7 +1079,7 @@ yes,x86_64|yes,amd64)
 	    *-Wpedantic*) CFLAGS="$CFLAGS -pedantic-errors -Wno-pedantic" ;;
 	esac
     fi
-esac
+fi
 
 AC_MSG_CHECKING([whether to use included libpopt])
 if test x"$with_included_popt" = x"yes"; then
@@ -1121,7 +1117,7 @@ else
 fi
 
 AC_CACHE_CHECK([for unsigned char],rsync_cv_SIGNED_CHAR_OK,[
-AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[signed char *s = ""]])],[rsync_cv_SIGNED_CHAR_OK=yes],[rsync_cv_SIGNED_CHAR_OK=no])])
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[signed char *s = (signed char *)""]])],[rsync_cv_SIGNED_CHAR_OK=yes],[rsync_cv_SIGNED_CHAR_OK=no])])
 if test x"$rsync_cv_SIGNED_CHAR_OK" = x"yes"; then
     AC_DEFINE(SIGNED_CHAR_OK, 1, [Define to 1 if "signed char" is a valid type])
 fi
