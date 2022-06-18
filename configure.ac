@@ -1066,7 +1066,11 @@ elif test x"$ac_cv_header_popt_h" != x"yes"; then
     with_included_popt=yes
 fi
 
-if test x"$GCC" = x"yes"; then
+# Some arm systems compute the checksums wrong when -pedantic-errors is set, so we
+# limit this to x86 for the moment (since this should ensure that the main purpose
+# of finding a static-list overflow will still occur on a large number of hosts).
+case "$GCC,$host_cpu" in
+yes,x86_64|yes,amd64)
     if test x"$with_included_popt" != x"yes"; then
 	# Turn pedantic warnings into errors to ensure an array-init overflow is an error.
 	CFLAGS="$CFLAGS -pedantic-errors"
@@ -1079,7 +1083,7 @@ if test x"$GCC" = x"yes"; then
 	    *-Wpedantic*) CFLAGS="$CFLAGS -pedantic-errors -Wno-pedantic" ;;
 	esac
     fi
-fi
+esac
 
 AC_MSG_CHECKING([whether to use included libpopt])
 if test x"$with_included_popt" = x"yes"; then
