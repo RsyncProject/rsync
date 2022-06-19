@@ -512,6 +512,9 @@ shell's command-line parsing.  Also keep in mind that a leading tilde (`~`) in
 a pathname is substituted by your shell, so make sure that you separate the
 option name from the pathname using a space if you want the shell to expand it.
 
+[comment]: # (Some markup below uses a literal non-breakable space when a backtick string)
+[comment]: # (needs to contain a space since markdown strips spaces from the start/end)
+
 [comment]: # (An OL starting at 0 is converted into a DL by the parser.)
 
 0.  `--help`
@@ -1163,7 +1166,7 @@ option name from the pathname using a space if you want the shell to expand it.
     transfer, the client is the sender, so specifying the option directly
     unmunges symlinks while specifying it as a remote option munges symlinks.
 
-    This option has no affect when sent to a daemon via [`--remote-option`](#opt)
+    This option has no effect when sent to a daemon via [`--remote-option`](#opt)
     because the daemon configures whether it wants munged symlinks via its
     "`munge symlinks`" parameter.
 
@@ -1866,13 +1869,25 @@ option name from the pathname using a space if you want the shell to expand it.
 
 0.  `--delete-excluded`
 
-    In addition to deleting the files on the receiving side that are not on the
-    sending side, this tells rsync to also delete any files on the receiving
-    side that are excluded (see [`--exclude`](#opt)).  See the [FILTER
-    RULES](#) section for a way to make individual exclusions behave this way
-    on the receiver, and for a way to protect files from `--delete-excluded`.
-    See [`--delete`](#opt) (which is implied) for more details on
-    file-deletion.
+    This option turns any unqualified exclude/include rules into server-side
+    rules that do not affect the receiver's deletions.
+
+    By default, an exclude or include has both a server-side effect (to "hide"
+    and "show" files when building the server's file list) and a receiver-side
+    effect (to "protect" and "risk" files when deletions are occuring).  Any
+    rule that has no modifier to specify what sides it is executed on will be
+    instead treated as if it were a server-side rule only, avoiding any
+    "protect" effects of the rules.
+
+    A rule can still apply to both sides even with this option specified if the
+    rule is given both the sender & receiver modifer letters (e.g., `-f'-sr
+    foo'`).  Receiver-side protect/risk rules can also be explicitly specified
+    to limit the deletions.  This is saves you from having to edit a bunch of
+    `-f'- foo'` rules into `-f'-s foo'` or `-f'H foo'` rules (not to mention
+    the corresponding includes).
+
+    See the [FILTER RULES](#) section for more information.  See
+    [`--delete`](#opt) (which is implied) for more details on deletion.
 
 0.  `--ignore-missing-args`
 
@@ -2191,8 +2206,8 @@ option name from the pathname using a space if you want the shell to expand it.
 0.  `--exclude=PATTERN`
 
     This option is a simplified form of the [`--filter`](#opt) option that
-    defaults to an exclude rule and does not allow the full rule-parsing syntax
-    of normal filter rules.
+    specifies an exclude rule and does not allow the full rule-parsing syntax
+    of normal filter rules.  This is equivalent to specifying `-f'- PATTERN'`.
 
     See the [FILTER RULES](#) section for detailed information on this option.
 
@@ -2203,13 +2218,20 @@ option name from the pathname using a space if you want the shell to expand it.
     file are ignored, as are whole-line comments that start with '`;`' or '`#`'
     (filename rules that contain those characters are unaffected).
 
+    If a line begins with "`- `" (dash, space) or "`+ `" (plus, space), then
+    the type of rule is being explicitly specified as an exclude or an include
+    (respectively).  Any rules without such a prefix are taken to be an exclude.
+
+    If a line consists of just "`!`", then the current filter rules are cleared
+    before adding any further rules.
+
     If _FILE_ is '`-`', the list will be read from standard input.
 
 0.  `--include=PATTERN`
 
     This option is a simplified form of the [`--filter`](#opt) option that
-    defaults to an include rule and does not allow the full rule-parsing syntax
-    of normal filter rules.
+    specifies an include rule and does not allow the full rule-parsing syntax
+    of normal filter rules.  This is equivalent to specifying `-f'+ PATTERN'`.
 
     See the [FILTER RULES](#) section for detailed information on this option.
 
@@ -2219,6 +2241,13 @@ option name from the pathname using a space if you want the shell to expand it.
     a FILE that contains include patterns (one per line).  Blank lines in the
     file are ignored, as are whole-line comments that start with '`;`' or '`#`'
     (filename rules that contain those characters are unaffected).
+
+    If a line begins with "`- `" (dash, space) or "`+ `" (plus, space), then
+    the type of rule is being explicitly specified as an exclude or an include
+    (respectively).  Any rules without such a prefix are taken to be an include.
+
+    If a line consists of just "`!`", then the current filter rules are cleared
+    before adding any further rules.
 
     If _FILE_ is '`-`', the list will be read from standard input.
 
@@ -3008,7 +3037,7 @@ option name from the pathname using a space if you want the shell to expand it.
     of "%i %n%L".  See the [`--log-file-format`](#opt) option if you wish to
     override this.
 
-    Here's a example command that requests the remote side to log what is
+    Here's an example command that requests the remote side to log what is
     happening:
 
     >     rsync -av --remote-option=--log-file=/tmp/rlog src/ dest/
@@ -3713,24 +3742,134 @@ The options allowed when starting an rsync daemon are as follows:
 The filter rules allow for flexible selection of which files to transfer
 (include) and which files to skip (exclude).  The rules either directly specify
 include/exclude patterns or they specify a way to acquire more include/exclude
-patterns (e.g. to read them from a file).
+patterns (e.g. to read them from a file). Some rules even exclude/include xattr
+attributes.
 
-As the list of files/directories to transfer is built, rsync checks each name
-to be transferred against the list of include/exclude patterns in turn, and the
-first matching pattern is acted on: if it is an exclude pattern, then that file
-is skipped; if it is an include pattern then that filename is not skipped; if
-no matching pattern is found, then the filename is not skipped.
+### SIMPLE INCLUDE/EXCLUDE RULES
 
-Aside: because the interactions of filter rules can be complex, it is useful to
-use the `--debug=FILTER` option if things aren't working the way you expect.
-The level-1 output (the default if no level number is specified) mentions the
-filter rule that is first matched by each file in the transfer.  It also warns
-if a filter rule has trailing whitespace.  The level-2 output mentions a lot
-more filter events, including the definition of each rule and the handling of
-per-directory filter files.
+We will first cover the basics of how include & exclude rules affect what files
+are transferred, ignoring any deletion side-effects.  Filter rules mainly
+affect the contents of directories that rsync is "recursing" into, but they can
+also affect a top-level item in the transfer that were specified as a argument.
 
-Rsync builds an ordered list of filter rules as specified on the command-line.
-Filter rules have the following syntax:
+The default for any unmatched file/dir is for it to be included in the
+transfer, which puts the file/dir into the sender's file list.  The use of an
+exclude rule causes one or more matching files/dirs to be left out of the
+sender's file list.  An include rule can be used to limit the effect of an
+exclude rule that is matching too many files.
+
+The order of the rules is important because the first rule that matches is the
+one that takes effect.  Thus, if an early rule excludes a file, no include rule
+that comes after it can have any effect. This means that you must place any
+include overrides somewhere prior to the exclude that it is intended to limit.
+
+When a directory is excluded, all its contents and sub-contents are also
+excluded.  The sender doesn't scan through any of it at all, which can save a
+lot of time when skipping large unneeded sub-trees.
+
+It is also important to understand that the include/exclude rules are applied
+to every file and directory that the sender is recursing into. Thus, if you
+want a particular deep file to be included, you have to make sure that none of
+the directories that must be traversed on the way down to that file are
+excluded or else the file will never be discovered to be included. As an
+example, if the directory "`a/path`" was given as a transfer argument and you
+want to ensure that the file "`a/path/down/deep/wanted.txt`" is a part of the
+transfer, then the sender must not exclude the directories "`a/path`",
+"`a/path/down`", or "`a/path/down/deep`" as it makes it way scanning through
+the file tree.
+
+When you are working on the rules, it can be helpful to ask rsync to tell you
+what is being excluded/included and why.  Specifying `--debug=FILTER` or (when
+pulling files) `-M--debug=FILTER` turns on level 1 of the FILTER debug
+information that will output a message any time that a file or directory is
+included or excluded and which rule it matched.  Beginning in 3.2.4 it will
+also warn if a filter rule has trailing whitespace, since an exclude of "foo "
+(with a trailing space) will not exclude a file named "foo".
+
+Exclude and include rules can specify wildcard [PATTERN MATCHING RULES](#)
+(similar to shell wilcards) that allow you to match things like a file suffix
+or a portion of a filename.
+
+A rule can be limited to only affecting a directory by putting a trailing slash
+onto the filename.
+
+### SIMPLE INCLUDE/EXCLUDE EXAMPLE
+
+With the following file tree created on the sending side:
+
+>     mkdir x/
+>     touch x/file.txt
+>     mkdir x/y/
+>     touch x/y/file.txt
+>     touch x/y/zzz.txt
+>     mkdir x/z/
+>     touch x/z/file.txt
+
+Then the following rsync command will transfer the file "`x/y/file.txt`" and
+the directories needed to hold it, resulting in the path "`/tmp/x/y/file.txt`"
+existing on the remote host:
+
+>     rsync -ai -f'+ x/' -f'+ x/y/' -f'+ x/y/file.txt' -f'- *' x host:/tmp/
+
+Aside: this copy could also have been accomplished using the [`-R`](#opt)
+option (though the 2 commands behave differently if deletions are enabled):
+
+>     rsync -aR x/y/file.txt host:/tmp/
+
+The following command does not need an include of the "x" directory because it
+is not a part of the transfer (note the traililng slash).  Running this command
+would copy just "`/tmp/x/file.txt`" because the "y" and "z" dirs get excluded:
+
+>     rsync -ai -f'+ file.txt' -f'- *' x/ host:/tmp/x/
+
+This command would omit the zzz.txt file while copying "x" and everything else
+it contains:
+
+>     rsync -aiv -f'- zzz.txt' x host:/tmp/
+
+### FILTER RULES WHEN DELETING
+
+By default a filter rule affects both the sender (as it creates its file list)
+and the receiver (as it creates its file lists for calculating deletions).  If
+no delete option is in effect, the receiver skips creating the delete-related
+file lists.  This two-sided default can be manually overridden so that you are
+only specifying sender rules or receiver rules, as described in the [FILTER
+RULES IN DEPTH](#) section.
+
+When deleting, an exclude protects a file from being removed on the receiving
+side while an include overrides that protection (putting the file at risk of
+deletion). The default is for a file to be at risk (its safety depends on it
+matching a corresponding file from the sender).
+
+An example of the two-sided exclude effect can be illustrated by the copying of
+a C development directory between 2 systems.  When doing a touch-up copy, you
+might want to skip copying the built executable and the `.o` files (sender
+hide) so that the receiving side can build their own and not lose any object
+files that are already correct (receiver protect).  For instance:
+
+>     rsync -ai --del -f'- *.o' -f'- cmd' src host:/dest/
+
+Note that using `-f'-p *.o'` is even better than `-f'- *.o'` if there is a
+chance that the directory structure may have changed.  The "p" modifier is
+discussed in [FILTER RULE MODIFIERS](#).
+
+One final note, if your shell doesn't mind unexpanded wildcards, you could
+simplify the typing of the filter options by using an underscore in place of
+the space and leaving off the quotes.  For instance, `-f -_*.o -f -_cmd` (and
+similar) could be used instead of the filter options above.
+
+### FILTER RULES IN DEPTH
+
+Rsync supports old-style include/exclude rules and new-style filter rules.  The
+older rules are specified using [`--include`](#opt) and [`--exclude`](#opt) as
+well as the [`--include-from`](#opt) and [`--exclude-from`](#opt). These are
+limited in behavior but they don't require a "-" or "+" prefix.  An old-style
+exclude rule is turned into a `+ name` filter rule (with no modifiers) and an
+old-style include rule is turned into a `- name` filter rule (with no
+modifiers).
+
+Rsync builds an ordered list of filter rules as specified on the command-line
+and/or read-in from files.  New style filter rules have the following syntax:
 
 >     RULE [PATTERN_OR_FILENAME]
 >     RULE,MODIFIERS [PATTERN_OR_FILENAME]
@@ -3738,35 +3877,33 @@ Filter rules have the following syntax:
 You have your choice of using either short or long RULE names, as described
 below.  If you use a short-named rule, the ',' separating the RULE from the
 MODIFIERS is optional.  The PATTERN or FILENAME that follows (when present)
-must come after either a single space or an underscore (\_).  Here are the
-available rule prefixes:
+must come after either a single space or an underscore (\_). Any additional
+spaces and/or undeerscore are considered to be a part of the pattern name.
+Here are the available rule prefixes:
 
-0.  `exclude, '-'` specifies an exclude pattern.
-0.  `include, '+'` specifies an include pattern.
+0.  `exclude, '-'` specifies an exclude pattern that (by default) is both a
+    `hide` and a `protect`.
+0.  `include, '+'` specifies an include pattern that (by default) is both a
+    `show` and a `risk`.
 0.  `merge, '.'` specifies a merge-file to read for more rules.
 0.  `dir-merge, ':'` specifies a per-directory merge-file.
 0.  `hide, 'H'` specifies a pattern for hiding files from the transfer.
-0.  `show, 'S'` files that match the pattern are not hidden.
+    Equivalent to a sender-only exclude, so `-f'H foo'` could also be specified
+    as `-f'-s foo'`.
+0.  `show, 'S'` files that match the pattern are not hidden. Equivalent to a
+    sender-only include, so `-f'S foo'` could also be specified as `-f'+s
+    foo'`.
 0.  `protect, 'P'` specifies a pattern for protecting files from deletion.
-0.  `risk, 'R'` files that match the pattern are not protected.
+    Equivalent to a receiver-only exclude, so `-f'P foo'` could also be
+    specified as `-f'-r foo'`.
+0.  `risk, 'R'` files that match the pattern are not protected. Equivalent to a
+    receiver-only include, so `-f'P foo'` could also be specified as `-f'+r
+    foo'`.
 0.  `clear, '!'` clears the current include/exclude list (takes no arg)
 
-When rules are being read from a file, empty lines are ignored, as are
-whole-line comments that start with a '`#`' (filename rules that contain a hash
-are unaffected).
-
-[comment]: # (Remember that markdown strips spaces from start/end of ` ... ` sequences!)
-[comment]: # (Thus, the `x ` sequences below use a literal non-breakable space!)
-
-Note that the [`--include`](#opt) & [`--exclude`](#opt) command-line options do
-not allow the full range of rule parsing as described above -- they only allow
-the specification of include / exclude patterns plus a "`!`" token to clear the
-list (and the normal comment parsing when rules are read from a file).  If a
-pattern does not begin with "`- `" (dash, space) or "`+ `" (plus, space), then
-the rule will be interpreted as if "`+ `" (for an include option) or "`- `"
-(for an exclude option) were prefixed to the string.  A [`--filter`](#opt)
-option, on the other hand, must always contain either a short or long rule name
-at the start of the rule.
+When rules are being read from a file (using merge or dir-merge), empty lines
+are ignored, as are whole-line comments that start with a '`#`' (filename rules
+that contain a hash character are unaffected).
 
 Note also that the [`--filter`](#opt), [`--include`](#opt), and
 [`--exclude`](#opt) options take one rule/pattern each.  To add multiple ones,
@@ -3774,121 +3911,90 @@ you can repeat the options on the command-line, use the merge-file syntax of
 the [`--filter`](#opt) option, or the [`--include-from`](#opt) /
 [`--exclude-from`](#opt) options.
 
-## PATTERN_OR_FILENAME MATCHING RULES
+### PATTERN MATCHING RULES
 
-You can include and exclude files by specifying patterns using the "+", "-",
-etc. filter rules (as introduced in the [FILTER RULES](#) section above).  The
-include/exclude rules each specify a pattern that is matched against the names
-of the files that are going to be transferred.  These patterns can take several
-forms:
+Most of the rules mentioned above take an argument that specifies what the rule
+should match.  If rsync is recursing through a directory hierarchy, keep in
+mind that each pattern is matched against the name of every directory in the
+descent path as rsync finds the filenames to send.
 
-- if the pattern starts with a `/` then it is anchored to a particular spot in
-  the hierarchy of files, otherwise it is matched against the end of the
-  pathname.  This is similar to a leading `^` in regular expressions.  Thus
-  `/foo` would match a name of "foo" at either the "root of the transfer" (for
-  a global rule) or in the merge-file's directory (for a per-directory rule).
-  An unqualified `foo` would match a name of "foo" anywhere in the tree because
-  the algorithm is applied recursively from the top down; it behaves as if each
-  path component gets a turn at being the end of the filename.  Even the
-  unanchored "sub/foo" would match at any point in the hierarchy where a "foo"
-  was found within a directory named "sub".  See the section on ANCHORING
-  INCLUDE/EXCLUDE PATTERNS for a full discussion of how to specify a pattern
-  that matches at the root of the transfer.
-- if the pattern ends with a `/` then it will only match a directory, not a
-  regular file, symlink, or device.
-- rsync chooses between doing a simple string match and wildcard matching by
-  checking if the pattern contains one of these three wildcard characters:
-  '`*`', '`?`', and '`[`' .
-- a '`*`' matches any path component, but it stops at slashes.
-- use '`**`' to match anything, including slashes.
-- a '`?`' matches any character except a slash (`/`).
-- a '`[`' introduces a character class, such as `[a-z]` or `[[:alpha:]]`.
-- in a wildcard pattern, a backslash can be used to escape a wildcard
-  character, but it is matched literally when no wildcards are present.  This
-  means that there is an extra level of backslash removal when a pattern
-  contains wildcard characters compared to a pattern that has none.  e.g. if
-  you add a wildcard to "`foo\bar`" (which matches the backslash) you would
-  need to use "`foo\\bar*`" to avoid the "`\b`" becoming just "b".
-- if the pattern contains a `/` (not counting a trailing /) or a "`**`", then it
-  is matched against the full pathname, including any leading directories.  If
-  the pattern doesn't contain a `/` or a "`**`", then it is matched only against
-  the final component of the filename. (Remember that the algorithm is applied
-  recursively so "full filename" can actually be any portion of a path from the
-  starting directory on down.)
-- a trailing "`dir_name/***`" will match both the directory (as if "dir_name/"
+The matching rules for the pattern argument take several forms:
+
+- If a pattern contains a `/` (not counting a trailing slash) or a "`**`"
+  (which can match a slash), then the pattern is matched against the full
+  pathname, including any leading directories within the transfer.  If the
+  pattern doesn't contain a `/` or a "`**`", then it is matched only against
+  the final component of the filename or pathname. For example, `foo` means
+  that the final path component must be "foo" while `foo/bar` would match the
+  last 2 elements of the path (as long as both elements are within the
+  transfer).
+- A pattern that ends with a `/` only matches a directory, not a regular file,
+  symlink, or device.
+- A pattern that starts with a `/` is anchored to the start of the transfer
+  path instead of the end.  For example, `/foo` or `/foo/bar` match only
+  leading elements in the path.  If the rule is read from a per-directory
+  filter file, the transfer path being matched will begin at the level of the
+  filter file instead of the top of the transfer.  See the section on
+  [ANCHORING INCLUDE/EXCLUDE PATTERNS](#) for a full discussion of how to
+  specify a pattern that matches at the root of the transfer.
+
+Rsync chooses between doing a simple string match and wildcard matching by
+checking if the pattern contains one of these three wildcard characters: '`*`',
+'`?`', and '`[`' :
+
+- a '`?`' matches any single character except a slash (`/`).
+- a '`*`' matches zero or more non-slash characters.
+- a '`**`' matches zero or more characters, including slashes.
+- a '`[`' introduces a character class, such as `[a-z]` or `[[:alpha:]]`, that
+  must match one character.
+- a trailing `***` in the pattern is a shorthand that allows you to match a
+  directory and all its contents using a single rule.  For example, specifying
+  "`dir_name/***`" will match both the "dir_name" directory (as if "dir_name/"
   had been specified) and everything in the directory (as if "`dir_name/**`"
-  had been specified).  This behavior was added in version 2.6.7.
-
-Note that, when using the [`--recursive`](#opt) (`-r`) option (which is implied
-by [`-a`](#opt)), every subdir component of every path is visited left to
-right, with each directory having a chance for exclusion before its content.
-In this way include/exclude patterns are applied recursively to the pathname of
-each node in the filesystem's tree (those inside the transfer).  The exclude
-patterns short-circuit the directory traversal stage as rsync finds the files
-to send.
-
-For instance, to include "`/foo/bar/baz`", the directories "`/foo`" and "`/foo/bar`"
-must not be excluded.  Excluding one of those parent directories prevents the
-examination of its content, cutting off rsync's recursion into those paths and
-rendering the include for "`/foo/bar/baz`" ineffectual (since rsync can't match
-something it never sees in the cut-off section of the directory hierarchy).
-
-The concept path exclusion is particularly important when using a trailing '`*`'
-rule.  For instance, this won't work:
-
->     + /some/path/this-file-will-not-be-found
->     + /file-is-included
->     - *
-
-This fails because the parent directory "some" is excluded by the '`*`' rule, so
-rsync never visits any of the files in the "some" or "some/path" directories.
-One solution is to ask for all directories in the hierarchy to be included by
-using a single rule: "`+ */`" (put it somewhere before the "`- *`" rule), and
-perhaps use the [`--prune-empty-dirs`](#opt) option.  Another solution is to add
-specific include rules for all the parent dirs that need to be visited.  For
-instance, this set of rules works fine:
-
->     + /some/
->     + /some/path/
->     + /some/path/this-file-is-found
->     + /file-also-included
->     - *
+  had been specified).
+- a backslash can be used to escape a wildcard character, but it is only
+  interpreted as an escape character if at least one wildcard character is
+  present in the match pattern. For instance, the pattern "`foo\bar`" matches
+  that single backslash literally, while the pattern "`foo\bar*`" would need to
+  be changed to "`foo\\bar*`" to avoid the "`\b`" becoming just "b".
 
 Here are some examples of exclude/include matching:
 
-- "`- *.o`" would exclude all names matching `*.o`
-- "`- /foo`" would exclude a file (or directory) named foo in the transfer-root
-  directory
-- "`- foo/`" would exclude any directory named foo
-- "`- /foo/*/bar`" would exclude any file named bar which is at two levels
-  below a directory named foo in the transfer-root directory
-- "`- /foo/**/bar`" would exclude any file named bar two or more levels below a
-  directory named foo in the transfer-root directory
-- The combination of "`+ */`", "`+ *.c`", and "`- *`" would include all
-  directories and C source files but nothing else (see also the
-  [`--prune-empty-dirs`](#opt) option)
-- The combination of "`+ foo/`", "`+ foo/bar.c`", and "`- *`" would include
-  only the foo directory and foo/bar.c (the foo directory must be explicitly
-  included or it would be excluded by the "`*`")
+- Option `-f'- *.o'` would exclude all filenames ending with `.o`
+- Option `-f'- /foo'` would exclude a file (or directory) named foo in the
+  transfer-root directory
+- Option `-f'- foo/'` would exclude any directory named foo
+- Option `-f'- /foo/*/bar'` would exclude any file/dir named bar which is at
+  two levels below a directory named foo, which must be at the root of the
+  transfer
+- Option `-f'- /foo/**/bar'` would exclude any file/dir named bar two or more
+  levels below a directory named foo, which must be at the root of the transfer
+- Options `-f'+ */' -f'+ *.c' -f'- *'` would include all directories and .c
+  source files but nothing else
+- Options `-f'+ foo/' -f'+ foo/bar.c' -f'- *'` would include only the foo
+  directory and foo/bar.c (the foo directory must be explicitly included or it
+  would be excluded by the "`- *`")
 
-The following modifiers are accepted after a "`+`" or "`-`":
+### FILTER RULE MODIFIERS
+
+The following modifiers are accepted after an include (+) or exclude (-) rule:
 
 - A `/` specifies that the include/exclude rule should be matched against the
-  absolute pathname of the current item.  For example, "`-/ /etc/passwd`" would
-  exclude the passwd file any time the transfer was sending files from the
-  "/etc" directory, and "-/ subdir/foo" would always exclude "foo" when it is
-  in a dir named "subdir", even if "foo" is at the root of the current
+  absolute pathname of the current item.  For example, `-f'-/ /etc/passwd'`
+  would exclude the passwd file any time the transfer was sending files from
+  the "/etc" directory, and "-/ subdir/foo" would always exclude "foo" when it
+  is in a dir named "subdir", even if "foo" is at the root of the current
   transfer.
 - A `!` specifies that the include/exclude should take effect if the pattern
-  fails to match.  For instance, "`-! */`" would exclude all non-directories.
+  fails to match.  For instance, `-f'-! */'` would exclude all non-directories.
 - A `C` is used to indicate that all the global CVS-exclude rules should be
   inserted as excludes in place of the "-C".  No arg should follow.
 - An `s` is used to indicate that the rule applies to the sending side.  When a
-  rule affects the sending side, it prevents files from being transferred.  The
-  default is for a rule to affect both sides unless [`--delete-excluded`](#opt)
-  was specified, in which case default rules become sender-side only.  See also
-  the hide (H) and show (S) rules, which are an alternate way to specify
-  sending-side includes/excludes.
+  rule affects the sending side, it affects what files are put into the
+  sender's file list.  The default is for a rule to affect both sides unless
+  [`--delete-excluded`](#opt) was specified, in which case default rules become
+  sender-side only.  See also the hide (H) and show (S) rules, which are an
+  alternate way to specify sending-side includes/excludes.
 - An `r` is used to indicate that the rule applies to the receiving side.  When
   a rule affects the receiving side, it prevents files from being deleted.  See
   the `s` modifier for more info.  See also the protect (P) and risk (R) rules,
@@ -3904,7 +4010,7 @@ The following modifiers are accepted after a "`+`" or "`-`":
   xattr-matching rules are specified, a default xattr filtering rule is used
   (see the [`--xattrs`](#opt) option).
 
-## MERGE-FILE FILTER RULES
+### MERGE-FILE FILTER RULES
 
 You can merge whole files into your filter rules by specifying either a merge
 (.) or a dir-merge (:) filter rule (as introduced in the [FILTER RULES](#)
@@ -4038,7 +4144,7 @@ $HOME/.cvsignore, and the value of $CVSIGNORE) you should omit the `-C`
 command-line option and instead insert a "-C" rule into your filter rules; e.g.
 "`--filter=-C`".
 
-## LIST-CLEARING FILTER RULE
+### LIST-CLEARING FILTER RULE
 
 You can clear the current include/exclude list by using the "!" filter rule (as
 introduced in the [FILTER RULES](#) section above).  The "current" list is either
@@ -4046,7 +4152,7 @@ the global list of rules (if the rule is encountered while parsing the filter
 options) or a set of per-directory rules (which are inherited in their own
 sub-list, so a subdirectory can use this to clear out the parent's rules).
 
-## ANCHORING INCLUDE/EXCLUDE PATTERNS
+### ANCHORING INCLUDE/EXCLUDE PATTERNS
 
 As mentioned earlier, global include/exclude patterns are anchored at the "root
 of the transfer" (as opposed to per-directory patterns, which are anchored at
@@ -4101,7 +4207,7 @@ The easiest way to see what name you should filter is to just look at the
 output when using [`--verbose`](#opt) and put a / in front of the name (use the
 `--dry-run` option if you're not yet ready to copy any files).
 
-## PER-DIRECTORY RULES AND DELETE
+### PER-DIRECTORY RULES AND DELETE
 
 Without a delete option, per-directory rules are only relevant on the sending
 side, so you can feel free to exclude the merge files themselves without
@@ -4161,9 +4267,10 @@ the receiving side.  For example, if the file "foo" is present in the sender's
 list but its size is such that it is omitted due to a transfer rule, the
 receiving side does not request the file.  However, its presence in the file
 list means that a delete pass will not remove a matching file named "foo" on
-the receiving side.  On the other hand, an exclude of the file "foo" leaves the
-file out of the server's file list, and thus the receiver will remove a
-matching file named "foo" if deletions are requested.
+the receiving side.  On the other hand, a server-side exclude (hide) of the
+file "foo" leaves the file out of the server's file list, and absent a
+receiver-side exclude (protect) the receiver will remove a matching file named
+"foo" if deletions are requested.
 
 Given that the files are still in the sender's file list, the
 [`--prune-empty-dirs`](#opt) option will not judge a directory as being empty
