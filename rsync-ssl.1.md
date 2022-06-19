@@ -94,6 +94,11 @@ The ssl helper scripts are affected by the following environment variables:
 
 >     rsync-ssl -aiv rsync://example.com:9874/mod/ dest
 
+## THE SERVER SIDE
+
+For help setting up an SSL/TLS supporting rsync, see the [instructions in
+rsyncd.conf](rsyncd.conf.5#SSL_TLS_Daemon_Setup).
+
 ## SEE ALSO
 
 [**rsync**(1)](rsync.1), [**rsyncd.conf**(5)](rsyncd.conf.5)
