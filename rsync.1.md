@@ -3739,11 +3739,19 @@ The options allowed when starting an rsync daemon are as follows:
 
 ## FILTER RULES
 
-The filter rules allow for flexible selection of which files to transfer
-(include) and which files to skip (exclude).  The rules either directly specify
-include/exclude patterns or they specify a way to acquire more include/exclude
-patterns (e.g. to read them from a file). Some rules even exclude/include xattr
-attributes.
+The filter rules allow for custom control of several aspects of how files are
+handled:
+
+- Control which files the sending side puts into the file list that describes
+  the transfer hierarchy
+- Control which files the receiving side protects from deletion when the file
+  is not in the sender's file list
+- Control which extended attribute names are skipped when copying xattrs
+
+The rules are either directly specified via option arguments or they can be
+read in from one or more files.  The filter-rule files can even be a part of
+the hierarchy of files being copied, affecting different parts of the tree in
+different ways.
 
 ### SIMPLE INCLUDE/EXCLUDE RULES
 
