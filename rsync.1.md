@@ -788,7 +788,7 @@ option name from the pathname using a space if you want the shell to expand it.
 
     In order to make [`--delete`](#opt) compatible with incremental recursion,
     rsync 3.0.0 made [`--delete-during`](#opt) the default delete mode (which
-    was first first added in 2.6.4).
+    was first added in 2.6.4).
 
     One side-effect of incremental recursion is that any missing
     sub-directories inside a recursively-scanned directory are (by default)
