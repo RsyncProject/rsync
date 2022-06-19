@@ -1114,15 +1114,15 @@ SSL proxy.
 ## SSL/TLS Daemon Setup
 
 When setting up an rsync daemon for access via SSL/TLS, you will need to
-configure a proxy (such as haproxy or nginx) as the front-end that handles the
-encryption.
+configure a TCP proxy (such as haproxy or nginx) as the front-end that handles
+the encryption.
 
 - You should limit the access to the backend-rsyncd port to only allow the
   proxy to connect.  If it is on the same host as the proxy, then configuring
   it to only listen on localhost is a good idea.
-- You should consider turning on the `proxy protocol` parameter if your proxy
-  supports sending that information.  The examples below assume that this is
-  enabled.
+- You should consider turning on the `proxy protocol` rsync-daemon parameter if
+  your proxy supports sending that information.  The examples below assume that
+  this is enabled.
 
 An example haproxy setup is as follows:
 
@@ -1149,14 +1149,14 @@ An example nginx proxy setup is as follows:
 >        ssl_certificate_key /etc/letsencrypt/example.com/privkey.pem;
 >
 >        proxy_pass localhost:873;
->        proxy_protocol on; # Requires "proxy protocol = true"
+>        proxy_protocol on; # Requires rsyncd.conf "proxy protocol = true"
 >        proxy_timeout 1m;
 >        proxy_connect_timeout 5s;
 >    }
 > }
 > ```
 
-## EXAMPLES
+## DAEMON CONFIG EXAMPLES
 
 A simple rsyncd.conf file that allow anonymous rsync to a ftp area at
 `/home/ftp` would be:
@@ -1237,8 +1237,9 @@ Thanks to Karsten Thygesen for his many suggestions and documentation!
 
 ## AUTHOR
 
-Rsync was written by Andrew Tridgell and Paul Mackerras.  Many people have
-later contributed to it.
+Rsync was originally written by Andrew Tridgell and Paul Mackerras.  Many
+people have later contributed to it. It is currently maintained by Wayne
+Davison.
 
 Mailing lists for support and development are available at
 <https://lists.samba.org/>.
