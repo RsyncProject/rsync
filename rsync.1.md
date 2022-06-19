@@ -943,9 +943,8 @@ option name from the pathname using a space if you want the shell to expand it.
     directory where the destination has a file, the transfer would occur
     regardless of the timestamps.
 
-    This option is a transfer rule, not an exclude, so it doesn't affect the
-    data that goes into the file-lists, and thus it doesn't affect deletions.
-    It just limits the files that the receiver requests to be transferred.
+    This option is a [TRANSFER RULE](#TRANSFER_RULES), so don't expect any
+    exclude side effects.
 
     A caution for those that choose to combine [`--inplace`](#opt) with
     `--update`: an interrupted transfer will leave behind a partial file on the
@@ -1728,9 +1727,8 @@ option name from the pathname using a space if you want the shell to expand it.
     [`--ignore-existing`](#opt) option, no files will be updated (which can be
     useful if all you want to do is delete extraneous files).
 
-    This option is a transfer rule, not an exclude, so it doesn't affect the
-    data that goes into the file-lists, and thus it doesn't affect deletions.
-    It just limits the files that the receiver requests to be transferred.
+    This option is a [TRANSFER RULE](#TRANSFER_RULES), so don't expect any
+    exclude side effects.
 
 0.  `--ignore-existing`
 
@@ -1738,9 +1736,8 @@ option name from the pathname using a space if you want the shell to expand it.
     destination (this does _not_ ignore existing directories, or nothing would
     get done).  See also [`--ignore-non-existing`](#opt).
 
-    This option is a transfer rule, not an exclude, so it doesn't affect the
-    data that goes into the file-lists, and thus it doesn't affect deletions.
-    It just limits the files that the receiver requests to be transferred.
+    This option is a [TRANSFER RULE](#TRANSFER_RULES), so don't expect any
+    exclude side effects.
 
     This option can be useful for those doing backups using the
     [`--link-dest`](#opt) option when they need to continue a backup run that
@@ -1936,9 +1933,8 @@ option name from the pathname using a space if you want the shell to expand it.
     the numeric units or left unqualified to specify bytes.  Feel free to use a
     fractional value along with the units, such as `--max-size=1.5m`.
 
-    This option is a transfer rule, not an exclude, so it doesn't affect the
-    data that goes into the file-lists, and thus it doesn't affect deletions.
-    It just limits the files that the receiver requests to be transferred.
+    This option is a [TRANSFER RULE](#TRANSFER_RULES), so don't expect any
+    exclude side effects.
 
     The first letter of a units string can be `B` (bytes), `K` (kilo), `M`
     (mega), `G` (giga), `T` (tera), or `P` (peta).  If the string is a single
@@ -3250,10 +3246,8 @@ option name from the pathname using a space if you want the shell to expand it.
     directories when the sending rsync is recursively scanning a hierarchy of
     files using include/exclude/filter rules.
 
-    Note that the use of transfer rules, such as the [`--min-size`](#opt)
-    option, does not affect what goes into the file list, and thus does not
-    leave directories empty, even if none of the files in a directory match the
-    transfer rule.
+    This option can still leave empty directories on the receiving side if you
+    make use of [TRANSFER_RULES](#).
 
     Because the file-list is actually being pruned, this option also affects
     what directories get deleted when a delete is active.  However, keep in
@@ -3780,7 +3774,7 @@ you can repeat the options on the command-line, use the merge-file syntax of
 the [`--filter`](#opt) option, or the [`--include-from`](#opt) /
 [`--exclude-from`](#opt) options.
 
-## INCLUDE/EXCLUDE PATTERN RULES
+## PATTERN_OR_FILENAME MATCHING RULES
 
 You can include and exclude files by specifying patterns using the "+", "-",
 etc. filter rules (as introduced in the [FILTER RULES](#) section above).  The
@@ -4152,6 +4146,37 @@ one of these commands:
 >     host:src/dir /dest
 > rsync -avFF --delete host:src/dir /dest
 > ```
+
+## TRANSFER RULES
+
+In addition to the [FILTER RULES](#) that affect the recursive file scans that
+generate the file list on the sending and (when deleting) receiving sides,
+there are transfer rules. These rules affect which files the generator decides
+need to be transferred without the side effects of an exclude filter rule.
+Transfer rules affect only files and never directories.
+
+Because a transfer rule does not affect what goes into the sender's (and
+receiver's) file list, it cannot have any effect on which files get deleted on
+the receiving side.  For example, if the file "foo" is present in the sender's
+list but its size is such that it is omitted due to a transfer rule, the
+receiving side does not request the file.  However, its presence in the file
+list means that a delete pass will not remove a matching file named "foo" on
+the receiving side.  On the other hand, an exclude of the file "foo" leaves the
+file out of the server's file list, and thus the receiver will remove a
+matching file named "foo" if deletions are requested.
+
+Given that the files are still in the sender's file list, the
+[`--prune-empty-dirs`](#opt) option will not judge a directory as being empty
+even if it contains only files that the transfer rules omitted.
+
+Similarly, a transfer rule does not have any extra affect on which files are
+deleted on the receiving side, so setting a maximum file size for the transfer
+does not prevent big files from being deleted.
+
+Examples of transfer rules include the default "quick check" algorithm (which
+compares size & modify time), the [`--update`](#opt) option, the
+[`--max-size`](#opt) option, the [`--ignore-non-existing`](#opt) option, and a
+few others.
 
 ## BATCH MODE
 
