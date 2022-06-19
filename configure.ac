@@ -13,7 +13,8 @@ AC_CHECK_HEADERS(sys/fcntl.h sys/select.h fcntl.h sys/time.h sys/unistd.h \
     netdb.h malloc.h float.h limits.h iconv.h libcharset.h langinfo.h mcheck.h \
     sys/acl.h acl/libacl.h attr/xattr.h sys/xattr.h sys/extattr.h dl.h \
     popt.h popt/popt.h linux/falloc.h netinet/in_systm.h netgroup.h \
-    zlib.h xxhash.h openssl/md4.h openssl/md5.h zstd.h lz4.h sys/file.h)
+    zlib.h xxhash.h openssl/md4.h openssl/md5.h zstd.h lz4.h sys/file.h \
+    bsd/string.h)
 AC_CHECK_HEADERS([netinet/ip.h], [], [], [[#include <netinet/in.h>]])
 AC_HEADER_MAJOR_FIXED
 
