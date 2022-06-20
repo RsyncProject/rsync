@@ -3822,7 +3822,7 @@ existing on the remote host:
 Aside: this copy could also have been accomplished using the [`-R`](#opt)
 option (though the 2 commands behave differently if deletions are enabled):
 
->     rsync -aR x/y/file.txt host:/tmp/
+>     rsync -aiR x/y/file.txt host:/tmp/
 
 The following command does not need an include of the "x" directory because it
 is not a part of the transfer (note the traililng slash).  Running this command
@@ -3833,7 +3833,7 @@ would copy just "`/tmp/x/file.txt`" because the "y" and "z" dirs get excluded:
 This command would omit the zzz.txt file while copying "x" and everything else
 it contains:
 
->     rsync -aiv -f'- zzz.txt' x host:/tmp/
+>     rsync -ai -f'- zzz.txt' x host:/tmp/
 
 ### FILTER RULES WHEN DELETING
 
@@ -3872,8 +3872,8 @@ Rsync supports old-style include/exclude rules and new-style filter rules.  The
 older rules are specified using [`--include`](#opt) and [`--exclude`](#opt) as
 well as the [`--include-from`](#opt) and [`--exclude-from`](#opt). These are
 limited in behavior but they don't require a "-" or "+" prefix.  An old-style
-exclude rule is turned into a `+ name` filter rule (with no modifiers) and an
-old-style include rule is turned into a `- name` filter rule (with no
+exclude rule is turned into a "`- name`" filter rule (with no modifiers) and an
+old-style include rule is turned into a "`+ name`" filter rule (with no
 modifiers).
 
 Rsync builds an ordered list of filter rules as specified on the command-line
@@ -3905,7 +3905,7 @@ Here are the available rule prefixes:
     Equivalent to a receiver-only exclude, so `-f'P foo'` could also be
     specified as `-f'-r foo'`.
 0.  `risk, 'R'` files that match the pattern are not protected. Equivalent to a
-    receiver-only include, so `-f'P foo'` could also be specified as `-f'+r
+    receiver-only include, so `-f'R foo'` could also be specified as `-f'+r
     foo'`.
 0.  `clear, '!'` clears the current include/exclude list (takes no arg)
 
