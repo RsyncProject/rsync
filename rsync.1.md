@@ -3795,7 +3795,7 @@ also warn if a filter rule has trailing whitespace, since an exclude of "foo "
 (with a trailing space) will not exclude a file named "foo".
 
 Exclude and include rules can specify wildcard [PATTERN MATCHING RULES](#)
-(similar to shell wilcards) that allow you to match things like a file suffix
+(similar to shell wildcards) that allow you to match things like a file suffix
 or a portion of a filename.
 
 A rule can be limited to only affecting a directory by putting a trailing slash
@@ -3837,7 +3837,8 @@ it contains:
 
 ### FILTER RULES WHEN DELETING
 
-By default a filter rule affects both the sender (as it creates its file list)
+By default the include & exclude filter rules affect both the sender
+(as it creates its file list)
 and the receiver (as it creates its file lists for calculating deletions).  If
 no delete option is in effect, the receiver skips creating the delete-related
 file lists.  This two-sided default can be manually overridden so that you are
@@ -3846,8 +3847,8 @@ RULES IN DEPTH](#) section.
 
 When deleting, an exclude protects a file from being removed on the receiving
 side while an include overrides that protection (putting the file at risk of
-deletion). The default is for a file to be at risk (its safety depends on it
-matching a corresponding file from the sender).
+deletion). The default is for a file to be at risk -- its safety depends on it
+matching a corresponding file from the sender.
 
 An example of the two-sided exclude effect can be illustrated by the copying of
 a C development directory between 2 systems.  When doing a touch-up copy, you
@@ -3957,7 +3958,7 @@ checking if the pattern contains one of these three wildcard characters: '`*`',
   must match one character.
 - a trailing `***` in the pattern is a shorthand that allows you to match a
   directory and all its contents using a single rule.  For example, specifying
-  "`dir_name/***`" will match both the "dir_name" directory (as if "dir_name/"
+  "`dir_name/***`" will match both the "dir_name" directory (as if "`dir_name/`"
   had been specified) and everything in the directory (as if "`dir_name/**`"
   had been specified).
 - a backslash can be used to escape a wildcard character, but it is only
@@ -4284,7 +4285,7 @@ Given that the files are still in the sender's file list, the
 [`--prune-empty-dirs`](#opt) option will not judge a directory as being empty
 even if it contains only files that the transfer rules omitted.
 
-Similarly, a transfer rule does not have any extra affect on which files are
+Similarly, a transfer rule does not have any extra effect on which files are
 deleted on the receiving side, so setting a maximum file size for the transfer
 does not prevent big files from being deleted.
 
