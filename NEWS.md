@@ -2,9 +2,34 @@
 
 ## Changes in this version:
 
+### SECURITY FIXES:
+
+- Added some file-list safety checking that helps to ensure that a rogue
+  sending rsync can't add unrequested top-level names and/or include recursive
+  names that should have been excluded by the sender.  This extra safety check
+  only requires the client side rsync to be udateed.  When dealing with an
+  untrusted sending host using an older rsync, it is safest to copy into a
+  dedicated destination directory for the remote content (i.e. don't copy into
+  a destination directory that contains files that aren't from the remote
+  host unless you trust the remote host). Fixes CVE-2022-29154.
+
 ### BUG FIXES:
 
-- ...
+- Fixed the configure check for signed char that was causing a host that
+  defaults to unsigned characters to generate bogus rolling checksums. This
+  made rsync send mostly literal data for a copy instead of finding matching
+  data in the receiver's basis file.
+
+### PACKAGING RELATED:
+
+- The build date that goes into the manpages is now based on the developer's
+  release date, not on the build's local-timezone interpretation of the date.
+
+### DEVELOPER RELATED:
+
+- Configure now looks for the bsd/string.h include file in order to fix the
+  build on a host that has strlcpy() in the main libc but not defined in the
+  main string.h file.
 
 ------------------------------------------------------------------------------
 
