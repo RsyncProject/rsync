@@ -27,16 +27,22 @@ extern int am_server;
 extern int am_sender;
 extern int eol_nulls;
 extern int io_error;
+extern int xfer_dirs;
+extern int recurse;
 extern int local_server;
 extern int prune_empty_dirs;
 extern int ignore_perishable;
+extern int old_style_args;
+extern int relative_paths;
 extern int delete_mode;
 extern int delete_excluded;
 extern int cvs_exclude;
 extern int sanitize_paths;
 extern int protocol_version;
+extern int list_only;
 extern int module_id;
 
+extern char *filesfrom_host;
 extern char curr_dir[MAXPATHLEN];
 extern unsigned int curr_dir_len;
 extern unsigned int module_dirlen;
@@ -44,8 +50,10 @@ extern unsigned int module_dirlen;
 filter_rule_list filter_list = { .debug_type = "" };
 filter_rule_list cvs_filter_list = { .debug_type = " [global CVS]" };
 filter_rule_list daemon_filter_list = { .debug_type = " [daemon]" };
+filter_rule_list implied_filter_list = { .debug_type = " [implied]" };
 
 int saw_xattr_filter = 0;
+int trust_sender_filter = 0;
 
 /* Need room enough for ":MODS " prefix plus some room to grow. */
 #define MAX_RULE_PREFIX (16)
@@ -289,6 +297,125 @@ static void add_rule(filter_rule_list *listp, const char *pat, unsigned int pat_
 		rule->next = listp->tail->next;
 		listp->tail->next = rule;
 		listp->tail = rule;
+	}
+}
+
+/* Each arg the client sends to the remote sender turns into an implied include
+ * that the receiver uses to validate the file list from the sender. */
+void add_implied_include(const char *arg)
+{
+	filter_rule *rule;
+	int arg_len, saw_wild = 0, backslash_cnt = 0;
+	int slash_cnt = 1; /* We know we're adding a leading slash. */
+	const char *cp;
+	char *p;
+	if (old_style_args || list_only || filesfrom_host != NULL)
+		return;
+	if (relative_paths) {
+		cp = strstr(arg, "/./");
+		if (cp)
+			arg = cp+3;
+	} else {
+		if ((cp = strrchr(arg, '/')) != NULL)
+			arg = cp + 1;
+	}
+	arg_len = strlen(arg);
+	if (arg_len) {
+		if (strpbrk(arg, "*[?")) {
+			/* We need to add room to escape backslashes if wildcard chars are present. */
+			cp = arg;
+			while ((cp = strchr(cp, '\\')) != NULL) {
+				arg_len++;
+				cp++;
+			}
+			saw_wild = 1;
+		}
+		arg_len++; /* Leave room for the prefixed slash */
+		rule = new0(filter_rule);
+		if (!implied_filter_list.head)
+			implied_filter_list.head = implied_filter_list.tail = rule;
+		else {
+			rule->next = implied_filter_list.head;
+			implied_filter_list.head = rule;
+		}
+		rule->rflags = FILTRULE_INCLUDE + (saw_wild ? FILTRULE_WILD : 0);
+		p = rule->pattern = new_array(char, arg_len + 1);
+		*p++ = '/';
+		cp = arg;
+		while (*cp) {
+			switch (*cp) {
+			  case '\\':
+				backslash_cnt++;
+				if (saw_wild)
+					*p++ = '\\';
+				*p++ = *cp++;
+				break;
+			  case '/':
+				if (p[-1] == '/') /* This is safe because of the initial slash. */
+					break;
+				if (relative_paths) {
+					filter_rule const *ent;
+					int found = 0;
+					*p = '\0';
+					for (ent = implied_filter_list.head; ent; ent = ent->next) {
+						if (ent != rule && strcmp(ent->pattern, rule->pattern) == 0)
+							found = 1;
+					}
+					if (!found) {
+						filter_rule *R_rule = new0(filter_rule);
+						R_rule->rflags = FILTRULE_INCLUDE + (saw_wild ? FILTRULE_WILD : 0);
+						R_rule->pattern = strdup(rule->pattern);
+						R_rule->u.slash_cnt = slash_cnt;
+						R_rule->next = implied_filter_list.head;
+						implied_filter_list.head = R_rule;
+					}
+				}
+				slash_cnt++;
+				*p++ = *cp++;
+				break;
+			  default:
+				*p++ = *cp++;
+				break;
+			}
+		}
+		*p = '\0';
+		rule->u.slash_cnt = slash_cnt;
+		arg = (const char *)rule->pattern;
+	}
+
+	if (recurse || xfer_dirs) {
+		/* Now create a rule with an added "/" & "**" or "*" at the end */
+		rule = new0(filter_rule);
+		if (recurse)
+			rule->rflags = FILTRULE_INCLUDE | FILTRULE_WILD | FILTRULE_WILD2;
+		else
+			rule->rflags = FILTRULE_INCLUDE | FILTRULE_WILD;
+		/* A +4 in the len leaves enough room for / * * \0 or / * \0 \0 */
+		if (!saw_wild && backslash_cnt) {
+			/* We are appending a wildcard, so now the backslashes need to be escaped. */
+			p = rule->pattern = new_array(char, arg_len + backslash_cnt + 3 + 1);
+			cp = arg;
+			while (*cp) {
+				if (*cp == '\\')
+					*p++ = '\\';
+				*p++ = *cp++;
+			}
+		} else {
+			p = rule->pattern = new_array(char, arg_len + 3 + 1);
+			if (arg_len) {
+				memcpy(p, arg, arg_len);
+				p += arg_len;
+			}
+		}
+		if (p[-1] != '/')
+			*p++ = '/';
+		*p++ = '*';
+		if (recurse)
+			*p++ = '*';
+		*p = '\0';
+		rule->u.slash_cnt = slash_cnt + 1;
+		rule->next = implied_filter_list.head;
+		implied_filter_list.head = rule;
 	}
 }
 
@@ -718,7 +845,7 @@ static void report_filter_result(enum logcode code, char const *name,
 			      : name_flags & NAME_IS_DIR ? "directory"
 			      : "file";
 		rprintf(code, "[%s] %sing %s %s because of pattern %s%s%s\n",
-		    w, actions[*w!='s'][!(ent->rflags & FILTRULE_INCLUDE)],
+		    w, actions[*w=='g'][!(ent->rflags & FILTRULE_INCLUDE)],
 		    t, name, ent->pattern,
 		    ent->rflags & FILTRULE_DIRECTORY ? "/" : "", type);
 	}
@@ -890,6 +1017,7 @@ static filter_rule *parse_rule_tok(const char **rulestr_ptr,
 		}
 		switch (ch) {
 		case ':':
+			trust_sender_filter = 1;
 			rule->rflags |= FILTRULE_PERDIR_MERGE
 				      | FILTRULE_FINISH_SETUP;
 			/* FALL THROUGH */

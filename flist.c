@@ -73,6 +73,7 @@ extern int need_unsorted_flist;
 extern int sender_symlink_iconv;
 extern int output_needs_newline;
 extern int sender_keeps_checksum;
+extern int trust_sender_filter;
 extern int unsort_ndx;
 extern uid_t our_uid;
 extern struct stats stats;
@@ -83,8 +84,7 @@ extern char curr_dir[MAXPATHLEN];
 
 extern struct chmod_mode_struct *chmod_modes;
 
-extern filter_rule_list filter_list;
-extern filter_rule_list daemon_filter_list;
+extern filter_rule_list filter_list, implied_filter_list, daemon_filter_list;
 
 #ifdef ICONV_OPTION
 extern int filesfrom_convert;
@@ -984,6 +984,19 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 	if (file_length < 0) {
 		rprintf(FERROR, "Offset underflow: file-length is negative\n");
 		exit_cleanup(RERR_UNSUPPORTED);
+	}
+
+	if (*thisname != '.' || thisname[1] != '\0') {
+		int filt_flags = S_ISDIR(mode) ? NAME_IS_DIR : NAME_IS_FILE;
+		if (!trust_sender_filter /* a per-dir filter rule means we must trust the sender's filtering */
+		 && filter_list.head && check_filter(&filter_list, FINFO, thisname, filt_flags) < 0) {
+			rprintf(FERROR, "ERROR: rejecting excluded file-list name: %s\n", thisname);
+			exit_cleanup(RERR_PROTOCOL);
+		}
+		if (implied_filter_list.head && check_filter(&implied_filter_list, FINFO, thisname, filt_flags) <= 0) {
+			rprintf(FERROR, "ERROR: rejecting unrequested file-list name: %s\n", thisname);
+			exit_cleanup(RERR_PROTOCOL);
+		}
 	}
 
 	if (inc_recurse && S_ISDIR(mode)) {

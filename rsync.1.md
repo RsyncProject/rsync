@@ -167,6 +167,33 @@ separate the files into different rsync calls, or consider using
 [`--delay-updates`](#opt) (which doesn't affect the sorted transfer order, but
 does make the final file-updating phase happen much more rapidly).
 
+## MULTI-HOST SECURITY
+
+Rsync takes steps to ensure that the file requests that are shared in a
+transfer are protected against various security issues.  Most of the potential
+problems arise on the receiving side where rsync takes steps to ensure that the
+list of files being transferred remains within the bounds of what was
+requested.
+
+Toward this end, rsync 3.1.2 and later have aborted when a file list contains
+an absolute or relative path that tries to escape out of the top of the
+transfer.  Also, beginning with version 3.2.5, rsync does two more safety
+checks of the file list to (1) ensure that no extra source arguments were added
+into the transfer other than those that the client requested and (2) ensure
+that the file list obeys the exclude rules that we sent to the sender.
+
+For those that don't yet have a 3.2.5 client rsync, it is safest to do a copy
+into a dedicated destination directory for the remote files rather than
+requesting the remote content get mixed in with other local content.  For
+example, doing an rsync copy into your home directory is potentially unsafe on
+an older rsync if the remote rsync is being controlled by a bad actor:
+
+>     rsync -aiv host1:dir1 ~
+
+A safer command would be:
+
+>     rsync -aiv host1:dir1 ~/host1-files
+
 ## ADVANCED USAGE
 
 The syntax for requesting multiple files from a remote host is done by
@@ -187,7 +214,7 @@ Starting in 3.2.4, filenames are passed to a remote shell in such a way as to
 preserve the characters you give it. Thus, if you ask for a file with spaces
 in the name, that's what the remote rsync looks for:
 
->     rsync -aiv host:'a simple file.pdf' /dest/                                                                                
+>     rsync -aiv host:'a simple file.pdf' /dest/
 
 If you use scripts that have been written to manually apply extra quoting to
 the remote rsync args (or to require remote arg splitting), you can ask rsync
@@ -2343,6 +2370,12 @@ option name from the pathname using a space if you want the shell to expand it.
     behavior.  The environment is always overridden by manually specified
     positive or negative options (the negative is `--no-old-args`).
 
+    Note that this option also disables the extra safety check added in 3.2.5
+    that ensures that a remote sender isn't including extra top-level items in
+    the file-list that you didn't request.  This side-effect is necessary
+    because we can't know for sure what names to expect when the remote shell
+    is interpreting the args.
+
     This option conflicts with the [`--protect-args`](#opt) option.
 
 0.  `--protect-args`, `-s`
@@ -3894,8 +3927,13 @@ Here are the available rule prefixes:
     `hide` and a `protect`.
 0.  `include, '+'` specifies an include pattern that (by default) is both a
     `show` and a `risk`.
-0.  `merge, '.'` specifies a merge-file to read for more rules.
-0.  `dir-merge, ':'` specifies a per-directory merge-file.
+0.  `merge, '.'` specifies a merge-file on the client side to read for more
+    rules.
+0.  `dir-merge, ':'` specifies a per-directory merge-file.  Using this kind of
+    filter rule requires that you trust the sending side's filter checking, and
+    thus it disables the receiver's verification of the file-list names against
+    the filter rules (since only the sender can know for sure if it obeyed all
+    the filter rules when some are per-dir merged from the sender's files).
 0.  `hide, 'H'` specifies a pattern for hiding files from the transfer.
     Equivalent to a sender-only exclude, so `-f'H foo'` could also be specified
     as `-f'-s foo'`.

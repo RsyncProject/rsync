@@ -89,6 +89,7 @@ extern int backup_dir_len;
 extern int basis_dir_cnt;
 extern int default_af_hint;
 extern int stdout_format_has_i;
+extern int trust_sender_filter;
 extern struct stats stats;
 extern char *stdout_format;
 extern char *logfile_format;
@@ -104,7 +105,7 @@ extern char curr_dir[MAXPATHLEN];
 extern char backup_dir_buf[MAXPATHLEN];
 extern char *basis_dir[MAX_BASIS_DIRS+1];
 extern struct file_list *first_flist;
-extern filter_rule_list daemon_filter_list;
+extern filter_rule_list daemon_filter_list, implied_filter_list;
 
 uid_t our_uid;
 gid_t our_gid;
@@ -635,6 +636,7 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char **remote_argv, in
 #ifdef ICONV_CONST
 		setup_iconv();
 #endif
+		trust_sender_filter = 1;
 	} else if (local_server) {
 		/* If the user didn't request --[no-]whole-file, force
 		 * it on, but only if we're not batch processing. */
@@ -1500,6 +1502,8 @@ static int start_client(int argc, char *argv[])
 		char *dummy_host;
 		int dummy_port = rsync_port;
 		int i;
+		if (filesfrom_fd < 0)
+			add_implied_include(remote_argv[0]);
 		/* For remote source, any extra source args must have either
 		 * the same hostname or an empty hostname. */
 		for (i = 1; i < remote_argc; i++) {
@@ -1523,6 +1527,7 @@ static int start_client(int argc, char *argv[])
 			if (!rsync_port && !*arg) /* Turn an empty arg into a dot dir. */
 				arg = ".";
 			remote_argv[i] = arg;
+			add_implied_include(arg);
 		}
 	}
 

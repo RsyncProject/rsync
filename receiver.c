@@ -593,10 +593,13 @@ int recv_files(int f_in, int f_out, char *local_name)
 		if (DEBUG_GTE(RECV, 1))
 			rprintf(FINFO, "recv_files(%s)\n", fname);
 
-		if (daemon_filter_list.head && (*fname != '.' || fname[1] != '\0')
-		 && check_filter(&daemon_filter_list, FLOG, fname, 0) < 0) {
-			rprintf(FERROR, "attempt to hack rsync failed.\n");
-			exit_cleanup(RERR_PROTOCOL);
+		if (daemon_filter_list.head && (*fname != '.' || fname[1] != '\0')) {
+			int filt_flags = S_ISDIR(file->mode) ? NAME_IS_DIR : NAME_IS_FILE;
+			if (check_filter(&daemon_filter_list, FLOG, fname, filt_flags) < 0) {
+				rprintf(FERROR, "ERROR: rejecting file transfer request for daemon excluded file: %s\n",
+					fname);
+				exit_cleanup(RERR_PROTOCOL);
+			}
 		}
 
 #ifdef SUPPORT_XATTRS
