@@ -625,7 +625,11 @@ fi
 
 AC_TYPE_UID_T
 AC_CHECK_TYPES([mode_t,off_t,size_t,pid_t,id_t])
-AC_TYPE_GETGROUPS
+if test "$cross_compiling" = no; then
+    AC_TYPE_GETGROUPS
+else
+    AC_DEFINE([GETGROUPS_T],[gid_t],[Define to the type of elements in the array set by `getgroups'. Usually this is either `int' or `gid_t'.])
+fi
 AC_CHECK_MEMBERS([struct stat.st_rdev,
 		  struct stat.st_mtimensec,
 		  struct stat.st_mtimespec.tv_nsec,
