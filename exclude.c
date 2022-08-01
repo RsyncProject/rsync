@@ -25,6 +25,7 @@
 
 extern int am_server;
 extern int am_sender;
+extern int am_generator;
 extern int eol_nulls;
 extern int io_error;
 extern int xfer_dirs;
@@ -309,7 +310,7 @@ void add_implied_include(const char *arg)
 	int slash_cnt = 1; /* We know we're adding a leading slash. */
 	const char *cp;
 	char *p;
-	if (old_style_args || list_only || filesfrom_host != NULL)
+	if (am_server || old_style_args || list_only || filesfrom_host != NULL)
 		return;
 	if (relative_paths) {
 		cp = strstr(arg, "/./");
@@ -363,11 +364,16 @@ void add_implied_include(const char *arg)
 					}
 					if (!found) {
 						filter_rule *R_rule = new0(filter_rule);
-						R_rule->rflags = FILTRULE_INCLUDE + (saw_wild ? FILTRULE_WILD : 0);
+						R_rule->rflags = FILTRULE_INCLUDE | FILTRULE_DIRECTORY
+							       | (saw_wild ? FILTRULE_WILD : 0);
 						R_rule->pattern = strdup(rule->pattern);
 						R_rule->u.slash_cnt = slash_cnt;
 						R_rule->next = implied_filter_list.head;
 						implied_filter_list.head = R_rule;
+						if (DEBUG_GTE(FILTER, 3)) {
+							rprintf(FINFO, "[%s] add_implied_include(%s/)\n",
+								who_am_i(), rule->pattern);
+						}
 					}
 				}
 				slash_cnt++;
@@ -381,6 +387,8 @@ void add_implied_include(const char *arg)
 		*p = '\0';
 		rule->u.slash_cnt = slash_cnt;
 		arg = (const char *)rule->pattern;
+		if (DEBUG_GTE(FILTER, 3))
+			rprintf(FINFO, "[%s] add_implied_include(%s)\n", who_am_i(), rule->pattern);
 	}
 
 	if (recurse || xfer_dirs) {
@@ -416,6 +424,8 @@ void add_implied_include(const char *arg)
 		rule->u.slash_cnt = slash_cnt + 1;
 		rule->next = implied_filter_list.head;
 		implied_filter_list.head = rule;
+		if (DEBUG_GTE(FILTER, 3))
+			rprintf(FINFO, "[%s] add_implied_include(%s)\n", who_am_i(), rule->pattern);
 	}
 }
 
@@ -833,11 +843,12 @@ static void report_filter_result(enum logcode code, char const *name,
 				 filter_rule const *ent,
 				 int name_flags, const char *type)
 {
+	int log_level = am_sender || am_generator ? 1 : 3;
+
 	/* If a trailing slash is present to match only directories,
 	 * then it is stripped out by add_rule().  So as a special
-	 * case we add it back in here. */
-
-	if (DEBUG_GTE(FILTER, 1)) {
+	 * case we add it back in the log output. */
+	if (DEBUG_GTE(FILTER, log_level)) {
 		static char *actions[2][2]
 		    = { {"show", "hid"}, {"risk", "protect"} };
 		const char *w = who_am_i();

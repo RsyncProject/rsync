@@ -1078,6 +1078,7 @@ static int do_recv(int f_in, int f_out, char *local_name)
 	}
 
 	am_generator = 1;
+	implied_filter_list.head = implied_filter_list.tail = NULL;
 	flist_receiving_enabled = True;
 
 	io_end_multiplex_in(MPLX_SWITCHING);
