@@ -210,7 +210,7 @@ static int is_in_group(gid_t gid)
 			ngroups = getgroups(ngroups, gidset);
 		/* The default gid might not be in the list on some systems. */
 		for (n = 0; n < ngroups; n++) {
-			if (gidset[n] == our_gid)
+			if ((gid_t)gidset[n] == our_gid)
 				break;
 		}
 		if (n == ngroups)
@@ -229,7 +229,7 @@ static int is_in_group(gid_t gid)
 
 	last_in = gid;
 	for (n = 0; n < ngroups; n++) {
-		if (gidset[n] == gid)
+		if ((gid_t)gidset[n] == gid)
 			return last_out = 1;
 	}
 	return last_out = 0;
