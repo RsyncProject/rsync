@@ -313,13 +313,10 @@ void add_implied_include(const char *arg)
 	if (am_server || old_style_args || list_only || filesfrom_host != NULL)
 		return;
 	if (relative_paths) {
-		cp = strstr(arg, "/./");
-		if (cp)
-			arg = cp+3;
-	} else {
-		if ((cp = strrchr(arg, '/')) != NULL)
-			arg = cp + 1;
-	}
+		if ((cp = strstr(arg, "/./")) != NULL)
+			arg = cp + 3;
+	} else if ((cp = strrchr(arg, '/')) != NULL)
+		arg = cp + 1;
 	arg_len = strlen(arg);
 	if (arg_len) {
 		if (strpbrk(arg, "*[?")) {
@@ -359,13 +356,17 @@ void add_implied_include(const char *arg)
 					int found = 0;
 					*p = '\0';
 					for (ent = implied_filter_list.head; ent; ent = ent->next) {
-						if (ent != rule && strcmp(ent->pattern, rule->pattern) == 0)
+						if (ent != rule && strcmp(ent->pattern, rule->pattern) == 0) {
 							found = 1;
+							break;
+						}
 					}
 					if (!found) {
 						filter_rule *R_rule = new0(filter_rule);
-						R_rule->rflags = FILTRULE_INCLUDE | FILTRULE_DIRECTORY
-							       | (saw_wild ? FILTRULE_WILD : 0);
+						R_rule->rflags = FILTRULE_INCLUDE | FILTRULE_DIRECTORY;
+						/* Check if our sub-path has wildcards or escaped backslashes */
+						if (saw_wild && strpbrk(rule->pattern, "*[?\\"))
+							R_rule->rflags |= FILTRULE_WILD;
 						R_rule->pattern = strdup(rule->pattern);
 						R_rule->u.slash_cnt = slash_cnt;
 						R_rule->next = implied_filter_list.head;
