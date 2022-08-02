@@ -7,7 +7,7 @@
 - Added some file-list safety checking that helps to ensure that a rogue
   sending rsync can't add unrequested top-level names and/or include recursive
   names that should have been excluded by the sender.  These extra safety
-  checks only require the receiver rsync to be udateed.  When dealing with an
+  checks only require the receiver rsync to be updated.  When dealing with an
   untrusted sending host, it is safest to copy into a dedicated destination
   directory for the remote content (i.e. don't copy into a destination
   directory that contains files that aren't from the remote host unless you
@@ -20,7 +20,7 @@
   made rsync send mostly literal data for a copy instead of finding matching
   data in the receiver's basis file.
 
-- Lots of manpage improvements, including an attempt to better desdribe how
+- Lots of manpage improvements, including an attempt to better describe how
   include/exclude filters work.
 
 ### PACKAGING RELATED:
