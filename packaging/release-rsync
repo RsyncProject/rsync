@@ -193,7 +193,9 @@ About to:
         with open(fn, 'r', encoding='utf-8') as fh:
             old_txt = txt = fh.read()
         if fn == 'version.h':
-            txt = f'#define RSYNC_VERSION "{version}"\n'
+            x_re = re.compile(r'^(#define RSYNC_VERSION).*', re.M)
+            msg = f"Unable to update RSYNC_VERSION in {fn}"
+            txt = replace_or_die(x_re, r'\1 "%s"' % version, txt, msg)
         elif '.spec' in fn:
             for var, val in specvars.items():
                 x_re = re.compile(r'^%s .*' % re.escape(var), re.M)
