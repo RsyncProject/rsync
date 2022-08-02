@@ -180,17 +180,16 @@ an absolute or relative path that tries to escape out of the top of the
 transfer.  Also, beginning with version 3.2.5, rsync does two more safety
 checks of the file list to (1) ensure that no extra source arguments were added
 into the transfer other than those that the client requested and (2) ensure
-that the file list obeys the exclude rules that we sent to the sender.
+that the file list obeys the exclude rules that were sent to the sender.
 
-For those that don't yet have a 3.2.5 client rsync, it is safest to do a copy
-into a dedicated destination directory for the remote files rather than
-requesting the remote content get mixed in with other local content.  For
-example, doing an rsync copy into your home directory is potentially unsafe on
-an older rsync if the remote rsync is being controlled by a bad actor:
+For those that don't yet have a 3.2.5 client rsync (or those that want to be
+extra careful), it is safest to do a copy into a dedicated destination
+directory for the remote files when you don't trust the remote host.  For
+example, instead of doing an rsync copy into your home directory:
 
 >     rsync -aiv host1:dir1 ~
 
-A safer command would be:
+Dedicate a "host1-files" dir to the remote content:
 
 >     rsync -aiv host1:dir1 ~/host1-files
 

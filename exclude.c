@@ -395,11 +395,10 @@ void add_implied_include(const char *arg)
 	if (recurse || xfer_dirs) {
 		/* Now create a rule with an added "/" & "**" or "*" at the end */
 		rule = new0(filter_rule);
+		rule->rflags = FILTRULE_INCLUDE | FILTRULE_WILD;
 		if (recurse)
-			rule->rflags = FILTRULE_INCLUDE | FILTRULE_WILD | FILTRULE_WILD2;
-		else
-			rule->rflags = FILTRULE_INCLUDE | FILTRULE_WILD;
-		/* A +4 in the len leaves enough room for / * * \0 or / * \0 \0 */
+			rule->rflags |= FILTRULE_WILD2;
+		/* We must leave enough room for / * * \0. */
 		if (!saw_wild && backslash_cnt) {
 			/* We are appending a wildcard, so now the backslashes need to be escaped. */
 			p = rule->pattern = new_array(char, arg_len + backslash_cnt + 3 + 1);
