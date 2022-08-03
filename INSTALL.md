@@ -26,7 +26,7 @@ build user (after installing python3's pip package):
 
 You can test if you've got it fixed by running (from the rsync checkout):
 
->     ./md2man --test rsync-ssl.1.md
+>     ./md-convert --test rsync-ssl.1.md
 
 Alternately, you can avoid generating the manpages by fetching the very latest
 versions (that match the latest git source) from the [generated-files][6] dir.
