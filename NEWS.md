@@ -13,12 +13,15 @@
   directory that contains files that aren't from the remote host unless you
   trust the remote host). Fixes CVE-2022-29154.
 
+ - A fix for CVE-2022-37434 in the bundled zlib (buffer overflow issue).
+
 ### BUG FIXES:
 
 - Fixed the configure check for signed char that was causing a host that
   defaults to unsigned characters to generate bogus rolling checksums. This
   made rsync send mostly literal data for a copy instead of finding matching
-  data in the receiver's basis file.
+  data in the receiver's basis file (for a file that contains high-bit
+  characters).
 
 - Lots of manpage improvements, including an attempt to better describe how
   include/exclude filters work.
