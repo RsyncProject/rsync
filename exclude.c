@@ -40,6 +40,7 @@ extern int delete_excluded;
 extern int cvs_exclude;
 extern int sanitize_paths;
 extern int protocol_version;
+extern int read_batch;
 extern int list_only;
 extern int module_id;
 
@@ -310,7 +311,7 @@ void add_implied_include(const char *arg)
 	int slash_cnt = 1; /* We know we're adding a leading slash. */
 	const char *cp;
 	char *p;
-	if (am_server || old_style_args || list_only || filesfrom_host != NULL)
+	if (am_server || old_style_args || list_only || read_batch || filesfrom_host != NULL)
 		return;
 	if (relative_paths) {
 		if ((cp = strstr(arg, "/./")) != NULL)
