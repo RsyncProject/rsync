@@ -349,6 +349,28 @@ static void maybe_add_literal_brackets_rule(filter_rule const *based_on, int arg
 	}
 }
 
+static char *partial_string_buf = NULL;
+static int partial_string_len = 0;
+void implied_include_partial_string(const char *s_start, const char *s_end)
+{
+	partial_string_len = s_end - s_start;
+	if (partial_string_len <= 0 || partial_string_len >= MAXPATHLEN) { /* too-large should be impossible... */
+		partial_string_len = 0;
+		return;
+	}
+	if (!partial_string_buf)
+		partial_string_buf = new_array(char, MAXPATHLEN);
+	memcpy(partial_string_buf, s_start, partial_string_len);
+}
+
+void free_implied_include_partial_string()
+{
+	if (partial_string_buf) {
+		free(partial_string_buf);
+		partial_string_buf = NULL;
+	}
+}
+
 /* Each arg the client sends to the remote sender turns into an implied include
  * that the receiver uses to validate the file list from the sender. */
 void add_implied_include(const char *arg)
@@ -360,6 +382,14 @@ void add_implied_include(const char *arg)
 	char *p;
 	if (am_server || old_style_args || list_only || read_batch || filesfrom_host != NULL)
 		return;
+	if (partial_string_len) {
+		arg_len = strlen(arg);
+		if (partial_string_len + arg_len >= MAXPATHLEN)
+			return; /* Should be impossible... */
+		memcpy(partial_string_buf + partial_string_len, arg, arg_len + 1);
+		partial_string_len = 0;
+		arg = partial_string_buf;
+	}
 	if (relative_paths) {
 		if ((cp = strstr(arg, "/./")) != NULL)
 			arg = cp + 3;

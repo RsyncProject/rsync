@@ -376,6 +376,7 @@ static void forward_filesfrom_data(void)
 			free_xbuf(&ff_xb);
 			if (ff_reenable_multiplex >= 0)
 				io_start_multiplex_out(ff_reenable_multiplex);
+			free_implied_include_partial_string();
 		}
 		return;
 	}
@@ -435,6 +436,7 @@ static void forward_filesfrom_data(void)
 			ff_lastchar = '\0';
 		else {
 			/* Handle a partial string specially, saving any incomplete chars. */
+			implied_include_partial_string(sob, s);
 			flags &= ~ICB_INCLUDE_INCOMPLETE;
 			if (iconvbufs(ic_send, &ff_xb, &iobuf.out, flags) < 0) {
 				if (errno == E2BIG)
@@ -461,6 +463,7 @@ static void forward_filesfrom_data(void)
 					f++;
 			}
 		}
+		implied_include_partial_string(cur, t);
 		ff_lastchar = f[-1];
 		if ((len = t - ff_xb.buf) != 0) {
 			/* This will not circle back to perform_io() because we only get
