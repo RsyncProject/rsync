@@ -434,8 +434,10 @@ void add_implied_include(const char *arg)
 				*p++ = *cp++;
 				break;
 			  case '/':
-				if (p[-1] == '/') /* This is safe because of the initial slash. */
+				if (p[-1] == '/') { /* This is safe because of the initial slash. */
+					cp++;
 					break;
+				}
 				if (relative_paths) {
 					filter_rule const *ent;
 					int found = 0;
