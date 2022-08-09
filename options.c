@@ -2492,12 +2492,17 @@ char *safe_arg(const char *opt, const char *arg)
 	BOOL is_filename_arg = !opt;
 	char *escapes = is_filename_arg ? SHELL_CHARS : WILD_CHARS SHELL_CHARS;
 	BOOL escape_leading_dash = is_filename_arg && *arg == '-';
+	BOOL escape_leading_tilde = 0;
 	int len1 = opt && *opt ? strlen(opt) + 1 : 0;
 	int len2 = strlen(arg);
 	int extras = escape_leading_dash ? 2 : 0;
 	char *ret;
 	if (!protect_args && old_style_args < 2 && (!old_style_args || (!is_filename_arg && opt != SPLIT_ARG_WHEN_OLD))) {
 		const char *f;
+		if (!old_style_args && *arg == '~' && (relative_paths || !strchr(arg, '/'))) {
+			extras++;
+			escape_leading_tilde = 1;
+		}
 		for (f = arg; *f; f++) {
 			if (strchr(escapes, *f))
 				extras++;
@@ -2520,6 +2525,8 @@ char *safe_arg(const char *opt, const char *arg)
 	else {
 		const char *f = arg;
 		char *t = ret + len1;
+		if (escape_leading_tilde)
+			*t++ = '\\';
 		while (*f) {
                         if (*f == '\\') {
 				if (!is_filename_arg || !strchr(WILD_CHARS, f[1]))
