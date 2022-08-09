@@ -316,8 +316,11 @@ void add_implied_include(const char *arg)
 	if (relative_paths) {
 		if ((cp = strstr(arg, "/./")) != NULL)
 			arg = cp + 3;
-	} else if ((cp = strrchr(arg, '/')) != NULL)
+	} else if ((cp = strrchr(arg, '/')) != NULL) {
 		arg = cp + 1;
+		if (*arg == '.' && arg[1] == '\0')
+		    arg++;
+	}
 	arg_len = strlen(arg);
 	if (arg_len) {
 		if (strpbrk(arg, "*[?")) {
