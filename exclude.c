@@ -33,18 +33,15 @@ extern int recurse;
 extern int local_server;
 extern int prune_empty_dirs;
 extern int ignore_perishable;
-extern int old_style_args;
 extern int relative_paths;
 extern int delete_mode;
 extern int delete_excluded;
 extern int cvs_exclude;
 extern int sanitize_paths;
 extern int protocol_version;
-extern int read_batch;
-extern int list_only;
+extern int trust_sender_args;
 extern int module_id;
 
-extern char *filesfrom_host;
 extern char curr_dir[MAXPATHLEN];
 extern unsigned int curr_dir_len;
 extern unsigned int module_dirlen;
@@ -55,6 +52,7 @@ filter_rule_list daemon_filter_list = { .debug_type = " [daemon]" };
 filter_rule_list implied_filter_list = { .debug_type = " [implied]" };
 
 int saw_xattr_filter = 0;
+int trust_sender_args = 0;
 int trust_sender_filter = 0;
 
 /* Need room enough for ":MODS " prefix plus some room to grow. */
@@ -377,7 +375,7 @@ void add_implied_include(const char *arg, int skip_daemon_module)
 	int slash_cnt = 1; /* We know we're adding a leading slash. */
 	const char *cp;
 	char *p;
-	if (am_server || old_style_args || list_only || read_batch || filesfrom_host != NULL)
+	if (trust_sender_args)
 		return;
 	if (partial_string_len) {
 		arg_len = strlen(arg);

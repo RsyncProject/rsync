@@ -193,6 +193,8 @@ Dedicate a "host1-files" dir to the remote content:
 
 >     rsync -aiv host1:dir1 ~/host1-files
 
+See the [`--trust-sender`](#opt) option for additional details.
+
 ## ADVANCED USAGE
 
 The syntax for requesting multiple files from a remote host is done by
@@ -463,6 +465,7 @@ has its own detailed description later in this manpage.
 --from0, -0              all *-from/filter files are delimited by 0s
 --old-args               disable the modern arg-protection idiom
 --protect-args, -s       no space-splitting; wildcard chars only
+--trust-sender           trust the remote sender's file list
 --copy-as=USER[:GROUP]   specify user & optional group for the copy
 --address=ADDRESS        bind address for outgoing socket to daemon
 --port=PORT              specify double-colon alternate port number
@@ -536,7 +539,8 @@ option has a short variant).
 The parameter may need to be quoted in some manner for it to survive the
 shell's command-line parsing.  Also keep in mind that a leading tilde (`~`) in
 a pathname is substituted by your shell, so make sure that you separate the
-option name from the pathname using a space if you want the shell to expand it.
+option name from the pathname using a space if you want the local shell to
+expand it.
 
 [comment]: # (Some markup below uses a literal non-breakable space when a backtick string)
 [comment]: # (needs to contain a space since markdown strips spaces from the start/end)
@@ -1908,8 +1912,8 @@ option name from the pathname using a space if you want the shell to expand it.
     A rule can still apply to both sides even with this option specified if the
     rule is given both the sender & receiver modifer letters (e.g., `-f'-sr
     foo'`).  Receiver-side protect/risk rules can also be explicitly specified
-    to limit the deletions.  This is saves you from having to edit a bunch of
-    `-f'- foo'` rules into `-f'-s foo'` or `-f'H foo'` rules (not to mention
+    to limit the deletions.  This saves you from having to edit a bunch of
+    `-f'- foo'` rules into `-f'-s foo'` (aka `-f'H foo'`) rules (not to mention
     the corresponding includes).
 
     See the [FILTER RULES](#) section for more information.  See
@@ -2407,6 +2411,38 @@ option name from the pathname using a space if you want the shell to expand it.
 
     Note that this option is incompatible with the use of the restricted rsync
     script (`rrsync`) since it hides options from the script's inspection.
+
+0.  `--trust-sender`
+
+    Disable the extra validation of the file list from a remote sender (this
+    safety feature was added in 3.2.5).  This should only be done if you trust
+    the sender to not try to do something malicious, which should be the case
+    if they're running a stock rsync.
+
+    Normally when pulling files from a remote rsync, the client runs 2 extra
+    validation checks:
+
+    - Verify that additional arg items didn't get added at the top of the
+      transfer.
+    - Verify that none of the items in the file list should have been excluded.
+
+    Note that various options can turn off one or both of these checks if the
+    option interferes with the validation.  For instance:
+
+    - Using a per-directory filter file reads filter rules that only the server
+      knows about, so the filter checking is disabled.
+    - Using the [`--old-args`](#opt) option allows the sender to manipulate the
+      requested args, so the arg checking is disabled.
+    - Reading the files-from list from the server side means that the client
+      doesn't know the arg list, so the arg checking is disabled.
+    - Using [`--read-batch`](#opt) disables both checks since the batch file's
+      contents will have been verified when it was created.
+
+    This option may help an under-powered client server if the extra pattern
+    matching is slowing things down on a huge transfer.  It can also be used
+    to work around a bug in the verification logic, possibly after using the
+    [`--list-only`](#opt) option combined with [`--trust-sender`](#opt) to look
+    over the full file list.
 
 0.  `--copy-as=USER[:GROUP]`
 
@@ -3444,8 +3480,8 @@ option name from the pathname using a space if you want the shell to expand it.
        include the destination.
 
     CAUTION: keep in mind that a source arg with a wild-card is expanded by the
-    shell into multiple args, so it is never safe to try to list such an arg
-    without using this option. For example:
+    shell into multiple args, so it is never safe to try to specify a single
+    wild-card arg to try to infer this option. A safe example is:
 
     >     rsync -av --list-only foo* dest/
 
@@ -3790,7 +3826,7 @@ different ways.
 We will first cover the basics of how include & exclude rules affect what files
 are transferred, ignoring any deletion side-effects.  Filter rules mainly
 affect the contents of directories that rsync is "recursing" into, but they can
-also affect a top-level item in the transfer that were specified as a argument.
+also affect a top-level item in the transfer that was specified as a argument.
 
 The default for any unmatched file/dir is for it to be included in the
 transfer, which puts the file/dir into the sender's file list.  The use of an
@@ -3919,7 +3955,7 @@ You have your choice of using either short or long RULE names, as described
 below.  If you use a short-named rule, the ',' separating the RULE from the
 MODIFIERS is optional.  The PATTERN or FILENAME that follows (when present)
 must come after either a single space or an underscore (\_). Any additional
-spaces and/or undeerscore are considered to be a part of the pattern name.
+spaces and/or underscores are considered to be a part of the pattern name.
 Here are the available rule prefixes:
 
 0.  `exclude, '-'` specifies an exclude pattern that (by default) is both a
@@ -3929,10 +3965,8 @@ Here are the available rule prefixes:
 0.  `merge, '.'` specifies a merge-file on the client side to read for more
     rules.
 0.  `dir-merge, ':'` specifies a per-directory merge-file.  Using this kind of
-    filter rule requires that you trust the sending side's filter checking, and
-    thus it disables the receiver's verification of the file-list names against
-    the filter rules (since only the sender can know for sure if it obeyed all
-    the filter rules when some are per-dir merged from the sender's files).
+    filter rule requires that you trust the sending side's filter checking, so
+    it has the side-effect mentioned under the [`--trust-sender`](#opt) option.
 0.  `hide, 'H'` specifies a pattern for hiding files from the transfer.
     Equivalent to a sender-only exclude, so `-f'H foo'` could also be specified
     as `-f'-s foo'`.
@@ -3969,15 +4003,15 @@ The matching rules for the pattern argument take several forms:
 - If a pattern contains a `/` (not counting a trailing slash) or a "`**`"
   (which can match a slash), then the pattern is matched against the full
   pathname, including any leading directories within the transfer.  If the
-  pattern doesn't contain a `/` or a "`**`", then it is matched only against
-  the final component of the filename or pathname. For example, `foo` means
-  that the final path component must be "foo" while `foo/bar` would match the
-  last 2 elements of the path (as long as both elements are within the
-  transfer).
+  pattern doesn't contain a (non-trailing) `/` or a "`**`", then it is matched
+  only against the final component of the filename or pathname. For example,
+  `foo` means that the final path component must be "foo" while `foo/bar` would
+  match the last 2 elements of the path (as long as both elements are within
+  the transfer).
 - A pattern that ends with a `/` only matches a directory, not a regular file,
   symlink, or device.
 - A pattern that starts with a `/` is anchored to the start of the transfer
-  path instead of the end.  For example, `/foo` or `/foo/bar` match only
+  path instead of the end.  For example, `/foo/**` or `/foo/bar/**` match only
   leading elements in the path.  If the rule is read from a per-directory
   filter file, the transfer path being matched will begin at the level of the
   filter file instead of the top of the transfer.  See the section on
@@ -4010,11 +4044,11 @@ Here are some examples of exclude/include matching:
 - Option `-f'- /foo'` would exclude a file (or directory) named foo in the
   transfer-root directory
 - Option `-f'- foo/'` would exclude any directory named foo
-- Option `-f'- /foo/*/bar'` would exclude any file/dir named bar which is at
-  two levels below a directory named foo, which must be at the root of the
-  transfer
-- Option `-f'- /foo/**/bar'` would exclude any file/dir named bar two or more
-  levels below a directory named foo, which must be at the root of the transfer
+- Option `-f'- foo/*/bar'` would exclude any file/dir named bar which is at two
+  levels below a directory named foo (if foo is in the transfer)
+- Option `-f'- /foo/**/bar'` would exclude any file/dir named bar that was two
+  or more levels below the top-level directory named foo (exclude /foo/bar in a
+  separate rule, if desired)
 - Options `-f'+ */' -f'+ *.c' -f'- *'` would include all directories and .c
   source files but nothing else
 - Options `-f'+ foo/' -f'+ foo/bar.c' -f'- *'` would include only the foo

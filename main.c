@@ -89,7 +89,6 @@ extern int backup_dir_len;
 extern int basis_dir_cnt;
 extern int default_af_hint;
 extern int stdout_format_has_i;
-extern int trust_sender_filter;
 extern struct stats stats;
 extern char *stdout_format;
 extern char *logfile_format;
@@ -636,7 +635,6 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char **remote_argv, in
 #ifdef ICONV_CONST
 		setup_iconv();
 #endif
-		trust_sender_filter = 1;
 	} else if (local_server) {
 		/* If the user didn't request --[no-]whole-file, force
 		 * it on, but only if we're not batch processing. */

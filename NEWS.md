@@ -17,6 +17,9 @@
 
 ### BUG FIXES:
 
+- Fixed the handling of filenames specified with backslash-quoted wildcards
+  when the default remote-arg-escaping is enabled.
+
 - Fixed the configure check for signed char that was causing a host that
   defaults to unsigned characters to generate bogus rolling checksums. This
   made rsync send mostly literal data for a copy instead of finding matching
@@ -25,6 +28,11 @@
 
 - Lots of manpage improvements, including an attempt to better describe how
   include/exclude filters work.
+
+### ENHANCEMENTS:
+
+- The [`--trust-sender`](rsync.1#opt) option was added as a way to bypass the
+  extra file-list safety checking (should that be required).
 
 ### PACKAGING RELATED:
 

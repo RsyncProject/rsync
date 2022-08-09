@@ -27,6 +27,8 @@
 extern int module_id;
 extern int local_server;
 extern int sanitize_paths;
+extern int trust_sender_args;
+extern int trust_sender_filter;
 extern unsigned int module_dirlen;
 extern filter_rule_list filter_list;
 extern filter_rule_list daemon_filter_list;
@@ -64,6 +66,7 @@ int preserve_atimes = 0;
 int preserve_crtimes = 0;
 int omit_dir_times = 0;
 int omit_link_times = 0;
+int trust_sender = 0;
 int update_only = 0;
 int open_noatime = 0;
 int cvs_exclude = 0;
@@ -788,6 +791,7 @@ static struct poptOption long_options[] = {
   {"protect-args",    's', POPT_ARG_VAL,    &protect_args, 1, 0, 0},
   {"no-protect-args",  0,  POPT_ARG_VAL,    &protect_args, 0, 0, 0},
   {"no-s",             0,  POPT_ARG_VAL,    &protect_args, 0, 0, 0},
+  {"trust-sender",     0,  POPT_ARG_VAL,    &trust_sender, 1, 0, 0},
   {"numeric-ids",      0,  POPT_ARG_VAL,    &numeric_ids, 1, 0, 0 },
   {"no-numeric-ids",   0,  POPT_ARG_VAL,    &numeric_ids, 0, 0, 0 },
   {"usermap",          0,  POPT_ARG_STRING, 0, OPT_USERMAP, 0, 0 },
@@ -2465,6 +2469,11 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		}
 	}
 
+	if (trust_sender || am_server || read_batch)
+		trust_sender_args = trust_sender_filter = 1;
+	else if (old_style_args || filesfrom_host != NULL)
+		trust_sender_args = 1;
+
 	am_starting_up = 0;
 
 	return 1;
@@ -2499,7 +2508,7 @@ char *safe_arg(const char *opt, const char *arg)
 	char *ret;
 	if (!protect_args && old_style_args < 2 && (!old_style_args || (!is_filename_arg && opt != SPLIT_ARG_WHEN_OLD))) {
 		const char *f;
-		if (!old_style_args && *arg == '~' && (relative_paths || !strchr(arg, '/'))) {
+		if (!trust_sender_args && *arg == '~' && (relative_paths || !strchr(arg, '/'))) {
 			extras++;
 			escape_leading_tilde = 1;
 		}
