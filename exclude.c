@@ -316,13 +316,11 @@ static void maybe_add_literal_brackets_rule(filter_rule const *based_on, int arg
 	if (arg_len < 0)
 		arg_len = strlen(arg);
 
-	cp = arg;
-	while (*cp) {
+	for (cp = arg; *cp; cp++) {
 		if (*cp == '\\' && cp[1]) {
 			cp++;
 		} else if (*cp == '[')
 			cnt++;
-		cp++;
 	}
 	if (!cnt)
 		return;
@@ -331,8 +329,7 @@ static void maybe_add_literal_brackets_rule(filter_rule const *based_on, int arg
 	rule->rflags = based_on->rflags;
 	rule->u.slash_cnt = based_on->u.slash_cnt;
 	p = rule->pattern = new_array(char, arg_len + cnt + 1);
-	cp = arg;
-	while (*cp) {
+	for (cp = arg; *cp; ) {
 		if (*cp == '\\' && cp[1]) {
 			*p++ = *cp++;
 		} else if (*cp == '[')
@@ -373,7 +370,7 @@ void free_implied_include_partial_string()
 
 /* Each arg the client sends to the remote sender turns into an implied include
  * that the receiver uses to validate the file list from the sender. */
-void add_implied_include(const char *arg)
+void add_implied_include(const char *arg, int skip_daemon_module)
 {
 	filter_rule *rule;
 	int arg_len, saw_wild = 0, saw_live_open_brkt = 0, backslash_cnt = 0;
@@ -390,6 +387,12 @@ void add_implied_include(const char *arg)
 		partial_string_len = 0;
 		arg = partial_string_buf;
 	}
+	if (skip_daemon_module) {
+		if ((cp = strchr(arg, '/')) != NULL)
+			arg = cp + 1;
+		else
+			arg = "";
+	}
 	if (relative_paths) {
 		if ((cp = strstr(arg, "/./")) != NULL)
 			arg = cp + 3;
@@ -402,11 +405,8 @@ void add_implied_include(const char *arg)
 	if (arg_len) {
 		if (strpbrk(arg, "*[?")) {
 			/* We need to add room to escape backslashes if wildcard chars are present. */
-			cp = arg;
-			while ((cp = strchr(cp, '\\')) != NULL) {
+			for (cp = arg; (cp = strchr(cp, '\\')) != NULL; cp++)
 				arg_len++;
-				cp++;
-			}
 			saw_wild = 1;
 		}
 		arg_len++; /* Leave room for the prefixed slash */
@@ -420,8 +420,7 @@ void add_implied_include(const char *arg)
 		rule->rflags = FILTRULE_INCLUDE + (saw_wild ? FILTRULE_WILD : 0);
 		p = rule->pattern = new_array(char, arg_len + 1);
 		*p++ = '/';
-		cp = arg;
-		while (*cp) {
+		for (cp = arg; *cp; ) {
 			switch (*cp) {
 			  case '\\':
 				if (cp[1] == ']')
@@ -498,8 +497,7 @@ void add_implied_include(const char *arg)
 		if (!saw_wild && backslash_cnt) {
 			/* We are appending a wildcard, so now the backslashes need to be escaped. */
 			p = rule->pattern = new_array(char, arg_len + backslash_cnt + 3 + 1);
-			cp = arg;
-			while (*cp) {
+			for (cp = arg; *cp; ) {
 				if (*cp == '\\')
 					*p++ = '\\';
 				*p++ = *cp++;

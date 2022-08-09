@@ -420,7 +420,7 @@ static void forward_filesfrom_data(void)
 		while (s != eob) {
 			if (*s++ == '\0') {
 				ff_xb.len = s - sob - 1;
-				add_implied_include(sob);
+				add_implied_include(sob, 0);
 				if (iconvbufs(ic_send, &ff_xb, &iobuf.out, flags) < 0)
 					exit_cleanup(RERR_PROTOCOL); /* impossible? */
 				write_buf(iobuf.out_fd, s-1, 1); /* Send the '\0'. */
@@ -457,7 +457,7 @@ static void forward_filesfrom_data(void)
 		/* Eliminate any multi-'\0' runs. */
 		while (f != eob) {
 			if (!(*t++ = *f++)) {
-				add_implied_include(cur);
+				add_implied_include(cur, 0);
 				cur = t;
 				while (f != eob && *f == '\0')
 					f++;

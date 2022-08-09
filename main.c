@@ -1504,7 +1504,7 @@ static int start_client(int argc, char *argv[])
 		int dummy_port = rsync_port;
 		int i;
 		if (filesfrom_fd < 0)
-			add_implied_include(remote_argv[0]);
+			add_implied_include(remote_argv[0], daemon_connection);
 		/* For remote source, any extra source args must have either
 		 * the same hostname or an empty hostname. */
 		for (i = 1; i < remote_argc; i++) {
@@ -1528,7 +1528,7 @@ static int start_client(int argc, char *argv[])
 			if (!rsync_port && !*arg) /* Turn an empty arg into a dot dir. */
 				arg = ".";
 			remote_argv[i] = arg;
-			add_implied_include(arg);
+			add_implied_include(arg, daemon_connection);
 		}
 	}
 
