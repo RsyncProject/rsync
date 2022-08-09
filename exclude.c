@@ -302,12 +302,59 @@ static void add_rule(filter_rule_list *listp, const char *pat, unsigned int pat_
 	}
 }
 
+/* If the wildcards failed, the remote shell might give us a file matching the literal
+ * wildcards.  Since "*" & "?" already match themselves, this just needs to deal with
+ * failed "[foo]" idioms.
+ */
+static void maybe_add_literal_brackets_rule(filter_rule const *based_on, int arg_len)
+{
+	filter_rule *rule;
+	const char *arg = based_on->pattern, *cp;
+	char *p;
+	int cnt = 0;
+
+	if (arg_len < 0)
+		arg_len = strlen(arg);
+
+	cp = arg;
+	while (*cp) {
+		if (*cp == '\\' && cp[1]) {
+			cp++;
+		} else if (*cp == '[')
+			cnt++;
+		cp++;
+	}
+	if (!cnt)
+		return;
+
+	rule = new0(filter_rule);
+	rule->rflags = based_on->rflags;
+	rule->u.slash_cnt = based_on->u.slash_cnt;
+	p = rule->pattern = new_array(char, arg_len + cnt + 1);
+	cp = arg;
+	while (*cp) {
+		if (*cp == '\\' && cp[1]) {
+			*p++ = *cp++;
+		} else if (*cp == '[')
+			*p++ = '\\';
+		*p++ = *cp++;
+	}
+	*p++ = '\0';
+
+	rule->next = implied_filter_list.head;
+	implied_filter_list.head = rule;
+	if (DEBUG_GTE(FILTER, 3)) {
+		rprintf(FINFO, "[%s] add_implied_include(%s%s)\n", who_am_i(), rule->pattern,
+			rule->rflags & FILTRULE_DIRECTORY ? "/" : "");
+	}
+}
+
 /* Each arg the client sends to the remote sender turns into an implied include
  * that the receiver uses to validate the file list from the sender. */
 void add_implied_include(const char *arg)
 {
 	filter_rule *rule;
-	int arg_len, saw_wild = 0, backslash_cnt = 0;
+	int arg_len, saw_wild = 0, saw_live_open_brkt = 0, backslash_cnt = 0;
 	int slash_cnt = 1; /* We know we're adding a leading slash. */
 	const char *cp;
 	char *p;
@@ -383,9 +430,15 @@ void add_implied_include(const char *arg)
 							rprintf(FINFO, "[%s] add_implied_include(%s/)\n",
 								who_am_i(), R_rule->pattern);
 						}
+						if (saw_live_open_brkt)
+							maybe_add_literal_brackets_rule(R_rule, -1);
 					}
 				}
 				slash_cnt++;
+				*p++ = *cp++;
+				break;
+			  case '[':
+				saw_live_open_brkt = 1;
 				*p++ = *cp++;
 				break;
 			  default:
@@ -395,10 +448,12 @@ void add_implied_include(const char *arg)
 		}
 		*p = '\0';
 		rule->u.slash_cnt = slash_cnt;
-		arg = (const char *)rule->pattern;
+		arg = rule->pattern;
 		arg_len = p - arg; /* We recompute it due to backslash weirdness. */
 		if (DEBUG_GTE(FILTER, 3))
 			rprintf(FINFO, "[%s] add_implied_include(%s)\n", who_am_i(), rule->pattern);
+		if (saw_live_open_brkt)
+			maybe_add_literal_brackets_rule(rule, arg_len);
 	}
 
 	if (recurse || xfer_dirs) {
@@ -435,6 +490,8 @@ void add_implied_include(const char *arg)
 		implied_filter_list.head = rule;
 		if (DEBUG_GTE(FILTER, 3))
 			rprintf(FINFO, "[%s] add_implied_include(%s)\n", who_am_i(), rule->pattern);
+		if (saw_live_open_brkt)
+			maybe_add_literal_brackets_rule(rule, p - rule->pattern);
 	}
 }
 
