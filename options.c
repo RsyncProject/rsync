@@ -2521,7 +2521,10 @@ char *safe_arg(const char *opt, const char *arg)
 		const char *f = arg;
 		char *t = ret + len1;
 		while (*f) {
-			if (strchr(escapes, *f))
+                        if (*f == '\\') {
+				if (!is_filename_arg || !strchr(WILD_CHARS, f[1]))
+					*t++ = '\\';
+			} else if (strchr(escapes, *f))
 				*t++ = '\\';
 			*t++ = *f++;
 		}

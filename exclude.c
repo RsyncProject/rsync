@@ -319,7 +319,7 @@ void add_implied_include(const char *arg)
 	} else if ((cp = strrchr(arg, '/')) != NULL) {
 		arg = cp + 1;
 		if (*arg == '.' && arg[1] == '\0')
-		    arg++;
+			arg++;
 	}
 	arg_len = strlen(arg);
 	if (arg_len) {
@@ -347,9 +347,13 @@ void add_implied_include(const char *arg)
 		while (*cp) {
 			switch (*cp) {
 			  case '\\':
-				backslash_cnt++;
-				if (saw_wild)
-					*p++ = '\\';
+				if (cp[1] == ']')
+					cp++; /* A \] in a filter might cause a problem w/o wildcards. */
+				else if (!strchr("*[?", cp[1])) {
+					backslash_cnt++;
+					if (saw_wild)
+						*p++ = '\\';
+				}
 				*p++ = *cp++;
 				break;
 			  case '/':
@@ -377,7 +381,7 @@ void add_implied_include(const char *arg)
 						implied_filter_list.head = R_rule;
 						if (DEBUG_GTE(FILTER, 3)) {
 							rprintf(FINFO, "[%s] add_implied_include(%s/)\n",
-								who_am_i(), rule->pattern);
+								who_am_i(), R_rule->pattern);
 						}
 					}
 				}
@@ -392,6 +396,7 @@ void add_implied_include(const char *arg)
 		*p = '\0';
 		rule->u.slash_cnt = slash_cnt;
 		arg = (const char *)rule->pattern;
+		arg_len = p - arg; /* We recompute it due to backslash weirdness. */
 		if (DEBUG_GTE(FILTER, 3))
 			rprintf(FINFO, "[%s] add_implied_include(%s)\n", who_am_i(), rule->pattern);
 	}
