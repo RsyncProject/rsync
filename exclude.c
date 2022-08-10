@@ -424,9 +424,10 @@ void add_implied_include(const char *arg, int skip_daemon_module)
 		for (cp = arg; *cp; ) {
 			switch (*cp) {
 			  case '\\':
-				if (cp[1] == ']')
-					cp++; /* A \] in a filter might cause a problem w/o wildcards. */
-				else if (!strchr("*[?", cp[1])) {
+				if (cp[1] == ']') {
+					if (!saw_wild)
+						cp++; /* A \] in a non-wild filter causes a problem, so drop the \ . */
+				} else if (!strchr("*[?", cp[1])) {
 					backslash_cnt++;
 					if (saw_wild)
 						*p++ = '\\';
