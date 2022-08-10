@@ -36,6 +36,10 @@
 
 ### PACKAGING RELATED:
 
+- A note to those wanting to patch older rsync versions: the changes in this
+  release requires the quoted argument change from 3.2.4. Then, you'll want
+  every single code change from 3.2.5 since there is no fluff in this release.
+
 - The build date that goes into the manpages is now based on the developer's
   release date, not on the build's local-timezone interpretation of the date.
 
