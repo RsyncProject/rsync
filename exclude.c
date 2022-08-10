@@ -364,6 +364,7 @@ void free_implied_include_partial_string()
 		free(partial_string_buf);
 		partial_string_buf = NULL;
 	}
+	partial_string_len = 0; /* paranoia */
 }
 
 /* Each arg the client sends to the remote sender turns into an implied include
@@ -379,8 +380,10 @@ void add_implied_include(const char *arg, int skip_daemon_module)
 		return;
 	if (partial_string_len) {
 		arg_len = strlen(arg);
-		if (partial_string_len + arg_len >= MAXPATHLEN)
+		if (partial_string_len + arg_len >= MAXPATHLEN) {
+			partial_string_len = 0;
 			return; /* Should be impossible... */
+		}
 		memcpy(partial_string_buf + partial_string_len, arg, arg_len + 1);
 		partial_string_len = 0;
 		arg = partial_string_buf;
