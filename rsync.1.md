@@ -2439,10 +2439,9 @@ expand it.
       contents will have been verified when it was created.
 
     This option may help an under-powered client server if the extra pattern
-    matching is slowing things down on a huge transfer.  It can also be used
-    to work around a bug in the verification logic, possibly after using the
-    [`--list-only`](#opt) option combined with [`--trust-sender`](#opt) to look
-    over the full file list.
+    matching is slowing things down on a huge transfer.  It can also be used to
+    work around a currently-unknown bug in the verification logic, possibly
+    after using the [`--list-only`](#opt) option to approve the file list.
 
 0.  `--copy-as=USER[:GROUP]`
 
@@ -4047,8 +4046,8 @@ Here are some examples of exclude/include matching:
 - Option `-f'- foo/*/bar'` would exclude any file/dir named bar which is at two
   levels below a directory named foo (if foo is in the transfer)
 - Option `-f'- /foo/**/bar'` would exclude any file/dir named bar that was two
-  or more levels below the top-level directory named foo (exclude /foo/bar in a
-  separate rule, if desired)
+  or more levels below a top-level directory named foo (note that /foo/bar is
+  **not** excluded by this)
 - Options `-f'+ */' -f'+ *.c' -f'- *'` would include all directories and .c
   source files but nothing else
 - Options `-f'+ foo/' -f'+ foo/bar.c' -f'- *'` would include only the foo
