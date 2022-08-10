@@ -2440,8 +2440,8 @@ expand it.
 
     This option may help an under-powered client server if the extra pattern
     matching is slowing things down on a huge transfer.  It can also be used to
-    work around a currently-unknown bug in the verification logic, possibly
-    after using the [`--list-only`](#opt) option to approve the file list.
+    work around a currently-unknown bug in the verification logic if you trust
+    the sender or make the transfer into a dedicated destination directory.
 
 0.  `--copy-as=USER[:GROUP]`
 
