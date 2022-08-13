@@ -232,7 +232,7 @@ struct new_acl_entry{
 
 #define SMB_ACL_ENTRY_T		struct new_acl_entry*
 #define SMB_ACL_T		struct acl_entry_link*
- 
+
 #define SMB_ACL_TAG_T		unsigned short
 #define SMB_ACL_TYPE_T		int
 

@@ -642,7 +642,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 #ifdef SUPPORT_ACLS
 	/* It's OK to call set_acl() now, even for a dir, as the generator
 	 * will enable owner-writability using chmod, if necessary.
-	 * 
+	 *
 	 * If set_acl() changes permission bits in the process of setting
 	 * an access ACL, it changes sxp->st.st_mode so we know whether we
 	 * need to chmod(). */

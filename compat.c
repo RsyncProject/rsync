@@ -400,7 +400,7 @@ static const char *getenv_nstr(int ntype)
 	const char *env_str = getenv(ntype == NSTR_COMPRESS ? "RSYNC_COMPRESS_LIST" : "RSYNC_CHECKSUM_LIST");
 
 	/* When writing a batch file, we always negotiate an old-style choice. */
-	if (write_batch) 
+	if (write_batch)
 		env_str = ntype == NSTR_COMPRESS ? "zlib" : protocol_version >= 30 ? "md5" : "md4";
 
 	if (am_server && env_str) {
@@ -433,7 +433,7 @@ void validate_choice_vs_env(int ntype, int num1, int num2)
 		nno->saw[CSUM_MD4_ARCHAIC] = nno->saw[CSUM_MD4_BUSTED] = nno->saw[CSUM_MD4_OLD] = nno->saw[CSUM_MD4];
 
 	if (!nno->saw[num1] || (num2 >= 0 && !nno->saw[num2])) {
-		rprintf(FERROR, "Your --%s-choice value (%s) was refused by the server.\n", 
+		rprintf(FERROR, "Your --%s-choice value (%s) was refused by the server.\n",
 			ntype == NSTR_COMPRESS ? "compress" : "checksum",
 			ntype == NSTR_COMPRESS ? compress_choice : checksum_choice);
 		exit_cleanup(RERR_UNSUPPORTED);
