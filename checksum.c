@@ -418,8 +418,8 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 
 		mdfour_begin(&m);
 
-		for (i = 0; i + CHUNK_SIZE <= len; i += CHUNK_SIZE)
-			mdfour_update(&m, (uchar *)map_ptr(buf, i, CHUNK_SIZE), CHUNK_SIZE);
+		for (i = 0; i + CSUM_CHUNK <= len; i += CSUM_CHUNK)
+			mdfour_update(&m, (uchar *)map_ptr(buf, i, CSUM_CHUNK), CSUM_CHUNK);
 
 		/* Prior to version 27 an incorrect MD4 checksum was computed
 		 * by failing to call mdfour_tail() for block sizes that
