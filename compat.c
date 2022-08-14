@@ -523,6 +523,8 @@ static void negotiate_the_strings(int f_in, int f_out)
 {
 	/* We send all the negotiation strings before we start to read them to help avoid a slow startup. */
 
+	init_checksum_choices();
+
 	if (!checksum_choice)
 		send_negotiate_str(f_out, &valid_checksums, NSTR_CHECKSUM);
 

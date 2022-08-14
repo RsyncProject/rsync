@@ -195,6 +195,8 @@ void print_rsync_version(enum logcode f)
 
 	print_info_flags(f);
 
+	init_checksum_choices();
+
 	rprintf(f, "Checksum list:\n");
 	get_default_nno_list(&valid_checksums, tmpbuf, sizeof tmpbuf, '(');
 	rprintf(f, "    %s\n", tmpbuf);

@@ -62,6 +62,8 @@ struct name_num_obj valid_checksums = {
 int xfersum_type = 0; /* used for the file transfer checksums */
 int checksum_type = 0; /* used for the pre-transfer (--checksum) checksums */
 
+static int initialized_choices = 0;
+
 int parse_csum_name(const char *name, int len)
 {
 	struct name_num_item *nni;
@@ -78,6 +80,9 @@ int parse_csum_name(const char *name, int len)
 			return CSUM_MD4_BUSTED;
 		return CSUM_MD4_ARCHAIC;
 	}
+
+	if (!initialized_choices)
+		init_checksum_choices();
 
 	nni = get_nni_by_name(&valid_checksums, name, len);
 
@@ -622,4 +627,32 @@ int sum_end(char *sum)
 	}
 
 	return csum_len_for_type(cursum_type, 0);
+}
+
+void init_checksum_choices()
+{
+#ifdef SUPPORT_XXH3
+	char buf[32816];
+	int j;
+	for (j = 0; j < (int)sizeof buf; j++) {
+		buf[j] = ' ' + (j % 96);
+	}
+	sum_init(CSUM_XXH3_64, 0);
+	sum_update(buf, 32816);
+	sum_update(buf, 31152);
+	sum_update(buf, 32474);
+	sum_update(buf, 9322);
+	if (XXH3_64bits_digest(xxh3_state) != 0xadbcf16d4678d1de) {
+		int t, f;
+		struct name_num_item *nni = valid_checksums.list;
+		for (t = f = 0; nni[f].name; f++) {
+			if (nni[f].num == CSUM_XXH3_64 || nni[f].num == CSUM_XXH3_128)
+				continue;
+			if (t != f)
+				nni[t++] = nni[f];
+		}
+		nni[t].name = NULL;
+	}
+#endif
+	initialized_choices = 1;
 }
