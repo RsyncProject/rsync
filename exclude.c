@@ -399,9 +399,9 @@ void add_implied_include(const char *arg, int skip_daemon_module)
 			arg = cp + 3;
 	} else if ((cp = strrchr(arg, '/')) != NULL) {
 		arg = cp + 1;
-		if (*arg == '.' && arg[1] == '\0')
-			arg++;
 	}
+	if (*arg == '.' && arg[1] == '\0')
+		arg++;
 	arg_len = strlen(arg);
 	if (arg_len) {
 		if (strpbrk(arg, "*[?")) {
