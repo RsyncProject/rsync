@@ -1,4 +1,4 @@
-# NEWS for rsync 3.2.5 (UNRELEASED)
+# NEWS for rsync 3.2.5 (14 Aug 2022)
 
 ## Changes in this version:
 
@@ -4541,7 +4541,7 @@
 
 | RELEASE DATE | VER.   | DATE OF COMMIT\* | PROTOCOL    |
 |--------------|--------|------------------|-------------|
-| ?? Aug 2022  | 3.2.5  |                  | 31          |
+| 14 Aug 2022  | 3.2.5  |                  | 31          |
 | 15 Apr 2022  | 3.2.4  |                  | 31          |
 | 06 Aug 2020  | 3.2.3  |                  | 31          |
 | 04 Jul 2020  | 3.2.2  |                  | 31          |
