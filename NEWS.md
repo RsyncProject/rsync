@@ -29,6 +29,10 @@
 - Lots of manpage improvements, including an attempt to better describe how
   include/exclude filters work.
 
+- If rsync is compiled with an xxhash 0.8 library and then moved to a system
+  with a dynamically linked xxhash 0.7 library, we now detect this and disable
+  the XX3 hashes (since these routines didn't stabilize until 0.8).
+
 ### ENHANCEMENTS:
 
 - The [`--trust-sender`](rsync.1#opt) option was added as a way to bypass the
