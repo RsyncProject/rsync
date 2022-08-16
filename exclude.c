@@ -372,7 +372,7 @@ void free_implied_include_partial_string()
 void add_implied_include(const char *arg, int skip_daemon_module)
 {
 	int arg_len, saw_wild = 0, saw_live_open_brkt = 0, backslash_cnt = 0;
-	int slash_cnt = 0; /* We know we're adding a leading slash. */
+	int slash_cnt = 0;
 	const char *cp;
 	char *p;
 	if (trust_sender_args)
