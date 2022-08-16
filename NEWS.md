@@ -1,3 +1,17 @@
+# NEWS for rsync 3.2.6 (UNRELEASED)
+
+## Changes in this version:
+
+### BUG FIXES:
+
+- More path-cleaning in the file-list verification code to handle some rejected
+  args.
+
+- Fixed a bug in the internal MD4 checksum code that could cause the digest
+  to be incorrect part of the time (the openssl version was/is fine).
+
+------------------------------------------------------------------------------
+
 # NEWS for rsync 3.2.5 (14 Aug 2022)
 
 ## Changes in this version:
@@ -4541,6 +4555,7 @@
 
 | RELEASE DATE | VER.   | DATE OF COMMIT\* | PROTOCOL    |
 |--------------|--------|------------------|-------------|
+| ?? Dec 2022  | 3.2.6  |                  | 31          |
 | 14 Aug 2022  | 3.2.5  |                  | 31          |
 | 15 Apr 2022  | 3.2.4  |                  | 31          |
 | 06 Aug 2020  | 3.2.3  |                  | 31          |
