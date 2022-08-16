@@ -1,7 +1,10 @@
 #!/bin/sh
 
 srcdir=`dirname $0`
-gitver=`git describe --abbrev=8 2>/dev/null`
+
+if [ -e "$srcdir/.git" ]; then
+    gitver=`git describe --abbrev=8 2>/dev/null`
+fi
 
 if [ ! -f git-version.h ]; then
     touch git-version.h
