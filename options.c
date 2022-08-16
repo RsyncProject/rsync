@@ -2508,7 +2508,9 @@ char *safe_arg(const char *opt, const char *arg)
 	char *ret;
 	if (!protect_args && old_style_args < 2 && (!old_style_args || (!is_filename_arg && opt != SPLIT_ARG_WHEN_OLD))) {
 		const char *f;
-		if (!trust_sender_args && *arg == '~' && (relative_paths || !strchr(arg, '/'))) {
+		if (!trust_sender_args && *arg == '~'
+		 && ((relative_paths && !strstr(arg, "/./"))
+		  || !strchr(arg, '/'))) {
 			extras++;
 			escape_leading_tilde = 1;
 		}
