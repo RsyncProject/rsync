@@ -8,7 +8,14 @@
   args.
 
 - Fixed a bug in the internal MD4 checksum code that could cause the digest
-  to be incorrect part of the time (the openssl version was/is fine).
+  to be sporadically incorrect (the openssl version was/is fine).
+
+### PACKAGING RELATED:
+
+- The mkgitver script now makes sure that a `.git` dir/file is in the top-level
+  source dir before calling `git describe`. It also runs a basic check on the
+  version value. This should avoid using an unrelated git description for
+  rsync's version.
 
 ------------------------------------------------------------------------------
 
