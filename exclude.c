@@ -371,9 +371,8 @@ void free_implied_include_partial_string()
  * that the receiver uses to validate the file list from the sender. */
 void add_implied_include(const char *arg, int skip_daemon_module)
 {
-	filter_rule *rule;
 	int arg_len, saw_wild = 0, saw_live_open_brkt = 0, backslash_cnt = 0;
-	int slash_cnt = 1; /* We know we're adding a leading slash. */
+	int slash_cnt = 0; /* We know we're adding a leading slash. */
 	const char *cp;
 	char *p;
 	if (trust_sender_args)
@@ -404,6 +403,7 @@ void add_implied_include(const char *arg, int skip_daemon_module)
 		arg++;
 	arg_len = strlen(arg);
 	if (arg_len) {
+		char *new_pat;
 		if (strpbrk(arg, "*[?")) {
 			/* We need to add room to escape backslashes if wildcard chars are present. */
 			for (cp = arg; (cp = strchr(cp, '\\')) != NULL; cp++)
@@ -411,16 +411,9 @@ void add_implied_include(const char *arg, int skip_daemon_module)
 			saw_wild = 1;
 		}
 		arg_len++; /* Leave room for the prefixed slash */
-		rule = new0(filter_rule);
-		if (!implied_filter_list.head)
-			implied_filter_list.head = implied_filter_list.tail = rule;
-		else {
-			rule->next = implied_filter_list.head;
-			implied_filter_list.head = rule;
-		}
-		rule->rflags = FILTRULE_INCLUDE + (saw_wild ? FILTRULE_WILD : 0);
-		p = rule->pattern = new_array(char, arg_len + 1);
+		p = new_pat = new_array(char, arg_len + 1);
 		*p++ = '/';
+		slash_cnt++;
 		for (cp = arg; *cp; ) {
 			switch (*cp) {
 			  case '\\':
@@ -436,39 +429,33 @@ void add_implied_include(const char *arg, int skip_daemon_module)
 				break;
 			  case '/':
 				if (p[-1] == '/') { /* This is safe because of the initial slash. */
+					if (*++cp == '\0') {
+						slash_cnt--;
+						p--;
+					}
+				} else if (cp[1] == '\0') {
 					cp++;
-					break;
+				} else {
+					slash_cnt++;
+					*p++ = *cp++;
 				}
-				if (relative_paths) {
-					filter_rule const *ent;
-					int found = 0;
-					*p = '\0';
-					for (ent = implied_filter_list.head; ent; ent = ent->next) {
-						if (ent != rule && strcmp(ent->pattern, rule->pattern) == 0) {
-							found = 1;
-							break;
+				break;
+			  case '.':
+				if (p[-1] == '/') {
+					if (cp[1] == '/') {
+						cp += 2;
+						if (!*cp) {
+							slash_cnt--;
+							p--;
 						}
+					} else if (cp[1] == '\0') {
+						cp++;
+						slash_cnt--;
+						p--;
+						break;
 					}
-					if (!found) {
-						filter_rule *R_rule = new0(filter_rule);
-						R_rule->rflags = FILTRULE_INCLUDE | FILTRULE_DIRECTORY;
-						/* Check if our sub-path has wildcards or escaped backslashes */
-						if (saw_wild && strpbrk(rule->pattern, "*[?\\"))
-							R_rule->rflags |= FILTRULE_WILD;
-						R_rule->pattern = strdup(rule->pattern);
-						R_rule->u.slash_cnt = slash_cnt;
-						R_rule->next = implied_filter_list.head;
-						implied_filter_list.head = R_rule;
-						if (DEBUG_GTE(FILTER, 3)) {
-							rprintf(FINFO, "[%s] add_implied_include(%s/)\n",
-								who_am_i(), R_rule->pattern);
-						}
-						if (saw_live_open_brkt)
-							maybe_add_literal_brackets_rule(R_rule, -1);
-					}
-				}
-				slash_cnt++;
-				*p++ = *cp++;
+				} else
+					*p++ = *cp++;
 				break;
 			  case '[':
 				saw_live_open_brkt = 1;
@@ -480,18 +467,63 @@ void add_implied_include(const char *arg, int skip_daemon_module)
 			}
 		}
 		*p = '\0';
-		rule->u.slash_cnt = slash_cnt;
-		arg = rule->pattern;
-		arg_len = p - arg; /* We recompute it due to backslash weirdness. */
-		if (DEBUG_GTE(FILTER, 3))
-			rprintf(FINFO, "[%s] add_implied_include(%s)\n", who_am_i(), rule->pattern);
-		if (saw_live_open_brkt)
-			maybe_add_literal_brackets_rule(rule, arg_len);
+		arg_len = p - new_pat;
+		if (!arg_len)
+			free(new_pat);
+		else {
+			filter_rule *rule = new0(filter_rule);
+			rule->rflags = FILTRULE_INCLUDE + (saw_wild ? FILTRULE_WILD : 0);
+			rule->u.slash_cnt = slash_cnt;
+			arg = rule->pattern = new_pat;
+			if (!implied_filter_list.head)
+				implied_filter_list.head = implied_filter_list.tail = rule;
+			else {
+				rule->next = implied_filter_list.head;
+				implied_filter_list.head = rule;
+			}
+			if (DEBUG_GTE(FILTER, 3))
+				rprintf(FINFO, "[%s] add_IMPlied_include(%s)\n", who_am_i(), arg);
+			if (saw_live_open_brkt)
+				maybe_add_literal_brackets_rule(rule, arg_len);
+			if (relative_paths && slash_cnt) {
+				filter_rule const *ent;
+				int found = 0;
+				slash_cnt = 1;
+				for (p = new_pat + 1; (p = strchr(p, '/')) != NULL; p++) {
+					*p = '\0';
+					for (ent = implied_filter_list.head; ent; ent = ent->next) {
+						if (ent != rule && strcmp(ent->pattern, new_pat) == 0) {
+							found = 1;
+							break;
+						}
+					}
+					if (!found) {
+						filter_rule *R_rule = new0(filter_rule);
+						R_rule->rflags = FILTRULE_INCLUDE | FILTRULE_DIRECTORY;
+						/* Check if our sub-path has wildcards or escaped backslashes */
+						if (saw_wild && strpbrk(rule->pattern, "*[?\\"))
+							R_rule->rflags |= FILTRULE_WILD;
+						R_rule->pattern = strdup(new_pat);
+						R_rule->u.slash_cnt = slash_cnt;
+						R_rule->next = implied_filter_list.head;
+						implied_filter_list.head = R_rule;
+						if (DEBUG_GTE(FILTER, 3)) {
+							rprintf(FINFO, "[%s] add_implied_include(%s/)\n",
+								who_am_i(), R_rule->pattern);
+						}
+						if (saw_live_open_brkt)
+							maybe_add_literal_brackets_rule(R_rule, -1);
+					}
+					*p = '/';
+					slash_cnt++;
+				}
+			}
+		}
 	}
 
 	if (recurse || xfer_dirs) {
 		/* Now create a rule with an added "/" & "**" or "*" at the end */
-		rule = new0(filter_rule);
+		filter_rule *rule = new0(filter_rule);
 		rule->rflags = FILTRULE_INCLUDE | FILTRULE_WILD;
 		if (recurse)
 			rule->rflags |= FILTRULE_WILD2;
@@ -499,7 +531,7 @@ void add_implied_include(const char *arg, int skip_daemon_module)
 		if (!saw_wild && backslash_cnt) {
 			/* We are appending a wildcard, so now the backslashes need to be escaped. */
 			p = rule->pattern = new_array(char, arg_len + backslash_cnt + 3 + 1);
-			for (cp = arg; *cp; ) {
+			for (cp = arg; *cp; ) { /* Note that arg_len != 0 because backslash_cnt > 0 */
 				if (*cp == '\\')
 					*p++ = '\\';
 				*p++ = *cp++;
@@ -511,13 +543,15 @@ void add_implied_include(const char *arg, int skip_daemon_module)
 				p += arg_len;
 			}
 		}
-		if (p[-1] != '/')
+		if (p[-1] != '/') {
 			*p++ = '/';
+			slash_cnt++;
+		}
 		*p++ = '*';
 		if (recurse)
 			*p++ = '*';
 		*p = '\0';
-		rule->u.slash_cnt = slash_cnt + 1;
+		rule->u.slash_cnt = slash_cnt;
 		rule->next = implied_filter_list.head;
 		implied_filter_list.head = rule;
 		if (DEBUG_GTE(FILTER, 3))
