@@ -1904,13 +1904,13 @@ expand it.
 
     By default, an exclude or include has both a server-side effect (to "hide"
     and "show" files when building the server's file list) and a receiver-side
-    effect (to "protect" and "risk" files when deletions are occuring).  Any
+    effect (to "protect" and "risk" files when deletions are occurring).  Any
     rule that has no modifier to specify what sides it is executed on will be
     instead treated as if it were a server-side rule only, avoiding any
     "protect" effects of the rules.
 
     A rule can still apply to both sides even with this option specified if the
-    rule is given both the sender & receiver modifer letters (e.g., `-f'-sr
+    rule is given both the sender & receiver modifier letters (e.g., `-f'-sr
     foo'`).  Receiver-side protect/risk rules can also be explicitly specified
     to limit the deletions.  This saves you from having to edit a bunch of
     `-f'- foo'` rules into `-f'-s foo'` (aka `-f'H foo'`) rules (not to mention
