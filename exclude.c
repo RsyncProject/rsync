@@ -361,6 +361,8 @@ void implied_include_partial_string(const char *s_start, const char *s_end)
 void free_implied_include_partial_string()
 {
 	if (partial_string_buf) {
+		if (partial_string_len)
+			add_implied_include("", 0);
 		free(partial_string_buf);
 		partial_string_buf = NULL;
 	}
