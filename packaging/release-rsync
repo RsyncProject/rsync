@@ -232,7 +232,7 @@ About to:
     cmd_chk(['packaging/year-tweak'])
 
     print(dash_line)
-    cmd_run("git diff")
+    cmd_run("git diff".split())
 
     srctar_name = f"{rsync_ver}.tar.gz"
     pattar_name = f"rsync-patches-{version}.tar.gz"
@@ -247,7 +247,7 @@ About to:
 
 About to:
     - git commit all changes
-    - generate the manpages
+    - run a full build, ensuring that the manpages & configure.sh are up-to-date
     - merge the {args.master_branch} branch into the patch/{args.master_branch}/* branches
     - update the files in the "patches" dir and OPTIONALLY (if you type 'y') to
       run patch-update with the --make option (which opens a shell on error)
@@ -258,9 +258,9 @@ About to:
     if s.returncode:
         die('Aborting')
 
-    cmd_chk('make gen')
+    cmd_chk('touch configure.ac && packaging/smart-make && make gen')
 
-    print(f'Creating any missing patch branches.')
+    print('Creating any missing patch branches.')
     s = cmd_run(f'packaging/branch-from-patch --branch={args.master_branch} --add-missing')
     if s.returncode:
         die('Aborting')

@@ -32,7 +32,7 @@ def _tweak_opts(cmd, opts, **maybe_set_args):
     opts = opts.copy()
     _maybe_set(opts, **maybe_set_args)
 
-    if type(cmd) == str:
+    if isinstance(cmd, str):
         _maybe_set(opts, shell=True)
 
     want_raw = opts.pop('raw', False)
