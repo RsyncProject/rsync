@@ -1172,7 +1172,7 @@ struct name_num_obj {
 	uchar *saw;
 	int saw_len;
 	int negotiated_num;
-	struct name_num_item list[10]; /* we'll get a compile error/warning if this is ever too small */
+	struct name_num_item *list;
 };
 
 #ifdef EXTERNAL_ZLIB

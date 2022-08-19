@@ -91,19 +91,21 @@ int filesfrom_convert = 0;
 
 #define MAX_NSTR_STRLEN 256
 
-struct name_num_obj valid_compressions = {
-	"compress", NULL, NULL, 0, 0, {
+struct name_num_item valid_compressions_items[] = {
 #ifdef SUPPORT_ZSTD
-		{ CPRES_ZSTD, "zstd", NULL },
+	{ CPRES_ZSTD, "zstd", NULL },
 #endif
 #ifdef SUPPORT_LZ4
-		{ CPRES_LZ4, "lz4", NULL },
+	{ CPRES_LZ4, "lz4", NULL },
 #endif
-		{ CPRES_ZLIBX, "zlibx", NULL },
-		{ CPRES_ZLIB, "zlib", NULL },
-		{ CPRES_NONE, "none", NULL },
-		{ 0, NULL, NULL }
-	}
+	{ CPRES_ZLIBX, "zlibx", NULL },
+	{ CPRES_ZLIB, "zlib", NULL },
+	{ CPRES_NONE, "none", NULL },
+	{ 0, NULL, NULL }
+};
+
+struct name_num_obj valid_compressions = {
+	"compress", NULL, NULL, 0, 0, valid_compressions_items
 };
 
 #define CF_INC_RECURSE	 (1<<0)

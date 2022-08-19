@@ -42,21 +42,23 @@ extern int protocol_version;
 extern int proper_seed_order;
 extern const char *checksum_choice;
 
-struct name_num_obj valid_checksums = {
-	"checksum", NULL, NULL, 0, 0, {
+struct name_num_item valid_checksums_items[] = {
 #ifdef SUPPORT_XXH3
-		{ CSUM_XXH3_128, "xxh128", NULL },
-		{ CSUM_XXH3_64, "xxh3", NULL },
+	{ CSUM_XXH3_128, "xxh128", NULL },
+	{ CSUM_XXH3_64, "xxh3", NULL },
 #endif
 #ifdef SUPPORT_XXHASH
-		{ CSUM_XXH64, "xxh64", NULL },
-		{ CSUM_XXH64, "xxhash", NULL },
+	{ CSUM_XXH64, "xxh64", NULL },
+	{ CSUM_XXH64, "xxhash", NULL },
 #endif
-		{ CSUM_MD5, "md5", NULL },
-		{ CSUM_MD4, "md4", NULL },
-		{ CSUM_NONE, "none", NULL },
-		{ 0, NULL, NULL }
-	}
+	{ CSUM_MD5, "md5", NULL },
+	{ CSUM_MD4, "md4", NULL },
+	{ CSUM_NONE, "none", NULL },
+	{ 0, NULL, NULL }
+};
+
+struct name_num_obj valid_checksums = {
+	"checksum", NULL, NULL, 0, 0, valid_checksums_items
 };
 
 int xfersum_type = 0; /* used for the file transfer checksums */
