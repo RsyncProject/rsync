@@ -47,6 +47,7 @@ long_opts = {
   'compress-choice': 1,
   'compress-level': 1,
   'copy-dest': 2,
+  'copy-devices': -1,
   'copy-unsafe-links': 0,
   'daemon': -1,
   'debug': 1,
