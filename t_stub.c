@@ -29,7 +29,6 @@ int protect_args = 0;
 int module_id = -1;
 int relative_paths = 0;
 int module_dirlen = 0;
-int preserve_mtimes = 0;
 int preserve_xattrs = 0;
 int preserve_perms = 0;
 int preserve_executability = 0;

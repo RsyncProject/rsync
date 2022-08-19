@@ -31,7 +31,6 @@ extern int do_fsync;
 extern int protect_args;
 extern int modify_window;
 extern int relative_paths;
-extern int preserve_mtimes;
 extern int preserve_xattrs;
 extern int omit_link_times;
 extern int preallocate_files;
