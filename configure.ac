@@ -1071,21 +1071,6 @@ elif test x"$ac_cv_header_popt_h" != x"yes"; then
     with_included_popt=yes
 fi
 
-if test x"$GCC" = x"yes"; then
-    if test x"$with_included_popt" != x"yes"; then
-	# Turn pedantic warnings into errors to ensure an array-init overflow is an error.
-	CFLAGS="$CFLAGS -pedantic-errors"
-    else
-	# Our internal popt code cannot be compiled with pedantic warnings as errors, so try to
-	# turn off pedantic warnings (which will not lose the error for array-init overflow).
-	# Older gcc versions don't understand -Wno-pedantic, so check if --help=warnings lists
-	# -Wpedantic and use that as a flag.
-	case `$CC --help=warnings 2>/dev/null | grep Wpedantic` in
-	    *-Wpedantic*) CFLAGS="$CFLAGS -pedantic-errors -Wno-pedantic" ;;
-	esac
-    fi
-fi
-
 AC_MSG_CHECKING([whether to use included libpopt])
 if test x"$with_included_popt" = x"yes"; then
     AC_MSG_RESULT($srcdir/popt)
