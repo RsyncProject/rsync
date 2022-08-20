@@ -27,6 +27,7 @@ long_opts = { # These include some extra long-args that BackupPC uses:
         'recursive': 0,
         'stderr': 1,
         'times': 0,
+        'copy-devices': -1,
         'write-devices': -1,
         }
 

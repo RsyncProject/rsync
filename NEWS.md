@@ -7,6 +7,9 @@
 - More path-cleaning in the file-list verification code to handle some rejected
   args.
 
+- Fixed a bug with the new file-list validation code when the last line of the
+  [`--files-from`](rsync.1#opt) list is not terminated by a newline.
+
 - Fixed a bug in the internal MD4 checksum code that could cause the digest
   to be sporadically incorrect (the openssl version was/is fine).
 
@@ -16,6 +19,17 @@
   source dir before calling `git describe`. It also runs a basic check on the
   version value. This should avoid using an unrelated git description for
   rsync's version.
+
+### DEVELOPER RELATED:
+
+- The configure script no longer sets the -pedantic-errors CFLAG (which it
+  used to try to do only for gcc).
+
+- A minor tweak to rrsync added "copy-devices" to the list of known args, but
+  left it disabled by default.
+
+- The name_num_obj struct was modified to allow its dynamic name_num_item list
+  to be initialized in a better way.
 
 ------------------------------------------------------------------------------
 
