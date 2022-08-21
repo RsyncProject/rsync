@@ -25,6 +25,7 @@
 extern int do_xfers;
 extern int am_server;
 extern int am_daemon;
+extern int local_server;
 extern int inc_recurse;
 extern int log_before_transfer;
 extern int stdout_format_has_i;
@@ -51,6 +52,7 @@ extern int file_old_total;
 extern BOOL want_progress_now;
 extern struct stats stats;
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
+extern char num_dev_ino_buf[4 + 8 + 8];
 
 BOOL extra_flist_sending_enabled;
 
@@ -142,6 +144,13 @@ void successful_send(int ndx)
 	if ((copy_links ? do_stat(fname, &st) : do_lstat(fname, &st)) < 0) {
 		failed_op = "re-lstat";
 		goto failed;
+	}
+
+	if (local_server
+	 && (int64)st.st_dev == IVAL64(num_dev_ino_buf, 4)
+	 && (int64)st.st_ino == IVAL64(num_dev_ino_buf, 4 + 8)) {
+		rprintf(FERROR_XFER, "ERROR: Skipping sender remove of destination file: %s\n", fname);
+		return;
 	}
 
 	if (st.st_size != F_LENGTH(file) || st.st_mtime != file->modtime

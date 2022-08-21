@@ -10,6 +10,11 @@
 - Fixed a bug with the new file-list validation code when the last line of the
   [`--files-from`](rsync.1#opt) list is not terminated by a newline.
 
+- Added a safety check that prevents the sender from removing destination files
+  when a local copy using [`--remove-source-files`](rsync.1#opt) has some
+  content that is shared between the sending & receiving hierarchies, including
+  the case where the source dir & destination dir are identical.
+
 - Fixed a bug in the internal MD4 checksum code that could cause the digest
   to be sporadically incorrect (the openssl version was/is fine).
 

@@ -1819,7 +1819,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			goto cleanup;
 	  return_with_success:
 		if (!dry_run)
-			send_msg_int(MSG_SUCCESS, ndx);
+			send_msg_success(fname, ndx);
 		goto cleanup;
 	}
 

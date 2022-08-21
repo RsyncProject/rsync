@@ -1808,6 +1808,10 @@ expand it.
     Starting with 3.1.0, rsync will skip the sender-side removal (and output an
     error) if the file's size or modify time has not stayed unchanged.
 
+    Starting with 3.2.6, a local rsync copy will ensure that the sender does
+    not remove a file the receiver just verified, such as when the user
+    accidentally makes the source and destination directory the same path.
+
 0.  `--delete`
 
     This tells rsync to delete extraneous files from the receiving side (ones

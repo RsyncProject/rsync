@@ -439,9 +439,8 @@ static void handle_delayed_updates(char *local_name)
 					"rename failed for %s (from %s)",
 					full_fname(fname), partialptr);
 			} else {
-				if (remove_source_files
-				 || (preserve_hard_links && F_IS_HLINKED(file)))
-					send_msg_int(MSG_SUCCESS, ndx);
+				if (remove_source_files || (preserve_hard_links && F_IS_HLINKED(file)))
+					send_msg_success(fname, ndx);
 				handle_partial_dir(partialptr, PDIR_DELETE);
 			}
 		}
@@ -698,7 +697,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 			if (!am_server)
 				discard_receive_data(f_in, file);
 			if (inc_recurse)
-				send_msg_int(MSG_SUCCESS, ndx);
+				send_msg_success(fname, ndx);
 			continue;
 		}
 
@@ -926,9 +925,8 @@ int recv_files(int f_in, int f_out, char *local_name)
 		case 2:
 			break;
 		case 1:
-			if (remove_source_files || inc_recurse
-			 || (preserve_hard_links && F_IS_HLINKED(file)))
-				send_msg_int(MSG_SUCCESS, ndx);
+			if (remove_source_files || inc_recurse || (preserve_hard_links && F_IS_HLINKED(file)))
+				send_msg_success(fname, ndx);
 			break;
 		case 0: {
 			enum logcode msgtype = redoing ? FERROR_XFER : FWARNING;

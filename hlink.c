@@ -446,7 +446,7 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 		return -1;
 
 	if (remove_source_files == 1 && do_xfers)
-		send_msg_int(MSG_SUCCESS, ndx);
+		send_msg_success(fname, ndx);
 
 	return 1;
 }
@@ -519,7 +519,7 @@ void finish_hard_link(struct file_struct *file, const char *fname, int fin_ndx,
 		if (val < 0)
 			continue;
 		if (remove_source_files == 1 && do_xfers)
-			send_msg_int(MSG_SUCCESS, ndx);
+			send_msg_success(fname, ndx);
 	}
 
 	if (inc_recurse) {

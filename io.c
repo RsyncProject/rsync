@@ -41,6 +41,7 @@ extern int am_server;
 extern int am_sender;
 extern int am_receiver;
 extern int am_generator;
+extern int local_server;
 extern int msgs2stderr;
 extern int inc_recurse;
 extern int io_error;
@@ -83,6 +84,8 @@ int sock_f_out = -1;
 
 int64 total_data_read = 0;
 int64 total_data_written = 0;
+
+char num_dev_ino_buf[4 + 8 + 8];
 
 static struct {
 	xbuf in, out, msg;
@@ -1064,6 +1067,24 @@ void send_msg_int(enum msgcode code, int num)
 	send_msg(code, numbuf, 4, -1);
 }
 
+void send_msg_success(const char *fname, int num)
+{
+	if (local_server) {
+		STRUCT_STAT st;
+
+		if (DEBUG_GTE(IO, 1))
+			rprintf(FINFO, "[%s] send_msg_success(%d)\n", who_am_i(), num);
+
+		if (stat(fname, &st) < 0)
+			memset(&st, 0, sizeof (STRUCT_STAT));
+		SIVAL(num_dev_ino_buf, 0, num);
+		SIVAL64(num_dev_ino_buf, 4, st.st_dev);
+		SIVAL64(num_dev_ino_buf, 4+8, st.st_ino);
+		send_msg(MSG_SUCCESS, num_dev_ino_buf, sizeof num_dev_ino_buf, -1);
+	} else
+		send_msg_int(MSG_SUCCESS, num);
+}
+
 static void got_flist_entry_status(enum festatus status, int ndx)
 {
 	struct file_list *flist = flist_for_ndx(ndx, "got_flist_entry_status");
@@ -1078,8 +1099,12 @@ static void got_flist_entry_status(enum festatus status, int ndx)
 
 	switch (status) {
 	case FES_SUCCESS:
-		if (remove_source_files)
-			send_msg_int(MSG_SUCCESS, ndx);
+		if (remove_source_files) {
+			if (local_server)
+				send_msg(MSG_SUCCESS, num_dev_ino_buf, sizeof num_dev_ino_buf, -1);
+			else
+				send_msg_int(MSG_SUCCESS, ndx);
+		}
 		/* FALL THROUGH */
 	case FES_NO_SEND:
 #ifdef SUPPORT_HARD_LINKS
@@ -1574,14 +1599,15 @@ static void read_a_msg(void)
 		}
 		break;
 	case MSG_SUCCESS:
-		if (msg_bytes != 4) {
+		if (msg_bytes != (local_server ? 4+8+8 : 4)) {
 		  invalid_msg:
 			rprintf(FERROR, "invalid multi-message %d:%lu [%s%s]\n",
 				tag, (unsigned long)msg_bytes, who_am_i(),
 				inc_recurse ? "/inc" : "");
 			exit_cleanup(RERR_STREAMIO);
 		}
-		val = raw_read_int();
+		raw_read_buf(num_dev_ino_buf, msg_bytes);
+		val = IVAL(num_dev_ino_buf, 0);
 		iobuf.in_multiplexed = 1;
 		if (am_generator)
 			got_flist_entry_status(FES_SUCCESS, val);
