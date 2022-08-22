@@ -4,19 +4,22 @@
 
 ### BUG FIXES:
 
-- More path-cleaning in the file-list verification code to handle some rejected
-  args.
+- More path-cleaning improvements in the file-list validation code to avoid
+  rejecting of valid args.
 
-- Fixed a bug with the new file-list validation code when the last line of the
-  [`--files-from`](rsync.1#opt) list is not terminated by a newline.
+- A file-list validation fix for a [`--files-from`](rsync.1#opt) file that ends
+  without a line-terminating character.
 
 - Added a safety check that prevents the sender from removing destination files
-  when a local copy using [`--remove-source-files`](rsync.1#opt) has some
-  content that is shared between the sending & receiving hierarchies, including
-  the case where the source dir & destination dir are identical.
+  when a local copy using [`--remove-source-files`](rsync.1#opt) has some files
+  that are shared between the sending & receiving hierarchies, including the
+  case where the source dir & destination dir are identical.
 
 - Fixed a bug in the internal MD4 checksum code that could cause the digest
   to be sporadically incorrect (the openssl version was/is fine).
+
+- A minor tweak to rrsync added "copy-devices" to the list of known args, but
+  left it disabled by default.
 
 ### PACKAGING RELATED:
 
@@ -29,9 +32,6 @@
 
 - The configure script no longer sets the -pedantic-errors CFLAG (which it
   used to try to do only for gcc).
-
-- A minor tweak to rrsync added "copy-devices" to the list of known args, but
-  left it disabled by default.
 
 - The name_num_obj struct was modified to allow its dynamic name_num_item list
   to be initialized in a better way.
