@@ -219,7 +219,7 @@
 
  - Fixed a potential issue in git-set-file-times when handling commits with
    high-bit characters in the description & when handling a description that
-   might mimick the git raw-commit deliniators.  (See the support dir.)
+   might mimic the git raw-commit deliniators.  (See the support dir.)
 
  - The bundled systemd/rsync.service file now includes `Restart=on-failure`.
 
