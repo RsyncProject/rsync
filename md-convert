@@ -389,7 +389,7 @@ class TransformHtml(HTMLParser):
                     if val.startswith(('https://', 'http://', 'mailto:', 'ftp:')):
                         pass # nothing to check
                     elif '#' in val:
-                        pg, tgt = val.split('#', 2)
+                        pg, tgt = val.split('#', 1)
                         if pg and pg not in VALID_PAGES or '#' in tgt:
                             st.bad_hashtags.add(val)
                         elif tgt in ('', 'opt', 'dopt'):
@@ -478,7 +478,7 @@ class TransformHtml(HTMLParser):
                 find = 'href="' + st.a_href + '"'
                 for j in range(len(st.html_out)-1, 0, -1):
                     if find in st.html_out[j]:
-                        pg, tgt = st.a_href.split('#', 2)
+                        pg, tgt = st.a_href.split('#', 1)
                         derived = txt2target(atxt, tgt)
                         if pg == '':
                             if derived in st.latest_targets:
