@@ -381,7 +381,7 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 
 	if (rl_nulls) {
 		for (i = 0; i < sargc; i++) {
-			if (!sargs[i]) /* stop at --protect-args NULL */
+			if (!sargs[i]) /* stop at --secluded-args NULL */
 				break;
 			write_sbuf(f_out, sargs[i]);
 			write_byte(f_out, 0);

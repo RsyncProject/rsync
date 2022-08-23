@@ -894,7 +894,7 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     >     refuse options = * !a !v !compress*
 
     Don't worry that the "`*`" will refuse certain vital options such as
-    `--dry-run`, `--server`, `--no-iconv`, `--protect-args`, etc. These
+    `--dry-run`, `--server`, `--no-iconv`, `--seclude-args`, etc. These
     important options are not matched by wild-card, so they must be overridden
     by their exact name.  For instance, if you're forcing iconv transfers you
     could use something like this:
@@ -948,7 +948,7 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
       `--log-file-format`.
     - `--sender`: Use "[write only](#)" parameter instead of refusing this.
     - `--dry-run`, `-n`: Who would want to disable this?
-    - `--protect-args`, `-s`: This actually makes transfers safer.
+    - `--seclude-args`, `-s`: Is the oldest arg-protection method.
     - `--from0`, `-0`: Makes it easier to accept/refuse `--files-from` without
       affecting this helpful modifier.
     - `--iconv`: This is auto-disabled based on "[charset](#)" parameter.

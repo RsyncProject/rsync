@@ -21,7 +21,18 @@
 - A minor tweak to rrsync added "copy-devices" to the list of known args, but
   left it disabled by default.
 
+### ENHANCEMENTS:
+
+- Rename `--protect-args` to [`--secluded-args`](#rsync.1#opt) to make it
+  clearer how it differs from the default backslash-escaped arg-protecting
+  behavior of rsync.  The old option names are still accepted.  The
+  environment-variable override did not change its name.
+
 ### PACKAGING RELATED:
+
+- The configure option `--with-protected-args` was renamed to
+  `--with-secluded-args`.  This option makes `--secluded-args` the default
+  rsync behavior instead of using backslash escaping for protecting args.
 
 - The mkgitver script now makes sure that a `.git` dir/file is in the top-level
   source dir before calling `git describe`. It also runs a basic check on the
@@ -104,7 +115,7 @@
 ### BEHAVIOR CHANGES:
 
  - A new form of arg protection was added that works similarly to the older
-   [`--protect-args`](rsync.1#opt) (`-s`) option but in a way that avoids
+   `--protect-args` ([`-s`](rsync.1#opt)) option but in a way that avoids
    breaking things like rrsync (the restricted rsync script): rsync now uses
    backslash escaping for sending "shell-active" characters to the remote
    shell. This includes spaces, so fetching a remote file via a simple quoted

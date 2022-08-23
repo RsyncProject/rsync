@@ -110,12 +110,12 @@ static void print_info_flags(enum logcode f)
 #endif
 			"xattrs",
 
-#ifdef RSYNC_USE_PROTECTED_ARGS
+#ifdef RSYNC_USE_SECLUDED_ARGS
 		"default "
 #else
 		"optional "
 #endif
-			"protect-args",
+			"secluded-args",
 
 #ifndef ICONV_OPTION
 		"no "

@@ -153,10 +153,10 @@ AC_ARG_WITH(included-popt,
 AC_ARG_WITH(included-zlib,
         AS_HELP_STRING([--with-included-zlib],[use bundled zlib library, not from system]))
 
-AC_ARG_WITH(protected-args,
-        AS_HELP_STRING([--with-protected-args],[make --protected-args option the default]))
-if test x"$with_protected_args" = x"yes"; then
-	AC_DEFINE_UNQUOTED(RSYNC_USE_PROTECTED_ARGS, 1, [Define to 1 if --protected-args should be the default])
+AC_ARG_WITH(secluded-args,
+        AS_HELP_STRING([--with-secluded-args],[make --secluded-args option the default]))
+if test x"$with_secluded_args" = x"yes"; then
+	AC_DEFINE_UNQUOTED(RSYNC_USE_SECLUDED_ARGS, 1, [Define to 1 if --secluded-args should be the default])
 fi
 
 AC_ARG_WITH(rsync-path,

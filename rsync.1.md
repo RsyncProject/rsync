@@ -464,7 +464,7 @@ has its own detailed description later in this manpage.
 --files-from=FILE        read list of source-file names from FILE
 --from0, -0              all *-from/filter files are delimited by 0s
 --old-args               disable the modern arg-protection idiom
---protect-args, -s       no space-splitting; wildcard chars only
+--secluded-args, -s      use the protocol to safely send the args
 --trust-sender           trust the remote sender's file list
 --copy-as=USER[:GROUP]   specify user & optional group for the copy
 --address=ADDRESS        bind address for outgoing socket to daemon
@@ -2334,7 +2334,7 @@ expand it.
     This would copy all the files specified in the /path/file-list file that
     was located on the remote "src" host.
 
-    If the [`--iconv`](#opt) and [`--protect-args`](#opt) options are specified
+    If the [`--iconv`](#opt) and [`--secluded-args`](#opt) options are specified
     and the `--files-from` filenames are being sent from one host to another,
     the filenames will be translated from the sending host's charset to the
     receiving host's charset.
@@ -2383,38 +2383,46 @@ expand it.
     because we can't know for sure what names to expect when the remote shell
     is interpreting the args.
 
-    This option conflicts with the [`--protect-args`](#opt) option.
+    This option conflicts with the [`--secluded-args`](#opt) option.
 
-0.  `--protect-args`, `-s`
+0.  `--secluded-args`, `-s`
 
-    This option sends all filenames and most options to the remote rsync
-    without allowing the remote shell to interpret them.  Wildcards are
-    expanded on the remote host by rsync instead of the shell doing it.
+    This option sends all filenames and most options to the remote rsync via
+    the protocol (not the remote shell command line) which avoids letting the
+    remote shell modify them.  Wildcards are expanded on the remote host by
+    rsync instead of a shell.
 
-    This is similar to the new-style backslash-escaping of args that was added
-    in 3.2.4, but supports some extra features and doesn't rely on backslash
-    escaping in the remote shell.
+    This is similar to the default backslash-escaping of args that was added
+    in 3.2.4 (see [`--old-args`](#opt)) in that it prevents things like space
+    splitting and unwanted special-character side-effects. However, it has the
+    drawbacks of being incompatible with older rsync versions (prior to 3.0.0)
+    and of being refused by restricted shells that want to be able to inspect
+    all the option values for safety.
 
-    If you use this option with [`--iconv`](#opt), the args related to the
-    remote side will also be translated from the local to the remote
-    character-set.  The translation happens before wild-cards are expanded.
-    See also the [`--files-from`](#opt) option.
+    This option is useful for those times that you need the argument's
+    character set to be converted for the remote host, if the remote shell is
+    incompatible with the default backslash-escpaing method, or there is some
+    other reason that you want the majority of the options and arguments to
+    bypass the command-line of the remote shell.
+
+    If you combine this option with [`--iconv`](#opt), the args related to the
+    remote side will be translated from the local to the remote character-set.
+    The translation happens before wild-cards are expanded.  See also the
+    [`--files-from`](#opt) option.
 
     You may also control this setting via the [`RSYNC_PROTECT_ARGS`](#)
     environment variable.  If it has a non-zero value, this setting will be
     enabled by default, otherwise it will be disabled by default.  Either state
     is overridden by a manually specified positive or negative version of this
-    option (note that `--no-s` and `--no-protect-args` are the negative
+    option (note that `--no-s` and `--no-secluded-args` are the negative
     versions).  This environment variable is also superseded by a non-zero
     [`RSYNC_OLD_ARGS`](#) export.
 
-    You may need to disable this option when interacting with an older rsync
-    (one prior to 3.0.0).
-
     This option conflicts with the [`--old-args`](#opt) option.
 
-    Note that this option is incompatible with the use of the restricted rsync
-    script (`rrsync`) since it hides options from the script's inspection.
+    This option used to be called `--protect-args` (before 3.2.6) and that
+    older name can still be used (though specifying it as `-s` is always the
+    easiest and most compatible choice).
 
 0.  `--trust-sender`
 
@@ -2922,9 +2930,8 @@ expand it.
     [`--group`](#opt) (`-g`) option (since rsync needs to have those options
     enabled for the mapping options to work).
 
-    An older rsync client may need to use [`--protect-args`](#opt) (`-s`) to
-    avoid a complaint about wildcard characters, but a modern rsync handles
-    this automatically.
+    An older rsync client may need to use [`-s`](#opt) to avoid a complaint
+    about wildcard characters, but a modern rsync handles this automatically.
 
 0.  `--chown=USER:GROUP`
 
@@ -2939,9 +2946,8 @@ expand it.
     "`--usermap=*:foo --groupmap=*:bar`", only easier (and with the same
     implied [`--owner`](#opt) and/or [`--group`](#opt) options).
 
-    An older rsync client may need to use [`--protect-args`](#opt) (`-s`) to
-    avoid a complaint about wildcard characters, but a modern rsync handles
-    this automatically.
+    An older rsync client may need to use [`-s`](#opt) to avoid a complaint
+    about wildcard characters, but a modern rsync handles this automatically.
 
 0.  `--timeout=SECONDS`
 
@@ -3645,7 +3651,7 @@ expand it.
     For a list of what charset names your local iconv library supports, you can
     run "`iconv --list`".
 
-    If you specify the [`--protect-args`](#opt) (`-s`) option, rsync will
+    If you specify the [`--secluded-args`](#opt) (`-s`) option, rsync will
     translate the filenames you specify on the command-line that are being sent
     to the remote host.  See also the [`--files-from`](#opt) option.
 
@@ -4593,17 +4599,17 @@ file is included or excluded.
     supersedes the [`RSYNC_PROTECT_ARGS`](#) variable.
 
     This variable is ignored if [`--old-args`](#opt), `--no-old-args`, or
-    [`--protect-args`](#opt) is specified on the command line.
+    [`--secluded-args`](#opt) is specified on the command line.
 
     First supported in 3.2.4.
 
 0.  `RSYNC_PROTECT_ARGS`
 
-    Specify a non-zero numeric value if you want the [`--protect-args`](#opt)
+    Specify a non-zero numeric value if you want the [`--secluded-args`](#opt)
     option to be enabled by default, or a zero value to make sure that it is
     disabled by default.
 
-    This variable is ignored if [`--protect-args`](#opt), `--no-protect-args`,
+    This variable is ignored if [`--secluded-args`](#opt), `--no-secluded-args`,
     or [`--old-args`](#opt) is specified on the command line.
 
     First supported in 3.1.0.  Starting in 3.2.4, this variable is ignored if

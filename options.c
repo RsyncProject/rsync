@@ -788,7 +788,9 @@ static struct poptOption long_options[] = {
   {"no-from0",         0,  POPT_ARG_VAL,    &eol_nulls, 0, 0, 0},
   {"old-args",         0,  POPT_ARG_NONE,   0, OPT_OLD_ARGS, 0, 0},
   {"no-old-args",      0,  POPT_ARG_VAL,    &old_style_args, 0, 0, 0},
-  {"protect-args",    's', POPT_ARG_VAL,    &protect_args, 1, 0, 0},
+  {"secluded-args",   's', POPT_ARG_VAL,    &protect_args, 1, 0, 0},
+  {"no-secluded-args", 0,  POPT_ARG_VAL,    &protect_args, 0, 0, 0},
+  {"protect-args",     0,  POPT_ARG_VAL,    &protect_args, 1, 0, 0},
   {"no-protect-args",  0,  POPT_ARG_VAL,    &protect_args, 0, 0, 0},
   {"no-s",             0,  POPT_ARG_VAL,    &protect_args, 0, 0, 0},
   {"trust-sender",     0,  POPT_ARG_VAL,    &trust_sender, 1, 0, 0},
@@ -950,7 +952,7 @@ static void set_refuse_options(void)
 		if (!am_daemon
 		 || op->shortName == 'e' /* Required for compatibility flags */
 		 || op->shortName == '0' /* --from0 just modifies --files-from, so refuse that instead (or not) */
-		 || op->shortName == 's' /* --protect-args is always OK */
+		 || op->shortName == 's' /* --secluded-args is always OK */
 		 || op->shortName == 'n' /* --dry-run is always OK */
 		 || strcmp("iconv", longName) == 0
 		 || strcmp("no-iconv", longName) == 0
@@ -1949,7 +1951,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	} else if (old_style_args) {
 		if (protect_args > 0) {
 			snprintf(err_buf, sizeof err_buf,
-				 "--protect-args conflicts with --old-args.\n");
+				 "--secluded-args conflicts with --old-args.\n");
 			return 0;
 		}
 		protect_args = 0;
@@ -1961,7 +1963,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		else if ((arg = getenv("RSYNC_PROTECT_ARGS")) != NULL && *arg)
 			protect_args = atoi(arg) ? 1 : 0;
 		else {
-#ifdef RSYNC_USE_PROTECTED_ARGS
+#ifdef RSYNC_USE_SECLUDED_ARGS
 			protect_args = 1;
 #else
 			protect_args = 0;
