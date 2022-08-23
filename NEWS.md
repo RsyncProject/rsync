@@ -23,7 +23,7 @@
 
 ### ENHANCEMENTS:
 
-- Rename `--protect-args` to [`--secluded-args`](#rsync.1#opt) to make it
+- Rename `--protect-args` to [`--secluded-args`](rsync.1#opt) to make it
   clearer how it differs from the default backslash-escaped arg-protecting
   behavior of rsync.  The old option names are still accepted.  The
   environment-variable override did not change its name.
