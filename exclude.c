@@ -454,8 +454,8 @@ void add_implied_include(const char *arg, int skip_daemon_module)
 						cp++;
 						slash_cnt--;
 						p--;
-						break;
-					}
+					} else
+						*p++ = *cp++;
 				} else
 					*p++ = *cp++;
 				break;
@@ -484,7 +484,7 @@ void add_implied_include(const char *arg, int skip_daemon_module)
 				implied_filter_list.head = rule;
 			}
 			if (DEBUG_GTE(FILTER, 3))
-				rprintf(FINFO, "[%s] add_IMPlied_include(%s)\n", who_am_i(), arg);
+				rprintf(FINFO, "[%s] add_implied_include(%s)\n", who_am_i(), arg);
 			if (saw_live_open_brkt)
 				maybe_add_literal_brackets_rule(rule, arg_len);
 			if (relative_paths && slash_cnt) {
