@@ -195,6 +195,24 @@ Dedicate a "host1-files" dir to the remote content:
 
 See the [`--trust-sender`](#opt) option for additional details.
 
+CAUTION: it is not particularly safe to use rsync to copy files from a
+case-preserving filesystem to a case-ignoring filesystem.  If you must perform
+such a copy, you should either disable symlinks via `--no-links` or enable the
+munging of symlinks via [`--munge-links`](#opt)) (and make sure you use the
+right local or remote option).  This will prevent rsync from doing potentially
+dangerous things if a symlink name overlaps with a file or directory. It does
+not, however, ensure that you get a full copy of all the files (since that may
+not be possible when the names overlap). A potentially better solution is to
+list all the source files and create a safe list of filenames that you pass to
+the [`--files-from`)(#opt) option.  Any files that conflict in name would need
+to be copied to different destination directories using more than one copy.
+
+While a copy of a case-ignoring filesystem to a case-ignoring filesystem can
+work out fairly well, if no `--delete-during` or `--delete-before` option is
+active, rsync can potentially update an existing file on the receiveing side
+without noticing that the upper-/lower-case of the filename should be changed
+to match the sender.
+
 ## ADVANCED USAGE
 
 The syntax for requesting multiple files from a remote host is done by
