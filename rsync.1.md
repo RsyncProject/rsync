@@ -224,7 +224,7 @@ the hostname omitted.  For instance, all these work:
 >     rsync -aiv host::modname/first ::extra-file{1,2} /dest/
 
 Note that a daemon connection only supports accessing one module per copy
-command, so if the first argument in a follow-up path doesn't begin with the
+command, so if the start of a follow-up path doesn't begin with the
 modname of the first path, it is assumed to be a path in the module (such as
 the extra-file1 & extra-file2 that are grabbed above).
 
@@ -260,9 +260,9 @@ that:
 
 - Use either double-colon syntax or rsync:// URL syntax instead of the
   single-colon (remote shell) syntax.
-- The first word of (at least) the first "path" is actually a module name.
-- Additional remote source args use an abbreviated syntax as discussed in
-  [ADVANCED USAGE](#).
+- The first element of the "path" is actually a module name.
+- Additional remote source args can use an abbreviated syntax that omits the
+  hostname and/or the module name, as discussed in [ADVANCED USAGE](#).
 - The remote daemon may print a "message of the day" when you connect.
 - If you specify only the host (with no module or path) then a list of
   accessible modules on the daemon is output.
