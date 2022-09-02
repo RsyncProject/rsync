@@ -221,7 +221,12 @@ the hostname omitted.  For instance, all these work:
 
 >     rsync -aiv host:file1 :file2 host:file{3,4} /dest/
 >     rsync -aiv host::modname/file{1,2} host::modname/extra /dest/
->     rsync -aiv host::modname/first ::modname/extra{1,2} /dest/
+>     rsync -aiv host::modname/first ::extra-file{1,2} /dest/
+
+Note that a daemon connection only supports accessing one module per copy
+command, so if the first argument in a follow-up path doesn't begin with the
+modname of the first path, it is assumed to be a path in the module (such as
+the extra-file1 & extra-file2 that are grabbed above).
 
 Really old versions of rsync (2.6.9 and before) only allowed specifying one
 remote-source arg, so some people have instead relied on the remote-shell
@@ -253,17 +258,19 @@ section below for information on that.)
 Using rsync in this way is the same as using it with a remote shell except
 that:
 
-- you either use a double colon :: instead of a single colon to separate the
-  hostname from the path, or you use an rsync:// URL.
-- the first word of the "path" is actually a module name.
-- the remote daemon may print a message of the day when you connect.
-- if you specify no path name on the remote daemon then the list of accessible
-  paths on the daemon will be shown.
-- if you specify no local destination then a listing of the specified files on
-  the remote daemon is provided.
-- you must not specify the [`--rsh`](#opt) (`-e`) option (since that overrides
-  the daemon connection to use ssh -- see [USING RSYNC-DAEMON FEATURES VIA A
-  REMOTE-SHELL CONNECTION](#) below).
+- Use either double-colon syntax or rsync:// URL syntax instead of the
+  single-colon (remote shell) syntax.
+- The first word of (at least) the first "path" is actually a module name.
+- Additional remote source args use an abbreviated syntax as discussed in
+  [ADVANCED USAGE](#).
+- The remote daemon may print a "message of the day" when you connect.
+- If you specify only the host (with no module or path) then a list of
+  accessible modules on the daemon is output.
+- If you specify a remote source path but no destination, a listing of the
+  matching files on the remote daemon is output.
+- The [`--rsh`](#opt) (`-e`) option must be omitted to avoid changing the
+  connection style from using a socket connection to [USING RSYNC-DAEMON
+  FEATURES VIA A REMOTE-SHELL CONNECTION](#).
 
 An example that copies all the files in a remote module named "src":
 
