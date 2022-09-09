@@ -105,6 +105,8 @@ def main():
         if not re.match(r'^del', ans, flags=re.I):
             die("Aborted")
         cmd_chk(['git', 'tag', '-d', v_ver])
+        if os.path.isdir('patches/.git'):
+            cmd_chk(f"cd patches && git tag -d '{v_ver}'")
 
     version = re.sub(r'[-.]*pre[-.]*', 'pre', version)
     if 'pre' in version and not curversion.endswith('dev'):
