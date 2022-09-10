@@ -30,15 +30,21 @@ def main():
         elif line.startswith('  '):
             if not saw_comma and ',' in line:
                 saw_comma = True
+                info[sect_name] = { }
             if saw_comma:
-                lst = line.strip(' ,').split(', ')
+                for x in line.strip(' ,').split(', '):
+                    if ' ' in x:
+                        val, var = x.split(' ', 1)
+                        var = var.replace(' ', '_')
+                        info[sect_name][var] = False if val == 'no' else val
+                    else:
+                        info[sect_name][x] = True
             else:
-                lst = [ x for x in line.split() if not x.startswith('(') ]
-            info[sect_name] += lst
+                info[sect_name] += [ x for x in line.split() if not x.startswith('(') ]
         elif line == '':
             break
         else:
-            sect_name = line.strip(" \n:").replace(' ', '_').lower()
+            sect_name = line.strip(' :').replace(' ', '_').lower()
             info[sect_name] = [ ]
             saw_comma = False
     for chk in 'checksum_list compress_list daemon_auth_list'.split():

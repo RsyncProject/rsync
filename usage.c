@@ -38,7 +38,7 @@ static void print_info_flags(enum logcode f)
 {
 	STRUCT_STAT *dumstat;
 	BOOL as_json = f == FNONE ? 1 : 0; /* We use 1 == first attribute, 2 == need closing array */
-	char line_buf[75], *quot = as_json ? "\"" : "";
+	char line_buf[75], item_buf[32];
 	int line_len, j;
 	char *info_flags[] = {
 
@@ -165,9 +165,25 @@ static void print_info_flags(enum logcode f)
 
 	for (line_len = 0, j = 0; ; j++) {
 		char *str = info_flags[j], *next_nfo = str ? info_flags[j+1] : NULL;
-		int str_len = str && *str != '*' ? strlen(str) + (as_json ? 2 : 0) : 1000;
 		int need_comma = next_nfo && *next_nfo != '*' ? 1 : 0;
-		if (line_len && line_len + 1 + str_len + need_comma >= (int)sizeof line_buf) {
+		int item_len;
+		if (!str || *str == '*')
+			item_len = 1000;
+		else if (as_json) {
+			char *space = strchr(str, ' ');
+			int is_no = space && strncmp(str, "no ", 3) == 0;
+			char *quot = space && !is_no ? "\"" : "";
+			char *item = space ? space + 1 : str;
+			char *val = !space ? "true" : is_no ? "false" : str;
+			int val_len = !space ? 4 : is_no ? 5 : space - str;
+			item_len = snprintf(item_buf, sizeof item_buf,
+					   " \"%s\": %s%.*s%s%s", item, quot, val_len, val, quot,
+					   need_comma ? "," : "");
+			for (space = item; (space = strchr(space, ' ')) != NULL; space++)
+				item_buf[space - item + 2] = '_';
+		} else
+			item_len = snprintf(item_buf, sizeof item_buf, " %s%s", str, need_comma ? "," : "");
+		if (line_len && line_len + item_len >= (int)sizeof line_buf) {
 			if (as_json)
 				printf("   %s\n", line_buf);
 			else
@@ -179,19 +195,19 @@ static void print_info_flags(enum logcode f)
 		if (*str == '*') {
 			if (as_json) {
 				if (as_json == 2)
-					printf("  ]");
+					printf("  }");
 				else
 					as_json = 2;
-				printf(",\n  \"%c%s\": [\n", toLower(str+1), str+2);
+				printf(",\n  \"%c%s\": {\n", toLower(str+1), str+2);
 			} else
 				rprintf(f, "%s:\n", str+1);
-			continue;
+		} else {
+			strlcpy(line_buf + line_len, item_buf, sizeof line_buf - line_len);
+			line_len += item_len;
 		}
-		line_len += snprintf(line_buf+line_len, sizeof line_buf - line_len,
-				     " %s%s%s%s", quot, str, quot, need_comma ? "," : "");
 	}
 	if (as_json == 2)
-		printf("  ]");
+		printf("  }");
 }
 
 static void output_nno_list(enum logcode f, const char *name, struct name_num_obj *nno)
