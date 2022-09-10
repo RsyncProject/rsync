@@ -67,6 +67,7 @@ extern uid_t our_uid;
 extern gid_t our_gid;
 
 char *auth_user;
+char *daemon_auth_choices;
 int read_only = 0;
 int module_id = -1;
 int pid_file_fd = -1;
@@ -149,13 +150,9 @@ int start_socket_client(char *host, int remote_argc, char *remote_argv[],
 static int exchange_protocols(int f_in, int f_out, char *buf, size_t bufsiz, int am_client)
 {
 	int remote_sub = -1;
-#if SUBPROTOCOL_VERSION != 0
-	int our_sub = protocol_version < PROTOCOL_VERSION ? 0 : SUBPROTOCOL_VERSION;
-#else
-	int our_sub = 0;
-#endif
+	int our_sub = get_subprotocol_version();
 
-	io_printf(f_out, "@RSYNCD: %d.%d\n", protocol_version, our_sub);
+	output_daemon_greeting(f_out, am_client);
 	if (!am_client) {
 		char *motd = lp_motd_file();
 		if (motd && *motd) {
@@ -195,6 +192,14 @@ static int exchange_protocols(int f_in, int f_out, char *buf, size_t bufsiz, int
 			return -1;
 		}
 		remote_sub = 0;
+	}
+
+	daemon_auth_choices = strchr(buf + 9, ' ');
+	if (daemon_auth_choices) {
+		char *cp;
+		daemon_auth_choices = strdup(daemon_auth_choices + 1);
+		if ((cp = strchr(daemon_auth_choices, '\n')) != NULL)
+			*cp = '\0';
 	}
 
 	if (protocol_version > remote_protocol) {
@@ -429,7 +434,7 @@ static int read_arg_from_pipe(int fd, char *buf, int limit)
 }
 #endif
 
-static void set_env_str(const char *var, const char *str)
+void set_env_str(const char *var, const char *str)
 {
 #ifdef HAVE_SETENV
 	if (setenv(var, str, 1) < 0)

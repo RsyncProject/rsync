@@ -42,49 +42,82 @@ extern int protocol_version;
 extern int proper_seed_order;
 extern const char *checksum_choice;
 
+#define NNI_BUILTIN (1<<0)
+#define NNI_EVP (1<<1)
+#define NNI_EVP_OK (1<<2)
+
 struct name_num_item valid_checksums_items[] = {
 #ifdef SUPPORT_XXH3
-	{ CSUM_XXH3_128, "xxh128", NULL },
-	{ CSUM_XXH3_64, "xxh3", NULL },
+	{ CSUM_XXH3_128, 0, "xxh128", NULL },
+	{ CSUM_XXH3_64, 0, "xxh3", NULL },
 #endif
 #ifdef SUPPORT_XXHASH
-	{ CSUM_XXH64, "xxh64", NULL },
-	{ CSUM_XXH64, "xxhash", NULL },
+	{ CSUM_XXH64, 0, "xxh64", NULL },
+	{ CSUM_XXH64, 0, "xxhash", NULL },
 #endif
-	{ CSUM_MD5, "md5", NULL },
-	{ CSUM_MD4, "md4", NULL },
-	{ CSUM_NONE, "none", NULL },
-	{ 0, NULL, NULL }
+	{ CSUM_MD5, NNI_BUILTIN|NNI_EVP, "md5", NULL },
+	{ CSUM_MD4, NNI_BUILTIN|NNI_EVP, "md4", NULL },
+	{ CSUM_NONE, 0, "none", NULL },
+	{ 0, 0, NULL, NULL }
 };
 
 struct name_num_obj valid_checksums = {
-	"checksum", NULL, NULL, 0, 0, valid_checksums_items
+	"checksum", NULL, 0, 0, valid_checksums_items
 };
 
-int xfersum_type = 0; /* used for the file transfer checksums */
-int checksum_type = 0; /* used for the pre-transfer (--checksum) checksums */
+struct name_num_item valid_auth_checksums_items[] = {
+	{ CSUM_MD5, NNI_BUILTIN|NNI_EVP, "md5", NULL },
+	{ CSUM_MD4, NNI_BUILTIN|NNI_EVP, "md4", NULL },
+	{ 0, 0, NULL, NULL }
+};
 
+struct name_num_obj valid_auth_checksums = {
+	"daemon auth checksum", NULL, 0, 0, valid_auth_checksums_items
+};
+
+/* These cannot make use of openssl, so they're marked just as built-in */
+struct name_num_item implied_checksum_md4 =
+    { CSUM_MD4, NNI_BUILTIN, "md4", NULL };
+struct name_num_item implied_checksum_md5 =
+    { CSUM_MD5, NNI_BUILTIN, "md5", NULL };
+
+struct name_num_item *xfer_sum_nni; /* used for the transfer checksum2 computations */
+const EVP_MD *xfer_sum_evp_md;
+int xfer_sum_len;
+struct name_num_item *file_sum_nni; /* used for the pre-transfer --checksum computations */
+const EVP_MD *file_sum_evp_md;
+int file_sum_len;
+
+#ifdef USE_OPENSSL
+EVP_MD_CTX *ctx_evp = NULL;
+#endif
 static int initialized_choices = 0;
 
-int parse_csum_name(const char *name, int len)
+struct name_num_item *parse_csum_name(const char *name, int len)
 {
 	struct name_num_item *nni;
 
 	if (len < 0 && name)
 		len = strlen(name);
 
-	if (!name || (len == 4 && strncasecmp(name, "auto", 4) == 0)) {
-		if (protocol_version >= 30)
-			return CSUM_MD5;
-		if (protocol_version >= 27)
-			return CSUM_MD4_OLD;
-		if (protocol_version >= 21)
-			return CSUM_MD4_BUSTED;
-		return CSUM_MD4_ARCHAIC;
-	}
+	init_checksum_choices();
 
-	if (!initialized_choices)
-		init_checksum_choices();
+	if (!name || (len == 4 && strncasecmp(name, "auto", 4) == 0)) {
+		if (protocol_version >= 30) {
+			if (!proper_seed_order)
+				return &implied_checksum_md5;
+			name = "md5";
+			len = 3;
+		} else {
+			if (protocol_version >= 27)
+				implied_checksum_md4.num = CSUM_MD4_OLD;
+			else if (protocol_version >= 21)
+				implied_checksum_md4.num = CSUM_MD4_BUSTED;
+			else
+				implied_checksum_md4.num = CSUM_MD4_ARCHAIC;
+			return &implied_checksum_md4;
+		}
+	}
 
 	nni = get_nni_by_name(&valid_checksums, name, len);
 
@@ -93,44 +126,72 @@ int parse_csum_name(const char *name, int len)
 		exit_cleanup(RERR_UNSUPPORTED);
 	}
 
-	return nni->num;
+	return nni;
 }
 
-static const char *checksum_name(int num)
+static const EVP_MD *csum_evp_md(struct name_num_item *nni)
 {
-	struct name_num_item *nni = get_nni_by_num(&valid_checksums, num);
+#ifdef USE_OPENSSL
+	const EVP_MD *emd;
+	if (!(nni->flags & NNI_EVP))
+		return NULL;
 
-	return nni ? nni->name : num < CSUM_MD4 ? "md4" : "UNKNOWN";
+#ifdef USE_MD5_ASM
+	if (nni->num == CSUM_MD5)
+		emd = NULL;
+	else
+#endif
+		emd = EVP_get_digestbyname(nni->name);                                               
+	if (emd && !(nni->flags & NNI_EVP_OK)) { /* Make sure it works before we advertise it */
+		if (!ctx_evp && !(ctx_evp = EVP_MD_CTX_create()))
+			out_of_memory("csum_evp_md");
+		/* Some routines are marked as legacy and are not enabled in the openssl.cnf file.
+		 * If we can't init the emd, we'll fall back to our built-in code. */
+		if (EVP_DigestInit_ex(ctx_evp, emd, NULL) == 0)
+			emd = NULL;
+		else
+			nni->flags = (nni->flags & ~NNI_BUILTIN) | NNI_EVP_OK;
+	}
+	if (!emd)
+		nni->flags &= ~NNI_EVP;
+	return emd;
+#else
+	return NULL;
+#endif
 }
 
 void parse_checksum_choice(int final_call)
 {
-	if (valid_checksums.negotiated_name)
-		xfersum_type = checksum_type = valid_checksums.negotiated_num;
+	if (valid_checksums.negotiated_nni)
+		xfer_sum_nni = file_sum_nni = valid_checksums.negotiated_nni;
 	else {
 		char *cp = checksum_choice ? strchr(checksum_choice, ',') : NULL;
 		if (cp) {
-			xfersum_type = parse_csum_name(checksum_choice, cp - checksum_choice);
-			checksum_type = parse_csum_name(cp+1, -1);
+			xfer_sum_nni = parse_csum_name(checksum_choice, cp - checksum_choice);
+			file_sum_nni = parse_csum_name(cp+1, -1);
 		} else
-			xfersum_type = checksum_type = parse_csum_name(checksum_choice, -1);
+			xfer_sum_nni = file_sum_nni = parse_csum_name(checksum_choice, -1);
 		if (am_server && checksum_choice)
-			validate_choice_vs_env(NSTR_CHECKSUM, xfersum_type, checksum_type);
+			validate_choice_vs_env(NSTR_CHECKSUM, xfer_sum_nni->num, file_sum_nni->num);
 	}
+	xfer_sum_len = csum_len_for_type(xfer_sum_nni->num, 0);
+	file_sum_len = csum_len_for_type(file_sum_nni->num, 0);
+	xfer_sum_evp_md = csum_evp_md(xfer_sum_nni);
+	file_sum_evp_md = csum_evp_md(file_sum_nni);
 
-	if (xfersum_type == CSUM_NONE)
+	if (xfer_sum_nni->num == CSUM_NONE)
 		whole_file = 1;
 
 	/* Snag the checksum name for both write_batch's option output & the following debug output. */
-	if (valid_checksums.negotiated_name)
-		checksum_choice = valid_checksums.negotiated_name;
+	if (valid_checksums.negotiated_nni)
+		checksum_choice = valid_checksums.negotiated_nni->name;
 	else if (checksum_choice == NULL)
-		checksum_choice = checksum_name(xfersum_type);
+		checksum_choice = xfer_sum_nni->name;
 
 	if (final_call && DEBUG_GTE(NSTR, am_server ? 3 : 1)) {
 		rprintf(FINFO, "%s%s checksum: %s\n",
 			am_server ? "Server" : "Client",
-			valid_checksums.negotiated_name ? " negotiated" : "",
+			valid_checksums.negotiated_nni ? " negotiated" : "",
 			checksum_choice);
 	}
 }
@@ -211,7 +272,22 @@ uint32 get_checksum1(char *buf1, int32 len)
 
 void get_checksum2(char *buf, int32 len, char *sum)
 {
-	switch (xfersum_type) {
+#ifdef USE_OPENSSL
+	if (xfer_sum_evp_md) {
+		static EVP_MD_CTX *evp = NULL;
+		uchar seedbuf[4];
+		if (!evp && !(evp = EVP_MD_CTX_create()))
+			out_of_memory("get_checksum2");
+		EVP_DigestInit_ex(evp, xfer_sum_evp_md, NULL);
+		if (checksum_seed) {
+			SIVALu(seedbuf, 0, checksum_seed);
+			EVP_DigestUpdate(evp, seedbuf, 4);
+		}
+		EVP_DigestUpdate(evp, (uchar *)buf, len);
+		EVP_DigestFinal_ex(evp, (uchar *)sum, NULL);
+	} else
+#endif
+	switch (xfer_sum_nni->num) {
 #ifdef SUPPORT_XXHASH
 	  case CSUM_XXH64:
 		SIVAL64(sum, 0, XXH64(buf, len, checksum_seed));
@@ -229,7 +305,7 @@ void get_checksum2(char *buf, int32 len, char *sum)
 	  }
 #endif
 	  case CSUM_MD5: {
-		md5_context m5;
+		md_context m5;
 		uchar seedbuf[4];
 		md5_begin(&m5);
 		if (proper_seed_order) {
@@ -249,20 +325,6 @@ void get_checksum2(char *buf, int32 len, char *sum)
 		break;
 	  }
 	  case CSUM_MD4:
-#ifdef USE_OPENSSL
-	  {
-		MD4_CTX m4;
-		MD4_Init(&m4);
-		MD4_Update(&m4, (uchar *)buf, len);
-		if (checksum_seed) {
-			uchar seedbuf[4];
-			SIVALu(seedbuf, 0, checksum_seed);
-			MD4_Update(&m4, seedbuf, 4);
-		}
-		MD4_Final((uchar *)sum, &m4);
-		break;
-	  }
-#endif
 	  case CSUM_MD4_OLD:
 	  case CSUM_MD4_BUSTED:
 	  case CSUM_MD4_ARCHAIC: {
@@ -295,7 +357,7 @@ void get_checksum2(char *buf, int32 len, char *sum)
 		 * are multiples of 64.  This is fixed by calling mdfour_update()
 		 * even when there are no more bytes.
 		 */
-		if (len - i > 0 || xfersum_type > CSUM_MD4_BUSTED)
+		if (len - i > 0 || xfer_sum_nni->num > CSUM_MD4_BUSTED)
 			mdfour_update(&m, (uchar *)(buf1+i), len-i);
 
 		mdfour_result(&m, (uchar *)sum);
@@ -313,15 +375,33 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 	int32 remainder;
 	int fd;
 
-	memset(sum, 0, MAX_DIGEST_LEN);
-
 	fd = do_open(fname, O_RDONLY, 0);
-	if (fd == -1)
+	if (fd == -1) {
+		memset(sum, 0, file_sum_len);
 		return;
+	}
 
 	buf = map_file(fd, len, MAX_MAP_SIZE, CHUNK_SIZE);
 
-	switch (checksum_type) {
+#ifdef USE_OPENSSL
+	if (file_sum_evp_md) {
+		static EVP_MD_CTX *evp = NULL;
+		if (!evp && !(evp = EVP_MD_CTX_create()))
+			out_of_memory("file_checksum");
+
+		EVP_DigestInit_ex(evp, file_sum_evp_md, NULL);
+
+		for (i = 0; i + CHUNK_SIZE <= len; i += CHUNK_SIZE)
+			EVP_DigestUpdate(evp, (uchar *)map_ptr(buf, i, CHUNK_SIZE), CHUNK_SIZE);
+
+		remainder = (int32)(len - i);
+		if (remainder > 0)
+			EVP_DigestUpdate(evp, (uchar *)map_ptr(buf, i, remainder), remainder);
+
+		EVP_DigestFinal_ex(evp, (uchar *)sum, NULL);
+	} else
+#endif
+	switch (file_sum_nni->num) {
 #ifdef SUPPORT_XXHASH
 	  case CSUM_XXH64: {
 		static XXH64_state_t* state = NULL;
@@ -381,7 +461,7 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 	  }
 #endif
 	  case CSUM_MD5: {
-		md5_context m5;
+		md_context m5;
 
 		md5_begin(&m5);
 
@@ -396,23 +476,6 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 		break;
 	  }
 	  case CSUM_MD4:
-#ifdef USE_OPENSSL
-	  {
-		MD4_CTX m4;
-
-		MD4_Init(&m4);
-
-		for (i = 0; i + CHUNK_SIZE <= len; i += CHUNK_SIZE)
-			MD4_Update(&m4, (uchar *)map_ptr(buf, i, CHUNK_SIZE), CHUNK_SIZE);
-
-		remainder = (int32)(len - i);
-		if (remainder > 0)
-			MD4_Update(&m4, (uchar *)map_ptr(buf, i, remainder), remainder);
-
-		MD4_Final((uchar *)sum, &m4);
-		break;
-	  }
-#endif
 	  case CSUM_MD4_OLD:
 	  case CSUM_MD4_BUSTED:
 	  case CSUM_MD4_ARCHAIC: {
@@ -428,7 +491,7 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 		 * are multiples of 64.  This is fixed by calling mdfour_update()
 		 * even when there are no more bytes. */
 		remainder = (int32)(len - i);
-		if (remainder > 0 || checksum_type > CSUM_MD4_BUSTED)
+		if (remainder > 0 || file_sum_nni->num > CSUM_MD4_BUSTED)
 			mdfour_update(&m, (uchar *)map_ptr(buf, i, remainder), remainder);
 
 		mdfour_result(&m, (uchar *)sum);
@@ -436,7 +499,7 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 	  }
 	  default:
 		rprintf(FERROR, "Invalid checksum-choice for --checksum: %s (%d)\n",
-			checksum_name(checksum_type), checksum_type);
+			file_sum_nni->name, file_sum_nni->num);
 		exit_cleanup(RERR_UNSUPPORTED);
 	}
 
@@ -445,30 +508,35 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 }
 
 static int32 sumresidue;
-static union {
-	md_context md;
-#ifdef USE_OPENSSL
-	MD4_CTX m4;
-#endif
-	md5_context m5;
-} ctx;
+static md_context ctx_md;
 #ifdef SUPPORT_XXHASH
 static XXH64_state_t* xxh64_state;
 #endif
 #ifdef SUPPORT_XXH3
 static XXH3_state_t* xxh3_state;
 #endif
-static int cursum_type;
+static struct name_num_item *cur_sum_nni;
+static const EVP_MD *cur_sum_evp_md;
+int cur_sum_len;
 
-void sum_init(int csum_type, int seed)
+int sum_init(struct name_num_item *nni, int seed)
 {
 	char s[4];
 
-	if (csum_type < 0)
-		csum_type = parse_csum_name(NULL, 0);
-	cursum_type = csum_type;
+	if (!nni)
+		nni = parse_csum_name(NULL, 0);
+	cur_sum_nni = nni;
+	cur_sum_len = csum_len_for_type(nni->num, 0);
+	cur_sum_evp_md = csum_evp_md(nni);
 
-	switch (csum_type) {
+#ifdef USE_OPENSSL
+	if (cur_sum_evp_md) {
+		if (!ctx_evp && !(ctx_evp = EVP_MD_CTX_create()))
+			out_of_memory("file_checksum");
+		EVP_DigestInit_ex(ctx_evp, cur_sum_evp_md, NULL);
+	} else
+#endif
+	switch (cur_sum_nni->num) {
 #ifdef SUPPORT_XXHASH
 	  case CSUM_XXH64:
 		if (!xxh64_state && !(xxh64_state = XXH64_createState()))
@@ -489,20 +557,16 @@ void sum_init(int csum_type, int seed)
 		break;
 #endif
 	  case CSUM_MD5:
-		md5_begin(&ctx.m5);
+		md5_begin(&ctx_md);
 		break;
 	  case CSUM_MD4:
-#ifdef USE_OPENSSL
-		MD4_Init(&ctx.m4);
-#else
-		mdfour_begin(&ctx.md);
+		mdfour_begin(&ctx_md);
 		sumresidue = 0;
-#endif
 		break;
 	  case CSUM_MD4_OLD:
 	  case CSUM_MD4_BUSTED:
 	  case CSUM_MD4_ARCHAIC:
-		mdfour_begin(&ctx.md);
+		mdfour_begin(&ctx_md);
 		sumresidue = 0;
 		SIVAL(s, 0, seed);
 		sum_update(s, 4);
@@ -512,6 +576,8 @@ void sum_init(int csum_type, int seed)
 	  default: /* paranoia to prevent missing case values */
 		exit_cleanup(RERR_UNSUPPORTED);
 	}
+
+	return cur_sum_len;
 }
 
 /**
@@ -524,7 +590,12 @@ void sum_init(int csum_type, int seed)
  **/
 void sum_update(const char *p, int32 len)
 {
-	switch (cursum_type) {
+#ifdef USE_OPENSSL
+	if (cur_sum_evp_md) {
+		EVP_DigestUpdate(ctx_evp, (uchar *)p, len);
+	} else
+#endif
+	switch (cur_sum_nni->num) {
 #ifdef SUPPORT_XXHASH
 	  case CSUM_XXH64:
 		XXH64_update(xxh64_state, p, len);
@@ -539,39 +610,35 @@ void sum_update(const char *p, int32 len)
 		break;
 #endif
 	  case CSUM_MD5:
-		md5_update(&ctx.m5, (uchar *)p, len);
+		md5_update(&ctx_md, (uchar *)p, len);
 		break;
 	  case CSUM_MD4:
-#ifdef USE_OPENSSL
-		MD4_Update(&ctx.m4, (uchar *)p, len);
-		break;
-#endif
 	  case CSUM_MD4_OLD:
 	  case CSUM_MD4_BUSTED:
 	  case CSUM_MD4_ARCHAIC:
 		if (len + sumresidue < CSUM_CHUNK) {
-			memcpy(ctx.md.buffer + sumresidue, p, len);
+			memcpy(ctx_md.buffer + sumresidue, p, len);
 			sumresidue += len;
 			break;
 		}
 
 		if (sumresidue) {
 			int32 i = CSUM_CHUNK - sumresidue;
-			memcpy(ctx.md.buffer + sumresidue, p, i);
-			mdfour_update(&ctx.md, (uchar *)ctx.md.buffer, CSUM_CHUNK);
+			memcpy(ctx_md.buffer + sumresidue, p, i);
+			mdfour_update(&ctx_md, (uchar *)ctx_md.buffer, CSUM_CHUNK);
 			len -= i;
 			p += i;
 		}
 
 		while (len >= CSUM_CHUNK) {
-			mdfour_update(&ctx.md, (uchar *)p, CSUM_CHUNK);
+			mdfour_update(&ctx_md, (uchar *)p, CSUM_CHUNK);
 			len -= CSUM_CHUNK;
 			p += CSUM_CHUNK;
 		}
 
 		sumresidue = len;
 		if (sumresidue)
-			memcpy(ctx.md.buffer, p, sumresidue);
+			memcpy(ctx_md.buffer, p, sumresidue);
 		break;
 	  case CSUM_NONE:
 		break;
@@ -580,13 +647,18 @@ void sum_update(const char *p, int32 len)
 	}
 }
 
-/* NOTE: all the callers of sum_end() pass in a pointer to a buffer that is
- * MAX_DIGEST_LEN in size, so even if the csum-len is shorter than that (i.e.
- * CSUM_MD4_ARCHAIC), we don't have to worry about limiting the data we write
- * into the "sum" buffer. */
-int sum_end(char *sum)
+/* The sum buffer only needs to be as long as the current checksum's digest
+ * len, not MAX_DIGEST_LEN. Note that for CSUM_MD4_ARCHAIC that is the full
+ * MD4_DIGEST_LEN even if the file-list code is going to ignore all but the
+ * first 2 bytes of it. */
+void sum_end(char *sum)
 {
-	switch (cursum_type) {
+#ifdef USE_OPENSSL
+	if (cur_sum_evp_md) {
+		EVP_DigestFinal_ex(ctx_evp, (uchar *)sum, NULL);
+	} else
+#endif
+	switch (cur_sum_nni->num) {
 #ifdef SUPPORT_XXHASH
 	  case CSUM_XXH64:
 		SIVAL64(sum, 0, XXH64_digest(xxh64_state));
@@ -604,22 +676,18 @@ int sum_end(char *sum)
 	  }
 #endif
 	  case CSUM_MD5:
-		md5_result(&ctx.m5, (uchar *)sum);
+		md5_result(&ctx_md, (uchar *)sum);
 		break;
 	  case CSUM_MD4:
-#ifdef USE_OPENSSL
-		MD4_Final((uchar *)sum, &ctx.m4);
-		break;
-#endif
 	  case CSUM_MD4_OLD:
-		mdfour_update(&ctx.md, (uchar *)ctx.md.buffer, sumresidue);
-		mdfour_result(&ctx.md, (uchar *)sum);
+		mdfour_update(&ctx_md, (uchar *)ctx_md.buffer, sumresidue);
+		mdfour_result(&ctx_md, (uchar *)sum);
 		break;
 	  case CSUM_MD4_BUSTED:
 	  case CSUM_MD4_ARCHAIC:
 		if (sumresidue)
-			mdfour_update(&ctx.md, (uchar *)ctx.md.buffer, sumresidue);
-		mdfour_result(&ctx.md, (uchar *)sum);
+			mdfour_update(&ctx_md, (uchar *)ctx_md.buffer, sumresidue);
+		mdfour_result(&ctx_md, (uchar *)sum);
 		break;
 	  case CSUM_NONE:
 		*sum = '\0';
@@ -627,34 +695,72 @@ int sum_end(char *sum)
 	  default: /* paranoia to prevent missing case values */
 		exit_cleanup(RERR_UNSUPPORTED);
 	}
-
-	return csum_len_for_type(cursum_type, 0);
 }
+
+#if defined SUPPORT_XXH3 || defined USE_OPENSSL
+static void verify_digest(struct name_num_item *nni, BOOL check_auth_list)
+{
+#ifdef SUPPORT_XXH3
+	static int xxh3_result = 0;
+#endif
+#ifdef USE_OPENSSL
+	static int prior_num = 0, prior_flags = 0, prior_result = 0;
+#endif
+
+#ifdef SUPPORT_XXH3
+	if (nni->num == CSUM_XXH3_64 || nni->num == CSUM_XXH3_128) {
+		if (!xxh3_result) {
+			char buf[32816];
+			int j;
+			for (j = 0; j < (int)sizeof buf; j++)
+				buf[j] = ' ' + (j % 96);
+			sum_init(nni, 0);
+			sum_update(buf, 32816);
+			sum_update(buf, 31152);
+			sum_update(buf, 32474);
+			sum_update(buf, 9322);
+			xxh3_result = XXH3_64bits_digest(xxh3_state) != 0xadbcf16d4678d1de ? -1 : 1;
+		}
+		if (xxh3_result < 0)
+			nni->num = CSUM_gone;
+		return;
+	}
+#endif
+
+#ifdef USE_OPENSSL
+	if (BITS_SETnUNSET(nni->flags, NNI_EVP, NNI_BUILTIN|NNI_EVP_OK)) {
+		if (nni->num == prior_num && nni->flags == prior_flags) {
+			nni->flags = prior_result;
+			if (!(nni->flags & NNI_EVP))
+				nni->num = CSUM_gone;
+		} else {
+			prior_num = nni->num;
+			prior_flags = nni->flags;
+			if (!csum_evp_md(nni))
+				nni->num = CSUM_gone;
+			prior_result = nni->flags;
+			if (check_auth_list && (nni = get_nni_by_num(&valid_auth_checksums, prior_num)) != NULL)
+				verify_digest(nni, False);
+		}
+	}
+#endif
+}
+#endif
 
 void init_checksum_choices()
 {
-#ifdef SUPPORT_XXH3
-	char buf[32816];
-	int j;
-	for (j = 0; j < (int)sizeof buf; j++) {
-		buf[j] = ' ' + (j % 96);
-	}
-	sum_init(CSUM_XXH3_64, 0);
-	sum_update(buf, 32816);
-	sum_update(buf, 31152);
-	sum_update(buf, 32474);
-	sum_update(buf, 9322);
-	if (XXH3_64bits_digest(xxh3_state) != 0xadbcf16d4678d1de) {
-		int t, f;
-		struct name_num_item *nni = valid_checksums.list;
-		for (t = f = 0; nni[f].name; f++) {
-			if (nni[f].num == CSUM_XXH3_64 || nni[f].num == CSUM_XXH3_128)
-				continue;
-			if (t != f)
-				nni[t++] = nni[f];
-		}
-		nni[t].name = NULL;
-	}
+	struct name_num_item *nni;
+
+	if (initialized_choices)
+		return;
+
+#if defined SUPPORT_XXH3 || defined USE_OPENSSL
+	for (nni = valid_checksums.list; nni->name; nni++)
+		verify_digest(nni, True);
+
+	for (nni = valid_auth_checksums.list; nni->name; nni++)
+		verify_digest(nni, False);
 #endif
+
 	initialized_choices = 1;
 }

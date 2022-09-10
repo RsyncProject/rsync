@@ -23,8 +23,7 @@
 #include "git-version.h"
 #include "default-cvsignore.h"
 
-extern struct name_num_obj valid_checksums;
-extern struct name_num_obj valid_compressions;
+extern struct name_num_obj valid_checksums, valid_compressions, valid_auth_checksums;
 
 static char *istring(const char *fmt, int val)
 {
@@ -203,6 +202,10 @@ void print_rsync_version(enum logcode f)
 
 	rprintf(f, "Compress list:\n");
 	get_default_nno_list(&valid_compressions, tmpbuf, sizeof tmpbuf, '(');
+	rprintf(f, "    %s\n", tmpbuf);
+
+	rprintf(f, "Daemon auth list:\n");
+	get_default_nno_list(&valid_auth_checksums, tmpbuf, sizeof tmpbuf, '(');
 	rprintf(f, "    %s\n", tmpbuf);
 
 #ifdef MAINTAINER_MODE

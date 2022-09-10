@@ -136,6 +136,16 @@ if test x"$GCC" = x"yes"; then
 	CFLAGS="$CFLAGS -Wall -W"
 fi
 
+AC_ARG_WITH(openssl-conf,
+	AS_HELP_STRING([--with-openssl-conf=PATH],[set default OPENSSL_CONF path for rsync]))
+case "$with_openssl_conf" in
+    *[^-/a-zA-Z0-9.,=@+_]*) AC_MSG_ERROR([Invalid path given to --with-openssl-conf]) ;;
+    /*) CFLAGS="$CFLAGS -DSET_OPENSSL_CONF=$with_openssl_conf" ;;
+    no|'') ;;
+    yes) AC_MSG_ERROR([No path given to --with-openssl-conf]) ;;
+    *) AC_MSG_ERROR([Non absolute path given to --with-openssl-conf]) ;;
+esac
+
 AC_ARG_WITH(rrsync,
         AS_HELP_STRING([--with-rrsync],[also install the rrsync script and its manpage]))
 if test x"$with_rrsync" != x"yes"; then

@@ -826,6 +826,7 @@ extern int uid_ndx;
 extern int gid_ndx;
 extern int acls_ndx;
 extern int xattrs_ndx;
+extern int file_sum_len;
 
 #ifdef USE_FLEXIBLE_ARRAY
 #define FILE_STRUCT_LEN (sizeof (struct file_struct))
@@ -836,7 +837,7 @@ extern int xattrs_ndx;
 #define DEV_EXTRA_CNT 2
 #define DIRNODE_EXTRA_CNT 3
 #define EXTRA64_CNT ((sizeof (union file_extras64) + EXTRA_LEN - 1) / EXTRA_LEN)
-#define SUM_EXTRA_CNT ((MAX_DIGEST_LEN + EXTRA_LEN - 1) / EXTRA_LEN)
+#define SUM_EXTRA_CNT ((file_sum_len + EXTRA_LEN - 1) / EXTRA_LEN)
 
 #define REQ_EXTRA(f,ndx) ((union file_extras*)(f) - (ndx))
 #define OPT_EXTRA(f,bump) ((union file_extras*)(f) - file_extra_cnt - 1 - (bump))
@@ -1162,16 +1163,16 @@ typedef struct {
 #define NSTR_COMPRESS 1
 
 struct name_num_item {
-	int num;
-	const char *name, *main_name;
+	int num, flags;
+	const char *name;
+	struct name_num_item *main_nni;
 };
 
 struct name_num_obj {
 	const char *type;
-	const char *negotiated_name;
+	struct name_num_item *negotiated_nni;
 	uchar *saw;
 	int saw_len;
-	int negotiated_num;
 	struct name_num_item *list;
 };
 

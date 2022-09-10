@@ -1743,6 +1743,17 @@ int main(int argc,char *argv[])
 
 	unset_env_var("DISPLAY");
 
+#if defined USE_OPENSSL && defined SET_OPENSSL_CONF
+#define TO_STR2(x) #x
+#define TO_STR(x) TO_STR2(x)
+	/* ./configure --with-openssl-conf=/etc/ssl/openssl-rsync.cnf
+	 * defines SET_OPENSSL_CONF as that unquoted pathname. */
+	if (!getenv("OPENSSL_CONF")) /* Don't override it if it's already set. */
+		set_env_str("OPENSSL_CONF", TO_STR(SET_OPENSSL_CONF));
+#undef TO_STR
+#undef TO_STR2
+#endif
+
 	memset(&stats, 0, sizeof(stats));
 
 	/* Even a non-daemon runs needs the default config values to be set, e.g.

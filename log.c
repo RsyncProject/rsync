@@ -36,8 +36,6 @@ extern int protocol_version;
 extern int always_checksum;
 extern int preserve_mtimes;
 extern int msgs2stderr;
-extern int xfersum_type;
-extern int checksum_type;
 extern int stdout_format_has_i;
 extern int stdout_format_has_o_or_i;
 extern int logfile_format_has_i;
@@ -61,6 +59,8 @@ extern char *full_module_path;
 extern unsigned int module_dirlen;
 extern char sender_file_sum[MAX_DIGEST_LEN];
 extern const char undetermined_hostname[];
+
+extern struct name_num_item *xfer_sum_nni, *file_sum_nni;
 
 static int log_initialised;
 static int logfile_was_closed;
@@ -680,12 +680,12 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 			n = NULL;
 			if (S_ISREG(file->mode)) {
 				if (always_checksum)
-					n = sum_as_hex(checksum_type, F_SUM(file), 1);
+					n = sum_as_hex(file_sum_nni->num, F_SUM(file), 1);
 				else if (iflags & ITEM_TRANSFER)
-					n = sum_as_hex(xfersum_type, sender_file_sum, 0);
+					n = sum_as_hex(xfer_sum_nni->num, sender_file_sum, 0);
 			}
 			if (!n) {
-				int sum_len = csum_len_for_type(always_checksum ? checksum_type : xfersum_type,
+				int sum_len = csum_len_for_type(always_checksum ? file_sum_nni->num : xfer_sum_nni->num,
 								always_checksum);
 				memset(buf2, ' ', sum_len*2);
 				buf2[sum_len*2] = '\0';

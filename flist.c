@@ -33,7 +33,6 @@ extern int am_sender;
 extern int am_generator;
 extern int inc_recurse;
 extern int always_checksum;
-extern int checksum_type;
 extern int module_id;
 extern int ignore_errors;
 extern int numeric_ids;
@@ -79,6 +78,8 @@ extern uid_t our_uid;
 extern struct stats stats;
 extern char *filesfrom_host;
 extern char *usermap, *groupmap;
+
+extern struct name_num_item *file_sum_nni;
 
 extern char curr_dir[MAXPATHLEN];
 
@@ -145,7 +146,8 @@ void init_flist(void)
 		rprintf(FINFO, "FILE_STRUCT_LEN=%d, EXTRA_LEN=%d\n",
 			(int)FILE_STRUCT_LEN, (int)EXTRA_LEN);
 	}
-	flist_csum_len = csum_len_for_type(checksum_type, 1);
+	/* Note that this isn't identical to file_sum_len in the case of CSUM_MD4_ARCHAIC: */
+	flist_csum_len = csum_len_for_type(file_sum_nni->num, 1);
 
 	show_filelist_progress = INFO_GTE(FLIST, 1) && xfer_dirs && !am_server && !inc_recurse;
 }

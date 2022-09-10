@@ -24,6 +24,7 @@
 
 extern int read_only;
 extern char *password_file;
+extern struct name_num_obj valid_auth_checksums;
 
 /***************************************************************************
 encode a buffer using base64 - simple and slow algorithm. null terminates
@@ -72,9 +73,9 @@ static void gen_challenge(const char *addr, char *challenge)
 	SIVAL(input, 20, tv.tv_usec);
 	SIVAL(input, 24, getpid());
 
-	sum_init(-1, 0);
+	len = sum_init(valid_auth_checksums.negotiated_nni, 0);
 	sum_update(input, sizeof input);
-	len = sum_end(digest);
+	sum_end(digest);
 
 	base64_encode(digest, len, challenge, 0);
 }
@@ -86,10 +87,10 @@ static void generate_hash(const char *in, const char *challenge, char *out)
 	char buf[MAX_DIGEST_LEN];
 	int len;
 
-	sum_init(-1, 0);
+	len = sum_init(valid_auth_checksums.negotiated_nni, 0);
 	sum_update(in, strlen(in));
 	sum_update(challenge, strlen(challenge));
-	len = sum_end(buf);
+	sum_end(buf);
 
 	base64_encode(buf, len, out, 0);
 }
@@ -238,6 +239,7 @@ char *auth_server(int f_in, int f_out, int module, const char *host,
 	if (!users || !*users)
 		return "";
 
+	negotiate_daemon_auth(f_out, 0);
 	gen_challenge(addr, challenge);
 
 	io_printf(f_out, "%s%s\n", leader, challenge);
@@ -350,6 +352,7 @@ void auth_client(int fd, const char *user, const char *challenge)
 
 	if (!user || !*user)
 		user = "nobody";
+	negotiate_daemon_auth(-1, 1);
 
 	if (!(pass = getpassf(password_file))
 	 && !(pass = getenv("RSYNC_PASSWORD"))) {

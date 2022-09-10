@@ -56,7 +56,6 @@ extern int inplace;
 extern int inplace_partial;
 extern int allowed_lull;
 extern int delay_updates;
-extern int xfersum_type;
 extern BOOL want_progress_now;
 extern mode_t orig_umask;
 extern struct stats stats;
@@ -67,6 +66,9 @@ extern char sender_file_sum[MAX_DIGEST_LEN];
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern filter_rule_list daemon_filter_list;
 extern OFF_T preallocated_len;
+
+extern struct name_num_item *xfer_sum_nni;
+extern int xfer_sum_len;
 
 static struct bitbag *delayed_bits = NULL;
 static int phase = 0, redoing = 0;
@@ -240,7 +242,6 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 	static char file_sum1[MAX_DIGEST_LEN];
 	struct map_struct *mapbuf;
 	struct sum_struct sum;
-	int sum_len;
 	int32 len;
 	OFF_T total_size = F_LENGTH(file);
 	OFF_T offset = 0;
@@ -280,7 +281,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 	} else
 		mapbuf = NULL;
 
-	sum_init(xfersum_type, checksum_seed);
+	sum_init(xfer_sum_nni, checksum_seed);
 
 	if (append_mode > 0) {
 		OFF_T j;
@@ -393,7 +394,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 	if (INFO_GTE(PROGRESS, 1))
 		end_progress(total_size);
 
-	sum_len = sum_end(file_sum1);
+	sum_end(file_sum1);
 
 	if (do_fsync && fd != -1 && fsync(fd) != 0) {
 		rsyserr(FERROR, errno, "fsync failed on %s", full_fname(fname));
@@ -403,10 +404,10 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 	if (mapbuf)
 		unmap_file(mapbuf);
 
-	read_buf(f_in, sender_file_sum, sum_len);
+	read_buf(f_in, sender_file_sum, xfer_sum_len);
 	if (DEBUG_GTE(DELTASUM, 2))
 		rprintf(FINFO,"got file_sum\n");
-	if (fd != -1 && memcmp(file_sum1, sender_file_sum, sum_len) != 0)
+	if (fd != -1 && memcmp(file_sum1, sender_file_sum, xfer_sum_len) != 0)
 		return 0;
 	return 1;
 }

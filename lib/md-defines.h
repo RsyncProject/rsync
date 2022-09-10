@@ -6,6 +6,7 @@
 
 #define CSUM_CHUNK 64
 
+#define CSUM_gone -1
 #define CSUM_NONE 0
 #define CSUM_MD4_ARCHAIC 1
 #define CSUM_MD4_BUSTED 2

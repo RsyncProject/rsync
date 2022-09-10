@@ -39,9 +39,13 @@ extern int preserve_specials;
 extern int checksum_seed;
 extern int saw_xattr_filter;
 
+extern struct name_num_item *xattr_sum_nni;
+extern int xattr_sum_len;
+
 #define RSYNC_XAL_INITIAL 5
 #define RSYNC_XAL_LIST_INITIAL 100
 
+#define MAX_XATTR_DIGEST_LEN MD5_DIGEST_LEN
 #define MAX_FULL_DATUM 32
 
 #define HAS_PREFIX(str, prfx) (*(str) == *(prfx) && strncmp(str, prfx, sizeof (prfx) - 1) == 0)
@@ -269,8 +273,8 @@ static int rsync_xal_get(const char *fname, item_list *xalp)
 
 		if (datum_len > MAX_FULL_DATUM) {
 			/* For large datums, we store a flag and a checksum. */
-			name_offset = 1 + MAX_DIGEST_LEN;
-			sum_init(-1, checksum_seed);
+			name_offset = 1 + MAX_XATTR_DIGEST_LEN;
+			sum_init(xattr_sum_nni, checksum_seed);
 			sum_update(ptr, datum_len);
 			free(ptr);
 
@@ -382,7 +386,7 @@ static int64 xattr_lookup_hash(const item_list *xalp)
 	for (i = 0; i < xalp->count; i++) {
 		key += hashlittle(rxas[i].name, rxas[i].name_len);
 		if (rxas[i].datum_len > MAX_FULL_DATUM)
-			key += hashlittle(rxas[i].datum, MAX_DIGEST_LEN);
+			key += hashlittle(rxas[i].datum, xattr_sum_len);
 		else
 			key += hashlittle(rxas[i].datum, rxas[i].datum_len);
 	}
@@ -435,7 +439,7 @@ static int find_matching_xattr(const item_list *xalp)
 			if (rxas1[j].datum_len > MAX_FULL_DATUM) {
 				if (memcmp(rxas1[j].datum + 1,
 					   rxas2[j].datum + 1,
-					   MAX_DIGEST_LEN) != 0)
+					   xattr_sum_len) != 0)
 					break;
 			} else {
 				if (memcmp(rxas1[j].datum, rxas2[j].datum,
@@ -535,7 +539,7 @@ int send_xattr(int f, stat_x *sxp)
 #endif
 			write_buf(f, name, name_len);
 			if (rxa->datum_len > MAX_FULL_DATUM)
-				write_buf(f, rxa->datum + 1, MAX_DIGEST_LEN);
+				write_buf(f, rxa->datum + 1, xattr_sum_len);
 			else
 				write_bigbuf(f, rxa->datum, rxa->datum_len);
 		}
@@ -588,7 +592,7 @@ int xattr_diff(struct file_struct *file, stat_x *sxp, int find_all)
 		else if (snd_rxa->datum_len > MAX_FULL_DATUM) {
 			same = cmp == 0 && snd_rxa->datum_len == rec_rxa->datum_len
 			    && memcmp(snd_rxa->datum + 1, rec_rxa->datum + 1,
-				      MAX_DIGEST_LEN) == 0;
+				      xattr_sum_len) == 0;
 			/* Flag unrequested items that we need. */
 			if (!same && find_all && snd_rxa->datum[0] == XSTATE_ABBREV)
 				snd_rxa->datum[0] = XSTATE_TODO;
@@ -797,7 +801,7 @@ void receive_xattr(int f, struct file_struct *file)
 		rsync_xa *rxa;
 		size_t name_len = read_varint(f);
 		size_t datum_len = read_varint(f);
-		size_t dget_len = datum_len > MAX_FULL_DATUM ? 1 + MAX_DIGEST_LEN : datum_len;
+		size_t dget_len = datum_len > MAX_FULL_DATUM ? 1 + (size_t)xattr_sum_len : datum_len;
 		size_t extra_len = MIGHT_NEED_RPRE ? RPRE_LEN : 0;
 		if (SIZE_MAX - dget_len < extra_len || SIZE_MAX - dget_len - extra_len < name_len)
 			overflow_exit("receive_xattr");
@@ -812,7 +816,7 @@ void receive_xattr(int f, struct file_struct *file)
 			read_buf(f, ptr, dget_len);
 		else {
 			*ptr = XSTATE_ABBREV;
-			read_buf(f, ptr + 1, MAX_DIGEST_LEN);
+			read_buf(f, ptr + 1, xattr_sum_len);
 		}
 
 		if (saw_xattr_filter) {
@@ -943,7 +947,7 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 	rsync_xa *rxas = xalp->items;
 	ssize_t list_len;
 	size_t i, len;
-	char *name, *ptr, sum[MAX_DIGEST_LEN];
+	char *name, *ptr, sum[MAX_XATTR_DIGEST_LEN];
 #ifdef HAVE_LINUX_XATTRS
 	int user_only = am_root <= 0;
 #endif
@@ -958,7 +962,6 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 		name = rxas[i].name;
 
 		if (XATTR_ABBREV(rxas[i])) {
-			int sum_len;
 			/* See if the fnamecmp version is identical. */
 			len = name_len = rxas[i].name_len;
 			if ((ptr = get_xattr_data(fnamecmp, name, &len, 1)) == NULL) {
@@ -975,10 +978,10 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 				goto still_abbrev;
 			}
 
-			sum_init(-1, checksum_seed);
+			sum_init(xattr_sum_nni, checksum_seed);
 			sum_update(ptr, len);
-			sum_len = sum_end(sum);
-			if (memcmp(sum, rxas[i].datum + 1, sum_len) != 0) {
+			sum_end(sum);
+			if (memcmp(sum, rxas[i].datum + 1, xattr_sum_len) != 0) {
 				free(ptr);
 				goto still_abbrev;
 			}

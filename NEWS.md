@@ -6,6 +6,28 @@
 
 - ...
 
+### ENHANCEMENTS:
+
+- Added negotiated daemon-auth support that allows a stronger checksum digest
+  to be used.
+
+### PACKAGING RELATED:
+
+- The checksum code now uses openssl's EVP methods, which gets rid of various
+  deprecation warnings and makes it easy to support more digest methods.  On
+  newer systems, the MD4 digest is marked as legacy in the openssl code, which
+  makes openssl refuse to support it via EVP.  You can just ignore this and
+  allow the included MD4 code to be used for older rsync connections (when
+  talking to an rsync prior to 3.0.0) or you can configure rsync to tell
+  openssl to enable legacy algorithms (see below).
+
+- A simple openssl config file is supplied that can be optionally installed for
+  rsync to use.  If you install packaging/openssl-rsync.cnf to a public spot
+  (such as ` /etc/ssl/openssl-rsync.cnf` or similar) and then configure rsync
+  using `--with-openssl-conf=/path/name.cnf`, this will cause rsync to export
+  the configured path in the OPENSSL_CONF environment variable (when it is not
+  already set).  This will enable openssl's MD4 code for rsync to use.
+
 ------------------------------------------------------------------------------
 
 # NEWS for rsync 3.2.6 (9 Sep 2022)
