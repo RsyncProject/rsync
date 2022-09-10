@@ -1,6 +1,7 @@
 /* The include file for both the MD4 and MD5 routines. */
 
 #ifdef USE_OPENSSL
+#include <openssl/sha.h>
 #include <openssl/evp.h>
 #endif
 #include "md-defines.h"

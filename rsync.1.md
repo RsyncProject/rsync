@@ -1727,6 +1727,9 @@ expand it.
     - `xxh64` (aka `xxhash`)
     - `md5`
     - `md4`
+    - `sha1`
+    - `sha256`
+    - `sha512`
     - `none`
 
     Run `rsync --version` to see the default checksum list compiled into your

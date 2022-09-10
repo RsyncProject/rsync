@@ -57,6 +57,15 @@ struct name_num_item valid_checksums_items[] = {
 #endif
 	{ CSUM_MD5, NNI_BUILTIN|NNI_EVP, "md5", NULL },
 	{ CSUM_MD4, NNI_BUILTIN|NNI_EVP, "md4", NULL },
+#ifdef SHA_DIGEST_LENGTH
+	{ CSUM_SHA1, NNI_EVP, "sha1", NULL },
+#endif
+#ifdef SHA256_DIGEST_LENGTH
+	{ CSUM_SHA256, NNI_EVP, "sha256", NULL },
+#endif
+#ifdef SHA512_DIGEST_LENGTH
+	{ CSUM_SHA512, NNI_EVP, "sha512", NULL },
+#endif
 	{ CSUM_NONE, 0, "none", NULL },
 	{ 0, 0, NULL, NULL }
 };
@@ -66,6 +75,15 @@ struct name_num_obj valid_checksums = {
 };
 
 struct name_num_item valid_auth_checksums_items[] = {
+#ifdef SHA512_DIGEST_LENGTH
+	{ CSUM_SHA512, NNI_EVP, "sha512", NULL },
+#endif
+#ifdef SHA256_DIGEST_LENGTH
+	{ CSUM_SHA256, NNI_EVP, "sha256", NULL },
+#endif
+#ifdef SHA_DIGEST_LENGTH
+	{ CSUM_SHA1, NNI_EVP, "sha1", NULL },
+#endif
 	{ CSUM_MD5, NNI_BUILTIN|NNI_EVP, "md5", NULL },
 	{ CSUM_MD4, NNI_BUILTIN|NNI_EVP, "md4", NULL },
 	{ 0, 0, NULL, NULL }
@@ -211,6 +229,18 @@ int csum_len_for_type(int cst, BOOL flist_csum)
 		return MD4_DIGEST_LEN;
 	  case CSUM_MD5:
 		return MD5_DIGEST_LEN;
+#ifdef SHA_DIGEST_LENGTH
+	  case CSUM_SHA1:
+		return SHA_DIGEST_LENGTH;
+#endif
+#ifdef SHA256_DIGEST_LENGTH
+	  case CSUM_SHA256:
+		return SHA256_DIGEST_LENGTH;
+#endif
+#ifdef SHA512_DIGEST_LENGTH
+	  case CSUM_SHA512:
+		return SHA512_DIGEST_LENGTH;
+#endif
 	  case CSUM_XXH64:
 	  case CSUM_XXH3_64:
 		return 64/8;
@@ -236,6 +266,9 @@ int canonical_checksum(int csum_type)
 		break;
 	  case CSUM_MD4:
 	  case CSUM_MD5:
+	  case CSUM_SHA1:
+	  case CSUM_SHA256:
+	  case CSUM_SHA512:
 		return -1;
 	  case CSUM_XXH64:
 	  case CSUM_XXH3_64:
