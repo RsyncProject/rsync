@@ -36,6 +36,8 @@ def main():
                     if ' ' in x:
                         val, var = x.split(' ', 1)
                         var = var.replace(' ', '_')
+                        if var == 'protect-args':
+                            var = 'secluded-args'
                         info[sect_name][var] = False if val == 'no' else val
                     else:
                         info[sect_name][x] = True
