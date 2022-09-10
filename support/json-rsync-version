@@ -49,6 +49,9 @@ def main():
             sect_name = line.strip(' :').replace(' ', '_').lower()
             info[sect_name] = [ ]
             saw_comma = False
+    for chk in 'capabilities optimizations'.split():
+        if chk not in info:
+            info[chk] = { }
     for chk in 'checksum_list compress_list daemon_auth_list'.split():
         if chk not in info:
             info[chk] = [ ]

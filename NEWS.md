@@ -13,7 +13,7 @@
   digests are at the highest priority in the new negotiation list.
 
 - Added support for SHA1, SHA256, and SHA512 digests in file checksums.  While
-  This tends to be overkill, if someone needs it, it is available.  These
+  this tends to be overkill, it is available if someone really needs it.  These
   overly-long checksums are at the lowest priority in the normal checksum
   negotation list.
 
@@ -21,9 +21,11 @@
   output in a (still human-readable) JSON format (client side only).
 
 - The script `support/json-rsync-version` is available to get the JSON style
-  version output from any rsync.  The script accepts the version output on
-  stdin **or** the name of an rsync to run as an arg.  If the text isn't
-  already in JSON format, the text is translated into equivalent JSON.
+  version output from any rsync.  The script accepts either text on stdin
+  **or** an arg that specifies an rsync executable to run with a doubled
+  `--version` option.  If the text we get isn't already in JSON format, it is
+  converted into equivalent JSON as rsync 3.2.7 would output it (though some
+  info may be missing from older versions).
 
 ### PACKAGING RELATED:
 
