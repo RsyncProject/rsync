@@ -1926,7 +1926,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		saw_stderr_opt = 1;
 
 	if (version_opt_cnt) {
-		print_rsync_version(FINFO);
+		print_rsync_version(version_opt_cnt > 1 && !am_server ? FNONE : FINFO);
 		exit_cleanup(0);
 	}
 

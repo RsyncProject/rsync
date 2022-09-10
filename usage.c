@@ -22,6 +22,7 @@
 #include "latest-year.h"
 #include "git-version.h"
 #include "default-cvsignore.h"
+#include "itypes.h"
 
 extern struct name_num_obj valid_checksums, valid_compressions, valid_auth_checksums;
 
@@ -36,7 +37,8 @@ static char *istring(const char *fmt, int val)
 static void print_info_flags(enum logcode f)
 {
 	STRUCT_STAT *dumstat;
-	char line_buf[75];
+	BOOL as_json = f == FNONE ? 1 : 0; /* We use 1 == first attribute, 2 == need closing array */
+	char line_buf[75], *quot = as_json ? "\"" : "";
 	int line_len, j;
 	char *info_flags[] = {
 
@@ -163,50 +165,115 @@ static void print_info_flags(enum logcode f)
 
 	for (line_len = 0, j = 0; ; j++) {
 		char *str = info_flags[j], *next_nfo = str ? info_flags[j+1] : NULL;
-		int str_len = str && *str != '*' ? strlen(str) : 1000;
+		int str_len = str && *str != '*' ? strlen(str) + (as_json ? 2 : 0) : 1000;
 		int need_comma = next_nfo && *next_nfo != '*' ? 1 : 0;
 		if (line_len && line_len + 1 + str_len + need_comma >= (int)sizeof line_buf) {
-			rprintf(f, "   %s\n", line_buf);
+			if (as_json)
+				printf("   %s\n", line_buf);
+			else
+				rprintf(f, "   %s\n", line_buf);
 			line_len = 0;
 		}
 		if (!str)
 			break;
 		if (*str == '*') {
-			rprintf(f, "%s:\n", str+1);
+			if (as_json) {
+				if (as_json == 2)
+					printf("  ]");
+				else
+					as_json = 2;
+				printf(",\n  \"%c%s\": [\n", toLower(str+1), str+2);
+			} else
+				rprintf(f, "%s:\n", str+1);
 			continue;
 		}
-		line_len += snprintf(line_buf+line_len, sizeof line_buf - line_len, " %s%s", str, need_comma ? "," : "");
+		line_len += snprintf(line_buf+line_len, sizeof line_buf - line_len,
+				     " %s%s%s%s", quot, str, quot, need_comma ? "," : "");
 	}
+	if (as_json == 2)
+		printf("  ]");
 }
 
+static void output_nno_list(enum logcode f, const char *name, struct name_num_obj *nno)
+{
+	char namebuf[64], tmpbuf[256];
+	char *tok, *next_tok, *comma = ",";
+	char *cp;
+
+	/* Using '(' ensures that we get a trailing "none" but also includes aliases. */
+	get_default_nno_list(nno, tmpbuf, sizeof tmpbuf - 1, '(');
+	if (f != FNONE) {
+		rprintf(f, "%s:\n", name);
+		rprintf(f, "    %s\n", tmpbuf);
+		return;
+	}
+
+	strlcpy(namebuf, name, sizeof namebuf);
+	for (cp = namebuf; *cp; cp++) {
+		if (*cp == ' ')
+			*cp = '_';
+		else if (isUpper(cp))
+			*cp = toLower(cp);
+	}
+
+	printf(",\n  \"%s\": [\n   ", namebuf);
+
+	for (tok = strtok(tmpbuf, " "); tok; tok = next_tok) {
+		next_tok = strtok(NULL, " ");
+		if (*tok != '(') /* Ignore the alises in the JSON output */
+			printf(" \"%s\"%s", tok, comma + (next_tok ? 0 : 1));
+	}
+
+	printf("\n  ]");
+}
+
+/* A request of f == FNONE wants json on stdout. */
 void print_rsync_version(enum logcode f)
 {
-	char tmpbuf[256], *subprotocol = "";
+	char copyright[] = "(C) 1996-" LATEST_YEAR " by Andrew Tridgell, Wayne Davison, and others.";
+	char url[] = "https://rsync.samba.org/";
+	BOOL first_line = 1;
 
+#define json_line(name, value) \
+	do { \
+		printf("%c\n  \"%s\": \"%s\"", first_line ? '{' : ',', name, value); \
+		first_line = 0; \
+	} while (0)
+
+	if (f == FNONE) {
+		char verbuf[32];
+		json_line("program", RSYNC_NAME);
+		json_line("version", rsync_version());
+		snprintf(verbuf, sizeof verbuf, "%d.%d", PROTOCOL_VERSION, SUBPROTOCOL_VERSION);
+		json_line("protocol", verbuf);
+		json_line("copyright", copyright);
+		json_line("url", url);
+	} else {
 #if SUBPROTOCOL_VERSION != 0
-	subprotocol = istring(".PR%d", SUBPROTOCOL_VERSION);
+		char *subprotocol = istring(".PR%d", SUBPROTOCOL_VERSION);
+#else
+		char *subprotocol = "";
 #endif
-	rprintf(f, "%s  version %s  protocol version %d%s\n",
-		RSYNC_NAME, rsync_version(), PROTOCOL_VERSION, subprotocol);
-
-	rprintf(f, "Copyright (C) 1996-" LATEST_YEAR " by Andrew Tridgell, Wayne Davison, and others.\n");
-	rprintf(f, "Web site: https://rsync.samba.org/\n");
+		rprintf(f, "%s  version %s  protocol version %d%s\n",
+			RSYNC_NAME, rsync_version(), PROTOCOL_VERSION, subprotocol);
+		rprintf(f, "Copyright %s\n", copyright);
+		rprintf(f, "Web site: %s\n", url);
+	}
 
 	print_info_flags(f);
 
 	init_checksum_choices();
 
-	rprintf(f, "Checksum list:\n");
-	get_default_nno_list(&valid_checksums, tmpbuf, sizeof tmpbuf, '(');
-	rprintf(f, "    %s\n", tmpbuf);
+	output_nno_list(f, "Checksum list", &valid_checksums);
+	output_nno_list(f, "Compress list", &valid_compressions);
+	output_nno_list(f, "Daemon auth list", &valid_auth_checksums);
 
-	rprintf(f, "Compress list:\n");
-	get_default_nno_list(&valid_compressions, tmpbuf, sizeof tmpbuf, '(');
-	rprintf(f, "    %s\n", tmpbuf);
-
-	rprintf(f, "Daemon auth list:\n");
-	get_default_nno_list(&valid_auth_checksums, tmpbuf, sizeof tmpbuf, '(');
-	rprintf(f, "    %s\n", tmpbuf);
+	if (f == FNONE) {
+		json_line("license", "GPL3");
+		json_line("caveat", "rsync comes with ABSOLUTELY NO WARRANTY");
+		printf("\n}\n");
+		return;
+	}
 
 #ifdef MAINTAINER_MODE
 	rprintf(f, "Panic Action: \"%s\"\n", get_panic_action());
@@ -268,11 +335,13 @@ void daemon_usage(enum logcode F)
 
 const char *rsync_version(void)
 {
+	char *ver;
 #ifdef RSYNC_GITVER
-	return RSYNC_GITVER;
+	ver = RSYNC_GITVER;
 #else
-	return RSYNC_VERSION;
+	ver = RSYNC_VERSION;
 #endif
+	return *ver == 'v' ? ver+1 : ver;
 }
 
 const char *default_cvsignore(void)

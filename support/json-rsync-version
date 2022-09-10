@@ -1,0 +1,59 @@
+#!/usr/bin/python3
+
+import sys, re, argparse, subprocess, json
+
+def main():
+    if not args.rsync or args.rsync == '-':
+        ver_out = sys.stdin.read().strip()
+    else:
+        ver_out = subprocess.check_output([args.rsync, '--version', '--version'], encoding='utf-8').strip()
+    if ver_out.startswith('{'):
+        print(ver_out)
+        return
+    info = { }
+    for line in ver_out.splitlines():
+        if line.startswith('rsync '):
+            prog, vstr, ver, pstr, vstr2, proto = line.split()
+            info['program'] = prog
+            if ver.startswith('v'):
+                ver = ver[1:]
+            info[vstr] = ver
+            if '.' not in proto:
+                proto += '.0'
+            else:
+                proto = proto.replace('.PR', '.')
+            info[pstr] = proto
+        elif line.startswith('Copyright '):
+            info['copyright'] = line[10:]
+        elif line.startswith('Web site: '):
+            info['url'] = line[10:]
+        elif line.startswith('  '):
+            if not saw_comma and ',' in line:
+                saw_comma = True
+            if saw_comma:
+                lst = line.strip(' ,').split(', ')
+            else:
+                lst = [ x for x in line.split() if not x.startswith('(') ]
+            info[sect_name] += lst
+        elif line == '':
+            break
+        else:
+            sect_name = line.strip(" \n:").replace(' ', '_').lower()
+            info[sect_name] = [ ]
+            saw_comma = False
+    for chk in 'checksum_list compress_list daemon_auth_list'.split():
+        if chk not in info:
+            info[chk] = [ ]
+    info['license'] = 'GPL3'
+    info['caveat'] = 'rsync comes with ABSOLUTELY NO WARRANTY'
+    print(json.dumps(info))
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Output rsync's version data in JSON format, even if the rsync doesn't support a native json-output method.", add_help=False)
+    parser.add_argument('rsync', nargs='?', help="Specify an rsync command to run. Otherwise stdin is consumed.")
+    parser.add_argument("--help", "-h", action="help", help="Output this help message and exit.")
+    args = parser.parse_args()
+    main()
+
+# vim: sw=4 et

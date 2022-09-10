@@ -17,6 +17,14 @@
   overly-long checksums are at the lowest priority in the normal checksum
   negotation list.
 
+- If the `--version` option is repeated (e.g. `-VV`) then the information is
+  output in a (still human-readable) JSON format (client side only).
+
+- The script `support/json-rsync-version` is available to get the JSON style
+  version output from any rsync.  The script accepts the version output on
+  stdin **or** the name of an rsync to run as an arg.  If the text isn't
+  already in JSON format, the text is translated into equivalent JSON.
+
 ### PACKAGING RELATED:
 
 - The checksum code now uses openssl's EVP methods, which gets rid of various

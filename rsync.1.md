@@ -580,11 +580,14 @@ expand it.
 
 0.  `--version`, `-V`
 
-    Print the rsync version plus other info and exit.
+    Print the rsync version plus other info and exit.  When repeated, the
+    information is output is a JSON format that is still hum-readable (client
+    side only).
 
-    The output includes the default list of checksum algorithms, the default
-    list of compression algorithms, a list of compiled-in capabilities, a link
-    to the rsync web site, and some license/copyright info.
+    The output includes a list of compiled-in capabilities, a list of
+    optimizations, the default list of checksum algorithms, the default list of
+    compression algorithms, the default list of daemon auth digests, a link to
+    the rsync web site, and a few other items.
 
 0.  `--verbose`, `-v`
 
