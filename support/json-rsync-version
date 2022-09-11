@@ -35,11 +35,12 @@ def main():
                 for x in line.strip(' ,').split(', '):
                     if ' ' in x:
                         val, var = x.split(' ', 1)
-                        var = var.replace(' ', '_')
                         if var == 'protect-args':
                             var = 'secluded-args'
+                        var = var.replace(' ', '_').replace('-', '_')
                         info[sect_name][var] = False if val == 'no' else val
                     else:
+                        x = x.replace('-', '_')
                         info[sect_name][x] = True
             else:
                 info[sect_name] += [ x for x in line.split() if not x.startswith('(') ]

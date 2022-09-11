@@ -179,7 +179,7 @@ static void print_info_flags(enum logcode f)
 			item_len = snprintf(item_buf, sizeof item_buf,
 					   " \"%s\": %s%.*s%s%s", item, quot, val_len, val, quot,
 					   need_comma ? "," : "");
-			for (space = item; (space = strchr(space, ' ')) != NULL; space++)
+			for (space = item; (space = strpbrk(space, " -")) != NULL; space++)
 				item_buf[space - item + 2] = '_';
 		} else
 			item_len = snprintf(item_buf, sizeof item_buf, " %s%s", str, need_comma ? "," : "");
