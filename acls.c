@@ -519,6 +519,7 @@ static int get_rsync_acl(const char *fname, rsync_acl *racl,
 
 		sys_acl_free_acl(sacl);
 		if (!ok) {
+			rsyserr(FERROR_XFER, errno, "get_acl: unpack_smb_acl(%s)", fname);
 			return -1;
 		}
 	} else if (no_acl_syscall_error(errno)) {

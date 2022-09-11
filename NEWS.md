@@ -4,7 +4,7 @@
 
 ### BUG FIXES:
 
-- ...
+- When rsync gets and unpack error on an ACL, mention the filename.
 
 ### ENHANCEMENTS:
 
