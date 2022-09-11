@@ -184,11 +184,11 @@ static int exchange_protocols(int f_in, int f_out, char *buf, size_t bufsiz, int
 	}
 
 	if (remote_sub < 0) {
-		if (remote_protocol == 30) {
+		if (remote_protocol >= 30) {
 			if (am_client)
-				rprintf(FERROR, "rsync: server is speaking an incompatible beta of protocol 30\n");
+				rprintf(FERROR, "rsync: the server omitted the subprotocol value: %s\n", buf);
 			else
-				io_printf(f_out, "@ERROR: your client is speaking an incompatible beta of protocol 30\n");
+				io_printf(f_out, "@ERROR: your client omitted the subprotocol value: %s\n", buf);
 			return -1;
 		}
 		remote_sub = 0;
@@ -200,6 +200,12 @@ static int exchange_protocols(int f_in, int f_out, char *buf, size_t bufsiz, int
 		daemon_auth_choices = strdup(daemon_auth_choices + 1);
 		if ((cp = strchr(daemon_auth_choices, '\n')) != NULL)
 			*cp = '\0';
+	} else if (remote_protocol > 31) {
+		if (am_client)
+			rprintf(FERROR, "rsync: the server omitted the digest name list: %s\n", buf);
+		else
+			io_printf(f_out, "@ERROR: your client omitted the digest name list: %s\n", buf);
+		return -1;
 	}
 
 	if (protocol_version > remote_protocol) {
