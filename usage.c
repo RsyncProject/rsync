@@ -172,13 +172,18 @@ static void print_info_flags(enum logcode f)
 		else if (as_json) {
 			char *space = strchr(str, ' ');
 			int is_no = space && strncmp(str, "no ", 3) == 0;
-			char *quot = space && !is_no ? "\"" : "";
+			int is_bits = space && isDigit(str);
+			char *quot = space && !is_no && !is_bits ? "\"" : "";
 			char *item = space ? space + 1 : str;
 			char *val = !space ? "true" : is_no ? "false" : str;
 			int val_len = !space ? 4 : is_no ? 5 : space - str;
+			if (is_bits && (space = strchr(val, '-')) != NULL)
+			    val_len = space - str;
 			item_len = snprintf(item_buf, sizeof item_buf,
-					   " \"%s\": %s%.*s%s%s", item, quot, val_len, val, quot,
-					   need_comma ? "," : "");
+					   " \"%s%s\": %s%.*s%s%s", item, is_bits ? "bits" : "",
+					   quot, val_len, val, quot, need_comma ? "," : "");
+			if (is_bits)
+				item_buf[strlen(item)+2-1] = '_'; /* Turn the 's' into a '_' */
 			for (space = item; (space = strpbrk(space, " -")) != NULL; space++)
 				item_buf[space - item + 2] = '_';
 		} else

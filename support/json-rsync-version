@@ -35,13 +35,18 @@ def main():
                 for x in line.strip(' ,').split(', '):
                     if ' ' in x:
                         val, var = x.split(' ', 1)
+                        if val == 'no':
+                            val = False
+                        elif val.endswith('-bit'):
+                            var = var[:-1] + '_bits'
+                            val = int(val.split('-')[0])
                         if var == 'protect-args':
                             var = 'secluded-args'
-                        var = var.replace(' ', '_').replace('-', '_')
-                        info[sect_name][var] = False if val == 'no' else val
                     else:
-                        x = x.replace('-', '_')
-                        info[sect_name][x] = True
+                        var = x
+                        val = True
+                    var = var.replace(' ', '_').replace('-', '_')
+                    info[sect_name][var] = val
             else:
                 info[sect_name] += [ x for x in line.split() if not x.startswith('(') ]
         elif line == '':
