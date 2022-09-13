@@ -4,6 +4,8 @@
 
 ### BUG FIXES:
 
+- Fix a bug with validating remote filter rules.
+
 - When rsync gets and unpack error on an ACL, mention the filename.
 
 ### ENHANCEMENTS:
