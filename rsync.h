@@ -1024,6 +1024,7 @@ typedef struct filter_struct {
 		int slash_cnt;
 		struct filter_list_struct *mergelist;
 	} u;
+	uchar elide;
 } filter_rule;
 
 typedef struct filter_list_struct {

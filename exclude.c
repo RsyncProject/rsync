@@ -78,6 +78,10 @@ static filter_rule **mergelist_parents;
 static int mergelist_cnt = 0;
 static int mergelist_size = 0;
 
+#define LOCAL_RULE   1
+#define REMOTE_RULE  2
+static uchar cur_elide_value = REMOTE_RULE;
+
 /* Each filter_list_struct describes a singly-linked list by keeping track
  * of both the head and tail pointers.  The list is slightly unusual in that
  * a parent-dir's content can be appended to the end of the local list in a
@@ -220,6 +224,7 @@ static void add_rule(filter_rule_list *listp, const char *pat, unsigned int pat_
 				slash_cnt++;
 		}
 	}
+	rule->elide = 0;
 	strlcpy(rule->pattern + pre_len, pat, pat_len + 1);
 	pat_len += pre_len;
 	if (suf_len) {
@@ -900,7 +905,7 @@ static int rule_matches(const char *fname, filter_rule *ex, int name_flags)
 	const char *strings[16]; /* more than enough */
 	const char *name = fname + (*fname == '/');
 
-	if (!*name)
+	if (!*name || ex->elide == cur_elide_value)
 		return 0;
 
 	if (!(name_flags & NAME_IS_XATTR) ^ !(ex->rflags & FILTRULE_XATTR))
@@ -1014,6 +1019,15 @@ int name_is_excluded(const char *fname, int name_flags, int filter_level)
 		return 1;
 
 	return 0;
+}
+
+int check_server_filter(filter_rule_list *listp, enum logcode code, const char *name, int name_flags)
+{
+	int ret;
+	cur_elide_value = LOCAL_RULE;
+	ret = check_filter(listp, code, name, name_flags);
+	cur_elide_value = REMOTE_RULE;
+	return ret;
 }
 
 /* Return -1 if file "name" is defined to be excluded by the specified
@@ -1571,7 +1585,7 @@ char *get_rule_prefix(filter_rule *rule, const char *pat, int for_xfer,
 
 static void send_rules(int f_out, filter_rule_list *flp)
 {
-	filter_rule *ent, *prev = NULL;
+	filter_rule *ent;
 
 	for (ent = flp->head; ent; ent = ent->next) {
 		unsigned int len, plen, dlen;
@@ -1586,21 +1600,15 @@ static void send_rules(int f_out, filter_rule_list *flp)
 		 * merge files as an optimization (since they can only have
 		 * include/exclude rules). */
 		if (ent->rflags & FILTRULE_SENDER_SIDE)
-			elide = am_sender ? 1 : -1;
+			elide = am_sender ? LOCAL_RULE : REMOTE_RULE;
 		if (ent->rflags & FILTRULE_RECEIVER_SIDE)
-			elide = elide ? 0 : am_sender ? -1 : 1;
+			elide = elide ? 0 : am_sender ? REMOTE_RULE : LOCAL_RULE;
 		else if (delete_excluded && !elide
 		 && (!(ent->rflags & FILTRULE_PERDIR_MERGE)
 		  || ent->rflags & FILTRULE_NO_PREFIXES))
-			elide = am_sender ? 1 : -1;
-		if (elide < 0) {
-			if (prev)
-				prev->next = ent->next;
-			else
-				flp->head = ent->next;
-		} else
-			prev = ent;
-		if (elide > 0)
+			elide = am_sender ? LOCAL_RULE : REMOTE_RULE;
+		ent->elide = elide;
+		if (elide == LOCAL_RULE)
 			continue;
 		if (ent->rflags & FILTRULE_CVS_IGNORE
 		    && !(ent->rflags & FILTRULE_MERGE_FILE)) {
@@ -1628,7 +1636,6 @@ static void send_rules(int f_out, filter_rule_list *flp)
 		if (dlen)
 			write_byte(f_out, '/');
 	}
-	flp->tail = prev;
 }
 
 /* This is only called by the client. */
