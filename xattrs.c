@@ -381,20 +381,14 @@ static int64 xattr_lookup_hash(const item_list *xalp)
 {
 	const rsync_xa *rxas = xalp->items;
 	size_t i;
-	int64 key = hashlittle(&xalp->count, sizeof xalp->count);
+	int64 key = hashlittle2(&xalp->count, sizeof xalp->count);
 
 	for (i = 0; i < xalp->count; i++) {
-		key += hashlittle(rxas[i].name, rxas[i].name_len);
+		key += hashlittle2(rxas[i].name, rxas[i].name_len);
 		if (rxas[i].datum_len > MAX_FULL_DATUM)
-			key += hashlittle(rxas[i].datum, xattr_sum_len);
+			key += hashlittle2(rxas[i].datum, xattr_sum_len);
 		else
-			key += hashlittle(rxas[i].datum, rxas[i].datum_len);
-	}
-
-	if (key == 0) {
-		/* This is very unlikely, but we should never
-		 * return 0 as hashtable_find() doesn't like it. */
-		return 1;
+			key += hashlittle2(rxas[i].datum, rxas[i].datum_len);
 	}
 
 	return key;
@@ -475,8 +469,6 @@ static int rsync_xal_store(item_list *xalp)
 
 	if (rsync_xal_h == NULL)
 		rsync_xal_h = hashtable_create(512, HT_KEY64);
-	if (rsync_xal_h == NULL)
-		out_of_memory("rsync_xal_h hashtable_create()");
 
 	new_ref = new0(rsync_xa_list_ref);
 	new_ref->ndx = ndx;
