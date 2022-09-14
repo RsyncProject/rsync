@@ -351,7 +351,7 @@ void *hashtable_find(struct hashtable *tbl, int64 key, void *data_when_new)
 */
 
 #define NON_ZERO_32(x) ((x) ? (x) : (uint32_t)1)
-#define NON_ZERO_64(x, y) ((x) || (y) ? ((int64)(x) << 32) | (y) : (int64)1)
+#define NON_ZERO_64(x, y) ((x) || (y) ? (y) | (int64)(x) << 32 | (y) : (int64)1)
 
 uint32_t hashlittle(const void *key, size_t length)
 {
