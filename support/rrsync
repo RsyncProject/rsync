@@ -130,7 +130,7 @@ long_opts = {
 
 ### END of options data produced by the cull-options script. ###
 
-import os, sys, re, argparse, glob, socket, time, subprocess
+import os, sys, re, argparse, glob, socket, time, subprocess, shlex
 from argparse import RawTextHelpFormatter
 
 try:
@@ -205,7 +205,7 @@ def main():
     saw_the_dot_arg = False
     last_opt = check_type = None
 
-    for arg in re.findall(r'(?:[^\s\\]+|\\.[^\s\\]*)+', command):
+    for arg in shlex.split(command):
         if check_type:
             rsync_opts.append(validated_arg(last_opt, arg, check_type))
             check_type = None
