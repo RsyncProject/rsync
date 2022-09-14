@@ -12,7 +12,7 @@
 
 - Added negotiated daemon-auth support that allows a stronger checksum digest
   to be used.  Added SHA512, SHA256, and SHA1 digests to MD5 & MD4.  These new
-  digests are at the highest priority in the new negotiation list.
+  digests are at the highest priority in the new daemon-auth negotiation list.
 
 - Added support for SHA1, SHA256, and SHA512 digests in file checksums.  While
   this tends to be overkill, it is available if someone really needs it.  These
