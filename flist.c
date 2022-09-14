@@ -756,7 +756,7 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 	if (*thisname
 	 && (clean_fname(thisname, CFN_REFUSE_DOT_DOT_DIRS) < 0 || (!relative_paths && *thisname == '/'))) {
 		rprintf(FERROR, "ABORTING due to unsafe pathname from sender: %s\n", thisname);
-		exit_cleanup(RERR_PROTOCOL);
+		exit_cleanup(RERR_UNSUPPORTED);
 	}
 
 	if (sanitize_paths)
@@ -993,11 +993,11 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 		if (!trust_sender_filter /* a per-dir filter rule means we must trust the sender's filtering */
 		 && filter_list.head && check_server_filter(&filter_list, FINFO, thisname, filt_flags) < 0) {
 			rprintf(FERROR, "ERROR: rejecting excluded file-list name: %s\n", thisname);
-			exit_cleanup(RERR_PROTOCOL);
+			exit_cleanup(RERR_UNSUPPORTED);
 		}
 		if (implied_filter_list.head && check_filter(&implied_filter_list, FINFO, thisname, filt_flags) <= 0) {
 			rprintf(FERROR, "ERROR: rejecting unrequested file-list name: %s\n", thisname);
-			exit_cleanup(RERR_PROTOCOL);
+			exit_cleanup(RERR_UNSUPPORTED);
 		}
 	}
 
@@ -2642,7 +2642,7 @@ struct file_list *recv_file_list(int f, int dir_ndx)
 					rprintf(FERROR,
 						"ABORTING due to invalid path from sender: %s/%s\n",
 						cur_dir, file->basename);
-					exit_cleanup(RERR_PROTOCOL);
+					exit_cleanup(RERR_UNSUPPORTED);
 				}
 				good_dirname = cur_dir;
 			}
