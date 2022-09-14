@@ -494,9 +494,9 @@ void add_implied_include(const char *arg, int skip_daemon_module)
 				maybe_add_literal_brackets_rule(rule, arg_len);
 			if (relative_paths && slash_cnt) {
 				filter_rule const *ent;
-				int found = 0;
 				slash_cnt = 1;
 				for (p = new_pat + 1; (p = strchr(p, '/')) != NULL; p++) {
+					int found = 0;
 					*p = '\0';
 					for (ent = implied_filter_list.head; ent; ent = ent->next) {
 						if (ent != rule && strcmp(ent->pattern, new_pat) == 0) {
