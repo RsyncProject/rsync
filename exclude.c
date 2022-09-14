@@ -493,9 +493,10 @@ void add_implied_include(const char *arg, int skip_daemon_module)
 			if (saw_live_open_brkt)
 				maybe_add_literal_brackets_rule(rule, arg_len);
 			if (relative_paths && slash_cnt) {
-				filter_rule const *ent;
-				slash_cnt = 1;
-				for (p = new_pat + 1; (p = strchr(p, '/')) != NULL; p++) {
+				int sub_slash_cnt = slash_cnt;
+				while ((p = strrchr(new_pat, '/')) != NULL && p != new_pat) {
+					filter_rule const *ent;
+					filter_rule *R_rule;
 					int found = 0;
 					*p = '\0';
 					for (ent = implied_filter_list.head; ent; ent = ent->next) {
@@ -504,25 +505,29 @@ void add_implied_include(const char *arg, int skip_daemon_module)
 							break;
 						}
 					}
-					if (!found) {
-						filter_rule *R_rule = new0(filter_rule);
-						R_rule->rflags = FILTRULE_INCLUDE | FILTRULE_DIRECTORY;
-						/* Check if our sub-path has wildcards or escaped backslashes */
-						if (saw_wild && strpbrk(new_pat, "*[?\\"))
-							R_rule->rflags |= FILTRULE_WILD;
-						R_rule->pattern = strdup(new_pat);
-						R_rule->u.slash_cnt = slash_cnt;
-						R_rule->next = implied_filter_list.head;
-						implied_filter_list.head = R_rule;
-						if (DEBUG_GTE(FILTER, 3)) {
-							rprintf(FINFO, "[%s] add_implied_include(%s/)\n",
-								who_am_i(), R_rule->pattern);
-						}
-						if (saw_live_open_brkt)
-							maybe_add_literal_brackets_rule(R_rule, -1);
+					if (found) {
+						*p = '/';
+						break; /* We added all parent dirs already */
 					}
+					R_rule = new0(filter_rule);
+					R_rule->rflags = FILTRULE_INCLUDE | FILTRULE_DIRECTORY;
+					/* Check if our sub-path has wildcards or escaped backslashes */
+					if (saw_wild && strpbrk(new_pat, "*[?\\"))
+						R_rule->rflags |= FILTRULE_WILD;
+					R_rule->pattern = strdup(new_pat);
+					R_rule->u.slash_cnt = --sub_slash_cnt;
+					R_rule->next = implied_filter_list.head;
+					implied_filter_list.head = R_rule;
+					if (DEBUG_GTE(FILTER, 3)) {
+						rprintf(FINFO, "[%s] add_implied_include(%s/)\n",
+							who_am_i(), R_rule->pattern);
+					}
+					if (saw_live_open_brkt)
+						maybe_add_literal_brackets_rule(R_rule, -1);
+				}
+				for (p = new_pat; sub_slash_cnt < slash_cnt; sub_slash_cnt++) {
+					p += strlen(p);
 					*p = '/';
-					slash_cnt++;
 				}
 			}
 		}
