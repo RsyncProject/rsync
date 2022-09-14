@@ -508,7 +508,7 @@ void add_implied_include(const char *arg, int skip_daemon_module)
 						filter_rule *R_rule = new0(filter_rule);
 						R_rule->rflags = FILTRULE_INCLUDE | FILTRULE_DIRECTORY;
 						/* Check if our sub-path has wildcards or escaped backslashes */
-						if (saw_wild && strpbrk(rule->pattern, "*[?\\"))
+						if (saw_wild && strpbrk(new_pat, "*[?\\"))
 							R_rule->rflags |= FILTRULE_WILD;
 						R_rule->pattern = strdup(new_pat);
 						R_rule->u.slash_cnt = slash_cnt;
