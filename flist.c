@@ -988,7 +988,7 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 		exit_cleanup(RERR_UNSUPPORTED);
 	}
 
-	if (*thisname != '.' || thisname[1] != '\0') {
+	if (*thisname == '/' ? thisname[1] != '.' || thisname[2] != '\0' : *thisname != '.' || thisname[1] != '\0') {
 		int filt_flags = S_ISDIR(mode) ? NAME_IS_DIR : NAME_IS_FILE;
 		if (!trust_sender_filter /* a per-dir filter rule means we must trust the sender's filtering */
 		 && filter_list.head && check_server_filter(&filter_list, FINFO, thisname, filt_flags) < 0) {
