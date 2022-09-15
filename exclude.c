@@ -555,15 +555,12 @@ void add_implied_include(const char *arg, int skip_daemon_module)
 				p += arg_len;
 			}
 		}
-		if (p[-1] != '/') {
-			*p++ = '/';
-			slash_cnt++;
-		}
+		*p++ = '/';
 		*p++ = '*';
 		if (recurse)
 			*p++ = '*';
 		*p = '\0';
-		rule->u.slash_cnt = slash_cnt;
+		rule->u.slash_cnt = slash_cnt + 1;
 		rule->next = implied_filter_list.head;
 		implied_filter_list.head = rule;
 		if (DEBUG_GTE(FILTER, 3))
