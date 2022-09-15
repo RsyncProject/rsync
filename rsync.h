@@ -826,7 +826,7 @@ extern int uid_ndx;
 extern int gid_ndx;
 extern int acls_ndx;
 extern int xattrs_ndx;
-extern int file_sum_len;
+extern int file_sum_extra_cnt;
 
 #ifdef USE_FLEXIBLE_ARRAY
 #define FILE_STRUCT_LEN (sizeof (struct file_struct))
@@ -837,7 +837,7 @@ extern int file_sum_len;
 #define DEV_EXTRA_CNT 2
 #define DIRNODE_EXTRA_CNT 3
 #define EXTRA64_CNT ((sizeof (union file_extras64) + EXTRA_LEN - 1) / EXTRA_LEN)
-#define SUM_EXTRA_CNT ((file_sum_len + EXTRA_LEN - 1) / EXTRA_LEN)
+#define SUM_EXTRA_CNT file_sum_extra_cnt
 
 #define REQ_EXTRA(f,ndx) ((union file_extras*)(f) - (ndx))
 #define OPT_EXTRA(f,bump) ((union file_extras*)(f) - file_extra_cnt - 1 - (bump))

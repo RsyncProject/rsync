@@ -104,7 +104,7 @@ const EVP_MD *xfer_sum_evp_md;
 int xfer_sum_len;
 struct name_num_item *file_sum_nni; /* used for the pre-transfer --checksum computations */
 const EVP_MD *file_sum_evp_md;
-int file_sum_len;
+int file_sum_len, file_sum_extra_cnt;
 
 #ifdef USE_OPENSSL
 EVP_MD_CTX *ctx_evp = NULL;
@@ -196,6 +196,8 @@ void parse_checksum_choice(int final_call)
 	file_sum_len = csum_len_for_type(file_sum_nni->num, 0);
 	xfer_sum_evp_md = csum_evp_md(xfer_sum_nni);
 	file_sum_evp_md = csum_evp_md(file_sum_nni);
+
+	file_sum_extra_cnt = (file_sum_len + EXTRA_LEN - 1) / EXTRA_LEN;
 
 	if (xfer_sum_nni->num == CSUM_NONE)
 		whole_file = 1;
