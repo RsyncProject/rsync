@@ -1497,9 +1497,8 @@ uint32 fuzzy_distance(const char *s1, unsigned len1, const char *s2, unsigned le
 	 * upper limit defined by the previously found lowest distance using
 	 * the heuristic that the Levenshtein distance is greater than the
 	 * difference in length of the two strings */
-	if ( ( (len1 > len2) * (len1 - len2) + (len1 < len2) * (len2 - len1) ) * UNIT > upperlimit ) {
-		return (0xFFFFU * UNIT + 1);
-	}
+	if ((len1 > len2 ? len1 - len2 : len2 - len1) * UNIT > upperlimit)
+		return 0xFFFFU * UNIT + 1;
 
 	if (!len1 || !len2) {
 		if (!len1) {
