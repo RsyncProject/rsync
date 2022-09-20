@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import sys, re, argparse, subprocess, json
+import sys, argparse, subprocess, json
 
 def main():
     if not args.rsync or args.rsync == '-':
