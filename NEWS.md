@@ -35,10 +35,11 @@
   converted. Newer rsync versions will provide more complete info than older
   versions.
 
-- The [`use chroot`](#rsyncd.conf) daemon parameter now defaults to "unset" so
-  that rsync can test if chrooting works and decide to proceed with a sanitized
-  copy if chroot is not supported (e.g., for a non-root daemon).  Explicitly
-  setting it to true or false (on or off) behaves the same way as before.
+- The [`use chroot`](rsyncd.conf.5#use_chroot) daemon parameter now defaults to
+  "unset" so that rsync can test if chrooting works and decide to proceed with
+  a sanitized copy if chroot is not supported (e.g., for a non-root daemon).
+  Explicitly setting it to true or false (on or off) behaves the same way as
+  before.
 
 ### PACKAGING RELATED:
 
