@@ -60,9 +60,9 @@ BOOL	read_only		True
 BOOL	reverse_lookup		True
 BOOL	strict_modes		True
 BOOL	transfer_logging	False
-BOOL	use_chroot		True
 BOOL	write_only		False
 
 BOOL3	munge_symlinks		Unset
 BOOL3	numeric_ids		Unset
 BOOL3	open_noatime		Unset
+BOOL3	use_chroot		Unset

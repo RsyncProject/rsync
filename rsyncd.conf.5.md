@@ -164,6 +164,16 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     available in this module.  You must specify this parameter for each module
     in `rsyncd.conf`.
 
+    If the value contains a "/./" element then the path will be divided at that
+    point into a chroot dir and an inner-chroot subdir.  If [`use chroot`](#)
+    is set to false, though, the extraneous dot dir is just cleaned out of the
+    path.  An example of this idiom is:
+
+    >     path = /var/rsync/./module1
+
+    This will (when chrooting) chroot to "/var/rsync" and set the inside-chroot
+    path to "/module1".
+
     You may base the path's value off of an environment variable by surrounding
     the variable name with percent signs.  You can even reference a variable
     that is set by rsync when the user connects.  For example, this would use
@@ -187,29 +197,43 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     path, and of complicating the preservation of users and groups by name (see
     below).
 
-    As an additional safety feature, you can specify a dot-dir in the module's
-    "[path](#)" to indicate the point where the chroot should occur.  This allows
-    rsync to run in a chroot with a non-"/" path for the top of the transfer
-    hierarchy.  Doing this guards against unintended library loading (since
-    those absolute paths will not be inside the transfer hierarchy unless you
-    have used an unwise pathname), and lets you setup libraries for the chroot
-    that are outside of the transfer.  For example, specifying
-    "/var/rsync/./module1" will chroot to the "/var/rsync" directory and set
-    the inside-chroot path to "/module1".  If you had omitted the dot-dir, the
-    chroot would have used the whole path, and the inside-chroot path would
-    have been "/".
+    If `use chroot` is not set, it defaults to trying to enable a chroot but
+    allows the daemon to continue (after logging a warning) if it fails. The
+    one exception to this is when a module's [`path`](#) has a "/./" chroot
+    divider in it -- this causes an unset value to be treated as true for that
+    module.
 
-    When both "use chroot" and "[daemon chroot](#)" are false, OR the inside-chroot
-    path of "use chroot" is not "/", rsync will: (1) munge symlinks by default
-    for security reasons (see "[munge symlinks](#)" for a way to turn this off, but
-    only if you trust your users), (2) substitute leading slashes in absolute
-    paths with the module's path (so that options such as `--backup-dir`,
-    `--compare-dest`, etc. interpret an absolute path as rooted in the module's
-    "[path](#)" dir), and (3) trim ".." path elements from args if rsync believes
-    they would escape the module hierarchy.  The default for "use chroot" is
-    true, and is the safer choice (especially if the module is not read-only).
+    Prior to rsync 3.2.7, the default value was "true".  The new default makes
+    it easier to setup an rsync daemon as a non-root user or to run a daemon on
+    a system where chroot fails.  Explicitly setting the value to true in the
+    rsyncd.conf file will always require the chroot to succeed.
 
-    When this parameter is enabled *and* the "[name converter](#)" parameter is
+    It is also possible to specify a dot-dir in the module's "[path](#)" to
+    indicate that you want to chdir to the earlier part of the path and then
+    serve files from inside the latter part of the path (with default
+    sanitizing and symlink munging).  This can be useful if you need some
+    library dirs inside the chroot (typically for uid & gid lookups) but don't
+    want to put the lib dir into the top of the served path (even though they
+    can be hidden with an [`exclude`](#) directive).  However, a better choice
+    for a modern rsync setup is to use a [`name converter`](#)" and try to
+    avoid inner lib dirs altogether.  See also the [`daemon chroot`](#)
+    parameter, which causes rsync to chroot into its own chroot area before
+    doing any path-related chrooting.
+
+    If the daemon is serving the "/" dir (either directly or due to being
+    chrooted to the module's path), rsync does not do any extra path sanitizing
+    or (default) munging.  When it has to limit access to a particular subdir
+    (either due to chroot being disabled or having an inside-chroot path set),
+    rsync will munge symlinks (by default) and sanitize paths.  Those that
+    dislike munged symlinks (and really, really trust their users to not break
+    out of the subdir) can disable the symlink munging via the "[munge
+    symlinks](#)" parameter. Sanitizing paths trims ".." path elements from
+    args that rsync believes would escape the module hierarchy, and also
+    substitutes leading slashes in absolute paths with the module's path (so
+    that options such as `--backup-dir` & `--compare-dest` interpret an
+    absolute path as rooted in the module's "[path](#)" dir).
+
+    When a chroot is in effect *and* the "[name converter](#)" parameter is
     *not* set, the "[numeric ids](#)" parameter will default to being enabled
     (disabling name lookups).  This means that if you manually setup
     name-lookup libraries in your chroot (instead of using a name converter)

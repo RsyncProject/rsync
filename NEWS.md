@@ -8,6 +8,9 @@
 
 - When rsync gets an unpack error on an ACL, mention the filename.
 
+- Avoid oversetting sanitize_paths when a daemon is serving "/" (even if
+  "use chroot" is false).
+
 ### ENHANCEMENTS:
 
 - Added negotiated daemon-auth support that allows a stronger checksum digest
@@ -32,6 +35,11 @@
   converted. Newer rsync versions will provide more complete info than older
   versions.
 
+- The [`use chroot`](#rsyncd.conf) daemon parameter now defaults to "unset" so
+  that rsync can test if chrooting works and decide to proceed with a sanitized
+  copy if chroot is not supported (e.g., for a non-root daemon).  Explicitly
+  setting it to true or false (on or off) behaves the same way as before.
+
 ### PACKAGING RELATED:
 
 - The checksum code now uses openssl's EVP methods, which gets rid of various
@@ -48,6 +56,11 @@
   `--with-openssl-conf=/path/name.cnf`, this will cause rsync to export the
   configured path in the OPENSSL_CONF environment variable (when the variable
   is not already set).  This will enable openssl's MD4 code for rsync to use.
+
+- The packager may wish to include an explicit "use chroot = true" in the top
+  section of the /etc/rsyncd.conf file if the daemon is being installed to run
+  as the root user (though rsync should behave the same even with the value
+  unset, a little extra paranoia doesn't hurt).
 
 ------------------------------------------------------------------------------
 

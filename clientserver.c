@@ -701,7 +701,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	int set_uid;
 	char *p, *err_msg = NULL;
 	char *name = lp_name(i);
-	int use_chroot = lp_use_chroot(i);
+	int use_chroot = lp_use_chroot(i); /* might be 1 (yes), 0 (no), or -1 (unset) */
 	int ret, pre_exec_arg_fd = -1, pre_exec_error_fd = -1;
 	int save_munge_symlinks;
 	pid_t pre_exec_pid = 0;
@@ -825,6 +825,20 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 		rprintf(FLOG, "No path specified for module %s\n", name);
 		io_printf(f_out, "@ERROR: no path setting.\n");
 		return -1;
+	}
+	if (use_chroot < 0) {
+		if (strstr(module_dir, "/./") != NULL)
+			use_chroot = 1; /* The module is expecting a chroot inner & outer path. */
+		else if (chroot("/") < 0) {
+			rprintf(FLOG, "chroot test failed: %s. "
+				      "Switching 'use chroot' from unset to no.\n",
+				      strerror(errno));
+			use_chroot = 0;
+		} else {
+			if (chdir("/") < 0)
+			    rsyserr(FLOG, errno, "chdir(\"/\") failed");
+			use_chroot = 1;
+		}
 	}
 	if (use_chroot) {
 		if ((p = strstr(module_dir, "/./")) != NULL) {
@@ -962,20 +976,8 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	}
 
 	if (use_chroot) {
-		/*
-		 * XXX: The 'use chroot' flag is a fairly reliable
-		 * source of confusion, because it fails under two
-		 * important circumstances: running as non-root,
-		 * running on Win32 (or possibly others).  On the
-		 * other hand, if you are running as root, then it
-		 * might be better to always use chroot.
-		 *
-		 * So, perhaps if we can't chroot we should just issue
-		 * a warning, unless a "require chroot" flag is set,
-		 * in which case we fail.
-		 */
 		if (chroot(module_chdir)) {
-			rsyserr(FLOG, errno, "chroot %s failed", module_chdir);
+			rsyserr(FLOG, errno, "chroot(\"%s\") failed", module_chdir);
 			io_printf(f_out, "@ERROR: chroot failed\n");
 			return -1;
 		}
@@ -984,7 +986,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 
 	if (!change_dir(module_chdir, CD_NORMAL))
 		return path_failure(f_out, module_chdir, True);
-	if (module_dirlen || (!use_chroot && !*lp_daemon_chroot()))
+	if (module_dirlen)
 		sanitize_paths = 1;
 
 	if ((munge_symlinks = lp_munge_symlinks(module_id)) < 0)
@@ -1299,8 +1301,12 @@ int start_daemon(int f_in, int f_out)
 	p = lp_daemon_chroot();
 	if (*p) {
 		log_init(0); /* Make use we've initialized syslog before chrooting. */
-		if (chroot(p) < 0 || chdir("/") < 0) {
-			rsyserr(FLOG, errno, "daemon chroot %s failed", p);
+		if (chroot(p) < 0) {
+			rsyserr(FLOG, errno, "daemon chroot(\"%s\") failed", p);
+			return -1;
+		}
+		if (chdir("/") < 0) {
+			rsyserr(FLOG, errno, "daemon chdir(\"/\") failed");
 			return -1;
 		}
 	}
