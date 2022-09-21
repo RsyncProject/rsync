@@ -6,7 +6,7 @@ if [ ! -f git-version.h ]; then
     touch git-version.h
 fi
 
-if [ -e "$srcdir/.git" ]; then
+if test -d "$srcdir/.git" || test -f "$srcdir/.git"; then
     gitver=`git describe --abbrev=8 2>/dev/null | sed -n '/^v3\.[0-9][0-9]*\.[0-9][0-9]*\(-\|$\)/p'`
     if [ -n "$gitver" ]; then
 	echo "#define RSYNC_GITVER \"$gitver\"" >git-version.h.new
