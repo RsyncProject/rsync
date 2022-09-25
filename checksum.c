@@ -60,12 +60,6 @@ struct name_num_item valid_checksums_items[] = {
 #ifdef SHA_DIGEST_LENGTH
 	{ CSUM_SHA1, NNI_EVP, "sha1", NULL },
 #endif
-#ifdef SHA256_DIGEST_LENGTH
-	{ CSUM_SHA256, NNI_EVP, "sha256", NULL },
-#endif
-#ifdef SHA512_DIGEST_LENGTH
-	{ CSUM_SHA512, NNI_EVP, "sha512", NULL },
-#endif
 	{ CSUM_NONE, 0, "none", NULL },
 	{ 0, 0, NULL, NULL }
 };
@@ -100,15 +94,16 @@ struct name_num_item implied_checksum_md5 =
     { CSUM_MD5, NNI_BUILTIN, "md5", NULL };
 
 struct name_num_item *xfer_sum_nni; /* used for the transfer checksum2 computations */
-const EVP_MD *xfer_sum_evp_md;
 int xfer_sum_len;
 struct name_num_item *file_sum_nni; /* used for the pre-transfer --checksum computations */
-const EVP_MD *file_sum_evp_md;
 int file_sum_len, file_sum_extra_cnt;
 
 #ifdef USE_OPENSSL
+const EVP_MD *xfer_sum_evp_md;
+const EVP_MD *file_sum_evp_md;
 EVP_MD_CTX *ctx_evp = NULL;
 #endif
+
 static int initialized_choices = 0;
 
 struct name_num_item *parse_csum_name(const char *name, int len)
@@ -147,9 +142,9 @@ struct name_num_item *parse_csum_name(const char *name, int len)
 	return nni;
 }
 
+#ifdef USE_OPENSSL
 static const EVP_MD *csum_evp_md(struct name_num_item *nni)
 {
-#ifdef USE_OPENSSL
 	const EVP_MD *emd;
 	if (!(nni->flags & NNI_EVP))
 		return NULL;
@@ -173,10 +168,8 @@ static const EVP_MD *csum_evp_md(struct name_num_item *nni)
 	if (!emd)
 		nni->flags &= ~NNI_EVP;
 	return emd;
-#else
-	return NULL;
-#endif
 }
+#endif
 
 void parse_checksum_choice(int final_call)
 {
@@ -194,8 +187,10 @@ void parse_checksum_choice(int final_call)
 	}
 	xfer_sum_len = csum_len_for_type(xfer_sum_nni->num, 0);
 	file_sum_len = csum_len_for_type(file_sum_nni->num, 0);
+#ifdef USE_OPENSSL
 	xfer_sum_evp_md = csum_evp_md(xfer_sum_nni);
 	file_sum_evp_md = csum_evp_md(file_sum_nni);
+#endif
 
 	file_sum_extra_cnt = (file_sum_len + EXTRA_LEN - 1) / EXTRA_LEN;
 
@@ -551,8 +546,11 @@ static XXH64_state_t* xxh64_state;
 static XXH3_state_t* xxh3_state;
 #endif
 static struct name_num_item *cur_sum_nni;
-static const EVP_MD *cur_sum_evp_md;
 int cur_sum_len;
+
+#ifdef USE_OPENSSL
+static const EVP_MD *cur_sum_evp_md;
+#endif
 
 int sum_init(struct name_num_item *nni, int seed)
 {
@@ -562,7 +560,9 @@ int sum_init(struct name_num_item *nni, int seed)
 		nni = parse_csum_name(NULL, 0);
 	cur_sum_nni = nni;
 	cur_sum_len = csum_len_for_type(nni->num, 0);
+#ifdef USE_OPENSSL
 	cur_sum_evp_md = csum_evp_md(nni);
+#endif
 
 #ifdef USE_OPENSSL
 	if (cur_sum_evp_md) {
@@ -784,7 +784,9 @@ static void verify_digest(struct name_num_item *nni, BOOL check_auth_list)
 
 void init_checksum_choices()
 {
+#if defined SUPPORT_XXH3 || defined USE_OPENSSL
 	struct name_num_item *nni;
+#endif
 
 	if (initialized_choices)
 		return;
