@@ -4,11 +4,15 @@
 
 ### BUG FIXES:
 
-- Fixed the validating of remote filter rules.
+- Fixed the client-side validating of the remote sender's filtering behavior.
+
+- More fixes for the "unrequested file-list name" name, including a copy of
+  "/" with `--relative` enabled and a copy with a lot of related paths with
+  `--relative` enabled (often derived from a `--files-from` list).
 
 - When rsync gets an unpack error on an ACL, mention the filename.
 
-- Avoid oversetting sanitize_paths when a daemon is serving "/" (even if
+- Avoid over-setting sanitize_paths when a daemon is serving "/" (even if
   "use chroot" is false).
 
 ### ENHANCEMENTS:
@@ -36,10 +40,14 @@
   versions.
 
 - The [`use chroot`](rsyncd.conf.5#use_chroot) daemon parameter now defaults to
-  "unset" so that rsync can test if chrooting works and decide to proceed with
-  a sanitized copy if chroot is not supported (e.g., for a non-root daemon).
+  "unset" so that rsync can use chroot when it works and decide to proceed with
+  a sanitized copy when chroot is not supported (e.g., for a non-root daemon).
   Explicitly setting it to true or false (on or off) behaves the same way as
   before.
+
+- The `--fuzzy` option was optimized a bit to try to cut down on the amount of
+  computations when considering a big pool of files. The simple heuristic from
+  Kenneth Finnegan resuled in about a 2x speedup.
 
 ### PACKAGING RELATED:
 
@@ -62,6 +70,11 @@
   section of the /etc/rsyncd.conf file if the daemon is being installed to run
   as the root user (though rsync should behave the same even with the value
   unset, a little extra paranoia doesn't hurt).
+
+- I've noticed that some packagers haven't installed support/nameconvert for
+  users to use in their chrooted rsync configs.  Even if it is not installed
+  as an executable script (to avoid a python3 dependency) it would be good to
+  install it with the other rsync-related support scripts.
 
 ------------------------------------------------------------------------------
 
