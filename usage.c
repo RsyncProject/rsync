@@ -265,7 +265,7 @@ void print_rsync_version(enum logcode f)
 		char verbuf[32];
 		json_line("program", RSYNC_NAME);
 		json_line("version", rsync_version());
-		snprintf(verbuf, sizeof verbuf, "%d.%d", PROTOCOL_VERSION, SUBPROTOCOL_VERSION);
+		(void)snprintf(verbuf, sizeof verbuf, "%d.%d", PROTOCOL_VERSION, SUBPROTOCOL_VERSION);
 		json_line("protocol", verbuf);
 		json_line("copyright", copyright);
 		json_line("url", url);
