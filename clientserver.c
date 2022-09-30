@@ -831,7 +831,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 			use_chroot = 1; /* The module is expecting a chroot inner & outer path. */
 		else if (chroot("/") < 0) {
 			rprintf(FLOG, "chroot test failed: %s. "
-				      "Switching 'use chroot' from unset to no.\n",
+				      "Switching 'use chroot' from unset to false.\n",
 				      strerror(errno));
 			use_chroot = 0;
 		} else {

@@ -203,35 +203,39 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     divider in it -- this causes an unset value to be treated as true for that
     module.
 
-    Prior to rsync 3.2.7, the default value was "true".  The new default makes
-    it easier to setup an rsync daemon as a non-root user or to run a daemon on
-    a system where chroot fails.  Explicitly setting the value to true in the
-    rsyncd.conf file will always require the chroot to succeed.
+    Prior to rsync 3.2.7, the default value was "true".  The new "unset"
+    default makes it easier to setup an rsync daemon as a non-root user or to
+    run a daemon on a system where chroot fails.  Explicitly setting the value
+    to "true" in rsyncd.conf will always require the chroot to succeed.
 
     It is also possible to specify a dot-dir in the module's "[path](#)" to
     indicate that you want to chdir to the earlier part of the path and then
-    serve files from inside the latter part of the path (with default
-    sanitizing and symlink munging).  This can be useful if you need some
-    library dirs inside the chroot (typically for uid & gid lookups) but don't
-    want to put the lib dir into the top of the served path (even though they
-    can be hidden with an [`exclude`](#) directive).  However, a better choice
-    for a modern rsync setup is to use a [`name converter`](#)" and try to
-    avoid inner lib dirs altogether.  See also the [`daemon chroot`](#)
-    parameter, which causes rsync to chroot into its own chroot area before
-    doing any path-related chrooting.
+    serve files from inside the latter part of the path (with sanitizing and
+    default symlink munging).  This can be useful if you need some library dirs
+    inside the chroot (typically for uid & gid lookups) but don't want to put
+    the lib dir into the top of the served path (even though they can be hidden
+    with an [`exclude`](#) directive).  However, a better choice for a modern
+    rsync setup is to use a [`name converter`](#)" and try to avoid inner lib
+    dirs altogether.  See also the [`daemon chroot`](#) parameter, which causes
+    rsync to chroot into its own chroot area before doing any path-related
+    chrooting.
 
     If the daemon is serving the "/" dir (either directly or due to being
-    chrooted to the module's path), rsync does not do any extra path sanitizing
-    or (default) munging.  When it has to limit access to a particular subdir
-    (either due to chroot being disabled or having an inside-chroot path set),
-    rsync will munge symlinks (by default) and sanitize paths.  Those that
-    dislike munged symlinks (and really, really trust their users to not break
-    out of the subdir) can disable the symlink munging via the "[munge
-    symlinks](#)" parameter. Sanitizing paths trims ".." path elements from
-    args that rsync believes would escape the module hierarchy, and also
-    substitutes leading slashes in absolute paths with the module's path (so
-    that options such as `--backup-dir` & `--compare-dest` interpret an
-    absolute path as rooted in the module's "[path](#)" dir).
+    chrooted to the module's path), rsync does not do any path sanitizing or
+    (default) munging.
+
+    When it has to limit access to a particular subdir (either due to chroot
+    being disabled or having an inside-chroot path set), rsync will munge
+    symlinks (by default) and sanitize paths.  Those that dislike munged
+    symlinks (and really, really trust their users to not break out of the
+    subdir) can disable the symlink munging via the "[munge symlinks](#)"
+    parameter.
+
+    When rsync is sanitizing paths, it trims ".." path elements from args that
+    it believes would escape the module hierarchy. It also substitutes leading
+    slashes in absolute paths with the module's path (so that options such as
+    `--backup-dir` & `--compare-dest` interpret an absolute path as rooted in
+    the module's "[path](#)" dir).
 
     When a chroot is in effect *and* the "[name converter](#)" parameter is
     *not* set, the "[numeric ids](#)" parameter will default to being enabled

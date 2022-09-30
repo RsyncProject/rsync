@@ -53,8 +53,8 @@ base64 form of the digest hash of the challenge+password string. The
 chosen digest method is the most preferred client method that is also in
 the server's list.  If no digest list was explicitly provided, the side
 expecting a list assumes the other side provided either the single name
-"md5" (for a negotiated protocol 30), or the single name "md4" (for an
-older protocol).
+"md5" (for a negotiated protocol 30 or 31), or the single name "md4"
+(for an older protocol).
 
 At this point the server applies all remaining constraints before
 handing control to the client, including switching uid/gid, setting up
@@ -91,10 +91,12 @@ stay tuned (or write it yourself!).
 ------------
 Protocol version changes
 
-31	(2022-09-10, 3.2.7dev)
+31	(2013-09-28, 3.1.0)
 
-	The use of a suffixed list of digest names was added as an
-	optional suffix to the greeting line.
+	Initial release of protocol 31 had no changes.  Rsync 3.2.7
+	introduced the suffixed list of digest names on the greeting
+	line.  The presence of the list is allowed even if the greeting
+	indicates an older protocol version number.
 
 30	(2007-10-04, 3.0.0pre1)
 

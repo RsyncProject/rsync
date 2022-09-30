@@ -581,8 +581,8 @@ expand it.
 0.  `--version`, `-V`
 
     Print the rsync version plus other info and exit.  When repeated, the
-    information is output is a JSON format that is still hum-readable (client
-    side only).
+    information is output is a JSON format that is still fairly readable
+    (client side only).
 
     The output includes a list of compiled-in capabilities, a list of
     optimizations, the default list of checksum algorithms, the default list of
@@ -1731,8 +1731,6 @@ expand it.
     - `md5`
     - `md4`
     - `sha1`
-    - `sha256`
-    - `sha512`
     - `none`
 
     Run `rsync --version` to see the default checksum list compiled into your

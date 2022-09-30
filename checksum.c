@@ -552,6 +552,9 @@ int cur_sum_len;
 static const EVP_MD *cur_sum_evp_md;
 #endif
 
+/* Initialize a hash digest accumulator.  Data is supplied via
+ * sum_update() and the resulting binary digest is retrieved via
+ * sum_end().  This only supports one active sum at a time. */
 int sum_init(struct name_num_item *nni, int seed)
 {
 	char s[4];
@@ -615,14 +618,7 @@ int sum_init(struct name_num_item *nni, int seed)
 	return cur_sum_len;
 }
 
-/**
- * Feed data into an MD4 accumulator, md.  The results may be
- * retrieved using sum_end().  md is used for different purposes at
- * different points during execution.
- *
- * @todo Perhaps get rid of md and just pass in the address each time.
- * Very slightly clearer and slower.
- **/
+/* Feed data into a hash digest accumulator. */
 void sum_update(const char *p, int32 len)
 {
 #ifdef USE_OPENSSL

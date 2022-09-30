@@ -18,32 +18,34 @@
 ### ENHANCEMENTS:
 
 - Added negotiated daemon-auth support that allows a stronger checksum digest
-  to be used.  Added SHA512, SHA256, and SHA1 digests to MD5 & MD4.  These new
-  digests are at the highest priority in the new daemon-auth negotiation list.
+  to be used to validate a user's login to the daemon.  Added SHA512, SHA256,
+  and SHA1 digests to MD5 & MD4.  These new digests are at the highest priority
+  in the new daemon-auth negotiation list.
 
-- Added support for SHA1, SHA256, and SHA512 digests in file checksums.  While
-  this tends to be overkill, it is available if someone really needs it.  These
-  overly-long checksums are at the lowest priority in the normal checksum
-  negotiation list.
+- Added support for the SHA1 digest in file checksums.  While this tends to be
+  overkill, it is available if someone really needs it.  This overly-long
+  checksum is at the lowest priority in the normal checksum negotiation list.
+  See `--checksum-choice` (`--cc`) and the `RSYNC_CHECKSUM_LIST` environment
+  var for how to customize this.
 
-- Improved the xattr hash table to use a 64-bit key (which should ensure fewer
-  collisions).
+- Improved the xattr hash table to use a 64-bit key without slowing down the
+  key's computation.  This should make extra sure that a collision doesn't
+  happen.
 
 - If the `--version` option is repeated (e.g. `-VV`) then the information is
-  output in a (still human-readable) JSON format (client side only).
+  output in a (still fairly readable) JSON format.  Client side only.
 
 - The script `support/json-rsync-version` is available to get the JSON style
   version output from any rsync.  The script accepts either text on stdin
   **or** an arg that specifies an rsync executable to run with a doubled
   `--version` option.  If the text we get isn't already in JSON format, it is
-  converted. Newer rsync versions will provide more complete info than older
-  versions.
+  converted. Newer rsync versions will provide more complete json info than
+  older rsync versions.
 
 - The [`use chroot`](rsyncd.conf.5#use_chroot) daemon parameter now defaults to
-  "unset" so that rsync can use chroot when it works and decide to proceed with
-  a sanitized copy when chroot is not supported (e.g., for a non-root daemon).
-  Explicitly setting it to true or false (on or off) behaves the same way as
-  before.
+  "unset" so that rsync can use chroot when it works and a sanitized copy when
+  chroot is not supported (e.g., for a non-root daemon).  Explicitly setting
+  the parameter to true or false (on or off) behaves the same way as before.
 
 - The `--fuzzy` option was optimized a bit to try to cut down on the amount of
   computations when considering a big pool of files. The simple heuristic from
@@ -54,10 +56,10 @@
 - The checksum code now uses openssl's EVP methods, which gets rid of various
   deprecation warnings and makes it easy to support more digest methods.  On
   newer systems, the MD4 digest is marked as legacy in the openssl code, which
-  makes openssl refuse to support it via EVP.  You can just ignore this and
-  allow the included MD4 code to be used for older rsync connections (when
-  talking to an rsync prior to 3.0.0) or you can configure rsync to tell
-  openssl to enable legacy algorithms (see below).
+  makes openssl refuse to support it via EVP.  You can choose to ignore this
+  and allow the included MD4 code to be used for older rsync connections (when
+  talking to an rsync prior to 3.0.0) or you can choose to configure rsync to
+  tell openssl to enable legacy algorithms (see below).
 
 - A simple openssl config file is supplied that can be installed for rsync to
   use.  If you install packaging/openssl-rsync.cnf to a public spot (such as
@@ -67,14 +69,17 @@
   is not already set).  This will enable openssl's MD4 code for rsync to use.
 
 - The packager may wish to include an explicit "use chroot = true" in the top
-  section of the /etc/rsyncd.conf file if the daemon is being installed to run
-  as the root user (though rsync should behave the same even with the value
-  unset, a little extra paranoia doesn't hurt).
+  section of their supplied /etc/rsyncd.conf file if the daemon is being
+  installed to run as the root user (though rsync should behave the same even
+  with the value unset, a little extra paranoia doesn't hurt).
 
 - I've noticed that some packagers haven't installed support/nameconvert for
   users to use in their chrooted rsync configs.  Even if it is not installed
   as an executable script (to avoid a python3 dependency) it would be good to
   install it with the other rsync-related support scripts.
+
+- It would be good to add support/json-rsync-version to the list of installed
+  support scripts.
 
 ------------------------------------------------------------------------------
 
