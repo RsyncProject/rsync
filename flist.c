@@ -836,7 +836,7 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 			}
 #endif
 		} else
-			modtime = read_int(f);
+			modtime = read_uint(f);
 	}
 	if (xflags & XMIT_MOD_NSEC)
 #ifndef CAN_SET_NSEC
