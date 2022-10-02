@@ -859,7 +859,7 @@ expand it.
     that until a bunch of recursive copying has finished).  However, these
     early directories don't yet have their completed mode, mtime, or ownership
     set -- they have more restrictive rights until the subdirectory's copying
-    actually begins.  This early-creation idiom can be avoiding by using the
+    actually begins.  This early-creation idiom can be avoided by using the
     [`--omit-dir-times`](#opt) option.
 
     Incremental recursion can be disabled using the
@@ -1559,6 +1559,15 @@ expand it.
     causing all files to be updated (though rsync's delta-transfer algorithm
     will make the update fairly efficient if the files haven't actually
     changed, you're much better off using `-t`).
+
+    A modern rsync that is using transfer protocol 30 or 31 conveys a modify
+    time using up to 8-bytes. If rsync is forced to speak an older protocol
+    (perhaps due to the remote rsync being older than 3.0.0) a modify time is
+    conveyed using 4-bytes. Prior to 3.2.7, these shorter values could convey
+    a date range of 13-Dec-1901 to 19-Jan-2038.  Beginning with 3.2.7, these
+    4-byte values now convey a date range of 1-Jan-1970 to 7-Feb-2106.  If you
+    have files dated older than 1970, make sure your rsync executables are
+    upgraded so that the full range of dates can be conveyed.
 
 0.  `--atimes`, `-U`
 
@@ -2388,6 +2397,8 @@ expand it.
 
     This option tells rsync to stop trying to protect the arg values on the
     remote side from unintended word-splitting or other misinterpretation.
+    It also allows the client to treat an empty arg as a "." instead of
+    generating an error.
 
     The default in a modern rsync is for "shell-active" characters (including
     spaces) to be backslash-escaped in the args that are sent to the remote

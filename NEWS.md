@@ -25,8 +25,8 @@
 - Added support for the SHA1 digest in file checksums.  While this tends to be
   overkill, it is available if someone really needs it.  This overly-long
   checksum is at the lowest priority in the normal checksum negotiation list.
-  See `--checksum-choice` (`--cc`) and the `RSYNC_CHECKSUM_LIST` environment
-  var for how to customize this.
+  See [`--checksum-choice`](rsync.1#opt) (`--cc`) and the `RSYNC_CHECKSUM_LIST`
+  environment var for how to customize this.
 
 - Improved the xattr hash table to use a 64-bit key without slowing down the
   key's computation.  This should make extra sure that a collision doesn't
@@ -42,14 +42,28 @@
   converted. Newer rsync versions will provide more complete json info than
   older rsync versions.
 
-- The [`use chroot`](rsyncd.conf.5#use_chroot) daemon parameter now defaults to
-  "unset" so that rsync can use chroot when it works and a sanitized copy when
-  chroot is not supported (e.g., for a non-root daemon).  Explicitly setting
-  the parameter to true or false (on or off) behaves the same way as before.
+- The [`use chroot`](rsyncd.conf.5#) daemon parameter now defaults to "unset"
+  so that rsync can use chroot when it works and a sanitized copy when chroot
+  is not supported (e.g., for a non-root daemon).  Explicitly setting the
+  parameter to true or false (on or off) behaves the same way as before.
 
 - The `--fuzzy` option was optimized a bit to try to cut down on the amount of
   computations when considering a big pool of files. The simple heuristic from
   Kenneth Finnegan resuled in about a 2x speedup.
+
+- If rsync is forced to use protocol 29 or before (perhaps due to talking to an
+  rsync before 3.0.0), the modify time of a file is limited to 4-bytes.  Rsync
+  now interprets this value as an unsigned integer so that a current year past
+  2038 can continue to be represented. This does mean that years prior to 1970
+  cannot be represented in an older protocol, but this trade-off seems like the
+  right choice given that (1) 2038 is very rapidly approaching, and (2) newer
+  protocols support a much wider range of old and new dates.
+
+- The rsync client now treats an empty destination arg as an error, just like
+  it does for an empty source arg. This doesn't affect a `host:` arg (which is
+  treated the same as `host:.`) since the arg is not completely empty.  The use
+  of [`--old-args`](rsync.1#opt) (including via `RSYNC_OLD_ARGS`) allows the
+  prior behavior of treating an empty destination arg as a ".".
 
 ### PACKAGING RELATED:
 
