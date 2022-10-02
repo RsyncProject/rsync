@@ -660,6 +660,16 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char **remote_argv, in
 	return pid;
 }
 
+/* Older versions turn an empty string as a reference to the current directory.
+ * We now treat this as an error unless --old-args was used. */
+static char *dot_dir_or_error()
+{
+	if (old_style_args || am_server)
+		return ".";
+	rprintf(FERROR, "Empty destination arg specified (use \".\" or see --old-args).\n");
+	exit_cleanup(RERR_SYNTAX);
+}
+
 /* The receiving side operates in one of two modes:
  *
  * 1. it receives any number of files into a destination directory,
@@ -687,9 +697,8 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 	if (!dest_path || list_only)
 		return NULL;
 
-	/* Treat an empty string as a copy into the current directory. */
 	if (!*dest_path)
-		dest_path = ".";
+		dest_path = dot_dir_or_error();
 
 	if (daemon_filter_list.head) {
 		char *slash = strrchr(dest_path, '/');
@@ -1432,6 +1441,8 @@ static int start_client(int argc, char *argv[])
 
 			if (argc > 1) {
 				p = argv[--argc];
+				if (!*p)
+					p = dot_dir_or_error();
 				remote_argv = argv + argc;
 			} else {
 				static char *dotarg[1] = { "." };
