@@ -7,7 +7,7 @@ if [ ! -f git-version.h ]; then
 fi
 
 if test -d "$srcdir/.git" || test -f "$srcdir/.git"; then
-    gitver=`git describe --abbrev=8 2>/dev/null | sed -n '/^v3\.[0-9][0-9]*\.[0-9][0-9]*\(-\|$\)/p'`
+    gitver=`git describe --abbrev=8 2>/dev/null | sed -n '/^v3\.[0-9][0-9]*\.[0-9][0-9]*\(pre[0-9]*\)*\(-\|$\)/p'`
     if [ -n "$gitver" ]; then
 	echo "#define RSYNC_GITVER \"$gitver\"" >git-version.h.new
 	if ! diff git-version.h.new git-version.h >/dev/null; then
