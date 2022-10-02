@@ -3539,13 +3539,17 @@ expand it.
 
     >     rsync -av --list-only foo* dest/
 
-    Starting with rsync 3.1.0, the sizes output by `--list-only` are affected
-    by the [`--human-readable`](#opt) option.  By default they will contain
-    digit separators, but higher levels of readability will output the sizes
-    with unit suffixes.  Note also that the column width for the size output
-    has increased from 11 to 14 characters for all human-readable levels.  Use
-    `--no-h` if you want just digits in the sizes, and the old column width of
-    11 characters.
+    This option always uses an output format that looks similar to this:
+
+    >     drwxrwxr-x          4,096 2022/09/30 12:53:11 support
+    >     -rw-rw-r--             80 2005/01/11 10:37:37 support/Makefile
+
+    The only option that affects this output style is (as of 3.1.0) the
+    [`--human-readable`](#opt) (`-h`) option.  The default is to output sizes
+    as byte counts with digit separators (in a 14-character-width column).
+    Specifying at least one `-h` option makes the sizes output with unit
+    suffixes.  If you want old-style bytecount sizes without digit separators
+    (and an 11-character-width column) use `--no-h`.
 
     Compatibility note: when requesting a remote listing of files from an rsync
     that is version 2.6.3 or older, you may encounter an error if you ask for a
