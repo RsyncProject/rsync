@@ -176,7 +176,7 @@ def mandate_gensend_hook():
         print('Creating hook file:', hook)
         cmd_chk(['./rsync', '-a', 'packaging/pre-push', hook])
     else:
-        ct = cmd_txt(['fgrep', 'make gensend', hook], discard='output')
+        ct = cmd_txt(['grep', 'make gensend', hook], discard='output')
         if ct.rc:
             die('Please add a "make gensend" into your', hook, 'script.')
 
