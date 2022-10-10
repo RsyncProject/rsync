@@ -71,7 +71,7 @@
   deprecation warnings and makes it easy to support more digest methods.  On
   newer systems, the MD4 digest is marked as legacy in the openssl code, which
   makes openssl refuse to support it via EVP.  You can choose to ignore this
-  and allow the included MD4 code to be used for older rsync connections (when
+  and allow rsync's MD4 code to be used for older rsync connections (when
   talking to an rsync prior to 3.0.0) or you can choose to configure rsync to
   tell openssl to enable legacy algorithms (see below).
 
