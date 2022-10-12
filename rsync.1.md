@@ -152,7 +152,36 @@ rsync daemon by leaving off the module name:
 
 >     rsync somehost.mydomain.com::
 
-See the following section for more details.
+## COPYING A SINGLE FILE
+
+Rsync has special handling for a copy of a single file that allows for the name
+to be changed on the destination.  The rules for this are:
+
+- The transfer list must consist of a single file (with no parent directory in
+  the transfer)
+- The final element of the destination path must not exist as a directory
+- The destination path must not have been specified with a trailing slash
+
+Under those circumstances, rsync will set the name of the destination file to
+the last element of the destination path.
+
+For example, the following will copy the foo.c file as bar.c in the "dest" dir
+(assuming that bar.c isn't a directory):
+
+>     rsync -ai src/foo.c dest/bar.c
+
+This rule might accidentally bite you if you unknowingly copy a single file and
+specify a destination dir that doesn't exist (without a trailing slash).  For
+example:
+
+>     rsync -ai src/*.c dest/dir
+
+If the `*.c` only matched one file and dest/dir did not yet exist, then rsync
+would rename the single .c file with the name "dir" in "dest".  To prevent
+this, it is safest to specify a destination path with a trailing slash when you
+want it to be treated as a directory:
+
+>     rsync -ai src/*.c dest/dir/
 
 ## SORTED TRANSFER ORDER
 
@@ -1113,23 +1142,17 @@ expand it.
 
 0.  `--mkpath`
 
-    Create a missing path component of the destination arg.  This allows rsync
-    to create multiple levels of missing destination dirs and to create a path
-    in which to put a single renamed file.  Keep in mind that you'll need to
-    supply a trailing slash if you want the entire destination path to be
-    treated as a directory when copying a single arg (making rsync behave the
-    same way that it would if the path component of the destination had already
-    existed).
+    Create a missing path component of the destination path. By default, rsync
+    allows only the final element of the destination path to not exist, which
+    is an attempt to help you to validate your destination path.  With this
+    option, rsync creates all the missing destination-path components just as
+    if `mkdir -p $DEST_PATH` had been run.
 
-    For example, the following creates a copy of file foo as bar in the sub/dir
-    directory, creating dirs "sub" and "sub/dir" if either do not yet exist:
-
-    >     rsync -ai --mkpath foo sub/dir/bar
-
-    If you instead ran the following, it would have created file foo in the
-    sub/dir/bar directory:
-
-    >     rsync -ai --mkpath foo sub/dir/bar/
+    When specifying a destination path, including a trailing slash ensures that
+    rsync always treats the whole path as the directory name to be created,
+    even if the source arg is a single filename. See the [COPYING A SINGLE
+    FILE](#) section for full details on how rsync decides if a final
+    destination path element is a directory or not.
 
 0.  `--links`, `-l`
 
