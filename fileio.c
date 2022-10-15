@@ -22,6 +22,8 @@
 #include "rsync.h"
 #include "inums.h"
 
+#include <sys/mman.h>
+
 #ifndef ENODATA
 #define ENODATA EAGAIN
 #endif
@@ -217,20 +219,26 @@ struct map_struct *map_file(int fd, OFF_T len, int32 read_size, int32 blk_size)
 
 	map = new0(struct map_struct);
 
+#ifndef ENABLE_MMAP
 	if (blk_size && (read_size % blk_size))
 		read_size += blk_size - (read_size % blk_size);
 
 	map->fd = fd;
 	map->file_size = len;
 	map->def_window_size = ALIGNED_LENGTH(read_size);
+#else
+	map->mmap_ptr = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, (OFF_T)0);
+	map->fd = fd;
+	map->file_size = len;
 
+#endif
 	return map;
 }
-
 
 /* slide the read window in the file */
 char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
 {
+#ifndef ENABLE_MMAP
 	OFF_T window_start, read_start;
 	int32 window_size, read_size, read_offset, align_fudge;
 
@@ -308,16 +316,24 @@ char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
 	}
 
 	return map->p + align_fudge;
+
+#else
+	return map->mmap_ptr + offset;
+#endif
 }
 
 int unmap_file(struct map_struct *map)
 {
 	int	ret;
 
+#ifndef ENABLE_MMAP
 	if (map->p) {
 		free(map->p);
 		map->p = NULL;
 	}
+#else
+	munmap(map->mmap_ptr, map->file_size);
+#endif
 	ret = map->status;
 #if 0 /* I don't think we really need this. */
 	force_memzero(map, sizeof map[0]);
