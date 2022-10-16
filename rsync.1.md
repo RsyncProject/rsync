@@ -152,10 +152,16 @@ rsync daemon by leaving off the module name:
 
 >     rsync somehost.mydomain.com::
 
-## COPYING A SINGLE FILE
+## COPYING TO A DIFFERENT NAME
 
-Rsync has the ability to customize the destination file's name when copying a
-single item.  The rules for this are:
+When you want to copy a directory to a different name, use a trailing slash on
+the source directory to put the contents of the directory into any destination
+directory you like:
+
+>     rsync -ai foo/ bar/
+
+Rsync also has the ability to customize a destination file's name when copying
+a single item.  The rules for this are:
 
 - The transfer list must consist of a single item (either a file or an empty
   directory)
@@ -163,30 +169,27 @@ single item.  The rules for this are:
 - The destination path must not have been specified with a trailing slash
 
 Under those circumstances, rsync will set the name of the destination's single
-item to the last element of the destination path.
+item to the last element of the destination path.  Keep in mind that it is best
+to only use this idiom when copying a file and use the above trailing-slash
+idiom when copying a directory.
 
-For example, the following will copy the foo.c file as bar.c in the "dest" dir
+The following example copies file foo.c file as bar.c in the "dest" dir
 (assuming that bar.c isn't a directory):
 
 >     rsync -ai src/foo.c dest/bar.c
 
-This rule might accidentally bite you if you unknowingly copy a single item and
-specify a destination dir that doesn't exist (without using a trailing slash).
-For example:
+The single-item rename rule might accidentally bite you if you unknowingly copy
+a single item and specify a destination dir that doesn't exist (without using a
+trailing slash).  For example, if `src/*.c` matches just one file and
+`dest/dir` doesn't exist yet, this will confuse you by renaming the file to the
+destination path:
 
 >     rsync -ai src/*.c dest/dir
 
-If the `*.c` only matched one file and dest/dir does not yet exist, then rsync
-copies the single .c file to the name "dir" in "dest".  To prevent this, it is
-safest to specify a destination path with a trailing slash when you want it to
-be treated as a directory:
+To prevent accidental renaming, either make sure the destination dir already
+exists or specify a destination path with a trailing slash:
 
 >     rsync -ai src/*.c dest/dir/
-
-If you want to copy a **non-empty** directory to a different name, specify the
-source path with a trailing slash:
-
->     rsync -ai foo/ bar
 
 ## SORTED TRANSFER ORDER
 
@@ -1155,9 +1158,9 @@ expand it.
 
     When specifying a destination path, including a trailing slash ensures that
     rsync always treats the whole path as the directory name to be created,
-    even if the source arg is a single filename. See the [COPYING A SINGLE
-    FILE](#) section for full details on how rsync decides if a final
-    destination path element is a directory or not.
+    even if the source arg is a single filename. See the [COPYING TO A
+    DIFFERENT NAME](#) section for full details on how rsync decides if a final
+    destination path element is a directory element or not.
 
     If you would like the newly-created destination dirs to match the dirs on
     the sending side, you should be using [`--relative`](#opt) (`-R`) instead
