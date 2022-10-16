@@ -4,7 +4,6 @@ AC_INIT([rsync],[ ],[https://rsync.samba.org/bug-tracking.html])
 
 AC_C_BIGENDIAN
 AC_HEADER_DIRENT
-AC_HEADER_TIME
 AC_HEADER_SYS_WAIT
 AC_CHECK_HEADERS(sys/fcntl.h sys/select.h fcntl.h sys/time.h sys/unistd.h \
     unistd.h utime.h compat.h sys/param.h ctype.h sys/wait.h sys/stat.h \
@@ -20,7 +19,7 @@ AC_HEADER_MAJOR_FIXED
 
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([byteorder.h])
-AC_CONFIG_HEADER(config.h)
+AC_CONFIG_HEADERS([config.h])
 AC_PREREQ([2.69])
 
 PACKAGE_VERSION=`sed -n 's/.*RSYNC_VERSION.*"\(.*\)".*/\1/p' <$srcdir/version.h`
@@ -61,7 +60,6 @@ AC_PROG_AWK
 AC_PROG_EGREP
 AC_PROG_INSTALL
 AC_PROG_MKDIR_P
-AC_PROG_CC_STDC
 AC_SUBST(SHELL)
 AC_PATH_PROG([PERL], [perl])
 AC_PATH_PROG([PYTHON3], [python3])
@@ -390,7 +388,7 @@ AS_HELP_STRING([--disable-ipv6],[disable to omit ipv6 support]),
 	;;
   esac ],
 
-  AC_TRY_RUN([ /* AF_INET6 availability check */
+  AC_RUN_IFELSE([AC_LANG_SOURCE([[ /* AF_INET6 availability check */
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -401,11 +399,11 @@ main()
    else
      exit(0);
 }
-],
-  AC_MSG_RESULT(yes)
-  AC_DEFINE(INET6, 1, [true if you have IPv6]),
-  AC_MSG_RESULT(no),
-  AC_MSG_RESULT(no)
+]])],
+  [AC_MSG_RESULT(yes)
+  AC_DEFINE(INET6, 1, true if you have IPv6)],
+  [AC_MSG_RESULT(no)],
+  [AC_MSG_RESULT(no)]
 ))
 
 dnl Do you want to disable use of locale functions
