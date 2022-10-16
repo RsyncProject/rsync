@@ -173,23 +173,22 @@ item to the last element of the destination path.  Keep in mind that it is best
 to only use this idiom when copying a file and use the above trailing-slash
 idiom when copying a directory.
 
-The following example copies file foo.c file as bar.c in the "dest" dir
-(assuming that bar.c isn't a directory):
+The following example copies the `foo.c` file as `bar.c` in the `save` dir
+(assuming that `bar.c` isn't a directory):
 
->     rsync -ai src/foo.c dest/bar.c
+>     rsync -ai src/foo.c save/bar.c
 
-The single-item rename rule might accidentally bite you if you unknowingly copy
-a single item and specify a destination dir that doesn't exist (without using a
-trailing slash).  For example, if `src/*.c` matches just one file and
-`dest/dir` doesn't exist yet, this will confuse you by renaming the file to the
-destination path:
+The single-item copy rule might accidentally bite you if you unknowingly copy a
+single item and specify a destination dir that doesn't exist (without using a
+trailing slash).  For example, if `src/*.c` matches one file and `save/dir`
+doesn't exist, this will confuse you by naming the destination file `save/dir`:
 
->     rsync -ai src/*.c dest/dir
+>     rsync -ai src/*.c save/dir
 
-To prevent accidental renaming, either make sure the destination dir already
-exists or specify a destination path with a trailing slash:
+To prevent such an accident, either make sure the destination dir exists or
+specify the destination path with a trailing slash:
 
->     rsync -ai src/*.c dest/dir/
+>     rsync -ai src/*.c save/dir/
 
 ## SORTED TRANSFER ORDER
 
