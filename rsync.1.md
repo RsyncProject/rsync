@@ -436,7 +436,7 @@ has its own detailed description later in this manpage.
 --append-verify          --append w/old data in file checksum
 --dirs, -d               transfer directories without recursing
 --old-dirs, --old-d      works like --dirs when talking to old rsync
---mkpath                 create the destination's path component
+--mkpath                 create destination's missing path components
 --links, -l              copy symlinks as symlinks
 --copy-links, -L         transform symlink into referent file/dir
 --copy-unsafe-links      only "unsafe" symlinks are transformed
@@ -1149,23 +1149,25 @@ expand it.
 
 0.  `--mkpath`
 
-    Create a missing path component of the destination path. By default, rsync
-    allows only the final element of the destination path to not exist, which
-    is an attempt to help you to validate your destination path.  With this
-    option, rsync creates all the missing destination-path components just as
-    if `mkdir -p $DEST_PATH` had been run.
+    Create all missing path components of the destination path.
+
+    By default, rsync allows only the final component of the destination path
+    to not exist, which is an attempt to help you to validate your destination
+    path.  With this option, rsync creates all the missing destination-path
+    components, just as if `mkdir -p $DEST_PATH` had been run on the receiving
+    side.
 
     When specifying a destination path, including a trailing slash ensures that
-    rsync always treats the whole path as the directory name to be created,
-    even if the source arg is a single filename. See the [COPYING TO A
-    DIFFERENT NAME](#) section for full details on how rsync decides if a final
-    destination path element is a directory element or not.
+    the whole path is treated as directory names to be created, even when the
+    file list has a single item. See the [COPYING TO A DIFFERENT NAME](#)
+    section for full details on how rsync decides if a final destination-path
+    component should be created as a directory or not.
 
     If you would like the newly-created destination dirs to match the dirs on
     the sending side, you should be using [`--relative`](#opt) (`-R`) instead
     of `--mkpath`.  For instance, the following two commands result in the same
-    destination tree, but it is only the second command that ensures that the
-    "some/extra/path" elements match the dirs on the sending side:
+    destination tree, but only the second command ensures that the
+    "some/extra/path" components match the dirs on the sending side:
 
     >     rsync -ai --mkpath host:some/extra/path/*.c some/extra/path/
     >     rsync -aiR host:some/extra/path/*.c ./
