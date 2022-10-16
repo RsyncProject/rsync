@@ -256,7 +256,7 @@ About to:
 """)
     ans = input("<Press Enter OR 'y' to continue> ")
 
-    s = cmd_run(['git', 'commit', '-a', '-m', f'Preparing for release of {version}'])
+    s = cmd_run(['git', 'commit', '-a', '-m', f'Preparing for release of {version} [buildall]'])
     if s.returncode:
         die('Aborting')
 
