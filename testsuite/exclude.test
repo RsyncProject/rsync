@@ -15,6 +15,19 @@
 CVSIGNORE='*.junk'
 export CVSIGNORE
 
+case $0 in
+*-lsh.*)
+    RSYNC_RSH="$scratchdir/src/support/lsh.sh"
+    export RSYNC_RSH
+    rpath=" --rsync-path='$RSYNC'"
+    host='lh:'
+    ;;
+*)
+    rpath=''
+    host=''
+    ;;
+esac
+
 # Build some files/dirs/links to copy
 
 makepath "$fromdir/foo/down/to/you"
@@ -106,8 +119,8 @@ home-cvs-exclude
 EOF
 
 # Start with a check of --prune-empty-dirs:
-$RSYNC -av -f -_foo/too/ -f -_foo/down/ -f -_foo/and/ -f -_new/ "$fromdir/" "$chkdir/"
-checkit "$RSYNC -av --prune-empty-dirs '$fromdir/' '$todir/'" "$chkdir" "$todir"
+$RSYNC -av --rsync-path="$RSYNC" -f -_foo/too/ -f -_foo/down/ -f -_foo/and/ -f -_new/ "$host$fromdir/" "$chkdir/"
+checkit "$RSYNC -av$rpath --prune-empty-dirs '$host$fromdir/' '$todir/'" "$chkdir" "$todir"
 rm -rf "$todir"
 
 # Add a directory symlink.
@@ -120,7 +133,7 @@ touch "$scratchdir/up1/same-newness" "$scratchdir/up2/same-newness"
 touch "$scratchdir/up1/extra-src" "$scratchdir/up2/extra-dest"
 
 # Create chkdir with what we expect to be excluded.
-checkit "$RSYNC -avv '$fromdir/' '$chkdir/'" "$fromdir" "$chkdir"
+checkit "$RSYNC -avv$rpath '$host$fromdir/' '$chkdir/'" "$fromdir" "$chkdir"
 sleep 1 # Ensures that the rm commands will tweak the directory times.
 rm -r "$chkdir"/foo/down
 rm -r "$chkdir"/mid/for/foo/and
@@ -135,12 +148,12 @@ touch "$scratchdir/up1/src-newness" "$scratchdir/up2/dst-newness"
 
 # Un-tweak the directory times in our first (weak) exclude test (though
 # it's a good test of the --existing option).
-$RSYNC -av --existing --include='*/' --exclude='*' "$fromdir/" "$chkdir/"
+$RSYNC -av --rsync-path="$RSYNC" --existing --include='*/' --exclude='*' "$host$fromdir/" "$chkdir/"
 
 # Now, test if rsync excludes the same files.
 
-checkit "$RSYNC -avv --exclude-from='$excl' \
-    --delete-during '$fromdir/' '$todir/'" "$chkdir" "$todir"
+checkit "$RSYNC -avv$rpath --exclude-from='$excl' \
+    --delete-during '$host$fromdir/' '$todir/'" "$chkdir" "$todir"
 
 # Modify the chk dir by removing cvs-ignored files and then tweaking the dir times.
 
@@ -150,13 +163,15 @@ rm "$chkdir"/bar/down/to/foo/*.junk
 rm "$chkdir"/bar/down/to/home-cvs-exclude
 rm "$chkdir"/mid/one-in-one-out
 
-$RSYNC -av --existing --filter='exclude,! */' "$fromdir/" "$chkdir/"
+$RSYNC -av --rsync-path="$RSYNC" --existing --filter='exclude,! */' "$host$fromdir/" "$chkdir/"
 
 # Now, test if rsync excludes the same files, this time with --cvs-exclude
 # and --delete-excluded.
 
-checkit "$RSYNC -avvC --filter='merge $excl' --delete-excluded \
-    --delete-during '$fromdir/' '$todir/'" "$chkdir" "$todir"
+# The -C option gets applied in a different order when pushing & pulling, so we instead
+# add the 2 --cvs-exclude filter rules (":C" & "-C") via -f to keep the order the same.
+checkit "$RSYNC -avv$rpath --filter='merge $excl' -f:C -f-C --delete-excluded \
+    --delete-during '$host$fromdir/' '$todir/'" "$chkdir" "$todir"
 
 # Modify the chk dir for our merge-exclude test and then tweak the dir times.
 
@@ -165,19 +180,19 @@ rm "$chkdir"/bar/down/to/bar/baz/*.deep
 cp_touch "$fromdir"/bar/down/to/foo/*.junk "$chkdir"/bar/down/to/foo
 cp_touch "$fromdir"/bar/down/to/foo/to "$chkdir"/bar/down/to/foo
 
-$RSYNC -av --existing -f 'show .filt*' -f 'hide,! */' --del "$fromdir/" "$todir/"
+$RSYNC -av --rsync-path="$RSYNC" --existing -f 'show .filt*' -f 'hide,! */' --del "$host$fromdir/" "$todir/"
 
 echo retained >"$todir"/bar/down/to/bar/baz/nodel.deep
 cp_touch "$todir"/bar/down/to/bar/baz/nodel.deep "$chkdir"/bar/down/to/bar/baz
 
-$RSYNC -av --existing --filter='-! */' "$fromdir/" "$chkdir/"
+$RSYNC -av --rsync-path="$RSYNC" --existing --filter='-! */' "$host$fromdir/" "$chkdir/"
 
 # Now, test if rsync excludes the same files, this time with a merge-exclude
 # file.
 
 checkit "sed '/!/d' '$excl' |
-    $RSYNC -avv -f dir-merge_.filt -f merge_- \
-    --delete-during '$fromdir/' '$todir/'" "$chkdir" "$todir"
+    $RSYNC -avv$rpath -f dir-merge_.filt -f merge_- \
+    --delete-during '$host$fromdir/' '$todir/'" "$chkdir" "$todir"
 
 # Remove the files that will be deleted.
 
@@ -188,14 +203,14 @@ rm "$chkdir"/bar/down/to/foo/.filt2
 rm "$chkdir"/bar/down/to/bar/.filt2
 rm "$chkdir"/mid/.filt
 
-$RSYNC -av --existing --include='*/' --exclude='*' "$fromdir/" "$chkdir/"
+$RSYNC -av --rsync-path="$RSYNC" --existing --include='*/' --exclude='*' "$host$fromdir/" "$chkdir/"
 
 # Now, try the prior command with --delete-before and some side-specific
 # rules.
 
 checkit "sed '/!/d' '$excl' |
-    $RSYNC -avv -f :s_.filt -f .s_- -f P_nodel.deep \
-    --delete-before '$fromdir/' '$todir/'" "$chkdir" "$todir"
+    $RSYNC -avv$rpath -f :s_.filt -f .s_- -f P_nodel.deep \
+    --delete-before '$host$fromdir/' '$todir/'" "$chkdir" "$todir"
 
 # Next, we'll test some rule-restricted filter files.
 
@@ -206,26 +221,26 @@ cat >"$fromdir/bar/down/to/foo/.excl" <<EOF
 + file3
 *.bak
 EOF
-$RSYNC -av --del "$fromdir/" "$chkdir/"
+$RSYNC -av --rsync-path="$RSYNC" --del "$host$fromdir/" "$chkdir/"
 rm "$chkdir/bar/down/to/foo/file1.bak"
 rm "$chkdir/bar/down/to/foo/file3"
 rm "$chkdir/bar/down/to/foo/+ file3"
-$RSYNC -av --existing --filter='-! */' "$fromdir/" "$chkdir/"
-$RSYNC -av --delete-excluded --exclude='*' "$fromdir/" "$todir/"
+$RSYNC -av --rsync-path="$RSYNC" --existing --filter='-! */' "$host$fromdir/" "$chkdir/"
+$RSYNC -av --rsync-path="$RSYNC" --delete-excluded --exclude='*' "$host$fromdir/" "$todir/"
 
-checkit "$RSYNC -avv -f dir-merge,-_.excl \
-    '$fromdir/' '$todir/'" "$chkdir" "$todir"
+checkit "$RSYNC -avv$rpath -f dir-merge,-_.excl \
+    '$host$fromdir/' '$todir/'" "$chkdir" "$todir"
 
 relative_opts='--relative --chmod=Du+w --copy-unsafe-links'
-$RSYNC -av $relative_opts "$fromdir/foo" "$chkdir/"
+$RSYNC -av --rsync-path="$RSYNC" $relative_opts "$host$fromdir/foo" "$chkdir/"
 rm -rf "$chkdir$fromdir/foo/down"
 $RSYNC -av $relative_opts --existing --filter='-! */' "$fromdir/foo" "$chkdir/"
 
-checkit "$RSYNC -avv $relative_opts --exclude='$fromdir/foo/down' \
-    '$fromdir/foo' '$todir'" "$chkdir$fromdir/foo" "$todir$fromdir/foo"
+checkit "$RSYNC -avv$rpath $relative_opts --exclude='$fromdir/foo/down' \
+    '$host$fromdir/foo' '$todir'" "$chkdir$fromdir/foo" "$todir$fromdir/foo"
 
 # Now we'll test the --update option.
-checkdiff "$RSYNC -aiiO --update --info=skip '$scratchdir/up1/' '$scratchdir/up2/'" \
+checkdiff "$RSYNC -aiiO$rpath --update --info=skip '$host$scratchdir/up1/' '$scratchdir/up2/'" \
 	"grep -v '^\.d$allspace'" <<EOT
 dst-newness is newer
 >f$all_plus extra-src
