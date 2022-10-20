@@ -29,18 +29,19 @@
   environment var for how to customize this.
 
 - Improved the xattr hash table to use a 64-bit key without slowing down the
-  key's computation.  This should make extra sure that a collision doesn't
+  key's computation.  This should make extra sure that a hash collision doesn't
   happen.
 
 - If the `--version` option is repeated (e.g. `-VV`) then the information is
-  output in a (still fairly readable) JSON format.  Client side only.
+  output in a (still readable) JSON format.  Client side only.
 
 - The script `support/json-rsync-version` is available to get the JSON style
   version output from any rsync.  The script accepts either text on stdin
   **or** an arg that specifies an rsync executable to run with a doubled
   `--version` option.  If the text we get isn't already in JSON format, it is
   converted. Newer rsync versions will provide more complete json info than
-  older rsync versions.
+  older rsync versions. Various tweaks are made to keep the flag names
+  consistent across versions.
 
 - The [`use chroot`](rsyncd.conf.5#) daemon parameter now defaults to "unset"
   so that rsync can use chroot when it works and a sanitized copy when chroot

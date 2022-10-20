@@ -290,7 +290,7 @@ void print_rsync_version(enum logcode f)
 	output_nno_list(f, "Daemon auth list", &valid_auth_checksums);
 
 	if (f == FNONE) {
-		json_line("license", "GPL3");
+		json_line("license", "GPLv3");
 		json_line("caveat", "rsync comes with ABSOLUTELY NO WARRANTY");
 		printf("\n}\n");
 		return;

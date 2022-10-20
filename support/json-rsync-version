@@ -2,6 +2,17 @@
 
 import sys, argparse, subprocess, json
 
+TWEAK_NAME = {
+        'asm': 'asm_roll',
+        'ASM': 'asm_roll',
+        'hardlink_special': 'hardlink_specials',
+        'protect_args': 'secluded_args',
+        'protected_args': 'secluded_args',
+        'SIMD': 'SIMD_roll',
+    }
+
+MOVE_OPTIM = set('asm_roll SIMD_roll'.split())
+
 def main():
     if not args.rsync or args.rsync == '-':
         ver_out = sys.stdin.read().strip()
@@ -11,6 +22,7 @@ def main():
         print(ver_out)
         return
     info = { }
+    misplaced_optims = { }
     for line in ver_out.splitlines():
         if line.startswith('rsync '):
             prog, vstr, ver, pstr, vstr2, proto = line.split()
@@ -40,13 +52,16 @@ def main():
                         elif val.endswith('-bit'):
                             var = var[:-1] + '_bits'
                             val = int(val.split('-')[0])
-                        if var == 'protect-args':
-                            var = 'secluded-args'
                     else:
                         var = x
                         val = True
                     var = var.replace(' ', '_').replace('-', '_')
-                    info[sect_name][var] = val
+                    if var in TWEAK_NAME:
+                        var = TWEAK_NAME[var]
+                    if sect_name[0] != 'o' and var in MOVE_OPTIM:
+                        misplaced_optims[var] = val
+                    else:
+                        info[sect_name][var] = val
             else:
                 info[sect_name] += [ x for x in line.split() if not x.startswith('(') ]
         elif line == '':
@@ -58,10 +73,12 @@ def main():
     for chk in 'capabilities optimizations'.split():
         if chk not in info:
             info[chk] = { }
+    if misplaced_optims:
+        info['optimizations'].update(misplaced_optims)
     for chk in 'checksum_list compress_list daemon_auth_list'.split():
         if chk not in info:
             info[chk] = [ ]
-    info['license'] = 'GPL3'
+    info['license'] = 'GPLv3' if ver[0] == '3' else 'GPLv2'
     info['caveat'] = 'rsync comes with ABSOLUTELY NO WARRANTY'
     print(json.dumps(info))
 
