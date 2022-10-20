@@ -13,7 +13,7 @@
 
 case $0 in
 *fake*)
-    $RSYNC --version | grep "[, ] xattrs" >/dev/null || test_skipped "Rsync needs xattrs for fake device tests"
+    $RSYNC -VV | grep '"xattrs": true' >/dev/null || test_skipped "Rsync needs xattrs for fake device tests"
     RSYNC="$RSYNC --fake-super"
     TLS_ARGS="$TLS_ARGS --fake-super"
     case "$HOST_OS" in
@@ -94,7 +94,7 @@ esac
 
 # TODO: Need to test whether hardlinks are possible on this OS/filesystem
 
-$RSYNC --version | grep "[, ] hardlink-special" >/dev/null && CAN_HLINK_SPECIAL=yes || CAN_HLINK_SPECIAL=no
+$RSYNC -VV | grep '"hardlink_specials": true' >/dev/null && CAN_HLINK_SPECIAL=yes || CAN_HLINK_SPECIAL=no
 
 mkdir "$fromdir"
 mkdir "$todir"

@@ -25,7 +25,7 @@ ln "$fromdir/foo/config1" "$fromdir/foo/extra"
 rm -f "$to2dir"
 
 # Check if rsync is set to hard-link symlinks.
-if $RSYNC --version | grep "[, ] hardlink-symlinks" >/dev/null; then
+if $RSYNC -VV | grep '"hardlink_symlinks": true' >/dev/null; then
     L=hL
     sym_dots="$allspace"
     L_sym_dots=".L$allspace"
@@ -45,7 +45,7 @@ case "$RSYNC" in
     T=.T
     ;;
 *)
-    if $RSYNC --version | grep "[, ] symtimes" >/dev/null; then
+    if $RSYNC -VV | grep '"symtimes": true' >/dev/null; then
 	T=.t
     else
 	T=.T

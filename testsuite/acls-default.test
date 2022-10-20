@@ -7,7 +7,7 @@
 
 . $suitedir/rsync.fns
 
-$RSYNC --version | grep "[, ] ACLs" >/dev/null || test_skipped "Rsync is configured without ACL support"
+$RSYNC -VV | grep '"ACLs": true' >/dev/null || test_skipped "Rsync is configured without ACL support"
 
 case "$setfacl_nodef" in
 true) test_skipped "I don't know how to use your setfacl command" ;;

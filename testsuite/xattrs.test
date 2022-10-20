@@ -8,7 +8,7 @@
 . $suitedir/rsync.fns
 lnkdir="$tmpdir/lnk"
 
-$RSYNC --version | grep "[, ] xattrs" >/dev/null || test_skipped "Rsync is configured without xattr support"
+$RSYNC -VV | grep '"xattrs": true' >/dev/null || test_skipped "Rsync is configured without xattr support"
 
 case "$HOST_OS" in
 darwin*)

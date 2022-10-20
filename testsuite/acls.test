@@ -7,7 +7,7 @@
 
 . $suitedir/rsync.fns
 
-$RSYNC --version | grep "[, ] ACLs" >/dev/null || test_skipped "Rsync is configured without ACL support"
+$RSYNC -VV | grep '"ACLs": true' >/dev/null || test_skipped "Rsync is configured without ACL support"
 
 makepath "$fromdir/foo"
 echo something >"$fromdir/file1"

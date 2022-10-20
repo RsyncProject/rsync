@@ -4,7 +4,7 @@
 
 . "$suitedir/rsync.fns"
 
-$RSYNC --version | grep "[, ] atimes" >/dev/null || test_skipped "Rsync is configured without atimes support"
+$RSYNC -VV | grep '"atimes": true' >/dev/null || test_skipped "Rsync is configured without atimes support"
 
 mkdir "$fromdir"
 

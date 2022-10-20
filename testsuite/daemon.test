@@ -81,7 +81,7 @@ drwxr-xr-x         DIR ####/##/## ##:##:## foo
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 3 failed"
 
-if $RSYNC --version | grep "[, ] atimes" >/dev/null; then
+if $RSYNC -VV | grep '"atimes": true' >/dev/null; then
     checkdiff "$RSYNC -rU localhost::test-from/f*" \
 	"sed -e '$FILE_REPL' -e '$DIR_REPL' -e '$LS_REPL'" <<EOT
 drwxr-xr-x         DIR ####/##/## ##:##:##                     foo

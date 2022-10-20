@@ -4,7 +4,7 @@
 
 . "$suitedir/rsync.fns"
 
-$RSYNC --version | grep "[, ] crtimes" >/dev/null || test_skipped "Rsync is configured without crtimes support"
+$RSYNC -VV | grep '"crtimes": true' >/dev/null || test_skipped "Rsync is configured without crtimes support"
 
 # Setting an older time via touch sets the create time to the mtime.
 # Setting it to a newer time affects just the mtime.

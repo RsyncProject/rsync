@@ -15,7 +15,7 @@
 
 case $0 in
 *fake*)
-    $RSYNC --version | grep "[, ] xattrs" >/dev/null || test_skipped "Rsync needs xattrs for fake device tests"
+    $RSYNC -VV | grep '"xattrs": true' >/dev/null || test_skipped "Rsync needs xattrs for fake device tests"
     RSYNC="$RSYNC --fake-super"
     TLS_ARGS="$TLS_ARGS --fake-super"
     case "$HOST_OS" in
