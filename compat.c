@@ -873,8 +873,10 @@ void negotiate_daemon_auth(int f_out, int am_client)
 		}
 	}
 	am_server = save_am_server;
-	if (md4_is_old && valid_auth_checksums.negotiated_nni->num == CSUM_MD4)
+	if (md4_is_old && valid_auth_checksums.negotiated_nni->num == CSUM_MD4) {
 		valid_auth_checksums.negotiated_nni->num = CSUM_MD4_OLD;
+		valid_auth_checksums.negotiated_nni->flags = 0;
+	}
 }
 
 int get_subprotocol_version()
