@@ -834,6 +834,8 @@ void output_daemon_greeting(int f_out, int am_client)
 	char tmpbuf[MAX_NSTR_STRLEN];
 	int our_sub = get_subprotocol_version();
 
+	init_checksum_choices();
+
 	get_default_nno_list(&valid_auth_checksums, tmpbuf, MAX_NSTR_STRLEN, '\0');
 
 	io_printf(f_out, "@RSYNCD: %d.%d %s\n", protocol_version, our_sub, tmpbuf);
