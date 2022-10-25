@@ -154,7 +154,7 @@ static const EVP_MD *csum_evp_md(struct name_num_item *nni)
 		emd = NULL;
 	else
 #endif
-		emd = EVP_get_digestbyname(nni->name);                                               
+		emd = EVP_get_digestbyname(nni->name);
 	if (emd && !(nni->flags & NNI_EVP_OK)) { /* Make sure it works before we advertise it */
 		if (!ctx_evp && !(ctx_evp = EVP_MD_CTX_create()))
 			out_of_memory("csum_evp_md");
@@ -786,6 +786,10 @@ void init_checksum_choices()
 
 	if (initialized_choices)
 		return;
+
+#if defined USE_OPENSSL && OPENSSL_VERSION_NUMBER < 0x10100000L
+	OpenSSL_add_all_algorithms();
+#endif
 
 #if defined SUPPORT_XXH3 || defined USE_OPENSSL
 	for (nni = valid_checksums.list; nni->name; nni++)
