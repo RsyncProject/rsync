@@ -15,7 +15,7 @@ jobs:
   ubuntu-build:
     runs-on: ubuntu-20.04
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: prep
       run: |
         sudo apt-get install acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev python3-cmarkgfm openssl wget
@@ -38,7 +38,7 @@ jobs:
     - name: ssl file list
       run: rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
     - name: save artifact
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: ubuntu-bin
         path: |
@@ -53,7 +53,7 @@ jobs:
   macos-build:
     runs-on: macos-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: prep
       run: |
         brew install automake openssl xxhash zstd lz4 wget
@@ -73,7 +73,7 @@ jobs:
     - name: ssl file list
       run: rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
     - name: save artifact
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: macos-bin
         path: |
@@ -89,7 +89,7 @@ jobs:
     runs-on: windows-2022
     if: (github.event_name == 'schedule' || contains(github.event.head_commit.message, '[buildall]'))
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: cygwin
       run: choco install -y --no-progress cygwin cyg-get
     - name: prep
@@ -112,7 +112,7 @@ jobs:
     - name: ssl file list
       run: bash -c 'PATH="/usr/local/bin:$PATH" rsync-ssl --no-motd download.samba.org::rsyncftp/ || true'
     - name: save artifact
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: cygwin-bin
         path: |
