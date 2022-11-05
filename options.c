@@ -2510,7 +2510,7 @@ char *safe_arg(const char *opt, const char *arg)
 	char *ret;
 	if (!protect_args && old_style_args < 2 && (!old_style_args || (!is_filename_arg && opt != SPLIT_ARG_WHEN_OLD))) {
 		const char *f;
-		if (!trust_sender_args && *arg == '~'
+		if (*arg == '~' && is_filename_arg && !am_sender && !trust_sender_args
 		 && ((relative_paths && !strstr(arg, "/./"))
 		  || !strchr(arg, '/'))) {
 			extras++;
