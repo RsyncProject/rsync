@@ -227,10 +227,14 @@
 
    Wildcards are not escaped in filename args, but they are escaped in options
    like the [`--suffix`](rsync.1#opt) and [`--usermap`](rsync.1#opt) values.
-   If your rsync script depends on the old arg-splitting behavior, either run
-   it with the [`--old-args`](rsync.1#opt) option or `export RSYNC_OLD_ARGS=1`
-   in the script's environment.  See also the [ADVANCED USAGE](rsync.1#)
-   section of rsync's manpage for how to use a more modern arg style.
+
+   If a script depends on the old arg behavior (perhaps because it quotes or
+   protects the args already, or perhaps because it expects arg splitting),
+   there are two easy ways to get things going with a modern rsync: either
+   `export RSYNC_OLD_ARGS=1` in the script's environment (perhaps in the script
+   itself) or add the option [`--old-args`](rsync.1#opt) to the rsync commands
+   that are run.  See also the [ADVANCED USAGE](rsync.1#) section of rsync's
+   manpage for how to use a more modern arg style.
 
  - A long-standing bug was preventing rsync from figuring out the current
    locale's decimal point character, which made rsync always output numbers
