@@ -1,0 +1,45 @@
+#!/usr/bin/env python3
+# This helper script makes it easy to use a passwd or group file to map values
+# in a LOCAL transfer.  For instance, if you mount a backup that does not have
+# the same passwd setup as the local machine, you can do a copy to/from the
+# backup area as follows and get the differing ID values mapped just like a
+# remote transfer to/from the backed-up machine would do:
+#
+# rsync -av --usermap=`idmap --to /mnt/backup/etc/passwd` \
+#           --groupmap=`idmap --to /mnt/backup/etc/group` \
+#           /some/src/ /mnt/backup/some/dest/
+#
+# rsync -av --usermap=`idmap --from /mnt/backup/etc/passwd` \
+#           --groupmap=`idmap --from /mnt/backup/etc/group` \
+#           /mnt/backup/some/src/ /some/dest/
+
+import re, fileinput, argparse
+
+NAME_ID_RE = re.compile(r'^(\w+):[^:]+:(\d+)')
+
+def main():
+    maps = [ ]
+    for line in fileinput.input(args.files):
+        m = NAME_ID_RE.match(line)
+        if not m:
+            continue
+        if args.to:
+            pair = (m[1], m[2])
+        else:
+            pair = (m[2], m[1])
+        maps.append(':'.join(pair))
+    print(','.join(maps))
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Output usermap or groupmap args for rsync.", add_help=False)
+    action = parser.add_argument_group()
+    action = parser.add_mutually_exclusive_group(required=True)
+    action.add_argument("--from", action="store_true", help="Output the map for use on the sending side.")
+    action.add_argument("--to", action="store_true", help="Output the map for use on the receiving side.")
+    parser.add_argument("--help", "-h", action="help", help="Output this help message and exit.")
+    parser.add_argument("files", metavar="FILE", default='-', nargs='*', help="The file(s) that hold the name & id pairs. Defaults to stdin.")
+    args = parser.parse_args()
+    main()
+
+# vim: sw=4 et

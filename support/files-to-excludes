@@ -1,27 +1,37 @@
-#!/usr/bin/env perl
-# This script takes an input of filenames and outputs a set of
-# include/exclude directives that can be used by rsync to copy
-# just the indicated files using an --exclude-from=FILE option.
-use strict;
+#!/usr/bin/env python3
+# This script takes an input of filenames and outputs a set of include/exclude
+# directives that can be used by rsync to copy just the indicated files using
+# an --exclude-from=FILE or -f'. FILE' option. To be able to delete files on
+# the receiving side, either use --delete-excluded or change the exclude (-)
+# rules to hide filter rules (H) that only affect the sending side.
 
-my %hash;
+import os, fileinput, argparse
 
-while (<>) {
-    chomp;
-    s#^/+##;
-    my $path = '/';
-    while (m#([^/]+/)/*#g) {
-	$path .= $1;
-	print "+ $path\n" unless $hash{$path}++;
-    }
-    if (m#([^/]+)$#) {
-	print "+ $path$1\n";
-    } else {
-	delete $hash{$path};
-    }
-}
+def main():
+    paths = set()
+    for line in fileinput.input(args.files):
+        dirs = line.strip().lstrip('/').split('/')
+        if not dirs:
+            continue
+        for j in range(1, len(dirs)):
+            if dirs[j] == '':
+                continue
+            path = '/' + '/'.join(dirs[:j]) + '/'
+            if path not in paths:
+                print('+', path)
+                paths.add(path)
+        print('+', '/' + '/'.join(dirs))
 
-foreach (sort keys %hash) {
-    print "- $_*\n";
-}
-print "- /*\n";
+    for path in sorted(paths):
+        print('-', path + '*')
+    print('-', '/*')
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Transform a list of files into a set of include/exclude rules.", add_help=False)
+    parser.add_argument("--help", "-h", action="help", help="Output this help message and exit.")
+    parser.add_argument("files", metavar="FILE", default='-', nargs='*', help="The file(s) that hold the pathnames to translate. Defaults to stdin.")
+    args = parser.parse_args()
+    main()
+
+# vim: sw=4 et
