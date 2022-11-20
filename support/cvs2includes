@@ -1,42 +1,63 @@
-#!/usr/bin/env perl
-#
+#!/usr/bin/env python3
 # This script finds all CVS/Entries files in the current directory and below
 # and creates a local .cvsinclude file with non-inherited rules including each
 # checked-in file.  Then, use this option whenever using --cvs-exclude (-C):
 #
-# 	-f ': .cvsinclude'
+#    -f ': .cvsinclude'
 #
 # That ensures that all checked-in files/dirs are included in the transfer.
 # (You could alternately put ": .cvsinclude" into an .rsync-filter file and
 # use the -F option, which is easier to type.)
 #
 # The downside is that you need to remember to re-run cvs2includes whenever
-# you add a new file to the project.
-use strict;
+# CVS gets an added or removed file. Maybe just run it before every copy.
 
-open(FIND, 'find . -name CVS -type d |') or die $!;
-while (<FIND>) {
-    chomp;
-    s#^\./##;
+import os, argparse
 
-    my $entries = "$_/Entries";
-    s/CVS$/.cvsinclude/;
-    my $filter = $_;
+INC_NAME = '.cvsinclude'
 
-    open(ENTRIES, $entries) or die "Unable to open $entries: $!\n";
-    my @includes;
-    while (<ENTRIES>) {
-	push(@includes, $1) if m#/(.+?)/#;
-    }
-    close ENTRIES;
-    if (@includes) {
-	open(FILTER, ">$filter") or die "Unable to write $filter: $!\n";
-	print FILTER map "+ /$_\n", @includes;
-	close FILTER;
-	print "Updated $filter\n";
-    } elsif (-f $filter) {
-	unlink($filter);
-	print "Removed $filter\n";
-    }
-}
-close FIND;
+def main():
+    if args.dir:
+        os.chdir(args.dir)
+
+    cvs_includes = set()
+    for root, dirs, files in os.walk('.'):
+        if INC_NAME in files:
+            cvs_includes.add((root + '/' + INC_NAME)[2:])
+        if root.endswith('/CVS') and 'Entries' in files:
+            entries = root[2:] + '/Entries'
+            includes = [ ]
+            with open(entries) as fh:
+                for line in fh:
+                    if line.startswith(('/', 'D/')):
+                        includes.append(line.split('/', 2)[1])
+            if includes:
+                inc = root[2:-3] + INC_NAME
+                cvs_includes.discard(inc)
+                try:
+                    with open(inc) as fh:
+                        old_txt = fh.read()
+                except OSError:
+                    old_txt = ''
+                txt = ''.join(f"+ /{x}\n" for x in includes)
+                if txt == old_txt:
+                    print("Unchanged", inc)
+                else:
+                    print("Updating", inc)
+                    with open(inc, 'w') as fh:
+                        fh.write(txt)
+        dirs.sort()
+
+    for inc in sorted(cvs_includes):
+        print("Removing", inc)
+        os.unlink(inc)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=f"Transform CVS/Entries into {INC_NAME} files.", add_help=False)
+    parser.add_argument("--help", "-h", action="help", help="Output this help message and exit.")
+    parser.add_argument("dir", nargs='?', help="The top CVS dir. Defaults to the current directory.")
+    args = parser.parse_args()
+    main()
+
+# vim: sw=4 et
