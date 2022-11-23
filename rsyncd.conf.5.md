@@ -120,9 +120,9 @@ parameters:
     You can override the default backlog value when the daemon listens for
     connections.  It defaults to 5.
 
-You may also include any module parameters in the global part of the config
-file, in which case the supplied value will override the default for that
-parameter.
+You may also include any [MODULE PARAMETERS](#) in the global part of the
+config file, in which case the supplied value will override the default for
+that parameter.
 
 You may use references to environment variables in the values of parameters.
 String parameters will have %VAR% references expanded as late as possible (when
@@ -153,8 +153,8 @@ parameters as a combination of the default values that are set at that position
 in the config file plus its own parameter list, the use of a "[global]" section
 can help to maintain shared config values for multiple modules.
 
-As with GLOBAL PARAMETERS, you may use references to environment variables in
-the values of parameters.  See the GLOBAL PARAMETERS section for more details.
+As with [GLOBAL PARAMETERS](#), you may use references to environment variables
+in the values of parameters.  See that section for details.
 
 0.  `comment`
 
