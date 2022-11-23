@@ -74,25 +74,7 @@ reread the `rsyncd.conf` file. The file is re-read on each client connection.
 ## GLOBAL PARAMETERS
 
 The first parameters in the file (before a [module] header) are the global
-parameters.  Rsync also allows for the use of a "[global]" module name to
-indicate the start of one or more global-parameter sections (the name must be
-lower case).
-
-You may also include any module parameters in the global part of the config
-file in which case the supplied value will override the default for that
-parameter.
-
-You may use references to environment variables in the values of parameters.
-String parameters will have %VAR% references expanded as late as possible (when
-the string is first used in the program), allowing for the use of variables
-that rsync sets at connection time, such as RSYNC_USER_NAME.  Non-string
-parameters (such as true/false settings) are expanded when read from the config
-file.  If a variable does not exist in the environment, or if a sequence of
-characters is not a valid reference (such as an un-paired percent sign), the
-raw characters are passed through unchanged.  This helps with backward
-compatibility and safety (e.g. expanding a non-existent %VAR% to an empty
-string in a path could result in a very unsafe path).  The safest way to insert
-a literal % into a value is to use %%.
+parameters:
 
 [comment]: # (An OL starting at 0 is converted into a DL by the parser.)
 
@@ -138,6 +120,22 @@ a literal % into a value is to use %%.
     You can override the default backlog value when the daemon listens for
     connections.  It defaults to 5.
 
+You may also include any module parameters in the global part of the config
+file, in which case the supplied value will override the default for that
+parameter.
+
+You may use references to environment variables in the values of parameters.
+String parameters will have %VAR% references expanded as late as possible (when
+the string is first used in the program), allowing for the use of variables
+that rsync sets at connection time, such as RSYNC_USER_NAME.  Non-string
+parameters (such as true/false settings) are expanded when read from the config
+file.  If a variable does not exist in the environment, or if a sequence of
+characters is not a valid reference (such as an un-paired percent sign), the
+raw characters are passed through unchanged.  This helps with backward
+compatibility and safety (e.g. expanding a non-existent %VAR% to an empty
+string in a path could result in a very unsafe path).  The safest way to insert
+a literal % into a value is to use %%.
+
 ## MODULE PARAMETERS
 
 After the global parameters you should define a number of modules, each module
@@ -146,8 +144,14 @@ a module name in square brackets [module] followed by the parameters for that
 module.  The module name cannot contain a slash or a closing square bracket.
 If the name contains whitespace, each internal sequence of whitespace will be
 changed into a single space, while leading or trailing whitespace will be
-discarded.  Also, the name cannot be "global" as that exact name indicates that
-global parameters follow (see above).
+discarded.
+
+There is also a special module name of "[global]" that does not define a module
+but instead switches back to the global settings context where default
+parameters can be specified.  Because each defined module gets its full set of
+parameters as a combination of the default values that are set at that position
+in the config file plus its own parameter list, the use of a "[global]" section
+can help to maintain shared config values for multiple modules.
 
 As with GLOBAL PARAMETERS, you may use references to environment variables in
 the values of parameters.  See the GLOBAL PARAMETERS section for more details.
