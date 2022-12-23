@@ -86,6 +86,7 @@ int sparse_files = 0;
 int preallocate_files = 0;
 int do_compression = 0;
 int do_compression_level = CLVL_NOT_SPECIFIED;
+int do_compression_threads = 0;
 int am_root = 0; /* 0 = normal, 1 = root, 2 = --super, -1 = --fake-super */
 int am_server = 0;
 int am_sender = 0;
@@ -754,6 +755,8 @@ static struct poptOption long_options[] = {
   {"compress-choice",  0,  POPT_ARG_STRING, &compress_choice, 0, 0, 0 },
   {"zc",               0,  POPT_ARG_STRING, &compress_choice, 0, 0, 0 },
   {"skip-compress",    0,  POPT_ARG_STRING, &skip_compress, 0, 0, 0 },
+  {"compress-threads", 0,  POPT_ARG_INT,    &do_compression_threads, 0, 0, 0 },
+  {"zt",               0,  POPT_ARG_INT,    &do_compression_threads, 0, 0, 0 },
   {"compress-level",   0,  POPT_ARG_INT,    &do_compression_level, 0, 0, 0 },
   {"zl",               0,  POPT_ARG_INT,    &do_compression_level, 0, 0, 0 },
   {0,                 'P', POPT_ARG_NONE,   0, 'P', 0, 0 },
