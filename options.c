@@ -2518,7 +2518,7 @@ static char SPLIT_ARG_WHEN_OLD[1];
  **/
 char *safe_arg(const char *opt, const char *arg)
 {
-#define SHELL_CHARS "!#$&;|<>(){}\"' \t\\"
+#define SHELL_CHARS "!#$&;|<>(){}\"'` \t\\"
 #define WILD_CHARS  "*?[]" /* We don't allow remote brace expansion */
 	BOOL is_filename_arg = !opt;
 	char *escapes = is_filename_arg ? SHELL_CHARS : WILD_CHARS SHELL_CHARS;
