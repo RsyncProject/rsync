@@ -2367,7 +2367,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		}
 
 		dirlen = dir ? strlen(dir) : 0;
-		if (dirlen != lastdir_len || memcmp(lastdir, dir, dirlen) != 0) {
+		if (dirlen != lastdir_len || (dirlen && memcmp(lastdir, dir, dirlen) != 0)) {
 			if (!change_pathname(NULL, dir, -dirlen))
 				goto bad_path;
 			lastdir = pathname;
