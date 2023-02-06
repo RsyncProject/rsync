@@ -2340,7 +2340,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	if (do_progress && !am_server) {
 		if (!log_before_transfer && INFO_EQ(NAME, 0))
 			parse_output_words(info_words, info_levels, "name", DEFAULT_PRIORITY);
-		parse_output_words(info_words, info_levels, "flist2,progress", DEFAULT_PRIORITY);
+		parse_output_words(info_words, info_levels, "FLIST2,PROGRESS", DEFAULT_PRIORITY);
 	}
 
 	if (dry_run)
