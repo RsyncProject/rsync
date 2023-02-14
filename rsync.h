@@ -970,6 +970,8 @@ struct sum_struct {
 	int s2length;		/**< sum2_length */
 };
 
+#ifndef ENABLE_MMAP
+
 struct map_struct {
 	OFF_T file_size;	/* File size (from stat)		*/
 	OFF_T p_offset;		/* Window start				*/
@@ -981,6 +983,17 @@ struct map_struct {
 	int fd;			/* File Descriptor			*/
 	int status;		/* first errno from read errors		*/
 };
+
+#else 
+
+struct map_struct {
+	OFF_T file_size;	/* File size (from stat)		*/
+	int fd;			/* File Descriptor			*/
+	char* mmap_ptr;
+	int status;		/* first errno from read errors		*/
+};
+
+#endif
 
 #define NAME_IS_FILE		(0)    /* filter name as a file */
 #define NAME_IS_DIR		(1<<0) /* filter name as a dir */

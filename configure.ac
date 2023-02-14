@@ -82,6 +82,15 @@ if test x"$enable_profile" = x"yes"; then
 	CFLAGS="$CFLAGS -pg"
 fi
 
+AC_ARG_ENABLE(mmap,
+    AS_HELP_STRING([--enable-mmap], [enable to omit mmap]))
+if test x"$enable_mmap" = x"yes"; then
+    AC_MSG_RESULT(yes)
+    AC_DEFINE(ENABLE_MMAP, 1, [Define if you want mmap.  By default this is undefined.])
+else
+    AC_MSG_RESULT(no)
+fi
+
 AC_MSG_CHECKING([if md2man can create manpages])
 if test x"$ac_cv_path_PYTHON3" = x; then
     AC_MSG_RESULT(no - python3 not found)
