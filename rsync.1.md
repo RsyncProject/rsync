@@ -3309,9 +3309,9 @@ expand it.
     digits) by specifying the `--no-human-readable` (`--no-h`) option.
 
     The unit letters that are appended in levels 2 and 3 are: `K` (kilo), `M`
-    (mega), `G` (giga), `T` (tera), or `P` (peta).  For example, a 1234567-byte
-    file would output as 1.23M in level-2 (assuming that a period is your local
-    decimal point).
+    (mega), `G` (giga), `T` (tera), `P` (peta), `E` (exa), `Z` (zetta) or `Y`
+    (yotta). For example, a 1234567-byte file would output as 1.23M in level-2
+    (assuming that a period is your local decimal point).
 
     Backward compatibility note: versions of rsync prior to 3.1.0 do not
     support human-readable level 1, and they default to level 0.  Thus,
