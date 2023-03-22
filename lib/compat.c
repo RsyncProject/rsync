@@ -182,32 +182,33 @@ char *do_big_num(int64 num, int human_flag, const char *fract)
 	if (human_flag > 1) {
 		int mult = human_flag == 2 ? 1000 : 1024;
 
-		if (num >= mult || num <= -mult) {
-			const char* units = " KMGTPEZY";
-			int64 powi = 1;
-			int powj = 1, precision = 2;
+		const char* units = " KMGTPEZY";
+		int64 powi = 1;
+		int powj = 1, precision = 2;
 
-			for (;;) {
-				if (labs(num / mult) < powi)
-					break;
+		for (;;) {
+			if (labs(num / mult) < powi)
+				break;
 
-				if (units[1] == '\0')
-					break;
+			if (units[1] == '\0')
+				break;
 
-				powi *= mult;
-				++units;
-			}
-
-			for (; precision > 0; precision--) {
-				powj *= 10;
-				if (labs(num / powi) < powj)
-					break;
-			}
-
-			snprintf(bufs[n], sizeof bufs[0], "%.*f%c",
-				precision, (double) num / powi, *units);
-			return bufs[n];
+			powi *= mult;
+			++units;
 		}
+
+		if (powi == 1)
+			precision = 0;
+
+		for (; precision > 0; precision--) {
+			powj *= 10;
+			if (labs(num / powi) < powj)
+				break;
+		}
+
+		snprintf(bufs[n], sizeof bufs[0], "%.*f%c", precision,
+			(double) num / powi, *units);
+		return bufs[n];
 	}
 
 	s = bufs[n] + sizeof bufs[0] - 1;
