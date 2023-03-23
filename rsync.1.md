@@ -3357,6 +3357,8 @@ expand it.
     period is your local decimal point). Dynamic precision is applied, so the
     three most-significant digits are shown (for example: 3.45M -> 46.7M ->
     523M -> 1.24G -> ...).
+    Additionally an `i` is appended in level-3 to indicate the binary base.
+    The same file would output as 1.17Mi in level-3.
 
     Backward compatibility note: versions of rsync prior to 3.1.0 do not
     support human-readable level 1, and they default to level 0.  Thus,
