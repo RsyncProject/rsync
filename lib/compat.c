@@ -210,8 +210,8 @@ char *do_big_num(int64 num, int human_flag, const char *fract)
 				break;
 		}
 
-		snprintf(bufs[n], sizeof bufs[0], "%.*f%s", precision,
-			(double) num / powi, unit);
+		snprintf(bufs[n], sizeof bufs[0], "%.*f%s%s", precision,
+			(double) num / powi, unit, *unit && mult == 1024 ? "i" : "");
 		return bufs[n];
 	}
 
