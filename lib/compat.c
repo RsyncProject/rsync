@@ -206,8 +206,8 @@ char *do_big_num(int64 num, int human_flag, const char *fract)
 				break;
 		}
 
-		snprintf(bufs[n], sizeof bufs[0], "%.*f%c", precision,
-			(double) num / powi, *units);
+		snprintf(bufs[n], sizeof bufs[0], "%.*f%c%s", precision,
+			(double) num / powi, *units, num > mult && mult == 1024 ? "i" : "");
 		return bufs[n];
 	}
 
