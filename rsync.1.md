@@ -3312,6 +3312,8 @@ expand it.
     (mega), `G` (giga), `T` (tera), `P` (peta), `E` (exa), `Z` (zetta) or `Y`
     (yotta). For example, a 1234567-byte file would output as 1.23M in level-2
     (assuming that a period is your local decimal point).
+    Additionally an `i` is appended in level-3 to indicate the binary base.
+    The same file would output as 1.17Mi in level-3.
 
     Backward compatibility note: versions of rsync prior to 3.1.0 do not
     support human-readable level 1, and they default to level 0.  Thus,
