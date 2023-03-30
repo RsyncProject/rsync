@@ -217,9 +217,10 @@
  - A new form of arg protection was added that works similarly to the older
    `--protect-args` ([`-s`](rsync.1#opt)) option but in a way that avoids
    breaking things like rrsync (the restricted rsync script): rsync now uses
-   backslash escaping for sending "shell-active" characters to the remote
-   shell. This includes spaces, so fetching a remote file via a simple quoted
-   filename value now works by default without any extra quoting:
+   backslash escaping for sending "shell-active" characters to the remote shell
+   (such as `$(){}<>#&` and others). This includes spaces, so fetching a remote
+   file via a quoted filename value now works by default without any extra
+   quoting:
 
    ```shell
        rsync -aiv host:'a simple file.pdf' .
