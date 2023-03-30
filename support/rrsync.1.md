@@ -87,7 +87,8 @@ The remainder of this manpage is dedicated to using the rrsync script.
 
 0.  `-no-overwrite`
 
-    Enforce `--ignore-existing` on the server. Prevents overwriting existing files.
+    Enforce `--ignore-existing` on the server. Prevents overwriting existing
+    files when the server is the receiver.
 
 0.  `-help`, `-h`
 
