@@ -5,7 +5,7 @@ rrsync - a script to setup restricted rsync users via ssh logins
 ## SYNOPSIS
 
 ```
-rrsync [-ro|-rw] [-munge] [-no-del] [-no-lock] DIR
+rrsync [-ro|-rw] [-munge] [-no-del] [-no-lock] [-no-overwrite]  DIR
 ```
 
 The single non-option argument specifies the restricted _DIR_ to use. It can be
@@ -84,6 +84,11 @@ The remainder of this manpage is dedicated to using the rrsync script.
 0.  `-no-lock`
 
     Avoid the single-run (per-user) lock check.  Useful with [`-munge`](#opt).
+
+0.  `-no-overwrite`
+
+    Enforce `--ignore-existing` on the server. Prevents overwriting existing
+    files when the server is the receiver.
 
 0.  `-help`, `-h`
 
