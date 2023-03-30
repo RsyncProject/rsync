@@ -258,6 +258,9 @@ def main():
 
     if args.munge:
         rsync_opts.append('--munge-links')
+    
+    if args.no_overwrite:
+      rsync_opts.append('--ignore-existing')
 
     if not rsync_args:
         rsync_args = [ '.' ]
@@ -364,6 +367,7 @@ if __name__ == '__main__':
     arg_parser.add_argument('-munge', action='store_true', help="Enable rsync's --munge-links on the server side.")
     arg_parser.add_argument('-no-del', action='store_true', help="Disable rsync's --delete* and --remove* options.")
     arg_parser.add_argument('-no-lock', action='store_true', help="Avoid the single-run (per-user) lock check.")
+    arg_parser.add_argument('-no-overwrite', action='store_true', help="Prevent overwriting existing files by enforcing --ignore-existing")
     arg_parser.add_argument('-help', '-h', action='help', help="Output this help message and exit.")
     arg_parser.add_argument('dir', metavar='DIR', help="The restricted directory to use.")
     args = arg_parser.parse_args()
