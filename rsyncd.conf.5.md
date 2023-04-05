@@ -1188,6 +1188,9 @@ An example nginx proxy setup is as follows:
 > }
 > ```
 
+If rsyncd should be accessible encrypted and unencrypted at the same time make
+the proxy listen on port 873 as well and let it handle both streams.
+
 ## DAEMON CONFIG EXAMPLES
 
 A simple rsyncd.conf file that allow anonymous rsync to a ftp area at
