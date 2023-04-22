@@ -142,7 +142,7 @@ static void hash_search(int f,struct sum_struct *s,
 {
 	OFF_T offset, aligned_offset, end;
 	int32 k, want_i, aligned_i, backup;
-	char sum2[SUM_LENGTH];
+	char sum2[MAX_DIGEST_LEN];
 	uint32 s1, s2, sum;
 	int more;
 	schar *map;

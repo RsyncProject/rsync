@@ -783,7 +783,7 @@ static int generate_and_send_sums(int fd, OFF_T len, int f_out, int f_copy)
 	for (i = 0; i < sum.count; i++) {
 		int32 n1 = (int32)MIN(len, (OFF_T)sum.blength);
 		char *map = map_ptr(mapbuf, offset, n1);
-		char sum2[SUM_LENGTH];
+		char sum2[MAX_DIGEST_LEN];
 		uint32 sum1;
 
 		len -= n1;
