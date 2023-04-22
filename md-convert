@@ -276,7 +276,10 @@ class TransformHtml(HTMLParser):
                 bad_hashtags = set(),
                 latest_targets = [ ],
                 opt_prefix = 'opt',
+                a_href = None,
+                a_href_external = False,
                 a_txt_start = None,
+                after_a_tag = False,
                 target_suf = '',
                 )
 
@@ -314,6 +317,13 @@ class TransformHtml(HTMLParser):
 
         for bad in st.referenced_hashtags - st.created_hashtags:
             warn('Unknown hashtag link in', self.fn + ':', '#' + bad)
+
+    def handle_UE(self):
+        st = self.state
+        if st.txt.startswith(('.', ',', '!', '?', ';', ':')):
+            st.man_out[-1] = ".UE " + st.txt[0] + "\n"
+            st.txt = st.txt[1:]
+        st.after_a_tag = False
 
     def handle_starttag(self, tag, attrs_list):
         st = self.state
@@ -387,13 +397,20 @@ class TransformHtml(HTMLParser):
             for var, val in attrs_list:
                 if var == 'href':
                     if val.startswith(('https://', 'http://', 'mailto:', 'ftp:')):
-                        pass # nothing to check
+                        if st.after_a_tag:
+                            self.handle_UE()
+                        st.man_out.append(manify(st.txt.strip()) + "\n")
+                        st.man_out.append(".UR " + val + "\n")
+                        st.txt = ''
+                        st.a_href = val
+                        st.a_href_external = True
                     elif '#' in val:
                         pg, tgt = val.split('#', 1)
                         if pg and pg not in VALID_PAGES or '#' in tgt:
                             st.bad_hashtags.add(val)
                         elif tgt in ('', 'opt', 'dopt'):
                             st.a_href = val
+                            st.a_href_external = False
                         elif pg == '':
                             st.referenced_hashtags.add(tgt)
                             if tgt in st.latest_targets:
@@ -409,6 +426,8 @@ class TransformHtml(HTMLParser):
         st = self.state
         if args.debug:
             self.output_debug('END', (tag,))
+        if st.after_a_tag:
+            self.handle_UE()
         if tag in CONSUMES_TXT or st.dt_from == tag:
             txt = st.txt.strip()
             st.txt = ''
@@ -473,7 +492,15 @@ class TransformHtml(HTMLParser):
         elif tag == 'hr':
             return
         elif tag == 'a':
-            if st.a_href:
+            if st.a_href_external:
+                st.txt = st.txt.strip()
+                if st.a_href != st.txt:
+                    st.man_out.append(manify(st.txt) + "\n")
+                st.man_out.append(".UE\n") # This might get replaced with a punctuation version in handle_UE()
+                st.after_a_tag = True
+                st.a_href_external = False
+                st.txt = ''
+            elif st.a_href:
                 atxt = st.txt[st.a_txt_start:]
                 find = 'href="' + st.a_href + '"'
                 for j in range(len(st.html_out)-1, 0, -1):
