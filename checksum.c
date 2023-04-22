@@ -300,6 +300,7 @@ uint32 get_checksum1(char *buf1, int32 len)
 }
 #endif
 
+/* The "sum" buffer must be at least MAX_DIGEST_LEN bytes! */
 void get_checksum2(char *buf, int32 len, char *sum)
 {
 #ifdef USE_OPENSSL
