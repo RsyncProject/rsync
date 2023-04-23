@@ -494,7 +494,7 @@ class TransformHtml(HTMLParser):
         elif tag == 'a':
             if st.a_href_external:
                 st.txt = st.txt.strip()
-                if st.a_href != st.txt:
+                if args.force_link_text or st.a_href != st.txt:
                     st.man_out.append(manify(st.txt) + "\n")
                 st.man_out.append(".UE\n") # This might get replaced with a punctuation version in handle_UE()
                 st.after_a_tag = True
@@ -639,6 +639,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Convert markdown into html and (optionally) nroff. Each input filename must have a .md suffix, which is changed to .html for the output filename. If the input filename ends with .num.md (e.g. foo.1.md) then a nroff file is also output with the input filename's .md suffix removed (e.g. foo.1).", add_help=False)
     parser.add_argument('--test', action='store_true', help="Just test the parsing without outputting any files.")
     parser.add_argument('--dest', metavar='DIR', help="Create files in DIR instead of the current directory.")
+    parser.add_argument('--force-link-text', action='store_true', help="Don't remove the link text if it matches the link href. Useful when nroff doesn't understand .UR and .UE.")
     parser.add_argument('--debug', '-D', action='count', default=0, help='Output copious info on the html parsing. Repeat for even more.')
     parser.add_argument("--help", "-h", action="help", help="Output this help message and exit.")
     parser.add_argument("mdfiles", metavar='FILE.md', nargs='+', help="One or more .md files to convert.")

@@ -8,6 +8,7 @@ fi
 inname="$1"
 srcdir=`dirname "$0"`
 flagfile="$srcdir/.md2man-works"
+force_flagfile="$srcdir/.md2man-force"
 
 if [ ! -f "$flagfile" ]; then
     # We test our smallest manpage just to see if the python setup works.
@@ -32,4 +33,10 @@ if [ ! -f "$flagfile" ]; then
     fi
 fi
 
-"$srcdir/md-convert" "$srcdir/$inname"
+if [ -f "$force_flagfile" ]; then
+    opt='--force-link-text'
+else
+    opt=''
+fi
+
+"$srcdir/md-convert" $opt "$srcdir/$inname"
