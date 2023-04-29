@@ -40,30 +40,34 @@ OFF_T preallocated_len = 0;
 static OFF_T sparse_seek = 0;
 static OFF_T sparse_past_write = 0;
 
-int sparse_end(int f, OFF_T size)
+int sparse_end(int f, OFF_T size, int updating_basis_or_equiv)
 {
-	int ret;
+	int ret = 0;
 
-	sparse_past_write = 0;
-
-	if (!sparse_seek)
-		return 0;
-
-#ifdef HAVE_FTRUNCATE
-	ret = do_ftruncate(f, size);
-#else
-	if (do_lseek(f, sparse_seek-1, SEEK_CUR) != size-1)
-		ret = -1;
-	else {
-		do {
-			ret = write(f, "", 1);
-		} while (ret < 0 && errno == EINTR);
-
-		ret = ret <= 0 ? -1 : 0;
-	}
+	if (updating_basis_or_equiv) {
+		if (sparse_seek && do_punch_hole(f, sparse_past_write, sparse_seek) < 0)
+			ret = -1;
+#ifdef HAVE_FTRUNCATE /* A compilation formality -- in-place requires ftruncate() */
+		else /* Just in case the original file was longer */
+			ret = do_ftruncate(f, size);
 #endif
+	} else if (sparse_seek) {
+#ifdef HAVE_FTRUNCATE
+		ret = do_ftruncate(f, size);
+#else
+		if (do_lseek(f, sparse_seek-1, SEEK_CUR) != size-1)
+			ret = -1;
+		else {
+			do {
+				ret = write(f, "", 1);
+			} while (ret < 0 && errno == EINTR);
 
-	sparse_seek = 0;
+			ret = ret <= 0 ? -1 : 0;
+		}
+#endif
+	}
+
+	sparse_past_write = sparse_seek = 0;
 
 	return ret;
 }

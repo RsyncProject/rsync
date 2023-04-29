@@ -372,7 +372,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 
 	if (fd != -1 && offset > 0) {
 		if (sparse_files > 0) {
-			if (sparse_end(fd, offset) != 0)
+			if (sparse_end(fd, offset, updating_basis_or_equiv) != 0)
 				goto report_write_error;
 		} else if (flush_write_file(fd) < 0) {
 		    report_write_error:
