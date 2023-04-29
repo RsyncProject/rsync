@@ -1636,7 +1636,9 @@ expand it.
 0.  `--crtimes`, `-N,`
 
     This tells rsync to set the create times (newness) of the destination
-    files to the same value as the source files.
+    files to the same value as the source files. Your OS & filesystem must
+    support the setting of arbitrary creation (birth) times for this option
+    to be supported.
 
 0.  `--omit-dir-times`, `-O`
 
