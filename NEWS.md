@@ -10,11 +10,11 @@
 - Fixed an buffer overflow in the checksum2 code if SHA1 is being used for
   the checksum2 algorithm.
 
-- Fixed a string-comparison issue in the internal file-list code that affected
-  tr_TR.utf-8.
-
 - Add a backtick to the list of characters that the filename quoting needs to
   escape using backslashes.
+
+- Fixed a string-comparison issue in the internal file-list code that affected
+  tr_TR.utf-8.
 
 - Make sure that a local transfer marks the sender side as trusted.
 
@@ -100,7 +100,7 @@
 
 - The `--fuzzy` option was optimized a bit to try to cut down on the amount of
   computations when considering a big pool of files. The simple heuristic from
-  Kenneth Finnegan resuled in about a 2x speedup.
+  Kenneth Finnegan resulted in about a 2x speedup.
 
 - If rsync is forced to use protocol 29 or before (perhaps due to talking to an
   rsync before 3.0.0), the modify time of a file is limited to 4-bytes.  Rsync

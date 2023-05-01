@@ -245,7 +245,7 @@ to be copied to different destination directories using more than one copy.
 
 While a copy of a case-ignoring filesystem to a case-ignoring filesystem can
 work out fairly well, if no `--delete-during` or `--delete-before` option is
-active, rsync can potentially update an existing file on the receiveing side
+active, rsync can potentially update an existing file on the receiving side
 without noticing that the upper-/lower-case of the filename should be changed
 to match the sender.
 
