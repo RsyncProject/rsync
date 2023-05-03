@@ -135,12 +135,11 @@ int poptConfigFileToString(FILE *fp, char ** argstrp, /*@unused@*/ UNUSED(int fl
     char * p;
     char * q;
     char * x;
-    int t;
-    int argvlen = 0;
+    size_t t;
+    size_t argvlen = 0;
     size_t maxlinelen = sizeof(line);
     size_t linelen;
-    int maxargvlen = 480;
-    int linenum = 0;
+    size_t maxargvlen = 480;
 
     *argstrp = NULL;
 
@@ -155,7 +154,6 @@ int poptConfigFileToString(FILE *fp, char ** argstrp, /*@unused@*/ UNUSED(int fl
     if (argstr == NULL) return POPT_ERROR_MALLOC;
 
     while (fgets(line, (int)maxlinelen, fp) != NULL) {
-	linenum++;
 	p = line;
 
 	/* loop until first non-space char or EOL */

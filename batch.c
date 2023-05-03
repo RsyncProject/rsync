@@ -164,7 +164,8 @@ void check_batch_flags(void)
 static int write_arg(const char *arg)
 {
 	const char *x, *s;
-	int len, err = 0;
+	size_t len;
+	int err = 0;
 
 	if (*arg == '-' && (x = strchr(arg, '=')) != NULL) {
 		err |= write(batch_sh_fd, arg, x - arg + 1) != x - arg + 1;
@@ -178,13 +179,13 @@ static int write_arg(const char *arg)
 			err |= write(batch_sh_fd, "'", 1) != 1;
 		}
 		len = strlen(s);
-		err |= write(batch_sh_fd, s, len) != len;
+		err |= write(batch_sh_fd, s, len) != (ssize_t)len;
 		err |= write(batch_sh_fd, "'", 1) != 1;
 		return err;
 	}
 
 	len = strlen(arg);
-	err |= write(batch_sh_fd, arg, len) != len;
+	err |= write(batch_sh_fd, arg, len) != (ssize_t)len;
 
 	return err;
 }
@@ -192,9 +193,9 @@ static int write_arg(const char *arg)
 /* Writes out a space and then an option (or other string) with an optional "=" + arg suffix. */
 static int write_opt(const char *opt, const char *arg)
 {
-	int len = strlen(opt);
+	size_t len = strlen(opt);
 	int err = write(batch_sh_fd, " ", 1) != 1;
-	err = write(batch_sh_fd, opt, len) != len ? 1 : 0;
+	err = write(batch_sh_fd, opt, len) != (ssize_t)len ? 1 : 0;
 	if (arg) {
 		err |= write(batch_sh_fd, "=", 1) != 1;
 		err |= write_arg(arg);

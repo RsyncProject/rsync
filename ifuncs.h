@@ -105,7 +105,7 @@ free_stat_x(stat_x *sx_p)
 
 static inline char *my_strdup(const char *str, const char *file, int line)
 {
-    int len = strlen(str)+1;
+    size_t len = strlen(str)+1;
     char *buf = my_alloc(NULL, len, 1, file, line);
     memcpy(buf, str, len);
     return buf;

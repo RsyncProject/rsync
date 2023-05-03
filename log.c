@@ -56,7 +56,7 @@ extern iconv_t ic_recv;
 #endif
 extern char curr_dir[MAXPATHLEN];
 extern char *full_module_path;
-extern unsigned int module_dirlen;
+extern size_t module_dirlen;
 extern char sender_file_sum[MAX_DIGEST_LEN];
 extern const char undetermined_hostname[];
 
@@ -248,7 +248,7 @@ static void filtered_fwrite(FILE *f, const char *in_buf, int in_len, int use_isp
 /* this is the underlying (unformatted) rsync debugging function. Call
  * it with FINFO, FERROR_*, FWARNING, FLOG, or FCLIENT.  Note: recursion
  * can happen with certain fatal conditions. */
-void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
+void rwrite(enum logcode code, const char *buf, size_t len, int is_utf8)
 {
 	char trailing_CR_or_NL;
 	FILE *f = msgs2stderr == 1 ? stderr : stdout;
@@ -259,10 +259,6 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 	iconv_t ic = ic_chck;
 #endif
 #endif
-
-	if (len < 0)
-		exit_cleanup(RERR_MESSAGEIO);
-
 	if (msgs2stderr == 1) {
 		/* A normal daemon can get msgs2stderr set if the socket is busted, so we
 		 * change the message destination into an FLOG message in order to try to
@@ -297,7 +293,7 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 		in_block = 1;
 		if (!log_initialised)
 			log_init(0);
-		strlcpy(msg, buf, MIN((int)sizeof msg, len + 1));
+		strlcpy(msg, buf, MIN(sizeof msg, len + 1));
 		logit(priority, msg);
 		in_block = 0;
 
@@ -729,11 +725,11 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 
 			if (iflags & (ITEM_IS_NEW|ITEM_MISSING_DATA)) {
 				char ch = iflags & ITEM_IS_NEW ? '+' : '?';
-				int i;
+				size_t i;
 				for (i = 2; c[i]; i++)
 					c[i] = ch;
 			} else if (c[0] == '.' || c[0] == 'h' || c[0] == 'c') {
-				int i;
+				size_t i;
 				for (i = 2; c[i]; i++) {
 					if (c[i] != '.')
 						break;
@@ -759,7 +755,7 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 		/* Subtract the length of the escape from the string's size. */
 		total -= p - s + 1;
 
-		if (len + total >= (size_t)sizeof buf) {
+		if (len + total >= sizeof buf) {
 			rprintf(FERROR,
 				"buffer overflow expanding %%%c -- exiting\n",
 				p[0]);
@@ -839,7 +835,7 @@ void maybe_log_item(struct file_struct *file, int iflags, int itemizing, const c
 void log_delete(const char *fname, int mode)
 {
 	static struct file_struct *file = NULL;
-	int len = strlen(fname);
+	size_t len = strlen(fname);
 	const char *fmt;
 
 	if (!file) {

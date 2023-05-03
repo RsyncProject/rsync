@@ -595,7 +595,7 @@ static void send_ida_entries(int f, const ida_entries *idal)
 			name = numeric_ids ? NULL : add_gid(ida->id);
 		write_varint(f, ida->id);
 		if (inc_recurse && name) {
-			int len = strlen(name);
+			size_t len = strlen(name);
 			write_varint(f, xbits | XFLAG_NAME_FOLLOWS);
 			write_byte(f, len);
 			write_buf(f, name, len);
@@ -730,7 +730,10 @@ static uchar recv_ida_entries(int f, ida_entries *ent)
 
 static int recv_rsync_acl(int f, item_list *racl_list, SMB_ACL_TYPE_T type, mode_t mode)
 {
+#ifndef HAVE_OSX_ACLS
 	uchar computed_mask_bits = 0;
+#endif
+
 	acl_duo *duo_item;
 	uchar flags;
 	int ndx = read_varint(f);
@@ -758,14 +761,15 @@ static int recv_rsync_acl(int f, item_list *racl_list, SMB_ACL_TYPE_T type, mode
 		duo_item->racl.mask_obj = recv_acl_access(f, NULL);
 	if (flags & XMIT_OTHER_OBJ)
 		duo_item->racl.other_obj = recv_acl_access(f, NULL);
-	if (flags & XMIT_NAME_LIST)
-		computed_mask_bits |= recv_ida_entries(f, &duo_item->racl.names);
 
 #ifdef HAVE_OSX_ACLS
 	/* If we received a superfluous mask, throw it away. */
 	duo_item->racl.mask_obj = NO_ENTRY;
 	(void)mode;
 #else
+	if (flags & XMIT_NAME_LIST)
+		computed_mask_bits |= recv_ida_entries(f, &duo_item->racl.names);
+
 	if (duo_item->racl.names.count && duo_item->racl.mask_obj == NO_ENTRY) {
 		/* Mask must be non-empty with lists. */
 		if (type == SMB_ACL_TYPE_ACCESS)

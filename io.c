@@ -1292,7 +1292,8 @@ void read_args(int f_in, char *mod_name, char *buf, size_t bufsiz, int rl_nulls,
 	       char ***argv_p, int *argc_p, char **request_p)
 {
 	int maxargs = MAX_ARGS;
-	int dot_pos = 0, argc = 0, request_len = 0;
+	int dot_pos = 0, argc = 0;
+	size_t request_len = 0;
 	char **argv, *p;
 	int rl_flags = (rl_nulls ? RL_EOL_NULLS : 0);
 
@@ -1318,7 +1319,7 @@ void read_args(int f_in, char *mod_name, char *buf, size_t bufsiz, int rl_nulls,
 
 		if (dot_pos) {
 			if (request_p && request_len < 1024) {
-				int len = strlen(buf);
+				size_t len = strlen(buf);
 				if (request_len)
 					request_p[0][request_len++] = ' ';
 				*request_p = realloc_array(*request_p, char, request_len + len + 1);
@@ -2089,7 +2090,7 @@ void write_varint(int f, int32 x)
 {
 	char b[5];
 	uchar bit;
-	int cnt;
+	size_t cnt;
 
 	SIVAL(b, 1, x);
 
@@ -2111,7 +2112,7 @@ void write_varlong(int f, int64 x, uchar min_bytes)
 {
 	char b[9];
 	uchar bit;
-	int cnt = 8;
+	size_t cnt = 8;
 
 #if SIZEOF_INT64 >= 8
 	SIVAL64(b, 1, x);
@@ -2218,14 +2219,14 @@ void write_byte(int f, uchar c)
 	write_buf(f, (char *)&c, 1);
 }
 
-void write_vstring(int f, const char *str, int len)
+void write_vstring(int f, const char *str, size_t len)
 {
 	uchar lenbuf[3], *lb = lenbuf;
 
 	if (len > 0x7F) {
 		if (len > 0x7FFF) {
 			rprintf(FERROR,
-				"attempting to send over-long vstring (%d > %d)\n",
+				"attempting to send over-long vstring (%zu > %d)\n",
 				len, 0x7FFF);
 			exit_cleanup(RERR_PROTOCOL);
 		}

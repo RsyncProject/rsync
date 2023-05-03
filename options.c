@@ -427,7 +427,9 @@ static char *make_output_option(struct output_struct *words, short *levels, ucha
 static void parse_output_words(struct output_struct *words, short *levels, const char *str, uchar priority)
 {
 	const char *s;
-	int j, len, lev;
+	size_t j;
+	size_t len;
+	int lev;
 
 	for ( ; str; str = s) {
 		if ((s = strchr(str, ',')) != NULL)
@@ -447,8 +449,10 @@ static void parse_output_words(struct output_struct *words, short *levels, const
 			output_item_help(words);
 			exit_cleanup(0);
 		}
-		if (len == 4 && strncasecmp(str, "none", 4) == 0)
-			len = lev = 0;
+		if (len == 4 && strncasecmp(str, "none", 4) == 0) {
+			len = 0;
+			lev = 0;
+		}
 		else if (len == 3 && strncasecmp(str, "all", 3) == 0)
 			len = 0;
 		for (j = 0; words[j].name; j++) {
@@ -464,7 +468,7 @@ static void parse_output_words(struct output_struct *words, short *levels, const
 		}
 		if (len && !words[j].name && !am_server) {
 			rprintf(FERROR, "Unknown %s item: \"%.*s\"\n",
-				words[j].help, len, str);
+				words[j].help, (int)len, str);
 			exit_cleanup(RERR_SYNTAX);
 		}
 	}
@@ -1894,7 +1898,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 #endif
 
 		case OPT_STDERR: {
-			int len;
+			size_t len;
 			arg = poptGetOptArg(pc);
 			len = strlen(arg);
 			if (len && strncmp("errors", arg, len) == 0)
@@ -2526,8 +2530,8 @@ char *safe_arg(const char *opt, const char *arg)
 	char *escapes = is_filename_arg ? SHELL_CHARS : WILD_CHARS SHELL_CHARS;
 	BOOL escape_leading_dash = is_filename_arg && *arg == '-';
 	BOOL escape_leading_tilde = 0;
-	int len1 = opt && *opt ? strlen(opt) + 1 : 0;
-	int len2 = strlen(arg);
+	size_t len1 = opt && *opt ? strlen(opt) + 1 : 0;
+	size_t len2 = strlen(arg);
 	int extras = escape_leading_dash ? 2 : 0;
 	char *ret;
 	if (!protect_args && old_style_args < 2 && (!old_style_args || (!is_filename_arg && opt != SPLIT_ARG_WHEN_OLD))) {

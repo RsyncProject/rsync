@@ -757,7 +757,7 @@ static size_t singleTableUsage(poptContext con, FILE * fp, size_t cursor,
  * @retval str		concatenation of short options
  * @return		length of display string
  */
-static int showShortOptions(const struct poptOption * opt, FILE * fp,
+static size_t showShortOptions(const struct poptOption * opt, FILE * fp,
 		/*@null@*/ char * str)
 	/*@globals fileSystem @*/
 	/*@modifies *str, *fp, fileSystem @*/
@@ -765,7 +765,7 @@ static int showShortOptions(const struct poptOption * opt, FILE * fp,
 {
     /* bufsize larger then the ascii set, lazy alloca on top level call. */
     char * s = (str != NULL ? str : memset(alloca(300), 0, 300));
-    int len = 0;
+    size_t len = 0;
 
     if (s == NULL)
 	return 0;

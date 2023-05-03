@@ -168,7 +168,7 @@ static char *expand_vars(const char *str)
 {
 	char *buf, *t;
 	const char *f;
-	int bufsize;
+	size_t bufsize;
 
 	if (!str || !strchr(str, '%'))
 		return (char *)str; /* TODO change return value to const char* at some point. */
@@ -179,19 +179,22 @@ static char *expand_vars(const char *str)
 	for (t = buf, f = str; bufsize && *f; ) {
 		if (*f == '%' && isUpper(f+1)) {
 			char *percent = strchr(f+1, '%');
-			if (percent && percent - f < bufsize) {
-				char *val;
-				strlcpy(t, f+1, percent - f);
-				val = getenv(t);
-				if (val) {
-					int len = strlcpy(t, val, bufsize+1);
-					if (len > bufsize)
-						break;
-					bufsize -= len;
-					t += len;
-					f = percent + 1;
-					continue;
-				}
+			if (percent) {
+				size_t diff = percent - f;
+				if (diff < bufsize) {
+					char *val;
+					strlcpy(t, f+1, diff);
+					val = getenv(t);
+					if (val) {
+						size_t len = strlcpy(t, val, bufsize+1);
+						if (len > bufsize)
+							break;
+						bufsize -= len;
+						t += len;
+						f = percent + 1;
+						continue;
+					}
+			 	}
 			}
 		}
 		*t++ = *f++;
@@ -443,7 +446,7 @@ static BOOL do_parameter(char *parmname, char *parmvalue)
 	case P_PATH:
 		string_set(parm_ptr, parmvalue);
 		if ((cp = *(char**)parm_ptr) != NULL) {
-			int len = strlen(cp);
+			size_t len = strlen(cp);
 			while (len > 1 && cp[len-1] == '/') len--;
 			cp[len] = '\0';
 		}

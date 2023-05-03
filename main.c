@@ -66,7 +66,7 @@ extern int protect_args;
 extern int relative_paths;
 extern int sanitize_paths;
 extern int curr_dir_depth;
-extern int curr_dir_len;
+extern size_t curr_dir_len;
 extern int module_id;
 extern int rsync_port;
 extern int whole_file;
@@ -81,7 +81,7 @@ extern int send_msgs_to_gen;
 extern dev_t filesystem_dev;
 extern pid_t cleanup_child_pid;
 extern size_t bwlimit_writemax;
-extern unsigned int module_dirlen;
+extern size_t module_dirlen;
 extern BOOL flist_receiving_enabled;
 extern BOOL want_progress_now;
 extern BOOL shutting_down;
@@ -846,11 +846,11 @@ static void check_alt_basis_dirs(void)
 
 	for (j = 0; j < basis_dir_cnt; j++) {
 		char *bdir = basis_dir[j];
-		int bd_len = strlen(bdir);
+		size_t bd_len = strlen(bdir);
 		if (bd_len > 1 && bdir[bd_len-1] == '/')
 			bdir[--bd_len] = '\0';
 		if (dry_run > 1 && *bdir != '/') {
-			int len = curr_dir_len + 1 + bd_len + 1;
+			size_t len = curr_dir_len + 1 + bd_len + 1;
 			char *new = new_array(char, len);
 			if (slash && strncmp(bdir, "../", 3) == 0) {
 				/* We want to remove only one leading "../" prefix for

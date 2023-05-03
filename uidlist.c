@@ -372,7 +372,7 @@ const char *add_gid(gid_t gid)
 
 static void send_one_name(int f, id_t id, const char *name)
 {
-	int len;
+	size_t len;
 
 	if (!name)
 		name = "";
@@ -416,7 +416,7 @@ void send_id_lists(int f)
 uid_t recv_user_name(int f, uid_t uid)
 {
 	struct idlist *node;
-	int len = read_byte(f);
+	size_t len = read_byte(f);
 	char *name;
 
 	if (len) {
@@ -436,7 +436,7 @@ uid_t recv_user_name(int f, uid_t uid)
 gid_t recv_group_name(int f, gid_t gid, uint16 *flags_ptr)
 {
 	struct idlist *node;
-	int len = read_byte(f);
+	size_t len = read_byte(f);
 	char *name;
 
 	if (len) {

@@ -106,7 +106,7 @@ static const char *check_secret(int module, const char *user, const char *group,
 	STRUCT_STAT st;
 	int ok = 1;
 	int user_len = strlen(user);
-	int group_len = group ? strlen(group) : 0;
+	size_t group_len = group ? strlen(group) : 0;
 	char *err;
 	FILE *fh;
 
@@ -140,7 +140,7 @@ static const char *check_secret(int module, const char *user, const char *group,
 	err = "secret not found";
 	while ((user || group) && fgets(line, sizeof line, fh) != NULL) {
 		const char **ptr, *s = strtok(line, "\n\r");
-		int len;
+		size_t len;
 		if (!s)
 			continue;
 		if (*s == '@') {

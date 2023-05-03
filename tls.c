@@ -138,7 +138,7 @@ static void storetime(char *dest, size_t destsize, time_t t, int nsecs)
 			snprintf(dest + len, destsize - len, ".%09d", nsecs);
 	} else {
 		int has_nsecs = nsecs >= 0 ? 1 : 0;
-		int len = MIN(20 + 10*has_nsecs, (int)destsize - 1);
+		size_t len = MIN(20 + 10*has_nsecs, (int)destsize - 1);
 		memset(dest, ' ', len);
 		dest[len] = '\0';
 	}

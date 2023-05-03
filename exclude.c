@@ -43,8 +43,8 @@ extern int trust_sender_args;
 extern int module_id;
 
 extern char curr_dir[MAXPATHLEN];
-extern unsigned int curr_dir_len;
-extern unsigned int module_dirlen;
+extern size_t curr_dir_len;
+extern size_t module_dirlen;
 
 filter_rule_list filter_list = { .debug_type = "" };
 filter_rule_list cvs_filter_list = { .debug_type = " [global CVS]" };
@@ -75,8 +75,8 @@ static BOOL parent_dirscan = False;
  * files.  This makes it easier to save the appropriate values when we
  * "push" down into each subdirectory. */
 static filter_rule **mergelist_parents;
-static int mergelist_cnt = 0;
-static int mergelist_size = 0;
+static size_t mergelist_cnt = 0;
+static size_t mergelist_size = 0;
 
 #define LOCAL_RULE   1
 #define REMOTE_RULE  2
@@ -115,13 +115,13 @@ static uchar cur_elide_value = REMOTE_RULE;
 
 static void teardown_mergelist(filter_rule *ex)
 {
-	int j;
+	size_t j;
 
 	if (!ex->u.mergelist)
 		return;
 
 	if (DEBUG_GTE(FILTER, 2)) {
-		rprintf(FINFO, "[%s] deactivating mergelist #%d%s\n",
+		rprintf(FINFO, "[%s] deactivating mergelist #%zu%s\n",
 			who_am_i(), mergelist_cnt - 1,
 			ex->u.mergelist->debug_type);
 	}
@@ -252,7 +252,7 @@ static void add_rule(filter_rule_list *listp, const char *pat, unsigned int pat_
 	if (rule->rflags & FILTRULE_PERDIR_MERGE) {
 		filter_rule_list *lp;
 		unsigned int len;
-		int i;
+		size_t i;
 
 		if ((cp = strrchr(rule->pattern, '/')) != NULL)
 			cp++;
@@ -288,7 +288,7 @@ static void add_rule(filter_rule_list *listp, const char *pat, unsigned int pat_
 			mergelist_parents = realloc_array(mergelist_parents, filter_rule *, mergelist_size);
 		}
 		if (DEBUG_GTE(FILTER, 2)) {
-			rprintf(FINFO, "[%s] activating mergelist #%d%s\n",
+			rprintf(FINFO, "[%s] activating mergelist #%zu%s\n",
 				who_am_i(), mergelist_cnt, lp->debug_type);
 		}
 		mergelist_parents[mergelist_cnt++] = rule;
@@ -378,7 +378,8 @@ void free_implied_include_partial_string()
  * that the receiver uses to validate the file list from the sender. */
 void add_implied_include(const char *arg, int skip_daemon_module)
 {
-	int arg_len, saw_wild = 0, saw_live_open_brkt = 0, backslash_cnt = 0;
+	size_t arg_len;
+	int saw_wild = 0, saw_live_open_brkt = 0, backslash_cnt = 0;
 	int slash_cnt = 0;
 	const char *cp;
 	char *p;
@@ -596,12 +597,12 @@ static void pop_filter_list(filter_rule_list *listp)
  * value and will be updated with the length of the resulting name.  We
  * always return a name that is null terminated, even if the merge_file
  * name was not. */
-static char *parse_merge_name(const char *merge_file, unsigned int *len_ptr,
-			      unsigned int prefix_skip)
+static char *parse_merge_name(const char *merge_file, size_t *len_ptr,
+			      size_t prefix_skip)
 {
 	static char buf[MAXPATHLEN];
 	char *fn, tmpbuf[MAXPATHLEN];
-	unsigned int fn_len;
+	size_t fn_len;
 
 	if (!parent_dirscan && *merge_file != '/') {
 		/* Return the name unchanged it doesn't have any slashes. */
@@ -654,9 +655,9 @@ static char *parse_merge_name(const char *merge_file, unsigned int *len_ptr,
 }
 
 /* Sets the dirbuf and dirbuf_len values. */
-void set_filter_dir(const char *dir, unsigned int dirlen)
+void set_filter_dir(const char *dir, size_t dirlen)
 {
-	unsigned int len;
+	size_t len;
 	if (*dir != '/') {
 		memcpy(dirbuf, curr_dir, curr_dir_len);
 		dirbuf[curr_dir_len] = '/';
@@ -683,18 +684,18 @@ void set_filter_dir(const char *dir, unsigned int dirlen)
  * parent directory of the first transfer dir.  If it does, we scan all the
  * dirs from that point through the parent dir of the transfer dir looking
  * for the per-dir merge-file in each one. */
-static BOOL setup_merge_file(int mergelist_num, filter_rule *ex,
+static BOOL setup_merge_file(size_t mergelist_num, filter_rule *ex,
 			     filter_rule_list *lp)
 {
 	char buf[MAXPATHLEN];
 	char *x, *y, *pat = ex->pattern;
-	unsigned int len;
+	size_t len;
 
 	if (!(x = parse_merge_name(pat, NULL, 0)) || *x != '/')
 		return 0;
 
 	if (DEBUG_GTE(FILTER, 2)) {
-		rprintf(FINFO, "[%s] performing parent_dirscan for mergelist #%d%s\n",
+		rprintf(FINFO, "[%s] performing parent_dirscan for mergelist #%zi%s\n",
 			who_am_i(), mergelist_num, lp->debug_type);
 	}
 	y = strrchr(x, '/');
@@ -739,7 +740,7 @@ static BOOL setup_merge_file(int mergelist_num, filter_rule *ex,
 	}
 	parent_dirscan = False;
 	if (DEBUG_GTE(FILTER, 2)) {
-		rprintf(FINFO, "[%s] completed parent_dirscan for mergelist #%d%s\n",
+		rprintf(FINFO, "[%s] completed parent_dirscan for mergelist #%zu%s\n",
 			who_am_i(), mergelist_num, lp->debug_type);
 	}
 	free(pat);
@@ -755,10 +756,10 @@ struct local_filter_state {
  * handle all the per-dir merge-files.  The "dir" value is the current path
  * relative to curr_dir (which might not be null-terminated).  We copy it
  * into dirbuf so that we can easily append a file name on the end. */
-void *push_local_filters(const char *dir, unsigned int dirlen)
+void *push_local_filters(const char *dir, size_t dirlen)
 {
 	struct local_filter_state *push;
-	int i;
+	size_t i;
 
 	set_filter_dir(dir, dirlen);
 	if (DEBUG_GTE(FILTER, 2)) {
@@ -793,7 +794,7 @@ void *push_local_filters(const char *dir, unsigned int dirlen)
 		lp = ex->u.mergelist;
 
 		if (DEBUG_GTE(FILTER, 2)) {
-			rprintf(FINFO, "[%s] pushing mergelist #%d%s\n",
+			rprintf(FINFO, "[%s] pushing mergelist #%zu%s\n",
 				who_am_i(), i, lp->debug_type);
 		}
 
@@ -871,7 +872,7 @@ void pop_local_filters(void *mem)
 	free(pop);
 }
 
-void change_local_filter_dir(const char *dname, int dlen, int dir_depth)
+void change_local_filter_dir(const char *dname, size_t dlen, int dir_depth)
 {
 	static int cur_depth = -1;
 	static void *filt_array[MAXPATHLEN/2+1];
@@ -968,8 +969,8 @@ static int rule_matches(const char *fname, filter_rule *ex, int name_flags)
 		if (strcmp(name, pattern) == 0)
 			return ret_match;
 	} else {
-		int l1 = strlen(name);
-		int l2 = strlen(pattern);
+		size_t l1 = strlen(name);
+		size_t l2 = strlen(pattern);
 		if (l2 <= l1 &&
 		    strcmp(name+(l1-l2),pattern) == 0 &&
 		    (l1==l2 || name[l1-(l2+1)] == '/')) {
@@ -1090,11 +1091,11 @@ static const uchar *rule_strcmp(const uchar *str, const char *rule, int rule_len
  * template rflags and the xflags additionally affect parsing. */
 static filter_rule *parse_rule_tok(const char **rulestr_ptr,
 				   const filter_rule *template, int xflags,
-				   const char **pat_ptr, unsigned int *pat_len_ptr)
+				   const char **pat_ptr, size_t *pat_len_ptr)
 {
 	const uchar *s = (const uchar *)*rulestr_ptr;
 	filter_rule *rule;
-	unsigned int len;
+	size_t len;
 
 	if (template->rflags & FILTRULE_WORD_SPLIT) {
 		/* Skip over any initial whitespace. */
@@ -1368,7 +1369,7 @@ void parse_filter_str(filter_rule_list *listp, const char *rulestr,
 {
 	filter_rule *rule;
 	const char *pat;
-	unsigned int pat_len;
+	size_t pat_len;
 
 	if (!rulestr)
 		return;
@@ -1418,7 +1419,7 @@ void parse_filter_str(filter_rule_list *listp, const char *rulestr,
 			if (new_rflags & FILTRULE_PERDIR_MERGE) {
 				if (parent_dirscan) {
 					const char *p;
-					unsigned int len = pat_len;
+					size_t len = pat_len;
 					if ((p = parse_merge_name(pat, &len, module_dirlen)))
 						add_rule(listp, p, len, rule, 0);
 					else
@@ -1427,7 +1428,7 @@ void parse_filter_str(filter_rule_list *listp, const char *rulestr,
 				}
 			} else {
 				const char *p;
-				unsigned int len = pat_len;
+				size_t len = pat_len;
 				if ((p = parse_merge_name(pat, &len, 0)))
 					parse_filter_file(listp, p, rule, XFLG_FATAL_ERRORS);
 				free_filter(rule);

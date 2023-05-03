@@ -35,14 +35,14 @@ extern int preserve_xattrs;
 extern int omit_link_times;
 extern int preallocate_files;
 extern char *module_dir;
-extern unsigned int module_dirlen;
+extern size_t module_dirlen;
 extern char *partial_dir;
 extern filter_rule_list daemon_filter_list;
 
 int sanitize_paths = 0;
 
 char curr_dir[MAXPATHLEN];
-unsigned int curr_dir_len;
+size_t curr_dir_len;
 int curr_dir_depth; /* This is only set for a sanitizing daemon. */
 
 /* Set a fd into nonblocking mode. */
@@ -638,7 +638,7 @@ static struct glob_data {
 
 static void glob_match(char *arg, int abpos, int fbpos)
 {
-	int len;
+	size_t len;
 	char *slash;
 
 	while (*arg == '.' && arg[1] == '/') {
@@ -788,7 +788,7 @@ void glob_expand_module(char *base1, char *arg, char ***argv_p, int *argc_p, int
 {
 	char *p, *s;
 	char *base = base1;
-	int base_len = strlen(base);
+	size_t base_len = strlen(base);
 
 	if (!arg || !*arg)
 		return;
@@ -940,7 +940,7 @@ int count_dir_elements(const char *p)
  * CFN_KEEP_TRAILING_SLASH is flagged, and will also collapse ".." elements
  * (except at the start) if CFN_COLLAPSE_DOT_DOT_DIRS is flagged.  If the
  * resulting name would be empty, returns ".". */
-int clean_fname(char *name, int flags)
+size_t clean_fname(char *name, int flags)
 {
 	char *limit = name - 1, *t = name, *f = name;
 	int anchored;
@@ -1035,10 +1035,11 @@ int clean_fname(char *name, int flags)
 char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth, int flags)
 {
 	char *start, *sanp;
-	int rlen = 0, drop_dot_dirs = !relative_paths || !(flags & SP_KEEP_DOT_DIRS);
+	size_t rlen = 0;
+	int drop_dot_dirs = !relative_paths || !(flags & SP_KEEP_DOT_DIRS);
 
 	if (dest != p) {
-		int plen = strlen(p); /* the path len INCLUDING any separating slash */
+		size_t plen = strlen(p); /* the path len INCLUDING any separating slash */
 		if (*p == '/') {
 			if (!rootdir)
 				rootdir = module_dir;
@@ -1113,7 +1114,7 @@ char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth, i
 int change_dir(const char *dir, int set_path_only)
 {
 	static int initialised, skipped_chdir;
-	unsigned int len;
+	size_t len;
 
 	if (!initialised) {
 		initialised = 1;
@@ -1141,7 +1142,7 @@ int change_dir(const char *dir, int set_path_only)
 		skipped_chdir = set_path_only;
 		memcpy(curr_dir, dir, len + 1);
 	} else {
-		unsigned int save_dir_len = curr_dir_len;
+		size_t save_dir_len = curr_dir_len;
 		if (curr_dir_len + 1 + len >= sizeof curr_dir) {
 			errno = ENAMETOOLONG;
 			return 0;
@@ -1173,12 +1174,12 @@ int change_dir(const char *dir, int set_path_only)
 
 /* This will make a relative path absolute and clean it up via clean_fname().
  * Returns the string, which might be newly allocated, or NULL on error. */
-char *normalize_path(char *path, BOOL force_newbuf, unsigned int *len_ptr)
+char *normalize_path(char *path, BOOL force_newbuf, size_t *len_ptr)
 {
-	unsigned int len;
+	size_t len;
 
 	if (*path != '/') { /* Make path absolute. */
-		int len = strlen(path);
+		len = strlen(path);
 		if (curr_dir_len + 1 + len >= sizeof curr_dir)
 			return NULL;
 		curr_dir[curr_dir_len] = '/';
@@ -1236,20 +1237,20 @@ static char partial_fname[MAXPATHLEN];
 char *partial_dir_fname(const char *fname)
 {
 	char *t = partial_fname;
-	int sz = sizeof partial_fname;
+	size_t sz = sizeof partial_fname;
 	const char *fn;
 
 	if ((fn = strrchr(fname, '/')) != NULL) {
 		fn++;
 		if (*partial_dir != '/') {
-			int len = fn - fname;
+			size_t len = fn - fname;
 			strncpy(t, fname, len); /* safe */
 			t += len;
 			sz -= len;
 		}
 	} else
 		fn = fname;
-	if ((int)pathjoin(t, sz, partial_dir, fn) >= sz)
+	if (pathjoin(t, sz, partial_dir, fn) >= sz)
 		return NULL;
 	if (daemon_filter_list.head) {
 		t = strrchr(partial_fname, '/');

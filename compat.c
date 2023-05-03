@@ -458,10 +458,10 @@ void validate_choice_vs_env(int ntype, int num1, int num2)
  * are removed otherwise the char is prefixed to the duplicate term and, if it
  * is an opening paren/bracket/brace, the matching closing char is suffixed.
  * "none" is removed on the client side unless dup_markup != '\0'. */
-int get_default_nno_list(struct name_num_obj *nno, char *to_buf, int to_buf_len, char dup_markup)
+size_t get_default_nno_list(struct name_num_obj *nno, char *to_buf, size_t to_buf_len, char dup_markup)
 {
 	struct name_num_item *nni;
-	int len = 0, cnt = 0;
+	size_t len = 0, cnt = 0;
 	char delim = '\0', post_delim;
 
 	switch (dup_markup) {

@@ -94,10 +94,12 @@ int do_symlink(const char *lnk, const char *path)
 	/* For --fake-super, we create a normal file with mode 0600
 	 * and write the lnk into it. */
 	if (am_root < 0) {
-		int ok, len = strlen(lnk);
+		int ok;
+		size_t len;
 		int fd = open(path, O_WRONLY|O_CREAT|O_TRUNC, S_IWUSR|S_IRUSR);
 		if (fd < 0)
 			return -1;
+		len = strlen(lnk);
 		ok = write(fd, lnk, len) == len;
 		if (close(fd) < 0)
 			ok = 0;
@@ -115,7 +117,7 @@ ssize_t do_readlink(const char *path, char *buf, size_t bufsiz)
 	if (am_root < 0) {
 		int fd = do_open_nofollow(path, O_RDONLY);
 		if (fd >= 0) {
-			int len = read(fd, buf, bufsiz);
+			ssize_t len = read(fd, buf, bufsiz);
 			close(fd);
 			return len;
 		}
@@ -299,7 +301,7 @@ int do_ftruncate(int fd, OFF_T size)
 
 void trim_trailing_slashes(char *name)
 {
-	int l;
+	size_t l;
 	/* Some BSD systems cannot make a directory if the name
 	 * contains a trailing slash.
 	 * <http://www.opensource.apple.com/bugs/X/BSD%20Kernel/2734739.html> */

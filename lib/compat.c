@@ -170,9 +170,10 @@ int sys_gettimeofday(struct timeval *tv)
 char *do_big_num(int64 num, int human_flag, const char *fract)
 {
 	static char bufs[4][128]; /* more than enough room */
-	static unsigned int n;
+	static size_t n;
 	char *s;
-	int len, negated;
+	size_t len;
+	int negated;
 
 	if (human_flag && !number_separator)
 		(void)get_number_separator();

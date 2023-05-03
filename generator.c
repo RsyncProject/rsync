@@ -317,7 +317,7 @@ static void delete_in_dir(char *fbuf, struct file_struct *file, dev_t fs_dev)
 
 	/* If an item in dirlist is not found in flist, delete it
 	 * from the filesystem. */
-	for (i = dirlist->used; i--; ) {
+	for (i = dirlist->used; i-- > 0; ) {
 		struct file_struct *fp = dirlist->files[i];
 		if (!F_IS_ACTIVE(fp))
 			continue;

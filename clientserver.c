@@ -71,7 +71,7 @@ char *daemon_auth_choices;
 int read_only = 0;
 int module_id = -1;
 int pid_file_fd = -1;
-int early_input_len = 0;
+size_t early_input_len = 0;
 char *early_input = NULL;
 pid_t namecvt_pid = 0;
 struct chmod_mode_struct *daemon_chmod_modes;
@@ -83,7 +83,7 @@ struct chmod_mode_struct *daemon_chmod_modes;
  * mode and module_dir is not "/"; otherwise 0.  (Note that a chroot-
  * enabled module can have a non-"/" module_dir these days.) */
 char *module_dir = NULL;
-unsigned int module_dirlen = 0;
+size_t module_dirlen = 0;
 
 char *full_module_path;
 
@@ -158,7 +158,7 @@ static int exchange_protocols(int f_in, int f_out, char *buf, size_t bufsiz, int
 		if (motd && *motd) {
 			FILE *f = fopen(motd, "r");
 			while (f && !feof(f)) {
-				int len = fread(buf, 1, bufsiz - 1, f);
+				size_t len = fread(buf, 1, bufsiz - 1, f);
 				if (len > 0)
 					write_buf(f_out, buf, len);
 			}
@@ -271,14 +271,14 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 			return -1;
 		}
 		early_input_len = st.st_size;
-		if (early_input_len > (int)sizeof line) {
-			rprintf(FERROR, "%s is > %d bytes.\n", early_input_file, (int)sizeof line);
+		if (early_input_len > sizeof line) {
+			rprintf(FERROR, "%s is > %zu bytes.\n", early_input_file, sizeof line);
 			return -1;
 		}
 		if (early_input_len > 0) {
-			io_printf(f_out, EARLY_INPUT_CMD "%d\n", early_input_len);
+			io_printf(f_out, EARLY_INPUT_CMD "%zu\n", early_input_len);
 			while (early_input_len > 0) {
-				int len;
+				size_t len;
 				if (feof(f)) {
 					rprintf(FERROR, "Early EOF in %s\n", early_input_file);
 					return -1;
@@ -1158,7 +1158,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	if (!ret || err_msg) {
 		if (err_msg) {
 			while ((p = strchr(err_msg, '\n')) != NULL) {
-				int len = p - err_msg + 1;
+				size_t len = p - err_msg + 1;
 				rwrite(FERROR, err_msg, len, 0);
 				err_msg += len;
 			}
@@ -1355,8 +1355,8 @@ int start_daemon(int f_in, int f_out)
 		return -1;
 
 	if (strncmp(line, EARLY_INPUT_CMD, EARLY_INPUT_CMDLEN) == 0) {
-		early_input_len = strtol(line + EARLY_INPUT_CMDLEN, NULL, 10);
-		if (early_input_len <= 0 || early_input_len > BIGPATHBUFLEN) {
+		early_input_len = strtoul(line + EARLY_INPUT_CMDLEN, NULL, 10);
+		if (early_input_len == 0 || early_input_len > BIGPATHBUFLEN) {
 			io_printf(f_out, "@ERROR: invalid early_input length\n");
 			return -1;
 		}
@@ -1442,7 +1442,7 @@ static void create_pid_file(void)
 			pidbuf[len++] = '\n';
 		/* We don't need the buffer to end in a '\0' (and we may not have room to add it). */
 #endif
-		if (write(pid_file_fd, pidbuf, len) != len)
+		if (len < 0 || write(pid_file_fd, pidbuf, len) != len)
 			 fail = "write";
 		cleanup_set_pid(pid); /* Mark the file for removal on exit, even if the write failed. */
 	}

@@ -51,7 +51,8 @@ static enum delret delete_dir_contents(char *fname, uint16 flags)
 	enum delret ret;
 	unsigned remainder;
 	void *save_filters;
-	int j, dlen;
+	int j;
+	size_t dlen;
 	char *p;
 
 	if (DEBUG_GTE(DEL, 3)) {

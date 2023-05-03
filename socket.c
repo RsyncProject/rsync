@@ -340,8 +340,8 @@ int open_socket_out_wrapped(char *host, int port, const char *bind_addr, int af_
 	char *prog = getenv("RSYNC_CONNECT_PROG");
 
 	if (prog && strchr(prog, '%')) {
-		int hlen = strlen(host);
-		int len = strlen(prog) + 1;
+		size_t hlen = strlen(host);
+		size_t len = strlen(prog) + 1;
 		char *f, *t;
 		for (f = prog; *f; f++) {
 			if (*f != '%')

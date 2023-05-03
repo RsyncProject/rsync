@@ -400,7 +400,7 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file,
 #ifdef SUPPORT_HARD_LINKS
 	int first_hlink_ndx = -1;
 #endif
-	int l1, l2;
+	size_t l1, l2;
 	int xflags;
 
 	/* Initialize starting value of xflags and adjust counts. */
@@ -600,7 +600,7 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file,
 		else {
 			write_varint(f, uid);
 			if (xflags & XMIT_USER_NAME_FOLLOWS) {
-				int len = strlen(user_name);
+				size_t len = strlen(user_name);
 				write_byte(f, len);
 				write_buf(f, user_name, len);
 			}
@@ -612,7 +612,7 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file,
 		else {
 			write_varint(f, gid);
 			if (xflags & XMIT_GROUP_NAME_FOLLOWS) {
-				int len = strlen(group_name);
+				size_t len = strlen(group_name);
 				write_byte(f, len);
 				write_buf(f, group_name, len);
 			}
@@ -1681,7 +1681,7 @@ static void send_if_directory(int f, struct file_list *flist,
 	if (S_ISDIR(file->mode)
 	    && !(file->flags & FLAG_MOUNT_DIR) && f_name(file, fbuf)) {
 		void *save_filters;
-		unsigned int len = strlen(fbuf);
+		size_t len = strlen(fbuf);
 		if (len > 1 && fbuf[len-1] == '/')
 			fbuf[--len] = '\0';
 		save_filters = push_local_filters(fbuf, len);
@@ -1907,7 +1907,8 @@ static void send_implied_dirs(int f, struct file_list *flist, char *fname,
 	struct file_struct *file;
 	item_list *relname_list;
 	relnamecache **rnpp;
-	int len, need_new_dir, depth = 0;
+	size_t len;
+	int need_new_dir, depth = 0;
 	filter_rule_list save_filter_list = filter_list;
 
 	flags = (flags | FLAG_IMPLIED_DIR) & ~(FLAG_TOP_DIR | FLAG_CONTENT_DIR);
@@ -2011,8 +2012,8 @@ static void send1extra(int f, struct file_struct *file, struct file_list *flist)
 {
 	char fbuf[MAXPATHLEN];
 	item_list *relname_list;
-	int len, dlen, flags = FLAG_DIVERT_DIRS | FLAG_CONTENT_DIR;
-	size_t j;
+	int flags = FLAG_DIVERT_DIRS | FLAG_CONTENT_DIR;
+	size_t len, dlen, j;
 
 	f_name(file, fbuf);
 	dlen = strlen(fbuf);
@@ -2049,7 +2050,7 @@ static void send1extra(int f, struct file_struct *file, struct file_list *flist)
 		fbuf[dlen] = '/';
 		len = strlcpy(fbuf + dlen + 1, rnp->fname, sizeof fbuf - dlen - 1);
 		free(rnp);
-		if (len >= (int)sizeof fbuf)
+		if (len >= sizeof fbuf)
 			continue; /* Impossible... */
 
 		slash = strchr(fbuf+dlen+1, '/');
@@ -3353,7 +3354,7 @@ char *f_name(const struct file_struct *f, char *fbuf)
 		fbuf = f_name_buf();
 
 	if (f->dirname) {
-		int len = strlen(f->dirname);
+		size_t len = strlen(f->dirname);
 		memcpy(fbuf, f->dirname, len);
 		fbuf[len] = '/';
 		strlcpy(fbuf + len + 1, f->basename, MAXPATHLEN - (len + 1));
