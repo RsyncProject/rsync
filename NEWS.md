@@ -13,8 +13,9 @@
 - Add a backtick to the list of characters that the filename quoting needs to
   escape using backslashes.
 
-- Fixed a string-comparison issue in the internal file-list code that affected
-  tr_TR.utf-8.
+- Fixed a string-comparison issue in the internal handling of `--progress` (a
+  locale such as tr_TR.utf-8 needed the internal triggering of `--info` options
+  to use upper-case flag names to ensure that they match).
 
 - Make sure that a local transfer marks the sender side as trusted.
 
@@ -25,7 +26,7 @@
   openssl library.
 
 - Fixed a problem in the daemon auth for older protocols (29 and before) if the
-  openssl library is being used to compute md4 checksums.
+  openssl library is being used to compute MD4 checksums.
 
 - Fixed `rsync -VV` on Cygwin -- it needed a flush of stdout.
 
