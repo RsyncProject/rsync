@@ -46,6 +46,11 @@
 - Changed the mapfrom & mapto perl scripts (in the support dir) into a single
   python script named idmap.  Converted a couple more perl scripts into python.
 
+### DEVELOPER RELATED:
+
+ - Updated config.guess (timestamp 2023-01-01) and config.sub (timestamp
+   2023-01-21).
+
 ------------------------------------------------------------------------------
 
 # NEWS for rsync 3.2.7 (20 Oct 2022)
