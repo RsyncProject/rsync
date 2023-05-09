@@ -473,6 +473,7 @@ has its own detailed description later in this manpage.
 --one-file-system, -x    don't cross filesystem boundaries
 --block-size=SIZE, -B    force a fixed checksum block-size
 --max-map-size           force mmap read block size (expressed in bytes, useful for fast storage, default 256K)
+--write-size             force write block size (expressed in bytes, default 32K)
 --rsh=COMMAND, -e        specify the remote shell to use
 --rsync-path=PROGRAM     specify the rsync to run on remote machine
 --existing               skip creating new files on receiver
@@ -2138,6 +2139,12 @@ expand it.
     To use 4K read block size:
     >     --max-map-size 4194304
 
+
+0.  `--write-size=SIZE`
+
+    This option forces the buffer size when writing a file on the receiver side.
+
+    By default, 32K and expressed in Bytes.
 
 0.  `--rsh=COMMAND`, `-e`
 

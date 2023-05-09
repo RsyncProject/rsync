@@ -34,6 +34,7 @@
 #define ALIGNED_LENGTH(len) ((((len) - 1) | (ALIGN_BOUNDARY-1)) + 1)
 
 extern int sparse_files;
+extern int write_size;
 
 OFF_T preallocated_len = 0;
 
@@ -158,7 +159,7 @@ int write_file(int f, int use_seek, OFF_T offset, const char *buf, int len)
 			offset += r1;
 		} else {
 			if (!wf_writeBuf) {
-				wf_writeBufSize = WRITE_SIZE * 8;
+				wf_writeBufSize = write_size * 8;
 				wf_writeBufCnt  = 0;
 				wf_writeBuf = new_array(char, wf_writeBufSize);
 			}
