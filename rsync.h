@@ -155,7 +155,6 @@
 #define SPARSE_WRITE_SIZE (1024)
 #define WRITE_SIZE (32*1024)
 #define CHUNK_SIZE (32*1024)
-#define MAX_MAP_SIZE (256*1024)
 #define IO_BUFFER_SIZE (32*1024)
 #define MAX_BLOCK_SIZE ((int32)1 << 17)
 

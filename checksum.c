@@ -41,6 +41,7 @@ extern int checksum_seed;
 extern int protocol_version;
 extern int proper_seed_order;
 extern const char *checksum_choice;
+extern int max_map_size;
 
 #define NNI_BUILTIN (1<<0)
 #define NNI_EVP (1<<1)
@@ -412,7 +413,7 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 		return;
 	}
 
-	buf = map_file(fd, len, MAX_MAP_SIZE, CHUNK_SIZE);
+	buf = map_file(fd, len, max_map_size, CHUNK_SIZE);
 
 #ifdef USE_OPENSSL
 	if (file_sum_evp_md) {

@@ -53,6 +53,7 @@ extern BOOL want_progress_now;
 extern struct stats stats;
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern char num_dev_ino_buf[4 + 8 + 8];
+extern int max_map_size;
 
 BOOL extra_flist_sending_enabled;
 
@@ -396,7 +397,7 @@ void send_files(int f_in, int f_out)
 		}
 
 		if (st.st_size) {
-			int32 read_size = MAX(s->blength * 3, MAX_MAP_SIZE);
+			int32 read_size = MAX(s->blength * 3, max_map_size);
 			mbuf = map_file(fd, st.st_size, read_size, s->blength);
 		} else
 			mbuf = NULL;
