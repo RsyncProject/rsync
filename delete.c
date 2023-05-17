@@ -188,7 +188,7 @@ enum delret delete_item(char *fbuf, uint16 mode, uint16 flags)
 				stats.deleted_symlinks++;
 #endif
 			else if (IS_DEVICE(mode))
-				stats.deleted_symlinks++;
+				stats.deleted_devices++;
 			else
 				stats.deleted_specials++;
 		}

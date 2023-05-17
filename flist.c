@@ -2659,7 +2659,7 @@ struct file_list *recv_file_list(int f, int dir_ndx)
 		} else if (S_ISLNK(file->mode))
 			stats.num_symlinks++;
 		else if (IS_DEVICE(file->mode))
-			stats.num_symlinks++;
+			stats.num_devices++;
 		else
 			stats.num_specials++;
 

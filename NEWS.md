@@ -30,6 +30,8 @@
 
 - Fixed `rsync -VV` on Cygwin -- it needed a flush of stdout.
 
+- Fixed an old stats bug that counted devices as symlinks.
+
 ### ENHANCEMENTS:
 
 - Enhanced rrsync with the `-no-overwrite` option that allows you to ensure
