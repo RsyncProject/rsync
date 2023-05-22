@@ -1,4 +1,4 @@
-#!/usr/bin/env perl
+#!/usr/bin/env python3
 # This script takes a command-line arg of a source directory
 # that will be passed to rsync, and generates a set of excludes
 # that will exclude all mount points from the list.  This is
@@ -27,23 +27,33 @@
 # awk '{print $2}' /proc/mounts | grep -v '^/$' | \
 #   rsync -avf 'merge,/- -' /dir host:/dest/
 
-use strict;
-use warnings;
-use Cwd 'abs_path';
+import os, argparse
 
-my $file = '/proc/mounts';
-my $dir = shift || '/';
-my $trailing_slash = $dir =~ m{./$} ? '/' : '';
-$dir = abs_path($dir) . $trailing_slash;
-$dir =~ s{([^/]*)$}{};
-my $trailing = $1;
-$trailing = '' if $trailing eq '.' || !-d "$dir$trailing";
-$trailing .= '/' if $trailing ne '';
+MNT_FILE = '/proc/mounts';
 
-open(IN, $file) or die "Unable to open $file: $!\n";
-while (<IN>) {
-    $_ = (split)[1];
-    next unless s{^\Q$dir$trailing\E}{}o && $_ ne '';
-    print "- /$trailing$_\n";
-}
-close IN;
+def main():
+    trailing_slash = '/' if args.path.endswith(('/', '/.')) and args.path != '/' else ''
+    args.path = os.path.realpath(args.path) + trailing_slash
+    parent_dir = os.path.dirname(args.path)
+    trailing = os.path.basename(args.path)
+    if not os.path.isdir(args.path):
+        trailing = ''
+    elif trailing != '':
+        trailing += '/'
+    want_path = os.path.join(parent_dir, trailing)
+    wp_len = len(want_path)
+
+    with open(MNT_FILE) as fh:
+        for line in fh:
+            mnt_path = line.split()[1]
+            if mnt_path.startswith(want_path) and mnt_path != want_path:
+                print(f"- /{trailing}{mnt_path[wp_len:]}")
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Output mount points as rsync excludes.", add_help=False)
+    parser.add_argument("--help", "-h", action="help", help="Output this help message and exit.")
+    parser.add_argument('path', metavar='PATH', nargs='?', default='/', help="Limit output to those within the PATH hierarchy.")
+    args = parser.parse_args()
+    main()
+
+# vim: sw=4 et
