@@ -2484,7 +2484,7 @@ expand it.
 
     This option is useful for those times that you need the argument's
     character set to be converted for the remote host, if the remote shell is
-    incompatible with the default backslash-escpaing method, or there is some
+    incompatible with the default backslash-escaping method, or there is some
     other reason that you want the majority of the options and arguments to
     bypass the command-line of the remote shell.
 
