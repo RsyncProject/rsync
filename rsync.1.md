@@ -2106,7 +2106,8 @@ expand it.
     See the [`--max-size`](#opt) option for a description of how SIZE can be
     specified.  The default suffix if none is given is bytes.
 
-    Beginning in 3.2.3, a value of 0 specifies no limit.
+    Beginning in 3.2.7, a value of 0 is an easy way to specify SIZE_MAX (the
+    largest limit possible).
 
     You can set a default value using the environment variable
     [`RSYNC_MAX_ALLOC`](#) using the same SIZE values as supported by this

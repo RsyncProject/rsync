@@ -72,7 +72,7 @@ int msleep(int t)
 
 void *my_alloc(void *ptr, size_t num, size_t size, const char *file, int line)
 {
-	if (max_alloc && num >= max_alloc/size) {
+	if (num >= max_alloc/size) {
 		if (!file)
 			return NULL;
 		rprintf(FERROR, "[%s] exceeded --max-alloc=%s setting (file=%s, line=%d)\n",
