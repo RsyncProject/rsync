@@ -2061,6 +2061,8 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		}
 		max_alloc = size;
 	}
+	if (!max_alloc)
+		max_alloc = SIZE_MAX;
 
 	if (old_style_args < 0) {
 		if (!am_server && protect_args <= 0 && (arg = getenv("RSYNC_OLD_ARGS")) != NULL && *arg) {
