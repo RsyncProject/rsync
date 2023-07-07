@@ -357,9 +357,14 @@ int do_mkstemp(char *template, mode_t perms)
 int do_stat(const char *path, STRUCT_STAT *st)
 {
 #ifdef USE_STAT64_FUNCS
-	return stat64(path, st);
+	int r = stat64(path, st);
 #else
-	return stat(path, st);
+	int r = stat(path, st);
+#endif
+#if defined __sun && defined HAVE_STRUCT_STAT_ST_MTIM_TV_NSEC
+	return stat_time_normalize(r, st);
+#else
+	return r;
 #endif
 }
 
@@ -367,9 +372,14 @@ int do_lstat(const char *path, STRUCT_STAT *st)
 {
 #ifdef SUPPORT_LINKS
 # ifdef USE_STAT64_FUNCS
-	return lstat64(path, st);
+	int r = lstat64(path, st);
 # else
-	return lstat(path, st);
+	int r = lstat(path, st);
+# endif
+# if defined __sun && defined HAVE_STRUCT_STAT_ST_MTIM_TV_NSEC
+	return stat_time_normalize(r, st);
+# else
+	return r;
 # endif
 #else
 	return do_stat(path, st);
