@@ -1,0 +1,26 @@
+#!/bin/sh
+
+# The objective here is to test both --address and --sockopt
+
+. "$suitedir/rsync.fns"
+
+# This is a kitchen sink test.
+sockopts='IP_PMTUDISC_DO,TCP_CORK,TCP_DEFER_ACCEPT=1,IP_FREEBIND,IP_LOCAL_PORT_RANGE=1234,TCP_CONGESTION=bbr,TCP_QUICKACK,TCP_NODELAY,TCP_DEFER_ACCEPT=1,TCP_FASTOPEN,TCP_FASTOPEN_CONNECT'
+
+extra_config="
+socket options = ${sockopts}
+"
+build_rsyncd_conf
+
+RSYNC_CONNECT_PROG="$RSYNC --config=$conf --daemon --sockopts=${sockopts}"
+export RSYNC_CONNECT_PROG
+
+hands_setup
+
+# Build chkdir with a normal rsync and an --exclude.
+$RSYNC -av --exclude=foobar.baz "$fromdir/" "$chkdir/"
+
+checkit "'$ignore23' $RSYNC -avvvvzz --sockopts=${sockopts} '$fromdir/' localhost::test-to/" "$chkdir" "$todir"
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0

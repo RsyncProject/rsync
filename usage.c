@@ -25,6 +25,7 @@
 #include "itypes.h"
 
 extern struct name_num_obj valid_checksums, valid_compressions, valid_auth_checksums;
+extern struct socket_option socket_options[];
 
 static char *istring(const char *fmt, int val)
 {
@@ -215,6 +216,45 @@ static void print_info_flags(enum logcode f)
 		printf("  }");
 }
 
+#define WIDTH 72
+static void output_sockopts_list(enum logcode f, const char* name, struct socket_option sockopts[])
+{
+	size_t linelen = 0, nextlen = 0, i = 0;
+	int last_level = -1;
+	char tmpbuf[256];
+	if (f != FNONE) {
+		rprintf(f, "%s:\n", name);
+
+		for (i = 0; sockopts[i].name; i++) {
+			// Skip options not available in this build.
+			if(sockopts[i].level == (int)(SOCK_OPT_ERR))
+				continue;
+
+			if(linelen > 0)
+				// Check if different protocol/level of options, or the
+				// previous line would be tood long.
+				if(last_level != sockopts[i].level ||
+						((linelen + strlen(sockopts[i].name) + 1) > WIDTH)) {
+					rprintf(f, "\n");
+					linelen = 0;
+				}
+			// This groups the levels together.
+			last_level = sockopts[i].level;
+
+			nextlen = snprintf(tmpbuf, sizeof(tmpbuf), "%s%s",
+					(linelen == 0) ? "    " : " ",
+					sockopts[i].name
+					);
+			rprintf(f, "%s", tmpbuf);
+			linelen += nextlen;
+		}
+		rprintf(f, "\n");
+
+		return;
+	}
+	// TODO: JSON path
+}
+
 static void output_nno_list(enum logcode f, const char *name, struct name_num_obj *nno)
 {
 	char namebuf[64], tmpbuf[256];
@@ -288,6 +328,7 @@ void print_rsync_version(enum logcode f)
 	output_nno_list(f, "Checksum list", &valid_checksums);
 	output_nno_list(f, "Compress list", &valid_compressions);
 	output_nno_list(f, "Daemon auth list", &valid_auth_checksums);
+	output_sockopts_list(f, "sockopts list", socket_options);
 
 	if (f == FNONE) {
 		json_line("license", "GPLv3");
