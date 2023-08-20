@@ -387,6 +387,7 @@ exclude = ? foobar.baz
 max verbosity = 4
 $uid_setting
 $gid_setting
+$extra_config
 
 [test-from]
 	path = $fromdir

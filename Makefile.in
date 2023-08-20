@@ -47,7 +47,7 @@ OBJS1=flist.o rsync.o generator.o receiver.o cleanup.o sender.o exclude.o \
 	util1.o util2.o main.o checksum.o match.o syscall.o log.o backup.o delete.o
 OBJS2=options.o io.o compat.o hlink.o token.o uidlist.o socket.o hashtable.o \
 	usage.o fileio.o batch.o clientname.o chmod.o acls.o xattrs.o
-OBJS3=progress.o pipe.o @MD5_ASM@ @ROLL_SIMD@ @ROLL_ASM@
+OBJS3=progress.o pipe.o sockopts.o @MD5_ASM@ @ROLL_SIMD@ @ROLL_ASM@
 DAEMON_OBJ = params.o loadparm.o clientserver.o access.o connection.o authenticate.o
 popt_OBJS=popt/findme.o  popt/popt.o  popt/poptconfig.o \
 	popt/popthelp.o popt/poptparse.o popt/poptint.o
@@ -359,3 +359,7 @@ doxygen:
 doxygen-upload:
 	rsync -avzv $(srcdir)/dox/html/ --delete \
 	$${RSYNC_SAMBA_HOST-samba.org}:/home/httpd/html/rsync/doxygen/head/
+
+# FreeBSD make does not support $<
+sockopts.c: sockopts.c.sh
+	sh sockopts.c.sh >$@.tmp && mv $@.tmp $@
