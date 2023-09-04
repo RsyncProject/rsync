@@ -68,8 +68,8 @@
 #endif
 
 // Missing from the headers on gcc 6 and older, clang 8 and older
-typedef long long __m128i_u __attribute__((__vector_size__(16), __may_alias__, __aligned__(1)));
-typedef long long __m256i_u __attribute__((__vector_size__(32), __may_alias__, __aligned__(1)));
+typedef long long __m128i_u __attribute__((__vector_size__(16), __may_alias__, __aligned__(16)));
+typedef long long __m256i_u __attribute__((__vector_size__(32), __may_alias__, __aligned__(16)));
 
 /* Compatibility macros to let our SSSE3 algorithm run with only SSE2.
    These used to be neat individual functions with target attributes switching between SSE2 and SSSE3 implementations
