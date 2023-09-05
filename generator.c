@@ -2040,10 +2040,24 @@ int atomic_create(struct file_struct *file, char *fname, const char *slnk, const
 	}
 
 	if (!skip_atomic) {
-		if (do_rename(tmpname, fname) < 0) {
-			rsyserr(FERROR_XFER, errno, "rename %s -> \"%s\" failed",
-				full_fname(tmpname), full_fname(fname));
-			do_unlink(tmpname);
+		if (do_rename(tmpname, fname) < 0) { 
+			/* In certain cases, renames of symlinks pointing to another device, 
+			 * or dangling symlinks will fail with "Invalid cross-device link".
+			 * In this case we'll do the same as mv(1) and manually create the symlink
+			 */		
+			if(errno == EXDEV && slnk){		
+				do_unlink(tmpname);
+				do_unlink(fname);
+				if (do_symlink(slnk, fname) < 0) {
+					rsyserr(FERROR_XFER, errno, "symlink %s -> \"%s\" failed",
+						full_fname(fname), slnk);
+					return 0;
+				}
+			}else{
+				rsyserr(FERROR_XFER, errno, "rename %s -> %s failed",
+					full_fname(tmpname), full_fname(fname));
+				do_unlink(tmpname);
+			}
 			return 0;
 		}
 	}
