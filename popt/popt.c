@@ -411,7 +411,7 @@ static int execCommand(poptContext con)
 	argv[argc] = s;
     } else
 	argv[argc] = findProgramPath(item->argv[0]);
-    if (argv[argc++] == NULL) return POPT_ERROR_NOARG;
+    if (argv[argc++] == NULL) goto fail_noarg;
 
     if (item->argc > 1) {
 	memcpy(argv + argc, item->argv + 1, sizeof(*argv) * (item->argc - 1));
@@ -434,9 +434,9 @@ static int execCommand(poptContext con)
   {
 #ifdef __hpux
     int rc = setresgid(getgid(), getgid(),-1);
-    if (rc) return POPT_ERROR_ERRNO;
+    if (rc) goto fail_errno;
     rc = setresuid(getuid(), getuid(),-1);
-    if (rc) return POPT_ERROR_ERRNO;
+    if (rc) goto fail_errno;
 #else
 /*
  * XXX " ... on BSD systems setuid() should be preferred over setreuid()"
@@ -445,14 +445,14 @@ static int execCommand(poptContext con)
  */
 #if defined(HAVE_SETUID)
     int rc = setgid(getgid());
-    if (rc) return POPT_ERROR_ERRNO;
+    if (rc) goto fail_errno;
     rc = setuid(getuid());
-    if (rc) return POPT_ERROR_ERRNO;
+    if (rc) goto fail_errno;
 #elif defined (HAVE_SETREUID)
     int rc = setregid(getgid(), getgid());
-    if (rc) return POPT_ERROR_ERRNO;
+    if (rc) goto fail_errno;
     rc = setreuid(getuid(), getuid());
-    if (rc) return POPT_ERROR_ERRNO;
+    if (rc) goto fail_errno;
 #else
     ; /* Can't drop privileges */
 #endif
@@ -460,7 +460,7 @@ static int execCommand(poptContext con)
   }
 
     if (argv[0] == NULL)
-	return POPT_ERROR_NOARG;
+	goto fail_noarg;
 
 #ifdef	MYDEBUG
 if (_popt_debug)
@@ -474,7 +474,12 @@ if (_popt_debug)
 
     execvp(argv[0], (char *const *)argv);
 
+fail_errno:
+    _free(argv);
     return POPT_ERROR_ERRNO;
+fail_noarg:
+    _free(argv);
+    return POPT_ERROR_NOARG;
 }
 /*@=bounds =boundswrite @*/
 
