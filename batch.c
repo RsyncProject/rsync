@@ -132,7 +132,7 @@ void check_batch_flags(void)
 	tweaked_iconv = iconv_opt != NULL;
 #endif
 	for (i = 0; flag_ptr[i]; i++) {
-		int set = batch_stream_flags & (1 << i) ? 1 : 0;
+		int set = (batch_stream_flags >> i) & 1;
 		if (*flag_ptr[i] != set) {
 			if (i == 9) {
 				rprintf(FERROR,
