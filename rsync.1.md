@@ -472,8 +472,8 @@ has its own detailed description later in this manpage.
 --checksum-choice=STR    choose the checksum algorithm (aka --cc)
 --one-file-system, -x    don't cross filesystem boundaries
 --block-size=SIZE, -B    force a fixed checksum block-size
---max-map-size           force mmap read block size (expressed in bytes, useful for fast storage, default 256K)
---write-size             force write block size (expressed in bytes, default 32K)
+--max-map-size=SIZE      force mmap read block size (expressed in bytes, useful for fast storage, default 256K)
+--write-size=SIZE        force write block size (expressed in bytes, default 32K)
 --rsh=COMMAND, -e        specify the remote shell to use
 --rsync-path=PROGRAM     specify the rsync to run on remote machine
 --existing               skip creating new files on receiver
