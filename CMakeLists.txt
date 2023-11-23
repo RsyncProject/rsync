@@ -1,17 +1,18 @@
 project(rsync)
 
 add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/rsync
-    COMMAND ./configure --disable-md2man CPPFLAGS=-I/opt/homebrew/include LDFLAGS=-L/opt/homebrew/lib
+    OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/rsync
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/configure --disable-md2man CPPFLAGS=-I/opt/homebrew/include LDFLAGS=-L/opt/homebrew/lib
     COMMAND make
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    COMMENT "Configuring and building rsync"
+    VERBATIM
 )
 
 add_custom_target(
     rsync_build ALL
-    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/rsync
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/rsync
 )
 
-add_executable(rsync IMPORTED)
-set_target_properties(rsync PROPERTIES IMPORTED_LOCATION 
-${CMAKE_CURRENT_BINARY_DIR}/rsync)
+add_executable(rsync IMPORTED GLOBAL)
+set_target_properties(rsync PROPERTIES IMPORTED_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/rsync)
