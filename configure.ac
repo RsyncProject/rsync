@@ -392,7 +392,7 @@ AS_HELP_STRING([--disable-ipv6],[disable to omit ipv6 support]),
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-main()
+int main()
 {
    if (socket(AF_INET6, SOCK_STREAM, 0) < 0)
      exit(1);
