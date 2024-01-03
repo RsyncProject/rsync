@@ -14,7 +14,7 @@ endif()
 
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/rsync
-    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/configure --disable-md2man CPPFLAGS=${CPP_FLAGS} LDFLAGS=${LD_FLAGS}
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/configure --disable-md2man --with-included-popt CPPFLAGS=${CPP_FLAGS} LDFLAGS=${LD_FLAGS}
     COMMAND make
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMENT "Configuring and building rsync for ${CMAKE_HOST_SYSTEM_PROCESSOR}"
