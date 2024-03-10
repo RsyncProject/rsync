@@ -424,6 +424,26 @@ case $host_os in
 	       * ) AC_MSG_RESULT(no);;
 esac
 
+# We default to using our zlib unless --with-included-zlib=no is given.
+if test x"$with_included_zlib" != x"no"; then
+    with_included_zlib=yes
+elif test x"$ac_cv_header_zlib_h" != x"yes"; then
+    with_included_zlib=yes
+fi
+if test x"$with_included_zlib" != x"yes"; then
+    AC_CHECK_LIB(z, deflateParams, , [with_included_zlib=yes])
+fi
+
+AC_MSG_CHECKING([whether to use included zlib])
+if test x"$with_included_zlib" = x"yes"; then
+    AC_MSG_RESULT($srcdir/zlib)
+    BUILD_ZLIB='$(zlib_OBJS)'
+    CFLAGS="-I$srcdir/zlib $CFLAGS"
+else
+    AC_DEFINE(EXTERNAL_ZLIB, 1, [Define to 1 if using external zlib])
+    AC_MSG_RESULT(no)
+fi
+
 AC_MSG_CHECKING([whether to enable use of openssl crypto library])
 AC_ARG_ENABLE([openssl],
 	AS_HELP_STRING([--disable-openssl],[disable to omit openssl crypto library]))
@@ -1093,26 +1113,6 @@ if test x"$with_included_popt" = x"yes"; then
 	AC_MSG_WARN([included libpopt will use malloc, not alloca (which wastes a small amount of memory)])
     fi
 else
-    AC_MSG_RESULT(no)
-fi
-
-# We default to using our zlib unless --with-included-zlib=no is given.
-if test x"$with_included_zlib" != x"no"; then
-    with_included_zlib=yes
-elif test x"$ac_cv_header_zlib_h" != x"yes"; then
-    with_included_zlib=yes
-fi
-if test x"$with_included_zlib" != x"yes"; then
-    AC_CHECK_LIB(z, deflateParams, , [with_included_zlib=yes])
-fi
-
-AC_MSG_CHECKING([whether to use included zlib])
-if test x"$with_included_zlib" = x"yes"; then
-    AC_MSG_RESULT($srcdir/zlib)
-    BUILD_ZLIB='$(zlib_OBJS)'
-    CFLAGS="-I$srcdir/zlib $CFLAGS"
-else
-    AC_DEFINE(EXTERNAL_ZLIB, 1, [Define to 1 if using external zlib])
     AC_MSG_RESULT(no)
 fi
 
