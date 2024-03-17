@@ -1023,7 +1023,7 @@ in the values of parameters.  See that section for details.
     _not_ displayed if the script returns success.  The other programs cannot
     send any text to the user.  All output except for the `pre-xfer exec`
     stdout goes to the corresponding daemon's stdout/stderr, which is typically
-    discarded.  See the `--no-detatch` option for a way to see the daemon's
+    discarded.  See the `--no-detach` option for a way to see the daemon's
     output, which can assist with debugging.
 
     Note that the `early exec` command runs before any part of the transfer
