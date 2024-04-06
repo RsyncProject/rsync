@@ -10,6 +10,11 @@
 - Fixed an buffer overflow in the checksum2 code if SHA1 is being used for
   the checksum2 algorithm.
 
+- Fixed an issue when rsync is compiled using `_FORTIFY_SOURCE` so that the
+  extra tests don't complain about a strlcpy() limit value (which was too
+  large, even though it wasn't possible for the larger value to cause an
+  overflow).
+
 - Add a backtick to the list of characters that the filename quoting needs to
   escape using backslashes.
 
@@ -48,6 +53,8 @@
 
 - Changed the mapfrom & mapto perl scripts (in the support dir) into a single
   python script named idmap.  Converted a couple more perl scripts into python.
+
+- Changed the mnt-excl perl script (in the support dir) into a python script.
 
 ### DEVELOPER RELATED:
 
