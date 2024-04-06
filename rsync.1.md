@@ -4818,7 +4818,7 @@ An rsync web site is available at <https://rsync.samba.org/>.  The site
 includes an FAQ-O-Matic which may cover questions unanswered by this manual
 page.
 
-The rsync github project is <https://github.com/WayneD/rsync>.
+The rsync github project is <https://github.com/RsyncProject/rsync>.
 
 We would be delighted to hear from you if you like this program.  Please
 contact the mailing-list at <rsync@lists.samba.org>.

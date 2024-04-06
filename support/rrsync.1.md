@@ -163,7 +163,7 @@ rsync is distributed under the GNU General Public License.  See the file
 [COPYING](COPYING) for details.
 
 An rsync web site is available at <https://rsync.samba.org/> and its github
-project is <https://github.com/WayneD/rsync>.
+project is <https://github.com/RsyncProject/rsync>.
 
 ## AUTHOR
 

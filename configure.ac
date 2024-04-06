@@ -573,7 +573,7 @@ if test x"$no_lib" != x; then
     echo ""
     echo "See the INSTALL file for hints on how to install the missing libraries and/or"
     echo "how to generate (or fetch) manpages:"
-    echo "    https://github.com/WayneD/rsync/blob/master/INSTALL.md"
+    echo "    https://github.com/RsyncProject/rsync/blob/master/INSTALL.md"
     echo ""
     echo "To disable one or more features, the relevant configure options are:"
     for lib in $no_lib; do
