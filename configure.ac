@@ -1084,6 +1084,8 @@ if test x"$with_included_popt" = x"yes"; then
     AC_MSG_RESULT($srcdir/popt)
     BUILD_POPT='$(popt_OBJS)'
     CFLAGS="-I$srcdir/popt $CFLAGS"
+    AC_DEFINE(POPT_SYSCONFDIR, "/etc", [sysconfig dir for popt])
+    AC_DEFINE(PACKAGE, "rsync", [package name for rsync])
     if test x"$ALLOCA" != x
     then
 	# this can be removed when/if we add an included alloca.c;
