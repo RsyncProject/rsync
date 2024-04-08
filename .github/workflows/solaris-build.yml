@@ -1,0 +1,27 @@
+name: Test rsync on Solaris
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  solaris-test:
+    runs-on: ubuntu-latest
+    name: Test rsync on Solaris
+    steps:
+    - uses: actions/checkout@v4
+    - name: Test in Solaris
+      id: test
+      uses: vmactions/solaris-vm@v1
+      with:
+        usesh: true
+        prepare: |
+          pkg install bash automake gnu-m4 wget pkg://solaris/runtime/python-35 autoconf gcc
+        run: |
+          uname -a
+          ./configure --with-rrsync -disable-zstd --disable-md2man --disable-xxhash --disable-lz4
+          make
+          ./rsync --version
+          ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
