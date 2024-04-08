@@ -1,3 +1,17 @@
+# NEWS for rsync 3.3.1 (UNRELEASED)
+
+## Changes in this version:
+
+### BUG FIXES:
+
+- Fixed the included popt to avoid a memory error on modern gcc versions.
+
+### INTERNAL:
+
+ - Updated included popt to version 1.19.
+
+------------------------------------------------------------------------------
+
 # NEWS for rsync 3.3.0 (6 Apr 2024)
 
 ## Changes in this version:
@@ -4762,6 +4776,7 @@
 
 | RELEASE DATE | VER.   | DATE OF COMMIT\* | PROTOCOL    |
 |--------------|--------|------------------|-------------|
+| ?? Apr 2024  | 3.3.1  |                  | 31          |
 | 06 Apr 2024  | 3.3.0  |                  | 31          |
 | 20 Oct 2022  | 3.2.7  |                  | 31          |
 | 09 Sep 2022  | 3.2.6  |                  | 31          |
