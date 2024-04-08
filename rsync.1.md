@@ -4838,8 +4838,7 @@ David Bell.  I've probably missed some people, my apologies if I have.
 ## AUTHOR
 
 Rsync was originally written by Andrew Tridgell and Paul Mackerras.  Many
-people have later contributed to it. It is currently maintained by Wayne
-Davison.
+people from around the world have helped to maintain and improve it.
 
 Mailing lists for support and development are available at
 <https://lists.samba.org/>.
