@@ -104,6 +104,8 @@ like.
     >     sudo apt install -y liblz4-dev
     >     sudo apt install -y libssl-dev
 
+Or run support/install_deps_ubuntu.sh
+
  -  For CentOS (use EPEL for python3-pip):
 
     >     sudo yum -y install epel-release
