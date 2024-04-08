@@ -3,10 +3,8 @@ name: build
 on:
   push:
     branches: [ master ]
-    paths-ignore: [ .cirrus.yml ]
   pull_request:
     branches: [ master ]
-    paths-ignore: [ .cirrus.yml ]
   schedule:
     - cron: '42 8 * * *'
 
