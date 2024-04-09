@@ -116,7 +116,7 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now, int is_l
 	output_needs_newline = 0;
 	pct = ofs == size ? 100 : (int) (100.0 * ofs / size);
 	rput_progress();
-	rprintf(FCLIENT, "%15s %3d%% %7sB/s %s%s", human_num(ofs), pct,
+	rprintf(FCLIENT, "%15sB %3d%% %7sB/s %s%s", human_num(ofs), pct,
 		rate >= INT64_MAX ? ">MAX " : human_num((int64)rate), rembuf, eol);
 	if (!is_last && !quiet) {
 		output_needs_newline = 1;
