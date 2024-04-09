@@ -69,7 +69,6 @@ static unsigned long msdiff(struct timeval *t1, struct timeval *t2)
 static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now, int is_last)
 {
 	char rembuf[64], eol[128];
-	const char *units;
 	unsigned long diff;
 	double rate, remain;
 	int pct;
@@ -93,7 +92,7 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now, int is_l
 		/* Compute stats based on the starting info. */
 		if (!ph_start.time.tv_sec || !(diff = msdiff(&ph_start.time, now)))
 			diff = 1;
-		rate = (double) (ofs - ph_start.ofs) * 1000.0 / diff / 1024.0;
+		rate = (double) (ofs - ph_start.ofs) * 1000.0 / diff;
 		/* Switch to total time taken for our last update. */
 		remain = (double) diff / 1000.0;
 	} else {
@@ -101,18 +100,8 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now, int is_l
 		/* Compute stats based on recent progress. */
 		if (!(diff = msdiff(&ph_list[oldest_hpos].time, now)))
 			diff = 1;
-		rate = (double) (ofs - ph_list[oldest_hpos].ofs) * 1000.0 / diff / 1024.0;
-		remain = rate ? (double) (size - ofs) / rate / 1000.0 : 0.0;
-	}
-
-	if (rate > 1024*1024) {
-		rate /= 1024.0 * 1024.0;
-		units = "GB/s";
-	} else if (rate > 1024) {
-		rate /= 1024.0;
-		units = "MB/s";
-	} else {
-		units = "kB/s";
+		rate = (double) (ofs - ph_list[oldest_hpos].ofs) * 1000.0 / diff;
+		remain = rate ? (double) (size - ofs) / rate : 0.0;
 	}
 
 	if (remain < 0 || remain > 9999.0 * 3600.0)
@@ -126,8 +115,8 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now, int is_l
 
 	output_needs_newline = 0;
 	pct = ofs == size ? 100 : (int) (100.0 * ofs / size);
-	rprintf(FCLIENT, "\r%15s %3d%% %7.2f%s %s%s",
-		human_num(ofs), pct, rate, units, rembuf, eol);
+	rprintf(FCLIENT, "\r%15s %3d%% %7sB/s %s%s",
+		human_num(ofs), pct, human_num((int64)rate), rembuf, eol);
 	if (!is_last && !quiet) {
 		output_needs_newline = 1;
 		rflush(FCLIENT);
