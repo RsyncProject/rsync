@@ -5,6 +5,8 @@ on:
     branches: [ master ]
   pull_request:
     branches: [ master ]
+  schedule:
+    - cron: '42 8 * * *'
 
 jobs:
   test:
@@ -14,7 +16,7 @@ jobs:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
-    - name: Test in FreeBSD
+    - name: Test in FreeBSD VM
       id: test
       uses: vmactions/freebsd-vm@v1
       with:

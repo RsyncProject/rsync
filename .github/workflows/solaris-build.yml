@@ -5,16 +5,18 @@ on:
     branches: [ master ]
   pull_request:
     branches: [ master ]
+  schedule:
+    - cron: '42 8 * * *'
 
 jobs:
-  solaris-test:
+  test:
     runs-on: ubuntu-latest
     name: Test rsync on Solaris
     steps:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
-    - name: Test in Solaris
+    - name: Test in Solaris VM
       id: test
       uses: vmactions/solaris-vm@v1
       with:
@@ -27,3 +29,15 @@ jobs:
           make
           ./rsync --version
           ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
+    - name: save artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: solaris-bin
+        path: |
+          rsync
+          rsync-ssl
+          rsync.1
+          rsync-ssl.1
+          rsyncd.conf.5
+          rrsync.1
+          rrsync
