@@ -14,7 +14,8 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v4
-      fetch-depth: 0
+      with:
+        fetch-depth: 0
     - name: prep
       run: |
         sudo apt-get install acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev python3-cmarkgfm openssl
@@ -52,7 +53,8 @@ jobs:
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v4
-      fetch-depth: 0
+      with:
+        fetch-depth: 0
     - name: prep
       run: |
         brew install automake openssl xxhash zstd lz4
@@ -88,7 +90,8 @@ jobs:
     if: (github.event_name == 'schedule' || contains(github.event.head_commit.message, '[buildall]'))
     steps:
     - uses: actions/checkout@v4
-      fetch-depth: 0
+      with:
+        fetch-depth: 0
     - name: cygwin
       run: choco install -y --no-progress cygwin cyg-get
     - name: prep

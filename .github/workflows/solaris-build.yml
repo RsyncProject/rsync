@@ -12,7 +12,8 @@ jobs:
     name: Test rsync on Solaris
     steps:
     - uses: actions/checkout@v4
-      fetch-depth: 0
+      with:
+        fetch-depth: 0
     - name: Test in Solaris
       id: test
       uses: vmactions/solaris-vm@v1
