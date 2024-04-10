@@ -27,8 +27,6 @@ def main():
     ztoday = now.strftime('%d %b %Y')
     today = ztoday.lstrip('0')
 
-    mandate_gensend_hook()
-
     curdir = os.getcwd()
 
     signal.signal(signal.SIGINT, signal_handler)

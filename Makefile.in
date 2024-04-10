@@ -184,14 +184,6 @@ conf: configure.sh config.h.in
 .PHONY: gen
 gen: conf proto.h man git-version.h
 
-.PHONY: gensend
-gensend: gen
-	if ! diff git-version.h $(srcdir)/gists/rsync-git-version.h >/dev/null; then \
-	    ./rsync -ai git-version.h $(srcdir)/gists/rsync-git-version.h && \
-	    (cd $(srcdir)/gists && git commit --allow-empty-message -m '' rsync-git-version.h && git push) ; \
-	fi
-	rsync -aic $(GENFILES) git-version.h $${SAMBA_HOST-samba.org}:/home/ftp/pub/rsync/generated-files/ || true
-
 aclocal.m4: $(srcdir)/m4/*.m4
 	aclocal -I $(srcdir)/m4
 
