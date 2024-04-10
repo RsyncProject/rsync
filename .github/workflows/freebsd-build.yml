@@ -23,7 +23,7 @@ jobs:
           pkg install -y bash autotools m4 devel/xxhash zstd liblz4 python3 archivers/liblz4
         run: |
           freebsd-version
-          ./configure --with-rrsync --disable-md2man
+          ./configure --with-rrsync -disable-zstd --disable-md2man --disable-xxhash --disable-lz4
           make
           ./rsync --version
           ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
@@ -34,4 +34,8 @@ jobs:
         path: |
           rsync
           rsync-ssl
+          rsync.1
+          rsync-ssl.1
+          rsyncd.conf.5
+          rrsync.1
           rrsync
