@@ -3,8 +3,14 @@ name: Test rsync on Solaris
 on:
   push:
     branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/solaris-build.yml'
   pull_request:
     branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/solaris-build.yml'
   schedule:
     - cron: '42 8 * * *'
 
@@ -22,7 +28,7 @@ jobs:
       with:
         usesh: true
         prepare: |
-          pkg install bash automake gnu-m4 pkg://solaris/runtime/python-35 autoconf gcc
+          pkg install bash automake gnu-m4 pkg://solaris/runtime/python-35 autoconf gcc git
         run: |
           uname -a
           ./configure --with-rrsync -disable-zstd --disable-md2man --disable-xxhash --disable-lz4

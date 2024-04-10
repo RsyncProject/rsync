@@ -3,8 +3,14 @@ name: Test rsync on FreeBSD
 on:
   push:
     branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/freebsd-build.yml'
   pull_request:
     branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/freebsd-build.yml'
   schedule:
     - cron: '42 8 * * *'
 
@@ -22,7 +28,7 @@ jobs:
       with:
         usesh: true
         prepare: |
-          pkg install -y bash autotools m4 devel/xxhash zstd liblz4 python3 archivers/liblz4
+          pkg install -y bash autotools m4 devel/xxhash zstd liblz4 python3 archivers/liblz4 git
         run: |
           freebsd-version
           ./configure --with-rrsync -disable-zstd --disable-md2man --disable-xxhash --disable-lz4

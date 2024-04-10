@@ -3,8 +3,14 @@ name: Test rsync on Ubuntu
 on:
   push:
     branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/ubuntu-build.yml'
   pull_request:
     branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/ubuntu-build.yml'
   schedule:
     - cron: '42 8 * * *'
 
