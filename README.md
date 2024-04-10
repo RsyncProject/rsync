@@ -132,9 +132,6 @@ source.
 COPYRIGHT
 ---------
 
-Rsync was originally written by Andrew Tridgell and has been improved by many
-developers from around the world.
-
 Rsync was originally written by Andrew Tridgell and Paul Mackerras.  Many
 people from around the world have helped to maintain and improve it.
 
