@@ -103,6 +103,7 @@ like.
     >     sudo apt install -y libzstd-dev
     >     sudo apt install -y liblz4-dev
     >     sudo apt install -y libssl-dev
+    >     sudo apt install -y make
 
 Or run support/install_deps_ubuntu.sh
 
