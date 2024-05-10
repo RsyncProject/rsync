@@ -3995,7 +3995,7 @@ option (though the 2 commands behave differently if deletions are enabled):
 >     rsync -aiR x/y/file.txt host:/tmp/
 
 The following command does not need an include of the "x" directory because it
-is not a part of the transfer (note the traililng slash).  Running this command
+is not a part of the transfer (note the trailing slash).  Running this command
 would copy just "`/tmp/x/file.txt`" because the "y" and "z" dirs get excluded:
 
 >     rsync -ai -f'+ file.txt' -f'- *' x/ host:/tmp/x/
