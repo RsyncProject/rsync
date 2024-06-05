@@ -1242,7 +1242,7 @@ The /etc/rsyncd.secrets file would look something like this:
 
 ## FILES
 
-/etc/rsyncd.conf or rsyncd.conf
+rsyncd.conf or /etc/rsyncd.conf or /usr/etc/rsyncd.conf
 
 ## SEE ALSO
 
