@@ -156,6 +156,10 @@ def main():
     command = os.environ.get('SSH_ORIGINAL_COMMAND', None)
     if not command:
         die("Not invoked via sshd")
+    if command == 'true':
+        # Allow checking connectivity with "ssh <host> true".  (For example,
+        # rsbackup uses this.)
+        sys.exit(0)
     command = command.split(' ', 2)
     if command[0:1] != ['rsync']:
         die("SSH_ORIGINAL_COMMAND does not run rsync")
