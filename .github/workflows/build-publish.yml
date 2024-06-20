@@ -1,0 +1,27 @@
+name: Build & publish
+on: {push: {branches: [master]}, pull_request: {branches: [master]}, workflow_dispatch}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: '0'
+    - id: debianise
+      uses: twojstaryzdomu/debianise@HEAD
+      with:
+        create_changelog: true
+        install_build_depends: true
+        debug: true
+    - id: action-gh-release
+      uses: softprops/action-gh-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        files: ${{ steps.debianise.outputs.files }}
+        name: ${{ steps.debianise.outputs.release_name }}
+        tag_name: ${{ steps.debianise.outputs.tag_name }}
+        fail_on_unmatched_files: true
+        draft: true
+        prerelease: true

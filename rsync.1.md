@@ -431,6 +431,8 @@ has its own detailed description later in this manpage.
 --backup-dir=DIR         make backups into hierarchy based in DIR
 --suffix=SUFFIX          backup suffix (default ~ w/o --backup-dir)
 --update, -u             skip files that are newer on the receiver
+--update-links           skip symlinks that are newer on the receiver
+--allow-link-update-dir  newer symlinks may replace older directories
 --inplace                update destination files in-place
 --append                 append data onto shorter files
 --append-verify          --append w/old data in file checksum
@@ -1034,11 +1036,12 @@ expand it.
     will be updated if the sizes are different.)
 
     Note that this does not affect the copying of dirs, symlinks, or other
-    special files.  Also, a difference of file format between the sender and
-    receiver is always considered to be important enough for an update, no
-    matter what date is on the objects.  In other words, if the source has a
-    directory where the destination has a file, the transfer would occur
-    regardless of the timestamps.
+    special files unless the `--update-links` option is enabled.  Also,
+    a difference of file format between the sender and receiver is always
+    considered to be important enough for an update, no matter what date is
+    on the objects.  In other words, if the source has a directory where
+    the destination has a file, the transfer would occur regardless of
+    the timestamps.
 
     This option is a [TRANSFER RULE](#TRANSFER_RULES), so don't expect any
     exclude side effects.
@@ -1049,6 +1052,49 @@ expand it.
     transfer will probably **not** continue the interrupted file.  As such, it
     is usually best to avoid combining this with[ `--inplace`](#opt) unless you
     have implemented manual steps to handle any interrupted in-progress files.
+
+0.  `--update-links`
+
+    This option controls rsync behaviour when a symbolic link on the source
+    encounters a destination file in the way of the symlink during transfer.
+    The setting forces rsync to skip any files which exist on the destination
+    and have a modified time that is newer than the symbolic link on the
+    source.  A file in the way of the symlink can be a regular file, a symlink,
+    a named pipe, or a device that exists on the destination.  Such a file with
+    an identical or less recent modification time than the source symlink will
+    be deleted and a symlink pointing to the same item (the referent) as the
+    source symlink on the destination created in its place.  A destination
+    symlink with an identical modification time as the source symlink will
+    only be replaced if the referent is different.  By default, any directory
+    in the way of the source symlink is exempted from removal by a symlink,
+    regardless of its modification time.  To extend the behaviour of this
+    option to directories, see the [`--allow-link-update-dir`](#opt) option
+    below.
+
+    This option may be specified independently of the [`--update`](#opt)
+    ([`-u`](#opt)) option mentioned above, which acts on regular source files
+    only.
+
+    If specified in tandem, `--update-links` prevails over
+    [`--copy-links`](#opt) and [`--links`](#opt).
+
+0.  `--allow-link-update-dir`
+
+    Enabling this option allows rsync to replace a less recent empty directory 
+    on the destination with a more recent symbolic link from the source.  This
+    option extends the [`--update-links`](#opt) option, which by default
+    preserves any existing directory on the destination from being replaced
+    by a more recent symbolic link.  The modification time of the symbolic link
+    on the source needs to be more recent than the modification time of the
+    directory existing on the destination for this option to take effect.  An
+    exisitng directory with a more recent modification time on the destination
+    than the symlink on the source will not be removed and replaced by
+    the symlink.  A destination directory with an identical modification time
+    as the source symbolic link will be removed and a symlink will be recreated
+    with same referent as the source symlink.  Non-empty directories are not
+    unlinked under any circumstances.
+
+    This option requires the [`--update-links`](#opt) option to be enabled.
 
 0.  `--inplace`
 
@@ -1179,7 +1225,12 @@ expand it.
     alternately silence the warning by specifying [`--info=nonreg0`](#opt).
 
     The default handling of symlinks is to recreate each symlink's unchanged
-    value on the receiving side.
+    value on the receiving side.  To exempt more recent destination
+    files from being replaced by a link, refer to the [`--update-links`](#opt)
+    option.
+
+    If specified in tandem, [`--update-links`](#opt) or [`--copy-links`](#opt)
+    prevail over `--links`.
 
     See the [SYMBOLIC LINKS](#) section for multi-option info.
 
@@ -1190,8 +1241,8 @@ expand it.
     references.  If a symlink chain is broken, an error is output and the file
     is dropped from the transfer.
 
-    This option supersedes any other options that affect symlinks in the
-    transfer, since there are no symlinks left in the transfer.
+    This option supersedes any other option that affect symlinks in the
+    transfer but [`--update-links`](#opt), which takes precedence.
 
     This option does not change the handling of existing symlinks on the
     receiving side, unlike versions of rsync prior to 2.6.3 which had the
@@ -4568,7 +4619,7 @@ version uses a new implementation.
 
 ## SYMBOLIC LINKS
 
-Three basic behaviors are possible when rsync encounters a symbolic
+Four basic behaviors are possible when rsync encounters a symbolic
 link in the source directory.
 
 By default, symbolic links are not transferred at all.  A message "skipping
@@ -4581,6 +4632,15 @@ implies [`--links`](#opt).
 
 If [`--copy-links`](#opt) is specified, then symlinks are "collapsed" by
 copying their referent, rather than the symlink.
+
+If [`--update-links`](#opt) is specified, then symlinks are recreated with
+the same target on the destination unless the existing destination file
+in the way of the symlink is newer or is a directory.
+Unlike [`--links`](#opt), this option preserves all more recent files on the
+destination from being replaced by a symlink.  It is possible to extend having
+an existing less recent directory on the destination replaced by a more recent
+symlink by specifying [`--allow-link-update-dir`](#opt) in addition to
+[`--update-links`](#opt).
 
 Rsync can also distinguish "safe" and "unsafe" symbolic links.  An example
 where this might be used is a web site mirror that wishes to ensure that the
@@ -4610,6 +4670,22 @@ first line that is a complete subset of your options:
 0.  `--links --safe-links` The receiver skips creating
     unsafe symlinks found in the transfer and creates the safe ones.
 0.  `--links` Create all symlinks.
+0.  `--update-links` Create symlinks, replace less recent files or files
+    with an identical modification time. Skip any more recent destination
+    files. Unconditionally exclude any existing directories on the destination
+    from deletion and replacement by a symlink when one would otherwise
+    be transferred.
+0.  `--update-links --allow-link-update-dir` Create symlinks, skip any more
+    recent files existing on the destination, allow a less recent
+    directory to be replaced by a more recent symlink.
+
+Note that some options are mutually exclusive.  The first option listed
+below prevails over the others, when multiple symlink mode options are
+specified.
+
+0.  `--update-links`
+0.  `--copy-links`
+0.  `--links`
 
 For the effect of [`--munge-links`](#opt), see the discussion in that option's
 section.
