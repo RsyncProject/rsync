@@ -1844,6 +1844,16 @@ expand it.
     This option is a [TRANSFER RULE](#TRANSFER_RULES), so don't expect any
     exclude side effects.
 
+0.  `--ignore-non-existing-directory`
+
+    This tells rsync to skip creating directories that do not
+    exist yet on the destination.  It is a variation of the
+    [`--ignore-non-existing`](#opt) option that is applied only for
+    directories.
+
+    This option is a [TRANSFER RULE](#TRANSFER_RULES), so don't expect any
+    exclude side effects.
+
 0.  `--ignore-existing`
 
     This tells rsync to skip updating files that already exist on the
