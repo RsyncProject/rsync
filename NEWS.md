@@ -6,6 +6,12 @@
 
 - Fixed the included popt to avoid a memory error on modern gcc versions.
 
+### ENHANCEMENTS:
+
+- Recognize many more sockopt inputs, including string inputs.
+  e.g. TCP_CONGESTION=bbr, TCP_FASTOPEN, TCP_FASTOPEN_CONNECT, IP_FREEBIND,
+  SO_INCOMING_CPU, TCP_QUICKACK, etc.
+
 ### INTERNAL:
 
  - Updated included popt to version 1.19.

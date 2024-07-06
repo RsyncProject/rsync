@@ -1171,6 +1171,24 @@ struct name_num_obj {
 	struct name_num_item *list;
 };
 
+enum SOCK_OPT_TYPES {
+    SOCK_OPT_BOOL,
+    SOCK_OPT_INT,
+    SOCK_OPT_ON,
+    SOCK_OPT_STR,
+    // error sentinal, hopefully never a valid setsockopt level
+    SOCK_OPT_ERR = 0xDEADCAFE
+};
+
+struct socket_option
+{
+	char *name;
+	int level;
+	int option;
+	int value;
+	int opttype;
+};
+
 #ifdef EXTERNAL_ZLIB
 #define read_buf read_buf_
 #endif
