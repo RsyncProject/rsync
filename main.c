@@ -586,6 +586,10 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char **remote_argv, in
 		args[argc++] = machine;
 #endif
 
+		// include a `--` before any rsync commands to indicate that
+		// all following arguments are intended as positional
+		// and should not be parsed by the shell
+		args[argc++] = "--";
 		args[argc++] = rsync_path;
 
 		if (blocking_io < 0 && (strcmp(t, "rsh") == 0 || strcmp(t, "remsh") == 0))
