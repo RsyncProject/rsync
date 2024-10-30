@@ -232,7 +232,7 @@ static void hash_search(int f,struct sum_struct *s,
 				done_csum2 = 1;
 			}
 
-			if (memcmp(sum2,s->sums[i].sum2,s->s2length) != 0) {
+			if (memcmp(sum2, sum2_at(s, i), s->s2length) != 0) {
 				false_alarms++;
 				continue;
 			}
@@ -252,7 +252,7 @@ static void hash_search(int f,struct sum_struct *s,
 					if (i != aligned_i) {
 						if (sum != s->sums[aligned_i].sum1
 						 || l != s->sums[aligned_i].len
-						 || memcmp(sum2, s->sums[aligned_i].sum2, s->s2length) != 0)
+						 || memcmp(sum2, sum2_at(s, aligned_i), s->s2length) != 0)
 							goto check_want_i;
 						i = aligned_i;
 					}
@@ -271,7 +271,7 @@ static void hash_search(int f,struct sum_struct *s,
 						if (sum != s->sums[i].sum1)
 							goto check_want_i;
 						get_checksum2((char *)map, l, sum2);
-						if (memcmp(sum2, s->sums[i].sum2, s->s2length) != 0)
+						if (memcmp(sum2, sum2_at(s, i), s->s2length) != 0)
 							goto check_want_i;
 						/* OK, we have a re-alignment match.  Bump the offset
 						 * forward to the new match point. */
@@ -290,7 +290,7 @@ static void hash_search(int f,struct sum_struct *s,
 			 && (!updating_basis_file || s->sums[want_i].offset >= offset
 			  || s->sums[want_i].flags & SUMFLG_SAME_OFFSET)
 			 && sum == s->sums[want_i].sum1
-			 && memcmp(sum2, s->sums[want_i].sum2, s->s2length) == 0) {
+			 && memcmp(sum2, sum2_at(s, want_i), s->s2length) == 0) {
 				/* we've found an adjacent match - the RLL coder
 				 * will be happy */
 				i = want_i;

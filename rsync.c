@@ -437,7 +437,10 @@ int read_ndx_and_attrs(int f_in, int f_out, int *iflag_ptr, uchar *type_ptr, cha
   */
 void free_sums(struct sum_struct *s)
 {
-	if (s->sums) free(s->sums);
+	if (s->sums) {
+		free(s->sums);
+		free(s->sum2_array);
+	}
 	free(s);
 }
 
