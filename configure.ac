@@ -1439,7 +1439,9 @@ case "$CC" in
     ;;
 esac
 
-AC_CONFIG_FILES([Makefile lib/dummy zlib/dummy popt/dummy shconfig])
+AC_CONFIG_FILES([Makefile lib/dummy shconfig])
+AS_IF([test x"$with_included_zlib" = x"yes"], [AC_CONFIG_FILES([zlib/dummy])])
+AS_IF([test x"$with_included_popt" = x"yes"], [AC_CONFIG_FILES([popt/dummy])])
 AC_OUTPUT
 
 AC_MSG_RESULT()
