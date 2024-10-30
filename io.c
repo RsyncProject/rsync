@@ -55,6 +55,7 @@ extern int read_batch;
 extern int compat_flags;
 extern int protect_args;
 extern int checksum_seed;
+extern int xfer_sum_len;
 extern int daemon_connection;
 extern int protocol_version;
 extern int remove_source_files;
@@ -1977,7 +1978,7 @@ void read_sum_head(int f, struct sum_struct *sum)
 		exit_cleanup(RERR_PROTOCOL);
 	}
 	sum->s2length = protocol_version < 27 ? csum_length : (int)read_int(f);
-	if (sum->s2length < 0 || sum->s2length > MAX_DIGEST_LEN) {
+	if (sum->s2length < 0 || sum->s2length > xfer_sum_len) {
 		rprintf(FERROR, "Invalid checksum length %d [%s]\n",
 			sum->s2length, who_am_i());
 		exit_cleanup(RERR_PROTOCOL);
