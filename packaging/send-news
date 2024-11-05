@@ -1,0 +1,33 @@
+#!/bin/bash -e
+
+# This script expects the ~/src/rsync directory to contain the rsync
+# source that has been updated. It also expects the auto-build-save
+# directory to have been created prior to the running of configure so
+# that each branch has its own build directory underneath. This supports
+# the maintainer workflow for the rsync-patches files maintenace.
+
+FTP_SRC="$HOME/samba-rsync-ftp"
+FTP_DEST="/home/ftp/pub/rsync"
+MD_FILES="README.md INSTALL.md NEWS.md"
+
+case "$RSYNC_SAMBA_HOST" in
+    *.samba.org) ;;
+    *)
+	echo "You must set RSYNC_SAMBA_HOST in your environment to the samba hostname to use." >&2
+	exit 1
+	;;
+esac
+
+if [ ! -d "$FTP_SRC" ]; then
+    packaging/samba-rsync ftp # Ask to initialize the local ftp dir
+fi
+
+cd ~/src/rsync
+
+make man
+./md-convert --dest="$FTP_SRC" $MD_FILES
+rsync -aiic $MD_FILES auto-build-save/master/*.?.html "$FTP_SRC"
+
+cd "$FTP_SRC"
+
+rsync -aiic README.* INSTALL.* NEWS.* *.?.html "$RSYNC_SAMBA_HOST:$FTP_DEST/"
