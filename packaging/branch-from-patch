@@ -154,7 +154,7 @@ def create_branch(patch):
         s = cmd_run(['git', 'commit', '-a', '-m', f"Creating branch from {patch.name}.diff."])
         if not s.returncode:
             break
-        s = cmd_run(['/bin/zsh'])
+        s = cmd_run([os.environ.get('SHELL', '/bin/sh')])
         if s.returncode:
             die('Aborting due to shell error code')
 
