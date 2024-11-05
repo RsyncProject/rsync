@@ -43,7 +43,7 @@ jobs:
     - name: ssl file list
       run: rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
     - name: save artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ubuntu-bin
         path: |
