@@ -982,7 +982,7 @@ struct map_struct {
 	int status;		/* first errno from read errors		*/
 };
 
-#define sum2_at(s, i)	((s)->sum2_array + ((OFF_T)(i) * xfer_sum_len))
+#define sum2_at(s, i)	((s)->sum2_array + ((size_t)(i) * xfer_sum_len))
 
 #define NAME_IS_FILE		(0)    /* filter name as a file */
 #define NAME_IS_DIR		(1<<0) /* filter name as a dir */
