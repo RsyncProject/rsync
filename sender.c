@@ -95,7 +95,7 @@ static struct sum_struct *receive_sums(int f)
 		return(s);
 
 	s->sums = new_array(struct sum_buf, s->count);
-	s->sum2_array = new_array(char, s->count * xfer_sum_len);
+	s->sum2_array = new_array(char, (size_t)s->count * xfer_sum_len);
 
 	for (i = 0; i < s->count; i++) {
 		s->sums[i].sum1 = read_int(f);
