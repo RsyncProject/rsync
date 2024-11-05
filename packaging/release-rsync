@@ -3,7 +3,24 @@
 # This script expects the directory ~/samba-rsync-ftp to exist and to be a
 # copy of the /home/ftp/pub/rsync dir on samba.org.  When the script is done,
 # the git repository in the current directory will be updated, and the local
-# ~/samba-rsync-ftp dir will be ready to be rsynced to samba.org.
+# ~/samba-rsync-ftp dir will be ready to be rsynced to samba.org. See the
+# script samba-rsync for an easy way to initialize the local ftp copy and to
+# thereafter update the remote files from your local copy.
+
+# This script also expects to be able to gpg sign the resulting tar files
+# using your default gpg key. Make sure that the html download.html file
+# has a link to the relevant keys that are authorized to sign the tar files
+# and also make sure that the following commands work as expected:
+#
+#   touch TeMp
+#   gpg --sign TeMp
+#   gpg --verify TeMp.gpg
+#   gpg --sign TeMp
+#   rm TeMp*
+#
+# The second time you sign the file it should NOT prompt you for your password
+# (unless the timeout period has passed).  It will prompt about overriding the
+# existing TeMp.gpg file, though.
 
 import os, sys, re, argparse, glob, shutil, signal
 from datetime import datetime
