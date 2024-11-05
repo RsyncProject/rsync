@@ -1,0 +1,85 @@
+#!/bin/sh
+# This script makes it easy to update the ftp & html directories on the samba.org server.
+# It expects the 2 *_DEST directories to contain updated files that need to be sent to
+# the remote server. If these directories don't exist yet, they will be copied from the
+# remote server (while also making the html dir a git checkout).
+
+FTP_SRC="$HOME/samba-rsync-ftp"
+HTML_SRC="$HOME/samba-rsync-html"
+
+FTP_DEST="/home/ftp/pub/rsync"
+HTML_DEST="/home/httpd/html/rsync"
+
+HTML_GIT='git.samba.org:/data/git/rsync-web.git'
+
+export RSYNC_PARTIAL_DIR=''
+
+case "$RSYNC_SAMBA_HOST" in
+    *.samba.org) ;;
+    *)
+	echo "You must set RSYNC_SAMBA_HOST in your environment to the samba hostname to use." >&2
+	exit 1
+	;;
+esac
+
+case "$1" in
+    f|-f|ftp|--ftp) MODE=ftp ;;
+    h|-h|html|--html) MODE=html ;;
+    '')
+	echo -n "Update ftp or html? "
+	read ans
+	case "$ans" in
+	    f*) MODE=ftp ;;
+	    h*) MODE=html ;;
+	    *)
+		echo "Invalid answer." >&2
+		exit 1
+		;;
+	esac
+	;;
+    *)
+	echo "Invalid option: $1" >&2
+	exit 1
+	;;
+esac
+
+if [ "$MODE" = ftp ]; then
+    SRC_DIR="$FTP_SRC"
+    DEST_DIR="$FTP_DEST"
+    FILT=".filt"
+else
+    SRC_DIR="$HTML_SRC"
+    DEST_DIR="$HTML_DEST"
+    FILT="filt"
+fi
+
+if [ ! -d "$SRC_DIR" ]; then
+    echo "The directory $SRC_DIR does not exist yet."
+    echo -n "Do you want to create it? [n] "
+    read ans
+    case "$ans" in
+	y*) ;;
+	*) exit 1 ;;
+    esac
+    OPTS='-aiv'
+    TMP_FILT="$SRC_DIR/tmp-filt"
+    if [ "$MODE" = html ]; then
+	git clone "$HTML_GIT" "$SRC_DIR"
+	sed -n -e 's/[-P]/H/p' "$SRC_DIR/$FILT" >"$TMP_FILT"
+	OPTS="${OPTS}f._$TMP_FILT"
+    fi
+    rsync "$OPTS" "$RSYNC_SAMBA_HOST:$DEST_DIR/" "$SRC_DIR/"
+    rm -f "$TMP_FILT"
+    exit
+fi
+
+cd "$SRC_DIR" || exit 1
+set -- -aivOHP --del -f._$FILT . "$RSYNC_SAMBA_HOST:$DEST_DIR/"
+
+rsync --dry-run "${@}" | grep -v 'is uptodate$'
+echo ''
+echo -n "Run without --dry-run? [n] "
+read ans
+case "$ans" in
+    y*) rsync "${@}" | grep -v 'is uptodate$' ;;
+esac

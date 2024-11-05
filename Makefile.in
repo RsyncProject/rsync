@@ -358,4 +358,4 @@ doxygen:
 .PHONY: doxygen-upload
 doxygen-upload:
 	rsync -avzv $(srcdir)/dox/html/ --delete \
-	$${SAMBA_HOST-samba.org}:/home/httpd/html/rsync/doxygen/head/
+	$${RSYNC_SAMBA_HOST-samba.org}:/home/httpd/html/rsync/doxygen/head/
