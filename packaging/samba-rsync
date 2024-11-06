@@ -29,32 +29,40 @@ while (( $# )); do
 	-R|--reverse) REVERSE=yes ;;
 	f|ftp) MODE=ftp ;;
 	h|html) MODE=html ;;
-	*)
-	    echo "Invalid option: $1" >&2
-	    exit 1
-	    ;;
 	-h|--help)
 	    echo "Usage: [-R] [f|ftp|h|html]"
 	    echo "-R --reverse  Copy the files from the server to the local host."
+	    echo "              The default is to update the remote files."
 	    echo "-h --help     Output this help message."
+	    echo " "
+	    echo "The script will prompt if ftp or html is not specified on the command line."
+	    echo "Only one category can be copied at a time. When pulling html files, a git"
+	    echo "checkout will be either created or updated prior to the rsync copy."
 	    exit
+	    ;;
+	*)
+	    echo "Invalid option: $1" >&2
+	    exit 1
 	    ;;
     esac
     shift
 done
 
-if [ ! "$MODE" ]; then
-    echo -n "Update ftp or html? "
+while [ ! "$MODE" ]; do
+    if [ "$REVERSE" = yes ]; then
+	DIRECTION=FROM
+    else
+	DIRECTION=TO
+    fi
+    echo -n "Copy which files $DIRECTION the server? ftp or html? "
     read ans
     case "$ans" in
 	f*) MODE=ftp ;;
 	h*) MODE=html ;;
-	*)
-	    echo "Invalid answer." >&2
-	    exit 1
-	    ;;
+	'') exit 1 ;;
+	*) echo "You must answer f or h to copy the ftp or html data." ;;
     esac
-fi
+done
 
 if [ "$MODE" = ftp ]; then
     SRC_DIR="$FTP_SRC"
@@ -96,10 +104,10 @@ if [ "$REVERSE" = yes ]; then
     echo "Copying files from $RSYNC_SAMBA_HOST to $SRC_DIR ..."
     if [ "$MODE" = html ]; then
 	if [ $REVERSE_RSYNC = rsync ]; then
-	    git clone "$HTML_GIT" "$SRC_DIR"
+	    git clone "$HTML_GIT" "$SRC_DIR" || exit 1
 	else
 	    cd "$SRC_DIR" || exit 1
-	    git pull
+	    git pull || exit 1
 	fi
 	sed -n -e 's/[-P]/H/p' "$SRC_DIR/$FILT" >"$TMP_FILT"
 	OPTS="${OPTS}f._$TMP_FILT"
