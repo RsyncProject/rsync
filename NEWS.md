@@ -10,6 +10,8 @@
 
 - Fixed the included popt to avoid a memory error on modern gcc versions.
 
+- Fixed an incorrect extern variable's type that caused an ACL issue on macOS.
+
 ### INTERNAL:
 
 - Updated included popt to version 1.19.
@@ -17,6 +19,8 @@
 ### DEVELOPER RELATED:
 
 - Various improvements to the release scripts and git setup.
+
+- Improved packaging/var-checker to identify variable type issues.
 
 ------------------------------------------------------------------------------
 
