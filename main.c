@@ -66,7 +66,7 @@ extern int protect_args;
 extern int relative_paths;
 extern int sanitize_paths;
 extern int curr_dir_depth;
-extern int curr_dir_len;
+extern unsigned int curr_dir_len;
 extern int module_id;
 extern int rsync_port;
 extern int whole_file;
