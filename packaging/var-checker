@@ -98,8 +98,6 @@ def parse_vars(fn, lines):
                 label = chk.pop(0)
                 new = chk.pop(0)
                 lst = chk.pop(0)
-                if not new:
-                    continue
                 if label == 'type':
                     new = ' '.join(new.split()).replace(' *', '*')
                 if m['var'] in lst:
