@@ -2584,6 +2584,15 @@ struct file_list *recv_file_list(int f, int dir_ndx)
 		init_hard_links();
 #endif
 
+	if (inc_recurse && dir_ndx >= 0) {
+		struct file_struct *file = dir_flist->files[dir_ndx];
+		if (file->flags & FLAG_GOT_DIR_FLIST) {
+			rprintf(FERROR_XFER, "rsync: refusing malicious duplicate flist for dir %d\n", dir_ndx);
+			exit_cleanup(RERR_PROTOCOL);
+		}
+		file->flags |= FLAG_GOT_DIR_FLIST;
+	}
+
 	flist = flist_new(0, "recv_file_list");
 	flist_expand(flist, FLIST_START_LARGE);
 
