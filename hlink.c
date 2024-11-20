@@ -117,7 +117,7 @@ static void match_gnums(int32 *ndx_list, int ndx_count)
 	struct ht_int32_node *node = NULL;
 	int32 gnum, gnum_next;
 
-	qsort(ndx_list, ndx_count, sizeof ndx_list[0], (int (*)()) hlink_compare_gnum);
+	qsort(ndx_list, ndx_count, sizeof ndx_list[0], (int (*)(const void*, const void*))hlink_compare_gnum);
 
 	for (from = 0; from < ndx_count; from++) {
 		file = hlink_flist->sorted[ndx_list[from]];
