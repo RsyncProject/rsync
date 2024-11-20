@@ -3995,7 +3995,7 @@ option (though the 2 commands behave differently if deletions are enabled):
 >     rsync -aiR x/y/file.txt host:/tmp/
 
 The following command does not need an include of the "x" directory because it
-is not a part of the transfer (note the traililng slash).  Running this command
+is not a part of the transfer (note the trailing slash).  Running this command
 would copy just "`/tmp/x/file.txt`" because the "y" and "z" dirs get excluded:
 
 >     rsync -ai -f'+ file.txt' -f'- *' x/ host:/tmp/x/
@@ -4818,7 +4818,7 @@ An rsync web site is available at <https://rsync.samba.org/>.  The site
 includes an FAQ-O-Matic which may cover questions unanswered by this manual
 page.
 
-The rsync github project is <https://github.com/WayneD/rsync>.
+The rsync github project is <https://github.com/RsyncProject/rsync>.
 
 We would be delighted to hear from you if you like this program.  Please
 contact the mailing-list at <rsync@lists.samba.org>.
@@ -4838,8 +4838,7 @@ David Bell.  I've probably missed some people, my apologies if I have.
 ## AUTHOR
 
 Rsync was originally written by Andrew Tridgell and Paul Mackerras.  Many
-people have later contributed to it. It is currently maintained by Wayne
-Davison.
+people from around the world have helped to maintain and improve it.
 
 Mailing lists for support and development are available at
 <https://lists.samba.org/>.

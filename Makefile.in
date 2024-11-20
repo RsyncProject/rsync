@@ -50,7 +50,7 @@ OBJS2=options.o io.o compat.o hlink.o token.o uidlist.o socket.o hashtable.o \
 OBJS3=progress.o pipe.o @MD5_ASM@ @ROLL_SIMD@ @ROLL_ASM@
 DAEMON_OBJ = params.o loadparm.o clientserver.o access.o connection.o authenticate.o
 popt_OBJS=popt/findme.o  popt/popt.o  popt/poptconfig.o \
-	popt/popthelp.o popt/poptparse.o
+	popt/popthelp.o popt/poptparse.o popt/poptint.o
 OBJS=$(OBJS1) $(OBJS2) $(OBJS3) $(DAEMON_OBJ) $(LIBOBJ) @BUILD_ZLIB@ @BUILD_POPT@
 
 TLS_OBJ = tls.o syscall.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/permstring.o lib/sysxattrs.o @BUILD_POPT@
@@ -183,14 +183,6 @@ conf: configure.sh config.h.in
 
 .PHONY: gen
 gen: conf proto.h man git-version.h
-
-.PHONY: gensend
-gensend: gen
-	if ! diff git-version.h $(srcdir)/gists/rsync-git-version.h >/dev/null; then \
-	    ./rsync -ai git-version.h $(srcdir)/gists/rsync-git-version.h && \
-	    (cd $(srcdir)/gists && git commit --allow-empty-message -m '' rsync-git-version.h && git push) ; \
-	fi
-	rsync -aic $(GENFILES) git-version.h $${SAMBA_HOST-samba.org}:/home/ftp/pub/rsync/generated-files/ || true
 
 aclocal.m4: $(srcdir)/m4/*.m4
 	aclocal -I $(srcdir)/m4
@@ -366,4 +358,4 @@ doxygen:
 .PHONY: doxygen-upload
 doxygen-upload:
 	rsync -avzv $(srcdir)/dox/html/ --delete \
-	$${SAMBA_HOST-samba.org}:/home/httpd/html/rsync/doxygen/head/
+	$${RSYNC_SAMBA_HOST-samba.org}:/home/httpd/html/rsync/doxygen/head/

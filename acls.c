@@ -28,7 +28,7 @@ extern int dry_run;
 extern int am_root;
 extern int read_only;
 extern int list_only;
-extern int orig_umask;
+extern mode_t orig_umask;
 extern int numeric_ids;
 extern int inc_recurse;
 extern int preserve_devices;
@@ -765,6 +765,7 @@ static int recv_rsync_acl(int f, item_list *racl_list, SMB_ACL_TYPE_T type, mode
 	/* If we received a superfluous mask, throw it away. */
 	duo_item->racl.mask_obj = NO_ENTRY;
 	(void)mode;
+	(void)computed_mask_bits;
 #else
 	if (duo_item->racl.names.count && duo_item->racl.mask_obj == NO_ENTRY) {
 		/* Mask must be non-empty with lists. */
@@ -981,7 +982,7 @@ static int set_rsync_acl(const char *fname, acl_duo *duo_item,
 		 && !pack_smb_acl(&duo_item->sacl, &duo_item->racl))
 			return -1;
 #ifdef HAVE_OSX_ACLS
-		mode = 0; /* eliminate compiler warning */
+		(void)mode; /* eliminate compiler warning */
 #else
 		if (type == SMB_ACL_TYPE_ACCESS) {
 			cur_mode = change_sacl_perms(duo_item->sacl, &duo_item->racl, cur_mode, mode);

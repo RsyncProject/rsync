@@ -1,4 +1,30 @@
-# NEWS for rsync 3.3.0 (UNRELEASED)
+# NEWS for rsync 3.3.1 (UNRELEASED)
+
+## Changes in this version:
+
+### SECURITY FIXES:
+
+- Fixed a buffer overflow when the sum2 digest algorithm is SHA1.
+
+### BUG FIXES:
+
+- Fixed the included popt to avoid a memory error on modern gcc versions.
+
+- Fixed an incorrect extern variable's type that caused an ACL issue on macOS.
+
+### INTERNAL:
+
+- Updated included popt to version 1.19.
+
+### DEVELOPER RELATED:
+
+- Various improvements to the release scripts and git setup.
+
+- Improved packaging/var-checker to identify variable type issues.
+
+------------------------------------------------------------------------------
+
+# NEWS for rsync 3.3.0 (6 Apr 2024)
 
 ## Changes in this version:
 
@@ -9,6 +35,11 @@
 
 - Fixed an buffer overflow in the checksum2 code if SHA1 is being used for
   the checksum2 algorithm.
+
+- Fixed an issue when rsync is compiled using `_FORTIFY_SOURCE` so that the
+  extra tests don't complain about a strlcpy() limit value (which was too
+  large, even though it wasn't possible for the larger value to cause an
+  overflow).
 
 - Add a backtick to the list of characters that the filename quoting needs to
   escape using backslashes.
@@ -48,6 +79,8 @@
 
 - Changed the mapfrom & mapto perl scripts (in the support dir) into a single
   python script named idmap.  Converted a couple more perl scripts into python.
+
+- Changed the mnt-excl perl script (in the support dir) into a python script.
 
 ### DEVELOPER RELATED:
 
@@ -4755,7 +4788,8 @@
 
 | RELEASE DATE | VER.   | DATE OF COMMIT\* | PROTOCOL    |
 |--------------|--------|------------------|-------------|
-| ?? May 2023  | 3.3.0  |                  | 31          |
+| ?? Nov 2024  | 3.3.1  |                  | 31          |
+| 06 Apr 2024  | 3.3.0  |                  | 31          |
 | 20 Oct 2022  | 3.2.7  |                  | 31          |
 | 09 Sep 2022  | 3.2.6  |                  | 31          |
 | 14 Aug 2022  | 3.2.5  |                  | 31          |

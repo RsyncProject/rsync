@@ -958,12 +958,12 @@ struct sum_buf {
 	uint32 sum1;	        /**< simple checksum */
 	int32 chain;		/**< next hash-table collision */
 	short flags;		/**< flag bits */
-	char sum2[SUM_LENGTH];	/**< checksum  */
 };
 
 struct sum_struct {
 	OFF_T flength;		/**< total file length */
 	struct sum_buf *sums;	/**< points to info for each chunk */
+	char *sum2_array;	/**< checksums of length xfer_sum_len */
 	int32 count;		/**< how many chunks */
 	int32 blength;		/**< block_length */
 	int32 remainder;	/**< flength % block_length */
@@ -981,6 +981,8 @@ struct map_struct {
 	int fd;			/* File Descriptor			*/
 	int status;		/* first errno from read errors		*/
 };
+
+#define sum2_at(s, i)	((s)->sum2_array + ((size_t)(i) * xfer_sum_len))
 
 #define NAME_IS_FILE		(0)    /* filter name as a file */
 #define NAME_IS_DIR		(1<<0) /* filter name as a dir */

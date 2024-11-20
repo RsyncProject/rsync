@@ -5,7 +5,7 @@ rrsync - a script to setup restricted rsync users via ssh logins
 ## SYNOPSIS
 
 ```
-rrsync [-ro|-rw] [-munge] [-no-del] [-no-lock] [-no-overwrite]  DIR
+rrsync [-ro|-wo] [-munge] [-no-del] [-no-lock] [-no-overwrite]  DIR
 ```
 
 The single non-option argument specifies the restricted _DIR_ to use. It can be
@@ -163,7 +163,7 @@ rsync is distributed under the GNU General Public License.  See the file
 [COPYING](COPYING) for details.
 
 An rsync web site is available at <https://rsync.samba.org/> and its github
-project is <https://github.com/WayneD/rsync>.
+project is <https://github.com/RsyncProject/rsync>.
 
 ## AUTHOR
 

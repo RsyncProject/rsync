@@ -1,0 +1,56 @@
+name: Test rsync on Cygwin
+
+on:
+  push:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/cygwin-build.yml'
+  pull_request:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/cygwin-build.yml'
+  schedule:
+    - cron: '42 8 * * *'
+
+jobs:
+  test:
+    runs-on: windows-2022
+    name: Test rsync on Cygwin
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: cygwin
+      run: choco install -y --no-progress cygwin cyg-get
+    - name: prep
+      run: |
+        cyg-get make autoconf automake gcc-core attr libattr-devel python39 python39-pip libzstd-devel liblz4-devel libssl-devel libxxhash0 libxxhash-devel
+        echo "C:/tools/cygwin/bin" >>$Env:GITHUB_PATH
+    - name: commonmark
+      run: bash -c 'python3 -mpip install --user commonmark'
+    - name: configure
+      run: bash -c './configure --with-rrsync'
+    - name: make
+      run: bash -c 'make'
+    - name: install
+      run: bash -c 'make install'
+    - name: info
+      run: bash -c '/usr/local/bin/rsync --version'
+    - name: check
+      run: bash -c 'RSYNC_EXPECT_SKIPPED=acls-default,acls,chown,devices,dir-sgid,protected-regular make check'
+    - name: ssl file list
+      run: bash -c 'PATH="/usr/local/bin:$PATH" rsync-ssl --no-motd download.samba.org::rsyncftp/ || true'
+    - name: save artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: cygwin-bin
+        path: |
+          rsync.exe
+          rsync-ssl
+          rsync.1
+          rsync-ssl.1
+          rsyncd.conf.5
+          rrsync.1
+          rrsync

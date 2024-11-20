@@ -1,0 +1,49 @@
+name: Test rsync on Solaris
+
+on:
+  push:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/solaris-build.yml'
+  pull_request:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/solaris-build.yml'
+  schedule:
+    - cron: '42 8 * * *'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Test rsync on Solaris
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Test in Solaris VM
+      id: test
+      uses: vmactions/solaris-vm@v1
+      with:
+        usesh: true
+        prepare: |
+          pkg install bash automake gnu-m4 pkg://solaris/runtime/python-35 autoconf gcc git
+        run: |
+          uname -a
+          ./configure --with-rrsync -disable-zstd --disable-md2man --disable-xxhash --disable-lz4
+          make
+          ./rsync --version
+          ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
+    - name: save artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: solaris-bin
+        path: |
+          rsync
+          rsync-ssl
+          rsync.1
+          rsync-ssl.1
+          rsyncd.conf.5
+          rrsync.1
+          rrsync

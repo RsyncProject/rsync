@@ -104,6 +104,8 @@ like.
     >     sudo apt install -y liblz4-dev
     >     sudo apt install -y libssl-dev
 
+Or run support/install_deps_ubuntu.sh
+
  -  For CentOS (use EPEL for python3-pip):
 
     >     sudo yum -y install epel-release
@@ -229,6 +231,9 @@ not completely implement the "New Sockets" API.
 
 [This site][5] says that Apple started to support IPv6 in 10.2 (Jaguar).  If
 your build fails, try again after running configure with `--disable-ipv6`.
+
+Apple Silicon macs may install packages in a slightly different location and require flags.
+CFLAGS="-I /opt/homebrew/include" LDFLAGS="-L /opt/homebrew/lib"
 
 [5]: http://www.ipv6.org/impl/mac.html
 

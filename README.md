@@ -34,7 +34,7 @@ If you need to build rsync yourself, check out the [INSTALL][1] page for
 information on what libraries and packages you can use to get the maximum
 features in your build.
 
-[1]: https://github.com/WayneD/rsync/blob/master/INSTALL.md
+[1]: https://github.com/RsyncProject/rsync/blob/master/INSTALL.md
 
 SETUP
 -----
@@ -120,7 +120,7 @@ If you want to get the very latest version of rsync direct from the
 source code repository, then you will need to use git.  The git repo
 is hosted [on GitHub][6] and [on Samba's site][7].
 
-[6]: https://github.com/WayneD/rsync
+[6]: https://github.com/RsyncProject/rsync
 [7]: https://git.samba.org/?p=rsync.git;a=summary
 
 See [the download page][8] for full details on all the ways to grab the
@@ -132,13 +132,12 @@ source.
 COPYRIGHT
 ---------
 
-Rsync was originally written by Andrew Tridgell and is currently
-maintained by Wayne Davison.  It has been improved by many developers
-from around the world.
+Rsync was originally written by Andrew Tridgell and Paul Mackerras.  Many
+people from around the world have helped to maintain and improve it.
 
 Rsync may be used, modified and redistributed only under the terms of
 the GNU General Public License, found in the file [COPYING][9] in this
 distribution, or at [the Free Software Foundation][10].
 
-[9]: https://github.com/WayneD/rsync/blob/master/COPYING
+[9]: https://github.com/RsyncProject/rsync/blob/master/COPYING
 [10]: https://www.fsf.org/licenses/gpl.html

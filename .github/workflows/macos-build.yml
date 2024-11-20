@@ -1,0 +1,53 @@
+name: Test rsync on macOS
+
+on:
+  push:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/macos-build.yml'
+  pull_request:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/macos-build.yml'
+  schedule:
+    - cron: '42 8 * * *'
+
+jobs:
+  test:
+    runs-on: macos-latest
+    name: Test rsync on macOS
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: prep
+      run: |
+        brew install automake openssl xxhash zstd lz4
+        sudo pip3 install commonmark
+        echo "/usr/local/bin" >>$GITHUB_PATH
+    - name: configure
+      run: CPPFLAGS=-I/usr/local/opt/openssl/include/ LDFLAGS=-L/usr/local/opt/openssl/lib/ ./configure --with-rrsync
+    - name: make
+      run: make
+    - name: install
+      run: sudo make install
+    - name: info
+      run: rsync --version
+    - name: check
+      run: sudo RSYNC_EXPECT_SKIPPED=acls-default,chmod-temp-dir,chown-fake,devices-fake,dir-sgid,protected-regular,xattrs-hlink,xattrs make check
+    - name: ssl file list
+      run: rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
+    - name: save artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: macos-bin
+        path: |
+          rsync
+          rsync-ssl
+          rsync.1
+          rsync-ssl.1
+          rsyncd.conf.5
+          rrsync.1
+          rrsync

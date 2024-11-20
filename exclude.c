@@ -4,7 +4,7 @@
  * Copyright (C) 1996-2001 Andrew Tridgell <tridge@samba.org>
  * Copyright (C) 1996 Paul Mackerras
  * Copyright (C) 2002 Martin Pool
- * Copyright (C) 2003-2022 Wayne Davison
+ * Copyright (C) 2003-2024 Wayne Davison
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -720,7 +720,8 @@ static BOOL setup_merge_file(int mergelist_num, filter_rule *ex,
 	parent_dirscan = True;
 	while (*y) {
 		char save[MAXPATHLEN];
-		strlcpy(save, y, MAXPATHLEN);
+		/* copylen is strlen(y) which is < MAXPATHLEN. +1 for \0 */
+		size_t copylen = strlcpy(save, y, MAXPATHLEN) + 1;
 		*y = '\0';
 		dirbuf_len = y - dirbuf;
 		strlcpy(x, ex->pattern, MAXPATHLEN - (x - buf));
@@ -734,7 +735,7 @@ static BOOL setup_merge_file(int mergelist_num, filter_rule *ex,
 			lp->head = NULL;
 		}
 		lp->tail = NULL;
-		strlcpy(y, save, MAXPATHLEN);
+		strlcpy(y, save, copylen);
 		while ((*x++ = *y++) != '/') {}
 	}
 	parent_dirscan = False;

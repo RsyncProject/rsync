@@ -9,7 +9,7 @@ struct alloc_pool
 	size_t			size;		/* extent size		*/
 	size_t			quantum;	/* allocation quantum	*/
 	struct pool_extent	*extents;	/* top extent is "live" */
-	void			(*bomb)();	/* called if malloc fails */
+	void			(*bomb)(const char*, const char*, int);	/* called if malloc fails */
 	int			flags;
 
 	/* statistical data */
@@ -42,6 +42,7 @@ struct align_test {
 /* Temporarily cast a void* var into a char* var when adding an offset (to
  * keep some compilers from complaining about the pointer arithmetic). */
 #define PTR_ADD(b,o)	( (void*) ((char*)(b) + (o)) )
+#define PTR_SUB(b,o)	( (void*) ((char*)(b) - (o)) )
 
 alloc_pool_t
 pool_create(size_t size, size_t quantum, void (*bomb)(const char*, const char*, int), int flags)
@@ -100,7 +101,7 @@ pool_destroy(alloc_pool_t p)
 	for (cur = pool->extents; cur; cur = next) {
 		next = cur->next;
 		if (pool->flags & POOL_PREPEND)
-			free(PTR_ADD(cur->start, -sizeof (struct pool_extent)));
+			free(PTR_SUB(cur->start, sizeof (struct pool_extent)));
 		else {
 			free(cur->start);
 			free(cur);
@@ -235,7 +236,7 @@ pool_free(alloc_pool_t p, size_t len, void *addr)
 		if (cur->free + cur->bound >= pool->size) {
 			prev->next = cur->next;
 			if (pool->flags & POOL_PREPEND)
-				free(PTR_ADD(cur->start, -sizeof (struct pool_extent)));
+				free(PTR_SUB(cur->start, sizeof (struct pool_extent)));
 			else {
 				free(cur->start);
 				free(cur);
@@ -292,7 +293,7 @@ pool_free_old(alloc_pool_t p, void *addr)
 	while ((cur = next) != NULL) {
 		next = cur->next;
 		if (pool->flags & POOL_PREPEND)
-			free(PTR_ADD(cur->start, -sizeof (struct pool_extent)));
+			free(PTR_SUB(cur->start, sizeof (struct pool_extent)));
 		else {
 			free(cur->start);
 			free(cur);

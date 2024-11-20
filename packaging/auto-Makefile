@@ -1,4 +1,4 @@
-TARGETS := all install install-ssl-daemon install-all install-strip conf gen gensend reconfigure restatus \
+TARGETS := all install install-ssl-daemon install-all install-strip conf gen reconfigure restatus \
 	proto man clean cleantests distclean test check check29 check30 installcheck splint \
 	doxygen doxygen-upload finddead rrsync
 

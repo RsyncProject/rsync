@@ -392,7 +392,7 @@ AS_HELP_STRING([--disable-ipv6],[disable to omit ipv6 support]),
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-main()
+int main()
 {
    if (socket(AF_INET6, SOCK_STREAM, 0) < 0)
      exit(1);
@@ -423,6 +423,26 @@ case $host_os in
 		   ;;
 	       * ) AC_MSG_RESULT(no);;
 esac
+
+# We default to using our zlib unless --with-included-zlib=no is given.
+if test x"$with_included_zlib" != x"no"; then
+    with_included_zlib=yes
+elif test x"$ac_cv_header_zlib_h" != x"yes"; then
+    with_included_zlib=yes
+fi
+if test x"$with_included_zlib" != x"yes"; then
+    AC_CHECK_LIB(z, deflateParams, , [with_included_zlib=yes])
+fi
+
+AC_MSG_CHECKING([whether to use included zlib])
+if test x"$with_included_zlib" = x"yes"; then
+    AC_MSG_RESULT($srcdir/zlib)
+    BUILD_ZLIB='$(zlib_OBJS)'
+    CFLAGS="-I$srcdir/zlib $CFLAGS"
+else
+    AC_DEFINE(EXTERNAL_ZLIB, 1, [Define to 1 if using external zlib])
+    AC_MSG_RESULT(no)
+fi
 
 AC_MSG_CHECKING([whether to enable use of openssl crypto library])
 AC_ARG_ENABLE([openssl],
@@ -573,7 +593,7 @@ if test x"$no_lib" != x; then
     echo ""
     echo "See the INSTALL file for hints on how to install the missing libraries and/or"
     echo "how to generate (or fetch) manpages:"
-    echo "    https://github.com/WayneD/rsync/blob/master/INSTALL.md"
+    echo "    https://github.com/RsyncProject/rsync/blob/master/INSTALL.md"
     echo ""
     echo "To disable one or more features, the relevant configure options are:"
     for lib in $no_lib; do
@@ -870,7 +890,7 @@ AC_CHECK_FUNCS(waitpid wait4 getcwd chown chmod lchmod mknod mkfifo \
     fchmod fstat ftruncate strchr readlink link utime utimes lutimes strftime \
     chflags getattrlist mktime innetgr linkat \
     memmove lchown vsnprintf snprintf vasprintf asprintf setsid strpbrk \
-    strlcat strlcpy strtol mallinfo mallinfo2 getgroups setgroups geteuid getegid \
+    strlcat strlcpy stpcpy strtol mallinfo mallinfo2 getgroups setgroups geteuid getegid \
     setlocale setmode open64 lseek64 mkstemp64 mtrace va_copy __va_copy \
     seteuid strerror putenv iconv_open locale_charset nl_langinfo getxattr \
     extattr_get_link sigaction sigprocmask setattrlist getgrouplist \
@@ -1084,6 +1104,8 @@ if test x"$with_included_popt" = x"yes"; then
     AC_MSG_RESULT($srcdir/popt)
     BUILD_POPT='$(popt_OBJS)'
     CFLAGS="-I$srcdir/popt $CFLAGS"
+    AC_DEFINE(POPT_SYSCONFDIR, "/etc", [sysconfig dir for popt])
+    AC_DEFINE(PACKAGE, "rsync", [package name for rsync])
     if test x"$ALLOCA" != x
     then
 	# this can be removed when/if we add an included alloca.c;
@@ -1091,26 +1113,6 @@ if test x"$with_included_popt" = x"yes"; then
 	AC_MSG_WARN([included libpopt will use malloc, not alloca (which wastes a small amount of memory)])
     fi
 else
-    AC_MSG_RESULT(no)
-fi
-
-# We default to using our zlib unless --with-included-zlib=no is given.
-if test x"$with_included_zlib" != x"no"; then
-    with_included_zlib=yes
-elif test x"$ac_cv_header_zlib_h" != x"yes"; then
-    with_included_zlib=yes
-fi
-if test x"$with_included_zlib" != x"yes"; then
-    AC_CHECK_LIB(z, deflateParams, , [with_included_zlib=yes])
-fi
-
-AC_MSG_CHECKING([whether to use included zlib])
-if test x"$with_included_zlib" = x"yes"; then
-    AC_MSG_RESULT($srcdir/zlib)
-    BUILD_ZLIB='$(zlib_OBJS)'
-    CFLAGS="-I$srcdir/zlib $CFLAGS"
-else
-    AC_DEFINE(EXTERNAL_ZLIB, 1, [Define to 1 if using external zlib])
     AC_MSG_RESULT(no)
 fi
 

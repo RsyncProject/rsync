@@ -1023,7 +1023,7 @@ in the values of parameters.  See that section for details.
     _not_ displayed if the script returns success.  The other programs cannot
     send any text to the user.  All output except for the `pre-xfer exec`
     stdout goes to the corresponding daemon's stdout/stderr, which is typically
-    discarded.  See the `--no-detatch` option for a way to see the daemon's
+    discarded.  See the `--no-detach` option for a way to see the daemon's
     output, which can assist with debugging.
 
     Note that the `early exec` command runs before any part of the transfer
@@ -1188,6 +1188,9 @@ An example nginx proxy setup is as follows:
 > }
 > ```
 
+If rsyncd should be accessible encrypted and unencrypted at the same time make
+the proxy listen on port 873 as well and let it handle both streams.
+
 ## DAEMON CONFIG EXAMPLES
 
 A simple rsyncd.conf file that allow anonymous rsync to a ftp area at
@@ -1260,7 +1263,7 @@ Rsync is distributed under the GNU General Public License.  See the file
 [COPYING](COPYING) for details.
 
 An rsync web site is available at <https://rsync.samba.org/> and its github
-project is <https://github.com/WayneD/rsync>.
+project is <https://github.com/RsyncProject/rsync>.
 
 ## THANKS
 
@@ -1270,8 +1273,7 @@ Thanks to Karsten Thygesen for his many suggestions and documentation!
 ## AUTHOR
 
 Rsync was originally written by Andrew Tridgell and Paul Mackerras.  Many
-people have later contributed to it. It is currently maintained by Wayne
-Davison.
+people from around the world have helped to maintain and improve it.
 
 Mailing lists for support and development are available at
 <https://lists.samba.org/>.

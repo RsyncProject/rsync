@@ -6,9 +6,10 @@
 
 import os, sys, re, argparse, glob
 
-VARS_RE = re.compile(r'^(?!(?:extern|enum)\s)([a-zA-Z]\S*\s+.*);', re.M)
+VARS_RE = re.compile(r'^(?!(?:extern|enum)\s)([a-zA-Z][^ \n\t:]*\s+.*);', re.M)
 EXTERNS_RE = re.compile(r'^extern\s+(.*);', re.M)
 
+types = { }
 sizes = { }
 
 def main():
@@ -68,19 +69,44 @@ def parse_vars(fn, lines):
     for line in lines:
         line = re.sub(r'\s*\{.*\}', '', line)
         line = re.sub(r'\s*\(.*\)', '', line)
-        for item in re.split(r'\s*,\s*', line):
-            item = re.sub(r'\s*=.*', '', item)
-            m = re.search(r'(?P<var>\w+)(?P<sz>\[.*?\])?$', item)
+        line = re.sub(r'\s*=\s*[^,]*', '', line)
+        m = re.search(r'^(?:(?:static|extern)\s+)?(?P<type>[^\[,]+?)(?P<vars>\w+([\[,].+)?)$', line)
+        if not m:
+            print(f"Bogus match? ({line})")
+            continue
+        items = m['vars']
+        main_type = m['type'].strip()
+        mt_len = len(main_type)
+        main_type = main_type.rstrip('*')
+        first_stars = '*' * (mt_len - len(main_type))
+        if first_stars:
+            main_type = main_type.rstrip()
+            items = first_stars + items
+        for item in re.split(r'\s*,\s*', items):
+            m = re.search(r'(?P<stars>\*+\s*)?(?P<var>\w+)(?P<sz>\[.*?\])?$', item)
             if not m:
                 print(f"Bogus match? ({item})")
                 continue
-            if m['sz']:
-                if m['var'] in sizes:
-                    if sizes[m['var']] != m['sz']:
+            typ = main_type
+            if m['stars']:
+                typ = typ + m['stars'].strip()
+            chk = [
+                    'type', typ, types,
+                    'size', m['sz'], sizes,
+                    ]
+            while chk:
+                label = chk.pop(0)
+                new = chk.pop(0)
+                lst = chk.pop(0)
+                if label == 'type':
+                    new = ' '.join(new.split()).replace(' *', '*')
+                if m['var'] in lst:
+                    old = lst[m['var']]
+                    if new != old:
                         var = m['var']
-                        print(fn, f'has inconsistent size for "{var}":', m['sz'], 'vs', sizes[var])
+                        print(fn, f'has inconsistent {label} for "{var}":', new, 'vs', old)
                 else:
-                    sizes[m['var']] = m['sz']
+                    lst[m['var']] = new
             ret.append(m['var'])
     return ret
 
