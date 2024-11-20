@@ -60,6 +60,7 @@ extern int update_only;
 extern int human_readable;
 extern int ignore_existing;
 extern int ignore_non_existing;
+extern int ignore_non_existing_dirs;
 extern int want_xattr_optim;
 extern int modify_window;
 extern int inplace;
@@ -1353,22 +1354,28 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		return;
 	}
 
-	if (ignore_non_existing > 0 && statret == -1 && stat_errno == ENOENT) {
+	if ((ignore_non_existing > 0 || ignore_non_existing_dirs > 0) && statret == -1 && stat_errno == ENOENT) {
+		int actually_ignore = 0;
 		if (is_dir) {
 			if (is_dir < 0)
 				return;
+			actually_ignore = 1;
 			skip_dir = file;
 			file->flags |= FLAG_MISSING_DIR;
 		}
 #ifdef SUPPORT_HARD_LINKS
-		else if (F_IS_HLINKED(file))
+		else if (ignore_non_existing > 0 && F_IS_HLINKED(file)) {
+			actually_ignore = 1;
 			handle_skipped_hlink(file, itemizing, code, f_out);
-#endif
-		if (INFO_GTE(SKIP, 1)) {
-			rprintf(FINFO, "not creating new %s \"%s\"\n",
-				is_dir ? "directory" : "file", fname);
 		}
-		return;
+#endif
+		if(actually_ignore == 1) {
+			if (INFO_GTE(SKIP, 1)) {
+				rprintf(FINFO, "not creating new %s \"%s\"\n",
+					is_dir ? "directory" : "file", fname);
+			}
+			return;
+		}
 	}
 
 	if (statret == 0 && !(sx.st.st_mode & S_IWUSR)
@@ -2161,6 +2168,7 @@ void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
 			min_size = -1;
 			ignore_existing = -ignore_existing;
 			ignore_non_existing = -ignore_non_existing;
+			ignore_non_existing_dirs = -ignore_non_existing_dirs;
 			update_only = -update_only;
 			always_checksum = -always_checksum;
 			size_only = -size_only;
@@ -2186,6 +2194,7 @@ void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
 			min_size = save_min_size;
 			ignore_existing = -ignore_existing;
 			ignore_non_existing = -ignore_non_existing;
+			ignore_non_existing_dirs = -ignore_non_existing_dirs;
 			update_only = -update_only;
 			always_checksum = -always_checksum;
 			size_only = -size_only;
