@@ -52,6 +52,7 @@ extern int need_messages_from_generator;
 extern int delete_mode, delete_before, delete_during, delete_after;
 extern int do_compression;
 extern int do_compression_level;
+extern int do_compression_threads;
 extern int saw_stderr_opt;
 extern int msgs2stderr;
 extern char *shell_cmd;

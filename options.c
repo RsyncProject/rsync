@@ -86,6 +86,7 @@ int sparse_files = 0;
 int preallocate_files = 0;
 int do_compression = 0;
 int do_compression_level = CLVL_NOT_SPECIFIED;
+int do_compression_threads = 0; /*n = 0 use rsync thread, n >= 1 spawn n threads for compression */
 int am_root = 0; /* 0 = normal, 1 = root, 2 = --super, -1 = --fake-super */
 int am_server = 0;
 int am_sender = 0;
@@ -756,6 +757,8 @@ static struct poptOption long_options[] = {
   {"skip-compress",    0,  POPT_ARG_STRING, &skip_compress, 0, 0, 0 },
   {"compress-level",   0,  POPT_ARG_INT,    &do_compression_level, 0, 0, 0 },
   {"zl",               0,  POPT_ARG_INT,    &do_compression_level, 0, 0, 0 },
+  {"compress-threads", 0,  POPT_ARG_INT,    &do_compression_threads, 0, 0, 0 },
+  {"zt",               0,  POPT_ARG_INT,    &do_compression_threads, 0, 0, 0 },
   {0,                 'P', POPT_ARG_NONE,   0, 'P', 0, 0 },
   {"progress",         0,  POPT_ARG_VAL,    &do_progress, 1, 0, 0 },
   {"no-progress",      0,  POPT_ARG_VAL,    &do_progress, 0, 0, 0 },
@@ -2006,6 +2009,8 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			create_refuse_error(refused_compress);
 			goto cleanup;
 		}
+		if (do_compression_threads < 0)
+			do_compression_threads = 0;
 	}
 
 #ifdef HAVE_SETVBUF
