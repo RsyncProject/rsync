@@ -1,0 +1,55 @@
+#!/bin/sh
+
+. "$suitedir/rsync.fns"
+
+test_symlink() {
+	is_a_link "$1" || test_fail "File $1 is not a symlink"
+}
+
+test_regular() {
+	if [ ! -f "$1" ]; then
+		test_fail "File $1 is not regular file or not exists"
+	fi
+}
+
+test_notexist() {
+        if [ -e "$1" ]; then
+                test_fail "File $1 exists"
+	fi
+        if [ -h "$1" ]; then
+                test_fail "File $1 exists as a symlink"
+	fi
+}
+
+cd "$tmpdir"
+
+mkdir from
+
+mkdir "from/safe"
+mkdir "from/unsafe"
+
+mkdir "from/safe/files"
+mkdir "from/safe/links"
+
+touch "from/safe/files/file1"
+touch "from/safe/files/file2"
+touch "from/unsafe/unsafefile"
+
+ln -s ../files/file1 "from/safe/links/"
+ln -s ../files/file2 "from/safe/links/"
+ln -s ../../unsafe/unsafefile "from/safe/links/"
+ln -s a/a/a/../../../unsafe2 "from/safe/links/"
+
+#echo "LISTING FROM"
+#ls -lR from
+
+echo "rsync with relative path and just -a"
+$RSYNC -avv --safe-links from/safe/ to
+
+#echo "LISTING TO"
+#ls -lR to
+
+test_symlink to/links/file1
+test_symlink to/links/file2
+test_notexist to/links/unsafefile
+test_notexist to/links/unsafe2
