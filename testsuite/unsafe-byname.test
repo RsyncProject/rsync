@@ -40,7 +40,7 @@ test_unsafe ..//../dest 		from/dir			unsafe
 test_unsafe ..				from/file			safe
 test_unsafe ../..			from/file			unsafe
 test_unsafe ..//..			from//file			unsafe
-test_unsafe dir/..			from				safe
+test_unsafe dir/..			from				unsafe
 test_unsafe dir/../..			from				unsafe
 test_unsafe dir/..//..			from				unsafe
 
