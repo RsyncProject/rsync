@@ -1318,7 +1318,14 @@ int handle_partial_dir(const char *fname, int create)
  *
  * "src" is the top source directory currently applicable at the level
  * of the referenced symlink.  This is usually the symlink's full path
- * (including its name), as referenced from the root of the transfer. */
+ * (including its name), as referenced from the root of the transfer.
+ *
+ * NOTE: this also rejects dest names with a .. component in other
+ * than the first component of the name ie. it rejects names such as
+ * a/b/../x/y. This needs to be done as the leading subpaths 'a' or
+ * 'b' could later be replaced with symlinks such as a link to '.'
+ * resulting in the link being transferred now becoming unsafe
+ */
 int unsafe_symlink(const char *dest, const char *src)
 {
 	const char *name, *slash;
@@ -1327,6 +1334,23 @@ int unsafe_symlink(const char *dest, const char *src)
 	/* all absolute and null symlinks are unsafe */
 	if (!dest || !*dest || *dest == '/')
 		return 1;
+
+	// reject destinations with /../ in the name other than at the start of the name
+	const char *dest2 = dest;
+	while (strncmp(dest2, "../", 3) == 0) {
+	    dest2 += 3;
+	    while (*dest2 == '/') {
+		// allow for ..//..///../foo
+		dest2++;
+	    }
+	}
+	if (strstr(dest2, "/../"))
+	    return 1;
+
+	// reject if the destination ends in /..
+	const size_t dlen = strlen(dest);
+	if (dlen > 3 && strcmp(&dest[dlen-3], "/..") == 0)
+	    return 1;
 
 	/* find out what our safety margin is */
 	for (name = src; (slash = strchr(name, '/')) != 0; name = slash+1) {
