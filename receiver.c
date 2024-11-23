@@ -552,6 +552,8 @@ int recv_files(int f_in, int f_out, char *local_name)
 	progress_init();
 
 	while (1) {
+		const char *basedir = NULL;
+
 		cleanup_disable();
 
 		/* This call also sets cur_flist. */
@@ -722,27 +724,29 @@ int recv_files(int f_in, int f_out, char *local_name)
 					exit_cleanup(RERR_PROTOCOL);
 				}
 				if (file->dirname) {
-					pathjoin(fnamecmpbuf, sizeof fnamecmpbuf, file->dirname, xname);
-					fnamecmp = fnamecmpbuf;
-				} else
-					fnamecmp = xname;
+					basedir = file->dirname;
+				}
+				fnamecmp = xname;
 				break;
 			default:
 				if (fnamecmp_type > FNAMECMP_FUZZY && fnamecmp_type-FNAMECMP_FUZZY <= basis_dir_cnt) {
 					fnamecmp_type -= FNAMECMP_FUZZY + 1;
 					if (file->dirname) {
-						stringjoin(fnamecmpbuf, sizeof fnamecmpbuf,
-							   basis_dir[fnamecmp_type], "/", file->dirname, "/", xname, NULL);
-					} else
-						pathjoin(fnamecmpbuf, sizeof fnamecmpbuf, basis_dir[fnamecmp_type], xname);
+						pathjoin(fnamecmpbuf, sizeof fnamecmpbuf, basis_dir[fnamecmp_type], file->dirname);
+						basedir = fnamecmpbuf;
+					} else {
+						basedir = basis_dir[fnamecmp_type];
+					}
+					fnamecmp = xname;
 				} else if (fnamecmp_type >= basis_dir_cnt) {
 					rprintf(FERROR,
 						"invalid basis_dir index: %d.\n",
 						fnamecmp_type);
 					exit_cleanup(RERR_PROTOCOL);
-				} else
-					pathjoin(fnamecmpbuf, sizeof fnamecmpbuf, basis_dir[fnamecmp_type], fname);
-				fnamecmp = fnamecmpbuf;
+				} else {
+					basedir = basis_dir[fnamecmp_type];
+					fnamecmp = fname;
+				}
 				break;
 			}
 			if (!fnamecmp || (daemon_filter_list.head
@@ -765,7 +769,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 		}
 
 		/* open the file */
-		fd1 = do_open(fnamecmp, O_RDONLY, 0);
+		fd1 = secure_relative_open(basedir, fnamecmp, O_RDONLY, 0);
 
 		if (fd1 == -1 && protocol_version < 29) {
 			if (fnamecmp != fname) {
@@ -776,12 +780,18 @@ int recv_files(int f_in, int f_out, char *local_name)
 
 			if (fd1 == -1 && basis_dir[0]) {
 				/* pre-29 allowed only one alternate basis */
-				pathjoin(fnamecmpbuf, sizeof fnamecmpbuf,
-					 basis_dir[0], fname);
-				fnamecmp = fnamecmpbuf;
+				basedir = basis_dir[0];
+				fnamecmp = fname;
 				fnamecmp_type = FNAMECMP_BASIS_DIR_LOW;
-				fd1 = do_open(fnamecmp, O_RDONLY, 0);
+				fd1 = secure_relative_open(basedir, fnamecmp, O_RDONLY, 0);
 			}
+		}
+
+		if (basedir) {
+			// for the following code we need the full
+			// path name as a single string
+			pathjoin(fnamecmpbuf, sizeof fnamecmpbuf, basedir, fnamecmp);
+			fnamecmp = fnamecmpbuf;
 		}
 
 		one_inplace = inplace_partial && fnamecmp_type == FNAMECMP_PARTIAL_DIR;
