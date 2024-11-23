@@ -66,6 +66,7 @@ extern char sender_file_sum[MAX_DIGEST_LEN];
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern filter_rule_list daemon_filter_list;
 extern OFF_T preallocated_len;
+extern int fuzzy_basis;
 
 extern struct name_num_item *xfer_sum_nni;
 extern int xfer_sum_len;
@@ -716,6 +717,10 @@ int recv_files(int f_in, int f_out, char *local_name)
 				fnamecmp = get_backup_name(fname);
 				break;
 			case FNAMECMP_FUZZY:
+				if (fuzzy_basis == 0) {
+					rprintf(FERROR_XFER, "rsync: refusing malicious fuzzy operation for %s\n", xname);
+					exit_cleanup(RERR_PROTOCOL);
+				}
 				if (file->dirname) {
 					pathjoin(fnamecmpbuf, sizeof fnamecmpbuf, file->dirname, xname);
 					fnamecmp = fnamecmpbuf;
