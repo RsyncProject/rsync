@@ -716,11 +716,18 @@ int do_open_nofollow(const char *pathname, int flags)
   must be a relative path, and the relpath must not contain any
   elements in the path which follow symlinks (ie. like O_NOFOLLOW, but
   applies to all path components, not just the last component)
+
+  The relpath must also not contain any ../ elements in the path
 */
 int secure_relative_open(const char *basedir, const char *relpath, int flags, mode_t mode)
 {
 	if (!relpath || relpath[0] == '/') {
 		// must be a relative path
+		errno = EINVAL;
+		return -1;
+	}
+	if (strncmp(relpath, "../", 3) == 0 || strstr(relpath, "/../")) {
+		// no ../ elements allowed in the relpath
 		errno = EINVAL;
 		return -1;
 	}
