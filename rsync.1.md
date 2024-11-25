@@ -472,6 +472,8 @@ has its own detailed description later in this manpage.
 --checksum-choice=STR    choose the checksum algorithm (aka --cc)
 --one-file-system, -x    don't cross filesystem boundaries
 --block-size=SIZE, -B    force a fixed checksum block-size
+--max-map-size=SIZE      force mmap read block size (expressed in bytes, useful for fast storage, default 256K)
+--write-size=SIZE        force write block size (expressed in bytes, default 32K)
 --rsh=COMMAND, -e        specify the remote shell to use
 --rsync-path=PROGRAM     specify the rsync to run on remote machine
 --existing               skip creating new files on receiver
@@ -2124,6 +2126,25 @@ expand it.
 
     Beginning in 3.2.3 the SIZE can be specified with a suffix as detailed in
     the [`--max-size`](#opt) option.  Older versions only accepted a byte count.
+
+0.  `--max-map-size=SIZE`
+
+    On fast storage, reading with a specific block size can drastically improve
+    fetch performance. This option acts as length mmap argument.
+
+    On scale-out or flash disk storage, this value can be set higher than 1MB.
+
+    By default, 256K and expressed in Bytes.
+
+    To use 4K read block size:
+    >     --max-map-size 4194304
+
+
+0.  `--write-size=SIZE`
+
+    This option forces the buffer size when writing a file on the receiver side.
+
+    By default, 32K and expressed in Bytes.
 
 0.  `--rsh=COMMAND`, `-e`
 
