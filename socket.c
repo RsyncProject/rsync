@@ -40,6 +40,7 @@ extern char *sockopts;
 extern int default_af_hint;
 extern int connect_timeout;
 extern int pid_file_fd;
+extern struct socket_option socket_options[];
 
 #ifdef HAVE_SIGACTION
 static struct sigaction sigact;
@@ -623,53 +624,6 @@ void start_accept_loop(int port, int (*fn)(int, int))
 	}
 }
 
-
-enum SOCK_OPT_TYPES {OPT_BOOL,OPT_INT,OPT_ON};
-
-struct
-{
-  char *name;
-  int level;
-  int option;
-  int value;
-  int opttype;
-} socket_options[] = {
-  {"SO_KEEPALIVE",      SOL_SOCKET,    SO_KEEPALIVE,    0,                 OPT_BOOL},
-  {"SO_REUSEADDR",      SOL_SOCKET,    SO_REUSEADDR,    0,                 OPT_BOOL},
-#ifdef SO_BROADCAST
-  {"SO_BROADCAST",      SOL_SOCKET,    SO_BROADCAST,    0,                 OPT_BOOL},
-#endif
-#ifdef TCP_NODELAY
-  {"TCP_NODELAY",       IPPROTO_TCP,   TCP_NODELAY,     0,                 OPT_BOOL},
-#endif
-#ifdef IPTOS_LOWDELAY
-  {"IPTOS_LOWDELAY",    IPPROTO_IP,    IP_TOS,          IPTOS_LOWDELAY,    OPT_ON},
-#endif
-#ifdef IPTOS_THROUGHPUT
-  {"IPTOS_THROUGHPUT",  IPPROTO_IP,    IP_TOS,          IPTOS_THROUGHPUT,  OPT_ON},
-#endif
-#ifdef SO_SNDBUF
-  {"SO_SNDBUF",         SOL_SOCKET,    SO_SNDBUF,       0,                 OPT_INT},
-#endif
-#ifdef SO_RCVBUF
-  {"SO_RCVBUF",         SOL_SOCKET,    SO_RCVBUF,       0,                 OPT_INT},
-#endif
-#ifdef SO_SNDLOWAT
-  {"SO_SNDLOWAT",       SOL_SOCKET,    SO_SNDLOWAT,     0,                 OPT_INT},
-#endif
-#ifdef SO_RCVLOWAT
-  {"SO_RCVLOWAT",       SOL_SOCKET,    SO_RCVLOWAT,     0,                 OPT_INT},
-#endif
-#ifdef SO_SNDTIMEO
-  {"SO_SNDTIMEO",       SOL_SOCKET,    SO_SNDTIMEO,     0,                 OPT_INT},
-#endif
-#ifdef SO_RCVTIMEO
-  {"SO_RCVTIMEO",       SOL_SOCKET,    SO_RCVTIMEO,     0,                 OPT_INT},
-#endif
-  {NULL,0,0,0,0}
-};
-
-
 /* Set user socket options. */
 void set_socket_options(int fd, char *options)
 {
@@ -682,13 +636,14 @@ void set_socket_options(int fd, char *options)
 
 	for (tok = strtok(options, " \t,"); tok; tok = strtok(NULL," \t,")) {
 		int ret=0,i;
-		int value = 1;
 		char *p;
+		char *value;
+		int intvalue = 1;
 		int got_value = 0;
 
 		if ((p = strchr(tok,'='))) {
 			*p = 0;
-			value = atoi(p+1);
+			value = p+1;
 			got_value = 1;
 		}
 
@@ -701,16 +656,52 @@ void set_socket_options(int fd, char *options)
 			rprintf(FERROR,"Unknown socket option %s\n",tok);
 			continue;
 		}
+		if(socket_options[i].level == (int)(SOCK_OPT_ERR)) {
+			// At compile-time, a potential socket option was NOT present on
+			// the build system.
+			rprintf(FERROR,"Unsupported socket option %s\n",tok);
+			continue;
+		}
 
 		switch (socket_options[i].opttype) {
-		case OPT_BOOL:
-		case OPT_INT:
-			ret = setsockopt(fd,socket_options[i].level,
-					 socket_options[i].option,
-					 (char *)&value, sizeof (int));
+		case SOCK_OPT_BOOL:
+			if(got_value)
+				intvalue = atoi(value);
+			ret = setsockopt(fd,
+					socket_options[i].level,
+					socket_options[i].option,
+					(char *)&intvalue,
+					sizeof (int)
+					);
 			break;
 
-		case OPT_ON:
+		case SOCK_OPT_INT:
+			if(got_value) {
+				intvalue = atoi(value);
+				ret = setsockopt(fd,
+						socket_options[i].level,
+						socket_options[i].option,
+						(char *)&intvalue,
+						sizeof (int)
+						);
+			} else {
+				rprintf(FERROR,"syntax error -- %s requires an integer value\n",tok);
+			}
+			break;
+
+		case SOCK_OPT_STR:
+			if (got_value) {
+				ret = setsockopt(fd,
+						socket_options[i].level,
+						socket_options[i].option,
+						value,
+						strlen(value));
+			} else {
+				rprintf(FERROR,"syntax error -- %s requires a string value\n",tok);
+			}
+			break;
+
+		case SOCK_OPT_ON:
 			if (got_value)
 				rprintf(FERROR,"syntax error -- %s does not take a value\n",tok);
 
