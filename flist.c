@@ -2585,6 +2585,10 @@ struct file_list *recv_file_list(int f, int dir_ndx)
 #endif
 
 	if (inc_recurse && dir_ndx >= 0) {
+		if (dir_ndx >= dir_flist->used) {
+			rprintf(FERROR_XFER, "rsync: refusing invalid dir_ndx %u >= %u\n", dir_ndx, dir_flist->used);
+			exit_cleanup(RERR_PROTOCOL);
+		}
 		struct file_struct *file = dir_flist->files[dir_ndx];
 		if (file->flags & FLAG_GOT_DIR_FLIST) {
 			rprintf(FERROR_XFER, "rsync: refusing malicious duplicate flist for dir %d\n", dir_ndx);
