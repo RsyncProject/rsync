@@ -57,6 +57,9 @@ extern int ignore_errors;
 extern int remove_source_files;
 extern int delay_updates;
 extern int update_only;
+extern int update_links;
+extern int copy_links;
+extern int allow_link_update_dir;
 extern int human_readable;
 extern int ignore_existing;
 extern int ignore_non_existing;
@@ -1193,6 +1196,19 @@ static BOOL is_below(struct file_struct *file, struct file_struct *subtree)
 		&& (!implied_dirs_are_missing || f_name_has_prefix(file, subtree));
 }
 
+static BOOL dir_empty(char *dirname) {
+	int n = 3;
+	DIR *dir = opendir(dirname);
+	if (dir == NULL)
+		return -1;
+	while (readdir(dir)) {
+		if (!--n)
+			break;
+	}
+	closedir(dir);
+	return n;
+}
+
 /* Acts on the indicated item in cur_flist whose name is fname.  If a dir,
  * make sure it exists, and has the right permissions/timestamp info.  For
  * all other non-regular files (symlinks, etc.) we create them here.  For
@@ -1540,6 +1556,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	 && hard_link_check(file, ndx, fname, statret, &sx, itemizing, code))
 		goto cleanup;
 #endif
+	if (DEBUG_GTE(GENR, 1))
+		rprintf(FINFO, "%s src mtime=%ld dest mtime=%ld modify_window=%d statret=%d copy_links=%d update_links=%d allow_link_update_dir=%d\n", fname, file->modtime, (long)sx.st.st_mtime, modify_window, statret, copy_links, update_links, allow_link_update_dir);
 
 	if (preserve_links && ftype == FT_SYMLINK) {
 #ifdef SUPPORT_LINKS
@@ -1586,6 +1604,66 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			} else if (j >= 0) {
 				statret = 1;
 				fnamecmp = fnamecmpbuf;
+			}
+		}
+		if (statret == 0) {
+			if (update_links > 0) {
+				if (S_ISDIR(sx.st.st_mode) && allow_link_update_dir == 0) {
+					if (INFO_GTE(SKIP, 1))
+						rprintf(FINFO, "symlink \"%s\" is a directory on destination and allow-link-update-dir isn't enabled, skipping\n", fname);
+					goto cleanup;
+				}
+				else {
+					int mtime_offset = sx.st.st_mtime - file->modtime;
+					char *st_mode = S_ISDIR(sx.st.st_mode)
+						      ? "directory"
+						      : S_ISLNK(sx.st.st_mode)
+						      ? "symlink"
+						      : S_ISCHR(sx.st.st_mode)
+						      ? "character device"
+						      : S_ISBLK(sx.st.st_mode)
+						      ? "block device"
+						      : S_ISFIFO(sx.st.st_mode)
+						      ? "named pipe"
+						      : S_ISSOCK(sx.st.st_mode)
+						      ? "socket"
+						      : "file";
+					if (mtime_offset > modify_window) {
+						if (INFO_GTE(SKIP, 1))
+							rprintf(FINFO, "%s \"%s\" is newer by %d sec, skipping\n", st_mode, fname, mtime_offset - modify_window);
+						goto cleanup;
+					}
+					else if (mtime_offset < modify_window) {
+						if (S_ISDIR(sx.st.st_mode)) {
+							if (!dir_empty(fname)) {
+								rprintf(FINFO, "directory %s not empty, skipping\n", fname);
+								goto cleanup;
+							}
+						}
+						if (INFO_GTE(SKIP, 1))
+							rprintf(FINFO, "%s \"%s\" is older by %d sec, updating\n", st_mode, fname, - mtime_offset - modify_window);
+					}
+					else if (S_ISLNK(sx.st.st_mode)) {
+						char lnk[MAXPATHLEN];
+						int llen = do_readlink(fname, lnk, MAXPATHLEN - 1);
+						lnk[llen] = '\0';
+						if (strcmp(lnk, F_SYMLINK(file)) == 0) {
+							if (INFO_GTE(SKIP, 1))
+								rprintf(FINFO, "symlink \"%s\" points to the same referent %s, skipping\n", fname, lnk);
+							goto cleanup;
+						}
+						else if (INFO_GTE(SKIP, 1))
+							rprintf(FINFO, "symlink \"%s\" points to a different referent on source (%s) than destination (%s), updating\n", fname, F_SYMLINK(file), lnk);
+					}
+					else {
+						if (INFO_GTE(SKIP, 1))
+							rprintf(FINFO, "symlink \"%s\" more recent than %s on destination, updating\n", fname, st_mode);
+					}
+				}
+			}
+			else {
+				if (DEBUG_GTE(GENR, 1))
+					rprintf(FINFO, "update-links not enabled for \"%s\"\n, skipping", fname);
 			}
 		}
 		if (atomic_create(file, fname, sl, NULL, MAKEDEV(0, 0), &sx, statret == 0 ? DEL_FOR_SYMLINK : 0)) {
