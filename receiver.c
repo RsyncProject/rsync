@@ -28,6 +28,7 @@ extern int am_root;
 extern int am_server;
 extern int inc_recurse;
 extern int log_before_transfer;
+extern int log_after_transfer;
 extern int stdout_format_has_i;
 extern int logfile_format_has_i;
 extern int want_xattr_optim;
@@ -876,7 +877,9 @@ int recv_files(int f_in, int f_out, char *local_name)
 		/* recv file data */
 		recv_ok = receive_data(f_in, fnamecmp, fd1, st.st_size, fname, fd2, file, inplace || one_inplace);
 
-		log_item(log_code, file, iflags, NULL);
+		/* log the transfer result after file is moved into place */
+		if (!log_after_transfer)
+			log_item(log_code, file, iflags, NULL);
 		if (want_progress_now)
 			instant_progress(fname);
 
@@ -916,6 +919,10 @@ int recv_files(int f_in, int f_out, char *local_name)
 				partialptr = NULL;
 		} else if (!one_inplace)
 			do_unlink(fnametmp);
+
+		/* log the transfer result */
+		if (log_after_transfer)
+			log_item(FLOG_AFTER, file, iflags, NULL);
 
 		cleanup_disable();
 
