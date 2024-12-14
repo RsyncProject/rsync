@@ -112,6 +112,7 @@ page of the web site.
 
 Alternately, email your bug report to <rsync@lists.samba.org>.
 
+For security issues please email details of the issue to <rsync.project@gmail.com>.
 
 GIT REPOSITORY
 --------------
