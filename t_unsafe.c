@@ -28,6 +28,9 @@ int am_root = 0;
 int am_sender = 1;
 int read_only = 0;
 int list_only = 0;
+int copy_links = 0;
+int copy_unsafe_links = 0;
+
 short info_levels[COUNT_INFO], debug_levels[COUNT_DEBUG];
 
 int
