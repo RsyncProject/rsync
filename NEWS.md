@@ -1,16 +1,38 @@
-# NEWS for rsync 3.3.1 (UNRELEASED)
+# NEWS for rsync 3.4.0 (14th Jan 2025)
+
+Release 3.4.0 is a security release that fixes a number of important vulnerabilities.
+
+Many thanks to Simon Scannell, Pedro Gallegos, and Jasiel Spelman at
+Google Cloud Vulnerability Research and Aleksei Gorban (Loqpa) for
+discovering these vulnerabilities and working with the rsync project
+to develop and test fixes.
+
+For more details on the vulnerabilities please see the CERT report
+https://kb.cert.org/vuls/id/952657
 
 ## Changes in this version:
 
 ### SECURITY FIXES:
 
-- Fixed a buffer overflow when the sum2 digest algorithm is SHA1.
+- CVE-2024-12084 - Heap Buffer Overflow in Checksum Parsing.
+
+- CVE-2024-12085 - Info Leak via uninitialized Stack contents defeats ASLR.
+  
+- CVE-2024-12086 - Server leaks arbitrary client files.
+
+- CVE-2024-12087 - Server can make client write files outside of destination directory using symbolic links.
+
+- CVE-2024-12088 - --safe-links Bypass.
+
+- CVE-2024-12747 - symlink race condition.
 
 ### BUG FIXES:
 
 - Fixed the included popt to avoid a memory error on modern gcc versions.
 
 - Fixed an incorrect extern variable's type that caused an ACL issue on macOS.
+
+- Fixed IPv6 configure check
 
 ### INTERNAL:
 
@@ -22,8 +44,9 @@
 
 - Improved packaging/var-checker to identify variable type issues.
 
-------------------------------------------------------------------------------
+- added FreeBSD and Solaris CI builds
 
+------------------------------------------------------------------------------
 # NEWS for rsync 3.3.0 (6 Apr 2024)
 
 ## Changes in this version:
