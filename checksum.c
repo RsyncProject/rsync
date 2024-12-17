@@ -406,7 +406,7 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 	int32 remainder;
 	int fd;
 
-	fd = do_open(fname, O_RDONLY, 0);
+	fd = do_open_checklinks(fname);
 	if (fd == -1) {
 		memset(sum, 0, file_sum_len);
 		return;

@@ -775,7 +775,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 			if (fnamecmp != fname) {
 				fnamecmp = fname;
 				fnamecmp_type = FNAMECMP_FNAME;
-				fd1 = do_open(fnamecmp, O_RDONLY, 0);
+				fd1 = do_open_nofollow(fnamecmp, O_RDONLY);
 			}
 
 			if (fd1 == -1 && basis_dir[0]) {
