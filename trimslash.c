@@ -26,6 +26,8 @@ int am_root = 0;
 int am_sender = 1;
 int read_only = 1;
 int list_only = 0;
+int copy_links = 0;
+int copy_unsafe_links = 0;
 
 int
 main(int argc, char **argv)

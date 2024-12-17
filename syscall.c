@@ -45,6 +45,8 @@ extern int preallocate_files;
 extern int preserve_perms;
 extern int preserve_executability;
 extern int open_noatime;
+extern int copy_links;
+extern int copy_unsafe_links;
 
 #ifndef S_BLKSIZE
 # if defined hpux || defined __hpux__ || defined __hpux
@@ -787,4 +789,22 @@ cleanup:
 	}
 	return retfd;
 #endif // O_NOFOLLOW, O_DIRECTORY
+}
+
+/*
+  varient of do_open/do_open_nofollow which does do_open() if the
+  copy_links or copy_unsafe_links options are set and does
+  do_open_nofollow() otherwise
+
+  This is used to prevent a race condition where an attacker could be
+  switching a file between being a symlink and being a normal file
+
+  The open is always done with O_RDONLY flags
+ */
+int do_open_checklinks(const char *pathname)
+{
+	if (copy_links || copy_unsafe_links) {
+		return do_open(pathname, O_RDONLY, 0);
+	}
+	return do_open_nofollow(pathname, O_RDONLY);
 }
