@@ -350,7 +350,7 @@ void send_files(int f_in, int f_out)
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
-		fd = do_open(fname, O_RDONLY, 0);
+		fd = do_open_checklinks(fname);
 		if (fd == -1) {
 			if (errno == ENOENT) {
 				enum logcode c = am_daemon && protocol_version < 28 ? FERROR : FWARNING;

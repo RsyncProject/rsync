@@ -365,7 +365,7 @@ int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
 	int len;   /* Number of bytes read into `buf'. */
 	OFF_T prealloc_len = 0, offset = 0;
 
-	if ((ifd = do_open(source, O_RDONLY, 0)) < 0) {
+	if ((ifd = do_open_nofollow(source, O_RDONLY)) < 0) {
 		int save_errno = errno;
 		rsyserr(FERROR_XFER, errno, "open %s", full_fname(source));
 		errno = save_errno;

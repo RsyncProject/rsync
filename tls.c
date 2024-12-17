@@ -49,6 +49,9 @@ int list_only = 0;
 int link_times = 0;
 int link_owner = 0;
 int nsec_times = 0;
+int safe_symlinks = 0;
+int copy_links = 0;
+int copy_unsafe_links = 0;
 
 #ifdef SUPPORT_XATTRS
 

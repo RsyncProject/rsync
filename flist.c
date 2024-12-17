@@ -1390,7 +1390,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 
 	if (copy_devices && am_sender && IS_DEVICE(st.st_mode)) {
 		if (st.st_size == 0) {
-			int fd = do_open(fname, O_RDONLY, 0);
+			int fd = do_open_checklinks(fname);
 			if (fd >= 0) {
 				st.st_size = get_device_size(fd, fname);
 				close(fd);
