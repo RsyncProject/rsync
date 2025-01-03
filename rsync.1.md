@@ -3071,6 +3071,18 @@ expand it.
     able to set.  By default no special socket options are set.  This only
     affects direct socket connections to a remote rsync daemon.
 
+    `OPTIONS` a space or comma seperated list of one or more `optname` strings
+    (e.g. `SO_KEEPALIVE`, `SO_SNDBUF=1234`, `SO_BINDTODEVICE=lo`, `IP_FREEBIND`,
+    `TCP_CONGESTION=reno`, `TCP_FASTOPEN`, `TCP_FASTOPEN_CONNECT`), or `optval`
+    strings (e.g. `IP_PMTUDISC_DO`, `IPTOS_THROUGHPUT`).
+
+    Unknown options are those not know to the source at build time.
+    Unsupported options are those known source code, but not present in the
+    build environment.
+
+    All errors are non-fatal, including unknown options, unsupported options,
+    missing required arguments or superflous arguments.
+
     See also [the daemon version of the `--sockopts` option](#dopt--sockopts).
 
 0.  `--blocking-io`
