@@ -361,7 +361,7 @@ void get_checksum2(char *buf, int32 len, char *sum)
 	  case CSUM_MD4_ARCHAIC: {
 		md_context m;
 		int32 i;
-		static char *buf1;
+		static char *buf1 = NULL;
 		static int32 len1;
 
 		mdfour_begin(&m);
