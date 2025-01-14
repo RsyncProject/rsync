@@ -1,18 +1,23 @@
-# NEWS for rsync 3.4.0 (14th Jan 2025)
+# NEWS for rsync 3.4.0 (15 Jan 2025)
 
 Release 3.4.0 is a security release that fixes a number of important vulnerabilities.
-
-Many thanks to Simon Scannell, Pedro Gallegos, and Jasiel Spelman at
-Google Cloud Vulnerability Research and Aleksei Gorban (Loqpa) for
-discovering these vulnerabilities and working with the rsync project
-to develop and test fixes.
 
 For more details on the vulnerabilities please see the CERT report
 https://kb.cert.org/vuls/id/952657
 
 ## Changes in this version:
 
+### PROTOCOL NUMBER:
+
+ - The protocol number was changed to 32 to make it easier for
+   administrators to check their servers have been updated
+
 ### SECURITY FIXES:
+
+Many thanks to Simon Scannell, Pedro Gallegos, and Jasiel Spelman at
+Google Cloud Vulnerability Research and Aleksei Gorban (Loqpa) for
+discovering these vulnerabilities and working with the rsync project
+to develop and test fixes.
 
 - CVE-2024-12084 - Heap Buffer Overflow in Checksum Parsing.
 
@@ -4811,7 +4816,7 @@ https://kb.cert.org/vuls/id/952657
 
 | RELEASE DATE | VER.   | DATE OF COMMIT\* | PROTOCOL    |
 |--------------|--------|------------------|-------------|
-| ?? Nov 2024  | 3.3.1  |                  | 31          |
+| 15 Jan 2025  | 3.4.0  |                  | 32          |
 | 06 Apr 2024  | 3.3.0  |                  | 31          |
 | 20 Oct 2022  | 3.2.7  |                  | 31          |
 | 09 Sep 2022  | 3.2.6  |                  | 31          |
