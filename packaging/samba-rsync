@@ -121,4 +121,4 @@ fi
 
 cd "$SRC_DIR" || exit 1
 echo "Copying files from $SRC_DIR to $RSYNC_SAMBA_HOST ..."
-do_rsync -aivOHP --del -f._$FILT . "$RSYNC_SAMBA_HOST:$DEST_DIR/"
+do_rsync -aivOHP --chown=:rsync --del -f._$FILT . "$RSYNC_SAMBA_HOST:$DEST_DIR/"
