@@ -79,9 +79,5 @@ rm -rf $RPM_BUILD_ROOT
 %dir /etc/rsync-ssl/certs
 
 %changelog
-* Wed Jan 15 2025 Wayne Davison <wayne@opencoder.net>
+* Wed Jan 15 2025 Rsync Project <rsync.project@gmail.com>
 Released 3.4.0.
-
-* Fri Mar 21 2008 Wayne Davison <wayne@opencoder.net>
-Added installation of /etc/xinetd.d/rsync file and some commented-out
-lines that demonstrate how to use the rsync-patches tar file.
