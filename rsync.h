@@ -84,7 +84,6 @@
 #define FLAG_DUPLICATE (1<<4)	/* sender */
 #define FLAG_MISSING_DIR (1<<4)	/* generator */
 #define FLAG_HLINKED (1<<5)	/* receiver/generator (checked on all types) */
-#define FLAG_GOT_DIR_FLIST (1<<5)/* sender/receiver/generator - dir_flist only */
 #define FLAG_HLINK_FIRST (1<<6)	/* receiver/generator (w/FLAG_HLINKED) */
 #define FLAG_IMPLIED_DIR (1<<6)	/* sender/receiver/generator (dirs only) */
 #define FLAG_HLINK_LAST (1<<7)	/* receiver/generator */
@@ -93,6 +92,7 @@
 #define FLAG_SKIP_GROUP (1<<10)	/* receiver/generator */
 #define FLAG_TIME_FAILED (1<<11)/* generator */
 #define FLAG_MOD_NSEC (1<<12)	/* sender/receiver/generator */
+#define FLAG_GOT_DIR_FLIST (1<<13)/* sender/receiver/generator - dir_flist only */
 
 /* These flags are passed to functions but not stored. */
 
