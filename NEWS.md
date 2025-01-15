@@ -1,16 +1,64 @@
-# NEWS for rsync 3.3.1 (UNRELEASED)
+# NEWS for rsync 3.4.1 (16 Jan 2025)
+
+Release 3.4.1 is a fix for regressions introduced in 3.4.0
 
 ## Changes in this version:
 
+### BUG FIXES:
+
+ - fixed handling of -H flag with conflict in internal flag values
+
+ - fixed a user after free in logging of failed rename
+
+ - fixed build on systems without openat()
+
+ - removed dependency on alloca() in bundled popt
+
+### DEVELOPER RELATED:
+
+ - fix to permissions handling in the developer release script
+
+------------------------------------------------------------------------------
+# NEWS for rsync 3.4.0 (15 Jan 2025)
+
+Release 3.4.0 is a security release that fixes a number of important vulnerabilities.
+
+For more details on the vulnerabilities please see the CERT report
+https://kb.cert.org/vuls/id/952657
+
+## Changes in this version:
+
+### PROTOCOL NUMBER:
+
+ - The protocol number was changed to 32 to make it easier for
+   administrators to check their servers have been updated
+
 ### SECURITY FIXES:
 
-- Fixed a buffer overflow when the sum2 digest algorithm is SHA1.
+Many thanks to Simon Scannell, Pedro Gallegos, and Jasiel Spelman at
+Google Cloud Vulnerability Research and Aleksei Gorban (Loqpa) for
+discovering these vulnerabilities and working with the rsync project
+to develop and test fixes.
+
+- CVE-2024-12084 - Heap Buffer Overflow in Checksum Parsing.
+
+- CVE-2024-12085 - Info Leak via uninitialized Stack contents defeats ASLR.
+  
+- CVE-2024-12086 - Server leaks arbitrary client files.
+
+- CVE-2024-12087 - Server can make client write files outside of destination directory using symbolic links.
+
+- CVE-2024-12088 - --safe-links Bypass.
+
+- CVE-2024-12747 - symlink race condition.
 
 ### BUG FIXES:
 
 - Fixed the included popt to avoid a memory error on modern gcc versions.
 
 - Fixed an incorrect extern variable's type that caused an ACL issue on macOS.
+
+- Fixed IPv6 configure check
 
 ### INTERNAL:
 
@@ -22,8 +70,9 @@
 
 - Improved packaging/var-checker to identify variable type issues.
 
-------------------------------------------------------------------------------
+- added FreeBSD and Solaris CI builds
 
+------------------------------------------------------------------------------
 # NEWS for rsync 3.3.0 (6 Apr 2024)
 
 ## Changes in this version:
@@ -4788,7 +4837,8 @@
 
 | RELEASE DATE | VER.   | DATE OF COMMIT\* | PROTOCOL    |
 |--------------|--------|------------------|-------------|
-| ?? Nov 2024  | 3.3.1  |                  | 31          |
+| 16 Jan 2025  | 3.4.1  |                  | 32          |
+| 15 Jan 2025  | 3.4.0  |                  | 32          |
 | 06 Apr 2024  | 3.3.0  |                  | 31          |
 | 20 Oct 2022  | 3.2.7  |                  | 31          |
 | 09 Sep 2022  | 3.2.6  |                  | 31          |

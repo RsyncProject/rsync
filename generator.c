@@ -1798,7 +1798,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 	if (write_devices && IS_DEVICE(sx.st.st_mode) && sx.st.st_size == 0) {
 		/* This early open into fd skips the regular open below. */
-		if ((fd = do_open(fnamecmp, O_RDONLY, 0)) >= 0)
+		if ((fd = do_open_nofollow(fnamecmp, O_RDONLY)) >= 0)
 			real_sx.st.st_size = sx.st.st_size = get_device_size(fd, fnamecmp);
 	}
 
@@ -1867,7 +1867,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	}
 
 	/* open the file */
-	if (fd < 0 && (fd = do_open(fnamecmp, O_RDONLY, 0)) < 0) {
+	if (fd < 0 && (fd = do_open_checklinks(fnamecmp)) < 0) {
 		rsyserr(FERROR, errno, "failed to open %s, continuing",
 			full_fname(fnamecmp));
 	  pretend_missing:
@@ -2041,8 +2041,12 @@ int atomic_create(struct file_struct *file, char *fname, const char *slnk, const
 
 	if (!skip_atomic) {
 		if (do_rename(tmpname, fname) < 0) {
+			char *full_tmpname = strdup(full_fname(tmpname));
+			if (full_tmpname == NULL)
+				out_of_memory("atomic_create");
 			rsyserr(FERROR_XFER, errno, "rename %s -> \"%s\" failed",
-				full_fname(tmpname), full_fname(fname));
+				full_tmpname, full_fname(fname));
+			free(full_tmpname);
 			do_unlink(tmpname);
 			return 0;
 		}

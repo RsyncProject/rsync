@@ -92,6 +92,7 @@
 #define FLAG_SKIP_GROUP (1<<10)	/* receiver/generator */
 #define FLAG_TIME_FAILED (1<<11)/* generator */
 #define FLAG_MOD_NSEC (1<<12)	/* sender/receiver/generator */
+#define FLAG_GOT_DIR_FLIST (1<<13)/* sender/receiver/generator - dir_flist only */
 
 /* These flags are passed to functions but not stored. */
 
@@ -110,7 +111,7 @@
 
 /* Update this if you make incompatible changes and ALSO update the
  * SUBPROTOCOL_VERSION if it is not a final (official) release. */
-#define PROTOCOL_VERSION 31
+#define PROTOCOL_VERSION 32
 
 /* This is used when working on a new protocol version or for any unofficial
  * protocol tweaks.  It should be a non-zero value for each pre-release repo

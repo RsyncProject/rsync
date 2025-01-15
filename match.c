@@ -147,6 +147,9 @@ static void hash_search(int f,struct sum_struct *s,
 	int more;
 	schar *map;
 
+	// prevent possible memory leaks
+	memset(sum2, 0, sizeof sum2);
+
 	/* want_i is used to encourage adjacent matches, allowing the RLL
 	 * coding of the output to work more efficiently. */
 	want_i = 0;

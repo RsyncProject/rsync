@@ -9,4 +9,5 @@ help backporting fixes into an older release, feel free to ask.
 
 Email your vulnerability information to rsync's maintainer:
 
-  Wayne Davison <wayne@opencoder.net>
+  Rsync Project <rsync.project@gmail.com>
+

@@ -202,7 +202,7 @@ About to:
         '%define srcdir': srcdir,
         }
 
-    tweak_files = 'version.h rsync.h NEWS.md'.split()
+    tweak_files = 'version.h rsync.h'.split()
     tweak_files += glob.glob('packaging/*.spec')
     tweak_files += glob.glob('packaging/*/*.spec')
 

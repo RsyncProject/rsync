@@ -33,6 +33,8 @@
 #include <sys/syscall.h>
 #endif
 
+#include "ifuncs.h"
+
 extern int dry_run;
 extern int am_root;
 extern int am_sender;
@@ -43,6 +45,8 @@ extern int preallocate_files;
 extern int preserve_perms;
 extern int preserve_executability;
 extern int open_noatime;
+extern int copy_links;
+extern int copy_unsafe_links;
 
 #ifndef S_BLKSIZE
 # if defined hpux || defined __hpux__ || defined __hpux
@@ -706,4 +710,101 @@ int do_open_nofollow(const char *pathname, int flags)
 #endif
 
 	return fd;
+}
+
+/*
+  open a file relative to a base directory. The basedir can be NULL,
+  in which case the current working directory is used. The relpath
+  must be a relative path, and the relpath must not contain any
+  elements in the path which follow symlinks (ie. like O_NOFOLLOW, but
+  applies to all path components, not just the last component)
+
+  The relpath must also not contain any ../ elements in the path
+*/
+int secure_relative_open(const char *basedir, const char *relpath, int flags, mode_t mode)
+{
+	if (!relpath || relpath[0] == '/') {
+		// must be a relative path
+		errno = EINVAL;
+		return -1;
+	}
+	if (strncmp(relpath, "../", 3) == 0 || strstr(relpath, "/../")) {
+		// no ../ elements allowed in the relpath
+		errno = EINVAL;
+		return -1;
+	}
+
+#if !defined(O_NOFOLLOW) || !defined(O_DIRECTORY) || !defined(AT_FDCWD)
+	// really old system, all we can do is live with the risks
+	if (!basedir) {
+		return open(relpath, flags, mode);
+	}
+	char fullpath[MAXPATHLEN];
+	pathjoin(fullpath, sizeof fullpath, basedir, relpath);
+	return open(fullpath, flags, mode);
+#else
+	int dirfd = AT_FDCWD;
+	if (basedir != NULL) {
+		dirfd = openat(AT_FDCWD, basedir, O_RDONLY | O_DIRECTORY);
+		if (dirfd == -1) {
+			return -1;
+		}
+	}
+	int retfd = -1;
+
+	char *path_copy = my_strdup(relpath, __FILE__, __LINE__);
+	if (!path_copy) {
+		return -1;
+	}
+	
+	for (const char *part = strtok(path_copy, "/");
+	     part != NULL;
+	     part = strtok(NULL, "/"))
+	{
+		int next_fd = openat(dirfd, part, O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+		if (next_fd == -1 && errno == ENOTDIR) {
+			if (strtok(NULL, "/") != NULL) {
+				// this is not the last component of the path
+				errno = ELOOP;
+				goto cleanup;
+			}
+			// this could be the last component of the path, try as a file
+			retfd = openat(dirfd, part, flags | O_NOFOLLOW, mode);
+			goto cleanup;
+		}
+		if (next_fd == -1) {
+			goto cleanup;
+		}
+		if (dirfd != AT_FDCWD) close(dirfd);
+		dirfd = next_fd;
+	}
+
+	// the path must be a directory
+	errno = EINVAL;
+
+cleanup:
+	free(path_copy);
+	if (dirfd != AT_FDCWD) {
+		close(dirfd);
+	}
+	return retfd;
+#endif // O_NOFOLLOW, O_DIRECTORY
+}
+
+/*
+  varient of do_open/do_open_nofollow which does do_open() if the
+  copy_links or copy_unsafe_links options are set and does
+  do_open_nofollow() otherwise
+
+  This is used to prevent a race condition where an attacker could be
+  switching a file between being a symlink and being a normal file
+
+  The open is always done with O_RDONLY flags
+ */
+int do_open_checklinks(const char *pathname)
+{
+	if (copy_links || copy_unsafe_links) {
+		return do_open(pathname, O_RDONLY, 0);
+	}
+	return do_open_nofollow(pathname, O_RDONLY);
 }
