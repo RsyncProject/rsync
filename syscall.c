@@ -734,7 +734,7 @@ int secure_relative_open(const char *basedir, const char *relpath, int flags, mo
 		return -1;
 	}
 
-#if !defined(O_NOFOLLOW) || !defined(O_DIRECTORY)
+#if !defined(O_NOFOLLOW) || !defined(O_DIRECTORY) || !defined(AT_FDCWD)
 	// really old system, all we can do is live with the risks
 	if (!basedir) {
 		return open(relpath, flags, mode);
