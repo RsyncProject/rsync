@@ -1,3 +1,24 @@
+# NEWS for rsync 3.4.1 (16 Jan 2025)
+
+Release 3.4.1 is a fix for regressions introduced in 3.4.0
+
+## Changes in this version:
+
+### BUG FIXES:
+
+ - fixed handling of -H flag with conflict in internal flag values
+
+ - fixed a user after free in logging of failed rename
+
+ - fixed build on systems without openat()
+
+ - removed dependency on alloca() in bundled popt
+
+### DEVELOPER RELATED:
+
+ - fix to permissions handling in the developer release script
+
+------------------------------------------------------------------------------
 # NEWS for rsync 3.4.0 (15 Jan 2025)
 
 Release 3.4.0 is a security release that fixes a number of important vulnerabilities.
@@ -4816,6 +4837,7 @@ to develop and test fixes.
 
 | RELEASE DATE | VER.   | DATE OF COMMIT\* | PROTOCOL    |
 |--------------|--------|------------------|-------------|
+| 16 Jan 2025  | 3.4.1  |                  | 32          |
 | 15 Jan 2025  | 3.4.0  |                  | 32          |
 | 06 Apr 2024  | 3.3.0  |                  | 31          |
 | 20 Oct 2022  | 3.2.7  |                  | 31          |
