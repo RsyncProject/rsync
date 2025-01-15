@@ -9,6 +9,10 @@
 #include "system.h"
 #include "findme.h"
 
+#ifndef HAVE_STRLCPY
+size_t strlcpy(char *d, const char *s, size_t bufsize);
+#endif
+
 const char * findProgramPath(const char * argv0)
 {
     char * path = getenv("PATH");
