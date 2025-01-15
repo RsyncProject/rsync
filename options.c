@@ -1319,6 +1319,9 @@ static void popt_unalias(poptContext con, const char *opt)
 	unalias.argv[0] = strdup(opt);
 
 	poptAddAlias(con, unalias, 0);
+
+	free((void*)unalias.argv[0]);
+	free((void*)unalias.argv);
 }
 
 char *alt_dest_opt(int type)
