@@ -1,3 +1,13 @@
+# NEWS for rsync 3.4.2 (UNRELEASED)
+
+## Changes in this version:
+
+### BUG FIXES:
+
+- ...
+
+------------------------------------------------------------------------------
+
 # NEWS for rsync 3.4.1 (16 Jan 2025)
 
 Release 3.4.1 is a fix for regressions introduced in 3.4.0
@@ -19,6 +29,7 @@ Release 3.4.1 is a fix for regressions introduced in 3.4.0
  - fix to permissions handling in the developer release script
 
 ------------------------------------------------------------------------------
+
 # NEWS for rsync 3.4.0 (15 Jan 2025)
 
 Release 3.4.0 is a security release that fixes a number of important vulnerabilities.
@@ -73,6 +84,7 @@ to develop and test fixes.
 - added FreeBSD and Solaris CI builds
 
 ------------------------------------------------------------------------------
+
 # NEWS for rsync 3.3.0 (6 Apr 2024)
 
 ## Changes in this version:
@@ -4837,8 +4849,9 @@ to develop and test fixes.
 
 | RELEASE DATE | VER.   | DATE OF COMMIT\* | PROTOCOL    |
 |--------------|--------|------------------|-------------|
+| ?? ??? 2025  | 3.4.2  |                  | 32          |
 | 16 Jan 2025  | 3.4.1  |                  | 32          |
-| 15 Jan 2025  | 3.4.0  |                  | 32          |
+| 15 Jan 2025  | 3.4.0  | 15 Jan 2025      | 32          |
 | 06 Apr 2024  | 3.3.0  |                  | 31          |
 | 20 Oct 2022  | 3.2.7  |                  | 31          |
 | 09 Sep 2022  | 3.2.6  |                  | 31          |
