@@ -7,9 +7,6 @@
 import sys, os, re, argparse, subprocess
 from datetime import datetime
 
-MAINTAINER_NAME = 'Wayne Davison'
-MAINTAINER_SUF = ' ' + MAINTAINER_NAME + "\n"
-
 def main():
     latest_year = '2000'
 
@@ -22,10 +19,6 @@ def main():
         m = argparse.Namespace(**m.groupdict())
         if m.year > latest_year:
             latest_year = m.year
-        if m.fn.startswith('zlib/') or m.fn.startswith('popt/'):
-            continue
-        if re.search(r'\.(c|h|sh|test)$', m.fn):
-            maybe_edit_copyright_year(m.fn, m.year)
     proc.communicate()
 
     fn = 'latest-year.h'
@@ -39,55 +32,8 @@ def main():
             fh.write(txt)
 
 
-def maybe_edit_copyright_year(fn, year):
-    opening_lines = [ ]
-    copyright_line = None
-
-    with open(fn, 'r', encoding='utf-8') as fh:
-        for lineno, line in enumerate(fh):
-            opening_lines.append(line)
-            if lineno > 3 and not re.search(r'\S', line):
-                break
-            m = re.match(r'^(?P<pre>.*Copyright\s+\S+\s+)(?P<year>\d\d\d\d(?:-\d\d\d\d)?(,\s+\d\d\d\d)*)(?P<suf>.+)', line)
-            if not m:
-                continue
-            copyright_line = argparse.Namespace(**m.groupdict())
-            copyright_line.lineno = len(opening_lines)
-            copyright_line.is_maintainer_line = MAINTAINER_NAME in copyright_line.suf
-            copyright_line.txt = line
-            if copyright_line.is_maintainer_line:
-                break
-
-        if not copyright_line:
-            return
-
-        if copyright_line.is_maintainer_line:
-            cyears = copyright_line.year.split('-')
-            if year == cyears[0]:
-                cyears = [ year ]
-            else:
-                cyears = [ cyears[0], year ]
-            txt = copyright_line.pre + '-'.join(cyears) + MAINTAINER_SUF
-            if txt == copyright_line.txt:
-                return
-            opening_lines[copyright_line.lineno - 1] = txt
-        else:
-            if fn.startswith('lib/') or fn.startswith('testsuite/'):
-                return
-            txt = copyright_line.pre + year + MAINTAINER_SUF
-            opening_lines[copyright_line.lineno - 1] += txt
-
-        remaining_txt = fh.read()
-
-    print(f"Updating {fn} with year {year}")
-
-    with open(fn, 'w', encoding='utf-8') as fh:
-        fh.write(''.join(opening_lines))
-        fh.write(remaining_txt)
-
-
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Grab the year of last mod for our c & h files and make sure the Copyright comment is up-to-date.")
+    parser = argparse.ArgumentParser(description="Grab the year of the last mod for our c & h files and make sure the LATEST_YEAR value is accurate.")
     args = parser.parse_args()
     main()
 
