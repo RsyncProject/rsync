@@ -120,6 +120,7 @@ TZ_RE = re.compile(r'^#define\s+MAINTAINER_TZ_OFFSET\s+(-?\d+(\.\d+)?)', re.M)
 VAR_REF_RE = re.compile(r'\$\{(\w+)\}')
 VERSION_RE = re.compile(r' (\d[.\d]+)[, ]')
 BIN_CHARS_RE = re.compile(r'[\1-\7]+')
+LONG_OPT_DASH_RE = re.compile(r'(--\w[-\w]+)')
 SPACE_DOUBLE_DASH_RE = re.compile(r'\s--(\s)')
 NON_SPACE_SINGLE_DASH_RE = re.compile(r'(^|\W)-')
 WHITESPACE_RE = re.compile(r'\s')
@@ -540,6 +541,7 @@ class TransformHtml(HTMLParser):
         if st.in_pre:
             html = htmlify(txt)
         else:
+            txt = LONG_OPT_DASH_RE.sub(lambda x: x.group(1).replace('-', NBR_DASH[0]), txt)
             txt = SPACE_DOUBLE_DASH_RE.sub(NBR_SPACE[0] + r'--\1', txt).replace('--', NBR_DASH[0]*2)
             txt = NON_SPACE_SINGLE_DASH_RE.sub(r'\1' + NBR_DASH[0], txt)
             html = htmlify(txt)
