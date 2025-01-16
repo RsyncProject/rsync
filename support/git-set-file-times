@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import os, re, argparse, subprocess
-from datetime import datetime
+from datetime import datetime, UTC
 
 NULL_COMMIT_RE = re.compile(r'\0\0commit [a-f0-9]{40}$|\0$')
 
@@ -74,7 +74,7 @@ def print_line(fn, mtime, commit_time):
     if args.list > 1:
         ts = str(commit_time).rjust(10)
     else:
-        ts = datetime.utcfromtimestamp(commit_time).strftime("%Y-%m-%d %H:%M:%S")
+        ts = datetime.fromtimestamp(commit_time, UTC).strftime("%Y-%m-%d %H:%M:%S")
     chg = '.' if mtime == commit_time else '*'
     print(chg, ts, fn)
 
