@@ -38,11 +38,15 @@ def main():
     if not os.path.isfile('packaging/release-rsync'):
         die('You must run this script from the top of your rsync checkout.')
 
-    now = datetime.now()
+    now = datetime.now().astimezone() # Requires python 3.6 or later
     cl_today = now.strftime('* %a %b %d %Y')
     year = now.strftime('%Y')
     ztoday = now.strftime('%d %b %Y')
     today = ztoday.lstrip('0')
+
+    # The MAINTAINER_TZ_OFFSET is a float number of hours vs UTC. It can start with '-' but not '+'.
+    tz_now = now.strftime('%z')
+    tz_num = tz_now[0:1].replace('+', '') + str(float(tz_now[1:3]) + float(tz_now[3:]) / 60)
 
     curdir = os.getcwd()
 
@@ -213,6 +217,9 @@ About to:
             x_re = re.compile(r'^(#define RSYNC_VERSION).*', re.M)
             msg = f"Unable to update RSYNC_VERSION in {fn}"
             txt = replace_or_die(x_re, r'\1 "%s"' % version, txt, msg)
+            x_re = re.compile(r'^(#define MAINTAINER_TZ_OFFSET).*', re.M)
+            msg = f"Unable to update MAINTAINER_TZ_OFFSET in {fn}"
+            txt = replace_or_die(x_re, r'\1 ' + tz_num, txt, msg)
         elif '.spec' in fn:
             for var, val in specvars.items():
                 x_re = re.compile(r'^%s .*' % re.escape(var), re.M)
@@ -220,7 +227,7 @@ About to:
             x_re = re.compile(r'^\* \w\w\w \w\w\w \d\d \d\d\d\d (.*)', re.M)
             txt = replace_or_die(x_re, r'%s \1' % cl_today, txt, f"Unable to update ChangeLog header in {fn}")
         elif fn == 'rsync.h':
-            x_re = re.compile('(#define\s+SUBPROTOCOL_VERSION)\s+(\d+)')
+            x_re = re.compile(r'(#define\s+SUBPROTOCOL_VERSION)\s+(\d+)')
             repl = lambda m: m[1] + ' ' + ('0' if not pre or not proto_changed else '1' if m[2] == '0' else m[2])
             txt = replace_or_die(x_re, repl, txt, f"Unable to find SUBPROTOCOL_VERSION define in {fn}")
         elif fn == 'NEWS.md':
