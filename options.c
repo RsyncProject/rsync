@@ -119,6 +119,7 @@ int safe_symlinks = 0;
 int copy_unsafe_links = 0;
 int munge_symlinks = 0;
 int size_only = 0;
+int time_only = 0;
 int daemon_bwlimit = 0;
 int bwlimit = 0;
 int fuzzy_basis = 0;
@@ -689,6 +690,7 @@ static struct poptOption long_options[] = {
   {"chmod",            0,  POPT_ARG_STRING, 0, OPT_CHMOD, 0, 0 },
   {"ignore-times",    'I', POPT_ARG_NONE,   &ignore_times, 0, 0, 0 },
   {"size-only",        0,  POPT_ARG_NONE,   &size_only, 0, 0, 0 },
+  {"time-only",        0,  POPT_ARG_NONE,   &time_only, 0, 0, 0 },
   {"one-file-system", 'x', POPT_ARG_NONE,   0, 'x', 0, 0 },
   {"no-one-file-system",0, POPT_ARG_VAL,    &one_file_system, 0, 0, 0 },
   {"no-x",             0,  POPT_ARG_VAL,    &one_file_system, 0, 0, 0 },
@@ -2835,6 +2837,16 @@ void server_options(char **args, int *argc_p)
 			args[ac++] = "--super";
 		if (size_only)
 			args[ac++] = "--size-only";
+		/* We don't send --time-only to server because: 
+		 * 1. sensible use of the --time-only option requires
+		 *    post-processing not done by rsync: compressing transferred 
+		 *    files and truncating the original while preserving the timestamp.
+		 * 2. older servers would croak.
+		 * It may be a good idea to throw an error with a better error
+		 * message...
+		 */
+		// if (time_only)
+		//   args[ac++] = "--time-only";
 		if (do_stats)
 			args[ac++] = "--stats";
 	} else {

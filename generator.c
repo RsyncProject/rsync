@@ -68,6 +68,7 @@ extern int make_backups;
 extern int csum_length;
 extern int ignore_times;
 extern int size_only;
+extern int time_only;
 extern OFF_T max_size;
 extern OFF_T min_size;
 extern int io_error;
@@ -618,7 +619,7 @@ int quick_check_ok(enum filetype ftype, const char *fn, struct file_struct *file
 {
 	switch (ftype) {
 	  case FT_REG:
-		if (st->st_size != F_LENGTH(file))
+		if (!time_only && st->st_size != F_LENGTH(file))
 			return 0;
 
 		/* If always_checksum is set then we use the checksum instead
