@@ -784,7 +784,7 @@ expand it.
     either a changed size or a changed last-modified time to just looking for
     files that have a changed last-modified time, ignoring size changes.  This
     is useful when remote files are uncompressed but a local copy should be
-    stored compressed, together with a zero-size stub to prevent retransfers.
+    stored compressed, together with a zero-size stub to prevent re-transfers.
     This option is only useful when pulling files, as it requires post-transfer
     compression and truncation of files whilst preserving the original
     modification time of the stub. Thus the option is not transmitted to the
