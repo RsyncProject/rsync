@@ -1389,7 +1389,7 @@ char *timestring(time_t t)
 	static int ndx = 0;
 	static char buffers[4][20]; /* We support 4 simultaneous timestring results. */
 	char *TimeBuf = buffers[ndx = (ndx + 1) % 4];
-	struct tm *tm = localtime(&t);
+	struct tm tmp, *tm = localtime_r(&t, &tmp);
 	int len = snprintf(TimeBuf, sizeof buffers[0], "%4d/%02d/%02d %02d:%02d:%02d",
 		 (int)tm->tm_year + 1900, (int)tm->tm_mon + 1, (int)tm->tm_mday,
 		 (int)tm->tm_hour, (int)tm->tm_min, (int)tm->tm_sec);
