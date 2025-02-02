@@ -1711,7 +1711,7 @@ static void unset_env_var(const char *var)
 int main(int argc,char *argv[])
 {
 	int ret;
-	printf("I was here!\n");
+	printf("Olin täällä 02.02.2025!\n");
 	raw_argc = argc;
 	raw_argv = argv;
 
