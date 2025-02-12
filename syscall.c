@@ -683,6 +683,11 @@ int do_open_nofollow(const char *pathname, int flags)
 #endif
 	}
 
+#ifdef O_NOATIME
+	if (open_noatime)
+		flags |= O_NOATIME;
+#endif
+
 #ifdef O_NOFOLLOW
 	fd = open(pathname, flags|O_NOFOLLOW);
 #else
