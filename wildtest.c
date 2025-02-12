@@ -32,7 +32,9 @@ int fnmatch_errors = 0;
 
 int wildmatch_errors = 0;
 
+#if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 202311L
 typedef char bool;
+#endif
 
 int output_iterations = 0;
 int explode_mod = 0;
