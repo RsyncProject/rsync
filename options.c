@@ -136,6 +136,8 @@ int checksum_seed = 0;
 int inplace = 0;
 int delay_updates = 0;
 int32 block_size = 0;
+int max_map_size = 256*1024;
+int write_size = 32*1024;
 time_t stop_at_utime = 0;
 char *skip_compress = NULL;
 char *copy_as = NULL;
@@ -740,6 +742,8 @@ static struct poptOption long_options[] = {
   {"checksum-choice",  0,  POPT_ARG_STRING, &checksum_choice, 0, 0, 0 },
   {"cc",               0,  POPT_ARG_STRING, &checksum_choice, 0, 0, 0 },
   {"block-size",      'B', POPT_ARG_STRING, 0, OPT_BLOCK_SIZE, 0, 0 },
+  {"max-map-size",     0,  POPT_ARG_INT,    &max_map_size, 0, 0, 0 },
+  {"write-size",       0,  POPT_ARG_INT,    &write_size, 0, 0, 0 },
   {"compare-dest",     0,  POPT_ARG_STRING, 0, OPT_COMPARE_DEST, 0, 0 },
   {"copy-dest",        0,  POPT_ARG_STRING, 0, OPT_COPY_DEST, 0, 0 },
   {"link-dest",        0,  POPT_ARG_STRING, 0, OPT_LINK_DEST, 0, 0 },
@@ -2772,7 +2776,19 @@ void server_options(char **args, int *argc_p)
 		args[ac++] = arg;
 	}
 
-	if (io_timeout) {
+    if (max_map_size) {
+        if (asprintf(&arg, "--max-map-size=%d", max_map_size) < 0)
+            goto oom;
+        args[ac++] = arg;
+    }
+
+    if (write_size) {
+        if (asprintf(&arg, "--write-size=%d", write_size) < 0)
+            goto oom;
+        args[ac++] = arg;
+    }
+
+    if (io_timeout) {
 		if (asprintf(&arg, "--timeout=%d", io_timeout) < 0)
 			goto oom;
 		args[ac++] = arg;
