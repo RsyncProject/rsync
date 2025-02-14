@@ -504,6 +504,7 @@ has its own detailed description later in this manpage.
 --contimeout=SECONDS     set daemon connection timeout in seconds
 --ignore-times, -I       don't skip files that match size and time
 --size-only              skip files that match in size
+--time-only              skip files that match in time (PULL ONLY)
 --modify-window=NUM, -@  set the accuracy for mod-time comparisons
 --temp-dir=DIR, -T       create temporary files in directory DIR
 --fuzzy, -y              find similar file for basis if no dest file
@@ -776,6 +777,19 @@ expand it.
     after using another mirroring system which may not preserve timestamps
     exactly.
 
+0.  `--time-only`
+
+    This modifies rsync's "quick check" algorithm for finding files that need
+    to be transferred, changing it from the default of transferring files with
+    either a changed size or a changed last-modified time to just looking for
+    files that have a changed last-modified time, ignoring size changes.  This
+    is useful when remote files are uncompressed but a local copy should be
+    stored compressed, together with a zero-size stub to prevent re-transfers.
+    This option is only useful when pulling files, as it requires post-transfer
+    compression and truncation of files whilst preserving the original
+    modification time of the stub. Thus the option is not transmitted to the
+    remote side, also preventing the server from croaking on an unknown option.
+
 0.  `--modify-window=NUM`, `-@`
 
     When comparing two timestamps, rsync treats the timestamps as being equal
@@ -1031,7 +1045,8 @@ expand it.
     This forces rsync to skip any files which exist on the destination and have
     a modified time that is newer than the source file. (If an existing
     destination file has a modification time equal to the source file's, it
-    will be updated if the sizes are different.)
+    will be updated if the sizes are different - unless the --time-only flag
+    is set.)
 
     Note that this does not affect the copying of dirs, symlinks, or other
     special files.  Also, a difference of file format between the sender and
