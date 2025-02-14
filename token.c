@@ -33,6 +33,7 @@ extern int do_compression;
 extern int protocol_version;
 extern int module_id;
 extern int do_compression_level;
+extern int do_compression_threads;
 extern char *skip_compress;
 
 #ifndef Z_INSERT_ONLY
@@ -692,6 +693,8 @@ static void send_zstd_token(int f, int32 token, struct map_struct *buf, OFF_T of
 		obuf = new_array(char, OBUF_SIZE);
 
 		ZSTD_CCtx_setParameter(zstd_cctx, ZSTD_c_compressionLevel, do_compression_level);
+		ZSTD_CCtx_setParameter(zstd_cctx, ZSTD_c_nbWorkers, do_compression_threads);
+
 		zstd_out_buff.dst = obuf + 2;
 
 		comp_init_done = 1;
@@ -729,12 +732,11 @@ static void send_zstd_token(int f, int32 token, struct map_struct *buf, OFF_T of
 		zstd_in_buff.src = map_ptr(buf, offset, nb);
 		zstd_in_buff.size = nb;
 		zstd_in_buff.pos = 0;
-
+		
+		int finished;
 		do {
-			if (zstd_out_buff.size == 0) {
-				zstd_out_buff.size = MAX_DATA_COUNT;
-				zstd_out_buff.pos = 0;
-			}
+			zstd_out_buff.size = MAX_DATA_COUNT;
+			zstd_out_buff.pos = 0;
 
 			/* File ended, flush */
 			if (token != -2)
@@ -752,20 +754,21 @@ static void send_zstd_token(int f, int32 token, struct map_struct *buf, OFF_T of
 			 * state and send a smaller buffer so that the remote side can
 			 * finish the file.
 			 */
-			if (zstd_out_buff.pos == zstd_out_buff.size || flush == ZSTD_e_flush) {
+			finished = (flush == ZSTD_e_flush) ? (r == 0) : (zstd_in_buff.pos == zstd_in_buff.size);
+
+			if (zstd_out_buff.pos != 0) {
 				n = zstd_out_buff.pos;
 
 				obuf[0] = DEFLATED_DATA + (n >> 8);
 				obuf[1] = n;
 				write_buf(f, obuf, n+2);
-
-				zstd_out_buff.size = 0;
 			}
 			/*
 			 * Loop while the input buffer isn't full consumed or the
 			 * internal state isn't fully flushed.
 			 */
-		} while (zstd_in_buff.pos < zstd_in_buff.size || r > 0);
+		} while (!finished);
+
 		flush_pending = token == -2;
 	}
 

@@ -46,6 +46,7 @@ long_opts = {
   'compare-dest': 2,
   'compress-choice': 1,
   'compress-level': 1,
+  'compress-threads': 1,
   'copy-dest': 2,
   'copy-devices': -1,
   'copy-unsafe-links': 0,
