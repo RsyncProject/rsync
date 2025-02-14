@@ -1369,6 +1369,10 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	/* TODO: Call poptReadDefaultConfig; handle errors. */
 
 	pc = poptGetContext(RSYNC_NAME, argc, argv, long_options, 0);
+	if (pc == NULL) {
+		strlcpy(err_buf, "poptGetContext returned NULL\n", sizeof err_buf);
+		return 0;
+	}
 	if (!am_server) {
 		poptReadDefaultConfig(pc, 0);
 		popt_unalias(pc, "--daemon");
