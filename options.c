@@ -176,7 +176,9 @@ char *basis_dir[MAX_BASIS_DIRS+1];
 char *config_file = NULL;
 char *shell_cmd = NULL;
 char *logfile_name = NULL;
+char *logafter_name = NULL;
 char *logfile_format = NULL;
+char *logafter_format = NULL;
 char *stdout_format = NULL;
 char *password_file = NULL;
 char *early_input_file = NULL;
@@ -205,6 +207,7 @@ static const char *empty_argv[1];
 int quiet = 0;
 int output_motd = 1;
 int log_before_transfer = 0;
+int log_after_transfer = 0;
 int stdout_format_has_i = 0;
 int stdout_format_has_o_or_i = 0;
 int logfile_format_has_i = 0;
@@ -769,6 +772,7 @@ static struct poptOption long_options[] = {
   {"no-m",             0,  POPT_ARG_VAL,    &prune_empty_dirs, 0, 0, 0 },
   {"log-file",         0,  POPT_ARG_STRING, &logfile_name, 0, 0, 0 },
   {"log-file-format",  0,  POPT_ARG_STRING, &logfile_format, 0, 0, 0 },
+  {"log-after",        0,  POPT_ARG_VAL,    &log_after_transfer, 1, 0, 0 },
   {"out-format",       0,  POPT_ARG_STRING, &stdout_format, 0, 0, 0 },
   {"log-format",       0,  POPT_ARG_STRING, &stdout_format, 0, 0, 0 }, /* DEPRECATED */
   {"itemize-changes", 'i', POPT_ARG_NONE,   0, 'i', 0, 0 },
@@ -2359,7 +2363,10 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 
 	if (logfile_name && !am_daemon) {
 		if (!logfile_format) {
-			logfile_format = "%i %n%L";
+			if (log_after_transfer)
+				logfile_format = "%o %i %n%L";
+			else
+				logfile_format = "%i %n%L";
 			logfile_format_has_i = logfile_format_has_o_or_i = 1;
 		} else {
 			if (log_format_has(logfile_format, 'i'))
@@ -2370,6 +2377,17 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		log_init(0);
 	} else if (!am_daemon)
 		logfile_format = NULL;
+
+	if (log_after_transfer) {
+		if (!logfile_name || *logfile_name != '/') {
+			snprintf(err_buf, sizeof err_buf,
+				 "--log-after requires --log-file=<absolute path>\n");
+			goto cleanup;
+		}
+		log_before_transfer = 0;
+		logafter_name = logfile_name;
+		logafter_format = logfile_format;
+	}
 
 	if (daemon_bwlimit && (!bwlimit || bwlimit > daemon_bwlimit))
 		bwlimit = daemon_bwlimit;
