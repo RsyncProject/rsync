@@ -48,6 +48,8 @@ int whole_file = -1;
 int append_mode = 0;
 int keep_dirlinks = 0;
 int copy_dirlinks = 0;
+int update_links = 0;
+int allow_link_update_dir = 0;
 int copy_links = 0;
 int copy_devices = 0;
 int write_devices = 0;
@@ -693,6 +695,8 @@ static struct poptOption long_options[] = {
   {"no-one-file-system",0, POPT_ARG_VAL,    &one_file_system, 0, 0, 0 },
   {"no-x",             0,  POPT_ARG_VAL,    &one_file_system, 0, 0, 0 },
   {"update",          'u', POPT_ARG_NONE,   &update_only, 0, 0, 0 },
+  {"update-links",     0,  POPT_ARG_NONE,   &update_links, 0, 0, 0 },
+  {"allow-link-update-dir",0,POPT_ARG_NONE, &allow_link_update_dir, 0, 0, 0 },
   {"existing",         0,  POPT_ARG_NONE,   &ignore_non_existing, 0, 0, 0 },
   {"ignore-non-existing",0,POPT_ARG_NONE,   &ignore_non_existing, 0, 0, 0 },
   {"ignore-existing",  0,  POPT_ARG_NONE,   &ignore_existing, 0, 0, 0 },
@@ -1380,6 +1384,8 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		 * only special cases are returned and listed here. */
 
 		switch (opt) {
+		case 'L':
+			break;
 		case 'V':
 			version_opt_cnt++;
 			break;
@@ -2321,6 +2327,9 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		parse_filter_str(&filter_list, backup_dir_buf, rule_template(0), 0);
 	}
 
+	if (update_links)
+		preserve_links = 1;
+
 	if (make_backups && !backup_dir)
 		omit_dir_times = -1; /* Implied, so avoid -O to sender. */
 
@@ -2615,7 +2624,7 @@ void server_options(char **args, int *argc_p)
 		argstr[x++] = 'u';
 	if (!do_xfers) /* Note: NOT "dry_run"! */
 		argstr[x++] = 'n';
-	if (preserve_links)
+	if (preserve_links || update_links)
 		argstr[x++] = 'l';
 	if ((xfer_dirs >= 2 && xfer_dirs < 4)
 	 || (xfer_dirs && !recurse && (list_only || (delete_mode && am_sender))))
@@ -2633,6 +2642,11 @@ void server_options(char **args, int *argc_p)
 			argstr[x++] = 'y';
 			if (fuzzy_basis > 1)
 				argstr[x++] = 'y';
+		}
+		if (update_links) {
+			args[ac++] = "--update-links";
+			if (allow_link_update_dir)
+			args[ac++] = "--allow-link-update-dir";
 		}
 	} else {
 		if (copy_links)
