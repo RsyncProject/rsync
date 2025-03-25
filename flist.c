@@ -3167,8 +3167,8 @@ static void output_flist(struct file_list *flist)
 		} else
 			*uidbuf = '\0';
 		if (gid_ndx) {
-			static char parens[] = "(\0)\0\0\0";
-			char *pp = parens + (file->flags & FLAG_SKIP_GROUP ? 0 : 3);
+			static const char parens[] = "(\0)\0\0\0";
+			const char *pp = parens + (file->flags & FLAG_SKIP_GROUP ? 0 : 3);
 			snprintf(gidbuf, sizeof gidbuf, " gid=%s%u%s",
 				 pp, F_GROUP(file), pp + 2);
 		} else

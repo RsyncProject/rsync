@@ -230,7 +230,7 @@ static void list_file(const char *fname)
 	       mtimebuf, atimebuf, crtimebuf, fname, linkbuf);
 }
 
-static struct poptOption long_options[] = {
+static const struct poptOption long_options[] = {
   /* longName, shortName, argInfo, argPtr, value, descrip, argDesc */
   {"atimes",          'U', POPT_ARG_NONE,   &display_atimes, 0, 0, 0},
 #ifdef SUPPORT_CRTIMES

@@ -117,7 +117,7 @@ static int active_filecnt = 0;
 static OFF_T active_bytecnt = 0;
 static int first_message = 1;
 
-static char int_byte_extra[64] = {
+static const char int_byte_extra[64] = {
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* (00 - 3F)/4 */
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* (40 - 7F)/4 */
 	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, /* (80 - BF)/4 */
@@ -1158,7 +1158,7 @@ void set_io_timeout(int secs)
 
 static void check_for_d_option_error(const char *msg)
 {
-	static char rsync263_opts[] = "BCDHIKLPRSTWabceghlnopqrtuvxz";
+	static const char rsync263_opts[] = "BCDHIKLPRSTWabceghlnopqrtuvxz";
 	char *colon;
 	int saw_d = 0;
 

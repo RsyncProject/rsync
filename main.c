@@ -386,7 +386,7 @@ static void handle_stats(int f)
 
 static void output_itemized_counts(const char *prefix, int *counts)
 {
-	static char *labels[] = { "reg", "dir", "link", "dev", "special" };
+	static char *const labels[] = { "reg", "dir", "link", "dev", "special" };
 	char buf[1024], *pre = " (";
 	int j, len = 0;
 	int total = counts[0];

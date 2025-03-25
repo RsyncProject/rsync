@@ -75,7 +75,7 @@ static int *flag_ptr[] = {
 	NULL
 };
 
-static char *flag_name[] = {
+static const char *const flag_name[] = {
 	"--recurse (-r)",
 	"--owner (-o)",
 	"--group (-g)",
