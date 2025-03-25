@@ -225,7 +225,7 @@ char *iconv_opt =
 
 struct chmod_mode_struct *chmod_modes = NULL;
 
-static const char *debug_verbosity[] = {
+static const char *const debug_verbosity[] = {
 	/*0*/ NULL,
 	/*1*/ NULL,
 	/*2*/ "BIND,CMD,CONNECT,DEL,DELTASUM,DUP,FILTER,FLIST,ICONV",
@@ -236,7 +236,7 @@ static const char *debug_verbosity[] = {
 
 #define MAX_VERBOSITY ((int)(sizeof debug_verbosity / sizeof debug_verbosity[0]) - 1)
 
-static const char *info_verbosity[1+MAX_VERBOSITY] = {
+static const char *const info_verbosity[1+MAX_VERBOSITY] = {
 	/*0*/ "NONREG",
 	/*1*/ "COPY,DEL,FLIST,MISC,NAME,STATS,SYMSAFE",
 	/*2*/ "BACKUP,MISC2,MOUNT,NAME2,REMOVE,SKIP",
@@ -474,7 +474,7 @@ static void parse_output_words(struct output_struct *words, short *levels, const
 static void output_item_help(struct output_struct *words)
 {
 	short *levels = words == info_words ? info_levels : debug_levels;
-	const char **verbosity = words == info_words ? info_verbosity : debug_verbosity;
+	const char *const*verbosity = words == info_words ? info_verbosity : debug_verbosity;
 	char buf[128], *opt, *fmt = "%-10s %s\n";
 	int j;
 
@@ -844,7 +844,7 @@ static struct poptOption long_options[] = {
   {0,0,0,0, 0, 0, 0}
 };
 
-static struct poptOption long_daemon_options[] = {
+static const struct poptOption long_daemon_options[] = {
   /* longName, shortName, argInfo, argPtr, value, descrip, argDesc */
   {"address",          0,  POPT_ARG_STRING, &bind_address, 0, 0, 0 },
   {"bwlimit",          0,  POPT_ARG_INT,    &daemon_bwlimit, 0, 0, 0 },

@@ -40,7 +40,7 @@ int empties_mod = 0;
 int empty_at_start = 0;
 int empty_at_end = 0;
 
-static struct poptOption long_options[] = {
+static const struct poptOption long_options[] = {
   /* longName, shortName, argInfo, argPtr, value, descrip, argDesc */
   {"iterations",     'i', POPT_ARG_NONE,   &output_iterations, 0, 0, 0},
   {"empties",        'e', POPT_ARG_STRING, 0, 'e', 0, 0},
