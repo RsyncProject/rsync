@@ -514,6 +514,7 @@ has its own detailed description later in this manpage.
 --compress-choice=STR    choose the compression algorithm (aka --zc)
 --compress-level=NUM     explicitly set compression level (aka --zl)
 --skip-compress=LIST     skip compressing files with suffix in LIST
+--skip-dir-with=FILE     skip directories containing specified FILE
 --cvs-exclude, -C        auto-ignore files in the same way CVS does
 --filter=RULE, -f        add a file-filtering RULE
 -F                       same as --filter='dir-merge /.rsync-filter'
@@ -2950,6 +2951,19 @@ expand it.
     situation: a copy from a daemon rsync will add your skipped suffixes to its
     list of non-compressing files (and its list may be configured to a
     different default).
+
+0.  `--skip-dir-with=FILE`
+
+    Skip directories that contain the specified FILE.
+
+    This option is useful for skipping transfer of directories that contain
+    a marker file indicating the directory should not be transferred. For
+    example, you could use it to skip directories containing temporary files or
+    cached data.
+
+    The FILE argument is required and specifies the name of the marker file to
+    look for. rsync will check each directory for the presence of a file with
+    this name, and if found, will skip the directory entirely.
 
 0.  `--numeric-ids`
 

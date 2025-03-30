@@ -139,6 +139,7 @@ int32 block_size = 0;
 time_t stop_at_utime = 0;
 char *skip_compress = NULL;
 char *copy_as = NULL;
+const char *skip_dir_with_file = NULL;
 item_list dparam_list = EMPTY_ITEM_LIST;
 
 /** Network address family. **/
@@ -584,7 +585,7 @@ enum {OPT_SERVER = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_NO_D, OPT_APPEND, OPT_NO_ICONV, OPT_INFO, OPT_DEBUG, OPT_BLOCK_SIZE,
       OPT_USERMAP, OPT_GROUPMAP, OPT_CHOWN, OPT_BWLIMIT, OPT_STDERR,
       OPT_OLD_COMPRESS, OPT_NEW_COMPRESS, OPT_NO_COMPRESS, OPT_OLD_ARGS,
-      OPT_STOP_AFTER, OPT_STOP_AT,
+      OPT_STOP_AFTER, OPT_STOP_AT, OPT_SKIP_DIR_WITH,
       OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
@@ -841,6 +842,8 @@ static struct poptOption long_options[] = {
   {"dparam",           0,  POPT_ARG_STRING, 0, OPT_DAEMON, 0, 0 },
   {"detach",           0,  POPT_ARG_NONE,   0, OPT_DAEMON, 0, 0 },
   {"no-detach",        0,  POPT_ARG_NONE,   0, OPT_DAEMON, 0, 0 },
+  {"skip-compress",    0,  POPT_ARG_STRING, &skip_compress, 0, 0, 0 },
+  {"skip-dir-with",    0,  POPT_ARG_STRING, &skip_dir_with_file, OPT_SKIP_DIR_WITH, 0, 0 },
   {0,0,0,0, 0, 0, 0}
 };
 
@@ -1892,6 +1895,16 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			}
 			break;
 #endif
+
+		case OPT_SKIP_DIR_WITH:
+			arg = poptGetOptArg(pc);
+			if (arg && *arg)
+				skip_dir_with_file = arg;
+			else {
+				snprintf(err_buf, sizeof err_buf, "skip-dir-with requires a FILE argument\n");
+				goto cleanup;
+			}
+			break;
 
 		case OPT_STDERR: {
 			int len;
