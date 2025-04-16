@@ -448,6 +448,7 @@ has its own detailed description later in this manpage.
 --perms, -p              preserve permissions
 --executability, -E      preserve executability
 --chmod=CHMOD            affect file and/or directory permissions
+--chmod-dest=CHMOD       override permissions with --fake-super
 --acls, -A               preserve ACLs (implies --perms)
 --xattrs, -X             preserve extended attributes
 --owner, -o              preserve owner (super-user only)
@@ -1517,6 +1518,20 @@ expand it.
 
     See the [`--perms`](#opt) and [`--executability`](#opt) options for how the
     resulting permission value can be applied to the files in the transfer.
+
+0.  `--chmod-dest=CHMOD`
+
+    This option tells rsync to apply one or more comma-separated "chmod" modes
+    to the permissions of the destination file on disk. The syntax is identical
+    to the [`--chmod`](#opt) option.
+
+    This option is used with the [`--fake-super`](#opt) option to apply the
+    original source permissions to the fake super attributes, while applying
+    different permissions to the destination file.
+
+    When the destination file is being used as a backup, this allows permissions
+    to be applied to the backup independent of the permissions of the source
+    file being backed up.
 
 0.  `--owner`, `-o`
 
