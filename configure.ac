@@ -1392,7 +1392,7 @@ else
 	AC_DEFINE(HAVE_LINUX_XATTRS, 1, [True if you have Linux xattrs (or equivalent)])
 	AC_DEFINE(SUPPORT_XATTRS, 1)
 	AC_DEFINE(NO_SYMLINK_USER_XATTRS, 1, [True if symlinks do not support user xattrs])
-	AC_CHECK_LIB(attr,getxattr)
+	AC_SEARCH_LIBS(getxattr,attr)
 	;;
     darwin*)
 	AC_MSG_RESULT(Using OS X xattrs)
