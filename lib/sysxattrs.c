@@ -126,8 +126,17 @@ ssize_t sys_llistxattr(const char *path, char *list, size_t size)
 	unsigned char keylen;
 	ssize_t off, len = extattr_list_link(path, EXTATTR_NAMESPACE_USER, list, size);
 
-	if (len <= 0 || (size_t)len > size)
+	if (len <= 0 || size == 0)
 		return len;
+
+	if ((size_t)len >= size) {
+		/* FreeBSD extattr_list_xx() returns 'size' as 'len' in case there are                                                              
+                   more data available, truncating the output, we solve this by signalling                                                          
+                   ERANGE in case len == size so that the code in xattrs.c will retry with                                                          
+                   a bigger buffer */
+		errno = ERANGE;
+		return -1;
+	}
 
 	/* FreeBSD puts a single-byte length before each string, with no '\0'
 	 * terminator.  We need to change this into a series of null-terminted
@@ -136,7 +145,7 @@ ssize_t sys_llistxattr(const char *path, char *list, size_t size)
 	for (off = 0; off < len; off += keylen + 1) {
 		keylen = ((unsigned char*)list)[off];
 		if (off + keylen >= len) {
-			/* Should be impossible, but kernel bugs happen! */
+			/* Should be impossible, but bugs happen! */
 			errno = EINVAL;
 			return -1;
 		}
