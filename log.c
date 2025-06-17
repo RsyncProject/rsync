@@ -229,7 +229,12 @@ static void filtered_fwrite(FILE *f, const char *in_buf, int in_len, int use_isp
 	while (in_buf < end) {
 		if (ob - outbuf >= (int)sizeof outbuf - 10) {
 			if (fwrite(outbuf, ob - outbuf, 1, f) != 1)
+			{
+				int fwrite_errno = errno;
+				FILE *fp = (f == stderr) ? stdout : stderr;
+				fprintf(fp, "filtered_fwrite(): fwrite() error: %s [%s]\n", strerror(fwrite_errno), who_am_i());
 				exit_cleanup(RERR_MESSAGEIO);
+			}
 			ob = outbuf;
 		}
 		if ((in_buf < end - 4 && *in_buf == '\\' && in_buf[1] == '#'
@@ -242,7 +247,12 @@ static void filtered_fwrite(FILE *f, const char *in_buf, int in_len, int use_isp
 	if (end_char) /* The "- 10" above means that there is always room for one more char here. */
 		*ob++ = end_char;
 	if (ob != outbuf && fwrite(outbuf, ob - outbuf, 1, f) != 1)
+	{
+		int fwrite_errno = errno;
+		FILE *fp = (f == stderr) ? stdout : stderr;
+		fprintf(fp, "filtered_fwrite(): fwrite() error: %s [%s]\n", strerror(fwrite_errno), who_am_i());
 		exit_cleanup(RERR_MESSAGEIO);
+	}
 }
 
 /* this is the underlying (unformatted) rsync debugging function. Call
