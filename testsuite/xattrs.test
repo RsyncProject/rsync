@@ -80,13 +80,14 @@ echo else >"$fromdir/file2"
 echo deep >"$fromdir/foo/file3"
 echo normal >"$fromdir/file4"
 echo deeper >"$fromdir/foo/bar/file5"
+echo longxattrname >"$fromdir/file7"
 
 makepath "$chkdir/foo"
 echo wow >"$chkdir/file1"
 cp_touch "$fromdir/foo/file3" "$chkdir/foo"
 
 dirs='foo foo/bar'
-files='file0 file1 file2 foo/file3 file4 foo/bar/file5'
+files='file0 file1 file2 foo/file3 file4 foo/bar/file5 file7'
 
 uid_gid=`"$TOOLDIR/tls" "$fromdir/foo" | sed 's/^.* \([0-9][0-9]*\)\.\([0-9][0-9]*\) .*/\1:\2/'`
 
@@ -124,6 +125,15 @@ xset user.extra 'remove me' "$chkdir/file1"
 
 xset user.foo 'old foo' "$chkdir/foo/file3"
 xset $RUSR.equal 'this long attribute should remain the same and not need to be transferred' "$chkdir/foo/file3"
+
+# Generate xattr names
+SEQ=`seq 1 200`
+xset user."`printf -- 'A%0.s' $SEQ`" 'first xattr' file7
+xset user."`printf -- 'B%0.s' $SEQ`" 'second xattr' file7
+xset user."`printf -- 'C%0.s' $SEQ`" 'third xattr' file7
+xset user."`printf -- 'D%0.s' $SEQ`" 'another xattr' file7
+xset user."`printf -- 'E%0.s' $SEQ`" 'final xattr' file7
+
 
 case $0 in
 *hlink*)
