@@ -259,5 +259,10 @@ checkit "$RSYNC -aiiX $XFILT . ../to" "$chkdir" "$todir"
 cd "$todir"
 xls file1 file2 | diff $diffopt "$scratchdir/xattrs.txt" -
 
+cd "$fromdir"
+rm -rf "$todir"
+mkfifo fifo1
+checktee "$RSYNC -avX --specials  $XFILT $dashH --super . '$chkdir/'" "$fromdir" "$chkdir"
+
 # The script would have aborted on error, so getting here means we've won.
 exit 0
