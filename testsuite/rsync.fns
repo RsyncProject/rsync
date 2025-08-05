@@ -195,15 +195,15 @@ hands_setup() {
     echo some data > "$fromdir/dir/subdir/foobar.baz"
     mkdir "$fromdir/dir/subdir/subsubdir"
     if [ -r /etc ]; then
-	ls -ltr /etc > "$fromdir/dir/subdir/subsubdir/etc-ltr-list"
+	ls -ltr /etc > "$fromdir/dir/subdir/subsubdir/etc-ltr-list" || [ $? -eq 1 ]
     else
-	ls -ltr / > "$fromdir/dir/subdir/subsubdir/etc-ltr-list"
+	ls -ltr / > "$fromdir/dir/subdir/subsubdir/etc-ltr-list" || [ $? -eq 1 ]
     fi
     mkdir "$fromdir/dir/subdir/subsubdir2"
     if [ -r /bin ]; then
-	ls -lt /bin > "$fromdir/dir/subdir/subsubdir2/bin-lt-list"
+	ls -lt /bin > "$fromdir/dir/subdir/subsubdir2/bin-lt-list" || [ $? -eq 1 ]
     else
-	ls -lt / > "$fromdir/dir/subdir/subsubdir2/bin-lt-list"
+	ls -lt / > "$fromdir/dir/subdir/subsubdir2/bin-lt-list" || [ $? -eq 1 ]
     fi
 
 #      echo testing head:
