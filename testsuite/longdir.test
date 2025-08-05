@@ -16,9 +16,9 @@ makepath "$longdir" || test_skipped "unable to create long directory"
 touch "$longdir/1" || test_skipped "unable to create files in long directory"
 date > "$longdir/1"
 if [ -r /etc ]; then
-    ls -la /etc >"$longdir/2"
+    ls -la /etc >"$longdir/2" || [ $? -eq 1 ]
 else
-    ls -la / >"$longdir/2"
+    ls -la / >"$longdir/2" || [ $? -eq 1 ]
 fi
 checkit "$RSYNC --delete -avH '$fromdir/' '$todir'" "$fromdir/" "$todir"
 
