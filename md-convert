@@ -248,6 +248,9 @@ def find_man_substitutions():
 
     env_subs['date'] = time.strftime('%d %b %Y', time.gmtime(mtime + tz_offset)).lstrip('0')
 
+    if 'SOURCE_DATE_EPOCH' in os.environ:
+        env_subs['date'] = time.strftime('%d %b %Y', time.gmtime(int(os.environ.get('SOURCE_DATE_EPOCH', time.time()))))
+
 
 def html_via_commonmark(txt):
     return commonmark.HtmlRenderer().render(commonmark.Parser().parse(txt))
