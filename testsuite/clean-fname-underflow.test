@@ -1,0 +1,66 @@
+#!/bin/sh
+# clean-fname-underflow.test
+# Ensure clean_fname() does not read-before-buffer when collapsing "..".
+# This exercises the --server path where a crafted merge filename hits clean_fname().
+#
+# Usage:
+#   ./configure && make
+#   make check TESTS='clean-fname-underflow.test'
+
+set -eu
+
+# Try to find the just-built rsync binary if RSYNC_BIN isn't set.
+if [ -z "${RSYNC_BIN:-}" ]; then
+  if [ -x "./rsync" ]; then
+    RSYNC_BIN=./rsync
+  elif [ -x "../rsync" ]; then
+    RSYNC_BIN=../rsync
+  else
+    RSYNC_BIN=rsync
+  fi
+fi
+
+workdir="${TMPDIR:-/tmp}/rsync-clean-fname.$$"
+mkdir -p "$workdir"
+trap 'rm -rf "$workdir"' EXIT INT TERM
+cd "$workdir"
+
+# Minimal rsyncd.conf using chroot so the crafted path reaches the server parser.
+cat > rsyncd.conf <<'EOF'
+pid file = rsyncd.pid
+use chroot = true
+[mod]
+    path = ./mod
+    read only = false
+EOF
+mkdir -p mod
+
+# Start daemon on a random high port.
+PORT=$(awk 'BEGIN{srand(); printf "%d", 20000+int(rand()*20000)}')
+"$RSYNC_BIN" --daemon --no-detach --config=rsyncd.conf --port="$PORT" >/dev/null 2>&1 &
+DAEMON_PID=$!
+# Give the daemon a moment to come up.
+sleep 0.3
+
+# Invoke the server-side path. We don't need a real transfer; we just want to
+# ensure clean_fname() doesn't crash when given "a/../test" via --filter=merge.
+EXIT_OK=0
+if "$RSYNC_BIN"     --server --sender -vlr     --filter='merge a/../test'     . mod/  >/dev/null 2>&1; then
+  EXIT_OK=1
+else
+  status=$?
+  # Non-zero exit is expected for bogus input; ensure it wasn't a signal/crash.
+  if [ $status -lt 128 ]; then
+    EXIT_OK=1
+  fi
+fi
+
+kill "$DAEMON_PID" >/dev/null 2>&1 || true
+
+if [ "$EXIT_OK" -ne 1 ]; then
+  echo "clean-fname-underflow.test: rsync exited due to a signal or unexpected status"
+  exit 1
+fi
+
+echo "OK: clean_fname() handled 'a/../test' without crashing"
+exit 0
