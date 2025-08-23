@@ -942,7 +942,7 @@ int count_dir_elements(const char *p)
  * resulting name would be empty, returns ".". */
 int clean_fname(char *name, int flags)
 {
-	char *limit = name - 1, *t = name, *f = name;
+	char *limit = name, *t = name, *f = name;
 	int anchored;
 
 	if (!name)
@@ -987,9 +987,13 @@ int clean_fname(char *name, int flags)
 					f += 2;
 					continue;
 				}
-				while (s > limit && *--s != '/') {}
-				if (s != t - 1 && (s < name || *s == '/')) {
-					t = s + 1;
+				/* backing up for ".." — avoid reading before 'name' */
+				while (s > limit && s[-1] != '/')
+					s--;
+
+				/* If found prior '/', or we reached the start, adjust t. */
+				if (s != t - 1 && (s <= name || *s == '/')) {
+					t = (s == name) ? name : s + 1;
 					f += 2;
 					continue;
 				}
