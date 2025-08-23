@@ -262,6 +262,8 @@ void send_files(int f_in, int f_out)
 
 		if (ndx - cur_flist->ndx_start >= 0)
 			file = cur_flist->files[ndx - cur_flist->ndx_start];
+		else if (cur_flist->parent_ndx < 0)
+			exit_cleanup(RERR_PROTOCOL);
 		else
 			file = dir_flist->files[cur_flist->parent_ndx];
 		if (F_PATHNAME(file)) {
