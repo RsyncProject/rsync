@@ -313,7 +313,7 @@ void print_rsync_version(enum logcode f)
 	rprintf(f,"\n");
 	rprintf(f,"rsync comes with ABSOLUTELY NO WARRANTY.  This is free software, and you\n");
 	rprintf(f,"are welcome to redistribute it under certain conditions.  See the GNU\n");
-	rprintf(f,"General Public Licence for details.\n");
+	rprintf(f,"General Public License for details.\n");
 }
 
 void usage(enum logcode F)
