@@ -24,5 +24,29 @@ StandardError=journal
 
 ProtectSystem=full
 #ProtectHome=on|off|read-only
+
+# These are general hardening parameters that should not affect file access
 PrivateDevices=on
 NoNewPrivileges=on
+MemoryDenyWriteExecute=on
+LockPersonality=on
+PrivateTmp=on
+ProtectClock=on
+ProtectControlGroups=on
+ProtectHostname=on
+ProtectKernelLogs=on
+ProtectKernelModules=on
+ProtectKernelTunables=on
+ProtectProc=invisible
+ProcSubset=pid
+RestrictNamespaces=on
+RestrictRealtime=on
+SystemCallArchitectures=native
+SystemCallErrorNumber=EPERM
+SystemCallFilter=@system-service
+
+# These settings work only for inetd-style activation
+RestrictAddressFamilies=AF_UNIX
+PrivateNetwork=on
+IPAddressDeny=any
+
