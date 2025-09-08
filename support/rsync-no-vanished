@@ -2,7 +2,7 @@
 
 REAL_RSYNC=/usr/bin/rsync
 IGNOREEXIT=24
-IGNOREOUT='^(file has vanished: |rsync warning: some files vanished before they could be transferred)'
+IGNOREOUT='^((file|directory) has vanished: |rsync warning: some files vanished before they could be transferred)'
 
 # If someone installs this as "rsync", make sure we don't affect a server run.
 for arg in "${@}"; do

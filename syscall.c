@@ -480,7 +480,7 @@ int do_SetFileTime(const char *path, time_t crtime)
 	free(pathw);
 	if (handle == INVALID_HANDLE_VALUE)
 	    return -1;
-	int64 temp_time = Int32x32To64(crtime, 10000000) + 116444736000000000LL;
+	int64 temp_time = (crtime * 10000000LL) + 116444736000000000LL;
 	FILETIME birth_time;
 	birth_time.dwLowDateTime = (DWORD)temp_time;
 	birth_time.dwHighDateTime = (DWORD)(temp_time >> 32);
@@ -682,6 +682,11 @@ int do_open_nofollow(const char *pathname, int flags)
 		return -1;
 #endif
 	}
+
+#ifdef O_NOATIME
+	if (open_noatime)
+		flags |= O_NOATIME;
+#endif
 
 #ifdef O_NOFOLLOW
 	fd = open(pathname, flags|O_NOFOLLOW);

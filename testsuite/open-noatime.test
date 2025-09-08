@@ -1,0 +1,26 @@
+#!/bin/sh
+
+# Test rsync --open-noatime option keeps source atimes intact
+
+. "$suitedir/rsync.fns"
+
+$RSYNC -VV | grep '"atimes": true' >/dev/null || test_skipped "Rsync is configured without atimes support"
+
+mkdir "$fromdir"
+
+# --open-noatime did not work properly on files with size > 0
+echo content > "$fromdir/foo"
+touch -a -t 200102031717.42 "$fromdir/foo"
+
+TLS_ARGS=--atimes
+
+"$TOOLDIR/tls" $TLS_ARGS "$fromdir/foo" > "$tmpdir/atime-from-before"
+
+# Do not use checkit because it uses "diff" which breaks atimes
+$RSYNC --open-noatime --archive --recursive --times --atimes -vvv "$fromdir/" "$todir/"
+
+"$TOOLDIR/tls" $TLS_ARGS "$fromdir/foo" > "$tmpdir/atime-from-after"
+diff "$tmpdir/atime-from-before" "$tmpdir/atime-from-after"
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0

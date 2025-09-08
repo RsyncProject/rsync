@@ -65,7 +65,7 @@ typedef enum {
 
 struct enum_list {
 	int value;
-	char *name;
+	const char *name;
 };
 
 struct parm_struct {
@@ -73,7 +73,7 @@ struct parm_struct {
 	parm_type type;
 	parm_class class;
 	void *ptr;
-	struct enum_list *enum_list;
+	const struct enum_list *enum_list;
 	unsigned flags;
 };
 
@@ -95,7 +95,7 @@ static item_list section_list = EMPTY_ITEM_LIST;
 static int iSectionIndex = -1;
 static BOOL bInGlobalSection = True;
 
-static struct enum_list enum_syslog_facility[] = {
+static const struct enum_list enum_syslog_facility[] = {
 #ifdef LOG_AUTH
 	{ LOG_AUTH, "auth" },
 #endif
