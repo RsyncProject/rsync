@@ -1743,7 +1743,9 @@ int main(int argc,char *argv[])
 	our_gid = MY_GID();
 	am_root = our_uid == ROOT_UID;
 
-	unset_env_var("DISPLAY");
+	// DISPLAY should not be emptied unconditionally
+	if (!getenv("SSH_ASKPASS"))
+		unset_env_var("DISPLAY");
 
 #if defined USE_OPENSSL && defined SET_OPENSSL_CONF
 #define TO_STR2(x) #x
