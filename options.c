@@ -114,6 +114,7 @@ int mkpath_dest_arg = 0;
 int allow_inc_recurse = 1;
 int xfer_dirs = -1;
 int am_daemon = 0;
+int enable_remote_to_remote = 0;
 int connect_timeout = 0;
 int keep_partial = 0;
 int safe_symlinks = 0;
@@ -585,7 +586,7 @@ enum {OPT_SERVER = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_NO_D, OPT_APPEND, OPT_NO_ICONV, OPT_INFO, OPT_DEBUG, OPT_BLOCK_SIZE,
       OPT_USERMAP, OPT_GROUPMAP, OPT_CHOWN, OPT_BWLIMIT, OPT_STDERR,
       OPT_OLD_COMPRESS, OPT_NEW_COMPRESS, OPT_NO_COMPRESS, OPT_OLD_ARGS,
-      OPT_STOP_AFTER, OPT_STOP_AT,
+      OPT_STOP_AFTER, OPT_STOP_AT, OPT_REMOTE_TO_REMOTE,
       OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
@@ -807,6 +808,7 @@ static struct poptOption long_options[] = {
   {"no-timeout",       0,  POPT_ARG_VAL,    &io_timeout, 0, 0, 0 },
   {"contimeout",       0,  POPT_ARG_INT,    &connect_timeout, 0, 0, 0 },
   {"no-contimeout",    0,  POPT_ARG_VAL,    &connect_timeout, 0, 0, 0 },
+  {"remote-to-remote", 0,  POPT_ARG_NONE,   0, OPT_REMOTE_TO_REMOTE, 0, 0 },
   {"fsync",            0,  POPT_ARG_NONE,   &do_fsync, 0, 0, 0 },
   {"stop-after",       0,  POPT_ARG_STRING, 0, OPT_STOP_AFTER, 0, 0 },
   {"time-limit",       0,  POPT_ARG_STRING, 0, OPT_STOP_AFTER, 0, 0 }, /* earlier stop-after name */
@@ -1918,6 +1920,10 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			saw_stderr_opt = 1;
 			break;
 		}
+
+		case OPT_REMOTE_TO_REMOTE:
+			enable_remote_to_remote = 1;
+			break;
 
 		default:
 			/* A large opt value means that set_refuse_options()

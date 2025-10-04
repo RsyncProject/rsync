@@ -39,6 +39,7 @@ extern int am_root;
 extern int am_server;
 extern int am_sender;
 extern int am_daemon;
+extern int enable_remote_to_remote;
 extern int inc_recurse;
 extern int blocking_io;
 extern int always_checksum;
@@ -107,6 +108,8 @@ extern char backup_dir_buf[MAXPATHLEN];
 extern char *basis_dir[MAX_BASIS_DIRS+1];
 extern struct file_list *first_flist;
 extern filter_rule_list daemon_filter_list, implied_filter_list;
+extern int raw_argc;
+extern char **raw_argv;
 
 uid_t our_uid;
 gid_t our_gid;
@@ -142,6 +145,7 @@ static time_t starttime, endtime;
 static int64 total_read, total_written;
 
 static void show_malloc_stats(void);
+static int start_remote_to_remote_transfer(int argc, char *argv[], char *source_host, char *dest_host, int dest_port);
 
 /* Works like waitpid(), but if we already harvested the child pid in our
  * remember_children(), we succeed instead of returning an error. */
@@ -464,6 +468,118 @@ static void output_summary(void)
 	fflush(stderr);
 }
 
+
+/* Handle remote-to-remote transfers by SSH-ing to the source host
+ * and running rsync from there to the destination */
+static int start_remote_to_remote_transfer(int argc, char *argv[], char *source_host, char *dest_host, int dest_port)
+{
+	char *rsync_cmd;
+	char *dest_spec;
+	char *source_path;
+	char *new_cmd;
+	int i;
+	int exit_code;
+	(void)argc; /* Suppress unused parameter warning */
+	(void)argv; /* Suppress unused parameter warning */
+	(void)dest_port; /* Suppress unused parameter warning */
+
+	/* Use raw arguments to get the full original command line */
+
+	/* Find the source and destination in raw_argv */
+	char *source_arg = NULL, *dest_arg = NULL;
+	for (int j = 1; j < raw_argc; j++) {
+		if (strchr(raw_argv[j], ':')) {
+			if (!source_arg) {
+				source_arg = raw_argv[j];
+			} else {
+				dest_arg = raw_argv[j];
+				break;
+			}
+		}
+	}
+
+	if (!source_arg || !dest_arg) {
+		rprintf(FERROR, "Could not find source and destination arguments\n");
+		return RERR_SYNTAX;
+	}
+
+	/* Extract the path component from the source */
+	source_path = strchr(source_arg, ':');
+	if (source_path)
+		source_path++;
+	else
+		source_path = ".";
+
+	/* Build the destination spec */
+	char *dest_path = strchr(dest_arg, ':');
+	if (!dest_path) {
+		rprintf(FERROR, "Invalid destination format (missing colon)\n");
+		return RERR_SYNTAX;
+	}
+	dest_path++; /* Skip the colon */
+	if (asprintf(&dest_spec, "%s:%s", dest_host, dest_path) < 0) {
+		rprintf(FERROR, "Failed to build destination specification\n");
+		return RERR_MALLOC;
+	}
+
+	/* Use asprintf to build the command safely */
+	rsync_cmd = strdup("rsync");
+	if (!rsync_cmd) {
+		free(dest_spec);
+		return RERR_MALLOC;
+	}
+
+	/* Add all the original options from raw_argv (skip program name and file arguments) */
+	for (i = 1; i < raw_argc; i++) {
+		/* Skip file arguments (those with colons) and our special option */
+		if (strchr(raw_argv[i], ':') || strstr(raw_argv[i], "--remote-to-remote") != NULL)
+			continue;
+		if (asprintf(&new_cmd, "%s '%s'", rsync_cmd, raw_argv[i]) < 0) {
+			free(rsync_cmd);
+			free(dest_spec);
+			return RERR_MALLOC;
+		}
+		free(rsync_cmd);
+		rsync_cmd = new_cmd;
+	}
+
+	/* Add the source path (local on the source host) */
+	if (asprintf(&new_cmd, "%s '%s'", rsync_cmd, source_path) < 0) {
+		free(rsync_cmd);
+		free(dest_spec);
+		return RERR_MALLOC;
+	}
+	free(rsync_cmd);
+	rsync_cmd = new_cmd;
+
+	/* Add the destination spec */
+	if (asprintf(&new_cmd, "%s '%s'", rsync_cmd, dest_spec) < 0) {
+		free(rsync_cmd);
+		free(dest_spec);
+		return RERR_MALLOC;
+	}
+	free(rsync_cmd);
+	rsync_cmd = new_cmd;
+
+	if (DEBUG_GTE(CMD, 1))
+		rprintf(FINFO, "Remote-to-remote command: ssh %s %s\n", source_host, rsync_cmd);
+
+	/* Execute the command via SSH to the source host */
+	char *ssh_cmd;
+	if (asprintf(&ssh_cmd, "ssh %s %s", source_host, rsync_cmd) < 0) {
+		free(rsync_cmd);
+		free(dest_spec);
+		return RERR_MALLOC;
+	}
+
+	exit_code = shell_exec(ssh_cmd);
+
+	free(ssh_cmd);
+	free(rsync_cmd);
+	free(dest_spec);
+
+	return exit_code;
+}
 
 /**
  * If our C library can get malloc statistics, then show them to FINFO
@@ -1410,9 +1526,17 @@ static int start_client(int argc, char *argv[])
 			if (argc == 1 || **argv == ':')
 				argc = 0; /* no dest arg */
 			else if (check_for_hostspec(*argv, &dummy_host, &dummy_port)) {
-				rprintf(FERROR,
-					"The source and destination cannot both be remote.\n");
-				exit_cleanup(RERR_SYNTAX);
+				if (enable_remote_to_remote) {
+					/* Remote-to-remote transfer enabled: we'll handle this by
+					 * connecting to the source host and running rsync from there */
+					return start_remote_to_remote_transfer(remote_argc, remote_argv, shell_machine, dummy_host, dummy_port);
+				} else {
+					rprintf(FERROR,
+						"The source and destination cannot both be remote.\n");
+					rprintf(FERROR,
+						"Use --remote-to-remote to enable remote-to-remote transfers.\n");
+					exit_cleanup(RERR_SYNTAX);
+				}
 			} else {
 				remote_argc--; /* don't count dest */
 				argc = 1;
