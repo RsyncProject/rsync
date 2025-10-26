@@ -112,6 +112,7 @@ int human_readable = 1;
 int recurse = 0;
 int mkpath_dest_arg = 0;
 int allow_inc_recurse = 1;
+int no_i_r_skip_unchanged = 0;
 int xfer_dirs = -1;
 int am_daemon = 0;
 int connect_timeout = 0;
@@ -585,7 +586,7 @@ enum {OPT_SERVER = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_NO_D, OPT_APPEND, OPT_NO_ICONV, OPT_INFO, OPT_DEBUG, OPT_BLOCK_SIZE,
       OPT_USERMAP, OPT_GROUPMAP, OPT_CHOWN, OPT_BWLIMIT, OPT_STDERR,
       OPT_OLD_COMPRESS, OPT_NEW_COMPRESS, OPT_NO_COMPRESS, OPT_OLD_ARGS,
-      OPT_STOP_AFTER, OPT_STOP_AT,
+      OPT_STOP_AFTER, OPT_STOP_AT, OPT_NO_I_R_SKIP_UNCHANGED,
       OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
@@ -616,6 +617,9 @@ static struct poptOption long_options[] = {
   {"no-inc-recursive", 0,  POPT_ARG_VAL,    &allow_inc_recurse, 0, 0, 0 },
   {"i-r",              0,  POPT_ARG_VAL,    &allow_inc_recurse, 1, 0, 0 },
   {"no-i-r",           0,  POPT_ARG_VAL,    &allow_inc_recurse, 0, 0, 0 },
+  {"no-inc-recursive-skip-unchanged", 0, POPT_ARG_NONE, 0, OPT_NO_I_R_SKIP_UNCHANGED, 0, 0 },
+  {"no-i-r-skip-unchanged", 0, POPT_ARG_NONE, 0, OPT_NO_I_R_SKIP_UNCHANGED, 0, 0 },
+  {"no-i-r-s-u",       0,  POPT_ARG_NONE,   0, OPT_NO_I_R_SKIP_UNCHANGED, 0, 0 },
   {"dirs",            'd', POPT_ARG_VAL,    &xfer_dirs, 2, 0, 0 },
   {"no-dirs",          0,  POPT_ARG_VAL,    &xfer_dirs, 0, 0, 0 },
   {"no-d",             0,  POPT_ARG_VAL,    &xfer_dirs, 0, 0, 0 },
@@ -1899,6 +1903,11 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			}
 			break;
 #endif
+
+		case OPT_NO_I_R_SKIP_UNCHANGED:
+			no_i_r_skip_unchanged = 1;
+			allow_inc_recurse = 0;
+			break;
 
 		case OPT_STDERR: {
 			int len;

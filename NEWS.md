@@ -2,6 +2,16 @@
 
 ## Changes in this version:
 
+### ENHANCEMENTS:
+
+- Added `--no-i-r-skip-unchanged` option to provide accurate progress reporting
+  for resumed transfers. This option pre-scans the destination to identify
+  unchanged files, skips them from processing, and adjusts `stats.total_size`
+  accordingly. This fixes the issue where interrupted transfers show incorrect
+  progress percentages (e.g., 1% to 80% instead of 0% to 100%) when resumed.
+  The option works for all transfer types (local, local→remote, remote→local,
+  daemon) and implies `--no-i-r`.
+
 ### BUG FIXES:
 
 - ...

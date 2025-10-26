@@ -269,6 +269,7 @@ enum msgcode {
 	MSG_LOG=FLOG, MSG_CLIENT=FCLIENT, /* sibling logging */
 	MSG_REDO=9,	/* reprocess indicated flist index */
 	MSG_STATS=10,	/* message has stats data for generator */
+	MSG_FLIST_COUNT=11, /* generator sends updated file count to sender */
 	MSG_IO_ERROR=22,/* the sending side had an I/O error */
 	MSG_IO_TIMEOUT=33,/* tell client about a daemon's timeout value */
 	MSG_NOOP=42,	/* a do-nothing message (legacy protocol-30 only) */
@@ -1044,6 +1045,7 @@ struct stats {
 	int created_files, created_dirs, created_symlinks, created_devices, created_specials;
 	int deleted_files, deleted_dirs, deleted_symlinks, deleted_devices, deleted_specials;
 	int xferred_files;
+	int num_skipped_files; /* files marked as unchanged by --no-i-r-skip-unchanged */
 };
 
 struct chmod_mode_struct;

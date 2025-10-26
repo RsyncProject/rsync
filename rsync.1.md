@@ -909,6 +909,43 @@ expand it.
     before it begins to transfer files.  See [`--inc-recursive`](#opt) for more
     info.
 
+0. `--no-inc-recursive-skip-unchanged`, `--no-i-r-skip-unchanged`, `--no-i-r-s-u`
+
+    This option combines [`--no-i-r`](#opt) with pre-scanning to skip unchanged
+    files, providing accurate progress reporting for resumed transfers.  When
+    using [`--info=progress2`](#opt), interrupted transfers that are resumed
+    normally show incorrect progress percentages because `stats.total_size`
+    includes already-transferred files.  This option pre-scans the destination
+    during generator initialization, marks unchanged files for skipping, and
+    adjusts `stats.total_size` accordingly, resulting in accurate 0% to 100%
+    progress reporting.
+
+    The pre-scan uses the same comparison logic as normal rsync operations
+    (checking size, mtime, checksums if [`--checksum`](#opt) is used, etc.).
+    Files determined to be unchanged are completely skipped from processing,
+    reducing both CPU and I/O overhead while fixing progress reporting.
+
+    This option works for all transfer types: local-to-local, local-to-remote,
+    remote-to-local, and daemon transfers.  Because the generator runs on the
+    receiver side and has access to destination files in all scenarios, the
+    feature functions correctly regardless of transfer direction.
+
+    This option implies [`--no-i-r`](#opt), so it requires the full file list
+    to be available before processing begins.  The performance overhead is
+    minimal since the pre-scan performs the same stat operations that would
+    occur anyway during normal generator operation, just earlier in the pipeline.
+
+    Example use cases:
+
+    - Resuming interrupted transfers with accurate progress:
+      `rsync -av --no-i-r-s-u --info=progress2 src/ host:dest/`
+
+    - Large synchronization with mostly unchanged files:
+      `rsync -av --no-inc-recursive-skip-unchanged /data/ /backup/`
+
+    - Remote-to-local transfer with progress tracking:
+      `rsync -av --no-i-r-skip-unchanged --info=progress2 host:src/ dest/`
+
 0.  `--relative`, `-R`
 
     Use relative paths.  This means that the full path names specified on the
