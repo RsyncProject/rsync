@@ -60,6 +60,7 @@ extern int daemon_connection;
 extern int protocol_version;
 extern int remove_source_files;
 extern int preserve_hard_links;
+extern int skip_unchanged_negotiated;
 extern BOOL extra_flist_sending_enabled;
 extern BOOL flush_ok_after_signal;
 extern struct stats stats;
@@ -1512,7 +1513,7 @@ static void read_a_msg(void)
 		iobuf.in_multiplexed = 1;
 		break;
 	case MSG_FLIST_COUNT:
-		if (msg_bytes != 12 || !am_sender)
+		if (msg_bytes != 12 || !am_sender || !skip_unchanged_negotiated)
 			goto invalid_msg;
 		val = raw_read_int();
 		stats.num_skipped_files = val;

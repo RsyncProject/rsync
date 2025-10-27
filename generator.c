@@ -34,6 +34,7 @@ extern int am_sender;
 extern int am_daemon;
 extern int inc_recurse;
 extern int no_i_r_skip_unchanged;
+extern int skip_unchanged_negotiated;
 extern int relative_paths;
 extern struct stats stats;
 extern int implied_dirs;
@@ -2241,7 +2242,8 @@ static void prescan_for_unchanged(const char *local_name, int f_out)
 	char fbuf[MAXPATHLEN];
 	STRUCT_STAT st;
 	
-	if (!no_i_r_skip_unchanged || !cur_flist)
+	/* Only prescan if feature was negotiated with remote side */
+	if (!no_i_r_skip_unchanged || !skip_unchanged_negotiated || !cur_flist)
 		return;
 	
 	if (DEBUG_GTE(GENR, 1))
@@ -2299,7 +2301,7 @@ static void prescan_for_unchanged(const char *local_name, int f_out)
 			skipped_count, active_count, (double)stats.total_size / 1024 / 1024 / 1024);
 	
 	/* Send skipped count and adjusted total_size to sender for accurate progress display */
-	if (f_out >= 0) {
+	if (f_out >= 0 && skip_unchanged_negotiated) {
 		char buf[12];
 		SIVAL(buf, 0, skipped_count);
 		SIVAL64(buf, 4, stats.total_size);
@@ -2364,6 +2366,10 @@ void generate_files(int f_out, const char *local_name)
 	dflt_perms = (ACCESSPERMS & ~orig_umask);
 
 	/* Pre-scan to mark unchanged files for accurate progress reporting */
+	if (no_i_r_skip_unchanged && !skip_unchanged_negotiated) {
+		rprintf(FWARNING, "WARNING: --no-i-r-skip-unchanged requested but not supported by remote rsync.\n");
+		rprintf(FWARNING, "         Falling back to standard --no-i-r behavior (no progress optimization).\n");
+	}
 	prescan_for_unchanged(local_name, f_out);
 
 	do {
