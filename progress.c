@@ -78,7 +78,7 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now, int is_l
 		int len = snprintf(eol, sizeof eol,
 			" (xfr#%d, %s-chk=%d/%d)\n",
 			stats.xferred_files, flist_eof ? "to" : "ir",
-			stats.num_files - (current_file_index - stats.num_skipped_files) - 1,
+			stats.num_files - stats.current_active_index,
 			stats.num_files);
 		if (INFO_GTE(PROGRESS, 2)) {
 			static int last_len = 0;
@@ -153,6 +153,10 @@ void set_current_file_index(struct file_struct *file, int ndx)
 	else
 		current_file_index = ndx;
 	current_file_index -= cur_flist->flist_num;
+	
+	/* Track active file index for accurate progress with --no-i-r-skip-unchanged */
+	if (file && F_IS_ACTIVE(file))
+		stats.current_active_index++;
 }
 
 void instant_progress(const char *fname)

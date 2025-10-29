@@ -82,7 +82,6 @@ int proper_seed_order = 0;
 int inplace_partial = 0;
 int do_negotiated_strings = 0;
 int xmit_id0_names = 0;
-int skip_unchanged_negotiated = 0;
 
 struct name_num_item *xattr_sum_nni;
 int xattr_sum_len = 0;
@@ -125,7 +124,6 @@ struct name_num_obj valid_compressions = {
 #define CF_INPLACE_PARTIAL_DIR (1<<6)
 #define CF_VARINT_FLIST_FLAGS (1<<7)
 #define CF_ID0_NAMES (1<<8)
-#define CF_SKIP_UNCHANGED (1<<9)
 
 static const char *client_info;
 
@@ -729,8 +727,6 @@ void setup_protocol(int f_out,int f_in)
 				compat_flags |= CF_INPLACE_PARTIAL_DIR;
 			if (strchr(client_info, 'u') != NULL)
 				compat_flags |= CF_ID0_NAMES;
-			if (strchr(client_info, 'U') != NULL)
-				compat_flags |= CF_SKIP_UNCHANGED;
 			if (strchr(client_info, 'v') != NULL) {
 				do_negotiated_strings = 1;
 				compat_flags |= CF_VARINT_FLIST_FLAGS;
@@ -752,9 +748,6 @@ void setup_protocol(int f_out,int f_in)
 		proper_seed_order = compat_flags & CF_CHKSUM_SEED_FIX ? 1 : 0;
 		xfer_flags_as_varint = compat_flags & CF_VARINT_FLIST_FLAGS ? 1 : 0;
 		xmit_id0_names = compat_flags & CF_ID0_NAMES ? 1 : 0;
-		if (compat_flags & CF_SKIP_UNCHANGED) {
-			skip_unchanged_negotiated = 1;
-		}
 		if (!xfer_flags_as_varint && preserve_crtimes) {
 			fprintf(stderr, "Both rsync versions must be at least 3.2.0 for --crtimes.\n");
 			exit_cleanup(RERR_PROTOCOL);

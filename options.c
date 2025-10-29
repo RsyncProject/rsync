@@ -2996,6 +2996,9 @@ void server_options(char **args, int *argc_p)
 	if (mkpath_dest_arg && am_sender)
 		args[ac++] = "--mkpath";
 
+	if (no_i_r_skip_unchanged)
+		args[ac++] = "--no-i-r-skip-unchanged";
+
 	if (ac > MAX_SERVER_ARGS) { /* Not possible... */
 		rprintf(FERROR, "argc overflow in server_options().\n");
 		exit_cleanup(RERR_MALLOC);
@@ -3050,7 +3053,6 @@ int maybe_add_e_option(char *buf, int buf_len)
 		buf[x++] = 'I'; /* support inplace_partial behavior */
 		buf[x++] = 'v'; /* use varint for flist & compat flags; negotiate checksum */
 		buf[x++] = 'u'; /* include name of uid 0 & gid 0 in the id map */
-		buf[x++] = 'U'; /* support --no-i-r-skip-unchanged feature */
 
 		/* NOTE: Avoid using 'V' -- it was represented with the high bit of a write_byte() that became a write_varint(). */
 	}

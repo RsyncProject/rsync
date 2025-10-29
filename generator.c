@@ -34,7 +34,6 @@ extern int am_sender;
 extern int am_daemon;
 extern int inc_recurse;
 extern int no_i_r_skip_unchanged;
-extern int skip_unchanged_negotiated;
 extern int relative_paths;
 extern struct stats stats;
 extern int implied_dirs;
@@ -2236,14 +2235,14 @@ void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
 
 /* Pre-scan the file list to mark unchanged files and adjust stats.total_size.
  * This allows accurate progress reporting on resumed transfers. */
-static void prescan_for_unchanged(const char *local_name, int f_out)
+void prescan_for_unchanged(const char *local_name)
 {
 	int i, active_count = 0, skipped_count = 0;
 	char fbuf[MAXPATHLEN];
 	STRUCT_STAT st;
 	
-	/* Only prescan if feature was negotiated with remote side */
-	if (!no_i_r_skip_unchanged || !skip_unchanged_negotiated || !cur_flist)
+	/* Only prescan if feature is enabled */
+	if (!no_i_r_skip_unchanged || !cur_flist)
 		return;
 	
 	if (DEBUG_GTE(GENR, 1))
@@ -2292,21 +2291,13 @@ static void prescan_for_unchanged(const char *local_name, int f_out)
 		}
 	}
 	
-	/* Update stats to reflect skipped files */
+	/* Update stats to reflect only active files for progress display */
 	stats.num_files = active_count;
 	stats.num_skipped_files = skipped_count;
 	
 	if (DEBUG_GTE(GENR, 1))
 		rprintf(FINFO, "skipped %d unchanged files, %d active, adjusted size: %.2f GB\n", 
 			skipped_count, active_count, (double)stats.total_size / 1024 / 1024 / 1024);
-	
-	/* Send skipped count and adjusted total_size to sender for accurate progress display */
-	if (f_out >= 0 && skip_unchanged_negotiated) {
-		char buf[12];
-		SIVAL(buf, 0, skipped_count);
-		SIVAL64(buf, 4, stats.total_size);
-		send_msg(MSG_FLIST_COUNT, buf, 12, -1);
-	}
 }
 
 void generate_files(int f_out, const char *local_name)
@@ -2364,13 +2355,7 @@ void generate_files(int f_out, const char *local_name)
 	}
 
 	dflt_perms = (ACCESSPERMS & ~orig_umask);
-
-	/* Pre-scan to mark unchanged files for accurate progress reporting */
-	if (no_i_r_skip_unchanged && !skip_unchanged_negotiated) {
-		rprintf(FWARNING, "WARNING: --no-i-r-skip-unchanged requested but not supported by remote rsync.\n");
-		rprintf(FWARNING, "         Falling back to standard --no-i-r behavior (no progress optimization).\n");
-	}
-	prescan_for_unchanged(local_name, f_out);
+	stats.current_active_index = 0;
 
 	do {
 #ifdef SUPPORT_HARD_LINKS

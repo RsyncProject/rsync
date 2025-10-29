@@ -60,7 +60,6 @@ extern int daemon_connection;
 extern int protocol_version;
 extern int remove_source_files;
 extern int preserve_hard_links;
-extern int skip_unchanged_negotiated;
 extern BOOL extra_flist_sending_enabled;
 extern BOOL flush_ok_after_signal;
 extern struct stats stats;
@@ -1513,18 +1512,13 @@ static void read_a_msg(void)
 		iobuf.in_multiplexed = 1;
 		break;
 	case MSG_FLIST_COUNT:
-		if (msg_bytes != 12 || !am_sender || !skip_unchanged_negotiated)
+		if (msg_bytes != 12 || !am_sender)
 			goto invalid_msg;
 		val = raw_read_int();
 		stats.num_skipped_files = val;
-		/* Adjust total file count to reflect only active files */
 		stats.num_files -= val;
-		/* Read and update adjusted total_size for accurate progress percentage */
 		raw_read_buf((char*)&stats.total_size, 8);
 		iobuf.in_multiplexed = 1;
-		if (DEBUG_GTE(IO, 1))
-			rprintf(FINFO, "[%s] received MSG_FLIST_COUNT: %d skipped, %d active, size: %.2f GB\n", 
-				who_am_i(), val, stats.num_files, (double)stats.total_size / 1024 / 1024 / 1024);
 		break;
 	case MSG_REDO:
 		if (msg_bytes != 4 || !am_generator)
