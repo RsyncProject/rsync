@@ -60,6 +60,7 @@ long_opts = {
   'delete-during': 0,
   'delete-excluded': 0,
   'delete-missing-args': 0,
+  'dirs': 0,
   'existing': 0,
   'fake-super': 0,
   'files-from': 3,
