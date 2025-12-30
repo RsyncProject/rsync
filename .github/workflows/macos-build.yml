@@ -25,10 +25,15 @@ jobs:
     - name: prep
       run: |
         brew install automake openssl xxhash zstd lz4
-        sudo pip3 install commonmark
-        echo "/usr/local/bin" >>$GITHUB_PATH
+        pip3 install --user --break-system-packages commonmark
+        echo "$(brew --prefix)/bin" >>$GITHUB_PATH
     - name: configure
-      run: CPPFLAGS=-I/usr/local/opt/openssl/include/ LDFLAGS=-L/usr/local/opt/openssl/lib/ ./configure --with-rrsync
+      run: |
+        BREW_PREFIX=$(brew --prefix)
+        OPENSSL_PREFIX=$(brew --prefix openssl)
+        CPPFLAGS="-I${BREW_PREFIX}/include -I${OPENSSL_PREFIX}/include" \
+        LDFLAGS="-L${BREW_PREFIX}/lib -L${OPENSSL_PREFIX}/lib" \
+        ./configure --with-rrsync
     - name: make
       run: make
     - name: install
@@ -36,11 +41,11 @@ jobs:
     - name: info
       run: rsync --version
     - name: check
-      run: sudo RSYNC_EXPECT_SKIPPED=acls-default,chmod-temp-dir,chown-fake,devices-fake,dir-sgid,protected-regular,xattrs-hlink,xattrs make check
+      run: sudo RSYNC_EXPECT_SKIPPED=acls-default,chmod-temp-dir,chown-fake,devices-fake,dir-sgid,open-noatime,protected-regular,xattrs-hlink,xattrs make check
     - name: ssl file list
       run: rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
     - name: save artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: macos-bin
         path: |
