@@ -6,6 +6,12 @@
 
 $RSYNC -VV | grep '"atimes": true' >/dev/null || test_skipped "Rsync is configured without atimes support"
 
+# O_NOATIME is Linux-specific; skip on other platforms
+case `uname` in
+Linux) ;;
+*) test_skipped "O_NOATIME is only supported on Linux" ;;
+esac
+
 mkdir "$fromdir"
 
 # --open-noatime did not work properly on files with size > 0
