@@ -590,8 +590,13 @@ static int32 recv_deflated_token(int f, char **data)
 			if (flag & TOKEN_REL) {
 				rx_token += flag & 0x3f;
 				flag >>= 6;
-			} else
+			} else {
 				rx_token = read_int(f);
+				if (rx_token < 0) {
+					rprintf(FERROR, "invalid token number in compressed stream\n");
+					exit_cleanup(RERR_PROTOCOL);
+				}
+			}
 			if (flag & 1) {
 				rx_run = read_byte(f);
 				rx_run += read_byte(f) << 8;
@@ -834,8 +839,13 @@ static int32 recv_zstd_token(int f, char **data)
 			if (flag & TOKEN_REL) {
 				rx_token += flag & 0x3f;
 				flag >>= 6;
-			} else
+			} else {
 				rx_token = read_int(f);
+				if (rx_token < 0) {
+					rprintf(FERROR, "invalid token number in compressed stream\n");
+					exit_cleanup(RERR_PROTOCOL);
+				}
+			}
 			if (flag & 1) {
 				rx_run = read_byte(f);
 				rx_run += read_byte(f) << 8;
@@ -998,8 +1008,13 @@ static int32 recv_compressed_token(int f, char **data)
 			if (flag & TOKEN_REL) {
 				rx_token += flag & 0x3f;
 				flag >>= 6;
-			} else
+			} else {
 				rx_token = read_int(f);
+				if (rx_token < 0) {
+					rprintf(FERROR, "invalid token number in compressed stream\n");
+					exit_cleanup(RERR_PROTOCOL);
+				}
+			}
 			if (flag & 1) {
 				rx_run = read_byte(f);
 				rx_run += read_byte(f) << 8;
