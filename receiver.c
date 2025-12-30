@@ -70,6 +70,7 @@ extern int fuzzy_basis;
 
 extern struct name_num_item *xfer_sum_nni;
 extern int xfer_sum_len;
+extern int use_secure_symlinks;
 
 static struct bitbag *delayed_bits = NULL;
 static int phase = 0, redoing = 0;
@@ -214,7 +215,12 @@ int open_tmpfile(char *fnametmp, const char *fname, struct file_struct *file)
 	 * access to ensure that there is no race condition.  They will be
 	 * correctly updated after the right owner and group info is set.
 	 * (Thanks to snabb@epipe.fi for pointing this out.) */
-	fd = do_mkstemp(fnametmp, (file->mode|added_perms) & INITACCESSPERMS);
+	/* When use_secure_symlinks is on (non-chroot daemon with munge_symlinks),
+	 * use secure_mkstemp to prevent symlink race attacks on parent directories. */
+	if (use_secure_symlinks)
+		fd = secure_mkstemp(fnametmp, (file->mode|added_perms) & INITACCESSPERMS);
+	else
+		fd = do_mkstemp(fnametmp, (file->mode|added_perms) & INITACCESSPERMS);
 
 #if 0
 	/* In most cases parent directories will already exist because their
@@ -854,11 +860,21 @@ int recv_files(int f_in, int f_out, char *local_name)
 		/* We now check to see if we are writing the file "inplace" */
 		if (inplace || one_inplace)  {
 			fnametmp = one_inplace ? partialptr : fname;
-			fd2 = do_open(fnametmp, O_WRONLY|O_CREAT, 0600);
+			/* When use_secure_symlinks is on (non-chroot daemon),
+			 * use secure open to prevent symlink race attacks where an
+			 * attacker could switch a directory to a symlink between
+			 * path validation and file open. */
+			if (use_secure_symlinks)
+				fd2 = secure_relative_open(NULL, fnametmp, O_WRONLY|O_CREAT, 0600);
+			else
+				fd2 = do_open(fnametmp, O_WRONLY|O_CREAT, 0600);
 #ifdef linux
 			if (fd2 == -1 && errno == EACCES) {
 				/* Maybe the error was due to protected_regular setting? */
-				fd2 = do_open(fname, O_WRONLY, 0600);
+				if (use_secure_symlinks)
+					fd2 = secure_relative_open(NULL, fname, O_WRONLY, 0600);
+				else
+					fd2 = do_open(fname, O_WRONLY, 0600);
 			}
 #endif
 			if (fd2 == -1) {
