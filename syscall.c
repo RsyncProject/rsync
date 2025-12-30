@@ -877,6 +877,145 @@ cleanup:
 #endif // O_NOFOLLOW, O_DIRECTORY
 }
 
+/* Fill buf with len random bytes.  Prefers /dev/urandom for cryptographic
+ * quality; falls back to rand() if /dev/urandom cannot be opened or read
+ * (e.g. inside a chroot or container without /dev populated). */
+static void rand_bytes(unsigned char *buf, size_t len)
+{
+#ifndef O_CLOEXEC
+#define O_CLOEXEC 0
+#endif
+	int fd = open("/dev/urandom", O_RDONLY | O_CLOEXEC);
+	if (fd >= 0) {
+		ssize_t n = read(fd, buf, len);
+		close(fd);
+		if (n == (ssize_t)len) {
+			return;
+		}
+	}
+	for (size_t i = 0; i < len; i++) {
+		buf[i] = (unsigned char)rand();
+	}
+}
+
+/*
+  Secure version of mkstemp that prevents symlink attacks on parent directories.
+  Like secure_relative_open(), this walks the path checking each component
+  with O_NOFOLLOW to prevent TOCTOU race conditions.
+
+  The template may be relative or absolute, but must not contain ../ components.
+  Returns fd on success, -1 on error.
+*/
+int secure_mkstemp(char *template, mode_t perms)
+{
+#if !defined(O_NOFOLLOW) || !defined(O_DIRECTORY) || !defined(AT_FDCWD)
+	/* Fall back to regular mkstemp on old systems */
+	return do_mkstemp(template, perms);
+#else
+	char *lastslash;
+	int dirfd = AT_FDCWD;
+	int fd = -1;
+
+	if (!template) {
+		errno = EINVAL;
+		return -1;
+	}
+	if (strncmp(template, "../", 3) == 0 || strstr(template, "/../")) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	/* For absolute paths, start the secure walk from "/" rather than CWD. */
+	if (template[0] == '/') {
+		dirfd = open("/", O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+		if (dirfd < 0)
+			return -1;
+	}
+
+	/* Find the last slash to separate directory from filename */
+	lastslash = strrchr(template, '/');
+	if (lastslash) {
+		char *path_copy = my_strdup(template, __FILE__, __LINE__);
+		if (!path_copy)
+			return -1;
+
+		/* Null-terminate at the last slash to get directory part */
+		path_copy[lastslash - template] = '\0';
+
+		/* Walk the directory path securely */
+		for (const char *part = strtok(path_copy, "/");
+		     part != NULL;
+		     part = strtok(NULL, "/"))
+		{
+			int next_fd = openat(dirfd, part, O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+			if (next_fd == -1) {
+				int save_errno = errno;
+				free(path_copy);
+				if (dirfd != AT_FDCWD) close(dirfd);
+				errno = (save_errno == ELOOP) ? ELOOP : save_errno;
+				return -1;
+			}
+			if (dirfd != AT_FDCWD) close(dirfd);
+			dirfd = next_fd;
+		}
+		free(path_copy);
+	}
+
+	/* Now create the temp file in the securely-opened directory */
+	perms |= S_IWUSR;
+
+	/* Generate unique filename - we need to modify the template in place */
+	char *filename = lastslash ? lastslash + 1 : template;
+	size_t filename_len = strlen(filename);
+
+	if (filename_len < 6) {
+		if (dirfd != AT_FDCWD) close(dirfd);
+		errno = EINVAL;
+		return -1;
+	}
+	char *suffix = filename + filename_len - 6; /* Points to XXXXXX */
+	if (strcmp(suffix, "XXXXXX") != 0) {
+		if (dirfd != AT_FDCWD) close(dirfd);
+		errno = EINVAL;
+		return -1;
+	}
+
+	/* Try random suffixes until we find one that works */
+	static const char letters[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+	for (int tries = 0; tries < 100; tries++) {
+		unsigned char rbytes[6];
+		rand_bytes(rbytes, sizeof(rbytes));
+		for (int i = 0; i < 6; i++)
+			suffix[i] = letters[rbytes[i] % (sizeof(letters) - 1)];
+
+		fd = openat(dirfd, filename, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW, perms);
+		if (fd >= 0)
+			break;
+		if (errno != EEXIST) {
+			if (dirfd != AT_FDCWD) close(dirfd);
+			return -1;
+		}
+	}
+
+	if (fd >= 0) {
+		if (fchmod(fd, perms) != 0 && preserve_perms) {
+			int errno_save = errno;
+			close(fd);
+			unlinkat(dirfd, filename, 0);
+			if (dirfd != AT_FDCWD) close(dirfd);
+			errno = errno_save;
+			return -1;
+		}
+#if defined HAVE_SETMODE && O_BINARY
+		setmode(fd, O_BINARY);
+#endif
+	}
+
+	if (dirfd != AT_FDCWD) close(dirfd);
+	return fd;
+#endif
+}
+
 /*
   varient of do_open/do_open_nofollow which does do_open() if the
   copy_links or copy_unsafe_links options are set and does
