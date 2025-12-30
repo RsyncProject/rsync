@@ -366,9 +366,8 @@ void get_checksum2(char *buf, int32 len, char *sum)
 
 		mdfour_begin(&m);
 
-		if (len > len1) {
-			if (buf1)
-				free(buf1);
+		if (len > len1 || !buf1) {
+			free(buf1);
 			buf1 = new_array(char, len+4);
 			len1 = len;
 		}
