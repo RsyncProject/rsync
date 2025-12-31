@@ -229,11 +229,13 @@ static int read_delay_line(char *buf, int *flags_p)
 		*flags_p = 0;
 
 	if (sscanf(bp, "%x ", &mode) != 1) {
-	  invalid_data:
-		rprintf(FERROR, "ERROR: invalid data in delete-delay file.\n");
-		return -1;
+		goto invalid_data;
 	}
-	past_space = strchr(bp, ' ') + 1;
+	past_space = strchr(bp, ' ');
+	if (!past_space) {
+		goto invalid_data;
+	}
+	past_space++;
 	len = j - read_pos - (past_space - bp) + 1; /* count the '\0' */
 	read_pos = j + 1;
 
@@ -247,6 +249,10 @@ static int read_delay_line(char *buf, int *flags_p)
 	memcpy(buf, past_space, len);
 
 	return mode;
+
+invalid_data:
+	rprintf(FERROR, "ERROR: invalid data in delete-delay file.\n");
+	return -1;
 }
 
 static void do_delayed_deletions(char *delbuf)
