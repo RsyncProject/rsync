@@ -697,6 +697,13 @@ int recv_xattr_request(struct file_struct *file, int f_in)
 	rxa = lst->items;
 	num = 0;
 	while ((rel_pos = read_varint(f_in)) != 0) {
+		/* Detect signed overflow before the accumulating add. A hostile
+		 * peer could otherwise wrap 'num' to land on an arbitrary value. */
+		if ((rel_pos > 0 && num > INT_MAX - rel_pos)
+		 || (rel_pos < 0 && num < INT_MIN - rel_pos)) {
+			rprintf(FERROR, "xattr rel_pos accumulation overflow [%s]\n", who_am_i());
+			exit_cleanup(RERR_PROTOCOL);
+		}
 		num += rel_pos;
 		if (am_sender) {
 			/* The sender-related num values are only in order on the sender.
@@ -742,7 +749,7 @@ int recv_xattr_request(struct file_struct *file, int f_in)
 		}
 
 		old_datum = rxa->datum;
-		rxa->datum_len = read_varint(f_in);
+		rxa->datum_len = read_varint_size(f_in, MAX_WIRE_XATTR_DATALEN, "xattr datum_len");
 
 		if (SIZE_MAX - rxa->name_len < rxa->datum_len)
 			overflow_exit("recv_xattr_request");
@@ -783,7 +790,8 @@ void receive_xattr(int f, struct file_struct *file)
 		return;
 	}
 
-	if ((count = read_varint(f)) != 0) {
+	count = read_varint_bounded(f, 0, MAX_WIRE_XATTR_COUNT, "xattr count");
+	if (count != 0) {
 		(void)EXPAND_ITEM_LIST(&temp_xattr, rsync_xa, count);
 		temp_xattr.count = 0;
 	}
@@ -791,8 +799,8 @@ void receive_xattr(int f, struct file_struct *file)
 	for (num = 1; num <= count; num++) {
 		char *ptr, *name;
 		rsync_xa *rxa;
-		size_t name_len = read_varint(f);
-		size_t datum_len = read_varint(f);
+		size_t name_len = read_varint_size(f, MAX_WIRE_XATTR_NAMELEN, "xattr name_len");
+		size_t datum_len = read_varint_size(f, MAX_WIRE_XATTR_DATALEN, "xattr datum_len");
 		size_t dget_len = datum_len > MAX_FULL_DATUM ? 1 + (size_t)xattr_sum_len : datum_len;
 		size_t extra_len = MIGHT_NEED_RPRE ? RPRE_LEN : 0;
 		if (SIZE_MAX - dget_len < extra_len || SIZE_MAX - dget_len - extra_len < name_len)

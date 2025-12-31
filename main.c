@@ -237,11 +237,11 @@ void write_del_stats(int f)
 
 void read_del_stats(int f)
 {
-	stats.deleted_files = read_varint(f);
-	stats.deleted_files += stats.deleted_dirs = read_varint(f);
-	stats.deleted_files += stats.deleted_symlinks = read_varint(f);
-	stats.deleted_files += stats.deleted_devices = read_varint(f);
-	stats.deleted_files += stats.deleted_specials = read_varint(f);
+	stats.deleted_files = read_varint_bounded(f, 0, MAX_WIRE_DEL_STAT, "deleted_files");
+	stats.deleted_files += stats.deleted_dirs = read_varint_bounded(f, 0, MAX_WIRE_DEL_STAT, "deleted_dirs");
+	stats.deleted_files += stats.deleted_symlinks = read_varint_bounded(f, 0, MAX_WIRE_DEL_STAT, "deleted_symlinks");
+	stats.deleted_files += stats.deleted_devices = read_varint_bounded(f, 0, MAX_WIRE_DEL_STAT, "deleted_devices");
+	stats.deleted_files += stats.deleted_specials = read_varint_bounded(f, 0, MAX_WIRE_DEL_STAT, "deleted_specials");
 }
 
 static void become_copy_as_user()
