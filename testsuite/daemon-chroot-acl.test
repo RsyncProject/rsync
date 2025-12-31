@@ -1,0 +1,111 @@
+#!/bin/sh
+
+# Copyright (C) 2026 by Andrew Tridgell
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Regression test for GHSA-rjfm-3w2m-jf4f: a hostname-based "hosts deny"
+# rule must still match when the daemon performs a 'daemon chroot' and
+# the chroot does not contain the NSS files glibc needs for reverse DNS.
+#
+# Pre-fix, reverse DNS happened *after* the daemon chroot. With an empty
+# chroot the NSS lookup failed, client_name() returned "UNKNOWN", and a
+# deny rule referring to the connecting hostname silently failed to
+# match.
+#
+# Two scenarios are exercised so we can distinguish the case the fix
+# definitely covers from the per-module path that may still be
+# vulnerable:
+#   A. global  "reverse lookup = yes"           (covered by b6abdb4c)
+#   B. only module "reverse lookup = yes"       (gap to verify)
+
+. "$suitedir/rsync.fns"
+
+case `uname -s` in
+Linux*) ;;
+*) test_skipped "test is Linux-specific (uses chroot+unshare)" ;;
+esac
+
+# We need CAP_SYS_CHROOT. Re-exec under a user namespace if not root.
+if ! chroot / /bin/true 2>/dev/null; then
+    if [ -z "$RSYNC_UNSHARED" ] && unshare --user --map-root-user true 2>/dev/null; then
+	echo "Re-running under unshare --user --map-root-user..."
+	RSYNC_UNSHARED=1 exec unshare --user --map-root-user "$SHELL_PATH" $RUNSHFLAGS "$0"
+    fi
+    test_skipped "need CAP_SYS_CHROOT (root or unshare --user --map-root-user)"
+fi
+
+# We need 127.0.0.1 to reverse-resolve to a real hostname while NSS is
+# still working (i.e. before the daemon's chroot). The daemon will
+# look that name up itself as part of its hostname-based ACL check;
+# we then deny that name and assert the connection is rejected.
+client_hostname=`getent hosts 127.0.0.1 2>/dev/null | awk 'NR==1 {print $2}'`
+if [ -z "$client_hostname" ] || [ "$client_hostname" = "127.0.0.1" ]; then
+    test_skipped "no reverse DNS for 127.0.0.1"
+fi
+
+chrootdir="$scratchdir/chroot"
+rm -rf "$chrootdir"
+mkdir -p "$chrootdir/modroot"
+echo "from chroot" > "$chrootdir/modroot/file1"
+
+conf="$scratchdir/test-rsyncd.conf"
+logfile="$scratchdir/rsyncd.log"
+
+write_conf() {
+    cat >"$conf" <<EOF
+use chroot = no
+log file = $logfile
+daemon chroot = $chrootdir
+reverse lookup = $1
+hosts deny = $client_hostname
+max verbosity = 4
+
+[chrootmod]
+    path = /modroot
+    read only = yes
+    reverse lookup = $2
+EOF
+}
+
+# Run a transfer and return 0 if the daemon refused with @ERROR access
+# denied (the expected outcome when the deny rule matches).
+run_check() {
+    label="$1"
+
+    rm -f "$logfile"
+    rm -rf "$todir"
+    mkdir -p "$todir"
+
+    out="$scratchdir/run.out"
+
+    RSYNC_CONNECT_PROG="$RSYNC --config=$conf --daemon" \
+	$RSYNC -av localhost::chrootmod/ "$todir/" >"$out" 2>&1
+    rc=$?
+
+    echo "----- $label (rsync exit $rc):"
+    cat "$out"
+    echo "----- daemon log:"
+    [ -f "$logfile" ] && cat "$logfile"
+    echo "-----"
+
+    grep -q '@ERROR.*access denied' "$out"
+}
+
+# Scenario A: global reverse lookup. Covered by b6abdb4c.
+write_conf yes yes
+if ! run_check "Scenario A (global reverse lookup = yes)"; then
+    test_fail "Scenario A: hostname deny rule was bypassed"
+fi
+
+# Scenario B: only the per-module reverse-lookup setting is enabled.
+# The b6abdb4c fix only pre-warms client_name()'s cache when the
+# global setting is on, so the post-chroot lookup in this path may
+# still produce "UNKNOWN" and bypass the deny rule.
+write_conf no yes
+if ! run_check "Scenario B (per-module reverse lookup only)"; then
+    test_fail "Scenario B: hostname deny rule was bypassed (per-module reverse lookup with daemon chroot still has the bypass)"
+fi
+
+exit 0
