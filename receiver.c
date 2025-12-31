@@ -352,6 +352,11 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 		}
 
 		i = -(i+1);
+		if (i < 0 || i >= sum.count) {
+			rprintf(FERROR, "Invalid block index %d (count=%ld) [%s]\n",
+				i, (long)sum.count, who_am_i());
+			exit_cleanup(RERR_PROTOCOL);
+		}
 		offset2 = i * (OFF_T)sum.blength;
 		len = sum.blength;
 		if (i == (int)sum.count-1 && sum.remainder != 0)
