@@ -1312,6 +1312,28 @@ int start_daemon(int f_in, int f_out)
 	if (lp_proxy_protocol() && !read_proxy_protocol_header(f_in))
 		return -1;
 
+	/* Do reverse DNS lookup before chroot/setuid. The result is cached,
+	 * so the later client_name() call will use this cached value. This
+	 * ensures hostname-based ACLs work even when DNS is unavailable
+	 * after chroot.
+	 *
+	 * "reverse lookup" can be set globally OR per-module, so we also
+	 * scan each module: a deployment with "reverse lookup = no" in the
+	 * global section but "reverse lookup = yes" in a specific module
+	 * still triggers a post-chroot lookup at access-check time
+	 * (rsync_module() in this file), which would also fail in the
+	 * chroot and turn hostname-based deny rules into silent bypasses. */
+	{
+		int need_reverse = lp_reverse_lookup(-1);
+		int j, num_modules = lp_num_modules();
+		for (j = 0; !need_reverse && j < num_modules; j++) {
+			if (lp_reverse_lookup(j))
+				need_reverse = 1;
+		}
+		if (need_reverse)
+			(void)client_name(client_addr(f_in));
+	}
+
 	p = lp_daemon_chroot();
 	if (*p) {
 		log_init(0); /* Make use we've initialized syslog before chrooting. */
