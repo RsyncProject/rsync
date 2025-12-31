@@ -840,9 +840,9 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 	}
 	if (xflags & XMIT_MOD_NSEC)
 #ifndef CAN_SET_NSEC
-		(void)read_varint(f);
+		(void)read_varint_bounded(f, 0, MAX_WIRE_NSEC, "modtime_nsec");
 #else
-		modtime_nsec = read_varint(f);
+		modtime_nsec = read_varint_bounded(f, 0, MAX_WIRE_NSEC, "modtime_nsec");
 	else
 		modtime_nsec = 0;
 #endif
@@ -861,8 +861,19 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 #endif
 	}
 #endif
-	if (!(xflags & XMIT_SAME_MODE))
+	if (!(xflags & XMIT_SAME_MODE)) {
 		mode = from_wire_mode(read_int(f));
+		/* Reject modes whose type bits are not one of the standard
+		 * file types; otherwise garbage mode values propagate through
+		 * the file-type checks below unpredictably. */
+		if (!S_ISREG(mode) && !S_ISDIR(mode) && !S_ISLNK(mode)
+		 && !S_ISCHR(mode) && !S_ISBLK(mode)
+		 && !S_ISFIFO(mode) && !S_ISSOCK(mode)) {
+			rprintf(FERROR, "invalid file mode 0%o for %s [%s]\n",
+				(unsigned)mode, lastname, who_am_i());
+			exit_cleanup(RERR_PROTOCOL);
+		}
+	}
 	if (atimes_ndx && !S_ISDIR(mode) && !(xflags & XMIT_SAME_ATIME)) {
 		atime = read_varlong(f, 4);
 #if SIZEOF_TIME_T < SIZEOF_INT64
