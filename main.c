@@ -40,6 +40,7 @@ extern int am_server;
 extern int am_sender;
 extern int am_daemon;
 extern int inc_recurse;
+extern int no_i_r_skip_unchanged;
 extern int blocking_io;
 extern int always_checksum;
 extern int remove_source_files;
@@ -1028,6 +1029,18 @@ static int do_recv(int f_in, int f_out, char *local_name)
 	}
 
 	io_flush(FULL_FLUSH);
+
+	/* Pre-scan for unchanged files before forking so both processes get updated stats */
+	prescan_for_unchanged(local_name);
+	
+	/* Send adjusted stats to sender for accurate progress (local→remote transfers) */
+	if (no_i_r_skip_unchanged && stats.num_skipped_files > 0) {
+		char buf[12];
+		SIVAL(buf, 0, stats.num_skipped_files);
+		SIVAL64(buf, 4, stats.total_size);
+		send_msg(MSG_FLIST_COUNT, buf, 12, 0);
+		io_flush(NORMAL_FLUSH);
+	}
 
 	if ((pid = do_fork()) == -1) {
 		rsyserr(FERROR, errno, "fork failed in do_recv");
