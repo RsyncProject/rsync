@@ -1,0 +1,47 @@
+#! /bin/sh
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+. $suitedir/rsync.fns
+
+makepath "$fromdir/subdir1" "$fromdir/subdir2" "$todir/subdir1"
+echo data >"$fromdir/subdir1/file"
+echo data >"$todir/subdir1/file2"
+echo data >"$fromdir/subdir2/file"
+
+# Test 1: Ensure subdir2 and content under it are not created
+$RSYNC -r --ignore-non-existing-directory -vv "$fromdir/" "$todir/" | tee "$scratchdir/out"
+if [ ! -d "$todir/subdir1" ]; then
+	test_fail 'test 1 failed: subdir1 should have been created'
+fi
+if [ ! -f "$todir/subdir1/file" ]; then
+	test_fail 'test 1 failed: subdir1/file should have been created'
+fi
+if [ ! -f "$todir/subdir1/file2" ]; then
+	test_fail 'test 1 failed: subdir1/file2 should not have been removed'
+fi
+if [ -d "$todir/subdir2" ]; then
+	test_fail 'test 1 failed: subdir2 should not have been created'
+fi
+if [ -f "$todir/subdir2/file" ]; then
+	test_fail 'test 1 failed: subdir2/file should not have been created'
+fi
+
+# Test 2: Also ensure that other delete handling was not impacted
+$RSYNC -r --delete --ignore-non-existing-directory -vv "$fromdir/" "$todir/" | tee "$scratchdir/out"
+if [ ! -d "$todir/subdir1" ]; then
+	test_fail 'test 2 failed: subdir1 should have been created'
+fi
+if [ ! -f "$todir/subdir1/file" ]; then
+	test_fail 'test 2 failed: subdir1/file should have been created'
+fi
+if [ -f "$todir/subdir1/file2" ]; then
+	test_fail 'test 2 failed: subdir1/file2 should have been removed'
+fi
+if [ -d "$todir/subdir2" ]; then
+	test_fail 'test 2 failed: subdir2 should not have been created'
+fi
+if [ -f "$todir/subdir2/file" ]; then
+	test_fail 'test 2 failed: subdir2/file should not have been created'
+fi
