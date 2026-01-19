@@ -116,6 +116,26 @@ loadparm.o: default-dont-compress.h daemon-parm.h
 
 flist.o: rounding.h
 
+# Added missing dependencies
+xattrs.o: lib/permstring.h lib/addrinfo.h lib/wildmatch.h
+zlib/inffast.o: zlib/zutil.h zlib/inffast.h lib/permstring.h lib/addrinfo.h zlib/zconf.h zlib/zlib.h zlib/inflate.h zlib/inftrees.h lib/wildmatch.h
+io.o: lib/permstring.h lib/addrinfo.h lib/wildmatch.h
+zlib/deflate.o: zlib/zutil.h lib/permstring.h lib/addrinfo.h zlib/deflate.h zlib/zconf.h zlib/zlib.h lib/wildmatch.h
+popt/poptparse.o: popt/system.h popt/popt.h
+progress.o: lib/permstring.h lib/addrinfo.h lib/wildmatch.h
+authenticate.o: lib/permstring.h lib/addrinfo.h lib/wildmatch.h
+zlib/crc32.o: zlib/zutil.h lib/permstring.h zlib/crc32.h lib/addrinfo.h zlib/zconf.h zlib/zlib.h lib/wildmatch.h
+util1.o: lib/permstring.h case_N.h lib/addrinfo.h lib/wildmatch.h
+lib/sysacls.o: lib/permstring.h lib/addrinfo.h lib/sysacls.h lib/wildmatch.h
+zlib/zutil.o: zlib/zutil.h lib/permstring.h lib/addrinfo.h zlib/zconf.h zlib/gzguts.h zlib/zlib.h lib/wildmatch.h
+token.o: lib/permstring.h lib/addrinfo.h zlib/zconf.h zlib/zlib.h lib/wildmatch.h
+clientserver.o: lib/permstring.h lib/addrinfo.h lib/wildmatch.h
+zlib/trees.o: zlib/zutil.h lib/permstring.h zlib/trees.h lib/addrinfo.h zlib/deflate.h zlib/zconf.h zlib/zlib.h lib/wildmatch.h
+popt/popthelp.o: popt/system.h popt/popt.h popt/poptint.h
+cleanup.o: lib/permstring.h case_N.h lib/addrinfo.h lib/wildmatch.h
+uidlist.o: lib/permstring.h lib/addrinfo.h io.h lib/wildmatch.h
+zlib/inflate.o: zlib/zutil.h zlib/inffast.h lib/permstring.h lib/addrinfo.h zlib/inffixed.h zlib/zconf.h zlib/zlib.h zlib/inflate.h zlib/inftrees.h lib/wildmatch.h
+
 default-cvsignore.h default-dont-compress.h: rsync.1.md define-from-md.awk
 	$(AWK) -f $(srcdir)/define-from-md.awk -v hfile=$@ $(srcdir)/rsync.1.md
 
