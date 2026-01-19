@@ -713,7 +713,7 @@ static uchar recv_ida_entries(int f, ida_entries *ent)
 			else
 				id = recv_group_name(f, id, NULL);
 		} else if (access & NAME_IS_USER) {
-			if (inc_recurse && am_root && !numeric_ids)
+			if (inc_recurse && !numeric_ids)
 				id = match_uid(id);
 		} else {
 			if (inc_recurse && (!am_root || !numeric_ids))
