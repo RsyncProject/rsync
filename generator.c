@@ -30,9 +30,12 @@ extern int stdout_format_has_i;
 extern int logfile_format_has_i;
 extern int am_root;
 extern int am_server;
+extern int am_sender;
 extern int am_daemon;
 extern int inc_recurse;
+extern int no_i_r_skip_unchanged;
 extern int relative_paths;
+extern struct stats stats;
 extern int implied_dirs;
 extern int keep_dirlinks;
 extern int write_devices;
@@ -1242,6 +1245,13 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		return;
 	}
 
+	if (!F_IS_ACTIVE(file)) {
+		/* File was marked as inactive (unchanged) during pre-scan */
+		if (DEBUG_GTE(GENR, 2))
+			rprintf(FINFO, "skipping inactive file: %s\n", fname);
+		return;
+	}
+
 	maybe_ATTRS_ACCURATE_TIME = always_checksum ? ATTRS_ACCURATE_TIME : 0;
 
 	if (skip_dir) {
@@ -2223,6 +2233,73 @@ void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
 	}
 }
 
+/* Pre-scan the file list to mark unchanged files and adjust stats.total_size.
+ * This allows accurate progress reporting on resumed transfers. */
+void prescan_for_unchanged(const char *local_name)
+{
+	int i, active_count = 0, skipped_count = 0;
+	char fbuf[MAXPATHLEN];
+	STRUCT_STAT st;
+	
+	/* Only prescan if feature is enabled */
+	if (!no_i_r_skip_unchanged || !cur_flist)
+		return;
+	
+	if (DEBUG_GTE(GENR, 1))
+		rprintf(FINFO, "pre-scanning for unchanged files\n");
+	
+	for (i = 0; i < cur_flist->used; i++) {
+		struct file_struct *file = cur_flist->files[i];
+		enum filetype ftype;
+		
+		if (!file || !F_IS_ACTIVE(file))
+			continue;
+		
+		ftype = get_file_type(file->mode);
+		
+		/* Only check regular files */
+		if (ftype != FT_REG) {
+			active_count++;
+			continue;
+		}
+		
+		/* Construct destination path */
+		if (local_name)
+			strlcpy(fbuf, local_name, sizeof fbuf);
+		else
+			f_name(file, fbuf);
+		
+		/* Stat destination file */
+		if (do_stat(fbuf, &st) < 0) {
+			active_count++;
+			continue;
+		}
+		
+		/* Check if file is unchanged */
+		if (quick_check_ok(ftype, fbuf, file, &st)) {
+			if (DEBUG_GTE(GENR, 2))
+				rprintf(FINFO, "skipping unchanged: %s\n", fbuf);
+			
+			/* Subtract from total size for accurate progress */
+			stats.total_size -= F_LENGTH(file);
+			
+			/* Mark as inactive to remove from file list */
+			clear_file(file);
+			skipped_count++;
+		} else {
+			active_count++;
+		}
+	}
+	
+	/* Update stats to reflect only active files for progress display */
+	stats.num_files = active_count;
+	stats.num_skipped_files = skipped_count;
+	
+	if (DEBUG_GTE(GENR, 1))
+		rprintf(FINFO, "skipped %d unchanged files, %d active, adjusted size: %.2f GB\n", 
+			skipped_count, active_count, (double)stats.total_size / 1024 / 1024 / 1024);
+}
+
 void generate_files(int f_out, const char *local_name)
 {
 	int i, ndx, next_loopchk = 0;
@@ -2278,6 +2355,7 @@ void generate_files(int f_out, const char *local_name)
 	}
 
 	dflt_perms = (ACCESSPERMS & ~orig_umask);
+	stats.current_active_index = 0;
 
 	do {
 #ifdef SUPPORT_HARD_LINKS

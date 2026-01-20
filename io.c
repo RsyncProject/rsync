@@ -1511,6 +1511,15 @@ static void read_a_msg(void)
 		raw_read_buf((char*)&stats.total_read, sizeof stats.total_read);
 		iobuf.in_multiplexed = 1;
 		break;
+	case MSG_FLIST_COUNT:
+		if (msg_bytes != 12 || !am_sender)
+			goto invalid_msg;
+		val = raw_read_int();
+		stats.num_skipped_files = val;
+		stats.num_files -= val;
+		raw_read_buf((char*)&stats.total_size, 8);
+		iobuf.in_multiplexed = 1;
+		break;
 	case MSG_REDO:
 		if (msg_bytes != 4 || !am_generator)
 			goto invalid_msg;
