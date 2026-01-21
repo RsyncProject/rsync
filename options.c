@@ -1159,7 +1159,7 @@ static time_t parse_time(const char *arg)
 {
 	const char *cp;
 	time_t val, now = time(NULL);
-	struct tm t, *today = localtime(&now);
+	struct tm t, tmp, *today = localtime_r(&now, &tmp);
 	int in_date, old_mday, n;
 
 	memset(&t, 0, sizeof t);
