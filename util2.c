@@ -143,3 +143,44 @@ const char *src_file(const char *file)
 		return file + prefix;
 	return file;
 }
+
+/* If a stat-like function returned RESULT, normalize the timestamps
+   in *ST, in case this platform suffers from the Solaris 11 bug where
+   tv_nsec might be negative.  Return the adjusted RESULT, setting
+   errno to EOVERFLOW if normalization overflowed.  This function
+   is intended to be private to this .h file.
+
+   This is adapted from Gnulib. */
+
+int stat_time_normalize(int result, STRUCT_STAT *st)
+{
+#if defined __sun && defined HAVE_STRUCT_STAT_ST_MTIM_TV_NSEC
+    if (result == 0) {
+        long int timespec_hz = 1000000000;
+        short int const ts_off[] = { offsetof (struct stat, st_atim),
+                                     offsetof (struct stat, st_mtim) };
+        unsigned i;
+        for (i = 0; i < sizeof ts_off / sizeof *ts_off; i++) {
+            struct timespec *ts = (struct timespec *)((char *) st + ts_off[i]);
+            long int q = ts->tv_nsec / timespec_hz;
+            long int r = ts->tv_nsec % timespec_hz;
+            if (r < 0) {
+                r += timespec_hz;
+                q--;
+            }
+            ts->tv_nsec = r;
+            /* Overflow is possible, as Solaris 11 stat can yield
+               tv_sec == TYPE_MINIMUM (time_t) && tv_nsec == -1000000000.  */
+            time_t sec = ts->tv_sec + q;
+            if ((q > 0 && sec < ts->tv_sec) || (q < 0 && sec > ts->tv_sec)) {
+                errno = EOVERFLOW;
+                return -1;
+            }
+            ts->tv_sec = sec;
+        }
+    }
+#else
+    (void)st;
+#endif
+    return result;
+}
