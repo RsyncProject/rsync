@@ -10,6 +10,13 @@ lnkdir="$tmpdir/lnk"
 
 $RSYNC -VV | grep '"xattrs": true' >/dev/null || test_skipped "Rsync is configured without xattr support"
 
+CYGWIN=0
+
+case "$HOST_OS" in
+cygwin*)
+    CYGWIN=1
+esac
+
 case "$HOST_OS" in
 darwin*)
     xset() {
@@ -80,6 +87,9 @@ echo else >"$fromdir/file2"
 echo deep >"$fromdir/foo/file3"
 echo normal >"$fromdir/file4"
 echo deeper >"$fromdir/foo/bar/file5"
+if [ $CYGWIN -eq 0 ]; then
+    echo longxattrname >"$fromdir/file7"
+fi
 
 makepath "$chkdir/foo"
 echo wow >"$chkdir/file1"
@@ -87,6 +97,10 @@ cp_touch "$fromdir/foo/file3" "$chkdir/foo"
 
 dirs='foo foo/bar'
 files='file0 file1 file2 foo/file3 file4 foo/bar/file5'
+if [ $CYGWIN -eq 0 ]
+then
+        files="$files file7"
+fi
 
 uid_gid=`"$TOOLDIR/tls" "$fromdir/foo" | sed 's/^.* \([0-9][0-9]*\)\.\([0-9][0-9]*\) .*/\1:\2/'`
 
@@ -124,6 +138,16 @@ xset user.extra 'remove me' "$chkdir/file1"
 
 xset user.foo 'old foo' "$chkdir/foo/file3"
 xset $RUSR.equal 'this long attribute should remain the same and not need to be transferred' "$chkdir/foo/file3"
+
+if [ $CYGWIN -eq 0 ] ; then
+# Generate xattr names
+SEQ=`seq 1 200`
+xset user."`printf -- 'A%0.s' $SEQ`" 'first xattr' file7
+xset user."`printf -- 'B%0.s' $SEQ`" 'second xattr' file7
+xset user."`printf -- 'C%0.s' $SEQ`" 'third xattr' file7
+xset user."`printf -- 'D%0.s' $SEQ`" 'another xattr' file7
+xset user."`printf -- 'E%0.s' $SEQ`" 'final xattr' file7
+fi
 
 case $0 in
 *hlink*)
@@ -234,6 +258,11 @@ checkit "$RSYNC -aiiX $XFILT . ../to" "$chkdir" "$todir"
 
 cd "$todir"
 xls file1 file2 | diff $diffopt "$scratchdir/xattrs.txt" -
+
+cd "$fromdir"
+rm -rf "$todir"
+mkfifo fifo1
+checktee "$RSYNC -avX --specials  $XFILT $dashH --super . '$chkdir/'" "$fromdir" "$chkdir"
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0
