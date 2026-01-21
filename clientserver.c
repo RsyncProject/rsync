@@ -1261,10 +1261,16 @@ static void send_listing(int fd)
 static int load_config(int globals_only)
 {
 	if (!config_file) {
-		if (am_daemon < 0 && am_root <= 0)
+		if (am_daemon < 0 && am_root <= 0) {
 			config_file = RSYNCD_USERCONF;
-		else
+		} else {
 			config_file = RSYNCD_SYSCONF;
+#ifdef RSYNCD_DISTCONF
+			STRUCT_STAT st;
+			if (do_stat(RSYNCD_SYSCONF, &st) != 0)
+				config_file = RSYNCD_DISTCONF;
+#endif
+		}
 	}
 	return lp_load(config_file, globals_only);
 }
