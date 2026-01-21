@@ -452,11 +452,15 @@ AH_TEMPLATE([USE_OPENSSL],
 if test x"$enable_openssl" != x"no"; then
     if test x"$ac_cv_header_openssl_md4_h" = x"yes" && test x"$ac_cv_header_openssl_md5_h" = x"yes"; then
       AC_MSG_RESULT(yes)
-      AC_SEARCH_LIBS(EVP_MD_CTX_copy, crypto,
+      PKG_CHECK_MODULES(LIBCRYPTO, libcrypto,
           [AC_DEFINE(USE_OPENSSL)
-	   enable_openssl=yes],
-          [err_msg="$err_msg$nl- Failed to find EVP_MD_CTX_copy function in openssl crypto lib.";
-	   no_lib="$no_lib openssl"])
+           enable_openssl=yes
+           LIBS="$LIBS $LIBCRYPTO_LIBS"],
+          [AC_SEARCH_LIBS(EVP_MD_CTX_copy, crypto,
+              [AC_DEFINE(USE_OPENSSL)
+	       enable_openssl=yes],
+              [err_msg="$err_msg$nl- Failed to find EVP_MD_CTX_copy function in openssl crypto lib.";
+	       no_lib="$no_lib openssl"])])
     else
         AC_MSG_RESULT(no)
 	err_msg="$err_msg$nl- Failed to find openssl/md4.h and openssl/md5.h for openssl crypto lib support."
