@@ -1239,11 +1239,10 @@ static filter_rule *parse_rule_tok(const char **rulestr_ptr,
 				rule->rflags |= FILTRULE_ABS_PATH;
 				break;
 			case '!':
-				/* Negation really goes with the pattern, so it
-				 * isn't useful as a merge-file default. */
 				if (rule->rflags & FILTRULE_MERGE_FILE)
-					goto invalid;
-				rule->rflags |= FILTRULE_NEGATE;
+					rule->rflags |= FILTRULE_DEFAULT_NONE;
+				else
+					rule->rflags |= FILTRULE_NEGATE;
 				break;
 			case 'C':
 				if (rule->rflags & FILTRULE_NO_PREFIXES || prefix_specifies_side)
@@ -1483,6 +1482,16 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 		}
 		return;
 	}
+
+	if (template->rflags & FILTRULE_DEFAULT_NONE) {
+		if (! (template->rflags & FILTRULE_EXCLUDE_SELF)) {
+			filter_rule *incl_self;
+			incl_self = new0(filter_rule);
+			incl_self->rflags |= FILTRULE_INCLUDE | FILTRULE_ABS_PATH;
+			add_rule(listp, fname, strlen(fname), incl_self, 0);
+		}
+	}
+
 	dirbuf[dirbuf_len] = '\0';
 
 	while (1) {
@@ -1517,6 +1526,13 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 			break;
 	}
 	fclose(fp);
+
+	if (template->rflags & FILTRULE_DEFAULT_NONE) {
+		const char *name = "/**";
+		filter_rule *default_none;
+		default_none = new0(filter_rule);
+		add_rule(listp, name, strlen(name), default_none, 0);
+	}
 }
 
 /* If the "for_xfer" flag is set, the prefix is made compatible with the
