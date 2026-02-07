@@ -2820,12 +2820,12 @@ expand it.
 
 0.  `--compress-threads=NUM`, `--zt=NUM`
 
-    Set the number of threads to spawn when compressing data. Setting this 
-    option to 1 or more will instruct the compression library to spawn 1 or 
-    more threads for compression. Ideally, increasing the number of threads 
+    Set the number of threads to spawn when compressing data. Setting this
+    option to 1 or more will instruct the compression library to spawn 1 or
+    more threads for compression. Ideally, increasing the number of threads
     will increase transfer speed if the transfer is CPU bound on the sender.
-    
-    This option does not affect decompression. 
+
+    This option does not affect decompression.
 
     Compression algorithms that allow threading:
 
@@ -3945,7 +3945,7 @@ different ways.
 We will first cover the basics of how include & exclude rules affect what files
 are transferred, ignoring any deletion side-effects.  Filter rules mainly
 affect the contents of directories that rsync is "recursing" into, but they can
-also affect a top-level item in the transfer that was specified as a argument.
+also affect a top-level item in the transfer that was specified as an argument.
 
 The default for any unmatched file/dir is for it to be included in the
 transfer, which puts the file/dir into the sender's file list.  The use of an
