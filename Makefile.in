@@ -57,7 +57,8 @@ TLS_OBJ = tls.o syscall.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/perms
 
 # Programs we must have to run the test cases
 CHECK_PROGS = rsync$(EXEEXT) tls$(EXEEXT) getgroups$(EXEEXT) getfsdev$(EXEEXT) \
-	testrun$(EXEEXT) trimslash$(EXEEXT) t_unsafe$(EXEEXT) wildtest$(EXEEXT)
+	testrun$(EXEEXT) trimslash$(EXEEXT) t_unsafe$(EXEEXT) wildtest$(EXEEXT) \
+	simdtest$(EXEEXT)
 
 CHECK_SYMLINKS = testsuite/chown-fake.test testsuite/devices-fake.test testsuite/xattrs-hlink.test
 
@@ -325,6 +326,14 @@ check30: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 wildtest.o: wildtest.c t_stub.o lib/wildmatch.c rsync.h config.h
 wildtest$(EXEEXT): wildtest.o lib/compat.o lib/snprintf.o @BUILD_POPT@
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ wildtest.o lib/compat.o lib/snprintf.o @BUILD_POPT@ $(LIBS)
+
+simdtest$(EXEEXT): simd-checksum-x86_64.cpp $(HEADERS)
+	@if test x"@ROLL_SIMD@" != x; then \
+	    $(CXX) -I. $(CXXFLAGS) $(CPPFLAGS) $(LDFLAGS) -DTEST_SIMD_CHECKSUM1 \
+	        -o $@ $(srcdir)/simd-checksum-x86_64.cpp @ROLL_ASM@ $(LIBS); \
+	else \
+	    touch $@; \
+	fi
 
 testsuite/chown-fake.test:
 	ln -s chown.test $(srcdir)/testsuite/chown-fake.test
