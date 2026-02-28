@@ -1,0 +1,11 @@
+#!/bin/sh
+
+# Test SIMD checksum implementations against the C reference
+
+. "$suitedir/rsync.fns"
+
+if ! test -x "$TOOLDIR/simdtest"; then
+    test_skipped "simdtest not built (SIMD not available)"
+fi
+
+"$TOOLDIR/simdtest"
