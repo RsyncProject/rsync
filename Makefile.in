@@ -62,7 +62,8 @@ CHECK_PROGS = rsync$(EXEEXT) tls$(EXEEXT) getgroups$(EXEEXT) getfsdev$(EXEEXT) \
 	t_rename_secure$(EXEEXT) t_symlink_secure$(EXEEXT) \
 	t_secure_relpath$(EXEEXT) t_acl$(EXEEXT) t_hashtable_overflow$(EXEEXT) \
 	t_clean_fname$(EXEEXT) t_owner_walk_fallback$(EXEEXT) \
-	t_safe_arg$(EXEEXT) t_socket_fallback$(EXEEXT) wildtest$(EXEEXT)
+	t_safe_arg$(EXEEXT) t_socket_fallback$(EXEEXT) wildtest$(EXEEXT) \
+	simdtest$(EXEEXT)
 
 CHECK_SYMLINKS = testsuite/chown-fake.test testsuite/devices-fake.test testsuite/xattrs-hlink.test
 
@@ -431,6 +432,14 @@ check30: all $(CHECK_PROGS) $(CHECK_COMPILE_OBJS) $(CHECK_SYMLINKS)
 wildtest.o: wildtest.c t_stub.o lib/wildmatch.c rsync.h config.h
 wildtest$(EXEEXT): wildtest.o lib/compat.o lib/snprintf.o @BUILD_POPT@
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ wildtest.o lib/compat.o lib/snprintf.o @BUILD_POPT@ $(LIBS)
+
+simdtest$(EXEEXT): simd-checksum-x86_64.cpp $(HEADERS)
+	@if test x"@ROLL_SIMD@" != x; then \
+	    $(CXX) -I. $(CXXFLAGS) $(CPPFLAGS) $(LDFLAGS) -DTEST_SIMD_CHECKSUM1 \
+	        -o $@ $(srcdir)/simd-checksum-x86_64.cpp @ROLL_ASM@ $(LIBS); \
+	else \
+	    touch $@; \
+	fi
 
 testsuite/chown-fake.test:
 	ln -s chown.test $(srcdir)/testsuite/chown-fake.test
