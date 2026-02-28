@@ -347,8 +347,7 @@ __attribute__ ((target("avx2"))) MVSTATIC int32 get_checksum1_avx2_64(schar* buf
 	__m128i tmp = _mm_load_si128((__m128i*) mul_t1_buf);
         __m256i mul_t1 = _mm256_cvtepu8_epi16(tmp);
 	__m256i mul_const = _mm256_broadcastd_epi32(_mm_cvtsi32_si128(4 | (3 << 8) | (2 << 16) | (1 << 24)));
-        __m256i mul_one;
-       	    mul_one = _mm256_abs_epi8(_mm256_cmpeq_epi16(mul_one,mul_one)); // set all vector elements to 1
+        __m256i mul_one = _mm256_set1_epi8(1);
 
         for (; i < (len-64); i+=64) {
             // Load ... 4*[int8*16]
@@ -547,6 +546,118 @@ int main() {
 #pragma GCC pop_options
 #pragma clang optimize on
 #endif /* BENCHMARK_SIMD_CHECKSUM1 */
+
+#ifdef TEST_SIMD_CHECKSUM1
+
+static uint32 checksum_via_default(char *buf, int32 len)
+{
+    uint32 s1 = 0, s2 = 0;
+    get_checksum1_default_1((schar*)buf, len, 0, &s1, &s2);
+    return (s1 & 0xffff) + (s2 << 16);
+}
+
+static uint32 checksum_via_sse2(char *buf, int32 len)
+{
+    int32 i;
+    uint32 s1 = 0, s2 = 0;
+    i = get_checksum1_sse2_32((schar*)buf, len, 0, &s1, &s2);
+    get_checksum1_default_1((schar*)buf, len, i, &s1, &s2);
+    return (s1 & 0xffff) + (s2 << 16);
+}
+
+static uint32 checksum_via_ssse3(char *buf, int32 len)
+{
+    int32 i;
+    uint32 s1 = 0, s2 = 0;
+    i = get_checksum1_ssse3_32((schar*)buf, len, 0, &s1, &s2);
+    get_checksum1_default_1((schar*)buf, len, i, &s1, &s2);
+    return (s1 & 0xffff) + (s2 << 16);
+}
+
+static uint32 checksum_via_avx2(char *buf, int32 len)
+{
+    int32 i;
+    uint32 s1 = 0, s2 = 0;
+#ifdef USE_ROLL_ASM
+    i = get_checksum1_avx2_asm((schar*)buf, len, 0, &s1, &s2);
+#else
+    i = get_checksum1_avx2_64((schar*)buf, len, 0, &s1, &s2);
+#endif
+    get_checksum1_default_1((schar*)buf, len, i, &s1, &s2);
+    return (s1 & 0xffff) + (s2 << 16);
+}
+
+int main()
+{
+    static const int sizes[] = {1, 4, 31, 32, 33, 63, 64, 65, 128, 129, 256, 700, 1024, 4096, 65536};
+    int num_sizes = sizeof(sizes) / sizeof(sizes[0]);
+    int max_size = sizes[num_sizes - 1];
+    int failures = 0;
+
+    /* Allocate with extra bytes for unaligned test */
+    unsigned char *raw = (unsigned char *)malloc(max_size + 64 + 1);
+    if (!raw) {
+        fprintf(stderr, "malloc failed\n");
+        return 1;
+    }
+
+    /* Fill with deterministic data */
+    for (int i = 0; i < max_size + 64 + 1; i++)
+        raw[i] = (i + (i % 3) + (i % 11)) % 256;
+
+    /* Test with aligned buffer (64-byte aligned) */
+    unsigned char *aligned = raw + (64 - ((uintptr_t)raw % 64));
+
+    /* Test with unaligned buffer (+1 byte offset) */
+    unsigned char *unaligned = aligned + 1;
+
+    struct { const char *name; unsigned char *buf; } buffers[] = {
+        {"aligned", aligned},
+        {"unaligned", unaligned},
+    };
+
+    for (int b = 0; b < 2; b++) {
+        char *buf = (char *)buffers[b].buf;
+        const char *bname = buffers[b].name;
+
+        for (int s = 0; s < num_sizes; s++) {
+            int32 len = sizes[s];
+            uint32 ref = checksum_via_default(buf, len);
+            uint32 cs_sse2 = checksum_via_sse2(buf, len);
+            uint32 cs_ssse3 = checksum_via_ssse3(buf, len);
+            uint32 cs_avx2 = checksum_via_avx2(buf, len);
+            uint32 cs_auto = get_checksum1(buf, len);
+
+            if (cs_sse2 != ref) {
+                printf("FAIL %-9s size=%5d: SSE2=%08x ref=%08x\n", bname, len, cs_sse2, ref);
+                failures++;
+            }
+            if (cs_ssse3 != ref) {
+                printf("FAIL %-9s size=%5d: SSSE3=%08x ref=%08x\n", bname, len, cs_ssse3, ref);
+                failures++;
+            }
+            if (cs_avx2 != ref) {
+                printf("FAIL %-9s size=%5d: AVX2=%08x ref=%08x\n", bname, len, cs_avx2, ref);
+                failures++;
+            }
+            if (cs_auto != ref) {
+                printf("FAIL %-9s size=%5d: auto=%08x ref=%08x\n", bname, len, cs_auto, ref);
+                failures++;
+            }
+        }
+    }
+
+    free(raw);
+
+    if (failures) {
+        printf("%d checksum mismatches!\n", failures);
+        return 1;
+    }
+    printf("All SIMD checksum tests passed.\n");
+    return 0;
+}
+
+#endif /* TEST_SIMD_CHECKSUM1 */
 
 #endif /* } USE_ROLL_SIMD */
 #endif /* } __cplusplus */
