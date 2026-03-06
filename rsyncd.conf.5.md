@@ -1073,7 +1073,7 @@ in the values of parameters.  See that section for details.
     **system()** call's default shell), and use RSYNC_NO_XFER_EXEC to disable
     both options completely.
 
-0.  `temp_dir`
+0.  `temp dir`
 
     Specifies a directory that rsync should use for temporary files created
     during the transfer of updated files. If that directory is on a different
