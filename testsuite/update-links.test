@@ -1,0 +1,610 @@
+#! /bin/sh
+
+SELF="$(basename "$0")"
+LSRC="$(readlink -f "$(realpath $0)")"
+LSELF="$(basename "$LSRC")"
+DSELF="$(dirname "$LSRC")"
+
+. "${testsuite:-${DSELF}}/rsync.fns"
+
+set_os_opts(){
+  os=$(uname -s) 
+  case ${os} in
+  Linux)
+    stat_opt=-c
+    size=%s
+    # ctime is not normally modifiable by user, defaults to mtime
+    ctime=%Y
+    mtime=%Y
+  ;;
+  FreeBSD)
+    stat_opt=-f
+    size=%z
+    # ctime is not normally modifiable by user, defaults to mtime
+    ctime=%Sm
+    mtime=%Sm
+    bsd="-t %s"
+  ;;
+  *)
+    test_fail "OS ${os} unsupported"
+  ;;
+  esac
+}
+
+log(){
+  echo "${SELF}: $@"
+}
+
+debug(){
+  [ -n "$DEBUG" ] && echo "$@" 1>&2 || :
+}
+
+error(){
+  test_fail "$@"
+}
+
+get_ctime(){
+  stat ${stat_opt} ${ctime} ${bsd} "$1" || test_fail "Unable to get ctime of $1"
+}
+
+get_mtime(){
+  stat ${stat_opt} ${mtime} ${bsd} "$1" || test_fail "Unable to get mtime of $1"
+}
+
+get_size(){
+  stat ${stat_opt} ${size} "$1" || test_fail "Unable to get size of $1"
+}
+
+get_referent(){
+  readlink "$1" || test_fail "Unable to dereference $1"
+}
+
+get_type(){
+  file -b "$1" || test_fail "Unable to get type of $1"
+}
+
+exists(){
+  [ -h "$1" ] || [ -e "$1" ]
+}
+
+is_a_link(){
+  [ -h "$1" ]
+}
+
+is_a_file(){
+  [ -h "$1" ]
+}
+
+is_a_pipe(){
+  [ -p "$1" ]
+}
+
+points_to_pipe(){
+  is_a_link "$1" && is_a_pipe "$1"
+}
+
+is_a_dir(){
+  ! is_a_link "$1" && [ -d "$1" ]
+}
+
+is_empty_dir(){
+  is_a_dir "$1" && [ $(find "$1" | wc -l) -eq 1 ]
+}
+
+points_to_dir(){
+  is_a_link "$1" && [ -d "$1" ]
+}
+
+is_newer(){
+  [ $(get_ctime "$1") -gt $(get_ctime "$2") ] || error "$1 is not newer than $2"
+  #DO NOT USE, DEREFERENCES LINKS! [ "$1" -nt "$2" ]
+}
+
+is_older(){
+  [ $(get_ctime "$1") -lt $(get_ctime "$2") ] || error "$1 is not older than $2"
+  #DO NOT USE, DEREFERENCES LINKS! [ "$1" -ot "$2" ]
+}
+
+is_defined(){
+  type "$1" >/dev/null 2>&1
+}
+
+compare(){
+  local s
+  local d
+  s=$($1 "$2")
+  debug "compare $1 $2: output = $s; exit status = $?"
+  d=$($1 "$3")
+  debug "compare $1 $3: output = $d; exit status = $?"
+  case "$s" in
+  "$d")
+    :
+  ;;
+  *)
+    return 1
+  ;;
+  esac
+}
+
+# The size of a symlink equals the length of the link target path
+# Links pointing at /dev/zero & /dev/null will thus have the same size
+is_same_size(){
+  compare get_size "$1" "$2" || test_fail "Files $1 & $2 are not same size"
+}
+
+is_diff_size(){
+  compare get_size "$1" "$2" && test_fail "Files $1 & $2 are supposed to be of different size" || :
+}
+
+is_same_mtime(){
+  compare get_mtime "$1" "$2" || test_fail "Files $1 & $2 have different mtimes"
+}
+
+is_diff_mtime(){
+  compare get_mtime "$1" "$2" && test_fail "Files $1 & $2 are supposed to have different mtimes" || :
+}
+
+is_any_mtime(){
+  compare get_mtime "$1" "$2" || :
+}
+
+is_same_ctime(){
+  compare get_ctime "$1" "$2" || test_fail "Files $1 & $2 have different ctimes"
+}
+
+is_diff_ctime(){
+  compare get_ctime "$1" "$2" && test_fail "Files $1 & $2 are supposed to have different ctimes" || :
+}
+
+is_any_ctime(){
+  compare get_ctime "$1" "$2" || :
+}
+
+is_same_referent(){
+  compare get_referent "$1" "$2" || test_fail "Links $1 & $2 point at a different referent each"
+}
+
+is_diff_referent(){
+  compare get_referent "$1" "$2" && test_fail "Links $1 & $2 should point at a different referent each" || :
+}
+
+touch_links(){
+  debug "touch_links: # touch -h $@"
+  touch -h "$@"
+}
+
+shift_mtime(){
+  local offset
+  local f
+  local epoch
+  local rc
+  local time
+  offset=$1
+  shift
+  for f in $@; do
+    epoch=$(stat ${stat_opt} ${mtime} ${bsd} "$f")
+    rc=$?
+    debug "shift_mtime: $f; offset = $offset; rc = $rc; touch -hd @$((epoch${offset})) $f"
+    case ${os} in FreeBSD) time=$(date -r $((epoch${offset})) +%Y-%m-%dT%H:%M:%S) ;; *) time=@$((epoch${offset})) ;; esac
+    [ $rc -eq 0 ] && touch -hd "${time}" "$f" || error "Unable to stat $f"
+  done
+}
+
+add_a_second(){
+  shift_mtime +1 $@
+}
+
+take_a_second(){
+  shift_mtime -1 $@
+}
+
+show_files(){
+  stat ${stat_opt} "${mtime} ${ctime} %N" ${bsd} $@ 1>&2 || test_fail "Unable to stat $@"
+}
+
+count_words(){
+  echo $@ | wc -w
+}
+
+get_word(){
+  local i
+  local words
+  i=$1
+  shift
+  words=$@
+  while [ $i -gt 0 ]; do
+    words=${words#* }
+    i=$(($i-1))
+  done
+  echo ${words%% *}
+}
+
+# Sets the referent of $1 to something else than the existing one and the referent of $2
+# choice of out of two variables, purposely defined to be of different length
+# size checks should pass
+cycle_referent(){
+  local links
+  local referent
+  local current
+  local n
+  local next
+  links="/dev/urandom /dev/random"
+  referent=$(get_referent "$1")
+  [ -n "$2" ] && compare_referent=$(get_referent "$2")
+  n=0; while [ $n -le $(count_words $links) ]; do
+    current=$(get_word $n $links)
+    n=$((n+1))
+    [ -n "$2" ] || next="$(get_word $n $links)"
+    case "$current" in
+    ${compare_referent}|${referent})
+      :
+    ;;
+    *)
+      ln -nsf "$current" "$1" && return
+    ;;
+    esac
+  done || test_fail "Unable to cycle referent for $1"
+}
+
+build_symlinks(){
+  rm -rf "$fromdir"
+  mkdir "$fromdir"
+  mkdir "$fromdir/emptydir"
+  mkdir "$fromdir/nonemptydir"
+  touch "$fromdir/nonemptydir/file"
+  mkfifo "$fromdir/fifo"
+  mkfifo "$fromdir/fifo"
+  date >"$fromdir/referent"
+  ln -s referent "$fromdir/relative"
+  ln -s "$fromdir/referent" "$fromdir/absolute"
+  ln -s nonexistent "$fromdir/dangling"
+  ln -s "$srcdir/rsync.c" "$fromdir/unsafe"
+  ln -s emptydir "$fromdir/dirlink"
+  ln -s /dev/null "$fromdir/devlink"
+}
+
+# Unused yet
+is_set(){
+  read opt opts << _EOT_
+$@
+_EOT_
+  case "${opts}" in
+  "${opt}"|"${opt} "*|*" ${opt}"*)
+    :
+  ;;
+  *)
+    false
+  ;;
+  esac
+}
+
+list_contains(){
+  read opt opts << _EOT_
+$@
+_EOT_
+  debug "list_contains: opt = $opt; opts = $opts"
+  echo "$opts" | egrep -q -- " ${opt} |^${opt} | ${opt}$" 1>/dev/null
+}
+
+# Various scenarios that modify either side before re-running rsync & performing a check
+default(){
+  read fromdir todir file scenario opts << _EOT_
+$@
+_EOT_
+  show_files $fromdir/$file
+  exists $todir/$file && show_files $todir/$file || :
+}
+
+newer_dest_link(){
+  read fromdir todir file scenario opts << _EOT_
+$@
+_EOT_
+  if exists $todir/$file; then
+    if is_a_link $todir/$file; then
+      take_a_second "$fromdir/$file"
+      add_a_second "$todir/$file"
+      show_files "$todir/$file" "$fromdir/$file"
+    fi
+  else
+    show_files "$fromdir/$file"
+    log "$todir/$file did not get transferred in scenario $scenario with rsync opts $opts"
+  fi
+}
+
+newer_source_link(){
+  read fromdir todir file scenario opts << _EOT_
+$@
+_EOT_
+  is_a_link $fromdir/$file && touch_links $fromdir/$file $todir/$file && add_a_second $fromdir/$file || :
+}
+
+cycle_dest_link(){
+  read fromdir todir file scenario opts << _EOT_
+$@
+_EOT_
+  if is_a_link $todir/$file; then
+    cycle_referent $todir/$file $fromdir/$file
+    # Simulate a time difference, making dest_link more recent
+    take_a_second $fromdir/$file
+    add_a_second $todir/$file
+    #show_files $fromdir/$file $todir/$file
+  fi
+}
+
+cycle_dest_newer_source_link(){
+  read fromdir todir file scenario opts << _EOT_
+$@
+_EOT_
+  cycle_dest_link $fromdir $todir $file $scenario $opts && newer_source_link $fromdir $todir $file $scenario $opts
+  if exists $todir/$file; then
+    show_files "$todir/$file" "$fromdir/$file"
+  else
+    show_files "$fromdir/$file"
+    log "$todir/$file did not get transferred in scenario $scenario with rsync opts $opts"
+  fi
+}
+
+link_update_dir(){
+  read fromdir todir file scenario opts << _EOT_
+$@
+_EOT_
+  # Make all target files directories
+  local f
+  for f in $FILES; do
+    debug "link_update_dir: $todir/$f"
+    rm $todir/$f 2>/dev/null || log "${scenario}: $f didn't exist"
+    mkdir -p $todir/$f
+    case $f in
+    nonemptydir)
+      touch $todir/$f/testfile
+    ;;
+    esac
+    # Make source link more recent than dir just created
+    add_a_second $fromdir/$f
+    show_files $todir/$f
+  done
+}
+
+test_failure(){
+  read fromdir todir file scenario opts << _EOT_
+$@
+_EOT_
+  debug "${scenario}: has predictably failed"
+  false
+}
+
+test_success(){
+  read fromdir todir file scenario opts << _EOT_
+$@
+_EOT_
+  debug "${scenario}: has predictably completed"
+  true
+}
+
+# Various checks after a scenario has run, these rules should all pass
+run_checks(){
+  read type fromdir todir file scenario opts << _EOT_
+$@
+_EOT_
+  local times
+  list_contains "--times" "$opts" || times=any
+  for check in ${times:-${type}}_mtime ${times:-${type}}_ctime ${type}_referent ${type}_size; do
+    debug "check_${scenario}: is_${check} $fromdir/$file $todir/$file"
+    is_${check} $fromdir/$file $todir/$file
+  done
+}
+
+check_existing_dest(){
+  read fromdir todir file scenario opts << _EOT_
+$@
+_EOT_
+  run_checks same $fromdir $todir $file $scenario $opts
+}
+
+check_default(){
+  read fromdir todir file scenario opts << _EOT_
+$@
+_EOT_
+  exists $todir/$file && check_existing_dest $fromdir $todir $file $scenario $opts || debug "$todir/$file does not exist, no more checks"
+}
+
+check_newer_dest_link(){
+  read fromdir todir file scenario opts << _EOT_
+$@
+_EOT_
+  if is_a_link $todir/$file; then
+    if list_contains "--update-links" "$opts"; then
+      # Newer dest links are supposed to be preserved
+      is_same_referent $fromdir/$file $todir/$file
+      # Times will get updated if times is in effect
+      if list_contains "--times" "$opts"; then
+        is_same_mtime $fromdir/$file $todir/$file
+        is_same_ctime $fromdir/$file $todir/$file
+      else
+        is_older $fromdir/$file $todir/$file
+      fi
+    fi
+  fi
+}
+
+check_newer_source_link(){
+  read fromdir todir file scenario opts << _EOT_
+$@
+_EOT_
+  if is_a_link $todir/$file; then
+    if list_contains "--update-links" "$opts"; then
+      # Newer source links are supposed to be transfered
+      run_checks same $fromdir $todir $file $scenario $opts
+    fi
+  fi
+}
+
+check_cycle_dest_link(){
+  read fromdir todir file scenario opts << _EOT_
+$@
+_EOT_
+  if is_a_link $todir/$file; then
+    if list_contains "--update-links" "$opts"; then
+      # Newer source links are supposed to be transfered
+      run_checks diff $fromdir $todir $file $scenario $opts
+    fi
+  fi
+}
+
+check_cycle_dest_newer_source_link(){
+  read fromdir todir file scenario opts << _EOT_
+$@
+_EOT_
+  check_newer_source_link $fromdir $todir $file $scenario $opts
+}
+
+check_link_update_dir(){
+  read fromdir todir file scenario opts << _EOT_
+$@
+_EOT_
+  if is_a_link $todir/$file; then
+    if list_contains "--update-links" "$opts"; then
+      if list_contains "--allow-link-update-dir" "$opts"; then
+	case $file in
+        nonemptydir)
+          error "$file should not have been replaced by a link"
+        ;;
+        esac
+      else
+	case $file in
+	*dir)
+	  error "$file should not have been replaced by a link without --allow-link-update-dir enabled"
+	;;
+	esac
+      fi
+    else
+      error "$file should not have been replaced by a link without --update-links enabled"
+    fi
+    # Newer source links are supposed to be transfered
+    run_checks same $fromdir $todir $file $scenario $opts
+  fi
+}
+
+check_test_failure(){
+  read fromdir todir file scenario opts << _EOT_
+$@
+_EOT_
+  debug "check_${scenario}: $scenario should have failed, this notice should never be displayed"
+  exit 1
+}
+
+check_test_success(){
+  read fromdir todir file scenario opts << _EOT_
+$@
+_EOT_
+  debug "check_${scenario}: $scenario should have completed, this notice should always be displayed"
+}
+
+run_rsync(){
+  read fromdir todir file opts << _EOT_
+$@
+_EOT_
+  debug "run_rsync: # $RSYNC $RSYNC_COMMON_OPTS $opts $fromdir/$file $todir/"
+  $RSYNC $RSYNC_COMMON_OPTS $opts $fromdir/$file $todir/ 1>&2 || test_fail "$RSYNC $RSYNC_COMMON_OPTS $opts $fromdir/$file $todir/ failed"
+}
+
+run_scenario(){
+  read fromdir todir file scenario opts << _EOT_
+$@
+_EOT_
+  cd $tmpdir && build_symlinks || error "Unable to change directory to $tmpdir"
+  debug "run_scenario: scenario = $scenario; file = $file; type = $(get_type $fromdir/$file); opts = $opts"
+  run_rsync $fromdir $todir $file $opts
+  is_defined $scenario && $scenario $fromdir $todir $file $scenario $opts
+  run_rsync $fromdir $todir $file $opts
+  check_${scenario} $fromdir $todir $file $scenario $opts
+  rm -rf $fromdir $todir
+}
+
+run_scenarios(){
+  read fromdir todir file opts << _EOT_
+$@
+_EOT_
+  local scenario
+  for scenario in $SCENARIOS; do
+    for t in '' check_; do
+      is_defined ${t}${scenario} || error "No ${t}${scenario} scenario defined"
+    done
+    log "Scenario $scenario running on $file with rsync opts $opts"
+    run_scenario $fromdir $todir $file $scenario $opts
+  done
+}
+
+process_files(){
+  read fromdir todir opts << _EOT_
+$@
+_EOT_
+  local file
+  for file in $FILES; do
+    run_scenarios $fromdir $todir $file $opts
+  done
+}
+
+sort_opts(){
+  echo "$@" | tr ' ' '\n' | sort | xargs echo
+}
+
+strip_whitespace(){
+  echo "${@}" | sed -e 's/ //g'
+}
+
+process_opts(){
+  read fromdir todir opts << _EOT_
+$@
+_EOT_
+  local current
+  local opt
+  debug "process_opts: opts = $opts"
+  for opt in $opts; do
+    debug "process_opts: opt = $opt; done = $done"
+    current="$(sort_opts $current $opt)"
+    if list_contains "$(strip_whitespace ${current})" "$done"; then
+      # Skip item if found on the done list
+      debug "process_opts: $current already processed"
+      continue
+    else
+      debug "process_opts: current = $current"
+      process_files $fromdir $todir $current
+      done="${done:+${done} }$(strip_whitespace ${current})"
+    fi
+    debug "process_opts: opt = $opt; opts = $opts; current = $current"
+  done
+}
+
+process_all_opts(){
+  read fromdir todir all_opts << _EOT_
+$@
+_EOT_
+  local remaining
+  local first
+  remaining=${all_opts}
+  debug "process_all_opts: remaining = ${remaining}"
+  first=${remaining%% *}
+  while [ -n "$remaining" ]; do
+    debug "process_all_opts: remaining before run = ${remaining}"
+    process_opts $fromdir $todir ${remaining}
+    # Remove first parameter for next iteration
+    remaining="${remaining##${remaining%% *} } ${remaining%% *}"
+    debug "process_all_opts: remaining after run = ${remaining}"
+    case ${remaining%% *} in ${first}) break;; esac
+  done
+  log "Completed scenarios with status $?"
+  #echo -e $n | wc -c
+}
+
+# All of the following variables may be overriden at command line
+FILES="${FILES:-relative dangling absolute unsafe devlink dirlink emptydir nonemptydir}"
+# For sanity testing only
+#SCENARIOS="test_success test_failure"
+SCENARIOS="${SCENARIOS:-default newer_source_link newer_dest_link cycle_dest_link cycle_dest_newer_source_link link_update_dir}"
+RSYNC=${RSYNC:-${DSELF}/../rsync}
+[ -n "$DEBUG" ] && RSYNC_COMMON_OPTS=${RSYNC_COMMON_OPTS:--r -i}
+RSYNC_OPTS="--update-links --times --allow-link-update-dir"
+
+set_os_opts
+process_all_opts $fromdir $todir ${RSYNC_OPTS}
