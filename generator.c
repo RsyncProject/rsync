@@ -99,6 +99,7 @@ extern char *tmpdir;
 extern char *basis_dir[MAX_BASIS_DIRS+1];
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern filter_rule_list filter_list, daemon_filter_list;
+extern int max_map_size;
 
 int maybe_ATTRS_REPORT = 0;
 int maybe_ATTRS_ACCURATE_TIME = 0;
@@ -776,7 +777,7 @@ static int generate_and_send_sums(int fd, OFF_T len, int f_out, int f_copy)
 		return 0;
 
 	if (len > 0)
-		mapbuf = map_file(fd, len, MAX_MAP_SIZE, sum.blength);
+		mapbuf = map_file(fd, len, max_map_size, sum.blength);
 	else
 		mapbuf = NULL;
 
