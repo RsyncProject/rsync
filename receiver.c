@@ -753,6 +753,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 			  && check_filter(&daemon_filter_list, FLOG, fnamecmp, 0) < 0)) {
 				fnamecmp = fname;
 				fnamecmp_type = FNAMECMP_FNAME;
+				basedir = NULL;
 			}
 		} else {
 			/* Reminder: --inplace && --partial-dir are never
@@ -768,6 +769,19 @@ int recv_files(int f_in, int f_out, char *local_name)
 				fnamecmp = fname;
 		}
 
+		/* For FNAMECMP_FNAME, split into basedir (dirname) + fnamecmp
+		 * (basename) so that secure_relative_open() follows symlinks
+		 * in the directory part. This is needed because the receiver's
+		 * destination may legitimately contain directory symlinks
+		 * (e.g. when using -K/--copy-dirlinks). The basedir is opened
+		 * following symlinks, while the file component uses O_NOFOLLOW.
+		 * See: https://github.com/RsyncProject/rsync/issues/715 */
+		if (fnamecmp_type == FNAMECMP_FNAME && basedir == NULL
+		 && fnamecmp == fname && file->dirname && !local_name) {
+			basedir = file->dirname;
+			fnamecmp = (char*)file->basename;
+		}
+
 		/* open the file */
 		fd1 = secure_relative_open(basedir, fnamecmp, O_RDONLY, 0);
 
@@ -775,6 +789,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 			if (fnamecmp != fname) {
 				fnamecmp = fname;
 				fnamecmp_type = FNAMECMP_FNAME;
+				basedir = NULL;
 				fd1 = do_open_nofollow(fnamecmp, O_RDONLY);
 			}
 
@@ -792,6 +807,12 @@ int recv_files(int f_in, int f_out, char *local_name)
 			// path name as a single string
 			pathjoin(fnamecmpbuf, sizeof fnamecmpbuf, basedir, fnamecmp);
 			fnamecmp = fnamecmpbuf;
+			/* For FNAMECMP_FNAME, the reconstructed path is
+			 * identical to fname. Restore the pointer so that
+			 * downstream pointer comparisons (e.g. in
+			 * finish_transfer) continue to work. */
+			if (fnamecmp_type == FNAMECMP_FNAME)
+				fnamecmp = fname;
 		}
 
 		one_inplace = inplace_partial && fnamecmp_type == FNAMECMP_PARTIAL_DIR;
