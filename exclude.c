@@ -904,7 +904,7 @@ static int rule_matches(const char *fname, filter_rule *ex, int name_flags)
 {
 	int slash_handling, str_cnt = 0, anchored_match = 0;
 	int ret_match = ex->rflags & FILTRULE_NEGATE ? 0 : 1;
-	char *p, *pattern = ex->pattern;
+	const char *p, *pattern = ex->pattern;
 	const char *strings[16]; /* more than enough */
 	const char *name = fname + (*fname == '/');
 
