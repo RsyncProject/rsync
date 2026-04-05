@@ -132,7 +132,7 @@ static const char *client_info;
  * of that protocol for it to be advertised as available. */
 static void check_sub_protocol(void)
 {
-	char *dot;
+	const char *dot;
 	int their_protocol, their_sub;
 	int our_sub = get_subprotocol_version();
 
@@ -415,7 +415,7 @@ static const char *getenv_nstr(int ntype)
 		env_str = ntype == NSTR_COMPRESS ? "zlib" : protocol_version >= 30 ? "md5" : "md4";
 
 	if (am_server && env_str) {
-		char *cp = strchr(env_str, '&');
+		const char *cp = strchr(env_str, '&');
 		if (cp)
 			env_str = cp + 1;
 	}
