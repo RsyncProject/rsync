@@ -1158,8 +1158,8 @@ void set_io_timeout(int secs)
 
 static void check_for_d_option_error(const char *msg)
 {
-	static char rsync263_opts[] = "BCDHIKLPRSTWabceghlnopqrtuvxz";
-	char *colon;
+	static const char rsync263_opts[] = "BCDHIKLPRSTWabceghlnopqrtuvxz";
+	const char *colon;
 	int saw_d = 0;
 
 	if (*msg != 'r'
