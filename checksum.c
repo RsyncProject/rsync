@@ -176,7 +176,7 @@ void parse_checksum_choice(int final_call)
 	if (valid_checksums.negotiated_nni)
 		xfer_sum_nni = file_sum_nni = valid_checksums.negotiated_nni;
 	else {
-		char *cp = checksum_choice ? strchr(checksum_choice, ',') : NULL;
+		const char *cp = checksum_choice ? strchr(checksum_choice, ',') : NULL;
 		if (cp) {
 			xfer_sum_nni = parse_csum_name(checksum_choice, cp - checksum_choice);
 			file_sum_nni = parse_csum_name(cp+1, -1);
