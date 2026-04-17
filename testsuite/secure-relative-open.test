@@ -1,0 +1,111 @@
+#!/bin/sh
+
+# Regression test for the CVE fix in commit c35e283 ("receiver: use
+# secure_relative_open() for basis file").
+#
+# secure_relative_open() enforces O_NOFOLLOW on every path component of
+# the relpath, preventing the receiver from following symlinks when
+# opening basis files for delta comparison. This stops a malicious
+# sender from causing the receiver to read files outside the
+# destination tree via crafted symlinks.
+#
+# This test verifies that when a basis directory (--copy-dest) contains
+# a symlink as an intermediate path component, the receiver does NOT
+# follow it to open the basis file. The generator may find the file
+# (it uses link_stat/do_open_checklinks which follow intermediate
+# symlinks), but the receiver's secure_relative_open must reject it.
+#
+# Observable difference: with a real directory, the receiver logs
+# "recv mapped <path>" when it successfully opens the basis file.
+# With a symlink, that line is absent because the open fails.
+
+. "$suitedir/rsync.fns"
+
+RSYNC_RSH="$scratchdir/src/support/lsh.sh"
+export RSYNC_RSH
+
+# Create source with a file in a subdirectory
+srcbase="$tmpdir/src"
+mkdir -p "$srcbase/sub"
+dd if=/dev/urandom of="$srcbase/sub/file" bs=1024 count=32 2>/dev/null \
+    || test_fail "failed to create source file"
+
+# Create a copy-dest where "sub" is a symlink to "realsub".
+# The basis file is reachable through the symlink, but
+# secure_relative_open must refuse to follow it.
+copydest="$tmpdir/copydest"
+mkdir -p "$copydest/realsub"
+# Basis has different size to force delta transfer (not hard-link)
+dd if=/dev/urandom of="$copydest/realsub/file" bs=1024 count=16 2>/dev/null \
+    || test_fail "failed to create basis file"
+ln -s realsub "$copydest/sub"
+
+######################################################################
+# Test 1: Symlink in copy-dest path must NOT be followed by receiver
+######################################################################
+
+mkdir -p "$todir"
+
+$RSYNC -aivvv --copy-dest="$copydest" --rsync-path="$RSYNC" \
+    "$srcbase/" "lh:$todir/" > "$outfile" 2>&1 \
+    || test_fail "test 1: rsync failed"
+
+# The receiver must NOT have mapped the basis file through the symlink.
+# "recv mapped" appears only when secure_relative_open succeeds.
+if grep "recv mapped.*copydest/sub/file" "$outfile" >/dev/null 2>&1; then
+    test_fail "test 1: receiver followed symlink in copy-dest path (CVE regression!)"
+fi
+
+# Verify the file was still transferred correctly
+diff "$srcbase/sub/file" "$todir/sub/file" >/dev/null \
+    || test_fail "test 1: transferred file content mismatch"
+
+######################################################################
+# Test 2: Real directory in copy-dest path SHOULD be used by receiver
+######################################################################
+
+rm -rf "$todir"
+mkdir -p "$todir"
+
+# Replace symlink with real directory
+rm "$copydest/sub"
+mkdir "$copydest/sub"
+cp "$copydest/realsub/file" "$copydest/sub/file"
+
+$RSYNC -aivvv --copy-dest="$copydest" --rsync-path="$RSYNC" \
+    "$srcbase/" "lh:$todir/" > "$outfile" 2>&1 \
+    || test_fail "test 2: rsync failed"
+
+# With a real directory, the receiver SHOULD map the basis file
+if ! grep "recv mapped.*copydest/sub/file" "$outfile" >/dev/null 2>&1; then
+    test_fail "test 2: receiver did not use basis file from real directory"
+fi
+
+diff "$srcbase/sub/file" "$todir/sub/file" >/dev/null \
+    || test_fail "test 2: transferred file content mismatch"
+
+######################################################################
+# Test 3: ".." in relpath must be rejected by secure_relative_open
+######################################################################
+
+rm -rf "$todir"
+mkdir -p "$todir"
+
+# Create a copy-dest with a normal structure
+copydest2="$tmpdir/copydest2"
+mkdir -p "$copydest2/sub"
+dd if=/dev/urandom of="$copydest2/sub/file" bs=1024 count=16 2>/dev/null
+
+# Create source with the same structure
+# (secure_relative_open rejects ".." in relpath at the syscall level,
+# but clean_fname also rejects it in the file list. This test verifies
+# the defense-in-depth.)
+$RSYNC -aivvv --copy-dest="$copydest2" --rsync-path="$RSYNC" \
+    "$srcbase/" "lh:$todir/" > "$outfile" 2>&1 \
+    || test_fail "test 3: rsync failed"
+
+diff "$srcbase/sub/file" "$todir/sub/file" >/dev/null \
+    || test_fail "test 3: transferred file content mismatch"
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0
