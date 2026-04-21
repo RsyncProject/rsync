@@ -860,8 +860,8 @@ void receive_xattr(int f, struct file_struct *file)
 		rxa->num = num;
 	}
 
-	if (need_sort && count > 1)
-		qsort(temp_xattr.items, count, sizeof (rsync_xa), rsync_xal_compare_names);
+	if (need_sort && temp_xattr.count > 1)
+		qsort(temp_xattr.items, temp_xattr.count, sizeof (rsync_xa), rsync_xal_compare_names);
 
 	ndx = rsync_xal_store(&temp_xattr); /* adds item to rsync_xal_l */
 
