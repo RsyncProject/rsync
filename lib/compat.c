@@ -181,26 +181,24 @@ char *do_big_num(int64 num, int human_flag, const char *fract)
 
 	if (human_flag > 1) {
 		int mult = human_flag == 2 ? 1000 : 1024;
+
 		if (num >= mult || num <= -mult) {
-			double dnum = (double)num / mult;
-			char units;
-			if (num < 0)
-				dnum = -dnum;
-			if (dnum < mult)
-				units = 'K';
-			else if ((dnum /= mult) < mult)
-				units = 'M';
-			else if ((dnum /= mult) < mult)
-				units = 'G';
-			else if ((dnum /= mult) < mult)
-				units = 'T';
-			else {
-				dnum /= mult;
-				units = 'P';
+			const char* units = " KMGTPEZY";
+			int64 powi = 1;
+
+			for (;;) {
+				if (labs(num / mult) < powi)
+					break;
+
+				if (units[1] == '\0')
+					break;
+
+				powi *= mult;
+				++units;
 			}
-			if (num < 0)
-				dnum = -dnum;
-			snprintf(bufs[n], sizeof bufs[0], "%.2f%c", dnum, units);
+
+			snprintf(bufs[n], sizeof bufs[0], "%.2f%c",
+				(double) num / powi, *units);
 			return bufs[n];
 		}
 	}
