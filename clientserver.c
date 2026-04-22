@@ -976,6 +976,8 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	}
 
 	if (use_chroot) {
+		/* Cache timezone data before chroot makes /etc/localtime inaccessible */
+		tzset();
 		if (chroot(module_chdir)) {
 			rsyserr(FLOG, errno, "chroot(\"%s\") failed", module_chdir);
 			io_printf(f_out, "@ERROR: chroot failed\n");
@@ -1301,6 +1303,7 @@ int start_daemon(int f_in, int f_out)
 	p = lp_daemon_chroot();
 	if (*p) {
 		log_init(0); /* Make use we've initialized syslog before chrooting. */
+		tzset();
 		if (chroot(p) < 0) {
 			rsyserr(FLOG, errno, "daemon chroot(\"%s\") failed", p);
 			return -1;
