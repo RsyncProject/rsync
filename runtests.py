@@ -347,6 +347,9 @@ def main():
     tests = collect_tests(suitedir, args.tests)
     full_run = len(args.tests) == 0
 
+    # Record test order for consistent skipped-list output
+    test_order = {os.path.basename(t).replace('.test', ''): i for i, t in enumerate(tests)}
+
     passed = 0
     failed = 0
     skipped = 0
@@ -442,7 +445,7 @@ def main():
     if vg_errors > 0:
         print(f'      {vg_errors} valgrind error(s) found (see logs in {scratchbase})')
 
-    skipped_str = ','.join(sorted(skipped_list))
+    skipped_str = ','.join(sorted(skipped_list, key=lambda x: test_order.get(x, 0)))
     if full_run and args.expect_skipped != 'IGNORE':
         print('----- skipped results:')
         print(f'      expected: {args.expect_skipped}')
