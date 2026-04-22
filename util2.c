@@ -79,9 +79,7 @@ void *my_alloc(void *ptr, size_t num, size_t size, const char *file, int line)
 			who_am_i(), do_big_num(max_alloc, 0, NULL), src_file(file), line);
 		exit_cleanup(RERR_MALLOC);
 	}
-	if (!ptr)
-		ptr = malloc(num * size);
-	else if (ptr == do_calloc)
+	if (!ptr || ptr == do_calloc)
 		ptr = calloc(num, size);
 	else
 		ptr = realloc(ptr, num * size);
