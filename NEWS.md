@@ -2,9 +2,140 @@
 
 ## Changes in this version:
 
+### SECURITY RELATED:
+
+Several security-relevant defects were reported and fixed since 3.4.1.
+None were assigned a CVE — rsync's fork-per-connection design scopes
+the impact of each of these to the attacker's own connection, which is
+equivalent to the client closing the socket itself — but they are
+fixed here as a matter of hygiene and to reduce the chances of a
+future exploitable combination.  Many thanks to the external
+researchers who reported these issues.
+
+- Fixed a signed integer overflow in the PROXY protocol v2 header
+  parser: a negative `len` field could bypass the size check and cause
+  a stack buffer overflow in `read_buf()`.  Reported by John Walker of
+  ZeroPath.
+
+- Fixed an invalid access to the files array.  Reported by Calum
+  Hutton of Rapid7.
+
+- Reject negative token values in the compressed-stream token
+  decoder; a negative value could cause callers to misinterpret a
+  missing data pointer as literal data.  Reported by Will Sergeant.
+
+- Fixed the element count passed to the xattr `qsort()` (see
+  https://www.openwall.com/lists/oss-security/2026/04/16/2).
+
+- Fixed a buffer underflow in `clean_fname()`, and added a regression
+  test.
+
+- Fixed an uninitialized `mul_one` in the AVX2 get_checksum1 path
+  (undefined behaviour), and added a SIMD-checksum self-test that
+  cross-checks SSE2, SSSE3 and AVX2 against the C reference on both
+  aligned and unaligned buffers.
+
+- Fixed an uninitialized `buf1` on the first call to
+  `get_checksum2()` in the MD4 path (fixes #673).
+
+- Zero all new memory from internal allocations: `my_alloc()` now uses
+  `calloc`, and `expand_item_list()` zeros the expanded portion after
+  `realloc`.  This gives more predictable behaviour if stale or
+  uninitialised memory is ever accidentally read.
+
 ### BUG FIXES:
 
-- ...
+- Call `tzset()` before chroot so that log timestamps continue to
+  reflect the configured local timezone after the daemon chroots
+  (glibc needs `/etc/localtime`, which is unreachable post-chroot).
+
+- Use the correct time when writing to the log file.
+
+- Do not clear `DISPLAY` unconditionally.
+
+- Fixed a Y2038 bug in `syscall.c` by replacing the `Int32x32To64`
+  macro (which truncates its arguments to 32 bits) with a plain
+  64-bit multiplication.
+
+- Fixed ACL ID mapping for non-root users (closes #618).
+
+- Fixed handling of objects with many xattrs on FreeBSD.
+
+- Fixed `--open-noatime` not taking effect when opening regular
+  files: `O_NOATIME` is now also passed to `do_open_nofollow()`, which
+  has been used for regular files since the CVE fix "fixed symlink
+  race condition in sender".
+
+- Ignore "directory has vanished" errors.
+
+- Fixed the removal of multiple leading slashes.
+
+- Added the missing `--dirs` long option.
+
+- Fixed a segfault if `poptGetContext()` returns NULL (e.g. under
+  OOM) by not passing NULL to `poptReadDefaultConfig()`.  Reported by
+  Ronnie Sahlberg; found with `malloc-fail-tester`.
+
+- Fixed a build error on ia64 NonStop (which treats missing
+  prototypes as an error, not a warning).
+
+- Fixed a flaky hardlinks test (fixes #735).
+
+### ENHANCEMENTS:
+
+- Added multi-threaded `zstd` compression, gated by a new
+  `--compress-threads=N` option, with validation and man-page
+  coverage.
+
+- Documented the `temp dir` parameter in the rsyncd.conf man page
+  (fixes #820).
+
+- Improved rendering of interior dashes in long-option names in
+  `md-convert` (perhaps fixes #686).
+
+### PORTABILITY / BUILD:
+
+- Fixed glibc 2.43 const-preserving overloads of `strtok()`,
+  `strchr()` etc. by declaring the affected locals with the right
+  constness.  Contributed by Holger Hoffstätte.
+
+- Converted the bundled zlib 1.2.8 from K&R-style function
+  definitions to ANSI prototypes, so it builds with clang 16+.
+
+- Avoid using `bool` as an identifier; it is a keyword in C23.
+
+- `configure.ac`: check for xattr functions in libc first and only
+  fall back to `-lattr`, avoiding spurious overlinking when `-lattr`
+  happens to be installed.  Contributed by Eli Schwartz.
+
+- Made the build reproducible by honouring `SOURCE_DATE_EPOCH` for
+  the manpage date.
+
+- Removed obsolete `popt/findme.c` and `popt/findme.h` that upstream
+  popt 1.14 folded into `popt.c` (fixes #710).  Contributed by Alan
+  Coopersmith.
+
+### INTERNAL:
+
+- Made many module-global variables `const` so they can live in
+  `.rodata` and enable additional compiler optimization.
+
+### DEVELOPER RELATED:
+
+- Replaced `runtests.sh` with `runtests.py`, a Python test runner
+  that supports `--valgrind` (with per-process log files so valgrind
+  output no longer interferes with output comparisons) and
+  `-j/--parallel` execution for roughly a 7× speed-up on typical
+  hardware.
+
+- Added a SIMD checksum self-test and a `clean-fname-underflow`
+  regression test.
+
+- Various CI fixes for macOS and Cygwin (including adding
+  `simd-checksum` to the expected-skipped lists on platforms without
+  SIMD), and tests now run on `ubuntu-latest`.
+
+- removed support for the unmaintained rsync-patches archive
 
 ------------------------------------------------------------------------------
 
