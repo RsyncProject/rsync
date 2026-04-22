@@ -10,22 +10,28 @@
 . "$suitedir/rsync.fns"
 
 test -f /proc/sys/fs/protected_regular || test_skipped "Can't find protected_regular setting (only available on Linux)"
-pr_lvl=`cat /proc/sys/fs/protected_regular 2>/dev/null` || test_skipped "Can't check if fs.protected_regular is enabled (probably need root)"
+pr_lvl=`cat /proc/sys/fs/protected_regular 2>/dev/null` || test_skipped "Can't check if fs.protected_regular is enabled"
 test "$pr_lvl" != 0 || test_skipped "fs.protected_regular is not enabled"
 
 workdir="$tmpdir/files"
-mkdir "$workdir"
+mkdir -p "$workdir"
 chmod 1777 "$workdir"
 
 echo "Source" > "$workdir/src"
 echo ""       > "$workdir/dst"
-chown 5001 "$workdir/dst" || test_skipped "Can't chown (probably need root)"
 
-# Output is only shown in case of an error
+if ! chown 5001 "$workdir/dst" 2>/dev/null; then
+    # Not root - try re-running under unshare with UID mapping
+    if [ -z "$RSYNC_UNSHARED" ] && unshare --user --map-root-user --map-users 5001:100000:1 true 2>/dev/null; then
+	echo "Re-running under unshare with UID mapping..."
+	RSYNC_UNSHARED=1 exec unshare --user --map-root-user --map-users 5001:100000:1 "$SHELL_PATH" $RUNSHFLAGS "$0"
+    fi
+    test_skipped "Can't chown (need root or unshare with uidmap)"
+fi
+
 echo "Contents of $workdir:"
 ls -al "$workdir"
 
 $RSYNC --inplace "$workdir/src" "$workdir/dst" || test_fail
 
-# The script would have aborted on error, so getting here means we've won.
 exit 0
