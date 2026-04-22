@@ -313,15 +313,15 @@ test: check
 
 .PHONY: check
 check: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
-	rsync_bin=`pwd`/rsync$(EXEEXT) $(srcdir)/runtests.sh
+	$(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT)
 
 .PHONY: check29
 check29: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
-	rsync_bin=`pwd`/rsync$(EXEEXT) $(srcdir)/runtests.sh --protocol=29
+	$(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) --protocol=29
 
 .PHONY: check30
 check30: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
-	rsync_bin=`pwd`/rsync$(EXEEXT) $(srcdir)/runtests.sh --protocol=30
+	$(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) --protocol=30
 
 wildtest.o: wildtest.c t_stub.o lib/wildmatch.c rsync.h config.h
 wildtest$(EXEEXT): wildtest.o lib/compat.o lib/snprintf.o @BUILD_POPT@
@@ -350,7 +350,7 @@ testsuite/xattrs-hlink.test:
 
 .PHONY: installcheck
 installcheck: $(CHECK_PROGS) $(CHECK_SYMLINKS)
-	POSIXLY_CORRECT=1 TOOLDIR=`pwd` rsync_bin="$(bindir)/rsync$(EXEEXT)" srcdir="$(srcdir)" $(srcdir)/runtests.sh
+	$(srcdir)/runtests.py --rsync-bin="$(bindir)/rsync$(EXEEXT)" --srcdir="$(srcdir)" --tooldir=`pwd`
 
 # TODO: Add 'dist' target; need to know which files will be included
 

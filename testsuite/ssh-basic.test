@@ -6,7 +6,7 @@
 # This program is distributable under the terms of the GNU GPL (see
 # COPYING)
 
-# This script tests ssh, if possible.  It's called by runtests.sh
+# This script tests ssh, if possible.  It's called by runtests.py
 
 . "$suitedir/rsync.fns"
 
