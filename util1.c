@@ -1718,6 +1718,8 @@ void *expand_item_list(item_list *lp, size_t item_size, const char *desc, int in
 				new_ptr == lp->items ? " not" : "");
 		}
 
+		memset((char *)new_ptr + lp->malloced * item_size, 0,
+		       (expand_size - lp->malloced) * item_size);
 		lp->items = new_ptr;
 		lp->malloced = expand_size;
 	}
