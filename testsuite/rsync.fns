@@ -97,7 +97,7 @@ printmsg() {
 }
 
 rsync_ls_lR() {
-    find "$@" -name .git -prune -o -name auto-build-save -prune -o -print | \
+    find "$@" -name .git -prune -o -name auto-build-save -prune -o -name testtmp -prune -o -print | \
 	sort | sed 's/ /\\ /g' | xargs "$TOOLDIR/tls" $TLS_ARGS
 }
 
