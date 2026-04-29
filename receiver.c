@@ -318,7 +318,12 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 		}
 	}
 
-	while ((i = recv_token(f_in, &data)) != 0) {
+	while (1) {
+		data = NULL;
+		i = recv_token(f_in, &data);
+		if (i == 0)
+			break;
+
 		if (INFO_GTE(PROGRESS, 1))
 			show_progress(offset, total_size);
 
@@ -326,6 +331,10 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 			maybe_send_keepalive(time(NULL), MSK_ALLOW_FLUSH | MSK_ACTIVE_RECEIVER);
 
 		if (i > 0) {
+			if (!data) {
+				rprintf(FERROR, "Invalid literal token with no data [%s]\n", who_am_i());
+				exit_cleanup(RERR_PROTOCOL);
+			}
 			if (DEBUG_GTE(DELTASUM, 3)) {
 				rprintf(FINFO,"data recv %d at %s\n",
 					i, big_num(offset));
