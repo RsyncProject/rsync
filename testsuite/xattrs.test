@@ -38,7 +38,10 @@ EOF
     xls() {
 	for fn in "${@}"; do
 	    runat "$fn" "$SHELL_PATH" <<EOF
-for x in *; do echo "\$x=\`cat \$x\`"; done
+for x in *; do
+    case "\$x" in SUNWattr_*) continue;; esac
+    echo "\$x=\`cat \$x\`"
+done
 EOF
        done
     }
