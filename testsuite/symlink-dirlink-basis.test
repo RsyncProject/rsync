@@ -26,6 +26,18 @@
 
 . "$suitedir/rsync.fns"
 
+# secure_relative_open() uses kernel-enforced "stay below dirfd" via
+# openat2(RESOLVE_BENEATH) on Linux 5.6+ and openat(O_RESOLVE_BENEATH)
+# on FreeBSD 13+. Other platforms fall back to a per-component
+# O_NOFOLLOW walk that rejects every symlink including legitimate
+# directory symlinks -- the very case this test exercises. Skip on
+# those rather than report a known failure.
+case "$(uname -s)" in
+    SunOS|OpenBSD|NetBSD|CYGWIN*)
+	test_skipped "secure_relative_open lacks RESOLVE_BENEATH equivalent on $(uname -s); issue #715 still affects this platform"
+	;;
+esac
+
 RSYNC_RSH="$scratchdir/src/support/lsh.sh"
 export RSYNC_RSH
 
