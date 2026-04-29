@@ -1,37 +1,38 @@
-name: Test rsync on FreeBSD
+name: Test rsync on NetBSD
 
 on:
   push:
     branches: [ master ]
     paths-ignore:
       - '.github/workflows/*.yml'
-      - '!.github/workflows/freebsd-build.yml'
+      - '!.github/workflows/netbsd-build.yml'
   pull_request:
     branches: [ master ]
     paths-ignore:
       - '.github/workflows/*.yml'
-      - '!.github/workflows/freebsd-build.yml'
+      - '!.github/workflows/netbsd-build.yml'
   schedule:
     - cron: '42 8 * * *'
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    name: Test rsync on FreeBSD
+    name: Test rsync on NetBSD
     steps:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
-    - name: Test in FreeBSD VM
+    - name: Test in NetBSD VM
       id: test
-      uses: vmactions/freebsd-vm@v1
+      uses: vmactions/netbsd-vm@v1
       with:
         usesh: true
         prepare: |
-          pkg install -y bash autotools m4 devel/xxhash zstd liblz4 python3 archivers/liblz4 git
+          PATH=/usr/sbin:$PATH pkg_add autoconf automake python312
+          ln -sf /usr/pkg/bin/python3.12 /usr/pkg/bin/python3
         run: |
-          freebsd-version
-          ./configure --with-rrsync -disable-zstd --disable-md2man --disable-xxhash --disable-lz4
+          uname -a
+          ./configure --with-rrsync --disable-zstd --disable-md2man --disable-xxhash --disable-lz4
           make
           ./rsync --version
           make check
@@ -39,7 +40,7 @@ jobs:
     - name: save artifact
       uses: actions/upload-artifact@v4
       with:
-        name: freebsd-bin
+        name: netbsd-bin
         path: |
           rsync
           rsync-ssl

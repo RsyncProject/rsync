@@ -1,37 +1,39 @@
-name: Test rsync on FreeBSD
+name: Test rsync on OpenBSD
 
 on:
   push:
     branches: [ master ]
     paths-ignore:
       - '.github/workflows/*.yml'
-      - '!.github/workflows/freebsd-build.yml'
+      - '!.github/workflows/openbsd-build.yml'
   pull_request:
     branches: [ master ]
     paths-ignore:
       - '.github/workflows/*.yml'
-      - '!.github/workflows/freebsd-build.yml'
+      - '!.github/workflows/openbsd-build.yml'
   schedule:
     - cron: '42 8 * * *'
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    name: Test rsync on FreeBSD
+    name: Test rsync on OpenBSD
     steps:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
-    - name: Test in FreeBSD VM
+    - name: Test in OpenBSD VM
       id: test
-      uses: vmactions/freebsd-vm@v1
+      uses: vmactions/openbsd-vm@v1
       with:
         usesh: true
         prepare: |
-          pkg install -y bash autotools m4 devel/xxhash zstd liblz4 python3 archivers/liblz4 git
+          pkg_add -I bash autoconf%2.71 automake%1.16
         run: |
-          freebsd-version
-          ./configure --with-rrsync -disable-zstd --disable-md2man --disable-xxhash --disable-lz4
+          uname -a
+          export AUTOCONF_VERSION=2.71
+          export AUTOMAKE_VERSION=1.16
+          ./configure --with-rrsync --disable-zstd --disable-md2man --disable-xxhash --disable-lz4
           make
           ./rsync --version
           make check
@@ -39,7 +41,7 @@ jobs:
     - name: save artifact
       uses: actions/upload-artifact@v4
       with:
-        name: freebsd-bin
+        name: openbsd-bin
         path: |
           rsync
           rsync-ssl
