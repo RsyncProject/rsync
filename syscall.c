@@ -734,9 +734,13 @@ int do_open_nofollow(const char *pathname, int flags)
   versions rejected every symlink with O_NOFOLLOW on each component,
   which broke legitimate directory symlinks on the receiver side
   (https://github.com/RsyncProject/rsync/issues/715). The escape
-  prevention is handled by the kernel via openat2(RESOLVE_BENEATH)
-  on Linux 5.6+; older systems fall back to the per-component
-  O_NOFOLLOW walk below.
+  prevention is handled by:
+    Linux 5.6+:                openat2(RESOLVE_BENEATH)
+    FreeBSD 13+:               openat() with O_RESOLVE_BENEATH
+    macOS 15+ / iOS 18+:       openat() with O_RESOLVE_BENEATH (same
+                               flag name, picked up by the same #ifdef;
+                               flag value differs from FreeBSD)
+  Other systems fall back to the per-component O_NOFOLLOW walk below.
 
   The relpath must also not contain any ../ elements in the path.
 */
@@ -768,6 +772,32 @@ static int secure_relative_open_linux(const char *basedir, const char *relpath, 
 }
 #endif
 
+#ifdef O_RESOLVE_BENEATH
+/* FreeBSD 13+ and macOS 15+ (Sequoia) / iOS 18+: O_RESOLVE_BENEATH is
+ * an openat() flag with the same "must not escape dirfd" semantics as
+ * Linux's RESOLVE_BENEATH. The kernel rejects ".." escapes, absolute
+ * symlinks, and symlinks whose target lies outside dirfd. (FreeBSD and
+ * Apple use different flag bit values, but the same symbolic name.) */
+static int secure_relative_open_resolve_beneath(const char *basedir, const char *relpath, int flags, mode_t mode)
+{
+	int dirfd, retfd;
+
+	if (basedir == NULL) {
+		dirfd = AT_FDCWD;
+	} else {
+		dirfd = openat(AT_FDCWD, basedir, O_RDONLY | O_DIRECTORY);
+		if (dirfd == -1)
+			return -1;
+	}
+
+	retfd = openat(dirfd, relpath, flags | O_RESOLVE_BENEATH, mode);
+
+	if (dirfd != AT_FDCWD)
+		close(dirfd);
+	return retfd;
+}
+#endif
+
 int secure_relative_open(const char *basedir, const char *relpath, int flags, mode_t mode)
 {
 	if (!relpath || relpath[0] == '/') {
@@ -789,6 +819,10 @@ int secure_relative_open(const char *basedir, const char *relpath, int flags, mo
 		if (fd != -1 || errno != ENOSYS)
 			return fd;
 	}
+#endif
+
+#ifdef O_RESOLVE_BENEATH
+	return secure_relative_open_resolve_beneath(basedir, relpath, flags, mode);
 #endif
 
 #if !defined(O_NOFOLLOW) || !defined(O_DIRECTORY) || !defined(AT_FDCWD)
