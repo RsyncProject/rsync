@@ -1,3 +1,58 @@
+# NEWS for rsync 3.4.3 (UNRELEASED)
+
+## Changes in this version:
+
+### BUG FIXES:
+
+- Fixed a regression introduced by the 3.4.0 secure_relative_open()
+  CVE fix where legitimate directory symlinks on the receiver side
+  (e.g. when using `-K` / `--copy-dirlinks`) caused "failed
+  verification -- update discarded" errors on delta transfers. The
+  old code rejected every symlink in the path with a per-component
+  `O_NOFOLLOW` walk; the receiver now uses kernel-enforced "stay
+  below dirfd" path resolution where available. Fixes #715.
+
+### PORTABILITY / BUILD:
+
+- secure_relative_open() now uses `openat2(RESOLVE_BENEATH |
+  RESOLVE_NO_MAGICLINKS)` on Linux 5.6+, and `openat()` with
+  `O_RESOLVE_BENEATH` on FreeBSD 13+ and macOS 15+ (Sequoia) /
+  iOS 18+. The kernel rejects ".." escapes, absolute symlinks, and
+  symlinks whose target lies outside the starting directory, while
+  still following symlinks that resolve within it -- the same
+  trade-off that fixes the issue #715 regression without weakening
+  the original CVE protection. Other platforms (Solaris, OpenBSD,
+  NetBSD, Cygwin) retain the previous per-component `O_NOFOLLOW`
+  walk; on those platforms the issue #715 regression remains
+  visible.
+
+- testsuite/xattrs: ignore `SUNWattr_*` in the Solaris `xls`
+  helper.
+
+### DEVELOPER RELATED:
+
+- Added testsuite/symlink-dirlink-basis.test (taken from PR #864
+  by Samuel Henrique) covering the issue #715 regression and
+  several edge cases (`--backup`, `--inplace`, `--partial-dir`
+  with protocol < 29, top-level files). The test skips on
+  platforms without a RESOLVE_BENEATH equivalent.
+
+- runtests.py now errors early with a clear message when the test
+  helper programs (`tls`, `trimslash`, `t_unsafe`, `wildtest`,
+  `getgroups`, `getfsdev`) are missing, instead of letting many
+  tests fail with confusing "not found" errors.
+
+- Added OpenBSD and NetBSD CI jobs that run `make check` on those
+  platforms.
+
+- Added `symlink-dirlink-basis` to the Cygwin CI's expected-skipped
+  list.
+
+- Removed the old release system (replaced by the new release
+  script in 3.4.2).
+
+------------------------------------------------------------------------------
+
 # NEWS for rsync 3.4.2 (28 Apr 2026)
 
 ## Changes in this version:
@@ -4980,6 +5035,7 @@ to develop and test fixes.
 
 | RELEASE DATE | VER.   | DATE OF COMMIT\* | PROTOCOL    |
 |--------------|--------|------------------|-------------|
+| ?? ??? 2026  | 3.4.3  |                  | 32          |
 | 28 Apr 2026  | 3.4.2  |                  | 32          |
 | 16 Jan 2025  | 3.4.1  |                  | 32          |
 | 15 Jan 2025  | 3.4.0  | 15 Jan 2025      | 32          |
