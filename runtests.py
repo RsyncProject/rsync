@@ -297,6 +297,22 @@ def main():
         sys.stderr.write(f"srcdir {srcdir} is not a directory\n")
         sys.exit(2)
 
+    # Helper programs the test scripts invoke directly. Missing any of these
+    # would cause many tests to fail with confusing "not found" errors, so
+    # check up front and point the user at the make target that builds them.
+    required_helpers = ['tls', 'trimslash', 't_unsafe', 'wildtest',
+                        'getgroups', 'getfsdev']
+    missing = [h for h in required_helpers
+               if not os.path.isfile(os.path.join(tooldir, h))]
+    if missing:
+        sys.stderr.write(
+            f"runtests.py: missing test helper program(s) in {tooldir}: "
+            f"{', '.join(missing)}\n"
+            f"Build them with: make {' '.join(missing)}\n"
+            f"or run the full test target: make check\n"
+        )
+        sys.exit(2)
+
     testuser = get_testuser()
 
     # Print header
