@@ -34,11 +34,6 @@ jobs:
           ./configure --with-rrsync -disable-zstd --disable-md2man --disable-xxhash --disable-lz4
           make
           ./rsync --version
-          cat > testsuite/xattrs.test <<'EOF'
-          #!/bin/sh
-          . $suitedir/rsync.fns
-          test_skipped "skipped on Solaris pending xattrs fix"
-          EOF
           make check
           ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
     - name: save artifact
