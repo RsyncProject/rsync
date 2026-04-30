@@ -394,9 +394,18 @@ static void output_itemized_counts(const char *prefix, int *counts)
 		counts[0] -= counts[1] + counts[2] + counts[3] + counts[4];
 		for (j = 0; j < 5; j++) {
 			if (counts[j]) {
+				/* snprintf can return more than its size arg
+				 * on truncation; keep len <= sizeof buf - 2 so
+				 * the closing ')' and trailing NUL always
+				 * have room and the next iteration's
+				 * sizeof buf - len - 2 cannot underflow. */
+				if (len >= (int)sizeof buf - 2)
+					break;
 				len += snprintf(buf+len, sizeof buf - len - 2,
 					"%s%s: %s",
 					pre, labels[j], comma_num(counts[j]));
+				if (len > (int)sizeof buf - 2)
+					len = (int)sizeof buf - 2;
 				pre = ", ";
 			}
 		}
