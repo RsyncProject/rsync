@@ -456,11 +456,17 @@ void rsyserr(enum logcode code, int errcode, const char *format, ...)
 	char buf[BIGPATHBUFLEN];
 	size_t len;
 
+	/* snprintf returns the would-have-been length on truncation, so
+	 * each cumulative call must be guarded; if not, sizeof buf - len
+	 * can underflow when promoted to size_t and the next call writes
+	 * past the buffer. */
 	len = snprintf(buf, sizeof buf, RSYNC_NAME ": [%s] ", who_am_i());
 
-	va_start(ap, format);
-	len += vsnprintf(buf + len, sizeof buf - len, format, ap);
-	va_end(ap);
+	if (len < sizeof buf) {
+		va_start(ap, format);
+		len += vsnprintf(buf + len, sizeof buf - len, format, ap);
+		va_end(ap);
+	}
 
 	if (len < sizeof buf) {
 		len += snprintf(buf + len, sizeof buf - len,
