@@ -1,0 +1,51 @@
+#!/bin/sh
+
+# Copyright (C) 2026 by Andrew Tridgell
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Test that a daemon module configured with "refuse options = compress"
+# rejects clients that ask for compression and still serves the same
+# transfer when the client does not.
+
+. "$suitedir/rsync.fns"
+
+build_rsyncd_conf
+
+# Append a module that refuses --compress (-z).
+cat >>"$conf" <<EOF
+
+[no-compress]
+	path = $fromdir
+	read only = yes
+	refuse options = compress
+EOF
+
+RSYNC_CONNECT_PROG="$RSYNC --config=$conf --daemon"
+export RSYNC_CONNECT_PROG
+
+hands_setup
+
+# Build a reference tree mirroring the daemon's global exclude rule.
+$RSYNC -av --exclude=foobar.baz "$fromdir/" "$chkdir/"
+
+# A compressed transfer must be refused.
+errlog="$scratchdir/refuse.err"
+if $RSYNC -avz localhost::no-compress/ "$todir/" >/dev/null 2>"$errlog"; then
+    cat "$errlog" >&2
+    test_fail "compressed transfer was not refused"
+fi
+
+grep -- '--compress' "$errlog" >/dev/null || {
+    cat "$errlog" >&2
+    test_fail "expected refuse error mentioning --compress"
+}
+
+# The same transfer without -z must succeed.
+rm -rf "$todir"
+mkdir "$todir"
+checkit "$RSYNC -av localhost::no-compress/ '$todir/'" "$chkdir" "$todir"
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0
