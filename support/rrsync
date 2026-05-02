@@ -302,12 +302,12 @@ def validated_arg(opt, arg, typ=3, wild=False):
     if arg.startswith('./'):
         arg = arg[1:]
     arg = arg.replace('//', '/')
-    arg = arg.lstrip('/')
+    is_absolute_arg = args.absolute and opt == 'arg' and args.dir != '/' and (arg == args.dir or arg.startswith(args.dir_slash))
+    if not is_absolute_arg:
+        arg = arg.lstrip('/')
     if args.dir != '/':
         if HAS_DOT_DOT_RE.search(arg):
             die("do not use .. in", opt, "(anchor the path at the root of your restricted dir)")
-        if arg.startswith('/'):
-            arg = args.dir + arg
 
     if wild:
         got = glob.glob(arg)
@@ -328,12 +328,15 @@ def validated_arg(opt, arg, typ=3, wild=False):
                     arg = arg[:-2]
             real_arg = os.path.realpath(arg)
             if arg != real_arg and not real_arg.startswith(args.dir_slash):
-                die('unsafe arg:', orig_arg, [arg, real_arg])
+                if not (is_absolute_arg and real_arg == args.dir):
+                    die('unsafe arg:', orig_arg, [arg, real_arg])
             if arg_has_trailing_slash:
                 arg += '/'
             elif arg_has_trailing_slash_dot:
                 arg += '/.'
-            if opt == 'arg' and arg.startswith(args.dir_slash):
+            if is_absolute_arg and arg == args.dir:
+                arg = '.'
+            elif opt == 'arg' and arg.startswith(args.dir_slash):
                 arg = arg[args.dir_slash_len:]
                 if arg == '':
                     arg = '.'
@@ -372,6 +375,7 @@ if __name__ == '__main__':
     only_group.add_argument('-ro', action='store_true', help="Allow only reading from the DIR. Implies -no-del and -no-lock.")
     only_group.add_argument('-wo', action='store_true', help="Allow only writing to the DIR.")
     arg_parser.add_argument('-munge', action='store_true', help="Enable rsync's --munge-links on the server side.")
+    arg_parser.add_argument('-absolute', action='store_true', help="Allow transfer args to use absolute server paths under DIR.")
     arg_parser.add_argument('-no-del', action='store_true', help="Disable rsync's --delete* and --remove* options.")
     arg_parser.add_argument('-no-lock', action='store_true', help="Avoid the single-run (per-user) lock check.")
     arg_parser.add_argument('-no-overwrite', action='store_true', help="Prevent overwriting existing files by enforcing --ignore-existing")
