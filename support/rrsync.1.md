@@ -5,7 +5,7 @@ rrsync - a script to setup restricted rsync users via ssh logins
 ## SYNOPSIS
 
 ```
-rrsync [-ro|-wo] [-munge] [-no-del] [-no-lock] [-no-overwrite]  DIR
+rrsync [-ro|-wo] [-munge] [-absolute] [-no-del] [-no-lock] [-no-overwrite] DIR
 ```
 
 The single non-option argument specifies the restricted _DIR_ to use. It can be
@@ -76,6 +76,12 @@ The remainder of this manpage is dedicated to using the rrsync script.
 0.  `-munge`
 
     Enable rsync's [`--munge-links`](rsync.1#opt) on the server side.
+
+0. `-absolute`
+
+    Allow file-transfer arguments to name the restricted directory using its
+    absolute server path. For example, with `rrsync -absolute /path/to/root`,
+    the transfer arg `/path/to/root/dir1` is accepted as an alias for `dir1`.
 
 0.  `-no-del`
 
