@@ -300,8 +300,8 @@ def main():
     # Helper programs the test scripts invoke directly. Missing any of these
     # would cause many tests to fail with confusing "not found" errors, so
     # check up front and point the user at the make target that builds them.
-    required_helpers = ['tls', 'trimslash', 't_unsafe', 'wildtest',
-                        'getgroups', 'getfsdev']
+    required_helpers = ['tls', 'trimslash', 't_unsafe', 't_chmod_secure',
+                        'wildtest', 'getgroups', 'getfsdev']
     missing = [h for h in required_helpers
                if not os.path.isfile(os.path.join(tooldir, h))]
     if missing:

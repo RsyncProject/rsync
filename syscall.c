@@ -281,6 +281,86 @@ int do_chmod(const char *path, mode_t mode)
 		return code;
 	return 0;
 }
+
+/*
+  Symlink-race-safe variant of do_chmod() for receiver-side use.
+
+  Threat model: on a daemon running with "use chroot = no" (the prerequisite
+  for CVE-2026-29518), a local attacker can race a symlink swap of one of
+  the parent directory components of a path the receiver is about to chmod.
+  Because chmod() resolves symlinks at every component, the swap redirects
+  the chmod outside the receiver's confinement.
+
+  Defence: open the *parent* directory of fname under secure_relative_open()
+  (which uses openat2(RESOLVE_BENEATH) on Linux 5.6+, openat() with
+  O_RESOLVE_BENEATH on FreeBSD 13+ and macOS 15+ (Sequoia), or a per-component
+  O_NOFOLLOW walk elsewhere) and do fchmodat() against that dirfd. A symlink
+  substituted into one of the parent components is then either followed
+  within the tree (legitimate dir-symlinks still work) or rejected by the
+  kernel (escape attempts fail).
+
+  Final-component handling matches do_chmod(): fchmodat() with flag 0
+  follows a symlink at the final component, which is the same behaviour as
+  chmod() and matches every current call site (the file being chmod'd is
+  one the receiver itself just created or transferred). For the rare case
+  where the caller wants to chmod a symlink-as-an-object (S_ISLNK in the
+  mode bits), we fall through to do_chmod() which has portability code for
+  that case.
+
+  Falls back to do_chmod() for absolute paths and for paths with no parent
+  component, where there is nothing to protect against.
+*/
+int do_chmod_at(const char *fname, mode_t mode)
+{
+#ifdef AT_FDCWD
+	extern int am_daemon, am_chrooted;
+	char dirpath[MAXPATHLEN];
+	const char *bname;
+	const char *slash;
+	int dfd, ret, e;
+	size_t dlen;
+
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+
+	/* Only the daemon-without-chroot case is exposed to the symlink-
+	 * race attack: a chroot already confines the receiver, and a
+	 * non-daemon rsync runs with the user's own authority so a
+	 * symlink they planted can only redirect to files they could
+	 * already access.  Everywhere else, fall through to plain
+	 * do_chmod() to avoid the dirfd-open overhead on every call. */
+	if (!am_daemon || am_chrooted)
+		return do_chmod(fname, mode);
+
+	if (!fname || !*fname || *fname == '/' || S_ISLNK(mode))
+		return do_chmod(fname, mode);
+
+	slash = strrchr(fname, '/');
+	if (!slash)
+		return do_chmod(fname, mode);
+
+	dlen = slash - fname;
+	if (dlen >= sizeof dirpath) {
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+	memcpy(dirpath, fname, dlen);
+	dirpath[dlen] = '\0';
+	bname = slash + 1;
+
+	dfd = secure_relative_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
+	if (dfd < 0)
+		return -1;
+
+	ret = fchmodat(dfd, bname, mode, 0);
+	e = errno;
+	close(dfd);
+	errno = e;
+	return ret;
+#else
+	return do_chmod(fname, mode);
+#endif
+}
 #endif
 
 int do_rename(const char *old_path, const char *new_path)
