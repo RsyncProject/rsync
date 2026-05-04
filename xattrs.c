@@ -1086,7 +1086,7 @@ int set_xattr(const char *fname, const struct file_struct *file, const char *fna
 	 && !S_ISLNK(sxp->st.st_mode)
 #endif
 	 && access(fname, W_OK) < 0
-	 && do_chmod(fname, (sxp->st.st_mode & CHMOD_BITS) | S_IWUSR) == 0)
+	 && do_chmod_at(fname, (sxp->st.st_mode & CHMOD_BITS) | S_IWUSR) == 0)
 		added_write_perm = 1;
 
 	ndx = F_XATTR(file);
@@ -1094,7 +1094,7 @@ int set_xattr(const char *fname, const struct file_struct *file, const char *fna
 	lst = &glst->xa_items;
 	int return_value = rsync_xal_set(fname, lst, fnamecmp, sxp);
 	if (added_write_perm) /* remove the temporary write permission */
-		do_chmod(fname, sxp->st.st_mode);
+		do_chmod_at(fname, sxp->st.st_mode);
 	return return_value;
 }
 
@@ -1211,7 +1211,7 @@ int set_stat_xattr(const char *fname, struct file_struct *file, mode_t new_mode)
 	mode = (fst.st_mode & _S_IFMT) | (fmode & ACCESSPERMS)
 	     | (S_ISDIR(fst.st_mode) ? 0700 : 0600);
 	if (fst.st_mode != mode)
-		do_chmod(fname, mode);
+		do_chmod_at(fname, mode);
 	if (!IS_DEVICE(fst.st_mode))
 		fst.st_rdev = 0; /* just in case */
 

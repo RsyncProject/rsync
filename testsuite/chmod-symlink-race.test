@@ -1,0 +1,68 @@
+#!/bin/sh
+
+# Copyright (C) 2026 by Andrew Tridgell
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Regression test for the symlink-TOCTOU class of bug applied to
+# chmod() on the receiver side. The CVE-2026-29518 fix used
+# secure_relative_open() for the basis-file open, but every other
+# path-based syscall the receiver runs on sender-controllable paths
+# is vulnerable to the same primitive: a local attacker swaps a
+# symlink into one of the parent directory components between the
+# receiver's check and its act, and the syscall escapes the module.
+#
+# This test exercises the new do_chmod_at() wrapper via the
+# t_chmod_secure helper. The helper sets up two scenarios:
+#   - a parent dir-symlink that resolves WITHIN the module tree
+#     (legitimate -K-style use, must continue to work)
+#   - a parent dir-symlink that escapes the module tree (the
+#     attack, must be rejected)
+# plus two regression scenarios (plain relative path, top-level
+# file) that just confirm the safe wrapper doesn't break the
+# normal case.
+#
+# The kernel-enforced "stay below dirfd" path resolution is
+# only available on Linux 5.6+, FreeBSD 13+, and macOS 15+.
+# Skip on platforms that fall back to per-component O_NOFOLLOW
+# (Solaris, OpenBSD, NetBSD, Cygwin); the per-component fallback
+# would also reject the attack but the legitimate dir-symlink
+# scenario would fail there.
+
+. "$suitedir/rsync.fns"
+
+case "$(uname -s)" in
+    SunOS|OpenBSD|NetBSD|CYGWIN*)
+	test_skipped "do_chmod_at relies on RESOLVE_BENEATH-equivalent kernel support not available on $(uname -s)"
+	;;
+esac
+
+mod="$scratchdir/module"
+trap_outside="$scratchdir/trap"
+rm -rf "$mod" "$trap_outside"
+mkdir -p "$mod/realdir" "$trap_outside"
+
+# Set up the four file-system objects the helper expects:
+echo bystander > "$mod/realdir/sentinel"
+chmod 0600 "$mod/realdir/sentinel"
+echo target > "$trap_outside/sentinel"
+chmod 0600 "$trap_outside/sentinel"
+ln -s realdir "$mod/inside_link"
+ln -s ../trap "$mod/escape_link"
+echo top > "$mod/topfile"
+chmod 0600 "$mod/topfile"
+
+"$TOOLDIR/t_chmod_secure" "$mod" || \
+    test_fail "t_chmod_secure reported failures (see stderr above)"
+
+# Sanity-check from the shell side too: the outside file's mode must
+# still be 0600 -- the helper checked this, but a second look from
+# the shell guards against a helper-internal stat() bug.
+mode=$(stat -c '%a' "$trap_outside/sentinel" 2>/dev/null \
+       || stat -f '%Lp' "$trap_outside/sentinel" 2>/dev/null)
+if [ "$mode" != "600" ]; then
+    test_fail "outside sentinel mode changed from 600 to $mode -- chmod escaped the module"
+fi
+
+exit 0

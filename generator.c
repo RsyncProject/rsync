@@ -1499,7 +1499,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 #ifdef HAVE_CHMOD
 		if (!am_root && (file->mode & S_IRWXU) != S_IRWXU && dir_tweaking) {
 			mode_t mode = file->mode | S_IRWXU;
-			if (do_chmod(fname, mode) < 0) {
+			if (do_chmod_at(fname, mode) < 0) {
 				rsyserr(FERROR_XFER, errno,
 					"failed to modify permissions on %s",
 					full_fname(fname));
@@ -2107,7 +2107,7 @@ static void touch_up_dirs(struct file_list *flist, int ndx)
 			continue;
 		fname = f_name(file, NULL);
 		if (fix_dir_perms)
-			do_chmod(fname, file->mode);
+			do_chmod_at(fname, file->mode);
 		if (need_retouch_dir_times) {
 			STRUCT_STAT st;
 			if (link_stat(fname, &st, 0) == 0 && mtime_differs(&st, file)) {
