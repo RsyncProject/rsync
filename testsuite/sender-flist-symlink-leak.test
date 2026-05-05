@@ -1,0 +1,90 @@
+#!/bin/sh
+
+# Copyright (C) 2026 by Andrew Tridgell
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Regression test for codex re-check finding: the sender-side file-
+# list generator can still follow an attacker-planted symlink out of
+# the module via change_pathname() -> change_dir(...,CD_SKIP_CHDIR)
+# followed by change_dir(...,CD_NORMAL). The CD_SKIP_CHDIR sets
+# skipped_chdir=1, and the next CD_NORMAL call's secure-branch in
+# util1.c is gated on `!skipped_chdir`, so the secure path is
+# bypassed and a raw chdir(curr_dir) follows attacker-controlled
+# symlinks during flist generation.
+#
+# Reach: rsync daemon module with `use chroot = no`. A local
+# attacker plants module/cd -> /outside. A client (innocent or
+# malicious) pulls rsync://<daemon>/<module>/cd/. The daemon, as
+# sender, enumerates files in /outside and ships their metadata
+# (names, sizes, modes, mtimes) to the client. The actual content
+# transfer fails later at the secure_relative_open step with EXDEV,
+# but by then the metadata has already leaked.
+#
+# We detect by running a dry-run pull of the symlinked subdir and
+# checking whether the client's --list-only output mentions any
+# file from /outside. With the bug, /outside/secret.txt appears in
+# the list with its size; with the fix, the daemon's chdir into
+# the symlinked subdir is rejected and no /outside file is listed.
+
+. "$suitedir/rsync.fns"
+
+case "$(uname -s)" in
+    SunOS|OpenBSD|NetBSD|CYGWIN*)
+        test_skipped "secure change_dir relies on RESOLVE_BENEATH-equivalent kernel support not available on $(uname -s)"
+        ;;
+esac
+
+mod="$scratchdir/module"
+outside="$scratchdir/outside"
+listfile="$scratchdir/listed.txt"
+conf="$scratchdir/test-rsyncd.conf"
+
+rm -rf "$mod" "$outside"
+mkdir -p "$mod" "$outside"
+
+# Outside-the-module file the daemon should NOT enumerate to clients.
+# A distinctive name + non-trivial size makes the leak easy to spot.
+echo "OUTSIDE_PROTECTED_FILE_USED_AS_LEAK_DETECTOR" > "$outside/leak_marker.txt"
+chmod 0644 "$outside/leak_marker.txt"
+
+# The symlink trap planted by the local attacker.
+ln -s "$outside" "$mod/cd"
+
+my_uid=`get_testuid`
+root_uid=`get_rootuid`
+root_gid=`get_rootgid`
+uid_setting="uid = $root_uid"
+gid_setting="gid = $root_gid"
+if test x"$my_uid" != x"$root_uid"; then
+    uid_setting="#$uid_setting"
+    gid_setting="#$gid_setting"
+fi
+
+cat > "$conf" <<EOF
+use chroot = no
+$uid_setting
+$gid_setting
+log file = $scratchdir/rsyncd.log
+[upload]
+    path = $mod
+    use chroot = no
+    read only = no
+EOF
+
+# Pull recursively into the symlinked subdir with dry-run + verbose,
+# capturing the daemon's flist (file list) on stdout. If the daemon
+# enumerates /outside, leak_marker.txt will appear in the listing.
+RSYNC_CONNECT_PROG="$RSYNC --config=$conf --daemon" \
+    $RSYNC -nrv rsync://localhost/upload/cd/ "$scratchdir/dst/" \
+    > "$listfile" 2>&1 || true
+
+if grep -q "leak_marker\.txt" "$listfile"; then
+    echo "----- leaked listing follows" >&2
+    sed 's/^/    /' "$listfile" >&2
+    echo "----- leaked listing ends" >&2
+    test_fail "sender flist leak: outside/leak_marker.txt was enumerated to the client (daemon's chdir followed the cd symlink during flist generation)"
+fi
+
+exit 0
