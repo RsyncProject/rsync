@@ -203,11 +203,6 @@ int do_symlink_at(const char *lnk, const char *path)
 	if (!am_daemon || am_chrooted)
 		return do_symlink(lnk, path);
 
-#if defined NO_SYMLINK_XATTRS || defined NO_SYMLINK_USER_XATTRS
-	if (am_root < 0)
-		return do_symlink(lnk, path);
-#endif
-
 	if (!path || !*path || *path == '/')
 		return do_symlink(lnk, path);
 
@@ -227,6 +222,34 @@ int do_symlink_at(const char *lnk, const char *path)
 	dfd = secure_relative_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
 	if (dfd < 0)
 		return -1;
+
+#if defined NO_SYMLINK_XATTRS || defined NO_SYMLINK_USER_XATTRS
+	/* For --fake-super, do_symlink writes the link target into a
+	 * regular file rather than creating a real symlink. Do that
+	 * here against the secure dirfd, with O_NOFOLLOW so a pre-
+	 * planted symlink at the basename can't redirect the file
+	 * creation. (Previously the fake-super branch fell through to
+	 * the bare-path do_symlink at the top of the function.) */
+	if (am_root < 0) {
+		int len = strlen(lnk);
+		int fd = openat(dfd, bname,
+				O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW,
+				S_IWUSR | S_IRUSR);
+		if (fd < 0) {
+			e = errno;
+			close(dfd);
+			errno = e;
+			return -1;
+		}
+		ret = (write(fd, lnk, len) == len) ? 0 : -1;
+		if (close(fd) < 0)
+			ret = -1;
+		e = errno;
+		close(dfd);
+		errno = e;
+		return ret;
+	}
+#endif
 
 	ret = symlinkat(lnk, dfd, bname);
 	e = errno;
@@ -503,9 +526,12 @@ int do_mknod(const char *pathname, mode_t mode, dev_t dev)
   mknodat() against that dirfd. mknodat() covers both regular-file
   (S_IFREG with dev=0) and FIFO (S_IFIFO) and device-node creation.
 
-  Falls through to do_mknod() for fake-super (am_root < 0) and for
-  sockets, both of which use auxiliary path-based syscalls that
-  don't have an *at() variant in any portable form.
+  Fake-super (am_root < 0) is handled inline against the secure
+  parent dirfd: it creates a regular empty file (the same file-as-
+  metadata-placeholder pattern do_mknod uses) via openat() with
+  O_NOFOLLOW. Sockets fall through to do_mknod() because their
+  bind(2) takes a path argument with no portable bindat() variant;
+  this is documented as a residual.
 */
 int do_mknod_at(const char *pathname, mode_t mode, dev_t dev)
 {
@@ -521,9 +547,6 @@ int do_mknod_at(const char *pathname, mode_t mode, dev_t dev)
 	RETURN_ERROR_IF_RO_OR_LO;
 
 	if (!am_daemon || am_chrooted)
-		return do_mknod(pathname, mode, dev);
-
-	if (am_root < 0)
 		return do_mknod(pathname, mode, dev);
 
 #if !defined MKNOD_CREATES_SOCKETS && defined HAVE_SYS_UN_H
@@ -550,6 +573,29 @@ int do_mknod_at(const char *pathname, mode_t mode, dev_t dev)
 	dfd = secure_relative_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
 	if (dfd < 0)
 		return -1;
+
+	if (am_root < 0) {
+		/* For --fake-super, do_mknod creates a regular empty
+		 * file as a placeholder for the special-file metadata
+		 * (which is stored in xattrs elsewhere). Do that against
+		 * the secure dirfd, with O_NOFOLLOW so a pre-planted
+		 * symlink at the basename can't redirect the file
+		 * creation. */
+		int fd = openat(dfd, bname,
+				O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW,
+				S_IWUSR | S_IRUSR);
+		if (fd < 0) {
+			e = errno;
+			close(dfd);
+			errno = e;
+			return -1;
+		}
+		ret = (close(fd) < 0) ? -1 : 0;
+		e = errno;
+		close(dfd);
+		errno = e;
+		return ret;
+	}
 
 #if !defined MKNOD_CREATES_FIFOS && defined HAVE_MKFIFO
 	if (S_ISFIFO(mode))
@@ -637,6 +683,76 @@ int do_open(const char *pathname, int flags, mode_t mode)
 #endif
 
 	return open(pathname, flags | O_BINARY, mode);
+}
+
+/*
+  Symlink-race-safe variant of do_open() for receiver-side use. See
+  the comment on do_chmod_at() for the threat model. open() resolves
+  parent components, so a parent-symlink swap can redirect the open
+  to a file outside the module. This wrapper is defence-in-depth for
+  bare-path do_open() sites that callers know are otherwise
+  protected by secure parent-syscalls (e.g. generator.c's in-place
+  backup creation, where robust_unlink() rejects the symlinked
+  parent before this open is reached): if any of those upstream
+  protections is later removed or regresses, the open here still
+  refuses to escape the module.
+
+  Defence: open the parent of pathname under secure_relative_open()
+  and call openat() against the resulting dirfd with O_NOFOLLOW
+  (so the basename itself isn't followed if it happens to be a
+  pre-planted symlink, which is what we want for O_CREAT|O_EXCL).
+*/
+int do_open_at(const char *pathname, int flags, mode_t mode)
+{
+#ifdef AT_FDCWD
+	extern int am_daemon, am_chrooted;
+	char dirpath[MAXPATHLEN];
+	const char *bname;
+	const char *slash;
+	int dfd, ret, e;
+	size_t dlen;
+
+	if (flags != O_RDONLY) {
+		RETURN_ERROR_IF(dry_run, 0);
+		RETURN_ERROR_IF_RO_OR_LO;
+	}
+
+	if (!am_daemon || am_chrooted)
+		return do_open(pathname, flags, mode);
+
+	if (!pathname || !*pathname || *pathname == '/')
+		return do_open(pathname, flags, mode);
+
+	slash = strrchr(pathname, '/');
+	if (!slash)
+		return do_open(pathname, flags, mode);
+
+	dlen = slash - pathname;
+	if (dlen >= sizeof dirpath) {
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+	memcpy(dirpath, pathname, dlen);
+	dirpath[dlen] = '\0';
+	bname = slash + 1;
+
+	dfd = secure_relative_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
+	if (dfd < 0)
+		return -1;
+
+#ifdef O_NOATIME
+	if (open_noatime)
+		flags |= O_NOATIME;
+#endif
+
+	ret = openat(dfd, bname, flags | O_NOFOLLOW | O_BINARY, mode);
+	e = errno;
+	close(dfd);
+	errno = e;
+	return ret;
+#else
+	return do_open(pathname, flags, mode);
+#endif
 }
 
 #ifdef HAVE_CHMOD
