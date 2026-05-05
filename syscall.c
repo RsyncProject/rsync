@@ -93,6 +93,63 @@ int do_unlink(const char *path)
 	return unlink(path);
 }
 
+/*
+  Symlink-race-safe variant of do_unlink() for receiver-side use. See
+  the comment on do_chmod_at() for the threat model. unlink() resolves
+  parent components, so a parent-symlink swap can delete an outside
+  file under the daemon's authority. Defence: open the parent of path
+  under secure_relative_open() and use unlinkat() (flags=0) against
+  that dirfd.
+
+  Falls through to do_unlink() for the same dry-run / non-daemon /
+  chrooted / no-parent / absolute-path cases as the other wrappers.
+*/
+int do_unlink_at(const char *path)
+{
+#ifdef AT_FDCWD
+	extern int am_daemon, am_chrooted;
+	char dirpath[MAXPATHLEN];
+	const char *bname;
+	const char *slash;
+	int dfd, ret, e;
+	size_t dlen;
+
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+
+	if (!am_daemon || am_chrooted)
+		return unlink(path);
+
+	if (!path || !*path || *path == '/')
+		return unlink(path);
+
+	slash = strrchr(path, '/');
+	if (!slash)
+		return unlink(path);
+
+	dlen = slash - path;
+	if (dlen >= sizeof dirpath) {
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+	memcpy(dirpath, path, dlen);
+	dirpath[dlen] = '\0';
+	bname = slash + 1;
+
+	dfd = secure_relative_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
+	if (dfd < 0)
+		return -1;
+
+	ret = unlinkat(dfd, bname, 0);
+	e = errno;
+	close(dfd);
+	errno = e;
+	return ret;
+#else
+	return do_unlink(path);
+#endif
+}
+
 #ifdef SUPPORT_LINKS
 int do_symlink(const char *lnk, const char *path)
 {
@@ -115,6 +172,70 @@ int do_symlink(const char *lnk, const char *path)
 #endif
 
 	return symlink(lnk, path);
+}
+
+/*
+  Symlink-race-safe variant of do_symlink() for receiver-side use. See
+  the comment on do_chmod_at() for the threat model. Only the parent
+  directory of `path` needs protection -- symlinkat() does not resolve
+  the final component (it creates it). Defence: open parent of `path`
+  under secure_relative_open() and call symlinkat() against that
+  dirfd. The link target string `lnk` is stored verbatim and not
+  resolved at creation time, so it doesn't need scrutiny here.
+
+  Falls through to do_symlink() for the --fake-super (am_root < 0)
+  path -- that code path opens `path` with do_open() which has its
+  own (separate) symlink-race exposure tracked elsewhere.
+*/
+int do_symlink_at(const char *lnk, const char *path)
+{
+#ifdef AT_FDCWD
+	extern int am_daemon, am_chrooted;
+	char dirpath[MAXPATHLEN];
+	const char *bname;
+	const char *slash;
+	int dfd, ret, e;
+	size_t dlen;
+
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+
+	if (!am_daemon || am_chrooted)
+		return do_symlink(lnk, path);
+
+#if defined NO_SYMLINK_XATTRS || defined NO_SYMLINK_USER_XATTRS
+	if (am_root < 0)
+		return do_symlink(lnk, path);
+#endif
+
+	if (!path || !*path || *path == '/')
+		return do_symlink(lnk, path);
+
+	slash = strrchr(path, '/');
+	if (!slash)
+		return do_symlink(lnk, path);
+
+	dlen = slash - path;
+	if (dlen >= sizeof dirpath) {
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+	memcpy(dirpath, path, dlen);
+	dirpath[dlen] = '\0';
+	bname = slash + 1;
+
+	dfd = secure_relative_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
+	if (dfd < 0)
+		return -1;
+
+	ret = symlinkat(lnk, dfd, bname);
+	e = errno;
+	close(dfd);
+	errno = e;
+	return ret;
+#else
+	return do_symlink(lnk, path);
+#endif
 }
 
 #if defined NO_SYMLINK_XATTRS || defined NO_SYMLINK_USER_XATTRS
@@ -153,6 +274,106 @@ int do_link(const char *old_path, const char *new_path)
 	return link(old_path, new_path);
 #endif
 }
+
+/*
+  Symlink-race-safe variant of do_link() for receiver-side use. See
+  the comment on do_chmod_at() for the threat model. link() resolves
+  parent components of *both* old_path and new_path, so a parent-
+  symlink swap on either side can plant the new hard link outside
+  the module, or hard-link an outside file into the module (read
+  disclosure).
+
+  Defence: open each parent under secure_relative_open() and use
+  linkat() between the two dirfds, reusing one when the parents
+  match. flags=0 matches the existing do_link() (don't follow a
+  symbolic-link old_path). Only available on systems with linkat();
+  pre-AT_FDCWD systems fall through to do_link().
+*/
+int do_link_at(const char *old_path, const char *new_path)
+{
+#if defined AT_FDCWD && defined HAVE_LINKAT
+	extern int am_daemon, am_chrooted;
+	char old_dirpath[MAXPATHLEN], new_dirpath[MAXPATHLEN];
+	const char *old_bname, *new_bname;
+	const char *old_slash, *new_slash;
+	int old_dfd = AT_FDCWD, new_dfd = AT_FDCWD;
+	BOOL old_owns = False, new_owns = False;
+	int ret, e;
+	size_t old_dlen = 0, new_dlen = 0;
+
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+
+	if (!am_daemon || am_chrooted)
+		return do_link(old_path, new_path);
+
+	if (!old_path || !*old_path || *old_path == '/'
+	 || !new_path || !*new_path || *new_path == '/')
+		return do_link(old_path, new_path);
+
+	old_slash = strrchr(old_path, '/');
+	new_slash = strrchr(new_path, '/');
+
+	/* Resolve each path's parent dir independently. A path without a
+	 * slash lives in CWD (AT_FDCWD), no parent open required. A path
+	 * with a slash needs secure_relative_open to confine its parent
+	 * resolution -- otherwise a parent symlink (e.g. --link-dest=cd
+	 * where cd -> /outside) lets the kernel-level linkat(AT_FDCWD,
+	 * "cd/target.txt", ...) escape the module. */
+	if (old_slash) {
+		old_dlen = old_slash - old_path;
+		if (old_dlen >= sizeof old_dirpath) { errno = ENAMETOOLONG; return -1; }
+		memcpy(old_dirpath, old_path, old_dlen);
+		old_dirpath[old_dlen] = '\0';
+		old_bname = old_slash + 1;
+		old_dfd = secure_relative_open(NULL, old_dirpath, O_RDONLY | O_DIRECTORY, 0);
+		if (old_dfd < 0)
+			return -1;
+		old_owns = True;
+	} else {
+		old_bname = old_path;
+	}
+
+	if (new_slash) {
+		new_dlen = new_slash - new_path;
+		if (new_dlen >= sizeof new_dirpath) {
+			e = ENAMETOOLONG;
+			if (old_owns) close(old_dfd);
+			errno = e;
+			return -1;
+		}
+		memcpy(new_dirpath, new_path, new_dlen);
+		new_dirpath[new_dlen] = '\0';
+		new_bname = new_slash + 1;
+		if (old_owns && old_dlen == new_dlen
+		 && memcmp(old_dirpath, new_dirpath, old_dlen) == 0) {
+			new_dfd = old_dfd;
+		} else {
+			new_dfd = secure_relative_open(NULL, new_dirpath, O_RDONLY | O_DIRECTORY, 0);
+			if (new_dfd < 0) {
+				e = errno;
+				if (old_owns) close(old_dfd);
+				errno = e;
+				return -1;
+			}
+			new_owns = True;
+		}
+	} else {
+		new_bname = new_path;
+	}
+
+	ret = linkat(old_dfd, old_bname, new_dfd, new_bname, 0);
+	e = errno;
+	if (new_owns)
+		close(new_dfd);
+	if (old_owns)
+		close(old_dfd);
+	errno = e;
+	return ret;
+#else
+	return do_link(old_path, new_path);
+#endif
+}
 #endif
 
 int do_lchown(const char *path, uid_t owner, gid_t group)
@@ -163,6 +384,66 @@ int do_lchown(const char *path, uid_t owner, gid_t group)
 #define lchown chown
 #endif
 	return lchown(path, owner, group);
+}
+
+/*
+  Symlink-race-safe variant of do_lchown() for receiver-side use. See the
+  comment on do_chmod_at() for the threat model and design rationale.
+
+  Resolves the parent directory under secure_relative_open() and invokes
+  fchownat(..., AT_SYMLINK_NOFOLLOW) against that dirfd, so that an
+  attacker who substitutes a symlink into one of the parent components
+  cannot redirect the chown outside the receiver's confinement. The
+  AT_SYMLINK_NOFOLLOW flag matches lchown()'s "do not follow a final-
+  component symlink" semantics.
+
+  Falls through to do_lchown() in the dry-run / non-daemon / chrooted /
+  absolute-path / no-parent cases, identical to do_chmod_at().
+*/
+int do_lchown_at(const char *fname, uid_t owner, gid_t group)
+{
+#ifdef AT_FDCWD
+	extern int am_daemon, am_chrooted;
+	char dirpath[MAXPATHLEN];
+	const char *bname;
+	const char *slash;
+	int dfd, ret, e;
+	size_t dlen;
+
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+
+	if (!am_daemon || am_chrooted)
+		return do_lchown(fname, owner, group);
+
+	if (!fname || !*fname || *fname == '/')
+		return do_lchown(fname, owner, group);
+
+	slash = strrchr(fname, '/');
+	if (!slash)
+		return do_lchown(fname, owner, group);
+
+	dlen = slash - fname;
+	if (dlen >= sizeof dirpath) {
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+	memcpy(dirpath, fname, dlen);
+	dirpath[dlen] = '\0';
+	bname = slash + 1;
+
+	dfd = secure_relative_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
+	if (dfd < 0)
+		return -1;
+
+	ret = fchownat(dfd, bname, owner, group, AT_SYMLINK_NOFOLLOW);
+	e = errno;
+	close(dfd);
+	errno = e;
+	return ret;
+#else
+	return do_lchown(fname, owner, group);
+#endif
 }
 
 int do_mknod(const char *pathname, mode_t mode, dev_t dev)
@@ -215,11 +496,132 @@ int do_mknod(const char *pathname, mode_t mode, dev_t dev)
 #endif
 }
 
+/*
+  Symlink-race-safe variant of do_mknod() for receiver-side use. See
+  the comment on do_chmod_at() for the threat model. Defence: open
+  the parent of pathname under secure_relative_open() and use
+  mknodat() against that dirfd. mknodat() covers both regular-file
+  (S_IFREG with dev=0) and FIFO (S_IFIFO) and device-node creation.
+
+  Falls through to do_mknod() for fake-super (am_root < 0) and for
+  sockets, both of which use auxiliary path-based syscalls that
+  don't have an *at() variant in any portable form.
+*/
+int do_mknod_at(const char *pathname, mode_t mode, dev_t dev)
+{
+#ifdef AT_FDCWD
+	extern int am_daemon, am_chrooted;
+	char dirpath[MAXPATHLEN];
+	const char *bname;
+	const char *slash;
+	int dfd, ret, e;
+	size_t dlen;
+
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+
+	if (!am_daemon || am_chrooted)
+		return do_mknod(pathname, mode, dev);
+
+	if (am_root < 0)
+		return do_mknod(pathname, mode, dev);
+
+#if !defined MKNOD_CREATES_SOCKETS && defined HAVE_SYS_UN_H
+	if (S_ISSOCK(mode))
+		return do_mknod(pathname, mode, dev);
+#endif
+
+	if (!pathname || !*pathname || *pathname == '/')
+		return do_mknod(pathname, mode, dev);
+
+	slash = strrchr(pathname, '/');
+	if (!slash)
+		return do_mknod(pathname, mode, dev);
+
+	dlen = slash - pathname;
+	if (dlen >= sizeof dirpath) {
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+	memcpy(dirpath, pathname, dlen);
+	dirpath[dlen] = '\0';
+	bname = slash + 1;
+
+	dfd = secure_relative_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
+	if (dfd < 0)
+		return -1;
+
+#if !defined MKNOD_CREATES_FIFOS && defined HAVE_MKFIFO
+	if (S_ISFIFO(mode))
+		ret = mkfifoat(dfd, bname, mode);
+	else
+#endif
+		ret = mknodat(dfd, bname, mode, dev);
+	e = errno;
+	close(dfd);
+	errno = e;
+	return ret;
+#else
+	return do_mknod(pathname, mode, dev);
+#endif
+}
+
 int do_rmdir(const char *pathname)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
 	return rmdir(pathname);
+}
+
+/*
+  Symlink-race-safe variant of do_rmdir(). See do_unlink_at() above;
+  same shape but with AT_REMOVEDIR set to require the target be a
+  directory.
+*/
+int do_rmdir_at(const char *pathname)
+{
+#ifdef AT_FDCWD
+	extern int am_daemon, am_chrooted;
+	char dirpath[MAXPATHLEN];
+	const char *bname;
+	const char *slash;
+	int dfd, ret, e;
+	size_t dlen;
+
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+
+	if (!am_daemon || am_chrooted)
+		return rmdir(pathname);
+
+	if (!pathname || !*pathname || *pathname == '/')
+		return rmdir(pathname);
+
+	slash = strrchr(pathname, '/');
+	if (!slash)
+		return rmdir(pathname);
+
+	dlen = slash - pathname;
+	if (dlen >= sizeof dirpath) {
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+	memcpy(dirpath, pathname, dlen);
+	dirpath[dlen] = '\0';
+	bname = slash + 1;
+
+	dfd = secure_relative_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
+	if (dfd < 0)
+		return -1;
+
+	ret = unlinkat(dfd, bname, AT_REMOVEDIR);
+	e = errno;
+	close(dfd);
+	errno = e;
+	return ret;
+#else
+	return do_rmdir(pathname);
+#endif
 }
 
 int do_open(const char *pathname, int flags, mode_t mode)
@@ -370,6 +772,89 @@ int do_rename(const char *old_path, const char *new_path)
 	return rename(old_path, new_path);
 }
 
+/*
+  Symlink-race-safe variant of do_rename() for receiver-side use. See
+  the comment on do_chmod_at() for the threat model and design rationale.
+
+  rename() is the central tmp -> final operation in rsync; if either the
+  source or the destination has an attacker-substituted symlink in one
+  of its parent components, the rename can publish or vanish files
+  outside the module. Defence: open the parent of *each* path under
+  secure_relative_open() and use renameat() against the resulting
+  dirfds. When old_path and new_path share the same parent (the common
+  case -- tmp file living next to its final name), we reuse the same
+  dirfd for both sides.
+
+  Falls through to do_rename() in dry-run, non-daemon, chrooted, no-
+  parent and absolute-path cases, identical to the other do_*_at()
+  wrappers.
+*/
+int do_rename_at(const char *old_path, const char *new_path)
+{
+#ifdef AT_FDCWD
+	extern int am_daemon, am_chrooted;
+	char old_dirpath[MAXPATHLEN], new_dirpath[MAXPATHLEN];
+	const char *old_bname, *new_bname;
+	const char *old_slash, *new_slash;
+	int old_dfd = -1, new_dfd = -1, ret = -1, e;
+	size_t old_dlen, new_dlen;
+
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+
+	if (!am_daemon || am_chrooted)
+		return do_rename(old_path, new_path);
+
+	if (!old_path || !*old_path || *old_path == '/'
+	 || !new_path || !*new_path || *new_path == '/')
+		return do_rename(old_path, new_path);
+
+	old_slash = strrchr(old_path, '/');
+	new_slash = strrchr(new_path, '/');
+	if (!old_slash || !new_slash)
+		return do_rename(old_path, new_path);
+
+	old_dlen = old_slash - old_path;
+	new_dlen = new_slash - new_path;
+	if (old_dlen >= sizeof old_dirpath || new_dlen >= sizeof new_dirpath) {
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+	memcpy(old_dirpath, old_path, old_dlen);
+	old_dirpath[old_dlen] = '\0';
+	memcpy(new_dirpath, new_path, new_dlen);
+	new_dirpath[new_dlen] = '\0';
+	old_bname = old_slash + 1;
+	new_bname = new_slash + 1;
+
+	old_dfd = secure_relative_open(NULL, old_dirpath, O_RDONLY | O_DIRECTORY, 0);
+	if (old_dfd < 0)
+		return -1;
+
+	if (old_dlen == new_dlen && memcmp(old_dirpath, new_dirpath, old_dlen) == 0) {
+		new_dfd = old_dfd;
+	} else {
+		new_dfd = secure_relative_open(NULL, new_dirpath, O_RDONLY | O_DIRECTORY, 0);
+		if (new_dfd < 0) {
+			e = errno;
+			close(old_dfd);
+			errno = e;
+			return -1;
+		}
+	}
+
+	ret = renameat(old_dfd, old_bname, new_dfd, new_bname);
+	e = errno;
+	if (new_dfd != old_dfd)
+		close(new_dfd);
+	close(old_dfd);
+	errno = e;
+	return ret;
+#else
+	return do_rename(old_path, new_path);
+#endif
+}
+
 #ifdef HAVE_FTRUNCATE
 int do_ftruncate(int fd, OFF_T size)
 {
@@ -410,6 +895,66 @@ int do_mkdir(char *path, mode_t mode)
 	RETURN_ERROR_IF_RO_OR_LO;
 	trim_trailing_slashes(path);
 	return mkdir(path, mode);
+}
+
+/*
+  Symlink-race-safe variant of do_mkdir() for receiver-side use. See
+  the comment on do_chmod_at() for the threat model and design rationale.
+
+  mkdir() resolves parent symlinks at every component, so a parent-
+  component swap can place an attacker-named directory outside the
+  module. Defence: open the parent of fname under secure_relative_open()
+  and call mkdirat() against that dirfd.
+
+  Mutates path in place to trim trailing slashes (matches do_mkdir()).
+  Falls through to do_mkdir() in dry-run, non-daemon, chrooted, no-
+  parent and absolute-path cases.
+*/
+int do_mkdir_at(char *path, mode_t mode)
+{
+#ifdef AT_FDCWD
+	extern int am_daemon, am_chrooted;
+	char dirpath[MAXPATHLEN];
+	const char *bname;
+	const char *slash;
+	int dfd, ret, e;
+	size_t dlen;
+
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+	trim_trailing_slashes(path);
+
+	if (!am_daemon || am_chrooted)
+		return mkdir(path, mode);
+
+	if (!path || !*path || *path == '/')
+		return mkdir(path, mode);
+
+	slash = strrchr(path, '/');
+	if (!slash)
+		return mkdir(path, mode);
+
+	dlen = slash - path;
+	if (dlen >= sizeof dirpath) {
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+	memcpy(dirpath, path, dlen);
+	dirpath[dlen] = '\0';
+	bname = slash + 1;
+
+	dfd = secure_relative_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
+	if (dfd < 0)
+		return -1;
+
+	ret = mkdirat(dfd, bname, mode);
+	e = errno;
+	close(dfd);
+	errno = e;
+	return ret;
+#else
+	return do_mkdir(path, mode);
+#endif
 }
 
 /* like mkstemp but forces permissions */
@@ -465,6 +1010,76 @@ int do_lstat(const char *path, STRUCT_STAT *st)
 #endif
 }
 
+/*
+  Symlink-race-safe variants of do_stat() / do_lstat() for receiver-
+  side use. See the comment on do_chmod_at() for the threat model.
+  stat() and lstat() resolve parent components, so a parent-symlink
+  swap can make the receiver's stat see attributes of a victim file
+  outside the module -- which then drives later behaviour (e.g.
+  "this isn't a directory, delete it" -> attacker-controlled unlink
+  on something outside the module).
+
+  Defence: open the parent under secure_relative_open() and use
+  fstatat() with AT_SYMLINK_NOFOLLOW (lstat) or 0 (stat) against
+  that dirfd. Same fall-through gating as the other wrappers.
+*/
+static int do_xstat_at(const char *path, STRUCT_STAT *st, int at_flags, int (*fallback)(const char *, STRUCT_STAT *))
+{
+#ifdef AT_FDCWD
+	extern int am_daemon, am_chrooted;
+	char dirpath[MAXPATHLEN];
+	const char *bname;
+	const char *slash;
+	int dfd, ret, e;
+	size_t dlen;
+
+	if (!am_daemon || am_chrooted)
+		return fallback(path, st);
+
+	if (!path || !*path || *path == '/')
+		return fallback(path, st);
+
+	slash = strrchr(path, '/');
+	if (!slash)
+		return fallback(path, st);
+
+	dlen = slash - path;
+	if (dlen >= sizeof dirpath) {
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+	memcpy(dirpath, path, dlen);
+	dirpath[dlen] = '\0';
+	bname = slash + 1;
+
+	dfd = secure_relative_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
+	if (dfd < 0)
+		return -1;
+
+	ret = fstatat(dfd, bname, st, at_flags);
+	e = errno;
+	close(dfd);
+	errno = e;
+	return ret;
+#else
+	return fallback(path, st);
+#endif
+}
+
+int do_stat_at(const char *path, STRUCT_STAT *st)
+{
+	return do_xstat_at(path, st, 0, do_stat);
+}
+
+int do_lstat_at(const char *path, STRUCT_STAT *st)
+{
+#ifdef SUPPORT_LINKS
+	return do_xstat_at(path, st, AT_SYMLINK_NOFOLLOW, do_lstat);
+#else
+	return do_xstat_at(path, st, 0, do_stat);
+#endif
+}
+
 int do_fstat(int fd, STRUCT_STAT *st)
 {
 #ifdef USE_STAT64_FUNCS
@@ -486,11 +1101,25 @@ OFF_T do_lseek(int fd, OFF_T offset, int whence)
 #ifdef HAVE_SETATTRLIST
 int do_setattrlist_times(const char *path, STRUCT_STAT *stp)
 {
+	extern int am_daemon, am_chrooted;
 	struct attrlist attrList;
 	struct timespec ts[2];
 
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
+
+	/* setattrlist() takes a raw path and follows parent symlinks
+	 * (FSOPT_NOFOLLOW only blocks the final component). On a
+	 * daemon-no-chroot deployment, return ENOSYS so set_times()'
+	 * tier walk falls through to do_utimensat_at(), which routes
+	 * the timestamp update through a secure parent dirfd. The
+	 * macOS-specific attribute set this function would have used
+	 * (ATTR_CMN_MODTIME / ATTR_CMN_ACCTIME) is the same set
+	 * utimensat() handles, so no functionality is lost. */
+	if (am_daemon && !am_chrooted) {
+		errno = ENOSYS;
+		return -1;
+	}
 
 	/* Yes, this is in the opposite order of utime and similar. */
 	ts[0].tv_sec = stp->st_mtime;
@@ -508,11 +1137,24 @@ int do_setattrlist_times(const char *path, STRUCT_STAT *stp)
 #ifdef SUPPORT_CRTIMES
 int do_setattrlist_crtime(const char *path, time_t crtime)
 {
+	extern int am_daemon, am_chrooted;
 	struct attrlist attrList;
 	struct timespec ts;
 
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
+
+	/* Same path-follows-parent-symlinks concern as
+	 * do_setattrlist_times. There is no portable at-aware variant
+	 * of setattrlist that targets ATTR_CMN_CRTIME, so on a
+	 * daemon-no-chroot deployment we return -1 and accept that
+	 * crtime preservation is silently dropped for that file (the
+	 * caller treats this as "crtime not updated"). The transfer
+	 * itself continues normally. */
+	if (am_daemon && !am_chrooted) {
+		errno = ENOSYS;
+		return -1;
+	}
 
 	ts.tv_sec = crtime;
 	ts.tv_nsec = 0;
@@ -529,10 +1171,19 @@ int do_setattrlist_crtime(const char *path, time_t crtime)
 time_t get_create_time(const char *path, STRUCT_STAT *stp)
 {
 #ifdef HAVE_GETATTRLIST
+	extern int am_daemon, am_chrooted;
 	static struct create_time attrBuf;
 	struct attrlist attrList;
 
 	(void)stp;
+	/* getattrlist() is also path-based and follows parent
+	 * symlinks. In daemon-no-chroot, refuse rather than read the
+	 * crtime of a file the parent-symlink chain might point at
+	 * outside the module. The caller's "no crtime available"
+	 * path returns 0; the file gets a fresh crtime instead of
+	 * preserving the source's. */
+	if (am_daemon && !am_chrooted)
+		return 0;
 	memset(&attrList, 0, sizeof attrList);
 	attrList.bitmapcount = ATTR_BIT_MAP_COUNT;
 	attrList.commonattr = ATTR_CMN_CRTIME;
@@ -597,6 +1248,81 @@ int do_utimensat(const char *path, STRUCT_STAT *stp)
 	t[1].tv_nsec = 0;
 #endif
 	return utimensat(AT_FDCWD, path, t, AT_SYMLINK_NOFOLLOW);
+}
+
+/*
+  Symlink-race-safe variant of do_utimensat() for receiver-side use.
+  See the comment on do_chmod_at() for the threat model. utimes()
+  resolves parent components and follows a final-component symlink;
+  lutimes() doesn't follow the final component but still resolves
+  parents. Either way, a parent-symlink swap can redirect the
+  timestamp update outside the module. Defence: open the parent of
+  path under secure_relative_open() and call utimensat() with
+  AT_SYMLINK_NOFOLLOW against that dirfd.
+
+  Falls through to do_utimensat() in the same dry-run / non-daemon /
+  chrooted / no-parent / absolute-path cases as the other wrappers.
+  Returns -1 with errno=ENOSYS on systems without utimensat()
+  (caller is expected to fall back to the legacy tier walk).
+*/
+int do_utimensat_at(const char *path, STRUCT_STAT *stp)
+{
+#ifdef AT_FDCWD
+	extern int am_daemon, am_chrooted;
+	struct timespec t[2];
+	char dirpath[MAXPATHLEN];
+	const char *bname;
+	const char *slash;
+	int dfd, ret, e;
+	size_t dlen;
+
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+
+	if (!am_daemon || am_chrooted)
+		return do_utimensat(path, stp);
+
+	if (!path || !*path || *path == '/')
+		return do_utimensat(path, stp);
+
+	slash = strrchr(path, '/');
+	if (!slash)
+		return do_utimensat(path, stp);
+
+	dlen = slash - path;
+	if (dlen >= sizeof dirpath) {
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+	memcpy(dirpath, path, dlen);
+	dirpath[dlen] = '\0';
+	bname = slash + 1;
+
+	t[0].tv_sec = stp->st_atime;
+#ifdef ST_ATIME_NSEC
+	t[0].tv_nsec = stp->ST_ATIME_NSEC;
+#else
+	t[0].tv_nsec = 0;
+#endif
+	t[1].tv_sec = stp->st_mtime;
+#ifdef ST_MTIME_NSEC
+	t[1].tv_nsec = stp->ST_MTIME_NSEC;
+#else
+	t[1].tv_nsec = 0;
+#endif
+
+	dfd = secure_relative_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
+	if (dfd < 0)
+		return -1;
+
+	ret = utimensat(dfd, bname, t, AT_SYMLINK_NOFOLLOW);
+	e = errno;
+	close(dfd);
+	errno = e;
+	return ret;
+#else
+	return do_utimensat(path, stp);
+#endif
 }
 #endif
 
@@ -820,6 +1546,30 @@ int do_open_nofollow(const char *pathname, int flags)
   The relpath must also not contain any ../ elements in the path.
 */
 
+/* Returns 1 if path has any "/"-separated component that is exactly
+ * "..", 0 otherwise. Used by secure_relative_open's front-door
+ * validation to reject inputs that the per-component walk fallback
+ * would otherwise resolve through ".." -- e.g. bare "..", "foo/..",
+ * "subdir/.." -- which RESOLVE_BENEATH-equivalent kernels reject in
+ * the kernel but the per-component fallback (NetBSD/OpenBSD/Solaris/
+ * Cygwin/pre-5.6 Linux) does not. */
+static int path_has_dotdot_component(const char *path)
+{
+	const char *p = path;
+
+	while (*p) {
+		const char *q;
+		if (*p == '/') { p++; continue; }
+		q = p;
+		while (*q && *q != '/')
+			q++;
+		if (q - p == 2 && p[0] == '.' && p[1] == '.')
+			return 1;
+		p = q;
+	}
+	return 0;
+}
+
 #ifdef __linux__
 static int secure_relative_open_linux(const char *basedir, const char *relpath, int flags, mode_t mode)
 {
@@ -833,8 +1583,23 @@ static int secure_relative_open_linux(const char *basedir, const char *relpath, 
 
 	if (basedir == NULL) {
 		dirfd = AT_FDCWD;
-	} else {
+	} else if (basedir[0] == '/') {
+		/* Absolute basedir: operator-trusted (module_dir and the
+		 * like). Plain openat. */
 		dirfd = openat(AT_FDCWD, basedir, O_RDONLY | O_DIRECTORY);
+		if (dirfd == -1)
+			return -1;
+	} else {
+		/* Relative basedir: may be wire-influenced via
+		 * --link-dest / --copy-dest / --compare-dest. Resolve it
+		 * under the same RESOLVE_BENEATH guarantee as relpath, so
+		 * a parent symlink on basedir cannot redirect the dirfd
+		 * outside the CWD anchor. */
+		struct open_how bhow;
+		memset(&bhow, 0, sizeof bhow);
+		bhow.flags = O_RDONLY | O_DIRECTORY;
+		bhow.resolve = RESOLVE_BENEATH | RESOLVE_NO_MAGICLINKS;
+		dirfd = syscall(SYS_openat2, AT_FDCWD, basedir, &bhow, sizeof bhow);
 		if (dirfd == -1)
 			return -1;
 	}
@@ -859,8 +1624,15 @@ static int secure_relative_open_resolve_beneath(const char *basedir, const char 
 
 	if (basedir == NULL) {
 		dirfd = AT_FDCWD;
-	} else {
+	} else if (basedir[0] == '/') {
+		/* Absolute basedir: operator-trusted, plain openat. */
 		dirfd = openat(AT_FDCWD, basedir, O_RDONLY | O_DIRECTORY);
+		if (dirfd == -1)
+			return -1;
+	} else {
+		/* Relative basedir: confine its resolution beneath CWD
+		 * (see secure_relative_open_linux for the rationale). */
+		dirfd = openat(AT_FDCWD, basedir, O_RDONLY | O_DIRECTORY | O_RESOLVE_BENEATH);
 		if (dirfd == -1)
 			return -1;
 	}
@@ -880,8 +1652,20 @@ int secure_relative_open(const char *basedir, const char *relpath, int flags, mo
 		errno = EINVAL;
 		return -1;
 	}
-	if (strncmp(relpath, "../", 3) == 0 || strstr(relpath, "/../")) {
-		// no ../ elements allowed in the relpath
+	/* Reject any path with a literal ".." component (bare "..",
+	 * "../foo", "foo/..", "foo/../bar", "subdir/.."). The previous
+	 * substring-based check caught only "../" prefix and "/../"
+	 * substring; bare ".." and trailing "/.." escape on the per-
+	 * component walk fallback used by NetBSD/OpenBSD/Solaris/Cygwin
+	 * and pre-5.6 Linux. RESOLVE_BENEATH on Linux/FreeBSD/macOS
+	 * catches some of these in-kernel with EXDEV, but the front
+	 * door must reject them consistently with EINVAL across all
+	 * platforms so callers can rely on the validation. */
+	if (path_has_dotdot_component(relpath)) {
+		errno = EINVAL;
+		return -1;
+	}
+	if (basedir && basedir[0] != '/' && path_has_dotdot_component(basedir)) {
 		errno = EINVAL;
 		return -1;
 	}
@@ -911,15 +1695,47 @@ int secure_relative_open(const char *basedir, const char *relpath, int flags, mo
 #else
 	int dirfd = AT_FDCWD;
 	if (basedir != NULL) {
-		dirfd = openat(AT_FDCWD, basedir, O_RDONLY | O_DIRECTORY);
-		if (dirfd == -1) {
-			return -1;
+		if (basedir[0] == '/') {
+			/* Absolute basedir: operator-trusted, plain openat. */
+			dirfd = openat(AT_FDCWD, basedir, O_RDONLY | O_DIRECTORY);
+			if (dirfd == -1) {
+				return -1;
+			}
+		} else {
+			/* Relative basedir: walk it component-by-component
+			 * with O_NOFOLLOW. This is the per-component
+			 * RESOLVE_BENEATH equivalent for platforms without
+			 * kernel-supported confinement, and matches the
+			 * relpath walk below. Symlinks in basedir are
+			 * rejected outright on this fallback path; the
+			 * Linux openat2 / O_RESOLVE_BENEATH paths above
+			 * still allow within-tree symlinks. */
+			char *bcopy = my_strdup(basedir, __FILE__, __LINE__);
+			if (!bcopy)
+				return -1;
+			for (const char *part = strtok(bcopy, "/");
+			     part != NULL;
+			     part = strtok(NULL, "/"))
+			{
+				int next_fd = openat(dirfd, part, O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+				if (next_fd == -1) {
+					int save_errno = errno;
+					if (dirfd != AT_FDCWD) close(dirfd);
+					free(bcopy);
+					errno = save_errno;
+					return -1;
+				}
+				if (dirfd != AT_FDCWD) close(dirfd);
+				dirfd = next_fd;
+			}
+			free(bcopy);
 		}
 	}
 	int retfd = -1;
 
 	char *path_copy = my_strdup(relpath, __FILE__, __LINE__);
 	if (!path_copy) {
+		if (dirfd != AT_FDCWD) close(dirfd);
 		return -1;
 	}
 	
@@ -945,8 +1761,15 @@ int secure_relative_open(const char *basedir, const char *relpath, int flags, mo
 		dirfd = next_fd;
 	}
 
-	// the path must be a directory
-	errno = EINVAL;
+	/* All components walked as directories. If the caller asked for
+	 * O_DIRECTORY, return the dirfd we built up; otherwise the path
+	 * resolved to a directory but the caller wanted a regular file. */
+	if ((flags & O_DIRECTORY) && dirfd != AT_FDCWD) {
+		retfd = dirfd;
+		dirfd = AT_FDCWD;
+		goto cleanup;
+	}
+	errno = EISDIR;
 
 cleanup:
 	free(path_copy);
