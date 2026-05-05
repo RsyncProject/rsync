@@ -1249,7 +1249,12 @@ int set_stat_xattr(const char *fname, struct file_struct *file, mode_t new_mode)
 
 int x_stat(const char *fname, STRUCT_STAT *fst, STRUCT_STAT *xst)
 {
-	int ret = do_stat(fname, fst);
+	/* Use the *_at variants so that on a daemon-no-chroot deployment
+	 * the metadata read goes through a secure parent dirfd instead
+	 * of bare path resolution. The *_at wrappers fall through to
+	 * plain do_stat outside the daemon-no-chroot context, so this
+	 * change is transparent for non-daemon use. */
+	int ret = do_stat_at(fname, fst);
 	if ((ret < 0 || get_stat_xattr(fname, -1, fst, xst) < 0) && xst)
 		xst->st_mode = 0;
 	return ret;
@@ -1257,7 +1262,7 @@ int x_stat(const char *fname, STRUCT_STAT *fst, STRUCT_STAT *xst)
 
 int x_lstat(const char *fname, STRUCT_STAT *fst, STRUCT_STAT *xst)
 {
-	int ret = do_lstat(fname, fst);
+	int ret = do_lstat_at(fname, fst);
 	if ((ret < 0 || get_stat_xattr(fname, -1, fst, xst) < 0) && xst)
 		xst->st_mode = 0;
 	return ret;

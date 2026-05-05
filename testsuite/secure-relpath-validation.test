@@ -1,0 +1,34 @@
+#!/bin/sh
+
+# Copyright (C) 2026 by Andrew Tridgell
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Regression test for codex audit Finding 5: secure_relative_open()'s
+# front-door input check rejects "../foo" and "foo/../bar" but
+# misses bare "..", "subdir/..", and other variants whose "/"-split
+# components contain a literal "..". The kernel-enforced
+# RESOLVE_BENEATH (Linux 5.6+) and O_RESOLVE_BENEATH
+# (FreeBSD 13+, macOS 15+) reject these in-kernel; the per-component
+# walk fallback used on NetBSD, OpenBSD, Solaris, Cygwin and pre-5.6
+# Linux does not -- so the validation must happen at the front door.
+#
+# This test invokes the t_secure_relpath helper, which calls
+# secure_relative_open() with each suspect input and verifies the
+# return value is -1 with errno == EINVAL. EINVAL is the marker
+# that the front-door rejected the input, not the kernel; pre-fix
+# the kernel returns -1 with EXDEV (or, on the per-component
+# fallback, may return a valid fd at all -- "escape").
+
+. "$suitedir/rsync.fns"
+
+testdir="$scratchdir/relpath-test"
+rm -rf "$testdir"
+mkdir -p "$testdir"
+
+if ! "$TOOLDIR/t_secure_relpath" "$testdir"; then
+    test_fail "t_secure_relpath rejected one or more inputs incorrectly (see stderr above for the specific case)"
+fi
+
+exit 0

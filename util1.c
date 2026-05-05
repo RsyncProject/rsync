@@ -141,7 +141,7 @@ int set_times(const char *fname, STRUCT_STAT *stp)
 
 #ifdef HAVE_UTIMENSAT
 #include "case_N.h"
-		if (do_utimensat(fname, stp) == 0)
+		if (do_utimensat_at(fname, stp) == 0)
 			break;
 		if (errno != ENOSYS)
 			return -1;
@@ -479,13 +479,13 @@ int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
 int robust_unlink(const char *fname)
 {
 #ifndef ETXTBSY
-	return do_unlink(fname);
+	return do_unlink_at(fname);
 #else
 	static int counter = 1;
 	int rc, pos, start;
 	char path[MAXPATHLEN];
 
-	rc = do_unlink(fname);
+	rc = do_unlink_at(fname);
 	if (rc == 0 || errno != ETXTBSY)
 		return rc;
 
@@ -515,7 +515,7 @@ int robust_unlink(const char *fname)
 	}
 
 	/* maybe we should return rename()'s exit status? Nah. */
-	if (do_rename(fname, path) != 0) {
+	if (do_rename_at(fname, path) != 0) {
 		errno = ETXTBSY;
 		return -1;
 	}
@@ -538,7 +538,7 @@ int robust_rename(const char *from, const char *to, const char *partialptr,
 		return 0;
 
 	while (tries--) {
-		if (do_rename(from, to) == 0)
+		if (do_rename_at(from, to) == 0)
 			return 0;
 
 		switch (errno) {
@@ -559,7 +559,7 @@ int robust_rename(const char *from, const char *to, const char *partialptr,
 			}
 			if (copy_file(from, to, -1, mode) != 0)
 				return -2;
-			do_unlink(from);
+			do_unlink_at(from);
 			return 1;
 		default:
 			return -1;
@@ -1333,20 +1333,20 @@ int handle_partial_dir(const char *fname, int create)
 	dir = partial_fname;
 	if (create) {
 		STRUCT_STAT st;
-		int statret = do_lstat(dir, &st);
+		int statret = do_lstat_at(dir, &st);
 		if (statret == 0 && !S_ISDIR(st.st_mode)) {
-			if (do_unlink(dir) < 0) {
+			if (do_unlink_at(dir) < 0) {
 				*fn = '/';
 				return 0;
 			}
 			statret = -1;
 		}
-		if (statret < 0 && do_mkdir(dir, 0700) < 0) {
+		if (statret < 0 && do_mkdir_at(dir, 0700) < 0) {
 			*fn = '/';
 			return 0;
 		}
 	} else
-		do_rmdir(dir);
+		do_rmdir_at(dir);
 	*fn = '/';
 
 	return 1;

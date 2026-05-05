@@ -442,7 +442,7 @@ static void handle_delayed_updates(char *local_name)
 			}
 			/* We don't use robust_rename() here because the
 			 * partial-dir must be on the same drive. */
-			if (do_rename(partialptr, fname) < 0) {
+			if (do_rename_at(partialptr, fname) < 0) {
 				rsyserr(FERROR_XFER, errno,
 					"rename failed for %s (from %s)",
 					full_fname(fname), partialptr);
@@ -926,7 +926,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 				recv_ok = -1;
 			else if (fnamecmp == partialptr) {
 				if (!one_inplace)
-					do_unlink(partialptr);
+					do_unlink_at(partialptr);
 				handle_partial_dir(partialptr, PDIR_DELETE);
 			}
 		} else if (keep_partial && partialptr && (!one_inplace || delay_updates)) {
@@ -935,7 +935,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 					"Unable to create partial-dir for %s -- discarding %s.\n",
 					local_name ? local_name : f_name(file, NULL),
 					recv_ok ? "completed file" : "partial file");
-				do_unlink(fnametmp);
+				do_unlink_at(fnametmp);
 				recv_ok = -1;
 			} else if (!finish_transfer(partialptr, fnametmp, fnamecmp, NULL,
 						    file, recv_ok, !partial_dir))
@@ -946,7 +946,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 			} else
 				partialptr = NULL;
 		} else if (!one_inplace)
-			do_unlink(fnametmp);
+			do_unlink_at(fnametmp);
 
 		cleanup_disable();
 
