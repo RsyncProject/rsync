@@ -1,0 +1,135 @@
+#!/bin/sh
+
+# Copyright (C) 2026 by Andrew Tridgell
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Regression test for the symlink-TOCTOU class of bug at the receiver's
+# chdir(). After the CVE-2026-29518 fix to secure_relative_open(), an
+# attack remained where the receiver's chdir() into a destination
+# subdirectory followed an attacker-planted symlink, escaping the
+# module. Every subsequent path-relative syscall (open, chmod, lchown,
+# utimes, etc.) inherited the escape -- secure_relative_open's
+# RESOLVE_BENEATH anchor itself was outside the module by then, so it
+# stopped protecting against anything.
+#
+# This test runs an actual rsync daemon (via RSYNC_CONNECT_PROG to
+# avoid the network) configured with "use chroot = no", plants a
+# symlink at module/subdir -> ../outside, and runs four flavours of
+# rsync transfer that previously all reached files in ../outside:
+#
+#   1. single-file dest = subdir/target.txt    (the original poc_chmod)
+#   2. -r src/subdir/ to upload/subdir/        (the chdir-escape case)
+#   3. -r src/subdir/ to upload/subdir/        (no --size-only: forces basis read+write)
+#   4. -r src/ to upload/                      (was already protected by the
+#                                               original CVE-2026-29518 fix;
+#                                               regression-checked here)
+#
+# All four must leave the outside-the-module sentinel file's mode AND
+# content unchanged.
+
+. "$suitedir/rsync.fns"
+
+case "$(uname -s)" in
+    SunOS|OpenBSD|NetBSD|CYGWIN*)
+	test_skipped "secure chdir relies on RESOLVE_BENEATH-equivalent kernel support not available on $(uname -s)"
+	;;
+esac
+
+mod="$scratchdir/module"
+outside="$scratchdir/outside"
+src="$scratchdir/src"
+conf="$scratchdir/test-rsyncd.conf"
+
+rm -rf "$mod" "$outside" "$src"
+mkdir -p "$mod" "$outside" "$src" "$src/subdir"
+
+# Portable octal-mode helper -- macOS and FreeBSD's stat use -f, GNU
+# coreutils stat uses -c.
+file_mode() {
+    stat -c %a "$1" 2>/dev/null || stat -f %Lp "$1"
+}
+
+# The "secret" file outside the module the attacker is trying to alter.
+# Save a pristine copy alongside it so we can compare with cmp(1) rather
+# than depending on sha1sum/shasum/sha1, which differ across platforms.
+echo "OUTSIDE_SECRET_DATA" > "$outside/target.txt"
+chmod 0600 "$outside/target.txt"
+outside_pristine="$scratchdir/outside-pristine.txt"
+cp -p "$outside/target.txt" "$outside_pristine"
+
+# Symlink trap planted in the module by the local attacker.
+ln -s "$outside" "$mod/subdir"
+
+# Source files the sender will push: same size as the outside target,
+# different content, mode 0666 (the perms the attacker tries to push).
+SIZE=$(stat -c %s "$outside/target.txt" 2>/dev/null \
+       || stat -f %z "$outside/target.txt")
+head -c "$SIZE" /dev/urandom > "$src/target.txt"
+head -c "$SIZE" /dev/urandom > "$src/subdir/target.txt"
+chmod 0666 "$src/target.txt" "$src/subdir/target.txt"
+
+cat > "$conf" <<EOF
+use chroot = no
+log file = $scratchdir/rsyncd.log
+[upload]
+    path = $mod
+    use chroot = no
+    read only = no
+EOF
+
+reset_outside() {
+    chmod 0600 "$outside/target.txt"
+    echo "OUTSIDE_SECRET_DATA" > "$outside/target.txt"
+}
+
+verify_unchanged() {
+    label="$1"
+    mode=$(file_mode "$outside/target.txt")
+    case "$mode" in
+	600|0600) ;;
+	*) test_fail "$label: outside file mode changed from 600 to $mode (chmod escape)" ;;
+    esac
+    if ! cmp -s "$outside/target.txt" "$outside_pristine"; then
+	test_fail "$label: outside file content changed (write escape)"
+    fi
+}
+
+run_attack() {
+    label="$1"; shift
+    reset_outside
+    RSYNC_CONNECT_PROG="$RSYNC --config=$conf --daemon" \
+	$RSYNC "$@" >/dev/null 2>&1 || true
+    verify_unchanged "$label"
+}
+
+# 1. The original poc_chmod scenario: single file, dest path with
+#    the symlinked subdir as a path component. With --size-only the
+#    receiver normally skips the basis open and goes straight to chmod
+#    -- only the chdir-escape blocks the chmod from reaching outside.
+run_attack "single-file --size-only" \
+    -tp --size-only \
+    "$src/target.txt" rsync://localhost/upload/subdir/target.txt
+
+# 2. -r push into the symlinked subdir: receiver chdir's into "subdir",
+#    follows the symlink, ends up in outside.
+run_attack "-r --size-only into subdir/" \
+    -rtp --size-only \
+    "$src/subdir/" rsync://localhost/upload/subdir/
+
+# 3. Same but no --size-only -- forces the basis-file open and a real
+#    rename, so this exercises the read-disclosure and write-escape
+#    paths together.
+run_attack "-r without --size-only into subdir/" \
+    -rtp \
+    "$src/subdir/" rsync://localhost/upload/subdir/
+
+# 4. -r src/ to upload/ -- this case was already covered by the
+#    original CVE-2026-29518 fix because the receiver stays at module
+#    root and operates on slashed paths. Regression check.
+run_attack "-r --size-only into upload/ root" \
+    -rtp --size-only \
+    "$src/" rsync://localhost/upload/
+
+exit 0
