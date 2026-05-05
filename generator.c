@@ -984,7 +984,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 		if (find_exact_for_existing) {
 			if (alt_dest_type == LINK_DEST && real_st.st_dev == sxp->st.st_dev && real_st.st_ino == sxp->st.st_ino)
 				return -1;
-			if (do_unlink(fname) < 0 && errno != ENOENT)
+			if (do_unlink_at(fname) < 0 && errno != ENOENT)
 				goto got_nothing_for_ya;
 		}
 #ifdef SUPPORT_HARD_LINKS
@@ -1112,7 +1112,7 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 		 && !IS_SPECIAL(file->mode) && !IS_DEVICE(file->mode)
 #endif
 		 && !S_ISDIR(file->mode)) {
-			if (do_link(cmpbuf, fname) < 0) {
+			if (do_link_at(cmpbuf, fname) < 0) {
 				rsyserr(FERROR_XFER, errno,
 					"failed to hard-link %s with %s",
 					cmpbuf, fname);
@@ -1315,7 +1315,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				}
 			}
 			if (relative_paths && !implied_dirs && file->mode != 0
-			 && do_stat(dn, &sx.st) < 0) {
+			 && do_stat_at(dn, &sx.st) < 0) {
 				if (dry_run)
 					goto parent_is_dry_missing;
 				if (make_path(fname, MKP_DROP_NAME | MKP_SKIP_SLASH) < 0) {
@@ -1427,7 +1427,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			 && (stype == FT_DIR
 			  || delete_item(fname, sx.st.st_mode, del_opts | DEL_FOR_DIR) != 0))
 				goto cleanup; /* Any errors get reported later. */
-			if (do_mkdir(fname, (file->mode|added_perms) & 0700) == 0)
+			if (do_mkdir_at(fname, (file->mode|added_perms) & 0700) == 0)
 				file->flags |= FLAG_DIR_CREATED;
 			goto cleanup;
 		}
@@ -1469,10 +1469,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			itemize(fnamecmp, file, ndx, statret, &sx,
 				statret ? ITEM_LOCAL_CHANGE : 0, 0, NULL);
 		}
-		if (real_ret != 0 && do_mkdir(fname,file->mode|added_perms) < 0 && errno != EEXIST) {
+		if (real_ret != 0 && do_mkdir_at(fname,file->mode|added_perms) < 0 && errno != EEXIST) {
 			if (!relative_paths || errno != ENOENT
 			 || make_path(fname, MKP_DROP_NAME | MKP_SKIP_SLASH) < 0
-			 || (do_mkdir(fname, file->mode|added_perms) < 0 && errno != EEXIST)) {
+			 || (do_mkdir_at(fname, file->mode|added_perms) < 0 && errno != EEXIST)) {
 				rsyserr(FERROR_XFER, errno,
 					"recv_generator: mkdir %s failed",
 					full_fname(fname));
@@ -1808,7 +1808,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		;
 	else if (quick_check_ok(FT_REG, fnamecmp, file, &sx.st)) {
 		if (partialptr) {
-			do_unlink(partialptr);
+			do_unlink_at(partialptr);
 			handle_partial_dir(partialptr, PDIR_DELETE);
 		}
 		set_file_attrs(fname, file, &sx, NULL, maybe_ATTRS_REPORT | maybe_ATTRS_ACCURATE_TIME);
@@ -2016,7 +2016,7 @@ int atomic_create(struct file_struct *file, char *fname, const char *slnk, const
 
 	if (slnk) {
 #ifdef SUPPORT_LINKS
-		if (do_symlink(slnk, create_name) < 0) {
+		if (do_symlink_at(slnk, create_name) < 0) {
 			rsyserr(FERROR_XFER, errno, "symlink %s -> \"%s\" failed",
 				full_fname(create_name), slnk);
 			return 0;
@@ -2032,7 +2032,7 @@ int atomic_create(struct file_struct *file, char *fname, const char *slnk, const
 		return 0;
 #endif
 	} else {
-		if (do_mknod(create_name, file->mode, rdev) < 0) {
+		if (do_mknod_at(create_name, file->mode, rdev) < 0) {
 			rsyserr(FERROR_XFER, errno, "mknod %s failed",
 				full_fname(create_name));
 			return 0;
@@ -2040,14 +2040,14 @@ int atomic_create(struct file_struct *file, char *fname, const char *slnk, const
 	}
 
 	if (!skip_atomic) {
-		if (do_rename(tmpname, fname) < 0) {
+		if (do_rename_at(tmpname, fname) < 0) {
 			char *full_tmpname = strdup(full_fname(tmpname));
 			if (full_tmpname == NULL)
 				out_of_memory("atomic_create");
 			rsyserr(FERROR_XFER, errno, "rename %s -> \"%s\" failed",
 				full_tmpname, full_fname(fname));
 			free(full_tmpname);
-			do_unlink(tmpname);
+			do_unlink_at(tmpname);
 			return 0;
 		}
 	}
