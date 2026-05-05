@@ -39,7 +39,7 @@ static int validate_backup_dir(void)
 {
 	STRUCT_STAT st;
 
-	if (do_lstat(backup_dir_buf, &st) < 0) {
+	if (do_lstat_at(backup_dir_buf, &st) < 0) {
 		if (errno == ENOENT)
 			return 0;
 		rsyserr(FERROR, errno, "backup lstat %s failed", backup_dir_buf);
@@ -98,7 +98,7 @@ static BOOL copy_valid_path(const char *fname)
 	for ( ; b; name = b + 1, b = strchr(name, '/')) {
 		*b = '\0';
 
-		while (do_mkdir(backup_dir_buf, ACCESSPERMS) < 0) {
+		while (do_mkdir_at(backup_dir_buf, ACCESSPERMS) < 0) {
 			if (errno == EEXIST) {
 				val = validate_backup_dir();
 				if (val > 0)
@@ -197,7 +197,7 @@ static inline int link_or_rename(const char *from, const char *to,
 		if (IS_SPECIAL(stp->st_mode) || IS_DEVICE(stp->st_mode))
 			return 0; /* Use copy code. */
 #endif
-		if (do_link(from, to) == 0) {
+		if (do_link_at(from, to) == 0) {
 			if (DEBUG_GTE(BACKUP, 1))
 				rprintf(FINFO, "make_backup: HLINK %s successful.\n", from);
 			return 2;
@@ -207,7 +207,7 @@ static inline int link_or_rename(const char *from, const char *to,
 			return 0;
 	}
 #endif
-	if (do_rename(from, to) == 0) {
+	if (do_rename_at(from, to) == 0) {
 		if (stp->st_nlink > 1 && !S_ISDIR(stp->st_mode)) {
 			/* If someone has hard-linked the file into the backup
 			 * dir, rename() might return success but do nothing! */
@@ -246,7 +246,7 @@ int make_backup(const char *fname, BOOL prefer_rename)
 		goto success;
 	if (errno == EEXIST || errno == EISDIR) {
 		STRUCT_STAT bakst;
-		if (do_lstat(buf, &bakst) == 0) {
+		if (do_lstat_at(buf, &bakst) == 0) {
 			int flags = get_del_for_flag(bakst.st_mode) | DEL_FOR_BACKUP | DEL_RECURSE;
 			if (delete_item(buf, bakst.st_mode, flags) != 0)
 				return 0;
@@ -277,7 +277,7 @@ int make_backup(const char *fname, BOOL prefer_rename)
 	/* Check to see if this is a device file, or link */
 	if ((am_root && preserve_devices && IS_DEVICE(file->mode))
 	 || (preserve_specials && IS_SPECIAL(file->mode))) {
-		if (do_mknod(buf, file->mode, sx.st.st_rdev) < 0)
+		if (do_mknod_at(buf, file->mode, sx.st.st_rdev) < 0)
 			rsyserr(FERROR, errno, "mknod %s failed", full_fname(buf));
 		else if (DEBUG_GTE(BACKUP, 1))
 			rprintf(FINFO, "make_backup: DEVICE %s successful.\n", fname);
@@ -294,7 +294,7 @@ int make_backup(const char *fname, BOOL prefer_rename)
 			}
 			ret = 2;
 		} else {
-			if (do_symlink(sl, buf) < 0)
+			if (do_symlink_at(sl, buf) < 0)
 				rsyserr(FERROR, errno, "link %s -> \"%s\"", full_fname(buf), sl);
 			else if (DEBUG_GTE(BACKUP, 1))
 				rprintf(FINFO, "make_backup: SYMLINK %s successful.\n", fname);
