@@ -1116,6 +1116,7 @@ char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth, i
  * Also cleans the path using the clean_fname() function. */
 int change_dir(const char *dir, int set_path_only)
 {
+	extern int am_daemon, am_chrooted;
 	static int initialised, skipped_chdir;
 	unsigned int len;
 
@@ -1154,10 +1155,57 @@ int change_dir(const char *dir, int set_path_only)
 			curr_dir[curr_dir_len++] = '/';
 		memcpy(curr_dir + curr_dir_len, dir, len + 1);
 
-		if (!set_path_only && chdir(curr_dir)) {
-			curr_dir_len = save_dir_len;
-			curr_dir[curr_dir_len] = '\0';
-			return 0;
+		if (!set_path_only) {
+			int chdir_failed;
+			/* In the daemon-without-chroot deployment we must not
+			 * follow a symlink in any component of the chdir
+			 * target -- otherwise CWD escapes the module and
+			 * every subsequent path-relative syscall (open,
+			 * chmod, lchown, ...) inherits the escape, which
+			 * defeats secure_relative_open's RESOLVE_BENEATH
+			 * anchor and re-opens the CVE-2026-29518 class of
+			 * symlink TOCTOU attacks. Use the secure resolver
+			 * to get a confined dirfd, then fchdir() to it.
+			 *
+			 * If skipped_chdir is set, a previous CD_SKIP_CHDIR
+			 * call buffered an absolute prefix in curr_dir
+			 * (e.g. change_pathname's CD_SKIP_CHDIR to orig_dir)
+			 * without syncing the kernel's CWD. Resolve `dir`
+			 * relative to that prefix as basedir so the secure
+			 * branch still anchors at the operator-trusted
+			 * directory rather than wherever the kernel CWD
+			 * happens to be. */
+			if (am_daemon && !am_chrooted) {
+				const char *basedir = NULL;
+				char prefix[MAXPATHLEN];
+				int dfd;
+				if (skipped_chdir) {
+					if (save_dir_len >= sizeof prefix) {
+						errno = ENAMETOOLONG;
+						chdir_failed = 1;
+						goto chdir_cleanup;
+					}
+					memcpy(prefix, curr_dir, save_dir_len);
+					prefix[save_dir_len] = '\0';
+					basedir = prefix;
+				}
+				dfd = secure_relative_open(basedir, dir,
+					O_RDONLY | O_DIRECTORY, 0);
+				if (dfd < 0) {
+					chdir_failed = 1;
+				} else {
+					chdir_failed = fchdir(dfd) != 0;
+					close(dfd);
+				}
+			} else {
+				chdir_failed = chdir(curr_dir) != 0;
+			}
+		chdir_cleanup:
+			if (chdir_failed) {
+				curr_dir_len = save_dir_len;
+				curr_dir[curr_dir_len] = '\0';
+				return 0;
+			}
 		}
 		skipped_chdir = set_path_only;
 	}
