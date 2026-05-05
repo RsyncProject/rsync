@@ -467,7 +467,10 @@ static void handle_delayed_updates(char *local_name)
 static void no_batched_update(int ndx, BOOL is_redo)
 {
 	struct file_list *flist = flist_for_ndx(ndx, "no_batched_update");
-	struct file_struct *file = flist->files[ndx - flist->ndx_start];
+	struct file_struct *file;
+	if (ndx < flist->ndx_start)
+		exit_cleanup(RERR_PROTOCOL);
+	file = flist->files[ndx - flist->ndx_start];
 
 	rprintf(FERROR_XFER, "(No batched update for%s \"%s\")\n",
 		is_redo ? " resend of" : "", f_name(file, NULL));
@@ -604,6 +607,8 @@ int recv_files(int f_in, int f_out, char *local_name)
 
 		if (ndx - cur_flist->ndx_start >= 0)
 			file = cur_flist->files[ndx - cur_flist->ndx_start];
+		else if (cur_flist->parent_ndx < 0)
+			exit_cleanup(RERR_PROTOCOL);
 		else
 			file = dir_flist->files[cur_flist->parent_ndx];
 		fname = local_name ? local_name : f_name(file, fbuf);
