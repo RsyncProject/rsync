@@ -2146,6 +2146,8 @@ void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
 			if (send_failed)
 				ndx = get_hlink_num();
 			flist = flist_for_ndx(ndx, "check_for_finished_files.1");
+			if (ndx < flist->ndx_start)
+				exit_cleanup(RERR_PROTOCOL);
 			file = flist->files[ndx - flist->ndx_start];
 			assert(file->flags & FLAG_HLINKED);
 			if (send_failed)
@@ -2174,6 +2176,8 @@ void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
 
 			flist = cur_flist;
 			cur_flist = flist_for_ndx(ndx, "check_for_finished_files.2");
+			if (ndx < cur_flist->ndx_start)
+				exit_cleanup(RERR_PROTOCOL);
 
 			file = cur_flist->files[ndx - cur_flist->ndx_start];
 			if (solo_file)

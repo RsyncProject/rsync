@@ -1090,6 +1090,9 @@ static void got_flist_entry_status(enum festatus status, int ndx)
 {
 	struct file_list *flist = flist_for_ndx(ndx, "got_flist_entry_status");
 
+	if (ndx < flist->ndx_start)
+		exit_cleanup(RERR_PROTOCOL);
+
 	if (remove_source_files) {
 		active_filecnt--;
 		active_bytecnt -= F_LENGTH(flist->files[ndx - flist->ndx_start]);

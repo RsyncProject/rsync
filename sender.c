@@ -140,6 +140,8 @@ void successful_send(int ndx)
 		return;
 
 	flist = flist_for_ndx(ndx, "successful_send");
+	if (ndx < flist->ndx_start)
+		exit_cleanup(RERR_PROTOCOL);
 	file = flist->files[ndx - flist->ndx_start];
 	if (!change_pathname(file, NULL, 0))
 		return;
