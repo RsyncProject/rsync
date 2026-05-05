@@ -336,7 +336,13 @@ static int unlink_and_reopen(const char *dest, mode_t mode)
 		mode |= S_IWUSR;
 #endif
 	mode &= INITACCESSPERMS;
-	if ((ofd = do_open(dest, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, mode)) < 0) {
+	/* Use do_open_at so the create/truncate goes through a secure
+	 * parent dirfd in the daemon-no-chroot deployment. Otherwise
+	 * an attacker could swap a parent component with a symlink in
+	 * the window between robust_unlink (which uses do_unlink_at,
+	 * already secure) and the create here, and redirect the new
+	 * file outside the module. */
+	if ((ofd = do_open_at(dest, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, mode)) < 0) {
 		int save_errno = errno;
 		rsyserr(FERROR_XFER, save_errno, "open %s", full_fname(dest));
 		errno = save_errno;
@@ -360,12 +366,23 @@ static int unlink_and_reopen(const char *dest, mode_t mode)
  * --copy-dest options. */
 int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
 {
+	extern int am_daemon, am_chrooted;
 	int ifd, ofd;
 	char buf[1024 * 8];
 	int len;   /* Number of bytes read into `buf'. */
 	OFF_T prealloc_len = 0, offset = 0;
 
-	if ((ifd = do_open_nofollow(source, O_RDONLY)) < 0) {
+	/* On a daemon without chroot, route the source open through
+	 * secure_relative_open so a parent-symlink on the source path
+	 * (e.g. --copy-dest=cd where cd is a symlink to an outside
+	 * directory) cannot redirect the read to a file the daemon can
+	 * see but the attacker should not. Plain do_open_nofollow only
+	 * refuses a final-component symlink; parents are still followed. */
+	if (am_daemon && !am_chrooted && source && *source && source[0] != '/')
+		ifd = secure_relative_open(NULL, source, O_RDONLY | O_NOFOLLOW, 0);
+	else
+		ifd = do_open_nofollow(source, O_RDONLY);
+	if (ifd < 0) {
 		int save_errno = errno;
 		rsyserr(FERROR_XFER, errno, "open %s", full_fname(source));
 		errno = save_errno;
