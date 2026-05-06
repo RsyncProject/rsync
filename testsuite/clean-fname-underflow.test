@@ -40,7 +40,8 @@ PORT=$(awk 'BEGIN{srand(); printf "%d", 20000+int(rand()*20000)}')
 "$RSYNC_BIN" --daemon --no-detach --config=rsyncd.conf --port="$PORT" >/dev/null 2>&1 &
 DAEMON_PID=$!
 # Give the daemon a moment to come up.
-sleep 0.3
+# Use integer second; subsecond sleep is not portable (e.g. Solaris /usr/bin/sleep).
+sleep 1
 
 # Invoke the server-side path. We don't need a real transfer; we just want to
 # ensure clean_fname() doesn't crash when given "a/../test" via --filter=merge.
