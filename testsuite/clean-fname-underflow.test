@@ -9,12 +9,25 @@
 
 set -eu
 
+# clean_fname() is platform-agnostic; the test only needs to run on one
+# host. Skip on non-Linux to avoid quirks in older /bin/sh implementations
+# (Solaris exited silently here, producing an empty log under set -eu).
+# runtests.sh expects $scratchdir/whyskipped to exist when a test exits 77.
+case "$(uname -s)" in
+  Linux) ;;
+  *)
+    if [ -n "${scratchdir:-}" ]; then
+      echo "Linux-only test (uname -s = $(uname -s))" > "$scratchdir/whyskipped"
+    fi
+    exit 77 ;;
+esac
+
 # Try to find the just-built rsync binary if RSYNC_BIN isn't set.
 if [ -z "${RSYNC_BIN:-}" ]; then
   if [ -x "./rsync" ]; then
-    RSYNC_BIN=./rsync
+    RSYNC_BIN=$(pwd)/rsync
   elif [ -x "../rsync" ]; then
-    RSYNC_BIN=../rsync
+    RSYNC_BIN=$(cd .. && pwd)/rsync
   else
     RSYNC_BIN=rsync
   fi

@@ -293,6 +293,7 @@ void print_rsync_version(enum logcode f)
 		json_line("license", "GPLv3");
 		json_line("caveat", "rsync comes with ABSOLUTELY NO WARRANTY");
 		printf("\n}\n");
+		fflush(stdout);
 		return;
 	}
 

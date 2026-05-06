@@ -38,7 +38,7 @@ jobs:
     - name: info
       run: bash -c '/usr/local/bin/rsync --version'
     - name: check
-      run: bash -c 'RSYNC_EXPECT_SKIPPED=acls-default,acls,atimes,bare-do-open-symlink-race,chdir-symlink-race,chmod-symlink-race,chown-fake,chown,crtimes,daemon-chroot-acl,devices-fake,devices,dir-sgid,protected-regular,sender-flist-symlink-leak,simd-checksum,symlink-dirlink-basis,xattrs-hlink,xattrs make check'
+      run: bash -c 'RSYNC_EXPECT_SKIPPED=acls-default,acls,bare-do-open-symlink-race,chdir-symlink-race,chmod-symlink-race,chown,clean-fname-underflow,daemon-chroot-acl,devices,dir-sgid,protected-regular,sender-flist-symlink-leak,simd-checksum,symlink-dirlink-basis make check'
     - name: ssl file list
       run: bash -c 'PATH="/usr/local/bin:$PATH" rsync-ssl --no-motd download.samba.org::rsyncftp/ || true'
     - name: save artifact
