@@ -35,17 +35,21 @@ jobs:
         fetch-depth: 0
     - name: prep
       # PowerTools is needed for libzstd-devel etc; xxhash and lz4 dev
-      # headers live in EPEL on RHEL 8.
+      # headers live in EPEL on RHEL 8. The default python3 on RHEL 8
+      # is 3.6, which is too old for runtests.py (uses capture_output=
+      # / text= introduced in 3.7), so install python39 and point
+      # /usr/bin/python3 at it.
       run: |
         dnf -y install epel-release
         dnf config-manager --set-enabled powertools
         dnf -y install gcc gcc-c++ make autoconf automake m4 \
-            python3 python3-pip diffutils \
+            python39 python39-pip diffutils \
             openssl openssl-devel \
             attr libattr-devel acl libacl-devel \
             zstd libzstd-devel \
             lz4 lz4-devel \
             xxhash xxhash-devel
+        alternatives --set python3 /usr/bin/python3.9
         pip3 install commonmark
     - name: configure
       run: ./configure --with-rrsync
