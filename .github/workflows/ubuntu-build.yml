@@ -7,7 +7,6 @@ on:
       - '.github/workflows/*.yml'
       - '!.github/workflows/ubuntu-build.yml'
   pull_request:
-    branches: [ master ]
     paths-ignore:
       - '.github/workflows/*.yml'
       - '!.github/workflows/ubuntu-build.yml'
@@ -16,7 +15,7 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     name: Test rsync on Ubuntu
     steps:
     - uses: actions/checkout@v4

@@ -7,7 +7,6 @@ on:
       - '.github/workflows/*.yml'
       - '!.github/workflows/freebsd-build.yml'
   pull_request:
-    branches: [ master ]
     paths-ignore:
       - '.github/workflows/*.yml'
       - '!.github/workflows/freebsd-build.yml'
@@ -34,6 +33,7 @@ jobs:
           ./configure --with-rrsync -disable-zstd --disable-md2man --disable-xxhash --disable-lz4
           make
           ./rsync --version
+          make check
           ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
     - name: save artifact
       uses: actions/upload-artifact@v4

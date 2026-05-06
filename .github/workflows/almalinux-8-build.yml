@@ -13,7 +13,6 @@ on:
       - '.github/workflows/*.yml'
       - '!.github/workflows/almalinux-8-build.yml'
   pull_request:
-    branches: [ master ]
     paths-ignore:
       - '.github/workflows/*.yml'
       - '!.github/workflows/almalinux-8-build.yml'

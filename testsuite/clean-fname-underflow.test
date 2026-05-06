@@ -22,7 +22,9 @@ fi
 
 workdir="${TMPDIR:-/tmp}/rsync-clean-fname.$$"
 mkdir -p "$workdir"
-trap 'rm -rf "$workdir"' EXIT INT TERM
+# Solaris's rm refuses to delete a directory in the path of the cwd,
+# so cd out before the trap runs.
+trap 'cd /; rm -rf "$workdir"' EXIT INT TERM
 cd "$workdir"
 
 # Minimal rsyncd.conf using chroot so the crafted path reaches the server parser.
