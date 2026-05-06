@@ -1,0 +1,51 @@
+name: Test rsync on NetBSD
+
+on:
+  push:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/netbsd-build.yml'
+  pull_request:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/netbsd-build.yml'
+  schedule:
+    - cron: '42 8 * * *'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Test rsync on NetBSD
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Test in NetBSD VM
+      id: test
+      uses: vmactions/netbsd-vm@v1
+      with:
+        usesh: true
+        prepare: |
+          PATH=/usr/sbin:$PATH pkg_add autoconf automake python312
+          ln -sf /usr/pkg/bin/python3.12 /usr/pkg/bin/python3
+        run: |
+          uname -a
+          ./configure --with-rrsync --disable-zstd --disable-md2man --disable-xxhash --disable-lz4
+          make
+          ./rsync --version
+          make check
+          ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
+    - name: save artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: netbsd-bin
+        path: |
+          rsync
+          rsync-ssl
+          rsync.1
+          rsync-ssl.1
+          rsyncd.conf.5
+          rrsync.1
+          rrsync

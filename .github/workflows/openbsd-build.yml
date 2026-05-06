@@ -1,0 +1,52 @@
+name: Test rsync on OpenBSD
+
+on:
+  push:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/openbsd-build.yml'
+  pull_request:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/openbsd-build.yml'
+  schedule:
+    - cron: '42 8 * * *'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Test rsync on OpenBSD
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Test in OpenBSD VM
+      id: test
+      uses: vmactions/openbsd-vm@v1
+      with:
+        usesh: true
+        prepare: |
+          pkg_add -I bash autoconf%2.71 automake%1.16
+        run: |
+          uname -a
+          export AUTOCONF_VERSION=2.71
+          export AUTOMAKE_VERSION=1.16
+          ./configure --with-rrsync --disable-zstd --disable-md2man --disable-xxhash --disable-lz4
+          make
+          ./rsync --version
+          make check
+          ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
+    - name: save artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: openbsd-bin
+        path: |
+          rsync
+          rsync-ssl
+          rsync.1
+          rsync-ssl.1
+          rsyncd.conf.5
+          rrsync.1
+          rrsync
