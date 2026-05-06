@@ -36,9 +36,15 @@ int poptDupArgv(int argc, const char **argv,
     dst += (argc + 1) * sizeof(*argv);
 
     /*@-branchstate@*/
-    for (i = 0; i < argc; i++) {
-	argv2[i] = dst;
-	dst += strlcpy(dst, argv[i], nb) + 1;
+    {
+	char * const end_buf = (char *)argv2 + nb;
+	for (i = 0; i < argc; i++) {
+	    argv2[i] = dst;
+	    /* nb is the TOTAL buffer size, not the remaining bytes; use the
+	     * remaining bytes from dst to end_buf so glibc 2.39+ fortified
+	     * strlcpy doesn't trip __bos() and abort. */
+	    dst += strlcpy(dst, argv[i], end_buf - dst) + 1;
+	}
     }
     /*@=branchstate@*/
     argv2[argc] = NULL;
