@@ -1,0 +1,73 @@
+name: Test rsync on AlmaLinux 8
+
+# Older-LTS coverage on the Fedora/RHEL family to help with backporting
+# security fixes. AlmaLinux 8 is the RHEL 8 rebuild and is the oldest
+# active LTS in this family (RHEL 8 full support runs to 2029).
+# GitHub Actions has no native runner for this family, so the job runs
+# inside an almalinux:8 container hosted on ubuntu-latest.
+
+on:
+  push:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/almalinux-8-build.yml'
+  pull_request:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/almalinux-8-build.yml'
+  schedule:
+    - cron: '42 8 * * *'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container:
+      image: almalinux:8
+    name: Test rsync on AlmaLinux 8
+    steps:
+    - name: install git
+      # actions/checkout needs git in the container before the checkout step.
+      run: dnf -y install git
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: prep
+      # PowerTools is needed for libzstd-devel etc; xxhash and lz4 dev
+      # headers live in EPEL on RHEL 8.
+      run: |
+        dnf -y install epel-release
+        dnf config-manager --set-enabled powertools
+        dnf -y install gcc gcc-c++ make autoconf automake m4 \
+            python3 python3-pip diffutils \
+            openssl openssl-devel \
+            attr libattr-devel acl libacl-devel \
+            zstd libzstd-devel \
+            lz4 lz4-devel \
+            xxhash xxhash-devel
+        pip3 install commonmark
+    - name: configure
+      run: ./configure --with-rrsync
+    - name: make
+      run: make
+    - name: info
+      run: ./rsync --version
+    - name: check
+      # In the container we already run as root, so no sudo. The
+      # crtimes-not-supported skip matches the other Linux jobs.
+      run: RSYNC_EXPECT_SKIPPED=crtimes make check
+    - name: ssl file list
+      run: ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
+    - name: save artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: almalinux-8-bin
+        path: |
+          rsync
+          rsync-ssl
+          rsync.1
+          rsync-ssl.1
+          rsyncd.conf.5
+          rrsync.1
+          rrsync
