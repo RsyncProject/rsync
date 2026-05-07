@@ -1,6 +1,121 @@
-# NEWS for rsync 3.4.3 (UNRELEASED)
+# NEWS for rsync 3.4.3 (20 May 2026)
 
 ## Changes in this version:
+
+### SECURITY FIXES:
+
+Six CVEs are fixed in this release.  All six are assigned by
+VulnCheck as CNA.  Affected versions are 3.4.2 and earlier in every
+case.  Three of the six (CVE-2026-29518, CVE-2026-43617,
+CVE-2026-43619) require non-default daemon configuration to reach:
+the first and third need `use chroot = no` for a module, the second
+needs `daemon chroot = ...` set in rsyncd.conf.  Two (CVE-2026-43618,
+CVE-2026-43620) are reachable from a normal pull or a normal
+authenticated daemon connection.  The sixth (CVE-2026-45232) is
+reachable only when `RSYNC_PROXY` is set and the proxy (or a MITM)
+returns a pathological response.  Many thanks to the external
+researchers who reported these issues.
+
+- CVE-2026-29518 (CVSS v4.0 7.3, HIGH): TOCTOU symlink race condition
+  allowing local privilege escalation in daemon mode without chroot.
+  An rsync daemon configured with "use chroot = no" was exposed to a
+  time-of-check / time-of-use race on parent path components: a local
+  attacker with write access to a module could replace a parent
+  directory component with a symlink between the receiver's check and
+  its open(), redirecting reads (basis-file disclosure) and writes
+  (file overwrite) outside the module.  Default "use chroot = yes" is
+  not exposed.  `secure_relative_open()` (added in 3.4.0 for
+  CVE-2024-12086) was previously unused in the daemon-no-chroot
+  case; the fix enables it there and reroutes the sender's
+  read-path opens through it.  Reported by Nullx3D (Batuhan Sancak),
+  Damien Neil and Michael Stapelberg.
+
+- CVE-2026-43617 (CVSS v3.1 4.8, MEDIUM): Hostname/ACL bypass on an
+  rsync daemon configured with `daemon chroot = /X` in rsyncd.conf
+  when the chroot tree lacks DNS resolution support.  The
+  reverse-DNS lookup of the connecting client was performed *after*
+  the daemon chroot had been entered; if /X did not contain the
+  libc resolver fixtures (`/etc/resolv.conf`, `/etc/nsswitch.conf`,
+  `/etc/hosts`, NSS service modules) the lookup failed and the
+  connecting hostname was set to "UNKNOWN", causing hostname-based
+  deny rules to silently fail open.  IP-based ACLs are unaffected.
+  The per-module `use chroot` setting is unrelated to this issue.
+  The fix performs the lookup before entering the daemon chroot.
+  Reported by MegaManSec.
+
+- CVE-2026-43618 (CVSS v3.1 8.1, HIGH): Integer overflow in the
+  compressed-token decoder enabling remote memory disclosure to an
+  authenticated daemon peer.  The receiver accumulated a 32-bit
+  signed counter without overflow checking; a malicious sender could
+  trigger an overflow that, with careful manipulation, leaked process
+  memory contents to the attacker -- environment variables,
+  passwords, heap and library pointers -- significantly weakening
+  ASLR.  The fix bounds the counter and adds wire-input validation in
+  several adjacent places (defence-in-depth).  Workaround for older
+  releases: `refuse options = compress` in rsyncd.conf.  Reported by
+  Omar Elsayed.
+
+- CVE-2026-43619 (CVSS v3.1 6.3, MEDIUM): Symlink races on path-based
+  system calls in "use chroot = no" daemon mode (generalisation of
+  CVE-2026-29518).  Earlier fixes for symlink races on the receiver's
+  open() call missed the same race class on every other path-based
+  system call: chmod, lchown, utimes, rename, unlink, mkdir, symlink,
+  mknod, link, rmdir and lstat.  The fix routes each affected
+  path-based syscall through a parent dirfd opened under
+  RESOLVE_BENEATH-equivalent kernel-enforced confinement (openat2 on
+  Linux 5.6+, O_RESOLVE_BENEATH on FreeBSD 13+ and macOS 15+,
+  per-component O_NOFOLLOW walk elsewhere).  Default "use chroot =
+  yes" is not exposed.  Reported by Andrew Tridgell as a follow-on
+  audit of CVE-2026-29518.
+
+- CVE-2026-43620 (CVSS v3.1 6.5, MEDIUM): Out-of-bounds read in the
+  receiver's recv_files() enabling remote denial-of-service of any
+  client pulling from a malicious server (incomplete fix of commit
+  797e17f).  The earlier parent_ndx<0 guard added to send_files() was
+  not applied to the visually-identical block in recv_files().  A
+  malicious rsync server can drive any connecting client into a
+  deterministic SIGSEGV by setting CF_INC_RECURSE in the
+  compatibility flags and sending a crafted file list and transfer
+  record.  inc_recurse is the protocol-30+ default, so no special
+  options are required on the victim.  Workaround for older
+  releases: `--no-inc-recursive` on the client.  Reported by Pratham
+  Gupta.
+
+- CVE-2026-45232 (CVSS v3.1 3.1, LOW): Off-by-one out-of-bounds stack
+  write in the rsync client's HTTP CONNECT proxy handler
+  (`establish_proxy_connection()` in `socket.c`).  After issuing the
+  CONNECT request, rsync read the proxy's first response line one
+  byte at a time into a 1024-byte stack buffer with the bound
+  `cp < &buffer[sizeof buffer - 1]`.  If the proxy (or a MITM in
+  front of it) returned 1023+ bytes on that first line without a
+  newline terminator, `cp` exited the loop pointing at a buffer slot
+  the loop never wrote, leaving `*cp` holding stale stack data from
+  the earlier `snprintf()` of the outgoing CONNECT request.  The
+  post-loop logic then wrote a single `\0` one byte past the end of
+  the buffer on the stack.  Reach is client-side only, and only when
+  `RSYNC_PROXY` is set so rsync tunnels an `rsync://` connection
+  through an HTTP CONNECT proxy.  The written byte is always `\0`
+  and the offset is fixed by the buffer size, not attacker-chosen,
+  so this is not an arbitrary-write primitive: practical impact is
+  corruption of one adjacent stack byte and possible later
+  misbehaviour or crash.  The fix detects the "buffer filled without
+  finding `\n`" case explicitly by position and refuses the response
+  with "proxy response line too long".  Reported by Aisle Research
+  via Michal Ruprich (rsync-3.4.1-2.el10 QE).
+
+In addition to the six CVE fixes, this release adds defence-in-depth
+hardening on several adjacent paths: bounded wire-supplied counts and
+lengths in flist/io/acls/xattrs, a guard against length underflow in
+cumulative `snprintf()` callers, a parent block-index bounds check on
+the receiver, a NULL check in `read_delay_line()`, a lower ceiling on
+`MAX_WIRE_DEL_STAT` to avoid signed-int overflow in the
+`read_del_stats()` accumulator, rejection of hyphen-prefixed
+remote-shell hostnames (defence-in-depth against argv-injection in
+tooling that forwards untrusted input into the hostspec position;
+reported by Aisle Research via Michal Ruprich), and a NULL-check on
+`localtime_r()` in `timestring()` to keep a malicious server from
+crashing the client by advertising a file with an out-of-range
+modtime.
 
 ### BUG FIXES:
 
@@ -37,13 +152,32 @@
   with protocol < 29, top-level files). The test skips on
   platforms without a RESOLVE_BENEATH equivalent.
 
-- runtests.py now errors early with a clear message when the test
-  helper programs (`tls`, `trimslash`, `t_unsafe`, `wildtest`,
-  `getgroups`, `getfsdev`) are missing, instead of letting many
-  tests fail with confusing "not found" errors.
+- Added regression tests for the new security fixes:
+  `chmod-symlink-race.test`, `chdir-symlink-race.test`,
+  `bare-do-open-symlink-race.test`, `alt-dest-symlink-race.test`,
+  `copy-dest-source-symlink.test`, `sender-flist-symlink-leak.test`,
+  `secure-relpath-validation.test`, `daemon-chroot-acl.test` and
+  `daemon-refuse-compress.test`. The symlink-race tests skip on
+  Cygwin, Solaris, OpenBSD and NetBSD (no RESOLVE_BENEATH
+  equivalent on those platforms).
+
+- runtests.py now errors early with a clear message when any of
+  the test helper programs (`tls`, `trimslash`, `t_unsafe`,
+  `t_chmod_secure`, `t_secure_relpath`, `wildtest`, `getgroups`,
+  `getfsdev`) are missing, instead of letting many tests fail with
+  confusing "not found" errors.
 
 - Added OpenBSD and NetBSD CI jobs that run `make check` on those
   platforms.
+
+- Added Ubuntu 22.04 and AlmaLinux 8 CI workflows so future
+  backports to the two mainstream LTS families build and test on
+  the same CI surface as trunk.
+
+- testsuite/protected-regular.test now runs unprivileged via
+  `unshare` with user-namespace UID mapping, falling back to skip
+  if `unshare`/`uidmap` is not available; previously it required
+  real root.
 
 - Added `symlink-dirlink-basis` to the Cygwin CI's expected-skipped
   list.
@@ -5035,7 +5169,7 @@ to develop and test fixes.
 
 | RELEASE DATE | VER.   | DATE OF COMMIT\* | PROTOCOL    |
 |--------------|--------|------------------|-------------|
-| ?? ??? 2026  | 3.4.3  |                  | 32          |
+| 20 May 2026  | 3.4.3  |                  | 32          |
 | 28 Apr 2026  | 3.4.2  |                  | 32          |
 | 16 Jan 2025  | 3.4.1  |                  | 32          |
 | 15 Jan 2025  | 3.4.0  | 15 Jan 2025      | 32          |
