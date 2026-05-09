@@ -1374,7 +1374,7 @@ int start_daemon(int f_in, int f_out)
 		rprintf(FLOG, "module-list request from %s (%s)\n",
 			host, addr);
 		send_listing(f_out);
-		return -1;
+		return 0;
 	}
 
 	if (*line == '#') {
