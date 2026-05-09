@@ -21,6 +21,7 @@
  */
 
 #include "rsync.h"
+#include <unistd.h>
 #include "ifuncs.h"
 #include "rounding.h"
 #include "inums.h"
@@ -277,6 +278,18 @@ static inline int path_is_daemon_excluded(char *path, int ignore_filename)
 
 static inline int is_excluded(const char *fname, int is_dir, int filter_level)
 {
+	/* Check for marker file in directories */
+	if (skip_dir_with_file && is_dir) {
+		char marker_path[MAXPATHLEN];
+		int len = snprintf(marker_path, MAXPATHLEN, "%s/%s", fname, skip_dir_with_file);
+
+		if (len > 0 && len < MAXPATHLEN && access(marker_path, F_OK) == 0) {
+			if (INFO_GTE(FLIST, 2))
+				rprintf(FINFO, "skipping directory %s containing %s marker\n",
+					full_fname(fname), skip_dir_with_file);
+			return 1;
+		}
+	}
 	return name_is_excluded(fname, is_dir ? NAME_IS_DIR : NAME_IS_FILE, filter_level);
 }
 
