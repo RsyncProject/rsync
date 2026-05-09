@@ -225,6 +225,7 @@ char *iconv_opt =
 #endif
 
 struct chmod_mode_struct *chmod_modes = NULL;
+struct chmod_mode_struct *dest_chmod_modes = NULL;
 
 static const char *const debug_verbosity[] = {
 	/*0*/ NULL,
@@ -585,7 +586,7 @@ enum {OPT_SERVER = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_NO_D, OPT_APPEND, OPT_NO_ICONV, OPT_INFO, OPT_DEBUG, OPT_BLOCK_SIZE,
       OPT_USERMAP, OPT_GROUPMAP, OPT_CHOWN, OPT_BWLIMIT, OPT_STDERR,
       OPT_OLD_COMPRESS, OPT_NEW_COMPRESS, OPT_NO_COMPRESS, OPT_OLD_ARGS,
-      OPT_STOP_AFTER, OPT_STOP_AT,
+      OPT_STOP_AFTER, OPT_STOP_AT, OPT_CHMOD_DEST,
       OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
@@ -688,6 +689,7 @@ static struct poptOption long_options[] = {
   {"i-d",              0,  POPT_ARG_VAL,    &implied_dirs, 1, 0, 0 },
   {"no-i-d",           0,  POPT_ARG_VAL,    &implied_dirs, 0, 0, 0 },
   {"chmod",            0,  POPT_ARG_STRING, 0, OPT_CHMOD, 0, 0 },
+  {"chmod-dest",       0,  POPT_ARG_STRING, 0, OPT_CHMOD_DEST, 0, 0 },
   {"ignore-times",    'I', POPT_ARG_NONE,   &ignore_times, 0, 0, 0 },
   {"size-only",        0,  POPT_ARG_NONE,   &size_only, 0, 0, 0 },
   {"one-file-system", 'x', POPT_ARG_NONE,   0, 'x', 0, 0 },
@@ -1753,6 +1755,16 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			if (!parse_chmod(arg, &chmod_modes)) {
 				snprintf(err_buf, sizeof err_buf,
 					"Invalid argument passed to --chmod (%s)\n",
+					arg);
+				goto cleanup;
+			}
+			break;
+
+		case OPT_CHMOD_DEST:
+			arg = poptGetOptArg(pc);
+			if (!parse_chmod(arg, &dest_chmod_modes)) {
+				snprintf(err_buf, sizeof err_buf,
+					"Invalid argument passed to --chmod-dest (%s)\n",
 					arg);
 				goto cleanup;
 			}

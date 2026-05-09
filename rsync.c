@@ -55,6 +55,7 @@ extern int make_backups;
 extern int sanitize_paths;
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern struct chmod_mode_struct *daemon_chmod_modes;
+extern struct chmod_mode_struct *dest_chmod_modes;
 #ifdef ICONV_OPTION
 extern char *iconv_opt;
 #endif
@@ -655,9 +656,12 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	}
 #endif
 
+	if (dest_chmod_modes)
+		new_mode = tweak_mode(new_mode, dest_chmod_modes);
+
 #ifdef HAVE_CHMOD
 	if (!BITS_EQUAL(sxp->st.st_mode, new_mode, CHMOD_BITS)) {
-		int ret = am_root < 0 ? 0 : do_chmod(fname, new_mode);
+		int ret = am_root < 0 && !dest_chmod_modes ? 0 : do_chmod(fname, new_mode);
 		if (ret < 0) {
 			rsyserr(FERROR_XFER, errno,
 				"failed to set permissions on %s",
