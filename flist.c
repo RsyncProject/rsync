@@ -62,6 +62,7 @@ extern int implied_dirs;
 extern int ignore_perishable;
 extern int non_perishable_cnt;
 extern int prune_empty_dirs;
+extern int update_links;
 extern int copy_links;
 extern int copy_unsafe_links;
 extern int protocol_version;
@@ -234,10 +235,15 @@ static int readlink_stat(const char *path, STRUCT_STAT *stp, char *linkbuf)
 int link_stat(const char *path, STRUCT_STAT *stp, int follow_dirlinks)
 {
 #ifdef SUPPORT_LINKS
-	if (copy_links)
+	if (copy_links && update_links == 0)
 		return x_stat(path, stp, NULL);
 	if (x_lstat(path, stp, NULL) < 0)
 		return -1;
+	if (update_links && S_ISLNK(stp->st_mode)) {
+		STRUCT_STAT st;
+		if (x_stat(path, &st, NULL) == 0 && !S_ISDIR(st.st_mode))
+			return 0;
+	}
 	if (follow_dirlinks && S_ISLNK(stp->st_mode)) {
 		STRUCT_STAT st;
 		if (x_stat(path, &st, NULL) == 0 && S_ISDIR(st.st_mode))
