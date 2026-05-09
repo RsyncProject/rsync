@@ -424,37 +424,37 @@ static void output_summary(void)
 			output_itemized_counts("Number of deleted files", &stats.deleted_files);
 		rprintf(FINFO,"Number of regular files transferred: %s\n",
 			comma_num(stats.xferred_files));
-		rprintf(FINFO,"Total file size: %s bytes\n",
+		rprintf(FINFO,"Total file size: %sB\n",
 			human_num(stats.total_size));
-		rprintf(FINFO,"Total transferred file size: %s bytes\n",
+		rprintf(FINFO,"Total transferred file size: %sB\n",
 			human_num(stats.total_transferred_size));
-		rprintf(FINFO,"Literal data: %s bytes\n",
+		rprintf(FINFO,"Literal data: %sB\n",
 			human_num(stats.literal_data));
-		rprintf(FINFO,"Matched data: %s bytes\n",
+		rprintf(FINFO,"Matched data: %sB\n",
 			human_num(stats.matched_data));
-		rprintf(FINFO,"File list size: %s\n",
+		rprintf(FINFO,"File list size: %sB\n",
 			human_num(stats.flist_size));
 		if (stats.flist_buildtime) {
 			rprintf(FINFO,
-				"File list generation time: %s seconds\n",
+				"File list generation time: %ss\n",
 				comma_dnum((double)stats.flist_buildtime / 1000, 3));
 			rprintf(FINFO,
-				"File list transfer time: %s seconds\n",
+				"File list transfer time: %ss\n",
 				comma_dnum((double)stats.flist_xfertime / 1000, 3));
 		}
-		rprintf(FINFO,"Total bytes sent: %s\n",
+		rprintf(FINFO,"Total bytes sent: %sB\n",
 			human_num(total_written));
-		rprintf(FINFO,"Total bytes received: %s\n",
+		rprintf(FINFO,"Total bytes received: %sB\n",
 			human_num(total_read));
 	}
 
 	if (INFO_GTE(STATS, 1)) {
 		rprintf(FCLIENT, "\n");
 		rprintf(FINFO,
-			"sent %s bytes  received %s bytes  %s bytes/sec\n",
+			"sent %sB  received %sB  %sB/s\n",
 			human_num(total_written), human_num(total_read),
 			bytes_per_sec_human_dnum());
-		rprintf(FINFO, "total size is %s  speedup is %s%s\n",
+		rprintf(FINFO, "total size is %sB  speedup is %s%s\n",
 			human_num(stats.total_size),
 			comma_dnum((double)stats.total_size / (total_written+total_read), 2),
 			write_batch < 0 ? " (BATCH ONLY)" : dry_run ? " (DRY RUN)" : "");
