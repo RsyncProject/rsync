@@ -93,7 +93,10 @@ extern int trust_sender_filter;
 extern int trust_sender_args;
 extern struct stats stats;
 extern char *stdout_format;
+extern char *logfile_name;
 extern char *logfile_format;
+extern char *logafter_name;
+extern int log_after_transfer;
 extern char *filesfrom_host;
 extern char *partial_dir;
 extern char *rsync_path;
@@ -1052,6 +1055,10 @@ static int do_recv(int f_in, int f_out, char *local_name)
 		if (read_batch)
 			io_start_buffering_in(f_in);
 		io_start_multiplex_out(f_out);
+
+		/* Reopen log file for --log-after */
+		if (log_after_transfer)
+			logfile_name = logafter_name;
 
 		recv_files(f_in, f_out, local_name);
 		io_flush(FULL_FLUSH);
