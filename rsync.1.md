@@ -1781,10 +1781,17 @@ expand it.
     - `xxh128`
     - `xxh3`
     - `xxh64` (aka `xxhash`)
+    - `sha3-512`
+    - `sha3-384`
+    - `sha3-256`
     - `md5`
     - `md4`
     - `sha1`
     - `none`
+
+    The `sha3-*` choices require an rsync built with OpenSSL support and
+    a libcrypto that provides SHA-3 (OpenSSL 1.1.1 or newer).  They are
+    never selected by `auto` negotiation and must be requested explicitly.
 
     Run `rsync --version` to see the default checksum list compiled into your
     version (which may differ from the list above).
