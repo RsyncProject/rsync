@@ -47,21 +47,23 @@ static struct sigaction sigact;
 
 static int sock_exec(const char *prog);
 
+#define PROXY_BUF_SIZE 1024
+
 /* Establish a proxy connection on an open socket to a web proxy by using the
  * CONNECT method.  If proxy_user and proxy_pass are not NULL, they are used to
  * authenticate to the proxy using the "Basic" proxy-authorization protocol. */
 static int establish_proxy_connection(int fd, char *host, int port, char *proxy_user, char *proxy_pass)
 {
-	char *cp, buffer[1024];
-	char *authhdr, authbuf[1024];
+	char *cp, buffer[PROXY_BUF_SIZE + 1];
+	char *authhdr, authbuf[PROXY_BUF_SIZE + 1];
 	int len;
 
 	if (proxy_user && proxy_pass) {
-		stringjoin(buffer, sizeof buffer,
+		stringjoin(buffer, PROXY_BUF_SIZE,
 			 proxy_user, ":", proxy_pass, NULL);
 		len = strlen(buffer);
 
-		if ((len*8 + 5) / 6 >= (int)sizeof authbuf - 3) {
+		if ((len*8 + 5) / 6 >= PROXY_BUF_SIZE - 3) {
 			rprintf(FERROR,
 				"authentication information is too long\n");
 			return -1;
@@ -74,14 +76,14 @@ static int establish_proxy_connection(int fd, char *host, int port, char *proxy_
 		authhdr = "";
 	}
 
-	len = snprintf(buffer, sizeof buffer, "CONNECT %s:%d HTTP/1.0%s%s\r\n\r\n", host, port, authhdr, authbuf);
-	assert(len > 0 && len < (int)sizeof buffer);
+	len = snprintf(buffer, PROXY_BUF_SIZE, "CONNECT %s:%d HTTP/1.0%s%s\r\n\r\n", host, port, authhdr, authbuf);
+	assert(len > 0 && len < PROXY_BUF_SIZE);
 	if (write(fd, buffer, len) != len) {
 		rsyserr(FERROR, errno, "failed to write to proxy");
 		return -1;
 	}
 
-	for (cp = buffer; cp < &buffer[sizeof buffer - 1]; cp++) {
+	for (cp = buffer; cp < &buffer[PROXY_BUF_SIZE - 1]; cp++) {
 		if (read(fd, cp, 1) != 1) {
 			rsyserr(FERROR, errno, "failed to read from proxy");
 			return -1;
@@ -90,11 +92,13 @@ static int establish_proxy_connection(int fd, char *host, int port, char *proxy_
 			break;
 	}
 
-	if (*cp != '\n')
-		cp++;
-	*cp-- = '\0';
-	if (*cp == '\r')
-		*cp = '\0';
+	if (cp == &buffer[PROXY_BUF_SIZE - 1]) {
+		rprintf(FERROR, "proxy response line too long\n");
+		return -1;
+	}
+	*cp = '\0';
+	if (cp > buffer && cp[-1] == '\r')
+		cp[-1] = '\0';
 	if (strncmp(buffer, "HTTP/", 5) != 0) {
 		rprintf(FERROR, "bad response from proxy -- %s\n",
 			buffer);
@@ -110,7 +114,7 @@ static int establish_proxy_connection(int fd, char *host, int port, char *proxy_
 	}
 	/* throw away the rest of the HTTP header */
 	while (1) {
-		for (cp = buffer; cp < &buffer[sizeof buffer - 1]; cp++) {
+		for (cp = buffer; cp < &buffer[PROXY_BUF_SIZE]; cp++) {
 			if (read(fd, cp, 1) != 1) {
 				rsyserr(FERROR, errno,
 					"failed to read from proxy");
