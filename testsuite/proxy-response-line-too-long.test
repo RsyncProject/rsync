@@ -1,0 +1,128 @@
+#!/bin/sh
+
+# Copyright (C) 2026 by Andrew Tridgell
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Regression test for the off-by-one stack OOB write in
+# establish_proxy_connection() in socket.c when a malicious or
+# man-in-the-middle HTTP proxy returns a first response line of
+# 1023+ bytes without a '\n' terminator.
+#
+# Pre-fix: the read loop walked buffer[0..sizeof-2] one byte at a
+# time, then post-loop logic did "if (*cp != '\n') cp++; *cp-- =
+# '\0';".  If no newline arrived before the loop filled the buffer,
+# cp was left at &buffer[sizeof-1] (never written by the loop),
+# *cp held stale stack bytes, and cp++ pushed cp one past the array.
+# The null-termination then wrote one byte out of bounds on the
+# stack.  AddressSanitizer reports stack-buffer-overflow at the
+# null-termination site.
+#
+# Post-fix: the bound-exhaustion case is detected by position and
+# rejected with an "proxy response line too long" message, so no
+# OOB write occurs and rsync exits with a non-signal status.
+
+. "$suitedir/rsync.fns"
+
+command -v python3 >/dev/null 2>&1 || test_skipped "python3 not available"
+
+workdir="$scratchdir/workdir"
+mkdir -p "$workdir"
+cd "$workdir"
+
+port_file="$workdir/port"
+proxy_log="$workdir/proxy.log"
+
+# A minimal TCP listener: binds to an ephemeral port on 127.0.0.1,
+# writes the chosen port to $port_file *before* accept() so the test
+# can synchronise without a sleep, accepts one connection, reads
+# until end-of-headers or 64 KiB, sends exactly 1023 bytes of 'X'
+# with no '\n', then closes.
+python3 - "$port_file" >"$proxy_log" 2>&1 <<'PYEOF' &
+import socket, sys, os
+port_file = sys.argv[1]
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+s.bind(("127.0.0.1", 0))
+port = s.getsockname()[1]
+tmp = port_file + ".tmp"
+with open(tmp, "w") as fp:
+    fp.write("%d\n" % port)
+os.rename(tmp, port_file)   # atomic visibility to the shell side
+s.listen(1)
+conn, _ = s.accept()
+conn.settimeout(5)
+try:
+    data = b""
+    while b"\r\n\r\n" not in data and len(data) < 65536:
+        chunk = conn.recv(8192)
+        if not chunk:
+            break
+        data += chunk
+except socket.timeout:
+    pass
+conn.sendall(b"X" * 1023)    # exactly the buffer-1 trigger size
+try:
+    conn.shutdown(socket.SHUT_RDWR)
+except OSError:
+    pass
+conn.close()
+s.close()
+PYEOF
+proxy_pid=$!
+
+# Wait up to ~10s for the listener to publish its port.
+i=0
+while [ ! -s "$port_file" ] && [ $i -lt 10 ]; do
+    sleep 1
+    i=$((i + 1))
+done
+
+if [ ! -s "$port_file" ]; then
+    kill "$proxy_pid" 2>/dev/null
+    cat "$proxy_log" >&2 2>/dev/null
+    test_fail "proxy listener never published a port"
+fi
+
+port=`cat "$port_file"`
+case "$port" in
+    *[!0-9]*|"") kill "$proxy_pid" 2>/dev/null; test_fail "bogus port from listener: '$port'" ;;
+esac
+
+# Run rsync through the malicious proxy.  Any rsync:// URL works:
+# the proxy intercepts the CONNECT and never forwards anywhere.
+rsync_err="$workdir/rsync.err"
+
+# rsync MUST exit non-zero here (the proxy is misbehaving).
+# Use `|| status=$?` so we capture the real exit code under `sh -e`;
+# `if ! cmd; then status=$?` would only ever see 0 because the `!`
+# is the last command before `$?`.
+status=0
+RSYNC_PROXY="127.0.0.1:$port" \
+    $RSYNC rsync://example.invalid:873/whatever/ "$workdir/out/" \
+    >/dev/null 2>"$rsync_err" || status=$?
+
+# Reap the listener.
+wait "$proxy_pid" 2>/dev/null || true
+
+# 1. rsync must not have crashed (SIGSEGV/SIGABRT report >= 128).
+if [ "$status" -ge 128 ]; then
+    cat "$rsync_err" >&2
+    test_fail "rsync killed by signal (status=$status) -- possible stack OOB regression"
+fi
+
+# 2. rsync must have actually exited non-zero (i.e. saw the bad proxy).
+if [ "$status" -eq 0 ]; then
+    cat "$rsync_err" >&2
+    test_fail "rsync returned success despite malformed proxy response"
+fi
+
+# 3. The new error message must appear.
+if ! grep -q "proxy response line too long" "$rsync_err"; then
+    cat "$rsync_err" >&2
+    test_fail "expected 'proxy response line too long' in rsync stderr"
+fi
+
+echo "OK: over-long proxy response line rejected cleanly without crashing"
+exit 0
