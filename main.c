@@ -1568,6 +1568,10 @@ static int start_client(int argc, char *argv[])
 			shell_user = shell_machine;
 			shell_machine = p+1;
 		}
+		if (*shell_machine == '-') {
+			rprintf(FERROR, "Invalid remote host: hostnames may not start with '-'.\n");
+			exit_cleanup(RERR_SYNTAX);
+		}
 	}
 
 	if (DEBUG_GTE(CMD, 2)) {
