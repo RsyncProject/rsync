@@ -137,14 +137,19 @@ def step_1_fetch(args):
     section(f"Fetching ftp dir into {FTP_DIR}")
     if not os.path.isdir(FTP_DIR):
         os.makedirs(FTP_DIR)
-    # The .filt file lives in the ftp dir on the server; mirror down using the
-    # transmitted filter, falling back to no filter on the very first pull.
+    # packaging/ftp.filt is the authoritative copy of the .filt filter file
+    # that controls which subtrees rsync excludes from the FTP mirror.
+    # Seed FTP_DIR/.filt from it so the bundled version is what step-1's
+    # rsync uses here, and so step-10-push-ftp propagates it back to the
+    # server.  --exclude=/.filt below stops the server's copy from
+    # overwriting our bundled one on the way down.
     filt = os.path.join(FTP_DIR, '.filt')
-    if os.path.exists(filt):
-        opts = ['-aivOHP', f'-f:_{filt}']
-    else:
-        opts = ['-aivOHP']
-    cmd_chk(['rsync', *opts, f'{host}:{FTP_REMOTE_PATH}/', f'{FTP_DIR}/'])
+    bundled_filt = os.path.realpath('packaging/ftp.filt')
+    if not os.path.isfile(bundled_filt):
+        die(f"{bundled_filt} not found; cannot seed .filt for the FTP pull.")
+    shutil.copyfile(bundled_filt, filt)
+    cmd_chk(['rsync', '-aivOHP', f'-f:_{filt}', '--exclude=/.filt',
+             f'{host}:{FTP_REMOTE_PATH}/', f'{FTP_DIR}/'])
 
     section(f"Snapshotting html dir from {HTML_SRC} into {HTML_DIR}")
     if not os.path.isdir(HTML_SRC):
