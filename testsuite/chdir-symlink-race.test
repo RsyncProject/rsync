@@ -66,8 +66,10 @@ ln -s "$outside" "$mod/subdir"
 # different content, mode 0666 (the perms the attacker tries to push).
 SIZE=$(stat -c %s "$outside/target.txt" 2>/dev/null \
        || stat -f %z "$outside/target.txt")
-head -c "$SIZE" /dev/urandom > "$src/target.txt"
-head -c "$SIZE" /dev/urandom > "$src/subdir/target.txt"
+make_data_file "$src/target.txt" "$SIZE" \
+    || test_fail "failed to create source file"
+make_data_file "$src/subdir/target.txt" "$SIZE" \
+    || test_fail "failed to create source file"
 chmod 0666 "$src/target.txt" "$src/subdir/target.txt"
 
 cat > "$conf" <<EOF

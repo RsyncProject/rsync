@@ -236,6 +236,50 @@ makepath() {
 
 
 ###########################
+# Create a file at $1 of $2 bytes containing non-trivial content
+# suitable for rsync's delta algorithm to chew on.  Prefers
+# /dev/urandom for speed and entropy, falling back to a
+# deterministic awk pseudo-random generator on platforms that
+# lack /dev/urandom (e.g. HPE NonStop).  The tests using this
+# helper don't need cryptographic randomness -- they only need
+# bytes that compress and delta-match like normal file content.
+
+make_data_file() {
+    if [ $# -ne 2 ]; then
+	echo "usage: make_data_file PATH SIZE" >&2
+	return 2
+    fi
+    if [ -r /dev/urandom ] && \
+       dd if=/dev/urandom of="$1" bs="$2" count=1 2>/dev/null && \
+       [ -s "$1" ]; then
+	return 0
+    fi
+    # Fallback: a 32-bit linear congruential generator with BSD/glibc
+    # parameters.  Seeded from PID and a POSIX cksum of the destination
+    # path so successive calls with different paths produce distinct
+    # content.  Output is constrained to the printable-ASCII range
+    # (33..126, i.e. '!' through '~') for two portability reasons:
+    #   - awk implementations vary on whether printf "%c", 0 emits a
+    #     NUL byte or terminates the string;
+    #   - gawk in UTF-8 locales encodes printf "%c", N for N > 127
+    #     as a 2-byte UTF-8 sequence, which would make the output
+    #     larger than the requested sz.
+    # The tests using this helper don't need 8-bit binary data, only
+    # non-trivial content for the rsync delta algorithm.
+    _path_seed=$(printf '%s' "$1" | cksum 2>/dev/null | awk '{print $1}')
+    awk -v sz="$2" -v seed_a="$$" -v seed_b="${_path_seed:-0}" 'BEGIN {
+	s = (seed_a + seed_b) % 2147483648
+	if (s < 0) s = -s
+	for (i = 0; i < sz; i++) {
+	    s = (s * 1103515245 + 12345) % 2147483648
+	    b = (int(s / 65536) % 94) + 33    # 33..126
+	    printf "%c", b
+	}
+    }' > "$1"
+}
+
+
+###########################
 # Run a test (in '$1') then compare directories $2 and $3 to see if
 # there are any difference.  If there are, explain them.
 
