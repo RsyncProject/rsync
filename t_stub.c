@@ -36,7 +36,12 @@ int preserve_perms = 0;
 int preserve_executability = 0;
 int omit_link_times = 0;
 int open_noatime = 0;
-size_t max_alloc = 0; /* max_alloc is needed when combined with util2.o */
+size_t max_alloc = (size_t)-1; /* test helpers are not memory-constrained;
+				* 0 here makes every my_alloc()/my_strdup() in
+				* util2.c trip the "exceeded --max-alloc=0"
+				* check, which any helper exercising the
+				* per-component fallback of secure_relative_open()
+				* hits at its first my_strdup() call. */
 char *partial_dir;
 char *module_dir;
 filter_rule_list daemon_filter_list;
