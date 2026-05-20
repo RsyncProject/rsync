@@ -7,6 +7,22 @@ option to use if you want to just skip that feature.  What follows are various
 support libraries that you may want to install to build rsync with the maximum
 features (the impatient can skip down to the package summary):
 
+## Ubuntu users: skip the build, use the PPA
+
+If you are on a currently supported Ubuntu series (jammy 22.04 LTS, noble
+24.04 LTS, questing 25.10, resolute 26.04 LTS) and just want the latest
+upstream rsync, the rsync project maintains a Launchpad PPA that tracks
+stable releases:
+
+>     sudo add-apt-repository ppa:rsyncproject/rsync
+>     sudo apt update && sudo apt install rsync
+
+See [the PPA page][ppa] for current build status across architectures.
+
+[ppa]: https://launchpad.net/~rsyncproject/+archive/ubuntu/rsync
+
+The rest of this document covers building from source.
+
 ## The basic setup
 
 You need to have a C compiler installed and optionally a C++ compiler in order
