@@ -1,0 +1,127 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<TITLE>rsync download</TITLE>
+</head>
+<!--#include virtual="header.html" -->
+
+<h2 align="center">rsync download</h2>
+
+<div style="float: right">
+<a href="https://github.com/RsyncProject/rsync/actions">
+<img src="badge.svg">
+</a></div>
+
+<h2>Source-code releases</h2>
+
+<p>You can grab the latest source code and other related files in a variety of ways:
+
+<ul>
+
+<li><p>The latest version is linked on the <a href="https://rsync.samba.org/">main page</a>.
+
+<li><p>A directory listing of these latest files and various historical release and diff files
+are available via <a href="https://download.samba.org/pub/rsync/">this web page</a> and
+via <i>anonymous SSL rsync</i> using this command:
+<p><code><small>rsync-ssl rsync://download.samba.org/rsyncftp/</small></code></p>
+
+<li><p>You can also get .zip and .tar.gz versions of the various git repo's release
+tags via the <a href="https://github.com/RsyncProject/rsync/tags">rsync GitHub tags page</a>
+and the associated patches via the
+<a href="https://github.com/RsyncProject/rsync-patches/tags">rsync-patches GitHub tags page</a>.
+Keep in mind that these git-derived files do NOT come with the extra generated files that are included
+in the official release tar files.
+
+<li><p>You can browse the very latest source files, clone the source using git, or download a .zip file of the latest
+master branch from <a href="https://github.com/RsyncProject/rsync">rsync's GitHub page</a>.
+
+<li><p>The <a href="https://git.samba.org/?p=rsync.git">Samba git repo</a> is also available,
+though it might lag behind the GitHub repo every now and then.
+
+</ul>
+
+Once you have the source, read the <a
+href="https://download.samba.org/pub/rsync/INSTALL">INSTALL.md</a> file for
+details on some development libraries that you will need to build it.
+
+<h2>The GPG Signing Key</h2>
+
+The GPG signing key that is used to sign the release files is available from the public pgp key-server
+network.  If you have automatic key-fetching enabled, just running a normal
+"gpg&nbsp;--verify" will grab my key automatically.
+Or, feel free to grab <a href="https://opencoder.net/WayneDavison.key">the gpp
+  key for Wayne Davison</a> manually.<p>
+
+From 3.4.0 and later releases will be signed by Andrew
+Tridgell. Please fetch the key for andrew@tridgell.net from https://keys.openpgp.org/
+
+<h2>Binaries</h2>
+
+<p>Precompiled binaries are available in most modern OS distributions, so
+you should first check if you can install an rsync package via your
+standard package-install tools for your OS.
+
+<h3>Ubuntu</h3>
+
+<p>The rsync project maintains a Launchpad PPA that tracks upstream stable
+releases for the currently supported Ubuntu series (jammy 22.04 LTS,
+noble 24.04 LTS, questing 25.10, resolute 26.04 LTS).  This is the
+fastest way to get the latest upstream rsync on Ubuntu without waiting
+for the distro to update its packaged version:
+
+<p><code><small>sudo add-apt-repository ppa:rsyncproject/rsync<br>
+sudo apt update &amp;&amp; sudo apt install rsync</small></code>
+
+<p>See the <a href="https://launchpad.net/~rsyncproject/+archive/ubuntu/rsync">PPA page on Launchpad</a>
+for build status across architectures.
+
+<p>The <a href="https://github.com/RsyncProject/rsync/actions">GitHub Actions
+page</a> has build events that each generate a few binary artifact zip files
+(just click through via the build's title to see them).  The actions page is
+also linked via the various green build-status icons on the web pages here.
+These builds use the newest libraries, such as xxhash checksums and zstd
+compression, and are dynamically linked, so you may need to install some
+official library packages for your distribution.  If you're curious how the
+build was done, you can look at the build rules in the "Workflow file" tab.
+See the <a href="https://download.samba.org/pub/rsync/INSTALL">INSTALL.md</a>
+file for some package name hints, though you can use the non-devel versions of
+the various lib packages and ignore the gcc/autoconf/awk packages.
+
+<p>There are also packages available from some <b>3rd-parties</b> (note that we
+cannot vouch for 3rd parties, so use a source that you trust):
+
+<ul>
+
+<li><p><a href="https://www.cygwin.com/">Cygwin</a> is a Posix runtime for MS
+Windows that includes rsync among their many packages.</p></li>
+
+<li><p><a href="https://www.itefix.net/cwrsync">cwRsync</a> is a native
+packaging of rsync for MS Windows (they appear to only provide paid releases,
+though).</p></li>
+
+</ul>
+
+<h2>Git source vs Release files</h2>
+
+The release tar files come with a few generated files that are not checked in to git.
+These mainly include the man pages and the configure related files.  To make use of
+the git-derived files you will need autoconf, autoheader, and a version of python3
+that has the commonmark lib (OR cmarkgfm).  If you have trouble with setting up the
+those required files, you can try running "./prepare-source fetchgen" to grab the
+very latest generated files that were created from the latest commit into the master
+branch.
+
+<p> <b>Note:</b> Since the source repository is a work in progress it may, at
+times, not compile or fail in various ways, though it is usually pretty good.
+
+<h2>Source repository patches</h2>
+
+<p>There are also various patch files in the "rsync-patches" repository that
+represent either some work-in-progress features or features that are considered
+to be a little too fringe-interest for the main release.  See the github link
+above for how to look around at what is available, or snag a release tar file.
+The maintainer like to put the rsync-patches dir into his rsync checkout as a
+directory named "patches" and has some helper scripts for how to use local git
+branches to test and update the diffs.
+
+<!--#include virtual="footer.html" -->

@@ -1,0 +1,189 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<HTML>
+<HEAD>
+<TITLE>rsync firewall tunneling</TITLE>
+</HEAD>
+<!--#include virtual="header.html" -->
+
+<H2 align="center">Using rsync through a firewall</H2>
+
+<p>If you have a setup where there is no way to directly connect two
+systems for an rsync transfer, there are several ways to get a firewall
+system to act as an intermediary in the transfer.
+
+<p>This first method should work for any remote-shell (e.g. ssh, rsh, etc).
+The other methods are all targeted at ssh (which has a lot of flexibility
+in making a tunneled connection possible).
+
+<h4>Method 1 -- should work with any remote-shell</h4>
+
+<p>Use your remote shell (e.g. ssh) to access the middle system and have it
+use a remote shell to hop over to the actual target system.
+
+<p>To effect this extra hop, you'll need to make sure that the remote-shell
+connection from the middle system to the target system does not involve any
+tty-based user interaction (such as prompting for a password) because there
+is no way for the middle system to access the local user's tty.
+
+<p>One way that should work for all remote-shell programs is to enable host-based
+authentication, which would allow all connections from the middle system to
+the target system to succeed (when the username remains the same).
+However, this may not be a desirable setup.
+
+<p>A better method that works with ssh (and is very safe) is to setup an ssh
+key (see the ssh-keygen manpage) and ensure that ssh-agent forwarding is turned
+on in your ssh client config (e.g. "ForwardAgent&nbsp;yes").  You would put
+the public version of your key onto the middle and target systems (in the
+~/.ssh/authorized_keys file), and the private key on your local system (which
+I recommend you encrypt).  With this setup, a series of ssh connections that
+starts from the system where your private key is available will auto-authorize
+(after a pass-phrase prompt on the first system if your key is encrypted).
+See also ssh-agent for a way to keep a public key unlocked in memory for an
+extended time, and the keychain project for a way to manage a system-wide,
+per-user ssh-agent.
+
+<p>To test that you have things setup right, first test a series of
+remote-shell connections outside of rsync.  A command such as the following
+should work without issuing multiple prompts (use the appropriate remote-shell
+and the substitute the real hostnames for "middle" and "target", of course):
+
+<blockquote><pre>ssh middle ssh target uptime</pre></blockquote>
+
+<p>If you get a password/passphrase prompt to get into the first ("middle")
+system that's fine, but the extra hop needs to occur without any extra user
+interaction.
+
+<p>Once that's done, you can do an rsync copy like this:
+
+<blockquote><pre>rsync -av -e "ssh middle ssh" target:/src/ /dest/</pre></blockquote>
+
+<h4>Method 2 -- requires ssh and nc (netcat)</h4>
+
+<p>Assuming you're using ssh as your remote shell, you can configure ssh to
+use a proxy command to get to the remote host you're interested in reaching.
+Doing this will allow the multi-hop connection to work with rsync, even if
+both hosts prompt for a password -- this is because both ssh connections
+originate from the localhost, and thus both instances of ssh have access to
+the local tty to use for an out-of-band password prompt.
+
+<p>Here is an example config for your ~/.ssh/config file (substitute "target",
+"target_user", and "middle" as appropriate):
+
+<blockquote><pre>Host target
+  ProxyCommand nohup ssh middle nc -w1 %h %p
+  User target_user
+</pre></blockquote>
+
+<p>This proxy setup uses "ssh" to login to the firewall system ("middle") and
+uses "nc" (netcat) to connect to the target host ("target") using the default
+port number.  The use of "nohup" silences a warning at the end of the run, and
+the "-w1" option tells nc to shut down when the connection closes.
+
+<p>With this done, you can run a normal-looking rsync command to "target" that
+will run the proxy command to get through the firewall system:
+
+<blockquote><pre>rsync -av /src/ target:/dest/</pre></blockquote>
+
+<h4>Method 3 -- an alternate ssh method for those without nc (netcat)</h4>
+
+<p>Assuming you're using ssh as your remote shell, you can configure ssh to
+forward a local port through your middle system to the ssh port (22) on the
+target system.  This method does not require the use of nc (it uses only
+ssh to effect the extra hop), but otherwise it is similar to, but slightly
+less convenient than, method 2.
+
+<p>The first thing we need is an ssh configuration that will allow us to
+connect to the forwarded port as if we were connecting to the target
+system, and we need ssh to know what we're doing so that it doesn't
+complain about the host keys being wrong.  We can do this by adding this
+section to your ~/.ssh/config file (substitute "target" and "target_user"
+as appropriate, but leave "localhost" unchanged):
+
+<blockquote><pre>Host target
+  HostName localhost
+  Port 2222
+  HostKeyAlias target
+  User target_user
+</pre></blockquote>
+
+<p>Next, we need to enable the port forwarding:
+
+<blockquote><pre>ssh -fN -l middle_user -L 2222:target:22 middle</pre></blockquote>
+
+<p>What this does is cause a connection to port 2222 on the local system to
+get tunneled to the middle system and then turn into a connection to the
+target system's port 22.  The -N option tells ssh not to start a shell on
+the remote system, which works with modern ssh versions (you can run a
+sleep command if -N doesn't work).  The -f option tells ssh to put the
+command in the background after any password/passphrase prompts.
+
+<p>With this done, you could run a normal-looking rsync command to "target"
+that would use a connection to port 2222 on localhost automatically:
+
+<blockquote><pre>rsync -av target:/src/ /dest/</pre></blockquote>
+
+<p><b>Note:</b> starting an ssh tunnel allows anyone on the source system
+to connect to the localhost port 2222, not just you, but they'd still need
+to be able to login to the target system using their own credentials.
+
+<h4>Method 4 -- for using rsync in daemon-mode (requires nc)</h4>
+
+<p>Install and configure an rsync daemon on the target and use ssh and nc
+to send the socket data to the remote host.
+
+<blockquote><pre>RSYNC_CONNECT_PROG='ssh -l middle_user middle nc %H 873' \
+    rsync daemonuser@target::module/src/ /dest/</pre></blockquote>
+
+<p>(You can also export that variable into your environment if you want to
+perform a series of daemon rsync commands through the same middle host.)
+
+<p>This command takes advantage of the RSYNC_CONNECT_PROG environment
+variable, which tells rsync to pipe its socket data to an external program
+in place of making a direct socket connection.  The command specifed above
+uses ssh to run the nc (netcat) command on the middle host, which forwards
+all socket data to port 873 on the target host (%H).  The "%H" will be
+substituted with the target host from the rsync command as long as you're
+running rsync 3.0.0 or newer (you'll need to replace %H with the actual
+target hostname for earlier rsync versions, which makes the hostname
+specified in the rsync command superfluous).
+
+<h4>Method 5 -- for using rsync in daemon-mode (for those without nc)</h4>
+
+<p>Install and configure an rsync daemon on the target and use an ssh
+tunnel to reach the rsync sever.  This is similar to method 3, but it
+tunnels the daemon port for those that prefer to use an rsync daemon.
+
+<p>(Note that this method also works to tunnel a socket connection
+directly to a destination system if you use "localhost" as the target
+hostname and your destination system's name as the middle hostname.)
+
+<p>Installing the rsync daemon is beyond the scope of this document, but
+see the rsyncd.conf manpage for more information.  Keep in mind that you
+don't need to be root to run an rsync daemon as long as you don't use a
+protected port.
+
+<p>Once your rsync daemon is up and running, you build an ssh tunnel
+through your middle system like this:
+
+<blockquote><pre>ssh -fN -l middle_user -L 8873:target:873 middle</pre></blockquote>
+
+<p>What this does is cause a connection to port 8873 on the local system to
+turn into a connection from the middle system to the target system on port
+873.  (Port 873 is the normal port for an rsync daemon.) The -N option
+tells ssh not to start a shell on the remote system, which works with
+modern ssh versions (you can run a sleep command if -N doesn't work).  The
+-f option tells ssh to put the command in the background after any
+password/passphrase prompts.
+
+<p>Now when an rsync command is executed with a daemon-mode command-line
+syntax to the local system, the conversation is directed to the target
+system.  For example:
+
+<blockquote><pre>rsync -av --port 8873 localhost::module/src/ dest/
+rsync -av rsync://localhost:8873/module/src/ dest/</pre></blockquote>
+
+<p><b>Note:</b> starting an ssh tunnel allows anyone on the source system
+to connect to the localhost port 8873, not just you, so you may want to
+enable username/password restrictions on your rsync daemon.
+
+<!--#include virtual="footer.html" -->

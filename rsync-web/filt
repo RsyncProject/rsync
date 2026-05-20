@@ -1,0 +1,13 @@
+P /badge.svg
+H /.git/
+H /.gitignore
+H /bin/
+H /upload/
+P /USE_THE_GIT_rsync-web_REPO_NOW
+H /filt
+H *.swp
+- /netware/
+- /pre-change
+- /rsync-and-debian/
+- /index.html-*
+- *~
