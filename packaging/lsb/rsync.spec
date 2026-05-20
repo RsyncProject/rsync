@@ -1,6 +1,6 @@
 Summary: A fast, versatile, remote (and local) file-copying tool
 Name: rsync
-Version: 3.4.2
+Version: 3.4.3
 %define fullversion %{version}
 Release: 1
 %define srcdir src
@@ -79,5 +79,5 @@ rm -rf $RPM_BUILD_ROOT
 %dir /etc/rsync-ssl/certs
 
 %changelog
-* Tue Apr 28 2026 Rsync Project <rsync.project@gmail.com>
-Released 3.4.2.
+* Wed May 20 2026 Rsync Project <rsync.project@gmail.com>
+Released 3.4.3.
