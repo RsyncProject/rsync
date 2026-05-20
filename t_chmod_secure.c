@@ -17,6 +17,11 @@
 
 #include <sys/stat.h>
 
+#ifdef __linux__
+#include <sys/syscall.h>
+#include <linux/openat2.h>
+#endif
+
 int dry_run = 0;
 int am_root = 0;
 int am_sender = 0;
@@ -29,6 +34,42 @@ extern int am_daemon, am_chrooted;
 short info_levels[COUNT_INFO], debug_levels[COUNT_DEBUG];
 
 static int errs = 0;
+
+/* Probe the running kernel for the RESOLVE_BENEATH-equivalent confinement
+ * that secure_relative_open() prefers over the per-component O_NOFOLLOW
+ * walk.  Returns 1 if either openat2(RESOLVE_BENEATH) on Linux 5.6+ or
+ * openat(O_RESOLVE_BENEATH) on FreeBSD 13+ / macOS 15+ is honoured by
+ * the running kernel, 0 otherwise.  The probe opens "." (a directory
+ * the helper has just chdir'd into) so it can't fail for any reason
+ * other than the kernel rejecting the requested confinement flag. */
+static int kernel_resolve_beneath_supported(void)
+{
+	int fd;
+#ifdef __linux__
+	{
+		struct open_how how;
+		memset(&how, 0, sizeof how);
+		how.flags = O_RDONLY | O_DIRECTORY;
+		how.resolve = RESOLVE_BENEATH | RESOLVE_NO_MAGICLINKS;
+		fd = syscall(SYS_openat2, AT_FDCWD, ".", &how, sizeof how);
+		if (fd >= 0) {
+			close(fd);
+			return 1;
+		}
+		/* ENOSYS = kernel < 5.6.  Fall through to the O_RESOLVE_BENEATH
+		 * probe in case we're a Linux build running on a kernel that
+		 * gained O_RESOLVE_BENEATH via some out-of-tree backport. */
+	}
+#endif
+#ifdef O_RESOLVE_BENEATH
+	fd = openat(AT_FDCWD, ".", O_RDONLY | O_DIRECTORY | O_RESOLVE_BENEATH);
+	if (fd >= 0) {
+		close(fd);
+		return 1;
+	}
+#endif
+	return 0;
+}
 
 static void check(const char *label, int actual_rc, int expect_ok,
 		  const char *path, mode_t expected_mode)
@@ -87,10 +128,35 @@ int main(int argc, char **argv)
 	 * files to mode 0600 so we have a clean baseline to compare.
 	 */
 
-	/* Scenario A: legitimate parent dir-symlink, chmod must succeed. */
+	/* Scenario A: legitimate parent dir-symlink.
+	 *
+	 * On platforms whose kernel offers RESOLVE_BENEATH-equivalent
+	 * confinement (Linux 5.6+ openat2, FreeBSD 13+ / macOS 15+
+	 * O_RESOLVE_BENEATH), the within-tree symlink is followed and
+	 * the chmod must succeed.
+	 *
+	 * On platforms that fall back to the per-component O_NOFOLLOW
+	 * walk (OpenBSD, NetBSD, Solaris, older Cygwin, HPE NonStop,
+	 * and pre-5.6 Linux), every symlink is rejected -- including
+	 * this legitimate one.  That's a real platform limitation (the
+	 * same one that causes the #715 regression there) and the
+	 * expected outcome is rejection.
+	 *
+	 * Detect at runtime and expect accordingly.  The other three
+	 * scenarios behave identically on both code paths and need no
+	 * adjustment. */
+	int kernel_has_rb = kernel_resolve_beneath_supported();
+	fprintf(stderr, "INFO: kernel RESOLVE_BENEATH-equivalent confinement: %s\n",
+		kernel_has_rb ? "available" : "not available (per-component fallback)");
+
 	int rc = do_chmod_at("inside_link/sentinel", 0640);
-	check("A: legit dir-symlink within tree",
-	      rc, 1, "realdir/sentinel", 0640);
+	if (kernel_has_rb) {
+		check("A: legit dir-symlink within tree (kernel confined)",
+		      rc, 1, "realdir/sentinel", 0640);
+	} else {
+		check("A: legit dir-symlink within tree (per-component fallback rejects)",
+		      rc, 0, "realdir/sentinel", 0600);
+	}
 
 	/* Scenario B: parent symlink escapes the tree -- chmod must be
 	 * rejected and the outside file's mode must be unchanged. */
