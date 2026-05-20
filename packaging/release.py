@@ -153,8 +153,8 @@ def step_1_fetch(args):
     os.makedirs(HTML_DIR, exist_ok=True)
     cmd_chk(['rsync', '-aiv', f'{HTML_SRC}/', f'{HTML_DIR}/'])
 
-    # Then mirror non-git html content from the server (mirroring samba-rsync's
-    # behavior: skip files that the html git already provides).
+    # Then mirror non-git html content from the server, skipping files that
+    # the html git already provides (driven by the 'filt' file in HTML_DIR).
     filt = os.path.join(HTML_DIR, 'filt')
     if os.path.exists(filt):
         tmp_filt = os.path.join(HTML_DIR, 'tmp-filt')
@@ -629,9 +629,8 @@ If you have a 'samba' remote configured (git.samba.org:/data/git/rsync.git):
     git push samba {master_branch}
     git push samba {v_ver}
 
-Then upload the tarball + .asc to the GitHub release for {v_ver}, run
-packaging/send-news (when convenient), and announce on rsync-announce@,
-rsync@, and Discord.
+Then upload the tarball + .asc to the GitHub release for {v_ver},
+and announce on rsync-announce@, rsync@, and Discord.
 """)
 
 
