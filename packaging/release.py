@@ -8,7 +8,7 @@
 # the rsync git checkout):
 #
 #   ../release/rsync-ftp/       mirror of samba.org:/home/ftp/pub/rsync
-#   ../release/rsync-html/      git checkout of rsync-web (the html site)
+#   ../release/rsync-html/      release-time snapshot of the html site
 #   ../release/work/            scratch space for tarball / diff staging
 #   ../release/release-state.json   info shared between steps
 #
@@ -35,10 +35,11 @@ HTML_DIR    = os.path.join(RELEASE_DIR, 'rsync-html')
 WORK_DIR    = os.path.join(RELEASE_DIR, 'work')
 STATE_FILE  = os.path.join(RELEASE_DIR, 'release-state.json')
 
-# Local rsync-web checkout (sibling of rsync-git) is the source-of-truth for
-# the git-tracked html content.  The maintainer pulls/commits/pushes there;
-# step-1-fetch just snapshots it into HTML_DIR for the release flow.
-HTML_SRC = os.path.realpath('../rsync-web')
+# The rsync-web/ subdirectory in the rsync source tree is the source-of-truth
+# for the git-tracked html content.  step-1-fetch snapshots it into HTML_DIR
+# for the release flow, where it can be edited or augmented with server-side
+# content before step-11-push-html sends it to samba.org.
+HTML_SRC = os.path.realpath('rsync-web')
 
 FTP_REMOTE_PATH  = '/home/ftp/pub/rsync'
 HTML_REMOTE_PATH = '/home/httpd/html/rsync'
@@ -60,7 +61,7 @@ GEN_FILES = [
 # ---------- Step registry ----------
 
 STEPS = [
-    ('step-1-fetch',       'mirror ../release/rsync-ftp from samba.org and snapshot ../release/rsync-html from ../rsync-web'),
+    ('step-1-fetch',       'mirror ../release/rsync-ftp from samba.org and snapshot ../release/rsync-html from rsync-web/'),
     ('step-2-prepare',     'gather release info interactively and write release-state.json'),
     ('step-3-tweak',       'update version.h, rsync.h, NEWS.md, and packaging/*.spec'),
     ('step-4-build',       'run smart-make + make gen'),
@@ -147,13 +148,10 @@ def step_1_fetch(args):
 
     section(f"Snapshotting html dir from {HTML_SRC} into {HTML_DIR}")
     if not os.path.isdir(HTML_SRC):
-        die(f"{HTML_SRC} not found.  Clone the rsync-web repo there first.")
-    if not os.path.isdir(os.path.join(HTML_SRC, '.git')):
-        die(f"{HTML_SRC} exists but is not a git checkout.")
-    print(f"(Make sure {HTML_SRC} is up to date — this script does not 'git pull' for you.)")
+        die(f"{HTML_SRC} not found.  This should be the in-tree rsync-web/ "
+            f"subdirectory; something is wrong with your checkout.")
     os.makedirs(HTML_DIR, exist_ok=True)
-    cmd_chk(['rsync', '-aiv', '--exclude=/.git',
-             f'{HTML_SRC}/', f'{HTML_DIR}/'])
+    cmd_chk(['rsync', '-aiv', f'{HTML_SRC}/', f'{HTML_DIR}/'])
 
     # Then mirror non-git html content from the server (mirroring samba-rsync's
     # behavior: skip files that the html git already provides).
