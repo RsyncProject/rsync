@@ -1,1 +1,8 @@
 * text=auto eol=lf
+
+# The rsync-web/ subdirectory holds the project website source content
+# (mirrors what gets pushed to https://rsync.samba.org).  Exclude it from
+# `git archive` output so the release source tarball produced by
+# packaging/release.py step_7_tarball does not bloat with HTML the
+# tarball doesn't need.
+/rsync-web/ export-ignore

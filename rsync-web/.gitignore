@@ -1,0 +1,11 @@
+/.xvpics
+/doxygen/
+/tech_report/IMG_PARAMS.dir
+/tech_report/IMG_PARAMS.pag
+/upload
+/netware
+/pre-change
+/index.html-*
+/rsync-and-debian/rsync-and-debian.html
+/rsync-and-debian/rsync-and-debian.ps
+/badge.svg

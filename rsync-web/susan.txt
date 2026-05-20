@@ -1,0 +1,31 @@
+I use rsync to backup my wifes home directory across a modem link each
+night. The cron job looks like this
+
+    #!/bin/sh
+    cd ~susan
+    {
+    echo
+    date
+    dest=~/backup/`date +%A`
+    mkdir $dest.new
+    find . -xdev -type f \( -mtime 0 -or -mtime 1 \) -exec cp -aPv "{}"
+    $dest.new \;
+    cnt=`find $dest.new -type f | wc -l`
+    if [ $cnt -gt 0 ]; then
+      rm -rf $dest
+      mv $dest.new $dest
+    fi
+    rm -rf $dest.new
+    rsync -Cavze ssh . samba:backup
+    } >> ~/backup/backup.log 2>&1
+
+
+note that most of this script isn't anything to do with rsync, it just
+creates a daily backup of Susans work in a ~susan/backup/ directory so
+she can retrieve any version from the last week. The last line does
+the rsync of her directory across the modem link to the host
+samba. Note that I am using the -C option which allows me to add
+entries to .cvsignore for stuff that doesn't need to be backed up.
+
+
+

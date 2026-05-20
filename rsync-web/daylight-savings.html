@@ -1,0 +1,183 @@
+<HTML><HEAD>
+<TITLE>DST change and date comparisons</TITLE>
+</HEAD><BODY>
+
+<p><small><i>J.W. Schultz wrote the following text in a
+<a href="http://www.cygwin.com/ml/cygwin/2003-10/msg00995.html">post</a>
+to the cygwin mailing list.&nbsp; It has been slightly edited and beautified
+for inclusion here.</i></small>
+
+<h1>How the DST Change can adversely affect FAT filesystems</h1>
+
+<p>
+The vernal and autumnal transitions to and from daylight-savings
+time have important implications
+for those with Microsoft systems and use utilities that
+compare file timestamps on different filesystem types or
+with filesystems on other operating systems that can lead to
+a problem in how the file's date is handled.
+This problem lies in the way FAT filesystems stores
+timestamps and how Windows converts between local time and
+UTC. 
+
+<h2>Background</h2>
+
+<p>
+In UNIX and UNIX-like systems (such as Linux) file timestamps
+are stored in UTC (universal time) and are only converted to
+local-time by user-space programs for display purposes.&nbsp; At
+the system call level all time values are in UTC and
+utilities that compare timestamps do so in UTC.&nbsp; Also, the
+standard UTC-&gt;local and local-&gt;UTC conversion functions are
+aware of DST and conversions reflect this so that if a
+timestamp was recorded during ST it will be converted using
+the ST offset even when the current system time is DST.
+
+<p>
+In Windows things are not so simple.&nbsp; Windows operates in
+local-time.&nbsp; Timestamps in the various FAT derived
+filesystems are stored in local-time.&nbsp; Timestamps in NTFS
+filesystems are stored in UTC.&nbsp; This inconsistency is
+further complicated by the fact that the conversion routines
+used are not DST aware.&nbsp; Instead of being DST aware the
+system has a fixed offset to convert between local-time and
+UTC regardless of the date in the timestamp.&nbsp; This fixed
+offset is calculated at boot time and only changed when
+systems transition to or from DST.&nbsp; As a result the apparent
+modification time of a file on NTFS as reported in a windows
+utility will change by one hour when reported in local-time
+and FAT based files when reported in UTC.
+
+<p>
+The difficulty that this produces is that any utilities that
+compare timestamps between FAT and NTFS filesystems or
+between Windows and other platforms will view files that
+have not changed as having a different modified time.&nbsp; Among other things
+this will affect rsync, rdiff, unison, wget, and make.&nbsp; However,
+for the purposes of this document, we will only discuss rsync.
+
+<p>
+With the reduced cost of hard disks many newer backup
+systems are using hard disk based storage and take advantage
+of timestamp comparison to detect file changes for the sake
+of efficiency.&nbsp; Rsync is probably premier in this role and
+is used by a fair number of free and even commercial backup
+systems as well as being the basis for many home-brew backup
+solutions.
+
+<p>
+With rsync and similar systems the effect of this is that
+every file will appear to have been changed.&nbsp; The result is
+any space savings associated with linking (--link-dest) or
+with decremental backup approaches (--compare-dest and
+--backup-dir) will be defeated.&nbsp; Perhaps worse, because
+every file will appear to have changed the time required to
+do a backup or a non-backup rsync will be much longer than
+normal.&nbsp; In some cases backups that normally complete in
+less than one hour can take several days.
+
+<p>
+So what can be done about it?  Several things, there are
+ways to merely mitigate the problem, to correct it and finally
+to prevent the problem entirely.
+
+<h2>Mitigation</h2>
+
+<p>
+Rsync has a --modify-window option.&nbsp; Many of you already use
+--modify-window=1 to cope with the fact that windows often
+stores timestamps with a two second resolution.&nbsp; Using a
+--modify-window=3601 will cause rsync to ignore timestamp
+differences of up to one hour.
+
+<p>
+This if often not particularly dangerous because a file would have to
+be changed, synced and changed again without changing size
+within a single hour and have no subsequent changes for this copy
+to miss a file change.&nbsp; However, for some systems any such risk is
+unacceptable, so other solutions are needed.
+
+<h2>Correcting the Timestamps</h2>
+
+<p>
+There are two ways to correct.
+
+<p>For the first run after the time change, you can run rsync with the
+--checksum option in order to ensure that only files that have a changed
+checksum get transferred, and update the modified time on all unchanged
+files.&nbsp; This option has the drawback that it increases disk I/O by
+a large amount on both the sending and receiving side, slowing down the
+copy.
+
+<p>
+The other way to correct things is to change the timestamps
+on the files on the backup server before doing a copy after a
+time change has occurred.
+
+<p>
+Included here is an example perl script that will change the
+timestamps of files in a list on standard-input.&nbsp; Whether
+you use a positive or negative shift will depend on which
+end you decide to adjust.
+
+<p>
+This is an example of how to use the script:
+
+<blockquote><pre>
+touch -d '01:00 13-apr-03' /tmp/cmpfile
+find . -type f ! -newer /tmp/cmpfile | shifttime.pl 3600
+</pre></blockquote>
+
+<hr>
+<pre>
+#!/usr/bin/perl
+use strict;
+
+my $offset = shift() + 0;
+die &quot;Usage: $0 OFFSET_SECONDS\n&quot; unless $offset;
+
+while (&lt;&gt;) {
+    chomp;
+    my $mtime = (stat $_)[9];
+    next unless $mtime;
+    $mtime += $offset;
+    utime $mtime, $mtime, $_;
+}
+</pre>
+<hr>
+
+<h2>Prevention</h2>
+
+<p>
+To prevent the problem in the first place you need to
+prevent changing to DST.&nbsp; This can be done by either running
+the windows system in UTC, by disabling DST and changing
+the system time manually twice each year, or by avoiding the use
+of the FAT filesystem (perhaps by switching to a different OS).
+
+
+<h2>Notes and References</h2>
+
+<p>
+Here are some references that Wayne Piekarski collected
+while researching this problem.&nbsp; They contain a lot of
+information about the ways that Windows deals with
+timestamps on NTFS and FAT filesystems.
+
+<p>
+<a  href="http://optics.ph.unimelb.edu.au/help/rsync/rsync_pc1.html#gotchas">http://optics.ph.unimelb.edu.au/help/rsync/rsync_pc1.html#gotchas</a></br>
+<a  href="http://list-archive.xemacs.org/xemacs-nt/199911/msg00130.html">http://list-archive.xemacs.org/xemacs-nt/199911/msg00130.html</a></br>
+<a  href="http://p2p.wrox.com/archive/c_plus_plus_programming/2001-06/53.asp">http://p2p.wrox.com/archive/c_plus_plus_programming/2001-06/53.asp</a></br>
+<a  href="http://www.codeproject.com/datetime/dstbugs.asp">http://www.codeproject.com/datetime/dstbugs.asp</a></br>
+<a  href="http://support.microsoft.com/default.aspx?scid=kb;[LN];158588">http://support.microsoft.com/default.aspx?scid=kb;[LN];158588</a>
+
+<p>
+I wish to thank Wayne Piekarski for having copiled the
+references and also supplying some additional insights.
+
+<p>
+Permission is granted without reservation reprint and
+distribute this in whole and in part to any interested
+parties.
+
+<p>&mdash;J.W. Schultz
