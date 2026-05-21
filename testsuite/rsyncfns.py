@@ -23,6 +23,7 @@ import os
 import shlex
 import shutil
 import socket as _socket
+import stat
 import subprocess
 import sys
 import time
@@ -46,6 +47,14 @@ SCRATCHDIR = Path(_required('scratchdir'))
 SRCDIR = Path(_required('srcdir'))
 TOOLDIR = Path(_required('TOOLDIR'))
 SUITEDIR = Path(os.environ.get('suitedir', SRCDIR / 'testsuite'))
+
+# rsync.fns set `umask 022` for every shell test, so the suite's expected
+# file/dir modes are computed against that baseline. Mirror it here so the
+# Python tests are deterministic regardless of the caller's ambient umask
+# (e.g. a CI runner with umask 077) -- several permission tests depend on
+# newly-created dirs being 0755. Individual tests may still narrow it (e.g.
+# chmod-option uses 002 for its --chmod comparison).
+os.umask(0o022)
 
 # rsync.fns overrides HOME to $scratchdir; tests that exercise ssh-style
 # transfers with no path component (e.g. localhost: at end of args) rely on
@@ -107,6 +116,52 @@ _PORT_LOCK_PATH = '/tmp/rsync_test.lck'
 _port_lock_fd = None
 
 
+def _open_lock_file() -> int:
+    """Open (or create) the host-wide port-lock file, defending against a
+    local attacker who pre-plants the well-known /tmp path. CI runs some
+    tests under sudo, so we must never let root open/chmod an attacker-
+    controlled target.
+
+    Strategy:
+      * Try an O_EXCL|O_CREAT create. If we win, the file is brand-new,
+        regular, owned by us and nlink==1 -- the ONLY case where we widen
+        the mode to 0o666 (so a second user sharing the lock can open it
+        RDWR; the create mode is otherwise narrowed by umask).
+      * If it already exists, open it WITHOUT O_CREAT, WITHOUT chmod, and
+        with O_NOFOLLOW so a planted symlink fails (ELOOP) rather than
+        being followed. Then require a pristine regular file with nlink==1,
+        rejecting a hard link to some other (e.g. root-owned 0600) file --
+        O_NOFOLLOW alone does not catch hard links.
+    """
+    nofollow = getattr(os, 'O_NOFOLLOW', 0)
+
+    # Path 1: we create it ourselves, exclusively.
+    try:
+        fd = os.open(_PORT_LOCK_PATH,
+                     os.O_CREAT | os.O_EXCL | os.O_RDWR | nofollow, 0o666)
+    except FileExistsError:
+        fd = None
+    if fd is not None:
+        try:
+            os.fchmod(fd, 0o666)  # we own this fresh file; undo umask
+        except OSError:
+            pass
+        return fd
+
+    # Path 2: it already exists -- open without creating or chmod'ing.
+    try:
+        fd = os.open(_PORT_LOCK_PATH, os.O_RDWR | nofollow)
+    except OSError as e:
+        test_fail(f"cannot open lock file {_PORT_LOCK_PATH}: {e} "
+                  "(refusing to follow a symlink -- possible tampering)")
+    st = os.fstat(fd)
+    if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1:
+        os.close(fd)
+        test_fail(f"lock file {_PORT_LOCK_PATH} is not a pristine regular "
+                  f"file (type/nlink check failed -- possible tampering)")
+    return fd
+
+
 def claim_ports(*ports: int) -> 'None':
     """Reserve the given TCP port numbers for the rest of this process.
 
@@ -137,20 +192,7 @@ def claim_ports(*ports: int) -> 'None':
     """
     global _port_lock_fd
     if _port_lock_fd is None:
-        _port_lock_fd = os.open(
-            _PORT_LOCK_PATH,
-            os.O_CREAT | os.O_RDWR,
-            0o666,
-        )
-        # The mode arg to os.open is masked by umask; on a runner with a
-        # restrictive umask the lock file ends up 0o644, and a second user
-        # sharing the machine can't open it RDWR. Force 0o666 explicitly.
-        # EPERM is fine: we're not the owner and the bits were already
-        # broad enough that the first owner's create satisfied us.
-        try:
-            os.fchmod(_port_lock_fd, 0o666)
-        except PermissionError:
-            pass
+        _port_lock_fd = _open_lock_file()
     for port in sorted(ports):
         # F_SETLKW via fcntl.lockf(LOCK_EX, length, start): exclusive
         # byte-range lock on byte `port`, blocking until acquired.
