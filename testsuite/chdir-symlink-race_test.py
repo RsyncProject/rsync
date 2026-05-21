@@ -13,11 +13,14 @@ import platform
 import subprocess
 
 from rsyncfns import (
-    RSYNC, SCRATCHDIR,
+    SCRATCHDIR,
     get_rootgid, get_rootuid, get_testuid,
-    make_data_file, rmtree, rsync_argv, test_fail, test_skipped,
+    make_data_file, rmtree, rsync_argv, start_test_daemon,
+    test_fail, test_skipped,
 )
 
+
+DAEMON_PORT = 12885
 
 if platform.system() in ('SunOS', 'OpenBSD', 'NetBSD') or platform.system().startswith('CYGWIN'):
     test_skipped(
@@ -79,14 +82,14 @@ def verify_unchanged(label: str) -> None:
         test_fail(f"{label}: outside file content changed (write escape)")
 
 
+url = start_test_daemon(conf, DAEMON_PORT)
+
+
 def run_attack(label: str, *args) -> None:
     reset_outside()
-    env = os.environ.copy()
-    env['RSYNC_CONNECT_PROG'] = f"{RSYNC} --config={conf} --daemon"
     subprocess.run(
         rsync_argv(*args),
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        env=env,
     )
     verify_unchanged(label)
 
@@ -96,24 +99,24 @@ def run_attack(label: str, *args) -> None:
 run_attack("single-file --size-only",
            '-tp', '--size-only',
            f'{src}/target.txt',
-           'rsync://localhost/upload/subdir/target.txt')
+           f'{url}upload/subdir/target.txt')
 
 # 2. -r push INTO the symlinked subdir -- receiver chdir's into "subdir",
 # follows the symlink, ends up in outside.
 run_attack("-r --size-only into subdir/",
            '-rtp', '--size-only',
            f'{src}/subdir/',
-           'rsync://localhost/upload/subdir/')
+           f'{url}upload/subdir/')
 
 # 3. Same but with delta+rename (read-disclosure + write-escape together).
 run_attack("-r without --size-only into subdir/",
            '-rtp',
            f'{src}/subdir/',
-           'rsync://localhost/upload/subdir/')
+           f'{url}upload/subdir/')
 
 # 4. -r into the module root -- already covered by the original CVE fix;
 # regression-check.
 run_attack("-r --size-only into upload/ root",
            '-rtp', '--size-only',
            f'{src}/',
-           'rsync://localhost/upload/')
+           f'{url}upload/')

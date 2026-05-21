@@ -15,8 +15,15 @@ import sys
 import threading
 import time
 
-from rsyncfns import SCRATCHDIR, claim_ports, rsync_argv, test_fail, test_skipped
+from rsyncfns import (
+    SCRATCHDIR, claim_ports, require_tcp, rsync_argv, test_fail, test_skipped,
+)
 
+
+# This test has no stdio-pipe equivalent: it binds a real loopback socket to
+# stand in for a malicious HTTP proxy. Honour the secure default (no listening
+# sockets) by only running it under --use-tcp.
+require_tcp("fake-proxy listener needs a real TCP socket; run with --use-tcp")
 
 if shutil.which('python3') is None:
     test_skipped("python3 not available")

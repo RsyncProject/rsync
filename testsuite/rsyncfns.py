@@ -17,12 +17,15 @@ Conventions matching the shell harness:
 
 from __future__ import annotations
 
+import atexit
 import fcntl
 import os
 import shlex
 import shutil
+import socket as _socket
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 
@@ -54,6 +57,12 @@ RSYNC = _required('RSYNC')         # full command line, possibly with valgrind/p
 # -l, -L). Tests that exercise non-default rsync features (atimes, etc.)
 # assign to rsyncfns.TLS_ARGS before calling checkit / rsync_ls_lR.
 TLS_ARGS = os.environ.get('TLS_ARGS', '')
+
+# Daemon-mode transport. The DEFAULT is the secure stdio-pipe mechanism
+# (RSYNC_CONNECT_PROG), which opens no listening socket at all. The runner
+# sets RSYNC_TEST_USE_TCP=1 only when invoked with --use-tcp, which switches
+# daemon tests to a real rsyncd bound to loopback (see start_test_daemon).
+USE_TCP = os.environ.get('RSYNC_TEST_USE_TCP') == '1'
 
 # Mnemonics for rsync's itemize-changes (-i / -ii) format:
 #   all_plus   ->  +++++++++   every attribute changed (an additive create)
@@ -146,6 +155,124 @@ def claim_ports(*ports: int) -> 'None':
         # F_SETLKW via fcntl.lockf(LOCK_EX, length, start): exclusive
         # byte-range lock on byte `port`, blocking until acquired.
         fcntl.lockf(_port_lock_fd, fcntl.LOCK_EX, 1, port)
+
+
+# --- standalone rsyncd helpers ---------------------------------------------
+
+def _set_pdeathsig() -> 'None':
+    """Linux: ask the kernel to send SIGTERM to us if our parent dies.
+    A no-op on every other platform. Used as preexec_fn so a kill -9 of
+    the test process doesn't strand the rsyncd we spawned."""
+    if not sys.platform.startswith('linux'):
+        return
+    try:
+        import ctypes
+        libc = ctypes.CDLL('libc.so.6', use_errno=True)
+        PR_SET_PDEATHSIG = 1
+        libc.prctl(PR_SET_PDEATHSIG, 15, 0, 0, 0)  # 15 == SIGTERM
+    except OSError:
+        pass
+
+
+def _stop_rsyncd(proc) -> 'None':
+    if proc.poll() is not None:
+        return
+    try:
+        proc.terminate()
+        proc.wait(timeout=2)
+    except subprocess.TimeoutExpired:
+        try:
+            proc.kill()
+            proc.wait(timeout=1)
+        except (subprocess.TimeoutExpired, OSError):
+            pass
+
+
+def start_rsyncd(conf_path, port: int) -> 'subprocess.Popen':
+    """Spawn `rsync --daemon --no-detach --address=127.0.0.1 --port=N
+    --config=conf` and return the Popen handle after the port is accepting
+    connections.
+
+    The daemon is bound to LOOPBACK ONLY (--address=127.0.0.1): without it,
+    rsync --daemon binds 0.0.0.0 and the test modules would be reachable from
+    the whole LAN. The daemon is killed automatically when this Python
+    process exits (atexit). On Linux, the kernel also signals SIGTERM to the
+    daemon if the parent dies abruptly (PR_SET_PDEATHSIG), so a SIGKILL on
+    the test process doesn't strand the daemon either. The caller is expected
+    to have already claim_ports()'d `port`.
+
+    This is only ever reached from start_test_daemon() in --use-tcp mode; the
+    default (pipe) mode never starts a listening daemon.
+    """
+    argv = shlex.split(RSYNC) + [
+        '--daemon', '--no-detach',
+        '--address=127.0.0.1',
+        f'--port={port}',
+        f'--config={conf_path}',
+    ]
+    proc = subprocess.Popen(
+        argv,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        preexec_fn=_set_pdeathsig,
+    )
+    atexit.register(_stop_rsyncd, proc)
+
+    deadline = time.monotonic() + 10
+    last_err = None
+    while time.monotonic() < deadline:
+        if proc.poll() is not None:
+            test_fail(
+                f"rsyncd exited before listening on port {port} "
+                f"(status={proc.returncode})"
+            )
+        try:
+            with _socket.create_connection(('127.0.0.1', port), timeout=0.5):
+                return proc
+        except OSError as e:
+            last_err = e
+            time.sleep(0.05)
+
+    _stop_rsyncd(proc)
+    test_fail(f"rsyncd never listened on 127.0.0.1:{port}: {last_err}")
+
+
+def start_test_daemon(conf_path, port: int) -> str:
+    """Bring up the test daemon and return a URL prefix for client commands.
+
+    This is the single seam every daemon test uses. The transport depends on
+    the mode the runner selected:
+
+      * DEFAULT (secure) -- no TCP socket at all. Sets RSYNC_CONNECT_PROG so
+        the rsync client forks the daemon over a private stdio pipe. Returns
+        'rsync://localhost/'. Another local user can't reach it; nothing is
+        listening.
+
+      * --use-tcp -- starts a real rsyncd bound to 127.0.0.1 on the given
+        claim_ports()-reserved port. Returns 'rsync://localhost:PORT/'. Bound
+        to loopback so off-host/LAN access is impossible; a same-host user
+        could still connect during the test window, which is the documented,
+        accepted cost of explicitly opting into TCP.
+
+    Build URLs as f"{prefix}module/path". `port` is only used (and claimed)
+    in --use-tcp mode.
+    """
+    if USE_TCP:
+        claim_ports(port)
+        start_rsyncd(conf_path, port)
+        return f'rsync://localhost:{port}/'
+    os.environ['RSYNC_CONNECT_PROG'] = f'{RSYNC} --config={conf_path} --daemon'
+    return 'rsync://localhost/'
+
+
+def require_tcp(reason: str) -> 'None':
+    """Skip the test (exit 77) unless we're in --use-tcp mode. For tests that
+    fundamentally need a real listening socket / TCP peer and have no secure
+    pipe equivalent (the fake-proxy listener; the reverse-DNS hostname-ACL
+    daemon test)."""
+    if not USE_TCP:
+        test_skipped(reason)
 
 
 def rsync_argv(*args: str) -> list:
@@ -269,8 +396,6 @@ def build_rsyncd_conf() -> 'Path':
     pidfile = SCRATCHDIR / 'rsyncd.pid'
     logfile = SCRATCHDIR / 'rsyncd.log'
 
-    hostname = subprocess.check_output(['uname', '-n'], text=True).strip()
-
     my_uid = get_testuid()
     root_uid = get_rootuid()
     root_gid = get_rootgid()
@@ -289,7 +414,10 @@ def build_rsyncd_conf() -> 'Path':
 pid file = {pidfile}
 use chroot = no
 munge symlinks = no
-hosts allow = localhost 127.0.0.0/24 192.168.0.0/16 10.0.0.0/8 {hostname}
+# Loopback only. In --use-tcp mode the daemon is also bound to 127.0.0.1
+# (start_rsyncd passes --address), so this is belt-and-suspenders; in the
+# default pipe mode there is no socket to guard at all.
+hosts allow = localhost 127.0.0.0/8
 log file = {logfile}
 transfer logging = yes
 # We don't define log format here so the test-hidden module defaults

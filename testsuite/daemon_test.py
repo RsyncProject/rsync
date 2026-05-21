@@ -13,8 +13,11 @@ import subprocess
 from rsyncfns import (
     CHKFILE, FROMDIR, OUTFILE, RSYNC, SCRATCHDIR, SRCDIR, TODIR,
     build_rsyncd_conf, get_rootuid, get_testuid, makepath,
-    rsync_argv, run_rsync, test_fail,
+    rsync_argv, run_rsync, start_test_daemon, test_fail,
 )
+
+
+DAEMON_PORT = 12877
 
 
 SSH = f"{SRCDIR / 'support' / 'lsh.sh'} --no-cd"
@@ -84,16 +87,18 @@ if expected_modules not in out:
     test_fail("module list via lsh.sh did not contain the expected modules")
 print('====')
 
-# Same module list via RSYNC_CONNECT_PROG -- the same daemon, no remote shell.
-os.environ['RSYNC_CONNECT_PROG'] = f"{RSYNC} --config={conf} --daemon"
-out = run_and_check(['-v', 'localhost::'], expected_modules, "module list via daemon")
+# Same module list via the test daemon (pipe transport by default; real
+# loopback rsyncd under --use-tcp).
+daemon_url = start_test_daemon(conf, DAEMON_PORT).rstrip('/')
+
+out = run_and_check(['-v', f'{daemon_url}/'], expected_modules, "module list via daemon")
 if expected_modules not in out:
     test_fail("module list via daemon did not contain the expected modules")
 print('====')
 
 # test-hidden: a recursive listing of the module, with file/dir/date
 # columns normalised so the diff is content-only.
-out = run_and_check(['-r', 'localhost::test-hidden'], "", "test-hidden listing")
+out = run_and_check(['-r', f'{daemon_url}/test-hidden'], "", "test-hidden listing")
 normalised = normalise(out)
 expected_hidden = """\
 drwxr-xr-x         DIR ####/##/## ##:##:## .
@@ -112,7 +117,7 @@ for path in ('bar', 'bar/two', 'bar/baz', 'bar/baz/three', 'foo', 'foo/one'):
         test_fail(f"test-hidden listing missing path {path!r}")
 
 # test-from/f* glob: only the foo subtree.
-out = run_and_check(['-r', 'localhost::test-from/f*'], "", "test-from glob")
+out = run_and_check(['-r', f'{daemon_url}/test-from/f*'], "", "test-from glob")
 normalised = normalise(out)
 for path in ('foo', 'foo/one'):
     if path not in normalised:
@@ -125,7 +130,7 @@ if 'bar' in normalised:
 # atimes-format variant -- only if rsync was built with atimes support.
 vv = run_rsync('-VV', check=True, capture_output=True)
 if '"atimes": true' in vv.stdout:
-    out = run_and_check(['-rU', 'localhost::test-from/f*'], "", "test-from glob with -U")
+    out = run_and_check(['-rU', f'{daemon_url}/test-from/f*'], "", "test-from glob with -U")
     normalised = normalise(out)
     for path in ('foo', 'foo/one'):
         if path not in normalised:

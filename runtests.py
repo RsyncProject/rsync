@@ -61,6 +61,12 @@ def parse_args():
                    help='Force protocol version (adds --protocol=VER to rsync)')
     p.add_argument('--expect-skipped', default=None, metavar='LIST',
                    help='Comma-separated list of expected-skipped tests')
+    p.add_argument('--use-tcp', action='store_true',
+                   help='Run daemon tests against a real rsyncd bound to '
+                        '127.0.0.1 (non-default). The default is the secure '
+                        'stdio-pipe transport, which opens no listening '
+                        'socket; --use-tcp exposes a loopback port for the '
+                        'duration of each daemon test.')
     return p.parse_args()
 
 
@@ -366,6 +372,7 @@ def main():
         print(f'    valgrind=enabled (logs in valgrind.*.log)')
     if args.parallel > 1:
         print(f'    parallel={args.parallel}')
+    print(f'    daemon_transport={"tcp (loopback)" if args.use_tcp else "pipe (secure default)"}')
     print(f'    scratchbase={scratchbase}')
 
     # Build base environment for test scripts
@@ -393,6 +400,10 @@ def main():
         'HOME': scratchbase,
         'PYTHONPATH': pythonpath,
     })
+    if args.use_tcp:
+        # Opt-in: daemon tests start a real rsyncd on a claimed loopback port.
+        # Default (unset) keeps the secure stdio-pipe transport.
+        base_env['RSYNC_TEST_USE_TCP'] = '1'
     for k, v in shconfig.items():
         if v:
             base_env[k] = v

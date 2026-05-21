@@ -1,28 +1,29 @@
 #!/usr/bin/env python3
 # Python rewrite of testsuite/daemon-gzip-download.test.
 #
-# Download a file tree over a compressed connection from an in-process
-# rsyncd (via RSYNC_CONNECT_PROG). Exercises (exorcises?) a bug in
-# 2.5.3 that mis-handled doubly-compressed transfers.
-
-import os
+# Download a file tree over a compressed connection from a test daemon.
+# Exercises (exorcises?) a bug in 2.5.3 that mis-handled doubly-compressed
+# transfers. Uses the secure stdio-pipe transport by default; --use-tcp
+# runs it against a real loopback rsyncd.
 
 from rsyncfns import (
-    CHKDIR, FROMDIR, RSYNC, TODIR,
-    build_rsyncd_conf, checkit, hands_setup, run_rsync,
+    CHKDIR, FROMDIR, TODIR,
+    build_rsyncd_conf, checkit, hands_setup, run_rsync, start_test_daemon,
 )
 
 
-conf = build_rsyncd_conf()
-os.environ['RSYNC_CONNECT_PROG'] = f"{RSYNC} --config={conf} --daemon"
+DAEMON_PORT = 12879
 
+conf = build_rsyncd_conf()
 hands_setup()
 
 # chkdir: vanilla copy minus the daemon's global "foobar.baz" exclude.
 run_rsync('-av', '--exclude=foobar.baz', f'{FROMDIR}/', f'{CHKDIR}/')
 
+url = start_test_daemon(conf, DAEMON_PORT)
+
 checkit(
-    ['-avvvvzz', 'localhost::test-from/', f'{TODIR}/'],
+    ['-avvvvzz', f'{url}test-from/', f'{TODIR}/'],
     CHKDIR, TODIR,
     allowed_codes=(0, 23),
 )

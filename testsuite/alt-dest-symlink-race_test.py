@@ -20,10 +20,13 @@ import os
 import subprocess
 
 from rsyncfns import (
-    RSYNC, SCRATCHDIR,
+    SCRATCHDIR,
     rsync_argv, get_testuid, get_rootuid, get_rootgid,
-    rmtree, test_fail,
+    rmtree, start_test_daemon, test_fail,
 )
+
+
+DAEMON_PORT = 12882
 
 
 mod = SCRATCHDIR / 'module'
@@ -69,17 +72,15 @@ log file = {SCRATCHDIR}/rsyncd.log
     read only = no
 """)
 
-env = os.environ.copy()
-env['RSYNC_CONNECT_PROG'] = f"{RSYNC} --config={conf} --daemon"
+url = start_test_daemon(conf, DAEMON_PORT)
 
 # Push directly into the module root: pushing into a destination subdir
 # would make the receiver chdir into it before resolving --link-dest,
 # making "cd" resolve in the wrong CWD and masking the bug.
 subprocess.run(
     rsync_argv('-rtp', '--link-dest=cd',
-               f'{src_dir}/', 'rsync://localhost/upload/'),
+               f'{src_dir}/', f'{url}upload/'),
     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-    env=env,
 )
 
 target = mod / 'target.txt'
