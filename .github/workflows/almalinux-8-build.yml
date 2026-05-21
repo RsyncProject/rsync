@@ -59,8 +59,13 @@ jobs:
       run: ./rsync --version
     - name: check
       # In the container we already run as root, so no sudo. The
-      # crtimes-not-supported skip matches the other Linux jobs.
-      run: RSYNC_EXPECT_SKIPPED=crtimes make check
+      # crtimes-not-supported skip matches the other Linux jobs;
+      # daemon-chroot-acl and proxy-response-line-too-long skip because
+      # the default (secure) transport opens no listening socket.
+      run: RSYNC_EXPECT_SKIPPED=crtimes,daemon-chroot-acl,proxy-response-line-too-long make check
+    - name: check (TCP daemon transport)
+      # Second run exercising the real loopback-TCP daemon path.
+      run: ./runtests.py --rsync-bin=`pwd`/rsync --use-tcp -j 8
     - name: ssl file list
       run: ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
     - name: save artifact

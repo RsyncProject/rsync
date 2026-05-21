@@ -9,11 +9,13 @@ import shutil
 import subprocess
 
 from rsyncfns import (
-    CHKDIR, FROMDIR, RSYNC, SCRATCHDIR, TMPDIR, TODIR,
+    CHKDIR, FROMDIR, SCRATCHDIR, TMPDIR, TODIR,
     build_rsyncd_conf, checkit, hands_setup, rmtree,
-    run_rsync, test_fail,
+    run_rsync, start_test_daemon, test_fail,
 )
 
+
+DAEMON_PORT = 12874
 
 conf = build_rsyncd_conf()
 hands_setup()
@@ -44,12 +46,14 @@ rmtree(TODIR)
 print("Test --read-batch:")
 checkit(['-av', '--read-batch=BATCH', str(TODIR)], FROMDIR, TODIR)
 
-# Daemon variants. RSYNC_CONNECT_PROG plumbs an in-process daemon.
-os.environ['RSYNC_CONNECT_PROG'] = f"{RSYNC} --config={conf} --daemon"
+# Daemon variants: pipe transport by default, real loopback rsyncd under
+# --use-tcp.
+url = start_test_daemon(conf, DAEMON_PORT)
 
 rmtree(TODIR)
 print("Test daemon sender --write-batch:")
-checkit(['-av', '--write-batch=BATCH', 'rsync://localhost/test-from/', str(TODIR)],
+checkit(['-av', '--write-batch=BATCH',
+         f'{url}test-from/', str(TODIR)],
         CHKDIR, TODIR, allowed_codes=(0, 23))
 
 rmtree(TODIR)
@@ -84,7 +88,7 @@ ignore23 = SCRATCHDIR / 'ignore23'
 from rsyncfns import rsync_argv
 proc = subprocess.run(
     [str(ignore23), *rsync_argv('-av', '--write-batch=BATCH',
-                                 f'{FROMDIR}/', 'rsync://localhost/test-to')],
+                                 f'{FROMDIR}/', f'{url}test-to')],
 )
 if proc.returncode != 0:
     test_fail(f"daemon recv --write-batch exited {proc.returncode}")

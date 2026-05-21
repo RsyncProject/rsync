@@ -10,9 +10,13 @@ import os
 import shutil
 
 from rsyncfns import (
-    FROMDIR, RSYNC, SCRATCHDIR, TODIR,
-    build_rsyncd_conf, checkit, makepath, rmtree, run_rsync,
+    FROMDIR, SCRATCHDIR, TODIR,
+    build_rsyncd_conf, checkit, makepath, rmtree,
+    run_rsync, start_test_daemon,
 )
+
+
+DAEMON_PORT = 12875
 
 
 checkdir = SCRATCHDIR / 'check'
@@ -78,10 +82,11 @@ with open(conf, 'a') as f:
 \tincoming chmod = Fo-x
 """)
 
-os.environ['RSYNC_CONNECT_PROG'] = f"{RSYNC} --config={conf} --daemon"
+url = start_test_daemon(conf, DAEMON_PORT)
 
 rmtree(TODIR)
 makepath(TODIR)
 
-checkit(['-avv', '--no-perms', f'{FROMDIR}/', 'localhost::test-incoming-chmod/'],
+checkit(['-avv', '--no-perms', f'{FROMDIR}/',
+         f'{url}test-incoming-chmod/'],
         checkdir, TODIR, allowed_codes=(0, 23))

@@ -15,10 +15,13 @@ import platform
 import subprocess
 
 from rsyncfns import (
-    RSYNC, SCRATCHDIR,
+    SCRATCHDIR,
     rsync_argv, get_testuid, get_rootuid, get_rootgid,
-    rmtree, test_fail, test_skipped,
+    rmtree, start_test_daemon, test_fail, test_skipped,
 )
+
+
+DAEMON_PORT = 12881
 
 
 # Platforms without RESOLVE_BENEATH equivalents fall back to a per-
@@ -66,12 +69,11 @@ log file = {SCRATCHDIR}/rsyncd.log
     read only = no
 """)
 
-env = os.environ.copy()
-env['RSYNC_CONNECT_PROG'] = f"{RSYNC} --config={conf} --daemon"
+url = start_test_daemon(conf, DAEMON_PORT)
 
 proc = subprocess.run(
-    rsync_argv('-nrv', 'rsync://localhost/upload/cd/', f'{SCRATCHDIR}/dst/'),
-    capture_output=True, text=True, env=env,
+    rsync_argv('-nrv', f'{url}upload/cd/', f'{SCRATCHDIR}/dst/'),
+    capture_output=True, text=True,
 )
 listfile.write_text(proc.stdout + proc.stderr)
 

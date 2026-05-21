@@ -15,10 +15,18 @@ import subprocess
 import sys
 
 from rsyncfns import (
-    RSYNC, SCRATCHDIR, TODIR,
-    rmtree, rsync_argv, test_fail, test_skipped,
+    SCRATCHDIR, TODIR,
+    require_tcp, rmtree, rsync_argv, start_test_daemon, test_fail, test_skipped,
 )
 
+
+DAEMON_PORT = 12878
+
+# This test fundamentally needs a real TCP peer address: the daemon reverse-
+# resolves the connecting IP for a hostname-based "hosts deny" ACL check.
+# The stdio-pipe transport has no peer IP, so only run under --use-tcp.
+require_tcp("needs a real TCP peer address for reverse-DNS hostname ACL; "
+            "run with --use-tcp")
 
 if platform.system() != 'Linux':
     test_skipped("test is Linux-specific (uses chroot+unshare)")
@@ -99,11 +107,12 @@ def run_check(label: str) -> bool:
     rmtree(TODIR)
     TODIR.mkdir()
 
-    env = os.environ.copy()
-    env['RSYNC_CONNECT_PROG'] = f"{RSYNC} --config={conf} --daemon"
+    # rsyncd re-reads its config file on each accepted connection, so
+    # rewriting `conf` between scenarios is enough -- we keep the one
+    # daemon for both.
     proc = subprocess.run(
-        rsync_argv('-av', 'localhost::chrootmod/', f'{TODIR}/'),
-        capture_output=True, text=True, env=env,
+        rsync_argv('-av', f'{url}chrootmod/', f'{TODIR}/'),
+        capture_output=True, text=True,
     )
     out = proc.stdout + proc.stderr
 
@@ -117,8 +126,12 @@ def run_check(label: str) -> bool:
     return '@ERROR' in out and 'access denied' in out
 
 
-# Scenario A: global reverse lookup. Covered by b6abdb4c.
+# Spin up the daemon once; we'll rewrite `conf` between scenarios and rely
+# on rsyncd's per-connection re-read of the config file.
 write_conf('yes', 'yes')
+url = start_test_daemon(conf, DAEMON_PORT)
+
+# Scenario A: global reverse lookup. Covered by b6abdb4c.
 if not run_check("Scenario A (global reverse lookup = yes)"):
     test_fail("Scenario A: hostname deny rule was bypassed")
 

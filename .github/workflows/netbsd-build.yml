@@ -36,6 +36,7 @@ jobs:
           make
           ./rsync --version
           make check
+          ./runtests.py --rsync-bin=`pwd`/rsync --use-tcp -j 8
           ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
     - name: save artifact
       uses: actions/upload-artifact@v4

@@ -14,10 +14,13 @@ import stat
 import subprocess
 
 from rsyncfns import (
-    RSYNC, SCRATCHDIR,
+    SCRATCHDIR,
     get_rootgid, get_rootuid, get_testuid,
-    rmtree, rsync_argv, test_fail, test_skipped,
+    rmtree, rsync_argv, start_test_daemon, test_fail, test_skipped,
 )
+
+
+DAEMON_PORT = 12884
 
 
 if platform.system() in ('SunOS', 'OpenBSD', 'NetBSD') or platform.system().startswith('CYGWIN'):
@@ -66,27 +69,32 @@ if my_uid != root_uid:
     gid_line = '#' + gid_line
 
 
-def write_conf(module_name: str, fake_super: bool = False) -> None:
-    extra = "    fake super = yes\n" if fake_super else ""
-    conf.write_text(f"""\
+# All three scenarios use the same daemon -- they just target a different
+# module. Write both modules up-front so the daemon doesn't need to be
+# restarted between scenarios.
+conf.write_text(f"""\
 use chroot = no
 {uid_line}
 {gid_line}
 log file = {SCRATCHDIR}/rsyncd.log
-[{module_name}]
+[upload]
     path = {mod}
     use chroot = no
     read only = no
-{extra}""")
+
+[upload_fake]
+    path = {mod}
+    use chroot = no
+    read only = no
+    fake super = yes
+""")
+daemon_url = start_test_daemon(conf, DAEMON_PORT).rstrip('/')
 
 
 def run_attack(args):
-    env = os.environ.copy()
-    env['RSYNC_CONNECT_PROG'] = f"{RSYNC} --config={conf} --daemon"
     subprocess.run(
         rsync_argv(*args),
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        env=env,
     )
 
 
@@ -97,10 +105,9 @@ os.chmod(mod / 'target.txt', 0o666)
 (src / 'target.txt').write_text("NEW_DATA_FROM_SENDER\n")
 os.chmod(src / 'target.txt', 0o644)
 
-write_conf('upload')
 run_attack([
     '--inplace', '--backup', '--backup-dir=cd',
-    f'{src}/target.txt', 'rsync://localhost/upload/target.txt',
+    f'{src}/target.txt', f'{daemon_url}/upload/target.txt',
 ])
 verify_outside_unchanged("3b inplace+backup-dir=cd")
 
@@ -110,8 +117,7 @@ setup()
 (src / 'cd').mkdir()
 os.symlink('/etc/passwd', src / 'cd' / 'sym')
 
-write_conf('upload_fake', fake_super=True)
-run_attack(['-rl', f'{src}/', 'rsync://localhost/upload_fake/'])
+run_attack(['-rl', f'{src}/', f'{daemon_url}/upload_fake/'])
 verify_outside_unchanged_or_absent("3c-symlink fake-super symlink push", "sym")
 
 
@@ -126,6 +132,5 @@ except OSError:
 if not stat.S_ISFIFO((src / 'cd' / 'fifo').stat().st_mode):
     test_skipped("mkfifo unavailable; cannot exercise 3c-mknod")
 
-write_conf('upload_fake', fake_super=True)
-run_attack(['-rD', f'{src}/', 'rsync://localhost/upload_fake/'])
+run_attack(['-rD', f'{src}/', f'{daemon_url}/upload_fake/'])
 verify_outside_unchanged_or_absent("3c-mknod fake-super FIFO push", "fifo")
