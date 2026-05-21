@@ -739,8 +739,12 @@ void set_socket_options(int fd, char *options)
 
 /* This is like socketpair but uses tcp.  The function guarantees that nobody
  * else can attach to the socket, or if they do that this function fails and
- * the socket gets closed.  Returns 0 on success, -1 on failure.  The resulting
- * file descriptors are symmetrical.  Currently only for RSYNC_CONNECT_PROG. */
+ * the socket gets closed.  The anti-hijack guarantee is enforced after the
+ * accept() below: a local attacker who races a connection in on the loopback
+ * listener before our own connect() lands would be detected by the peer-vs-
+ * local address comparison and the function fails.  Returns 0 on success, -1
+ * on failure.  The resulting file descriptors are symmetrical.  Currently
+ * only for RSYNC_CONNECT_PROG. */
 static int socketpair_tcp(int fd[2])
 {
 	int listener;
@@ -790,6 +794,28 @@ static int socketpair_tcp(int fd[2])
 	if (connect_done == 0) {
 		if (connect(fd[1], (struct sockaddr *)&sock, sizeof sock) != 0 && errno != EISCONN)
 			goto failed;
+	}
+
+	/* Confirm that the connection we accepted is the one we just made, and
+	 * not one a local attacker raced in on the loopback listener before our
+	 * own connect() completed.  The peer of the accepted end (fd[0]) must be
+	 * the local address of our connecting end (fd[1]), and both must be
+	 * loopback.  If they differ, someone else connected first; fail closed. */
+	{
+		struct sockaddr_in accepted_peer, our_local;
+		socklen_t plen = sizeof accepted_peer;
+		socklen_t llen = sizeof our_local;
+
+		if (getpeername(fd[0], (struct sockaddr *)&accepted_peer, &plen) != 0
+		 || getsockname(fd[1], (struct sockaddr *)&our_local, &llen) != 0
+		 || accepted_peer.sin_family != AF_INET
+		 || our_local.sin_family != AF_INET
+		 || accepted_peer.sin_addr.s_addr != htonl(INADDR_LOOPBACK)
+		 || our_local.sin_addr.s_addr != htonl(INADDR_LOOPBACK)
+		 || accepted_peer.sin_port != our_local.sin_port) {
+			errno = EPERM;
+			goto failed;
+		}
 	}
 
 	/* all OK! */
