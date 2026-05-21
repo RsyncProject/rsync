@@ -85,6 +85,10 @@ out = run_and_check(
 )
 if expected_modules not in out:
     test_fail("module list via lsh.sh did not contain the expected modules")
+# test-hidden is `list = no`; it must NOT appear in the module listing.
+if 'test-hidden' in out:
+    print(out)
+    test_fail("module list via lsh.sh leaked the `list = no` test-hidden module")
 print('====')
 
 # Same module list via the test daemon (pipe transport by default; real
@@ -94,6 +98,10 @@ daemon_url = start_test_daemon(conf, DAEMON_PORT).rstrip('/')
 out = run_and_check(['-v', f'{daemon_url}/'], expected_modules, "module list via daemon")
 if expected_modules not in out:
     test_fail("module list via daemon did not contain the expected modules")
+# test-hidden is `list = no`; it must NOT appear in the module listing.
+if 'test-hidden' in out:
+    print(out)
+    test_fail("module list via daemon leaked the `list = no` test-hidden module")
 print('====')
 
 # test-hidden: a recursive listing of the module, with file/dir/date
