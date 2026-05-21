@@ -39,11 +39,12 @@ jobs:
     - name: info
       run: bash -c '/usr/local/bin/rsync --version'
     - name: check
-      # The fake-super / xattr tests (chown-fake, devices-fake, xattrs,
-      # xattrs-hlink) skip on Cygwin: the Python rewrite currently does the
-      # xattr operations via os.setxattr, which CPython only provides on
-      # Linux. (Restoring non-Linux xattr coverage is a follow-up.)
-      run: bash -c 'RSYNC_EXPECT_SKIPPED=acls-default,acls,bare-do-open-symlink-race,chdir-symlink-race,chown-fake,chown,daemon-chroot-acl,devices-fake,devices,dir-sgid,open-noatime,protected-regular,proxy-response-line-too-long,sender-flist-symlink-leak,simd-checksum,symlink-dirlink-basis,xattrs-hlink,xattrs make check'
+      # chown-fake / devices-fake / xattrs / xattrs-hlink now RUN on Cygwin
+      # (rsyncfns.py drives xattrs via getfattr/setfattr from the `attr`
+      # package installed above), verified on a real Cygwin host. The real
+      # chown/devices tests still skip (need root/mknod), as do the
+      # RESOLVE_BENEATH symlink-race tests.
+      run: bash -c 'RSYNC_EXPECT_SKIPPED=acls-default,acls,bare-do-open-symlink-race,chdir-symlink-race,chown,daemon-chroot-acl,devices,dir-sgid,open-noatime,protected-regular,proxy-response-line-too-long,sender-flist-symlink-leak,simd-checksum,symlink-dirlink-basis make check'
     - name: check (TCP daemon transport)
       # Second run with daemon tests over a real loopback rsyncd; the default
       # 'make check' above uses the secure stdio-pipe transport.

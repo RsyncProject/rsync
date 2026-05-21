@@ -8,45 +8,19 @@
 # survive alongside xattrs.
 
 import os
-import platform
 import subprocess
 import sys
 
 from rsyncfns import (
-    CHKDIR, FROMDIR, SCRATCHDIR, TMPDIR, TODIR, TOOLDIR,
+    CHKDIR, FROMDIR, RSYNC_PREFIX, RUSR, SCRATCHDIR, TMPDIR, TODIR, TOOLDIR,
     checkit, cp_touch, makepath, run_rsync, test_fail, test_skipped,
+    xattr_set as xset, xattr_dump, xattrs_supported,
 )
 
 
-vv = run_rsync('-VV', check=True, capture_output=True)
-if '"xattrs": true' not in vv.stdout:
-    test_skipped("Rsync is configured without xattr support")
-
-if platform.system() != 'Linux':
-    test_skipped(f"xattr surface not implemented for {platform.system()}")
-
-# Per-OS xattr surfaces -- Linux only here (other platforms test_skipped'd
-# above). RSYNC_PREFIX is the name-prefix rsync itself looks for; RUSR is
-# the prefix the test uses for "%stat"-style faux-attributes (must match
-# how --fake-super stores them).
-RSYNC_PREFIX = 'user.rsync'
-RUSR = 'user.rsync'
-
-
-def xset(name: str, value: str, *paths):
-    """Set the named xattr to `value` on each of `paths`."""
-    val = value.encode()
-    for p in paths:
-        try:
-            os.setxattr(str(p), name.encode(), val)
-        except OSError as e:
-            raise OSError(f"setxattr {name}={value} on {p}: {e}")
-
-
-def xls(*paths) -> str:
-    """Mirror `getfattr -d` -- a per-path dump of name=value lines."""
-    return subprocess.check_output(['getfattr', '-d', *(str(p) for p in paths)],
-                                   text=True)
+if not xattrs_supported():
+    test_skipped("Rsync is configured without xattr support (or no xattr "
+                 "tooling on this platform)")
 
 
 script_name = os.path.basename(sys.argv[0] if sys.argv[0] else __file__)
@@ -84,47 +58,47 @@ uid_gid = f"{m.group(1)}:{m.group(2)}"
 os.chdir(FROMDIR)
 
 try:
-    xset('user.foo', 'foo', 'file0')
+    xset('foo', 'foo', 'file0')
 except OSError:
     test_skipped("Unable to set an xattr")
-xset('user.bar', 'bar', 'file0')
+xset('bar', 'bar', 'file0')
 
-xset('user.short', 'this is short', 'file1')
-xset('user.long',
+xset('short', 'this is short', 'file1')
+xset('long',
      'this is a long attribute that will be truncated in the initial data send',
      'file1')
-xset('user.good', 'this is good', 'file1')
-xset('user.nice', 'this is nice', 'file1')
+xset('good', 'this is good', 'file1')
+xset('nice', 'this is nice', 'file1')
 
-xset('user.foo', 'foo', 'file2')
-xset('user.bar', 'bar', 'file2')
-xset('user.long',
+xset('foo', 'foo', 'file2')
+xset('bar', 'bar', 'file2')
+xset('long',
      'a long attribute for our new file that tests to ensure that this works',
      'file2')
 
-xset('user.dir1', 'need to test directory xattrs too', 'foo')
-xset('user.dir2', 'another xattr', 'foo')
-xset('user.dir3', 'this is one last one for the moment', 'foo')
+xset('dir1', 'need to test directory xattrs too', 'foo')
+xset('dir2', 'another xattr', 'foo')
+xset('dir3', 'this is one last one for the moment', 'foo')
 
-xset('user.dir4', 'another dir test', 'foo/bar')
-xset('user.dir5', 'one last one', 'foo/bar')
+xset('dir4', 'another dir test', 'foo/bar')
+xset('dir5', 'one last one', 'foo/bar')
 
-xset('user.foo', 'new foo', 'foo/file3', 'foo/bar/file5')
-xset('user.bar', 'new bar', 'foo/file3', 'foo/bar/file5')
-xset('user.long',
+xset('foo', 'new foo', 'foo/file3', 'foo/bar/file5')
+xset('bar', 'new bar', 'foo/file3', 'foo/bar/file5')
+xset('long',
      'this is also a long attribute that will be truncated in the initial data send',
      'foo/file3', 'foo/bar/file5')
 xset(f'{RUSR}.equal',
      'this long attribute should remain the same and not need to be transferred',
      'foo/file3', 'foo/bar/file5')
 
-xset('user.dir0', 'old extra value', CHKDIR / 'foo')
-xset('user.dir1', 'old dir value', CHKDIR / 'foo')
+xset('dir0', 'old extra value', CHKDIR / 'foo')
+xset('dir1', 'old dir value', CHKDIR / 'foo')
 
-xset('user.short', 'old short', CHKDIR / 'file1')
-xset('user.extra', 'remove me', CHKDIR / 'file1')
+xset('short', 'old short', CHKDIR / 'file1')
+xset('extra', 'remove me', CHKDIR / 'file1')
 
-xset('user.foo', 'old foo', CHKDIR / 'foo' / 'file3')
+xset('foo', 'old foo', CHKDIR / 'foo' / 'file3')
 xset(f'{RUSR}.equal',
      'this long attribute should remain the same and not need to be transferred',
      CHKDIR / 'foo' / 'file3')
@@ -144,8 +118,7 @@ else:
 
 def _save_xattrs(paths, dest_file):
     """Snapshot the xattrs of `paths` (relative to cwd) into dest_file."""
-    out = subprocess.check_output(['getfattr', '-d', *paths], text=True)
-    dest_file.write_text(out)
+    dest_file.write_text(xattr_dump(*paths))
 
 
 _save_xattrs(dirs + files, SCRATCHDIR / 'xattrs.txt')
@@ -156,7 +129,7 @@ XFILT = ['-f-x_system.*', '-f-x_security.*']
 checkit(['-avX', *XFILT, *dashH, '--super', '.', f'{CHKDIR}/'], FROMDIR, CHKDIR)
 
 os.chdir(CHKDIR)
-got = subprocess.check_output(['getfattr', '-d', *(dirs + files)], text=True)
+got = xattr_dump(*(dirs + files))
 expected = (SCRATCHDIR / 'xattrs.txt').read_text()
 if got != expected:
     from difflib import unified_diff
@@ -178,7 +151,7 @@ checkit(['-aiX', *XFILT, *dashH, '--super', f'{altDest}=../chk', '.', '../to'],
         FROMDIR, TODIR)
 
 os.chdir(TODIR)
-got = subprocess.check_output(['getfattr', '-d', *(dirs + files)], text=True)
+got = xattr_dump(*(dirs + files))
 if got != expected:
     test_fail("xattr listing differs after --copy-dest / --link-dest copy")
 
@@ -190,7 +163,7 @@ os.chdir(FROMDIR)
 import shutil
 shutil.rmtree(TODIR, ignore_errors=True)
 
-xset('user.nice', 'this is nice, but different', 'file1')
+xset('nice', 'this is nice, but different', 'file1')
 
 _save_xattrs(dirs + files, SCRATCHDIR / 'xattrs.txt')
 
@@ -198,7 +171,7 @@ checkit(['-aiX', *XFILT, *dashH, '--fake-super', '--link-dest=../chk', '.', '../
         CHKDIR, TODIR)
 
 os.chdir(TODIR)
-got = subprocess.check_output(['getfattr', '-d', *(dirs + files)], text=True)
+got = xattr_dump(*(dirs + files))
 expected = (SCRATCHDIR / 'xattrs.txt').read_text()
 if got != expected:
     test_fail("xattr listing differs after --fake-super --link-dest copy")
@@ -232,7 +205,7 @@ os.chmod('.', 0o700)
 for p in dirs + files:
     os.chmod(p, os.stat(p).st_mode & ~0o077)
 
-xset('user.nice', 'this is nice, but different', 'file1')
+xset('nice', 'this is nice, but different', 'file1')
 xset(f'{RSYNC_PREFIX}.%stat', f'40000 0,0 {uid_gid}', *dirs)
 xset(f'{RSYNC_PREFIX}.%stat', f'100000 0,0 {uid_gid}', *files)
 
@@ -247,7 +220,7 @@ checkit(['-aiX', *XFILT, *dashH, '--fake-super', '--chmod=a=', '.', '../to'],
         CHKDIR, TODIR)
 
 os.chdir(TODIR)
-got = subprocess.check_output(['getfattr', '-d', *(dirs + files)], text=True)
+got = xattr_dump(*(dirs + files))
 expected = (SCRATCHDIR / 'xattrs.txt').read_text()
 if got != expected:
     test_fail("xattr listing differs after --fake-super --chmod=a= copy")
@@ -272,7 +245,7 @@ if dashH:
     (lnkdir / 'extra-link').unlink()
 
 os.chdir(TODIR)
-got = subprocess.check_output(['getfattr', '-d', 'file1', 'file2'], text=True)
+got = xattr_dump('file1', 'file2')
 expected = (SCRATCHDIR / 'xattrs.txt').read_text()
 if got != expected:
     test_fail("xattr listing differs after --link-dest=../lnk copy")
@@ -287,6 +260,6 @@ run_rsync('-aX', '.', '../chk/')
 checkit(['-aiiX', *XFILT, '.', '../to'], CHKDIR, TODIR)
 
 os.chdir(TODIR)
-got = subprocess.check_output(['getfattr', '-d', 'file1', 'file2'], text=True)
+got = xattr_dump('file1', 'file2')
 if got != expected:
     test_fail("xattr listing differs after the final round")

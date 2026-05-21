@@ -8,15 +8,12 @@
 # tests --fake-super.
 
 import os
-import platform
-import shutil
-import subprocess
 import sys
 
 import rsyncfns
 from rsyncfns import (
-    FROMDIR, TODIR,
-    checkit, run_rsync, test_fail, test_skipped,
+    FROMDIR, RSYNC_PREFIX, TODIR,
+    checkit, test_skipped, xattr_set, xattrs_supported,
 )
 
 
@@ -26,28 +23,20 @@ script_name = os.path.basename(sys.argv[0] if sys.argv[0] else __file__)
 fake_variant = 'fake' in script_name
 
 if fake_variant:
-    # --fake-super needs xattrs support.
-    vv = run_rsync('-VV', check=True, capture_output=True)
-    if '"xattrs": true' not in vv.stdout:
+    # --fake-super needs xattrs support (and a way to set them here).
+    if not xattrs_supported():
         test_skipped("Rsync needs xattrs for fake device tests")
     # Augment the RSYNC command and TLS_ARGS so checkit's listing path
     # treats the xattr-encoded ownership as the file's real ownership.
     rsyncfns.RSYNC = rsyncfns.RSYNC + ' --fake-super'
     rsyncfns.TLS_ARGS = (rsyncfns.TLS_ARGS + ' --fake-super').strip()
 
-    if platform.system() != 'Linux':
-        test_skipped(
-            f"fake chown emulation not implemented for {platform.system()}"
-        )
-
     def chown_or_fake(path, uid, gid):
-        # On Linux, store ownership in the user.rsync.%stat xattr -- the
-        # format rsync's --fake-super expects.
-        stat = os.stat(path)
-        mode = stat.st_mode
+        # Store ownership in rsync's fake-super "%stat" xattr -- the name
+        # (RSYNC_PREFIX) and namespace vary by OS; xattr_set handles that.
         # %stat format: "MODE DEV_MAJOR,DEV_MINOR UID:GID"
-        value = f"{mode:o} 0,0 {uid}:{gid}".encode()
-        os.setxattr(str(path), b'user.rsync.%stat', value)
+        mode = os.stat(path).st_mode
+        xattr_set(f'{RSYNC_PREFIX}.%stat', f"{mode:o} 0,0 {uid}:{gid}", path)
         return True
 else:
     rsyncfns.RSYNC = rsyncfns.RSYNC + ' --super'

@@ -20,6 +20,7 @@ from __future__ import annotations
 import atexit
 import fcntl
 import os
+import platform
 import shlex
 import shutil
 import socket as _socket
@@ -509,6 +510,128 @@ def rsync_getgroups() -> list:
     test helper binary. Mirrors rsync.fns rsync_getgroups."""
     out = subprocess.check_output([str(TOOLDIR / 'getgroups')], text=True)
     return out.split()
+
+
+# --- extended attributes (per-OS surface) ----------------------------------
+# Mirrors the per-OS xset/xls/RSYNC_PREFIX/RUSR logic from the old
+# testsuite/rsync.fns + xattrs.test so the xattr / fake-super tests run on
+# Linux, macOS and FreeBSD (not just Linux). Test attributes use literal
+# names ("user.foo" etc., exactly as the shell did on every platform); only
+# rsync's own fake-super attribute name (RSYNC_PREFIX, used for the
+# "%stat" attr) and the special "equal" attr (RUSR) vary by OS.
+
+_SYSTEM = platform.system()
+
+# Cygwin reports "CYGWIN_NT-10.0-..." and uses Linux-style user.* xattrs
+# (rsync builds there with HAVE_LINUX_XATTRS), but CPython on Cygwin lacks
+# os.*xattr, so we drive the getfattr/setfattr CLIs there instead.
+_CYGWIN = _SYSTEM.startswith('CYGWIN')
+
+# Platforms whose user xattrs live in the "user." namespace encoded in the
+# attribute name (Linux and Cygwin). macOS/FreeBSD carry the namespace out
+# of band and a literal "user." prefix is actually rejected there.
+_LINUX_NS = _SYSTEM == 'Linux' or _CYGWIN
+
+# Test attribute names are LOGICAL (un-prefixed, e.g. "foo", "rsync.%stat");
+# _xattr_full() adds the "user." prefix on the Linux-namespace platforms.
+# RSYNC_PREFIX is the logical name of rsync's own fake-super attr ("rsync"
+# -> "rsync.%stat", and "user.rsync.%stat" on Linux/Cygwin). RUSR is the
+# prefix for the test's "equal" attr; macOS and Solaris use "rsync.nonuser"
+# to stay clear of rsync's reserved "rsync.*" space.
+RSYNC_PREFIX = 'rsync'
+RUSR = 'rsync.nonuser' if _SYSTEM in ('Darwin', 'SunOS') else 'rsync'
+
+
+def _xattr_full(name: str) -> str:
+    """Map a logical user-xattr name to the on-disk name for this OS."""
+    return ('user.' + name) if _LINUX_NS else name
+
+
+def xattrs_supported() -> bool:
+    """True if this rsync was built with xattr support AND this platform has
+    a way for the tests to set/list user xattrs."""
+    vv = run_rsync('-VV', check=True, capture_output=True).stdout
+    if '"xattrs": true' not in vv:
+        return False
+    if _SYSTEM == 'Linux':
+        return hasattr(os, 'setxattr')
+    if _CYGWIN:
+        return shutil.which('setfattr') is not None
+    if _SYSTEM == 'Darwin':
+        return shutil.which('xattr') is not None
+    if _SYSTEM == 'FreeBSD':
+        return shutil.which('setextattr') is not None
+    if _SYSTEM == 'SunOS':
+        return shutil.which('runat') is not None
+    return False  # NetBSD/etc.: not yet ported
+
+
+def xattr_set(name: str, value: str, *paths) -> 'None':
+    """Set the user-namespace xattr `name` (logical) = `value` on each path."""
+    full = _xattr_full(name)
+    for p in paths:
+        p = str(p)
+        if _SYSTEM == 'Linux':
+            os.setxattr(p, full.encode(), value.encode())
+        elif _CYGWIN:
+            subprocess.run(['setfattr', '-n', full, '-v', value, p],
+                           check=True)
+        elif _SYSTEM == 'Darwin':
+            subprocess.run(['xattr', '-w', full, value, p], check=True)
+        elif _SYSTEM == 'FreeBSD':
+            subprocess.run(['setextattr', '-h', 'user', full, value, p],
+                           check=True)
+        elif _SYSTEM == 'SunOS':
+            # Solaris extended attributes are a per-file namespace; runat
+            # cd's into it and runs a shell that reads the script on stdin
+            # (the -c form mangles args). Pass name/value via the environment
+            # to dodge quoting; printf writes the value with no trailing
+            # newline, matching the byte-exact value other platforms store.
+            subprocess.run(
+                ['runat', p, '/bin/sh'],
+                input='printf %s "$XVAL" > "$XNAME"\n', text=True,
+                env={**os.environ, 'XNAME': full, 'XVAL': value}, check=True)
+        else:
+            raise NotImplementedError(f"xattr_set on {_SYSTEM}")
+
+
+def xattr_dump(*paths) -> str:
+    """Return a deterministic name=value dump of the user xattrs on `paths`,
+    for comparing a source tree against its rsync'd copy. The format only
+    needs to be self-consistent on a given OS (we never compare across OSes),
+    mirroring the per-OS xls() in the old xattrs.test."""
+    if _SYSTEM == 'Linux' or _CYGWIN:
+        return subprocess.check_output(
+            ['getfattr', '-d', *(str(p) for p in paths)], text=True)
+    if _SYSTEM == 'Darwin':
+        out = []
+        for p in paths:
+            t = subprocess.check_output(['xattr', '-l', str(p)], text=True)
+            out.append('\n'.join(ln.lstrip(' \t') for ln in t.splitlines()))
+            out.append('\n')
+        return ''.join(out)
+    if _SYSTEM == 'FreeBSD':
+        out = []
+        for p in paths:
+            names = subprocess.check_output(
+                ['lsextattr', '-q', '-h', 'user', str(p)], text=True).split()
+            for n in sorted(names):
+                out.append(subprocess.check_output(
+                    ['getextattr', '-h', 'user', n, str(p)], text=True))
+        return ''.join(out)
+    if _SYSTEM == 'SunOS':
+        # List the file's extended-attribute namespace via runat (script on
+        # stdin), skipping the always-present SUNWattr_* system attrs, and
+        # dump name=value (sorted glob order; $(cat) drops a trailing newline).
+        script = ('for x in *; do case "$x" in SUNWattr_*) continue;; esac; '
+                  'printf "%s=%s\\n" "$x" "$(cat "$x")"; done\n')
+        out = []
+        for p in paths:
+            out.append(subprocess.run(
+                ['runat', str(p), '/bin/sh'], input=script,
+                capture_output=True, text=True, check=True).stdout)
+        return ''.join(out)
+    raise NotImplementedError(f"xattr_dump on {_SYSTEM}")
 
 
 def runtest(label: str, fn, *args, **kwargs):
