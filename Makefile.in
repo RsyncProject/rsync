@@ -60,7 +60,8 @@ CHECK_PROGS = rsync$(EXEEXT) tls$(EXEEXT) getgroups$(EXEEXT) getfsdev$(EXEEXT) \
 	testrun$(EXEEXT) trimslash$(EXEEXT) t_unsafe$(EXEEXT) t_chmod_secure$(EXEEXT) \
 	t_secure_relpath$(EXEEXT) wildtest$(EXEEXT) simdtest$(EXEEXT)
 
-CHECK_SYMLINKS = testsuite/chown-fake.test testsuite/devices-fake.test testsuite/xattrs-hlink.test
+CHECK_SYMLINKS = testsuite/chown-fake_test.py testsuite/devices-fake_test.py \
+	testsuite/xattrs-hlink_test.py testsuite/exclude-lsh_test.py
 
 # Objects for CHECK_PROGS to clean
 CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o t_chmod_secure.o t_secure_relpath.o trimslash.o wildtest.o
@@ -343,14 +344,17 @@ simdtest$(EXEEXT): simd-checksum-x86_64.cpp $(HEADERS)
 	    touch $@; \
 	fi
 
-testsuite/chown-fake.test:
-	ln -s chown.test $(srcdir)/testsuite/chown-fake.test
+testsuite/chown-fake_test.py:
+	ln -s chown_test.py $(srcdir)/testsuite/chown-fake_test.py
 
-testsuite/devices-fake.test:
-	ln -s devices.test $(srcdir)/testsuite/devices-fake.test
+testsuite/devices-fake_test.py:
+	ln -s devices_test.py $(srcdir)/testsuite/devices-fake_test.py
 
-testsuite/xattrs-hlink.test:
-	ln -s xattrs.test $(srcdir)/testsuite/xattrs-hlink.test
+testsuite/xattrs-hlink_test.py:
+	ln -s xattrs_test.py $(srcdir)/testsuite/xattrs-hlink_test.py
+
+testsuite/exclude-lsh_test.py:
+	ln -s exclude_test.py $(srcdir)/testsuite/exclude-lsh_test.py
 
 # This does *not* depend on building or installing: you can use it to
 # check a version installed from a binary or some other source tree,

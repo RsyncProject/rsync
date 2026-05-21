@@ -151,17 +151,47 @@ def prep_scratch(scratchdir, srcdir, tooldir, setfacl_nodef):
             os.symlink(os.path.join(tooldir, srcdir), src_link)
 
 
+# Python tests are identified by a positive "_test.py" suffix so that
+# helper modules (e.g. rsyncfns.py) sit in testsuite/ without being mistaken
+# for tests.
+_PY_TEST_SUFFIX = '_test.py'
+
+
+def _is_test_path(path):
+    base = os.path.basename(path)
+    return base.endswith('.test') or base.endswith(_PY_TEST_SUFFIX)
+
+
+def _testbase(path):
+    """Strip the test extension to get the canonical test name."""
+    base = os.path.basename(path)
+    if base.endswith('.test'):
+        return base[:-len('.test')]
+    if base.endswith(_PY_TEST_SUFFIX):
+        return base[:-len(_PY_TEST_SUFFIX)]
+    return base
+
+
 def collect_tests(suitedir, patterns):
-    """Collect test scripts matching the given patterns."""
+    """Collect test scripts (.test or _test.py) matching the given patterns."""
     if not patterns:
-        tests = sorted(glob.glob(os.path.join(suitedir, '*.test')))
+        candidates = (glob.glob(os.path.join(suitedir, '*.test'))
+                      + glob.glob(os.path.join(suitedir, '*' + _PY_TEST_SUFFIX)))
+        tests = sorted(p for p in candidates if _is_test_path(p))
     else:
+        seen = set()
         tests = []
         for pat in patterns:
-            if not pat.endswith('.test'):
-                pat = pat + '.test'
-            matches = sorted(glob.glob(os.path.join(suitedir, pat)))
-            tests.extend(matches)
+            # Accept either bare name ("mkpath"), explicit extension, or glob.
+            if pat.endswith('.test') or pat.endswith('.py'):
+                pats = [pat]
+            else:
+                pats = [pat + '.test', pat + _PY_TEST_SUFFIX]
+            for p in pats:
+                for m in sorted(glob.glob(os.path.join(suitedir, p))):
+                    if _is_test_path(m) and m not in seen:
+                        seen.add(m)
+                        tests.append(m)
     return tests
 
 
@@ -203,11 +233,18 @@ def run_one_test(testscript, testbase, scratchdir, base_env, timeout,
     env = base_env.copy()
     env['scratchdir'] = scratchdir
 
+    # Dispatch by extension: shell tests via /bin/sh -e, Python tests via
+    # the same python3 that's running this runner.
+    if testscript.endswith('.py'):
+        cmd = [sys.executable, testscript]
+    else:
+        cmd = ['sh', '-e', testscript]
+
     logfile = os.path.join(scratchdir, 'test.log')
     try:
         with open(logfile, 'w') as log:
             proc = subprocess.run(
-                ['sh', '-e', testscript],
+                cmd,
                 stdout=log, stderr=subprocess.STDOUT,
                 env=env, timeout=timeout,
                 cwd=env.get('TOOLDIR', '.')
@@ -336,6 +373,11 @@ def main():
     if os.path.isdir('/usr/xpg4/bin'):
         path = '/usr/xpg4/bin:' + path
 
+    # Make the testsuite/ directory importable so Python tests can `import rsyncfns`.
+    pythonpath = suitedir
+    if os.environ.get('PYTHONPATH'):
+        pythonpath = suitedir + os.pathsep + os.environ['PYTHONPATH']
+
     base_env = os.environ.copy()
     base_env.update({
         'PATH': path,
@@ -349,6 +391,7 @@ def main():
         'suitedir': suitedir,
         'TESTRUN_TIMEOUT': str(args.timeout),
         'HOME': scratchbase,
+        'PYTHONPATH': pythonpath,
     })
     for k, v in shconfig.items():
         if v:
@@ -365,7 +408,7 @@ def main():
     full_run = len(args.tests) == 0
 
     # Record test order for consistent skipped-list output
-    test_order = {os.path.basename(t).replace('.test', ''): i for i, t in enumerate(tests)}
+    test_order = {_testbase(t): i for i, t in enumerate(tests)}
 
     passed = 0
     failed = 0
@@ -402,7 +445,7 @@ def main():
         with concurrent.futures.ThreadPoolExecutor(max_workers=args.parallel) as executor:
             futures = {}
             for testscript in tests:
-                testbase = os.path.basename(testscript).replace('.test', '')
+                testbase = _testbase(testscript)
                 scratchdir = os.path.join(scratchbase, testbase)
                 timeout = 600 if 'hardlinks' in testbase else args.timeout
                 f = executor.submit(
@@ -423,7 +466,7 @@ def main():
     else:
         # Sequential execution
         for testscript in tests:
-            testbase = os.path.basename(testscript).replace('.test', '')
+            testbase = _testbase(testscript)
             scratchdir = os.path.join(scratchbase, testbase)
             timeout = 600 if 'hardlinks' in testbase else args.timeout
             tr = run_one_test(

@@ -1,0 +1,592 @@
+"""Shared helpers for rsync's Python test scripts.
+
+This is the Python counterpart of testsuite/rsync.fns. It exposes only what
+the Python-rewritten tests actually need; grow it as more shell tests are
+ported.
+
+Conventions matching the shell harness:
+  * Exit 0 = pass, 1 = fail, 77 = skip, 78 = xfail.
+  * The runner sets these environment variables before invoking each test:
+      scratchdir   per-test scratch directory
+      srcdir       rsync source directory
+      TOOLDIR      build directory (holds the rsync binary and helpers)
+      RSYNC        the rsync command line (may include valgrind / --protocol=N)
+      TLS_ARGS     extra arguments to pass to the 'tls' helper
+      suitedir     this directory (testsuite/)
+"""
+
+from __future__ import annotations
+
+import os
+import shlex
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+
+# --- environment -----------------------------------------------------------
+
+def _required(name: str) -> str:
+    v = os.environ.get(name)
+    if not v:
+        sys.stderr.write(
+            f"rsyncfns: required environment variable {name} is not set; "
+            "run this test via runtests.py rather than directly.\n"
+        )
+        sys.exit(2)
+    return v
+
+
+SCRATCHDIR = Path(_required('scratchdir'))
+SRCDIR = Path(_required('srcdir'))
+TOOLDIR = Path(_required('TOOLDIR'))
+SUITEDIR = Path(os.environ.get('suitedir', SRCDIR / 'testsuite'))
+
+# rsync.fns overrides HOME to $scratchdir; tests that exercise ssh-style
+# transfers with no path component (e.g. localhost: at end of args) rely on
+# HOME pointing at the per-test scratch dir.
+os.environ['HOME'] = str(SCRATCHDIR)
+RSYNC = _required('RSYNC')         # full command line, possibly with valgrind/protocol
+
+# TLS_ARGS controls how the 'tls' helper formats listings (e.g. --atimes,
+# -l, -L). Tests that exercise non-default rsync features (atimes, etc.)
+# assign to rsyncfns.TLS_ARGS before calling checkit / rsync_ls_lR.
+TLS_ARGS = os.environ.get('TLS_ARGS', '')
+
+# Mnemonics for rsync's itemize-changes (-i / -ii) format:
+#   all_plus   ->  +++++++++   every attribute changed (an additive create)
+#   allspace   ->             every attribute unchanged
+#   dots       ->  .....       trailing dots after the change columns
+all_plus = '+++++++++'
+allspace = '         '
+dots = '.....'
+
+# The "$tmpdir/from", "$tmpdir/to", "$tmpdir/chk" layout from rsync.fns.
+TMPDIR = SCRATCHDIR
+FROMDIR = SCRATCHDIR / 'from'
+TODIR = SCRATCHDIR / 'to'
+CHKDIR = SCRATCHDIR / 'chk'
+CHKFILE = SCRATCHDIR / 'rsync.chk'
+OUTFILE = SCRATCHDIR / 'rsync.out'
+
+
+# --- result reporting ------------------------------------------------------
+
+def test_fail(msg: str) -> 'None':
+    sys.stderr.write(msg.rstrip() + '\n')
+    sys.exit(1)
+
+
+def test_skipped(msg: str) -> 'None':
+    sys.stderr.write(msg.rstrip() + '\n')
+    (TMPDIR / 'whyskipped').write_text(msg.rstrip() + '\n')
+    sys.exit(77)
+
+
+def test_xfail(msg: str) -> 'None':
+    sys.stderr.write(msg.rstrip() + '\n')
+    sys.exit(78)
+
+
+# --- rsync invocation ------------------------------------------------------
+
+def rsync_argv(*args: str) -> list:
+    """Return the argv for invoking rsync with the given extra arguments.
+
+    RSYNC may be a multi-word command (e.g. 'valgrind ... /build/rsync'); we
+    shlex-split it so subprocess sees a proper argv list. Each *args entry
+    is appended verbatim, so callers should pass tokens already split (no
+    embedded option/value joined by spaces).
+    """
+    return shlex.split(RSYNC) + list(args)
+
+
+def run_rsync(*args: str, check: bool = True,
+              capture_output: bool = False) -> subprocess.CompletedProcess:
+    """Run rsync with the given arguments.
+
+    By default, stdout/stderr inherit (so the runner captures them in the
+    per-test log). Set capture_output=True if the test needs to inspect the
+    output. If check is True (the default), a non-zero exit calls
+    test_fail() with the rsync command line.
+    """
+    argv = rsync_argv(*args)
+    if capture_output:
+        proc = subprocess.run(argv, capture_output=True, text=True)
+    else:
+        proc = subprocess.run(argv)
+    if check and proc.returncode != 0:
+        test_fail(f"rsync exited {proc.returncode}: {' '.join(argv)}")
+    return proc
+
+
+# --- filesystem helpers ----------------------------------------------------
+
+def makepath(*paths) -> 'None':
+    """Equivalent of rsync.fns makepath: mkdir -p, but for multiple paths."""
+    for p in paths:
+        os.makedirs(p, exist_ok=True)
+
+
+def rmtree(path) -> 'None':
+    """Remove a tree if it exists, ignoring missing entries."""
+    p = Path(path)
+    if p.exists() or p.is_symlink():
+        shutil.rmtree(p, ignore_errors=True)
+
+
+def is_a_link(path) -> bool:
+    """True if 'path' is a symbolic link (dangling or not)."""
+    return os.path.islink(path)
+
+
+def cp_p(src, dst) -> 'None':
+    """Equivalent of rsync.fns cp_p: copy preserving mode + timestamps."""
+    shutil.copy2(src, dst)
+
+
+def make_data_file(path, size: int) -> 'None':
+    """Equivalent of rsync.fns make_data_file: create `path` with `size`
+    bytes of non-trivial content suitable for rsync's delta algorithm.
+
+    Prefers /dev/urandom for speed. Falls back to a deterministic LCG
+    seeded from PID and the destination path so successive calls produce
+    distinct content -- matching the shell helper.
+    """
+    path = str(path)
+    if os.path.exists('/dev/urandom'):
+        try:
+            with open('/dev/urandom', 'rb') as src, open(path, 'wb') as dst:
+                remaining = size
+                while remaining:
+                    chunk = src.read(min(remaining, 1 << 16))
+                    if not chunk:
+                        break
+                    dst.write(chunk)
+                    remaining -= len(chunk)
+            if remaining == 0:
+                return
+        except OSError:
+            pass
+
+    # Fallback: BSD-LCG to printable-ASCII (33..126), so output stays
+    # exactly `size` bytes regardless of awk/utf8 quirks the shell
+    # version worked around.
+    path_seed = int.from_bytes(path.encode(), 'big') & 0xFFFFFFFF
+    state = (os.getpid() + path_seed) % 2147483648
+    with open(path, 'wb') as f:
+        out = bytearray(size)
+        for i in range(size):
+            state = (state * 1103515245 + 12345) % 2147483648
+            out[i] = ((state >> 16) % 94) + 33
+        f.write(bytes(out))
+
+
+def get_testuid() -> int:
+    return os.getuid()
+
+
+def get_rootuid() -> int:
+    return 0
+
+
+def get_rootgid() -> int:
+    return 0
+
+
+def build_rsyncd_conf() -> 'Path':
+    """Equivalent of rsync.fns build_rsyncd_conf.
+
+    Writes $scratchdir/test-rsyncd.conf with the four standard modules
+    (test-from, test-to, test-scratch, test-hidden) and a $scratchdir/
+    ignore23 wrapper that propagates rsync's exit status except for
+    code 23 (vanished/missing source files), which it eats so that the
+    surrounding test can tolerate the partial-transfer case.
+
+    Returns the path to the config file. Tests typically follow up by
+    setting RSYNC_CONNECT_PROG so rsync forks an in-tree daemon instead
+    of contacting one over the network.
+    """
+    conf = SCRATCHDIR / 'test-rsyncd.conf'
+    pidfile = SCRATCHDIR / 'rsyncd.pid'
+    logfile = SCRATCHDIR / 'rsyncd.log'
+
+    hostname = subprocess.check_output(['uname', '-n'], text=True).strip()
+
+    my_uid = get_testuid()
+    root_uid = get_rootuid()
+    root_gid = get_rootgid()
+
+    if my_uid != root_uid:
+        # Non-root cannot specify uid/gid in rsyncd.conf.
+        uid_line = f"#uid = {root_uid}"
+        gid_line = f"#gid = {root_gid}"
+    else:
+        uid_line = f"uid = {root_uid}"
+        gid_line = f"gid = {root_gid}"
+
+    conf.write_text(f"""\
+# rsyncd configuration file autogenerated by rsyncfns.build_rsyncd_conf
+
+pid file = {pidfile}
+use chroot = no
+munge symlinks = no
+hosts allow = localhost 127.0.0.0/24 192.168.0.0/16 10.0.0.0/8 {hostname}
+log file = {logfile}
+transfer logging = yes
+# We don't define log format here so the test-hidden module defaults
+# to the internal static string (since we had a crash trying to tweak it).
+exclude = ? foobar.baz
+max verbosity = 4
+{uid_line}
+{gid_line}
+
+[test-from]
+\tpath = {FROMDIR}
+\tlog format = %i %h [%a] %m (%u) %l %f%L
+\tread only = yes
+\tcomment = r/o
+
+[test-to]
+\tpath = {TODIR}
+\tlog format = %i %h [%a] %m (%u) %l %f%L
+\tread only = no
+\tcomment = r/w
+
+[test-scratch]
+\tpath = {SCRATCHDIR}
+\tlog format = %i %h [%a] %m (%u) %l %f%L
+\tread only = no
+
+[test-hidden]
+\tpath = {FROMDIR}
+\tlist = no
+""")
+
+    ignore23 = SCRATCHDIR / 'ignore23'
+    ignore23.write_text(
+        '#!/bin/sh\n'
+        'if "${@}"; then exit; fi\n'
+        'ret=$?\n'
+        'if test $ret = 23; then exit; fi\n'
+        'exit $ret\n'
+    )
+    ignore23.chmod(0o755)
+
+    return conf
+
+
+def rsync_getgroups() -> list:
+    """List of group ids the test user is a member of, via the getgroups
+    test helper binary. Mirrors rsync.fns rsync_getgroups."""
+    out = subprocess.check_output([str(TOOLDIR / 'getgroups')], text=True)
+    return out.split()
+
+
+def runtest(label: str, fn, *args, **kwargs):
+    """Run a sub-test step with an echoed label, like rsync.fns runtest.
+
+    The shell helper does `Test $1: $2 ... done.` -- this prints a similar
+    banner and propagates exceptions (which surface as a failing test).
+    """
+    print(f"Test {label}: ", end="", flush=True)
+    fn(*args, **kwargs)
+    print("done.")
+
+
+def cp_touch(src, dst) -> 'None':
+    """Equivalent of rsync.fns cp_touch: copy preserving timestamps, then
+    forcibly re-touch both source and destination to identical times.
+
+    On some filesystems cp rounds microsecond timestamps on the destination;
+    rsync.fns works around this by then `touch -r dst src dst`. Here we set
+    both src and dst to dst's mtime/atime after the copy, so a diff of the
+    tls output (which prints times) sees identical entries on both sides.
+    """
+    shutil.copy2(src, dst)
+    if os.path.isdir(dst):
+        dst = os.path.join(dst, os.path.basename(src))
+    st = os.stat(dst, follow_symlinks=False)
+    os.utime(src, ns=(st.st_atime_ns, st.st_mtime_ns), follow_symlinks=False)
+    os.utime(dst, ns=(st.st_atime_ns, st.st_mtime_ns), follow_symlinks=False)
+
+
+def build_symlinks() -> 'None':
+    """Equivalent of rsync.fns build_symlinks: a set of canonical relative,
+    absolute, dangling and unsafe symlinks under FROMDIR for symlink tests.
+    """
+    FROMDIR.mkdir(parents=True, exist_ok=True)
+    (FROMDIR / 'referent').write_text(
+        subprocess.check_output(['date'], text=True)
+    )
+    os.symlink('referent', FROMDIR / 'relative')
+    os.symlink(str(FROMDIR / 'referent'), FROMDIR / 'absolute')
+    os.symlink('nonexistent', FROMDIR / 'dangling')
+    os.symlink(str(SRCDIR / 'rsync.c'), FROMDIR / 'unsafe')
+
+
+def hands_setup() -> 'None':
+    """Equivalent of rsync.fns hands_setup: populate FROMDIR with a varied
+    tree of files and directories for the canonical 'hands' transfer test.
+
+    Recreates the shell behavior bit-for-bit so the tls listings match
+    across the shell and Python halves of the suite during the transition.
+    """
+    rmtree(FROMDIR)
+    rmtree(TODIR)
+    TMPDIR.mkdir(parents=True, exist_ok=True)
+    FROMDIR.mkdir(parents=True, exist_ok=True)
+    TODIR.mkdir(parents=True, exist_ok=True)
+
+    (FROMDIR / 'empty').touch()
+    (FROMDIR / 'emptydir').mkdir(exist_ok=True)
+
+    # File list of srcdir contents, generated through the tls helper so it
+    # matches the format the rest of the suite uses.
+    (FROMDIR / 'filelist').write_text(rsync_ls_lR(SRCDIR))
+
+    # The shell test uses `echo -n` semantics; write_text without a trailing
+    # newline is the cleanest equivalent.
+    (FROMDIR / 'nolf').write_text("This file has no trailing lf")
+
+    old_umask = os.umask(0)
+    try:
+        os.symlink('nolf', FROMDIR / 'nolf-symlink')
+    finally:
+        os.umask(old_umask)
+
+    # Concatenate all *.c files in srcdir into a single 'text' file.
+    text = bytearray()
+    for c in sorted(SRCDIR.glob('*.c')):
+        text.extend(c.read_bytes())
+    (FROMDIR / 'text').write_bytes(bytes(text))
+
+    (FROMDIR / 'dir').mkdir(exist_ok=True)
+    shutil.copy(FROMDIR / 'text', FROMDIR / 'dir')
+    (FROMDIR / 'dir' / 'subdir').mkdir(exist_ok=True)
+    (FROMDIR / 'dir' / 'subdir' / 'foobar.baz').write_text("some data\n")
+    (FROMDIR / 'dir' / 'subdir' / 'subsubdir').mkdir(exist_ok=True)
+
+    src_listdir = '/etc' if os.access('/etc', os.R_OK) else '/'
+    out = subprocess.run(['ls', '-ltr', src_listdir], capture_output=True, text=True)
+    (FROMDIR / 'dir' / 'subdir' / 'subsubdir' / 'etc-ltr-list').write_text(out.stdout)
+
+    (FROMDIR / 'dir' / 'subdir' / 'subsubdir2').mkdir(exist_ok=True)
+    src_listdir = '/bin' if os.access('/bin', os.R_OK) else '/'
+    out = subprocess.run(['ls', '-lt', src_listdir], capture_output=True, text=True)
+    (FROMDIR / 'dir' / 'subdir' / 'subsubdir2' / 'bin-lt-list').write_text(out.stdout)
+
+
+# --- listing / verification ------------------------------------------------
+
+def rsync_ls_lR(directory) -> str:
+    """Equivalent of rsync.fns rsync_ls_lR: print a sorted ls-style listing
+    of `directory`, pruning .git / auto-build-save / testtmp subtrees, using
+    the project's `tls` helper so the output format matches the rest of the
+    suite.
+    """
+    cmd = (
+        "find . -name .git -prune -o -name auto-build-save -prune "
+        "-o -name testtmp -prune -o -print | sort | sed 's/ /\\\\ /g' | "
+        f"xargs '{TOOLDIR}/tls' {TLS_ARGS}"
+    )
+    proc = subprocess.run(['sh', '-c', cmd], capture_output=True,
+                          text=True, cwd=str(directory))
+    return proc.stdout
+
+
+def checkit(args, expected_dir, actual_dir, skip_file_diff: bool = False,
+            allowed_codes=(0,)) -> 'None':
+    """Run rsync with `args` (a list of extra rsync arguments) and then
+    verify two things:
+
+      1. The tls-formatted listings of `expected_dir` and `actual_dir`
+         are identical.
+      2. (Unless skip_file_diff) diff -r against the two trees reports
+         no differences.
+
+    `allowed_codes` is the tuple of exit codes treated as success.
+    Pass (0, 23) for daemon-mode transfers that may report partial-
+    transfer codes even when the listings still match.
+
+    Calls test_fail() on any mismatch. Mirrors the rsync.fns checkit shell
+    helper; callers pass rsync arguments as a Python list rather than as a
+    pre-quoted command string, which avoids the shell-quoting gymnastics
+    that the shell version needed.
+    """
+    expected_dir = str(expected_dir)
+    actual_dir = str(actual_dir)
+
+    failed = []
+
+    # If TLS_ARGS asks for atimes, the listing must be captured BEFORE the
+    # rsync run because diff'ing files afterwards updates their atimes.
+    ls_from = None
+    if '--atimes' in TLS_ARGS:
+        ls_from = rsync_ls_lR(expected_dir)
+
+    print(f"Running: rsync {' '.join(args)}")
+    proc = subprocess.run(rsync_argv(*args))
+    if proc.returncode not in allowed_codes:
+        failed.append(f"status={proc.returncode}")
+
+    if ls_from is None:
+        ls_from = rsync_ls_lR(expected_dir)
+    ls_to = rsync_ls_lR(actual_dir)
+
+    print("-------------")
+    print("check how the directory listings compare with diff:")
+    print()
+    if ls_from != ls_to:
+        ls_from_path = TMPDIR / 'ls-from'
+        ls_to_path = TMPDIR / 'ls-to'
+        ls_from_path.write_text(ls_from)
+        ls_to_path.write_text(ls_to)
+        diff = subprocess.run(
+            ['diff', '-u', str(ls_from_path), str(ls_to_path)],
+            capture_output=True, text=True,
+        )
+        sys.stdout.write(diff.stdout)
+        failed.append("dir-diff")
+
+    print("-------------")
+    print("check how the files compare with diff:")
+    print()
+    if skip_file_diff:
+        print("  === Skipping (as directed) ===")
+    else:
+        diff = subprocess.run(['diff', '-r', '-u', expected_dir, actual_dir])
+        if diff.returncode != 0:
+            failed.append("file-diff")
+
+    print("-------------")
+    if failed:
+        test_fail("Failed: " + " ".join(failed))
+
+
+def verify_dirs(expected_dir, actual_dir, skip_file_diff: bool = False,
+                label: str = '') -> 'None':
+    """Verify two directory trees match: identical tls listings and
+    (unless skip_file_diff) identical file contents. Same comparison
+    logic as checkit() but with no rsync invocation -- useful when the
+    rsync that produced `actual_dir` had to be driven manually so that
+    its output could be captured for inspection."""
+    expected_dir = str(expected_dir)
+    actual_dir = str(actual_dir)
+    tag = f"{label}: " if label else ""
+
+    ls_expected = rsync_ls_lR(expected_dir)
+    ls_actual = rsync_ls_lR(actual_dir)
+    if ls_expected != ls_actual:
+        ls_expected_path = TMPDIR / 'ls-from'
+        ls_actual_path = TMPDIR / 'ls-to'
+        ls_expected_path.write_text(ls_expected)
+        ls_actual_path.write_text(ls_actual)
+        diff = subprocess.run(
+            ['diff', '-u', str(ls_expected_path), str(ls_actual_path)],
+            capture_output=True, text=True,
+        )
+        sys.stdout.write(diff.stdout)
+        test_fail(f"{tag}directory listings differ between "
+                  f"{expected_dir} and {actual_dir}")
+
+    if not skip_file_diff:
+        diff = subprocess.run(['diff', '-r', '-u', expected_dir, actual_dir])
+        if diff.returncode != 0:
+            test_fail(f"{tag}file content differs between "
+                      f"{expected_dir} and {actual_dir}")
+
+
+def v_filt(text: str) -> str:
+    """Strip the boilerplate lines rsync emits at -v / -vv so callers can
+    diff only the file/directory change lines. Mirrors rsync.fns v_filt:
+    delete the build/progress banners, then everything from the first
+    blank line to end-of-text."""
+    out = []
+    skip_prefix = (
+        'building file list ',
+        'sending incremental file list',
+        'created directory ',
+        'total: ',
+        'client charset: ',
+        'server charset: ',
+    )
+    for line in text.splitlines():
+        if line == '':
+            break
+        if line.startswith(skip_prefix):
+            continue
+        if line == 'done':
+            continue
+        if line.endswith(' --whole-file'):
+            continue
+        out.append(line)
+    return '\n'.join(out) + ('\n' if out else '')
+
+
+def checkdiff(args, expected: str, *, filter=None, allowed_codes=(0,),
+              direct: bool = False) -> 'None':
+    """Run a command, capture its stdout, optionally pipe through `filter`,
+    then compare to `expected`. Mirrors rsync.fns checkdiff/checkdiff2.
+
+    args is normally a list of rsync arguments -- the rsync binary is
+    prepended via rsync_argv. Pass direct=True to run `args` as a literal
+    command (used by tests that drive a wrapper such as BATCH.sh).
+    """
+    if direct:
+        argv = list(args)
+        label = ' '.join(argv)
+    else:
+        argv = rsync_argv(*args)
+        label = 'rsync ' + ' '.join(args)
+    print(f"Running: {label}")
+    proc = subprocess.run(argv, capture_output=True, text=True)
+    stdout = proc.stdout
+    if proc.stderr:
+        sys.stderr.write(proc.stderr)
+    sys.stdout.write(stdout)
+
+    failed = []
+    if proc.returncode not in allowed_codes:
+        failed.append(f"status={proc.returncode}")
+
+    if filter is not None:
+        stdout = filter(stdout)
+
+    if stdout != expected:
+        from difflib import unified_diff
+        diff = unified_diff(
+            expected.splitlines(keepends=True),
+            stdout.splitlines(keepends=True),
+            fromfile='expected', tofile='got',
+        )
+        sys.stdout.write(''.join(diff))
+        failed.append("output differs")
+
+    if failed:
+        test_fail("Failed: " + " ".join(failed))
+
+
+def check_perms(path, expected: str) -> 'None':
+    """Verify that the 9-char rwx permission string of `path` matches
+    `expected` (e.g. 'rwx------'). Calls test_fail() on mismatch."""
+    mode = os.stat(path, follow_symlinks=False).st_mode
+    bits = [
+        (0o400, 'r'), (0o200, 'w'), (0o100, 'x'),
+        (0o040, 'r'), (0o020, 'w'), (0o010, 'x'),
+        (0o004, 'r'), (0o002, 'w'), (0o001, 'x'),
+    ]
+    chars = [c if mode & bit else '-' for bit, c in bits]
+    # Layer the setuid/setgid/sticky bits over x as the long-listing format does.
+    if mode & 0o4000:
+        chars[2] = 's' if mode & 0o100 else 'S'
+    if mode & 0o2000:
+        chars[5] = 's' if mode & 0o010 else 'S'
+    if mode & 0o1000:
+        chars[8] = 't' if mode & 0o001 else 'T'
+    perms = ''.join(chars)
+    if perms != expected:
+        print(f"permissions: {perms} on {path}")
+        print(f"should be:   {expected}")
+        test_fail(f"check_perms failed for {path}")
