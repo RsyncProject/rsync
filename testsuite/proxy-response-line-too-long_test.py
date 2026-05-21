@@ -15,7 +15,7 @@ import sys
 import threading
 import time
 
-from rsyncfns import SCRATCHDIR, rsync_argv, test_fail, test_skipped
+from rsyncfns import SCRATCHDIR, claim_ports, rsync_argv, test_fail, test_skipped
 
 
 if shutil.which('python3') is None:
@@ -25,15 +25,19 @@ workdir = SCRATCHDIR / 'workdir'
 workdir.mkdir(parents=True, exist_ok=True)
 os.chdir(workdir)
 
-# In-process listener: bind a TCP socket, capture the chosen port,
-# accept one client, read up to end-of-headers (or 64 KiB), reply
-# with exactly 1023 'X' bytes and no '\n', then close. We use a
-# thread rather than spawning python3 again -- simpler synchronisation,
-# same effect on the rsync side.
+# Reserve our proxy port across any concurrent test processes; another
+# test asking for the same port blocks here until we exit.
+PROXY_PORT = 12873
+claim_ports(PROXY_PORT)
+
+# In-process listener: bind to the claimed port, accept one client, read
+# up to end-of-headers (or 64 KiB), reply with exactly 1023 'X' bytes and
+# no '\n', then close. A thread is simpler than spawning python3 again
+# and has the same effect on the rsync side.
 listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-listener.bind(('127.0.0.1', 0))
-port = listener.getsockname()[1]
+listener.bind(('127.0.0.1', PROXY_PORT))
+port = PROXY_PORT
 listener.listen(1)
 
 

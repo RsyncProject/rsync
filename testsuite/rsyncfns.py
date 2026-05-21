@@ -17,6 +17,7 @@ Conventions matching the shell harness:
 
 from __future__ import annotations
 
+import fcntl
 import os
 import shlex
 import shutil
@@ -90,6 +91,62 @@ def test_xfail(msg: str) -> 'None':
 
 
 # --- rsync invocation ------------------------------------------------------
+
+# --- TCP port coordination across parallel tests ---------------------------
+
+_PORT_LOCK_PATH = '/tmp/rsync_test.lck'
+_port_lock_fd = None
+
+
+def claim_ports(*ports: int) -> 'None':
+    """Reserve the given TCP port numbers for the rest of this process.
+
+    Uses POSIX byte-range locks on /tmp/rsync_test.lck (one byte per port,
+    offset = port number) so that any number of tests can run in parallel
+    without colliding on a port: if another test has already claimed any of
+    the requested ports the call blocks until that test exits. The kernel
+    drops POSIX advisory locks automatically when the holding process
+    terminates, so a crashed test releases its ports without manual
+    cleanup.
+
+    Ports are claimed in sorted order, so two callers that ask for the same
+    set in different orders can't deadlock against each other.
+
+    Call once near the top of any test that binds to a specific TCP port,
+    BEFORE the bind:
+
+        from rsyncfns import claim_ports
+        claim_ports(12873)
+        listener = socket.socket(...)
+        listener.bind(('127.0.0.1', 12873))
+
+    The lock file lives in /tmp so it's shared across all rsync test
+    processes on the host. Ports outside the claim_ports() ecosystem are
+    not protected -- nothing stops an unrelated process from binding the
+    port. For the rsync testsuite that's fine; we just need to avoid
+    collisions between concurrent test scripts.
+    """
+    global _port_lock_fd
+    if _port_lock_fd is None:
+        _port_lock_fd = os.open(
+            _PORT_LOCK_PATH,
+            os.O_CREAT | os.O_RDWR,
+            0o666,
+        )
+        # The mode arg to os.open is masked by umask; on a runner with a
+        # restrictive umask the lock file ends up 0o644, and a second user
+        # sharing the machine can't open it RDWR. Force 0o666 explicitly.
+        # EPERM is fine: we're not the owner and the bits were already
+        # broad enough that the first owner's create satisfied us.
+        try:
+            os.fchmod(_port_lock_fd, 0o666)
+        except PermissionError:
+            pass
+    for port in sorted(ports):
+        # F_SETLKW via fcntl.lockf(LOCK_EX, length, start): exclusive
+        # byte-range lock on byte `port`, blocking until acquired.
+        fcntl.lockf(_port_lock_fd, fcntl.LOCK_EX, 1, port)
+
 
 def rsync_argv(*args: str) -> list:
     """Return the argv for invoking rsync with the given extra arguments.
