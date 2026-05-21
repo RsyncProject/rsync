@@ -7,17 +7,15 @@
 # user.rsync.%stat xattr instead of mknod-ing real devices.
 
 import os
-import platform
-import shutil
 import subprocess
 import sys
 
 import rsyncfns
 from rsyncfns import (
-    CHKDIR, CHKFILE, FROMDIR, OUTFILE, TMPDIR, TODIR,
+    CHKDIR, CHKFILE, FROMDIR, OUTFILE, RSYNC_PREFIX, TMPDIR, TODIR,
     all_plus, allspace, dots,
     checkdiff, hands_setup, makepath, rsync_ls_lR, run_rsync,
-    test_fail, test_skipped, v_filt,
+    test_fail, test_skipped, v_filt, xattr_set, xattrs_supported,
 )
 
 
@@ -25,32 +23,25 @@ script_name = os.path.basename(sys.argv[0] if sys.argv[0] else __file__)
 fake_variant = 'fake' in script_name
 
 if fake_variant:
-    vv = run_rsync('-VV', check=True, capture_output=True)
-    if '"xattrs": true' not in vv.stdout:
+    if not xattrs_supported():
         test_skipped("Rsync needs xattrs for fake device tests")
 
     rsyncfns.RSYNC = rsyncfns.RSYNC + ' --fake-super'
     rsyncfns.TLS_ARGS = (rsyncfns.TLS_ARGS + ' --fake-super').strip()
 
-    if platform.system() != 'Linux':
-        test_skipped(
-            f"fake device emulation not implemented for {platform.system()}"
-        )
-
     def make_special(path, kind: str, major: int = 0, minor: int = 0) -> bool:
-        """Pretend to mknod `path` as kind {'p','c','b'} via an xattr.
-
-        Returns True on success, False if the FS rejects the xattr (so the
-        caller can skip).
+        """Pretend to mknod `path` as kind {'p','c','b'} via rsync's
+        fake-super "%stat" xattr (name/namespace handled per-OS by
+        xattr_set). Returns True on success, False if the FS rejects it.
         """
         mode = {'p': 0o10644, 'c': 0o20644, 'b': 0o60644}[kind]
         try:
             with open(path, 'w'):
                 pass
-            value = f"{mode:o} {major},{minor} 0:0".encode()
-            os.setxattr(str(path), b'user.rsync.%stat', value)
+            xattr_set(f'{RSYNC_PREFIX}.%stat',
+                      f"{mode:o} {major},{minor} 0:0", path)
             return True
-        except OSError:
+        except (OSError, subprocess.CalledProcessError):
             return False
 else:
     my_uid = os.getuid()
