@@ -93,6 +93,15 @@ details.
 [3]: https://rsync.samba.org/lists.html
 
 
+DISCORD
+-------
+
+There is also an rsync [Discord server][d] for real-time chat about rsync
+and its development.
+
+[d]: https://discord.gg/Avfvy9zhdp
+
+
 BUG REPORTS
 -----------
 
