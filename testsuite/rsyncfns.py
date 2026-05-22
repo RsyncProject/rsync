@@ -78,9 +78,26 @@ USE_TCP = os.environ.get('RSYNC_TEST_USE_TCP') == '1'
 #   all_plus   ->  +++++++++   every attribute changed (an additive create)
 #   allspace   ->             every attribute unchanged
 #   dots       ->  .....       trailing dots after the change columns
-all_plus = '+++++++++'
-allspace = '         '
-dots = '.....'
+#
+# A build with fileflags support emits a 12-char %i string -- the extra
+# 'f' (file-flags) column at the end -- so the change-column run after the
+# 2-char "Yx" prefix is 10 wide (and the trailing-dots span 6) instead of
+# the historical 9/5. Detect it from the rsync under test, mirroring the
+# width selection the shell rsync.fns used, so the itemize tests stay
+# correct on both chflags/chattr and non-fileflags builds.
+def _itemize_widths():
+    width = 9
+    try:
+        out = subprocess.run(shlex.split(RSYNC) + ['-VV'],
+                             capture_output=True, text=True).stdout
+        if '"file_flags": true' in out:
+            width = 10
+    except OSError:
+        pass
+    return '+' * width, ' ' * width, '.' * (width - 4)
+
+
+all_plus, allspace, dots = _itemize_widths()
 
 # The "$tmpdir/from", "$tmpdir/to", "$tmpdir/chk" layout from rsync.fns.
 TMPDIR = SCRATCHDIR

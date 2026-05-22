@@ -13,7 +13,7 @@ AC_CHECK_HEADERS(sys/fcntl.h sys/select.h fcntl.h sys/time.h sys/unistd.h \
     sys/acl.h acl/libacl.h attr/xattr.h sys/xattr.h sys/extattr.h dl.h \
     popt.h popt/popt.h linux/falloc.h netinet/in_systm.h netgroup.h \
     zlib.h xxhash.h openssl/md4.h openssl/md5.h zstd.h lz4.h sys/file.h \
-    bsd/string.h)
+    bsd/string.h linux/fs.h)
 AC_CHECK_HEADERS([netinet/ip.h], [], [], [[#include <netinet/in.h>]])
 AC_HEADER_MAJOR_FIXED
 
@@ -923,6 +923,35 @@ AC_PREPROC_IFELSE([AC_LANG_SOURCE([[
     ]])], [
         AC_MSG_RESULT([yes])
         AC_DEFINE([HAVE_FALLOC_FL_PUNCH_HOLE], [1], [Define if FALLOC_FL_PUNCH_HOLE is available.])
+    ], [
+        AC_MSG_RESULT([no])
+    ]
+)
+
+AC_MSG_CHECKING([for FS_IOC_GETFLAGS])
+AC_PREPROC_IFELSE([AC_LANG_SOURCE([[
+        #include <sys/ioctl.h>
+        #ifdef HAVE_LINUX_FS_H
+        #include <linux/fs.h>
+        #endif
+        #ifndef FS_IOC_GETFLAGS
+        #error FS_IOC_GETFLAGS is missing
+        #endif
+        #ifndef FS_IOC_SETFLAGS
+        #error FS_IOC_SETFLAGS is missing
+        #endif
+        #ifndef FS_NODUMP_FL
+        #error FS_NODUMP_FL is missing
+        #endif
+        #ifndef FS_IMMUTABLE_FL
+        #error FS_IMMUTABLE_FL is missing
+        #endif
+        #ifndef FS_APPEND_FL
+        #error FS_APPEND_FL is missing
+        #endif
+    ]])], [
+        AC_MSG_RESULT([yes])
+        AC_DEFINE([HAVE_FS_IOC_GETFLAGS], [1], [Define if FS_IOC_GETFLAGS / FS_IOC_SETFLAGS ioctls are available (Linux chattr-style file flags).])
     ], [
         AC_MSG_RESULT([no])
     ]

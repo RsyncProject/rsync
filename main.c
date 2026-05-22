@@ -31,6 +31,13 @@
 #ifdef __TANDEM
 #include <floss.h(floss_execlp)>
 #endif
+#if defined SUPPORT_FORCE_CHANGE && defined HAVE_CHFLAGS
+/* The securelevel check below uses BSD sysctl(KERN_SECURELVL) -- only
+ * relevant on systems with the BSD chflags(2) family.  Linux has no
+ * equivalent of securelevel for the immutable bits, so this whole
+ * block is BSD-only. */
+#include <sys/sysctl.h>
+#endif
 
 extern int dry_run;
 extern int list_only;
@@ -49,6 +56,7 @@ extern int need_messages_from_generator;
 extern int kluge_around_eof;
 extern int got_xfer_error;
 extern int old_style_args;
+extern int force_change;
 extern int msgs2stderr;
 extern int module_id;
 extern int read_only;
@@ -985,6 +993,26 @@ static int do_recv(int f_in, int f_out, char *local_name)
 	/* The receiving side mustn't obey this, or an existing symlink that
 	 * points to an identical file won't be replaced by the referent. */
 	copy_links = copy_dirlinks = copy_unsafe_links = 0;
+
+#if defined SUPPORT_FORCE_CHANGE && defined HAVE_CHFLAGS
+	if (force_change & SYS_IMMUTABLE) {
+		/* BSD-only: determine whether we'll be able to unlock a system
+		 * immutable item.  Linux has no equivalent of securelevel for
+		 * its chattr +i (it requires CAP_LINUX_IMMUTABLE rather than
+		 * a kernel-wide securelevel knob), and CAP_LINUX_IMMUTABLE
+		 * either is or is not set on this process. */
+		int mib[2];
+		int securityLevel = 0;
+		size_t len = sizeof securityLevel;
+
+		mib[0] = CTL_KERN;
+		mib[1] = KERN_SECURELVL;
+		if (sysctl(mib, 2, &securityLevel, &len, NULL, 0) == 0 && securityLevel > 0) {
+			rprintf(FERROR, "System security level is too high to force mutability on system immutable files and directories.\n");
+			exit_cleanup(RERR_UNSUPPORTED);
+		}
+	}
+#endif
 
 #ifdef SUPPORT_HARD_LINKS
 	if (preserve_hard_links && !inc_recurse)

@@ -76,6 +76,10 @@ static inline void
 init_stat_x(stat_x *sx_p)
 {
 	sx_p->crtime = 0;
+#ifdef SUPPORT_FILEFLAGS
+	sx_p->fileflags = 0;
+	sx_p->fileflags_cached = 0;
+#endif
 #ifdef SUPPORT_ACLS
 	sx_p->acc_acl = sx_p->def_acl = NULL;
 #endif

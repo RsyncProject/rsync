@@ -31,6 +31,9 @@ extern int dry_run;
 extern int preserve_acls;
 extern int preserve_xattrs;
 extern int preserve_perms;
+extern int preserve_fileflags;
+extern int preserve_unsafe_fileflags;
+extern int force_change;
 extern int preserve_executability;
 extern int preserve_mtimes;
 extern int omit_dir_times;
@@ -55,6 +58,7 @@ extern int make_backups;
 extern int sanitize_paths;
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern struct chmod_mode_struct *daemon_chmod_modes;
+extern char curr_dir[MAXPATHLEN];
 #ifdef ICONV_OPTION
 extern char *iconv_opt;
 #endif
@@ -471,6 +475,182 @@ mode_t dest_mode(mode_t flist_mode, mode_t stat_mode, int dflt_perms,
 	return new_mode;
 }
 
+#if defined SUPPORT_FILEFLAGS || defined SUPPORT_FORCE_CHANGE
+/* Project the sender-supplied fileflags onto the bits this receiver is
+ * willing to apply, preserving the bits the receiver already has outside
+ * that mask.  By default the safe-to-apply set is SAFE_FILEFLAGS; the
+ * --unsafe-fileflags option widens it to all bits.  See rsync.h comment
+ * on SAFE_FILEFLAGS for the threat model. */
+uint32 filter_recv_fileflags(uint32 received, uint32 current_on_dest)
+{
+	uint32 mask = preserve_unsafe_fileflags ? (uint32)-1 : SAFE_FILEFLAGS;
+	return (received & mask) | (current_on_dest & ~mask);
+}
+
+/* Try to open fname O_RDONLY|O_NOFOLLOW via secure_relative_open
+ * (relative) or plain open() (absolute).  If the per-component-walk
+ * fallback returns EISDIR (the resolved target is a directory and we
+ * didn't ask for O_DIRECTORY), retry with O_DIRECTORY -- set_fileflags
+ * is happy with either type and the fallback enforces O_DIRECTORY
+ * stricter than the kernel RESOLVE_BENEATH path does.  Returns fd on
+ * success, -1 with errno preserved on failure. */
+static int open_for_fileflags(const char *fname)
+{
+	int oflags = O_RDONLY | O_NOFOLLOW;
+	int fd;
+
+	if (fname[0] != '/')
+		fd = secure_relative_open(NULL, fname, oflags, 0);
+	else
+		fd = open(fname, oflags);
+#ifdef O_DIRECTORY
+	if (fd < 0 && errno == EISDIR) {
+		oflags |= O_DIRECTORY;
+		if (fname[0] != '/')
+			fd = secure_relative_open(NULL, fname, oflags, 0);
+		else
+			fd = open(fname, oflags);
+	}
+#endif
+	return fd;
+}
+
+/* Set a file's BSD-canonical fileflags, via the portable wrapper that
+ * handles both BSD fchflags(fd, ...) and Linux ioctl(FS_IOC_SETFLAGS).
+ *
+ * SECURITY: relative paths are opened via secure_relative_open(NULL,
+ * fname, ...) so the full path chain is bounded -- on Linux 5.6+,
+ * FreeBSD 13+ and macOS 15+ this uses openat2/openat with
+ * RESOLVE_BENEATH (or O_RESOLVE_BENEATH), and elsewhere falls back to
+ * a per-component O_NOFOLLOW walk.  This closes the same daemon
+ * (use chroot = no) symlink-race attack class as CVE-2026-29518.
+ *
+ * basedir = NULL means "anchor at AT_FDCWD" -- the cwd the receiver
+ * already set via change_dir() before the file-ops phase, kernel-level
+ * confined and not re-traversed component-by-component on each call.
+ * The earlier basedir=curr_dir variant re-opened curr_dir-as-a-path-
+ * string each call, which made the basedir itself re-resolvable through
+ * any swapped components above the module root.
+ *
+ * Absolute paths still fall back to a plain open(O_NOFOLLOW): we have
+ * no basedir context for them and they don't occur on the normal
+ * receiver path (only via --partial-dir=/abs and similar). */
+int set_fileflags(const char *fname, uint32 fileflags)
+{
+	int fd, rc, save_errno;
+	int restore_mode = -1;	/* mode_t to restore after, -1 = no restore */
+	STRUCT_STAT lst;
+	STRUCT_STAT st;
+
+	/* Do NOT add O_NONBLOCK: NetBSD's open() rejects directories
+	 * when O_NONBLOCK is set in the flags, returning EISDIR even
+	 * though POSIX allows opening directories O_RDONLY.  We don't
+	 * need O_NONBLOCK here -- rsync_fchflags() rejects everything
+	 * except S_IFREG and S_IFDIR, and callers already short-circuit
+	 * on S_ISLNK, so the open target is always a regular file or
+	 * directory.  Neither blocks on plain O_RDONLY. */
+	fd = open_for_fileflags(fname);
+	if (fd < 0 && errno == EACCES) {
+		/* set_file_attrs chmods before set_fileflags, so if the
+		 * caller's target mode lacks owner-read (e.g. 000 backup of
+		 * a chattr+i secret file), the O_RDONLY open above fails
+		 * for non-root users.  Recover by lstat-ing the path,
+		 * temporarily widening the mode to add owner-read, retrying
+		 * the open, then restoring via fchmod through the fd we
+		 * just acquired (which closes the path-based TOCTOU window
+		 * on the restore step).  Refuse anything that isn't a
+		 * regular file or directory, both to keep within the same
+		 * set_fileflags target types and to avoid chmod-ing through
+		 * a setuid program file we don't own. */
+		if (do_lstat(fname, &lst) == 0
+		 && (S_ISREG(lst.st_mode) || S_ISDIR(lst.st_mode))
+		 && !(lst.st_mode & S_IRUSR)
+		 && do_chmod_at(fname, lst.st_mode | S_IRUSR) == 0) {
+			restore_mode = lst.st_mode & CHMOD_BITS;
+			fd = open_for_fileflags(fname);
+			if (fd < 0) {
+				save_errno = errno;
+				do_chmod_at(fname, restore_mode);
+				errno = save_errno;
+			}
+		}
+	}
+	if (fd < 0)
+		goto fail;
+	if (fstat(fd, &st) != 0) {
+		save_errno = errno;
+		if (restore_mode != -1)
+			(void)fchmod(fd, restore_mode);
+		close(fd);
+		errno = save_errno;
+		goto fail;
+	}
+	if (restore_mode != -1) {
+		/* Restore via fd, BEFORE the fchflags below -- if the
+		 * fchflags sets immutable, a later fchmod would be
+		 * rejected by the kernel even through the existing fd.
+		 * fchmod here works because the inode is still mutable and
+		 * we own it; the already-open fd retains its read access
+		 * across the mode drop (POSIX checks read perm at open(),
+		 * not at use). */
+		(void)fchmod(fd, restore_mode);
+	}
+	rc = rsync_fchflags(fd, st.st_mode, fileflags);
+	save_errno = errno;
+	close(fd);
+	errno = save_errno;
+	if (rc != 0)
+		goto fail;
+	return 1;
+fail:
+	rsyserr(FERROR_XFER, errno,
+		"failed to set file flags on %s",
+		full_fname(fname));
+	return 0;
+}
+
+/* Remove immutable flags from an object, so it can be altered/removed. */
+int make_mutable(const char *fname, mode_t mode, uint32 fileflags, uint32 iflags)
+{
+	if (S_ISLNK(mode) || !(fileflags & iflags))
+		return 0;
+	if (!set_fileflags(fname, fileflags & ~iflags))
+		return -1;
+	return 1;
+}
+
+/* Undo a prior make_mutable() call that returned a 1. */
+int undo_make_mutable(const char *fname, uint32 fileflags)
+{
+	if (!set_fileflags(fname, fileflags))
+		return -1;
+	return 1;
+}
+
+/* fd-based variants for use from the syscall.c force_change recovery
+ * paths, where we hold an fd we just openat()'d.  No path is touched
+ * after open, eliminating the TOCTOU window between an lstat and the
+ * chflags. */
+int make_mutable_fd(int fd, mode_t mode, uint32 fileflags, uint32 iflags)
+{
+	if (S_ISLNK(mode) || !(fileflags & iflags))
+		return 0;
+	if (rsync_fchflags(fd, mode, fileflags & ~iflags) != 0)
+		return -1;
+	return 1;
+}
+
+int undo_make_mutable_fd(int fd, uint32 fileflags)
+{
+	/* mode unknown here; pass S_IFREG so the Linux rsync_fchflags
+	 * doesn't refuse based on file type (we've already validated in
+	 * make_mutable_fd that the fd is regular/dir). */
+	if (rsync_fchflags(fd, S_IFREG, fileflags) != 0)
+		return -1;
+	return 1;
+}
+#endif
+
 static int same_mtime(struct file_struct *file, STRUCT_STAT *st, int extra_accuracy)
 {
 #ifdef ST_MTIME_NSEC
@@ -669,6 +849,25 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	}
 #endif
 
+#ifdef SUPPORT_FILEFLAGS
+	if (preserve_fileflags && !S_ISLNK(sxp->st.st_mode)) {
+		uint32 current = stat_x_get_fileflags(sxp, fname);
+		uint32 wanted = filter_recv_fileflags(F_FFLAGS(file), current);
+		if (flags & ATTRS_DELAY_IMMUTABLE)
+			wanted &= ~ALL_IMMUTABLE;
+		if (current != wanted) {
+			if (!set_fileflags(fname, wanted))
+				goto cleanup;
+			/* Deliberately do NOT invalidate the cache here: the
+			 * itemize() call that follows compares pre-change
+			 * (cached) against wanted to decide whether to emit
+			 * the 'f' column.  Invalidating would refresh to the
+			 * post-change value and itemize would see no diff. */
+			updated = 1;
+		}
+	}
+#endif
+
 	if (INFO_GTE(NAME, 2) && flags & ATTRS_REPORT) {
 		if (updated)
 			rprintf(FCLIENT, "%s\n", fname);
@@ -728,6 +927,27 @@ int finish_transfer(const char *fname, const char *fnametmp,
 {
 	int ret;
 	const char *temp_copy_name = partialptr && *partialptr != '/' ? partialptr : NULL;
+#ifdef SUPPORT_FORCE_CHANGE
+	/* For force_change without preserve_fileflags, the generator's
+	 * F_FFLAGS stash isn't visible to us (the receiver runs in a
+	 * separate process from the generator and we never decoded the
+	 * dest's flags off the wire -- they're a local-only fact).  Stat
+	 * the dest ourselves before any rename so we can re-apply the
+	 * force_change-affected bits afterwards.  Without this, the
+	 * manpage's "original flags are restored" promise silently fails
+	 * for single-link rename-replaced destinations. */
+	uint32 fc_pre_flags = 0;
+	if (force_change && !preserve_fileflags && !inplace) {
+		stat_x sx_dst;
+		init_stat_x(&sx_dst);
+		if (do_lstat(fname, &sx_dst.st) == 0
+		 && (S_ISREG(sx_dst.st.st_mode) || S_ISDIR(sx_dst.st.st_mode)))
+			fc_pre_flags = stat_x_get_fileflags(&sx_dst, fname);
+		if (fc_pre_flags == NO_FFLAGS)
+			fc_pre_flags = 0;
+		free_stat_x(&sx_dst);
+	}
+#endif
 
 	if (inplace) {
 		if (DEBUG_GTE(RECV, 1))
@@ -746,7 +966,8 @@ int finish_transfer(const char *fname, const char *fnametmp,
 
 	/* Change permissions before putting the file into place. */
 	set_file_attrs(fnametmp, file, NULL, fnamecmp,
-		       ok_to_set_time ? ATTRS_ACCURATE_TIME : ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME | ATTRS_SKIP_CRTIME);
+		       ATTRS_DELAY_IMMUTABLE
+		       | (ok_to_set_time ? ATTRS_ACCURATE_TIME : ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME | ATTRS_SKIP_CRTIME));
 
 	/* move tmp file over real file */
 	if (DEBUG_GTE(RECV, 1))
@@ -763,6 +984,29 @@ int finish_transfer(const char *fname, const char *fnametmp,
 	}
 	if (ret == 0) {
 		/* The file was moved into place (not copied), so it's done. */
+#ifdef SUPPORT_FILEFLAGS
+		if (preserve_fileflags) {
+			/* We delayed applying the immutable bits until after
+			 * the rename; do so now -- but only the bits the
+			 * receiver's policy lets through (see
+			 * filter_recv_fileflags). */
+			uint32 wanted = filter_recv_fileflags(F_FFLAGS(file), 0);
+			if (wanted & ALL_IMMUTABLE)
+				set_fileflags(fname, wanted);
+		}
+#endif
+#ifdef SUPPORT_FORCE_CHANGE
+		/* Restore the dest's pre-rename force_change-affected bits.
+		 * The temp inode now sits at fname with no flags, so
+		 * without this the manpage's promise that the "original
+		 * flags are restored" silently fails for the common
+		 * single-link case.  fc_pre_flags was captured at function
+		 * entry via lstat (preserve_fileflags already took the
+		 * separate restoration path above). */
+		if (force_change && !preserve_fileflags
+		 && (fc_pre_flags & force_change))
+			set_fileflags(fname, fc_pre_flags & force_change);
+#endif
 		return 1;
 	}
 	/* The file was copied, so tweak the perms of the copied file.  If it
@@ -780,6 +1024,15 @@ int finish_transfer(const char *fname, const char *fnametmp,
 			return 0;
 		}
 		handle_partial_dir(temp_copy_name, PDIR_DELETE);
+#ifdef SUPPORT_FORCE_CHANGE
+		/* Same rename-replaced-the-inode hazard as the move path
+		 * above: the temp inode now sits at fname with no flags,
+		 * so restore the force_change-affected bits captured at
+		 * function entry. */
+		if (force_change && !preserve_fileflags
+		 && (fc_pre_flags & force_change))
+			set_fileflags(fname, fc_pre_flags & force_change);
+#endif
 	}
 	return 1;
 }

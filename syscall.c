@@ -45,6 +45,7 @@ extern int am_root;
 extern int am_sender;
 extern int read_only;
 extern int list_only;
+extern int force_change;
 extern int inplace;
 extern int preallocate_files;
 extern int preserve_perms;
@@ -52,6 +53,7 @@ extern int preserve_executability;
 extern int open_noatime;
 extern int copy_links;
 extern int copy_unsafe_links;
+extern char curr_dir[MAXPATHLEN];
 
 #ifndef S_BLKSIZE
 # if defined hpux || defined __hpux__ || defined __hpux
@@ -86,11 +88,220 @@ struct create_time {
 
 #define RETURN_ERROR_IF_RO_OR_LO RETURN_ERROR_IF(read_only || list_only, EROFS)
 
+#ifdef SUPPORT_FORCE_CHANGE
+/* Split path into dirname (copied into dirbuf) and basename (pointer into
+ * the original path).  Used by the force_change recovery paths to obtain a
+ * dirfd we can anchor openat()/unlinkat()/renameat()/fchownat() onto, so
+ * the actual operation runs on the inode we opened rather than re-resolving
+ * the path each call (which is the TOCTOU primitive).  Returns 0 on
+ * success, -1 with errno set on failure. */
+static int split_dir_base(const char *path, char *dirbuf, size_t dirbuf_sz,
+			  const char **base_out)
+{
+	const char *slash = strrchr(path, '/');
+	size_t dirlen;
+
+	if (slash == NULL) {
+		/* No slash: bare filename, parent is "." */
+		if (dirbuf_sz < 2) { errno = ENAMETOOLONG; return -1; }
+		dirbuf[0] = '.';
+		dirbuf[1] = '\0';
+		*base_out = path;
+		return 0;
+	}
+	dirlen = slash - path;
+	if (dirlen == 0) {
+		/* "/file" -> dir="/" */
+		if (dirbuf_sz < 2) { errno = ENAMETOOLONG; return -1; }
+		dirbuf[0] = '/';
+		dirbuf[1] = '\0';
+	} else {
+		if (dirlen + 1 > dirbuf_sz) { errno = ENAMETOOLONG; return -1; }
+		memcpy(dirbuf, path, dirlen);
+		dirbuf[dirlen] = '\0';
+	}
+	*base_out = slash + 1;
+	if (**base_out == '\0') {
+		/* Trailing slash -- not a normal target. */
+		errno = EISDIR;
+		return -1;
+	}
+	return 0;
+}
+
+/* Open the parent directory of path, returning the dirfd and the
+ * basename pointer.  Caller closes dirfd.
+ *
+ * SECURITY (phase 3): when path is relative we anchor the parent-dir
+ * open at AT_FDCWD via secure_relative_open(NULL, ...), which uses
+ * openat2(RESOLVE_BENEATH) on Linux 5.6+, openat(O_RESOLVE_BENEATH) on
+ * FreeBSD 13+ / macOS 15+, and a per-component O_NOFOLLOW walk
+ * elsewhere.  All of these reject any path that escapes the anchor via
+ * ".." or via a symlink that points outside the subtree.  The receiver
+ * change_dir()s into the destination root before the file-ops phase,
+ * so AT_FDCWD IS the destination root -- and unlike a basedir passed
+ * as a path string (which would be re-traversed component-by-component
+ * on every call, re-exposing any swapped parent dirs above the module
+ * root), AT_FDCWD is a stable kernel-held reference set up once at
+ * startup.  A sender that managed to inject a path like
+ * "../etc/master.passwd" still gets the openat refused at the kernel.
+ *
+ * For absolute paths we fall back to the phase-2 path-based open
+ * (O_NOFOLLOW on the parent dir, no RESOLVE_BENEATH).  Absolute paths
+ * are rare in the force_change recovery context (receiver normally
+ * operates on relative paths) but a few configurations -- partial-dir,
+ * backup-dir -- can pass them. */
+static int force_change_open_parent(const char *path, const char **base_out)
+{
+	char dirbuf[MAXPATHLEN];
+	int dirfd;
+
+	if (split_dir_base(path, dirbuf, sizeof dirbuf, base_out) < 0)
+		return -1;
+#ifndef O_DIRECTORY
+#define O_DIRECTORY 0
+#endif
+	if (dirbuf[0] != '/') {
+		dirfd = secure_relative_open(NULL, dirbuf,
+					     O_RDONLY | O_DIRECTORY | O_NOFOLLOW, 0);
+		/* Do NOT fall back to a path-based open on failure -- that
+		 * would re-enable the escape route we just closed. */
+		return dirfd;
+	}
+	dirfd = open(dirbuf, O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+	return dirfd;
+}
+
+/* Open the target via dirfd+basename with O_NOFOLLOW (so we never operate
+ * on a symlink the attacker substituted), then fstat to learn its current
+ * mode and read its current BSD-canonical fileflags (via rsync_fgetflags,
+ * which abstracts BSD fstat-st_flags vs Linux ioctl(FS_IOC_GETFLAGS)).
+ * Returns fd on success, -1 with errno set on failure.
+ *
+ * NB: we don't set O_NONBLOCK here even though the target may be a fifo --
+ * the force_change recovery path also fires on directories (rmdir,
+ * chmod), and NetBSD/OpenBSD reject O_NONBLOCK|O_RDONLY on directory
+ * open() with EISDIR/EPERM.  This is the same trap that set_fileflags
+ * documents at rsync.c.  A fifo open *without* O_NONBLOCK can block in
+ * theory, but openat with O_NOFOLLOW on a fifo with no other end behaves
+ * the same as the unlinkat would have -- in practice the receiver only
+ * reaches this path after its own unlinkat or chmod failed on a node it
+ * just generated, and the kernel doesn't make us wait. */
+static int force_change_open_target(int dirfd, const char *base, STRUCT_STAT *stp, uint32 *flags_out)
+{
+	int oflags = O_RDONLY | O_NOFOLLOW;
+	int fd;
+
+	fd = openat(dirfd, base, oflags);
+	if (fd < 0)
+		return -1;
+	if (fstat(fd, stp) != 0) {
+		int e = errno;
+		close(fd);
+		errno = e;
+		return -1;
+	}
+	*flags_out = rsync_fgetflags(fd, stp->st_mode, stp);
+	if (*flags_out == NO_FFLAGS) {
+		int e = errno;
+		close(fd);
+		errno = e;
+		return -1;
+	}
+	return fd;
+}
+
+/* Shared force_change EPERM-recovery helper for do_unlink_at / do_rmdir_at:
+ * make the target temporarily mutable via fchflags, retry unlinkat with the
+ * given AT_REMOVEDIR-or-0 flag, restore flags on failure.  Reuses the
+ * caller's already-opened secure dirfd so the recovery stays bounded to
+ * the same secure-relative-open context.  Returns 0 on successful
+ * removal, -1 otherwise (with errno reset to EPERM as the original
+ * unlinkat would have left it).
+ *
+ * Hardlink-aware restore: if the inode had st_nlink > 1, the unlinked
+ * name was just one of several references to the same inode and the
+ * inode itself survives.  Restore the original flags via the still-open
+ * fd so the *other* hardlinks don't end up less-protected than they
+ * started.  (For AT_REMOVEDIR / dirs this is moot: a dir's st_nlink
+ * counts "." and child-".." references, never additional hardlinks,
+ * and after rmdir the inode is gone.) */
+static int force_change_retry_unlinkat(int dirfd, const char *base, int rm_flags)
+{
+	STRUCT_STAT st;
+	uint32 fileflags;
+	int fd = force_change_open_target(dirfd, base, &st, &fileflags);
+	if (fd < 0) {
+		errno = EPERM;
+		return -1;
+	}
+	if (make_mutable_fd(fd, st.st_mode, fileflags, force_change) > 0) {
+		if (unlinkat(dirfd, base, rm_flags) == 0) {
+			if (!(rm_flags & AT_REMOVEDIR) && st.st_nlink > 1)
+				undo_make_mutable_fd(fd, fileflags);
+			close(fd);
+			return 0;
+		}
+		undo_make_mutable_fd(fd, fileflags);
+	}
+	close(fd);
+	errno = EPERM;
+	return -1;
+}
+#endif /* SUPPORT_FORCE_CHANGE */
+
 int do_unlink(const char *path)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
-	return unlink(path);
+	if (unlink(path) == 0)
+		return 0;
+#ifdef SUPPORT_FORCE_CHANGE
+	if (force_change && errno == EPERM) {
+		const char *base;
+		int dirfd, fd;
+		STRUCT_STAT st;
+		uint32 fileflags;
+
+		/* Dirfd-anchored recovery: open the parent + the target with
+		 * O_NOFOLLOW, fchflags-clear via the fd, then unlinkat via
+		 * the dirfd.  This prevents an attacker from swapping the
+		 * path under us between the lstat and the unlink (which the
+		 * earlier path-based code allowed, giving an arbitrary
+		 * make-mutable / unlink primitive when rsync is running as
+		 * root). */
+		dirfd = force_change_open_parent(path, &base);
+		if (dirfd < 0)
+			goto unlink_fail;
+		fd = force_change_open_target(dirfd, base, &st, &fileflags);
+		if (fd < 0) {
+			close(dirfd);
+			goto unlink_fail;
+		}
+		if (make_mutable_fd(fd, st.st_mode, fileflags, force_change) > 0) {
+			if (unlinkat(dirfd, base, 0) == 0) {
+				/* Hardlink-aware: if this name was one of
+				 * several hardlinks to the inode, the inode
+				 * survives and the other names still hold the
+				 * cleared flags.  Restore via the still-open
+				 * fd before close so the surviving links
+				 * aren't left less-protected. */
+				if (st.st_nlink > 1)
+					undo_make_mutable_fd(fd, fileflags);
+				close(fd);
+				close(dirfd);
+				return 0;
+			}
+			undo_make_mutable_fd(fd, fileflags);
+		}
+		close(fd);
+		close(dirfd);
+		/* TODO: handle immutable directories */
+	  unlink_fail:
+		errno = EPERM;
+	}
+#endif
+	return -1;
 }
 
 /*
@@ -117,15 +328,17 @@ int do_unlink_at(const char *path)
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
 
+	/* In the non-secure fallback cases, go through do_unlink() (not bare
+	 * unlink()) so the force_change EPERM-recovery in do_unlink fires. */
 	if (!am_daemon || am_chrooted)
-		return unlink(path);
+		return do_unlink(path);
 
 	if (!path || !*path || *path == '/')
-		return unlink(path);
+		return do_unlink(path);
 
 	slash = strrchr(path, '/');
 	if (!slash)
-		return unlink(path);
+		return do_unlink(path);
 
 	dlen = slash - path;
 	if (dlen >= sizeof dirpath) {
@@ -142,6 +355,17 @@ int do_unlink_at(const char *path)
 
 	ret = unlinkat(dfd, bname, 0);
 	e = errno;
+#ifdef SUPPORT_FORCE_CHANGE
+	/* Secure-path force_change recovery: reuse the dirfd, fchflags-clear
+	 * the target via the fd, retry unlinkat against the same dirfd.
+	 * Keeps the operation bounded to the secure-relative-open context. */
+	if (ret < 0 && e == EPERM && force_change) {
+		if (force_change_retry_unlinkat(dfd, bname, 0) == 0) {
+			close(dfd);
+			return 0;
+		}
+	}
+#endif
 	close(dfd);
 	errno = e;
 	return ret;
@@ -406,7 +630,44 @@ int do_lchown(const char *path, uid_t owner, gid_t group)
 #ifndef HAVE_LCHOWN
 #define lchown chown
 #endif
-	return lchown(path, owner, group);
+	if (lchown(path, owner, group) == 0)
+		return 0;
+#ifdef SUPPORT_FORCE_CHANGE
+	if (force_change && errno == EPERM) {
+		const char *base;
+		int dirfd, fd;
+		STRUCT_STAT st;
+		uint32 fileflags;
+		int ret;
+
+		dirfd = force_change_open_parent(path, &base);
+		if (dirfd < 0)
+			goto lchown_fail;
+		fd = force_change_open_target(dirfd, base, &st, &fileflags);
+		if (fd < 0) {
+			close(dirfd);
+			goto lchown_fail;
+		}
+		if (make_mutable_fd(fd, st.st_mode, fileflags, force_change) > 0) {
+			/* lchown semantics on the fd: fchownat with
+			 * AT_SYMLINK_NOFOLLOW operates on the symlink itself,
+			 * but we opened with O_NOFOLLOW so it's not a symlink
+			 * by construction.  Use fchown for clarity. */
+			ret = fchown(fd, owner, group);
+			undo_make_mutable_fd(fd, fileflags);
+			if (ret == 0) {
+				close(fd);
+				close(dirfd);
+				return 0;
+			}
+		}
+		close(fd);
+		close(dirfd);
+	  lchown_fail:
+		errno = EPERM;
+	}
+#endif
+	return -1;
 }
 
 /*
@@ -461,6 +722,26 @@ int do_lchown_at(const char *fname, uid_t owner, gid_t group)
 
 	ret = fchownat(dfd, bname, owner, group, AT_SYMLINK_NOFOLLOW);
 	e = errno;
+#ifdef SUPPORT_FORCE_CHANGE
+	if (ret < 0 && e == EPERM && force_change) {
+		STRUCT_STAT st;
+		uint32 fileflags;
+		int fd = force_change_open_target(dfd, bname, &st, &fileflags);
+		if (fd >= 0) {
+			if (make_mutable_fd(fd, st.st_mode, fileflags, force_change) > 0) {
+				/* fd was opened O_NOFOLLOW so it's not a symlink. */
+				int chown_rc = fchown(fd, owner, group);
+				undo_make_mutable_fd(fd, fileflags);
+				if (chown_rc == 0) {
+					close(fd);
+					close(dfd);
+					return 0;
+				}
+			}
+			close(fd);
+		}
+	}
+#endif
 	close(dfd);
 	errno = e;
 	return ret;
@@ -616,7 +897,38 @@ int do_rmdir(const char *pathname)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
-	return rmdir(pathname);
+	if (rmdir(pathname) == 0)
+		return 0;
+#ifdef SUPPORT_FORCE_CHANGE
+	if (force_change && errno == EPERM) {
+		const char *base;
+		int dirfd, fd;
+		STRUCT_STAT st;
+		uint32 fileflags;
+
+		dirfd = force_change_open_parent(pathname, &base);
+		if (dirfd < 0)
+			goto rmdir_fail;
+		fd = force_change_open_target(dirfd, base, &st, &fileflags);
+		if (fd < 0) {
+			close(dirfd);
+			goto rmdir_fail;
+		}
+		if (make_mutable_fd(fd, st.st_mode, fileflags, force_change) > 0) {
+			if (unlinkat(dirfd, base, AT_REMOVEDIR) == 0) {
+				close(fd);
+				close(dirfd);
+				return 0;
+			}
+			undo_make_mutable_fd(fd, fileflags);
+		}
+		close(fd);
+		close(dirfd);
+	  rmdir_fail:
+		errno = EPERM;
+	}
+#endif
+	return -1;
 }
 
 /*
@@ -637,15 +949,17 @@ int do_rmdir_at(const char *pathname)
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
 
+	/* Route fallback paths through do_rmdir() so its force_change
+	 * recovery still applies. */
 	if (!am_daemon || am_chrooted)
-		return rmdir(pathname);
+		return do_rmdir(pathname);
 
 	if (!pathname || !*pathname || *pathname == '/')
-		return rmdir(pathname);
+		return do_rmdir(pathname);
 
 	slash = strrchr(pathname, '/');
 	if (!slash)
-		return rmdir(pathname);
+		return do_rmdir(pathname);
 
 	dlen = slash - pathname;
 	if (dlen >= sizeof dirpath) {
@@ -662,6 +976,14 @@ int do_rmdir_at(const char *pathname)
 
 	ret = unlinkat(dfd, bname, AT_REMOVEDIR);
 	e = errno;
+#ifdef SUPPORT_FORCE_CHANGE
+	if (ret < 0 && e == EPERM && force_change) {
+		if (force_change_retry_unlinkat(dfd, bname, AT_REMOVEDIR) == 0) {
+			close(dfd);
+			return 0;
+		}
+	}
+#endif
 	close(dfd);
 	errno = e;
 	return ret;
@@ -795,6 +1117,44 @@ int do_chmod(const char *path, mode_t mode)
 			code = chmod(path, mode & CHMOD_BITS); /* DISCOURAGED FUNCTION */
 		break;
 	}
+#ifdef SUPPORT_FORCE_CHANGE
+	if (code < 0 && force_change && errno == EPERM && !S_ISLNK(mode)) {
+		const char *base;
+		int dirfd, fd;
+		STRUCT_STAT st;
+		uint32 fileflags;
+
+		dirfd = force_change_open_parent(path, &base);
+		if (dirfd < 0) {
+			errno = EPERM;
+			goto chmod_done;
+		}
+		fd = force_change_open_target(dirfd, base, &st, &fileflags);
+		if (fd < 0) {
+			close(dirfd);
+			errno = EPERM;
+			goto chmod_done;
+		}
+		/* Use st.st_mode (from the fstat we just did) for the
+		 * file-type-classification arg to make_mutable_fd, not the
+		 * caller-supplied chmod mode.  Some callers (e.g. xattrs.c)
+		 * pass only permission bits, no S_IFx, so rsync_fchflags()
+		 * would reject it as neither regular file nor directory. */
+		if (make_mutable_fd(fd, st.st_mode, fileflags, force_change) > 0) {
+			code = fchmod(fd, mode & CHMOD_BITS);
+			undo_make_mutable_fd(fd, fileflags);
+			if (code == 0) {
+				close(fd);
+				close(dirfd);
+				return 0;
+			}
+		}
+		close(fd);
+		close(dirfd);
+		errno = EPERM;
+	}
+  chmod_done:
+#endif
 	if (code != 0 && (preserve_perms || preserve_executability))
 		return code;
 	return 0;
@@ -872,6 +1232,28 @@ int do_chmod_at(const char *fname, mode_t mode)
 
 	ret = fchmodat(dfd, bname, mode, 0);
 	e = errno;
+#ifdef SUPPORT_FORCE_CHANGE
+	if (ret < 0 && e == EPERM && force_change && !S_ISLNK(mode)) {
+		STRUCT_STAT st;
+		uint32 fileflags;
+		int fd = force_change_open_target(dfd, bname, &st, &fileflags);
+		if (fd >= 0) {
+			/* st.st_mode (not the caller-supplied chmod mode):
+			 * callers like xattrs.c pass perm bits only, no S_IFx,
+			 * which would fail rsync_fchflags's type check. */
+			if (make_mutable_fd(fd, st.st_mode, fileflags, force_change) > 0) {
+				int chmod_rc = fchmod(fd, mode & CHMOD_BITS);
+				undo_make_mutable_fd(fd, fileflags);
+				if (chmod_rc == 0) {
+					close(fd);
+					close(dfd);
+					return 0;
+				}
+			}
+			close(fd);
+		}
+	}
+#endif
 	close(dfd);
 	errno = e;
 	return ret;
@@ -881,11 +1263,86 @@ int do_chmod_at(const char *fname, mode_t mode)
 }
 #endif
 
+/* (do_chflags removed -- callers now go through rsync.c's
+ * set_fileflags(), which opens with O_NOFOLLOW + fstat and routes
+ * via the portable rsync_fchflags() in lib/fileflags.c.  The same
+ * symlink-follow defence is in place there; this just centralizes
+ * the path-to-fd transition for both BSD and Linux.) */
+
 int do_rename(const char *old_path, const char *new_path)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
-	return rename(old_path, new_path);
+	if (rename(old_path, new_path) == 0)
+		return 0;
+#ifdef SUPPORT_FORCE_CHANGE
+	if (force_change && errno == EPERM) {
+		const char *old_base = NULL, *new_base = NULL;
+		int old_dirfd = -1, new_dirfd = -1;
+		int old_fd = -1, new_fd = -1;
+		STRUCT_STAT old_st, new_st;
+		uint32 old_fileflags = 0, new_fileflags = 0;
+		int old_mutated = 0, new_mutated = 0;
+
+		/* Open old_path's parent + target. */
+		old_dirfd = force_change_open_parent(old_path, &old_base);
+		if (old_dirfd < 0)
+			goto rename_fail;
+		old_fd = force_change_open_target(old_dirfd, old_base, &old_st, &old_fileflags);
+		if (old_fd < 0)
+			goto rename_fail;
+		old_mutated = make_mutable_fd(old_fd, old_st.st_mode,
+					      old_fileflags, force_change) > 0;
+		if (old_mutated && renameat(old_dirfd, old_base,
+					    AT_FDCWD, new_path) == 0)
+			goto rename_success;
+
+		/* Old side wasn't the blocker (or rename still failed):
+		 * try to make new_path mutable too. */
+		new_dirfd = force_change_open_parent(new_path, &new_base);
+		if (new_dirfd < 0)
+			goto rename_fail;
+		new_fd = force_change_open_target(new_dirfd, new_base, &new_st, &new_fileflags);
+		if (new_fd < 0)
+			goto rename_fail;
+		new_mutated = make_mutable_fd(new_fd, new_st.st_mode,
+					      new_fileflags, force_change) > 0;
+		if (new_mutated
+		 && renameat(old_dirfd, old_base, new_dirfd, new_base) == 0) {
+		  rename_success:
+			/* After a successful rename, the inode that used to be
+			 * at old_path now lives at new_path.  Restore its
+			 * original flags on the new location via the still-open
+			 * fd (the fd survives the rename). */
+			if (old_mutated)
+				undo_make_mutable_fd(old_fd, old_fileflags);
+			/* If the replaced new-side inode had st_nlink > 1 the
+			 * renameat only removed one of its names; the inode
+			 * itself survives via the other hardlinks and would be
+			 * left with the cleared flags unless we restore via
+			 * new_fd (which still refers to that surviving inode). */
+			if (new_mutated && new_st.st_nlink > 1)
+				undo_make_mutable_fd(new_fd, new_fileflags);
+			close(old_fd);
+			close(old_dirfd);
+			if (new_fd != -1) close(new_fd);
+			if (new_dirfd != -1) close(new_dirfd);
+			return 0;
+		}
+		if (new_mutated)
+			undo_make_mutable_fd(new_fd, new_fileflags);
+		if (old_mutated)
+			undo_make_mutable_fd(old_fd, old_fileflags);
+	rename_fail:
+		if (old_fd != -1) close(old_fd);
+		if (old_dirfd != -1) close(old_dirfd);
+		if (new_fd != -1) close(new_fd);
+		if (new_dirfd != -1) close(new_dirfd);
+		/* TODO: handle immutable directories */
+		errno = EPERM;
+	}
+#endif
+	return -1;
 }
 
 /*
@@ -961,6 +1418,81 @@ int do_rename_at(const char *old_path, const char *new_path)
 
 	ret = renameat(old_dfd, old_bname, new_dfd, new_bname);
 	e = errno;
+#ifdef SUPPORT_FORCE_CHANGE
+	/* Secure-path force_change recovery -- done entirely on the held
+	 * dirfds so the symlink-race guarantees of the outer
+	 * secure_relative_open()s are preserved.  Falling back to do_rename()
+	 * here would be wrong: do_rename() starts with a bare rename(old,new)
+	 * before its own recovery (syscall.c:1241), which re-resolves the
+	 * path components through whatever the filesystem says NOW -- a daemon
+	 * (use chroot = no) attacker can swap a parent dir to a symlink after
+	 * our dirfds close and redirect the retry outside the module.
+	 *
+	 * The logic mirrors do_rename's recovery but every operation goes
+	 * through the dirfds: openat(O_NOFOLLOW), fchflags, renameat,
+	 * unlinkat (implicit via renameat's replace), restore via the fd that
+	 * survives the rename. */
+	if (ret < 0 && e == EPERM && force_change) {
+		STRUCT_STAT old_st, new_st;
+		uint32 old_fileflags = 0, new_fileflags = 0;
+		int old_fd = -1, new_fd = -1;
+		int old_mutated = 0, new_mutated = 0;
+
+		/* Try to make the old-side target mutable -- some uchg/uappnd
+		 * flags block rename of the source inode. */
+		old_fd = force_change_open_target(old_dfd, old_bname, &old_st, &old_fileflags);
+		if (old_fd >= 0) {
+			old_mutated = make_mutable_fd(old_fd, old_st.st_mode,
+						      old_fileflags, force_change) > 0;
+			if (old_mutated && renameat(old_dfd, old_bname,
+						    new_dfd, new_bname) == 0) {
+				ret = 0;
+				goto rename_success;
+			}
+		}
+
+		/* Try to make the new-side target mutable -- a uchg/uappnd on
+		 * the file being replaced blocks rename's overwrite. */
+		new_fd = force_change_open_target(new_dfd, new_bname, &new_st, &new_fileflags);
+		if (new_fd >= 0) {
+			new_mutated = make_mutable_fd(new_fd, new_st.st_mode,
+						      new_fileflags, force_change) > 0;
+			if (new_mutated && renameat(old_dfd, old_bname,
+						    new_dfd, new_bname) == 0) {
+				ret = 0;
+				goto rename_success;
+			}
+		}
+
+		/* Rename still failed -- restore both sides. */
+		if (new_mutated)
+			undo_make_mutable_fd(new_fd, new_fileflags);
+		if (old_mutated)
+			undo_make_mutable_fd(old_fd, old_fileflags);
+		goto rename_cleanup;
+
+	  rename_success:
+		/* After a successful rename, the inode that was at old now
+		 * lives at new_bname under new_dfd.  Restore its original
+		 * flags via old_fd (the fd survives the rename and still
+		 * refers to that inode). */
+		if (old_mutated)
+			undo_make_mutable_fd(old_fd, old_fileflags);
+		/* The new-side inode that the rename replaced was unlinked
+		 * by renameat(); usually that means it's gone.  But if it had
+		 * st_nlink > 1, the inode survives via its other hardlinks --
+		 * and those hardlinks would be left with the cleared flags
+		 * unless we restore via new_fd (which still refers to the
+		 * old-new-inode since the fd was opened before the rename). */
+		if (new_mutated && new_st.st_nlink > 1)
+			undo_make_mutable_fd(new_fd, new_fileflags);
+		e = 0;
+
+	  rename_cleanup:
+		if (old_fd != -1) close(old_fd);
+		if (new_fd != -1) close(new_fd);
+	}
+#endif
 	if (new_dfd != old_dfd)
 		close(new_dfd);
 	close(old_dfd);

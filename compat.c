@@ -40,6 +40,7 @@ extern int checksum_seed;
 extern int basis_dir_cnt;
 extern int prune_empty_dirs;
 extern int protocol_version;
+extern int force_change;
 extern int protect_args;
 extern int preserve_uid;
 extern int preserve_gid;
@@ -47,6 +48,7 @@ extern int preserve_atimes;
 extern int preserve_crtimes;
 extern int preserve_acls;
 extern int preserve_xattrs;
+extern int preserve_fileflags;
 extern int xfer_flags_as_varint;
 extern int need_messages_from_generator;
 extern int delete_mode, delete_before, delete_during, delete_after;
@@ -87,7 +89,7 @@ struct name_num_item *xattr_sum_nni;
 int xattr_sum_len = 0;
 
 /* These index values are for the file-list's extra-attribute array. */
-int pathname_ndx, depth_ndx, atimes_ndx, crtimes_ndx, uid_ndx, gid_ndx, acls_ndx, xattrs_ndx, unsort_ndx;
+int pathname_ndx, depth_ndx, atimes_ndx, crtimes_ndx, uid_ndx, gid_ndx, fileflags_ndx, acls_ndx, xattrs_ndx, unsort_ndx;
 
 int receiver_symlink_times = 0; /* receiver can set the time on a symlink */
 int sender_symlink_iconv = 0;	/* sender should convert symlink content */
@@ -589,6 +591,8 @@ void setup_protocol(int f_out,int f_in)
 		uid_ndx = ++file_extra_cnt;
 	if (preserve_gid)
 		gid_ndx = ++file_extra_cnt;
+	if (preserve_fileflags || (force_change && !am_sender))
+		fileflags_ndx = ++file_extra_cnt;
 	if (preserve_acls && !am_sender)
 		acls_ndx = ++file_extra_cnt;
 	if (preserve_xattrs)
@@ -752,6 +756,10 @@ void setup_protocol(int f_out,int f_in)
 			fprintf(stderr, "Both rsync versions must be at least 3.2.0 for --crtimes.\n");
 			exit_cleanup(RERR_PROTOCOL);
 		}
+		/* --fileflags rejection moved to after the if/else if cascade
+		 * so it also runs for protocol < 30 (where xfer_flags_as_varint
+		 * stays 0 and the receiver wouldn't understand the extra
+		 * fileflags word that flist.c would write). */
 		if (am_sender) {
 			receiver_symlink_times = am_server
 			    ? strchr(client_info, 'L') != NULL
@@ -781,6 +789,18 @@ void setup_protocol(int f_out,int f_in)
 	} else if (!am_sender) {
 		receiver_symlink_times = 1;
 #endif
+	}
+
+	/* --fileflags writes an extra word per file in the file-list stream
+	 * and uses the XMIT_SAME_FLAGS bit (1<<16), both of which require the
+	 * varint flag-encoding negotiated by CF_VARINT_FLIST_FLAGS in
+	 * compat_flags.  That negotiation only happens in the protocol >= 30
+	 * branch above, so for protocol < 30 xfer_flags_as_varint stays 0.
+	 * Without this check, --fileflags --protocol=29 would silently emit
+	 * bytes the receiver doesn't expect and desync the file-list stream. */
+	if (!xfer_flags_as_varint && preserve_fileflags) {
+		fprintf(stderr, "Both rsync versions must be at least 3.2.0 for --fileflags.\n");
+		exit_cleanup(RERR_PROTOCOL);
 	}
 
 	if (read_batch)

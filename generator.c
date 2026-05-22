@@ -43,10 +43,13 @@ extern int preserve_devices;
 extern int preserve_specials;
 extern int preserve_hard_links;
 extern int preserve_executability;
+extern int preserve_fileflags;
+extern int preserve_unsafe_fileflags;
 extern int preserve_perms;
 extern int preserve_mtimes;
 extern int omit_dir_times;
 extern int omit_link_times;
+extern int force_change;
 extern int delete_mode;
 extern int delete_before;
 extern int delete_during;
@@ -492,6 +495,13 @@ int unchanged_attrs(const char *fname, struct file_struct *file, stat_x *sxp)
 			return 0;
 		if (perms_differ(file, sxp))
 			return 0;
+#ifdef SUPPORT_FILEFLAGS
+		if (preserve_fileflags) {
+			uint32 current = stat_x_get_fileflags(sxp, fname);
+			if (current != filter_recv_fileflags(F_FFLAGS(file), current))
+				return 0;
+		}
+#endif
 		if (ownership_differs(file, sxp))
 			return 0;
 #ifdef SUPPORT_ACLS
@@ -553,6 +563,13 @@ void itemize(const char *fnamecmp, struct file_struct *file, int ndx, int statre
 			iflags |= ITEM_REPORT_OWNER;
 		if (gid_ndx && !(file->flags & FLAG_SKIP_GROUP) && sxp->st.st_gid != (gid_t)F_GROUP(file))
 			iflags |= ITEM_REPORT_GROUP;
+#ifdef SUPPORT_FILEFLAGS
+		if (preserve_fileflags && !S_ISLNK(file->mode)) {
+			uint32 current = stat_x_get_fileflags(sxp, fnamecmp);
+			if (current != filter_recv_fileflags(F_FFLAGS(file), current))
+				iflags |= ITEM_REPORT_FFLAGS;
+		}
+#endif
 #ifdef SUPPORT_ACLS
 		if (preserve_acls && !S_ISLNK(file->mode)) {
 			if (!ACL_READY(*sxp))
@@ -1460,6 +1477,19 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		if (!preserve_perms) { /* See comment in non-dir code below. */
 			file->mode = dest_mode(file->mode, sx.st.st_mode, dflt_perms, statret == 0);
 		}
+#ifdef SUPPORT_FORCE_CHANGE
+		if (force_change && !preserve_fileflags) {
+			/* Only consult the dest's current flags when the
+			 * lstat actually succeeded.  For missing entries
+			 * sx.st has not been populated; on BSD,
+			 * rsync_lgetflags() would return hint->st_flags
+			 * which is uninitialized stack memory. */
+			if (statret == 0)
+				F_FFLAGS(file) = stat_x_get_fileflags(&sx, fname);
+			else
+				F_FFLAGS(file) = 0;
+		}
+#endif
 		if (statret != 0 && basis_dir[0] != NULL) {
 			int j = try_dests_non(file, fname, ndx, fnamecmpbuf, &sx, itemizing, code);
 			if (j == -2) {
@@ -1494,7 +1524,13 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		if (preserve_xattrs && statret == 1)
 			copy_xattrs(fnamecmpbuf, fname);
 #endif
-		if (set_file_attrs(fname, file, real_ret ? NULL : &real_sx, NULL, 0)
+		/* ATTRS_DELAY_IMMUTABLE: hold back any UF_IMMUTABLE / UF_APPEND
+		 * etc that the sender wants on this dir, otherwise applying
+		 * them now would block populating the children we're about
+		 * to recv_generator into the dir.  The immutable bits get
+		 * re-applied by touch_up_dirs after children are in place. */
+		if (set_file_attrs(fname, file, real_ret ? NULL : &real_sx, NULL,
+				   ATTRS_DELAY_IMMUTABLE)
 		 && INFO_GTE(NAME, 1) && code != FNONE && f_out != -1)
 			rprintf(code, "%s/\n", fname);
 
@@ -1502,6 +1538,16 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		 * readable and writable permissions during the time we are
 		 * putting files within them.  This is then restored to the
 		 * former permissions after the transfer is done. */
+#ifdef SUPPORT_FORCE_CHANGE
+		/* make_mutable returns >0 on success, 0 if there was nothing
+		 * to clear, -1 on failure.  Only flag need_retouch when we
+		 * actually cleared bits -- otherwise the matching
+		 * undo_make_mutable in touch_up_dirs would try to restore
+		 * flags that were never modified. */
+		if (force_change && (F_FFLAGS(file) & force_change)
+		 && make_mutable(fname, file->mode, F_FFLAGS(file), force_change) > 0)
+			need_retouch_dir_perms = 1;
+#endif
 #ifdef HAVE_CHMOD
 		if (!am_root && (file->mode & S_IRWXU) != S_IRWXU && dir_tweaking) {
 			mode_t mode = file->mode | S_IRWXU;
@@ -1540,6 +1586,18 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		int exists = statret == 0 && stype != FT_DIR;
 		file->mode = dest_mode(file->mode, sx.st.st_mode, dflt_perms, exists);
 	}
+#ifdef SUPPORT_FORCE_CHANGE
+	if (force_change && !preserve_fileflags) {
+		/* Same guard as the dir-path branch above: sx.st is only
+		 * populated when statret == 0; for missing entries it's
+		 * uninitialized stack memory, and on BSD rsync_lgetflags()
+		 * would return that garbage via hint->st_flags. */
+		if (statret == 0)
+			F_FFLAGS(file) = stat_x_get_fileflags(&sx, fname);
+		else
+			F_FFLAGS(file) = 0;
+	}
+#endif
 
 #ifdef SUPPORT_HARD_LINKS
 	if (preserve_hard_links && F_HLINK_NOT_FIRST(file)
@@ -2113,8 +2171,31 @@ static void touch_up_dirs(struct file_list *flist, int ndx)
 		}
 		/* Be sure not to retouch permissions with --fake-super. */
 		fix_dir_perms = !am_root && !(file->mode & S_IWUSR);
-		if (file->flags & FLAG_MISSING_DIR || !(need_retouch_dir_times || fix_dir_perms))
+		if (file->flags & FLAG_MISSING_DIR)
 			continue;
+		/* The body below may need to run for any of:
+		 *   - retouch dir times (--times etc)
+		 *   - fix dir perms (set above)
+		 *   - restore force_change bits we cleared in recv_generator
+		 *   - apply deferred --fileflags immutable bits we held back
+		 *     in recv_generator so children could populate
+		 * Skip the dir only if there's truly nothing to do.  Without
+		 * the SUPPORT_* clauses here, --omit-dir-times + --force-change
+		 * (or --omit-dir-times + --fileflags on an immutable source dir)
+		 * would silently leave the dir mutable / never apply the bits. */
+		{
+			BOOL has_work = need_retouch_dir_times || fix_dir_perms;
+#ifdef SUPPORT_FORCE_CHANGE
+			if (force_change && (F_FFLAGS(file) & force_change))
+				has_work = True;
+#endif
+#ifdef SUPPORT_FILEFLAGS
+			if (preserve_fileflags && (F_FFLAGS(file) & ALL_IMMUTABLE))
+				has_work = True;
+#endif
+			if (!has_work)
+				continue;
+		}
 		fname = f_name(file, NULL);
 		if (fix_dir_perms)
 			do_chmod_at(fname, file->mode);
@@ -2125,9 +2206,44 @@ static void touch_up_dirs(struct file_list *flist, int ndx)
 #ifdef ST_MTIME_NSEC
 				st.ST_MTIME_NSEC = F_MOD_NSEC_or_0(file);
 #endif
+#ifdef SUPPORT_FORCE_CHANGE
+				st.st_mode = file->mode;
+#ifdef HAVE_CHFLAGS
+				/* Tell set_times' try_a_force_change there's nothing
+				 * to bypass yet; the real flags come from rsync_lgetflags.
+				 * On Linux STRUCT_STAT has no st_flags so this is a no-op. */
+				st.st_flags = 0;
+#endif
+#endif
 				set_times(fname, &st);
 			}
 		}
+#ifdef SUPPORT_FORCE_CHANGE
+		if (force_change && F_FFLAGS(file) & force_change)
+			undo_make_mutable(fname, F_FFLAGS(file));
+#endif
+#ifdef SUPPORT_FILEFLAGS
+		/* Apply the immutable bits we held back at recv_generator time.
+		 * undo_make_mutable above already restored the dir's pre-clear
+		 * state for the force_change-affected bits; this handles the
+		 * non-force_change case where the sender simply wants the dest
+		 * dir to end up with immutable bits set (e.g. --fileflags on a
+		 * source dir that was chflags +uchg, no --force-change).  For
+		 * dirs whose effective wanted-state already matches dest, this
+		 * is a no-op via the current==wanted check inside set_fileflags's
+		 * caller. */
+		if (preserve_fileflags && (F_FFLAGS(file) & ALL_IMMUTABLE)) {
+			stat_x sx_dir;
+			init_stat_x(&sx_dir);
+			if (link_stat(fname, &sx_dir.st, 0) == 0) {
+				uint32 current = stat_x_get_fileflags(&sx_dir, fname);
+				uint32 wanted = filter_recv_fileflags(F_FFLAGS(file), current);
+				if (current != wanted)
+					set_fileflags(fname, wanted);
+			}
+			free_stat_x(&sx_dir);
+		}
+#endif
 		if (counter >= loopchk_limit) {
 			if (allowed_lull)
 				maybe_send_keepalive(time(NULL), MSK_ALLOW_FLUSH);

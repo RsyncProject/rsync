@@ -43,7 +43,9 @@ jobs:
     - name: check30
       run: sudo RSYNC_EXPECT_SKIPPED=crtimes,daemon-chroot-acl,proxy-response-line-too-long make check30
     - name: check29
-      run: sudo RSYNC_EXPECT_SKIPPED=crtimes,daemon-chroot-acl,proxy-response-line-too-long make check29
+      # Under protocol 29 both fileflags tests self-skip (--fileflags needs
+      # the varint flag encoding negotiated only at protocol >= 30).
+      run: sudo RSYNC_EXPECT_SKIPPED=crtimes,daemon-chroot-acl,daemon-refuse-fileflags,fileflags,proxy-response-line-too-long make check29
     - name: check (TCP daemon transport)
       # Second run with daemon tests over a real loopback rsyncd; the default
       # 'make check' above uses the secure stdio-pipe transport.

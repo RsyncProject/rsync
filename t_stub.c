@@ -31,6 +31,9 @@ int protect_args = 0;
 int module_id = -1;
 int relative_paths = 0;
 unsigned int module_dirlen = 0;
+int force_change = 0;
+int preserve_acls = 0;
+int preserve_unsafe_fileflags = 0;
 int preserve_xattrs = 0;
 int preserve_perms = 0;
 int preserve_executability = 0;
@@ -44,6 +47,11 @@ size_t max_alloc = (size_t)-1; /* test helpers are not memory-constrained;
 				* hits at its first my_strdup() call. */
 char *partial_dir;
 char *module_dir;
+/* curr_dir is the rsync-managed cwd, normally defined in util1.c.
+ * Some test helpers (tls, trimslash) don't link util1.o; define it
+ * here as weak so the real def in util1.o still wins for helpers
+ * that DO link it (t_unsafe). */
+__attribute__((weak)) char curr_dir[MAXPATHLEN];
 filter_rule_list daemon_filter_list;
 
  void rprintf(UNUSED(enum logcode code), const char *format, ...)
@@ -118,3 +126,33 @@ filter_rule_list daemon_filter_list;
 {
 	return cst ? 0 : 0;
 }
+
+#if defined SUPPORT_FILEFLAGS || defined SUPPORT_FORCE_CHANGE
+ int make_mutable(UNUSED(const char *fname), UNUSED(mode_t mode), UNUSED(uint32 fileflags), UNUSED(uint32 iflags))
+{
+	return 0;
+}
+
+/* Undo a prior make_mutable() call that returned a 1. */
+ int undo_make_mutable(UNUSED(const char *fname), UNUSED(uint32 fileflags))
+{
+	return 0;
+}
+
+ int make_mutable_fd(UNUSED(int fd), UNUSED(mode_t mode), UNUSED(uint32 fileflags), UNUSED(uint32 iflags))
+{
+	return 0;
+}
+
+ int undo_make_mutable_fd(UNUSED(int fd), UNUSED(uint32 fileflags))
+{
+	return 0;
+}
+#endif
+
+#ifdef SUPPORT_XATTRS
+ int x_lstat(UNUSED(const char *fname), UNUSED(STRUCT_STAT *fst), UNUSED(STRUCT_STAT *xst))
+{
+	return -1;
+}
+#endif

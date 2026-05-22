@@ -25,6 +25,7 @@
 extern int am_root;
 extern int make_backups;
 extern int max_delete;
+extern int force_change;
 extern char *backup_dir;
 extern char *backup_suffix;
 extern int backup_suffix_len;
@@ -97,6 +98,31 @@ static enum delret delete_dir_contents(char *fname, uint16 flags)
 		}
 
 		strlcpy(p, fp->basename, remainder);
+#ifdef SUPPORT_FORCE_CHANGE
+		/* For SUB-DIRECTORIES only: clear the immutable bits so the
+		 * recursive delete_dir_contents below can unlink entries
+		 * inside (the dir's +i blocks all add/remove operations on
+		 * its children).  Track so we can undo on failure.
+		 *
+		 * Non-dirs are deliberately NOT pre-cleared here: the
+		 * underlying do_unlink_at / do_rmdir_at force_change recovery
+		 * uses fd-based fchflags, and that fd survives a rename or
+		 * hardlink performed by make_backup() -- so the recovery
+		 * correctly preserves the immutable flag on the inode after
+		 * it lands at its backup location.  A path-based pre-clear
+		 * here would lose the flag because our undo only knows the
+		 * original path, which is gone after make_backup moves the
+		 * inode into the backup tree. */
+		int entry_unmuted = 0;
+		uint32 entry_saved_flags = 0;
+		if (S_ISDIR(fp->mode) && force_change
+		 && (F_FFLAGS(fp) & force_change)) {
+			if (make_mutable(fname, fp->mode, F_FFLAGS(fp), force_change) > 0) {
+				entry_unmuted = 1;
+				entry_saved_flags = F_FFLAGS(fp);
+			}
+		}
+#endif
 		if (!(fp->mode & S_IWUSR) && !am_root && fp->flags & FLAG_OWNED_BY_US)
 			do_chmod_at(fname, fp->mode | S_IWUSR);
 		/* Save stack by recursing to ourself directly. */
@@ -104,8 +130,17 @@ static enum delret delete_dir_contents(char *fname, uint16 flags)
 			if (delete_dir_contents(fname, flags | DEL_RECURSE) != DR_SUCCESS)
 				ret = DR_NOT_EMPTY;
 		}
-		if (delete_item(fname, fp->mode, flags) != DR_SUCCESS)
+		enum delret item_ret = delete_item(fname, fp->mode, flags);
+		if (item_ret != DR_SUCCESS)
 			ret = DR_NOT_EMPTY;
+#ifdef SUPPORT_FORCE_CHANGE
+		/* Restore the entry's flags if the delete didn't actually take
+		 * place.  DR_SUCCESS means the inode is gone, no need to
+		 * restore; everything else (DR_NOT_EMPTY, DR_AT_LIMIT,
+		 * DR_FAILURE) leaves the file in place. */
+		if (entry_unmuted && item_ret != DR_SUCCESS)
+			undo_make_mutable(fname, entry_saved_flags);
+#endif
 	}
 
 	fname[dlen] = '\0';
@@ -132,6 +167,15 @@ enum delret delete_item(char *fbuf, uint16 mode, uint16 flags)
 	enum delret ret;
 	char *what;
 	int ok;
+#ifdef SUPPORT_FORCE_CHANGE
+	/* Track whether we cleared the dir's immutable bits so we can
+	 * restore them if the directory ends up NOT being removed (delete
+	 * skipped, contents non-empty, rmdir failed).  Without this the
+	 * receiver would be left with a less-protected directory than it
+	 * started with. */
+	int dir_unmuted = 0;
+	uint32 dir_saved_flags = 0;
+#endif
 
 	if (DEBUG_GTE(DEL, 2)) {
 		rprintf(FINFO, "delete_item(%s) mode=%o flags=%d\n",
@@ -144,6 +188,18 @@ enum delret delete_item(char *fbuf, uint16 mode, uint16 flags)
 	if (S_ISDIR(mode) && !(flags & DEL_DIR_IS_EMPTY)) {
 		/* This only happens on the first call to delete_item() since
 		 * delete_dir_contents() always calls us w/DEL_DIR_IS_EMPTY. */
+#ifdef SUPPORT_FORCE_CHANGE
+		if (force_change) {
+			STRUCT_STAT st;
+			if (x_lstat(fbuf, &st, NULL) == 0) {
+				uint32 ff = rsync_lgetflags(fbuf, st.st_mode, &st);
+				if (ff != NO_FFLAGS && make_mutable(fbuf, st.st_mode, ff, force_change) > 0) {
+					dir_unmuted = 1;
+					dir_saved_flags = ff;
+				}
+			}
+		}
+#endif
 		ignore_perishable = 1;
 		/* If DEL_RECURSE is not set, this just reports emptiness. */
 		ret = delete_dir_contents(fbuf, flags);
@@ -155,7 +211,8 @@ enum delret delete_item(char *fbuf, uint16 mode, uint16 flags)
 
 	if (!(flags & DEL_MAKE_ROOM) && max_delete >= 0 && stats.deleted_files >= max_delete) {
 		skipped_deletes++;
-		return DR_AT_LIMIT;
+		ret = DR_AT_LIMIT;
+		goto check_ret;
 	}
 
 	if (S_ISDIR(mode)) {
@@ -207,6 +264,14 @@ enum delret delete_item(char *fbuf, uint16 mode, uint16 flags)
 	}
 
   check_ret:
+#ifdef SUPPORT_FORCE_CHANGE
+	/* If we made the directory mutable but it's still present (delete
+	 * skipped, contents non-empty, rmdir EPERM after recovery, etc.),
+	 * restore its original flags so we don't leave the receiver with
+	 * weaker protection than it started with. */
+	if (dir_unmuted && ret != DR_SUCCESS)
+		undo_make_mutable(fbuf, dir_saved_flags);
+#endif
 	if (ret != DR_SUCCESS && flags & DEL_MAKE_ROOM) {
 		const char *desc;
 		switch (flags & DEL_MAKE_ROOM) {
