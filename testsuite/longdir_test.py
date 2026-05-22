@@ -6,10 +6,8 @@
 # 175-char directory names, drop a couple of files in the leaf, and
 # verify that --delete -avH still produces an identical destination.
 
-import os
-import subprocess
-
-from rsyncfns import FROMDIR, TODIR, checkit, hands_setup, test_skipped
+from rsyncfns import (FROMDIR, TODIR, checkit, hands_setup, make_text_file,
+                      test_skipped)
 
 
 hands_setup()
@@ -29,13 +27,8 @@ try:
 except OSError:
     test_skipped("unable to create files in long directory")
 
-# Drop some recognisably-varied content into the two leaf files.
-(longdir / '1').write_text(subprocess.check_output(['date'], text=True))
-
-listdir = '/etc' if os.access('/etc', os.R_OK) else '/'
-out = subprocess.run(['ls', '-la', listdir], capture_output=True, text=True)
-# ls exits 1 if it can't stat some entries (e.g. permission-denied files in
-# /etc); the shell test silently accepts that. We do the same.
-(longdir / '2').write_text(out.stdout)
+# Drop predictable, self-contained content into the two leaf files.
+make_text_file(longdir / '1', 50)
+make_text_file(longdir / '2', 100)
 
 checkit(['--delete', '-avH', f'{FROMDIR}/', str(TODIR)], FROMDIR, TODIR)

@@ -410,6 +410,26 @@ def make_data_file(path, size: int) -> 'None':
         f.write(bytes(out))
 
 
+def make_text_file(path, lines: int = 100) -> 'None':
+    """Write a predictable, self-contained text file of `lines` lines.
+
+    This replaces the old habit of capturing `ls -l /etc` / `ls -l /bin`
+    (falling back to `ls /`) into the test tree. Those tied the fixtures
+    to the host filesystem layout: the directories are absent or
+    unreadable on Android/Termux and other minimal environments, where
+    `ls /` fails outright, and the captured content was never
+    reproducible. The output here is deterministic and depends on nothing
+    outside the suite, so every platform builds the identical fixture.
+    """
+    content = ''.join(
+        "line %06d  the quick brown fox jumps over the lazy dog  %d %d\n"
+        % (i, (i * 31) % 97, (i * 131) % 89)
+        for i in range(1, lines + 1)
+    )
+    with open(str(path), 'w') as f:
+        f.write(content)
+
+
 def get_testuid() -> int:
     return os.getuid()
 
@@ -677,11 +697,12 @@ def build_symlinks() -> 'None':
 
 
 def hands_setup() -> 'None':
-    """Equivalent of rsync.fns hands_setup: populate FROMDIR with a varied
-    tree of files and directories for the canonical 'hands' transfer test.
+    """Populate FROMDIR with a varied tree of files and directories for the
+    canonical 'hands' transfer test.
 
-    Recreates the shell behavior bit-for-bit so the tls listings match
-    across the shell and Python halves of the suite during the transition.
+    All content is generated from within the suite (srcdir contents plus
+    make_text_file output) so the fixture is self-contained and
+    reproducible on every platform.
     """
     rmtree(FROMDIR)
     rmtree(TODIR)
@@ -717,15 +738,12 @@ def hands_setup() -> 'None':
     (FROMDIR / 'dir' / 'subdir').mkdir(exist_ok=True)
     (FROMDIR / 'dir' / 'subdir' / 'foobar.baz').write_text("some data\n")
     (FROMDIR / 'dir' / 'subdir' / 'subsubdir').mkdir(exist_ok=True)
-
-    src_listdir = '/etc' if os.access('/etc', os.R_OK) else '/'
-    out = subprocess.run(['ls', '-ltr', src_listdir], capture_output=True, text=True)
-    (FROMDIR / 'dir' / 'subdir' / 'subsubdir' / 'etc-ltr-list').write_text(out.stdout)
+    # Predictable, self-contained fixture files (the names etc-ltr-list /
+    # bin-lt-list are kept because other tests reference them by name).
+    make_text_file(FROMDIR / 'dir' / 'subdir' / 'subsubdir' / 'etc-ltr-list', 120)
 
     (FROMDIR / 'dir' / 'subdir' / 'subsubdir2').mkdir(exist_ok=True)
-    src_listdir = '/bin' if os.access('/bin', os.R_OK) else '/'
-    out = subprocess.run(['ls', '-lt', src_listdir], capture_output=True, text=True)
-    (FROMDIR / 'dir' / 'subdir' / 'subsubdir2' / 'bin-lt-list').write_text(out.stdout)
+    make_text_file(FROMDIR / 'dir' / 'subdir' / 'subsubdir2' / 'bin-lt-list', 200)
 
 
 # --- listing / verification ------------------------------------------------
