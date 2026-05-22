@@ -11,7 +11,8 @@ import shutil
 from rsyncfns import (
     CHKFILE, FROMDIR, RSYNC, SCRATCHDIR, SRCDIR, TMPDIR, TODIR,
     all_plus, allspace, dots,
-    checkdiff, cp_p, makepath, run_rsync, v_filt,
+    checkdiff, cp_p, hardlinks_supported, makepath, run_rsync, test_skipped,
+    v_filt,
 )
 
 
@@ -31,6 +32,10 @@ try:
 finally:
     os.umask(old_umask)
 
+# The expected itemized output below assumes the 'extra' hard link
+# exists, so skip the whole test where hard links aren't available.
+if not hardlinks_supported():
+    test_skipped("hard links not supported on this filesystem")
 os.link(FROMDIR / 'foo' / 'config1', FROMDIR / 'foo' / 'extra')
 if to2dir.is_file():
     to2dir.unlink()

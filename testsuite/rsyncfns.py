@@ -463,6 +463,47 @@ def make_text_file(path, lines: int = 100) -> 'None':
         f.write(content)
 
 
+_hardlinks_ok = None
+
+
+def hardlinks_supported() -> bool:
+    """Cached check for whether hard links work in the scratch tree.
+
+    Some platforms can't create them: Termux's Python is built without
+    os.link, and Android app storage rejects link(2) outright. Tests that
+    need hard links call this to skip cleanly rather than crash.
+    """
+    global _hardlinks_ok
+    if _hardlinks_ok is not None:
+        return _hardlinks_ok
+    if not hasattr(os, 'link'):
+        _hardlinks_ok = False
+        return _hardlinks_ok
+    SCRATCHDIR.mkdir(parents=True, exist_ok=True)
+    a = SCRATCHDIR / '.hardlink-probe-a'
+    b = SCRATCHDIR / '.hardlink-probe-b'
+    try:
+        a.write_text('probe')
+        b.unlink(missing_ok=True)
+        os.link(a, b)
+        _hardlinks_ok = True
+    except OSError:
+        _hardlinks_ok = False
+    finally:
+        a.unlink(missing_ok=True)
+        b.unlink(missing_ok=True)
+    return _hardlinks_ok
+
+
+def make_hardlink(src, dst) -> 'None':
+    """Create a hard link, raising OSError (never AttributeError) when the
+    platform's Python lacks os.link, so a caller's `except OSError` can
+    treat it the same as a runtime link() failure."""
+    if not hasattr(os, 'link'):
+        raise OSError("os.link is not available on this platform")
+    os.link(src, dst)
+
+
 def get_testuid() -> int:
     return os.getuid()
 
