@@ -1692,10 +1692,71 @@ static int path_has_dotdot_component(const char *path)
 }
 
 #ifdef __linux__
+#include <setjmp.h>
+
+/* openat2(2) is invoked directly via syscall() (glibc lacked a wrapper
+ * for years). In a seccomp-restricted environment -- the Android app
+ * sandbox, a hardened container, or systemd's SystemCallFilter -- a
+ * disallowed syscall raises SIGSYS and kills the process rather than
+ * failing with ENOSYS, so checking errno after the fact is too late.
+ * Probe openat2 once behind a temporary SIGSYS handler; if it is missing
+ * or blocked, secure_relative_open_linux() reports ENOSYS so the caller
+ * falls back to the portable per-component O_NOFOLLOW walk. */
+static sigjmp_buf openat2_probe_env;
+
+static void openat2_probe_handler(int signo)
+{
+	(void)signo;
+	siglongjmp(openat2_probe_env, 1);
+}
+
+static int openat2_usable(void)
+{
+	static int cached = -1;
+	struct sigaction sa, old_sa;
+
+	if (cached >= 0)
+		return cached;
+
+	memset(&sa, 0, sizeof sa);
+	sa.sa_handler = openat2_probe_handler;
+	sigemptyset(&sa.sa_mask);
+	if (sigaction(SIGSYS, &sa, &old_sa) != 0)
+		return cached = 0;
+
+	if (sigsetjmp(openat2_probe_env, 1) != 0) {
+		/* SIGSYS delivered: openat2 is blocked by a seccomp filter. */
+		cached = 0;
+	} else {
+		struct open_how how;
+		int fd;
+		memset(&how, 0, sizeof how);
+		how.flags = O_RDONLY | O_DIRECTORY;
+		how.resolve = RESOLVE_BENEATH | RESOLVE_NO_MAGICLINKS;
+		fd = syscall(SYS_openat2, AT_FDCWD, ".", &how, sizeof how);
+		if (fd >= 0) {
+			close(fd);
+			cached = 1;
+		} else {
+			/* ENOSYS = kernel too old; any other errno means the
+			 * syscall is wired up and reachable, so it is usable. */
+			cached = errno != ENOSYS;
+		}
+	}
+
+	sigaction(SIGSYS, &old_sa, NULL);
+	return cached;
+}
+
 static int secure_relative_open_linux(const char *basedir, const char *relpath, int flags, mode_t mode)
 {
 	struct open_how how;
 	int dirfd, retfd;
+
+	if (!openat2_usable()) {
+		errno = ENOSYS;
+		return -1;
+	}
 
 	memset(&how, 0, sizeof how);
 	how.flags = flags;
