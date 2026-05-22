@@ -620,7 +620,29 @@ def xattr_dump(*paths) -> str:
     for comparing a source tree against its rsync'd copy. The format only
     needs to be self-consistent on a given OS (we never compare across OSes),
     mirroring the per-OS xls() in the old xattrs.test."""
-    if _SYSTEM == 'Linux' or _CYGWIN:
+    if _SYSTEM == 'Linux':
+        # Read xattrs natively (symmetric with the os.setxattr used in
+        # xattr_set) so the suite needs no external getfattr. The attr
+        # package's CLI tools are frequently absent -- on Android/Termux
+        # and minimal CI images -- even when the filesystem itself supports
+        # user xattrs, in which case shelling out to getfattr would crash
+        # the test instead of exercising it. The output mimics "getfattr
+        # -d": a "# file:" header then sorted name="value" lines, files
+        # with no user xattrs omitted.
+        out = []
+        for p in paths:
+            sp = str(p)
+            names = sorted(n for n in os.listxattr(sp) if n.startswith('user.'))
+            if not names:
+                continue
+            out.append(f'# file: {sp}\n')
+            for n in names:
+                v = os.getxattr(sp, n).decode('utf-8', 'surrogateescape')
+                out.append(f'{n}="{v}"\n')
+            out.append('\n')
+        return ''.join(out)
+    if _CYGWIN:
+        # Python on Cygwin lacks os.*xattr, so use the CLI there.
         return subprocess.check_output(
             ['getfattr', '-d', *(str(p) for p in paths)], text=True)
     if _SYSTEM == 'Darwin':
