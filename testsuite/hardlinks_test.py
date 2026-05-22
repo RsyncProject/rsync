@@ -13,7 +13,7 @@ import subprocess
 
 from rsyncfns import (
     CHKDIR, FROMDIR, OUTFILE, RSYNC, SRCDIR, TODIR,
-    checkit, makepath, rsync_argv, test_fail, test_skipped,
+    checkit, make_hardlink, makepath, rsync_argv, test_fail, test_skipped,
 )
 
 
@@ -26,11 +26,11 @@ name3 = FROMDIR / 'name3'
 name4 = FROMDIR / 'name4'
 name1.write_text("This is the file\n")
 try:
-    os.link(name1, name2)
+    make_hardlink(name1, name2)
 except OSError:
     test_skipped("Can't create hardlink")
 try:
-    os.link(name2, name3)
+    make_hardlink(name2, name3)
 except OSError:
     test_fail("Can't create hardlink")
 shutil.copy(name2, name4)
@@ -61,7 +61,7 @@ for x in chars:
     for y in chars:
         (cdir / f'{x}{y}').touch()
 
-os.link(name1, FROMDIR / 'subdir' / 'down' / 'deep' / 'new-file')
+make_hardlink(name1, FROMDIR / 'subdir' / 'down' / 'deep' / 'new-file')
 (TODIR / 'text').unlink()
 
 checkit(['-aHivve', SSH, '--debug=HLINK5', f'--rsync-path={RSYNC}',
@@ -79,7 +79,7 @@ checkit(['-aHivv', '--debug=HLINK5', f'--copy-dest={TODIR}',
 # stays single-linked -- and re-sync with --checksum.
 (FROMDIR / 'solo').write_text("This is another file\n")
 try:
-    os.link(FROMDIR / 'solo', CHKDIR / 'solo')
+    make_hardlink(FROMDIR / 'solo', CHKDIR / 'solo')
 except OSError:
     test_fail("Can't create hardlink")
 
