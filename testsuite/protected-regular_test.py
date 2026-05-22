@@ -16,10 +16,12 @@ from rsyncfns import TMPDIR, run_rsync, test_skipped
 
 
 pr_path = Path('/proc/sys/fs/protected_regular')
-if not pr_path.is_file():
-    test_skipped("Can't find protected_regular setting (only available on Linux)")
-
+# is_file() and read_text() can both raise (e.g. PermissionError when an
+# app sandbox such as Android/Termux denies access to /proc/sys); treat
+# any OSError as "can't determine the setting" and skip.
 try:
+    if not pr_path.is_file():
+        test_skipped("Can't find protected_regular setting (only available on Linux)")
     pr_lvl = pr_path.read_text().strip()
 except OSError:
     test_skipped("Can't check if fs.protected_regular is enabled")
