@@ -69,7 +69,7 @@
 
 /* The following XMIT flags require an rsync that uses a varint for the flag values */
 
-#define XMIT_RESERVED_16 (1<<16) 	/* reserved for future fileflags use */
+#define XMIT_SAME_FLAGS (1<<16) 	/* any protocol - restricted by command-line option */
 #define XMIT_CRTIME_EQ_MTIME (1<<17)	/* any protocol - restricted by command-line option */
 
 /* These flags are used in the live flist data. */
@@ -216,6 +216,7 @@
 #define ATTRS_SKIP_MTIME	(1<<1)
 #define ATTRS_ACCURATE_TIME	(1<<2)
 #define ATTRS_SKIP_ATIME	(1<<3)
+#define ATTRS_DELAY_IMMUTABLE	(1<<4)
 #define ATTRS_SKIP_CRTIME	(1<<5)
 
 #define MSG_FLUSH	2
@@ -244,6 +245,7 @@
 #define ITEM_REPORT_GROUP (1<<6)
 #define ITEM_REPORT_ACL (1<<7)
 #define ITEM_REPORT_XATTR (1<<8)
+#define ITEM_REPORT_FFLAGS (1<<9)
 #define ITEM_REPORT_CRTIME (1<<10)
 #define ITEM_BASIS_TYPE_FOLLOWS (1<<11)
 #define ITEM_XNAME_FOLLOWS (1<<12)
@@ -611,6 +613,74 @@ typedef unsigned int size_t;
 #define SUPPORT_CRTIMES 1
 #endif
 
+#define NO_FFLAGS ((uint32)-1)
+
+/* SUPPORT_FILEFLAGS / SUPPORT_FORCE_CHANGE: enabled on BSD-family systems
+ * with chflags(2) and on Linux systems with the FS_IOC_{GET,SET}FLAGS
+ * ioctls (chattr).  The on-the-wire bit values are the BSD UF_xxx and
+ * SF_xxx set; the Linux side (in lib/fileflags.c) translates to/from
+ * FS_xxx_FL at the platform boundary. */
+#if defined HAVE_CHFLAGS || defined HAVE_FS_IOC_GETFLAGS
+#define SUPPORT_FILEFLAGS 1
+#define SUPPORT_FORCE_CHANGE 1
+#endif
+
+#if defined SUPPORT_FILEFLAGS || defined SUPPORT_FORCE_CHANGE
+/* BSD bit values that may be missing in some headers (and on Linux,
+ * which has none of them in <sys/stat.h>).  These are the canonical
+ * wire values regardless of platform. */
+#ifndef UF_NODUMP
+#define UF_NODUMP    0x00000001
+#endif
+#ifndef UF_IMMUTABLE
+#define UF_IMMUTABLE 0x00000002
+#endif
+#ifndef UF_APPEND
+#define UF_APPEND    0x00000004
+#endif
+#ifndef UF_NOUNLINK
+#define UF_NOUNLINK  0
+#endif
+#ifndef UF_HIDDEN
+#define UF_HIDDEN    0
+#endif
+#ifndef SF_IMMUTABLE
+#define SF_IMMUTABLE 0x00020000
+#endif
+#ifndef SF_APPEND
+#define SF_APPEND    0x00040000
+#endif
+#ifndef SF_NOUNLINK
+#define SF_NOUNLINK  0
+#endif
+#define USR_IMMUTABLE (UF_IMMUTABLE|UF_NOUNLINK|UF_APPEND)
+#define SYS_IMMUTABLE (SF_IMMUTABLE|SF_NOUNLINK|SF_APPEND)
+#define ALL_IMMUTABLE (USR_IMMUTABLE|SYS_IMMUTABLE)
+/* SAFE_FILEFLAGS: the bits --fileflags will apply by default from an
+ * untrusted source.  Excludes SF_* (root-only, kernel securelevel-locked,
+ * can permanently brick a receiver) and UF_NOUNLINK (DoS: locks the
+ * receiver out of cleanup even for the file owner).  Use
+ * --unsafe-fileflags to apply the full sender value. */
+#define SAFE_FILEFLAGS (UF_NODUMP|UF_IMMUTABLE|UF_APPEND|UF_HIDDEN)
+#else
+#define USR_IMMUTABLE 0
+#define SYS_IMMUTABLE 0
+#define ALL_IMMUTABLE 0
+#define SAFE_FILEFLAGS 0
+#endif
+
+/* ST_FLAGS reads the current fileflags off an already-known stat.  On
+ * BSD struct stat has st_flags; on Linux it doesn't, so the access
+ * needs an extra ioctl (which the code arranges via stat_x's cached
+ * fileflags or via an explicit helper).  ST_FLAGS therefore only
+ * applies on BSD-with-chflags builds; elsewhere it returns NO_FFLAGS
+ * to force the caller into the explicit-helper path. */
+#ifdef HAVE_CHFLAGS
+#define ST_FLAGS(st) ((st).st_flags)
+#else
+#define ST_FLAGS(st) NO_FFLAGS
+#endif
+
 /* Find a variable that is either exactly 32-bits or longer.
  * If some code depends on 32-bit truncation, it will need to
  * take special action in a "#if SIZEOF_INT32 > 4" section. */
@@ -842,6 +912,7 @@ extern int pathname_ndx;
 extern int depth_ndx;
 extern int uid_ndx;
 extern int gid_ndx;
+extern int fileflags_ndx;
 extern int acls_ndx;
 extern int xattrs_ndx;
 extern int file_sum_extra_cnt;
@@ -897,6 +968,11 @@ extern int file_sum_extra_cnt;
 /* When the associated option is on, all entries will have these present: */
 #define F_OWNER(f) REQ_EXTRA(f, uid_ndx)->unum
 #define F_GROUP(f) REQ_EXTRA(f, gid_ndx)->unum
+#if defined SUPPORT_FILEFLAGS || defined SUPPORT_FORCE_CHANGE
+#define F_FFLAGS(f) REQ_EXTRA(f, fileflags_ndx)->unum
+#else
+#define F_FFLAGS(f) NO_FFLAGS
+#endif
 #define F_ACL(f) REQ_EXTRA(f, acls_ndx)->num
 #define F_XATTR(f) REQ_EXTRA(f, xattrs_ndx)->num
 #define F_NDX(f) REQ_EXTRA(f, unsort_ndx)->num
@@ -1159,6 +1235,14 @@ typedef struct {
 typedef struct {
     STRUCT_STAT st;
     time_t crtime;
+#ifdef SUPPORT_FILEFLAGS
+    /* Cached BSD-canonical fileflags for this inode.  On BSD this is
+     * just sxp->st.st_flags (populated when fileflags_cached != 0); on
+     * Linux it requires an open()+ioctl(FS_IOC_GETFLAGS), so we cache
+     * it after the first read for the lifetime of the stat_x. */
+    uint32 fileflags;
+    int    fileflags_cached;
+#endif
 #ifdef SUPPORT_ACLS
     struct rsync_acl *acc_acl; /* access ACL */
     struct rsync_acl *def_acl; /* default ACL */
@@ -1170,6 +1254,15 @@ typedef struct {
 
 #define ACL_READY(sx) ((sx).acc_acl != NULL)
 #define XATTR_READY(sx) ((sx).xattr != NULL)
+
+/* Portable fileflags helpers (lib/fileflags.c). */
+#ifdef SUPPORT_FILEFLAGS
+int rsync_fchflags(int fd, mode_t mode, uint32 bsd_flags);
+uint32 rsync_fgetflags(int fd, mode_t mode, const STRUCT_STAT *hint);
+uint32 rsync_lgetflags(const char *path, mode_t mode, const STRUCT_STAT *hint);
+uint32 stat_x_get_fileflags(stat_x *sxp, const char *path);
+void   stat_x_invalidate_fileflags(stat_x *sxp);
+#endif
 
 #define CLVL_NOT_SPECIFIED INT_MIN
 

@@ -34,6 +34,7 @@ extern int relative_paths;
 extern int preserve_xattrs;
 extern int omit_link_times;
 extern int preallocate_files;
+extern int force_change;
 extern char *module_dir;
 extern unsigned int module_dirlen;
 extern char *partial_dir;
@@ -116,6 +117,33 @@ void print_child_argv(const char *prefix, char **cmd)
 	rprintf(FCLIENT, " (%d args)\n", cnt);
 }
 
+#ifdef SUPPORT_FORCE_CHANGE
+static int try_a_force_change(const char *fname, STRUCT_STAT *stp)
+{
+	uint32 fileflags = ST_FLAGS(*stp);
+	if (fileflags == NO_FFLAGS) {
+		STRUCT_STAT st;
+		if (x_lstat(fname, &st, NULL) == 0)
+			fileflags = rsync_lgetflags(fname, st.st_mode, &st);
+	}
+	if (fileflags != NO_FFLAGS && make_mutable(fname, stp->st_mode, fileflags, force_change) > 0) {
+		int ret, save_force_change = force_change;
+
+		force_change = 0; /* Make certain we can't come back here. */
+		ret = set_times(fname, stp);
+		force_change = save_force_change;
+
+		undo_make_mutable(fname, fileflags);
+
+		return ret;
+	}
+
+	errno = EPERM;
+
+	return -1;
+}
+#endif
+
 /* This returns 0 for success, 1 for a symlink if symlink time-setting
  * is not possible, or -1 for any other error. */
 int set_times(const char *fname, STRUCT_STAT *stp)
@@ -143,6 +171,10 @@ int set_times(const char *fname, STRUCT_STAT *stp)
 #include "case_N.h"
 		if (do_utimensat_at(fname, stp) == 0)
 			break;
+#ifdef SUPPORT_FORCE_CHANGE
+		if (force_change && errno == EPERM && try_a_force_change(fname, stp) == 0)
+			break;
+#endif
 		if (errno != ENOSYS)
 			return -1;
 		switch_step++;
@@ -152,6 +184,10 @@ int set_times(const char *fname, STRUCT_STAT *stp)
 #include "case_N.h"
 		if (do_lutimes(fname, stp) == 0)
 			break;
+#ifdef SUPPORT_FORCE_CHANGE
+		if (force_change && errno == EPERM && try_a_force_change(fname, stp) == 0)
+			break;
+#endif
 		if (errno != ENOSYS)
 			return -1;
 		switch_step++;
@@ -171,6 +207,10 @@ int set_times(const char *fname, STRUCT_STAT *stp)
 			break;
 #else
 		if (do_utime(fname, stp) == 0)
+			break;
+#endif
+#ifdef SUPPORT_FORCE_CHANGE
+		if (force_change && errno == EPERM && try_a_force_change(fname, stp) == 0)
 			break;
 #endif
 

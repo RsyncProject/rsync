@@ -446,6 +446,8 @@ has its own detailed description later in this manpage.
 --keep-dirlinks, -K      treat symlinked dir on receiver as dir
 --hard-links, -H         preserve hard links
 --perms, -p              preserve permissions
+--fileflags              preserve file-flags (aka chflags)
+--unsafe-fileflags        widen --fileflags to include system flags
 --executability, -E      preserve executability
 --chmod=CHMOD            affect file and/or directory permissions
 --acls, -A               preserve ACLs (implies --perms)
@@ -488,6 +490,8 @@ has its own detailed description later in this manpage.
 --delete-missing-args    delete missing source args from destination
 --ignore-errors          delete even if there are I/O errors
 --force                  force deletion of dirs even if not empty
+--force-change           affect user-immutable files/dirs (alias --force-uchange)
+--force-schange          also affect system-immutable files/dirs
 --max-delete=NUM         don't delete more than NUM files
 --max-size=SIZE          don't transfer any file larger than SIZE
 --min-size=SIZE          don't transfer any file smaller than SIZE
@@ -832,6 +836,7 @@ expand it.
     recursion and want to preserve almost everything.  Be aware that it does
     **not** include preserving ACLs (`-A`), xattrs (`-X`), atimes (`-U`),
     crtimes (`-N`), nor the finding and preserving of hardlinks (`-H`).
+    It also does **not** imply [`--fileflags`](#opt).
 
     The only exception to the above equivalence is when [`--files-from`](#opt)
     is specified, in which case [`-r`](#opt) is not implied.
@@ -1491,6 +1496,85 @@ expand it.
     those used by [`--fake-super`](#opt)) unless you repeat the option (e.g. `-XX`).
     This "copy all xattrs" mode cannot be used with [`--fake-super`](#opt).
 
+0.  `--fileflags`
+
+    This option causes rsync to update the file flags on the receiver to be
+    the same as on the source, the same way it updates mode and ownership
+    under [`--perms`](#opt) / [`--owner`](#opt) / [`--group`](#opt) -- that
+    is, "make the destination match the source" rather than "only ever set
+    flags."  If the source has `nodump` set and the destination doesn't,
+    the destination gets `nodump`; if the source has `uchg` cleared and the
+    destination has it set, the destination has `uchg` cleared.  This
+    matches the long-standing behaviour of the BSD `--fileflags` patch.
+    Requires **chflags**(2) (BSD/macOS) or the chattr ioctls
+    (Linux ext2/3/4, xfs, btrfs, ...) on both sides.
+
+    By default only the bits in a small "safe" set are honoured on the
+    receiver: `UF_NODUMP`, `UF_IMMUTABLE`, `UF_APPEND`, plus `UF_HIDDEN`
+    on macOS.  Sender-supplied `SF_*` (system-immutable) and `UF_NOUNLINK`
+    bits are dropped silently, because they're root-only, kernel-
+    securelevel-locked on BSD, and have caused real foot-guns where a
+    hostile source could pin files in a way the receiver couldn't easily
+    clean up.  Use [`--unsafe-fileflags`](#opt) to widen the mask to the
+    full sender value.
+
+    Once a destination has bits in the "safe" set set on it, that
+    immutable bit blocks rsync from modifying or deleting the file.  Use
+    [`--force-change`](#opt) (or [`--force-uchange`](#opt) /
+    [`--force-schange`](#opt)) to let rsync clear the bits transparently
+    around the update.
+
+    Daemon mode refuses `--fileflags`, `--unsafe-fileflags`, and the
+    `--force-*change` family by default.  An admin must explicitly opt
+    each module in via `refuse options = !fileflags` (etc.) before
+    clients may use them -- handing a daemon's filesystem over to
+    sender-controlled immutable bits is dangerous and we want it to be
+    a deliberate choice.
+
+0.  `--unsafe-fileflags`
+
+    Used together with [`--fileflags`](#opt), this widens the
+    receiver's "safe" mask to accept the full sender value -- including
+    the system-immutable (`SF_*`) and `UF_NOUNLINK` bits that
+    `--fileflags` alone drops.  Setting these bits requires root on the
+    receiver and, on BSD, may be effectively permanent depending on the
+    running kernel securelevel.  Use only when you trust the source.
+
+0.  `--force-change`, `--force-uchange`
+
+    This option causes rsync to temporarily clear the **user-immutable**
+    flags (`UF_IMMUTABLE`, `UF_APPEND`, `UF_NOUNLINK`) on files and
+    directories on the receiving side that are being updated or deleted,
+    so that the update can proceed.  The original flags are restored
+    after the operation.  By default it does **not** affect
+    system-immutable (`SF_*`) flags -- those require root, are
+    securelevel-locked on BSD, and a misdirected clear can permanently
+    weaken receiver protections; combine with [`--force-schange`](#opt)
+    if you really want that behaviour.
+    `--force-uchange` is an alias for `--force-change`.
+    Use `--no-force-change` to clear both classes back to off.
+    Use `--no-force-uchange` to clear only the user-class bit,
+    leaving any [`--force-schange`](#opt) in effect.
+
+    Note: earlier patched rsync versions had `--force-change` clear both
+    user- and system-immutable flags.  The current default is user-class
+    only; pass `--force-change --force-schange` to recover the previous
+    behaviour.
+
+0.  `--force-schange`
+
+    This option causes rsync to temporarily clear the **system-immutable**
+    flags (`SF_IMMUTABLE`, `SF_APPEND`, `SF_NOUNLINK`) on files and
+    directories on the receiving side that are being updated or deleted,
+    restoring the original flags afterwards.  Operating on system flags
+    requires root, and on BSD systems running at securelevel >= 1 these
+    flags cannot be cleared at all -- the option will fail at startup
+    if it can't do its job.  Use with care: a misdirected clear on a
+    security-relevant file is harder to recover from than the
+    user-immutable equivalent.
+    Use `--no-force-schange` to clear only this bit, leaving
+    any [`--force-change`](#opt) / [`--force-uchange`](#opt) in effect.
+
 0.  `--chmod=CHMOD`
 
     This option tells rsync to apply one or more comma-separated "chmod" modes
@@ -2020,8 +2104,8 @@ expand it.
     [`--ignore-missing-args`](#opt) option a step farther: each missing arg
     will become a deletion request of the corresponding destination file on the
     receiving side (should it exist).  If the destination file is a non-empty
-    directory, it will only be successfully deleted if [`--force`](#opt) or
-    [`--delete`](#opt) are in effect.  Other than that, this option is
+    directory, it will only be successfully deleted if [`--force`](#opt)
+    or [`--delete`](#opt) are in effect.  Other than that, this option is
     independent of any other type of delete processing.
 
     The missing source files are represented by special file-list entries which
@@ -2038,8 +2122,8 @@ expand it.
     replaced by a non-directory.  This is only relevant if deletions are not
     active (see [`--delete`](#opt) for details).
 
-    Note for older rsync versions: `--force` used to still be required when
-    using [`--delete-after`](#opt), and it used to be non-functional unless the
+    Note that some older rsync versions used to require `--force` when using
+    [`--delete-after`](#opt), and it used to be non-functional unless the
     [`--recursive`](#opt) option was also enabled.
 
 0.  `--max-delete=NUM`
@@ -3115,8 +3199,8 @@ expand it.
     version 2.6.7 (you can use `-vv` with older versions of rsync, but that
     also turns on the output of other verbose messages).
 
-    The "%i" escape has a cryptic output that is 11 letters long.  The general
-    format is like the string `YXcstpoguax`, where **Y** is replaced by the type
+    The "%i" escape has a cryptic output that is 12 letters long.  The general
+    format is like the string `YXcstpoguaxf`, where **Y** is replaced by the type
     of update being done, **X** is replaced by the file-type, and the other
     letters represent attributes that may be output if they are being modified.
 
@@ -3178,6 +3262,8 @@ expand it.
       - `b` means that both the access and create times are being updated
     - The `a` means that the ACL information is being changed.
     - The `x` means that the extended attribute information is being changed.
+    - The `f` means that the BSD/Linux file flags are being changed (requires
+      [`--fileflags`](#opt)).
 
     One other output is possible: when deleting files, the "%i" will output the
     string "`*deleting`" for each item that is being removed (assuming that you

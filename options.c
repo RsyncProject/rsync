@@ -56,6 +56,8 @@ int preserve_hard_links = 0;
 int preserve_acls = 0;
 int preserve_xattrs = 0;
 int preserve_perms = 0;
+int preserve_fileflags = 0;
+int preserve_unsafe_fileflags = 0;
 int preserve_executability = 0;
 int preserve_devices = 0;
 int preserve_specials = 0;
@@ -99,6 +101,7 @@ int msgs2stderr = 2; /* Default: send errors to stderr for local & remote-shell 
 int saw_stderr_opt = 0;
 int allow_8bit_chars = 0;
 int force_delete = 0;
+int force_change = 0;
 int io_timeout = 0;
 int prune_empty_dirs = 0;
 int use_qsort = 0;
@@ -633,6 +636,10 @@ static struct poptOption long_options[] = {
   {"perms",           'p', POPT_ARG_VAL,    &preserve_perms, 1, 0, 0 },
   {"no-perms",         0,  POPT_ARG_VAL,    &preserve_perms, 0, 0, 0 },
   {"no-p",             0,  POPT_ARG_VAL,    &preserve_perms, 0, 0, 0 },
+  {"fileflags",        0,  POPT_ARG_VAL,    &preserve_fileflags, 1, 0, 0 },
+  {"no-fileflags",     0,  POPT_ARG_VAL,    &preserve_fileflags, 0, 0, 0 },
+  {"unsafe-fileflags",  0, POPT_ARG_VAL,    &preserve_unsafe_fileflags, 1, 0, 0 },
+  {"no-unsafe-fileflags",0,POPT_ARG_VAL,    &preserve_unsafe_fileflags, 0, 0, 0 },
   {"executability",   'E', POPT_ARG_NONE,   &preserve_executability, 0, 0, 0 },
   {"acls",            'A', POPT_ARG_NONE,   0, 'A', 0, 0 },
   {"no-acls",          0,  POPT_ARG_VAL,    &preserve_acls, 0, 0, 0 },
@@ -731,6 +738,17 @@ static struct poptOption long_options[] = {
   {"remove-source-files",0,POPT_ARG_VAL,    &remove_source_files, 1, 0, 0 },
   {"force",            0,  POPT_ARG_VAL,    &force_delete, 1, 0, 0 },
   {"no-force",         0,  POPT_ARG_VAL,    &force_delete, 0, 0, 0 },
+  /* --force-change defaults to USR_IMMUTABLE only (the safer set --
+   * UF_*).  System-class flags require an explicit --force-schange.
+   * USR + SYS are additive: combine with "--force-change --force-schange"
+   * (or "--force-uchange --force-schange"); use --no-force-change to clear
+   * everything. */
+  {"force-change",     0,  POPT_BIT_SET,    &force_change, USR_IMMUTABLE, 0, 0 },
+  {"no-force-change",  0,  POPT_ARG_VAL,    &force_change, 0, 0, 0 },
+  {"force-uchange",    0,  POPT_BIT_SET,    &force_change, USR_IMMUTABLE, 0, 0 },
+  {"no-force-uchange", 0,  POPT_BIT_CLR,    &force_change, USR_IMMUTABLE, 0, 0 },
+  {"force-schange",    0,  POPT_BIT_SET,    &force_change, SYS_IMMUTABLE, 0, 0 },
+  {"no-force-schange", 0,  POPT_BIT_CLR,    &force_change, SYS_IMMUTABLE, 0, 0 },
   {"ignore-errors",    0,  POPT_ARG_VAL,    &ignore_errors, 1, 0, 0 },
   {"no-ignore-errors", 0,  POPT_ARG_VAL,    &ignore_errors, 0, 0, 0 },
   {"max-delete",       0,  POPT_ARG_INT,    &max_delete, 0, 0, 0 },
@@ -984,6 +1002,22 @@ static void set_refuse_options(void)
 	if (am_daemon) { /* Refused by default, but can be accepted via a negated exact match. */
 		parse_one_refuse_match(0, "copy-devices", list_end);
 		parse_one_refuse_match(0, "write-devices", list_end);
+#ifdef SUPPORT_FILEFLAGS
+		/* A daemon shouldn't apply sender-controlled st_flags or clear
+		 * receiver-side immutability by default -- both are foot-guns
+		 * for the daemon admin and DoS vectors for the daemon's
+		 * filesystem.  Admin can opt-in per-module with "refuse
+		 * options = !fileflags" etc. */
+		parse_one_refuse_match(0, "fileflags", list_end);
+		parse_one_refuse_match(0, "unsafe-fileflags", list_end);
+#endif
+#ifdef SUPPORT_FORCE_CHANGE
+		parse_one_refuse_match(0, "force-change", list_end);
+		parse_one_refuse_match(0, "force-uchange", list_end);
+		parse_one_refuse_match(0, "force-schange", list_end);
+		parse_one_refuse_match(0, "no-force-uchange", list_end);
+		parse_one_refuse_match(0, "no-force-schange", list_end);
+#endif
 	}
 
 	while (1) {
@@ -1028,6 +1062,17 @@ static void set_refuse_options(void)
 #ifndef SUPPORT_CRTIMES
 	parse_one_refuse_match(0, "crtimes", list_end);
 #endif
+#ifndef SUPPORT_FILEFLAGS
+	parse_one_refuse_match(0, "fileflags", list_end);
+	parse_one_refuse_match(0, "unsafe-fileflags", list_end);
+#endif
+#ifndef SUPPORT_FORCE_CHANGE
+	parse_one_refuse_match(0, "force-change", list_end);
+	parse_one_refuse_match(0, "force-uchange", list_end);
+	parse_one_refuse_match(0, "force-schange", list_end);
+	parse_one_refuse_match(0, "no-force-uchange", list_end);
+	parse_one_refuse_match(0, "no-force-schange", list_end);
+#endif
 
 	/* Now we use the descrip values to actually mark the options for refusal. */
 	for (op = long_options; op != list_end; op++) {
@@ -1035,7 +1080,12 @@ static void set_refuse_options(void)
 		op->descrip = NULL;
 		if (!refused)
 			continue;
-		if (op->argInfo == POPT_ARG_VAL)
+		/* Mask off any POPT_ARGFLAG_* bits so we also catch
+		 * POPT_BIT_SET (POPT_ARG_VAL|POPT_ARGFLAG_OR) and
+		 * POPT_BIT_CLR (POPT_ARG_VAL|POPT_ARGFLAG_NAND); otherwise
+		 * those slip through the refuse path because popt silently
+		 * performs the bit op and never returns the overridden val. */
+		if ((op->argInfo & POPT_ARG_MASK) == POPT_ARG_VAL)
 			op->argInfo = POPT_ARG_NONE;
 		op->val = (op - long_options) + OPT_REFUSED_BASE;
 		/* The following flags are set to let us easily check an implied option later in the code. */
@@ -2752,6 +2802,11 @@ void server_options(char **args, int *argc_p)
 	if (xfer_dirs && !recurse && delete_mode && am_sender)
 		args[ac++] = "--no-r";
 
+	if (preserve_fileflags)
+		args[ac++] = "--fileflags";
+	if (preserve_unsafe_fileflags)
+		args[ac++] = "--unsafe-fileflags";
+
 	if (do_compression && do_compression_level != CLVL_NOT_SPECIFIED) {
 		if (asprintf(&arg, "--compress-level=%d", do_compression_level) < 0)
 			goto oom;
@@ -2847,6 +2902,14 @@ void server_options(char **args, int *argc_p)
 			args[ac++] = "--delete-excluded";
 		if (force_delete)
 			args[ac++] = "--force";
+#ifdef SUPPORT_FORCE_CHANGE
+		/* Propagate USR/SYS bits independently -- the receiver-side
+		 * options are additive, so both can be passed together. */
+		if (force_change & USR_IMMUTABLE)
+			args[ac++] = "--force-uchange";
+		if (force_change & SYS_IMMUTABLE)
+			args[ac++] = "--force-schange";
+#endif
 		if (write_batch < 0)
 			args[ac++] = "--only-write-batch=X";
 		if (am_root > 1)

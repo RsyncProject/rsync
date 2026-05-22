@@ -61,8 +61,11 @@ jobs:
       # In the container we already run as root, so no sudo. The
       # crtimes-not-supported skip matches the other Linux jobs;
       # daemon-chroot-acl and proxy-response-line-too-long skip because
-      # the default (secure) transport opens no listening socket.
-      run: RSYNC_EXPECT_SKIPPED=crtimes,daemon-chroot-acl,proxy-response-line-too-long make check
+      # the default (secure) transport opens no listening socket. chattr(1)
+      # isn't installed in the AlmaLinux 8 base image so the fileflags test
+      # self-skips even though the build has FS_IOC_GETFLAGS support;
+      # daemon-refuse-fileflags needs no chattr and still runs.
+      run: RSYNC_EXPECT_SKIPPED=crtimes,daemon-chroot-acl,fileflags,proxy-response-line-too-long make check
     - name: check (TCP daemon transport)
       # Second run exercising the real loopback-TCP daemon path.
       run: ./runtests.py --rsync-bin=`pwd`/rsync --use-tcp -j 8

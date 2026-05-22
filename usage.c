@@ -138,6 +138,11 @@ static void print_info_flags(enum logcode f)
 #endif
 			"crtimes",
 
+#ifndef SUPPORT_FILEFLAGS
+		"no "
+#endif
+			"file-flags",
+
 	"*Optimizations",
 
 #ifndef USE_ROLL_SIMD

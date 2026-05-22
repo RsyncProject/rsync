@@ -56,6 +56,12 @@ static int tweaked_append;
 static int tweaked_append_verify;
 static int tweaked_iconv;
 
+/* preserve_fileflags is referenced by flag_ptr even when SUPPORT_FILEFLAGS
+ * is not defined (so the bit position in the batch stream is stable
+ * across builds with and without chflags support).  It's defined in
+ * options.c on every build. */
+extern int preserve_fileflags;
+
 static int *flag_ptr[] = {
 	&recurse,		/* 0 */
 	&preserve_uid,		/* 1 */
@@ -72,6 +78,7 @@ static int *flag_ptr[] = {
 	&inplace,		/* 12 (protocol 30) */
 	&tweaked_append,	/* 13 (protocol 30) */
 	&tweaked_append_verify,	/* 14 (protocol 30) */
+	&preserve_fileflags,	/* 15 (protocol 30+, requires varint flags) */
 	NULL
 };
 
@@ -91,6 +98,7 @@ static const char *const flag_name[] = {
 	"--inplace",
 	"--append",
 	"--append-verify",
+	"--fileflags",
 	NULL
 };
 

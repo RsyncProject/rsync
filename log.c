@@ -731,7 +731,16 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 			     : iflags & ITEM_REPORT_ATIME ? 'u' : 'n';
 			c[9] = !(iflags & ITEM_REPORT_ACL) ? '.' : 'a';
 			c[10] = !(iflags & ITEM_REPORT_XATTR) ? '.' : 'x';
+#ifdef SUPPORT_FILEFLAGS
+			/* The 'f' column is only emitted when the build has
+			 * fileflags support, so non-chflags builds keep the
+			 * historical 11-char %i format and existing scripts
+			 * that parse --itemize-changes don't see a wider line. */
+			c[11] = !(iflags & ITEM_REPORT_FFLAGS) ? '.' : 'f';
+			c[12] = '\0';
+#else
 			c[11] = '\0';
+#endif
 
 			if (iflags & (ITEM_IS_NEW|ITEM_MISSING_DATA)) {
 				char ch = iflags & ITEM_IS_NEW ? '+' : '?';
