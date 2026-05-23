@@ -1618,6 +1618,11 @@ static void sigusr2_handler(UNUSED(int val))
 	if (!am_server)
 		output_summary();
 	close_all();
+#ifdef GCOV_COVERAGE
+	/* The receiver child is killed here via SIGUSR2 and exits with _exit(),
+	 * bypassing the gcov atexit flush; without this it writes no .gcda. */
+	{ extern void __gcov_dump(void); __gcov_dump(); }
+#endif
 	if (got_xfer_error)
 		_exit(RERR_PARTIAL);
 	_exit(0);

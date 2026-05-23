@@ -82,6 +82,32 @@ if test x"$enable_profile" = x"yes"; then
 	CFLAGS="$CFLAGS -pg"
 fi
 
+dnl Coverage build (gcov) for `make coverage`. NOTE: --enable-profile above is
+dnl gprof (-pg) and is NOT coverage. -O0 keeps branch coverage meaningful;
+dnl -fprofile-update=atomic keeps the shared .gcda counters correct while the
+dnl suite runs many rsync processes in parallel.
+AC_ARG_ENABLE(coverage,
+	AS_HELP_STRING([--enable-coverage],[build with gcov instrumentation for `make coverage`]))
+if test x"$enable_coverage" = x"yes"; then
+	CFLAGS="$CFLAGS --coverage -fprofile-update=atomic -O0"
+	CXXFLAGS="$CXXFLAGS --coverage -fprofile-update=atomic -O0"
+	LDFLAGS="$LDFLAGS --coverage"
+	AC_DEFINE([GCOV_COVERAGE], 1,
+		[Flush gcov counters at exit_cleanup: rsync's children exit via _exit(), which bypasses the gcov atexit handler, so without this no .gcda is written for the receiver/generator/daemon-worker processes.])
+fi
+
+dnl openat2(RESOLVE_BENEATH) is used on Linux 5.6+ for the secure resolver.
+dnl --disable-openat2 forces the portable per-component O_NOFOLLOW fallback to
+dnl run as the primary resolver on ordinary Linux, so that tier is exercised
+dnl (and coverage-counted) without needing a pre-5.6 kernel. Behaviour-neutral
+dnl by default (the knob only REMOVES a tier when explicitly disabled).
+AC_ARG_ENABLE(openat2,
+	AS_HELP_STRING([--disable-openat2],[do not use Linux openat2(RESOLVE_BENEATH); force the portable resolver (for exercising the fallback tier)]))
+if test x"$enable_openat2" != x"no"; then
+	AC_DEFINE([HAVE_OPENAT2], 1,
+		[Define to use Linux openat2(RESOLVE_BENEATH) in secure_relative_open where available.])
+fi
+
 AC_MSG_CHECKING([if md2man can create manpages])
 if test x"$ac_cv_path_PYTHON3" = x; then
     AC_MSG_RESULT(no - python3 not found)

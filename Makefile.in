@@ -280,6 +280,8 @@ clean: cleantests
 	rm -f *~ $(OBJS) $(CHECK_PROGS) $(CHECK_OBJS) $(CHECK_SYMLINKS) @MAKE_RRSYNC@ \
 		git-version.h rounding rounding.h *.old rsync*.1 rsync*.5 @MAKE_RRSYNC_1@ \
 		*.html daemon-parm.h help-*.h default-*.h proto.h proto.h-tstamp
+	rm -f *.gcno *.gcda lib/*.gcno lib/*.gcda zlib/*.gcno zlib/*.gcda popt/*.gcno popt/*.gcda
+	rm -rf coverage
 
 .PHONY: cleantests
 cleantests:
@@ -324,6 +326,15 @@ test: check
 # `make check CHECK_J=1` (serial) or any other value.
 CHECK_J = 8
 
+# Parallelism for `make coverage`. Defaults to the same as CHECK_J: the
+# coverage build sets -fprofile-update=atomic (atomic in-memory counters) and
+# gcc's libgcov serializes the per-source .gcda read-modify-write merge with a
+# file lock, so concurrent rsync processes (incl. the forked sender/generator/
+# receiver) accumulate exactly -- verified by a count-linearity check (a hot
+# line accumulates identically at -j1 and -P16). Override with
+# `make coverage COVERAGE_J=1` if your libgcov does not lock .gcda merges.
+COVERAGE_J = $(CHECK_J)
+
 .PHONY: check
 check: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	$(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(CHECK_J)
@@ -335,6 +346,29 @@ check29: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 .PHONY: check30
 check30: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	$(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(CHECK_J) --protocol=30
+
+# Whole-suite gcov coverage report (HTML, with branch + decision coverage).
+# Requires a build configured with --enable-coverage and the `gcovr` tool
+# (pip install gcovr). Runs the suite in parallel (COVERAGE_J, default CHECK_J):
+# this is safe because the coverage build uses -fprofile-update=atomic and
+# libgcov locks the per-source .gcda during its merge, so concurrent rsync
+# processes accumulate exactly (see COVERAGE_J above). Use COVERAGE_J=1 if your
+# toolchain's libgcov does not lock .gcda merges.
+.PHONY: coverage
+coverage: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
+	@case '$(CFLAGS)' in *--coverage*) ;; \
+	  *) echo "*** not a coverage build; reconfigure with --enable-coverage"; exit 1 ;; esac
+	@command -v gcovr >/dev/null 2>&1 || { echo "*** gcovr not found (pip install gcovr)"; exit 1; }
+	find . -name '*.gcda' -delete
+	@rc=0; $(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(COVERAGE_J) || rc=$$?; \
+	  rm -rf coverage && mkdir -p coverage; \
+	  gcovr --root $(srcdir) --branches --decisions --print-summary \
+	      --html-details -o coverage/index.html . || exit $$?; \
+	  echo "Coverage report written to coverage/index.html"; \
+	  if test $$rc != 0; then \
+	    echo "*** test suite FAILED (status $$rc) -- coverage report still written above"; \
+	  fi; \
+	  exit $$rc
 
 wildtest.o: wildtest.c t_stub.o lib/wildmatch.c rsync.h config.h
 wildtest$(EXEEXT): wildtest.o lib/compat.o lib/snprintf.o @BUILD_POPT@
