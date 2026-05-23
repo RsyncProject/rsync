@@ -281,7 +281,7 @@ clean: cleantests
 		git-version.h rounding rounding.h *.old rsync*.1 rsync*.5 @MAKE_RRSYNC_1@ \
 		*.html daemon-parm.h help-*.h default-*.h proto.h proto.h-tstamp
 	rm -f *.gcno *.gcda lib/*.gcno lib/*.gcda zlib/*.gcno zlib/*.gcda popt/*.gcno popt/*.gcda
-	rm -rf coverage
+	rm -rf coverage coverage-tcp
 
 .PHONY: cleantests
 cleantests:
@@ -335,6 +335,13 @@ CHECK_J = 8
 # `make coverage COVERAGE_J=1` if your libgcov does not lock .gcda merges.
 COVERAGE_J = $(CHECK_J)
 
+# Output directory and extra runtests.py flags for `make coverage`. The
+# `coverage-tcp` target reuses the coverage recipe with --use-tcp (real
+# loopback rsyncd, which exercises the TCP accept/auth path and the
+# require_tcp-only tests) and a separate output directory.
+COVERAGE_DIR = coverage
+COVERAGE_RUNFLAGS =
+
 .PHONY: check
 check: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	$(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(CHECK_J)
@@ -360,15 +367,21 @@ coverage: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	  *) echo "*** not a coverage build; reconfigure with --enable-coverage"; exit 1 ;; esac
 	@command -v gcovr >/dev/null 2>&1 || { echo "*** gcovr not found (pip install gcovr)"; exit 1; }
 	find . -name '*.gcda' -delete
-	@rc=0; $(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(COVERAGE_J) || rc=$$?; \
-	  rm -rf coverage && mkdir -p coverage; \
-	  gcovr --root $(srcdir) --branches --decisions --print-summary \
-	      --html-details -o coverage/index.html . || exit $$?; \
-	  echo "Coverage report written to coverage/index.html"; \
+	@rc=0; $(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(COVERAGE_J) $(COVERAGE_RUNFLAGS) || rc=$$?; \
+	  rm -rf $(COVERAGE_DIR) && mkdir -p $(COVERAGE_DIR); \
+	  gcovr --root $(srcdir) --decisions --print-summary \
+	      --html-details -o $(COVERAGE_DIR)/index.html . || exit $$?; \
+	  echo "Coverage report written to $(COVERAGE_DIR)/index.html"; \
 	  if test $$rc != 0; then \
 	    echo "*** test suite FAILED (status $$rc) -- coverage report still written above"; \
 	  fi; \
 	  exit $$rc
+
+# Same as `make coverage` but with the daemon tests run over a real loopback
+# rsyncd (--use-tcp), into a separate report directory.
+.PHONY: coverage-tcp
+coverage-tcp:
+	$(MAKE) coverage COVERAGE_RUNFLAGS=--use-tcp COVERAGE_DIR=coverage-tcp
 
 wildtest.o: wildtest.c t_stub.o lib/wildmatch.c rsync.h config.h
 wildtest$(EXEEXT): wildtest.o lib/compat.o lib/snprintf.o @BUILD_POPT@
