@@ -1,0 +1,71 @@
+name: Coverage (Ubuntu)
+
+on:
+  push:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/coverage.yml'
+  pull_request:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/coverage.yml'
+  schedule:
+    - cron: '42 9 * * *'
+  workflow_dispatch:
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    name: gcov coverage
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: prep
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev python3-cmarkgfm openssl gcovr
+        echo "/usr/local/bin" >>$GITHUB_PATH
+    - name: configure
+      run: ./configure --enable-coverage --with-rrsync
+    - name: make
+      run: make
+    - name: info
+      run: rsync --version
+    # Two coverage runs: the default pipe transport, then a second pass over a
+    # real loopback rsyncd (--use-tcp) which also exercises the require_tcp-only
+    # tests. gcovr's --print-summary line/branch/decision totals go to the step
+    # log (and the job summary below), so the numbers are visible in CI.
+    # `make coverage` exits with the suite's status, so a regression fails CI.
+    - name: coverage (pipe transport)
+      run: |
+        set -o pipefail
+        sudo make coverage 2>&1 | tee cov-pipe.log
+    - name: coverage (TCP transport)
+      run: |
+        set -o pipefail
+        sudo make coverage-tcp 2>&1 | tee cov-tcp.log
+    - name: coverage summary
+      if: always()
+      run: |
+        {
+          echo "## gcov coverage"
+          echo "### Pipe transport (\`make coverage\`)"
+          echo '```'
+          grep -E '^(lines|functions|branches|decisions):' cov-pipe.log || echo '(no summary -- see step log)'
+          echo '```'
+          echo "### TCP transport (\`make coverage-tcp\`)"
+          echo '```'
+          grep -E '^(lines|functions|branches|decisions):' cov-tcp.log || echo '(no summary -- see step log)'
+          echo '```'
+        } >> "$GITHUB_STEP_SUMMARY"
+    - name: upload HTML reports
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-html
+        path: |
+          coverage
+          coverage-tcp
