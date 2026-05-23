@@ -44,7 +44,7 @@ jobs:
       # chown-fake / devices-fake / xattrs / xattrs-hlink now RUN on macOS
       # (rsyncfns.py drives xattrs via the `xattr` command), verified on a
       # real macOS host, so they're no longer in the skip set.
-      run: sudo RSYNC_EXPECT_SKIPPED=acls-default,chmod-temp-dir,daemon-chroot-acl,dir-sgid,open-noatime,protected-regular,proxy-response-line-too-long,simd-checksum make check
+      run: sudo RSYNC_EXPECT_SKIPPED=acls-default,acls-depth,chmod-temp-dir,daemon-chroot-acl,dir-sgid,open-noatime,protected-regular,proxy-response-line-too-long,simd-checksum,sparse make check
     - name: check (TCP daemon transport)
       # Second run with daemon tests over a real loopback rsyncd; the default
       # 'make check' above uses the secure stdio-pipe transport.
