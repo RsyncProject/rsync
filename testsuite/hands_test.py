@@ -10,7 +10,8 @@
 import os
 import shutil
 
-from rsyncfns import FROMDIR, TMPDIR, TODIR, checkit, hands_setup, run_rsync
+from rsyncfns import (FROMDIR, TMPDIR, TODIR, checkit, hands_setup,
+                      hardlinks_supported, run_rsync)
 
 
 hands_setup()
@@ -23,8 +24,11 @@ print("Test basic operation:")
 checkit(['-av', f'{FROMDIR}/', str(TODIR)], FROMDIR, TODIR)
 
 # 2. hard links — link filelist into dir/ then transfer with -H so the
-# receiver should recreate the link relationship.
-os.link(FROMDIR / 'filelist', FROMDIR / 'dir' / 'filelist')
+# receiver should recreate the link relationship. Skip just this step
+# where hard links aren't available (e.g. Android/Termux); the -H
+# transfer below is still a valid no-op there.
+if hardlinks_supported():
+    os.link(FROMDIR / 'filelist', FROMDIR / 'dir' / 'filelist')
 print("Test hard links:")
 checkit(['-avH', '--bwlimit=0', DEBUG_OPTS, f'{FROMDIR}/', str(TODIR)], FROMDIR, TODIR)
 

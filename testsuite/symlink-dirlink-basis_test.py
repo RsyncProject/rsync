@@ -16,6 +16,7 @@ import filecmp
 import os
 import platform
 import subprocess
+import sys
 import time
 
 from rsyncfns import (
@@ -28,6 +29,37 @@ if platform.system() in ('SunOS', 'OpenBSD', 'NetBSD') or platform.system().star
     test_skipped(
         f"secure_relative_open lacks RESOLVE_BENEATH equivalent on "
         f"{platform.system()}; issue #715 still affects this platform"
+    )
+
+
+def _resolve_beneath_works() -> bool:
+    """The issue #715 fix relies on openat2(RESOLVE_BENEATH). Where that is
+    unavailable (kernel < 5.6) or blocked by a seccomp filter (the Android
+    app sandbox, hardened containers), secure_relative_open() uses the
+    per-component fallback, which can't follow a dir-symlink basedir -- so
+    #715 still applies and this test must skip, exactly as it does on the
+    non-Linux fallback platforms above. Probe in a subprocess so a seccomp
+    SIGSYS kills the child rather than this test."""
+    code = (
+        "import ctypes, sys\n"
+        "class H(ctypes.Structure):\n"
+        "    _fields_ = [('f', ctypes.c_uint64), ('m', ctypes.c_uint64),\n"
+        "                ('r', ctypes.c_uint64)]\n"
+        "libc = ctypes.CDLL(None, use_errno=True)\n"
+        "h = H(0, 0, 0x08)  # resolve = RESOLVE_BENEATH\n"
+        "fd = libc.syscall(437, -100, b'.', ctypes.byref(h), ctypes.sizeof(h))\n"
+        "sys.exit(0 if fd >= 0 else 1)\n"
+    )
+    return subprocess.run([sys.executable, '-c', code]).returncode == 0
+
+
+# Termux's Python reports 'Android', not 'Linux'; both run the Linux
+# kernel where syscall 437 is openat2, so probe on either. (Darwin and
+# FreeBSD use O_RESOLVE_BENEATH and must not run the Linux-specific probe.)
+if platform.system() in ('Linux', 'Android') and not _resolve_beneath_works():
+    test_skipped(
+        "openat2(RESOLVE_BENEATH) is unavailable here (old kernel or a "
+        "seccomp filter); issue #715's dir-symlink-basis fix relies on it"
     )
 
 os.environ['RSYNC_RSH'] = str(SRCDIR / 'support' / 'lsh.sh')

@@ -20,6 +20,8 @@
 #ifdef __linux__
 #include <sys/syscall.h>
 #include <linux/openat2.h>
+#include <setjmp.h>
+#include <signal.h>
 #endif
 
 int dry_run = 0;
@@ -42,23 +44,49 @@ static int errs = 0;
  * the running kernel, 0 otherwise.  The probe opens "." (a directory
  * the helper has just chdir'd into) so it can't fail for any reason
  * other than the kernel rejecting the requested confinement flag. */
+#ifdef __linux__
+static sigjmp_buf rb_probe_env;
+static void rb_probe_handler(int signo)
+{
+	(void)signo;
+	siglongjmp(rb_probe_env, 1);
+}
+#endif
+
 static int kernel_resolve_beneath_supported(void)
 {
 	int fd;
 #ifdef __linux__
 	{
-		struct open_how how;
-		memset(&how, 0, sizeof how);
-		how.flags = O_RDONLY | O_DIRECTORY;
-		how.resolve = RESOLVE_BENEATH | RESOLVE_NO_MAGICLINKS;
-		fd = syscall(SYS_openat2, AT_FDCWD, ".", &how, sizeof how);
-		if (fd >= 0) {
-			close(fd);
-			return 1;
+		struct sigaction sa, old_sa;
+		/* In a seccomp sandbox (Android/Termux, hardened containers)
+		 * openat2() is blocked with SIGSYS, which kills the helper,
+		 * rather than failing with ENOSYS. Probe behind a temporary
+		 * SIGSYS handler so a blocked openat2 reports "unsupported"
+		 * and we fall through to the O_RESOLVE_BENEATH / per-component
+		 * path, matching what secure_relative_open() itself does. */
+		memset(&sa, 0, sizeof sa);
+		sa.sa_handler = rb_probe_handler;
+		sigemptyset(&sa.sa_mask);
+		if (sigaction(SIGSYS, &sa, &old_sa) == 0) {
+			if (sigsetjmp(rb_probe_env, 1) == 0) {
+				struct open_how how;
+				memset(&how, 0, sizeof how);
+				how.flags = O_RDONLY | O_DIRECTORY;
+				how.resolve = RESOLVE_BENEATH | RESOLVE_NO_MAGICLINKS;
+				fd = syscall(SYS_openat2, AT_FDCWD, ".", &how, sizeof how);
+				if (fd >= 0) {
+					close(fd);
+					sigaction(SIGSYS, &old_sa, NULL);
+					return 1;
+				}
+			}
+			sigaction(SIGSYS, &old_sa, NULL);
 		}
-		/* ENOSYS = kernel < 5.6.  Fall through to the O_RESOLVE_BENEATH
-		 * probe in case we're a Linux build running on a kernel that
-		 * gained O_RESOLVE_BENEATH via some out-of-tree backport. */
+		/* ENOSYS = kernel < 5.6, or seccomp-blocked. Fall through to
+		 * the O_RESOLVE_BENEATH probe in case we're a Linux build
+		 * running on a kernel that gained it via an out-of-tree
+		 * backport. */
 	}
 #endif
 #ifdef O_RESOLVE_BENEATH

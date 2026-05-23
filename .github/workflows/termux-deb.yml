@@ -1,0 +1,78 @@
+name: Build rsync .deb for Termux
+
+# Cross-compiles a statically-linked rsync with the Android NDK and packages
+# it as a Termux .deb for each Termux architecture. The .deb files are uploaded
+# as workflow artifacts so users can download and install them on a device:
+#   dpkg -i rsync_<ver>_<arch>.deb     (or: apt install ./rsync_<ver>_<arch>.deb)
+#
+# The binaries are cross-compiled, so the test suite can't run here; we sanity
+# check that each binary is static and the right architecture, smoke-test
+# `--version` under qemu-user, and verify the .deb metadata.
+
+on:
+  push:
+    branches: [ master, pr-termux-test ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/termux-deb.yml'
+  pull_request:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/termux-deb.yml'
+  workflow_dispatch:
+
+env:
+  ANDROID_API: 24      # Android 7.0; runs on every modern phone, broad reach
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: aarch64    # modern 64-bit phones
+            qemu: qemu-aarch64-static
+          - arch: arm        # older 32-bit phones
+            qemu: qemu-arm-static
+          - arch: x86_64     # 64-bit emulators / x86 tablets
+            qemu: qemu-x86_64-static
+          - arch: i686       # 32-bit emulators
+            qemu: qemu-i386-static
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install build prerequisites
+        run: sudo apt-get update && sudo apt-get install -y autoconf automake gawk qemu-user-static
+
+      - name: Build and package (${{ matrix.arch }})
+        run: packaging/build-termux-deb.sh ${{ matrix.arch }} "$ANDROID_API" dist
+
+      - name: Verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          file rsync
+          file rsync | grep -q "statically linked"
+          if file rsync | grep -q "dynamically linked"; then
+            echo "ERROR: binary is not static" >&2; exit 1
+          fi
+          echo "=== .deb metadata ==="
+          dpkg-deb --info dist/rsync_*_${{ matrix.arch }}.deb
+          dpkg-deb --contents dist/rsync_*_${{ matrix.arch }}.deb
+          # Best-effort: confirm it runs under qemu-user.
+          ${{ matrix.qemu }} ./rsync --version | head -3 || \
+            echo "WARNING: qemu smoke test did not run cleanly (check on a real device)"
+
+      - name: Checksum
+        run: ( cd dist && sha256sum rsync_*_${{ matrix.arch }}.deb > rsync_${{ matrix.arch }}.deb.sha256 )
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rsync-termux-${{ matrix.arch }}
+          path: dist/

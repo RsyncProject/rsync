@@ -12,7 +12,7 @@ import time
 
 from rsyncfns import (
     CHKDIR, FROMDIR, OUTFILE, TMPDIR, TODIR,
-    checkit, hands_setup, makepath, rsync_argv,
+    checkit, hands_setup, hardlinks_supported, makepath, rsync_argv,
     run_rsync, test_fail,
 )
 
@@ -59,8 +59,11 @@ checkit(['-avR', f'./{deepstr}', str(TODIR)], CHKDIR, TODIR)
 
 # Add a hard link inside the source and the chk dir; mirror it on both
 # sides so the --delete pass below doesn't see it as new on either tree.
-os.link(deepdir / 'filelist', deepdir / 'dir' / 'filelist')
-os.link(CHKDIR / deepstr / 'filelist', CHKDIR / deepstr / 'dir' / 'filelist')
+# Where hard links aren't available (e.g. Android/Termux) skip both so
+# the two trees stay symmetric and the rest of the test still runs.
+if hardlinks_supported():
+    os.link(deepdir / 'filelist', deepdir / 'dir' / 'filelist')
+    os.link(CHKDIR / deepstr / 'filelist', CHKDIR / deepstr / 'dir' / 'filelist')
 # Re-touch both dirs so the inner-dir time matches.
 src_t = (deepdir / 'dir').stat().st_mtime
 os.utime(deepdir / 'dir', (src_t, src_t))
