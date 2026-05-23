@@ -1126,6 +1126,48 @@ def assert_not_exists(path, label: str = '') -> 'None':
         test_fail(f"{_tag(label)}{path} exists but should not")
 
 
+_rb_cache = None
+
+
+def resolve_beneath_supported() -> bool:
+    """True if this rsync can FOLLOW an in-tree directory symlink under its
+    secure resolver -- i.e. update a file through a dir-symlink on the receiver
+    (--keep-dirlinks; issue #715).
+
+    False wherever the portable per-component O_NOFOLLOW fallback is the active
+    resolver: a platform with no kernel "beneath" primitive, Linux < 5.6, a
+    seccomp-blocked openat2, or a --disable-openat2 build. There the delta
+    update through the symlinked directory fails verification. Probed
+    functionally (an initial transfer plus a delta update through a dir-symlink)
+    so it tracks the actual binary rather than a platform name, and cached."""
+    global _rb_cache
+    if _rb_cache is not None:
+        return _rb_cache
+    probe = SCRATCHDIR / '.rb_probe'
+    rmtree(probe)
+    (probe / 'home' / 'real').mkdir(parents=True)
+    os.symlink('real', probe / 'home' / 'link')
+    (probe / 'src' / 'link').mkdir(parents=True)
+    f = probe / 'src' / 'link' / 'f'
+    make_data_file(f, 40000)
+
+    def push():
+        subprocess.run(
+            rsync_argv('-KRl', '--no-whole-file', 'link/f',
+                       f"{probe / 'home'}/"),
+            cwd=str(probe / 'src'),
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    push()
+    with open(f, 'ab') as fh:           # size change -> forces a delta update
+        fh.write(b'appended tail for delta\n')
+    push()
+    dst = probe / 'home' / 'real' / 'f'
+    _rb_cache = dst.is_file() and filecmp.cmp(str(f), str(dst), shallow=False)
+    rmtree(probe)
+    return _rb_cache
+
+
 def write_daemon_conf(modules, globals=None, *,
                       name: str = 'test-rsyncd.conf') -> 'Path':
     """Write a custom rsyncd.conf for daemon-parameter tests.
