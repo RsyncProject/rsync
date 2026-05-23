@@ -9,11 +9,6 @@ directory; an ABSOLUTE dir is a reserved location that holds partials by
 basename. All of this is parent- and cross-directory path resolution -- what
 the resolver restructure rewrites -- so exercise it on a file several levels
 deep, with the absolute partial-dir kept OUTSIDE the destination tree.
-
-Note: a *delta* resume from an absolute partial-dir currently fails whole-file
-verification on master (it re-puts the partial and never converges). This test
-therefore only asserts the cross-directory WRITE of the partial for that case
-and completes it with --whole-file, which is the clearly-correct baseline.
 """
 
 import os
@@ -115,7 +110,7 @@ run_rsync('-a', '--partial-dir=.rsync-partial', '--no-whole-file',
           f'{src}/', f'{TODIR}/')
 assert_same(TODIR / deep, src / deep, label='rel partial-dir resume')
 
-# --- 4. absolute --partial-dir OUTSIDE the tree (cross-dir): interrupt -----
+# --- 4. absolute --partial-dir OUTSIDE the tree (cross-dir): interrupt write -
 ext = SCRATCHDIR / 'partials'      # sibling of from/ and to/ -- outside both
 rmtree(ext)
 ext.mkdir()
@@ -124,7 +119,21 @@ interrupt_transfer([f'--partial-dir={ext}'], ext / 'f3')
 if not (ext / 'f3').is_file() or not is_prefix(ext / 'f3'):
     test_fail("absolute --partial-dir did not write the partial to the "
               "outside-tree dir")
-run_rsync('-a', f'--partial-dir={ext}', '--whole-file', f'{src}/', f'{TODIR}/')
-assert_same(TODIR / deep, src / deep, label='abs partial-dir resume')
+
+# --- 5. absolute --partial-dir delta resume completes (regression guard) ----
+# A delta (--no-whole-file) resume from an absolute, outside-tree partial-dir
+# used to fail whole-file verification forever: the receiver couldn't open the
+# absolute basis, so matched blocks were dropped from the verify checksum.
+rmtree(src)
+rmtree(TODIR)
+rmtree(ext)
+makepath(src / deepdir, ext)
+make_data_file(src / deep, 1_000_000)
+(ext / 'f3').write_bytes((src / deep).read_bytes()[:400_000])   # clean prefix
+run_rsync('-a', f'--partial-dir={ext}', '--no-whole-file', f'{src}/', f'{TODIR}/')
+assert_same(TODIR / deep, src / deep, label='abs partial-dir delta resume')
+if (ext / 'f3').exists():
+    test_fail("absolute --partial-dir basis was not consumed after a "
+              "successful delta resume")
 
 print("partial: --partial + relative/absolute --partial-dir verified at depth")

@@ -77,7 +77,7 @@ Status legend: ✓ property asserted · `~` shallow / by an existing ported test
 |---|---|---|---|---|
 | -T, --temp-dir | temp-dir*new*, chmod-temp-dir | Y | Y | ✓ cross-dir rename |
 | --partial | partial*new* | Y | — | ✓ partial kept in dest file |
-| --partial-dir | partial*new*, symlink-dirlink-basis | Y | Y | ✓ relative (in-tree) + absolute (outside). Absolute **delta** resume is broken on master — asserts only the cross-dir write |
+| --partial-dir | partial*new*, symlink-dirlink-basis | Y | Y | ✓ relative (in-tree) + absolute (outside), incl. delta resume from an absolute outside-tree partial |
 | --delay-updates | delay-updates, delay-updates-deep*new* | Y | — | ✓ per-dir staging |
 | --inplace | inplace*new*, alt-dest | Y | — | ✓ inode preserved |
 | --append / --append-verify | append*new* | Y | — | ✓ verify split is proto 30+ |
@@ -202,5 +202,3 @@ Status legend: ✓ property asserted · `~` shallow / by an existing ported test
   = yes`, daemon uid/gid) skip as non-root; run the suite as root to cover.
 * `--ignore-errors`, `-x/--one-file-system`, `--numeric-ids` have no dedicated
   test yet (lower restructure risk).
-* Absolute `--partial-dir` + delta resume is broken on master; the test asserts
-  only the cross-directory write there and completes with `--whole-file`.
