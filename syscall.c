@@ -33,7 +33,7 @@
 #include <sys/syscall.h>
 #endif
 
-#ifdef __linux__
+#if defined(__linux__) && defined(HAVE_OPENAT2)
 #include <sys/syscall.h>
 #include <linux/openat2.h>
 #endif
@@ -1691,7 +1691,7 @@ static int path_has_dotdot_component(const char *path)
 	return 0;
 }
 
-#ifdef __linux__
+#if defined(__linux__) && defined(HAVE_OPENAT2)
 static int secure_relative_open_linux(const char *basedir, const char *relpath, int flags, mode_t mode)
 {
 	struct open_how how;
@@ -1791,11 +1791,13 @@ int secure_relative_open(const char *basedir, const char *relpath, int flags, mo
 		return -1;
 	}
 
-#ifdef __linux__
+#if defined(__linux__) && defined(HAVE_OPENAT2)
 	{
 		int fd = secure_relative_open_linux(basedir, relpath, flags, mode);
 		/* ENOSYS = kernel < 5.6 doesn't have the syscall even though
-		 * glibc/kernel-headers do; fall through to the portable path. */
+		 * glibc/kernel-headers do; fall through to the portable path.
+		 * (Built unconditionally unless --disable-openat2, which forces
+		 * the portable resolver below so that tier is exercised.) */
 		if (fd != -1 || errno != ENOSYS)
 			return fd;
 	}
