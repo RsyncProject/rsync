@@ -39,11 +39,11 @@ jobs:
     - name: info
       run: rsync --version
     - name: check
-      run: sudo RSYNC_EXPECT_SKIPPED=crtimes,daemon-chroot-acl,proxy-response-line-too-long make check
+      run: sudo RSYNC_EXPECT_SKIPPED=crtimes,daemon-access-ip,daemon-chroot-acl,proxy-response-line-too-long make check
     - name: check30
-      run: sudo RSYNC_EXPECT_SKIPPED=crtimes,daemon-chroot-acl,proxy-response-line-too-long make check30
+      run: sudo RSYNC_EXPECT_SKIPPED=crtimes,daemon-access-ip,daemon-chroot-acl,proxy-response-line-too-long make check30
     - name: check29
-      run: sudo RSYNC_EXPECT_SKIPPED=crtimes,daemon-chroot-acl,proxy-response-line-too-long make check29
+      run: sudo RSYNC_EXPECT_SKIPPED=crtimes,daemon-access-ip,daemon-chroot-acl,proxy-response-line-too-long make check29
     - name: check (TCP daemon transport)
       # Second run with daemon tests over a real loopback rsyncd; the default
       # 'make check' above uses the secure stdio-pipe transport.

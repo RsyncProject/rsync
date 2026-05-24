@@ -528,8 +528,15 @@ def main():
     print('-' * 60)
 
     exit_code = failed + vg_errors
-    if exit_code == 0 and skipped_str != args.expect_skipped:
-        exit_code = 1
+    if exit_code == 0:
+        # Compare the skipped set order-insensitively: which tests skipped is
+        # what matters, not the order runtests happened to collect them in
+        # (that order is just sorted filenames -- an easy thing to get subtly
+        # wrong when maintaining the per-platform expected lists).
+        got = set(s for s in skipped_str.split(',') if s)
+        want = set(s for s in args.expect_skipped.split(',') if s)
+        if got != want:
+            exit_code = 1
 
     print(f'overall result is {exit_code}')
     sys.exit(exit_code)
