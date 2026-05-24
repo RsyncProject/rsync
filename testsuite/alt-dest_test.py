@@ -12,7 +12,7 @@ import time
 
 from rsyncfns import (
     CHKDIR, FROMDIR, RSYNC, SCRATCHDIR, SRCDIR, TMPDIR, TODIR,
-    checkit, hands_setup, rmtree, run_rsync,
+    checkit, hands_setup, rmtree, run_rsync, test_fail,
 )
 
 
@@ -62,6 +62,13 @@ for maybe_inplace in ([], ['--inplace']):
     rmtree(TODIR)
     checkit(['-av', *maybe_inplace, f'--copy-dest={alt3dir}',
              f'{FROMDIR}/', f'{TODIR}/'], FROMDIR, TODIR)
+    # --copy-dest must COPY the unchanged candidate, not hard-link it: the
+    # result is a distinct inode from the alt-dir source (this is the property
+    # that distinguishes --copy-dest from --link-dest, which checkit's tree
+    # comparison alone does not capture).
+    if os.stat(TODIR / 'likely').st_ino == os.stat(alt3dir / 'likely').st_ino:
+        test_fail(f"--copy-dest{' --inplace' if maybe_inplace else ''} "
+                  "hard-linked 'likely' instead of copying it")
 
     for srchost in ('', 'localhost:'):
         desthost = 'localhost:' if not srchost else ''

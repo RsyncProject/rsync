@@ -12,7 +12,7 @@ import subprocess
 
 from rsyncfns import (
     SCRATCHDIR,
-    check_perms, run_rsync, test_skipped,
+    check_perms, run_rsync, test_fail, test_skipped,
 )
 
 
@@ -41,8 +41,11 @@ def testit(dirname, default_acl, file_expected, prog_expected):
     a transfer into a fresh subdir picks up the inherited perms."""
     todir = SCRATCHDIR / dirname
     todir.mkdir()
-    # Clear any inherited default ACL first.
-    subprocess.run(shlex.split(setfacl_nodef) + [str(todir)])
+    # Clear any inherited default ACL first -- and confirm it succeeded, so the
+    # no-default-ACL cases can't silently inherit the scratch dir's seeded
+    # default ACL and test the wrong base state.
+    if subprocess.run(shlex.split(setfacl_nodef) + [str(todir)]).returncode != 0:
+        test_fail(f"{dirname}: clearing the inherited default ACL failed")
     if default_acl:
         if '-k' in setfacl_nodef.split():
             opts = ['-dm', default_acl]
