@@ -44,19 +44,23 @@ def refused(args, what):
     return proc.stderr
 
 
-def allowed(args, what):
+def allowed(args, what, expected=None, actual=None):
     proc = subprocess.run(rsync_argv(*args),
                           stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
                           text=True)
     if proc.returncode not in (0, 23):
         test_fail(f"{what} was unexpectedly refused: {proc.stderr}")
+    # A 0/23 exit alone doesn't prove the transfer happened; verify the data
+    # actually landed for the allowed cases.
+    if expected is not None:
+        verify_dirs(expected, actual, label=what)
 
 
 # --- a named refused option (delete) ----------------------------------------
 refused(['-a', '--delete', f'{src}/', f'{url}refuse-delete/'],
         "--delete on a refuse=delete module")
 allowed(['-a', f'{src}/', f'{url}refuse-delete/'],
-        "plain push to a refuse=delete module")
+        "plain push to a refuse=delete module", src, deldir)
 
 # --- a wildcard refused option (checksum*) ----------------------------------
 dest = SCRATCHDIR / 'wilddest'
@@ -67,7 +71,8 @@ refused(['-a', '--checksum', f'{url}refuse-wild/', f'{dest}/'],
 # --- the "* !a !v" allow-list: -av allowed, -z refused ----------------------
 rmtree(dest)
 makepath(dest)
-allowed(['-av', f'{url}only-av/', f'{dest}/'], "-av on an allow-list module")
+allowed(['-av', f'{url}only-av/', f'{dest}/'], "-av on an allow-list module",
+        src, dest)
 refused(['-avz', f'{url}only-av/', f'{dest}/'],
         "-z on an allow-list module")
 
