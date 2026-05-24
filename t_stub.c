@@ -27,6 +27,7 @@ int am_daemon = 0;
 int am_chrooted = 0;
 int modify_window = 0;
 int preallocate_files = 0;
+int sparse_files = 0;
 int protect_args = 0;
 int module_id = -1;
 int relative_paths = 0;
