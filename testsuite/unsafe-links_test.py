@@ -12,9 +12,12 @@ import os
 from rsyncfns import TMPDIR, is_a_link, rmtree, run_rsync, test_fail
 
 
-def assert_symlink(path):
+def assert_symlink(path, target):
     if not is_a_link(path):
         test_fail(f"File {path} is not a symlink")
+    actual = os.readlink(path)
+    if actual != target:
+        test_fail(f"symlink {path} target is {actual!r}, expected {target!r}")
 
 
 def assert_regular(path):
@@ -41,9 +44,9 @@ os.symlink("../../unsafe/unsafefile", "from/safe/links/unsafefile")
 
 print("rsync with relative path and just -a")
 run_rsync('-avv', 'from/safe/', 'to')
-assert_symlink("to/links/file1")
-assert_symlink("to/links/file2")
-assert_symlink("to/links/unsafefile")
+assert_symlink("to/links/file1", "../files/file1")
+assert_symlink("to/links/file2", "../files/file2")
+assert_symlink("to/links/unsafefile", "../../unsafe/unsafefile")
 
 print("rsync with relative path and -a --copy-links")
 run_rsync('-avv', '--copy-links', 'from/safe/', 'to')
@@ -53,8 +56,8 @@ assert_regular("to/links/unsafefile")
 
 print("rsync with relative path and --copy-unsafe-links")
 run_rsync('-avv', '--copy-unsafe-links', 'from/safe/', 'to')
-assert_symlink("to/links/file1")
-assert_symlink("to/links/file2")
+assert_symlink("to/links/file1", "../files/file1")
+assert_symlink("to/links/file2", "../files/file2")
 assert_regular("to/links/unsafefile")
 
 rmtree("to")
@@ -67,13 +70,13 @@ try:
     run_rsync('-avv', '--copy-unsafe-links', 'safe/', '../to')
 finally:
     os.chdir(saved)
-assert_symlink("to/links/file1")
-assert_symlink("to/links/file2")
+assert_symlink("to/links/file1", "../files/file1")
+assert_symlink("to/links/file2", "../files/file2")
 assert_regular("to/links/unsafefile")
 
 rmtree("to")
 print("rsync with absolute path")
 run_rsync('-avv', '--copy-unsafe-links', f'{os.getcwd()}/from/safe/', 'to')
-assert_symlink("to/links/file1")
-assert_symlink("to/links/file2")
+assert_symlink("to/links/file1", "../files/file1")
+assert_symlink("to/links/file2", "../files/file2")
 assert_regular("to/links/unsafefile")

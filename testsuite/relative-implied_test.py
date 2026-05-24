@@ -9,13 +9,13 @@ implied directory carrying a non-default mode, several levels deep.
 """
 
 import os
-import stat
 
 from rsyncfns import (
     SCRATCHDIR, TODIR,
     assert_mode, assert_same, forced_protocol, makepath, rmtree, run_rsync,
-    test_fail,
 )
+
+os.umask(0o022)        # make the default implied-dir mode deterministic (0o755)
 
 base = SCRATCHDIR / 'rbase'
 rmtree(base)
@@ -43,10 +43,11 @@ if proto is not None and proto < 30:
 else:
     rmtree(TODIR)
     run_rsync('-aR', '--no-implied-dirs', 'b/c/file', f'{TODIR}/')
-    m = stat.S_IMODE(os.stat(TODIR / 'b').st_mode)
-    if m == 0o750:
-        test_fail("--no-implied-dirs unexpectedly mirrored the source mode "
-                  "0750 onto the implied directory")
+    # The implied dir must get the default mode (0o777 & ~umask == 0o755),
+    # not the source's distinctive 0750 -- assert the exact mode, not merely
+    # "different from 0750".
+    assert_mode(TODIR / 'b', 0o755,
+                label='--no-implied-dirs uses the default mode, not source 0750')
     assert_same(TODIR / 'b' / 'c' / 'file', base / 'a' / 'b' / 'c' / 'file',
                 label='--no-implied-dirs deep file')
 

@@ -119,6 +119,10 @@ st = os.stat(src / deep)
 os.utime(src / deep, (st.st_atime, st.st_mtime + 100))   # force a delta update
 run_rsync('-a', '--inplace', '--sparse', '--no-whole-file', f'{src}/', f'{TODIR}/')
 assert_same(TODIR / deep, src / deep, label='--inplace --sparse content')
+if can_punch and allocated(TODIR / deep) >= os.path.getsize(TODIR / deep):
+    test_fail(f"--inplace --sparse did not punch the zero run: allocated "
+              f"{allocated(TODIR / deep)} for a {os.path.getsize(TODIR / deep)}"
+              "-byte file")
 
 print("preallocate: --preallocate (do_fallocate) + sparse hole-punching "
       "(do_punch_hole) verified at depth")
