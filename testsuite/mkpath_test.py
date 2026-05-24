@@ -4,6 +4,7 @@
 # Test the rsync --mkpath option: it should create any missing intermediate
 # destination directories rather than erroring out.
 
+import filecmp
 import os
 import shutil
 from pathlib import Path
@@ -25,10 +26,19 @@ os.chdir(TMPDIR)
 deep_dir = Path('to/foo/bar/baz/down/deep')
 
 
-def assert_file(path: Path, label: str) -> None:
+def assert_file(path: Path, label: str, src: str = 'from/text') -> None:
     if not path.is_file():
         test_fail(f"{label}: {path} not found")
+    if not filecmp.cmp(path, src, shallow=False):
+        test_fail(f"{label}: {path} content differs from {src}")
 
+
+# Negative control: without --mkpath, a missing intermediate path must fail and
+# create nothing -- otherwise the --mkpath successes below prove nothing.
+rmtree('to/foo')
+proc = run_rsync('-ai', 'from/text', str(deep_dir / 'new'), check=False)
+if proc.returncode == 0 or (deep_dir / 'new').exists():
+    test_fail("a transfer WITHOUT --mkpath created the missing intermediate path")
 
 # Create several levels of dest dir (file destination — final component
 # is the new filename).
@@ -53,7 +63,8 @@ rmtree('to/foo')
 
 # Multiple source args (whole directory) — bare dest name.
 run_rsync('-aiv', '--mkpath', 'from/', str(deep_dir))
-assert_file(deep_dir / 'extra', "'extra' file in deep dir (multi-source, no trailing slash)")
+assert_file(deep_dir / 'extra', "'extra' file in deep dir (multi-source, no trailing slash)",
+            src='from/extra')
 rmtree('to/foo')
 
 # Multiple source args (whole directory) — dest with trailing slash.

@@ -12,7 +12,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from rsyncfns import TMPDIR, run_rsync, test_skipped
+from rsyncfns import TMPDIR, run_rsync, test_fail, test_skipped
 
 
 pr_path = Path('/proc/sys/fs/protected_regular')
@@ -71,3 +71,10 @@ print(f"Contents of {workdir}:")
 subprocess.run(['ls', '-al', str(workdir)])
 
 run_rsync('--inplace', str(workdir / 'src'), str(workdir / 'dst'))
+
+# A zero exit isn't enough: confirm --inplace actually wrote the source bytes
+# into the protected destination (a no-op/short write would also exit 0).
+dst_content = (workdir / 'dst').read_text()
+if dst_content != "Source\n":
+    test_fail(f"--inplace did not write the source content into the protected "
+              f"dst: got {dst_content!r}")
