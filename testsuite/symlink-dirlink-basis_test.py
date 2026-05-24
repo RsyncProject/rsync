@@ -132,6 +132,7 @@ make_testfile(srcbase / 'dir' / 'file')
 
 push('-KRlptv', 'dir/file', 'localhost:', label="test 4 initial")
 
+old_content = (srcbase / 'dir' / 'file').read_bytes()   # the backup should hold this
 with open(srcbase / 'dir' / 'file', 'ab') as f:
     f.write(b"backup update\n")
 time.sleep(1)
@@ -141,6 +142,9 @@ push('-KRlptv', '--backup', 'dir/file', 'localhost:', label="test 4 update")
 assert_same("test 4 update", srcbase / 'dir' / 'file', home / 'real-dir' / 'file')
 if not (home / 'real-dir' / 'file~').is_file():
     test_fail("test 4: backup file was not created")
+# The backup must hold the OLD content, not just exist.
+if (home / 'real-dir' / 'file~').read_bytes() != old_content:
+    test_fail("test 4: backup file~ does not hold the pre-update content")
 
 
 # Test 5: --inplace.
