@@ -63,13 +63,8 @@ jobs:
 
           # Bionic doesn't declare lchmod()/lutimes() until API 36, but the
           # symbols link, so configure mis-detects them -- force them off so
-          # rsync uses its fallbacks. The other cache vars restore values
-          # that configure can't probe when cross-compiling (Android runs a
-          # normal Linux kernel, so these match the native Linux result).
-          export ac_cv_func_lchmod=no ac_cv_func_lutimes=no \
-                 rsync_cv_HAVE_SOCKETPAIR=yes \
-                 rsync_cv_MKNOD_CREATES_FIFOS=yes \
-                 rsync_cv_MKNOD_CREATES_SOCKETS=yes
+          # rsync uses its fallbacks.
+          export ac_cv_func_lchmod=no ac_cv_func_lutimes=no
 
           # Self-contained build: drop optional external libraries so the
           # static binary needs nothing at runtime. rsync keeps md5/md4

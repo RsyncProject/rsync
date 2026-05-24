@@ -1120,9 +1120,11 @@ int main(void) {
        int fd[2];
        return (socketpair(AF_UNIX, SOCK_STREAM, 0, fd) != -1) ? 0 : 1;
 }]])],[rsync_cv_HAVE_SOCKETPAIR=yes],[rsync_cv_HAVE_SOCKETPAIR=no],[rsync_cv_HAVE_SOCKETPAIR=cross])])
-if test x"$rsync_cv_HAVE_SOCKETPAIR" = x"yes"; then
+case "$rsync_cv_HAVE_SOCKETPAIR-$host_os" in
+yes-*|cross-*linux*)
     AC_DEFINE(HAVE_SOCKETPAIR, 1, [Define to 1 if you have the "socketpair" function])
-fi
+    ;;
+esac
 
 AC_REPLACE_FUNCS([getpass])
 
@@ -1243,20 +1245,17 @@ int main(void) {
   if ((st.st_mode & 0777) != 0600) return 1;
   return 0;
 }]])],[rsync_cv_HAVE_SECURE_MKSTEMP=yes],[rsync_cv_HAVE_SECURE_MKSTEMP=no],[rsync_cv_HAVE_SECURE_MKSTEMP=cross])])
-if test x"$rsync_cv_HAVE_SECURE_MKSTEMP" = x"yes"; then
-    case $host_os in
-    hpux*)
-	dnl HP-UX has a broken mkstemp() implementation they refuse to fix,
-	dnl so we noisily skip using it.  See HP change request JAGaf34426
-	dnl for details. (sbonds)
-	AC_MSG_WARN(Skipping broken HP-UX mkstemp() -- using mktemp() instead)
-	;;
-    *)
-	AC_DEFINE(HAVE_SECURE_MKSTEMP, 1, [Define to 1 if mkstemp() is available and works right])
-	;;
-    esac
-fi
-
+case "$rsync_cv_HAVE_SECURE_MKSTEMP-$host_os" in
+yes-hpux*)
+    dnl HP-UX has a broken mkstemp() implementation they refuse to fix,
+    dnl so we noisily skip using it.  See HP change request JAGaf34426
+    dnl for details. (sbonds)
+    AC_MSG_WARN(Skipping broken HP-UX mkstemp() -- using mktemp() instead)
+    ;;
+yes-*|cross-*android*)
+    AC_DEFINE(HAVE_SECURE_MKSTEMP, 1, [Define to 1 if mkstemp() is available and works right])
+    ;;
+esac
 
 AC_CACHE_CHECK([if mknod creates FIFOs],rsync_cv_MKNOD_CREATES_FIFOS,[
 AC_RUN_IFELSE([AC_LANG_SOURCE([[
@@ -1270,9 +1269,11 @@ int main(void) { int rc, ec; char *fn = "fifo-test";
 unlink(fn); rc = mknod(fn,S_IFIFO,0600); ec = errno; unlink(fn);
 if (rc) {printf("(%d %d) ",rc,ec); return ec;}
 return 0;}]])],[rsync_cv_MKNOD_CREATES_FIFOS=yes],[rsync_cv_MKNOD_CREATES_FIFOS=no],[rsync_cv_MKNOD_CREATES_FIFOS=cross])])
-if test x"$rsync_cv_MKNOD_CREATES_FIFOS" = x"yes"; then
+case "$rsync_cv_MKNOD_CREATES_FIFOS-$host_os" in
+yes-*|cross-*linux*)
     AC_DEFINE(MKNOD_CREATES_FIFOS, 1, [Define to 1 if mknod() can create FIFOs.])
-fi
+    ;;
+esac
 
 AC_CACHE_CHECK([if mknod creates sockets],rsync_cv_MKNOD_CREATES_SOCKETS,[
 AC_RUN_IFELSE([AC_LANG_SOURCE([[
@@ -1286,9 +1287,11 @@ int main(void) { int rc, ec; char *fn = "sock-test";
 unlink(fn); rc = mknod(fn,S_IFSOCK,0600); ec = errno; unlink(fn);
 if (rc) {printf("(%d %d) ",rc,ec); return ec;}
 return 0;}]])],[rsync_cv_MKNOD_CREATES_SOCKETS=yes],[rsync_cv_MKNOD_CREATES_SOCKETS=no],[rsync_cv_MKNOD_CREATES_SOCKETS=cross])])
-if test x"$rsync_cv_MKNOD_CREATES_SOCKETS" = x"yes"; then
+case "$rsync_cv_MKNOD_CREATES_SOCKETS-$host_os" in
+yes-*|cross-*linux*)
     AC_DEFINE(MKNOD_CREATES_SOCKETS, 1, [Define to 1 if mknod() can create sockets.])
-fi
+    ;;
+esac
 
 #
 # The following test was mostly taken from the tcl/tk plus patches
