@@ -40,8 +40,11 @@ url = start_test_daemon(conf, DAEMON_PORT)
 def pull(mod, dest):
     rmtree(dest)
     makepath(dest)
-    subprocess.run(rsync_argv('-a', f'{url}{mod}/', f'{dest}/'),
-                   stdout=subprocess.DEVNULL)
+    proc = subprocess.run(rsync_argv('-a', f'{url}{mod}/', f'{dest}/'),
+                          stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                          text=True)
+    if proc.returncode not in (0, 23):
+        test_fail(f"pull from {mod} failed (rc={proc.returncode}): {proc.stderr}")
 
 
 # --- daemon exclude hides *.secret everywhere in the module -----------------
@@ -53,8 +56,11 @@ assert_same(fp / 'd1' / 'd2' / 'f2', src / 'd1' / 'd2' / 'f2',
             label='daemon exclude kept others')
 
 # --- incoming chmod rewrites pushed file modes at depth ---------------------
-subprocess.run(rsync_argv('-a', f'{src}/', f'{url}inc/'),
-               stdout=subprocess.DEVNULL)
+proc = subprocess.run(rsync_argv('-a', f'{src}/', f'{url}inc/'),
+                      stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                      text=True)
+if proc.returncode not in (0, 23):
+    test_fail(f"incoming push failed (rc={proc.returncode}): {proc.stderr}")
 checked = 0
 for rel in rels:
     p = incdir / rel
@@ -67,10 +73,16 @@ if checked == 0:
 # --- outgoing chmod rewrites pulled file modes at depth ---------------------
 op = SCRATCHDIR / 'outpull'
 pull('out', op)
+checked = 0
 for rel in rels:
     p = op / rel
-    if p.is_file() and (os.stat(p).st_mode & 0o044):
+    if not p.is_file():
+        continue
+    checked += 1
+    if os.stat(p).st_mode & 0o044:
         test_fail(f"outgoing chmod did not clear group/other read on {rel}: "
                   f"{oct(os.stat(p).st_mode & 0o777)}")
+if checked == 0:
+    test_fail("outgoing chmod test pulled no files (loop was vacuous)")
 
 print("daemon-filter: exclude / incoming chmod / outgoing chmod verified at depth")
