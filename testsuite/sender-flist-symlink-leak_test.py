@@ -49,6 +49,11 @@ os.chmod(outside / 'leak_marker.txt', 0o644)
 
 os.symlink(str(outside), mod / 'cd')
 
+# A legitimate in-module file, used as a positive control so the leak check
+# below can't pass simply because the daemon's listing machinery is broken.
+(mod / 'realdir').mkdir()
+(mod / 'realdir' / 'in_module.txt').write_text("INSIDE_THE_MODULE\n")
+
 my_uid = get_testuid()
 root_uid = get_rootuid()
 root_gid = get_rootgid()
@@ -71,10 +76,24 @@ log file = {SCRATCHDIR}/rsyncd.log
 
 url = start_test_daemon(conf, DAEMON_PORT)
 
+# Positive control: a normal recursive listing of an in-module path must
+# enumerate the in-module file. If this fails, the daemon's flist generation is
+# broken and the leak check below would be vacuously satisfied.
+ctl = subprocess.run(
+    rsync_argv('-nrv', f'{url}upload/realdir/', f'{SCRATCHDIR}/dst/'),
+    capture_output=True, text=True,
+)
+if ctl.returncode != 0 or 'in_module.txt' not in ctl.stdout:
+    test_fail("positive control: listing an in-module path did not enumerate "
+              f"in_module.txt (rc={ctl.returncode}); leak check would be vacuous"
+              f"\n{ctl.stdout}{ctl.stderr}")
+
 proc = subprocess.run(
     rsync_argv('-nrv', f'{url}upload/cd/', f'{SCRATCHDIR}/dst/'),
     capture_output=True, text=True,
 )
+if proc.returncode >= 128:
+    test_fail(f"leak pull: rsync died from a signal (rc={proc.returncode})")
 listfile.write_text(proc.stdout + proc.stderr)
 
 if 'leak_marker.txt' in listfile.read_text():
