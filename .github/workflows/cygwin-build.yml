@@ -44,7 +44,7 @@ jobs:
       # package installed above), verified on a real Cygwin host. The real
       # chown/devices tests still skip (need root/mknod), as do the
       # RESOLVE_BENEATH symlink-race tests.
-      run: bash -c 'RSYNC_EXPECT_SKIPPED=acls-default,acls-depth,acls,bare-do-open-symlink-race,chdir-symlink-race,chown,daemon-chroot-acl,devices,dir-sgid,open-noatime,protected-regular,proxy-response-line-too-long,sender-flist-symlink-leak,simd-checksum,symlink-dirlink-basis make check'
+      run: bash -c 'RSYNC_EXPECT_SKIPPED=acls-default,acls-depth,acls,bare-do-open-symlink-race,chdir-symlink-race,chown,daemon-access-ip,daemon-chroot-acl,devices,dir-sgid,open-noatime,protected-regular,proxy-response-line-too-long,sender-flist-symlink-leak,simd-checksum,symlink-dirlink-basis make check'
     - name: check (TCP daemon transport)
       # Second run with daemon tests over a real loopback rsyncd; the default
       # 'make check' above uses the secure stdio-pipe transport.
