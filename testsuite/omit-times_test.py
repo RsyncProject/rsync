@@ -31,13 +31,13 @@ seed()
 run_rsync('-rlt', '-O', f'{src}/', f'{TODIR}/')
 for f in walk_files(src):
     assert_mtime_close(TODIR / f.relative_to(src), OLD, label=f'-O file {f.name}')
-omitted = False
+# Every directory mtime must be omitted (left at ~now), not just one of them:
+# the old "at least one differs" check would miss a bug that preserved some.
 for d in walk_dirs(src):
-    if abs(os.stat(TODIR / d.relative_to(src)).st_mtime - OLD) > 1:
-        omitted = True            # at least one dir keeps a fresh (now) mtime
-if not omitted:
-    test_fail("-O did not omit directory times -- every dir mtime matched the "
-              "source")
+    rel = d.relative_to(src)
+    if abs(os.stat(TODIR / rel).st_mtime - OLD) <= 1:
+        test_fail(f"-O preserved the mtime of directory {rel} instead of "
+                  "omitting it")
 
 # --- -J: symlink mtime omitted (where the platform records symlink mtimes) --
 seed()

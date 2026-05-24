@@ -10,9 +10,12 @@ import os
 from rsyncfns import TMPDIR, is_a_link, run_rsync, test_fail
 
 
-def assert_symlink(path):
+def assert_symlink(path, target):
     if not is_a_link(path):
         test_fail(f"File {path} is not a symlink")
+    actual = os.readlink(path)
+    if actual != target:
+        test_fail(f"symlink {path} target is {actual!r}, expected {target!r}")
 
 
 def assert_notexist(path):
@@ -42,7 +45,7 @@ os.symlink("a/a/a/../../../unsafe2", "from/safe/links/unsafe2")
 print("rsync with relative path and --safe-links")
 run_rsync('-avv', '--safe-links', 'from/safe/', 'to')
 
-assert_symlink("to/links/file1")
-assert_symlink("to/links/file2")
+assert_symlink("to/links/file1", "../files/file1")
+assert_symlink("to/links/file2", "../files/file2")
 assert_notexist("to/links/unsafefile")
 assert_notexist("to/links/unsafe2")
