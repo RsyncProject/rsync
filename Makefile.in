@@ -281,7 +281,7 @@ clean: cleantests
 		git-version.h rounding rounding.h *.old rsync*.1 rsync*.5 @MAKE_RRSYNC_1@ \
 		*.html daemon-parm.h help-*.h default-*.h proto.h proto.h-tstamp
 	rm -f *.gcno *.gcda lib/*.gcno lib/*.gcda zlib/*.gcno zlib/*.gcda popt/*.gcno popt/*.gcda
-	rm -rf coverage coverage-tcp
+	rm -rf coverage coverage-tcp coverage-all coverage-fallback
 
 .PHONY: cleantests
 cleantests:
@@ -342,6 +342,15 @@ COVERAGE_J = $(CHECK_J)
 COVERAGE_DIR = coverage
 COVERAGE_RUNFLAGS =
 
+# Bundled third-party code that rsync ships but does not own; excluded from the
+# coverage report so the percentages reflect rsync's own source. zlib/ and popt/
+# are wholly vendored; the named lib/ files are PostgreSQL (getaddrinfo) and ISC
+# (inet_ntop/inet_pton) / standalone (getpass) imports. The other lib/*.c
+# (md5, mdfour, wildmatch, permstring, pool_alloc, snprintf, sysacls, sysxattrs,
+# compat) are rsync's own and stay in the report.
+COVERAGE_EXCLUDE = -e '(^|/)zlib/' -e '(^|/)popt/' \
+	-e '(^|/)lib/(getaddrinfo|getpass|inet_ntop|inet_pton)\.'
+
 .PHONY: check
 check: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	$(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(CHECK_J)
@@ -369,7 +378,7 @@ coverage: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	find . -name '*.gcda' -delete
 	@rc=0; $(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(COVERAGE_J) $(COVERAGE_RUNFLAGS) || rc=$$?; \
 	  rm -rf $(COVERAGE_DIR) && mkdir -p $(COVERAGE_DIR); \
-	  gcovr --root $(srcdir) --decisions --print-summary \
+	  gcovr --root $(srcdir) $(COVERAGE_EXCLUDE) --decisions --print-summary \
 	      --html-details -o $(COVERAGE_DIR)/index.html . || exit $$?; \
 	  echo "Coverage report written to $(COVERAGE_DIR)/index.html"; \
 	  if test $$rc != 0; then \
@@ -382,6 +391,40 @@ coverage: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 .PHONY: coverage-tcp
 coverage-tcp:
 	$(MAKE) coverage COVERAGE_RUNFLAGS=--use-tcp COVERAGE_DIR=coverage-tcp
+
+# Comprehensive single report: run the suite under several configurations,
+# accumulating into the shared .gcda counters (NOT cleared between runs), then
+# emit one merged, rsync-scoped report. Covers the default (pipe) transport, the
+# protocol-29/30 compat branches, and the real-TCP daemon path (which also runs
+# the require_tcp-only tests). Run under sudo to additionally cover root-only
+# paths (devices, chown, use-chroot, protected-regular). Local target -- CI uses
+# the plain `coverage`/`coverage-tcp` targets.
+.PHONY: coverage-all
+coverage-all: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
+	@case '$(CFLAGS)' in *--coverage*) ;; \
+	  *) echo "*** not a coverage build; reconfigure with --enable-coverage"; exit 1 ;; esac
+	@command -v gcovr >/dev/null 2>&1 || { echo "*** gcovr not found (pip install gcovr)"; exit 1; }
+	find . -name '*.gcda' -delete
+	@rc=0; \
+	  for cfg in '' '--protocol=30' '--protocol=29' '--use-tcp'; do \
+	    echo "===== coverage-all: runtests.py $$cfg ====="; \
+	    $(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(COVERAGE_J) $$cfg || rc=$$?; \
+	  done; \
+	  rm -rf coverage-all && mkdir -p coverage-all; \
+	  gcovr --root $(srcdir) $(COVERAGE_EXCLUDE) --decisions --print-summary \
+	      --html-details -o coverage-all/index.html . || exit $$?; \
+	  echo "Merged coverage report written to coverage-all/index.html"; \
+	  if test $$rc != 0; then \
+	    echo "*** some suite runs FAILED (status $$rc) -- report still written above"; \
+	  fi; \
+	  exit $$rc
+
+# Coverage for the portable (non-openat2) resolver tier. Requires a SEPARATE
+# build configured with --enable-coverage --disable-openat2: its .gcno differ
+# from the openat2 build, so this report cannot be merged with the others.
+.PHONY: coverage-fallback
+coverage-fallback:
+	$(MAKE) coverage COVERAGE_DIR=coverage-fallback
 
 wildtest.o: wildtest.c t_stub.o lib/wildmatch.c rsync.h config.h
 wildtest$(EXEEXT): wildtest.o lib/compat.o lib/snprintf.o @BUILD_POPT@
