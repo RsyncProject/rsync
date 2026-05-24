@@ -11,7 +11,7 @@ import os
 
 from rsyncfns import (
     FROMDIR, TODIR,
-    assert_same, make_data_file, makepath, rmtree, run_rsync,
+    assert_same, make_data_file, makepath, rmtree, run_rsync, test_fail,
 )
 
 src = FROMDIR
@@ -31,7 +31,15 @@ base = (src / newfile).read_bytes()
 (TODIR / deepdir / 'archive-old.tar').write_bytes(base[:200_000])
 (TODIR / deepdir / 'unrelated.dat').write_bytes(b'nothing alike' * 1000)
 
-run_rsync('-a', '--fuzzy', '--no-whole-file', f'{src}/', f'{TODIR}/')
+# Capture --debug=FUZZY: a correct final file alone would also result from a
+# full transfer that ignored --fuzzy, so assert the scorer actually chose the
+# closest-named candidate (archive-v1.tar) as the basis, not just that bytes match.
+proc = run_rsync('-a', '--fuzzy', '--no-whole-file', '--debug=FUZZY',
+                 f'{src}/', f'{TODIR}/', capture_output=True)
+want = f'fuzzy basis selected for {newfile}: {os.path.join(deepdir, "archive-v1.tar")}'
+if want not in proc.stdout:
+    test_fail(f"--fuzzy did not score archive-v1.tar as the closest basis; "
+              f"expected {want!r}, --debug=FUZZY output was:\n{proc.stdout}")
 assert_same(TODIR / newfile, src / newfile, label='fuzzy result')
 
 print("fuzzy-basis: --fuzzy candidate scoring (fuzzy_distance) verified at depth")
