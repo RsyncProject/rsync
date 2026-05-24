@@ -9,10 +9,11 @@ algorithm is exercised for a clean, byte-identical transfer of a >=3-deep tree
 """
 
 import json
+import re
 
 from rsyncfns import (
     FROMDIR, TODIR,
-    assert_same, make_tree, rmtree, run_rsync, walk_files,
+    assert_same, make_tree, rmtree, run_rsync, test_fail, walk_files,
 )
 
 src = FROMDIR
@@ -34,14 +35,25 @@ def verify(rels, label):
 
 
 # --- --compress-choice for every advertised compressor ----------------------
+# Byte-identical output alone proves only that the option didn't corrupt data;
+# assert via --debug=NSTR (compat.c) that the requested compressor was actually
+# selected for the transfer. The trailing " (level" anchors so zlib != zlibx.
 for algo in compressors:
     rels = fresh()
-    run_rsync('-az', f'--compress-choice={algo}', f'{src}/', f'{TODIR}/')
+    proc = run_rsync('-az', f'--compress-choice={algo}', '--debug=NSTR',
+                     f'{src}/', f'{TODIR}/', capture_output=True)
+    if not re.search(rf'compress: {re.escape(algo)} \(level', proc.stdout):
+        test_fail(f"--compress-choice={algo} was not the selected compressor; "
+                  f"--debug=NSTR output:\n{proc.stdout}")
     verify(rels, f'--compress-choice={algo}')
 
-# --- --compress-level -------------------------------------------------------
+# --- --compress-level (the requested level reaches the compressor) ----------
 rels = fresh()
-run_rsync('-az', '--compress-level=9', f'{src}/', f'{TODIR}/')
+proc = run_rsync('-az', '--compress-level=9', '--debug=NSTR',
+                 f'{src}/', f'{TODIR}/', capture_output=True)
+if not re.search(r'compress: \S+ \(level 9\)', proc.stdout):
+    test_fail("--compress-level=9 was not applied; "
+              f"--debug=NSTR output:\n{proc.stdout}")
 verify(rels, '--compress-level=9')
 
 # --- --skip-compress (the file must still arrive intact) --------------------
@@ -52,9 +64,15 @@ assert_same(TODIR / 'd1' / 'd2' / 'x.gz', src / 'd1' / 'd2' / 'x.gz',
             label='--skip-compress gz')
 
 # --- --checksum-choice for every advertised checksum ------------------------
+# As above: assert via --debug=NSTR (checksum.c) that the requested checksum was
+# the one negotiated, not merely that the transfer succeeded.
 for algo in checksums:
     rels = fresh()
-    run_rsync('-a', '-c', f'--checksum-choice={algo}', f'{src}/', f'{TODIR}/')
+    proc = run_rsync('-a', '-c', f'--checksum-choice={algo}', '--debug=NSTR',
+                     f'{src}/', f'{TODIR}/', capture_output=True)
+    if not re.search(rf'checksum: {re.escape(algo)}\b', proc.stdout):
+        test_fail(f"--checksum-choice={algo} was not the selected checksum; "
+                  f"--debug=NSTR output:\n{proc.stdout}")
     verify(rels, f'--checksum-choice={algo}')
 
 # --- --checksum-seed --------------------------------------------------------
