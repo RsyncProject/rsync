@@ -47,6 +47,7 @@ extern int read_only;
 extern int list_only;
 extern int inplace;
 extern int preallocate_files;
+extern int sparse_files;
 extern int preserve_perms;
 extern int preserve_executability;
 extern int open_noatime;
@@ -1525,7 +1526,13 @@ int do_utime(const char *path, STRUCT_STAT *stp)
 
 OFF_T do_fallocate(int fd, OFF_T offset, OFF_T length)
 {
-	int opts = inplace || preallocate_files ? DO_FALLOC_OPTIONS : 0;
+	/* FALLOC_FL_KEEP_SIZE lets --preallocate/--inplace keep the file size at 0
+	 * until data is written, but a later hole-punch (for --sparse) can only
+	 * deallocate blocks that lie within the file's size -- with KEEP_SIZE the
+	 * reserved blocks sit beyond EOF and the punch silently does nothing,
+	 * leaving the file fully allocated.  So when holes will also be punched,
+	 * preallocate at full size instead (write_sparse then punches the nulls). */
+	int opts = (inplace || preallocate_files) && sparse_files <= 0 ? DO_FALLOC_OPTIONS : 0;
 	int ret;
 	RETURN_ERROR_IF(dry_run, 0);
 	RETURN_ERROR_IF_RO_OR_LO;
@@ -1550,7 +1557,14 @@ OFF_T do_fallocate(int fd, OFF_T offset, OFF_T length)
 			return length;
 		return st.st_blocks * S_BLKSIZE;
 	}
-	return 0;
+	/* With FALLOC_FL_KEEP_SIZE the blocks for [0, length) are reserved even
+	 * though the file size stays put.  Return that reserved length (not 0) so
+	 * the caller's preallocated_len is meaningful: write_sparse() needs it to
+	 * choose do_punch_hole() over a plain lseek() when turning a null run into
+	 * a hole, and the receiver uses it to trim any over-preallocation.  (A
+	 * stray 0 here, from 2019's switch to KEEP_SIZE, is why --preallocate
+	 * --sparse stopped producing sparse files.) */
+	return length;
 }
 #endif
 
