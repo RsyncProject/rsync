@@ -87,11 +87,39 @@ url = start_test_daemon(conf, DAEMON_PORT)
 
 def run_attack(label: str, *args) -> None:
     reset_outside()
-    subprocess.run(
+    rc = subprocess.run(
         rsync_argv(*args),
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-    )
+    ).returncode
+    if rc >= 128:
+        test_fail(f"{label}: rsync died from a signal (rc={rc})")
     verify_unchanged(label)
+
+
+def positive_control() -> None:
+    """Confirm the receiver writes into an ordinary in-module subdirectory, so
+    the symlink-escape scenarios below genuinely exercise the chdir path rather
+    than passing because the daemon refused (or failed) before reaching it."""
+    real = mod / 'realdir'
+    rmtree(real)
+    real.mkdir()
+    # When this test runs as root the daemon serves as 'nobody' (the module
+    # sets no uid), so make the control target world-writable; push a single
+    # file with no attribute preservation so the write never needs to own/chmod
+    # the dir -- it should land purely on the receiver's normal write path.
+    os.chmod(real, 0o777)
+    rc = subprocess.run(
+        rsync_argv(f'{src}/subdir/target.txt', f'{url}upload/realdir/'),
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    ).returncode
+    landed = real / 'target.txt'
+    if rc != 0 or not landed.is_file() \
+            or not filecmp.cmp(landed, src / 'subdir' / 'target.txt', shallow=False):
+        test_fail(f"positive control: receiver did not write into an ordinary "
+                  f"in-module subdir (rc={rc}); attack scenarios would be vacuous")
+
+
+positive_control()
 
 
 # 1. Single file with --size-only -- receiver normally skips basis open and
