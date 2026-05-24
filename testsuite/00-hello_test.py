@@ -97,3 +97,8 @@ try:
     )
 finally:
     os.chdir(saved)
+
+# check=True only proves a zero exit; confirm the env-var path actually copied
+# both files (as the explicit --old-args case above does).
+if not (TODIR / 'one').is_file() or not (TODIR / 'two').is_file():
+    test_fail("RSYNC_OLD_ARGS=1 copy of 'one two' failed")

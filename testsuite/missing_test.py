@@ -31,6 +31,8 @@ def run_capture(*args):
 out_path = TMPDIR / 'out1'
 proc = run_capture('-n', '-r', '--ignore-non-existing', '-vv',
                    f'{FROMDIR}/', f'{TODIR}/')
+if proc.returncode != 0:
+    test_fail(f"test 1 failed: dry-run errored (rc={proc.returncode})")
 out_path.write_text(proc.stdout)
 for line in proc.stdout.splitlines():
     if 'not creating new' in line and 'subdir/file' in line:
