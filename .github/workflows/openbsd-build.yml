@@ -37,7 +37,15 @@ jobs:
           make
           ./rsync --version
           make check
-          ./runtests.py --rsync-bin=`pwd`/rsync --use-tcp -j 8
+          # The --use-tcp daemon tests run at -j2 here (vs -j8 elsewhere): this
+          # job runs inside a nested VM, and at -j8 the many concurrent loopback
+          # daemons occasionally lose a connection-handshake timing race under
+          # that resource pressure, hanging one test to the 300s timeout. It is
+          # an environment artifact, not an rsync bug (the handshake is
+          # deadlock-free and unreproducible elsewhere, even pinned to 1 CPU at
+          # -j8); -j2 keeps the VM from over-subscribing. The pipe `make check`
+          # above stays at the default parallelism.
+          ./runtests.py --rsync-bin=`pwd`/rsync --use-tcp -j 2
           ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
     - name: save artifact
       uses: actions/upload-artifact@v4
