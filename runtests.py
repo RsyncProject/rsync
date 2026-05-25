@@ -346,6 +346,8 @@ def main():
     required_helpers = ['tls', 'trimslash', 't_unsafe', 't_chmod_secure',
                         't_secure_relpath',
                         'wildtest', 'getgroups', 'getfsdev']
+    if sys.platform == 'win32':
+        required_helpers = [h + '.exe' for h in required_helpers]
     missing = [h for h in required_helpers
                if not os.path.isfile(os.path.join(tooldir, h))]
     if missing:

@@ -59,3 +59,47 @@ aclocal.m4
 .deps
 /*.exe
 *.dSYM/
+
+# --- Added for CMake, MSVC, vcpkg, and Python workflows ---
+
+# CMake & vcpkg
+/build-*/
+/out/
+/bin/
+CMakeCache.txt
+CMakeFiles/
+CMakeUserPresets.json
+vcpkg_installed/
+.vcpkg/
+vcpkg-manifest-install.log
+
+# Visual Studio & Windows artifacts
+.vs/
+*.sln
+*.suo
+*.user
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.obj
+*.lib
+*.exp
+*.pdb
+*.ilk
+*.dll
+*.idb
+*.manifest
+
+# Python
+__pycache__/
+*.py[cod]
+*.class
+.pytest_cache/
+.venv/
+venv/
+
+# Scratch & Temporary
+test_*.c
+test_*.py
+child_*.txt
+*.i

@@ -18,7 +18,11 @@ Conventions matching the shell harness:
 from __future__ import annotations
 
 import atexit
-import fcntl
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
+    import msvcrt
 import filecmp
 import os
 import platform
@@ -196,9 +200,17 @@ def claim_ports(*ports: int) -> 'None':
     if _port_lock_fd is None:
         _port_lock_fd = _open_lock_file()
     for port in sorted(ports):
-        # F_SETLKW via fcntl.lockf(LOCK_EX, length, start): exclusive
-        # byte-range lock on byte `port`, blocking until acquired.
-        fcntl.lockf(_port_lock_fd, fcntl.LOCK_EX, 1, port)
+        # exclusive byte-range lock on byte `port`, blocking until acquired.
+        if fcntl:
+            fcntl.lockf(_port_lock_fd, fcntl.LOCK_EX, 1, port)
+        else:
+            os.lseek(_port_lock_fd, port, os.SEEK_SET)
+            while True:
+                try:
+                    msvcrt.locking(_port_lock_fd, msvcrt.LK_LOCK, 1)
+                    break
+                except OSError:
+                    time.sleep(0.1)
 
 
 # --- standalone rsyncd helpers ---------------------------------------------
