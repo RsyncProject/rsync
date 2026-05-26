@@ -1325,6 +1325,8 @@ AC_SUBST(MAKE_RRSYNC)
 AC_SUBST(MAKE_RRSYNC_1)
 AC_SUBST(GEN_RRSYNC)
 AC_SUBST(MAKE_MAN)
+AC_SUBST(cross_compiling)
+AC_SUBST(host_os)
 
 AC_CHECK_FUNCS(_acl __acl _facl __facl)
 #################################################

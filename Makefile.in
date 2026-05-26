@@ -381,7 +381,12 @@ check-progs: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 
 .PHONY: check
 check: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
-	$(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(CHECK_J)
+	@case "@cross_compiling@-@host_os@" in \
+	yes-*android*) \
+	  $(srcdir)/test-android -j $(CHECK_J) ;; \
+	*) \
+	  $(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(CHECK_J) ;; \
+	esac
 
 .PHONY: check29
 check29: all $(CHECK_PROGS) $(CHECK_SYMLINKS)

@@ -1,0 +1,46 @@
+#!/bin/sh -e
+
+# Copyright © 2026 Matt Robinson
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+if [ $# -eq 0 ]; then
+    echo 'A list of helper names was expected' >&2
+    exit 1
+fi
+
+if ! adb -e get-state > /dev/null 2>&1; then
+    echo 'Unable to find a running Android emulator' >&2
+    exit 1
+fi
+
+if [ -z "$(adb shell pm list packages com.termux)" ]; then
+    tempdir=$(mktemp -d)
+    trap 'rm -rf "$tempdir"' EXIT
+
+    gh release download --repo termux/termux-app  --dir "$tempdir" \
+        --pattern 'termux-app_v*-debug_x86_64.apk'
+    adb install "$tempdir"/termux-app_*.apk
+
+    # Launch Termux so that it bootstraps the environment
+    adb shell monkey -p com.termux 1
+
+    # termux.properties appears to be created at the end of the bootstrapping
+    until adb shell run-as com.termux \
+            test -f files/home/.termux/termux.properties; do
+        sleep 1
+    done
+fi
+
+tar -c --exclude-vcs --exclude-backup --exclude="*.o" . | \
+    adb shell run-as com.termux sh -c "'cat > files/home/transfer.tar'"
+
+adb shell run-as com.termux files/usr/bin/bash -le <<EOF
+export PATH=\$(pwd)/files/usr/bin:\$PATH
+export LD_PRELOAD=\$(pwd)/files/usr/lib/libtermux-exec.so
+export HOME=\$(pwd)/files/home
+cd
+command -v python > /dev/null || pkg install -y --no-install-recommends python
+tar -xf transfer.tar
+python ./runtests.py "$@"
+EOF
