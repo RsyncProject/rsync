@@ -65,7 +65,7 @@ jobs:
       run: RSYNC_EXPECT_SKIPPED=crtimes,daemon-access-ip,daemon-chroot-acl,proxy-response-line-too-long make check
     - name: check (TCP daemon transport)
       # Second run exercising the real loopback-TCP daemon path.
-      run: ./runtests.py --rsync-bin=`pwd`/rsync --use-tcp -j 8
+      run: ./runtests.py --rsync-bin="$PWD/rsync" --use-tcp -j 8
     - name: ssl file list
       run: ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
     - name: save artifact

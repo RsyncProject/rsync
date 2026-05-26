@@ -25,7 +25,7 @@ jobs:
     - name: prep
       run: |
         sudo apt-get install acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev python3-cmarkgfm openssl
-        echo "/usr/local/bin" >>$GITHUB_PATH
+        echo "/usr/local/bin" >>"$GITHUB_PATH"
     - name: configure
       run: ./configure --with-rrsync
     - name: make
@@ -45,7 +45,7 @@ jobs:
       # 'make check' above uses the secure stdio-pipe transport (no listening
       # sockets); this run exercises the real TCP accept/auth path. Skip-set
       # is env-dependent here (chroot-acl), so leave RSYNC_EXPECT_SKIPPED unset.
-      run: sudo ./runtests.py --rsync-bin=`pwd`/rsync --use-tcp -j 8
+      run: sudo ./runtests.py --rsync-bin="$PWD/rsync" --use-tcp -j 8
     - name: ssl file list
       run: rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
     - name: save artifact

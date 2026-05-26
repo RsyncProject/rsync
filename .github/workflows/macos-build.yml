@@ -26,7 +26,7 @@ jobs:
       run: |
         brew install automake openssl xxhash zstd lz4
         pip3 install --user --break-system-packages commonmark
-        echo "$(brew --prefix)/bin" >>$GITHUB_PATH
+        echo "$(brew --prefix)/bin" >>"$GITHUB_PATH"
     - name: configure
       run: |
         BREW_PREFIX=$(brew --prefix)
@@ -48,7 +48,7 @@ jobs:
     - name: check (TCP daemon transport)
       # Second run with daemon tests over a real loopback rsyncd; the default
       # 'make check' above uses the secure stdio-pipe transport.
-      run: sudo ./runtests.py --rsync-bin=`pwd`/rsync --use-tcp -j 8
+      run: sudo ./runtests.py --rsync-bin="$PWD/rsync" --use-tcp -j 8
     - name: ssl file list
       run: rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
     - name: save artifact
