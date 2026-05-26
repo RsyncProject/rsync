@@ -1,13 +1,11 @@
-name: Build static rsync for Android
+name: Test rsync on Android
 
 # Cross-compiles statically-linked rsync binaries with the Android NDK,
 # suitable for dropping onto a phone (adb push / Termux) with no shared
 # libraries. arm64-v8a covers all modern phones; armeabi-v7a covers older
 # 32-bit devices. The binaries are uploaded as workflow artifacts.
 #
-# These are cross-compiled, so the test suite can't run here; we sanity
-# check that each binary is the right architecture, is static, and that
-# it executes (`--version`) under qemu-user.
+# Run the test suite within Termux under the Android Emulator.
 
 on:
   push:
@@ -43,6 +41,8 @@ jobs:
           - abi: armeabi-v7a     # older 32-bit phones
             triple: armv7a-linux-androideabi
             qemu: qemu-arm-static
+          - abi: x86_64
+            triple: x86_64-linux-android
     steps:
       - uses: actions/checkout@v4
         with:
@@ -89,6 +89,7 @@ jobs:
           "$STRIP" rsync
 
       - name: Verify binary
+        if: matrix.abi != 'x86_64'
         shell: bash
         run: |
           set -euo pipefail
@@ -101,6 +102,24 @@ jobs:
           # Best-effort: confirm it actually runs under qemu-user.
           ${{ matrix.qemu }} ./rsync --version | head -3 || \
             echo "WARNING: qemu smoke test did not run cleanly (check on a real device)"
+
+      - name: Enable hardware acceleration for emulator
+        if: matrix.abi == 'x86_64'
+        run: echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666",
+                   OPTIONS+="static_node=kvm"'
+                | sudo tee /etc/udev/rules.d/99-kvm4all.rules;
+          sudo udevadm control --reload-rules;
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run Tests
+        if: matrix.abi == 'x86_64'
+        uses: reactivecircus/android-emulator-runner@e89f39f1abbbd05b1113a29cf4db69e7540cae5a
+        with:
+          api-level: 30
+          arch: x86_64
+          script: make check
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Package
         shell: bash
