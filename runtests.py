@@ -323,6 +323,12 @@ def main():
     if not srcdir or srcdir == '.':
         srcdir = tooldir
     rsync_bin = args.rsync_bin or os.environ.get('rsync_bin') or os.path.join(tooldir, 'rsync')
+    # Absolutize: tests run with subprocess(cwd=TOOLDIR) below, so a relative
+    # argv[0] would re-resolve against TOOLDIR rather than the runner's
+    # invocation cwd, breaking --rsync-bin=../foo/rsync forms.  abspath()
+    # captures os.getcwd() now, which is what the operator intended.
+    if rsync_bin and not os.path.isabs(rsync_bin):
+        rsync_bin = os.path.abspath(rsync_bin)
 
     suitedir = os.path.join(srcdir, 'testsuite')
     scratchbase = os.path.join(os.environ.get('scratchbase', tooldir), 'testtmp')
