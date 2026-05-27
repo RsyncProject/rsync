@@ -1,0 +1,120 @@
+name: Build static rsync for Android
+
+# Cross-compiles statically-linked rsync binaries with the Android NDK,
+# suitable for dropping onto a phone (adb push / Termux) with no shared
+# libraries. arm64-v8a covers all modern phones; armeabi-v7a covers older
+# 32-bit devices. The binaries are uploaded as workflow artifacts.
+#
+# These are cross-compiled, so the test suite can't run here; we sanity
+# check that each binary is the right architecture, is static, and that
+# it executes (`--version`) under qemu-user.
+
+on:
+  push:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/android-static-build.yml'
+  pull_request:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/android-static-build.yml'
+  schedule:
+    - cron: '42 8 * * *'
+  workflow_dispatch:
+
+env:
+  # Minimum supported API level. 24 (Android 7.0) runs on every modern
+  # phone while keeping broad reach; bump if you need newer Bionic APIs.
+  ANDROID_API: 24
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: ${{ matrix.abi }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - abi: arm64-v8a       # modern phones
+            triple: aarch64-linux-android
+            qemu: qemu-aarch64-static
+          - abi: armeabi-v7a     # older 32-bit phones
+            triple: armv7a-linux-androideabi
+            qemu: qemu-arm-static
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install build prerequisites
+        run: sudo apt-get update && sudo apt-get install -y autoconf automake gawk qemu-user-static
+
+      - name: Configure and build (${{ matrix.abi }})
+        shell: bash
+        run: |
+          set -euo pipefail
+          NDK="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_ROOT}"
+          TC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          export CC="$TC/${{ matrix.triple }}${ANDROID_API}-clang"
+          export AR="$TC/llvm-ar" RANLIB="$TC/llvm-ranlib" STRIP="$TC/llvm-strip"
+          export CFLAGS="-O2" LDFLAGS="-static"
+
+          # Bionic doesn't declare lchmod()/lutimes() until API 36, but the
+          # symbols link, so configure mis-detects them -- force them off so
+          # rsync uses its fallbacks. The other cache vars restore values
+          # that configure can't probe when cross-compiling (Android runs a
+          # normal Linux kernel, so these match the native Linux result).
+          export ac_cv_func_lchmod=no ac_cv_func_lutimes=no \
+                 rsync_cv_HAVE_SOCKETPAIR=yes \
+                 rsync_cv_MKNOD_CREATES_FIFOS=yes \
+                 rsync_cv_MKNOD_CREATES_SOCKETS=yes
+
+          # Self-contained build: drop optional external libraries so the
+          # static binary needs nothing at runtime. rsync keeps md5/md4
+          # checksums and its bundled zlib.
+          ./configure --host=${{ matrix.triple }} --build=x86_64-pc-linux-gnu \
+            --enable-ipv6 \
+            --disable-zstd --disable-lz4 --disable-xxhash --disable-openssl \
+            --disable-iconv --disable-iconv-open \
+            --disable-acl-support --disable-xattr-support \
+            --disable-md2man --disable-roll-simd \
+            --with-included-popt --with-included-zlib
+
+          # Generate the awk-built headers serially first so the parallel
+          # build can't race on proto.h <- daemon-parm.h.
+          make proto.h
+          make -j"$(nproc)" rsync
+          "$STRIP" rsync
+
+      - name: Verify binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          file rsync
+          # Gate: must be a statically-linked executable (no interpreter).
+          file rsync | grep -q "statically linked"
+          if file rsync | grep -q "dynamically linked"; then
+            echo "ERROR: binary is not static" >&2; exit 1
+          fi
+          # Best-effort: confirm it actually runs under qemu-user.
+          ${{ matrix.qemu }} ./rsync --version | head -3 || \
+            echo "WARNING: qemu smoke test did not run cleanly (check on a real device)"
+
+      - name: Package
+        shell: bash
+        run: |
+          set -euo pipefail
+          VER=$(sed -n 's/.*RSYNC_VERSION "\([^"]*\)".*/\1/p' version.h)
+          out="rsync-${VER}-android-${{ matrix.abi }}"
+          mkdir -p dist
+          cp rsync "dist/$out"
+          ( cd dist && sha256sum "$out" > "$out.sha256" )
+          echo "ARTIFACT_NAME=rsync-android-${{ matrix.abi }}" >>"$GITHUB_ENV"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: dist/

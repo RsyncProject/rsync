@@ -547,7 +547,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		if (am_root >= 0) {
 			uid_t uid = change_uid ? (uid_t)F_OWNER(file) : sxp->st.st_uid;
 			gid_t gid = change_gid ? (gid_t)F_GROUP(file) : sxp->st.st_gid;
-			if (do_lchown(fname, uid, gid) != 0) {
+			if (do_lchown_at(fname, uid, gid) != 0) {
 				/* We shouldn't have attempted to change uid
 				 * or gid unless have the privilege. */
 				rsyserr(FERROR_XFER, errno, "%s %s failed",
@@ -657,7 +657,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 
 #ifdef HAVE_CHMOD
 	if (!BITS_EQUAL(sxp->st.st_mode, new_mode, CHMOD_BITS)) {
-		int ret = am_root < 0 ? 0 : do_chmod(fname, new_mode);
+		int ret = am_root < 0 ? 0 : do_chmod_at(fname, new_mode);
 		if (ret < 0) {
 			rsyserr(FERROR_XFER, errno,
 				"failed to set permissions on %s",
@@ -758,7 +758,7 @@ int finish_transfer(const char *fname, const char *fnametmp,
 			full_fname(fnametmp), fname);
 		if (!partialptr || (ret == -2 && temp_copy_name)
 		 || robust_rename(fnametmp, partialptr, NULL, file->mode) < 0)
-			do_unlink(fnametmp);
+			do_unlink_at(fnametmp);
 		return 0;
 	}
 	if (ret == 0) {
@@ -774,7 +774,7 @@ int finish_transfer(const char *fname, const char *fnametmp,
 		       ok_to_set_time ? ATTRS_ACCURATE_TIME : ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME | ATTRS_SKIP_CRTIME);
 
 	if (temp_copy_name) {
-		if (do_rename(fnametmp, fname) < 0) {
+		if (do_rename_at(fnametmp, fname) < 0) {
 			rsyserr(FERROR_XFER, errno, "rename %s -> \"%s\"",
 				full_fname(fnametmp), fname);
 			return 0;

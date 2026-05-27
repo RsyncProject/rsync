@@ -1,0 +1,183 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<!--Converted with LaTeX2HTML 98.1p1 release (March 2nd, 1998)
+originally by Nikos Drakos (nikos@cbl.leeds.ac.uk), CBLU, University of Leeds
+* revised and updated by:  Marcus Hennecke, Ross Moore, Herb Swan
+* with significant contributions from:
+  Jens Lippmann, Marek Rouchal, Martin Wilck and others -->
+<HTML>
+<HEAD>
+<TITLE>The rsync algorithm</TITLE>
+<META NAME="description" CONTENT="The rsync algorithm">
+<META NAME="keywords" CONTENT="tech_report">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+<LINK REL="STYLESHEET" HREF="tech_report.css">
+<LINK REL="next" HREF="node3.html">
+<LINK REL="previous" HREF="node1.html">
+<LINK REL="up" HREF="tech_report.html">
+<LINK REL="next" HREF="node3.html">
+</HEAD>
+<BODY >
+<!--Navigation Panel-->
+<A NAME="tex2html32"
+ HREF="node3.html">
+<IMG WIDTH="37" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="next"
+ SRC="next.gif"></A> 
+<A NAME="tex2html30"
+ HREF="tech_report.html">
+<IMG WIDTH="26" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="up"
+ SRC="up.gif"></A> 
+<A NAME="tex2html24"
+ HREF="node1.html">
+<IMG WIDTH="63" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="previous"
+ SRC="previous.gif"></A>   
+<BR>
+<B> Next:</B> <A NAME="tex2html33"
+ HREF="node3.html">Rolling checksum</A>
+<B> Up:</B> <A NAME="tex2html31"
+ HREF="tech_report.html">The rsync algorithm</A>
+<B> Previous:</B> <A NAME="tex2html25"
+ HREF="node1.html">The problem</A>
+<BR>
+<BR>
+<!--End of Navigation Panel-->
+
+<H1><A NAME="SECTION00020000000000000000">
+The rsync algorithm</A>
+</H1>
+
+<P>
+Suppose we have two general purpose computers <IMG
+ WIDTH="15" HEIGHT="13" ALIGN="BOTTOM" BORDER="0"
+ SRC="img1.gif"
+ ALT="$\alpha$">
+and <IMG
+ WIDTH="14" HEIGHT="29" ALIGN="MIDDLE" BORDER="0"
+ SRC="img2.gif"
+ ALT="$\beta$">.
+Computer <IMG
+ WIDTH="15" HEIGHT="13" ALIGN="BOTTOM" BORDER="0"
+ SRC="img1.gif"
+ ALT="$\alpha$">
+has access to a file <I>A</I> and <IMG
+ WIDTH="14" HEIGHT="29" ALIGN="MIDDLE" BORDER="0"
+ SRC="img2.gif"
+ ALT="$\beta$">
+has access to
+file <I>B</I>, where <I>A</I> and <I>B</I> are ``similar''.  There is a slow
+communications link between <IMG
+ WIDTH="15" HEIGHT="13" ALIGN="BOTTOM" BORDER="0"
+ SRC="img1.gif"
+ ALT="$\alpha$">
+and <IMG
+ WIDTH="14" HEIGHT="29" ALIGN="MIDDLE" BORDER="0"
+ SRC="img2.gif"
+ ALT="$\beta$">.
+
+<P>
+The rsync algorithm consists of the following steps:
+
+<P>
+<DL COMPACT>
+<DT>1.
+<DD><IMG
+ WIDTH="14" HEIGHT="29" ALIGN="MIDDLE" BORDER="0"
+ SRC="img2.gif"
+ ALT="$\beta$">
+splits the file <I>B</I> into a series of non-overlapping
+fixed-sized blocks of size S bytes<A NAME="tex2html1"
+ HREF="footnode.html#foot10"><SUP>1</SUP></A>.
+  The last block may be shorter than <I>S</I> bytes.
+
+<P>
+<DT>2.
+<DD>For each of these blocks <IMG
+ WIDTH="14" HEIGHT="29" ALIGN="MIDDLE" BORDER="0"
+ SRC="img2.gif"
+ ALT="$\beta$">
+calculates two checksums:
+  a weak ``rolling'' 32-bit checksum (described below) and a strong
+  128-bit MD4 checksum.
+
+<P>
+<DT>3.
+<DD><IMG
+ WIDTH="14" HEIGHT="29" ALIGN="MIDDLE" BORDER="0"
+ SRC="img2.gif"
+ ALT="$\beta$">
+sends these checksums to <IMG
+ WIDTH="15" HEIGHT="13" ALIGN="BOTTOM" BORDER="0"
+ SRC="img1.gif"
+ ALT="$\alpha$">.
+  
+<DT>4.
+<DD><IMG
+ WIDTH="15" HEIGHT="13" ALIGN="BOTTOM" BORDER="0"
+ SRC="img1.gif"
+ ALT="$\alpha$">
+searches through <I>A</I> to find all blocks of length <I>S</I>  bytes (at any offset, not just multiples of <I>S</I>) that have the same
+  weak and strong checksum as one of the blocks of <I>B</I>. This can be
+  done in a single pass very quickly using a special property of the
+  rolling checksum described below.
+  
+<DT>5.
+<DD><IMG
+ WIDTH="15" HEIGHT="13" ALIGN="BOTTOM" BORDER="0"
+ SRC="img1.gif"
+ ALT="$\alpha$">
+sends <IMG
+ WIDTH="14" HEIGHT="29" ALIGN="MIDDLE" BORDER="0"
+ SRC="img2.gif"
+ ALT="$\beta$">
+a sequence of instructions for
+  constructing a copy of <I>A</I>.  Each instruction is either a reference
+  to a block of <I>B</I>, or literal data.  Literal data is sent only for
+  those sections of <I>A</I> which did not match any of the blocks of <I>B</I>.
+</DL>
+<P>
+The end result is that <IMG
+ WIDTH="14" HEIGHT="29" ALIGN="MIDDLE" BORDER="0"
+ SRC="img2.gif"
+ ALT="$\beta$">
+gets a copy of <I>A</I>, but only the pieces
+of <I>A</I> that are not found in <I>B</I> (plus a small amount of data for
+checksums and block indexes) are sent over the link. The algorithm
+also only requires one round trip, which minimises the impact of the
+link latency.
+
+<P>
+The most important details of the algorithm are the rolling checksum
+and the associated multi-alternate search mechanism which allows the
+all-offsets checksum search to proceed very quickly. These will be
+discussed in greater detail below.
+
+<P>
+<HR>
+<!--Navigation Panel-->
+<A NAME="tex2html32"
+ HREF="node3.html">
+<IMG WIDTH="37" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="next"
+ SRC="next.gif"></A> 
+<A NAME="tex2html30"
+ HREF="tech_report.html">
+<IMG WIDTH="26" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="up"
+ SRC="up.gif"></A> 
+<A NAME="tex2html24"
+ HREF="node1.html">
+<IMG WIDTH="63" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="previous"
+ SRC="previous.gif"></A>   
+<BR>
+<B> Next:</B> <A NAME="tex2html33"
+ HREF="node3.html">Rolling checksum</A>
+<B> Up:</B> <A NAME="tex2html31"
+ HREF="tech_report.html">The rsync algorithm</A>
+<B> Previous:</B> <A NAME="tex2html25"
+ HREF="node1.html">The problem</A>
+<!--End of Navigation Panel-->
+<ADDRESS>
+<I>Andrew Tridgell</I>
+<BR><I>1998-11-09</I>
+</ADDRESS>
+</BODY>
+</HTML>

@@ -239,11 +239,11 @@ void write_del_stats(int f)
 
 void read_del_stats(int f)
 {
-	stats.deleted_files = read_varint(f);
-	stats.deleted_files += stats.deleted_dirs = read_varint(f);
-	stats.deleted_files += stats.deleted_symlinks = read_varint(f);
-	stats.deleted_files += stats.deleted_devices = read_varint(f);
-	stats.deleted_files += stats.deleted_specials = read_varint(f);
+	stats.deleted_files = read_varint_bounded(f, 0, MAX_WIRE_DEL_STAT, "deleted_files");
+	stats.deleted_files += stats.deleted_dirs = read_varint_bounded(f, 0, MAX_WIRE_DEL_STAT, "deleted_dirs");
+	stats.deleted_files += stats.deleted_symlinks = read_varint_bounded(f, 0, MAX_WIRE_DEL_STAT, "deleted_symlinks");
+	stats.deleted_files += stats.deleted_devices = read_varint_bounded(f, 0, MAX_WIRE_DEL_STAT, "deleted_devices");
+	stats.deleted_files += stats.deleted_specials = read_varint_bounded(f, 0, MAX_WIRE_DEL_STAT, "deleted_specials");
 }
 
 static void become_copy_as_user()
@@ -394,9 +394,18 @@ static void output_itemized_counts(const char *prefix, int *counts)
 		counts[0] -= counts[1] + counts[2] + counts[3] + counts[4];
 		for (j = 0; j < 5; j++) {
 			if (counts[j]) {
+				/* snprintf can return more than its size arg
+				 * on truncation; keep len <= sizeof buf - 2 so
+				 * the closing ')' and trailing NUL always
+				 * have room and the next iteration's
+				 * sizeof buf - len - 2 cannot underflow. */
+				if (len >= (int)sizeof buf - 2)
+					break;
 				len += snprintf(buf+len, sizeof buf - len - 2,
 					"%s%s: %s",
 					pre, labels[j], comma_num(counts[j]));
+				if (len > (int)sizeof buf - 2)
+					len = (int)sizeof buf - 2;
 				pre = ", ";
 			}
 		}
@@ -1559,6 +1568,10 @@ static int start_client(int argc, char *argv[])
 			shell_user = shell_machine;
 			shell_machine = p+1;
 		}
+		if (*shell_machine == '-') {
+			rprintf(FERROR, "Invalid remote host: hostnames may not start with '-'.\n");
+			exit_cleanup(RERR_SYNTAX);
+		}
 	}
 
 	if (DEBUG_GTE(CMD, 2)) {
@@ -1605,6 +1618,11 @@ static void sigusr2_handler(UNUSED(int val))
 	if (!am_server)
 		output_summary();
 	close_all();
+#ifdef GCOV_COVERAGE
+	/* The receiver child is killed here via SIGUSR2 and exits with _exit(),
+	 * bypassing the gcov atexit flush; without this it writes no .gcda. */
+	{ extern void __gcov_dump(void); __gcov_dump(); }
+#endif
 	if (got_xfer_error)
 		_exit(RERR_PARTIAL);
 	_exit(0);

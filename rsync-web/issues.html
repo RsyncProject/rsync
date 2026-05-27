@@ -1,0 +1,210 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<HTML>
+<HEAD>
+<TITLE>rsync current issues</TITLE>
+<style>
+code {
+  font-family: monospace;
+  font-weight: bold;
+  white-space: pre;
+}
+pre code {
+  display: block;
+  font-weight: normal;
+}
+blockquote pre code {
+  background: #f1f1f1;
+}
+</style>
+</HEAD>
+<!--#include virtual="header.html" -->
+
+<H2 align="center">current issues and debugging</H2>
+
+<ol>
+
+<li><p><b>Q:</b>
+
+Rsync appears hung -- what should I do?
+
+<p><b>A:</b>
+
+When experiencing a hang or freeze <b>please</b> gather the following
+information before killing the rsync process:
+
+<ul>
+
+<li> The state of the send/receive queues shown with netstat on the two ends.
+
+<li> The system call that each of the 3 processes is stuck in (use truss on
+solaris, strace on Linux, etc.).
+
+</ul>
+
+<p>Try telling rsync on both sides of the connection to send messages to
+stderr, which might make the failure message visible.  i.e., use:
+
+<blockquote<pre><code>
+--msgs2stderr -M--msgs2stderr
+</code></pre></blockquote>
+
+<p>That alone might get rsync to stop hanging.  Also, if you're using more than
+one <code>--verbose</code> (<code>-v</code>) option then I have 2 simple words
+for you: stop it.  If you need more info on what rsync is changing, using the
+<code>--itemize-changes</code> option (<code>-i</code>) and repeat it if you
+need to see unchanged files. This is a much better way to go that doesn't fill
+up the communication pipeline with a large quanity of debug messages.
+
+<p>See the "rsync-debug" script below for an example of how to grab strace
+information from the remote rsync process(es).  If you need help, send email to
+the mailing list. 
+
+<li><p><b>Q:</b>
+
+Why does my chrooted rsync daemon crash when doing an LDAP lookup for a user or
+group?
+
+<p><b>A:</b>
+
+There is a bug in some LDAP libraries (e.g. Fedora Core 3) where it crashes
+when someone looks up a name from inside a chrooted process (one that does not
+contain copies of the libraries to perform the lookup).  This is a bug that the
+LDAP libraries will need to fix, and is out of rsync's hands.  You can work
+around the problem by using the <code>--numeric-ids</code> option, turning
+chroot off, or getting rid of LDAP lookups.
+
+<li><p><b>Q:</b>
+
+Why does my transfer die with something like the following error?
+
+<blockquote><pre><code>
+rsync: error writing 4 unbuffered bytes - exiting: Broken pipe
+rsync error: error in rsync protocol data stream (code 12) at io.c(463)
+</code></pre></blockquote>
+
+<p>or
+
+<blockquote><pre><code>
+rsync: connection unexpectedly closed (24 bytes read so far)
+rsync error: error in rsync protocol data stream (code 12) at io.c(342)
+</code></pre></blockquote>
+
+<p><b>A:</b>
+
+This error tells you that the local rsync was trying to talk to the remote
+rsync, but the connection to that rsync is now gone.  The thing you must
+figure out is <b>why</b>, and that can involve some investigative work.
+
+<p>It is a good idea use the <code>--msgs2stderr</code> options mentioned at
+the top of this page to get rsync to output any errors it encounters to stderr
+instead of trying to write them down the failing pipeline.
+
+<p>If the connection is via ssh (or other remote-shell command) then you should
+run some tests to make sure that you can actually run the remote rsync and that
+your shell isn't injecting extraneous output into the rsync stream.  For instance,
+try running these two commands using whatever HOST (and user) options you need:
+
+<blockquote><pre><code>
+echo hi | ssh HOST cat
+ssh HOST rsync --version
+</code></pre></blockquote>
+
+<p>The first command should output just the string "hi" and nothing else. The
+second command should successfully start the remote rsync and report its version.
+
+<p>If the remote rsync is a daemon, your first step should be to look at the
+daemon's log file to see if it logged an error explaining why it aborted the
+transfer.  Also double-check to ensure that the log file is setup right, as a
+wrong "log file" setting in your rsyncd.conf file can also cause this problem.
+You could also halt the daemon and run it interactively using the
+<code>--no-detach</code> and <code>--msgs2stderr</code> options and look for
+errors while someone tries the rsync copy in another window.
+
+<p>As for the cause of the remote rsync going away, there are several
+common issues that people run into:
+
+<ul>
+
+<li>The destination disk is full (remember that you need at least the
+size of the largest file that needs to be updated available in free
+disk space for the transfer to succeed).
+
+<li>An idle connection caused a router or remote-shell server to close
+the connection.
+
+<li>A network error caused the connection to be dropped.
+
+<li>The remote rsync executable wasn't found.
+
+<li>Your remote-shell setup isn't working right or isn't "clean"
+(i.e. it is sending spurious text to rsync).
+
+</ul>
+
+<p>If you think the problem might be an idle connection getting closed, you
+might be able to work around the problem by using a <code>--timeout</code>
+option (newer rsyncs send keep-alive messages during lulls).  You can also
+configure ssh to send keep-alive messages when using Protocol 2 (look for
+KeepAlive, ServerAliveInterval, ClientAliveInterval, ServerAliveCountMax, and
+ClientAliveCountMax).  You can also avoid some lulls by switching from
+<code>--delete</code> (aka <code>--delete-before</code>) to <code>--del</code>
+(aka <code>--delete-during</code>).
+
+<p>If you can't figure out why the failure happened, there are steps
+you can take to debug the situation.  One way is to create a shell
+script on the remote system such as
+<a href="rsync-debug">this one named "rsync-debug"</a>.
+You would use the script like this:
+
+<blockquote><pre><code>
+rsync -av --rsync-path=/some/path/rsync-debug HOST:SOURCE DEST
+rsync -av --rsync-path=/some/path/rsync-debug SOURCE HOST:DEST
+</code></pre></blockquote>
+
+<p>This script enables core dumps and also logs all the OS system calls
+that lead up to the failure to a file in the /tmp dir.  You can use the
+resulting files to help figure out why the remote rsync failed.
+
+<p>If you are rsyncing directly to an rsync daemon (without using a
+remote-shell transport), the above script won't have
+any effect.  Instead, halt the current daemon and run a debug version
+with core-dumps enabled and (if desired) using a
+system-call tracing utility such as <i>strace</i>, <i>truss</i>, or
+<i>tusc</i>.  For strace, you would do it like this (the -f option
+tells strace to follow the child processes too):
+
+<blockquote><pre><code>
+ulimit -c unlimited
+strace -f -t -s 1024 -o /tmp/rsync-$$.out rsync --daemon --no-detach
+</code></pre></blockquote>
+
+<p>Then, use a separate window to actually run the failing transfer, after
+which you can kill the debug rsync daemon (pressing Ctrl-C should do it).
+
+<p>If you are using rsync under inetd, I'd suggest temporarily disabling
+that and using the above daemon approach to debug what is going on.
+
+<li><p><b>Q:</b>
+
+Why does my connection to an rsync daemon (using the "::" syntax)
+fail immediately with an error like the following?
+
+<blockquote><pre><code>
+rsync: connection unexpectedly closed (24 bytes read so far)
+rsync error: error in rsync protocol data stream (code 12) at io.c(342)
+</code></pre></blockquote>
+
+<p><b>A:</b>
+
+Older rsync daemons (before 2.6.3) were unable to return errors that were
+generated during the option-parsing phase of the transfer.  Look in the
+logfile on the server to see if an error was reported, such as a "refused"
+option, an option that the server rsync doesn't support (e.g.  perhaps
+links are not supported by the server), or some other failure (such as
+trying to send data to a read-only module).  Upgrading the version of rsync
+that is running as a daemon to at least 2.6.3 will allow these errors to
+get returned to all rsync clients, old or new alike.
+
+</ol>
+
+<!--#include virtual="footer.html" -->

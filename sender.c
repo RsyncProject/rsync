@@ -48,6 +48,8 @@ extern int make_backups;
 extern int inplace;
 extern int inplace_partial;
 extern int batch_fd;
+extern int use_secure_symlinks;
+extern char *module_dir;
 extern int write_batch;
 extern int file_old_total;
 extern BOOL want_progress_now;
@@ -138,6 +140,8 @@ void successful_send(int ndx)
 		return;
 
 	flist = flist_for_ndx(ndx, "successful_send");
+	if (ndx < flist->ndx_start)
+		exit_cleanup(RERR_PROTOCOL);
 	file = flist->files[ndx - flist->ndx_start];
 	if (!change_pathname(file, NULL, 0))
 		return;
@@ -352,7 +356,25 @@ void send_files(int f_in, int f_out)
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
-		fd = do_open_checklinks(fname);
+		if (use_secure_symlinks) {
+			/* Open from module root to prevent TOCTOU race where
+			 * change_pathname's chdir follows a directory symlink.
+			 * Reconstruct the full path relative to module_dir
+			 * from F_PATHNAME (path) and f_name (fname). */
+			char secure_path[MAXPATHLEN];
+			int slen = snprintf(secure_path, sizeof secure_path, "%s%s%s", path, slash, fname);
+			if (slen >= (int)sizeof secure_path) {
+				io_error |= IOERR_GENERAL;
+				rprintf(FERROR_XFER, "path too long: %s%s%s\n", path, slash, fname);
+				free_sums(s);
+				if (protocol_version >= 30)
+					send_msg_int(MSG_NO_SEND, ndx);
+				continue;
+			}
+			fd = secure_relative_open(module_dir, secure_path, O_RDONLY, 0);
+		} else {
+			fd = do_open_checklinks(fname);
+		}
 		if (fd == -1) {
 			if (errno == ENOENT) {
 				enum logcode c = am_daemon && protocol_version < 28 ? FERROR : FWARNING;

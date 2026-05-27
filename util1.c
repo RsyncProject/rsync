@@ -141,7 +141,7 @@ int set_times(const char *fname, STRUCT_STAT *stp)
 
 #ifdef HAVE_UTIMENSAT
 #include "case_N.h"
-		if (do_utimensat(fname, stp) == 0)
+		if (do_utimensat_at(fname, stp) == 0)
 			break;
 		if (errno != ENOSYS)
 			return -1;
@@ -336,7 +336,13 @@ static int unlink_and_reopen(const char *dest, mode_t mode)
 		mode |= S_IWUSR;
 #endif
 	mode &= INITACCESSPERMS;
-	if ((ofd = do_open(dest, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, mode)) < 0) {
+	/* Use do_open_at so the create/truncate goes through a secure
+	 * parent dirfd in the daemon-no-chroot deployment. Otherwise
+	 * an attacker could swap a parent component with a symlink in
+	 * the window between robust_unlink (which uses do_unlink_at,
+	 * already secure) and the create here, and redirect the new
+	 * file outside the module. */
+	if ((ofd = do_open_at(dest, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, mode)) < 0) {
 		int save_errno = errno;
 		rsyserr(FERROR_XFER, save_errno, "open %s", full_fname(dest));
 		errno = save_errno;
@@ -360,12 +366,23 @@ static int unlink_and_reopen(const char *dest, mode_t mode)
  * --copy-dest options. */
 int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
 {
+	extern int am_daemon, am_chrooted;
 	int ifd, ofd;
 	char buf[1024 * 8];
 	int len;   /* Number of bytes read into `buf'. */
 	OFF_T prealloc_len = 0, offset = 0;
 
-	if ((ifd = do_open_nofollow(source, O_RDONLY)) < 0) {
+	/* On a daemon without chroot, route the source open through
+	 * secure_relative_open so a parent-symlink on the source path
+	 * (e.g. --copy-dest=cd where cd is a symlink to an outside
+	 * directory) cannot redirect the read to a file the daemon can
+	 * see but the attacker should not. Plain do_open_nofollow only
+	 * refuses a final-component symlink; parents are still followed. */
+	if (am_daemon && !am_chrooted && source && *source && source[0] != '/')
+		ifd = secure_relative_open(NULL, source, O_RDONLY | O_NOFOLLOW, 0);
+	else
+		ifd = do_open_nofollow(source, O_RDONLY);
+	if (ifd < 0) {
 		int save_errno = errno;
 		rsyserr(FERROR_XFER, errno, "open %s", full_fname(source));
 		errno = save_errno;
@@ -479,13 +496,13 @@ int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
 int robust_unlink(const char *fname)
 {
 #ifndef ETXTBSY
-	return do_unlink(fname);
+	return do_unlink_at(fname);
 #else
 	static int counter = 1;
 	int rc, pos, start;
 	char path[MAXPATHLEN];
 
-	rc = do_unlink(fname);
+	rc = do_unlink_at(fname);
 	if (rc == 0 || errno != ETXTBSY)
 		return rc;
 
@@ -515,7 +532,7 @@ int robust_unlink(const char *fname)
 	}
 
 	/* maybe we should return rename()'s exit status? Nah. */
-	if (do_rename(fname, path) != 0) {
+	if (do_rename_at(fname, path) != 0) {
 		errno = ETXTBSY;
 		return -1;
 	}
@@ -538,7 +555,7 @@ int robust_rename(const char *from, const char *to, const char *partialptr,
 		return 0;
 
 	while (tries--) {
-		if (do_rename(from, to) == 0)
+		if (do_rename_at(from, to) == 0)
 			return 0;
 
 		switch (errno) {
@@ -559,7 +576,7 @@ int robust_rename(const char *from, const char *to, const char *partialptr,
 			}
 			if (copy_file(from, to, -1, mode) != 0)
 				return -2;
-			do_unlink(from);
+			do_unlink_at(from);
 			return 1;
 		default:
 			return -1;
@@ -1116,6 +1133,7 @@ char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth, i
  * Also cleans the path using the clean_fname() function. */
 int change_dir(const char *dir, int set_path_only)
 {
+	extern int am_daemon, am_chrooted;
 	static int initialised, skipped_chdir;
 	unsigned int len;
 
@@ -1154,10 +1172,57 @@ int change_dir(const char *dir, int set_path_only)
 			curr_dir[curr_dir_len++] = '/';
 		memcpy(curr_dir + curr_dir_len, dir, len + 1);
 
-		if (!set_path_only && chdir(curr_dir)) {
-			curr_dir_len = save_dir_len;
-			curr_dir[curr_dir_len] = '\0';
-			return 0;
+		if (!set_path_only) {
+			int chdir_failed;
+			/* In the daemon-without-chroot deployment we must not
+			 * follow a symlink in any component of the chdir
+			 * target -- otherwise CWD escapes the module and
+			 * every subsequent path-relative syscall (open,
+			 * chmod, lchown, ...) inherits the escape, which
+			 * defeats secure_relative_open's RESOLVE_BENEATH
+			 * anchor and re-opens the CVE-2026-29518 class of
+			 * symlink TOCTOU attacks. Use the secure resolver
+			 * to get a confined dirfd, then fchdir() to it.
+			 *
+			 * If skipped_chdir is set, a previous CD_SKIP_CHDIR
+			 * call buffered an absolute prefix in curr_dir
+			 * (e.g. change_pathname's CD_SKIP_CHDIR to orig_dir)
+			 * without syncing the kernel's CWD. Resolve `dir`
+			 * relative to that prefix as basedir so the secure
+			 * branch still anchors at the operator-trusted
+			 * directory rather than wherever the kernel CWD
+			 * happens to be. */
+			if (am_daemon && !am_chrooted) {
+				const char *basedir = NULL;
+				char prefix[MAXPATHLEN];
+				int dfd;
+				if (skipped_chdir) {
+					if (save_dir_len >= sizeof prefix) {
+						errno = ENAMETOOLONG;
+						chdir_failed = 1;
+						goto chdir_cleanup;
+					}
+					memcpy(prefix, curr_dir, save_dir_len);
+					prefix[save_dir_len] = '\0';
+					basedir = prefix;
+				}
+				dfd = secure_relative_open(basedir, dir,
+					O_RDONLY | O_DIRECTORY, 0);
+				if (dfd < 0) {
+					chdir_failed = 1;
+				} else {
+					chdir_failed = fchdir(dfd) != 0;
+					close(dfd);
+				}
+			} else {
+				chdir_failed = chdir(curr_dir) != 0;
+			}
+		chdir_cleanup:
+			if (chdir_failed) {
+				curr_dir_len = save_dir_len;
+				curr_dir[curr_dir_len] = '\0';
+				return 0;
+			}
 		}
 		skipped_chdir = set_path_only;
 	}
@@ -1285,20 +1350,20 @@ int handle_partial_dir(const char *fname, int create)
 	dir = partial_fname;
 	if (create) {
 		STRUCT_STAT st;
-		int statret = do_lstat(dir, &st);
+		int statret = do_lstat_at(dir, &st);
 		if (statret == 0 && !S_ISDIR(st.st_mode)) {
-			if (do_unlink(dir) < 0) {
+			if (do_unlink_at(dir) < 0) {
 				*fn = '/';
 				return 0;
 			}
 			statret = -1;
 		}
-		if (statret < 0 && do_mkdir(dir, 0700) < 0) {
+		if (statret < 0 && do_mkdir_at(dir, 0700) < 0) {
 			*fn = '/';
 			return 0;
 		}
 	} else
-		do_rmdir(dir);
+		do_rmdir_at(dir);
 	*fn = '/';
 
 	return 1;
@@ -1394,7 +1459,12 @@ char *timestring(time_t t)
 	static char buffers[4][20]; /* We support 4 simultaneous timestring results. */
 	char *TimeBuf = buffers[ndx = (ndx + 1) % 4];
 	struct tm tmp, *tm = localtime_r(&t, &tmp);
-	int len = snprintf(TimeBuf, sizeof buffers[0], "%4d/%02d/%02d %02d:%02d:%02d",
+	int len;
+	if (!tm) {
+		strlcpy(TimeBuf, "(time out of range)", sizeof buffers[0]);
+		return TimeBuf;
+	}
+	len = snprintf(TimeBuf, sizeof buffers[0], "%4d/%02d/%02d %02d:%02d:%02d",
 		 (int)tm->tm_year + 1900, (int)tm->tm_mon + 1, (int)tm->tm_mday,
 		 (int)tm->tm_hour, (int)tm->tm_min, (int)tm->tm_sec);
 	assert(len > 0); /* Silence gcc warning */

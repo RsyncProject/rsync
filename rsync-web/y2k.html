@@ -1,0 +1,24 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<HTML>
+<HEAD>
+<TITLE>rsync y2k issues</TITLE>
+</HEAD>
+<!--#include virtual="header.html" -->
+
+<H2 align="center">Year 2000 Issues</H2>
+
+We are starting to get a lot of Y2K compliance questions. The answer
+is that rsync has no Y2K problems. rsync uses 32 bit "seconds since
+1970" date formats and thus has no problems with the turn of the
+century.<p>
+
+You must remember though that rsync is part of a larger system. It
+relies on a transport mechanism (rsh, ssh etc) and many operating
+systems services (such as inetd, syslog etc). If any of these other
+parts fail then rsync will of course be affected.<p>
+
+Also remember that rsync comes with absolutely no warranty. It is up
+to you to test whether rsync is suitable in your computing environment,
+both before and after the turn of the century.
+
+<!--#include virtual="footer.html" -->

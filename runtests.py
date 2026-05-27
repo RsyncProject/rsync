@@ -61,6 +61,12 @@ def parse_args():
                    help='Force protocol version (adds --protocol=VER to rsync)')
     p.add_argument('--expect-skipped', default=None, metavar='LIST',
                    help='Comma-separated list of expected-skipped tests')
+    p.add_argument('--use-tcp', action='store_true',
+                   help='Run daemon tests against a real rsyncd bound to '
+                        '127.0.0.1 (non-default). The default is the secure '
+                        'stdio-pipe transport, which opens no listening '
+                        'socket; --use-tcp exposes a loopback port for the '
+                        'duration of each daemon test.')
     return p.parse_args()
 
 
@@ -151,17 +157,47 @@ def prep_scratch(scratchdir, srcdir, tooldir, setfacl_nodef):
             os.symlink(os.path.join(tooldir, srcdir), src_link)
 
 
+# Python tests are identified by a positive "_test.py" suffix so that
+# helper modules (e.g. rsyncfns.py) sit in testsuite/ without being mistaken
+# for tests.
+_PY_TEST_SUFFIX = '_test.py'
+
+
+def _is_test_path(path):
+    base = os.path.basename(path)
+    return base.endswith('.test') or base.endswith(_PY_TEST_SUFFIX)
+
+
+def _testbase(path):
+    """Strip the test extension to get the canonical test name."""
+    base = os.path.basename(path)
+    if base.endswith('.test'):
+        return base[:-len('.test')]
+    if base.endswith(_PY_TEST_SUFFIX):
+        return base[:-len(_PY_TEST_SUFFIX)]
+    return base
+
+
 def collect_tests(suitedir, patterns):
-    """Collect test scripts matching the given patterns."""
+    """Collect test scripts (.test or _test.py) matching the given patterns."""
     if not patterns:
-        tests = sorted(glob.glob(os.path.join(suitedir, '*.test')))
+        candidates = (glob.glob(os.path.join(suitedir, '*.test'))
+                      + glob.glob(os.path.join(suitedir, '*' + _PY_TEST_SUFFIX)))
+        tests = sorted(p for p in candidates if _is_test_path(p))
     else:
+        seen = set()
         tests = []
         for pat in patterns:
-            if not pat.endswith('.test'):
-                pat = pat + '.test'
-            matches = sorted(glob.glob(os.path.join(suitedir, pat)))
-            tests.extend(matches)
+            # Accept either bare name ("mkpath"), explicit extension, or glob.
+            if pat.endswith('.test') or pat.endswith('.py'):
+                pats = [pat]
+            else:
+                pats = [pat + '.test', pat + _PY_TEST_SUFFIX]
+            for p in pats:
+                for m in sorted(glob.glob(os.path.join(suitedir, p))):
+                    if _is_test_path(m) and m not in seen:
+                        seen.add(m)
+                        tests.append(m)
     return tests
 
 
@@ -203,11 +239,18 @@ def run_one_test(testscript, testbase, scratchdir, base_env, timeout,
     env = base_env.copy()
     env['scratchdir'] = scratchdir
 
+    # Dispatch by extension: shell tests via /bin/sh -e, Python tests via
+    # the same python3 that's running this runner.
+    if testscript.endswith('.py'):
+        cmd = [sys.executable, testscript]
+    else:
+        cmd = ['sh', '-e', testscript]
+
     logfile = os.path.join(scratchdir, 'test.log')
     try:
         with open(logfile, 'w') as log:
             proc = subprocess.run(
-                ['sh', '-e', testscript],
+                cmd,
                 stdout=log, stderr=subprocess.STDOUT,
                 env=env, timeout=timeout,
                 cwd=env.get('TOOLDIR', '.')
@@ -280,6 +323,12 @@ def main():
     if not srcdir or srcdir == '.':
         srcdir = tooldir
     rsync_bin = args.rsync_bin or os.environ.get('rsync_bin') or os.path.join(tooldir, 'rsync')
+    # Absolutize: tests run with subprocess(cwd=TOOLDIR) below, so a relative
+    # argv[0] would re-resolve against TOOLDIR rather than the runner's
+    # invocation cwd, breaking --rsync-bin=../foo/rsync forms.  abspath()
+    # captures os.getcwd() now, which is what the operator intended.
+    if rsync_bin and not os.path.isabs(rsync_bin):
+        rsync_bin = os.path.abspath(rsync_bin)
 
     suitedir = os.path.join(srcdir, 'testsuite')
     scratchbase = os.path.join(os.environ.get('scratchbase', tooldir), 'testtmp')
@@ -297,6 +346,23 @@ def main():
         sys.stderr.write(f"srcdir {srcdir} is not a directory\n")
         sys.exit(2)
 
+    # Helper programs the test scripts invoke directly. Missing any of these
+    # would cause many tests to fail with confusing "not found" errors, so
+    # check up front and point the user at the make target that builds them.
+    required_helpers = ['tls', 'trimslash', 't_unsafe', 't_chmod_secure',
+                        't_secure_relpath',
+                        'wildtest', 'getgroups', 'getfsdev']
+    missing = [h for h in required_helpers
+               if not os.path.isfile(os.path.join(tooldir, h))]
+    if missing:
+        sys.stderr.write(
+            f"runtests.py: missing test helper program(s) in {tooldir}: "
+            f"{', '.join(missing)}\n"
+            f"Build them with: make {' '.join(missing)}\n"
+            f"or run the full test target: make check\n"
+        )
+        sys.exit(2)
+
     testuser = get_testuser()
 
     # Print header
@@ -312,12 +378,18 @@ def main():
         print(f'    valgrind=enabled (logs in valgrind.*.log)')
     if args.parallel > 1:
         print(f'    parallel={args.parallel}')
+    print(f'    daemon_transport={"tcp (loopback)" if args.use_tcp else "pipe (secure default)"}')
     print(f'    scratchbase={scratchbase}')
 
     # Build base environment for test scripts
     path = os.environ.get('PATH', '')
     if os.path.isdir('/usr/xpg4/bin'):
         path = '/usr/xpg4/bin:' + path
+
+    # Make the testsuite/ directory importable so Python tests can `import rsyncfns`.
+    pythonpath = suitedir
+    if os.environ.get('PYTHONPATH'):
+        pythonpath = suitedir + os.pathsep + os.environ['PYTHONPATH']
 
     base_env = os.environ.copy()
     base_env.update({
@@ -332,7 +404,12 @@ def main():
         'suitedir': suitedir,
         'TESTRUN_TIMEOUT': str(args.timeout),
         'HOME': scratchbase,
+        'PYTHONPATH': pythonpath,
     })
+    if args.use_tcp:
+        # Opt-in: daemon tests start a real rsyncd on a claimed loopback port.
+        # Default (unset) keeps the secure stdio-pipe transport.
+        base_env['RSYNC_TEST_USE_TCP'] = '1'
     for k, v in shconfig.items():
         if v:
             base_env[k] = v
@@ -348,7 +425,7 @@ def main():
     full_run = len(args.tests) == 0
 
     # Record test order for consistent skipped-list output
-    test_order = {os.path.basename(t).replace('.test', ''): i for i, t in enumerate(tests)}
+    test_order = {_testbase(t): i for i, t in enumerate(tests)}
 
     passed = 0
     failed = 0
@@ -385,7 +462,7 @@ def main():
         with concurrent.futures.ThreadPoolExecutor(max_workers=args.parallel) as executor:
             futures = {}
             for testscript in tests:
-                testbase = os.path.basename(testscript).replace('.test', '')
+                testbase = _testbase(testscript)
                 scratchdir = os.path.join(scratchbase, testbase)
                 timeout = 600 if 'hardlinks' in testbase else args.timeout
                 f = executor.submit(
@@ -406,7 +483,7 @@ def main():
     else:
         # Sequential execution
         for testscript in tests:
-            testbase = os.path.basename(testscript).replace('.test', '')
+            testbase = _testbase(testscript)
             scratchdir = os.path.join(scratchbase, testbase)
             timeout = 600 if 'hardlinks' in testbase else args.timeout
             tr = run_one_test(
@@ -457,8 +534,15 @@ def main():
     print('-' * 60)
 
     exit_code = failed + vg_errors
-    if exit_code == 0 and skipped_str != args.expect_skipped:
-        exit_code = 1
+    if exit_code == 0:
+        # Compare the skipped set order-insensitively: which tests skipped is
+        # what matters, not the order runtests happened to collect them in
+        # (that order is just sorted filenames -- an easy thing to get subtly
+        # wrong when maintaining the per-platform expected lists).
+        got = set(s for s in skipped_str.split(',') if s)
+        want = set(s for s in args.expect_skipped.split(',') if s)
+        if got != want:
+            exit_code = 1
 
     print(f'overall result is {exit_code}')
     sys.exit(exit_code)

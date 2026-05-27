@@ -163,6 +163,29 @@
 /* For compatibility with older rsyncs */
 #define OLD_MAX_BLOCK_SIZE ((int32)1 << 29)
 
+/* Policy ceilings on attacker-controlled wire values. Picked well above any
+ * legitimate filesystem / protocol traffic but well below sizes that could
+ * cause integer overflow or DoS-grade allocations. See input_checking.txt.
+ *
+ * Note on MAX_WIRE_XATTR_DATALEN: xattr datum size is bounded only by the
+ * wire-format maximum (signed int32 varint, ~2GB). macOS resource forks
+ * are transferred as the com.apple.ResourceFork xattr and can legitimately
+ * be many GB; --max-alloc (default 1GB, configurable) is the real
+ * allocation cap. read_varint_size() still rejects negative values so a
+ * hostile peer cannot wrap to ~SIZE_MAX. */
+#define MAX_WIRE_XATTR_COUNT   65536
+#define MAX_WIRE_XATTR_NAMELEN 4096
+#define MAX_WIRE_XATTR_DATALEN ((int32)0x7fffffff)
+#define MAX_WIRE_ACL_COUNT     65536
+#define MAX_WIRE_NSEC          999999999
+/* MAX_WIRE_DEL_STAT is the per-category cap for read_del_stats() in main.c,
+ * which accumulates 5 wire-supplied counts into the int32 stats.deleted_files
+ * accumulator.  Capped at 2^28 so 5 * 2^28 = 1.34 GB stays under INT32_MAX
+ * (2.15 GB) with margin -- a higher cap (e.g. 2^30) would let a hostile peer
+ * supplying 3+ max-sized counts overflow the accumulator, which is signed-int
+ * UB.  2^28 is still well above any plausible real transfer's deletion count. */
+#define MAX_WIRE_DEL_STAT      ((int32)1 << 28)
+
 #define ROUND_UP_1024(siz) ((siz) & (1024-1) ? ((siz) | (1024-1)) + 1 : (siz))
 
 #define IOERR_GENERAL	(1<<0) /* For backward compatibility, this must == 1 */

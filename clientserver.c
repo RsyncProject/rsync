@@ -30,6 +30,7 @@ extern int list_only;
 extern int am_sender;
 extern int am_server;
 extern int am_daemon;
+extern int am_chrooted;
 extern int am_root;
 extern int msgs2stderr;
 extern int rsync_port;
@@ -38,6 +39,7 @@ extern int ignore_errors;
 extern int preserve_xattrs;
 extern int kluge_around_eof;
 extern int munge_symlinks;
+extern int use_secure_symlinks;
 extern int open_noatime;
 extern int sanitize_paths;
 extern int numeric_ids;
@@ -983,6 +985,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 			io_printf(f_out, "@ERROR: chroot failed\n");
 			return -1;
 		}
+		am_chrooted = 1;
 		module_chdir = module_dir;
 	}
 
@@ -1004,6 +1007,15 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 			exit_cleanup(RERR_UNSUPPORTED);
 		}
 	}
+
+	/* Enable secure symlink handling for any non-chrooted daemon module.
+	 * This prevents TOCTOU race attacks where an attacker could switch a
+	 * directory to a symlink between path validation and file open.
+	 * Match the gate used by the do_*_at() wrappers in syscall.c
+	 * (am_daemon && !am_chrooted) -- the protection has nothing to do
+	 * with symlink munging, so a module configured with
+	 * "munge symlinks = false" must still get the secure-open path. */
+	use_secure_symlinks = am_daemon && !am_chrooted;
 
 	if (gid_list.count) {
 		gid_t *gid_array = gid_list.items;
@@ -1300,6 +1312,28 @@ int start_daemon(int f_in, int f_out)
 	if (lp_proxy_protocol() && !read_proxy_protocol_header(f_in))
 		return -1;
 
+	/* Do reverse DNS lookup before chroot/setuid. The result is cached,
+	 * so the later client_name() call will use this cached value. This
+	 * ensures hostname-based ACLs work even when DNS is unavailable
+	 * after chroot.
+	 *
+	 * "reverse lookup" can be set globally OR per-module, so we also
+	 * scan each module: a deployment with "reverse lookup = no" in the
+	 * global section but "reverse lookup = yes" in a specific module
+	 * still triggers a post-chroot lookup at access-check time
+	 * (rsync_module() in this file), which would also fail in the
+	 * chroot and turn hostname-based deny rules into silent bypasses. */
+	{
+		int need_reverse = lp_reverse_lookup(-1);
+		int j, num_modules = lp_num_modules();
+		for (j = 0; !need_reverse && j < num_modules; j++) {
+			if (lp_reverse_lookup(j))
+				need_reverse = 1;
+		}
+		if (need_reverse)
+			(void)client_name(client_addr(f_in));
+	}
+
 	p = lp_daemon_chroot();
 	if (*p) {
 		log_init(0); /* Make use we've initialized syslog before chrooting. */
@@ -1308,6 +1342,19 @@ int start_daemon(int f_in, int f_out)
 			rsyserr(FLOG, errno, "daemon chroot(\"%s\") failed", p);
 			return -1;
 		}
+		/* Deliberately do NOT set am_chrooted here.  am_chrooted
+		 * gates the per-module symlink-race defenses
+		 * (secure_relative_open() and the do_*_at() wrappers in
+		 * syscall.c) and means "the kernel is enforcing path
+		 * confinement at the module boundary".  The daemon chroot
+		 * confines path resolution to the daemon-chroot directory,
+		 * not to any individual module path -- modules sharing the
+		 * daemon chroot are still distinguishable filesystem
+		 * subtrees and a sender-controlled symlink in module A
+		 * could redirect a syscall to module B (or to other files
+		 * inside the daemon chroot) without the per-module
+		 * defenses.  Leave am_chrooted=0 here so secure_relative_open()
+		 * still fires for "use chroot = no" modules. */
 		if (chdir("/") < 0) {
 			rsyserr(FLOG, errno, "daemon chdir(\"/\") failed");
 			return -1;

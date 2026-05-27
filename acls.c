@@ -697,7 +697,7 @@ static uint32 recv_acl_access(int f, uchar *name_follows_ptr)
 static uchar recv_ida_entries(int f, ida_entries *ent)
 {
 	uchar computed_mask_bits = 0;
-	int i, count = read_varint(f);
+	int i, count = read_varint_bounded(f, 0, MAX_WIRE_ACL_COUNT, "ACL count");
 
 	ent->idas = count ? new_array(id_access, count) : NULL;
 	ent->count = count;
