@@ -40,6 +40,7 @@ jobs:
     - name: save artifact
       uses: actions/upload-artifact@v4
       with:
+        retention-days: 45
         name: solaris-bin
         path: |
           rsync
