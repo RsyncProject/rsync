@@ -71,6 +71,7 @@ jobs:
     - name: save artifact
       uses: actions/upload-artifact@v4
       with:
+        retention-days: 45
         name: almalinux-8-bin
         path: |
           rsync
