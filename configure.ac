@@ -103,10 +103,6 @@ dnl (and coverage-counted) without needing a pre-5.6 kernel. Behaviour-neutral
 dnl by default (the knob only REMOVES a tier when explicitly disabled).
 AC_ARG_ENABLE(openat2,
 	AS_HELP_STRING([--disable-openat2],[do not use Linux openat2(RESOLVE_BENEATH); force the portable resolver (for exercising the fallback tier)]))
-if test x"$enable_openat2" != x"no"; then
-	AC_DEFINE([HAVE_OPENAT2], 1,
-		[Define to use Linux openat2(RESOLVE_BENEATH) in secure_relative_open where available.])
-fi
 
 AC_MSG_CHECKING([if md2man can create manpages])
 if test x"$ac_cv_path_PYTHON3" = x; then
@@ -356,6 +352,19 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[ ]], [[return 0;]])],
 [ NOEXECSTACK='' ; AC_MSG_RESULT(no) ])
 CFLAGS="$OLD_CFLAGS"
 AC_SUBST(NOEXECSTACK)
+
+AC_CACHE_CHECK([for openat2],rsync_cv_HAVE_OPENAT2,[
+    AC_COMPILE_IFELSE([
+        AC_LANG_PROGRAM([[#include <sys/syscall.h>]], [[int i = SYS_openat2]])
+    ],
+    [rsync_cv_HAVE_OPENAT2=yes], [rsync_cv_HAVE_OPENAT2=no])
+])
+if test x"$enable_openat2" != x"no"; then
+    if test x"$rsync_cv_HAVE_OPENAT2" = x"yes"; then
+      AC_DEFINE([HAVE_OPENAT2], 1,
+        [Define to use Linux openat2(RESOLVE_BENEATH) in secure_relative_open where available.])
+    fi
+fi
 
 # arrgh. libc in some old debian version screwed up the largefile
 # stuff, getting byte range locking wrong
