@@ -17,7 +17,7 @@
 
 #include <sys/stat.h>
 
-#ifdef __linux__
+#if defined(__linux__) && defined(HAVE_OPENAT2)
 #include <sys/syscall.h>
 #include <linux/openat2.h>
 #endif
@@ -45,7 +45,7 @@ static int errs = 0;
 static int kernel_resolve_beneath_supported(void)
 {
 	int fd;
-#ifdef __linux__
+#if defined(__linux__) && defined(HAVE_OPENAT2)
 	{
 		struct open_how how;
 		memset(&how, 0, sizeof how);
