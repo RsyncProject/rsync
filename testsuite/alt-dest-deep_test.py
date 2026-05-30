@@ -23,7 +23,7 @@ import os
 from rsyncfns import (
     FROMDIR, SCRATCHDIR, TODIR,
     assert_exists, assert_hardlinked, assert_not_exists, assert_not_hardlinked,
-    assert_same, make_tree, rmtree, run_rsync, walk_files,
+    assert_same, hardlinks_supported, make_tree, rmtree, run_rsync, walk_files,
 )
 
 src = FROMDIR
@@ -55,14 +55,15 @@ def run_to(opt):
 
 
 # --- --link-dest: unchanged -> hardlink to ref; changed -> fresh copy -------
-run_to('link-dest')
-for rel in rels:
-    d, r = TODIR / rel, ref / rel
-    if str(rel) == changed:
-        assert_not_hardlinked(d, r, label=f'link-dest changed {rel}')
-        assert_same(d, src / rel, label=f'link-dest changed {rel}')
-    else:
-        assert_hardlinked(d, r, label=f'link-dest unchanged {rel}')
+if hardlinks_supported():
+    run_to('link-dest')
+    for rel in rels:
+        d, r = TODIR / rel, ref / rel
+        if str(rel) == changed:
+            assert_not_hardlinked(d, r, label=f'link-dest changed {rel}')
+            assert_same(d, src / rel, label=f'link-dest changed {rel}')
+        else:
+            assert_hardlinked(d, r, label=f'link-dest unchanged {rel}')
 
 # --- --copy-dest: every file copied (never linked), dest complete -----------
 run_to('copy-dest')

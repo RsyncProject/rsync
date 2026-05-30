@@ -10,7 +10,8 @@ independent inodes.
 
 from rsyncfns import (
     FROMDIR, TODIR,
-    assert_hardlinked, assert_not_hardlinked, makepath, rmtree, run_rsync,
+    assert_hardlinked, assert_not_hardlinked, make_hardlink, makepath, rmtree,
+    run_rsync, test_skipped,
 )
 import os
 
@@ -22,7 +23,11 @@ rmtree(src)
 rmtree(TODIR)
 makepath(src / 'a' / 'aa', src / 'b' / 'bb')
 (src / a).write_text("shared content across directories\n")
-os.link(src / a, src / b)            # one inode, two names in different dirs
+
+try:
+    make_hardlink(src / a, src / b) # one inode, two names in different dirs
+except OSError:
+    test_skipped("Can't create hardlink")
 
 # -H preserves the cross-directory hard link.
 run_rsync('-aH', f'{src}/', f'{TODIR}/')
