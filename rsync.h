@@ -1510,3 +1510,13 @@ const char *get_panic_action(void);
 #elif defined HAVE_MALLINFO
 #define MEM_ALLOC_INFO mallinfo
 #endif
+
+ /* Some header files needed to be nice ;) */
+#ifdef HAVE_SYS_RESOURCE_H
+#define SUPPORT_RENICE
+#endif
+
+#if defined HAVE_LINUX_IOPRIO_H && defined HAVE_SYS_SYSCALL_H
+#define SUPPORT_IONICE
+#endif
+
