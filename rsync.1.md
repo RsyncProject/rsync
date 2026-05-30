@@ -586,6 +586,9 @@ accepted:
 --log-file=FILE          override the "log file" setting
 --log-file-format=FMT    override the "log format" setting
 --sockopts=OPTIONS       specify custom TCP options
+--nice-local             renice local daemon process to low priority
+--ionice-local           ionice local daemon process to low priority
+                         They are given at client site as (io)nice-remote
 --verbose, -v            increase verbosity
 --ipv4, -4               prefer IPv4
 --ipv6, -6               prefer IPv6
