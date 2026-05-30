@@ -18,6 +18,9 @@
  * with this program; if not, visit the http://fsf.org website.
  */
 
+#ifndef RSYNC_H // Ensure that this header file is never included more than once, thus avoiding errors with duplicate definitions
+#define RSYNC_H 1
+
 #define False 0
 #define True 1
 #define Unset (-1) /* Our BOOL values are always an int. */
@@ -1523,3 +1526,4 @@ const char *get_panic_action(void);
 #include <sys/syscall.h>
 #endif
 
+#endif // ifndef RSYNC_H
