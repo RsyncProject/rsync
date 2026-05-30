@@ -559,6 +559,13 @@ has its own detailed description later in this manpage.
 --checksum-seed=NUM      set block/file checksum seed (advanced)
 --ipv4, -4               prefer IPv4
 --ipv6, -6               prefer IPv6
+--nice-local             renice local process to low priority
+--nice-remote            renice remote process to low priority
+--ionice-local           ionice local process to low priority
+--ionice-remote          ionice remote process to low priority
+--nice, --ionice         set local and remote process to low priority
+--no-nice, ...           prepending "no-" turns the given option off
+--nice-and-ionice, -Q    same as --nice --ionice
 --version, -V            print the version + other info and exit
 --help, -h (*)           show this help (* -h is help only on its own)
 ```
