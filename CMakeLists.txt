@@ -2,7 +2,20 @@ cmake_minimum_required(VERSION 3.15)
 project(rsync C CXX)
 
 # Find dependencies
-find_package(ZLIB REQUIRED)
+find_package(ZLIB QUIET)
+if(NOT ZLIB_FOUND)
+    message(STATUS 'ZLIB not found in environment, fetching via FetchContent')
+    include(FetchContent)
+    FetchContent_Declare(
+        zlib
+        GIT_REPOSITORY https://github.com/madler/zlib.git
+        GIT_TAG v1.3.1
+    )
+    FetchContent_MakeAvailable(zlib)
+    if(NOT TARGET ZLIB::ZLIB)
+        add_library(ZLIB::ZLIB ALIAS zlibstatic)
+    endif()
+endif()
 find_package(zstd CONFIG REQUIRED)
 find_package(lz4 CONFIG REQUIRED)
 find_package(xxHash CONFIG REQUIRED)
@@ -175,3 +188,51 @@ if(PYTHON_EXECUTABLE)
         set_tests_properties(${TEST_NAME} PROPERTIES ENVIRONMENT "TOOLDIR=$<TARGET_FILE_DIR:tls>")
     endforeach()
 endif()
+
+if(TARGET popt)
+  target_compile_definitions(popt PRIVATE HAVE_CONFIG_H=1)
+endif()
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/rounding.h "#define EXTRA_ROUNDING 0\n")
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/git-version.h "#define RSYNC_GITOBJ \"\"\n")
+
+if(TARGET popt)
+  target_compile_definitions(popt PRIVATE HAVE_CONFIG_H=1)
+endif()
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/rounding.h "#define EXTRA_ROUNDING 0\n")
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/git-version.h "#define RSYNC_GITOBJ \"\"\n")
+
+if(TARGET popt)
+  target_compile_definitions(popt PRIVATE HAVE_CONFIG_H=1)
+endif()
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/rounding.h "#define EXTRA_ROUNDING 0\n")
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/git-version.h "#define RSYNC_GITOBJ \"\"\n")
+
+if(TARGET popt)
+  target_compile_definitions(popt PRIVATE HAVE_CONFIG_H=1)
+endif()
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/rounding.h "#define EXTRA_ROUNDING 0\n")
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/git-version.h "#define RSYNC_GITOBJ \"\"\n")
+
+if(TARGET popt)
+  target_compile_definitions(popt PRIVATE HAVE_CONFIG_H=1)
+endif()
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/rounding.h "#define EXTRA_ROUNDING 0\n")
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/git-version.h "#define RSYNC_GITOBJ \"\"\n")
+
+if(TARGET popt)
+  target_compile_definitions(popt PRIVATE HAVE_CONFIG_H=1)
+endif()
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/rounding.h "#define EXTRA_ROUNDING 0\n")
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/git-version.h "#define RSYNC_GITOBJ \"\"\n")
+
+if(TARGET popt)
+  target_compile_definitions(popt PRIVATE HAVE_CONFIG_H=1)
+endif()
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/rounding.h "#define EXTRA_ROUNDING 0\n")
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/git-version.h "#define RSYNC_GITOBJ \"\"\n")
+
+if(TARGET popt)
+  target_compile_definitions(popt PRIVATE HAVE_CONFIG_H=1)
+endif()
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/rounding.h "#define EXTRA_ROUNDING 0\n")
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/git-version.h "#define RSYNC_GITOBJ \"\"\n")
