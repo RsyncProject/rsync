@@ -46,7 +46,7 @@ zlib_OBJS=zlib/deflate.o zlib/inffast.o zlib/inflate.o zlib/inftrees.o \
 OBJS1=flist.o rsync.o generator.o receiver.o cleanup.o sender.o exclude.o \
 	util1.o util2.o main.o checksum.o match.o syscall.o log.o backup.o delete.o
 OBJS2=options.o io.o compat.o hlink.o token.o uidlist.o socket.o hashtable.o \
-	usage.o fileio.o batch.o clientname.o chmod.o acls.o xattrs.o
+	usage.o fileio.o batch.o clientname.o chmod.o acls.o xattrs.o niceness.o
 OBJS3=progress.o pipe.o @MD5_ASM@ @ROLL_SIMD@ @ROLL_ASM@
 DAEMON_OBJ = params.o loadparm.o clientserver.o access.o connection.o authenticate.o
 popt_OBJS= popt/popt.o  popt/poptconfig.o \
