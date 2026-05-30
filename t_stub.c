@@ -45,6 +45,13 @@ size_t max_alloc = (size_t)-1; /* test helpers are not memory-constrained;
 				* hits at its first my_strdup() call. */
 char *partial_dir;
 char *module_dir;
+/* secure_relative_open() reads curr_dir[]/curr_dir_len to re-anchor an
+ * alt-dest ".." climb at the module root.  The real definitions live in
+ * util1.c; declare these weak so the helpers that link util1.o (t_unsafe,
+ * t_chmod_secure, t_secure_relpath) use the real ones without a duplicate-
+ * symbol clash, while the helpers that don't (tls, trimslash) still link. */
+char curr_dir[MAXPATHLEN] __attribute__((weak));
+unsigned int curr_dir_len __attribute__((weak)) = 0;
 filter_rule_list daemon_filter_list;
 
  void rprintf(UNUSED(enum logcode code), const char *format, ...)

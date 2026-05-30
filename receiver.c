@@ -99,6 +99,31 @@ static int updating_basis_or_equiv;
  * Anything else is a straight pass-through that preserves the strict contract. */
 static int secure_basis_open(const char *basedir, const char *relpath, int flags, mode_t mode)
 {
+	extern int am_daemon, am_chrooted;
+
+	/* Confinement via secure_relative_open() is only required for the
+	 * sanitizing daemon (am_daemon && !am_chrooted) -- exactly the gate the
+	 * do_*_at() wrappers in syscall.c apply.  In local / remote-shell mode
+	 * there is no module boundary to enforce, and under "use chroot = yes"
+	 * the kernel root is the module, so the chroot is its own boundary
+	 * (CVE-2026-29518 was specific to chroot-disabled daemons).  In both
+	 * cases an alt-dest basis such as --link-dest=../01 must resolve against
+	 * the CWD the way a bare open does (and did before the CVE hardening);
+	 * confining it here would reject the legitimate sibling ".." and strand a
+	 * delta'd file with "block match with no basis file".  Restrict the secure
+	 * path to the one context that needs it. */
+	if (!am_daemon || am_chrooted) {
+		if (basedir) {
+			char fullpath[MAXPATHLEN];
+			if (pathjoin(fullpath, sizeof fullpath, basedir, relpath) >= sizeof fullpath) {
+				errno = ENAMETOOLONG;
+				return -1;
+			}
+			return do_open(fullpath, flags, mode);
+		}
+		return do_open(relpath, flags, mode);
+	}
+
 	if (!basedir && relpath && *relpath == '/') {
 		const char *slash = strrchr(relpath, '/');
 		const char *leaf = slash + 1;
@@ -859,7 +884,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 				basedir = basis_dir[0];
 				fnamecmp = fname;
 				fnamecmp_type = FNAMECMP_BASIS_DIR_LOW;
-				fd1 = secure_relative_open(basedir, fnamecmp, O_RDONLY, 0);
+				fd1 = secure_basis_open(basedir, fnamecmp, O_RDONLY, 0);
 			}
 		}
 

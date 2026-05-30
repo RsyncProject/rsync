@@ -1782,27 +1782,100 @@ static int secure_relative_open_resolve_beneath(const char *basedir, const char 
 
 int secure_relative_open(const char *basedir, const char *relpath, int flags, mode_t mode)
 {
+	extern int am_daemon, am_chrooted;
+	extern char *module_dir;
+	extern unsigned int module_dirlen;
+	extern char curr_dir[MAXPATHLEN];
+	extern unsigned int curr_dir_len;
+	char modrel_buf[MAXPATHLEN];
+	int reanchored = 0;
+
 	if (!relpath || relpath[0] == '/') {
 		// must be a relative path
 		errno = EINVAL;
 		return -1;
 	}
-	/* Reject any path with a literal ".." component (bare "..",
-	 * "../foo", "foo/..", "foo/../bar", "subdir/.."). The previous
-	 * substring-based check caught only "../" prefix and "/../"
-	 * substring; bare ".." and trailing "/.." escape on the per-
-	 * component walk fallback used by NetBSD/OpenBSD/Solaris/Cygwin
-	 * and pre-5.6 Linux. RESOLVE_BENEATH on Linux/FreeBSD/macOS
-	 * catches some of these in-kernel with EXDEV, but the front
-	 * door must reject them consistently with EINVAL across all
-	 * platforms so callers can rely on the validation. */
-	if (path_has_dotdot_component(relpath)) {
-		errno = EINVAL;
-		return -1;
+
+	/* Sanitizing daemon (am_daemon && !am_chrooted) only: this is the
+	 * sole context in which the confinement here is reached for an
+	 * attacker-influenced path -- the do_*_at() wrappers fall back to a
+	 * bare syscall for the local / remote-shell / chrooted cases, and a
+	 * chroot is its own module boundary.
+	 *
+	 * In this context we have chdir'd into a sub-directory of the module
+	 * (the transfer destination), so the current directory is NOT the
+	 * module root.  A relative path such as the alt-dest "../01" is
+	 * resolved against the destination and may legitimately climb back out
+	 * to a sibling that is still inside the module (e.g. .../backup/00 with
+	 * --link-dest=../01 -> .../backup/01).  Anchoring RESOLVE_BENEATH at
+	 * the current directory would reject that climb with EXDEV, silently
+	 * disabling hard-linking and re-transferring everything (issue #915).
+	 *
+	 * Re-anchor at the module root -- the actual trust boundary -- by
+	 * prefixing the path of the current directory within the module, taken
+	 * from rsync's own curr_dir[] (the logical CWD that change_dir()
+	 * maintains).  curr_dir is built by the same normalize_path()/clean_fname()
+	 * machinery as module_dir, so module_dir is a guaranteed lexical prefix of
+	 * curr_dir -- which getcwd() would NOT be, since getcwd() returns the
+	 * physical path with every symlink resolved while module_dir is only
+	 * lexically normalized (a module whose configured path traverses a symlink
+	 * would make the two disagree and silently skip the re-anchor).  The
+	 * resulting "<curr_dir-within-module>/<path>" is resolved beneath the real
+	 * module_dir fd: RESOLVE_BENEATH follows the actual on-disk symlinks at
+	 * runtime, permitting any climb that stays inside the module while still
+	 * rejecting one that escapes it (../../etc) and any symlink whose target
+	 * lies outside the module.  module_dir is the absolute, operator-configured
+	 * module path, so the dispatch below opens it on its trusted
+	 * absolute-basedir branch.  Limited to paths that actually contain a
+	 * ".." component; forward paths resolve correctly against the CWD and
+	 * stay on the unchanged code path. */
+	if (am_daemon && !am_chrooted
+	 && module_dirlen && module_dir && module_dir[0] == '/'
+	 && (basedir == NULL || basedir[0] != '/')
+	 && (path_has_dotdot_component(relpath)
+	  || (basedir && path_has_dotdot_component(basedir)))) {
+		const char *p;
+		int n;
+		if (curr_dir_len >= module_dirlen
+		 && strncmp(curr_dir, module_dir, module_dirlen) == 0
+		 && (curr_dir[module_dirlen] == '\0' || curr_dir[module_dirlen] == '/')) {
+			for (p = curr_dir + module_dirlen; *p == '/'; p++) {}	/* CWD relative to module, no leading slash */
+			if (basedir)
+				n = snprintf(modrel_buf, sizeof modrel_buf, "%s%s%s/%s",
+					     p, *p ? "/" : "", basedir, relpath);
+			else
+				n = snprintf(modrel_buf, sizeof modrel_buf, "%s%s%s",
+					     p, *p ? "/" : "", relpath);
+			if (n < 0 || n >= (int)sizeof modrel_buf) {
+				errno = ENAMETOOLONG;
+				return -1;
+			}
+			basedir = module_dir;	/* absolute, operator-trusted anchor */
+			relpath = modrel_buf;
+			reanchored = 1;
+		}
+		/* else: CWD not under the module root as expected -- leave the
+		 * path unchanged and let the front-door rejection below handle
+		 * it (fail safe). */
 	}
-	if (basedir && basedir[0] != '/' && path_has_dotdot_component(basedir)) {
-		errno = EINVAL;
-		return -1;
+
+	/* Reject any path with a literal ".." component (bare "..", "../foo",
+	 * "foo/..", "foo/../bar", "subdir/..").  RESOLVE_BENEATH on
+	 * Linux/FreeBSD/macOS catches escaping ".." in-kernel, but the front
+	 * door rejects them consistently with EINVAL across all platforms so
+	 * callers can rely on the validation.  Skipped for a re-anchored path:
+	 * its ".." is deliberate, stays within the module, and is adjudicated
+	 * by RESOLVE_BENEATH in the dispatch below (the portable fallback
+	 * re-checks and rejects it, see there). */
+	if (!reanchored) {
+		if (path_has_dotdot_component(relpath)) {
+			errno = EINVAL;
+			return -1;
+		}
+		if (basedir && basedir[0] != '/' && path_has_dotdot_component(basedir)) {
+			errno = EINVAL;
+			return -1;
+		}
 	}
 
 #if defined(__linux__) && defined(HAVE_OPENAT2)
@@ -1820,6 +1893,27 @@ int secure_relative_open(const char *basedir, const char *relpath, int flags, mo
 #ifdef O_RESOLVE_BENEATH
 	return secure_relative_open_resolve_beneath(basedir, relpath, flags, mode);
 #endif
+
+	/* Portable fallback only: no kernel RESOLVE_BENEATH is available, so the
+	 * per-component O_NOFOLLOW walk below cannot adjudicate ".." safely (it
+	 * would have to open a real ".." and could thereby leave the anchor).
+	 * On the kernel paths above the ".." handling is enforced by
+	 * RESOLVE_BENEATH (escapes rejected with EXDEV, in-module climbs
+	 * allowed), so this rejection is intentionally confined to the fallback.
+	 * Reject any literal ".." component (bare "..", "../foo", "foo/..",
+	 * "foo/../bar", "subdir/..").  Note: this re-breaks --link-dest=../01
+	 * on platforms with neither openat2 nor O_RESOLVE_BENEATH
+	 * (NetBSD/OpenBSD/Solaris/Cygwin/pre-5.6 Linux), trading function for
+	 * safety there; those are the same platforms that lacked within-tree
+	 * symlink support in the original fix. */
+	if (path_has_dotdot_component(relpath)) {
+		errno = EINVAL;
+		return -1;
+	}
+	if (basedir && basedir[0] != '/' && path_has_dotdot_component(basedir)) {
+		errno = EINVAL;
+		return -1;
+	}
 
 #if !defined(O_NOFOLLOW) || !defined(O_DIRECTORY) || !defined(AT_FDCWD)
 	// really old system, all we can do is live with the risks
