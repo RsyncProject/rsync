@@ -132,6 +132,18 @@ static int64 tmp_dev = -1, tmp_ino;
 #endif
 static char tmp_sum[MAX_DIGEST_LEN];
 
+#ifdef ST_MTIME_NSEC
+/* Return st_mtim nsec if it is in the wire-valid range, else 0. */
+static inline uint32 wire_mtime_nsec_from_stat(const STRUCT_STAT *stp)
+{
+	unsigned long nsec = (unsigned long)stp->ST_MTIME_NSEC;
+
+	if (nsec > MAX_WIRE_NSEC)
+		return 0;
+	return (uint32)nsec;
+}
+#endif
+
 static char empty_sum[MAX_DIGEST_LEN];
 static int flist_count_offset; /* for --delete --progress */
 static int show_filelist_progress;
@@ -1255,7 +1267,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	int extra_len = file_extra_cnt * EXTRA_LEN;
 	const char *basename;
 	alloc_pool_t *pool;
-	STRUCT_STAT st;
+	STRUCT_STAT st = {0};
 	char *bp;
 
 	if (strlcpy(thisname, fname, sizeof thisname) >= sizeof thisname) {
@@ -1417,8 +1429,12 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	}
 
 #ifdef ST_MTIME_NSEC
-	if (st.ST_MTIME_NSEC && protocol_version >= 31)
-		extra_len += EXTRA_LEN;
+	{
+		uint32 nsec = wire_mtime_nsec_from_stat(&st);
+
+		if (nsec && protocol_version >= 31)
+			extra_len += EXTRA_LEN;
+	}
 #endif
 #if SIZEOF_CAPITAL_OFF_T >= 8
 	if (st.st_size > 0xFFFFFFFFu && S_ISREG(st.st_mode))
@@ -1473,9 +1489,13 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	file->flags = flags;
 	file->modtime = st.st_mtime;
 #ifdef ST_MTIME_NSEC
-	if (st.ST_MTIME_NSEC && protocol_version >= 31) {
-		file->flags |= FLAG_MOD_NSEC;
-		F_MOD_NSEC(file) = st.ST_MTIME_NSEC;
+	{
+		uint32 nsec = wire_mtime_nsec_from_stat(&st);
+
+		if (nsec && protocol_version >= 31) {
+			file->flags |= FLAG_MOD_NSEC;
+			F_MOD_NSEC(file) = nsec;
+		}
 	}
 #endif
 	file->len32 = (uint32)st.st_size;
@@ -2075,10 +2095,9 @@ static void send1extra(int f, struct file_struct *file, struct file_list *flist)
 		}
 
 		if (name_type != NORMAL_NAME) {
-			STRUCT_STAT st;
-			if (name_type == MISSING_NAME)
-				memset(&st, 0, sizeof st);
-			else if (link_stat(fbuf, &st, 1) != 0) {
+			STRUCT_STAT st = {0};
+
+			if (name_type != MISSING_NAME && link_stat(fbuf, &st, 1) != 0) {
 				interpret_stat_error(fbuf, True);
 				continue;
 			}
@@ -2210,7 +2229,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	static const char *lastdir;
 	static int lastdir_len = -1;
 	int len, dirlen;
-	STRUCT_STAT st;
+	STRUCT_STAT st = {0};
 	char *p, *dir;
 	struct file_list *flist;
 	struct timeval start_tv, end_tv;
