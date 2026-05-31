@@ -1,0 +1,31 @@
+# Expected outcomes for current rsync <-> rsync 3.2.7 peer (see
+# rsync_3.1.3.expect for the format/semantics; listed tests are the run set).
+
+00-hello                    pass
+reverse-daemon-delta        pass    # old client -> current daemon (backward-compat: delta+compress, both directions)
+alt-dest                    pass
+bare-do-open-symlink-race   pass
+batch-mode                  pass
+chmod-option                pass
+daemon                      pass
+daemon-access               pass
+daemon-auth                 pass
+daemon-config               pass
+daemon-exec                 pass
+daemon-filter               pass
+daemon-gzip-download        pass
+daemon-gzip-upload          pass
+daemon-munge                pass
+daemon-refuse               pass
+daemon-refuse-compress      pass
+exclude                     pass
+files-from                  pass
+hardlinks                   pass
+ssh-basic                   pass
+symlink-dirlink-basis       pass
+
+# --- May-2026 security fixes absent in 3.2.7 (peer is vulnerable) ---
+alt-dest-symlink-race       xfail   # --link-dest basis lookup follows basedir symlink (escape)
+chdir-symlink-race          xfail   # chmod escape via cd symlink during chdir
+copy-dest-source-symlink    xfail   # copy_file source reads /outside via cd symlink (poison)
+sender-flist-symlink-leak   xfail   # sender flist follows cd symlink, leaks outside paths

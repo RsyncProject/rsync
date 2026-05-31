@@ -1,0 +1,40 @@
+# Expected outcomes for current rsync <-> rsync 3.4.1 peer (see
+# rsync_3.1.3.expect for the format/semantics; listed tests are the run set).
+
+00-hello                    pass
+reverse-daemon-delta        pass    # old client -> current daemon (backward-compat: delta+compress, both directions)
+alt-dest                    pass
+bare-do-open-symlink-race   pass
+batch-mode                  pass
+chmod-option                pass
+daemon                      pass
+daemon-access               pass
+daemon-auth                 pass
+daemon-config               pass
+daemon-exec                 pass
+daemon-filter               pass
+daemon-gzip-download        pass
+daemon-gzip-upload          pass
+daemon-munge                pass
+daemon-refuse               pass
+daemon-refuse-compress      pass
+exclude                     pass
+files-from                  pass
+hardlinks                   pass
+ssh-basic                   pass
+
+# issue #715, present in 3.4.1: updating a file through a -K (--copy-dirlinks)
+# directory symlink fails on the receiver because its secure_relative_open()
+# O_NOFOLLOW-confines every path component, including the basedir reached via
+# the symlink, so the basis open is rejected and the update is discarded
+# ("failed verification"). Current master fixes this with secure_basis_open()
+# (receiver.c), which splits the path so the basedir may follow symlinks while
+# only the leaf is O_NOFOLLOW'd. Verified peer-version-, not protocol-, driven
+# (forcing this peer to --protocol=31 still fails; 3.3.0 at proto 31 passes).
+symlink-dirlink-basis       xfail
+
+# --- May-2026 security fixes absent in 3.4.1 (peer is vulnerable) ---
+alt-dest-symlink-race       xfail   # --link-dest basis lookup follows basedir symlink (escape)
+chdir-symlink-race          xfail   # chmod escape via cd symlink during chdir
+copy-dest-source-symlink    xfail   # copy_file source reads /outside via cd symlink (poison)
+sender-flist-symlink-leak   xfail   # sender flist follows cd symlink, leaks outside paths

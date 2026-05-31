@@ -351,6 +351,12 @@ COVERAGE_RUNFLAGS =
 COVERAGE_EXCLUDE = -e '(^|/)zlib/' -e '(^|/)popt/' \
 	-e '(^|/)lib/(getaddrinfo|getpass|inet_ntop|inet_pton)\.'
 
+# Build everything the test suite needs (rsync + helper programs + symlinks)
+# WITHOUT running it. Used by CI jobs that invoke runtests.py directly with
+# custom options (e.g. the version-mix workflow's --rsync-bin2/--expect-result).
+.PHONY: check-progs
+check-progs: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
+
 .PHONY: check
 check: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	$(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(CHECK_J)
