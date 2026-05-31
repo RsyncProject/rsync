@@ -6,7 +6,7 @@
 # files-host / src-host / dest-host placement combinations.
 
 from rsyncfns import (
-    CHKDIR, FROMDIR, RSYNC, SCRATCHDIR, SRCDIR, TODIR,
+    CHKDIR, FROMDIR, RSYNC, RSYNC_PEER, SCRATCHDIR, SRCDIR, TODIR,
     checkit, hands_setup, rmtree, run_rsync,
 )
 
@@ -44,7 +44,7 @@ for filehost in ('', 'localhost:'):
 
         rmtree(TODIR)
         checkit(
-            ['-avse', SSH, f'--rsync-path={RSYNC}',
+            ['-avse', SSH, f'--rsync-path={RSYNC_PEER}',
              f'--files-from={filehost}{filelist}',
              f'{srchost}{SCRATCHDIR}', f'{desthost}{TODIR}/'],
             CHKDIR, TODIR,

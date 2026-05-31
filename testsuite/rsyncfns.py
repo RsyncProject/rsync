@@ -64,6 +64,15 @@ os.umask(0o022)
 os.environ['HOME'] = str(SCRATCHDIR)
 RSYNC = _required('RSYNC')         # full command line, possibly with valgrind/protocol
 
+# The "peer" rsync command -- used for the SERVER side of two-sided transfers
+# (the daemon process; the remote-shell --rsync-path target). The runner sets
+# RSYNC_PEER to a second binary when invoked with --rsync-bin2, letting a run
+# mix two rsync versions over the wire. When no second binary was selected,
+# RSYNC_PEER == RSYNC, so every consumer below behaves exactly as before and
+# single-binary runs are unchanged. Use .get (not _required) so a test invoked
+# by hand without the runner still works.
+RSYNC_PEER = os.environ.get('RSYNC_PEER', RSYNC)
+
 # TLS_ARGS controls how the 'tls' helper formats listings (e.g. --atimes,
 # -l, -L). Tests that exercise non-default rsync features (atimes, etc.)
 # assign to rsyncfns.TLS_ARGS before calling checkit / rsync_ls_lR.
@@ -232,7 +241,7 @@ def _stop_rsyncd(proc) -> 'None':
             pass
 
 
-def start_rsyncd(conf_path, port: int) -> 'subprocess.Popen':
+def start_rsyncd(conf_path, port: int, rsync_cmd: str = None) -> 'subprocess.Popen':
     """Spawn `rsync --daemon --no-detach --address=127.0.0.1 --port=N
     --config=conf` and return the Popen handle after the port is accepting
     connections.
@@ -245,10 +254,16 @@ def start_rsyncd(conf_path, port: int) -> 'subprocess.Popen':
     the test process doesn't strand the daemon either. The caller is expected
     to have already claim_ports()'d `port`.
 
+    rsync_cmd selects the binary to run as the daemon; it defaults to
+    RSYNC_PEER (the peer side of a two-sided run), so ordinary daemon tests
+    get current-client <-> peer-daemon. The reverse-direction test passes
+    rsync_cmd=RSYNC to put the current build on the daemon side and drive with
+    the old client.
+
     This is only ever reached from start_test_daemon() in --use-tcp mode; the
     default (pipe) mode never starts a listening daemon.
     """
-    argv = shlex.split(RSYNC) + [
+    argv = shlex.split(rsync_cmd or RSYNC_PEER) + [
         '--daemon', '--no-detach',
         '--address=127.0.0.1',
         f'--port={port}',
@@ -282,8 +297,11 @@ def start_rsyncd(conf_path, port: int) -> 'subprocess.Popen':
     test_fail(f"rsyncd never listened on 127.0.0.1:{port}: {last_err}")
 
 
-def start_test_daemon(conf_path, port: int) -> str:
+def start_test_daemon(conf_path, port: int, rsync_cmd: str = None) -> str:
     """Bring up the test daemon and return a URL prefix for client commands.
+
+    rsync_cmd selects the daemon-side binary (default RSYNC_PEER); pass
+    rsync_cmd=RSYNC for the reverse-direction test (current daemon, old client).
 
     This is the single seam every daemon test uses. The transport depends on
     the mode the runner selected:
@@ -302,11 +320,12 @@ def start_test_daemon(conf_path, port: int) -> str:
     Build URLs as f"{prefix}module/path". `port` is only used (and claimed)
     in --use-tcp mode.
     """
+    daemon_cmd = rsync_cmd or RSYNC_PEER
     if USE_TCP:
         claim_ports(port)
-        start_rsyncd(conf_path, port)
+        start_rsyncd(conf_path, port, daemon_cmd)
         return f'rsync://localhost:{port}/'
-    os.environ['RSYNC_CONNECT_PROG'] = f'{RSYNC} --config={conf_path} --daemon'
+    os.environ['RSYNC_CONNECT_PROG'] = f'{daemon_cmd} --config={conf_path} --daemon'
     return 'rsync://localhost/'
 
 

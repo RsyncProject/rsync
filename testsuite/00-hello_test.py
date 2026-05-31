@@ -8,7 +8,7 @@
 import os
 
 from rsyncfns import (
-    FROMDIR, RSYNC, SRCDIR, TODIR,
+    FROMDIR, RSYNC, RSYNC_PEER, SRCDIR, TODIR,
     checkit, run_rsync, test_fail,
 )
 
@@ -39,7 +39,7 @@ def append_line(line: str) -> None:
 
 def copy_weird(args: list, src_host: str, dst_host: str) -> None:
     checkit(
-        [*args, f'--rsync-path={RSYNC}',
+        [*args, f'--rsync-path={RSYNC_PEER}',
          f'{src_host}{weird_dir}/',
          f'{dst_host}{TODIR / weird_name}'],
         FROMDIR, TODIR,
@@ -70,7 +70,7 @@ print('test6')
 saved = os.getcwd()
 os.chdir(FROMDIR)
 try:
-    run_rsync('-ai', '--old-args', f'--rsync-path={RSYNC}',
+    run_rsync('-ai', '--old-args', f'--rsync-path={RSYNC_PEER}',
               'lh:one two', f'{TODIR}/')
 finally:
     os.chdir(saved)
@@ -91,7 +91,7 @@ from rsyncfns import rsync_argv
 os.chdir(FROMDIR)
 try:
     subprocess.run(
-        rsync_argv('-ai', f'--rsync-path={RSYNC}',
+        rsync_argv('-ai', f'--rsync-path={RSYNC_PEER}',
                    'lh:one two', f'{TODIR}/'),
         env=env, check=True,
     )
