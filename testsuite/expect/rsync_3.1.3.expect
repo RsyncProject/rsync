@@ -1,0 +1,49 @@
+# Expected outcomes for current rsync (client/driver) <-> rsync 3.1.3 peer
+# (daemon / remote-shell server), used by runtests.py --expect-result.
+#
+# Format: "<testname> <pass|skip|fail|xfail>", '#' comments ignored. The listed
+# tests ARE the run set. outcome meanings:
+#   pass  - must succeed
+#   skip  - must skip (exit 77)
+#   xfail - expected to fail: a known, benign old-peer limitation or an
+#           unpatched-old-peer vulnerability (documented per line below)
+#   fail  - expected to fail, flagged for investigation (not understood / may
+#           be a current-side bug)
+# fail and xfail are equivalent for pass/fail accounting; the label documents
+# why. An UNEXPECTED pass (xpass) of an xfail/fail line fails the run, which is
+# the signal to revisit this manifest (e.g. an old-peer gap got closed).
+#
+# daemon-access-ip and daemon-chroot-acl are intentionally omitted: they need a
+# real TCP peer and would skip/run differently by transport.
+
+# --- two-sided tests that pass against a 3.1.3 peer ---
+00-hello                    pass
+reverse-daemon-delta        pass    # old client -> current daemon (backward-compat: delta+compress, both directions)
+alt-dest                    pass
+bare-do-open-symlink-race   pass
+batch-mode                  pass
+chmod-option                pass
+daemon-access               pass
+daemon-auth                 pass
+daemon-config               pass
+daemon-exec                 pass
+daemon-filter               pass
+daemon-gzip-download        pass
+daemon-gzip-upload          pass
+daemon-munge                pass
+exclude                     pass
+files-from                  pass
+hardlinks                   pass
+ssh-basic                   pass
+symlink-dirlink-basis       pass
+
+# --- version feature/option gaps in 3.1.3 ---
+daemon                      xfail   # exercises -U/--atimes etc. unknown to 3.1.3 (server errors)
+daemon-refuse               xfail   # daemon refuse/option semantics differ (connection reset)
+daemon-refuse-compress      xfail   # pre-zstd compress negotiation; no --compress refuse error
+
+# --- May-2026 security fixes absent in 3.1.3 (peer is vulnerable) ---
+alt-dest-symlink-race       xfail   # --link-dest basis lookup follows basedir symlink (escape)
+chdir-symlink-race          xfail   # chmod escape via cd symlink during chdir
+copy-dest-source-symlink    xfail   # copy_file source reads /outside via cd symlink (poison)
+sender-flist-symlink-leak   xfail   # sender flist follows cd symlink, leaks outside paths

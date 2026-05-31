@@ -1,0 +1,33 @@
+# Expected outcomes for current rsync <-> rsync 2.6.0 peer (protocol 27).
+# See rsync_3.1.3.expect for format/semantics; listed tests are the run set.
+# 2.6.0 predates much of the suite; many daemon/feature tests are expected
+# to fail (xfail) -- a documented old-peer gap, not a current-side bug.
+# The four *-symlink-race / sender-flist-symlink-leak xfails show the peer
+# is vulnerable to the May-2026 findings that current master fixes.
+
+00-hello                     xfail   # feature/negotiation absent in 2.6.0 (proto 27)
+alt-dest                     xfail   # peer vulnerable to May-2026 finding (fixed in current)
+alt-dest-symlink-race        xfail   # peer vulnerable to May-2026 finding (fixed in current)
+bare-do-open-symlink-race    pass
+batch-mode                   xfail   # feature/negotiation absent in 2.6.0 (proto 27)
+chdir-symlink-race           xfail   # peer vulnerable to May-2026 finding (fixed in current)
+chmod-option                 xfail   # feature/negotiation absent in 2.6.0 (proto 27)
+copy-dest-source-symlink     xfail   # peer vulnerable to May-2026 finding (fixed in current)
+daemon                       xfail   # feature/negotiation absent in 2.6.0 (proto 27)
+daemon-access                xfail   # feature/negotiation absent in 2.6.0 (proto 27)
+daemon-auth                  pass
+daemon-config                xfail   # feature/negotiation absent in 2.6.0 (proto 27)
+daemon-exec                  xfail   # feature/negotiation absent in 2.6.0 (proto 27)
+daemon-filter                xfail   # feature/negotiation absent in 2.6.0 (proto 27)
+daemon-gzip-download         xfail   # feature/negotiation absent in 2.6.0 (proto 27)
+daemon-gzip-upload           xfail   # feature/negotiation absent in 2.6.0 (proto 27)
+daemon-munge                 xfail   # feature/negotiation absent in 2.6.0 (proto 27)
+daemon-refuse                xfail   # feature/negotiation absent in 2.6.0 (proto 27)
+daemon-refuse-compress       xfail   # feature/negotiation absent in 2.6.0 (proto 27)
+exclude                      pass
+files-from                   xfail   # feature/negotiation absent in 2.6.0 (proto 27)
+hardlinks                    pass
+reverse-daemon-delta         pass
+sender-flist-symlink-leak    xfail   # peer vulnerable to May-2026 finding (fixed in current)
+ssh-basic                    pass
+symlink-dirlink-basis        xfail   # feature/negotiation absent in 2.6.0 (proto 27)
