@@ -3131,6 +3131,13 @@ char *check_for_hostspec(char *s, char **host_ptr, int *port_ptr)
 {
 	char *path;
 
+	/* Establish the default port value up front. parse_hostspec() only
+	 * writes *port_ptr when it parses an explicit port, and the non-URL
+	 * call below passes a NULL port_ptr, so without this the reads at the
+	 * "!*port_ptr" tests below can observe an uninitialized caller value. */
+	if (port_ptr)
+		*port_ptr = 0;
+
 	if (port_ptr && strncasecmp(URL_PREFIX, s, strlen(URL_PREFIX)) == 0) {
 		*host_ptr = parse_hostspec(s + strlen(URL_PREFIX), &path, port_ptr);
 		if (*host_ptr) {

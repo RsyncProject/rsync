@@ -15,6 +15,21 @@ crash here means a real parser bug, not a harness artifact.
 | `fuzz_flist`   | `flist.c` `recv_file_entry`                | staged stub (see header notes) |
 | `fuzz_xattrs`  | `xattrs.c` `receive_xattr`                 | staged stub (see header notes) |
 
+| `fuzz_recv_discard` | `receiver.c` discard-path NULL deref: `read_sum_head` + match-token → `full_fname(NULL)` (static-findings REAL #1, util1.c:1282) | **working — bug FIXED, now a clean-gate regression** |
+| `fuzz_flist`   | `flist.c` `recv_file_entry`                | staged stub (see header notes) |
+| `fuzz_xattrs`  | `xattrs.c` `receive_xattr`                 | staged stub (see header notes) |
+
+> **`fuzz_recv_discard` is a REGRESSION harness for a now-FIXED bug.** On the
+> original (vulnerable) code its committed seed
+> `corpus/fuzz_recv_discard/match_nobasis.bin` triggered an ASan/UBSan NULL
+> dereference in `full_fname` (util1.c:1282) when a block-match token arrived on
+> the discard path (`fname == NULL`). The receiver fix (handle a block-match
+> token on the discard path by absorbing it benignly — it is normal protocol,
+> not malformed — and restrict the `mapbuf == NULL` protocol error to real-output
+> transfers where `fd != -1` and `fname` is non-NULL) makes this path unwind
+> cleanly. The harness is therefore now part of the default `run-regression.sh`
+> clean-gate target list; it must stay green.
+
 The two stubs are no-op `LLVMFuzzerTestOneInput`s with a detailed header
 documenting the exact target region, the required global-init contract, and the
 dependency wall that puts a *hygienic* harness out of WS2 budget. They are not

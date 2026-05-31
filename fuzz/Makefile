@@ -50,6 +50,13 @@ TOKEN_OBJS := $(RSYNC_DIR)/token.o $(RSYNC_DIR)/io.o $(ZLIB_OBJS)
 TOKEN_LIBS := -llz4 -lzstd
 
 HARNESSES := fuzz_io fuzz_token
+# fuzz_recv_discard drives the receiver discard-path NULL-deref (static-findings
+# REAL #1). It needs the real read_sum_head/recv_token (io.o + token.o + zlib)
+# plus the real full_fname (util1.o), where the NULL deref actually lands.
+RECV_DISCARD_OBJS := $(RSYNC_DIR)/util1.o $(TOKEN_OBJS)
+RECV_DISCARD_LIBS := -llz4 -lzstd
+
+HARNESSES := fuzz_io fuzz_token fuzz_recv_discard
 
 .PHONY: all clean regression
 all: $(HARNESSES)
@@ -68,6 +75,18 @@ fuzz_token.o: fuzz_token.c
 
 fuzz_token: fuzz_token.o stubs.o $(TOKEN_OBJS)
 	$(CC) $(FUZZ_SAN) $^ -o $@ $(TOKEN_LIBS)
+
+fuzz_recv_discard.o: fuzz_recv_discard.c
+	$(CC) $(HARNESS_CFLAGS) -c $< -o $@
+
+recv_discard_stubs.o: recv_discard_stubs.c
+	$(CC) $(HARNESS_CFLAGS) -c $< -o $@
+
+fuzz_recv_discard: fuzz_recv_discard.o stubs.o $(RECV_DISCARD_OBJS) recv_discard_stubs.o
+	# util1.o provides real definitions of a few helpers (flist_ndx_push/pop,
+	# glob_expand*) that stubs.c also stubs; none are on the full_fname path, so
+	# allow the duplicates (linker keeps the first / stubs.c version).
+	$(CC) $(FUZZ_SAN) -Wl,--allow-multiple-definition $^ -o $@ $(RECV_DISCARD_LIBS)
 
 regression: all
 	./run-regression.sh

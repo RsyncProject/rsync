@@ -5,6 +5,7 @@
 /fuzz_flist
 /fuzz_token
 /fuzz_xattrs
+/fuzz_recv_discard
 
 # libFuzzer crash / leak reproducers (a real find should be MINIMIZED and
 # committed under corpus/<target>/ with a descriptive name, not left here)

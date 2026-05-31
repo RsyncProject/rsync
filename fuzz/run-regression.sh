@@ -23,6 +23,13 @@ TARGETS="${FUZZ_TARGETS:-fuzz_io}"
 # Ensure the rsync wire-parser objects exist & are sanitizer-instrumented.
 # (CI is expected to have configured with the campaign CFLAGS already.)
 make -C .. io.o >/dev/null
+TARGETS="${FUZZ_TARGETS:-fuzz_io fuzz_token fuzz_recv_discard}"
+
+# Ensure the rsync wire-parser objects exist & are sanitizer-instrumented.
+# (CI is expected to have configured with the campaign CFLAGS already.)
+# io.o feeds fuzz_io; token.o feeds fuzz_token; util1.o (real full_fname) feeds
+# fuzz_recv_discard's discard-path regression.
+make -C .. io.o token.o util1.o >/dev/null
 
 make all
 
