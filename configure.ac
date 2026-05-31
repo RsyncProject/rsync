@@ -1479,6 +1479,8 @@ case "$CC" in
     ;;
 esac
 
+AC_DEFINE_UNQUOTED([COMPILE_TARGET], ["$host"], [String describing the compiled target OS and architecture])
+
 AC_CONFIG_FILES([Makefile lib/dummy zlib/dummy popt/dummy shconfig])
 AC_OUTPUT
 
