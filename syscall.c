@@ -1960,7 +1960,7 @@ int secure_mkstemp(char *template, mode_t perms)
 		errno = EINVAL;
 		return -1;
 	}
-	if (strncmp(template, "../", 3) == 0 || strstr(template, "/../")) {
+	if (path_has_dotdot_component(template)) {
 		errno = EINVAL;
 		return -1;
 	}

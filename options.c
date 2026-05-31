@@ -972,6 +972,7 @@ static void set_refuse_options(void)
 		 || strcmp("checksum-seed", longName) == 0
 		 || strcmp("copy-devices", longName) == 0 /* disable wild-match (it gets refused below) */
 		 || strcmp("write-devices", longName) == 0 /* disable wild-match (it gets refused below) */
+		 || strcmp("copy-as", longName) == 0 /* disable wild-match (it gets refused below) */
 		 || strcmp("log-format", longName) == 0 /* aka out-format (NOT log-file-format) */
 		 || strcmp("sender", longName) == 0
 		 || strcmp("server", longName) == 0)
@@ -984,6 +985,7 @@ static void set_refuse_options(void)
 	if (am_daemon) { /* Refused by default, but can be accepted via a negated exact match. */
 		parse_one_refuse_match(0, "copy-devices", list_end);
 		parse_one_refuse_match(0, "write-devices", list_end);
+		parse_one_refuse_match(0, "copy-as", list_end);
 	}
 
 	while (1) {

@@ -133,9 +133,11 @@ static void match_gnums(int32 *ndx_list, int ndx_count)
 				struct file_list *flist;
 				prev = IVAL(node->data, 1);
 				flist = flist_for_ndx(prev, NULL);
-				if (flist)
+				if (flist) {
+					if (prev < flist->ndx_start)
+						exit_cleanup(RERR_PROTOCOL);
 					flist->files[prev - flist->ndx_start]->flags &= ~FLAG_HLINK_LAST;
-				else {
+				} else {
 					/* We skipped all prior files in this
 					 * group, so mark this as a "first". */
 					file->flags |= FLAG_HLINK_FIRST;
@@ -255,6 +257,8 @@ static char *check_prior(struct file_struct *file, int gnum,
 		if (prev_ndx < 0
 		 || (flist = flist_for_ndx(prev_ndx, NULL)) == NULL)
 			break;
+		if (prev_ndx < flist->ndx_start)
+			exit_cleanup(RERR_PROTOCOL);
 		fp = flist->files[prev_ndx - flist->ndx_start];
 		if (!(fp->flags & FLAG_SKIP_HLINK)) {
 			*prev_ndx_p = prev_ndx;
@@ -507,6 +511,8 @@ void finish_hard_link(struct file_struct *file, const char *fname, int fin_ndx,
 	while ((ndx = prev_ndx) >= 0) {
 		int val;
 		flist = flist_for_ndx(ndx, "finish_hard_link");
+		if (ndx < flist->ndx_start)
+			exit_cleanup(RERR_PROTOCOL);
 		file = flist->files[ndx - flist->ndx_start];
 		file->flags = (file->flags & ~FLAG_HLINK_FIRST) | FLAG_HLINK_DONE;
 		prev_ndx = F_HL_PREV(file);
