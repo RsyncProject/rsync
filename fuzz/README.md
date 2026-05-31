@@ -12,12 +12,10 @@ crash here means a real parser bug, not a harness artifact.
 |----------------|-------------------------------------------|--------|
 | `fuzz_io`      | `io.c` primitives: `read_sum_head`, `read_varint`/`read_varlong`/`read_longint`/`read_vstring`, `read_int_bounded`/`read_varint_bounded`/`read_varint_size` | **working** |
 | `fuzz_token`   | `token.c` `recv_token` → `simple_recv_token` (CPRES_NONE literal-token path; the `i > CHUNK_SIZE` guard) | **working** |
-| `fuzz_flist`   | `flist.c` `recv_file_entry`                | staged stub (see header notes) |
-| `fuzz_xattrs`  | `xattrs.c` `receive_xattr`                 | staged stub (see header notes) |
-
 | `fuzz_recv_discard` | `receiver.c` discard-path NULL deref: `read_sum_head` + match-token → `full_fname(NULL)` (static-findings REAL #1, util1.c:1282) | **working — bug FIXED, now a clean-gate regression** |
-| `fuzz_flist`   | `flist.c` `recv_file_entry`                | staged stub (see header notes) |
-| `fuzz_xattrs`  | `xattrs.c` `receive_xattr`                 | staged stub (see header notes) |
+| `fuzz_deflated_token` | `token.c` `recv_deflated_token` (zlib/CPRES_ZLIB inflate path) | **working** |
+| `fuzz_flist`   | `flist.c` `recv_file_entry`                | **working (live harness)** |
+| `fuzz_xattrs`  | `xattrs.c` `receive_xattr`                 | **working (live harness)** |
 
 > **`fuzz_recv_discard` is a REGRESSION harness for a now-FIXED bug.** On the
 > original (vulnerable) code its committed seed
@@ -30,10 +28,10 @@ crash here means a real parser bug, not a harness artifact.
 > cleanly. The harness is therefore now part of the default `run-regression.sh`
 > clean-gate target list; it must stay green.
 
-The two stubs are no-op `LLVMFuzzerTestOneInput`s with a detailed header
-documenting the exact target region, the required global-init contract, and the
-dependency wall that puts a *hygienic* harness out of WS2 budget. They are not
-wired into the Makefile and never run in regression.
+The `fuzz_flist` / `fuzz_xattrs` harnesses are LIVE: they link the REAL
+`flist.c` / `xattrs.c` recompiled with an in-file `#ifdef RSYNC_FUZZ_*` hook
+(`flist_fuzz.o` / `xattrs_fuzz.o`) plus their whole reachable call graph, and
+`fuzz_deflated_token` drives the real `recv_deflated_token` via `token_fuzz.o`.
 
 ## Toolchain
 

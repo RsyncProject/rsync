@@ -3432,3 +3432,50 @@ struct file_list *get_dirlist(char *dirname, int dlen, int flags)
 
 	return dirlist;
 }
+
+#ifdef RSYNC_FUZZ_FLIST
+/* Fuzzing hook (compiled ONLY when RSYNC_FUZZ_FLIST is defined; the normal
+ * rsync build never sees this). It exposes the file-internal static function
+ * recv_file_entry() to fuzz/fuzz_flist.c, replicating exactly the per-entry
+ * work the real caller (recv_file_list, lines ~2625-2658) does around it:
+ *   flist_expand(flist, 1); file = recv_file_entry(f, flist, flags);
+ *   flist->files[flist->used++] = file;
+ * It deliberately omits the heavy, non-target tail of recv_file_list
+ * (flist_sort_and_clean / recv_id_list / fsort) so the fuzzer stays focused on
+ * the wire parser and its stateful lastname[] reconstruction. The harness owns
+ * setjmp; an over-range guard's overflow_exit/exit_cleanup longjmps out. */
+struct file_list *fuzz_flist_new(void)
+{
+	struct file_list *flist = new0(struct file_list);
+	flist->file_pool = pool_create(NORMAL_EXTENT, 0, _out_of_memory, POOL_INTERN);
+	if (!flist->file_pool)
+		out_of_memory("fuzz_flist_new");
+	flist->ndx_start = 0;
+	flist->pool_boundary = pool_boundary(flist->file_pool, 0);
+	/* recv_file_entry consults first_flist/cur_flist indirectly via globals
+	 * in some paths; mirror flist_new's first-list bookkeeping. */
+	first_flist = cur_flist = flist->prev = flist;
+	return flist;
+}
+
+struct file_struct *fuzz_recv_file_entry(int f, struct file_list *flist, int xflags)
+{
+	struct file_struct *file;
+	flist_expand(flist, 1);
+	file = recv_file_entry(f, flist, xflags);
+	if (file)
+		flist->files[flist->used++] = file;
+	return file;
+}
+
+void fuzz_flist_free(struct file_list *flist)
+{
+	if (!flist)
+		return;
+	if (flist->file_pool)
+		pool_destroy(flist->file_pool);
+	free(flist->files);
+	free(flist);
+	first_flist = cur_flist = NULL;
+}
+#endif /* RSYNC_FUZZ_FLIST */

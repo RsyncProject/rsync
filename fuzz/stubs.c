@@ -36,7 +36,7 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 	_exit(99);
 }
 
-NORETURN void _out_of_memory(const char *msg, const char *file, int line)
+__attribute__((weak)) NORETURN void _out_of_memory(const char *msg, const char *file, int line)
 {
 	(void)msg; (void)file; (void)line;
 	if (fuzz_unwind_armed)
@@ -44,7 +44,7 @@ NORETURN void _out_of_memory(const char *msg, const char *file, int line)
 	_exit(99);
 }
 
-NORETURN void _overflow_exit(const char *msg, const char *file, int line)
+__attribute__((weak)) NORETURN void _overflow_exit(const char *msg, const char *file, int line)
 {
 	(void)msg; (void)file; (void)line;
 	if (fuzz_unwind_armed)
@@ -60,7 +60,7 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 
 const char *who_am_i(void) { return "fuzz"; }
 
-char *do_big_num(int64 num, int human_flag, const char *fract)
+__attribute__((weak)) char *do_big_num(int64 num, int human_flag, const char *fract)
 {
 	static char buf[32];
 	(void)human_flag; (void)fract;
@@ -68,16 +68,19 @@ char *do_big_num(int64 num, int human_flag, const char *fract)
 	return buf;
 }
 
-int msleep(int t) { (void)t; return 0; }
+__attribute__((weak)) int msleep(int t) { (void)t; return 0; }
 
 /* my_alloc: a self-contained allocator so ASan tracks every wire-driven
  * allocation. Mirrors rsync's semantics closely enough for the parsers:
  * honours max_alloc, returns NULL when file==NULL on over-limit (callers like
  * EXPAND_ITEM_LIST rely on that), zero-fills on the calloc sentinel. */
-char *do_calloc = "42";
+/* WEAK: real util2.o defines do_calloc + my_alloc; when fuzz_flist/fuzz_xattrs
+ * link util2.o those strong defs win. fuzz_io/fuzz_token (no util2.o) fall back
+ * to these. Same weakening applies to the few globals flist.o itself defines. */
+__attribute__((weak)) char *do_calloc = "42";
 extern size_t max_alloc;
 
-void *my_alloc(void *ptr, size_t num, size_t size, const char *file, int line)
+__attribute__((weak)) void *my_alloc(void *ptr, size_t num, size_t size, const char *file, int line)
 {
 	(void)line;
 	if (size && num >= max_alloc / size) {
@@ -96,13 +99,13 @@ struct stats stats;
 size_t max_alloc = 1u << 30;	/* 1 GiB cap so over-range counts still get rejected by guards */
 
 int protocol_version = PROTOCOL_VERSION;
-int xfer_sum_len = 16;		/* MD5-ish default; harness may override */
+__attribute__((weak)) int xfer_sum_len = 16;	/* MD5-ish default; flist/checksum may override */
 int file_extra_cnt = 0;
 
 int am_server = 0, am_sender = 0, am_generator = 0, am_receiver = 0, am_root = 0;
 int local_server = 0, daemon_connection = 0;
 int inc_recurse = 0;
-int io_error = 0;
+__attribute__((weak)) int io_error = 0;	/* flist.o defines this strong */
 int io_timeout = 0;
 int batch_fd = -1;
 int eol_nulls = 0;
@@ -110,10 +113,10 @@ int read_batch = 0;
 int list_only = 0;
 int protect_args = 0;
 int checksum_seed = 0;
-int flist_eof = 0;
+__attribute__((weak)) int flist_eof = 0;	/* flist.o strong */
 int compat_flags = 0;
-int file_total = 0;
-int file_old_total = 0;
+__attribute__((weak)) int file_total = 0;	/* flist.o strong */
+__attribute__((weak)) int file_old_total = 0;	/* flist.o strong */
 int preserve_hard_links = 0;
 int remove_source_files = 0;
 int extra_flist_sending_enabled = 0;
@@ -128,33 +131,47 @@ int stop_at_utime = 0;
 short info_levels[COUNT_INFO];
 short debug_levels[COUNT_DEBUG];
 
-struct file_list *cur_flist = NULL;
+__attribute__((weak)) struct file_list *cur_flist = NULL;	/* flist.o strong */
 
 /* ------- functions io.o references but the parser paths never reach ------- */
 
 void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
 { (void)itemizing; (void)code; (void)check_redo; }
 
+/* flist_for_ndx lives in rsync.c, which NO harness links, so this stub is the
+ * only definition. The reachable receive-side parser paths exercised here never
+ * call it (recv_file_entry's proto<30 hardlink path uses idev_find, not
+ * flist_for_ndx). A NULL return would silently diverge from real receiver
+ * behavior and could mask a bug, so instead of returning fake data we abort
+ * loudly: if a future parser path ever reaches it, the harness fails the run
+ * rather than carrying on with wrong state. (Not made weak: there is no real
+ * flist_for_ndx object to override it; weak would just leave NULL behind.) */
 struct file_list *flist_for_ndx(int ndx, const char *fatal_error_msg)
-{ (void)ndx; (void)fatal_error_msg; return NULL; }
+{
+	fprintf(stderr, "fuzz/stubs.c: flist_for_ndx(%d, %s) reached -- the "
+		"harness does not link the real implementation; aborting rather "
+		"than returning fake flist data.\n",
+		ndx, fatal_error_msg ? fatal_error_msg : "(null)");
+	abort();
+}
 
-struct file_list *recv_file_list(int f, int dir_ndx) { (void)f; (void)dir_ndx; return NULL; }
-void send_extra_file_list(int f, int at_least) { (void)f; (void)at_least; }
+__attribute__((weak)) struct file_list *recv_file_list(int f, int dir_ndx) { (void)f; (void)dir_ndx; return NULL; }
+__attribute__((weak)) void send_extra_file_list(int f, int at_least) { (void)f; (void)at_least; }
 
-int flist_ndx_pop(flist_ndx_list *lp) { (void)lp; return -1; }
-void flist_ndx_push(flist_ndx_list *lp, int ndx) { (void)lp; (void)ndx; }
+__attribute__((weak)) int flist_ndx_pop(flist_ndx_list *lp) { (void)lp; return -1; }
+__attribute__((weak)) void flist_ndx_push(flist_ndx_list *lp, int ndx) { (void)lp; (void)ndx; }
 
 void log_delete(const char *fname, int mode) { (void)fname; (void)mode; }
 void match_hard_links(struct file_list *flist) { (void)flist; }
 void successful_send(int ndx) { (void)ndx; }
-int glob_expand(const char *arg, char ***argv_p, int *argc_p, int *maxargs_p)
+__attribute__((weak)) int glob_expand(const char *arg, char ***argv_p, int *argc_p, int *maxargs_p)
 { (void)arg; (void)argv_p; (void)argc_p; (void)maxargs_p; return 0; }
-void glob_expand_module(char *base1, char *arg, char ***argv_p, int *argc_p, int *maxargs_p)
+__attribute__((weak)) void glob_expand_module(char *base1, char *arg, char ***argv_p, int *argc_p, int *maxargs_p)
 { (void)base1; (void)arg; (void)argv_p; (void)argc_p; (void)maxargs_p; }
 
-void add_implied_include(const char *arg, int skip_daemon_module) { (void)arg; (void)skip_daemon_module; }
-void free_implied_include_partial_string(void) {}
-void implied_include_partial_string(const char *s_start, const char *s_end) { (void)s_start; (void)s_end; }
+__attribute__((weak)) void add_implied_include(const char *arg, int skip_daemon_module) { (void)arg; (void)skip_daemon_module; }
+__attribute__((weak)) void free_implied_include_partial_string(void) {}
+__attribute__((weak)) void implied_include_partial_string(const char *s_start, const char *s_end) { (void)s_start; (void)s_end; }
 
 int iconvbufs(iconv_t ic, xbuf *in, xbuf *out, int flags)
 { (void)ic; (void)in; (void)out; (void)flags; return 0; }
@@ -172,5 +189,5 @@ int module_id = -1;
 char *skip_compress = NULL;
 
 char *lp_dont_compress(int module_id_) { (void)module_id_; return NULL; }
-char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
+__attribute__((weak)) char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
 { (void)map; (void)offset; (void)len; return NULL; }

@@ -1287,4 +1287,40 @@ int x_fstat(int fd, STRUCT_STAT *fst, STRUCT_STAT *xst)
 	return ret;
 }
 
+#ifdef RSYNC_FUZZ_XATTRS
+#include "rounding.h"	/* EXTRA_ROUNDING - rsync.h does NOT pull this in; flist.c does */
+/* Fuzzing hook (compiled ONLY when RSYNC_FUZZ_XATTRS is defined). Exposes the
+ * per-file xattr wire decode receive_xattr() to fuzz/fuzz_xattrs.c together with
+ * a minimal file_struct that owns the F_XATTR extra slot the function writes.
+ * receive_xattr's storage tail (rsync_xal_store -> xattr_lookup_hash ->
+ * hashtable + checksum) runs for real against the linked instrumented objects;
+ * nothing in the parse/alloc/copy path is stubbed. The rsync_xal_l / temp_xattr
+ * statics persist across inputs (cannot reset file-statics from outside);
+ * documented cross-input coupling, same as recv_file_entry's lastname[]. */
+struct file_struct *fuzz_xattr_file_new(alloc_pool_t pool)
+{
+	/* Replicate recv_file_entry's extra-slot alignment dance (flist.c
+	 * 1024-1034) EXACTLY so the file_struct lands 8-byte aligned - otherwise
+	 * F_XATTR's union access is misaligned (a harness artifact, not a bug). */
+	int extra_len = file_extra_cnt * EXTRA_LEN;
+	char *bp;
+	struct file_struct *file;
+#if EXTRA_ROUNDING > 0
+	if (extra_len & (EXTRA_ROUNDING * EXTRA_LEN))
+		extra_len = (extra_len | (EXTRA_ROUNDING * EXTRA_LEN)) + EXTRA_LEN;
+#endif
+	bp = pool_alloc(pool, FILE_STRUCT_LEN + extra_len + 1, "fuzz_xattr_file_new");
+	memset(bp, 0, FILE_STRUCT_LEN + extra_len);
+	bp += extra_len;
+	file = (struct file_struct *)bp;
+	file->mode = S_IFREG | 0644;	/* a plain file; not a symlink */
+	return file;
+}
+
+void fuzz_receive_xattr(int f, struct file_struct *file)
+{
+	receive_xattr(f, file);
+}
+#endif /* RSYNC_FUZZ_XATTRS */
+
 #endif /* SUPPORT_XATTRS */

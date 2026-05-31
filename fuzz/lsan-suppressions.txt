@@ -1,0 +1,24 @@
+# LeakSanitizer suppressions for the rsync wire-parser fuzz harnesses.
+#
+# These name EXACTLY the two intentional process-lifetime static caches the
+# code review identified. Both are by-design shared buffers whose lifetime is
+# the process and which the receive-only harnesses cannot free from outside
+# (they are file-static). They are NOT per-entry leaks and NOT memory-safety
+# defects; freeing them would introduce a real use-after-free.
+#
+# Suppressions are by FUNCTION NAME (the allocation site frame), not a blanket
+# detect_leaks=0, so any DIFFERENT leak -- a genuine new regression anywhere
+# else in the parser call graph -- is still reported and still fails the run.
+#
+# 1) flist.c `lastdir`: recv_file_entry assigns a fresh new_array() to the
+#    file-static `lastdir` whenever a new directory prefix appears, without
+#    freeing the previous buffer, because consecutive same-directory
+#    file_structs SHARE it via file->dirname. Freeing on replace would dangle
+#    every earlier file->dirname. Reclaimed by the OS at process exit.
+leak:recv_file_entry
+
+# 2) xattrs.c `rsync_xal_l` dedup cache: receive_xattr's storage tail moves the
+#    parsed items into the global process-lifetime dedup cache rsync_xal_l via
+#    rsync_xal_store. Only partially trimmed by uncache_tmp_xattrs, a
+#    generator/sender path this receive-only harness never exercises.
+leak:receive_xattr

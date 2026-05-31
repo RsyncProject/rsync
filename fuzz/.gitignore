@@ -4,6 +4,7 @@
 /fuzz_io
 /fuzz_flist
 /fuzz_token
+/fuzz_deflated_token
 /fuzz_xattrs
 /fuzz_recv_discard
 
@@ -17,3 +18,8 @@ oom-*
 # libFuzzer-generated corpus entries (40-hex-char names). The committed seed
 # corpus uses descriptive names; generated growth is not tracked.
 corpus/*/[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]*
+
+# Transient fuzzer working corpora (deep-run mutation pools); only the
+# descriptive seeds under corpus/<target>/ are tracked.
+/corpus_flist/
+/corpus_xattrs/

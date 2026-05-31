@@ -1126,3 +1126,35 @@ void see_token(char *data, int32 toklen)
 		NOISY_DEATH("Unknown do_compression value");
 	}
 }
+
+#ifdef RSYNC_FUZZ_TOKEN
+/* Fuzzing hook (compiled ONLY when RSYNC_FUZZ_TOKEN is defined; the normal
+ * rsync build never sees this). It exposes the file-internal static
+ * recv_deflated_token() (the zlib/CPRES_ZLIB compressed-token decoder) to
+ * fuzz/fuzz_deflated_token.c, plus a reset that restores the per-stream decode
+ * state to what a fresh receiver has at the start of a transfer.
+ *
+ * recv_deflated_token keeps file-static decode state (recv_state, the rx_strm
+ * inflate stream, rx_token/rx_run run accounting). A real receiver processes
+ * exactly one well-formed token stream per process lifetime and resets to
+ * r_init on END_FLAG. To isolate fuzz iterations - including iterations that
+ * unwound mid-stream via an exit_cleanup longjmp, leaving rx_strm mid-inflate-
+ * block - fuzz_recv_deflated_token_reset() forces recv_state back to r_init.
+ * The very next call then takes the r_init arm, which runs inflateReset(&rx_strm)
+ * (after first init) - the identical zlib re-init the real receiver performs -
+ * so every input starts from a pristine, faithfully-initialized decompressor,
+ * and rx_token is zeroed there too. (The function-local static saved_flag can
+ * carry a value across a mid-DEFLATED_DATA unwind; it is masked & 0xff and fed
+ * back as a flag byte, so at worst it injects one spurious bounded token/inflate
+ * step on the next input - documented cross-input coupling, never a memory bug.)
+ * No parse, bound, inflate, or accounting logic is altered. */
+void fuzz_recv_deflated_token_reset(void)
+{
+	recv_state = r_init;
+}
+
+int32 fuzz_recv_deflated_token(int f, char **data)
+{
+	return recv_deflated_token(f, data);
+}
+#endif /* RSYNC_FUZZ_TOKEN */
