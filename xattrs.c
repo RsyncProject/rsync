@@ -295,8 +295,10 @@ static int rsync_xal_get(const char *fname, item_list *xalp)
 	rxa = xalp->items;
 	if (count > 1)
 		qsort(rxa, count, sizeof (rsync_xa), rsync_xal_compare_names);
-	for (rxa += count-1; count; count--, rxa--)
-		rxa->num = count;
+	if (count) {
+		for (rxa += count-1; count; count--, rxa--)
+			rxa->num = count;
+	}
 	return 0;
 }
 
@@ -460,7 +462,8 @@ static int rsync_xal_store(item_list *xalp)
 	 * entire initial-count, not just enough space for one new item. */
 	*new_list = empty_xa_list;
 	(void)EXPAND_ITEM_LIST(&new_list->xa_items, rsync_xa, xalp->count);
-	memcpy(new_list->xa_items.items, xalp->items, xalp->count * sizeof (rsync_xa));
+	if (xalp->count)
+		memcpy(new_list->xa_items.items, xalp->items, xalp->count * sizeof (rsync_xa));
 	new_list->xa_items.count = xalp->count;
 	xalp->count = 0;
 

@@ -1,0 +1,23 @@
+# UBSan runtime suppressions for rsync.
+#
+# These entries suppress intentional, architecture-safe UB that we do NOT want
+# to fix in source.  Every other UBSan check class runs FULLY.
+#
+# Format: <check>:<function-or-glob>
+#   "alignment" fires when a misaligned pointer dereference is detected.
+#
+# byteorder.h -- deliberate unaligned 32/64-bit access on the !CAREFUL_ALIGNMENT
+# (x86/amd64) fast path.  The union-pun approach is intentional; the header's own
+# comment documents this.  CAREFUL_ALIGNMENT=1 selects a byte-shuffle fallback for
+# strict-alignment architectures; the CI runner is x86-64 so the fast path is
+# compiled.  Suppressed at runtime rather than disabled class-wide so that any NEW
+# misaligned access outside byteorder.h is still caught.
+alignment:IVALu
+alignment:SIVALu
+alignment:IVAL64
+alignment:SIVAL64
+# log.c log_delete() -- intentional pool-style allocation: new_array0(char,...) +
+# pointer-arithmetic offset then cast to struct file_struct*.  Same x86 alignment-
+# tolerance assumption as byteorder.h; not a memory-safety bug.
+alignment:log_delete
+alignment:log_formatted

@@ -1,0 +1,65 @@
+name: Static analysis (cppcheck)
+
+# cppcheck baseline scan. GATING: NON-gating -- `--error-exitcode=0` means
+# cppcheck never fails the job; it produces a baseline report artifact + a
+# job-summary count. No local baseline (cppcheck is not in the dev shell), so
+# this stays non-gating until a CI baseline is triaged. CI-ONLY: no source/flag
+# change, cppcheck only reads the sources.
+
+on:
+  push:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/analysis-cppcheck.yml'
+  pull_request:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/analysis-cppcheck.yml'
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  cppcheck:
+    runs-on: ubuntu-latest
+    name: cppcheck
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: prep
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cppcheck
+    - name: prepare-source
+      # Generate config/derived sources so cppcheck sees the real tree.
+      run: ./prepare-source || true
+    - name: cppcheck
+      run: |
+        set -o pipefail
+        cppcheck --enable=warning,portability --error-exitcode=0 \
+          --inline-suppr --std=c11 \
+          --suppress=missingInclude --suppress=missingIncludeSystem \
+          -i zlib -i popt \
+          . 2>&1 | tee cppcheck.log
+    - name: report
+      if: always()
+      run: |
+        {
+          echo "## cppcheck (baseline, non-gating)"
+          n=$(grep -c "): " cppcheck.log || true)
+          echo "Findings: ${n:-0}"
+          echo '```'
+          grep -oE '\[[a-zA-Z]+\]$' cppcheck.log | sort | uniq -c | sort -rn | head -20 || true
+          echo '```'
+        } >> "$GITHUB_STEP_SUMMARY"
+    - name: upload report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        retention-days: 45
+        name: cppcheck-log
+        path: cppcheck.log
+        if-no-files-found: ignore

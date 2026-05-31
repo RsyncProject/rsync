@@ -96,6 +96,24 @@ if test x"$enable_coverage" = x"yes"; then
 		[Flush gcov counters at exit_cleanup: rsync's children exit via _exit(), which bypasses the gcov atexit handler, so without this no .gcda is written for the receiver/generator/daemon-worker processes.])
 fi
 
+dnl Hardened build. Appends defensive compiler flags (FORTIFY_SOURCE, stack
+dnl protector, format-string warnings). Defaults OFF: a plain ./configure is
+dnl unchanged, so exotic platforms are unaffected. NOTE: -Werror is deliberately
+dnl NOT added here -- these flags run BEFORE autoconf's feature-detection probes
+dnl (struct addrinfo, sockaddr_storage, ...), and -Werror would make a probe's
+dnl benign warning look like a failure, causing mis-detection and colliding
+dnl fallback definitions. _FORTIFY_SOURCE=2 needs optimization, so -O2 is added
+dnl only when the user has not already requested an optimization level.
+AC_ARG_ENABLE(hardened,
+	AS_HELP_STRING([--enable-hardened],[build with hardening flags (FORTIFY_SOURCE, stack protector, format-security)]))
+if test x"$enable_hardened" = x"yes"; then
+	case " $CFLAGS " in
+	*\ -O*) ;;                       dnl user already set an -O level; respect it
+	*) CFLAGS="$CFLAGS -O2" ;;
+	esac
+	CFLAGS="$CFLAGS -Wall -Wextra -Wformat -Wformat-security -D_FORTIFY_SOURCE=2 -fstack-protector-strong"
+fi
+
 dnl openat2(RESOLVE_BENEATH) is used on Linux 5.6+ for the secure resolver.
 dnl --disable-openat2 forces the portable per-component O_NOFOLLOW fallback to
 dnl run as the primary resolver on ordinary Linux, so that tier is exercised

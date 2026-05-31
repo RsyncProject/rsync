@@ -1,0 +1,70 @@
+name: Static analysis (clang scan-build)
+
+# Clang static analyzer over a full ./configure && make build.
+#
+# GATING: NON-gating. scan-build's analyzer is prone to false positives and no
+# local baseline could be established (the nix-packaged scan-build cannot find
+# ccc-analyzer). The job runs `scan-build --status-bugs make`, which exits
+# non-zero when bugs are found, but the step is wrapped in continue-on-error so
+# a finding does NOT fail the workflow -- it surfaces as an uploaded HTML report
+# + a job-summary note. Promote to gating only after a clean CI baseline exists.
+#
+# CI-ONLY: this changes no default build flags and no source. The analyzer wraps
+# the normal configure/make; exotic-platform builds are unaffected.
+
+on:
+  push:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/analysis-scan-build.yml'
+  pull_request:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/analysis-scan-build.yml'
+  schedule:
+    - cron: '17 7 * * *'
+  workflow_dispatch:
+
+jobs:
+  scan-build:
+    runs-on: ubuntu-latest
+    name: clang scan-build
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: prep
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang clang-tools acl libacl1-dev attr libattr1-dev \
+          liblz4-dev libzstd-dev libxxhash-dev python3-cmarkgfm openssl
+    - name: prepare-source
+      run: ./prepare-source
+    - name: scan-build configure
+      run: scan-build -o scan-build-report ./configure --disable-md2man
+    - name: scan-build make
+      id: scan
+      continue-on-error: true
+      run: scan-build -o scan-build-report --status-bugs make
+    - name: report
+      if: always()
+      run: |
+        {
+          echo "## clang scan-build"
+          if [ "${{ steps.scan.outcome }}" = "success" ]; then
+            echo "No analyzer bugs reported."
+          else
+            echo "scan-build reported findings (non-gating baseline). See the"
+            echo "**scan-build-report** artifact for the HTML report."
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"
+    - name: upload report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        retention-days: 45
+        name: scan-build-report
+        path: scan-build-report
+        if-no-files-found: ignore

@@ -1,0 +1,75 @@
+name: Hardened build (-Werror)
+
+# Compile the whole tree under hardened, warning-fatal flags to surface latent
+# warnings.
+#
+# GATING: GATING. Verified clean on HEAD locally -- 58 translation units, 0
+# warnings/errors -- so a NEW warning under these flags MUST fail CI. -Werror is
+# fatal ONLY in this job; it does not affect default builds.
+#
+# CI-ONLY: flags are injected via env CFLAGS passthrough. No default-flag change,
+# no source/Makefile change -- exotic platforms are untouched.
+#
+# IMPORTANT mechanic: -Werror is applied at MAKE time, NOT at configure time.
+# autoconf feature-detection probes legitimately emit warnings; with -Werror in
+# CFLAGS during ./configure those probes "fail", so configure mis-detects e.g.
+# struct addrinfo / sockaddr_storage as absent and emits colliding fallback
+# definitions (redefinition errors in lib/addrinfo.h). So: configure with the
+# hardened flags MINUS -Werror, then `make CFLAGS=<full set WITH -Werror>`.
+# The make override must re-add -DHAVE_CONFIG_H because overriding CFLAGS on the
+# make line replaces autoconf's substituted @CFLAGS@ (which carried it); the
+# .c.o rule keeps -I./-I$(srcdir) but not the substituted CFLAGS.
+# _FORTIFY_SOURCE=2 requires optimization, so -O2 is included.
+
+on:
+  push:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/hardened-build.yml'
+  pull_request:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/hardened-build.yml'
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  hardened:
+    runs-on: ubuntu-latest
+    name: hardened -Werror (${{ matrix.cc }})
+    strategy:
+      fail-fast: false
+      matrix:
+        cc: [ gcc, clang ]
+    env:
+      # Flags WITHOUT -Werror, used for ./configure so feature probes pass.
+      CONFIGURE_CFLAGS: >-
+        -Wall -Wextra -Wformat -Wformat-security
+        -D_FORTIFY_SOURCE=2 -fstack-protector-strong -O2
+      # Full hardened set WITH -Werror, applied at make time only.
+      MAKE_CFLAGS: >-
+        -Wall -Wextra -Werror -Wformat -Wformat-security
+        -D_FORTIFY_SOURCE=2 -fstack-protector-strong -O2 -DHAVE_CONFIG_H
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: prep
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ${{ matrix.cc }} acl libacl1-dev attr libattr1-dev \
+          liblz4-dev libzstd-dev libxxhash-dev python3-cmarkgfm openssl
+    - name: prepare-source
+      run: ./prepare-source
+    - name: configure (hardened, no -Werror)
+      env:
+        CC: ${{ matrix.cc }}
+        CFLAGS: ${{ env.CONFIGURE_CFLAGS }}
+      run: ./configure --disable-md2man
+    - name: make (-Werror)
+      run: make CFLAGS="${MAKE_CFLAGS}"
+    - name: info
+      run: ./rsync --version

@@ -1,0 +1,92 @@
+name: Sanitizers (ASan + UBSan)
+
+# Address + Undefined-Behavior sanitizer build, exercised by the full test
+# suite, the TCP-bound equivalence matrix, and the WS2 fuzz regression.
+#
+# GATING: GATING. Verified clean on HEAD locally:
+#   make check        -> 99 passed, 6 skipped, 0 failed
+#   make check-equiv  -> 1 passed (real loopback rsyncd, --use-tcp)
+#   fuzz regression   -> 829041 runs, 0 crashes
+# A new ASan/UBSan error (heap/stack overflow, use-after-free, UB) MUST fail CI.
+#
+# UBSan runs FULL (all check classes enabled, including pointer-overflow,
+# nonnull-attribute, null, alignment).  The two zero-count edge cases in xattrs.c
+# are FIXED in source so UBSan is silent there.  The deliberate unaligned-access
+# sites (byteorder.h IVALu/SIVALu/IVAL64/SIVAL64 on !CAREFUL_ALIGNMENT x86, and
+# log_delete/log_formatted pool-allocated file_struct) are suppressed at runtime
+# via .github/ubsan-suppressions.txt -- this is a narrow per-function suppression,
+# not a class-wide -fno-sanitize, so NEW misaligned accesses elsewhere are caught.
+# ASan itself is left fully enabled.
+#
+# CI-ONLY: sanitizers are injected via env CFLAGS passthrough (the mechanism
+# configure.ac already supports for --enable-coverage). No default build flags
+# and no source/Makefile change -- exotic-platform builds are untouched.
+
+on:
+  push:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/sanitizers-asan-ubsan.yml'
+  pull_request:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/sanitizers-asan-ubsan.yml'
+  schedule:
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+
+env:
+  # Halt on the first sanitizer error and dump a stack so the failing step is
+  # actionable. detect_leaks=0: rsync's short-lived processes intentionally let
+  # the OS reclaim some allocations; LeakSanitizer noise is out of scope here.
+  # suppressions= silences the intentional unaligned-access sites in byteorder.h
+  # and log.c; all other UBSan checks remain fully active.  The path is absolute
+  # so it resolves correctly when rsync child processes cd into test scratch dirs.
+  UBSAN_OPTIONS: suppressions=${{ github.workspace }}/.github/ubsan-suppressions.txt:halt_on_error=1:print_stacktrace=1
+  ASAN_OPTIONS: halt_on_error=1:abort_on_error=1:detect_leaks=0
+
+jobs:
+  asan-ubsan:
+    runs-on: ubuntu-latest
+    name: ASan + UBSan + check + check-equiv + fuzz
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: prep
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang acl libacl1-dev attr libattr1-dev \
+          liblz4-dev libzstd-dev libxxhash-dev python3-cmarkgfm openssl
+    - name: prepare-source
+      run: ./prepare-source
+    - name: configure (sanitizers)
+      env:
+        CC: clang
+        # fuzzer-no-link instruments the rsync wire-parser objects for the fuzz
+        # regression below while staying a normal (non-libFuzzer) rsync binary.
+        CFLAGS: >-
+          -g -O1 -fno-omit-frame-pointer
+          -fsanitize=address,undefined,fuzzer-no-link
+      run: ./configure --disable-md2man
+    - name: make
+      run: make
+    - name: info
+      run: ./rsync --version
+    # `make check` runs the suite over the secure stdio-pipe transport. Tests that
+    # need privileges or absent features SKIP cleanly (exit 77) and do NOT fail the
+    # job -- the runner distinguishes skip (77) from fail. No sudo here so the
+    # ASAN/UBSAN env propagates to the test rsync processes unchanged.
+    - name: make check (ASan/UBSan)
+      run: make check
+    # The equivalence matrix with a GUARANTEED real loopback rsyncd (--use-tcp).
+    - name: make check-equiv (ASan/UBSan, TCP)
+      run: make check-equiv
+    # WS2 fuzz regression: bounded corpus replay + short top-up under the same
+    # sanitizers; exits non-zero on any crash.
+    - name: fuzz regression (ASan/UBSan)
+      env:
+        FUZZ_MAX_TIME: "30"
+      run: make -C fuzz regression

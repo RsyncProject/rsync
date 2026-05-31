@@ -1,0 +1,79 @@
+name: Static analysis (gcc -fanalyzer)
+
+# GCC's built-in static analyzer, enabled purely via env CFLAGS passthrough
+# (configure.ac preserves CFLAGS -- the same mechanism --enable-coverage uses).
+#
+# GATING: NON-gating. On HEAD this is clean (0 warnings locally with gcc 15),
+# but -fanalyzer's findings vary across gcc versions and configure paths and are
+# prone to false positives, so a finding produces an artifact + job-summary note
+# rather than failing the build. The build step is continue-on-error.
+#
+# CI-ONLY: no default flags change; -fanalyzer is injected only into this job's
+# environment. No source or Makefile change.
+
+on:
+  push:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/analysis-gcc-fanalyzer.yml'
+  pull_request:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/analysis-gcc-fanalyzer.yml'
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  fanalyzer:
+    runs-on: ubuntu-latest
+    name: gcc -fanalyzer
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: prep
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gcc acl libacl1-dev attr libattr1-dev \
+          liblz4-dev libzstd-dev libxxhash-dev python3-cmarkgfm openssl
+    - name: prepare-source
+      run: ./prepare-source
+    - name: configure
+      # -fanalyzer needs an optimized build to be effective; -O2 also matches the
+      # flags that surface the most analyzer paths.
+      env:
+        CFLAGS: "-fanalyzer -O2"
+      run: ./configure --disable-md2man
+    - name: make
+      id: build
+      continue-on-error: true
+      run: |
+        set -o pipefail
+        make 2>&1 | tee fanalyzer.log
+        # Fail this (non-gating) step if any analyzer warning was emitted, so the
+        # report step can flag it; continue-on-error keeps the workflow green.
+        ! grep -q "warning:" fanalyzer.log
+    - name: report
+      if: always()
+      run: |
+        {
+          echo "## gcc -fanalyzer"
+          n=$(grep -c "warning:" fanalyzer.log || true)
+          echo "Analyzer warnings: ${n:-0}"
+          if [ "${n:-0}" != "0" ]; then
+            echo '```'
+            grep -oE '\[-W[a-z0-9-]+\]' fanalyzer.log | sort | uniq -c | sort -rn
+            echo '```'
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"
+    - name: upload log
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        retention-days: 45
+        name: fanalyzer-log
+        path: fanalyzer.log
+        if-no-files-found: ignore

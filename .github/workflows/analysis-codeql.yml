@@ -1,0 +1,51 @@
+name: CodeQL (cpp)
+
+# GitHub CodeQL static analysis for C/C++. Uses a MANUAL build (not autobuild)
+# because rsync needs ./prepare-source to generate sources before configure/make,
+# which autobuild can miss.
+#
+# GATING: NON-gating by default -- CodeQL surfaces results in the repository's
+# Security tab and as PR code-scanning annotations rather than failing this job.
+# (Branch-protection "code scanning results" rules are the proper place to gate
+# on CodeQL, configured in repo settings, not here.) CI-ONLY: no source/flag
+# change; the build uses --disable-md2man like every other CI job.
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  schedule:
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    name: CodeQL analyze (cpp)
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: prep
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y acl libacl1-dev attr libattr1-dev \
+          liblz4-dev libzstd-dev libxxhash-dev python3-cmarkgfm openssl
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: cpp
+    - name: Manual build
+      run: |
+        ./prepare-source
+        ./configure --disable-md2man
+        make
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: "/language:cpp"

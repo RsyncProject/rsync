@@ -363,6 +363,16 @@ check29: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 check30: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	$(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(CHECK_J) --protocol=30
 
+# Transport-equivalence matrix with a GUARANTEED real bound socket.
+# Unlike plain `make check` (which runs the *-equiv tests with the TCP-daemon
+# leg skipped via require_tcp/SkipLeg), this runs them with --use-tcp so the
+# daemon legs bind a real 127.0.0.1 rsyncd -- socket-bound coverage is not
+# optional here. Scoped to the *-equiv tests so the loopback ports are claimed
+# for the equivalence matrix only.
+.PHONY: check-equiv
+check-equiv: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
+	$(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(CHECK_J) --use-tcp '*-equiv'
+
 # Whole-suite gcov coverage report (HTML, with branch + decision coverage).
 # Requires a build configured with --enable-coverage and the `gcovr` tool
 # (pip install gcovr). Runs the suite in parallel (COVERAGE_J, default CHECK_J):

@@ -1,0 +1,18 @@
+# Build artifacts (harness binaries live at the fuzz/ root; anchor with a
+# leading slash so the names do not also match corpus/<target>/ directories)
+*.o
+/fuzz_io
+/fuzz_flist
+/fuzz_token
+/fuzz_xattrs
+
+# libFuzzer crash / leak reproducers (a real find should be MINIMIZED and
+# committed under corpus/<target>/ with a descriptive name, not left here)
+crash-*
+leak-*
+timeout-*
+oom-*
+
+# libFuzzer-generated corpus entries (40-hex-char names). The committed seed
+# corpus uses descriptive names; generated growth is not tracked.
+corpus/*/[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]*
