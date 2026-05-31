@@ -19,6 +19,8 @@
 
 #include "rsync.h"
 
+extern int am_server;
+
 void renice_me() 
 {
 #ifdef SUPPORT_RENICE
@@ -27,8 +29,16 @@ void renice_me()
 	int prio = 19; // lowest CPU Priority
 	int result = setpriority(which, who, prio);
 	if ( result < 0 ) {
-		// Failed to set priority, TODO: log or inform user, but can be ignored (it's just not so nice).
+		// Failed to set priority, inform user, but can be ignored (it's just not so nice).
+		rprintf(FWARNING, "renice rejected by OS (%s  version %s)\n",
+			RSYNC_NAME, rsync_version());
+	} else {
+		if (DEBUG_GTE(CMD, 1))
+				rprintf(FINFO, "successfully reniced %s\n", am_server ? "server" : "client");
 	}
+#else
+	rprintf(FWARNING, "renice not supported for %s (%s: %s version %s)\n",
+			COMPILE_TARGET, am_server ? "server" : "client", RSYNC_NAME, rsync_version());
 #endif
 }
 
@@ -42,7 +52,15 @@ void ionice_me()
 	int ioprio = IOPRIO_PRIO_VALUE(class, data);
 	int result = syscall(SYS_ioprio_set, which, who, ioprio);
 	if ( result < 0 ) {
-		// Failed to set priority, TODO: log or inform user, but can be ignored (it's just not so ionice).
+		// Failed to set priority, inform user, but can be ignored (it's just not so ionice).
+		rprintf(FWARNING, "ionice rejected by OS (%s  version %s)\n",
+			RSYNC_NAME, rsync_version());
+	} else {
+		if (DEBUG_GTE(CMD, 1))
+			rprintf(FINFO, "successfully ioniced %s\n", am_server ? "server" : "client");
 	}
+#else
+	rprintf(FWARNING, "ionice not supported for %s (%s: %s version %s)\n",
+			COMPILE_TARGET, am_server ? "server" : "client", RSYNC_NAME, rsync_version());
 #endif
 }
