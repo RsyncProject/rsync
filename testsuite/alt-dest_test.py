@@ -11,7 +11,7 @@ import shutil
 import time
 
 from rsyncfns import (
-    CHKDIR, FROMDIR, RSYNC, SCRATCHDIR, SRCDIR, TMPDIR, TODIR,
+    CHKDIR, FROMDIR, RSYNC, RSYNC_PEER, SCRATCHDIR, SRCDIR, TMPDIR, TODIR,
     checkit, hands_setup, rmtree, run_rsync, test_fail,
 )
 
@@ -73,7 +73,7 @@ for maybe_inplace in ([], ['--inplace']):
     for srchost in ('', 'localhost:'):
         desthost = 'localhost:' if not srchost else ''
         rmtree(TODIR)
-        checkit(['-ave', SSH, f'--rsync-path={RSYNC}', *maybe_inplace,
+        checkit(['-ave', SSH, f'--rsync-path={RSYNC_PEER}', *maybe_inplace,
                  f'--copy-dest={alt3dir}',
                  f'{srchost}{FROMDIR}/', f'{desthost}{TODIR}/'],
                 FROMDIR, TODIR)

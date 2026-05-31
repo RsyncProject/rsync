@@ -12,7 +12,7 @@ import shutil
 import subprocess
 
 from rsyncfns import (
-    CHKDIR, FROMDIR, OUTFILE, RSYNC, SRCDIR, TODIR,
+    CHKDIR, FROMDIR, OUTFILE, RSYNC, RSYNC_PEER, SRCDIR, TODIR,
     checkit, makepath, rsync_argv, test_fail, test_skipped,
 )
 
@@ -64,7 +64,7 @@ for x in chars:
 os.link(name1, FROMDIR / 'subdir' / 'down' / 'deep' / 'new-file')
 (TODIR / 'text').unlink()
 
-checkit(['-aHivve', SSH, '--debug=HLINK5', f'--rsync-path={RSYNC}',
+checkit(['-aHivve', SSH, '--debug=HLINK5', f'--rsync-path={RSYNC_PEER}',
          f'{FROMDIR}/', f'localhost:{TODIR}/'], FROMDIR, TODIR)
 
 # --link-dest and --copy-dest should also keep hard-linked entries.

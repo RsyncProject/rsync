@@ -38,17 +38,17 @@ print(f"Using remote shell: {SSH}")
 hands_setup()
 
 # RSYNC may be a multi-word command line; pass it through --rsync-path.
-from rsyncfns import RSYNC
+from rsyncfns import RSYNC, RSYNC_PEER
 
 
 def _basic():
-    checkit(['-avH', '-e', SSH, f'--rsync-path={RSYNC}',
+    checkit(['-avH', '-e', SSH, f'--rsync-path={RSYNC_PEER}',
              f'{FROMDIR}/', f'localhost:{TODIR}'], FROMDIR, TODIR)
 
 
 def _delete_after_rename():
     shutil.move(str(TODIR / 'text'), str(TODIR / 'ThisShouldGo'))
-    checkit(['--delete', '-avH', '-e', SSH, f'--rsync-path={RSYNC}',
+    checkit(['--delete', '-avH', '-e', SSH, f'--rsync-path={RSYNC_PEER}',
              f'{FROMDIR}/', f'localhost:{TODIR}'], FROMDIR, TODIR)
 
 
