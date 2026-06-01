@@ -75,6 +75,20 @@ sudo apt update &amp;&amp; sudo apt install rsync</small></code>
 <p>See the <a href="https://launchpad.net/~rsyncproject/+archive/ubuntu/rsync">PPA page on Launchpad</a>
 for build status across architectures.
 
+<p>For testing the upcoming release, the project also maintains a
+<a href="https://launchpad.net/~rsyncproject/+archive/ubuntu/rsync-latest">rsync-latest PPA</a>
+that is rebuilt from the tip of the <a href="https://github.com/RsyncProject/rsync">git
+master branch</a>.  These are development snapshots: their version numbers
+(such as <code>3.5.0~git20260601...</code>) deliberately sort <em>below</em>
+the matching stable release, so mixing this with the stable PPA above will
+never silently move you from a release onto a snapshot:
+
+<p><code><small>sudo add-apt-repository ppa:rsyncproject/rsync-latest<br>
+sudo apt update &amp;&amp; sudo apt install rsync</small></code>
+
+<p>Use the stable PPA for production systems; the rsync-latest PPA is for
+testing the master branch and may contain unreleased changes.
+
 <p>The <a href="https://github.com/RsyncProject/rsync/actions">GitHub Actions
 page</a> has build events that each generate a few binary artifact zip files
 (just click through via the build's title to see them).  The actions page is
