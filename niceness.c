@@ -34,11 +34,11 @@ void renice_me(int prio)
 	int result = setpriority(which, who, prio);
 	if ( result < 0 ) {
 		// Failed to set priority, inform user, but can be ignored (it's just not so nice).
-		rprintf(FWARNING, "renice rejected by OS (%s  version %s)\n",
-			RSYNC_NAME, rsync_version());
+		rprintf(FWARNING, "renice to %d rejected by OS (%s version %s): %s\n",
+			prio, RSYNC_NAME, rsync_version(), strerror(errno));
 	} else {
 		if (DEBUG_GTE(CMD, 1))
-				rprintf(FINFO, "successfully reniced %s\n", am_server ? "server" : "client");
+				rprintf(FINFO, "successfully reniced %s to new priority %d\n", am_server ? "server" : "client", prio);
 	}
 #else
 	rprintf(FWARNING, "renice not supported for %s (%s: %s version %s)\n",
@@ -57,7 +57,7 @@ void ionice_me()
 	int result = syscall(SYS_ioprio_set, which, who, ioprio);
 	if ( result < 0 ) {
 		// Failed to set priority, inform user, but can be ignored (it's just not so ionice).
-		rprintf(FWARNING, "ionice rejected by OS (%s  version %s)\n",
+		rprintf(FWARNING, "ionice rejected by OS (%s version %s)\n",
 			RSYNC_NAME, rsync_version());
 	} else {
 		if (DEBUG_GTE(CMD, 1))
