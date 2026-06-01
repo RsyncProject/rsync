@@ -1677,33 +1677,7 @@ int do_open_nofollow(const char *pathname, int flags)
                                flag name, picked up by the same #ifdef;
                                flag value differs from FreeBSD)
   Other systems fall back to the per-component O_NOFOLLOW walk below.
-
-  The relpath must also not contain any ../ elements in the path.
 */
-
-/* Returns 1 if path has any "/"-separated component that is exactly
- * "..", 0 otherwise. Used by secure_relative_open's front-door
- * validation to reject inputs that the per-component walk fallback
- * would otherwise resolve through ".." -- e.g. bare "..", "foo/..",
- * "subdir/.." -- which RESOLVE_BENEATH-equivalent kernels reject in
- * the kernel but the per-component fallback (NetBSD/OpenBSD/Solaris/
- * Cygwin/pre-5.6 Linux) does not. */
-static int path_has_dotdot_component(const char *path)
-{
-	const char *p = path;
-
-	while (*p) {
-		const char *q;
-		if (*p == '/') { p++; continue; }
-		q = p;
-		while (*q && *q != '/')
-			q++;
-		if (q - p == 2 && p[0] == '.' && p[1] == '.')
-			return 1;
-		p = q;
-	}
-	return 0;
-}
 
 #if defined(__linux__) && defined(HAVE_OPENAT2)
 static int secure_relative_open_linux(const char *basedir, const char *relpath, int flags, mode_t mode)
@@ -1787,23 +1761,6 @@ int secure_relative_open(const char *basedir, const char *relpath, int flags, mo
 		errno = EINVAL;
 		return -1;
 	}
-	/* Reject any path with a literal ".." component (bare "..",
-	 * "../foo", "foo/..", "foo/../bar", "subdir/.."). The previous
-	 * substring-based check caught only "../" prefix and "/../"
-	 * substring; bare ".." and trailing "/.." escape on the per-
-	 * component walk fallback used by NetBSD/OpenBSD/Solaris/Cygwin
-	 * and pre-5.6 Linux. RESOLVE_BENEATH on Linux/FreeBSD/macOS
-	 * catches some of these in-kernel with EXDEV, but the front
-	 * door must reject them consistently with EINVAL across all
-	 * platforms so callers can rely on the validation. */
-	if (path_has_dotdot_component(relpath)) {
-		errno = EINVAL;
-		return -1;
-	}
-	if (basedir && basedir[0] != '/' && path_has_dotdot_component(basedir)) {
-		errno = EINVAL;
-		return -1;
-	}
 
 #if defined(__linux__) && defined(HAVE_OPENAT2)
 	/* openat2(2) can fail with -EAGAIN if the path contains a ".." component
@@ -1833,23 +1790,23 @@ int secure_relative_open(const char *basedir, const char *relpath, int flags, mo
 	pathjoin(fullpath, sizeof fullpath, basedir, relpath);
 	return open(fullpath, flags, mode);
 #else
-	int dirfd = AT_FDCWD;
+	int dirfd = AT_FDCWD, retfd = -1;
+	char *path_copy = NULL;
 	if (basedir != NULL) {
 		if (basedir[0] == '/') {
 			/* Absolute basedir: operator-trusted, plain openat. */
 			dirfd = openat(AT_FDCWD, basedir, O_RDONLY | O_DIRECTORY);
-			if (dirfd == -1) {
+			if (dirfd == -1)
 				return -1;
-			}
 		} else {
-			/* Relative basedir: walk it component-by-component
-			 * with O_NOFOLLOW. This is the per-component
-			 * RESOLVE_BENEATH equivalent for platforms without
-			 * kernel-supported confinement, and matches the
-			 * relpath walk below. Symlinks in basedir are
-			 * rejected outright on this fallback path; the
-			 * Linux openat2 / O_RESOLVE_BENEATH paths above
-			 * still allow within-tree symlinks. */
+			/* Relative basedir: walk it component-by-component with
+			 * O_NOFOLLOW. This is the per-component RESOLVE_BENEATH equivalent
+			 * for platforms without kernel-supported confinement, and matches
+			 * the relpath walk below. Symlinks and ".." components in basedir
+			 * are rejected outright on this fallback path; the Linux openat2 /
+			 * O_RESOLVE_BENEATH paths above still allow them as long as they
+			 * stay within the tree.
+			 * */
 			char *bcopy = my_strdup(basedir, __FILE__, __LINE__);
 			if (!bcopy)
 				return -1;
@@ -1857,13 +1814,17 @@ int secure_relative_open(const char *basedir, const char *relpath, int flags, mo
 			     part != NULL;
 			     part = strtok(NULL, "/"))
 			{
+				if (!strcmp(part, "..")) {
+					free(bcopy);
+					errno = EXDEV; // emulate RESOLVE_BENEATH
+					goto cleanup;
+				}
 				int next_fd = openat(dirfd, part, O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
 				if (next_fd == -1) {
-					int save_errno = errno;
-					if (dirfd != AT_FDCWD) close(dirfd);
+					int save_errno = errno; // free only saves errno on glibc >= 2.33
 					free(bcopy);
 					errno = save_errno;
-					return -1;
+					goto cleanup;
 				}
 				if (dirfd != AT_FDCWD) close(dirfd);
 				dirfd = next_fd;
@@ -1871,18 +1832,19 @@ int secure_relative_open(const char *basedir, const char *relpath, int flags, mo
 			free(bcopy);
 		}
 	}
-	int retfd = -1;
 
-	char *path_copy = my_strdup(relpath, __FILE__, __LINE__);
-	if (!path_copy) {
-		if (dirfd != AT_FDCWD) close(dirfd);
-		return -1;
-	}
-	
+	path_copy = my_strdup(relpath, __FILE__, __LINE__);
+	if (!path_copy)
+		goto cleanup;
+
 	for (const char *part = strtok(path_copy, "/");
 	     part != NULL;
 	     part = strtok(NULL, "/"))
 	{
+		if (!strcmp(part, "..")) {
+			errno = EXDEV; // emulate RESOLVE_BENEATH
+			goto cleanup;
+		}
 		int next_fd = openat(dirfd, part, O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
 		if (next_fd == -1 && errno == ENOTDIR) {
 			if (strtok(NULL, "/") != NULL) {

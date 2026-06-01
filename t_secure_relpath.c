@@ -28,6 +28,11 @@
 
 #include <sys/stat.h>
 
+#ifdef __linux__
+#include <sys/syscall.h>
+#include <linux/openat2.h>
+#endif
+
 int dry_run = 0;
 int am_root = 0;
 int am_sender = 0;
@@ -40,6 +45,40 @@ extern int am_daemon, am_chrooted;
 short info_levels[COUNT_INFO], debug_levels[COUNT_DEBUG];
 
 static int errs = 0;
+
+/* Probe the running kernel for the RESOLVE_BENEATH-equivalent confinement
+ * that secure_relative_open() prefers over the per-component O_NOFOLLOW
+ * walk.  Returns 1 if either openat2(RESOLVE_BENEATH) on Linux 5.6+ or
+ * openat(O_RESOLVE_BENEATH) on FreeBSD 13+ / macOS 15+ is honoured by
+ * the running kernel, 0 otherwise.  The probe opens "." (a directory
+ * the helper has just chdir'd into) so it can't fail for any reason
+ * other than the kernel rejecting the requested confinement flag. */
+static int kernel_resolve_beneath_supported(void)
+{
+	int fd;
+#if defined __linux__
+	struct open_how how;
+	memset(&how, 0, sizeof how);
+	how.flags = O_RDONLY | O_DIRECTORY;
+	how.resolve = RESOLVE_BENEATH | RESOLVE_NO_MAGICLINKS;
+	fd = syscall(SYS_openat2, AT_FDCWD, ".", &how, sizeof how);
+	if (fd >= 0) {
+		close(fd);
+		return 1;
+	}
+	/* O_RESOLVE_BENEATH is not defined on Linux, and even if it were, Linux's
+	 * openat(2) does not return -EINVAL for unknown flag bits and so if
+	 * O_RESOLVE_BENEATH happened to get defined somehow, the following
+	 * fallback would always return success. */
+#elif defined O_RESOLVE_BENEATH
+	fd = openat(AT_FDCWD, ".", O_RDONLY | O_DIRECTORY | O_RESOLVE_BENEATH);
+	if (fd >= 0) {
+		close(fd);
+		return 1;
+	}
+#endif
+	return 0;
+}
 
 static void check_relative_open(const char *basedir, const char *relpath,
 								int want_errno)
@@ -84,6 +123,10 @@ int main(int argc, char **argv)
 		return 2;
 	}
 
+	/* On systems with no RESOLVE_BENEATH, ".." at any point is an error. */
+	int contained_dotdot_errno = 0;
+	if (!kernel_resolve_beneath_supported())
+		contained_dotdot_errno = EXDEV;
 
 	/* secure_relative_open's daemon-only confinement protections only
 	 * fire when am_daemon && !am_chrooted (the threat model is the
@@ -93,32 +136,36 @@ int main(int argc, char **argv)
 	am_daemon = 1;
 	am_chrooted = 0;
 
+	mkdir("ok", 0755);
 	mkdir("subdir", 0755);
+	mkdir("subdir/ok", 0755);
+	mkdir("foo", 0755);
+	mkdir("foo/ok", 0755);
+	mkdir("bar", 0755);
+	mkdir("bar/ok", 0755);
 
-	/* Each of these relpaths must be rejected with EINVAL at the
-	 * secure_relative_open() front door. ".." is the actual one-level
-	 * escape; the others ("subdir/..", "subdir/../subdir") resolve
-	 * back to the start dir on systems that allow them, but we still
-	 * reject them as defence-in-depth: a path containing a ".." token
-	 * is suspicious and the caller should normalise before passing
-	 * it in. The "../foo" / "foo/../bar" / "/foo" / "/" cases are
-	 * regression checks for the existing checks. */
-	check_relative_open(NULL, "..", EINVAL);
-	check_relative_open(NULL, "../foo", EINVAL);
-	check_relative_open(NULL, "subdir/..", EINVAL);
-	check_relative_open(NULL, "subdir/../subdir", EINVAL);
-	check_relative_open(NULL, "foo/../bar", EINVAL);
+	/* ".." that jumps outside of the root is rejected with EXDEV. */
+	check_relative_open(NULL, "..", EXDEV);
+	check_relative_open(NULL, "../foo", EXDEV);
+	/* Absolute paths for relpath are rejected with EINVAL. */
 	check_relative_open(NULL, "/foo", EINVAL);
 	check_relative_open(NULL, "/", EINVAL);
+	/* If RESOLVE_BENEATH is supported, ".." components that are contained
+	 * within the root are permitted. On older systems, they are rejected with
+	 * EXDEV. */
+	check_relative_open(NULL, "subdir/..", contained_dotdot_errno);
+	check_relative_open(NULL, "subdir/../subdir", contained_dotdot_errno);
+	check_relative_open(NULL, "foo/../bar", contained_dotdot_errno);
 
 	/* Same checks against basedir (which the codex Finding 2 fix
 	 * routes through the same RESOLVE_BENEATH-equivalent). Absolute
 	 * basedirs are operator-trusted and intentionally not validated
 	 * here. */
-	check_relative_open("..", "ok", EINVAL);
-	check_relative_open("../subdir", "ok", EINVAL);
-	check_relative_open("subdir/..", "ok", EINVAL);
-	check_relative_open("foo/../bar", "ok", EINVAL);
+	check_relative_open("..", "ok", EXDEV);
+	check_relative_open("../subdir", "ok", EXDEV);
+	check_relative_open("subdir/..", "ok", contained_dotdot_errno);
+	check_relative_open("subdir/../subdir", "ok", contained_dotdot_errno);
+	check_relative_open("foo/../bar", "ok", contained_dotdot_errno);
 
 	if (errs)
 		fprintf(stderr, "\n%d failure(s)\n", errs);
