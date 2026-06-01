@@ -24,6 +24,7 @@ If no tests are specified, all tests are run.
 
 import argparse
 import concurrent.futures
+import fnmatch
 import glob
 import os
 import subprocess
@@ -35,6 +36,12 @@ def parse_args():
     p = argparse.ArgumentParser(description='Run rsync test suite')
     p.add_argument('tests', nargs='*', metavar='TEST',
                    help='Test names or patterns to run (default: all)')
+    p.add_argument('--exclude', default=None, metavar='LIST',
+                   help='Comma-separated test names/globs to skip entirely: '
+                        'they are not run and not reported as skipped. Useful '
+                        'for tests that cannot work in a given build/CI '
+                        'environment (e.g. a restricted buildd chroot). '
+                        'Falls back to the RSYNC_EXCLUDE environment variable.')
     p.add_argument('-j', '--parallel', type=int, default=1, metavar='N',
                    help='Run up to N tests in parallel (default: 1)')
     p.add_argument('--valgrind', action='store_true',
@@ -313,6 +320,8 @@ def main():
         args.log_level = int(os.environ.get('loglevel', '1'))
     if args.expect_skipped is None:
         args.expect_skipped = os.environ.get('RSYNC_EXPECT_SKIPPED', 'IGNORE')
+    if args.exclude is None:
+        args.exclude = os.environ.get('RSYNC_EXCLUDE', '')
     if os.environ.get('whichtests'):
         args.tests = [os.environ['whichtests']]
 
@@ -423,6 +432,16 @@ def main():
     # Collect tests
     tests = collect_tests(suitedir, args.tests)
     full_run = len(args.tests) == 0
+
+    # Drop excluded tests entirely (matched by basename against name/glob).
+    excl = [e.strip() for e in args.exclude.split(',') if e.strip()]
+    if excl:
+        before = len(tests)
+        tests = [t for t in tests
+                 if not any(fnmatch.fnmatch(_testbase(t), pat) for pat in excl)]
+        if before != len(tests):
+            print(f"Excluding {before - len(tests)} test(s) matching: "
+                  f"{', '.join(excl)}")
 
     # Record test order for consistent skipped-list output
     test_order = {_testbase(t): i for i, t in enumerate(tests)}
