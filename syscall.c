@@ -1806,14 +1806,19 @@ int secure_relative_open(const char *basedir, const char *relpath, int flags, mo
 	}
 
 #if defined(__linux__) && defined(HAVE_OPENAT2)
-	{
+	/* openat2(2) can fail with -EAGAIN if the path contains a ".." component
+	 * and there was a rename or mount on the system, so on busy machines it is
+	 * necessary to retry this a few times. Based on experiments in libpathrs,
+	 * ~256 iterations is enough to ensure that ~50k openat2(2) runs on a very
+	 * rename-heavy system never fail. */
+	for (int tries = 0; tries < 256; tries++) {
 		int fd = secure_relative_open_linux(basedir, relpath, flags, mode);
-		/* ENOSYS = kernel < 5.6 doesn't have the syscall even though
-		 * glibc/kernel-headers do; fall through to the portable path.
-		 * (Built unconditionally unless --disable-openat2, which forces
-		 * the portable resolver below so that tier is exercised.) */
-		if (fd != -1 || errno != ENOSYS)
+		if (fd != -1)
 			return fd;
+		if (errno == ENOSYS)
+			break; // fallback to portable path
+		if (errno != EAGAIN)
+			return -1;
 	}
 #elif defined(O_RESOLVE_BENEATH)
 	return secure_relative_open_resolve_beneath(basedir, relpath, flags, mode);
