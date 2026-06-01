@@ -78,6 +78,7 @@ extern uid_t our_uid;
 extern struct stats stats;
 extern char *filesfrom_host;
 extern char *usermap, *groupmap;
+extern int data_transfer_limit_reached;
 
 extern struct name_num_item *file_sum_nni;
 
@@ -1689,6 +1690,9 @@ static void send_if_directory(int f, struct file_list *flist,
 {
 	char is_dot_dir = fbuf[ol-1] == '.' && (ol == 1 || fbuf[ol-2] == '/');
 
+	if (data_transfer_limit_reached)
+		return;
+
 	if (S_ISDIR(file->mode)
 	    && !(file->flags & FLAG_MOUNT_DIR) && f_name(file, fbuf)) {
 		void *save_filters;
@@ -1841,6 +1845,9 @@ static void send_directory(int f, struct file_list *flist, char *fbuf, int len,
 
 	assert(flist != NULL);
 
+	if (data_transfer_limit_reached)
+		return;
+
 	if (!(d = opendir(fbuf))) {
 		if (errno == ENOENT) {
 			if (am_sender) /* Can abuse this for vanished error w/ENOENT: */
@@ -1867,6 +1874,10 @@ static void send_directory(int f, struct file_list *flist, char *fbuf, int len,
 	for (errno = 0, di = readdir(d); di; errno = 0, di = readdir(d)) {
 		unsigned name_len;
 		char *dname = d_name(di);
+
+		if (data_transfer_limit_reached)
+			break;
+
 		if (dname[0] == '.' && (dname[1] == '\0'
 		    || (dname[1] == '.' && dname[2] == '\0')))
 			continue;
@@ -2025,6 +2036,9 @@ static void send1extra(int f, struct file_struct *file, struct file_list *flist)
 	int len, dlen, flags = FLAG_DIVERT_DIRS | FLAG_CONTENT_DIR;
 	size_t j;
 
+	if (data_transfer_limit_reached)
+		return;
+
 	f_name(file, fbuf);
 	dlen = strlen(fbuf);
 
@@ -2056,6 +2070,9 @@ static void send1extra(int f, struct file_struct *file, struct file_list *flist)
 		char *slash;
 		relnamecache *rnp = ((relnamecache**)relname_list->items)[j];
 		char name_type = rnp->name_type;
+
+		if (data_transfer_limit_reached)
+			break;
 
 		fbuf[dlen] = '/';
 		len = strlcpy(fbuf + dlen + 1, rnp->fname, sizeof fbuf - dlen - 1);
@@ -2097,6 +2114,17 @@ static void write_end_of_flist(int f, int send_io_error)
 		write_byte(f, 0);
 }
 
+static void send_data_limit_flist_eof(int f)
+{
+	if (!flist_eof) {
+		write_ndx(f, NDX_FLIST_EOF);
+		flist_eof = 1;
+		if (DEBUG_GTE(FLIST, 3))
+			rprintf(FINFO, "[%s] flist_eof=1 due to data transfer limit\n", who_am_i());
+		change_local_filter_dir(NULL, 0, 0);
+	}
+}
+
 void send_extra_file_list(int f, int at_least)
 {
 	struct file_list *flist;
@@ -2106,6 +2134,11 @@ void send_extra_file_list(int f, int at_least)
 
 	if (flist_eof)
 		return;
+
+	if (data_transfer_limit_reached) {
+		send_data_limit_flist_eof(f);
+		return;
+	}
 
 	if (at_least < 0)
 		at_least = file_total - file_old_total + 1;
@@ -2117,6 +2150,11 @@ void send_extra_file_list(int f, int at_least)
 		int dir_ndx, dstart = stats.num_dirs;
 		const char *pathname = F_PATHNAME(file);
 		int32 *dp;
+
+		if (data_transfer_limit_reached) {
+			send_data_limit_flist_eof(f);
+			goto finish;
+		}
 
 		flist = flist_new(0, "send_extra_file_list");
 		start_write = stats.total_written;
@@ -2268,6 +2306,9 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 	while (1) {
 		char fbuf[MAXPATHLEN], *fn, name_type;
+
+		if (data_transfer_limit_reached)
+			break;
 
 		if (use_ff_fd) {
 			if (read_line(filesfrom_fd, fbuf, sizeof fbuf, rl_flags) == 0)

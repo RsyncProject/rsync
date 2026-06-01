@@ -151,6 +151,13 @@ char *skip_compress = NULL;
 char *copy_as = NULL;
 item_list dparam_list = EMPTY_ITEM_LIST;
 
+//CEH3
+int64 data_transfer_limit = -1;
+int delay_transfer_limit_check = 0;
+int data_transfer_limit_reached = 0;
+static char *data_transfer_limit_arg = NULL;
+//END CEH3
+
 /** Network address family. **/
 int default_af_hint
 #ifdef INET6
@@ -853,6 +860,10 @@ static struct poptOption long_options[] = {
   {"dparam",           0,  POPT_ARG_STRING, 0, OPT_DAEMON, 0, 0 },
   {"detach",           0,  POPT_ARG_NONE,   0, OPT_DAEMON, 0, 0 },
   {"no-detach",        0,  POPT_ARG_NONE,   0, OPT_DAEMON, 0, 0 },
+  /* CEH3 */
+  {"data-transfer-limit",  0, POPT_ARG_STRING, &data_transfer_limit_arg, 0, 0, 0},
+  {"delay-transfer-limit-check", 0, POPT_ARG_NONE, &delay_transfer_limit_check, 0, 0, 0},
+  /* END CEH3 */
   {0,0,0,0, 0, 0, 0}
 };
 
@@ -2508,6 +2519,16 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		}
 	}
 
+	//CEH3
+	if (data_transfer_limit_arg) {
+		/* parse_size_arg converts strings like "10G" into a 64-bit integer */
+		data_transfer_limit = parse_size_arg(data_transfer_limit_arg, 'b',
+			"data-transfer-limit", 0, -1, False);
+		if (data_transfer_limit < 0)
+			goto cleanup;
+	}
+	//END CEH3
+
 	if (trust_sender || am_server || read_batch)
 		trust_sender_args = trust_sender_filter = 1;
 	else if (old_style_args || filesfrom_host != NULL)
@@ -2801,6 +2822,14 @@ void server_options(char **args, int *argc_p)
 			goto oom;
 		args[ac++] = arg;
 	}
+
+	//CEH3
+	if (data_transfer_limit >= 0) {
+		args[ac++] = safe_arg("--data-transfer-limit", data_transfer_limit_arg);
+		if (delay_transfer_limit_check)
+			args[ac++] = "--delay-transfer-limit-check";
+	}
+	//END CEH3
 
 	if (backup_dir) {
 		/* This split idiom allows for ~/path expansion via the shell. */
