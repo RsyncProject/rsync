@@ -60,3 +60,11 @@ aclocal.m4
 .deps
 /*.exe
 *.dSYM/
+simdtest
+t_chmod_secure
+t_secure_relpath
+testsuite/__pycache__/
+testsuite/chown-fake_test.py
+testsuite/devices-fake_test.py
+testsuite/exclude-lsh_test.py
+testsuite/xattrs-hlink_test.py
