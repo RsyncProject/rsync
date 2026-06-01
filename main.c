@@ -1847,7 +1847,7 @@ int main(int argc,char *argv[])
 		dry_run = 1;
 
 	if (nice_local) {
-		renice_me();
+		renice_me(nice_local);
 	}
 
 	if (ionice_local) {

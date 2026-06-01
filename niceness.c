@@ -21,12 +21,16 @@
 
 extern int am_server;
 
-void renice_me() 
+int get_renice_default_prio()
+{
+	return 19; // lowest CPU Priority
+}
+
+void renice_me(int prio)
 {
 #ifdef SUPPORT_RENICE
 	int which = PRIO_PROCESS; // who specifies a Process ID
 	int who = 0; // 0 means current process
-	int prio = 19; // lowest CPU Priority
 	int result = setpriority(which, who, prio);
 	if ( result < 0 ) {
 		// Failed to set priority, inform user, but can be ignored (it's just not so nice).
