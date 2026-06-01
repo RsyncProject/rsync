@@ -860,7 +860,9 @@ static struct poptOption long_options[] = {
   {"protocol",         0,  POPT_ARG_INT,    &protocol_version, 0, 0, 0 },
   {"checksum-seed",    0,  POPT_ARG_INT,    &checksum_seed, 0, 0, 0 },
   {"nice-local",       0,  POPT_ARG_NONE,   0, OPT_NICE_LOCAL, 0, 0 },
+  {"nice-local-value", 0,  POPT_ARG_INT,    &nice_local, 0, 0, 0 },
   {"nice-remote",      0,  POPT_ARG_NONE,   0, OPT_NICE_REMOTE, 0, 0 },
+  {"nice-remote-value",0,  POPT_ARG_INT,    &nice_remote, 0, 0, 0 },
   {"ionice-local",     0,  POPT_ARG_VAL,    &ionice_local, 1, 0, 0 },
   {"ionice-remote",    0,  POPT_ARG_VAL,    &ionice_remote, 1, 0, 0 },
   {"no-nice-local",    0,  POPT_ARG_VAL,    &nice_local, 0, 0, 0 },
@@ -3070,8 +3072,15 @@ void server_options(char **args, int *argc_p)
 	if (mkpath_dest_arg && am_sender)
 		args[ac++] = "--mkpath";
 
-	if (nice_remote)
-		args[ac++] = "--nice-local";
+	if (nice_remote) {
+		if (get_renice_default_prio()==nice_remote) {
+			args[ac++] = "--nice-local";
+		} else {
+			if (asprintf(&arg, "--nice-local-value=%d", nice_remote) < 0)
+				goto oom;
+		    args[ac++] = arg;
+		}
+	}
 
 	if (ionice_remote)
 		args[ac++] = "--ionice-local";
