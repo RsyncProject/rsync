@@ -45,23 +45,21 @@ static int errs = 0;
 static int kernel_resolve_beneath_supported(void)
 {
 	int fd;
-#ifdef __linux__
-	{
-		struct open_how how;
-		memset(&how, 0, sizeof how);
-		how.flags = O_RDONLY | O_DIRECTORY;
-		how.resolve = RESOLVE_BENEATH | RESOLVE_NO_MAGICLINKS;
-		fd = syscall(SYS_openat2, AT_FDCWD, ".", &how, sizeof how);
-		if (fd >= 0) {
-			close(fd);
-			return 1;
-		}
-		/* ENOSYS = kernel < 5.6.  Fall through to the O_RESOLVE_BENEATH
-		 * probe in case we're a Linux build running on a kernel that
-		 * gained O_RESOLVE_BENEATH via some out-of-tree backport. */
+#if defined __linux__
+	struct open_how how;
+	memset(&how, 0, sizeof how);
+	how.flags = O_RDONLY | O_DIRECTORY;
+	how.resolve = RESOLVE_BENEATH | RESOLVE_NO_MAGICLINKS;
+	fd = syscall(SYS_openat2, AT_FDCWD, ".", &how, sizeof how);
+	if (fd >= 0) {
+		close(fd);
+		return 1;
 	}
-#endif
-#ifdef O_RESOLVE_BENEATH
+	/* O_RESOLVE_BENEATH is not defined on Linux, and even if it were, Linux's
+	 * openat(2) does not return -EINVAL for unknown flag bits and so if
+	 * O_RESOLVE_BENEATH happened to get defined somehow, the following
+	 * fallback would always return success. */
+#elif defined O_RESOLVE_BENEATH
 	fd = openat(AT_FDCWD, ".", O_RDONLY | O_DIRECTORY | O_RESOLVE_BENEATH);
 	if (fd >= 0) {
 		close(fd);

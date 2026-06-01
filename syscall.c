@@ -1815,9 +1815,7 @@ int secure_relative_open(const char *basedir, const char *relpath, int flags, mo
 		if (fd != -1 || errno != ENOSYS)
 			return fd;
 	}
-#endif
-
-#ifdef O_RESOLVE_BENEATH
+#elif defined(O_RESOLVE_BENEATH)
 	return secure_relative_open_resolve_beneath(basedir, relpath, flags, mode);
 #endif
 
