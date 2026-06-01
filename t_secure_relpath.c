@@ -41,62 +41,36 @@ short info_levels[COUNT_INFO], debug_levels[COUNT_DEBUG];
 
 static int errs = 0;
 
-static void check_relpath(const char *relpath)
+static void check_relative_open(const char *basedir, const char *relpath,
+								int want_errno)
 {
 	int fd;
 	int saved_errno;
 
 	errno = 0;
-	fd = secure_relative_open(NULL, relpath, O_RDONLY | O_DIRECTORY, 0);
+	fd = secure_relative_open(basedir, relpath, O_RDONLY | O_DIRECTORY, 0);
 	saved_errno = errno;
 
 	if (fd >= 0) {
-		fprintf(stderr,
-			"FAIL [relpath=%-12s]: returned valid fd %d (escape) -- expected -1 EINVAL\n",
-			relpath, fd);
 		close(fd);
-		errs++;
-		return;
-	}
-
-	if (saved_errno != EINVAL) {
+		if (want_errno != 0) {
+			fprintf(stderr,
+				"FAIL [basedir=%-12s relpath=%-12s]: returned valid fd %d (escape) -- expected -1 errno=%d (%s)\n",
+				basedir, relpath, fd, want_errno, strerror(want_errno));
+			errs++;
+			return;
+		}
+	} else if (saved_errno != want_errno) {
 		fprintf(stderr,
-			"FAIL [relpath=%-12s]: rejected but errno=%d (%s), expected EINVAL\n",
-			relpath, saved_errno, strerror(saved_errno));
+			"FAIL [basedir=%-12s relpath=%-12s]: rejected but errno=%d (%s), expected errno=%d (%s)\n",
+			basedir, relpath, saved_errno, strerror(saved_errno), want_errno, strerror(want_errno));
 		errs++;
 		return;
 	}
 
-	fprintf(stderr, "OK   [relpath=%-12s]: rejected with EINVAL\n", relpath);
-}
-
-static void check_basedir(const char *basedir)
-{
-	int fd;
-	int saved_errno;
-
-	errno = 0;
-	fd = secure_relative_open(basedir, "ok", O_RDONLY | O_DIRECTORY, 0);
-	saved_errno = errno;
-
-	if (fd >= 0) {
-		fprintf(stderr,
-			"FAIL [basedir=%-12s]: returned valid fd %d -- expected -1 EINVAL\n",
-			basedir, fd);
-		close(fd);
-		errs++;
-		return;
-	}
-
-	if (saved_errno != EINVAL) {
-		fprintf(stderr,
-			"FAIL [basedir=%-12s]: rejected but errno=%d (%s), expected EINVAL\n",
-			basedir, saved_errno, strerror(saved_errno));
-		errs++;
-		return;
-	}
-
-	fprintf(stderr, "OK   [basedir=%-12s]: rejected with EINVAL\n", basedir);
+	fprintf(stderr,
+		"OK   [basedir=%-12s relpath=%-12s]: rejected with errno %d (%s)\n",
+		basedir, relpath, saved_errno, strerror(saved_errno));
 }
 
 int main(int argc, char **argv)
@@ -109,6 +83,7 @@ int main(int argc, char **argv)
 		perror("chdir");
 		return 2;
 	}
+
 
 	/* secure_relative_open's daemon-only confinement protections only
 	 * fire when am_daemon && !am_chrooted (the threat model is the
@@ -128,22 +103,22 @@ int main(int argc, char **argv)
 	 * is suspicious and the caller should normalise before passing
 	 * it in. The "../foo" / "foo/../bar" / "/foo" / "/" cases are
 	 * regression checks for the existing checks. */
-	check_relpath("..");
-	check_relpath("../foo");
-	check_relpath("subdir/..");
-	check_relpath("subdir/../subdir");
-	check_relpath("foo/../bar");
-	check_relpath("/foo");
-	check_relpath("/");
+	check_relative_open(NULL, "..", EINVAL);
+	check_relative_open(NULL, "../foo", EINVAL);
+	check_relative_open(NULL, "subdir/..", EINVAL);
+	check_relative_open(NULL, "subdir/../subdir", EINVAL);
+	check_relative_open(NULL, "foo/../bar", EINVAL);
+	check_relative_open(NULL, "/foo", EINVAL);
+	check_relative_open(NULL, "/", EINVAL);
 
 	/* Same checks against basedir (which the codex Finding 2 fix
 	 * routes through the same RESOLVE_BENEATH-equivalent). Absolute
 	 * basedirs are operator-trusted and intentionally not validated
 	 * here. */
-	check_basedir("..");
-	check_basedir("../subdir");
-	check_basedir("subdir/..");
-	check_basedir("foo/../bar");
+	check_relative_open("..", "ok", EINVAL);
+	check_relative_open("../subdir", "ok", EINVAL);
+	check_relative_open("subdir/..", "ok", EINVAL);
+	check_relative_open("foo/../bar", "ok", EINVAL);
 
 	if (errs)
 		fprintf(stderr, "\n%d failure(s)\n", errs);
