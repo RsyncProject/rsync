@@ -608,7 +608,7 @@ enum {OPT_SERVER = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_USERMAP, OPT_GROUPMAP, OPT_CHOWN, OPT_BWLIMIT, OPT_STDERR,
       OPT_OLD_COMPRESS, OPT_NEW_COMPRESS, OPT_NO_COMPRESS, OPT_OLD_ARGS,
       OPT_STOP_AFTER, OPT_STOP_AT, OPT_NICE, OPT_NO_NICE, OPT_IONICE, OPT_NO_IONICE,
-      OPT_NICE_LOCAL, OPT_NICE_REMOTE,
+      OPT_NICE_LOCAL, OPT_NICE_REMOTE, OPT_NICE_VALUE,
       OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
@@ -870,6 +870,7 @@ static struct poptOption long_options[] = {
   {"no-ionice-local",  0,  POPT_ARG_VAL,    &ionice_local, 0, 0, 0 },
   {"no-ionice-remote", 0,  POPT_ARG_VAL,    &ionice_remote, 0, 0, 0 },
   {"nice",             0,  POPT_ARG_NONE,   0, OPT_NICE, 0, 0 },
+  {"nice-value",       0,  POPT_ARG_INT,    &nice_local, OPT_NICE_VALUE, 0, 0 },
   {"ionice",           0,  POPT_ARG_NONE,   0, OPT_IONICE, 0, 0 },
   {"no-nice",          0,  POPT_ARG_NONE,   0, OPT_NO_NICE, 0, 0 },
   {"no-ionice",        0,  POPT_ARG_NONE,   0, OPT_NO_IONICE, 0, 0 },
@@ -1643,6 +1644,13 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			 */
 			nice_local = nice_local==0 ? default_nice_prio : nice_local;
 			nice_remote = nice_remote==0 ? default_nice_prio : nice_remote;
+			break;
+
+		case OPT_NICE_VALUE:
+			/*
+			 * POPT writes to nice_local. We have to copy the value from nice-local to nice-remote here.
+			 */
+			nice_remote = nice_local;
 			break;
 
 		case OPT_NICE_LOCAL:
