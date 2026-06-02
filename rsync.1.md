@@ -564,6 +564,9 @@ has its own detailed description later in this manpage.
 --ionice-local           ionice local process to low priority
 --ionice-remote          ionice remote process to low priority
 --nice, --ionice         set local and remote process to low priority
+--nice-local-value=10    renice local process to given priority
+--nice-remote-value=10   renice remote process to given priority
+--nice-value=10          renice local+remote process to given priority
 --no-nice, ...           prepending "no-" turns the given option off
 --nice-and-ionice, -Q    same as --nice --ionice
 --version, -V            print the version + other info and exit
