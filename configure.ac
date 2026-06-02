@@ -1454,6 +1454,42 @@ else
     esac
 fi
 
+#################################################
+# On Linux, POSIX ACLs are stored as the "system.posix_acl_{access,default}"
+# xattrs, so we can get/set them through a held O_NOFOLLOW fd (fsetxattr) or a
+# dirfd+leaf (setxattrat, AT_SYMLINK_NOFOLLOW) instead of the path-based libacl
+# acl_*_file() calls -- making the operation safe against a parent-symlink race.
+# This needs POSIX ACLs and the f/at xattr syscalls, which on Linux are
+# available whenever <sys/xattr.h> (or <attr/xattr.h>) is -- independent of the
+# -X feature (--disable-xattr-support), so we gate on the header, not
+# enable_xattr_support.
+AH_TEMPLATE([SUPPORT_ACL_FD],
+[Define to 1 to do POSIX ACL ops via fd/at xattr syscalls (lib/acl.c)])
+AH_TEMPLATE([HAVE_XATTRAT_SYSCALLS],
+[Define to 1 if the setxattrat/getxattrat/removexattrat syscalls are available])
+if test x"$samba_cv_HAVE_POSIX_ACLS" = x"yes" \
+   && { test x"$ac_cv_header_sys_xattr_h" = x"yes" || test x"$ac_cv_header_attr_xattr_h" = x"yes"; }; then
+    case "$host_os" in
+    *linux*)
+	AC_DEFINE(SUPPORT_ACL_FD, 1)
+	AC_CACHE_CHECK([for SYS_setxattrat],rsync_cv_have_sys_setxattrat,[
+	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <sys/syscall.h>
+#include <stdint.h>
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+struct xattr_args { uint64_t value; uint32_t size; uint32_t flags; };]],
+	[[struct xattr_args a; a.value = 0; a.size = 0; a.flags = 0;
+	  syscall(SYS_setxattrat, 0, ".", 0, "n", &a, sizeof a);
+	  syscall(SYS_getxattrat, 0, ".", 0, "n", &a, sizeof a);
+	  syscall(SYS_removexattrat, 0, ".", 0, "n");]])],[rsync_cv_have_sys_setxattrat=yes],[rsync_cv_have_sys_setxattrat=no])])
+	if test x"$rsync_cv_have_sys_setxattrat" = x"yes"; then
+	    AC_DEFINE(HAVE_XATTRAT_SYSCALLS, 1)
+	fi
+	;;
+    esac
+fi
+
 if test x"$enable_acl_support" = x"no" || test x"$enable_xattr_support" = x"no" || test x"$enable_iconv" = x"no"; then
     AC_MSG_CHECKING([whether $CC supports -Wno-unused-parameter])
     OLD_CFLAGS="$CFLAGS"
