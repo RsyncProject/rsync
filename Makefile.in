@@ -40,7 +40,7 @@ GENFILES=configure.sh aclocal.m4 config.h.in rsync.1 rsync.1.html \
 HEADERS=byteorder.h config.h errcode.h proto.h rsync.h ifuncs.h itypes.h inums.h \
 	lib/pool_alloc.h lib/mdigest.h lib/md-defines.h
 LIBOBJ=lib/wildmatch.o lib/compat.o lib/snprintf.o lib/mdfour.o lib/md5.o \
-	lib/permstring.o lib/pool_alloc.o lib/sysacls.o lib/sysxattrs.o @LIBOBJS@
+	lib/permstring.o lib/pool_alloc.o lib/sysacls.o lib/sysxattrs.o lib/acl.o @LIBOBJS@
 zlib_OBJS=zlib/deflate.o zlib/inffast.o zlib/inflate.o zlib/inftrees.o \
 	zlib/trees.o zlib/zutil.o zlib/adler32.o zlib/compress.o zlib/crc32.o
 OBJS1=flist.o rsync.o generator.o receiver.o cleanup.o sender.o exclude.o \
@@ -59,12 +59,12 @@ TLS_OBJ = tls.o syscall.o android.o util2.o t_stub.o lib/compat.o lib/snprintf.o
 CHECK_PROGS = rsync$(EXEEXT) tls$(EXEEXT) getgroups$(EXEEXT) getfsdev$(EXEEXT) \
 	testrun$(EXEEXT) trimslash$(EXEEXT) t_unsafe$(EXEEXT) t_chmod_secure$(EXEEXT) \
 	t_rename_secure$(EXEEXT) t_symlink_secure$(EXEEXT) \
-	t_secure_relpath$(EXEEXT) wildtest$(EXEEXT) simdtest$(EXEEXT)
+	t_secure_relpath$(EXEEXT) t_acl$(EXEEXT) wildtest$(EXEEXT) simdtest$(EXEEXT)
 
 CHECK_SYMLINKS = testsuite/chown-fake.test testsuite/devices-fake.test testsuite/xattrs-hlink.test
 
 # Objects for CHECK_PROGS to clean
-CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o t_chmod_secure.o t_rename_secure.o t_symlink_secure.o t_secure_relpath.o trimslash.o wildtest.o
+CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o t_chmod_secure.o t_rename_secure.o t_symlink_secure.o t_secure_relpath.o t_acl.o trimslash.o wildtest.o
 
 # note that the -I. is needed to handle config.h when using VPATH
 .c.o:
@@ -202,6 +202,14 @@ t_rename_secure$(EXEEXT): $(T_RENAME_SECURE_OBJ)
 T_SYMLINK_SECURE_OBJ = t_symlink_secure.o syscall.o android.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o
 t_symlink_secure$(EXEEXT): $(T_SYMLINK_SECURE_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_SYMLINK_SECURE_OBJ) $(LIBS)
+
+# Unit test for lib/acl.c: compares our fd/at ACL ops against the system libacl
+# (linked via $(LIBS), which carries -lacl).  lib/acl.o references no rsync
+# globals, so this links with no stubs.  Self-skips (exit 77) when built
+# without SUPPORT_ACL_FD.
+T_ACL_OBJ = t_acl.o lib/acl.o
+t_acl$(EXEEXT): $(T_ACL_OBJ)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_ACL_OBJ) $(LIBS)
 
 .PHONY: conf
 conf: configure.sh config.h.in
