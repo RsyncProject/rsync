@@ -1,0 +1,44 @@
+#!/bin/sh
+
+# Copyright (C) 2002 by Martin Pool <mbp@samba.org>
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Test rsync handling of duplicate filenames.
+
+# It's quite possible that the user might specify the same source file
+# more than once on the command line, perhaps through shell variables
+# or wildcard expansions.  It might cause problems for rsync if the
+# same name occurred more than once in the file list, because we might
+# be trying to update the first copy and generate checksums for the
+# second copy at the same time.  See clean_flist() for the implementation.
+
+# We don't need to worry about hardlinks or symlinks.  Because we
+# always rename-and-replace the new copy, they can't affect us.
+
+# This test is not great, because it is a timing-dependent bug.
+
+. "$suitedir/rsync.fns"
+
+# Build some hardlinks
+
+mkdir "$fromdir"
+name1="$fromdir/name1"
+name2="$fromdir/name2"
+echo "This is the file" > "$name1"
+ln -s "$name1" "$name2" || test_fail "can't create symlink"
+
+checkit "$RSYNC -avv '$fromdir/' '$fromdir/' '$fromdir/' '$fromdir/' '$fromdir/' '$fromdir/' '$fromdir/' '$fromdir/' '$fromdir/' '$fromdir/' '$todir/'" "$fromdir" "$todir" \
+    | tee "$outfile"
+
+# Make sure each file was only copied once...
+if [ `grep -c '^name1$' "$outfile"` != 1 ]; then
+    test_fail "name1 was not copied exactly once"
+fi
+if [ `grep -c '^name2 -> ' "$outfile"` != 1 ]; then
+    test_fail "name2 was not copied exactly once"
+fi
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0

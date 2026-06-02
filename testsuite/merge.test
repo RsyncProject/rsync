@@ -1,0 +1,57 @@
+#!/bin/sh
+
+# Copyright (C) 2004-2022 Wayne Davison
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Make sure we can merge files from multiple directories into one.
+
+. "$suitedir/rsync.fns"
+
+# Build some files/dirs/links to copy
+
+# Use local dirnames to better exercise the arg-parsing code.
+cd "$tmpdir"
+
+mkdir from1 from2 from3 deep
+mkdir from2/sub1 from3/sub1
+mkdir from3/sub2 from1/dir-and-not-dir
+mkdir chk chk/sub1 chk/sub2 chk/dir-and-not-dir
+echo "one" >from1/one
+cp_touch from1/one from2/one
+cp_touch from1/one from3/one
+echo "two" >from1/two
+echo "three" >from2/three
+echo "four" >from3/four
+echo "five" >from1/five
+echo "six" >from3/six
+echo "sub1" >from2/sub1/uno
+cp_touch from2/sub1/uno from3/sub1/uno
+echo "sub2" >from3/sub1/dos
+echo "sub3" >from2/sub1/tres
+echo "subby" >from3/sub2/subby
+echo "extra" >from1/dir-and-not-dir/inside
+echo "not-dir" >from3/dir-and-not-dir
+echo "arg-test" >deep/arg-test
+echo "shallow" >shallow
+
+cp_touch from1/one from1/two from2/three from3/four from1/five from3/six chk
+cp_touch deep/arg-test shallow chk
+cp_touch from1/dir-and-not-dir/inside chk/dir-and-not-dir
+cp_touch from2/sub1/uno from3/sub1/dos from2/sub1/tres chk/sub1
+cp_touch from3/sub2/subby chk/sub2
+
+# Make sure that time has moved on.
+sleep 1
+
+# Get rid of any directory-time differences
+$RSYNC -av --existing -f 'exclude,! */' from1/ from2/
+$RSYNC -av --existing -f 'exclude,! */' from2/ from3/
+$RSYNC -av --existing -f 'exclude,! */' from1/ chk/
+$RSYNC -av --existing -f 'exclude,! */' from3/ chk/
+
+checkit "$RSYNC -avv deep/arg-test shallow from1/ from2/ from3/ to/" "$chkdir" "$todir"
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0

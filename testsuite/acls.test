@@ -1,0 +1,62 @@
+#!/bin/sh
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Test that rsync handles basic ACL preservation.
+
+. $suitedir/rsync.fns
+
+$RSYNC -VV | grep '"ACLs": true' >/dev/null || test_skipped "Rsync is configured without ACL support"
+
+makepath "$fromdir/foo"
+echo something >"$fromdir/file1"
+echo else >"$fromdir/file2"
+
+files='foo file1 file2'
+
+case "$setfacl_nodef" in
+true)
+    if ! chmod --help 2>&1 | grep -F +a >/dev/null; then
+        test_skipped "I don't know how to use setfacl or chmod for ACLs"
+    fi
+    chmod +a "root allow read,write,execute" "$fromdir/foo" || test_skipped "Your filesystem has ACLs disabled"
+    chmod +a "root allow read,execute" "$fromdir/file1"
+    chmod +a "admin allow read" "$fromdir/file1"
+    chmod +a "daemon allow read,write" "$fromdir/file1"
+    chmod +a "root allow read,execute" "$fromdir/file2"
+
+    see_acls() {
+        ls -le "${@}"
+    }
+    ;;
+*)
+    setfacl -m u:0:7 "$fromdir/foo" || test_skipped "Your filesystem has ACLs disabled"
+    setfacl -m g:1:5 "$fromdir/foo"
+    setfacl -m g:2:1 "$fromdir/foo"
+    setfacl -m g:0:7 "$fromdir/foo"
+    setfacl -m u:2:1 "$fromdir/foo"
+    setfacl -m u:1:5 "$fromdir/foo"
+
+    setfacl -m u:0:5 "$fromdir/file1"
+    setfacl -m g:0:4 "$fromdir/file1"
+    setfacl -m u:1:6 "$fromdir/file1"
+
+    setfacl -m u:0:5 "$fromdir/file2"
+
+    see_acls() {
+        getfacl "${@}"
+    }
+    ;;
+esac
+
+cd "$fromdir"
+$RSYNC -avvA $files "$todir/"
+
+see_acls $files >"$scratchdir/acls.txt"
+
+cd "$todir"
+see_acls $files | diff $diffopt "$scratchdir/acls.txt" -
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0

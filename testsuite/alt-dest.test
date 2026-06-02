@@ -1,0 +1,68 @@
+#!/bin/sh
+
+# Copyright (C) 2004-2022 Wayne Davison
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Test rsync handling of --compare-dest and similar options.
+
+. "$suitedir/rsync.fns"
+
+alt1dir="$tmpdir/alt1"
+alt2dir="$tmpdir/alt2"
+alt3dir="$tmpdir/alt3"
+
+SSH="$scratchdir/src/support/lsh.sh"
+
+# Build some files/dirs/links to copy
+
+hands_setup
+
+# Setup the alt and chk dirs
+$RSYNC -av --include=text --include='*/' --exclude='*' "$fromdir/" "$alt1dir/"
+$RSYNC -av --include=etc-ltr-list --include='*/' --exclude='*' "$fromdir/" "$alt2dir/"
+
+# Create a side dir where there is a candidate destfile of the same name as a sourcefile
+echo "This is a test file" >"$fromdir/likely"
+
+mkdir "$alt3dir"
+echo "This is a test file" >"$alt3dir/likely"
+
+sleep 1
+touch "$fromdir/dir/text" "$fromdir/likely"
+
+$RSYNC -av --exclude=/text --exclude=etc-ltr-list "$fromdir/" "$chkdir/"
+
+# Let's do it!
+checkit "$RSYNC -avv --no-whole-file \
+    --compare-dest='$alt1dir' --compare-dest='$alt2dir' \
+    '$fromdir/' '$todir/'" "$chkdir" "$todir"
+
+rm -rf "$todir"
+checkit "$RSYNC -avv --no-whole-file \
+    --copy-dest='$alt1dir' --copy-dest='$alt2dir' \
+    '$fromdir/' '$todir/'" "$fromdir" "$todir"
+
+# Test that copy_file() works correctly with tmpfiles
+for maybe_inplace in '' --inplace; do
+    rm -rf "$todir"
+    checkit "$RSYNC -av $maybe_inplace --copy-dest='$alt3dir' \
+	'$fromdir/' '$todir/'" "$fromdir" "$todir"
+
+    for srchost in '' 'localhost:'; do
+	if [ -z "$srchost" ]; then
+	    desthost='localhost:'
+	else
+	    desthost=''
+	fi
+
+	rm -rf "$todir"
+	checkit "$RSYNC -ave '$SSH' --rsync-path='$RSYNC' $maybe_inplace \
+	    --copy-dest='$alt3dir' '$srchost$fromdir/' '$desthost$todir/'" \
+	    "$fromdir" "$todir"
+    done
+done
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0

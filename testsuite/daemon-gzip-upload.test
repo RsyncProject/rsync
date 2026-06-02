@@ -1,0 +1,31 @@
+#!/bin/sh
+
+# Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING)
+
+# We don't really want to start the server listening, because that
+# might interfere with the security or operation of the test machine.
+# Instead we use the fake-connect feature to dynamically assign a pair
+# of ports.
+
+# This test tries to upload a file over a compressed connection to the
+# server.  This ought to exercise (exorcise?) a bug in 2.5.3.
+
+. "$suitedir/rsync.fns"
+
+build_rsyncd_conf
+
+RSYNC_CONNECT_PROG="$RSYNC --config=$conf --daemon"
+export RSYNC_CONNECT_PROG
+
+hands_setup
+
+# Build chkdir with a normal rsync and an --exclude.
+$RSYNC -av --exclude=foobar.baz "$fromdir/" "$chkdir/"
+
+checkit "'$ignore23' $RSYNC -avvvvzz '$fromdir/' localhost::test-to/" "$chkdir" "$todir"
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0

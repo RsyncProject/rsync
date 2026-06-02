@@ -127,7 +127,7 @@ static void storetime(char *dest, size_t destsize, time_t t, int nsecs)
 {
 	if (t) {
 		int len;
-		struct tm tmp, *mt = gmtime_r(&t, &tmp);
+		struct tm *mt = gmtime(&t);
 
 		len = snprintf(dest, destsize,
 			" %04d-%02d-%02d %02d:%02d:%02d",

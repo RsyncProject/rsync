@@ -1,0 +1,421 @@
+#!/usr/bin/env -S python3 -B
+
+# This script expects the directory ~/samba-rsync-ftp to exist and to be a
+# copy of the /home/ftp/pub/rsync dir on samba.org.  When the script is done,
+# the git repository in the current directory will be updated, and the local
+# ~/samba-rsync-ftp dir will be ready to be rsynced to samba.org. See the
+# script samba-rsync for an easy way to initialize the local ftp copy and to
+# thereafter update the remote files from your local copy.
+
+# This script also expects to be able to gpg sign the resulting tar files
+# using your default gpg key. Make sure that the html download.html file
+# has a link to the relevant keys that are authorized to sign the tar files
+# and also make sure that the following commands work as expected:
+#
+#   touch TeMp
+#   gpg --sign TeMp
+#   gpg --verify TeMp.gpg
+#   gpg --sign TeMp
+#   rm TeMp*
+#
+# The second time you sign the file it should NOT prompt you for your password
+# (unless the timeout period has passed).  It will prompt about overriding the
+# existing TeMp.gpg file, though.
+
+import os, sys, re, argparse, glob, shutil, signal
+from datetime import datetime
+from getpass import getpass
+
+sys.path = ['packaging'] + sys.path
+
+from pkglib import *
+
+os.environ['LESS'] = 'mqeiXR'; # Make sure that -F is turned off and -R is turned on.
+dest = os.environ['HOME'] + '/samba-rsync-ftp'
+ORIGINAL_PATH = os.environ['PATH']
+
+def main():
+    if not os.path.isfile('packaging/release-rsync'):
+        die('You must run this script from the top of your rsync checkout.')
+
+    now = datetime.now().astimezone() # Requires python 3.6 or later
+    cl_today = now.strftime('* %a %b %d %Y')
+    year = now.strftime('%Y')
+    ztoday = now.strftime('%d %b %Y')
+    today = ztoday.lstrip('0')
+
+    # The MAINTAINER_TZ_OFFSET is a float number of hours vs UTC. It can start with '-' but not '+'.
+    tz_now = now.strftime('%z')
+    tz_num = tz_now[0:1].replace('+', '') + str(float(tz_now[1:3]) + float(tz_now[3:]) / 60)
+
+    curdir = os.getcwd()
+
+    signal.signal(signal.SIGINT, signal_handler)
+
+    if cmd_txt_chk(['packaging/prep-auto-dir']).out == '':
+        die('You must setup an auto-build-save dir to use this script.');
+
+    auto_dir, gen_files = get_gen_files(True)
+    gen_pathnames = [ os.path.join(auto_dir, fn) for fn in gen_files ]
+
+    dash_line = '=' * 74
+
+    print(f"""\
+{dash_line}
+== This will release a new version of rsync onto an unsuspecting world. ==
+{dash_line}
+""")
+
+    with open('build/rsync.1') as fh:
+        for line in fh:
+            if line.startswith(r'.\" prefix='):
+                doc_prefix = line.split('=')[1].strip()
+                if doc_prefix != '/usr':
+                    warn(f"*** The documentation was built with prefix {doc_prefix} instead of /usr ***")
+                    die("*** Read the md2man script for a way to override this. ***")
+                break
+            if line.startswith('.P'):
+                die("Failed to find the prefix comment at the start of the rsync.1 manpage.")
+
+    if not os.path.isdir(dest):
+        die(dest, "dest does not exist")
+    if not os.path.isdir('.git'):
+        die("There is no .git dir in the current directory.")
+    if os.path.lexists('a'):
+        die('"a" must not exist in the current directory.')
+    if os.path.lexists('b'):
+        die('"b" must not exist in the current directory.')
+    if os.path.lexists('patches.gen'):
+        die('"patches.gen" must not exist in the current directory.')
+
+    check_git_state(args.master_branch, True, 'patches')
+
+    curversion = get_rsync_version()
+
+    # All version values are strings!
+    lastversion, last_protocol_version, pdate = get_NEWS_version_info()
+    protocol_version, subprotocol_version = get_protocol_versions()
+
+    version = curversion
+    m = re.search(r'pre(\d+)', version)
+    if m:
+        version = re.sub(r'pre\d+', 'pre' + str(int(m[1]) + 1), version)
+    else:
+        version = version.replace('dev', 'pre1')
+
+    ans = input(f"Please enter the version number of this release: [{version}] ")
+    if ans == '.':
+        version = re.sub(r'pre\d+', '', version)
+    elif ans != '':
+        version = ans
+    if not re.match(r'^[\d.]+(pre\d+)?$', version):
+        die(f'Invalid version: "{version}"')
+
+    v_ver = 'v' + version
+    rsync_ver = 'rsync-' + version
+
+    if os.path.lexists(rsync_ver):
+        die(f'"{rsync_ver}" must not exist in the current directory.')
+
+    out = cmd_txt_chk(['git', 'tag', '-l', v_ver]).out
+    if out != '':
+        print(f"Tag {v_ver} already exists.")
+        ans = input("\nDelete tag or quit? [Q/del] ")
+        if not re.match(r'^del', ans, flags=re.I):
+            die("Aborted")
+        cmd_chk(['git', 'tag', '-d', v_ver])
+        if os.path.isdir('patches/.git'):
+            cmd_chk(f"cd patches && git tag -d '{v_ver}'")
+
+    version = re.sub(r'[-.]*pre[-.]*', 'pre', version)
+    if 'pre' in version and not curversion.endswith('dev'):
+        lastversion = curversion
+
+    ans = input(f"Enter the previous version to produce a patch against: [{lastversion}] ")
+    if ans != '':
+        lastversion = ans
+    lastversion = re.sub(r'[-.]*pre[-.]*', 'pre', lastversion)
+
+    rsync_lastver = 'rsync-' + lastversion
+    if os.path.lexists(rsync_lastver):
+        die(f'"{rsync_lastver}" must not exist in the current directory.')
+
+    m = re.search(r'(pre\d+)', version)
+    pre = m[1] if m else ''
+
+    release = '0.1' if pre else '1'
+    ans = input(f"Please enter the RPM release number of this release: [{release}] ")
+    if ans != '':
+        release = ans
+    if pre:
+        release += '.' + pre
+
+    finalversion = re.sub(r'pre\d+', '', version)
+    proto_changed = protocol_version != last_protocol_version
+    if proto_changed:
+        if finalversion in pdate:
+            proto_change_date = pdate[finalversion]
+        else:
+            while True:
+                ans = input("On what date did the protocol change to {protocol_version} get checked in? (dd Mmm yyyy) ")
+                if re.match(r'^\d\d \w\w\w \d\d\d\d$', ans):
+                    break
+            proto_change_date = ans
+    else:
+        proto_change_date = ' ' * 11
+
+    if 'pre' in lastversion:
+        if not pre:
+            die("You should not diff a release version against a pre-release version.")
+        srcdir = srcdiffdir = lastsrcdir = 'src-previews'
+        skipping = ' ** SKIPPING **'
+    elif pre:
+        srcdir = srcdiffdir = 'src-previews'
+        lastsrcdir = 'src'
+        skipping = ' ** SKIPPING **'
+    else:
+        srcdir = lastsrcdir = 'src'
+        srcdiffdir = 'src-diffs'
+        skipping = ''
+
+    print(f"""
+{dash_line}
+version is "{version}"
+lastversion is "{lastversion}"
+dest is "{dest}"
+curdir is "{curdir}"
+srcdir is "{srcdir}"
+srcdiffdir is "{srcdiffdir}"
+lastsrcdir is "{lastsrcdir}"
+release is "{release}"
+
+About to:
+    - tweak SUBPROTOCOL_VERSION in rsync.h, if needed
+    - tweak the version in version.h and the spec files
+    - tweak NEWS.md to ensure header values are correct
+    - generate configure.sh, config.h.in, and proto.h
+    - page through the differences
+""")
+    ans = input("<Press Enter to continue> ")
+
+    specvars = {
+        'Version:': finalversion,
+        'Release:': release,
+        '%define fullversion': f'%{{version}}{pre}',
+        'Released': version + '.',
+        '%define srcdir': srcdir,
+        }
+
+    tweak_files = 'version.h rsync.h'.split()
+    tweak_files += glob.glob('packaging/*.spec')
+    tweak_files += glob.glob('packaging/*/*.spec')
+
+    for fn in tweak_files:
+        with open(fn, 'r', encoding='utf-8') as fh:
+            old_txt = txt = fh.read()
+        if fn == 'version.h':
+            x_re = re.compile(r'^(#define RSYNC_VERSION).*', re.M)
+            msg = f"Unable to update RSYNC_VERSION in {fn}"
+            txt = replace_or_die(x_re, r'\1 "%s"' % version, txt, msg)
+            x_re = re.compile(r'^(#define MAINTAINER_TZ_OFFSET).*', re.M)
+            msg = f"Unable to update MAINTAINER_TZ_OFFSET in {fn}"
+            txt = replace_or_die(x_re, r'\1 ' + tz_num, txt, msg)
+        elif '.spec' in fn:
+            for var, val in specvars.items():
+                x_re = re.compile(r'^%s .*' % re.escape(var), re.M)
+                txt = replace_or_die(x_re, var + ' ' + val, txt, f"Unable to update {var} in {fn}")
+            x_re = re.compile(r'^\* \w\w\w \w\w\w \d\d \d\d\d\d (.*)', re.M)
+            txt = replace_or_die(x_re, r'%s \1' % cl_today, txt, f"Unable to update ChangeLog header in {fn}")
+        elif fn == 'rsync.h':
+            x_re = re.compile(r'(#define\s+SUBPROTOCOL_VERSION)\s+(\d+)')
+            repl = lambda m: m[1] + ' ' + ('0' if not pre or not proto_changed else '1' if m[2] == '0' else m[2])
+            txt = replace_or_die(x_re, repl, txt, f"Unable to find SUBPROTOCOL_VERSION define in {fn}")
+        elif fn == 'NEWS.md':
+            efv = re.escape(finalversion)
+            x_re = re.compile(r'^# NEWS for rsync %s \(UNRELEASED\)\s+## Changes in this version:\n' % efv
+                    + r'(\n### PROTOCOL NUMBER:\s+- The protocol number was changed to \d+\.\n)?')
+            rel_day = 'UNRELEASED' if pre else today
+            repl = (f'# NEWS for rsync {finalversion} ({rel_day})\n\n'
+                + '## Changes in this version:\n')
+            if proto_changed:
+                repl += f'\n### PROTOCOL NUMBER:\n\n - The protocol number was changed to {protocol_version}.\n'
+            good_top = re.sub(r'\(.*?\)', '(UNRELEASED)', repl, 1)
+            msg = f"The top lines of {fn} are not in the right format.  It should be:\n" + good_top
+            txt = replace_or_die(x_re, repl, txt, msg)
+            x_re = re.compile(r'^(\| )(\S{2} \S{3} \d{4})(\s+\|\s+%s\s+\| ).{11}(\s+\| )\S{2}(\s+\|+)$' % efv, re.M)
+            repl = lambda m: m[1] + (m[2] if pre else ztoday) + m[3] + proto_change_date + m[4] + protocol_version + m[5]
+            txt = replace_or_die(x_re, repl, txt, f'Unable to find "| ?? ??? {year} | {finalversion} | ... |" line in {fn}')
+        else:
+            die(f"Unrecognized file in tweak_files: {fn}")
+
+        if txt != old_txt:
+            print(f"Updating {fn}")
+            with open(fn, 'w', encoding='utf-8') as fh:
+                fh.write(txt)
+
+    cmd_chk(['packaging/year-tweak'])
+
+    print(dash_line)
+    cmd_run("git diff".split())
+
+    srctar_name = f"{rsync_ver}.tar.gz"
+    pattar_name = f"rsync-patches-{version}.tar.gz"
+    diff_name = f"{rsync_lastver}-{version}.diffs.gz"
+    srctar_file = os.path.join(dest, srcdir, srctar_name)
+    pattar_file = os.path.join(dest, srcdir, pattar_name)
+    diff_file = os.path.join(dest, srcdiffdir, diff_name)
+    lasttar_file = os.path.join(dest, lastsrcdir, rsync_lastver + '.tar.gz')
+
+    print(f"""\
+{dash_line}
+
+About to:
+    - git commit all changes
+    - run a full build, ensuring that the manpages & configure.sh are up-to-date
+    - merge the {args.master_branch} branch into the patch/{args.master_branch}/* branches
+    - update the files in the "patches" dir and OPTIONALLY (if you type 'y') to
+      run patch-update with the --make option (which opens a shell on error)
+""")
+    ans = input("<Press Enter OR 'y' to continue> ")
+
+    s = cmd_run(['git', 'commit', '-a', '-m', f'Preparing for release of {version} [buildall]'])
+    if s.returncode:
+        die('Aborting')
+
+    cmd_chk('touch configure.ac && packaging/smart-make && make gen')
+
+    print('Creating any missing patch branches.')
+    s = cmd_run(f'packaging/branch-from-patch --branch={args.master_branch} --add-missing')
+    if s.returncode:
+        die('Aborting')
+
+    print('Updating files in "patches" dir ...')
+    s = cmd_run(f'packaging/patch-update --branch={args.master_branch}')
+    if s.returncode:
+        die('Aborting')
+
+    if re.match(r'^y', ans, re.I):
+        print(f'\nRunning smart-make on all "patch/{args.master_branch}/*" branches ...')
+        cmd_run(f"packaging/patch-update --branch={args.master_branch} --skip-check --make")
+
+    if os.path.isdir('patches/.git'):
+        s = cmd_run(f"cd patches && git commit -a -m 'The patches for {version}.'")
+        if s.returncode:
+            die('Aborting')
+
+    print(f"""\
+{dash_line}
+
+About to:
+    - create signed tag for this release: {v_ver}
+    - create release diffs, "{diff_name}"
+    - create release tar, "{srctar_name}"
+    - generate {rsync_ver}/patches/* files
+    - create patches tar, "{pattar_name}"
+    - update top-level README.md, NEWS.md, TODO, and ChangeLog
+    - update top-level rsync*.html manpages
+    - gpg-sign the release files
+    - update hard-linked top-level release files{skipping}
+""")
+    ans = input("<Press Enter to continue> ")
+
+    # TODO: is there a better way to ensure that our passphrase is in the agent?
+    cmd_run("touch TeMp; gpg --sign TeMp; rm TeMp*")
+
+    out = cmd_txt(f"git tag -s -m 'Version {version}.' {v_ver}", capture='combined').out
+    print(out, end='')
+    if 'bad passphrase' in out or 'failed' in out:
+        die('Aborting')
+
+    if os.path.isdir('patches/.git'):
+        out = cmd_txt(f"cd patches && git tag -s -m 'Version {version}.' {v_ver}", capture='combined').out
+        print(out, end='')
+        if 'bad passphrase' in out or 'failed' in out:
+            die('Aborting')
+
+    os.environ['PATH'] = ORIGINAL_PATH
+
+    # Extract the generated files from the old tar.
+    tweaked_gen_files = [ os.path.join(rsync_lastver, fn) for fn in gen_files ]
+    cmd_run(['tar', 'xzf', lasttar_file, *tweaked_gen_files])
+    os.rename(rsync_lastver, 'a')
+
+    print(f"Creating {diff_file} ...")
+    cmd_chk(['rsync', '-a', *gen_pathnames, 'b/'])
+
+    sed_script = r's:^((---|\+\+\+) [ab]/[^\t]+)\t.*:\1:' # CAUTION: must not contain any single quotes!
+    cmd_chk(f"(git diff v{lastversion} {v_ver} -- ':!.github'; diff -upN a b | sed -r '{sed_script}') | gzip -9 >{diff_file}")
+    shutil.rmtree('a')
+    os.rename('b', rsync_ver)
+
+    print(f"Creating {srctar_file} ...")
+    cmd_chk(f"git archive --format=tar --prefix={rsync_ver}/ {v_ver} | tar xf -")
+    cmd_chk(f"support/git-set-file-times --quiet --prefix={rsync_ver}/")
+    cmd_chk(['fakeroot', 'tar', 'czf', srctar_file, '--exclude=.github', rsync_ver])
+    shutil.rmtree(rsync_ver)
+
+    print(f'Updating files in "{rsync_ver}/patches" dir ...')
+    os.mkdir(rsync_ver, 0o755)
+    os.mkdir(f"{rsync_ver}/patches", 0o755)
+    cmd_chk(f"packaging/patch-update --skip-check --branch={args.master_branch} --gen={rsync_ver}/patches".split())
+
+    print(f"Creating {pattar_file} ...")
+    cmd_chk(['fakeroot', 'tar', 'chzf', pattar_file, rsync_ver + '/patches'])
+    shutil.rmtree(rsync_ver)
+
+    print(f"Updating the other files in {dest} ...")
+    md_files = 'README.md NEWS.md INSTALL.md'.split()
+    html_files = [ fn for fn in gen_pathnames if fn.endswith('.html') ]
+    cmd_chk(['rsync', '-a', *md_files, *html_files, dest])
+    cmd_chk(["./md-convert", "--dest", dest, *md_files])
+
+    cmd_chk(f"git log --name-status | gzip -9 >{dest}/ChangeLog.gz")
+
+    for fn in (srctar_file, pattar_file, diff_file):
+        asc_fn = fn + '.asc'
+        if os.path.lexists(asc_fn):
+            os.unlink(asc_fn)
+        res = cmd_run(['gpg', '--batch', '-ba', fn])
+        if res.returncode != 0 and res.returncode != 2:
+            die("gpg signing failed")
+
+    if not pre:
+        for find in f'{dest}/rsync-*.gz {dest}/rsync-*.asc {dest}/src-previews/rsync-*diffs.gz*'.split():
+            for fn in glob.glob(find):
+                os.unlink(fn)
+        top_link = [
+                srctar_file, f"{srctar_file}.asc",
+                pattar_file, f"{pattar_file}.asc",
+                diff_file, f"{diff_file}.asc",
+                ]
+        for fn in top_link:
+            os.link(fn, re.sub(r'/src(-\w+)?/', '/', fn))
+
+    print(f"""\
+{dash_line}
+
+Local changes are done.  When you're satisfied, push the git repository
+and rsync the release files.  Remember to announce the release on *BOTH*
+rsync-announce@lists.samba.org and rsync@lists.samba.org (and the web)!
+""")
+
+
+def replace_or_die(regex, repl, txt, die_msg):
+    m = regex.search(txt)
+    if not m:
+        die(die_msg)
+    return regex.sub(repl, txt, 1)
+
+
+def signal_handler(sig, frame):
+    die("\nAborting due to SIGINT.")
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Prepare a new release of rsync in the git repo & ftp dir.", add_help=False)
+    parser.add_argument('--branch', '-b', dest='master_branch', default='master', help="The branch to release. Default: master.")
+    parser.add_argument("--help", "-h", action="help", help="Output this help message and exit.")
+    args = parser.parse_args()
+    main()
+
+# vim: sw=4 et ft=python

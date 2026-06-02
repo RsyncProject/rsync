@@ -1,0 +1,246 @@
+#!/bin/sh
+
+# Copyright (C) 2005-2022 Wayne Davison
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Test the output of various copy commands to ensure itemized output
+# and double-verbose output is correct.
+
+. "$suitedir/rsync.fns"
+
+to2dir="$tmpdir/to2"
+
+makepath "$fromdir/foo"
+makepath "$fromdir/bar/baz"
+cp_p "$srcdir/configure.ac" "$fromdir/foo/config1"
+cp_p "$srcdir/config.sub" "$fromdir/foo/config2"
+cp_p "$srcdir/rsync.h" "$fromdir/bar/baz/rsync"
+chmod 600 "$fromdir"/foo/config? "$fromdir/bar/baz/rsync"
+umask 0
+ln -s ../bar/baz/rsync "$fromdir/foo/sym"
+umask 022
+ln "$fromdir/foo/config1" "$fromdir/foo/extra"
+rm -f "$to2dir"
+
+# Check if rsync is set to hard-link symlinks.
+if $RSYNC -VV | grep '"hardlink_symlinks": true' >/dev/null; then
+    L=hL
+    sym_dots="$allspace"
+    L_sym_dots=".L$allspace"
+    is_uptodate='is uptodate'
+    touch "$chkfile.extra"
+else
+    L=cL
+    sym_dots="c.t.$dots"
+    L_sym_dots="cL$sym_dots"
+    is_uptodate='-> ../bar/baz/rsync'
+    echo "cL$sym_dots foo/sym $is_uptodate" >"$chkfile.extra"
+fi
+
+# Check if rsync can preserve time on symlinks
+case "$RSYNC" in
+*protocol=2*)
+    T=.T
+    ;;
+*)
+    if $RSYNC -VV | grep '"symtimes": true' >/dev/null; then
+	T=.t
+    else
+	T=.T
+    fi
+    ;;
+esac
+
+checkdiff "$RSYNC -iplr '$fromdir/' '$todir/'" <<EOT
+created directory $todir
+cd$all_plus ./
+cd$all_plus bar/
+cd$all_plus bar/baz/
+>f$all_plus bar/baz/rsync
+cd$all_plus foo/
+>f$all_plus foo/config1
+>f$all_plus foo/config2
+>f$all_plus foo/extra
+cL$all_plus foo/sym -> ../bar/baz/rsync
+EOT
+
+# Ensure there are no accidental directory-time problems.
+$RSYNC -a -f '-! */' "$fromdir/" "$todir"
+
+cp_p "$srcdir/configure.ac" "$fromdir/foo/config2"
+chmod 601 "$fromdir/foo/config2"
+checkdiff "$RSYNC -iplrH '$fromdir/' '$todir/'" <<EOT
+>f..T.$dots bar/baz/rsync
+>f..T.$dots foo/config1
+>f.sTp$dots foo/config2
+hf..T.$dots foo/extra => foo/config1
+EOT
+
+$RSYNC -a -f '-! */' "$fromdir/" "$todir"
+cp_p "$srcdir/config.sub" "$fromdir/foo/config2"
+sleep 1 # For directory mod below to ensure time difference
+rm "$todir/foo/sym"
+umask 0
+ln -s ../bar/baz "$todir/foo/sym"
+umask 022
+chmod 600 "$fromdir/foo/config2"
+chmod 777 "$todir/bar/baz/rsync"
+
+checkdiff "$RSYNC -iplrtc '$fromdir/' '$todir/'" <<EOT
+.f..tp$dots bar/baz/rsync
+.d..t.$dots foo/
+.f..t.$dots foo/config1
+>fcstp$dots foo/config2
+cLc$T.$dots foo/sym -> ../bar/baz/rsync
+EOT
+
+cp_p "$srcdir/configure.ac" "$fromdir/foo/config2"
+chmod 600 "$fromdir/foo/config2"
+# Lack of -t is for unchanged hard-link stress-test!
+checkdiff "$RSYNC -vvplrH '$fromdir/' '$todir/'" \
+	v_filt <<EOT
+bar/baz/rsync is uptodate
+foo/config1 is uptodate
+foo/extra is uptodate
+foo/sym is uptodate
+foo/config2
+EOT
+
+chmod 747 "$todir/bar/baz/rsync"
+$RSYNC -a -f '-! */' "$fromdir/" "$todir"
+checkdiff "$RSYNC -ivvplrtH '$fromdir/' '$todir/'" \
+	v_filt <<EOT
+.d$allspace ./
+.d$allspace bar/
+.d$allspace bar/baz/
+.f...p$dots bar/baz/rsync
+.d$allspace foo/
+.f$allspace foo/config1
+>f..t.$dots foo/config2
+hf$allspace foo/extra
+.L$allspace foo/sym -> ../bar/baz/rsync
+EOT
+
+chmod 757 "$todir/foo/config1"
+touch "$todir/foo/config2"
+checkdiff "$RSYNC -vplrtH '$fromdir/' '$todir/'" \
+	v_filt <<EOT
+foo/config2
+EOT
+
+chmod 757 "$todir/foo/config1"
+touch "$todir/foo/config2"
+checkdiff "$RSYNC -iplrtH '$fromdir/' '$todir/'" <<EOT
+.f...p$dots foo/config1
+>f..t.$dots foo/config2
+EOT
+
+checkdiff "$RSYNC -ivvplrtH --copy-dest=../to '$fromdir/' '$to2dir/'" \
+	v_filt <<EOT
+cd$allspace ./
+cd$allspace bar/
+cd$allspace bar/baz/
+cf$allspace bar/baz/rsync
+cd$allspace foo/
+cf$allspace foo/config1
+cf$allspace foo/config2
+hf$allspace foo/extra => foo/config1
+cL$sym_dots foo/sym -> ../bar/baz/rsync
+EOT
+
+rm -rf "$to2dir"
+cat - "$chkfile.extra" <<EOT >"$chkfile"
+created directory $to2dir
+hf$allspace foo/extra => foo/config1
+EOT
+checkdiff2 "$RSYNC -iplrtH --copy-dest=../to '$fromdir/' '$to2dir/'"
+
+rm -rf "$to2dir"
+checkdiff "$RSYNC -vvplrtH --copy-dest='$todir' '$fromdir/' '$to2dir/'" \
+	v_filt <<EOT
+./ is uptodate
+bar/ is uptodate
+bar/baz/ is uptodate
+bar/baz/rsync is uptodate
+foo/ is uptodate
+foo/config1 is uptodate
+foo/config2 is uptodate
+foo/sym $is_uptodate
+foo/extra => foo/config1
+EOT
+
+rm -rf "$to2dir"
+checkdiff "$RSYNC -ivvplrtH --link-dest='$todir' '$fromdir/' '$to2dir/'" \
+	v_filt <<EOT
+cd$allspace ./
+cd$allspace bar/
+cd$allspace bar/baz/
+hf$allspace bar/baz/rsync
+cd$allspace foo/
+hf$allspace foo/config1
+hf$allspace foo/config2
+hf$allspace foo/extra => foo/config1
+$L$sym_dots foo/sym -> ../bar/baz/rsync
+EOT
+
+rm -rf "$to2dir"
+cat - "$chkfile.extra" <<EOT >"$chkfile"
+created directory $to2dir
+EOT
+checkdiff2 "$RSYNC -iplrtH --dry-run --link-dest=../to '$fromdir/' '$to2dir/'"
+
+rm -rf "$to2dir"
+checkdiff2 "$RSYNC -iplrtH --link-dest=../to '$fromdir/' '$to2dir/'"
+
+rm -rf "$to2dir"
+checkdiff "$RSYNC -vvplrtH --link-dest='$todir' '$fromdir/' '$to2dir/'" \
+	v_filt <<EOT
+./ is uptodate
+bar/ is uptodate
+bar/baz/ is uptodate
+bar/baz/rsync is uptodate
+foo/ is uptodate
+foo/config1 is uptodate
+foo/config2 is uptodate
+foo/extra is uptodate
+foo/sym $is_uptodate
+EOT
+
+rm -rf "$to2dir"
+checkdiff "$RSYNC -ivvplrtH --compare-dest='$todir' '$fromdir/' '$to2dir/'" \
+	v_filt <<EOT
+cd$allspace ./
+cd$allspace bar/
+cd$allspace bar/baz/
+.f$allspace bar/baz/rsync
+cd$allspace foo/
+.f$allspace foo/config1
+.f$allspace foo/config2
+.f$allspace foo/extra
+$L_sym_dots foo/sym -> ../bar/baz/rsync
+EOT
+
+rm -rf "$to2dir"
+cat - "$chkfile.extra" <<EOT >"$chkfile"
+created directory $to2dir
+EOT
+checkdiff2 "$RSYNC -iplrtH --compare-dest='$todir' '$fromdir/' '$to2dir/'"
+
+rm -rf "$to2dir"
+checkdiff "$RSYNC -vvplrtH --compare-dest='$todir' '$fromdir/' '$to2dir/'" \
+	v_filt <<EOT
+./ is uptodate
+bar/ is uptodate
+bar/baz/ is uptodate
+bar/baz/rsync is uptodate
+foo/ is uptodate
+foo/config1 is uptodate
+foo/config2 is uptodate
+foo/extra is uptodate
+foo/sym $is_uptodate
+EOT
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0

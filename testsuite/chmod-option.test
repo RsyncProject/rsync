@@ -1,0 +1,71 @@
+#!/bin/sh
+
+# Copyright (C) 2002 by Martin Pool <mbp@samba.org>
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Test that the --chmod option functions correctly.
+
+. $suitedir/rsync.fns
+
+# Build some files
+
+fromdir="$scratchdir/from"
+todir="$scratchdir/to"
+checkdir="$scratchdir/check"
+
+mkdir "$fromdir"
+name1="$fromdir/name1"
+name2="$fromdir/name2"
+dir1="$fromdir/dir1"
+dir2="$fromdir/dir2"
+echo "This is the file" > "$name1"
+echo "This is the other file" > "$name2"
+mkdir "$dir1" "$dir2"
+
+chmod 4700 "$name1" || test_skipped "Can't chmod"
+chmod 700 "$dir1"
+chmod 770 "$dir2"
+
+# Copy the files we've created over to another directory
+checkit "$RSYNC -avv '$fromdir/' '$checkdir/'" "$fromdir" "$checkdir"
+
+# And then manually make the changes which should occur
+umask 002
+chmod ug-s,a+rX "$checkdir"/*
+chmod +w "$checkdir" "$checkdir"/dir*
+
+checkit "$RSYNC -avv --chmod ug-s,a+rX,D+w '$fromdir/' '$todir/'" "$checkdir" "$todir"
+
+rm -r "$fromdir" "$checkdir" "$todir"
+makepath "$todir" "$fromdir/foo"
+touch "$fromdir/bar"
+
+checkit "$RSYNC -avv '$fromdir/' '$checkdir/'" "$fromdir" "$checkdir"
+chmod o+x "$fromdir"/bar
+
+checkit "$RSYNC -avv --chmod=Fo-x '$fromdir/' '$todir/'" "$checkdir" "$todir"
+
+# Tickle a bug in rsync 2.6.8: if you push a new directory with --perms off to
+# a daemon with an incoming chmod, the daemon pretends the directory is a file
+# for the purposes of the second application of the incoming chmod.
+
+build_rsyncd_conf
+cat >>"$scratchdir/test-rsyncd.conf" <<EOF
+[test-incoming-chmod]
+	path = $todir
+	read only = no
+	incoming chmod = Fo-x
+EOF
+
+RSYNC_CONNECT_PROG="$RSYNC --config=$conf --daemon"
+export RSYNC_CONNECT_PROG
+
+rm -r "$todir"
+makepath "$todir"
+
+checkit "$RSYNC -avv --no-perms '$fromdir/' localhost::test-incoming-chmod/" "$checkdir" "$todir"
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0

@@ -39,22 +39,12 @@ jobs:
     - name: info
       run: bash -c '/usr/local/bin/rsync --version'
     - name: check
-      # chown-fake / devices-fake / xattrs / xattrs-hlink now RUN on Cygwin
-      # (rsyncfns.py drives xattrs via getfattr/setfattr from the `attr`
-      # package installed above), verified on a real Cygwin host. The real
-      # chown/devices tests still skip (need root/mknod), as do the
-      # RESOLVE_BENEATH symlink-race tests.
-      run: bash -c 'RSYNC_EXPECT_SKIPPED=acls-default,acls-depth,acls,bare-do-open-symlink-race,chdir-symlink-race,chown,daemon-access-ip,daemon-chroot-acl,devices,dir-sgid,open-noatime,protected-regular,proxy-response-line-too-long,sender-flist-symlink-leak,simd-checksum,symlink-dirlink-basis make check'
-    - name: check (TCP daemon transport)
-      # Second run with daemon tests over a real loopback rsyncd; the default
-      # 'make check' above uses the secure stdio-pipe transport.
-      run: bash -c './runtests.py --rsync-bin=`pwd`/rsync.exe --use-tcp -j 8'
+      run: bash -c 'RSYNC_EXPECT_SKIPPED=acls-default,acls,chown,devices,dir-sgid,open-noatime,protected-regular make check'
     - name: ssl file list
       run: bash -c 'PATH="/usr/local/bin:$PATH" rsync-ssl --no-motd download.samba.org::rsyncftp/ || true'
     - name: save artifact
       uses: actions/upload-artifact@v4
       with:
-        retention-days: 45
         name: cygwin-bin
         path: |
           rsync.exe

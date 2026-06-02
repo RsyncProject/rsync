@@ -1,0 +1,61 @@
+#!/bin/sh
+
+# Test some foundational things.
+
+. "$suitedir/rsync.fns"
+
+RSYNC_RSH="$scratchdir/src/support/lsh.sh"
+export RSYNC_RSH
+
+echo $0 running
+
+$RSYNC --version || test_fail '--version output failed'
+
+$RSYNC --info=help || test_fail '--info=help output failed'
+
+$RSYNC --debug=help || test_fail '--debug=help output failed'
+
+weird_name="A weird)name"
+
+mkdir "$fromdir"
+mkdir "$fromdir/$weird_name"
+
+append_line() {
+    echo "$1"
+    echo "$1" >>"$fromdir/$weird_name/file"
+}
+
+append_line test1
+checkit "$RSYNC -ai '$fromdir/' '$todir/'" "$fromdir" "$todir"
+
+copy_weird() {
+    checkit "$RSYNC $1 --rsync-path='$RSYNC' '$2$fromdir/$weird_name/' '$3$todir/$weird_name'" "$fromdir" "$todir"
+}
+
+append_line test2
+copy_weird '-ai' 'lh:' ''
+
+append_line test3
+copy_weird '-ai' '' 'lh:'
+
+append_line test4
+copy_weird '-ais' 'lh:' ''
+
+append_line test5
+copy_weird '-ais' '' 'lh:'
+
+echo test6
+
+touch "$fromdir/one" "$fromdir/two"
+(cd "$fromdir" && $RSYNC -ai --old-args --rsync-path="$RSYNC" lh:'one two' "$todir/")
+if [ ! -f "$todir/one" ] || [ ! -f "$todir/two" ]; then
+    test_fail "old-args copy of 'one two' failed"
+fi
+
+echo test7
+
+rm "$todir/one" "$todir/two"
+(cd "$fromdir" && RSYNC_OLD_ARGS=1 $RSYNC -ai --rsync-path="$RSYNC" lh:'one two' "$todir/")
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0

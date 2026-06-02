@@ -1,0 +1,171 @@
+#!/bin/sh
+
+# Copyright (C) 2002 by Martin Pool <mbp@samba.org>
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Test rsync handling of devices.  This can only run if you're root.
+
+. "$suitedir/rsync.fns"
+
+# Build some hardlinks
+
+case $0 in
+*fake*)
+    $RSYNC -VV | grep '"xattrs": true' >/dev/null || test_skipped "Rsync needs xattrs for fake device tests"
+    RSYNC="$RSYNC --fake-super"
+    TLS_ARGS="$TLS_ARGS --fake-super"
+    case "$HOST_OS" in
+    darwin*)
+	mknod() {
+	    fn="$1"
+	    case "$2" in
+	    p) mode=10644 ;;
+	    c) mode=20644 ;;
+	    b) mode=60644 ;;
+	    esac
+	    maj="${3:-0}"
+	    min="${4:-0}"
+	    touch "$fn"
+	    xattr -s 'rsync.%stat' "$mode $maj,$min 0:0" "$fn"
+	}
+	;;
+    solaris*)
+	mknod() {
+	    fn="$1"
+	    case "$2" in
+	    p) mode=10644 ;;
+	    c) mode=20644 ;;
+	    b) mode=60644 ;;
+	    esac
+	    maj="${3:-0}"
+	    min="${4:-0}"
+	    touch "$fn"
+	    runat "$fn" "$SHELL_PATH" <<EOF
+echo "$mode $maj,$min 0:0" > rsync.%stat
+EOF
+	}
+	;;
+    freebsd*)
+	mknod() {
+	    fn="$1"
+	    case "$2" in
+	    p) mode=10644 ;;
+	    c) mode=20644 ;;
+	    b) mode=60644 ;;
+	    esac
+	    maj="${3:-0}"
+	    min="${4:-0}"
+	    touch "$fn"
+	    setextattr -h user "rsync.%stat" "$mode $maj,$min 0:0" "$fn"
+	}
+	;;
+    *)
+	mknod() {
+	    fn="$1"
+	    case "$2" in
+	    p) mode=10644 ;;
+	    c) mode=20644 ;;
+	    b) mode=60644 ;;
+	    esac
+	    maj="${3:-0}"
+	    min="${4:-0}"
+	    touch "$fn"
+	    setfattr -n 'user.rsync.%stat' -v "$mode $maj,$min 0:0" "$fn"
+	}
+	;;
+    esac
+    ;;
+*)
+    my_uid=`get_testuid`
+    root_uid=`get_rootuid`
+    if test x"$my_uid" = x; then
+	: # If "id" failed, try to continue...
+    elif test x"$my_uid" != x"$root_uid"; then
+	if [ -e "$FAKEROOT_PATH" ]; then
+	    echo "Let's try re-running the script under fakeroot..."
+	    exec "$FAKEROOT_PATH" "$SHELL_PATH" $RUNSHFLAGS "$0"
+	fi
+	test_skipped "Rsync needs root/fakeroot for device tests"
+    fi
+    ;;
+esac
+
+# TODO: Need to test whether hardlinks are possible on this OS/filesystem
+
+$RSYNC -VV | grep '"hardlink_specials": true' >/dev/null && CAN_HLINK_SPECIAL=yes || CAN_HLINK_SPECIAL=no
+
+mkdir "$fromdir"
+mkdir "$todir"
+mknod "$fromdir/char" c 41 67  || test_skipped "Can't create char device node"
+mknod "$fromdir/char2" c 42 68  || test_skipped "Can't create char device node"
+mknod "$fromdir/char3" c 42 69  || test_skipped "Can't create char device node"
+mknod "$fromdir/block" b 42 69 || test_skipped "Can't create block device node"
+mknod "$fromdir/block2" b 42 73 || test_skipped "Can't create block device node"
+mknod "$fromdir/block3" b 105 73 || test_skipped "Can't create block device node"
+if test "$CAN_HLINK_SPECIAL" = yes; then
+    ln "$fromdir/block3" "$fromdir/block3.5"
+else
+    echo "Skipping hard-linked device test..."
+fi
+mkfifo "$fromdir/fifo" || mknod "$fromdir/fifo" p || test_skipped "Can't run mkfifo"
+# Work around time rounding/truncating issue by touching both files.
+touch -r "$fromdir/block" "$fromdir/block" "$fromdir/block2"
+
+checkdiff "$RSYNC -ai '$fromdir/block' '$todir/block2'" <<EOT
+cD$all_plus block
+EOT
+
+checkdiff "$RSYNC -ai '$fromdir/block2' '$todir/block'" <<EOT
+cD$all_plus block2
+EOT
+
+sleep 1
+
+checkdiff "$RSYNC -Di '$fromdir/block3' '$todir/block'" <<EOT
+cDc.T.$dots block3
+EOT
+
+cat >"$chkfile" <<EOT
+.d..t.$dots ./
+cDc.t.$dots block
+cDc...$dots block2
+cD$all_plus block3
+hD$all_plus block3.5 => block3
+cD$all_plus char
+cD$all_plus char2
+cD$all_plus char3
+cS$all_plus fifo
+EOT
+if test "$CAN_HLINK_SPECIAL" = no; then
+    grep -v block3.5 <"$chkfile" >"$chkfile.new"
+    mv "$chkfile.new" "$chkfile"
+fi
+
+checkdiff2 "$RSYNC -aiHvv '$fromdir/' '$todir/'" v_filt
+
+echo "check how the directory listings compare with diff:"
+echo ""
+( cd "$fromdir" && rsync_ls_lR . ) > "$tmpdir/ls-from"
+( cd "$todir" && rsync_ls_lR . ) > "$tmpdir/ls-to"
+diff $diffopt "$tmpdir/ls-from" "$tmpdir/ls-to"
+
+if test "$CAN_HLINK_SPECIAL" = yes; then
+    set -x
+    checkdiff "$RSYNC -aii --link-dest='$todir' '$fromdir/' '$chkdir/'" <<EOT
+created directory $chkdir
+cd$allspace ./
+hD$allspace block
+hD$allspace block2
+hD$allspace block3
+hD$allspace block3.5
+hD$allspace char
+hD$allspace char2
+hD$allspace char3
+hS$allspace fifo
+EOT
+fi
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0

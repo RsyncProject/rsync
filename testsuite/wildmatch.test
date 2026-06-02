@@ -1,0 +1,23 @@
+#!/bin/sh
+
+# Copyright (C) 2003-2022 Wayne Davison
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Test the wildmatch functionality
+
+. "$suitedir/rsync.fns"
+
+# This test exercises the wildmatch() function (with no options) and the
+# wildmatch_join() function (using -x and/or -e).
+for opts in "" -x1 "-x1 -e1" "-x1 -e1se" -x2 "-x2 -ese" -x3 "-x3 -e1" -x4 "-x4 -e2e" -x5 "-x5 -es"; do
+    echo Running wildtest with "$opts"
+    "$TOOLDIR/wildtest" $opts "$srcdir/wildtest.txt" >"$scratchdir/wild.out"
+    diff $diffopt "$scratchdir/wild.out" - <<EOF
+No wildmatch errors found.
+EOF
+done
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0

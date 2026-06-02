@@ -1,0 +1,19 @@
+#!/bin/sh
+
+# Test rsync copying atimes
+
+. "$suitedir/rsync.fns"
+
+$RSYNC -VV | grep '"atimes": true' >/dev/null || test_skipped "Rsync is configured without atimes support"
+
+mkdir "$fromdir"
+
+touch "$fromdir/foo"
+touch -a -t 200102031717.42 "$fromdir/foo"
+
+TLS_ARGS=--atimes
+
+checkit "$RSYNC -rtUgvvv \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0

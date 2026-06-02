@@ -1,0 +1,498 @@
+#!/bin/sh
+
+# Copyright (C) 2001 by Martin Pool <mbp@samba.org>
+
+# General-purpose test functions for rsync.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version
+# 2 as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this program; if not, write to the Free Software
+# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+tmpdir="$scratchdir"
+fromdir="$tmpdir/from"
+todir="$tmpdir/to"
+chkdir="$tmpdir/chk"
+
+chkfile="$scratchdir/rsync.chk"
+outfile="$scratchdir/rsync.out"
+
+# For itemized output:
+all_plus='+++++++++'
+allspace='         '
+dots='.....' # trailing dots after changes
+tab_ch='	' # a single tab character
+
+# Berkley's nice.
+PATH="$PATH:/usr/ucb"
+
+if diff -u "$suitedir/rsync.fns" "$suitedir/rsync.fns" >/dev/null 2>&1; then
+    diffopt="-u"
+else
+    diffopt="-c"
+fi
+
+HOME="$scratchdir"
+export HOME
+
+runtest() {
+    echo $ECHO_N "Test $1: $ECHO_C"
+    if eval "$2"; then
+        echo "$ECHO_T	done."
+        return 0
+    else
+        echo "$ECHO_T failed!"
+        return 1
+    fi
+}
+
+set_cp_destdir() {
+    while test $# -gt 1; do
+	shift
+    done
+    destdir="$1"
+}
+
+# Perform a "cp -p", making sure that timestamps are really the same,
+# even if the copy rounded microsecond times on the destination file.
+cp_touch() {
+    cp_p "${@}"
+    if test $# -gt 2 || test -d "$2"; then
+	set_cp_destdir "${@}" # sets destdir var
+	while test $# -gt 1; do
+	    destname="$destdir/`basename $1`"
+	    touch -r "$destname" "$1" "$destname"
+	    shift
+	done
+    else
+	touch -r "$2" "$1" "$2"
+    fi
+}
+
+# Call this if you want to filter (stdin -> stdout) verbose messages (-v or
+# -vv) from an rsync run (whittling the output down to just the file messages).
+# This isn't needed if you use -i without -v.
+v_filt() {
+    sed -e '/^building file list /d' \
+	-e '/^sending incremental file list/d' \
+	-e '/^created directory /d' \
+	-e '/^done$/d' \
+	-e '/ --whole-file$/d' \
+	-e '/^total: /d' \
+	-e '/^client charset: /d' \
+	-e '/^server charset: /d' \
+	-e '/^$/,$d'
+}
+
+printmsg() {
+    echo "$1"
+}
+
+rsync_ls_lR() {
+    find "$@" -name .git -prune -o -name auto-build-save -prune -o -print | \
+	sort | sed 's/ /\\ /g' | xargs "$TOOLDIR/tls" $TLS_ARGS
+}
+
+get_testuid() {
+    uid=`id -u 2>/dev/null || true`
+    case "$uid" in
+	[0-9]*) echo "$uid" ;;
+	*) id 2>/dev/null | sed 's/^[^0-9]*\([0-9][0-9]*\).*/\1/' ;;
+    esac
+}
+
+get_rootuid() {
+    uid=`id -u root 2>/dev/null || true`
+    case "$uid" in
+	[0-9]*) echo "$uid" ;;
+	*) echo 0 ;;
+    esac
+}
+
+get_rootgid() {
+    gid=`id -g root 2>/dev/null || true`
+    case "$gid" in
+	[0-9]*) echo "$gid" ;;
+	*) echo 0 ;;
+    esac
+}
+
+# When copying via "cp -p", we want to ensure that a non-root user does not
+# preserve ownership (we want our files to be created as the testing user).
+# For instance, a Cygwin CI run might have git files owned by a different
+# user than the (admin) user running the tests.
+cp_cmd="cp -p"
+if test x`get_testuid` != x0; then
+    case `cp --help 2>/dev/null` in
+	*--no-preserve=*) cp_cmd="cp -p --no-preserve=ownership" ;;
+    esac
+fi
+cp_p() {
+    $cp_cmd "${@}" || test_fail "$cp_cmd failed"
+}
+
+check_perms() {
+    perms=`"$TOOLDIR/tls" "$1" | sed 's/^[-d]\(.........\).*/\1/'`
+    if test $perms = $2; then
+	return 0
+    fi
+    echo "permissions: $perms on $1"
+    echo "should be:   $2"
+    test_fail "failed test $3"
+}
+
+rsync_getgroups() {
+    "$TOOLDIR/getgroups"
+}
+
+
+####################
+# Build test directories $todir and $fromdir, with $fromdir full of files.
+
+hands_setup() {
+    # Clean before creation
+    rm -rf "$fromdir"
+    rm -rf "$todir"
+
+    [ -d "$tmpdir" ] || mkdir "$tmpdir"
+    [ -d "$fromdir" ] || mkdir "$fromdir"
+    [ -d "$todir" ] || mkdir "$todir"
+
+    # On some BSD systems, the umask affects the mode of created
+    # symlinks, even though the mode apparently has no effect on how
+    # the links behave in the future, and it cannot be changed using
+    # chmod!  rsync always sets its umask to 000 so that it can
+    # accurately recreate permissions, but this script is probably run
+    # with a different umask.
+
+    # This causes a little problem that "ls -l" of the two will not be
+    # the same.  So, we need to set our umask before doing any creations.
+
+    # set up test data
+    touch "$fromdir/empty"
+    mkdir "$fromdir/emptydir"
+
+    # a hundred lines of text or so
+    rsync_ls_lR "$srcdir" > "$fromdir/filelist"
+
+    echo $ECHO_N "This file has no trailing lf$ECHO_C" > "$fromdir/nolf"
+    umask 0
+    ln -s nolf "$fromdir/nolf-symlink"
+    umask 022
+
+    cat "$srcdir"/*.c > "$fromdir/text"
+    mkdir "$fromdir/dir"
+    cp "$fromdir/text" "$fromdir/dir"
+    mkdir "$fromdir/dir/subdir"
+    echo some data > "$fromdir/dir/subdir/foobar.baz"
+    mkdir "$fromdir/dir/subdir/subsubdir"
+    if [ -r /etc ]; then
+	ls -ltr /etc > "$fromdir/dir/subdir/subsubdir/etc-ltr-list" || [ $? -eq 1 ]
+    else
+	ls -ltr / > "$fromdir/dir/subdir/subsubdir/etc-ltr-list" || [ $? -eq 1 ]
+    fi
+    mkdir "$fromdir/dir/subdir/subsubdir2"
+    if [ -r /bin ]; then
+	ls -lt /bin > "$fromdir/dir/subdir/subsubdir2/bin-lt-list" || [ $? -eq 1 ]
+    else
+	ls -lt / > "$fromdir/dir/subdir/subsubdir2/bin-lt-list" || [ $? -eq 1 ]
+    fi
+
+#      echo testing head:
+#      ls -lR "$srcdir" | head -10 || echo failed
+}
+
+
+####################
+# Many machines do not have "mkdir -p", so we have to build up long paths.
+# How boring.
+makepath() {
+    for p in "${@}"; do
+	(echo "        makepath $p"
+
+	# Absolute Unix path.
+	if echo $p | grep '^/' >/dev/null; then
+	    cd /
+	fi
+
+	# This will break if $p contains a space.
+	for c in `echo $p | tr '/' ' '`; do
+	    if [ -d "$c" ] || mkdir "$c"; then
+		cd "$c" || return $?
+	    else
+		echo "failed to create $c" >&2; return $?
+	    fi
+	done)
+    done
+}
+
+
+###########################
+# Run a test (in '$1') then compare directories $2 and $3 to see if
+# there are any difference.  If there are, explain them.
+
+# So normally basically $1 should be an rsync command, and $2 and $3
+# the source and destination directories.  This is only good when you
+# expect to transfer the whole directory exactly as is.  If some files
+# should be excluded, you might need to use something else.
+
+checkit() {
+    failed=
+
+    # We can just write everything to stdout/stderr, because the
+    # wrapper hides it unless there is a problem.
+
+    case "x$TLS_ARGS" in
+    *--atimes*)
+	( cd "$2" && rsync_ls_lR . ) > "$tmpdir/ls-from"
+	;;
+    *)
+	;;
+    esac
+
+    echo "Running: \"$1\""
+    eval "$1"
+    status=$?
+    if [ $status != 0 ]; then
+	failed="$failed status=$status"
+    fi
+
+    case "x$TLS_ARGS" in
+    *--atimes*)
+	;;
+    *)
+	( cd "$2" && rsync_ls_lR . ) > "$tmpdir/ls-from"
+	;;
+    esac
+
+    echo "-------------"
+    echo "check how the directory listings compare with diff:"
+    echo ""
+    ( cd "$3" && rsync_ls_lR . ) > "$tmpdir/ls-to"
+    diff $diffopt "$tmpdir/ls-from" "$tmpdir/ls-to" || failed="$failed dir-diff"
+
+    echo "-------------"
+    echo "check how the files compare with diff:"
+    echo ""
+    if [ "x$4" != x ]; then
+	echo "  === Skipping (as directed) ==="
+    else
+	diff -r $diffopt "$2" "$3" || failed="$failed file-diff"
+    fi
+
+    echo "-------------"
+    if [ -z "$failed" ]; then
+	return 0
+    fi
+
+    echo "Failed: $failed"
+    return 1
+}
+
+
+# Run a test in $1 and make sure it has a zero exit status.  Capture the
+# output into $outfile and echo it to stdout.
+checktee() {
+    echo "Running: \"$1\""
+    eval "$1" >"$outfile"
+    status=$?
+    cat "$outfile"
+    if [ $status != 0 ]; then
+	echo "Failed: status=$status"
+	return 1
+    fi
+    return 0
+}
+
+
+# Slurp stdin into $chkfile and then call checkdiff2().
+checkdiff() {
+    cat >"$chkfile" # Save off stdin
+    checkdiff2 "${@}"
+}
+
+
+# Run a test in $1 and make sure it has a zero exit status.  Capture the output
+# into $outfile.  If $2 is set, use it to filter the outfile.  If resulting
+# outfile differs from the chkfile data, fail with an error.
+checkdiff2() {
+    failed=
+
+    echo "Running: \"$1\""
+    eval "$1" >"$outfile"
+    status=$?
+    cat "$outfile"
+    if [ $status != 0 ]; then
+	failed="$failed status=$status"
+    fi
+
+    if [ -n "$2" ]; then
+	eval "cat '$outfile' | $2 >'$outfile.new'"
+	mv "$outfile.new" "$outfile"
+    fi
+
+    diff $diffopt "$chkfile" "$outfile" || failed="$failed output differs"
+
+    if [ -n "$failed" ]; then
+	echo "Failed:$failed"
+	return 1
+    fi
+    return 0
+}
+
+
+build_rsyncd_conf() {
+    # Build an appropriate configuration file
+    conf="$scratchdir/test-rsyncd.conf"
+    echo "building configuration $conf"
+
+    port=2612
+    pidfile="$scratchdir/rsyncd.pid"
+    logfile="$scratchdir/rsyncd.log"
+    hostname=`uname -n`
+
+    my_uid=`get_testuid`
+    root_uid=`get_rootuid`
+    root_gid=`get_rootgid`
+
+    uid_setting="uid = $root_uid"
+    gid_setting="gid = $root_gid"
+
+    if test x"$my_uid" != x"$root_uid"; then
+	# Non-root cannot specify uid & gid settings
+	uid_setting="#$uid_setting"
+	gid_setting="#$gid_setting"
+    fi
+
+    cat >"$conf" <<EOF
+# rsyncd configuration file autogenerated by $0
+
+pid file = $pidfile
+use chroot = no
+munge symlinks = no
+hosts allow = localhost 127.0.0.0/24 192.168.0.0/16 10.0.0.0/8 $hostname
+log file = $logfile
+transfer logging = yes
+# We don't define log format here so that the test-hidden module will default
+# to the internal static string (since we had a crash trying to tweak it).
+exclude = ? foobar.baz
+max verbosity = 4
+$uid_setting
+$gid_setting
+
+[test-from]
+	path = $fromdir
+	log format = %i %h [%a] %m (%u) %l %f%L
+	read only = yes
+	comment = r/o
+
+[test-to]
+	path = $todir
+	log format = %i %h [%a] %m (%u) %l %f%L
+	read only = no
+	comment = r/w
+
+[test-scratch]
+	path = $scratchdir
+	log format = %i %h [%a] %m (%u) %l %f%L
+	read only = no
+
+[test-hidden]
+	path = $fromdir
+	list = no
+EOF
+
+    # Build a helper script to ignore exit code 23
+    ignore23="$scratchdir/ignore23"
+    echo "building help script $ignore23"
+
+    cat >"$ignore23" <<'EOT'
+if "${@}"; then
+    exit
+fi
+
+ret=$?
+
+if test $ret = 23; then
+    exit
+fi
+
+exit $ret
+EOT
+chmod +x "$ignore23"
+}
+
+
+build_symlinks() {
+    mkdir "$fromdir"
+    date >"$fromdir/referent"
+    ln -s referent "$fromdir/relative"
+    ln -s "$fromdir/referent" "$fromdir/absolute"
+    ln -s nonexistent "$fromdir/dangling"
+    ln -s "$srcdir/rsync.c" "$fromdir/unsafe"
+}
+
+test_fail() {
+    echo "$@" >&2
+    exit 1
+}
+
+test_skipped() {
+    echo "$@" >&2
+    echo "$@" > "$tmpdir/whyskipped"
+    exit 77
+}
+
+# It failed, but we expected that.  Don't dump out error logs,
+# because most users won't want to see them.  But do leave
+# the working directory around.
+test_xfail() {
+    echo "$@" >&2
+    exit 78
+}
+
+# Determine what shell command will appropriately test for links.
+ln -s foo "$scratchdir/testlink"
+for cmd in test /bin/test /usr/bin/test /usr/ucb/bin/test /usr/ucb/test; do
+    for switch in -h -L; do
+        if $cmd $switch "$scratchdir/testlink" 2>/dev/null; then
+            # how nice
+            TEST_SYMLINK_CMD="$cmd $switch"
+            # i wonder if break 2 is portable?
+            break 2
+        fi
+    done
+done
+# ok, now get rid of it
+rm "$scratchdir/testlink"
+
+
+if [ "x$TEST_SYMLINK_CMD" = 'x' ]; then
+    test_fail "Couldn't determine how to test for symlinks"
+else
+    echo "Testing for symlinks using '$TEST_SYMLINK_CMD'"
+fi
+
+
+# Test whether something is a link, allowing for shell peculiarities
+is_a_link() {
+    # note the variable contains the first option and therefore is not quoted
+    $TEST_SYMLINK_CMD "$1"
+}
+
+
+# We need to set the umask to be reproducible.  Note also that when we
+# do some daemon tests as root, we will setuid() and therefore the
+# directory has to be writable by the nobody user in some cases.  The
+# best thing is probably to explicitly chmod those directories after
+# creation.
+
+umask 022

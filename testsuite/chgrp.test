@@ -1,0 +1,29 @@
+#!/bin/sh
+
+# Copyright (C) 2002 by Martin Pool <mbp@samba.org>
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Test that rsync with -gr will preserve groups when the user running
+# the test is a member of them.  Hopefully they're in at least one
+# test.
+
+. "$suitedir/rsync.fns"
+
+# Build some hardlinks
+
+mygrps="`rsync_getgroups`" || test_fail "Can't get groups"
+mkdir "$fromdir"
+
+for g in $mygrps; do
+    name="$fromdir/foo-$g"
+    date > "$name"
+    chgrp "$g" "$name" || test_fail "Can't chgrp"
+done
+sleep 2
+
+checkit "$RSYNC -rtgpvvv '$fromdir/' '$todir/'" "$fromdir" "$todir"
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0

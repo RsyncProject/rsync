@@ -1,0 +1,21 @@
+#!/bin/sh
+
+# Test rsync --delay-updates
+
+. "$suitedir/rsync.fns"
+
+mkdir "$fromdir"
+
+echo 1 > "$fromdir/foo"
+
+checkit "$RSYNC -aiv --delay-updates \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
+
+mkdir "$todir/.~tmp~"
+echo 2 > "$todir/.~tmp~/foo"
+touch -r .. "$todir/.~tmp~/foo" "$todir/foo"
+echo 3 > "$fromdir/foo"
+
+checkit "$RSYNC -aiv --delay-updates \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0

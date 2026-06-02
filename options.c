@@ -114,20 +114,11 @@ int mkpath_dest_arg = 0;
 int allow_inc_recurse = 1;
 int xfer_dirs = -1;
 int am_daemon = 0;
-/* Set after a successful per-module chroot ("use chroot = yes") in
- * clientserver.c. NOT set for the daemon-level "daemon chroot = /X"
- * chroot: that confines path resolution to /X, but module paths
- * /X/modA, /X/modB, etc. are not chroot boundaries, so the per-module
- * symlink-race defenses (secure_relative_open() / do_*_at() in
- * syscall.c, gated by `am_daemon && !am_chrooted`) must still fire
- * even when the daemon is inside a daemon chroot. */
-int am_chrooted = 0;
 int connect_timeout = 0;
 int keep_partial = 0;
 int safe_symlinks = 0;
 int copy_unsafe_links = 0;
 int munge_symlinks = 0;
-int use_secure_symlinks = 0;
 int size_only = 0;
 int daemon_bwlimit = 0;
 int bwlimit = 0;
@@ -1168,7 +1159,7 @@ static time_t parse_time(const char *arg)
 {
 	const char *cp;
 	time_t val, now = time(NULL);
-	struct tm t, tmp, *today = localtime_r(&now, &tmp);
+	struct tm t, *today = localtime(&now);
 	int in_date, old_mday, n;
 
 	memset(&t, 0, sizeof t);

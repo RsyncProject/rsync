@@ -1,0 +1,60 @@
+#!/bin/sh
+
+# Copyright (C) 2005-2020 Wayne Davison
+#
+# This program is distributable under the terms of the GNU GPL (see COPYING)
+
+. "$suitedir/rsync.fns"
+
+deepstr='down/3/deep'
+deepdir="$fromdir/$deepstr"
+extradir="$fromdir/extra"
+makepath "$deepdir" "$extradir/$deepstr" "$chkdir"
+
+fromdir="$deepdir"
+hands_setup
+fromdir="$tmpdir/from"
+
+extrafile="$extradir/./$deepstr/extra.added.value"
+echo wowza >"$extrafile"
+
+$RSYNC -av --existing --include='*/' --exclude='*' "$fromdir/" "$extradir/"
+
+cd "$fromdir"
+
+# Main script starts here
+
+$RSYNC -ai --include=/down/ --exclude='/*' "$fromdir/" "$chkdir/"
+
+sleep 1
+runtest "basic relative" 'checkit "$RSYNC -avR ./$deepstr \"$todir\"" "$chkdir" "$todir"'
+
+ln $deepstr/filelist $deepstr/dir
+ln ../chk/$deepstr/filelist ../chk/$deepstr/dir
+# Work around time rounding/truncating issue by touching both dirs.
+touch -r $deepstr/dir $deepstr/dir ../chk/$deepstr/dir
+runtest "hard links" 'checkit "$RSYNC -avHR ./$deepstr/ \"$todir\"" "$chkdir" "$todir"'
+
+cp "$deepdir/text" "$todir/$deepstr/ThisShouldGo"
+cp "$deepdir/text" "$todir/$deepstr/dir/ThisShouldGoToo"
+runtest "deletion" 'checkit "$RSYNC -avHR --del ./$deepstr/ \"$todir\"" "$chkdir" "$todir"'
+
+runtest "non-deletion" 'checkit "$RSYNC -aiHR --del ./$deepstr/ \"$todir\"" "$chkdir" "$todir"' \
+    | tee "$outfile"
+
+# Make sure no files were deleted
+grep 'deleting ' "$outfile" && test_fail "Erroneous deletions occurred!"
+
+# Relative with merging.
+$RSYNC -ai "$extradir/down" "$chkdir/"
+
+checkit "$RSYNC -aiR $deepstr '$extrafile' '$todir'" "$chkdir" "$todir"
+
+checkit "$RSYNC -aiR --del $deepstr '$extrafile' '$todir'" "$chkdir" "$todir" \
+    | tee "$outfile"
+
+# Make sure no files were deleted
+grep 'deleting ' "$outfile" && test_fail "Erroneous deletions occurred! (2)"
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0

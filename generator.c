@@ -229,13 +229,11 @@ static int read_delay_line(char *buf, int *flags_p)
 		*flags_p = 0;
 
 	if (sscanf(bp, "%x ", &mode) != 1) {
-		goto invalid_data;
+	  invalid_data:
+		rprintf(FERROR, "ERROR: invalid data in delete-delay file.\n");
+		return -1;
 	}
-	past_space = strchr(bp, ' ');
-	if (!past_space) {
-		goto invalid_data;
-	}
-	past_space++;
+	past_space = strchr(bp, ' ') + 1;
 	len = j - read_pos - (past_space - bp) + 1; /* count the '\0' */
 	read_pos = j + 1;
 
@@ -249,10 +247,6 @@ static int read_delay_line(char *buf, int *flags_p)
 	memcpy(buf, past_space, len);
 
 	return mode;
-
-invalid_data:
-	rprintf(FERROR, "ERROR: invalid data in delete-delay file.\n");
-	return -1;
 }
 
 static void do_delayed_deletions(char *delbuf)
@@ -990,7 +984,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 		if (find_exact_for_existing) {
 			if (alt_dest_type == LINK_DEST && real_st.st_dev == sxp->st.st_dev && real_st.st_ino == sxp->st.st_ino)
 				return -1;
-			if (do_unlink_at(fname) < 0 && errno != ENOENT)
+			if (do_unlink(fname) < 0 && errno != ENOENT)
 				goto got_nothing_for_ya;
 		}
 #ifdef SUPPORT_HARD_LINKS
@@ -1118,7 +1112,7 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 		 && !IS_SPECIAL(file->mode) && !IS_DEVICE(file->mode)
 #endif
 		 && !S_ISDIR(file->mode)) {
-			if (do_link_at(cmpbuf, fname) < 0) {
+			if (do_link(cmpbuf, fname) < 0) {
 				rsyserr(FERROR_XFER, errno,
 					"failed to hard-link %s with %s",
 					cmpbuf, fname);
@@ -1321,7 +1315,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				}
 			}
 			if (relative_paths && !implied_dirs && file->mode != 0
-			 && do_stat_at(dn, &sx.st) < 0) {
+			 && do_stat(dn, &sx.st) < 0) {
 				if (dry_run)
 					goto parent_is_dry_missing;
 				if (make_path(fname, MKP_DROP_NAME | MKP_SKIP_SLASH) < 0) {
@@ -1433,7 +1427,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			 && (stype == FT_DIR
 			  || delete_item(fname, sx.st.st_mode, del_opts | DEL_FOR_DIR) != 0))
 				goto cleanup; /* Any errors get reported later. */
-			if (do_mkdir_at(fname, (file->mode|added_perms) & 0700) == 0)
+			if (do_mkdir(fname, (file->mode|added_perms) & 0700) == 0)
 				file->flags |= FLAG_DIR_CREATED;
 			goto cleanup;
 		}
@@ -1475,10 +1469,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			itemize(fnamecmp, file, ndx, statret, &sx,
 				statret ? ITEM_LOCAL_CHANGE : 0, 0, NULL);
 		}
-		if (real_ret != 0 && do_mkdir_at(fname,file->mode|added_perms) < 0 && errno != EEXIST) {
+		if (real_ret != 0 && do_mkdir(fname,file->mode|added_perms) < 0 && errno != EEXIST) {
 			if (!relative_paths || errno != ENOENT
 			 || make_path(fname, MKP_DROP_NAME | MKP_SKIP_SLASH) < 0
-			 || (do_mkdir_at(fname, file->mode|added_perms) < 0 && errno != EEXIST)) {
+			 || (do_mkdir(fname, file->mode|added_perms) < 0 && errno != EEXIST)) {
 				rsyserr(FERROR_XFER, errno,
 					"recv_generator: mkdir %s failed",
 					full_fname(fname));
@@ -1505,7 +1499,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 #ifdef HAVE_CHMOD
 		if (!am_root && (file->mode & S_IRWXU) != S_IRWXU && dir_tweaking) {
 			mode_t mode = file->mode | S_IRWXU;
-			if (do_chmod_at(fname, mode) < 0) {
+			if (do_chmod(fname, mode) < 0) {
 				rsyserr(FERROR_XFER, errno,
 					"failed to modify permissions on %s",
 					full_fname(fname));
@@ -1814,7 +1808,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		;
 	else if (quick_check_ok(FT_REG, fnamecmp, file, &sx.st)) {
 		if (partialptr) {
-			do_unlink_at(partialptr);
+			do_unlink(partialptr);
 			handle_partial_dir(partialptr, PDIR_DELETE);
 		}
 		set_file_attrs(fname, file, &sx, NULL, maybe_ATTRS_REPORT | maybe_ATTRS_ACCURATE_TIME);
@@ -1902,7 +1896,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			back_file = NULL;
 			goto cleanup;
 		}
-		if ((f_copy = do_open_at(backupptr, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, 0600)) < 0) {
+		if ((f_copy = do_open(backupptr, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, 0600)) < 0) {
 			rsyserr(FERROR_XFER, errno, "open %s", full_fname(backupptr));
 			unmake_file(back_file);
 			back_file = NULL;
@@ -2022,7 +2016,7 @@ int atomic_create(struct file_struct *file, char *fname, const char *slnk, const
 
 	if (slnk) {
 #ifdef SUPPORT_LINKS
-		if (do_symlink_at(slnk, create_name) < 0) {
+		if (do_symlink(slnk, create_name) < 0) {
 			rsyserr(FERROR_XFER, errno, "symlink %s -> \"%s\" failed",
 				full_fname(create_name), slnk);
 			return 0;
@@ -2038,7 +2032,7 @@ int atomic_create(struct file_struct *file, char *fname, const char *slnk, const
 		return 0;
 #endif
 	} else {
-		if (do_mknod_at(create_name, file->mode, rdev) < 0) {
+		if (do_mknod(create_name, file->mode, rdev) < 0) {
 			rsyserr(FERROR_XFER, errno, "mknod %s failed",
 				full_fname(create_name));
 			return 0;
@@ -2046,14 +2040,14 @@ int atomic_create(struct file_struct *file, char *fname, const char *slnk, const
 	}
 
 	if (!skip_atomic) {
-		if (do_rename_at(tmpname, fname) < 0) {
+		if (do_rename(tmpname, fname) < 0) {
 			char *full_tmpname = strdup(full_fname(tmpname));
 			if (full_tmpname == NULL)
 				out_of_memory("atomic_create");
 			rsyserr(FERROR_XFER, errno, "rename %s -> \"%s\" failed",
 				full_tmpname, full_fname(fname));
 			free(full_tmpname);
-			do_unlink_at(tmpname);
+			do_unlink(tmpname);
 			return 0;
 		}
 	}
@@ -2117,7 +2111,7 @@ static void touch_up_dirs(struct file_list *flist, int ndx)
 			continue;
 		fname = f_name(file, NULL);
 		if (fix_dir_perms)
-			do_chmod_at(fname, file->mode);
+			do_chmod(fname, file->mode);
 		if (need_retouch_dir_times) {
 			STRUCT_STAT st;
 			if (link_stat(fname, &st, 0) == 0 && mtime_differs(&st, file)) {
@@ -2152,8 +2146,6 @@ void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
 			if (send_failed)
 				ndx = get_hlink_num();
 			flist = flist_for_ndx(ndx, "check_for_finished_files.1");
-			if (ndx < flist->ndx_start)
-				exit_cleanup(RERR_PROTOCOL);
 			file = flist->files[ndx - flist->ndx_start];
 			assert(file->flags & FLAG_HLINKED);
 			if (send_failed)
@@ -2182,8 +2174,6 @@ void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
 
 			flist = cur_flist;
 			cur_flist = flist_for_ndx(ndx, "check_for_finished_files.2");
-			if (ndx < cur_flist->ndx_start)
-				exit_cleanup(RERR_PROTOCOL);
 
 			file = cur_flist->files[ndx - cur_flist->ndx_start];
 			if (solo_file)

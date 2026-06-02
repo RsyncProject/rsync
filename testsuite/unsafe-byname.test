@@ -1,0 +1,58 @@
+#!/bin/sh
+
+# Copyright (C) 2002 by Martin Pool
+
+# Call directly into unsafe_symlink and test its handling of various filenames
+
+. "$suitedir/rsync.fns"
+
+test_unsafe() {
+    # $1 is the target of a symlink
+    # $2 is the directory we're copying
+    # $3 is the expected outcome: "safe" if the link lies within $2,
+    # or "unsafe" otherwise
+
+    result=`"$TOOLDIR/t_unsafe" "$1" "$2"` || test_fail "Failed to check $1 $2"
+    if [ "$result" != "$3" ]; then
+        test_fail "t_unsafe $1 $2 returned \"$result\", expected \"$3\""
+    fi
+}
+
+test_unsafe file			from				safe
+test_unsafe dir/file			from				safe
+test_unsafe dir/./file			from				safe
+test_unsafe dir/.			from				safe
+test_unsafe dir/			from				safe
+
+test_unsafe /etc/passwd 		from				unsafe
+test_unsafe //../etc/passwd		from				unsafe
+test_unsafe //./etc/passwd		from				unsafe
+
+test_unsafe ./foo			from				safe
+test_unsafe ../foo			from				unsafe
+test_unsafe ./../foo			from				unsafe
+test_unsafe .//../foo			from				unsafe
+test_unsafe ./../foo			from/..				unsafe
+test_unsafe ../dest			from/dir			safe
+test_unsafe ../../dest			from//dir			unsafe
+test_unsafe ..//../dest 		from/dir			unsafe
+
+test_unsafe ..				from/file			safe
+test_unsafe ../..			from/file			unsafe
+test_unsafe ..//..			from//file			unsafe
+test_unsafe dir/..			from				unsafe
+test_unsafe dir/../..			from				unsafe
+test_unsafe dir/..//..			from				unsafe
+
+test_unsafe ''				from				unsafe
+
+# Based on tests from unsafe-links by Vladimír Michl
+test_unsafe ../../unsafe/unsafefile	from/safe			unsafe
+test_unsafe ..//../unsafe/unsafefile	from/safe			unsafe
+test_unsafe ../files/file1		from/safe			safe
+
+test_unsafe ../../unsafe/unsafefile	safe				unsafe
+test_unsafe ../files/file1		safe				unsafe
+
+test_unsafe ../../unsafe/unsafefile	`pwd`/from/safe			safe
+test_unsafe ../files/file1		`pwd`/from/safe			safe

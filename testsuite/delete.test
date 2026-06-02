@@ -1,0 +1,57 @@
+#!/bin/sh
+
+# Copyright (C) 2005-2022 Wayne Davison
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Test rsync handling of various delete directives.
+
+. "$suitedir/rsync.fns"
+
+hands_setup
+
+makepath "$chkdir" "$todir/extradir" "$todir/emptydir/subdir"
+
+echo extra >"$todir"/remove1
+echo extra >"$todir"/remove2
+echo extra >"$todir"/extradir/remove3
+echo extra >"$todir"/emptydir/subdir/remove4
+
+# Create two chk dirs, one with a copy of the source files, and one with
+# what we expect to be left behind by the copy using --remove-source-files.
+# Also, make sure that --dry-run --del doesn't output anything extraneous.
+$RSYNC -av "$fromdir/" "$chkdir/copy/" >"$tmpdir/copy.out" 2>&1
+cat "$tmpdir/copy.out"
+grep -E -v '^(created directory|sent|total size) ' "$tmpdir/copy.out" >"$tmpdir/copy.new"
+mv "$tmpdir/copy.new" "$tmpdir/copy.out"
+
+$RSYNC -avn --del "$fromdir/" "$chkdir/copy2/" >"$tmpdir/copy2.out" 2>&1 || true
+cat "$tmpdir/copy2.out"
+grep -E -v '^(created directory|sent|total size) ' "$tmpdir/copy2.out" >"$tmpdir/copy2.new"
+mv "$tmpdir/copy2.new" "$tmpdir/copy2.out"
+
+diff $diffopt "$tmpdir/copy.out" "$tmpdir/copy2.out"
+
+$RSYNC -av -f 'exclude,! */' "$fromdir/" "$chkdir/empty/"
+
+checkit "$RSYNC -avv --del --remove-source-files '$fromdir/' '$todir/'" "$chkdir/copy" "$todir"
+
+diff -r "$chkdir/empty" "$fromdir"
+
+# Make sure that "P" but not "-" per-dir merge-file filters take effect with
+# --delete-excluded.
+cat >"$todir/filters" <<EOF
+P foo
+- bar
+EOF
+touch "$todir/foo" "$todir/bar" "$todir/baz"
+
+$RSYNC -r --exclude=baz --filter=': filters' --delete-excluded "$fromdir/" "$todir/"
+
+test -f "$todir/foo" || test_fail "rsync should NOT have deleted $todir/foo"
+test -f "$todir/bar" && test_fail "rsync SHOULD have deleted $todir/bar"
+test -f "$todir/baz" && test_fail "rsync SHOULD have deleted $todir/baz"
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0

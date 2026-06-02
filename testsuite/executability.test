@@ -1,0 +1,47 @@
+#!/bin/sh
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Test the --executability or -E option. -- Matt McCutchen
+
+. $suitedir/rsync.fns
+
+# Put some files in the From directory
+mkdir "$fromdir"
+cat <<EOF >"$fromdir/1"
+#!/bin/sh
+echo 'Program One!'
+EOF
+cat <<EOF >"$fromdir/2"
+#!/bin/sh
+echo 'Program Two!'
+EOF
+
+chmod 1700 "$fromdir/1" || test_skipped "Can't chmod"
+chmod 600 "$fromdir/2"
+
+$RSYNC -rvv "$fromdir/" "$todir/"
+
+check_perms "$todir/1" rwx------ 1
+check_perms "$todir/2" rw------- 1
+
+# Mix up the permissions a bit
+chmod 600 "$fromdir/1"
+chmod 601 "$fromdir/2"
+chmod 604 "$todir/2"
+
+$RSYNC -rvv "$fromdir/" "$todir/"
+
+# No -E, so nothing should have changed
+check_perms "$todir/1" rwx------ 2
+check_perms "$todir/2" rw----r-- 2
+
+$RSYNC -rvvE "$fromdir/" "$todir/"
+
+# Now things should have happened!
+check_perms "$todir/1" rw------- 3
+check_perms "$todir/2" rwx---r-x 3
+
+# Hooray
+exit 0

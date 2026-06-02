@@ -1,0 +1,124 @@
+#!/bin/bash
+# This script makes it easy to update the ftp & html directories on the samba.org server.
+# It expects the 2 *_DEST directories to contain updated files that need to be sent to
+# the remote server. If these directories don't exist yet, they will be copied from the
+# remote server (while also making the html dir a git checkout).
+
+FTP_SRC="$HOME/samba-rsync-ftp"
+HTML_SRC="$HOME/samba-rsync-html"
+
+FTP_DEST="/home/ftp/pub/rsync"
+HTML_DEST="/home/httpd/html/rsync"
+
+HTML_GIT='git.samba.org:/data/git/rsync-web.git'
+
+export RSYNC_PARTIAL_DIR=''
+
+case "$RSYNC_SAMBA_HOST" in
+    *.samba.org) ;;
+    *)
+	echo "You must set RSYNC_SAMBA_HOST in your environment to the samba hostname to use." >&2
+	exit 1
+	;;
+esac
+
+MODE=''
+REVERSE=''
+while (( $# )); do
+    case "$1" in
+	-R|--reverse) REVERSE=yes ;;
+	f|ftp) MODE=ftp ;;
+	h|html) MODE=html ;;
+	-h|--help)
+	    echo "Usage: [-R] [f|ftp|h|html]"
+	    echo "-R --reverse  Copy the files from the server to the local host."
+	    echo "              The default is to update the remote files."
+	    echo "-h --help     Output this help message."
+	    echo " "
+	    echo "The script will prompt if ftp or html is not specified on the command line."
+	    echo "Only one category can be copied at a time. When pulling html files, a git"
+	    echo "checkout will be either created or updated prior to the rsync copy."
+	    exit
+	    ;;
+	*)
+	    echo "Invalid option: $1" >&2
+	    exit 1
+	    ;;
+    esac
+    shift
+done
+
+while [ ! "$MODE" ]; do
+    if [ "$REVERSE" = yes ]; then
+	DIRECTION=FROM
+    else
+	DIRECTION=TO
+    fi
+    echo -n "Copy which files $DIRECTION the server? ftp or html? "
+    read ans
+    case "$ans" in
+	f*) MODE=ftp ;;
+	h*) MODE=html ;;
+	'') exit 1 ;;
+	*) echo "You must answer f or h to copy the ftp or html data." ;;
+    esac
+done
+
+if [ "$MODE" = ftp ]; then
+    SRC_DIR="$FTP_SRC"
+    DEST_DIR="$FTP_DEST"
+    FILT=".filt"
+else
+    SRC_DIR="$HTML_SRC"
+    DEST_DIR="$HTML_DEST"
+    FILT="filt"
+fi
+
+function do_rsync {
+    rsync --dry-run "${@}" | grep -v 'is uptodate$'
+    echo ''
+    echo -n "Run without --dry-run? [n] "
+    read ans
+    case "$ans" in
+	y*) rsync "${@}" | grep -v 'is uptodate$' ;;
+    esac
+}
+
+if [ -d "$SRC_DIR" ]; then
+    REVERSE_RSYNC=do_rsync
+else
+    echo "The directory $SRC_DIR does not exist yet."
+    echo -n "Do you want to create it? [n] "
+    read ans
+    case "$ans" in
+	y*) ;;
+	*) exit 1 ;;
+    esac
+    REVERSE=yes
+    REVERSE_RSYNC=rsync
+fi
+
+if [ "$REVERSE" = yes ]; then
+    OPTS='-aivOHP'
+    TMP_FILT="$SRC_DIR/tmp-filt"
+    echo "Copying files from $RSYNC_SAMBA_HOST to $SRC_DIR ..."
+    if [ "$MODE" = html ]; then
+	if [ $REVERSE_RSYNC = rsync ]; then
+	    git clone "$HTML_GIT" "$SRC_DIR" || exit 1
+	else
+	    cd "$SRC_DIR" || exit 1
+	    git pull || exit 1
+	fi
+	sed -n -e 's/[-P]/H/p' "$SRC_DIR/$FILT" >"$TMP_FILT"
+	OPTS="${OPTS}f._$TMP_FILT"
+    else
+	OPTS="${OPTS}f:_$FILT"
+    fi
+    $REVERSE_RSYNC "$OPTS" "$RSYNC_SAMBA_HOST:$DEST_DIR/" "$SRC_DIR/"
+    rm -f "$TMP_FILT"
+    exit
+fi
+
+cd "$SRC_DIR" || exit 1
+echo "Copying files from $SRC_DIR to $RSYNC_SAMBA_HOST ..."
+do_rsync -aivOHP --chown=:rsync --del -f._$FILT . "$RSYNC_SAMBA_HOST:$DEST_DIR/"

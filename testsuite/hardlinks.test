@@ -1,0 +1,88 @@
+#!/bin/sh
+
+# Copyright (C) 2002 by Martin Pool <mbp@samba.org>
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Test rsync handling of hardlinks.  By default, rsync does not detect
+# hard links and they get sent as separate files.  If you specify -H,
+# then hard links are detected and linked together on the receiver.
+
+. "$suitedir/rsync.fns"
+
+SSH="$scratchdir/src/support/lsh.sh"
+
+# Build some hardlinks
+
+fromdir="$scratchdir/from"
+todir="$scratchdir/to"
+
+# TODO: Need to test whether hardlinks are possible on this OS/filesystem
+
+mkdir "$fromdir"
+name1="$fromdir/name1"
+name2="$fromdir/name2"
+name3="$fromdir/name3"
+name4="$fromdir/name4"
+echo "This is the file" > "$name1"
+ln "$name1" "$name2" || test_skipped "Can't create hardlink"
+ln "$name2" "$name3" || test_fail "Can't create hardlink"
+cp "$name2" "$name4" || test_fail "Can't copy file"
+cat $srcdir/*.c >"$fromdir/text"
+
+checkit "$RSYNC -aHivv --debug=HLINK5 '$fromdir/' '$todir/'" "$fromdir" "$todir"
+
+echo "extra extra" >>"$todir/name1"
+
+checkit "$RSYNC -aHivv --debug=HLINK5 --no-whole-file '$fromdir/' '$todir/'" "$fromdir" "$todir"
+
+# Add a new link in a new subdirectory to test that we don't try to link
+# the files before the directory gets created.  We also create a bunch of
+# extra files to ensure that an incremental-recursion transfer works across
+# distant files.
+makepath "$fromdir/subdir/down/deep"
+
+files=''
+for x in a b c d e f g h i j k l m n o p q r s t u v w x y z 0 1 2 3 4 5 6 7 8 9; do
+    for y in a b c d e f g h i j k l m n o p q r s t u v w x y z 0 1 2 3 4 5 6 7 8 9; do
+	files="$files $x$y"
+    done
+done
+(cd "$fromdir/subdir"; touch $files)
+
+ln "$name1" "$fromdir/subdir/down/deep/new-file"
+rm "$todir/text"
+
+checkit "$RSYNC -aHivve '$SSH' --debug=HLINK5 --rsync-path='$RSYNC' '$fromdir/' localhost:'$todir/'" "$fromdir" "$todir"
+
+# Do some duplicate copies using --link-dest and --copy-dest to test that
+# we hard-link all locally-inherited items.
+checkit "$RSYNC -aHivv --debug=HLINK5 --link-dest='$todir' '$fromdir/' '$chkdir/'" "$todir" "$chkdir"
+
+rm -rf "$chkdir"
+checkit "$RSYNC -aHivv --debug=HLINK5 --copy-dest='$todir' '$fromdir/' '$chkdir/'" "$fromdir" "$chkdir"
+
+# Create a hard link that has only one part in the hierarchy.
+echo "This is another file" >"$fromdir/solo"
+ln "$fromdir/solo" "$chkdir/solo" || test_fail "Can't create hardlink"
+
+# Make sure that the checksum data doesn't slide due to an HLINK_BUMP() change.
+checktee "$RSYNC -aHivc --debug=HLINK5 '$fromdir/' '$chkdir/'"
+grep solo "$outfile" && test_fail "Erroneous copy of solo file occurred!"
+
+# Make sure there's nothing wrong with sending a single file with -H
+# enabled (this has broken twice so far, so we need this test).
+rm -rf "$todir"
+$RSYNC -aHivv --debug=HLINK5 "$name1" "$todir/"
+diff $diffopt "$name1" "$todir" || test_fail "solo copy of name1 failed"
+
+# Make sure there's nothing wrong with sending a single directory with -H
+# enabled (this has broken in 3.4.0 so far, so we need this test).
+rm -rf "$fromdir" "$todir"
+makepath "$fromdir/sym" "$todir"
+$RSYNC -aH "$fromdir/sym" "$todir"
+diff $diffopt "$fromdir" "$todir" || test_fail "solo copy of sym failed"
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0

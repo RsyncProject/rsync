@@ -1,0 +1,244 @@
+#!/usr/bin/env -S python3 -B
+
+# This script is used to turn one or more of the "patch/BASE/*" branches
+# into one or more diffs in the "patches" directory.  Pass the option
+# --gen if you want generated files in the diffs.  Pass the name of
+# one or more diffs if you want to just update a subset of all the
+# diffs.
+
+import os, sys, re, argparse, time, shutil
+
+sys.path = ['packaging'] + sys.path
+
+from pkglib import *
+
+MAKE_GEN_CMDS = [
+        './prepare-source'.split(),
+        'cd build && if test -f config.status ; then ./config.status ; else ../configure ; fi',
+        'make -C build gen'.split(),
+        ]
+TMP_DIR = "patches.gen"
+
+os.environ['GIT_MERGE_AUTOEDIT'] = 'no'
+
+def main():
+    global master_commit, parent_patch, description, completed, last_touch
+
+    if not os.path.isdir(args.patches_dir):
+        die(f'No "{args.patches_dir}" directory was found.')
+    if not os.path.isdir('.git'):
+        die('No ".git" directory present in the current dir.')
+
+    starting_branch, args.base_branch = check_git_state(args.base_branch, not args.skip_check, args.patches_dir)
+
+    master_commit = latest_git_hash(args.base_branch)
+
+    if cmd_txt_chk(['packaging/prep-auto-dir']).out == '':
+        die('You must setup an auto-build-save dir to use this script.')
+
+    if args.gen:
+        if os.path.lexists(TMP_DIR):
+            die(f'"{TMP_DIR}" must not exist in the current directory.')
+        gen_files = get_gen_files()
+        os.mkdir(TMP_DIR, 0o700)
+        for cmd in MAKE_GEN_CMDS:
+            cmd_chk(cmd)
+        cmd_chk(['rsync', '-a', *gen_files, f'{TMP_DIR}/master/'])
+
+    last_touch = int(time.time())
+
+    # Start by finding all patches so that we can load all possible parents.
+    patches = sorted(list(get_patch_branches(args.base_branch)))
+
+    parent_patch = { }
+    description = { }
+
+    for patch in patches:
+        branch = f"patch/{args.base_branch}/{patch}"
+        desc = ''
+        proc = cmd_pipe(['git', 'diff', '-U1000', f"{args.base_branch}...{branch}", '--', f"PATCH.{patch}"])
+        in_diff = False
+        for line in proc.stdout:
+            if in_diff:
+                if not re.match(r'^[ +]', line):
+                    continue
+                line = line[1:]
+                m = re.search(r'patch -p1 <patches/(\S+)\.diff', line)
+                if m and m[1] != patch:
+                    parpat = parent_patch[patch] = m[1]
+                    if not parpat in patches:
+                        die(f"Parent of {patch} is not a local branch: {parpat}")
+                desc += line
+            elif re.match(r'^@@ ', line):
+                in_diff = True
+        description[patch] = desc
+        proc.communicate()
+
+    if args.patch_files: # Limit the list of patches to actually process
+        valid_patches = patches
+        patches = [ ]
+        for fn in args.patch_files:
+            name = re.sub(r'\.diff$', '', re.sub(r'.+/', '', fn))
+            if name not in valid_patches:
+                die(f"Local branch not available for patch: {name}")
+            patches.append(name)
+
+    completed = set()
+
+    for patch in patches:
+        if patch in completed:
+            continue
+        if not update_patch(patch):
+            break
+
+    if args.gen:
+        shutil.rmtree(TMP_DIR)
+
+    while last_touch >= int(time.time()):
+        time.sleep(1)
+    cmd_chk(['git', 'checkout', starting_branch])
+    cmd_chk(['packaging/prep-auto-dir'], discard='output')
+
+
+def update_patch(patch):
+    global last_touch
+
+    completed.add(patch) # Mark it as completed early to short-circuit any (bogus) dependency loops.
+
+    parent = parent_patch.get(patch, None)
+    if parent:
+        if parent not in completed:
+            if not update_patch(parent):
+                return 0
+        based_on = parent = f"patch/{args.base_branch}/{parent}"
+    else:
+        parent = args.base_branch
+        based_on = master_commit
+
+    print(f"======== {patch} ========")
+
+    while args.gen and last_touch >= int(time.time()):
+        time.sleep(1)
+
+    branch = f"patch/{args.base_branch}/{patch}"
+    s = cmd_run(['git', 'checkout', branch])
+    if s.returncode != 0:
+        return 0
+
+    s = cmd_run(['git', 'merge', based_on])
+    ok = s.returncode == 0
+    skip_shell = False
+    if not ok or args.cmd or args.make or args.shell:
+        cmd_chk(['packaging/prep-auto-dir'], discard='output')
+    if not ok:
+        print(f'"git merge {based_on}" incomplete -- please fix.')
+        if not run_a_shell(parent, patch):
+            return 0
+        if not args.make and not args.cmd:
+            skip_shell = True
+    if args.make:
+        if cmd_run(['packaging/smart-make']).returncode != 0:
+            if not run_a_shell(parent, patch):
+                return 0
+            if not args.cmd:
+                skip_shell = True
+    if args.cmd:
+        if cmd_run(args.cmd).returncode != 0:
+            if not run_a_shell(parent, patch):
+                return 0
+            skip_shell = True
+    if args.shell and not skip_shell:
+        if not run_a_shell(parent, patch):
+            return 0
+
+    with open(f"{args.patches_dir}/{patch}.diff", 'w', encoding='utf-8') as fh:
+        fh.write(description[patch])
+        fh.write(f"\nbased-on: {based_on}\n")
+
+        if args.gen:
+            gen_files = get_gen_files()
+            for cmd in MAKE_GEN_CMDS:
+                cmd_chk(cmd)
+            cmd_chk(['rsync', '-a', *gen_files, f"{TMP_DIR}/{patch}/"])
+        else:
+            gen_files = [ ]
+        last_touch = int(time.time())
+
+        proc = cmd_pipe(['git', 'diff', based_on])
+        skipping = False
+        for line in proc.stdout:
+            if skipping:
+                if not re.match(r'^diff --git a/', line):
+                    continue
+                skipping = False
+            elif re.match(r'^diff --git a/PATCH', line):
+                skipping = True
+                continue
+            if not re.match(r'^index ', line):
+                fh.write(line)
+        proc.communicate()
+
+        if args.gen:
+            e_tmp_dir = re.escape(TMP_DIR)
+            diff_re  = re.compile(r'^(diff -Nurp) %s/[^/]+/(.*?) %s/[^/]+/(.*)' % (e_tmp_dir, e_tmp_dir))
+            minus_re = re.compile(r'^\-\-\- %s/[^/]+/([^\t]+)\t.*' % e_tmp_dir)
+            plus_re  = re.compile(r'^\+\+\+ %s/[^/]+/([^\t]+)\t.*' % e_tmp_dir)
+
+            if parent == args.base_branch:
+                parent_dir = 'master'
+            else:
+                m = re.search(r'([^/]+)$', parent)
+                parent_dir = m[1]
+
+            proc = cmd_pipe(['diff', '-Nurp', f"{TMP_DIR}/{parent_dir}", f"{TMP_DIR}/{patch}"])
+            for line in proc.stdout:
+                line = diff_re.sub(r'\1 a/\2 b/\3', line)
+                line = minus_re.sub(r'--- a/\1', line)
+                line =  plus_re.sub(r'+++ b/\1', line)
+                fh.write(line)
+            proc.communicate()
+
+    return 1
+
+
+def run_a_shell(parent, patch):
+    m = re.search(r'([^/]+)$', parent)
+    parent_dir = m[1]
+    os.environ['PS1'] = f"[{parent_dir}] {patch}: "
+
+    while True:
+        s = cmd_run([os.environ.get('SHELL', '/bin/sh')])
+        if s.returncode != 0:
+            ans = input("Abort? [n/y] ")
+            if re.match(r'^y', ans, flags=re.I):
+                return False
+            continue
+        cur_branch, is_clean, status_txt = check_git_status(0)
+        if is_clean:
+            break
+        print(status_txt, end='')
+
+    cmd_run('rm -f build/*.o build/*/*.o')
+
+    return True
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Turn a git branch back into a diff files in the patches dir.", add_help=False)
+    parser.add_argument('--branch', '-b', dest='base_branch', metavar='BASE_BRANCH', default='master', help="The branch the patch is based on. Default: master.")
+    parser.add_argument('--skip-check', action='store_true', help="Skip the check that ensures starting with a clean branch.")
+    parser.add_argument('--make', '-m', action='store_true', help="Run the smart-make script in every patch branch.")
+    parser.add_argument('--cmd', '-c', help="Run a command in every patch branch.")
+    parser.add_argument('--shell', '-s', action='store_true', help="Launch a shell for every patch/BASE/* branch updated, not just when a conflict occurs.")
+    parser.add_argument('--gen', metavar='DIR', nargs='?', const='', help='Include generated files. Optional DIR value overrides the default of using the "patches" dir.')
+    parser.add_argument('--patches-dir', '-p', metavar='DIR', default='patches', help="Override the location of the rsync-patches dir. Default: patches.")
+    parser.add_argument('patch_files', metavar='patches/DIFF_FILE', nargs='*', help="Specify what patch diff files to process. Default: all of them.")
+    parser.add_argument("--help", "-h", action="help", help="Output this help message and exit.")
+    args = parser.parse_args()
+    if args.gen == '':
+        args.gen = args.patches_dir
+    elif args.gen is not None:
+        args.patches_dir = args.gen
+    main()
+
+# vim: sw=4 et ft=python

@@ -1,0 +1,41 @@
+#!/bin/sh
+
+# Copyright (C) 2004-2022 Wayne Davison
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Test that various read-only and set[ug]id permissions work properly,
+# even when using a --temp-dir option (which we try to point at a
+# different filesystem than the destination dir).
+
+. "$suitedir/rsync.fns"
+
+hands_setup
+
+sdev=`$TOOLDIR/getfsdev $scratchdir`
+tdev=$sdev
+
+for tmpdir2 in "${RSYNC_TEST_TMP:-/override-tmp-not-specified}" /run/shm /var/tmp /tmp; do
+    [ -d "$tmpdir2" ] && [ -w "$tmpdir2" ] || continue
+    tdev=`$TOOLDIR/getfsdev "$tmpdir2"`
+    [ x$sdev != x$tdev ] && break
+done
+
+[ x$sdev = x$tdev ] && test_skipped "Can't find a tmp dir on a different file system"
+
+chmod 440 "$fromdir/text"
+chmod 500 "$fromdir/dir/text"
+e="$fromdir/dir/subdir/foobar.baz"
+chmod 6450 "$e" || chmod 2450 "$e" || chmod 1450 "$e" || chmod 450 "$e"
+e="$fromdir/dir/subdir/subsubdir/etc-ltr-list"
+chmod 2670 "$e" || chmod 1670 "$e" || chmod 670 "$e"
+
+# First a normal copy.
+runtest "normal copy" 'checkit "$RSYNC -avv --temp-dir=\"$tmpdir2\" \"$fromdir/\" \"$todir\"" "$fromdir" "$todir"'
+
+# Then we update all the files.
+runtest "update copy" 'checkit "$RSYNC -avvI --no-whole-file --temp-dir=\"$tmpdir2\" \"$fromdir/\" \"$todir\"" "$fromdir" "$todir"'
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0

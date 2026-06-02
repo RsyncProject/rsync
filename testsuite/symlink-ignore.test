@@ -1,0 +1,34 @@
+#!/bin/sh
+
+# Copyright (C) 2001 by Martin Pool <mbp@samba.org>
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Test rsync's somewhat over-featured symlink control: the default
+# behaviour is that symlinks should not be copied at all.
+
+. "$suitedir/rsync.fns"
+
+build_symlinks || test_fail "failed to build symlinks"
+
+# Copy recursively, but without -l or -L or -a, and all the symlinks
+# should be missing.
+$RSYNC -r "$fromdir/" "$todir" || test_fail "$RSYNC returned $?"
+
+[ -f "$todir/referent" ] || test_fail "referent was not copied"
+[ -d "$todir/from" ] && test_fail "extra level of directories"
+if is_a_link "$todir/dangling"; then
+    test_fail "dangling symlink was copied"
+fi
+
+if is_a_link "$todir/relative"; then
+    test_fail "relative symlink was copied"
+fi
+
+if is_a_link "$todir/absolute"; then
+    test_fail "absolute symlink was copied"
+fi
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0

@@ -1,0 +1,34 @@
+#!/bin/sh
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Test three bugs fixed by my redoing of the missing_below logic.
+
+. $suitedir/rsync.fns
+
+makepath "$fromdir/subdir" "$todir"
+echo data >"$fromdir/subdir/file"
+echo data >"$todir/other"
+
+# Test 1: Too much "not creating new..." output on a dry run
+$RSYNC -n -r --ignore-non-existing -vv "$fromdir/" "$todir/" | tee "$scratchdir/out"
+if grep 'not creating new.*subdir/file' "$scratchdir/out" >/dev/null; then
+	test_fail 'test 1 failed'
+fi
+
+case "$RSYNC" in
+*protocol=29*) # FIXME can we get past the new flist sanity check in protocol 29?
+	echo "Skipped test 2 for protocol 29."
+	;;
+*)
+	# Test 2: Attempt to make a fuzzy dirlist for a dir not created on a dry run
+	$RSYNC -n -r -R --no-implied-dirs -y "$fromdir/./subdir/file" "$todir/" \
+		|| test_fail 'test 2 failed'
+	;;
+esac
+
+# Test 3: --delete-after pass skipped when last dir is dry-missing
+$RSYNC -n -r --delete-after -i "$fromdir/" "$todir/" | tee "$scratchdir/out"
+grep '^\*deleting * other' "$scratchdir/out" >/dev/null \
+	|| test_fail 'test 3 failed'

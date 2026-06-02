@@ -1,0 +1,174 @@
+#!/usr/bin/env -S python3 -B
+
+# This script turns one or more diff files in the patches dir (which is
+# expected to be a checkout of the rsync-patches git repo) into a branch
+# in the main rsync git checkout. This allows the applied patch to be
+# merged with the latest rsync changes and tested.  To update the diff
+# with the resulting changes, see the patch-update script.
+
+import os, sys, re, argparse, glob
+
+sys.path = ['packaging'] + sys.path
+
+from pkglib import *
+
+def main():
+    global created, info, local_branch
+
+    cur_branch, args.base_branch = check_git_state(args.base_branch, not args.skip_check, args.patches_dir)
+
+    local_branch = get_patch_branches(args.base_branch)
+
+    if args.delete_local_branches:
+        for name in sorted(local_branch):
+            branch = f"patch/{args.base_branch}/{name}"
+            cmd_chk(['git', 'branch', '-D', branch])
+        local_branch = set()
+
+    if args.add_missing:
+        for fn in sorted(glob.glob(f"{args.patches_dir}/*.diff")):
+            name = re.sub(r'\.diff$', '', re.sub(r'.+/', '', fn))
+            if name not in local_branch and fn not in args.patch_files:
+                args.patch_files.append(fn)
+
+    if not args.patch_files:
+        return
+
+    for fn in args.patch_files:
+        if not fn.endswith('.diff'):
+            die(f"Filename is not a .diff file: {fn}")
+        if not os.path.isfile(fn):
+            die(f"File not found: {fn}")
+
+    scanned = set()
+    info = { }
+
+    patch_list = [ ]
+    for fn in args.patch_files:
+        m = re.match(r'^(?P<dir>.*?)(?P<name>[^/]+)\.diff$', fn)
+        patch = argparse.Namespace(**m.groupdict())
+        if patch.name in scanned:
+            continue
+        patch.fn = fn
+
+        lines = [ ]
+        commit_hash = None
+        with open(patch.fn, 'r', encoding='utf-8') as fh:
+            for line in fh:
+                m = re.match(r'^based-on: (\S+)', line)
+                if m:
+                    commit_hash = m[1]
+                    break
+                if (re.match(r'^index .*\.\..* \d', line)
+                 or re.match(r'^diff --git ', line)
+                 or re.match(r'^--- (old|a)/', line)):
+                    break
+                lines.append(re.sub(r'\s*\Z', "\n", line, 1))
+        info_txt = ''.join(lines).strip() + "\n"
+        lines = None
+
+        parent = args.base_branch
+        patches = re.findall(r'patch -p1 <%s/(\S+)\.diff' % args.patches_dir, info_txt)
+        if patches:
+            last = patches.pop()
+            if last != patch.name:
+                warn(f"No identity patch line in {patch.fn}")
+                patches.append(last)
+            if patches:
+                parent = patches.pop()
+                if parent not in scanned:
+                    diff_fn = patch.dir + parent + '.diff'
+                    if not os.path.isfile(diff_fn):
+                        die(f"Failed to find parent of {patch.fn}: {parent}")
+                    # Add parent to args.patch_files so that we will look for the
+                    # parent's parent.  Any duplicates will be ignored.
+                    args.patch_files.append(diff_fn)
+        else:
+            warn(f"No patch lines found in {patch.fn}")
+
+        info[patch.name] = [ parent, info_txt, commit_hash ]
+
+        patch_list.append(patch)
+
+    created = set()
+    for patch in patch_list:
+        create_branch(patch)
+
+    cmd_chk(['git', 'checkout', args.base_branch])
+
+
+def create_branch(patch):
+    if patch.name in created:
+        return
+    created.add(patch.name)
+
+    parent, info_txt, commit_hash = info[patch.name]
+    parent = argparse.Namespace(dir=patch.dir, name=parent, fn=patch.dir + parent + '.diff')
+
+    if parent.name == args.base_branch:
+        parent_branch = commit_hash if commit_hash else args.base_branch
+    else:
+        create_branch(parent)
+        parent_branch = '/'.join(['patch', args.base_branch, parent.name])
+
+    branch = '/'.join(['patch', args.base_branch, patch.name])
+    print("\n" + '=' * 64)
+    print(f"Processing {branch} ({parent_branch})")
+
+    if patch.name in local_branch:
+        cmd_chk(['git', 'branch', '-D', branch])
+
+    cmd_chk(['git', 'checkout', '-b', branch, parent_branch])
+
+    info_fn = 'PATCH.' + patch.name
+    with open(info_fn, 'w', encoding='utf-8') as fh:
+        fh.write(info_txt)
+    cmd_chk(['git', 'add', info_fn])
+
+    with open(patch.fn, 'r', encoding='utf-8') as fh:
+        patch_txt = fh.read()
+
+    cmd_run('patch -p1'.split(), input=patch_txt)
+
+    for fn in glob.glob('*.orig') + glob.glob('*/*.orig'):
+        os.unlink(fn)
+
+    pos = 0
+    new_file_re = re.compile(r'\nnew file mode (?P<mode>\d+)\s+--- /dev/null\s+\+\+\+ b/(?P<fn>.+)')
+    while True:
+        m = new_file_re.search(patch_txt, pos)
+        if not m:
+            break
+        os.chmod(m['fn'], int(m['mode'], 8))
+        cmd_chk(['git', 'add', m['fn']])
+        pos = m.end()
+
+    while True:
+        cmd_chk('git status'.split())
+        ans = input('Press Enter to commit, Ctrl-C to abort, or type a wild-name to add a new file: ')
+        if ans == '':
+            break
+        cmd_chk("git add " + ans, shell=True)
+
+    while True:
+        s = cmd_run(['git', 'commit', '-a', '-m', f"Creating branch from {patch.name}.diff."])
+        if not s.returncode:
+            break
+        s = cmd_run([os.environ.get('SHELL', '/bin/sh')])
+        if s.returncode:
+            die('Aborting due to shell error code')
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Create a git patch branch from an rsync patch file.", add_help=False)
+    parser.add_argument('--branch', '-b', dest='base_branch', metavar='BASE_BRANCH', default='master', help="The branch the patch is based on. Default: master.")
+    parser.add_argument('--add-missing', '-a', action='store_true', help="Add a branch for every patches/*.diff that doesn't have a branch.")
+    parser.add_argument('--skip-check', action='store_true', help="Skip the check that ensures starting with a clean branch.")
+    parser.add_argument('--delete', dest='delete_local_branches', action='store_true', help="Delete all the local patch/BASE/* branches, not just the ones that are being recreated.")
+    parser.add_argument('--patches-dir', '-p', metavar='DIR', default='patches', help="Override the location of the rsync-patches dir. Default: patches.")
+    parser.add_argument('patch_files', metavar='patches/DIFF_FILE', nargs='*', help="Specify what patch diff files to process. Default: all of them.")
+    parser.add_argument("--help", "-h", action="help", help="Output this help message and exit.")
+    args = parser.parse_args()
+    main()
+
+# vim: sw=4 et ft=python

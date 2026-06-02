@@ -1,0 +1,45 @@
+#!/bin/sh
+
+# Copyright (C) 2008-2020 Wayne Davison
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Test that --files-from=FILE works right.
+
+. "$suitedir/rsync.fns"
+
+SSH="$scratchdir/src/support/lsh.sh"
+
+hands_setup
+
+# This list of files skips the contents of "subsubdir" but includes
+# the contents of "subsubdir2" due to its trailing slash.
+cat >"$scratchdir/filelist" <<EOT
+from/./
+from/./dir/subdir
+from/./dir/subdir/subsubdir
+from/./dir/subdir/subsubdir2/
+from/./dir/subdir/foobar.baz
+EOT
+
+# Create a chkdir without the content that we expect to be omitted.
+$RSYNC -a --exclude=dir/text --exclude='subsubdir/**' "$fromdir/" "$chkdir/"
+
+checkit "$RSYNC -av --files-from='$scratchdir/filelist' '$scratchdir' '$todir/'" "$chkdir" "$todir"
+
+for filehost in '' 'localhost:'; do
+    for srchost in '' 'localhost:'; do
+	if [ -z "$srchost" ]; then
+	    desthost='localhost:'
+	else
+	    desthost=''
+	fi
+
+	rm -rf "$todir"
+	checkit "$RSYNC -avse '$SSH' --rsync-path='$RSYNC' --files-from='$filehost$scratchdir/filelist' '$srchost$scratchdir' '$desthost$todir/'" "$chkdir" "$todir"
+    done
+done
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0

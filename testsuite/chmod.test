@@ -1,0 +1,30 @@
+#!/bin/sh
+
+# Copyright (C) 2004-2022 Wayne Davison
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Test that various read-only and set[ug]id permissions work properly,
+# even when using a --temp-dir option (which we try to point at a
+# different filesystem than the destination dir).
+
+. "$suitedir/rsync.fns"
+
+hands_setup
+
+chmod 440 "$fromdir/text"
+chmod 500 "$fromdir/dir/text"
+e="$fromdir/dir/subdir/foobar.baz"
+chmod 6450 "$e" || chmod 2450 "$e" || chmod 1450 "$e" || chmod 450 "$e"
+e="$fromdir/dir/subdir/subsubdir/etc-ltr-list"
+chmod 2670 "$e" || chmod 1670 "$e" || chmod 670 "$e"
+
+# First a normal copy.
+runtest "normal copy" 'checkit "$RSYNC -avv \"$fromdir/\" \"$todir\"" "$fromdir" "$todir"'
+
+# Then we update all the files.
+runtest "update copy" 'checkit "$RSYNC -avvI --no-whole-file \"$fromdir/\" \"$todir\"" "$fromdir" "$todir"'
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0

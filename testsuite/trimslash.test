@@ -1,0 +1,26 @@
+#!/bin/sh
+
+# Copyright (C) 2002 by Martin Pool <mbp@samba.org>
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Test tiny function to trim trailing slashes.
+
+. "$suitedir/rsync.fns"
+
+"$TOOLDIR/trimslash" "/usr/local/bin" "/usr/local/bin/" "/usr/local/bin///" \
+	"//a//" "////" \
+        "/Users/Weird Macintosh Name/// Ooh, translucent plastic/" \
+	> "$scratchdir/slash.out"
+diff $diffopt "$scratchdir/slash.out" - <<EOF
+/usr/local/bin
+/usr/local/bin
+/usr/local/bin
+//a
+/
+/Users/Weird Macintosh Name/// Ooh, translucent plastic
+EOF
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0

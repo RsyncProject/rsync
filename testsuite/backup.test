@@ -1,0 +1,63 @@
+#!/bin/sh
+
+# Copyright (C) 2004-2022 Wayne Davison
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Test that the --backup option works right.
+
+. "$suitedir/rsync.fns"
+
+bakdir="$tmpdir/bak"
+
+makepath "$fromdir/deep" "$bakdir/dname"
+name1="$fromdir/deep/name1"
+name2="$fromdir/deep/name2"
+
+cat "$srcdir"/[gr]*.[ch] > "$name1"
+cat "$srcdir"/[et]*.[ch] > "$name2"
+
+checkit "$RSYNC -ai --info=backup '$fromdir/' '$todir/'" "$fromdir" "$todir"
+
+checkit "$RSYNC -ai --info=backup '$fromdir/' '$chkdir/'" "$fromdir" "$chkdir"
+cat "$srcdir"/[fgpr]*.[ch] > "$name1"
+cat "$srcdir"/[etw]*.[ch] > "$name2"
+
+checktee "$RSYNC -ai --info=backup --no-whole-file --backup '$fromdir/' '$todir/'"
+for fn in deep/name1 deep/name2; do
+    grep "backed up $fn to $fn~" "$outfile" >/dev/null || test_fail "no backup message output for $fn"
+    diff $diffopt "$fromdir/$fn" "$todir/$fn" || test_fail "copy of $fn failed"
+    diff $diffopt "$chkdir/$fn" "$todir/$fn~" || test_fail "backup of $fn to $fn~ failed"
+    mv "$todir/$fn~" "$todir/$fn"
+done
+
+echo deleted-file >"$todir/dname"
+cp_touch "$todir/dname" "$chkdir"
+
+checkit "$RSYNC -ai --info=backup --no-whole-file --delete-delay \
+    --backup --backup-dir='$bakdir' '$fromdir/' '$todir/'" "$fromdir" "$todir" \
+    | tee "$outfile"
+
+for fn in deep/name1 deep/name2; do
+    grep "backed up $fn to .*/$fn$" "$outfile" >/dev/null || test_fail "no backup message output for $fn"
+done
+diff -r $diffopt "$chkdir" "$bakdir" || test_fail "backup dir contents are bogus"
+rm "$bakdir/dname"
+
+checkit "$RSYNC -ai --info=backup --del '$fromdir/' '$chkdir/'" "$fromdir" "$chkdir"
+cat "$srcdir"/[efgr]*.[ch] > "$name1"
+cat "$srcdir"/[ew]*.[ch] > "$name2"
+
+checkit "$RSYNC -ai --info=backup --inplace --no-whole-file --backup --backup-dir='$bakdir' '$fromdir/' '$todir/'" "$fromdir" "$todir" \
+    | tee "$outfile"
+
+for fn in deep/name1 deep/name2; do
+    grep "backed up $fn to .*/$fn$" "$outfile" >/dev/null || test_fail "no backup message output for $fn"
+done
+diff -r $diffopt "$chkdir" "$bakdir" || test_fail "backup dir contents are bogus"
+
+checkit "$RSYNC -ai --info=backup --inplace --no-whole-file '$fromdir/' '$bakdir/'" "$fromdir" "$bakdir"
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0

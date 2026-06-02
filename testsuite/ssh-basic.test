@@ -1,0 +1,34 @@
+#!/bin/sh
+
+# Copyright (C) 1998,1999 Philip Hands <phil@hands.com>
+# Copyright (C) 2001 by Martin Pool <mbp@samba.org>
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING)
+
+# This script tests ssh, if possible.  It's called by runtests.sh
+
+. "$suitedir/rsync.fns"
+
+SSH="$scratchdir/src/support/lsh.sh"
+
+if test x"$rsync_enable_ssh_tests" = xyes; then
+    if type ssh >/dev/null; then
+	SSH=ssh
+    fi
+fi
+
+if [ "`$SSH -o'BatchMode yes' localhost echo yes`" != "yes" ]; then
+    test_skipped "Skipping SSH tests because ssh connection to localhost not authorised"
+fi
+
+echo "Using remote shell: $SSH"
+
+# Create some files for rsync to copy
+hands_setup
+
+runtest "ssh: basic test" 'checkit "$RSYNC -avH -e \"$SSH\" --rsync-path=\"$RSYNC\" \"$fromdir/\" \"localhost:$todir\"" "$fromdir/" "$todir"'
+
+mv "$todir/text" "$todir/ThisShouldGo"
+
+runtest "ssh: renamed file" 'checkit "$RSYNC --delete -avH -e \"$SSH\" --rsync-path=\"$RSYNC\" \"$fromdir/\" \"localhost:$todir\"" "$fromdir/" "$todir"'

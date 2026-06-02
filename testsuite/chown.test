@@ -1,0 +1,86 @@
+#!/bin/sh
+
+# Copyright (C) 2002 by Martin Pool <mbp@samba.org>
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Test that when rsync is running as root and has -a it correctly sets
+# the ownership of the destination.
+
+# We don't know what users will be present on this system, so we just
+# use random numeric uids and gids.
+
+. "$suitedir/rsync.fns"
+
+case $0 in
+*fake*)
+    $RSYNC -VV | grep '"xattrs": true' >/dev/null || test_skipped "Rsync needs xattrs for fake device tests"
+    RSYNC="$RSYNC --fake-super"
+    TLS_ARGS="$TLS_ARGS --fake-super"
+    case "$HOST_OS" in
+    darwin*)
+	chown() {
+	    own=$1
+	    shift
+	    xattr -s 'rsync.%stat' "100644 0,0 $own" "${@}"
+	}
+	;;
+    solaris*)
+	chown() {
+	    own=$1
+	    shift
+	    for fn in "${@}"; do
+		runat "$fn" "$SHELL_PATH" <<EOF
+echo "100644 0,0 $own" > rsync.%stat
+EOF
+	    done
+	}
+	;;
+    freebsd*)
+	chown() {
+	    own=$1
+	    shift
+	    setextattr -h user "rsync.%stat" "100644 0,0 $own" "${@}"
+	}
+	;;
+    *)
+	chown() {
+	    own=$1
+	    shift
+	    setfattr -n 'user.rsync.%stat' -v "100644 0,0 $own" "${@}"
+	}
+	;;
+    esac
+    ;;
+*)
+    RSYNC="$RSYNC --super"
+    my_uid=`get_testuid`
+    root_uid=`get_rootuid`
+    if test x"$my_uid" = x; then
+	: # If "id" failed, try to continue...
+    elif test x"$my_uid" != x"$root_uid"; then
+	if [ -e "$FAKEROOT_PATH" ]; then
+	    echo "Let's try re-running the script under fakeroot..."
+	    exec "$FAKEROOT_PATH" "$SHELL_PATH" "$0"
+	fi
+    fi
+    ;;
+esac
+
+# Build some hardlinks
+
+mkdir "$fromdir"
+name1="$fromdir/name1"
+name2="$fromdir/name2"
+echo "This is the file" > "$name1"
+echo "This is the other file" > "$name2"
+
+chown 5000:5002 "$name1" || test_skipped "Can't chown (probably need root)"
+chown 5001:5003 "$name2" || test_skipped "Can't chown (probably need root)"
+
+cd "$fromdir/.."
+checkit "$RSYNC -aHvv from/ to/" "$fromdir" "$todir"
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0

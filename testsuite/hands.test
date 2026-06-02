@@ -1,0 +1,38 @@
+#!/bin/sh
+
+# Copyright (C) 1998, 1999 by Philip Hands <phil@hands.com>
+# Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
+#
+# This program is distributable under the terms of the GNU GPL (see COPYING)
+
+. "$suitedir/rsync.fns"
+
+hands_setup
+
+DEBUG_OPTS="--debug=all0,deltasum0"
+
+# Main script starts here
+
+runtest "basic operation" 'checkit "$RSYNC -av \"$fromdir/\" \"$todir\"" "$fromdir/" "$todir"'
+
+ln "$fromdir/filelist" "$fromdir/dir"
+runtest "hard links" 'checkit "$RSYNC -avH --bwlimit=0 $DEBUG_OPTS \"$fromdir/\" \"$todir\"" "$fromdir/" "$todir"'
+
+rm "$todir/text"
+runtest "one file" 'checkit "$RSYNC -avH $DEBUG_OPTS \"$fromdir/\" \"$todir\"" "$fromdir/" "$todir"'
+
+echo "extra line" >> "$todir/text"
+runtest "extra data" 'checkit "$RSYNC -avH $DEBUG_OPTS --no-whole-file \"$fromdir/\" \"$todir\"" "$fromdir/" "$todir"'
+
+cp "$fromdir/text" "$todir/ThisShouldGo"
+runtest " --delete" 'checkit "$RSYNC --delete -avH $DEBUG_OPTS \"$fromdir/\" \"$todir\"" "$fromdir/" "$todir"'
+
+cd "$tmpdir"
+rm -rf to from/*dir
+
+# Do the real copy, touch up the parent-dir's time, and then check the copy.
+$RSYNC -av from/* to/
+checkit "$RSYNC -av --exclude='*' from/ to/" "$fromdir" "$todir"
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0

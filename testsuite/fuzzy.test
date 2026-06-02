@@ -1,0 +1,24 @@
+#!/bin/sh
+
+# Copyright (C) 2005-2022 Wayne Davison
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Test rsync handling of the --fuzzy option.
+
+. "$suitedir/rsync.fns"
+
+mkdir "$fromdir"
+mkdir "$todir"
+
+cp_p "$srcdir"/rsync.c "$fromdir"/rsync.c
+cp_touch "$fromdir"/rsync.c "$todir"/rsync2.c
+sleep 1
+
+# Let's do it!
+checkit "$RSYNC -avvi --no-whole-file --fuzzy --delete-delay \
+    '$fromdir/' '$todir/'" "$fromdir" "$todir"
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0

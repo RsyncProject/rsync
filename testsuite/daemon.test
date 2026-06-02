@@ -1,0 +1,90 @@
+#!/bin/sh
+
+# Copyright (C) 2001 by Martin Pool <mbp@samba.org>
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING)
+
+# We don't really want to start the server listening, because that
+# might interfere with the security or operation of the test machine.
+# Instead we use the fake-connect feature to dynamically assign a pair
+# of ports.
+
+# Having started the server we try some basic operations against it:
+
+# getting a list of module
+# listing files in a module
+# retrieving a module
+# uploading to a module
+# checking the log file
+# password authentication
+
+. "$suitedir/rsync.fns"
+
+SSH="src/support/lsh.sh --no-cd"
+FILE_REPL='s/^\([^d][^ ]*\) *\(..........[0-9]\) /\1 \2 /'
+DIR_REPL='s/^\(d[^ ]*\)  *[0-9][.,0-9]* /\1         DIR /'
+LS_REPL='s;[0-9][0-9][0-9][0-9]/[0-9][0-9]/[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9] ;####/##/## ##:##:## ;g'
+
+build_rsyncd_conf
+
+makepath "$fromdir/foo" "$fromdir/bar/baz"
+makepath "$todir"
+echo one >"$fromdir/foo/one"
+echo two >"$fromdir/bar/two"
+echo three >"$fromdir/bar/baz/three"
+
+cd "$scratchdir"
+
+ln -s test-rsyncd.conf rsyncd.conf
+
+my_uid=`get_testuid`
+root_uid=`get_rootuid`
+confopt=''
+if test x"$my_uid" = x"$root_uid"; then
+    # Root needs to specify the config file, or it uses /etc/rsyncd.conf.
+    echo "Forcing --config=$conf"
+    confopt=" --config=$conf"
+fi
+
+# These have a space-padded 15-char name, then a tab, then a comment.
+sed 's/NOCOMMENT//' <<EOT >"$chkfile"
+test-from      	r/o
+test-to        	r/w
+test-scratch   	NOCOMMENT
+EOT
+
+checkdiff2 "$RSYNC -ve '$SSH' --rsync-path='$RSYNC$confopt' localhost::"
+echo '===='
+
+RSYNC_CONNECT_PROG="$RSYNC --config=$conf --daemon"
+export RSYNC_CONNECT_PROG
+
+checkdiff2 "$RSYNC -v localhost::"
+echo '===='
+
+checkdiff "$RSYNC -r localhost::test-hidden" \
+	"sed -e '$FILE_REPL' -e '$DIR_REPL' -e '$LS_REPL'" <<EOT
+drwxr-xr-x         DIR ####/##/## ##:##:## .
+drwxr-xr-x         DIR ####/##/## ##:##:## bar
+-rw-r--r--           4 ####/##/## ##:##:## bar/two
+drwxr-xr-x         DIR ####/##/## ##:##:## bar/baz
+-rw-r--r--           6 ####/##/## ##:##:## bar/baz/three
+drwxr-xr-x         DIR ####/##/## ##:##:## foo
+-rw-r--r--           4 ####/##/## ##:##:## foo/one
+EOT
+
+checkdiff "$RSYNC -r localhost::test-from/f*" \
+	"sed -e '$FILE_REPL' -e '$DIR_REPL' -e '$LS_REPL'" <<EOT
+drwxr-xr-x         DIR ####/##/## ##:##:## foo
+-rw-r--r--           4 ####/##/## ##:##:## foo/one
+EOT
+diff $diffopt "$chkfile" "$outfile" || test_fail "test 3 failed"
+
+if $RSYNC -VV | grep '"atimes": true' >/dev/null; then
+    checkdiff "$RSYNC -rU localhost::test-from/f*" \
+	"sed -e '$FILE_REPL' -e '$DIR_REPL' -e '$LS_REPL'" <<EOT
+drwxr-xr-x         DIR ####/##/## ##:##:##                     foo
+-rw-r--r--           4 ####/##/## ##:##:## ####/##/## ##:##:## foo/one
+EOT
+fi

@@ -1,0 +1,66 @@
+#!/bin/sh
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Test that rsync obeys default ACLs. -- Matt McCutchen
+
+. $suitedir/rsync.fns
+
+$RSYNC -VV | grep '"ACLs": true' >/dev/null || test_skipped "Rsync is configured without ACL support"
+
+case "$setfacl_nodef" in
+true) test_skipped "I don't know how to use your setfacl command" ;;
+*-k*) opts='-dm u::7,g::5,o:5' ;;
+*) opts='-m d:u::7,d:g::5,d:o:5' ;;
+esac
+setfacl $opts "$scratchdir" || test_skipped "Your filesystem has ACLs disabled"
+
+# Call as: testit <dirname> <default-acl> <file-expected> <program-expected>
+testit() {
+    todir="$scratchdir/$1"
+    mkdir "$todir"
+    $setfacl_nodef "$todir"
+    if [ -n "$2" ]; then
+	case "$setfacl_nodef" in
+	*-k*) opts="-dm $2" ;;
+	*) opts="-m `echo $2 | sed 's/\([ugom]:\)/d:\1/g'`"
+	esac
+	setfacl $opts "$todir"
+    fi
+    # Make sure we obey ACLs when creating a directory to hold multiple transferred files,
+    # even though the directory itself is outside the transfer
+    $RSYNC -rvv "$scratchdir/dir" "$scratchdir/file" "$scratchdir/program" "$todir/to/"
+    check_perms "$todir/to" $4 "Target $1"
+    check_perms "$todir/to/dir" $4 "Target $1"
+    check_perms "$todir/to/file" $3 "Target $1"
+    check_perms "$todir/to/program" $4 "Target $1"
+    # Make sure get_local_name doesn't mess us up when transferring only one file
+    $RSYNC -rvv "$scratchdir/file" "$todir/to/anotherfile"
+    check_perms "$todir/to/anotherfile" $3 "Target $1"
+    # Make sure we obey default ACLs when not transferring a regular file
+    $RSYNC -rvv "$scratchdir/dir/" "$todir/to/anotherdir/"
+    check_perms "$todir/to/anotherdir" $4 "Target $1"
+}
+
+mkdir "$scratchdir/dir"
+echo "File!" >"$scratchdir/file"
+echo "#!/bin/sh" >"$scratchdir/program"
+chmod 777 "$scratchdir/dir"
+chmod 666 "$scratchdir/file"
+chmod 777 "$scratchdir/program"
+
+# Test some target directories
+umask 0077
+testit da777 u::7,g::7,o:7 rw-rw-rw- rwxrwxrwx
+testit da775 u::7,g::7,o:5 rw-rw-r-- rwxrwxr-x
+testit da750 u::7,g::5,o:0 rw-r----- rwxr-x---
+testit da750mask u::7,u:0:7,g::7,m:5,o:0 rw-r----- rwxr-x---
+testit noda1 '' rw------- rwx------
+umask 0000
+testit noda2 '' rw-rw-rw- rwxrwxrwx
+umask 0022
+testit noda3 '' rw-r--r-- rwxr-xr-x
+
+# Hooray
+exit 0

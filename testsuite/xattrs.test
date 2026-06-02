@@ -1,0 +1,239 @@
+#!/bin/sh
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Test that rsync handles basic xattr preservation.
+
+. $suitedir/rsync.fns
+lnkdir="$tmpdir/lnk"
+
+$RSYNC -VV | grep '"xattrs": true' >/dev/null || test_skipped "Rsync is configured without xattr support"
+
+case "$HOST_OS" in
+darwin*)
+    xset() {
+	xnam="$1"
+	xval="$2"
+	shift 2
+	xattr -s "$xnam" "$xval" "${@}"
+    }
+    xls() {
+	xattr -l "${@}" | sed "s/^[ $tab_ch]*//"
+    }
+    RSYNC_PREFIX='rsync'
+    RUSR='rsync.nonuser'
+    ;;
+solaris*)
+    xset() {
+	xnam="$1"
+	xval="$2"
+	shift 2
+	for fn in "${@}"; do
+	    runat "$fn" "$SHELL_PATH" <<EOF
+echo "${xval}" > "${xnam}"
+EOF
+	done
+    }
+    xls() {
+	for fn in "${@}"; do
+	    runat "$fn" "$SHELL_PATH" <<EOF
+for x in *; do echo "\$x=\`cat \$x\`"; done
+EOF
+       done
+    }
+    RSYNC_PREFIX='rsync'
+    RUSR='rsync.nonuser'
+    ;;
+freebsd*)
+    xset() {
+	xnam="$1"
+	xval="$2"
+	shift 2
+	setextattr -h user "$xnam" "$xval" "${@}"
+    }
+    xls() {
+	for f in "${@}"; do lsextattr -q -h user "$f" | tr '[[:space:]]' '\n' | sort | xargs -I % getextattr -h user % "$f"; done
+    }
+    RSYNC_PREFIX='rsync'
+    RUSR='rsync'
+    ;;
+*)
+    xset() {
+	xnam="$1"
+	xval="$2"
+	shift 2
+	setfattr -n "$xnam" -v "$xval" "${@}"
+    }
+    xls() {
+	getfattr -d "${@}"
+    }
+    RSYNC_PREFIX='user.rsync'
+    RUSR='user.rsync'
+    ;;
+esac
+
+makepath "$lnkdir" "$fromdir/foo/bar"
+echo now >"$fromdir/file0"
+echo something >"$fromdir/file1"
+echo else >"$fromdir/file2"
+echo deep >"$fromdir/foo/file3"
+echo normal >"$fromdir/file4"
+echo deeper >"$fromdir/foo/bar/file5"
+
+makepath "$chkdir/foo"
+echo wow >"$chkdir/file1"
+cp_touch "$fromdir/foo/file3" "$chkdir/foo"
+
+dirs='foo foo/bar'
+files='file0 file1 file2 foo/file3 file4 foo/bar/file5'
+
+uid_gid=`"$TOOLDIR/tls" "$fromdir/foo" | sed 's/^.* \([0-9][0-9]*\)\.\([0-9][0-9]*\) .*/\1:\2/'`
+
+cd "$fromdir"
+
+xset user.foo foo file0 2>/dev/null || test_skipped "Unable to set an xattr"
+xset user.bar bar file0
+
+xset user.short 'this is short' file1
+xset user.long 'this is a long attribute that will be truncated in the initial data send' file1
+xset user.good 'this is good' file1
+xset user.nice 'this is nice' file1
+
+xset user.foo foo file2
+xset user.bar bar file2
+xset user.long 'a long attribute for our new file that tests to ensure that this works' file2
+
+xset user.dir1 'need to test directory xattrs too' foo
+xset user.dir2 'another xattr' foo
+xset user.dir3 'this is one last one for the moment' foo
+
+xset user.dir4 'another dir test' foo/bar
+xset user.dir5 'one last one' foo/bar
+
+xset user.foo 'new foo' foo/file3 foo/bar/file5
+xset user.bar 'new bar' foo/file3 foo/bar/file5
+xset user.long 'this is also a long attribute that will be truncated in the initial data send' foo/file3 foo/bar/file5
+xset $RUSR.equal 'this long attribute should remain the same and not need to be transferred' foo/file3 foo/bar/file5
+
+xset user.dir0 'old extra value' "$chkdir/foo"
+xset user.dir1 'old dir value' "$chkdir/foo"
+
+xset user.short 'old short' "$chkdir/file1"
+xset user.extra 'remove me' "$chkdir/file1"
+
+xset user.foo 'old foo' "$chkdir/foo/file3"
+xset $RUSR.equal 'this long attribute should remain the same and not need to be transferred' "$chkdir/foo/file3"
+
+case $0 in
+*hlink*)
+    ln foo/bar/file5 foo/bar/file6 || test_skipped "Can't create hardlink"
+    files="$files foo/bar/file6"
+    dashH='-H'
+    altDest='--link-dest'
+    ;;
+*)
+    dashH=''
+    altDest='--copy-dest'
+    ;;
+esac
+
+xls $dirs $files >"$scratchdir/xattrs.txt"
+
+XFILT='-f-x_system.* -f-x_security.*'
+
+# OK, let's try a simple xattr copy.
+checkit "$RSYNC -avX $XFILT $dashH --super . '$chkdir/'" "$fromdir" "$chkdir"
+
+cd "$chkdir"
+xls $dirs $files | diff $diffopt "$scratchdir/xattrs.txt" -
+
+cd "$fromdir"
+
+if [ -n "$dashH" ]; then
+    for fn in $files; do
+	name=`basename $fn`
+	ln $fn ../lnk/$name
+    done
+fi
+
+checkit "$RSYNC -aiX $XFILT $dashH --super $altDest=../chk . ../to" "$fromdir" "$todir"
+
+cd "$todir"
+xls $dirs $files | diff $diffopt "$scratchdir/xattrs.txt" -
+
+[ -n "$dashH" ] && rm -rf "$lnkdir"
+
+cd "$fromdir"
+rm -rf "$todir"
+
+xset user.nice 'this is nice, but different' file1
+
+xls $dirs $files >"$scratchdir/xattrs.txt"
+
+checkit "$RSYNC -aiX $XFILT $dashH --fake-super --link-dest=../chk . ../to" "$chkdir" "$todir"
+
+cd "$todir"
+xls $dirs $files | diff $diffopt "$scratchdir/xattrs.txt" -
+
+sed -n -e '/^[^d ][^ ]*  *[^ ][^ ]*  *[^ ][^ ]*  *1 /p' "$scratchdir/ls-to" >"$scratchdir/ls-diff-all"
+grep -F -v './file1' "$scratchdir/ls-diff-all" >"$scratchdir/ls-diff" || :
+if [ -s "$scratchdir/ls-diff" ]; then
+    echo "Missing hard links on:"
+    cat "$scratchdir/ls-diff"
+    exit 1
+fi
+if [ ! -s "$scratchdir/ls-diff-all" ]; then
+    echo "Too many hard links on file1!"
+    exit 1
+fi
+
+cd "$chkdir"
+chmod go-rwx . $dirs $files
+
+xset user.nice 'this is nice, but different' file1
+xset $RSYNC_PREFIX.%stat "40000 0,0 $uid_gid" $dirs
+xset $RSYNC_PREFIX.%stat "100000 0,0 $uid_gid" $files
+
+xls $dirs $files >"$scratchdir/xattrs.txt"
+
+cd "$fromdir"
+rm -rf "$todir"
+
+# When run by a non-root tester, this checks if no-user-perm files/dirs can be copied.
+checkit "$RSYNC -aiX $XFILT $dashH --fake-super --chmod=a= . ../to" "$chkdir" "$todir" # 2>"$scratchdir/errors.txt"
+
+cd "$todir"
+xls $dirs $files | diff $diffopt "$scratchdir/xattrs.txt" -
+
+cd "$fromdir"
+rm -rf "$todir" "$chkdir"
+
+$RSYNC -aX file1 file2
+$RSYNC -aX file1 file2 ../chk/
+$RSYNC -aX --del ../chk/ .
+$RSYNC -aX file1 ../lnk/
+[ -n "$dashH" ] && ln "$chkdir/file1" ../lnk/extra-link
+
+xls file1 file2 >"$scratchdir/xattrs.txt"
+
+checkit "$RSYNC -aiiX $XFILT $dashH $altDest=../lnk . ../to" "$chkdir" "$todir"
+
+[ -n "$dashH" ] && rm ../lnk/extra-link
+
+cd "$todir"
+xls file1 file2 | diff $diffopt "$scratchdir/xattrs.txt" -
+
+cd "$fromdir"
+rm "$todir/file2"
+
+echo extra >file1
+$RSYNC -aX . ../chk/
+
+checkit "$RSYNC -aiiX $XFILT . ../to" "$chkdir" "$todir"
+
+cd "$todir"
+xls file1 file2 | diff $diffopt "$scratchdir/xattrs.txt" -
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0
