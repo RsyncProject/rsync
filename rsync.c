@@ -496,6 +496,9 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	int inherit;
 	int dfd = -1;            /* held dir fd for the entry's own dir, or -1 */
 	const char *leaf = NULL; /* leaf of fname relative to dfd */
+#if defined SUPPORT_XATTRS || defined SUPPORT_ACLS
+	int held_fd = -1; /* held O_NOFOLLOW fd for fd-based xattr/ACL ops, or -1 */
+#endif
 
 	if (!sxp) {
 		if (dry_run)
@@ -519,6 +522,24 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		leaf = slash ? slash + 1 : fname;
 	}
 
+#if defined SUPPORT_XATTRS || defined SUPPORT_ACLS
+	/* Pin a regular-file/dir/fifo entry via the held dir fd with O_NOFOLLOW so
+	 * the xattr/ACL ops below act on the held inode (sys_f*xattr/fsetxattr),
+	 * not a re-resolved path a parent-symlink race could redirect.  O_NONBLOCK
+	 * stops a raced FIFO blocking the open; O_NOFOLLOW refuses a raced symlink
+	 * leaf.  A symlink/socket/device leaf or no held dfd leaves held_fd == -1,
+	 * and the ACL code then uses setxattrat(AT_SYMLINK_NOFOLLOW) or falls back.
+	 * Under --fake-super the ACL store stays an l-variant xattr and ignores it. */
+	if (dfd >= 0
+	 && (S_ISREG(sxp->st.st_mode) || S_ISDIR(sxp->st.st_mode) || S_ISFIFO(sxp->st.st_mode))
+	 && (preserve_xattrs || am_root < 0
+# ifdef SUPPORT_ACLS
+	     || (preserve_acls && am_root >= 0)
+# endif
+	    ))
+		held_fd = openat(dfd, leaf, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_NOCTTY | O_CLOEXEC);
+#endif
+
 	if (inherit && S_ISDIR(new_mode) && sxp->st.st_mode & S_ISGID) {
 		/* We just created this directory and its setgid
 		 * bit is on, so make sure it stays on. */
@@ -530,7 +551,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 
 #ifdef SUPPORT_ACLS
 	if (preserve_acls && !S_ISLNK(file->mode) && !ACL_READY(*sxp))
-		get_acl(fname, sxp);
+		get_acl_fdat(held_fd, dfd, leaf, fname, sxp);
 #endif
 
 	change_uid = am_root && uid_ndx && sxp->st.st_uid != (uid_t)F_OWNER(file);
@@ -586,9 +607,9 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 
 #ifdef SUPPORT_XATTRS
 	if (am_root < 0)
-		set_stat_xattr(fname, file, new_mode);
+		set_stat_xattr(fname, file, new_mode, held_fd);
 	if (preserve_xattrs && fnamecmp)
-		set_xattr(fname, file, fnamecmp, sxp);
+		set_xattr(fname, file, fnamecmp, sxp, held_fd);
 #endif
 
 	if ((omit_dir_times && S_ISDIR(sxp->st.st_mode))
@@ -663,7 +684,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	 * an access ACL, it changes sxp->st.st_mode so we know whether we
 	 * need to chmod(). */
 	if (preserve_acls && !S_ISLNK(new_mode)) {
-		if (set_acl(fname, file, sxp, new_mode) > 0)
+		if (set_acl_fdat(held_fd, dfd, leaf, fname, file, sxp, new_mode) > 0)
 			updated |= UPDATED_ACLS;
 	}
 #endif
@@ -691,6 +712,10 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 			rprintf(FCLIENT, "%s is uptodate\n", fname);
 	}
   cleanup:
+#if defined SUPPORT_XATTRS || defined SUPPORT_ACLS
+	if (held_fd >= 0)
+		close(held_fd);
+#endif
 	if (sxp == &sx2)
 		free_stat_x(&sx2);
 	return updated;
