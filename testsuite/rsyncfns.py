@@ -5,7 +5,7 @@ the Python-rewritten tests actually need; grow it as more shell tests are
 ported.
 
 Conventions matching the shell harness:
-  * Exit 0 = pass, 1 = fail, 77 = skip, 78 = xfail.
+  * Exit codes (see the Exit enum): 0=pass, 1=fail, 2=error, 77=skip, 78=xfail.
   * The runner sets these environment variables before invoking each test:
       scratchdir   per-test scratch directory
       srcdir       rsync source directory
@@ -31,6 +31,8 @@ import sys
 import time
 from pathlib import Path
 
+from exitcodes import Exit   # re-exported: tests may `from rsyncfns import Exit`
+
 
 # --- environment -----------------------------------------------------------
 
@@ -41,7 +43,7 @@ def _required(name: str) -> str:
             f"rsyncfns: required environment variable {name} is not set; "
             "run this test via runtests.py rather than directly.\n"
         )
-        sys.exit(2)
+        sys.exit(Exit.ERROR)
     return v
 
 
@@ -105,18 +107,18 @@ OUTFILE = SCRATCHDIR / 'rsync.out'
 
 def test_fail(msg: str) -> 'None':
     sys.stderr.write(msg.rstrip() + '\n')
-    sys.exit(1)
+    sys.exit(Exit.FAIL)
 
 
 def test_skipped(msg: str) -> 'None':
     sys.stderr.write(msg.rstrip() + '\n')
     (TMPDIR / 'whyskipped').write_text(msg.rstrip() + '\n')
-    sys.exit(77)
+    sys.exit(Exit.SKIP)
 
 
 def test_xfail(msg: str) -> 'None':
     sys.stderr.write(msg.rstrip() + '\n')
-    sys.exit(78)
+    sys.exit(Exit.XFAIL)
 
 
 # --- rsync invocation ------------------------------------------------------
