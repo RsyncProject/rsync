@@ -963,11 +963,40 @@ int recv_files(int f_in, int f_out, char *local_name)
 			if (fd2 == -1 && errno == EACCES) {
 				/* Maybe the error was due to protected_regular setting? */
 				if (use_secure_symlinks)
-					fd2 = secure_relative_open(NULL, fname, O_WRONLY, 0600);
+					fd2 = secure_relative_open(NULL, fnametmp, O_WRONLY, 0600);
 				else
-					fd2 = do_open(fname, O_WRONLY, 0600);
+					fd2 = do_open(fnametmp, O_WRONLY, 0600);
 			}
 #endif
+			if (fd2 == -1 && errno == EACCES) {
+				/* A read-only existing file: make it writable, then retry
+				 * (its mode is restored after the transfer).  On a
+				 * non-chroot daemon fchmod() a no-follow fd rather than
+				 * chmod the path, so a symlink raced into fnametmp can't
+				 * redirect the chmod (do_chmod_at follows the final link). */
+				int errno_save = errno, chmod_ok;
+				if (use_secure_symlinks) {
+#ifdef O_NOFOLLOW
+					int cfd = secure_relative_open(NULL, fnametmp, O_RDONLY|O_NOFOLLOW, 0);
+					chmod_ok = cfd != -1 && fchmod(cfd, 0600) == 0;
+					if (cfd != -1)
+						close(cfd);
+#else
+					/* Without O_NOFOLLOW the resolver's oldest fallback would
+					 * follow a raced symlink, so fail closed rather than
+					 * chmod through it. */
+					chmod_ok = 0;
+#endif
+				} else
+					chmod_ok = do_chmod_at(fnametmp, 0600) == 0;
+				if (chmod_ok) {
+					if (use_secure_symlinks)
+						fd2 = secure_relative_open(NULL, fnametmp, O_WRONLY, 0600);
+					else
+						fd2 = do_open(fnametmp, O_WRONLY, 0600);
+				} else
+					errno = errno_save;
+			}
 			if (fd2 == -1) {
 				rsyserr(FERROR_XFER, errno, "open %s failed",
 					full_fname(fnametmp));
