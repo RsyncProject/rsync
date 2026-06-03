@@ -353,9 +353,18 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[ ]], [[return 0;]])],
 CFLAGS="$OLD_CFLAGS"
 AC_SUBST(NOEXECSTACK)
 
+dnl We need both the SYS_openat2 syscall number and <linux/openat2.h> (for
+dnl struct open_how / RESOLVE_BENEATH); some setups have one without the other.
 AC_CACHE_CHECK([for openat2],rsync_cv_HAVE_OPENAT2,[
     AC_COMPILE_IFELSE([
-        AC_LANG_PROGRAM([[#include <sys/syscall.h>]], [[int i = SYS_openat2]])
+        AC_LANG_PROGRAM([[
+#include <sys/syscall.h>
+#include <linux/openat2.h>
+]], [[
+struct open_how how;
+how.resolve = RESOLVE_BENEATH;
+return SYS_openat2 + (int)how.resolve;
+]])
     ],
     [rsync_cv_HAVE_OPENAT2=yes], [rsync_cv_HAVE_OPENAT2=no])
 ])
