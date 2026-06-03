@@ -99,6 +99,27 @@ static int updating_basis_or_equiv;
  * Anything else is a straight pass-through that preserves the strict contract. */
 static int secure_basis_open(const char *basedir, const char *relpath, int flags, mode_t mode)
 {
+	extern int am_daemon, am_chrooted;
+
+	/* The confined resolver is only needed for the sanitizing daemon
+	 * (am_daemon && !am_chrooted, i.e. use_secure_symlinks).  Local /
+	 * remote-shell mode has no module boundary, and "use chroot = yes" makes
+	 * the kernel root the boundary, so there an alt-dest basis like
+	 * --link-dest=../01 must resolve against the cwd as a bare open did before
+	 * the hardening (confining it would reject the legitimate sibling "..",
+	 * #915). */
+	if (!am_daemon || am_chrooted) {
+		if (basedir) {
+			char fullpath[MAXPATHLEN];
+			if (pathjoin(fullpath, sizeof fullpath, basedir, relpath) >= sizeof fullpath) {
+				errno = ENAMETOOLONG;
+				return -1;
+			}
+			return do_open(fullpath, flags, mode);
+		}
+		return do_open(relpath, flags, mode);
+	}
+
 	if (!basedir && relpath && *relpath == '/') {
 		const char *slash = strrchr(relpath, '/');
 		const char *leaf = slash + 1;
@@ -859,7 +880,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 				basedir = basis_dir[0];
 				fnamecmp = fname;
 				fnamecmp_type = FNAMECMP_BASIS_DIR_LOW;
-				fd1 = secure_relative_open(basedir, fnamecmp, O_RDONLY, 0);
+				fd1 = secure_basis_open(basedir, fnamecmp, O_RDONLY, 0);
 			}
 		}
 
