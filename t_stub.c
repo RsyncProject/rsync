@@ -45,6 +45,8 @@ size_t max_alloc = (size_t)-1; /* test helpers are not memory-constrained;
 				* hits at its first my_strdup() call. */
 char *partial_dir;
 char *module_dir;
+/* curr_dir[]/curr_dir_len (read by secure_relative_open) are defined in
+ * syscall.c, which every helper links -- no stub needed here. */
 filter_rule_list daemon_filter_list;
 
  void rprintf(UNUSED(enum logcode code), const char *format, ...)
