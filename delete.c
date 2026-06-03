@@ -159,8 +159,26 @@ enum delret delete_item(char *fbuf, uint16 mode, uint16 flags)
 	}
 
 	if (S_ISDIR(mode)) {
-		what = "rmdir";
-		ok = do_rmdir_at(fbuf) == 0;
+		ok = 0;
+		if (make_backups > 0 && !(flags & DEL_FOR_BACKUP) && backup_dir) {
+			char *buf = get_backup_name(fbuf);
+			if (buf && do_rename_at(fbuf, buf) == 0) {
+				if (INFO_GTE(BACKUP, 1))
+					rprintf(FINFO, "backed up %s to %s\n", fbuf, buf);
+				what = "rename";
+				ok = 1;
+			} else if (buf && errno != EEXIST && errno != ENOTEMPTY
+			           && errno != EISDIR) {
+				/* Rename failed for an unexpected reason (e.g. EXDEV).
+				 * Warn and fall through to rmdir. */
+				rprintf(FWARNING, "skipping backup of directory %s: %s\n",
+				        fbuf, strerror(errno));
+			}
+		}
+		if (!ok) {
+			what = "rmdir";
+			ok = do_rmdir_at(fbuf) == 0;
+		}
 	} else {
 		if (make_backups > 0 && !(flags & DEL_FOR_BACKUP) && (backup_dir || !is_backup_file(fbuf))) {
 			what = "make_backup";
