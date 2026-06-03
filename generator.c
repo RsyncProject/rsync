@@ -1718,7 +1718,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		goto cleanup;
 	}
 
-	if (update_only > 0 && statret == 0 && file->modtime - sx.st.st_mtime < modify_window) {
+	if (update_only > 0 && statret == 0 && stype == ftype
+	 && file->modtime - sx.st.st_mtime < modify_window) {
 		if (INFO_GTE(SKIP, 1))
 			rprintf(FINFO, "%s is newer\n", fname);
 #ifdef SUPPORT_HARD_LINKS
