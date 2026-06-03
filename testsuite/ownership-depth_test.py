@@ -7,6 +7,10 @@ covered too. As a normal user we can still remap the group to a secondary group
 we belong to; the uid side then needs root and is skipped.
 """
 
+# Rerun under the fleet harness's non-root pass (testsuite/fleettest.py): the uid
+# remap only runs as root, so a non-root run exercises the group-only path too.
+fleet_nonroot = True
+
 import os
 
 from rsyncfns import (

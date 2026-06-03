@@ -1,0 +1,100 @@
+{
+  "_comment": [
+    "Example fleet definition for testsuite/fleettest.py -- this is one",
+    "maintainer's setup. Copy (or symlink) this file to testsuite/fleettest.json",
+    "and edit it for your own machines, or point at another file with --fleet PATH.",
+    "fleettest.json is git-ignored; this .example is the committed template.",
+    "",
+    "Each object under \"targets\" maps to fields of the Target dataclass in",
+    "fleettest.py. Required: name, ssh_host (null = run locally), workflow",
+    "(a file under .github/workflows, whose configure flags and RSYNC_EXPECT_SKIPPED",
+    "this target mirrors), configure_flags. Optional (with defaults): make (\"make\"),",
+    "python (\"python3\"), rsync_bin (\"rsync\"; \"rsync.exe\" on Cygwin), privilege",
+    "(\"root\" | \"sudo\" | \"user\"), pipe_jobs/tcp_jobs (8), builddir (\"rsync-citest\",",
+    "relative to the remote $HOME), env_prefix, configure_pre, nonroot.",
+    "",
+    "nonroot: true reruns -- as the non-root ssh user, after the sudo runs -- the",
+    "tests that declare `fleet_nonroot = True` at module level (so the set is",
+    "maintained in the test files, not here). Keys starting with \"_\" are comments.",
+    "See testsuite/README.md."
+  ],
+  "targets": [
+    {
+      "name": "freebsd",
+      "ssh_host": "root@freebsd",
+      "workflow": "freebsd-build.yml",
+      "make": "gmake",
+      "configure_flags": ["--with-rrsync", "--disable-zstd", "--disable-md2man",
+                          "--disable-xxhash", "--disable-lz4"]
+    },
+    {
+      "name": "solaris",
+      "ssh_host": "root@solaris",
+      "workflow": "solaris-build.yml",
+      "make": "gmake",
+      "configure_flags": ["--with-rrsync", "--disable-zstd", "--disable-md2man",
+                          "--disable-xxhash", "--disable-lz4"]
+    },
+    {
+      "name": "openbsd",
+      "ssh_host": "root@openbsd",
+      "workflow": "openbsd-build.yml",
+      "make": "gmake",
+      "configure_pre": "export AUTOCONF_VERSION=2.71 AUTOMAKE_VERSION=1.16;",
+      "tcp_jobs": 2,
+      "configure_flags": ["--with-rrsync", "--disable-zstd", "--disable-md2man",
+                          "--disable-xxhash", "--disable-lz4"]
+    },
+    {
+      "name": "netbsd",
+      "ssh_host": "root@netbsd",
+      "workflow": "netbsd-build.yml",
+      "make": "gmake",
+      "configure_flags": ["--with-rrsync", "--disable-zstd", "--disable-md2man",
+                          "--disable-xxhash", "--disable-lz4"]
+    },
+    {
+      "_comment": "Ubuntu 20.04 older-LTS backport coverage on a root@ box; no 20.04 runner image exists so it mirrors the 22.04 workflow.",
+      "name": "ubuntu-2004",
+      "ssh_host": "root@ubuntu-2004",
+      "workflow": "ubuntu-22.04-build.yml",
+      "configure_flags": ["--with-rrsync"]
+    },
+    {
+      "_comment": "Builds unprivileged (like a CI runner) and runs the suite via sudo; the nonroot pass reruns the privilege-sensitive tests as the ssh user.",
+      "name": "ubuntu-2204",
+      "ssh_host": "runner@ubuntu-2204",
+      "workflow": "ubuntu-22.04-build.yml",
+      "privilege": "sudo",
+      "nonroot": true,
+      "configure_flags": ["--with-rrsync"]
+    },
+    {
+      "name": "ubuntu-2604",
+      "ssh_host": "runner@ubuntu-2604",
+      "workflow": "ubuntu-build.yml",
+      "privilege": "sudo",
+      "nonroot": true,
+      "configure_flags": ["--with-rrsync"]
+    },
+    {
+      "_comment": "macOS: brew is not on the non-interactive ssh PATH, so put it on PATH for the whole build and pass brew include/lib dirs to configure.",
+      "name": "mac2",
+      "ssh_host": "runner@mac2",
+      "workflow": "macos-build.yml",
+      "privilege": "sudo",
+      "env_prefix": "export PATH=/opt/homebrew/bin:/usr/local/bin:$PATH",
+      "configure_pre": "CPPFLAGS=\"-I$(brew --prefix)/include -I$(brew --prefix openssl)/include\"; LDFLAGS=\"-L$(brew --prefix)/lib -L$(brew --prefix openssl)/lib\"; export CPPFLAGS LDFLAGS;",
+      "configure_flags": ["--with-rrsync"]
+    },
+    {
+      "_comment": "Cygwin: non-root plain user (no sudo), binary is rsync.exe.",
+      "name": "cygwin",
+      "ssh_host": "win11",
+      "workflow": "cygwin-build.yml",
+      "rsync_bin": "rsync.exe",
+      "privilege": "user",
+      "configure_flags": ["--with-rrsync"]
+    }
+  ]
+}
