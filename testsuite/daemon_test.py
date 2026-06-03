@@ -6,6 +6,10 @@
 # atimes-format variant. We avoid actually starting a listening server
 # by using RSYNC_CONNECT_PROG to spawn the daemon as a child of rsync.
 
+# Rerun under the fleet harness's non-root pass (testsuite/fleettest.py): a
+# non-root rsyncd emits different uid/gid config, so exercise that path too.
+fleet_nonroot = True
+
 import os
 import subprocess
 
