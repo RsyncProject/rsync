@@ -865,13 +865,18 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 		mode = from_wire_mode(read_int(f));
 		/* Reject modes whose type bits are not one of the standard
 		 * file types; otherwise garbage mode values propagate through
-		 * the file-type checks below unpredictably. */
-		if (!S_ISREG(mode) && !S_ISDIR(mode) && !S_ISLNK(mode)
-		 && !S_ISCHR(mode) && !S_ISBLK(mode)
-		 && !S_ISFIFO(mode) && !S_ISSOCK(mode)) {
+		 * the file-type checks below unpredictably.  mode 0 is the one
+		 * legitimate exception: --delete-missing-args (missing_args==2)
+		 * sends a missing arg as a mode-0 entry (IS_MISSING_FILE), the
+		 * generator's delete signal (#910). */
+		if (mode != 0 || missing_args != 2) {
+		    if (!S_ISREG(mode) && !S_ISDIR(mode) && !S_ISLNK(mode)
+		     && !S_ISCHR(mode) && !S_ISBLK(mode)
+		     && !S_ISFIFO(mode) && !S_ISSOCK(mode)) {
 			rprintf(FERROR, "invalid file mode 0%o for %s [%s]\n",
 				(unsigned)mode, lastname, who_am_i());
 			exit_cleanup(RERR_PROTOCOL);
+		    }
 		}
 	}
 	if (atimes_ndx && !S_ISDIR(mode) && !(xflags & XMIT_SAME_ATIME)) {
