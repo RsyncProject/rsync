@@ -41,8 +41,8 @@ extern filter_rule_list daemon_filter_list;
 
 int sanitize_paths = 0;
 
-char curr_dir[MAXPATHLEN];
-unsigned int curr_dir_len;
+extern char curr_dir[MAXPATHLEN];   /* defined in syscall.c */
+extern unsigned int curr_dir_len;
 int curr_dir_depth; /* This is only set for a sanitizing daemon. */
 
 /* Set a fd into nonblocking mode. */
