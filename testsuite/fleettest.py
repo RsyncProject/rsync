@@ -12,15 +12,22 @@ from the workflow (not hardcoded). The --use-tcp run never sets an expected-skip
 list (matching the workflows), so only test FAILs matter there.
 
 The fleet -- which machines, how to reach and build each -- is read from a JSON
-config: fleettest.json next to this script, or --fleet PATH. Copy the bundled
-fleettest.json.example to fleettest.json (or symlink it) and edit for your own
-hosts; see testsuite/README.md and the comments in fleettest.json.example.
+config: ~/.fleettest.json if present, else fleettest.json next to this script,
+or --fleet PATH. Copy the bundled fleettest.json.example to either location (or
+symlink it) and edit for your own hosts; see testsuite/README.md and the
+comments in fleettest.json.example.
 
 Source = `git archive HEAD` of the rsync tree (the current directory, or --repo
-PATH) -- source-only, no .o/binaries are ever pushed. Build is incremental by
-default (each target's tree is kept in sync; native objects are preserved and
-only changed files rebuild). Use --clean for a from-scratch build (recommended
-on a target's first run).
+PATH) -- source-only, no .o/binaries are ever pushed.
+
+Every run uses its own randomly-named build directory on each target
+(<builddir>-<run_id>), so two or three fleettest runs can share the same fleet
+without interfering: each pushes, builds and tests in isolation. The run dir is
+removed when the run ends -- on success, on failure, and on Ctrl-C/kill (pass
+--keep to retain it for inspection). A run that is hard-killed (SIGKILL) or
+whose ssh dies mid-cleanup can leave a stray <builddir>-<id> behind; sweep those
+with `fleettest.py --cleanup` (optionally scoped with --targets). Because each
+run starts from a fresh dir, every build is a full configure + build.
 
 PROVISIONING: each target must have the build toolchain its workflow's prepare
 step installs -- the target regenerates its own configure/proto.h/man pages, so
@@ -40,8 +47,9 @@ fleet-config edit when new ones are added.
 Usage (run from inside an rsync checkout, or pass --repo):
     python3 testsuite/fleettest.py                 # whole fleet, both transports
     python3 testsuite/fleettest.py --targets cygwin,freebsd
-    python3 testsuite/fleettest.py --transport pipe --clean
-    python3 testsuite/fleettest.py --no-push       # reuse synced trees
+    python3 testsuite/fleettest.py --transport pipe
+    python3 testsuite/fleettest.py --keep          # keep run dirs for inspection
+    python3 testsuite/fleettest.py --cleanup       # sweep stray run dirs, exit
     python3 testsuite/fleettest.py --fleet my-fleet.json --list
 
 Exit 0 iff every selected (target x transport) cell is OK.
@@ -50,11 +58,14 @@ Exit 0 iff every selected (target x transport) cell is OK.
 from __future__ import annotations
 
 import argparse
+import atexit
 import concurrent.futures
 import dataclasses
 import json
 import os
 import re
+import secrets
+import signal
 import subprocess
 import sys
 import tempfile
@@ -68,9 +79,13 @@ from pathlib import Path
 REPO = Path.cwd()
 WORKFLOWS = REPO / ".github" / "workflows"
 
-# Fleet config: fleettest.json next to this script, overridable with --fleet.
-DEFAULT_CONFIG = Path(__file__).resolve().parent / "fleettest.json"
-EXAMPLE_CONFIG = DEFAULT_CONFIG.with_name(DEFAULT_CONFIG.name + ".example")
+# Fleet config (overridable with --fleet): ~/.fleettest.json is tried first, then
+# fleettest.json next to this script. The example template sits next to the
+# script too.
+HOME_CONFIG = Path.home() / ".fleettest.json"
+SCRIPT_CONFIG = Path(__file__).resolve().parent / "fleettest.json"
+DEFAULT_CONFIGS = [HOME_CONFIG, SCRIPT_CONFIG]
+EXAMPLE_CONFIG = SCRIPT_CONFIG.with_name(SCRIPT_CONFIG.name + ".example")
 
 # The pushed tree is source-only (git archive). Each target regenerates its own
 # build files, so --delete must NOT prune them: we exclude everything `make`
@@ -104,7 +119,10 @@ class Target:
     privilege: str = "root"       # "root" (already root) | "sudo" | "user" (plain, no sudo)
     pipe_jobs: int = 8
     tcp_jobs: int = 8
-    builddir: str = "rsync-citest"   # relative to remote $HOME; absolute for local
+    # Base build-dir name (relative to remote $HOME; absolute for local). A
+    # per-run random suffix is appended (-> <builddir>-<run_id>) so concurrent
+    # fleettest runs don't share a tree; --cleanup sweeps leftover <builddir>-*.
+    builddir: str = "rsync-citest"
     # When true, after the sudo runs, additionally run -- as the (non-root) ssh
     # user -- every test that declares `fleet_nonroot = True` (see
     # discover_nonroot_tests). Mirrors a workflow's non-root check step.
@@ -176,7 +194,7 @@ def run_on(target: Target, script: str, timeout: int) -> CmdResult:
         return CmdResult(127, str(e))
 
 
-def push_argv(target: Target, staging: str, clean: bool) -> list[str]:
+def push_argv(target: Target, staging: str) -> list[str]:
     # -rlpgoD = -a without -t: do NOT preserve mtimes. The host clock can be
     # hours AHEAD of a target, so preserved (commit-time) mtimes land "in the
     # future" there and rsync's `Makefile: Makefile.in config.status` rule
@@ -380,18 +398,15 @@ def run_target(t: Target, args, staging: str) -> TargetResult:
             log(f"[{t.name}] UNREACHABLE")
             return res
 
-    if not args.no_push:
-        if args.clean:
-            bd = t.builddir
-            if bd and bd not in ("/", "~", os.path.expanduser("~")):
-                run_on(t, f'rm -rf {bd}', timeout=120)
-        push = subprocess.run(push_argv(t, staging, args.clean),
-                              capture_output=True, text=True, timeout=600)
-        if push.returncode != 0:
-            res.pushed = False
-            res.error = f"push failed (rc={push.returncode}): {push.stderr.strip()[:300]}"
-            log(f"[{t.name}] PUSH-FAIL")
-            return res
+    # Always push: the run dir is freshly named per run, so there is no prior
+    # tree to reuse -- every run is a full configure + build.
+    push = subprocess.run(push_argv(t, staging),
+                          capture_output=True, text=True, timeout=600)
+    if push.returncode != 0:
+        res.pushed = False
+        res.error = f"push failed (rc={push.returncode}): {push.stderr.strip()[:300]}"
+        log(f"[{t.name}] PUSH-FAIL")
+        return res
 
     b = run_on(t, build_script(t), timeout=1200)
     res.build_ok = b.rc == 0
@@ -458,7 +473,7 @@ def print_report(results: list[TargetResult], args, fleet: list[Target]) -> bool
     ts = time.strftime("%Y-%m-%d %H:%M")
     print("\n" + "=" * 64)
     print(f"rsync fleet CI — branch {current_branch()} — {ts}")
-    print(f"source: HEAD   build: {'clean' if args.clean else 'incremental'}   "
+    print(f"source: HEAD   run: {args.run_id}   "
           f"transports: {','.join(args.transports)}")
     print("(A target's pipe skip-set is only enforced when its workflow sets "
           "RSYNC_EXPECT_SKIPPED; otherwise only FAILs matter. The 'nonroot' "
@@ -551,6 +566,71 @@ def current_branch() -> str:
 
 
 # ---------------------------------------------------------------------------
+# run-dir cleanup
+# ---------------------------------------------------------------------------
+
+# Targets whose per-run dir (t.builddir, already suffixed with the run_id) this
+# process must remove on exit. Populated in main() once the run_id is applied.
+_cleanup_targets: list[Target] = []
+_cleanup_lock = threading.Lock()
+_cleanup_done = False
+
+
+def cleanup_run() -> None:
+    """Best-effort `rm -rf` of this run's dir on every chosen target. Idempotent
+    (atexit + a signal handler may both call it). Each target removes only its
+    own <base>-<run_id> dir, so a concurrent run's dir is never touched."""
+    global _cleanup_done
+    with _cleanup_lock:
+        if _cleanup_done or not _cleanup_targets:
+            return
+        _cleanup_done = True
+        targets = list(_cleanup_targets)
+    for t in targets:
+        bd = t.builddir
+        if not bd or bd in ("/", "~", os.path.expanduser("~")):
+            continue
+        run_on(t, f'rm -rf {bd}', timeout=60)
+
+
+def _on_signal(signum, frame):
+    cleanup_run()
+    # Skip atexit/thread-join: worker threads' ssh calls can't be cancelled and
+    # would otherwise block exit until they return. The remote build/test simply
+    # errors out now that its dir is gone.
+    os._exit(130 if signum == signal.SIGINT else 143)
+
+
+def cleanup_remnants(targets: list[Target]) -> int:
+    """--cleanup mode: remove every <base>-* run dir (and a bare legacy <base>)
+    on each target, reporting what each removed. Returns a process exit code."""
+    rc = 0
+    for t in targets:
+        base = t.builddir
+        if not base or base in ("/", "~", os.path.expanduser("~")):
+            log(f"[{t.name}] skipped (unsafe builddir {base!r})")
+            continue
+        # Echo each match before removing it so the harness can report what
+        # went; an unmatched glob stays literal and is skipped by the -e test.
+        script = (f'set -e\n'
+                  f'for d in {base}-* {base}; do\n'
+                  f'  [ -e "$d" ] || continue\n'
+                  f'  echo "$d"\n'
+                  f'  rm -rf "$d"\n'
+                  f'done\n')
+        r = run_on(t, script, timeout=120)
+        removed = [ln for ln in r.out.splitlines() if ln.strip()]
+        if r.rc != 0:
+            rc = 1
+            log(f"[{t.name}] cleanup error (rc={r.rc}): {r.out.strip()[:200]}")
+        elif removed:
+            log(f"[{t.name}] removed: {' '.join(removed)}")
+        else:
+            log(f"[{t.name}] nothing to remove")
+    return rc
+
+
+# ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
 
@@ -559,31 +639,38 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Fleet CI harness for rsync.")
     ap.add_argument("--targets", help="comma-separated subset (default: all)")
     ap.add_argument("--transport", choices=["pipe", "tcp", "both"], default="both")
-    ap.add_argument("--no-push", action="store_true",
-                    help="reuse the already-synced tree on each target")
-    ap.add_argument("--clean", action="store_true",
-                    help="wipe each builddir and reconfigure (recommended first run)")
+    ap.add_argument("--keep", action="store_true",
+                    help="keep each run's build dir (default: remove it at exit)")
+    ap.add_argument("--cleanup", action="store_true",
+                    help="remove stray <builddir>-* run dirs on the targets, then exit")
     ap.add_argument("--jobs", type=int, help="override -j for both transports")
     ap.add_argument("--repo", help="rsync source tree to build (default: cwd)")
-    ap.add_argument("--fleet", help="fleet config JSON "
-                    "(default: fleettest.json next to this script)")
+    ap.add_argument("--fleet", help="fleet config JSON (default: ~/.fleettest.json, "
+                    "else fleettest.json next to this script)")
     ap.add_argument("--list", action="store_true", help="list targets and exit")
     args = ap.parse_args()
 
     global REPO, WORKFLOWS
     REPO = Path(args.repo).resolve() if args.repo else Path.cwd()
     WORKFLOWS = REPO / ".github" / "workflows"
-    if not (REPO / "runtests.py").is_file():
+    if not args.cleanup and not (REPO / "runtests.py").is_file():
         print(f"{REPO} is not an rsync source tree (no runtests.py); "
               f"run from inside a checkout or pass --repo", file=sys.stderr)
         return 2
 
-    config_path = Path(args.fleet).resolve() if args.fleet else DEFAULT_CONFIG
-    if not config_path.exists():
-        print(f"no fleet config at {config_path}\n"
-              f"copy {EXAMPLE_CONFIG} to {DEFAULT_CONFIG} (or pass --fleet PATH)",
-              file=sys.stderr)
-        return 2
+    if args.fleet:
+        config_path = Path(args.fleet).resolve()
+        if not config_path.exists():
+            print(f"no fleet config at {config_path}", file=sys.stderr)
+            return 2
+    else:
+        config_path = next((p for p in DEFAULT_CONFIGS if p.exists()), None)
+        if config_path is None:
+            tried = " or ".join(str(p) for p in DEFAULT_CONFIGS)
+            print(f"no fleet config found (looked for {tried})\n"
+                  f"copy {EXAMPLE_CONFIG} to {SCRIPT_CONFIG} or {HOME_CONFIG} "
+                  f"(or pass --fleet PATH)", file=sys.stderr)
+            return 2
     fleet = load_fleet(config_path)
 
     if args.list:
@@ -593,8 +680,6 @@ def main() -> int:
             print(f"{t.name:12} {host:18} {t.make:6} "
                   f"pipe-skip={'set' if skip else 'unset'}")
         return 0
-
-    args.transports = ["pipe", "tcp"] if args.transport == "both" else [args.transport]
 
     chosen = fleet
     if args.targets:
@@ -606,6 +691,31 @@ def main() -> int:
             print(f"known: {', '.join(by_name)}", file=sys.stderr)
             return 2
         chosen = [by_name[w] for w in want]
+
+    if args.cleanup:
+        # Sweep every <builddir>-* run dir on the selected targets. NB: this
+        # also removes dirs belonging to runs that are still in progress, so
+        # only run it when no other fleettest runs are active (or scope with
+        # --targets).
+        return cleanup_remnants(chosen)
+
+    args.transports = ["pipe", "tcp"] if args.transport == "both" else [args.transport]
+
+    # Give this run its own build dir on every target so concurrent runs don't
+    # collide: <builddir>-<run_id>. The base name is the prefix --cleanup globs.
+    args.run_id = secrets.token_hex(3)
+    for t in chosen:
+        t.builddir = f"{t.builddir}-{args.run_id}"
+    log(f"run {args.run_id}: build dir <target>:{chosen[0].builddir} "
+        f"(removed at exit; --keep to retain)")
+
+    # Remove each run dir when we exit -- success, failure, Ctrl-C or kill.
+    # SIGKILL can't be caught; `fleettest.py --cleanup` sweeps any such remnant.
+    if not args.keep:
+        _cleanup_targets.extend(chosen)
+        atexit.register(cleanup_run)
+        signal.signal(signal.SIGINT, _on_signal)
+        signal.signal(signal.SIGTERM, _on_signal)
 
     # Stage committed HEAD (source-only). Each target regenerates its own
     # build files with its own toolchain -- exactly like the CI jobs, which

@@ -133,6 +133,9 @@ cp testsuite/fleettest.json.example testsuite/fleettest.json   # then edit
 # (or symlink it, or point elsewhere with --fleet PATH)
 ```
 
+The config is looked up in order: `~/.fleettest.json` first, then
+`testsuite/fleettest.json`, unless overridden with `--fleet PATH`.
+
 Each entry names an ssh host (`null` to run locally), the workflow it mirrors,
 and its configure flags, plus optional per-target settings (`make`, `privilege`,
 `env_prefix`, …). See the comments in `fleettest.json.example`.
@@ -150,9 +153,18 @@ Run it from inside a checkout (it builds the current directory's HEAD; use
 ```sh
 python3 testsuite/fleettest.py                       # whole fleet, both transports
 python3 testsuite/fleettest.py --list                # list configured targets
-python3 testsuite/fleettest.py --targets NAME[,NAME] --clean
+python3 testsuite/fleettest.py --targets NAME[,NAME]
 python3 testsuite/fleettest.py --fleet other.json --transport pipe
 ```
+
+Each run gets its own randomly-named build dir on every target
+(`<builddir>-<run_id>`), so two or three runs can share the same fleet without
+interfering. The dir is removed when the run ends — on success, failure, or
+Ctrl-C/kill; pass `--keep` to retain it for inspection. A hard kill (`SIGKILL`)
+can leave a stray `<builddir>-<id>` behind; sweep leftovers with
+`python3 testsuite/fleettest.py --cleanup` (scope it with `--targets`, and only
+run it when no other fleet runs are active, since it removes *all* matching run
+dirs on the selected targets).
 
 Each target must be provisioned with the build toolchain its workflow installs
 (autoconf, automake, a C compiler, perl, a python3 markdown module such as
