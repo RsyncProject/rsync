@@ -1840,7 +1840,7 @@ int main(int argc,char *argv[])
 	if (am_server && protect_args) {
 		char buf[MAXPATHLEN];
 		protect_args = 2;
-		read_args(STDIN_FILENO, NULL, buf, sizeof buf, 1, &argv, &argc, NULL);
+		read_args(STDIN_FILENO, NULL, buf, sizeof buf, 1, 0, &argv, &argc, NULL);
 		if (!parse_arguments(&argc, (const char ***) &argv)) {
 			option_error();
 			exit_cleanup(RERR_SYNTAX);
