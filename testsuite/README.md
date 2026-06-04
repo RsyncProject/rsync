@@ -159,9 +159,10 @@ python3 testsuite/fleettest.py --fleet other.json --transport pipe
 
 Each run gets its own randomly-named build dir on every target
 (`<builddir>-<run_id>`), so two or three runs can share the same fleet without
-interfering. The dir is removed when the run ends — on success, failure, or
-Ctrl-C/kill; pass `--keep` to retain it for inspection. A hard kill (`SIGKILL`)
-can leave a stray `<builddir>-<id>` behind; sweep leftovers with
+interfering. The dir is removed when the run ends — on success or failure, and
+best-effort on Ctrl-C/kill; pass `--keep` to retain it for inspection. A hard
+kill (`SIGKILL`), or a signal arriving mid-push, can leave a stray
+`<builddir>-<id>` behind; sweep leftovers with
 `python3 testsuite/fleettest.py --cleanup` (scope it with `--targets`, and only
 run it when no other fleet runs are active, since it removes *all* matching run
 dirs on the selected targets).

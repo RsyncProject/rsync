@@ -23,10 +23,11 @@ PATH) -- source-only, no .o/binaries are ever pushed.
 Every run uses its own randomly-named build directory on each target
 (<builddir>-<run_id>), so two or three fleettest runs can share the same fleet
 without interfering: each pushes, builds and tests in isolation. The run dir is
-removed when the run ends -- on success, on failure, and on Ctrl-C/kill (pass
---keep to retain it for inspection). A run that is hard-killed (SIGKILL) or
-whose ssh dies mid-cleanup can leave a stray <builddir>-<id> behind; sweep those
-with `fleettest.py --cleanup` (optionally scoped with --targets). Because each
+removed when the run ends -- on success or failure, and best-effort on
+Ctrl-C/kill (pass --keep to retain it for inspection). A run that is hard-killed
+(SIGKILL), or signalled mid-push, or whose ssh dies during cleanup can leave a
+stray <builddir>-<id> behind; sweep those with `fleettest.py --cleanup`
+(optionally scoped with --targets). Because each
 run starts from a fresh dir, every build is a full configure + build.
 
 PROVISIONING: each target must have the build toolchain its workflow's prepare
@@ -576,6 +577,17 @@ _cleanup_lock = threading.Lock()
 _cleanup_done = False
 
 
+def _unsafe_builddir(path: str) -> bool:
+    """True if `path` is too broad to feed to `rm -rf` -- empty, root, $HOME, or
+    an absolute path sitting directly under / (e.g. /tmp). A real run dir is
+    always nested deeper, so this rejects an obvious builddir misconfiguration
+    before any destructive command is built."""
+    p = (path or "").rstrip("/")
+    if p in ("", "/", "~") or os.path.expanduser(p) == os.path.expanduser("~"):
+        return True
+    return os.path.isabs(p) and os.path.dirname(p) == "/"
+
+
 def cleanup_run() -> None:
     """Best-effort `rm -rf` of this run's dir on every chosen target. Idempotent
     (atexit + a signal handler may both call it). Each target removes only its
@@ -587,10 +599,9 @@ def cleanup_run() -> None:
         _cleanup_done = True
         targets = list(_cleanup_targets)
     for t in targets:
-        bd = t.builddir
-        if not bd or bd in ("/", "~", os.path.expanduser("~")):
+        if _unsafe_builddir(t.builddir):
             continue
-        run_on(t, f'rm -rf {bd}', timeout=60)
+        run_on(t, f'rm -rf -- {t.builddir}', timeout=60)
 
 
 def _on_signal(signum, frame):
@@ -602,21 +613,22 @@ def _on_signal(signum, frame):
 
 
 def cleanup_remnants(targets: list[Target]) -> int:
-    """--cleanup mode: remove every <base>-* run dir (and a bare legacy <base>)
-    on each target, reporting what each removed. Returns a process exit code."""
+    """--cleanup mode: remove every <base>-* run dir on each target, reporting
+    what each removed. Returns a process exit code. Only suffixed run dirs are
+    swept -- a bare <base> is left alone."""
     rc = 0
     for t in targets:
         base = t.builddir
-        if not base or base in ("/", "~", os.path.expanduser("~")):
+        if _unsafe_builddir(base):
             log(f"[{t.name}] skipped (unsafe builddir {base!r})")
             continue
         # Echo each match before removing it so the harness can report what
         # went; an unmatched glob stays literal and is skipped by the -e test.
         script = (f'set -e\n'
-                  f'for d in {base}-* {base}; do\n'
+                  f'for d in {base}-*; do\n'
                   f'  [ -e "$d" ] || continue\n'
                   f'  echo "$d"\n'
-                  f'  rm -rf "$d"\n'
+                  f'  rm -rf -- "$d"\n'
                   f'done\n')
         r = run_on(t, script, timeout=120)
         removed = [ln for ln in r.out.splitlines() if ln.strip()]
@@ -709,8 +721,9 @@ def main() -> int:
     log(f"run {args.run_id}: build dir <target>:{chosen[0].builddir} "
         f"(removed at exit; --keep to retain)")
 
-    # Remove each run dir when we exit -- success, failure, Ctrl-C or kill.
-    # SIGKILL can't be caught; `fleettest.py --cleanup` sweeps any such remnant.
+    # Remove each run dir when we exit -- success or failure, and best-effort on
+    # Ctrl-C/kill (a signal mid-push may still leave a remnant). SIGKILL can't be
+    # caught; `fleettest.py --cleanup` sweeps any such remnant.
     if not args.keep:
         _cleanup_targets.extend(chosen)
         atexit.register(cleanup_run)
