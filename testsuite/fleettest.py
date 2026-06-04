@@ -373,6 +373,9 @@ class TargetResult:
     error: str = ""
     build_log: str = ""
     transports: dict[str, TransportResult] = dataclasses.field(default_factory=dict)
+    # Wall-clock seconds per phase (push/build/pipe/tcp/nonroot) plus "total";
+    # populated for --timing. Phases run sequentially, so they sum to the total.
+    timings: dict[str, float] = dataclasses.field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -390,6 +393,7 @@ def log(msg: str) -> None:
 def run_target(t: Target, args, staging: str) -> TargetResult:
     res = TargetResult(t.name)
     log(f"[{t.name}] start")
+    started = time.monotonic()
 
     if t.ssh_host:
         ping = run_on(t, "echo ok", timeout=25)
@@ -401,15 +405,19 @@ def run_target(t: Target, args, staging: str) -> TargetResult:
 
     # Always push: the run dir is freshly named per run, so there is no prior
     # tree to reuse -- every run is a full configure + build.
+    t0 = time.monotonic()
     push = subprocess.run(push_argv(t, staging),
                           capture_output=True, text=True, timeout=600)
+    res.timings["push"] = time.monotonic() - t0
     if push.returncode != 0:
         res.pushed = False
         res.error = f"push failed (rc={push.returncode}): {push.stderr.strip()[:300]}"
         log(f"[{t.name}] PUSH-FAIL")
         return res
 
+    t0 = time.monotonic()
     b = run_on(t, build_script(t), timeout=1200)
+    res.timings["build"] = time.monotonic() - t0
     res.build_ok = b.rc == 0
     res.build_log = b.out
     if not res.build_ok:
@@ -421,7 +429,9 @@ def run_target(t: Target, args, staging: str) -> TargetResult:
         jobs = (args.jobs if args.jobs else
                 (t.tcp_jobs if transport == "tcp" else t.pipe_jobs))
         cmd = test_script(t, transport, skip_csv, jobs)
+        t0 = time.monotonic()
         r = run_on(t, cmd, timeout=2400)
+        res.timings[transport] = time.monotonic() - t0
         res.transports[transport] = parse_transport(transport, r, skip_csv is not None)
         log(f"[{t.name}] {transport} done "
             f"({'ok' if res.transports[transport].ok else 'ISSUE'})")
@@ -429,10 +439,13 @@ def run_target(t: Target, args, staging: str) -> TargetResult:
     # Extra non-root pass (after the sudo runs) for targets that opt in, running
     # the tests that declare `fleet_nonroot = True` (discovered in main()).
     if t.nonroot and args.nonroot_tests:
+        t0 = time.monotonic()
         r = run_on(t, nonroot_test_script(t, args.nonroot_tests), timeout=2400)
+        res.timings["nonroot"] = time.monotonic() - t0
         res.transports["nonroot"] = parse_transport("nonroot", r, skip_checked=False)
         log(f"[{t.name}] nonroot done "
             f"({'ok' if res.transports['nonroot'].ok else 'ISSUE'})")
+    res.timings["total"] = time.monotonic() - started
     return res
 
 
@@ -557,6 +570,46 @@ def print_report(results: list[TargetResult], args, fleet: list[Target]) -> bool
     return all_ok
 
 
+# Phase columns for --timing, in execution order (push -> build -> tests).
+_TIMING_PHASES = ("push", "build", "pipe", "tcp", "nonroot")
+
+
+def _fmt_dur(s: float) -> str:
+    if s < 60:
+        return f"{s:.0f}s"
+    m, sec = divmod(int(round(s)), 60)
+    return f"{m}m{sec:02d}s"
+
+
+def print_timing(results: list[TargetResult]) -> None:
+    """Per-target wall-clock breakdown, slowest first. Targets run in parallel,
+    so the whole run is gated by the slowest one -- that's the hold-up; the
+    phase columns show whether it's push, build or the test passes."""
+    timed = [r for r in results if r.timings]
+    if not timed:
+        return
+    phases = [p for p in _TIMING_PHASES if any(p in r.timings for r in timed)]
+
+    def total(r: TargetResult) -> float:
+        # Failed-early targets have no "total"; sum the phases they did reach.
+        return r.timings.get("total") or sum(r.timings.get(p, 0.0) for p in phases)
+
+    timed.sort(key=total, reverse=True)
+    width = max([len("TARGET")] + [len(r.target) for r in timed]) + 2
+    print("\n==== TIMING (slowest target first) ====")
+    print("TARGET".ljust(width) + "TOTAL".ljust(9)
+          + "".join(p.upper().ljust(9) for p in phases))
+    for r in timed:
+        row = r.target.ljust(width) + _fmt_dur(total(r)).ljust(9)
+        for p in phases:
+            v = r.timings.get(p)
+            row += (_fmt_dur(v) if v is not None else "-").ljust(9)
+        print(row)
+    slow = timed[0]
+    print(f"hold-up: {slow.target} at {_fmt_dur(total(slow))} gates the run "
+          "(targets run in parallel)")
+
+
 def current_branch() -> str:
     try:
         return subprocess.run(["git", "-C", str(REPO), "rev-parse",
@@ -656,6 +709,9 @@ def main() -> int:
     ap.add_argument("--cleanup", action="store_true",
                     help="remove stray <builddir>-* run dirs on the targets, then exit")
     ap.add_argument("--jobs", type=int, help="override -j for both transports")
+    ap.add_argument("--timing", action="store_true",
+                    help="report per-target wall-clock (push/build/test) to find "
+                    "the slowest target")
     ap.add_argument("--repo", help="rsync source tree to build (default: cwd)")
     ap.add_argument("--fleet", help="fleet config JSON (default: ~/.fleettest.json, "
                     "else fleettest.json next to this script)")
@@ -764,6 +820,8 @@ def main() -> int:
         subprocess.run(["rm", "-rf", staging])
 
     all_ok = print_report(results, args, fleet)
+    if args.timing:
+        print_timing(results)
     return 0 if all_ok else 1
 
 
