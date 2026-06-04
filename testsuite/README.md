@@ -155,7 +155,13 @@ python3 testsuite/fleettest.py                       # whole fleet, both transpo
 python3 testsuite/fleettest.py --list                # list configured targets
 python3 testsuite/fleettest.py --targets NAME[,NAME]
 python3 testsuite/fleettest.py --fleet other.json --transport pipe
+python3 testsuite/fleettest.py --timing              # per-target wall-clock breakdown
 ```
+
+`--timing` adds a per-target breakdown after the report — total wall-clock plus
+the push / build / pipe / tcp / nonroot phases, sorted slowest-first. Targets
+run in parallel, so the whole run is gated by the slowest one; the phase columns
+show whether that target's hold-up is the push, the build, or a test pass.
 
 Each run gets its own randomly-named build dir on every target
 (`<builddir>-<run_id>`), so two or three runs can share the same fleet without
