@@ -66,6 +66,7 @@ extern int inplace;
 extern int append_mode;
 extern int make_backups;
 extern int csum_length;
+extern int xfer_sum_len;
 extern int ignore_times;
 extern int size_only;
 extern OFF_T max_size;
@@ -697,6 +698,11 @@ static void sum_sizes_sqroot(struct sum_struct *sum, int64 len)
 {
 	int32 blength;
 	int s2length;
+	/* The strong sum can be no longer than the negotiated checksum digest:
+	 * a short checksum (e.g. xxh64 = 8 bytes, when xxh128/xxh3 are absent)
+	 * makes xfer_sum_len < SUM_LENGTH, and the sender rejects an s2length
+	 * larger than xfer_sum_len (io.c). */
+	int max_s2length = MIN(SUM_LENGTH, xfer_sum_len);
 	int64 l;
 
 	if (len < 0) {
@@ -731,7 +737,7 @@ static void sum_sizes_sqroot(struct sum_struct *sum, int64 len)
 	if (protocol_version < 27) {
 		s2length = csum_length;
 	} else if (csum_length == SUM_LENGTH) {
-		s2length = SUM_LENGTH;
+		s2length = max_s2length;
 	} else {
 		int32 c;
 		int b = BLOCKSUM_BIAS;
@@ -740,7 +746,7 @@ static void sum_sizes_sqroot(struct sum_struct *sum, int64 len)
 		/* add a bit, subtract rollsum, round up. */
 		s2length = (b + 1 - 32 + 7) / 8; /* --optimize in compiler-- */
 		s2length = MAX(s2length, csum_length);
-		s2length = MIN(s2length, SUM_LENGTH);
+		s2length = MIN(s2length, max_s2length);
 	}
 
 	sum->flength	= len;
