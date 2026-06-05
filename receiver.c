@@ -423,16 +423,32 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 
 		stats.matched_data += len;
 
-		/* A block match can only be honored if we actually mapped the
-		 * basis. If we didn't (basis open failed), the sender should
-		 * never have been told a basis existed -- treat it as a protocol
-		 * inconsistency rather than silently omitting these bytes from
-		 * the verification checksum (which yields a spurious failure) or
-		 * leaving a hole in the output. */
+		/* A block match with no mapped basis is a protocol inconsistency
+		 * ONLY when we are actually producing output (fd != -1): the
+		 * generator told the sender a basis existed but the receiver could
+		 * not open it, so honoring the match would silently omit these
+		 * bytes from the verification checksum (a spurious failure) or
+		 * leave a hole in the output. Fail cleanly in that case.
+		 *
+		 * On the DISCARD path (fd == -1, fname == NULL) there is no output
+		 * and no verification: discard_receive_data() deliberately drains a
+		 * delta the receiver never intends to write (basis fstat failed,
+		 * basis is a directory, output open failed, batch skip, ...). The
+		 * sender does not know the data is being discarded and streams an
+		 * ordinary delta, so a match token here is NORMAL protocol, not
+		 * malformed. Absorb it benignly (advance the offset and continue),
+		 * as the pre-existing "if (mapbuf)" guards did before this check was
+		 * added in 31fbb17d -- erroring would wrongly break legitimate
+		 * transfers, and full_fname(fname) with fname==NULL would
+		 * dereference NULL (a receiver crash on a normal transfer). */
 		if (!mapbuf) {
-			rprintf(FERROR, "got a block match with no basis file for %s [%s]\n",
-				full_fname(fname), who_am_i());
-			exit_cleanup(RERR_PROTOCOL);
+			if (fd != -1) {
+				rprintf(FERROR, "got a block match with no basis file for %s [%s]\n",
+					full_fname(fname), who_am_i());
+				exit_cleanup(RERR_PROTOCOL);
+			}
+			offset += len;
+			continue;
 		}
 
 		if (DEBUG_GTE(DELTASUM, 3)) {
