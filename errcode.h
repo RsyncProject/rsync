@@ -43,6 +43,7 @@
 #define RERR_PARTIAL    23      /* partial transfer */
 #define RERR_VANISHED   24      /* file(s) vanished on sender side */
 #define RERR_DEL_LIMIT  25      /* skipped some deletes due to --max-delete */
+#define RERR_DATA_LIMIT 26      /* data transfer limit reached */
 
 #define RERR_TIMEOUT    30      /* timeout in data send/receive */
 #define RERR_CONTIMEOUT 35      /* timeout waiting for daemon connection */
