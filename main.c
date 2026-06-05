@@ -830,7 +830,16 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 		dest_path = "/";
 
 	*cp = '\0';
-	if (!change_dir(dest_path, CD_NORMAL)) {
+	if (dry_run && mkpath_dest_arg && do_stat(dest_path, &st) < 0) {
+		/* --mkpath would have created this parent dir, but a dry run did
+		 * not, so don't chdir into it; flag the destination as not yet
+		 * present (as the dir-creation path above does) so the generator
+		 * doesn't try to compare against the missing tree (#880).  Only
+		 * the missing-parent case is touched, so an ordinary file-to-file
+		 * dry run still itemizes against an existing destination. */
+		dry_run++;
+		change_dir(dest_path, CD_SKIP_CHDIR);
+	} else if (!change_dir(dest_path, CD_NORMAL)) {
 		rsyserr(FERROR, errno, "change_dir#3 %s failed",
 			full_fname(dest_path));
 		exit_cleanup(RERR_FILESELECT);
