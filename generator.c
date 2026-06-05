@@ -1718,7 +1718,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		goto cleanup;
 	}
 
-	if (update_only > 0 && statret == 0 && file->modtime - sx.st.st_mtime < modify_window) {
+	if (update_only > 0 && statret == 0 && stype == ftype
+	 && file->modtime - sx.st.st_mtime < modify_window) {
 		if (INFO_GTE(SKIP, 1))
 			rprintf(FINFO, "%s is newer\n", fname);
 #ifdef SUPPORT_HARD_LINKS
@@ -2390,7 +2391,7 @@ void generate_files(int f_out, const char *local_name)
 		write_ndx(f_out, NDX_DONE);
 
 	if (protocol_version >= 31 && EARLY_DELETE_DONE_MSG()) {
-		if ((INFO_GTE(STATS, 2) && (delete_mode || force_delete)) || read_batch)
+		if (delete_mode || force_delete || read_batch)
 			write_del_stats(f_out);
 		if (EARLY_DELAY_DONE_MSG()) /* Can't send this before delay */
 			write_ndx(f_out, NDX_DONE);
@@ -2435,7 +2436,7 @@ void generate_files(int f_out, const char *local_name)
 
 	if (protocol_version >= 31) {
 		if (!EARLY_DELETE_DONE_MSG()) {
-			if (INFO_GTE(STATS, 2) || read_batch)
+			if (delete_mode || force_delete || read_batch)
 				write_del_stats(f_out);
 			write_ndx(f_out, NDX_DONE);
 		}

@@ -536,7 +536,9 @@ int do_mknod(const char *pathname, mode_t mode, dev_t dev)
 */
 int do_mknod_at(const char *pathname, mode_t mode, dev_t dev)
 {
-#ifdef AT_FDCWD
+	/* HAVE_MKNODAT: older Darwin declares AT_FDCWD but not mknodat(), so
+	 * the at-variant won't build there; fall back to do_mknod() (#896). */
+#if defined(AT_FDCWD) && defined(HAVE_MKNODAT)
 	extern int am_daemon, am_chrooted;
 	char dirpath[MAXPATHLEN];
 	const char *bname;
@@ -598,7 +600,7 @@ int do_mknod_at(const char *pathname, mode_t mode, dev_t dev)
 		return ret;
 	}
 
-#if !defined MKNOD_CREATES_FIFOS && defined HAVE_MKFIFO
+#if !defined MKNOD_CREATES_FIFOS && defined HAVE_MKFIFO && defined HAVE_MKFIFOAT
 	if (S_ISFIFO(mode))
 		ret = mkfifoat(dfd, bname, mode);
 	else
