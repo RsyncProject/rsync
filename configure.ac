@@ -432,21 +432,17 @@ AS_HELP_STRING([--disable-ipv6],[disable to omit ipv6 support]),
 	;;
   esac ],
 
-  AC_RUN_IFELSE([AC_LANG_SOURCE([[ /* AF_INET6 availability check */
-#include <stdlib.h>
+  AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 #include <sys/types.h>
 #include <sys/socket.h>
-int main()
-{
-   if (socket(AF_INET6, SOCK_STREAM, 0) < 0)
-     exit(1);
-   else
-     exit(0);
-}
+#include <netinet/in.h>
+]], [[
+struct sockaddr_in6 sa6;
+(void)sa6;
+(void)AF_INET6;
 ]])],
   [AC_MSG_RESULT(yes)
-  AC_DEFINE(INET6, 1, true if you have IPv6)],
-  [AC_MSG_RESULT(no)],
+  AC_DEFINE(INET6, 1, [true if you have IPv6])],
   [AC_MSG_RESULT(no)]
 ))
 
