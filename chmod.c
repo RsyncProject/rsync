@@ -43,6 +43,20 @@ struct chmod_mode_struct {
 #define STATE_2ND_HALF 2
 #define STATE_OCTAL_NUM 3
 
+static int mode_dest_special_bits(int where)
+{
+	int bits = 0;
+
+	if (where & 0100)
+		bits |= S_ISUID;
+	if (where & 0010)
+		bits |= S_ISGID;
+	if (where & 0001)
+		bits |= S_ISVTX;
+
+	return bits;
+}
+
 /* Parse a chmod-style argument, and break it down into one or more AND/OR
  * pairs in a linked list.  We return a pointer to new items on success
  * (appending the items to the specified list), or NULL on error. */
@@ -96,7 +110,8 @@ struct chmod_mode_struct *parse_chmod(const char *modestr,
 				curr_mode->ModeOP = op;
 				break;
 			case CHMOD_EQ:
-				curr_mode->ModeAND = CHMOD_BITS - (where * 7) - (topoct ? topbits : 0);
+				curr_mode->ModeAND = CHMOD_BITS - (where * 7) - (topoct ? topbits : 0)
+						    - (copybits ? mode_dest_special_bits(where) : 0);
 				curr_mode->ModeOR  = bits + topoct;
 				curr_mode->ModeCOPY_SRC = copybits;
 				curr_mode->ModeCOPY_DST = where;
