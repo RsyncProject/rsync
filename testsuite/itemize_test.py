@@ -45,7 +45,7 @@ if hardlink_symlinks:
     L = 'hL'
     sym_dots = allspace
     L_sym_dots = '.L' + allspace
-    is_uptodate = 'is uptodate'
+    is_uptodate = 'is up-to-date'
     chkfile_extra = ''  # no extra trailing line
 else:
     L = 'cL'
@@ -115,10 +115,10 @@ cp_p(SRCDIR / 'configure.ac', FROMDIR / 'foo' / 'config2')
 os.chmod(FROMDIR / 'foo' / 'config2', 0o600)
 
 checkdiff(['-vvplrH', f'{FROMDIR}/', f'{TODIR}/'],
-          "bar/baz/rsync is uptodate\n"
-          "foo/config1 is uptodate\n"
-          "foo/extra is uptodate\n"
-          "foo/sym is uptodate\n"
+          "bar/baz/rsync is up-to-date\n"
+          "foo/config1 is up-to-date\n"
+          "foo/extra is up-to-date\n"
+          "foo/sym is up-to-date\n"
           "foo/config2\n",
           filter=v_filt)
 
@@ -173,13 +173,13 @@ checkdiff(['-iplrtH', '--copy-dest=../to', f'{FROMDIR}/', f'{to2dir}/'],
 
 shutil.rmtree(to2dir, ignore_errors=True)
 checkdiff(['-vvplrtH', f'--copy-dest={TODIR}', f'{FROMDIR}/', f'{to2dir}/'],
-          "./ is uptodate\n"
-          "bar/ is uptodate\n"
-          "bar/baz/ is uptodate\n"
-          "bar/baz/rsync is uptodate\n"
-          "foo/ is uptodate\n"
-          "foo/config1 is uptodate\n"
-          "foo/config2 is uptodate\n"
+          "./ is up-to-date\n"
+          "bar/ is up-to-date\n"
+          "bar/baz/ is up-to-date\n"
+          "bar/baz/rsync is up-to-date\n"
+          "foo/ is up-to-date\n"
+          "foo/config1 is up-to-date\n"
+          "foo/config2 is up-to-date\n"
           f"foo/sym {is_uptodate}\n"
           "foo/extra => foo/config1\n",
           filter=v_filt)
@@ -211,14 +211,14 @@ checkdiff(['-iplrtH', '--link-dest=../to', f'{FROMDIR}/', f'{to2dir}/'],
 
 shutil.rmtree(to2dir, ignore_errors=True)
 checkdiff(['-vvplrtH', f'--link-dest={TODIR}', f'{FROMDIR}/', f'{to2dir}/'],
-          "./ is uptodate\n"
-          "bar/ is uptodate\n"
-          "bar/baz/ is uptodate\n"
-          "bar/baz/rsync is uptodate\n"
-          "foo/ is uptodate\n"
-          "foo/config1 is uptodate\n"
-          "foo/config2 is uptodate\n"
-          "foo/extra is uptodate\n"
+          "./ is up-to-date\n"
+          "bar/ is up-to-date\n"
+          "bar/baz/ is up-to-date\n"
+          "bar/baz/rsync is up-to-date\n"
+          "foo/ is up-to-date\n"
+          "foo/config1 is up-to-date\n"
+          "foo/config2 is up-to-date\n"
+          "foo/extra is up-to-date\n"
           f"foo/sym {is_uptodate}\n",
           filter=v_filt)
 
@@ -244,13 +244,13 @@ checkdiff(['-iplrtH', f'--compare-dest={TODIR}', f'{FROMDIR}/', f'{to2dir}/'],
 
 shutil.rmtree(to2dir, ignore_errors=True)
 checkdiff(['-vvplrtH', f'--compare-dest={TODIR}', f'{FROMDIR}/', f'{to2dir}/'],
-          "./ is uptodate\n"
-          "bar/ is uptodate\n"
-          "bar/baz/ is uptodate\n"
-          "bar/baz/rsync is uptodate\n"
-          "foo/ is uptodate\n"
-          "foo/config1 is uptodate\n"
-          "foo/config2 is uptodate\n"
-          "foo/extra is uptodate\n"
+          "./ is up-to-date\n"
+          "bar/ is up-to-date\n"
+          "bar/baz/ is up-to-date\n"
+          "bar/baz/rsync is up-to-date\n"
+          "foo/ is up-to-date\n"
+          "foo/config1 is up-to-date\n"
+          "foo/config2 is up-to-date\n"
+          "foo/extra is up-to-date\n"
           f"foo/sym {is_uptodate}\n",
           filter=v_filt)

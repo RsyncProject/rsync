@@ -29,7 +29,7 @@ print("Test hard links:")
 checkit(['-avH', '--bwlimit=0', DEBUG_OPTS, f'{FROMDIR}/', str(TODIR)], FROMDIR, TODIR)
 
 # 3. one file — delete the destination 'text' and re-sync; only it should
-# transfer, everything else stays uptodate.
+# transfer, everything else stays up-to-date.
 (TODIR / 'text').unlink()
 print("Test one file:")
 checkit(['-avH', DEBUG_OPTS, f'{FROMDIR}/', str(TODIR)], FROMDIR, TODIR)

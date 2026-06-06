@@ -142,7 +142,7 @@ static void invokeCallbacksOPTION(poptContext con,
 	    {	const void *cbData = (cbopt->descrip ? cbopt->descrip : myData);
 		cbarg.cb(con, POPT_CALLBACK_REASON_OPTION,
 			myOpt, con->os->nextArg, cbData);
-		/* Terminate (unless explcitly continuing). */
+		/* Terminate (unless explicitly continuing). */
 		if (!CBF_ISSET(cbopt, CONTINUE))
 		    return;
 	    }
