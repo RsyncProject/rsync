@@ -1510,3 +1510,5 @@ const char *get_panic_action(void);
 #elif defined HAVE_MALLINFO
 #define MEM_ALLOC_INFO mallinfo
 #endif
+
+extern const char *skip_dir_with_file;
