@@ -1,8 +1,8 @@
 #!/bin/sh
 
 if [ $# != 1 ]; then
-    echo "Usage: $0 NAME.NUM.md" 1>&2
-    exit 1
+  echo "Usage: $0 NAME.NUM.md" 1>&2
+  exit 1
 fi
 
 inname="$1"
@@ -11,32 +11,32 @@ flagfile="$srcdir/.md2man-works"
 force_flagfile="$srcdir/.md2man-force"
 
 if [ ! -f "$flagfile" ]; then
-    # We test our smallest manpage just to see if the python setup works.
-    if "$srcdir/md-convert" --test "$srcdir/rsync-ssl.1.md" >/dev/null 2>&1; then
-	touch $flagfile
+  # We test our smallest manpage just to see if the python setup works.
+  if "$srcdir/md-convert" --test "$srcdir/rsync-ssl.1.md" >/dev/null 2>&1; then
+    touch $flagfile
+  else
+    outname=`basename "$inname" .md`
+    if [ -f "$outname" ]; then
+      exit 0
+    elif [ -f "$srcdir/$outname" ]; then
+      echo "Copying $srcdir/$outname"
+      cp -p "$srcdir/$outname" .
+      exit 0
     else
-	outname=`basename "$inname" .md`
-	if [ -f "$outname" ]; then
-	    exit 0
-	elif [ -f "$srcdir/$outname" ]; then
-	    echo "Copying $srcdir/$outname"
-	    cp -p "$srcdir/$outname" .
-	    exit 0
-	else
-	    echo "ERROR: $outname cannot be created."
-	    if [ -f "$HOME/build_farm/build_test.fns" ]; then
-		exit 0 # No exit errorno to avoid a build failure in the samba build farm
-	    else
-		exit 1
-	    fi
-	fi
+      echo "ERROR: $outname cannot be created."
+      if [ -f "$HOME/build_farm/build_test.fns" ]; then
+        exit 0 # No exit errorno to avoid a build failure in the samba build farm
+      else
+        exit 1
+      fi
     fi
+  fi
 fi
 
 if [ -f "$force_flagfile" ]; then
-    opt='--force-link-text'
+  opt='--force-link-text'
 else
-    opt=''
+  opt=''
 fi
 
 "$srcdir/md-convert" $opt "$srcdir/$inname"

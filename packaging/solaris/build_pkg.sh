@@ -91,4 +91,3 @@ cd ..
 
 # Comment this out if you want to see, which file structure has been created
 rm -rf $FAKE_ROOT
-
