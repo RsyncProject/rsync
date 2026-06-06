@@ -11,12 +11,16 @@
     "this target mirrors), configure_flags. Optional (with defaults): make (\"make\"),",
     "python (\"python3\"), rsync_bin (\"rsync\"; \"rsync.exe\" on Cygwin), privilege",
     "(\"root\" | \"sudo\" | \"user\"), pipe_jobs/tcp_jobs (8), builddir (\"rsync-citest\",",
-    "relative to the remote $HOME), env_prefix, configure_pre, nonroot.",
+    "relative to the remote $HOME), env_prefix, configure_pre, nonroot, protocols.",
     "",
     "nonroot: true reruns -- as the non-root ssh user, after the sudo runs -- the",
     "tests that declare `fleet_nonroot = True` at module level (so the set is",
-    "maintained in the test files, not here). Keys starting with \"_\" are comments.",
-    "See testsuite/README.md."
+    "maintained in the test files, not here).",
+    "",
+    "protocols: [30, 29] adds one extra stdio-pipe test pass per listed version,",
+    "each run with runtests --protocol=N (the fleet analogue of a workflow's",
+    "check30/check29 steps) and shown as a protoNN column. Keys starting with",
+    "\"_\" are comments. See testsuite/README.md."
   ],
   "targets": [
     {
@@ -70,11 +74,13 @@
       "configure_flags": ["--with-rrsync"]
     },
     {
+      "_comment": "Modern Ubuntu (mirrors ubuntu-build.yml). protocols: [30, 29] also runs the workflow's check30/check29 passes as extra stdio-pipe runs.",
       "name": "ubuntu-2604",
       "ssh_host": "runner@ubuntu-2604",
       "workflow": "ubuntu-build.yml",
       "privilege": "sudo",
       "nonroot": true,
+      "protocols": [30, 29],
       "configure_flags": ["--with-rrsync"]
     },
     {
