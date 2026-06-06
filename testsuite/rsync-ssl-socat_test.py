@@ -9,6 +9,7 @@ transport selection and OPENSSL address construction.
 import os
 import shutil
 import subprocess
+import sys
 
 from rsyncfns import SCRATCHDIR, SRCDIR, test_fail
 
@@ -31,46 +32,34 @@ def script(path, text):
     return path
 
 
-fake_socat = script(FAKEBIN / 'socat', f'''#!/bin/sh
-: > "{HELPER_ARGV}"
-for arg in "$@"
-do
-\tprintf '%s\\n' "$arg" >> "{HELPER_ARGV}"
-done
-exit 0
+def argv_capture_script(path, output_path, env_name=None):
+    env_capture = ''
+    if env_name:
+        env_capture = (
+            f"    out.write({env_name + '='!r} + "
+            f"os.environ.get({env_name!r}, '') + '\\n')\n"
+        )
+    return script(path, f'''#!{sys.executable}
+import os
+import sys
+
+with open({str(output_path)!r}, 'w', encoding='utf-8') as out:
+{env_capture}    for arg in sys.argv[1:]:
+        out.write(arg + '\\n')
 ''')
+
+
+fake_socat = argv_capture_script(FAKEBIN / 'socat', HELPER_ARGV)
 
 FALLBACKBIN = SCRATCHDIR / 'fallbackbin'
 FALLBACKBIN.mkdir()
 fallback_helper_argv = SCRATCHDIR / 'fallback-helper.argv'
 
-script(FALLBACKBIN / 'socat', f'''#!/bin/sh
-: > "{fallback_helper_argv}"
-for arg in "$@"
-do
-\tprintf '%s\\n' "$arg" >> "{fallback_helper_argv}"
-done
-exit 0
-''')
+argv_capture_script(FALLBACKBIN / 'socat', fallback_helper_argv)
 
-script(FAKEBIN / 'openssl', f'''#!/bin/sh
-: > "{OPENSSL_ARGV}"
-for arg in "$@"
-do
-\tprintf '%s\\n' "$arg" >> "{OPENSSL_ARGV}"
-done
-exit 0
-''')
+argv_capture_script(FAKEBIN / 'openssl', OPENSSL_ARGV)
 
-script(FAKEBIN / 'rsync', f'''#!/bin/sh
-: > "{RSYNC_ARGV}"
-printf 'RSYNC_SSL_TYPE=%s\\n' "$RSYNC_SSL_TYPE" >> "{RSYNC_ARGV}"
-for arg in "$@"
-do
-\tprintf '%s\\n' "$arg" >> "{RSYNC_ARGV}"
-done
-exit 0
-''')
+argv_capture_script(FAKEBIN / 'rsync', RSYNC_ARGV, 'RSYNC_SSL_TYPE')
 
 
 def clean_env(**updates):
