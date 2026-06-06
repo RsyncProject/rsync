@@ -44,6 +44,27 @@ for rel in listed:
 for rel in unlisted:
     assert_not_exists(TODIR / rel, label=f'--from0 excluded {rel}')
 
+# --- comments: line mode ignores them, --from0 treats them as filenames ------
+rmtree(TODIR)
+commented = SCRATCHDIR / 'files-commented.lst'
+commented.write_text('\n'.join(['', ';ignored', '#ignored', *listed]) + '\n')
+run_rsync('-a', f'--files-from={commented}', f'{src}/', f'{TODIR}/')
+for rel in listed:
+    assert_same(TODIR / rel, src / rel, label=f'--files-from comment list {rel}')
+for rel in unlisted:
+    assert_not_exists(TODIR / rel, label=f'--files-from comment list excluded {rel}')
+
+rmtree(TODIR)
+(src / '#literal').write_text('hash literal\n')
+(src / ';literal').write_text('semi literal\n')
+comments0 = SCRATCHDIR / 'files-comments0.lst'
+comments0.write_bytes(b'#literal\0;literal\0')
+run_rsync('-a', '--from0', f'--files-from={comments0}', f'{src}/', f'{TODIR}/')
+assert_same(TODIR / '#literal', src / '#literal',
+            label='--from0 literal hash filename')
+assert_same(TODIR / ';literal', src / ';literal',
+            label='--from0 literal semicolon filename')
+
 # --- --exclude-from drops matching files at depth ---------------------------
 seed()
 (src / 'a.skip').write_text('s\n')
