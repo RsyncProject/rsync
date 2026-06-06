@@ -45,4 +45,3 @@ $cached_env_img{$key} = q|<IMG
  ALT="$\beta$">|;
 
 1;
-

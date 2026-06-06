@@ -17,132 +17,132 @@
 # Note that an stunnel connection requires at least version 4.x of stunnel.
 
 function rsync_ssl_run {
-    case "$*" in
+  case "$*" in
     *rsync://*) ;;
     *::*) ;;
     *)
-	echo "You must use rsync-ssl with a daemon-style hostname." 1>&2
-	exit 1
-	;;
-    esac
+      echo "You must use rsync-ssl with a daemon-style hostname." 1>&2
+      exit 1
+      ;;
+  esac
 
-    exec rsync --rsh="$0 --HELPER" "${@}"
+  exec rsync --rsh="$0 --HELPER" "${@}"
 }
 
 function rsync_ssl_helper {
-    if [[ -z "$RSYNC_SSL_TYPE" ]]; then
-	found=`path_search openssl stunnel4 stunnel` || exit 1
-	if [[ "$found" == */openssl ]]; then
-	    RSYNC_SSL_TYPE=openssl
-	    RSYNC_SSL_OPENSSL="$found"
-	elif [[ "$found" == */gnutls-cli ]]; then
-	    RSYNC_SSL_TYPE=gnutls
-	    RSYNC_SSL_GNUTLS="$found"
-	else
-	    RSYNC_SSL_TYPE=stunnel
-	    RSYNC_SSL_STUNNEL="$found"
-	fi
-    fi
-
-    case "$RSYNC_SSL_TYPE" in
-	openssl)
-	    if [[ -z "$RSYNC_SSL_OPENSSL" ]]; then
-		RSYNC_SSL_OPENSSL=`path_search openssl` || exit 1
-	    fi
-	    optsep=' '
-	    ;;
-	gnutls)
-	    if [[ -z "$RSYNC_SSL_GNUTLS" ]]; then
-		RSYNC_SSL_GNUTLS=`path_search gnutls-cli` || exit 1
-	    fi
-	    optsep=' '
-	    ;;
-	stunnel)
-	    if [[ -z "$RSYNC_SSL_STUNNEL" ]]; then
-		RSYNC_SSL_STUNNEL=`path_search stunnel4 stunnel` || exit 1
-	    fi
-	    optsep=' = '
-	    ;;
-	*)
-	    echo "The RSYNC_SSL_TYPE specifies an unknown type: $RSYNC_SSL_TYPE" 1>&2
-	    exit 1
-	    ;;
-    esac
-
-    if [[ -z "$RSYNC_SSL_CERT" ]]; then
-	certopt=""
-	gnutls_cert_opt=""
+  if [[ -z "$RSYNC_SSL_TYPE" ]]; then
+    found=`path_search openssl stunnel4 stunnel` || exit 1
+    if [[ "$found" == */openssl ]]; then
+      RSYNC_SSL_TYPE=openssl
+      RSYNC_SSL_OPENSSL="$found"
+    elif [[ "$found" == */gnutls-cli ]]; then
+      RSYNC_SSL_TYPE=gnutls
+      RSYNC_SSL_GNUTLS="$found"
     else
-	certopt="-cert$optsep$RSYNC_SSL_CERT"
-	gnutls_cert_opt="--x509certfile=$RSYNC_SSL_CERT"
+      RSYNC_SSL_TYPE=stunnel
+      RSYNC_SSL_STUNNEL="$found"
     fi
+  fi
 
-    if [[ -z "$RSYNC_SSL_KEY" ]]; then
-	keyopt=""
-	gnutls_key_opt=""
-    else
-	keyopt="-key$optsep$RSYNC_SSL_KEY"
-	gnutls_key_opt="--x509keyfile=$RSYNC_SSL_KEY"
-    fi
+  case "$RSYNC_SSL_TYPE" in
+    openssl)
+      if [[ -z "$RSYNC_SSL_OPENSSL" ]]; then
+        RSYNC_SSL_OPENSSL=`path_search openssl` || exit 1
+      fi
+      optsep=' '
+      ;;
+    gnutls)
+      if [[ -z "$RSYNC_SSL_GNUTLS" ]]; then
+        RSYNC_SSL_GNUTLS=`path_search gnutls-cli` || exit 1
+      fi
+      optsep=' '
+      ;;
+    stunnel)
+      if [[ -z "$RSYNC_SSL_STUNNEL" ]]; then
+        RSYNC_SSL_STUNNEL=`path_search stunnel4 stunnel` || exit 1
+      fi
+      optsep=' = '
+      ;;
+    *)
+      echo "The RSYNC_SSL_TYPE specifies an unknown type: $RSYNC_SSL_TYPE" 1>&2
+      exit 1
+      ;;
+  esac
 
-    if [[ -z ${RSYNC_SSL_CA_CERT+x} ]]; then
-	# RSYNC_SSL_CA_CERT unset - default CA set AND verify:
-	# openssl:
-	caopt="-verify_return_error -verify 4"
-	# gnutls:
-	gnutls_opts=""
-	# stunnel:
-	# Since there is no way of using the default CA certificate collection,
-	# we cannot do any verification. Thus, stunnel should really only be
-	# used if nothing else is available.
-	cafile=""
-	verify=""
-    elif [[ "$RSYNC_SSL_CA_CERT" == "" ]]; then
-	# RSYNC_SSL_CA_CERT set but empty -do NO verifications:
-	# openssl:
-	caopt="-verify 1"
-	# gnutls:
-	gnutls_opts="--insecure"
-	# stunnel:
-	cafile=""
-	verify="verifyChain = no"
-    else
-	# RSYNC_SSL_CA_CERT set - use CA AND verify:
-	# openssl:
-	caopt="-CAfile $RSYNC_SSL_CA_CERT -verify_return_error -verify 4"
-	# gnutls:
-	gnutls_opts="--x509cafile=$RSYNC_SSL_CA_CERT"
-	# stunnel:
-	cafile="CAfile = $RSYNC_SSL_CA_CERT"
-	verify="verifyChain = yes"
-    fi
+  if [[ -z "$RSYNC_SSL_CERT" ]]; then
+    certopt=""
+    gnutls_cert_opt=""
+  else
+    certopt="-cert$optsep$RSYNC_SSL_CERT"
+    gnutls_cert_opt="--x509certfile=$RSYNC_SSL_CERT"
+  fi
 
-    port="${RSYNC_PORT:-0}"
-    if [[ "$port" == 0 ]]; then
-	port="${RSYNC_SSL_PORT:-874}"
-    fi
+  if [[ -z "$RSYNC_SSL_KEY" ]]; then
+    keyopt=""
+    gnutls_key_opt=""
+  else
+    keyopt="-key$optsep$RSYNC_SSL_KEY"
+    gnutls_key_opt="--x509keyfile=$RSYNC_SSL_KEY"
+  fi
 
-    # If the user specified USER@HOSTNAME::module, then rsync passes us
-    # the -l USER option too, so we must be prepared to ignore it.
-    if [[ "$1" == "-l" ]]; then
-	shift 2
-    fi
+  if [[ -z ${RSYNC_SSL_CA_CERT+x} ]]; then
+    # RSYNC_SSL_CA_CERT unset - default CA set AND verify:
+    # openssl:
+    caopt="-verify_return_error -verify 4"
+    # gnutls:
+    gnutls_opts=""
+    # stunnel:
+    # Since there is no way of using the default CA certificate collection,
+    # we cannot do any verification. Thus, stunnel should really only be
+    # used if nothing else is available.
+    cafile=""
+    verify=""
+  elif [[ "$RSYNC_SSL_CA_CERT" == "" ]]; then
+    # RSYNC_SSL_CA_CERT set but empty -do NO verifications:
+    # openssl:
+    caopt="-verify 1"
+    # gnutls:
+    gnutls_opts="--insecure"
+    # stunnel:
+    cafile=""
+    verify="verifyChain = no"
+  else
+    # RSYNC_SSL_CA_CERT set - use CA AND verify:
+    # openssl:
+    caopt="-CAfile $RSYNC_SSL_CA_CERT -verify_return_error -verify 4"
+    # gnutls:
+    gnutls_opts="--x509cafile=$RSYNC_SSL_CA_CERT"
+    # stunnel:
+    cafile="CAfile = $RSYNC_SSL_CA_CERT"
+    verify="verifyChain = yes"
+  fi
 
-    hostname="$1"
-    shift
+  port="${RSYNC_PORT:-0}"
+  if [[ "$port" == 0 ]]; then
+    port="${RSYNC_SSL_PORT:-874}"
+  fi
 
-    if [[ -z "$hostname" || "$1" != rsync || "$2" != --server || "$3" != --daemon ]]; then
-	echo "Usage: rsync-ssl --HELPER HOSTNAME rsync --server --daemon ." 1>&2
-	exit 1
-    fi
+  # If the user specified USER@HOSTNAME::module, then rsync passes us
+  # the -l USER option too, so we must be prepared to ignore it.
+  if [[ "$1" == "-l" ]]; then
+    shift 2
+  fi
 
-    if [[ $RSYNC_SSL_TYPE == openssl ]]; then
-	exec $RSYNC_SSL_OPENSSL s_client $caopt $certopt $keyopt -quiet -verify_quiet -servername $hostname -verify_hostname $hostname -connect $hostname:$port
-    elif [[ $RSYNC_SSL_TYPE == gnutls ]]; then
-	exec $RSYNC_SSL_GNUTLS --logfile=/dev/null $gnutls_cert_opt $gnutls_key_opt $gnutls_opts $hostname:$port
-    else
-	# devzero@web.de came up with this no-tmpfile calling syntax:
-	exec $RSYNC_SSL_STUNNEL -fd 10 11<&0 <<EOF 10<&0 0<&11 11<&-
+  hostname="$1"
+  shift
+
+  if [[ -z "$hostname" || "$1" != rsync || "$2" != --server || "$3" != --daemon ]]; then
+    echo "Usage: rsync-ssl --HELPER HOSTNAME rsync --server --daemon ." 1>&2
+    exit 1
+  fi
+
+  if [[ $RSYNC_SSL_TYPE == openssl ]]; then
+    exec $RSYNC_SSL_OPENSSL s_client $caopt $certopt $keyopt -quiet -verify_quiet -servername $hostname -verify_hostname $hostname -connect $hostname:$port
+  elif [[ $RSYNC_SSL_TYPE == gnutls ]]; then
+    exec $RSYNC_SSL_GNUTLS --logfile=/dev/null $gnutls_cert_opt $gnutls_key_opt $gnutls_opts $hostname:$port
+  else
+    # devzero@web.de came up with this no-tmpfile calling syntax:
+    exec $RSYNC_SSL_STUNNEL -fd 10 11<&0 <<EOF 10<&0 0<&11 11<&-
 foreground = yes
 debug = crit
 connect = $hostname:$port
@@ -152,47 +152,47 @@ $verify
 $certopt
 $cafile
 EOF
-    fi
+  fi
 }
 
 function path_search {
-    IFS_SAVE="$IFS"
-    IFS=:
-    for prog in "${@}"; do
-	for dir in $PATH; do
-	    [[ -z "$dir" ]] && dir=.
-	    if [[ -f "$dir/$prog" && -x "$dir/$prog" ]]; then
-		echo "$dir/$prog"
-		IFS="$IFS_SAVE"
-		return 0
-	    fi
-	done
+  IFS_SAVE="$IFS"
+  IFS=:
+  for prog in "${@}"; do
+    for dir in $PATH; do
+      [[ -z "$dir" ]] && dir=.
+      if [[ -f "$dir/$prog" && -x "$dir/$prog" ]]; then
+        echo "$dir/$prog"
+        IFS="$IFS_SAVE"
+        return 0
+      fi
     done
+  done
 
-    IFS="$IFS_SAVE"
-    echo "Failed to find on your path: $*" 1>&2
-    echo "See the rsync-ssl manpage for configuration assistance." 1>&2
-    return 1
+  IFS="$IFS_SAVE"
+  echo "Failed to find on your path: $*" 1>&2
+  echo "See the rsync-ssl manpage for configuration assistance." 1>&2
+  return 1
 }
 
 if [[ "$#" == 0 ]]; then
-    echo "Usage: rsync-ssl [--type=SSL_TYPE] RSYNC_ARG [...]" 1>&2
-    echo "The SSL_TYPE can be openssl or stunnel"
-    exit 1
+  echo "Usage: rsync-ssl [--type=SSL_TYPE] RSYNC_ARG [...]" 1>&2
+  echo "The SSL_TYPE can be openssl or stunnel"
+  exit 1
 fi
 
 if [[ "$1" = --help || "$1" = -h ]]; then
-    exec rsync --help
+  exec rsync --help
 fi
 
 if [[ "$1" == --HELPER ]]; then
-    shift
-    rsync_ssl_helper "${@}"
+  shift
+  rsync_ssl_helper "${@}"
 fi
 
 if [[ "$1" == --type=* ]]; then
-    export RSYNC_SSL_TYPE="${1/--type=/}"
-    shift
+  export RSYNC_SSL_TYPE="${1/--type=/}"
+  shift
 fi
 
 rsync_ssl_run "${@}"

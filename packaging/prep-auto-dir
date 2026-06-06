@@ -14,30 +14,30 @@
 
 auto_top='auto-build-save'
 if test -d $auto_top && test -d .git; then
-    desired_branch=`git rev-parse --abbrev-ref HEAD | tr / %`
-    if test "$desired_branch" = HEAD; then
-	echo "ERROR: switch to the right build dir manually when in detached HEAD mode." 1>&2
-	exit 1
+  desired_branch=`git rev-parse --abbrev-ref HEAD | tr / %`
+  if test "$desired_branch" = HEAD; then
+    echo "ERROR: switch to the right build dir manually when in detached HEAD mode." 1>&2
+    exit 1
+  fi
+  auto_dir="$auto_top/$desired_branch"
+  if test -d build; then
+    cur_branch=`readlink build/.branch`
+  else
+    cur_branch='/'
+  fi
+  if test "$desired_branch" != "$cur_branch"; then
+    if test "$cur_branch" != /; then
+      rm -f "$auto_top/$cur_branch"
+      mv build "$auto_top/$cur_branch"
     fi
-    auto_dir="$auto_top/$desired_branch"
-    if test -d build; then
-	cur_branch=`readlink build/.branch`
-    else
-	cur_branch='/'
-    fi
-    if test "$desired_branch" != "$cur_branch"; then
-	if test "$cur_branch" != /; then
-	    rm -f "$auto_top/$cur_branch"
-	    mv build "$auto_top/$cur_branch"
-	fi
-	test -d "$auto_dir" || mkdir "$auto_dir"
-	test -h "$auto_dir/.branch" || ln -s "$desired_branch" "$auto_dir/.branch"
-	mv "$auto_dir" build
-	ln -s ../build "$auto_dir"
-    fi
-    if test ! -h Makefile; then
-	rm -f Makefile
-	ln -s packaging/auto-Makefile Makefile
-    fi
-    echo $desired_branch
+    test -d "$auto_dir" || mkdir "$auto_dir"
+    test -h "$auto_dir/.branch" || ln -s "$desired_branch" "$auto_dir/.branch"
+    mv "$auto_dir" build
+    ln -s ../build "$auto_dir"
+  fi
+  if test ! -h Makefile; then
+    rm -f Makefile
+    ln -s packaging/auto-Makefile Makefile
+  fi
+  echo $desired_branch
 fi
