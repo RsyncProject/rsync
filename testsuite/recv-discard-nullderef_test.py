@@ -104,20 +104,23 @@ finally:
 rc = proc.returncode
 
 # A receiver SIGSEGV manifests to the client as a protocol error (the daemon's
-# receiver child crashes mid-stream and the connection drops). Pre-fix this is
-# code 12 (error in rsync protocol data stream); post-fix the receiver drains
-# the delta and reports a benign "could not transfer" (code 23), or succeeds.
+# receiver child crashes mid-stream and the connection drops): exit code 12.
+# With the fix the receiver drains the delta and, because the forced-unwritable
+# destination leaves the file untransferred, the run reports the benign "some
+# files were not transferred" -- exit code 23.
 #
-# rsync's own exit codes are all < 128, so we can't read the receiver's signal
-# directly from the client. The discriminator is the PROTOCOL error: only a
-# crashed (or otherwise vanished) receiver produces code 12 here. A clean
-# discard yields 23 (file not transferred) or 0.
+# 23 is the ONLY non-crash outcome here: the writability probe above guarantees
+# the receiver's mkstemp() fails, so the file is always discarded. An exit 0
+# would mean the file actually transferred -- the discard path was NOT exercised
+# and the run proves nothing -- so require exactly 23 (and call out 12 as the
+# pre-fix crash).
 if rc == 12:
     test_fail(f"receiver crashed on the discard path (rsync exited {rc}: "
               "error in rsync protocol data stream -- the receiver child "
               "SIGSEGV'd in full_fname(NULL))")
-if rc not in (0, 23):
-    test_fail(f"unexpected rsync exit {rc} (expected 0 or 23, a benign "
-              "discard; 12 would be the crash)")
+if rc != 23:
+    test_fail(f"expected rsync exit 23 (the forced discard leaves the file "
+              f"untransferred); got {rc} -- the discard path was not exercised, "
+              "so this run validates nothing (12 would be the pre-fix crash)")
 
 print(f"OK: receiver discarded the delta without crashing (rsync exit {rc})")
