@@ -1513,6 +1513,12 @@ expand it.
 
     >     --chmod=D2775,F664
 
+    Symbolic permission-copy modes are also allowed, such as `g=u`, `o=g` or
+    `g-o`.  A permission-copy item may copy from one class only (`u`, `g` or
+    `o`) and cannot be combined with `rwxXst` permission letters in the same
+    item.  Use comma-separated items when you need both behaviours, such as
+    `g=o,o=`.
+
     It is also legal to specify multiple `--chmod` options, as each additional
     option is just appended to the list of changes to make.
 
