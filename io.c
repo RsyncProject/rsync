@@ -1090,6 +1090,9 @@ static void got_flist_entry_status(enum festatus status, int ndx)
 {
 	struct file_list *flist = flist_for_ndx(ndx, "got_flist_entry_status");
 
+	if (ndx < flist->ndx_start)
+		exit_cleanup(RERR_PROTOCOL);
+
 	if (remove_source_files) {
 		active_filecnt--;
 		active_bytecnt -= F_LENGTH(flist->files[ndx - flist->ndx_start]);
@@ -1289,8 +1292,21 @@ int read_line(int fd, char *buf, size_t bufsiz, int flags)
 	return s - buf;
 }
 
+/* Reverse safe_arg()'s backslash escaping of a daemon option arg, the way a
+ * remote shell un-escapes args for the ssh transport.  In place; \X -> X. */
+static void unbackslash_arg(char *s)
+{
+	char *f = s, *t = s;
+	while (*f) {
+		if (*f == '\\' && f[1])
+			f++;
+		*t++ = *f++;
+	}
+	*t = '\0';
+}
+
 void read_args(int f_in, char *mod_name, char *buf, size_t bufsiz, int rl_nulls,
-	       char ***argv_p, int *argc_p, char **request_p)
+	       int unescape, char ***argv_p, int *argc_p, char **request_p)
 {
 	int maxargs = MAX_ARGS;
 	int dot_pos = 0, argc = 0, request_len = 0;
@@ -1332,6 +1348,11 @@ void read_args(int f_in, char *mod_name, char *buf, size_t bufsiz, int rl_nulls,
 				glob_expand(buf, &argv, &argc, &maxargs);
 		} else {
 			p = strdup(buf);
+			/* An option arg the client escaped with safe_arg() (no
+			 * remote shell un-escapes it for a daemon).  File args
+			 * after the dot are handled by glob_expand() below. */
+			if (unescape)
+				unbackslash_arg(p);
 			argv[argc++] = p;
 			if (*p == '.' && p[1] == '\0')
 				dot_pos = argc;
@@ -1865,6 +1886,45 @@ int64 read_varlong(int f, uchar min_bytes)
 	return u.x;
 }
 
+/* Read an int32 and verify lo <= v <= hi. On out-of-range, abort with a
+ * protocol error naming "what". The bound is co-located with the read so it
+ * cannot be forgotten by a downstream user. */
+int32 read_int_bounded(int f, int32 lo, int32 hi, const char *what)
+{
+	int32 v = read_int(f);
+	if (v < lo || v > hi) {
+		rprintf(FERROR, "wire value %s out of range: %ld not in [%ld,%ld] [%s]\n",
+			what, (long)v, (long)lo, (long)hi, who_am_i());
+		exit_cleanup(RERR_PROTOCOL);
+	}
+	return v;
+}
+
+/* As read_int_bounded but for varint-encoded values. */
+int32 read_varint_bounded(int f, int32 lo, int32 hi, const char *what)
+{
+	int32 v = read_varint(f);
+	if (v < lo || v > hi) {
+		rprintf(FERROR, "wire value %s out of range: %ld not in [%ld,%ld] [%s]\n",
+			what, (long)v, (long)lo, (long)hi, who_am_i());
+		exit_cleanup(RERR_PROTOCOL);
+	}
+	return v;
+}
+
+/* Read a varint that will be used as a size_t. Rejects negative values
+ * (which would wrap to ~SIZE_MAX) and values exceeding the supplied max. */
+size_t read_varint_size(int f, size_t max, const char *what)
+{
+	int32 v = read_varint(f);
+	if (v < 0 || (size_t)v > max) {
+		rprintf(FERROR, "wire size %s out of range: %ld > %lu [%s]\n",
+			what, (long)v, (unsigned long)max, who_am_i());
+		exit_cleanup(RERR_PROTOCOL);
+	}
+	return (size_t)v;
+}
+
 int64 read_longint(int f)
 {
 #if SIZEOF_INT64 >= 8
@@ -1968,6 +2028,21 @@ void read_sum_head(int f, struct sum_struct *sum)
 	sum->count = read_int(f);
 	if (sum->count < 0) {
 		rprintf(FERROR, "Invalid checksum count %ld [%s]\n",
+			(long)sum->count, who_am_i());
+		exit_cleanup(RERR_PROTOCOL);
+	}
+	/* Guard against integer overflow in downstream allocations sized by
+	 * count*element_size. my_alloc uses divide-not-multiply so it is
+	 * already wraparound-safe, but checking here gives a clearer error
+	 * and also covers the (size_t)count * xfer_sum_len arithmetic that
+	 * is performed *before* reaching my_alloc. */
+	if (xfer_sum_len > 0 && (size_t)sum->count > SIZE_MAX / (size_t)xfer_sum_len) {
+		rprintf(FERROR, "Invalid checksum count %ld (too large) [%s]\n",
+			(long)sum->count, who_am_i());
+		exit_cleanup(RERR_PROTOCOL);
+	}
+	if ((size_t)sum->count > SIZE_MAX / sizeof(struct sum_buf)) {
+		rprintf(FERROR, "Invalid checksum count %ld (sum_buf overflow) [%s]\n",
 			(long)sum->count, who_am_i());
 		exit_cleanup(RERR_PROTOCOL);
 	}

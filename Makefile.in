@@ -44,7 +44,7 @@ LIBOBJ=lib/wildmatch.o lib/compat.o lib/snprintf.o lib/mdfour.o lib/md5.o \
 zlib_OBJS=zlib/deflate.o zlib/inffast.o zlib/inflate.o zlib/inftrees.o \
 	zlib/trees.o zlib/zutil.o zlib/adler32.o zlib/compress.o zlib/crc32.o
 OBJS1=flist.o rsync.o generator.o receiver.o cleanup.o sender.o exclude.o \
-	util1.o util2.o main.o checksum.o match.o syscall.o log.o backup.o delete.o
+	util1.o util2.o main.o checksum.o match.o syscall.o android.o log.o backup.o delete.o
 OBJS2=options.o io.o compat.o hlink.o token.o uidlist.o socket.o hashtable.o \
 	usage.o fileio.o batch.o clientname.o chmod.o acls.o xattrs.o
 OBJS3=progress.o pipe.o @MD5_ASM@ @ROLL_SIMD@ @ROLL_ASM@
@@ -53,17 +53,18 @@ popt_OBJS= popt/popt.o  popt/poptconfig.o \
 	popt/popthelp.o popt/poptparse.o popt/poptint.o
 OBJS=$(OBJS1) $(OBJS2) $(OBJS3) $(DAEMON_OBJ) $(LIBOBJ) @BUILD_ZLIB@ @BUILD_POPT@
 
-TLS_OBJ = tls.o syscall.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/permstring.o lib/sysxattrs.o @BUILD_POPT@
+TLS_OBJ = tls.o syscall.o android.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/permstring.o lib/sysxattrs.o @BUILD_POPT@
 
 # Programs we must have to run the test cases
 CHECK_PROGS = rsync$(EXEEXT) tls$(EXEEXT) getgroups$(EXEEXT) getfsdev$(EXEEXT) \
-	testrun$(EXEEXT) trimslash$(EXEEXT) t_unsafe$(EXEEXT) wildtest$(EXEEXT) \
-	simdtest$(EXEEXT)
+	testrun$(EXEEXT) trimslash$(EXEEXT) t_unsafe$(EXEEXT) t_chmod_secure$(EXEEXT) \
+	t_secure_relpath$(EXEEXT) wildtest$(EXEEXT) simdtest$(EXEEXT)
 
-CHECK_SYMLINKS = testsuite/chown-fake.test testsuite/devices-fake.test testsuite/xattrs-hlink.test
+CHECK_SYMLINKS = testsuite/chown-fake_test.py testsuite/devices-fake_test.py \
+	testsuite/xattrs-hlink_test.py testsuite/exclude-lsh_test.py
 
 # Objects for CHECK_PROGS to clean
-CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o trimslash.o wildtest.o
+CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o t_chmod_secure.o t_secure_relpath.o trimslash.o wildtest.o
 
 # note that the -I. is needed to handle config.h when using VPATH
 .c.o:
@@ -83,12 +84,19 @@ install: all
 	$(INSTALLCMD) -m 755 $(srcdir)/rsync-ssl $(DESTDIR)$(bindir)
 	-$(MKDIR_P) $(DESTDIR)$(mandir)/man1
 	-$(MKDIR_P) $(DESTDIR)$(mandir)/man5
-	if test -f rsync.1; then $(INSTALLMAN) -m 644 rsync.1 $(DESTDIR)$(mandir)/man1; fi
-	if test -f rsync-ssl.1; then $(INSTALLMAN) -m 644 rsync-ssl.1 $(DESTDIR)$(mandir)/man1; fi
-	if test -f rsyncd.conf.5; then $(INSTALLMAN) -m 644 rsyncd.conf.5 $(DESTDIR)$(mandir)/man5; fi
+	for fn in rsync.1 rsync-ssl.1; do \
+	    if test -f $$fn; then $(INSTALLMAN) -m 644 $$fn $(DESTDIR)$(mandir)/man1; \
+	    elif test -f $(srcdir)/$$fn; then $(INSTALLMAN) -m 644 $(srcdir)/$$fn $(DESTDIR)$(mandir)/man1; fi; \
+	done
+	for fn in rsyncd.conf.5; do \
+	    if test -f $$fn; then $(INSTALLMAN) -m 644 $$fn $(DESTDIR)$(mandir)/man5; \
+	    elif test -f $(srcdir)/$$fn; then $(INSTALLMAN) -m 644 $(srcdir)/$$fn $(DESTDIR)$(mandir)/man5; fi; \
+	done
 	if test "$(with_rrsync)" = yes; then \
 	    $(INSTALLCMD) -m 755 rrsync $(DESTDIR)$(bindir); \
-	    if test -f rrsync.1; then $(INSTALLMAN) -m 644 rrsync.1 $(DESTDIR)$(mandir)/man1; fi; \
+	    fn=rrsync.1; \
+	    if test -f $$fn; then $(INSTALLMAN) -m 644 $$fn $(DESTDIR)$(mandir)/man1; \
+	    elif test -f $(srcdir)/$$fn; then $(INSTALLMAN) -m 644 $(srcdir)/$$fn $(DESTDIR)$(mandir)/man1; fi; \
 	fi
 
 install-ssl-daemon: stunnel-rsyncd.conf
@@ -171,13 +179,21 @@ getgroups$(EXEEXT): getgroups.o
 getfsdev$(EXEEXT): getfsdev.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ getfsdev.o $(LIBS)
 
-TRIMSLASH_OBJ = trimslash.o syscall.o util2.o t_stub.o lib/compat.o lib/snprintf.o
+TRIMSLASH_OBJ = trimslash.o syscall.o android.o util2.o t_stub.o lib/compat.o lib/snprintf.o
 trimslash$(EXEEXT): $(TRIMSLASH_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(TRIMSLASH_OBJ) $(LIBS)
 
-T_UNSAFE_OBJ = t_unsafe.o syscall.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o
+T_UNSAFE_OBJ = t_unsafe.o syscall.o android.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o
 t_unsafe$(EXEEXT): $(T_UNSAFE_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_UNSAFE_OBJ) $(LIBS)
+
+T_CHMOD_SECURE_OBJ = t_chmod_secure.o syscall.o android.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o
+t_chmod_secure$(EXEEXT): $(T_CHMOD_SECURE_OBJ)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_CHMOD_SECURE_OBJ) $(LIBS)
+
+T_SECURE_RELPATH_OBJ = t_secure_relpath.o syscall.o android.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o
+t_secure_relpath$(EXEEXT): $(T_SECURE_RELPATH_OBJ)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_SECURE_RELPATH_OBJ) $(LIBS)
 
 .PHONY: conf
 conf: configure.sh config.h.in
@@ -271,6 +287,8 @@ clean: cleantests
 	rm -f *~ $(OBJS) $(CHECK_PROGS) $(CHECK_OBJS) $(CHECK_SYMLINKS) @MAKE_RRSYNC@ \
 		git-version.h rounding rounding.h *.old rsync*.1 rsync*.5 @MAKE_RRSYNC_1@ \
 		*.html daemon-parm.h help-*.h default-*.h proto.h proto.h-tstamp
+	rm -f *.gcno *.gcda lib/*.gcno lib/*.gcda zlib/*.gcno zlib/*.gcda popt/*.gcno popt/*.gcda
+	rm -rf coverage coverage-tcp coverage-all coverage-fallback
 
 .PHONY: cleantests
 cleantests:
@@ -311,17 +329,115 @@ test: check
 # catch Bash-isms earlier even if we're running on GNU.  Of course, we
 # might lose in the future where POSIX diverges from old sh.
 
+# `make check` runs tests in parallel by default. Override with
+# `make check CHECK_J=1` (serial) or any other value.
+CHECK_J = 8
+
+# Parallelism for `make coverage`. Defaults to the same as CHECK_J: the
+# coverage build sets -fprofile-update=atomic (atomic in-memory counters) and
+# gcc's libgcov serializes the per-source .gcda read-modify-write merge with a
+# file lock, so concurrent rsync processes (incl. the forked sender/generator/
+# receiver) accumulate exactly -- verified by a count-linearity check (a hot
+# line accumulates identically at -j1 and -P16). Override with
+# `make coverage COVERAGE_J=1` if your libgcov does not lock .gcda merges.
+COVERAGE_J = $(CHECK_J)
+
+# Output directory and extra runtests.py flags for `make coverage`. The
+# `coverage-tcp` target reuses the coverage recipe with --use-tcp (real
+# loopback rsyncd, which exercises the TCP accept/auth path and the
+# require_tcp-only tests) and a separate output directory.
+COVERAGE_DIR = coverage
+COVERAGE_RUNFLAGS =
+
+# Bundled third-party code that rsync ships but does not own; excluded from the
+# coverage report so the percentages reflect rsync's own source. zlib/ and popt/
+# are wholly vendored; the named lib/ files are PostgreSQL (getaddrinfo) and ISC
+# (inet_ntop/inet_pton) / standalone (getpass) imports. The other lib/*.c
+# (md5, mdfour, wildmatch, permstring, pool_alloc, snprintf, sysacls, sysxattrs,
+# compat) are rsync's own and stay in the report.
+COVERAGE_EXCLUDE = -e '(^|/)zlib/' -e '(^|/)popt/' \
+	-e '(^|/)lib/(getaddrinfo|getpass|inet_ntop|inet_pton)\.'
+
+# Build everything the test suite needs (rsync + helper programs + symlinks)
+# WITHOUT running it. Used by CI jobs that invoke runtests.py directly with
+# custom options (e.g. the version-mix workflow's --rsync-bin2/--expect-result).
+.PHONY: check-progs
+check-progs: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
+
 .PHONY: check
 check: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
-	$(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT)
+	$(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(CHECK_J)
 
 .PHONY: check29
 check29: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
-	$(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) --protocol=29
+	$(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(CHECK_J) --protocol=29
 
 .PHONY: check30
 check30: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
-	$(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) --protocol=30
+	$(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(CHECK_J) --protocol=30
+
+# Whole-suite gcov coverage report (HTML, with branch + decision coverage).
+# Requires a build configured with --enable-coverage and the `gcovr` tool
+# (pip install gcovr). Runs the suite in parallel (COVERAGE_J, default CHECK_J):
+# this is safe because the coverage build uses -fprofile-update=atomic and
+# libgcov locks the per-source .gcda during its merge, so concurrent rsync
+# processes accumulate exactly (see COVERAGE_J above). Use COVERAGE_J=1 if your
+# toolchain's libgcov does not lock .gcda merges.
+.PHONY: coverage
+coverage: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
+	@case '$(CFLAGS)' in *--coverage*) ;; \
+	  *) echo "*** not a coverage build; reconfigure with --enable-coverage"; exit 1 ;; esac
+	@command -v gcovr >/dev/null 2>&1 || { echo "*** gcovr not found (pip install gcovr)"; exit 1; }
+	find . -name '*.gcda' -delete
+	@rc=0; $(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(COVERAGE_J) $(COVERAGE_RUNFLAGS) || rc=$$?; \
+	  rm -rf $(COVERAGE_DIR) && mkdir -p $(COVERAGE_DIR); \
+	  gcovr --root $(srcdir) $(COVERAGE_EXCLUDE) --decisions --print-summary \
+	      --html-details -o $(COVERAGE_DIR)/index.html . || exit $$?; \
+	  echo "Coverage report written to $(COVERAGE_DIR)/index.html"; \
+	  if test $$rc != 0; then \
+	    echo "*** test suite FAILED (status $$rc) -- coverage report still written above"; \
+	  fi; \
+	  exit $$rc
+
+# Same as `make coverage` but with the daemon tests run over a real loopback
+# rsyncd (--use-tcp), into a separate report directory.
+.PHONY: coverage-tcp
+coverage-tcp:
+	$(MAKE) coverage COVERAGE_RUNFLAGS=--use-tcp COVERAGE_DIR=coverage-tcp
+
+# Comprehensive single report: run the suite under several configurations,
+# accumulating into the shared .gcda counters (NOT cleared between runs), then
+# emit one merged, rsync-scoped report. Covers the default (pipe) transport, the
+# protocol-29/30 compat branches, and the real-TCP daemon path (which also runs
+# the require_tcp-only tests). Run under sudo to additionally cover root-only
+# paths (devices, chown, use-chroot, protected-regular). Local target -- CI uses
+# the plain `coverage`/`coverage-tcp` targets.
+.PHONY: coverage-all
+coverage-all: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
+	@case '$(CFLAGS)' in *--coverage*) ;; \
+	  *) echo "*** not a coverage build; reconfigure with --enable-coverage"; exit 1 ;; esac
+	@command -v gcovr >/dev/null 2>&1 || { echo "*** gcovr not found (pip install gcovr)"; exit 1; }
+	find . -name '*.gcda' -delete
+	@rc=0; \
+	  for cfg in '' '--protocol=30' '--protocol=29' '--use-tcp'; do \
+	    echo "===== coverage-all: runtests.py $$cfg ====="; \
+	    $(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(COVERAGE_J) $$cfg || rc=$$?; \
+	  done; \
+	  rm -rf coverage-all && mkdir -p coverage-all; \
+	  gcovr --root $(srcdir) $(COVERAGE_EXCLUDE) --decisions --print-summary \
+	      --html-details -o coverage-all/index.html . || exit $$?; \
+	  echo "Merged coverage report written to coverage-all/index.html"; \
+	  if test $$rc != 0; then \
+	    echo "*** some suite runs FAILED (status $$rc) -- report still written above"; \
+	  fi; \
+	  exit $$rc
+
+# Coverage for the portable (non-openat2) resolver tier. Requires a SEPARATE
+# build configured with --enable-coverage --disable-openat2: its .gcno differ
+# from the openat2 build, so this report cannot be merged with the others.
+.PHONY: coverage-fallback
+coverage-fallback:
+	$(MAKE) coverage COVERAGE_DIR=coverage-fallback
 
 wildtest.o: wildtest.c t_stub.o lib/wildmatch.c rsync.h config.h
 wildtest$(EXEEXT): wildtest.o lib/compat.o lib/snprintf.o @BUILD_POPT@
@@ -335,14 +451,17 @@ simdtest$(EXEEXT): simd-checksum-x86_64.cpp $(HEADERS)
 	    touch $@; \
 	fi
 
-testsuite/chown-fake.test:
-	ln -s chown.test $(srcdir)/testsuite/chown-fake.test
+testsuite/chown-fake_test.py:
+	ln -s chown_test.py $(srcdir)/testsuite/chown-fake_test.py
 
-testsuite/devices-fake.test:
-	ln -s devices.test $(srcdir)/testsuite/devices-fake.test
+testsuite/devices-fake_test.py:
+	ln -s devices_test.py $(srcdir)/testsuite/devices-fake_test.py
 
-testsuite/xattrs-hlink.test:
-	ln -s xattrs.test $(srcdir)/testsuite/xattrs-hlink.test
+testsuite/xattrs-hlink_test.py:
+	ln -s xattrs_test.py $(srcdir)/testsuite/xattrs-hlink_test.py
+
+testsuite/exclude-lsh_test.py:
+	ln -s exclude_test.py $(srcdir)/testsuite/exclude-lsh_test.py
 
 # This does *not* depend on building or installing: you can use it to
 # check a version installed from a binary or some other source tree,
@@ -350,7 +469,7 @@ testsuite/xattrs-hlink.test:
 
 .PHONY: installcheck
 installcheck: $(CHECK_PROGS) $(CHECK_SYMLINKS)
-	$(srcdir)/runtests.py --rsync-bin="$(bindir)/rsync$(EXEEXT)" --srcdir="$(srcdir)" --tooldir=`pwd`
+	$(srcdir)/runtests.py --rsync-bin="$(bindir)/rsync$(EXEEXT)" --srcdir="$(srcdir)" --tooldir=`pwd` -j $(CHECK_J)
 
 # TODO: Add 'dist' target; need to know which files will be included
 

@@ -1,0 +1,284 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<HTML>
+<HEAD>
+<TITLE>rsync</TITLE>
+<style>
+.security { color: red; }
+h3 { margin-bottom: 0px; }
+.date { color: #D25A0B; }
+</style>
+</HEAD>
+<!--#include virtual="header.html" -->
+
+<H2 align="center">Rsync Security Advisories</H2>
+
+<p>You should install a security fix for rsync when the rync you are running is:<ol>
+<li>older than 3.2.5 and pulling from an untrusted server
+<li>older than 3.2.5 and using the bundled zlib
+<li>older than 3.1.3 with --xattrs enabled
+<li>older than 3.1.3 with a writable rsync daemon
+<li>older than 2.6.6
+</ol>
+
+<p><a name="s3_2_5"></a><hr>
+<h3>Improved file-list validation in 3.2.5</h3>
+<i class=date>August 14th, 2022</i>
+
+<p>If you are running an rsync older than 3.2.5 and pulling files from an
+untrusted server, upgrade to 3.2.5 to get some added file-list validation rules
+that should prevent the sender from sneaking in extra top-level arguments
+and/or including files/dirs that should have been filtered out by the client's
+filter rules. Fixes CVE-2022-29154.
+
+<p><a name="s3_2_5-2"></a><hr>
+<h3>Zlib memory corruption bug in rsync 2.6.6 - 3.2.4</h3>
+<i class=date>August 14th, 2022</i>
+
+<p>If your rsync is configured to use the bundled zlib, you should upgrade to
+3.2.5 which contains the official zlib fix for a buffer overrun bug that was
+detailed in CVE-2022-37434. While you're at it, be sure to update your system's
+zlib.
+
+<p><a name="s3_2_4"></a><hr>
+<h3>Zlib memory corruption bug in rsync 2.6.6 - 3.2.3</h3>
+<i class=date>April 15th, 2022</i>
+
+<p>If your rsync is configured to use the bundled zlib, you should upgrade to
+3.2.4 which contains the official zlib fix for a memory corruption bug that was
+detailed in CVE-2018-25032. While you're at it, be sure to update your system's
+zlib.
+
+<p><a name="s3_1_3"></a><hr>
+<h3>File-list validation in 3.1.3</h3>
+<i class=date>January 28st, 2018</i>
+
+<p>If you are using a version of rsync older than 3.1.3 as a client and
+receiving xattrs from an rsync server that you might not fully trust, a
+malicious (modified) server could send a non-null-terminated xattr name to
+overflow the xattr read buffer.
+
+<p>If you are running a writable rsync daemon older than 3.1.3, you should add
+a rule "refuse options = protect-args" if you don't fully trust the users who
+are sending you files.
+
+<p><a name="s3_1_2"></a><hr>
+<h3>File-list validation in 3.1.2</h3>
+<i class=date>December 21st, 2015</i>
+
+<p>If you're using a version of rsync older than 3.1.2 as a client and
+receiving files from an rsync server that you might not fully trust, this
+version adds extra checking to the file list to prevent the sender from
+tweaking the paths and/or the transfer requests in a way that could cause
+a file to be received outside the transfer destination.
+
+<p><a name="s3_0_2"></a><hr>
+<h3>Xattr security fix in 3.0.2</h3>
+<i class=date>April 8th, 2008</i>
+
+<p>If you're using a version of rsync from 2.6.9 to 3.0.1 that has extended
+attribute (xattr) support enabled, you should upgrade to 3.0.2 to avoid a
+potential buffer overflow problem.  All 3.x versions have the potential to
+support xattrs (depending on OS availability and the configure options used),
+but version 2.6.9 had to be patched for this support.  You can run the command
+"rsync --version" and look for the string "xattrs" (as long as it is not
+"no&nbsp;xattrs") to see if your rsync is affected.
+
+<p>For those running affected versions, there is
+<a href="https://download.samba.org/pub/rsync/security/rsync-3.0.1-xattr-alloc.diff">a
+patch with the fix available</a>.
+
+<p>Those running a writable rsync daemon can opt to refuse the "xattrs" option
+as a way to avoid the problem without an upgrade:
+
+<blockquote><pre>refuse options = xattrs</pre></blockquote>
+
+<p>(If you already refuse options, be sure to append "xattrs" to your existing
+config parameter rather than adding another refuse directive.)
+
+<p><a name="s3_0_0"></a><hr>
+<h3>Daemon security fixes in 3.0.0 (with patches for 2.6.9)</h3>
+<i class=date>First published on November 28th, 2007;<br>
+Updated on December 16th, 2007;<br>
+Item 3 added on February 15th, 2008</i>
+
+<p>Three security advisories affect people who run a <b>writable</b> rsync
+daemon:  The first affects only those with "use chroot = no" (which is not a
+very safe combination in general), the second affects a daemon that has
+daemon-excluded files that are being hidden in a module's hierarchy, and
+the third affects only those with "use chroot = yes".
+Included are simple config-change suggestions that should help you to
+avoid the security issues and patches that make things safer.
+These advisories affect all rsync versions.
+
+<h4>1. Daemon advisory for "use chroot = no"</h4>
+
+<p>If you are running a writable rsync daemon with "use chroot = no", there
+is at least one way for someone to trick rsync into creating a symlink
+that points outside of the module's hierarchy.
+
+<p>This means that if you are allowing access from users who you don't
+trust, that you should either figure out a way to turn on "use chroot",
+or configure the daemon to refuse the "links" option (see "refuse
+options" in the rsyncd.conf manpage) which will disable the ability of
+the rsync module to receive symlinks.  After doing so, you should also
+check that any existing symlinks in the daemon hierarchy are safe.
+
+<p>Starting with the 3.0.0-pre6 release, there is a new daemon parameter
+available: "munge symlinks".  This allows an rsync daemon to accept
+symlinks and return them intact (with even a leading slash still there,
+which is new for a non-chroot daemon), but will not allow the symlinks
+to be used while they are in the daemon's hierarchy.
+
+<p>For those running
+2.6.9, there is
+<a href="https://download.samba.org/pub/rsync/security/rsync-2.6.9-munge-symlinks.diff">a
+patch for 2.6.9 to implement this parameter</a>.
+
+<p>Any admin applying that patch should read the "munge symlinks" section
+of the modified rsyncd.conf manpage for more information.  You can also
+read about this parameter in the
+<a href="https://download.samba.org/pub/rsync/rsyncd.conf.html">rsyncd.conf
+manpage from a 3.x version</a>.
+
+<h4>2. Daemon advisory for daemon excludes</h4>
+
+<p>If you are running a writable rsync daemon that is using one of the
+"exclude", "exclude from", or "filter" parameters in the rsyncd.conf file
+to hide data from your users, you should be aware that there are tricks
+that a user can play with symlinks and/or certain options that can allow
+a user that knows the name of a hidden file to access it or overwrite it
+(if file permissions allow that).
+
+<p>You can avoid the symlink problem using the suggestions in the advisory
+above.
+
+<p>When a daemon has "use chroot = no" set , there was some buggy
+exclude-checking for these options: <code>--compare-dest</code>,
+<code>--link-dest</code>, <code>--copy-dest</code>, <code>--partial-dir</code>,
+<code>--backup-dir</code>, <code>--temp-dir</code>, and
+<code>--files-from</code>.  These are fixed in the 3.0.0pre7 release.  For
+those running 2.6.9, there is <a
+href="https://download.samba.org/pub/rsync/security/rsync-2.6.9-daemon-exclude.diff">a patch for
+2.6.9</a> to fix these checks.
+
+<p>Some of the above options can still cause problems if an excluded
+sub-directory or filename is inside the option's directory hierarchy and the
+names of a transferred file clashes with it.  The affected options are the
+various <code>--*-dest</code> options (of which only <code>--link-dest</code>
+is particularly worrisome),
+<code>--backup-dir</code>, and <code>--partial-dir</code>.
+
+<p>You can avoid these sub-path problems by putting the following "refuse
+options" setting into your rsyncd.conf file:
+
+<blockquote><pre>refuse options = link-dest backup-dir partial-dir</pre></blockquote>
+
+<p>Those who aren't using an rsync with the latest exclude fixes may want to add
+some of the other affected options as well.
+
+<h4>3. Daemon advisory for "use chroot = yes"</h4>
+
+<p>If you are running a writable rsync daemon with "use chroot = yes", you
+should take care that users cannot upload their own library files and attempt
+to load them.
+
+<p>Beginning with rsync 3.0.0pre10, you can specify an inside-chroot path that
+makes the top of the transfer a subdirectory inside the chroot area, and that
+automatically makes library loading occur outside the transfer area (assuming
+you didn't pick an unwise subdirectory name for the transfer area and you
+don't have symlinks that point outside the transfer area).
+
+<p>If that solution is not good for you, the easiest way to protect your daemon
+is to create some appropriate directories in the top of your module's path
+hierarchy, such as "/etc", "/lib", and "/usr" (and any other top-level dirs
+that might be in the load path), chown those directories to some other user
+than the one that the module runs as (so that rsync will not be able to write
+files there, assuming that it is not run as root), and then hide the dirs using
+an exclude directive (either add a new one or extend your existing one):
+
+<blockquote><pre>exclude = /etc /lib /usr</pre></blockquote>
+
+<p>Doing all that will assure you that no user will be able to use rsync to
+upload a library that can be potentially loaded while rsync is attempting to
+perform an action, such as translating a username.  You can feel free to put
+trusted libraries that you want rsync to access in the protected hierarchies,
+as desired.
+
+<p>Also available in rsync 3.0.0pre10 is a new daemon parameter that allows you
+to avoid the accessing of user/group-name translation libraries by a chrooted
+rsync:  the "numeric ids" daemon parameter lets you turn on a forced
+numeric-only mode.  The default for a chroot module is to enable this
+parameter, while the default for a non-chroot module is to disable it.
+
+<p>For those running 2.6.9, there is <a
+href="https://download.samba.org/pub/rsync/security/rsync-2.6.9-daemon-ids.diff">a patch for
+2.6.9</a> to add the "numeric ids" daemon config parameter.  (The patch will
+only apply cleanly if you've already applied the munge-symlinks diff mentioned
+above.)
+
+<p><a name="s2_6_8"></a><hr>
+<h3>Xattr security fix in 2.6.8</h3>
+<i class=date>April 22th, 2006</i>
+
+<p>If you're using a version of rsync prior to 2.6.8 that was patched to
+include extended attribute (xattr) support, you should upgrade to 2.6.8 or
+later to avoid a potential buffer overflow problem.
+
+<p><a name="s2_6_6"></a><hr>
+<h3>Zlib security fix in 2.6.6</h3>
+<i class=date>July 28th, 2005</i>
+
+<p>If you're using a version of rsync prior to 2.6.6, there is a potential
+null-pointer security bug in the zlib code.  You can avoid its affect in an
+rsync daemon situation by configuring rsync to refuse the "compress" option.
+
+<p><a name="s2_6_3"></a><hr>
+<h3>Daemon path-sanitizing fix in 2.6.3</h3>
+<i class=date>August 12th, 2004</i>
+
+<p>There is a path-sanitizing bug that affects daemon-mode in
+rsync versions prior to 2.6.3, but only if "use chroot" is disabled.  It
+does <b>not</b> affect the normal send/receive filenames that specify what
+files should be transferred (this is because these names happen to get
+sanitized twice, and thus the second call removes any lingering leading
+slash(es) that the first call left behind).  It does affect certain
+option paths that cause auxiliary files to be read or written.
+
+<p>One potential fix that doesn't require recompiling rsync is to set
+"use chroot = true" for all the modules in the rsyncd.conf file.
+
+<p><a name="s2_6_1"></a><hr>
+<h3>Daemon security fix in 2.6.1</h3>
+<i class=date>April 26th, 2004</i>
+
+<p>There is a security problem in all versions prior to 2.6.1 that affects only
+people running a read/write daemon with "use chroot" disabled.  If the user privs
+of a module in the daemon config is anything above "nobody", you are at risk
+of someone crafting an attack that could write a file outside of the module's
+"path" setting (where all its files should be stored).  Please either enable
+chroot or upgrade to 2.6.1.  People not running a daemon, running a read-only
+daemon, or running a chrooted daemon are totally unaffected.
+
+<p><a name="s2_5_7"></a><hr>
+<h3>Memory overflow fix in 2.5.7</h3>
+<i class=date>December 4th, 2003</i>
+
+<p>Rsync versions prior to 2.5.7 contain a heap overflow vulnerability that
+could be used to remotely run arbitrary code, but this only affects the use of
+rsync as an "rsync daemon" (where rsync handles incoming socket connections,
+typically on port 873).
+
+<!--#include virtual="footer.html" -->
+<br>&nbsp;
+<br>&nbsp;
+<br>&nbsp;
+<br>&nbsp;
+<br>&nbsp;
+<br>&nbsp;
+<br>&nbsp;
+<br>&nbsp;
+<br>&nbsp;
+<br>&nbsp;
+<br>&nbsp;
+<br>&nbsp;
+<br>&nbsp;

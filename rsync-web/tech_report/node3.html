@@ -1,0 +1,187 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<!--Converted with LaTeX2HTML 98.1p1 release (March 2nd, 1998)
+originally by Nikos Drakos (nikos@cbl.leeds.ac.uk), CBLU, University of Leeds
+* revised and updated by:  Marcus Hennecke, Ross Moore, Herb Swan
+* with significant contributions from:
+  Jens Lippmann, Marek Rouchal, Martin Wilck and others -->
+<HTML>
+<HEAD>
+<TITLE>Rolling checksum</TITLE>
+<META NAME="description" CONTENT="Rolling checksum">
+<META NAME="keywords" CONTENT="tech_report">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+<LINK REL="STYLESHEET" HREF="tech_report.css">
+<LINK REL="next" HREF="node4.html">
+<LINK REL="previous" HREF="node2.html">
+<LINK REL="up" HREF="tech_report.html">
+<LINK REL="next" HREF="node4.html">
+</HEAD>
+<BODY >
+<!--Navigation Panel-->
+<A NAME="tex2html42"
+ HREF="node4.html">
+<IMG WIDTH="37" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="next"
+ SRC="next.gif"></A> 
+<A NAME="tex2html40"
+ HREF="tech_report.html">
+<IMG WIDTH="26" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="up"
+ SRC="up.gif"></A> 
+<A NAME="tex2html34"
+ HREF="node2.html">
+<IMG WIDTH="63" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="previous"
+ SRC="previous.gif"></A>   
+<BR>
+<B> Next:</B> <A NAME="tex2html43"
+ HREF="node4.html">Checksum searching</A>
+<B> Up:</B> <A NAME="tex2html41"
+ HREF="tech_report.html">The rsync algorithm</A>
+<B> Previous:</B> <A NAME="tex2html35"
+ HREF="node2.html">The rsync algorithm</A>
+<BR>
+<BR>
+<!--End of Navigation Panel-->
+
+<H1><A NAME="SECTION00030000000000000000">
+Rolling checksum</A>
+</H1>
+
+<P>
+The weak rolling checksum used in the rsync algorithm needs to have
+the property that it is very cheap to calculate the checksum of a
+buffer 
+<!-- MATH: $X_2 .. X_{n+1}$ -->
+<I>X</I><SUB>2</SUB> .. <I>X</I><SUB><I>n</I>+1</SUB> given the checksum of buffer 
+<!-- MATH: $X_1 .. X_n$ -->
+<I>X</I><SUB>1</SUB> .. <I>X</I><SUB><I>n</I></SUB> and
+the values of the bytes <I>X</I><SUB>1</SUB> and <I>X</I><SUB><I>n</I>+1</SUB>.
+
+<P>
+The weak checksum algorithm we used in our implementation was inspired
+by Mark Adler's adler-32 checksum.  Our checksum is defined by
+<BR><P></P>
+<DIV ALIGN="CENTER">
+<!-- MATH: \begin{displaymath}
+a(k,l) = (\sum_{i=k}^l X_i) \bmod M
+\end{displaymath} -->
+
+
+<IMG
+ WIDTH="176" HEIGHT="56"
+ SRC="img3.gif"
+ ALT="\begin{displaymath}a(k,l) = (\sum_{i=k}^l X_i) \bmod M \end{displaymath}">
+</DIV>
+<BR CLEAR="ALL">
+<P></P>
+<BR><P></P>
+<DIV ALIGN="CENTER">
+<!-- MATH: \begin{displaymath}
+b(k,l) = (\sum_{i=k}^l (l-i+1)X_i) \bmod M
+\end{displaymath} -->
+
+
+<IMG
+ WIDTH="240" HEIGHT="56"
+ SRC="img4.gif"
+ ALT="\begin{displaymath}b(k,l) = (\sum_{i=k}^l (l-i+1)X_i) \bmod M \end{displaymath}">
+</DIV>
+<BR CLEAR="ALL">
+<P></P>
+<BR><P></P>
+<DIV ALIGN="CENTER">
+<!-- MATH: \begin{displaymath}
+s(k,l) = a(k,l) + 2^{16} b(k,l)
+\end{displaymath} -->
+
+
+<I>s</I>(<I>k</I>,<I>l</I>) = <I>a</I>(<I>k</I>,<I>l</I>) + 2<SUP>16</SUP> <I>b</I>(<I>k</I>,<I>l</I>)
+</DIV>
+<BR CLEAR="ALL">
+<P></P>
+<P>
+where <I>s</I>(<I>k</I>,<I>l</I>) is the rolling checksum of the bytes 
+<!-- MATH: $X_k \ldots X_l$ -->
+<IMG
+ WIDTH="67" HEIGHT="29" ALIGN="MIDDLE" BORDER="0"
+ SRC="img5.gif"
+ ALT="$X_k \ldots X_l$">.
+For simplicity and speed, we use 
+<!-- MATH: $M = 2^{16}$ -->
+<I>M</I> = 2<SUP>16</SUP>.  
+
+<P>
+The important property of this checksum is that successive values can
+be computed very efficiently using the recurrence relations
+
+<P>
+<BR><P></P>
+<DIV ALIGN="CENTER">
+<!-- MATH: \begin{displaymath}
+a(k+1,l+1) = (a(k,l) - X_k + X_{l+1}) \bmod M
+\end{displaymath} -->
+
+
+<IMG
+ WIDTH="322" HEIGHT="28"
+ SRC="img6.gif"
+ ALT="\begin{displaymath}a(k+1,l+1) = (a(k,l) - X_k + X_{l+1}) \bmod M \end{displaymath}">
+</DIV>
+<BR CLEAR="ALL">
+<P></P>
+<BR><P></P>
+<DIV ALIGN="CENTER">
+<!-- MATH: \begin{displaymath}
+b(k+1,l+1) = (b(k,l) - (l-k+1) X_k + a(k+1,l+1)) \bmod M
+\end{displaymath} -->
+
+
+<IMG
+ WIDTH="454" HEIGHT="28"
+ SRC="img7.gif"
+ ALT="\begin{displaymath}b(k+1,l+1) = (b(k,l) - (l-k+1) X_k + a(k+1,l+1)) \bmod M \end{displaymath}">
+</DIV>
+<BR CLEAR="ALL">
+<P></P>
+<P>
+Thus the checksum can be calculated for blocks of length S at all
+possible offsets within a file in a ``rolling'' fashion, with very
+little computation at each point.
+
+<P>
+Despite its simplicity, this checksum was found to be quite adequate as
+a first level check for a match of two file blocks.  We have found in
+practice that the probability of this checksum matching when the
+blocks are not equal is quite low.  This is important because the much
+more expensive strong checksum must be calculated for each block where
+the weak checksum matches.
+
+<P>
+<HR>
+<!--Navigation Panel-->
+<A NAME="tex2html42"
+ HREF="node4.html">
+<IMG WIDTH="37" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="next"
+ SRC="next.gif"></A> 
+<A NAME="tex2html40"
+ HREF="tech_report.html">
+<IMG WIDTH="26" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="up"
+ SRC="up.gif"></A> 
+<A NAME="tex2html34"
+ HREF="node2.html">
+<IMG WIDTH="63" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="previous"
+ SRC="previous.gif"></A>   
+<BR>
+<B> Next:</B> <A NAME="tex2html43"
+ HREF="node4.html">Checksum searching</A>
+<B> Up:</B> <A NAME="tex2html41"
+ HREF="tech_report.html">The rsync algorithm</A>
+<B> Previous:</B> <A NAME="tex2html35"
+ HREF="node2.html">The rsync algorithm</A>
+<!--End of Navigation Panel-->
+<ADDRESS>
+<I>Andrew Tridgell</I>
+<BR><I>1998-11-09</I>
+</ADDRESS>
+</BODY>
+</HTML>

@@ -1,0 +1,43 @@
+name: Lint GitHub Actions workflows
+
+# Static-check the workflow YAML with rhysd/actionlint.  Catches missing
+# secrets, bad expressions, expression-type errors, unsupported runner
+# images, and (via embedded shellcheck) common pitfalls in `run:` scripts.
+# Trigger only on changes under .github/workflows/ so the rest of the
+# matrix isn't billed when nothing here moves.
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - '.github/workflows/*.yml'
+      - '.github/actionlint.yaml'
+      - '.github/actionlint.yml'
+  pull_request:
+    branches: [ master ]
+    paths:
+      - '.github/workflows/*.yml'
+      - '.github/actionlint.yaml'
+      - '.github/actionlint.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  actionlint:
+    runs-on: ubuntu-latest
+    name: actionlint
+    steps:
+      - uses: actions/checkout@v4
+      - name: install actionlint
+        # Pin a version so this job is reproducible; bump deliberately.
+        # The download script verifies a SHA256 of the release tarball.
+        run: |
+          bash <(curl --proto '=https' --tlsv1.2 -fsSL \
+              https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) \
+              1.7.12
+          echo "$PWD" >>"$GITHUB_PATH"
+      - name: actionlint --version
+        run: actionlint -version
+      - name: actionlint .github/workflows/*.yml
+        run: actionlint -color

@@ -1,0 +1,127 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<HTML>
+<HEAD>
+<TITLE>rsync resources</TITLE>
+</HEAD>
+<!--#include virtual="header.html" -->
+
+<H2 align="center">rsync resources</H2>
+
+Please <a href="lists.html">let us know</a> if you have any rsync-related
+documents to add to this list:
+
+<ul> 
+
+<li>Be sure to search for the latest rsync info to get up-to-the-minute
+results.  You can use the search box at the top of the page for either
+web searching or project searching (they are done via Google).
+
+<li>
+2002-05-15: rsync is not official GNU software, but we try to
+work more or less in accordance with their <a
+href="http://www.gnu.org/prep/maintain_toc.html">Guidelines for
+Maintaining GNU Software</a>.
+
+<li> 2002-04-10: A new tutorial on using rsync to create a system of <a
+href="http://www.mikerubel.org/computers/rsync_snapshots/">rotating
+backups</a>, by Mike Rubel.
+
+<li>If you still don't know what rsync is, then take a look at the
+<A HREF="https://download.samba.org/pub/rsync/README">README</A>.
+
+<li>There is now a python script that implements
+<a href="https://download.samba.org/pub/unpacked/rsync/support/atomic-rsync">an
+atomic update</a> of the received files at the end of the transfer (when pulling).
+
+<li> Brian Elliott Finley has put together a great Linux install system based
+on rsync. You you read about it at <a href="http://thefinleys.com/SystemImager/">http://thefinleys.com/SystemImager/</a>
+
+<li><a href="http://www.dirvish.com/">Dirvish</a> is a fast, disk based,
+rotating network backup system that was originally written by JW Schultz.
+
+<li><a href="http://backuppc.sourceforge.net/">BackupPC</a>: a backup
+system using rsync.  Hard-links all identical files (even between multiple
+runs and multiple backup sources), compresses the files, provides an easy
+interface to find and restore files, etc.
+
+<li><a href="https://github.com/CharlesMAtkinson/bung">Bung</a>: (BackUp Next
+Generation) backs up files, MariaDB, OpenLDAP, postgres, etc. via an extensible
+templates system with git support.  The rsync-based "rolling full" backup is
+easy to browse and restore from using everyday tools.
+
+<li><a href="http://hacks.dlux.hu/drsync/">drsync</a>: a wrapper for rsync
+that remembers file sets between invocations so that a 2-way synchronization
+of two systems is possible.
+
+<li><a href="http://rsyncbackup.erlang.no/">rsyncbackup</a>: a helper
+script that uses config files to setup multiple backup scenarios and
+invokes rsync (or rsyncX on macOS).
+
+<li>Users who use the new character-set conversion option of rsync (--iconv)
+may want to check into the <a href="http://www.j3e.de/linux/convmv/man/">convmv</a>
+package that lets you convert the names of already-transferred files into a
+new characterset (for when you want to change or normalize the characterset
+of a hierarchy of files).
+
+<li>For those wanting to use launchd to run an rsync daemon (e.g. Mac
+OS X Tiger users), Glen Scott provides the necessary
+<a href="http://www.designsolution.co.uk/resources/rsync/">rsync.plist</a>
+file.
+
+<li>For the developer wanting to work on a branched rsync version based on
+one of the diffs in the patches dir, you may want to check into Matt's
+<a href="http://www.kepreon.com/~matt/myrsync/index.html#patchsync">patchsync</a>
+script.
+
+<!--#include virtual="doc-resources.html" -->
+
+<li>There are a few choices for making rsync work with OS X's resource forks.
+One is the official apple patch found on their opendarwin site, such as
+<a href="http://darwinsource.opendarwin.org/10.4/rsync-20">this one</a>
+(I've heard patch inefficiently transfers the entire resource fork information
+for every file on every transfer.)  Another choice is to use a third-party
+adapted rsync, such as
+<a href="http://archive.macosxlabs.org/rsyncx/rsyncx.html">rsyncx</a> or a
+<a href="http://www.quesera.com/reynhout/misc/rsync+hfsmode">rsync+hfsmode
+patch</a> by D Andrew Reynhout.  For the future, I would like to see an rsync
+that supports ACLs and Posix xattrs adapted to interact with resource forks in
+a seamless way (if that's possible).
+
+<li>Piero Orsoni wrote a GTK-based GUI for rsync called
+<a href="http://www.opbyte.it/grsync/">grsync</a>.
+
+<li>Those interested in using an rsync daemon over SSL may be interested in
+<a href="http://dozzie.jarowit.net/trac/wiki/RsyncSSL">this wiki page</a>
+that outlines a way to use a modern, simplified stunnel setup.
+
+<li>Thomas Roessler has written an rsync wrapper for
+<a href="ftp://riemann.iam.uni-bonn.de/pub/users/roessler/cvslock/">efficient,
+safe CVS mirroring</a>.
+
+<li>Rsync is distributed with the
+<a href="https://download.samba.org/pub/unpacked/rsync/support/rrsync">rrsync python script</a>
+that lets you restrict the rsync commands that can be run via ssh.  (This is
+a enhanced and reworked version of Joe Smith's original perl version.)
+
+<li><a href="mailto:LEakin@Nostrum.COM">Lee Eakin</a> has written a <a href="rsync_wrapper.pl">perl wrapper for rsync</a>.
+
+<li>A wire-compatible <a href="http://search.cpan.org/~cbarratt/">rsync implementation in perl</a>.
+
+<li>A <a href="http://www.srehttp.org/apps/rxrsync/">REXX implementation of rsync</a>.
+
+<li>An initial version of a <a href="http://www.kolosy.com/wordpress/?p=8">rewrite of rsync for .Net</a>.
+
+<li>You might want to check out an encryption program that is being developed
+to produce more rsync-friendly output:
+<a href="http://rsyncrypto.lingnu.com/">rsyncrypto</a>.
+
+<li>If you need a 2-way synchronization because both ends of the transfer may
+be changing files, you may want to either look into a tool designed to do this
+(e.g. <a href="http://freshmeat.net/projects/unison/">unison</a>), or you may
+wish to use an external wrapper for rsync that keeps extra data about what was
+in the last transfer so that it can figure out if a file is new or deleted
+(e.g. <a href="http://freshmeat.net/projects/drsync/">drsync</a>).
+
+</ul>
+
+<!--#include virtual="footer.html" -->
