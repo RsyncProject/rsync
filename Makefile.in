@@ -334,6 +334,12 @@ test: check
 # catch Bash-isms earlier even if we're running on GNU.  Of course, we
 # might lose in the future where POSIX diverges from old sh.
 
+# Build the test-helper programs (CHECK_PROGS) without running the suite, so
+# an external harness (e.g. fleettest.py) can invoke runtests.py with its own
+# options.
+.PHONY: check-progs
+check-progs: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
+
 .PHONY: check
 check: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	rsync_bin=`pwd`/rsync$(EXEEXT) $(srcdir)/runtests.sh
