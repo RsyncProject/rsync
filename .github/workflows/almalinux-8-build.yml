@@ -8,12 +8,12 @@ name: Test rsync on AlmaLinux 8
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, '*-stable' ]
     paths-ignore:
       - '.github/workflows/*.yml'
       - '!.github/workflows/almalinux-8-build.yml'
   pull_request:
-    branches: [ master ]
+    branches: [ master, '*-stable' ]
     paths-ignore:
       - '.github/workflows/*.yml'
       - '!.github/workflows/almalinux-8-build.yml'
