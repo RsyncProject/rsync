@@ -155,4 +155,3 @@ const char *POPT_next_char (const char *str);
 #endif
 
 #define N_(foo) foo
-

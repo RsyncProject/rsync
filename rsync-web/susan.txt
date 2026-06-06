@@ -26,6 +26,3 @@ she can retrieve any version from the last week. The last line does
 the rsync of her directory across the modem link to the host
 samba. Note that I am using the -C option which allows me to add
 entries to .cvsignore for stuff that doesn't need to be backed up.
-
-
-
