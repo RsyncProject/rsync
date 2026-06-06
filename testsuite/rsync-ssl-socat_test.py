@@ -33,7 +33,7 @@ def script(path, text):
 
 fake_socat = script(FAKEBIN / 'socat', f'''#!/bin/sh
 : > "{HELPER_ARGV}"
-for arg
+for arg in "$@"
 do
 \tprintf '%s\\n' "$arg" >> "{HELPER_ARGV}"
 done
@@ -46,7 +46,7 @@ fallback_helper_argv = SCRATCHDIR / 'fallback-helper.argv'
 
 script(FALLBACKBIN / 'socat', f'''#!/bin/sh
 : > "{fallback_helper_argv}"
-for arg
+for arg in "$@"
 do
 \tprintf '%s\\n' "$arg" >> "{fallback_helper_argv}"
 done
@@ -55,7 +55,7 @@ exit 0
 
 script(FAKEBIN / 'openssl', f'''#!/bin/sh
 : > "{OPENSSL_ARGV}"
-for arg
+for arg in "$@"
 do
 \tprintf '%s\\n' "$arg" >> "{OPENSSL_ARGV}"
 done
@@ -65,7 +65,7 @@ exit 0
 script(FAKEBIN / 'rsync', f'''#!/bin/sh
 : > "{RSYNC_ARGV}"
 printf 'RSYNC_SSL_TYPE=%s\\n' "$RSYNC_SSL_TYPE" >> "{RSYNC_ARGV}"
-for arg
+for arg in "$@"
 do
 \tprintf '%s\\n' "$arg" >> "{RSYNC_ARGV}"
 done
