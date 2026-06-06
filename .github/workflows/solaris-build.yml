@@ -2,12 +2,12 @@ name: Test rsync on Solaris
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, '*-stable' ]
     paths-ignore:
       - '.github/workflows/*.yml'
       - '!.github/workflows/solaris-build.yml'
   pull_request:
-    branches: [ master ]
+    branches: [ master, '*-stable' ]
     paths-ignore:
       - '.github/workflows/*.yml'
       - '!.github/workflows/solaris-build.yml'

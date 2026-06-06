@@ -2,12 +2,12 @@ name: Test rsync on OpenBSD
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, '*-stable' ]
     paths-ignore:
       - '.github/workflows/*.yml'
       - '!.github/workflows/openbsd-build.yml'
   pull_request:
-    branches: [ master ]
+    branches: [ master, '*-stable' ]
     paths-ignore:
       - '.github/workflows/*.yml'
       - '!.github/workflows/openbsd-build.yml'
