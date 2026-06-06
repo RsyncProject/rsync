@@ -425,6 +425,9 @@ has its own detailed description later in this manpage.
 --archive, -a            archive mode is -rlptgoD (no -A,-X,-U,-N,-H)
 --no-OPTION              turn off an implied OPTION (e.g. --no-D)
 --recursive, -r          recurse into directories
+--inc-recursive, --i-r   enable incremental recursion
+--no-inc-recursive       disable incremental recursion
+--no-i-r                 same as --no-inc-recursive
 --relative, -R           use relative path names
 --no-implied-dirs        don't send implied dirs with --relative
 --backup, -b             make backups (see --suffix & --backup-dir)
@@ -435,7 +438,8 @@ has its own detailed description later in this manpage.
 --append                 append data onto shorter files
 --append-verify          --append w/old data in file checksum
 --dirs, -d               transfer directories without recursing
---old-dirs, --old-d      works like --dirs when talking to old rsync
+--old-dirs               works like --dirs when talking to old rsync
+--old-d                  same as --old-dirs
 --mkpath                 create destination's missing path components
 --links, -l              copy symlinks as symlinks
 --copy-links, -L         transform symlink into referent file/dir
@@ -469,12 +473,14 @@ has its own detailed description later in this manpage.
 --preallocate            allocate dest files before writing them
 --dry-run, -n            perform a trial run with no changes made
 --whole-file, -W         copy files whole (w/o delta-xfer algorithm)
+--no-whole-file, --no-W  use the delta-xfer algorithm
 --checksum-choice=STR    choose the checksum algorithm (aka --cc)
 --one-file-system, -x    don't cross filesystem boundaries
 --block-size=SIZE, -B    force a fixed checksum block-size
 --rsh=COMMAND, -e        specify the remote shell to use
 --rsync-path=PROGRAM     specify the rsync to run on remote machine
 --existing               skip creating new files on receiver
+--ignore-non-existing    skip creating new files on receiver
 --ignore-existing        skip updating files that exist on receiver
 --remove-source-files    sender removes synchronized files (non-dir)
 --del                    an alias for --delete-during
@@ -868,7 +874,7 @@ expand it.
 
 0. `--inc-recursive`, `--i-r`
 
-    This option explicitly enables on incremental recursion when scanning for
+    This option explicitly enables incremental recursion when scanning for
     files, which is enabled by default when using the [`--recursive`](#opt)
     option and both sides of the transfer are running rsync 3.0.0 or newer.
 
@@ -1144,9 +1150,13 @@ expand it.
     seen in the listing).  Specify `--no-dirs` (or `--no-d`) if you want to
     turn this off.
 
-    There is also a backward-compatibility helper option, `--old-dirs`
-    (`--old-d`) that tells rsync to use a hack of `-r --exclude='/*/*'` to get
-    an older rsync to list a single directory without recursing.
+    See also the backward-compatibility helper option [`--old-dirs`](#opt).
+
+0.  `--old-dirs`, `--old-d`
+
+    This backward-compatibility helper tells rsync to use a hack of
+    `-r --exclude='/*/*'` to get an older rsync to list a single directory
+    without recursing.
 
 0.  `--mkpath`
 
@@ -2390,7 +2400,9 @@ expand it.
 
     The filenames that are read from the FILE are all relative to the source
     dir -- any leading slashes are removed and no ".." references are allowed
-    to go higher than the source dir.  For example, take this command:
+    to go higher than the source dir.  Blank entries are ignored, as are
+    whole-entry comments that start with '`;`' or '`#`'.  For example, take
+    this command:
 
     >     rsync -a --files-from=/tmp/foo /usr remote:/backup
 
@@ -3015,6 +3027,10 @@ expand it.
     via a "`*`" or using an empty name.  For instance:
 
     >     --usermap=:nobody --groupmap=*:nobody
+
+    An empty **FROM** value matches only sender-side IDs that have no name.  It
+    is not a wildcard for named users or groups; use "`*`" when you want to map
+    every sender-side name.
 
     When the [`--numeric-ids`](#opt) option is used, the sender does not send any
     names, so all the IDs are treated as having an empty name.  This means that
@@ -3701,9 +3717,9 @@ expand it.
     also the [`--only-write-batch`](#opt) option.
 
     This option overrides the negotiated checksum & compress lists and always
-    negotiates a choice based on old-school md5/md4/zlib choices.  If you want
-    a more modern choice, use the [`--checksum-choice`](#opt) (`--cc`) and/or
-    [`--compress-choice`](#opt) (`--zc`) options.
+    negotiates a choice based on old-school md5/md4/zlib choices.  This means
+    batch mode is not compatible with newer compression choices such as zstd or
+    lz4.
 
 0.  `--only-write-batch=FILE`
 

@@ -56,6 +56,13 @@ You can launch it either via inetd, as a stand-alone daemon, or from an rsync
 client via a remote shell.  If run as a stand-alone daemon then just run the
 command "`rsync --daemon`" from a suitable startup script.
 
+Systems using systemd can use the example unit files in the source tree's
+`packaging/systemd` directory.  The `rsync.service` file runs a stand-alone
+daemon using `rsync --daemon --no-detach`, while `rsync.socket` and
+`rsync@.service` show a socket-activated setup for incoming connections.  These
+files may need local adjustment to match your installed rsync path, packaging
+layout, and module policy.
+
 When run via inetd you should add a line like this to /etc/services:
 
 >     rsync           873/tcp

@@ -147,6 +147,13 @@ setting a module-level `fleet_nonroot = True`, so the set is maintained in the
 test files and new privilege-sensitive tests join automatically with no
 fleet-config change.
 
+A target with `"protocols": [30, 29]` runs one extra stdio-pipe pass per listed
+version, each forcing that older wire version with `runtests --protocol=N` — the
+fleet analogue of a workflow's `check30`/`check29` steps. The passes reuse the
+same parsed `RSYNC_EXPECT_SKIPPED` list as the pipe run and show up as `protoNN`
+columns in the report (and `--timing` breakdown). Targets that don't set
+`protocols` show `-` there.
+
 Run it from inside a checkout (it builds the current directory's HEAD; use
 `--repo PATH` for another tree):
 
@@ -159,7 +166,7 @@ python3 testsuite/fleettest.py --timing              # per-target wall-clock bre
 ```
 
 `--timing` adds a per-target breakdown after the report — total wall-clock plus
-the push / build / pipe / tcp / nonroot phases, sorted slowest-first. Targets
+the push / build / pipe / tcp / protoNN / nonroot phases, sorted slowest-first. Targets
 run in parallel, so the whole run is gated by the slowest one; the phase columns
 show whether that target's hold-up is the push, the build, or a test pass.
 

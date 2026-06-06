@@ -11,6 +11,11 @@ flags mirror that workflow, and the pipe-run RSYNC_EXPECT_SKIPPED list is PARSED
 from the workflow (not hardcoded). The --use-tcp run never sets an expected-skip
 list (matching the workflows), so only test FAILs matter there.
 
+A target may also list older "protocols" (e.g. [30, 29]) in the fleet config:
+each runs as an extra stdio-pipe pass with runtests --protocol=N (the fleet
+analogue of a workflow's check30/check29 steps), using the same parsed skip list
+as the pipe run, and shows up as a protoNN column in the report.
+
 The fleet -- which machines, how to reach and build each -- is read from a JSON
 config: ~/.fleettest.json if present, else fleettest.json next to this script,
 or --fleet PATH. Copy the bundled fleettest.json.example to either location (or
@@ -128,6 +133,16 @@ class Target:
     # user -- every test that declares `fleet_nonroot = True` (see
     # discover_nonroot_tests). Mirrors a workflow's non-root check step.
     nonroot: bool = False
+    # Older protocol versions to additionally exercise, each as a separate
+    # stdio-pipe pass with runtests --protocol=N (the fleet analogue of a
+    # workflow's check30/check29 steps). e.g. [30, 29]. Empty => proto pass off.
+    protocols: list[int] = dataclasses.field(default_factory=list)
+    # Per-target retry budget for FLAKY tests: after a run, each failed test is
+    # re-run on its own up to max_retry more times, and any that then pass are
+    # dropped from the failure list (and reported as "recovered", never hidden).
+    # Use on a slow/loaded box where concurrency-sensitive tests occasionally
+    # flake, instead of dropping the whole target to a lower -j. 0 => no retry.
+    max_retry: int = 0
 
 
 def load_fleet(path: Path) -> list[Target]:
@@ -273,15 +288,23 @@ def build_script(t: Target) -> str:
     )
 
 
-def test_script(t: Target, transport: str, skip_csv: str | None, jobs: int) -> str:
+def test_script(t: Target, transport: str, skip_csv: str | None, jobs: int,
+                protocol: int | None = None, only: list[str] | None = None) -> str:
     rb = f'--rsync-bin="$PWD/{t.rsync_bin}"'
     tcp = " --use-tcp" if transport == "tcp" else ""
+    # protocol forces an older wire version (mirrors `make check30`/`check29`).
+    proto = f" --protocol={protocol}" if protocol is not None else ""
     # PYTHONDONTWRITEBYTECODE: don't drop root-owned __pycache__/*.pyc into the
     # tree (a sudo run would, breaking the next non-root push --delete).
     env = "PYTHONDONTWRITEBYTECODE=1 "
-    if skip_csv:
+    # Named tests (a max_retry re-run) make runtests full_run False, so the
+    # expected-skip list does not apply -- only the named tests' pass/fail matter.
+    names = ""
+    if only:
+        names = " " + " ".join(only)
+    elif skip_csv:
         env += f"RSYNC_EXPECT_SKIPPED={skip_csv} "
-    runtests = f'{t.python} runtests.py {rb}{tcp} -j {jobs}'
+    runtests = f'{t.python} runtests.py {rb}{tcp}{proto} -j {jobs}{names}'
     # env_prefix (e.g. a brew PATH) must reach the test too: some tests build a
     # helper binary on the fly (a test may invoke `make`, which needs gawk etc.),
     # so the build tools must be on PATH at test time.
@@ -337,6 +360,10 @@ class TransportResult:
     skip_expected: set[str]
     skip_got: set[str]
     raw: str
+    # Tests that failed the initial run but passed on a max_retry re-run, so they
+    # were dropped from `failed`.  Surfaced in the report (a recovered flake is
+    # noted, never silently hidden).
+    recovered: list[str] = dataclasses.field(default_factory=list)
 
     @property
     def skip_mismatch(self) -> bool:
@@ -362,6 +389,35 @@ def parse_transport(transport: str, r: CmdResult, skip_checked: bool) -> Transpo
         got = _csv_set(gm.group(1)) if gm else set()
     return TransportResult(transport, r.rc, r.timed_out, counts, failed,
                            skip_checked, exp, got, r.out)
+
+
+def retry_failed(t: Target, label: str, tr: TransportResult, rerun) -> None:
+    """Honour the target's max_retry budget: re-run each failed test on its own
+    (serially) up to max_retry more times; drop any that pass and record them in
+    tr.recovered.  `rerun(names)` runs the given tests and returns a CmdResult.
+    A no-op when max_retry is 0 or there were no failures."""
+    if not t.max_retry or not tr.failed:
+        return
+    remaining = list(tr.failed)
+    for attempt in range(1, t.max_retry + 1):
+        r = rerun(remaining)
+        still = [m.group(2) for m in RE_RESULT.finditer(r.out)
+                 if m.group(1) in ("FAIL", "ERROR")]
+        recovered = [n for n in remaining if n not in still]
+        if recovered:
+            tr.recovered.extend(recovered)
+            log(f"[{t.name}] {label} retry {attempt}/{t.max_retry}: "
+                f"recovered {','.join(recovered)}"
+                + (f"; still failing {','.join(still)}" if still else ""))
+        remaining = [n for n in remaining if n in still]
+        if not remaining:
+            break
+    tr.failed = remaining
+    # The initial run's non-zero exit was the now-recovered failures; once they
+    # all pass on retry the cell is OK, so clear the stale exit code (only the
+    # failed tests can make runtests exit non-zero on a no-skip-list re-run).
+    if not remaining and tr.recovered and tr.exit_code != 0:
+        tr.exit_code = 0
 
 
 @dataclasses.dataclass
@@ -432,9 +488,33 @@ def run_target(t: Target, args, staging: str) -> TargetResult:
         t0 = time.monotonic()
         r = run_on(t, cmd, timeout=2400)
         res.timings[transport] = time.monotonic() - t0
-        res.transports[transport] = parse_transport(transport, r, skip_csv is not None)
+        tr = parse_transport(transport, r, skip_csv is not None)
+        retry_failed(t, transport, tr, lambda names, tp=transport: run_on(
+            t, test_script(t, tp, None, 1, only=names), timeout=1200))
+        res.transports[transport] = tr
         log(f"[{t.name}] {transport} done "
-            f"({'ok' if res.transports[transport].ok else 'ISSUE'})")
+            f"({'ok' if tr.ok else 'ISSUE'})")
+
+    # Extra older-protocol passes (mirroring the workflow's check30/check29
+    # steps): same stdio-pipe transport and skip list as `make check`, but with
+    # runtests --protocol=N forcing an older wire version. Only targets that list
+    # `protocols` opt in; skipped under --transport tcp (these are pipe runs).
+    if t.protocols and "pipe" in args.transports:
+        skip_csv = parse_workflow_skip(t.workflow)
+        jobs = args.jobs if args.jobs else t.pipe_jobs
+        for proto in t.protocols:
+            label = f"proto{proto}"
+            cmd = test_script(t, "pipe", skip_csv, jobs, protocol=proto)
+            t0 = time.monotonic()
+            r = run_on(t, cmd, timeout=2400)
+            res.timings[label] = time.monotonic() - t0
+            tr = parse_transport(label, r, skip_csv is not None)
+            retry_failed(t, label, tr, lambda names, pr=proto: run_on(
+                t, test_script(t, "pipe", None, 1, protocol=pr, only=names),
+                timeout=1200))
+            res.transports[label] = tr
+            log(f"[{t.name}] {label} done "
+                f"({'ok' if tr.ok else 'ISSUE'})")
 
     # Extra non-root pass (after the sudo runs) for targets that opt in, running
     # the tests that declare `fleet_nonroot = True` (discovered in main()).
@@ -442,9 +522,12 @@ def run_target(t: Target, args, staging: str) -> TargetResult:
         t0 = time.monotonic()
         r = run_on(t, nonroot_test_script(t, args.nonroot_tests), timeout=2400)
         res.timings["nonroot"] = time.monotonic() - t0
-        res.transports["nonroot"] = parse_transport("nonroot", r, skip_checked=False)
+        tr = parse_transport("nonroot", r, skip_checked=False)
+        retry_failed(t, "nonroot", tr, lambda names: run_on(
+            t, nonroot_test_script(t, names), timeout=1200))
+        res.transports["nonroot"] = tr
         log(f"[{t.name}] nonroot done "
-            f"({'ok' if res.transports['nonroot'].ok else 'ISSUE'})")
+            f"({'ok' if tr.ok else 'ISSUE'})")
     res.timings["total"] = time.monotonic() - started
     return res
 
@@ -479,9 +562,13 @@ def print_report(results: list[TargetResult], args, fleet: list[Target]) -> bool
     by_name = {t.name: t for t in fleet}
     order = {t.name: i for i, t in enumerate(fleet)}
     results.sort(key=lambda r: order.get(r.target, 99))
-    # The 'nonroot' column appears only when some target ran a non-root pass;
-    # targets without one show "-" there (a neutral N/A, not a failure).
+    # protoNN columns appear only when some target ran that older-protocol pass;
+    # the 'nonroot' column only when some target ran a non-root pass. Targets
+    # without a given pass show "-" there (a neutral N/A, not a failure).
     transports = list(args.transports)
+    protos = {k for r in results for k in r.transports if k.startswith("proto")}
+    # highest protocol first (proto30 before proto29), matching check30/check29.
+    transports += sorted(protos, key=lambda c: int(c[len("proto"):]), reverse=True)
     if any("nonroot" in r.transports for r in results):
         transports.append("nonroot")
     ts = time.strftime("%Y-%m-%d %H:%M")
@@ -565,6 +652,17 @@ def print_report(results: list[TargetResult], args, fleet: list[Target]) -> bool
         for d in details:
             print(d)
         print("=" * 64)
+    # Recovered flakes: tests that failed but passed within the target's
+    # max_retry budget.  The cell counts as OK, but list them so a flaky test is
+    # never silently swallowed.
+    recovered = [f"{res.target} / {transport}: {','.join(tr.recovered)}"
+                 for res in results for transport in transports
+                 if (tr := res.transports.get(transport)) and tr.recovered]
+    if recovered:
+        print("==== RECOVERED (flaky -- failed, then passed on retry) ====")
+        for r in recovered:
+            print(f"    {r}")
+        print("=" * 64)
     print(f"{len(results)} targets x {len(transports)} transports = {cells} cells: "
           f"{ok_cells} OK, {cells - ok_cells} not OK")
     return all_ok
@@ -588,7 +686,11 @@ def print_timing(results: list[TargetResult]) -> None:
     timed = [r for r in results if r.timings]
     if not timed:
         return
-    phases = [p for p in _TIMING_PHASES if any(p in r.timings for r in timed)]
+    # Insert any protoNN phases (highest first) just before nonroot, in run order.
+    protos = sorted({k for r in timed for k in r.timings if k.startswith("proto")},
+                    key=lambda c: int(c[len("proto"):]), reverse=True)
+    order = [p for p in _TIMING_PHASES if p != "nonroot"] + protos + ["nonroot"]
+    phases = [p for p in order if any(p in r.timings for r in timed)]
 
     def total(r: TargetResult) -> float:
         # Failed-early targets have no "total"; sum the phases they did reach.
@@ -745,8 +847,10 @@ def main() -> int:
         for t in fleet:
             host = t.ssh_host or "(local)"
             skip = parse_workflow_skip(t.workflow)
+            proto = (",".join(f"proto{p}" for p in t.protocols)
+                     if t.protocols else "none")
             print(f"{t.name:12} {host:18} {t.make:6} "
-                  f"pipe-skip={'set' if skip else 'unset'}")
+                  f"pipe-skip={'set' if skip else 'unset'} protocols={proto}")
         return 0
 
     chosen = fleet

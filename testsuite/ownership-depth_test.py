@@ -11,6 +11,7 @@ we belong to; the uid side then needs root and is skipped.
 # remap only runs as root, so a non-root run exercises the group-only path too.
 fleet_nonroot = True
 
+import grp
 import os
 
 from rsyncfns import (
@@ -45,6 +46,13 @@ def assert_all(entries, *, gid=None, uid=None, label=''):
             test_fail(f"{label}: owner of {rel} is {st.st_uid}, expected {uid}")
 
 
+try:
+    grp.getgrgid(prim)
+    prim_has_name = True
+except KeyError:
+    prim_has_name = False
+
+
 if is_root:
     # Root may assign any numeric id (it need not exist); pick targets that
     # differ from the source's ids so the remap is observable.
@@ -54,6 +62,20 @@ if is_root:
     entries = seed()
     run_rsync('-a', f'--groupmap={prim}:{target_gid}', f'{src}/', f'{TODIR}/')
     assert_all(entries, gid=target_gid, label='--groupmap (root)')
+
+    entries = seed()
+    run_rsync('-a', f'--groupmap=*:{target_gid}', f'{src}/', f'{TODIR}/')
+    assert_all(entries, gid=target_gid, label='--groupmap wildcard (root)')
+
+    if prim_has_name:
+        entries = seed()
+        run_rsync('-a', f'--groupmap=:{target_gid}', f'{src}/', f'{TODIR}/')
+        assert_all(entries, gid=prim, label='--groupmap empty named group (root)')
+
+    entries = seed()
+    run_rsync('-a', '--numeric-ids', f'--groupmap=:{target_gid}',
+              f'{src}/', f'{TODIR}/')
+    assert_all(entries, gid=target_gid, label='--groupmap empty nameless group (root)')
 
     entries = seed()
     run_rsync('-a', f'--chown=:{target_gid}', f'{src}/', f'{TODIR}/')
@@ -78,6 +100,19 @@ else:
     entries = seed()
     run_rsync('-a', f'--groupmap={prim}:{sec}', f'{src}/', f'{TODIR}/')
     assert_all(entries, gid=sec, label='--groupmap')
+
+    entries = seed()
+    run_rsync('-a', f'--groupmap=*:{sec}', f'{src}/', f'{TODIR}/')
+    assert_all(entries, gid=sec, label='--groupmap wildcard')
+
+    if prim_has_name:
+        entries = seed()
+        run_rsync('-a', f'--groupmap=:{sec}', f'{src}/', f'{TODIR}/')
+        assert_all(entries, gid=prim, label='--groupmap empty named group')
+
+    entries = seed()
+    run_rsync('-a', '--numeric-ids', f'--groupmap=:{sec}', f'{src}/', f'{TODIR}/')
+    assert_all(entries, gid=sec, label='--groupmap empty nameless group')
 
     entries = seed()
     run_rsync('-a', f'--chown=:{sec}', f'{src}/', f'{TODIR}/')
