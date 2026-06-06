@@ -2147,7 +2147,7 @@ int secure_mkstemp(char *template, mode_t perms)
 }
 
 /*
-  varient of do_open/do_open_nofollow which does do_open() if the
+  variant of do_open/do_open_nofollow which does do_open() if the
   copy_links or copy_unsafe_links options are set and does
   do_open_nofollow() otherwise
 

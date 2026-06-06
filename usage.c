@@ -241,7 +241,7 @@ static void output_nno_list(enum logcode f, const char *name, struct name_num_ob
 
 	for (tok = strtok(tmpbuf, " "); tok; tok = next_tok) {
 		next_tok = strtok(NULL, " ");
-		if (*tok != '(') /* Ignore the alises in the JSON output */
+		if (*tok != '(') /* Ignore the aliases in the JSON output */
 			printf(" \"%s\"%s", tok, comma + (next_tok ? 0 : 1));
 	}
 

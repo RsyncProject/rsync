@@ -504,7 +504,7 @@ int poptSaveString(const char *** argvp, unsigned int argInfo,
 
 /**
  * Save a long long, performing logical operation with value.
- * @warning Alignment check may be too strict on certain platorms.
+ * @warning Alignment check may be too strict on certain platforms.
  * @param arg		integer pointer, aligned on int boundary.
  * @param argInfo	logical operation (see POPT_ARGFLAG_*)
  * @param aLongLong	value to use
@@ -515,7 +515,7 @@ int poptSaveLongLong(long long * arg, unsigned int argInfo,
 
 /**
  * Save a long, performing logical operation with value.
- * @warning Alignment check may be too strict on certain platorms.
+ * @warning Alignment check may be too strict on certain platforms.
  * @param arg		integer pointer, aligned on int boundary.
  * @param argInfo	logical operation (see POPT_ARGFLAG_*)
  * @param aLong		value to use
@@ -525,7 +525,7 @@ int poptSaveLong(long * arg, unsigned int argInfo, long aLong);
 
 /**
  * Save a short integer, performing logical operation with value.
- * @warning Alignment check may be too strict on certain platorms.
+ * @warning Alignment check may be too strict on certain platforms.
  * @param arg		short pointer, aligned on short boundary.
  * @param argInfo	logical operation (see POPT_ARGFLAG_*)
  * @param aLong		value to use
@@ -535,7 +535,7 @@ int poptSaveShort(short * arg, unsigned int argInfo, long aLong);
 
 /**
  * Save an integer, performing logical operation with value.
- * @warning Alignment check may be too strict on certain platorms.
+ * @warning Alignment check may be too strict on certain platforms.
  * @param arg		integer pointer, aligned on int boundary.
  * @param argInfo	logical operation (see POPT_ARGFLAG_*)
  * @param aLong		value to use
