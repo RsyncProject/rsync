@@ -2390,9 +2390,9 @@ expand it.
 
     The filenames that are read from the FILE are all relative to the source
     dir -- any leading slashes are removed and no ".." references are allowed
-    to go higher than the source dir.  Blank lines are ignored, as are
-    whole-line comments that start with '`;`' or '`#`' (unless [`--from0`](#opt)
-    is specified).  For example, take this command:
+    to go higher than the source dir.  Blank entries are ignored, as are
+    whole-entry comments that start with '`;`' or '`#`'.  For example, take
+    this command:
 
     >     rsync -a --files-from=/tmp/foo /usr remote:/backup
 
