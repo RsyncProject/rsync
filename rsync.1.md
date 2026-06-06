@@ -1529,6 +1529,10 @@ expand it.
     item.  Use comma-separated items when you need both behaviours, such as
     `g=o,o=`.
 
+    A permission-copy `=` item also clears the special bit for each destination
+    class it updates (`u` clears setuid, `g` clears setgid, and `o` clears
+    sticky), matching GNU **chmod** behaviour.
+
     It is also legal to specify multiple `--chmod` options, as each additional
     option is just appended to the list of changes to make.
 
