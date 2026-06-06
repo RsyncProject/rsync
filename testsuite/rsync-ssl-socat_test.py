@@ -7,17 +7,22 @@ transport selection and OPENSSL address construction.
 """
 
 import os
+import shutil
 import subprocess
 
 from rsyncfns import SCRATCHDIR, SRCDIR, test_fail
 
 
 RSYNC_SSL = SRCDIR / 'rsync-ssl'
+BASH = shutil.which('bash')
 HELPER_ARGV = SCRATCHDIR / 'helper.argv'
 RSYNC_ARGV = SCRATCHDIR / 'rsync.argv'
 OPENSSL_ARGV = SCRATCHDIR / 'openssl.argv'
 FAKEBIN = SCRATCHDIR / 'fakebin'
 FAKEBIN.mkdir()
+
+if BASH is None:
+    test_fail('bash is required to run rsync-ssl')
 
 
 def script(path, text):
@@ -175,7 +180,7 @@ if not openssl_argv or openssl_argv[0] != 's_client':
 # --- if openssl is unavailable, default selection prefers socat over stunnel -
 fallback_helper_argv.unlink(missing_ok=True)
 proc = subprocess.run(
-    ['/bin/bash', str(RSYNC_SSL), '--HELPER', 'fallback.example', 'rsync',
+    [BASH, str(RSYNC_SSL), '--HELPER', 'fallback.example', 'rsync',
      '--server', '--daemon', '.'],
     env=fallback_env(),
     stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
