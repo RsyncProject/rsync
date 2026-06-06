@@ -111,6 +111,21 @@ install-all: install install-ssl-daemon
 install-strip:
 	$(MAKE) INSTALL_STRIP='-s' install
 
+.PHONY: uninstall
+uninstall:
+	rm -f $(DESTDIR)$(bindir)/rsync$(EXEEXT) $(DESTDIR)$(bindir)/rsync-ssl
+	rm -f $(DESTDIR)$(bindir)/rrsync
+	rm -f $(DESTDIR)$(mandir)/man1/rsync.1 $(DESTDIR)$(mandir)/man1/rsync-ssl.1
+	rm -f $(DESTDIR)$(mandir)/man1/rrsync.1
+	rm -f $(DESTDIR)$(mandir)/man5/rsyncd.conf.5
+
+.PHONY: uninstall-ssl-daemon
+uninstall-ssl-daemon:
+	rm -f $(DESTDIR)/etc/stunnel/rsyncd.conf
+
+.PHONY: uninstall-all
+uninstall-all: uninstall uninstall-ssl-daemon
+
 rsync$(EXEEXT): $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
 

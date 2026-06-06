@@ -30,6 +30,34 @@ jobs:
       run: ./configure --with-rrsync
     - name: make
       run: make
+    - name: install/uninstall DESTDIR smoke test
+      run: |
+        set -e
+        tmp="$(mktemp -d)"
+        trap 'rm -rf "$tmp"' EXIT
+
+        make install-all DESTDIR="$tmp"
+
+        for path in \
+          /usr/local/bin/rsync \
+          /usr/local/bin/rsync-ssl \
+          /usr/local/bin/rrsync \
+          /usr/local/share/man/man1/rsync.1 \
+          /usr/local/share/man/man1/rsync-ssl.1 \
+          /usr/local/share/man/man1/rrsync.1 \
+          /usr/local/share/man/man5/rsyncd.conf.5 \
+          /etc/stunnel/rsyncd.conf
+        do
+          test -e "$tmp$path"
+        done
+
+        make uninstall-all DESTDIR="$tmp"
+
+        leftover="$(find "$tmp" -type f -print)"
+        if [ -n "$leftover" ]; then
+          printf '%s\n' "$leftover"
+          exit 1
+        fi
     - name: install
       run: sudo make install
     - name: info
