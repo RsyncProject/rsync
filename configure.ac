@@ -331,6 +331,28 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[ ]], [[return 0;]])],
 CFLAGS="$OLD_CFLAGS"
 AC_SUBST(NOEXECSTACK)
 
+dnl Only define HAVE_OPENAT2 when both the <linux/openat2.h> header and the
+dnl SYS_openat2 syscall number are present.  syscall.c uses openat2(RESOLVE_BENEATH)
+dnl for the secure resolver on Linux 5.6+; defining it unconditionally broke the
+dnl build on older kernels/headers that lack the header (#924, #905, #900).
+AC_CACHE_CHECK([for openat2],rsync_cv_HAVE_OPENAT2,[
+    AC_COMPILE_IFELSE([
+        AC_LANG_PROGRAM([[
+#include <sys/syscall.h>
+#include <linux/openat2.h>
+]], [[
+struct open_how how;
+how.resolve = RESOLVE_BENEATH;
+return SYS_openat2 + (int)how.resolve;
+]])
+    ],
+    [rsync_cv_HAVE_OPENAT2=yes], [rsync_cv_HAVE_OPENAT2=no])
+])
+if test x"$rsync_cv_HAVE_OPENAT2" = x"yes"; then
+  AC_DEFINE([HAVE_OPENAT2], 1,
+    [Define to use Linux openat2(RESOLVE_BENEATH) in secure_relative_open where available.])
+fi
+
 # arrgh. libc in some old debian version screwed up the largefile
 # stuff, getting byte range locking wrong
 AC_CACHE_CHECK([for broken largefile support],rsync_cv_HAVE_BROKEN_LARGEFILE,[

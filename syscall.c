@@ -33,7 +33,7 @@
 #include <sys/syscall.h>
 #endif
 
-#ifdef __linux__
+#if defined(__linux__) && defined(HAVE_OPENAT2)
 #include <sys/syscall.h>
 #include <linux/openat2.h>
 #endif
@@ -1688,7 +1688,20 @@ static int path_has_dotdot_component(const char *path)
 	return 0;
 }
 
-#ifdef __linux__
+#if defined(__linux__) && defined(HAVE_OPENAT2)
+/* openat2(RESOLVE_BENEATH) via the raw syscall, gated on openat2_usable() so a
+ * seccomp filter that traps openat2 with SIGSYS (e.g. the Android sandbox)
+ * makes us report ENOSYS and fall back rather than killing the process.  Only
+ * the openat2 call is gated here; a plain openat() is always safe to attempt. */
+static int openat2_beneath(int dirfd, const char *path, const struct open_how *how)
+{
+	if (!openat2_usable()) {
+		errno = ENOSYS;
+		return -1;
+	}
+	return syscall(SYS_openat2, dirfd, path, how, sizeof *how);
+}
+
 static int secure_relative_open_linux(const char *basedir, const char *relpath, int flags, mode_t mode)
 {
 	struct open_how how;
@@ -1717,12 +1730,12 @@ static int secure_relative_open_linux(const char *basedir, const char *relpath, 
 		memset(&bhow, 0, sizeof bhow);
 		bhow.flags = O_RDONLY | O_DIRECTORY;
 		bhow.resolve = RESOLVE_BENEATH | RESOLVE_NO_MAGICLINKS;
-		dirfd = syscall(SYS_openat2, AT_FDCWD, basedir, &bhow, sizeof bhow);
+		dirfd = openat2_beneath(AT_FDCWD, basedir, &bhow);
 		if (dirfd == -1)
 			return -1;
 	}
 
-	retfd = syscall(SYS_openat2, dirfd, relpath, &how, sizeof how);
+	retfd = openat2_beneath(dirfd, relpath, &how);
 
 	if (dirfd != AT_FDCWD)
 		close(dirfd);
@@ -1848,7 +1861,7 @@ int secure_relative_open(const char *basedir, const char *relpath, int flags, mo
 		}
 	}
 
-#ifdef __linux__
+#if defined(__linux__) && defined(HAVE_OPENAT2)
 	{
 		int fd = secure_relative_open_linux(basedir, relpath, flags, mode);
 		/* ENOSYS = kernel < 5.6 doesn't have the syscall even though
