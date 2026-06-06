@@ -203,7 +203,7 @@ enum delret delete_item(char *fbuf, uint16 mode, uint16 flags)
 		}
 		ret = DR_SUCCESS;
 	} else {
-		if (S_ISDIR(mode) && errno == ENOTEMPTY) {
+		if (S_ISDIR(mode) && (errno == ENOTEMPTY || errno == EEXIST)) {
 			rprintf(FINFO, "cannot delete non-empty directory: %s\n",
 				fbuf);
 			ret = DR_NOT_EMPTY;
