@@ -11,6 +11,11 @@ flags mirror that workflow, and the pipe-run RSYNC_EXPECT_SKIPPED list is PARSED
 from the workflow (not hardcoded). The --use-tcp run never sets an expected-skip
 list (matching the workflows), so only test FAILs matter there.
 
+A target may also list older "protocols" (e.g. [30, 29]) in the fleet config:
+each runs as an extra stdio-pipe pass with runtests --protocol=N (the fleet
+analogue of a workflow's check30/check29 steps), using the same parsed skip list
+as the pipe run, and shows up as a protoNN column in the report.
+
 The fleet -- which machines, how to reach and build each -- is read from a JSON
 config: ~/.fleettest.json if present, else fleettest.json next to this script,
 or --fleet PATH. Copy the bundled fleettest.json.example to either location (or
@@ -128,6 +133,10 @@ class Target:
     # user -- every test that declares `fleet_nonroot = True` (see
     # discover_nonroot_tests). Mirrors a workflow's non-root check step.
     nonroot: bool = False
+    # Older protocol versions to additionally exercise, each as a separate
+    # stdio-pipe pass with runtests --protocol=N (the fleet analogue of a
+    # workflow's check30/check29 steps). e.g. [30, 29]. Empty => proto pass off.
+    protocols: list[int] = dataclasses.field(default_factory=list)
 
 
 def load_fleet(path: Path) -> list[Target]:
@@ -273,15 +282,18 @@ def build_script(t: Target) -> str:
     )
 
 
-def test_script(t: Target, transport: str, skip_csv: str | None, jobs: int) -> str:
+def test_script(t: Target, transport: str, skip_csv: str | None, jobs: int,
+                protocol: int | None = None) -> str:
     rb = f'--rsync-bin="$PWD/{t.rsync_bin}"'
     tcp = " --use-tcp" if transport == "tcp" else ""
+    # protocol forces an older wire version (mirrors `make check30`/`check29`).
+    proto = f" --protocol={protocol}" if protocol is not None else ""
     # PYTHONDONTWRITEBYTECODE: don't drop root-owned __pycache__/*.pyc into the
     # tree (a sudo run would, breaking the next non-root push --delete).
     env = "PYTHONDONTWRITEBYTECODE=1 "
     if skip_csv:
         env += f"RSYNC_EXPECT_SKIPPED={skip_csv} "
-    runtests = f'{t.python} runtests.py {rb}{tcp} -j {jobs}'
+    runtests = f'{t.python} runtests.py {rb}{tcp}{proto} -j {jobs}'
     # env_prefix (e.g. a brew PATH) must reach the test too: some tests build a
     # helper binary on the fly (a test may invoke `make`, which needs gawk etc.),
     # so the build tools must be on PATH at test time.
@@ -436,6 +448,23 @@ def run_target(t: Target, args, staging: str) -> TargetResult:
         log(f"[{t.name}] {transport} done "
             f"({'ok' if res.transports[transport].ok else 'ISSUE'})")
 
+    # Extra older-protocol passes (mirroring the workflow's check30/check29
+    # steps): same stdio-pipe transport and skip list as `make check`, but with
+    # runtests --protocol=N forcing an older wire version. Only targets that list
+    # `protocols` opt in; skipped under --transport tcp (these are pipe runs).
+    if t.protocols and "pipe" in args.transports:
+        skip_csv = parse_workflow_skip(t.workflow)
+        jobs = args.jobs if args.jobs else t.pipe_jobs
+        for proto in t.protocols:
+            label = f"proto{proto}"
+            cmd = test_script(t, "pipe", skip_csv, jobs, protocol=proto)
+            t0 = time.monotonic()
+            r = run_on(t, cmd, timeout=2400)
+            res.timings[label] = time.monotonic() - t0
+            res.transports[label] = parse_transport(label, r, skip_csv is not None)
+            log(f"[{t.name}] {label} done "
+                f"({'ok' if res.transports[label].ok else 'ISSUE'})")
+
     # Extra non-root pass (after the sudo runs) for targets that opt in, running
     # the tests that declare `fleet_nonroot = True` (discovered in main()).
     if t.nonroot and args.nonroot_tests:
@@ -479,9 +508,13 @@ def print_report(results: list[TargetResult], args, fleet: list[Target]) -> bool
     by_name = {t.name: t for t in fleet}
     order = {t.name: i for i, t in enumerate(fleet)}
     results.sort(key=lambda r: order.get(r.target, 99))
-    # The 'nonroot' column appears only when some target ran a non-root pass;
-    # targets without one show "-" there (a neutral N/A, not a failure).
+    # protoNN columns appear only when some target ran that older-protocol pass;
+    # the 'nonroot' column only when some target ran a non-root pass. Targets
+    # without a given pass show "-" there (a neutral N/A, not a failure).
     transports = list(args.transports)
+    protos = {k for r in results for k in r.transports if k.startswith("proto")}
+    # highest protocol first (proto30 before proto29), matching check30/check29.
+    transports += sorted(protos, key=lambda c: int(c[len("proto"):]), reverse=True)
     if any("nonroot" in r.transports for r in results):
         transports.append("nonroot")
     ts = time.strftime("%Y-%m-%d %H:%M")
@@ -588,7 +621,11 @@ def print_timing(results: list[TargetResult]) -> None:
     timed = [r for r in results if r.timings]
     if not timed:
         return
-    phases = [p for p in _TIMING_PHASES if any(p in r.timings for r in timed)]
+    # Insert any protoNN phases (highest first) just before nonroot, in run order.
+    protos = sorted({k for r in timed for k in r.timings if k.startswith("proto")},
+                    key=lambda c: int(c[len("proto"):]), reverse=True)
+    order = [p for p in _TIMING_PHASES if p != "nonroot"] + protos + ["nonroot"]
+    phases = [p for p in order if any(p in r.timings for r in timed)]
 
     def total(r: TargetResult) -> float:
         # Failed-early targets have no "total"; sum the phases they did reach.
@@ -745,8 +782,10 @@ def main() -> int:
         for t in fleet:
             host = t.ssh_host or "(local)"
             skip = parse_workflow_skip(t.workflow)
+            proto = (",".join(f"proto{p}" for p in t.protocols)
+                     if t.protocols else "none")
             print(f"{t.name:12} {host:18} {t.make:6} "
-                  f"pipe-skip={'set' if skip else 'unset'}")
+                  f"pipe-skip={'set' if skip else 'unset'} protocols={proto}")
         return 0
 
     chosen = fleet
