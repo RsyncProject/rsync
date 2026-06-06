@@ -3016,6 +3016,10 @@ expand it.
 
     >     --usermap=:nobody --groupmap=*:nobody
 
+    An empty **FROM** value matches only sender-side IDs that have no name.  It
+    is not a wildcard for named users or groups; use "`*`" when you want to map
+    every sender-side name.
+
     When the [`--numeric-ids`](#opt) option is used, the sender does not send any
     names, so all the IDs are treated as having an empty name.  This means that
     you will need to specify numeric **FROM** values if you want to map these
