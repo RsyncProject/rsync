@@ -3701,9 +3701,9 @@ expand it.
     also the [`--only-write-batch`](#opt) option.
 
     This option overrides the negotiated checksum & compress lists and always
-    negotiates a choice based on old-school md5/md4/zlib choices.  If you want
-    a more modern choice, use the [`--checksum-choice`](#opt) (`--cc`) and/or
-    [`--compress-choice`](#opt) (`--zc`) options.
+    negotiates a choice based on old-school md5/md4/zlib choices.  This means
+    batch mode is not compatible with newer compression choices such as zstd or
+    lz4.
 
 0.  `--only-write-batch=FILE`
 
