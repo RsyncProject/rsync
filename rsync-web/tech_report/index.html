@@ -1,0 +1,94 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<!--Converted with LaTeX2HTML 98.1p1 release (March 2nd, 1998)
+originally by Nikos Drakos (nikos@cbl.leeds.ac.uk), CBLU, University of Leeds
+* revised and updated by:  Marcus Hennecke, Ross Moore, Herb Swan
+* with significant contributions from:
+  Jens Lippmann, Marek Rouchal, Martin Wilck and others -->
+<HTML>
+<HEAD>
+<TITLE>The rsync algorithm</TITLE>
+<META NAME="description" CONTENT="The rsync algorithm">
+<META NAME="keywords" CONTENT="tech_report">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+<LINK REL="STYLESHEET" HREF="tech_report.css">
+<LINK REL="next" HREF="node1.html">
+</HEAD>
+<BODY >
+<!--Navigation Panel-->
+<A NAME="tex2html4"
+ HREF="node1.html">
+<IMG WIDTH="37" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="next"
+ SRC="next.gif"></A> 
+<IMG WIDTH="26" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="up"
+ SRC="up.gif"> 
+<IMG WIDTH="63" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="previous"
+ SRC="previous.gif">   
+<BR>
+<B> Next:</B> <A NAME="tex2html5"
+ HREF="node1.html">The problem</A>
+<BR>
+<BR>
+<!--End of Navigation Panel-->
+
+<P>
+
+<P>
+
+<P>
+<H1 ALIGN="CENTER">The rsync algorithm</H1>
+<P ALIGN="CENTER"><STRONG>Andrew Tridgell &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Paul Mackerras
+<BR>
+Department of Computer Science <BR>
+Australian National University <BR>
+Canberra, ACT 0200, Australia</STRONG></P>
+<P ALIGN="LEFT"></P>
+
+<P>
+
+<H3>Abstract:</H3>
+<DIV>
+This report presents an algorithm for updating a file on one machine
+  to be identical to a file on another machine.  We assume that the
+  two machines are connected by a low-bandwidth high-latency
+  bi-directional communications link.  The algorithm identifies parts
+  of the source file which are identical to some part of the
+  destination file, and only sends those parts which cannot be matched
+  in this way.  Effectively, the algorithm computes a set of
+  differences without having both files on the same machine.  The
+  algorithm works best when the files are similar, but will also
+  function correctly and reasonably efficiently when the files are
+  quite different.
+</DIV>
+<P>
+<P>
+<BR><HR>
+<!--Table of Child-Links-->
+<A NAME="CHILD_LINKS">&#160;</A>
+<UL>
+<LI><A NAME="tex2html6"
+ HREF="node1.html">The problem</A>
+<LI><A NAME="tex2html7"
+ HREF="node2.html">The rsync algorithm</A>
+<LI><A NAME="tex2html8"
+ HREF="node3.html">Rolling checksum</A>
+<LI><A NAME="tex2html9"
+ HREF="node4.html">Checksum searching</A>
+<LI><A NAME="tex2html10"
+ HREF="node5.html">Pipelining</A>
+<LI><A NAME="tex2html11"
+ HREF="node6.html">Results</A>
+<LI><A NAME="tex2html12"
+ HREF="node7.html">Availability</A>
+<LI><A NAME="tex2html13"
+ HREF="node8.html">About this document ... </A>
+</UL>
+<!--End of Table of Child-Links-->
+<BR><HR>
+<ADDRESS>
+<I>Andrew Tridgell</I>
+<BR><I>1998-11-09</I>
+</ADDRESS>
+</BODY>
+</HTML>

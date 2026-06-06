@@ -26,7 +26,7 @@ jobs:
       run: |
         brew install automake openssl xxhash zstd lz4
         pip3 install --user --break-system-packages commonmark
-        echo "$(brew --prefix)/bin" >>$GITHUB_PATH
+        echo "$(brew --prefix)/bin" >>"$GITHUB_PATH"
     - name: configure
       run: |
         BREW_PREFIX=$(brew --prefix)
@@ -41,12 +41,20 @@ jobs:
     - name: info
       run: rsync --version
     - name: check
-      run: sudo RSYNC_EXPECT_SKIPPED=acls-default,chmod-temp-dir,chown-fake,devices-fake,dir-sgid,open-noatime,protected-regular,xattrs-hlink,xattrs make check
+      # chown-fake / devices-fake / xattrs / xattrs-hlink now RUN on macOS
+      # (rsyncfns.py drives xattrs via the `xattr` command), verified on a
+      # real macOS host, so they're no longer in the skip set.
+      run: sudo RSYNC_EXPECT_SKIPPED=acls-default,acls-depth,chmod-temp-dir,daemon-access-ip,daemon-chroot-acl,dir-sgid,open-noatime,preallocate,protected-regular,proxy-response-line-too-long,simd-checksum,sparse make check
+    - name: check (TCP daemon transport)
+      # Second run with daemon tests over a real loopback rsyncd; the default
+      # 'make check' above uses the secure stdio-pipe transport.
+      run: sudo ./runtests.py --rsync-bin="$PWD/rsync" --use-tcp -j 8
     - name: ssl file list
       run: rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
     - name: save artifact
       uses: actions/upload-artifact@v4
       with:
+        retention-days: 45
         name: macos-bin
         path: |
           rsync

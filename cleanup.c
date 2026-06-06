@@ -198,7 +198,7 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 		switch_step++;
 
 		if (cleanup_fname)
-			do_unlink(cleanup_fname);
+			do_unlink_at(cleanup_fname);
 		if (exit_code)
 			kill_all(SIGUSR1);
 		if (cleanup_pid && cleanup_pid == getpid()) {
@@ -269,8 +269,16 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 		break;
 	}
 
-	if (called_from_signal_handler)
+	if (called_from_signal_handler) {
+#ifdef GCOV_COVERAGE
+		/* _exit() bypasses the gcov atexit flush; rsync's generator (and
+		 * other processes) normally finish via the signal handler, so
+		 * without this they would write no .gcda. Harmless otherwise. */
+		extern void __gcov_dump(void);
+		__gcov_dump();
+#endif
 		_exit(exit_code);
+	}
 	exit(exit_code);
 }
 

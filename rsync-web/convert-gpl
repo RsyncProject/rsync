@@ -1,0 +1,11 @@
+#!/usr/bin/perl
+use strict;
+
+while (<>) {
+    s/&/&amp;/g;
+    s/</&lt;/g;
+    s/>/&gt;/g;
+    s//<hr>/;
+    s#(&lt;)(https?:.*?)(&gt;)#$1<a href="$2">$2</a>$3#g;
+    print $_;
+}

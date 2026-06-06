@@ -1,0 +1,77 @@
+name: Test rsync version mixing on Ubuntu
+
+# Runs the CURRENT test suite with two different rsync binaries: the freshly
+# built ./rsync as the client/driver, and a committed OLD static binary
+# (old_versions/rsync_<ver>) as the daemon / remote-shell peer. This exercises
+# real version mixing over the wire -- more convincing than --protocol forcing,
+# which only makes the current binary speak an old protocol.
+#
+# Direction is fixed: the current binary always drives (only it understands the
+# new test scripts); the old binary is only ever the server/daemon side. The
+# reverse (old client driving new scripts) is not possible -- but one test,
+# reverse-daemon-delta, swaps the roles internally (current build as the daemon,
+# old binary as the client) to cover the backward-compat direction: a current
+# daemon serving the installed base of old clients.
+#
+# The per-version manifest testsuite/expect/rsync_<ver>.expect lists exactly
+# which tests run and each one's expected outcome (pass/skip/fail/xfail), so an
+# old peer's known feature gaps are recorded rather than treated as breakage.
+#
+# All peers run in a SINGLE job (looped, not a matrix) so the PR shows one check
+# line rather than one per version. Each peer/transport is a foldable ::group::
+# in the log, and a failure annotates which peer/transport broke.
+
+on:
+  push:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/ubuntu-version-mix.yml'
+  pull_request:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/ubuntu-version-mix.yml'
+  schedule:
+    - cron: '52 8 * * *'
+
+jobs:
+  version-mix:
+    runs-on: ubuntu-latest
+    name: rsync version-mix
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: prep
+      run: |
+        sudo apt-get install acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev python3-cmarkgfm openssl
+        echo "/usr/local/bin" >>"$GITHUB_PATH"
+    - name: configure
+      run: ./configure --with-rrsync
+    - name: make
+      # check-progs builds rsync AND the test helper programs (tls, trimslash,
+      # t_unsafe, ...) that runtests.py requires; plain `make` does not.
+      run: make check-progs
+    - name: info
+      run: ./rsync --version | head -1
+    - name: version mixing (all peers, pipe + TCP transports)
+      run: |
+        rc=0
+        for peer in old_versions/rsync_*; do
+          chmod +x "$peer"
+          name=$(basename "$peer")
+          expect="testsuite/expect/$name.expect"
+          for transport in pipe tcp; do
+            tcp=()
+            [ "$transport" = tcp ] && tcp=(--use-tcp)
+            echo "::group::$name ($transport): $("$peer" --version | head -1)"
+            if ! ./runtests.py --rsync-bin="$PWD/rsync" --rsync-bin2="$PWD/$peer" \
+                  --expect-result "$expect" "${tcp[@]}" -j 8; then
+              echo "::error::version-mix failed: $name ($transport)"
+              rc=1
+            fi
+            echo "::endgroup::"
+          done
+        done
+        exit $rc

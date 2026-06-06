@@ -1,0 +1,4 @@
+#!/bin/sh
+rm -f badge.svg
+wget https://github.com/RsyncProject/rsync/workflows/build/badge.svg
+rsync -aiic --inplace --remove-source-files badge.svg $SAMBA_HOST:/home/httpd/html/rsync/

@@ -1,0 +1,33 @@
+# Expected outcomes for current rsync <-> rsync 3.1.0 peer (protocol 31).
+# See rsync_3.1.3.expect for format/semantics; listed tests are the run set.
+# 3.1.0 predates much of the suite; many daemon/feature tests are expected
+# to fail (xfail) -- a documented old-peer gap, not a current-side bug.
+# The four *-symlink-race / sender-flist-symlink-leak xfails show the peer
+# is vulnerable to the May-2026 findings that current master fixes.
+
+00-hello                     pass
+alt-dest                     pass
+alt-dest-symlink-race        xfail   # peer vulnerable to May-2026 finding (fixed in current)
+bare-do-open-symlink-race    pass
+batch-mode                   pass
+chdir-symlink-race           xfail   # peer vulnerable to May-2026 finding (fixed in current)
+chmod-option                 pass
+copy-dest-source-symlink     xfail   # peer vulnerable to May-2026 finding (fixed in current)
+daemon                       xfail   # feature/negotiation absent in 3.1.0 (proto 31)
+daemon-access                pass
+daemon-auth                  pass
+daemon-config                pass
+daemon-exec                  pass
+daemon-filter                pass
+daemon-gzip-download         xfail   # feature/negotiation absent in 3.1.0 (proto 31)
+daemon-gzip-upload           xfail   # feature/negotiation absent in 3.1.0 (proto 31)
+daemon-munge                 pass
+daemon-refuse                xfail   # feature/negotiation absent in 3.1.0 (proto 31)
+daemon-refuse-compress       xfail   # feature/negotiation absent in 3.1.0 (proto 31)
+exclude                      pass
+files-from                   pass
+hardlinks                    pass
+reverse-daemon-delta         pass
+sender-flist-symlink-leak    xfail   # peer vulnerable to May-2026 finding (fixed in current)
+ssh-basic                    pass
+symlink-dirlink-basis        pass

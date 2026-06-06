@@ -98,7 +98,7 @@ static enum delret delete_dir_contents(char *fname, uint16 flags)
 
 		strlcpy(p, fp->basename, remainder);
 		if (!(fp->mode & S_IWUSR) && !am_root && fp->flags & FLAG_OWNED_BY_US)
-			do_chmod(fname, fp->mode | S_IWUSR);
+			do_chmod_at(fname, fp->mode | S_IWUSR);
 		/* Save stack by recursing to ourself directly. */
 		if (S_ISDIR(fp->mode)) {
 			if (delete_dir_contents(fname, flags | DEL_RECURSE) != DR_SUCCESS)
@@ -139,7 +139,7 @@ enum delret delete_item(char *fbuf, uint16 mode, uint16 flags)
 	}
 
 	if (flags & DEL_NO_UID_WRITE)
-		do_chmod(fbuf, mode | S_IWUSR);
+		do_chmod_at(fbuf, mode | S_IWUSR);
 
 	if (S_ISDIR(mode) && !(flags & DEL_DIR_IS_EMPTY)) {
 		/* This only happens on the first call to delete_item() since
@@ -160,7 +160,7 @@ enum delret delete_item(char *fbuf, uint16 mode, uint16 flags)
 
 	if (S_ISDIR(mode)) {
 		what = "rmdir";
-		ok = do_rmdir(fbuf) == 0;
+		ok = do_rmdir_at(fbuf) == 0;
 	} else {
 		if (make_backups > 0 && !(flags & DEL_FOR_BACKUP) && (backup_dir || !is_backup_file(fbuf))) {
 			what = "make_backup";

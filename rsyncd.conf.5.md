@@ -1073,6 +1073,16 @@ in the values of parameters.  See that section for details.
     **system()** call's default shell), and use RSYNC_NO_XFER_EXEC to disable
     both options completely.
 
+0.  `temp dir`
+
+    Specifies a directory that rsync should use for temporary files created
+    during the transfer of updated files. If that directory is on a different
+    partition, after transfer file is being copied instead of unlinked. 
+
+    This parameter equals with `--temp-dir` option, so please consult rsync
+    manpage for further information. 
+
+    
 ## CONFIG DIRECTIVES
 
 There are currently two config directives available that allow a config file to

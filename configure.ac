@@ -82,6 +82,28 @@ if test x"$enable_profile" = x"yes"; then
 	CFLAGS="$CFLAGS -pg"
 fi
 
+dnl Coverage build (gcov) for `make coverage`. NOTE: --enable-profile above is
+dnl gprof (-pg) and is NOT coverage. -O0 keeps branch coverage meaningful;
+dnl -fprofile-update=atomic keeps the shared .gcda counters correct while the
+dnl suite runs many rsync processes in parallel.
+AC_ARG_ENABLE(coverage,
+	AS_HELP_STRING([--enable-coverage],[build with gcov instrumentation for `make coverage`]))
+if test x"$enable_coverage" = x"yes"; then
+	CFLAGS="$CFLAGS --coverage -fprofile-update=atomic -O0"
+	CXXFLAGS="$CXXFLAGS --coverage -fprofile-update=atomic -O0"
+	LDFLAGS="$LDFLAGS --coverage"
+	AC_DEFINE([GCOV_COVERAGE], 1,
+		[Flush gcov counters at exit_cleanup: rsync's children exit via _exit(), which bypasses the gcov atexit handler, so without this no .gcda is written for the receiver/generator/daemon-worker processes.])
+fi
+
+dnl openat2(RESOLVE_BENEATH) is used on Linux 5.6+ for the secure resolver.
+dnl --disable-openat2 forces the portable per-component O_NOFOLLOW fallback to
+dnl run as the primary resolver on ordinary Linux, so that tier is exercised
+dnl (and coverage-counted) without needing a pre-5.6 kernel. Behaviour-neutral
+dnl by default (the knob only REMOVES a tier when explicitly disabled).
+AC_ARG_ENABLE(openat2,
+	AS_HELP_STRING([--disable-openat2],[do not use Linux openat2(RESOLVE_BENEATH); force the portable resolver (for exercising the fallback tier)]))
+
 AC_MSG_CHECKING([if md2man can create manpages])
 if test x"$ac_cv_path_PYTHON3" = x; then
     AC_MSG_RESULT(no - python3 not found)
@@ -330,6 +352,28 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[ ]], [[return 0;]])],
 [ NOEXECSTACK='' ; AC_MSG_RESULT(no) ])
 CFLAGS="$OLD_CFLAGS"
 AC_SUBST(NOEXECSTACK)
+
+dnl We need both the SYS_openat2 syscall number and <linux/openat2.h> (for
+dnl struct open_how / RESOLVE_BENEATH); some setups have one without the other.
+AC_CACHE_CHECK([for openat2],rsync_cv_HAVE_OPENAT2,[
+    AC_COMPILE_IFELSE([
+        AC_LANG_PROGRAM([[
+#include <sys/syscall.h>
+#include <linux/openat2.h>
+]], [[
+struct open_how how;
+how.resolve = RESOLVE_BENEATH;
+return SYS_openat2 + (int)how.resolve;
+]])
+    ],
+    [rsync_cv_HAVE_OPENAT2=yes], [rsync_cv_HAVE_OPENAT2=no])
+])
+if test x"$enable_openat2" != x"no"; then
+    if test x"$rsync_cv_HAVE_OPENAT2" = x"yes"; then
+      AC_DEFINE([HAVE_OPENAT2], 1,
+        [Define to use Linux openat2(RESOLVE_BENEATH) in secure_relative_open where available.])
+    fi
+fi
 
 # arrgh. libc in some old debian version screwed up the largefile
 # stuff, getting byte range locking wrong
@@ -888,7 +932,7 @@ AC_FUNC_UTIME_NULL
 AC_FUNC_ALLOCA
 AC_CHECK_FUNCS(waitpid wait4 getcwd chown chmod lchmod mknod mkfifo \
     fchmod fstat ftruncate strchr readlink link utime utimes lutimes strftime \
-    chflags getattrlist mktime innetgr linkat \
+    chflags getattrlist mktime innetgr linkat mknodat mkfifoat \
     memmove lchown vsnprintf snprintf vasprintf asprintf setsid strpbrk \
     strlcat strlcpy stpcpy strtol mallinfo mallinfo2 getgroups setgroups geteuid getegid \
     setlocale setmode open64 lseek64 mkstemp64 mtrace va_copy __va_copy \

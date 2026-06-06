@@ -178,7 +178,7 @@ static char *expand_vars(const char *str)
 
 	for (t = buf, f = str; bufsize && *f; ) {
 		if (*f == '%' && isUpper(f+1)) {
-			char *percent = strchr(f+1, '%');
+			const char *percent = strchr(f+1, '%');
 			if (percent && percent - f < bufsize) {
 				char *val;
 				strlcpy(t, f+1, percent - f);

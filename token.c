@@ -292,6 +292,14 @@ static int32 simple_recv_token(int f, char **data)
 		int32 i = read_int(f);
 		if (i <= 0)
 			return i;
+		/* simple_send_token caps each literal chunk at CHUNK_SIZE;
+		 * reject anything larger so a hostile peer cannot drive the
+		 * read_buf below past our static CHUNK_SIZE buffer. */
+		if (i > CHUNK_SIZE) {
+			rprintf(FERROR, "invalid uncompressed token length %ld [%s]\n",
+				(long)i, who_am_i());
+			exit_cleanup(RERR_PROTOCOL);
+		}
 		residue = i;
 	}
 
@@ -473,14 +481,29 @@ send_deflated_token(int f, int32 token, struct map_struct *buf, OFF_T offset, in
 			tx_strm.avail_in = n1;
 			if (protocol_version >= 31) /* Newer protocols avoid a data-duplicating bug */
 				offset += n1;
-			tx_strm.next_out = (Bytef *) obuf;
-			tx_strm.avail_out = AVAIL_OUT_SIZE(CHUNK_SIZE);
-			r = deflate(&tx_strm, Z_INSERT_ONLY);
-			if (r != Z_OK || tx_strm.avail_in != 0) {
-				rprintf(FERROR, "deflate on token returned %d (%d bytes left)\n",
-					r, tx_strm.avail_in);
-				exit_cleanup(RERR_STREAMIO);
-			}
+			/* With our bundled zlib's Z_INSERT_ONLY this produces no
+			 * output and consumes the input in one call.  A build
+			 * against a system zlib lacks Z_INSERT_ONLY and falls back
+			 * to Z_SYNC_FLUSH (see top of file), which emits a flush
+			 * block we discard -- and for an incompressible token that
+			 * block can exceed obuf.  Loop, resetting the output buffer,
+			 * until all the input is consumed so a large token can't
+			 * overflow obuf and abort the transfer (#951).  Drain until
+			 * avail_out != 0 too: a full output buffer can leave pending
+			 * bytes that would otherwise leak into the next real deflate
+			 * send and corrupt the stream (same condition as the data loop
+			 * above).  The discarded output is not sent: the receiver
+			 * rebuilds the matching history itself in see_deflate_token(). */
+			do {
+				tx_strm.next_out = (Bytef *) obuf;
+				tx_strm.avail_out = AVAIL_OUT_SIZE(CHUNK_SIZE);
+				r = deflate(&tx_strm, Z_INSERT_ONLY);
+				if (r != Z_OK) {
+					rprintf(FERROR, "deflate on token returned %d (%d bytes left)\n",
+						r, tx_strm.avail_in);
+					exit_cleanup(RERR_STREAMIO);
+				}
+			} while (tx_strm.avail_in != 0 || tx_strm.avail_out == 0);
 		} while (toklen > 0);
 	}
 }
@@ -494,8 +517,51 @@ static char *cbuf;
 static char *dbuf;
 
 /* for decoding runs of tokens */
+#define MAX_TOKEN_INDEX ((int32)0x7ffffffe)
+
 static int32 rx_token;
 static int32 rx_run;
+
+static NORETURN void invalid_compressed_token(void)
+{
+	rprintf(FERROR, "invalid token number in compressed stream\n");
+	exit_cleanup(RERR_PROTOCOL);
+}
+
+static int32 recv_compressed_token_num(int f, int32 flag)
+{
+	if (flag & TOKEN_REL) {
+		int32 incr = flag & 0x3f;
+		if (rx_token > MAX_TOKEN_INDEX - incr)
+			invalid_compressed_token();
+		rx_token += incr;
+		flag >>= 6;
+	} else {
+		rx_token = read_int(f);
+		if (rx_token < 0 || rx_token > MAX_TOKEN_INDEX)
+			invalid_compressed_token();
+	}
+
+	if (flag & 1) {
+		rx_run = read_byte(f);
+		rx_run += read_byte(f) << 8;
+		if (rx_run <= 0 || rx_token > MAX_TOKEN_INDEX - rx_run)
+			invalid_compressed_token();
+		recv_state = r_running;
+	}
+
+	return -1 - rx_token;
+}
+
+static int32 recv_compressed_token_run(void)
+{
+	if (rx_run <= 0 || rx_token >= MAX_TOKEN_INDEX)
+		invalid_compressed_token();
+	++rx_token;
+	if (--rx_run == 0)
+		recv_state = r_idle;
+	return -1 - rx_token;
+}
 
 /* Receive a deflated token and inflate it */
 static int32 recv_deflated_token(int f, char **data)
@@ -587,22 +653,7 @@ static int32 recv_deflated_token(int f, char **data)
 			}
 
 			/* here we have a token of some kind */
-			if (flag & TOKEN_REL) {
-				rx_token += flag & 0x3f;
-				flag >>= 6;
-			} else {
-				rx_token = read_int(f);
-				if (rx_token < 0) {
-					rprintf(FERROR, "invalid token number in compressed stream\n");
-					exit_cleanup(RERR_PROTOCOL);
-				}
-			}
-			if (flag & 1) {
-				rx_run = read_byte(f);
-				rx_run += read_byte(f) << 8;
-				recv_state = r_running;
-			}
-			return -1 - rx_token;
+			return recv_compressed_token_num(f, flag);
 
 		case r_inflating:
 			rx_strm.next_out = (Bytef *)dbuf;
@@ -622,10 +673,7 @@ static int32 recv_deflated_token(int f, char **data)
 			break;
 
 		case r_running:
-			++rx_token;
-			if (--rx_run == 0)
-				recv_state = r_idle;
-			return -1 - rx_token;
+			return recv_compressed_token_run();
 		}
 	}
 }
@@ -836,22 +884,7 @@ static int32 recv_zstd_token(int f, char **data)
 				return 0;
 			}
 			/* here we have a token of some kind */
-			if (flag & TOKEN_REL) {
-				rx_token += flag & 0x3f;
-				flag >>= 6;
-			} else {
-				rx_token = read_int(f);
-				if (rx_token < 0) {
-					rprintf(FERROR, "invalid token number in compressed stream\n");
-					exit_cleanup(RERR_PROTOCOL);
-				}
-			}
-			if (flag & 1) {
-				rx_run = read_byte(f);
-				rx_run += read_byte(f) << 8;
-				recv_state = r_running;
-			}
-			return -1 - rx_token;
+			return recv_compressed_token_num(f, flag);
 
 		case r_inflated: /* zstd doesn't get into this state */
 			break;
@@ -882,10 +915,7 @@ static int32 recv_zstd_token(int f, char **data)
 			break;
 
 		case r_running:
-			++rx_token;
-			if (--rx_run == 0)
-				recv_state = r_idle;
-			return -1 - rx_token;
+			return recv_compressed_token_run();
 		}
 	}
 }
@@ -1005,22 +1035,7 @@ static int32 recv_compressed_token(int f, char **data)
 			}
 
 			/* here we have a token of some kind */
-			if (flag & TOKEN_REL) {
-				rx_token += flag & 0x3f;
-				flag >>= 6;
-			} else {
-				rx_token = read_int(f);
-				if (rx_token < 0) {
-					rprintf(FERROR, "invalid token number in compressed stream\n");
-					exit_cleanup(RERR_PROTOCOL);
-				}
-			}
-			if (flag & 1) {
-				rx_run = read_byte(f);
-				rx_run += read_byte(f) << 8;
-				recv_state = r_running;
-			}
-			return -1 - rx_token;
+			return recv_compressed_token_num(f, flag);
 
 		case r_inflating:
 			avail_out = LZ4_decompress_safe(next_in, dbuf, avail_in, size);
@@ -1036,10 +1051,7 @@ static int32 recv_compressed_token(int f, char **data)
 			break;
 
 		case r_running:
-			++rx_token;
-			if (--rx_run == 0)
-				recv_state = r_idle;
-			return -1 - rx_token;
+			return recv_compressed_token_run();
 		}
 	}
 }

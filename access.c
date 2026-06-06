@@ -99,7 +99,7 @@ static void make_mask(char *mask, int plen, int addrlen)
 	return;
 }
 
-static int match_address(const char *addr, const char *tok)
+static int match_address(const char *addr, char *tok)
 {
 	char *p;
 	struct addrinfo hints, *resa, *rest;

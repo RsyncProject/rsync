@@ -697,6 +697,13 @@ int recv_xattr_request(struct file_struct *file, int f_in)
 	rxa = lst->items;
 	num = 0;
 	while ((rel_pos = read_varint(f_in)) != 0) {
+		/* Detect signed overflow before the accumulating add. A hostile
+		 * peer could otherwise wrap 'num' to land on an arbitrary value. */
+		if ((rel_pos > 0 && num > INT_MAX - rel_pos)
+		 || (rel_pos < 0 && num < INT_MIN - rel_pos)) {
+			rprintf(FERROR, "xattr rel_pos accumulation overflow [%s]\n", who_am_i());
+			exit_cleanup(RERR_PROTOCOL);
+		}
 		num += rel_pos;
 		if (am_sender) {
 			/* The sender-related num values are only in order on the sender.
@@ -742,7 +749,7 @@ int recv_xattr_request(struct file_struct *file, int f_in)
 		}
 
 		old_datum = rxa->datum;
-		rxa->datum_len = read_varint(f_in);
+		rxa->datum_len = read_varint_size(f_in, MAX_WIRE_XATTR_DATALEN, "xattr datum_len");
 
 		if (SIZE_MAX - rxa->name_len < rxa->datum_len)
 			overflow_exit("recv_xattr_request");
@@ -783,7 +790,8 @@ void receive_xattr(int f, struct file_struct *file)
 		return;
 	}
 
-	if ((count = read_varint(f)) != 0) {
+	count = read_varint_bounded(f, 0, MAX_WIRE_XATTR_COUNT, "xattr count");
+	if (count != 0) {
 		(void)EXPAND_ITEM_LIST(&temp_xattr, rsync_xa, count);
 		temp_xattr.count = 0;
 	}
@@ -791,8 +799,8 @@ void receive_xattr(int f, struct file_struct *file)
 	for (num = 1; num <= count; num++) {
 		char *ptr, *name;
 		rsync_xa *rxa;
-		size_t name_len = read_varint(f);
-		size_t datum_len = read_varint(f);
+		size_t name_len = read_varint_size(f, MAX_WIRE_XATTR_NAMELEN, "xattr name_len");
+		size_t datum_len = read_varint_size(f, MAX_WIRE_XATTR_DATALEN, "xattr datum_len");
 		size_t dget_len = datum_len > MAX_FULL_DATUM ? 1 + (size_t)xattr_sum_len : datum_len;
 		size_t extra_len = MIGHT_NEED_RPRE ? RPRE_LEN : 0;
 		if (SIZE_MAX - dget_len < extra_len || SIZE_MAX - dget_len - extra_len < name_len)
@@ -860,8 +868,8 @@ void receive_xattr(int f, struct file_struct *file)
 		rxa->num = num;
 	}
 
-	if (need_sort && count > 1)
-		qsort(temp_xattr.items, count, sizeof (rsync_xa), rsync_xal_compare_names);
+	if (need_sort && temp_xattr.count > 1)
+		qsort(temp_xattr.items, temp_xattr.count, sizeof (rsync_xa), rsync_xal_compare_names);
 
 	ndx = rsync_xal_store(&temp_xattr); /* adds item to rsync_xal_l */
 
@@ -1086,7 +1094,7 @@ int set_xattr(const char *fname, const struct file_struct *file, const char *fna
 	 && !S_ISLNK(sxp->st.st_mode)
 #endif
 	 && access(fname, W_OK) < 0
-	 && do_chmod(fname, (sxp->st.st_mode & CHMOD_BITS) | S_IWUSR) == 0)
+	 && do_chmod_at(fname, (sxp->st.st_mode & CHMOD_BITS) | S_IWUSR) == 0)
 		added_write_perm = 1;
 
 	ndx = F_XATTR(file);
@@ -1094,7 +1102,7 @@ int set_xattr(const char *fname, const struct file_struct *file, const char *fna
 	lst = &glst->xa_items;
 	int return_value = rsync_xal_set(fname, lst, fnamecmp, sxp);
 	if (added_write_perm) /* remove the temporary write permission */
-		do_chmod(fname, sxp->st.st_mode);
+		do_chmod_at(fname, sxp->st.st_mode);
 	return return_value;
 }
 
@@ -1211,7 +1219,7 @@ int set_stat_xattr(const char *fname, struct file_struct *file, mode_t new_mode)
 	mode = (fst.st_mode & _S_IFMT) | (fmode & ACCESSPERMS)
 	     | (S_ISDIR(fst.st_mode) ? 0700 : 0600);
 	if (fst.st_mode != mode)
-		do_chmod(fname, mode);
+		do_chmod_at(fname, mode);
 	if (!IS_DEVICE(fst.st_mode))
 		fst.st_rdev = 0; /* just in case */
 
@@ -1249,7 +1257,12 @@ int set_stat_xattr(const char *fname, struct file_struct *file, mode_t new_mode)
 
 int x_stat(const char *fname, STRUCT_STAT *fst, STRUCT_STAT *xst)
 {
-	int ret = do_stat(fname, fst);
+	/* Use the *_at variants so that on a daemon-no-chroot deployment
+	 * the metadata read goes through a secure parent dirfd instead
+	 * of bare path resolution. The *_at wrappers fall through to
+	 * plain do_stat outside the daemon-no-chroot context, so this
+	 * change is transparent for non-daemon use. */
+	int ret = do_stat_at(fname, fst);
 	if ((ret < 0 || get_stat_xattr(fname, -1, fst, xst) < 0) && xst)
 		xst->st_mode = 0;
 	return ret;
@@ -1257,7 +1270,7 @@ int x_stat(const char *fname, STRUCT_STAT *fst, STRUCT_STAT *xst)
 
 int x_lstat(const char *fname, STRUCT_STAT *fst, STRUCT_STAT *xst)
 {
-	int ret = do_lstat(fname, fst);
+	int ret = do_lstat_at(fname, fst);
 	if ((ret < 0 || get_stat_xattr(fname, -1, fst, xst) < 0) && xst)
 		xst->st_mode = 0;
 	return ret;
