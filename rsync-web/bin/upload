@@ -1,6 +1,6 @@
 #!/bin/sh
 if [ -d rsync-and-debian ]; then
-  rsync -aviOHFFc --del -f._filt . $SAMBA_HOST:/home/httpd/html/rsync/ "${@}"
+  rsync -aviOHFFc --del -f._filt . "$SAMBA_HOST":/home/httpd/html/rsync/ "${@}"
 else
   echo "Run this from the root of the html hierarchy."
   exit 1

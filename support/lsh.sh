@@ -13,7 +13,7 @@ do_cd=y # Default path is user's home dir (just like ssh) unless host is "lh".
 while : ; do
   case "$1" in
     -l) user="$2"; shift; shift ;;
-    -l*) user=`echo "$1" | sed 's/^-l//'`; shift ;;
+    -l*) user=$(echo "$1" | sed 's/^-l//'); shift ;;
     --no-cd) do_cd=n; shift ;;
     -*) shift ;;
     localhost) shift; break ;;
@@ -25,7 +25,7 @@ done
 if [ "$user" ]; then
   prefix=''
   if [ $do_cd = y ]; then
-    home=`perl -e "print((getpwnam('$user'))[7])"`
+    home=$(perl -e "print((getpwnam('$user'))[7])")
     prefix="cd '$home' &&"
   fi
   sudo -H -u "$user" sh -c "$prefix $*"
@@ -33,5 +33,6 @@ else
   if [ $do_cd = y ]; then
     cd || exit 1
   fi
+  # shellcheck disable=2294
   eval "${@}"
 fi

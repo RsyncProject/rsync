@@ -20,7 +20,7 @@ PKGNAME=SMBrsync
 # but for now it is hard coded
 BASEDIR=/usr/local
 VERSION="2.5.5"
-ARCH=`uname -p`
+ARCH=$(uname -p)
 NAME=rsync
 
 # Definitions end here
@@ -28,27 +28,27 @@ NAME=rsync
 
 ## Start by faking root install
 echo "Creating install directory (fake $BASEDIR)..."
-START=`pwd`
-FAKE_ROOT=$START/${PKGNAME}
-mkdir $FAKE_ROOT
+START=$(pwd)
+FAKE_ROOT="$START"/"${PKGNAME}"
+mkdir "$FAKE_ROOT"
 
 # copy the binary and the man page to their places
-mkdir $FAKE_ROOT/bin
-mkdir -p $FAKE_ROOT/doc/rsync
-mkdir -p $FAKE_ROOT/man/man1
-mkdir -p $FAKE_ROOT/man/man5
+mkdir "$FAKE_ROOT"/bin
+mkdir -p "$FAKE_ROOT"/doc/rsync
+mkdir -p "$FAKE_ROOT"/man/man1
+mkdir -p "$FAKE_ROOT"/man/man5
 
-cp ../../../rsync $FAKE_ROOT/bin/rsync
-cp ../../../rsync.1 $FAKE_ROOT/man/man1/rsync.1
-cp ../../../rsyncd.conf.5 $FAKE_ROOT/man/man5/rsyncd.conf.5
-cp ../../../README.md $FAKE_ROOT/doc/rsync/README.md
-cp ../../../COPYING $FAKE_ROOT/doc/rsync/COPYING
-cp ../../../tech_report.pdf $FAKE_ROOT/doc/rsync/tech_report.pdf
-cp ../../../COPYING $FAKE_ROOT/COPYING
+cp ../../../rsync "$FAKE_ROOT"/bin/rsync
+cp ../../../rsync.1 "$FAKE_ROOT"/man/man1/rsync.1
+cp ../../../rsyncd.conf.5 "$FAKE_ROOT"/man/man5/rsyncd.conf.5
+cp ../../../README.md "$FAKE_ROOT"/doc/rsync/README.md
+cp ../../../COPYING "$FAKE_ROOT"/doc/rsync/COPYING
+cp ../../../tech_report.pdf "$FAKE_ROOT"/doc/rsync/tech_report.pdf
+cp ../../../COPYING "$FAKE_ROOT"/COPYING
 
 ## Build info file
 echo "Building pkginfo file..."
-cat > $FAKE_ROOT/pkginfo << EOF_INFO
+cat > "$FAKE_ROOT"/pkginfo << EOF_INFO
 PKG=$PKGNAME
 NAME=$NAME
 DESC="Program for efficient remote updates of files."
@@ -61,7 +61,7 @@ CLASSES=none
 EOF_INFO
 
 ## Build prototype file
-cat > $FAKE_ROOT/prototype << EOFPROTO
+cat > "$FAKE_ROOT"/prototype << EOFPROTO
 i copyright=COPYING
 i pkginfo=pkginfo
 d none bin 0755 bin bin
@@ -81,13 +81,13 @@ EOFPROTO
 ## And now build the package.
 OUTPUTFILE=$PKGNAME-$VERSION-sol8-$ARCH-local.pkg
 echo "Building package.."
-echo FAKE_ROOT = $FAKE_ROOT
-cd $FAKE_ROOT
+echo "FAKE_ROOT = $FAKE_ROOT"
+cd "$FAKE_ROOT" || exit
 pkgmk -d . -r . -f ./prototype -o
-pkgtrans -os . $OUTPUTFILE $PKGNAME
+pkgtrans -os . "$OUTPUTFILE" "$PKGNAME"
 
-mv $OUTPUTFILE ..
-cd ..
+mv "$OUTPUTFILE" ..
+cd .. || exit
 
 # Comment this out if you want to see, which file structure has been created
-rm -rf $FAKE_ROOT
+rm -rf "$FAKE_ROOT"

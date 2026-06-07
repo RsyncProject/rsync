@@ -6,16 +6,16 @@ if [ $# != 1 ]; then
 fi
 
 inname="$1"
-srcdir=`dirname "$0"`
+srcdir=$(dirname "$0")
 flagfile="$srcdir/.md2man-works"
 force_flagfile="$srcdir/.md2man-force"
 
 if [ ! -f "$flagfile" ]; then
   # We test our smallest manpage just to see if the python setup works.
   if "$srcdir/md-convert" --test "$srcdir/rsync-ssl.1.md" >/dev/null 2>&1; then
-    touch $flagfile
+    touch "$flagfile"
   else
-    outname=`basename "$inname" .md`
+    outname=$(basename "$inname" .md)
     if [ -f "$outname" ]; then
       exit 0
     elif [ -f "$srcdir/$outname" ]; then
