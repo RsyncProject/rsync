@@ -48,7 +48,7 @@ POPT_dgettext(const char * dom, const char * str)
     char * codeset = NULL;
     char * retval = NULL;
 
-    if (!dom) 
+    if (!dom)
 	dom = textdomain(NULL);
     codeset = bind_textdomain_codeset(dom, NULL);
     bind_textdomain_codeset(dom, "UTF-8");

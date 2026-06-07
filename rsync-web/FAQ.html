@@ -171,7 +171,7 @@ binary in your path. There are 3 possible solutions:
 
 <ol>
 
-<li>install rsync in a "standard" location that is in your remote path. 
+<li>install rsync in a "standard" location that is in your remote path.
 
 <li>modify your .cshrc, .bashrc etc on the remote system to include the path
 that rsync is in
@@ -194,7 +194,7 @@ remote system where rsync is installed
 
 <p>Short answer: Yes, rsync can handle filenames with spaces.
 
-<p>Long answer: 
+<p>Long answer:
 
 <p>Rsync handles spaces just like any other unix command line application.
 Within the code spaces are treated just like any other character so a
@@ -203,7 +203,7 @@ character in it.
 
 <p>The problem of spaces is in the argv processing done to interpret the
 command line.  As with any other unix application you have to escape spaces
-in some way on the command line or they will be used to separate arguments. 
+in some way on the command line or they will be used to separate arguments.
 
 <p>It is slightly trickier in rsync (and other remote-copy programs like
 scp) because rsync sends a command line to the remote system to launch the
@@ -237,7 +237,7 @@ any character):
 <blockquote><pre>rsync -av host:a?long?filename /tmp/</pre></blockquote>
 
 <p>As long as you know that the remote filenames on the command line
-are interpreted by the remote shell then it all works fine. 
+are interpreted by the remote shell then it all works fine.
 
 <hr>
 <h3><a name=10>ignore "vanished files" warning</a></h3>

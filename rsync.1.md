@@ -2842,12 +2842,12 @@ expand it.
 
 0.  `--compress-threads=NUM`, `--zt=NUM`
 
-    Set the number of threads to spawn when compressing data. Setting this 
-    option to 1 or more will instruct the compression library to spawn 1 or 
-    more threads for compression. Ideally, increasing the number of threads 
+    Set the number of threads to spawn when compressing data. Setting this
+    option to 1 or more will instruct the compression library to spawn 1 or
+    more threads for compression. Ideally, increasing the number of threads
     will increase transfer speed if the transfer is CPU bound on the sender.
-    
-    This option does not affect decompression. 
+
+    This option does not affect decompression.
 
     Compression algorithms that allow threading:
 
