@@ -835,11 +835,19 @@ def main() -> int:
     # tree that provides the tests.
     WORKFLOWS = TESTSUITE_REPO / ".github" / "workflows"
     if not args.cleanup:
-        for label, tree in (("--repo", REPO), ("--testsuite-repo", TESTSUITE_REPO)):
-            if not (tree / "runtests.py").is_file():
-                print(f"{tree} is not an rsync source tree (no runtests.py); "
-                      f"run from inside a checkout or pass {label}", file=sys.stderr)
-                return 2
+        # The Python test suite (runtests.py + testsuite/) comes from
+        # TESTSUITE_REPO, so that is where runtests.py must live.  The build tree
+        # (REPO) only has to be a buildable rsync source -- it may be an older
+        # release whose runtests.py predates the Python suite, or lacks it.
+        if not (TESTSUITE_REPO / "runtests.py").is_file():
+            print(f"{TESTSUITE_REPO} has no runtests.py; run from inside a "
+                  f"checkout or pass --testsuite-repo a tree with the Python "
+                  f"test suite", file=sys.stderr)
+            return 2
+        if not (REPO / "rsync.h").is_file():
+            print(f"{REPO} is not an rsync source tree (no rsync.h); "
+                  f"run from inside a checkout or pass --repo", file=sys.stderr)
+            return 2
 
     if args.fleet:
         config_path = Path(args.fleet).resolve()
