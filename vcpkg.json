@@ -1,0 +1,12 @@
+{
+  "name": "rsync",
+  "version": "3.3.0",
+  "dependencies": [
+    "zlib",
+    "zstd",
+    "lz4",
+    "xxhash",
+    "openssl"
+  ],
+  "builtin-baseline": "aa40adda5352e87655b8583cfb2451d5e9e276fd"
+}

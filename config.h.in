@@ -1,0 +1,115 @@
+#ifndef CONFIG_H
+#define CONFIG_H
+
+#ifdef _MSC_VER
+#include <stdint.h>
+typedef int32_t int32;
+typedef uint32_t uint32;
+typedef int64_t int64;
+typedef uint64_t uint64;
+typedef int16_t int16;
+typedef uint16_t uint16;
+
+#include "../auto-win-msvc/namespace_win_shim.h"
+
+// Interpolated config variables from CMake
+#cmakedefine HAVE_CONFIG_H 1
+#define RSYNC_VERSION "@RSYNC_VERSION@"
+#cmakedefine HAVE_ZLIB 1
+#cmakedefine HAVE_OPENSSL 1
+#cmakedefine HAVE_STRERROR 1
+#define PACKAGE "@PACKAGE@"
+#define POPT_SYSCONFDIR "@POPT_SYSCONFDIR@"
+
+#ifndef __builtin_expect
+#define __builtin_expect(exp, c) (exp)
+#endif
+
+// Some extra missing types/macros for rsync
+#define PATH_MAX MAX_PATH
+
+#define SIZEOF_INT @SIZEOF_INT@
+#define SIZEOF_LONG @SIZEOF_LONG@
+#define SIZEOF_SHORT @SIZEOF_SHORT@
+#define SIZEOF_INT32_T @SIZEOF_INT32_T@
+#define SIZEOF_UINT32_T @SIZEOF_UINT32_T@
+#define SIZEOF_INT64_T @SIZEOF_INT64_T@
+#define SIZEOF_UINT64_T @SIZEOF_UINT64_T@
+#define SIZEOF_OFF_T @SIZEOF_OFF_T@
+#define SIZEOF_TIME_T @SIZEOF_TIME_T@
+#define SIZEOF_CHARP @SIZEOF_CHARP@
+
+#cmakedefine HAVE_SIZE_T 1
+#cmakedefine HAVE_OFF_T 1
+#cmakedefine HAVE_TIME_T 1
+#cmakedefine HAVE_PID_T 1
+#cmakedefine HAVE_DIRENT_H 1
+#cmakedefine HAVE_UTIME 1
+#cmakedefine HAVE_UTIMES 1
+#cmakedefine HAVE_STRPBRK 1
+#cmakedefine HAVE_GETCWD 1
+#cmakedefine HAVE_STRUCT_ADDRINFO 1
+#cmakedefine HAVE_STRUCT_SOCKADDR_STORAGE 1
+#cmakedefine HAVE_GETADDRINFO 1
+#cmakedefine HAVE_GETNAMEINFO 1
+#cmakedefine HAVE_SOCKADDR_IN6 1
+#cmakedefine HAVE_MEMMOVE 1
+#cmakedefine HAVE_GETTIMEOFDAY_TZ 1
+#cmakedefine HAVE_READLINK 1
+
+#define direct dirent
+
+#ifndef S_ISUID
+#define S_ISUID 04000
+#endif
+#ifndef S_ISGID
+#define S_ISGID 02000
+#endif
+#ifndef S_ISVTX
+#define S_ISVTX 01000
+#endif
+
+#cmakedefine SIGUSR1 @SIGUSR1@
+#cmakedefine SIGUSR2 @SIGUSR2@
+#cmakedefine SIGHUP @SIGHUP@
+#cmakedefine SIGALRM @SIGALRM@
+#cmakedefine WNOHANG @WNOHANG@
+#cmakedefine O_NOFOLLOW @O_NOFOLLOW@
+#cmakedefine O_DIRECTORY @O_DIRECTORY@
+#cmakedefine AT_REMOVEDIR @AT_REMOVEDIR@
+
+#define RSYNC_RSH "@RSYNC_RSH@"
+#define NOBODY_USER "@NOBODY_USER@"
+#define NOBODY_GROUP "@NOBODY_GROUP@"
+#define RSYNCD_SYSCONF "@RSYNCD_SYSCONF@"
+
+#define index strchr
+#define rindex strrchr
+
+#ifndef major
+#define major(dev) 0
+#define minor(dev) 0
+#define makedev(maj, min) 0
+#endif
+
+static inline int do_chmod_at(int a, const char* b, int c) { return 0; }
+static inline int fchdir(int a) { return 0; }
+#define WIFSIGNALED(x) 0
+#define SIGACTMASK(a,b) 0
+static inline int unlinkat(int a, const char* b, int c) { return 0; }
+static inline int renameat(int a, const char* b, int c, const char* d) { return 0; }
+static inline int mkdirat(int a, const char* b, int c) { return 0; }
+static inline int chroot(const char* a) { return 0; }
+static inline char* getpass(const char* a) { return ""; }
+static inline char* getwd(char* a) { return ""; }
+static inline int wait3(int* a, int b, void* c) { return 0; }
+static inline struct tm *gmtime_r(const time_t *timep, struct tm *result) { return gmtime_s(result, timep) == 0 ? result : NULL; }
+
+#include <corecrt_io.h>
+
+#define socketpair posix_socketpair
+extern int posix_socketpair(int domain, int type, int protocol, int socket_vector[2]);
+
+#endif
+
+#endif // CONFIG_H
