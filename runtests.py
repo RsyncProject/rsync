@@ -191,35 +191,31 @@ _PY_TEST_SUFFIX = '_test.py'
 
 
 def _is_test_path(path):
-    base = os.path.basename(path)
-    return base.endswith('.test') or base.endswith(_PY_TEST_SUFFIX)
+    return os.path.basename(path).endswith(_PY_TEST_SUFFIX)
 
 
 def _testbase(path):
     """Strip the test extension to get the canonical test name."""
     base = os.path.basename(path)
-    if base.endswith('.test'):
-        return base[:-len('.test')]
     if base.endswith(_PY_TEST_SUFFIX):
         return base[:-len(_PY_TEST_SUFFIX)]
     return base
 
 
 def collect_tests(suitedir, patterns):
-    """Collect test scripts (.test or _test.py) matching the given patterns."""
+    """Collect test scripts (_test.py) matching the given patterns."""
     if not patterns:
-        candidates = (glob.glob(os.path.join(suitedir, '*.test'))
-                      + glob.glob(os.path.join(suitedir, '*' + _PY_TEST_SUFFIX)))
+        candidates = glob.glob(os.path.join(suitedir, '*' + _PY_TEST_SUFFIX))
         tests = sorted(p for p in candidates if _is_test_path(p))
     else:
         seen = set()
         tests = []
         for pat in patterns:
             # Accept either bare name ("mkpath"), explicit extension, or glob.
-            if pat.endswith('.test') or pat.endswith('.py'):
+            if pat.endswith('.py'):
                 pats = [pat]
             else:
-                pats = [pat + '.test', pat + _PY_TEST_SUFFIX]
+                pats = [pat + _PY_TEST_SUFFIX]
             for p in pats:
                 for m in sorted(glob.glob(os.path.join(suitedir, p))):
                     if _is_test_path(m) and m not in seen:
