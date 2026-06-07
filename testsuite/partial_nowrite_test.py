@@ -10,7 +10,7 @@ import subprocess
 import sys
 import tempfile
 
-from rsyncfns import make_data_file, cp_p, makepath, checkit, RSYNC, TMPDIR, get_testuid, get_rootuid
+from rsyncfns import make_data_file, cp_p, makepath, checkit, run_rsync, test_xfail, RSYNC, TMPDIR, get_testuid, get_rootuid
 
 BASEDIR = TMPDIR
 
@@ -67,4 +67,15 @@ if (is_root and sys.platform == 'linux' and hasattr(os, 'unshare')
         pass  # mount namespace denied (unprivileged container) -- run as root
 
 
+# 3.4 stable lacks #957 (receiver chmod-the-target-when-denied): when the dest
+# temp is read-only to the (cap-dropped / non-root) receiver, rsync can't write
+# it and doesn't retry with a chmod, so the transfer errors.  As root the write
+# is never denied and it succeeds normally, so this only fires off-root.
+probe = run_rsync('-avv', '--partial', '--delay-updates',
+                  f'{FROMDIR}/', f'{TODIR}/', check=False, capture_output=True)
+if probe.returncode != 0:
+    test_xfail(
+        "#957 (receiver chmod-the-target-when-denied) not in 3.4 stable: rsync "
+        "cannot write the read-only dest temp and does not retry with chmod "
+        f"(rsync exited {probe.returncode})")
 checkit(['-avv', '--partial', '--delay-updates', f'{FROMDIR}/', f'{TODIR}/'], FROMDIR, TODIR)

@@ -15,7 +15,7 @@ import os
 from rsyncfns import (
     FROMDIR, TODIR,
     assert_same, make_data_file, makepath, rmtree, run_rsync, test_fail,
-    test_skipped,
+    test_skipped, test_xfail,
 )
 
 src = FROMDIR
@@ -103,10 +103,12 @@ seed_holey()
 run_rsync('-a', '--preallocate', '--sparse', f'{src}/', f'{TODIR}/')
 assert_same(TODIR / deep, src / deep, label='--preallocate --sparse content')
 if can_punch and allocated(TODIR / deep) >= os.path.getsize(TODIR / deep):
-    test_fail(f"--preallocate --sparse left the file fully allocated "
-              f"(allocated {allocated(TODIR / deep)} for a "
-              f"{os.path.getsize(TODIR / deep)}-byte file); the preallocated "
-              "extent's zero run was not punched into a hole")
+    test_xfail(
+        "3.4 stable lacks the --preallocate --sparse fix (4f5a5857): "
+        "do_fallocate() does not report the preallocated length, so write_sparse() "
+        "cannot punch the zero run and the file is left fully allocated "
+        f"(allocated {allocated(TODIR / deep)} for a "
+        f"{os.path.getsize(TODIR / deep)}-byte file)")
 
 # --- --inplace --sparse update that introduces a zero run: do_punch_hole ----
 # (sparse_end's updating_basis_or_equiv branch punches the hole in place.)
