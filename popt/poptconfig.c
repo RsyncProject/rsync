@@ -3,7 +3,7 @@
  */
 
 /* (C) 1998-2002 Red Hat, Inc. -- Licensing details are in the COPYING
-   file accompanying popt source distributions, available from 
+   file accompanying popt source distributions, available from
    ftp://ftp.rpm.org/pub/rpm/dist. */
 
 #include "system.h"
@@ -234,7 +234,7 @@ static int poptConfigLine(poptContext con, char * line)
 
     if (con->appName == NULL)
 	goto exit;
-    
+
     memset(item, 0, sizeof(*item));
 
     appName = se;
@@ -327,7 +327,7 @@ static int poptConfigLine(poptContext con, char * line)
 	item->argv[j] = NULL;
 	item->argc = j;
     }
-	
+
     if (!strcmp(entryType, "alias"))
 	rc = poptAddItem(con, item, 0);
     else if (!strcmp(entryType, "exec"))
@@ -500,7 +500,7 @@ poptInit(int argc, const char ** argv,
 
     if ((argv0 = strrchr(argv[0], '/')) != NULL) argv0++;
     else argv0 = argv[0];
-   
+
     con = poptGetContext(argv0, argc, (const char **)argv, options, 0);
     if (con != NULL&& poptReadConfigFiles(con, configPaths))
 	con = poptFini(con);
