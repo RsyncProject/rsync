@@ -485,7 +485,8 @@ static void output_item_help(struct output_struct *words)
 {
 	short *levels = words == info_words ? info_levels : debug_levels;
 	const char *const*verbosity = words == info_words ? info_verbosity : debug_verbosity;
-	char buf[128], *opt, *fmt = "%-10s %s\n";
+	char buf[128], *opt;
+        static const char * const fmt = "%-10s %s\n";
 	int j;
 
 	reset_output_levels();
@@ -943,7 +944,8 @@ static void parse_one_refuse_match(int negated, const char *ref, const struct po
  **/
 static void set_refuse_options(void)
 {
-	struct poptOption *op, *list_end = NULL;
+	struct poptOption *op;
+        struct poptOption const *list_end = NULL;
 	char *cp, *ref = lp_refuse_options(module_id);
 	int negated;
 
@@ -2870,7 +2872,7 @@ void server_options(char **args, int *argc_p)
 		args[ac++] = "--ignore-missing-args";
 
 	if (modify_window_set && am_sender) {
-		char *fmt = modify_window < 0 ? "-@%d" : "--modify-window=%d";
+		const char *fmt = modify_window < 0 ? "-@%d" : "--modify-window=%d";
 		if (asprintf(&arg, fmt, modify_window) < 0)
 			goto oom;
 		args[ac++] = arg;

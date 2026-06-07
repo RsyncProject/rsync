@@ -184,7 +184,7 @@ void parse_compress_choice(int final_call)
 	if (valid_compressions.negotiated_nni)
 		do_compression = valid_compressions.negotiated_nni->num;
 	else if (compress_choice) {
-		struct name_num_item *nni = get_nni_by_name(&valid_compressions, compress_choice, -1);
+		struct name_num_item const * const nni = get_nni_by_name(&valid_compressions, compress_choice, -1);
 		if (!nni) {
 			rprintf(FERROR, "unknown compress name: %s\n", compress_choice);
 			exit_cleanup(RERR_UNSUPPORTED);
@@ -292,7 +292,7 @@ static int parse_nni_str(struct name_num_obj *nno, const char *from, char *tobuf
 			ch = '\0';
 		if (!ch || at_space) {
 			if (tok) {
-				struct name_num_item *nni = get_nni_by_name(nno, tok, to - tok);
+				struct name_num_item const * const nni = get_nni_by_name(nno, tok, to - tok);
 				if (nni && !nno->saw[nni->num]) {
 					nno->saw[nni->num] = ++cnt;
 					if (nni->main_nni) {
@@ -743,11 +743,11 @@ void setup_protocol(int f_out,int f_in)
 				do_negotiated_strings = 1;
 		}
 		/* The inc_recurse var MUST be set to 0 or 1. */
-		inc_recurse = compat_flags & CF_INC_RECURSE ? 1 : 0;
+		inc_recurse = (compat_flags & CF_INC_RECURSE) ? 1 : 0;
 		want_xattr_optim = protocol_version >= 31 && !(compat_flags & CF_AVOID_XATTR_OPTIM);
-		proper_seed_order = compat_flags & CF_CHKSUM_SEED_FIX ? 1 : 0;
-		xfer_flags_as_varint = compat_flags & CF_VARINT_FLIST_FLAGS ? 1 : 0;
-		xmit_id0_names = compat_flags & CF_ID0_NAMES ? 1 : 0;
+		proper_seed_order = (compat_flags & CF_CHKSUM_SEED_FIX) ? 1 : 0;
+		xfer_flags_as_varint = (compat_flags & CF_VARINT_FLIST_FLAGS) ? 1 : 0;
+		xmit_id0_names = (compat_flags & CF_ID0_NAMES) ? 1 : 0;
 		if (!xfer_flags_as_varint && preserve_crtimes) {
 			fprintf(stderr, "Both rsync versions must be at least 3.2.0 for --crtimes.\n");
 			exit_cleanup(RERR_PROTOCOL);

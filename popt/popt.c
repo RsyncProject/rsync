@@ -408,7 +408,8 @@ static int handleAlias(poptContext con,
 static
 const char * findProgramPath(const char * argv0)
 {
-    char *path = NULL, *s = NULL, *se;
+    char *path = NULL, *se;
+    const char *s = NULL;
     char *t = NULL;
 
     if (argv0 == NULL) return NULL;	/* XXX can't happen */
@@ -581,12 +582,12 @@ findOption(const struct poptOption * opt,
 	     && callbackData && *callbackData == NULL)
 		*callbackData = opt->descrip;
 	    return opt2;
-	}   break;
+	}   // break; // Already continues or returns
 	case POPT_ARG_CALLBACK:
 	    cb = opt;
 	    cbarg.ptr = opt->arg;
 	    continue;
-	    break;
+	    // break; // Already continues
 	default:
 	    break;
 	}
@@ -804,7 +805,7 @@ int poptBitsDel(poptBits bits, const char * s)
 int poptBitsIntersect(poptBits *ap, const poptBits b)
 {
     __pbm_bits *abits;
-    __pbm_bits *bbits;
+    const __pbm_bits *bbits;
     __pbm_bits rc = 0;
     size_t nw = (__PBM_IX(_poptBitsM-1) + 1);
     size_t i;
@@ -824,7 +825,7 @@ int poptBitsIntersect(poptBits *ap, const poptBits b)
 int poptBitsUnion(poptBits *ap, const poptBits b)
 {
     __pbm_bits *abits;
-    __pbm_bits *bbits;
+    const __pbm_bits *bbits;
     __pbm_bits rc = 0;
     size_t nw = (__PBM_IX(_poptBitsM-1) + 1);
     size_t i;
@@ -864,7 +865,8 @@ int poptSaveBits(poptBits * bitsp,
 		UNUSED(unsigned int argInfo), const char * s)
 {
     char *tbuf = NULL;
-    char *t, *te;
+    const char *t;
+    char *te;
     int rc = 0;
 
     if (bitsp == NULL || s == NULL || *s == '\0' || _poptBitsNew(bitsp))

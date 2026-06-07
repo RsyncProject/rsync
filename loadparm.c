@@ -180,7 +180,7 @@ static char *expand_vars(const char *str)
 		if (*f == '%' && isUpper(f+1)) {
 			const char *percent = strchr(f+1, '%');
 			if (percent && percent - f < bufsize) {
-				char *val;
+				const char *val;
 				strlcpy(t, f+1, percent - f);
 				val = getenv(t);
 				if (val) {
@@ -485,7 +485,7 @@ static BOOL do_section(char *sectionname)
 			memcpy(vp, &Vars, sizeof Vars);
 		} else if (strcmp(sectionname+1, "pop") == 0
 		 || strcmp(sectionname+1, "reset") == 0) {
-			all_vars *vp = ((all_vars*)Vars_stack.items) + Vars_stack.count - 1;
+			const all_vars *vp = ((all_vars*)Vars_stack.items) + Vars_stack.count - 1;
 			if (!Vars_stack.count)
 				return False;
 			memcpy(&Vars, vp, sizeof Vars);
