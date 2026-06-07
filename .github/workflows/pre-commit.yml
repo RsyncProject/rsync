@@ -1,0 +1,116 @@
+---
+name: pre-commit
+on:
+  pull_request:
+  push:
+jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+    env:
+      RAW_LOG: pre-commit.log
+      CS_XML: pre-commit.xml
+      CPPCHECK_VERSION: 2.21.0
+    steps:
+      # In case we are satisfied with cppcheck in ubuntu-latest
+      # - run: sudo apt-get update && sudo apt-get install cppcheck uncrustify
+      # In case we build cppcheck
+      - run: sudo apt-get update && sudo apt-get install -y build-essential git uncrustify
+
+      #
+      # Setup cppcheck
+      #
+      - name: Restore cppcheck from cache
+        id: cache-cppcheck
+        uses: actions/cache/restore@v5
+        with:
+          path: ~/cppcheck-install
+          key: cppcheck-${{ env.CPPCHECK_VERSION }}-${{ runner.os }}-${{ hashFiles('~/cppcheck-install/cppcheck-build-stamp') }}
+
+      - name: Build and install cppcheck
+        if: steps.cache-cppcheck.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch ${{ env.CPPCHECK_VERSION }} https://github.com/danmar/cppcheck.git
+          cd cppcheck
+          make -j$(nproc) FILESDIR=/usr/local/share/cppcheck
+          mkdir -p ~/cppcheck-install
+          make DESTDIR=~/cppcheck-install install FILESDIR=/usr/local/share/cppcheck
+          echo "$(date +%s)-$(uname -a)" > ~/cppcheck-install/usr/local/share/cppcheck/cppcheck-build-stamp
+      - name: Install cppcheck from cache or build
+        run: |
+          sudo mkdir -p /usr/local/share/cppcheck
+          sudo cp ~/cppcheck-install/usr/bin/cppcheck /usr/local/bin/
+          sudo cp -r ~/cppcheck-install/usr/local/share/cppcheck/* /usr/local/share/cppcheck/
+
+      - name: Save cppcheck to cache
+        if: steps.cache-cppcheck.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ~/cppcheck-install
+          key: cppcheck-${{ env.CPPCHECK_VERSION }}-${{ runner.os }}-${{ hashFiles('~/cppcheck-install/cppcheck-build-stamp') }}
+
+      # Project specific
+      - uses: actions/checkout@v6
+
+      #
+      # Remove existing cache files (before restoring, after checkout)
+      #
+      - run: |
+          find .cache -type f ! -name .gitkeep -delete
+          find .cache -type d -empty -delete
+
+      - run: python -m pip install pre-commit
+      - uses: actions/cache/restore@v5
+        if: github.event_name == 'pull_request'
+        with:
+          path: .cache/cppcheck
+          key: cppcheck-${{ env.CPPCHECK_VERSION }}-cache-${{ github.ref_name }}-${{ github.sha }}
+          restore-keys: |
+            cppcheck-${{ env.CPPCHECK_VERSION }}-cache-${{ github.ref_name }}-
+            cppcheck-${{ env.CPPCHECK_VERSION }}-cache-${{ github.base_ref }}-
+            cppcheck-${{ env.CPPCHECK_VERSION }}-cache-
+      - uses: actions/cache/restore@v5
+        if: github.event_name != 'pull_request'
+        with:
+          path: .cache/cppcheck
+          key: cppcheck-${{ env.CPPCHECK_VERSION }}-cache-${{ github.ref_name }}-${{ github.sha }}
+          restore-keys: |
+            cppcheck-${{ env.CPPCHECK_VERSION }}-cache-${{ github.ref_name }}-
+            cppcheck-${{ env.CPPCHECK_VERSION }}-cache-${{ github.base_ref }}-
+            cppcheck-${{ env.CPPCHECK_VERSION }}-cache-
+      - uses: actions/cache/restore@v5
+        with:
+          path: ~/.cache/pre-commit/
+          key: pre-commit-4|${{ env.pythonLocation }}|${{ hashFiles('.pre-commit-config.yaml') }}
+      - name: Run pre-commit hooks
+        env:
+          SKIP: no-commit-to-branch
+        run: |
+          set -o pipefail
+          mkdir -p .cache/cppcheck
+          pre-commit gc
+          pre-commit run --hook-stage manual --show-diff-on-failure --color=always --all-files | tee ${RAW_LOG}
+      - uses: actions/cache/save@v5
+        if: ${{ ! cancelled() }}
+        with:
+          path: .cache/cppcheck
+          key: cppcheck-${{ env.CPPCHECK_VERSION }}-cache-${{ github.ref_name }}-${{ github.sha }}
+      - name: Convert Raw Log to Checkstyle format (launch action)
+        uses: mdeweerd/logToCheckStyle@v2025.1.1
+        if: ${{ failure() }}
+        with:
+          in: ${{ env.RAW_LOG }}
+          # out: ${{ env.CS_XML }}
+      - uses: actions/cache/save@v5
+        if: ${{ ! cancelled() }}
+        with:
+          path: ~/.cache/pre-commit/
+          key: pre-commit-4|${{ env.pythonLocation }}|${{ hashFiles('.pre-commit-config.yaml') }}
+      - name: Provide log as artifact
+        uses: actions/upload-artifact@v7
+        if: ${{ ! cancelled() }}
+        with:
+          name: precommit-logs
+          path: |
+            ${{ env.RAW_LOG }}
+            ${{ env.CS_XML }}
+          retention-days: 2
