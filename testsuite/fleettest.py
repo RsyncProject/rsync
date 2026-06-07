@@ -83,7 +83,11 @@ from pathlib import Path
 # source tree these point at, so it must be run from inside an rsync checkout
 # or given --repo PATH.
 REPO = Path.cwd()
-WORKFLOWS = REPO / ".github" / "workflows"
+# Source tree providing the test suite (runtests.py + testsuite/). Defaults to
+# REPO; --testsuite-repo decouples it so one tree is built and another's suite is
+# run against the result.
+TESTSUITE_REPO = REPO
+WORKFLOWS = TESTSUITE_REPO / ".github" / "workflows"
 
 # Fleet config (overridable with --fleet): ~/.fleettest.json is tried first, then
 # fleettest.json next to this script. The example template sits next to the
@@ -815,18 +819,27 @@ def main() -> int:
                     help="report per-target wall-clock (push/build/test) to find "
                     "the slowest target")
     ap.add_argument("--repo", help="rsync source tree to build (default: cwd)")
+    ap.add_argument("--testsuite-repo",
+                    help="rsync tree to take runtests.py + testsuite/ from "
+                    "(default: --repo). Build one tree and run another's test "
+                    "suite against it, e.g. --repo ../rsync-v3.4 --testsuite-repo .")
     ap.add_argument("--fleet", help="fleet config JSON (default: ~/.fleettest.json, "
                     "else fleettest.json next to this script)")
     ap.add_argument("--list", action="store_true", help="list targets and exit")
     args = ap.parse_args()
 
-    global REPO, WORKFLOWS
+    global REPO, WORKFLOWS, TESTSUITE_REPO
     REPO = Path(args.repo).resolve() if args.repo else Path.cwd()
-    WORKFLOWS = REPO / ".github" / "workflows"
-    if not args.cleanup and not (REPO / "runtests.py").is_file():
-        print(f"{REPO} is not an rsync source tree (no runtests.py); "
-              f"run from inside a checkout or pass --repo", file=sys.stderr)
-        return 2
+    TESTSUITE_REPO = Path(args.testsuite_repo).resolve() if args.testsuite_repo else REPO
+    # The expected-skip lists travel with the suite, so read workflows from the
+    # tree that provides the tests.
+    WORKFLOWS = TESTSUITE_REPO / ".github" / "workflows"
+    if not args.cleanup:
+        for label, tree in (("--repo", REPO), ("--testsuite-repo", TESTSUITE_REPO)):
+            if not (tree / "runtests.py").is_file():
+                print(f"{tree} is not an rsync source tree (no runtests.py); "
+                      f"run from inside a checkout or pass {label}", file=sys.stderr)
+                return 2
 
     if args.fleet:
         config_path = Path(args.fleet).resolve()
@@ -904,6 +917,19 @@ def main() -> int:
         if ar.returncode != 0:
             print(f"git archive failed: {ar.stderr}", file=sys.stderr)
             return 2
+
+        # --testsuite-repo: overlay another tree's runtests.py + testsuite/ onto
+        # the built source (merge, no delete). Build REPO's rsync, but run
+        # TESTSUITE_REPO's suite against it. The leftover .test files from REPO
+        # are ignored by a Python runtests.py (it globs *_test.py).
+        if TESTSUITE_REPO != REPO:
+            ov = subprocess.run(
+                f"git -C {TESTSUITE_REPO} archive HEAD -- runtests.py testsuite "
+                f"| tar -x -C {staging}",
+                shell=True, capture_output=True, text=True)
+            if ov.returncode != 0:
+                print(f"testsuite overlay archive failed: {ov.stderr}", file=sys.stderr)
+                return 2
 
         # Tests that opt into the non-root pass (same for every target).
         args.nonroot_tests = discover_nonroot_tests(Path(staging) / "testsuite")
