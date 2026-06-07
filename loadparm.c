@@ -204,8 +204,10 @@ static char *expand_vars(const char *str)
 		exit_cleanup(RERR_MALLOC);
 	}
 
-	if (bufsize && (buf = realloc(buf, t - buf + 1)) == NULL)
+	if (bufsize && (t = realloc(buf, t - buf + 1)) == NULL)
 		out_of_memory("expand_vars");
+	else
+		buf = t;
 
 	return buf;
 }
