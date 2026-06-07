@@ -1813,13 +1813,6 @@ uint32 read_uint(int f)
 	return IVAL(b, 0);
 }
 
-#ifndef CAREFUL_ALIGNMENT
-#ifdef __clang__
-__attribute__((no_sanitize("undefined")))
-#elif GCC_VERSION >= 409
-__attribute__((no_sanitize_undefined))
-#endif
-#endif
 int32 read_varint(int f)
 {
 	union {
@@ -1852,13 +1845,6 @@ int32 read_varint(int f)
 	return u.x;
 }
 
-#ifndef CAREFUL_ALIGNMENT
-#ifdef __clang__
-__attribute__((no_sanitize("undefined")))
-#elif GCC_VERSION >= 409
-__attribute__((no_sanitize_undefined))
-#endif
-#endif
 int64 read_varlong(int f, uchar min_bytes)
 {
 	union {
