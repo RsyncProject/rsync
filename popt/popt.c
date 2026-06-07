@@ -378,7 +378,7 @@ static int handleAlias(poptContext con,
     con->os->currAlias = con->aliases + i;
     {	const char ** av;
 	int ac = con->os->currAlias->argc;
-	/* Append --foo=bar arg to alias argv array (if present). */ 
+	/* Append --foo=bar arg to alias argv array (if present). */
 	if (longName && nextArg != NULL && *nextArg != '\0') {
 	    av = malloc((ac + 1 + 1) * sizeof(*av));
 	    if (av != NULL) {	/* XXX won't happen. */
@@ -907,7 +907,7 @@ int poptSaveString(const char *** argvp,
     if (*argvp != NULL)
     while ((*argvp)[argc] != NULL)
 	argc++;
- 
+
     if ((*argvp = xrealloc(*argvp, (argc + 1 + 1) * sizeof(**argvp))) != NULL) {
 	(*argvp)[argc++] = xstrdup(val);
 	(*argvp)[argc  ] = NULL;
@@ -1406,7 +1406,7 @@ int poptGetNextOpt(poptContext con)
 		    {
 			poptStripArg(con, con->os->next);
 		    }
-		
+
 		    if (con->os->argv != NULL) {	/* XXX can't happen */
 			if (F_ISSET(opt, OPTIONAL) &&
 			    con->os->argv[con->os->next][0] == '-') {
@@ -1547,7 +1547,7 @@ poptContext poptFreeContext(poptContext con)
     con->otherHelp = _free(con->otherHelp);
     con->execPath = _free(con->execPath);
     con->arg_strip = PBM_FREE(con->arg_strip);
-    
+
     con = _free(con);
     return con;
 }
@@ -1697,19 +1697,19 @@ int poptStrippedArgv(poptContext con, int argc, char ** argv)
     int numargs = argc;
     int j = 1;
     int i;
-    
+
     if (con->arg_strip)
     for (i = 1; i < argc; i++) {
 	if (PBM_ISSET(i, con->arg_strip))
 	    numargs--;
     }
-    
+
     for (i = 1; i < argc; i++) {
 	if (con->arg_strip && PBM_ISSET(i, con->arg_strip))
 	    continue;
 	argv[j] = (j < numargs) ? argv[i] : NULL;
 	j++;
     }
-    
+
     return numargs;
 }
