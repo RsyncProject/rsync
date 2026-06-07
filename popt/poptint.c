@@ -161,7 +161,8 @@ POPT_fprintf (FILE * stream, const char * format, ...)
      * to do with whether the final '\0' is counted (or not). The code
      * below already adds +1 for the (possibly already counted) trailing NUL.
      */
-    while ((b = realloc(b, nb+1)) != NULL) {
+    while ((ob = realloc(b, nb+1)) != NULL) {
+	b = ob; /* reallocation was successful */
 	va_start(ap, format);
 	rc = vsnprintf(b, nb, format, ap);
 	va_end(ap);
@@ -172,6 +173,11 @@ POPT_fprintf (FILE * stream, const char * format, ...)
 	} else 		/* glibc 2.0 */
 	    nb += (nb < (size_t)100 ? (size_t)100 : nb);
 	ob = b;
+    }
+    if (ob == NULL && b != NULL) {
+        /* Re-alloc failed, free memory */
+        free(b);
+        b = NULL;
     }
 #endif
 
