@@ -128,7 +128,8 @@ int poptReadFile(const char * fn, char ** bp, size_t * nbp, int flags)
     int fdno;
     char * b = NULL;
     off_t nb = 0;
-    char * s, * t, * se;
+    char * s, * t;
+    const char * se;
     int rc = POPT_ERROR_ERRNO;	/* assume failure */
 
     fdno = open(fn, O_RDONLY);
@@ -277,8 +278,10 @@ static int poptConfigLine(poptContext con, char * line)
 	/* Append remaining text to the interpolated file option text. */
 	if (*se != '\0') {
 	    size_t nse = strlen(se) + 1;
-	    if ((b = realloc(b, (nb + nse))) == NULL)	/* XXX can't happen */
+    	    char *new_b = NULL;
+	    if ((new_b = realloc(b, (nb + nse))) == NULL)	/* XXX can't happen */
 		goto exit;
+            b = new_b;
 	    (void) stpcpy( stpcpy(&b[nb-1], " "), se);
 	    nb += nse;
 	}
@@ -341,7 +344,8 @@ exit:
 
 int poptReadConfigFile(poptContext con, const char * fn)
 {
-    char * b = NULL, *be;
+    char * b = NULL;
+    const char *be;
     size_t nb = 0;
     const char *se;
     char *t = NULL, *te;
@@ -436,7 +440,7 @@ int poptReadConfigFiles(poptContext con, const char * paths)
 
 int poptReadDefaultConfig(poptContext con, UNUSED(int useEnv))
 {
-    char * home;
+    const char * home;
     struct stat sb;
     int rc = 0;		/* assume success */
 
