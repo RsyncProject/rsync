@@ -37,8 +37,8 @@ get_checksum1_avx2_asm:
 	add	rdi, rdx
 	vmovdqu ymm2, [rdi]   # preload the first 64 bytes.
 	vmovdqu ymm3, [rdi+32]
-	and	esi, ~63   # only needed during final reduction, 
-			   # done here to avoid a longer nop for 
+	and	esi, ~63   # only needed during final reduction,
+			   # done here to avoid a longer nop for
 			   # alignment below.
 	add	edx, esi
 	shr	rsi, 6	   # longer opcode for alignment
@@ -49,8 +49,8 @@ get_checksum1_avx2_asm:
 	.p2align 4 		# should fit into the LSD allocation queue.
 .loop:
 	vpmaddubsw	ymm0, ymm15, ymm2  # s1 partial sums
-	vpmaddubsw	ymm5, ymm15, ymm3 
-	vmovdqu	ymm8,  [rdi]	# preload the next 
+	vpmaddubsw	ymm5, ymm15, ymm3
+	vmovdqu	ymm8,  [rdi]	# preload the next
 	vmovdqu	ymm9,  [rdi+32] # 64 bytes.
 	add	rdi, 64
 	vpaddd	ymm4, ymm4, ymm6
@@ -70,7 +70,7 @@ get_checksum1_avx2_asm:
 	vpaddd ymm6, ymm10, ymm6  #  32*CHAR_OFFSET
 	vpaddd ymm1, ymm13, ymm1  # 528*CHAR_OFFSET
 #endif
-	vmovdqa ymm2, ymm8   # move the next 64 bytes 
+	vmovdqa ymm2, ymm8   # move the next 64 bytes
 	vmovdqa ymm3, ymm9   # into the right registers
 	sub	esi, 1
 	jnz	.loop
@@ -78,11 +78,11 @@ get_checksum1_avx2_asm:
 	# now we reduce the partial sums.
 	vpslld	ymm3, ymm4, 6
 	vpsrldq	ymm2, ymm6, 4
-	
+
 	vpaddd  ymm0, ymm3, ymm1
 	vpaddd	ymm6, ymm2, ymm6
 	vpsrlq	ymm3, ymm0, 32
-	
+
 	vpsrldq	ymm2, ymm6, 8
 	vpaddd	ymm0, ymm3, ymm0
 	vpsrldq	ymm3, ymm0, 8
@@ -106,9 +106,9 @@ get_checksum1_avx2_asm:
 	.align 6
 #else
 .section	.rodata
-	.p2align 6 
+	.p2align 6
 #endif
-.mul_T2: 
+.mul_T2:
 	.byte 64
 	.byte 63
 	.byte 62

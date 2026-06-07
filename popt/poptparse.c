@@ -3,7 +3,7 @@
  */
 
 /* (C) 1998-2002 Red Hat, Inc. -- Licensing details are in the COPYING
-   file accompanying popt source distributions, available from 
+   file accompanying popt source distributions, available from
    ftp://ftp.rpm.org/pub/rpm/dist. */
 
 #include "system.h"
@@ -25,7 +25,7 @@ int poptDupArgv(int argc, const char **argv,
 	    return POPT_ERROR_NOARG;
 	nb += strlen(argv[i]) + 1;
     }
-	
+
     dst = malloc(nb);
     if (dst == NULL)			/* XXX can't happen */
 	return POPT_ERROR_MALLOC;
@@ -202,7 +202,7 @@ int poptConfigFileToString(FILE *fp, char ** argstrp,
 	}
 	if (*q != '=')
 	    continue;	/* XXX for now, silently ignore bogus line */
-		
+
 	/* *q is an equal sign. */
 	*q++ = '\0';
 

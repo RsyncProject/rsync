@@ -103,7 +103,7 @@ Protocol version changes
 	The use of a ".<subprotocol>" number was added to
 	@RSYNCD: <version>.<subprotocol>
 
-25	(2001-08-20, 2.4.7pre2) 
+25	(2001-08-20, 2.4.7pre2)
 
 	Send an explicit "@RSYNC EXIT" command at the end of the
 	module listing.  We never intentionally end the transmission

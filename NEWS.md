@@ -374,7 +374,7 @@ to develop and test fixes.
 - CVE-2024-12084 - Heap Buffer Overflow in Checksum Parsing.
 
 - CVE-2024-12085 - Info Leak via uninitialized Stack contents defeats ASLR.
-  
+
 - CVE-2024-12086 - Server leaks arbitrary client files.
 
 - CVE-2024-12087 - Server can make client write files outside of destination directory using symbolic links.

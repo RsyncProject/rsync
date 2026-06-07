@@ -785,7 +785,7 @@ static void send_zstd_token(int f, int32 token, struct map_struct *buf, OFF_T of
 		zstd_in_buff.src = map_ptr(buf, offset, nb);
 		zstd_in_buff.size = nb;
 		zstd_in_buff.pos = 0;
-		
+
 		int finished;
 		do {
 			zstd_out_buff.size = MAX_DATA_COUNT;
