@@ -36,7 +36,7 @@ static char *istring(const char *fmt, int val)
 
 static void print_info_flags(enum logcode f)
 {
-	STRUCT_STAT *dumstat;
+	const STRUCT_STAT *dumstat;
 	BOOL as_json = f == FNONE ? 1 : 0; /* We use 1 == first attribute, 2 == need closing array */
 	char line_buf[75], item_buf[32];
 	int line_len, j;
@@ -164,7 +164,7 @@ static void print_info_flags(enum logcode f)
 	};
 
 	for (line_len = 0, j = 0; ; j++) {
-		char *str = info_flags[j], *next_nfo = str ? info_flags[j+1] : NULL;
+		const char *str = info_flags[j], *next_nfo = str ? info_flags[j+1] : NULL;
 		int need_comma = next_nfo && *next_nfo != '*' ? 1 : 0;
 		int item_len;
 		if (!str || *str == '*')
@@ -218,7 +218,8 @@ static void print_info_flags(enum logcode f)
 static void output_nno_list(enum logcode f, const char *name, struct name_num_obj *nno)
 {
 	char namebuf[64], tmpbuf[256];
-	char *tok, *next_tok, *comma = ",";
+	char *tok, *next_tok;
+	static const * const comma = ",";
 	char *cp;
 
 	/* Using '(' ensures that we get a trailing "none" but also includes aliases. */

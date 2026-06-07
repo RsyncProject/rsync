@@ -82,7 +82,7 @@ strdup_locale_from_utf8 (char * istr)
     if (codeset != NULL && strcmp(codeset, "UTF-8") != 0
      && (cd = iconv_open(codeset, "UTF-8")) != (iconv_t)-1)
     {
-	char * shift_pin = NULL;
+	const char * shift_pin = NULL;
 	size_t db = strlen(istr);
 	char * dstr = malloc((db + 1) * sizeof(*dstr));
 	char * dstr_tmp;
@@ -122,7 +122,7 @@ strdup_locale_from_utf8 (char * istr)
 		pout = dstr + used;
 		ob = db - used;
 		continue;
-	    }   break;
+	    }   // break;  // Already has continue
 	    case EINVAL:
 	    case EILSEQ:
 	    default:

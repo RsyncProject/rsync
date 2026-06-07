@@ -112,7 +112,7 @@ static int match_address(const char *addr, char *tok)
 	int bits;
 #endif
 	char mask[16];
-	char *a = NULL, *t = NULL;
+	const char *a = NULL, *t = NULL;
 
 	if (!addr || !*addr)
 		return 0;
