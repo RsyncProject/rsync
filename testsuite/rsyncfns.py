@@ -175,6 +175,42 @@ def _open_lock_file() -> int:
     return fd
 
 
+def _probe_bindable(port: int) -> 'None':
+    """Confirm `port` is actually free once we hold its claim_ports() lock.
+
+    The byte-range lock only coordinates *live* test drivers, and the kernel
+    releases it the instant the holding process dies -- even if that driver left
+    an orphaned daemon still bound to the port. That happens when a run is
+    SIGKILLed (or its ssh drops) on a platform with no parent-death backstop:
+    rsyncfns only arms PR_SET_PDEATHSIG, which is Linux-only, so on the
+    BSDs/Solaris/macOS a killed fleettest run can strand its rsyncd, which then
+    squats the fixed test port forever. A later run wins the (now-free) lock but
+    the socket is still taken, and the daemon dies with a cryptic "bind() failed:
+    Address already in use" / the client "did not see server greeting".
+
+    So actually try to bind it. SO_REUSEADDR is used so a port merely in
+    TIME_WAIT (recently and cleanly closed) is NOT a false positive; only a
+    live bound/listening socket -- a real squatter -- makes the bind fail, and
+    then we stop here with an actionable message instead of failing obscurely
+    later. The probe socket is closed immediately, freeing the port for the
+    daemon that is about to bind it.
+    """
+    s = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM)
+    s.setsockopt(_socket.SOL_SOCKET, _socket.SO_REUSEADDR, 1)
+    try:
+        s.bind(('127.0.0.1', port))
+    except OSError as e:
+        test_fail(
+            f"port {port} was claimed for this run but something is still bound "
+            f"to 127.0.0.1:{port} ({e.strerror}). The claim_ports() lock only "
+            "serializes live test runs, so a still-bound port almost always "
+            "means an orphaned 'rsync --daemon' from a previously killed run "
+            f"(find it with `fstat | grep {port}` / `netstat -an | grep {port}` "
+            "and kill it, or run `fleettest.py --cleanup`), then retry.")
+    finally:
+        s.close()
+
+
 def claim_ports(*ports: int) -> 'None':
     """Reserve the given TCP port numbers for the rest of this process.
 
@@ -210,6 +246,9 @@ def claim_ports(*ports: int) -> 'None':
         # F_SETLKW via fcntl.lockf(LOCK_EX, length, start): exclusive
         # byte-range lock on byte `port`, blocking until acquired.
         fcntl.lockf(_port_lock_fd, fcntl.LOCK_EX, 1, port)
+        # The lock only proves no other live test run owns the port; an orphaned
+        # daemon from a killed run can still squat it (see _probe_bindable).
+        _probe_bindable(port)
 
 
 # --- standalone rsyncd helpers ---------------------------------------------
