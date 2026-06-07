@@ -14,14 +14,14 @@
 
 auto_top='auto-build-save'
 if test -d $auto_top && test -d .git; then
-  desired_branch=`git rev-parse --abbrev-ref HEAD | tr / %`
+  desired_branch=$(git rev-parse --abbrev-ref HEAD | tr / %)
   if test "$desired_branch" = HEAD; then
     echo "ERROR: switch to the right build dir manually when in detached HEAD mode." 1>&2
     exit 1
   fi
   auto_dir="$auto_top/$desired_branch"
   if test -d build; then
-    cur_branch=`readlink build/.branch`
+    cur_branch=$(readlink build/.branch)
   else
     cur_branch='/'
   fi
@@ -39,5 +39,5 @@ if test -d $auto_top && test -d .git; then
     rm -f Makefile
     ln -s packaging/auto-Makefile Makefile
   fi
-  echo $desired_branch
+  echo "$desired_branch"
 fi

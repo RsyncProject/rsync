@@ -1,15 +1,15 @@
 #!/bin/sh
 
-srcdir=`dirname $0`
+srcdir=$(dirname "$0")
 
 if [ ! -f git-version.h ]; then
   touch git-version.h
 fi
 
 if test -d "$srcdir/.git" || test -f "$srcdir/.git"; then
-  gitver=`git describe --abbrev=8 2>/dev/null`
+  gitver=$(git describe --abbrev=8 2>/dev/null)
   # NOTE: I'm avoiding "|" in sed since I'm not sure if sed -r is portable and "\|" fails on some OSes.
-  verchk=`echo "$gitver-" | sed -n '/^v3\.[0-9][0-9]*\.[0-9][0-9]*\(pre[0-9]*\)*-/p'`
+  verchk=$(echo "$gitver-" | sed -n '/^v3\.[0-9][0-9]*\.[0-9][0-9]*\(pre[0-9]*\)*-/p')
   if [ -n "$verchk" ]; then
     echo "#define RSYNC_GITVER \"$gitver\"" >git-version.h.new
     if ! diff git-version.h.new git-version.h >/dev/null; then

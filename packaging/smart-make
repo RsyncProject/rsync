@@ -4,8 +4,8 @@ set -e
 
 export LANG=C
 
-branch=`packaging/prep-auto-dir`
-if test x"$branch" = x; then
+branch=$(packaging/prep-auto-dir)
+if test "$branch" = ""; then
   srcdir=.
 else
   cd build
@@ -40,6 +40,6 @@ fi
 
 make all
 
-if test x"$1" = x"check"; then
+if test "$1" = "check"; then
   make check
 fi

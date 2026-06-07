@@ -20,7 +20,7 @@ echo
 echo "This will setup an rsync daemon in $dir"
 
 if [ $# = 0 ]; then
-  IFS='' read -p 'Module name to create (or return to exit): ' module
+  IFS='' read -r -p 'Module name to create (or return to exit): ' module
   [ ! "$module" ] && exit
 else
   module="$1"
@@ -28,7 +28,7 @@ else
 fi
 
 if [ $# = 0 ]; then
-  IFS='' read -p 'Port number the daemon should listen on [873]: ' port
+  IFS='' read -r -p 'Port number the daemon should listen on [873]: ' port
 else
   port="$1"
   shift
@@ -36,14 +36,14 @@ fi
 [ "$port" ] || port=873
 
 if [ $# = 0 ]; then
-  IFS='' read -p 'User name for authentication (empty for none): ' user
+  IFS='' read -r -p 'User name for authentication (empty for none): ' user
 else
   user="$1"
   shift
 fi
 
 if [ "$user" ]; then
-  IFS='' read -s -p 'Desired password: ' password
+  IFS='' read -r -s -p 'Desired password: ' password
   echo
 fi
 
@@ -117,7 +117,7 @@ if ./start; then
     echo "Let's test the daemon now."
   fi
   echo
-  echo '$' $rsync --list-only "$path"
+  echo '$' "$rsync" --list-only "$path"
   $rsync --list-only "$path"
   echo
   echo "You should see an empty folder; it's $moduledir."
