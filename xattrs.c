@@ -295,8 +295,12 @@ static int rsync_xal_get(const char *fname, item_list *xalp)
 	rxa = xalp->items;
 	if (count > 1)
 		qsort(rxa, count, sizeof (rsync_xa), rsync_xal_compare_names);
-	for (rxa += count-1; count; count--, rxa--)
-		rxa->num = count;
+	/* Guard count==0: rxa is then xalp->items (possibly NULL) and the
+	 * "rxa += count-1" init would form NULL-1 (undefined). */
+	if (count) {
+		for (rxa += count-1; count; count--, rxa--)
+			rxa->num = count;
+	}
 	return 0;
 }
 
@@ -381,17 +385,19 @@ static int64 xattr_lookup_hash(const item_list *xalp)
 {
 	const rsync_xa *rxas = xalp->items;
 	size_t i;
-	int64 key = hashlittle2(&xalp->count, sizeof xalp->count);
+	/* Accumulate unsigned: the summed hash values routinely overflow a
+	 * signed int64 (UB), and we only care about the resulting bit pattern. */
+	uint64_t key = (uint64_t)hashlittle2(&xalp->count, sizeof xalp->count);
 
 	for (i = 0; i < xalp->count; i++) {
-		key += hashlittle2(rxas[i].name, rxas[i].name_len);
+		key += (uint64_t)hashlittle2(rxas[i].name, rxas[i].name_len);
 		if (rxas[i].datum_len > MAX_FULL_DATUM)
-			key += hashlittle2(rxas[i].datum, xattr_sum_len);
+			key += (uint64_t)hashlittle2(rxas[i].datum, xattr_sum_len);
 		else
-			key += hashlittle2(rxas[i].datum, rxas[i].datum_len);
+			key += (uint64_t)hashlittle2(rxas[i].datum, rxas[i].datum_len);
 	}
 
-	return key;
+	return (int64)key;
 }
 
 static int find_matching_xattr(const item_list *xalp)
@@ -460,7 +466,9 @@ static int rsync_xal_store(item_list *xalp)
 	 * entire initial-count, not just enough space for one new item. */
 	*new_list = empty_xa_list;
 	(void)EXPAND_ITEM_LIST(&new_list->xa_items, rsync_xa, xalp->count);
-	memcpy(new_list->xa_items.items, xalp->items, xalp->count * sizeof (rsync_xa));
+	/* xalp->items is NULL for an empty list; memcpy(dst, NULL, 0) is UB. */
+	if (xalp->count)
+		memcpy(new_list->xa_items.items, xalp->items, xalp->count * sizeof (rsync_xa));
 	new_list->xa_items.count = xalp->count;
 	xalp->count = 0;
 
