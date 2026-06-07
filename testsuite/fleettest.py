@@ -31,8 +31,11 @@ without interfering: each pushes, builds and tests in isolation. The run dir is
 removed when the run ends -- on success or failure, and best-effort on
 Ctrl-C/kill (pass --keep to retain it for inspection). A run that is hard-killed
 (SIGKILL), or signalled mid-push, or whose ssh dies during cleanup can leave a
-stray <builddir>-<id> behind; sweep those with `fleettest.py --cleanup`
-(optionally scoped with --targets). Because each
+stray <builddir>-<id> behind -- plus an orphaned path-flipper or test rsyncd on
+platforms without a parent-death backstop; sweep all of those (root-owned files
+included, via sudo -n) with `fleettest.py --cleanup` (optionally scoped with
+--targets). Run --cleanup between runs, not during one: its process kills are
+host-global and would also catch a concurrent run's flipper/daemon. Because each
 run starts from a fresh dir, every build is a full configure + build.
 
 PROVISIONING: each target must have the build toolchain its workflow's prepare
@@ -771,33 +774,94 @@ def _on_signal(signum, frame):
     os._exit(130 if signum == signal.SIGINT else 143)
 
 
+# sweep() counts a pattern, kills it (best effort; sudo -n retry for processes a
+# root-running test left), then RE-counts after a settle so we report what
+# actually died (KILLED = before-after) and flag any survivor (SURVIVED, sets
+# fail) instead of claiming success when pkill couldn't reach it. The patterns
+# use the pgrep self-exclusion trick -- 'r[e]name'/'det[a]ch' match a real
+# process's "rename"/"detach" but not the bracketed literal in this script's own
+# argv (run_on passes the whole script as the remote argv), so we never signal
+# ourselves. @BASE@ is substituted with the target's run-dir prefix.
+_CLEANUP_SCRIPT = r'''fail=0
+sweep() {
+  command -v pgrep >/dev/null 2>&1 || return 0
+  before=$(pgrep -f "$2" 2>/dev/null | wc -l | tr -d ' ')
+  [ "$before" -gt 0 ] 2>/dev/null || return 0
+  pkill -f "$2" 2>/dev/null
+  sudo -n pkill -f "$2" 2>/dev/null
+  sleep 1
+  after=$(pgrep -f "$2" 2>/dev/null | wc -l | tr -d ' ')
+  killed=$((before - after))
+  [ "$killed" -gt 0 ] 2>/dev/null && echo "KILLED $killed stray $1(s)"
+  if [ "$after" -gt 0 ] 2>/dev/null; then
+    echo "SURVIVED $after stray $1(s)"
+    fail=1
+  fi
+}
+sweep flipper 'r[e]name.*r[e]name.*r[e]name'
+sweep daemon 'det[a]ch --address=127.0.0.1'
+for d in @BASE@-*; do
+  [ -e "$d" ] || continue
+  if rm -rf -- "$d" 2>/dev/null || sudo -n rm -rf -- "$d" 2>/dev/null; then
+    echo "REMOVED $d"
+  else
+    echo "FAILED $d"
+    fail=1
+  fi
+done
+exit $fail
+'''
+
+
 def cleanup_remnants(targets: list[Target]) -> int:
-    """--cleanup mode: remove every <base>-* run dir on each target, reporting
-    what each removed. Returns a process exit code. Only suffixed run dirs are
-    swept -- a bare <base> is left alone."""
+    """--cleanup mode: on each target, kill the stray processes a killed run can
+    leave behind, then remove every <base>-* run dir, reporting what went.
+    Returns a process exit code. Only suffixed run dirs are swept -- a bare
+    <base> is left alone.
+
+    A run that is SIGKILLed (or whose ssh drops) can strand two kinds of process
+    on platforms without a parent-death backstop: the TOCTOU path-flipper (a
+    busy `python -c` rename loop that pins a CPU) and an orphaned test rsyncd
+    (`--no-detach --address=127.0.0.1`, which then squats its fixed port -- the
+    very wedge claim_ports()' bind-probe now reports). Both are killed best
+    effort (sudo -n retry for root-owned ones); a kill is verified by re-counting
+    afterwards, and a process that survives is reported and fails the run.
+
+    CAVEAT: the kill patterns are host-global, not scoped to a particular run, so
+    --cleanup assumes no *other* fleettest run is active on the target -- it
+    would also kill a concurrent run's flipper/daemon (and any manual `rsync
+    --daemon --no-detach --address=127.0.0.1`). Run it between runs, not during
+    one. Run dirs whose contents a root test owns are removed via a `sudo -n rm`
+    fallback; only a dir that survives even that is a failure."""
     rc = 0
     for t in targets:
         base = t.builddir
         if _unsafe_builddir(base):
             log(f"[{t.name}] skipped (unsafe builddir {base!r})")
             continue
-        # Echo each match before removing it so the harness can report what
-        # went; an unmatched glob stays literal and is skipped by the -e test.
-        script = (f'set -e\n'
-                  f'for d in {base}-*; do\n'
-                  f'  [ -e "$d" ] || continue\n'
-                  f'  echo "$d"\n'
-                  f'  rm -rf -- "$d"\n'
-                  f'done\n')
-        r = run_on(t, script, timeout=120)
-        removed = [ln for ln in r.out.splitlines() if ln.strip()]
-        if r.rc != 0:
+        # Structured markers (KILLED/SURVIVED/REMOVED/FAILED) keep the report
+        # clean even though run_on() folds stderr into stdout.
+        r = run_on(t, _CLEANUP_SCRIPT.replace("@BASE@", base), timeout=120)
+        lines = r.out.splitlines()
+        removed = [ln.split(" ", 1)[1] for ln in lines if ln.startswith("REMOVED ")]
+        failed = [ln.split(" ", 1)[1] for ln in lines if ln.startswith("FAILED ")]
+        killed = [ln.replace("KILLED ", "killed ", 1)
+                  for ln in lines if ln.startswith("KILLED ")]
+        survived = [ln.replace("SURVIVED ", "still alive: ", 1)
+                    for ln in lines if ln.startswith("SURVIVED ")]
+        msgs = killed[:]
+        if removed:
+            msgs.append("removed: " + " ".join(removed))
+        if survived:
             rc = 1
-            log(f"[{t.name}] cleanup error (rc={r.rc}): {r.out.strip()[:200]}")
-        elif removed:
-            log(f"[{t.name}] removed: {' '.join(removed)}")
-        else:
-            log(f"[{t.name}] nothing to remove")
+            msgs += survived
+        if failed:
+            rc = 1
+            msgs.append("could not remove (even with sudo): " + " ".join(failed))
+        if r.rc not in (0, 1):
+            rc = 1
+            msgs.append(f"cleanup error rc={r.rc}: {r.out.strip()[:160]}")
+        log(f"[{t.name}] " + ("; ".join(msgs) if msgs else "nothing to remove"))
     return rc
 
 
@@ -813,7 +877,10 @@ def main() -> int:
     ap.add_argument("--keep", action="store_true",
                     help="keep each run's build dir (default: remove it at exit)")
     ap.add_argument("--cleanup", action="store_true",
-                    help="remove stray <builddir>-* run dirs on the targets, then exit")
+                    help="kill stray flippers/test daemons and remove stray "
+                    "<builddir>-* run dirs (root-owned via sudo -n) on the "
+                    "targets, then exit; run between runs, not during one "
+                    "(kills are host-global)")
     ap.add_argument("--jobs", type=int, help="override -j for both transports")
     ap.add_argument("--timing", action="store_true",
                     help="report per-target wall-clock (push/build/test) to find "
