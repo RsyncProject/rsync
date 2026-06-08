@@ -33,7 +33,7 @@ on:
       - '.github/workflows/*.yml'
       - '!.github/workflows/ubuntu-version-mix.yml'
   schedule:
-    - cron: '52 8 * * *'
+    - cron: '52 8 * * 1'
 
 jobs:
   version-mix:
