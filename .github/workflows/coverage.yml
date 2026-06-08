@@ -12,7 +12,7 @@ on:
       - '.github/workflows/*.yml'
       - '!.github/workflows/coverage.yml'
   schedule:
-    - cron: '42 9 * * *'
+    - cron: '42 9 * * 1'
   workflow_dispatch:
 
 jobs:

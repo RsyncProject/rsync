@@ -16,7 +16,7 @@ on:
       - '.github/workflows/*.yml'
       - '!.github/workflows/ubuntu-22.04-build.yml'
   schedule:
-    - cron: '42 8 * * *'
+    - cron: '42 8 * * 1'
 
 jobs:
   test:
