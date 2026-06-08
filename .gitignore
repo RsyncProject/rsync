@@ -1,5 +1,6 @@
 *.[oa]
 *~
+/.vscode
 dummy
 ID
 Makefile
