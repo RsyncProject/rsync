@@ -1,3 +1,95 @@
+# NEWS for rsync 3.4.4 (8 June 2026)
+
+## Changes in this version:
+
+This is a conservative point release that backports regression fixes
+on top of 3.4.3.  No new features are included.
+
+### BUG FIXES:
+
+- Honour a relative alt-basis directory (e.g. `--link-dest=../sibling`,
+  `--copy-dest`, `--compare-dest`) on a daemon receiver running with
+  `use chroot = no`.  Such a path is re-anchored at the module root but
+  was then rejected by the receiver's secure open; it now works where
+  kernel-enforced confinement is available.  See the PORTABILITY note
+  below for the platform limitation.  Fixes #915.
+
+- sender: open a module-root-absolute path for a `path = /` module so a
+  daemon serving the filesystem root can satisfy absolute request
+  paths again.  Fixes #897.
+
+- flist: accept the missing-args mode-0 entry in recv_file_entry.
+  Fixes #910.
+
+- receiver: fix a false "failed verification -- update discarded" when
+  resuming a delta transfer with an absolute `--partial-dir`.
+
+- receiver: fix a NULL dereference on the delta discard path.
+
+- generator: cap the block s2length at the negotiated checksum length.
+
+- main: fix `--mkpath` with `--dry-run` for a file-to-file copy.
+  Fixes #880.
+
+- daemon: un-backslash escaped option args.  Fixes #829.
+
+- token: drain the matched-block insert deflate.  Fixes #951.
+
+- Fix the "update skips a file of a different type" case and the
+  daemon upload delete stats.
+
+- alloc: revert "zero all new memory from allocations".  Fixes #959.
+
+- Always clear the stat buffer and validate nanoseconds before use.
+
+### PORTABILITY / BUILD:
+
+- The relative alt-basis fix for daemon receivers (#915) relies on
+  kernel "stay below dirfd" path resolution -- `openat2(RESOLVE_BENEATH)`
+  on Linux 5.6+, or `openat()` with `O_RESOLVE_BENEATH` on FreeBSD 13+
+  and macOS 15+.  On platforms that lack it (Solaris, OpenBSD, NetBSD,
+  Cygwin and older Linux) `secure_relative_open()` deliberately rejects
+  any path with a `..` component, so relative alt-basis directories
+  remain unavailable there -- function traded for safety, matching the
+  trade-off already documented for the #715 fix.  Absolute alt-basis
+  paths are unaffected on every platform.
+
+- openat2 is now autodetected at configure time (HAVE_OPENAT2): the
+  `openat2(RESOLVE_BENEATH)` resolver is compiled in only when both
+  `<linux/openat2.h>` and the `SYS_openat2` syscall number are present,
+  fixing the build on older kernels/headers.  Fixes #924, #905, #900,
+  #904.
+
+- Fall back to do_mknod() when mknodat() / mkfifoat() are unavailable.
+  Fixes #896.
+
+- Install generated manpages correctly in an out-of-tree build.
+
+### DEVELOPER RELATED:
+
+- Added a CI workflow that builds this stable branch and runs the
+  `v34-stable-testsuite` regression suite against the built binary,
+  giving regression coverage without importing the full master test
+  suite into the stable branch.
+
+- Added a check-progs target for fleettest and extended the build
+  workflows to run on `*-stable` release branches.
+
+### CREDITS:
+
+Thanks to everyone who helped with this release:
+
+- Code contributions from Zen Dodd (steadytao), Mike-Goutokuji,
+  pterror, and Stiliyan Tonev (Bark).
+
+- Zen Dodd (steadytao) also reviewed the 3.4.4 backport set (PR #980).
+
+- Bug reports from @mmayer (#924), @fda77 (#905), @darkshram (#900),
+  @ketas (#904), @pkzc (#880), @brabalan (#951), @elcamlost (#829),
+  @debohman (#896), @guilherme-puida (#959), @fufu65 (#915),
+  @JetAppsClark (#928), @moonlitbugs (#897), @mgkeeley (#910), and
+  @sylvain-ilm (#724, #725).
+
 # NEWS for rsync 3.4.3 (20 May 2026)
 
 ## Changes in this version:
