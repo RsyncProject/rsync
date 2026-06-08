@@ -1,0 +1,76 @@
+name: Stable testsuite
+
+# Regression coverage for this stable-backport branch.  The branch keeps the old
+# shell test suite, so the modern Python suite is maintained separately on the
+# v34-stable-testsuite branch.  This job builds rsync from this branch and runs
+# that suite against the freshly-built binary (the same "testsuite from one
+# branch, code from another" split fleettest uses).  Helper programs and
+# config.h come from this branch's build (tooldir); the test scripts come from
+# the stable-testsuite checkout (--srcdir).
+
+on:
+  push:
+    branches: [ v3.4.1-sec-patches2 ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/stable-testsuite.yml'
+  pull_request:
+    branches: [ v3.4.1-sec-patches2 ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/stable-testsuite.yml'
+  workflow_dispatch:
+  schedule:
+    - cron: '23 6 * * *'
+
+jobs:
+  stable-testsuite:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, ubuntu-22.04 ]
+    name: Stable testsuite on ${{ matrix.os }}
+    steps:
+    - name: checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: checkout stable testsuite
+      uses: actions/checkout@v4
+      with:
+        repository: RsyncProject/rsync
+        ref: v34-stable-testsuite
+        path: stable-testsuite
+        fetch-depth: 1
+    - name: prep
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gcc g++ gawk autoconf automake \
+          acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev \
+          python3-cmarkgfm openssl
+        echo "/usr/local/bin" >>$GITHUB_PATH
+    - name: configure
+      run: ./configure --with-rrsync
+    - name: make check-progs
+      run: make check-progs
+    - name: info
+      run: ./rsync --version
+    # Pipe transport (the secure stdio default).  The TCP-only daemon tests
+    # (daemon-access-ip, proxy-response-line-too-long) skip here and are run in
+    # the --use-tcp pass below; crtimes/daemon-chroot-acl/recv-discard-nullderef
+    # skip on the runner's filesystem / under root.
+    - name: run stable testsuite (pipe)
+      run: |
+        sudo RSYNC_EXPECT_SKIPPED=crtimes,daemon-access-ip,daemon-chroot-acl,proxy-response-line-too-long,recv-discard-nullderef \
+          ./stable-testsuite/runtests.py \
+            --srcdir="$GITHUB_WORKSPACE/stable-testsuite" \
+            --rsync-bin="$GITHUB_WORKSPACE/rsync" \
+            -j16
+    # TCP transport over loopback, exercising the daemon paths the pipe run skips.
+    - name: run stable testsuite (tcp)
+      run: |
+        sudo ./stable-testsuite/runtests.py \
+          --srcdir="$GITHUB_WORKSPACE/stable-testsuite" \
+          --rsync-bin="$GITHUB_WORKSPACE/rsync" \
+          --use-tcp -j8
