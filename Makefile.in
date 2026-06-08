@@ -139,6 +139,7 @@ usage.o: version.h latest-year.h help-rsync.h help-rsyncd.h git-version.h defaul
 loadparm.o: default-dont-compress.h daemon-parm.h
 
 flist.o: rounding.h
+log.o: rounding.h
 
 default-cvsignore.h default-dont-compress.h: rsync.1.md define-from-md.awk
 	$(AWK) -f $(srcdir)/define-from-md.awk -v hfile=$@ $(srcdir)/rsync.1.md
