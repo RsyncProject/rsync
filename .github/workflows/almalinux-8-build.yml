@@ -18,7 +18,7 @@ on:
       - '.github/workflows/*.yml'
       - '!.github/workflows/almalinux-8-build.yml'
   schedule:
-    - cron: '42 8 * * *'
+    - cron: '42 8 * * 1'
 
 jobs:
   test:
