@@ -959,6 +959,7 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 			rprintf(FERROR, "overflow: linkname_len=%d\n",
 				linkname_len - 1);
 			overflow_exit("recv_file_entry");
+			overflow_exit("recv_file_entry");
 		}
 #ifdef ICONV_OPTION
 		/* We don't know how much extra room we need to convert
