@@ -12,7 +12,7 @@ on:
       - '.github/workflows/*.yml'
       - '!.github/workflows/cygwin-build.yml'
   schedule:
-    - cron: '42 8 * * *'
+    - cron: '42 8 * * 1'
 
 jobs:
   test:
@@ -43,8 +43,10 @@ jobs:
       # (rsyncfns.py drives xattrs via getfattr/setfattr from the `attr`
       # package installed above), verified on a real Cygwin host. The real
       # chown/devices tests still skip (need root/mknod), as do the
-      # RESOLVE_BENEATH symlink-race tests.
-      run: bash -c 'RSYNC_EXPECT_SKIPPED=acls-default,acls-depth,acls,bare-do-open-symlink-race,chdir-symlink-race,chown,daemon-access-ip,daemon-chroot-acl,devices,dir-sgid,open-noatime,protected-regular,proxy-response-line-too-long,sender-flist-symlink-leak,simd-checksum,symlink-dirlink-basis make check'
+      # RESOLVE_BENEATH symlink-race tests.  symlink-dirlink-basis also now
+      # RUNS (the #915 non-daemon basis open uses a plain do_open, restoring
+      # following an in-tree dir-symlink basis without RESOLVE_BENEATH).
+      run: bash -c 'RSYNC_EXPECT_SKIPPED=acls-default,acls-depth,acls,bare-do-open-symlink-race,chdir-symlink-race,chown,daemon-access-ip,daemon-chroot-acl,devices,dir-sgid,open-noatime,protected-regular,proxy-response-line-too-long,recv-discard-nullderef,sender-flist-symlink-leak,simd-checksum make check'
     - name: check (TCP daemon transport)
       # Second run with daemon tests over a real loopback rsyncd; the default
       # 'make check' above uses the secure stdio-pipe transport.
@@ -54,6 +56,7 @@ jobs:
     - name: save artifact
       uses: actions/upload-artifact@v4
       with:
+        retention-days: 45
         name: cygwin-bin
         path: |
           rsync.exe

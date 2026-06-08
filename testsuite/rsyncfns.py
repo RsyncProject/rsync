@@ -5,7 +5,7 @@ the Python-rewritten tests actually need; grow it as more shell tests are
 ported.
 
 Conventions matching the shell harness:
-  * Exit 0 = pass, 1 = fail, 77 = skip, 78 = xfail.
+  * Exit codes (see the Exit enum): 0=pass, 1=fail, 2=error, 77=skip, 78=xfail.
   * The runner sets these environment variables before invoking each test:
       scratchdir   per-test scratch directory
       srcdir       rsync source directory
@@ -31,6 +31,8 @@ import sys
 import time
 from pathlib import Path
 
+from exitcodes import Exit   # re-exported: tests may `from rsyncfns import Exit`
+
 
 # --- environment -----------------------------------------------------------
 
@@ -41,7 +43,7 @@ def _required(name: str) -> str:
             f"rsyncfns: required environment variable {name} is not set; "
             "run this test via runtests.py rather than directly.\n"
         )
-        sys.exit(2)
+        sys.exit(Exit.ERROR)
     return v
 
 
@@ -63,6 +65,15 @@ os.umask(0o022)
 # HOME pointing at the per-test scratch dir.
 os.environ['HOME'] = str(SCRATCHDIR)
 RSYNC = _required('RSYNC')         # full command line, possibly with valgrind/protocol
+
+# The "peer" rsync command -- used for the SERVER side of two-sided transfers
+# (the daemon process; the remote-shell --rsync-path target). The runner sets
+# RSYNC_PEER to a second binary when invoked with --rsync-bin2, letting a run
+# mix two rsync versions over the wire. When no second binary was selected,
+# RSYNC_PEER == RSYNC, so every consumer below behaves exactly as before and
+# single-binary runs are unchanged. Use .get (not _required) so a test invoked
+# by hand without the runner still works.
+RSYNC_PEER = os.environ.get('RSYNC_PEER', RSYNC)
 
 # TLS_ARGS controls how the 'tls' helper formats listings (e.g. --atimes,
 # -l, -L). Tests that exercise non-default rsync features (atimes, etc.)
@@ -96,18 +107,18 @@ OUTFILE = SCRATCHDIR / 'rsync.out'
 
 def test_fail(msg: str) -> 'None':
     sys.stderr.write(msg.rstrip() + '\n')
-    sys.exit(1)
+    sys.exit(Exit.FAIL)
 
 
 def test_skipped(msg: str) -> 'None':
     sys.stderr.write(msg.rstrip() + '\n')
     (TMPDIR / 'whyskipped').write_text(msg.rstrip() + '\n')
-    sys.exit(77)
+    sys.exit(Exit.SKIP)
 
 
 def test_xfail(msg: str) -> 'None':
     sys.stderr.write(msg.rstrip() + '\n')
-    sys.exit(78)
+    sys.exit(Exit.XFAIL)
 
 
 # --- rsync invocation ------------------------------------------------------
@@ -164,6 +175,42 @@ def _open_lock_file() -> int:
     return fd
 
 
+def _probe_bindable(port: int) -> 'None':
+    """Confirm `port` is actually free once we hold its claim_ports() lock.
+
+    The byte-range lock only coordinates *live* test drivers, and the kernel
+    releases it the instant the holding process dies -- even if that driver left
+    an orphaned daemon still bound to the port. That happens when a run is
+    SIGKILLed (or its ssh drops) on a platform with no parent-death backstop:
+    rsyncfns only arms PR_SET_PDEATHSIG, which is Linux-only, so on the
+    BSDs/Solaris/macOS a killed fleettest run can strand its rsyncd, which then
+    squats the fixed test port forever. A later run wins the (now-free) lock but
+    the socket is still taken, and the daemon dies with a cryptic "bind() failed:
+    Address already in use" / the client "did not see server greeting".
+
+    So actually try to bind it. SO_REUSEADDR is used so a port merely in
+    TIME_WAIT (recently and cleanly closed) is NOT a false positive; only a
+    live bound/listening socket -- a real squatter -- makes the bind fail, and
+    then we stop here with an actionable message instead of failing obscurely
+    later. The probe socket is closed immediately, freeing the port for the
+    daemon that is about to bind it.
+    """
+    s = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM)
+    s.setsockopt(_socket.SOL_SOCKET, _socket.SO_REUSEADDR, 1)
+    try:
+        s.bind(('127.0.0.1', port))
+    except OSError as e:
+        test_fail(
+            f"port {port} was claimed for this run but something is still bound "
+            f"to 127.0.0.1:{port} ({e.strerror}). The claim_ports() lock only "
+            "serializes live test runs, so a still-bound port almost always "
+            "means an orphaned 'rsync --daemon' from a previously killed run "
+            f"(find it with `fstat | grep {port}` / `netstat -an | grep {port}` "
+            "and kill it, or run `fleettest.py --cleanup`), then retry.")
+    finally:
+        s.close()
+
+
 def claim_ports(*ports: int) -> 'None':
     """Reserve the given TCP port numbers for the rest of this process.
 
@@ -199,6 +246,9 @@ def claim_ports(*ports: int) -> 'None':
         # F_SETLKW via fcntl.lockf(LOCK_EX, length, start): exclusive
         # byte-range lock on byte `port`, blocking until acquired.
         fcntl.lockf(_port_lock_fd, fcntl.LOCK_EX, 1, port)
+        # The lock only proves no other live test run owns the port; an orphaned
+        # daemon from a killed run can still squat it (see _probe_bindable).
+        _probe_bindable(port)
 
 
 # --- standalone rsyncd helpers ---------------------------------------------
@@ -232,7 +282,7 @@ def _stop_rsyncd(proc) -> 'None':
             pass
 
 
-def start_rsyncd(conf_path, port: int) -> 'subprocess.Popen':
+def start_rsyncd(conf_path, port: int, rsync_cmd: str = None) -> 'subprocess.Popen':
     """Spawn `rsync --daemon --no-detach --address=127.0.0.1 --port=N
     --config=conf` and return the Popen handle after the port is accepting
     connections.
@@ -245,10 +295,16 @@ def start_rsyncd(conf_path, port: int) -> 'subprocess.Popen':
     the test process doesn't strand the daemon either. The caller is expected
     to have already claim_ports()'d `port`.
 
+    rsync_cmd selects the binary to run as the daemon; it defaults to
+    RSYNC_PEER (the peer side of a two-sided run), so ordinary daemon tests
+    get current-client <-> peer-daemon. The reverse-direction test passes
+    rsync_cmd=RSYNC to put the current build on the daemon side and drive with
+    the old client.
+
     This is only ever reached from start_test_daemon() in --use-tcp mode; the
     default (pipe) mode never starts a listening daemon.
     """
-    argv = shlex.split(RSYNC) + [
+    argv = shlex.split(rsync_cmd or RSYNC_PEER) + [
         '--daemon', '--no-detach',
         '--address=127.0.0.1',
         f'--port={port}',
@@ -282,8 +338,11 @@ def start_rsyncd(conf_path, port: int) -> 'subprocess.Popen':
     test_fail(f"rsyncd never listened on 127.0.0.1:{port}: {last_err}")
 
 
-def start_test_daemon(conf_path, port: int) -> str:
+def start_test_daemon(conf_path, port: int, rsync_cmd: str = None) -> str:
     """Bring up the test daemon and return a URL prefix for client commands.
+
+    rsync_cmd selects the daemon-side binary (default RSYNC_PEER); pass
+    rsync_cmd=RSYNC for the reverse-direction test (current daemon, old client).
 
     This is the single seam every daemon test uses. The transport depends on
     the mode the runner selected:
@@ -302,11 +361,12 @@ def start_test_daemon(conf_path, port: int) -> str:
     Build URLs as f"{prefix}module/path". `port` is only used (and claimed)
     in --use-tcp mode.
     """
+    daemon_cmd = rsync_cmd or RSYNC_PEER
     if USE_TCP:
         claim_ports(port)
-        start_rsyncd(conf_path, port)
+        start_rsyncd(conf_path, port, daemon_cmd)
         return f'rsync://localhost:{port}/'
-    os.environ['RSYNC_CONNECT_PROG'] = f'{RSYNC} --config={conf_path} --daemon'
+    os.environ['RSYNC_CONNECT_PROG'] = f'{daemon_cmd} --config={conf_path} --daemon'
     return 'rsync://localhost/'
 
 

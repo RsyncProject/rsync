@@ -18,7 +18,7 @@ import subprocess
 import time
 
 from rsyncfns import (
-    RSYNC, SCRATCHDIR, SRCDIR, TMPDIR,
+    RSYNC, SCRATCHDIR, RSYNC_PEER, SRCDIR, TMPDIR,
     make_data_file, resolve_beneath_supported, rsync_argv, test_fail,
     test_skipped,
 )
@@ -59,7 +59,7 @@ def push(*args, label: str) -> None:
     os.chdir(srcbase)
     try:
         proc = subprocess.run(
-            rsync_argv(f'--rsync-path={RSYNC}', *args),
+            rsync_argv(f'--rsync-path={RSYNC_PEER}', *args),
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
         )
         print(proc.stdout, end='')

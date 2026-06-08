@@ -15,7 +15,6 @@ Create more granular verbosity					2003/05/15
 
 DOCUMENTATION --------------------------------------------------------
 Keep list of open issues and todos on the web site
-Perhaps redo manual as SGML
 
 LOGGING --------------------------------------------------------------
 Memory accounting
@@ -212,16 +211,6 @@ DOCUMENTATION --------------------------------------------------------
 
 
 Keep list of open issues and todos on the web site
-
-                      --          --
-
-
-Perhaps redo manual as SGML
-
-  The man page is getting rather large, and there is more information
-  that ought to be added.
-
-  TexInfo source is probably a dying format.
 
   Linuxdoc looks like the most likely contender.  I know DocBook is
   favoured by some people, but it's so bloody verbose, even with emacs

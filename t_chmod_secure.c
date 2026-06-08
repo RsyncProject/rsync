@@ -17,7 +17,7 @@
 
 #include <sys/stat.h>
 
-#ifdef __linux__
+#if defined(__linux__) && defined(HAVE_OPENAT2)
 #include <sys/syscall.h>
 #include <linux/openat2.h>
 #endif
@@ -44,9 +44,11 @@ static int errs = 0;
  * other than the kernel rejecting the requested confinement flag. */
 static int kernel_resolve_beneath_supported(void)
 {
+#if (defined(__linux__) && defined(HAVE_OPENAT2)) || defined(O_RESOLVE_BENEATH)
 	int fd;
-#ifdef __linux__
-	{
+#endif
+#if defined(__linux__) && defined(HAVE_OPENAT2)
+	if (openat2_usable()) {
 		struct open_how how;
 		memset(&how, 0, sizeof how);
 		how.flags = O_RDONLY | O_DIRECTORY;
@@ -56,7 +58,7 @@ static int kernel_resolve_beneath_supported(void)
 			close(fd);
 			return 1;
 		}
-		/* ENOSYS = kernel < 5.6.  Fall through to the O_RESOLVE_BENEATH
+		/* ENOSYS = kernel < 5.6 or openat2 seccomp-blocked.  Fall through to the O_RESOLVE_BENEATH
 		 * probe in case we're a Linux build running on a kernel that
 		 * gained O_RESOLVE_BENEATH via some out-of-tree backport. */
 	}

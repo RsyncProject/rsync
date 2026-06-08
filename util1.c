@@ -41,8 +41,8 @@ extern filter_rule_list daemon_filter_list;
 
 int sanitize_paths = 0;
 
-char curr_dir[MAXPATHLEN];
-unsigned int curr_dir_len;
+extern char curr_dir[MAXPATHLEN];   /* defined in syscall.c */
+extern unsigned int curr_dir_len;
 int curr_dir_depth; /* This is only set for a sanitizing daemon. */
 
 /* Set a fd into nonblocking mode. */
@@ -1788,8 +1788,6 @@ void *expand_item_list(item_list *lp, size_t item_size, const char *desc, int in
 				new_ptr == lp->items ? " not" : "");
 		}
 
-		memset((char *)new_ptr + lp->malloced * item_size, 0,
-		       (expand_size - lp->malloced) * item_size);
 		lp->items = new_ptr;
 		lp->malloced = expand_size;
 	}

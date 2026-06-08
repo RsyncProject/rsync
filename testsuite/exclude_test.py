@@ -15,7 +15,7 @@ import subprocess
 import sys
 
 from rsyncfns import (
-    CHKDIR, FROMDIR, RSYNC, SCRATCHDIR, SRCDIR, TMPDIR, TODIR,
+    CHKDIR, FROMDIR, RSYNC, RSYNC_PEER, SCRATCHDIR, SRCDIR, TMPDIR, TODIR,
     all_plus, allspace, dots,
     checkdiff, checkit, makepath, rsync_argv, run_rsync, test_fail,
 )
@@ -26,7 +26,7 @@ os.environ['CVSIGNORE'] = '*.junk'
 script_name = os.path.basename(sys.argv[0] if sys.argv[0] else __file__)
 if 'lsh' in script_name:
     os.environ['RSYNC_RSH'] = str(SRCDIR / 'support' / 'lsh.sh')
-    rpath = [f'--rsync-path={RSYNC}']
+    rpath = [f'--rsync-path={RSYNC_PEER}']
     host = 'lh:'
 else:
     rpath = []
@@ -116,7 +116,7 @@ excl.write_text(
 # --- main checks ------------------------------------------------------------
 
 # Start with a check of --prune-empty-dirs.
-run_rsync('-av', f'--rsync-path={RSYNC}',
+run_rsync('-av', f'--rsync-path={RSYNC_PEER}',
           '-f', '-_foo/too/', '-f', '-_foo/down/',
           '-f', '-_foo/and/', '-f', '-_new/',
           f'{host}{FROMDIR}/', f'{CHKDIR}/')
@@ -162,7 +162,7 @@ for f in (CHKDIR / 'bar' / 'down' / 'to' / 'foo').glob('file[235-9]'):
 (up2 / 'dst-newness').touch()
 
 # Un-tweak the directory times in our first (weak) exclude test.
-run_rsync('-av', f'--rsync-path={RSYNC}',
+run_rsync('-av', f'--rsync-path={RSYNC_PEER}',
           '--existing', '--include=*/', '--exclude=*',
           f'{host}{FROMDIR}/', f'{CHKDIR}/')
 
@@ -181,7 +181,7 @@ for f in (CHKDIR / 'bar' / 'down' / 'to' / 'foo').glob('*.junk'):
 (CHKDIR / 'bar' / 'down' / 'to' / 'home-cvs-exclude').unlink()
 (CHKDIR / 'mid' / 'one-in-one-out').unlink()
 
-run_rsync('-av', f'--rsync-path={RSYNC}',
+run_rsync('-av', f'--rsync-path={RSYNC_PEER}',
           '--existing', '--filter=exclude,! */',
           f'{host}{FROMDIR}/', f'{CHKDIR}/')
 
@@ -205,7 +205,7 @@ from rsyncfns import cp_touch
 cp_touch(FROMDIR / 'bar' / 'down' / 'to' / 'foo' / 'to',
          CHKDIR / 'bar' / 'down' / 'to' / 'foo')
 
-run_rsync('-av', f'--rsync-path={RSYNC}',
+run_rsync('-av', f'--rsync-path={RSYNC_PEER}',
           '--existing', '-f', 'show .filt*', '-f', 'hide,! */', '--del',
           f'{host}{FROMDIR}/', f'{TODIR}/')
 
@@ -213,7 +213,7 @@ run_rsync('-av', f'--rsync-path={RSYNC}',
 cp_touch(TODIR / 'bar' / 'down' / 'to' / 'bar' / 'baz' / 'nodel.deep',
          CHKDIR / 'bar' / 'down' / 'to' / 'bar' / 'baz')
 
-run_rsync('-av', f'--rsync-path={RSYNC}',
+run_rsync('-av', f'--rsync-path={RSYNC_PEER}',
           '--existing', '--filter=-! */',
           f'{host}{FROMDIR}/', f'{CHKDIR}/')
 
@@ -255,7 +255,7 @@ verify_dirs(CHKDIR, TODIR, label="dir-merge + merge-from-stdin")
 (CHKDIR / 'bar' / 'down' / 'to' / 'bar' / '.filt2').unlink()
 (CHKDIR / 'mid' / '.filt').unlink()
 
-run_rsync('-av', f'--rsync-path={RSYNC}',
+run_rsync('-av', f'--rsync-path={RSYNC_PEER}',
           '--existing', '--include=*/', '--exclude=*',
           f'{host}{FROMDIR}/', f'{CHKDIR}/')
 
@@ -275,15 +275,15 @@ verify_dirs(CHKDIR, TODIR, label="delete-before with merge")
     "+ file3\n*.bak\n"
 )
 
-run_rsync('-av', f'--rsync-path={RSYNC}',
+run_rsync('-av', f'--rsync-path={RSYNC_PEER}',
           '--del', f'{host}{FROMDIR}/', f'{CHKDIR}/')
 (CHKDIR / 'bar' / 'down' / 'to' / 'foo' / 'file1.bak').unlink()
 (CHKDIR / 'bar' / 'down' / 'to' / 'foo' / 'file3').unlink()
 (CHKDIR / 'bar' / 'down' / 'to' / 'foo' / '+ file3').unlink()
-run_rsync('-av', f'--rsync-path={RSYNC}',
+run_rsync('-av', f'--rsync-path={RSYNC_PEER}',
           '--existing', '--filter=-! */',
           f'{host}{FROMDIR}/', f'{CHKDIR}/')
-run_rsync('-av', f'--rsync-path={RSYNC}',
+run_rsync('-av', f'--rsync-path={RSYNC_PEER}',
           '--delete-excluded', '--exclude=*',
           f'{host}{FROMDIR}/', f'{TODIR}/')
 
@@ -293,7 +293,7 @@ checkit(['-avv', *rpath, '-f', 'dir-merge,-_.excl',
 
 # Combine with --relative.
 relative_opts = ['--relative', '--chmod=Du+w', '--copy-unsafe-links']
-run_rsync('-av', f'--rsync-path={RSYNC}', *relative_opts,
+run_rsync('-av', f'--rsync-path={RSYNC_PEER}', *relative_opts,
           f'{host}{FROMDIR}/foo', f'{CHKDIR}/')
 shutil.rmtree(str(CHKDIR) + str(FROMDIR) + '/foo/down', ignore_errors=True)
 run_rsync('-av', *relative_opts, '--existing', '--filter=-! */',

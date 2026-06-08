@@ -6,3 +6,12 @@
 # packaging/release.py step_7_tarball does not bloat with HTML the
 # tarball doesn't need.
 /rsync-web/ export-ignore
+
+# old_versions/ holds static binaries of historical rsync releases, used by the
+# version-mixing test suite (.github/workflows/ubuntu-version-mix.yml) to run
+# the current code against a real old peer over the daemon / remote-shell.
+# Mark the binaries as binary so the `text=auto eol=lf` rule above can't try to
+# normalise line endings and corrupt them; export-ignore keeps them out of the
+# release source tarball.
+/old_versions/rsync_* binary
+/old_versions/rsync_* export-ignore

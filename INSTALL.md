@@ -21,6 +21,18 @@ See [the PPA page][ppa] for current build status across architectures.
 
 [ppa]: https://launchpad.net/~rsyncproject/+archive/ubuntu/rsync
 
+To test the upcoming release instead, there is also a [`rsync-latest`
+PPA][ppa-latest] that is rebuilt from the tip of the git master branch.  These
+are development snapshots whose version numbers (such as
+`3.5.0~git20260601...`) deliberately sort below the matching stable release, so
+the stable PPA above will never silently move you from a release onto a
+snapshot.  Use it for testing only -- it may contain unreleased changes:
+
+>     sudo add-apt-repository ppa:rsyncproject/rsync-latest
+>     sudo apt update && sudo apt install rsync
+
+[ppa-latest]: https://launchpad.net/~rsyncproject/+archive/ubuntu/rsync-latest
+
 The rest of this document covers building from source.
 
 ## The basic setup

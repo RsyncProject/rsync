@@ -12,7 +12,7 @@ on:
       - '.github/workflows/*.yml'
       - '!.github/workflows/coverage.yml'
   schedule:
-    - cron: '42 9 * * *'
+    - cron: '42 9 * * 1'
   workflow_dispatch:
 
 jobs:
@@ -65,6 +65,7 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v4
       with:
+        retention-days: 45
         name: coverage-html
         path: |
           coverage

@@ -44,7 +44,7 @@ LIBOBJ=lib/wildmatch.o lib/compat.o lib/snprintf.o lib/mdfour.o lib/md5.o \
 zlib_OBJS=zlib/deflate.o zlib/inffast.o zlib/inflate.o zlib/inftrees.o \
 	zlib/trees.o zlib/zutil.o zlib/adler32.o zlib/compress.o zlib/crc32.o
 OBJS1=flist.o rsync.o generator.o receiver.o cleanup.o sender.o exclude.o \
-	util1.o util2.o main.o checksum.o match.o syscall.o log.o backup.o delete.o
+	util1.o util2.o main.o checksum.o match.o syscall.o android.o log.o backup.o delete.o
 OBJS2=options.o io.o compat.o hlink.o token.o uidlist.o socket.o hashtable.o \
 	usage.o fileio.o batch.o clientname.o chmod.o acls.o xattrs.o
 OBJS3=progress.o pipe.o @MD5_ASM@ @ROLL_SIMD@ @ROLL_ASM@
@@ -53,7 +53,7 @@ popt_OBJS= popt/popt.o  popt/poptconfig.o \
 	popt/popthelp.o popt/poptparse.o popt/poptint.o
 OBJS=$(OBJS1) $(OBJS2) $(OBJS3) $(DAEMON_OBJ) $(LIBOBJ) @BUILD_ZLIB@ @BUILD_POPT@
 
-TLS_OBJ = tls.o syscall.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/permstring.o lib/sysxattrs.o @BUILD_POPT@
+TLS_OBJ = tls.o syscall.o android.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/permstring.o lib/sysxattrs.o @BUILD_POPT@
 
 # Programs we must have to run the test cases
 CHECK_PROGS = rsync$(EXEEXT) tls$(EXEEXT) getgroups$(EXEEXT) getfsdev$(EXEEXT) \
@@ -84,12 +84,19 @@ install: all
 	$(INSTALLCMD) -m 755 $(srcdir)/rsync-ssl $(DESTDIR)$(bindir)
 	-$(MKDIR_P) $(DESTDIR)$(mandir)/man1
 	-$(MKDIR_P) $(DESTDIR)$(mandir)/man5
-	if test -f rsync.1; then $(INSTALLMAN) -m 644 rsync.1 $(DESTDIR)$(mandir)/man1; fi
-	if test -f rsync-ssl.1; then $(INSTALLMAN) -m 644 rsync-ssl.1 $(DESTDIR)$(mandir)/man1; fi
-	if test -f rsyncd.conf.5; then $(INSTALLMAN) -m 644 rsyncd.conf.5 $(DESTDIR)$(mandir)/man5; fi
+	for fn in rsync.1 rsync-ssl.1; do \
+	    if test -f $$fn; then $(INSTALLMAN) -m 644 $$fn $(DESTDIR)$(mandir)/man1; \
+	    elif test -f $(srcdir)/$$fn; then $(INSTALLMAN) -m 644 $(srcdir)/$$fn $(DESTDIR)$(mandir)/man1; fi; \
+	done
+	for fn in rsyncd.conf.5; do \
+	    if test -f $$fn; then $(INSTALLMAN) -m 644 $$fn $(DESTDIR)$(mandir)/man5; \
+	    elif test -f $(srcdir)/$$fn; then $(INSTALLMAN) -m 644 $(srcdir)/$$fn $(DESTDIR)$(mandir)/man5; fi; \
+	done
 	if test "$(with_rrsync)" = yes; then \
 	    $(INSTALLCMD) -m 755 rrsync $(DESTDIR)$(bindir); \
-	    if test -f rrsync.1; then $(INSTALLMAN) -m 644 rrsync.1 $(DESTDIR)$(mandir)/man1; fi; \
+	    fn=rrsync.1; \
+	    if test -f $$fn; then $(INSTALLMAN) -m 644 $$fn $(DESTDIR)$(mandir)/man1; \
+	    elif test -f $(srcdir)/$$fn; then $(INSTALLMAN) -m 644 $(srcdir)/$$fn $(DESTDIR)$(mandir)/man1; fi; \
 	fi
 
 install-ssl-daemon: stunnel-rsyncd.conf
@@ -104,6 +111,21 @@ install-all: install install-ssl-daemon
 install-strip:
 	$(MAKE) INSTALL_STRIP='-s' install
 
+.PHONY: uninstall
+uninstall:
+	rm -f $(DESTDIR)$(bindir)/rsync$(EXEEXT) $(DESTDIR)$(bindir)/rsync-ssl
+	rm -f $(DESTDIR)$(bindir)/rrsync
+	rm -f $(DESTDIR)$(mandir)/man1/rsync.1 $(DESTDIR)$(mandir)/man1/rsync-ssl.1
+	rm -f $(DESTDIR)$(mandir)/man1/rrsync.1
+	rm -f $(DESTDIR)$(mandir)/man5/rsyncd.conf.5
+
+.PHONY: uninstall-ssl-daemon
+uninstall-ssl-daemon:
+	rm -f $(DESTDIR)/etc/stunnel/rsyncd.conf
+
+.PHONY: uninstall-all
+uninstall-all: uninstall uninstall-ssl-daemon
+
 rsync$(EXEEXT): $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
 
@@ -117,6 +139,7 @@ usage.o: version.h latest-year.h help-rsync.h help-rsyncd.h git-version.h defaul
 loadparm.o: default-dont-compress.h daemon-parm.h
 
 flist.o: rounding.h
+log.o: rounding.h
 
 default-cvsignore.h default-dont-compress.h: rsync.1.md define-from-md.awk
 	$(AWK) -f $(srcdir)/define-from-md.awk -v hfile=$@ $(srcdir)/rsync.1.md
@@ -172,19 +195,19 @@ getgroups$(EXEEXT): getgroups.o
 getfsdev$(EXEEXT): getfsdev.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ getfsdev.o $(LIBS)
 
-TRIMSLASH_OBJ = trimslash.o syscall.o util2.o t_stub.o lib/compat.o lib/snprintf.o
+TRIMSLASH_OBJ = trimslash.o syscall.o android.o util2.o t_stub.o lib/compat.o lib/snprintf.o
 trimslash$(EXEEXT): $(TRIMSLASH_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(TRIMSLASH_OBJ) $(LIBS)
 
-T_UNSAFE_OBJ = t_unsafe.o syscall.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o
+T_UNSAFE_OBJ = t_unsafe.o syscall.o android.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o
 t_unsafe$(EXEEXT): $(T_UNSAFE_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_UNSAFE_OBJ) $(LIBS)
 
-T_CHMOD_SECURE_OBJ = t_chmod_secure.o syscall.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o
+T_CHMOD_SECURE_OBJ = t_chmod_secure.o syscall.o android.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o
 t_chmod_secure$(EXEEXT): $(T_CHMOD_SECURE_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_CHMOD_SECURE_OBJ) $(LIBS)
 
-T_SECURE_RELPATH_OBJ = t_secure_relpath.o syscall.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o
+T_SECURE_RELPATH_OBJ = t_secure_relpath.o syscall.o android.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o
 t_secure_relpath$(EXEEXT): $(T_SECURE_RELPATH_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_SECURE_RELPATH_OBJ) $(LIBS)
 
@@ -350,6 +373,12 @@ COVERAGE_RUNFLAGS =
 # compat) are rsync's own and stay in the report.
 COVERAGE_EXCLUDE = -e '(^|/)zlib/' -e '(^|/)popt/' \
 	-e '(^|/)lib/(getaddrinfo|getpass|inet_ntop|inet_pton)\.'
+
+# Build everything the test suite needs (rsync + helper programs + symlinks)
+# WITHOUT running it. Used by CI jobs that invoke runtests.py directly with
+# custom options (e.g. the version-mix workflow's --rsync-bin2/--expect-result).
+.PHONY: check-progs
+check-progs: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 
 .PHONY: check
 check: all $(CHECK_PROGS) $(CHECK_SYMLINKS)

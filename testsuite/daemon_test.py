@@ -6,11 +6,15 @@
 # atimes-format variant. We avoid actually starting a listening server
 # by using RSYNC_CONNECT_PROG to spawn the daemon as a child of rsync.
 
+# Rerun under the fleet harness's non-root pass (testsuite/fleettest.py): a
+# non-root rsyncd emits different uid/gid config, so exercise that path too.
+fleet_nonroot = True
+
 import os
 import subprocess
 
 from rsyncfns import (
-    CHKFILE, FROMDIR, OUTFILE, RSYNC, SCRATCHDIR, SRCDIR, TODIR,
+    CHKFILE, FROMDIR, OUTFILE, RSYNC, RSYNC_PEER, SCRATCHDIR, SRCDIR, TODIR,
     build_rsyncd_conf, get_rootuid, get_testuid, makepath,
     rsync_argv, run_rsync, start_test_daemon, test_fail,
 )
@@ -78,7 +82,7 @@ def run_and_check(args, label, capture_stderr=False):
 
 
 # Module list via the lsh.sh stand-in.
-rsync_path = f"{RSYNC}{(' ' + ' '.join(confopt)) if confopt else ''}"
+rsync_path = f"{RSYNC_PEER}{(' ' + ' '.join(confopt)) if confopt else ''}"
 out = run_and_check(
     ['-ve', SSH, f'--rsync-path={rsync_path}', 'localhost::'],
     "module list via lsh.sh",
