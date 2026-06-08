@@ -36,7 +36,10 @@ int preserve_perms = 0;
 int preserve_executability = 0;
 int omit_link_times = 0;
 int open_noatime = 0;
-size_t max_alloc = 0; /* max_alloc is needed when combined with util2.o */
+size_t max_alloc = (size_t)-1; /* unlimited: helpers link util2.o, where 0 makes
+			       * every my_alloc()/my_strdup() abort with
+			       * "exceeded --max-alloc=0" (hit on the
+			       * secure_relative_open() fallback path). */
 char *partial_dir;
 char *module_dir;
 /* curr_dir[]/curr_dir_len (read by secure_relative_open) are defined in
