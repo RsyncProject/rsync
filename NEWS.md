@@ -1,4 +1,4 @@
-# NEWS for rsync 3.4.4 (8 June 2026)
+# NEWS for rsync 3.4.4 (8 Jun 2026)
 
 ## Changes in this version:
 
@@ -5261,6 +5261,7 @@ to develop and test fixes.
 
 | RELEASE DATE | VER.   | DATE OF COMMIT\* | PROTOCOL    |
 |--------------|--------|------------------|-------------|
+| 08 Jun 2026  | 3.4.4  |                  | 32          |
 | 20 May 2026  | 3.4.3  |                  | 32          |
 | 28 Apr 2026  | 3.4.2  |                  | 32          |
 | 16 Jan 2025  | 3.4.1  |                  | 32          |
