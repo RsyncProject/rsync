@@ -185,22 +185,24 @@ char *do_big_num(int64 num, int human_flag, const char *fract)
 		unsigned int mult = human_flag == 2 ? 1000 : 1024;
 
 		if (abs_num >= mult) {
-			const char* units = " KMGTPE";
+			char units[] = "\0KMGTPE";
+			char *unit = units;
 			uint64_t powi = 1;
 
 			for (;;) {
 				if (abs_num / mult < powi)
 					break;
 
-				if (units[1] == '\0')
+				if (unit[1] == '\0')
 					break;
 
 				powi *= mult;
-				++units;
+				++unit;
 			}
+			unit[1] = '\0';
 
-			snprintf(bufs[n], sizeof bufs[0], "%.2f%c",
-				(double) num / powi, *units);
+			snprintf(bufs[n], sizeof bufs[0], "%.2f%s",
+				(double) num / powi, unit);
 			return bufs[n];
 		}
 	}
