@@ -22,6 +22,7 @@
 #include "rsync.h"
 #include "itypes.h"
 #include "inums.h"
+#include "rounding.h"	/* EXTRA_ROUNDING, so log_delete() aligns its file_struct */
 
 extern int dry_run;
 extern int am_daemon;

@@ -1,0 +1,51 @@
+name: rsync scan-build (clang analyzer)
+
+on:
+  push:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/scan-build.yml'
+  pull_request:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/scan-build.yml'
+  workflow_dispatch:
+
+jobs:
+  scan-build:
+    runs-on: ubuntu-latest
+    name: rsync scan-build (clang analyzer)
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: prep
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang clang-tools acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev openssl
+    - name: configure (under scan-build)
+      # Run configure under scan-build so its analyzer compiler-wrapper is baked
+      # into the Makefile's $(CC); --disable-md2man avoids the doc toolchain.
+      run: scan-build ./configure --with-rrsync --disable-md2man
+    - name: scan-build (informational)
+      # Static analysis only -- INFORMATIONAL, not a gate.  rsync currently has
+      # a fair number of reports that are overwhelmingly known false positives
+      # (e.g. unix.Chroot "no chdir after chroot", core.NonNullParamChecker
+      # against functions that can't actually receive NULL).  We publish the
+      # HTML report as an artifact and print the bug count to the run summary,
+      # but do NOT pass --status-bugs, so this surfaces new analyzer findings
+      # without going red on arrival.  check-progs builds rsync + the test
+      # helpers without needing the man-page toolchain.
+      run: |
+        scan-build -o "$PWD/scan-report" make check-progs -j"$(nproc)" 2>&1 | tee scan-build.out
+        echo '## scan-build summary' >>"$GITHUB_STEP_SUMMARY"
+        grep -E 'scan-build: .* bugs? found|scan-build: No bugs found' scan-build.out >>"$GITHUB_STEP_SUMMARY" || true
+    - name: upload report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: scan-build-report
+        path: scan-report
+        if-no-files-found: ignore

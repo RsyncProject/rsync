@@ -11,8 +11,8 @@ import shutil
 
 from rsyncfns import (
     FROMDIR, SCRATCHDIR, TODIR,
-    build_rsyncd_conf, checkit, makepath, rmtree,
-    run_rsync, start_test_daemon,
+    build_rsyncd_conf, check_perms, checkit, makepath, rmtree,
+    run_rsync, start_test_daemon, test_fail,
 )
 
 
@@ -61,6 +61,37 @@ for d in (checkdir, checkdir / 'dir1', checkdir / 'dir2'):
 
 checkit(['-avv', '--chmod', 'ug-s,a+rX,D+w', f'{FROMDIR}/', f'{TODIR}/'],
         checkdir, TODIR)
+
+def check_permcopy(chmod_arg, start_mode, expected, is_dir=False):
+    rmtree(FROMDIR)
+    rmtree(TODIR)
+    makepath(FROMDIR)
+    permcopy = FROMDIR / 'permcopy'
+    if is_dir:
+        permcopy.mkdir()
+    else:
+        permcopy.write_text('permcopy\n')
+    os.chmod(permcopy, start_mode)
+    run_rsync('-avv', f'--chmod={chmod_arg}', f'{FROMDIR}/', f'{TODIR}/')
+    check_perms(TODIR / 'permcopy', expected)
+
+
+# Exercise chmod(1)-style permission copies.
+check_permcopy('g=o,o=', 0o647, 'rw-rwx---')
+check_permcopy('g=u', 0o741, 'rwxrwx--x')
+check_permcopy('g-o', 0o775, 'rwx-w-r-x')
+check_permcopy('u=g', 0o4755, 'r-xr-xr-x')
+check_permcopy('g=u', 0o2755, 'rwxrwxr-x')
+check_permcopy('o=u', 0o1750, 'rwxr-xrwx', is_dir=True)
+
+rmtree(FROMDIR)
+rmtree(TODIR)
+makepath(FROMDIR)
+(FROMDIR / 'permcopy').write_text('permcopy\n')
+proc = run_rsync('-avv', '--chmod=g=ur', f'{FROMDIR}/', f'{TODIR}/',
+                 check=False, capture_output=True)
+if proc.returncode == 0:
+    test_fail('--chmod=g=ur was not rejected')
 
 # Now exercise the F-only chmod path.
 rmtree(FROMDIR)

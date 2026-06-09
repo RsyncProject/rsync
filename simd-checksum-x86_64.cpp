@@ -317,6 +317,21 @@ __attribute__ ((target("sse2"))) MVSTATIC int32 get_checksum1_sse2_32(schar* buf
 
 extern "C" __attribute__ ((target("avx2"))) int32 get_checksum1_avx2_asm(schar* buf, int32 len, int32 i, uint32* ps1, uint32* ps2);
 
+/* The asm routine is AVX2-only and, unlike the multi-versioned intrinsic
+ * paths, has no compiler-generated fallback, so it must not be called on a
+ * CPU without AVX2 (it would fault with SIGILL). Gate it on a cached runtime
+ * check; when AVX2 is absent we skip it and the SSSE3/SSE2/scalar steps,
+ * which are safe everywhere, do all the work. */
+static int roll_asm_have_avx2(void)
+{
+    static int have = -1;
+    if (have < 0) {
+	__builtin_cpu_init();
+	have = __builtin_cpu_supports("avx2") ? 1 : 0;
+    }
+    return have;
+}
+
 #else /* } { */
 
 /*
@@ -461,7 +476,8 @@ static inline uint32 get_checksum1_cpp(char *buf1, int32 len)
 
     // multiples of 64 bytes using AVX2 (if available)
 #ifdef USE_ROLL_ASM
-    i = get_checksum1_avx2_asm((schar*)buf1, len, i, &s1, &s2);
+    if (roll_asm_have_avx2())
+	i = get_checksum1_avx2_asm((schar*)buf1, len, i, &s1, &s2);
 #else
     i = get_checksum1_avx2_64((schar*)buf1, len, i, &s1, &s2);
 #endif
@@ -579,7 +595,10 @@ static uint32 checksum_via_avx2(char *buf, int32 len)
     int32 i;
     uint32 s1 = 0, s2 = 0;
 #ifdef USE_ROLL_ASM
-    i = get_checksum1_avx2_asm((schar*)buf, len, 0, &s1, &s2);
+    if (roll_asm_have_avx2())
+	i = get_checksum1_avx2_asm((schar*)buf, len, 0, &s1, &s2);
+    else
+	i = 0;
 #else
     i = get_checksum1_avx2_64((schar*)buf, len, 0, &s1, &s2);
 #endif
