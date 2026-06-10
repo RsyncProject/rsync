@@ -670,8 +670,6 @@ int recv_files(int f_in, int f_out, char *local_name)
 		ndx = read_ndx_and_attrs(f_in, f_out, &iflags, &fnamecmp_type,
 					 xname, &xlen);
 		if (ndx == NDX_DONE) {
-			/* Chunk/phase boundary: drop any held dir fd. */
-			reset_dir_fd_cache();
 			if (!am_server && cur_flist) {
 				set_current_file_index(NULL, 0);
 				if (INFO_GTE(PROGRESS, 2))
