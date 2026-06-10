@@ -1251,6 +1251,9 @@ int change_dir(const char *dir, int set_path_only)
 		curr_dir_depth = count_dir_elements(curr_dir + module_dirlen);
 	}
 
+	if (!set_path_only)	/* a real chdir invalidates the cwd-relative dir-fd stack */
+		reset_dir_fd_cache();
+
 	if (DEBUG_GTE(CHDIR, 1) && !set_path_only)
 		rprintf(FINFO, "[%s] change_dir(%s)\n", who_am_i(), curr_dir);
 
