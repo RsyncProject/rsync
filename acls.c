@@ -665,14 +665,11 @@ static int get_rsync_acl(int fd, int dirfd, const char *leaf, const char *fname,
 			free(ents);
 		return 0;
 	}
-	/* Hardened context (dirfd >= 0) but no held fd and no setxattrat: we must
-	 * not re-resolve fname (a parent-symlink race could redirect it), so fake
-	 * the perms from the mode -- the matching set path skips with a warning. */
-	if (dirfd >= 0) {
-		if (type == SMB_ACL_TYPE_ACCESS)
-			rsync_acl_fake_perms(racl, mode);
-		return 0;
-	}
+	/* No held fd and no *xattrat syscalls (pre-6.13 Linux, the BSDs, an
+	 * un-pinnable entry): prefer reading the real destination ACL via the
+	 * path-based call over a mode-only fake, so --acls stays functional on
+	 * platforms that cannot offer the race-safe primitive.  This matches the
+	 * matching set path's fall-through and the prior (3.4.x) behaviour. */
 #endif
 
 	if ((sacl = sys_acl_get_file(fname, type)) != 0) {
@@ -1117,16 +1114,17 @@ static int set_rsync_acl(int fd, int dirfd, const char *leaf, const char *fname,
 		else
 #endif
 #ifdef SUPPORT_ACL_FD
-		/* Race-safe default-ACL delete via the held fd or dirfd+leaf. */
+		/* Race-safe default-ACL delete via the held fd or dirfd+leaf.  Where
+		 * neither is available -- no held fd and no *xattrat syscalls (pre-6.13
+		 * Linux, the BSDs, an un-pinnable entry) -- fall back to the path-based
+		 * call: we prefer the documented --acls functionality over refusing it
+		 * on platforms that cannot offer the race-safe primitive.  A current
+		 * Linux kernel (6.13+) takes the secure xacl_*_at() path above. */
 		if (fd >= 0)
 			rc = xacl_del_default_fd(fd);
 		else if (dirfd >= 0 && xacl_at_available())
 			rc = xacl_del_default_at(dirfd, leaf);
-		else if (dirfd >= 0) {
-			rprintf(FWARNING, "set_acl: skipping default-ACL delete on %s"
-				" (no safe fd-based ACL primitive)\n", full_fname(fname));
-			rc = 0;
-		} else
+		else
 #endif
 			rc = sys_acl_delete_def_file(fname);
 		if (rc < 0) {
@@ -1200,13 +1198,13 @@ static int set_rsync_acl(int fd, int dirfd, const char *leaf, const char *fname,
 				sxp->st.st_mode = cur_mode;
 			return 0;
 		}
-		if (dirfd >= 0) {
-			/* Hardened context, special file / no setxattrat: fail safe
-			 * rather than re-resolve fname through a possible symlink. */
-			rprintf(FWARNING, "set_acl: skipping ACL on %s"
-				" (no safe fd-based ACL primitive)\n", full_fname(fname));
-			return 0;
-		}
+		/* No held fd and no *xattrat syscalls (pre-6.13 Linux, the BSDs, an
+		 * un-pinnable entry): prefer the documented --acls functionality over
+		 * refusing it and fall back to the path-based set, on platforms that
+		 * cannot offer the race-safe primitive.  (6.13+ takes xacl_set_at()
+		 * above.)  This re-resolves fname, so it carries the long-standing
+		 * parent-symlink-race exposure on those platforms; it is the prior
+		 * (3.4.x) behaviour and the only way to honour --acls there. */
 #endif
 		if (sys_acl_set_file(fname, type, duo_item->sacl) < 0) {
 			rsyserr(FERROR_XFER, errno, "set_acl: sys_acl_set_file(%s, %s)",
