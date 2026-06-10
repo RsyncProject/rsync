@@ -2394,32 +2394,142 @@ int open_dir_secure(const char *dirname)
 #endif
 }
 
-/* Cache of the current directory's held fd, keyed on the interned
- * file->dirname pointer (flist.c reallocates lastdir only on a directory
- * change, so distinct live dirs have distinct pointers).  Reopened on a
- * pointer change; reset_dir_fd_cache() MUST be called at flist-chunk
- * boundaries so a reused lastdir allocation can't alias a stale fd. */
-static const char *cur_dkey = (const char *)-1;
-static int cur_dfd = -1;
-
-int get_dir_fd(const char *dirname)
-{
-	if (dirname != cur_dkey) {
-		if (cur_dfd >= 0)
-			close(cur_dfd);
-		cur_dfd = open_dir_secure(dirname);
-		cur_dkey = dirname;
-	}
-	return cur_dfd;
-}
+/* Persistent ancestor-dirfd stack for held-directory traversal.
+ *
+ * The transfer's file list is path-sorted, so iterating it walks the tree in
+ * DFS order and consecutive directory resolutions share a long leading prefix.
+ * Rather than re-resolve a full path from the anchor each time (re-opening
+ * every ancestor dir per file), we keep the whole current ancestor chain open
+ * as pinned, race-safe dirfds and, on the next resolution, reuse the longest
+ * common component prefix -- popping only the divergent tail and descending the
+ * new tail.  Each directory is then opened once while we are inside its subtree.
+ *
+ * The chain is relative to the process cwd (for a NULL anchor), so change_dir()
+ * drops it on any real chdir; it otherwise persists across flist chunks (the
+ * pinned fds stay valid, and a raced/replaced ancestor resolves to the original
+ * inode the fd holds -- the held-dirfd race-safety property, not a hazard).
+ * Each component is resolved with ds_descend(), which follows in-tree directory
+ * symlinks exactly as secure_relative_open() does; only the resolved dir fd is
+ * kept (intermediate symlink-target fds are closed -- sound, since an open
+ * dirfd needs no live parent). */
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+#define DPC_MAXDEPTH 64
+static const char *dpc_anchor = (const char *)-2;
+static int dpc_base = -1;			/* opened anchor dir (owned), or -1 */
+static int dpc_fd[DPC_MAXDEPTH];		/* dpc_fd[i] = dir after components 0..i */
+static char dpc_name[DPC_MAXDEPTH][256];	/* textual component names */
+static int dpc_depth = 0;
 
 void reset_dir_fd_cache(void)
 {
-	if (cur_dfd >= 0)
-		close(cur_dfd);
-	cur_dfd = -1;
-	cur_dkey = (const char *)-1;
+	while (dpc_depth > 0)
+		close(dpc_fd[--dpc_depth]);
+	if (dpc_base >= 0)
+		close(dpc_base);
+	dpc_base = -1;
+	dpc_anchor = (const char *)-2;
 }
+
+/* Resolve directory `dirpath` beneath `anchor` (NULL = cwd, else an absolute
+ * trusted root), reusing the held ancestor stack.  Returns a BORROWED dirfd
+ * owned by the cache (do NOT close), or -1 (errno preserved for a real open
+ * error, errno==0 for an uncacheable path -- "..", too deep/long, or a relative
+ * non-cwd anchor) so the caller can fall back to secure_relative_open(). */
+static int dpc_dir_fd(const char *anchor, const char *dirpath)
+{
+	char copy[MAXPATHLEN];
+	char *comps[DPC_MAXDEPTH];
+	char *sv = NULL;
+	int nc = 0, p, i;
+
+	if (anchor && anchor[0] != '/') { errno = 0; return -1; }
+	if (!dirpath)
+		dirpath = "";
+	if (dirpath[0] == '/') { errno = 0; return -1; }
+
+	if (anchor != dpc_anchor || dpc_base < 0) {
+		int fl;
+		reset_dir_fd_cache();
+		dpc_base = openat(AT_FDCWD, anchor ? anchor : ".", O_RDONLY | O_DIRECTORY);
+		if (dpc_base < 0)
+			return -1;
+		if ((fl = fcntl(dpc_base, F_GETFD)) >= 0)
+			fcntl(dpc_base, F_SETFD, fl | FD_CLOEXEC);
+		dpc_anchor = anchor;
+	}
+
+	if (strlcpy(copy, dirpath, sizeof copy) >= sizeof copy) { errno = ENAMETOOLONG; return -1; }
+	for (char *c = strtok_r(copy, "/", &sv); c; c = strtok_r(NULL, "/", &sv)) {
+		if (c[0] == '.' && c[1] == '\0')
+			continue;					/* "." */
+		if (c[0] == '.' && c[1] == '.' && c[2] == '\0') { errno = 0; return -1; }
+		if (nc >= DPC_MAXDEPTH || strlen(c) >= sizeof dpc_name[0]) { errno = 0; return -1; }
+		comps[nc++] = c;
+	}
+
+	/* Reuse the longest common prefix; drop the divergent tail. */
+	for (p = 0; p < dpc_depth && p < nc && strcmp(dpc_name[p], comps[p]) == 0; p++)
+		;
+	while (dpc_depth > p)
+		close(dpc_fd[--dpc_depth]);
+
+	/* Descend the new tail, holding each resolved component. */
+	for (i = p; i < nc; i++) {
+		int afd = dpc_depth > 0 ? dpc_fd[dpc_depth-1] : dpc_base;
+		struct dirstack ds;
+		int hops = SECURE_OPEN_MAXSYMLINKS;
+		int fd, fl;
+		if (ds_init(&ds, afd) < 0)
+			return -1;
+		if (ds_descend(&ds, comps[i], &hops) < 0) {
+			int e = errno;
+			ds_free(&ds);
+			errno = e;
+			return -1;
+		}
+		fd = ds_take(&ds);
+		ds_free(&ds);				/* closes intermediate symlink fds, not afd */
+		if (fd < 0)
+			return -1;
+		if ((fl = fcntl(fd, F_GETFD)) >= 0)
+			fcntl(fd, F_SETFD, fl | FD_CLOEXEC);
+		strlcpy(dpc_name[dpc_depth], comps[i], sizeof dpc_name[0]);
+		dpc_fd[dpc_depth++] = fd;
+	}
+
+	return nc > 0 ? dpc_fd[dpc_depth-1] : dpc_base;
+}
+
+/* Public entry for the sender (no secure_relpath_active gate: its send paths
+ * confine unconditionally).  Borrowed fd; -1 => caller uses the full walk. */
+int held_dir_path_fd(const char *anchor, const char *dirpath)
+{
+	return dpc_dir_fd(anchor, dirpath);
+}
+
+int get_dir_fd(const char *dirname)
+{
+	if (!secure_relpath_active()) { errno = 0; return -1; }
+	return dpc_dir_fd(NULL, dirname);
+}
+#else
+void reset_dir_fd_cache(void)
+{
+}
+int held_dir_path_fd(const char *anchor, const char *dirpath)
+{
+	(void)anchor;
+	(void)dirpath;
+	errno = 0;
+	return -1;
+}
+int get_dir_fd(const char *dirname)
+{
+	(void)dirname;
+	errno = 0;
+	return -1;
+}
+#endif
 
 /* Return the cached current-directory fd iff `path` lives directly in the
  * entry's own directory (file->dirname) -- the common case for held-dirfd
