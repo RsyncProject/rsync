@@ -184,3 +184,53 @@ Each target must be provisioned with the build toolchain its workflow installs
 (autoconf, automake, a C compiler, perl, a python3 markdown module such as
 cmarkgfm or commonmark unless the flags pass `--disable-md2man`, and the dev
 libraries its configure flags enable). A missing piece shows up as `BUILD-FAIL`.
+
+## Differential regression hunting (abdiff.py)
+
+`testsuite/abdiff.py` is a developer tool — **not** a `*_test.py`, so `runtests.py`
+ignores it. It hunts *regressions* by running the **same benign transfer** with
+two rsync binaries (`A` = the build under test, `B` = a baseline) and comparing
+the OUTCOME. The oracle is: for a benign input, a correctness/behaviour change
+between the builds must be **invisible**, so A and B must produce an identical
+result. Any divergence is a regression candidate to investigate and, if real,
+minimize into a `*_test.py`.
+
+It compares exit code, stderr (error markers + normalised text), `--stats`
+"Literal data", the destination tree (content + full metadata: mode/uid/gid/
+mtime/size/symlink target/xattrs/ACLs/hardlink grouping), the `--itemize` list,
+and — with `--cost` — peak process-group RSS (a resource-regression oracle that
+functional comparison misses). A **stability gate** runs each binary several
+times and escalates on a candidate diff; nondeterministic scenarios are
+quarantined `FLAKY`, never reported as regressions.
+
+Run it from the build directory (so `./rsync` and `old_versions/` resolve):
+
+```sh
+testsuite/abdiff.py                       # default: ./rsync vs old_versions/rsync_3.4.1
+testsuite/abdiff.py --sweep all -j5       # broad single pass, 5-way parallel
+testsuite/abdiff.py --loop --timelimit 3600 --cost   # hunt for an hour, resource oracle on
+testsuite/abdiff.py --list --sweep all    # list scenarios without running
+```
+
+Each finding is classed `DIFF` (regression candidate), `ALLOW` (an intentional,
+documented behaviour change listed in the tool's allowlist), `BETTER` (A succeeds
+where B fails), `FLAKY`, or `TIMEOUT`. Findings are printed and appended to a
+per-run `abdiff-log_<TIME>.txt` (and the curated `--findings` log).
+
+Key options: `-j N` parallelism; `--sweep NAME|all`; `--loop` (endless
+random + systematic-combo stream) bounded by `--timelimit SECS`; `--cost`
+(+`--scale N` for the large-tree fixtures); `--repeat N` (stability samples);
+`--rsync-a`/`--rsync-b` the two binaries. Run **as root** to fold in the
+owner/device/specials/fake-super and chroot-daemon sweeps automatically.
+
+Transport lanes (a feature broken only over the wire is invisible to a local
+copy): local, an ssh split (`support/lsh.sh`), a stdio-pipe daemon, a **real TCP
+daemon** (bound port + greeting/handshake, and an auth challenge-response
+variant), and the restricted **rrsync** wrapper (`support/rrsh.sh`). rrsync's
+behaviour ships in the *script*, so pair each binary with its own version's
+rrsync via `--rrsync-a`/`--rrsync-b` (give B's rrsync, e.g. one extracted from
+that release's `support/rrsync`).
+
+Cross-version baselines are the static binaries already in `old_versions/`;
+`old_versions/build_static.sh` builds more from a git tag (and you can grab a
+matching `support/rrsync` from the same tag for the rrsync lane).
