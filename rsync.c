@@ -501,9 +501,18 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 #endif
 
 	if (!sxp) {
+		int sret, sdfd;
 		if (dry_run)
 			return 1;
-		if (link_stat(fname, &sx2.st, 0) < 0) {
+		/* Stat through the entry's held dir fd (like gen_entry_stat) so we
+		 * don't re-walk the full path here; link_stat_at folds in no
+		 * fake-super xattr, so only when am_root >= 0. */
+		if (am_root >= 0 && (sdfd = held_dfd_for(fname, file)) >= 0) {
+			const char *sl = strrchr(fname, '/');
+			sret = link_stat_at(sdfd, sl ? sl + 1 : fname, &sx2.st, 0);
+		} else
+			sret = link_stat(fname, &sx2.st, 0);
+		if (sret < 0) {
 			rsyserr(FERROR_XFER, errno, "stat %s failed",
 				full_fname(fname));
 			return 0;
@@ -595,8 +604,12 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 			 * the destination had the setuid or setgid bits set
 			 * (due to the side effect of the chown call). */
 			if (sxp->st.st_mode & (S_ISUID | S_ISGID)) {
-				link_stat(fname, &sxp->st,
-					  keep_dirlinks && S_ISDIR(sxp->st.st_mode));
+				if (dfd >= 0)
+					link_stat_at(dfd, leaf, &sxp->st,
+						     keep_dirlinks && S_ISDIR(sxp->st.st_mode));
+				else
+					link_stat(fname, &sxp->st,
+						  keep_dirlinks && S_ISDIR(sxp->st.st_mode));
 			}
 		}
 		if (change_uid)
