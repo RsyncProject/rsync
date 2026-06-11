@@ -161,6 +161,15 @@ enum delret delete_item(char *fbuf, uint16 mode, uint16 flags)
 	if (S_ISDIR(mode)) {
 		what = "rmdir";
 		ok = do_rmdir_at(fbuf) == 0;
+		if (ok && make_backups > 0 && !(flags & DEL_FOR_BACKUP) && backup_dir) {
+			char *buf = get_backup_name(fbuf);
+			if (buf && do_mkdir_at(buf, ACCESSPERMS) == 0) {
+				if (INFO_GTE(BACKUP, 1))
+					rprintf(FINFO, "backed up %s to %s\n", fbuf, buf);
+			} else if (buf && errno != EEXIST && errno != EISDIR) {
+				rsyserr(FWARNING, errno, "backup mkdir %s failed", buf);
+			}
+		}
 	} else {
 		if (make_backups > 0 && !(flags & DEL_FOR_BACKUP) && (backup_dir || !is_backup_file(fbuf))) {
 			what = "make_backup";
@@ -194,7 +203,7 @@ enum delret delete_item(char *fbuf, uint16 mode, uint16 flags)
 		}
 		ret = DR_SUCCESS;
 	} else {
-		if (S_ISDIR(mode) && errno == ENOTEMPTY) {
+		if (S_ISDIR(mode) && (errno == ENOTEMPTY || errno == EEXIST)) {
 			rprintf(FINFO, "cannot delete non-empty directory: %s\n",
 				fbuf);
 			ret = DR_NOT_EMPTY;
