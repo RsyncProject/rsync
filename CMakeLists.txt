@@ -104,17 +104,21 @@ add_executable(rsync ${RSYNC_SOURCES})
 
 # Target include directories
 get_filename_component(AUTO_WIN_MSVC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../auto-win-msvc" ABSOLUTE)
-file(GLOB POSIX_INCLUDES "${AUTO_WIN_MSVC_DIR}/posix-*/include")
-file(GLOB LINUX_INCLUDES "${AUTO_WIN_MSVC_DIR}/linux-*/include")
-file(GLOB POSIX_SOURCES "${AUTO_WIN_MSVC_DIR}/posix-*/src/*.c")
-target_include_directories(rsync PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/lib ${CMAKE_CURRENT_SOURCE_DIR}/popt ${AUTO_WIN_MSVC_DIR} ${POSIX_INCLUDES} ${LINUX_INCLUDES})
+include(FetchContent)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../auto-win-msvc")
+    set(FETCHCONTENT_SOURCE_DIR_AUTO_WIN_MSVC "${CMAKE_CURRENT_SOURCE_DIR}/../auto-win-msvc" CACHE PATH "")
+        FetchContent_Declare(auto_win_msvc SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../auto-win-msvc")
+else()
+    FetchContent_Declare(auto_win_msvc GIT_REPOSITORY https://github.com/SamuelMarks/auto-win-msvc.git GIT_TAG master)
+endif()
+FetchContent_MakeAvailable(auto_win_msvc)
 
-add_library(posix_shims STATIC ${POSIX_SOURCES})
-target_include_directories(posix_shims PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/popt ${AUTO_WIN_MSVC_DIR} ${POSIX_INCLUDES} ${LINUX_INCLUDES})
+target_include_directories(rsync PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/lib ${CMAKE_CURRENT_SOURCE_DIR}/popt)
+
 
 # Link libraries
 target_link_libraries(rsync PRIVATE
-    posix_shims
+    auto-win-msvc
     ws2_32
     netapi32
     ZLIB::ZLIB
@@ -134,43 +138,44 @@ else()
         popt/popt.c popt/poptconfig.c popt/popthelp.c popt/poptparse.c popt/poptint.c
     )
     # Exclude CMAKE_CURRENT_SOURCE_DIR to avoid io.h clash
-    target_include_directories(popt PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/popt ${CMAKE_CURRENT_SOURCE_DIR}/popt ${AUTO_WIN_MSVC_DIR} ${POSIX_INCLUDES} ${LINUX_INCLUDES})
+    target_include_directories(popt PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/popt)
+    target_link_libraries(popt PRIVATE auto-win-msvc)
     target_link_libraries(rsync PRIVATE popt)
     target_include_directories(rsync PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/popt)
 endif()
 
 # Test Helpers
 add_executable(tls tls.c syscall.c util2.c t_stub.c lib/compat.c lib/snprintf.c lib/permstring.c lib/sysxattrs.c)
-target_link_libraries(tls PRIVATE posix_shims ws2_32 netapi32 popt)
-target_include_directories(tls PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/lib ${CMAKE_CURRENT_SOURCE_DIR}/popt ${AUTO_WIN_MSVC_DIR} ${POSIX_INCLUDES} ${LINUX_INCLUDES})
+target_link_libraries(tls PRIVATE auto-win-msvc ws2_32 netapi32 popt)
+target_include_directories(tls PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/lib ${CMAKE_CURRENT_SOURCE_DIR}/popt)
 
 add_executable(trimslash trimslash.c syscall.c util2.c t_stub.c lib/compat.c lib/snprintf.c)
-target_link_libraries(trimslash PRIVATE posix_shims ws2_32 netapi32)
-target_include_directories(trimslash PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/lib ${CMAKE_CURRENT_SOURCE_DIR}/popt ${AUTO_WIN_MSVC_DIR} ${POSIX_INCLUDES} ${LINUX_INCLUDES})
+target_link_libraries(trimslash PRIVATE auto-win-msvc ws2_32 netapi32)
+target_include_directories(trimslash PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/lib ${CMAKE_CURRENT_SOURCE_DIR}/popt)
 
 add_executable(t_unsafe t_unsafe.c syscall.c util1.c util2.c t_stub.c lib/compat.c lib/snprintf.c lib/wildmatch.c)
-target_link_libraries(t_unsafe PRIVATE posix_shims ws2_32 netapi32)
-target_include_directories(t_unsafe PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/lib ${CMAKE_CURRENT_SOURCE_DIR}/popt ${AUTO_WIN_MSVC_DIR} ${POSIX_INCLUDES} ${LINUX_INCLUDES})
+target_link_libraries(t_unsafe PRIVATE auto-win-msvc ws2_32 netapi32)
+target_include_directories(t_unsafe PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/lib ${CMAKE_CURRENT_SOURCE_DIR}/popt)
 
 add_executable(t_chmod_secure t_chmod_secure.c syscall.c util1.c util2.c t_stub.c lib/compat.c lib/snprintf.c lib/wildmatch.c lib/permstring.c)
-target_link_libraries(t_chmod_secure PRIVATE posix_shims ws2_32 netapi32)
-target_include_directories(t_chmod_secure PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/lib ${CMAKE_CURRENT_SOURCE_DIR}/popt ${AUTO_WIN_MSVC_DIR} ${POSIX_INCLUDES} ${LINUX_INCLUDES})
+target_link_libraries(t_chmod_secure PRIVATE auto-win-msvc ws2_32 netapi32)
+target_include_directories(t_chmod_secure PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/lib ${CMAKE_CURRENT_SOURCE_DIR}/popt)
 
 add_executable(t_secure_relpath t_secure_relpath.c syscall.c util1.c util2.c t_stub.c lib/compat.c lib/snprintf.c lib/wildmatch.c lib/permstring.c)
-target_link_libraries(t_secure_relpath PRIVATE posix_shims ws2_32 netapi32)
-target_include_directories(t_secure_relpath PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/lib ${CMAKE_CURRENT_SOURCE_DIR}/popt ${AUTO_WIN_MSVC_DIR} ${POSIX_INCLUDES} ${LINUX_INCLUDES})
+target_link_libraries(t_secure_relpath PRIVATE auto-win-msvc ws2_32 netapi32)
+target_include_directories(t_secure_relpath PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/lib ${CMAKE_CURRENT_SOURCE_DIR}/popt)
 
 add_executable(wildtest wildtest.c t_stub.c lib/compat.c lib/snprintf.c)
-target_link_libraries(wildtest PRIVATE posix_shims ws2_32 netapi32 popt)
-target_include_directories(wildtest PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/lib ${CMAKE_CURRENT_SOURCE_DIR}/popt ${AUTO_WIN_MSVC_DIR} ${POSIX_INCLUDES} ${LINUX_INCLUDES})
+target_link_libraries(wildtest PRIVATE auto-win-msvc ws2_32 netapi32 popt)
+target_include_directories(wildtest PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/lib ${CMAKE_CURRENT_SOURCE_DIR}/popt)
 
 add_executable(getgroups getgroups.c)
-target_link_libraries(getgroups PRIVATE posix_shims ws2_32 netapi32)
-target_include_directories(getgroups PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/lib ${CMAKE_CURRENT_SOURCE_DIR}/popt ${AUTO_WIN_MSVC_DIR} ${POSIX_INCLUDES} ${LINUX_INCLUDES})
+target_link_libraries(getgroups PRIVATE auto-win-msvc ws2_32 netapi32)
+target_include_directories(getgroups PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/lib ${CMAKE_CURRENT_SOURCE_DIR}/popt)
 
 add_executable(getfsdev getfsdev.c)
-target_link_libraries(getfsdev PRIVATE posix_shims ws2_32 netapi32)
-target_include_directories(getfsdev PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/lib ${CMAKE_CURRENT_SOURCE_DIR}/popt ${AUTO_WIN_MSVC_DIR} ${POSIX_INCLUDES} ${LINUX_INCLUDES})
+target_link_libraries(getfsdev PRIVATE auto-win-msvc ws2_32 netapi32)
+target_include_directories(getfsdev PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/lib ${CMAKE_CURRENT_SOURCE_DIR}/popt)
 
 # Tests
 enable_testing()
