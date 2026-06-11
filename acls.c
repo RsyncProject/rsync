@@ -22,6 +22,9 @@
 #include "rsync.h"
 #include "lib/sysacls.h"
 #include "lib/acl.h"
+#ifdef HAVE_LIBACL_AT
+#include <fcntl.h>	/* AT_EMPTY_PATH / AT_SYMLINK_NOFOLLOW */
+#endif
 
 #ifdef SUPPORT_ACLS
 
@@ -470,7 +473,10 @@ static int find_matching_rsync_acl(const rsync_acl *racl, SMB_ACL_TYPE_T type,
 	return *match;
 }
 
-#ifdef SUPPORT_ACL_FD
+/* These two bridge lib/acl.c's neutral (tag,perm,id) entry array; with
+ * HAVE_LIBACL_AT the libacl *_at path uses unpack_smb_acl/pack_smb_acl directly,
+ * so they are unused there. */
+#if defined(SUPPORT_ACL_FD) && !defined(HAVE_LIBACL_AT)
 /* Convert a packed system ACL into the neutral (tag,perm,id) entry array that
  * lib/acl.c serializes.  Reuses pack_smb_acl()+change_sacl_perms() output so
  * the bytes we write match exactly what acl_set_file() would have written.
@@ -627,6 +633,33 @@ static int get_rsync_acl(int fd, int dirfd, const char *leaf, const char *fname,
 #endif
 
 #ifdef SUPPORT_ACL_FD
+#ifdef HAVE_LIBACL_AT
+	/* Read the ACL via the new libacl *_at calls; fd<0 && dirfd<0
+	 * (e.g. a synthetic dir) falls through to the path-based call below. */
+	if (fd >= 0 || dirfd >= 0) {
+		if (fd >= 0)
+			sacl = sys_acl_get_file_at(fd, "", AT_EMPTY_PATH, type);
+		else
+			sacl = sys_acl_get_file_at(dirfd, leaf, AT_SYMLINK_NOFOLLOW, type);
+		if (sacl != 0) {
+			BOOL ok = unpack_smb_acl(sacl, racl);
+			sys_acl_free_acl(sacl);
+			if (!ok) {
+				rsyserr(FERROR_XFER, errno, "get_acl: unpack_smb_acl(%s)", fname);
+				return -1;
+			}
+			return 0;
+		}
+		if (no_acl_syscall_error(errno)) {
+			if (type == SMB_ACL_TYPE_ACCESS)
+				rsync_acl_fake_perms(racl, mode);
+			return 0;
+		}
+		rsyserr(FERROR_XFER, errno, "get_acl: acl_get_file_at(%s, %s)",
+			fname, str_acl_type(type));
+		return -1;
+	}
+#else
 	/* Race-safe path: read the ACL through the held O_NOFOLLOW fd, or via
 	 * setxattrat(AT_SYMLINK_NOFOLLOW) on dirfd+leaf, instead of re-resolving
 	 * fname.  Only for real-root ACLs (am_root >= 0; the fake-super branch
@@ -670,6 +703,7 @@ static int get_rsync_acl(int fd, int dirfd, const char *leaf, const char *fname,
 	 * BSDs / a /proc-less namespace / an un-pinnable entry): read the real
 	 * destination ACL via the path-based call rather than a mode-only fake, so
 	 * --acls stays functional where the race-safe primitive is unavailable. */
+#endif /* HAVE_LIBACL_AT */
 #endif
 
 	if ((sacl = sys_acl_get_file(fname, type)) != 0) {
@@ -1113,6 +1147,16 @@ static int set_rsync_acl(int fd, int dirfd, const char *leaf, const char *fname,
 		else
 #endif
 #ifdef SUPPORT_ACL_FD
+#ifdef HAVE_LIBACL_AT
+		/* Race-safe default-ACL delete via the new libacl *_at
+		 * calls (held fd via AT_EMPTY_PATH, dirfd+leaf via AT_SYMLINK_NOFOLLOW)
+		 * -- race-safe on every Linux kernel.  fd<0 && dirfd<0 falls to path. */
+		if (fd >= 0)
+			rc = sys_acl_delete_def_file_at(fd, "", AT_EMPTY_PATH);
+		else if (dirfd >= 0)
+			rc = sys_acl_delete_def_file_at(dirfd, leaf, AT_SYMLINK_NOFOLLOW);
+		else
+#else
 		/* Race-safe default-ACL delete via the held fd or dirfd+leaf.  Where
 		 * neither is available (xacl_at_available() is false -- the BSDs, a
 		 * /proc-less namespace, an un-pinnable entry; every Linux with procfs
@@ -1124,6 +1168,7 @@ static int set_rsync_acl(int fd, int dirfd, const char *leaf, const char *fname,
 		else if (dirfd >= 0 && xacl_at_available())
 			rc = xacl_del_default_at(dirfd, leaf);
 		else
+#endif /* HAVE_LIBACL_AT */
 #endif
 			rc = sys_acl_delete_def_file(fname);
 		if (rc < 0) {
@@ -1171,6 +1216,28 @@ static int set_rsync_acl(int fd, int dirfd, const char *leaf, const char *fname,
 		}
 #endif
 #ifdef SUPPORT_ACL_FD
+#ifdef HAVE_LIBACL_AT
+		/* Apply the packed/perm-reconciled ACL (duo_item->sacl)
+		 * through the new libacl *_at calls -- held fd via AT_EMPTY_PATH,
+		 * dirfd+leaf via AT_SYMLINK_NOFOLLOW -- race-safe on every Linux kernel,
+		 * and byte-identical to the path-based sys_acl_set_file() below. */
+		if (fd >= 0 || dirfd >= 0) {
+			int rc;
+
+			if (fd >= 0)
+				rc = sys_acl_set_file_at(fd, "", AT_EMPTY_PATH, type, duo_item->sacl);
+			else
+				rc = sys_acl_set_file_at(dirfd, leaf, AT_SYMLINK_NOFOLLOW, type, duo_item->sacl);
+			if (rc < 0) {
+				rsyserr(FERROR_XFER, errno, "set_acl: acl_set_file_at(%s, %s)",
+					fname, str_acl_type(type));
+				return -1;
+			}
+			if (type == SMB_ACL_TYPE_ACCESS)
+				sxp->st.st_mode = cur_mode;
+			return 0;
+		}
+#else
 		/* Race-safe write: serialize the packed (and perm-reconciled)
 		 * system ACL to the kernel xattr format and apply it through the
 		 * held fd or dirfd+leaf -- never re-resolving fname.  This matches
@@ -1205,6 +1272,7 @@ static int set_rsync_acl(int fd, int dirfd, const char *leaf, const char *fname,
 		 * carries the parent-symlink-race exposure on those remaining platforms;
 		 * it is the only way to honour --acls where no race-safe primitive
 		 * exists. */
+#endif /* HAVE_LIBACL_AT */
 #endif
 		if (sys_acl_set_file(fname, type, duo_item->sacl) < 0) {
 			rsyserr(FERROR_XFER, errno, "set_acl: sys_acl_set_file(%s, %s)",

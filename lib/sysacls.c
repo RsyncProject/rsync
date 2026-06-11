@@ -180,6 +180,26 @@ int sys_acl_free_acl(SMB_ACL_T the_acl)
 	return acl_free(the_acl);
 }
 
+#ifdef HAVE_LIBACL_AT
+/* Dirfd/AT-flag ACL ops via the new libacl,
+ * race-safe on every Linux kernel.  at_flags is AT_SYMLINK_NOFOLLOW (dirfd+leaf)
+ * or AT_EMPTY_PATH (operate on an open fd passed as dirfd, path ""). */
+SMB_ACL_T sys_acl_get_file_at(int dirfd, const char *path_p, int at_flags, SMB_ACL_TYPE_T type)
+{
+	return acl_get_file_at(dirfd, path_p, at_flags, type);
+}
+
+int sys_acl_set_file_at(int dirfd, const char *path_p, int at_flags, SMB_ACL_TYPE_T type, SMB_ACL_T theacl)
+{
+	return acl_set_file_at(dirfd, path_p, at_flags, type, theacl);
+}
+
+int sys_acl_delete_def_file_at(int dirfd, const char *path_p, int at_flags)
+{
+	return acl_delete_def_file_at(dirfd, path_p, at_flags);
+}
+#endif /* HAVE_LIBACL_AT */
+
 #elif defined(HAVE_TRU64_ACLS) /*--------------------------------------------*/
 /*
  * The interface to DEC/Compaq Tru64 UNIX ACLs
