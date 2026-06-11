@@ -107,6 +107,8 @@ extern char backup_dir_buf[MAXPATHLEN];
 extern char *basis_dir[MAX_BASIS_DIRS+1];
 extern struct file_list *first_flist;
 extern filter_rule_list daemon_filter_list, implied_filter_list;
+extern int nice_local;
+extern int ionice_local;
 
 uid_t our_uid;
 gid_t our_gid;
@@ -1843,6 +1845,14 @@ int main(int argc,char *argv[])
 	}
 	if (write_batch < 0)
 		dry_run = 1;
+
+	if (nice_local) {
+		renice_me(nice_local);
+	}
+
+	if (ionice_local) {
+		ionice_me();
+	}
 
 	if (am_server) {
 #ifdef ICONV_CONST
