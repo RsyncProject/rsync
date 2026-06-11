@@ -1492,6 +1492,30 @@ struct xattr_args { uint64_t value; uint32_t size; uint32_t flags; };]],
     esac
 fi
 
+#################################################
+# Detect a patched libacl providing the race-safe
+# *_at ACL entry points (acl_get_file_at/acl_set_file_at/acl_delete_def_file_at,
+# ACL_1.3, unreleased upstream).  When present we route the race-safe ACL get/
+# set/delete through them on Linux -- race-safe on every kernel (6.13+ uses
+# *xattrat; older uses libacl's /proc/self/fd compat).  A stock -lacl lacks these
+# symbols, so this stays undefined and the build falls back to lib/acl.c;
+# detection must therefore run against the patched lib (CPPFLAGS/LDFLAGS).
+AH_TEMPLATE([HAVE_LIBACL_AT],
+[Define to 1 if libacl provides acl_get_file_at/acl_set_file_at/acl_delete_def_file_at])
+if test x"$samba_cv_HAVE_POSIX_ACLS" = x"yes"; then
+    case "$host_os" in
+    *linux*)
+	AC_CHECK_LIB(acl, acl_get_file_at, [rsync_have_libacl_at=yes], [rsync_have_libacl_at=no])
+	if test x"$rsync_have_libacl_at" = x"yes"; then
+	    AC_CHECK_FUNCS([acl_set_file_at acl_delete_def_file_at], [], [rsync_have_libacl_at=no])
+	fi
+	if test x"$rsync_have_libacl_at" = x"yes"; then
+	    AC_DEFINE(HAVE_LIBACL_AT, 1)
+	fi
+	;;
+    esac
+fi
+
 if test x"$enable_acl_support" = x"no" || test x"$enable_xattr_support" = x"no" || test x"$enable_iconv" = x"no"; then
     AC_MSG_CHECKING([whether $CC supports -Wno-unused-parameter])
     OLD_CFLAGS="$CFLAGS"
