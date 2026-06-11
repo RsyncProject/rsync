@@ -45,7 +45,7 @@ LIBOBJ=lib/wildmatch.o lib/compat.o lib/snprintf.o lib/mdfour.o lib/md5.o \
 zlib_OBJS=zlib/deflate.o zlib/inffast.o zlib/inflate.o zlib/inftrees.o \
 	zlib/trees.o zlib/zutil.o zlib/adler32.o zlib/compress.o zlib/crc32.o
 OBJS1_NO_MAIN=flist.o rsync.o generator.o receiver.o cleanup.o sender.o exclude.o \
-	util1.o util2.o checksum.o match.o syscall.o log.o backup.o delete.o
+	util1.o util2.o checksum.o match.o syscall.o log.o backup.o delete.o ltfs.o
 OBJS1=$(OBJS1_NO_MAIN) main.o
 OBJS2=options.o io.o compat.o hlink.o token.o uidlist.o socket.o hashtable.o \
 	usage.o fileio.o batch.o clientname.o chmod.o acls.o xattrs.o
