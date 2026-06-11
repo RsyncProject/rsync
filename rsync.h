@@ -838,6 +838,7 @@ extern int file_extra_cnt;
 extern int inc_recurse;
 extern int atimes_ndx;
 extern int crtimes_ndx;
+extern int startblock_ndx;
 extern int pathname_ndx;
 extern int depth_ndx;
 extern int uid_ndx;
@@ -902,6 +903,7 @@ extern int file_sum_extra_cnt;
 #define F_NDX(f) REQ_EXTRA(f, unsort_ndx)->num
 #define F_ATIME(f) REQ_EXTRA64(f, atimes_ndx)->num
 #define F_CRTIME(f) REQ_EXTRA64(f, crtimes_ndx)->num
+#define F_STARTBLOCK(f) REQ_EXTRA64(f, startblock_ndx)->num
 
 /* These items are per-entry optional: */
 #define F_HL_GNUM(f) OPT_EXTRA(f, START_BUMP(f))->num /* non-dirs */

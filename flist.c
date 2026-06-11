@@ -57,6 +57,7 @@ extern int missing_args;
 extern int eol_nulls;
 extern int atimes_ndx;
 extern int crtimes_ndx;
+extern int startblock_ndx;
 extern int relative_paths;
 extern int implied_dirs;
 extern int ignore_perishable;
@@ -602,6 +603,8 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file,
 	if (crtimes_ndx && !(xflags & XMIT_CRTIME_EQ_MTIME))
 		write_varlong(f, crtime, 4);
 #endif
+	if (startblock_ndx)
+		write_varlong(f, F_STARTBLOCK(file), 3);
 	if (!(xflags & XMIT_SAME_MODE))
 		write_int(f, to_wire_mode(mode));
 	if (atimes_ndx && !S_ISDIR(mode) && !(xflags & XMIT_SAME_ATIME))
@@ -697,6 +700,7 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 #ifdef SUPPORT_CRTIMES
 	static time_t crtime;
 #endif
+	static int64 startblock;
 	static mode_t mode;
 #ifdef SUPPORT_HARD_LINKS
 	static int64 dev;
@@ -873,6 +877,8 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 #endif
 	}
 #endif
+	if (startblock_ndx)
+		startblock = read_varlong(f, 3);
 	if (!(xflags & XMIT_SAME_MODE)) {
 		mode = from_wire_mode(read_int(f));
 		/* Reject modes whose type bits are not one of the standard
@@ -1097,6 +1103,8 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 	if (crtimes_ndx)
 		F_CRTIME(file) = crtime;
 #endif
+	if (startblock_ndx)
+		F_STARTBLOCK(file) = startblock;
 	if (unsort_ndx)
 		F_NDX(file) = flist->used + flist->ndx_start;
 
@@ -1518,6 +1526,12 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	if (crtimes_ndx)
 		F_CRTIME(file) = get_create_time(fname, &st);
 #endif
+	if (startblock_ndx) {
+		int64 blk = am_sender && S_ISREG(file->mode) ? ltfs_startblock(fname) : -1;
+		/* Unknown sorts first; keep it non-negative so write_varlong
+		 * stays compact (a real LTFS data block is well past block 0). */
+		F_STARTBLOCK(file) = blk < 0 ? 0 : blk;
+	}
 
 	if (basename != thisname)
 		file->dirname = lastdir;
