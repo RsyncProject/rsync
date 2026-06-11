@@ -665,11 +665,11 @@ static int get_rsync_acl(int fd, int dirfd, const char *leaf, const char *fname,
 			free(ents);
 		return 0;
 	}
-	/* No held fd and no *xattrat syscalls (pre-6.13 Linux, the BSDs, an
-	 * un-pinnable entry): prefer reading the real destination ACL via the
-	 * path-based call over a mode-only fake, so --acls stays functional on
-	 * platforms that cannot offer the race-safe primitive.  This matches the
-	 * matching set path's fall-through and the prior (3.4.x) behaviour. */
+	/* Neither a held fd nor a usable dirfd path (xacl_at_available() covers the
+	 * *xattrat syscalls AND the pre-6.13 /proc/self/fd compat, so this is the
+	 * BSDs / a /proc-less namespace / an un-pinnable entry): read the real
+	 * destination ACL via the path-based call rather than a mode-only fake, so
+	 * --acls stays functional where the race-safe primitive is unavailable. */
 #endif
 
 	if ((sacl = sys_acl_get_file(fname, type)) != 0) {
@@ -1115,11 +1115,11 @@ static int set_rsync_acl(int fd, int dirfd, const char *leaf, const char *fname,
 #endif
 #ifdef SUPPORT_ACL_FD
 		/* Race-safe default-ACL delete via the held fd or dirfd+leaf.  Where
-		 * neither is available -- no held fd and no *xattrat syscalls (pre-6.13
-		 * Linux, the BSDs, an un-pinnable entry) -- fall back to the path-based
-		 * call: we prefer the documented --acls functionality over refusing it
-		 * on platforms that cannot offer the race-safe primitive.  A current
-		 * Linux kernel (6.13+) takes the secure xacl_*_at() path above. */
+		 * neither is available (xacl_at_available() is false -- the BSDs, a
+		 * /proc-less namespace, an un-pinnable entry; every Linux with procfs
+		 * takes the dirfd path via *xattrat or the /proc/self/fd compat) -- fall
+		 * back to the path-based call, preferring the documented --acls behaviour
+		 * over refusing it where the race-safe primitive is unavailable. */
 		if (fd >= 0)
 			rc = xacl_del_default_fd(fd);
 		else if (dirfd >= 0 && xacl_at_available())
@@ -1198,13 +1198,14 @@ static int set_rsync_acl(int fd, int dirfd, const char *leaf, const char *fname,
 				sxp->st.st_mode = cur_mode;
 			return 0;
 		}
-		/* No held fd and no *xattrat syscalls (pre-6.13 Linux, the BSDs, an
-		 * un-pinnable entry): prefer the documented --acls functionality over
-		 * refusing it and fall back to the path-based set, on platforms that
-		 * cannot offer the race-safe primitive.  (6.13+ takes xacl_set_at()
-		 * above.)  This re-resolves fname, so it carries the long-standing
-		 * parent-symlink-race exposure on those platforms; it is the prior
-		 * (3.4.x) behaviour and the only way to honour --acls there. */
+		/* No held fd and no usable dirfd path (xacl_at_available() is false --
+		 * the BSDs, a /proc-less namespace, an un-pinnable entry; every Linux
+		 * with procfs took xacl_set_at() above via *xattrat or the /proc/self/fd
+		 * compat): prefer the documented --acls behaviour over refusing it and
+		 * fall back to the path-based set.  This re-resolves fname, so it still
+		 * carries the parent-symlink-race exposure on those remaining platforms;
+		 * it is the only way to honour --acls where no race-safe primitive
+		 * exists. */
 #endif
 		if (sys_acl_set_file(fname, type, duo_item->sacl) < 0) {
 			rsyserr(FERROR_XFER, errno, "set_acl: sys_acl_set_file(%s, %s)",

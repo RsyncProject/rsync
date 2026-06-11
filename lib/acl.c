@@ -186,59 +186,90 @@ static int xattr_to_acl(const unsigned char *buf, size_t len,
 
 /* === syscall dispatchers (fd-variant vs at-variant) === */
 
+/* Pre-6.13 fallback for the dirfd+leaf at-variants: address the leaf as
+ * /proc/self/fd/<dirfd>/<leaf> and use the l*xattr (no-follow-leaf) calls.  The
+ * /proc/self/fd/<dirfd> magic symlink resolves to the pinned parent inode -- a
+ * raced parent symlink cannot redirect it -- and l*xattr does not follow a raced
+ * leaf symlink, so this is race-safe without the Linux 6.13 *xattrat syscalls, as
+ * long as procfs is mounted.  (`leaf` is a single component, <= NAME_MAX.)
+ * Returns 0 and fills `buf`, or -1 with ENAMETOOLONG. */
+static int proc_fd_leaf_path(char *buf, size_t buflen, int dirfd, const char *leaf)
+{
+	int n = snprintf(buf, buflen, "/proc/self/fd/%d/%s", dirfd, leaf);
+	if (n < 0 || (size_t)n >= buflen) {
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+	return 0;
+}
+
 static ssize_t do_getxattr(int fd, int dirfd, const char *leaf,
 			   const char *name, void *val, size_t size)
 {
+	char p[MAXPATHLEN];
+
 	if (fd >= 0)
 		return fgetxattr(fd, name, val, size);
 #ifdef HAVE_XATTRAT_SYSCALLS
 	{
 		struct rsync_xattr_args args;
+		ssize_t ret;
 		args.value = (uint64_t)(uintptr_t)val;
 		args.size = (uint32_t)size;
 		args.flags = 0;
-		return syscall(SYS_getxattrat, dirfd, leaf, AT_SYMLINK_NOFOLLOW,
-			       name, &args, sizeof args);
+		ret = syscall(SYS_getxattrat, dirfd, leaf, AT_SYMLINK_NOFOLLOW,
+			      name, &args, sizeof args);
+		if (ret != -1 || errno != ENOSYS)
+			return ret;
+		/* ENOSYS: kernel < 6.13 -- fall through to the /proc compat. */
 	}
-#else
-	(void)dirfd; (void)leaf; (void)name; (void)val; (void)size;
-	errno = ENOSYS;
-	return -1;
 #endif
+	if (proc_fd_leaf_path(p, sizeof p, dirfd, leaf) < 0)
+		return -1;
+	return lgetxattr(p, name, val, size);
 }
 
 static int do_setxattr(int fd, int dirfd, const char *leaf,
 		       const char *name, const void *val, size_t size)
 {
+	char p[MAXPATHLEN];
+
 	if (fd >= 0)
 		return fsetxattr(fd, name, val, size, 0);
 #ifdef HAVE_XATTRAT_SYSCALLS
 	{
 		struct rsync_xattr_args args;
+		int ret;
 		args.value = (uint64_t)(uintptr_t)val;
 		args.size = (uint32_t)size;
 		args.flags = 0;	/* replace */
-		return syscall(SYS_setxattrat, dirfd, leaf, AT_SYMLINK_NOFOLLOW,
-			       name, &args, sizeof args);
+		ret = syscall(SYS_setxattrat, dirfd, leaf, AT_SYMLINK_NOFOLLOW,
+			      name, &args, sizeof args);
+		if (ret != -1 || errno != ENOSYS)
+			return ret;
 	}
-#else
-	(void)dirfd; (void)leaf; (void)name; (void)val; (void)size;
-	errno = ENOSYS;
-	return -1;
 #endif
+	if (proc_fd_leaf_path(p, sizeof p, dirfd, leaf) < 0)
+		return -1;
+	return lsetxattr(p, name, val, size, 0);
 }
 
 static int do_removexattr(int fd, int dirfd, const char *leaf, const char *name)
 {
+	char p[MAXPATHLEN];
+
 	if (fd >= 0)
 		return fremovexattr(fd, name);
 #ifdef HAVE_XATTRAT_SYSCALLS
-	return syscall(SYS_removexattrat, dirfd, leaf, AT_SYMLINK_NOFOLLOW, name);
-#else
-	(void)dirfd; (void)leaf; (void)name;
-	errno = ENOSYS;
-	return -1;
+	{
+		int ret = syscall(SYS_removexattrat, dirfd, leaf, AT_SYMLINK_NOFOLLOW, name);
+		if (ret != -1 || errno != ENOSYS)
+			return ret;
+	}
 #endif
+	if (proc_fd_leaf_path(p, sizeof p, dirfd, leaf) < 0)
+		return -1;
+	return lremovexattr(p, name);
 }
 
 /* Read the whole named xattr into a malloc'd buffer, growing as needed. */
@@ -367,20 +398,52 @@ int xacl_del_default_at(int dirfd, const char *leaf)
 	return acl_del_default_common(-1, dirfd, leaf);
 }
 
+/* True iff /proc/self/fd magic symlinks are usable, so the dirfd+leaf at-variants
+ * work race-safely via the /proc compat on a pre-6.13 kernel. */
+static int proc_self_fd_usable(void)
+{
+	int dfd = open(".", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+	char p[64];
+	int usable = 0;
+
+	if (dfd < 0)
+		return 0;
+	if (snprintf(p, sizeof p, "/proc/self/fd/%d/.", dfd) < (int)sizeof p) {
+		/* The probe attr is absent; the path resolving (any errno but
+		 * ENOENT/ENOTDIR -- e.g. ENODATA/ENOTSUP/EACCES) means procfs gives us
+		 * the magic fd-symlink we need. */
+		errno = 0;
+		lgetxattr(p, "user.rsync_acl_probe", NULL, 0);
+		usable = !(errno == ENOENT || errno == ENOTDIR);
+	}
+	close(dfd);
+	return usable;
+}
+
 int xacl_at_available(void)
 {
 	static int avail = -1;
 
 	if (avail < 0) {
 #ifdef HAVE_XATTRAT_SYSCALLS
-		/* A harmless probe: query a nonexistent attr on ".".  Any errno
-		 * other than ENOSYS means the syscall itself is present. */
+		/* Probe the *xattrat syscall directly (not via do_getxattr's /proc
+		 * fallback): any errno other than ENOSYS means it is present (6.13+). */
+		struct rsync_xattr_args args;
+		args.value = 0;
+		args.size = 0;
+		args.flags = 0;
 		errno = 0;
-		do_getxattr(-1, AT_FDCWD, ".", "user.rsync_acl_probe", NULL, 0);
-		avail = errno == ENOSYS ? 0 : 1;
-#else
-		avail = 0;
+		syscall(SYS_getxattrat, AT_FDCWD, ".", AT_SYMLINK_NOFOLLOW,
+			"user.rsync_acl_probe", &args, sizeof args);
+		if (errno != ENOSYS) {
+			avail = 1;
+			return avail;
+		}
 #endif
+		/* No *xattrat syscalls (pre-6.13, or a kernel built without them): the dirfd+leaf ACL ops
+		 * are still race-safe via /proc/self/fd if procfs is mounted, closing
+		 * the parent-symlink-race gap that otherwise forces the path-based set. */
+		avail = proc_self_fd_usable();
 	}
 	return avail;
 }
