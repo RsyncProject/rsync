@@ -1,4 +1,5 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.24)
+cmake_policy(SET CMP0135 NEW)
 project(rsync C CXX)
 
 # Find dependencies
@@ -106,7 +107,6 @@ add_executable(rsync ${RSYNC_SOURCES})
 get_filename_component(AUTO_WIN_MSVC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../auto-win-msvc" ABSOLUTE)
 include(FetchContent)
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../auto-win-msvc")
-    set(FETCHCONTENT_SOURCE_DIR_AUTO_WIN_MSVC "${CMAKE_CURRENT_SOURCE_DIR}/../auto-win-msvc" CACHE PATH "")
         FetchContent_Declare(auto_win_msvc SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../auto-win-msvc")
 else()
     FetchContent_Declare(auto_win_msvc GIT_REPOSITORY https://github.com/SamuelMarks/auto-win-msvc.git GIT_TAG master)
