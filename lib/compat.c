@@ -187,7 +187,6 @@ char *do_big_num(int64 num, int human_flag, const char *fract)
 		char units[] = "\0KMGTPE";
 		char *unit = units;
 		uint64_t powi = 1;
-		unsigned int powj = 1, precision = 2;
 
 		for (;;) {
 			if (abs_num / mult < powi)
@@ -201,18 +200,19 @@ char *do_big_num(int64 num, int human_flag, const char *fract)
 		}
 		unit[1] = '\0';
 
-		if (powi == 1)
-			precision = 0;
+		if (powi > 1) {
+			unsigned int powj = 1, precision = 2;
 
-		for (; precision > 0; precision--) {
-			powj *= 10;
-			if (abs_num / powi < powj)
-				break;
+			for (; precision > 0; precision--) {
+				powj *= 10;
+				if (abs_num / powi < powj)
+					break;
+			}
+
+			snprintf(bufs[n], sizeof bufs[0], "%.*f%s%s", precision,
+				(double) num / powi, unit, *unit && mult == 1024 ? "i" : "");
+			return bufs[n];
 		}
-
-		snprintf(bufs[n], sizeof bufs[0], "%.*f%s%s", precision,
-			(double) num / powi, unit, *unit && mult == 1024 ? "i" : "");
-		return bufs[n];
 	}
 
 	s = bufs[n] + sizeof bufs[0] - 1;
