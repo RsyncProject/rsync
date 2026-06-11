@@ -1,0 +1,10 @@
+---
+# Inherit the Linux (K&R) style and all other rules from the root _clang-format
+BasedOnStyle: InheritParentConfig
+
+# Override the 8-character tab baseline with 4 spaces
+IndentWidth: 4
+ContinuationIndentWidth: 4
+ConstructorInitializerIndentWidth: 4
+UseTab: Never
+...
