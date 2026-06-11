@@ -95,8 +95,9 @@ verify_dirs(src, TODIR, label='--quiet still transferred')
 # --- --progress shows a percentage ------------------------------------------
 rmtree(TODIR)
 p = out('-a', '--progress', f'{src}/', f'{TODIR}/')
-if '100%' not in p.stdout:
-    test_fail(f"--progress did not show a percentage:\n{p.stdout}")
+progress_re = r'[\d.,]+B\s+100%\s+[\d.,]+B/s\s+\d+:\d\d:\d\d'
+if not re.search(progress_re, p.stdout):
+    test_fail(f"--progress did not show the expected final shape:\n{p.stdout}")
 
 # --- -h / --human-readable formats byte counts with a unit suffix -----------
 # Without -h, --stats prints grouped digits ("50,000 bytes"); with -h it uses a
@@ -113,6 +114,28 @@ if not re.search(suffix_re, human):
     test_fail(f"-h did not use a human-readable unit suffix:\n{human}")
 if re.search(suffix_re, plain):
     test_fail(f"--stats without -h unexpectedly used a unit suffix:\n{plain}")
+
+rmtree(TODIR)
+human_binary = out('-a', '-hh', '--stats', f'{src}/', f'{TODIR}/').stdout
+if 'Total file size: 48.8Ki bytes' not in human_binary:
+    test_fail(f"-hh did not use dynamic binary-unit precision:\n{human_binary}")
+
+rmtree(src)
+rmtree(TODIR)
+makepath(src)
+make_data_file(src / 'threshold', 1024)
+threshold = out('-a', '-hh', '--stats', f'{src}/', f'{TODIR}/').stdout
+if 'Total file size: 1.00Ki bytes' not in threshold:
+    test_fail(f"-hh did not show an exact-threshold binary unit:\n{threshold}")
+
+rmtree(src)
+rmtree(TODIR)
+makepath(src)
+make_data_file(src / 'below-threshold', 1000)
+below_threshold = out('-a', '-hh', '--stats', f'{src}/', f'{TODIR}/').stdout
+if 'Total file size: 1,000 bytes' not in below_threshold:
+    test_fail("-hh should preserve raw byte formatting below the binary-unit "
+              f"threshold:\n{below_threshold}")
 
 # --- -8 / --8-bit-output leaves high-bit filename bytes unescaped ------------
 # rsync escapes non-printable name bytes as \#NNN; -8 prints 8-bit bytes raw.
