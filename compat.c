@@ -45,6 +45,7 @@ extern int preserve_uid;
 extern int preserve_gid;
 extern int preserve_atimes;
 extern int preserve_crtimes;
+extern int ltfs_mode;
 extern int preserve_acls;
 extern int preserve_xattrs;
 extern int xfer_flags_as_varint;
@@ -87,7 +88,7 @@ struct name_num_item *xattr_sum_nni;
 int xattr_sum_len = 0;
 
 /* These index values are for the file-list's extra-attribute array. */
-int pathname_ndx, depth_ndx, atimes_ndx, crtimes_ndx, uid_ndx, gid_ndx, acls_ndx, xattrs_ndx, unsort_ndx;
+int pathname_ndx, depth_ndx, atimes_ndx, crtimes_ndx, startblock_ndx, uid_ndx, gid_ndx, acls_ndx, xattrs_ndx, unsort_ndx;
 
 int receiver_symlink_times = 0; /* receiver can set the time on a symlink */
 int sender_symlink_iconv = 0;	/* sender should convert symlink content */
@@ -581,6 +582,10 @@ void setup_protocol(int f_out,int f_in)
 		atimes_ndx = (file_extra_cnt += EXTRA64_CNT);
 	if (preserve_crtimes)
 		crtimes_ndx = (file_extra_cnt += EXTRA64_CNT);
+#ifdef SUPPORT_XATTRS
+	if (ltfs_mode)
+		startblock_ndx = (file_extra_cnt += EXTRA64_CNT);
+#endif
 	if (am_sender) /* This is most likely in the file_extras64 union as well. */
 		pathname_ndx = (file_extra_cnt += PTR_EXTRA_CNT);
 	else

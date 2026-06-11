@@ -112,6 +112,7 @@ int human_readable = 1;
 int recurse = 0;
 int mkpath_dest_arg = 0;
 int allow_inc_recurse = 1;
+int ltfs_mode = 0;
 int xfer_dirs = -1;
 int am_daemon = 0;
 /* Set after a successful per-module chroot ("use chroot = yes") in
@@ -623,6 +624,8 @@ static struct poptOption long_options[] = {
   {"no-r",             0,  POPT_ARG_VAL,    &recurse, 0, 0, 0 },
   {"inc-recursive",    0,  POPT_ARG_VAL,    &allow_inc_recurse, 1, 0, 0 },
   {"no-inc-recursive", 0,  POPT_ARG_VAL,    &allow_inc_recurse, 0, 0, 0 },
+  {"ltfs",             0,  POPT_ARG_VAL,    &ltfs_mode, 1, 0, 0 },
+  {"no-ltfs",          0,  POPT_ARG_VAL,    &ltfs_mode, 0, 0, 0 },
   {"i-r",              0,  POPT_ARG_VAL,    &allow_inc_recurse, 1, 0, 0 },
   {"no-i-r",           0,  POPT_ARG_VAL,    &allow_inc_recurse, 0, 0, 0 },
   {"dirs",            'd', POPT_ARG_VAL,    &xfer_dirs, 2, 0, 0 },
@@ -1027,6 +1030,11 @@ static void set_refuse_options(void)
 #endif
 #ifndef SUPPORT_CRTIMES
 	parse_one_refuse_match(0, "crtimes", list_end);
+#endif
+#ifndef SUPPORT_XATTRS
+	/* --ltfs orders the read by each file's ltfs.startblock xattr, so it is
+	 * meaningless (and would silently no-op) without xattr support. */
+	parse_one_refuse_match(0, "ltfs", list_end);
 #endif
 
 	/* Now we use the descrip values to actually mark the options for refusal. */
@@ -2397,6 +2405,23 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			bwlimit_writemax = 512;
 	}
 
+	if (ltfs_mode) {
+		/* A delta read would only re-read the source file we must
+		 * stream off the tape anyway, so force whole-file. */
+		if (whole_file < 0)
+			whole_file = 1;
+		/* We need the complete file list before we can order the read
+		 * by physical block, so incremental recursion is incompatible. */
+		allow_inc_recurse = 0;
+		/* --checksum would read every byte of every file off the tape
+		 * just to decide what to transfer, defeating the whole point. */
+		if (always_checksum) {
+			snprintf(err_buf, sizeof err_buf,
+				 "--checksum cannot be used with --ltfs (it would read the entire tape)\n");
+			goto cleanup;
+		}
+	}
+
 	if (append_mode) {
 		if (whole_file > 0) {
 			snprintf(err_buf, sizeof err_buf,
@@ -2764,6 +2789,11 @@ void server_options(char **args, int *argc_p)
 			args[ac++] = "--no-specials"; /* -D is already set. */
 	} else if (preserve_specials)
 		args[ac++] = "--specials";
+
+	/* The sender reads the start-block metadata and both sides must agree
+	 * on the file-list extra layout, so tell the server side about --ltfs. */
+	if (ltfs_mode)
+		args[ac++] = "--ltfs";
 
 	/* The server side doesn't use our log-format, but in certain
 	 * circumstances they need to know a little about the option. */
