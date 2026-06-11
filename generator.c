@@ -32,6 +32,7 @@ extern int am_root;
 extern int am_server;
 extern int am_daemon;
 extern int inc_recurse;
+extern int ltfs_mode;
 extern int relative_paths;
 extern int implied_dirs;
 extern int keep_dirlinks;
@@ -2247,6 +2248,7 @@ void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
 void generate_files(int f_out, const char *local_name)
 {
 	int i, ndx, next_loopchk = 0;
+	int *ltfs_order = NULL;
 	char fbuf[MAXPATHLEN];
 	int itemizing;
 	enum logcode code;
@@ -2330,8 +2332,15 @@ void generate_files(int f_out, const char *local_name)
 					change_local_filter_dir(fbuf, strlen(fbuf), F_DEPTH(fp));
 			}
 		}
+		/* For an LTFS source, read the files in physical tape order
+		 * (by start block) rather than name order, so the drive makes
+		 * one forward streaming pass instead of seeking back and forth.
+		 * ltfs_order maps the natural sweep position to a sorted[] index;
+		 * a NULL result falls back to the natural low..high order. */
+		ltfs_order = ltfs_mode ? ltfs_build_order(cur_flist) : NULL;
 		for (i = cur_flist->low; i <= cur_flist->high; i++) {
-			struct file_struct *file = cur_flist->sorted[i];
+			int si = ltfs_order ? ltfs_order[i - cur_flist->low] : i;
+			struct file_struct *file = cur_flist->sorted[si];
 
 			if (!F_IS_ACTIVE(file))
 				continue;
@@ -2339,7 +2348,7 @@ void generate_files(int f_out, const char *local_name)
 			if (unsort_ndx)
 				ndx = F_NDX(file);
 			else
-				ndx = i + cur_flist->ndx_start;
+				ndx = si + cur_flist->ndx_start;
 
 			if (solo_file)
 				strlcpy(fbuf, solo_file, sizeof fbuf);
@@ -2357,6 +2366,9 @@ void generate_files(int f_out, const char *local_name)
 				next_loopchk += loopchk_limit;
 			}
 		}
+
+		if (ltfs_order)
+			free(ltfs_order);
 
 		if (!inc_recurse) {
 			write_ndx(f_out, NDX_DONE);
