@@ -1693,91 +1693,15 @@ static int path_has_dotdot_component(const char *path)
 	return 0;
 }
 
-#if defined(__linux__) && defined(HAVE_OPENAT2)
-/* openat2(RESOLVE_BENEATH) via the raw syscall, gated on openat2_usable() so a
- * seccomp filter that traps openat2 with SIGSYS (e.g. the Android sandbox)
- * makes us report ENOSYS and fall back rather than killing the process.  Only
- * the openat2 call is gated here; a plain openat() is always safe to attempt. */
-static int openat2_beneath(int dirfd, const char *path, const struct open_how *how)
+/* Symlink-race-safe path resolver: a held-dirfd-stack walk (replaces the
+ * 3.4.x openat2/RESOLVE_BENEATH resolver) -- follows in-tree symlinks while
+ * confining beneath the anchor. */
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+/* Open a trusted absolute anchor directory as an owned dirfd.  (The daemon
+ * module_dirfd privilege-drop optimization is added with that backport.) */
+static int open_anchor_dirfd(const char *path)
 {
-	if (!openat2_usable()) {
-		errno = ENOSYS;
-		return -1;
-	}
-	return syscall(SYS_openat2, dirfd, path, how, sizeof *how);
-}
-
-static int secure_relative_open_linux(const char *basedir, const char *relpath, int flags, mode_t mode)
-{
-	struct open_how how;
-	int dirfd, retfd;
-
-	memset(&how, 0, sizeof how);
-	how.flags = flags;
-	how.mode = mode;
-	how.resolve = RESOLVE_BENEATH | RESOLVE_NO_MAGICLINKS;
-
-	if (basedir == NULL) {
-		dirfd = AT_FDCWD;
-	} else if (basedir[0] == '/') {
-		/* Absolute basedir: operator-trusted (module_dir and the
-		 * like). Plain openat. */
-		dirfd = openat(AT_FDCWD, basedir, O_RDONLY | O_DIRECTORY);
-		if (dirfd == -1)
-			return -1;
-	} else {
-		/* Relative basedir: may be wire-influenced via
-		 * --link-dest / --copy-dest / --compare-dest. Resolve it
-		 * under the same RESOLVE_BENEATH guarantee as relpath, so
-		 * a parent symlink on basedir cannot redirect the dirfd
-		 * outside the CWD anchor. */
-		struct open_how bhow;
-		memset(&bhow, 0, sizeof bhow);
-		bhow.flags = O_RDONLY | O_DIRECTORY;
-		bhow.resolve = RESOLVE_BENEATH | RESOLVE_NO_MAGICLINKS;
-		dirfd = openat2_beneath(AT_FDCWD, basedir, &bhow);
-		if (dirfd == -1)
-			return -1;
-	}
-
-	retfd = openat2_beneath(dirfd, relpath, &how);
-
-	if (dirfd != AT_FDCWD)
-		close(dirfd);
-	return retfd;
-}
-#endif
-
-#ifdef O_RESOLVE_BENEATH
-/* FreeBSD 13+ and macOS 15+ (Sequoia) / iOS 18+: O_RESOLVE_BENEATH is
- * an openat() flag with the same "must not escape dirfd" semantics as
- * Linux's RESOLVE_BENEATH. The kernel rejects ".." escapes, absolute
- * symlinks, and symlinks whose target lies outside dirfd. (FreeBSD and
- * Apple use different flag bit values, but the same symbolic name.) */
-static int secure_relative_open_resolve_beneath(const char *basedir, const char *relpath, int flags, mode_t mode)
-{
-	int dirfd, retfd;
-
-	if (basedir == NULL) {
-		dirfd = AT_FDCWD;
-	} else if (basedir[0] == '/') {
-		/* Absolute basedir: operator-trusted, plain openat. */
-		dirfd = openat(AT_FDCWD, basedir, O_RDONLY | O_DIRECTORY);
-		if (dirfd == -1)
-			return -1;
-	} else {
-		/* Relative basedir: confine its resolution beneath CWD
-		 * (see secure_relative_open_linux for the rationale). */
-		dirfd = openat(AT_FDCWD, basedir, O_RDONLY | O_DIRECTORY | O_RESOLVE_BENEATH);
-		if (dirfd == -1)
-			return -1;
-	}
-
-	retfd = openat(dirfd, relpath, flags | O_RESOLVE_BENEATH, mode);
-
-	if (dirfd != AT_FDCWD)
-		close(dirfd);
-	return retfd;
+	return openat(AT_FDCWD, path, O_RDONLY | O_DIRECTORY);
 }
 #endif
 
@@ -1787,6 +1711,250 @@ static int secure_relative_open_resolve_beneath(const char *basedir, const char 
  * weak-symbol fallback, which is not portable to PE/COFF targets (Cygwin). */
 char curr_dir[MAXPATHLEN];
 unsigned int curr_dir_len;
+
+#if defined(O_NOFOLLOW) && defined(O_DIRECTORY) && defined(AT_FDCWD)
+/* In-tree symlink following for secure_relative_open()'s directory walk (below).
+ * An early version refused every symlink with O_NOFOLLOW on each component, which
+ * broke legitimate within-tree directory symlinks (--keep-dirlinks #715, and -aR
+ * through a symlinked parent); the walk now follows them safely.
+ *
+ * A directory walk keeps a stack of the open dirfds from the anchor (index 0,
+ * borrowed -- not closed here) down to the current directory.  Descending into
+ * a real subdirectory pushes its fd; a ".." in a followed symlink target pops
+ * back to the already-pinned parent fd rather than re-resolving ".." with
+ * openat(), so an ancestor renamed mid-walk cannot redirect the climb, and the
+ * climb can never rise above the anchor (a pop at the anchor returns ELOOP).
+ * This matches RESOLVE_BENEATH, which allows in-tree ".." that stays beneath the
+ * root.  Absolute symlink targets are refused; symlink hops are bounded. */
+#ifndef SECURE_OPEN_MAXSYMLINKS
+#define SECURE_OPEN_MAXSYMLINKS 40
+#endif
+
+struct dirstack {
+	int *fds;	/* fds[0] = anchor (borrowed); fds[top] = current dir */
+	int top;
+	int cap;
+};
+
+/* Initialise with `anchor` (which may be AT_FDCWD) as the un-owned base. */
+static int ds_init(struct dirstack *ds, int anchor)
+{
+	ds->cap = 16;
+	ds->fds = (int*)malloc(ds->cap * sizeof(int));
+	if (!ds->fds)
+		return -1;
+	ds->fds[0] = anchor;
+	ds->top = 0;
+	return 0;
+}
+
+/* Close every pushed fd (but not the borrowed anchor at index 0) and free. */
+static void ds_free(struct dirstack *ds)
+{
+	while (ds->top > 0)
+		close(ds->fds[ds->top--]);
+	free(ds->fds);
+	ds->fds = NULL;
+}
+
+static int ds_cur(struct dirstack *ds)
+{
+	return ds->fds[ds->top];
+}
+
+static int ds_push(struct dirstack *ds, int fd)
+{
+	if (ds->top + 1 >= ds->cap) {
+		int ncap = ds->cap * 2;
+		int *n = (int*)realloc(ds->fds, ncap * sizeof(int));
+		if (!n) {
+			close(fd);
+			errno = ENOMEM;
+			return -1;
+		}
+		ds->fds = n;
+		ds->cap = ncap;
+	}
+	ds->fds[++ds->top] = fd;
+	return 0;
+}
+
+/* Detach the current dir as an owned fd the caller must close.  At the anchor
+ * (top 0) the anchor is borrowed, so return a fresh dup of it instead. */
+static int ds_take(struct dirstack *ds)
+{
+	if (ds->top > 0)
+		return ds->fds[ds->top--];
+	return openat(ds->fds[0], ".", O_RDONLY | O_DIRECTORY);
+}
+
+static int ds_walk_path(struct dirstack *ds, char *path, int *hops);
+
+/* Descend one path component on the stack: "." stays, ".." pops to the pinned
+ * parent (ELOOP at the anchor), a real subdirectory is pushed, and an in-tree
+ * directory symlink is followed by walking its (relative, possibly
+ * ..-containing) target on the same stack.  Returns 0, or -1 with errno set:
+ * ELOOP for a refused/escaping symlink or a hop overrun, otherwise the
+ * underlying openat()/readlinkat() errno (ENOENT, a real ENOTDIR, EACCES). */
+static int ds_descend(struct dirstack *ds, const char *part, int *hops)
+{
+	if (part[0] == '.' && part[1] == '\0')
+		return 0;				/* "." -- no movement */
+	if (part[0] == '.' && part[1] == '.' && part[2] == '\0') {
+		if (ds->top == 0) {			/* would rise above the anchor */
+			errno = ELOOP;
+			return -1;
+		}
+		close(ds->fds[ds->top--]);		/* pop to the held parent fd */
+		return 0;
+	}
+
+	int fd = openat(ds_cur(ds), part, O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+	if (fd != -1)
+		return ds_push(ds, fd);			/* a real subdirectory */
+	/* O_NOFOLLOW refused a symlink (NOFOLLOW_HIT_SYMLINK: ELOOP on Linux, EMLINK
+	 * on FreeBSD, EFTYPE on NetBSD/OpenBSD), or O_DIRECTORY hit a non-directory
+	 * (ENOTDIR).  Either may be a symlink, so fall through to the readlink probe;
+	 * anything else is a hard error. */
+	if (errno != ENOTDIR && !NOFOLLOW_HIT_SYMLINK(errno)) {
+		if (errno == EMFILE || errno == ENFILE) {
+			/* The resolver holds one dirfd per path component, so a deep path
+			 * can exhaust descriptors where plain open() would not.  Hint at
+			 * the fix once -- otherwise "Too many open files" is opaque. */
+			static int warned = 0;
+			if (!warned) {
+				int e = errno;
+				warned = 1;
+				rprintf(FWARNING, "out of file descriptors resolving a deep path;"
+					" raise the open-file limit (e.g. `ulimit -n`)\n");
+				errno = e;
+			}
+		}
+		return -1;
+	}
+	int open_errno = errno;
+
+	char buf[MAXPATHLEN];
+	ssize_t n = readlinkat(ds_cur(ds), part, buf, sizeof buf - 1);
+	if (n < 0) {
+		if (errno == EINVAL)			/* not a symlink: a real non-dir */
+			errno = open_errno;
+		return -1;
+	}
+	if (n == 0 || (size_t)n >= sizeof buf - 1) {
+		errno = ELOOP;				/* empty or truncated target */
+		return -1;
+	}
+	buf[n] = '\0';
+	if (buf[0] == '/') {				/* absolute target: refuse */
+		errno = ELOOP;
+		return -1;
+	}
+	if (--(*hops) < 0) {
+		errno = ELOOP;
+		return -1;
+	}
+	return ds_walk_path(ds, buf, hops);
+}
+
+/* Walk every component of a relative path on the stack (used for the basedir,
+ * and for a followed symlink's target -- which may contain ".."). */
+static int ds_walk_path(struct dirstack *ds, char *path, int *hops)
+{
+	char *save = NULL;
+	for (char *c = strtok_r(path, "/", &save); c; c = strtok_r(NULL, "/", &save)) {
+		if (ds_descend(ds, c, hops) < 0)
+			return -1;
+	}
+	return 0;
+}
+
+/* Walk `relpath` confined beneath the borrowed anchor dirfd (which may be
+ * AT_FDCWD) and return the opened leaf fd, or -1.  Does NOT close `anchor_fd` --
+ * the caller owns it.  Shared by secure_relative_open() (which first resolves a
+ * basedir to the anchor) and secure_relative_open_at() (handed an already-open
+ * anchor, e.g. a held module-root fd).  `hops` is the shared symlink-hop budget. */
+static int secure_walk_at(int anchor_fd, const char *relpath, int flags, mode_t mode, int *hops)
+{
+	struct dirstack ds;
+	int retfd = -1;
+	char *path_copy;
+
+	if (ds_init(&ds, anchor_fd) < 0)
+		return -1;
+	path_copy = my_strdup(relpath, __FILE__, __LINE__);
+	if (!path_copy) {
+		ds_free(&ds);
+		return -1;
+	}
+
+	/* Trim trailing slashes so the last-component test below is exact, then
+	 * note the offset of the final component. */
+	size_t pclen = strlen(path_copy);
+	while (pclen > 1 && path_copy[pclen-1] == '/')
+		path_copy[--pclen] = '\0';
+	char *last_slash = strrchr(path_copy, '/');
+	size_t last_off = last_slash ? (size_t)(last_slash + 1 - path_copy) : 0;
+
+	int saw_component = 0;
+	char *psave = NULL;
+	for (char *part = strtok_r(path_copy, "/", &psave);
+	     part != NULL;
+	     part = strtok_r(NULL, "/", &psave))
+	{
+		int is_last = (size_t)(part - path_copy) == last_off;
+		saw_component = 1;
+
+		/* File leaf (final component, caller did not ask for O_DIRECTORY):
+		 * never follow a symlink leaf. */
+		if (is_last && !(flags & O_DIRECTORY)) {
+			int next_fd = openat(ds_cur(&ds), part, O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+			if (next_fd == -1 && (errno == ENOTDIR || errno == ENOENT)) {
+				retfd = openat(ds_cur(&ds), part, flags | O_NOFOLLOW, mode);
+				goto cleanup;
+			}
+			if (next_fd == -1)
+				goto cleanup;
+			close(next_fd);
+			errno = EISDIR;
+			goto cleanup;
+		}
+
+		/* O_DIRECTORY|O_NOFOLLOW leaf: the caller's O_NOFOLLOW governs the leaf. */
+		if (is_last && (flags & O_NOFOLLOW)) {
+			retfd = openat(ds_cur(&ds), part, O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+			goto cleanup;
+		}
+
+		/* Directory component (intermediate, or an O_DIRECTORY leaf to follow):
+		 * descend on the stack, following in-tree symlinks. */
+		if (ds_descend(&ds, part, hops) < 0) {
+			if (!is_last && errno == ENOTDIR)
+				errno = ELOOP;
+			goto cleanup;
+		}
+		if (is_last) {
+			retfd = ds_take(&ds);
+			goto cleanup;
+		}
+	}
+
+	/* Empty relpath: hand back a real anchor for an O_DIRECTORY caller (ds_take
+	 * dups the borrowed anchor), else EISDIR.  An AT_FDCWD anchor is not a
+	 * resolvable target, so it fails rather than silently returning the cwd. */
+	if (!saw_component) {
+		if ((flags & O_DIRECTORY) && anchor_fd != AT_FDCWD)
+			retfd = ds_take(&ds);
+		else
+			errno = EISDIR;
+	}
+
+cleanup:
+	free(path_copy);
+	ds_free(&ds);
+	return retfd;
+}
+#endif /* O_NOFOLLOW && O_DIRECTORY && AT_FDCWD */
 
 int secure_relative_open(const char *basedir, const char *relpath, int flags, mode_t mode)
 {
@@ -1802,19 +1970,21 @@ int secure_relative_open(const char *basedir, const char *relpath, int flags, mo
 		return -1;
 	}
 
-	/* Sanitizing daemon only (am_daemon && !am_chrooted).  Here we have chdir'd
-	 * into a sub-dir of the module (the transfer destination), so a relative
-	 * alt-dest like "../01" may legitimately climb to a sibling that is still
-	 * inside the module (#915).  Confining beneath the cwd would reject that
-	 * climb.  Re-anchor at the module root -- the real trust boundary -- by
-	 * prefixing the cwd's module-relative path (from rsync's logical curr_dir[],
-	 * a guaranteed lexical prefix of module_dir, unlike getcwd()) and resolving
-	 * beneath module_dir; RESOLVE_BENEATH then allows in-module climbs and still
-	 * rejects escapes.  Only for paths that contain "..".  module_dirlen is 0 for
-	 * a `path = /` module (clientserver.c), so we gate on module_dir, not its
+	/* Sanitizing daemon (am_daemon && !am_chrooted) and the /./ inner-module
+	 * chroot (am_daemon && am_chrooted && module_dirlen) -- both keep the module
+	 * root, not the cwd, as the trust boundary.  Here we have chdir'd into a
+	 * sub-dir of the module (the transfer destination), so a relative alt-dest
+	 * like "../01" may legitimately climb to a sibling that is still inside the
+	 * module (#915).  Confining beneath the cwd would reject that climb.
+	 * Re-anchor at the module root by prefixing the cwd's module-relative path
+	 * (from rsync's logical curr_dir[], a guaranteed lexical prefix of
+	 * module_dir, unlike getcwd()) and resolving beneath module_dir; RESOLVE_
+	 * BENEATH then allows in-module climbs and still rejects escapes.  Only for
+	 * paths that contain "..".  module_dirlen is 0 for a `path = /` module
+	 * (clientserver.c), so the non-chroot arm gates on module_dir, not its
 	 * length, to cover that case too -- the prefix check below treats
 	 * module_dirlen 0 as "module root is /". */
-	if (am_daemon && !am_chrooted
+	if (am_daemon && (!am_chrooted || module_dirlen)
 	 && module_dir && module_dir[0] == '/'
 	 && (basedir == NULL || basedir[0] != '/')
 	 && (path_has_dotdot_component(relpath)
@@ -1844,17 +2014,12 @@ int secure_relative_open(const char *basedir, const char *relpath, int flags, mo
 	}
 
 	/* Reject any path with a literal ".." component (bare "..",
-	 * "../foo", "foo/..", "foo/../bar", "subdir/.."). The previous
-	 * substring-based check caught only "../" prefix and "/../"
-	 * substring; bare ".." and trailing "/.." escape on the per-
-	 * component walk fallback used by NetBSD/OpenBSD/Solaris/Cygwin
-	 * and pre-5.6 Linux. RESOLVE_BENEATH on Linux/FreeBSD/macOS
-	 * catches some of these in-kernel with EXDEV, but the front
-	 * door must reject them consistently with EINVAL across all
-	 * platforms so callers can rely on the validation.  Skipped for a
-	 * re-anchored path: its ".." is deliberate, stays within the module,
-	 * and is adjudicated by RESOLVE_BENEATH below (the portable fallback
-	 * re-rejects it -- see there). */
+	 * "../foo", "foo/..", "foo/../bar", "subdir/..") at the front door,
+	 * with EINVAL, so callers can rely on the validation regardless of
+	 * platform.  Skipped for a re-anchored path: its ".." is deliberate,
+	 * stays within the module, and is adjudicated safely by the walk
+	 * below (ds_descend pops a "../" to the held parent, never above the
+	 * anchor). */
 	if (!reanchored) {
 		if (path_has_dotdot_component(relpath)) {
 			errno = EINVAL;
@@ -1866,34 +2031,10 @@ int secure_relative_open(const char *basedir, const char *relpath, int flags, mo
 		}
 	}
 
-#if defined(__linux__) && defined(HAVE_OPENAT2)
-	{
-		int fd = secure_relative_open_linux(basedir, relpath, flags, mode);
-		/* ENOSYS = kernel < 5.6 doesn't have the syscall even though
-		 * glibc/kernel-headers do; fall through to the portable path. */
-		if (fd != -1 || errno != ENOSYS)
-			return fd;
-	}
+#ifdef O_NOATIME
+	if (open_noatime)
+		flags |= O_NOATIME;
 #endif
-
-#ifdef O_RESOLVE_BENEATH
-	return secure_relative_open_resolve_beneath(basedir, relpath, flags, mode);
-#endif
-
-	/* Portable fallback only (no kernel RESOLVE_BENEATH): the per-component
-	 * O_NOFOLLOW walk below can't adjudicate ".." safely, so reject it here --
-	 * even for a re-anchored path.  This re-breaks --link-dest=../01 on
-	 * openat2/O_RESOLVE_BENEATH-less platforms (NetBSD/OpenBSD/Solaris/Cygwin/
-	 * pre-5.6 Linux), trading function for safety; on the kernel paths above
-	 * RESOLVE_BENEATH already allowed the in-module climb. */
-	if (path_has_dotdot_component(relpath)) {
-		errno = EINVAL;
-		return -1;
-	}
-	if (basedir && basedir[0] != '/' && path_has_dotdot_component(basedir)) {
-		errno = EINVAL;
-		return -1;
-	}
 
 #if !defined(O_NOFOLLOW) || !defined(O_DIRECTORY) || !defined(AT_FDCWD)
 	// really old system, all we can do is live with the risks
@@ -1904,91 +2045,82 @@ int secure_relative_open(const char *basedir, const char *relpath, int flags, mo
 	pathjoin(fullpath, sizeof fullpath, basedir, relpath);
 	return open(fullpath, flags, mode);
 #else
-	int dirfd = AT_FDCWD;
+	int dirfd = AT_FDCWD;	/* anchor for the relpath walk (owned unless AT_FDCWD) */
+	int hops = SECURE_OPEN_MAXSYMLINKS;	/* shared symlink-hop budget */
 	if (basedir != NULL) {
 		if (basedir[0] == '/') {
-			/* Absolute basedir: operator-trusted, plain openat. */
-			dirfd = openat(AT_FDCWD, basedir, O_RDONLY | O_DIRECTORY);
-			if (dirfd == -1) {
+			/* Absolute basedir: operator-trusted.  Prefer the identity-pinned
+			 * module-root fd when this is the served module, so a dropped-
+			 * privilege daemon need not re-traverse the absolute path. */
+			dirfd = open_anchor_dirfd(basedir);
+			if (dirfd == -1)
+				return -1;
+		} else {
+			/* Relative basedir: resolve it on a dirfd stack anchored at
+			 * the CWD, following in-tree directory symlinks -- the
+			 * portable RESOLVE_BENEATH equivalent.  A symlink target's
+			 * ".." may climb but not above the CWD anchor. */
+			struct dirstack bds;
+			char *bcopy;
+			if (ds_init(&bds, AT_FDCWD) < 0)
+				return -1;
+			bcopy = my_strdup(basedir, __FILE__, __LINE__);
+			if (!bcopy) {
+				ds_free(&bds);
 				return -1;
 			}
-		} else {
-			/* Relative basedir: walk it component-by-component
-			 * with O_NOFOLLOW. This is the per-component
-			 * RESOLVE_BENEATH equivalent for platforms without
-			 * kernel-supported confinement, and matches the
-			 * relpath walk below. Symlinks in basedir are
-			 * rejected outright on this fallback path; the
-			 * Linux openat2 / O_RESOLVE_BENEATH paths above
-			 * still allow within-tree symlinks. */
-			char *bcopy = my_strdup(basedir, __FILE__, __LINE__);
-			if (!bcopy)
+			if (ds_walk_path(&bds, bcopy, &hops) < 0) {
+				int e = errno;
+				free(bcopy);
+				ds_free(&bds);
+				errno = e;
 				return -1;
-			for (const char *part = strtok(bcopy, "/");
-			     part != NULL;
-			     part = strtok(NULL, "/"))
-			{
-				int next_fd = openat(dirfd, part, O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
-				if (next_fd == -1) {
-					int save_errno = errno;
-					if (dirfd != AT_FDCWD) close(dirfd);
-					free(bcopy);
-					errno = save_errno;
-					return -1;
-				}
-				if (dirfd != AT_FDCWD) close(dirfd);
-				dirfd = next_fd;
 			}
 			free(bcopy);
+			dirfd = ds_take(&bds);		/* owned dirfd for the basedir */
+			ds_free(&bds);
+			if (dirfd == -1)
+				return -1;
 		}
 	}
-	int retfd = -1;
 
-	char *path_copy = my_strdup(relpath, __FILE__, __LINE__);
-	if (!path_copy) {
-		if (dirfd != AT_FDCWD) close(dirfd);
-		return -1;
-	}
-	
-	for (const char *part = strtok(path_copy, "/");
-	     part != NULL;
-	     part = strtok(NULL, "/"))
-	{
-		int next_fd = openat(dirfd, part, O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
-		if (next_fd == -1 && errno == ENOTDIR) {
-			if (strtok(NULL, "/") != NULL) {
-				// this is not the last component of the path
-				errno = ELOOP;
-				goto cleanup;
-			}
-			// this could be the last component of the path, try as a file
-			retfd = openat(dirfd, part, flags | O_NOFOLLOW, mode);
-			goto cleanup;
-		}
-		if (next_fd == -1) {
-			goto cleanup;
-		}
-		if (dirfd != AT_FDCWD) close(dirfd);
-		dirfd = next_fd;
-	}
-
-	/* All components walked as directories. If the caller asked for
-	 * O_DIRECTORY, return the dirfd we built up; otherwise the path
-	 * resolved to a directory but the caller wanted a regular file. */
-	if ((flags & O_DIRECTORY) && dirfd != AT_FDCWD) {
-		retfd = dirfd;
-		dirfd = AT_FDCWD;
-		goto cleanup;
-	}
-	errno = EISDIR;
-
-cleanup:
-	free(path_copy);
-	if (dirfd != AT_FDCWD) {
+	int retfd = secure_walk_at(dirfd, relpath, flags, mode, &hops);
+	if (dirfd != AT_FDCWD)
 		close(dirfd);
-	}
 	return retfd;
 #endif // O_NOFOLLOW, O_DIRECTORY
+}
+
+/* Like secure_relative_open() but anchored at an already-open directory fd
+ * (borrowed -- the caller keeps ownership) rather than a basedir path.  Lets a
+ * caller pin the trust root once -- e.g. a daemon's module root opened while
+ * still privileged, or reached by climbing ".." up from the cwd -- and resolve a
+ * relative path beneath it without re-walking (and re-permission-checking) the
+ * absolute path as a dropped-privilege uid.  `relpath` must be relative and must
+ * not contain a literal ".." component (a ".." inside a followed in-tree symlink
+ * target is still handled by the walk). */
+int secure_relative_open_at(int anchor_fd, const char *relpath, int flags, mode_t mode)
+{
+#if !defined(O_NOFOLLOW) || !defined(O_DIRECTORY) || !defined(AT_FDCWD)
+	(void)anchor_fd; (void)relpath; (void)flags; (void)mode;
+	errno = ENOSYS;
+	return -1;
+#else
+	int hops = SECURE_OPEN_MAXSYMLINKS;
+	if (!relpath || relpath[0] == '/') {
+		errno = EINVAL;
+		return -1;
+	}
+	if (path_has_dotdot_component(relpath)) {
+		errno = EINVAL;
+		return -1;
+	}
+#ifdef O_NOATIME
+	if (open_noatime)
+		flags |= O_NOATIME;
+#endif
+	return secure_walk_at(anchor_fd, relpath, flags, mode, &hops);
+#endif
 }
 
 /* Fill buf with len random bytes.  Prefers /dev/urandom for cryptographic
