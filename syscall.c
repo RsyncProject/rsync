@@ -2147,3 +2147,322 @@ int do_open_checklinks(const char *pathname)
 	}
 	return do_open_nofollow(pathname, O_RDONLY);
 }
+
+/* Held-directory-fd traversal.
+ *
+ * Rather than re-resolve a full path on every syscall (do_*_at() re-opens the
+ * parent via secure_relative_open() each call), the generator and receiver
+ * open each directory ONCE via open_dir_secure() and issue single-component
+ * *at() ops against that held dirfd with the do_*_atfd() wrappers below.  The
+ * parent is a pinned fd, not re-resolved, so the per-entry symlink-race window
+ * is closed and the re-resolution overhead is gone.
+ *
+ * open_dir_secure() owns both the authority gate and the resolver choice: it
+ * returns a held dirfd only when hardened resolution is in effect, else -1
+ * with errno==0 so the caller falls back to the do_*_at() wrappers
+ * (behaviour-neutral).  The do_*_atfd() wrappers are thin shims with the same
+ * leaf semantics as do_*_at() (dry-run/read-only guards, AT_SYMLINK_NOFOLLOW,
+ * fake-super placeholder files); they never re-check the gate or re-resolve a
+ * parent. */
+
+int open_dir_secure(const char *dirname)
+{
+#ifdef AT_FDCWD
+	extern int am_daemon, am_chrooted;
+	int dfd;
+
+	/* Authority gate, identical to the do_*_at() wrappers.  When hardened
+	 * resolution isn't in effect, return -1 with errno cleared so the caller
+	 * uses the full-path wrappers. */
+	if (!am_daemon || am_chrooted) {
+		errno = 0;
+		return -1;
+	}
+
+	if (!dirname || !*dirname) {
+		/* The transfer root itself (file->dirname == NULL): the cwd. */
+		dfd = openat(AT_FDCWD, ".", O_RDONLY | O_DIRECTORY);
+	} else if (dirname[0] == '/') {
+		/* An absolute dirname is not expected for an in-transfer entry;
+		 * leave it to the legacy path. */
+		errno = 0;
+		return -1;
+	} else {
+		dfd = secure_relative_open(NULL, dirname, O_RDONLY | O_DIRECTORY, 0);
+	}
+
+	if (dfd >= 0) {
+		/* O_CLOEXEC on every tier (the per-component walk fallback
+		 * doesn't thread our flags onto the returned dirfd). */
+		int fl = fcntl(dfd, F_GETFD);
+		if (fl >= 0)
+			fcntl(dfd, F_SETFD, fl | FD_CLOEXEC);
+	}
+	return dfd;
+#else
+	(void)dirname;
+	errno = 0;
+	return -1;
+#endif
+}
+
+/* Cache of the current directory's held fd, keyed on the interned
+ * file->dirname pointer (flist.c reallocates lastdir only on a directory
+ * change, so distinct live dirs have distinct pointers).  Reopened on a
+ * pointer change; reset_dir_fd_cache() MUST be called at flist-chunk
+ * boundaries so a reused lastdir allocation can't alias a stale fd. */
+static const char *cur_dkey = (const char *)-1;
+static int cur_dfd = -1;
+
+int get_dir_fd(const char *dirname)
+{
+	if (dirname != cur_dkey) {
+		if (cur_dfd >= 0)
+			close(cur_dfd);
+		cur_dfd = open_dir_secure(dirname);
+		cur_dkey = dirname;
+	}
+	return cur_dfd;
+}
+
+void reset_dir_fd_cache(void)
+{
+	if (cur_dfd >= 0)
+		close(cur_dfd);
+	cur_dfd = -1;
+	cur_dkey = (const char *)-1;
+}
+
+int do_unlink_atfd(int dfd, const char *name, int flags)
+{
+#ifdef AT_FDCWD
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+	return unlinkat(dfd, name, flags);
+#else
+	(void)dfd; (void)name; (void)flags;
+	errno = ENOSYS;
+	return -1;
+#endif
+}
+
+int do_mkdir_atfd(int dfd, const char *name, mode_t mode)
+{
+#ifdef AT_FDCWD
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+	return mkdirat(dfd, name, mode);
+#else
+	(void)dfd; (void)name; (void)mode;
+	errno = ENOSYS;
+	return -1;
+#endif
+}
+
+#ifdef HAVE_CHMOD
+int do_chmod_atfd(int dfd, const char *name, mode_t mode)
+{
+#ifdef AT_FDCWD
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+	/* Mirrors do_chmod_at()'s leaf op (flag 0): the file being chmod'd is
+	 * one the receiver just created/transferred.  A symlink-as-object
+	 * (S_ISLNK(mode)) must be handled by the caller via the full-path
+	 * do_chmod() lchmod/setattrlist code, exactly as do_chmod_at() does. */
+	return fchmodat(dfd, name, mode, 0);
+#else
+	(void)dfd; (void)name; (void)mode;
+	errno = ENOSYS;
+	return -1;
+#endif
+}
+#endif
+
+int do_lchown_atfd(int dfd, const char *name, uid_t owner, gid_t group)
+{
+#ifdef AT_FDCWD
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+	return fchownat(dfd, name, owner, group, AT_SYMLINK_NOFOLLOW);
+#else
+	(void)dfd; (void)name; (void)owner; (void)group;
+	errno = ENOSYS;
+	return -1;
+#endif
+}
+
+#ifdef HAVE_UTIMENSAT
+int do_utimensat_atfd(int dfd, const char *name, STRUCT_STAT *stp)
+{
+#ifdef AT_FDCWD
+	struct timespec t[2];
+
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+
+	t[0].tv_sec = stp->st_atime;
+#ifdef ST_ATIME_NSEC
+	t[0].tv_nsec = stp->ST_ATIME_NSEC;
+#else
+	t[0].tv_nsec = 0;
+#endif
+	t[1].tv_sec = stp->st_mtime;
+#ifdef ST_MTIME_NSEC
+	t[1].tv_nsec = stp->ST_MTIME_NSEC;
+#else
+	t[1].tv_nsec = 0;
+#endif
+	return utimensat(dfd, name, t, AT_SYMLINK_NOFOLLOW);
+#else
+	(void)dfd; (void)name; (void)stp;
+	errno = ENOSYS;
+	return -1;
+#endif
+}
+#endif
+
+int do_open_atfd(int dfd, const char *name, int flags, mode_t mode)
+{
+#ifdef AT_FDCWD
+	if (flags != O_RDONLY) {
+		RETURN_ERROR_IF(dry_run, 0);
+		RETURN_ERROR_IF_RO_OR_LO;
+	}
+#ifdef O_NOATIME
+	if (open_noatime)
+		flags |= O_NOATIME;
+#endif
+	return openat(dfd, name, flags | O_NOFOLLOW | O_BINARY, mode);
+#else
+	(void)dfd; (void)name; (void)flags; (void)mode;
+	errno = ENOSYS;
+	return -1;
+#endif
+}
+
+int do_symlink_atfd(const char *lnk, int dfd, const char *name)
+{
+#ifdef AT_FDCWD
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+
+#if defined NO_SYMLINK_XATTRS || defined NO_SYMLINK_USER_XATTRS
+	/* --fake-super: store the link target in a regular placeholder file,
+	 * created with O_NOFOLLOW so a planted basename symlink can't redirect
+	 * the write (mirrors do_symlink_at()). */
+	if (am_root < 0) {
+		int len = strlen(lnk);
+		int ok;
+		int fd = openat(dfd, name, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW,
+				S_IWUSR | S_IRUSR);
+		if (fd < 0)
+			return -1;
+		ok = write(fd, lnk, len) == len;
+		if (close(fd) < 0)
+			ok = 0;
+		return ok ? 0 : -1;
+	}
+#endif
+	return symlinkat(lnk, dfd, name);
+#else
+	(void)lnk; (void)dfd; (void)name;
+	errno = ENOSYS;
+	return -1;
+#endif
+}
+
+/* S_ISSOCK is NOT supported here (no portable bindat()); the caller must
+ * route sockets to do_mknod()/do_mknod_at() with a full path. */
+int do_mknod_atfd(int dfd, const char *name, mode_t mode, dev_t dev)
+{
+#ifdef AT_FDCWD
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+
+#if !defined MKNOD_CREATES_SOCKETS && defined HAVE_SYS_UN_H
+	if (S_ISSOCK(mode)) {
+		errno = EOPNOTSUPP;	/* caller falls back to do_mknod_at() */
+		return -1;
+	}
+#endif
+
+	if (am_root < 0) {
+		/* --fake-super: regular empty placeholder file (O_NOFOLLOW). */
+		int fd = openat(dfd, name, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW,
+				S_IWUSR | S_IRUSR);
+		if (fd < 0)
+			return -1;
+		return (close(fd) < 0) ? -1 : 0;
+	}
+
+#if !defined MKNOD_CREATES_FIFOS && defined HAVE_MKFIFO
+	if (S_ISFIFO(mode))
+		return mkfifoat(dfd, name, mode);
+#endif
+#ifdef HAVE_MKNOD
+	return mknodat(dfd, name, mode, dev);
+#else
+	(void)dev;
+	errno = ENOSYS;
+	return -1;
+#endif
+#else
+	(void)dfd; (void)name; (void)mode; (void)dev;
+	errno = ENOSYS;
+	return -1;
+#endif
+}
+
+int do_rename_atfd(int old_dfd, const char *old_name, int new_dfd, const char *new_name)
+{
+#ifdef AT_FDCWD
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+	return renameat(old_dfd, old_name, new_dfd, new_name);
+#else
+	(void)old_dfd; (void)old_name; (void)new_dfd; (void)new_name;
+	errno = ENOSYS;
+	return -1;
+#endif
+}
+
+#if defined HAVE_LINK || defined HAVE_LINKAT
+int do_link_atfd(int old_dfd, const char *old_name, int new_dfd, const char *new_name, int flags)
+{
+#if defined AT_FDCWD && defined HAVE_LINKAT
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+	return linkat(old_dfd, old_name, new_dfd, new_name, flags);
+#else
+	(void)old_dfd; (void)old_name; (void)new_dfd; (void)new_name; (void)flags;
+	errno = ENOSYS;
+	return -1;
+#endif
+}
+#endif
+
+int do_lstat_atfd(int dfd, const char *name, STRUCT_STAT *st)
+{
+#ifdef AT_FDCWD
+# ifdef SUPPORT_LINKS
+	return fstatat(dfd, name, st, AT_SYMLINK_NOFOLLOW);
+# else
+	return fstatat(dfd, name, st, 0);
+# endif
+#else
+	(void)dfd; (void)name; (void)st;
+	errno = ENOSYS;
+	return -1;
+#endif
+}
+
+int do_stat_atfd(int dfd, const char *name, STRUCT_STAT *st)
+{
+#ifdef AT_FDCWD
+	return fstatat(dfd, name, st, 0);
+#else
+	(void)dfd; (void)name; (void)st;
+	errno = ENOSYS;
+	return -1;
+#endif
+}
