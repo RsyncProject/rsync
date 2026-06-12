@@ -342,6 +342,12 @@ void send_files(int f_in, int f_out)
 			file = cur_flist->files[ndx - cur_flist->ndx_start];
 		else
 			file = dir_flist->files[cur_flist->parent_ndx];
+		if (!F_IS_ACTIVE(file)) {
+			rprintf(FERROR,
+				"rsync: refusing transfer of cleared file index %d\n",
+				ndx);
+			exit_cleanup(RERR_PROTOCOL);
+		}
 		if (F_PATHNAME(file)) {
 			path = F_PATHNAME(file);
 			slash = "/";
