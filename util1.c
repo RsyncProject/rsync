@@ -284,6 +284,188 @@ int make_path(char *fname, int flags)
 	return ret;
 }
 
+/* Open an operator-supplied path, refusing to traverse any symlink (parent or
+ * leaf) not owned by uid 0 or our euid.  A trusted-owned symlink (e.g. root's
+ * /var/log -> /data/log) is still followed; an untrusted one fails ELOOP.
+ * Unlike plain O_NOFOLLOW this also defends a planted parent component
+ * (--log-file=$plant/log), not just a planted leaf.  Used for opens that may
+ * transit attacker-writable parents: --log-file, --password-file, --*-from,
+ * --read/write-batch, daemon motd/lock/early-input/--config.
+ *
+ * Walks component-by-component with fstatat(AT_SYMLINK_NOFOLLOW) +
+ * openat(O_NOFOLLOW), splicing a trusted symlink's target back into the path.
+ * Returns the fd, or -1 (errno ELOOP on the security refusal so callers can
+ * tell it apart).  Falls back to plain open() where openat/O_NOFOLLOW are
+ * unavailable. */
+int safe_open_no_attacker_symlinks(const char *path, int flags, mode_t mode)
+{
+#if defined AT_FDCWD && defined O_NOFOLLOW
+	if (!path || !*path) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	const uid_t trusted_uid = geteuid();
+	int dfd = AT_FDCWD;
+	int dfd_owns = 0;
+
+	/* Path-walk state. `remaining` is the unconsumed tail; we splice
+	 * symlink targets back into it as we go. Sized 2x MAXPATHLEN so a
+	 * one-level expansion can't immediately overflow; deeper chains
+	 * fail with ENAMETOOLONG below. */
+	char remaining[MAXPATHLEN * 2];
+	if (strlcpy(remaining, path, sizeof remaining) >= sizeof remaining) {
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+
+	/* Absolute path: pin "/" as the starting dfd. */
+	if (remaining[0] == '/') {
+		dfd = open("/", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+		if (dfd < 0)
+			return -1;
+		dfd_owns = 1;
+		char *p = remaining;
+		while (*p == '/') p++;
+		memmove(remaining, p, strlen(p) + 1);
+	}
+
+	int loops = 40;	/* SYMLOOP_MAX-ish; breaks symlink cycles. */
+	int retfd = -1;
+	int saved_errno = 0;
+
+	while (*remaining) {
+		if (--loops < 0) {
+			saved_errno = ELOOP;
+			goto out;
+		}
+
+		/* Peel one component off the front of `remaining`. */
+		char *slash = strchr(remaining, '/');
+		size_t comp_len = slash ? (size_t)(slash - remaining) : strlen(remaining);
+		char comp[MAXPATHLEN];
+		if (comp_len == 0 || comp_len >= sizeof comp) {
+			saved_errno = comp_len == 0 ? EINVAL : ENAMETOOLONG;
+			goto out;
+		}
+		memcpy(comp, remaining, comp_len);
+		comp[comp_len] = '\0';
+		int is_last = (slash == NULL);
+
+		/* Inspect this component without following symlinks. */
+		STRUCT_STAT lst;
+		if (fstatat(dfd, comp, &lst, AT_SYMLINK_NOFOLLOW) < 0) {
+			/* The leaf may not exist yet (O_CREAT case). Allow it
+			 * and openat with O_NOFOLLOW so a race-planted leaf
+			 * symlink at this instant is still refused. */
+			if (is_last && errno == ENOENT && (flags & O_CREAT)) {
+				retfd = openat(dfd, comp, flags | O_NOFOLLOW, mode);
+				saved_errno = errno;
+				goto out;
+			}
+			saved_errno = errno;
+			goto out;
+		}
+
+		if (S_ISLNK(lst.st_mode)) {
+			/* Symlink: untrusted owner is refused; trusted owner
+			 * is followed via readlinkat + splice. */
+			if (lst.st_uid != 0 && lst.st_uid != trusted_uid) {
+				saved_errno = ELOOP;
+				goto out;
+			}
+			char target[MAXPATHLEN];
+			ssize_t n = readlinkat(dfd, comp, target, sizeof target - 1);
+			if (n < 0) {
+				saved_errno = errno;
+				goto out;
+			}
+			target[n] = '\0';
+
+			/* Splice: new `remaining` = <target> + <tail-after-comp>.
+			 * Absolute target restarts the walk from "/". */
+			char tail[MAXPATHLEN];
+			tail[0] = '\0';
+			if (slash)
+				strlcpy(tail, slash, sizeof tail);
+
+			char rebuilt[MAXPATHLEN * 2];
+			if (snprintf(rebuilt, sizeof rebuilt, "%s%s",
+				     target, tail) >= (int)sizeof rebuilt) {
+				saved_errno = ENAMETOOLONG;
+				goto out;
+			}
+
+			if (target[0] == '/') {
+				if (dfd_owns) close(dfd);
+				dfd = open("/", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+				if (dfd < 0) {
+					saved_errno = errno;
+					dfd_owns = 0;
+					goto out;
+				}
+				dfd_owns = 1;
+				char *p = rebuilt;
+				while (*p == '/') p++;
+				strlcpy(remaining, p, sizeof remaining);
+			} else {
+				strlcpy(remaining, rebuilt, sizeof remaining);
+			}
+			continue;
+		}
+
+		/* Non-symlink. */
+		if (is_last) {
+			retfd = openat(dfd, comp, flags | O_NOFOLLOW, mode);
+			saved_errno = errno;
+			goto out;
+		}
+
+		if (!S_ISDIR(lst.st_mode)) {
+			saved_errno = ENOTDIR;
+			goto out;
+		}
+		int next = openat(dfd, comp, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+		if (next < 0) {
+			saved_errno = errno;
+			goto out;
+		}
+		if (dfd_owns) close(dfd);
+		dfd = next;
+		dfd_owns = 1;
+
+		/* Advance `remaining` past this component (and the slash). */
+		if (slash) {
+			char *p = slash;
+			while (*p == '/') p++;
+			memmove(remaining, p, strlen(p) + 1);
+		} else {
+			remaining[0] = '\0';
+		}
+	}
+
+	/* Path resolved entirely to a directory (no leaf component left).
+	 * If the caller wanted O_DIRECTORY we already hold the dirfd we
+	 * built up; otherwise it's an EISDIR. */
+	if (flags & O_DIRECTORY) {
+		retfd = dfd;
+		dfd_owns = 0;	/* caller now owns it */
+		saved_errno = 0;
+	} else {
+		saved_errno = EISDIR;
+	}
+
+out:
+	if (dfd_owns) close(dfd);
+	errno = saved_errno;
+	return retfd;
+#else
+	/* Pre-AT_FDCWD / no O_NOFOLLOW systems: best-effort fallback. */
+	return open(path, flags, mode);
+#endif
+}
+
+
 /**
  * Write @p len bytes at @p ptr to descriptor @p desc, retrying if
  * interrupted.
@@ -1175,8 +1357,27 @@ int change_dir(const char *dir, int set_path_only)
 			errno = ENAMETOOLONG;
 			return 0;
 		}
-		if (!set_path_only && chdir(dir))
-			return 0;
+		if (!set_path_only) {
+			/* With `use chroot = no` and an attacker-influenceable module
+			 * path (e.g. `path = /home/$user/share`), a planted symlink
+			 * could redirect the daemon's CWD out of the module before any
+			 * transfer begins.  For daemon receivers, refuse symlinks not
+			 * owned by uid 0 or our euid in the path walk. */
+			if (am_daemon && !am_chrooted) {
+				int dfd = safe_open_no_attacker_symlinks(dir, O_RDONLY | O_DIRECTORY, 0);
+				if (dfd < 0)
+					return 0;
+				if (fchdir(dfd) != 0) {
+					int e = errno;
+					close(dfd);
+					errno = e;
+					return 0;
+				}
+				close(dfd);
+			} else if (chdir(dir)) {
+				return 0;
+			}
+		}
 		skipped_chdir = set_path_only;
 		memcpy(curr_dir, dir, len + 1);
 	} else {
