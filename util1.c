@@ -180,6 +180,25 @@ int set_times(const char *fname, STRUCT_STAT *stp)
 	return 0;
 }
 
+/* Held-dirfd variant of set_times(): set `name`'s times relative to dir fd
+ * `dfd`.  Returns 0/-1 like set_times(), or -2 when this platform's active
+ * time-setting tier has no dfd-relative form (caller falls back to
+ * set_times(fname, stp)).  Only the utimensat tier has an at-on-dfd form. */
+int set_times_at(int dfd, const char *name, STRUCT_STAT *stp)
+{
+#if defined HAVE_UTIMENSAT && !defined HAVE_SETATTRLIST
+	int r = do_utimensat_atfd(dfd, name, stp);
+	if (r == 0)
+		return 0;
+	if (errno == ENOSYS)
+		return -2;
+	return -1;
+#else
+	(void)dfd; (void)name; (void)stp;
+	return -2;
+#endif
+}
+
 /* Create any necessary directories in fname.  Any missing directories are
  * created with default permissions.  Returns < 0 on error, or the number
  * of directories created. */
@@ -214,7 +233,7 @@ int make_path(char *fname, int flags)
 				else
 					errno = ENOTDIR;
 			}
-		} else if (do_mkdir(fname, ACCESSPERMS) == 0) {
+		} else if (do_mkdir_at(fname, ACCESSPERMS) == 0) {
 			ret++;
 			break;
 		}
@@ -253,7 +272,7 @@ int make_path(char *fname, int flags)
 		p += strlen(p);
 		if (ret < 0) /* Skip mkdir on error, but keep restoring the path. */
 			continue;
-		if (do_mkdir(fname, ACCESSPERMS) < 0)
+		if (do_mkdir_at(fname, ACCESSPERMS) < 0)
 			ret = -ret - 1;
 		else
 			ret++;
