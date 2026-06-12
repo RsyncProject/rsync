@@ -300,6 +300,11 @@ int make_path(char *fname, int flags)
 int safe_open_no_attacker_symlinks(const char *path, int flags, mode_t mode)
 {
 #if defined AT_FDCWD && defined O_NOFOLLOW
+	/* O_CLOEXEC predates some still-supported targets; mirror rand_bytes()'s
+	 * fallback in syscall.c so a build without it still compiles. */
+#ifndef O_CLOEXEC
+#define O_CLOEXEC 0
+#endif
 	if (!path || !*path) {
 		errno = EINVAL;
 		return -1;

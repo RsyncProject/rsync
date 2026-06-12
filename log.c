@@ -153,7 +153,15 @@ static void syslog_init()
 static void logfile_open(void)
 {
 	mode_t old_umask = umask(022 | orig_umask);
-	logfile_fp = fopen(logfile_name, "a");
+	/* --log-file/`log file =` are operator-supplied paths that may transit
+	 * attacker-writable dirs; a planted symlink could redirect root's log
+	 * into e.g. /root/.ssh/authorized_keys.  Refuse symlinks not owned by
+	 * uid 0 or our euid. */
+	int fd = safe_open_no_attacker_symlinks(logfile_name,
+						O_WRONLY | O_APPEND | O_CREAT, 0644);
+	logfile_fp = fd >= 0 ? fdopen(fd, "a") : NULL;
+	if (!logfile_fp && fd >= 0)
+		close(fd);
 	umask(old_umask);
 	if (!logfile_fp) {
 		int fopen_errno = errno;
