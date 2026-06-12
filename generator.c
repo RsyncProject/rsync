@@ -1216,6 +1216,46 @@ static BOOL is_below(struct file_struct *file, struct file_struct *subtree)
  *
  * Note that f_out is set to -1 when doing final directory-permission and
  * modification-time repair. */
+
+/* Held-dirfd helpers for the per-entry ops below: when the secure resolver is
+ * active they act on the entry's basename relative to its cached directory fd
+ * (held_dfd_for, keyed on file->dirname), else fall back to the full-path
+ * do_*_at wrappers (behaviour-identical).  held_dfd_for() declines when fname
+ * isn't in file->dirname (e.g. the single-file local_name dest), and the leaf
+ * is derived from fname, not file->basename. */
+static int gen_entry_stat(const char *fname, struct file_struct *file,
+			  STRUCT_STAT *stp, int follow_dirlinks)
+{
+	int dfd;
+	/* link_stat_at folds in no fake-super xattr, so only use it when
+	 * am_root >= 0 (where link_stat's get_stat_xattr is a no-op anyway). */
+	if (am_root >= 0 && (dfd = held_dfd_for(fname, file)) >= 0) {
+		const char *slash = strrchr(fname, '/');
+		return link_stat_at(dfd, slash ? slash + 1 : fname, stp, follow_dirlinks);
+	}
+	return link_stat(fname, stp, follow_dirlinks);
+}
+
+static int gen_entry_mkdir(char *fname, struct file_struct *file, mode_t mode)
+{
+	int dfd = held_dfd_for(fname, file);
+	if (dfd >= 0) {
+		const char *slash = strrchr(fname, '/');
+		return do_mkdir_atfd(dfd, slash ? slash + 1 : fname, mode);
+	}
+	return do_mkdir_at(fname, mode);
+}
+
+static int gen_entry_chmod(const char *fname, struct file_struct *file, mode_t mode)
+{
+	int dfd = held_dfd_for(fname, file);
+	if (dfd >= 0) {
+		const char *slash = strrchr(fname, '/');
+		return do_chmod_atfd(dfd, slash ? slash + 1 : fname, mode);
+	}
+	return do_chmod_at(fname, mode);
+}
+
 static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			   int itemizing, enum logcode code, int f_out)
 {
@@ -1353,7 +1393,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		}
 		parent_dirname = dn;
 
-		statret = link_stat(fname, &sx.st, keep_dirlinks && is_dir);
+		statret = gen_entry_stat(fname, file, &sx.st, keep_dirlinks && is_dir);
 		stat_errno = errno;
 	}
 
@@ -1439,7 +1479,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			 && (stype == FT_DIR
 			  || delete_item(fname, sx.st.st_mode, del_opts | DEL_FOR_DIR) != 0))
 				goto cleanup; /* Any errors get reported later. */
-			if (do_mkdir_at(fname, (file->mode|added_perms) & 0700) == 0)
+			if (gen_entry_mkdir(fname, file, (file->mode|added_perms) & 0700) == 0)
 				file->flags |= FLAG_DIR_CREATED;
 			goto cleanup;
 		}
@@ -1481,10 +1521,13 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			itemize(fnamecmp, file, ndx, statret, &sx,
 				statret ? ITEM_LOCAL_CHANGE : 0, 0, NULL);
 		}
-		if (real_ret != 0 && do_mkdir_at(fname,file->mode|added_perms) < 0 && errno != EEXIST) {
+		if (real_ret != 0 && gen_entry_mkdir(fname, file, file->mode|added_perms) < 0 && errno != EEXIST) {
+			/* The parent may have just been created by make_path(), so
+			 * drop any cached (failed) dir fd before the retry. */
+			reset_dir_fd_cache();
 			if (!relative_paths || errno != ENOENT
 			 || make_path(fname, MKP_DROP_NAME | MKP_SKIP_SLASH) < 0
-			 || (do_mkdir_at(fname, file->mode|added_perms) < 0 && errno != EEXIST)) {
+			 || (gen_entry_mkdir(fname, file, file->mode|added_perms) < 0 && errno != EEXIST)) {
 				rsyserr(FERROR_XFER, errno,
 					"recv_generator: mkdir %s failed",
 					full_fname(fname));
@@ -1511,7 +1554,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 #ifdef HAVE_CHMOD
 		if (!am_root && (file->mode & S_IRWXU) != S_IRWXU && dir_tweaking) {
 			mode_t mode = file->mode | S_IRWXU;
-			if (do_chmod_at(fname, mode) < 0) {
+			if (gen_entry_chmod(fname, file, mode) < 0) {
 				rsyserr(FERROR_XFER, errno,
 					"failed to modify permissions on %s",
 					full_fname(fname));
