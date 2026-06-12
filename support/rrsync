@@ -186,6 +186,7 @@ def main():
     if args.dir != '/':
         global short_disabled
         short_disabled += short_disabled_subdir
+        long_opts['copy-unsafe-links'] = -1
 
     short_no_arg_re = short_no_arg
     short_with_num_re = short_with_num
@@ -340,13 +341,20 @@ def validated_arg(opt, arg, typ=3, wild=False):
 
 
 def lock_or_die(dirname):
-    import fcntl
+    import fcntl, errno
     global lock_handle
     lock_handle = os.open(dirname, os.O_RDONLY)
     try:
         fcntl.flock(lock_handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except:
-        die('Another instance of rrsync is already accessing this directory.')
+    except OSError as e:
+        if e.errno in (errno.EWOULDBLOCK, errno.EAGAIN, errno.EACCES):
+            die('Another instance of rrsync is already accessing this directory.')
+        # flock() is unavailable on this fd/platform -- e.g. Solaris returns
+        # EBADF for flock() on a directory fd. The single-run lock is a
+        # best-effort convenience (cf. -no-lock), not a security control, so
+        # proceed without it rather than abort every transfer.
+        os.close(lock_handle)
+        lock_handle = None
 
 
 def die(*msg):
