@@ -340,7 +340,11 @@ int get_xattr(const char *fname, stat_x *sxp)
 	return 0;
 }
 
-int copy_xattrs(const char *source, const char *dest)
+/* Copy xattrs from source to dest.  When dest_fd >= 0 it is a held,
+ * O_NOFOLLOW-opened fd for dest and the set goes through fsetxattr so a
+ * parent-symlink race can't redirect it; dest_fd < 0 keeps the path-based
+ * lsetxattr behaviour (non-hardened receivers, or no held fd available). */
+int copy_xattrs(const char *source, const char *dest, int dest_fd)
 {
 	ssize_t list_len, name_len;
 	size_t datum_len;
@@ -370,11 +374,12 @@ int copy_xattrs(const char *source, const char *dest)
 		datum_len = 0;
 		if (!(ptr = get_xattr_data(source, name, &datum_len, 0)))
 			return -1;
-		if (sys_lsetxattr(dest, name, ptr, datum_len) < 0) {
+		if ((dest_fd >= 0 ? sys_fsetxattr(dest_fd, name, ptr, datum_len)
+				  : sys_lsetxattr(dest, name, ptr, datum_len)) < 0) {
 			int save_errno = errno ? errno : EINVAL;
 			rsyserr(FERROR_XFER, errno,
-				"copy_xattrs: lsetxattr(%s,\"%s\") failed",
-				full_fname(dest), name);
+				"copy_xattrs: %ssetxattr(%s,\"%s\") failed",
+				dest_fd >= 0 ? "f" : "l", full_fname(dest), name);
 			errno = save_errno;
 			return -1;
 		}

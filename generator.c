@@ -1290,6 +1290,37 @@ static int gen_entry_chmod(const char *fname, struct file_struct *file, mode_t m
 	return do_chmod_at(fname, mode);
 }
 
+#ifdef SUPPORT_XATTRS
+/* Copy xattrs from src onto fname through a held, O_NOFOLLOW-opened fd so a
+ * parent-symlink race can't redirect the setxattr; falls back to path-based
+ * when no held dir fd is available (matches set_file_attrs' held-fd open). */
+static int gen_entry_copy_xattrs(const char *src, const char *fname, struct file_struct *file)
+{
+	int dfd = held_dfd_for(fname, file);
+	int xfd = -1, ret;
+	if (dfd >= 0) {
+		const char *slash = strrchr(fname, '/');
+		xfd = openat(dfd, slash ? slash + 1 : fname,
+			     O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_NOCTTY | O_CLOEXEC);
+		if (xfd < 0) {
+			/* We hold a confined parent dirfd but couldn't pin the
+			 * leaf (e.g. it was raced to a symlink) -- refuse rather
+			 * than fall back to a path-based set that would follow the
+			 * parent components.  Only a missing held dirfd (dfd < 0,
+			 * non-hardened receiver) uses the path-based fallback. */
+			rsyserr(FERROR_XFER, errno,
+				"gen_entry_copy_xattrs: openat(%s) failed",
+				full_fname(fname));
+			return -1;
+		}
+	}
+	ret = copy_xattrs(src, fname, xfd);
+	if (xfd >= 0)
+		close(xfd);
+	return ret;
+}
+#endif
+
 static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			   int itemizing, enum logcode code, int f_out)
 {
@@ -1575,7 +1606,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 #ifdef SUPPORT_XATTRS
 		if (preserve_xattrs && statret == 1)
-			copy_xattrs(fnamecmpbuf, fname);
+			gen_entry_copy_xattrs(fnamecmpbuf, fname, file);
 #endif
 		if (set_file_attrs(fname, file, real_ret ? NULL : &real_sx, NULL, 0)
 		 && INFO_GTE(NAME, 1) && code != FNONE && f_out != -1)
@@ -2054,14 +2085,19 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		close(fd);
 	if (back_file) {
 		int save_preserve_xattrs = preserve_xattrs;
-		if (f_copy >= 0)
-			close(f_copy);
 #ifdef SUPPORT_XATTRS
-		if (preserve_xattrs) {
-			copy_xattrs(fname, backupptr);
+		/* The delta-backup path wrote backupptr via the held f_copy, so
+		 * copy its xattrs through that fd here.  The whole-file/inplace
+		 * path (f_copy < 0) backed it up via copy_file(), which already
+		 * copied the xattrs through its own held fd -- don't repeat it
+		 * with a path-based set a parent-symlink race could redirect. */
+		if (preserve_xattrs && f_copy >= 0) {
+			copy_xattrs(fname, backupptr, f_copy);
 			preserve_xattrs = 0;
 		}
 #endif
+		if (f_copy >= 0)
+			close(f_copy);
 		set_file_attrs(backupptr, back_file, NULL, NULL, 0);
 		preserve_xattrs = save_preserve_xattrs;
 		if (INFO_GTE(BACKUP, 1)) {
