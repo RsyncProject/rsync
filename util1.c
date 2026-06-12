@@ -668,17 +668,19 @@ int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
 		return -1;
 	}
 
+#ifdef SUPPORT_XATTRS
+	/* Set xattrs through ofd while it's still held so a parent-symlink race
+	 * can't redirect them onto a file outside the tree. */
+	if (preserve_xattrs)
+		copy_xattrs(source, dest, ofd);
+#endif
+
 	if (close(ofd) < 0) {
 		int save_errno = errno;
 		rsyserr(FERROR_XFER, errno, "close failed on %s", full_fname(dest));
 		errno = save_errno;
 		return -1;
 	}
-
-#ifdef SUPPORT_XATTRS
-	if (preserve_xattrs)
-		copy_xattrs(source, dest);
-#endif
 
 	return 0;
 }
