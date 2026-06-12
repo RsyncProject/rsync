@@ -1224,14 +1224,20 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	return 0;
 }
 
+static BOOL namecvt_safe_token(const char *s);
+
 BOOL namecvt_call(const char *cmd, const char **name_p, id_t *id_p)
 {
 	char buf[1024];
 	int got, len;
 
-	if (*name_p)
+	if (*name_p) {
+		if (!namecvt_safe_token(*name_p)) {
+			rprintf(FERROR, "invalid name-converter token: %s\n", *name_p);
+			return False;
+		}
 		len = snprintf(buf, sizeof buf, "%s %s\n", cmd, *name_p);
-	else
+	} else
 		len = snprintf(buf, sizeof buf, "%s %ld\n", cmd, (long)*id_p);
 	if (len >= (int)sizeof buf) {
 		rprintf(FERROR, "namecvt_call() request was too large.\n");
@@ -1248,11 +1254,40 @@ BOOL namecvt_call(const char *cmd, const char **name_p, id_t *id_p)
 	if (!read_line_old(namecvt_fd_ans, buf, sizeof buf, 0))
 		return False;
 
-	if (*name_p)
-		*id_p = (id_t)atol(buf);
-	else
+	if (*name_p) {
+		/* Name-to-id branch.  An unknown name returns an empty line
+		 * (support/nameconvert), and atol("") = 0 would silently map every
+		 * daemon-unknown name to root.  strtoul() alone isn't strict enough
+		 * (accepts a leading '-' or whitespace, won't catch id_t overflow),
+		 * so check explicitly: every byte 0-9, no ERANGE, and the value fits
+		 * id_t (unsigned int, narrower than unsigned long on LP64).  On
+		 * failure recv_add_id() falls back to the sender's numeric id. */
+		const char *p;
+		unsigned long v;
+		if (!*buf)
+			return False;
+		for (p = buf; *p; p++) {
+			if (*p < '0' || *p > '9')
+				return False;
+		}
+		errno = 0;
+		v = strtoul(buf, NULL, 10);
+		if (errno == ERANGE || v > (unsigned long)(id_t)-1)
+			return False;
+		*id_p = (id_t)v;
+	} else
 		*name_p = strdup(buf);
 
+	return True;
+}
+
+static BOOL namecvt_safe_token(const char *s)
+{
+	for (; *s; s++) {
+		unsigned char ch = (unsigned char)*s;
+		if (ch < ' ' || ch == 0x7f)
+			return False;
+	}
 	return True;
 }
 
