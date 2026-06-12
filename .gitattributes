@@ -6,3 +6,12 @@
 # packaging/release.py step_7_tarball does not bloat with HTML the
 # tarball doesn't need.
 /rsync-web/ export-ignore
+*.patch
+text
+eol=lf
+CMakeLists.txt
+text
+eol=lf
+*.cmake
+text
+eol=lf
