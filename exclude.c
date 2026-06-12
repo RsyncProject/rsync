@@ -1033,6 +1033,41 @@ int check_server_filter(filter_rule_list *listp, enum logcode code, const char *
 	return ret;
 }
 
+/* Returns 1 if `name` matches an implied-parent rule (a directory component
+ * seeded by add_implied_include() with FILTRULE_DIRECTORY) but not a leaf
+ * rule -- i.e. the client asked for something under the dir, never the dir
+ * itself as content.
+ *
+ * The receiver uses this to refuse a malicious sender that sets XMIT_TOP_DIR
+ * without XMIT_NO_CONTENT_DIR on such a dir: the honest encoding is both flags
+ * (flist.c send path), so otherwise the receiver would set FLAG_CONTENT_DIR
+ * and delete_in_dir() could sweep pre-existing siblings under --delete. */
+int is_implied_parent_dir(const char *name)
+{
+	filter_rule *ent;
+	int parent_match = 0;
+
+	if (!implied_filter_list.head)
+		return 0;
+
+	for (ent = implied_filter_list.head; ent; ent = ent->next) {
+		if (ent->rflags & (FILTRULE_PERDIR_MERGE | FILTRULE_CVS_IGNORE))
+			continue;
+		if (!rule_matches(name, ent, NAME_IS_DIR))
+			continue;
+		if (!(ent->rflags & FILTRULE_INCLUDE))
+			continue;
+		if (ent->rflags & FILTRULE_DIRECTORY) {
+			parent_match = 1;
+			continue;
+		}
+		/* A non-DIRECTORY include rule = a leaf the client asked for, so
+		 * the dir is legitimately in the list, not parent-only. */
+		return 0;
+	}
+	return parent_match;
+}
+
 /* Return -1 if file "name" is defined to be excluded by the specified
  * exclude list, 1 if it is included, and 0 if it was not matched. */
 int check_filter(filter_rule_list *listp, enum logcode code,
@@ -1456,12 +1491,28 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 
 	if (*fname != '-' || fname[1] || am_server) {
 		if (daemon_filter_list.head) {
+			char *dir;
 			strlcpy(line, fname, sizeof line);
-			clean_fname(line, CFN_COLLAPSE_DOT_DOT_DIRS);
-			if (check_filter(&daemon_filter_list, FLOG, line, 0) < 0)
-				fp = NULL;
-			else
-				fp = fopen(line, "rb");
+			/* parse_merge_name() prepends module_dir for absolute paths,
+			 * so strip module_dirlen back off before the check or the
+			 * anchored module-relative daemon rule won't match (as
+			 * options.c does for --exclude-from/--include-from).  The
+			 * original absolute path is still used for the open below. */
+			dir = line + (*line == '/' ? module_dirlen : 0);
+			clean_fname(dir, CFN_COLLAPSE_DOT_DOT_DIRS);
+			if (check_filter(&daemon_filter_list, FLOG, dir, 0) < 0) {
+				/* Hidden by the daemon filter: treat the merge file as
+				 * non-existent rather than tripping XFLG_FATAL_ERRORS,
+				 * so it neither errors out nor leaks a fatal-vs-silent
+				 * oracle. */
+				if (DEBUG_GTE(FILTER, 2)) {
+					rprintf(FINFO,
+						"[%s] parse_filter_file(%s) hidden by daemon filter\n",
+						who_am_i(), fname);
+				}
+				return;
+			}
+			fp = fopen(line, "rb");
 		} else
 			fp = fopen(fname, "rb");
 	} else

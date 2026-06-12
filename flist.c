@@ -1110,6 +1110,26 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 		if (basename_len == 1+1 && *basename == '.') /* +1 for '\0' */
 			F_DEPTH(file)--;
 		if (protocol_version >= 30) {
+			/* Stop a malicious sender expanding --delete scope by flagging
+			 * an implied parent as a content dir: if we only allowed this
+			 * entry as a parent of the requested leaf, force the flags back
+			 * to the honest implied-parent encoding (XMIT_TOP_DIR |
+			 * XMIT_NO_CONTENT_DIR) so it lands in FLAG_IMPLIED_DIR, not
+			 * FLAG_CONTENT_DIR, and delete_in_dir() can't sweep siblings.
+			 * Not gated on trust_sender_filter: implied_filter_list is
+			 * receiver-owned state, so a per-dir filter must not be able to
+			 * downgrade this defense. */
+			if (implied_filter_list.head
+			 && is_implied_parent_dir(thisname)
+			 && (!(xflags & XMIT_NO_CONTENT_DIR) || !(xflags & XMIT_TOP_DIR))) {
+				if (DEBUG_GTE(FILTER, 1)) {
+					rprintf(FINFO,
+						"[%s] receiver downgraded implied-parent dir %s "
+						"to non-content (sender xflags=0x%x)\n",
+						who_am_i(), thisname, xflags);
+				}
+				xflags |= XMIT_NO_CONTENT_DIR | XMIT_TOP_DIR;
+			}
 			if (!(xflags & XMIT_NO_CONTENT_DIR)) {
 				if (xflags & XMIT_TOP_DIR)
 					file->flags |= FLAG_TOP_DIR;
