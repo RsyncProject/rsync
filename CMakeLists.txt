@@ -15,6 +15,7 @@ endif()
 cmake_minimum_required(VERSION 3.24)
 cmake_policy(SET CMP0135 NEW)
 project(rsync C CXX)
+add_compile_definitions(_out_of_memory=rsync_out_of_memory src_file=rsync_src_file)
 
 # Find dependencies
 find_package(ZLIB QUIET)
