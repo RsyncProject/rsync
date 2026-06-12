@@ -704,6 +704,17 @@ int recv_files(int f_in, int f_out, char *local_name)
 			exit_cleanup(RERR_PROTOCOL);
 		else
 			file = dir_flist->files[cur_flist->parent_ndx];
+		if (!F_IS_ACTIVE(file)) {
+			/* A peer that sends duplicate file-list entries gets
+			 * one of them clear_file()'d by flist_sort_and_clean();
+			 * referencing that slot here yields fname == NULL and
+			 * a crash in the first deref (daemon filter check,
+			 * set_file_attrs → full_fname, …). */
+			rprintf(FERROR,
+				"rsync: refusing transfer of cleared file index %d\n",
+				ndx);
+			exit_cleanup(RERR_PROTOCOL);
+		}
 		fname = local_name ? local_name : f_name(file, fbuf);
 
 		if (DEBUG_GTE(RECV, 1))
