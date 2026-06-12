@@ -110,8 +110,23 @@ static const char *check_secret(int module, const char *user, const char *group,
 	char *err;
 	FILE *fh;
 
-	if (!fname || !*fname || (fh = fopen(fname, "r")) == NULL)
+	/* Daemon 'secrets file = PATH' open.  A planted symlink would be
+	 * followed and the strict-modes fstat() check below runs on the target
+	 * inode, so a symlink to /etc/shadow (0640 root:shadow) would pass and
+	 * the daemon would auth against shadow hashes.  Refuse symlinks not
+	 * owned by uid 0 or our euid. */
+	if (!fname || !*fname)
 		return "no secrets file";
+	{
+		int fd = safe_open_no_attacker_symlinks(fname, O_RDONLY, 0);
+		if (fd < 0)
+			return "no secrets file";
+		fh = fdopen(fd, "r");
+		if (!fh) {
+			close(fd);
+			return "no secrets file";
+		}
+	}
 
 	if (do_fstat(fileno(fh), &st) == -1) {
 		rsyserr(FLOG, errno, "fstat(%s)", fname);
@@ -184,13 +199,23 @@ static const char *getpassf(const char *filename)
 	} else {
 		int fd;
 
-		if ((fd = open(filename,O_RDONLY)) < 0) {
+		/* --password-file=PATH client open.  Its first line is sent as the
+		 * auth response, so a planted symlink leaks the target's content
+		 * (e.g. shadow hashes) to a malicious daemon; the do_stat()
+		 * other-access check runs on the target mode and passes 0640
+		 * root:shadow.  Refuse symlinks not owned by uid 0 or our euid. */
+		if ((fd = safe_open_no_attacker_symlinks(filename, O_RDONLY, 0)) < 0) {
 			rsyserr(FERROR, errno, "could not open password file %s", filename);
 			exit_cleanup(RERR_SYNTAX);
 		}
 
-		if (do_stat(filename, &st) == -1) {
-			rsyserr(FERROR, errno, "stat(%s)", filename);
+		/* fstat the opened fd, not the pathname: a same-object check
+		 * (matching check_secret() above) so an attacker who swaps the
+		 * path between open and check can't make the owner/mode test
+		 * validate a different inode than the one we read the password
+		 * from. */
+		if (do_fstat(fd, &st) == -1) {
+			rsyserr(FERROR, errno, "fstat(%s)", filename);
 			exit_cleanup(RERR_SYNTAX);
 		}
 		if ((st.st_mode & 06) != 0) {
