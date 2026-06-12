@@ -2809,6 +2809,17 @@ struct file_list *recv_file_list(int f, int dir_ndx)
 			exit_cleanup(RERR_PROTOCOL);
 		}
 		struct file_struct *file = dir_flist->files[dir_ndx];
+		if (!F_IS_ACTIVE(file)) {
+			/* flist_sort_and_clean() can clear_file() a directory
+			 * entry that was a duplicate or otherwise pruned, but
+			 * the cleared file_struct stays in dir_flist.  A peer
+			 * that then sends a sub-flist for that slot would make
+			 * f_name() return NULL into the dirname strcmp() below. */
+			rprintf(FERROR_XFER,
+				"rsync: refusing flist for cleared dir_ndx %d\n",
+				dir_ndx);
+			exit_cleanup(RERR_PROTOCOL);
+		}
 		if (file->flags & FLAG_GOT_DIR_FLIST) {
 			rprintf(FERROR_XFER, "rsync: refusing malicious duplicate flist for dir %d\n", dir_ndx);
 			exit_cleanup(RERR_PROTOCOL);
@@ -2870,7 +2881,7 @@ struct file_list *recv_file_list(int f, int dir_ndx)
 				cur_dir++;
 			if (cur_dir != good_dirname) {
 				const char *d = dir_ndx >= 0 ? f_name(dir_flist->files[dir_ndx], NULL) : empty_dir;
-				if (strcmp(cur_dir, d) != 0) {
+				if (!d || strcmp(cur_dir, d) != 0) {
 					rprintf(FERROR,
 						"ABORTING due to invalid path from sender: %s/%s\n",
 						cur_dir, file->basename);
