@@ -456,6 +456,15 @@ void send_files(int f_in, int f_out)
 				fd = sender_open_copylinks_confined(module_dir, relp);
 			else
 				fd = secure_relative_open(module_dir, relp, O_RDONLY | O_NOFOLLOW, 0);
+		} else if (fname[0] != '/' && !copy_links && !copy_unsafe_links && !copy_dirlinks) {
+			/* Default symlink handling (no -L/--copy-unsafe-links/-k follow):
+			 * the scan recorded this as a regular file under a real-directory
+			 * parent.  Open it confined beneath the transfer root that
+			 * change_pathname() chdir'd into, so a parent raced into a symlink
+			 * after the scan isn't followed out of the tree, and O_NOFOLLOW
+			 * refuses a raced leaf symlink.  A symlink-following mode keeps the
+			 * legacy open below. */
+			fd = secure_relative_open(NULL, fname, O_RDONLY | O_NOFOLLOW, 0);
 		} else {
 			fd = do_open_checklinks(fname);
 		}
