@@ -1840,11 +1840,20 @@ static int path_has_dotdot_component(const char *path)
 /* Symlink-race-safe path resolver: a held-dirfd-stack walk (replaces the
  * 3.4.x openat2/RESOLVE_BENEATH resolver) -- follows in-tree symlinks while
  * confining beneath the anchor. */
+extern char *module_dir;
+extern int module_dirfd;	/* daemon: served module root pinned by identity, or -1 */
+
 #if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
-/* Open a trusted absolute anchor directory as an owned dirfd.  (The daemon
- * module_dirfd privilege-drop optimization is added with that backport.) */
+/* Open a trusted absolute anchor directory as an owned dirfd.  When the anchor is
+ * the served module root and the daemon pinned it by identity (module_dirfd), dup
+ * that fd rather than re-resolving the absolute path with openat(AT_FDCWD, ...) --
+ * which re-traverses the module's ancestors as the dropped-privilege module uid
+ * and EACCESes when the module sits under a non-traversable parent (a 0700 home).
+ * Functionally identical (same inode), just privilege-drop-safe. */
 static int open_anchor_dirfd(const char *path)
 {
+	if (module_dirfd >= 0 && am_daemon && module_dir && strcmp(path, module_dir) == 0)
+		return dup(module_dirfd);
 	return openat(AT_FDCWD, path, O_RDONLY | O_DIRECTORY);
 }
 #endif
