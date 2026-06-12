@@ -53,6 +53,7 @@ extern int open_noatime;
 extern int copy_links;
 extern int copy_unsafe_links;
 
+
 #ifndef S_BLKSIZE
 # if defined hpux || defined __hpux__ || defined __hpux
 #  define S_BLKSIZE 1024
@@ -176,16 +177,22 @@ int do_symlink(const char *lnk, const char *path)
 
 /*
   Symlink-race-safe variant of do_symlink() for receiver-side use. See
-  the comment on do_chmod_at() for the threat model. Only the parent
-  directory of `path` needs protection -- symlinkat() does not resolve
-  the final component (it creates it). Defence: open parent of `path`
-  under secure_relative_open() and call symlinkat() against that
-  dirfd. The link target string `lnk` is stored verbatim and not
-  resolved at creation time, so it doesn't need scrutiny here.
+  the comment on do_chmod_at() for the threat model. For a real symlink
+  only the parent directory of `path` needs protection -- symlinkat()
+  does not resolve the final component (it creates it). Defence: open
+  the parent of `path` under secure_relative_open() and call symlinkat()
+  against that dirfd; a top-level (no-slash) path has no parent to
+  confine, so it uses AT_FDCWD directly. The link target string `lnk` is
+  stored verbatim and not resolved at creation time, so it doesn't need
+  scrutiny here.
 
-  Falls through to do_symlink() for the --fake-super (am_root < 0)
-  path -- that code path opens `path` with do_open() which has its
-  own (separate) symlink-race exposure tracked elsewhere.
+  For --fake-super (am_root < 0) the "symlink" is written as a regular
+  file, so the final component IS resolved at creation: we create it
+  with openat(... O_NOFOLLOW) so a pre-planted symlink at the basename
+  cannot redirect the write outside the module. This protection applies
+  to top-level paths too -- the previous code fell through to the
+  bare-path do_symlink() there, whose plain open() followed such a
+  symlink.
 */
 int do_symlink_at(const char *lnk, const char *path)
 {
@@ -194,7 +201,8 @@ int do_symlink_at(const char *lnk, const char *path)
 	char dirpath[MAXPATHLEN];
 	const char *bname;
 	const char *slash;
-	int dfd, ret, e;
+	int dfd = AT_FDCWD, ret, e;
+	BOOL owns = False;
 	size_t dlen;
 
 	if (dry_run) return 0;
@@ -206,30 +214,33 @@ int do_symlink_at(const char *lnk, const char *path)
 	if (!path || !*path || *path == '/')
 		return do_symlink(lnk, path);
 
+	/* A path with a slash needs secure_relative_open to confine its parent;
+	 * a top-level path is in CWD (AT_FDCWD), no parent to subvert.  The leaf
+	 * is protected below either way (symlinkat() won't follow it; the
+	 * fake-super openat() uses O_NOFOLLOW). */
 	slash = strrchr(path, '/');
-	if (!slash)
-		return do_symlink(lnk, path);
-
-	dlen = slash - path;
-	if (dlen >= sizeof dirpath) {
-		errno = ENAMETOOLONG;
-		return -1;
+	if (slash) {
+		dlen = slash - path;
+		if (dlen >= sizeof dirpath) {
+			errno = ENAMETOOLONG;
+			return -1;
+		}
+		memcpy(dirpath, path, dlen);
+		dirpath[dlen] = '\0';
+		bname = slash + 1;
+		dfd = secure_relative_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
+		if (dfd < 0)
+			return -1;
+		owns = True;
+	} else {
+		bname = path;
 	}
-	memcpy(dirpath, path, dlen);
-	dirpath[dlen] = '\0';
-	bname = slash + 1;
-
-	dfd = secure_relative_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
-	if (dfd < 0)
-		return -1;
 
 #if defined NO_SYMLINK_XATTRS || defined NO_SYMLINK_USER_XATTRS
 	/* For --fake-super, do_symlink writes the link target into a
-	 * regular file rather than creating a real symlink. Do that
-	 * here against the secure dirfd, with O_NOFOLLOW so a pre-
-	 * planted symlink at the basename can't redirect the file
-	 * creation. (Previously the fake-super branch fell through to
-	 * the bare-path do_symlink at the top of the function.) */
+	 * regular file rather than creating a real symlink. Do that here
+	 * against the (secure or AT_FDCWD) dirfd, with O_NOFOLLOW so a pre-
+	 * planted symlink at the basename can't redirect the file creation. */
 	if (am_root < 0) {
 		int len = strlen(lnk);
 		int fd = openat(dfd, bname,
@@ -237,7 +248,7 @@ int do_symlink_at(const char *lnk, const char *path)
 				S_IWUSR | S_IRUSR);
 		if (fd < 0) {
 			e = errno;
-			close(dfd);
+			if (owns) close(dfd);
 			errno = e;
 			return -1;
 		}
@@ -245,7 +256,7 @@ int do_symlink_at(const char *lnk, const char *path)
 		if (close(fd) < 0)
 			ret = -1;
 		e = errno;
-		close(dfd);
+		if (owns) close(dfd);
 		errno = e;
 		return ret;
 	}
@@ -253,7 +264,7 @@ int do_symlink_at(const char *lnk, const char *path)
 
 	ret = symlinkat(lnk, dfd, bname);
 	e = errno;
-	close(dfd);
+	if (owns) close(dfd);
 	errno = e;
 	return ret;
 #else
@@ -526,12 +537,19 @@ int do_mknod(const char *pathname, mode_t mode, dev_t dev)
   mknodat() against that dirfd. mknodat() covers both regular-file
   (S_IFREG with dev=0) and FIFO (S_IFIFO) and device-node creation.
 
-  Fake-super (am_root < 0) is handled inline against the secure
-  parent dirfd: it creates a regular empty file (the same file-as-
+  A top-level (no-slash) pathname has no parent to confine, so it uses
+  AT_FDCWD; the final component is still protected (mknodat/mkfifoat do
+  not follow it, and the fake-super openat() uses O_NOFOLLOW).
+
+  Fake-super (am_root < 0) is handled inline against the (secure or
+  AT_FDCWD) dirfd: it creates a regular empty file (the same file-as-
   metadata-placeholder pattern do_mknod uses) via openat() with
-  O_NOFOLLOW. Sockets fall through to do_mknod() because their
-  bind(2) takes a path argument with no portable bindat() variant;
-  this is documented as a residual.
+  O_NOFOLLOW so a pre-planted symlink at the basename can't redirect
+  the file creation -- top-level paths included (the previous code fell
+  through to the bare-path do_mknod() there, whose plain open() followed
+  such a symlink). Sockets fall through to do_mknod() because their
+  bind(2) takes a path argument with no portable bindat() variant; this
+  is documented as a residual.
 */
 int do_mknod_at(const char *pathname, mode_t mode, dev_t dev)
 {
@@ -542,7 +560,8 @@ int do_mknod_at(const char *pathname, mode_t mode, dev_t dev)
 	char dirpath[MAXPATHLEN];
 	const char *bname;
 	const char *slash;
-	int dfd, ret, e;
+	int dfd = AT_FDCWD, ret, e;
+	BOOL owns = False;
 	size_t dlen;
 
 	if (dry_run) return 0;
@@ -559,42 +578,47 @@ int do_mknod_at(const char *pathname, mode_t mode, dev_t dev)
 	if (!pathname || !*pathname || *pathname == '/')
 		return do_mknod(pathname, mode, dev);
 
+	/* A path with a slash needs secure_relative_open to confine its
+	 * parent resolution; a top-level path lives in CWD (AT_FDCWD) with
+	 * no parent to subvert. The final component is protected below
+	 * regardless. */
 	slash = strrchr(pathname, '/');
-	if (!slash)
-		return do_mknod(pathname, mode, dev);
-
-	dlen = slash - pathname;
-	if (dlen >= sizeof dirpath) {
-		errno = ENAMETOOLONG;
-		return -1;
+	if (slash) {
+		dlen = slash - pathname;
+		if (dlen >= sizeof dirpath) {
+			errno = ENAMETOOLONG;
+			return -1;
+		}
+		memcpy(dirpath, pathname, dlen);
+		dirpath[dlen] = '\0';
+		bname = slash + 1;
+		dfd = secure_relative_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
+		if (dfd < 0)
+			return -1;
+		owns = True;
+	} else {
+		bname = pathname;
 	}
-	memcpy(dirpath, pathname, dlen);
-	dirpath[dlen] = '\0';
-	bname = slash + 1;
-
-	dfd = secure_relative_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
-	if (dfd < 0)
-		return -1;
 
 	if (am_root < 0) {
 		/* For --fake-super, do_mknod creates a regular empty
 		 * file as a placeholder for the special-file metadata
 		 * (which is stored in xattrs elsewhere). Do that against
-		 * the secure dirfd, with O_NOFOLLOW so a pre-planted
-		 * symlink at the basename can't redirect the file
-		 * creation. */
+		 * the (secure or AT_FDCWD) dirfd, with O_NOFOLLOW so a
+		 * pre-planted symlink at the basename can't redirect the
+		 * file creation. */
 		int fd = openat(dfd, bname,
 				O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW,
 				S_IWUSR | S_IRUSR);
 		if (fd < 0) {
 			e = errno;
-			close(dfd);
+			if (owns) close(dfd);
 			errno = e;
 			return -1;
 		}
 		ret = (close(fd) < 0) ? -1 : 0;
 		e = errno;
-		close(dfd);
+		if (owns) close(dfd);
 		errno = e;
 		return ret;
 	}
@@ -606,7 +630,7 @@ int do_mknod_at(const char *pathname, mode_t mode, dev_t dev)
 #endif
 		ret = mknodat(dfd, bname, mode, dev);
 	e = errno;
-	close(dfd);
+	if (owns) close(dfd);
 	errno = e;
 	return ret;
 #else
@@ -903,9 +927,8 @@ int do_rename(const char *old_path, const char *new_path)
   case -- tmp file living next to its final name), we reuse the same
   dirfd for both sides.
 
-  Falls through to do_rename() in dry-run, non-daemon, chrooted, no-
-  parent and absolute-path cases, identical to the other do_*_at()
-  wrappers.
+  Falls through to do_rename() in dry-run, non-daemon, chrooted and
+  absolute-path cases, identical to the other do_*_at() wrappers.
 */
 int do_rename_at(const char *old_path, const char *new_path)
 {
@@ -914,8 +937,10 @@ int do_rename_at(const char *old_path, const char *new_path)
 	char old_dirpath[MAXPATHLEN], new_dirpath[MAXPATHLEN];
 	const char *old_bname, *new_bname;
 	const char *old_slash, *new_slash;
-	int old_dfd = -1, new_dfd = -1, ret = -1, e;
-	size_t old_dlen, new_dlen;
+	int old_dfd = AT_FDCWD, new_dfd = AT_FDCWD;
+	BOOL old_owns = False, new_owns = False;
+	int ret = -1, e;
+	size_t old_dlen = 0, new_dlen = 0;
 
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
@@ -929,43 +954,58 @@ int do_rename_at(const char *old_path, const char *new_path)
 
 	old_slash = strrchr(old_path, '/');
 	new_slash = strrchr(new_path, '/');
-	if (!old_slash || !new_slash)
-		return do_rename(old_path, new_path);
 
-	old_dlen = old_slash - old_path;
-	new_dlen = new_slash - new_path;
-	if (old_dlen >= sizeof old_dirpath || new_dlen >= sizeof new_dirpath) {
-		errno = ENAMETOOLONG;
-		return -1;
-	}
-	memcpy(old_dirpath, old_path, old_dlen);
-	old_dirpath[old_dlen] = '\0';
-	memcpy(new_dirpath, new_path, new_dlen);
-	new_dirpath[new_dlen] = '\0';
-	old_bname = old_slash + 1;
-	new_bname = new_slash + 1;
-
-	old_dfd = secure_relative_open(NULL, old_dirpath, O_RDONLY | O_DIRECTORY, 0);
-	if (old_dfd < 0)
-		return -1;
-
-	if (old_dlen == new_dlen && memcmp(old_dirpath, new_dirpath, old_dlen) == 0) {
-		new_dfd = old_dfd;
+	if (old_slash) {
+		old_dlen = old_slash - old_path;
+		if (old_dlen >= sizeof old_dirpath) {
+			errno = ENAMETOOLONG;
+			return -1;
+		}
+		memcpy(old_dirpath, old_path, old_dlen);
+		old_dirpath[old_dlen] = '\0';
+		old_bname = old_slash + 1;
+		old_dfd = secure_relative_open(NULL, old_dirpath, O_RDONLY | O_DIRECTORY, 0);
+		if (old_dfd < 0)
+			return -1;
+		old_owns = True;
 	} else {
-		new_dfd = secure_relative_open(NULL, new_dirpath, O_RDONLY | O_DIRECTORY, 0);
-		if (new_dfd < 0) {
-			e = errno;
-			close(old_dfd);
+		old_bname = old_path;
+	}
+
+	if (new_slash) {
+		new_dlen = new_slash - new_path;
+		if (new_dlen >= sizeof new_dirpath) {
+			e = ENAMETOOLONG;
+			if (old_owns) close(old_dfd);
 			errno = e;
 			return -1;
 		}
+		memcpy(new_dirpath, new_path, new_dlen);
+		new_dirpath[new_dlen] = '\0';
+		new_bname = new_slash + 1;
+		if (old_owns && old_dlen == new_dlen
+		 && memcmp(old_dirpath, new_dirpath, old_dlen) == 0) {
+			new_dfd = old_dfd;
+		} else {
+			new_dfd = secure_relative_open(NULL, new_dirpath, O_RDONLY | O_DIRECTORY, 0);
+			if (new_dfd < 0) {
+				e = errno;
+				if (old_owns) close(old_dfd);
+				errno = e;
+				return -1;
+			}
+			new_owns = True;
+		}
+	} else {
+		new_bname = new_path;
 	}
 
 	ret = renameat(old_dfd, old_bname, new_dfd, new_bname);
 	e = errno;
-	if (new_dfd != old_dfd)
+	if (new_owns)
 		close(new_dfd);
-	close(old_dfd);
+	if (old_owns)
+		close(old_dfd);
 	errno = e;
 	return ret;
 #else
@@ -2363,6 +2403,26 @@ void reset_dir_fd_cache(void)
 		close(cur_dfd);
 	cur_dfd = -1;
 	cur_dkey = (const char *)-1;
+}
+
+/* Return the cached current-directory fd iff `path` lives directly in the
+ * entry's own directory (file->dirname) -- the common case for held-dirfd
+ * traversal.  Returns -1 (caller falls back to the do_*_at() wrappers) for
+ * anything elsewhere: --temp-dir/--partial-dir/--backup-dir, an absolute path,
+ * a differently-nested dir, or when open_dir_secure() is gated off. */
+int held_dfd_for(const char *path, const struct file_struct *file)
+{
+	const char *slash, *dn;
+	size_t plen;
+
+	if (!path || *path == '/')
+		return -1;
+	dn = file && file->dirname ? file->dirname : "";
+	slash = strrchr(path, '/');
+	plen = slash ? (size_t)(slash - path) : 0;
+	if (strlen(dn) != plen || memcmp(path, dn, plen) != 0)
+		return -1;
+	return get_dir_fd(file ? file->dirname : NULL);
 }
 
 int do_unlink_atfd(int dfd, const char *name, int flags)
