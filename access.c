@@ -290,3 +290,11 @@ int allow_access(const char *addr, const char **host_ptr, int i)
 	/* Allow all other access. */
 	return 1;
 }
+
+int allow_proxy_protocol_peer(const char *list, const char *addr, const char **host_ptr)
+{
+	if (!list || !*list)
+		return 0;
+	allow_forward_dns = 0;
+	return access_match(list, addr, host_ptr);
+}

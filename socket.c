@@ -77,7 +77,10 @@ static int establish_proxy_connection(int fd, char *host, int port, char *proxy_
 	}
 
 	len = snprintf(buffer, PROXY_BUF_SIZE, "CONNECT %s:%d HTTP/1.0%s%s\r\n\r\n", host, port, authhdr, authbuf);
-	assert(len > 0 && len < PROXY_BUF_SIZE);
+	if (len <= 0 || len >= PROXY_BUF_SIZE) {
+		rprintf(FERROR, "proxy CONNECT request too long\n");
+		return -1;
+	}
 	if (write(fd, buffer, len) != len) {
 		rsyserr(FERROR, errno, "failed to write to proxy");
 		return -1;
@@ -114,7 +117,7 @@ static int establish_proxy_connection(int fd, char *host, int port, char *proxy_
 	}
 	/* throw away the rest of the HTTP header */
 	while (1) {
-		for (cp = buffer; cp < &buffer[PROXY_BUF_SIZE]; cp++) {
+		for (cp = buffer; cp < &buffer[PROXY_BUF_SIZE - 1]; cp++) {
 			if (read(fd, cp, 1) != 1) {
 				rsyserr(FERROR, errno,
 					"failed to read from proxy");
@@ -122,6 +125,10 @@ static int establish_proxy_connection(int fd, char *host, int port, char *proxy_
 			}
 			if (*cp == '\n')
 				break;
+		}
+		if (cp == &buffer[PROXY_BUF_SIZE - 1]) {
+			rprintf(FERROR, "proxy response header line too long\n");
+			return -1;
 		}
 		if (cp > buffer && *cp == '\n')
 			cp--;
