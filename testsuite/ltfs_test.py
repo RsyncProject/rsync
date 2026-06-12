@@ -11,6 +11,7 @@
 # that same order, so the itemized output is our observable proxy for the
 # physical read schedule.
 
+import datetime
 import os
 import re
 
@@ -95,3 +96,30 @@ if res.returncode == 0:
     test_fail("--ltfs --checksum was accepted; expected a usage error")
 if 'checksum' not in (res.stderr + res.stdout):
     test_fail(f"--ltfs --checksum gave an unexpected error: {res.stderr!r}")
+
+
+# --- 4. --ltfs implies -t so the index quick-check can skip files -----------
+# Pin a known old mtime on the source; --ltfs (no explicit -t) must preserve
+# it on the destination, so an immediate re-run finds nothing to transfer.
+old = datetime.datetime(2008, 1, 1, 12, 0, 0).timestamp()
+src4 = SCRATCHDIR / 'from4'
+dst4 = SCRATCHDIR / 'to4'
+makepath(src4)
+f4 = src4 / 'pinned.dat'
+f4.write_text('pinned\n')
+set_block(f4, 100)
+os.utime(f4, (old, old))
+
+run_rsync('-r', '--ltfs', f'{src4}/', f'{dst4}/', check=True)
+if abs((dst4 / 'pinned.dat').stat().st_mtime - old) > 1:
+    test_fail("--ltfs did not preserve mtime (expected an implied -t)")
+res = run_rsync('-r', '-i', '--ltfs', f'{src4}/', f'{dst4}/',
+                check=True, capture_output=True)
+if 'pinned.dat' in res.stdout:
+    test_fail(f"--ltfs re-transferred an unchanged file: {res.stdout!r}")
+
+# An explicit --no-times defeats that, so it must warn (but still run).
+res = run_rsync('-r', '--ltfs', '--no-times', f'{src4}/', f'{dst4}/',
+                check=True, capture_output=True)
+if 'ltfs' not in (res.stderr + res.stdout).lower():
+    test_fail(f"--ltfs --no-times did not warn: {res.stderr!r}")
