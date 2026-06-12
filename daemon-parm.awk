@@ -84,7 +84,14 @@ BEGIN {
     defines = defines "\t" vtype " " name ";\n"
     values = values "\t" $0 ", /* " name " */\n"
     parms = parms " {\"" pubname "\", P_" ptype psect name ", " enum ", 0},\n"
-    accessors = accessors "FN_" sect "_" atype "(lp_" name ", " name ")\n"
+    # The shell-executed hook params (whose %RSYNC_*% expansion is fed to
+    # /bin/sh) use the _SHELL accessor, which single-quotes peer-controlled
+    # values to prevent injection.  Ordinary string params must NOT quote --
+    # it would corrupt a documented `path = /home/%RSYNC_USER_NAME%` etc.
+    if (atype == "STRING" && (name == "early_exec" || name == "prexfer_exec" || name == "postxfer_exec" || name == "name_converter"))
+	accessors = accessors "FN_" sect "_STRING_SHELL(lp_" name ", " name ")\n"
+    else
+	accessors = accessors "FN_" sect "_" atype "(lp_" name ", " name ")\n"
 
     if (vtype == "char*") {
 	exps = exps "\tBOOL " name "_EXP;\n"
