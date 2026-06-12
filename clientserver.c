@@ -86,6 +86,12 @@ struct chmod_mode_struct *daemon_chmod_modes;
  * enabled module can have a non-"/" module_dir these days.) */
 char *module_dir = NULL;
 unsigned int module_dirlen = 0;
+/* An fd held open on the served module root, captured while the daemon is still
+ * positioned there (and privileged) -- so the sender's directory scan can be
+ * confined beneath the module by resolving module-relative paths against this fd,
+ * without re-walking (and re-permission-checking) the absolute module path as the
+ * dropped-privilege module uid.  -1 when not a daemon or not yet captured. */
+int module_dirfd = -1;
 
 char *full_module_path;
 
@@ -991,6 +997,12 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 
 	if (!change_dir(module_chdir, CD_NORMAL))
 		return path_failure(f_out, module_chdir, True);
+	/* Pin the module root by identity now -- cwd is the served root and we are
+	 * still privileged -- so the sender's later directory scans resolve against
+	 * this fd rather than re-walking the absolute module path post-setuid. */
+#if defined HAVE_FDOPENDIR && defined O_DIRECTORY
+	module_dirfd = open(".", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+#endif
 	if (module_dirlen)
 		sanitize_paths = 1;
 
