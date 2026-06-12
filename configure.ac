@@ -908,7 +908,7 @@ dnl AC_FUNC_MEMCMP
 
 AC_FUNC_UTIME_NULL
 AC_FUNC_ALLOCA
-AC_CHECK_FUNCS(waitpid wait4 getcwd chown chmod lchmod mknod mkfifo \
+AC_CHECK_FUNCS(waitpid wait4 getcwd chown chmod lchmod mknod mkfifo fdopendir \
     fchmod fstat ftruncate strchr readlink link utime utimes lutimes strftime \
     chflags getattrlist mktime innetgr linkat mknodat mkfifoat \
     memmove lchown vsnprintf snprintf vasprintf asprintf setsid strpbrk \
@@ -918,6 +918,18 @@ AC_CHECK_FUNCS(waitpid wait4 getcwd chown chmod lchmod mknod mkfifo \
     extattr_get_link sigaction sigprocmask setattrlist getgrouplist \
     initgroups utimensat posix_fallocate attropen setvbuf nanosleep usleep \
     setenv unsetenv)
+
+dnl dirfd() is a macro or static inline on several systems (the BSDs), so the
+dnl default AC_CHECK_FUNCS link probe -- which declares `char dirfd(void);` and
+dnl links against a bare symbol -- gives a false negative there.  Probe it with a
+dnl real compile+link that includes <dirent.h> and actually calls dirfd().
+AC_CACHE_CHECK([for dirfd], rsync_cv_HAVE_DIRFD,
+  [AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <dirent.h>]],
+    [[DIR *d = opendir("."); return d ? dirfd(d) < -1 : 0;]])],
+    [rsync_cv_HAVE_DIRFD=yes], [rsync_cv_HAVE_DIRFD=no])])
+if test x"$rsync_cv_HAVE_DIRFD" = x"yes"; then
+    AC_DEFINE([HAVE_DIRFD], 1, [Define to 1 if you have a working dirfd() (function or macro).])
+fi
 
 dnl cygwin iconv.h defines iconv_open as libiconv_open
 if test x"$ac_cv_func_iconv_open" != x"yes"; then
