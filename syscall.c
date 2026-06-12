@@ -43,6 +43,8 @@
 extern int dry_run;
 extern int am_root;
 extern int am_sender;
+extern int am_daemon;
+extern int am_chrooted;
 extern int read_only;
 extern int list_only;
 extern int inplace;
@@ -52,6 +54,14 @@ extern int preserve_executability;
 extern int open_noatime;
 extern int copy_links;
 extern int copy_unsafe_links;
+
+int secure_relpath_active(void)
+{
+	extern unsigned int module_dirlen;
+	if (am_daemon && am_chrooted && module_dirlen)
+		return 1;
+	return !am_chrooted && (am_daemon || !am_sender);
+}
 
 
 #ifndef S_BLKSIZE
@@ -118,7 +128,7 @@ int do_unlink_at(const char *path)
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
 
-	if (!am_daemon || am_chrooted)
+	if (!secure_relpath_active())
 		return unlink(path);
 
 	if (!path || !*path || *path == '/')
@@ -208,7 +218,7 @@ int do_symlink_at(const char *lnk, const char *path)
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
 
-	if (!am_daemon || am_chrooted)
+	if (!secure_relpath_active())
 		return do_symlink(lnk, path);
 
 	if (!path || !*path || *path == '/')
@@ -338,11 +348,10 @@ int do_link_at(const char *old_path, const char *new_path)
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
 
-	if (!am_daemon || am_chrooted)
+	if (!secure_relpath_active())
 		return do_link(old_path, new_path);
 
-	if (!old_path || !*old_path || *old_path == '/'
-	 || !new_path || !*new_path || *new_path == '/')
+	if (!old_path || !*old_path || !new_path || !*new_path)
 		return do_link(old_path, new_path);
 
 	old_slash = strrchr(old_path, '/');
@@ -354,7 +363,9 @@ int do_link_at(const char *old_path, const char *new_path)
 	 * resolution -- otherwise a parent symlink (e.g. --link-dest=cd
 	 * where cd -> /outside) lets the kernel-level linkat(AT_FDCWD,
 	 * "cd/target.txt", ...) escape the module. */
-	if (old_slash) {
+	if (*old_path == '/') {
+		old_bname = old_path;
+	} else if (old_slash) {
 		old_dlen = old_slash - old_path;
 		if (old_dlen >= sizeof old_dirpath) { errno = ENAMETOOLONG; return -1; }
 		memcpy(old_dirpath, old_path, old_dlen);
@@ -368,7 +379,9 @@ int do_link_at(const char *old_path, const char *new_path)
 		old_bname = old_path;
 	}
 
-	if (new_slash) {
+	if (*new_path == '/') {
+		new_bname = new_path;
+	} else if (new_slash) {
 		new_dlen = new_slash - new_path;
 		if (new_dlen >= sizeof new_dirpath) {
 			e = ENAMETOOLONG;
@@ -447,7 +460,7 @@ int do_lchown_at(const char *fname, uid_t owner, gid_t group)
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
 
-	if (!am_daemon || am_chrooted)
+	if (!secure_relpath_active())
 		return do_lchown(fname, owner, group);
 
 	if (!fname || !*fname || *fname == '/')
@@ -567,7 +580,7 @@ int do_mknod_at(const char *pathname, mode_t mode, dev_t dev)
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
 
-	if (!am_daemon || am_chrooted)
+	if (!secure_relpath_active())
 		return do_mknod(pathname, mode, dev);
 
 #if !defined MKNOD_CREATES_SOCKETS && defined HAVE_SYS_UN_H
@@ -663,7 +676,7 @@ int do_rmdir_at(const char *pathname)
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
 
-	if (!am_daemon || am_chrooted)
+	if (!secure_relpath_active())
 		return rmdir(pathname);
 
 	if (!pathname || !*pathname || *pathname == '/')
@@ -743,7 +756,7 @@ int do_open_at(const char *pathname, int flags, mode_t mode)
 		RETURN_ERROR_IF_RO_OR_LO;
 	}
 
-	if (!am_daemon || am_chrooted)
+	if (!secure_relpath_active())
 		return do_open(pathname, flags, mode);
 
 	if (!pathname || !*pathname || *pathname == '/')
@@ -873,7 +886,7 @@ int do_chmod_at(const char *fname, mode_t mode)
 	 * symlink they planted can only redirect to files they could
 	 * already access.  Everywhere else, fall through to plain
 	 * do_chmod() to avoid the dirfd-open overhead on every call. */
-	if (!am_daemon || am_chrooted)
+	if (!secure_relpath_active())
 		return do_chmod(fname, mode);
 
 	if (!fname || !*fname || *fname == '/' || S_ISLNK(mode))
@@ -945,17 +958,18 @@ int do_rename_at(const char *old_path, const char *new_path)
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
 
-	if (!am_daemon || am_chrooted)
+	if (!secure_relpath_active())
 		return do_rename(old_path, new_path);
 
-	if (!old_path || !*old_path || *old_path == '/'
-	 || !new_path || !*new_path || *new_path == '/')
+	if (!old_path || !*old_path || !new_path || !*new_path)
 		return do_rename(old_path, new_path);
 
 	old_slash = strrchr(old_path, '/');
 	new_slash = strrchr(new_path, '/');
 
-	if (old_slash) {
+	if (*old_path == '/') {
+		old_bname = old_path;
+	} else if (old_slash) {
 		old_dlen = old_slash - old_path;
 		if (old_dlen >= sizeof old_dirpath) {
 			errno = ENAMETOOLONG;
@@ -972,7 +986,9 @@ int do_rename_at(const char *old_path, const char *new_path)
 		old_bname = old_path;
 	}
 
-	if (new_slash) {
+	if (*new_path == '/') {
+		new_bname = new_path;
+	} else if (new_slash) {
 		new_dlen = new_slash - new_path;
 		if (new_dlen >= sizeof new_dirpath) {
 			e = ENAMETOOLONG;
@@ -1082,7 +1098,7 @@ int do_mkdir_at(char *path, mode_t mode)
 	RETURN_ERROR_IF_RO_OR_LO;
 	trim_trailing_slashes(path);
 
-	if (!am_daemon || am_chrooted)
+	if (!secure_relpath_active())
 		return mkdir(path, mode);
 
 	if (!path || !*path || *path == '/')
@@ -1191,7 +1207,7 @@ static int do_xstat_at(const char *path, STRUCT_STAT *st, int at_flags, int (*fa
 	int dfd, ret, e;
 	size_t dlen;
 
-	if (!am_daemon || am_chrooted)
+	if (!secure_relpath_active())
 		return fallback(path, st);
 
 	if (!path || !*path || *path == '/')
@@ -1274,7 +1290,7 @@ int do_setattrlist_times(const char *path, STRUCT_STAT *stp)
 	 * macOS-specific attribute set this function would have used
 	 * (ATTR_CMN_MODTIME / ATTR_CMN_ACCTIME) is the same set
 	 * utimensat() handles, so no functionality is lost. */
-	if (am_daemon && !am_chrooted) {
+	if (secure_relpath_active()) {
 		errno = ENOSYS;
 		return -1;
 	}
@@ -1309,7 +1325,7 @@ int do_setattrlist_crtime(const char *path, time_t crtime)
 	 * crtime preservation is silently dropped for that file (the
 	 * caller treats this as "crtime not updated"). The transfer
 	 * itself continues normally. */
-	if (am_daemon && !am_chrooted) {
+	if (secure_relpath_active()) {
 		errno = ENOSYS;
 		return -1;
 	}
@@ -1340,7 +1356,7 @@ time_t get_create_time(const char *path, STRUCT_STAT *stp)
 	 * outside the module. The caller's "no crtime available"
 	 * path returns 0; the file gets a fresh crtime instead of
 	 * preserving the source's. */
-	if (am_daemon && !am_chrooted)
+	if (secure_relpath_active())
 		return 0;
 	memset(&attrList, 0, sizeof attrList);
 	attrList.bitmapcount = ATTR_BIT_MAP_COUNT;
@@ -1437,7 +1453,7 @@ int do_utimensat_at(const char *path, STRUCT_STAT *stp)
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
 
-	if (!am_daemon || am_chrooted)
+	if (!secure_relpath_active())
 		return do_utimensat(path, stp);
 
 	if (!path || !*path || *path == '/')
@@ -2346,7 +2362,7 @@ int open_dir_secure(const char *dirname)
 	/* Authority gate, identical to the do_*_at() wrappers.  When hardened
 	 * resolution isn't in effect, return -1 with errno cleared so the caller
 	 * uses the full-path wrappers. */
-	if (!am_daemon || am_chrooted) {
+	if (!secure_relpath_active()) {
 		errno = 0;
 		return -1;
 	}
