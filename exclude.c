@@ -1490,6 +1490,13 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 		return;
 
 	if (*fname != '-' || fname[1] || am_server) {
+		/* This path is operator- and (via per-directory merge files like
+		 * .cvsignore) sender-controlled: a planted symlink could leak a
+		 * root-readable file through the filter parser, or redirect an
+		 * --exclude-from open via a planted parent.  Refuse symlinks not
+		 * owned by uid 0 or our euid. */
+		const char *open_path;
+		int fd;
 		if (daemon_filter_list.head) {
 			char *dir;
 			strlcpy(line, fname, sizeof line);
@@ -1512,9 +1519,14 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 				}
 				return;
 			}
-			fp = fopen(line, "rb");
+			open_path = line;
 		} else
-			fp = fopen(fname, "rb");
+			open_path = fname;
+		fd = safe_open_no_attacker_symlinks(open_path, O_RDONLY, 0);
+		if (fd < 0)
+			fp = NULL;
+		else if (!(fp = fdopen(fd, "rb")))
+			close(fd);
 	} else
 		fp = stdin;
 
