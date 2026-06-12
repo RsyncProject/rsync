@@ -28,6 +28,8 @@ if '"xattrs": true' not in vv.stdout:
 
 # ...and a scratch filesystem that lets us set a user.* xattr to stand in for
 # the tape's ltfs.startblock attribute.
+if not hasattr(os, 'setxattr'):
+    test_skipped("os.setxattr not available on this platform")
 makepath(FROMDIR)
 probe = FROMDIR / '.xattr-probe'
 probe.write_text('x')
