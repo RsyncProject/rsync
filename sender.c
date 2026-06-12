@@ -35,6 +35,9 @@ extern int xfer_sum_len;
 extern int csum_length;
 extern int append_mode;
 extern int copy_links;
+extern int copy_unsafe_links;
+extern int copy_dirlinks;
+extern int open_noatime;
 extern int io_error;
 extern int flist_eof;
 extern int whole_file;
@@ -197,6 +200,77 @@ static void write_ndx_and_attrs(int f_out, int ndx, int iflags,
 	if (preserve_xattrs && iflags & ITEM_REPORT_XATTR && do_xfers
 	 && !(want_xattr_optim && BITS_SET(iflags, ITEM_XNAME_FOLLOWS|ITEM_LOCAL_CHANGE)))
 		send_xattr_request(fname, file, f_out);
+#endif
+}
+
+/* Open the content of `relpath` for a symlink-following transfer mode (-L /
+ * --copy-unsafe-links / -k) while staying confined beneath `anchor`.  The leaf
+ * O_NOFOLLOW the secure resolver applies refuses an in-tree symlink the operator
+ * explicitly asked to follow, so resolve the link ourselves: read it, refuse an
+ * absolute or escaping target (a module escape), and re-resolve the relative
+ * target through secure_relative_open() -- which follows in-tree links and
+ * rejects an escape above the anchor -- looping for a symlink chain.  The final
+ * open stays O_NOFOLLOW, so the module boundary and leaf-race protection hold. */
+static int sender_open_copylinks_confined(const char *anchor, const char *relpath)
+{
+#if defined AT_FDCWD && defined O_NOFOLLOW
+	char cur[MAXPATHLEN];
+	int hops = 32;
+	int extra = 0;
+#ifdef O_NOATIME
+	if (open_noatime)
+		extra |= O_NOATIME;
+#endif
+	if (strlcpy(cur, relpath, sizeof cur) >= sizeof cur) {
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+	while (hops-- > 0) {
+		const char *slash = strrchr(cur, '/');
+		const char *bname;
+		char dir[MAXPATHLEN], tgt[MAXPATHLEN];
+		int pdfd, fd, e;
+		ssize_t n;
+		if (slash) {
+			size_t dlen = slash - cur;
+			if (dlen >= sizeof dir) { errno = ENAMETOOLONG; return -1; }
+			memcpy(dir, cur, dlen);
+			dir[dlen] = '\0';
+			bname = slash + 1;
+		} else {
+			dir[0] = '\0';
+			bname = cur;
+		}
+		if ((pdfd = secure_relative_open(anchor, dir, O_RDONLY | O_DIRECTORY, 0)) < 0)
+			return -1;
+		n = readlinkat(pdfd, bname, tgt, sizeof tgt - 1);
+		e = errno;
+		if (n < 0) {
+			/* EINVAL: not a symlink -> the resolved target file. */
+			fd = e == EINVAL
+			   ? openat(pdfd, bname, O_RDONLY | O_NOFOLLOW | extra, 0)
+			   : -1;
+			close(pdfd);
+			if (n < 0 && e != EINVAL)
+				errno = e;
+			return fd;
+		}
+		close(pdfd);
+		tgt[n] = '\0';
+		if (tgt[0] == '/') {		/* absolute target escapes the module */
+			errno = ELOOP;
+			return -1;
+		}
+		if ((size_t)snprintf(cur, sizeof cur, "%s%s%s",
+				     dir, *dir ? "/" : "", tgt) >= sizeof cur) {
+			errno = ENAMETOOLONG;
+			return -1;
+		}
+	}
+	errno = ELOOP;
+	return -1;
+#else
+	return secure_relative_open(anchor, relpath, O_RDONLY | O_NOFOLLOW, 0);
 #endif
 }
 
@@ -378,7 +452,10 @@ void send_files(int f_in, int f_out)
 			relp = secure_path;
 			while (*relp == '/')
 				relp++;
-			fd = secure_relative_open(module_dir, relp, O_RDONLY, 0);
+			if (copy_links || copy_unsafe_links || copy_dirlinks)
+				fd = sender_open_copylinks_confined(module_dir, relp);
+			else
+				fd = secure_relative_open(module_dir, relp, O_RDONLY | O_NOFOLLOW, 0);
 		} else {
 			fd = do_open_checklinks(fname);
 		}
