@@ -224,26 +224,44 @@ static void write_filter_rules(int fd)
 /* This sets batch_fd and (for --write-batch) batch_sh_fd. */
 void open_batch_files(void)
 {
+	/* --write-batch/--read-batch are operator-supplied; a planted symlink
+	 * could truncate+overwrite an arbitrary file (write side) or stream
+	 * attacker bytes into the protocol parser (read side).  Refuse symlinks
+	 * not owned by uid 0 or our euid anywhere in the path. */
 	if (write_batch) {
 		char filename[MAXPATHLEN];
 
 		stringjoin(filename, sizeof filename, batch_name, ".sh", NULL);
 
-		batch_sh_fd = do_open(filename, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IXUSR);
+		batch_sh_fd = safe_open_no_attacker_symlinks(filename, O_WRONLY | O_CREAT | O_TRUNC | O_BINARY, S_IRUSR | S_IWUSR | S_IXUSR);
 		if (batch_sh_fd < 0) {
 			rsyserr(FERROR, errno, "Batch file %s open error", full_fname(filename));
 			exit_cleanup(RERR_FILESELECT);
 		}
 
-		batch_fd = do_open(batch_name, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+		/* O_BINARY: the batch stream is binary protocol data; without it
+		 * Cygwin et al apply CRLF translation and corrupt it.  Unlike
+		 * do_open(), safe_open_no_attacker_symlinks passes flags verbatim. */
+		batch_fd = safe_open_no_attacker_symlinks(batch_name, O_WRONLY | O_CREAT | O_TRUNC | O_BINARY, S_IRUSR | S_IWUSR);
 	} else if (strcmp(batch_name, "-") == 0)
 		batch_fd = STDIN_FILENO;
 	else
-		batch_fd = do_open(batch_name, O_RDONLY, S_IRUSR | S_IWUSR);
+		batch_fd = safe_open_no_attacker_symlinks(batch_name, O_RDONLY | O_BINARY, S_IRUSR | S_IWUSR);
 
 	if (batch_fd < 0) {
 		rsyserr(FERROR, errno, "Batch file %s open error", full_fname(batch_name));
 		exit_cleanup(RERR_FILEIO);
+	}
+
+	/* --read-batch: the file's bytes drive the protocol parser, so refuse
+	 * non-regular files (FIFO, device, socket) at the batch path. */
+	if (!write_batch && batch_fd != STDIN_FILENO) {
+		STRUCT_STAT st;
+		if (do_fstat(batch_fd, &st) == 0 && !S_ISREG(st.st_mode)) {
+			rprintf(FERROR, "Batch file %s is not a regular file\n",
+				full_fname(batch_name));
+			exit_cleanup(RERR_FILEIO);
+		}
 	}
 }
 
