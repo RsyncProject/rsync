@@ -2052,6 +2052,11 @@ void read_sum_head(int f, struct sum_struct *sum)
 			(long)sum->blength, who_am_i());
 		exit_cleanup(RERR_PROTOCOL);
 	}
+	if (sum->count && sum->blength == 0) {
+		rprintf(FERROR, "Invalid zero block length [%s]\n",
+			who_am_i());
+		exit_cleanup(RERR_PROTOCOL);
+	}
 	sum->s2length = protocol_version < 27 ? csum_length : (int)read_int(f);
 	if (sum->s2length < 0 || sum->s2length > xfer_sum_len) {
 		rprintf(FERROR, "Invalid checksum length %d [%s]\n",
@@ -2366,6 +2371,7 @@ int32 read_ndx(int f)
 {
 	static int32 prev_positive = -1, prev_negative = 1;
 	int32 *prev_ptr, num;
+	uint32 unum;
 	char b[4];
 
 	if (protocol_version < 30)
@@ -2385,11 +2391,20 @@ int32 read_ndx(int f)
 			b[3] = CVAL(b, 0) & ~0x80;
 			b[0] = b[1];
 			read_buf(f, b+1, 2);
-			num = IVAL(b, 0);
+			unum = IVAL(b, 0);
 		} else
-			num = (UVAL(b,0)<<8) + UVAL(b,1) + *prev_ptr;
+			unum = (UVAL(b,0)<<8) + UVAL(b,1) + (uint32)*prev_ptr;
 	} else
-		num = UVAL(b, 0) + *prev_ptr;
+		unum = UVAL(b, 0) + (uint32)*prev_ptr;
+	/* A peer-supplied index that overflows a signed int32 (used unchecked as a
+	 * file-list index) is a protocol violation -- reject it here rather than
+	 * relying on every downstream consumer to bounds-check. */
+	if (unum > (uint32)MAX_INT32) {
+		rprintf(FERROR, "Invalid file index: %lu [%s]\n",
+			(unsigned long)unum, who_am_i());
+		exit_cleanup(RERR_PROTOCOL);
+	}
+	num = (int32)unum;
 	*prev_ptr = num;
 	if (prev_ptr == &prev_negative)
 		num = -num;
