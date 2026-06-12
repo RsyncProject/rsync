@@ -1549,6 +1549,9 @@ char *full_fname(const char *fn)
 	if (result)
 		free(result);
 
+	if (!fn)
+		fn = "(null)";
+
 	if (*fn == '/')
 		p1 = p2 = "";
 	else {
