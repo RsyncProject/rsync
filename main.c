@@ -865,10 +865,16 @@ static void check_alt_basis_dirs(void)
 		int bd_len = strlen(bdir);
 		if (bd_len > 1 && bdir[bd_len-1] == '/')
 			bdir[--bd_len] = '\0';
-		if (dry_run > 1 && *bdir != '/') {
+		/* Make a relative --link-dest/--copy-dest/--compare-dest absolute
+		 * (vs the destination curr_dir).  These are operator-trusted roots,
+		 * so an absolute path makes the do_*_at() wrappers use plain
+		 * resolution rather than reject an operator '..' outside the dest
+		 * tree (e.g. --copy-dest=../to).  Skipped when sanitize_paths already
+		 * confined them; the dry_run>1 case keeps its leading-"../"-strip. */
+		if (*bdir != '/' && (dry_run > 1 || !sanitize_paths)) {
 			int len = curr_dir_len + 1 + bd_len + 1;
 			char *new = new_array(char, len);
-			if (slash && strncmp(bdir, "../", 3) == 0) {
+			if (dry_run > 1 && slash && strncmp(bdir, "../", 3) == 0) {
 				/* We want to remove only one leading "../" prefix for
 				 * the directory we couldn't create in dry-run mode:
 				 * this ensures that any other ".." references get

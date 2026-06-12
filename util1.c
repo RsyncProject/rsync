@@ -385,19 +385,17 @@ static int unlink_and_reopen(const char *dest, mode_t mode)
  * --copy-dest options. */
 int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
 {
-	extern int am_daemon, am_chrooted;
 	int ifd, ofd;
 	char buf[1024 * 8];
 	int len;   /* Number of bytes read into `buf'. */
 	OFF_T prealloc_len = 0, offset = 0;
 
-	/* On a daemon without chroot, route the source open through
+	/* For a hardened receiver, route a *relative* source open through
 	 * secure_relative_open so a parent-symlink on the source path
 	 * (e.g. --copy-dest=cd where cd is a symlink to an outside
-	 * directory) cannot redirect the read to a file the daemon can
-	 * see but the attacker should not. Plain do_open_nofollow only
-	 * refuses a final-component symlink; parents are still followed. */
-	if (am_daemon && !am_chrooted && source && *source && source[0] != '/')
+	 * directory) cannot redirect the read.  An absolute source is an
+	 * operator-trusted (absolutized) basis dir and uses do_open_nofollow. */
+	if (secure_relpath_active() && source && *source && source[0] != '/')
 		ifd = secure_relative_open(NULL, source, O_RDONLY | O_NOFOLLOW, 0);
 	else
 		ifd = do_open_nofollow(source, O_RDONLY);
