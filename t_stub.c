@@ -42,6 +42,7 @@ size_t max_alloc = (size_t)-1; /* unlimited: helpers link util2.o, where 0 makes
 			       * secure_relative_open() fallback path). */
 char *partial_dir;
 char *module_dir;
+int module_dirfd = -1;
 /* curr_dir[]/curr_dir_len (read by secure_relative_open) are defined in
  * syscall.c, which every helper links -- no stub needed here. */
 filter_rule_list daemon_filter_list;
