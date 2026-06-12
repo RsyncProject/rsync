@@ -58,12 +58,13 @@ TLS_OBJ = tls.o syscall.o android.o util2.o t_stub.o lib/compat.o lib/snprintf.o
 # Programs we must have to run the test cases
 CHECK_PROGS = rsync$(EXEEXT) tls$(EXEEXT) getgroups$(EXEEXT) getfsdev$(EXEEXT) \
 	testrun$(EXEEXT) trimslash$(EXEEXT) t_unsafe$(EXEEXT) t_chmod_secure$(EXEEXT) \
+	t_rename_secure$(EXEEXT) t_symlink_secure$(EXEEXT) \
 	t_secure_relpath$(EXEEXT) wildtest$(EXEEXT) simdtest$(EXEEXT)
 
 CHECK_SYMLINKS = testsuite/chown-fake.test testsuite/devices-fake.test testsuite/xattrs-hlink.test
 
 # Objects for CHECK_PROGS to clean
-CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o t_chmod_secure.o t_secure_relpath.o trimslash.o wildtest.o
+CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o t_chmod_secure.o t_rename_secure.o t_symlink_secure.o t_secure_relpath.o trimslash.o wildtest.o
 
 # note that the -I. is needed to handle config.h when using VPATH
 .c.o:
@@ -193,6 +194,14 @@ t_chmod_secure$(EXEEXT): $(T_CHMOD_SECURE_OBJ)
 T_SECURE_RELPATH_OBJ = t_secure_relpath.o syscall.o android.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o
 t_secure_relpath$(EXEEXT): $(T_SECURE_RELPATH_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_SECURE_RELPATH_OBJ) $(LIBS)
+
+T_RENAME_SECURE_OBJ = t_rename_secure.o syscall.o android.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o
+t_rename_secure$(EXEEXT): $(T_RENAME_SECURE_OBJ)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_RENAME_SECURE_OBJ) $(LIBS)
+
+T_SYMLINK_SECURE_OBJ = t_symlink_secure.o syscall.o android.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o
+t_symlink_secure$(EXEEXT): $(T_SYMLINK_SECURE_OBJ)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_SYMLINK_SECURE_OBJ) $(LIBS)
 
 .PHONY: conf
 conf: configure.sh config.h.in
