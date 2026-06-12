@@ -945,6 +945,38 @@ static int copy_altdest_file(const char *src, const char *dest, struct file_stru
 	return ok ? 0 : -1;
 }
 
+/* Stat an alternate-basis candidate (basis_dir[j]/fname) for a daemon /./
+ * inner-module chroot through the secure resolver, so a --compare/copy/link-dest
+ * basis can't reach outside the inner module via a symlinked parent (the kernel
+ * chroot confines only the outer path).  secure_relative_open() refuses a parent
+ * that escapes beneath the module root.  Plain link_stat() everywhere else --
+ * the non-chroot daemon sanitizes basis paths already, and a local receiver must
+ * still follow an operator's --link-dest=../backup. */
+static int basis_link_stat(const char *path, STRUCT_STAT *stp)
+{
+	extern int am_chrooted;
+	extern unsigned int module_dirlen;
+	if (am_daemon && am_chrooted && module_dirlen && path[0] != '/') {
+		const char *slash = strrchr(path, '/');
+		if (slash) {
+			char dir[MAXPATHLEN];
+			size_t dlen = (size_t)(slash - path);
+			int dfd, r, e;
+			if (dlen >= sizeof dir) { errno = ENAMETOOLONG; return -1; }
+			memcpy(dir, path, dlen);
+			dir[dlen] = '\0';
+			if ((dfd = secure_relative_open(NULL, dir, O_RDONLY | O_DIRECTORY, 0)) < 0)
+				return -1;
+			r = link_stat_at(dfd, slash + 1, stp, 0);
+			e = errno;
+			close(dfd);
+			errno = e;
+			return r;
+		}
+	}
+	return link_stat(path, stp, 0);
+}
+
 /* This is only called for regular files.  We return -2 if we've finished
  * handling the file, -1 if no dest-linking occurred, or a non-negative
  * value if we found an alternate basis file.  If we're called with the
@@ -962,7 +994,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 
 	do {
 		pathjoin(cmpbuf, MAXPATHLEN, basis_dir[j], fname);
-		if (link_stat(cmpbuf, &sxp->st, 0) < 0 || !S_ISREG(sxp->st.st_mode))
+		if (basis_link_stat(cmpbuf, &sxp->st) < 0 || !S_ISREG(sxp->st.st_mode))
 			continue;
 		if (match_level == 0) {
 			best_match = j;
@@ -988,7 +1020,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 	if (j != best_match) {
 		j = best_match;
 		pathjoin(cmpbuf, MAXPATHLEN, basis_dir[j], fname);
-		if (link_stat(cmpbuf, &sxp->st, 0) < 0)
+		if (basis_link_stat(cmpbuf, &sxp->st) < 0)
 			goto got_nothing_for_ya;
 	}
 
@@ -1083,7 +1115,7 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 
 	do {
 		pathjoin(cmpbuf, MAXPATHLEN, basis_dir[j], fname);
-		if (link_stat(cmpbuf, &sxp->st, 0) < 0)
+		if (basis_link_stat(cmpbuf, &sxp->st) < 0)
 			continue;
 		if (ftype != get_file_type(sxp->st.st_mode))
 			continue;
@@ -1110,7 +1142,7 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 	if (j != best_match) {
 		j = best_match;
 		pathjoin(cmpbuf, MAXPATHLEN, basis_dir[j], fname);
-		if (link_stat(cmpbuf, &sxp->st, 0) < 0)
+		if (basis_link_stat(cmpbuf, &sxp->st) < 0)
 			return -1;
 	}
 
