@@ -164,7 +164,12 @@ static int exchange_protocols(int f_in, int f_out, char *buf, size_t bufsiz, int
 	if (!am_client) {
 		char *motd = lp_motd_file();
 		if (motd && *motd) {
-			FILE *f = fopen(motd, "r");
+			/* 'motd file = PATH': motd content is sent to every client, so
+			 * a planted symlink would leak the target's bytes.  Refuse
+			 * symlinks not owned by uid 0 or our euid. */
+			int motd_fd = safe_open_no_attacker_symlinks(motd, O_RDONLY, 0);
+			FILE *f = motd_fd >= 0 ? fdopen(motd_fd, "r") : NULL;
+			if (!f && motd_fd >= 0) close(motd_fd);
 			while (f && !feof(f)) {
 				int len = fread(buf, 1, bufsiz - 1, f);
 				if (len > 0)
@@ -273,7 +278,11 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 
 	if (early_input_file) {
 		STRUCT_STAT st;
-		FILE *f = fopen(early_input_file, "rb");
+		/* --early-input-file=PATH: refuse symlinks not owned by uid 0 or
+		 * our euid anywhere in the path. */
+		int ei_fd = safe_open_no_attacker_symlinks(early_input_file, O_RDONLY, 0);
+		FILE *f = ei_fd >= 0 ? fdopen(ei_fd, "rb") : NULL;
+		if (!f && ei_fd >= 0) close(ei_fd);
 		if (!f || do_fstat(fileno(f), &st) < 0) {
 			rsyserr(FERROR, errno, "failed to open %s", early_input_file);
 			return -1;
@@ -1498,21 +1507,58 @@ static void create_pid_file(void)
 	char pidbuf[32];
 	STRUCT_STAT st1, st2;
 	char *fail = NULL;
+	const char *base = pid_file;
+	int pdfd = -1;
 
 	if (!pid_file || !*pid_file)
 		return;
 
 #ifdef O_NOFOLLOW
-#define SAFE_OPEN_FLAGS (O_CREAT|O_NOFOLLOW)
+#define SAFE_NOFOLLOW O_NOFOLLOW
 #else
-#define SAFE_OPEN_FLAGS (O_CREAT)
+#define SAFE_NOFOLLOW 0
+#endif
+
+#ifdef AT_FDCWD
+	/* Pin the parent directory so the existence check, open and re-stat below
+	 * all resolve the leaf against one stable directory inode, removing the
+	 * lstat->open path race.  The parent is operator-configured and trusted, so
+	 * it is opened following symlinks (e.g. a /var/run -> /run); only the leaf
+	 * is opened/checked O_NOFOLLOW (the do_*_atfd wrappers force that). */
+	{
+		const char *slash = strrchr(pid_file, '/');
+		char dirbuf[MAXPATHLEN];
+		const char *dir = ".";
+		if (slash) {
+			size_t dlen = slash == pid_file ? 1 : (size_t)(slash - pid_file);
+			if (dlen >= sizeof dirbuf) {
+				rprintf(FLOG, "pid file path is too long: %s\n", pid_file);
+				exit_cleanup(RERR_FILEIO);
+			}
+			memcpy(dirbuf, pid_file, dlen);
+			dirbuf[dlen] = '\0';
+			dir = dirbuf;
+			base = slash + 1;
+		}
+		if ((pdfd = do_open(dir, O_RDONLY|O_DIRECTORY, 0)) < 0) {
+			rsyserr(FLOG, errno, "failed to open pid-file directory \"%s\"", dir);
+			exit_cleanup(RERR_FILEIO);
+		}
+	}
+#define PID_LSTAT(stp) do_lstat_atfd(pdfd, base, stp)
+#define PID_UNLINK()   do_unlink_atfd(pdfd, base, 0)
+#define PID_OPEN()     do_open_atfd(pdfd, base, O_RDWR|O_CREAT, 0664)
+#else
+#define PID_LSTAT(stp) do_lstat(base, stp)
+#define PID_UNLINK()   unlink(base)
+#define PID_OPEN()     do_open(base, O_RDWR|O_CREAT|SAFE_NOFOLLOW, 0664)
 #endif
 
 	/* These tests make sure that a temp-style lock dir is handled safely. */
 	st1.st_mode = 0;
-	if (do_lstat(pid_file, &st1) == 0 && !S_ISREG(st1.st_mode) && unlink(pid_file) < 0)
+	if (PID_LSTAT(&st1) == 0 && !S_ISREG(st1.st_mode) && PID_UNLINK() < 0)
 		fail = "unlink";
-	else if ((pid_file_fd = do_open(pid_file, O_RDWR|SAFE_OPEN_FLAGS, 0664)) < 0)
+	else if ((pid_file_fd = PID_OPEN()) < 0)
 		fail = S_ISREG(st1.st_mode) ? "open" : "create";
 	else if (!lock_range(pid_file_fd, 0, 4))
 		fail = "lock";
@@ -1520,7 +1566,7 @@ static void create_pid_file(void)
 		fail = "fstat opened";
 	else if (st1.st_size > (int)sizeof pidbuf)
 		fail = "find small";
-	else if (do_lstat(pid_file, &st2) < 0)
+	else if (PID_LSTAT(&st2) < 0)
 		fail = "lstat";
 	else if (!S_ISREG(st1.st_mode))
 		fail = "avoid file overwrite race for";
@@ -1543,6 +1589,13 @@ static void create_pid_file(void)
 			 fail = "write";
 		cleanup_set_pid(pid); /* Mark the file for removal on exit, even if the write failed. */
 	}
+
+#undef PID_LSTAT
+#undef PID_UNLINK
+#undef PID_OPEN
+#undef SAFE_NOFOLLOW
+	if (pdfd >= 0)
+		close(pdfd);
 
 	if (fail) {
 		char msg[1024];
