@@ -1036,7 +1036,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	 * (am_daemon && !am_chrooted) -- the protection has nothing to do
 	 * with symlink munging, so a module configured with
 	 * "munge symlinks = false" must still get the secure-open path. */
-	use_secure_symlinks = am_daemon && !am_chrooted;
+	use_secure_symlinks = am_daemon && (!am_chrooted || module_dirlen);
 
 	if (gid_list.count) {
 		gid_t *gid_array = gid_list.items;

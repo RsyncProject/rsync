@@ -100,6 +100,7 @@ static int updating_basis_or_equiv;
 static int secure_basis_open(const char *basedir, const char *relpath, int flags, mode_t mode)
 {
 	extern int am_daemon, am_chrooted;
+	extern unsigned int module_dirlen;
 
 	/* The confined resolver is only needed for the sanitizing daemon
 	 * (am_daemon && !am_chrooted, i.e. use_secure_symlinks).  Local /
@@ -108,7 +109,7 @@ static int secure_basis_open(const char *basedir, const char *relpath, int flags
 	 * --link-dest=../01 must resolve against the cwd as a bare open did before
 	 * the hardening (confining it would reject the legitimate sibling "..",
 	 * #915). */
-	if (!am_daemon || am_chrooted) {
+	if (!am_daemon || (am_chrooted && !module_dirlen)) {
 		if (basedir) {
 			char fullpath[MAXPATHLEN];
 			if (pathjoin(fullpath, sizeof fullpath, basedir, relpath) >= sizeof fullpath) {
