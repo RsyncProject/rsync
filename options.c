@@ -1086,6 +1086,8 @@ static ssize_t parse_size_arg(const char *size_arg, char def_suf, const char *op
 	int reps, mult, len;
 	const char *arg, *err = "invalid", *min_max = NULL;
 	ssize_t limit = -1, size = 1;
+	ssize_t size_max = max_value >= 0 ? max_value : (ssize_t)(SIZE_MAX / 2);
+	double dsize;
 
 	for (arg = size_arg; isDigit(arg); arg++) {}
 	if (*arg == '.' || *arg == get_decimal_point()) /* backward compatibility: always allow '.' */
@@ -1120,11 +1122,38 @@ static ssize_t parse_size_arg(const char *size_arg, char def_suf, const char *op
 		mult = 1024, arg += 2;
 	else
 		goto failure;
-	while (reps--)
+	while (reps--) {
+		if (size > size_max / mult) {
+			err = "too large";
+			min_max = "max";
+			limit = max_value;
+			goto failure;
+		}
 		size *= mult;
-	size *= atof(size_arg);
-	if ((*arg == '+' || *arg == '-') && arg[1] == '1' && arg != size_arg)
-		size += atoi(arg), arg += 2;
+	}
+	errno = 0;
+	dsize = strtod(size_arg, NULL);
+	if (errno == ERANGE || dsize < 0 || dsize > (double)size_max / size
+	 || (max_value < 0 && dsize >= (double)size_max / size)) {
+		err = "too large";
+		min_max = "max";
+		limit = max_value;
+		goto failure;
+	}
+	size = (ssize_t)(dsize * size);
+	if ((*arg == '+' || *arg == '-') && arg[1] == '1' && arg != size_arg) {
+		if (*arg == '+') {
+			if (size == size_max) {
+				err = "too large";
+				min_max = "max";
+				limit = max_value;
+				goto failure;
+			}
+			size++;
+		} else
+			size--;
+		arg += 2;
+	}
 	if (*arg)
 		goto failure;
 	if (size < 0 || (max_value >= 0 && size > max_value)) {
@@ -1957,6 +1986,10 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		ssize_t size = parse_size_arg(max_alloc_arg, 'B', "max-alloc", 1024*1024, -1, True);
 		if (size < 0)
 			goto cleanup;
+		if (size == 0) {
+			snprintf(err_buf, sizeof err_buf, "max-alloc must be greater than zero\n");
+			goto cleanup;
+		}
 		max_alloc = size;
 	}
 	if (!max_alloc)
@@ -2533,7 +2566,7 @@ static char SPLIT_ARG_WHEN_OLD[1];
  **/
 char *safe_arg(const char *opt, const char *arg)
 {
-#define SHELL_CHARS "!#$&;|<>(){}\"'` \t\\"
+#define SHELL_CHARS "!#$&;|<>(){}\"\'` \t\n\r\\"
 #define WILD_CHARS  "*?[]" /* We don't allow remote brace expansion */
 	BOOL is_filename_arg = !opt;
 	char *escapes = is_filename_arg ? SHELL_CHARS : WILD_CHARS SHELL_CHARS;
