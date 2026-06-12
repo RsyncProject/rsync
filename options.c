@@ -595,7 +595,7 @@ enum {OPT_SERVER = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_NO_D, OPT_APPEND, OPT_NO_ICONV, OPT_INFO, OPT_DEBUG, OPT_BLOCK_SIZE,
       OPT_USERMAP, OPT_GROUPMAP, OPT_CHOWN, OPT_BWLIMIT, OPT_STDERR,
       OPT_OLD_COMPRESS, OPT_NEW_COMPRESS, OPT_NO_COMPRESS, OPT_OLD_ARGS,
-      OPT_STOP_AFTER, OPT_STOP_AT,
+      OPT_STOP_AFTER, OPT_STOP_AT, OPT_LTFS,
       OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
@@ -624,7 +624,7 @@ static struct poptOption long_options[] = {
   {"no-r",             0,  POPT_ARG_VAL,    &recurse, 0, 0, 0 },
   {"inc-recursive",    0,  POPT_ARG_VAL,    &allow_inc_recurse, 1, 0, 0 },
   {"no-inc-recursive", 0,  POPT_ARG_VAL,    &allow_inc_recurse, 0, 0, 0 },
-  {"ltfs",             0,  POPT_ARG_VAL,    &ltfs_mode, 1, 0, 0 },
+  {"ltfs",             0,  POPT_ARG_NONE,   0, OPT_LTFS, 0, 0 },
   {"no-ltfs",          0,  POPT_ARG_VAL,    &ltfs_mode, 0, 0, 0 },
   {"i-r",              0,  POPT_ARG_VAL,    &allow_inc_recurse, 1, 0, 0 },
   {"no-i-r",           0,  POPT_ARG_VAL,    &allow_inc_recurse, 0, 0, 0 },
@@ -1577,6 +1577,14 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			preserve_devices = preserve_specials = 0;
 			break;
 
+		case OPT_LTFS:
+			ltfs_mode = 1;
+			/* Imply -t (like --archive does) so the index quick-check can
+			 * skip unchanged files on a later run.  Processed here in option
+			 * order so a subsequent --no-times can still override it. */
+			preserve_mtimes = 1;
+			break;
+
 		case 'h':
 			human_readable++;
 			break;
@@ -2420,6 +2428,13 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 				 "--checksum cannot be used with --ltfs (it would read the entire tape)\n");
 			goto cleanup;
 		}
+		/* --ltfs implies -t (see OPT_LTFS); a 0 here means the user added an
+		 * explicit --no-times afterward.  We honor it, but warn: without
+		 * preserved mtimes the index quick-check can't skip unchanged files,
+		 * so every run re-reads the whole tape. */
+		if (!preserve_mtimes && !am_server)
+			rprintf(FWARNING,
+				"--ltfs with --no-times: unchanged files cannot be skipped by mtime, so every run re-reads the tape.\n");
 	}
 
 	if (append_mode) {
