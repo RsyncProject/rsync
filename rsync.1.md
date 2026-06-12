@@ -938,9 +938,14 @@ expand it.
     file anyway) and forces [`--no-inc-recursive`](#opt) (the complete file
     list is needed before the read order can be chosen).  It also refuses
     [`--checksum`](#opt), which would read every byte of every file off the
-    tape just to decide what to transfer.  The fast index metadata still drives
-    the normal quick check (size & modify time), so unchanged files are skipped
-    without touching their data.
+    tape just to decide what to transfer.
+
+    The fast index metadata still drives the normal quick check (size & modify
+    time), so unchanged files are skipped without touching their data.  For
+    that to work across runs the destination must keep the source mtimes, so
+    `--ltfs` also implies [`--times`](#opt) (like [`--archive`](#opt) does); a
+    later `--no-times` overrides it but triggers a warning, since without
+    preserved mtimes every run re-reads the whole tape.
 
     This option only affects reading the source; writing a transfer *onto* an
     LTFS volume is not currently optimized.  It requires a build with extended
