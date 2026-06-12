@@ -29,6 +29,11 @@
 extern int am_root;
 extern int am_server;
 extern int am_daemon;
+extern int am_chrooted;
+extern char *module_dir;
+extern unsigned int module_dirlen;
+extern int module_dirfd;
+extern unsigned int curr_dir_len;
 extern int am_sender;
 extern int am_generator;
 extern int inc_recurse;
@@ -214,10 +219,34 @@ void show_flist_stats(void)
  *
  * The stat structure pointed to by stp will contain information about the
  * link or the referent as appropriate, if they exist. */
+/* Set by send_directory() to the fd of the directory it is currently scanning
+ * (and that dir's path prefix), so the per-entry stat can go through the
+ * already-open dir fd instead of re-resolving the full path for every entry.
+ * Pure performance and sender-side only -- the scanned dir is already open, so
+ * fstatat(scan_dirfd, basename) is identical to lstat(scandir/basename); no
+ * confinement is implied or needed. */
+static int scan_dirfd = -1;
+static const char *scan_dir_prefix;
+static int scan_dir_prefix_len;
+
+static int scan_link_stat(const char *path, STRUCT_STAT *stp, int follow_dirlinks)
+{
+	/* Use the held scan fd only for a single component directly inside the
+	 * scanned dir, and only when am_root >= 0 (link_stat_at folds in no
+	 * fake-super %stat xattr; link_stat does so via get_stat_xattr, a no-op
+	 * once am_root >= 0). */
+	if (scan_dirfd >= 0 && am_root >= 0
+	 && strncmp(path, scan_dir_prefix, scan_dir_prefix_len) == 0
+	 && path[scan_dir_prefix_len] == '/'
+	 && strchr(path + scan_dir_prefix_len + 1, '/') == NULL)
+		return link_stat_at(scan_dirfd, path + scan_dir_prefix_len + 1, stp, follow_dirlinks);
+	return link_stat(path, stp, follow_dirlinks);
+}
+
 static int readlink_stat(const char *path, STRUCT_STAT *stp, char *linkbuf)
 {
 #ifdef SUPPORT_LINKS
-	if (link_stat(path, stp, copy_dirlinks) < 0)
+	if (scan_link_stat(path, stp, copy_dirlinks) < 0)
 		return -1;
 	if (S_ISLNK(stp->st_mode)) {
 		int llen = do_readlink(path, linkbuf, MAXPATHLEN - 1);
@@ -1892,6 +1921,77 @@ static void interpret_stat_error(const char *fname, int is_dir)
 	}
 }
 
+#if defined HAVE_FDOPENDIR && defined HAVE_DIRFD
+/* Open a source directory for scanning confined beneath the transfer root.
+ * secure_relative_open() does a per-component O_NOFOLLOW walk that refuses a
+ * parent component raced into a symlink pointing out of the tree; fdopendir()
+ * then turns the held fd into the DIR* the scan reads.  This mirrors the
+ * sender's confined content open (sender.c): the directory enumeration must be
+ * confined the same way, or a parent-symlink race (or, for a daemon following
+ * mode, an in-module symlink to outside) lets the scan enumerate an out-of-tree
+ * directory and leak its names/metadata/symlink targets.  O_DIRECTORY without
+ * O_NOFOLLOW makes secure_relative_open() follow in-tree directory symlinks
+ * beneath the anchor and refuse escapes, so this serves both the default
+ * no-follow scan and a daemon's symlink-following scan (see the caller).
+ * Returns NULL with errno set on failure, like opendir(). */
+static DIR *secure_opendir(const char *fbuf)
+{
+	int dfd, fl;
+	DIR *d;
+
+	if (am_daemon && (!am_chrooted || module_dirlen)
+	 && module_dir && module_dir[0] == '/' && *fbuf != '/' && module_dirfd >= 0
+	 && curr_dir_len >= module_dirlen
+	 && strncmp(curr_dir, module_dir, module_dirlen) == 0
+	 && (curr_dir[module_dirlen] == '\0' || curr_dir[module_dirlen] == '/')) {
+		/* Daemon: anchor the confined scan at the module root pinned by identity
+		 * at module setup (module_dirfd, opened while the daemon was positioned
+		 * there and still privileged), and walk the module-relative path of the
+		 * scan target beneath it.  This re-follows the same in-module path -- so a
+		 * legitimate in-module ".." climb (sub/climb -> ../sibling) or an in-module
+		 * directory symlink is followed, and an escape refused -- without
+		 * re-walking the absolute module path as the dropped uid (the privilege-
+		 * drop EACCES), and without assuming the lexical curr_dir depth matches the
+		 * real cwd (a followed in-module symlink can desync them; anchoring at the
+		 * pinned module root and walking down the logical path is correct either
+		 * way). */
+		const char *p = curr_dir + module_dirlen;
+		char modrel[MAXPATHLEN];
+		while (*p == '/')
+			p++;
+		if ((size_t)snprintf(modrel, sizeof modrel, "%s%s%s",
+				     p, *p ? "/" : "", fbuf) >= sizeof modrel) {
+			errno = ENAMETOOLONG;
+			return NULL;
+		}
+		dfd = secure_relative_open_at(module_dirfd, *modrel ? modrel : ".",
+					      O_RDONLY | O_DIRECTORY, 0);
+	} else if (*fbuf == '/') {
+		/* An absolute scan path (an absolute --relative / --files-from name, or a
+		 * "/" transfer root): anchor at "/" -- operator-named, trusted. */
+		const char *relp = fbuf;
+		while (*relp == '/')
+			relp++;
+		dfd = secure_relative_open("/", relp, O_RDONLY | O_DIRECTORY, 0);
+	} else {
+		/* Non-daemon (or chrooted) sender: confine beneath the cwd the sender
+		 * chdir'd into (the transfer root). */
+		dfd = secure_relative_open(NULL, fbuf, O_RDONLY | O_DIRECTORY, 0);
+	}
+
+	if (dfd < 0)
+		return NULL;
+	if ((fl = fcntl(dfd, F_GETFD)) >= 0)
+		fcntl(dfd, F_SETFD, fl | FD_CLOEXEC);
+	if (!(d = fdopendir(dfd))) {
+		int save = errno;
+		close(dfd);
+		errno = save;
+	}
+	return d;
+}
+#endif
+
 /* This function is normally called by the sender, but the receiving side also
  * calls it from get_dirlist() with f set to -1 so that we just construct the
  * file list in memory without sending it over the wire.  Also, get_dirlist()
@@ -1910,7 +2010,28 @@ static void send_directory(int f, struct file_list *flist, char *fbuf, int len,
 
 	assert(flist != NULL);
 
-	if (!(d = opendir(fbuf))) {
+#if defined HAVE_FDOPENDIR && defined HAVE_DIRFD
+	/* Confine the enumeration beneath the transfer root.  secure_opendir()
+	 * follows in-tree directory symlinks (RESOLVE_BENEATH) and refuses one that
+	 * escapes, so it serves both modes:
+	 *   - a daemon/hardened sender (secure_relpath_active()) is confined to the
+	 *     module in EVERY mode -- including -L/--copy-dirlinks/--copy-unsafe-
+	 *     links, matching the content open (sender_open_copylinks_confined) --
+	 *     so a following mode cannot be lured to enumerate outside the module;
+	 *   - a non-daemon sender is confined in the default no-follow mode; its
+	 *     symlink-following modes intentionally dereference out of the
+	 *     operator's own tree, so they keep the legacy opendir().
+	 * f >= 0 is the sender's outgoing scan; get_dirlist() passes f < 0 and keeps
+	 * the legacy opendir(). */
+	if (f >= 0 && (secure_relpath_active()
+		    || !(copy_links || copy_unsafe_links || copy_dirlinks)))
+		d = secure_opendir(fbuf);
+	else
+		d = opendir(fbuf);
+#else
+	d = opendir(fbuf);
+#endif
+	if (!d) {
 		if (errno == ENOENT) {
 			if (am_sender) /* Can abuse this for vanished error w/ENOENT: */
 				interpret_stat_error(fbuf, True);
@@ -1932,6 +2053,14 @@ static void send_directory(int f, struct file_list *flist, char *fbuf, int len,
 		remainder = MAXPATHLEN - (len + 1);
 	} else
 		remainder = 0;
+
+#ifdef HAVE_DIRFD
+	/* Let the per-entry stat (readlink_stat -> scan_link_stat) go through the
+	 * already-open directory fd instead of re-resolving fbuf for each name. */
+	scan_dirfd = dirfd(d);
+	scan_dir_prefix = fbuf;
+	scan_dir_prefix_len = len;
+#endif
 
 	for (errno = 0, di = readdir(d); di; errno = 0, di = readdir(d)) {
 		unsigned name_len;
@@ -1961,6 +2090,7 @@ static void send_directory(int f, struct file_list *flist, char *fbuf, int len,
 		send_file_name(f, flist, fbuf, NULL, flags, filter_level);
 	}
 
+	scan_dirfd = -1;	/* fbuf is about to be reused / d closed */
 	fbuf[len] = '\0';
 
 	if (errno) {
