@@ -1332,7 +1332,7 @@ char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth, i
  * Also cleans the path using the clean_fname() function. */
 int change_dir(const char *dir, int set_path_only)
 {
-	extern int am_daemon, am_chrooted;
+	extern int am_daemon, am_chrooted, am_sender;
 	static int initialised, skipped_chdir;
 	unsigned int len;
 
@@ -1374,6 +1374,35 @@ int change_dir(const char *dir, int set_path_only)
 					return 0;
 				}
 				close(dfd);
+#if defined O_NOFOLLOW && defined O_DIRECTORY
+			} else if (!am_chrooted && !am_sender) {
+				/* The destination is operator-supplied: resolve it with
+				 * safe_open_no_attacker_symlinks -- follow the operator's/root's
+				 * own symlinked dest (the /backup -> /mnt/disk admin pattern) but
+				 * refuse one an attacker raced in from another uid, closing the
+				 * dest chdir TOCTOU.  Strip the trailing slash so the final
+				 * O_NOFOLLOW sees the bare name. */
+				char nf[MAXPATHLEN];
+				unsigned int nl = len;
+				int dfd;
+				if (nl >= sizeof nf) {
+					errno = ENAMETOOLONG;
+					return 0;
+				}
+				memcpy(nf, dir, nl + 1);
+				while (nl > 1 && nf[nl-1] == '/')
+					nf[--nl] = '\0';
+				dfd = safe_open_no_attacker_symlinks(nf, O_RDONLY | O_DIRECTORY, 0);
+				if (dfd < 0)
+					return 0;
+				if (fchdir(dfd) != 0) {
+					int e = errno;
+					close(dfd);
+					errno = e;
+					return 0;
+				}
+				close(dfd);
+#endif
 			} else if (chdir(dir)) {
 				return 0;
 			}
@@ -1429,6 +1458,19 @@ int change_dir(const char *dir, int set_path_only)
 				if (dfd < 0) {
 					chdir_failed = 1;
 				} else {
+					chdir_failed = fchdir(dfd) != 0;
+					close(dfd);
+				}
+			} else if (!am_chrooted && !am_sender) {
+				/* Non-daemon receiver: confine the operator-named relative
+				 * destination like the absolute case -- refuse a component
+				 * symlink not owned by uid 0 or our euid, while still following
+				 * the operator's own symlinks. */
+				int dfd = safe_open_no_attacker_symlinks(curr_dir,
+					O_RDONLY | O_DIRECTORY, 0);
+				if (dfd < 0)
+					chdir_failed = 1;
+				else {
 					chdir_failed = fchdir(dfd) != 0;
 					close(dfd);
 				}
