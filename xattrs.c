@@ -47,6 +47,8 @@ extern int xattr_sum_len;
 
 #define MAX_XATTR_DIGEST_LEN MD5_DIGEST_LEN
 #define MAX_FULL_DATUM 32
+#define MAX_XATTR_LIST_BYTES ((size_t)512 * 1024 * 1024)
+#define MAX_XATTR_VALUE_BYTES ((size_t)128 * 1024 * 1024)
 
 #define HAS_PREFIX(str, prfx) (*(str) == *(prfx) && strncmp(str, prfx, sizeof (prfx) - 1) == 0)
 
@@ -750,6 +752,10 @@ int recv_xattr_request(struct file_struct *file, int f_in)
 
 		old_datum = rxa->datum;
 		rxa->datum_len = read_varint_size(f_in, MAX_WIRE_XATTR_DATALEN, "xattr datum_len");
+		if (rxa->datum_len > MAX_XATTR_VALUE_BYTES) {
+			rprintf(FERROR, "xattr datum_len exceeds per-value limit [%s]\n", who_am_i());
+			exit_cleanup(RERR_PROTOCOL);
+		}
 
 		if (SIZE_MAX - rxa->name_len < rxa->datum_len)
 			overflow_exit("recv_xattr_request");
@@ -778,6 +784,7 @@ void receive_xattr(int f, struct file_struct *file)
 	int need_sort = 1;
 #endif
 	int ndx = read_varint(f);
+	size_t total_xattr_bytes = 0;
 
 	if (ndx < 0 || (size_t)ndx > rsync_xal_l.count) {
 		rprintf(FERROR, "receive_xattr: xa index %d out of"
@@ -803,6 +810,19 @@ void receive_xattr(int f, struct file_struct *file)
 		size_t datum_len = read_varint_size(f, MAX_WIRE_XATTR_DATALEN, "xattr datum_len");
 		size_t dget_len = datum_len > MAX_FULL_DATUM ? 1 + (size_t)xattr_sum_len : datum_len;
 		size_t extra_len = MIGHT_NEED_RPRE ? RPRE_LEN : 0;
+		if (datum_len > MAX_XATTR_VALUE_BYTES) {
+			rprintf(FERROR, "xattr datum_len exceeds per-value limit [%s]\n", who_am_i());
+			exit_cleanup(RERR_PROTOCOL);
+		}
+		if (SIZE_MAX - total_xattr_bytes < name_len
+		 || SIZE_MAX - total_xattr_bytes - name_len < datum_len) {
+			overflow_exit("receive_xattr");
+		}
+		total_xattr_bytes += name_len + datum_len;
+		if (total_xattr_bytes > MAX_XATTR_LIST_BYTES) {
+			rprintf(FERROR, "xattr list exceeds per-file limit [%s]\n", who_am_i());
+			exit_cleanup(RERR_PROTOCOL);
+		}
 		if (SIZE_MAX - dget_len < extra_len || SIZE_MAX - dget_len - extra_len < name_len)
 			overflow_exit("receive_xattr");
 		ptr = new_array(char, dget_len + extra_len + name_len);
