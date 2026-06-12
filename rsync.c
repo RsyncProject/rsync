@@ -494,6 +494,8 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	int change_uid, change_gid;
 	mode_t new_mode = file->mode;
 	int inherit;
+	int dfd = -1;            /* held dir fd for the entry's own dir, or -1 */
+	const char *leaf = NULL; /* leaf of fname relative to dfd */
 
 	if (!sxp) {
 		if (dry_run)
@@ -508,6 +510,14 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		inherit = !preserve_perms;
 	} else
 		inherit = !preserve_perms && file->flags & FLAG_DIR_CREATED;
+
+	/* Resolve the entry's directory once; the chown/chmod/times ops below
+	 * issue single-component *at() calls against it.  -1 => full-path wrappers. */
+	dfd = held_dfd_for(fname, file);
+	if (dfd >= 0) {
+		const char *slash = strrchr(fname, '/');
+		leaf = slash ? slash + 1 : fname;
+	}
 
 	if (inherit && S_ISDIR(new_mode) && sxp->st.st_mode & S_ISGID) {
 		/* We just created this directory and its setgid
@@ -547,7 +557,8 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		if (am_root >= 0) {
 			uid_t uid = change_uid ? (uid_t)F_OWNER(file) : sxp->st.st_uid;
 			gid_t gid = change_gid ? (gid_t)F_GROUP(file) : sxp->st.st_gid;
-			if (do_lchown_at(fname, uid, gid) != 0) {
+			if ((dfd >= 0 ? do_lchown_atfd(dfd, leaf, uid, gid)
+				      : do_lchown_at(fname, uid, gid)) != 0) {
 				/* We shouldn't have attempted to change uid
 				 * or gid unless have the privilege. */
 				rsyserr(FERROR_XFER, errno, "%s %s failed",
@@ -631,7 +642,9 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	}
 #endif
 	if (updated & (UPDATED_MTIME|UPDATED_ATIME)) {
-		int ret = set_times(fname, &sx2.st);
+		int ret = dfd >= 0 ? set_times_at(dfd, leaf, &sx2.st) : -2;
+		if (ret == -2)
+			ret = set_times(fname, &sx2.st);
 		if (ret < 0) {
 			rsyserr(FERROR_XFER, errno, "failed to set times on %s", full_fname(fname));
 			goto cleanup;
@@ -657,7 +670,9 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 
 #ifdef HAVE_CHMOD
 	if (!BITS_EQUAL(sxp->st.st_mode, new_mode, CHMOD_BITS)) {
-		int ret = am_root < 0 ? 0 : do_chmod_at(fname, new_mode);
+		int ret = am_root < 0 ? 0
+			: dfd >= 0 && !S_ISLNK(new_mode) ? do_chmod_atfd(dfd, leaf, new_mode)
+			: do_chmod_at(fname, new_mode);
 		if (ret < 0) {
 			rsyserr(FERROR_XFER, errno,
 				"failed to set permissions on %s",
