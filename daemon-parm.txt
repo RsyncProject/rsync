@@ -6,6 +6,7 @@ STRING	daemon_gid		NULL
 STRING	daemon_uid		NULL
 STRING	motd_file		NULL
 STRING	pid_file		NULL
+STRING	proxy_protocol_hosts	NULL
 STRING	socket_options		NULL
 
 INTEGER	listen_backlog		5
