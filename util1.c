@@ -1363,7 +1363,7 @@ int change_dir(const char *dir, int set_path_only)
 			 * could redirect the daemon's CWD out of the module before any
 			 * transfer begins.  For daemon receivers, refuse symlinks not
 			 * owned by uid 0 or our euid in the path walk. */
-			if (am_daemon && !am_chrooted) {
+			if (am_daemon && (!am_chrooted || module_dirlen)) {
 				int dfd = safe_open_no_attacker_symlinks(dir, O_RDONLY | O_DIRECTORY, 0);
 				if (dfd < 0)
 					return 0;
@@ -1410,7 +1410,7 @@ int change_dir(const char *dir, int set_path_only)
 			 * branch still anchors at the operator-trusted
 			 * directory rather than wherever the kernel CWD
 			 * happens to be. */
-			if (am_daemon && !am_chrooted) {
+			if (am_daemon && (!am_chrooted || module_dirlen)) {
 				const char *basedir = NULL;
 				char prefix[MAXPATHLEN];
 				int dfd;
