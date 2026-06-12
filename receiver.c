@@ -670,6 +670,8 @@ int recv_files(int f_in, int f_out, char *local_name)
 		ndx = read_ndx_and_attrs(f_in, f_out, &iflags, &fnamecmp_type,
 					 xname, &xlen);
 		if (ndx == NDX_DONE) {
+			/* Chunk/phase boundary: drop any held dir fd. */
+			reset_dir_fd_cache();
 			if (!am_server && cur_flist) {
 				set_current_file_index(NULL, 0);
 				if (INFO_GTE(PROGRESS, 2))
@@ -880,9 +882,20 @@ int recv_files(int f_in, int f_out, char *local_name)
 				fnamecmp = fname;
 		}
 
-		/* open the file (secure_basis_open tolerates an operator-trusted
-		 * absolute fnamecmp, e.g. an absolute --partial-dir basis) */
-		fd1 = secure_basis_open(basedir, fnamecmp, O_RDONLY, 0);
+		/* Open the delta basis.  When it lives in the entry's own dir (no
+		 * alternate basedir), read it via the held dir fd with O_NOFOLLOW: a
+		 * regular-file basis is never legitimately a symlink, and refusing a
+		 * planted one avoids both an escape and a basis-content info-leak.
+		 * Otherwise use secure_basis_open, which also tolerates an operator-
+		 * trusted absolute fnamecmp (e.g. an absolute --partial-dir basis). */
+		{
+			int bdfd;
+			if (!basedir && (bdfd = held_dfd_for(fnamecmp, file)) >= 0) {
+				const char *slash = strrchr(fnamecmp, '/');
+				fd1 = do_open_atfd(bdfd, slash ? slash + 1 : fnamecmp, O_RDONLY, 0);
+			} else
+				fd1 = secure_basis_open(basedir, fnamecmp, O_RDONLY, 0);
+		}
 
 		if (fd1 == -1 && protocol_version < 29) {
 			if (fnamecmp != fname) {

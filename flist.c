@@ -261,6 +261,30 @@ int link_stat(const char *path, STRUCT_STAT *stp, int follow_dirlinks)
 #endif
 }
 
+/* Held-dirfd variant of link_stat(): stat single-component `name` relative to
+ * directory fd `dfd`, instead of re-resolving a full path.  Equivalent to
+ * link_stat() only when NOT in --fake-super mode -- x_stat/x_lstat fold the
+ * fake-super %stat xattr into the result via get_stat_xattr(), which is a
+ * path-based no-op once am_root >= 0.  Callers therefore use this only when
+ * am_root >= 0 (and a valid dfd), falling back to link_stat() otherwise. */
+int link_stat_at(int dfd, const char *name, STRUCT_STAT *stp, int follow_dirlinks)
+{
+#ifdef SUPPORT_LINKS
+	if (copy_links)
+		return do_stat_atfd(dfd, name, stp);
+	if (do_lstat_atfd(dfd, name, stp) < 0)
+		return -1;
+	if (follow_dirlinks && S_ISLNK(stp->st_mode)) {
+		STRUCT_STAT st;
+		if (do_stat_atfd(dfd, name, &st) == 0 && S_ISDIR(st.st_mode))
+			*stp = st;
+	}
+	return 0;
+#else
+	return do_stat_atfd(dfd, name, stp);
+#endif
+}
+
 static inline int path_is_daemon_excluded(char *path, int ignore_filename)
 {
 	if (daemon_filter_list.head) {
