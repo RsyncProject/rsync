@@ -1305,6 +1305,8 @@ static void unbackslash_arg(char *s)
 	*t = '\0';
 }
 
+#define MAX_DAEMON_ARGS (MAX_ARGS * 16)
+
 void read_args(int f_in, char *mod_name, char *buf, size_t bufsiz, int rl_nulls,
 	       int unescape, char ***argv_p, int *argc_p, char **request_p)
 {
@@ -1327,6 +1329,11 @@ void read_args(int f_in, char *mod_name, char *buf, size_t bufsiz, int rl_nulls,
 	while (1) {
 		if (read_line(f_in, buf, bufsiz, rl_flags) == 0)
 			break;
+
+		if (mod_name && argc >= MAX_DAEMON_ARGS - 1) {
+			rprintf(FERROR, "too many daemon arguments\n");
+			exit_cleanup(RERR_PROTOCOL);
+		}
 
 		if (argc == maxargs-1) {
 			maxargs += MAX_ARGS;

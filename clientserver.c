@@ -1328,6 +1328,18 @@ static void send_listing(int fd)
 		io_printf(fd,"@RSYNCD: EXIT\n");
 }
 
+static int proxy_peer_allowed(int fd)
+{
+	const char *host = undetermined_hostname;
+	const char *addr = client_addr(fd);
+
+	if (!allow_proxy_protocol_peer(lp_proxy_protocol_hosts(), addr, &host)) {
+		rprintf(FLOG, "proxy protocol rejected from untrusted peer %s (%s)\n", host, addr);
+		return 0;
+	}
+	return 1;
+}
+
 static int load_config(int globals_only)
 {
 	if (!config_file) {
@@ -1365,8 +1377,10 @@ int start_daemon(int f_in, int f_out)
 	if (!load_config(0))
 		exit_cleanup(RERR_SYNTAX);
 
-	if (lp_proxy_protocol() && !read_proxy_protocol_header(f_in))
-		return -1;
+	if (lp_proxy_protocol()) {
+		if (!proxy_peer_allowed(f_in) || !read_proxy_protocol_header(f_in))
+			return -1;
+	}
 
 	/* Do reverse DNS lookup before chroot/setuid. The result is cached,
 	 * so the later client_name() call will use this cached value. This
@@ -1664,6 +1678,17 @@ int daemon_main(void)
 		exit_cleanup(RERR_SYNTAX);
 	}
 	set_dparams(0);
+
+	/* "proxy protocol = true" with no trusted-proxy list rejects every
+	 * connection as an untrusted proxy peer (fail-closed).  That is intended,
+	 * but silent at startup, so warn the operator while stderr is still open. */
+	if (lp_proxy_protocol()
+	 && (!lp_proxy_protocol_hosts() || !*lp_proxy_protocol_hosts())) {
+		rprintf(FWARNING,
+			"\"proxy protocol = true\" but \"proxy protocol hosts\" is unset:"
+			" all connections will be rejected as untrusted proxy peers."
+			"  Set \"proxy protocol hosts\" to your trusted proxy's address.\n");
+	}
 
 	if (no_detach)
 		create_pid_file();

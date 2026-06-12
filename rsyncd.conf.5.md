@@ -289,6 +289,13 @@ in the values of parameters.  See that section for details.
     others, then you will need to setup multiple rsync daemon processes on
     different ports.
 
+0.  `proxy protocol hosts`
+
+    This global parameter lists the socket peer IP addresses that are allowed
+    to supply a `proxy protocol` header.  The syntax is the same token format
+    used by `hosts allow`.  When `proxy protocol = true`, this list must match
+    the direct peer before rsync trusts the forwarded client address.
+
 0.  `name converter`
 
     This parameter lets you specify a program that will be run by the rsync
