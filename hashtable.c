@@ -120,7 +120,7 @@ void *hashtable_find(struct hashtable *tbl, int64 key, void *data_when_new)
 
 	if (!key64) {
 		/* Based on Jenkins One-at-a-time hash. */
-		uchar buf[4], *keyp = buf;
+		uchar buf[4] = {0}, *keyp = buf; /* {0} only to satisfy the analyzer (SIVALu fills buf) */
 		int i;
 
 		SIVALu(buf, 0, key);
