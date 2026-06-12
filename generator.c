@@ -932,8 +932,10 @@ static int copy_altdest_file(const char *src, const char *dest, struct file_stru
 			rsyserr(FINFO, errno, "copy_file %s => %s",
 				full_fname(src), copy_to);
 		}
-		/* Try to clean up. */
-		unlink(copy_to);
+		/* Try to clean up.  copy_to's parent components are peer-named
+		 * and can be raced to a symlink, so resolve each with O_NOFOLLOW
+		 * via do_unlink_at() like the other generator-side unlinks. */
+		do_unlink_at(copy_to);
 		cleanup_disable();
 		return -1;
 	}
