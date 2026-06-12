@@ -125,8 +125,22 @@ static void match_gnums(int32 *ndx_list, int ndx_count)
 		if (inc_recurse) {
 			node = hashtable_find(prior_hlinks, gnum, data_when_new);
 			if (node->data == data_when_new) {
+				if (gnum < hlink_flist->ndx_start) {
+					/* A non-first hard-link entry whose
+					 * gnum points before this flist's
+					 * ndx_start should already have been
+					 * recorded in prior_hlinks by an
+					 * earlier flist.  A peer that sends
+					 * such a back-reference on the first
+					 * flist (or to a gnum that was never
+					 * declared XMIT_HLINK_FIRST) is
+					 * misbehaving. */
+					rprintf(FERROR,
+					    "hard-link gnum %d precedes flist start %d\n",
+					    (int)gnum, (int)hlink_flist->ndx_start);
+					exit_cleanup(RERR_PROTOCOL);
+				}
 				node->data = new_array0(char, 5);
-				assert(gnum >= hlink_flist->ndx_start);
 				file->flags |= FLAG_HLINK_FIRST;
 				prev = -1;
 			} else if (CVAL(node->data, 0) == 0) {
