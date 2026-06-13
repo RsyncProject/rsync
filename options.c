@@ -1031,11 +1031,6 @@ static void set_refuse_options(void)
 #ifndef SUPPORT_CRTIMES
 	parse_one_refuse_match(0, "crtimes", list_end);
 #endif
-#ifndef SUPPORT_XATTRS
-	/* --ltfs orders the read by each file's ltfs.startblock xattr, so it is
-	 * meaningless (and would silently no-op) without xattr support. */
-	parse_one_refuse_match(0, "ltfs", list_end);
-#endif
 
 	/* Now we use the descrip values to actually mark the options for refusal. */
 	for (op = long_options; op != list_end; op++) {
@@ -2413,6 +2408,13 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			bwlimit_writemax = 512;
 	}
 
+#ifndef SUPPORT_LTFS
+	if (ltfs_mode && am_server) {
+		snprintf(err_buf, sizeof err_buf,
+			 "--ltfs is not supported on this server\n");
+		goto cleanup;
+	}
+#endif
 	if (ltfs_mode) {
 		/* A delta read would only re-read the source file we must
 		 * stream off the tape anyway, so force whole-file. */

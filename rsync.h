@@ -611,6 +611,10 @@ typedef unsigned int size_t;
 #define SUPPORT_CRTIMES 1
 #endif
 
+#ifdef SUPPORT_XATTRS
+#define SUPPORT_LTFS 1
+#endif
+
 /* Find a variable that is either exactly 32-bits or longer.
  * If some code depends on 32-bit truncation, it will need to
  * take special action in a "#if SIZEOF_INT32 > 4" section. */
