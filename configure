@@ -629,6 +629,7 @@ ac_unique_file="byteorder.h"
 ac_config_libobj_dir=lib
 : ${enable_year2038:=no}
 ac_subst_vars='LTLIBOBJS
+LTFS_RUNTESTS_ARGS
 LTFS_CHECK_OBJS
 LTFS_CHECK_PROGS
 MAKE_MAN
@@ -12575,16 +12576,20 @@ if test x"$enable_ltfs" != x"no" && test x"$enable_xattr_support" != x"no"; then
         *cygwin*)
             LTFS_CHECK_PROGS=''
             LTFS_CHECK_OBJS=''
+            LTFS_RUNTESTS_ARGS='--exclude=ltfs-server-reject,ltfs-client-compat'
             ;;
         *)
             LTFS_CHECK_PROGS='rsync_noltfs$(EXEEXT)'
             LTFS_CHECK_OBJS='options_noltfs.o'
+            LTFS_RUNTESTS_ARGS=''
             ;;
     esac
 else
     LTFS_CHECK_PROGS=''
     LTFS_CHECK_OBJS=''
+    LTFS_RUNTESTS_ARGS='--exclude=ltfs-server-reject,ltfs-client-compat'
 fi
+
 
 
 

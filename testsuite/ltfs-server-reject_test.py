@@ -8,20 +8,17 @@
 # local pipe (RSYNC_CONNECT_PROG) so no TCP socket or real LTFS volume is
 # needed, and the test runs on all platforms regardless of xattr support.
 
-import shutil
 import subprocess
 
 from rsyncfns import (
     FROMDIR, TODIR, TOOLDIR,
     build_rsyncd_conf, makepath, rsync_argv,
-    start_test_daemon, test_fail, test_skipped,
+    start_test_daemon, test_fail,
 )
 
 DAEMON_PORT = 12896
 
-noltfs_bin = shutil.which('rsync_noltfs', path=str(TOOLDIR))
-if noltfs_bin is None:
-    test_skipped(f"rsync_noltfs binary not found in TOOLDIR ({TOOLDIR})")
+noltfs_bin = str(TOOLDIR / 'rsync_noltfs')
 
 makepath(FROMDIR, TODIR)
 (FROMDIR / 'probe.txt').write_text('hello from the ltfs-server-reject test\n')
