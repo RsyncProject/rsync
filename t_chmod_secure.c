@@ -130,35 +130,22 @@ int main(int argc, char **argv)
 	 * files to mode 0600 so we have a clean baseline to compare.
 	 */
 
-	/* Scenario A: legitimate parent dir-symlink.
+	/* Scenario A: legitimate parent dir-symlink within the tree.
 	 *
-	 * On platforms whose kernel offers RESOLVE_BENEATH-equivalent
-	 * confinement (Linux 5.6+ openat2, FreeBSD 13+ / macOS 15+
-	 * O_RESOLVE_BENEATH), the within-tree symlink is followed and
-	 * the chmod must succeed.
-	 *
-	 * On platforms that fall back to the per-component O_NOFOLLOW
-	 * walk (OpenBSD, NetBSD, Solaris, older Cygwin, HPE NonStop,
-	 * and pre-5.6 Linux), every symlink is rejected -- including
-	 * this legitimate one.  That's a real platform limitation (the
-	 * same one that causes the #715 regression there) and the
-	 * expected outcome is rejection.
-	 *
-	 * Detect at runtime and expect accordingly.  The other three
-	 * scenarios behave identically on both code paths and need no
-	 * adjustment. */
+	 * The within-tree symlink is followed and the chmod must succeed on
+	 * every platform: the kernel RESOLVE_BENEATH paths (Linux 5.6+ openat2,
+	 * FreeBSD 13+ / macOS 15+ O_RESOLVE_BENEATH) and, since the #715/-K
+	 * fallback fix, the per-component O_NOFOLLOW walk too (OpenBSD, NetBSD,
+	 * Solaris, older Cygwin, HPE NonStop, pre-5.6 Linux) -- which now follows
+	 * an in-tree directory symlink whose target is relative and ".."-free.
+	 * Escapes are still rejected on both paths (Scenario B). */
 	int kernel_has_rb = kernel_resolve_beneath_supported();
 	fprintf(stderr, "INFO: kernel RESOLVE_BENEATH-equivalent confinement: %s\n",
 		kernel_has_rb ? "available" : "not available (per-component fallback)");
 
 	int rc = do_chmod_at("inside_link/sentinel", 0640);
-	if (kernel_has_rb) {
-		check("A: legit dir-symlink within tree (kernel confined)",
-		      rc, 1, "realdir/sentinel", 0640);
-	} else {
-		check("A: legit dir-symlink within tree (per-component fallback rejects)",
-		      rc, 0, "realdir/sentinel", 0600);
-	}
+	check("A: legit dir-symlink within tree (followed)",
+	      rc, 1, "realdir/sentinel", 0640);
 
 	/* Scenario B: parent symlink escapes the tree -- chmod must be
 	 * rejected and the outside file's mode must be unchanged. */
