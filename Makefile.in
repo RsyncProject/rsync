@@ -53,18 +53,26 @@ popt_OBJS= popt/popt.o  popt/poptconfig.o \
 	popt/popthelp.o popt/poptparse.o popt/poptint.o
 OBJS=$(OBJS1) $(OBJS2) $(OBJS3) $(DAEMON_OBJ) $(LIBOBJ) @BUILD_ZLIB@ @BUILD_POPT@
 
+# rsync_noltfs: identical to rsync but options.c recompiled with
+# -DLTFS_SERVER_REJECT_TEST, which forces the server-side --ltfs rejection
+# path active regardless of SUPPORT_LTFS.  Used by the ltfs-server-reject test.
+OBJS_NOLTFS=$(OBJS1) options_noltfs.o io.o compat.o hlink.o token.o uidlist.o \
+	socket.o hashtable.o usage.o fileio.o batch.o clientname.o chmod.o acls.o \
+	xattrs.o $(OBJS3) $(DAEMON_OBJ) $(LIBOBJ) @BUILD_ZLIB@ @BUILD_POPT@
+
 TLS_OBJ = tls.o syscall.o android.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/permstring.o lib/sysxattrs.o @BUILD_POPT@
 
 # Programs we must have to run the test cases
 CHECK_PROGS = rsync$(EXEEXT) tls$(EXEEXT) getgroups$(EXEEXT) getfsdev$(EXEEXT) \
 	testrun$(EXEEXT) trimslash$(EXEEXT) t_unsafe$(EXEEXT) t_chmod_secure$(EXEEXT) \
-	t_secure_relpath$(EXEEXT) wildtest$(EXEEXT) simdtest$(EXEEXT)
+	t_secure_relpath$(EXEEXT) wildtest$(EXEEXT) simdtest$(EXEEXT) \
+	rsync_noltfs$(EXEEXT)
 
 CHECK_SYMLINKS = testsuite/chown-fake_test.py testsuite/devices-fake_test.py \
 	testsuite/xattrs-hlink_test.py testsuite/exclude-lsh_test.py
 
 # Objects for CHECK_PROGS to clean
-CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o t_chmod_secure.o t_secure_relpath.o trimslash.o wildtest.o
+CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o t_chmod_secure.o t_secure_relpath.o trimslash.o wildtest.o options_noltfs.o
 
 # note that the -I. is needed to handle config.h when using VPATH
 .c.o:
@@ -466,6 +474,12 @@ simdtest$(EXEEXT): simd-checksum-x86_64.cpp $(HEADERS)
 	else \
 	    touch $@; \
 	fi
+
+options_noltfs.o: $(srcdir)/options.c $(HEADERS)
+	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) -DLTFS_SERVER_REJECT_TEST -c -o $@ $(srcdir)/options.c
+
+rsync_noltfs$(EXEEXT): $(OBJS_NOLTFS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS_NOLTFS) $(LIBS)
 
 testsuite/chown-fake_test.py:
 	ln -s chown_test.py $(srcdir)/testsuite/chown-fake_test.py
