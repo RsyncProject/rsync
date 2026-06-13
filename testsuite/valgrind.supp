@@ -25,35 +25,6 @@
    fun:main
 }
 
-# rwrite() strlcpy()s a peer log message.  read_a_msg() hands it exactly
-# msg_bytes valid bytes with no terminating NUL; the copy is bounded to len,
-# but strlcpy over-reads past the message to compute its (discarded) return
-# length.  Harmless read of one+ uninitialised stack byte.
-{
-   rsync-rwrite-strlcpy-peer-msg
-   Memcheck:Cond
-   fun:strlcpy
-   fun:strlcpy
-   fun:rwrite
-}
-
-# atomic_create()/delete_item() test sxp->st.st_mode when replacing an
-# existing item.  Under fakeroot the faked stat overlay leaves mode bits that
-# valgrind treats as uninitialised.  Pre-existing hard-link code; fakeroot
-# artifact, not an rsync read of uninitialised memory.
-{
-   rsync-atomic-create-stmode
-   Memcheck:Cond
-   fun:atomic_create
-   fun:recv_generator
-}
-{
-   rsync-delete-item-stmode
-   Memcheck:Cond
-   fun:delete_item
-   fun:atomic_create
-}
-
 # libxxhash returns an internally-aligned XXH3 state whose pointer is offset
 # from the malloc base, so valgrind sees only an interior pointer and reports
 # the one-time checksum state as "possibly lost".  Alignment artifact.
