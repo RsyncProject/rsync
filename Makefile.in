@@ -450,15 +450,15 @@ check-progs: all $(CHECK_PROGS) $(CHECK_COMPILE_OBJS) $(CHECK_SYMLINKS)
 
 .PHONY: check
 check: all $(CHECK_PROGS) $(CHECK_COMPILE_OBJS) $(CHECK_SYMLINKS)
-	"$(srcdir)/runtests.py" --rsync-bin="`pwd`/rsync$(EXEEXT)" -j $(CHECK_J)
+	"$(srcdir)/runtests.py" --rsync-bin="`pwd`/rsync$(EXEEXT)" -j $(CHECK_J) @LTFS_RUNTESTS_ARGS@
 
 .PHONY: check29
 check29: all $(CHECK_PROGS) $(CHECK_COMPILE_OBJS) $(CHECK_SYMLINKS)
-	"$(srcdir)/runtests.py" --rsync-bin="`pwd`/rsync$(EXEEXT)" -j $(CHECK_J) --protocol=29
+	"$(srcdir)/runtests.py" --rsync-bin="`pwd`/rsync$(EXEEXT)" -j $(CHECK_J) --protocol=29 @LTFS_RUNTESTS_ARGS@
 
 .PHONY: check30
 check30: all $(CHECK_PROGS) $(CHECK_COMPILE_OBJS) $(CHECK_SYMLINKS)
-	"$(srcdir)/runtests.py" --rsync-bin="`pwd`/rsync$(EXEEXT)" -j $(CHECK_J) --protocol=30
+	"$(srcdir)/runtests.py" --rsync-bin="`pwd`/rsync$(EXEEXT)" -j $(CHECK_J) --protocol=30 @LTFS_RUNTESTS_ARGS@
 
 # Whole-suite gcov coverage report (HTML, with branch + decision coverage).
 # Requires a build configured with --enable-coverage and the `gcovr` tool
@@ -486,7 +486,7 @@ coverage: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	    chmod a+rwx "$$d"; \
 	    setfacl -m 'd:u::rwx,d:g::rwx,d:o::rwx' "$$d" 2>/dev/null || true; \
 	  done
-	@rc=0; "$(srcdir)/runtests.py" --rsync-bin="`pwd`/rsync$(EXEEXT)" -j $(COVERAGE_J) $(COVERAGE_RUNFLAGS) || rc=$$?; \
+	@rc=0; "$(srcdir)/runtests.py" --rsync-bin="`pwd`/rsync$(EXEEXT)" -j $(COVERAGE_J) $(COVERAGE_RUNFLAGS) @LTFS_RUNTESTS_ARGS@ || rc=$$?; \
 	  rm -rf $(COVERAGE_DIR) && mkdir -p $(COVERAGE_DIR); \
 	  gcovr --root $(srcdir) $(COVERAGE_EXCLUDE) --decisions --print-summary \
 	      --gcov-ignore-parse-errors=negative_hits.warn_once_per_file \
@@ -526,7 +526,7 @@ coverage-all: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	@rc=0; \
 	  for cfg in '' '--protocol=30' '--protocol=29' '--use-tcp'; do \
 	    echo "===== coverage-all: runtests.py $$cfg ====="; \
-	    "$(srcdir)/runtests.py" --rsync-bin="`pwd`/rsync$(EXEEXT)" -j $(COVERAGE_J) $$cfg || rc=$$?; \
+	    "$(srcdir)/runtests.py" --rsync-bin="`pwd`/rsync$(EXEEXT)" -j $(COVERAGE_J) $$cfg @LTFS_RUNTESTS_ARGS@ || rc=$$?; \
 	  done; \
 	  rm -rf coverage-all && mkdir -p coverage-all; \
 	  gcovr --root $(srcdir) $(COVERAGE_EXCLUDE) --decisions --print-summary \
@@ -581,7 +581,7 @@ testsuite/exclude-lsh_test.py:
 
 .PHONY: installcheck
 installcheck: $(CHECK_PROGS) $(CHECK_SYMLINKS)
-	"$(srcdir)/runtests.py" --rsync-bin="$(bindir)/rsync$(EXEEXT)" --srcdir="$(srcdir)" --tooldir="`pwd`" -j $(CHECK_J)
+	"$(srcdir)/runtests.py" --rsync-bin="$(bindir)/rsync$(EXEEXT)" --srcdir="$(srcdir)" --tooldir="`pwd`" -j $(CHECK_J) @LTFS_RUNTESTS_ARGS@
 
 # TODO: Add 'dist' target; need to know which files will be included
 

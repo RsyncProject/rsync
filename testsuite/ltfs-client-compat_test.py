@@ -11,20 +11,17 @@
 # SUPPORT_XATTRS (which also suppresses SUPPORT_LTFS).  It acts as the
 # client here; the daemon runs the normal LTFS-capable build.
 
-import shutil
 import subprocess
 
 from rsyncfns import (
     FROMDIR, TODIR, TOOLDIR,
     build_rsyncd_conf, checkit, makepath, rsync_argv,
-    start_test_daemon, test_fail, test_skipped,
+    start_test_daemon, test_fail,
 )
 
 DAEMON_PORT = 12897
 
-noltfs_bin = shutil.which('rsync_noltfs', path=str(TOOLDIR))
-if noltfs_bin is None:
-    test_skipped(f"rsync_noltfs binary not found in TOOLDIR ({TOOLDIR})")
+noltfs_bin = str(TOOLDIR / 'rsync_noltfs')
 
 # --- setup -------------------------------------------------------------------
 
