@@ -1119,6 +1119,7 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 
 #ifdef SUPPORT_HARD_LINKS
 	if (preserve_hard_links && xflags & XMIT_HLINKED
+	 && !S_ISDIR(mode)
 #ifndef CAN_HARDLINK_SYMLINK
 	 && !S_ISLNK(mode)
 #endif
