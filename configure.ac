@@ -1478,6 +1478,15 @@ else
     AC_MSG_RESULT(yes)
     AC_DEFINE(SUPPORT_LTFS, 1)
 fi
+if test x"$enable_ltfs" != x"no" && test x"$enable_xattr_support" != x"no"; then
+    LTFS_CHECK_PROGS='rsync_noltfs$(EXEEXT)'
+    LTFS_CHECK_OBJS='options_noltfs.o'
+else
+    LTFS_CHECK_PROGS=''
+    LTFS_CHECK_OBJS=''
+fi
+AC_SUBST(LTFS_CHECK_PROGS)
+AC_SUBST(LTFS_CHECK_OBJS)
 
 if test x"$enable_acl_support" = x"no" || test x"$enable_xattr_support" = x"no" || test x"$enable_iconv" = x"no"; then
     AC_MSG_CHECKING([whether $CC supports -Wno-unused-parameter])
