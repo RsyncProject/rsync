@@ -298,7 +298,12 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 		in_block = 1;
 		if (!log_initialised)
 			log_init(0);
-		strlcpy(msg, buf, MIN((int)sizeof msg, len + 1));
+		/* buf holds exactly len bytes and is not necessarily NUL-terminated
+		 * (e.g. a forwarded MSG_* payload from read_a_msg), so copy by length
+		 * rather than strlcpy(), which would strlen() past the end of buf. */
+		int mlen = MIN((int)sizeof msg - 1, len);
+		memcpy(msg, buf, mlen);
+		msg[mlen] = '\0';
 		logit(priority, msg);
 		in_block = 0;
 
