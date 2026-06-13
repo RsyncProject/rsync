@@ -13,7 +13,7 @@ AC_CHECK_HEADERS(sys/fcntl.h sys/select.h fcntl.h sys/time.h sys/unistd.h \
     sys/acl.h acl/libacl.h attr/xattr.h sys/xattr.h sys/extattr.h dl.h \
     popt.h popt/popt.h linux/falloc.h netinet/in_systm.h netgroup.h \
     zlib.h xxhash.h openssl/md4.h openssl/md5.h zstd.h lz4.h sys/file.h \
-    bsd/string.h)
+    bsd/string.h idn2.h)
 AC_CHECK_HEADERS([netinet/ip.h], [], [], [[#include <netinet/in.h>]])
 AC_HEADER_MAJOR_FIXED
 
@@ -621,6 +621,27 @@ if test x"$enable_lz4" != x"no"; then
 	AC_MSG_RESULT(no)
 	err_msg="$err_msg$nl- Failed to find lz4.h for lz4 compression support."
 	no_lib="$no_lib lz4"
+    fi
+else
+    AC_MSG_RESULT(no)
+fi
+
+AC_MSG_CHECKING([whether to enable IDN support])
+AC_ARG_ENABLE([idn],
+        AS_HELP_STRING([--disable-idn], [disable to omit IDN (Internationalized Domain Name) support]))
+AH_TEMPLATE([SUPPORT_IDN],
+[Undefine if you do not want IDN support.  By default this is defined.])
+if test x"$enable_idn" != x"no"; then
+    if test x"$ac_cv_header_idn2_h" = x"yes"; then
+	AC_MSG_RESULT(yes)
+	AC_SEARCH_LIBS(idn2_lookup_ul, idn2,
+	    [AC_DEFINE(SUPPORT_IDN)],
+	    [err_msg="$err_msg$nl- Failed to find idn2_lookup_ul function in idn2 lib.";
+	     no_lib="$no_lib idn"])
+    else
+	AC_MSG_RESULT(no)
+	err_msg="$err_msg$nl- Failed to find idn2.h for IDN support."
+	no_lib="$no_lib idn"
     fi
 else
     AC_MSG_RESULT(no)

@@ -33,7 +33,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y valgrind acl libacl1-dev attr libattr1-dev \
-          liblz4-dev libzstd-dev libxxhash-dev python3-cmarkgfm openssl
+          liblz4-dev libzstd-dev libxxhash-dev libidn2-dev python3-cmarkgfm openssl
         echo "/usr/local/bin" >>"$GITHUB_PATH"
     - name: configure
       run: ./configure --with-rrsync --enable-debug
