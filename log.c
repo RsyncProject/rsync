@@ -698,7 +698,7 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 		case 'C':
 			n = NULL;
 			if (S_ISREG(file->mode)) {
-				if (always_checksum)
+				if (always_checksum && !(iflags & ITEM_DELETED))
 					n = sum_as_hex(file_sum_nni->num, F_SUM(file), 1);
 				else if (iflags & ITEM_TRANSFER)
 					n = sum_as_hex(xfer_sum_nni->num, sender_file_sum, 0);
