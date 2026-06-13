@@ -8,9 +8,9 @@
       </author>
       <date>$Date: 2002/05/14 03:10:09 $</date>
     </titlepag>
-    
+
     <toc>
-    
+
     <sect>
       <heading>Introduction</heading>
 
@@ -34,9 +34,9 @@
 	hours into rsync I suppose I am quite fond of it and may be a
 	little biased, but I think I also know its strengths and
 	problems more than most.
-      
+
       <p>
-	If there are issues ommitted by this document, or if you think
+	If there are issues omitted by this document, or if you think
 	the answers are incomplete, unbalanced, or incorrect, then
 	please mail <tt/mbp@samba.org/, <tt/rsync@lists.samba.org/
 	and/or <tt/debian-devel@lists.debian.org/.
@@ -47,7 +47,7 @@
     <sect>
       <heading>Background</heading>
 
-      
+
       <sect1>
 	<heading>The rsync algorithm</heading>
 
@@ -56,7 +56,7 @@
 	  <em/rsync algorithm/ for delta compression, and its
 	  implementation in a mirroring program.
 	</p>
-	
+
 	<p>
 	  The rsync algorithm is described in detail in the ANU
 	  Technical Report included with the distribution and on the
@@ -100,7 +100,7 @@
       </sect1>
 
 
-      
+
       <sect1>
 	<heading/The rsync program/
 
@@ -158,7 +158,7 @@
 	  commonly used for making network backups, or uploading
 	  information to a web server.
 	</p>
-	
+
 	<p>
 	  rsync may also be used locally, which is a degenerate case
 	  with client and server connected across a unix-domain or
@@ -173,7 +173,7 @@
       </sect1>
 
 
-      
+
 
       <sect1>
 	<heading/librsync/
@@ -235,7 +235,7 @@
 	  downstream support, which at the moment means two
 	  installations of rproxy, but in the future could conceivably
 	  be integrated into Mozilla, Squid, Apache and similar
-	  programs.  
+	  programs.
 
 	<p>
 	  rproxy is packaged in Debian and is moderately useful for
@@ -271,7 +271,7 @@
 	  does not work on this.  Personally I think that developing
 	  rsync itself, and then librsync/rdiff, is likely to be more
 	  useful; I suspect other people interested in working in this
-	  area might have similar thoughts.  
+	  area might have similar thoughts.
 
 	<p>
 	  I don't think there are any problems in the code or project
@@ -282,7 +282,7 @@
 	  in the future.
       </sect1>
 
-      
+
 
       <sect1>
 	<heading>Introduction to Debian</heading>
@@ -330,11 +330,11 @@
 
 
       <sect1>
-	<heading>apt-proxy</heading> 
+	<heading>apt-proxy</heading>
       <p><label id="apt-proxy">
 	<url url="http://apt-proxy.sourceforge.net/" name="apt-proxy">	is a caching proxy for Debian archives.  It appears as an HTTP
 	server to apt clients, and uses rsync, http, or ftp to connect
-	to an upstream server.  
+	to an upstream server.
 
       <p>
 	Because rsync is less efficient than HTTP for transferring
@@ -352,9 +352,9 @@
 	The current maintainer is Chris Halls.
       </p>
     </sect1>
-  </sect>      
+  </sect>
 
-    
+
 
     <sect>
       <heading>Open Issues</heading>
@@ -449,7 +449,7 @@
       </sect1>
 
 
-      
+
       <sect1>
 	<heading/We should throw out the current code and start from
 	scratch/
@@ -488,7 +488,7 @@
 	  keeping the same network protocol limits your ability to
 	  redesign things.
 
-	
+
 	<p>
 	  There is some cruft in the command line syntax, but throwing
 	  it out would also break everybody's scripts, mental maps,
@@ -503,7 +503,7 @@
 
       </sect1>
 
-      
+
 
 
       <sect1>
@@ -541,7 +541,7 @@
 
 
 
-      
+
       <sect1>
 	<heading/Goswin Brederlow's proposal to use the reverse rsync
 	algorithm over HTTP Range requests/
@@ -569,7 +569,7 @@
 	  old file.  The checksum file ought to also include a
 	  whole-file message digest which can be used to ensure that
 	  reassembly was successful.
-	
+
 	<p>
 	  This scheme has the great advantage that the server is
 	  entirely passive, and only needs to support standard HTTP.
@@ -823,10 +823,10 @@
 	   distribution it might be simpler to just distribute the new
 	   packages directly as is currently done.
       </sect1>
-      
+
       <sect1>
 	<heading>rsync should be used by <tt/apt-get update/</heading>
-	
+
 	<p>
 	  Even if there are few gains from compressing <tt/.deb/s,
 	  rsync might help in providing a more efficient transfer of
@@ -835,12 +835,12 @@
       </sect1>
     </sect>
 
-    
+
     <appendix>
     <sect>
       <heading>Revision history</heading>
 
-      
+
 <p><tscreen><verb>
 $Log: rsync-and-debian.sgml,v $
 Revision 1.10  2002/05/14 03:10:09  mbp
@@ -862,7 +862,7 @@ Fix revision history SGML stuff.
 Revision 1.5  2002/04/12 00:24:50  mbp
 Fix mailing list name.
 Add revision history.
-	
+
 	  </verb></tscreen></p>
     </sect>
   </article>

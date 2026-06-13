@@ -97,7 +97,7 @@ def main():
     txt += '# These are all possible short options that we will accept (when not disabled above):\n'
     txt += str_assign('short_no_arg', ''.join(sorted(short_no_arg)), 'DO NOT REMOVE ANY')
     txt += str_assign('short_with_num', ''.join(sorted(short_with_num)), 'DO NOT REMOVE ANY')
-   
+
     txt += """
 # To disable a long-named option, change its value to a -1.  The values mean:
 # 0 = the option has no arg; 1 = the arg doesn't need any checking; 2 = only

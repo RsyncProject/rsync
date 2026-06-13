@@ -1,0 +1,126 @@
+---
+exclude:
+  (?x)^(
+  old_versions|
+  __NONE__)$
+repos:
+  - repo: https://github.com/executablebooks/mdformat
+    # Do this before other tools "fixing" the line endings
+    rev: 1.0.0
+    hooks:
+      - id: mdformat
+        name: Format Markdown
+        stages: [manual]
+        entry: mdformat  # Executable to run, with fixed options
+        language: python
+        types: [markdown]
+        args: [--wrap, '80', --number]
+        additional_dependencies:
+          - mdformat-toc
+          - mdformat-gfm
+          - mdformat-beautysh
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      # - id: no-commit-to-branch
+      #  args: [--branch, main]
+      - id: debug-statements
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-json
+      - id: mixed-line-ending
+      - id: check-builtin-literals
+      - id: check-ast
+      - id: check-merge-conflict
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+      - id: check-docstring-first
+      - id: fix-byte-order-marker
+      - id: check-case-conflict
+      - id: check-toml
+  - repo: https://github.com/lovesegfault/beautysh.git
+    rev: v6.4.3
+    hooks:
+      - id: beautysh
+        exclude: ^(config.guess|config.sub)$
+        args: [--indent-size=2]
+        additional_dependencies:
+          - setuptools
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.4.2
+    hooks:
+      - id: codespell
+        # scripts/updateCodespellIgnoreFile.sh updates the ignore file.
+        exclude: ^(configure.ac|config.sub|deapon-parm.awk|wildtest.txt)$
+        args:
+          - --builtin=clear,informal,names
+          - --ignore-words-list=te,uptodate,siz,mis,ake,chang,ue,cna,devine,seein,noo,servent,tim,parms,unx,blong,sorce
+        #  - -xscripts/codespell-lines-ignore.txt
+        #  - --toml
+        #  - pyproject.toml
+        additional_dependencies:
+          - tomli
+  - repo: https://github.com/pocc/pre-commit-hooks
+    rev: v1.3.5
+    # Install dependencies on windows:
+    #  choco install llvm uncrustify cppcheck
+    hooks:
+      - id: uncrustify
+        stages: [manual]
+        args: [--replace, --no-backup, -c, uncrustify.cfg, -l, C]
+      - id: cppcheck
+        stages: [manual]
+        exclude: ^(case_N.h)$
+        args:
+          - --quiet
+          - --force
+          - --platform=unix32
+          - --language=c
+          - --cppcheck-build-dir=.cache/cppcheck/
+          - -Uisblank
+          - -DSIZEOF_CHARP=8
+          - -DZLIB_CONST
+          - -DNORETURN=
+          - -DPOPT_fprintf=fprintf
+          #- -DVARN="value"   # For static analysis
+          - -I.
+          - '--template={file}({line}): {severity} ({id}): {message}'
+          - --inline-suppr
+          - --check-level=exhaustive
+          - --suppress=unmatchedSuppression
+          - --suppress=checkersReport
+          - --suppress=internalError
+          # - --suppress=constParameterPointer
+          - --suppress=variableScope
+          - --suppress=constParameterPointer
+          - --suppress=constParameterCallback
+          - --suppress=unusedFunction
+          - --suppress=missingIncludeSystem
+          - --suppress=missingInclude:rsync.h
+          - --suppress=shiftTooManyBits:byteorder.h
+          - --suppress=unusedStructMember:popt/poptint.h
+          - --suppress=unusedStructMember:rsync.h
+          - --suppress=unusedStructMember:zlib/inflate.h
+          - --suppress=unusedStructMember:zlib/inftrees.h
+          - --suppress=unusedStructMember:zlib/gzguts.h
+          - --suppress=unusedStructMember:zlib/deflate.h
+          - --suppress=unusedStructMember:zlib/zlib.h
+          - --suppress=unusedStructMember:lib/pool_alloc.c
+          - --suppress=unusedStructMember:lib/sysacls.h
+          - --suppress=missingInclude:lib/sysacls.h
+
+  - repo: https://github.com/cpplint/cpplint
+    rev: "2.0.2"
+    hooks:
+      - id: cpplint
+        stages: [manual]
+        args: ["--filter=-legal/copyright,-build/header_guard,-build/include_dir,-build/include_subdir,-readability/braces,-readability/casting,-readability/multiline_comment,-whitespace/blank_line,-whitespace/braces,-whitespace/comma,-whitespace/indent,-whitespace/line_length,-whitespace/newline,-whitespace/operators,-whitespace/parens,-whitespace/semicolon,-whitespace/tab"]
+        additional_dependencies:
+          - cpplint>=1.6.1
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1
+    hooks:
+      - id: shellcheck
+        exclude: ^(config\.guess|config\.sub)$
+        # exclude: (?x)^(__NONE__)$
+        # args: [-x,-e1007,-e1009,-e1072,-e1073]

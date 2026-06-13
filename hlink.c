@@ -221,7 +221,7 @@ static int maybe_hard_link(struct file_struct *file, int ndx,
 					0, "");
 			}
 			if (INFO_GTE(NAME, 2) && maybe_ATTRS_REPORT)
-				rprintf(FCLIENT, "%s is uptodate\n", fname);
+				rprintf(FCLIENT, "%s is up-to-date\n", fname);
 			file->flags |= FLAG_HLINK_DONE;
 			return 0;
 		}
@@ -402,7 +402,7 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 					itemizing = 0;
 					code = FNONE;
 					if (INFO_GTE(NAME, 2) && maybe_ATTRS_REPORT)
-						rprintf(FCLIENT, "%s is uptodate\n", fname);
+						rprintf(FCLIENT, "%s is up-to-date\n", fname);
 				}
 				break;
 			}

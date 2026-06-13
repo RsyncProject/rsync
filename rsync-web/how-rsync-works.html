@@ -198,7 +198,7 @@ most common mode of operation files are not skipped if the
 modification time or size differs.  If --checksum was
 specified a file-level checksum will be created and
 compared.  Directories, device nodes and symlinks are not
-skipped.  Missing directories will be created.  
+skipped.  Missing directories will be created.
 <p>
 If a file is not to be skipped, any existing version on the
 receiving side becomes the "basis file" for the transfer, and is
@@ -237,7 +237,7 @@ checksum generator will be advanced to the next byte after
 the matching block.
 <p>
 Matching blocks can be identified in this way even if
-the blocks are reordered or at different offsets.  
+the blocks are reordered or at different offsets.
 This process is the very heart of the rsync algorithm.
 <p>
 In this way, the sender will give the receiver instructions for

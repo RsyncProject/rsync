@@ -10,4 +10,3 @@ help backporting fixes into an older release, feel free to ask.
 Email your vulnerability information to rsync's maintainer:
 
   Rsync Project <rsync.project@gmail.com>
-
