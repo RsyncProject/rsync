@@ -31,6 +31,9 @@
 #ifdef __TANDEM
 #include <floss.h(floss_execlp)>
 #endif
+#ifdef SUPPORT_IDN
+#include <idn2.h>
+#endif
 
 extern int dry_run;
 extern int list_only;
@@ -517,6 +520,18 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char **remote_argv, in
 	char *args[MAX_ARGS], *need_to_free = NULL;
 	pid_t pid;
 	int dash_l_set = 0;
+#ifdef SUPPORT_IDN
+	char idn_machine[1024];
+
+	if (machine && daemon_connection > 0) {
+		char *idn;
+		if (idn2_lookup_ul(machine, &idn, IDN2_NONTRANSITIONAL) == IDN2_OK) {
+			strlcpy(idn_machine, idn, sizeof idn_machine);
+			idn2_free(idn);
+			machine = idn_machine;
+		}
+	}
+#endif
 
 	if (!read_batch && !local_server) {
 		char *t, *f, in_quote = '\0';

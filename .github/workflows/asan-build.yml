@@ -41,7 +41,7 @@ jobs:
     - name: prep
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev openssl
+        sudo apt-get install -y clang acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev libidn2-dev openssl
         echo "/usr/local/bin" >>"$GITHUB_PATH"
     - name: configure
       # -DNDEBUG builds as a shipped release does (assert() compiled out), so

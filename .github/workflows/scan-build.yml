@@ -24,7 +24,7 @@ jobs:
     - name: prep
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang clang-tools acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev openssl
+        sudo apt-get install -y clang clang-tools acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev libidn2-dev openssl
     - name: configure (under scan-build)
       # Run configure under scan-build so its analyzer compiler-wrapper is baked
       # into the Makefile's $(CC); --disable-md2man avoids the doc toolchain.

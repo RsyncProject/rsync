@@ -48,7 +48,8 @@ jobs:
             attr libattr-devel acl libacl-devel \
             zstd libzstd-devel \
             lz4 lz4-devel \
-            xxhash xxhash-devel
+            xxhash xxhash-devel \
+            libidn2 libidn2-devel
         alternatives --set python3 /usr/bin/python3.9
         pip3 install commonmark
     - name: configure

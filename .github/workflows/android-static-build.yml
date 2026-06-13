@@ -76,7 +76,7 @@ jobs:
           # checksums and its bundled zlib.
           ./configure --host=${{ matrix.triple }} --build=x86_64-pc-linux-gnu \
             --enable-ipv6 \
-            --disable-zstd --disable-lz4 --disable-xxhash --disable-openssl \
+            --disable-zstd --disable-lz4 --disable-xxhash --disable-openssl --disable-idn \
             --disable-iconv --disable-iconv-open \
             --disable-acl-support --disable-xattr-support \
             --disable-md2man --disable-roll-simd \

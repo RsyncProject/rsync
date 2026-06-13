@@ -24,7 +24,7 @@ jobs:
         fetch-depth: 0
     - name: prep
       run: |
-        brew install automake openssl xxhash zstd lz4
+        brew install automake openssl xxhash zstd lz4 libidn2
         pip3 install --user --break-system-packages commonmark
         echo "$(brew --prefix)/bin" >>"$GITHUB_PATH"
     - name: configure
