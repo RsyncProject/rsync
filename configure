@@ -12557,14 +12557,30 @@ elif test x"$enable_xattr_support" = x"no"; then
     { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: no (requires xattr support)" >&5
 printf '%s\n' "no (requires xattr support)" >&6; }
 else
-    { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+    case $host_os in
+        *cygwin*)
+            { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: no (Cygwin)" >&5
+printf '%s\n' "no (Cygwin)" >&6; }
+            ;;
+        *)
+            { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 printf '%s\n' "yes" >&6; }
-    printf '%s\n' "#define SUPPORT_LTFS 1" >>confdefs.h
+            printf '%s\n' "#define SUPPORT_LTFS 1" >>confdefs.h
 
+            ;;
+    esac
 fi
 if test x"$enable_ltfs" != x"no" && test x"$enable_xattr_support" != x"no"; then
-    LTFS_CHECK_PROGS='rsync_noltfs$(EXEEXT)'
-    LTFS_CHECK_OBJS='options_noltfs.o'
+    case $host_os in
+        *cygwin*)
+            LTFS_CHECK_PROGS=''
+            LTFS_CHECK_OBJS=''
+            ;;
+        *)
+            LTFS_CHECK_PROGS='rsync_noltfs$(EXEEXT)'
+            LTFS_CHECK_OBJS='options_noltfs.o'
+            ;;
+    esac
 else
     LTFS_CHECK_PROGS=''
     LTFS_CHECK_OBJS=''
