@@ -41,6 +41,7 @@ filter-merge-symlink
 insecure-links-admin-optout
 link-dest-symlink-enotsup                # the ENOTSUP hard-link hook is an LD_PRELOAD, Linux-only
 log-file-symlink
+ltfs-daemon
 ltfs-local
 msg-io-timeout-overflow
 nondaemon-symlink-race
