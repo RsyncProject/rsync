@@ -1084,12 +1084,12 @@ in the values of parameters.  See that section for details.
 
     Specifies a directory that rsync should use for temporary files created
     during the transfer of updated files. If that directory is on a different
-    partition, after transfer file is being copied instead of unlinked. 
+    partition, after transfer file is being copied instead of unlinked.
 
     This parameter equals with `--temp-dir` option, so please consult rsync
-    manpage for further information. 
+    manpage for further information.
 
-    
+
 ## CONFIG DIRECTIVES
 
 There are currently two config directives available that allow a config file to
