@@ -582,10 +582,8 @@ void setup_protocol(int f_out,int f_in)
 		atimes_ndx = (file_extra_cnt += EXTRA64_CNT);
 	if (preserve_crtimes)
 		crtimes_ndx = (file_extra_cnt += EXTRA64_CNT);
-#ifdef SUPPORT_XATTRS
 	if (ltfs_mode)
 		startblock_ndx = (file_extra_cnt += EXTRA64_CNT);
-#endif
 	if (am_sender) /* This is most likely in the file_extras64 union as well. */
 		pathname_ndx = (file_extra_cnt += PTR_EXTRA_CNT);
 	else
