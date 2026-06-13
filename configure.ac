@@ -1462,6 +1462,23 @@ else
     esac
 fi
 
+#################################################
+# check for LTFS tape-ordering support
+AC_MSG_CHECKING(whether to support LTFS tape ordering)
+AC_ARG_ENABLE(ltfs,
+    AS_HELP_STRING([--disable-ltfs],[disable LTFS tape-order awareness (--ltfs option)]),
+    [], [enable_ltfs=yes])
+AH_TEMPLATE([SUPPORT_LTFS],
+[Define to 1 to add support for LTFS tape-order-aware transfers])
+if test x"$enable_ltfs" = x"no"; then
+    AC_MSG_RESULT(no)
+elif test x"$enable_xattr_support" = x"no"; then
+    AC_MSG_RESULT([no (requires xattr support)])
+else
+    AC_MSG_RESULT(yes)
+    AC_DEFINE(SUPPORT_LTFS, 1)
+fi
+
 if test x"$enable_acl_support" = x"no" || test x"$enable_xattr_support" = x"no" || test x"$enable_iconv" = x"no"; then
     AC_MSG_CHECKING([whether $CC supports -Wno-unused-parameter])
     OLD_CFLAGS="$CFLAGS"
