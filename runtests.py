@@ -268,6 +268,10 @@ def build_rsync_cmd(rsync_bin, args, scratchbase):
     if args.valgrind:
         vlog = os.path.join(scratchbase, 'valgrind.%p.log')
         vopts = f'--log-file={vlog}'
+        supp = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            'testsuite', 'valgrind.supp')
+        if os.path.exists(supp):
+            vopts += f' --suppressions={supp}'
         if args.valgrind_opts:
             vopts += ' ' + args.valgrind_opts
         parts.append(f'valgrind {vopts}')
