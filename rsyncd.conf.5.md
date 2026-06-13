@@ -725,6 +725,42 @@ in the values of parameters.  See that section for details.
     readable by "other"; see "[strict modes](#)".  If the file is not found or is
     rejected, no logins for an "[auth users](#)" module will be possible.
 
+0.  `auth digest`
+
+    This parameter sets the *minimum* message digest that the daemon will accept
+    for the challenge-response authentication of an "[auth users](#)" module.
+    The available digests, strongest first, are `sha512`, `sha256`, `sha1`,
+    `md5`, `md4`.  The daemon selects the auth digest from the connecting
+    client's advertised list (and falls back to `md5`, or `md4` below protocol
+    30, for a client that advertises none), so the negotiated digest can be
+    weaker than both sides actually support.  If it is weaker than the configured
+    name, the connection is refused before the challenge is sent.  The value is a
+    single digest name, for example:
+
+    >     auth digest = sha256
+
+    which requires `sha256` or `sha512` and refuses an `md5` or `md4` exchange.
+
+    This guards against an *auth-digest downgrade*.  A peer that sends no digest
+    list (any rsync before 3.2.0, including the openrsync that ships with macOS)
+    makes the daemon fall back to `md5` (or `md4` below protocol 30), and an
+    on-path attacker can rewrite the unauthenticated negotiation to force the same
+    weak choice.  A captured challenge-response is far cheaper to brute-force
+    offline against a weak digest, so a site whose clients are all modern can
+    require a strong one.  See the rsync `SECURITY.md` document for the full
+    threat model.
+
+    There is **no default** -- the floor is off and the daemon accepts whatever
+    digest is negotiated, preserving compatibility with older clients.  Enabling a
+    floor refuses every client that cannot offer at least that digest, notably any
+    rsync older than 3.2.0 (when the SHA digests were added) and the
+    macOS-bundled openrsync, which authenticate only with `md4`/`md5`.  The SHA
+    digests require an rsync built with openssl at both ends; naming a digest this
+    build does not provide refuses all logins to the module (fail-closed).
+
+    Like the other auth parameters, this may be set per module or, for a default
+    that applies to every module, in the global part of the config file.
+
 0.  `strict modes`
 
     This parameter determines whether or not the permissions on the secrets
@@ -1137,11 +1173,16 @@ modules without any global-value cross-talk).
 
 ## AUTHENTICATION STRENGTH
 
-The authentication protocol used in rsync is a 128 bit MD4 based challenge
-response system. This is fairly weak protection, though (with at least one
-brute-force hash-finding algorithm publicly available), so if you want really
-top-quality security, then I recommend that you run rsync over ssh.  (Yes, a
-future version of rsync will switch over to a stronger hashing method.)
+Daemon authentication is a challenge-response system in which the client
+returns a digest of the shared secret and a server-chosen challenge.  Modern
+rsync (3.2.7 and later, built with openssl) negotiates the strongest digest both
+sides support -- `sha512` by default -- but for backward compatibility it falls
+back to `md5` (or `md4` below protocol 30) for a client that advertises no digest
+list, and the digest negotiation is itself unauthenticated.  A daemon that wants
+to require a strong digest can set "[auth digest](#)".  For the best protection,
+run rsync over ssh or a verified TLS transport (`rsync-ssl`), which protects the
+exchange at the transport layer, and use a high-entropy shared secret (which is
+infeasible to brute-force regardless of the digest).
 
 Also note that the rsync daemon protocol does not currently provide any
 encryption of the data that is transferred over the connection. Only

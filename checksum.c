@@ -87,6 +87,24 @@ struct name_num_obj valid_auth_checksums = {
 	"daemon auth checksum", NULL, 0, 0, valid_auth_checksums_items
 };
 
+/* Return the strength rank (0 = strongest) of a daemon-auth digest by name in
+ * valid_auth_checksums_items[], which is listed strongest-first; -1 if the name
+ * is not a supported auth digest on this build.  Used by the daemon's
+ * "auth digest" floor to compare the negotiated digest against the minimum. */
+int auth_digest_rank(const char *name)
+{
+	struct name_num_item *nni;
+	int rank = 0;
+
+	if (!name || !*name)
+		return -1;
+	for (nni = valid_auth_checksums_items; nni->name; nni++, rank++) {
+		if (strcasecmp(nni->name, name) == 0)
+			return rank;
+	}
+	return -1;
+}
+
 /* These cannot make use of openssl, so they're marked just as built-in */
 struct name_num_item implied_checksum_md4 =
     { CSUM_MD4, NNI_BUILTIN, "md4", NULL };
