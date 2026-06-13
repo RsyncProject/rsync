@@ -17,7 +17,7 @@ import os
 import re
 
 from rsyncfns import (
-    FROMDIR, SCRATCHDIR, TOOLDIR,
+    FROMDIR, SCRATCHDIR, TODIR, TOOLDIR,
     build_rsyncd_conf, makepath, run_rsync, start_test_daemon,
     test_fail, test_skipped,
 )
@@ -49,6 +49,7 @@ def set_block(path, block):
 
 # --- daemon setup ------------------------------------------------------------
 
+makepath(TODIR)
 conf = build_rsyncd_conf()
 url = start_test_daemon(conf, DAEMON_PORT)
 
