@@ -1475,12 +1475,27 @@ if test x"$enable_ltfs" = x"no"; then
 elif test x"$enable_xattr_support" = x"no"; then
     AC_MSG_RESULT([no (requires xattr support)])
 else
-    AC_MSG_RESULT(yes)
-    AC_DEFINE(SUPPORT_LTFS, 1)
+    case $host_os in
+        *cygwin*)
+            AC_MSG_RESULT([no (Cygwin)])
+            ;;
+        *)
+            AC_MSG_RESULT(yes)
+            AC_DEFINE(SUPPORT_LTFS, 1)
+            ;;
+    esac
 fi
 if test x"$enable_ltfs" != x"no" && test x"$enable_xattr_support" != x"no"; then
-    LTFS_CHECK_PROGS='rsync_noltfs$(EXEEXT)'
-    LTFS_CHECK_OBJS='options_noltfs.o'
+    case $host_os in
+        *cygwin*)
+            LTFS_CHECK_PROGS=''
+            LTFS_CHECK_OBJS=''
+            ;;
+        *)
+            LTFS_CHECK_PROGS='rsync_noltfs$(EXEEXT)'
+            LTFS_CHECK_OBJS='options_noltfs.o'
+            ;;
+    esac
 else
     LTFS_CHECK_PROGS=''
     LTFS_CHECK_OBJS=''
