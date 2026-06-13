@@ -428,6 +428,7 @@ has its own detailed description later in this manpage.
 --inc-recursive, --i-r   enable incremental recursion
 --no-inc-recursive       disable incremental recursion
 --no-i-r                 same as --no-inc-recursive
+--ltfs                   read an LTFS-tape source in physical block order
 --relative, -R           use relative path names
 --no-implied-dirs        don't send implied dirs with --relative
 --backup, -b             make backups (see --suffix & --backup-dir)
@@ -914,6 +915,42 @@ expand it.
     [`--recursive`](#opt) option.  This makes rsync scan the full file list
     before it begins to transfer files.  See [`--inc-recursive`](#opt) for more
     info.
+
+0.  `--ltfs`
+
+    Optimize reading from a source that lives on an LTFS (Linear Tape File
+    System) volume.  On tape, a file's metadata (name, size, modify time, and
+    the block where its data begins) is held in the volume index and is cheap
+    to read, but reading file *content* requires physically positioning the
+    tape.  rsync's normal name-sorted order bears no relation to the physical
+    layout, so a restore seeks back and forth ("shoe-shining") and can take
+    many times longer than a single streaming pass.
+
+    With `--ltfs`, rsync reads each file's starting block from the
+    `ltfs.startblock` virtual extended attribute and drives the transfer in
+    ascending block order, so the drive makes one forward pass.  Files whose
+    start block is unknown (directories, symlinks, anything not on tape) are
+    handled first, which conveniently creates the destination directory tree
+    before the bulk data read begins.
+
+    Because the whole point is to avoid re-reading tape data, this option
+    implies [`--whole-file`](#opt) (a delta transfer would re-read the source
+    file anyway) and forces [`--no-inc-recursive`](#opt) (the complete file
+    list is needed before the read order can be chosen).  It also refuses
+    [`--checksum`](#opt), which would read every byte of every file off the
+    tape just to decide what to transfer.
+
+    The fast index metadata still drives the normal quick check (size & modify
+    time), so unchanged files are skipped without touching their data.  For
+    that to work across runs the destination must keep the source mtimes, so
+    `--ltfs` also implies [`--times`](#opt) (like [`--archive`](#opt) does); a
+    later `--no-times` overrides it but triggers a warning, since without
+    preserved mtimes every run re-reads the whole tape.
+
+    This option only affects reading the source; writing a transfer *onto* an
+    LTFS volume is not currently optimized.  It requires a build with extended
+    attribute support and the start-block ordering only takes effect when the
+    source files expose the `ltfs.startblock` attribute.
 
 0.  `--relative`, `-R`
 

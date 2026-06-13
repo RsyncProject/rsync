@@ -1462,6 +1462,51 @@ else
     esac
 fi
 
+#################################################
+# check for LTFS tape-ordering support
+AC_MSG_CHECKING(whether to support LTFS tape ordering)
+AC_ARG_ENABLE(ltfs,
+    AS_HELP_STRING([--disable-ltfs],[disable LTFS tape-order awareness (--ltfs option)]),
+    [], [enable_ltfs=yes])
+AH_TEMPLATE([SUPPORT_LTFS],
+[Define to 1 to add support for LTFS tape-order-aware transfers])
+if test x"$enable_ltfs" = x"no"; then
+    AC_MSG_RESULT(no)
+elif test x"$enable_xattr_support" = x"no"; then
+    AC_MSG_RESULT([no (requires xattr support)])
+else
+    case $host_os in
+        *cygwin*)
+            AC_MSG_RESULT([no (Cygwin)])
+            ;;
+        *)
+            AC_MSG_RESULT(yes)
+            AC_DEFINE(SUPPORT_LTFS, 1)
+            ;;
+    esac
+fi
+if test x"$enable_ltfs" != x"no" && test x"$enable_xattr_support" != x"no"; then
+    case $host_os in
+        *cygwin*)
+            LTFS_CHECK_PROGS=''
+            LTFS_CHECK_OBJS=''
+            LTFS_RUNTESTS_ARGS='--exclude=ltfs-server-reject,ltfs-client-compat'
+            ;;
+        *)
+            LTFS_CHECK_PROGS='rsync_noltfs$(EXEEXT)'
+            LTFS_CHECK_OBJS='options_noltfs.o'
+            LTFS_RUNTESTS_ARGS=''
+            ;;
+    esac
+else
+    LTFS_CHECK_PROGS=''
+    LTFS_CHECK_OBJS=''
+    LTFS_RUNTESTS_ARGS='--exclude=ltfs-server-reject,ltfs-client-compat'
+fi
+AC_SUBST(LTFS_CHECK_PROGS)
+AC_SUBST(LTFS_CHECK_OBJS)
+AC_SUBST(LTFS_RUNTESTS_ARGS)
+
 if test x"$enable_acl_support" = x"no" || test x"$enable_xattr_support" = x"no" || test x"$enable_iconv" = x"no"; then
     AC_MSG_CHECKING([whether $CC supports -Wno-unused-parameter])
     OLD_CFLAGS="$CFLAGS"
