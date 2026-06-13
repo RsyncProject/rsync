@@ -1230,7 +1230,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	static int need_fuzzy_dirlist = 0;
 	struct file_struct *fuzzy_file = NULL;
 	int fd = -1, f_copy = -1;
-	stat_x sx, real_sx;
+	stat_x sx = {0}, real_sx;
 	STRUCT_STAT partial_st;
 	struct file_struct *back_file = NULL;
 	int statret, real_ret, stat_errno;
@@ -1628,6 +1628,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	 || (preserve_specials && ftype == FT_SPECIAL)) {
 		dev_t rdev;
 		int del_for_flag;
+		/* Whether the dest existed, captured before the type-mismatch
+		 * flip below clears statret -- so atomic_create() gets a delete
+		 * flag (and reads sx.st) only when sx.st was actually stat'd. */
+		int dest_existed = (statret == 0);
 		if (ftype == FT_DEVICE) {
 			uint32 *devp = F_RDEV_P(file);
 			rdev = MAKEDEV(DEV_MAJOR(devp), DEV_MINOR(devp));
@@ -1674,7 +1678,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				fname, (int)file->mode,
 				(long)major(rdev), (long)minor(rdev));
 		}
-		if (atomic_create(file, fname, NULL, NULL, rdev, &sx, del_for_flag)) {
+		if (atomic_create(file, fname, NULL, NULL, rdev, &sx, dest_existed ? del_for_flag : 0)) {
 			set_file_attrs(fname, file, NULL, NULL, 0);
 			if (itemizing) {
 				itemize(fnamecmp, file, ndx, statret, &sx,
