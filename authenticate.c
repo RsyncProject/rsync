@@ -265,6 +265,35 @@ char *auth_server(int f_in, int f_out, int module, const char *host,
 		return "";
 
 	negotiate_daemon_auth(f_out, 0);
+
+	/* Enforce a configured minimum auth digest (default: none).  This refuses
+	 * a peer that negotiated -- or, via an omitted digest list / old protocol,
+	 * fell back to -- a digest weaker than the operator-required floor, e.g. a
+	 * client downgraded to md5/md4.  Lower rank == stronger (the auth list is
+	 * ordered strongest-first), so a higher rank than the floor is too weak. */
+	{
+		const char *min_digest = lp_auth_digest(module);
+		if (min_digest && *min_digest) {
+			int floor_rank = auth_digest_rank(min_digest);
+			int got_rank = auth_digest_rank(valid_auth_checksums.negotiated_nni->name);
+			if (floor_rank < 0) {
+				rprintf(FLOG, "auth failed on module %s from %s (%s): the "
+					"configured 'auth digest = %s' is not a supported digest "
+					"on this build\n",
+					lp_name(module), host, addr, min_digest);
+				return NULL;
+			}
+			if (got_rank < 0 || got_rank > floor_rank) {
+				rprintf(FLOG, "auth failed on module %s from %s (%s): negotiated "
+					"auth digest %s is weaker than the required "
+					"'auth digest = %s'\n",
+					lp_name(module), host, addr,
+					valid_auth_checksums.negotiated_nni->name, min_digest);
+				return NULL;
+			}
+		}
+	}
+
 	gen_challenge(addr, challenge);
 
 	io_printf(f_out, "%s%s\n", leader, challenge);

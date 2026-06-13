@@ -16,6 +16,7 @@ BOOL	proxy_protocol		False
 
 Locals: =================================================================
 
+STRING	auth_digest		NULL
 STRING	auth_users		NULL
 STRING	charset			NULL
 STRING	comment			NULL
