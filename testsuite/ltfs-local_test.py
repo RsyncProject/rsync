@@ -23,10 +23,10 @@ from rsyncfns import (
 )
 
 
-# The feature needs a build with xattr support...
+# The feature needs a build with LTFS support...
 vv = run_rsync('-VV', check=True, capture_output=True)
-if '"xattrs": true' not in vv.stdout:
-    test_skipped("Rsync is configured without xattrs support")
+if '"ltfs": true' not in vv.stdout:
+    test_skipped("Rsync is configured without LTFS support")
 
 # ...and a scratch filesystem that lets us set a user.* xattr to stand in for
 # the tape's ltfs.startblock attribute.

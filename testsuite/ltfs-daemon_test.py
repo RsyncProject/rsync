@@ -27,8 +27,8 @@ DAEMON_PORT = 12898
 # --- skip guards (same as ltfs-local_test.py) --------------------------------
 
 vv = run_rsync('-VV', check=True, capture_output=True)
-if '"xattrs": true' not in vv.stdout:
-    test_skipped("rsync built without xattr support")
+if '"ltfs": true' not in vv.stdout:
+    test_skipped("rsync built without LTFS support")
 
 if not hasattr(os, 'setxattr'):
     test_skipped("os.setxattr not available on this platform")
