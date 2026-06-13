@@ -2408,8 +2408,8 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			bwlimit_writemax = 512;
 	}
 
-#ifndef SUPPORT_LTFS
-	if (ltfs_mode && am_server) {
+#if !defined(SUPPORT_LTFS) || defined(LTFS_SERVER_REJECT_TEST)
+	if (ltfs_mode && (am_server || am_daemon)) {
 		snprintf(err_buf, sizeof err_buf,
 			 "--ltfs is not supported on this server\n");
 		goto cleanup;
