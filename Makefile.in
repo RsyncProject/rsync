@@ -66,13 +66,13 @@ TLS_OBJ = tls.o syscall.o android.o util2.o t_stub.o lib/compat.o lib/snprintf.o
 CHECK_PROGS = rsync$(EXEEXT) tls$(EXEEXT) getgroups$(EXEEXT) getfsdev$(EXEEXT) \
 	testrun$(EXEEXT) trimslash$(EXEEXT) t_unsafe$(EXEEXT) t_chmod_secure$(EXEEXT) \
 	t_secure_relpath$(EXEEXT) wildtest$(EXEEXT) simdtest$(EXEEXT) \
-	rsync_noltfs$(EXEEXT)
+	@LTFS_CHECK_PROGS@
 
 CHECK_SYMLINKS = testsuite/chown-fake_test.py testsuite/devices-fake_test.py \
 	testsuite/xattrs-hlink_test.py testsuite/exclude-lsh_test.py
 
 # Objects for CHECK_PROGS to clean
-CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o t_chmod_secure.o t_secure_relpath.o trimslash.o wildtest.o options_noltfs.o
+CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o t_chmod_secure.o t_secure_relpath.o trimslash.o wildtest.o @LTFS_CHECK_OBJS@
 
 # note that the -I. is needed to handle config.h when using VPATH
 .c.o:
