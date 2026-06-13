@@ -38,7 +38,7 @@ jobs:
     - name: configure
       run: ./configure --with-rrsync --enable-debug
     - name: make
-      run: make
+      run: make check-progs   # builds rsync + the test helper programs runtests.py needs
     - name: info
       run: ./rsync --version
 
