@@ -2805,6 +2805,17 @@ struct file_list *recv_file_list(int f, int dir_ndx)
 #endif
 
 	if (inc_recurse && dir_ndx >= 0) {
+		if (!first_flist) {
+			/* All flists have already been freed via the NDX_DONE
+			 * chain, so dir_flist is stale: its files[] entries
+			 * point into a destroyed pool.  A sub-flist marker now
+			 * is a protocol violation (and would otherwise UAF the
+			 * stale dir entry below, then deref an uninitialised
+			 * slot in the freshly reset dir_flist further down). */
+			rprintf(FERROR_XFER,
+				"rsync: refusing sub-flist after final flist was freed\n");
+			exit_cleanup(RERR_PROTOCOL);
+		}
 		if (dir_ndx >= dir_flist->used) {
 			rprintf(FERROR_XFER, "rsync: refusing invalid dir_ndx %u >= %u\n", dir_ndx, dir_flist->used);
 			exit_cleanup(RERR_PROTOCOL);
