@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-# Test rsync's --ltfs mode (LTFS / tape-aware read ordering).
+# Test rsync's --ltfs mode: LOCAL copy behaviour and tape-aware read ordering.
+# This test exercises only local-to-local file copying; it does NOT test
+# forwarding --ltfs to a remote server.
 #
 # On a real LTFS mount each file's starting data block is published as the
 # "ltfs.startblock" virtual xattr; --ltfs reads files in ascending start-block
