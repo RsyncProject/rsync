@@ -71,6 +71,9 @@ static int dirbuf_depth;
 /* This is True when we're scanning parent dirs for per-dir merge-files. */
 static BOOL parent_dirscan = False;
 
+#define MAX_MERGE_DEPTH 32
+static int merge_depth = 0;
+
 /* This array contains a list of all the currently active per-dir merge
  * files.  This makes it easier to save the appropriate values when we
  * "push" down into each subdirectory. */
@@ -1489,6 +1492,18 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 	if (!fname || !*fname)
 		return;
 
+	if (merge_depth >= MAX_MERGE_DEPTH) {
+		rprintf(FERROR,
+			"[%s] merge-file include depth limit (%d) exceeded at %s\n",
+			who_am_i(), MAX_MERGE_DEPTH, fname);
+		/* Match the failed-open path below: abort under a fatal
+		 * (operator-supplied) merge, otherwise drop the rule. */
+		if (xflags & XFLG_FATAL_ERRORS)
+			exit_cleanup(RERR_FILEIO);
+		return;
+	}
+	merge_depth++;
+
 	if (*fname != '-' || fname[1] || am_server) {
 		/* This path is operator- and (via per-directory merge files like
 		 * .cvsignore) sender-controlled: a planted symlink could leak a
@@ -1517,6 +1532,7 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 						"[%s] parse_filter_file(%s) hidden by daemon filter\n",
 						who_am_i(), fname);
 				}
+				merge_depth--;
 				return;
 			}
 			open_path = line;
@@ -1544,6 +1560,7 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 				fname);
 			exit_cleanup(RERR_FILEIO);
 		}
+		merge_depth--;
 		return;
 	}
 	dirbuf[dirbuf_len] = '\0';
@@ -1580,6 +1597,7 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 			break;
 	}
 	fclose(fp);
+	merge_depth--;
 }
 
 /* If the "for_xfer" flag is set, the prefix is made compatible with the
