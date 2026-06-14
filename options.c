@@ -1176,6 +1176,8 @@ failure:
 			min_max, do_big_num(limit, 3, NULL),
 			unlimited_0 && min_max[1] == 'i' ? " or 0 for unlimited" : "");
 	}
+	if (len < 0 || len > (int)sizeof err_buf - 2)
+		len = sizeof err_buf - 2;
 	err_buf[len] = '\n';
 	err_buf[len+1] = '\0';
 	return -1;
