@@ -6,11 +6,18 @@
 # plus test passing the correct options to the remote command
 
 import os
+import platform
 
 from rsyncfns import (
     FROMDIR, RSYNC, SRCDIR, TODIR,
     checkit, run_rsync, test_fail,
 )
+
+if platform.system() in ('OpenBSD'):
+    test_skipped(
+        f"test fails with 'ssh exited with code 1' instead of ignoring the expected error."
+        f"support not available on {platform.system()}"
+    )
 
 # Helper function
 def fail(msg: str) -> 'None':
@@ -25,7 +32,15 @@ if run_rsync('-Q', '--info=help', check=False).returncode != 0:
 if run_rsync('-Q', '--debug=help', check=False).returncode != 0:
     fail('-Q --debug=help output failed')
 
-
+# We just want to test which parameters are handed over to the remote,
+# but do not really want to run rsync on the remote site to copy files.
+# For this we add "--rsh=echo" to replace ssh for the remote site with echo.
+# Thus no remote connection is actually created, instead the echo will just
+# exit quickly without any further rsync communication, letting the local
+# rsync process fail fast, not wasting much time for the test execution.
+# It is expected that the local rsync process will exit here with non zero.
+# We then just check the log output here for any options that may or may not
+# have been given for the remote rsync process by our local rsync process.
 def test_remote_args(testname: str, args: list, expected_remote_args: list) -> None:
     print('### TEST BEGIN ### ' + testname + '\n')
     probe = run_rsync(*['-nvv', '--rsh=echo', *args], check=False, capture_output=True)
