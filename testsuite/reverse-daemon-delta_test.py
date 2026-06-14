@@ -57,8 +57,11 @@ def peer_client(args, label):
     """Run the OLD client (RSYNC_PEER) and return (sent, received) wire bytes
     parsed from rsync's summary line. Fails the test on non-zero exit."""
     argv = shlex.split(RSYNC_PEER) + args
+    # Force C locale: rsync groups the "sent/received N bytes" numbers per the
+    # locale (e.g. de_DE uses '.' for thousands), which would break parsing.
     proc = subprocess.run(argv, stdout=subprocess.PIPE,
-                          stderr=subprocess.STDOUT, text=True)
+                          stderr=subprocess.STDOUT, text=True,
+                          env={**os.environ, 'LC_ALL': 'C'})
     print(proc.stdout, end='')
     if proc.returncode != 0:
         test_fail(f"{label}: old client exited {proc.returncode}")

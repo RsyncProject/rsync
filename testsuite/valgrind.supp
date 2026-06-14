@@ -1,0 +1,48 @@
+# Valgrind suppressions for the rsync test suite.
+#
+# Every stanza here is a known-benign report, not a defect in rsync's own
+# logic.  They are suppressed so that a --valgrind run fails only on a *real*
+# error.  Pass to valgrind with --suppressions=testsuite/valgrind.supp
+# (runtests.py --valgrind does this automatically).
+#
+# The valgrind CI gate runs with --leak-check=no and so checks memory *errors*
+# only: rsync intentionally leaves file-list/socket/option memory unfreed at
+# exit, which makes a full leak check inherently noisy.  The two Memcheck:Leak
+# stanzas below therefore only matter for a manual leak audit (--leak-check=
+# full); they cover the two leaks that are not rsync's own at-exit slack.
+
+# popt alias strings are strdup'd while parsing arguments and only reclaimed
+# at process exit.  One-time, bounded, unreachable-at-exit; bundled popt.
+{
+   rsync-popt-alias-leak
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   fun:my_alloc
+   fun:my_strdup
+   fun:popt_unalias
+   fun:parse_arguments
+   fun:main
+}
+
+# libxxhash returns an internally-aligned XXH3 state whose pointer is offset
+# from the malloc base, so valgrind sees only an interior pointer and reports
+# the one-time checksum state as "possibly lost".  Alignment artifact.
+{
+   xxhash-createstate-aligned
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:malloc
+   fun:XXH3_createState
+}
+
+# libfakeroot's own SysV message padding in send_fakem(); the uninitialised
+# bytes are inside libfakeroot's mtext buffer, not rsync memory.
+{
+   fakeroot-msgsnd-padding
+   Memcheck:Param
+   msgsnd(msgp->mtext)
+   fun:msgsnd
+   ...
+   obj:*libfakeroot*
+}

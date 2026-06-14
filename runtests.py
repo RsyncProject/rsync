@@ -266,8 +266,19 @@ def build_rsync_cmd(rsync_bin, args, scratchbase):
     """Build the RSYNC command string for tests."""
     parts = []
     if args.valgrind:
-        vlog = os.path.join(scratchbase, 'valgrind.%p.log')
+        # Logs go in a world-writable+sticky subdir so that rsync children
+        # which drop privileges (the setpriv cap-drop in partial_nowrite, a
+        # daemon dropping to the module's uid) can still create their log file
+        # even when scratchbase itself is root-owned.
+        vgdir = os.path.join(scratchbase, 'valgrind-logs')
+        os.makedirs(vgdir, exist_ok=True)
+        os.chmod(vgdir, 0o1777)
+        vlog = os.path.join(vgdir, 'valgrind.%p.log')
         vopts = f'--log-file={vlog}'
+        supp = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            'testsuite', 'valgrind.supp')
+        if os.path.exists(supp):
+            vopts += f' --suppressions={supp}'
         if args.valgrind_opts:
             vopts += ' ' + args.valgrind_opts
         parts.append(f'valgrind {vopts}')
@@ -450,7 +461,7 @@ def main():
     print(f'    os={subprocess.check_output(["uname", "-a"], text=True).strip()}')
     print(f'    preserve_scratch={"yes" if args.preserve_scratch else "no"}')
     if args.valgrind:
-        print(f'    valgrind=enabled (logs in valgrind.*.log)')
+        print(f'    valgrind=enabled (logs in valgrind-logs/valgrind.*.log)')
     if args.parallel > 1:
         print(f'    parallel={args.parallel}')
     print(f'    daemon_transport={"tcp (loopback)" if args.use_tcp else "pipe (secure default)"}')
@@ -616,7 +627,7 @@ def main():
     # Check valgrind logs for errors
     vg_errors = 0
     if args.valgrind:
-        for vlog in sorted(glob.glob(os.path.join(scratchbase, 'valgrind.*.log'))):
+        for vlog in sorted(glob.glob(os.path.join(scratchbase, 'valgrind-logs', 'valgrind.*.log'))):
             try:
                 with open(vlog) as f:
                     content = f.read()
@@ -640,7 +651,7 @@ def main():
     if skipped > 0:
         print(f'      {skipped} skipped')
     if vg_errors > 0:
-        print(f'      {vg_errors} valgrind error(s) found (see logs in {scratchbase})')
+        print(f'      {vg_errors} valgrind error(s) found (see logs in {os.path.join(scratchbase, "valgrind-logs")})')
 
     if expect is not None:
         # Version-mixing mode: the run is judged purely on whether each test's
