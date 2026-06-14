@@ -280,8 +280,12 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 		if (am_daemon > 0 && code != FCLIENT)
 			code = FLOG;
 	} else if (send_msgs_to_gen) {
-		assert(!is_utf8);
-		/* Pass the message to our sibling in native charset. */
+		/* Pass the message to our sibling in native charset.  is_utf8
+		 * may be set here if a malicious peer sends MSG_INFO/MSG_ERROR
+		 * to a daemon receiver (read_a_msg passes !am_generator); the
+		 * old assert(!is_utf8) made that a remotely-reachable abort.
+		 * Forwarding the bytes raw is safe -- the generator's rwrite()
+		 * gets is_utf8=0 and filtered_fwrite escapes non-printables. */
 		send_msg((enum msgcode)code, buf, len, 0);
 		return;
 	}
