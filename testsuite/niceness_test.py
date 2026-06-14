@@ -10,7 +10,7 @@ import platform
 
 from rsyncfns import (
     FROMDIR, RSYNC, SRCDIR, TODIR,
-    checkit, run_rsync, test_fail,
+    checkit, run_rsync, test_fail, test_skipped
 )
 
 if platform.system() in ('OpenBSD'):
