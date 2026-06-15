@@ -1586,8 +1586,8 @@ static void read_a_msg(void)
 			goto overflow;
 		if (am_generator) {
 			raw_read_buf(data, msg_bytes);
-			iobuf.in_multiplexed = 1;
 			send_msg(MSG_DELETED, data, msg_bytes, 1);
+			iobuf.in_multiplexed = 1;
 			break;
 		}
 #ifdef ICONV_OPTION
@@ -1625,7 +1625,6 @@ static void read_a_msg(void)
 		} else
 #endif
 			raw_read_buf(data, msg_bytes);
-		iobuf.in_multiplexed = 1;
 		/* A directory name was sent with the trailing null */
 		if (msg_bytes > 0 && !data[msg_bytes-1])
 			log_delete(data, S_IFDIR);
@@ -1633,6 +1632,7 @@ static void read_a_msg(void)
 			data[msg_bytes] = '\0';
 			log_delete(data, S_IFREG);
 		}
+		iobuf.in_multiplexed = 1;
 		break;
 	case MSG_SUCCESS:
 		if (msg_bytes != (local_server ? 4+8+8 : 4)) {
@@ -1654,11 +1654,11 @@ static void read_a_msg(void)
 		if (msg_bytes != 4)
 			goto invalid_msg;
 		val = raw_read_int();
-		iobuf.in_multiplexed = 1;
 		if (am_generator)
 			got_flist_entry_status(FES_NO_SEND, val);
 		else
 			send_msg_int(MSG_NO_SEND, val);
+		iobuf.in_multiplexed = 1;
 		break;
 	case MSG_ERROR_SOCKET:
 	case MSG_ERROR_UTF8:
