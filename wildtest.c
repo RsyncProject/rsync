@@ -210,6 +210,8 @@ main(int argc, char **argv)
 		 string[0], string[1]);
     }
 
+    fclose(fp);
+
     if (!wildmatch_errors)
 	fputs("No", stdout);
     else
