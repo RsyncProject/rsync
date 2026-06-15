@@ -442,11 +442,11 @@ has its own detailed description later in this manpage.
 --old-d                  same as --old-dirs
 --mkpath                 create destination's missing path components
 --links, -l              copy symlinks as symlinks
---copy-links, -L         transform symlink into referent file/dir
---copy-unsafe-links      only "unsafe" symlinks are transformed
+--copy-links, -L         copy symlinks as their referent file/dir
+--copy-unsafe-links      copy only "unsafe" symlinks as their referent file/dir
 --safe-links             ignore symlinks that point outside the tree
 --munge-links            munge symlinks to make them safe & unusable
---copy-dirlinks, -k      transform symlink to dir into referent dir
+--copy-dirlinks, -k      copy symlinks to dirs as their referent dir
 --keep-dirlinks, -K      treat symlinked dir on receiver as dir
 --hard-links, -H         preserve hard links
 --perms, -p              preserve permissions
