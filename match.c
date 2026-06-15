@@ -371,6 +371,14 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 	sum_init(xfer_sum_nni, checksum_seed);
 
 	if (append_mode > 0) {
+		if (s->flength > len) {
+			/* A hostile or confused peer can claim a verified-prefix
+			 * length that exceeds what we have on disk -- including
+			 * for an empty local file, where buf is NULL and the
+			 * map_ptr() calls below would dereference it.  Clamp to
+			 * what we can actually read. */
+			s->flength = len;
+		}
 		if (append_mode == 2) {
 			OFF_T j = 0;
 			for (j = CHUNK_SIZE; j < s->flength; j += CHUNK_SIZE) {
