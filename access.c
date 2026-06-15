@@ -23,6 +23,9 @@
 #ifdef HAVE_NETGROUP_H
 #include <netgroup.h>
 #endif
+#ifdef SUPPORT_IDN
+#include <idn2.h>
+#endif
 
 static int allow_forward_dns;
 
@@ -33,6 +36,9 @@ static int match_hostname(const char **host_ptr, const char *addr, const char *t
 	struct hostent *hp;
 	unsigned int i;
 	const char *host = *host_ptr;
+#ifdef SUPPORT_IDN
+	char idn_tok[1024], *idn;
+#endif
 
 	if (!host || !*host)
 		return 0;
@@ -40,6 +46,14 @@ static int match_hostname(const char **host_ptr, const char *addr, const char *t
 #ifdef HAVE_INNETGR
 	if (*tok == '@' && tok[1])
 		return innetgr(tok + 1, host, NULL, NULL);
+#endif
+
+#ifdef SUPPORT_IDN
+	if (idn2_to_ascii_8z(tok, &idn, IDN2_NFC_INPUT | IDN2_NONTRANSITIONAL) == IDN2_OK) {
+		strlcpy(idn_tok, idn, sizeof idn_tok);
+		idn2_free(idn);
+		tok = idn_tok;
+	}
 #endif
 
 	/* First check if the reverse-DNS-determined hostname matches. */

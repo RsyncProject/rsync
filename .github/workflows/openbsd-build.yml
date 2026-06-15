@@ -33,7 +33,7 @@ jobs:
           uname -a
           export AUTOCONF_VERSION=2.71
           export AUTOMAKE_VERSION=1.16
-          ./configure --with-rrsync --disable-zstd --disable-md2man --disable-xxhash --disable-lz4
+          ./configure --with-rrsync --disable-zstd --disable-md2man --disable-xxhash --disable-lz4 --disable-idn
           make
           ./rsync --version
           make check

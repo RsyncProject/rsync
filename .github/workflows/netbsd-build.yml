@@ -32,7 +32,7 @@ jobs:
           ln -sf /usr/pkg/bin/python3.12 /usr/pkg/bin/python3
         run: |
           uname -a
-          ./configure --with-rrsync --disable-zstd --disable-md2man --disable-xxhash --disable-lz4
+          ./configure --with-rrsync --disable-zstd --disable-md2man --disable-xxhash --disable-lz4 --disable-idn
           make
           ./rsync --version
           make check
