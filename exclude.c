@@ -430,7 +430,7 @@ void add_implied_include(const char *arg, int skip_daemon_module)
 				if (cp[1] == ']') {
 					if (!saw_wild)
 						cp++; /* A \] in a non-wild filter causes a problem, so drop the \ . */
-				} else if (!strchr("*[?", cp[1])) {
+				} else if (!cp[1] || !strchr("*[?", cp[1])) {
 					backslash_cnt++;
 					if (saw_wild)
 						*p++ = '\\';
