@@ -1365,6 +1365,13 @@ void read_args(int f_in, char *mod_name, char *buf, size_t bufsiz, int rl_nulls,
 				dot_pos = argc;
 		}
 	}
+	/* glob_expand()/glob_match() reserve glob.argc+1 slots -- room for the
+	 * entry being added but not for this trailing NULL.  A post-dot line
+	 * whose " mod/" splits land argc on exactly maxargs (or any later
+	 * ENSURE_MEMSPACE doubling boundary) would otherwise make the next
+	 * store an 8-byte NULL write one slot past the argv allocation. */
+	if (argc >= maxargs)
+		argv = realloc_array(argv, char *, maxargs = argc + 1);
 	argv[argc] = NULL;
 
 	glob_expand(NULL, NULL, NULL, NULL);
