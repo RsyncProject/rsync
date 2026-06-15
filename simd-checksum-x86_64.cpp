@@ -488,8 +488,8 @@ static inline uint32 get_checksum1_cpp(char *buf1, int32 len)
     // multiples of 32 bytes using SSE2 (if available)
     i = get_checksum1_sse2_32((schar*)buf1, len, i, &s1, &s2);
 
-    // whatever is left
-    i = get_checksum1_default_1((schar*)buf1, len, i, &s1, &s2);
+    // whatever is left (updates s1/s2; the returned offset is unused here)
+    get_checksum1_default_1((schar*)buf1, len, i, &s1, &s2);
 
     return (s1 & 0xffff) + (s2 << 16);
 }

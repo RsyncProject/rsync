@@ -1489,7 +1489,6 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 				*argc_p = 0;
 			} else if (poptDupArgv(argc, argv, argc_p, argv_p) != 0)
 				out_of_memory("parse_arguments");
-			argv = *argv_p;
 			poptFreeContext(pc);
 
 			am_starting_up = 0;

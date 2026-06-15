@@ -524,7 +524,7 @@ int robust_unlink(const char *fname)
 		snprintf(&path[pos], MAX_RENAMES_DIGITS+1, "%03d", counter);
 		if (++counter >= MAX_RENAMES)
 			counter = 1;
-	} while ((rc = access(path, 0)) == 0 && counter != start);
+	} while (access(path, 0) == 0 && counter != start);
 
 	if (INFO_GTE(MISC, 1)) {
 		rprintf(FWARNING, "renaming %s to %s because of text busy\n",
