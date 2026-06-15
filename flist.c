@@ -243,13 +243,23 @@ static int scan_link_stat(const char *path, STRUCT_STAT *stp, int follow_dirlink
 	return link_stat(path, stp, follow_dirlinks);
 }
 
+static int scan_readlink(const char *path, char *linkbuf, size_t bufsiz)
+{
+	if (scan_dirfd >= 0 && am_root >= 0
+	 && strncmp(path, scan_dir_prefix, scan_dir_prefix_len) == 0
+	 && path[scan_dir_prefix_len] == '/'
+	 && strchr(path + scan_dir_prefix_len + 1, '/') == NULL)
+		return do_readlink_atfd(scan_dirfd, path + scan_dir_prefix_len + 1, linkbuf, bufsiz);
+	return do_readlink(path, linkbuf, bufsiz);
+}
+
 static int readlink_stat(const char *path, STRUCT_STAT *stp, char *linkbuf)
 {
 #ifdef SUPPORT_LINKS
 	if (scan_link_stat(path, stp, copy_dirlinks) < 0)
 		return -1;
 	if (S_ISLNK(stp->st_mode)) {
-		int llen = do_readlink(path, linkbuf, MAXPATHLEN - 1);
+		int llen = scan_readlink(path, linkbuf, MAXPATHLEN - 1);
 		if (llen < 0)
 			return -1;
 		linkbuf[llen] = '\0';

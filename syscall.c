@@ -305,6 +305,30 @@ ssize_t do_readlink(const char *path, char *buf, size_t bufsiz)
 	return readlink(path, buf, bufsiz);
 }
 #endif
+
+ssize_t do_readlink_atfd(int dfd, const char *name, char *buf, size_t bufsiz)
+{
+#ifdef AT_FDCWD
+# if defined NO_SYMLINK_XATTRS || defined NO_SYMLINK_USER_XATTRS
+	if (am_root < 0) {
+		int fd = openat(dfd, name, O_RDONLY | O_NOFOLLOW);
+		if (fd >= 0) {
+			int len = read(fd, buf, bufsiz);
+			close(fd);
+			return len;
+		}
+		if (!NOFOLLOW_HIT_SYMLINK(errno))
+			return -1;
+		if (!am_sender)
+			return 0;
+	}
+# endif
+	return readlinkat(dfd, name, buf, bufsiz);
+#else
+	(void)dfd;
+	return do_readlink(name, buf, bufsiz);
+#endif
+}
 #endif
 
 #if defined HAVE_LINK || defined HAVE_LINKAT
