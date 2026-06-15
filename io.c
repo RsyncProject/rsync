@@ -1550,10 +1550,10 @@ static void read_a_msg(void)
 		if (msg_bytes != 4)
 			goto invalid_msg;
 		val = raw_read_int();
-		iobuf.in_multiplexed = 1;
 		io_error |= val;
 		if (am_receiver)
 			send_msg_int(MSG_IO_ERROR, val);
+		iobuf.in_multiplexed = 1;
 		break;
 	case MSG_IO_TIMEOUT:
 		if (msg_bytes != 4 || am_server || am_generator)
@@ -1570,9 +1570,9 @@ static void read_a_msg(void)
 		/* Support protocol-30 keep-alive method. */
 		if (msg_bytes != 0)
 			goto invalid_msg;
-		iobuf.in_multiplexed = 1;
 		if (am_sender)
 			maybe_send_keepalive(time(NULL), MSK_ALLOW_FLUSH);
+		iobuf.in_multiplexed = 1;
 		break;
 	case MSG_DELETED:
 		if (msg_bytes >= sizeof data)
