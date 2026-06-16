@@ -21,6 +21,36 @@
 
 extern int am_server;
 
+/*
+ * Enum for ionice values. 
+ * Constants with negative numbers need root permission, others can be set by any user.
+ * RT_X is realtime priority
+ * BE_X is best effort with the given level
+ * IDLE means the process gets served only when no other processes are using disk io.
+ * NONE means best effort with level calculated by the formula (cpu_nice + 20) / 5
+ *      and is the default that does not need to be set.
+ */
+enum Ionice_Values {
+    RT_0 =-8,
+    RT_1 =-7,
+    RT_2 =-6,
+    RT_3 =-5,
+    RT_4 =-4,
+    RT_5 =-3,
+    RT_6 =-2,
+    RT_7 =-1,
+    NONE = 0,
+    BE_0 = 1,
+    BE_1 = 2,
+    BE_2 = 3,
+    BE_3 = 4,
+    BE_4 = 5,
+    BE_5 = 6,
+    BE_6 = 7,
+    BE_7 = 8,
+    IDLE = 9
+};
+
 
 /*
  * Try to parse the location and set the variables isLocal and isRemote.
