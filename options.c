@@ -1382,6 +1382,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	int opt, want_dest_type;
 	int orig_protect_args = protect_args;
 	int default_nice_prio = get_renice_default_prio(); // default nice priority to be used, if no explicit priority is given.
+	int default_ionice_prio = get_ionice_default_prio(); // default ionice priority to be used, if no explicit priority is given.
 
 	if (argc == 0) {
 		strlcpy(err_buf, "argc is zero!\n", sizeof err_buf);
@@ -1620,8 +1621,8 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			 */
 			nice_local = default_nice_prio;
 			nice_remote = default_nice_prio;
-			ionice_local = 1;
-			ionice_remote = 1;
+			ionice_local = default_ionice_prio;
+			ionice_remote = default_ionice_prio;
 			break;
 
 		case OPT_NICE:
@@ -3050,8 +3051,9 @@ void server_options(char **args, int *argc_p)
 		args[ac++] = "--mkpath";
 
 	if (nice_remote || ionice_remote) {
-		char *ionice_str = ionice_remote > 0 ? "/idle":"";
-		if (asprintf(&arg, "--nice=local:%d%s", nice_remote, ionice_str) < 0)
+		char *ionice_str = ionice_remote ? intToIoniceValueString(ionice_remote):"";
+		char *slash_str = ionice_remote ? "/":"";
+		if (asprintf(&arg, "--nice=local:%d%s%s", nice_remote, slash_str, ionice_str) < 0)
 			goto oom;
 		args[ac++] = arg;
 	}

@@ -1851,7 +1851,7 @@ int main(int argc,char *argv[])
 	}
 
 	if (ionice_local) {
-		ionice_me();
+		ionice_me(ionice_local);
 	}
 
 	if (am_server) {

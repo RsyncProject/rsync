@@ -51,6 +51,56 @@ enum Ionice_Values {
     IDLE = 9
 };
 
+/*
+ * String representation of ionice. All strings have to be 4 characters long. 
+ */
+const char *Ionice_ValueStrings[] = {
+	"rt_0",
+	"rt_1",
+	"rt_2",
+	"rt_3",
+	"rt_4",
+	"rt_5",
+	"rt_6",
+	"rt_7",
+	"none",
+	"be_0",
+	"be_1",
+	"be_2",
+	"be_3",
+	"be_4",
+	"be_5",
+	"be_6",
+	"be_7",
+	"idle",
+	0
+};
+
+/*
+ * Get the string representation for the given ionice_value
+ */
+const char *intToIoniceValueString(int ionice_value) 
+{
+	if (ionice_value<-8) return 0;
+	if (ionice_value>9) return 0;
+	return Ionice_ValueStrings[ionice_value+8];
+}
+
+/*
+ * Parse string into ionice_value. Returns 1 on success, 0 otherwise. 
+ */
+int ioniceStringToInt(char * string, int *ionice_value)
+{
+	for (int i=0; Ionice_ValueStrings[i]; i++)
+	{
+		if (strncasecmp(string, Ionice_ValueStrings[i], 4) == 0) // All values are 4 chars long 
+		{
+			*ionice_value=i-8;
+			return 1;
+		}
+	}
+	return 0;
+}
 
 /*
  * Try to parse the location and set the variables isLocal and isRemote.
@@ -58,19 +108,19 @@ enum Ionice_Values {
  */
 char *parse_location(char *str, int *isLocal, int *isRemote) 
 {
-	if (strncmp(str, "local", 5) == 0) 
+	if (strncasecmp(str, "local", 5) == 0) 
 	{
 		*isLocal=1;
 		*isRemote=0;
 		return str+5;
 	}
-	if (strncmp(str, "remote", 6) == 0) 
+	if (strncasecmp(str, "remote", 6) == 0) 
 	{
 		*isLocal=0;
 		*isRemote=1;
 		return str+6;
 	}
-	if (strncmp(str, "all", 3) == 0) 
+	if (strncasecmp(str, "all", 3) == 0) 
 	{
 		*isLocal=1;
 		*isRemote=1;
@@ -93,14 +143,7 @@ char *parse_nice_value(char *str, int *nice_value)
 
 char *parse_ionice_value(char *str, int *ionice_value)
 {
-	if (strncmp(str, "none", 3) == 0) 
-	{
-		*ionice_value=0;
-		return str+4;
-	}
-	if (strncmp(str, "idle", 3) == 0) 
-	{
-		*ionice_value=1;
+	if (ioniceStringToInt(str, ionice_value)) {
 		return str+4;
 	}
 	*ionice_value=0;
@@ -110,7 +153,8 @@ char *parse_ionice_value(char *str, int *ionice_value)
 char *parse_nice_and_ionice_values(char *str, int *nice_value, int *ionice_value)
 {
 	char *pointer = parse_ionice_value(str, ionice_value);
-	if (*ionice_value) {
+	if (pointer != str) // ionice value has been given standalone, no nice
+	{
 		*nice_value=0;
 		return pointer;
 	}
@@ -155,7 +199,7 @@ char *parse_setting(char *config_str, int *nice_local, int *ionice_local, int *n
 			{   /* End of string or comma */
 				/* Location without specific setting, use default */
                 int nice_default=get_renice_default_prio();
-                int ionice_default=1;
+                int ionice_default=get_ionice_default_prio();
 				if (isLocal) {
 					*nice_local=nice_default;
 					*ionice_local=ionice_default;
@@ -202,6 +246,11 @@ int get_renice_default_prio()
 	return 19; // lowest CPU Priority
 }
 
+int get_ionice_default_prio()
+{
+	return IDLE; // lowest IO Priority
+}
+
 void renice_me(int prio)
 {
 #ifdef SUPPORT_RENICE
@@ -210,8 +259,8 @@ void renice_me(int prio)
 	int result = setpriority(which, who, prio);
 	if ( result < 0 ) {
 		// Failed to set priority, inform user, but can be ignored (it's just not so nice).
-		rprintf(FWARNING, "renice to %d rejected by OS (%s version %s): %s\n",
-			prio, RSYNC_NAME, rsync_version(), strerror(errno));
+		rprintf(FWARNING, "renice %s to new priority %d failed (%s version %s): %s\n",
+			am_server ? "server" : "client", prio, RSYNC_NAME, rsync_version(), strerror(errno));
 	} else {
 		if (DEBUG_GTE(CMD, 1))
 				rprintf(FINFO, "successfully reniced %s to new priority %d\n", am_server ? "server" : "client", prio);
@@ -222,22 +271,43 @@ void renice_me(int prio)
 #endif
 }
 
-void ionice_me() 
+void ionice_me(int ionice_value) 
 {
 #ifdef SUPPORT_IONICE
 	int which = IOPRIO_WHO_PROCESS; // who specifies a Process ID
 	int who = 0; // 0 means current process
-	int class = IOPRIO_CLASS_IDLE;
-	int data = 0; // Ignored when using the IOPRIO_CLASS_IDLE class
+	char *ionice_string = intToIoniceValueString(ionice_value);
+	int class;
+	int data; // Ignored when using the IOPRIO_CLASS_IDLE or IOPRIO_CLASS_NONE class
+	switch (ionice_string[0])
+	{
+		case 'r': // Realtime
+			class = IOPRIO_CLASS_RT;
+			data = ionice_string[3]-'0';  // rt_X: X -> data
+			break;
+		case 'b': // Best effort
+			class = IOPRIO_CLASS_BE;
+			data = ionice_string[3]-'0';  // be_X: X -> data
+			break;
+		case 'i': // Idle
+			class = IOPRIO_CLASS_IDLE;
+			data = 0;
+			break;
+		case 'n': // None
+		default:
+			class = IOPRIO_CLASS_NONE;
+			data = 0;
+			break;
+	}
 	int ioprio = IOPRIO_PRIO_VALUE(class, data);
 	int result = syscall(SYS_ioprio_set, which, who, ioprio);
 	if ( result < 0 ) {
 		// Failed to set priority, inform user, but can be ignored (it's just not so ionice).
-		rprintf(FWARNING, "ionice rejected by OS (%s version %s)\n",
-			RSYNC_NAME, rsync_version());
+		rprintf(FWARNING, "ionice %s to new priority %s failed (%s version %s): %s\n",
+			am_server ? "server" : "client", ionice_string, RSYNC_NAME, rsync_version(), strerror(errno));
 	} else {
 		if (DEBUG_GTE(CMD, 1))
-			rprintf(FINFO, "successfully ioniced %s to new priority idle\n", am_server ? "server" : "client");
+			rprintf(FINFO, "successfully ioniced %s to new priority %s\n", am_server ? "server" : "client", ionice_string);
 	}
 #else
 	rprintf(FWARNING, "ionice not supported for %s (%s: %s version %s)\n",
