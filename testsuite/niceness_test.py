@@ -41,30 +41,43 @@ if run_rsync('-Q', '--debug=help', check=False).returncode != 0:
 # It is expected that the local rsync process will exit here with non zero.
 # We then just check the log output here for any options that may or may not
 # have been given for the remote rsync process by our local rsync process.
-def test_remote_args(testname: str, args: list, expected_remote_args: list) -> None:
+def test_remote_args(testname: str, args: list, expected_nice_value: str, expected_ionice_value: str, expected_remote_args: list) -> None:
     print('### TEST BEGIN ### ' + testname + '\n')
     probe = run_rsync(*['-nvv', '--rsh=echo', *args], check=False, capture_output=True)
     if probe.returncode == 0:
         fail('The command should not succeed here.')
     actual_remote_args = 'not found'
+    nice_value="<not set>"
+    ionice_value="<not set>"
     for remote_line in probe.stdout.splitlines():
         if 'opening connection using' in remote_line:
             actual_remote_args = remote_line.strip()
+        elif 'client to new priority' in remote_line:
+            if 'reniced' in remote_line:
+                nice_value = remote_line.split("to new priority", 1)[1].strip()
+                print("Local nice value: "+nice_value);
+            else:
+                ionice_value = remote_line.split("to new priority", 1)[1].strip()
+                print("Local ionice value: "+ionice_value);
         else:
             print('ignoring line: ' + remote_line)
     if 'not found' == actual_remote_args:
         fail('No remote shell command has been started or it was not logged.')    
+    if not nice_value == expected_nice_value:
+        fail('Local nice value does not match: expected: '+expected_nice_value+", but was: "+nice_value)
+    if not ionice_value == expected_ionice_value:
+        fail('Local ionice value does not match: expected: '+expected_ionice_value+", but was: "+ionice_value)
     for string in expected_remote_args:
         if string[0] == '!':
             substring = string[1:]
-            if (substring+' ') in actual_remote_args:
+            if (substring+' ') in actual_remote_args or ('\"'+substring+'\"') in actual_remote_args:
                 fail('Remote command line contains unexpected ' + substring + ': ' + actual_remote_args)
         else:
-            if not (string+' ') in actual_remote_args:
+            if not ((string+' ') in actual_remote_args or ('\"'+string+'\"') in actual_remote_args):
                 fail('Remote command line did not contain expected ' + string + ': ' + actual_remote_args)
     print('### TEST END ### ' + testname + '\n')
 
-test_remote_args('Check with no flags', [f'localhost:{FROMDIR}', TODIR], ["--server", "--sender", "!--blahblah", 
+test_remote_args('Check with no flags', [f'localhost:{FROMDIR}', TODIR], "<not set>", "<not set>", ["--server", "--sender", "!--blahblah",
                                                                           "!--nice", 
                                                                           "!--nice-local",
                                                                           "!--nice-local-value=4",
@@ -76,21 +89,9 @@ test_remote_args('Check with no flags', [f'localhost:{FROMDIR}', TODIR], ["--ser
                                                                           "!-Q"
                                                                           ])
 
-test_remote_args('Check with -Q', ['-Q', f'localhost:{FROMDIR}', TODIR], ["--server", "--sender", "!--blahblah", 
+test_remote_args('Check with -Q', ['-Q', f'localhost:{FROMDIR}', TODIR], "19", "idle", ["--server", "--sender", "!--blahblah",
                                                                           "!--nice", 
-                                                                          "--nice-local",
-                                                                          "!--nice-local-value=4",
-                                                                          "!--nice-remote", 
-                                                                          "!--nice-remote-value=6", 
-                                                                          "!--ionice", 
-                                                                          "--ionice-local",
-                                                                          "!--ionice-remote",
-                                                                          "!-Q"
-                                                                          ])
-
-test_remote_args('Check with --nice', ['--nice', f'localhost:{FROMDIR}', TODIR], ["--server", "--sender", "!--blahblah", 
-                                                                          "!--nice", 
-                                                                          "--nice-local",
+                                                                          "--nice=local:19/idle",
                                                                           "!--nice-local-value=4",
                                                                           "!--nice-remote", 
                                                                           "!--nice-remote-value=6", 
@@ -100,9 +101,9 @@ test_remote_args('Check with --nice', ['--nice', f'localhost:{FROMDIR}', TODIR],
                                                                           "!-Q"
                                                                           ])
 
-test_remote_args('Check with --nice-local', ['--nice-local', f'localhost:{FROMDIR}', TODIR], ["--server", "--sender", "!--blahblah", 
+test_remote_args('Check with --nice=all', ['--nice=all', f'localhost:{FROMDIR}', TODIR], "19", "idle", ["--server", "--sender", "!--blahblah",
                                                                           "!--nice", 
-                                                                          "!--nice-local",
+                                                                          "--nice=local:19/idle",
                                                                           "!--nice-local-value=4",
                                                                           "!--nice-remote", 
                                                                           "!--nice-remote-value=6", 
@@ -112,9 +113,9 @@ test_remote_args('Check with --nice-local', ['--nice-local', f'localhost:{FROMDI
                                                                           "!-Q"
                                                                           ])
 
-test_remote_args('Check with --nice-remote', ['--nice-remote', f'localhost:{FROMDIR}', TODIR], ["--server", "--sender", "!--blahblah", 
+test_remote_args('Check with --nice=local', ['--nice=local', f'localhost:{FROMDIR}', TODIR], "19", "idle", ["--server", "--sender", "!--blahblah",
                                                                           "!--nice", 
-                                                                          "--nice-local",
+                                                                          "!--nice=local:19/idle",
                                                                           "!--nice-local-value=4",
                                                                           "!--nice-remote", 
                                                                           "!--nice-remote-value=6", 
@@ -124,21 +125,9 @@ test_remote_args('Check with --nice-remote', ['--nice-remote', f'localhost:{FROM
                                                                           "!-Q"
                                                                           ])
 
-test_remote_args('Check with --ionice', ['--ionice', f'localhost:{FROMDIR}', TODIR], ["--server", "--sender", "!--blahblah", 
+test_remote_args('Check with --nice=remote', ['--nice=remote', f'localhost:{FROMDIR}', TODIR], "<not set>", "<not set>", ["--server", "--sender", "!--blahblah",
                                                                           "!--nice", 
-                                                                          "!--nice-local",
-                                                                          "!--nice-local-value=4",
-                                                                          "!--nice-remote", 
-                                                                          "!--nice-remote-value=6", 
-                                                                          "!--ionice", 
-                                                                          "--ionice-local",
-                                                                          "!--ionice-remote",
-                                                                          "!-Q"
-                                                                          ])
-
-test_remote_args('Check with --ionice-local', ['--ionice-local', f'localhost:{FROMDIR}', TODIR], ["--server", "--sender", "!--blahblah", 
-                                                                          "!--nice", 
-                                                                          "!--nice-local",
+                                                                          "--nice=local:19/idle",
                                                                           "!--nice-local-value=4",
                                                                           "!--nice-remote", 
                                                                           "!--nice-remote-value=6", 
@@ -148,21 +137,45 @@ test_remote_args('Check with --ionice-local', ['--ionice-local', f'localhost:{FR
                                                                           "!-Q"
                                                                           ])
 
-test_remote_args('Check with --ionice-remote', ['--ionice-remote', f'localhost:{FROMDIR}', TODIR], ["--server", "--sender", "!--blahblah", 
+test_remote_args('Check with --nice=idle', ['--nice=idle', f'localhost:{FROMDIR}', TODIR], "<not set>", "idle", ["--server", "--sender", "!--blahblah",
                                                                           "!--nice", 
-                                                                          "!--nice-local",
+                                                                          "--nice=local:0/idle",
                                                                           "!--nice-local-value=4",
                                                                           "!--nice-remote", 
                                                                           "!--nice-remote-value=6", 
                                                                           "!--ionice", 
-                                                                          "--ionice-local",
+                                                                          "!--ionice-local",
                                                                           "!--ionice-remote",
                                                                           "!-Q"
                                                                           ])
 
-test_remote_args('Check with --nice-local-value=4', ['--nice-local-value=4', f'localhost:{FROMDIR}', TODIR], ["--server", "--sender", "!--blahblah", 
+test_remote_args('Check with --nice=local:idle', ['--nice=local:idle', f'localhost:{FROMDIR}', TODIR], "<not set>", "idle", ["--server", "--sender", "!--blahblah",
                                                                           "!--nice", 
-                                                                          "!--nice-local",
+                                                                          "!--nice=local:19/idle",
+                                                                          "!--nice-local-value=4",
+                                                                          "!--nice-remote", 
+                                                                          "!--nice-remote-value=6", 
+                                                                          "!--ionice", 
+                                                                          "!--ionice-local",
+                                                                          "!--ionice-remote",
+                                                                          "!-Q"
+                                                                          ])
+
+test_remote_args('Check with --nice=remote:idle', ['--nice=remote:idle', f'localhost:{FROMDIR}', TODIR], "<not set>", "<not set>", ["--server", "--sender", "!--blahblah",
+                                                                          "!--nice", 
+                                                                          "--nice=local:0/idle",
+                                                                          "!--nice-local-value=4",
+                                                                          "!--nice-remote", 
+                                                                          "!--nice-remote-value=6", 
+                                                                          "!--ionice", 
+                                                                          "!--ionice-local",
+                                                                          "!--ionice-remote",
+                                                                          "!-Q"
+                                                                          ])
+
+test_remote_args('Check with --nice=local:4', ['--nice=local:4', f'localhost:{FROMDIR}', TODIR], "4", "<not set>", ["--server", "--sender", "!--blahblah",
+                                                                          "!--nice", 
+                                                                          "!--nice=local:4",
                                                                           "!--nice-local-value=4",
                                                                           "!--nice-local-value=6",
                                                                           "!--nice-remote", 
@@ -174,11 +187,11 @@ test_remote_args('Check with --nice-local-value=4', ['--nice-local-value=4', f'l
                                                                           "!-Q"
                                                                           ])
 
-test_remote_args('Check with --nice-remote-value=6', ['--nice-remote-value=6', f'localhost:{FROMDIR}', TODIR], ["--server", "--sender", "!--blahblah", 
+test_remote_args('Check with --nice=remote:6', ['--nice=remote:6', f'localhost:{FROMDIR}', TODIR], "<not set>", "<not set>", ["--server", "--sender", "!--blahblah",
                                                                           "!--nice", 
-                                                                          "!--nice-local",
+                                                                          "--nice=local:6",
                                                                           "!--nice-local-value=4",
-                                                                          "--nice-local-value=6",
+                                                                          "!--nice-local-value=6",
                                                                           "!--nice-remote", 
                                                                           "!--nice-remote-value=4", 
                                                                           "!--nice-remote-value=6", 
@@ -189,11 +202,11 @@ test_remote_args('Check with --nice-remote-value=6', ['--nice-remote-value=6', f
                                                                           ])
 
 
-test_remote_args('Check with --nice-value=6', ['--nice-value=6', f'localhost:{FROMDIR}', TODIR], ["--server", "--sender", "!--blahblah", 
+test_remote_args('Check with --nice=6', ['--nice=6', f'localhost:{FROMDIR}', TODIR], "6", "<not set>", ["--server", "--sender", "!--blahblah",
                                                                           "!--nice", 
-                                                                          "!--nice-local",
+                                                                          "--nice=local:6",
                                                                           "!--nice-local-value=4",
-                                                                          "--nice-local-value=6",
+                                                                          "!--nice-local-value=6",
                                                                           "!--nice-remote", 
                                                                           "!--nice-remote-value=4", 
                                                                           "!--nice-remote-value=6", 

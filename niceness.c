@@ -21,6 +21,152 @@
 
 extern int am_server;
 
+
+/*
+ * Try to parse the location and set the variables isLocal and isRemote.
+ * Return the pointer to the string after the found string. 
+ */
+char *parse_location(char *str, int *isLocal, int *isRemote) 
+{
+	if (strncmp(str, "local", 5) == 0) 
+	{
+		*isLocal=1;
+		*isRemote=0;
+		return str+5;
+	}
+	if (strncmp(str, "remote", 6) == 0) 
+	{
+		*isLocal=0;
+		*isRemote=1;
+		return str+6;
+	}
+	if (strncmp(str, "all", 3) == 0) 
+	{
+		*isLocal=1;
+		*isRemote=1;
+		return str+3;
+	}
+		*isLocal=0;
+		*isRemote=0;
+	return str;
+}
+
+char *parse_nice_value(char *str, int *nice_value)
+{
+	if (!str || !str[0]) return 0; // ERROR
+	char *pointer = str;
+	long nice_long = strtol(str, &pointer, 10);
+	if (nice_long<-20 || nice_long>20) return 0;
+	*nice_value=(int)nice_long;
+	return pointer;
+}
+
+char *parse_ionice_value(char *str, int *ionice_value)
+{
+	if (strncmp(str, "none", 3) == 0) 
+	{
+		*ionice_value=0;
+		return str+4;
+	}
+	if (strncmp(str, "idle", 3) == 0) 
+	{
+		*ionice_value=1;
+		return str+4;
+	}
+	*ionice_value=0;
+	return str;
+}
+
+char *parse_nice_and_ionice_values(char *str, int *nice_value, int *ionice_value)
+{
+	char *pointer = parse_ionice_value(str, ionice_value);
+	if (*ionice_value) {
+		*nice_value=0;
+		return pointer;
+	}
+	pointer = parse_nice_value(pointer, nice_value);
+	if (pointer == 0) return 0; // ERROR
+	if (pointer[0] == '/') // nice/ionice value
+	{
+		pointer++;
+		pointer = parse_ionice_value(pointer, ionice_value);
+	}
+	return pointer;
+}
+
+/*
+ * parse the configuration string and return a pointer to the still not processed remainder of the configuration string
+ */ 
+char *parse_setting(char *config_str, int *nice_local, int *ionice_local, int *nice_remote, int *ionice_remote) 
+{
+	int isLocal=0;
+	int isRemote=0;
+	char *pointer=parse_location(config_str, &isLocal, &isRemote);
+	if (isLocal || isRemote) 
+	{   /* Location "local" or "remote" or "all" found */
+		if (pointer[0] == ':') 
+		{   /* Location followed by specific setting */
+			pointer++; /* Skip colon */
+			/* Read nice/ionice value */ 
+			int nice_value=0;
+			int ionice_value=0;
+			pointer = parse_nice_and_ionice_values(pointer, &nice_value, &ionice_value);
+			if (isLocal) {
+				*nice_local=nice_value;
+				*ionice_local=ionice_value;
+			}
+			if (isRemote) {
+				*nice_remote=nice_value;
+				*ionice_remote=ionice_value;
+			}
+			return pointer;
+		} else { 
+			if (!pointer[0] || pointer[0] == ',') 
+			{   /* End of string or comma */
+				/* Location without specific setting, use default */
+                int nice_default=get_renice_default_prio();
+                int ionice_default=1;
+				if (isLocal) {
+					*nice_local=nice_default;
+					*ionice_local=ionice_default;
+				}
+				if (isRemote) {
+					*nice_remote=nice_default;
+					*ionice_remote=ionice_default;
+				}
+				return pointer;
+			} else 
+			{ /* Unexpected characters */
+				return 0; // ERROR
+			}
+		}
+	} else {
+		/* Read nice/ionice value */ 
+			int nice_value=0;
+			int ionice_value=0;
+			pointer = parse_nice_and_ionice_values(pointer, &nice_value, &ionice_value);
+			*nice_local=nice_value;
+			*ionice_local=ionice_value;
+			*nice_remote=nice_value;
+			*ionice_remote=ionice_value;
+			return pointer;
+	}
+	return 0; // ERROR
+}
+
+int parse_nice(const char *config_str, int *nice_local, int *ionice_local, int *nice_remote, int *ionice_remote) 
+{
+	char *str = (char *) config_str;
+	while (str && str[0]) { // string is valid and not empty
+		str=parse_setting(str, nice_local, ionice_local, nice_remote, ionice_remote);
+		if (!str) return 0; // ERROR returned by parser
+		if (!str[0]) return 1; // End of string - everything has been parsed - finished successfully!
+		if (str[0] != ',') return 0; // ERROR: Unexpected character, we expect a comma here as separator.
+		str++;
+	}
+	return 0; // string was empty or not valid (maybe even after a comma)
+}
+
 int get_renice_default_prio()
 {
 	return 19; // lowest CPU Priority
@@ -61,7 +207,7 @@ void ionice_me()
 			RSYNC_NAME, rsync_version());
 	} else {
 		if (DEBUG_GTE(CMD, 1))
-			rprintf(FINFO, "successfully ioniced %s\n", am_server ? "server" : "client");
+			rprintf(FINFO, "successfully ioniced %s to new priority idle\n", am_server ? "server" : "client");
 	}
 #else
 	rprintf(FWARNING, "ionice not supported for %s (%s: %s version %s)\n",

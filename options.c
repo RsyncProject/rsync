@@ -607,8 +607,7 @@ enum {OPT_SERVER = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_NO_D, OPT_APPEND, OPT_NO_ICONV, OPT_INFO, OPT_DEBUG, OPT_BLOCK_SIZE,
       OPT_USERMAP, OPT_GROUPMAP, OPT_CHOWN, OPT_BWLIMIT, OPT_STDERR,
       OPT_OLD_COMPRESS, OPT_NEW_COMPRESS, OPT_NO_COMPRESS, OPT_OLD_ARGS,
-      OPT_STOP_AFTER, OPT_STOP_AT, OPT_NICE, OPT_NO_NICE, OPT_IONICE, OPT_NO_IONICE,
-      OPT_NICE_LOCAL, OPT_NICE_REMOTE, OPT_NICE_VALUE,
+      OPT_STOP_AFTER, OPT_STOP_AT, OPT_NICE, OPT_NO_NICE,
       OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
@@ -859,22 +858,9 @@ static struct poptOption long_options[] = {
   {"remote-option",   'M', POPT_ARG_STRING, 0, 'M', 0, 0 },
   {"protocol",         0,  POPT_ARG_INT,    &protocol_version, 0, 0, 0 },
   {"checksum-seed",    0,  POPT_ARG_INT,    &checksum_seed, 0, 0, 0 },
-  {"nice-local",       0,  POPT_ARG_NONE,   0, OPT_NICE_LOCAL, 0, 0 },
-  {"nice-local-value", 0,  POPT_ARG_INT,    &nice_local, 0, 0, 0 },
-  {"nice-remote",      0,  POPT_ARG_NONE,   0, OPT_NICE_REMOTE, 0, 0 },
-  {"nice-remote-value",0,  POPT_ARG_INT,    &nice_remote, 0, 0, 0 },
-  {"ionice-local",     0,  POPT_ARG_VAL,    &ionice_local, 1, 0, 0 },
-  {"ionice-remote",    0,  POPT_ARG_VAL,    &ionice_remote, 1, 0, 0 },
-  {"no-nice-local",    0,  POPT_ARG_VAL,    &nice_local, 0, 0, 0 },
-  {"no-nice-remote",   0,  POPT_ARG_VAL,    &nice_remote, 0, 0, 0 },
-  {"no-ionice-local",  0,  POPT_ARG_VAL,    &ionice_local, 0, 0, 0 },
-  {"no-ionice-remote", 0,  POPT_ARG_VAL,    &ionice_remote, 0, 0, 0 },
-  {"nice",             0,  POPT_ARG_NONE,   0, OPT_NICE, 0, 0 },
-  {"nice-value",       0,  POPT_ARG_INT,    &nice_local, OPT_NICE_VALUE, 0, 0 },
-  {"ionice",           0,  POPT_ARG_NONE,   0, OPT_IONICE, 0, 0 },
+  {"nice",             0,  POPT_ARG_STRING, 0, OPT_NICE, 0, 0 },
   {"no-nice",          0,  POPT_ARG_NONE,   0, OPT_NO_NICE, 0, 0 },
-  {"no-ionice",        0,  POPT_ARG_NONE,   0, OPT_NO_IONICE, 0, 0 },
-  {"nice-and-ionice", 'Q', POPT_ARG_NONE,   0, 'Q', 0, 0 },
+  {0,                 'Q', POPT_ARG_NONE,   0, 'Q', 0, 0 },
   {"server",           0,  POPT_ARG_NONE,   0, OPT_SERVER, 0, 0 },
   {"sender",           0,  POPT_ARG_NONE,   0, OPT_SENDER, 0, 0 },
   /* All the following options switch us into daemon-mode option-parsing. */
@@ -1630,55 +1616,38 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 
 		case 'Q':
 			/*
-			 * Turn nice on with default prio when it was turned off, but do not overwrite any previously set nice value.
+			 * Turn nice on with default prio and turn ionice on (idle).
 			 */
-			nice_local = nice_local==0 ? default_nice_prio : nice_local;
-			nice_remote = nice_remote==0 ? default_nice_prio : nice_remote;
+			nice_local = default_nice_prio;
+			nice_remote = default_nice_prio;
 			ionice_local = 1;
 			ionice_remote = 1;
 			break;
 
 		case OPT_NICE:
 			/*
-			 * Turn nice on with default prio when it was turned off, but do not overwrite any previously set nice value.
+			 * Parse parameters for nice and set the following fields:
+			   - nice_local
+			   - ionice_local
+			   - nice_remote
+			   - ionice_remote
 			 */
-			nice_local = nice_local==0 ? default_nice_prio : nice_local;
-			nice_remote = nice_remote==0 ? default_nice_prio : nice_remote;
-			break;
-
-		case OPT_NICE_VALUE:
-			/*
-			 * POPT writes to nice_local. We have to copy the value from nice-local to nice-remote here.
-			 */
-			nice_remote = nice_local;
-			break;
-
-		case OPT_NICE_LOCAL:
-			/*
-			 * Turn nice on with default prio when it was turned off, but do not overwrite any previously set nice value.
-			 */
-			nice_local = nice_local==0 ? default_nice_prio : nice_local;
-			break;
-
-		case OPT_NICE_REMOTE:
-			/*
-			 * Turn nice on with default prio when it was turned off, but do not overwrite any previously set nice value.
-			 */
-			nice_remote = nice_remote==0 ? default_nice_prio : nice_remote;
-			break;
-
-		case OPT_IONICE:
-			ionice_local = 1;
-			ionice_remote = 1;
+			arg = poptGetOptArg(pc);
+			if (!parse_nice(arg, &nice_local, &ionice_local, &nice_remote, &ionice_remote)) {
+				snprintf(err_buf, sizeof err_buf,
+					"Invalid argument passed to --nice (%s)\n",
+					arg);
+				goto cleanup;
+			}
 			break;
 
 		case OPT_NO_NICE:
+			/*
+			 * Turn off nice and ionice
+			 */
 			nice_local = 0;
-			nice_remote = 0;
-			break;
-
-		case OPT_NO_IONICE:
 			ionice_local = 0;
+			nice_remote = 0;
 			ionice_remote = 0;
 			break;
 
@@ -3080,18 +3049,12 @@ void server_options(char **args, int *argc_p)
 	if (mkpath_dest_arg && am_sender)
 		args[ac++] = "--mkpath";
 
-	if (nice_remote) {
-		if (get_renice_default_prio()==nice_remote) {
-			args[ac++] = "--nice-local";
-		} else {
-			if (asprintf(&arg, "--nice-local-value=%d", nice_remote) < 0)
-				goto oom;
-		    args[ac++] = arg;
-		}
+	if (nice_remote || ionice_remote) {
+		char *ionice_str = ionice_remote > 0 ? "/idle":"";
+		if (asprintf(&arg, "--nice=local:%d%s", nice_remote, ionice_str) < 0)
+			goto oom;
+		args[ac++] = arg;
 	}
-
-	if (ionice_remote)
-		args[ac++] = "--ionice-local";
 
 	if (ac > MAX_SERVER_ARGS) { /* Not possible... */
 		rprintf(FERROR, "argc overflow in server_options().\n");
