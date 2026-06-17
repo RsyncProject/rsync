@@ -1,3 +1,15 @@
+# NEWS for rsync 3.5.0 (UNRELEASED)
+
+## Changes in this version:
+
+### ENHANCEMENTS:
+
+- Added `sha256` to the list of transfer checksum algorithms that can be
+  selected via [`--checksum-choice`](rsync.1#opt) (and negotiated
+  automatically).  It is available when rsync is built with OpenSSL
+  support.
+
+
 # NEWS for rsync 3.4.3 (20 May 2026)
 
 ## Changes in this version:
