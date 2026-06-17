@@ -565,16 +565,15 @@ has its own detailed description later in this manpage.
 --checksum-seed=NUM      set block/file checksum seed (advanced)
 --ipv4, -4               prefer IPv4
 --ipv6, -6               prefer IPv6
---nice-local             renice local process to low priority
---nice-remote            renice remote process to low priority
---ionice-local           ionice local process to low priority
---ionice-remote          ionice remote process to low priority
---nice, --ionice         set local and remote process to low priority
---nice-local-value=10    renice local process to given priority
---nice-remote-value=10   renice remote process to given priority
---nice-value=10          renice local+remote process to given priority
---no-nice, ...           prepending "no-" turns the given option off
---nice-and-ionice, -Q    same as --nice --ionice
+--nice=(LOCATION|[LOCATION:]SETTING)[,...] Set prio of the rsync process
+      LOCATION: local|remote|all
+      SETTING: NICESETTING|IONICESETTING|NICESETTING/IONICESETTING
+      NICESETTING:   -20...19
+      IONICESETTING: RT_0|RT_1|RT_2|RT_3|RT_4|RT_5|RT_6|RT_7|NONE|
+                     BE_0|BE_1|BE_2|BE_3|BE_4|BE_5|BE_6|BE_7|IDLE
+--no-nice                prepending "no-" turns the option off
+--Q                      same as --nice=all:19/idle
+      LOCATION and IONICESETTING are not case sensitive
 --version, -V            print the version + other info and exit
 --help, -h (*)           show this help (* -h is help only on its own)
 ```
@@ -595,9 +594,7 @@ accepted:
 --log-file=FILE          override the "log file" setting
 --log-file-format=FMT    override the "log format" setting
 --sockopts=OPTIONS       specify custom TCP options
---nice-local             renice local daemon process to low priority
---ionice-local           ionice local daemon process to low priority
-                         They are given at client site as (io)nice-remote
+--nice=...               set priority of the local daemon process
 --verbose, -v            increase verbosity
 --ipv4, -4               prefer IPv4
 --ipv6, -6               prefer IPv6
@@ -3837,6 +3834,74 @@ expand it.
     applications that want repeatable block checksums, or in the case where the
     user wants a more random checksum seed.  Setting NUM to 0 causes rsync to
     use the default of **time**() for checksum seed.
+
+0.  `--nice=(LOCATION|[LOCATION:]SETTING)[,...]`
+
+    LOCATION: `LOCAL`|`REMOTE`|`ALL`
+
+      - `LOCAL` is the local rsync process that has been started by the user/script/etc.
+
+      - `REMOTE` it the remote rsync process that has been started via SSH on the remote system
+
+      - `ALL` means both, local and remote.
+        The constants are not case sensitive, thus e.g. `REMOTE` and `remote` are the same value.
+        If omitted, the default is: all
+
+    SETTING: NICESETTING|IONICESETTING|NICESETTING/IONICESETTING
+      - If the whole setting is omitted, the default is `19/IDLE`
+
+    NICESETTING:   `-20`...`19`
+      - Higher number means lower priority, negative numbers require root permissions
+      - If not specified in the setting, the default is `0`. 
+      - No system call is made to set the priority `0`.
+      - If the setting fails, e.g. due to the lack of permission to set negative nice
+        priority, a warning is issued and rsync will continue doing its work.
+
+    IONICESETTING: RT_0|RT_1|RT_2|RT_3|RT_4|RT_5|RT_6|RT_7|NONE|BE_0|BE_1|BE_2|BE_3|BE_4|BE_5|BE_6|BE_7|IDLE
+      - `RT_X` is realtime priority, need root permission
+      - `BE_X` is best effort with the given level
+      - `IDLE` means the process gets served only when no other processes are using disk io.
+      - `NONE` means best effort with level calculated by the formula (cpu_nice + 20) / 5
+             and is the default that does not need to be set.
+      - The constants are not case sensitive, thus e.g. `IDLE` and `idle` are the same value.
+      - If not specified in the setting, the default is `NONE`.
+      - No system call is made to set the priority `NONE`.
+      - If the setting fails, e.g. due to the lack of permission to set realtime
+        priority, a warning is issued and rsync will continue doing its work.
+    
+    Examples:
+    
+        Specifying a setting for both, local and remote:
+         --nice=19/idle = --nice=all:19/idle
+         --nice=19      = --nice=all:19       (no ionice -> NONE => only nice will be set)
+         --nice=idle    = --nice=all:idle     (no nice -> 0 => only ionice will be set)
+         --nice=0       = --nice=all:0        (nice value 0 and no ionice -> 0/NONE => none of them is set)
+        
+        Specifying a setting for the given location:
+         --nice=local:10
+         --nice=remote:idle
+         --nice=local:19,remote:5
+         --nice=local:19/idle,remote:5
+         --nice=local:19/be_0,remote:idle
+        
+        No specific setting means default 19/idle:
+         --nice=local   = --nice=local:19/idle
+         --nice=remote  = --nice=remote:19/idle
+         --nice=all     = --nice=19/idle
+         -Q             = --nice=19/idle
+         --nice=local,remote
+        
+        Any specific setting set before may be overwritten by the following setting, e. g.:
+         --nice=local:5 --nice=all 
+         --nice=local:6/idle,all
+         --nice=local:5 --nice=remote:6 -Q
+        would result in setting the default 19/idle for both, local and remote.
+    
+    nice and ionice are always set as a pair, even when only one of them is specified.
+     --nice=remote:5 --nice=remote:idle
+    therefore would result in an unset nice value (`5` will be overwritten with default `0`) 
+    and effectively only ionice value `idle` beeing applied.
+
 
 ## DAEMON OPTIONS
 
