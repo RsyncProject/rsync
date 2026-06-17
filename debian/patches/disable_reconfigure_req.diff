@@ -1,0 +1,38 @@
+diff --git a/Makefile.in b/Makefile.in
+index 3cde955..ef71d7e 100644
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -210,15 +210,6 @@ configure.sh config.h.in: configure.ac aclocal.m4
+ 	else \
+ 	    echo "config.h.in has CHANGED."; \
+ 	fi
+-	@if test -f configure.sh.old || test -f config.h.in.old; then \
+-	    if test "$(MAKECMDGOALS)" = reconfigure; then \
+-		echo 'Continuing with "make reconfigure".'; \
+-	    else \
+-		echo 'You may need to run:'; \
+-		echo '  make reconfigure'; \
+-		exit 1; \
+-	    fi \
+-	fi
+ 
+ .PHONY: reconfigure
+ reconfigure: configure.sh
+@@ -232,17 +223,6 @@ restatus:
+ Makefile: Makefile.in config.status configure.sh config.h.in
+ 	@if test -f Makefile; then cp -p Makefile Makefile.old; else touch Makefile.old; fi
+ 	@./config.status
+-	@if diff Makefile Makefile.old >/dev/null 2>&1; then \
+-	    echo "Makefile is unchanged."; \
+-	    rm Makefile.old; \
+-	else \
+-	    if test "$(MAKECMDGOALS)" = reconfigure; then \
+-		echo 'Continuing with "make reconfigure".'; \
+-	    else \
+-		echo "Makefile updated -- rerun your make command."; \
+-		exit 1; \
+-	    fi \
+-	fi
+ 
+ stunnel-rsyncd.conf: $(srcdir)/stunnel-rsyncd.conf.in Makefile
+ 	sed 's;\@bindir\@;$(bindir);g' <$(srcdir)/stunnel-rsyncd.conf.in >stunnel-rsyncd.conf
