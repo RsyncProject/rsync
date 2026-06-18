@@ -2163,7 +2163,7 @@ void write_int(int f, int32 x)
 
 void write_varint(int f, int32 x)
 {
-	char b[5];
+	char b[5] = {0}; /* {0} only to satisfy the analyzer: it doesn't model SIVAL initialising b[1..4] */
 	uchar bit;
 	int cnt;
 
@@ -2185,7 +2185,7 @@ void write_varint(int f, int32 x)
 
 void write_varlong(int f, int64 x, uchar min_bytes)
 {
-	char b[9];
+	char b[9] = {0}; /* {0} only to satisfy the analyzer: it doesn't model SIVAL64 initialising b[1..8] */
 	uchar bit;
 	int cnt = 8;
 
