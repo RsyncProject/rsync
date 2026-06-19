@@ -273,10 +273,10 @@ void renice_me(int prio)
 
 void ionice_me(int ionice_value) 
 {
+	const char *ionice_string = intToIoniceValueString(ionice_value);
 #ifdef SUPPORT_IONICE
 	int which = IOPRIO_WHO_PROCESS; // who specifies a Process ID
 	int who = 0; // 0 means current process
-	const char *ionice_string = intToIoniceValueString(ionice_value);
 	int class;
 	int data; // Ignored when using the IOPRIO_CLASS_IDLE or IOPRIO_CLASS_NONE class
 	switch (ionice_string[0])
@@ -310,7 +310,7 @@ void ionice_me(int ionice_value)
 			rprintf(FINFO, "successfully ioniced %s to new priority %s\n", am_server ? "server" : "client", ionice_string);
 	}
 #else
-	rprintf(FWARNING, "ionice not supported for %s (%s: %s version %s)\n",
-			COMPILE_TARGET, am_server ? "server" : "client", RSYNC_NAME, rsync_version());
+	rprintf(FWARNING, "ionice %s to new priority %s failed (%s version %s): ionice not supported for %s\n",
+			am_server ? "server" : "client", ionice_string, RSYNC_NAME, rsync_version(), COMPILE_TARGET);
 #endif
 }
