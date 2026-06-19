@@ -227,7 +227,7 @@ int sys_lsetxattr(const char *path, const char *name, const void *value, size_t 
 		return -1;
 
 	for (bufpos = 0; bufpos < size; ) {
-		ssize_t cnt = write(attrfd, (char*)value + bufpos, size);
+		ssize_t cnt = write(attrfd, (char*)value + bufpos, size - bufpos);
 		if (cnt <= 0) {
 			if (cnt < 0 && errno == EINTR)
 				continue;
