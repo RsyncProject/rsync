@@ -1,5 +1,5 @@
 
-find_program(AWK_EXE awk PATHS "C:/usr/cygwin64/bin")
+find_program(AWK_EXE gawk PATHS "C:/usr/cygwin64/bin")
 if(AWK_EXE)
     file(GLOB RSYNC_C_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*.c")
     execute_process(COMMAND ${AWK_EXE} -f ${CMAKE_CURRENT_SOURCE_DIR}/daemon-parm.awk ${CMAKE_CURRENT_SOURCE_DIR}/daemon-parm.txt OUTPUT_FILE ${CMAKE_CURRENT_SOURCE_DIR}/daemon-parm.h)
@@ -13,9 +13,14 @@ if(AWK_EXE)
 endif()
 
 cmake_minimum_required(VERSION 3.24)
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 cmake_policy(SET CMP0135 NEW)
 project(rsync C CXX)
 add_compile_definitions(_out_of_memory=rsync_out_of_memory src_file=rsync_src_file)
+
+if(MSVC)
+    add_compile_definitions(HAVE_INET_PTON HAVE_ERRNO_DECL)
+endif()
 
 # Find dependencies
 find_package(ZLIB QUIET)
@@ -35,21 +40,21 @@ endif()
 find_package(zstd CONFIG QUIET)
 if(NOT zstd_FOUND)
     include(FetchContent)
-    FetchContent_Declare(zstd GIT_REPOSITORY https://github.com/facebook/zstd.git GIT_TAG v1.5.5)
+    FetchContent_Declare(zstd GIT_REPOSITORY https://github.com/facebook/zstd.git GIT_TAG v1.5.5 SOURCE_SUBDIR build/cmake)
     FetchContent_MakeAvailable(zstd)
 endif()
 
 find_package(lz4 CONFIG QUIET)
 if(NOT lz4_FOUND)
     include(FetchContent)
-    FetchContent_Declare(lz4 GIT_REPOSITORY https://github.com/lz4/lz4.git GIT_TAG v1.9.4)
+    FetchContent_Declare(lz4 GIT_REPOSITORY https://github.com/lz4/lz4.git GIT_TAG v1.9.4 SOURCE_SUBDIR build/cmake)
     FetchContent_MakeAvailable(lz4)
 endif()
 
 find_package(xxHash CONFIG QUIET)
 if(NOT xxHash_FOUND)
     include(FetchContent)
-    FetchContent_Declare(xxHash GIT_REPOSITORY https://github.com/Cyan4973/xxHash.git GIT_TAG v0.8.2)
+    FetchContent_Declare(xxHash GIT_REPOSITORY https://github.com/Cyan4973/xxHash.git GIT_TAG v0.8.2 SOURCE_SUBDIR cmake_unofficial)
     FetchContent_MakeAvailable(xxHash)
 endif()
 
@@ -129,6 +134,7 @@ set(NOBODY_GROUP "nobody")
 set(RSYNCD_SYSCONF "/etc/rsyncd.conf")
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
+file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/config.h "\nvoid rsync_out_of_memory(const char *msg, const char *file, int line);\nconst char *rsync_src_file(const char *file);\n")
 
 # Use the pre-generated headers that are committed to the repo
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/proto.h ${CMAKE_CURRENT_BINARY_DIR}/proto.h COPYONLY)
@@ -231,6 +237,24 @@ if(PYTHON_EXECUTABLE)
         set_tests_properties(${TEST_NAME} PROPERTIES ENVIRONMENT "TOOLDIR=$<TARGET_FILE_DIR:tls>")
     endforeach()
 endif()
+
+if(TARGET popt)
+  target_compile_definitions(popt PRIVATE HAVE_CONFIG_H=1)
+endif()
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/rounding.h "#define EXTRA_ROUNDING 0\n")
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/git-version.h "#define RSYNC_GITOBJ \"\"\n")
+
+if(TARGET popt)
+  target_compile_definitions(popt PRIVATE HAVE_CONFIG_H=1)
+endif()
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/rounding.h "#define EXTRA_ROUNDING 0\n")
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/git-version.h "#define RSYNC_GITOBJ \"\"\n")
+
+if(TARGET popt)
+  target_compile_definitions(popt PRIVATE HAVE_CONFIG_H=1)
+endif()
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/rounding.h "#define EXTRA_ROUNDING 0\n")
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/git-version.h "#define RSYNC_GITOBJ \"\"\n")
 
 if(TARGET popt)
   target_compile_definitions(popt PRIVATE HAVE_CONFIG_H=1)
