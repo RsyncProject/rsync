@@ -6,18 +6,11 @@
 # plus test passing the correct options to the remote command
 
 import os
-import platform
 
 from rsyncfns import (
     FROMDIR, RSYNC, SRCDIR, TODIR,
     checkit, run_rsync, test_fail, test_skipped
 )
-
-if platform.system() in ('OpenBSD'):
-    test_skipped(
-        f"test fails with 'ssh exited with code 1' instead of ignoring the expected error."
-        f"support not available on {platform.system()}"
-    )
 
 # Helper function
 def fail(msg: str) -> 'None':
