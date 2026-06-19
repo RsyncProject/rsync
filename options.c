@@ -3051,8 +3051,8 @@ void server_options(char **args, int *argc_p)
 		args[ac++] = "--mkpath";
 
 	if (nice_remote || ionice_remote) {
-		char *ionice_str = ionice_remote ? intToIoniceValueString(ionice_remote):"";
-		char *slash_str = ionice_remote ? "/":"";
+		const char *ionice_str = ionice_remote ? intToIoniceValueString(ionice_remote):"";
+		const char *slash_str = ionice_remote ? "/":"";
 		if (asprintf(&arg, "--nice=local:%d%s%s", nice_remote, slash_str, ionice_str) < 0)
 			goto oom;
 		args[ac++] = arg;

@@ -276,7 +276,7 @@ void ionice_me(int ionice_value)
 #ifdef SUPPORT_IONICE
 	int which = IOPRIO_WHO_PROCESS; // who specifies a Process ID
 	int who = 0; // 0 means current process
-	char *ionice_string = intToIoniceValueString(ionice_value);
+	const char *ionice_string = intToIoniceValueString(ionice_value);
 	int class;
 	int data; // Ignored when using the IOPRIO_CLASS_IDLE or IOPRIO_CLASS_NONE class
 	switch (ionice_string[0])
