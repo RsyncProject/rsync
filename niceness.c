@@ -266,8 +266,8 @@ void renice_me(int prio)
 				rprintf(FINFO, "successfully reniced %s to new priority %d\n", am_server ? "server" : "client", prio);
 	}
 #else
-	rprintf(FWARNING, "renice not supported for %s (%s: %s version %s)\n",
-			COMPILE_TARGET, am_server ? "server" : "client", RSYNC_NAME, rsync_version());
+	rprintf(FWARNING, "renice %s to new priority %d failed (%s version %s): renice not supported for %s\n",
+		am_server ? "server" : "client", prio, RSYNC_NAME, rsync_version(), COMPILE_TARGET);
 #endif
 }
 
