@@ -227,19 +227,19 @@ int sys_lsetxattr(const char *path, const char *name, const void *value, size_t 
 		return -1;
 
 	for (bufpos = 0; bufpos < size; ) {
-		ssize_t cnt = write(attrfd, (char*)value + bufpos, size);
+		ssize_t cnt = write(attrfd, (char*)value + bufpos, size - bufpos);
 		if (cnt <= 0) {
 			if (cnt < 0 && errno == EINTR)
 				continue;
-			bufpos = -1;
-			break;
+			close(attrfd);
+			return -1;
 		}
 		bufpos += cnt;
 	}
 
 	close(attrfd);
 
-	return bufpos > 0 ? 0 : -1;
+	return 0;
 }
 
 int sys_lremovexattr(const char *path, const char *name)
