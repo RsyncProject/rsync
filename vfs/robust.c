@@ -32,16 +32,16 @@
  * --delete trying to remove old .rsyncNNN files, hence it renames it
  * each time.
  **/
-int robust_unlink(const char *fname)
+int robust_unlink(const char *fname, int vfs_flags)
 {
 #ifndef ETXTBSY
-	return vfs_unlink_at(fname);
+	return vfs_unlink(VFS_AT_FDCWD, fname, vfs_flags);
 #else
 	static int counter = 1;
 	int rc, pos, start;
 	char path[MAXPATHLEN];
 
-	rc = vfs_unlink_at(fname);
+	rc = vfs_unlink(VFS_AT_FDCWD, fname, vfs_flags);
 	if (rc == 0 || errno != ETXTBSY)
 		return rc;
 
@@ -111,7 +111,7 @@ int robust_rename(const char *from, const char *to, const char *partialptr,
 		switch (errno) {
 #ifdef ETXTBSY
 		case ETXTBSY:
-			if (robust_unlink(to) != 0) {
+			if (robust_unlink(to, 0) != 0) {
 				errno = ETXTBSY;
 				return -1;
 			}
@@ -126,7 +126,7 @@ int robust_rename(const char *from, const char *to, const char *partialptr,
 			}
 			if (copy_file(from, to, -1, mode, 0) != 0)
 				return -2;
-			vfs_unlink_at(from);
+			vfs_unlink(VFS_AT_FDCWD, from, 0);
 			return 1;
 		default:
 			return -1;

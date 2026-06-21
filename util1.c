@@ -1085,7 +1085,7 @@ int handle_partial_dir(const char *fname, int create)
 		STRUCT_STAT st;
 		int statret = vfs_lstat_at(dir, &st);
 		if (statret == 0 && !S_ISDIR(st.st_mode)) {
-			if (vfs_unlink_at(dir) < 0) {
+			if (vfs_unlink(VFS_AT_FDCWD, dir, VFS_OPERATOR_PATH) < 0) {
 				vfs.operator_path_resolve = 0;
 				*fn = '/';
 				return 0;
@@ -1098,7 +1098,7 @@ int handle_partial_dir(const char *fname, int create)
 			return 0;
 		}
 	} else
-		vfs_rmdir_at(dir);
+		vfs_unlink(VFS_AT_FDCWD, dir, VFS_REMOVEDIR);
 	vfs.operator_path_resolve = 0;
 	*fn = '/';
 

@@ -1291,7 +1291,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 					 * exclude-aware ownership walk (a symlinked partial-dir
 					 * must not delete a file in an excluded subtree). */
 					vfs.operator_path_resolve = 1;
-					vfs_unlink_at(partialptr);
+					vfs_unlink(VFS_AT_FDCWD, partialptr, VFS_OPERATOR_PATH);
 					vfs.operator_path_resolve = 0;
 				}
 				handle_partial_dir(partialptr, PDIR_DELETE);
@@ -1302,7 +1302,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 					"Unable to create partial-dir for %s -- discarding %s.\n",
 					local_name ? local_name : f_name(file, NULL),
 					recv_ok ? "completed file" : "partial file");
-				vfs_unlink_at(fnametmp);
+				vfs_unlink(VFS_AT_FDCWD, fnametmp, 0);
 				recv_ok = -1;
 			} else if (!finish_transfer(partialptr, fnametmp, fnamecmp, NULL,
 						    file, recv_ok, !partial_dir))
@@ -1313,7 +1313,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 			} else
 				partialptr = NULL;
 		} else if (!one_inplace)
-			vfs_unlink_at(fnametmp);
+			vfs_unlink(VFS_AT_FDCWD, fnametmp, 0);
 
 		cleanup_disable();
 

@@ -251,7 +251,7 @@ static inline int link_or_rename(const char *from, const char *to,
 		if (stp->st_nlink > 1 && !S_ISDIR(stp->st_mode)) {
 			/* If someone has hard-linked the file into the backup
 			 * dir, rename() might return success but do nothing! */
-			robust_unlink(from); /* Just in case... */
+			robust_unlink(from, VFS_OPERATOR_PATH); /* Just in case... */
 		}
 		if (DEBUG_GTE(BACKUP, 1))
 			rprintf(FINFO, "make_backup: RENAME %s successful.\n", from);

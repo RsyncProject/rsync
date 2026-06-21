@@ -125,11 +125,7 @@ int vfs_rename_at(const char *old_path, const char *new_path);
 int vfs_rename_atfd(int old_dfd, const char *old_name, int new_dfd, const char *new_name);
 
 /* unlink and rmdir (vfs/unlink.c). */
-int vfs_unlink(const char *path);
-int vfs_unlink_at(const char *path);
-int vfs_unlink_atfd(int dfd, const char *name, int flags);
-int vfs_rmdir(const char *pathname);
-int vfs_rmdir_at(const char *pathname);
+int vfs_unlink(int dirfd, const char *path, int flags);
 
 /* open (vfs/open.c). */
 int vfs_open(const char *pathname, int flags, mode_t mode);
@@ -185,7 +181,7 @@ int vfs_SetFileTime(const char *path, time_t crtime);
  * argument (VFS_OPERATOR_PATH for operator-supplied paths, else 0). */
 int vfs_make_path(char *fname, int mkp_flags, int vfs_flags);
 int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode, int vfs_flags);
-int robust_unlink(const char *fname);
+int robust_unlink(const char *fname, int vfs_flags);
 int robust_rename(const char *from, const char *to, const char *partialptr,
 		  int mode, struct file_struct *file);
 int vfs_utimensat(const char *path, STRUCT_STAT *stp);

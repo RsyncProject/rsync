@@ -939,7 +939,7 @@ static int copy_altdest_file(const char *src, const char *dest, struct file_stru
 		/* Try to clean up.  copy_to's parent components are peer-named
 		 * and can be raced to a symlink, so resolve each with O_NOFOLLOW
 		 * via vfs_unlink_at() like the other generator-side unlinks. */
-		vfs_unlink_at(copy_to);
+		vfs_unlink(VFS_AT_FDCWD, copy_to, 0);
 		cleanup_disable();
 		return -1;
 	}
@@ -1114,7 +1114,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 		if (find_exact_for_existing) {
 			if (alt_dest_type == LINK_DEST && real_st.st_dev == sxp->st.st_dev && real_st.st_ino == sxp->st.st_ino)
 				return -1;
-			if (vfs_unlink_at(fname) < 0 && errno != ENOENT)
+			if (vfs_unlink(VFS_AT_FDCWD, fname, 0) < 0 && errno != ENOENT)
 				goto got_nothing_for_ya;
 		}
 #ifdef SUPPORT_HARD_LINKS
@@ -1466,9 +1466,9 @@ static int gen_entry_unlink(const char *path, struct file_struct *file)
 	int dfd = vfs_cached_dirfd(path, file);
 	if (dfd >= 0) {
 		const char *slash = strrchr(path, '/');
-		return vfs_unlink_atfd(dfd, slash ? slash + 1 : path, 0);
+		return vfs_unlink(dfd, slash ? slash + 1 : path, 0);
 	}
-	return vfs_unlink_at(path);
+	return vfs_unlink(VFS_AT_FDCWD, path, 0);
 }
 
 /* opath and npath are both expected to live in the entry's directory (the
@@ -2212,7 +2212,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			 * through the exclude-aware ownership walk so a symlinked
 			 * partial-dir can't delete a file in an excluded subtree. */
 			vfs.operator_path_resolve = 1;
-			vfs_unlink_at(partialptr);
+			vfs_unlink(VFS_AT_FDCWD, partialptr, VFS_OPERATOR_PATH);
 			vfs.operator_path_resolve = 0;
 			handle_partial_dir(partialptr, PDIR_DELETE);
 		}
@@ -2310,7 +2310,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			vfs.operator_path_resolve = 0;
 			goto pretend_missing;
 		}
-		if (robust_unlink(backupptr) && errno != ENOENT) {
+		if (robust_unlink(backupptr, VFS_OPERATOR_PATH) && errno != ENOENT) {
 			vfs.operator_path_resolve = 0;
 			rsyserr(FERROR_XFER, errno, "unlink %s",
 				full_fname(backupptr));

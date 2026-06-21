@@ -198,7 +198,7 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 		switch_step++;
 
 		if (cleanup_fname)
-			vfs_unlink_at(cleanup_fname);
+			vfs_unlink(VFS_AT_FDCWD, cleanup_fname, 0);
 		if (exit_code)
 			kill_all(SIGUSR1);
 		if (cleanup_pid && cleanup_pid == getpid()) {

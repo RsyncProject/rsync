@@ -418,7 +418,7 @@ void successful_send(int ndx)
 		return;
 	}
 
-	if (dfd >= 0 ? secure_remove_source_file(dfd, bname) < 0 : vfs_unlink(fname) < 0) {
+	if (dfd >= 0 ? secure_remove_source_file(dfd, bname) < 0 : vfs_unlink(VFS_AT_FDCWD, fname, VFS_ALLOW_SYMLINK) < 0) {
 		failed_op = "remove";
 	  failed:
 		if (errno == ENOENT)

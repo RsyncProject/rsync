@@ -48,7 +48,7 @@ static int unlink_and_reopen(const char *dest, mode_t mode, int vfs_flags)
 {
 	int ofd;
 
-	if (robust_unlink(dest) && errno != ENOENT) {
+	if (robust_unlink(dest, vfs_flags) && errno != ENOENT) {
 		int save_errno = errno;
 		rsyserr(FERROR_XFER, errno, "unlink %s", full_fname(dest));
 		errno = save_errno;
@@ -63,7 +63,7 @@ static int unlink_and_reopen(const char *dest, mode_t mode, int vfs_flags)
 	/* Use vfs_open_at so the create/truncate goes through a secure
 	 * parent dirfd in the daemon-no-chroot deployment. Otherwise
 	 * an attacker could swap a parent component with a symlink in
-	 * the window between robust_unlink (which uses vfs_unlink_at,
+	 * the window between robust_unlink (which uses vfs_unlink,
 	 * already secure) and the create here, and redirect the new
 	 * file outside the module. */
 	if ((ofd = vfs_open_at(dest, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, mode, vfs_flags)) < 0) {
