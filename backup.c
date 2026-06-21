@@ -65,7 +65,7 @@ static int validate_backup_dir(void)
 {
 	STRUCT_STAT st;
 
-	if (do_lstat_at(backup_dir_buf, &st) < 0) {
+	if (vfs_lstat_at(backup_dir_buf, &st) < 0) {
 		if (errno == ENOENT)
 			return 0;
 		rsyserr(FERROR, errno, "backup lstat %s failed", backup_dir_buf);
@@ -316,7 +316,7 @@ static int make_backup_inner(const char *fname, BOOL prefer_rename)
 		goto success;
 	if (errno == EEXIST || errno == EISDIR) {
 		STRUCT_STAT bakst;
-		if (do_lstat_at(buf, &bakst) == 0) {
+		if (vfs_lstat_at(buf, &bakst) == 0) {
 			int flags = get_del_for_flag(bakst.st_mode) | DEL_FOR_BACKUP | DEL_RECURSE;
 			if (delete_item(buf, bakst.st_mode, flags) != 0)
 				return 0;

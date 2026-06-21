@@ -392,8 +392,8 @@ void successful_send(int ndx)
 	}
 
 	if (dfd >= 0
-	 ? (copy_links ? do_stat_atfd(dfd, bname, &st) : do_lstat_atfd(dfd, bname, &st)) < 0
-	 : (copy_links ? do_stat(fname, &st) : do_lstat(fname, &st)) < 0) {
+	 ? (copy_links ? vfs_stat_atfd(dfd, bname, &st) : vfs_lstat_atfd(dfd, bname, &st)) < 0
+	 : (copy_links ? vfs_stat(fname, &st) : vfs_lstat(fname, &st)) < 0) {
 		failed_op = "re-lstat";
 		goto failed;
 	}
@@ -693,7 +693,7 @@ void send_files(int f_in, int f_out)
 		}
 
 		/* map the local file */
-		if (do_fstat(fd, &st) != 0) {
+		if (vfs_fstat(fd, &st) != 0) {
 			io_error |= IOERR_GENERAL;
 			rsyserr(FERROR_XFER, errno, "fstat failed");
 			free_sums(s);

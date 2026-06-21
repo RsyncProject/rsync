@@ -735,7 +735,7 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 	}
 
 	/* See what currently exists at the destination. */
-	statret = do_stat(dest_path, &st);
+	statret = vfs_stat(dest_path, &st);
 	cp = strrchr(dest_path, '/');
 	trailing_slash = cp && !cp[1];
 
@@ -752,7 +752,7 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 				*cp = '/';
 		}
 		if (ret)
-			statret = do_stat(dest_path, &st);
+			statret = vfs_stat(dest_path, &st);
 		else
 			errno = save_errno;
 	}
@@ -838,7 +838,7 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 		dest_path = "/";
 
 	*cp = '\0';
-	if (dry_run && mkpath_dest_arg && do_stat(dest_path, &st) < 0) {
+	if (dry_run && mkpath_dest_arg && vfs_stat(dest_path, &st) < 0) {
 		/* --mkpath would have created this parent dir, but a dry run did
 		 * not, so don't chdir into it; flag the destination as not yet
 		 * present (as the dir-creation path above does) so the generator
@@ -895,7 +895,7 @@ static void check_alt_basis_dirs(void)
 				pathjoin(new, len, vfs.curr_dir, bdir);
 			basis_dir[j] = bdir = new;
 		}
-		if (do_stat(bdir, &st) < 0)
+		if (vfs_stat(bdir, &st) < 0)
 			rprintf(FWARNING, "%s arg does not exist: %s\n", alt_dest_opt(0), bdir);
 		else if (!S_ISDIR(st.st_mode))
 			rprintf(FWARNING, "%s arg is not a dir: %s\n", alt_dest_opt(0), bdir);
@@ -1023,7 +1023,7 @@ static int do_recv(int f_in, int f_out, char *local_name)
 		int ret;
 		if (backup_dir_len > 1)
 			backup_dir_buf[backup_dir_len-1] = '\0';
-		ret = do_stat(backup_dir_buf, &st);
+		ret = vfs_stat(backup_dir_buf, &st);
 		if (ret != 0 || !S_ISDIR(st.st_mode)) {
 			if (ret == 0) {
 				rprintf(FERROR, "The backup-dir is not a directory: %s\n", backup_dir_buf);
@@ -1043,7 +1043,7 @@ static int do_recv(int f_in, int f_out, char *local_name)
 
 	if (tmpdir) {
 		STRUCT_STAT st;
-		int ret = do_stat(tmpdir, &st);
+		int ret = vfs_stat(tmpdir, &st);
 		if (ret < 0 || !S_ISDIR(st.st_mode)) {
 			if (ret == 0) {
 				rprintf(FERROR, "The temp-dir is not a directory: %s\n", tmpdir);

@@ -1116,7 +1116,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 		if (fd1 == -1) {
 			st.st_mode = 0;
 			st.st_size = 0;
-		} else if (do_fstat(fd1,&st) != 0) {
+		} else if (vfs_fstat(fd1,&st) != 0) {
 			rsyserr(FERROR_XFER, errno, "fstat %s failed",
 				full_fname(fnamecmp));
 			discard_receive_data(f_in, file);

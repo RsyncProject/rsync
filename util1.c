@@ -226,7 +226,7 @@ int make_path(char *fname, int flags)
 	for (p = end; ; ) {
 		if (dry_run) {
 			STRUCT_STAT st;
-			if (do_stat(fname, &st) == 0) {
+			if (vfs_stat(fname, &st) == 0) {
 				if (S_ISDIR(st.st_mode))
 					errno = EEXIST;
 				else
@@ -239,7 +239,7 @@ int make_path(char *fname, int flags)
 
 		if (errno != ENOENT) {
 			STRUCT_STAT st;
-			if (errno != EEXIST || (do_stat(fname, &st) == 0 && !S_ISDIR(st.st_mode)))
+			if (errno != EEXIST || (vfs_stat(fname, &st) == 0 && !S_ISDIR(st.st_mode)))
 				ret = -ret - 1;
 			break;
 		}
@@ -425,7 +425,7 @@ int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
 
 		/* Try to preallocate enough space for file's eventual length.  Can
 		 * reduce fragmentation on filesystems like ext4, xfs, and NTFS. */
-		if (do_fstat(ifd, &srcst) < 0)
+		if (vfs_fstat(ifd, &srcst) < 0)
 			rsyserr(FWARNING, errno, "fstat %s", full_fname(source));
 		else if (srcst.st_size > 0) {
 			prealloc_len = do_fallocate(ofd, 0, srcst.st_size);
@@ -774,7 +774,7 @@ static inline void call_glob_match(const char *name, int len, int from_glob,
 		STRUCT_STAT st;
 		int is_dir;
 
-		if (do_stat(glob.arg_buf, &st) != 0)
+		if (vfs_stat(glob.arg_buf, &st) != 0)
 			return;
 		is_dir = S_ISDIR(st.st_mode) != 0;
 		if (arg && !is_dir)
@@ -1491,7 +1491,7 @@ int handle_partial_dir(const char *fname, int create)
 	vfs.operator_path_resolve = 1;
 	if (create) {
 		STRUCT_STAT st;
-		int statret = do_lstat_at(dir, &st);
+		int statret = vfs_lstat_at(dir, &st);
 		if (statret == 0 && !S_ISDIR(st.st_mode)) {
 			if (do_unlink_at(dir) < 0) {
 				vfs.operator_path_resolve = 0;

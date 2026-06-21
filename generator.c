@@ -1715,7 +1715,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				}
 			}
 			if (relative_paths && !implied_dirs && file->mode != 0
-			 && do_stat_at(dn, &sx.st) < 0) {
+			 && vfs_stat_at(dn, &sx.st) < 0) {
 				if (dry_run)
 					goto parent_is_dry_missing;
 				if (make_path(fname, MKP_DROP_NAME | MKP_SKIP_SLASH) < 0) {

@@ -18,9 +18,27 @@
  * clientserver.c / syscall.c).  Centralized here so each vfs/ source picks them
  * up from one place rather than re-declaring them. */
 extern int am_daemon;
+extern int read_only;
+extern int list_only;
 extern char *module_dir;
 extern unsigned int module_dirlen;
 extern int module_dirfd;
+
+/* Dry-run / read-only guard macros shared by the syscall wrappers. */
+#define RETURN_ERROR_IF(x,e) \
+	do { \
+		if (x) { \
+			errno = (e); \
+			return -1; \
+		} \
+	} while (0)
+
+#define RETURN_ERROR_IF_RO_OR_LO RETURN_ERROR_IF(read_only || list_only, EROFS)
+
+/* A NULL path reaching one of the path-forwarding wrappers is always a caller
+ * bug; reject it rather than forwarding NULL to libc.  Also quiets the static
+ * analyzer's interprocedural nonnull false positives. */
+#define RETURN_ERROR_IF_NULL(p) RETURN_ERROR_IF(!(p), EFAULT)
 
 /* Module-confinement helpers (pure logic, always compiled). */
 int path_has_dotdot_component(const char *path);

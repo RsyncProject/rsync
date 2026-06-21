@@ -275,7 +275,7 @@ void open_batch_files(void)
 	 * non-regular files (FIFO, device, socket) at the batch path. */
 	if (!write_batch && batch_fd != STDIN_FILENO) {
 		STRUCT_STAT st;
-		if (do_fstat(batch_fd, &st) == 0 && !S_ISREG(st.st_mode)) {
+		if (vfs_fstat(batch_fd, &st) == 0 && !S_ISREG(st.st_mode)) {
 			rprintf(FERROR, "Batch file %s is not a regular file\n",
 				full_fname(batch_name));
 			exit_cleanup(RERR_FILEIO);

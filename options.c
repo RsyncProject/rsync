@@ -331,7 +331,7 @@ static struct output_struct debug_words[COUNT_DEBUG+1] = {
 };
 
 static int verbose = 0;
-static int do_stats = 0;
+static int vfs_stats = 0;
 static int do_progress = 0;
 static int daemon_opt;   /* sets am_daemon after option error-reporting */
 static int F_option_cnt = 0;
@@ -621,7 +621,7 @@ static struct poptOption long_options[] = {
   {"quiet",           'q', POPT_ARG_NONE,   0, 'q', 0, 0 },
   {"motd",             0,  POPT_ARG_VAL,    &output_motd, 1, 0, 0 },
   {"no-motd",          0,  POPT_ARG_VAL,    &output_motd, 0, 0, 0 },
-  {"stats",            0,  POPT_ARG_NONE,   &do_stats, 0, 0, 0 },
+  {"stats",            0,  POPT_ARG_NONE,   &vfs_stats, 0, 0, 0 },
   {"human-readable",  'h', POPT_ARG_NONE,   0, 'h', 0, 0},
   {"no-human-readable",0,  POPT_ARG_VAL,    &human_readable, 0, 0, 0},
   {"no-h",             0,  POPT_ARG_VAL,    &human_readable, 0, 0, 0},
@@ -2178,7 +2178,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 
 	set_output_verbosity(verbose, DEFAULT_PRIORITY);
 
-	if (do_stats) {
+	if (vfs_stats) {
 		parse_output_words(info_words, info_levels,
 			verbose > 1 ? "stats3" : "stats2", DEFAULT_PRIORITY);
 	}
@@ -2372,7 +2372,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		STRUCT_STAT st;
 		char prefix[SYMLINK_PREFIX_LEN]; /* NOT +1 ! */
 		strlcpy(prefix, SYMLINK_PREFIX, sizeof prefix); /* trim the trailing slash */
-		if (do_stat(prefix, &st) == 0 && S_ISDIR(st.st_mode)) {
+		if (vfs_stat(prefix, &st) == 0 && S_ISDIR(st.st_mode)) {
 			rprintf(FERROR, "Symlink munging is unsafe when a %s directory exists.\n",
 				prefix);
 			exit_cleanup(RERR_UNSUPPORTED);
@@ -3010,7 +3010,7 @@ void server_options(char **args, int *argc_p)
 			args[ac++] = "--super";
 		if (size_only)
 			args[ac++] = "--size-only";
-		if (do_stats)
+		if (vfs_stats)
 			args[ac++] = "--stats";
 	} else {
 		if (skip_compress)

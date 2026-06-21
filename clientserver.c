@@ -303,7 +303,7 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 		int ei_fd = vfs_open_owner_walk(early_input_file, O_RDONLY, 0);
 		FILE *f = ei_fd >= 0 ? fdopen(ei_fd, "rb") : NULL;
 		if (!f && ei_fd >= 0) close(ei_fd);
-		if (!f || do_fstat(fileno(f), &st) < 0) {
+		if (!f || vfs_fstat(fileno(f), &st) < 0) {
 			rsyserr(FERROR, errno, "failed to open %s", early_input_file);
 			if (f)
 				fclose(f);
@@ -1073,7 +1073,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 		STRUCT_STAT st;
 		char prefix[SYMLINK_PREFIX_LEN]; /* NOT +1 ! */
 		strlcpy(prefix, SYMLINK_PREFIX, sizeof prefix); /* trim the trailing slash */
-		if (do_stat(prefix, &st) == 0 && S_ISDIR(st.st_mode)) {
+		if (vfs_stat(prefix, &st) == 0 && S_ISDIR(st.st_mode)) {
 			rprintf(FLOG, "Symlink munging is unsafe when a %s directory exists.\n",
 				prefix);
 			io_printf(f_out, "@ERROR: daemon security issue -- contact admin\n", name);
@@ -1623,11 +1623,11 @@ static void create_pid_file(void)
 			exit_cleanup(RERR_FILEIO);
 		}
 	}
-#define PID_LSTAT(stp) do_lstat_atfd(pdfd, base, stp)
+#define PID_LSTAT(stp) vfs_lstat_atfd(pdfd, base, stp)
 #define PID_UNLINK()   do_unlink_atfd(pdfd, base, 0)
 #define PID_OPEN()     do_open_atfd(pdfd, base, O_RDWR|O_CREAT, 0664)
 #else
-#define PID_LSTAT(stp) do_lstat(base, stp)
+#define PID_LSTAT(stp) vfs_lstat(base, stp)
 #define PID_UNLINK()   unlink(base)
 #define PID_OPEN()     do_open(base, O_RDWR|O_CREAT|SAFE_NOFOLLOW, 0664)
 #endif
@@ -1640,7 +1640,7 @@ static void create_pid_file(void)
 		fail = S_ISREG(st1.st_mode) ? "open" : "create";
 	else if (!lock_range(pid_file_fd, 0, 4))
 		fail = "lock";
-	else if (do_fstat(pid_file_fd, &st1) < 0)
+	else if (vfs_fstat(pid_file_fd, &st1) < 0)
 		fail = "fstat opened";
 	else if (st1.st_size > (int)sizeof pidbuf)
 		fail = "find small";

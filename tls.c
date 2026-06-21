@@ -160,7 +160,7 @@ static void list_file(const char *fname)
 	char linkbuf[4096];
 	int nsecs;
 
-	if (do_lstat(fname, &buf) < 0)
+	if (vfs_lstat(fname, &buf) < 0)
 		failed("stat", fname);
 #ifdef SUPPORT_CRTIMES
 	if (display_crtimes && (crtime = get_create_time(fname, &buf)) == 0)
