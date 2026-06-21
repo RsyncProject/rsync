@@ -1293,6 +1293,17 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
 
 	if (am_sender) {
 		keep_dirlinks = 0; /* Must be disabled on the sender. */
+
+		/* Mirror client_run()'s sender_keeps_checksum check: a daemon-
+		 * as-sender with -c and a `log format` containing %C will read
+		 * F_SUM(file) in log_formatted(), so make_file() must allocate
+		 * SUM_EXTRA_CNT.  Without this, F_SUM() reads past the pool slot
+		 * and hex-encodes adjacent heap into the transfer log. */
+		if (always_checksum
+		 && (log_format_has(stdout_format, 'C')
+		  || log_format_has(logfile_format, 'C')))
+			sender_keeps_checksum = 1;
+
 		if (need_messages_from_generator)
 			io_start_multiplex_in(f_in);
 		else
