@@ -1,12 +1,24 @@
 /*
  * vfs/vfs.h - public interface to rsync's virtual filesystem layer.
  *
- * The VFS owns the messy, security-critical filesystem details (the do_*
+ * The VFS owns the messy, security-critical filesystem details (the vfs_*
  * syscall wrappers, the race-safe path resolver, the held-dirfd cache, the
  * operator-path ownership walk and the daemon module confinement) so the
- * mainline protocol/transfer code can stay clean.  State that used to be
- * scattered across syscall.c statics and clientserver.c externs lives in the
- * single global "struct vfs vfs" below.
+ * mainline protocol/transfer code can stay clean.  The state lives in the
+ * single global "struct vfs vfs" below; the implementations are in the
+ * per-concern vfs/*.c files (one per operation family, plus the resolver,
+ * dirstack, dircache and owner-walk cores).
+ *
+ * Most operations come in up to three forms, sharing one leaf behaviour:
+ *   vfs_<op>(path, ...)        - operate on a path as given (the plain wrapper;
+ *                                honours dry-run / read-only).
+ *   vfs_<op>_at(path, ...)     - resolve the parent components race-safely
+ *                                (vfs_resolve_open) and act on the leaf with
+ *                                *at()/O_NOFOLLOW; the receiver's TOCTOU-safe
+ *                                form, used when vfs_relpath_active().
+ *   vfs_<op>_atfd(dfd, name, ) - act on a single component `name` under an
+ *                                already-pinned dirfd (from vfs_opendir /
+ *                                vfs_get_dirfd); no path resolution.
  *
  * This header is included by rsync.h (just after proto.h) so every translation
  * unit sees the vfs_* API.  It must not include rsync.h itself.
