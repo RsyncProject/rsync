@@ -754,10 +754,11 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     This parameter sets the *minimum* message digest that the daemon will accept
     for the challenge-response authentication of an "[auth users](#)" module.
     The available digests, strongest first, are `sha512`, `sha256`, `sha1`,
-    `md5`, `md4`.  The daemon selects the auth digest from the connecting
-    client's advertised list (and falls back to `md5`, or `md4` below protocol
-    30, for a client that advertises none), so the negotiated digest can be
-    weaker than both sides actually support.  If it is weaker than the configured
+    `md5`, `md4`.  The daemon selects its own most-preferred digest that also
+    appears in the connecting client's advertised list (and falls back to `md5`,
+    or `md4` below protocol 30, for a client that advertises none), so a client
+    that advertises only weak digests can still force a weak negotiated digest.
+    If it is weaker than the configured
     name, the connection is refused before the challenge is sent.  The value is a
     single digest name, for example:
 
