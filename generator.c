@@ -977,7 +977,7 @@ static int basis_link_stat(const char *path, STRUCT_STAT *stp)
 	 * the plain path (a lower-severity, non-root basis lookup). */
 	if (!am_daemon && am_root >= 0 && !vfs_symlink_optout_allowed()) {
 		const char *leaf;
-		int dfd = vfs_owner_walk_parent(path, &leaf);
+		int dfd = vfs_owner_walk_parent(path, &leaf, vfs.operator_path_resolve);
 		int r, e;
 		if (dfd < 0)
 			return -1;
@@ -1385,10 +1385,10 @@ static int gen_entry_mkdir(char *fname, struct file_struct *file, mode_t mode)
 {
 	int dfd = vfs_cached_dirfd(fname, file);
 	if (dfd >= 0) {
-		const char *slash = strrchr(fname, '/');
-		return vfs_mkdir_atfd(dfd, slash ? slash + 1 : fname, mode);
+		char *slash = strrchr(fname, '/');
+		return vfs_mkdir(dfd, slash ? slash + 1 : fname, mode, 0);
 	}
-	return vfs_mkdir_at(fname, mode);
+	return vfs_mkdir(VFS_AT_FDCWD, fname, mode, 0);
 }
 
 static int gen_entry_chmod(const char *fname, struct file_struct *file, mode_t mode)

@@ -66,10 +66,10 @@ int vfs_rename_at(const char *old_path, const char *new_path)
 	if (vfs.operator_path_resolve) {
 		if (vfs_symlink_optout_allowed())
 			return vfs_rename(old_path, new_path);
-		old_dfd = vfs_owner_walk_parent(old_path, &old_bname);
+		old_dfd = vfs_owner_walk_parent(old_path, &old_bname, vfs.operator_path_resolve);
 		if (old_dfd < 0)
 			return -1;
-		new_dfd = vfs_owner_walk_parent(new_path, &new_bname);
+		new_dfd = vfs_owner_walk_parent(new_path, &new_bname, vfs.operator_path_resolve);
 		if (new_dfd < 0) {
 			e = errno;
 			close(old_dfd);

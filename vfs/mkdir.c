@@ -56,47 +56,26 @@ void trim_trailing_slashes(char *name)
 	}
 }
 
-int vfs_mkdir(char *path, mode_t mode)
+/* Secure receiver-side resolve for a path mkdir.  An operator path
+ * (--backup-dir/--temp-dir, may live outside the tree) uses the ownership walk;
+ * otherwise the strict transfer-path resolver (refuse all symlinks, confine
+ * beneath the transfer root).  mkdir() resolves parent symlinks at every
+ * component, so a parent-component swap can place an attacker-named directory
+ * outside the module -- defence is to resolve the parent securely and mkdirat()
+ * the leaf.  Falls through to a plain mkdir() in non-daemon/sender, chrooted,
+ * no-parent and absolute-path cases. */
+static int vfs__mkdir_secure(char *path, mode_t mode, int flags)
 {
-	if (dry_run) return 0;
-	RETURN_ERROR_IF_RO_OR_LO;
-	RETURN_ERROR_IF_NULL(path);
-	trim_trailing_slashes(path);
-	return mkdir(path, mode);
-}
-
-/*
-  Symlink-race-safe variant of vfs_mkdir() for receiver-side use. See
-  the comment on vfs_chmod_at() for the threat model and design rationale.
-
-  mkdir() resolves parent symlinks at every component, so a parent-
-  component swap can place an attacker-named directory outside the
-  module. Defence: open the parent of fname under vfs_resolve_open()
-  and call mkdirat() against that dirfd.
-
-  Mutates path in place to trim trailing slashes (matches vfs_mkdir()).
-  Falls through to vfs_mkdir() in dry-run, non-daemon, chrooted, no-
-  parent and absolute-path cases.
-*/
-int vfs_mkdir_at(char *path, mode_t mode)
-{
-#ifdef AT_FDCWD
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
 	char dirpath[MAXPATHLEN];
-	const char *bname;
-	const char *slash;
+	const char *bname, *slash;
 	int dfd, ret, e;
 	size_t dlen;
 
-	if (dry_run) return 0;
-	RETURN_ERROR_IF_RO_OR_LO;
-	RETURN_ERROR_IF_NULL(path);
-	trim_trailing_slashes(path);
-
-#if defined O_NOFOLLOW && defined O_DIRECTORY
-	if (vfs.operator_path_resolve) {
+	if (flags & VFS_OPERATOR_PATH) {
 		if (vfs_symlink_optout_allowed())
 			return mkdir(path, mode);
-		dfd = vfs_owner_walk_parent(path, &bname);
+		dfd = vfs_owner_walk_parent(path, &bname, 1);
 		if (dfd < 0)
 			return -1;
 		ret = mkdirat(dfd, bname, mode);
@@ -105,18 +84,14 @@ int vfs_mkdir_at(char *path, mode_t mode)
 		errno = e;
 		return ret;
 	}
-#endif
 
 	if (!vfs_relpath_active())
 		return mkdir(path, mode);
-
-	if (!path || !*path || *path == '/')
+	if (!*path || *path == '/')
 		return mkdir(path, mode);
-
 	slash = strrchr(path, '/');
 	if (!slash)
 		return mkdir(path, mode);
-
 	dlen = slash - path;
 	if (dlen >= sizeof dirpath) {
 		errno = ENAMETOOLONG;
@@ -129,15 +104,54 @@ int vfs_mkdir_at(char *path, mode_t mode)
 	dfd = vfs_resolve_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
 	if (dfd < 0)
 		return -1;
-
 	ret = mkdirat(dfd, bname, mode);
 	e = errno;
 	close(dfd);
 	errno = e;
 	return ret;
 #else
-	return vfs_mkdir(path, mode);
+	(void)flags;
+	return mkdir(path, mode);
 #endif
+}
+
+/* Unified mkdir.  dirfd == VFS_AT_FDCWD resolves `path`; a real held dirfd makes
+ * `path` a single component created directly under it.  flags: VFS_ALLOW_SYMLINK
+ * (trusted, follow symlinks), VFS_OPERATOR_PATH (operator-supplied path),
+ * default 0 (secure receiver resolve). */
+int vfs_mkdir(int dirfd, char *path, mode_t mode, int flags)
+{
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+	RETURN_ERROR_IF_NULL(path);
+
+	if (dirfd != VFS_AT_FDCWD) {
+#ifdef AT_FDCWD
+		/* Held-fd: `path` must be a single harmless component -- reject
+		 * anything that could reintroduce path resolution under the pinned
+		 * dir (empty, any '/', "." or ".."). */
+		if (!*path || strchr(path, '/')
+		 || (path[0] == '.' && (path[1] == '\0'
+		     || (path[1] == '.' && path[2] == '\0')))) {
+			errno = EINVAL;
+			return -1;
+		}
+		return mkdirat(dirfd, path, mode);
+#else
+		(void)dirfd; (void)mode;
+		errno = ENOSYS;
+		return -1;
+#endif
+	}
+
+	trim_trailing_slashes(path);
+
+	/* VFS_ALLOW_SYMLINK takes precedence: the call site asserts the path is
+	 * trusted, so follow symlinks (the legacy plain mkdir). */
+	if (flags & VFS_ALLOW_SYMLINK)
+		return mkdir(path, mode);
+
+	return vfs__mkdir_secure(path, mode, flags);
 }
 
 /* like mkstemp but forces permissions */
@@ -300,21 +314,5 @@ int vfs_secure_mkstemp(char *template, mode_t perms, int operator_path)
 		errno = e;
 	}
 	return fd;
-#endif
-}
-
-
-
-
-int vfs_mkdir_atfd(int dfd, const char *name, mode_t mode)
-{
-#ifdef AT_FDCWD
-	if (dry_run) return 0;
-	RETURN_ERROR_IF_RO_OR_LO;
-	return mkdirat(dfd, name, mode);
-#else
-	(void)dfd; (void)name; (void)mode;
-	errno = ENOSYS;
-	return -1;
 #endif
 }

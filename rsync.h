@@ -337,6 +337,7 @@ enum delret {
 /* Defines for make_path() */
 #define MKP_DROP_NAME		(1<<0) /* drop trailing filename or trailing slash */
 #define MKP_SKIP_SLASH		(1<<1) /* skip one or more leading slashes */
+#define MKP_OPERATOR		(1<<2) /* path is operator-supplied (-> VFS_OPERATOR_PATH) */
 
 /* Defines for maybe_send_keepalive() */
 #define MSK_ALLOW_FLUSH 	(1<<0)

@@ -311,13 +311,12 @@ int vfs_open_owner_walk(const char *path, int flags, mode_t mode)
 /* For an operator-supplied path: open its parent directory via the ownership
  * walk (handles absolute and relative paths) and point *bname at the final
  * component.  Returns the dirfd (caller closes) or -1 with errno set. */
-int vfs_owner_walk_parent(const char *path, const char **bname)
+int vfs_owner_walk_parent(const char *path, const char **bname, int is_operator)
 {
 	const char *slash = strrchr(path, '/');
 	char dir[MAXPATHLEN], pabs[MAXPATHLEN];
 	size_t dlen;
 	int dfd;
-	int is_operator = vfs.operator_path_resolve;
 
 	*bname = slash ? slash + 1 : path;
 	pabs[0] = '\0';

@@ -51,7 +51,7 @@ int vfs_unlink_at(const char *path)
 	if (vfs.operator_path_resolve) {
 		if (vfs_symlink_optout_allowed())
 			return unlink(path);
-		dfd = vfs_owner_walk_parent(path, &bname);
+		dfd = vfs_owner_walk_parent(path, &bname, vfs.operator_path_resolve);
 		if (dfd < 0)
 			return -1;
 		ret = unlinkat(dfd, bname, 0);

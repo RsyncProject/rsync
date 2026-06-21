@@ -67,7 +67,7 @@ int vfs_open_at(const char *pathname, int flags, mode_t mode)
 	if (vfs.operator_path_resolve) {
 		if (vfs_symlink_optout_allowed())
 			return vfs_open(pathname, flags, mode);
-		dfd = vfs_owner_walk_parent(pathname, &bname);
+		dfd = vfs_owner_walk_parent(pathname, &bname, vfs.operator_path_resolve);
 		if (dfd < 0)
 			return -1;
 		ret = openat(dfd, bname, flags | O_NOFOLLOW, mode);

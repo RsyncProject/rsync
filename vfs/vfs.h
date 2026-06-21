@@ -37,9 +37,22 @@
 /* Max held ancestor-dirfd cache depth (was DPC_MAXDEPTH in syscall.c). */
 #define VFS_DPC_MAXDEPTH 64
 
+/* dirfd sentinel for the unified vfs_* ops: "no held directory -- resolve the
+ * path argument".  Always defined (even on platforms without AT_FDCWD, where the
+ * held-fd forms are unavailable and report ENOSYS), so mainline code never has
+ * to mention AT_FDCWD directly. */
+#ifdef AT_FDCWD
+#define VFS_AT_FDCWD AT_FDCWD
+#else
+#define VFS_AT_FDCWD (-100)
+#endif
+
 /* Per-call flags for the unified vfs_* operations.  The default (0) is the
  * secure, no-follow parent resolve used by the receiver; the flags are explicit
- * opt-ins that each carry a security meaning the call site is asserting. */
+ * opt-ins that each carry a security meaning the call site is asserting.
+ * VFS_ALLOW_SYMLINK and VFS_OPERATOR_PATH are mutually exclusive policies; if
+ * both are passed VFS_ALLOW_SYMLINK wins (it is checked first).  No call site
+ * needs both. */
 #define VFS_ALLOW_SYMLINK  (1<<0)  /* call site is known-safe to follow symlinks */
 #define VFS_OPERATOR_PATH  (1<<1)  /* operator-supplied path: ownership walk + module confinement */
 #define VFS_REMOVEDIR      (1<<2)  /* unlink op targets a directory (AT_REMOVEDIR) */
@@ -88,7 +101,7 @@ int vfs_resolve_open_at(int anchor_fd, const char *relpath, int flags, mode_t mo
 
 /* Operator-supplied-path resolution by ownership (vfs/owner_walk.c). */
 int vfs_open_owner_walk(const char *path, int flags, mode_t mode);
-int vfs_owner_walk_parent(const char *path, const char **bname);
+int vfs_owner_walk_parent(const char *path, const char **bname, int is_operator);
 
 /* Held ancestor-dirfd cache for directory traversal (vfs/dircache.c). */
 int vfs_opendir(const char *dirname);
@@ -147,9 +160,10 @@ int vfs_link_atfd(int old_dfd, const char *old_name, int new_dfd, const char *ne
 
 /* mkdir / mkstemp and the trim_trailing_slashes path helper (vfs/mkdir.c). */
 void trim_trailing_slashes(char *name);
-int vfs_mkdir(char *path, mode_t mode);
-int vfs_mkdir_at(char *path, mode_t mode);
-int vfs_mkdir_atfd(int dfd, const char *name, mode_t mode);
+/* dirfd == VFS_AT_FDCWD: resolve `path` (secure parent walk unless
+ * VFS_ALLOW_SYMLINK / VFS_OPERATOR_PATH); a real held dirfd: `path` is a single
+ * component created directly under it. */
+int vfs_mkdir(int dirfd, char *path, mode_t mode, int flags);
 int vfs_mkstemp(char *template, mode_t perms);
 int vfs_mkstemp_atfd(int dfd, char *filename, mode_t perms);
 int vfs_secure_mkstemp(char *template, mode_t perms, int operator_path);

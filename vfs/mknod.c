@@ -122,7 +122,7 @@ int vfs_mknod_at(const char *pathname, mode_t mode, dev_t dev)
 	if (vfs.operator_path_resolve) {
 		if (vfs_symlink_optout_allowed())
 			return vfs_mknod(pathname, mode, dev);
-		dfd = vfs_owner_walk_parent(pathname, &bname);
+		dfd = vfs_owner_walk_parent(pathname, &bname, vfs.operator_path_resolve);
 		if (dfd < 0)
 			return -1;
 		ret = mknodat(dfd, bname, mode, dev);

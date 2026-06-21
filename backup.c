@@ -124,7 +124,7 @@ static BOOL copy_valid_path(const char *fname)
 	for ( ; b; name = b + 1, b = strchr(name, '/')) {
 		*b = '\0';
 
-		while (vfs_mkdir_at(backup_dir_buf, ACCESSPERMS) < 0) {
+		while (vfs_mkdir(VFS_AT_FDCWD, backup_dir_buf, ACCESSPERMS, VFS_OPERATOR_PATH) < 0) {
 			if (errno == EEXIST) {
 				val = validate_backup_dir();
 				if (val > 0)
@@ -201,8 +201,10 @@ char *get_backup_name(const char *fname)
 				return NULL;
 			}
 			if (backup_dir_len > 1)
-				dirbuf[backup_dir_len-1] = '\0';
-			ret = make_path(dirbuf, 0);
+				backup_dir_buf[backup_dir_len-1] = '\0';
+			ret = make_path(backup_dir_buf, MKP_OPERATOR);
+			if (backup_dir_len > 1)
+				backup_dir_buf[backup_dir_len-1] = '/';
 			if (ret < 0)
 				return NULL;
 			initialized = 1;

@@ -66,7 +66,7 @@ static int do_xstat_at(const char *path, STRUCT_STAT *st, int at_flags, int (*fa
 	if (vfs.operator_path_resolve) {
 		if (vfs_symlink_optout_allowed())
 			return fallback(path, st);
-		dfd = vfs_owner_walk_parent(path, &bname);
+		dfd = vfs_owner_walk_parent(path, &bname, vfs.operator_path_resolve);
 		if (dfd < 0)
 			return -1;
 		ret = fstatat(dfd, bname, st, at_flags);
