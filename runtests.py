@@ -631,7 +631,7 @@ def main():
             for testscript in tests:
                 testbase = _testbase(testscript)
                 scratchdir = os.path.join(scratchbase, testbase)
-                timeout = 600 if 'hardlinks' in testbase else args.timeout
+                timeout = 600 if ('hardlinks' in testbase or testbase == 'variety') else args.timeout
                 f = executor.submit(
                     run_one_test, testscript, testbase, scratchdir,
                     base_env, timeout, srcdir, tooldir, setfacl_nodef,
@@ -652,7 +652,7 @@ def main():
         for testscript in tests:
             testbase = _testbase(testscript)
             scratchdir = os.path.join(scratchbase, testbase)
-            timeout = 600 if 'hardlinks' in testbase else args.timeout
+            timeout = 600 if ('hardlinks' in testbase or testbase == 'variety') else args.timeout
             tr = run_one_test(
                 testscript, testbase, scratchdir,
                 base_env, timeout, srcdir, tooldir, setfacl_nodef,
