@@ -55,7 +55,7 @@ OBJS3=progress.o pipe.o @MD5_ASM@ @ROLL_SIMD@ @ROLL_ASM@
 DAEMON_OBJ = params.o loadparm.o clientserver.o access.o connection.o authenticate.o
 popt_OBJS= popt/popt.o  popt/poptconfig.o \
 	popt/popthelp.o popt/poptparse.o popt/poptint.o
-VFS_OBJ=vfs/vfs.o
+VFS_OBJ=vfs/vfs.o vfs/dirstack.o
 OBJS=$(OBJS1) $(OBJS2) $(OBJS3) $(DAEMON_OBJ) $(LIBOBJ) @BUILD_ZLIB@ @BUILD_POPT@ libvfs.a
 
 TLS_OBJ = tls.o syscall.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/permstring.o lib/sysxattrs.o @BUILD_POPT@ libvfs.a
@@ -155,6 +155,7 @@ rrsync: support/rrsync
 $(OBJS): $(HEADERS)
 $(CHECK_OBJS): $(HEADERS)
 $(VFS_OBJ): $(HEADERS)
+$(VFS_OBJ) syscall.o: vfs/vfs_internal.h
 tls.o xattrs.o: lib/sysxattrs.h
 
 # The VFS layer is bundled into a static archive linked last on every target so
