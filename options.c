@@ -35,6 +35,19 @@ extern filter_rule_list daemon_filter_list;
 
 int make_backups = 0;
 
+/* If set to other than 0, be nice on the local or remote site
+ * Contains the nice priority to be set on the process, or 0=feature is turned off, no priority will be set.
+ * I have to admit, that it is not possible to set a nice value of 0 with this code,
+ * but in most cases 0 should be the priority of the newly started rsync process already anyway.
+ */
+int nice_local = 0;
+int nice_remote = 0;
+/* If set to other than 0, be ionice on the local or remote site
+ * Currently only idle is supported for ionice when turned on.
+ */
+int ionice_local = 0;
+int ionice_remote = 0;
+
 /**
  * If 1, send the whole file as literal data rather than trying to
  * create an incremental diff.
@@ -594,7 +607,7 @@ enum {OPT_SERVER = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_NO_D, OPT_APPEND, OPT_NO_ICONV, OPT_INFO, OPT_DEBUG, OPT_BLOCK_SIZE,
       OPT_USERMAP, OPT_GROUPMAP, OPT_CHOWN, OPT_BWLIMIT, OPT_STDERR,
       OPT_OLD_COMPRESS, OPT_NEW_COMPRESS, OPT_NO_COMPRESS, OPT_OLD_ARGS,
-      OPT_STOP_AFTER, OPT_STOP_AT,
+      OPT_STOP_AFTER, OPT_STOP_AT, OPT_NICE, OPT_NO_NICE,
       OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
@@ -845,6 +858,9 @@ static struct poptOption long_options[] = {
   {"remote-option",   'M', POPT_ARG_STRING, 0, 'M', 0, 0 },
   {"protocol",         0,  POPT_ARG_INT,    &protocol_version, 0, 0, 0 },
   {"checksum-seed",    0,  POPT_ARG_INT,    &checksum_seed, 0, 0, 0 },
+  {"nice",             0,  POPT_ARG_STRING, 0, OPT_NICE, 0, 0 },
+  {"no-nice",          0,  POPT_ARG_NONE,   0, OPT_NO_NICE, 0, 0 },
+  {0,                 'Q', POPT_ARG_NONE,   0, 'Q', 0, 0 },
   {"server",           0,  POPT_ARG_NONE,   0, OPT_SERVER, 0, 0 },
   {"sender",           0,  POPT_ARG_NONE,   0, OPT_SENDER, 0, 0 },
   /* All the following options switch us into daemon-mode option-parsing. */
@@ -1365,6 +1381,8 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	int argc = *argc_p;
 	int opt, want_dest_type;
 	int orig_protect_args = protect_args;
+	int default_nice_prio = get_renice_default_prio(); // default nice priority to be used, if no explicit priority is given.
+	int default_ionice_prio = get_ionice_default_prio(); // default ionice priority to be used, if no explicit priority is given.
 
 	if (argc == 0) {
 		strlcpy(err_buf, "argc is zero!\n", sizeof err_buf);
@@ -1595,6 +1613,43 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 
 		case 'q':
 			quiet++;
+			break;
+
+		case 'Q':
+			/*
+			 * Turn nice on with default prio and turn ionice on (idle).
+			 */
+			nice_local = default_nice_prio;
+			nice_remote = default_nice_prio;
+			ionice_local = default_ionice_prio;
+			ionice_remote = default_ionice_prio;
+			break;
+
+		case OPT_NICE:
+			/*
+			 * Parse parameters for nice and set the following fields:
+			   - nice_local
+			   - ionice_local
+			   - nice_remote
+			   - ionice_remote
+			 */
+			arg = poptGetOptArg(pc);
+			if (!parse_nice(arg, &nice_local, &ionice_local, &nice_remote, &ionice_remote)) {
+				snprintf(err_buf, sizeof err_buf,
+					"Invalid argument passed to --nice (%s)\n",
+					arg);
+				goto cleanup;
+			}
+			break;
+
+		case OPT_NO_NICE:
+			/*
+			 * Turn off nice and ionice
+			 */
+			nice_local = 0;
+			ionice_local = 0;
+			nice_remote = 0;
+			ionice_remote = 0;
 			break;
 
 		case 'x':
@@ -2994,6 +3049,14 @@ void server_options(char **args, int *argc_p)
 
 	if (mkpath_dest_arg && am_sender)
 		args[ac++] = "--mkpath";
+
+	if (nice_remote || ionice_remote) {
+		const char *ionice_str = ionice_remote ? intToIoniceValueString(ionice_remote):"";
+		const char *slash_str = ionice_remote ? "/":"";
+		if (asprintf(&arg, "--nice=local:%d%s%s", nice_remote, slash_str, ionice_str) < 0)
+			goto oom;
+		args[ac++] = arg;
+	}
 
 	if (ac > MAX_SERVER_ARGS) { /* Not possible... */
 		rprintf(FERROR, "argc overflow in server_options().\n");
