@@ -35,6 +35,12 @@ extern filter_rule_list daemon_filter_list;
 
 int make_backups = 0;
 
+/* If set, be nice on the local or remote site */
+int nice_local = 0;
+int nice_remote = 0;
+int ionice_local = 0;
+int ionice_remote = 0;
+
 /**
  * If 1, send the whole file as literal data rather than trying to
  * create an incremental diff.
@@ -594,7 +600,7 @@ enum {OPT_SERVER = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_NO_D, OPT_APPEND, OPT_NO_ICONV, OPT_INFO, OPT_DEBUG, OPT_BLOCK_SIZE,
       OPT_USERMAP, OPT_GROUPMAP, OPT_CHOWN, OPT_BWLIMIT, OPT_STDERR,
       OPT_OLD_COMPRESS, OPT_NEW_COMPRESS, OPT_NO_COMPRESS, OPT_OLD_ARGS,
-      OPT_STOP_AFTER, OPT_STOP_AT,
+      OPT_STOP_AFTER, OPT_STOP_AT, OPT_NICE, OPT_NO_NICE, OPT_IONICE, OPT_NO_IONICE, 
       OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
@@ -845,6 +851,19 @@ static struct poptOption long_options[] = {
   {"remote-option",   'M', POPT_ARG_STRING, 0, 'M', 0, 0 },
   {"protocol",         0,  POPT_ARG_INT,    &protocol_version, 0, 0, 0 },
   {"checksum-seed",    0,  POPT_ARG_INT,    &checksum_seed, 0, 0, 0 },
+  {"nice-local",       0,  POPT_ARG_VAL,    &nice_local, 1, 0, 0 },
+  {"nice-remote",      0,  POPT_ARG_VAL,    &nice_remote, 1, 0, 0 },
+  {"ionice-local",     0,  POPT_ARG_VAL,    &ionice_local, 1, 0, 0 },
+  {"ionice-remote",    0,  POPT_ARG_VAL,    &ionice_remote, 1, 0, 0 },
+  {"no-nice-local",    0,  POPT_ARG_VAL,    &nice_local, 0, 0, 0 },
+  {"no-nice-remote",   0,  POPT_ARG_VAL,    &nice_remote, 0, 0, 0 },
+  {"no-ionice-local",  0,  POPT_ARG_VAL,    &ionice_local, 0, 0, 0 },
+  {"no-ionice-remote", 0,  POPT_ARG_VAL,    &ionice_remote, 0, 0, 0 },
+  {"nice",             0,  POPT_ARG_NONE,   0, OPT_NICE, 0, 0 },
+  {"ionice",           0,  POPT_ARG_NONE,   0, OPT_IONICE, 0, 0 },
+  {"no-nice",          0,  POPT_ARG_NONE,   0, OPT_NO_NICE, 0, 0 },
+  {"no-ionice",        0,  POPT_ARG_NONE,   0, OPT_NO_IONICE, 0, 0 },
+  {"nice-and-ionice", 'Q', POPT_ARG_NONE,   0, 'Q', 0, 0 },
   {"server",           0,  POPT_ARG_NONE,   0, OPT_SERVER, 0, 0 },
   {"sender",           0,  POPT_ARG_NONE,   0, OPT_SENDER, 0, 0 },
   /* All the following options switch us into daemon-mode option-parsing. */
@@ -1595,6 +1614,33 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 
 		case 'q':
 			quiet++;
+			break;
+
+		case 'Q':
+			nice_local = 1;
+			nice_remote = 1;
+			ionice_local = 1;
+			ionice_remote = 1;
+			break;
+
+		case OPT_NICE:
+			nice_local = 1;
+			nice_remote = 1;
+			break;
+
+		case OPT_IONICE:
+			ionice_local = 1;
+			ionice_remote = 1;
+			break;
+
+		case OPT_NO_NICE:
+			nice_local = 0;
+			nice_remote = 0;
+			break;
+
+		case OPT_NO_IONICE:
+			ionice_local = 0;
+			ionice_remote = 0;
 			break;
 
 		case 'x':
@@ -2994,6 +3040,12 @@ void server_options(char **args, int *argc_p)
 
 	if (mkpath_dest_arg && am_sender)
 		args[ac++] = "--mkpath";
+
+	if (nice_remote)
+		args[ac++] = "--nice-local";
+
+	if (ionice_remote)
+		args[ac++] = "--ionice-local";
 
 	if (ac > MAX_SERVER_ARGS) { /* Not possible... */
 		rprintf(FERROR, "argc overflow in server_options().\n");
