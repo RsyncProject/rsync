@@ -298,7 +298,7 @@ int vfs_secure_mkstemp(char *template, mode_t perms, int operator_path)
 			dir = dirbuf;
 		}
 		dirfd = operator_path
-		      ? vfs_open_owner_walk(dir, O_RDONLY | O_DIRECTORY, 0)
+		      ? vfs_open_owner_walk(dir, O_RDONLY | O_DIRECTORY, 0, 0)
 		      : vfs_resolve_open(dir, ".", O_RDONLY | O_DIRECTORY, 0);
 		if (dirfd < 0)
 			return -1;

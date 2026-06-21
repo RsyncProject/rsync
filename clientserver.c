@@ -185,7 +185,7 @@ static int exchange_protocols(int f_in, int f_out, char *buf, size_t bufsiz, int
 			/* 'motd file = PATH': motd content is sent to every client, so
 			 * a planted symlink would leak the target's bytes.  Refuse
 			 * symlinks not owned by uid 0 or our euid. */
-			int motd_fd = vfs_open_owner_walk(motd, O_RDONLY, 0);
+			int motd_fd = vfs_open_owner_walk(motd, O_RDONLY, 0, 0);
 			FILE *f = motd_fd >= 0 ? fdopen(motd_fd, "r") : NULL;
 			if (!f && motd_fd >= 0) close(motd_fd);
 			while (f && !feof(f)) {
@@ -300,7 +300,7 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 		STRUCT_STAT st;
 		/* --early-input-file=PATH: refuse symlinks not owned by uid 0 or
 		 * our euid anywhere in the path. */
-		int ei_fd = vfs_open_owner_walk(early_input_file, O_RDONLY, 0);
+		int ei_fd = vfs_open_owner_walk(early_input_file, O_RDONLY, 0, 0);
 		FILE *f = ei_fd >= 0 ? fdopen(ei_fd, "rb") : NULL;
 		if (!f && ei_fd >= 0) close(ei_fd);
 		if (!f || vfs_fstat(fileno(f), &st) < 0) {

@@ -1663,7 +1663,7 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 			open_path = line;
 		} else
 			open_path = fname;
-		fd = vfs_open_owner_walk(open_path, O_RDONLY, 0);
+		fd = vfs_open_owner_walk(open_path, O_RDONLY, 0, 0);
 		if (fd < 0)
 			fp = NULL;
 		else if (!(fp = fdopen(fd, "rb")))

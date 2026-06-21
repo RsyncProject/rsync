@@ -166,7 +166,7 @@ static void logfile_open(void)
 	 * into e.g. /root/.ssh/authorized_keys.  Refuse symlinks not owned by
 	 * uid 0 or our euid. */
 	int fd = vfs_open_owner_walk(logfile_name,
-						O_WRONLY | O_APPEND | O_CREAT, 0644);
+						O_WRONLY | O_APPEND | O_CREAT, 0644, 0);
 	logfile_fp = fd >= 0 ? fdopen(fd, "a") : NULL;
 	if (!logfile_fp && fd >= 0)
 		close(fd);

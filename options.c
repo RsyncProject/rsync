@@ -2643,7 +2643,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			/* Operator-supplied path that may transit attacker-writable
 			 * parents; refuse symlinks not owned by uid 0 or our euid,
 			 * as for --exclude-from/--include-from/--filter in exclude.c. */
-			filesfrom_fd = vfs_open_owner_walk(files_from, O_RDONLY|O_BINARY, 0);
+			filesfrom_fd = vfs_open_owner_walk(files_from, O_RDONLY|O_BINARY, 0, 0);
 			if (filesfrom_fd < 0) {
 				snprintf(err_buf, sizeof err_buf,
 					"failed to open files-from file %s: %s\n",

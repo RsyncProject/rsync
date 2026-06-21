@@ -292,9 +292,9 @@ out:
 #endif
 }
 
-int vfs_open_owner_walk(const char *path, int flags, mode_t mode)
+int vfs_open_owner_walk(const char *path, int flags, mode_t mode, int is_operator)
 {
-	return ona_open(path, flags, mode, NULL, 0, vfs.operator_path_resolve);
+	return ona_open(path, flags, mode, NULL, 0, is_operator);
 }
 
 /* When set, the do_*_at() wrappers resolve their path as an OPERATOR-supplied

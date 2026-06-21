@@ -817,7 +817,7 @@ int change_dir(const char *dir, int set_path_only)
 			 * non-daemon receiver can opt back into the legacy plain chdir with
 			 * --insecure-links. */
 			if (am_daemon && !am_chrooted) {
-				int dfd = vfs_open_owner_walk(dir, O_RDONLY | O_DIRECTORY, 0);
+				int dfd = vfs_open_owner_walk(dir, O_RDONLY | O_DIRECTORY, 0, 0);
 				if (dfd < 0)
 					return 0;
 				if (fchdir(dfd) != 0) {
@@ -848,7 +848,7 @@ int change_dir(const char *dir, int set_path_only)
 				 * another uid.  A real dir is opened directly.  This closes the
 				 * destination chdir TOCTOU; --insecure-links keeps the plain
 				 * chdir for an operator whose dest is a foreign-owned symlink. */
-				dfd = vfs_open_owner_walk(nf, O_RDONLY | O_DIRECTORY, 0);
+				dfd = vfs_open_owner_walk(nf, O_RDONLY | O_DIRECTORY, 0, 0);
 				if (dfd < 0)
 					return 0;
 				if (fchdir(dfd) != 0) {
@@ -929,7 +929,7 @@ int change_dir(const char *dir, int set_path_only)
 				 * relative-dest chdir TOCTOU while still following the operator's
 				 * own symlinks.  --insecure-links keeps the plain chdir. */
 				int dfd = vfs_open_owner_walk(vfs.curr_dir,
-					O_RDONLY | O_DIRECTORY, 0);
+					O_RDONLY | O_DIRECTORY, 0, 0);
 				if (dfd < 0)
 					chdir_failed = 1;
 				else {

@@ -156,7 +156,7 @@ static const char *check_secret(int module, const char *user, const char *group,
 	if (!fname || !*fname)
 		return "no secrets file";
 	{
-		int fd = vfs_open_owner_walk(fname, O_RDONLY, 0);
+		int fd = vfs_open_owner_walk(fname, O_RDONLY, 0, 0);
 		if (fd < 0)
 			return "no secrets file";
 		fh = fdopen(fd, "r");
@@ -242,7 +242,7 @@ static const char *getpassf(const char *filename)
 		 * (e.g. shadow hashes) to a malicious daemon; the vfs_stat()
 		 * other-access check runs on the target mode and passes 0640
 		 * root:shadow.  Refuse symlinks not owned by uid 0 or our euid. */
-		if ((fd = vfs_open_owner_walk(filename, O_RDONLY, 0)) < 0) {
+		if ((fd = vfs_open_owner_walk(filename, O_RDONLY, 0, 0)) < 0) {
 			rsyserr(FERROR, errno, "could not open password file %s", filename);
 			exit_cleanup(RERR_SYNTAX);
 		}

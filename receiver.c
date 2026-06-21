@@ -98,18 +98,18 @@ static int updating_basis_or_equiv;
  * (trusted) and leaf and confine just the leaf -- exactly how secure_relative_
  * open already trusts an absolute basedir while O_NOFOLLOW-confining the leaf.
  * Anything else is a straight pass-through that preserves the strict contract. */
-static int secure_basis_open(const char *basedir, const char *relpath, int flags, mode_t mode)
+static int secure_basis_open(const char *basedir, const char *relpath, int flags, mode_t mode, int is_operator)
 {
 	extern int am_daemon, am_chrooted;
 	extern unsigned int module_dirlen;
 
-	/* A peer-supplied --partial-dir basis/staging path (vfs.operator_path_resolve set
-	 * by recv_files) may be absolute (module_dir-prefixed on a non-chroot daemon)
-	 * and traverse a symlink the vfs_resolve_open path can't confine: resolve
-	 * it with the ownership walk, which follows a uid0/euid-owned symlink but
-	 * refuses a foreign one AND (via abspath_excluded_by_module) refuses a target
-	 * the module's exclude hides -- closing the partial-dir exclude bypass. */
-	if (vfs.operator_path_resolve) {
+	/* A peer-supplied --partial-dir basis/staging path (is_operator, set by the
+	 * recv_files caller) may be absolute (module_dir-prefixed on a non-chroot
+	 * daemon) and traverse a symlink the vfs_resolve_open path can't confine:
+	 * resolve it with the ownership walk, which follows a uid0/euid-owned symlink
+	 * but refuses a foreign one AND (via abspath_excluded_by_module) refuses a
+	 * target the module's exclude hides -- closing the partial-dir exclude bypass. */
+	if (is_operator) {
 		char fullpath[MAXPATHLEN];
 		const char *p = relpath;
 		if (basedir) {
@@ -119,7 +119,7 @@ static int secure_basis_open(const char *basedir, const char *relpath, int flags
 			}
 			p = fullpath;
 		}
-		return vfs_open_owner_walk(p, flags, mode);
+		return vfs_open_owner_walk(p, flags, mode, is_operator);
 	}
 
 	/* The confined resolver is needed for the sanitizing daemon
@@ -1057,10 +1057,8 @@ int recv_files(int f_in, int f_out, char *local_name)
 				 * the exclude-aware ownership walk so a symlinked partial-dir
 				 * can't read (and feed back as delta) a file in an excluded
 				 * subtree. */
-				if (fnamecmp_type == FNAMECMP_PARTIAL_DIR)
-					vfs.operator_path_resolve = 1;
-				fd1 = secure_basis_open(basedir, fnamecmp, O_RDONLY, 0);
-				vfs.operator_path_resolve = 0;
+				fd1 = secure_basis_open(basedir, fnamecmp, O_RDONLY, 0,
+					fnamecmp_type == FNAMECMP_PARTIAL_DIR ? VFS_OPERATOR_PATH : 0);
 			}
 		}
 		if (fnamecmp_type == FNAMECMP_PARTIAL_DIR && fd1 == -1) {
@@ -1091,10 +1089,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 				basedir = basis_dir[0];
 				fnamecmp = fname;
 				fnamecmp_type = FNAMECMP_BASIS_DIR_LOW;
-				if (!am_daemon)
-					operator_path_resolve = 1;
-				fd1 = secure_basis_open(basedir, fnamecmp, O_RDONLY, 0);
-				operator_path_resolve = 0;
+				fd1 = secure_basis_open(basedir, fnamecmp, O_RDONLY, 0, 0);
 			}
 		}
 
@@ -1174,13 +1169,11 @@ int recv_files(int f_in, int f_out, char *local_name)
 			/* one_inplace stages into the operator/peer --partial-dir path:
 			 * resolve it with the ownership walk (exclude-aware) so it can't be
 			 * redirected through a symlink into an excluded subtree. */
-			if (one_inplace)
-				vfs.operator_path_resolve = 1;
 			if (vfs_relpath_active())
-				fd2 = secure_basis_open(NULL, fnametmp, O_WRONLY|O_CREAT, 0600);
+				fd2 = secure_basis_open(NULL, fnametmp, O_WRONLY|O_CREAT, 0600,
+					one_inplace ? VFS_OPERATOR_PATH : 0);
 			else
 				fd2 = vfs_open(fnametmp, O_WRONLY|O_CREAT, 0600);
-			vfs.operator_path_resolve = 0;
 #ifdef linux
 			if (fd2 == -1 && errno == EACCES) {
 				/* Maybe the error was due to protected_regular setting? */

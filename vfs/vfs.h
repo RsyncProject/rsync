@@ -100,7 +100,7 @@ int vfs_resolve_open(const char *basedir, const char *relpath, int flags, mode_t
 int vfs_resolve_open_at(int anchor_fd, const char *relpath, int flags, mode_t mode);
 
 /* Operator-supplied-path resolution by ownership (vfs/owner_walk.c). */
-int vfs_open_owner_walk(const char *path, int flags, mode_t mode);
+int vfs_open_owner_walk(const char *path, int flags, mode_t mode, int is_operator);
 int vfs_owner_walk_parent(const char *path, const char **bname, int is_operator);
 
 /* Held ancestor-dirfd cache for directory traversal (vfs/dircache.c). */
