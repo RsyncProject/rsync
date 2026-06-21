@@ -423,6 +423,16 @@ enum delret {
 #endif
 #include <errno.h>
 
+/* O_NOFOLLOW refuses a final-component symlink with ELOOP on Linux, EMLINK on
+ * FreeBSD, and EFTYPE on NetBSD/OpenBSD. Treat all three as "hit a symlink". A
+ * genuine EMLINK (too many hard links) is harmless where this is used: callers
+ * fall through to a readlink/lstat, which restores the real error. */
+#ifdef EFTYPE
+# define NOFOLLOW_HIT_SYMLINK(e) ((e) == ELOOP || (e) == EMLINK || (e) == EFTYPE)
+#else
+# define NOFOLLOW_HIT_SYMLINK(e) ((e) == ELOOP || (e) == EMLINK)
+#endif
+
 #ifdef HAVE_UTIME_H
 #include <utime.h>
 #endif
