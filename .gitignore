@@ -43,6 +43,12 @@ aclocal.m4
 /testrun
 /trimslash
 /t_unsafe
+/t_acl
+/t_chmod_secure
+/t_rename_secure
+/t_secure_relpath
+/t_symlink_secure
+/simdtest
 /wildtest
 /getfsdev
 /simdtest
