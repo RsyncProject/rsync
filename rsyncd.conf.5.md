@@ -296,6 +296,13 @@ in the values of parameters.  See that section for details.
     others, then you will need to setup multiple rsync daemon processes on
     different ports.
 
+0.  `proxy protocol hosts`
+
+    This global parameter lists the socket peer IP addresses that are allowed
+    to supply a `proxy protocol` header.  The syntax is the same token format
+    used by `hosts allow`.  When `proxy protocol = true`, this list must match
+    the direct peer before rsync trusts the forwarded client address.
+
 0.  `name converter`
 
     This parameter lets you specify a program that will be run by the rsync
@@ -346,7 +353,9 @@ in the values of parameters.  See that section for details.
     tricks that a user can play with uploaded symlinks to access
     daemon-excluded items (if your module has any), and, if "[use chroot](#)" is
     off, rsync can even be tricked into showing or changing data that is
-    outside the module's path (as access-permissions allow).
+    outside the module's path (as access-permissions allow).  This parameter --
+    not the "[exclude](#)"/"[filter](#)" chain, which only matches logical names --
+    is what defends a writable module against symlink trickery; keep it enabled.
 
     The way rsync disables the use of symlinks is to prefix each one with the
     string "/rsyncd-munged/".  This prevents the links from being used as long
@@ -371,6 +380,34 @@ in the values of parameters.  See that section for details.
     rsync believes will allow a symlink to escape the module's hierarchy.
     There are tricky ways to work around this, though, so you had better trust
     your users if you choose this combination of parameters.
+
+0.  `insecure links`
+
+    This parameter (defaulting to "false") controls whether the daemon resolves
+    its symlink-bearing paths with the normal symlink-race defences or with the
+    legacy follow-any-symlink behaviour.
+
+    When false (the default), the daemon refuses to follow a symlink it did not
+    create -- the directory enumeration and file-content opens of the served
+    module, and the operator-supplied paths (`--backup-dir`, `--temp-dir`,
+    `--partial-dir`, the alt-dest basis dirs, and so on) are all resolved with a
+    walk that follows a symlink component only when it is owned by uid&nbsp;0 or
+    by the uid the module runs as, refusing one planted by any other user.  A
+    client can never relax this: a client that sends `--insecure-links` to the
+    daemon has its request refused.
+
+    Setting this parameter to "true" restores the pre-hardening behaviour for
+    **this module only**: the daemon follows **any** symlink in those paths.
+
+    > **WARNING:** enabling "insecure links" re-opens the symlink-escape /
+    > TOCTOU vulnerabilities that the default closes (including CVE-2026-53797
+    > and CVE-2026-53801): an attacker who can create a symlink inside the module
+    > -- or who shares the host with the served tree -- can redirect the daemon's
+    > reads and writes to files **outside** the module.  Enable it **only** on a
+    > single-tenant, fully-isolated, or otherwise trusted host where no untrusted
+    > local user can plant a symlink in the served tree.  It is the daemon
+    > analogue of the client's `--insecure-links` and exists for the same narrow
+    > "I accept the risk in my isolated environment" case.
 
 0.  `charset`
 
@@ -580,6 +617,16 @@ in the values of parameters.  See that section for details.
     exclude everything in the subtree; the easiest way to do this is with a
     triple-star pattern like "`/secret/***`".
 
+    The filter chain matches the **logical name** of each item relative to the
+    module root, not the physical file it resolves to.  It is a visibility and
+    tamper filter, **not** a security boundary against symlinks: a symlink inside
+    the module whose own name is not excluded can still be followed to an excluded
+    target (the name the filter sees -- e.g. "`link`" -- is not the excluded name
+    -- e.g. "`secret`").  What protects a writable module from symlink trickery is
+    the "[munge symlinks](#)" parameter (enabled by default for a writable,
+    non-chrooted module), **not** this filter; do not rely on `exclude`/`filter` to
+    confine a peer who can introduce or traverse a symlink.
+
     The "filter" parameter takes a space-separated list of daemon filter rules,
     though it is smart enough to know not to split a token at an internal space
     in a rule (e.g. "`- /foo  - /bar`" is parsed as two rules).  You may specify
@@ -724,6 +771,42 @@ in the values of parameters.  See that section for details.
     name (such as `/etc/rsyncd.secrets`).  The file must normally not be
     readable by "other"; see "[strict modes](#)".  If the file is not found or is
     rejected, no logins for an "[auth users](#)" module will be possible.
+
+0.  `auth digest`
+
+    This parameter sets the *minimum* message digest that the daemon will accept
+    for the challenge-response authentication of an "[auth users](#)" module.
+    The available digests, strongest first, are `sha512`, `sha256`, `sha1`,
+    `md5`, `md4`.  The daemon selects the auth digest from the connecting
+    client's advertised list (and falls back to `md5`, or `md4` below protocol
+    30, for a client that advertises none), so the negotiated digest can be
+    weaker than both sides actually support.  If it is weaker than the configured
+    name, the connection is refused before the challenge is sent.  The value is a
+    single digest name, for example:
+
+    >     auth digest = sha256
+
+    which requires `sha256` or `sha512` and refuses an `md5` or `md4` exchange.
+
+    This guards against an *auth-digest downgrade*.  A peer that sends no digest
+    list (any rsync before 3.2.0, including the openrsync that ships with macOS)
+    makes the daemon fall back to `md5` (or `md4` below protocol 30), and an
+    on-path attacker can rewrite the unauthenticated negotiation to force the same
+    weak choice.  A captured challenge-response is far cheaper to brute-force
+    offline against a weak digest, so a site whose clients are all modern can
+    require a strong one.  See the rsync `SECURITY.md` document for the full
+    threat model.
+
+    There is **no default** -- the floor is off and the daemon accepts whatever
+    digest is negotiated, preserving compatibility with older clients.  Enabling a
+    floor refuses every client that cannot offer at least that digest, notably any
+    rsync older than 3.2.0 (when the SHA digests were added) and the
+    macOS-bundled openrsync, which authenticate only with `md4`/`md5`.  The SHA
+    digests require an rsync built with openssl at both ends; naming a digest this
+    build does not provide refuses all logins to the module (fail-closed).
+
+    Like the other auth parameters, this may be set per module or, for a default
+    that applies to every module, in the global part of the config file.
 
 0.  `strict modes`
 
@@ -1145,13 +1228,70 @@ This would merge any `/etc/rsyncd.d/*.inc` files (for global values that should
 stay in effect), and then include any `/etc/rsyncd.d/*.conf` files (defining
 modules without any global-value cross-talk).
 
+## SECURITY
+
+An rsync daemon exposes part of your filesystem to network clients, and its
+master process usually runs as root, so it should be configured defensively.
+The following is a practical checklist; the project's `SECURITY.md` describes the
+underlying threat model and the per-platform residuals.
+
+0.  **Confine each module to its path.**
+    Leave "[use chroot](#)" enabled (the default attempts a chroot) so the
+    per-connection worker is jailed inside the module's "[path](#)".  Where chroot
+    is unavailable rsync still resolves every transfer path so it cannot escape
+    the module through a symlinked parent, but a chroot is the stronger boundary
+    -- keep it on unless you have a specific reason not to.  A `path =
+    /outer/./inner` chroots to `/outer` while serving `/inner` as the module root.
+
+0.  **Drop privileges.**
+    Give each module a low-privilege "[uid](#)" and "[gid](#)" so a worker never
+    serves files as root; only the master process needs root (to chroot and bind
+    the port).  Keep modules "[read only](#)" unless they must accept uploads, and
+    prefer "[numeric ids](#)" (or a "[name converter](#)") so a malicious file
+    list cannot map files to an unexpected local owner.
+
+0.  **Restrict who can connect.**
+    Limit reachability with "[hosts allow](#)" / "[hosts deny](#)", bind the
+    daemon to a specific "[address](#)", and use a host firewall.  A module
+    without "[auth users](#)" is reachable by anyone who can reach the port.
+
+0.  **Authenticate with a strong secret and digest.**
+    Require login with "[auth users](#)" plus a "[secrets file](#)" that is
+    readable only by the daemon user (rsync refuses a too-open file unless
+    "[strict modes](#)" is disabled), and use a long, high-entropy secret.  To
+    refuse the weak MD4/MD5 challenge digests that old clients can negotiate, set
+    a floor with "[auth digest](#)" (for example `auth digest = sha512`); see the
+    AUTHENTICATION STRENGTH section below.
+
+0.  **Encrypt the connection.**
+    The daemon protocol authenticates but does **not** encrypt the data stream.
+    Do not expose a cleartext daemon to an untrusted network: front it with a TLS
+    proxy (see the SSL/TLS Daemon Setup section below) or run it over ssh.
+
+0.  **Keep symlink handling safe.**
+    Leave "[munge symlinks](#)" enabled on any writable module (it is the default)
+    so an uploaded symlink cannot redirect a later operation outside the module.
+    Do **not** set "[insecure links](#) = yes" on a host shared with untrusted
+    local users: it disables the daemon's symlink-escape protections (re-opening
+    the symlink TOCTOU/escape vulnerabilities, including CVE-2026-53797 and
+    CVE-2026-53801) and is appropriate only on a single-tenant, fully isolated
+    host.
+
+0.  **Refuse options you do not want.**
+    Use "[refuse options](#)" to reject client options a module should not allow.
+
 ## AUTHENTICATION STRENGTH
 
-The authentication protocol used in rsync is a 128 bit MD4 based challenge
-response system. This is fairly weak protection, though (with at least one
-brute-force hash-finding algorithm publicly available), so if you want really
-top-quality security, then I recommend that you run rsync over ssh.  (Yes, a
-future version of rsync will switch over to a stronger hashing method.)
+Daemon authentication is a challenge-response system in which the client
+returns a digest of the shared secret and a server-chosen challenge.  Modern
+rsync (3.2.7 and later, built with openssl) negotiates the strongest digest both
+sides support -- `sha512` by default -- but for backward compatibility it falls
+back to `md5` (or `md4` below protocol 30) for a client that advertises no digest
+list, and the digest negotiation is itself unauthenticated.  A daemon that wants
+to require a strong digest can set "[auth digest](#)".  For the best protection,
+run rsync over ssh or a verified TLS transport (`rsync-ssl`), which protects the
+exchange at the transport layer, and use a high-entropy shared secret (which is
+infeasible to brute-force regardless of the digest).
 
 Also note that the rsync daemon protocol does not currently provide any
 encryption of the data that is transferred over the connection. Only
@@ -1291,6 +1431,8 @@ Thanks to Karsten Thygesen for his many suggestions and documentation!
 
 Rsync was originally written by Andrew Tridgell and Paul Mackerras.  Many
 people from around the world have helped to maintain and improve it.
+
+Special thanks go to Wayne Davison, who maintained rsync from 2004 to 2024.
 
 Mailing lists for support and development are available at
 <https://lists.samba.org/>.

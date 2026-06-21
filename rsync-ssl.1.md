@@ -66,7 +66,28 @@ The ssl helper scripts are affected by the following environment variables:
 0.  `RSYNC_SSL_CA_CERT`
 
     If specified, the value is a filename that contains a certificate authority
-    certificate that is used to validate the connection.
+    certificate that is used to validate the connection.  When set, the server
+    certificate is verified against this CA **and** its name is checked against
+    the host you are connecting to (the chain and the identity), for all of the
+    openssl, gnutls, and stunnel backends.  Set it to an empty string to disable
+    certificate validation entirely (an encrypt-only connection).
+
+0.  `RSYNC_SSL_ALLOW_INSECURE_STUNNEL`
+
+    Set to `1` to allow the stunnel backend to run without a CA certificate (and
+    thus with no server-certificate validation at all).  Without this, stunnel
+    mode refuses to start unless `RSYNC_SSL_CA_CERT` is set, since an unvalidated
+    TLS connection can be silently man-in-the-middled.
+
+0.  `RSYNC_SSL_SKIP_HOSTNAME_CHECK`
+
+    Set to `1` to verify the certificate **chain** but skip the **hostname**
+    (identity) check, for the openssl and stunnel backends.  Use this only when
+    the server certificate legitimately cannot match the host you connect to --
+    for example connecting by bare IP address, or to a server whose internal-CA
+    certificate carries a different name.  The CA chain is still validated, so
+    this is much narrower than disabling validation with an empty
+    `RSYNC_SSL_CA_CERT`.
 
 0.  `RSYNC_SSL_OPENSSL`
 
