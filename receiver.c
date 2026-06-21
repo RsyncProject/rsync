@@ -688,7 +688,7 @@ static void handle_delayed_updates(char *local_name)
 			 * an excluded subtree. */
 			int rret;
 			vfs.operator_path_resolve = 1;
-			rret = do_rename_at(partialptr, fname);
+			rret = vfs_rename_at(partialptr, fname);
 			vfs.operator_path_resolve = 0;
 			if (rret < 0) {
 				rsyserr(FERROR_XFER, errno,

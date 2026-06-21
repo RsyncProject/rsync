@@ -554,7 +554,7 @@ int robust_unlink(const char *fname)
 	}
 
 	/* maybe we should return rename()'s exit status? Nah. */
-	if (do_rename_at(fname, path) != 0) {
+	if (vfs_rename_at(fname, path) != 0) {
 		errno = ETXTBSY;
 		return -1;
 	}
@@ -585,9 +585,9 @@ int robust_rename(const char *from, const char *to, const char *partialptr,
 		if (ofd >= 0 && nfd >= 0) {
 			const char *os = strrchr(from, '/');
 			const char *ns = strrchr(to, '/');
-			rr = do_rename_atfd(ofd, os ? os + 1 : from, nfd, ns ? ns + 1 : to);
+			rr = vfs_rename_atfd(ofd, os ? os + 1 : from, nfd, ns ? ns + 1 : to);
 		} else
-			rr = do_rename_at(from, to);
+			rr = vfs_rename_at(from, to);
 		if (rr == 0)
 			return 0;
 

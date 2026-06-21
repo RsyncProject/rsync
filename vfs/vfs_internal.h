@@ -17,9 +17,22 @@
 /* Option/daemon globals the VFS internals read (defined in options.c /
  * clientserver.c / syscall.c).  Centralized here so each vfs/ source picks them
  * up from one place rather than re-declaring them. */
+extern int dry_run;
+extern int am_root;
+extern int am_sender;
 extern int am_daemon;
 extern int read_only;
 extern int list_only;
+extern int inplace;
+extern int preallocate_files;
+extern int sparse_files;
+extern int preserve_perms;
+extern int preserve_executability;
+extern int open_noatime;
+extern int copy_links;
+extern int copy_unsafe_links;
+extern int insecure_links;
+extern int module_id;
 extern char *module_dir;
 extern unsigned int module_dirlen;
 extern int module_dirfd;

@@ -1,5 +1,5 @@
 /*
- * Test harness for do_rename_at(): a mixed top-level/slashed rename must still
+ * Test harness for vfs_rename_at(): a mixed top-level/slashed rename must still
  * resolve the slashed side's parent under vfs_resolve_open() rather than
  * fall back to plain rename(). Not linked into rsync. GPL version 2.
  */
@@ -30,14 +30,14 @@ static int vulnerable_mixed_rename_at(const char *old_path, const char *new_path
 
 	if (!old_path || !*old_path || *old_path == '/'
 	 || !new_path || !*new_path || *new_path == '/')
-		return do_rename(old_path, new_path);
+		return vfs_rename(old_path, new_path);
 
 	old_slash = strrchr(old_path, '/');
 	new_slash = strrchr(new_path, '/');
 	if (!old_slash || !new_slash)
-		return do_rename(old_path, new_path);
+		return vfs_rename(old_path, new_path);
 
-	return do_rename_at(old_path, new_path);
+	return vfs_rename_at(old_path, new_path);
 }
 #endif
 
@@ -64,7 +64,7 @@ static void check_rename(const char *label, const char *old_path,
 	int saved_errno;
 
 	errno = 0;
-	rc = do_rename_at(old_path, new_path);
+	rc = vfs_rename_at(old_path, new_path);
 	saved_errno = errno;
 	got_ok = rc == 0;
 

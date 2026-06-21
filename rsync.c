@@ -938,7 +938,7 @@ int finish_transfer(const char *fname, const char *fnametmp,
 		       ok_to_set_time ? ATTRS_ACCURATE_TIME : ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME | ATTRS_SKIP_CRTIME);
 
 	if (temp_copy_name) {
-		if (do_rename_at(fnametmp, fname) < 0) {
+		if (vfs_rename_at(fnametmp, fname) < 0) {
 			rsyserr(FERROR_XFER, errno, "rename %s -> \"%s\"",
 				full_fname(fnametmp), fname);
 			return 0;

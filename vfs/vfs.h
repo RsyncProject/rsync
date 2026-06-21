@@ -83,4 +83,9 @@ int vfs_lstat_at(const char *path, STRUCT_STAT *st);
 int vfs_stat_atfd(int dfd, const char *name, STRUCT_STAT *st);
 int vfs_lstat_atfd(int dfd, const char *name, STRUCT_STAT *st);
 
+/* rename (vfs/rename.c). */
+int vfs_rename(const char *old_path, const char *new_path);
+int vfs_rename_at(const char *old_path, const char *new_path);
+int vfs_rename_atfd(int old_dfd, const char *old_name, int new_dfd, const char *new_name);
+
 #endif /* RSYNC_VFS_H */

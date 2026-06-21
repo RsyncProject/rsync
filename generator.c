@@ -1507,9 +1507,9 @@ static int gen_entry_rename(const char *opath, const char *npath, struct file_st
 	if (odfd >= 0 && ndfd >= 0) {
 		const char *os = strrchr(opath, '/');
 		const char *ns = strrchr(npath, '/');
-		return do_rename_atfd(odfd, os ? os + 1 : opath, ndfd, ns ? ns + 1 : npath);
+		return vfs_rename_atfd(odfd, os ? os + 1 : opath, ndfd, ns ? ns + 1 : npath);
 	}
-	return do_rename_at(opath, npath);
+	return vfs_rename_at(opath, npath);
 }
 
 #ifdef SUPPORT_XATTRS
