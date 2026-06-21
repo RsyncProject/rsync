@@ -31,6 +31,9 @@
 #ifdef __TANDEM
 #include <floss.h(floss_execlp)>
 #endif
+#ifdef HAVE_SYS_RESOURCE_H
+#include <sys/resource.h>
+#endif
 
 extern int dry_run;
 extern int list_only;
@@ -739,10 +742,10 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 		if (ret < 0)
 			goto mkdir_error;
 		if (ret && (INFO_GTE(NAME, 1) || stdout_format_has_i)) {
-			if (file_total == 1 || trailing_slash)
+			if (cp && (file_total == 1 || trailing_slash))
 				*cp = '\0';
 			rprintf(FINFO, "created %d director%s for %s\n", ret, ret == 1 ? "y" : "ies", dest_path);
-			if (file_total == 1 || trailing_slash)
+			if (cp && (file_total == 1 || trailing_slash))
 				*cp = '/';
 		}
 		if (ret)
@@ -864,13 +867,20 @@ static void check_alt_basis_dirs(void)
 
 	for (j = 0; j < basis_dir_cnt; j++) {
 		char *bdir = basis_dir[j];
+		assert(bdir != NULL); /* option-supplied root; never NULL */
 		int bd_len = strlen(bdir);
 		if (bd_len > 1 && bdir[bd_len-1] == '/')
 			bdir[--bd_len] = '\0';
-		if (dry_run > 1 && *bdir != '/') {
+		/* Make a relative --link-dest/--copy-dest/--compare-dest absolute
+		 * (vs the destination curr_dir).  These are operator-trusted roots, so
+		 * an absolute path makes the do_*_at() wrappers use plain resolution
+		 * rather than reject an operator '..' outside the dest tree (e.g.
+		 * --copy-dest=../to).  Skipped when sanitize_paths already confined
+		 * them; the dry_run>1 case keeps its leading-"../"-strip. */
+		if (*bdir != '/' && (dry_run > 1 || !sanitize_paths)) {
 			int len = curr_dir_len + 1 + bd_len + 1;
 			char *new = new_array(char, len);
-			if (slash && strncmp(bdir, "../", 3) == 0) {
+			if (dry_run > 1 && slash && strncmp(bdir, "../", 3) == 0) {
 				/* We want to remove only one leading "../" prefix for
 				 * the directory we couldn't create in dry-run mode:
 				 * this ensures that any other ".." references get
@@ -1332,7 +1342,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 
 		become_copy_as_user();
 
-		flist = send_file_list(f_out, argc, argv);
+		send_file_list(f_out, argc, argv);
 		if (DEBUG_GTE(FLIST, 3))
 			rprintf(FINFO,"file list sent\n");
 
@@ -1734,12 +1744,39 @@ static void unset_env_var(const char *var)
 }
 
 
+/* The symlink-race-safe path resolver (secure_relative_open) holds one open
+ * dirfd per path component while it walks a path, plus an ancestor-dirfd cache
+ * -- far more descriptors than legacy rsync's single open().  On a host with a
+ * low default soft limit (e.g. OpenBSD's 128) a deep tree can hit EMFILE.
+ * Raise the soft RLIMIT_NOFILE toward the hard limit (unprivileged, per
+ * process; inherited by the sender/generator/receiver forks and daemon
+ * children), but cap it: some systems set an enormous hard limit (2^20+) that
+ * we don't want to adopt wholesale. */
+static void raise_fd_limit(void)
+{
+#if defined HAVE_GETRLIMIT && defined HAVE_SETRLIMIT && defined RLIMIT_NOFILE
+	struct rlimit rl;
+	rlim_t want = 4096; /* covers a MAXPATHLEN-deep walk + cache + headroom */
+
+	if (getrlimit(RLIMIT_NOFILE, &rl) < 0)
+		return;
+	if (want > rl.rlim_max)
+		want = rl.rlim_max; /* never exceed the (admin-set) hard limit */
+	if (rl.rlim_cur < want) { /* only ever raise, never lower an inherited limit */
+		rl.rlim_cur = want;
+		(void)setrlimit(RLIMIT_NOFILE, &rl); /* best-effort */
+	}
+#endif
+}
+
 int main(int argc,char *argv[])
 {
 	int ret;
 
 	raw_argc = argc;
 	raw_argv = argv;
+
+	raise_fd_limit();
 
 #ifdef HAVE_SIGACTION
 # ifdef HAVE_SIGPROCMASK

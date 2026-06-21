@@ -494,11 +494,25 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	int change_uid, change_gid;
 	mode_t new_mode = file->mode;
 	int inherit;
+	int dfd = -1;            /* held dir fd for the entry's own dir, or -1 */
+	const char *leaf = NULL; /* leaf of fname relative to dfd */
+#if defined SUPPORT_XATTRS || defined SUPPORT_ACLS
+	int held_fd = -1; /* held O_NOFOLLOW fd for fd-based xattr/ACL ops, or -1 */
+#endif
 
 	if (!sxp) {
+		int sret, sdfd;
 		if (dry_run)
 			return 1;
-		if (link_stat(fname, &sx2.st, 0) < 0) {
+		/* Stat through the entry's held dir fd (like gen_entry_stat) so we
+		 * don't re-walk the full path here; link_stat_at folds in no
+		 * fake-super xattr, so only when am_root >= 0. */
+		if (am_root >= 0 && (sdfd = held_dfd_for(fname, file)) >= 0) {
+			const char *sl = strrchr(fname, '/');
+			sret = link_stat_at(sdfd, sl ? sl + 1 : fname, &sx2.st, 0);
+		} else
+			sret = link_stat(fname, &sx2.st, 0);
+		if (sret < 0) {
 			rsyserr(FERROR_XFER, errno, "stat %s failed",
 				full_fname(fname));
 			return 0;
@@ -508,6 +522,34 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		inherit = !preserve_perms;
 	} else
 		inherit = !preserve_perms && file->flags & FLAG_DIR_CREATED;
+
+	/* Resolve the entry's directory once; the chown/chmod/times ops below
+	 * issue single-component *at() calls against it instead of re-resolving
+	 * the full path each time.  -1 => fall back to the full-path wrappers
+	 * (cross-tree path such as --temp-dir/--backup-dir, or gated off). */
+	dfd = held_dfd_for(fname, file);
+	if (dfd >= 0) {
+		const char *slash = strrchr(fname, '/');
+		leaf = slash ? slash + 1 : fname;
+	}
+
+#if defined SUPPORT_XATTRS || defined SUPPORT_ACLS
+	/* Pin a regular-file/dir/fifo entry via the held dir fd with O_NOFOLLOW so
+	 * the xattr/ACL ops below act on the held inode (sys_f*xattr/fsetxattr),
+	 * not a re-resolved path a parent-symlink race could redirect.  O_NONBLOCK
+	 * stops a raced FIFO blocking the open; O_NOFOLLOW refuses a raced symlink
+	 * leaf.  A symlink/socket/device leaf or no held dfd leaves held_fd == -1,
+	 * and the ACL code then uses setxattrat(AT_SYMLINK_NOFOLLOW) or falls back.
+	 * Under --fake-super the ACL store stays an l-variant xattr and ignores it. */
+	if (dfd >= 0
+	 && (S_ISREG(sxp->st.st_mode) || S_ISDIR(sxp->st.st_mode) || S_ISFIFO(sxp->st.st_mode))
+	 && (preserve_xattrs || am_root < 0
+# ifdef SUPPORT_ACLS
+	     || (preserve_acls && am_root >= 0)
+# endif
+	    ))
+		held_fd = openat(dfd, leaf, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_NOCTTY | O_CLOEXEC);
+#endif
 
 	if (inherit && S_ISDIR(new_mode) && sxp->st.st_mode & S_ISGID) {
 		/* We just created this directory and its setgid
@@ -520,7 +562,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 
 #ifdef SUPPORT_ACLS
 	if (preserve_acls && !S_ISLNK(file->mode) && !ACL_READY(*sxp))
-		get_acl(fname, sxp);
+		get_acl_fdat(held_fd, dfd, leaf, fname, sxp);
 #endif
 
 	change_uid = am_root && uid_ndx && sxp->st.st_uid != (uid_t)F_OWNER(file);
@@ -547,7 +589,8 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		if (am_root >= 0) {
 			uid_t uid = change_uid ? (uid_t)F_OWNER(file) : sxp->st.st_uid;
 			gid_t gid = change_gid ? (gid_t)F_GROUP(file) : sxp->st.st_gid;
-			if (do_lchown_at(fname, uid, gid) != 0) {
+			if ((dfd >= 0 ? do_lchown_atfd(dfd, leaf, uid, gid)
+				      : do_lchown_at(fname, uid, gid)) != 0) {
 				/* We shouldn't have attempted to change uid
 				 * or gid unless have the privilege. */
 				rsyserr(FERROR_XFER, errno, "%s %s failed",
@@ -563,8 +606,12 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 			 * the destination had the setuid or setgid bits set
 			 * (due to the side effect of the chown call). */
 			if (sxp->st.st_mode & (S_ISUID | S_ISGID)) {
-				link_stat(fname, &sxp->st,
-					  keep_dirlinks && S_ISDIR(sxp->st.st_mode));
+				if (dfd >= 0)
+					link_stat_at(dfd, leaf, &sxp->st,
+						     keep_dirlinks && S_ISDIR(sxp->st.st_mode));
+				else
+					link_stat(fname, &sxp->st,
+						  keep_dirlinks && S_ISDIR(sxp->st.st_mode));
 			}
 		}
 		if (change_uid)
@@ -575,9 +622,9 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 
 #ifdef SUPPORT_XATTRS
 	if (am_root < 0)
-		set_stat_xattr(fname, file, new_mode);
+		set_stat_xattr(fname, file, new_mode, held_fd);
 	if (preserve_xattrs && fnamecmp)
-		set_xattr(fname, file, fnamecmp, sxp);
+		set_xattr(fname, file, fnamecmp, sxp, held_fd);
 #endif
 
 	if ((omit_dir_times && S_ISDIR(sxp->st.st_mode))
@@ -631,7 +678,9 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	}
 #endif
 	if (updated & (UPDATED_MTIME|UPDATED_ATIME)) {
-		int ret = set_times(fname, &sx2.st);
+		int ret = dfd >= 0 ? set_times_at(dfd, leaf, &sx2.st) : -2;
+		if (ret == -2)
+			ret = set_times(fname, &sx2.st);
 		if (ret < 0) {
 			rsyserr(FERROR_XFER, errno, "failed to set times on %s", full_fname(fname));
 			goto cleanup;
@@ -650,14 +699,16 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	 * an access ACL, it changes sxp->st.st_mode so we know whether we
 	 * need to chmod(). */
 	if (preserve_acls && !S_ISLNK(new_mode)) {
-		if (set_acl(fname, file, sxp, new_mode) > 0)
+		if (set_acl_fdat(held_fd, dfd, leaf, fname, file, sxp, new_mode) > 0)
 			updated |= UPDATED_ACLS;
 	}
 #endif
 
 #ifdef HAVE_CHMOD
 	if (!BITS_EQUAL(sxp->st.st_mode, new_mode, CHMOD_BITS)) {
-		int ret = am_root < 0 ? 0 : do_chmod_at(fname, new_mode);
+		int ret = am_root < 0 ? 0
+			: dfd >= 0 && !S_ISLNK(new_mode) ? do_chmod_atfd(dfd, leaf, new_mode)
+			: do_chmod_at(fname, new_mode);
 		if (ret < 0) {
 			rsyserr(FERROR_XFER, errno,
 				"failed to set permissions on %s",
@@ -676,6 +727,10 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 			rprintf(FCLIENT, "%s is uptodate\n", fname);
 	}
   cleanup:
+#if defined SUPPORT_XATTRS || defined SUPPORT_ACLS
+	if (held_fd >= 0)
+		close(held_fd);
+#endif
 	if (sxp == &sx2)
 		free_stat_x(&sx2);
 	return updated;
@@ -751,13 +806,13 @@ int finish_transfer(const char *fname, const char *fnametmp,
 	/* move tmp file over real file */
 	if (DEBUG_GTE(RECV, 1))
 		rprintf(FINFO, "renaming %s to %s\n", fnametmp, fname);
-	ret = robust_rename(fnametmp, fname, temp_copy_name, file->mode);
+	ret = robust_rename(fnametmp, fname, temp_copy_name, file->mode, file);
 	if (ret < 0) {
 		rsyserr(FERROR_XFER, errno, "%s %s -> \"%s\"",
 			ret == -2 ? "copy" : "rename",
 			full_fname(fnametmp), fname);
 		if (!partialptr || (ret == -2 && temp_copy_name)
-		 || robust_rename(fnametmp, partialptr, NULL, file->mode) < 0)
+		 || robust_rename(fnametmp, partialptr, NULL, file->mode, file) < 0)
 			do_unlink_at(fnametmp);
 		return 0;
 	}

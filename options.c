@@ -126,6 +126,7 @@ int connect_timeout = 0;
 int keep_partial = 0;
 int safe_symlinks = 0;
 int copy_unsafe_links = 0;
+int insecure_links = 0;
 int munge_symlinks = 0;
 int use_secure_symlinks = 0;
 int size_only = 0;
@@ -682,6 +683,8 @@ static struct poptOption long_options[] = {
   {"copy-links",      'L', POPT_ARG_NONE,   &copy_links, 0, 0, 0 },
   {"copy-unsafe-links",0,  POPT_ARG_NONE,   &copy_unsafe_links, 0, 0, 0 },
   {"safe-links",       0,  POPT_ARG_NONE,   &safe_symlinks, 0, 0, 0 },
+  {"insecure-links",   0,  POPT_ARG_VAL,    &insecure_links, 1, 0, 0 },
+  {"no-insecure-links",0,  POPT_ARG_VAL,    &insecure_links, 0, 0, 0 },
   {"munge-links",      0,  POPT_ARG_VAL,    &munge_symlinks, 1, 0, 0 },
   {"no-munge-links",   0,  POPT_ARG_VAL,    &munge_symlinks, 0, 0, 0 },
   {"copy-dirlinks",   'k', POPT_ARG_NONE,   &copy_dirlinks, 0, 0, 0 },
@@ -1008,6 +1011,11 @@ static void set_refuse_options(void)
 			parse_one_refuse_match(0, "iconv", list_end);
 #endif
 		parse_one_refuse_match(0, "log-file*", list_end);
+		/* A client must never disable the daemon's symlink confinement:
+		 * --insecure-links is a local-only flag, so the daemon hard-refuses it
+		 * (dropping the connection).  The daemon's own opt-out is the
+		 * "insecure links" module parameter, not this flag. */
+		parse_one_refuse_match(0, "insecure-links", list_end);
 	}
 
 #ifndef SUPPORT_ATIMES
@@ -1089,6 +1097,8 @@ static ssize_t parse_size_arg(const char *size_arg, char def_suf, const char *op
 	int reps, mult, len;
 	const char *arg, *err = "invalid", *min_max = NULL;
 	ssize_t limit = -1, size = 1;
+	ssize_t size_max = max_value >= 0 ? max_value : (ssize_t)(SIZE_MAX / 2);
+	double dsize;
 
 	for (arg = size_arg; isDigit(arg); arg++) {}
 	if (*arg == '.' || *arg == get_decimal_point()) /* backward compatibility: always allow '.' */
@@ -1123,11 +1133,38 @@ static ssize_t parse_size_arg(const char *size_arg, char def_suf, const char *op
 		mult = 1024, arg += 2;
 	else
 		goto failure;
-	while (reps--)
+	while (reps--) {
+		if (size > size_max / mult) {
+			err = "too large";
+			min_max = "max";
+			limit = max_value;
+			goto failure;
+		}
 		size *= mult;
-	size *= atof(size_arg);
-	if ((*arg == '+' || *arg == '-') && arg[1] == '1' && arg != size_arg)
-		size += atoi(arg), arg += 2;
+	}
+	errno = 0;
+	dsize = strtod(size_arg, NULL);
+	if (errno == ERANGE || dsize < 0 || dsize > (double)size_max / size
+	 || (max_value < 0 && dsize >= (double)size_max / size)) {
+		err = "too large";
+		min_max = "max";
+		limit = max_value;
+		goto failure;
+	}
+	size = (ssize_t)(dsize * size);
+	if ((*arg == '+' || *arg == '-') && arg[1] == '1' && arg != size_arg) {
+		if (*arg == '+') {
+			if (size == size_max) {
+				err = "too large";
+				min_max = "max";
+				limit = max_value;
+				goto failure;
+			}
+			size++;
+		} else
+			size--;
+		arg += 2;
+	}
 	if (*arg)
 		goto failure;
 	if (size < 0 || (max_value >= 0 && size > max_value)) {
@@ -1151,6 +1188,8 @@ failure:
 			min_max, do_big_num(limit, 3, NULL),
 			unlimited_0 && min_max[1] == 'i' ? " or 0 for unlimited" : "");
 	}
+	if (len < 0 || len > (int)sizeof err_buf - 2)
+		len = sizeof err_buf - 2;
 	err_buf[len] = '\n';
 	err_buf[len+1] = '\0';
 	return -1;
@@ -1959,6 +1998,10 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		ssize_t size = parse_size_arg(max_alloc_arg, 'B', "max-alloc", 1024*1024, -1, True);
 		if (size < 0)
 			goto cleanup;
+		if (size == 0) {
+			snprintf(err_buf, sizeof err_buf, "max-alloc must be greater than zero\n");
+			goto cleanup;
+		}
 		max_alloc = size;
 	}
 	if (!max_alloc)
@@ -2463,7 +2506,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 
 	if (files_from) {
 		char *h, *p;
-		int q;
+		int q = 0;
 		if (argc > 2 || (!am_daemon && !am_server && argc == 1)) {
 			usage(FERROR);
 			exit_cleanup(RERR_SYNTAX);
@@ -2497,7 +2540,10 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 				if (check_filter(&daemon_filter_list, FLOG, dir, 0) < 0)
 					goto options_rejected;
 			}
-			filesfrom_fd = open(files_from, O_RDONLY|O_BINARY);
+			/* Operator-supplied path that may transit attacker-writable
+			 * parents; refuse symlinks not owned by uid 0 or our euid,
+			 * as for --exclude-from/--include-from/--filter in exclude.c. */
+			filesfrom_fd = open_no_attacker_symlinks(files_from, O_RDONLY|O_BINARY, 0);
 			if (filesfrom_fd < 0) {
 				snprintf(err_buf, sizeof err_buf,
 					"failed to open files-from file %s: %s\n",
@@ -2537,7 +2583,7 @@ static char SPLIT_ARG_WHEN_OLD[1];
  **/
 char *safe_arg(const char *opt, const char *arg)
 {
-#define SHELL_CHARS "!#$&;|<>(){}\"'` \t\\"
+#define SHELL_CHARS "!#$&;|<>(){}\"\'` \t\n\r\\"
 #define WILD_CHARS  "*?[]" /* We don't allow remote brace expansion */
 	BOOL is_filename_arg = !opt;
 	char *escapes = is_filename_arg ? SHELL_CHARS : WILD_CHARS SHELL_CHARS;
@@ -2897,6 +2943,11 @@ void server_options(char **args, int *argc_p)
 
 	if (copy_unsafe_links)
 		args[ac++] = "--copy-unsafe-links";
+
+	/* --insecure-links is NOT forwarded: it is a local-only opt-out.  A daemon
+	 * governs its own confinement via the "insecure links" module parameter and
+	 * drops a connection that sends --insecure-links; a remote-shell peer that
+	 * wants it must be given it on its own side (e.g. via --rsync-path). */
 
 	if (safe_symlinks)
 		args[ac++] = "--safe-links";
