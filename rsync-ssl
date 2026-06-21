@@ -90,6 +90,9 @@ function rsync_ssl_helper {
 	# openssl:
 	caopt="-verify_return_error -verify 4"
 	# gnutls:
+	# gnutls-cli has no reliable "use the system trust store AND make
+	# verification fatal" switch across versions, so the gnutls path
+	# refuses below unless RSYNC_SSL_ALLOW_INSECURE_GNUTLS is set.
 	gnutls_opts=""
 	# stunnel:
 	# Since there is no way of using the default CA certificate collection,
@@ -153,6 +156,11 @@ function rsync_ssl_helper {
     if [[ "$RSYNC_SSL_SKIP_HOSTNAME_CHECK" == 1 ]]; then
 	openssl_host_opt=""
 	stunnel_host_opt=""
+    fi
+
+    if [[ $RSYNC_SSL_TYPE == gnutls && -z ${RSYNC_SSL_CA_CERT+x} && "$RSYNC_SSL_ALLOW_INSECURE_GNUTLS" != 1 ]]; then
+	echo "gnutls-cli requires RSYNC_SSL_CA_CERT for server certificate validation (or set RSYNC_SSL_ALLOW_INSECURE_GNUTLS=1 to opt out)" 1>&2
+	exit 1
     fi
 
     if [[ $RSYNC_SSL_TYPE == openssl ]]; then
