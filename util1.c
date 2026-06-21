@@ -34,7 +34,6 @@ extern int relative_paths;
 extern int preserve_xattrs;
 extern int omit_link_times;
 extern int preallocate_files;
-extern int operator_path_resolve;
 extern char *module_dir;
 extern unsigned int module_dirlen;
 extern char *partial_dir;
@@ -1489,26 +1488,26 @@ int handle_partial_dir(const char *fname, int create)
 	 * outside the tree): resolve it with the ownership walk -- follow a
 	 * uid0/euid-owned symlink, refuse a foreign one, absolute and relative alike.
 	 * --insecure-links (or a daemon module's "insecure links =") opts out. */
-	operator_path_resolve = 1;
+	vfs.operator_path_resolve = 1;
 	if (create) {
 		STRUCT_STAT st;
 		int statret = do_lstat_at(dir, &st);
 		if (statret == 0 && !S_ISDIR(st.st_mode)) {
 			if (do_unlink_at(dir) < 0) {
-				operator_path_resolve = 0;
+				vfs.operator_path_resolve = 0;
 				*fn = '/';
 				return 0;
 			}
 			statret = -1;
 		}
 		if (statret < 0 && do_mkdir_at(dir, 0700) < 0) {
-			operator_path_resolve = 0;
+			vfs.operator_path_resolve = 0;
 			*fn = '/';
 			return 0;
 		}
 	} else
 		do_rmdir_at(dir);
-	operator_path_resolve = 0;
+	vfs.operator_path_resolve = 0;
 	*fn = '/';
 
 	return 1;

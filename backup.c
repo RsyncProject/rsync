@@ -30,7 +30,6 @@ extern int preserve_links;
 extern int safe_symlinks;
 extern int backup_dir_len;
 extern unsigned int backup_dir_remainder;
-extern int operator_path_resolve;
 extern char backup_dir_buf[MAXPATHLEN];
 extern char *backup_suffix;
 extern char *backup_dir;
@@ -442,8 +441,8 @@ int make_backup(const char *fname, BOOL prefer_rename)
 	 * symlink component is refused while the operator's own is followed --
 	 * absolute and relative alike.  --insecure-links / "insecure links ="
 	 * restores legacy following. */
-	operator_path_resolve = 1;
+	vfs.operator_path_resolve = 1;
 	ret = make_backup_inner(fname, prefer_rename);
-	operator_path_resolve = 0;
+	vfs.operator_path_resolve = 0;
 	return ret;
 }

@@ -43,7 +43,7 @@ int path_has_dotdot_component(const char *path)
 
 /* Refuse (return 1) when the ABSOLUTE resolved path `abspath` lands OUTSIDE the
  * serving module's root, for an operator/peer-supplied path that must stay in the
- * module (--partial-dir/--backup-dir/alt-basis: operator_path_resolve).  An
+ * module (--partial-dir/--backup-dir/alt-basis: vfs.operator_path_resolve).  An
  * in-tree symlink owned by uid 0 / the euid is followed by design, so it can
  * redirect the resolved target outside the module; this catches that escape.
  *
@@ -66,7 +66,7 @@ int abspath_excluded_by_module(const char *abspath, int name_is_dir)
 	 * root's ancestors ("/", "/home", ...) on the way down -- those are not
 	 * "outside", just not-yet-arrived, so allow them.  A path that has truly
 	 * DIVERGED from the module tree is outside: refuse it for an operator/peer
-	 * path that must stay in the module (operator_path_resolve); other daemon
+	 * path that must stay in the module (vfs.operator_path_resolve); other daemon
 	 * opens (--log-file, --*-from, lock/motd) may legitimately live elsewhere.
 	 * The --insecure-links / "insecure links = yes" opt-out short-circuits
 	 * before we get here. */
@@ -74,7 +74,7 @@ int abspath_excluded_by_module(const char *abspath, int name_is_dir)
 	if (alen == 0
 	 || (strncmp(abspath, module_dir, alen) == 0 && module_dir[alen] == '/'))
 		return 0;			/* ancestor of the module root: still descending */
-	return operator_path_resolve ? 1 : 0;
+	return vfs.operator_path_resolve ? 1 : 0;
 }
 
 #if defined(O_NOFOLLOW) && defined(O_DIRECTORY) && defined(AT_FDCWD)

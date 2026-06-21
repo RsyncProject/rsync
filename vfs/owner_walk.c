@@ -306,7 +306,6 @@ int vfs_open_owner_walk(const char *path, int flags, mode_t mode)
  * the trust signal is authority (ownership), not location.  Set around the
  * relevant ops by backup.c et al.; the opt-out (--insecure-links / "insecure
  * links =") restores legacy following.  Default 0 (transfer-path resolver). */
-int operator_path_resolve = 0;
 
 #if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
 /* For an operator-supplied path: open its parent directory via the ownership

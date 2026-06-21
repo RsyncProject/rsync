@@ -129,7 +129,7 @@ int do_unlink_at(const char *path)
 	RETURN_ERROR_IF_NULL(path);
 
 #if defined O_NOFOLLOW && defined O_DIRECTORY
-	if (operator_path_resolve) {
+	if (vfs.operator_path_resolve) {
 		if (vfs_symlink_optout_allowed())
 			return unlink(path);
 		dfd = vfs_owner_walk_parent(path, &bname);
@@ -415,7 +415,7 @@ int do_link_at(const char *old_path, const char *new_path)
 #if defined O_NOFOLLOW && defined O_DIRECTORY
 	/* Operator-supplied path (a --backup-dir/--link-dest side): resolve each
 	 * parent via the ownership walk (follow uid0/euid symlinks, refuse others). */
-	if (operator_path_resolve) {
+	if (vfs.operator_path_resolve) {
 		if (vfs_symlink_optout_allowed())
 			return do_link(old_path, new_path);
 		old_dfd = vfs_owner_walk_parent(old_path, &old_bname);
@@ -703,7 +703,7 @@ int do_mknod_at(const char *pathname, mode_t mode, dev_t dev)
 	RETURN_ERROR_IF_RO_OR_LO;
 
 #if defined O_NOFOLLOW && defined O_DIRECTORY
-	if (operator_path_resolve) {
+	if (vfs.operator_path_resolve) {
 		if (vfs_symlink_optout_allowed())
 			return do_mknod(pathname, mode, dev);
 		dfd = vfs_owner_walk_parent(pathname, &bname);
@@ -944,7 +944,7 @@ int do_open_at(const char *pathname, int flags, mode_t mode)
 	}
 
 #if defined O_NOFOLLOW && defined O_DIRECTORY
-	if (operator_path_resolve) {
+	if (vfs.operator_path_resolve) {
 		if (vfs_symlink_optout_allowed())
 			return do_open(pathname, flags, mode);
 		dfd = vfs_owner_walk_parent(pathname, &bname);
@@ -1320,7 +1320,7 @@ int do_rename_at(const char *old_path, const char *new_path)
 	/* Operator-supplied path (e.g. a --backup-dir destination or a --temp-dir
 	 * source): resolve each side's parent via the ownership walk (follow
 	 * uid0/euid symlinks, refuse others; absolute and relative alike). */
-	if (operator_path_resolve) {
+	if (vfs.operator_path_resolve) {
 		if (vfs_symlink_optout_allowed())
 			return do_rename(old_path, new_path);
 		old_dfd = vfs_owner_walk_parent(old_path, &old_bname);
@@ -1510,7 +1510,7 @@ int do_mkdir_at(char *path, mode_t mode)
 	trim_trailing_slashes(path);
 
 #if defined O_NOFOLLOW && defined O_DIRECTORY
-	if (operator_path_resolve) {
+	if (vfs.operator_path_resolve) {
 		if (vfs_symlink_optout_allowed())
 			return mkdir(path, mode);
 		dfd = vfs_owner_walk_parent(path, &bname);
@@ -1635,7 +1635,7 @@ static int do_xstat_at(const char *path, STRUCT_STAT *st, int at_flags, int (*fa
 	size_t dlen;
 
 #if defined O_NOFOLLOW && defined O_DIRECTORY
-	if (operator_path_resolve) {
+	if (vfs.operator_path_resolve) {
 		if (vfs_symlink_optout_allowed())
 			return fallback(path, st);
 		dfd = vfs_owner_walk_parent(path, &bname);

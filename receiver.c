@@ -72,7 +72,6 @@ extern int fuzzy_basis;
 extern struct name_num_item *xfer_sum_nni;
 extern int xfer_sum_len;
 extern int use_secure_symlinks;
-extern int operator_path_resolve;
 
 static struct bitbag *delayed_bits = NULL;
 static int phase = 0, redoing = 0;
@@ -104,28 +103,13 @@ static int secure_basis_open(const char *basedir, const char *relpath, int flags
 	extern int am_daemon, am_chrooted;
 	extern unsigned int module_dirlen;
 
-	/* "insecure links = yes": restore the 3.2.7 plain open so an operator/peer
-	 * alt-dest basis follows symlinks like legacy rsync, the same opt-out the
-	 * other daemon symlink sites honour. */
-	if (symlink_optout_allowed()) {
-		if (basedir) {
-			char fullpath[MAXPATHLEN];
-			if (pathjoin(fullpath, sizeof fullpath, basedir, relpath) >= sizeof fullpath) {
-				errno = ENAMETOOLONG;
-				return -1;
-			}
-			return do_open(fullpath, flags, mode);
-		}
-		return do_open(relpath, flags, mode);
-	}
-
-	/* A peer-supplied --partial-dir basis/staging path (operator_path_resolve set
+	/* A peer-supplied --partial-dir basis/staging path (vfs.operator_path_resolve set
 	 * by recv_files) may be absolute (module_dir-prefixed on a non-chroot daemon)
 	 * and traverse a symlink the vfs_resolve_open path can't confine: resolve
 	 * it with the ownership walk, which follows a uid0/euid-owned symlink but
 	 * refuses a foreign one AND (via abspath_excluded_by_module) refuses a target
 	 * the module's exclude hides -- closing the partial-dir exclude bypass. */
-	if (operator_path_resolve) {
+	if (vfs.operator_path_resolve) {
 		char fullpath[MAXPATHLEN];
 		const char *p = relpath;
 		if (basedir) {
@@ -703,9 +687,9 @@ static void handle_delayed_updates(char *local_name)
 			 * walk so a symlinked partial-dir can't move a file out of
 			 * an excluded subtree. */
 			int rret;
-			operator_path_resolve = 1;
+			vfs.operator_path_resolve = 1;
 			rret = do_rename_at(partialptr, fname);
-			operator_path_resolve = 0;
+			vfs.operator_path_resolve = 0;
 			if (rret < 0) {
 				rsyserr(FERROR_XFER, errno,
 					"rename failed for %s (from %s)",
@@ -1070,19 +1054,14 @@ int recv_files(int f_in, int f_out, char *local_name)
 				slash = strrchr(fnamecmp, '/');
 				fd1 = do_open_atfd(bdfd, slash ? slash + 1 : fnamecmp, O_RDONLY, 0);
 			} else {
-				/* An operator-supplied basis -- a --partial-dir, or an
-				 * alt-dest basedir (--copy-dest/--compare-dest/--link-dest) --
-				 * is a peer/operator path: resolve it with the exclude-aware
-				 * ownership walk so a flipped foreign-owned parent symlink can't
-				 * read (and feed back as delta) an out-of-tree / excluded file.
-				 * The walk still allows the legitimate "../sibling" basis (#915)
-				 * and the operator's own uid0/euid symlinks.  A daemon keeps its
-				 * stronger confinement branch in secure_basis_open(), so only
-				 * route the alt-dest basedir read through the walk off-daemon. */
-				if ((basedir && !am_daemon) || fnamecmp_type == FNAMECMP_PARTIAL_DIR)
-					operator_path_resolve = 1;
+				/* A --partial-dir basis is an operator/peer path: resolve it with
+				 * the exclude-aware ownership walk so a symlinked partial-dir
+				 * can't read (and feed back as delta) a file in an excluded
+				 * subtree. */
+				if (fnamecmp_type == FNAMECMP_PARTIAL_DIR)
+					vfs.operator_path_resolve = 1;
 				fd1 = secure_basis_open(basedir, fnamecmp, O_RDONLY, 0);
-				operator_path_resolve = 0;
+				vfs.operator_path_resolve = 0;
 			}
 		}
 		if (fnamecmp_type == FNAMECMP_PARTIAL_DIR && fd1 == -1) {
@@ -1197,11 +1176,12 @@ int recv_files(int f_in, int f_out, char *local_name)
 			 * resolve it with the ownership walk (exclude-aware) so it can't be
 			 * redirected through a symlink into an excluded subtree. */
 			if (one_inplace)
-				operator_path_resolve = 1;
+				vfs.operator_path_resolve = 1;
 			if (vfs_relpath_active())
 				fd2 = secure_basis_open(NULL, fnametmp, O_WRONLY|O_CREAT, 0600);
 			else
 				fd2 = do_open(fnametmp, O_WRONLY|O_CREAT, 0600);
+			vfs.operator_path_resolve = 0;
 #ifdef linux
 			if (fd2 == -1 && errno == EACCES) {
 				/* Maybe the error was due to protected_regular setting? */
@@ -1310,9 +1290,9 @@ int recv_files(int f_in, int f_out, char *local_name)
 					/* Unlink the consumed --partial-dir basis through the
 					 * exclude-aware ownership walk (a symlinked partial-dir
 					 * must not delete a file in an excluded subtree). */
-					operator_path_resolve = 1;
+					vfs.operator_path_resolve = 1;
 					do_unlink_at(partialptr);
-					operator_path_resolve = 0;
+					vfs.operator_path_resolve = 0;
 				}
 				handle_partial_dir(partialptr, PDIR_DELETE);
 			}

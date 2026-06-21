@@ -21,7 +21,6 @@ extern int am_daemon;
 extern char *module_dir;
 extern unsigned int module_dirlen;
 extern int module_dirfd;
-extern int operator_path_resolve;
 
 /* Module-confinement helpers (pure logic, always compiled). */
 int path_has_dotdot_component(const char *path);
