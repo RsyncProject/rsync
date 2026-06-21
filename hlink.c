@@ -420,7 +420,14 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 				}
 				break;
 			}
-			if (!quick_check_ok(FT_REG, cmpbuf, file, &alt_sx.st))
+			/* Content-based basis match only applies to regular
+			 * files: for a hard-linked symlink/device/special the
+			 * exact-inode check above is the only meaningful test,
+			 * and quick_check_ok(FT_REG, ...) would read F_SUM()
+			 * on a file_struct that has no SUM_EXTRA_CNT space
+			 * (recv_file_entry only allocates it for S_ISREG). */
+			if (!S_ISREG(file->mode)
+			 || !quick_check_ok(FT_REG, cmpbuf, file, &alt_sx.st))
 				continue;
 			statret = 1;
 			if (unchanged_attrs(cmpbuf, file, &alt_sx))
