@@ -44,7 +44,7 @@ LIBOBJ=lib/wildmatch.o lib/compat.o lib/snprintf.o lib/mdfour.o lib/md5.o \
 zlib_OBJS=zlib/deflate.o zlib/inffast.o zlib/inflate.o zlib/inftrees.o \
 	zlib/trees.o zlib/zutil.o zlib/adler32.o zlib/compress.o zlib/crc32.o
 OBJS1=flist.o rsync.o generator.o receiver.o cleanup.o sender.o exclude.o \
-	util1.o util2.o main.o checksum.o match.o syscall.o android.o log.o backup.o delete.o
+	util1.o util2.o main.o checksum.o match.o syscall.o android.o log.o backup.o delete.o ltfs.o
 OBJS2=options.o io.o compat.o hlink.o token.o uidlist.o socket.o hashtable.o \
 	usage.o fileio.o batch.o clientname.o chmod.o acls.o xattrs.o
 OBJS3=progress.o pipe.o @MD5_ASM@ @ROLL_SIMD@ @ROLL_ASM@
@@ -53,18 +53,26 @@ popt_OBJS= popt/popt.o  popt/poptconfig.o \
 	popt/popthelp.o popt/poptparse.o popt/poptint.o
 OBJS=$(OBJS1) $(OBJS2) $(OBJS3) $(DAEMON_OBJ) $(LIBOBJ) @BUILD_ZLIB@ @BUILD_POPT@
 
+# rsync_noltfs: identical to rsync but options.c recompiled with
+# -DLTFS_SERVER_REJECT_TEST, which forces the server-side --ltfs rejection
+# path active regardless of SUPPORT_LTFS.  Used by the ltfs-server-reject test.
+OBJS_NOLTFS=$(OBJS1) options_noltfs.o io.o compat.o hlink.o token.o uidlist.o \
+	socket.o hashtable.o usage.o fileio.o batch.o clientname.o chmod.o acls.o \
+	xattrs.o $(OBJS3) $(DAEMON_OBJ) $(LIBOBJ) @BUILD_ZLIB@ @BUILD_POPT@
+
 TLS_OBJ = tls.o syscall.o android.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/permstring.o lib/sysxattrs.o @BUILD_POPT@
 
 # Programs we must have to run the test cases
 CHECK_PROGS = rsync$(EXEEXT) tls$(EXEEXT) getgroups$(EXEEXT) getfsdev$(EXEEXT) \
 	testrun$(EXEEXT) trimslash$(EXEEXT) t_unsafe$(EXEEXT) t_chmod_secure$(EXEEXT) \
-	t_secure_relpath$(EXEEXT) wildtest$(EXEEXT) simdtest$(EXEEXT)
+	t_secure_relpath$(EXEEXT) wildtest$(EXEEXT) simdtest$(EXEEXT) \
+	@LTFS_CHECK_PROGS@
 
 CHECK_SYMLINKS = testsuite/chown-fake_test.py testsuite/devices-fake_test.py \
 	testsuite/xattrs-hlink_test.py testsuite/exclude-lsh_test.py
 
 # Objects for CHECK_PROGS to clean
-CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o t_chmod_secure.o t_secure_relpath.o trimslash.o wildtest.o
+CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o t_chmod_secure.o t_secure_relpath.o trimslash.o wildtest.o @LTFS_CHECK_OBJS@
 
 # note that the -I. is needed to handle config.h when using VPATH
 .c.o:
@@ -223,8 +231,7 @@ aclocal.m4: $(srcdir)/m4/*.m4
 configure.sh config.h.in: configure.ac aclocal.m4
 	@if test -f configure.sh; then cp -p configure.sh configure.sh.old; else touch configure.sh.old; fi
 	@if test -f config.h.in; then cp -p config.h.in config.h.in.old; else touch config.h.in.old; fi
-	autoconf -o configure.sh
-	autoheader && touch config.h.in
+	$(srcdir)/autogen.sh
 	@if diff configure.sh configure.sh.old >/dev/null 2>&1; then \
 	    echo "configure.sh is unchanged."; \
 	    rm configure.sh.old; \
@@ -382,15 +389,15 @@ check-progs: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 
 .PHONY: check
 check: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
-	$(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(CHECK_J)
+	$(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(CHECK_J) @LTFS_RUNTESTS_ARGS@
 
 .PHONY: check29
 check29: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
-	$(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(CHECK_J) --protocol=29
+	$(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(CHECK_J) --protocol=29 @LTFS_RUNTESTS_ARGS@
 
 .PHONY: check30
 check30: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
-	$(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(CHECK_J) --protocol=30
+	$(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(CHECK_J) --protocol=30 @LTFS_RUNTESTS_ARGS@
 
 # Whole-suite gcov coverage report (HTML, with branch + decision coverage).
 # Requires a build configured with --enable-coverage and the `gcovr` tool
@@ -405,7 +412,7 @@ coverage: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	  *) echo "*** not a coverage build; reconfigure with --enable-coverage"; exit 1 ;; esac
 	@command -v gcovr >/dev/null 2>&1 || { echo "*** gcovr not found (pip install gcovr)"; exit 1; }
 	find . -name '*.gcda' -delete
-	@rc=0; $(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(COVERAGE_J) $(COVERAGE_RUNFLAGS) || rc=$$?; \
+	@rc=0; $(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(COVERAGE_J) $(COVERAGE_RUNFLAGS) @LTFS_RUNTESTS_ARGS@ || rc=$$?; \
 	  rm -rf $(COVERAGE_DIR) && mkdir -p $(COVERAGE_DIR); \
 	  gcovr --root $(srcdir) $(COVERAGE_EXCLUDE) --decisions --print-summary \
 	      --html-details -o $(COVERAGE_DIR)/index.html . || exit $$?; \
@@ -437,7 +444,7 @@ coverage-all: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	@rc=0; \
 	  for cfg in '' '--protocol=30' '--protocol=29' '--use-tcp'; do \
 	    echo "===== coverage-all: runtests.py $$cfg ====="; \
-	    $(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(COVERAGE_J) $$cfg || rc=$$?; \
+	    $(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(COVERAGE_J) $$cfg @LTFS_RUNTESTS_ARGS@ || rc=$$?; \
 	  done; \
 	  rm -rf coverage-all && mkdir -p coverage-all; \
 	  gcovr --root $(srcdir) $(COVERAGE_EXCLUDE) --decisions --print-summary \
@@ -467,6 +474,12 @@ simdtest$(EXEEXT): simd-checksum-x86_64.cpp $(HEADERS)
 	    touch $@; \
 	fi
 
+options_noltfs.o: $(srcdir)/options.c $(HEADERS)
+	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) -DLTFS_SERVER_REJECT_TEST -c -o $@ $(srcdir)/options.c
+
+rsync_noltfs$(EXEEXT): $(OBJS_NOLTFS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS_NOLTFS) $(LIBS)
+
 testsuite/chown-fake_test.py:
 	ln -s chown_test.py $(srcdir)/testsuite/chown-fake_test.py
 
@@ -485,7 +498,7 @@ testsuite/exclude-lsh_test.py:
 
 .PHONY: installcheck
 installcheck: $(CHECK_PROGS) $(CHECK_SYMLINKS)
-	$(srcdir)/runtests.py --rsync-bin="$(bindir)/rsync$(EXEEXT)" --srcdir="$(srcdir)" --tooldir=`pwd` -j $(CHECK_J)
+	$(srcdir)/runtests.py --rsync-bin="$(bindir)/rsync$(EXEEXT)" --srcdir="$(srcdir)" --tooldir=`pwd` -j $(CHECK_J) @LTFS_RUNTESTS_ARGS@
 
 # TODO: Add 'dist' target; need to know which files will be included
 

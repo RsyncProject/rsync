@@ -112,6 +112,7 @@ int human_readable = 1;
 int recurse = 0;
 int mkpath_dest_arg = 0;
 int allow_inc_recurse = 1;
+int ltfs_mode = 0;
 int xfer_dirs = -1;
 int am_daemon = 0;
 /* Set after a successful per-module chroot ("use chroot = yes") in
@@ -594,7 +595,7 @@ enum {OPT_SERVER = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_NO_D, OPT_APPEND, OPT_NO_ICONV, OPT_INFO, OPT_DEBUG, OPT_BLOCK_SIZE,
       OPT_USERMAP, OPT_GROUPMAP, OPT_CHOWN, OPT_BWLIMIT, OPT_STDERR,
       OPT_OLD_COMPRESS, OPT_NEW_COMPRESS, OPT_NO_COMPRESS, OPT_OLD_ARGS,
-      OPT_STOP_AFTER, OPT_STOP_AT,
+      OPT_STOP_AFTER, OPT_STOP_AT, OPT_LTFS,
       OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
@@ -623,6 +624,8 @@ static struct poptOption long_options[] = {
   {"no-r",             0,  POPT_ARG_VAL,    &recurse, 0, 0, 0 },
   {"inc-recursive",    0,  POPT_ARG_VAL,    &allow_inc_recurse, 1, 0, 0 },
   {"no-inc-recursive", 0,  POPT_ARG_VAL,    &allow_inc_recurse, 0, 0, 0 },
+  {"ltfs",             0,  POPT_ARG_NONE,   0, OPT_LTFS, 0, 0 },
+  {"no-ltfs",          0,  POPT_ARG_VAL,    &ltfs_mode, 0, 0, 0 },
   {"i-r",              0,  POPT_ARG_VAL,    &allow_inc_recurse, 1, 0, 0 },
   {"no-i-r",           0,  POPT_ARG_VAL,    &allow_inc_recurse, 0, 0, 0 },
   {"dirs",            'd', POPT_ARG_VAL,    &xfer_dirs, 2, 0, 0 },
@@ -1568,6 +1571,14 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			preserve_devices = preserve_specials = 0;
 			break;
 
+		case OPT_LTFS:
+			ltfs_mode = 1;
+			/* Imply -t (like --archive does) so the index quick-check can
+			 * skip unchanged files on a later run.  Processed here in option
+			 * order so a subsequent --no-times can still override it. */
+			preserve_mtimes = 1;
+			break;
+
 		case 'h':
 			human_readable++;
 			break;
@@ -2396,6 +2407,37 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			bwlimit_writemax = 512;
 	}
 
+#if !defined(SUPPORT_LTFS) || defined(LTFS_SERVER_REJECT_TEST)
+	if (ltfs_mode && (am_server || am_daemon)) {
+		snprintf(err_buf, sizeof err_buf,
+			 "--ltfs is not supported on this server\n");
+		goto cleanup;
+	}
+#endif
+	if (ltfs_mode) {
+		/* A delta read would only re-read the source file we must
+		 * stream off the tape anyway, so force whole-file. */
+		if (whole_file < 0)
+			whole_file = 1;
+		/* We need the complete file list before we can order the read
+		 * by physical block, so incremental recursion is incompatible. */
+		allow_inc_recurse = 0;
+		/* --checksum would read every byte of every file off the tape
+		 * just to decide what to transfer, defeating the whole point. */
+		if (always_checksum) {
+			snprintf(err_buf, sizeof err_buf,
+				 "--checksum cannot be used with --ltfs (it would read the entire tape)\n");
+			goto cleanup;
+		}
+		/* --ltfs implies -t (see OPT_LTFS); a 0 here means the user added an
+		 * explicit --no-times afterward.  We honor it, but warn: without
+		 * preserved mtimes the index quick-check can't skip unchanged files,
+		 * so every run re-reads the whole tape. */
+		if (!preserve_mtimes && !am_server)
+			rprintf(FWARNING,
+				"--ltfs with --no-times: unchanged files cannot be skipped by mtime, so every run re-reads the tape.\n");
+	}
+
 	if (append_mode) {
 		if (whole_file > 0) {
 			snprintf(err_buf, sizeof err_buf,
@@ -2763,6 +2805,11 @@ void server_options(char **args, int *argc_p)
 			args[ac++] = "--no-specials"; /* -D is already set. */
 	} else if (preserve_specials)
 		args[ac++] = "--specials";
+
+	/* The sender reads the start-block metadata and both sides must agree
+	 * on the file-list extra layout, so tell the server side about --ltfs. */
+	if (ltfs_mode)
+		args[ac++] = "--ltfs";
 
 	/* The server side doesn't use our log-format, but in certain
 	 * circumstances they need to know a little about the option. */
