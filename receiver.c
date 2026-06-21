@@ -704,7 +704,8 @@ int recv_files(int f_in, int f_out, char *local_name)
 #ifdef SUPPORT_ACLS
 	const char *parent_dirname = "";
 #endif
-	int ndx, recv_ok, one_inplace;
+	int ndx, recv_ok, one_inplace, write_to_device;
+	mode_t write_devices_saved_mode = 0;
 
 	if (DEBUG_GTE(RECV, 1))
 		rprintf(FINFO, "recv_files(%d) starting\n", cur_flist->used);
@@ -1025,11 +1026,10 @@ int recv_files(int f_in, int f_out, char *local_name)
 			continue;
 		}
 
-		if (write_devices && IS_DEVICE(st.st_mode)) {
+		write_to_device = write_devices && IS_DEVICE(st.st_mode);
+		if (write_to_device) {
 			if (fd1 != -1 && st.st_size == 0)
 				st.st_size = get_device_size(fd1, fname);
-			/* Mark the file entry as a device so that we don't try to truncate it later on. */
-			file->mode = S_IFBLK | (file->mode & ACCESSPERMS);
 		} else if (fd1 != -1 && !(S_ISREG(st.st_mode))) {
 			close(fd1);
 			fd1 = -1;
@@ -1103,8 +1103,26 @@ int recv_files(int f_in, int f_out, char *local_name)
 		else if (!am_server && INFO_GTE(NAME, 1) && INFO_EQ(PROGRESS, 1))
 			rprintf(FINFO, "%s\n", fname);
 
+		/* --write-devices writes a regular source file's content into an
+		 * existing destination device.  Flip file->mode to S_IFBLK just for
+		 * receive_data()'s ftruncate gate (!IS_DEVICE), then restore it right
+		 * after -- the file_struct was built as a regular file with no
+		 * DEV_EXTRA_CNT, so leaving it S_IFBLK would make set_stat_xattr's
+		 * F_RDEV_P() read past the allocation.  Kept tight here (after the
+		 * pre-transfer log and the fd2 bail-out) so no continue skips the
+		 * restore and dest_mode() above ran on the real mode. */
+		if (write_to_device) {
+			write_devices_saved_mode = file->mode;
+			file->mode = S_IFBLK | (file->mode & ACCESSPERMS);
+		}
+
 		/* recv file data */
 		recv_ok = receive_data(f_in, fnamecmp, fd1, st.st_size, fname, fd2, file, inplace || one_inplace);
+
+		if (write_to_device) {
+			file->mode = write_devices_saved_mode;
+			write_devices_saved_mode = 0;
+		}
 
 		log_item(log_code, file, iflags, NULL);
 		if (want_progress_now)
