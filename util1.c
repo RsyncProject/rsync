@@ -428,9 +428,9 @@ int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
 		if (vfs_fstat(ifd, &srcst) < 0)
 			rsyserr(FWARNING, errno, "fstat %s", full_fname(source));
 		else if (srcst.st_size > 0) {
-			prealloc_len = do_fallocate(ofd, 0, srcst.st_size);
+			prealloc_len = vfs_fallocate(ofd, 0, srcst.st_size);
 			if (prealloc_len < 0)
-				rsyserr(FWARNING, errno, "do_fallocate %s", full_fname(dest));
+				rsyserr(FWARNING, errno, "vfs_fallocate %s", full_fname(dest));
 		}
 	}
 #endif
@@ -462,7 +462,7 @@ int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
 #ifdef HAVE_FTRUNCATE
 		/* If we fail to truncate, the dest file may be wrong, so we
 		 * must trigger the "partial transfer" error. */
-		if (do_ftruncate(ofd, offset) < 0)
+		if (vfs_ftruncate(ofd, offset) < 0)
 			rsyserr(FERROR_XFER, errno, "ftruncate %s", full_fname(dest));
 #else
 		rprintf(FERROR_XFER, "no ftruncate for over-long pre-alloc: %s", full_fname(dest));

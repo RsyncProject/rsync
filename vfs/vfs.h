@@ -153,4 +153,10 @@ int vfs_lutimes(const char *path, STRUCT_STAT *stp);
 int vfs_utimes(const char *path, STRUCT_STAT *stp);
 int vfs_utime(const char *path, STRUCT_STAT *stp);
 
+/* fd-based file-data ops (vfs/fileio.c). */
+int vfs_ftruncate(int fd, OFF_T size);
+OFF_T vfs_lseek(int fd, OFF_T offset, int whence);
+OFF_T vfs_fallocate(int fd, OFF_T offset, OFF_T length);
+int vfs_punch_hole(int fd, OFF_T pos, OFF_T len);
+
 #endif /* RSYNC_VFS_H */

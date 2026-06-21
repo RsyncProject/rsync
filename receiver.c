@@ -460,14 +460,14 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 	if (preallocate_files && fd != -1 && total_size > 0 && (!inplace_sizing || total_size > size_r)) {
 		/* Try to preallocate enough space for file's eventual length.  Can
 		 * reduce fragmentation on filesystems like ext4, xfs, and NTFS. */
-		if ((preallocated_len = do_fallocate(fd, 0, total_size)) < 0)
-			rsyserr(FWARNING, errno, "do_fallocate %s", full_fname(fname));
+		if ((preallocated_len = vfs_fallocate(fd, 0, total_size)) < 0)
+			rsyserr(FWARNING, errno, "vfs_fallocate %s", full_fname(fname));
 	} else
 #endif
 	if (inplace_sizing) {
 #ifdef HAVE_FTRUNCATE
 		/* The most compatible way to create a sparse file is to start with no length. */
-		if (sparse_files > 0 && whole_file && fd >= 0 && do_ftruncate(fd, 0) == 0)
+		if (sparse_files > 0 && whole_file && fd >= 0 && vfs_ftruncate(fd, 0) == 0)
 			preallocated_len = 0;
 		else
 #endif
@@ -510,7 +510,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 			}
 		}
 		offset = sum.flength;
-		if (fd != -1 && (j = do_lseek(fd, offset, SEEK_SET)) != offset) {
+		if (fd != -1 && (j = vfs_lseek(fd, offset, SEEK_SET)) != offset) {
 			rsyserr(FERROR_XFER, errno, "lseek of %s returned %s, not %s",
 				full_fname(fname), big_num(j), big_num(offset));
 			exit_cleanup(RERR_FILEIO);
@@ -634,7 +634,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 	 * preallocate_files: total_size could have been an overestimate.
 	 *     Cut off any extra preallocated zeros from dest file. */
 	if ((inplace_sizing || preallocated_len > offset) && fd != -1 && !IS_DEVICE(file->mode)) {
-		if (do_ftruncate(fd, offset) < 0)
+		if (vfs_ftruncate(fd, offset) < 0)
 			rsyserr(FERROR_XFER, errno, "ftruncate failed on %s", full_fname(fname));
 	}
 #endif

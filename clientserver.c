@@ -1651,7 +1651,7 @@ static void create_pid_file(void)
 	else if (st1.st_dev != st2.st_dev || st1.st_ino != st2.st_ino)
 		fail = "verify stat info for";
 #ifdef HAVE_FTRUNCATE
-	else if (do_ftruncate(pid_file_fd, 0) < 0)
+	else if (vfs_ftruncate(pid_file_fd, 0) < 0)
 		fail = "truncate";
 #endif
 	else {
