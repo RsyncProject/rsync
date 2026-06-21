@@ -1675,7 +1675,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 		F_ATIME(file) = st.st_atime;
 #ifdef SUPPORT_CRTIMES
 	if (crtimes_ndx)
-		F_CRTIME(file) = get_create_time(fname, &st);
+		F_CRTIME(file) = vfs_get_create_time(fname, &st);
 #endif
 
 	if (basename != thisname)

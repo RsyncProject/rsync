@@ -413,7 +413,7 @@ static inline int any_time_differs(stat_x *sxp, struct file_struct *file, UNUSED
 #ifdef SUPPORT_CRTIMES
 	if (!differs && crtimes_ndx) {
 		if (sxp->crtime == 0)
-			sxp->crtime = get_create_time(fname, &sxp->st);
+			sxp->crtime = vfs_get_create_time(fname, &sxp->st);
 		differs = !same_time(sxp->crtime, 0, F_CRTIME(file), 0);
 	}
 #endif
@@ -539,7 +539,7 @@ void itemize(const char *fnamecmp, struct file_struct *file, int ndx, int statre
 #ifdef SUPPORT_CRTIMES
 		if (crtimes_ndx) {
 			if (sxp->crtime == 0)
-				sxp->crtime = get_create_time(fnamecmp, &sxp->st);
+				sxp->crtime = vfs_get_create_time(fnamecmp, &sxp->st);
 			if (!same_time(sxp->crtime, 0, F_CRTIME(file), 0))
 				iflags |= ITEM_REPORT_CRTIME;
 		}

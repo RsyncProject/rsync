@@ -749,13 +749,13 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	if (crtimes_ndx && !(flags & ATTRS_SKIP_CRTIME)) {
 		time_t file_crtime = F_CRTIME(file);
 		if (sxp->crtime == 0)
-			sxp->crtime = get_create_time(fname, &sxp->st);
+			sxp->crtime = vfs_get_create_time(fname, &sxp->st);
 		if (!same_time(sxp->crtime, 0L, file_crtime, 0L)) {
 			if (
 #ifdef HAVE_GETATTRLIST
-			     do_setattrlist_crtime(fname, file_crtime) == 0
+			     vfs_setattrlist_crtime(fname, file_crtime) == 0
 #elif defined __CYGWIN__
-			     do_SetFileTime(fname, file_crtime) == 0
+			     vfs_SetFileTime(fname, file_crtime) == 0
 #else
 #error Unknown crtimes implementation
 #endif

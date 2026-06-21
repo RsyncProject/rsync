@@ -130,7 +130,7 @@ int set_times(const char *fname, STRUCT_STAT *stp)
 	switch (switch_step) {
 #ifdef HAVE_SETATTRLIST
 #include "case_N.h"
-		if (do_setattrlist_times(fname, stp) == 0)
+		if (vfs_setattrlist_times(fname, stp) == 0)
 			break;
 		if (errno != ENOSYS)
 			return -1;
@@ -139,7 +139,7 @@ int set_times(const char *fname, STRUCT_STAT *stp)
 
 #ifdef HAVE_UTIMENSAT
 #include "case_N.h"
-		if (do_utimensat_at(fname, stp) == 0)
+		if (vfs_utimensat_at(fname, stp) == 0)
 			break;
 		if (errno != ENOSYS)
 			return -1;
@@ -148,7 +148,7 @@ int set_times(const char *fname, STRUCT_STAT *stp)
 
 #ifdef HAVE_LUTIMES
 #include "case_N.h"
-		if (do_lutimes(fname, stp) == 0)
+		if (vfs_lutimes(fname, stp) == 0)
 			break;
 		if (errno != ENOSYS)
 			return -1;
@@ -165,10 +165,10 @@ int set_times(const char *fname, STRUCT_STAT *stp)
 
 #include "case_N.h"
 #ifdef HAVE_UTIMES
-		if (do_utimes(fname, stp) == 0)
+		if (vfs_utimes(fname, stp) == 0)
 			break;
 #else
-		if (do_utime(fname, stp) == 0)
+		if (vfs_utime(fname, stp) == 0)
 			break;
 #endif
 
@@ -186,7 +186,7 @@ int set_times(const char *fname, STRUCT_STAT *stp)
 int set_times_at(int dfd, const char *name, STRUCT_STAT *stp)
 {
 #if defined HAVE_UTIMENSAT && !defined HAVE_SETATTRLIST
-	int r = do_utimensat_atfd(dfd, name, stp);
+	int r = vfs_utimensat_atfd(dfd, name, stp);
 	if (r == 0)
 		return 0;
 	if (errno == ENOSYS)

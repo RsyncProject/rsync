@@ -163,8 +163,8 @@ static void list_file(const char *fname)
 	if (vfs_lstat(fname, &buf) < 0)
 		failed("stat", fname);
 #ifdef SUPPORT_CRTIMES
-	if (display_crtimes && (crtime = get_create_time(fname, &buf)) == 0)
-		failed("get_create_time", fname);
+	if (display_crtimes && (crtime = vfs_get_create_time(fname, &buf)) == 0)
+		failed("vfs_get_create_time", fname);
 #endif
 #ifdef SUPPORT_XATTRS
 	if (am_root < 0)

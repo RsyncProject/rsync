@@ -141,4 +141,16 @@ int vfs_mknod(const char *pathname, mode_t mode, dev_t dev);
 int vfs_mknod_at(const char *pathname, mode_t mode, dev_t dev);
 int vfs_mknod_atfd(int dfd, const char *name, mode_t mode, dev_t dev);
 
+/* timestamp setting + crtimes (vfs/times.c). */
+int vfs_setattrlist_times(const char *path, STRUCT_STAT *stp);
+int vfs_setattrlist_crtime(const char *path, time_t crtime);
+time_t vfs_get_create_time(const char *path, STRUCT_STAT *stp);
+int vfs_SetFileTime(const char *path, time_t crtime);
+int vfs_utimensat(const char *path, STRUCT_STAT *stp);
+int vfs_utimensat_at(const char *path, STRUCT_STAT *stp);
+int vfs_utimensat_atfd(int dfd, const char *name, STRUCT_STAT *stp);
+int vfs_lutimes(const char *path, STRUCT_STAT *stp);
+int vfs_utimes(const char *path, STRUCT_STAT *stp);
+int vfs_utime(const char *path, STRUCT_STAT *stp);
+
 #endif /* RSYNC_VFS_H */
