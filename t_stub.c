@@ -25,6 +25,7 @@ int do_fsync = 0;
 int inplace = 0;
 int am_daemon = 0;
 int am_chrooted = 0;
+int insecure_links = 0;
 int modify_window = 0;
 int preallocate_files = 0;
 int protect_args = 0;
@@ -100,7 +101,12 @@ filter_rule_list daemon_filter_list;
 	return NULL;
 }
 
- BOOL lp_use_chroot(UNUSED(int mod))
+ BOOL lp_insecure_links(UNUSED(int mod))
+{
+	return 0;
+}
+
+BOOL lp_use_chroot(UNUSED(int mod))
 {
 	return 0;
 }
