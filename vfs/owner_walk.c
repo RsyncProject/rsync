@@ -66,7 +66,7 @@ static int abspath_step(char *abspath, size_t cap, const char *comp, size_t comp
 /* Core walk.  When out_abs is non-NULL and the path resolves to a directory
  * (O_DIRECTORY), the resolved absolute path is copied there -- vfs_owner_walk_parent
  * uses it to filter-check the (otherwise unchecked) leaf basename. */
-static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, size_t out_cap)
+static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, size_t out_cap, int is_operator)
 {
 #if defined AT_FDCWD && defined O_NOFOLLOW
 	/* O_CLOEXEC predates some still-supported targets; mirror rand_bytes()'s
@@ -149,7 +149,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 					saved_errno = errno;
 					goto out;
 				}
-				if (abspath_excluded_by_module(abspath, 0)) {
+				if (abspath_excluded_by_module(abspath, 0, is_operator)) {
 					saved_errno = ELOOP;
 					goto out;
 				}
@@ -219,7 +219,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 				saved_errno = errno;
 				goto out;
 			}
-			if (abspath_excluded_by_module(abspath, S_ISDIR(lst.st_mode))) {
+			if (abspath_excluded_by_module(abspath, S_ISDIR(lst.st_mode), is_operator)) {
 				saved_errno = ELOOP;
 				goto out;
 			}
@@ -243,7 +243,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 			saved_errno = errno;
 			goto out;
 		}
-		if (abspath_excluded_by_module(abspath, 1)) {
+		if (abspath_excluded_by_module(abspath, 1, is_operator)) {
 			saved_errno = ELOOP;
 			goto out;
 		}
@@ -294,7 +294,7 @@ out:
 
 int vfs_open_owner_walk(const char *path, int flags, mode_t mode)
 {
-	return ona_open(path, flags, mode, NULL, 0);
+	return ona_open(path, flags, mode, NULL, 0, vfs.operator_path_resolve);
 }
 
 /* When set, the do_*_at() wrappers resolve their path as an OPERATOR-supplied
@@ -317,11 +317,12 @@ int vfs_owner_walk_parent(const char *path, const char **bname)
 	char dir[MAXPATHLEN], pabs[MAXPATHLEN];
 	size_t dlen;
 	int dfd;
+	int is_operator = vfs.operator_path_resolve;
 
 	*bname = slash ? slash + 1 : path;
 	pabs[0] = '\0';
 	if (!slash)
-		dfd = ona_open(".", O_RDONLY | O_DIRECTORY, 0, pabs, sizeof pabs);
+		dfd = ona_open(".", O_RDONLY | O_DIRECTORY, 0, pabs, sizeof pabs, is_operator);
 	else {
 		dlen = slash == path ? 1 : (size_t)(slash - path); /* "/x" -> parent "/" */
 		if (dlen >= sizeof dir) {
@@ -330,7 +331,7 @@ int vfs_owner_walk_parent(const char *path, const char **bname)
 		}
 		memcpy(dir, path, dlen);
 		dir[dlen] = '\0';
-		dfd = ona_open(dir, O_RDONLY | O_DIRECTORY, 0, pabs, sizeof pabs);
+		dfd = ona_open(dir, O_RDONLY | O_DIRECTORY, 0, pabs, sizeof pabs, is_operator);
 	}
 	if (dfd < 0)
 		return -1;
@@ -353,8 +354,8 @@ int vfs_owner_walk_parent(const char *path, const char **bname)
 		}
 		/* For an absent leaf the op may create a dir, so also test dir-only
 		 * filter rules (a "/foo/" rule never matches a file). */
-		refuse = abspath_excluded_by_module(leafabs, isdir)
-		      || (absent && abspath_excluded_by_module(leafabs, 1));
+		refuse = abspath_excluded_by_module(leafabs, isdir, is_operator)
+		      || (absent && abspath_excluded_by_module(leafabs, 1, is_operator));
 		if (refuse) {
 			close(dfd);
 			errno = ELOOP;

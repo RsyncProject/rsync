@@ -43,7 +43,7 @@ int path_has_dotdot_component(const char *path)
 
 /* Refuse (return 1) when the ABSOLUTE resolved path `abspath` lands OUTSIDE the
  * serving module's root, for an operator/peer-supplied path that must stay in the
- * module (--partial-dir/--backup-dir/alt-basis: vfs.operator_path_resolve).  An
+ * module (--partial-dir/--backup-dir/alt-basis: is_operator).  An
  * in-tree symlink owned by uid 0 / the euid is followed by design, so it can
  * redirect the resolved target outside the module; this catches that escape.
  *
@@ -52,7 +52,7 @@ int path_has_dotdot_component(const char *path)
  * name is not excluded may still resolve into an excluded IN-module subtree,
  * exactly as in stock rsync.  The defense for a writable module is `munge
  * symlinks` (see rsyncd.conf(5)), not this walk.  No-op unless we're a daemon. */
-int abspath_excluded_by_module(const char *abspath, int name_is_dir)
+int abspath_excluded_by_module(const char *abspath, int name_is_dir, int is_operator)
 {
 	(void)name_is_dir;
 	if (!am_daemon || !abspath || !vfs.module_dir)
@@ -66,7 +66,7 @@ int abspath_excluded_by_module(const char *abspath, int name_is_dir)
 	 * root's ancestors ("/", "/home", ...) on the way down -- those are not
 	 * "outside", just not-yet-arrived, so allow them.  A path that has truly
 	 * DIVERGED from the module tree is outside: refuse it for an operator/peer
-	 * path that must stay in the module (vfs.operator_path_resolve); other daemon
+	 * path that must stay in the module (is_operator); other daemon
 	 * opens (--log-file, --*-from, lock/motd) may legitimately live elsewhere.
 	 * The --insecure-links / "insecure links = yes" opt-out short-circuits
 	 * before we get here. */
@@ -74,7 +74,7 @@ int abspath_excluded_by_module(const char *abspath, int name_is_dir)
 	if (alen == 0
 	 || (strncmp(abspath, vfs.module_dir, alen) == 0 && vfs.module_dir[alen] == '/'))
 		return 0;			/* ancestor of the module root: still descending */
-	return vfs.operator_path_resolve ? 1 : 0;
+	return is_operator ? 1 : 0;
 }
 
 #if defined(O_NOFOLLOW) && defined(O_DIRECTORY) && defined(AT_FDCWD)
@@ -202,7 +202,9 @@ int ds_descend(struct dirstack *ds, const char *part, int *hops)
 			return -1;
 		/* exclude-aware: refuse descending into a module-hidden dir (catches a
 		 * symlink that redirected the walk into an excluded subtree). */
-		if (abspath_excluded_by_module(ds->abspath, 1)) {
+		/* The strict resolver stays confined beneath the anchor (within the
+		 * module), so this never actually refuses; pass is_operator=0. */
+		if (abspath_excluded_by_module(ds->abspath, 1, 0)) {
 			errno = ELOOP;
 			return -1;
 		}

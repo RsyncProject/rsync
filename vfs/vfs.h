@@ -37,6 +37,13 @@
 /* Max held ancestor-dirfd cache depth (was DPC_MAXDEPTH in syscall.c). */
 #define VFS_DPC_MAXDEPTH 64
 
+/* Per-call flags for the unified vfs_* operations.  The default (0) is the
+ * secure, no-follow parent resolve used by the receiver; the flags are explicit
+ * opt-ins that each carry a security meaning the call site is asserting. */
+#define VFS_ALLOW_SYMLINK  (1<<0)  /* call site is known-safe to follow symlinks */
+#define VFS_OPERATOR_PATH  (1<<1)  /* operator-supplied path: ownership walk + module confinement */
+#define VFS_REMOVEDIR      (1<<2)  /* unlink op targets a directory (AT_REMOVEDIR) */
+
 /* The single global VFS state instance (defined in vfs/vfs.c).
  *
  * Only curr_dir/curr_dir_len/operator_path_resolve are read by mainline code;

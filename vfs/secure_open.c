@@ -130,7 +130,7 @@ static int secure_walk_at(int anchor_fd, const char *anchor_abspath,
 				char leafabs[MAXPATHLEN];
 				if (snprintf(leafabs, sizeof leafabs, "%s/%s", ds.abspath, part)
 				      < (int)sizeof leafabs
-				 && abspath_excluded_by_module(leafabs, 0)) {
+				 && abspath_excluded_by_module(leafabs, 0, 0)) {
 					errno = ELOOP;
 					goto cleanup;
 				}

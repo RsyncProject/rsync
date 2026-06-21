@@ -52,7 +52,7 @@ extern int module_id;
 
 /* Module-confinement helpers (pure logic, always compiled). */
 int path_has_dotdot_component(const char *path);
-int abspath_excluded_by_module(const char *abspath, int name_is_dir);
+int abspath_excluded_by_module(const char *abspath, int name_is_dir, int is_operator);
 
 #if defined(O_NOFOLLOW) && defined(O_DIRECTORY) && defined(AT_FDCWD)
 
