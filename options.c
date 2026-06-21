@@ -452,7 +452,10 @@ static void parse_output_words(struct output_struct *words, short *levels, const
 				len--;
 		}
 		lev = isDigit(str+len) ? atoi(str+len) : 1;
-		if (lev > MAX_OUT_LEVEL)
+		/* atoi() of an overflowing positive digit string can return a
+		 * negative int (LONG_MAX truncated on LP64); a negative lev
+		 * here later indexes counts[lev] in make_output_option(). */
+		if (lev > MAX_OUT_LEVEL || lev < 0)
 			lev = MAX_OUT_LEVEL;
 		if (len == 4 && strncasecmp(str, "help", 4) == 0) {
 			output_item_help(words);
@@ -2672,7 +2675,10 @@ void server_options(char **args, int *argc_p)
 	if (protect_args)
 		argstr[x++] = 's';
 
-	for (i = 0; i < verbose; i++)
+	/* `verbose` is unbounded (one increment per -v on our own command
+	 * line), so an uncapped loop walks past argstr[64].  Anything beyond
+	 * level ~5 is meaningless to the server anyway. */
+	for (i = 0; i < verbose && i < 9; i++)
 		argstr[x++] = 'v';
 
 	if (quiet && msgs2stderr)
