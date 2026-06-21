@@ -16,6 +16,12 @@
 #include "rsync.h"
 #include "ifuncs.h"
 #include "vfs/vfs_internal.h"
+#ifdef HAVE_SYS_ATTR_H
+#include <sys/attr.h>		/* for the macOS setattrlist() chmod path */
+#endif
+#ifdef __linux__
+#include <sys/syscall.h>	/* SYS_fchmodat2 raw-syscall wrapper */
+#endif
 
 #ifdef HAVE_CHMOD
 int vfs_chmod(const char *path, mode_t mode)
