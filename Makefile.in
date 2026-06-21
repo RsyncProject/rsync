@@ -55,7 +55,7 @@ OBJS3=progress.o pipe.o @MD5_ASM@ @ROLL_SIMD@ @ROLL_ASM@
 DAEMON_OBJ = params.o loadparm.o clientserver.o access.o connection.o authenticate.o
 popt_OBJS= popt/popt.o  popt/poptconfig.o \
 	popt/popthelp.o popt/poptparse.o popt/poptint.o
-VFS_OBJ=vfs/vfs.o vfs/dirstack.o vfs/secure_open.o vfs/owner_walk.o vfs/dircache.o vfs/stat.o vfs/rename.o vfs/unlink.o vfs/open.o vfs/chmod.o vfs/symlink.o vfs/link.o vfs/mkdir.o vfs/chown.o vfs/mknod.o vfs/times.o vfs/fileio.o vfs/make_path.o
+VFS_OBJ=vfs/vfs.o vfs/dirstack.o vfs/secure_open.o vfs/owner_walk.o vfs/dircache.o vfs/stat.o vfs/rename.o vfs/unlink.o vfs/open.o vfs/chmod.o vfs/symlink.o vfs/link.o vfs/mkdir.o vfs/chown.o vfs/mknod.o vfs/times.o vfs/fileio.o vfs/make_path.o vfs/copy_file.o vfs/robust.o
 OBJS=$(OBJS1) $(OBJS2) $(OBJS3) $(DAEMON_OBJ) $(LIBOBJ) @BUILD_ZLIB@ @BUILD_POPT@ libvfs.a
 
 TLS_OBJ = tls.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/permstring.o lib/sysxattrs.o @BUILD_POPT@ libvfs.a

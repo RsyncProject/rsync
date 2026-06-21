@@ -184,6 +184,10 @@ int vfs_SetFileTime(const char *path, time_t crtime);
  * primitives above.  The resolution policy travels as an explicit vfs_flags
  * argument (VFS_OPERATOR_PATH for operator-supplied paths, else 0). */
 int vfs_make_path(char *fname, int mkp_flags, int vfs_flags);
+int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode);
+int robust_unlink(const char *fname);
+int robust_rename(const char *from, const char *to, const char *partialptr,
+		  int mode, struct file_struct *file);
 int vfs_utimensat(const char *path, STRUCT_STAT *stp);
 int vfs_utimensat_at(const char *path, STRUCT_STAT *stp);
 int vfs_utimensat_atfd(int dfd, const char *name, STRUCT_STAT *stp);
