@@ -354,13 +354,13 @@ static int unlink_and_reopen(const char *dest, mode_t mode)
 		mode |= S_IWUSR;
 #endif
 	mode &= INITACCESSPERMS;
-	/* Use do_open_at so the create/truncate goes through a secure
+	/* Use vfs_open_at so the create/truncate goes through a secure
 	 * parent dirfd in the daemon-no-chroot deployment. Otherwise
 	 * an attacker could swap a parent component with a symlink in
 	 * the window between robust_unlink (which uses vfs_unlink_at,
 	 * already secure) and the create here, and redirect the new
 	 * file outside the module. */
-	if ((ofd = do_open_at(dest, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, mode)) < 0) {
+	if ((ofd = vfs_open_at(dest, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, mode)) < 0) {
 		int save_errno = errno;
 		rsyserr(FERROR_XFER, save_errno, "open %s", full_fname(dest));
 		errno = save_errno;
@@ -393,13 +393,13 @@ int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
 	 * vfs_resolve_open so a parent-symlink on the source path (e.g.
 	 * --copy-dest=cd where cd is a symlink to an outside directory) cannot
 	 * redirect the read to a file the attacker should not see.  Plain
-	 * do_open_nofollow only refuses a final-component symlink; parents are
+	 * vfs_open_nofollow only refuses a final-component symlink; parents are
 	 * still followed.  (An absolute source is operator-trusted -- e.g. an
-	 * absolutized basis dir -- and uses do_open_nofollow.) */
+	 * absolutized basis dir -- and uses vfs_open_nofollow.) */
 	if (vfs_relpath_active() && source && *source && source[0] != '/')
 		ifd = vfs_resolve_open(NULL, source, O_RDONLY | O_NOFOLLOW, 0);
 	else
-		ifd = do_open_nofollow(source, O_RDONLY);
+		ifd = vfs_open_nofollow(source, O_RDONLY);
 	if (ifd < 0) {
 		int save_errno = errno;
 		rsyserr(FERROR_XFER, errno, "open %s", full_fname(source));

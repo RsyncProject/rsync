@@ -1618,18 +1618,18 @@ static void create_pid_file(void)
 			dir = dirbuf;
 			base = slash + 1;
 		}
-		if ((pdfd = do_open(dir, O_RDONLY|O_DIRECTORY, 0)) < 0) {
+		if ((pdfd = vfs_open(dir, O_RDONLY|O_DIRECTORY, 0)) < 0) {
 			rsyserr(FLOG, errno, "failed to open pid-file directory \"%s\"", dir);
 			exit_cleanup(RERR_FILEIO);
 		}
 	}
 #define PID_LSTAT(stp) vfs_lstat_atfd(pdfd, base, stp)
 #define PID_UNLINK()   vfs_unlink_atfd(pdfd, base, 0)
-#define PID_OPEN()     do_open_atfd(pdfd, base, O_RDWR|O_CREAT, 0664)
+#define PID_OPEN()     vfs_open_atfd(pdfd, base, O_RDWR|O_CREAT, 0664)
 #else
 #define PID_LSTAT(stp) vfs_lstat(base, stp)
 #define PID_UNLINK()   unlink(base)
-#define PID_OPEN()     do_open(base, O_RDWR|O_CREAT|SAFE_NOFOLLOW, 0664)
+#define PID_OPEN()     vfs_open(base, O_RDWR|O_CREAT|SAFE_NOFOLLOW, 0664)
 #endif
 
 	/* These tests make sure that a temp-style lock dir is handled safely. */

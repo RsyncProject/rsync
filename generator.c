@@ -2224,7 +2224,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 	if (write_devices && IS_DEVICE(sx.st.st_mode) && sx.st.st_size == 0) {
 		/* This early open into fd skips the regular open below. */
-		if ((fd = do_open_nofollow(fnamecmp, O_RDONLY)) >= 0)
+		if ((fd = vfs_open_nofollow(fnamecmp, O_RDONLY)) >= 0)
 			real_sx.st.st_size = sx.st.st_size = get_device_size(fd, fnamecmp);
 	}
 
@@ -2309,7 +2309,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	}
 
 	/* open the file */
-	if (fd < 0 && (fd = do_open_checklinks(fnamecmp)) < 0) {
+	if (fd < 0 && (fd = vfs_open_checklinks(fnamecmp)) < 0) {
 		rsyserr(FERROR, errno, "failed to open %s, continuing",
 			full_fname(fnamecmp));
 	  pretend_missing:
@@ -2344,7 +2344,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			back_file = NULL;
 			goto cleanup;
 		}
-		if ((f_copy = do_open_at(backupptr, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, 0600)) < 0) {
+		if ((f_copy = vfs_open_at(backupptr, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, 0600)) < 0) {
 			vfs.operator_path_resolve = 0;
 			rsyserr(FERROR_XFER, errno, "open %s", full_fname(backupptr));
 			unmake_file(back_file);

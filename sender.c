@@ -620,7 +620,7 @@ void send_files(int f_in, int f_out)
 			 * yes", admin-only) -- or a non-daemon --insecure-links: legacy
 			 * unconfined open, restoring the pre-hardening content read
 			 * (re-opening the escape for that module; documented). */
-			fd = do_open_checklinks(fname);
+			fd = vfs_open_checklinks(fname);
 		} else if (vfs_relpath_active()) {
 			/* Open from module root to prevent TOCTOU race where
 			 * change_pathname's chdir follows a directory symlink.
@@ -672,7 +672,7 @@ void send_files(int f_in, int f_out)
 			} else
 				fd = sender_open_confined(NULL, fname, O_RDONLY);
 		} else {
-			fd = do_open_checklinks(fname);
+			fd = vfs_open_checklinks(fname);
 		}
 		if (fd == -1) {
 			if (errno == ENOENT) {

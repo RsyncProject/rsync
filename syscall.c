@@ -213,7 +213,7 @@ ssize_t do_readlink(const char *path, char *buf, size_t bufsiz)
 {
 	/* For --fake-super, we read the link from the file. */
 	if (am_root < 0) {
-		int fd = do_open_nofollow(path, O_RDONLY);
+		int fd = vfs_open_nofollow(path, O_RDONLY);
 		if (fd >= 0) {
 			int len = read(fd, buf, bufsiz);
 			close(fd);
@@ -717,105 +717,6 @@ int do_mknod_at(const char *pathname, mode_t mode, dev_t dev)
 }
 
 
-int do_open(const char *pathname, int flags, mode_t mode)
-{
-	RETURN_ERROR_IF_NULL(pathname);
-	if (flags != O_RDONLY) {
-		RETURN_ERROR_IF(dry_run, 0);
-		RETURN_ERROR_IF_RO_OR_LO;
-	}
-
-#ifdef O_NOATIME
-	if (open_noatime)
-		flags |= O_NOATIME;
-#endif
-
-	return open(pathname, flags | O_BINARY, mode);
-}
-
-/*
-  Symlink-race-safe variant of do_open() for receiver-side use. See
-  the comment on do_chmod_at() for the threat model. open() resolves
-  parent components, so a parent-symlink swap can redirect the open
-  to a file outside the module. This wrapper is defence-in-depth for
-  bare-path do_open() sites that callers know are otherwise
-  protected by secure parent-syscalls (e.g. generator.c's in-place
-  backup creation, where robust_unlink() rejects the symlinked
-  parent before this open is reached): if any of those upstream
-  protections is later removed or regresses, the open here still
-  refuses to escape the module.
-
-  Defence: open the parent of pathname under vfs_resolve_open()
-  and call openat() against the resulting dirfd with O_NOFOLLOW
-  (so the basename itself isn't followed if it happens to be a
-  pre-planted symlink, which is what we want for O_CREAT|O_EXCL).
-*/
-int do_open_at(const char *pathname, int flags, mode_t mode)
-{
-#ifdef AT_FDCWD
-	char dirpath[MAXPATHLEN];
-	const char *bname;
-	const char *slash;
-	int dfd, ret, e;
-	size_t dlen;
-
-	if (flags != O_RDONLY) {
-		RETURN_ERROR_IF(dry_run, 0);
-		RETURN_ERROR_IF_RO_OR_LO;
-	}
-
-#if defined O_NOFOLLOW && defined O_DIRECTORY
-	if (vfs.operator_path_resolve) {
-		if (vfs_symlink_optout_allowed())
-			return do_open(pathname, flags, mode);
-		dfd = vfs_owner_walk_parent(pathname, &bname);
-		if (dfd < 0)
-			return -1;
-		ret = openat(dfd, bname, flags | O_NOFOLLOW, mode);
-		e = errno;
-		close(dfd);
-		errno = e;
-		return ret;
-	}
-#endif
-
-	if (!vfs_relpath_active())
-		return do_open(pathname, flags, mode);
-
-	if (!pathname || !*pathname || *pathname == '/')
-		return do_open(pathname, flags, mode);
-
-	slash = strrchr(pathname, '/');
-	if (!slash)
-		return do_open(pathname, flags, mode);
-
-	dlen = slash - pathname;
-	if (dlen >= sizeof dirpath) {
-		errno = ENAMETOOLONG;
-		return -1;
-	}
-	memcpy(dirpath, pathname, dlen);
-	dirpath[dlen] = '\0';
-	bname = slash + 1;
-
-	dfd = vfs_resolve_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
-	if (dfd < 0)
-		return -1;
-
-#ifdef O_NOATIME
-	if (open_noatime)
-		flags |= O_NOATIME;
-#endif
-
-	ret = openat(dfd, bname, flags | O_NOFOLLOW | O_BINARY, mode);
-	e = errno;
-	close(dfd);
-	errno = e;
-	return ret;
-#else
-	return do_open(pathname, flags, mode);
-#endif
-}
 
 #ifdef HAVE_CHMOD
 int do_chmod(const char *path, mode_t mode)
@@ -1239,7 +1140,7 @@ int do_mkstemp(char *template, mode_t perms)
 #else
 	if (!mktemp(template))
 		return -1;
-	return do_open(template, O_RDWR|O_EXCL|O_CREAT, perms);
+	return vfs_open(template, O_RDWR|O_EXCL|O_CREAT, perms);
 #endif
 }
 
@@ -1634,56 +1535,6 @@ int do_punch_hole(int fd, OFF_T pos, OFF_T len)
 	return 0;
 }
 
-int do_open_nofollow(const char *pathname, int flags)
-{
-#ifndef O_NOFOLLOW
-	STRUCT_STAT f_st, l_st;
-#endif
-	int fd;
-
-	if (flags != O_RDONLY) {
-		RETURN_ERROR_IF(dry_run, 0);
-		RETURN_ERROR_IF_RO_OR_LO;
-#ifndef O_NOFOLLOW
-		/* This function doesn't support write attempts w/o O_NOFOLLOW. */
-		errno = EINVAL;
-		return -1;
-#endif
-	}
-
-#ifdef O_NOATIME
-	if (open_noatime)
-		flags |= O_NOATIME;
-#endif
-
-#ifdef O_NOFOLLOW
-	fd = open(pathname, flags|O_NOFOLLOW);
-#else
-	if (vfs_lstat(pathname, &l_st) < 0)
-		return -1;
-	if (S_ISLNK(l_st.st_mode)) {
-		errno = ELOOP;
-		return -1;
-	}
-	if ((fd = open(pathname, flags)) < 0)
-		return fd;
-	if (vfs_fstat(fd, &f_st) < 0) {
-	  close_and_return_error:
-		{
-			int save_errno = errno;
-			close(fd);
-			errno = save_errno;
-		}
-		return -1;
-	}
-	if (l_st.st_dev != f_st.st_dev || l_st.st_ino != f_st.st_ino) {
-		errno = EINVAL;
-		goto close_and_return_error;
-	}
-#endif
-
-	return fd;
-}
 
 /* The logical current directory (maintained by change_dir() in util1.c).
  * Defined here -- rather than in util1.c -- so the test helpers that link
@@ -1843,23 +1694,6 @@ int secure_mkstemp(char *template, mode_t perms, int operator_path)
 #endif
 }
 
-/*
-  varient of do_open/do_open_nofollow which does do_open() if the
-  copy_links or copy_unsafe_links options are set and does
-  do_open_nofollow() otherwise
-
-  This is used to prevent a race condition where an attacker could be
-  switching a file between being a symlink and being a normal file
-
-  The open is always done with O_RDONLY flags
- */
-int do_open_checklinks(const char *pathname)
-{
-	if (copy_links || copy_unsafe_links) {
-		return do_open(pathname, O_RDONLY, 0);
-	}
-	return do_open_nofollow(pathname, O_RDONLY);
-}
 
 
 
@@ -1982,24 +1816,6 @@ int do_utimensat_atfd(int dfd, const char *name, STRUCT_STAT *stp)
 }
 #endif
 
-int do_open_atfd(int dfd, const char *name, int flags, mode_t mode)
-{
-#ifdef AT_FDCWD
-	if (flags != O_RDONLY) {
-		RETURN_ERROR_IF(dry_run, 0);
-		RETURN_ERROR_IF_RO_OR_LO;
-	}
-#ifdef O_NOATIME
-	if (open_noatime)
-		flags |= O_NOATIME;
-#endif
-	return openat(dfd, name, flags | O_NOFOLLOW | O_BINARY, mode);
-#else
-	(void)dfd; (void)name; (void)flags; (void)mode;
-	errno = ENOSYS;
-	return -1;
-#endif
-}
 
 int do_symlink_atfd(const char *lnk, int dfd, const char *name)
 {

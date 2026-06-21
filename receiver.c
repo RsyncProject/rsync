@@ -140,9 +140,9 @@ static int secure_basis_open(const char *basedir, const char *relpath, int flags
 				errno = ENAMETOOLONG;
 				return -1;
 			}
-			return do_open(fullpath, flags, mode);
+			return vfs_open(fullpath, flags, mode);
 		}
-		return do_open(relpath, flags, mode);
+		return vfs_open(relpath, flags, mode);
 	}
 
 	if (!basedir && relpath && *relpath == '/') {
@@ -1052,7 +1052,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 				const char *slash;
 				assert(fnamecmp != NULL); /* set on every path above */
 				slash = strrchr(fnamecmp, '/');
-				fd1 = do_open_atfd(bdfd, slash ? slash + 1 : fnamecmp, O_RDONLY, 0);
+				fd1 = vfs_open_atfd(bdfd, slash ? slash + 1 : fnamecmp, O_RDONLY, 0);
 			} else {
 				/* A --partial-dir basis is an operator/peer path: resolve it with
 				 * the exclude-aware ownership walk so a symlinked partial-dir
@@ -1084,7 +1084,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 			if (fnamecmp != fname) {
 				fnamecmp = fname;
 				fnamecmp_type = FNAMECMP_FNAME;
-				fd1 = do_open_nofollow(fnamecmp, O_RDONLY);
+				fd1 = vfs_open_nofollow(fnamecmp, O_RDONLY);
 			}
 
 			if (fd1 == -1 && basis_dir[0]) {
@@ -1180,7 +1180,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 			if (vfs_relpath_active())
 				fd2 = secure_basis_open(NULL, fnametmp, O_WRONLY|O_CREAT, 0600);
 			else
-				fd2 = do_open(fnametmp, O_WRONLY|O_CREAT, 0600);
+				fd2 = vfs_open(fnametmp, O_WRONLY|O_CREAT, 0600);
 			vfs.operator_path_resolve = 0;
 #ifdef linux
 			if (fd2 == -1 && errno == EACCES) {
@@ -1188,7 +1188,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 				if (use_secure_symlinks)
 					fd2 = vfs_resolve_open(NULL, fnametmp, O_WRONLY, 0600);
 				else
-					fd2 = do_open(fnametmp, O_WRONLY, 0600);
+					fd2 = vfs_open(fnametmp, O_WRONLY, 0600);
 			}
 #endif
 			if (fd2 == -1 && errno == EACCES) {
@@ -1216,7 +1216,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 					if (use_secure_symlinks)
 						fd2 = vfs_resolve_open(NULL, fnametmp, O_WRONLY, 0600);
 					else
-						fd2 = do_open(fnametmp, O_WRONLY, 0600);
+						fd2 = vfs_open(fnametmp, O_WRONLY, 0600);
 				} else
 					errno = errno_save;
 			}

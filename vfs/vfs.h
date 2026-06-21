@@ -95,4 +95,11 @@ int vfs_unlink_atfd(int dfd, const char *name, int flags);
 int vfs_rmdir(const char *pathname);
 int vfs_rmdir_at(const char *pathname);
 
+/* open (vfs/open.c). */
+int vfs_open(const char *pathname, int flags, mode_t mode);
+int vfs_open_at(const char *pathname, int flags, mode_t mode);
+int vfs_open_atfd(int dfd, const char *name, int flags, mode_t mode);
+int vfs_open_nofollow(const char *pathname, int flags);
+int vfs_open_checklinks(const char *pathname);
+
 #endif /* RSYNC_VFS_H */
