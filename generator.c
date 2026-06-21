@@ -1453,21 +1453,12 @@ static int no_atfd_mknod_primitive(mode_t mode)
 static int gen_entry_mknod(const char *path, struct file_struct *file, mode_t mode, dev_t rdev)
 {
 	int dfd;
-	/* do_mknod_atfd can't create a socket (no portable bindat); fall back. */
+	/* vfs_mknod_atfd can't create a socket (no portable bindat); fall back. */
 	if (!S_ISSOCK(mode) && (dfd = vfs_cached_dirfd(path, file)) >= 0) {
 		const char *slash = strrchr(path, '/');
-		int ret = do_mknod_atfd(dfd, slash ? slash + 1 : path, mode, rdev);
-		/* Fall through to the unconfined path-based create only where this
-		 * build compiled no fd-relative primitive for this kind of node --
-		 * SECURITY.md's rule for a platform that cannot be secure at all.
-		 * Testing errno == ENOSYS is not that test: a live mknodat() or
-		 * mkfifoat() can return ENOSYS too (an unimplemented FUSE mknod,
-		 * or seccomp), which would drop confinement on a platform that
-		 * does have the secure primitive. */
-		if (ret == 0 || !no_atfd_mknod_primitive(mode))
-			return ret;
+		return vfs_mknod_atfd(dfd, slash ? slash + 1 : path, mode, rdev);
 	}
-	return do_mknod_at(path, mode, rdev);
+	return vfs_mknod_at(path, mode, rdev);
 }
 
 static int gen_entry_unlink(const char *path, struct file_struct *file)

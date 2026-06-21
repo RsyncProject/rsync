@@ -356,7 +356,7 @@ static int make_backup_inner(const char *fname, BOOL prefer_rename)
 	/* Check to see if this is a device file, or link */
 	if ((am_root && preserve_devices && IS_DEVICE(file->mode))
 	 || (preserve_specials && IS_SPECIAL(file->mode))) {
-		if (do_mknod_at(buf, file->mode, sx.st.st_rdev) < 0)
+		if (vfs_mknod_at(buf, file->mode, sx.st.st_rdev) < 0)
 			rsyserr(FERROR, errno, "mknod %s failed", full_fname(buf));
 		else if (DEBUG_GTE(BACKUP, 1))
 			rprintf(FINFO, "make_backup: DEVICE %s successful.\n", fname);

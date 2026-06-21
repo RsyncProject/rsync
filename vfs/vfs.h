@@ -136,4 +136,9 @@ int vfs_lchown(const char *path, uid_t owner, gid_t group);
 int vfs_lchown_at(const char *fname, uid_t owner, gid_t group);
 int vfs_lchown_atfd(int dfd, const char *name, uid_t owner, gid_t group);
 
+/* device/fifo/socket node creation (vfs/mknod.c). */
+int vfs_mknod(const char *pathname, mode_t mode, dev_t dev);
+int vfs_mknod_at(const char *pathname, mode_t mode, dev_t dev);
+int vfs_mknod_atfd(int dfd, const char *name, mode_t mode, dev_t dev);
+
 #endif /* RSYNC_VFS_H */
