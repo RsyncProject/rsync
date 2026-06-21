@@ -247,7 +247,7 @@ static inline int link_or_rename(const char *from, const char *to,
 			return 0;
 	}
 #endif
-	if (vfs_rename_at(from, to) == 0) {
+	if (vfs_rename_at(from, to, VFS_OPERATOR_PATH) == 0) {
 		if (stp->st_nlink > 1 && !S_ISDIR(stp->st_mode)) {
 			/* If someone has hard-linked the file into the backup
 			 * dir, rename() might return success but do nothing! */

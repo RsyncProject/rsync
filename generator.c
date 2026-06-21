@@ -1483,7 +1483,7 @@ static int gen_entry_rename(const char *opath, const char *npath, struct file_st
 		const char *ns = strrchr(npath, '/');
 		return vfs_rename_atfd(odfd, os ? os + 1 : opath, ndfd, ns ? ns + 1 : npath);
 	}
-	return vfs_rename_at(opath, npath);
+	return vfs_rename_at(opath, npath, 0);
 }
 
 #ifdef SUPPORT_XATTRS
@@ -2211,9 +2211,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			/* The --partial-dir basis is an operator/peer path: unlink it
 			 * through the exclude-aware ownership walk so a symlinked
 			 * partial-dir can't delete a file in an excluded subtree. */
-			vfs.operator_path_resolve = 1;
 			vfs_unlink(VFS_AT_FDCWD, partialptr, VFS_OPERATOR_PATH);
-			vfs.operator_path_resolve = 0;
 			handle_partial_dir(partialptr, PDIR_DELETE);
 		}
 		set_file_attrs(fname, file, &sx, NULL, maybe_ATTRS_REPORT | maybe_ATTRS_ACCURATE_TIME);

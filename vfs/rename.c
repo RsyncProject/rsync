@@ -39,7 +39,7 @@ int vfs_rename(const char *old_path, const char *new_path)
   Falls through to vfs_rename() in dry-run, non-daemon, chrooted and
   absolute-path cases, identical to the other do_*_at() wrappers.
 */
-int vfs_rename_at(const char *old_path, const char *new_path)
+int vfs_rename_at(const char *old_path, const char *new_path, int vfs_flags)
 {
 #ifdef AT_FDCWD
 	char old_dirpath[MAXPATHLEN], new_dirpath[MAXPATHLEN];
@@ -63,13 +63,13 @@ int vfs_rename_at(const char *old_path, const char *new_path)
 	/* Operator-supplied path (e.g. a --backup-dir destination or a --temp-dir
 	 * source): resolve each side's parent via the ownership walk (follow
 	 * uid0/euid symlinks, refuse others; absolute and relative alike). */
-	if (vfs.operator_path_resolve) {
+	if (vfs_flags & VFS_OPERATOR_PATH) {
 		if (vfs_symlink_optout_allowed())
 			return vfs_rename(old_path, new_path);
-		old_dfd = vfs_owner_walk_parent(old_path, &old_bname, vfs.operator_path_resolve);
+		old_dfd = vfs_owner_walk_parent(old_path, &old_bname, 1);
 		if (old_dfd < 0)
 			return -1;
-		new_dfd = vfs_owner_walk_parent(new_path, &new_bname, vfs.operator_path_resolve);
+		new_dfd = vfs_owner_walk_parent(new_path, &new_bname, 1);
 		if (new_dfd < 0) {
 			e = errno;
 			close(old_dfd);

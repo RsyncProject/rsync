@@ -687,9 +687,8 @@ static void handle_delayed_updates(char *local_name)
 			 * walk so a symlinked partial-dir can't move a file out of
 			 * an excluded subtree. */
 			int rret;
-			vfs.operator_path_resolve = 1;
-			rret = vfs_rename_at(partialptr, fname);
-			vfs.operator_path_resolve = 0;
+			/* operator-supplied --partial-dir: resolve via the ownership walk. */
+			rret = vfs_rename_at(partialptr, fname, VFS_OPERATOR_PATH);
 			if (rret < 0) {
 				rsyserr(FERROR_XFER, errno,
 					"rename failed for %s (from %s)",
@@ -1290,9 +1289,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 					/* Unlink the consumed --partial-dir basis through the
 					 * exclude-aware ownership walk (a symlinked partial-dir
 					 * must not delete a file in an excluded subtree). */
-					vfs.operator_path_resolve = 1;
 					vfs_unlink(VFS_AT_FDCWD, partialptr, VFS_OPERATOR_PATH);
-					vfs.operator_path_resolve = 0;
 				}
 				handle_partial_dir(partialptr, PDIR_DELETE);
 			}
