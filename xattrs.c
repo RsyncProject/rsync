@@ -919,7 +919,7 @@ void cache_tmp_xattr(struct file_struct *file, stat_x *sxp)
 		prior_xattr_count = rsync_xal_l.count;
 	ndx = find_matching_xattr(sxp->xattr);
 	if (ndx < 0)
-		rsync_xal_store(sxp->xattr); /* adds item to rsync_xal_l */
+		ndx = rsync_xal_store(sxp->xattr); /* adds item to rsync_xal_l */
 
 	F_XATTR(file) = ndx;
 }
@@ -1142,6 +1142,18 @@ int set_xattr(const char *fname, const struct file_struct *file, const char *fna
 		added_write_perm = 1;
 
 	ndx = F_XATTR(file);
+	if (ndx < 0) {
+		/* No cached xattr list for this file (e.g. the cache_tmp_xattr()
+		 * path on --backup); match the guards at the other F_XATTR()
+		 * consumers rather than indexing rsync_xal_l.items[-1]. */
+		if (added_write_perm) {
+			if (fd >= 0)
+				fchmod(fd, sxp->st.st_mode);
+			else
+				do_chmod_at(fname, sxp->st.st_mode);
+		}
+		return 0;
+	}
 	glst += ndx;
 	lst = &glst->xa_items;
 	int return_value = rsync_xal_set(fname, lst, fnamecmp, sxp, fd);
