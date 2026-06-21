@@ -71,75 +71,6 @@ struct create_time {
 
 
 
-int do_lchown(const char *path, uid_t owner, gid_t group)
-{
-	if (dry_run) return 0;
-	RETURN_ERROR_IF_RO_OR_LO;
-	RETURN_ERROR_IF_NULL(path);
-#ifndef HAVE_LCHOWN
-#define lchown chown
-#endif
-	return lchown(path, owner, group);
-}
-
-/*
-  Symlink-race-safe variant of do_lchown() for receiver-side use. See the
-  comment on vfs_chmod_at() for the threat model and design rationale.
-
-  Resolves the parent directory under vfs_resolve_open() and invokes
-  fchownat(..., AT_SYMLINK_NOFOLLOW) against that dirfd, so that an
-  attacker who substitutes a symlink into one of the parent components
-  cannot redirect the chown outside the receiver's confinement. The
-  AT_SYMLINK_NOFOLLOW flag matches lchown()'s "do not follow a final-
-  component symlink" semantics.
-
-  Falls through to do_lchown() in the dry-run / non-daemon / chrooted /
-  absolute-path / no-parent cases, identical to vfs_chmod_at().
-*/
-int do_lchown_at(const char *fname, uid_t owner, gid_t group)
-{
-#ifdef AT_FDCWD
-	char dirpath[MAXPATHLEN];
-	const char *bname;
-	const char *slash;
-	int dfd, ret, e;
-	size_t dlen;
-
-	if (dry_run) return 0;
-	RETURN_ERROR_IF_RO_OR_LO;
-
-	if (!vfs_relpath_active())
-		return do_lchown(fname, owner, group);
-
-	if (!fname || !*fname || *fname == '/')
-		return do_lchown(fname, owner, group);
-
-	slash = strrchr(fname, '/');
-	if (!slash)
-		return do_lchown(fname, owner, group);
-
-	dlen = slash - fname;
-	if (dlen >= sizeof dirpath) {
-		errno = ENAMETOOLONG;
-		return -1;
-	}
-	memcpy(dirpath, fname, dlen);
-	dirpath[dlen] = '\0';
-	bname = slash + 1;
-
-	dfd = vfs_resolve_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
-	if (dfd < 0)
-		return -1;
-
-	ret = fchownat(dfd, bname, owner, group, AT_SYMLINK_NOFOLLOW);
-	e = errno;
-	close(dfd);
-	errno = e;
-	return ret;
-#else
-	return do_lchown(fname, owner, group);
-#endif
-}
 
 int do_mknod(const char *pathname, mode_t mode, dev_t dev)
 {
@@ -780,18 +711,6 @@ int do_punch_hole(int fd, OFF_T pos, OFF_T len)
 
 
 
-int do_lchown_atfd(int dfd, const char *name, uid_t owner, gid_t group)
-{
-#ifdef AT_FDCWD
-	if (dry_run) return 0;
-	RETURN_ERROR_IF_RO_OR_LO;
-	return fchownat(dfd, name, owner, group, AT_SYMLINK_NOFOLLOW);
-#else
-	(void)dfd; (void)name; (void)owner; (void)group;
-	errno = ENOSYS;
-	return -1;
-#endif
-}
 
 /* Mode/owner on an already-open fd (no path, no symlink to follow): the
  * race-free way to set metadata on a cross-tree operator-path leaf that was

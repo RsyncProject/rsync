@@ -131,4 +131,9 @@ int vfs_mkstemp(char *template, mode_t perms);
 int vfs_mkstemp_atfd(int dfd, char *filename, mode_t perms);
 int vfs_secure_mkstemp(char *template, mode_t perms, int operator_path);
 
+/* lchown (vfs/chown.c). */
+int vfs_lchown(const char *path, uid_t owner, gid_t group);
+int vfs_lchown_at(const char *fname, uid_t owner, gid_t group);
+int vfs_lchown_atfd(int dfd, const char *name, uid_t owner, gid_t group);
+
 #endif /* RSYNC_VFS_H */

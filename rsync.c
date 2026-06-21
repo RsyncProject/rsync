@@ -676,10 +676,8 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		if (am_root >= 0) {
 			uid_t uid = change_uid ? (uid_t)F_OWNER(file) : sxp->st.st_uid;
 			gid_t gid = change_gid ? (gid_t)F_GROUP(file) : sxp->st.st_gid;
-			if ((op_leaf_fd >= 0 ? do_fchown(op_leaf_fd, uid, gid)
-			     : op_refuse ? (errno = ELOOP, -1)
-			     : dfd >= 0 ? do_lchown_atfd(dfd, leaf, uid, gid)
-					: do_lchown_at(fname, uid, gid)) != 0) {
+			if ((dfd >= 0 ? vfs_lchown_atfd(dfd, leaf, uid, gid)
+				      : vfs_lchown_at(fname, uid, gid)) != 0) {
 				/* We shouldn't have attempted to change uid
 				 * or gid unless have the privilege. */
 				rsyserr(FERROR_XFER, errno, "%s %s failed",
