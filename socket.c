@@ -58,6 +58,15 @@ static int establish_proxy_connection(int fd, char *host, int port, char *proxy_
 	char *authhdr, authbuf[PROXY_BUF_SIZE + 1];
 	int len;
 
+	/* Reject control bytes in the host so they can't be smuggled into the
+	 * HTTP CONNECT request line (CRLF header/request injection). */
+	for (cp = host; *cp; cp++) {
+		if ((unsigned char)*cp < 0x20 || (unsigned char)*cp == 0x7f) {
+			rprintf(FERROR, "invalid control character in proxy CONNECT host\n");
+			return -1;
+		}
+	}
+
 	if (proxy_user && proxy_pass) {
 		stringjoin(buffer, PROXY_BUF_SIZE,
 			 proxy_user, ":", proxy_pass, NULL);
