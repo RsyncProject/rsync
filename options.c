@@ -125,6 +125,7 @@ int connect_timeout = 0;
 int keep_partial = 0;
 int safe_symlinks = 0;
 int copy_unsafe_links = 0;
+int insecure_links = 0;
 int munge_symlinks = 0;
 int use_secure_symlinks = 0;
 int size_only = 0;
@@ -680,6 +681,8 @@ static struct poptOption long_options[] = {
   {"copy-links",      'L', POPT_ARG_NONE,   &copy_links, 0, 0, 0 },
   {"copy-unsafe-links",0,  POPT_ARG_NONE,   &copy_unsafe_links, 0, 0, 0 },
   {"safe-links",       0,  POPT_ARG_NONE,   &safe_symlinks, 0, 0, 0 },
+  {"insecure-links",   0,  POPT_ARG_VAL,    &insecure_links, 1, 0, 0 },
+  {"no-insecure-links",0,  POPT_ARG_VAL,    &insecure_links, 0, 0, 0 },
   {"munge-links",      0,  POPT_ARG_VAL,    &munge_symlinks, 1, 0, 0 },
   {"no-munge-links",   0,  POPT_ARG_VAL,    &munge_symlinks, 0, 0, 0 },
   {"copy-dirlinks",   'k', POPT_ARG_NONE,   &copy_dirlinks, 0, 0, 0 },
@@ -1004,6 +1007,11 @@ static void set_refuse_options(void)
 			parse_one_refuse_match(0, "iconv", list_end);
 #endif
 		parse_one_refuse_match(0, "log-file*", list_end);
+		/* A client must never disable the daemon's symlink confinement:
+		 * --insecure-links is a local-only flag, so the daemon hard-refuses it
+		 * (dropping the connection).  The daemon's own opt-out is the
+		 * "insecure links" module parameter, not this flag. */
+		parse_one_refuse_match(0, "insecure-links", list_end);
 	}
 
 #ifndef SUPPORT_ATIMES
@@ -2509,7 +2517,10 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 				if (check_filter(&daemon_filter_list, FLOG, dir, 0) < 0)
 					goto options_rejected;
 			}
-			filesfrom_fd = open(files_from, O_RDONLY|O_BINARY);
+			/* Operator-supplied path that may transit attacker-writable
+			 * parents; refuse symlinks not owned by uid 0 or our euid,
+			 * as for --exclude-from/--include-from/--filter in exclude.c. */
+			filesfrom_fd = open_no_attacker_symlinks(files_from, O_RDONLY|O_BINARY, 0);
 			if (filesfrom_fd < 0) {
 				snprintf(err_buf, sizeof err_buf,
 					"failed to open files-from file %s: %s\n",

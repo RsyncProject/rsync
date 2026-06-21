@@ -36,6 +36,7 @@ extern int csum_length;
 extern int append_mode;
 extern int copy_links;
 extern int copy_unsafe_links;
+extern int insecure_links;
 extern int copy_dirlinks;
 extern int open_noatime;
 extern int io_error;
@@ -436,7 +437,13 @@ void send_files(int f_in, int f_out)
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
-		if (use_secure_symlinks) {
+		if (symlink_optout_allowed()) {
+			/* Module opted out of symlink confinement ("insecure links =
+			 * yes", admin-only) -- or a non-daemon --insecure-links: legacy
+			 * unconfined open, restoring the pre-hardening content read
+			 * (re-opening the escape for that module; documented). */
+			fd = do_open_checklinks(fname);
+		} else if (use_secure_symlinks) {
 			/* Open from module root to prevent TOCTOU race where
 			 * change_pathname's chdir follows a directory symlink.
 			 * Reconstruct the full path relative to module_dir
@@ -458,11 +465,11 @@ void send_files(int f_in, int f_out)
 			relp = secure_path;
 			while (*relp == '/')
 				relp++;
-			if (copy_links || copy_unsafe_links || copy_dirlinks)
+			if (copy_links || copy_unsafe_links || copy_dirlinks || insecure_links)
 				fd = sender_open_copylinks_confined(module_dir, relp);
 			else
 				fd = secure_relative_open(module_dir, relp, O_RDONLY | O_NOFOLLOW, 0);
-		} else if (fname[0] != '/' && !copy_links && !copy_unsafe_links && !copy_dirlinks) {
+		} else if (fname[0] != '/' && !copy_links && !copy_unsafe_links && !copy_dirlinks && !insecure_links) {
 			/* Default symlink handling (no -L/--copy-unsafe-links/-k follow):
 			 * the scan recorded this as a regular file under a real-directory
 			 * parent.  Open it confined beneath the transfer root that

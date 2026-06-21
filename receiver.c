@@ -71,6 +71,7 @@ extern int fuzzy_basis;
 extern struct name_num_item *xfer_sum_nni;
 extern int xfer_sum_len;
 extern int use_secure_symlinks;
+extern int operator_path_resolve;
 
 static struct bitbag *delayed_bits = NULL;
 static int phase = 0, redoing = 0;
@@ -102,13 +103,36 @@ static int secure_basis_open(const char *basedir, const char *relpath, int flags
 	extern int am_daemon, am_chrooted;
 	extern unsigned int module_dirlen;
 
-	/* The confined resolver is only needed for the sanitizing daemon
-	 * (am_daemon && !am_chrooted, i.e. use_secure_symlinks).  Local /
-	 * remote-shell mode has no module boundary, and "use chroot = yes" makes
-	 * the kernel root the boundary, so there an alt-dest basis like
-	 * --link-dest=../01 must resolve against the cwd as a bare open did before
-	 * the hardening (confining it would reject the legitimate sibling "..",
-	 * #915). */
+	/* A peer-supplied --partial-dir basis/staging path (operator_path_resolve set
+	 * by recv_files) may be absolute (module_dir-prefixed on a non-chroot daemon)
+	 * and traverse a symlink the secure_relative_open path can't confine: resolve
+	 * it with the ownership walk, which follows a uid0/euid-owned symlink but
+	 * refuses a foreign one AND (via abspath_excluded_by_module) refuses a target
+	 * the module's exclude hides -- closing the partial-dir exclude bypass. */
+	if (operator_path_resolve) {
+		char fullpath[MAXPATHLEN];
+		const char *p = relpath;
+		if (basedir) {
+			if (pathjoin(fullpath, sizeof fullpath, basedir, relpath) >= sizeof fullpath) {
+				errno = ENAMETOOLONG;
+				return -1;
+			}
+			p = fullpath;
+		}
+		return open_no_attacker_symlinks(p, flags, mode);
+	}
+
+	/* The confined resolver is needed for the sanitizing daemon
+	 * (am_daemon && !am_chrooted) and for a /./ inner-module chroot
+	 * (am_chrooted && module_dirlen) -- in the latter the kernel chroot confines
+	 * only the outer path, so a peer-chosen alt-dest basis index (fnamecmp_type)
+	 * could otherwise reach an outside-inner-module file through a symlinked
+	 * parent.  Local / remote-shell mode has no module boundary, and a plain
+	 * "use chroot = yes" makes the kernel root the boundary, so there an alt-dest
+	 * basis like --link-dest=../01 must resolve against the cwd as a bare open did
+	 * before the hardening (confining it would reject the legitimate sibling
+	 * "..", #915).  The re-anchoring in secure_relative_open() covers the
+	 * in-module ".." climb for the inner-module case too. */
 	if (!am_daemon || (am_chrooted && !module_dirlen)) {
 		if (basedir) {
 			char fullpath[MAXPATHLEN];
@@ -275,11 +299,23 @@ int open_tmpfile(char *fnametmp, const char *fname, struct file_struct *file)
 	 * access to ensure that there is no race condition.  They will be
 	 * correctly updated after the right owner and group info is set.
 	 * (Thanks to snabb@epipe.fi for pointing this out.) */
-	/* When use_secure_symlinks is on (non-chroot daemon with munge_symlinks),
-	 * use secure_mkstemp to prevent symlink race attacks on parent directories. */
-	if (use_secure_symlinks)
-		fd = secure_mkstemp(fnametmp, (file->mode|added_perms) & INITACCESSPERMS);
-	else
+	/* For any non-chrooted receiver (secure_relpath_active()), create the
+	 * temp file securely so a parent-symlink race can't redirect it.  When
+	 * the temp lives in the entry's own dir (the common case, no --temp-dir)
+	 * use the cached held dir fd; otherwise fall back to secure_mkstemp.  An
+	 * operator-supplied --temp-dir (tmpdir) gets the ownership-walk resolver
+	 * (it may legitimately point outside the tree); the deep-entry-dir fallback,
+	 * when the held-dirfd cache declines, gets the strict transfer-path one. */
+	if (secure_relpath_active()) {
+		int dfd = held_dfd_for(fnametmp, file);
+		if (dfd >= 0) {
+			char *slash = strrchr(fnametmp, '/');
+			fd = do_mkstemp_atfd(dfd, slash ? slash + 1 : fnametmp,
+					     (file->mode|added_perms) & INITACCESSPERMS);
+		} else
+			fd = secure_mkstemp(fnametmp, (file->mode|added_perms) & INITACCESSPERMS,
+					    tmpdir != NULL);
+	} else
 		fd = do_mkstemp(fnametmp, (file->mode|added_perms) & INITACCESSPERMS);
 
 #if 0
@@ -400,6 +436,12 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 					i, big_num(offset));
 			}
 
+			if (offset + i > total_size) {
+				rprintf(FERROR, "received more data than file length %s [%s]\n",
+					big_num(total_size), who_am_i());
+				exit_cleanup(RERR_PROTOCOL);
+			}
+
 			stats.literal_data += i;
 			cleanup_got_literal = 1;
 
@@ -421,6 +463,12 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 		len = sum.blength;
 		if (i == (int)sum.count-1 && sum.remainder != 0)
 			len = sum.remainder;
+
+		if (offset + len > total_size) {
+			rprintf(FERROR, "received more data than file length %s [%s]\n",
+				big_num(total_size), who_am_i());
+			exit_cleanup(RERR_PROTOCOL);
+		}
 
 		stats.matched_data += len;
 
@@ -543,8 +591,15 @@ static void handle_delayed_updates(char *local_name)
 					partialptr, fname);
 			}
 			/* We don't use robust_rename() here because the
-			 * partial-dir must be on the same drive. */
-			if (do_rename_at(partialptr, fname) < 0) {
+			 * partial-dir must be on the same drive.  Resolve the
+			 * --partial-dir source through the exclude-aware ownership
+			 * walk so a symlinked partial-dir can't move a file out of
+			 * an excluded subtree. */
+			int rret;
+			operator_path_resolve = 1;
+			rret = do_rename_at(partialptr, fname);
+			operator_path_resolve = 0;
+			if (rret < 0) {
 				rsyserr(FERROR_XFER, errno,
 					"rename failed for %s (from %s)",
 					full_fname(fname), partialptr);
@@ -903,8 +958,16 @@ int recv_files(int f_in, int f_out, char *local_name)
 			if (!basedir && (bdfd = held_dfd_for(fnamecmp, file)) >= 0) {
 				const char *slash = strrchr(fnamecmp, '/');
 				fd1 = do_open_atfd(bdfd, slash ? slash + 1 : fnamecmp, O_RDONLY, 0);
-			} else
+			} else {
+				/* A --partial-dir basis is an operator/peer path: resolve it with
+				 * the exclude-aware ownership walk so a symlinked partial-dir
+				 * can't read (and feed back as delta) a file in an excluded
+				 * subtree. */
+				if (fnamecmp_type == FNAMECMP_PARTIAL_DIR)
+					operator_path_resolve = 1;
 				fd1 = secure_basis_open(basedir, fnamecmp, O_RDONLY, 0);
+				operator_path_resolve = 0;
+			}
 		}
 
 		if (fd1 == -1 && protocol_version < 29) {
@@ -994,10 +1057,16 @@ int recv_files(int f_in, int f_out, char *local_name)
 			 * use secure open to prevent symlink race attacks where an
 			 * attacker could switch a directory to a symlink between
 			 * path validation and file open. */
-			if (use_secure_symlinks)
+			/* one_inplace stages into the operator/peer --partial-dir path:
+			 * resolve it with the ownership walk (exclude-aware) so it can't be
+			 * redirected through a symlink into an excluded subtree. */
+			if (one_inplace)
+				operator_path_resolve = 1;
+			if (secure_relpath_active())
 				fd2 = secure_basis_open(NULL, fnametmp, O_WRONLY|O_CREAT, 0600);
 			else
 				fd2 = do_open(fnametmp, O_WRONLY|O_CREAT, 0600);
+			operator_path_resolve = 0;
 #ifdef linux
 			if (fd2 == -1 && errno == EACCES) {
 				/* Maybe the error was due to protected_regular setting? */
@@ -1055,8 +1124,14 @@ int recv_files(int f_in, int f_out, char *local_name)
 			if (!finish_transfer(fname, fnametmp, fnamecmp, partialptr, file, recv_ok, 1))
 				recv_ok = -1;
 			else if (fnamecmp == partialptr) {
-				if (!one_inplace)
+				if (!one_inplace) {
+					/* Unlink the consumed --partial-dir basis through the
+					 * exclude-aware ownership walk (a symlinked partial-dir
+					 * must not delete a file in an excluded subtree). */
+					operator_path_resolve = 1;
 					do_unlink_at(partialptr);
+					operator_path_resolve = 0;
+				}
 				handle_partial_dir(partialptr, PDIR_DELETE);
 			}
 		} else if (keep_partial && partialptr && (!one_inplace || delay_updates)) {

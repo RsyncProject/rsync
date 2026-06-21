@@ -29,6 +29,7 @@ extern int do_xfers;
 extern int stdout_format_has_i;
 extern int logfile_format_has_i;
 extern int am_root;
+extern int operator_path_resolve;
 extern int am_server;
 extern int am_daemon;
 extern int inc_recurse;
@@ -958,6 +959,31 @@ static int basis_link_stat(const char *path, STRUCT_STAT *stp)
 {
 	extern int am_chrooted;
 	extern unsigned int module_dirlen;
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+	/* The basis dir (--link-dest/--compare-dest/--copy-dest) is an operator-
+	 * supplied path.  For a non-daemon receiver, resolve it with the ownership
+	 * walk: a symlink component owned by uid 0 or the euid (the operator's own
+	 * basis dir, e.g. --link-dest=/var/backups) is followed, a foreign-owned one
+	 * is refused -- absolute and relative alike.  Refusing it makes the basis
+	 * look absent, so the file transfers normally instead of being read/linked/
+	 * skipped through an attacker's symlink.  --insecure-links restores legacy
+	 * following; a daemon keeps its stronger confinement (chroot / secure
+	 * resolver) below.  Only when am_root >= 0: link_stat_at() omits the
+	 * fake-super %stat xattr that link_stat() folds in, so --fake-super keeps
+	 * the plain path (a lower-severity, non-root basis lookup). */
+	if (!am_daemon && am_root >= 0 && !symlink_optout_allowed()) {
+		const char *leaf;
+		int dfd = owner_walk_parent(path, &leaf);
+		int r, e;
+		if (dfd < 0)
+			return -1;
+		r = link_stat_at(dfd, leaf, stp, 0);
+		e = errno;
+		close(dfd);
+		errno = e;
+		return r;
+	}
+#endif
 	if (am_daemon && am_chrooted && module_dirlen && path[0] != '/') {
 		const char *slash = strrchr(path, '/');
 		if (slash) {
@@ -1035,7 +1061,20 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 		}
 #ifdef SUPPORT_HARD_LINKS
 		if (alt_dest_type == LINK_DEST) {
-			if (!hard_link_one(file, fname, cmpbuf, 1))
+			/* For a NON-daemon receiver the basis dir is an operator path:
+			 * resolve the link source via the ownership walk so a foreign-owned
+			 * symlink raced in after the basis_link_stat() check is still
+			 * refused (matching basis_link_stat's !am_daemon gate).  A daemon
+			 * keeps its stronger module-anchored confinement (do_link_at's
+			 * secure_relpath_active path) -- the ownership walk would follow an
+			 * operator-owned symlink out of the module. */
+			int hlok, op = !am_daemon;
+			if (op)
+				operator_path_resolve = 1;
+			hlok = hard_link_one(file, fname, cmpbuf, 1);
+			if (op)
+				operator_path_resolve = 0;
+			if (!hlok)
 				goto try_a_copy;
 			if (atimes_ndx)
 				set_file_attrs(fname, file, sxp, NULL, 0);
@@ -1064,6 +1103,13 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 #ifdef SUPPORT_HARD_LINKS
 	  try_a_copy: /* Copy the file locally. */
 #endif
+		/* NB: the copy-dest basis read is deliberately NOT routed through the
+		 * ownership walk: copy_altdest_file()->copy_file() also opens the dest
+		 * and copies xattrs through a held O_NOFOLLOW fd, and forcing
+		 * operator_path_resolve across that re-opens the copy_xattrs parent-
+		 * symlink race (copy-xattrs-symlink-race).  basis_link_stat() already
+		 * refuses a foreign-owned basis symlink, closing the static escape; the
+		 * post-stat race on an absolute copy-dest basis is a documented residual. */
 		if (!dry_run && copy_altdest_file(cmpbuf, fname, file) < 0) {
 			if (find_exact_for_existing) /* Can get here via hard-link failure */
 				goto got_nothing_for_ya;
@@ -1933,7 +1979,12 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		;
 	else if (quick_check_ok(FT_REG, fnamecmp, file, &sx.st)) {
 		if (partialptr) {
+			/* The --partial-dir basis is an operator/peer path: unlink it
+			 * through the exclude-aware ownership walk so a symlinked
+			 * partial-dir can't delete a file in an excluded subtree. */
+			operator_path_resolve = 1;
 			do_unlink_at(partialptr);
+			operator_path_resolve = 0;
 			handle_partial_dir(partialptr, PDIR_DELETE);
 		}
 		set_file_attrs(fname, file, &sx, NULL, maybe_ATTRS_REPORT | maybe_ATTRS_ACCURATE_TIME);
@@ -1972,15 +2023,26 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 	if (read_batch || whole_file) {
 		if (inplace && make_backups > 0 && fnamecmp_type == FNAMECMP_FNAME) {
-			if (!(backupptr = get_backup_name(fname)))
+			/* The --backup-dir (backupptr) is an operator path; this in-place
+			 * backup bypasses make_backup(), so set operator_path_resolve here
+			 * too -- get_backup_name() (make_path) and copy_file() then resolve
+			 * it with the ownership walk instead of following any symlink. */
+			operator_path_resolve = 1;
+			if (!(backupptr = get_backup_name(fname))) {
+				operator_path_resolve = 0;
 				goto cleanup;
-			if (!(back_file = make_file(fname, NULL, NULL, 0, NO_FILTERS)))
+			}
+			if (!(back_file = make_file(fname, NULL, NULL, 0, NO_FILTERS))) {
+				operator_path_resolve = 0;
 				goto pretend_missing;
+			}
 			if (copy_file(fname, backupptr, -1, back_file->mode) < 0) {
+				operator_path_resolve = 0;
 				unmake_file(back_file);
 				back_file = NULL;
 				goto cleanup;
 			}
+			operator_path_resolve = 0;
 		}
 		goto notify_others;
 	}
@@ -2008,13 +2070,19 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	}
 
 	if (inplace && make_backups > 0 && fnamecmp_type == FNAMECMP_FNAME) {
+		/* Operator --backup-dir, bypassing make_backup(): resolve get_backup_name()
+		 * (make_path), the unlink and the create with the ownership walk. */
+		operator_path_resolve = 1;
 		if (!(backupptr = get_backup_name(fname))) {
+			operator_path_resolve = 0;
 			goto cleanup;
 		}
 		if (!(back_file = make_file(fname, NULL, NULL, 0, NO_FILTERS))) {
+			operator_path_resolve = 0;
 			goto pretend_missing;
 		}
 		if (robust_unlink(backupptr) && errno != ENOENT) {
+			operator_path_resolve = 0;
 			rsyserr(FERROR_XFER, errno, "unlink %s",
 				full_fname(backupptr));
 			unmake_file(back_file);
@@ -2022,11 +2090,13 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			goto cleanup;
 		}
 		if ((f_copy = do_open_at(backupptr, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, 0600)) < 0) {
+			operator_path_resolve = 0;
 			rsyserr(FERROR_XFER, errno, "open %s", full_fname(backupptr));
 			unmake_file(back_file);
 			back_file = NULL;
 			goto cleanup;
 		}
+		operator_path_resolve = 0;
 		fnamecmp_type = FNAMECMP_BACKUP;
 	}
 

@@ -32,7 +32,7 @@ int claim_connection(char *fname, int max_connections)
 
 	/* 'lock file = PATH': refuse symlinks not owned by uid 0 or our euid so
 	 * a planted parent can't redirect the root daemon's O_CREAT open. */
-	if ((fd = safe_open_no_attacker_symlinks(fname, O_RDWR|O_CREAT, 0600)) < 0)
+	if ((fd = open_no_attacker_symlinks(fname, O_RDWR|O_CREAT, 0600)) < 0)
 		return 0;
 
 	/* Find a free spot. */
