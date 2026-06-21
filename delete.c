@@ -133,7 +133,7 @@ static enum delret delete_dir_contents(char *fname, uint16 flags)
 	const char *save_del_prefix = del_dir_prefix;
 	int save_del_prefix_len = del_dir_prefix_len;
 	fname[dlen] = '\0';
-	del_dirfd = open_dir_secure(fname);
+	del_dirfd = vfs_opendir(fname);
 	fname[dlen] = '/';
 	del_dir_prefix = fname;
 	del_dir_prefix_len = dlen;

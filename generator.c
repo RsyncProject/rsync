@@ -1382,8 +1382,8 @@ static BOOL is_below(struct file_struct *file, struct file_struct *subtree)
 
 /* Held-dirfd helpers for the per-entry ops below: when the secure resolver is
  * active they act on the entry's basename relative to its cached directory fd
- * (held_dfd_for, keyed on file->dirname), else fall back to the full-path
- * do_*_at wrappers (behaviour-identical).  held_dfd_for() declines when fname
+ * (vfs_cached_dirfd, keyed on file->dirname), else fall back to the full-path
+ * do_*_at wrappers (behaviour-identical).  vfs_cached_dirfd() declines when fname
  * isn't in file->dirname (e.g. the single-file local_name dest), and the leaf
  * is derived from fname, not file->basename. */
 static int gen_entry_stat(const char *fname, struct file_struct *file,
@@ -1392,7 +1392,7 @@ static int gen_entry_stat(const char *fname, struct file_struct *file,
 	int dfd;
 	/* link_stat_at folds in no fake-super xattr, so only use it when
 	 * am_root >= 0 (where link_stat's get_stat_xattr is a no-op anyway). */
-	if (am_root >= 0 && (dfd = held_dfd_for(fname, file)) >= 0) {
+	if (am_root >= 0 && (dfd = vfs_cached_dirfd(fname, file)) >= 0) {
 		const char *slash = strrchr(fname, '/');
 		return link_stat_at(dfd, slash ? slash + 1 : fname, stp, follow_dirlinks);
 	}
@@ -1401,7 +1401,7 @@ static int gen_entry_stat(const char *fname, struct file_struct *file,
 
 static int gen_entry_mkdir(char *fname, struct file_struct *file, mode_t mode)
 {
-	int dfd = held_dfd_for(fname, file);
+	int dfd = vfs_cached_dirfd(fname, file);
 	if (dfd >= 0) {
 		const char *slash = strrchr(fname, '/');
 		return do_mkdir_atfd(dfd, slash ? slash + 1 : fname, mode);
@@ -1411,7 +1411,7 @@ static int gen_entry_mkdir(char *fname, struct file_struct *file, mode_t mode)
 
 static int gen_entry_chmod(const char *fname, struct file_struct *file, mode_t mode)
 {
-	int dfd = held_dfd_for(fname, file);
+	int dfd = vfs_cached_dirfd(fname, file);
 	if (dfd >= 0) {
 		const char *slash = strrchr(fname, '/');
 		return do_chmod_atfd(dfd, slash ? slash + 1 : fname, mode);
@@ -1421,7 +1421,7 @@ static int gen_entry_chmod(const char *fname, struct file_struct *file, mode_t m
 
 static void gen_entry_set_times(const char *fname, struct file_struct *file, STRUCT_STAT *stp)
 {
-	int dfd = held_dfd_for(fname, file);
+	int dfd = vfs_cached_dirfd(fname, file);
 	if (dfd >= 0) {
 		const char *slash = strrchr(fname, '/');
 		if (set_times_at(dfd, slash ? slash + 1 : fname, stp) != -2)
@@ -1432,7 +1432,7 @@ static void gen_entry_set_times(const char *fname, struct file_struct *file, STR
 
 static int gen_entry_symlink(const char *slnk, const char *path, struct file_struct *file)
 {
-	int dfd = held_dfd_for(path, file);
+	int dfd = vfs_cached_dirfd(path, file);
 	if (dfd >= 0) {
 		const char *slash = strrchr(path, '/');
 		return do_symlink_atfd(slnk, dfd, slash ? slash + 1 : path);
@@ -1472,7 +1472,7 @@ static int gen_entry_mknod(const char *path, struct file_struct *file, mode_t mo
 {
 	int dfd;
 	/* do_mknod_atfd can't create a socket (no portable bindat); fall back. */
-	if (!S_ISSOCK(mode) && (dfd = held_dfd_for(path, file)) >= 0) {
+	if (!S_ISSOCK(mode) && (dfd = vfs_cached_dirfd(path, file)) >= 0) {
 		const char *slash = strrchr(path, '/');
 		int ret = do_mknod_atfd(dfd, slash ? slash + 1 : path, mode, rdev);
 		/* Fall through to the unconfined path-based create only where this
@@ -1490,7 +1490,7 @@ static int gen_entry_mknod(const char *path, struct file_struct *file, mode_t mo
 
 static int gen_entry_unlink(const char *path, struct file_struct *file)
 {
-	int dfd = held_dfd_for(path, file);
+	int dfd = vfs_cached_dirfd(path, file);
 	if (dfd >= 0) {
 		const char *slash = strrchr(path, '/');
 		return do_unlink_atfd(dfd, slash ? slash + 1 : path, 0);
@@ -1503,8 +1503,8 @@ static int gen_entry_unlink(const char *path, struct file_struct *file)
  * single renameat() within it, else fall back to the full-path wrapper. */
 static int gen_entry_rename(const char *opath, const char *npath, struct file_struct *file)
 {
-	int odfd = held_dfd_for(opath, file);
-	int ndfd = held_dfd_for(npath, file);
+	int odfd = vfs_cached_dirfd(opath, file);
+	int ndfd = vfs_cached_dirfd(npath, file);
 	if (odfd >= 0 && ndfd >= 0) {
 		const char *os = strrchr(opath, '/');
 		const char *ns = strrchr(npath, '/');
@@ -1522,8 +1522,8 @@ static int gen_entry_rename(const char *opath, const char *npath, struct file_st
  * set_file_attrs' held-fd handling). */
 static int gen_entry_copy_xattrs(const char *src, const char *fname, struct file_struct *file)
 {
-	int dfd = held_dfd_for(fname, file);
-	int xfd = -1, sfd = -1, ret;
+	int dfd = vfs_cached_dirfd(fname, file);
+	int xfd = -1, ret;
 	if (dfd >= 0) {
 		const char *slash = strrchr(fname, '/');
 		xfd = openat(dfd, slash ? slash + 1 : fname,
@@ -1873,7 +1873,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		if (real_ret != 0 && gen_entry_mkdir(fname, file, file->mode|added_perms) < 0 && errno != EEXIST) {
 			/* The parent may have just been created by make_path(), so
 			 * drop any cached (failed) dir fd before the retry. */
-			reset_dir_fd_cache();
+			vfs_dircache_reset();
 			if (!relative_paths || errno != ENOENT
 			 || make_path(fname, MKP_DROP_NAME | MKP_SKIP_SLASH) < 0
 			 || (gen_entry_mkdir(fname, file, file->mode|added_perms) < 0 && errno != EEXIST)) {

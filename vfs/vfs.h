@@ -67,4 +67,11 @@ int vfs_resolve_open_at(int anchor_fd, const char *relpath, int flags, mode_t mo
 int vfs_open_owner_walk(const char *path, int flags, mode_t mode);
 int vfs_owner_walk_parent(const char *path, const char **bname);
 
+/* Held ancestor-dirfd cache for directory traversal (vfs/dircache.c). */
+int vfs_opendir(const char *dirname);
+int vfs_get_dirfd(const char *dirname);
+int vfs_path_dirfd(const char *anchor, const char *dirpath);
+int vfs_cached_dirfd(const char *path, const struct file_struct *file);
+void vfs_dircache_reset(void);
+
 #endif /* RSYNC_VFS_H */

@@ -526,7 +526,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		/* Stat through the entry's held dir fd (like gen_entry_stat) so we
 		 * don't re-walk the full path here; link_stat_at folds in no
 		 * fake-super xattr, so only when am_root >= 0. */
-		if (am_root >= 0 && (sdfd = held_dfd_for(fname, file)) >= 0) {
+		if (am_root >= 0 && (sdfd = vfs_cached_dirfd(fname, file)) >= 0) {
 			const char *sl = strrchr(fname, '/');
 			sret = link_stat_at(sdfd, sl ? sl + 1 : fname, &sx2.st, 0);
 		} else
@@ -546,7 +546,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	 * issue single-component *at() calls against it instead of re-resolving
 	 * the full path each time.  -1 => fall back to the full-path wrappers
 	 * (cross-tree path such as --temp-dir/--backup-dir, or gated off). */
-	dfd = held_dfd_for(fname, file);
+	dfd = vfs_cached_dirfd(fname, file);
 	if (dfd >= 0) {
 		const char *slash = strrchr(fname, '/');
 		leaf = slash ? slash + 1 : fname;

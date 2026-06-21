@@ -426,7 +426,7 @@ int open_tmpfile(char *fnametmp, const char *fname, struct file_struct *file)
 	 * (it may legitimately point outside the tree); the deep-entry-dir fallback,
 	 * when the held-dirfd cache declines, gets the strict transfer-path one. */
 	if (vfs_relpath_active()) {
-		int dfd = held_dfd_for(fnametmp, file);
+		int dfd = vfs_cached_dirfd(fnametmp, file);
 		if (dfd >= 0) {
 			char *slash = strrchr(fnametmp, '/');
 			fd = do_mkstemp_atfd(dfd, slash ? slash + 1 : fnametmp,
@@ -1064,12 +1064,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 		 * trusted absolute fnamecmp (e.g. an absolute --partial-dir basis). */
 		{
 			int bdfd;
-			if (fnamecmp_type == FNAMECMP_PARTIAL_DIR
-			 && fnamecmp && *fnamecmp != '/') {
-				/* The relative partial path contains peer-derived directory
-				 * components.  It is not an operator-trusted path as a whole. */
-				fd1 = secure_relative_open(NULL, fnamecmp, O_RDONLY, 0);
-			} else if (!basedir && (bdfd = held_dfd_for(fnamecmp, file)) >= 0) {
+			if (!basedir && (bdfd = vfs_cached_dirfd(fnamecmp, file)) >= 0) {
 				const char *slash;
 				assert(fnamecmp != NULL); /* set on every path above */
 				slash = strrchr(fnamecmp, '/');

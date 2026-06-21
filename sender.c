@@ -108,35 +108,13 @@ static int secure_sender_parent_fd(struct file_struct *file, const char *fname, 
 			}
 			memcpy(dir, fname, dlen);
 			dir[dlen] = '\0';
-			/* An absolute --relative name is still rooted at / after
-			 * change_pathname().  Resolving its parent through the cwd-backed
-			 * dirfd cache would re-anchor cleanup at the sender's working
-			 * directory and can remove a same-named, unrelated entry there. */
-			if (*fname == '/') {
-				const char *rel = dir;
-#ifdef __CYGWIN__
-				/* clean_fname() keeps exactly two leading slashes here,
-				 * because //server/share is a separate UNC namespace.
-				 * Stripping them and anchoring at "/" would resolve a
-				 * different object entirely, so decline (errno 0) and let
-				 * the caller fall back to the path-based cleanup. */
-				if (fname[1] == '/' && fname[2] != '/') {
-					errno = 0;
-					return -1;
-				}
-#endif
-				while (*rel == '/')
-					rel++;
-				return secure_relative_open("/", rel,
-					O_RDONLY | O_DIRECTORY, 0);
-			}
-			/* held_dir_path_fd returns a cache-OWNED fd; the caller closes
+			/* vfs_path_dirfd returns a cache-OWNED fd; the caller closes
 			 * what we return, so hand back an owned dup and leave the cache's
 			 * dirfd intact.  An uncacheable (very deep) dir declines with
 			 * errno 0 -- fall back to the full confined walk (an owned fd,
 			 * matching the sender's content open) so deep paths stay confined
 			 * too; a real error propagates. */
-			dfd = held_dir_path_fd(NULL, dir);
+			dfd = vfs_path_dirfd(NULL, dir);
 			if (dfd >= 0)
 				return dup(dfd);
 			if (errno != 0)
@@ -205,10 +183,10 @@ static int secure_remove_source_file(int dfd, const char *bname)
 
 /* Open `relpath` (relative to `anchor`: NULL=cwd, else an absolute trusted root)
  * with `flags`, opening the leaf via the shared held ancestor-dirfd stack
- * (held_dir_path_fd) so a directory is walked once, not once per file.  The leaf
+ * (vfs_path_dirfd) so a directory is walked once, not once per file.  The leaf
  * semantics are identical to vfs_resolve_open() -- it always O_NOFOLLOWs a
  * file leaf and folds in O_NOATIME, both preserved here.  An uncacheable path
- * (held_dir_path_fd returns -1) falls back to the full confined walk. */
+ * (vfs_path_dirfd returns -1) falls back to the full confined walk. */
 static int sender_open_confined(const char *anchor, const char *relpath, int flags)
 {
 #ifdef AT_FDCWD
@@ -237,7 +215,7 @@ static int sender_open_confined(const char *anchor, const char *relpath, int fla
 	if (open_noatime)
 		flags |= O_NOATIME;
 #endif
-	dfd = held_dir_path_fd(anchor, dir);
+	dfd = vfs_path_dirfd(anchor, dir);
 	if (dfd < 0)
 		return vfs_resolve_open(anchor, relpath, flags | O_NOFOLLOW, 0);
 	return openat(dfd, bname, flags | O_NOFOLLOW, 0);

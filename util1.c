@@ -582,8 +582,8 @@ int robust_rename(const char *from, const char *to, const char *partialptr,
 	while (tries--) {
 		/* tmp -> final usually live in the entry's own dir: rename via the
 		 * held dir fd when both do, else the full-path wrapper. */
-		int ofd = held_dfd_for(from, file);
-		int nfd = held_dfd_for(to, file);
+		int ofd = vfs_cached_dirfd(from, file);
+		int nfd = vfs_cached_dirfd(to, file);
 		int rr;
 		if (ofd >= 0 && nfd >= 0) {
 			const char *os = strrchr(from, '/');
@@ -1368,7 +1368,7 @@ int change_dir(const char *dir, int set_path_only)
 	}
 
 	if (!set_path_only)	/* a real chdir invalidates the cwd-relative dir-fd stack */
-		reset_dir_fd_cache();
+		vfs_dircache_reset();
 
 	if (DEBUG_GTE(CHDIR, 1) && !set_path_only)
 		rprintf(FINFO, "[%s] change_dir(%s)\n", who_am_i(), curr_dir);
