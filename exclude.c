@@ -136,8 +136,6 @@ static void filter_rule_err(const char *msg, const char *rulestr)
 	exit_cleanup(RERR_SYNTAX);
 }
 
-extern char curr_dir[MAXPATHLEN];
-extern unsigned int curr_dir_len;
 extern unsigned int module_dirlen;
 
 filter_rule_list filter_list = { .debug_type = "" };
@@ -155,7 +153,7 @@ int trust_sender_filter = 0;
 #define SLASH_WILD3_SUFFIX "/***"
 
 /* The dirbuf is set by push_local_filters() to the current subdirectory
- * relative to curr_dir that is being processed.  The path always has a
+ * relative to vfs.curr_dir that is being processed.  The path always has a
  * trailing slash appended, and the variable dirbuf_len contains the length
  * of this path prefix.  The path is always absolute. */
 static char dirbuf[MAXPATHLEN+1];
@@ -757,9 +755,9 @@ void set_filter_dir(const char *dir, unsigned int dirlen)
 {
 	unsigned int len;
 	if (*dir != '/') {
-		memcpy(dirbuf, curr_dir, curr_dir_len);
-		dirbuf[curr_dir_len] = '/';
-		len = curr_dir_len + 1;
+		memcpy(dirbuf, vfs.curr_dir, vfs.curr_dir_len);
+		dirbuf[vfs.curr_dir_len] = '/';
+		len = vfs.curr_dir_len + 1;
 		if (len + dirlen >= MAXPATHLEN)
 			dirlen = 0;
 	} else
@@ -853,7 +851,7 @@ struct local_filter_state {
 
 /* Each time rsync changes to a new directory it call this function to
  * handle all the per-dir merge-files.  The "dir" value is the current path
- * relative to curr_dir (which might not be null-terminated).  We copy it
+ * relative to vfs.curr_dir (which might not be null-terminated).  We copy it
  * into dirbuf so that we can easily append a file name on the end. */
 void *push_local_filters(const char *dir, unsigned int dirlen)
 {
@@ -1020,10 +1018,10 @@ static int rule_matches(const char *fname, filter_rule *ex, int name_flags)
 		if ((p = strrchr(name,'/')) != NULL)
 			name = p+1;
 	} else if (ex->rflags & FILTRULE_ABS_PATH && *fname != '/'
-	    && curr_dir_len > module_dirlen + 1) {
+	    && vfs.curr_dir_len > module_dirlen + 1) {
 		/* If we're matching against an absolute-path pattern,
 		 * we need to prepend our full path info. */
-		strings[str_cnt++] = curr_dir + module_dirlen + 1;
+		strings[str_cnt++] = vfs.curr_dir + module_dirlen + 1;
 		strings[str_cnt++] = "/";
 	} else if (ex->rflags & FILTRULE_WILD2_PREFIX && *fname != '/') {
 		/* Allow "**"+"/" to match at the start of the string. */

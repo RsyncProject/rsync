@@ -70,7 +70,6 @@ extern int protect_args;
 extern int relative_paths;
 extern int sanitize_paths;
 extern int curr_dir_depth;
-extern unsigned int curr_dir_len;
 extern int module_id;
 extern int rsync_port;
 extern int whole_file;
@@ -106,7 +105,6 @@ extern char *password_file;
 extern char *backup_dir;
 extern char *copy_as;
 extern char *tmpdir;
-extern char curr_dir[MAXPATHLEN];
 extern char backup_dir_buf[MAXPATHLEN];
 extern char *basis_dir[MAX_BASIS_DIRS+1];
 extern struct file_list *first_flist;
@@ -862,12 +860,12 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 /* This function checks on our alternate-basis directories.  If we're in
  * dry-run mode and the destination dir does not yet exist, we'll try to
  * tweak any dest-relative paths to make them work for a dry-run (the
- * destination dir must be in curr_dir[] when this function is called).
+ * destination dir must be in vfs.curr_dir[] when this function is called).
  * We also warn about any arg that is non-existent or not a directory. */
 static void check_alt_basis_dirs(void)
 {
 	STRUCT_STAT st;
-	char *slash = strrchr(curr_dir, '/');
+	char *slash = strrchr(vfs.curr_dir, '/');
 	int j;
 
 	for (j = 0; j < basis_dir_cnt; j++) {
@@ -877,13 +875,13 @@ static void check_alt_basis_dirs(void)
 		if (bd_len > 1 && bdir[bd_len-1] == '/')
 			bdir[--bd_len] = '\0';
 		/* Make a relative --link-dest/--copy-dest/--compare-dest absolute
-		 * (vs the destination curr_dir).  These are operator-trusted roots, so
+		 * (vs the destination vfs.curr_dir).  These are operator-trusted roots, so
 		 * an absolute path makes the do_*_at() wrappers use plain resolution
 		 * rather than reject an operator '..' outside the dest tree (e.g.
 		 * --copy-dest=../to).  Skipped when sanitize_paths already confined
 		 * them; the dry_run>1 case keeps its leading-"../"-strip. */
 		if (*bdir != '/' && (dry_run > 1 || !sanitize_paths)) {
-			int len = curr_dir_len + 1 + bd_len + 1;
+			int len = vfs.curr_dir_len + 1 + bd_len + 1;
 			char *new = new_array(char, len);
 			if (dry_run > 1 && slash && strncmp(bdir, "../", 3) == 0) {
 				/* We want to remove only one leading "../" prefix for
@@ -891,10 +889,10 @@ static void check_alt_basis_dirs(void)
 				 * this ensures that any other ".." references get
 				 * evaluated the same as they would for a live copy. */
 				*slash = '\0';
-				pathjoin(new, len, curr_dir, bdir + 3);
+				pathjoin(new, len, vfs.curr_dir, bdir + 3);
 				*slash = '/';
 			} else
-				pathjoin(new, len, curr_dir, bdir);
+				pathjoin(new, len, vfs.curr_dir, bdir);
 			basis_dir[j] = bdir = new;
 		}
 		if (do_stat(bdir, &st) < 0)

@@ -42,8 +42,6 @@ extern filter_rule_list daemon_filter_list;
 
 int sanitize_paths = 0;
 
-extern char curr_dir[MAXPATHLEN];   /* defined in syscall.c */
-extern unsigned int curr_dir_len;
 int curr_dir_depth; /* This is only set for a sanitizing daemon. */
 
 /* Set a fd into nonblocking mode. */
@@ -1187,7 +1185,7 @@ char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth, i
 }
 
 /* Like chdir(), but it keeps track of the current directory (in the
- * global "curr_dir"), and ensures that the path size doesn't overflow.
+ * global "vfs.curr_dir"), and ensures that the path size doesn't overflow.
  * Also cleans the path using the clean_fname() function. */
 int change_dir(const char *dir, int set_path_only)
 {
@@ -1197,11 +1195,11 @@ int change_dir(const char *dir, int set_path_only)
 
 	if (!initialised) {
 		initialised = 1;
-		if (getcwd(curr_dir, sizeof curr_dir - 1) == NULL) {
+		if (getcwd(vfs.curr_dir, sizeof vfs.curr_dir - 1) == NULL) {
 			rsyserr(FERROR, errno, "getcwd()");
 			exit_cleanup(RERR_FILESELECT);
 		}
-		curr_dir_len = strlen(curr_dir);
+		vfs.curr_dir_len = strlen(vfs.curr_dir);
 	}
 
 	if (!dir)	/* this call was probably just to initialize */
@@ -1212,7 +1210,7 @@ int change_dir(const char *dir, int set_path_only)
 		return 1;
 
 	if (*dir == '/') {
-		if (len >= sizeof curr_dir) {
+		if (len >= sizeof vfs.curr_dir) {
 			errno = ENAMETOOLONG;
 			return 0;
 		}
@@ -1275,16 +1273,16 @@ int change_dir(const char *dir, int set_path_only)
 			}
 		}
 		skipped_chdir = set_path_only;
-		memcpy(curr_dir, dir, len + 1);
+		memcpy(vfs.curr_dir, dir, len + 1);
 	} else {
-		unsigned int save_dir_len = curr_dir_len;
-		if (curr_dir_len + 1 + len >= sizeof curr_dir) {
+		unsigned int save_dir_len = vfs.curr_dir_len;
+		if (vfs.curr_dir_len + 1 + len >= sizeof vfs.curr_dir) {
 			errno = ENAMETOOLONG;
 			return 0;
 		}
-		if (!(curr_dir_len && curr_dir[curr_dir_len-1] == '/'))
-			curr_dir[curr_dir_len++] = '/';
-		memcpy(curr_dir + curr_dir_len, dir, len + 1);
+		if (!(vfs.curr_dir_len && vfs.curr_dir[vfs.curr_dir_len-1] == '/'))
+			vfs.curr_dir[vfs.curr_dir_len++] = '/';
+		memcpy(vfs.curr_dir + vfs.curr_dir_len, dir, len + 1);
 
 		if (!set_path_only) {
 			int chdir_failed;
@@ -1299,7 +1297,7 @@ int change_dir(const char *dir, int set_path_only)
 			 * to get a confined dirfd, then fchdir() to it.
 			 *
 			 * If skipped_chdir is set, a previous CD_SKIP_CHDIR
-			 * call buffered an absolute prefix in curr_dir
+			 * call buffered an absolute prefix in vfs.curr_dir
 			 * (e.g. change_pathname's CD_SKIP_CHDIR to orig_dir)
 			 * without syncing the kernel's CWD. Resolve `dir`
 			 * relative to that prefix as basedir so the secure
@@ -1316,7 +1314,7 @@ int change_dir(const char *dir, int set_path_only)
 						chdir_failed = 1;
 						goto chdir_cleanup;
 					}
-					memcpy(prefix, curr_dir, save_dir_len);
+					memcpy(prefix, vfs.curr_dir, save_dir_len);
 					prefix[save_dir_len] = '\0';
 					basedir = prefix;
 				}
@@ -1339,7 +1337,7 @@ int change_dir(const char *dir, int set_path_only)
 				 * symlink not owned by uid 0 or our euid, closing the
 				 * relative-dest chdir TOCTOU while still following the operator's
 				 * own symlinks.  --insecure-links keeps the plain chdir. */
-				int dfd = vfs_open_owner_walk(curr_dir,
+				int dfd = vfs_open_owner_walk(vfs.curr_dir,
 					O_RDONLY | O_DIRECTORY, 0);
 				if (dfd < 0)
 					chdir_failed = 1;
@@ -1348,30 +1346,30 @@ int change_dir(const char *dir, int set_path_only)
 					close(dfd);
 				}
 			} else {
-				chdir_failed = chdir(curr_dir) != 0;
+				chdir_failed = chdir(vfs.curr_dir) != 0;
 			}
 		chdir_cleanup:
 			if (chdir_failed) {
-				curr_dir_len = save_dir_len;
-				curr_dir[curr_dir_len] = '\0';
+				vfs.curr_dir_len = save_dir_len;
+				vfs.curr_dir[vfs.curr_dir_len] = '\0';
 				return 0;
 			}
 		}
 		skipped_chdir = set_path_only;
 	}
 
-	curr_dir_len = clean_fname(curr_dir, CFN_COLLAPSE_DOT_DOT_DIRS | CFN_DROP_TRAILING_DOT_DIR);
+	vfs.curr_dir_len = clean_fname(vfs.curr_dir, CFN_COLLAPSE_DOT_DOT_DIRS | CFN_DROP_TRAILING_DOT_DIR);
 	if (sanitize_paths) {
-		if (module_dirlen > curr_dir_len)
-			module_dirlen = curr_dir_len;
-		curr_dir_depth = count_dir_elements(curr_dir + module_dirlen);
+		if (module_dirlen > vfs.curr_dir_len)
+			module_dirlen = vfs.curr_dir_len;
+		curr_dir_depth = count_dir_elements(vfs.curr_dir + module_dirlen);
 	}
 
 	if (!set_path_only)	/* a real chdir invalidates the cwd-relative dir-fd stack */
 		vfs_dircache_reset();
 
 	if (DEBUG_GTE(CHDIR, 1) && !set_path_only)
-		rprintf(FINFO, "[%s] change_dir(%s)\n", who_am_i(), curr_dir);
+		rprintf(FINFO, "[%s] change_dir(%s)\n", who_am_i(), vfs.curr_dir);
 
 	return 1;
 }
@@ -1384,12 +1382,12 @@ char *normalize_path(char *path, BOOL force_newbuf, unsigned int *len_ptr)
 
 	if (*path != '/') { /* Make path absolute. */
 		int len = strlen(path);
-		if (curr_dir_len + 1 + len >= sizeof curr_dir)
+		if (vfs.curr_dir_len + 1 + len >= sizeof vfs.curr_dir)
 			return NULL;
-		curr_dir[curr_dir_len] = '/';
-		memcpy(curr_dir + curr_dir_len + 1, path, len + 1);
-		path = strdup(curr_dir);
-		curr_dir[curr_dir_len] = '\0';
+		vfs.curr_dir[vfs.curr_dir_len] = '/';
+		memcpy(vfs.curr_dir + vfs.curr_dir_len + 1, path, len + 1);
+		path = strdup(vfs.curr_dir);
+		vfs.curr_dir[vfs.curr_dir_len] = '\0';
 	} else if (force_newbuf)
 		path = strdup(path);
 
@@ -1421,7 +1419,7 @@ char *full_fname(const char *fn)
 	if (*fn == '/')
 		p1 = p2 = "";
 	else {
-		p1 = curr_dir + module_dirlen;
+		p1 = vfs.curr_dir + module_dirlen;
 		for (p2 = p1; *p2 == '/'; p2++) {}
 		if (*p2)
 			p2 = "/";

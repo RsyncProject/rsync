@@ -25,8 +25,6 @@ extern int am_sender;
 extern int module_id;
 extern int insecure_links;
 extern int open_noatime;
-extern char curr_dir[MAXPATHLEN];
-extern unsigned int curr_dir_len;
 
 /* Single gate for whether path resolution must be hardened against
  * parent-component symlink races (TOCTOU).  Used by the do_*_at()/do_*_atfd()
@@ -206,7 +204,7 @@ int vfs_resolve_open(const char *basedir, const char *relpath, int flags, mode_t
 	 * like "../01" may legitimately climb to a sibling that is still inside the
 	 * module (#915).  Confining beneath the cwd would reject that climb.
 	 * Re-anchor at the module root by prefixing the cwd's module-relative path
-	 * (from rsync's logical curr_dir[], a guaranteed lexical prefix of
+	 * (from rsync's logical vfs.curr_dir[], a guaranteed lexical prefix of
 	 * module_dir, unlike getcwd()) and resolving beneath module_dir; RESOLVE_
 	 * BENEATH then allows in-module climbs and still rejects escapes.  Only for
 	 * paths that contain "..".  module_dirlen is 0 for a `path = /` module
@@ -220,10 +218,10 @@ int vfs_resolve_open(const char *basedir, const char *relpath, int flags, mode_t
 	  || (basedir && path_has_dotdot_component(basedir)))) {
 		const char *p;
 		int n;
-		if (curr_dir_len >= module_dirlen
-		 && strncmp(curr_dir, module_dir, module_dirlen) == 0
-		 && (curr_dir[module_dirlen] == '\0' || curr_dir[module_dirlen] == '/')) {
-			for (p = curr_dir + module_dirlen; *p == '/'; p++) {}
+		if (vfs.curr_dir_len >= module_dirlen
+		 && strncmp(vfs.curr_dir, module_dir, module_dirlen) == 0
+		 && (vfs.curr_dir[module_dirlen] == '\0' || vfs.curr_dir[module_dirlen] == '/')) {
+			for (p = vfs.curr_dir + module_dirlen; *p == '/'; p++) {}
 			if (basedir)
 				n = snprintf(modrel_buf, sizeof modrel_buf, "%s%s%s/%s",
 					     p, *p ? "/" : "", basedir, relpath);
@@ -317,7 +315,7 @@ int vfs_resolve_open(const char *basedir, const char *relpath, int flags, mode_t
 	 * module root for a daemon) when AT_FDCWD, or an operator-trusted absolute
 	 * basedir.  A relative basedir's resolved abspath isn't tracked, so leave it
 	 * unseeded (the refusal is then a no-op for that uncommon case). */
-	const char *anchor_abspath = !basedir ? curr_dir
+	const char *anchor_abspath = !basedir ? vfs.curr_dir
 				   : (basedir[0] == '/' ? basedir : NULL);
 	int retfd = secure_walk_at(dirfd, anchor_abspath, relpath, flags, mode, &hops);
 	if (dirfd != AT_FDCWD)

@@ -2150,8 +2150,6 @@ int do_open_nofollow(const char *pathname, int flags)
  * Defined here -- rather than in util1.c -- so the test helpers that link
  * syscall.o but not util1.o (tls, trimslash) get the definition without a
  * weak-symbol fallback, which is not portable to PE/COFF targets (Cygwin). */
-char curr_dir[MAXPATHLEN];
-unsigned int curr_dir_len;
 
 /* Fill buf with len random bytes.  Prefers /dev/urandom for cryptographic
  * quality; falls back to rand() if /dev/urandom cannot be opened or read

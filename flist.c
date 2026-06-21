@@ -33,7 +33,6 @@ extern int am_chrooted;
 extern char *module_dir;
 extern unsigned int module_dirlen;
 extern int module_dirfd;
-extern unsigned int curr_dir_len;
 extern int am_sender;
 extern int am_generator;
 extern int inc_recurse;
@@ -87,7 +86,6 @@ extern char *usermap, *groupmap;
 
 extern struct name_num_item *file_sum_nni;
 
-extern char curr_dir[MAXPATHLEN];
 
 extern struct chmod_mode_struct *chmod_modes;
 
@@ -2033,9 +2031,9 @@ static DIR *secure_opendir(const char *fbuf)
 
 	if (am_daemon && (!am_chrooted || module_dirlen)
 	 && module_dir && module_dir[0] == '/' && *fbuf != '/' && module_dirfd >= 0
-	 && curr_dir_len >= module_dirlen
-	 && strncmp(curr_dir, module_dir, module_dirlen) == 0
-	 && (curr_dir[module_dirlen] == '\0' || curr_dir[module_dirlen] == '/')) {
+	 && vfs.curr_dir_len >= module_dirlen
+	 && strncmp(vfs.curr_dir, module_dir, module_dirlen) == 0
+	 && (vfs.curr_dir[module_dirlen] == '\0' || vfs.curr_dir[module_dirlen] == '/')) {
 		/* Daemon: anchor the confined scan at the module root pinned by identity
 		 * at module setup (module_dirfd, opened while the daemon was positioned
 		 * there and still privileged), and walk the module-relative path of the
@@ -2043,11 +2041,11 @@ static DIR *secure_opendir(const char *fbuf)
 		 * legitimate in-module ".." climb (sub/climb -> ../sibling) or an in-module
 		 * directory symlink is followed, and an escape refused -- without
 		 * re-walking the absolute module path as the dropped uid (the privilege-
-		 * drop EACCES), and without assuming the lexical curr_dir depth matches the
+		 * drop EACCES), and without assuming the lexical vfs.curr_dir depth matches the
 		 * real cwd (a followed in-module symlink can desync them; anchoring at the
 		 * pinned module root and walking down the logical path is correct either
 		 * way). */
-		const char *p = curr_dir + module_dirlen;
+		const char *p = vfs.curr_dir + module_dirlen;
 		char modrel[MAXPATHLEN];
 		while (*p == '/')
 			p++;
@@ -2560,7 +2558,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	}
 
 	if (!orig_dir)
-		orig_dir = strdup(curr_dir);
+		orig_dir = strdup(vfs.curr_dir);
 
 	while (1) {
 		char fbuf[MAXPATHLEN], *fn, name_type;

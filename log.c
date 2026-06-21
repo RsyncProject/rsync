@@ -55,7 +55,6 @@ extern iconv_t ic_chck;
 #ifdef ICONV_OPTION
 extern iconv_t ic_recv;
 #endif
-extern char curr_dir[MAXPATHLEN];
 extern char *full_module_path;
 extern unsigned int module_dirlen;
 extern char sender_file_sum[MAX_DIGEST_LEN];
@@ -648,7 +647,7 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 					n = buf2;
 			} else if (am_daemon && *c != '/') {
 				pathjoin(buf2, sizeof buf2,
-					 curr_dir + module_dirlen, c);
+					 vfs.curr_dir + module_dirlen, c);
 				clean_fname(buf2, 0);
 				if (fmt[1]) {
 					strlcpy(c, buf2, MAXPATHLEN);
