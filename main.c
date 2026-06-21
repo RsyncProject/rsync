@@ -31,6 +31,9 @@
 #ifdef __TANDEM
 #include <floss.h(floss_execlp)>
 #endif
+#ifdef HAVE_SYS_RESOURCE_H
+#include <sys/resource.h>
+#endif
 
 extern int dry_run;
 extern int list_only;
@@ -1749,12 +1752,31 @@ static void unset_env_var(const char *var)
 }
 
 
+static void raise_fd_limit(void)
+{
+#if defined HAVE_GETRLIMIT && defined HAVE_SETRLIMIT && defined RLIMIT_NOFILE
+	struct rlimit rl;
+	rlim_t want = 4096; /* covers a MAXPATHLEN-deep walk + cache + headroom */
+
+	if (getrlimit(RLIMIT_NOFILE, &rl) < 0)
+		return;
+	if (want > rl.rlim_max)
+		want = rl.rlim_max; /* never exceed the (admin-set) hard limit */
+	if (rl.rlim_cur < want) { /* only ever raise, never lower an inherited limit */
+		rl.rlim_cur = want;
+		(void)setrlimit(RLIMIT_NOFILE, &rl); /* best-effort */
+	}
+#endif
+}
+
 int main(int argc,char *argv[])
 {
 	int ret;
 
 	raw_argc = argc;
 	raw_argv = argv;
+
+	raise_fd_limit();
 
 #ifdef HAVE_SIGACTION
 # ifdef HAVE_SIGPROCMASK
