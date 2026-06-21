@@ -653,6 +653,7 @@ void start_accept_loop(int port, int (*fn)(int, int))
 			logfile_reopen();
 			ret = fn(fd, fd);
 			close_all();
+			gcov_flush();
 			_exit(ret);
 		} else if (pid < 0) {
 			rsyserr(FERROR, errno,

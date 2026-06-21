@@ -387,14 +387,25 @@ COVERAGE_J = $(CHECK_J)
 COVERAGE_DIR = coverage
 COVERAGE_RUNFLAGS =
 
-# Bundled third-party code that rsync ships but does not own; excluded from the
-# coverage report so the percentages reflect rsync's own source. zlib/ and popt/
-# are wholly vendored; the named lib/ files are PostgreSQL (getaddrinfo) and ISC
-# (inet_ntop/inet_pton) / standalone (getpass) imports. The other lib/*.c
-# (md5, mdfour, wildmatch, permstring, pool_alloc, snprintf, sysacls, sysxattrs,
-# compat) are rsync's own and stay in the report.
+# Excluded from the coverage report so the percentages reflect rsync's own
+# runtime source.  Three buckets:
+#  (1) Bundled third-party code rsync ships but does not own: zlib/, popt/, and
+#      the named lib/ imports (PostgreSQL getaddrinfo, ISC inet_ntop/inet_pton,
+#      standalone getpass).  The other lib/*.c are rsync's own and stay in.
+#  (2) Test-helper / build-time programs that link against rsync objects but are
+#      not the rsync runtime: t_*.c, tls.c, wildtest.c, testrun.c, getgroups.c,
+#      getfsdev.c, trimslash.c, rounding.c.  These have their own main() and are
+#      either driven directly by a test (counted there) or are configure-time
+#      probes; counting them as "rsync uncovered" is noise.
+#  (3) Compile-time-dead fallbacks under this build's config.h: lib/md5.c (the
+#      reference md5 -- openssl's EVP path is used when HAVE_OPENSSL) and
+#      lib/snprintf.c (only the #include line survives under
+#      HAVE_C99_VSNPRINTF).  Covering these would mean a separate non-openssl /
+#      non-C99 build, which is out of scope for this report.
 COVERAGE_EXCLUDE = -e '(^|/)zlib/' -e '(^|/)popt/' \
-	-e '(^|/)lib/(getaddrinfo|getpass|inet_ntop|inet_pton)\.'
+	-e '(^|/)lib/(getaddrinfo|getpass|inet_ntop|inet_pton)\.' \
+	-e '(^|/)(t_[a-z_]+|tls|wildtest|testrun|getgroups|getfsdev|trimslash|rounding)\.c$$' \
+	-e '(^|/)lib/(md5|snprintf)\.c$$'
 
 # Build everything the test suite needs (rsync + helper programs + symlinks)
 # WITHOUT running it. Used by CI jobs that invoke runtests.py directly with
@@ -427,9 +438,23 @@ coverage: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	  *) echo "*** not a coverage build; reconfigure with --enable-coverage"; exit 1 ;; esac
 	@command -v gcovr >/dev/null 2>&1 || { echo "*** gcovr not found (pip install gcovr)"; exit 1; }
 	find . -name '*.gcda' -delete
+	@# Daemon modules with `uid = <non-root>` setuid the per-connection child
+	@# (and so the forked generator/receiver), which then cannot create or
+	@# merge .gcda files in a root-owned build dir -- silently dropping ALL
+	@# coverage from those processes.  Make every .gcno's directory
+	@# world-writable so any uid can create the sibling .gcda, and set a
+	@# default ACL of o::rw so the .gcda are world-mergeable regardless of
+	@# the creator's umask (every test process resets umask to 022 via
+	@# rsyncfns.py, so a Makefile-level `umask 0` would not survive).
+	@find . -name '*.gcno' -printf '%h\n' 2>/dev/null | sort -u | \
+	  while read d; do \
+	    chmod a+rwx "$$d"; \
+	    setfacl -m 'd:u::rwx,d:g::rwx,d:o::rwx' "$$d" 2>/dev/null || true; \
+	  done
 	@rc=0; $(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(COVERAGE_J) $(COVERAGE_RUNFLAGS) || rc=$$?; \
 	  rm -rf $(COVERAGE_DIR) && mkdir -p $(COVERAGE_DIR); \
 	  gcovr --root $(srcdir) $(COVERAGE_EXCLUDE) --decisions --print-summary \
+	      --gcov-ignore-parse-errors=negative_hits.warn_once_per_file \
 	      --html-details -o $(COVERAGE_DIR)/index.html . || exit $$?; \
 	  echo "Coverage report written to $(COVERAGE_DIR)/index.html"; \
 	  if test $$rc != 0; then \
@@ -456,6 +481,13 @@ coverage-all: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	  *) echo "*** not a coverage build; reconfigure with --enable-coverage"; exit 1 ;; esac
 	@command -v gcovr >/dev/null 2>&1 || { echo "*** gcovr not found (pip install gcovr)"; exit 1; }
 	find . -name '*.gcda' -delete
+	@# See the `coverage` target above for why: setuid'd daemon children must
+	@# be able to create/merge .gcda owned by a different uid.
+	@find . -name '*.gcno' -printf '%h\n' 2>/dev/null | sort -u | \
+	  while read d; do \
+	    chmod a+rwx "$$d"; \
+	    setfacl -m 'd:u::rwx,d:g::rwx,d:o::rwx' "$$d" 2>/dev/null || true; \
+	  done
 	@rc=0; \
 	  for cfg in '' '--protocol=30' '--protocol=29' '--use-tcp'; do \
 	    echo "===== coverage-all: runtests.py $$cfg ====="; \
@@ -463,6 +495,7 @@ coverage-all: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	  done; \
 	  rm -rf coverage-all && mkdir -p coverage-all; \
 	  gcovr --root $(srcdir) $(COVERAGE_EXCLUDE) --decisions --print-summary \
+	      --gcov-ignore-parse-errors=negative_hits.warn_once_per_file \
 	      --html-details -o coverage-all/index.html . || exit $$?; \
 	  echo "Merged coverage report written to coverage-all/index.html"; \
 	  if test $$rc != 0; then \

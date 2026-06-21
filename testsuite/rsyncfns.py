@@ -30,6 +30,7 @@ import stat
 import struct
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -1899,10 +1900,21 @@ def acls_supported() -> bool:
     return False
 
 
+@_functools.lru_cache(maxsize=1)
 def devices_supported() -> bool:
-    """True if device nodes can be created here: euid==0 AND os.mknod exists
-    (mknod of S_IFCHR/S_IFBLK needs CAP_MKNOD, i.e. root)."""
-    return os.geteuid() == 0 and hasattr(os, 'mknod')
+    """True if device nodes can be created here.
+
+    euid==0 is necessary but not sufficient: a user-namespaced container
+    (rootless podman/docker, buildd chroots) reports euid==0 yet lacks
+    CAP_MKNOD, so os.mknod() of a device fails EPERM.  Probe once."""
+    if os.geteuid() != 0 or not hasattr(os, 'mknod'):
+        return False
+    with tempfile.TemporaryDirectory(prefix='rsync-devprobe.') as d:
+        try:
+            os.mknod(os.path.join(d, 'p'), 0o600 | stat.S_IFCHR, os.makedev(1, 3))
+        except (PermissionError, OSError):
+            return False
+    return True
 
 
 def owners_supported() -> bool:

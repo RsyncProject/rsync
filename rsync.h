@@ -1168,6 +1168,20 @@ typedef struct {
 #define NORETURN __attribute__((__noreturn__))
 #endif
 
+/* Under --enable-coverage, gcov flushes counters via an atexit handler that
+ * _exit() bypasses.  Forked helpers that terminate via _exit() -- the
+ * pre/post-xfer-exec children, the become_daemon original process, the
+ * per-connection accept-loop child on early return -- must dump explicitly
+ * or their counters are lost, which systematically under-reports daemon-side
+ * coverage.  cleanup.c and main.c already inline this for the two main exit
+ * paths; this macro covers the rest.  No-op when not a coverage build. */
+#ifdef GCOV_COVERAGE
+extern void __gcov_dump(void);
+#define gcov_flush() __gcov_dump()
+#else
+#define gcov_flush() ((void)0)
+#endif
+
 typedef struct {
     STRUCT_STAT st;
     time_t crtime;

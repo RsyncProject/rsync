@@ -564,6 +564,7 @@ static pid_t start_pre_exec(const char *cmd, int *arg_fd_ptr, int *error_fd_ptr)
 
 		status = shell_exec(cmd);
 
+		gcov_flush();
 		if (!WIFEXITED(status))
 			_exit(1);
 		_exit(WEXITSTATUS(status));
@@ -948,6 +949,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 				set_env_num("RSYNC_EXIT_STATUS", status);
 				if (shell_exec(lp_postxfer_exec(module_id)) < 0)
 					status = -1;
+				gcov_flush();
 				_exit(status);
 			}
 		}
@@ -1638,6 +1640,7 @@ static void become_daemon(void)
 			fprintf(stderr, "failed to fork: %s\n", strerror(errno));
 			exit_cleanup(RERR_FILEIO);
 		}
+		gcov_flush();
 		_exit(0);
 	}
 
