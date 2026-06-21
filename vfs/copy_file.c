@@ -42,8 +42,7 @@ static int safe_read(int desc, char *ptr, size_t len)
 
 /* Remove existing file @dest and reopen, creating a new file with @mode.
  * vfs_flags carries the resolution policy (VFS_OPERATOR_PATH for an operator
- * dest) to the create; the robust_unlink still reads it from the (transitional)
- * operator-path global. */
+ * dest) to both the robust_unlink and the create. */
 static int unlink_and_reopen(const char *dest, mode_t mode, int vfs_flags)
 {
 	int ofd;
