@@ -57,6 +57,7 @@ BOOL	fake_super		False
 BOOL	forward_lookup		True
 BOOL	ignore_errors		False
 BOOL	ignore_nonreadable	False
+BOOL	insecure_links		False
 BOOL	list			True
 BOOL	read_only		True
 BOOL	reverse_lookup		True

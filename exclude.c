@@ -1538,7 +1538,7 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 			open_path = line;
 		} else
 			open_path = fname;
-		fd = safe_open_no_attacker_symlinks(open_path, O_RDONLY, 0);
+		fd = open_no_attacker_symlinks(open_path, O_RDONLY, 0);
 		if (fd < 0)
 			fp = NULL;
 		else if (!(fp = fdopen(fd, "rb")))

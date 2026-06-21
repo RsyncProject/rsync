@@ -69,6 +69,7 @@ extern int non_perishable_cnt;
 extern int prune_empty_dirs;
 extern int copy_links;
 extern int copy_unsafe_links;
+extern int insecure_links;
 extern int protocol_version;
 extern int sanitize_paths;
 extern int munge_symlinks;
@@ -2034,8 +2035,8 @@ static void send_directory(int f, struct file_list *flist, char *fbuf, int len,
 	 *     operator's own tree, so they keep the legacy opendir().
 	 * f >= 0 is the sender's outgoing scan; get_dirlist() passes f < 0 and keeps
 	 * the legacy opendir(). */
-	if (f >= 0 && (secure_relpath_active()
-		    || !(copy_links || copy_unsafe_links || copy_dirlinks)))
+	if (f >= 0 && !symlink_optout_allowed() && (secure_relpath_active()
+		    || !(copy_links || copy_unsafe_links || copy_dirlinks || insecure_links)))
 		d = secure_opendir(fbuf);
 	else
 		d = opendir(fbuf);
