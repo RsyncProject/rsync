@@ -238,7 +238,11 @@ static int read_delay_line(char *buf, int *flags_p)
 		goto invalid_data;
 	}
 	past_space++;
-	len = j - read_pos - (past_space - bp) + 1; /* count the '\0' */
+	/* Name length + NUL.  Computed from past_space directly: the old
+	 * `j - read_pos - (past_space - bp)` form was off by +1 when a '!'
+	 * prefix had advanced bp past read_pos, over-reading deldelay_buf
+	 * by one byte on a buffer-filling final entry. */
+	len = (deldelay_buf + j) - past_space + 1;
 	read_pos = j + 1;
 
 	if (len > MAXPATHLEN) {
