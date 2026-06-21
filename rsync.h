@@ -708,6 +708,8 @@ typedef unsigned int size_t;
 # define SIZEOF_INT64 SIZEOF_OFF_T
 #endif
 
+#define MAX_INT32 ((int32)0x7fffffff)
+
 #define HT_KEY32 0
 #define HT_KEY64 1
 

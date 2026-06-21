@@ -29,6 +29,11 @@
 extern int am_root;
 extern int am_server;
 extern int am_daemon;
+extern int am_chrooted;
+extern char *module_dir;
+extern unsigned int module_dirlen;
+extern int module_dirfd;
+extern unsigned int curr_dir_len;
 extern int am_sender;
 extern int am_generator;
 extern int inc_recurse;
@@ -64,6 +69,7 @@ extern int non_perishable_cnt;
 extern int prune_empty_dirs;
 extern int copy_links;
 extern int copy_unsafe_links;
+extern int insecure_links;
 extern int protocol_version;
 extern int sanitize_paths;
 extern int munge_symlinks;
@@ -214,13 +220,47 @@ void show_flist_stats(void)
  *
  * The stat structure pointed to by stp will contain information about the
  * link or the referent as appropriate, if they exist. */
+/* Set by send_directory() to the fd of the directory it is currently scanning
+ * (and that dir's path prefix), so the per-entry stat can go through the
+ * already-open dir fd instead of re-resolving the full path for every entry.
+ * Pure performance and sender-side only -- the scanned dir is already open, so
+ * fstatat(scan_dirfd, basename) is identical to lstat(scandir/basename); no
+ * confinement is implied or needed. */
+static int scan_dirfd = -1;
+static const char *scan_dir_prefix;
+static int scan_dir_prefix_len;
+
+static int scan_link_stat(const char *path, STRUCT_STAT *stp, int follow_dirlinks)
+{
+	/* Use the held scan fd only for a single component directly inside the
+	 * scanned dir, and only when am_root >= 0 (link_stat_at folds in no
+	 * fake-super %stat xattr; link_stat does so via get_stat_xattr, a no-op
+	 * once am_root >= 0). */
+	if (scan_dirfd >= 0 && am_root >= 0
+	 && strncmp(path, scan_dir_prefix, scan_dir_prefix_len) == 0
+	 && path[scan_dir_prefix_len] == '/'
+	 && strchr(path + scan_dir_prefix_len + 1, '/') == NULL)
+		return link_stat_at(scan_dirfd, path + scan_dir_prefix_len + 1, stp, follow_dirlinks);
+	return link_stat(path, stp, follow_dirlinks);
+}
+
+static int scan_readlink(const char *path, char *linkbuf, size_t bufsiz)
+{
+	if (scan_dirfd >= 0 && am_root >= 0
+	 && strncmp(path, scan_dir_prefix, scan_dir_prefix_len) == 0
+	 && path[scan_dir_prefix_len] == '/'
+	 && strchr(path + scan_dir_prefix_len + 1, '/') == NULL)
+		return do_readlink_atfd(scan_dirfd, path + scan_dir_prefix_len + 1, linkbuf, bufsiz);
+	return do_readlink(path, linkbuf, bufsiz);
+}
+
 static int readlink_stat(const char *path, STRUCT_STAT *stp, char *linkbuf)
 {
 #ifdef SUPPORT_LINKS
-	if (link_stat(path, stp, copy_dirlinks) < 0)
+	if (scan_link_stat(path, stp, copy_dirlinks) < 0)
 		return -1;
 	if (S_ISLNK(stp->st_mode)) {
-		int llen = do_readlink(path, linkbuf, MAXPATHLEN - 1);
+		int llen = scan_readlink(path, linkbuf, MAXPATHLEN - 1);
 		if (llen < 0)
 			return -1;
 		linkbuf[llen] = '\0';
@@ -258,6 +298,30 @@ int link_stat(const char *path, STRUCT_STAT *stp, int follow_dirlinks)
 	return 0;
 #else
 	return x_stat(path, stp, NULL);
+#endif
+}
+
+/* Held-dirfd variant of link_stat(): stat single-component `name` relative to
+ * directory fd `dfd`, instead of re-resolving a full path.  Equivalent to
+ * link_stat() only when NOT in --fake-super mode -- x_stat/x_lstat fold the
+ * fake-super %stat xattr into the result via get_stat_xattr(), which is a
+ * path-based no-op once am_root >= 0.  Callers therefore use this only when
+ * am_root >= 0 (and a valid dfd), falling back to link_stat() otherwise. */
+int link_stat_at(int dfd, const char *name, STRUCT_STAT *stp, int follow_dirlinks)
+{
+#ifdef SUPPORT_LINKS
+	if (copy_links)
+		return do_stat_atfd(dfd, name, stp);
+	if (do_lstat_atfd(dfd, name, stp) < 0)
+		return -1;
+	if (follow_dirlinks && S_ISLNK(stp->st_mode)) {
+		STRUCT_STAT st;
+		if (do_stat_atfd(dfd, name, &st) == 0 && S_ISDIR(st.st_mode))
+			*stp = st;
+	}
+	return 0;
+#else
+	return do_stat_atfd(dfd, name, stp);
 #endif
 }
 
@@ -776,7 +840,7 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 
 	if ((basename = strrchr(thisname, '/')) != NULL) {
 		int len = basename++ - thisname;
-		if (len != lastdir_len || memcmp(thisname, lastdir, len) != 0) {
+		if (len != lastdir_len || !lastdir || memcmp(thisname, lastdir, len) != 0) {
 			lastdir = new_array(char, len + 1);
 			memcpy(lastdir, thisname, len);
 			lastdir[len] = '\0';
@@ -1055,7 +1119,8 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 	memcpy(bp, basename, basename_len);
 
 #ifdef SUPPORT_HARD_LINKS
-	if (xflags & XMIT_HLINKED
+	if (preserve_hard_links && xflags & XMIT_HLINKED
+	 && !S_ISDIR(mode)
 #ifndef CAN_HARDLINK_SYMLINK
 	 && !S_ISLNK(mode)
 #endif
@@ -1110,6 +1175,26 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 		if (basename_len == 1+1 && *basename == '.') /* +1 for '\0' */
 			F_DEPTH(file)--;
 		if (protocol_version >= 30) {
+			/* Stop a malicious sender expanding --delete scope by flagging
+			 * an implied parent as a content dir: if we only allowed this
+			 * entry as a parent of the requested leaf, force the flags back
+			 * to the honest implied-parent encoding (XMIT_TOP_DIR |
+			 * XMIT_NO_CONTENT_DIR) so it lands in FLAG_IMPLIED_DIR, not
+			 * FLAG_CONTENT_DIR, and delete_in_dir() can't sweep siblings.
+			 * Not gated on trust_sender_filter: implied_filter_list is
+			 * receiver-owned state, so a per-dir filter must not be able to
+			 * downgrade this defense. */
+			if (implied_filter_list.head
+			 && is_implied_parent_dir(thisname)
+			 && (!(xflags & XMIT_NO_CONTENT_DIR) || !(xflags & XMIT_TOP_DIR))) {
+				if (DEBUG_GTE(FILTER, 1)) {
+					rprintf(FINFO,
+						"[%s] receiver downgraded implied-parent dir %s "
+						"to non-content (sender xflags=0x%x)\n",
+						who_am_i(), thisname, xflags);
+				}
+				xflags |= XMIT_NO_CONTENT_DIR | XMIT_TOP_DIR;
+			}
 			if (!(xflags & XMIT_NO_CONTENT_DIR)) {
 				if (xflags & XMIT_TOP_DIR)
 					file->flags |= FLAG_TOP_DIR;
@@ -1400,7 +1485,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 
 	if ((basename = strrchr(thisname, '/')) != NULL) {
 		int len = basename++ - thisname;
-		if (len != lastdir_len || memcmp(thisname, lastdir, len) != 0) {
+		if (len != lastdir_len || !lastdir || memcmp(thisname, lastdir, len) != 0) {
 			lastdir = new_array(char, len + 1);
 			memcpy(lastdir, thisname, len);
 			lastdir[len] = '\0';
@@ -1848,6 +1933,77 @@ static void interpret_stat_error(const char *fname, int is_dir)
 	}
 }
 
+#if defined HAVE_FDOPENDIR && defined HAVE_DIRFD
+/* Open a source directory for scanning confined beneath the transfer root.
+ * secure_relative_open() does a per-component O_NOFOLLOW walk that refuses a
+ * parent component raced into a symlink pointing out of the tree; fdopendir()
+ * then turns the held fd into the DIR* the scan reads.  This mirrors the
+ * sender's confined content open (sender.c): the directory enumeration must be
+ * confined the same way, or a parent-symlink race (or, for a daemon following
+ * mode, an in-module symlink to outside) lets the scan enumerate an out-of-tree
+ * directory and leak its names/metadata/symlink targets.  O_DIRECTORY without
+ * O_NOFOLLOW makes secure_relative_open() follow in-tree directory symlinks
+ * beneath the anchor and refuse escapes, so this serves both the default
+ * no-follow scan and a daemon's symlink-following scan (see the caller).
+ * Returns NULL with errno set on failure, like opendir(). */
+static DIR *secure_opendir(const char *fbuf)
+{
+	int dfd, fl;
+	DIR *d;
+
+	if (am_daemon && (!am_chrooted || module_dirlen)
+	 && module_dir && module_dir[0] == '/' && *fbuf != '/' && module_dirfd >= 0
+	 && curr_dir_len >= module_dirlen
+	 && strncmp(curr_dir, module_dir, module_dirlen) == 0
+	 && (curr_dir[module_dirlen] == '\0' || curr_dir[module_dirlen] == '/')) {
+		/* Daemon: anchor the confined scan at the module root pinned by identity
+		 * at module setup (module_dirfd, opened while the daemon was positioned
+		 * there and still privileged), and walk the module-relative path of the
+		 * scan target beneath it.  This re-follows the same in-module path -- so a
+		 * legitimate in-module ".." climb (sub/climb -> ../sibling) or an in-module
+		 * directory symlink is followed, and an escape refused -- without
+		 * re-walking the absolute module path as the dropped uid (the privilege-
+		 * drop EACCES), and without assuming the lexical curr_dir depth matches the
+		 * real cwd (a followed in-module symlink can desync them; anchoring at the
+		 * pinned module root and walking down the logical path is correct either
+		 * way). */
+		const char *p = curr_dir + module_dirlen;
+		char modrel[MAXPATHLEN];
+		while (*p == '/')
+			p++;
+		if ((size_t)snprintf(modrel, sizeof modrel, "%s%s%s",
+				     p, *p ? "/" : "", fbuf) >= sizeof modrel) {
+			errno = ENAMETOOLONG;
+			return NULL;
+		}
+		dfd = secure_relative_open_at(module_dirfd, *modrel ? modrel : ".",
+					      O_RDONLY | O_DIRECTORY, 0);
+	} else if (*fbuf == '/') {
+		/* An absolute scan path (an absolute --relative / --files-from name, or a
+		 * "/" transfer root): anchor at "/" -- operator-named, trusted. */
+		const char *relp = fbuf;
+		while (*relp == '/')
+			relp++;
+		dfd = secure_relative_open("/", relp, O_RDONLY | O_DIRECTORY, 0);
+	} else {
+		/* Non-daemon (or chrooted) sender: confine beneath the cwd the sender
+		 * chdir'd into (the transfer root). */
+		dfd = secure_relative_open(NULL, fbuf, O_RDONLY | O_DIRECTORY, 0);
+	}
+
+	if (dfd < 0)
+		return NULL;
+	if ((fl = fcntl(dfd, F_GETFD)) >= 0)
+		fcntl(dfd, F_SETFD, fl | FD_CLOEXEC);
+	if (!(d = fdopendir(dfd))) {
+		int save = errno;
+		close(dfd);
+		errno = save;
+	}
+	return d;
+}
+#endif
+
 /* This function is normally called by the sender, but the receiving side also
  * calls it from get_dirlist() with f set to -1 so that we just construct the
  * file list in memory without sending it over the wire.  Also, get_dirlist()
@@ -1866,7 +2022,31 @@ static void send_directory(int f, struct file_list *flist, char *fbuf, int len,
 
 	assert(flist != NULL);
 
-	if (!(d = opendir(fbuf))) {
+#if defined HAVE_FDOPENDIR && defined HAVE_DIRFD
+	/* Confine the enumeration beneath the transfer root.  secure_opendir()
+	 * follows in-tree directory symlinks (RESOLVE_BENEATH) and refuses one that
+	 * escapes, so it serves both modes:
+	 *   - a daemon/hardened sender (secure_relpath_active()) is confined to the
+	 *     module in EVERY mode -- including -L/--copy-dirlinks/--copy-unsafe-
+	 *     links, matching the content open (sender_open_copylinks_confined) --
+	 *     so a following mode cannot be lured to enumerate outside the module;
+	 *   - a non-daemon sender is confined in the default no-follow mode; its
+	 *     symlink-following modes intentionally dereference out of the
+	 *     operator's own tree, so they keep the legacy opendir().
+	 * f >= 0 is the sender's outgoing scan; get_dirlist() passes f < 0 and keeps
+	 * the legacy opendir().  A module opted out of confinement ("insecure links =
+	 * yes", admin-only) -- or a non-daemon --insecure-links -- uses the legacy
+	 * opendir() too, restoring the pre-hardening enumeration (re-opening the
+	 * escape; documented). */
+	if (f >= 0 && !symlink_optout_allowed() && (secure_relpath_active()
+		    || !(copy_links || copy_unsafe_links || copy_dirlinks || insecure_links)))
+		d = secure_opendir(fbuf);
+	else
+		d = opendir(fbuf);
+#else
+	d = opendir(fbuf);
+#endif
+	if (!d) {
 		if (errno == ENOENT) {
 			if (am_sender) /* Can abuse this for vanished error w/ENOENT: */
 				interpret_stat_error(fbuf, True);
@@ -1888,6 +2068,14 @@ static void send_directory(int f, struct file_list *flist, char *fbuf, int len,
 		remainder = MAXPATHLEN - (len + 1);
 	} else
 		remainder = 0;
+
+#ifdef HAVE_DIRFD
+	/* Let the per-entry stat (readlink_stat -> scan_link_stat) go through the
+	 * already-open directory fd instead of re-resolving fbuf for each name. */
+	scan_dirfd = dirfd(d);
+	scan_dir_prefix = fbuf;
+	scan_dir_prefix_len = len;
+#endif
 
 	for (errno = 0, di = readdir(d); di; errno = 0, di = readdir(d)) {
 		unsigned name_len;
@@ -1917,6 +2105,9 @@ static void send_directory(int f, struct file_list *flist, char *fbuf, int len,
 		send_file_name(f, flist, fbuf, NULL, flags, filter_level);
 	}
 
+	scan_dirfd = -1;	/* fbuf is about to be reused / d closed */
+	scan_dir_prefix = NULL;	/* and don't leave the global pointing into fbuf */
+	scan_dir_prefix_len = 0;
 	fbuf[len] = '\0';
 
 	if (errno) {
@@ -2050,7 +2241,8 @@ static void send1extra(int f, struct file_struct *file, struct file_list *flist)
 	int len, dlen, flags = FLAG_DIVERT_DIRS | FLAG_CONTENT_DIR;
 	size_t j;
 
-	f_name(file, fbuf);
+	if (!f_name(file, fbuf))
+		return;
 	dlen = strlen(fbuf);
 
 	if (!change_pathname(file, NULL, 0))
@@ -2620,11 +2812,33 @@ struct file_list *recv_file_list(int f, int dir_ndx)
 #endif
 
 	if (inc_recurse && dir_ndx >= 0) {
+		if (!first_flist) {
+			/* All flists have already been freed via the NDX_DONE
+			 * chain, so dir_flist is stale: its files[] entries
+			 * point into a destroyed pool.  A sub-flist marker now
+			 * is a protocol violation (and would otherwise UAF the
+			 * stale dir entry below, then deref an uninitialised
+			 * slot in the freshly reset dir_flist further down). */
+			rprintf(FERROR_XFER,
+				"rsync: refusing sub-flist after final flist was freed\n");
+			exit_cleanup(RERR_PROTOCOL);
+		}
 		if (dir_ndx >= dir_flist->used) {
 			rprintf(FERROR_XFER, "rsync: refusing invalid dir_ndx %u >= %u\n", dir_ndx, dir_flist->used);
 			exit_cleanup(RERR_PROTOCOL);
 		}
 		struct file_struct *file = dir_flist->files[dir_ndx];
+		if (!F_IS_ACTIVE(file)) {
+			/* flist_sort_and_clean() can clear_file() a directory
+			 * entry that was a duplicate or otherwise pruned, but
+			 * the cleared file_struct stays in dir_flist.  A peer
+			 * that then sends a sub-flist for that slot would make
+			 * f_name() return NULL into the dirname strcmp() below. */
+			rprintf(FERROR_XFER,
+				"rsync: refusing flist for cleared dir_ndx %d\n",
+				dir_ndx);
+			exit_cleanup(RERR_PROTOCOL);
+		}
 		if (file->flags & FLAG_GOT_DIR_FLIST) {
 			rprintf(FERROR_XFER, "rsync: refusing malicious duplicate flist for dir %d\n", dir_ndx);
 			exit_cleanup(RERR_PROTOCOL);
@@ -2686,7 +2900,7 @@ struct file_list *recv_file_list(int f, int dir_ndx)
 				cur_dir++;
 			if (cur_dir != good_dirname) {
 				const char *d = dir_ndx >= 0 ? f_name(dir_flist->files[dir_ndx], NULL) : empty_dir;
-				if (strcmp(cur_dir, d) != 0) {
+				if (!d || strcmp(cur_dir, d) != 0) {
 					rprintf(FERROR,
 						"ABORTING due to invalid path from sender: %s/%s\n",
 						cur_dir, file->basename);
@@ -2776,7 +2990,15 @@ struct file_list *recv_file_list(int f, int dir_ndx)
 		if (!ignore_errors)
 			io_error |= err;
 	} else if (inc_recurse && flist->ndx_start == 1) {
-		if (!file_total || strcmp(flist->sorted[flist->low]->basename, ".") != 0)
+		/* The first inc_recurse flist has no parent in dir_flist; a
+		 * malicious peer can send a "." entry whose mode is not a
+		 * directory, so it never lands in dir_flist (used stays 0) yet
+		 * the basename test below still passes.  That left parent_ndx at
+		 * its default 0 and the consumers dereferenced dir_flist->files[0]
+		 * = uninitialised heap.  Require dir_flist to actually hold an
+		 * entry before trusting index 0. */
+		if (!file_total || !dir_flist->used
+		 || strcmp(flist->sorted[flist->low]->basename, ".") != 0)
 			flist->parent_ndx = -1;
 	}
 

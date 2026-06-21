@@ -71,6 +71,9 @@ static int dirbuf_depth;
 /* This is True when we're scanning parent dirs for per-dir merge-files. */
 static BOOL parent_dirscan = False;
 
+#define MAX_MERGE_DEPTH 32
+static int merge_depth = 0;
+
 /* This array contains a list of all the currently active per-dir merge
  * files.  This makes it easier to save the appropriate values when we
  * "push" down into each subdirectory. */
@@ -427,7 +430,7 @@ void add_implied_include(const char *arg, int skip_daemon_module)
 				if (cp[1] == ']') {
 					if (!saw_wild)
 						cp++; /* A \] in a non-wild filter causes a problem, so drop the \ . */
-				} else if (!strchr("*[?", cp[1])) {
+				} else if (!cp[1] || !strchr("*[?", cp[1])) {
 					backslash_cnt++;
 					if (saw_wild)
 						*p++ = '\\';
@@ -1033,6 +1036,41 @@ int check_server_filter(filter_rule_list *listp, enum logcode code, const char *
 	return ret;
 }
 
+/* Returns 1 if `name` matches an implied-parent rule (a directory component
+ * seeded by add_implied_include() with FILTRULE_DIRECTORY) but not a leaf
+ * rule -- i.e. the client asked for something under the dir, never the dir
+ * itself as content.
+ *
+ * The receiver uses this to refuse a malicious sender that sets XMIT_TOP_DIR
+ * without XMIT_NO_CONTENT_DIR on such a dir: the honest encoding is both flags
+ * (flist.c send path), so otherwise the receiver would set FLAG_CONTENT_DIR
+ * and delete_in_dir() could sweep pre-existing siblings under --delete. */
+int is_implied_parent_dir(const char *name)
+{
+	filter_rule *ent;
+	int parent_match = 0;
+
+	if (!implied_filter_list.head)
+		return 0;
+
+	for (ent = implied_filter_list.head; ent; ent = ent->next) {
+		if (ent->rflags & (FILTRULE_PERDIR_MERGE | FILTRULE_CVS_IGNORE))
+			continue;
+		if (!rule_matches(name, ent, NAME_IS_DIR))
+			continue;
+		if (!(ent->rflags & FILTRULE_INCLUDE))
+			continue;
+		if (ent->rflags & FILTRULE_DIRECTORY) {
+			parent_match = 1;
+			continue;
+		}
+		/* A non-DIRECTORY include rule = a leaf the client asked for, so
+		 * the dir is legitimately in the list, not parent-only. */
+		return 0;
+	}
+	return parent_match;
+}
+
 /* Return -1 if file "name" is defined to be excluded by the specified
  * exclude list, 1 if it is included, and 0 if it was not matched. */
 int check_filter(filter_rule_list *listp, enum logcode code,
@@ -1454,16 +1492,57 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 	if (!fname || !*fname)
 		return;
 
+	if (merge_depth >= MAX_MERGE_DEPTH) {
+		rprintf(FERROR,
+			"[%s] merge-file include depth limit (%d) exceeded at %s\n",
+			who_am_i(), MAX_MERGE_DEPTH, fname);
+		/* Match the failed-open path below: abort under a fatal
+		 * (operator-supplied) merge, otherwise drop the rule. */
+		if (xflags & XFLG_FATAL_ERRORS)
+			exit_cleanup(RERR_FILEIO);
+		return;
+	}
+	merge_depth++;
+
 	if (*fname != '-' || fname[1] || am_server) {
+		/* This path is operator- and (via per-directory merge files like
+		 * .cvsignore) sender-controlled: a planted symlink could leak a
+		 * root-readable file through the filter parser, or redirect an
+		 * --exclude-from open via a planted parent.  Refuse symlinks not
+		 * owned by uid 0 or our euid. */
+		const char *open_path;
+		int fd;
 		if (daemon_filter_list.head) {
+			char *dir;
 			strlcpy(line, fname, sizeof line);
-			clean_fname(line, CFN_COLLAPSE_DOT_DOT_DIRS);
-			if (check_filter(&daemon_filter_list, FLOG, line, 0) < 0)
-				fp = NULL;
-			else
-				fp = fopen(line, "rb");
+			/* parse_merge_name() prepends module_dir for absolute paths,
+			 * so strip module_dirlen back off before the check or the
+			 * anchored module-relative daemon rule won't match (as
+			 * options.c does for --exclude-from/--include-from).  The
+			 * original absolute path is still used for the open below. */
+			dir = line + (*line == '/' ? module_dirlen : 0);
+			clean_fname(dir, CFN_COLLAPSE_DOT_DOT_DIRS);
+			if (check_filter(&daemon_filter_list, FLOG, dir, 0) < 0) {
+				/* Hidden by the daemon filter: treat the merge file as
+				 * non-existent rather than tripping XFLG_FATAL_ERRORS
+				 * below, so it neither errors out nor leaks a
+				 * fatal-vs-silent oracle. */
+				if (DEBUG_GTE(FILTER, 2)) {
+					rprintf(FINFO,
+						"[%s] parse_filter_file(%s) hidden by daemon filter\n",
+						who_am_i(), fname);
+				}
+				merge_depth--;
+				return;
+			}
+			open_path = line;
 		} else
-			fp = fopen(fname, "rb");
+			open_path = fname;
+		fd = open_no_attacker_symlinks(open_path, O_RDONLY, 0);
+		if (fd < 0)
+			fp = NULL;
+		else if (!(fp = fdopen(fd, "rb")))
+			close(fd);
 	} else
 		fp = stdin;
 
@@ -1481,6 +1560,7 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 				fname);
 			exit_cleanup(RERR_FILEIO);
 		}
+		merge_depth--;
 		return;
 	}
 	dirbuf[dirbuf_len] = '\0';
@@ -1517,6 +1597,7 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 			break;
 	}
 	fclose(fp);
+	merge_depth--;
 }
 
 /* If the "for_xfer" flag is set, the prefix is made compatible with the

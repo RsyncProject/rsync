@@ -154,7 +154,15 @@ static void syslog_init()
 static void logfile_open(void)
 {
 	mode_t old_umask = umask(022 | orig_umask);
-	logfile_fp = fopen(logfile_name, "a");
+	/* --log-file/`log file =` are operator-supplied paths that may transit
+	 * attacker-writable dirs; a planted symlink could redirect root's log
+	 * into e.g. /root/.ssh/authorized_keys.  Refuse symlinks not owned by
+	 * uid 0 or our euid. */
+	int fd = open_no_attacker_symlinks(logfile_name,
+						O_WRONLY | O_APPEND | O_CREAT, 0644);
+	logfile_fp = fd >= 0 ? fdopen(fd, "a") : NULL;
+	if (!logfile_fp && fd >= 0)
+		close(fd);
 	umask(old_umask);
 	if (!logfile_fp) {
 		int fopen_errno = errno;
@@ -273,8 +281,12 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 		if (am_daemon > 0 && code != FCLIENT)
 			code = FLOG;
 	} else if (send_msgs_to_gen) {
-		assert(!is_utf8);
-		/* Pass the message to our sibling in native charset. */
+		/* Pass the message to our sibling in native charset.  is_utf8
+		 * may be set here if a malicious peer sends MSG_INFO/MSG_ERROR
+		 * to a daemon receiver (read_a_msg passes !am_generator); the
+		 * old assert(!is_utf8) made that a remotely-reachable abort.
+		 * Forwarding the bytes raw is safe -- the generator's rwrite()
+		 * gets is_utf8=0 and filtered_fwrite escapes non-printables. */
 		send_msg((enum msgcode)code, buf, len, 0);
 		return;
 	}
@@ -691,7 +703,7 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 		case 'C':
 			n = NULL;
 			if (S_ISREG(file->mode)) {
-				if (always_checksum)
+				if (always_checksum && !(iflags & ITEM_DELETED))
 					n = sum_as_hex(file_sum_nni->num, F_SUM(file), 1);
 				else if (iflags & ITEM_TRANSFER)
 					n = sum_as_hex(xfer_sum_nni->num, sender_file_sum, 0);

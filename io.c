@@ -1076,11 +1076,17 @@ void send_msg_success(const char *fname, int num)
 		if (DEBUG_GTE(IO, 1))
 			rprintf(FINFO, "[%s] send_msg_success(%d)\n", who_am_i(), num);
 
-		if (stat(fname, &st) < 0)
-			memset(&st, 0, sizeof (STRUCT_STAT));
+		/* The dev/ino is consumed only by the sender's --remove-source-files
+		 * same-file safety check (successful_send), so skip the per-file
+		 * stat entirely otherwise -- it's sent but never read. */
+		if (remove_source_files && stat(fname, &st) == 0) {
+			SIVAL64(num_dev_ino_buf, 4, st.st_dev);
+			SIVAL64(num_dev_ino_buf, 4+8, st.st_ino);
+		} else {
+			SIVAL64(num_dev_ino_buf, 4, 0);
+			SIVAL64(num_dev_ino_buf, 4+8, 0);
+		}
 		SIVAL(num_dev_ino_buf, 0, num);
-		SIVAL64(num_dev_ino_buf, 4, st.st_dev);
-		SIVAL64(num_dev_ino_buf, 4+8, st.st_ino);
 		send_msg(MSG_SUCCESS, num_dev_ino_buf, sizeof num_dev_ino_buf, -1);
 	} else
 		send_msg_int(MSG_SUCCESS, num);
@@ -1305,6 +1311,8 @@ static void unbackslash_arg(char *s)
 	*t = '\0';
 }
 
+#define MAX_DAEMON_ARGS (MAX_ARGS * 16)
+
 void read_args(int f_in, char *mod_name, char *buf, size_t bufsiz, int rl_nulls,
 	       int unescape, char ***argv_p, int *argc_p, char **request_p)
 {
@@ -1327,6 +1335,11 @@ void read_args(int f_in, char *mod_name, char *buf, size_t bufsiz, int rl_nulls,
 	while (1) {
 		if (read_line(f_in, buf, bufsiz, rl_flags) == 0)
 			break;
+
+		if (mod_name && argc >= MAX_DAEMON_ARGS - 1) {
+			rprintf(FERROR, "too many daemon arguments\n");
+			exit_cleanup(RERR_PROTOCOL);
+		}
 
 		if (argc == maxargs-1) {
 			maxargs += MAX_ARGS;
@@ -1358,6 +1371,13 @@ void read_args(int f_in, char *mod_name, char *buf, size_t bufsiz, int rl_nulls,
 				dot_pos = argc;
 		}
 	}
+	/* glob_expand()/glob_match() reserve glob.argc+1 slots -- room for the
+	 * entry being added but not for this trailing NULL.  A post-dot line
+	 * whose " mod/" splits land argc on exactly maxargs (or any later
+	 * ENSURE_MEMSPACE doubling boundary) would otherwise make the next
+	 * store an 8-byte NULL write one slot past the argv allocation. */
+	if (argc >= maxargs)
+		argv = realloc_array(argv, char *, maxargs = argc + 1);
 	argv[argc] = NULL;
 
 	glob_expand(NULL, NULL, NULL, NULL);
@@ -1543,10 +1563,10 @@ static void read_a_msg(void)
 		if (msg_bytes != 4)
 			goto invalid_msg;
 		val = raw_read_int();
-		iobuf.in_multiplexed = 1;
 		io_error |= val;
 		if (am_receiver)
 			send_msg_int(MSG_IO_ERROR, val);
+		iobuf.in_multiplexed = 1;
 		break;
 	case MSG_IO_TIMEOUT:
 		if (msg_bytes != 4 || am_server || am_generator)
@@ -1563,17 +1583,17 @@ static void read_a_msg(void)
 		/* Support protocol-30 keep-alive method. */
 		if (msg_bytes != 0)
 			goto invalid_msg;
-		iobuf.in_multiplexed = 1;
 		if (am_sender)
 			maybe_send_keepalive(time(NULL), MSK_ALLOW_FLUSH);
+		iobuf.in_multiplexed = 1;
 		break;
 	case MSG_DELETED:
 		if (msg_bytes >= sizeof data)
 			goto overflow;
 		if (am_generator) {
 			raw_read_buf(data, msg_bytes);
-			iobuf.in_multiplexed = 1;
 			send_msg(MSG_DELETED, data, msg_bytes, 1);
+			iobuf.in_multiplexed = 1;
 			break;
 		}
 #ifdef ICONV_OPTION
@@ -1611,7 +1631,6 @@ static void read_a_msg(void)
 		} else
 #endif
 			raw_read_buf(data, msg_bytes);
-		iobuf.in_multiplexed = 1;
 		/* A directory name was sent with the trailing null */
 		if (msg_bytes > 0 && !data[msg_bytes-1])
 			log_delete(data, S_IFDIR);
@@ -1619,6 +1638,7 @@ static void read_a_msg(void)
 			data[msg_bytes] = '\0';
 			log_delete(data, S_IFREG);
 		}
+		iobuf.in_multiplexed = 1;
 		break;
 	case MSG_SUCCESS:
 		if (msg_bytes != (local_server ? 4+8+8 : 4)) {
@@ -1640,11 +1660,11 @@ static void read_a_msg(void)
 		if (msg_bytes != 4)
 			goto invalid_msg;
 		val = raw_read_int();
-		iobuf.in_multiplexed = 1;
 		if (am_generator)
 			got_flist_entry_status(FES_NO_SEND, val);
 		else
 			send_msg_int(MSG_NO_SEND, val);
+		iobuf.in_multiplexed = 1;
 		break;
 	case MSG_ERROR_SOCKET:
 	case MSG_ERROR_UTF8:
@@ -2052,6 +2072,21 @@ void read_sum_head(int f, struct sum_struct *sum)
 			(long)sum->blength, who_am_i());
 		exit_cleanup(RERR_PROTOCOL);
 	}
+	if (sum->count && sum->blength == 0) {
+		rprintf(FERROR, "Invalid zero block length [%s]\n",
+			who_am_i());
+		exit_cleanup(RERR_PROTOCOL);
+	}
+#if SIZEOF_CAPITAL_OFF_T < 8
+	/* The append-mode callers compute (OFF_T)count * blength; on a 32-bit
+	 * OFF_T that product can wrap even though both factors are individually
+	 * in range, corrupting the lseek/loop bounds.  Reject it early. */
+	if (sum->blength > 0 && sum->count > MAX_INT32 / sum->blength) {
+		rprintf(FERROR, "checksum count*blength overflows OFF_T [%s]\n",
+			who_am_i());
+		exit_cleanup(RERR_PROTOCOL);
+	}
+#endif
 	sum->s2length = protocol_version < 27 ? csum_length : (int)read_int(f);
 	if (sum->s2length < 0 || sum->s2length > xfer_sum_len) {
 		rprintf(FERROR, "Invalid checksum length %d [%s]\n",
@@ -2366,6 +2401,7 @@ int32 read_ndx(int f)
 {
 	static int32 prev_positive = -1, prev_negative = 1;
 	int32 *prev_ptr, num;
+	uint32 unum;
 	char b[4];
 
 	if (protocol_version < 30)
@@ -2385,11 +2421,20 @@ int32 read_ndx(int f)
 			b[3] = CVAL(b, 0) & ~0x80;
 			b[0] = b[1];
 			read_buf(f, b+1, 2);
-			num = IVAL(b, 0);
+			unum = IVAL(b, 0);
 		} else
-			num = (UVAL(b,0)<<8) + UVAL(b,1) + *prev_ptr;
+			unum = (UVAL(b,0)<<8) + UVAL(b,1) + (uint32)*prev_ptr;
 	} else
-		num = UVAL(b, 0) + *prev_ptr;
+		unum = UVAL(b, 0) + (uint32)*prev_ptr;
+	/* A peer-supplied index that overflows a signed int32 (used unchecked as a
+	 * file-list index) is a protocol violation -- reject it here rather than
+	 * relying on every downstream consumer to bounds-check. */
+	if (unum > (uint32)MAX_INT32) {
+		rprintf(FERROR, "Invalid file index: %lu [%s]\n",
+			(unsigned long)unum, who_am_i());
+		exit_cleanup(RERR_PROTOCOL);
+	}
+	num = (int32)unum;
 	*prev_ptr = num;
 	if (prev_ptr == &prev_negative)
 		num = -num;
