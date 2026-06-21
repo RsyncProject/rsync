@@ -123,7 +123,7 @@ int am_daemon = 0;
  * clientserver.c. NOT set for the daemon-level "daemon chroot = /X"
  * chroot: that confines path resolution to /X, but module paths
  * /X/modA, /X/modB, etc. are not chroot boundaries, so the per-module
- * symlink-race defenses (secure_relative_open() / do_*_at() in
+ * symlink-race defenses (vfs_resolve_open() / do_*_at() in
  * syscall.c, gated by `am_daemon && !am_chrooted`) must still fire
  * even when the daemon is inside a daemon chroot. */
 int am_chrooted = 0;

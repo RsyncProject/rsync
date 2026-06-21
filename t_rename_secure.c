@@ -1,6 +1,6 @@
 /*
  * Test harness for do_rename_at(): a mixed top-level/slashed rename must still
- * resolve the slashed side's parent under secure_relative_open() rather than
+ * resolve the slashed side's parent under vfs_resolve_open() rather than
  * fall back to plain rename(). Not linked into rsync. GPL version 2.
  */
 
@@ -23,7 +23,7 @@ static int errs = 0;
 
 #ifdef AT_FDCWD
 /* The 3.4.3 bug: if either side has no slash the whole op fell back to plain
- * rename(), leaving the slashed side's parent outside secure_relative_open(). */
+ * rename(), leaving the slashed side's parent outside vfs_resolve_open(). */
 static int vulnerable_mixed_rename_at(const char *old_path, const char *new_path)
 {
 	const char *old_slash, *new_slash;

@@ -20,7 +20,7 @@
 #include "vfs/vfs_internal.h"
 
 /* Returns 1 if path has any "/"-separated component that is exactly
- * "..", 0 otherwise. Used by secure_relative_open's front-door
+ * "..", 0 otherwise. Used by vfs_resolve_open's front-door
  * validation to reject ".." inputs (bare "..", "foo/..", "subdir/..")
  * for non-re-anchored paths; the walk itself resolves an in-tree ".."
  * safely (ds_descend pops to the held parent) for a re-anchored path. */

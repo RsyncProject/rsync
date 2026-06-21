@@ -42,14 +42,12 @@ size_t max_alloc = (size_t)-1; /* test helpers are not memory-constrained;
 				* 0 here makes every my_alloc()/my_strdup() in
 				* util2.c trip the "exceeded --max-alloc=0"
 				* check, which any helper exercising the
-				* per-component fallback of secure_relative_open()
+				* per-component fallback of vfs_resolve_open()
 				* hits at its first my_strdup() call. */
 char *partial_dir;
 char *module_dir;
 int module_dirfd = -1;
-char *confine_root;
-unsigned int confine_rootlen = 0;
-/* curr_dir[]/curr_dir_len (read by secure_relative_open) are defined in
+/* curr_dir[]/curr_dir_len (read by vfs_resolve_open) are defined in
  * syscall.c, which every helper links -- no stub needed here. */
 filter_rule_list daemon_filter_list;
 

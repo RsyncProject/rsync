@@ -87,7 +87,7 @@ static int updating_basis_or_equiv;
 
 /* Open a basis/output path that may legitimately be an operator-trusted
  * ABSOLUTE path -- e.g. an absolute --partial-dir ("a directory reserved for
- * partial-dir work") or --backup-dir. secure_relative_open() deliberately
+ * partial-dir work") or --backup-dir. vfs_resolve_open() deliberately
  * rejects an absolute relpath, so feeding it the whole absolute partialptr
  * (with a NULL basedir) returns EINVAL: the basis fd is then -1, no basis is
  * mapped, and receive_data() omits every matched block from the whole-file
@@ -121,7 +121,7 @@ static int secure_basis_open(const char *basedir, const char *relpath, int flags
 
 	/* A peer-supplied --partial-dir basis/staging path (operator_path_resolve set
 	 * by recv_files) may be absolute (module_dir-prefixed on a non-chroot daemon)
-	 * and traverse a symlink the secure_relative_open path can't confine: resolve
+	 * and traverse a symlink the vfs_resolve_open path can't confine: resolve
 	 * it with the ownership walk, which follows a uid0/euid-owned symlink but
 	 * refuses a foreign one AND (via abspath_excluded_by_module) refuses a target
 	 * the module's exclude hides -- closing the partial-dir exclude bypass. */
@@ -147,7 +147,7 @@ static int secure_basis_open(const char *basedir, const char *relpath, int flags
 	 * "use chroot = yes" makes the kernel root the boundary, so there an alt-dest
 	 * basis like --link-dest=../01 must resolve against the cwd as a bare open did
 	 * before the hardening (confining it would reject the legitimate sibling
-	 * "..", #915).  The re-anchoring in secure_relative_open() covers the
+	 * "..", #915).  The re-anchoring in vfs_resolve_open() covers the
 	 * in-module ".." climb for the inner-module case too. */
 	if (!am_daemon || (am_chrooted && !module_dirlen)) {
 		if (basedir) {
@@ -178,9 +178,9 @@ static int secure_basis_open(const char *basedir, const char *relpath, int flags
 			dirbuf[dlen] = '\0';
 			dir = dirbuf;
 		}
-		return secure_relative_open(dir, leaf, flags, mode);
+		return vfs_resolve_open(dir, leaf, flags, mode);
 	}
-	return secure_relative_open(basedir, relpath, flags, mode);
+	return vfs_resolve_open(basedir, relpath, flags, mode);
 }
 
 /* Keep the ownership policy for every attempt to open a one-inplace partial
@@ -418,14 +418,14 @@ int open_tmpfile(char *fnametmp, const char *fname, struct file_struct *file)
 	 * access to ensure that there is no race condition.  They will be
 	 * correctly updated after the right owner and group info is set.
 	 * (Thanks to snabb@epipe.fi for pointing this out.) */
-	/* For any non-chrooted receiver (secure_relpath_active()), create the
+	/* For any non-chrooted receiver (vfs_relpath_active()), create the
 	 * temp file securely so a parent-symlink race can't redirect it.  When
 	 * the temp lives in the entry's own dir (the common case, no --temp-dir)
 	 * use the cached held dir fd; otherwise fall back to secure_mkstemp.  An
 	 * operator-supplied --temp-dir (tmpdir) gets the ownership-walk resolver
 	 * (it may legitimately point outside the tree); the deep-entry-dir fallback,
 	 * when the held-dirfd cache declines, gets the strict transfer-path one. */
-	if (secure_relpath_active()) {
+	if (vfs_relpath_active()) {
 		int dfd = held_dfd_for(fnametmp, file);
 		if (dfd >= 0) {
 			char *slash = strrchr(fnametmp, '/');
@@ -1194,33 +1194,56 @@ int recv_files(int f_in, int f_out, char *local_name)
 		/* We now check to see if we are writing the file "inplace" */
 		if (inplace || one_inplace)  {
 			fnametmp = one_inplace ? partialptr : fname;
-			/* For any non-chrooted receiver (secure_relpath_active()),
+			/* For any non-chrooted receiver (vfs_relpath_active()),
 			 * use secure open to prevent symlink race attacks where an
 			 * attacker could switch a directory to a symlink between
 			 * path validation and file open. */
 			/* one_inplace stages into the operator/peer --partial-dir path:
 			 * resolve it with the ownership walk (exclude-aware) so it can't be
 			 * redirected through a symlink into an excluded subtree. */
-			if (secure_relpath_active())
-				fd2 = secure_recv_open(fnametmp, O_WRONLY|O_CREAT, 0600,
-						      one_inplace);
+			if (one_inplace)
+				operator_path_resolve = 1;
+			if (vfs_relpath_active())
+				fd2 = secure_basis_open(NULL, fnametmp, O_WRONLY|O_CREAT, 0600);
 			else
 				fd2 = do_open(fnametmp, O_WRONLY|O_CREAT, 0600);
 #ifdef linux
 			if (fd2 == -1 && errno == EACCES) {
 				/* Maybe the error was due to protected_regular setting? */
-				if (use_secure_symlinks || one_inplace)
-					fd2 = secure_recv_open(fnametmp, O_WRONLY, 0600,
-							      one_inplace);
+				if (use_secure_symlinks)
+					fd2 = vfs_resolve_open(NULL, fnametmp, O_WRONLY, 0600);
 				else
 					fd2 = do_open(fnametmp, O_WRONLY, 0600);
 			}
 #endif
 			if (fd2 == -1 && errno == EACCES) {
-				/* Temporarily add owner-write access only long enough to open
-				 * a writable descriptor; the helper restores the old mode
-				 * before any network data is consumed, including on failure. */
-				fd2 = open_readonly_inplace(fnametmp, one_inplace);
+				/* A read-only existing file: make it writable, then retry
+				 * (its mode is restored after the transfer).  On a
+				 * non-chroot daemon fchmod() a no-follow fd rather than
+				 * chmod the path, so a symlink raced into fnametmp can't
+				 * redirect the chmod (do_chmod_at follows the final link). */
+				int errno_save = errno, chmod_ok;
+				if (use_secure_symlinks) {
+#ifdef O_NOFOLLOW
+					int cfd = vfs_resolve_open(NULL, fnametmp, O_RDONLY|O_NOFOLLOW, 0);
+					chmod_ok = cfd != -1 && fchmod(cfd, 0600) == 0;
+					if (cfd != -1)
+						close(cfd);
+#else
+					/* Without O_NOFOLLOW the resolver's oldest fallback would
+					 * follow a raced symlink, so fail closed rather than
+					 * chmod through it. */
+					chmod_ok = 0;
+#endif
+				} else
+					chmod_ok = do_chmod_at(fnametmp, 0600) == 0;
+				if (chmod_ok) {
+					if (use_secure_symlinks)
+						fd2 = vfs_resolve_open(NULL, fnametmp, O_WRONLY, 0600);
+					else
+						fd2 = do_open(fnametmp, O_WRONLY, 0600);
+				} else
+					errno = errno_save;
 			}
 			if (fd2 == -1) {
 				rsyserr(FERROR_XFER, errno, "open %s failed",

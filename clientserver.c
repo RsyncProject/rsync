@@ -1087,7 +1087,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	 * the receiver finish/rename path must still resolve beneath the module
 	 * root.  This prevents TOCTOU race attacks where an attacker could switch a
 	 * directory to a symlink between path validation and file open.  Match the
-	 * gate in secure_relpath_active() (syscall.c) -- the protection has nothing
+	 * gate in vfs_relpath_active() (syscall.c) -- the protection has nothing
 	 * to do with symlink munging, so a module configured with "munge symlinks =
 	 * false" must still get the secure-open path. */
 	use_secure_symlinks = am_daemon && (!am_chrooted || module_dirlen)
@@ -1477,7 +1477,7 @@ int start_daemon(int f_in, int f_out)
 		}
 		/* Deliberately do NOT set am_chrooted here.  am_chrooted
 		 * gates the per-module symlink-race defenses
-		 * (secure_relative_open() and the do_*_at() wrappers in
+		 * (vfs_resolve_open() and the do_*_at() wrappers in
 		 * syscall.c) and means "the kernel is enforcing path
 		 * confinement at the module boundary".  The daemon chroot
 		 * confines path resolution to the daemon-chroot directory,
@@ -1486,7 +1486,7 @@ int start_daemon(int f_in, int f_out)
 		 * subtrees and a sender-controlled symlink in module A
 		 * could redirect a syscall to module B (or to other files
 		 * inside the daemon chroot) without the per-module
-		 * defenses.  Leave am_chrooted=0 here so secure_relative_open()
+		 * defenses.  Leave am_chrooted=0 here so vfs_resolve_open()
 		 * still fires for "use chroot = no" modules. */
 		if (chdir("/") < 0) {
 			rsyserr(FLOG, errno, "daemon chdir(\"/\") failed");

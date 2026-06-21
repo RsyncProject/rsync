@@ -141,7 +141,7 @@ static int secure_sender_parent_fd(struct file_struct *file, const char *fname, 
 				return dup(dfd);
 			if (errno != 0)
 				return -1;
-			return secure_relative_open(NULL, dir, O_RDONLY | O_DIRECTORY, 0);
+			return vfs_resolve_open(NULL, dir, O_RDONLY | O_DIRECTORY, 0);
 		}
 		errno = 0;	/* top-level file: no parent component to confine */
 		return -1;
@@ -176,9 +176,9 @@ static int secure_sender_parent_fd(struct file_struct *file, const char *fname, 
 		}
 		memcpy(dir, relp, dlen);
 		dir[dlen] = '\0';
-		dfd = secure_relative_open(module_dir, dir, O_RDONLY | O_DIRECTORY, 0);
+		dfd = vfs_resolve_open(module_dir, dir, O_RDONLY | O_DIRECTORY, 0);
 	} else
-		dfd = secure_relative_open(module_dir, "", O_RDONLY | O_DIRECTORY, 0);
+		dfd = vfs_resolve_open(module_dir, "", O_RDONLY | O_DIRECTORY, 0);
 
 	/* The leaf is the same last component either way; take it from the caller's
 	 * persistent fname buffer, not the local secure_path. */
@@ -206,7 +206,7 @@ static int secure_remove_source_file(int dfd, const char *bname)
 /* Open `relpath` (relative to `anchor`: NULL=cwd, else an absolute trusted root)
  * with `flags`, opening the leaf via the shared held ancestor-dirfd stack
  * (held_dir_path_fd) so a directory is walked once, not once per file.  The leaf
- * semantics are identical to secure_relative_open() -- it always O_NOFOLLOWs a
+ * semantics are identical to vfs_resolve_open() -- it always O_NOFOLLOWs a
  * file leaf and folds in O_NOATIME, both preserved here.  An uncacheable path
  * (held_dir_path_fd returns -1) falls back to the full confined walk. */
 static int sender_open_confined(const char *anchor, const char *relpath, int flags)
@@ -239,12 +239,12 @@ static int sender_open_confined(const char *anchor, const char *relpath, int fla
 #endif
 	dfd = held_dir_path_fd(anchor, dir);
 	if (dfd < 0)
-		return secure_relative_open(anchor, relpath, flags | O_NOFOLLOW, 0);
+		return vfs_resolve_open(anchor, relpath, flags | O_NOFOLLOW, 0);
 	return openat(dfd, bname, flags | O_NOFOLLOW, 0);
 #else
-	/* No *at() support: secure_relative_open is a plain open() here (no walk,
+	/* No *at() support: vfs_resolve_open is a plain open() here (no walk,
 	 * so nothing to amortise); use it directly to keep the anchor semantics. */
-	return secure_relative_open(anchor, relpath, flags | O_NOFOLLOW, 0);
+	return vfs_resolve_open(anchor, relpath, flags | O_NOFOLLOW, 0);
 #endif
 }
 
@@ -253,7 +253,7 @@ static int sender_open_confined(const char *anchor, const char *relpath, int fla
  * O_NOFOLLOW that sender_open_confined() applies refuses an in-tree symlink the
  * operator explicitly asked to follow, so resolve the link ourselves: read it,
  * refuse an absolute or "../"-escaping target (a module escape), and re-resolve
- * the relative target through secure_relative_open() -- which follows in-tree
+ * the relative target through vfs_resolve_open() -- which follows in-tree
  * links and rejects an escape above the anchor -- looping for a symlink chain.
  * The final open is still O_NOFOLLOW, so a raced flip at the resolved leaf is
  * refused.  This keeps the module boundary while honouring --copy-links. */
@@ -287,17 +287,7 @@ static int sender_open_copylinks_confined(const char *anchor, const char *relpat
 			dir[0] = '\0';
 			bname = cur;
 		}
-		/* anchor is checked explicitly: the resolver treats a NULL anchor as
-		 * "relative to cwd", so it is a legal argument for the else branch --
-		 * only this branch would hand it to strcmp(). */
-		if (am_daemon && module_dirfd >= 0 && module_dir && anchor
-		 && strcmp(anchor, module_dir) == 0)
-			pdfd = secure_relative_open_at_beneath(module_dirfd, dir,
-					O_RDONLY | O_DIRECTORY, 0);
-		else
-			pdfd = secure_relative_open(anchor, dir,
-					O_RDONLY | O_DIRECTORY, 0);
-		if (pdfd < 0)
+		if ((pdfd = vfs_resolve_open(anchor, dir, O_RDONLY | O_DIRECTORY, 0)) < 0)
 			return -1;
 		n = do_readlink_atfd(pdfd, bname, tgt, sizeof tgt - 1);
 		e = errno;
@@ -327,7 +317,7 @@ static int sender_open_copylinks_confined(const char *anchor, const char *relpat
 	errno = ELOOP;
 	return -1;
 #else
-	return secure_relative_open(anchor, relpath, O_RDONLY | O_NOFOLLOW, 0);
+	return vfs_resolve_open(anchor, relpath, O_RDONLY | O_NOFOLLOW, 0);
 #endif
 }
 
@@ -647,13 +637,13 @@ void send_files(int f_in, int f_out)
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
-		if (symlink_optout_allowed()) {
+		if (vfs_symlink_optout_allowed()) {
 			/* Module opted out of symlink confinement ("insecure links =
 			 * yes", admin-only) -- or a non-daemon --insecure-links: legacy
 			 * unconfined open, restoring the pre-hardening content read
 			 * (re-opening the escape for that module; documented). */
 			fd = do_open_checklinks(fname);
-		} else if (secure_relpath_active()) {
+		} else if (vfs_relpath_active()) {
 			/* Open from module root to prevent TOCTOU race where
 			 * change_pathname's chdir follows a directory symlink.
 			 * Reconstruct the full path relative to module_dir
@@ -671,7 +661,7 @@ void send_files(int f_in, int f_out)
 			}
 			/* A module with `path = /` makes F_PATHNAME absolute, so the
 			 * joined path starts with '/'; strip leading slashes to a
-			 * module-relative path that secure_relative_open accepts (#897). */
+			 * module-relative path that vfs_resolve_open accepts (#897). */
 			relp = secure_path;
 			while (*relp == '/')
 				relp++;

@@ -2015,14 +2015,14 @@ static void interpret_stat_error(const char *fname, int is_dir)
 
 #if defined HAVE_FDOPENDIR && defined HAVE_DIRFD
 /* Open a source directory for scanning confined beneath the transfer root.
- * secure_relative_open() does a per-component O_NOFOLLOW walk that refuses a
+ * vfs_resolve_open() does a per-component O_NOFOLLOW walk that refuses a
  * parent component raced into a symlink pointing out of the tree; fdopendir()
  * then turns the held fd into the DIR* the scan reads.  This mirrors the
  * sender's confined content open (sender.c): the directory enumeration must be
  * confined the same way, or a parent-symlink race (or, for a daemon following
  * mode, an in-module symlink to outside) lets the scan enumerate an out-of-tree
  * directory and leak its names/metadata/symlink targets.  O_DIRECTORY without
- * O_NOFOLLOW makes secure_relative_open() follow in-tree directory symlinks
+ * O_NOFOLLOW makes vfs_resolve_open() follow in-tree directory symlinks
  * beneath the anchor and refuse escapes, so this serves both the default
  * no-follow scan and a daemon's symlink-following scan (see the caller).
  * Returns NULL with errno set on failure, like opendir(). */
@@ -2056,7 +2056,7 @@ static DIR *secure_opendir(const char *fbuf)
 			errno = ENAMETOOLONG;
 			return NULL;
 		}
-		dfd = secure_relative_open_at(module_dirfd, *modrel ? modrel : ".",
+		dfd = vfs_resolve_open_at(module_dirfd, *modrel ? modrel : ".",
 					      O_RDONLY | O_DIRECTORY, 0);
 	} else if (*fbuf == '/') {
 		/* An absolute scan path (an absolute --relative / --files-from name, or a
@@ -2064,11 +2064,11 @@ static DIR *secure_opendir(const char *fbuf)
 		const char *relp = fbuf;
 		while (*relp == '/')
 			relp++;
-		dfd = secure_relative_open("/", relp, O_RDONLY | O_DIRECTORY, 0);
+		dfd = vfs_resolve_open("/", relp, O_RDONLY | O_DIRECTORY, 0);
 	} else {
 		/* Non-daemon (or chrooted) sender: confine beneath the cwd the sender
 		 * chdir'd into (the transfer root). */
-		dfd = secure_relative_open(NULL, fbuf, O_RDONLY | O_DIRECTORY, 0);
+		dfd = vfs_resolve_open(NULL, fbuf, O_RDONLY | O_DIRECTORY, 0);
 	}
 
 	if (dfd < 0)
@@ -2106,7 +2106,7 @@ static void send_directory(int f, struct file_list *flist, char *fbuf, int len,
 	/* Confine the enumeration beneath the transfer root.  secure_opendir()
 	 * follows in-tree directory symlinks (RESOLVE_BENEATH) and refuses one that
 	 * escapes, so it serves both modes:
-	 *   - a daemon/hardened sender (secure_relpath_active()) is confined to the
+	 *   - a daemon/hardened sender (vfs_relpath_active()) is confined to the
 	 *     module in EVERY mode -- including -L/--copy-dirlinks/--copy-unsafe-
 	 *     links, matching the content open (sender_open_copylinks_confined) --
 	 *     so a following mode cannot be lured to enumerate outside the module;
@@ -2118,7 +2118,7 @@ static void send_directory(int f, struct file_list *flist, char *fbuf, int len,
 	 * yes", admin-only) -- or a non-daemon --insecure-links -- uses the legacy
 	 * opendir() too, restoring the pre-hardening enumeration (re-opening the
 	 * escape; documented). */
-	if (f >= 0 && !symlink_optout_allowed() && (secure_relpath_active()
+	if (f >= 0 && !vfs_symlink_optout_allowed() && (vfs_relpath_active()
 		    || !(copy_links || copy_unsafe_links || copy_dirlinks || insecure_links)))
 		d = secure_opendir(fbuf);
 	else

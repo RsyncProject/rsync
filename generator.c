@@ -955,7 +955,7 @@ static int copy_altdest_file(const char *src, const char *dest, struct file_stru
 /* Stat an alternate-basis candidate (basis_dir[j]/fname) for a daemon /./
  * inner-module chroot through the secure resolver, so a --compare/copy/link-dest
  * basis can't reach outside the inner module via a symlinked parent (the kernel
- * chroot confines only the outer path).  secure_relative_open() refuses a parent
+ * chroot confines only the outer path).  vfs_resolve_open() refuses a parent
  * that escapes beneath the module root.  Plain link_stat() everywhere else --
  * the non-chroot daemon sanitizes basis paths already, and a local receiver must
  * still follow an operator's --link-dest=../backup. */
@@ -976,7 +976,7 @@ static int basis_link_stat(const char *path, STRUCT_STAT *stp)
 	 * resolver) below.  Only when am_root >= 0: link_stat_at() omits the
 	 * fake-super %stat xattr that link_stat() folds in, so --fake-super keeps
 	 * the plain path (a lower-severity, non-root basis lookup). */
-	if (!am_daemon && am_root >= 0 && !symlink_optout_allowed()) {
+	if (!am_daemon && am_root >= 0 && !vfs_symlink_optout_allowed()) {
 		const char *leaf;
 		int dfd = owner_walk_parent(path, &leaf);
 		int r, e;
@@ -1052,7 +1052,7 @@ static int basis_link_stat(const char *path, STRUCT_STAT *stp)
 			if (dlen >= sizeof dir) { errno = ENAMETOOLONG; return -1; }
 			memcpy(dir, path, dlen);
 			dir[dlen] = '\0';
-			if ((dfd = secure_relative_open(NULL, dir, O_RDONLY | O_DIRECTORY, 0)) < 0)
+			if ((dfd = vfs_resolve_open(NULL, dir, O_RDONLY | O_DIRECTORY, 0)) < 0)
 				return -1;
 			r = link_stat_at(dfd, slash + 1, stp, 0);
 			e = errno;
@@ -1125,7 +1125,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 			 * symlink raced in after the basis_link_stat() check is still
 			 * refused (matching basis_link_stat's !am_daemon gate).  A daemon
 			 * keeps its stronger module-anchored confinement (do_link_at's
-			 * secure_relpath_active path) -- the ownership walk would follow an
+			 * vfs_relpath_active path) -- the ownership walk would follow an
 			 * operator-owned symlink out of the module. */
 			int hlok, op = !am_daemon;
 			if (op)

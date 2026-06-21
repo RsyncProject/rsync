@@ -57,4 +57,10 @@ extern struct vfs vfs;
  * from the static initializer in vfs/vfs.c, not from this call. */
 void vfs_init(void);
 
+/* Race-safe path resolution (vfs/secure_open.c). */
+int vfs_relpath_active(void);
+int vfs_symlink_optout_allowed(void);
+int vfs_resolve_open(const char *basedir, const char *relpath, int flags, mode_t mode);
+int vfs_resolve_open_at(int anchor_fd, const char *relpath, int flags, mode_t mode);
+
 #endif /* RSYNC_VFS_H */

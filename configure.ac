@@ -373,7 +373,7 @@ return SYS_openat2 + (int)how.resolve;
 if test x"$enable_openat2" != x"no"; then
     if test x"$rsync_cv_HAVE_OPENAT2" = x"yes"; then
       AC_DEFINE([HAVE_OPENAT2], 1,
-        [Define to use Linux openat2(RESOLVE_BENEATH) in secure_relative_open where available.])
+        [Define to use Linux openat2(RESOLVE_BENEATH) in vfs_resolve_open where available.])
     fi
 fi
 

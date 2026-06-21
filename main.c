@@ -1782,7 +1782,7 @@ static void unset_env_var(const char *var)
 }
 
 
-/* The symlink-race-safe path resolver (secure_relative_open) holds one open
+/* The symlink-race-safe path resolver (vfs_resolve_open) holds one open
  * dirfd per path component while it walks a path, plus an ancestor-dirfd cache
  * -- far more descriptors than legacy rsync's single open().  On a host with a
  * low default soft limit (e.g. OpenBSD's 128) a deep tree can hit EMFILE.
