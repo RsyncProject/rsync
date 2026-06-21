@@ -14,15 +14,14 @@ on:
   workflow_dispatch:
 
 jobs:
-  # PINNED run: clang-18 on a pinned runner (ubuntu-24.04, whose apt repos carry
-  # clang-18/clang-tools-18) so the checker set -- and thus the report -- is
-  # deterministic.  Informational for now: the tree still has known clang-18
-  # findings, so this surfaces the report without blocking.  Once the tree is at
-  # zero for clang-18, re-add --status-bugs to the scan-build step below to turn
-  # this back into a gate.
-  pinned-clang18:
+  # GATING run: pinned clang-18 on a pinned runner so the checker set -- and
+  # thus the expected zero -- is deterministic.  The tree is kept clean for
+  # clang-18, so --status-bugs (non-zero exit on any report) fails the build
+  # when a new finding appears.  Pin both the analyzer (clang-18/clang-tools-18)
+  # and the runner (ubuntu-24.04, whose apt repos carry those packages).
+  gate-clang18:
     runs-on: ubuntu-24.04
-    name: scan-build (clang-18, pinned)
+    name: scan-build gate (clang-18, pinned)
     steps:
     - uses: actions/checkout@v4
       with:
@@ -35,15 +34,17 @@ jobs:
       # Run configure under scan-build so its analyzer compiler-wrapper is baked
       # into the Makefile's $(CC); --disable-md2man avoids the doc toolchain.
       run: scan-build-18 ./configure --with-rrsync --disable-md2man
-    - name: scan-build (pinned clang-18)
-      # Informational: no --status-bugs, so existing findings don't fail the
-      # build; the report is summarised and uploaded for triage.  Re-add
-      # --status-bugs here (and 'set -o pipefail; ...; exit $status') to gate
-      # once the tree is at zero for clang-18.
+    - name: scan-build (gating)
+      # --status-bugs makes scan-build exit non-zero if it finds ANY report.
+      # pipefail + 'exit $status' propagate that through the tee so the job goes
+      # red while still printing the summary; the report uploads for triage.
       run: |
-        scan-build-18 -o "$PWD/scan-report" make check-progs -j"$(nproc)" 2>&1 | tee scan-build.out
-        echo '## scan-build (clang-18, pinned)' >>"$GITHUB_STEP_SUMMARY"
+        set -o pipefail
+        status=0
+        scan-build-18 --status-bugs -o "$PWD/scan-report" make check-progs -j"$(nproc)" 2>&1 | tee scan-build.out || status=$?
+        echo '## scan-build gate (clang-18)' >>"$GITHUB_STEP_SUMMARY"
         grep -E 'scan-build: .* bugs? found|scan-build: No bugs found' scan-build.out >>"$GITHUB_STEP_SUMMARY" || true
+        exit $status
     - name: upload report
       if: always()
       uses: actions/upload-artifact@v4
@@ -53,7 +54,8 @@ jobs:
         if-no-files-found: ignore
 
   # INFORMATIONAL run: whatever clang ubuntu-latest currently ships.  Newer
-  # clang releases enable extra, FP-heavy checkers that the gate deliberately
+  # clang releases enable extra, FP-heavy checkers (e.g. unix.Chroot
+  # "no chdir after chroot", alpha.unix.Stream) that the gate deliberately
   # avoids, so this is NOT a gate (no --status-bugs).  It surfaces what the
   # newest analyzer sees -- useful for spotting genuine new findings before a
   # gate bump -- without blocking merges.  continue-on-error keeps a noisy or
