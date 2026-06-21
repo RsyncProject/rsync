@@ -1876,9 +1876,10 @@ expand it.
     The "auto" option is the default, where rsync bases its algorithm choice on
     a negotiation between the client and the server as follows:
 
-    When both sides of the transfer are at least 3.2.0, rsync chooses the first
-    algorithm in the client's list of choices that is also in the server's list
-    of choices.  If no common checksum choice is found, rsync exits with
+    When both sides of the transfer are at least 3.2.0, each side chooses its own
+    most-preferred algorithm that also appears in the peer's list.  Both sides
+    order their lists strongest-first, so they converge on the strongest mutual
+    choice.  If no common checksum choice is found, rsync exits with
     an error.  If the remote rsync is too old to support checksum negotiation,
     a value is chosen based on the protocol version (which chooses between MD5
     and various flavors of MD4 based on protocol age).
@@ -2813,9 +2814,10 @@ expand it.
     Run `rsync --version` to see the default compress list compiled into your
     version.
 
-    When both sides of the transfer are at least 3.2.0, rsync chooses the first
-    algorithm in the client's list of choices that is also in the server's list
-    of choices.  If no common compress choice is found, rsync exits with
+    When both sides of the transfer are at least 3.2.0, each side chooses its own
+    most-preferred algorithm that also appears in the peer's list.  Both sides
+    order their lists strongest-first, so they converge on the strongest mutual
+    choice.  If no common compress choice is found, rsync exits with
     an error.  If the remote rsync is too old to support checksum negotiation,
     its list is assumed to be "zlib".
 
