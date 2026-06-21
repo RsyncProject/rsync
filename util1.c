@@ -357,7 +357,7 @@ static int unlink_and_reopen(const char *dest, mode_t mode)
 	/* Use do_open_at so the create/truncate goes through a secure
 	 * parent dirfd in the daemon-no-chroot deployment. Otherwise
 	 * an attacker could swap a parent component with a symlink in
-	 * the window between robust_unlink (which uses do_unlink_at,
+	 * the window between robust_unlink (which uses vfs_unlink_at,
 	 * already secure) and the create here, and redirect the new
 	 * file outside the module. */
 	if ((ofd = do_open_at(dest, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, mode)) < 0) {
@@ -518,13 +518,13 @@ int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
 int robust_unlink(const char *fname)
 {
 #ifndef ETXTBSY
-	return do_unlink_at(fname);
+	return vfs_unlink_at(fname);
 #else
 	static int counter = 1;
 	int rc, pos, start;
 	char path[MAXPATHLEN];
 
-	rc = do_unlink_at(fname);
+	rc = vfs_unlink_at(fname);
 	if (rc == 0 || errno != ETXTBSY)
 		return rc;
 
@@ -624,7 +624,7 @@ int robust_rename(const char *from, const char *to, const char *partialptr,
 				return -2;
 			if (*from == '/')
 				operator_path_resolve = 1;
-			do_unlink_at(from);
+			vfs_unlink_at(from);
 			operator_path_resolve = save;
 			return 1;
 		}
@@ -1493,7 +1493,7 @@ int handle_partial_dir(const char *fname, int create)
 		STRUCT_STAT st;
 		int statret = vfs_lstat_at(dir, &st);
 		if (statret == 0 && !S_ISDIR(st.st_mode)) {
-			if (do_unlink_at(dir) < 0) {
+			if (vfs_unlink_at(dir) < 0) {
 				vfs.operator_path_resolve = 0;
 				*fn = '/';
 				return 0;
@@ -1506,7 +1506,7 @@ int handle_partial_dir(const char *fname, int create)
 			return 0;
 		}
 	} else
-		do_rmdir_at(dir);
+		vfs_rmdir_at(dir);
 	vfs.operator_path_resolve = 0;
 	*fn = '/';
 

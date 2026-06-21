@@ -68,84 +68,6 @@ struct create_time {
 #endif
 
 
-int do_unlink(const char *path)
-{
-	if (dry_run) return 0;
-	RETURN_ERROR_IF_RO_OR_LO;
-	return unlink(path);
-}
-
-/*
-  Symlink-race-safe variant of do_unlink() for receiver-side use. See
-  the comment on do_chmod_at() for the threat model. unlink() resolves
-  parent components, so a parent-symlink swap can delete an outside
-  file under the daemon's authority. Defence: open the parent of path
-  under vfs_resolve_open() and use unlinkat() (flags=0) against
-  that dirfd.
-
-  Falls through to do_unlink() for the same dry-run / non-daemon /
-  chrooted / no-parent / absolute-path cases as the other wrappers.
-*/
-int do_unlink_at(const char *path)
-{
-#ifdef AT_FDCWD
-	char dirpath[MAXPATHLEN];
-	const char *bname;
-	const char *slash;
-	int dfd, ret, e;
-	size_t dlen;
-
-	if (dry_run) return 0;
-	RETURN_ERROR_IF_RO_OR_LO;
-	RETURN_ERROR_IF_NULL(path);
-
-#if defined O_NOFOLLOW && defined O_DIRECTORY
-	if (vfs.operator_path_resolve) {
-		if (vfs_symlink_optout_allowed())
-			return unlink(path);
-		dfd = vfs_owner_walk_parent(path, &bname);
-		if (dfd < 0)
-			return -1;
-		ret = unlinkat(dfd, bname, 0);
-		e = errno;
-		close(dfd);
-		errno = e;
-		return ret;
-	}
-#endif
-
-	if (!vfs_relpath_active())
-		return unlink(path);
-
-	if (!path || !*path || *path == '/')
-		return unlink(path);
-
-	slash = strrchr(path, '/');
-	if (!slash)
-		return unlink(path);
-
-	dlen = slash - path;
-	if (dlen >= sizeof dirpath) {
-		errno = ENAMETOOLONG;
-		return -1;
-	}
-	memcpy(dirpath, path, dlen);
-	dirpath[dlen] = '\0';
-	bname = slash + 1;
-
-	dfd = vfs_resolve_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
-	if (dfd < 0)
-		return -1;
-
-	ret = unlinkat(dfd, bname, 0);
-	e = errno;
-	close(dfd);
-	errno = e;
-	return ret;
-#else
-	return do_unlink(path);
-#endif
-}
 
 #ifdef SUPPORT_LINKS
 int do_symlink(const char *lnk, const char *path)
@@ -794,78 +716,6 @@ int do_mknod_at(const char *pathname, mode_t mode, dev_t dev)
 #endif
 }
 
-int do_rmdir(const char *pathname)
-{
-	if (dry_run) return 0;
-	RETURN_ERROR_IF_RO_OR_LO;
-	return rmdir(pathname);
-}
-
-/*
-  Symlink-race-safe variant of do_rmdir(). See do_unlink_at() above;
-  same shape but with AT_REMOVEDIR set to require the target be a
-  directory.
-*/
-int do_rmdir_at(const char *pathname)
-{
-#ifdef AT_FDCWD
-	char dirpath[MAXPATHLEN];
-	const char *bname;
-	const char *slash;
-	int dfd, ret, e;
-	size_t dlen;
-
-	if (dry_run) return 0;
-	RETURN_ERROR_IF_RO_OR_LO;
-	RETURN_ERROR_IF_NULL(pathname);
-
-#if defined O_NOFOLLOW && defined O_DIRECTORY
-	if (operator_path_resolve) {
-		if (vfs_symlink_optout_allowed())
-			return do_rmdir(pathname);
-		dfd = owner_walk_parent(pathname, &bname);
-		if (dfd < 0)
-			return -1;
-		ret = unlinkat(dfd, bname, AT_REMOVEDIR);
-		e = errno;
-		close(dfd);
-		errno = e;
-		return ret;
-	}
-#endif
-
-	if (!vfs_relpath_active())
-		return rmdir(pathname);
-
-	if (!pathname || !*pathname || *pathname == '/')
-		return rmdir(pathname);
-
-	slash = strrchr(pathname, '/');
-	if (!slash)
-		return rmdir(pathname);
-
-	dlen = slash - pathname;
-	if (dlen >= sizeof dirpath) {
-		errno = ENAMETOOLONG;
-		return -1;
-	}
-	memcpy(dirpath, pathname, dlen);
-	dirpath[dlen] = '\0';
-	bname = slash + 1;
-
-	dfd = vfs_resolve_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
-	if (dfd < 0)
-		return -1;
-
-	ret = unlinkat(dfd, bname, AT_REMOVEDIR);
-	e = errno;
-	close(dfd);
-	errno = e;
-	return ret;
-#else
-	return do_rmdir(pathname);
-#endif
-}
 
 int do_open(const char *pathname, int flags, mode_t mode)
 {
@@ -2012,18 +1862,6 @@ int do_open_checklinks(const char *pathname)
 }
 
 
-int do_unlink_atfd(int dfd, const char *name, int flags)
-{
-#ifdef AT_FDCWD
-	if (dry_run) return 0;
-	RETURN_ERROR_IF_RO_OR_LO;
-	return unlinkat(dfd, name, flags);
-#else
-	(void)dfd; (void)name; (void)flags;
-	errno = ENOSYS;
-	return -1;
-#endif
-}
 
 int do_mkdir_atfd(int dfd, const char *name, mode_t mode)
 {

@@ -72,7 +72,7 @@ static int del_unlink(const char *fbuf)
 {
 	const char *leaf;
 	int dfd = del_held_dfd(fbuf, &leaf);
-	if (dfd >= 0 && do_unlink_atfd(dfd, leaf, 0) == 0)
+	if (dfd >= 0 && vfs_unlink_atfd(dfd, leaf, 0) == 0)
 		return 0;
 	return robust_unlink(fbuf);	/* fall back (ETXTBSY retry, or not held) */
 }
@@ -223,7 +223,7 @@ enum delret delete_item(char *fbuf, uint16 mode, uint16 flags)
 		const char *leaf;
 		int dfd = del_held_dfd(fbuf, &leaf);
 		what = "rmdir";
-		ok = (dfd >= 0 ? do_unlink_atfd(dfd, leaf, AT_REMOVEDIR) : do_rmdir_at(fbuf)) == 0;
+		ok = (dfd >= 0 ? vfs_unlink_atfd(dfd, leaf, AT_REMOVEDIR) : vfs_rmdir_at(fbuf)) == 0;
 	} else {
 		if (make_backups > 0 && !(flags & DEL_FOR_BACKUP) && (backup_dir || !is_backup_file(fbuf))) {
 			what = "make_backup";

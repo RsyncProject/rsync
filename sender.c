@@ -418,7 +418,7 @@ void successful_send(int ndx)
 		return;
 	}
 
-	if (dfd >= 0 ? secure_remove_source_file(dfd, bname) < 0 : do_unlink(fname) < 0) {
+	if (dfd >= 0 ? secure_remove_source_file(dfd, bname) < 0 : vfs_unlink(fname) < 0) {
 		failed_op = "remove";
 	  failed:
 		if (errno == ENOENT)

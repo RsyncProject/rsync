@@ -88,4 +88,11 @@ int vfs_rename(const char *old_path, const char *new_path);
 int vfs_rename_at(const char *old_path, const char *new_path);
 int vfs_rename_atfd(int old_dfd, const char *old_name, int new_dfd, const char *new_name);
 
+/* unlink and rmdir (vfs/unlink.c). */
+int vfs_unlink(const char *path);
+int vfs_unlink_at(const char *path);
+int vfs_unlink_atfd(int dfd, const char *name, int flags);
+int vfs_rmdir(const char *pathname);
+int vfs_rmdir_at(const char *pathname);
+
 #endif /* RSYNC_VFS_H */

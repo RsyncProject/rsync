@@ -1624,7 +1624,7 @@ static void create_pid_file(void)
 		}
 	}
 #define PID_LSTAT(stp) vfs_lstat_atfd(pdfd, base, stp)
-#define PID_UNLINK()   do_unlink_atfd(pdfd, base, 0)
+#define PID_UNLINK()   vfs_unlink_atfd(pdfd, base, 0)
 #define PID_OPEN()     do_open_atfd(pdfd, base, O_RDWR|O_CREAT, 0664)
 #else
 #define PID_LSTAT(stp) vfs_lstat(base, stp)

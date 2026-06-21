@@ -922,7 +922,7 @@ int finish_transfer(const char *fname, const char *fnametmp,
 			full_fname(fnametmp), fname);
 		if (!partialptr || (ret == -2 && temp_copy_name)
 		 || robust_rename(fnametmp, partialptr, NULL, file->mode, file) < 0)
-			do_unlink_at(fnametmp);
+			vfs_unlink_at(fnametmp);
 		return 0;
 	}
 	if (ret == 0) {
