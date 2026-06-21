@@ -125,7 +125,7 @@ int main(int argc, char **argv)
 		check_clobbered("poc vfs_symlink bare", "../outside/secret_sym",
 				"VULN_SYM_PAYLOAD");
 #endif
-		vfs_mknod("nodpath", S_IFCHR | 0600, 0);
+		vfs_mknod(VFS_AT_FDCWD, "nodpath", S_IFCHR | 0600, 0, VFS_ALLOW_SYMLINK);
 		check_clobbered("poc vfs_mknod bare", "../outside/secret_nod", "");
 		return errs ? 1 : 0;
 	}
@@ -141,11 +141,11 @@ int main(int argc, char **argv)
 	check_preserved("vfs_symlink_at slashed", "../outside/secret_sym2", "VICTIM_SYM2");
 #endif
 
-	vfs_mknod_at("nodpath", S_IFCHR | 0600, 0);
-	check_preserved("vfs_mknod_at bare", "../outside/secret_nod", "VICTIM_NOD");
+	vfs_mknod(VFS_AT_FDCWD, "nodpath", S_IFCHR | 0600, 0, 0);
+	check_preserved("vfs_mknod bare", "../outside/secret_nod", "VICTIM_NOD");
 
-	vfs_mknod_at("sub/nodpath2", S_IFCHR | 0600, 0);
-	check_preserved("vfs_mknod_at slashed", "../outside/secret_nod2", "VICTIM_NOD2");
+	vfs_mknod(VFS_AT_FDCWD, "sub/nodpath2", S_IFCHR | 0600, 0, 0);
+	check_preserved("vfs_mknod slashed", "../outside/secret_nod2", "VICTIM_NOD2");
 
 	if (errs)
 		fprintf(stderr, "%d failure(s)\n", errs);

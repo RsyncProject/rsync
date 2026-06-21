@@ -21,7 +21,7 @@
 #include <sys/un.h>	/* for the socket+bind() fallback in vfs_mknod() */
 #endif
 
-int vfs_mknod(const char *pathname, mode_t mode, dev_t dev)
+static int vfs__mknod_plain(const char *pathname, mode_t mode, dev_t dev)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
@@ -103,10 +103,10 @@ int vfs_mknod(const char *pathname, mode_t mode, dev_t dev)
   other special file; on systems where mknod() can't create sockets the
   at-variant fails instead of re-resolving an unsafe parent.
 */
-int vfs_mknod_at(const char *pathname, mode_t mode, dev_t dev)
+static int vfs__mknod_secure(const char *pathname, mode_t mode, dev_t dev, int flags)
 {
 	/* HAVE_MKNODAT: older Darwin declares AT_FDCWD but not mknodat(), so
-	 * the at-variant won't build there; fall back to vfs_mknod() (#896). */
+	 * the at-variant won't build there; fall back to the plain mknod (#896). */
 #if defined(AT_FDCWD) && defined(HAVE_MKNODAT)
 	char dirpath[MAXPATHLEN];
 	const char *bname;
@@ -119,10 +119,10 @@ int vfs_mknod_at(const char *pathname, mode_t mode, dev_t dev)
 	RETURN_ERROR_IF_RO_OR_LO;
 
 #if defined O_NOFOLLOW && defined O_DIRECTORY
-	if (vfs.operator_path_resolve) {
+	if (flags & VFS_OPERATOR_PATH) {
 		if (vfs_symlink_optout_allowed())
-			return vfs_mknod(pathname, mode, dev);
-		dfd = vfs_owner_walk_parent(pathname, &bname, vfs.operator_path_resolve);
+			return vfs__mknod_plain(pathname, mode, dev);
+		dfd = vfs_owner_walk_parent(pathname, &bname, 1);
 		if (dfd < 0)
 			return -1;
 		ret = mknodat(dfd, bname, mode, dev);
@@ -134,10 +134,10 @@ int vfs_mknod_at(const char *pathname, mode_t mode, dev_t dev)
 #endif
 
 	if (!vfs_relpath_active())
-		return vfs_mknod(pathname, mode, dev);
+		return vfs__mknod_plain(pathname, mode, dev);
 
 	if (!pathname || !*pathname || *pathname == '/')
-		return vfs_mknod(pathname, mode, dev);
+		return vfs__mknod_plain(pathname, mode, dev);
 
 	/* A path with a slash needs vfs_resolve_open to confine its
 	 * parent resolution; a top-level path lives in CWD (AT_FDCWD) with
@@ -200,7 +200,7 @@ int vfs_mknod_at(const char *pathname, mode_t mode, dev_t dev)
 			 * vfs_mknod(), but a nested one fails safe rather than
 			 * re-resolve a potentially unsafe parent. */
 			if (dfd == AT_FDCWD)
-				ret = vfs_mknod(pathname, mode, dev);
+				ret = vfs__mknod_plain(pathname, mode, dev);
 			else
 				errno = EOPNOTSUPP;
 		}
@@ -211,11 +211,11 @@ int vfs_mknod_at(const char *pathname, mode_t mode, dev_t dev)
 	errno = e;
 	return ret;
 #else
-	return vfs_mknod(pathname, mode, dev);
+	return vfs__mknod_plain(pathname, mode, dev);
 #endif
 }
 
-int vfs_mknod_atfd(int dfd, const char *name, mode_t mode, dev_t dev)
+static int vfs__mknod_atfd(int dfd, const char *name, mode_t mode, dev_t dev)
 {
 #ifdef AT_FDCWD
 	if (dry_run) return 0;
@@ -258,4 +258,25 @@ int vfs_mknod_atfd(int dfd, const char *name, mode_t mode, dev_t dev)
 	errno = ENOSYS;
 	return -1;
 #endif
+}
+
+/* Unified node creation.  dirfd == VFS_AT_FDCWD resolves `path`; a real held
+ * dirfd makes `path` a single component created directly under it.  flags:
+ * VFS_ALLOW_SYMLINK (trusted, plain mknod), VFS_OPERATOR_PATH (operator path),
+ * default 0 (secure receiver resolve). */
+int vfs_mknod(int dirfd, const char *path, mode_t mode, dev_t dev, int flags)
+{
+	if (dirfd != VFS_AT_FDCWD) {
+		/* Held-fd: `path` must be a single harmless component. */
+		if (!path || !*path || strchr(path, '/')
+		 || (path[0] == '.' && (path[1] == '\0'
+		     || (path[1] == '.' && path[2] == '\0')))) {
+			errno = EINVAL;
+			return -1;
+		}
+		return vfs__mknod_atfd(dirfd, path, mode, dev);
+	}
+	if (flags & VFS_ALLOW_SYMLINK)
+		return vfs__mknod_plain(path, mode, dev);
+	return vfs__mknod_secure(path, mode, dev, flags);
 }

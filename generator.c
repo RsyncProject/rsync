@@ -1456,9 +1456,9 @@ static int gen_entry_mknod(const char *path, struct file_struct *file, mode_t mo
 	/* vfs_mknod_atfd can't create a socket (no portable bindat); fall back. */
 	if (!S_ISSOCK(mode) && (dfd = vfs_cached_dirfd(path, file)) >= 0) {
 		const char *slash = strrchr(path, '/');
-		return vfs_mknod_atfd(dfd, slash ? slash + 1 : path, mode, rdev);
+		return vfs_mknod(dfd, slash ? slash + 1 : path, mode, rdev, 0);
 	}
-	return vfs_mknod_at(path, mode, rdev);
+	return vfs_mknod(VFS_AT_FDCWD, path, mode, rdev, 0);
 }
 
 static int gen_entry_unlink(const char *path, struct file_struct *file)
