@@ -304,4 +304,10 @@ int sys_acl_delete_def_file(const char *name);
 int sys_acl_free_acl(SMB_ACL_T the_acl);
 int no_acl_syscall_error(int err);
 
+#ifdef HAVE_LIBACL_AT
+SMB_ACL_T sys_acl_get_file_at(int dirfd, const char *path_p, int at_flags, SMB_ACL_TYPE_T type);
+int sys_acl_set_file_at(int dirfd, const char *path_p, int at_flags, SMB_ACL_TYPE_T type, SMB_ACL_T theacl);
+int sys_acl_delete_def_file_at(int dirfd, const char *path_p, int at_flags);
+#endif
+
 #endif /* SUPPORT_ACLS */

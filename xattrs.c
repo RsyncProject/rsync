@@ -47,6 +47,8 @@ extern int xattr_sum_len;
 
 #define MAX_XATTR_DIGEST_LEN MD5_DIGEST_LEN
 #define MAX_FULL_DATUM 32
+#define MAX_XATTR_LIST_BYTES ((size_t)512 * 1024 * 1024)
+#define MAX_XATTR_VALUE_BYTES ((size_t)128 * 1024 * 1024)
 
 #define HAS_PREFIX(str, prfx) (*(str) == *(prfx) && strncmp(str, prfx, sizeof (prfx) - 1) == 0)
 
@@ -141,7 +143,10 @@ static int rsync_xal_compare_names(const void *x1, const void *x2)
 	return strcmp(xa1->name, xa2->name);
 }
 
-static ssize_t get_xattr_names(const char *fname)
+/* List the names of fname's xattrs into the global namebuf.  When fd >= 0 the
+ * list is read from that held fd (sys_flistxattr) so a parent-symlink race
+ * can't redirect it; otherwise it falls back to the path (sys_llistxattr). */
+static ssize_t get_xattr_names(const char *fname, int fd)
 {
 	ssize_t list_len;
 	int64 arg;
@@ -153,7 +158,8 @@ static ssize_t get_xattr_names(const char *fname)
 
 	while (1) {
 		/* The length returned includes all the '\0' terminators. */
-		list_len = sys_llistxattr(fname, namebuf, namebuf_len);
+		list_len = fd >= 0 ? sys_flistxattr(fd, namebuf, namebuf_len)
+				   : sys_llistxattr(fname, namebuf, namebuf_len);
 		if (list_len >= 0) {
 			if ((size_t)list_len <= namebuf_len)
 				break;
@@ -167,7 +173,8 @@ static ssize_t get_xattr_names(const char *fname)
 				full_fname(fname), big_num(arg));
 			return -1;
 		}
-		list_len = sys_llistxattr(fname, NULL, 0);
+		list_len = fd >= 0 ? sys_flistxattr(fd, NULL, 0)
+				   : sys_llistxattr(fname, NULL, 0);
 		if (list_len < 0) {
 			arg = 0;
 			goto got_error;
@@ -240,7 +247,7 @@ static int rsync_xal_get(const char *fname, item_list *xalp)
 	int count;
 
 	/* This puts the name list into the "namebuf" buffer. */
-	if ((list_len = get_xattr_names(fname)) < 0)
+	if ((list_len = get_xattr_names(fname, -1)) < 0)
 		return -1;
 
 	for (name = namebuf; list_len > 0; name += name_len) {
@@ -337,7 +344,11 @@ int get_xattr(const char *fname, stat_x *sxp)
 	return 0;
 }
 
-int copy_xattrs(const char *source, const char *dest)
+/* Copy xattrs from source to dest.  When dest_fd >= 0 it is a held,
+ * O_NOFOLLOW-opened fd for dest and the set goes through fsetxattr so a
+ * parent-symlink race can't redirect it; dest_fd < 0 keeps the path-based
+ * lsetxattr behaviour (non-hardened receivers, or no held fd available). */
+int copy_xattrs(const char *source, const char *dest, int dest_fd)
 {
 	ssize_t list_len, name_len;
 	size_t datum_len;
@@ -347,7 +358,7 @@ int copy_xattrs(const char *source, const char *dest)
 #endif
 
 	/* This puts the name list into the "namebuf" buffer. */
-	if ((list_len = get_xattr_names(source)) < 0)
+	if ((list_len = get_xattr_names(source, -1)) < 0)
 		return -1;
 
 	for (name = namebuf; list_len > 0; name += name_len) {
@@ -367,11 +378,12 @@ int copy_xattrs(const char *source, const char *dest)
 		datum_len = 0;
 		if (!(ptr = get_xattr_data(source, name, &datum_len, 0)))
 			return -1;
-		if (sys_lsetxattr(dest, name, ptr, datum_len) < 0) {
+		if ((dest_fd >= 0 ? sys_fsetxattr(dest_fd, name, ptr, datum_len)
+				  : sys_lsetxattr(dest, name, ptr, datum_len)) < 0) {
 			int save_errno = errno ? errno : EINVAL;
 			rsyserr(FERROR_XFER, errno,
-				"copy_xattrs: lsetxattr(%s,\"%s\") failed",
-				full_fname(dest), name);
+				"copy_xattrs: %ssetxattr(%s,\"%s\") failed",
+				dest_fd >= 0 ? "f" : "l", full_fname(dest), name);
 			errno = save_errno;
 			return -1;
 		}
@@ -758,6 +770,10 @@ int recv_xattr_request(struct file_struct *file, int f_in)
 
 		old_datum = rxa->datum;
 		rxa->datum_len = read_varint_size(f_in, MAX_WIRE_XATTR_DATALEN, "xattr datum_len");
+		if (rxa->datum_len > MAX_XATTR_VALUE_BYTES) {
+			rprintf(FERROR, "xattr datum_len exceeds per-value limit [%s]\n", who_am_i());
+			exit_cleanup(RERR_PROTOCOL);
+		}
 
 		if (SIZE_MAX - rxa->name_len < rxa->datum_len)
 			overflow_exit("recv_xattr_request");
@@ -786,6 +802,7 @@ void receive_xattr(int f, struct file_struct *file)
 	int need_sort = 1;
 #endif
 	int ndx = read_varint(f);
+	size_t total_xattr_bytes = 0;
 
 	if (ndx < 0 || (size_t)ndx > rsync_xal_l.count) {
 		rprintf(FERROR, "receive_xattr: xa index %d out of"
@@ -811,6 +828,19 @@ void receive_xattr(int f, struct file_struct *file)
 		size_t datum_len = read_varint_size(f, MAX_WIRE_XATTR_DATALEN, "xattr datum_len");
 		size_t dget_len = datum_len > MAX_FULL_DATUM ? 1 + (size_t)xattr_sum_len : datum_len;
 		size_t extra_len = MIGHT_NEED_RPRE ? RPRE_LEN : 0;
+		if (datum_len > MAX_XATTR_VALUE_BYTES) {
+			rprintf(FERROR, "xattr datum_len exceeds per-value limit [%s]\n", who_am_i());
+			exit_cleanup(RERR_PROTOCOL);
+		}
+		if (SIZE_MAX - total_xattr_bytes < name_len
+		 || SIZE_MAX - total_xattr_bytes - name_len < datum_len) {
+			overflow_exit("receive_xattr");
+		}
+		total_xattr_bytes += name_len + datum_len;
+		if (total_xattr_bytes > MAX_XATTR_LIST_BYTES) {
+			rprintf(FERROR, "xattr list exceeds per-file limit [%s]\n", who_am_i());
+			exit_cleanup(RERR_PROTOCOL);
+		}
 		if (SIZE_MAX - dget_len < extra_len || SIZE_MAX - dget_len - extra_len < name_len)
 			overflow_exit("receive_xattr");
 		ptr = new_array(char, dget_len + extra_len + name_len);
@@ -949,8 +979,12 @@ void uncache_tmp_xattrs(void)
 	}
 }
 
+/* Apply the wanted xattr set to fname.  When fd >= 0, the list/set/remove ops
+ * that target fname go through that held fd (sys_f*xattr) so a parent-symlink
+ * race can't redirect them; the abbreviated-value compare still reads the basis
+ * via the fnamecmp path.  fd < 0 keeps the path-based behavior. */
 static int rsync_xal_set(const char *fname, item_list *xalp,
-			 const char *fnamecmp, stat_x *sxp)
+			 const char *fnamecmp, stat_x *sxp, int fd)
 {
 	rsync_xa *rxas = xalp->items;
 	ssize_t list_len;
@@ -963,7 +997,7 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 	int ret = 0;
 
 	/* This puts the current name list into the "namebuf" buffer. */
-	if ((list_len = get_xattr_names(fname)) < 0)
+	if ((list_len = get_xattr_names(fname, fd)) < 0)
 		return -1;
 
 	for (i = 0; i < xalp->count; i++) {
@@ -996,10 +1030,11 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 
 			if (fname == fnamecmp)
 				; /* Value is already set when identical */
-			else if (sys_lsetxattr(fname, name, ptr, len) < 0) {
+			else if ((fd >= 0 ? sys_fsetxattr(fd, name, ptr, len)
+					  : sys_lsetxattr(fname, name, ptr, len)) < 0) {
 				rsyserr(FERROR_XFER, errno,
-					"rsync_xal_set: lsetxattr(%s,\"%s\") failed",
-					full_fname(fname), name);
+					"rsync_xal_set: %ssetxattr(%s,\"%s\") failed",
+					fd >= 0 ? "f" : "l", full_fname(fname), name);
 				ret = -1;
 			} else /* make sure caller sets mtime */
 				sxp->st.st_mtime = (time_t)-1;
@@ -1012,15 +1047,16 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 			memcpy(ptr + len, name, name_len);
 			free(rxas[i].datum);
 
-			rxas[i].name = name = ptr + len;
+			rxas[i].name = ptr + len;
 			rxas[i].datum = ptr;
 			continue;
 		}
 
-		if (sys_lsetxattr(fname, name, rxas[i].datum, rxas[i].datum_len) < 0) {
+		if ((fd >= 0 ? sys_fsetxattr(fd, name, rxas[i].datum, rxas[i].datum_len)
+			     : sys_lsetxattr(fname, name, rxas[i].datum, rxas[i].datum_len)) < 0) {
 			rsyserr(FERROR_XFER, errno,
-				"rsync_xal_set: lsetxattr(%s,\"%s\") failed",
-				full_fname(fname), name);
+				"rsync_xal_set: %ssetxattr(%s,\"%s\") failed",
+				fd >= 0 ? "f" : "l", full_fname(fname), name);
 			ret = -1;
 		} else /* make sure caller sets mtime */
 			sxp->st.st_mtime = (time_t)-1;
@@ -1048,10 +1084,11 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 				break;
 		}
 		if (i == xalp->count) {
-			if (sys_lremovexattr(fname, name) < 0) {
+			if ((fd >= 0 ? sys_fremovexattr(fd, name)
+				     : sys_lremovexattr(fname, name)) < 0) {
 				rsyserr(FERROR_XFER, errno,
-					"rsync_xal_set: lremovexattr(%s,\"%s\") failed",
-					full_fname(fname), name);
+					"rsync_xal_set: %sremovexattr(%s,\"%s\") failed",
+					fd >= 0 ? "f" : "l", full_fname(fname), name);
 				ret = -1;
 			} else /* make sure caller sets mtime */
 				sxp->st.st_mtime = (time_t)-1;
@@ -1061,8 +1098,12 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 	return ret;
 }
 
-/* Set extended attributes on indicated filename. */
-int set_xattr(const char *fname, const struct file_struct *file, const char *fnamecmp, stat_x *sxp)
+/* Set extended attributes on indicated filename.  When fd >= 0 it is a held,
+ * O_NOFOLLOW-opened fd for fname (a regular file or directory) and the xattr
+ * ops go through it (fsetxattr/fremovexattr/flistxattr) so a parent-symlink
+ * race can't redirect them; fd < 0 keeps the path-based behavior (symlinks,
+ * special files, non-hardened receivers, platforms without the f-variants). */
+int set_xattr(const char *fname, const struct file_struct *file, const char *fnamecmp, stat_x *sxp, int fd)
 {
 	rsync_xa_list *glst = rsync_xal_l.items;
 	item_list *lst;
@@ -1096,21 +1137,28 @@ int set_xattr(const char *fname, const struct file_struct *file, const char *fna
 #endif
 
 	/* If the target file lacks write permission, we try to add it
-	 * temporarily so we can change the extended attributes. */
+	 * temporarily so we can change the extended attributes.  With a held fd
+	 * the perm change goes through fchmod() on the pinned inode rather than
+	 * re-resolving the path. */
 	if (!am_root
 #ifdef SUPPORT_LINKS
 	 && !S_ISLNK(sxp->st.st_mode)
 #endif
 	 && access(fname, W_OK) < 0
-	 && do_chmod_at(fname, (sxp->st.st_mode & CHMOD_BITS) | S_IWUSR) == 0)
+	 && (fd >= 0 ? fchmod(fd, (sxp->st.st_mode & CHMOD_BITS) | S_IWUSR)
+		     : do_chmod_at(fname, (sxp->st.st_mode & CHMOD_BITS) | S_IWUSR)) == 0)
 		added_write_perm = 1;
 
 	ndx = F_XATTR(file);
 	glst += ndx;
 	lst = &glst->xa_items;
-	int return_value = rsync_xal_set(fname, lst, fnamecmp, sxp);
-	if (added_write_perm) /* remove the temporary write permission */
-		do_chmod_at(fname, sxp->st.st_mode);
+	int return_value = rsync_xal_set(fname, lst, fnamecmp, sxp, fd);
+	if (added_write_perm) { /* remove the temporary write permission */
+		if (fd >= 0)
+			fchmod(fd, sxp->st.st_mode);
+		else
+			do_chmod_at(fname, sxp->st.st_mode);
+	}
 	return return_value;
 }
 
@@ -1122,21 +1170,26 @@ char *get_xattr_acl(const char *fname, int is_access_acl, size_t *len_p)
 	return get_xattr_data(fname, name, len_p, 1);
 }
 
-int set_xattr_acl(const char *fname, int is_access_acl, const char *buf, size_t buf_len)
+/* Store/delete a --fake-super ACL-as-xattr.  When fd >= 0 (a held O_NOFOLLOW fd
+ * from set_file_attrs) use the f-variant so a parent-symlink race can't redirect
+ * the write; otherwise fall back to the l-variant on the path. */
+int set_xattr_acl(int fd, const char *fname, int is_access_acl, const char *buf, size_t buf_len)
 {
 	const char *name = is_access_acl ? XACC_ACL_ATTR : XDEF_ACL_ATTR;
-	if (sys_lsetxattr(fname, name, buf, buf_len) < 0) {
+	if ((fd >= 0 ? sys_fsetxattr(fd, name, buf, buf_len)
+		     : sys_lsetxattr(fname, name, buf, buf_len)) < 0) {
 		rsyserr(FERROR_XFER, errno,
-			"set_xattr_acl: lsetxattr(%s,\"%s\") failed",
-			full_fname(fname), name);
+			"set_xattr_acl: %ssetxattr(%s,\"%s\") failed",
+			fd >= 0 ? "f" : "l", full_fname(fname), name);
 		return -1;
 	}
 	return 0;
 }
 
-int del_def_xattr_acl(const char *fname)
+int del_def_xattr_acl(int fd, const char *fname)
 {
-	return sys_lremovexattr(fname, XDEF_ACL_ATTR);
+	return fd >= 0 ? sys_fremovexattr(fd, XDEF_ACL_ATTR)
+		       : sys_lremovexattr(fname, XDEF_ACL_ATTR);
 }
 #endif
 
@@ -1154,7 +1207,6 @@ int get_stat_xattr(const char *fname, int fd, STRUCT_STAT *fst, STRUCT_STAT *xst
 	else
 		xst = fst;
 	if (fname) {
-		fd = -1;
 		len = sys_lgetxattr(fname, XSTAT_ATTR, buf, sizeof buf - 1);
 	} else {
 		fname = "fd";
@@ -1193,7 +1245,12 @@ int get_stat_xattr(const char *fname, int fd, STRUCT_STAT *fst, STRUCT_STAT *xst
 	return 0;
 }
 
-int set_stat_xattr(const char *fname, struct file_struct *file, mode_t new_mode)
+/* Store the fake-super %stat metadata on fname.  When fd >= 0 it is a held,
+ * O_NOFOLLOW-opened fd for fname (regular file or directory): the re-stat, the
+ * permission reset and the xattr write/remove go through it so a parent-symlink
+ * race can't redirect them.  fd < 0 keeps the path-based behavior (symlinks,
+ * devices/specials, non-hardened receivers, platforms without the f-variants). */
+int set_stat_xattr(const char *fname, struct file_struct *file, mode_t new_mode, int fd)
 {
 	STRUCT_STAT fst, xst;
 	dev_t rdev;
@@ -1208,7 +1265,17 @@ int set_stat_xattr(const char *fname, struct file_struct *file, mode_t new_mode)
 		return -1;
 	}
 
-	if (x_lstat(fname, &fst, &xst) < 0) {
+	if (fd >= 0) {
+		if (do_fstat(fd, &fst) < 0) {
+			rsyserr(FERROR_XFER, errno, "failed to re-stat %s",
+				full_fname(fname));
+			return -1;
+		}
+		if (get_stat_xattr(NULL, fd, &fst, &xst) < 0) {
+			xst = fst; /* keep xst fully defined; st_mode=0 means "no stat xattr" */
+			xst.st_mode = 0;
+		}
+	} else if (x_lstat(fname, &fst, &xst) < 0) {
 		rsyserr(FERROR_XFER, errno, "failed to re-stat %s",
 			full_fname(fname));
 		return -1;
@@ -1226,15 +1293,20 @@ int set_stat_xattr(const char *fname, struct file_struct *file, mode_t new_mode)
 	/* Dump the special permissions and enable full owner access. */
 	mode = (fst.st_mode & _S_IFMT) | (fmode & ACCESSPERMS)
 	     | (S_ISDIR(fst.st_mode) ? 0700 : 0600);
-	if (fst.st_mode != mode)
-		do_chmod_at(fname, mode);
+	if (fst.st_mode != mode) {
+		if (fd >= 0)
+			fchmod(fd, mode);
+		else
+			do_chmod_at(fname, mode);
+	}
 	if (!IS_DEVICE(fst.st_mode))
 		fst.st_rdev = 0; /* just in case */
 
 	if (mode == fmode && fst.st_rdev == rdev
 	 && fst.st_uid == F_OWNER(file) && fst.st_gid == F_GROUP(file)) {
 		/* xst.st_mode will be 0 if there's no current stat xattr */
-		if (xst.st_mode && sys_lremovexattr(fname, XSTAT_ATTR) < 0) {
+		if (xst.st_mode && (fd >= 0 ? sys_fremovexattr(fd, XSTAT_ATTR)
+					    : sys_lremovexattr(fname, XSTAT_ATTR)) < 0) {
 			rsyserr(FERROR_XFER, errno,
 				"delete of stat xattr failed for %s",
 				full_fname(fname));
@@ -1250,7 +1322,8 @@ int set_stat_xattr(const char *fname, struct file_struct *file, mode_t new_mode)
 			to_wire_mode(fmode),
 			(int)major(rdev), (int)minor(rdev),
 			F_OWNER(file), F_GROUP(file));
-		if (sys_lsetxattr(fname, XSTAT_ATTR, buf, len) < 0) {
+		if ((fd >= 0 ? sys_fsetxattr(fd, XSTAT_ATTR, buf, len)
+			     : sys_lsetxattr(fname, XSTAT_ATTR, buf, len)) < 0) {
 			if (errno == EPERM && S_ISLNK(fst.st_mode))
 				return 0;
 			rsyserr(FERROR_XFER, errno,
