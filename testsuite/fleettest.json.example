@@ -47,13 +47,14 @@
                           "--disable-xxhash", "--disable-lz4"]
     },
     {
-      "_comment": "Nested-VM OpenBSD occasionally flakes a daemon/tcp test under load; max_retry re-runs just the failed test rather than throttling the whole box (tcp_jobs/pipe_jobs are still available if you prefer that).",
+      "_comment": "Nested-VM OpenBSD. max_retry re-runs a flaky test on its own. The daemon+flipper symlink-race tests are excluded here: this box's kernel has a connect()-under-rename-load lost-wakeup (and an FFS rename-storm corruption) that hangs them for non-rsync reasons (see dev-notes/openbsd-connect-lost-wakeup-report.txt); the protections they check are verified on the Linux/BSD boxes.",
       "name": "openbsd",
       "ssh_host": "root@openbsd",
       "workflow": "openbsd-build.yml",
       "make": "gmake",
       "configure_pre": "export AUTOCONF_VERSION=2.71 AUTOMAKE_VERSION=1.16;",
       "max_retry": 2,
+      "exclude": ["acl-symlink-race", "sender-readlink-atfd", "sender-remove-source-secure"],
       "configure_flags": ["--with-rrsync", "--disable-zstd", "--disable-md2man",
                           "--disable-xxhash", "--disable-lz4"]
     },
@@ -66,20 +67,49 @@
                           "--disable-xxhash", "--disable-lz4"]
     },
     {
+      "_comment": "Ubuntu 18.04 older-LTS backport coverage on a root@ box; no 18.04 runner image exists so it mirrors the 22.04 workflow.",
+      "name": "ubuntu-1804",
+      "ssh_host": "root@ubuntu-1804",
+      "workflow": "ubuntu-22.04-build.yml",
+      "_python_comment": "18.04's default python3 is 3.6, but runtests.py uses subprocess capture_output (3.7+); run the suite under the 3.10 that's also installed.",
+      "python": "python3.10",
+      "_configure_flags_comment": "18.04's libzstd 1.3.3 lacks ZSTD_minCLevel (configure aborts), so disable zstd; also disable lz4 so the default -z compressor is zlib -- with lz4 as the default, compress-options' --compress-level=9 check fails since lz4 has no levels. xxhash is fine.",
+      "configure_flags": ["--with-rrsync", "--disable-zstd", "--disable-lz4"],
+      "_expect_skip_extra_comment": "daemon-max-alloc-zero needs the old static client (git-archive export-ignore'd); protected-regular's fs.protected_regular path is not exercised on this box.",
+      "expect_skip_extra": ["daemon-max-alloc-zero", "protected-regular"]
+    },
+    {
       "_comment": "Ubuntu 20.04 older-LTS backport coverage on a root@ box; no 20.04 runner image exists so it mirrors the 22.04 workflow.",
       "name": "ubuntu-2004",
       "ssh_host": "root@ubuntu-2004",
       "workflow": "ubuntu-22.04-build.yml",
-      "configure_flags": ["--with-rrsync"]
+      "configure_flags": ["--with-rrsync"],
+      "_expect_skip_extra_comment": "The symlink-race tests now run on every platform (one portable race-free resolver), so only daemon-max-alloc-zero skips here: it needs the old static client, which git-archive omits (.gitattributes export-ignore) from the source-only fleet push.",
+      "expect_skip_extra": ["daemon-max-alloc-zero"]
     },
     {
-      "_comment": "Builds unprivileged (like a CI runner) and runs the suite via sudo; the nonroot pass reruns the privilege-sensitive tests as the ssh user.",
+      "_comment": "Builds unprivileged (like a CI runner) and runs the suite via sudo; the nonroot pass reruns the privilege-sensitive tests as the ssh user. protocols: [30, 29] runs the check30/check29 passes on this NO-xattrat kernel: the CI's proto-29 step runs here, but the only other proto-29 fleet box (ubuntu-2604) is xattrat, so without this the (no-xattrat x proto-29) cell is uncovered.",
       "name": "ubuntu-2204",
       "ssh_host": "runner@ubuntu-2204",
       "workflow": "ubuntu-22.04-build.yml",
       "privilege": "sudo",
       "nonroot": true,
-      "configure_flags": ["--with-rrsync"]
+      "protocols": [30, 29],
+      "configure_flags": ["--with-rrsync"],
+      "_expect_skip_extra_comment": "daemon-max-alloc-zero needs the old static client, which git-archive omits (.gitattributes export-ignore) from the source-only fleet push.",
+      "expect_skip_extra": ["daemon-max-alloc-zero"]
+    },
+    {
+      "_comment": "Noble (24.04), kernel 6.8 -- a NO-xattrat kernel like ubuntu-2204 but with modern userspace; mirrors ubuntu-build.yml.",
+      "name": "ubuntu-2404",
+      "ssh_host": "runner@ubuntu-2404",
+      "workflow": "ubuntu-build.yml",
+      "privilege": "sudo",
+      "nonroot": true,
+      "protocols": [30, 29],
+      "configure_flags": ["--with-rrsync"],
+      "_expect_skip_extra_comment": "daemon-max-alloc-zero needs the old static client, which git-archive omits (.gitattributes export-ignore) from the source-only fleet push.",
+      "expect_skip_extra": ["daemon-max-alloc-zero"]
     },
     {
       "_comment": "Modern Ubuntu (mirrors ubuntu-build.yml). protocols: [30, 29] also runs the workflow's check30/check29 passes as extra stdio-pipe runs.",
@@ -89,7 +119,9 @@
       "privilege": "sudo",
       "nonroot": true,
       "protocols": [30, 29],
-      "configure_flags": ["--with-rrsync"]
+      "configure_flags": ["--with-rrsync"],
+      "_expect_skip_extra_comment": "daemon-max-alloc-zero needs the old static client, which git-archive omits (.gitattributes export-ignore) from the source-only fleet push.",
+      "expect_skip_extra": ["daemon-max-alloc-zero"]
     },
     {
       "_comment": "macOS: brew is not on the non-interactive ssh PATH, so put it on PATH for the whole build and pass brew include/lib dirs to configure.",

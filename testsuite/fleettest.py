@@ -70,6 +70,7 @@ import argparse
 import atexit
 import concurrent.futures
 import dataclasses
+import fnmatch
 import json
 import os
 import re
@@ -81,6 +82,13 @@ import tempfile
 import threading
 import time
 from pathlib import Path
+
+# Set from --skip / --xfail in main(). SKIP_CSV is passed to runtests as
+# RSYNC_EXCLUDE (tests dropped before running); XFAIL_GLOBS are tolerated
+# failures (a matching FAIL does not make a cell "not OK"). Both are
+# comma-separated test-name globs (fnmatch), applied across every target.
+SKIP_CSV = ""
+XFAIL_GLOBS: list[str] = []
 
 # Set from --repo in main() (default: cwd). The harness builds whatever rsync
 # source tree these point at, so it must be run from inside an rsync checkout
@@ -150,6 +158,16 @@ class Target:
     # Use on a slow/loaded box where concurrency-sensitive tests occasionally
     # flake, instead of dropping the whole target to a lower -j. 0 => no retry.
     max_retry: int = 0
+    # Test names this specific box skips beyond what its workflow lists -- e.g. an
+    # old-kernel fleet box (no openat2/RESOLVE_BENEATH) skips the RB-conditional
+    # symlink-race tests that the workflow's newer CI runner actually runs.  Merged
+    # into RSYNC_EXPECT_SKIPPED for the pipe and protocol passes.
+    expect_skip_extra: list[str] = dataclasses.field(default_factory=list)
+    # Test-name globs this box never runs (passed to runtests as RSYNC_EXCLUDE),
+    # for tests unreliable on this platform for a non-rsync reason -- e.g. the
+    # daemon+flipper symlink-race tests on openbsd, which the platform's kernel
+    # connect()-under-rename-load bug hangs (see dev-notes). Merged with --skip.
+    exclude: list[str] = dataclasses.field(default_factory=list)
 
 
 def load_fleet(path: Path) -> list[Target]:
@@ -237,20 +255,35 @@ def push_argv(target: Target, staging: str) -> list[str]:
 # workflow skip-list parsing
 # ---------------------------------------------------------------------------
 
-# The trailing '? tolerates a `bash -c '... make check'` wrapper (e.g. Cygwin).
-_SKIP_RE = re.compile(r"RSYNC_EXPECT_SKIPPED=(\S+)\s+make\s+check'?\s*$", re.M)
-
-
-def parse_workflow_skip(workflow: str) -> str | None:
-    """Return the literal RSYNC_EXPECT_SKIPPED csv for the `make check` step, or
-    None if the workflow leaves it unset."""
+def parse_workflow_skip(workflow: str, make_target: str = "check") -> str | None:
+    """Return the literal RSYNC_EXPECT_SKIPPED csv for the given `make <target>`
+    step (check / check30 / check29), or None if that step leaves it unset.  The
+    protocol passes have their own check30/check29 lines (e.g. an xattr/ACL test
+    that runs at proto 30 but skips at 29), so they must be parsed separately from
+    the plain pipe `make check`.  The trailing '? tolerates a `bash -c '... make
+    check'` wrapper (e.g. Cygwin)."""
     path = WORKFLOWS / workflow
     try:
         text = path.read_text()
     except OSError:
         return None
-    m = _SKIP_RE.search(text)
+    rx = re.compile(r"RSYNC_EXPECT_SKIPPED=(\S+)\s+make\s+"
+                    + re.escape(make_target) + r"'?\s*$", re.M)
+    m = rx.search(text)
     return m.group(1) if m else None
+
+
+def workflow_skip_for(t: "Target", make_target: str = "check") -> str | None:
+    """The target's expected-skip csv for a `make <target>` pass: its workflow's
+    RSYNC_EXPECT_SKIPPED plus any per-target expect_skip_extra (old-box-only skips
+    the workflow omits)."""
+    base = parse_workflow_skip(t.workflow, make_target)
+    if not t.expect_skip_extra:
+        return base
+    items = set(t.expect_skip_extra)
+    if base:
+        items |= set(base.split(","))
+    return ",".join(sorted(items))
 
 
 # ---------------------------------------------------------------------------
@@ -275,6 +308,14 @@ def discover_nonroot_tests(testsuite_dir: Path) -> list[str]:
         except OSError:
             continue
     return names
+
+
+def _exclude_csv(t: "Target") -> str:
+    """RSYNC_EXCLUDE csv for a target: the global --skip globs plus this target's
+    per-box `exclude` list (tests it never runs, e.g. the openbsd kernel-bug
+    daemon+flipper races)."""
+    parts = [p for p in ([SKIP_CSV] + list(t.exclude)) if p]
+    return ",".join(parts)
 
 
 # ---------------------------------------------------------------------------
@@ -304,6 +345,9 @@ def test_script(t: Target, transport: str, skip_csv: str | None, jobs: int,
     # PYTHONDONTWRITEBYTECODE: don't drop root-owned __pycache__/*.pyc into the
     # tree (a sudo run would, breaking the next non-root push --delete).
     env = "PYTHONDONTWRITEBYTECODE=1 "
+    excl = _exclude_csv(t)
+    if excl:
+        env += f"RSYNC_EXCLUDE={excl} "
     # Named tests (a max_retry re-run) make runtests full_run False, so the
     # expected-skip list does not apply -- only the named tests' pass/fail matter.
     names = ""
@@ -334,7 +378,9 @@ def nonroot_test_script(t: Target, names: list[str]) -> str:
     The prior sudo pipe/tcp runs left testtmp root-owned, so clear it (via sudo)
     before the non-root run recreates it."""
     pre = f'{t.env_prefix}; ' if t.env_prefix else ''
-    runtests = (f'PYTHONDONTWRITEBYTECODE=1 {t.python} runtests.py '
+    _e = _exclude_csv(t)
+    excl = f'RSYNC_EXCLUDE={_e} ' if _e else ''
+    runtests = (f'PYTHONDONTWRITEBYTECODE=1 {excl}{t.python} runtests.py '
                 f'--rsync-bin="$PWD/{t.rsync_bin}" {" ".join(names)}')
     return (f'cd {t.builddir} || exit 3\n'
             f'sudo -n rm -rf testtmp\n'
@@ -371,6 +417,9 @@ class TransportResult:
     # were dropped from `failed`.  Surfaced in the report (a recovered flake is
     # noted, never silently hidden).
     recovered: list[str] = dataclasses.field(default_factory=list)
+    # Tests whose failure was tolerated via --xfail: dropped from `failed` (so the
+    # cell can still be OK) but surfaced in the report, never silently hidden.
+    xfailed_req: list[str] = dataclasses.field(default_factory=list)
 
     @property
     def skip_mismatch(self) -> bool:
@@ -388,14 +437,23 @@ def parse_transport(transport: str, r: CmdResult, skip_checked: bool) -> Transpo
         counts[m.group(2)] = int(m.group(1))
     failed = [m.group(2) for m in RE_RESULT.finditer(r.out)
               if m.group(1) in ("FAIL", "ERROR")]
+    # --xfail: drop tolerated failures from `failed` so they don't fail the cell.
+    xfailed_req = [f for f in failed
+                   if any(fnmatch.fnmatch(f, g) for g in XFAIL_GLOBS)]
+    failed = [f for f in failed if f not in xfailed_req]
     exp = got = set()
     if skip_checked and RE_SKIP_HDR.search(r.out):
         em = RE_SKIP_EXP.search(r.out)
         gm = RE_SKIP_GOT.search(r.out)
         exp = _csv_set(em.group(1)) if em else set()
         got = _csv_set(gm.group(1)) if gm else set()
-    return TransportResult(transport, r.rc, r.timed_out, counts, failed,
-                           skip_checked, exp, got, r.out)
+    rc = r.rc
+    # runtests exits non-zero per failing test; if the only failures were
+    # tolerated, clear the stale code so the cell reads OK (cf. retry_failed).
+    if xfailed_req and not failed and rc != 0:
+        rc = 0
+    return TransportResult(transport, rc, r.timed_out, counts, failed,
+                           skip_checked, exp, got, r.out, xfailed_req=xfailed_req)
 
 
 def retry_failed(t: Target, label: str, tr: TransportResult, rerun) -> None:
@@ -488,7 +546,7 @@ def run_target(t: Target, args, staging: str) -> TargetResult:
         return res
 
     for transport in args.transports:
-        skip_csv = parse_workflow_skip(t.workflow) if transport == "pipe" else None
+        skip_csv = workflow_skip_for(t) if transport == "pipe" else None
         jobs = (args.jobs if args.jobs else
                 (t.tcp_jobs if transport == "tcp" else t.pipe_jobs))
         cmd = test_script(t, transport, skip_csv, jobs)
@@ -503,14 +561,15 @@ def run_target(t: Target, args, staging: str) -> TargetResult:
             f"({'ok' if tr.ok else 'ISSUE'})")
 
     # Extra older-protocol passes (mirroring the workflow's check30/check29
-    # steps): same stdio-pipe transport and skip list as `make check`, but with
-    # runtests --protocol=N forcing an older wire version. Only targets that list
-    # `protocols` opt in; skipped under --transport tcp (these are pipe runs).
+    # steps): same stdio-pipe transport, but each protocol uses its own
+    # check30/check29 skip list (a feature like xattrs/ACLs runs at proto 30 yet
+    # skips at 29). Only targets that list `protocols` opt in; skipped under
+    # --transport tcp (these are pipe runs).
     if t.protocols and "pipe" in args.transports:
-        skip_csv = parse_workflow_skip(t.workflow)
         jobs = args.jobs if args.jobs else t.pipe_jobs
         for proto in t.protocols:
             label = f"proto{proto}"
+            skip_csv = workflow_skip_for(t, f"check{proto}")
             cmd = test_script(t, "pipe", skip_csv, jobs, protocol=proto)
             t0 = time.monotonic()
             r = run_on(t, cmd, timeout=2400)
@@ -670,6 +729,14 @@ def print_report(results: list[TargetResult], args, fleet: list[Target]) -> bool
         for r in recovered:
             print(f"    {r}")
         print("=" * 64)
+    xfreq = [f"{res.target} / {transport}: {','.join(tr.xfailed_req)}"
+             for res in results for transport in transports
+             if (tr := res.transports.get(transport)) and tr.xfailed_req]
+    if xfreq:
+        print("==== XFAILED BY REQUEST (--xfail; failure tolerated, cell still OK) ====")
+        for r in xfreq:
+            print(f"    {r}")
+        print("=" * 64)
     print(f"{len(results)} targets x {len(transports)} transports = {cells} cells: "
           f"{ok_cells} OK, {cells - ok_cells} not OK")
     return all_ok
@@ -778,10 +845,12 @@ def _on_signal(signum, frame):
 # root-running test left), then RE-counts after a settle so we report what
 # actually died (KILLED = before-after) and flag any survivor (SURVIVED, sets
 # fail) instead of claiming success when pkill couldn't reach it. The patterns
-# use the pgrep self-exclusion trick -- 'r[e]name'/'det[a]ch' match a real
-# process's "rename"/"detach" but not the bracketed literal in this script's own
-# argv (run_on passes the whole script as the remote argv), so we never signal
-# ourselves. @BASE@ is substituted with the target's run-dir prefix.
+# use the pgrep self-exclusion trick -- 'r[e]name'/'det[a]ch'/'[l]ocalhost' match a
+# real process's "rename"/"detach"/"localhost" but not the bracketed literal in this
+# script's own argv (run_on passes the whole script as the remote argv), so we never
+# signal ourselves. The client sweep catches an orphaned `rsync rsync://localhost:N/`
+# left blocked on a read when its test was killed (no I/O timeout). @BASE@ is
+# substituted with the target's run-dir prefix.
 _CLEANUP_SCRIPT = r'''fail=0
 sweep() {
   command -v pgrep >/dev/null 2>&1 || return 0
@@ -800,6 +869,7 @@ sweep() {
 }
 sweep flipper 'r[e]name.*r[e]name.*r[e]name'
 sweep daemon 'det[a]ch --address=127.0.0.1'
+sweep client 'rsync://[l]ocalhost'
 for d in @BASE@-*; do
   [ -e "$d" ] || continue
   if rm -rf -- "$d" 2>/dev/null || sudo -n rm -rf -- "$d" 2>/dev/null; then
@@ -892,8 +962,21 @@ def main() -> int:
                     "suite against it, e.g. --repo ../rsync-v3.4 --testsuite-repo .")
     ap.add_argument("--fleet", help="fleet config JSON (default: ~/.fleettest.json, "
                     "else fleettest.json next to this script)")
+    ap.add_argument("--skip", metavar="LIST",
+                    help="comma-separated test-name globs to exclude from every "
+                    "run on every target (passed to runtests as RSYNC_EXCLUDE; "
+                    "the tests are not run). E.g. --skip 'chmod-option,prealloc*'")
+    ap.add_argument("--xfail", metavar="LIST",
+                    help="comma-separated test-name globs whose FAILURE is "
+                    "tolerated: a matching fail is listed but does not make a "
+                    "cell 'not OK'. For known stable-gap tests you still want to "
+                    "run. E.g. --xfail 'chmod-option,preallocate,crtimes'")
     ap.add_argument("--list", action="store_true", help="list targets and exit")
     args = ap.parse_args()
+
+    global SKIP_CSV, XFAIL_GLOBS
+    SKIP_CSV = ",".join(s.strip() for s in (args.skip or "").split(",") if s.strip())
+    XFAIL_GLOBS = [s.strip() for s in (args.xfail or "").split(",") if s.strip()]
 
     global REPO, WORKFLOWS, TESTSUITE_REPO
     REPO = Path(args.repo).resolve() if args.repo else Path.cwd()

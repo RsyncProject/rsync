@@ -20,6 +20,8 @@ exclude                     pass
 files-from                  pass
 hardlinks                   pass
 ssh-basic                   pass
+variety                     pass
+variety-symlink-traversal   pass
 symlink-dirlink-basis       pass
 
 # --- version feature/option gaps in 3.2.0 ---
