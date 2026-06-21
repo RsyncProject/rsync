@@ -135,7 +135,7 @@ static int secure_basis_open(const char *basedir, const char *relpath, int flags
 			}
 			p = fullpath;
 		}
-		return open_no_attacker_symlinks(p, flags, mode);
+		return vfs_open_owner_walk(p, flags, mode);
 	}
 
 	/* The confined resolver is needed for the sanitizing daemon

@@ -1218,7 +1218,7 @@ int change_dir(const char *dir, int set_path_only)
 		}
 		if (!set_path_only) {
 			/* The destination is operator-supplied (like --log-file et al.), so
-			 * resolve it with open_no_attacker_symlinks: walk each component
+			 * resolve it with vfs_open_owner_walk: walk each component
 			 * refusing a symlink not owned by uid 0 or our euid, then fchdir to
 			 * the result.  This still follows the operator's/root's own symlinked
 			 * dest -- the `/backup -> /mnt/disk` / `/var/www -> /srv/www` admin
@@ -1228,7 +1228,7 @@ int change_dir(const char *dir, int set_path_only)
 			 * non-daemon receiver can opt back into the legacy plain chdir with
 			 * --insecure-links. */
 			if (am_daemon && !am_chrooted) {
-				int dfd = open_no_attacker_symlinks(dir, O_RDONLY | O_DIRECTORY, 0);
+				int dfd = vfs_open_owner_walk(dir, O_RDONLY | O_DIRECTORY, 0);
 				if (dfd < 0)
 					return 0;
 				if (fchdir(dfd) != 0) {
@@ -1259,7 +1259,7 @@ int change_dir(const char *dir, int set_path_only)
 				 * another uid.  A real dir is opened directly.  This closes the
 				 * destination chdir TOCTOU; --insecure-links keeps the plain
 				 * chdir for an operator whose dest is a foreign-owned symlink. */
-				dfd = open_no_attacker_symlinks(nf, O_RDONLY | O_DIRECTORY, 0);
+				dfd = vfs_open_owner_walk(nf, O_RDONLY | O_DIRECTORY, 0);
 				if (dfd < 0)
 					return 0;
 				if (fchdir(dfd) != 0) {
@@ -1339,7 +1339,7 @@ int change_dir(const char *dir, int set_path_only)
 				 * symlink not owned by uid 0 or our euid, closing the
 				 * relative-dest chdir TOCTOU while still following the operator's
 				 * own symlinks.  --insecure-links keeps the plain chdir. */
-				int dfd = open_no_attacker_symlinks(curr_dir,
+				int dfd = vfs_open_owner_walk(curr_dir,
 					O_RDONLY | O_DIRECTORY, 0);
 				if (dfd < 0)
 					chdir_failed = 1;

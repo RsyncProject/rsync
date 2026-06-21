@@ -63,4 +63,8 @@ int vfs_symlink_optout_allowed(void);
 int vfs_resolve_open(const char *basedir, const char *relpath, int flags, mode_t mode);
 int vfs_resolve_open_at(int anchor_fd, const char *relpath, int flags, mode_t mode);
 
+/* Operator-supplied-path resolution by ownership (vfs/owner_walk.c). */
+int vfs_open_owner_walk(const char *path, int flags, mode_t mode);
+int vfs_owner_walk_parent(const char *path, const char **bname);
+
 #endif /* RSYNC_VFS_H */

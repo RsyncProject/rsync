@@ -978,7 +978,7 @@ static int basis_link_stat(const char *path, STRUCT_STAT *stp)
 	 * the plain path (a lower-severity, non-root basis lookup). */
 	if (!am_daemon && am_root >= 0 && !vfs_symlink_optout_allowed()) {
 		const char *leaf;
-		int dfd = owner_walk_parent(path, &leaf);
+		int dfd = vfs_owner_walk_parent(path, &leaf);
 		int r, e;
 		if (dfd < 0)
 			return -1;
