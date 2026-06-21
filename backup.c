@@ -373,7 +373,7 @@ static int make_backup_inner(const char *fname, BOOL prefer_rename)
 			}
 			ret = 2;
 		} else {
-			if (do_symlink_at(sl, buf) < 0)
+			if (vfs_symlink_at(sl, buf) < 0)
 				rsyserr(FERROR, errno, "link %s -> \"%s\"", full_fname(buf), sl);
 			else if (DEBUG_GTE(BACKUP, 1))
 				rprintf(FINFO, "make_backup: SYMLINK %s successful.\n", fname);

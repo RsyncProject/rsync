@@ -1,8 +1,8 @@
 /*
- * Test harness for the fake-super branches of do_symlink_at()/do_mknod_at().
+ * Test harness for the fake-super branches of vfs_symlink_at()/do_mknod_at().
  * Fake-super stores a symlink/device as a placeholder file, so the create
  * resolves the final component; the no-slash branch used to fall back to
- * do_symlink()/do_mknod(), whose plain open() followed a planted basename
+ * vfs_symlink()/do_mknod(), whose plain open() followed a planted basename
  * symlink and escaped the module. Checks the fixed wrappers refuse it;
  * --poc shows the old fallback escaping. Not linked into rsync. GPL version 2.
  */
@@ -12,7 +12,7 @@
 #include <sys/stat.h>
 
 /* The symlink placeholder (and thus this escape) exists only where symlink
- * xattrs are unavailable -- the same guard do_symlink() uses. Elsewhere
+ * xattrs are unavailable -- the same guard vfs_symlink() uses. Elsewhere
  * symlink() fails EEXIST on a planted link, so only the device path applies. */
 #if defined SUPPORT_LINKS && (defined NO_SYMLINK_XATTRS || defined NO_SYMLINK_USER_XATTRS)
 #define TEST_SYMLINK_PLACEHOLDER 1
@@ -118,11 +118,11 @@ int main(int argc, char **argv)
 	am_root = -1;	/* fake-super: symlinks/devices stored as files */
 
 	if (poc) {
-		/* Pre-fix fallback: a no-slash path went to do_symlink()/do_mknod(),
+		/* Pre-fix fallback: a no-slash path went to vfs_symlink()/do_mknod(),
 		 * which open() the basename without O_NOFOLLOW. */
 #ifdef TEST_SYMLINK_PLACEHOLDER
-		do_symlink("VULN_SYM_PAYLOAD", "sympath");
-		check_clobbered("poc do_symlink bare", "../outside/secret_sym",
+		vfs_symlink("VULN_SYM_PAYLOAD", "sympath");
+		check_clobbered("poc vfs_symlink bare", "../outside/secret_sym",
 				"VULN_SYM_PAYLOAD");
 #endif
 		do_mknod("nodpath", S_IFCHR | 0600, 0);
@@ -133,12 +133,12 @@ int main(int argc, char **argv)
 	/* Fixed wrappers: a bare-path basename symlink must not be followed;
 	 * the victim outside the module stays untouched. */
 #ifdef TEST_SYMLINK_PLACEHOLDER
-	do_symlink_at("FIXED_SYM_PAYLOAD", "sympath");
-	check_preserved("do_symlink_at bare", "../outside/secret_sym", "VICTIM_SYM");
+	vfs_symlink_at("FIXED_SYM_PAYLOAD", "sympath");
+	check_preserved("vfs_symlink_at bare", "../outside/secret_sym", "VICTIM_SYM");
 
 	/* Slashed path for parity (already protected before the fix). */
-	do_symlink_at("FIXED_SYM_PAYLOAD", "sub/sympath2");
-	check_preserved("do_symlink_at slashed", "../outside/secret_sym2", "VICTIM_SYM2");
+	vfs_symlink_at("FIXED_SYM_PAYLOAD", "sub/sympath2");
+	check_preserved("vfs_symlink_at slashed", "../outside/secret_sym2", "VICTIM_SYM2");
 #endif
 
 # ifdef HAVE_MKNODAT

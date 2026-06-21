@@ -267,7 +267,7 @@ static int sender_open_copylinks_confined(const char *anchor, const char *relpat
 		}
 		if ((pdfd = vfs_resolve_open(anchor, dir, O_RDONLY | O_DIRECTORY, 0)) < 0)
 			return -1;
-		n = do_readlink_atfd(pdfd, bname, tgt, sizeof tgt - 1);
+		n = vfs_readlink_atfd(pdfd, bname, tgt, sizeof tgt - 1);
 		e = errno;
 		if (n < 0) {
 			/* EINVAL: not a symlink -> the resolved target file.  Open it

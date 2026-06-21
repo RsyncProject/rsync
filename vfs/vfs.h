@@ -107,4 +107,14 @@ int vfs_chmod(const char *path, mode_t mode);
 int vfs_chmod_at(const char *fname, mode_t mode);
 int vfs_chmod_atfd(int dfd, const char *name, mode_t mode);
 
+/* symlink/readlink (vfs/symlink.c).  vfs_readlink is a function only in
+ * fake-super builds; otherwise it is a macro -> readlink() (see rsync.h). */
+int vfs_symlink(const char *lnk, const char *path);
+int vfs_symlink_at(const char *lnk, const char *path);
+int vfs_symlink_atfd(const char *lnk, int dfd, const char *name);
+ssize_t vfs_readlink_atfd(int dfd, const char *name, char *buf, size_t bufsiz);
+#if defined NO_SYMLINK_XATTRS || defined NO_SYMLINK_USER_XATTRS
+ssize_t vfs_readlink(const char *path, char *buf, size_t bufsiz);
+#endif
+
 #endif /* RSYNC_VFS_H */

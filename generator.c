@@ -655,7 +655,7 @@ int quick_check_ok(enum filetype ftype, const char *fn, struct file_struct *file
 	  case FT_SYMLINK: {
 #ifdef SUPPORT_LINKS
 		char lnk[MAXPATHLEN];
-		int len = do_readlink(fn, lnk, MAXPATHLEN-1);
+		int len = vfs_readlink(fn, lnk, MAXPATHLEN-1);
 		if (len <= 0)
 			return 0;
 		lnk[len] = '\0';
@@ -1434,9 +1434,9 @@ static int gen_entry_symlink(const char *slnk, const char *path, struct file_str
 	int dfd = vfs_cached_dirfd(path, file);
 	if (dfd >= 0) {
 		const char *slash = strrchr(path, '/');
-		return do_symlink_atfd(slnk, dfd, slash ? slash + 1 : path);
+		return vfs_symlink_atfd(slnk, dfd, slash ? slash + 1 : path);
 	}
-	return do_symlink_at(slnk, path);
+	return vfs_symlink_at(slnk, path);
 }
 
 /* True when this build compiled no fd-relative primitive able to create this

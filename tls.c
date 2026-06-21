@@ -188,9 +188,9 @@ static void list_file(const char *fname)
 			buf.st_uid = buf.st_gid = 0;
 		strlcpy(linkbuf, " -> ", sizeof linkbuf);
 		/* const-cast required for silly UNICOS headers */
-		len = do_readlink((char*)fname, linkbuf+4, sizeof linkbuf - 4);
+		len = vfs_readlink((char*)fname, linkbuf+4, sizeof linkbuf - 4);
 		if (len == -1)
-			failed("do_readlink", fname);
+			failed("vfs_readlink", fname);
 		else
 			/* it's not nul-terminated */
 			linkbuf[4+len] = 0;

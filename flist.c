@@ -248,8 +248,8 @@ static int scan_readlink(const char *path, char *linkbuf, size_t bufsiz)
 	 && strncmp(path, scan_dir_prefix, scan_dir_prefix_len) == 0
 	 && path[scan_dir_prefix_len] == '/'
 	 && strchr(path + scan_dir_prefix_len + 1, '/') == NULL)
-		return do_readlink_atfd(scan_dirfd, path + scan_dir_prefix_len + 1, linkbuf, bufsiz);
-	return do_readlink(path, linkbuf, bufsiz);
+		return vfs_readlink_atfd(scan_dirfd, path + scan_dir_prefix_len + 1, linkbuf, bufsiz);
+	return vfs_readlink(path, linkbuf, bufsiz);
 }
 
 static int readlink_stat(const char *path, STRUCT_STAT *stp, char *linkbuf)
