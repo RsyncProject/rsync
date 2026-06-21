@@ -368,6 +368,34 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     There are tricky ways to work around this, though, so you had better trust
     your users if you choose this combination of parameters.
 
+0.  `insecure links`
+
+    This parameter (defaulting to "false") controls whether the daemon resolves
+    its symlink-bearing paths with the normal symlink-race defences or with the
+    legacy follow-any-symlink behaviour.
+
+    When false (the default), the daemon refuses to follow a symlink it did not
+    create -- the directory enumeration and file-content opens of the served
+    module, and the operator-supplied paths (`--backup-dir`, `--temp-dir`,
+    `--partial-dir`, the alt-dest basis dirs, and so on) are all resolved with a
+    walk that follows a symlink component only when it is owned by uid&nbsp;0 or
+    by the uid the module runs as, refusing one planted by any other user.  A
+    client can never relax this: a client that sends `--insecure-links` to the
+    daemon has its request refused.
+
+    Setting this parameter to "true" restores the pre-hardening behaviour for
+    **this module only**: the daemon follows **any** symlink in those paths.
+
+    > **WARNING:** enabling "insecure links" re-opens the symlink-escape /
+    > TOCTOU vulnerabilities that the default closes (including CVE-2026-53797
+    > and CVE-2026-53801): an attacker who can create a symlink inside the module
+    > -- or who shares the host with the served tree -- can redirect the daemon's
+    > reads and writes to files **outside** the module.  Enable it **only** on a
+    > single-tenant, fully-isolated, or otherwise trusted host where no untrusted
+    > local user can plant a symlink in the served tree.  It is the daemon
+    > analogue of the client's `--insecure-links` and exists for the same narrow
+    > "I accept the risk in my isolated environment" case.
+
 0.  `charset`
 
     This specifies the name of the character set in which the module's
@@ -1167,6 +1195,58 @@ This would merge any `/etc/rsyncd.d/*.inc` files (for global values that should
 stay in effect), and then include any `/etc/rsyncd.d/*.conf` files (defining
 modules without any global-value cross-talk).
 
+## SECURITY
+
+An rsync daemon exposes part of your filesystem to network clients, and its
+master process usually runs as root, so it should be configured defensively.
+The following is a practical checklist; the project's `SECURITY.md` describes the
+underlying threat model and the per-platform residuals.
+
+0.  **Confine each module to its path.**
+    Leave "[use chroot](#)" enabled (the default attempts a chroot) so the
+    per-connection worker is jailed inside the module's "[path](#)".  Where chroot
+    is unavailable rsync still resolves every transfer path so it cannot escape
+    the module through a symlinked parent, but a chroot is the stronger boundary
+    -- keep it on unless you have a specific reason not to.  A `path =
+    /outer/./inner` chroots to `/outer` while serving `/inner` as the module root.
+
+0.  **Drop privileges.**
+    Give each module a low-privilege "[uid](#)" and "[gid](#)" so a worker never
+    serves files as root; only the master process needs root (to chroot and bind
+    the port).  Keep modules "[read only](#)" unless they must accept uploads, and
+    prefer "[numeric ids](#)" (or a "[name converter](#)") so a malicious file
+    list cannot map files to an unexpected local owner.
+
+0.  **Restrict who can connect.**
+    Limit reachability with "[hosts allow](#)" / "[hosts deny](#)", bind the
+    daemon to a specific "[address](#)", and use a host firewall.  A module
+    without "[auth users](#)" is reachable by anyone who can reach the port.
+
+0.  **Authenticate with a strong secret and digest.**
+    Require login with "[auth users](#)" plus a "[secrets file](#)" that is
+    readable only by the daemon user (rsync refuses a too-open file unless
+    "[strict modes](#)" is disabled), and use a long, high-entropy secret.  To
+    refuse the weak MD4/MD5 challenge digests that old clients can negotiate, set
+    a floor with "[auth digest](#)" (for example `auth digest = sha512`); see the
+    AUTHENTICATION STRENGTH section below.
+
+0.  **Encrypt the connection.**
+    The daemon protocol authenticates but does **not** encrypt the data stream.
+    Do not expose a cleartext daemon to an untrusted network: front it with a TLS
+    proxy (see the SSL/TLS Daemon Setup section below) or run it over ssh.
+
+0.  **Keep symlink handling safe.**
+    Leave "[munge symlinks](#)" enabled on any writable module (it is the default)
+    so an uploaded symlink cannot redirect a later operation outside the module.
+    Do **not** set "[insecure links](#) = yes" on a host shared with untrusted
+    local users: it disables the daemon's symlink-escape protections (re-opening
+    the symlink TOCTOU/escape vulnerabilities, including CVE-2026-53797 and
+    CVE-2026-53801) and is appropriate only on a single-tenant, fully isolated
+    host.
+
+0.  **Refuse options you do not want.**
+    Use "[refuse options](#)" to reject client options a module should not allow.
+
 ## AUTHENTICATION STRENGTH
 
 Daemon authentication is a challenge-response system in which the client
@@ -1314,8 +1394,9 @@ Thanks to Karsten Thygesen for his many suggestions and documentation!
 ## AUTHOR
 
 Rsync was originally written by Andrew Tridgell and Paul Mackerras.  Many
-people have later contributed to it. It is currently maintained by Wayne
-Davison.
+people have later contributed to it.
+
+Special thanks go to Wayne Davison, who maintained rsync from 2004 to 2024.
 
 Mailing lists for support and development are available at
 <https://lists.samba.org/>.

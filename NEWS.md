@@ -1,4 +1,42 @@
-# NEWS for rsync 3.2.7 (20 Oct 2022)
+# NEWS for rsync 3.2.7 SECURITY UPDATE (UNRELEASED)
+
+This is a security-only update to the 3.2.7 release.  It backports the
+path-handling and daemon-protocol security fixes from the 3.5.0 audit onto the
+3.2.7 base, with no feature changes.  The fixes are validated against the 3.5.0
+security regression test suite.
+
+## Security changes in this update:
+
+### SECURITY FIXES:
+
+- Operator-supplied paths (`--backup-dir`, `--temp-dir`, `--partial-dir`,
+  `--link-dest`/`--compare-dest`/`--copy-dest`, `--log-file`, `--password-file`,
+  `--files-from`/`--include-from`/`--exclude-from`, `--filter` merge files,
+  `--write-batch`/`--read-batch`, the daemon's motd/lock/early-input/`--config`,
+  and the destination chdir) are now resolved with an ownership walk that follows
+  a symlink component only when it is owned by uid&nbsp;0 or the effective uid,
+  refusing one planted by any other user.  This closes a family of
+  symlink-redirection / TOCTOU file-read, file-write and privilege-escalation
+  issues (CWE-59/61).  The new `--insecure-links` option (local only; never
+  honoured by a daemon) and the per-module "`insecure links`" rsyncd.conf
+  parameter restore the legacy follow-any-symlink behaviour where explicitly
+  wanted.
+
+- The daemon sender's directory enumeration and file-content opens, the receiver
+  temp/partial-dir creation, and the alt-dest basis lookup are likewise confined.
+
+- batch: the `--write-batch` replay script now single-quotes every argument and
+  refuses a newline in a filter rule, preventing shell injection into the
+  generated replay script.
+
+- socket: the daemon rejects control bytes in the host before a proxy CONNECT.
+
+- syscall: the no-`AT_SYMLINK_NOFOLLOW` chmod fallback fails closed.
+
+- receiver: token writes are capped at the advertised file length.
+
+- rsync-ssl: the stunnel backend now binds the server certificate to the
+  requested hostname (`RSYNC_SSL_SKIP_HOSTNAME_CHECK` opts back to chain-only).
 
 ## Changes in this version:
 

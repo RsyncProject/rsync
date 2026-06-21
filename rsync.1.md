@@ -203,29 +203,45 @@ separate the files into different rsync calls, or consider using
 [`--delay-updates`](#opt) (which doesn't affect the sorted transfer order, but
 does make the final file-updating phase happen much more rapidly).
 
-## MULTI-HOST SECURITY
+## SECURITY
 
-Rsync takes steps to ensure that the file requests that are shared in a
-transfer are protected against various security issues.  Most of the potential
-problems arise on the receiving side where rsync takes steps to ensure that the
-list of files being transferred remains within the bounds of what was
-requested.
+Rsync is frequently run across a network and with elevated privileges, so it is
+worth thinking about who you are trusting and with what.  This section is a
+practical guide for safe use; the project's `SECURITY.md` describes the full
+threat model and the per-platform residuals.
 
-Toward this end, rsync 3.1.2 and later have aborted when a file list contains
-an absolute or relative path that tries to escape out of the top of the
-transfer.  Also, beginning with version 3.2.5, rsync does two more safety
-checks of the file list to (1) ensure that no extra source arguments were added
-into the transfer other than those that the client requested and (2) ensure
-that the file list obeys the exclude rules that were sent to the sender.
+### Use an authenticated, encrypted transport
 
-For those that don't yet have a 3.2.5 client rsync (or those that want to be
-extra careful), it is safest to do a copy into a dedicated destination
-directory for the remote files when you don't trust the remote host.  For
-example, instead of doing an rsync copy into your home directory:
+A plain `host:path` transfer runs over your remote shell (ssh by default), which
+authenticates the peer and encrypts the connection -- this is the safe default.
+A direct daemon connection (`host::module` or `rsync://`) is **not encrypted**
+and its authentication is comparatively weak, so do not send sensitive data or a
+daemon password over it across an untrusted network.  Instead tunnel it over ssh
+(see [USING RSYNC-DAEMON FEATURES VIA A REMOTE-SHELL CONNECTION](#)) or wrap it in
+TLS with [**rsync-ssl**(1)](rsync-ssl.1), setting `RSYNC_SSL_CA_CERT` so that the
+server certificate's chain **and** hostname are verified.  When you must supply a
+daemon password non-interactively, put it in a [`--password-file`](#opt) that is
+readable only by you (mode 600) rather than on the command line.
+
+### Copying from an untrusted sending host
+
+Rsync takes steps to ensure that the file requests shared in a transfer remain
+within the bounds of what was requested.  Most of the potential problems arise
+on the receiving side, where rsync ensures that the list of files being
+transferred stays within the requested tree: rsync 3.1.2 and later abort when a
+file list contains an absolute or relative path that tries to escape the top of
+the transfer, and 3.2.5 and later also verify that no extra source arguments
+were slipped into the transfer and that the file list obeys the exclude rules
+that were sent to the sender.
+
+For those without a 3.2.5-or-later client (or those who want to be extra
+careful), it is safest to copy untrusted remote files into a dedicated
+destination directory.  For example, instead of copying into your home
+directory:
 
 >     rsync -aiv host1:dir1 ~
 
-Dedicate a "host1-files" dir to the remote content:
+dedicate a "host1-files" dir to the remote content:
 
 >     rsync -aiv host1:dir1 ~/host1-files
 
@@ -233,21 +249,60 @@ See the [`--trust-sender`](#opt) option for additional details.
 
 CAUTION: it is not particularly safe to use rsync to copy files from a
 case-preserving filesystem to a case-ignoring filesystem.  If you must perform
-such a copy, you should either disable symlinks via `--no-links` or enable the
-munging of symlinks via [`--munge-links`](#opt) (and make sure you use the
-right local or remote option).  This will prevent rsync from doing potentially
-dangerous things if a symlink name overlaps with a file or directory. It does
-not, however, ensure that you get a full copy of all the files (since that may
-not be possible when the names overlap). A potentially better solution is to
-list all the source files and create a safe list of filenames that you pass to
-the [`--files-from`](#opt) option.  Any files that conflict in name would need
-to be copied to different destination directories using more than one copy.
+such a copy, either disable symlinks via `--no-links` or enable the munging of
+symlinks via [`--munge-links`](#opt) (and make sure you use the right local or
+remote option).  This prevents rsync from doing potentially dangerous things if a
+symlink name overlaps with a file or directory.  It does not, however, ensure
+that you get a full copy of all the files (since that may not be possible when
+the names overlap); a potentially better solution is to build a safe list of
+filenames and pass it to [`--files-from`](#opt).
 
 While a copy of a case-ignoring filesystem to a case-ignoring filesystem can
 work out fairly well, if no `--delete-during` or `--delete-before` option is
 active, rsync can potentially update an existing file on the receiveing side
 without noticing that the upper-/lower-case of the filename should be changed
 to match the sender.
+
+### Symbolic links
+
+A malicious sender can include symlinks that point outside the destination tree
+(for example at `/etc/passwd`).  Use [`--safe-links`](#opt) to ignore any symlink
+that escapes the transfer, or [`--munge-links`](#opt) to store every symlink in a
+form that is unusable on disk but recoverable later; `--no-links` drops them
+entirely.  See the [SYMBOLIC LINKS](#) section for how these interact.
+
+Separately, the directory and file paths that *you* supply on the command line --
+[`--backup-dir`](#opt), [`--temp-dir`](#opt), [`--partial-dir`](#opt), the
+[`--link-dest`](#opt)/[`--compare-dest`](#opt)/[`--copy-dest`](#opt) basis dirs,
+[`--log-file`](#opt), [`--files-from`](#opt)/`--include-from`/`--exclude-from`,
+[`--filter`](#opt) merge files, [`--write-batch`](#opt)/[`--read-batch`](#opt),
+and the destination itself -- are resolved so that a symlink component is followed
+only when it is owned by you or by root; an attacker-planted symlink along one of
+those paths is refused.  [`--insecure-links`](#opt) turns that protection off
+(restoring the historical follow-any-symlink behaviour); use it only when every
+directory along those paths is trusted, never on a path an unprivileged user can
+write.
+
+### Use strong checksums
+
+Rsync auto-negotiates the strongest checksum that both ends support, so keeping
+both rsync versions reasonably current is usually all that is needed.  You can
+pin the choice with [`--checksum-choice`](#opt) (`--cc`, e.g. `--cc=sha1` or one
+of the xxHash variants) or constrain negotiation with the
+[`RSYNC_CHECKSUM_LIST`](#) environment variable; only very old peers fall back to
+MD4/MD5.  This pre-transfer "does this file need updating?" checksum is separate
+from the whole-file checksum rsync always computes to verify each transferred
+file afterward.
+
+### Protocol version
+
+The client and server automatically negotiate the newest protocol they both
+support, so a current pair is already using the most recent version;
+[`--protocol`](#opt) only *forces an older* version for compatibility and should
+not be used to downgrade a connection.  Avoiding old protocols is therefore a
+matter of running a current rsync on both ends (a protocol below 30 also forces
+the weak MD4 authentication digest on a daemon connection -- see the AUTHENTICATION
+STRENGTH section of [**rsyncd.conf**(5)](rsyncd.conf.5)).
 
 ## ADVANCED USAGE
 
@@ -441,6 +496,7 @@ has its own detailed description later in this manpage.
 --copy-links, -L         transform symlink into referent file/dir
 --copy-unsafe-links      only "unsafe" symlinks are transformed
 --safe-links             ignore symlinks that point outside the tree
+--insecure-links         follow attacker-owned symlinks in operator paths
 --munge-links            munge symlinks to make them safe & unusable
 --copy-dirlinks, -k      transform symlink to dir into referent dir
 --keep-dirlinks, -K      treat symlinked dir on receiver as dir
@@ -1246,6 +1302,36 @@ expand it.
 
     Using this option in conjunction with [`--relative`](#opt) may give
     unexpected results.
+
+    See the [SYMBOLIC LINKS](#) section for multi-option info.
+
+0.  `--insecure-links`
+
+    By default rsync resolves the directory and file paths that the **operator**
+    supplies on the command line -- `--backup-dir`, `--temp-dir`/`-T`,
+    `--partial-dir`, `--link-dest`/`--compare-dest`/`--copy-dest`, `--log-file`,
+    `--password-file`, `--files-from`/`--include-from`/`--exclude-from`,
+    `--filter` merge files, `--write-batch`/`--read-batch`, and the destination
+    directory it changes into -- with a defensive walk that **follows a symlink
+    component only when it is owned by uid&nbsp;0 or by the running user**, and
+    refuses one owned by any other user.  This stops an attacker who can write
+    inside one of those directories from planting (or racing in) a symlink that
+    redirects a privileged rsync to a target outside the intended tree, while
+    still honouring the operator's own symlinks (the `/var/backups -> /mnt/disk`
+    admin pattern).  The rule is the same for absolute and relative paths.
+
+    `--insecure-links` turns that defence off, restoring the historical behaviour
+    of following any symlink in those paths.  Use it only when you fully trust
+    every directory along each operator-supplied path -- it re-exposes the
+    symlink-redirection attacks the walk prevents.
+
+    The option is **local only**: it is not sent to the remote side of the
+    transfer (a remote-shell peer that needs the opt-out must set it there, e.g.
+    via [`--rsync-path`](#opt)), and a daemon never honours it -- a daemon that
+    receives `--insecure-links` from a client refuses the request.  A daemon
+    administrator who wants the legacy behaviour for a single trusted module sets
+    "`insecure links = yes`" in that module's **rsyncd.conf**(5) section instead;
+    a client can never enable it.
 
     See the [SYMBOLIC LINKS](#) section for multi-option info.
 
@@ -2539,7 +2625,7 @@ expand it.
     from a trusted sender.
 
     When using this option it is a good idea to specify a dedicated destination
-    directory, as discussed in the [MULTI-HOST SECURITY](#) section.
+    directory, as discussed in the [SECURITY](#) section.
 
 0.  `--copy-as=USER[:GROUP]`
 
@@ -4835,8 +4921,9 @@ David Bell.  I've probably missed some people, my apologies if I have.
 ## AUTHOR
 
 Rsync was originally written by Andrew Tridgell and Paul Mackerras.  Many
-people have later contributed to it. It is currently maintained by Wayne
-Davison.
+people have later contributed to it.
+
+Special thanks go to Wayne Davison, who maintained rsync from 2004 to 2024.
 
 Mailing lists for support and development are available at
 <https://lists.samba.org/>.
