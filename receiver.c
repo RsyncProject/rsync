@@ -405,7 +405,7 @@ int open_tmpfile(char *fnametmp, const char *fname, struct file_struct *file)
 	/* For any non-chrooted receiver (vfs_relpath_active()), create the
 	 * temp file securely so a parent-symlink race can't redirect it.  When
 	 * the temp lives in the entry's own dir (the common case, no --temp-dir)
-	 * use the cached held dir fd; otherwise fall back to secure_mkstemp.  An
+	 * use the cached held dir fd; otherwise fall back to vfs_secure_mkstemp.  An
 	 * operator-supplied --temp-dir (tmpdir) gets the ownership-walk resolver
 	 * (it may legitimately point outside the tree); the deep-entry-dir fallback,
 	 * when the held-dirfd cache declines, gets the strict transfer-path one. */
@@ -413,13 +413,13 @@ int open_tmpfile(char *fnametmp, const char *fname, struct file_struct *file)
 		int dfd = vfs_cached_dirfd(fnametmp, file);
 		if (dfd >= 0) {
 			char *slash = strrchr(fnametmp, '/');
-			fd = do_mkstemp_atfd(dfd, slash ? slash + 1 : fnametmp,
+			fd = vfs_mkstemp_atfd(dfd, slash ? slash + 1 : fnametmp,
 					     (file->mode|added_perms) & INITACCESSPERMS);
 		} else
-			fd = secure_mkstemp(fnametmp, (file->mode|added_perms) & INITACCESSPERMS,
+			fd = vfs_secure_mkstemp(fnametmp, (file->mode|added_perms) & INITACCESSPERMS,
 					    tmpdir != NULL);
 	} else
-		fd = do_mkstemp(fnametmp, (file->mode|added_perms) & INITACCESSPERMS);
+		fd = vfs_mkstemp(fnametmp, (file->mode|added_perms) & INITACCESSPERMS);
 
 #if 0
 	/* In most cases parent directories will already exist because their
@@ -429,7 +429,7 @@ int open_tmpfile(char *fnametmp, const char *fname, struct file_struct *file)
 	 && make_path(fnametmp, MKP_SKIP_SLASH | MKP_DROP_NAME) == 0) {
 		/* Get back to name with XXXXXX in it. */
 		get_tmpname(fnametmp, fname, False);
-		fd = do_mkstemp(fnametmp, (file->mode|added_perms) & INITACCESSPERMS);
+		fd = vfs_mkstemp(fnametmp, (file->mode|added_perms) & INITACCESSPERMS);
 	}
 #endif
 

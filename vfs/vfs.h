@@ -122,4 +122,13 @@ int vfs_link(const char *old_path, const char *new_path);
 int vfs_link_at(const char *old_path, const char *new_path);
 int vfs_link_atfd(int old_dfd, const char *old_name, int new_dfd, const char *new_name, int flags);
 
+/* mkdir / mkstemp and the trim_trailing_slashes path helper (vfs/mkdir.c). */
+void trim_trailing_slashes(char *name);
+int vfs_mkdir(char *path, mode_t mode);
+int vfs_mkdir_at(char *path, mode_t mode);
+int vfs_mkdir_atfd(int dfd, const char *name, mode_t mode);
+int vfs_mkstemp(char *template, mode_t perms);
+int vfs_mkstemp_atfd(int dfd, char *filename, mode_t perms);
+int vfs_secure_mkstemp(char *template, mode_t perms, int operator_path);
+
 #endif /* RSYNC_VFS_H */

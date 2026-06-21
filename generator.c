@@ -132,7 +132,7 @@ static int start_delete_delay_temp(void)
 
 	dry_run = 0;
 	if (!get_tmpname(fnametmp, "deldelay", False)
-	 || (deldelay_fd = do_mkstemp(fnametmp, 0600)) < 0) {
+	 || (deldelay_fd = vfs_mkstemp(fnametmp, 0600)) < 0) {
 		rprintf(FINFO, "NOTE: Unable to create delete-delay temp file%s.\n",
 			inc_recurse ? "" : " -- switching to --delete-after");
 		delete_during = 0;
@@ -1386,9 +1386,9 @@ static int gen_entry_mkdir(char *fname, struct file_struct *file, mode_t mode)
 	int dfd = vfs_cached_dirfd(fname, file);
 	if (dfd >= 0) {
 		const char *slash = strrchr(fname, '/');
-		return do_mkdir_atfd(dfd, slash ? slash + 1 : fname, mode);
+		return vfs_mkdir_atfd(dfd, slash ? slash + 1 : fname, mode);
 	}
-	return do_mkdir_at(fname, mode);
+	return vfs_mkdir_at(fname, mode);
 }
 
 static int gen_entry_chmod(const char *fname, struct file_struct *file, mode_t mode)

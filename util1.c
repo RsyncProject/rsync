@@ -232,7 +232,7 @@ int make_path(char *fname, int flags)
 				else
 					errno = ENOTDIR;
 			}
-		} else if (do_mkdir_at(fname, ACCESSPERMS) == 0) {
+		} else if (vfs_mkdir_at(fname, ACCESSPERMS) == 0) {
 			ret++;
 			break;
 		}
@@ -271,7 +271,7 @@ int make_path(char *fname, int flags)
 		p += strlen(p);
 		if (ret < 0) /* Skip mkdir on error, but keep restoring the path. */
 			continue;
-		if (do_mkdir_at(fname, ACCESSPERMS) < 0)
+		if (vfs_mkdir_at(fname, ACCESSPERMS) < 0)
 			ret = -ret - 1;
 		else
 			ret++;
@@ -1500,7 +1500,7 @@ int handle_partial_dir(const char *fname, int create)
 			}
 			statret = -1;
 		}
-		if (statret < 0 && do_mkdir_at(dir, 0700) < 0) {
+		if (statret < 0 && vfs_mkdir_at(dir, 0700) < 0) {
 			vfs.operator_path_resolve = 0;
 			*fn = '/';
 			return 0;

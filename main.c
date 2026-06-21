@@ -799,7 +799,7 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 			exit_cleanup(RERR_SYNTAX);
 		}
 
-		if (do_mkdir(dest_path, ACCESSPERMS) != 0) {
+		if (vfs_mkdir(dest_path, ACCESSPERMS) != 0) {
 		    mkdir_error:
 			rsyserr(FERROR, errno, "mkdir %s failed",
 				full_fname(dest_path));
