@@ -583,7 +583,7 @@ static FILE *OpenConfFile( char *FileName )
   /* rsyncd.conf path (--config or default): a planted symlink could redirect
    * the daemon's config read.  Refuse symlinks not owned by uid 0 or euid. */
   {
-    int cfg_fd = safe_open_no_attacker_symlinks( FileName, O_RDONLY, 0 );
+    int cfg_fd = open_no_attacker_symlinks( FileName, O_RDONLY, 0 );
     OpenedFile = cfg_fd >= 0 ? fdopen( cfg_fd, "r" ) : NULL;
     if( !OpenedFile && cfg_fd >= 0 )
       close( cfg_fd );

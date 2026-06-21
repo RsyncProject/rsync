@@ -30,6 +30,7 @@ extern int preserve_links;
 extern int safe_symlinks;
 extern int backup_dir_len;
 extern unsigned int backup_dir_remainder;
+extern int operator_path_resolve;
 extern char backup_dir_buf[MAXPATHLEN];
 extern char *backup_suffix;
 extern char *backup_dir;
@@ -223,7 +224,7 @@ static inline int link_or_rename(const char *from, const char *to,
 /* Hard-link, rename, or copy an item to the backup name.  Returns 0 for
  * failure, 1 if item was moved, 2 if item was duplicated or hard linked
  * into backup area, or 3 if item doesn't exist or isn't a regular file. */
-int make_backup(const char *fname, BOOL prefer_rename)
+static int make_backup_inner(const char *fname, BOOL prefer_rename)
 {
 	stat_x sx;
 	struct file_struct *file;
@@ -351,5 +352,19 @@ int make_backup(const char *fname, BOOL prefer_rename)
   success:
 	if (INFO_GTE(BACKUP, 1))
 		rprintf(FINFO, "backed up %s to %s\n", fname, buf);
+	return ret;
+}
+
+int make_backup(const char *fname, BOOL prefer_rename)
+{
+	int ret;
+	/* The --backup-dir is an operator-supplied path: resolve it (and the
+	 * tail/rename beneath it) with the ownership walk so a foreign-owned
+	 * symlink component is refused while the operator's own is followed --
+	 * absolute and relative alike.  --insecure-links / "insecure links ="
+	 * restores legacy following. */
+	operator_path_resolve = 1;
+	ret = make_backup_inner(fname, prefer_rename);
+	operator_path_resolve = 0;
 	return ret;
 }
