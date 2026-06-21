@@ -715,20 +715,24 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 		dest_path = dot_dir_or_error();
 
 	if (daemon_filter_list.head) {
-		char *slash = strrchr(dest_path, '/');
+		/* Collapse ".." for the NAME-based daemon filter check so a "../excluded"
+		 * destination is matched by name, as stock rsync does on its sanitized
+		 * arg.  Done on a copy: the daemon exclude/filter is name-based (a symlink
+		 * whose own name is not excluded is still followed -- see rsyncd.conf(5)
+		 * "munge symlinks"), and the real dest_path is left for the resolver. */
+		char cleaned[MAXPATHLEN], *slash;
+		if (!sanitize_path(cleaned, dest_path, NULL, 0, SP_KEEP_DOT_DIRS))
+			strlcpy(cleaned, dest_path, sizeof cleaned);
+		slash = strrchr(cleaned, '/');
 		if (slash && (slash[1] == '\0' || (slash[1] == '.' && slash[2] == '\0')))
 			*slash = '\0';
-		else
-			slash = NULL;
-		if ((*dest_path != '.' || dest_path[1] != '\0')
-		 && (check_filter(&daemon_filter_list, FLOG, dest_path, 0) < 0
-		  || check_filter(&daemon_filter_list, FLOG, dest_path, 1) < 0)) {
+		if ((*cleaned != '.' || cleaned[1] != '\0')
+		 && (check_filter(&daemon_filter_list, FLOG, cleaned, 0) < 0
+		  || check_filter(&daemon_filter_list, FLOG, cleaned, 1) < 0)) {
 			rprintf(FERROR, "ERROR: daemon has excluded destination \"%s\"\n",
 				dest_path);
 			exit_cleanup(RERR_FILESELECT);
 		}
-		if (slash)
-			*slash = '/';
 	}
 
 	/* See what currently exists at the destination. */
@@ -1237,15 +1241,25 @@ static void do_server_recv(int f_in, int f_out, int argc, char *argv[])
 		char **dir_p;
 		filter_rule_list *elp = &daemon_filter_list;
 
+		/* Collapse ".." and strip the module-dir prefix to get the module-relative
+		 * name, but keep a leading "/" for a "path = /" module (module_dirlen <= 1)
+		 * so an absolute (module-rooted) filter rule still matches. */
+		char clean[MAXPATHLEN], *dir;
 		for (dir_p = basis_dir; *dir_p; dir_p++) {
-			char *dir = *dir_p;
-			if (*dir == '/')
-				dir += module_dirlen;
+			if (!sanitize_path(clean, *dir_p, "/", 0, SP_DEFAULT))
+				strlcpy(clean, *dir_p, sizeof clean);
+			dir = clean + (*clean == '/' && module_dirlen > 1 ? module_dirlen : 0);
 			if (check_filter(elp, FLOG, dir, 1) < 0)
 				goto options_rejected;
 		}
-		if (partial_dir && *partial_dir == '/'
-		 && check_filter(elp, FLOG, partial_dir + module_dirlen, 1) < 0) {
+		if (partial_dir && *partial_dir == '/') {
+			if (!sanitize_path(clean, partial_dir, "/", 0, SP_DEFAULT))
+				strlcpy(clean, partial_dir, sizeof clean);
+			dir = clean + (*clean == '/' && module_dirlen > 1 ? module_dirlen : 0);
+			if (check_filter(elp, FLOG, dir, 1) < 0)
+				goto options_rejected;
+		}
+		if (0) {
 		    options_rejected:
 			rprintf(FERROR, "Your options have been rejected by the server.\n");
 			exit_cleanup(RERR_SYNTAX);

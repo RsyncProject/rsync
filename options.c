@@ -2315,21 +2315,26 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	}
 	if (daemon_filter_list.head && !am_sender) {
 		filter_rule_list *elp = &daemon_filter_list;
+		/* Strip the module-dir prefix to get the module-relative name, but keep a
+		 * leading "/" for a "path = /" module (module_dirlen <= 1) so an absolute
+		 * (module-rooted) filter rule still matches. */
 		if (tmpdir) {
-			char *dir;
+			char clean[MAXPATHLEN], *dir;
 			if (!*tmpdir)
 				goto options_rejected;
-			dir = tmpdir + (*tmpdir == '/' ? module_dirlen : 0);
-			clean_fname(dir, CFN_COLLAPSE_DOT_DOT_DIRS);
+			if (!sanitize_path(clean, tmpdir, "/", 0, SP_DEFAULT))
+				strlcpy(clean, tmpdir, sizeof clean);
+			dir = clean + (*clean == '/' && module_dirlen > 1 ? module_dirlen : 0);
 			if (check_filter(elp, FLOG, dir, 1) < 0)
 				goto options_rejected;
 		}
 		if (backup_dir) {
-			char *dir;
+			char clean[MAXPATHLEN], *dir;
 			if (!*backup_dir)
 				goto options_rejected;
-			dir = backup_dir + (*backup_dir == '/' ? module_dirlen : 0);
-			clean_fname(dir, CFN_COLLAPSE_DOT_DOT_DIRS);
+			if (!sanitize_path(clean, backup_dir, "/", 0, SP_DEFAULT))
+				strlcpy(clean, backup_dir, sizeof clean);
+			dir = clean + (*clean == '/' && module_dirlen > 1 ? module_dirlen : 0);
 			if (check_filter(elp, FLOG, dir, 1) < 0)
 				goto options_rejected;
 		}
