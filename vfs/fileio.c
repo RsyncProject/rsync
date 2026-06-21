@@ -20,6 +20,16 @@
 #include <sys/syscall.h>
 #endif
 
+#ifndef S_BLKSIZE
+# if defined hpux || defined __hpux__ || defined __hpux
+#  define S_BLKSIZE 1024
+# elif defined _AIX && defined _I386
+#  define S_BLKSIZE 4096
+# else
+#  define S_BLKSIZE 512
+# endif
+#endif
+
 #ifdef HAVE_FTRUNCATE
 int vfs_ftruncate(int fd, OFF_T size)
 {

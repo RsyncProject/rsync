@@ -47,7 +47,7 @@ LIBOBJ=lib/wildmatch.o lib/compat.o lib/snprintf.o lib/mdfour.o lib/md5.o \
 zlib_OBJS=zlib/deflate.o zlib/inffast.o zlib/inflate.o zlib/inftrees.o \
 	zlib/trees.o zlib/zutil.o zlib/adler32.o zlib/compress.o zlib/crc32.o
 OBJS1_NO_MAIN=flist.o rsync.o generator.o receiver.o cleanup.o sender.o exclude.o \
-	util1.o util2.o checksum.o match.o syscall.o log.o backup.o delete.o
+	util1.o util2.o checksum.o match.o log.o backup.o delete.o
 OBJS1=$(OBJS1_NO_MAIN) main.o
 OBJS2=options.o io.o compat.o hlink.o token.o uidlist.o socket.o hashtable.o \
 	usage.o fileio.o batch.o clientname.o chmod.o acls.o xattrs.o
@@ -58,7 +58,7 @@ popt_OBJS= popt/popt.o  popt/poptconfig.o \
 VFS_OBJ=vfs/vfs.o vfs/dirstack.o vfs/secure_open.o vfs/owner_walk.o vfs/dircache.o vfs/stat.o vfs/rename.o vfs/unlink.o vfs/open.o vfs/chmod.o vfs/symlink.o vfs/link.o vfs/mkdir.o vfs/chown.o vfs/mknod.o vfs/times.o vfs/fileio.o
 OBJS=$(OBJS1) $(OBJS2) $(OBJS3) $(DAEMON_OBJ) $(LIBOBJ) @BUILD_ZLIB@ @BUILD_POPT@ libvfs.a
 
-TLS_OBJ = tls.o syscall.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/permstring.o lib/sysxattrs.o @BUILD_POPT@ libvfs.a
+TLS_OBJ = tls.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/permstring.o lib/sysxattrs.o @BUILD_POPT@ libvfs.a
 
 # Programs we must have to run the test cases
 CHECK_PROGS = rsync$(EXEEXT) tls$(EXEEXT) getgroups$(EXEEXT) getfsdev$(EXEEXT) \
@@ -155,11 +155,11 @@ rrsync: support/rrsync
 $(OBJS): $(HEADERS)
 $(CHECK_OBJS): $(HEADERS)
 $(VFS_OBJ): $(HEADERS)
-$(VFS_OBJ) syscall.o: vfs/vfs_internal.h
+$(VFS_OBJ): vfs/vfs_internal.h
 tls.o xattrs.o: lib/sysxattrs.h
 
 # The VFS layer is bundled into a static archive linked last on every target so
-# that moving filesystem code out of syscall.o never breaks a test harness link
+# that moving a filesystem family between files never breaks a test harness link
 # (the linker pulls only the members each program references).
 libvfs.a: $(VFS_OBJ)
 	rm -f $@
@@ -225,11 +225,11 @@ getgroups$(EXEEXT): getgroups.o
 getfsdev$(EXEEXT): getfsdev.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ getfsdev.o $(LIBS)
 
-TRIMSLASH_OBJ = trimslash.o syscall.o util2.o t_stub.o lib/compat.o lib/snprintf.o libvfs.a
+TRIMSLASH_OBJ = trimslash.o util2.o t_stub.o lib/compat.o lib/snprintf.o libvfs.a
 trimslash$(EXEEXT): $(TRIMSLASH_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(TRIMSLASH_OBJ) $(LIBS)
 
-T_UNSAFE_OBJ = t_unsafe.o syscall.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o libvfs.a
+T_UNSAFE_OBJ = t_unsafe.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o libvfs.a
 t_unsafe$(EXEEXT): $(T_UNSAFE_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_UNSAFE_OBJ) $(LIBS)
 
@@ -237,7 +237,7 @@ T_IWILDMATCH_OBJ = t_iwildmatch.o lib/wildmatch.o
 t_iwildmatch$(EXEEXT): $(T_IWILDMATCH_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_IWILDMATCH_OBJ) $(LIBS)
 
-T_CLEAN_FNAME_OBJ = t_clean_fname.o syscall.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o libvfs.a
+T_CLEAN_FNAME_OBJ = t_clean_fname.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o libvfs.a
 t_clean_fname$(EXEEXT): $(T_CLEAN_FNAME_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_CLEAN_FNAME_OBJ) $(LIBS)
 
@@ -254,19 +254,19 @@ T_SAFE_ARG_OBJ = t_safe_arg.o t_safe_arg_main.o $(OBJS1_NO_MAIN) $(OBJS2) $(OBJS
 t_safe_arg$(EXEEXT): $(T_SAFE_ARG_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_SAFE_ARG_OBJ) $(LIBS)
 
-T_CHMOD_SECURE_OBJ = t_chmod_secure.o syscall.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o libvfs.a
+T_CHMOD_SECURE_OBJ = t_chmod_secure.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o libvfs.a
 t_chmod_secure$(EXEEXT): $(T_CHMOD_SECURE_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_CHMOD_SECURE_OBJ) $(LIBS)
 
-T_RENAME_SECURE_OBJ = t_rename_secure.o syscall.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o libvfs.a
+T_RENAME_SECURE_OBJ = t_rename_secure.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o libvfs.a
 t_rename_secure$(EXEEXT): $(T_RENAME_SECURE_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_RENAME_SECURE_OBJ) $(LIBS)
 
-T_SYMLINK_SECURE_OBJ = t_symlink_secure.o syscall.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o libvfs.a
+T_SYMLINK_SECURE_OBJ = t_symlink_secure.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o libvfs.a
 t_symlink_secure$(EXEEXT): $(T_SYMLINK_SECURE_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_SYMLINK_SECURE_OBJ) $(LIBS)
 
-T_SECURE_RELPATH_OBJ = t_secure_relpath.o syscall.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o libvfs.a
+T_SECURE_RELPATH_OBJ = t_secure_relpath.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o libvfs.a
 t_secure_relpath$(EXEEXT): $(T_SECURE_RELPATH_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_SECURE_RELPATH_OBJ) $(LIBS)
 
