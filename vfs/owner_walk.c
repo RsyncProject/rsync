@@ -21,9 +21,6 @@
 #include "ifuncs.h"
 #include "vfs/vfs_internal.h"
 
-extern int am_sender;
-extern int insecure_links;
-
 
 /* Advance the tracked absolute path `abspath` by one resolved component,
  * normalizing "." and ".." exactly as openat() does so the module-confinement

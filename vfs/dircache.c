@@ -22,9 +22,6 @@
 #include "ifuncs.h"
 #include "vfs/vfs_internal.h"
 
-extern char curr_dir[MAXPATHLEN];
-extern unsigned int curr_dir_len;
-
 /* Held-directory-fd traversal.
  *
  * Rather than re-resolve a full path on every syscall (do_*_at() re-opens the

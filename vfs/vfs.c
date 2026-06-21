@@ -24,7 +24,7 @@ struct vfs vfs = {
 /* Reset the VFS between transfers.  Idempotent; re-establishes the same safe
  * sentinels as the static initializer.  Behaviorally inert until the held-
  * dirfd cache and module snapshot are migrated into struct vfs in later
- * commits (the live cache is still the dpc_* statics in syscall.c for now). */
+ * commits (the live cache is still the dpc_* statics in vfs/dircache.c). */
 void vfs_init(void)
 {
 	vfs.dpc.base = -1;
