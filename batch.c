@@ -166,25 +166,33 @@ static int write_arg(const char *arg)
 	const char *x, *s;
 	int len, err = 0;
 
+	/* Emit a "--opt=" prefix unquoted only when it is a plain option token;
+	 * a metacharacter before '=' (an attacker-shaped arg) must be quoted
+	 * along with the rest, or it would run raw in the replay script. */
 	if (*arg == '-' && (x = strchr(arg, '=')) != NULL) {
-		err |= write(batch_sh_fd, arg, x - arg + 1) != x - arg + 1;
-		arg += x - arg + 1;
-	}
-
-	if (strpbrk(arg, " \"'&;|[]()$#!*?^\\") != NULL) {
-		err |= write(batch_sh_fd, "'", 1) != 1;
-		for (s = arg; (x = strchr(s, '\'')) != NULL; s = x + 1) {
-			err |= write(batch_sh_fd, s, x - s + 1) != x - s + 1;
-			err |= write(batch_sh_fd, "'", 1) != 1;
+		const char *p = arg;
+		while (p < x && (*p == '-' || *p == '_'
+		    || (*p >= '0' && *p <= '9')
+		    || (*p >= 'A' && *p <= 'Z')
+		    || (*p >= 'a' && *p <= 'z')))
+			p++;
+		if (p == x) {
+			err |= write(batch_sh_fd, arg, x - arg + 1) != x - arg + 1;
+			arg += x - arg + 1;
 		}
-		len = strlen(s);
-		err |= write(batch_sh_fd, s, len) != len;
-		err |= write(batch_sh_fd, "'", 1) != 1;
-		return err;
 	}
 
-	len = strlen(arg);
-	err |= write(batch_sh_fd, arg, len) != len;
+	/* Single-quote unconditionally so every shell metacharacter (backtick,
+	 * newline, redirection, ...) stays literal in the replay script. An
+	 * embedded ' is emitted as the '\'' close/escape/reopen sequence. */
+	err |= write(batch_sh_fd, "'", 1) != 1;
+	for (s = arg; (x = strchr(s, '\'')) != NULL; s = x + 1) {
+		err |= write(batch_sh_fd, s, x - s) != x - s;
+		err |= write(batch_sh_fd, "'\\''", 4) != 4;
+	}
+	len = strlen(s);
+	err |= write(batch_sh_fd, s, len) != len;
+	err |= write(batch_sh_fd, "'", 1) != 1;
 
 	return err;
 }
@@ -210,6 +218,16 @@ static void write_filter_rules(int fd)
 	for (ent = filter_list.head; ent; ent = ent->next) {
 		unsigned int plen;
 		char *p = get_rule_prefix(ent, "- ", 0, &plen);
+		/* A filter pattern is one here-doc line; an embedded newline would let
+		 * a crafted pattern (e.g. from a dir-merge/--exclude-from file in an
+		 * untrusted tree) forge the "#E#" terminator on its own line and inject
+		 * shell commands into the generated replay script.  Such a pattern also
+		 * can't round-trip the line-delimited here-doc, so refuse it fail-closed
+		 * rather than emit an injectable script. */
+		if (ent->pattern && strchr(ent->pattern, '\n')) {
+			rprintf(FERROR, "cannot write a filter rule containing a newline to the batch replay script\n");
+			exit_cleanup(RERR_SYNTAX);
+		}
 		write_buf(fd, p, plen);
 		write_sbuf(fd, ent->pattern);
 		if (ent->rflags & FILTRULE_DIRECTORY)
@@ -224,26 +242,44 @@ static void write_filter_rules(int fd)
 /* This sets batch_fd and (for --write-batch) batch_sh_fd. */
 void open_batch_files(void)
 {
+	/* --write-batch/--read-batch are operator-supplied; a planted symlink
+	 * could truncate+overwrite an arbitrary file (write side) or stream
+	 * attacker bytes into the protocol parser (read side).  Refuse symlinks
+	 * not owned by uid 0 or our euid anywhere in the path. */
 	if (write_batch) {
 		char filename[MAXPATHLEN];
 
 		stringjoin(filename, sizeof filename, batch_name, ".sh", NULL);
 
-		batch_sh_fd = do_open(filename, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IXUSR);
+		batch_sh_fd = open_no_attacker_symlinks(filename, O_WRONLY | O_CREAT | O_TRUNC | O_BINARY, S_IRUSR | S_IWUSR | S_IXUSR);
 		if (batch_sh_fd < 0) {
 			rsyserr(FERROR, errno, "Batch file %s open error", full_fname(filename));
 			exit_cleanup(RERR_FILESELECT);
 		}
 
-		batch_fd = do_open(batch_name, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+		/* O_BINARY: the batch stream is binary protocol data; without it
+		 * Cygwin et al apply CRLF translation and corrupt it.  Unlike
+		 * do_open(), open_no_attacker_symlinks passes flags verbatim. */
+		batch_fd = open_no_attacker_symlinks(batch_name, O_WRONLY | O_CREAT | O_TRUNC | O_BINARY, S_IRUSR | S_IWUSR);
 	} else if (strcmp(batch_name, "-") == 0)
 		batch_fd = STDIN_FILENO;
 	else
-		batch_fd = do_open(batch_name, O_RDONLY, S_IRUSR | S_IWUSR);
+		batch_fd = open_no_attacker_symlinks(batch_name, O_RDONLY | O_BINARY, S_IRUSR | S_IWUSR);
 
 	if (batch_fd < 0) {
 		rsyserr(FERROR, errno, "Batch file %s open error", full_fname(batch_name));
 		exit_cleanup(RERR_FILEIO);
+	}
+
+	/* --read-batch: the file's bytes drive the protocol parser, so refuse
+	 * non-regular files (FIFO, device, socket) at the batch path. */
+	if (!write_batch && batch_fd != STDIN_FILENO) {
+		STRUCT_STAT st;
+		if (do_fstat(batch_fd, &st) == 0 && !S_ISREG(st.st_mode)) {
+			rprintf(FERROR, "Batch file %s is not a regular file\n",
+				full_fname(batch_name));
+			exit_cleanup(RERR_FILEIO);
+		}
 	}
 }
 
