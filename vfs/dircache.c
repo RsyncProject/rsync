@@ -98,21 +98,15 @@ int vfs_opendir(const char *dirname)
  * kept (intermediate symlink-target fds are closed -- sound, since an open
  * dirfd needs no live parent). */
 #if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
-#define DPC_MAXDEPTH 64
-static const char *dpc_anchor = (const char *)-2;
-static int dpc_base = -1;			/* opened anchor dir (owned), or -1 */
-static int dpc_fd[DPC_MAXDEPTH];		/* dpc_fd[i] = dir after components 0..i */
-static char dpc_name[DPC_MAXDEPTH][256];	/* textual component names */
-static int dpc_depth = 0;
 
 void vfs_dircache_reset(void)
 {
-	while (dpc_depth > 0)
-		close(dpc_fd[--dpc_depth]);
-	if (dpc_base >= 0)
-		close(dpc_base);
-	dpc_base = -1;
-	dpc_anchor = (const char *)-2;
+	while (vfs.dpc.depth > 0)
+		close(vfs.dpc.fd[--vfs.dpc.depth]);
+	if (vfs.dpc.base >= 0)
+		close(vfs.dpc.base);
+	vfs.dpc.base = -1;
+	vfs.dpc.anchor = (const char *)-2;
 }
 
 /* Resolve directory `dirpath` beneath `anchor` (NULL = cwd, else an absolute
@@ -123,7 +117,7 @@ void vfs_dircache_reset(void)
 static int dpc_dir_fd(const char *anchor, const char *dirpath)
 {
 	char copy[MAXPATHLEN];
-	char *comps[DPC_MAXDEPTH];
+	char *comps[VFS_DPC_MAXDEPTH];
 	char *sv = NULL;
 	int nc = 0, p, i;
 
@@ -132,15 +126,15 @@ static int dpc_dir_fd(const char *anchor, const char *dirpath)
 		dirpath = "";
 	if (dirpath[0] == '/') { errno = 0; return -1; }
 
-	if (anchor != dpc_anchor || dpc_base < 0) {
+	if (anchor != vfs.dpc.anchor || vfs.dpc.base < 0) {
 		int fl;
 		vfs_dircache_reset();
-		dpc_base = open_anchor_dirfd(anchor ? anchor : ".");
-		if (dpc_base < 0)
+		vfs.dpc.base = open_anchor_dirfd(anchor ? anchor : ".");
+		if (vfs.dpc.base < 0)
 			return -1;
-		if ((fl = fcntl(dpc_base, F_GETFD)) >= 0)
-			fcntl(dpc_base, F_SETFD, fl | FD_CLOEXEC);
-		dpc_anchor = anchor;
+		if ((fl = fcntl(vfs.dpc.base, F_GETFD)) >= 0)
+			fcntl(vfs.dpc.base, F_SETFD, fl | FD_CLOEXEC);
+		vfs.dpc.anchor = anchor;
 	}
 
 	if (strlcpy(copy, dirpath, sizeof copy) >= sizeof copy) { errno = ENAMETOOLONG; return -1; }
@@ -148,7 +142,7 @@ static int dpc_dir_fd(const char *anchor, const char *dirpath)
 		if (c[0] == '.' && c[1] == '\0')
 			continue;					/* "." */
 		if (c[0] == '.' && c[1] == '.' && c[2] == '\0') { errno = 0; return -1; }
-		if (nc >= DPC_MAXDEPTH || strlen(c) >= sizeof dpc_name[0]) {
+		if (nc >= VFS_DPC_MAXDEPTH || strlen(c) >= sizeof vfs.dpc.name[0]) {
 			/* Too deep / a too-long component to cache.  Release the held
 			 * ancestor fds first so the caller's full-path fallback walk does
 			 * not stack on top of them: a deep tree plus a low RLIMIT_NOFILE
@@ -162,14 +156,14 @@ static int dpc_dir_fd(const char *anchor, const char *dirpath)
 	}
 
 	/* Reuse the longest common prefix; drop the divergent tail. */
-	for (p = 0; p < dpc_depth && p < nc && strcmp(dpc_name[p], comps[p]) == 0; p++)
+	for (p = 0; p < vfs.dpc.depth && p < nc && strcmp(vfs.dpc.name[p], comps[p]) == 0; p++)
 		;
-	while (dpc_depth > p)
-		close(dpc_fd[--dpc_depth]);
+	while (vfs.dpc.depth > p)
+		close(vfs.dpc.fd[--vfs.dpc.depth]);
 
 	/* Descend the new tail, holding each resolved component. */
 	for (i = p; i < nc; i++) {
-		int afd = dpc_depth > 0 ? dpc_fd[dpc_depth-1] : dpc_base;
+		int afd = vfs.dpc.depth > 0 ? vfs.dpc.fd[vfs.dpc.depth-1] : vfs.dpc.base;
 		struct dirstack ds;
 		int hops = SECURE_OPEN_MAXSYMLINKS;
 		int fd, fl;
@@ -187,11 +181,11 @@ static int dpc_dir_fd(const char *anchor, const char *dirpath)
 			return -1;
 		if ((fl = fcntl(fd, F_GETFD)) >= 0)
 			fcntl(fd, F_SETFD, fl | FD_CLOEXEC);
-		strlcpy(dpc_name[dpc_depth], comps[i], sizeof dpc_name[0]);
-		dpc_fd[dpc_depth++] = fd;
+		strlcpy(vfs.dpc.name[vfs.dpc.depth], comps[i], sizeof vfs.dpc.name[0]);
+		vfs.dpc.fd[vfs.dpc.depth++] = fd;
 	}
 
-	return nc > 0 ? dpc_fd[dpc_depth-1] : dpc_base;
+	return nc > 0 ? vfs.dpc.fd[vfs.dpc.depth-1] : vfs.dpc.base;
 }
 
 /* Public entry for the sender (no vfs_relpath_active gate: its send paths
