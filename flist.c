@@ -889,9 +889,17 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 				rdev_major = DEV_MAJOR(devp);
 				rdev = MAKEDEV(rdev_major, DEV_MINOR(devp));
 				extra_len += DEV_EXTRA_CNT * EXTRA_LEN;
+			} else if (IS_DEVICE(mode)) {
+				/* Abbrev-branch counterpart to the !preserve_devices
+				 * stub-alloc below: zeroed F_RDEV_P slots. */
+				extra_len += DEV_EXTRA_CNT * EXTRA_LEN;
 			}
 			if (preserve_links && S_ISLNK(mode))
 				linkname_len = strlen(F_SYMLINK(first)) + 1;
+			else if (S_ISLNK(mode))
+				/* Abbrev-branch counterpart to the !preserve_links
+				 * stub-alloc below: empty linkname. */
+				linkname_len = 1;
 			else
 				linkname_len = 0;
 			real_ISREG_entry = S_ISREG(mode) ? 1 : 0;
@@ -1013,6 +1021,15 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 		if (IS_DEVICE(mode))
 			extra_len += DEV_EXTRA_CNT * EXTRA_LEN;
 		file_length = 0;
+	} else if (IS_DEVICE(mode)) {
+		/* Peer/batch sent an S_IFCHR/S_IFBLK entry but we are not
+		 * preserving devices.  A cooperating sender wouldn't do this;
+		 * a crafted batch can.  Allocate (and zero, via the memset
+		 * below) the DEV_EXTRA_CNT slots so F_RDEV_P() callers
+		 * (set_stat_xattr under --fake-super, generator IS_DEVICE
+		 * paths) read {0,0} instead of the previous pool slot. */
+		extra_len += DEV_EXTRA_CNT * EXTRA_LEN;
+		file_length = 0;
 	} else if (protocol_version < 28)
 		rdev = MAKEDEV(0, 0);
 
@@ -1033,6 +1050,14 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 #endif
 		if (munge_symlinks)
 			linkname_len += SYMLINK_PREFIX_LEN;
+	} else if (S_ISLNK(mode)) {
+		/* Peer/batch sent an S_IFLNK entry but we are not preserving
+		 * links (no -l, and the batch stream-flags didn't set it).  A
+		 * cooperating sender wouldn't do this; a crafted batch can.
+		 * Allocate one byte for an empty linkname so F_SYMLINK()
+		 * callers (log.c %L, generator.c) read a valid "" instead of
+		 * the next pool slot's redzone. */
+		linkname_len = 1;
 	}
 	else
 #endif
@@ -1228,7 +1253,11 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 #ifdef SUPPORT_LINKS
 	if (linkname_len) {
 		bp += basename_len;
-		if (first_hlink_ndx >= flist->ndx_start) {
+		if (!preserve_links) {
+			/* The empty-linkname case allocated above; nothing on
+			 * the wire to read.  Just terminate it. */
+			*bp = '\0';
+		} else if (first_hlink_ndx >= flist->ndx_start) {
 			struct file_struct *first = flist->files[first_hlink_ndx - flist->ndx_start];
 			memcpy(bp, F_SYMLINK(first), linkname_len);
 		} else {
@@ -1532,6 +1561,18 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 			extra_len += SUM_EXTRA_CNT * EXTRA_LEN;
 	}
 
+#ifdef HAVE_STRUCT_STAT_ST_RDEV
+	/* The sender path historically passes rdev via the tmp_rdev static
+	 * (read by send_file_entry()), so make_file() never reserved
+	 * DEV_EXTRA_CNT in the file_struct itself.  But receiver-side callers
+	 * (recv_generator's --inplace --backup back_file, backup.c make_backup)
+	 * hand this struct to set_file_attrs() -> set_stat_xattr(), which reads
+	 * F_RDEV_P(file) under --fake-super.  Reserve and populate the slots
+	 * so the struct is self-contained, matching recv_file_entry(). */
+	if (IS_DEVICE(st.st_mode))
+		extra_len += DEV_EXTRA_CNT * EXTRA_LEN;
+#endif
+
 #if EXTRA_ROUNDING > 0
 	if (extra_len & (EXTRA_ROUNDING * EXTRA_LEN))
 		extra_len = (extra_len | (EXTRA_ROUNDING * EXTRA_LEN)) + EXTRA_LEN;
@@ -1565,7 +1606,10 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 
 #ifdef HAVE_STRUCT_STAT_ST_RDEV
 	if (IS_DEVICE(st.st_mode)) {
+		uint32 *devp = F_RDEV_P(file);
 		tmp_rdev = st.st_rdev;
+		DEV_MAJOR(devp) = major(st.st_rdev);
+		DEV_MINOR(devp) = minor(st.st_rdev);
 		st.st_size = 0;
 	} else if (IS_SPECIAL(st.st_mode))
 		st.st_size = 0;
