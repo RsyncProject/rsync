@@ -1394,8 +1394,9 @@ BOOL io_start_buffering_out(int f_out)
 	if (iobuf.out.buf) {
 		if (iobuf.out_fd == -1)
 			iobuf.out_fd = f_out;
-		else
+		else if (iobuf.out_fd >= 0)
 			assert(f_out == iobuf.out_fd);
+		/* else out_fd == -2: peer already gone; leave it dead. */
 		return False;
 	}
 
@@ -1413,8 +1414,9 @@ BOOL io_start_buffering_in(int f_in)
 	if (iobuf.in.buf) {
 		if (iobuf.in_fd == -1)
 			iobuf.in_fd = f_in;
-		else
+		else if (iobuf.in_fd >= 0)
 			assert(f_in == iobuf.in_fd);
+		/* else in_fd == -2: peer already EOF'd; leave it dead. */
 		return False;
 	}
 
