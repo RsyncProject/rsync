@@ -164,7 +164,30 @@ static const struct enum_list enum_syslog_facility[] = {
 
 /* Expand %VAR% references.  Any unknown vars or unrecognized
  * syntax leaves the raw chars unchanged. */
-static char *expand_vars(const char *str)
+static char *expand_vars_shell_escape(const char *val)
+{
+	const char *s;
+	char *ret, *t;
+	size_t len = 2;
+
+	for (s = val; *s; s++)
+		len += *s == '\'' ? 4 : 1;
+	ret = new_array(char, len + 1);
+	t = ret;
+	*t++ = '\'';
+	for (s = val; *s; s++) {
+		if (*s == '\'') {
+			memcpy(t, "'\\''", 4);
+			t += 4;
+		} else
+			*t++ = *s;
+	}
+	*t++ = '\'';
+	*t = '\0';
+	return ret;
+}
+
+static char *expand_vars(const char *str, int shell_escape)
 {
 	char *buf, *t;
 	const char *f;
@@ -184,7 +207,20 @@ static char *expand_vars(const char *str)
 				strlcpy(t, f+1, percent - f);
 				val = getenv(t);
 				if (val) {
-					int len = strlcpy(t, val, bufsize+1);
+					char *escaped = NULL;
+					int len;
+					/* %RSYNC_*% values originate from the peer request/args.
+					 * When the result is fed to a shell-executed hook
+					 * (shell_escape), single-quote them so a value containing
+					 * shell metacharacters can't inject; for ordinary string
+					 * params (path, uid, gid, ...) leave them verbatim --
+					 * quoting there would corrupt the value (e.g. a documented
+					 * `path = /home/%RSYNC_USER_NAME%` would become /home/'x'). */
+					if (shell_escape && strncmp(t, "RSYNC_", 6) == 0)
+						val = escaped = expand_vars_shell_escape(val);
+					len = strlcpy(t, val, bufsize+1);
+					if (escaped)
+						free(escaped);
 					if (len > bufsize)
 						break;
 					bufsize -= len;
@@ -213,7 +249,10 @@ static char *expand_vars(const char *str)
 /* Each "char* foo" has an associated "BOOL foo_EXP" that tracks if the string has been expanded yet or not. */
 
 /* NOTE: use this function and all the FN_{GLOBAL,LOCAL} ones WITHOUT a trailing semicolon! */
-#define RETURN_EXPANDED(val) {if (!val ## _EXP) {val = expand_vars(val); val ## _EXP = True;} return val ? val : "";}
+#define RETURN_EXPANDED(val) {if (!val ## _EXP) {val = expand_vars(val, 0); val ## _EXP = True;} return val ? val : "";}
+/* Variant for params whose expansion is fed to a shell-executed hook: quote
+ * %RSYNC_*% peer-controlled values to prevent shell injection. */
+#define RETURN_EXPANDED_SHELL(val) {if (!val ## _EXP) {val = expand_vars(val, 1); val ## _EXP = True;} return val ? val : "";}
 
 /* In this section all the functions that are used to access the
  * parameters from the rest of the program are defined. */
@@ -229,6 +268,8 @@ static char *expand_vars(const char *str)
 
 #define FN_LOCAL_STRING(fn_name, val) \
  char *fn_name(int i) {if (LP_SNUM_OK(i) && iSECTION(i).val) RETURN_EXPANDED(iSECTION(i).val) else RETURN_EXPANDED(Vars.l.val)}
+#define FN_LOCAL_STRING_SHELL(fn_name, val) \
+ char *fn_name(int i) {if (LP_SNUM_OK(i) && iSECTION(i).val) RETURN_EXPANDED_SHELL(iSECTION(i).val) else RETURN_EXPANDED_SHELL(Vars.l.val)}
 #define FN_LOCAL_BOOL(fn_name, val) \
  BOOL fn_name(int i) {return LP_SNUM_OK(i)? iSECTION(i).val : Vars.l.val;}
 #define FN_LOCAL_CHAR(fn_name, val) \
@@ -410,7 +451,7 @@ static BOOL do_parameter(char *parmname, char *parmvalue)
 		break;
 	default:
 		/* expand any %VAR% strings now */
-		parmvalue = expand_vars(parmvalue);
+		parmvalue = expand_vars(parmvalue, 0);
 		break;
 	}
 

@@ -46,6 +46,7 @@ static struct sigaction sigact;
 #endif
 
 static int sock_exec(const char *prog);
+static char *shell_quote_connect_host(const char *host);
 
 #define PROXY_BUF_SIZE 1024
 
@@ -57,6 +58,15 @@ static int establish_proxy_connection(int fd, char *host, int port, char *proxy_
 	char *cp, buffer[PROXY_BUF_SIZE + 1];
 	char *authhdr, authbuf[PROXY_BUF_SIZE + 1];
 	int len;
+
+	/* Reject control bytes in the host so they can't be smuggled into the
+	 * HTTP CONNECT request line (CRLF header/request injection). */
+	for (cp = host; *cp; cp++) {
+		if ((unsigned char)*cp < 0x20 || (unsigned char)*cp == 0x7f) {
+			rprintf(FERROR, "invalid control character in proxy CONNECT host\n");
+			return -1;
+		}
+	}
 
 	if (proxy_user && proxy_pass) {
 		stringjoin(buffer, PROXY_BUF_SIZE,
@@ -77,7 +87,10 @@ static int establish_proxy_connection(int fd, char *host, int port, char *proxy_
 	}
 
 	len = snprintf(buffer, PROXY_BUF_SIZE, "CONNECT %s:%d HTTP/1.0%s%s\r\n\r\n", host, port, authhdr, authbuf);
-	assert(len > 0 && len < PROXY_BUF_SIZE);
+	if (len <= 0 || len >= PROXY_BUF_SIZE) {
+		rprintf(FERROR, "proxy CONNECT request too long\n");
+		return -1;
+	}
 	if (write(fd, buffer, len) != len) {
 		rsyserr(FERROR, errno, "failed to write to proxy");
 		return -1;
@@ -114,7 +127,7 @@ static int establish_proxy_connection(int fd, char *host, int port, char *proxy_
 	}
 	/* throw away the rest of the HTTP header */
 	while (1) {
-		for (cp = buffer; cp < &buffer[PROXY_BUF_SIZE]; cp++) {
+		for (cp = buffer; cp < &buffer[PROXY_BUF_SIZE - 1]; cp++) {
 			if (read(fd, cp, 1) != 1) {
 				rsyserr(FERROR, errno,
 					"failed to read from proxy");
@@ -123,12 +136,39 @@ static int establish_proxy_connection(int fd, char *host, int port, char *proxy_
 			if (*cp == '\n')
 				break;
 		}
+		if (cp == &buffer[PROXY_BUF_SIZE - 1]) {
+			rprintf(FERROR, "proxy response header line too long\n");
+			return -1;
+		}
 		if (cp > buffer && *cp == '\n')
 			cp--;
 		if (cp == buffer && (*cp == '\n' || *cp == '\r'))
 			break;
 	}
 	return 0;
+}
+
+static char *shell_quote_connect_host(const char *host)
+{
+	const char *s;
+	char *quoted, *t;
+	size_t len = 2; /* surrounding single quotes */
+
+	for (s = host; *s; s++)
+		len += *s == '\'' ? 4 : 1;
+	quoted = new_array(char, len + 1);
+	t = quoted;
+	*t++ = '\'';
+	for (s = host; *s; s++) {
+		if (*s == '\'') {
+			memcpy(t, "'\\''", 4);
+			t += 4;
+		} else
+			*t++ = *s;
+	}
+	*t++ = '\'';
+	*t = '\0';
+	return quoted;
 }
 
 
@@ -344,7 +384,8 @@ int open_socket_out_wrapped(char *host, int port, const char *bind_addr, int af_
 	char *prog = getenv("RSYNC_CONNECT_PROG");
 
 	if (prog && strchr(prog, '%')) {
-		int hlen = strlen(host);
+		char *qhost = shell_quote_connect_host(host);
+		int hlen = strlen(qhost);
 		int len = strlen(prog) + 1;
 		char *f, *t;
 		for (f = prog; *f; f++) {
@@ -365,7 +406,7 @@ int open_socket_out_wrapped(char *host, int port, const char *bind_addr, int af_
 					/* Just skips the extra '%'. */
 					break;
 				case 'H':
-					memcpy(t, host, hlen);
+					memcpy(t, qhost, hlen);
 					t += hlen;
 					continue;
 				default:
@@ -376,6 +417,7 @@ int open_socket_out_wrapped(char *host, int port, const char *bind_addr, int af_
 			*t++ = *f;
 		}
 		*t = '\0';
+		free(qhost);
 	}
 
 	if (DEBUG_GTE(CONNECT, 1)) {
@@ -753,7 +795,7 @@ static int socketpair_tcp(int fd[2])
 	socklen_t socklen = sizeof sock;
 	int connect_done = 0;
 
-	fd[0] = fd[1] = listener = -1;
+	fd[0] = fd[1] = -1;	/* listener is set by socket() below before any use */
 
 	memset(&sock, 0, sizeof sock);
 
