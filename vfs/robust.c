@@ -124,7 +124,7 @@ int robust_rename(const char *from, const char *to, const char *partialptr,
 					return -2;
 				to = partialptr;
 			}
-			if (copy_file(from, to, -1, mode) != 0)
+			if (copy_file(from, to, -1, mode, 0) != 0)
 				return -2;
 			vfs_unlink_at(from);
 			return 1;

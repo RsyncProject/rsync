@@ -133,7 +133,7 @@ int vfs_rmdir_at(const char *pathname);
 
 /* open (vfs/open.c). */
 int vfs_open(const char *pathname, int flags, mode_t mode);
-int vfs_open_at(const char *pathname, int flags, mode_t mode);
+int vfs_open_at(const char *pathname, int flags, mode_t mode, int vfs_flags);
 int vfs_open_atfd(int dfd, const char *name, int flags, mode_t mode);
 int vfs_open_nofollow(const char *pathname, int flags);
 int vfs_open_checklinks(const char *pathname);
@@ -184,7 +184,7 @@ int vfs_SetFileTime(const char *path, time_t crtime);
  * primitives above.  The resolution policy travels as an explicit vfs_flags
  * argument (VFS_OPERATOR_PATH for operator-supplied paths, else 0). */
 int vfs_make_path(char *fname, int mkp_flags, int vfs_flags);
-int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode);
+int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode, int vfs_flags);
 int robust_unlink(const char *fname);
 int robust_rename(const char *from, const char *to, const char *partialptr,
 		  int mode, struct file_struct *file);

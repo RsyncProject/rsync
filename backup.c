@@ -401,7 +401,7 @@ static int make_backup_inner(const char *fname, BOOL prefer_rename)
 
 	/* Copy to backup tree if a file. */
 	if (!ret) {
-		if (copy_file(fname, buf, -1, file->mode) < 0) {
+		if (copy_file(fname, buf, -1, file->mode, VFS_OPERATOR_PATH) < 0) {
 			rsyserr(FERROR, errno, "keep_backup failed: %s -> \"%s\"",
 				full_fname(fname), buf);
 			unmake_file(file);

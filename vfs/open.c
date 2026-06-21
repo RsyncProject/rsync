@@ -49,7 +49,7 @@ int vfs_open(const char *pathname, int flags, mode_t mode)
   (so the basename itself isn't followed if it happens to be a
   pre-planted symlink, which is what we want for O_CREAT|O_EXCL).
 */
-int vfs_open_at(const char *pathname, int flags, mode_t mode)
+int vfs_open_at(const char *pathname, int flags, mode_t mode, int vfs_flags)
 {
 #ifdef AT_FDCWD
 	char dirpath[MAXPATHLEN];
@@ -64,10 +64,10 @@ int vfs_open_at(const char *pathname, int flags, mode_t mode)
 	}
 
 #if defined O_NOFOLLOW && defined O_DIRECTORY
-	if (vfs.operator_path_resolve) {
+	if (vfs_flags & VFS_OPERATOR_PATH) {
 		if (vfs_symlink_optout_allowed())
 			return vfs_open(pathname, flags, mode);
-		dfd = vfs_owner_walk_parent(pathname, &bname, vfs.operator_path_resolve);
+		dfd = vfs_owner_walk_parent(pathname, &bname, 1);
 		if (dfd < 0)
 			return -1;
 		ret = openat(dfd, bname, flags | O_NOFOLLOW, mode);

@@ -40,8 +40,11 @@ static int safe_read(int desc, char *ptr, size_t len)
 	return n_chars;
 }
 
-/* Remove existing file @dest and reopen, creating a new file with @mode */
-static int unlink_and_reopen(const char *dest, mode_t mode)
+/* Remove existing file @dest and reopen, creating a new file with @mode.
+ * vfs_flags carries the resolution policy (VFS_OPERATOR_PATH for an operator
+ * dest) to the create; the robust_unlink still reads it from the (transitional)
+ * operator-path global. */
+static int unlink_and_reopen(const char *dest, mode_t mode, int vfs_flags)
 {
 	int ofd;
 
@@ -63,7 +66,7 @@ static int unlink_and_reopen(const char *dest, mode_t mode)
 	 * the window between robust_unlink (which uses vfs_unlink_at,
 	 * already secure) and the create here, and redirect the new
 	 * file outside the module. */
-	if ((ofd = vfs_open_at(dest, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, mode)) < 0) {
+	if ((ofd = vfs_open_at(dest, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, mode, vfs_flags)) < 0) {
 		int save_errno = errno;
 		rsyserr(FERROR_XFER, save_errno, "open %s", full_fname(dest));
 		errno = save_errno;
@@ -85,7 +88,7 @@ static int unlink_and_reopen(const char *dest, mode_t mode)
  *
  * This is used in conjunction with the --temp-dir, --backup, and
  * --copy-dest options. */
-int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
+int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode, int vfs_flags)
 {
 	int ifd, ofd;
 	char buf[1024 * 8];
@@ -113,7 +116,7 @@ int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
 	if (tmpfilefd >= 0) {
 		ofd = tmpfilefd;
 	} else {
-		ofd = unlink_and_reopen(dest, mode);
+		ofd = unlink_and_reopen(dest, mode, vfs_flags);
 		if (ofd < 0) {
 			int save_errno = errno;
 			close(ifd);

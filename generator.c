@@ -931,7 +931,7 @@ static int copy_altdest_file(const char *src, const char *dest, struct file_stru
 		copy_to = buf;
 	}
 	cleanup_set(copy_to, NULL, NULL, -1, -1);
-	if (copy_file(src, copy_to, fd_w, file->mode) < 0) {
+	if (copy_file(src, copy_to, fd_w, file->mode, 0) < 0) {
 		if (INFO_GTE(COPY, 1)) {
 			rsyserr(FINFO, errno, "copy_file %s => %s",
 				full_fname(src), copy_to);
@@ -2265,7 +2265,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				vfs.operator_path_resolve = 0;
 				goto pretend_missing;
 			}
-			if (copy_file(fname, backupptr, -1, back_file->mode) < 0) {
+			if (copy_file(fname, backupptr, -1, back_file->mode, VFS_OPERATOR_PATH) < 0) {
 				vfs.operator_path_resolve = 0;
 				unmake_file(back_file);
 				back_file = NULL;
@@ -2318,7 +2318,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			back_file = NULL;
 			goto cleanup;
 		}
-		if ((f_copy = vfs_open_at(backupptr, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, 0600)) < 0) {
+		if ((f_copy = vfs_open_at(backupptr, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, 0600, VFS_OPERATOR_PATH)) < 0) {
 			vfs.operator_path_resolve = 0;
 			rsyserr(FERROR_XFER, errno, "open %s", full_fname(backupptr));
 			unmake_file(back_file);
