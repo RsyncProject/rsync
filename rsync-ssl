@@ -142,8 +142,21 @@ function rsync_ssl_helper {
 	exit 1
     fi
 
+    # Bind the server certificate to the requested host (openssl -verify_hostname,
+    # stunnel checkHost) so a cert that is CA-valid for a *different* name can't be
+    # used to MITM. Set RSYNC_SSL_SKIP_HOSTNAME_CHECK=1 to keep CA chain
+    # verification but skip the identity check (e.g. bare-IP or internal-CA setups).
+    # checkHost only applies while the chain is being verified.
+    openssl_host_opt="-verify_hostname $hostname"
+    stunnel_host_opt=""
+    [[ "$verify" == "verifyChain = yes" ]] && stunnel_host_opt="checkHost = $hostname"
+    if [[ "$RSYNC_SSL_SKIP_HOSTNAME_CHECK" == 1 ]]; then
+	openssl_host_opt=""
+	stunnel_host_opt=""
+    fi
+
     if [[ $RSYNC_SSL_TYPE == openssl ]]; then
-	exec $RSYNC_SSL_OPENSSL s_client $caopt $certopt $keyopt -quiet -verify_quiet -servername $hostname -verify_hostname $hostname -connect $hostname:$port
+	exec $RSYNC_SSL_OPENSSL s_client $caopt $certopt $keyopt -quiet -verify_quiet -servername $hostname $openssl_host_opt -connect $hostname:$port
     elif [[ $RSYNC_SSL_TYPE == gnutls ]]; then
 	exec $RSYNC_SSL_GNUTLS --logfile=/dev/null $gnutls_cert_opt $gnutls_key_opt $gnutls_opts $hostname:$port
     else
@@ -155,6 +168,7 @@ connect = $hostname:$port
 client = yes
 TIMEOUTclose = 0
 $verify
+$stunnel_host_opt
 $certopt
 $cafile
 EOF
