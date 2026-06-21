@@ -37,6 +37,12 @@ os.symlink('realdir', mod / 'inside_link')
 os.symlink('../trap', mod / 'escape_link')
 (mod / 'topfile').write_text("top\n")
 os.chmod(mod / 'topfile', 0o600)
+# A LEAF symlink (final path component) escaping the tree, for the leaf-flip
+# scenario: do_chmod_at('realdir/leaflink') has a legitimate real parent but an
+# escaping symlink leaf, so it isolates the O_NOFOLLOW leaf guard from the
+# parent-confinement scenarios. Target is the same outside sentinel (relative to
+# realdir/, the outside trap is ../../trap).
+os.symlink('../../trap/sentinel', mod / 'realdir' / 'leaflink')
 
 proc = subprocess.run([str(TOOLDIR / 't_chmod_secure'), str(mod)])
 if proc.returncode != 0:

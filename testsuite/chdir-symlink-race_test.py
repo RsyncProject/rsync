@@ -9,24 +9,17 @@
 
 import filecmp
 import os
-import platform
 import subprocess
 
 from rsyncfns import (
     SCRATCHDIR,
     get_rootgid, get_rootuid, get_testuid,
     make_data_file, rmtree, rsync_argv, start_test_daemon,
-    test_fail, test_skipped,
+    test_fail,
 )
 
 
 DAEMON_PORT = 12885
-
-if platform.system() in ('SunOS', 'OpenBSD', 'NetBSD') or platform.system().startswith('CYGWIN'):
-    test_skipped(
-        f"secure chdir relies on RESOLVE_BENEATH-equivalent kernel "
-        f"support not available on {platform.system()}"
-    )
 
 mod = SCRATCHDIR / 'module'
 outside = SCRATCHDIR / 'outside'

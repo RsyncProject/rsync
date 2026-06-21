@@ -24,17 +24,16 @@
 # Each signal cleanly separates "basis honoured" (fixed/3.4.1) from "basis
 # ignored" (the regression).
 #
-# XFAIL until a relative alt-basis dir is honoured by a sanitize_paths receiver
-# again (the accompanying syscall.c/receiver.c fix; cf. upstream PR #930).  On
-# platforms without openat2/O_RESOLVE_BENEATH the portable resolver still
-# rejects the '..' for safety, so this stays XFAIL there.  Runs at any uid.
+# Fixed (#915/#930): the secure resolver honours an in-module relative `..` climb
+# to a sibling basis on every platform (the per-component walk pops `..` to the
+# held parent), so all three relative alt-basis forms use the basis. Runs at any uid.
 
 import re
 import subprocess
 
 from rsyncfns import (
     SCRATCHDIR, make_data_file, makepath, rmtree, rsync_argv, start_test_daemon,
-    test_fail, test_xfail, write_daemon_conf,
+    test_fail, write_daemon_conf,
 )
 
 DAEMON_PORT = 12915
@@ -82,7 +81,7 @@ basis = mod / '01' / 'f.dat'
 
 # --- 1. --link-dest=../01 : matched file must be hard-linked to the basis ----
 rc, out = push('--link-dest=../01')
-if rc not in (0, 23):    # 23: no-RESOLVE_BENEATH platforms reject the basis
+if rc != 0:
     test_fail(f"--link-dest push failed unexpectedly (rc={rc}):\n{out}")
 dest = mod / '00' / 'f.dat'
 if not dest.is_file():
@@ -93,7 +92,7 @@ if not same_inode(dest, basis):
 
 # --- 2. --copy-dest=../01 : matched file copied locally, NOT sent on the wire -
 rc, out = push('--copy-dest=../01')
-if rc not in (0, 23):    # 23: no-RESOLVE_BENEATH platforms reject the basis
+if rc != 0:
     test_fail(f"--copy-dest push failed unexpectedly (rc={rc}):\n{out}")
 dest = mod / '00' / 'f.dat'
 if not dest.is_file():
@@ -105,17 +104,15 @@ if lit > DATA_SIZE // 2:
 
 # --- 3. --compare-dest=../01 : matched file skipped, NOT created in dest ------
 rc, out = push('--compare-dest=../01')
-if rc not in (0, 23):    # 23: no-RESOLVE_BENEATH platforms reject the basis
+if rc != 0:
     test_fail(f"--compare-dest push failed unexpectedly (rc={rc}):\n{out}")
 if (mod / '00' / 'f.dat').is_file():
     regressions.append("--compare-dest=../01 created the file in the dest "
                        "(basis not matched, so the file was transferred)")
 
 if regressions:
-    test_xfail(
-        "#915: a daemon receiver ignored a RELATIVE alt-basis dir (../01); the "
-        "confined path resolver rejects the `..` climb to the sibling basis so "
-        "the basis is never used:\n  - " + "\n  - ".join(regressions) +
-        "\nTo be closed by honouring a relative alt-basis dir on a "
-        "sanitize_paths receiver again (cf. PR #930).")
+    test_fail(
+        "#915/#930: a daemon receiver ignored a RELATIVE alt-basis dir (../01) -- "
+        "the secure resolver must honour an in-module `..` climb to the sibling "
+        "basis on every platform:\n  - " + "\n  - ".join(regressions))
 # No regressions -> all three relative alt-basis forms honoured the basis.
