@@ -1196,7 +1196,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 				 * (its mode is restored after the transfer).  On a
 				 * non-chroot daemon fchmod() a no-follow fd rather than
 				 * chmod the path, so a symlink raced into fnametmp can't
-				 * redirect the chmod (do_chmod_at follows the final link). */
+				 * redirect the chmod (vfs_chmod_at follows the final link). */
 				int errno_save = errno, chmod_ok;
 				if (use_secure_symlinks) {
 #ifdef O_NOFOLLOW
@@ -1211,7 +1211,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 					chmod_ok = 0;
 #endif
 				} else
-					chmod_ok = do_chmod_at(fnametmp, 0600) == 0;
+					chmod_ok = vfs_chmod_at(fnametmp, 0600) == 0;
 				if (chmod_ok) {
 					if (use_secure_symlinks)
 						fd2 = vfs_resolve_open(NULL, fnametmp, O_WRONLY, 0600);

@@ -806,10 +806,8 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 #ifdef HAVE_CHMOD
 	if (!BITS_EQUAL(sxp->st.st_mode, new_mode, CHMOD_BITS)) {
 		int ret = am_root < 0 ? 0
-			: op_leaf_fd >= 0 ? do_fchmod(op_leaf_fd, new_mode)
-			: op_refuse ? (errno = ELOOP, -1)
-			: dfd >= 0 && !S_ISLNK(new_mode) ? do_chmod_atfd(dfd, leaf, new_mode)
-			: do_chmod_at(fname, new_mode);
+			: dfd >= 0 && !S_ISLNK(new_mode) ? vfs_chmod_atfd(dfd, leaf, new_mode)
+			: vfs_chmod_at(fname, new_mode);
 		if (ret < 0) {
 			rsyserr(FERROR_XFER, errno,
 				"failed to set permissions on %s",

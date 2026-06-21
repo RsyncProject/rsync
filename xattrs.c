@@ -1154,7 +1154,7 @@ int set_xattr(const char *fname, const struct file_struct *file, const char *fna
 #endif
 	 && access(fname, W_OK) < 0
 	 && (fd >= 0 ? fchmod(fd, (sxp->st.st_mode & CHMOD_BITS) | S_IWUSR)
-		     : do_chmod_at(fname, (sxp->st.st_mode & CHMOD_BITS) | S_IWUSR)) == 0)
+		     : vfs_chmod_at(fname, (sxp->st.st_mode & CHMOD_BITS) | S_IWUSR)) == 0)
 		added_write_perm = 1;
 
 	ndx = F_XATTR(file);
@@ -1177,7 +1177,7 @@ int set_xattr(const char *fname, const struct file_struct *file, const char *fna
 		if (fd >= 0)
 			fchmod(fd, sxp->st.st_mode);
 		else
-			do_chmod_at(fname, sxp->st.st_mode);
+			vfs_chmod_at(fname, sxp->st.st_mode);
 	}
 	return return_value;
 }
@@ -1317,7 +1317,7 @@ int set_stat_xattr(const char *fname, struct file_struct *file, mode_t new_mode,
 		if (fd >= 0)
 			fchmod(fd, mode);
 		else
-			do_chmod_at(fname, mode);
+			vfs_chmod_at(fname, mode);
 	}
 	if (!IS_DEVICE(fst.st_mode))
 		fst.st_rdev = 0; /* just in case */

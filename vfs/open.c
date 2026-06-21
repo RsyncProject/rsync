@@ -34,7 +34,7 @@ int vfs_open(const char *pathname, int flags, mode_t mode)
 
 /*
   Symlink-race-safe variant of vfs_open() for receiver-side use. See
-  the comment on do_chmod_at() for the threat model. open() resolves
+  the comment on vfs_chmod_at() for the threat model. open() resolves
   parent components, so a parent-symlink swap can redirect the open
   to a file outside the module. This wrapper is defence-in-depth for
   bare-path vfs_open() sites that callers know are otherwise

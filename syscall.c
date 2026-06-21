@@ -97,7 +97,7 @@ int do_symlink(const char *lnk, const char *path)
 
 /*
   Symlink-race-safe variant of do_symlink() for receiver-side use. See
-  the comment on do_chmod_at() for the threat model. For a real symlink
+  the comment on vfs_chmod_at() for the threat model. For a real symlink
   only the parent directory of `path` needs protection -- symlinkat()
   does not resolve the final component (it creates it). Defence: open
   the parent of `path` under vfs_resolve_open() and call symlinkat()
@@ -273,7 +273,7 @@ int do_link(const char *old_path, const char *new_path)
 
 /*
   Symlink-race-safe variant of do_link() for receiver-side use. See
-  the comment on do_chmod_at() for the threat model. link() resolves
+  the comment on vfs_chmod_at() for the threat model. link() resolves
   parent components of *both* old_path and new_path, so a parent-
   symlink swap on either side can plant the new hard link outside
   the module, or hard-link an outside file into the module (read
@@ -441,7 +441,7 @@ int do_lchown(const char *path, uid_t owner, gid_t group)
 
 /*
   Symlink-race-safe variant of do_lchown() for receiver-side use. See the
-  comment on do_chmod_at() for the threat model and design rationale.
+  comment on vfs_chmod_at() for the threat model and design rationale.
 
   Resolves the parent directory under vfs_resolve_open() and invokes
   fchownat(..., AT_SYMLINK_NOFOLLOW) against that dirfd, so that an
@@ -451,7 +451,7 @@ int do_lchown(const char *path, uid_t owner, gid_t group)
   component symlink" semantics.
 
   Falls through to do_lchown() in the dry-run / non-daemon / chrooted /
-  absolute-path / no-parent cases, identical to do_chmod_at().
+  absolute-path / no-parent cases, identical to vfs_chmod_at().
 */
 int do_lchown_at(const char *fname, uid_t owner, gid_t group)
 {
@@ -545,7 +545,7 @@ int do_mknod(const char *pathname, mode_t mode, dev_t dev)
 			return -1;
 		close(sock);
 #ifdef HAVE_CHMOD
-		return do_chmod(pathname, mode);
+		return vfs_chmod(pathname, mode);
 #else
 		return 0;
 #endif
@@ -561,7 +561,7 @@ int do_mknod(const char *pathname, mode_t mode, dev_t dev)
 
 /*
   Symlink-race-safe variant of do_mknod() for receiver-side use. See
-  the comment on do_chmod_at() for the threat model. Defence: open
+  the comment on vfs_chmod_at() for the threat model. Defence: open
   the parent of pathname under vfs_resolve_open() and use
   mknodat() against that dirfd. mknodat() covers both regular-file
   (S_IFREG with dev=0) and FIFO (S_IFIFO) and device-node creation.
@@ -718,281 +718,6 @@ int do_mknod_at(const char *pathname, mode_t mode, dev_t dev)
 
 
 
-#ifdef HAVE_CHMOD
-int do_chmod(const char *path, mode_t mode)
-{
-	static int switch_step = 0;
-	int code;
-
-	if (dry_run) return 0;
-	RETURN_ERROR_IF_RO_OR_LO;
-	RETURN_ERROR_IF_NULL(path);
-
-	switch (switch_step) {
-#ifdef HAVE_LCHMOD
-	case 0:
-		if ((code = lchmod(path, mode & CHMOD_BITS)) == 0)
-			break;
-		if (errno == ENOSYS)
-			switch_step++;
-		else if (errno != ENOTSUP)
-			break;
-#endif
-		/* FALLTHROUGH */
-	default:
-		if (S_ISLNK(mode)) {
-# if defined HAVE_SETATTRLIST
-			struct attrlist attrList;
-			uint32_t m = mode & CHMOD_BITS; /* manpage is wrong: not mode_t! */
-
-			memset(&attrList, 0, sizeof attrList);
-			attrList.bitmapcount = ATTR_BIT_MAP_COUNT;
-			attrList.commonattr = ATTR_CMN_ACCESSMASK;
-			if ((code = setattrlist(path, &attrList, &m, sizeof m, FSOPT_NOFOLLOW)) == 0)
-				break;
-			if (errno == ENOTSUP)
-				code = 1;
-# else
-			code = 1;
-# endif
-		} else
-			code = chmod(path, mode & CHMOD_BITS); /* DISCOURAGED FUNCTION */
-		break;
-	}
-	if (code != 0 && (preserve_perms || preserve_executability))
-		return code;
-	return 0;
-}
-
-/* chmod `name` relative to dfd without following a final-component symlink.
- * The held parent fd confines the ancestors; this closes the leaf race (an
- * attacker swapping the leaf to a symlink that fchmodat(...,0) would follow out
- * of the tree).
- *
- * Never follows the leaf: a regular file or dir is pinned via
- * openat(O_NOFOLLOW) and chmod'd with fchmod() (leaf-safe, every kernel, and
- * fakeroot-wrappable unlike the raw fchmodat2() syscall); a symlink leaf is
- * refused (ELOOP, or EMLINK/EFTYPE on the BSDs).  Other types or an open
- * failure fall to fchmodat(AT_SYMLINK_NOFOLLOW) (a real no-follow chmod on
- * glibc>=2.32 / Linux>=6.6), then the raw fchmodat2() syscall.  If no
- * no-follow primitive exists we skip with a warning rather than follow the
- * leaf.
- *
- * A FIFO takes the fd path on Linux and the pathname path elsewhere -- see the
- * S_ISFIFO arm below for why, and for what that costs.  Note the type used to
- * choose between them comes from the lstat above, so a leaf swapped between
- * that and the open is classified by what it WAS: an observed regular file or
- * dir that becomes a FIFO is still opened.  O_NOFOLLOW rejects symlinks, not
- * type changes.  Constraining the open to the observed type would close that;
- * it is not done here. */
-static int do_fchmodat_nofollow(int dfd, const char *name, mode_t mode)
-{
-#if defined AT_FDCWD && defined AT_SYMLINK_NOFOLLOW
-	mode &= CHMOD_BITS;
-# ifdef O_NOFOLLOW
-	{
-		STRUCT_STAT st;
-		if (vfs_lstat_atfd(dfd, name, &st) < 0)
-			return -1;
-		if (S_ISLNK(st.st_mode)) {
-			errno = ELOOP;	/* refuse to chmod through a symlink leaf */
-			return -1;
-		}
-		if (S_ISREG(st.st_mode) || S_ISDIR(st.st_mode) || S_ISFIFO(st.st_mode)) {
-			int fd;
-#  ifndef __linux__
-			/* Never open a FIFO here.  Opening one -- even O_NONBLOCK --
-			 * makes this process a reader for as long as the descriptor
-			 * lives, which wakes a writer blocked in open(O_WRONLY) and
-			 * can cost it a SIGPIPE or the bytes it writes before we
-			 * close.  The pathname call reaches the same end state
-			 * without that: it succeeds outright when the mode is
-			 * grantable, and when macOS refuses an ungrantable setgid
-			 * with EPERM (having applied nothing), asking again without
-			 * that bit gives exactly what fchmod() would have -- it drops
-			 * the bit it cannot grant and applies the ordinary ones.
-			 * Measured on macOS: fchmodat(2750) EPERM leaving 0600,
-			 * fchmodat(0750) ok giving 0750, for a FIFO and a directory
-			 * alike.
-			 *
-			 * This is a pathname call, so unlike the descriptor path it
-			 * does not pin the inode; a leaf swapped for another object
-			 * of the same name is chmod'd instead.  AT_SYMLINK_NOFOLLOW
-			 * still keeps it off a symlink's target.  That trade buys
-			 * away the reader hazard, and only for FIFOs.
-			 *
-			 * Only S_ISGID is retried.  An ungrantable S_ISUID would
-			 * still fail where fchmod() would have cleared it, but
-			 * setuid is meaningless on a FIFO and the behaviour is
-			 * undemonstrated, so it is not coded for.
-			 *
-			 * Linux keeps the fd-first order it has always had. */
-			if (S_ISFIFO(st.st_mode)) {
-				if (fchmodat(dfd, name, mode, AT_SYMLINK_NOFOLLOW) == 0)
-					return 0;
-				if (errno == EPERM && (mode & S_ISGID)
-				 && fchmodat(dfd, name, mode & ~S_ISGID,
-					     AT_SYMLINK_NOFOLLOW) == 0)
-					return 0;
-				return -1;
-			}
-#  endif
-#  ifdef O_CLOEXEC
-			oflags |= O_CLOEXEC;
-#  endif
-			fd = openat(dfd, name, oflags);
-			if (fd >= 0) {
-				int r = fchmod(fd, mode), e = errno;
-				close(fd);
-				errno = e;
-				return r;
-			}
-			/* A leaf swapped for a symlink between the lstat above and
-			 * this open: refuse rather than fall through.  The errno is
-			 * not the same everywhere -- Linux/Solaris ELOOP, FreeBSD
-			 * EMLINK, NetBSD EFTYPE. */
-			if (errno == ELOOP
-#  ifdef EMLINK
-			    || errno == EMLINK
-#  endif
-#  ifdef EFTYPE
-			    || errno == EFTYPE
-#  endif
-			   )
-				return -1;	/* raced to a symlink: refuse */
-			/* otherwise (e.g. EACCES on an unreadable file) fall through */
-		}
-	}
-# endif
-# if defined __linux__
-	{
-		int r = fchmodat(dfd, name, mode, AT_SYMLINK_NOFOLLOW);
-		if (r == 0)
-			return 0;
-		if (errno != ENOTSUP && errno != EOPNOTSUPP && errno != ENOSYS)
-			return r;	/* a real error (EPERM, ENOENT, ...) */
-	}
-#  ifdef SYS_fchmodat2
-	{
-		int r = syscall(SYS_fchmodat2, dfd, name, (unsigned int)mode, AT_SYMLINK_NOFOLLOW);
-		if (r == 0)
-			return 0;
-		if (errno != ENOSYS && errno != EPERM && errno != EOPNOTSUPP)
-			return r;
-	}
-#  endif
-	/* No symlink-safe chmod primitive here: skip rather than follow the leaf. */
-	rprintf(FWARNING, "do_chmod: no symlink-safe chmod for \"%s\"; mode not set\n", name);
-	return 1;
-# else
-	return fchmodat(dfd, name, mode, AT_SYMLINK_NOFOLLOW);
-# endif
-#else
-	(void)dfd;
-	(void)mode;
-	/* No symlink-safe chmod primitive here: skip rather than follow the leaf. */
-	rprintf(FWARNING, "do_chmod: no symlink-safe chmod for \"%s\"; mode not set\n", name);
-	return 1;
-#endif
-}
-
-/*
-  Symlink-race-safe variant of do_chmod() for receiver-side use.
-
-  Threat model: on a daemon running with "use chroot = no" (the prerequisite
-  for CVE-2026-29518), a local attacker can race a symlink swap of one of
-  the parent directory components of a path the receiver is about to chmod.
-  Because chmod() resolves symlinks at every component, the swap redirects
-  the chmod outside the receiver's confinement.
-
-  Defence: open the *parent* directory of fname under vfs_resolve_open()
-  (a portable per-component O_NOFOLLOW walk on held parent dirfds) and do
-  fchmodat() against that dirfd. A symlink substituted into one of the parent
-  components is then either followed within the tree (legitimate dir-symlinks
-  still work) or rejected (escape attempts fail).
-
-  Final-component handling matches do_chmod(): fchmodat() with flag 0
-  follows a symlink at the final component, which is the same behaviour as
-  chmod() and matches every current call site (the file being chmod'd is
-  one the receiver itself just created or transferred). For the rare case
-  where the caller wants to chmod a symlink-as-an-object (S_ISLNK in the
-  mode bits), we fall through to do_chmod() which has portability code for
-  that case.
-
-  Falls back to do_chmod() for absolute paths and for paths with no parent
-  component, where there is nothing to protect against.
-*/
-int do_chmod_at(const char *fname, mode_t mode)
-{
-#ifdef AT_FDCWD
-	char dirpath[MAXPATHLEN];
-	const char *bname;
-	const char *slash;
-	int dfd, ret, e;
-	size_t dlen;
-
-	if (dry_run) return 0;
-	RETURN_ERROR_IF_RO_OR_LO;
-
-#if defined O_NOFOLLOW && defined O_DIRECTORY
-	/* Operator-supplied path: resolve the parent via the ownership walk, as
-	 * the other do_*_at() wrappers do.  Without this the caller's
-	 * operator_path_resolve has no effect here, and an absolute name would
-	 * fall straight through to the unconfined full-path do_chmod().
-	 * S_ISLNK(mode) still needs do_chmod()'s lchmod()/setattrlist() handling. */
-	if (operator_path_resolve && fname && *fname && !S_ISLNK(mode)) {
-		if (symlink_optout_allowed())
-			return do_chmod(fname, mode);
-		dfd = owner_walk_parent(fname, &bname);
-		if (dfd < 0)
-			return -1;
-		ret = do_fchmodat_nofollow(dfd, bname, mode);
-		e = errno;
-		close(dfd);
-		errno = e;
-		return ret;
-	}
-#endif
-
-	/* Only the daemon-without-chroot case is exposed to the symlink-
-	 * race attack: a chroot already confines the receiver, and a
-	 * non-daemon rsync runs with the user's own authority so a
-	 * symlink they planted can only redirect to files they could
-	 * already access.  Everywhere else, fall through to plain
-	 * do_chmod() to avoid the dirfd-open overhead on every call. */
-	if (!vfs_relpath_active())
-		return do_chmod(fname, mode);
-
-	if (!fname || !*fname || *fname == '/' || S_ISLNK(mode))
-		return do_chmod(fname, mode);
-
-	slash = strrchr(fname, '/');
-	if (!slash)
-		return do_chmod(fname, mode);
-
-	dlen = slash - fname;
-	if (dlen >= sizeof dirpath) {
-		errno = ENAMETOOLONG;
-		return -1;
-	}
-	memcpy(dirpath, fname, dlen);
-	dirpath[dlen] = '\0';
-	bname = slash + 1;
-
-	dfd = vfs_resolve_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
-	if (dfd < 0)
-		return -1;
-
-	ret = do_fchmodat_nofollow(dfd, bname, mode);
-	e = errno;
-	close(dfd);
-	errno = e;
-	return ret;
-#else
-	return do_chmod(fname, mode);
-#endif
-}
-#endif
 
 
 #ifdef HAVE_FTRUNCATE
@@ -1040,7 +765,7 @@ int do_mkdir(char *path, mode_t mode)
 
 /*
   Symlink-race-safe variant of do_mkdir() for receiver-side use. See
-  the comment on do_chmod_at() for the threat model and design rationale.
+  the comment on vfs_chmod_at() for the threat model and design rationale.
 
   mkdir() resolves parent symlinks at every component, so a parent-
   component swap can place an attacker-named directory outside the
@@ -1298,7 +1023,7 @@ int do_utimensat(const char *path, STRUCT_STAT *stp)
 
 /*
   Symlink-race-safe variant of do_utimensat() for receiver-side use.
-  See the comment on do_chmod_at() for the threat model. utimes()
+  See the comment on vfs_chmod_at() for the threat model. utimes()
   resolves parent components and follows a final-component symlink;
   lutimes() doesn't follow the final component but still resolves
   parents. Either way, a parent-symlink swap can redirect the
@@ -1710,24 +1435,6 @@ int do_mkdir_atfd(int dfd, const char *name, mode_t mode)
 #endif
 }
 
-#ifdef HAVE_CHMOD
-int do_chmod_atfd(int dfd, const char *name, mode_t mode)
-{
-#ifdef AT_FDCWD
-	if (dry_run) return 0;
-	RETURN_ERROR_IF_RO_OR_LO;
-	/* Do not follow a final-component symlink (closes the leaf race; the
-	 * held parent dfd already confines the ancestors).  A symlink-as-object
-	 * (S_ISLNK(mode)) is still handled by the caller via the full-path
-	 * do_chmod() lchmod/setattrlist code, exactly as do_chmod_at() does. */
-	return do_fchmodat_nofollow(dfd, name, mode);
-#else
-	(void)dfd; (void)name; (void)mode;
-	errno = ENOSYS;
-	return -1;
-#endif
-}
-#endif
 
 int do_lchown_atfd(int dfd, const char *name, uid_t owner, gid_t group)
 {

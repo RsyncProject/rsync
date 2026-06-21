@@ -25,7 +25,7 @@ int vfs_unlink(const char *path)
 
 /*
   Symlink-race-safe variant of vfs_unlink() for receiver-side use. See
-  the comment on do_chmod_at() for the threat model. unlink() resolves
+  the comment on vfs_chmod_at() for the threat model. unlink() resolves
   parent components, so a parent-symlink swap can delete an outside
   file under the daemon's authority. Defence: open the parent of path
   under vfs_resolve_open() and use unlinkat() (flags=0) against

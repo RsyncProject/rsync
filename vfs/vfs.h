@@ -102,4 +102,9 @@ int vfs_open_atfd(int dfd, const char *name, int flags, mode_t mode);
 int vfs_open_nofollow(const char *pathname, int flags);
 int vfs_open_checklinks(const char *pathname);
 
+/* chmod (vfs/chmod.c). */
+int vfs_chmod(const char *path, mode_t mode);
+int vfs_chmod_at(const char *fname, mode_t mode);
+int vfs_chmod_atfd(int dfd, const char *name, mode_t mode);
+
 #endif /* RSYNC_VFS_H */

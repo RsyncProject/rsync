@@ -1413,9 +1413,9 @@ static int gen_entry_chmod(const char *fname, struct file_struct *file, mode_t m
 	int dfd = vfs_cached_dirfd(fname, file);
 	if (dfd >= 0) {
 		const char *slash = strrchr(fname, '/');
-		return do_chmod_atfd(dfd, slash ? slash + 1 : fname, mode);
+		return vfs_chmod_atfd(dfd, slash ? slash + 1 : fname, mode);
 	}
-	return do_chmod_at(fname, mode);
+	return vfs_chmod_at(fname, mode);
 }
 
 static void gen_entry_set_times(const char *fname, struct file_struct *file, STRUCT_STAT *stp)
