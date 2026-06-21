@@ -60,6 +60,8 @@ AC_PROG_AWK
 AC_PROG_EGREP
 AC_PROG_INSTALL
 AC_PROG_MKDIR_P
+AC_CHECK_TOOL([AR], [ar], [ar])
+AC_PROG_RANLIB
 AC_SUBST(SHELL)
 AC_PATH_PROG([PERL], [perl])
 AC_PATH_PROG([PYTHON3], [python3])
@@ -1542,7 +1544,7 @@ case "$CC" in
     ;;
 esac
 
-AC_CONFIG_FILES([Makefile lib/dummy zlib/dummy popt/dummy shconfig])
+AC_CONFIG_FILES([Makefile lib/dummy zlib/dummy popt/dummy vfs/dummy shconfig])
 AC_OUTPUT
 
 AC_MSG_RESULT()

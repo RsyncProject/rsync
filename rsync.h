@@ -1237,6 +1237,7 @@ struct name_num_obj {
 
 #ifndef __cplusplus
 #include "proto.h"
+#include "vfs/vfs.h"
 #endif
 
 #ifndef SUPPORT_XATTRS

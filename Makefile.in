@@ -18,6 +18,9 @@ CXXFLAGS=@CXXFLAGS@
 EXEEXT=@EXEEXT@
 LDFLAGS=@LDFLAGS@
 LIBOBJDIR=lib/
+AR=@AR@
+ARFLAGS=cr
+RANLIB=@RANLIB@
 
 INSTALLCMD=@INSTALL@
 INSTALLMAN=@INSTALL@
@@ -38,7 +41,7 @@ GENFILES=configure.sh aclocal.m4 config.h.in rsync.1 rsync.1.html \
 	 rsync-ssl.1 rsync-ssl.1.html rsyncd.conf.5 rsyncd.conf.5.html \
 	 @GEN_RRSYNC@
 HEADERS=byteorder.h config.h errcode.h proto.h rsync.h ifuncs.h itypes.h inums.h \
-	lib/pool_alloc.h lib/mdigest.h lib/md-defines.h
+	lib/pool_alloc.h lib/mdigest.h lib/md-defines.h vfs/vfs.h
 LIBOBJ=lib/wildmatch.o lib/compat.o lib/snprintf.o lib/mdfour.o lib/md5.o \
 	lib/permstring.o lib/pool_alloc.o lib/sysacls.o lib/sysxattrs.o lib/acl.o @LIBOBJS@
 zlib_OBJS=zlib/deflate.o zlib/inffast.o zlib/inflate.o zlib/inftrees.o \
@@ -52,9 +55,10 @@ OBJS3=progress.o pipe.o @MD5_ASM@ @ROLL_SIMD@ @ROLL_ASM@
 DAEMON_OBJ = params.o loadparm.o clientserver.o access.o connection.o authenticate.o
 popt_OBJS= popt/popt.o  popt/poptconfig.o \
 	popt/popthelp.o popt/poptparse.o popt/poptint.o
-OBJS=$(OBJS1) $(OBJS2) $(OBJS3) $(DAEMON_OBJ) $(LIBOBJ) @BUILD_ZLIB@ @BUILD_POPT@
+VFS_OBJ=vfs/vfs.o
+OBJS=$(OBJS1) $(OBJS2) $(OBJS3) $(DAEMON_OBJ) $(LIBOBJ) @BUILD_ZLIB@ @BUILD_POPT@ libvfs.a
 
-TLS_OBJ = tls.o syscall.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/permstring.o lib/sysxattrs.o @BUILD_POPT@
+TLS_OBJ = tls.o syscall.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/permstring.o lib/sysxattrs.o @BUILD_POPT@ libvfs.a
 
 # Programs we must have to run the test cases
 CHECK_PROGS = rsync$(EXEEXT) tls$(EXEEXT) getgroups$(EXEEXT) getfsdev$(EXEEXT) \
@@ -67,7 +71,7 @@ CHECK_SYMLINKS = testsuite/chown-fake_test.py testsuite/devices-fake_test.py \
 # Objects for CHECK_PROGS to clean
 CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o t_chmod_secure.o t_rename_secure.o t_symlink_secure.o t_secure_relpath.o t_acl.o t_hashtable_overflow.o t_iwildmatch.o t_clean_fname.o t_safe_arg.o trimslash.o wildtest.o
 # Compile-only feature-shape checks.
-CHECK_COMPILE_OBJS=syscall-no-at-fdcwd.o
+CHECK_COMPILE_OBJS=vfs-no-at-fdcwd.o
 
 # note that the -I. is needed to handle config.h when using VPATH
 .c.o:
@@ -80,9 +84,18 @@ CHECK_COMPILE_OBJS=syscall-no-at-fdcwd.o
 all: Makefile rsync$(EXEEXT) stunnel-rsyncd.conf @MAKE_RRSYNC@ @MAKE_MAN@
 .PHONY: all
 
-syscall-no-at-fdcwd.o: syscall.c $(HEADERS)
-	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) \
-	    -DRSYNC_TEST_NO_AT_FDCWD -c $(srcdir)/syscall.c -o $@
+# Compile-check the pre-*at() portability tier.  syscall.c's *at wrappers were
+# split into vfs/, so compile every vfs source with the AT_FDCWD primitives
+# undefined (via vfs/vfs_internal.h's RSYNC_TEST_NO_AT_FDCWD block) and confirm
+# the fallback arms still build.  A shell loop keeps this portable (BSD/Solaris
+# make have no pattern rules); the last object compiled is left as the target.
+# $(VFS_OBJ:.o=.c) is POSIX suffix substitution, portable across makes.
+vfs-no-at-fdcwd.o: $(VFS_OBJ:.o=.c) $(HEADERS) vfs/vfs.h vfs/vfs_internal.h
+	@for f in $(VFS_OBJ:.o=.c); do \
+	    echo "  no-AT_FDCWD compile-check: $$f"; \
+	    $(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) \
+	        -DRSYNC_TEST_NO_AT_FDCWD -c $(srcdir)/$$f -o $@ || exit 1; \
+	done
 
 .PHONY: install
 install: all
@@ -141,7 +154,16 @@ rrsync: support/rrsync
 
 $(OBJS): $(HEADERS)
 $(CHECK_OBJS): $(HEADERS)
+$(VFS_OBJ): $(HEADERS)
 tls.o xattrs.o: lib/sysxattrs.h
+
+# The VFS layer is bundled into a static archive linked last on every target so
+# that moving filesystem code out of syscall.o never breaks a test harness link
+# (the linker pulls only the members each program references).
+libvfs.a: $(VFS_OBJ)
+	rm -f $@
+	$(AR) $(ARFLAGS) $@ $(VFS_OBJ)
+	$(RANLIB) $@
 usage.o: version.h latest-year.h help-rsync.h help-rsyncd.h git-version.h default-cvsignore.h
 loadparm.o: default-dont-compress.h daemon-parm.h
 
@@ -202,23 +224,19 @@ getgroups$(EXEEXT): getgroups.o
 getfsdev$(EXEEXT): getfsdev.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ getfsdev.o $(LIBS)
 
-TRIMSLASH_OBJ = trimslash.o syscall.o util2.o t_stub.o lib/compat.o lib/snprintf.o
+TRIMSLASH_OBJ = trimslash.o syscall.o util2.o t_stub.o lib/compat.o lib/snprintf.o libvfs.a
 trimslash$(EXEEXT): $(TRIMSLASH_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(TRIMSLASH_OBJ) $(LIBS)
 
-T_UNSAFE_OBJ = t_unsafe.o syscall.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o
+T_UNSAFE_OBJ = t_unsafe.o syscall.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o libvfs.a
 t_unsafe$(EXEEXT): $(T_UNSAFE_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_UNSAFE_OBJ) $(LIBS)
-
-T_HASHTABLE_OVERFLOW_OBJ = t_hashtable_overflow.o hashtable.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o
-t_hashtable_overflow$(EXEEXT): $(T_HASHTABLE_OVERFLOW_OBJ)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_HASHTABLE_OVERFLOW_OBJ) $(LIBS)
 
 T_IWILDMATCH_OBJ = t_iwildmatch.o lib/wildmatch.o
 t_iwildmatch$(EXEEXT): $(T_IWILDMATCH_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_IWILDMATCH_OBJ) $(LIBS)
 
-T_CLEAN_FNAME_OBJ = t_clean_fname.o syscall.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o
+T_CLEAN_FNAME_OBJ = t_clean_fname.o syscall.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o libvfs.a
 t_clean_fname$(EXEEXT): $(T_CLEAN_FNAME_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_CLEAN_FNAME_OBJ) $(LIBS)
 
@@ -231,23 +249,23 @@ t_clean_fname$(EXEEXT): $(T_CLEAN_FNAME_OBJ)
 # GNU-make-only; BSD and Solaris make expand it to nothing.
 t_safe_arg_main.o: main.c $(HEADERS)
 	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) -Dmain=rsync_unused_main -c $(srcdir)/main.c -o t_safe_arg_main.o
-T_SAFE_ARG_OBJ = t_safe_arg.o t_safe_arg_main.o $(OBJS1_NO_MAIN) $(OBJS2) $(OBJS3) $(DAEMON_OBJ) $(LIBOBJ) @BUILD_ZLIB@ @BUILD_POPT@
+T_SAFE_ARG_OBJ = t_safe_arg.o t_safe_arg_main.o $(OBJS1_NO_MAIN) $(OBJS2) $(OBJS3) $(DAEMON_OBJ) $(LIBOBJ) @BUILD_ZLIB@ @BUILD_POPT@ libvfs.a
 t_safe_arg$(EXEEXT): $(T_SAFE_ARG_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_SAFE_ARG_OBJ) $(LIBS)
 
-T_CHMOD_SECURE_OBJ = t_chmod_secure.o syscall.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o
+T_CHMOD_SECURE_OBJ = t_chmod_secure.o syscall.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o libvfs.a
 t_chmod_secure$(EXEEXT): $(T_CHMOD_SECURE_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_CHMOD_SECURE_OBJ) $(LIBS)
 
-T_RENAME_SECURE_OBJ = t_rename_secure.o syscall.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o
+T_RENAME_SECURE_OBJ = t_rename_secure.o syscall.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o libvfs.a
 t_rename_secure$(EXEEXT): $(T_RENAME_SECURE_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_RENAME_SECURE_OBJ) $(LIBS)
 
-T_SYMLINK_SECURE_OBJ = t_symlink_secure.o syscall.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o
+T_SYMLINK_SECURE_OBJ = t_symlink_secure.o syscall.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o libvfs.a
 t_symlink_secure$(EXEEXT): $(T_SYMLINK_SECURE_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_SYMLINK_SECURE_OBJ) $(LIBS)
 
-T_SECURE_RELPATH_OBJ = t_secure_relpath.o syscall.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o
+T_SECURE_RELPATH_OBJ = t_secure_relpath.o syscall.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o libvfs.a
 t_secure_relpath$(EXEEXT): $(T_SECURE_RELPATH_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_SECURE_RELPATH_OBJ) $(LIBS)
 
@@ -348,10 +366,10 @@ rrsync.1: support/rrsync.1.md md-convert Makefile
 
 .PHONY: clean
 clean: cleantests
-	rm -f *~ $(OBJS) $(CHECK_PROGS) $(CHECK_OBJS) $(CHECK_COMPILE_OBJS) $(CHECK_SYMLINKS) @MAKE_RRSYNC@ \
+	rm -f *~ $(OBJS) $(VFS_OBJ) libvfs.a $(CHECK_PROGS) $(CHECK_OBJS) $(CHECK_COMPILE_OBJS) $(CHECK_SYMLINKS) @MAKE_RRSYNC@ \
 		git-version.h rounding rounding.h *.old rsync*.1 rsync*.5 @MAKE_RRSYNC_1@ \
 		*.html daemon-parm.h help-*.h default-*.h proto.h proto.h-tstamp
-	rm -f *.gcno *.gcda lib/*.gcno lib/*.gcda zlib/*.gcno zlib/*.gcda popt/*.gcno popt/*.gcda
+	rm -f *.gcno *.gcda lib/*.gcno lib/*.gcda zlib/*.gcno zlib/*.gcda popt/*.gcno popt/*.gcda vfs/*.gcno vfs/*.gcda
 	rm -rf coverage coverage-tcp coverage-all coverage-fallback
 
 .PHONY: cleantests

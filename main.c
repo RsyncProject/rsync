@@ -1814,6 +1814,8 @@ int main(int argc,char *argv[])
 	raw_argc = argc;
 	raw_argv = argv;
 
+	vfs_init();
+
 	raise_fd_limit();
 
 #ifdef HAVE_SIGACTION
