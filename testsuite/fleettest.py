@@ -168,6 +168,11 @@ class Target:
     # daemon+flipper symlink-race tests on openbsd, which the platform's kernel
     # connect()-under-rename-load bug hangs (see dev-notes). Merged with --skip.
     exclude: list[str] = dataclasses.field(default_factory=list)
+    # Test-name globs whose failure is tolerated on THIS box (merged with the
+    # global --xfail), for a known platform/version-specific failure that should
+    # not fail the cell -- e.g. crtimes on macOS for an older binary. The test
+    # still runs; if it passes, the entry is simply a no-op.
+    xfail: list[str] = dataclasses.field(default_factory=list)
 
 
 def load_fleet(path: Path) -> list[Target]:
@@ -431,15 +436,18 @@ class TransportResult:
                 and not self.failed and not self.skip_mismatch)
 
 
-def parse_transport(transport: str, r: CmdResult, skip_checked: bool) -> TransportResult:
+def parse_transport(transport: str, r: CmdResult, skip_checked: bool,
+                    xfail_extra: list[str] = ()) -> TransportResult:
     counts = {"passed": 0, "failed": 0, "xfailed": 0, "skipped": 0}
     for m in RE_COUNT.finditer(r.out):
         counts[m.group(2)] = int(m.group(1))
     failed = [m.group(2) for m in RE_RESULT.finditer(r.out)
               if m.group(1) in ("FAIL", "ERROR")]
-    # --xfail: drop tolerated failures from `failed` so they don't fail the cell.
+    # --xfail (global) plus this box's per-target xfail: drop tolerated failures
+    # from `failed` so they don't fail the cell.
+    xfail_globs = [*XFAIL_GLOBS, *xfail_extra]
     xfailed_req = [f for f in failed
-                   if any(fnmatch.fnmatch(f, g) for g in XFAIL_GLOBS)]
+                   if any(fnmatch.fnmatch(f, g) for g in xfail_globs)]
     failed = [f for f in failed if f not in xfailed_req]
     exp = got = set()
     if skip_checked and RE_SKIP_HDR.search(r.out):
@@ -553,7 +561,7 @@ def run_target(t: Target, args, staging: str) -> TargetResult:
         t0 = time.monotonic()
         r = run_on(t, cmd, timeout=2400)
         res.timings[transport] = time.monotonic() - t0
-        tr = parse_transport(transport, r, skip_csv is not None)
+        tr = parse_transport(transport, r, skip_csv is not None, t.xfail)
         retry_failed(t, transport, tr, lambda names, tp=transport: run_on(
             t, test_script(t, tp, None, 1, only=names), timeout=1200))
         res.transports[transport] = tr
@@ -574,7 +582,7 @@ def run_target(t: Target, args, staging: str) -> TargetResult:
             t0 = time.monotonic()
             r = run_on(t, cmd, timeout=2400)
             res.timings[label] = time.monotonic() - t0
-            tr = parse_transport(label, r, skip_csv is not None)
+            tr = parse_transport(label, r, skip_csv is not None, t.xfail)
             retry_failed(t, label, tr, lambda names, pr=proto: run_on(
                 t, test_script(t, "pipe", None, 1, protocol=pr, only=names),
                 timeout=1200))
@@ -588,7 +596,7 @@ def run_target(t: Target, args, staging: str) -> TargetResult:
         t0 = time.monotonic()
         r = run_on(t, nonroot_test_script(t, args.nonroot_tests), timeout=2400)
         res.timings["nonroot"] = time.monotonic() - t0
-        tr = parse_transport("nonroot", r, skip_checked=False)
+        tr = parse_transport("nonroot", r, skip_checked=False, xfail_extra=t.xfail)
         retry_failed(t, "nonroot", tr, lambda names: run_on(
             t, nonroot_test_script(t, names), timeout=1200))
         res.transports["nonroot"] = tr

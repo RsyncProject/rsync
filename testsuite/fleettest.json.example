@@ -131,7 +131,9 @@
       "privilege": "sudo",
       "env_prefix": "export PATH=/opt/homebrew/bin:/usr/local/bin:$PATH",
       "configure_pre": "CPPFLAGS=\"-I$(brew --prefix)/include -I$(brew --prefix openssl)/include\"; LDFLAGS=\"-L$(brew --prefix)/lib -L$(brew --prefix openssl)/lib\"; export CPPFLAGS LDFLAGS;",
-      "configure_flags": ["--with-rrsync"]
+      "configure_flags": ["--with-rrsync"],
+      "_xfail_comment": "crtimes uses APFS birthtime via setattrlist; older backport binaries (3.4.x/3.2.7) drive it differently than current rsync, so the 3.5.0 testsuite's crtimes check fails here. Tolerated -- it passes for a current binary, where this entry is a no-op.",
+      "xfail": ["crtimes"]
     },
     {
       "_comment": "Cygwin: non-root plain user (no sudo), binary is rsync.exe.",
