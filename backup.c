@@ -202,7 +202,7 @@ char *get_backup_name(const char *fname)
 			}
 			if (backup_dir_len > 1)
 				backup_dir_buf[backup_dir_len-1] = '\0';
-			ret = make_path(backup_dir_buf, MKP_OPERATOR);
+			ret = vfs_make_path(backup_dir_buf, 0, VFS_OPERATOR_PATH);
 			if (backup_dir_len > 1)
 				backup_dir_buf[backup_dir_len-1] = '/';
 			if (ret < 0)

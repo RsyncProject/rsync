@@ -179,6 +179,11 @@ int vfs_setattrlist_times(const char *path, STRUCT_STAT *stp);
 int vfs_setattrlist_crtime(const char *path, time_t crtime);
 time_t vfs_get_create_time(const char *path, STRUCT_STAT *stp);
 int vfs_SetFileTime(const char *path, time_t crtime);
+
+/* Compound operations (vfs/<op>.c): filesystem mechanics layered on the
+ * primitives above.  The resolution policy travels as an explicit vfs_flags
+ * argument (VFS_OPERATOR_PATH for operator-supplied paths, else 0). */
+int vfs_make_path(char *fname, int mkp_flags, int vfs_flags);
 int vfs_utimensat(const char *path, STRUCT_STAT *stp);
 int vfs_utimensat_at(const char *path, STRUCT_STAT *stp);
 int vfs_utimensat_atfd(int dfd, const char *name, STRUCT_STAT *stp);

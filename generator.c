@@ -1692,7 +1692,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			 && vfs_stat_at(dn, &sx.st) < 0) {
 				if (dry_run)
 					goto parent_is_dry_missing;
-				if (make_path(fname, MKP_DROP_NAME | MKP_SKIP_SLASH) < 0) {
+				if (vfs_make_path(fname, MKP_DROP_NAME | MKP_SKIP_SLASH, 0) < 0) {
 					rsyserr(FERROR_XFER, errno,
 						"recv_generator: mkdir %s failed",
 						full_fname(dn));
@@ -1848,7 +1848,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			 * drop any cached (failed) dir fd before the retry. */
 			vfs_dircache_reset();
 			if (!relative_paths || errno != ENOENT
-			 || make_path(fname, MKP_DROP_NAME | MKP_SKIP_SLASH) < 0
+			 || vfs_make_path(fname, MKP_DROP_NAME | MKP_SKIP_SLASH, 0) < 0
 			 || (gen_entry_mkdir(fname, file, file->mode|added_perms) < 0 && errno != EEXIST)) {
 				rsyserr(FERROR_XFER, errno,
 					"recv_generator: mkdir %s failed",

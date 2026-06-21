@@ -741,7 +741,7 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 
 	if (mkpath_dest_arg && statret < 0 && (cp || file_total > 1)) {
 		int save_errno = errno;
-		int ret = make_path(dest_path, file_total > 1 && !trailing_slash ? 0 : MKP_DROP_NAME);
+		int ret = vfs_make_path(dest_path, file_total > 1 && !trailing_slash ? 0 : MKP_DROP_NAME, 0);
 		if (ret < 0)
 			goto mkdir_error;
 		if (ret && (INFO_GTE(NAME, 1) || stdout_format_has_i)) {
