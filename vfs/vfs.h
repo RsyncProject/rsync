@@ -6,7 +6,7 @@
  * operator-path ownership walk and the daemon module confinement) so the
  * mainline protocol/transfer code can stay clean.  The state lives in the
  * single global "struct vfs vfs" below; the implementations are in the
- * per-concern vfs/*.c files (one per operation family, plus the resolver,
+ * per-concern sources under vfs/ (one per operation family, plus the resolver,
  * dirstack, dircache and owner-walk cores).
  *
  * Most operations come in up to three forms, sharing one leaf behaviour:
@@ -68,6 +68,10 @@ extern struct vfs vfs;
 /* Reset the VFS to a safe between-transfers state.  Safety at startup comes
  * from the static initializer in vfs/vfs.c, not from this call. */
 void vfs_init(void);
+
+/* Snapshot the served daemon module root (clientserver.c calls this); the
+ * dirfd is borrowed, never closed by the VFS. */
+void vfs_set_module_root(const char *dir, unsigned int len, int dirfd);
 
 /* Race-safe path resolution (vfs/secure_open.c). */
 int vfs_relpath_active(void);

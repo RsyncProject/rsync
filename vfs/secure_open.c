@@ -35,7 +35,7 @@ extern int open_noatime;
  * chroot confines the outer path, not the inner module. */
 int vfs_relpath_active(void)
 {
-	if (am_daemon && am_chrooted && module_dirlen)
+	if (am_daemon && am_chrooted && vfs.module_dirlen)
 		return 1;
 	return !am_chrooted && (am_daemon || !am_sender);
 }
@@ -186,8 +186,6 @@ cleanup:
 int vfs_resolve_open(const char *basedir, const char *relpath, int flags, mode_t mode)
 {
 	extern int am_daemon, am_chrooted;
-	extern char *module_dir;
-	extern unsigned int module_dirlen;
 	char modrel_buf[MAXPATHLEN];
 	int reanchored = 0;
 
@@ -198,30 +196,30 @@ int vfs_resolve_open(const char *basedir, const char *relpath, int flags, mode_t
 	}
 
 	/* Sanitizing daemon (am_daemon && !am_chrooted) and the /./ inner-module
-	 * chroot (am_daemon && am_chrooted && module_dirlen) -- both keep the module
+	 * chroot (am_daemon && am_chrooted && vfs.module_dirlen) -- both keep the module
 	 * root, not the cwd, as the trust boundary.  Here we have chdir'd into a
 	 * sub-dir of the module (the transfer destination), so a relative alt-dest
 	 * like "../01" may legitimately climb to a sibling that is still inside the
 	 * module (#915).  Confining beneath the cwd would reject that climb.
 	 * Re-anchor at the module root by prefixing the cwd's module-relative path
 	 * (from rsync's logical vfs.curr_dir[], a guaranteed lexical prefix of
-	 * module_dir, unlike getcwd()) and resolving beneath module_dir; RESOLVE_
+	 * vfs.module_dir, unlike getcwd()) and resolving beneath vfs.module_dir; RESOLVE_
 	 * BENEATH then allows in-module climbs and still rejects escapes.  Only for
-	 * paths that contain "..".  module_dirlen is 0 for a `path = /` module
-	 * (clientserver.c), so the non-chroot arm gates on module_dir, not its
+	 * paths that contain "..".  vfs.module_dirlen is 0 for a `path = /` module
+	 * (clientserver.c), so the non-chroot arm gates on vfs.module_dir, not its
 	 * length, to cover that case too -- the prefix check below treats
-	 * module_dirlen 0 as "module root is /". */
-	if (am_daemon && (!am_chrooted || module_dirlen)
-	 && module_dir && module_dir[0] == '/'
+	 * vfs.module_dirlen 0 as "module root is /". */
+	if (am_daemon && (!am_chrooted || vfs.module_dirlen)
+	 && vfs.module_dir && vfs.module_dir[0] == '/'
 	 && (basedir == NULL || basedir[0] != '/')
 	 && (path_has_dotdot_component(relpath)
 	  || (basedir && path_has_dotdot_component(basedir)))) {
 		const char *p;
 		int n;
-		if (vfs.curr_dir_len >= module_dirlen
-		 && strncmp(vfs.curr_dir, module_dir, module_dirlen) == 0
-		 && (vfs.curr_dir[module_dirlen] == '\0' || vfs.curr_dir[module_dirlen] == '/')) {
-			for (p = vfs.curr_dir + module_dirlen; *p == '/'; p++) {}
+		if (vfs.curr_dir_len >= vfs.module_dirlen
+		 && strncmp(vfs.curr_dir, vfs.module_dir, vfs.module_dirlen) == 0
+		 && (vfs.curr_dir[vfs.module_dirlen] == '\0' || vfs.curr_dir[vfs.module_dirlen] == '/')) {
+			for (p = vfs.curr_dir + vfs.module_dirlen; *p == '/'; p++) {}
 			if (basedir)
 				n = snprintf(modrel_buf, sizeof modrel_buf, "%s%s%s/%s",
 					     p, *p ? "/" : "", basedir, relpath);
@@ -232,7 +230,7 @@ int vfs_resolve_open(const char *basedir, const char *relpath, int flags, mode_t
 				errno = ENAMETOOLONG;
 				return -1;
 			}
-			basedir = module_dir;	/* absolute, operator-trusted anchor */
+			basedir = vfs.module_dir;	/* absolute, operator-trusted anchor */
 			relpath = modrel_buf;
 			reanchored = 1;
 		}

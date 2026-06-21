@@ -925,10 +925,11 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	} else
 		set_filter_dir(module_dir, module_dirlen);
 
-	/* Everything loaded from here to the end of the exclude block is the
-	 * operator's own configuration, so it keeps the ownership walk without the
-	 * module-confinement parse_filter_file() applies to peer-driven merges. */
-	daemon_config_filter_file = 1;
+	/* Snapshot the module root for the VFS confinement checks now that the
+	 * path is final.  The root dirfd is pinned later (below); this first call
+	 * must precede any VFS open of an operator-supplied path -- the filter/
+	 * include files just below, and the log file -- so they see the boundary. */
+	vfs_set_module_root(module_dir, module_dirlen, -1);
 
 	p = lp_filter(module_id);
 	parse_filter_str(&daemon_filter_list, p, rule_template(FILTRULE_WORD_SPLIT),
@@ -1064,6 +1065,8 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 #if defined HAVE_FDOPENDIR && defined O_DIRECTORY
 	module_dirfd = open(".", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
 #endif
+	/* Update the VFS snapshot with the now-pinned root dirfd. */
+	vfs_set_module_root(module_dir, module_dirlen, module_dirfd);
 	if (module_dirlen)
 		sanitize_paths = 1;
 

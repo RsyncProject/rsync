@@ -94,8 +94,8 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 	 * absolute symlink target) restarts at "/". */
 	char abspath[MAXPATHLEN];
 	abspath[0] = '\0';
-	if (am_daemon && module_dir && module_dir[0] == '/')
-		strlcpy(abspath, module_dir, sizeof abspath);	/* "/" for a path=/ module */
+	if (am_daemon && vfs.module_dir && vfs.module_dir[0] == '/')
+		strlcpy(abspath, vfs.module_dir, sizeof abspath);	/* "/" for a path=/ module */
 
 	/* Path-walk state. `remaining` is the unconsumed tail; we splice
 	 * symlink targets back into it as we go. Sized 2x MAXPATHLEN so a

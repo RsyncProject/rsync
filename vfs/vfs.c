@@ -21,14 +21,26 @@ struct vfs vfs = {
 	.module_dirfd = -1,
 };
 
-/* Reset the VFS between transfers.  Idempotent; re-establishes the same safe
- * sentinels as the static initializer.  Behaviorally inert until the held-
- * dirfd cache and module snapshot are migrated into struct vfs in later
- * commits (the live cache is still the dpc_* statics in vfs/dircache.c). */
+/* Reset the VFS to a safe state.  Idempotent; re-establishes the same safe
+ * sentinels as the static initializer, and clears the module-root snapshot so
+ * confinement state can never be stale (no module is attached yet). */
 void vfs_init(void)
 {
 	vfs.dpc.base = -1;
 	vfs.dpc.anchor = (const char *)-2;
 	vfs.dpc.depth = 0;
+	vfs.module_dir = NULL;
+	vfs.module_dirlen = 0;
 	vfs.module_dirfd = -1;
+}
+
+/* Snapshot the served daemon module root for the confinement checks.  Called
+ * by clientserver.c once the module path is final (with dirfd == -1), and again
+ * once the root dirfd is pinned.  The dirfd is BORROWED -- open_anchor_dirfd()
+ * dup()s it; the VFS never closes it. */
+void vfs_set_module_root(const char *dir, unsigned int len, int dirfd)
+{
+	vfs.module_dir = dir;
+	vfs.module_dirlen = len;
+	vfs.module_dirfd = dirfd;
 }

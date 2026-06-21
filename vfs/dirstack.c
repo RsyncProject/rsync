@@ -55,12 +55,12 @@ int path_has_dotdot_component(const char *path)
 int abspath_excluded_by_module(const char *abspath, int name_is_dir)
 {
 	(void)name_is_dir;
-	if (!am_daemon || !abspath || !module_dir)
+	if (!am_daemon || !abspath || !vfs.module_dir)
 		return 0;
-	if (module_dirlen <= 1)			/* module root is "/": nothing is outside */
+	if (vfs.module_dirlen <= 1)			/* module root is "/": nothing is outside */
 		return 0;
-	if (strncmp(abspath, module_dir, module_dirlen) == 0
-	 && (abspath[module_dirlen] == '\0' || abspath[module_dirlen] == '/'))
+	if (strncmp(abspath, vfs.module_dir, vfs.module_dirlen) == 0
+	 && (abspath[vfs.module_dirlen] == '\0' || abspath[vfs.module_dirlen] == '/'))
 		return 0;			/* inside the module: name-based exclude is not a boundary */
 	/* Not under the module root.  An ABSOLUTE walk passes through the module
 	 * root's ancestors ("/", "/home", ...) on the way down -- those are not
@@ -72,7 +72,7 @@ int abspath_excluded_by_module(const char *abspath, int name_is_dir)
 	 * before we get here. */
 	size_t alen = strlen(abspath);
 	if (alen == 0
-	 || (strncmp(abspath, module_dir, alen) == 0 && module_dir[alen] == '/'))
+	 || (strncmp(abspath, vfs.module_dir, alen) == 0 && vfs.module_dir[alen] == '/'))
 		return 0;			/* ancestor of the module root: still descending */
 	return vfs.operator_path_resolve ? 1 : 0;
 }
@@ -80,7 +80,7 @@ int abspath_excluded_by_module(const char *abspath, int name_is_dir)
 #if defined(O_NOFOLLOW) && defined(O_DIRECTORY) && defined(AT_FDCWD)
 
 /* Open a trusted absolute anchor directory as an owned dirfd.  When the anchor is
- * the served module root and the daemon pinned it by identity (module_dirfd), dup
+ * the served module root and the daemon pinned it by identity (vfs.module_dirfd), dup
  * that fd rather than re-resolving the absolute path with openat(AT_FDCWD, ...) --
  * which re-traverses the module's ancestors as the dropped-privilege module uid
  * and EACCESes when the module sits under a non-traversable parent (a 0700 home).
@@ -88,8 +88,8 @@ int abspath_excluded_by_module(const char *abspath, int name_is_dir)
  * callers (the secure resolver and dpc_dir_fd both require these three). */
 int open_anchor_dirfd(const char *path)
 {
-	if (module_dirfd >= 0 && am_daemon && module_dir && strcmp(path, module_dir) == 0)
-		return dup(module_dirfd);
+	if (vfs.module_dirfd >= 0 && am_daemon && vfs.module_dir && strcmp(path, vfs.module_dir) == 0)
+		return dup(vfs.module_dirfd);
 	return openat(AT_FDCWD, path, O_RDONLY | O_DIRECTORY);
 }
 

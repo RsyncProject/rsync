@@ -33,9 +33,6 @@ extern int copy_links;
 extern int copy_unsafe_links;
 extern int insecure_links;
 extern int module_id;
-extern char *module_dir;
-extern unsigned int module_dirlen;
-extern int module_dirfd;
 
 /* Dry-run / read-only guard macros shared by the syscall wrappers. */
 #define RETURN_ERROR_IF(x,e) \
