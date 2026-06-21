@@ -90,7 +90,7 @@ Status legend: ✓ property asserted · `~` shallow / by an existing ported test
 | -x, --one-file-system | — | — | — | ✗ (needs a mount boundary) |
 | --preallocate / --fsync | — | — | — | ✗ |
 | -B, --block-size | — | — | — | ✗ |
-| --max-alloc | — | — | — | ✗ |
+| --max-alloc | max-alloc-zero-rejected*new*, daemon-max-alloc-zero*new* | — | — | ✓ zero rejected locally and when forwarded to the daemon (needs an old client) |
 
 ### Filtering
 | option | test(s) | depth | x-dir | notes / gap |

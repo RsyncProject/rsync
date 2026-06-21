@@ -27,6 +27,7 @@ import concurrent.futures
 import fnmatch
 import glob
 import os
+import signal
 import subprocess
 import sys
 import threading
@@ -164,11 +165,30 @@ def get_testuser():
         return os.environ.get('LOGNAME', os.environ.get('USER', 'UNKNOWN'))
 
 
+def _move_aside(path):
+    """Rename an un-removable directory to a unique sibling so its name is free.
+
+    A rename-storm symlink-race test can corrupt a directory on some filesystems
+    (OpenBSD FFS soft-updates can leave an "empty" dir that still reports
+    ENOTEMPTY/EPERM and only fsck clears). `rm -rf` then can't remove it, but
+    renaming the top dir aside succeeds even with a corrupted descendant, freeing
+    the original name for a clean scratchdir."""
+    n = 0
+    while os.path.exists(f"{path}.corrupt.{os.getpid()}.{n}"):
+        n += 1
+    try:
+        os.rename(path, f"{path}.corrupt.{os.getpid()}.{n}")
+    except OSError:
+        pass
+
+
 def prep_scratch(scratchdir, srcdir, tooldir, setfacl_nodef):
     """Prepare a scratch directory for a test."""
     if os.path.isdir(scratchdir):
         subprocess.run(['chmod', '-R', 'u+rwX', scratchdir], capture_output=True)
         subprocess.run(['rm', '-rf', scratchdir], capture_output=True)
+        if os.path.isdir(scratchdir):
+            _move_aside(scratchdir)   # rm -rf left corrupted debris; don't inherit it
     os.makedirs(scratchdir, exist_ok=True)
     if setfacl_nodef:
         subprocess.run(setfacl_nodef + [scratchdir], capture_output=True)
@@ -319,18 +339,36 @@ def run_one_test(testscript, testbase, scratchdir, base_env, timeout,
         cmd = ['sh', '-e', testscript]
 
     logfile = os.path.join(scratchdir, 'test.log')
-    try:
-        with open(logfile, 'w') as log:
-            proc = subprocess.run(
-                cmd,
-                stdout=log, stderr=subprocess.STDOUT,
-                env=env, timeout=timeout,
-                cwd=env.get('TOOLDIR', '.')
-            )
-        result = proc.returncode
-    except subprocess.TimeoutExpired:
-        result = 1
-        with open(logfile, 'a') as log:
+    with open(logfile, 'w') as log:
+        # start_new_session: run the test driver as its own session/group leader
+        # so the daemon, clients and flipper it spawns inherit that group. A
+        # timeout then killpg's the whole tree (not just the driver), and the
+        # lock-file sweep can reap a SIGKILLed run's stranded group the same way.
+        proc = subprocess.Popen(
+            cmd,
+            stdout=log, stderr=subprocess.STDOUT,
+            env=env, cwd=env.get('TOOLDIR', '.'),
+            start_new_session=True,
+        )
+        try:
+            result = proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            # Reap the whole session group, but only if the driver really is its
+            # own group leader (start_new_session took) and that group isn't ours
+            # -- killpg of our own group would take down the runner.
+            try:
+                pgid = os.getpgid(proc.pid)
+            except OSError:
+                pgid = -1
+            if pgid == proc.pid and pgid != os.getpgrp():
+                try:
+                    os.killpg(pgid, signal.SIGKILL)
+                except OSError:
+                    proc.kill()
+            else:
+                proc.kill()
+            proc.wait()
+            result = 1
             log.write(f"\nTIMEOUT: test took over {timeout} seconds\n")
 
     # Build output text

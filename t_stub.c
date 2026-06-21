@@ -25,6 +25,7 @@ int do_fsync = 0;
 int inplace = 0;
 int am_daemon = 0;
 int am_chrooted = 0;
+int insecure_links = 0;
 int modify_window = 0;
 int preallocate_files = 0;
 int sparse_files = 0;
@@ -45,6 +46,7 @@ size_t max_alloc = (size_t)-1; /* test helpers are not memory-constrained;
 				* hits at its first my_strdup() call. */
 char *partial_dir;
 char *module_dir;
+int module_dirfd = -1;
 /* curr_dir[]/curr_dir_len (read by secure_relative_open) are defined in
  * syscall.c, which every helper links -- no stub needed here. */
 filter_rule_list daemon_filter_list;
@@ -82,7 +84,7 @@ filter_rule_list daemon_filter_list;
 	return 0;
 }
 
- int copy_xattrs(UNUSED(const char *source), UNUSED(const char *dest))
+ int copy_xattrs(UNUSED(const char *source), UNUSED(const char *dest), UNUSED(int dest_fd))
 {
 	return -1;
 }
@@ -103,6 +105,11 @@ filter_rule_list daemon_filter_list;
 }
 
  BOOL lp_use_chroot(UNUSED(int mod))
+{
+	return 0;
+}
+
+ BOOL lp_insecure_links(UNUSED(int mod))
 {
 	return 0;
 }

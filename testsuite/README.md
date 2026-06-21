@@ -9,6 +9,39 @@ is gone). Shared helpers live in `testsuite/rsyncfns.py`. A handful of C helper
 programs (`tls`, `getgroups`, `trimslash`, …) are built alongside `rsync` and
 used by some tests. Coverage notes are in [COVERAGE.md](COVERAGE.md).
 
+## Writing tests
+
+Favour readability — a test is also documentation of the behaviour it pins, so
+prefer clarity over cleverness:
+
+* When a test writes an `rsyncd.conf`, write it as a triple-quoted f-string so
+  the actual config is readable top-to-bottom, with module parameters indented
+  with plain spaces. Don't build it from adjacent string literals full of `\n`
+  (and `\t`) escapes. The daemon's parser accepts space-indented parameters.
+* Better still, use the structured helpers in `rsyncfns.py` when a stock config
+  will do: `write_daemon_conf(modules, globals)` (per-test modules/params) or
+  `build_rsyncd_conf()` (the four standard modules). They also handle the
+  root-only `uid`/`gid` lines for you (needed so a `use chroot = no` daemon run
+  as root can read a root-owned module).
+* For config that varies (e.g. those root-only `uid`/`gid` lines), interpolate a
+  single optional block that expands when needed and is an empty string
+  otherwise, rather than splicing pieces together:
+
+  ```python
+  root = get_testuid() == get_rootuid()
+  ids = f"uid = {get_rootuid()}\ngid = {get_rootgid()}" if root else ""
+  conf.write_text(f"""\
+  pid file = {base}/rsyncd.pid
+  use chroot = no
+  {ids}
+  log file = {base}/rsyncd.log
+
+  [m]
+      path = {mod}
+      read only = yes
+  """)
+  ```
+
 ## Running the tests
 
 ### Via make
