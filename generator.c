@@ -1417,9 +1417,9 @@ static int gen_entry_symlink(const char *slnk, const char *path, struct file_str
 	int dfd = vfs_cached_dirfd(path, file);
 	if (dfd >= 0) {
 		const char *slash = strrchr(path, '/');
-		return vfs_symlink_atfd(slnk, dfd, slash ? slash + 1 : path);
+		return vfs_symlink(slnk, dfd, slash ? slash + 1 : path, 0);
 	}
-	return vfs_symlink_at(slnk, path);
+	return vfs_symlink(slnk, VFS_AT_FDCWD, path, 0);
 }
 
 /* True when this build compiled no fd-relative primitive able to create this

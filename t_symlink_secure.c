@@ -121,7 +121,7 @@ int main(int argc, char **argv)
 		/* Pre-fix fallback: a no-slash path went to vfs_symlink()/vfs_mknod(),
 		 * which open() the basename without O_NOFOLLOW. */
 #ifdef TEST_SYMLINK_PLACEHOLDER
-		vfs_symlink("VULN_SYM_PAYLOAD", "sympath");
+		vfs_symlink("VULN_SYM_PAYLOAD", VFS_AT_FDCWD, "sympath", VFS_ALLOW_SYMLINK);
 		check_clobbered("poc vfs_symlink bare", "../outside/secret_sym",
 				"VULN_SYM_PAYLOAD");
 #endif
@@ -133,12 +133,12 @@ int main(int argc, char **argv)
 	/* Fixed wrappers: a bare-path basename symlink must not be followed;
 	 * the victim outside the module stays untouched. */
 #ifdef TEST_SYMLINK_PLACEHOLDER
-	vfs_symlink_at("FIXED_SYM_PAYLOAD", "sympath");
-	check_preserved("vfs_symlink_at bare", "../outside/secret_sym", "VICTIM_SYM");
+	vfs_symlink("FIXED_SYM_PAYLOAD", VFS_AT_FDCWD, "sympath", 0);
+	check_preserved("vfs_symlink bare", "../outside/secret_sym", "VICTIM_SYM");
 
 	/* Slashed path for parity (already protected before the fix). */
-	vfs_symlink_at("FIXED_SYM_PAYLOAD", "sub/sympath2");
-	check_preserved("vfs_symlink_at slashed", "../outside/secret_sym2", "VICTIM_SYM2");
+	vfs_symlink("FIXED_SYM_PAYLOAD", VFS_AT_FDCWD, "sub/sympath2", 0);
+	check_preserved("vfs_symlink slashed", "../outside/secret_sym2", "VICTIM_SYM2");
 #endif
 
 	vfs_mknod(VFS_AT_FDCWD, "nodpath", S_IFCHR | 0600, 0, 0);

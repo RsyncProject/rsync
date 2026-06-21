@@ -19,7 +19,7 @@
 #include "vfs/vfs_internal.h"
 
 #ifdef SUPPORT_LINKS
-int vfs_symlink(const char *lnk, const char *path)
+static int vfs__symlink_plain(const char *lnk, const char *path)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
@@ -63,8 +63,13 @@ int vfs_symlink(const char *lnk, const char *path)
   bare-path vfs_symlink() there, whose plain open() followed such a
   symlink.
 */
-int vfs_symlink_at(const char *lnk, const char *path)
+/* NOTE: unlike vfs_mkdir/vfs_mknod, the symlink secure path has no ownership-walk
+ * branch -- VFS_OPERATOR_PATH is accepted but resolves the same as the default
+ * secure receiver walk (the link target is stored verbatim and never resolved at
+ * creation; only the parent dir is confined).  Pre-existing asymmetry. */
+static int vfs__symlink_secure(const char *lnk, const char *path, int flags)
 {
+	(void)flags;
 #ifdef AT_FDCWD
 	char dirpath[MAXPATHLEN];
 	const char *bname;
@@ -77,10 +82,10 @@ int vfs_symlink_at(const char *lnk, const char *path)
 	RETURN_ERROR_IF_RO_OR_LO;
 
 	if (!vfs_relpath_active())
-		return vfs_symlink(lnk, path);
+		return vfs__symlink_plain(lnk, path);
 
 	if (!path || !*path || *path == '/')
-		return vfs_symlink(lnk, path);
+		return vfs__symlink_plain(lnk, path);
 
 	/* A path with a slash needs vfs_resolve_open to confine its parent;
 	 * a top-level path is in CWD (AT_FDCWD), no parent to subvert.  The leaf
@@ -191,7 +196,7 @@ ssize_t vfs_readlink_atfd(int dfd, const char *name, char *buf, size_t bufsiz)
 }
 #endif
 
-int vfs_symlink_atfd(const char *lnk, int dfd, const char *name)
+static int vfs__symlink_atfd(const char *lnk, int dfd, const char *name)
 {
 #ifdef AT_FDCWD
 	if (dry_run) return 0;
@@ -220,4 +225,24 @@ int vfs_symlink_atfd(const char *lnk, int dfd, const char *name)
 	errno = ENOSYS;
 	return -1;
 #endif
+}
+
+/* Unified symlink creation.  dirfd == VFS_AT_FDCWD resolves `path`; a real held
+ * dirfd makes `path` a single validated component under it.  flags:
+ * VFS_ALLOW_SYMLINK (trusted, plain symlink), default 0 (secure receiver
+ * resolve).  See the note on vfs__symlink_secure re VFS_OPERATOR_PATH. */
+int vfs_symlink(const char *lnk, int dirfd, const char *path, int flags)
+{
+	if (dirfd != VFS_AT_FDCWD) {
+		if (!path || !*path || strchr(path, '/')
+		 || (path[0] == '.' && (path[1] == '\0'
+		     || (path[1] == '.' && path[2] == '\0')))) {
+			errno = EINVAL;
+			return -1;
+		}
+		return vfs__symlink_atfd(lnk, dirfd, path);
+	}
+	if (flags & VFS_ALLOW_SYMLINK)
+		return vfs__symlink_plain(lnk, path);
+	return vfs__symlink_secure(lnk, path, flags);
 }

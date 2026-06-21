@@ -375,7 +375,9 @@ static int make_backup_inner(const char *fname, BOOL prefer_rename)
 			}
 			ret = 2;
 		} else {
-			if (vfs_symlink_at(sl, buf) < 0)
+			/* symlink has no ownership-walk branch (see vfs/symlink.c), so
+			 * flags=0 reproduces the old vfs_symlink_at behavior here. */
+			if (vfs_symlink(sl, VFS_AT_FDCWD, buf, 0) < 0)
 				rsyserr(FERROR, errno, "link %s -> \"%s\"", full_fname(buf), sl);
 			else if (DEBUG_GTE(BACKUP, 1))
 				rprintf(FINFO, "make_backup: SYMLINK %s successful.\n", fname);
