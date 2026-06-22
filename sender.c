@@ -392,8 +392,8 @@ void successful_send(int ndx)
 	}
 
 	if (dfd >= 0
-	 ? (copy_links ? vfs_stat_atfd(dfd, bname, &st) : vfs_lstat_atfd(dfd, bname, &st)) < 0
-	 : (copy_links ? vfs_stat(fname, &st) : vfs_lstat(fname, &st)) < 0) {
+	 ? (copy_links ? vfs_stat(dfd, bname, &st, 0) : vfs_lstat(dfd, bname, &st, 0)) < 0
+	 : (copy_links ? vfs_stat(VFS_AT_FDCWD, fname, &st, VFS_ALLOW_SYMLINK) : vfs_lstat(VFS_AT_FDCWD, fname, &st, VFS_ALLOW_SYMLINK)) < 0) {
 		failed_op = "re-lstat";
 		goto failed;
 	}

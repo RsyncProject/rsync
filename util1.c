@@ -366,7 +366,7 @@ static inline void call_glob_match(const char *name, int len, int from_glob,
 		STRUCT_STAT st;
 		int is_dir;
 
-		if (vfs_stat(glob.arg_buf, &st) != 0)
+		if (vfs_stat(VFS_AT_FDCWD, glob.arg_buf, &st, VFS_ALLOW_SYMLINK) != 0)
 			return;
 		is_dir = S_ISDIR(st.st_mode) != 0;
 		if (arg && !is_dir)
@@ -1082,7 +1082,7 @@ int handle_partial_dir(const char *fname, int create)
 	 * --insecure-links (or a daemon module's "insecure links =") opts out. */
 	if (create) {
 		STRUCT_STAT st;
-		int statret = vfs_lstat_at(dir, &st, VFS_OPERATOR_PATH);
+		int statret = vfs_lstat(VFS_AT_FDCWD, dir, &st, VFS_OPERATOR_PATH);
 		if (statret == 0 && !S_ISDIR(st.st_mode)) {
 			if (vfs_unlink(VFS_AT_FDCWD, dir, VFS_OPERATOR_PATH) < 0) {
 				*fn = '/';

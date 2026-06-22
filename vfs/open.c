@@ -141,7 +141,7 @@ int vfs_open_nofollow(const char *pathname, int flags)
 #ifdef O_NOFOLLOW
 	fd = open(pathname, flags|O_NOFOLLOW);
 #else
-	if (vfs_lstat(pathname, &l_st) < 0)
+	if (vfs_lstat(VFS_AT_FDCWD, pathname, &l_st, VFS_ALLOW_SYMLINK) < 0)
 		return -1;
 	if (S_ISLNK(l_st.st_mode)) {
 		errno = ELOOP;

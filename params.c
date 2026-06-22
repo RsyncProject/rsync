@@ -416,7 +416,7 @@ static int include_config(char *include, int manage_globals)
     char *match = manage_globals ? "*.conf" : "*.inc";
     int ret;
 
-    if (vfs_stat(include, &sb) < 0) {
+    if (vfs_stat(VFS_AT_FDCWD, include, &sb, VFS_ALLOW_SYMLINK) < 0) {
 	rsyserr(FLOG, errno, "unable to stat config file \"%s\"", include);
 	return 0;
     }

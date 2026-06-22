@@ -110,13 +110,9 @@ int vfs_cached_dirfd(const char *path, const struct file_struct *file);
 void vfs_dircache_reset(void);
 
 /* stat/lstat/fstat (vfs/stat.c). */
-int vfs_stat(const char *path, STRUCT_STAT *st);
-int vfs_lstat(const char *path, STRUCT_STAT *st);
+int vfs_stat(int dirfd, const char *path, STRUCT_STAT *st, int flags);
+int vfs_lstat(int dirfd, const char *path, STRUCT_STAT *st, int flags);
 int vfs_fstat(int fd, STRUCT_STAT *st);
-int vfs_stat_at(const char *path, STRUCT_STAT *st, int vfs_flags);
-int vfs_lstat_at(const char *path, STRUCT_STAT *st, int vfs_flags);
-int vfs_stat_atfd(int dfd, const char *name, STRUCT_STAT *st);
-int vfs_lstat_atfd(int dfd, const char *name, STRUCT_STAT *st);
 
 /* rename (vfs/rename.c). */
 int vfs_rename(const char *old_path, const char *new_path);
@@ -134,9 +130,7 @@ int vfs_open_nofollow(const char *pathname, int flags);
 int vfs_open_checklinks(const char *pathname);
 
 /* chmod (vfs/chmod.c). */
-int vfs_chmod(const char *path, mode_t mode);
-int vfs_chmod_at(const char *fname, mode_t mode);
-int vfs_chmod_atfd(int dfd, const char *name, mode_t mode);
+int vfs_chmod(int dirfd, const char *path, mode_t mode, int flags);
 
 /* symlink/readlink (vfs/symlink.c).  vfs_readlink is a function only in
  * fake-super builds; otherwise it is a macro -> readlink() (see rsync.h). */
@@ -162,9 +156,7 @@ int vfs_mkstemp_atfd(int dfd, char *filename, mode_t perms);
 int vfs_secure_mkstemp(char *template, mode_t perms, int operator_path);
 
 /* lchown (vfs/chown.c). */
-int vfs_lchown(const char *path, uid_t owner, gid_t group);
-int vfs_lchown_at(const char *fname, uid_t owner, gid_t group);
-int vfs_lchown_atfd(int dfd, const char *name, uid_t owner, gid_t group);
+int vfs_lchown(int dirfd, const char *path, uid_t owner, gid_t group, int flags);
 
 /* device/fifo/socket node creation (vfs/mknod.c). */
 int vfs_mknod(int dirfd, const char *path, mode_t mode, dev_t dev, int flags);

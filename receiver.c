@@ -1203,7 +1203,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 					chmod_ok = 0;
 #endif
 				} else
-					chmod_ok = vfs_chmod_at(fnametmp, 0600) == 0;
+					chmod_ok = vfs_chmod(VFS_AT_FDCWD, fnametmp, 0600, 0) == 0;
 				if (chmod_ok) {
 					if (use_secure_symlinks)
 						fd2 = vfs_resolve_open(NULL, fnametmp, O_WRONLY, 0600);

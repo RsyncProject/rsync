@@ -1076,7 +1076,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 		STRUCT_STAT st;
 		char prefix[SYMLINK_PREFIX_LEN]; /* NOT +1 ! */
 		strlcpy(prefix, SYMLINK_PREFIX, sizeof prefix); /* trim the trailing slash */
-		if (vfs_stat(prefix, &st) == 0 && S_ISDIR(st.st_mode)) {
+		if (vfs_stat(VFS_AT_FDCWD, prefix, &st, VFS_ALLOW_SYMLINK) == 0 && S_ISDIR(st.st_mode)) {
 			rprintf(FLOG, "Symlink munging is unsafe when a %s directory exists.\n",
 				prefix);
 			io_printf(f_out, "@ERROR: daemon security issue -- contact admin\n", name);
@@ -1626,11 +1626,11 @@ static void create_pid_file(void)
 			exit_cleanup(RERR_FILEIO);
 		}
 	}
-#define PID_LSTAT(stp) vfs_lstat_atfd(pdfd, base, stp)
+#define PID_LSTAT(stp) vfs_lstat(pdfd, base, stp, 0)
 #define PID_UNLINK()   vfs_unlink(pdfd, base, 0)
 #define PID_OPEN()     vfs_open_atfd(pdfd, base, O_RDWR|O_CREAT, 0664)
 #else
-#define PID_LSTAT(stp) vfs_lstat(base, stp)
+#define PID_LSTAT(stp) vfs_lstat(VFS_AT_FDCWD, base, stp, VFS_ALLOW_SYMLINK)
 #define PID_UNLINK()   unlink(base)
 #define PID_OPEN()     vfs_open(base, O_RDWR|O_CREAT|SAFE_NOFOLLOW, 0664)
 #endif

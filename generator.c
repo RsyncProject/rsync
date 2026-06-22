@@ -1395,9 +1395,9 @@ static int gen_entry_chmod(const char *fname, struct file_struct *file, mode_t m
 	int dfd = vfs_cached_dirfd(fname, file);
 	if (dfd >= 0) {
 		const char *slash = strrchr(fname, '/');
-		return vfs_chmod_atfd(dfd, slash ? slash + 1 : fname, mode);
+		return vfs_chmod(dfd, slash ? slash + 1 : fname, mode, 0);
 	}
-	return vfs_chmod_at(fname, mode);
+	return vfs_chmod(VFS_AT_FDCWD, fname, mode, 0);
 }
 
 static void gen_entry_set_times(const char *fname, struct file_struct *file, STRUCT_STAT *stp)
@@ -1688,7 +1688,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				}
 			}
 			if (relative_paths && !implied_dirs && file->mode != 0
-			 && vfs_stat_at(dn, &sx.st, 0) < 0) {
+			 && vfs_stat(VFS_AT_FDCWD, dn, &sx.st, 0) < 0) {
 				if (dry_run)
 					goto parent_is_dry_missing;
 				if (vfs_make_path(fname, MKP_DROP_NAME | MKP_SKIP_SLASH, 0) < 0) {

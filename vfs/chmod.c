@@ -24,7 +24,7 @@
 #endif
 
 #ifdef HAVE_CHMOD
-int vfs_chmod(const char *path, mode_t mode)
+static int vfs__chmod_plain(const char *path, mode_t mode)
 {
 	static int switch_step = 0;
 	int code;
@@ -88,7 +88,7 @@ static int do_fchmodat_nofollow(int dfd, const char *name, mode_t mode)
 # if defined __linux__
 	{
 		STRUCT_STAT st;
-		if (vfs_lstat_atfd(dfd, name, &st) < 0)
+		if (vfs_lstat(dfd, name, &st, 0) < 0)
 			return -1;
 		if (S_ISLNK(st.st_mode)) {
 			errno = ELOOP;	/* refuse to chmod through a symlink leaf */
@@ -162,8 +162,9 @@ static int do_fchmodat_nofollow(int dfd, const char *name, mode_t mode)
   Falls back to vfs_chmod() for absolute paths and for paths with no parent
   component, where there is nothing to protect against.
 */
-int vfs_chmod_at(const char *fname, mode_t mode)
+static int vfs__chmod_secure(const char *fname, mode_t mode, int flags)
 {
+	(void)flags;	/* chmod has no ownership-walk branch (like vfs_lchown) */
 #ifdef AT_FDCWD
 	char dirpath[MAXPATHLEN];
 	const char *bname;
@@ -181,14 +182,14 @@ int vfs_chmod_at(const char *fname, mode_t mode)
 	 * already access.  Everywhere else, fall through to plain
 	 * vfs_chmod() to avoid the dirfd-open overhead on every call. */
 	if (!vfs_relpath_active())
-		return vfs_chmod(fname, mode);
+		return vfs__chmod_plain(fname, mode);
 
 	if (!fname || !*fname || *fname == '/' || S_ISLNK(mode))
-		return vfs_chmod(fname, mode);
+		return vfs__chmod_plain(fname, mode);
 
 	slash = strrchr(fname, '/');
 	if (!slash)
-		return vfs_chmod(fname, mode);
+		return vfs__chmod_plain(fname, mode);
 
 	dlen = slash - fname;
 	if (dlen >= sizeof dirpath) {
@@ -209,26 +210,41 @@ int vfs_chmod_at(const char *fname, mode_t mode)
 	errno = e;
 	return ret;
 #else
-	return vfs_chmod(fname, mode);
+	return vfs__chmod_plain(fname, mode);
 #endif
 }
 #endif
 
+/* Unified chmod.  dirfd == VFS_AT_FDCWD resolves `path`; a real held dirfd makes
+ * `path` a single component chmod'd (no-follow leaf, via do_fchmodat_nofollow)
+ * under it.  flags: VFS_ALLOW_SYMLINK (trusted, plain chmod), default 0 (secure
+ * receiver resolve).  A symlink-as-object (S_ISLNK(mode)) goes through the plain
+ * lchmod/setattrlist path. */
 #ifdef HAVE_CHMOD
-int vfs_chmod_atfd(int dfd, const char *name, mode_t mode)
+int vfs_chmod(int dirfd, const char *path, mode_t mode, int flags)
 {
-#ifdef AT_FDCWD
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
-	/* Do not follow a final-component symlink (closes the leaf race; the
-	 * held parent dfd already confines the ancestors).  A symlink-as-object
-	 * (S_ISLNK(mode)) is still handled by the caller via the full-path
-	 * vfs_chmod() lchmod/setattrlist code, exactly as vfs_chmod_at() does. */
-	return do_fchmodat_nofollow(dfd, name, mode);
+	RETURN_ERROR_IF_NULL(path);
+
+	if (dirfd != VFS_AT_FDCWD) {
+#ifdef AT_FDCWD
+		/* Held-fd: reject empty and multi-component; "." (chmod the dir
+		 * itself) is a legitimate single-component op. */
+		if (!*path || strchr(path, '/')) {
+			errno = EINVAL;
+			return -1;
+		}
+		return do_fchmodat_nofollow(dirfd, path, mode);
 #else
-	(void)dfd; (void)name; (void)mode;
-	errno = ENOSYS;
-	return -1;
+		(void)dirfd; (void)mode;
+		errno = ENOSYS;
+		return -1;
 #endif
+	}
+
+	if (flags & VFS_ALLOW_SYMLINK)
+		return vfs__chmod_plain(path, mode);
+	return vfs__chmod_secure(path, mode, flags);
 }
 #endif

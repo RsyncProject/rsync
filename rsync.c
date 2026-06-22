@@ -676,8 +676,8 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		if (am_root >= 0) {
 			uid_t uid = change_uid ? (uid_t)F_OWNER(file) : sxp->st.st_uid;
 			gid_t gid = change_gid ? (gid_t)F_GROUP(file) : sxp->st.st_gid;
-			if ((dfd >= 0 ? vfs_lchown_atfd(dfd, leaf, uid, gid)
-				      : vfs_lchown_at(fname, uid, gid)) != 0) {
+			if ((dfd >= 0 ? vfs_lchown(dfd, leaf, uid, gid, 0)
+				      : vfs_lchown(VFS_AT_FDCWD, fname, uid, gid, 0)) != 0) {
 				/* We shouldn't have attempted to change uid
 				 * or gid unless have the privilege. */
 				rsyserr(FERROR_XFER, errno, "%s %s failed",
@@ -804,8 +804,8 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 #ifdef HAVE_CHMOD
 	if (!BITS_EQUAL(sxp->st.st_mode, new_mode, CHMOD_BITS)) {
 		int ret = am_root < 0 ? 0
-			: dfd >= 0 && !S_ISLNK(new_mode) ? vfs_chmod_atfd(dfd, leaf, new_mode)
-			: vfs_chmod_at(fname, new_mode);
+			: dfd >= 0 && !S_ISLNK(new_mode) ? vfs_chmod(dfd, leaf, new_mode, 0)
+			: vfs_chmod(VFS_AT_FDCWD, fname, new_mode, 0);
 		if (ret < 0) {
 			rsyserr(FERROR_XFER, errno,
 				"failed to set permissions on %s",

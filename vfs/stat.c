@@ -16,7 +16,7 @@
 #include "ifuncs.h"
 #include "vfs/vfs_internal.h"
 
-int vfs_stat(const char *path, STRUCT_STAT *st)
+static int vfs__stat_plain(const char *path, STRUCT_STAT *st)
 {
 	RETURN_ERROR_IF_NULL(path);
 #ifdef USE_STAT64_FUNCS
@@ -26,7 +26,7 @@ int vfs_stat(const char *path, STRUCT_STAT *st)
 #endif
 }
 
-int vfs_lstat(const char *path, STRUCT_STAT *st)
+static int vfs__lstat_plain(const char *path, STRUCT_STAT *st)
 {
 	RETURN_ERROR_IF_NULL(path);
 #ifdef SUPPORT_LINKS
@@ -36,7 +36,7 @@ int vfs_lstat(const char *path, STRUCT_STAT *st)
 	return lstat(path, st);
 # endif
 #else
-	return vfs_stat(path, st);
+	return vfs__stat_plain(path, st);
 #endif
 }
 
@@ -110,17 +110,58 @@ static int do_xstat_at(const char *path, STRUCT_STAT *st, int at_flags, int (*fa
 #endif
 }
 
-int vfs_stat_at(const char *path, STRUCT_STAT *st, int vfs_flags)
+/* Unified stat/lstat.  dirfd == VFS_AT_FDCWD resolves `path` (VFS_ALLOW_SYMLINK =
+ * plain libc stat/lstat, default 0 = secure receiver resolve, VFS_OPERATOR_PATH =
+ * ownership walk); a real held dirfd fstatat()s a single validated component
+ * under it.  vfs_stat follows the leaf, vfs_lstat does not. */
+int vfs_stat(int dirfd, const char *path, STRUCT_STAT *st, int flags)
 {
-	return do_xstat_at(path, st, 0, vfs_stat, vfs_flags);
+	RETURN_ERROR_IF_NULL(path);
+	if (dirfd != VFS_AT_FDCWD) {
+#ifdef AT_FDCWD
+		/* Held-fd: reject empty and multi-component (a '/' would resolve a
+		 * path under the pinned dir).  "." / ".." are allowed: a read-only
+		 * fstatat of the dir or its parent is legitimate (link_stat_at). */
+		if (!*path || strchr(path, '/')) {
+			errno = EINVAL;
+			return -1;
+		}
+		return fstatat(dirfd, path, st, 0);
+#else
+		(void)dirfd; errno = ENOSYS; return -1;
+#endif
+	}
+	if (flags & VFS_ALLOW_SYMLINK)
+		return vfs__stat_plain(path, st);
+	return do_xstat_at(path, st, 0, vfs__stat_plain, flags);
 }
 
-int vfs_lstat_at(const char *path, STRUCT_STAT *st, int vfs_flags)
+int vfs_lstat(int dirfd, const char *path, STRUCT_STAT *st, int flags)
 {
-#ifdef SUPPORT_LINKS
-	return do_xstat_at(path, st, AT_SYMLINK_NOFOLLOW, vfs_lstat, vfs_flags);
+	RETURN_ERROR_IF_NULL(path);
+	if (dirfd != VFS_AT_FDCWD) {
+#ifdef AT_FDCWD
+		/* Held-fd: reject empty and multi-component; "." / ".." are allowed
+		 * (read-only fstatat of the dir or its parent -- link_stat_at). */
+		if (!*path || strchr(path, '/')) {
+			errno = EINVAL;
+			return -1;
+		}
+# ifdef SUPPORT_LINKS
+		return fstatat(dirfd, path, st, AT_SYMLINK_NOFOLLOW);
+# else
+		return fstatat(dirfd, path, st, 0);
+# endif
 #else
-	return do_xstat_at(path, st, 0, vfs_stat, vfs_flags);
+		(void)dirfd; errno = ENOSYS; return -1;
+#endif
+	}
+	if (flags & VFS_ALLOW_SYMLINK)
+		return vfs__lstat_plain(path, st);
+#ifdef SUPPORT_LINKS
+	return do_xstat_at(path, st, AT_SYMLINK_NOFOLLOW, vfs__lstat_plain, flags);
+#else
+	return do_xstat_at(path, st, 0, vfs__stat_plain, flags);
 #endif
 }
 
@@ -133,28 +174,3 @@ int vfs_fstat(int fd, STRUCT_STAT *st)
 #endif
 }
 
-int vfs_lstat_atfd(int dfd, const char *name, STRUCT_STAT *st)
-{
-#ifdef AT_FDCWD
-# ifdef SUPPORT_LINKS
-	return fstatat(dfd, name, st, AT_SYMLINK_NOFOLLOW);
-# else
-	return fstatat(dfd, name, st, 0);
-# endif
-#else
-	(void)dfd; (void)name; (void)st;
-	errno = ENOSYS;
-	return -1;
-#endif
-}
-
-int vfs_stat_atfd(int dfd, const char *name, STRUCT_STAT *st)
-{
-#ifdef AT_FDCWD
-	return fstatat(dfd, name, st, 0);
-#else
-	(void)dfd; (void)name; (void)st;
-	errno = ENOSYS;
-	return -1;
-#endif
-}

@@ -2372,7 +2372,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		STRUCT_STAT st;
 		char prefix[SYMLINK_PREFIX_LEN]; /* NOT +1 ! */
 		strlcpy(prefix, SYMLINK_PREFIX, sizeof prefix); /* trim the trailing slash */
-		if (vfs_stat(prefix, &st) == 0 && S_ISDIR(st.st_mode)) {
+		if (vfs_stat(VFS_AT_FDCWD, prefix, &st, VFS_ALLOW_SYMLINK) == 0 && S_ISDIR(st.st_mode)) {
 			rprintf(FERROR, "Symlink munging is unsafe when a %s directory exists.\n",
 				prefix);
 			exit_cleanup(RERR_UNSUPPORTED);

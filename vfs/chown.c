@@ -16,85 +16,84 @@
 #include "ifuncs.h"
 #include "vfs/vfs_internal.h"
 
-int vfs_lchown(const char *path, uid_t owner, gid_t group)
-{
-	if (dry_run) return 0;
-	RETURN_ERROR_IF_RO_OR_LO;
-	RETURN_ERROR_IF_NULL(path);
 #ifndef HAVE_LCHOWN
 #define lchown chown
 #endif
+
+static int vfs__lchown_plain(const char *path, uid_t owner, gid_t group)
+{
 	return lchown(path, owner, group);
 }
 
-/*
-  Symlink-race-safe variant of vfs_lchown() for receiver-side use. See the
-  comment on vfs_chmod_at() for the threat model and design rationale.
-
-  Resolves the parent directory under vfs_resolve_open() and invokes
-  fchownat(..., AT_SYMLINK_NOFOLLOW) against that dirfd, so that an
-  attacker who substitutes a symlink into one of the parent components
-  cannot redirect the chown outside the receiver's confinement. The
-  AT_SYMLINK_NOFOLLOW flag matches lchown()'s "do not follow a final-
-  component symlink" semantics.
-
-  Falls through to vfs_lchown() in the dry-run / non-daemon / chrooted /
-  absolute-path / no-parent cases, identical to vfs_chmod_at().
-*/
-int vfs_lchown_at(const char *fname, uid_t owner, gid_t group)
+/* Secure receiver-side resolve: open the parent under vfs_resolve_open() and
+ * fchownat(..., AT_SYMLINK_NOFOLLOW) so a parent-component symlink swap can't
+ * redirect the chown outside the module.  Like vfs_chmod, lchown has no
+ * ownership-walk branch (VFS_OPERATOR_PATH resolves the same as the default
+ * secure walk).  Falls through to the plain lchown in non-daemon/sender,
+ * chrooted, no-parent and absolute-path cases. */
+static int vfs__lchown_secure(const char *path, uid_t owner, gid_t group, int flags)
 {
-#ifdef AT_FDCWD
+	(void)flags;
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
 	char dirpath[MAXPATHLEN];
-	const char *bname;
-	const char *slash;
+	const char *bname, *slash;
 	int dfd, ret, e;
 	size_t dlen;
 
-	if (dry_run) return 0;
-	RETURN_ERROR_IF_RO_OR_LO;
-
-	if (!vfs_relpath_active())
-		return vfs_lchown(fname, owner, group);
-
-	if (!fname || !*fname || *fname == '/')
-		return vfs_lchown(fname, owner, group);
-
-	slash = strrchr(fname, '/');
+	if (!vfs_relpath_active() || !*path || *path == '/')
+		return vfs__lchown_plain(path, owner, group);
+	slash = strrchr(path, '/');
 	if (!slash)
-		return vfs_lchown(fname, owner, group);
-
-	dlen = slash - fname;
+		return vfs__lchown_plain(path, owner, group);
+	dlen = slash - path;
 	if (dlen >= sizeof dirpath) {
 		errno = ENAMETOOLONG;
 		return -1;
 	}
-	memcpy(dirpath, fname, dlen);
+	memcpy(dirpath, path, dlen);
 	dirpath[dlen] = '\0';
 	bname = slash + 1;
 
 	dfd = vfs_resolve_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
 	if (dfd < 0)
 		return -1;
-
 	ret = fchownat(dfd, bname, owner, group, AT_SYMLINK_NOFOLLOW);
 	e = errno;
 	close(dfd);
 	errno = e;
 	return ret;
 #else
-	return vfs_lchown(fname, owner, group);
+	return vfs__lchown_plain(path, owner, group);
 #endif
 }
 
-int vfs_lchown_atfd(int dfd, const char *name, uid_t owner, gid_t group)
+/* Unified lchown.  dirfd == VFS_AT_FDCWD resolves `path`; a real held dirfd
+ * makes `path` a single component chowned (no-follow) under it.  flags:
+ * VFS_ALLOW_SYMLINK (trusted, plain lchown), default 0 (secure receiver
+ * resolve). */
+int vfs_lchown(int dirfd, const char *path, uid_t owner, gid_t group, int flags)
 {
-#ifdef AT_FDCWD
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
-	return fchownat(dfd, name, owner, group, AT_SYMLINK_NOFOLLOW);
+	RETURN_ERROR_IF_NULL(path);
+
+	if (dirfd != VFS_AT_FDCWD) {
+#ifdef AT_FDCWD
+		/* Held-fd: reject empty and multi-component; "." (chown the dir
+		 * itself) is a legitimate single-component op. */
+		if (!*path || strchr(path, '/')) {
+			errno = EINVAL;
+			return -1;
+		}
+		return fchownat(dirfd, path, owner, group, AT_SYMLINK_NOFOLLOW);
 #else
-	(void)dfd; (void)name; (void)owner; (void)group;
-	errno = ENOSYS;
-	return -1;
+		(void)dirfd; (void)owner; (void)group;
+		errno = ENOSYS;
+		return -1;
 #endif
+	}
+
+	if (flags & VFS_ALLOW_SYMLINK)
+		return vfs__lchown_plain(path, owner, group);
+	return vfs__lchown_secure(path, owner, group, flags);
 }

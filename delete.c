@@ -63,9 +63,9 @@ static void del_chmod(const char *fbuf, mode_t mode)
 	const char *leaf;
 	int dfd = del_held_dfd(fbuf, &leaf);
 	if (dfd >= 0)
-		vfs_chmod_atfd(dfd, leaf, mode);
+		vfs_chmod(dfd, leaf, mode, 0);
 	else
-		vfs_chmod_at(fbuf, mode);
+		vfs_chmod(VFS_AT_FDCWD, fbuf, mode, 0);
 }
 
 static int del_unlink(const char *fbuf)

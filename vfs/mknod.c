@@ -68,7 +68,7 @@ static int vfs__mknod_plain(const char *pathname, mode_t mode, dev_t dev)
 			return -1;
 		close(sock);
 #ifdef HAVE_CHMOD
-		return vfs_chmod(pathname, mode);
+		return vfs_chmod(VFS_AT_FDCWD, pathname, mode, VFS_ALLOW_SYMLINK);
 #else
 		return 0;
 #endif

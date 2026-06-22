@@ -1154,7 +1154,7 @@ int set_xattr(const char *fname, const struct file_struct *file, const char *fna
 #endif
 	 && access(fname, W_OK) < 0
 	 && (fd >= 0 ? fchmod(fd, (sxp->st.st_mode & CHMOD_BITS) | S_IWUSR)
-		     : vfs_chmod_at(fname, (sxp->st.st_mode & CHMOD_BITS) | S_IWUSR)) == 0)
+		     : vfs_chmod(VFS_AT_FDCWD, fname, (sxp->st.st_mode & CHMOD_BITS) | S_IWUSR, 0)) == 0)
 		added_write_perm = 1;
 
 	ndx = F_XATTR(file);
@@ -1177,7 +1177,7 @@ int set_xattr(const char *fname, const struct file_struct *file, const char *fna
 		if (fd >= 0)
 			fchmod(fd, sxp->st.st_mode);
 		else
-			vfs_chmod_at(fname, sxp->st.st_mode);
+			vfs_chmod(VFS_AT_FDCWD, fname, sxp->st.st_mode, 0);
 	}
 	return return_value;
 }
@@ -1317,7 +1317,7 @@ int set_stat_xattr(const char *fname, struct file_struct *file, mode_t new_mode,
 		if (fd >= 0)
 			fchmod(fd, mode);
 		else
-			vfs_chmod_at(fname, mode);
+			vfs_chmod(VFS_AT_FDCWD, fname, mode, 0);
 	}
 	if (!IS_DEVICE(fst.st_mode))
 		fst.st_rdev = 0; /* just in case */
@@ -1364,7 +1364,7 @@ int x_stat(const char *fname, STRUCT_STAT *fst, STRUCT_STAT *xst, int vfs_flags)
 	 * plain vfs_stat outside the daemon-no-chroot context, so this
 	 * change is transparent for non-daemon use.  vfs_flags carries the
 	 * operator-path policy (VFS_OPERATOR_PATH for a backup-dir stat). */
-	int ret = vfs_stat_at(fname, fst, vfs_flags);
+	int ret = vfs_stat(VFS_AT_FDCWD, fname, fst, vfs_flags);
 	if ((ret < 0 || get_stat_xattr(fname, -1, fst, xst) < 0) && xst)
 		xst->st_mode = 0;
 	return ret;
@@ -1372,7 +1372,7 @@ int x_stat(const char *fname, STRUCT_STAT *fst, STRUCT_STAT *xst, int vfs_flags)
 
 int x_lstat(const char *fname, STRUCT_STAT *fst, STRUCT_STAT *xst, int vfs_flags)
 {
-	int ret = vfs_lstat_at(fname, fst, vfs_flags);
+	int ret = vfs_lstat(VFS_AT_FDCWD, fname, fst, vfs_flags);
 	if ((ret < 0 || get_stat_xattr(fname, -1, fst, xst) < 0) && xst)
 		xst->st_mode = 0;
 	return ret;

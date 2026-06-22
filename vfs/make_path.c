@@ -48,7 +48,7 @@ int vfs_make_path(char *fname, int mkp_flags, int vfs_flags)
 	for (p = end; ; ) {
 		if (dry_run) {
 			STRUCT_STAT st;
-			if (vfs_stat(fname, &st) == 0) {
+			if (vfs_stat(VFS_AT_FDCWD, fname, &st, VFS_ALLOW_SYMLINK) == 0) {
 				if (S_ISDIR(st.st_mode))
 					errno = EEXIST;
 				else
@@ -61,7 +61,7 @@ int vfs_make_path(char *fname, int mkp_flags, int vfs_flags)
 
 		if (errno != ENOENT) {
 			STRUCT_STAT st;
-			if (errno != EEXIST || (vfs_stat(fname, &st) == 0 && !S_ISDIR(st.st_mode)))
+			if (errno != EEXIST || (vfs_stat(VFS_AT_FDCWD, fname, &st, VFS_ALLOW_SYMLINK) == 0 && !S_ISDIR(st.st_mode)))
 				ret = -ret - 1;
 			break;
 		}
