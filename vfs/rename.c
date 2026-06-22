@@ -25,7 +25,7 @@ int vfs_rename(const char *old_path, const char *new_path)
 
 /*
   Symlink-race-safe variant of vfs_rename() for receiver-side use. See
-  the comment on vfs_chmod_at() for the threat model and design rationale.
+  the comment on vfs__chmod_secure() for the threat model and design rationale.
 
   rename() is the central tmp -> final operation in rsync; if either the
   source or the destination has an attacker-substituted symlink in one

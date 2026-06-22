@@ -84,7 +84,7 @@ static int vfs__mknod_plain(const char *pathname, mode_t mode, dev_t dev)
 
 /*
   Symlink-race-safe variant of vfs_mknod() for receiver-side use. See
-  the comment on vfs_chmod_at() for the threat model. Defence: open
+  the comment on vfs__chmod_secure() for the threat model. Defence: open
   the parent of pathname under vfs_resolve_open() and use
   mknodat() against that dirfd. mknodat() covers both regular-file
   (S_IFREG with dev=0) and FIFO (S_IFIFO) and device-node creation.
@@ -242,7 +242,7 @@ static int vfs__mknod_atfd(int dfd, const char *name, mode_t mode, dev_t dev)
 #endif
 	if (S_ISSOCK(mode)) {
 		/* No dirfd-relative socket bind without /proc/self/fd; fail safe.
-		 * (The generator routes sockets to vfs_mknod_at(), not here.) */
+		 * (The generator routes sockets to vfs_mknod(), not here.) */
 		errno = EOPNOTSUPP;
 		return -1;
 	}

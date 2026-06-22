@@ -42,7 +42,7 @@ static int vfs__lstat_plain(const char *path, STRUCT_STAT *st)
 
 /*
   Symlink-race-safe variants of vfs_stat() / vfs_lstat() for receiver-
-  side use. See the comment on vfs_chmod_at() for the threat model.
+  side use. See the comment on vfs__chmod_secure() for the threat model.
   stat() and lstat() resolve parent components, so a parent-symlink
   swap can make the receiver's stat see attributes of a victim file
   outside the module -- which then drives later behaviour (e.g.

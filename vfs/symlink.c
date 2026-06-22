@@ -46,7 +46,7 @@ static int vfs__symlink_plain(const char *lnk, const char *path)
 
 /*
   Symlink-race-safe variant of vfs_symlink() for receiver-side use. See
-  the comment on vfs_chmod_at() for the threat model. For a real symlink
+  the comment on vfs__chmod_secure() for the threat model. For a real symlink
   only the parent directory of `path` needs protection -- symlinkat()
   does not resolve the final component (it creates it). Defence: open
   the parent of `path` under vfs_resolve_open() and call symlinkat()
@@ -205,7 +205,7 @@ static int vfs__symlink_atfd(const char *lnk, int dfd, const char *name)
 #if defined NO_SYMLINK_XATTRS || defined NO_SYMLINK_USER_XATTRS
 	/* --fake-super: store the link target in a regular placeholder file,
 	 * created with O_NOFOLLOW so a planted basename symlink can't redirect
-	 * the write (mirrors vfs_symlink_at()). */
+	 * the write (mirrors vfs__symlink_secure()). */
 	if (am_root < 0) {
 		int len = strlen(lnk);
 		int ok;

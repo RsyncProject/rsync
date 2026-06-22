@@ -32,7 +32,7 @@ int vfs_link(const char *old_path, const char *new_path)
 
 /*
   Symlink-race-safe variant of vfs_link() for receiver-side use. See
-  the comment on vfs_chmod_at() for the threat model. link() resolves
+  the comment on vfs__chmod_secure() for the threat model. link() resolves
   parent components of *both* old_path and new_path, so a parent-
   symlink swap on either side can plant the new hard link outside
   the module, or hard-link an outside file into the module (read

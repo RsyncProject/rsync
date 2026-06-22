@@ -177,7 +177,7 @@ int vfs_utimensat(const char *path, STRUCT_STAT *stp)
 
 /*
   Symlink-race-safe variant of vfs_utimensat() for receiver-side use.
-  See the comment on vfs_chmod_at() for the threat model. utimes()
+  See the comment on vfs__chmod_secure() for the threat model. utimes()
   resolves parent components and follows a final-component symlink;
   lutimes() doesn't follow the final component but still resolves
   parents. Either way, a parent-symlink swap can redirect the

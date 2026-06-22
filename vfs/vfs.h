@@ -4,21 +4,34 @@
  * The VFS owns the messy, security-critical filesystem details (the vfs_*
  * syscall wrappers, the race-safe path resolver, the held-dirfd cache, the
  * operator-path ownership walk and the daemon module confinement) so the
- * mainline protocol/transfer code can stay clean.  The state lives in the
- * single global "struct vfs vfs" below; the implementations are in the
- * per-concern sources under vfs/ (one per operation family, plus the resolver,
- * dirstack, dircache and owner-walk cores).
+ * mainline protocol/transfer code can stay clean.  Implementations live in the
+ * per-concern sources under vfs/ in two layers: PRIMITIVES (one file per
+ * operation family, plus the resolver/dirstack/dircache/owner-walk cores) and
+ * COMPOUNDS built on them (vfs_make_path, copy_file, robust_unlink/rename).  The
+ * remaining VFS-internal state lives in the single "struct vfs vfs" below.
  *
- * Most operations come in up to three forms, sharing one leaf behaviour:
- *   vfs_<op>(path, ...)        - operate on a path as given (the plain wrapper;
- *                                honours dry-run / read-only).
- *   vfs_<op>_at(path, ...)     - resolve the parent components race-safely
- *                                (vfs_resolve_open) and act on the leaf with
- *                                *at()/O_NOFOLLOW; the receiver's TOCTOU-safe
- *                                form, used when vfs_relpath_active().
- *   vfs_<op>_atfd(dfd, name, ) - act on a single component `name` under an
- *                                already-pinned dirfd (from vfs_opendir /
- *                                vfs_get_dirfd); no path resolution.
+ * Each single-path operation is one call taking a dirfd and a flags word:
+ *
+ *   vfs_<op>(int dirfd, path, ..., int flags)
+ *
+ *     dirfd == VFS_AT_FDCWD -- resolve `path`, per flags:
+ *        0                  secure receiver resolve (race-safe O_NOFOLLOW parent
+ *                           walk + *at() leaf) when vfs_relpath_active(), else plain
+ *        VFS_ALLOW_SYMLINK  plain libc op -- the call site asserts the path is
+ *                           trusted to follow symlinks (was the bare vfs_<op>())
+ *        VFS_OPERATOR_PATH  operator-supplied path (--backup-dir/--temp-dir/
+ *                           --partial-dir/--link-dest): ownership walk (follow a
+ *                           uid0/euid-owned symlink, refuse a foreign one) +
+ *                           daemon module-root confinement
+ *     a real held dirfd -- `path` is a single component acted on directly under
+ *                           it (from vfs_opendir/vfs_get_dirfd); no resolution.
+ *
+ * The operator-path policy is this explicit per-call flag, never ambient state.
+ * VFS_REMOVEDIR turns vfs_unlink into rmdir.  chmod/lchown/symlink have no
+ * ownership-walk branch (VFS_OPERATOR_PATH resolves as the default secure walk).
+ * Two-path ops (vfs_rename_at, vfs_link_at) and open (distinct nofollow/
+ * checklinks variants) keep explicit forms + a vfs_flags arg; vfs_fstat and the
+ * fileio ops are fd-based.
  *
  * This header is included by rsync.h (just after proto.h) so every translation
  * unit sees the vfs_* API.  It must not include rsync.h itself.
