@@ -1126,12 +1126,8 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 			 * keeps its stronger module-anchored confinement (vfs_link_at's
 			 * vfs_relpath_active path) -- the ownership walk would follow an
 			 * operator-owned symlink out of the module. */
-			int hlok, op = !am_daemon;
-			if (op)
-				vfs.operator_path_resolve = 1;
-			hlok = hard_link_one(file, fname, cmpbuf, 1);
-			if (op)
-				vfs.operator_path_resolve = 0;
+			int hlok = hard_link_one(file, fname, cmpbuf, 1,
+						 !am_daemon ? VFS_OPERATOR_PATH : 0);
 			if (!hlok)
 				goto try_a_copy;
 			if (atimes_ndx)
@@ -1265,7 +1261,7 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 		 && !IS_SPECIAL(file->mode) && !IS_DEVICE(file->mode)
 #endif
 		 && !S_ISDIR(file->mode)) {
-			if (vfs_link_at(cmpbuf, fname) < 0) {
+			if (vfs_link_at(cmpbuf, fname, 0) < 0) {
 				rsyserr(FERROR_XFER, errno,
 					"failed to hard-link %s with %s",
 					cmpbuf, fname);
@@ -2469,7 +2465,7 @@ int atomic_create(struct file_struct *file, char *fname, const char *slnk, const
 #endif
 	} else if (hlnk) {
 #ifdef SUPPORT_HARD_LINKS
-		if (!hard_link_one(file, create_name, hlnk, 0))
+		if (!hard_link_one(file, create_name, hlnk, 0, 0))
 			return 0;
 #else
 		return 0;

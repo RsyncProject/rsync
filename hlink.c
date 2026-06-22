@@ -473,9 +473,9 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 }
 
 int hard_link_one(struct file_struct *file, const char *fname,
-		  const char *oldname, int terse)
+		  const char *oldname, int terse, int vfs_flags)
 {
-	if (vfs_link_at(oldname, fname) < 0) {
+	if (vfs_link_at(oldname, fname, vfs_flags) < 0) {
 		enum logcode code;
 		if (terse) {
 			if (!INFO_GTE(NAME, 1))

@@ -237,7 +237,7 @@ static inline int link_or_rename(const char *from, const char *to,
 		if (IS_SPECIAL(stp->st_mode) || IS_DEVICE(stp->st_mode))
 			return 0; /* Use copy code. */
 #endif
-		if (vfs_link_at(from, to) == 0) {
+		if (vfs_link_at(from, to, VFS_OPERATOR_PATH) == 0) {
 			if (DEBUG_GTE(BACKUP, 1))
 				rprintf(FINFO, "make_backup: HLINK %s successful.\n", from);
 			return 2;

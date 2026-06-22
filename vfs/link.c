@@ -44,7 +44,7 @@ int vfs_link(const char *old_path, const char *new_path)
   symbolic-link old_path). Only available on systems with linkat();
   pre-AT_FDCWD systems fall through to vfs_link().
 */
-int vfs_link_at(const char *old_path, const char *new_path)
+int vfs_link_at(const char *old_path, const char *new_path, int vfs_flags)
 {
 #if defined AT_FDCWD && defined HAVE_LINKAT
 	char old_dirpath[MAXPATHLEN], new_dirpath[MAXPATHLEN];
@@ -67,13 +67,13 @@ int vfs_link_at(const char *old_path, const char *new_path)
 #if defined O_NOFOLLOW && defined O_DIRECTORY
 	/* Operator-supplied path (a --backup-dir/--link-dest side): resolve each
 	 * parent via the ownership walk (follow uid0/euid symlinks, refuse others). */
-	if (vfs.operator_path_resolve) {
+	if (vfs_flags & VFS_OPERATOR_PATH) {
 		if (vfs_symlink_optout_allowed())
 			return vfs_link(old_path, new_path);
-		old_dfd = vfs_owner_walk_parent(old_path, &old_bname, vfs.operator_path_resolve);
+		old_dfd = vfs_owner_walk_parent(old_path, &old_bname, 1);
 		if (old_dfd < 0)
 			return -1;
-		new_dfd = vfs_owner_walk_parent(new_path, &new_bname, vfs.operator_path_resolve);
+		new_dfd = vfs_owner_walk_parent(new_path, &new_bname, 1);
 		if (new_dfd < 0) {
 			e = errno;
 			close(old_dfd);

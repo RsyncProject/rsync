@@ -149,7 +149,7 @@ ssize_t vfs_readlink(const char *path, char *buf, size_t bufsiz);
 
 /* hard links (vfs/link.c). */
 int vfs_link(const char *old_path, const char *new_path);
-int vfs_link_at(const char *old_path, const char *new_path);
+int vfs_link_at(const char *old_path, const char *new_path, int vfs_flags);
 int vfs_link_atfd(int old_dfd, const char *old_name, int new_dfd, const char *new_name, int flags);
 
 /* mkdir / mkstemp and the trim_trailing_slashes path helper (vfs/mkdir.c). */
