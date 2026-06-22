@@ -1166,7 +1166,7 @@ int set_xattr(const char *fname, const struct file_struct *file, const char *fna
 			if (fd >= 0)
 				fchmod(fd, sxp->st.st_mode);
 			else
-				do_chmod_at(fname, sxp->st.st_mode);
+				vfs_chmod(VFS_AT_FDCWD, fname, sxp->st.st_mode, 0);
 		}
 		return 0;
 	}

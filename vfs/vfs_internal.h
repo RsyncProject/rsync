@@ -60,12 +60,17 @@ int abspath_excluded_by_module(const char *abspath, int name_is_dir, int is_oper
 #define SECURE_OPEN_MAXSYMLINKS 40
 #endif
 
+/* Max directory levels held open at once during a single resolve.  The walk
+ * holds one fd per component, so depth is bounded by RLIMIT_NOFILE anyway; a
+ * fixed array (no malloc/realloc) keeps the stack simple and the static
+ * analyzer happy.  Mirrors DPC_MAXDEPTH's fixed-cap approach. */
+#define DS_MAXDEPTH 1024
+
 /* The component-walk dirfd stack used by the secure resolver: a stack of the
  * open dirfds from the anchor (index 0, borrowed) down to the current dir. */
 struct dirstack {
-	int *fds;	/* fds[0] = anchor (borrowed); fds[top] = current dir */
+	int fds[DS_MAXDEPTH];	/* fds[0] = anchor (borrowed); fds[top] = current dir */
 	int top;
-	int cap;
 	/* Absolute path of fds[top], maintained as we descend/pop, for the
 	 * exclude-aware refusal (abspath_excluded_by_module).  Empty unless the
 	 * caller seeds it with the anchor's absolute path; then a followed symlink

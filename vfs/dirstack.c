@@ -121,26 +121,21 @@ static void ds_path_pop(struct dirstack *ds)
 		*slash = '\0';
 }
 
-/* Initialise with `anchor` (which may be AT_FDCWD) as the un-owned base. */
+/* Initialise with `anchor` (which may be AT_FDCWD) as the un-owned base.
+ * Returns int for caller symmetry, but cannot fail (the fd array is inline). */
 int ds_init(struct dirstack *ds, int anchor)
 {
 	ds->abspath[0] = '\0';
-	ds->cap = 16;
-	ds->fds = (int*)malloc(ds->cap * sizeof(int));
-	if (!ds->fds)
-		return -1;
 	ds->fds[0] = anchor;
 	ds->top = 0;
 	return 0;
 }
 
-/* Close every pushed fd (but not the borrowed anchor at index 0) and free. */
+/* Close every pushed fd (but not the borrowed anchor at index 0). */
 void ds_free(struct dirstack *ds)
 {
 	while (ds->top > 0)
 		close(ds->fds[ds->top--]);
-	free(ds->fds);
-	ds->fds = NULL;
 }
 
 int ds_cur(struct dirstack *ds)
@@ -150,16 +145,10 @@ int ds_cur(struct dirstack *ds)
 
 static int ds_push(struct dirstack *ds, int fd)
 {
-	if (ds->top + 1 >= ds->cap) {
-		int ncap = ds->cap * 2;
-		int *n = (int*)realloc(ds->fds, ncap * sizeof(int));
-		if (!n) {
-			close(fd);
-			errno = ENOMEM;
-			return -1;
-		}
-		ds->fds = n;
-		ds->cap = ncap;
+	if (ds->top + 1 >= DS_MAXDEPTH) {	/* deeper than we'll hold open */
+		close(fd);
+		errno = ENOMEM;
+		return -1;
 	}
 	ds->fds[++ds->top] = fd;
 	return 0;
