@@ -146,7 +146,7 @@ int main(int argc, char **argv)
 		      rc, -1, "../trap/sentinel", 0600);
 	} else {
 		fprintf(stderr, "INFO: leaf-nofollow chmod unsupported here; "
-			"vfs_chmod_at follows a leaf symlink (documented limitation), "
+			"vfs_chmod follows a leaf symlink (documented limitation), "
 			"skipping scenario E\n");
 	}
 

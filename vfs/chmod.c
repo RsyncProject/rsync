@@ -229,9 +229,11 @@ int vfs_chmod(int dirfd, const char *path, mode_t mode, int flags)
 
 	if (dirfd != VFS_AT_FDCWD) {
 #ifdef AT_FDCWD
-		/* Held-fd: reject empty and multi-component; "." (chmod the dir
-		 * itself) is a legitimate single-component op. */
-		if (!*path || strchr(path, '/')) {
+		/* Held-fd: reject empty, multi-component and ".." (writing the
+		 * parent of the pinned dir); "." (chmod the dir itself) is a
+		 * legitimate single-component op. */
+		if (!*path || strchr(path, '/')
+		 || (path[0] == '.' && path[1] == '.' && path[2] == '\0')) {
 			errno = EINVAL;
 			return -1;
 		}

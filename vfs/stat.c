@@ -119,10 +119,12 @@ int vfs_stat(int dirfd, const char *path, STRUCT_STAT *st, int flags)
 	RETURN_ERROR_IF_NULL(path);
 	if (dirfd != VFS_AT_FDCWD) {
 #ifdef AT_FDCWD
-		/* Held-fd: reject empty and multi-component (a '/' would resolve a
-		 * path under the pinned dir).  "." / ".." are allowed: a read-only
-		 * fstatat of the dir or its parent is legitimate (link_stat_at). */
-		if (!*path || strchr(path, '/')) {
+		/* Held-fd: reject empty, multi-component (a '/' would resolve a path
+		 * under the pinned dir) and ".." (escapes to the parent).  "." is
+		 * allowed: a read-only fstatat of the dir itself is legitimate
+		 * (link_stat_at). */
+		if (!*path || strchr(path, '/')
+		 || (path[0] == '.' && path[1] == '.' && path[2] == '\0')) {
 			errno = EINVAL;
 			return -1;
 		}
@@ -141,9 +143,10 @@ int vfs_lstat(int dirfd, const char *path, STRUCT_STAT *st, int flags)
 	RETURN_ERROR_IF_NULL(path);
 	if (dirfd != VFS_AT_FDCWD) {
 #ifdef AT_FDCWD
-		/* Held-fd: reject empty and multi-component; "." / ".." are allowed
-		 * (read-only fstatat of the dir or its parent -- link_stat_at). */
-		if (!*path || strchr(path, '/')) {
+		/* Held-fd: reject empty, multi-component and ".."; "." is allowed
+		 * (read-only fstatat of the dir itself -- link_stat_at). */
+		if (!*path || strchr(path, '/')
+		 || (path[0] == '.' && path[1] == '.' && path[2] == '\0')) {
 			errno = EINVAL;
 			return -1;
 		}
