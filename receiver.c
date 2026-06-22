@@ -262,7 +262,7 @@ int open_tmpfile(char *fnametmp, const char *fname, struct file_struct *file)
 		return -1;
 
 	if (am_root < 0) {
-		/* For --fake-super, the file must be useable by the copying
+		/* For --fake-super, the file must be usable by the copying
 		 * user, just like it would be for root. */
 		added_perms = S_IRUSR|S_IWUSR;
 	} else {

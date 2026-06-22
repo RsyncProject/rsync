@@ -11,62 +11,62 @@
 #
 # The script stops after the first successful action.
 
-dir=`dirname $0`
-if test x"$dir" = x; then
-    dir=.
+dir=$(dirname "$0")
+if test "$dir" = ""; then
+  dir=.
 fi
 
 if test "$dir" = '.'; then
-    branch=`packaging/prep-auto-dir` || exit 1
-    if test x"$branch" != x; then
-	cd build || exit 1
-	dir=..
-    fi
+  branch=$(packaging/prep-auto-dir) || exit 1
+  if test "$branch" != ""; then
+    cd build || exit 1
+    dir=..
+  fi
 fi
 
 if test "$dir" != '.'; then
-    for lnk in configure.ac m4; do
-	if test ! -h $lnk; then
-	    rm -f $lnk # Just in case
-	    ln -s "$dir/$lnk" $lnk
-	fi
-    done
-    for fn in configure.sh config.h.in aclocal.m4; do
-	test ! -f $fn && test -f "$dir/$fn" && cp -p "$dir/$fn" $fn
-    done
+  for lnk in configure.ac m4; do
+    if test ! -h $lnk; then
+      rm -f $lnk # Just in case
+      ln -s "$dir/$lnk" $lnk
+    fi
+  done
+  for fn in configure.sh config.h.in aclocal.m4; do
+    test ! -f $fn && test -f "$dir/$fn" && cp -p "$dir/$fn" $fn
+  done
 fi
 
 if test $# = 0; then
-    set -- build
+  set -- build
 fi
 
 for action in "${@}"; do
-    case "$action" in
+  case "$action" in
     build|make)
-	make -f "$dir/prepare-source.mak"
-	;;
+      make -f "$dir/prepare-source.mak"
+      ;;
     fetch|fetchgen)
-	if test "$action" = fetchgen; then
-	    match='*'
-	else
-	    match='[ca]*'
-	fi
-	$dir/rsync-ssl -iipc --no-motd "rsync://download.samba.org/rsyncftp/generated-files/$match" ./
-	test $? != 0 && continue
-	sleep 1 # The following files need to be newer than aclocal.m4
-	touch configure.sh config.h.in
-	;;
+      if test "$action" = fetchgen; then
+        match='*'
+      else
+        match='[ca]*'
+      fi
+      "$dir"/rsync-ssl -iipc --no-motd "rsync://download.samba.org/rsyncftp/generated-files/$match" ./
+      test $? != 0 && continue
+      sleep 1 # The following files need to be newer than aclocal.m4
+      touch configure.sh config.h.in
+      ;;
     fetchSRC)
-	./rsync-ssl -iipr --no-motd --exclude=/.git/ rsync://download.samba.org/ftp/pub/unpacked/rsync/ .
-	;;
+      ./rsync-ssl -iipr --no-motd --exclude=/.git/ rsync://download.samba.org/ftp/pub/unpacked/rsync/ .
+      ;;
     *)
-	echo "Unknown action: $action"
-	exit 1
-	;;
-    esac
-    if test $? = 0; then
-	exit
-    fi
+      echo "Unknown action: $action"
+      exit 1
+      ;;
+  esac
+  if test $? = 0; then
+    exit
+  fi
 done
 
 exit 1

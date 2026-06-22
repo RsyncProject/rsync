@@ -11,14 +11,14 @@ REAL_RSYNC=/usr/bin/rsync
 
 args=()
 for arg in "${@}"; do
-    if [[ "$arg" == --server ]]; then
-	exec $REAL_RSYNC "${@}"
-	exit $? # Not reached
-    fi
-    if [[ "$arg" == / ]]; then
-	args=("${args[@]}" /)
-    else
-	args=("${args[@]}" "${arg%/}")
-    fi
+  if [[ "$arg" == --server ]]; then
+    exec $REAL_RSYNC "${@}"
+    exit $? # Not reached
+  fi
+  if [[ "$arg" == / ]]; then
+    args=("${args[@]}" /)
+  else
+    args=("${args[@]}" "${arg%/}")
+  fi
 done
 exec $REAL_RSYNC "${args[@]}"

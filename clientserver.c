@@ -119,7 +119,8 @@ int start_socket_client(char *host, int remote_argc, char *remote_argv[],
 			int argc, char *argv[])
 {
 	int fd, ret;
-	char *p, *user = NULL;
+	char *p;
+        const char *user = NULL;
 
 	/* This is redundant with code in start_inband_exchange(), but this
 	 * short-circuits a problem in the client before we open a socket,
@@ -156,7 +157,7 @@ static int exchange_protocols(int f_in, int f_out, char *buf, size_t bufsiz, int
 
 	output_daemon_greeting(f_out, am_client);
 	if (!am_client) {
-		char *motd = lp_motd_file();
+		const char *motd = lp_motd_file();
 		if (motd && *motd) {
 			FILE *f = fopen(motd, "r");
 			while (f && !feof(f)) {
@@ -327,7 +328,7 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 				} while ((p = strstr(p+1, line)) != NULL);
 			}
 			if (extra_chars) {
-				char *f = arg;
+				const char *f = arg;
 				char *t = arg = new_array(char, strlen(arg) + extra_chars + 1);
 				if (*f == '-') {
 					*t++ = '.';
@@ -1159,9 +1160,9 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 			 * Without this, the socket would be in the wrong
 			 * state for the upcoming error message. */
 			if (!files_from) {
-				int i;
-				for (i = 0; i < argc; i++) {
-					if (strncmp(argv[i], "--files-from", 12) == 0) {
+				int arg_idx;
+				for (arg_idx = 0; arg_idx < argc; arg_idx++) {
+					if (strncmp(argv[arg_idx], "--files-from", 12) == 0) {
 						files_from = "";
 						break;
 					}

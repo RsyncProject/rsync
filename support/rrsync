@@ -264,7 +264,7 @@ def main():
 
     if args.munge:
         rsync_opts.append('--munge-links')
-    
+
     if args.no_overwrite:
       rsync_opts.append('--ignore-existing')
 

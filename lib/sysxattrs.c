@@ -130,9 +130,9 @@ ssize_t sys_llistxattr(const char *path, char *list, size_t size)
 		return len;
 
 	if ((size_t)len >= size) {
-		/* FreeBSD extattr_list_xx() returns 'size' as 'len' in case there are                                                              
-                   more data available, truncating the output, we solve this by signalling                                                          
-                   ERANGE in case len == size so that the code in xattrs.c will retry with                                                          
+		/* FreeBSD extattr_list_xx() returns 'size' as 'len' in case there are
+                   more data available, truncating the output, we solve this by signalling
+                   ERANGE in case len == size so that the code in xattrs.c will retry with
                    a bigger buffer */
 		errno = ERANGE;
 		return -1;

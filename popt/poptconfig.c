@@ -3,7 +3,7 @@
  */
 
 /* (C) 1998-2002 Red Hat, Inc. -- Licensing details are in the COPYING
-   file accompanying popt source distributions, available from 
+   file accompanying popt source distributions, available from
    ftp://ftp.rpm.org/pub/rpm/dist. */
 
 #include "system.h"
@@ -128,7 +128,8 @@ int poptReadFile(const char * fn, char ** bp, size_t * nbp, int flags)
     int fdno;
     char * b = NULL;
     off_t nb = 0;
-    char * s, * t, * se;
+    char * s, * t;
+    const char * se;
     int rc = POPT_ERROR_ERRNO;	/* assume failure */
 
     fdno = open(fn, O_RDONLY);
@@ -234,7 +235,7 @@ static int poptConfigLine(poptContext con, char * line)
 
     if (con->appName == NULL)
 	goto exit;
-    
+
     memset(item, 0, sizeof(*item));
 
     appName = se;
@@ -277,8 +278,10 @@ static int poptConfigLine(poptContext con, char * line)
 	/* Append remaining text to the interpolated file option text. */
 	if (*se != '\0') {
 	    size_t nse = strlen(se) + 1;
-	    if ((b = realloc(b, (nb + nse))) == NULL)	/* XXX can't happen */
+    	    char *new_b = NULL;
+	    if ((new_b = realloc(b, (nb + nse))) == NULL)	/* XXX can't happen */
 		goto exit;
+            b = new_b;
 	    (void) stpcpy( stpcpy(&b[nb-1], " "), se);
 	    nb += nse;
 	}
@@ -327,7 +330,7 @@ static int poptConfigLine(poptContext con, char * line)
 	item->argv[j] = NULL;
 	item->argc = j;
     }
-	
+
     if (!strcmp(entryType, "alias"))
 	rc = poptAddItem(con, item, 0);
     else if (!strcmp(entryType, "exec"))
@@ -341,7 +344,8 @@ exit:
 
 int poptReadConfigFile(poptContext con, const char * fn)
 {
-    char * b = NULL, *be;
+    char * b = NULL;
+    const char *be;
     size_t nb = 0;
     const char *se;
     char *t = NULL, *te;
@@ -436,7 +440,7 @@ int poptReadConfigFiles(poptContext con, const char * paths)
 
 int poptReadDefaultConfig(poptContext con, UNUSED(int useEnv))
 {
-    char * home;
+    const char * home;
     struct stat sb;
     int rc = 0;		/* assume success */
 
@@ -500,7 +504,7 @@ poptInit(int argc, const char ** argv,
 
     if ((argv0 = strrchr(argv[0], '/')) != NULL) argv0++;
     else argv0 = argv[0];
-   
+
     con = poptGetContext(argv0, argc, (const char **)argv, options, 0);
     if (con != NULL&& poptReadConfigFiles(con, configPaths))
 	con = poptFini(con);
