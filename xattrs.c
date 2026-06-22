@@ -1295,7 +1295,7 @@ int set_stat_xattr(const char *fname, struct file_struct *file, mode_t new_mode,
 			xst = fst; /* keep xst fully defined; st_mode=0 means "no stat xattr" */
 			xst.st_mode = 0;
 		}
-	} else if (x_lstat(fname, &fst, &xst) < 0) {
+	} else if (x_lstat(fname, &fst, &xst, 0) < 0) {
 		rsyserr(FERROR_XFER, errno, "failed to re-stat %s",
 			full_fname(fname));
 		return -1;
@@ -1356,22 +1356,23 @@ int set_stat_xattr(const char *fname, struct file_struct *file, mode_t new_mode,
 	return 0;
 }
 
-int x_stat(const char *fname, STRUCT_STAT *fst, STRUCT_STAT *xst)
+int x_stat(const char *fname, STRUCT_STAT *fst, STRUCT_STAT *xst, int vfs_flags)
 {
 	/* Use the *_at variants so that on a daemon-no-chroot deployment
 	 * the metadata read goes through a secure parent dirfd instead
 	 * of bare path resolution. The *_at wrappers fall through to
 	 * plain vfs_stat outside the daemon-no-chroot context, so this
-	 * change is transparent for non-daemon use. */
-	int ret = vfs_stat_at(fname, fst);
+	 * change is transparent for non-daemon use.  vfs_flags carries the
+	 * operator-path policy (VFS_OPERATOR_PATH for a backup-dir stat). */
+	int ret = vfs_stat_at(fname, fst, vfs_flags);
 	if ((ret < 0 || get_stat_xattr(fname, -1, fst, xst) < 0) && xst)
 		xst->st_mode = 0;
 	return ret;
 }
 
-int x_lstat(const char *fname, STRUCT_STAT *fst, STRUCT_STAT *xst)
+int x_lstat(const char *fname, STRUCT_STAT *fst, STRUCT_STAT *xst, int vfs_flags)
 {
-	int ret = vfs_lstat_at(fname, fst);
+	int ret = vfs_lstat_at(fname, fst, vfs_flags);
 	if ((ret < 0 || get_stat_xattr(fname, -1, fst, xst) < 0) && xst)
 		xst->st_mode = 0;
 	return ret;

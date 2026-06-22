@@ -1083,7 +1083,7 @@ int handle_partial_dir(const char *fname, int create)
 	vfs.operator_path_resolve = 1;
 	if (create) {
 		STRUCT_STAT st;
-		int statret = vfs_lstat_at(dir, &st);
+		int statret = vfs_lstat_at(dir, &st, VFS_OPERATOR_PATH);
 		if (statret == 0 && !S_ISDIR(st.st_mode)) {
 			if (vfs_unlink(VFS_AT_FDCWD, dir, VFS_OPERATOR_PATH) < 0) {
 				vfs.operator_path_resolve = 0;

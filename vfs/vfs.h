@@ -114,8 +114,8 @@ void vfs_dircache_reset(void);
 int vfs_stat(const char *path, STRUCT_STAT *st);
 int vfs_lstat(const char *path, STRUCT_STAT *st);
 int vfs_fstat(int fd, STRUCT_STAT *st);
-int vfs_stat_at(const char *path, STRUCT_STAT *st);
-int vfs_lstat_at(const char *path, STRUCT_STAT *st);
+int vfs_stat_at(const char *path, STRUCT_STAT *st, int vfs_flags);
+int vfs_lstat_at(const char *path, STRUCT_STAT *st, int vfs_flags);
 int vfs_stat_atfd(int dfd, const char *name, STRUCT_STAT *st);
 int vfs_lstat_atfd(int dfd, const char *name, STRUCT_STAT *st);
 

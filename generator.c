@@ -977,7 +977,9 @@ static int basis_link_stat(const char *path, STRUCT_STAT *stp)
 	 * the plain path (a lower-severity, non-root basis lookup). */
 	if (!am_daemon && am_root >= 0 && !vfs_symlink_optout_allowed()) {
 		const char *leaf;
-		int dfd = vfs_owner_walk_parent(path, &leaf, vfs.operator_path_resolve);
+		/* non-daemon path: is_operator only gates the daemon module-confinement
+		 * (a no-op here), so the ownership walk is identical either way. */
+		int dfd = vfs_owner_walk_parent(path, &leaf, 0);
 		int r, e;
 		if (dfd < 0)
 			return -1;
@@ -1685,7 +1687,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				}
 			}
 			if (relative_paths && !implied_dirs && file->mode != 0
-			 && vfs_stat_at(dn, &sx.st) < 0) {
+			 && vfs_stat_at(dn, &sx.st, 0) < 0) {
 				if (dry_run)
 					goto parent_is_dry_missing;
 				if (vfs_make_path(fname, MKP_DROP_NAME | MKP_SKIP_SLASH, 0) < 0) {

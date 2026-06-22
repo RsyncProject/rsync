@@ -65,7 +65,7 @@ static int validate_backup_dir(void)
 {
 	STRUCT_STAT st;
 
-	if (vfs_lstat_at(backup_dir_buf, &st) < 0) {
+	if (vfs_lstat_at(backup_dir_buf, &st, VFS_OPERATOR_PATH) < 0) {
 		if (errno == ENOENT)
 			return 0;
 		rsyserr(FERROR, errno, "backup lstat %s failed", backup_dir_buf);
@@ -140,7 +140,7 @@ static BOOL copy_valid_path(const char *fname)
 
 		/* Try to transfer the directory settings of the actual dir
 		 * that the files are coming from. */
-		if (x_stat(rel, &sx.st, NULL) < 0)
+		if (x_stat(rel, &sx.st, NULL, VFS_OPERATOR_PATH) < 0)
 			rsyserr(FERROR, errno, "backup stat %s failed", full_fname(rel));
 		else {
 			struct file_struct *file;
@@ -273,7 +273,7 @@ static int make_backup_inner(const char *fname, BOOL prefer_rename)
 
 	init_stat_x(&sx);
 	/* Return success if no file to keep. */
-	if (x_lstat(fname, &sx.st, NULL) < 0)
+	if (x_lstat(fname, &sx.st, NULL, VFS_OPERATOR_PATH) < 0)
 		return 3;
 
 	if (!(buf = get_backup_name(fname)))
@@ -318,7 +318,7 @@ static int make_backup_inner(const char *fname, BOOL prefer_rename)
 		goto success;
 	if (errno == EEXIST || errno == EISDIR) {
 		STRUCT_STAT bakst;
-		if (vfs_lstat_at(buf, &bakst) == 0) {
+		if (vfs_lstat_at(buf, &bakst, VFS_OPERATOR_PATH) == 0) {
 			int flags = get_del_for_flag(bakst.st_mode) | DEL_FOR_BACKUP | DEL_RECURSE;
 			if (delete_item(buf, bakst.st_mode, flags) != 0)
 				return 0;

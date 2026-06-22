@@ -267,7 +267,7 @@ static int readlink_stat(const char *path, STRUCT_STAT *stp, char *linkbuf)
 				rprintf(FINFO,"copying unsafe symlink \"%s\" -> \"%s\"\n",
 					path, linkbuf);
 			}
-			return x_stat(path, stp, NULL);
+			return x_stat(path, stp, NULL, 0);
 		}
 		if (munge_symlinks && am_sender && llen > SYMLINK_PREFIX_LEN
 		 && strncmp(linkbuf, SYMLINK_PREFIX, SYMLINK_PREFIX_LEN) == 0) {
@@ -277,7 +277,7 @@ static int readlink_stat(const char *path, STRUCT_STAT *stp, char *linkbuf)
 	}
 	return 0;
 #else
-	return x_stat(path, stp, NULL);
+	return x_stat(path, stp, NULL, 0);
 #endif
 }
 
@@ -285,17 +285,17 @@ int link_stat(const char *path, STRUCT_STAT *stp, int follow_dirlinks)
 {
 #ifdef SUPPORT_LINKS
 	if (copy_links)
-		return x_stat(path, stp, NULL);
-	if (x_lstat(path, stp, NULL) < 0)
+		return x_stat(path, stp, NULL, 0);
+	if (x_lstat(path, stp, NULL, 0) < 0)
 		return -1;
 	if (follow_dirlinks && S_ISLNK(stp->st_mode)) {
 		STRUCT_STAT st;
-		if (x_stat(path, &st, NULL) == 0 && S_ISDIR(st.st_mode))
+		if (x_stat(path, &st, NULL, 0) == 0 && S_ISDIR(st.st_mode))
 			*stp = st;
 	}
 	return 0;
 #else
-	return x_stat(path, stp, NULL);
+	return x_stat(path, stp, NULL, 0);
 #endif
 }
 
@@ -1447,7 +1447,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 			 * options was specified, so there's no need for the
 			 * extra lstat() if one of these options isn't on. */
 			if ((copy_links || copy_unsafe_links || copy_dirlinks)
-			 && x_lstat(thisname, &st, NULL) == 0
+			 && x_lstat(thisname, &st, NULL, 0) == 0
 			 && S_ISLNK(st.st_mode)) {
 				io_error |= IOERR_GENERAL;
 				rprintf(FERROR_XFER, "symlink has no referent: %s\n",

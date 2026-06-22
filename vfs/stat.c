@@ -53,7 +53,7 @@ int vfs_lstat(const char *path, STRUCT_STAT *st)
   fstatat() with AT_SYMLINK_NOFOLLOW (lstat) or 0 (stat) against
   that dirfd. Same fall-through gating as the other wrappers.
 */
-static int do_xstat_at(const char *path, STRUCT_STAT *st, int at_flags, int (*fallback)(const char *, STRUCT_STAT *))
+static int do_xstat_at(const char *path, STRUCT_STAT *st, int at_flags, int (*fallback)(const char *, STRUCT_STAT *), int vfs_flags)
 {
 #ifdef AT_FDCWD
 	char dirpath[MAXPATHLEN];
@@ -63,10 +63,10 @@ static int do_xstat_at(const char *path, STRUCT_STAT *st, int at_flags, int (*fa
 	size_t dlen;
 
 #if defined O_NOFOLLOW && defined O_DIRECTORY
-	if (vfs.operator_path_resolve) {
+	if (vfs_flags & VFS_OPERATOR_PATH) {
 		if (vfs_symlink_optout_allowed())
 			return fallback(path, st);
-		dfd = vfs_owner_walk_parent(path, &bname, vfs.operator_path_resolve);
+		dfd = vfs_owner_walk_parent(path, &bname, 1);
 		if (dfd < 0)
 			return -1;
 		ret = fstatat(dfd, bname, st, at_flags);
@@ -110,17 +110,17 @@ static int do_xstat_at(const char *path, STRUCT_STAT *st, int at_flags, int (*fa
 #endif
 }
 
-int vfs_stat_at(const char *path, STRUCT_STAT *st)
+int vfs_stat_at(const char *path, STRUCT_STAT *st, int vfs_flags)
 {
-	return do_xstat_at(path, st, 0, vfs_stat);
+	return do_xstat_at(path, st, 0, vfs_stat, vfs_flags);
 }
 
-int vfs_lstat_at(const char *path, STRUCT_STAT *st)
+int vfs_lstat_at(const char *path, STRUCT_STAT *st, int vfs_flags)
 {
 #ifdef SUPPORT_LINKS
-	return do_xstat_at(path, st, AT_SYMLINK_NOFOLLOW, vfs_lstat);
+	return do_xstat_at(path, st, AT_SYMLINK_NOFOLLOW, vfs_lstat, vfs_flags);
 #else
-	return do_xstat_at(path, st, 0, vfs_stat);
+	return do_xstat_at(path, st, 0, vfs_stat, vfs_flags);
 #endif
 }
 
