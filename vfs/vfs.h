@@ -59,14 +59,13 @@
 
 /* The single global VFS state instance (defined in vfs/vfs.c).
  *
- * Only curr_dir/curr_dir_len/operator_path_resolve are read by mainline code;
- * the dpc cache and the module_* snapshot are VFS-internal (touched only by
- * the vfs/ sources) and are documented as such. */
+ * Only curr_dir/curr_dir_len are read by mainline code; the dpc cache and the
+ * module_* snapshot are VFS-internal (touched only by the vfs/ sources) and are
+ * documented as such.  The operator-supplied path resolution policy is no
+ * longer ambient state -- it travels as an explicit VFS_OPERATOR_PATH flag. */
 struct vfs {
 	char curr_dir[MAXPATHLEN];	/* logical cwd (tracked by change_dir) */
 	unsigned int curr_dir_len;
-
-	int operator_path_resolve;	/* operator-supplied path resolver mode */
 
 	/* VFS-INTERNAL: held ancestor-dirfd cache. */
 	struct {

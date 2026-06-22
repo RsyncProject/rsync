@@ -1080,26 +1080,22 @@ int handle_partial_dir(const char *fname, int create)
 	 * outside the tree): resolve it with the ownership walk -- follow a
 	 * uid0/euid-owned symlink, refuse a foreign one, absolute and relative alike.
 	 * --insecure-links (or a daemon module's "insecure links =") opts out. */
-	vfs.operator_path_resolve = 1;
 	if (create) {
 		STRUCT_STAT st;
 		int statret = vfs_lstat_at(dir, &st, VFS_OPERATOR_PATH);
 		if (statret == 0 && !S_ISDIR(st.st_mode)) {
 			if (vfs_unlink(VFS_AT_FDCWD, dir, VFS_OPERATOR_PATH) < 0) {
-				vfs.operator_path_resolve = 0;
 				*fn = '/';
 				return 0;
 			}
 			statret = -1;
 		}
 		if (statret < 0 && vfs_mkdir(VFS_AT_FDCWD, dir, 0700, VFS_OPERATOR_PATH) < 0) {
-			vfs.operator_path_resolve = 0;
 			*fn = '/';
 			return 0;
 		}
 	} else
 		vfs_unlink(VFS_AT_FDCWD, dir, VFS_REMOVEDIR);
-	vfs.operator_path_resolve = 0;
 	*fn = '/';
 
 	return 1;

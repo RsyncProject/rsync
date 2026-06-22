@@ -1161,9 +1161,10 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 #endif
 		/* NB: the copy-dest basis read is deliberately NOT routed through the
 		 * ownership walk: copy_altdest_file()->copy_file() also opens the dest
-		 * and copies xattrs through a held O_NOFOLLOW fd, and forcing
-		 * vfs.operator_path_resolve across that re-opens the copy_xattrs parent-
-		 * symlink race (copy-xattrs-symlink-race).  basis_link_stat() already
+		 * and copies xattrs through a held O_NOFOLLOW fd, and passing
+		 * VFS_OPERATOR_PATH across that re-opens the copy_xattrs parent-
+		 * symlink race (copy-xattrs-symlink-race) -- so copy_file gets flags 0.
+		 * basis_link_stat() already
 		 * refuses a foreign-owned basis symlink, closing the static escape; the
 		 * post-stat race on an absolute copy-dest basis is a documented residual. */
 		if (!dry_run && copy_altdest_file(cmpbuf, fname, file) < 0) {
@@ -2249,25 +2250,20 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	if (read_batch || whole_file) {
 		if (inplace && make_backups > 0 && fnamecmp_type == FNAMECMP_FNAME) {
 			/* The --backup-dir (backupptr) is an operator path; this in-place
-			 * backup bypasses make_backup(), so set vfs.operator_path_resolve here
-			 * too -- get_backup_name() (make_path) and copy_file() then resolve
-			 * it with the ownership walk instead of following any symlink. */
-			vfs.operator_path_resolve = 1;
+			 * backup bypasses make_backup(), so get_backup_name() (make_path) and
+			 * copy_file() below are passed VFS_OPERATOR_PATH to resolve it with the
+			 * ownership walk instead of following any symlink. */
 			if (!(backupptr = get_backup_name(fname))) {
-				vfs.operator_path_resolve = 0;
 				goto cleanup;
 			}
 			if (!(back_file = make_file(fname, NULL, NULL, 0, NO_FILTERS))) {
-				vfs.operator_path_resolve = 0;
 				goto pretend_missing;
 			}
 			if (copy_file(fname, backupptr, -1, back_file->mode, VFS_OPERATOR_PATH) < 0) {
-				vfs.operator_path_resolve = 0;
 				unmake_file(back_file);
 				back_file = NULL;
 				goto cleanup;
 			}
-			vfs.operator_path_resolve = 0;
 		}
 		goto notify_others;
 	}
@@ -2297,17 +2293,13 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	if (inplace && make_backups > 0 && fnamecmp_type == FNAMECMP_FNAME) {
 		/* Operator --backup-dir, bypassing make_backup(): resolve get_backup_name()
 		 * (make_path), the unlink and the create with the ownership walk. */
-		vfs.operator_path_resolve = 1;
 		if (!(backupptr = get_backup_name(fname))) {
-			vfs.operator_path_resolve = 0;
 			goto cleanup;
 		}
 		if (!(back_file = make_file(fname, NULL, NULL, 0, NO_FILTERS))) {
-			vfs.operator_path_resolve = 0;
 			goto pretend_missing;
 		}
 		if (robust_unlink(backupptr, VFS_OPERATOR_PATH) && errno != ENOENT) {
-			vfs.operator_path_resolve = 0;
 			rsyserr(FERROR_XFER, errno, "unlink %s",
 				full_fname(backupptr));
 			unmake_file(back_file);
@@ -2315,13 +2307,11 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			goto cleanup;
 		}
 		if ((f_copy = vfs_open_at(backupptr, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, 0600, VFS_OPERATOR_PATH)) < 0) {
-			vfs.operator_path_resolve = 0;
 			rsyserr(FERROR_XFER, errno, "open %s", full_fname(backupptr));
 			unmake_file(back_file);
 			back_file = NULL;
 			goto cleanup;
 		}
-		vfs.operator_path_resolve = 0;
 		fnamecmp_type = FNAMECMP_BACKUP;
 	}
 
@@ -2405,7 +2395,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		if (f_copy >= 0)
 			close(f_copy);
 		/* backupptr's data/xattrs were written safely (confined create under
-		 * vfs.operator_path_resolve, held-fd xattr copy above).  This metadata set
+		 * VFS_OPERATOR_PATH, held-fd xattr copy above).  This metadata set
 		 * re-resolves backupptr by path and is NOT wrapped in operator mode:
 		 * set_file_attrs() also drives the path-based xattr set whose held-fd
 		 * race-fix operator mode would defeat (cf. the copy-dest note in

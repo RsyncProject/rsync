@@ -445,8 +445,6 @@ int make_backup(const char *fname, BOOL prefer_rename)
 	 * symlink component is refused while the operator's own is followed --
 	 * absolute and relative alike.  --insecure-links / "insecure links ="
 	 * restores legacy following. */
-	vfs.operator_path_resolve = 1;
 	ret = make_backup_inner(fname, prefer_rename);
-	vfs.operator_path_resolve = 0;
 	return ret;
 }
