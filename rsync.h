@@ -1241,8 +1241,8 @@ struct name_num_obj {
 #endif
 
 #ifndef SUPPORT_XATTRS
-#define x_stat(fn,fst,xst) vfs_stat(fn,fst)
-#define x_lstat(fn,fst,xst) vfs_lstat(fn,fst)
+#define x_stat(fn,fst,xst,vfsflags) vfs_stat(fn,fst)
+#define x_lstat(fn,fst,xst,vfsflags) vfs_lstat(fn,fst)
 #define x_fstat(fd,fst,xst) vfs_fstat(fd,fst)
 #endif
 
