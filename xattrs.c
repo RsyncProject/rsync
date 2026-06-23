@@ -385,6 +385,7 @@ int copy_xattrs(const char *source, const char *dest, int dest_fd)
 				"copy_xattrs: %ssetxattr(%s,\"%s\") failed",
 				dest_fd >= 0 ? "f" : "l", full_fname(dest), name);
 			errno = save_errno;
+			free(ptr);
 			return -1;
 		}
 		free(ptr);

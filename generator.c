@@ -1441,7 +1441,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	static int need_fuzzy_dirlist = 0;
 	struct file_struct *fuzzy_file = NULL;
 	int fd = -1, f_copy = -1;
-	stat_x sx = {0}, real_sx;
+	stat_x sx = {0}, real_sx = {0};
 	STRUCT_STAT partial_st;
 	struct file_struct *back_file = NULL;
 	int statret, real_ret, stat_errno;
@@ -2250,6 +2250,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	}
 
 	free_stat_x(&sx);
+	free_stat_x(&real_sx);
 }
 
 /* If we are replacing an existing hard link, symlink, device, or special file,
