@@ -87,6 +87,7 @@ extern BOOL want_progress_now;
 extern BOOL shutting_down;
 extern int backup_dir_len;
 extern int basis_dir_cnt;
+extern int basis_dir_perdir[MAX_BASIS_DIRS+1];
 extern int default_af_hint;
 extern int stdout_format_has_i;
 extern int trust_sender_filter;
@@ -867,7 +868,7 @@ static void check_alt_basis_dirs(void)
 		int bd_len = strlen(bdir);
 		if (bd_len > 1 && bdir[bd_len-1] == '/')
 			bdir[--bd_len] = '\0';
-		if (dry_run > 1 && *bdir != '/') {
+		if (!basis_dir_perdir[j] && dry_run > 1 && *bdir != '/') {
 			int len = curr_dir_len + 1 + bd_len + 1;
 			char *new = new_array(char, len);
 			if (slash && strncmp(bdir, "../", 3) == 0) {
@@ -882,6 +883,8 @@ static void check_alt_basis_dirs(void)
 				pathjoin(new, len, curr_dir, bdir);
 			basis_dir[j] = bdir = new;
 		}
+		if (basis_dir_perdir[j] && *bdir != '/')
+			continue;
 		if (do_stat(bdir, &st) < 0)
 			rprintf(FWARNING, "%s arg does not exist: %s\n", alt_dest_opt(0), bdir);
 		else if (!S_ISDIR(st.st_mode))

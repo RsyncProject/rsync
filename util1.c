@@ -37,6 +37,8 @@ extern int preallocate_files;
 extern char *module_dir;
 extern unsigned int module_dirlen;
 extern char *partial_dir;
+extern char *basis_dir[MAX_BASIS_DIRS+1];
+extern int basis_dir_perdir[MAX_BASIS_DIRS+1];
 extern filter_rule_list daemon_filter_list;
 
 int sanitize_paths = 0;
@@ -903,6 +905,49 @@ size_t pathjoin(char *dest, size_t destsize, const char *p1, const char *p2)
 	else
 		len += strlen(p2) + 1; /* Assume we'd insert a '/'. */
 	return len;
+}
+
+/* Join an alternate-basis dir and a destination filename.  A per-directory
+ * basis dir is relative to the destination file's containing directory. */
+size_t pathjoin_altdest(char *dest, size_t destsize, int basis_ndx, const char *fname)
+{
+	const char *bdir = basis_dir[basis_ndx];
+	const char *slash;
+	size_t bdir_len;
+	int len;
+
+	if (!basis_dir_perdir[basis_ndx] || *bdir == '/')
+		return pathjoin(dest, destsize, bdir, fname);
+
+	slash = strrchr(fname, '/');
+	if (!slash) {
+		if (!*bdir)
+			return strlcpy(dest, fname, destsize);
+		return pathjoin(dest, destsize, bdir, fname);
+	}
+
+	if (!*bdir)
+		len = snprintf(dest, destsize, "%.*s/%s", (int)(slash - fname), fname, slash + 1);
+	else {
+		bdir_len = strlen(bdir);
+		len = snprintf(dest, destsize, "%.*s/%s%s%s",
+			       (int)(slash - fname), fname, bdir,
+			       bdir[bdir_len-1] == '/' ? "" : "/", slash + 1);
+	}
+
+	return len < 0 ? destsize : (size_t)len;
+}
+
+/* Join an alternate-basis dir and a destination directory. */
+size_t pathjoin_altdest_dir(char *dest, size_t destsize, int basis_ndx, const char *dir)
+{
+	const char *bdir = basis_dir[basis_ndx];
+
+	if (!basis_dir_perdir[basis_ndx] || *bdir == '/')
+		return pathjoin(dest, destsize, bdir, dir);
+	if (!*bdir)
+		return strlcpy(dest, dir, destsize);
+	return pathjoin(dest, destsize, dir, bdir);
 }
 
 /* Join any number of strings together, putting them in "dest".  The return

@@ -183,6 +183,7 @@ char *backup_suffix = NULL;
 char *tmpdir = NULL;
 char *partial_dir = NULL;
 char *basis_dir[MAX_BASIS_DIRS+1];
+int basis_dir_perdir[MAX_BASIS_DIRS+1];
 char *config_file = NULL;
 char *shell_cmd = NULL;
 char *logfile_name = NULL;
@@ -1737,6 +1738,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			want_dest_type = COMPARE_DEST;
 
 		set_dest_dir:
+			arg = poptGetOptArg(pc);
 			if (alt_dest_type && alt_dest_type != want_dest_type) {
 				snprintf(err_buf, sizeof err_buf,
 					"ERROR: the %s option conflicts with the %s option\n",
@@ -1751,9 +1753,13 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 					MAX_BASIS_DIRS, alt_dest_opt(0));
 				goto cleanup;
 			}
+			if (arg[0] == ':' && arg[1] == ' ') {
+				basis_dir_perdir[basis_dir_cnt] = 1;
+				arg += 2;
+			}
 			/* We defer sanitizing this arg until we know what
 			 * our destination directory is going to be. */
-			basis_dir[basis_dir_cnt++] = (char *)poptGetOptArg(pc);
+			basis_dir[basis_dir_cnt++] = (char *)arg;
 			break;
 
 		case OPT_CHMOD:
@@ -2935,8 +2941,15 @@ void server_options(char **args, int *argc_p)
 			 *   option, so don't send it if client is the sender.
 			 */
 			for (i = 0; i < basis_dir_cnt; i++) {
+				char *basis_arg = basis_dir[i];
 				args[ac++] = alt_dest_opt(0);
-				args[ac++] = safe_arg("", basis_dir[i]);
+				if (basis_dir_perdir[i]) {
+					int len = strlen(basis_arg) + 3;
+					char *new = new_array(char, len);
+					snprintf(new, len, ": %s", basis_arg);
+					basis_arg = new;
+				}
+				args[ac++] = safe_arg("", basis_arg);
 			}
 		}
 	}

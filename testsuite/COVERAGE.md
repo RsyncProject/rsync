@@ -82,7 +82,7 @@ Status legend: ✓ property asserted · `~` shallow / by an existing ported test
 | --inplace | inplace*new*, alt-dest | Y | — | ✓ inode preserved |
 | --append / --append-verify | append*new* | Y | — | ✓ verify split is proto 30+ |
 | -b, --backup / --backup-dir / --suffix | backup, backup-deep*new* | Y | Y | ✓ |
-| --compare-dest / --copy-dest / --link-dest | alt-dest, alt-dest-deep*new* | Y | Y | ✓ link=hardlink, copy=copy, compare=skip |
+| --compare-dest / --copy-dest / --link-dest | alt-dest, alt-dest-deep*new*, alt-dest-per-dir*new* | Y | Y | ✓ link=hardlink, copy=copy, compare=skip, per-dir `: REL` |
 | -y, --fuzzy | fuzzy | `~` | — | `~` |
 | -u, --update | update*new* | Y | — | ✓ keeps newer dest, updates older |
 | -W, --whole-file | (used widely; --no-whole-file ubiquitous) | n/a | — | `~` |

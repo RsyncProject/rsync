@@ -356,8 +356,8 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 			}
 
 			if (alt_dest >= 0 && dry_run) {
-				pathjoin(namebuf, MAXPATHLEN, basis_dir[alt_dest],
-					 f_name(prev_file, NULL));
+				pathjoin_altdest(namebuf, MAXPATHLEN, alt_dest,
+						  f_name(prev_file, NULL));
 				prev_name = namebuf;
 				realname = f_name(prev_file, altbuf);
 			} else {
@@ -389,7 +389,7 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 		int j = 0;
 		init_stat_x(&alt_sx);
 		do {
-			pathjoin(cmpbuf, MAXPATHLEN, basis_dir[j], fname);
+			pathjoin_altdest(cmpbuf, MAXPATHLEN, j, fname);
 			if (link_stat(cmpbuf, &alt_sx.st, 0) < 0)
 				continue;
 			if (alt_dest_type == LINK_DEST) {
@@ -496,8 +496,8 @@ void finish_hard_link(struct file_struct *file, const char *fname, int fin_ndx,
 	file->flags |= FLAG_HLINK_FIRST | FLAG_HLINK_DONE;
 	F_HL_PREV(file) = alt_dest;
 	if (alt_dest >= 0 && dry_run) {
-		pathjoin(alt_name, MAXPATHLEN, basis_dir[alt_dest],
-			 f_name(file, NULL));
+		pathjoin_altdest(alt_name, MAXPATHLEN, alt_dest,
+				  f_name(file, NULL));
 		our_name = alt_name;
 	} else
 		our_name = fname;

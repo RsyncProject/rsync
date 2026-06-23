@@ -119,6 +119,10 @@ modtime.
 
 ### BUG FIXES:
 
+- Added support for a per-directory relative form of `--compare-dest`,
+  `--copy-dest`, and `--link-dest`: prefix a relative DIR with `: ` to make it
+  resolve from each destination file's containing directory.
+
 - Fixed a regression introduced by the 3.4.0 secure_relative_open()
   CVE fix where legitimate directory symlinks on the receiver side
   (e.g. when using `-K` / `--copy-dirlinks`) caused "failed
