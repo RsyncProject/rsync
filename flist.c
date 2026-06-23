@@ -1774,6 +1774,7 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 			sx.st.st_mode = file->mode;
 			if (get_acl(fname, &sx) < 0) {
 				io_error |= IOERR_GENERAL;
+				free_acl(&sx);
 				return NULL;
 			}
 		}
@@ -1783,6 +1784,9 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 			sx.st.st_mode = file->mode;
 			if (get_xattr(fname, &sx) < 0) {
 				io_error |= IOERR_GENERAL;
+#ifdef SUPPORT_ACLS
+				free_acl(&sx); /* get_acl() above may have loaded one */
+#endif
 				return NULL;
 			}
 		}

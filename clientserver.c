@@ -273,8 +273,10 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 	if (!user)
 		user = getenv("LOGNAME");
 
-	if (exchange_protocols(f_in, f_out, line, sizeof line, 1) < 0)
+	if (exchange_protocols(f_in, f_out, line, sizeof line, 1) < 0) {
+		free(modname);
 		return -1;
+	}
 
 	if (early_input_file) {
 		STRUCT_STAT st;
@@ -285,11 +287,16 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 		if (!f && ei_fd >= 0) close(ei_fd);
 		if (!f || do_fstat(fileno(f), &st) < 0) {
 			rsyserr(FERROR, errno, "failed to open %s", early_input_file);
+			if (f)
+				fclose(f);
+			free(modname);
 			return -1;
 		}
 		early_input_len = st.st_size;
 		if (early_input_len > (int)sizeof line) {
 			rprintf(FERROR, "%s is > %d bytes.\n", early_input_file, (int)sizeof line);
+			fclose(f);
+			free(modname);
 			return -1;
 		}
 		if (early_input_len > 0) {
@@ -298,6 +305,8 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 				int len;
 				if (feof(f)) {
 					rprintf(FERROR, "Early EOF in %s\n", early_input_file);
+					fclose(f);
+					free(modname);
 					return -1;
 				}
 				len = fread(line, 1, early_input_len, f);
@@ -374,6 +383,7 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 	while (1) {
 		if (!read_line_old(f_in, line, sizeof line, 0)) {
 			rprintf(FERROR, "rsync: didn't get server startup line\n");
+			free(modname);
 			return -1;
 		}
 
@@ -397,6 +407,7 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 			rprintf(FERROR, "%s\n", line);
 			/* This is always fatal; the server will now
 			 * close the socket. */
+			free(modname);
 			return -1;
 		}
 
