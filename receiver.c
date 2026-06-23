@@ -43,6 +43,7 @@ extern int write_devices;
 extern int preserve_xattrs;
 extern int do_fsync;
 extern int basis_dir_cnt;
+extern int basis_dir_perdir[MAX_BASIS_DIRS+1];
 extern int make_backups;
 extern int cleanup_got_literal;
 extern int remove_source_files;
@@ -844,7 +845,8 @@ int recv_files(int f_in, int f_out, char *local_name)
 				if (fnamecmp_type > FNAMECMP_FUZZY && fnamecmp_type-FNAMECMP_FUZZY <= basis_dir_cnt) {
 					fnamecmp_type -= FNAMECMP_FUZZY + 1;
 					if (file->dirname) {
-						pathjoin(fnamecmpbuf, sizeof fnamecmpbuf, basis_dir[fnamecmp_type], file->dirname);
+						pathjoin_altdest_dir(fnamecmpbuf, sizeof fnamecmpbuf,
+								     fnamecmp_type, file->dirname);
 						basedir = fnamecmpbuf;
 					} else {
 						basedir = basis_dir[fnamecmp_type];
@@ -856,8 +858,13 @@ int recv_files(int f_in, int f_out, char *local_name)
 						fnamecmp_type);
 					exit_cleanup(RERR_PROTOCOL);
 				} else {
-					basedir = basis_dir[fnamecmp_type];
-					fnamecmp = fname;
+					if (basis_dir_perdir[fnamecmp_type] && *basis_dir[fnamecmp_type] != '/') {
+						pathjoin_altdest(fnamecmpbuf, sizeof fnamecmpbuf, fnamecmp_type, fname);
+						fnamecmp = fnamecmpbuf;
+					} else {
+						basedir = basis_dir[fnamecmp_type];
+						fnamecmp = fname;
+					}
 				}
 				break;
 			}
@@ -893,8 +900,14 @@ int recv_files(int f_in, int f_out, char *local_name)
 
 			if (fd1 == -1 && basis_dir[0]) {
 				/* pre-29 allowed only one alternate basis */
-				basedir = basis_dir[0];
-				fnamecmp = fname;
+				if (basis_dir_perdir[0] && *basis_dir[0] != '/') {
+					pathjoin_altdest(fnamecmpbuf, sizeof fnamecmpbuf, 0, fname);
+					basedir = NULL;
+					fnamecmp = fnamecmpbuf;
+				} else {
+					basedir = basis_dir[0];
+					fnamecmp = fname;
+				}
 				fnamecmp_type = FNAMECMP_BASIS_DIR_LOW;
 				fd1 = secure_basis_open(basedir, fnamecmp, O_RDONLY, 0);
 			}
