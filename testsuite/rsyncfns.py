@@ -1189,8 +1189,15 @@ def rsync_ls_lR(directory) -> str:
         "-o -name testtmp -prune -o -print | sort | sed 's/ /\\\\ /g' | "
         f"xargs '{TOOLDIR}/tls' {TLS_ARGS}"
     )
+    # tls can emit bytes that are not valid UTF-8 (a filename or symlink target
+    # with high bytes); decode with backslashreplace so Python 3.14's strict
+    # UTF-8 text mode doesn't raise UnicodeDecodeError.  Unlike surrogateescape
+    # this yields a clean str (bad bytes shown as \xNN) that callers can safely
+    # write_text()/print() without re-raising, and it is deterministic so the
+    # listing still compares consistently.
     proc = subprocess.run(['sh', '-c', cmd], capture_output=True,
-                          text=True, cwd=str(directory))
+                          encoding='utf-8', errors='backslashreplace',
+                          cwd=str(directory))
     return proc.stdout
 
 
