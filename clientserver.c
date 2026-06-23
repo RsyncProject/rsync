@@ -1003,6 +1003,13 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	if (use_chroot) {
 		/* Cache timezone data before chroot makes /etc/localtime inaccessible */
 		tzset();
+		/* Flush gcov counters now: after chroot the build-tree .gcda
+		 * paths are unreachable, so everything this child has executed
+		 * so far (the whole rsync_module() pre-chroot path) would
+		 * otherwise be lost.  Post-chroot coverage from this child is
+		 * still unrecordable -- accepted, documented in
+		 * testsuite/COVERAGE.md. */
+		gcov_flush();
 		if (chroot(module_chdir)) {
 			rsyserr(FLOG, errno, "chroot(\"%s\") failed", module_chdir);
 			io_printf(f_out, "@ERROR: chroot failed\n");
