@@ -115,6 +115,7 @@ def probe(port, hdr, label, *, want):
     """
     s = socket.create_connection(('127.0.0.1', port), timeout=10)
     s.settimeout(10)
+    out = b''
     try:
         if hdr:
             s.sendall(hdr)
@@ -122,7 +123,6 @@ def probe(port, hdr, label, *, want):
         # list-only request.  Protocol 30, no capabilities, no auth.
         s.sendall(b'@RSYNCD: 30.0\nmod\n')
         # Slurp everything the daemon writes before it closes.
-        out = b''
         try:
             s.shutdown(socket.SHUT_WR)
         except OSError:
@@ -135,6 +135,13 @@ def probe(port, hdr, label, *, want):
             if not chunk:
                 break
             out += chunk
+    except OSError:
+        # A 'drop' daemon closes the connection, which can surface as
+        # EPIPE/ECONNRESET on our sendall() before we ever read -- a timing
+        # race seen on some CI runners.  Leave `out` empty and let the
+        # want-check below decide: for want='drop' the absent greeting is the
+        # expected outcome; for want='ok'/'denied' it still fails correctly.
+        pass
     finally:
         s.close()
 
