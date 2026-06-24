@@ -126,6 +126,19 @@ static int vfs__mknod_secure(const char *pathname, mode_t mode, dev_t dev, int f
 		if (dfd < 0)
 			return -1;
 		ret = mknodat(dfd, bname, mode, dev);
+		if (ret < 0) {
+			/* mknodat() can't make a FIFO/socket on the BSDs/macOS/
+			 * Solaris (EINVAL); retry race-safely on the held dirfd,
+			 * mirroring the secure-relpath path below.  Without this a
+			 * FIFO backup to an operator --backup-dir fails there. */
+#ifdef HAVE_MKFIFOAT
+			if (S_ISFIFO(mode))
+				ret = mkfifoat(dfd, bname, mode);
+			else
+#endif
+			if (S_ISSOCK(mode))
+				errno = EOPNOTSUPP; /* no dirfd-relative socket bind */
+		}
 		e = errno;
 		close(dfd);
 		errno = e;
