@@ -73,10 +73,12 @@ Alongside the issues enumerated elsewhere in this document, the code is hardened
 continuously through protocol fuzzing (driving the daemon protocol against a
 writable module) and static analysis, with a CI gate. This release closes a
 batch of peer-triggerable faults found that way: NULL-dereference and
-reachable-assert crashes from crafted file lists or indices, an unbounded
-merge-file recursion, and several bounded out-of-bounds writes driven by
-peer-supplied lengths. Each is fixed at the root with a bounds or validity check
-plus a defence-in-depth guard at the use site, and carries a regression test.
+reachable-assert crashes from crafted file lists or indices, reads past a
+file-list allocation (mostly bounded over-reads of an entry's extra slots),
+unbounded merge-file and suffix-list recursion, and several bounded
+out-of-bounds writes driven by peer-supplied lengths or option arguments. Each
+is fixed at the root with a bounds or validity check plus a defence-in-depth
+guard at the use site, and carries a regression test.
 Contributors adding code that consumes peer input should validate it at the
 point of receipt rather than relying on a downstream check.
 
