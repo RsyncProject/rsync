@@ -63,7 +63,15 @@ extern int module_dirfd;	/* daemon: served module root pinned by identity, or -1
 
 int secure_relpath_active(void)
 {
-	extern unsigned int module_dirlen;
+	/* The "insecure links" / --insecure-links opt-out restores the legacy
+	 * follow-any-symlink behaviour uniformly, so it disables the secure
+	 * resolver on the RECEIVER side too (not just the sender enumeration that
+	 * already checks symlink_optout_allowed()).  Without this an opted-out
+	 * module still confined receiver writes/stats through a pre-existing
+	 * in-module symlink -- failing to match the pre-3.4.3 behaviour the opt-out
+	 * promises (documented in rsyncd.conf(5) "munge symlinks"/"insecure links"). */
+	if (symlink_optout_allowed())
+		return 0;
 	if (am_daemon && am_chrooted && module_dirlen)
 		return 1;
 	return !am_chrooted && (am_daemon || !am_sender);
