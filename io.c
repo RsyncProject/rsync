@@ -1575,6 +1575,11 @@ static void read_a_msg(void)
 			goto invalid_msg;
 		val = raw_read_int();
 		iobuf.in_multiplexed = 1;
+		/* The peer may only ask us to use a SHORTER timeout (a stricter cap); a
+		 * non-positive value would disable our --timeout entirely, letting a
+		 * malicious server hang the client indefinitely, so ignore it. */
+		if (val <= 0)
+			break;
 		if (!io_timeout || io_timeout > val) {
 			if (INFO_GTE(MISC, 2))
 				rprintf(FINFO, "Setting --timeout=%d to match server\n", val);
