@@ -37,6 +37,7 @@ extern int omit_dir_times;
 extern int omit_link_times;
 extern int am_root;
 extern int am_server;
+extern int operator_path_resolve;
 extern int am_daemon;
 extern int am_sender;
 extern int am_receiver;
@@ -496,6 +497,9 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	int inherit;
 	int dfd = -1;            /* held dir fd for the entry's own dir, or -1 */
 	const char *leaf = NULL; /* leaf of fname relative to dfd */
+	int op_leaf_fd = -1;     /* O_NOFOLLOW fd pinning a cross-tree operator leaf */
+	int op_pin = 0;          /* drive chmod/chown off op_leaf_fd for a cross-tree leaf */
+	int op_refuse = 0;       /* pin open hit the symlink-race signal: refuse, don't redirect */
 #if defined SUPPORT_XATTRS || defined SUPPORT_ACLS
 	int held_fd = -1; /* held O_NOFOLLOW fd for fd-based xattr/ACL ops, or -1 */
 #endif
@@ -549,6 +553,38 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		held_fd = openat(dfd, leaf, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_NOCTTY | O_CLOEXEC);
 #endif
 
+	/* A cross-tree operator path (an absolute --backup-dir/--temp-dir/--*-dest
+	 * leaf) has no held parent dfd, so the chmod/chown below would re-resolve the
+	 * full path and could follow a parent component an attacker flips to a
+	 * symlink mid-operation -- and an lchown through such a component even retags
+	 * the planted symlink as ours (trust laundering that then defeats the
+	 * owner-walk).  Pin the leaf inode itself with an O_NOFOLLOW open via the
+	 * operator owner-walk resolver and drive fchmod/fchown off that fd.  A raced
+	 * symlink leaf makes the open fail, leaving op_leaf_fd == -1: the metadata op
+	 * is then refused, never redirected.  --insecure-links opts back out (the
+	 * resolver in do_open_at honours it), and a genuine symlink leaf (a symlink
+	 * backup) keeps the existing l-variant path. */
+	/* Gate on the INTENDED type (new_mode), not the on-disk type (sxp->st): the
+	 * attacker controls the latter via the flip, and a dir component that has
+	 * just been flipped to a symlink must still take the pinned path so the
+	 * O_NOFOLLOW open refuses it -- otherwise the lchown would launder it. */
+	op_pin = operator_path_resolve && dfd < 0 && !symlink_optout_allowed()
+	      && (S_ISREG(new_mode) || S_ISDIR(new_mode) || S_ISFIFO(new_mode));
+	if (op_pin && am_root >= 0) {
+		op_leaf_fd = do_open_at(fname, O_RDONLY | O_NONBLOCK | O_NOCTTY | O_CLOEXEC, 0);
+		/* When running as root (the uid-0 trust-laundering case) an O_RDONLY open
+		 * of a real owned reg/dir/fifo leaf never fails for permission reasons, so
+		 * ANY failure here means the leaf is being raced (a symlink refused by
+		 * O_NOFOLLOW / owner-walk -> ELOOP, or vanished mid-flip -> ENOENT):
+		 * refuse, never redirect via a re-resolvable path.  A non-root operator
+		 * cannot launder a uid-0 symlink, but can still hit a legitimate EACCES on
+		 * an owned-but-unreadable leaf; there we only treat the explicit
+		 * symlink-race signal (ELOOP) as a refusal and otherwise fall back to the
+		 * legacy path op rather than spuriously failing a real file. */
+		if (op_leaf_fd < 0 && (am_root > 0 || errno == ELOOP))
+			op_refuse = 1;
+	}
+
 	if (inherit && S_ISDIR(new_mode) && sxp->st.st_mode & S_ISGID) {
 		/* We just created this directory and its setgid
 		 * bit is on, so make sure it stays on. */
@@ -587,8 +623,10 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		if (am_root >= 0) {
 			uid_t uid = change_uid ? (uid_t)F_OWNER(file) : sxp->st.st_uid;
 			gid_t gid = change_gid ? (gid_t)F_GROUP(file) : sxp->st.st_gid;
-			if ((dfd >= 0 ? do_lchown_atfd(dfd, leaf, uid, gid)
-				      : do_lchown_at(fname, uid, gid)) != 0) {
+			if ((op_leaf_fd >= 0 ? do_fchown(op_leaf_fd, uid, gid)
+			     : op_refuse ? (errno = ELOOP, -1)
+			     : dfd >= 0 ? do_lchown_atfd(dfd, leaf, uid, gid)
+					: do_lchown_at(fname, uid, gid)) != 0) {
 				/* We shouldn't have attempted to change uid
 				 * or gid unless have the privilege. */
 				rsyserr(FERROR_XFER, errno, "%s %s failed",
@@ -705,6 +743,8 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 #ifdef HAVE_CHMOD
 	if (!BITS_EQUAL(sxp->st.st_mode, new_mode, CHMOD_BITS)) {
 		int ret = am_root < 0 ? 0
+			: op_leaf_fd >= 0 ? do_fchmod(op_leaf_fd, new_mode)
+			: op_refuse ? (errno = ELOOP, -1)
 			: dfd >= 0 && !S_ISLNK(new_mode) ? do_chmod_atfd(dfd, leaf, new_mode)
 			: do_chmod_at(fname, new_mode);
 		if (ret < 0) {
@@ -729,6 +769,8 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	if (held_fd >= 0)
 		close(held_fd);
 #endif
+	if (op_leaf_fd >= 0)
+		close(op_leaf_fd);
 	if (sxp == &sx2)
 		free_stat_x(&sx2);
 	return updated;

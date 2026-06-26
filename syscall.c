@@ -3413,6 +3413,25 @@ int do_lchown_atfd(int dfd, const char *name, uid_t owner, gid_t group)
 #endif
 }
 
+/* Mode/owner on an already-open fd (no path, no symlink to follow): the
+ * race-free way to set metadata on a cross-tree operator-path leaf that was
+ * pinned with O_NOFOLLOW.  See set_file_attrs(). */
+int do_fchown(int fd, uid_t owner, gid_t group)
+{
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+	return fchown(fd, owner, group);
+}
+
+#ifdef HAVE_CHMOD
+int do_fchmod(int fd, mode_t mode)
+{
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+	return fchmod(fd, mode);
+}
+#endif
+
 #ifdef HAVE_UTIMENSAT
 int do_utimensat_atfd(int dfd, const char *name, STRUCT_STAT *stp)
 {
