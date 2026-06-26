@@ -585,6 +585,10 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		 * legacy path op rather than spuriously failing a real file. */
 		if (op_leaf_fd < 0 && (am_root > 0 || errno == ELOOP))
 			op_refuse = 1;
+#if defined SUPPORT_XATTRS || defined SUPPORT_ACLS
+		if (op_leaf_fd >= 0)
+			held_fd = op_leaf_fd;	/* xattr/ACL ops below pin to this leaf fd too */
+#endif
 	}
 
 	if (inherit && S_ISDIR(new_mode) && sxp->st.st_mode & S_ISGID) {
@@ -597,7 +601,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		new_mode = tweak_mode(new_mode, daemon_chmod_modes);
 
 #ifdef SUPPORT_ACLS
-	if (preserve_acls && !S_ISLNK(file->mode) && !ACL_READY(*sxp))
+	if (preserve_acls && !S_ISLNK(file->mode) && !ACL_READY(*sxp) && !op_refuse)
 		get_acl_fdat(held_fd, dfd, leaf, fname, sxp);
 #endif
 
@@ -659,9 +663,9 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	}
 
 #ifdef SUPPORT_XATTRS
-	if (am_root < 0)
+	if (am_root < 0 && !op_refuse)
 		set_stat_xattr(fname, file, new_mode, held_fd);
-	if (preserve_xattrs && fnamecmp)
+	if (preserve_xattrs && fnamecmp && !op_refuse)
 		set_xattr(fname, file, fnamecmp, sxp, held_fd);
 #endif
 
@@ -716,9 +720,19 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	}
 #endif
 	if (updated & (UPDATED_MTIME|UPDATED_ATIME)) {
-		int ret = dfd >= 0 ? set_times_at(dfd, leaf, &sx2.st) : -2;
-		if (ret == -2)
-			ret = set_times(fname, &sx2.st);
+		int ret;
+#ifdef HAVE_FUTIMENS
+		if (op_leaf_fd >= 0)
+			ret = do_futimens(op_leaf_fd, &sx2.st);
+		else
+#endif
+		if (op_refuse)
+			ret = (errno = ELOOP, -1);
+		else {
+			ret = dfd >= 0 ? set_times_at(dfd, leaf, &sx2.st) : -2;
+			if (ret == -2)
+				ret = set_times(fname, &sx2.st);
+		}
 		if (ret < 0) {
 			rsyserr(FERROR_XFER, errno, "failed to set times on %s", full_fname(fname));
 			goto cleanup;
@@ -736,7 +750,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	 * If set_acl() changes permission bits in the process of setting
 	 * an access ACL, it changes sxp->st.st_mode so we know whether we
 	 * need to chmod(). */
-	if (preserve_acls && !S_ISLNK(new_mode)) {
+	if (preserve_acls && !S_ISLNK(new_mode) && !op_refuse) {
 		if (set_acl_fdat(held_fd, dfd, leaf, fname, file, sxp, new_mode) > 0)
 			updated |= UPDATED_ACLS;
 	}
@@ -768,7 +782,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	}
   cleanup:
 #if defined SUPPORT_XATTRS || defined SUPPORT_ACLS
-	if (held_fd >= 0)
+	if (held_fd >= 0 && held_fd != op_leaf_fd)	/* may alias op_leaf_fd (cross-tree) */
 		close(held_fd);
 #endif
 	if (op_leaf_fd >= 0)
@@ -841,9 +855,15 @@ int finish_transfer(const char *fname, const char *fnametmp,
 			fnamecmp = get_backup_name(fname);
 	}
 
-	/* Change permissions before putting the file into place. */
+	/* Change permissions before putting the file into place.  An absolute
+	 * --temp-dir/--partial-dir leaves fnametmp on an operator path with no held
+	 * dirfd, so resolve its metadata through the ownership walk (op_pin); a
+	 * flipped temp-dir parent then can't redirect the chmod/chown/times/etc.
+	 * (in-tree temps keep their held dirfd, so op_pin stays off there). */
+	operator_path_resolve = 1;
 	set_file_attrs(fnametmp, file, NULL, fnamecmp,
 		       ok_to_set_time ? ATTRS_ACCURATE_TIME : ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME | ATTRS_SKIP_CRTIME);
+	operator_path_resolve = 0;
 
 	/* move tmp file over real file */
 	if (DEBUG_GTE(RECV, 1))

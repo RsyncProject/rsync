@@ -880,9 +880,21 @@ int do_link_at(const char *old_path, const char *new_path)
 	 * "cd/target.txt", ...) escape the module.  An absolute path uses
 	 * AT_FDCWD + the full path; each side is confined independently, so an
 	 * absolute source (e.g. an absolute --link-dest) cannot disable
-	 * confinement of a relative destination. */
+	 * confinement of a relative destination.  An absolute side is an operator
+	 * path resolved via the ownership walk (foreign-owned parent symlink refused;
+	 * --insecure-links keeps the legacy AT_FDCWD path). */
 	if (*old_path == '/') {
-		old_bname = old_path;
+#if defined O_NOFOLLOW && defined O_DIRECTORY
+		if (!symlink_optout_allowed()) {
+			operator_path_resolve = 1;	/* operator side: enforce module-exclude */
+			old_dfd = owner_walk_parent(old_path, &old_bname);
+			operator_path_resolve = 0;
+			if (old_dfd < 0)
+				return -1;
+			old_owns = True;
+		} else
+#endif
+			old_bname = old_path;
 	} else if (old_slash) {
 		old_dlen = old_slash - old_path;
 		if (old_dlen >= sizeof old_dirpath) { errno = ENAMETOOLONG; return -1; }
@@ -898,7 +910,21 @@ int do_link_at(const char *old_path, const char *new_path)
 	}
 
 	if (*new_path == '/') {
-		new_bname = new_path;
+#if defined O_NOFOLLOW && defined O_DIRECTORY
+		if (!symlink_optout_allowed()) {
+			operator_path_resolve = 1;	/* operator side: enforce module-exclude */
+			new_dfd = owner_walk_parent(new_path, &new_bname);
+			operator_path_resolve = 0;
+			if (new_dfd < 0) {
+				e = errno;
+				if (old_owns) close(old_dfd);
+				errno = e;
+				return -1;
+			}
+			new_owns = True;
+		} else
+#endif
+			new_bname = new_path;
 	} else if (new_slash) {
 		new_dlen = new_slash - new_path;
 		if (new_dlen >= sizeof new_dirpath) {
@@ -1645,14 +1671,26 @@ int do_rename_at(const char *old_path, const char *new_path)
 	old_slash = strrchr(old_path, '/');
 	new_slash = strrchr(new_path, '/');
 
-	/* An absolute path uses AT_FDCWD with the full path; only a *relative* side
-	 * is confined under the secure resolver.  Confine each side independently:
-	 * an absolute source (e.g. an absolute --temp-dir temp file) must NOT
-	 * disable confinement of a relative destination, or finish_transfer's
-	 * tmp->final rename re-resolves the dest from the path and a flipped parent
-	 * symlink writes the file outside the tree (a symlink-race write escape). */
+	/* Confine each side independently.  A *relative* side is a transfer path,
+	 * confined beneath the tree via secure_relative_open().  An *absolute* side is
+	 * an operator path (an absolute --temp-dir/--partial-dir temp file): resolve
+	 * its parent via the ownership walk so a flipped foreign-owned parent symlink
+	 * can't redirect the rename out of tree, while still allowing the operator's
+	 * own dirs/".."/uid0-or-euid symlinks.  (--insecure-links keeps the legacy
+	 * unconfined AT_FDCWD path.)  Doing each side independently means an absolute
+	 * source never disables confinement of a relative destination. */
 	if (*old_path == '/') {
-		old_bname = old_path;
+#if defined O_NOFOLLOW && defined O_DIRECTORY
+		if (!symlink_optout_allowed()) {
+			operator_path_resolve = 1;	/* operator side: enforce module-exclude */
+			old_dfd = owner_walk_parent(old_path, &old_bname);
+			operator_path_resolve = 0;
+			if (old_dfd < 0)
+				return -1;
+			old_owns = True;
+		} else
+#endif
+			old_bname = old_path;
 	} else if (old_slash) {
 		old_dlen = old_slash - old_path;
 		if (old_dlen >= sizeof old_dirpath) {
@@ -1671,7 +1709,21 @@ int do_rename_at(const char *old_path, const char *new_path)
 	}
 
 	if (*new_path == '/') {
-		new_bname = new_path;
+#if defined O_NOFOLLOW && defined O_DIRECTORY
+		if (!symlink_optout_allowed()) {
+			operator_path_resolve = 1;	/* operator side: enforce module-exclude */
+			new_dfd = owner_walk_parent(new_path, &new_bname);
+			operator_path_resolve = 0;
+			if (new_dfd < 0) {
+				e = errno;
+				if (old_owns) close(old_dfd);
+				errno = e;
+				return -1;
+			}
+			new_owns = True;
+		} else
+#endif
+			new_bname = new_path;
 	} else if (new_slash) {
 		new_dlen = new_slash - new_path;
 		if (new_dlen >= sizeof new_dirpath) {
@@ -3431,6 +3483,31 @@ int do_fchmod(int fd, mode_t mode)
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
 	return fchmod(fd, mode);
+}
+#endif
+
+#ifdef HAVE_FUTIMENS
+/* Set times on an already-open fd (the race-free counterpart for a pinned
+ * cross-tree operator leaf -- see set_file_attrs()). */
+int do_futimens(int fd, STRUCT_STAT *stp)
+{
+	struct timespec t[2];
+
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+	t[0].tv_sec = stp->st_atime;
+#ifdef ST_ATIME_NSEC
+	t[0].tv_nsec = stp->ST_ATIME_NSEC;
+#else
+	t[0].tv_nsec = 0;
+#endif
+	t[1].tv_sec = stp->st_mtime;
+#ifdef ST_MTIME_NSEC
+	t[1].tv_nsec = stp->ST_MTIME_NSEC;
+#else
+	t[1].tv_nsec = 0;
+#endif
+	return futimens(fd, t);
 }
 #endif
 
