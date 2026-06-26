@@ -767,13 +767,153 @@ def start_path_flipper(name_a, name_b):
 
 
 def stop_flipper(proc):
-    """Stop a start_path_flipper() process."""
+    """Stop a start_path_flipper()/start_c_flipper() process."""
     proc.terminate()
     try:
         proc.wait(timeout=2)
     except subprocess.TimeoutExpired:
         proc.kill()
         proc.wait()
+
+
+# A compiled flipper wins TOCTOU races far more reliably than the Python one:
+# on a journaled disk fs it does ~2x the swaps/sec with a plain rename loop and
+# ~7x with renameat2(RENAME_EXCHANGE) -- which is also denser, as EXCHANGE is a
+# single atomic syscall with no transient missing-name window.  Compiled on
+# demand against the build's config.h so the renameat2/portability guards match
+# the target; falls back to the Python flipper where no compiler is available.
+_C_FLIPPER_SRC = r'''
+/* testsuite flipper: repeatedly swap two sibling names a<->b so a shared path
+ * keeps flipping (typically real-dir <-> symlink) under a running rsync.
+ * Prefers atomic renameat2(RENAME_EXCHANGE); falls back to a 3-rename dance.
+ * Self-terminates when its parent (the test) goes away, plus a deadline
+ * backstop, so a killed test never leaks an orphan that poisons later tests.
+ * Built on demand by rsyncfns.compile_c_flipper(); not linked into rsync. */
+#define _GNU_SOURCE 1
+#include "config.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <time.h>
+#include <sys/stat.h>
+#if defined(__linux__)
+# include <sys/syscall.h>
+# ifndef RENAME_EXCHANGE
+#  define RENAME_EXCHANGE (1 << 1)
+# endif
+#endif
+
+static double mono(void) {
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return t.tv_sec + t.tv_nsec / 1e9;
+}
+
+static int use_exchange = 1;
+
+static void flip(const char *a, const char *b) {
+#if defined(__linux__) && defined(SYS_renameat2)
+    if (use_exchange) {
+        if (syscall(SYS_renameat2, AT_FDCWD, a, AT_FDCWD, b, RENAME_EXCHANGE) == 0)
+            return;
+        if (errno == ENOSYS || errno == EINVAL || errno == EOPNOTSUPP)
+            use_exchange = 0;   /* kernel or filesystem lacks EXCHANGE */
+        else
+            return;             /* transient race error (e.g. ENOENT): retry */
+    }
+#endif
+    {
+        char tmp[4096];
+        if (snprintf(tmp, sizeof tmp, "%s.flip", a) >= (int)sizeof tmp)
+            return;                 /* too long: don't act on a truncated name */
+        rmdir(tmp); unlink(tmp);    /* clear a stale scratch from a wedged half-swap */
+        if (rename(a, tmp) != 0) {
+            mkdir(a, 0700);         /* a was consumed: recreate so the next loop swaps */
+            return;
+        }
+        if (rename(b, a) != 0)
+            rename(tmp, a);         /* b gone: restore a, retry next loop */
+        else
+            rename(tmp, b);         /* complete the swap */
+    }
+}
+
+int main(int argc, char **argv) {
+    if (argc < 3) {
+        fprintf(stderr, "usage: %s PATH_A PATH_B\n", argv[0]);
+        return 2;
+    }
+    const char *a = argv[1], *b = argv[2];
+    pid_t parent = getppid();
+    double deadline = mono() + 300.0;   /* backstop if never reaped */
+    while (getppid() == parent && mono() < deadline)
+        flip(a, b);
+    return 0;
+}
+'''
+
+_c_flipper_bin = None  # None=untried, ''=unavailable, else path
+
+
+def _detect_cc():
+    """The C compiler the tree was built with (so the flipper matches the
+    target), falling back to a plain cc/gcc/clang on PATH."""
+    cc = os.environ.get('CC')
+    if cc:
+        return cc
+    import re
+    # The generated Makefile lives in the BUILD dir (TOOLDIR); for a VPATH build
+    # that is not SRCDIR.  Prefer TOOLDIR, fall back to SRCDIR for an in-tree build.
+    for d in (TOOLDIR, SRCDIR):
+        mk = d / 'Makefile'
+        if mk.is_file():
+            m = re.search(r'(?m)^CC\s*=\s*(.+?)\s*$', mk.read_text())
+            if m and m.group(1):
+                return m.group(1)
+    for c in ('cc', 'gcc', 'clang'):
+        if shutil.which(c):
+            return c
+    return None
+
+
+def compile_c_flipper():
+    """Build (once, cached) the C flipper against the build's config.h.  Returns
+    its path, or None if no compiler is available (caller uses the Python flipper)."""
+    global _c_flipper_bin
+    if _c_flipper_bin is not None:
+        return _c_flipper_bin or None
+    cc = _detect_cc()
+    src = SCRATCHDIR / 't_flipper.c'
+    out = SCRATCHDIR / ('t_flipper' + ('.exe' if os.name == 'nt' else ''))
+    if not cc:
+        _c_flipper_bin = ''
+        return None
+    src.write_text(_C_FLIPPER_SRC)
+    # config.h is generated into the BUILD dir (TOOLDIR); the Makefile compiles
+    # with `-I. -I$(srcdir)`, so mirror that (TOOLDIR first, then SRCDIR).
+    cmd = (shlex.split(cc)
+           + ['-O2', f'-I{TOOLDIR}', f'-I{SRCDIR}', '-o', str(out), str(src)])
+    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                          text=True)
+    if proc.returncode != 0 or not os.access(out, os.X_OK):
+        _c_flipper_bin = ''
+        return None
+    _c_flipper_bin = str(out)
+    return _c_flipper_bin
+
+
+def start_c_flipper(name_a, name_b):
+    """Like start_path_flipper() but execs the compiled flipper for a far higher
+    flip rate (a stronger RED oracle on slow filesystems).  Transparently falls
+    back to the Python flipper where no compiler is available.  Returns a Popen;
+    stop with stop_flipper()."""
+    binpath = compile_c_flipper()
+    if binpath:
+        return subprocess.Popen([binpath, str(name_a), str(name_b)])
+    return start_path_flipper(name_a, name_b)
 
 
 def cp_p(src, dst) -> 'None':
