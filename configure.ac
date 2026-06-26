@@ -897,7 +897,7 @@ AC_CHECK_FUNCS(waitpid wait4 getcwd chown chmod lchmod mknod mkfifo fdopendir \
     setlocale setmode open64 lseek64 mkstemp64 mtrace va_copy __va_copy \
     seteuid strerror putenv iconv_open locale_charset nl_langinfo getxattr \
     extattr_get_link sigaction sigprocmask setattrlist getgrouplist \
-    initgroups utimensat posix_fallocate attropen setvbuf nanosleep usleep \
+    initgroups utimensat futimens posix_fallocate attropen setvbuf nanosleep usleep \
     setenv unsetenv)
 
 dnl dirfd() is a macro or static inline on several systems (the BSDs), so the
