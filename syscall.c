@@ -101,9 +101,8 @@ int symlink_optout_allowed(void)
  * name is not excluded may still resolve into an excluded IN-module subtree,
  * exactly as in stock rsync.  The defense for a writable module is `munge
  * symlinks` (see rsyncd.conf(5)), not this walk.  No-op unless we're a daemon. */
-static int abspath_excluded_by_module(const char *abspath, int name_is_dir)
+static int abspath_excluded_by_module(const char *abspath)
 {
-	(void)name_is_dir;
 	if (!am_daemon || !abspath || !module_dir)
 		return 0;
 	if (module_dirlen <= 1)			/* module root is "/": nothing is outside */
@@ -254,7 +253,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 					saved_errno = errno;
 					goto out;
 				}
-				if (abspath_excluded_by_module(abspath, 0)) {
+				if (abspath_excluded_by_module(abspath)) {
 					saved_errno = ELOOP;
 					goto out;
 				}
@@ -324,7 +323,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 				saved_errno = errno;
 				goto out;
 			}
-			if (abspath_excluded_by_module(abspath, S_ISDIR(lst.st_mode))) {
+			if (abspath_excluded_by_module(abspath)) {
 				saved_errno = ELOOP;
 				goto out;
 			}
@@ -348,7 +347,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 			saved_errno = errno;
 			goto out;
 		}
-		if (abspath_excluded_by_module(abspath, 1)) {
+		if (abspath_excluded_by_module(abspath)) {
 			saved_errno = ELOOP;
 			goto out;
 		}
@@ -446,22 +445,12 @@ int owner_walk_parent(const char *path, const char **bname)
 	 * resolved leaf and refuse it. */
 	if (pabs[0]) {
 		char leafabs[MAXPATHLEN];
-		STRUCT_STAT lst;
-		int isdir = 0, absent = 0, refuse;
-		if (fstatat(dfd, *bname, &lst, AT_SYMLINK_NOFOLLOW) == 0)
-			isdir = S_ISDIR(lst.st_mode);
-		else
-			absent = 1;	/* mkdir/rename target: type unknown yet */
 		if (snprintf(leafabs, sizeof leafabs, "%s/%s", pabs, *bname) >= (int)sizeof leafabs) {
 			close(dfd);
 			errno = ENAMETOOLONG;	/* fail closed, never skip the check */
 			return -1;
 		}
-		/* For an absent leaf the op may create a dir, so also test dir-only
-		 * filter rules (a "/foo/" rule never matches a file). */
-		refuse = abspath_excluded_by_module(leafabs, isdir)
-		      || (absent && abspath_excluded_by_module(leafabs, 1));
-		if (refuse) {
+		if (abspath_excluded_by_module(leafabs)) {
 			close(dfd);
 			errno = ELOOP;
 			return -1;
@@ -2609,7 +2598,7 @@ static int ds_descend(struct dirstack *ds, const char *part, int *hops)
 			return -1;
 		/* exclude-aware: refuse descending into a module-hidden dir (catches a
 		 * symlink that redirected the walk into an excluded subtree). */
-		if (abspath_excluded_by_module(ds->abspath, 1)) {
+		if (abspath_excluded_by_module(ds->abspath)) {
 			errno = ELOOP;
 			return -1;
 		}
@@ -2720,7 +2709,7 @@ static int secure_walk_at(int anchor_fd, const char *anchor_abspath,
 				char leafabs[MAXPATHLEN];
 				if (snprintf(leafabs, sizeof leafabs, "%s/%s", ds.abspath, part)
 				      < (int)sizeof leafabs
-				 && abspath_excluded_by_module(leafabs, 0)) {
+				 && abspath_excluded_by_module(leafabs)) {
 					errno = ELOOP;
 					goto cleanup;
 				}
