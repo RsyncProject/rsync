@@ -79,6 +79,7 @@ BOOL flist_receiving_enabled = False;
 /* Ignore an EOF error if non-zero. See whine_about_eof(). */
 int kluge_around_eof = 0;
 int got_kill_signal = -1; /* is set to 0 only after multiplexed I/O starts */
+volatile sig_atomic_t got_sigusr2 = 0; /* set by the async-signal-safe SIGUSR2 handler */
 
 int sock_f_in = -1;
 int sock_f_out = -1;
@@ -220,9 +221,15 @@ static NORETURN void whine_about_eof(BOOL allow_kluge)
 		int i;
 		if (kluge_around_eof > 0)
 			exit_cleanup(0);
-		/* If we're still here after 10 seconds, exit with an error. */
-		for (i = 10*1000/20; i--; )
+		/* The receiver is waiting here for the generator's SIGUSR2; act on it
+		 * (exit cleanly) the moment it arrives rather than sleeping the full
+		 * 10s and then erroring.  The async-signal-safe handler only sets the
+		 * flag, so this loop must poll it. */
+		for (i = 10*1000/20; i--; ) {
+			if (got_sigusr2)
+				receive_sigusr2();
 			msleep(20);
+		}
 	}
 
 	rprintf(FERROR, RSYNC_NAME ": connection unexpectedly closed "
@@ -246,6 +253,9 @@ static size_t safe_read(int fd, char *buf, size_t len)
 		struct timeval tv;
 		fd_set r_fds, e_fds;
 		int cnt;
+
+		if (got_sigusr2)	/* receiver told to wrap up (e.g. a --read-batch fd) */
+			receive_sigusr2();
 
 		FD_ZERO(&r_fds);
 		FD_SET(fd, &r_fds);
@@ -315,6 +325,9 @@ static void safe_write(int fd, const char *buf, size_t len)
 
 	assert(fd != iobuf.out_fd);
 
+	if (got_sigusr2)	/* receiver told to wrap up before this (batch) write */
+		receive_sigusr2();
+
 	n = write(fd, buf, len);
 	if ((size_t)n == len)
 		return;
@@ -335,6 +348,9 @@ static void safe_write(int fd, const char *buf, size_t len)
 		struct timeval tv;
 		fd_set w_fds;
 		int cnt;
+
+		if (got_sigusr2)	/* receiver told to wrap up (e.g. a --write-batch fd) */
+			receive_sigusr2();
 
 		FD_ZERO(&w_fds);
 		FD_SET(fd, &w_fds);
@@ -749,6 +765,8 @@ static char *perform_io(size_t needed, int flags)
 
 		if (got_kill_signal > 0)
 			handle_kill_signal(True);
+		if (got_sigusr2)
+			receive_sigusr2();
 
 		if (extra_flist_sending_enabled) {
 			if (file_total - file_old_total < MAX_FILECNT_LOOKAHEAD && IN_MULTIPLEXED_AND_READY)
@@ -878,6 +896,8 @@ static char *perform_io(size_t needed, int flags)
 
 		if (got_kill_signal > 0)
 			handle_kill_signal(True);
+		if (got_sigusr2)
+			receive_sigusr2();
 
 		/* We need to help prevent deadlock by doing what reading
 		 * we can whenever we are here trying to write. */
@@ -900,6 +920,8 @@ static char *perform_io(size_t needed, int flags)
 
 	if (got_kill_signal > 0)
 		handle_kill_signal(True);
+	if (got_sigusr2)
+		receive_sigusr2();
 
 	data = iobuf.in.buf + iobuf.in.pos;
 
