@@ -730,7 +730,7 @@ struct ht_int64_node {
 	int64 key;
 };
 
-#define HT_NODE(tbl, bkts, i) ((void*)((char*)(bkts) + (i)*(tbl)->node_size))
+#define HT_NODE(tbl, bkts, i) ((void*)((char*)(bkts) + (size_t)(i)*(tbl)->node_size))
 #define HT_KEY(node, k64) ((k64)? ((struct ht_int64_node*)(node))->key \
 			 : (int64)((struct ht_int32_node*)(node))->key)
 
