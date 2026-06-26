@@ -25,6 +25,7 @@
 extern int dry_run;
 extern int do_xfers;
 extern int am_root;
+extern int am_daemon;
 extern int am_server;
 extern int inc_recurse;
 extern int log_before_transfer;
@@ -960,11 +961,16 @@ int recv_files(int f_in, int f_out, char *local_name)
 				const char *slash = strrchr(fnamecmp, '/');
 				fd1 = do_open_atfd(bdfd, slash ? slash + 1 : fnamecmp, O_RDONLY, 0);
 			} else {
-				/* A --partial-dir basis is an operator/peer path: resolve it with
-				 * the exclude-aware ownership walk so a symlinked partial-dir
-				 * can't read (and feed back as delta) a file in an excluded
-				 * subtree. */
-				if (fnamecmp_type == FNAMECMP_PARTIAL_DIR)
+				/* An operator-supplied basis -- a --partial-dir, or an
+				 * alt-dest basedir (--copy-dest/--compare-dest/--link-dest) --
+				 * is a peer/operator path: resolve it with the exclude-aware
+				 * ownership walk so a flipped foreign-owned parent symlink can't
+				 * read (and feed back as delta) an out-of-tree / excluded file.
+				 * The walk still allows the legitimate "../sibling" basis (#915)
+				 * and the operator's own uid0/euid symlinks.  A daemon keeps its
+				 * stronger confinement branch in secure_basis_open(), so only
+				 * route the alt-dest basedir read through the walk off-daemon. */
+				if ((basedir && !am_daemon) || fnamecmp_type == FNAMECMP_PARTIAL_DIR)
 					operator_path_resolve = 1;
 				fd1 = secure_basis_open(basedir, fnamecmp, O_RDONLY, 0);
 				operator_path_resolve = 0;
@@ -983,7 +989,10 @@ int recv_files(int f_in, int f_out, char *local_name)
 				basedir = basis_dir[0];
 				fnamecmp = fname;
 				fnamecmp_type = FNAMECMP_BASIS_DIR_LOW;
+				if (!am_daemon)
+					operator_path_resolve = 1;
 				fd1 = secure_basis_open(basedir, fnamecmp, O_RDONLY, 0);
+				operator_path_resolve = 0;
 			}
 		}
 
