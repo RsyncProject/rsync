@@ -238,15 +238,16 @@ in the values of parameters.  See that section for details.
     When it has to limit access to a particular subdir (either due to chroot
     being disabled or having an inside-chroot path set), rsync will munge
     symlinks (by default) and sanitize paths.  Those that dislike munged
-    symlinks (and really, really trust their users to not break out of the
-    subdir) can disable the symlink munging via the "[munge symlinks](#)"
-    parameter.
+    symlinks can disable the symlink munging via the "[munge symlinks](#)"
+    parameter; incoming symlink values are then sanitized instead (see that
+    parameter).
 
-    When rsync is sanitizing paths, it trims ".." path elements from args that
-    it believes would escape the module hierarchy. It also substitutes leading
-    slashes in absolute paths with the module's path (so that options such as
-    `--backup-dir` & `--compare-dest` interpret an absolute path as rooted in
-    the module's "[path](#)" dir).
+    When rsync is sanitizing paths, it resolves away the ".." path elements that
+    would take an arg above the module hierarchy.  For an operator-supplied
+    option path such as `--backup-dir` & `--compare-dest`, a leading slash is
+    also substituted with the module's path (so an absolute path is interpreted
+    as rooted in the module's "[path](#)" dir); for the transfer's own source
+    args a leading slash is simply dropped.
 
     When a chroot is in effect *and* the "[name converter](#)" parameter is
     *not* set, the "[numeric ids](#)" parameter will default to being enabled
@@ -342,44 +343,43 @@ in the values of parameters.  See that section for details.
 
 0.  `munge symlinks`
 
-    This parameter tells rsync to modify all symlinks in the same way as the
-    (non-daemon-affecting) `--munge-links` command-line option (using a method
-    described below).  This should help protect your files from user trickery
-    when your daemon module is writable.  The default is disabled when
-    "[use chroot](#)" is on with an inside-chroot path of "/", OR if "[daemon chroot](#)"
-    is on, otherwise it is enabled.
+    This parameter tells rsync to modify all incoming symlinks the same way as
+    the (non-daemon-affecting) `--munge-links` command-line option: it prefixes
+    each stored symlink's value with the string "/rsyncd-munged/".  Because that
+    directory does not normally exist, a munged symlink cannot be followed, so
+    an uploaded symlink cannot be used to read or write a file through it.  On
+    the way back out the prefix is stripped, so clients see the original symlink
+    values.  When this parameter is enabled, rsync refuses to run a module if
+    "/rsyncd-munged/" already exists in it as a directory or a symlink to a
+    directory.  The default depends on chroot.  For a plain chrooted module --
+    "[use chroot](#)" on and "[path](#)" with no "/./" split, so the daemon
+    chroots straight into the module and serves it as the chroot root -- munging
+    is disabled by default, since the chroot itself already stops a symlink from
+    escaping.  In every other case it is enabled: any non-chroot module, or a
+    chroot module whose "[path](#)" uses a "/./" split to serve an inner subdir
+    below the chroot root.
 
-    If you disable this parameter on a daemon that is not read-only, there are
-    tricks that a user can play with uploaded symlinks to access
-    daemon-excluded items (if your module has any), and, if "[use chroot](#)" is
-    off, rsync can even be tricked into showing or changing data that is
-    outside the module's path (as access-permissions allow).  This parameter --
-    not the "[exclude](#)"/"[filter](#)" chain, which only matches logical names --
-    is what defends a writable module against symlink trickery; keep it enabled.
+    When this parameter is disabled on a writable module whose access is limited
+    to a subdir (i.e. "[use chroot](#)" is off, or the inside-chroot path is not
+    "/"), an incoming symlink is not prefixed but is still sanitized as it is
+    stored: a leading slash is dropped and any leading ".." components that would
+    take the value above the module are removed, so a stored symlink's value
+    cannot name a path outside the module (it can still point to another name
+    inside the module).
 
-    The way rsync disables the use of symlinks is to prefix each one with the
-    string "/rsyncd-munged/".  This prevents the links from being used as long
-    as that directory does not exist.  When this parameter is enabled, rsync
-    will refuse to run if that path is a directory or a symlink to a directory.
+    Munging changes only the symlink VALUES that are stored.  Whether the daemon
+    follows a *pre-existing* in-module symlink when it resolves a transfer path
+    is a separate matter, governed by the secure path resolver that is on by
+    default; see the "[insecure links](#)" parameter for the exact rule and how
+    to opt out of it.
+
     When using the "munge symlinks" parameter in a chroot area that has an
     inside-chroot path of "/", you should add "/rsyncd-munged/" to the exclude
     setting for the module so that a user can't try to create it.
 
-    Note:  rsync makes no attempt to verify that any pre-existing symlinks in
-    the module's hierarchy are as safe as you want them to be (unless, of
-    course, it just copied in the whole hierarchy).  If you setup an rsync
-    daemon on a new area or locally add symlinks, you can manually protect your
-    symlinks from being abused by prefixing "/rsyncd-munged/" to the start of
-    every symlink's value.  There is a perl script in the support directory of
-    the source code named "munge-symlinks" that can be used to add or remove
-    this prefix from your symlinks.
-
-    When this parameter is disabled on a writable module and "[use chroot](#)" is
-    off (or the inside-chroot path is not "/"), incoming symlinks will be
-    modified to drop a leading slash and to remove ".." path elements that
-    rsync believes will allow a symlink to escape the module's hierarchy.
-    There are tricky ways to work around this, though, so you had better trust
-    your users if you choose this combination of parameters.
+    To add or remove the "/rsyncd-munged/" prefix on symlinks yourself (for
+    instance on links you create locally inside a module), there is a python
+    script in the support directory of the source code named "munge-symlinks".
 
 0.  `insecure links`
 
@@ -768,9 +768,11 @@ in the values of parameters.  See that section for details.
     passwords.
 
     There is no default for the "secrets file" parameter, you must choose a
-    name (such as `/etc/rsyncd.secrets`).  The file must normally not be
-    readable by "other"; see "[strict modes](#)".  If the file is not found or is
-    rejected, no logins for an "[auth users](#)" module will be possible.
+    name (such as `/etc/rsyncd.secrets`).  Unless "[strict modes](#)" is
+    disabled, the file must not be readable or writable by "other", and (when
+    the daemon runs as root) must be owned by root; see "[strict modes](#)" for
+    the exact check.  If the file is not found or is rejected, no logins for an
+    "[auth users](#)" module will be possible.
 
 0.  `auth digest`
 
@@ -812,11 +814,14 @@ in the values of parameters.  See that section for details.
 0.  `strict modes`
 
     This parameter determines whether or not the permissions on the secrets
-    file will be checked.  If "strict modes" is true, then the secrets file
-    must not be readable by any user ID other than the one that the rsync
-    daemon is running under.  If "strict modes" is false, the check is not
-    performed.  The default is true.  This parameter was added to accommodate
-    rsync running on the Windows operating system.
+    file will be checked.  If "strict modes" is true (the default), the secrets
+    file is rejected if it is readable or writable by "other" (i.e. if any of
+    the other-read or other-write permission bits is set), and, when the daemon
+    is running as root, if the file is not owned by root.  Group permissions and
+    the other-execute bit are not consulted, so modes such as 600 or 640 are
+    accepted while 644 (or any other-readable/-writable mode) is rejected.  If
+    "strict modes" is false, no permission check is performed.  This parameter
+    was added to accommodate rsync running on the Windows operating system.
 
 0.  `hosts allow`
 

@@ -1041,11 +1041,17 @@ expand it.
     are implied when [`--relative`](#opt) is used.  If "path/foo" is a symlink to "bar"
     on the destination system, the receiving rsync would ordinarily delete
     "path/foo", recreate it as a directory, and receive the file into the new
-    directory.  With `--no-implied-dirs`, the receiving rsync updates
-    "path/foo/file" using the existing path elements, which means that the file
-    ends up being created in "path/bar".  Another way to accomplish this link
-    preservation is to use the [`--keep-dirlinks`](#opt) option (which will also affect
-    symlinks to directories in the rest of the transfer).
+    directory.  With `--no-implied-dirs`, the receiving rsync leaves the
+    existing "path/foo" symlink in place and follows it, so the file is written
+    through the symlink and ends up in "path/bar".  Note the security
+    implication: a pre-existing in-tree symlink-to-directory on the receiving
+    side will redirect where the file is written, so only use
+    `--no-implied-dirs` when you trust the destination's existing path elements.
+    (A symlink whose target is absolute or escapes the destination tree is still
+    refused by the secure path resolver rather than followed.)  Another way to
+    accomplish this link preservation is to use the [`--keep-dirlinks`](#opt)
+    option (which will also affect symlinks to directories in the rest of the
+    transfer).
 
     When pulling files from an rsync older than 3.0.0, you may need to use this
     option if the sending side has a symlink in the path you request and you
@@ -1284,14 +1290,17 @@ expand it.
     and so are any symlinks in the source path itself when [`--relative`](#opt)
     is used.
 
-    Note that the cut-off point is the top of the transfer, which is the part
-    of the path that rsync isn't mentioning in the verbose output.  If you copy
-    "/src/subdir" to "/dest/" then the "subdir" directory is a name inside the
-    transfer tree, not the top of the transfer (which is /src) so it is legal
-    for created relative symlinks to refer to other names inside the /src and
-    /dest directories.  If you instead copy "/src/subdir/" (with a trailing
-    slash) to "/dest/subdir" that would not allow symlinks to any files outside
-    of "subdir".
+    A symlink is judged unsafe by a lexical test on its value, without resolving
+    it on disk.  An absolute or empty target is always unsafe.  A relative
+    target is unsafe if its ".." components would climb above the top of the
+    transfer; a ".." that appears anywhere other than as a leading prefix (an
+    embedded or trailing "/..") is also treated as unsafe.  The top is set by
+    how the source is specified: a trailing slash on the source (e.g.
+    "/src/subdir/" copied to "/dest/subdir") makes that directory itself the
+    top, so a symlink may not point above it; without the trailing slash (e.g.
+    "/src/subdir" copied to "/dest/") the source's parent ("/src") is the top,
+    so "subdir" is a name inside the transfer and a relative symlink may point
+    to any other name within it.
 
     Note that safe symlinks are only copied if [`--links`](#opt) was also
     specified or implied. The `--copy-unsafe-links` option has no extra effect
@@ -2500,10 +2509,12 @@ expand it.
       `--files-from`, as does `--no-R` and all other options).
 
     The filenames that are read from the FILE are all relative to the source
-    dir -- any leading slashes are removed and no ".." references are allowed
-    to go higher than the source dir.  Blank entries are ignored, as are
-    whole-entry comments that start with '`;`' or '`#`'.  For example, take
-    this command:
+    dir: any leading slash is removed, and ".." components are resolved away so
+    an entry cannot rise above the source dir -- e.g. "../foo" is taken as "foo"
+    within the source dir.  An entry that still contains an active ".." after
+    that resolution (one that cannot be collapsed) is rejected with an error.
+    Blank entries are ignored, as are whole-entry comments that start with '`;`'
+    or '`#`'.  For example, take this command:
 
     >     rsync -a --files-from=/tmp/foo /usr remote:/backup
 
