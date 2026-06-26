@@ -367,17 +367,31 @@ static void flist_expand(struct file_list *flist, int extra)
 {
 	struct file_struct **new_ptr;
 
+	/* Refuse BEFORE any int arithmetic below can overflow: used+extra (computed
+	 * in the early-return and the cap below) and the malloced growth math.  Only
+	 * reachable past INT_MAX entries (my_alloc's --max-alloc cap normally stops
+	 * the list growing anywhere near there). */
+	if (extra < 0 || flist->used < 0 || flist->used > INT_MAX - extra)
+		goto too_large;
+
 	if (flist->used + extra <= flist->malloced)
 		return;
 
 	if (flist->malloced < FLIST_START)
 		flist->malloced = FLIST_START;
-	else if (flist->malloced >= FLIST_LINEAR)
+	else if (flist->malloced >= FLIST_LINEAR) {
+		if (flist->malloced > INT_MAX - FLIST_LINEAR)
+			goto too_large;
 		flist->malloced += FLIST_LINEAR;
-	else if (flist->malloced < FLIST_START_LARGE/16)
+	} else if (flist->malloced < FLIST_START_LARGE/16) {
+		if (flist->malloced > INT_MAX/4)
+			goto too_large;
 		flist->malloced *= 4;
-	else
+	} else {
+		if (flist->malloced > INT_MAX/2)
+			goto too_large;
 		flist->malloced *= 2;
+	}
 
 	/* In case count jumped or we are starting the list
 	 * with a known size just set it. */
@@ -394,6 +408,11 @@ static void flist_expand(struct file_list *flist, int extra)
 	}
 
 	flist->files = new_ptr;
+	return;
+
+  too_large:
+	rprintf(FERROR, "[%s] file list has grown too large to expand\n", who_am_i());
+	exit_cleanup(RERR_MALLOC);
 }
 
 static void flist_done_allocating(struct file_list *flist)
