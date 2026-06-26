@@ -392,13 +392,39 @@ int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
 	int len;   /* Number of bytes read into `buf'. */
 	OFF_T prealloc_len = 0, offset = 0;
 
-	/* For a hardened receiver, route a *relative* source open through
-	 * secure_relative_open so a parent-symlink on the source path
-	 * (e.g. --copy-dest=cd where cd is a symlink to an outside
-	 * directory) cannot redirect the read.  An absolute source is an
-	 * operator-trusted (absolutized) basis dir and uses do_open_nofollow. */
+	/* For any hardened (non-chrooted) receiver, route the source open through
+	 * secure_relative_open so a parent-symlink on the source path (e.g.
+	 * --copy-dest=cd where cd is a symlink to an outside directory) cannot
+	 * redirect the read to a file the attacker should not see.  Plain
+	 * do_open_nofollow only refuses a final-component symlink; parents are
+	 * still followed.  An ABSOLUTE source is an operator basis (e.g. an absolute
+	 * --copy-dest): confine its parents via the ownership walk -- a foreign-owned
+	 * parent symlink is refused, the operator's own dirs/uid0/euid symlinks
+	 * followed -- so a flipped parent can't redirect the basis read out of tree.
+	 * operator_path_resolve is set only across the walk (so module-exclude is
+	 * enforced) and restored, leaving the caller's value for the dest side -- this
+	 * is why confining the source here does not re-open the copy_xattrs dest
+	 * race the way wrapping the whole copy_altdest_file would. */
 	if (secure_relpath_active() && source && *source && source[0] != '/')
 		ifd = secure_relative_open(NULL, source, O_RDONLY | O_NOFOLLOW, 0);
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+	else if (secure_relpath_active() && source && source[0] == '/'
+	      && !symlink_optout_allowed()) {
+		int save = operator_path_resolve, dfd, e;
+		const char *leaf;
+		operator_path_resolve = 1;
+		dfd = owner_walk_parent(source, &leaf);
+		operator_path_resolve = save;
+		if (dfd < 0)
+			ifd = -1;
+		else {
+			ifd = openat(dfd, leaf, O_RDONLY | O_NOFOLLOW);
+			e = errno;
+			close(dfd);
+			errno = e;
+		}
+	}
+#endif
 	else
 		ifd = do_open_nofollow(source, O_RDONLY);
 	if (ifd < 0) {
