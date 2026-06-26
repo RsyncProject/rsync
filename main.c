@@ -51,6 +51,7 @@ extern int called_from_signal_handler;
 extern int need_messages_from_generator;
 extern int kluge_around_eof;
 extern int got_xfer_error;
+extern volatile sig_atomic_t got_sigusr2;
 extern int old_style_args;
 extern int msgs2stderr;
 extern int module_id;
@@ -1111,11 +1112,13 @@ static int do_recv(int f_in, int f_out, char *local_name)
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
-		/* Finally, we go to sleep until our parent kills us with a
-		 * USR2 signal.  We sleep for a short time, as on some OSes
-		 * a signal won't interrupt a sleep! */
-		while (1)
+		/* Finally, we go to sleep until our parent tells us to wrap up
+		 * with a USR2 signal.  We sleep for a short time, as on some OSes
+		 * a signal won't interrupt a sleep, then act on the flag the
+		 * (async-signal-safe) handler set. */
+		while (!got_sigusr2)
 			msleep(20);
+		receive_sigusr2();
 	}
 
 	am_generator = 1;
@@ -1657,14 +1660,24 @@ static void sigusr1_handler(UNUSED(int val))
 	exit_cleanup(RERR_SIGNAL1);
 }
 
+/* SIGUSR2 tells the receiver child to wrap up.  A signal handler must be
+ * async-signal-safe, so it only sets a flag here; receive_sigusr2() does the
+ * actual summary + shutdown (which use stdio/malloc/close) at a safe point in
+ * the receiver's post-transfer wait loops (read_final_goodbye via perform_io,
+ * and the trailing sleep). */
 static void sigusr2_handler(UNUSED(int val))
+{
+	got_sigusr2 = 1;
+}
+
+void receive_sigusr2(void)
 {
 	if (!am_server)
 		output_summary();
 	close_all();
 #ifdef GCOV_COVERAGE
-	/* The receiver child is killed here via SIGUSR2 and exits with _exit(),
-	 * bypassing the gcov atexit flush; without this it writes no .gcda. */
+	/* The receiver child exits with _exit() here, bypassing the gcov atexit
+	 * flush; without this it writes no .gcda. */
 	{ extern void __gcov_dump(void); __gcov_dump(); }
 #endif
 	if (got_xfer_error)
