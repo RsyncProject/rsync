@@ -191,9 +191,13 @@ static ssize_t get_xattr_names(const char *fname, int fd)
 /* On entry, the *len_ptr parameter contains the size of the extra space we
  * should allocate when we create a buffer for the data.  On exit, it contains
  * the length of the datum. */
-static char *get_xattr_data(const char *fname, const char *name, size_t *len_ptr, int no_missing_error)
+/* Read xattr `name`'s value.  When fd >= 0 the read goes through that held fd
+ * (sys_fgetxattr) so a parent-symlink race can't redirect it; otherwise it falls
+ * back to the path (sys_lgetxattr), matching get_xattr_names(). */
+static char *get_xattr_data(const char *fname, int fd, const char *name, size_t *len_ptr, int no_missing_error)
 {
-	size_t datum_len = sys_lgetxattr(fname, name, NULL, 0);
+	size_t datum_len = fd >= 0 ? sys_fgetxattr(fd, name, NULL, 0)
+				   : sys_lgetxattr(fname, name, NULL, 0);
 	size_t extra_len = *len_ptr;
 	char *ptr;
 
@@ -215,7 +219,8 @@ static char *get_xattr_data(const char *fname, const char *name, size_t *len_ptr
 	ptr = new_array(char, datum_len + extra_len);
 
 	if (datum_len) {
-		size_t len = sys_lgetxattr(fname, name, ptr, datum_len);
+		size_t len = fd >= 0 ? sys_fgetxattr(fd, name, ptr, datum_len)
+				     : sys_lgetxattr(fname, name, ptr, datum_len);
 		if (len != datum_len) {
 			if (len == (size_t)-1) {
 				rsyserr(FERROR_XFER, errno,
@@ -235,7 +240,7 @@ static char *get_xattr_data(const char *fname, const char *name, size_t *len_ptr
 	return ptr;
 }
 
-static int rsync_xal_get(const char *fname, item_list *xalp)
+static int rsync_xal_get(const char *fname, int fd, item_list *xalp)
 {
 	ssize_t list_len, name_len;
 	size_t datum_len, name_offset;
@@ -247,7 +252,7 @@ static int rsync_xal_get(const char *fname, item_list *xalp)
 	int count;
 
 	/* This puts the name list into the "namebuf" buffer. */
-	if ((list_len = get_xattr_names(fname, -1)) < 0)
+	if ((list_len = get_xattr_names(fname, fd)) < 0)
 		return -1;
 
 	for (name = namebuf; list_len > 0; name += name_len) {
@@ -275,7 +280,7 @@ static int rsync_xal_get(const char *fname, item_list *xalp)
 		}
 
 		datum_len = name_len; /* Pass extra size to get_xattr_data() */
-		if (!(ptr = get_xattr_data(fname, name, &datum_len, 0)))
+		if (!(ptr = get_xattr_data(fname, fd, name, &datum_len, 0)))
 			return -1;
 
 		if (datum_len > MAX_FULL_DATUM) {
@@ -308,7 +313,9 @@ static int rsync_xal_get(const char *fname, item_list *xalp)
 }
 
 /* Read the xattr(s) for this filename. */
-int get_xattr(const char *fname, stat_x *sxp)
+/* Collect fname's xattrs into sxp.  fd >= 0 reads them through that held fd
+ * (race-safe); fd < 0 uses the path. */
+int get_xattr(const char *fname, int fd, stat_x *sxp)
 {
 	sxp->xattr = new(item_list);
 	*sxp->xattr = empty_xattr;
@@ -333,18 +340,18 @@ int get_xattr(const char *fname, stat_x *sxp)
 	} else if (IS_MISSING_FILE(sxp->st))
 		return 0;
 
-	if (rsync_xal_get(fname, sxp->xattr) < 0) {
+	if (rsync_xal_get(fname, fd, sxp->xattr) < 0) {
 		free_xattr(sxp);
 		return -1;
 	}
 	return 0;
 }
 
-/* Copy xattrs from source to dest.  When dest_fd >= 0 it is a held,
- * O_NOFOLLOW-opened fd for dest and the set goes through fsetxattr so a
- * parent-symlink race can't redirect it; dest_fd < 0 keeps the path-based
- * lsetxattr behaviour (non-hardened receivers, or no held fd available). */
-int copy_xattrs(const char *source, const char *dest, int dest_fd)
+/* Copy xattrs from source to dest.  source_fd/dest_fd, when >= 0, are held
+ * O_NOFOLLOW-opened fds so the source read (fgetxattr) and the dest set
+ * (fsetxattr) can't be redirected by a parent-symlink race; a < 0 fd keeps the
+ * path-based l-variant (non-hardened receivers, or no held fd available). */
+int copy_xattrs(const char *source, int source_fd, const char *dest, int dest_fd)
 {
 	ssize_t list_len, name_len;
 	size_t datum_len;
@@ -354,7 +361,7 @@ int copy_xattrs(const char *source, const char *dest, int dest_fd)
 #endif
 
 	/* This puts the name list into the "namebuf" buffer. */
-	if ((list_len = get_xattr_names(source, -1)) < 0)
+	if ((list_len = get_xattr_names(source, source_fd)) < 0)
 		return -1;
 
 	for (name = namebuf; list_len > 0; name += name_len) {
@@ -372,7 +379,7 @@ int copy_xattrs(const char *source, const char *dest, int dest_fd)
 #endif
 
 		datum_len = 0;
-		if (!(ptr = get_xattr_data(source, name, &datum_len, 0)))
+		if (!(ptr = get_xattr_data(source, source_fd, name, &datum_len, 0)))
 			return -1;
 		if ((dest_fd >= 0 ? sys_fsetxattr(dest_fd, name, ptr, datum_len)
 				  : sys_lsetxattr(dest, name, ptr, datum_len)) < 0) {
@@ -671,7 +678,7 @@ void send_xattr_request(const char *fname, struct file_struct *file, int f_out)
 			char *ptr;
 
 			/* Re-read the long datum. */
-			if (!(ptr = get_xattr_data(fname, rxa->name, &len, 0))) {
+			if (!(ptr = get_xattr_data(fname, -1, rxa->name, &len, 0))) {
 				rprintf(FERROR_XFER, "failed to re-read xattr %s for %s\n", rxa->name, fname);
 				write_varint(f_out, 0);
 				continue;
@@ -999,7 +1006,7 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 		if (XATTR_ABBREV(rxas[i])) {
 			/* See if the fnamecmp version is identical. */
 			len = name_len = rxas[i].name_len;
-			if ((ptr = get_xattr_data(fnamecmp, name, &len, 1)) == NULL) {
+			if ((ptr = get_xattr_data(fnamecmp, -1, name, &len, 1)) == NULL) {
 			  still_abbrev:
 				if (am_generator)
 					continue;
@@ -1168,11 +1175,11 @@ int set_xattr(const char *fname, const struct file_struct *file, const char *fna
 }
 
 #ifdef SUPPORT_ACLS
-char *get_xattr_acl(const char *fname, int is_access_acl, size_t *len_p)
+char *get_xattr_acl(const char *fname, int fd, int is_access_acl, size_t *len_p)
 {
 	const char *name = is_access_acl ? XACC_ACL_ATTR : XDEF_ACL_ATTR;
 	*len_p = 0; /* no extra data alloc needed from get_xattr_data() */
-	return get_xattr_data(fname, name, len_p, 1);
+	return get_xattr_data(fname, fd, name, len_p, 1);
 }
 
 /* Store/delete a --fake-super ACL-as-xattr.  When fd >= 0 (a held O_NOFOLLOW fd

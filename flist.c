@@ -1821,7 +1821,7 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 #ifdef SUPPORT_XATTRS
 		if (preserve_xattrs) {
 			sx.st.st_mode = file->mode;
-			if (get_xattr(fname, &sx) < 0) {
+			if (get_xattr(fname, -1, &sx) < 0) {
 				io_error |= IOERR_GENERAL;
 #ifdef SUPPORT_ACLS
 				free_acl(&sx); /* get_acl() above may have loaded one */

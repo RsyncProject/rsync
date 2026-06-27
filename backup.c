@@ -35,6 +35,32 @@ extern char backup_dir_buf[MAXPATHLEN];
 extern char *backup_suffix;
 extern char *backup_dir;
 
+/* Pin a backup SOURCE leaf with a confined O_NOFOLLOW fd (via the operator
+ * owner-walk resolver, like set_file_attrs's op_leaf_fd) so the ACL/xattr the
+ * backup caches off it are read through the held fd -- a parent-symlink race
+ * can't redirect the read out of the module.  Returns -1 for a non-hardened
+ * receiver (caller path-reads) or for a raced/absent leaf on a hardened one
+ * (caller skips the cache rather than read through a flippable path; use
+ * backup_metadata_hardened() to tell the two -1 cases apart). */
+int backup_metadata_hardened(void)
+{
+	return secure_relpath_active() && !symlink_optout_allowed();
+}
+
+int backup_source_fd(const char *path)
+{
+#if defined AT_FDCWD && defined O_NOFOLLOW
+	if (backup_metadata_hardened() && path && *path) {
+		int save = operator_path_resolve, fd;
+		operator_path_resolve = 1;
+		fd = do_open_at(path, O_RDONLY | O_NONBLOCK | O_NOCTTY | O_CLOEXEC, 0);
+		operator_path_resolve = save;
+		return fd;
+	}
+#endif
+	return -1;
+}
+
 /* Returns -1 on error, 0 on missing dir, and 1 on present dir. */
 static int validate_backup_dir(void)
 {
@@ -121,18 +147,27 @@ static BOOL copy_valid_path(const char *fname)
 			struct file_struct *file;
 			if (!(file = make_file(rel, NULL, NULL, 0, NO_FILTERS)))
 				continue;
-#ifdef SUPPORT_ACLS
-			if (preserve_acls && !S_ISLNK(file->mode)) {
-				get_acl(rel, &sx);
-				cache_tmp_acl(file, &sx);
-				free_acl(&sx);
+#if defined SUPPORT_ACLS || defined SUPPORT_XATTRS
+			{	/* read the source dir's ACL/xattr through a confined fd */
+			int bfd = backup_source_fd(rel);
+			if (!backup_metadata_hardened() || bfd >= 0) {
+# ifdef SUPPORT_ACLS
+				if (preserve_acls && !S_ISLNK(file->mode)) {
+					get_acl_fdat(bfd, -1, NULL, rel, &sx);
+					cache_tmp_acl(file, &sx);
+					free_acl(&sx);
+				}
+# endif
+# ifdef SUPPORT_XATTRS
+				if (preserve_xattrs) {
+					get_xattr(rel, bfd, &sx);
+					cache_tmp_xattr(file, &sx);
+					free_xattr(&sx);
+				}
+# endif
 			}
-#endif
-#ifdef SUPPORT_XATTRS
-			if (preserve_xattrs) {
-				get_xattr(rel, &sx);
-				cache_tmp_xattr(file, &sx);
-				free_xattr(&sx);
+			if (bfd >= 0)
+				close(bfd);
 			}
 #endif
 			set_file_attrs(backup_dir_buf, file, NULL, NULL, 0);
@@ -260,18 +295,27 @@ static int make_backup_inner(const char *fname, BOOL prefer_rename)
 	if (!(file = make_file(fname, NULL, &sx.st, 0, NO_FILTERS)))
 		return 3; /* the file could have disappeared */
 
-#ifdef SUPPORT_ACLS
-	if (preserve_acls && !S_ISLNK(file->mode)) {
-		get_acl(fname, &sx);
-		cache_tmp_acl(file, &sx);
-		free_acl(&sx);
+#if defined SUPPORT_ACLS || defined SUPPORT_XATTRS
+	{	/* read the source file's ACL/xattr through a confined fd */
+	int bfd = backup_source_fd(fname);
+	if (!backup_metadata_hardened() || bfd >= 0) {
+# ifdef SUPPORT_ACLS
+		if (preserve_acls && !S_ISLNK(file->mode)) {
+			get_acl_fdat(bfd, -1, NULL, fname, &sx);
+			cache_tmp_acl(file, &sx);
+			free_acl(&sx);
+		}
+# endif
+# ifdef SUPPORT_XATTRS
+		if (preserve_xattrs) {
+			get_xattr(fname, bfd, &sx);
+			cache_tmp_xattr(file, &sx);
+			free_xattr(&sx);
+		}
+# endif
 	}
-#endif
-#ifdef SUPPORT_XATTRS
-	if (preserve_xattrs) {
-		get_xattr(fname, &sx);
-		cache_tmp_xattr(file, &sx);
-		free_xattr(&sx);
+	if (bfd >= 0)
+		close(bfd);
 	}
 #endif
 

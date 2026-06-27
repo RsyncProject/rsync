@@ -599,7 +599,7 @@ static int get_rsync_acl(int fd, int dirfd, const char *leaf, const char *fname,
 		size_t len;
 		int cnt;
 
-		if ((buf = get_xattr_acl(fname, type == SMB_ACL_TYPE_ACCESS, &len)) == NULL)
+		if ((buf = get_xattr_acl(fname, fd, type == SMB_ACL_TYPE_ACCESS, &len)) == NULL)
 			return 0;
 		cnt = (len - 4*4) / (4+4);
 		if (len < 4*4 || len != (size_t)cnt*(4+4) + 4*4) {
