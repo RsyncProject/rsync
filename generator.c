@@ -1261,7 +1261,11 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 		 && !IS_SPECIAL(file->mode) && !IS_DEVICE(file->mode)
 #endif
 		 && !S_ISDIR(file->mode)) {
-			if (vfs_link_at(cmpbuf, fname, 0) < 0) {
+			/* cmpbuf is the alt-dest (--link-dest) basis: for a non-daemon
+			 * receiver it is an operator path (owner walk; matches the
+			 * hard_link_one() path above and basis_link_stat's !am_daemon gate).
+			 * fname is the transfer destination (secure receiver resolve). */
+			if (vfs_link_at(cmpbuf, fname, !am_daemon ? VFS_OPERATOR_PATH : 0, 0) < 0) {
 				rsyserr(FERROR_XFER, errno,
 					"failed to hard-link %s with %s",
 					cmpbuf, fname);
@@ -1479,7 +1483,7 @@ static int gen_entry_rename(const char *opath, const char *npath, struct file_st
 		const char *ns = strrchr(npath, '/');
 		return vfs_rename_atfd(odfd, os ? os + 1 : opath, ndfd, ns ? ns + 1 : npath);
 	}
-	return vfs_rename_at(opath, npath, 0);
+	return vfs_rename_at(opath, npath, 0, 0);	/* both live in the entry's dir (transfer) */
 }
 
 #ifdef SUPPORT_XATTRS

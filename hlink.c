@@ -475,7 +475,10 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 int hard_link_one(struct file_struct *file, const char *fname,
 		  const char *oldname, int terse, int vfs_flags)
 {
-	if (vfs_link_at(oldname, fname, vfs_flags) < 0) {
+	/* oldname is the link source (vfs_flags carries its policy -- VFS_OPERATOR_PATH
+	 * for an alt-dest basis on a non-daemon receiver, else 0); fname is the
+	 * transfer destination, always under the secure receiver resolve. */
+	if (vfs_link_at(oldname, fname, vfs_flags, 0) < 0) {
 		enum logcode code;
 		if (terse) {
 			if (!INFO_GTE(NAME, 1))

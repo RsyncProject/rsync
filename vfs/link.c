@@ -38,22 +38,22 @@ int vfs_link(const char *old_path, const char *new_path)
   the module, or hard-link an outside file into the module (read
   disclosure).
 
-  Defence: open each parent under vfs_resolve_open() and use
-  linkat() between the two dirfds, reusing one when the parents
-  match. flags=0 matches the existing vfs_link() (don't follow a
-  symbolic-link old_path). Only available on systems with linkat();
-  pre-AT_FDCWD systems fall through to vfs_link().
+  Defence: resolve each path's parent under its OWN policy and linkat()
+  between the two dirfds.  old_flags / new_flags are the per-operand policy
+  (VFS_OPERATOR_PATH for an operator operand -- e.g. a --link-dest/--backup-dir
+  basis; 0 for a transfer path), so an operator basis on one side can't relax the
+  transfer-path confinement of the other -- see vfs_twopath_side().  flags=0 to
+  linkat() matches the existing vfs_link() (don't follow a symlink old_path).
+  Only available on systems with linkat(); pre-AT_FDCWD systems fall through.
 */
-int vfs_link_at(const char *old_path, const char *new_path, int vfs_flags)
+int vfs_link_at(const char *old_path, const char *new_path, int old_flags, int new_flags)
 {
 #if defined AT_FDCWD && defined HAVE_LINKAT
 	char old_dirpath[MAXPATHLEN], new_dirpath[MAXPATHLEN];
 	const char *old_bname, *new_bname;
-	const char *old_slash, *new_slash;
 	int old_dfd = AT_FDCWD, new_dfd = AT_FDCWD;
 	BOOL old_owns = False, new_owns = False;
 	int ret, e;
-	size_t old_dlen = 0, new_dlen = 0;
 
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
@@ -64,109 +64,15 @@ int vfs_link_at(const char *old_path, const char *new_path, int vfs_flags)
 	if (!old_path || !*old_path || !new_path || !*new_path)
 		return vfs_link(old_path, new_path);
 
-#if defined O_NOFOLLOW && defined O_DIRECTORY
-	/* Operator-supplied path (a --backup-dir/--link-dest side): resolve each
-	 * parent via the ownership walk (follow uid0/euid symlinks, refuse others). */
-	if (vfs_flags & VFS_OPERATOR_PATH) {
-		if (vfs_symlink_optout_allowed())
-			return vfs_link(old_path, new_path);
-		old_dfd = vfs_owner_walk_parent(old_path, &old_bname, 1);
-		if (old_dfd < 0)
-			return -1;
-		new_dfd = vfs_owner_walk_parent(new_path, &new_bname, 1);
-		if (new_dfd < 0) {
-			e = errno;
-			close(old_dfd);
-			errno = e;
-			return -1;
-		}
-		ret = linkat(old_dfd, old_bname, new_dfd, new_bname, 0);
+	if (vfs_twopath_side(old_path, old_flags, &old_bname, &old_dfd, &old_owns,
+			     old_dirpath, sizeof old_dirpath) < 0)
+		return -1;
+	if (vfs_twopath_side(new_path, new_flags, &new_bname, &new_dfd, &new_owns,
+			     new_dirpath, sizeof new_dirpath) < 0) {
 		e = errno;
-		close(new_dfd);
-		close(old_dfd);
+		if (old_owns) close(old_dfd);
 		errno = e;
-		return ret;
-	}
-#endif
-
-	old_slash = strrchr(old_path, '/');
-	new_slash = strrchr(new_path, '/');
-
-	/* Resolve each path's parent dir independently. A path without a
-	 * slash lives in CWD (AT_FDCWD), no parent open required. A path
-	 * with a slash needs vfs_resolve_open to confine its parent
-	 * resolution -- otherwise a parent symlink (e.g. --link-dest=cd
-	 * where cd -> /outside) lets the kernel-level linkat(AT_FDCWD,
-	 * "cd/target.txt", ...) escape the module.  An absolute path uses
-	 * AT_FDCWD + the full path; each side is confined independently, so an
-	 * absolute source (e.g. an absolute --link-dest) cannot disable
-	 * confinement of a relative destination.  An absolute side is an operator
-	 * path resolved via the ownership walk (foreign-owned parent symlink refused;
-	 * --insecure-links keeps the legacy AT_FDCWD path). */
-	if (*old_path == '/') {
-#if defined O_NOFOLLOW && defined O_DIRECTORY
-		if (!vfs_symlink_optout_allowed()) {
-			old_dfd = vfs_owner_walk_parent(old_path, &old_bname, 1);
-			if (old_dfd < 0)
-				return -1;
-			old_owns = True;
-		} else
-#endif
-			old_bname = old_path;
-	} else if (old_slash) {
-		old_dlen = old_slash - old_path;
-		if (old_dlen >= sizeof old_dirpath) { errno = ENAMETOOLONG; return -1; }
-		memcpy(old_dirpath, old_path, old_dlen);
-		old_dirpath[old_dlen] = '\0';
-		old_bname = old_slash + 1;
-		old_dfd = vfs_resolve_open(NULL, old_dirpath, O_RDONLY | O_DIRECTORY, 0);
-		if (old_dfd < 0)
-			return -1;
-		old_owns = True;
-	} else {
-		old_bname = old_path;
-	}
-
-	if (*new_path == '/') {
-#if defined O_NOFOLLOW && defined O_DIRECTORY
-		if (!vfs_symlink_optout_allowed()) {
-			new_dfd = vfs_owner_walk_parent(new_path, &new_bname, 1);
-			if (new_dfd < 0) {
-				e = errno;
-				if (old_owns) close(old_dfd);
-				errno = e;
-				return -1;
-			}
-			new_owns = True;
-		} else
-#endif
-			new_bname = new_path;
-	} else if (new_slash) {
-		new_dlen = new_slash - new_path;
-		if (new_dlen >= sizeof new_dirpath) {
-			e = ENAMETOOLONG;
-			if (old_owns) close(old_dfd);
-			errno = e;
-			return -1;
-		}
-		memcpy(new_dirpath, new_path, new_dlen);
-		new_dirpath[new_dlen] = '\0';
-		new_bname = new_slash + 1;
-		if (old_owns && old_dlen == new_dlen
-		 && memcmp(old_dirpath, new_dirpath, old_dlen) == 0) {
-			new_dfd = old_dfd;
-		} else {
-			new_dfd = vfs_resolve_open(NULL, new_dirpath, O_RDONLY | O_DIRECTORY, 0);
-			if (new_dfd < 0) {
-				e = errno;
-				if (old_owns) close(old_dfd);
-				errno = e;
-				return -1;
-			}
-			new_owns = True;
-		}
-	} else {
-		new_bname = new_path;
+		return -1;
 	}
 
 	ret = linkat(old_dfd, old_bname, new_dfd, new_bname, 0);
@@ -178,6 +84,7 @@ int vfs_link_at(const char *old_path, const char *new_path, int vfs_flags)
 	errno = e;
 	return ret;
 #else
+	(void)old_flags; (void)new_flags;
 	return vfs_link(old_path, new_path);
 #endif
 }

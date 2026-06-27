@@ -232,7 +232,11 @@ static inline int link_or_rename(const char *from, const char *to,
 		if (IS_SPECIAL(stp->st_mode) || IS_DEVICE(stp->st_mode))
 			return 0; /* Use copy code. */
 #endif
-		if (vfs_link_at(from, to, VFS_OPERATOR_PATH) == 0) {
+		/* from = the live dest file being backed up (a transfer path); to = the
+		 * --backup-dir path (operator).  Per-operand policy keeps the transfer
+		 * source under the secure receiver resolve and only owner-walks the
+		 * operator backup parent. */
+		if (vfs_link_at(from, to, 0, VFS_OPERATOR_PATH) == 0) {
 			if (DEBUG_GTE(BACKUP, 1))
 				rprintf(FINFO, "make_backup: HLINK %s successful.\n", from);
 			return 2;
@@ -242,11 +246,12 @@ static inline int link_or_rename(const char *from, const char *to,
 			return 0;
 	}
 #endif
-	if (vfs_rename_at(from, to, VFS_OPERATOR_PATH) == 0) {
+	if (vfs_rename_at(from, to, 0, VFS_OPERATOR_PATH) == 0) {
 		if (stp->st_nlink > 1 && !S_ISDIR(stp->st_mode)) {
 			/* If someone has hard-linked the file into the backup
-			 * dir, rename() might return success but do nothing! */
-			robust_unlink(from, VFS_OPERATOR_PATH); /* Just in case... */
+			 * dir, rename() might return success but do nothing!  from is the
+			 * transfer-side source, so unlink it under the secure resolve (0). */
+			robust_unlink(from, 0); /* Just in case... */
 		}
 		if (DEBUG_GTE(BACKUP, 1))
 			rprintf(FINFO, "make_backup: RENAME %s successful.\n", from);

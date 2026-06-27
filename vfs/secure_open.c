@@ -365,3 +365,61 @@ int vfs_resolve_open_at(int anchor_fd, const char *relpath, int flags, mode_t mo
 	return secure_walk_at(anchor_fd, NULL, relpath, flags, mode, &hops);
 #endif
 }
+
+/* Resolve ONE operand of a two-path op (rename/link) to a parent dirfd + leaf,
+ * per that operand's OWN policy -- so a two-path op can confine each side
+ * independently (an operator basis/backup path on one side must not relax the
+ * transfer-path confinement of the other).  Policy:
+ *   - side_flags & VFS_OPERATOR_PATH, or an absolute path: ownership walk
+ *     (follow uid0/euid symlinks, refuse foreign; module-exclude enforced).
+ *   - a relative path with a slash: secure receiver resolve of the parent.
+ *   - a bare name: AT_FDCWD + the name.
+ * Sets *bname and *dfd_out (a dirfd or AT_FDCWD), and *owns True when *dfd_out
+ * must be closed by the caller.  dirbuf (>= MAXPATHLEN) is scratch for a parent
+ * path.  Returns 0 on success, -1 (errno set) on error.  The caller must already
+ * have confirmed vfs_relpath_active() (otherwise it does the plain libc op). */
+int vfs_twopath_side(const char *path, int side_flags, const char **bname,
+		     int *dfd_out, BOOL *owns, char *dirbuf, size_t dirbufsz)
+{
+	*owns = False;
+#ifdef AT_FDCWD
+	const char *slash = strrchr(path, '/');
+	size_t dlen;
+
+#if defined O_NOFOLLOW && defined O_DIRECTORY
+	if (((side_flags & VFS_OPERATOR_PATH) || *path == '/')
+	 && !vfs_symlink_optout_allowed()) {
+		int dfd = vfs_owner_walk_parent(path, bname, 1);
+		if (dfd < 0)
+			return -1;
+		*dfd_out = dfd;
+		*owns = True;
+		return 0;
+	}
+#endif
+	if (*path == '/' || !slash) {
+		/* absolute under --insecure-links, or a bare name: AT_FDCWD + path. */
+		*bname = path;
+		*dfd_out = AT_FDCWD;
+		return 0;
+	}
+	dlen = (size_t)(slash - path);
+	if (dlen >= dirbufsz) {
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+	memcpy(dirbuf, path, dlen);
+	dirbuf[dlen] = '\0';
+	*bname = slash + 1;
+	*dfd_out = vfs_resolve_open(NULL, dirbuf, O_RDONLY | O_DIRECTORY, 0);
+	if (*dfd_out < 0)
+		return -1;
+	*owns = True;
+	return 0;
+#else
+	(void)side_flags; (void)dirbuf; (void)dirbufsz;
+	*bname = path;
+	*dfd_out = -1;
+	return 0;
+#endif
+}

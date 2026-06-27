@@ -70,8 +70,9 @@ int robust_unlink(const char *fname, int vfs_flags)
 			fname, path);
 	}
 
-	/* maybe we should return rename()'s exit status? Nah. */
-	if (vfs_rename_at(fname, path, vfs_flags) != 0) {
+	/* maybe we should return rename()'s exit status? Nah.  path is a sibling of
+	 * fname in the same parent, so both sides share fname's policy (vfs_flags). */
+	if (vfs_rename_at(fname, path, vfs_flags, vfs_flags) != 0) {
 		errno = ETXTBSY;
 		return -1;
 	}
@@ -104,7 +105,7 @@ int robust_rename(const char *from, const char *to, const char *partialptr,
 			const char *ns = strrchr(to, '/');
 			rr = vfs_rename_atfd(ofd, os ? os + 1 : from, nfd, ns ? ns + 1 : to);
 		} else
-			rr = vfs_rename_at(from, to, 0);
+			rr = vfs_rename_at(from, to, 0, 0);
 		if (rr == 0)
 			return 0;
 

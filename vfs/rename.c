@@ -30,25 +30,26 @@ int vfs_rename(const char *old_path, const char *new_path)
   rename() is the central tmp -> final operation in rsync; if either the
   source or the destination has an attacker-substituted symlink in one
   of its parent components, the rename can publish or vanish files
-  outside the module. Defence: open the parent of *each* path under
-  vfs_resolve_open() and use renameat() against the resulting
-  dirfds. When old_path and new_path share the same parent (the common
-  case -- tmp file living next to its final name), we reuse the same
-  dirfd for both sides.
+  outside the module. Defence: resolve the parent of *each* path under its
+  OWN policy and renameat() between the resulting dirfds.
+
+  old_flags / new_flags are the per-operand policy (VFS_OPERATOR_PATH for an
+  operator-supplied operand -- a --backup-dir/--partial-dir/--temp-dir path; 0
+  for a transfer path).  Passing them separately means an operator operand on one
+  side cannot relax (owner-walk) the transfer-path confinement of the other side
+  -- see vfs_twopath_side() for the per-side resolution.
 
   Falls through to vfs_rename() in dry-run, non-daemon, chrooted and
-  absolute-path cases, identical to the other do_*_at() wrappers.
+  --insecure-links cases, identical to the other *_at() wrappers.
 */
-int vfs_rename_at(const char *old_path, const char *new_path, int vfs_flags)
+int vfs_rename_at(const char *old_path, const char *new_path, int old_flags, int new_flags)
 {
 #ifdef AT_FDCWD
 	char old_dirpath[MAXPATHLEN], new_dirpath[MAXPATHLEN];
 	const char *old_bname, *new_bname;
-	const char *old_slash, *new_slash;
 	int old_dfd = AT_FDCWD, new_dfd = AT_FDCWD;
 	BOOL old_owns = False, new_owns = False;
-	int ret = -1, e;
-	size_t old_dlen = 0, new_dlen = 0;
+	int ret, e;
 
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
@@ -59,110 +60,15 @@ int vfs_rename_at(const char *old_path, const char *new_path, int vfs_flags)
 	if (!old_path || !*old_path || !new_path || !*new_path)
 		return vfs_rename(old_path, new_path);
 
-#if defined O_NOFOLLOW && defined O_DIRECTORY
-	/* Operator-supplied path (e.g. a --backup-dir destination or a --temp-dir
-	 * source): resolve each side's parent via the ownership walk (follow
-	 * uid0/euid symlinks, refuse others; absolute and relative alike). */
-	if (vfs_flags & VFS_OPERATOR_PATH) {
-		if (vfs_symlink_optout_allowed())
-			return vfs_rename(old_path, new_path);
-		old_dfd = vfs_owner_walk_parent(old_path, &old_bname, 1);
-		if (old_dfd < 0)
-			return -1;
-		new_dfd = vfs_owner_walk_parent(new_path, &new_bname, 1);
-		if (new_dfd < 0) {
-			e = errno;
-			close(old_dfd);
-			errno = e;
-			return -1;
-		}
-		ret = renameat(old_dfd, old_bname, new_dfd, new_bname);
+	if (vfs_twopath_side(old_path, old_flags, &old_bname, &old_dfd, &old_owns,
+			     old_dirpath, sizeof old_dirpath) < 0)
+		return -1;
+	if (vfs_twopath_side(new_path, new_flags, &new_bname, &new_dfd, &new_owns,
+			     new_dirpath, sizeof new_dirpath) < 0) {
 		e = errno;
-		close(new_dfd);
-		close(old_dfd);
+		if (old_owns) close(old_dfd);
 		errno = e;
-		return ret;
-	}
-#endif
-
-	old_slash = strrchr(old_path, '/');
-	new_slash = strrchr(new_path, '/');
-
-	/* Confine each side independently.  A *relative* side is a transfer path,
-	 * confined beneath the tree via vfs_resolve_open().  An *absolute* side is
-	 * an operator path (an absolute --temp-dir/--partial-dir temp file): resolve
-	 * its parent via the ownership walk so a flipped foreign-owned parent symlink
-	 * can't redirect the rename out of tree, while still allowing the operator's
-	 * own dirs/".."/uid0-or-euid symlinks.  (--insecure-links keeps the legacy
-	 * unconfined AT_FDCWD path.)  Doing each side independently means an absolute
-	 * source never disables confinement of a relative destination. */
-	if (*old_path == '/') {
-#if defined O_NOFOLLOW && defined O_DIRECTORY
-		if (!vfs_symlink_optout_allowed()) {
-			old_dfd = vfs_owner_walk_parent(old_path, &old_bname, 1);
-			if (old_dfd < 0)
-				return -1;
-			old_owns = True;
-		} else
-#endif
-			old_bname = old_path;
-	} else if (old_slash) {
-		old_dlen = old_slash - old_path;
-		if (old_dlen >= sizeof old_dirpath) {
-			errno = ENAMETOOLONG;
-			return -1;
-		}
-		memcpy(old_dirpath, old_path, old_dlen);
-		old_dirpath[old_dlen] = '\0';
-		old_bname = old_slash + 1;
-		old_dfd = vfs_resolve_open(NULL, old_dirpath, O_RDONLY | O_DIRECTORY, 0);
-		if (old_dfd < 0)
-			return -1;
-		old_owns = True;
-	} else {
-		old_bname = old_path;
-	}
-
-	if (*new_path == '/') {
-#if defined O_NOFOLLOW && defined O_DIRECTORY
-		if (!vfs_symlink_optout_allowed()) {
-			new_dfd = vfs_owner_walk_parent(new_path, &new_bname, 1);
-			if (new_dfd < 0) {
-				e = errno;
-				if (old_owns) close(old_dfd);
-				errno = e;
-				return -1;
-			}
-			new_owns = True;
-		} else
-#endif
-			new_bname = new_path;
-	} else if (new_slash) {
-		new_dlen = new_slash - new_path;
-		if (new_dlen >= sizeof new_dirpath) {
-			e = ENAMETOOLONG;
-			if (old_owns) close(old_dfd);
-			errno = e;
-			return -1;
-		}
-		memcpy(new_dirpath, new_path, new_dlen);
-		new_dirpath[new_dlen] = '\0';
-		new_bname = new_slash + 1;
-		if (old_owns && old_dlen == new_dlen
-		 && memcmp(old_dirpath, new_dirpath, old_dlen) == 0) {
-			new_dfd = old_dfd;
-		} else {
-			new_dfd = vfs_resolve_open(NULL, new_dirpath, O_RDONLY | O_DIRECTORY, 0);
-			if (new_dfd < 0) {
-				e = errno;
-				if (old_owns) close(old_dfd);
-				errno = e;
-				return -1;
-			}
-			new_owns = True;
-		}
-	} else {
-		new_bname = new_path;
+		return -1;
 	}
 
 	ret = renameat(old_dfd, old_bname, new_dfd, new_bname);
@@ -174,6 +80,7 @@ int vfs_rename_at(const char *old_path, const char *new_path, int vfs_flags)
 	errno = e;
 	return ret;
 #else
+	(void)old_flags; (void)new_flags;
 	return vfs_rename(old_path, new_path);
 #endif
 }

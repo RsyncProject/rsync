@@ -54,6 +54,10 @@ extern int module_id;
 int path_has_dotdot_component(const char *path);
 int abspath_excluded_by_module(const char *abspath, int is_operator);
 
+/* Per-operand parent resolver for the two-path ops (vfs_rename_at/vfs_link_at). */
+int vfs_twopath_side(const char *path, int side_flags, const char **bname,
+		     int *dfd_out, BOOL *owns, char *dirbuf, size_t dirbufsz);
+
 #if defined(O_NOFOLLOW) && defined(O_DIRECTORY) && defined(AT_FDCWD)
 
 #ifndef SECURE_OPEN_MAXSYMLINKS

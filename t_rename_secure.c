@@ -37,7 +37,7 @@ static int vulnerable_mixed_rename_at(const char *old_path, const char *new_path
 	if (!old_slash || !new_slash)
 		return vfs_rename(old_path, new_path);
 
-	return vfs_rename_at(old_path, new_path, 0);
+	return vfs_rename_at(old_path, new_path, 0, 0);
 }
 #endif
 
@@ -64,7 +64,7 @@ static void check_rename(const char *label, const char *old_path,
 	int saved_errno;
 
 	errno = 0;
-	rc = vfs_rename_at(old_path, new_path, 0);
+	rc = vfs_rename_at(old_path, new_path, 0, 0);
 	saved_errno = errno;
 	got_ok = rc == 0;
 
