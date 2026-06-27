@@ -962,6 +962,7 @@ static int copy_altdest_file(const char *src, const char *dest, struct file_stru
 static int basis_link_stat(const char *path, STRUCT_STAT *stp)
 {
 	extern int am_chrooted;
+	extern int operator_path_resolve;
 	extern unsigned int module_dirlen;
 #if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
 	/* The basis dir (--link-dest/--compare-dest/--copy-dest) is an operator-
@@ -987,8 +988,62 @@ static int basis_link_stat(const char *path, STRUCT_STAT *stp)
 		errno = e;
 		return r;
 	}
+	/* A non-chroot daemon serving an operator/peer alt-dest basis: resolve through
+	 * the ownership walk with module-ROOT confinement (operator_path_resolve) so an
+	 * in-module symlink whose target lands OUTSIDE the module is refused -- the
+	 * basis then looks absent and the file transfers normally instead of being
+	 * stat'd/read/linked through the link (closes the --compare-dest=/E read
+	 * oracle).  "insecure links = yes" falls through to the legacy link_stat()
+	 * below, restoring 3.2.7 following.  Only an ABSOLUTE basis (rooted under the
+	 * module by check_alt_basis_dirs, so it can reach an in-module symlink) is
+	 * confined here; a RELATIVE basis (--link-dest=../01) is a dest-relative
+	 * sibling whose "../" is already clamped to the module root by sanitize_path,
+	 * and must keep the plain link_stat below (#915/#930).  The leaf is taken
+	 * under the confined parent with O_NOFOLLOW/AT_SYMLINK_NOFOLLOW, so
+	 * --copy-links can't follow a leaf symlink out of the module. */
+	if (am_daemon && !am_chrooted && path[0] == '/' && !symlink_optout_allowed()) {
+		const char *leaf;
+		int dfd, e, save = operator_path_resolve;
+		operator_path_resolve = 1;
+		dfd = owner_walk_parent(path, &leaf);
+		operator_path_resolve = save;
+		if (dfd < 0)
+			return -1;
+		if (am_root >= 0) {
+			int r = do_lstat_atfd(dfd, leaf, stp);
+			e = errno;
+			close(dfd);
+			errno = e;
+			return r;
+		}
+#ifdef SUPPORT_XATTRS
+		{
+			/* --fake-super: O_NOFOLLOW-open the held leaf (the daemon owns its
+			 * fake-super files) so the %stat xattr link_stat() would fold is
+			 * preserved while a leaf symlink is still refused. */
+			int lfd = do_open_atfd(dfd, leaf, O_RDONLY | O_NOFOLLOW | O_NONBLOCK, 0);
+			STRUCT_STAT xst;
+			e = errno;
+			close(dfd);
+			if (lfd < 0) { errno = e; return -1; }
+			if (do_fstat(lfd, stp) < 0) { e = errno; close(lfd); errno = e; return -1; }
+			if (get_stat_xattr(NULL, lfd, stp, &xst) == 0)
+				*stp = xst;
+			close(lfd);
+			return 0;
+		}
+#else
+		{
+			int r = do_lstat_atfd(dfd, leaf, stp);
+			e = errno;
+			close(dfd);
+			errno = e;
+			return r;
+		}
 #endif
-	if (am_daemon && am_chrooted && module_dirlen && path[0] != '/') {
+	}
+#endif
+	if (am_daemon && am_chrooted && module_dirlen && path[0] != '/' && !symlink_optout_allowed()) {
 		const char *slash = strrchr(path, '/');
 		if (slash) {
 			char dir[MAXPATHLEN];
