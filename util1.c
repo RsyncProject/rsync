@@ -1182,7 +1182,7 @@ char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth, i
  * Also cleans the path using the clean_fname() function. */
 int change_dir(const char *dir, int set_path_only)
 {
-	extern int am_daemon, am_chrooted, am_sender;
+	extern int am_daemon, am_chrooted, am_sender, insecure_links;
 	static int initialised, skipped_chdir;
 	unsigned int len;
 
