@@ -35,6 +35,15 @@ extern int open_noatime;
  * chroot confines the outer path, not the inner module. */
 int vfs_relpath_active(void)
 {
+	/* The "insecure links" / --insecure-links opt-out restores the legacy
+	 * follow-any-symlink behaviour uniformly, so it disables the secure
+	 * resolver on the RECEIVER side too (not just the sender enumeration that
+	 * already checks vfs_symlink_optout_allowed()).  Without this an opted-out
+	 * module still confined receiver writes/stats through a pre-existing
+	 * in-module symlink -- failing to match the pre-3.4.3 behaviour the opt-out
+	 * promises (documented in rsyncd.conf(5) "munge symlinks"/"insecure links"). */
+	if (vfs_symlink_optout_allowed())
+		return 0;
 	if (am_daemon && am_chrooted && vfs.module_dirlen)
 		return 1;
 	return !am_chrooted && (am_daemon || !am_sender);
@@ -130,7 +139,7 @@ static int secure_walk_at(int anchor_fd, const char *anchor_abspath,
 				char leafabs[MAXPATHLEN];
 				if (snprintf(leafabs, sizeof leafabs, "%s/%s", ds.abspath, part)
 				      < (int)sizeof leafabs
-				 && abspath_excluded_by_module(leafabs, 0, 0)) {
+				 && abspath_excluded_by_module(leafabs, 0)) {
 					errno = ELOOP;
 					goto cleanup;
 				}

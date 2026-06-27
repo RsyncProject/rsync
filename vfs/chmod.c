@@ -249,4 +249,13 @@ int vfs_chmod(int dirfd, const char *path, mode_t mode, int flags)
 		return vfs__chmod_plain(path, mode);
 	return vfs__chmod_secure(path, mode, flags);
 }
+
+/* Mode on an already-open fd (no path, no symlink to follow): the race-free
+ * counterpart for a pinned cross-tree operator leaf -- see set_file_attrs(). */
+int vfs_fchmod(int fd, mode_t mode)
+{
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+	return fchmod(fd, mode);
+}
 #endif

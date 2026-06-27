@@ -37,7 +37,6 @@ extern int omit_dir_times;
 extern int omit_link_times;
 extern int am_root;
 extern int am_server;
-extern int operator_path_resolve;
 extern int am_daemon;
 extern int am_sender;
 extern int am_receiver;
@@ -607,16 +606,16 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	 * operator owner-walk resolver and drive fchmod/fchown off that fd.  A raced
 	 * symlink leaf makes the open fail, leaving op_leaf_fd == -1: the metadata op
 	 * is then refused, never redirected.  --insecure-links opts back out (the
-	 * resolver in do_open_at honours it), and a genuine symlink leaf (a symlink
+	 * resolver in vfs_open_at honours it), and a genuine symlink leaf (a symlink
 	 * backup) keeps the existing l-variant path. */
 	/* Gate on the INTENDED type (new_mode), not the on-disk type (sxp->st): the
 	 * attacker controls the latter via the flip, and a dir component that has
 	 * just been flipped to a symlink must still take the pinned path so the
 	 * O_NOFOLLOW open refuses it -- otherwise the lchown would launder it. */
-	op_pin = operator_path_resolve && dfd < 0 && !symlink_optout_allowed()
+	op_pin = (flags & ATTRS_OPERATOR_PATH) && dfd < 0 && !vfs_symlink_optout_allowed()
 	      && (S_ISREG(new_mode) || S_ISDIR(new_mode) || S_ISFIFO(new_mode));
 	if (op_pin) {
-		op_leaf_fd = do_open_at(fname, O_RDONLY | O_NONBLOCK | O_NOCTTY | O_CLOEXEC, 0);
+		op_leaf_fd = vfs_open_at(fname, O_RDONLY | O_NONBLOCK | O_NOCTTY | O_CLOEXEC, 0, VFS_OPERATOR_PATH);
 		/* When running as root (the uid-0 trust-laundering case) an O_RDONLY open
 		 * of a real owned reg/dir/fifo leaf never fails for permission reasons, so
 		 * ANY failure here means the leaf is being raced (a symlink refused by
@@ -676,8 +675,10 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		if (am_root >= 0) {
 			uid_t uid = change_uid ? (uid_t)F_OWNER(file) : sxp->st.st_uid;
 			gid_t gid = change_gid ? (gid_t)F_GROUP(file) : sxp->st.st_gid;
-			if ((dfd >= 0 ? vfs_lchown(dfd, leaf, uid, gid, 0)
-				      : vfs_lchown(VFS_AT_FDCWD, fname, uid, gid, 0)) != 0) {
+			if ((op_leaf_fd >= 0 ? vfs_fchown(op_leaf_fd, uid, gid)
+			     : op_refuse ? (errno = ELOOP, -1)
+			     : dfd >= 0 ? vfs_lchown(dfd, leaf, uid, gid, 0)
+					: vfs_lchown(VFS_AT_FDCWD, fname, uid, gid, 0)) != 0) {
 				/* We shouldn't have attempted to change uid
 				 * or gid unless have the privilege. */
 				rsyserr(FERROR_XFER, errno, "%s %s failed",
@@ -768,7 +769,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		int ret;
 #ifdef HAVE_FUTIMENS
 		if (op_leaf_fd >= 0)
-			ret = do_futimens(op_leaf_fd, &sx2.st);
+			ret = vfs_futimens(op_leaf_fd, &sx2.st);
 		else
 #endif
 		if (op_refuse)
@@ -804,6 +805,8 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 #ifdef HAVE_CHMOD
 	if (!BITS_EQUAL(sxp->st.st_mode, new_mode, CHMOD_BITS)) {
 		int ret = am_root < 0 ? 0
+			: op_leaf_fd >= 0 ? vfs_fchmod(op_leaf_fd, new_mode)
+			: op_refuse ? (errno = ELOOP, -1)
 			: dfd >= 0 && !S_ISLNK(new_mode) ? vfs_chmod(dfd, leaf, new_mode, 0)
 			: vfs_chmod(VFS_AT_FDCWD, fname, new_mode, 0);
 		if (ret < 0) {
@@ -903,10 +906,8 @@ int finish_transfer(const char *fname, const char *fnametmp,
 	 * dirfd, so resolve its metadata through the ownership walk (op_pin); a
 	 * flipped temp-dir parent then can't redirect the chmod/chown/times/etc.
 	 * (in-tree temps keep their held dirfd, so op_pin stays off there). */
-	operator_path_resolve = 1;
 	set_file_attrs(fnametmp, file, NULL, fnamecmp,
-		       ok_to_set_time ? ATTRS_ACCURATE_TIME : ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME | ATTRS_SKIP_CRTIME);
-	operator_path_resolve = 0;
+		       ATTRS_OPERATOR_PATH | (ok_to_set_time ? ATTRS_ACCURATE_TIME : ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME | ATTRS_SKIP_CRTIME));
 
 	/* move tmp file over real file */
 	if (DEBUG_GTE(RECV, 1))

@@ -99,3 +99,13 @@ int vfs_lchown(int dirfd, const char *path, uid_t owner, gid_t group, int flags)
 		return vfs__lchown_plain(path, owner, group);
 	return vfs__lchown_secure(path, owner, group, flags);
 }
+
+/* Mode/owner on an already-open fd (no path, no symlink to follow): the
+ * race-free way to set metadata on a cross-tree operator-path leaf that was
+ * pinned with O_NOFOLLOW.  See set_file_attrs(). */
+int vfs_fchown(int fd, uid_t owner, gid_t group)
+{
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+	return fchown(fd, owner, group);
+}

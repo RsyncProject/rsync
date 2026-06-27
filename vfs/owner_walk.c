@@ -149,7 +149,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 					saved_errno = errno;
 					goto out;
 				}
-				if (abspath_excluded_by_module(abspath, 0, is_operator)) {
+				if (abspath_excluded_by_module(abspath, is_operator)) {
 					saved_errno = ELOOP;
 					goto out;
 				}
@@ -219,7 +219,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 				saved_errno = errno;
 				goto out;
 			}
-			if (abspath_excluded_by_module(abspath, S_ISDIR(lst.st_mode), is_operator)) {
+			if (abspath_excluded_by_module(abspath, is_operator)) {
 				saved_errno = ELOOP;
 				goto out;
 			}
@@ -243,7 +243,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 			saved_errno = errno;
 			goto out;
 		}
-		if (abspath_excluded_by_module(abspath, 1, is_operator)) {
+		if (abspath_excluded_by_module(abspath, is_operator)) {
 			saved_errno = ELOOP;
 			goto out;
 		}
@@ -340,22 +340,12 @@ int vfs_owner_walk_parent(const char *path, const char **bname, int is_operator)
 	 * based and not enforced here -- see abspath_excluded_by_module.) */
 	if (pabs[0]) {
 		char leafabs[MAXPATHLEN];
-		STRUCT_STAT lst;
-		int isdir = 0, absent = 0, refuse;
-		if (fstatat(dfd, *bname, &lst, AT_SYMLINK_NOFOLLOW) == 0)
-			isdir = S_ISDIR(lst.st_mode);
-		else
-			absent = 1;	/* mkdir/rename target: type unknown yet */
 		if (snprintf(leafabs, sizeof leafabs, "%s/%s", pabs, *bname) >= (int)sizeof leafabs) {
 			close(dfd);
 			errno = ENAMETOOLONG;	/* fail closed, never skip the check */
 			return -1;
 		}
-		/* For an absent leaf the op may create a dir, so also test dir-only
-		 * filter rules (a "/foo/" rule never matches a file). */
-		refuse = abspath_excluded_by_module(leafabs, isdir, is_operator)
-		      || (absent && abspath_excluded_by_module(leafabs, 1, is_operator));
-		if (refuse) {
+		if (abspath_excluded_by_module(leafabs, is_operator)) {
 			close(dfd);
 			errno = ELOOP;
 			return -1;

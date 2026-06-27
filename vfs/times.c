@@ -353,3 +353,28 @@ int vfs_utimensat_atfd(int dfd, const char *name, STRUCT_STAT *stp)
 #endif
 }
 #endif
+
+#ifdef HAVE_FUTIMENS
+/* Set times on an already-open fd (the race-free counterpart for a pinned
+ * cross-tree operator leaf -- see set_file_attrs()). */
+int vfs_futimens(int fd, STRUCT_STAT *stp)
+{
+	struct timespec t[2];
+
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
+	t[0].tv_sec = stp->st_atime;
+#ifdef ST_ATIME_NSEC
+	t[0].tv_nsec = stp->ST_ATIME_NSEC;
+#else
+	t[0].tv_nsec = 0;
+#endif
+	t[1].tv_sec = stp->st_mtime;
+#ifdef ST_MTIME_NSEC
+	t[1].tv_nsec = stp->ST_MTIME_NSEC;
+#else
+	t[1].tv_nsec = 0;
+#endif
+	return futimens(fd, t);
+}
+#endif

@@ -103,6 +103,21 @@ static int secure_basis_open(const char *basedir, const char *relpath, int flags
 	extern int am_daemon, am_chrooted;
 	extern unsigned int module_dirlen;
 
+	/* "insecure links = yes": restore the 3.2.7 plain open so an operator/peer
+	 * alt-dest basis follows symlinks like legacy rsync, the same opt-out the
+	 * other daemon symlink sites honour. */
+	if (vfs_symlink_optout_allowed()) {
+		if (basedir) {
+			char fullpath[MAXPATHLEN];
+			if (pathjoin(fullpath, sizeof fullpath, basedir, relpath) >= sizeof fullpath) {
+				errno = ENAMETOOLONG;
+				return -1;
+			}
+			return vfs_open(fullpath, flags, mode);
+		}
+		return vfs_open(relpath, flags, mode);
+	}
+
 	/* A peer-supplied --partial-dir basis/staging path (is_operator, set by the
 	 * recv_files caller) may be absolute (module_dir-prefixed on a non-chroot
 	 * daemon) and traverse a symlink the vfs_resolve_open path can't confine:
@@ -1053,12 +1068,18 @@ int recv_files(int f_in, int f_out, char *local_name)
 				slash = strrchr(fnamecmp, '/');
 				fd1 = vfs_open_atfd(bdfd, slash ? slash + 1 : fnamecmp, O_RDONLY, 0);
 			} else {
-				/* A --partial-dir basis is an operator/peer path: resolve it with
-				 * the exclude-aware ownership walk so a symlinked partial-dir
-				 * can't read (and feed back as delta) a file in an excluded
-				 * subtree. */
+				/* An operator-supplied basis -- a --partial-dir, or an
+				 * alt-dest basedir (--copy-dest/--compare-dest/--link-dest) --
+				 * is a peer/operator path: resolve it with the exclude-aware
+				 * ownership walk so a flipped foreign-owned parent symlink can't
+				 * read (and feed back as delta) an out-of-tree / excluded file.
+				 * The walk still allows the legitimate "../sibling" basis (#915)
+				 * and the operator's own uid0/euid symlinks.  A daemon keeps its
+				 * stronger confinement branch in secure_basis_open(), so only
+				 * route the alt-dest basedir read through the walk off-daemon. */
 				fd1 = secure_basis_open(basedir, fnamecmp, O_RDONLY, 0,
-					fnamecmp_type == FNAMECMP_PARTIAL_DIR ? VFS_OPERATOR_PATH : 0);
+					((basedir && !am_daemon) || fnamecmp_type == FNAMECMP_PARTIAL_DIR) ? VFS_OPERATOR_PATH : 0);
+
 			}
 		}
 		if (fnamecmp_type == FNAMECMP_PARTIAL_DIR && fd1 == -1) {
@@ -1089,7 +1110,8 @@ int recv_files(int f_in, int f_out, char *local_name)
 				basedir = basis_dir[0];
 				fnamecmp = fname;
 				fnamecmp_type = FNAMECMP_BASIS_DIR_LOW;
-				fd1 = secure_basis_open(basedir, fnamecmp, O_RDONLY, 0, 0);
+				fd1 = secure_basis_open(basedir, fnamecmp, O_RDONLY, 0,
+					!am_daemon ? VFS_OPERATOR_PATH : 0);
 			}
 		}
 

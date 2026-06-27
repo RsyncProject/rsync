@@ -100,9 +100,19 @@ int vfs_link_at(const char *old_path, const char *new_path, int vfs_flags)
 	 * "cd/target.txt", ...) escape the module.  An absolute path uses
 	 * AT_FDCWD + the full path; each side is confined independently, so an
 	 * absolute source (e.g. an absolute --link-dest) cannot disable
-	 * confinement of a relative destination. */
+	 * confinement of a relative destination.  An absolute side is an operator
+	 * path resolved via the ownership walk (foreign-owned parent symlink refused;
+	 * --insecure-links keeps the legacy AT_FDCWD path). */
 	if (*old_path == '/') {
-		old_bname = old_path;
+#if defined O_NOFOLLOW && defined O_DIRECTORY
+		if (!vfs_symlink_optout_allowed()) {
+			old_dfd = vfs_owner_walk_parent(old_path, &old_bname, 1);
+			if (old_dfd < 0)
+				return -1;
+			old_owns = True;
+		} else
+#endif
+			old_bname = old_path;
 	} else if (old_slash) {
 		old_dlen = old_slash - old_path;
 		if (old_dlen >= sizeof old_dirpath) { errno = ENAMETOOLONG; return -1; }
@@ -118,7 +128,19 @@ int vfs_link_at(const char *old_path, const char *new_path, int vfs_flags)
 	}
 
 	if (*new_path == '/') {
-		new_bname = new_path;
+#if defined O_NOFOLLOW && defined O_DIRECTORY
+		if (!vfs_symlink_optout_allowed()) {
+			new_dfd = vfs_owner_walk_parent(new_path, &new_bname, 1);
+			if (new_dfd < 0) {
+				e = errno;
+				if (old_owns) close(old_dfd);
+				errno = e;
+				return -1;
+			}
+			new_owns = True;
+		} else
+#endif
+			new_bname = new_path;
 	} else if (new_slash) {
 		new_dlen = new_slash - new_path;
 		if (new_dlen >= sizeof new_dirpath) {

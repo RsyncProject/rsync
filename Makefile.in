@@ -233,6 +233,10 @@ T_UNSAFE_OBJ = t_unsafe.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o l
 t_unsafe$(EXEEXT): $(T_UNSAFE_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_UNSAFE_OBJ) $(LIBS)
 
+T_HASHTABLE_OVERFLOW_OBJ = t_hashtable_overflow.o hashtable.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o libvfs.a
+t_hashtable_overflow$(EXEEXT): $(T_HASHTABLE_OVERFLOW_OBJ)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_HASHTABLE_OVERFLOW_OBJ) $(LIBS)
+
 T_IWILDMATCH_OBJ = t_iwildmatch.o lib/wildmatch.o
 t_iwildmatch$(EXEEXT): $(T_IWILDMATCH_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_IWILDMATCH_OBJ) $(LIBS)

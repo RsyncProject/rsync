@@ -52,9 +52,8 @@ int path_has_dotdot_component(const char *path)
  * name is not excluded may still resolve into an excluded IN-module subtree,
  * exactly as in stock rsync.  The defense for a writable module is `munge
  * symlinks` (see rsyncd.conf(5)), not this walk.  No-op unless we're a daemon. */
-int abspath_excluded_by_module(const char *abspath, int name_is_dir, int is_operator)
+int abspath_excluded_by_module(const char *abspath, int is_operator)
 {
-	(void)name_is_dir;
 	if (!am_daemon || !abspath || !vfs.module_dir)
 		return 0;
 	if (vfs.module_dirlen <= 1)			/* module root is "/": nothing is outside */
@@ -193,7 +192,7 @@ int ds_descend(struct dirstack *ds, const char *part, int *hops)
 		 * symlink that redirected the walk into an excluded subtree). */
 		/* The strict resolver stays confined beneath the anchor (within the
 		 * module), so this never actually refuses; pass is_operator=0. */
-		if (abspath_excluded_by_module(ds->abspath, 1, 0)) {
+		if (abspath_excluded_by_module(ds->abspath, 0)) {
 			errno = ELOOP;
 			return -1;
 		}

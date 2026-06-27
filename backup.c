@@ -43,19 +43,14 @@ extern char *backup_dir;
  * backup_metadata_hardened() to tell the two -1 cases apart). */
 int backup_metadata_hardened(void)
 {
-	return secure_relpath_active() && !symlink_optout_allowed();
+	return vfs_relpath_active() && !vfs_symlink_optout_allowed();
 }
 
 int backup_source_fd(const char *path)
 {
 #if defined AT_FDCWD && defined O_NOFOLLOW
-	if (backup_metadata_hardened() && path && *path) {
-		int save = operator_path_resolve, fd;
-		operator_path_resolve = 1;
-		fd = do_open_at(path, O_RDONLY | O_NONBLOCK | O_NOCTTY | O_CLOEXEC, 0);
-		operator_path_resolve = save;
-		return fd;
-	}
+	if (backup_metadata_hardened() && path && *path)
+		return vfs_open_at(path, O_RDONLY | O_NONBLOCK | O_NOCTTY | O_CLOEXEC, 0, VFS_OPERATOR_PATH);
 #endif
 	return -1;
 }
@@ -169,7 +164,7 @@ static BOOL copy_valid_path(const char *fname)
 				close(bfd);
 			}
 #endif
-			set_file_attrs(backup_dir_buf, file, NULL, NULL, 0);
+			set_file_attrs(backup_dir_buf, file, NULL, NULL, ATTRS_OPERATOR_PATH);
 			unmake_file(file);
 		}
 
@@ -420,7 +415,7 @@ static int make_backup_inner(const char *fname, BOOL prefer_rename)
 
 	save_preserve_xattrs = preserve_xattrs;
 	preserve_xattrs = 0;
-	set_file_attrs(buf, file, NULL, fname, ATTRS_ACCURATE_TIME);
+	set_file_attrs(buf, file, NULL, fname, ATTRS_OPERATOR_PATH | ATTRS_ACCURATE_TIME);
 	preserve_xattrs = save_preserve_xattrs;
 
 	unmake_file(file);

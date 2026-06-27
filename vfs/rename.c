@@ -88,14 +88,24 @@ int vfs_rename_at(const char *old_path, const char *new_path, int vfs_flags)
 	old_slash = strrchr(old_path, '/');
 	new_slash = strrchr(new_path, '/');
 
-	/* An absolute path uses AT_FDCWD with the full path; only a *relative* side
-	 * is confined under the secure resolver.  Confine each side independently:
-	 * an absolute source (e.g. an absolute --temp-dir temp file) must NOT
-	 * disable confinement of a relative destination, or finish_transfer's
-	 * tmp->final rename re-resolves the dest from the path and a flipped parent
-	 * symlink writes the file outside the tree (a symlink-race write escape). */
+	/* Confine each side independently.  A *relative* side is a transfer path,
+	 * confined beneath the tree via vfs_resolve_open().  An *absolute* side is
+	 * an operator path (an absolute --temp-dir/--partial-dir temp file): resolve
+	 * its parent via the ownership walk so a flipped foreign-owned parent symlink
+	 * can't redirect the rename out of tree, while still allowing the operator's
+	 * own dirs/".."/uid0-or-euid symlinks.  (--insecure-links keeps the legacy
+	 * unconfined AT_FDCWD path.)  Doing each side independently means an absolute
+	 * source never disables confinement of a relative destination. */
 	if (*old_path == '/') {
-		old_bname = old_path;
+#if defined O_NOFOLLOW && defined O_DIRECTORY
+		if (!vfs_symlink_optout_allowed()) {
+			old_dfd = vfs_owner_walk_parent(old_path, &old_bname, 1);
+			if (old_dfd < 0)
+				return -1;
+			old_owns = True;
+		} else
+#endif
+			old_bname = old_path;
 	} else if (old_slash) {
 		old_dlen = old_slash - old_path;
 		if (old_dlen >= sizeof old_dirpath) {
@@ -114,7 +124,19 @@ int vfs_rename_at(const char *old_path, const char *new_path, int vfs_flags)
 	}
 
 	if (*new_path == '/') {
-		new_bname = new_path;
+#if defined O_NOFOLLOW && defined O_DIRECTORY
+		if (!vfs_symlink_optout_allowed()) {
+			new_dfd = vfs_owner_walk_parent(new_path, &new_bname, 1);
+			if (new_dfd < 0) {
+				e = errno;
+				if (old_owns) close(old_dfd);
+				errno = e;
+				return -1;
+			}
+			new_owns = True;
+		} else
+#endif
+			new_bname = new_path;
 	} else if (new_slash) {
 		new_dlen = new_slash - new_path;
 		if (new_dlen >= sizeof new_dirpath) {

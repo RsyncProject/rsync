@@ -144,6 +144,9 @@ int vfs_open_checklinks(const char *pathname);
 
 /* chmod (vfs/chmod.c). */
 int vfs_chmod(int dirfd, const char *path, mode_t mode, int flags);
+#ifdef HAVE_CHMOD
+int vfs_fchmod(int fd, mode_t mode);
+#endif
 
 /* symlink/readlink (vfs/symlink.c).  vfs_readlink is a function only in
  * fake-super builds; otherwise it is a macro -> readlink() (see rsync.h). */
@@ -170,6 +173,7 @@ int vfs_secure_mkstemp(char *template, mode_t perms, int operator_path);
 
 /* lchown (vfs/chown.c). */
 int vfs_lchown(int dirfd, const char *path, uid_t owner, gid_t group, int flags);
+int vfs_fchown(int fd, uid_t owner, gid_t group);
 
 /* device/fifo/socket node creation (vfs/mknod.c). */
 int vfs_mknod(int dirfd, const char *path, mode_t mode, dev_t dev, int flags);
@@ -191,6 +195,9 @@ int robust_rename(const char *from, const char *to, const char *partialptr,
 int vfs_utimensat(const char *path, STRUCT_STAT *stp);
 int vfs_utimensat_at(const char *path, STRUCT_STAT *stp);
 int vfs_utimensat_atfd(int dfd, const char *name, STRUCT_STAT *stp);
+#ifdef HAVE_FUTIMENS
+int vfs_futimens(int fd, STRUCT_STAT *stp);
+#endif
 int vfs_lutimes(const char *path, STRUCT_STAT *stp);
 int vfs_utimes(const char *path, STRUCT_STAT *stp);
 int vfs_utime(const char *path, STRUCT_STAT *stp);

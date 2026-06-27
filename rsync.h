@@ -223,6 +223,7 @@
 #define ATTRS_SKIP_MTIME	(1<<1)
 #define ATTRS_ACCURATE_TIME	(1<<2)
 #define ATTRS_SKIP_ATIME	(1<<3)
+#define ATTRS_OPERATOR_PATH	(1<<4)	/* fname is a cross-tree operator path: pin its leaf (op_pin) */
 #define ATTRS_SKIP_CRTIME	(1<<5)
 
 #define MSG_FLUSH	2

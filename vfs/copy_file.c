@@ -99,10 +99,32 @@ int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode, 
 	 * --copy-dest=cd where cd is a symlink to an outside directory) cannot
 	 * redirect the read to a file the attacker should not see.  Plain
 	 * vfs_open_nofollow only refuses a final-component symlink; parents are
-	 * still followed.  (An absolute source is operator-trusted -- e.g. an
-	 * absolutized basis dir -- and uses vfs_open_nofollow.) */
+	 * still followed.  An ABSOLUTE source is an operator basis (e.g. an absolute
+	 * --copy-dest): confine its parents via the ownership walk -- a foreign-owned
+	 * parent symlink is refused, the operator's own dirs/uid0/euid symlinks
+	 * followed -- so a flipped parent can't redirect the basis read out of tree.
+	 * The walk runs with is_operator=1 (module-exclude enforced) and pins only
+	 * the source side, leaving the dest open untouched -- this is why confining
+	 * the source here does not re-open the copy_xattrs dest race the way wrapping
+	 * the whole copy_altdest_file would. */
 	if (vfs_relpath_active() && source && *source && source[0] != '/')
 		ifd = vfs_resolve_open(NULL, source, O_RDONLY | O_NOFOLLOW, 0);
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+	else if (vfs_relpath_active() && source && source[0] == '/'
+	      && !vfs_symlink_optout_allowed()) {
+		int dfd, e;
+		const char *leaf;
+		dfd = vfs_owner_walk_parent(source, &leaf, 1);
+		if (dfd < 0)
+			ifd = -1;
+		else {
+			ifd = openat(dfd, leaf, O_RDONLY | O_NOFOLLOW);
+			e = errno;
+			close(dfd);
+			errno = e;
+		}
+	}
+#endif
 	else
 		ifd = vfs_open_nofollow(source, O_RDONLY);
 	if (ifd < 0) {
@@ -161,11 +183,6 @@ int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode, 
 		return -1;
 	}
 
-	if (close(ifd) < 0) {
-		rsyserr(FWARNING, errno, "close failed on %s",
-			full_fname(source));
-	}
-
 	/* Source file might have shrunk since we fstatted it.
 	 * Cut off any extra preallocated zeros from dest file. */
 	if (offset < prealloc_len) {
@@ -183,16 +200,23 @@ int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode, 
 		int save_errno = errno;
 		rsyserr(FERROR, errno, "fsync failed on %s", full_fname(dest));
 		close(ofd);
+		close(ifd);	/* ifd is held open until after the xattr copy below */
 		errno = save_errno;
 		return -1;
 	}
 
 #ifdef SUPPORT_XATTRS
-	/* Set xattrs through ofd while it's still held so a parent-symlink race
-	 * can't redirect them onto a file outside the tree. */
+	/* Read the source xattrs through the held source fd (ifd) and set them
+	 * through ofd while both are still held, so a parent-symlink race can't
+	 * redirect the read out of tree or the write onto a file outside it. */
 	if (preserve_xattrs)
-		copy_xattrs(source, dest, ofd);
+		copy_xattrs(source, ifd, dest, ofd);
 #endif
+
+	if (close(ifd) < 0) {
+		rsyserr(FWARNING, errno, "close failed on %s",
+			full_fname(source));
+	}
 
 	if (close(ofd) < 0) {
 		int save_errno = errno;

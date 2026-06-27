@@ -961,7 +961,6 @@ static int copy_altdest_file(const char *src, const char *dest, struct file_stru
 static int basis_link_stat(const char *path, STRUCT_STAT *stp)
 {
 	extern int am_chrooted;
-	extern int operator_path_resolve;
 	extern unsigned int module_dirlen;
 #if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
 	/* The basis dir (--link-dest/--compare-dest/--copy-dest) is an operator-
@@ -990,7 +989,7 @@ static int basis_link_stat(const char *path, STRUCT_STAT *stp)
 		return r;
 	}
 	/* A non-chroot daemon serving an operator/peer alt-dest basis: resolve through
-	 * the ownership walk with module-ROOT confinement (operator_path_resolve) so an
+	 * the ownership walk with module-ROOT confinement (is_operator=1) so an
 	 * in-module symlink whose target lands OUTSIDE the module is refused -- the
 	 * basis then looks absent and the file transfers normally instead of being
 	 * stat'd/read/linked through the link (closes the --compare-dest=/E read
@@ -1002,16 +1001,14 @@ static int basis_link_stat(const char *path, STRUCT_STAT *stp)
 	 * and must keep the plain link_stat below (#915/#930).  The leaf is taken
 	 * under the confined parent with O_NOFOLLOW/AT_SYMLINK_NOFOLLOW, so
 	 * --copy-links can't follow a leaf symlink out of the module. */
-	if (am_daemon && !am_chrooted && path[0] == '/' && !symlink_optout_allowed()) {
+	if (am_daemon && !am_chrooted && path[0] == '/' && !vfs_symlink_optout_allowed()) {
 		const char *leaf;
-		int dfd, e, save = operator_path_resolve;
-		operator_path_resolve = 1;
-		dfd = owner_walk_parent(path, &leaf);
-		operator_path_resolve = save;
+		int dfd, e;
+		dfd = vfs_owner_walk_parent(path, &leaf, 1);
 		if (dfd < 0)
 			return -1;
 		if (am_root >= 0) {
-			int r = do_lstat_atfd(dfd, leaf, stp);
+			int r = vfs_lstat(dfd, leaf, stp, 0);
 			e = errno;
 			close(dfd);
 			errno = e;
@@ -1022,12 +1019,12 @@ static int basis_link_stat(const char *path, STRUCT_STAT *stp)
 			/* --fake-super: O_NOFOLLOW-open the held leaf (the daemon owns its
 			 * fake-super files) so the %stat xattr link_stat() would fold is
 			 * preserved while a leaf symlink is still refused. */
-			int lfd = do_open_atfd(dfd, leaf, O_RDONLY | O_NOFOLLOW | O_NONBLOCK, 0);
+			int lfd = vfs_open_atfd(dfd, leaf, O_RDONLY | O_NOFOLLOW | O_NONBLOCK, 0);
 			STRUCT_STAT xst;
 			e = errno;
 			close(dfd);
 			if (lfd < 0) { errno = e; return -1; }
-			if (do_fstat(lfd, stp) < 0) { e = errno; close(lfd); errno = e; return -1; }
+			if (vfs_fstat(lfd, stp) < 0) { e = errno; close(lfd); errno = e; return -1; }
 			if (get_stat_xattr(NULL, lfd, stp, &xst) == 0)
 				*stp = xst;
 			close(lfd);
@@ -1035,7 +1032,7 @@ static int basis_link_stat(const char *path, STRUCT_STAT *stp)
 		}
 #else
 		{
-			int r = do_lstat_atfd(dfd, leaf, stp);
+			int r = vfs_lstat(dfd, leaf, stp, 0);
 			e = errno;
 			close(dfd);
 			errno = e;
@@ -1044,7 +1041,7 @@ static int basis_link_stat(const char *path, STRUCT_STAT *stp)
 #endif
 	}
 #endif
-	if (am_daemon && am_chrooted && module_dirlen && path[0] != '/' && !symlink_optout_allowed()) {
+	if (am_daemon && am_chrooted && module_dirlen && path[0] != '/' && !vfs_symlink_optout_allowed()) {
 		const char *slash = strrchr(path, '/');
 		if (slash) {
 			char dir[MAXPATHLEN];
@@ -1495,7 +1492,7 @@ static int gen_entry_rename(const char *opath, const char *npath, struct file_st
 static int gen_entry_copy_xattrs(const char *src, const char *fname, struct file_struct *file)
 {
 	int dfd = vfs_cached_dirfd(fname, file);
-	int xfd = -1, ret;
+	int xfd = -1, sfd = -1, ret;
 	if (dfd >= 0) {
 		const char *slash = strrchr(fname, '/');
 		xfd = openat(dfd, slash ? slash + 1 : fname,
@@ -1539,20 +1536,18 @@ static int gen_entry_copy_xattrs(const char *src, const char *fname, struct file
 	 * through the operator ownership walk.  Refuse (don't path-read) when we are
 	 * meant to confine but can't pin; a non-hardened receiver path-reads (sfd<0). */
 #if defined AT_FDCWD && defined O_NOFOLLOW
-	if (secure_relpath_active() && src && *src && !symlink_optout_allowed()) {
+	if (vfs_relpath_active() && src && *src && !vfs_symlink_optout_allowed()) {
 		int odir = 0;
 #ifdef O_DIRECTORY
-		if (S_ISDIR(file->mode))	/* secure_relative_open rejects a dir leaf without this */
+		if (S_ISDIR(file->mode))	/* vfs_resolve_open rejects a dir leaf without this */
 			odir = O_DIRECTORY;
 #endif
 		if (src[0] != '/')
-			sfd = secure_relative_open(NULL, src, O_RDONLY | O_NOFOLLOW | odir, 0);
+			sfd = vfs_resolve_open(NULL, src, O_RDONLY | O_NOFOLLOW | odir, 0);
 		else {
-			int save = operator_path_resolve, sdfd, e;
+			int sdfd, e;
 			const char *leaf;
-			operator_path_resolve = 1;
-			sdfd = owner_walk_parent(src, &leaf);
-			operator_path_resolve = save;
+			sdfd = vfs_owner_walk_parent(src, &leaf, 1);
 			if (sdfd >= 0) {
 				sfd = openat(sdfd, leaf, O_RDONLY | O_NOFOLLOW | odir | O_NONBLOCK | O_NOCTTY | O_CLOEXEC);
 				e = errno; close(sdfd); errno = e;
