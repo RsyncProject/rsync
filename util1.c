@@ -483,11 +483,6 @@ int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
 		return -1;
 	}
 
-	if (close(ifd) < 0) {
-		rsyserr(FWARNING, errno, "close failed on %s",
-			full_fname(source));
-	}
-
 	/* Source file might have shrunk since we fstatted it.
 	 * Cut off any extra preallocated zeros from dest file. */
 	if (offset < prealloc_len) {
@@ -505,16 +500,23 @@ int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
 		int save_errno = errno;
 		rsyserr(FERROR, errno, "fsync failed on %s", full_fname(dest));
 		close(ofd);
+		close(ifd);	/* ifd is held open until after the xattr copy below */
 		errno = save_errno;
 		return -1;
 	}
 
 #ifdef SUPPORT_XATTRS
-	/* Set xattrs through ofd while it's still held so a parent-symlink race
-	 * can't redirect them onto a file outside the tree. */
+	/* Read the source xattrs through the held source fd (ifd) and set them
+	 * through ofd while both are still held, so a parent-symlink race can't
+	 * redirect the read out of tree or the write onto a file outside it. */
 	if (preserve_xattrs)
-		copy_xattrs(source, dest, ofd);
+		copy_xattrs(source, ifd, dest, ofd);
 #endif
+
+	if (close(ifd) < 0) {
+		rsyserr(FWARNING, errno, "close failed on %s",
+			full_fname(source));
+	}
 
 	if (close(ofd) < 0) {
 		int save_errno = errno;
