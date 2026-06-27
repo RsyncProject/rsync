@@ -1,22 +1,23 @@
 #!/usr/bin/env python3
-# Symlink-race (TOCTOU) in the generator's --copy-dest xattr copy.
+# Symlink-race (TOCTOU) in a confined receiver's metadata xattr write.
 #
 # With -X and --copy-dest, when a basis file matches the source the generator
-# copies it into place with copy_altdest_file() -> copy_file() -> copy_xattrs().
-# copy_xattrs() wrote each attribute with sys_lsetxattr(dest, ...): lsetxattr
+# copies it into place and then runs set_file_attrs(), which sets the xattrs/ACLs
+# through a held O_NOFOLLOW fd (fsetxattr).  When that held fd is unavailable --
+# the held-dirfd cache misses, e.g. for a path deeper than the cache -- the
+# unfixed code fell through to a path-based sys_lsetxattr(dest, ...).  lsetxattr
 # does not follow a *leaf* symlink, but the kernel's path walk follows symlinks
-# in PARENT components.  copy_file's dest open is confined (do_open_at, secure),
-# so it only succeeds while dest/sub is a real directory and pins that inode --
-# but the unfixed copy_xattrs re-resolved the dest *path* afterwards, so a parent
-# component flipped to a symlink->outside in the window between the open and the
-# setxattr redirected the attacker-chosen xattr onto a file OUTSIDE the
-# destination tree (the attacker controls the bytes -- e.g. security.capabilities
-# as root).
+# in PARENT components, so a parent flipped to a symlink->outside in the window
+# between the confined create and the setxattr redirected the attacker-chosen
+# xattr onto a file OUTSIDE the destination tree (the attacker controls the
+# bytes -- e.g. security.capabilities as root).
 #
 # RED before the fix (the marker xattr lands on an outside sentinel); GREEN once
-# copy_xattrs sets through the held O_NOFOLLOW fd (fsetxattr), which a parent
-# flip cannot redirect.  A separate-process flipper wins the race; no rsync
-# instrumentation is needed.
+# set_file_attrs() re-pins via the secure resolver (or refuses) so the write
+# always uses fsetxattr on a confined fd, which a parent flip cannot redirect.
+# The dest path is buried below the held-dirfd cache depth so the fd-less path is
+# taken on EVERY push (see DEEP), making the flip the only race; a separate-
+# process flipper wins it.  No rsync instrumentation is needed.
 
 import os
 import platform
@@ -29,7 +30,7 @@ from rsyncfns import (
 )
 
 MARKER = 'user.marker'   # on-disk name we look for on the outside sentinels
-N = 40
+N = 120
 
 if platform.system() != 'Linux':
     test_skipped("parent-flip xattr race is checked on Linux (os.*xattr)")
@@ -41,21 +42,28 @@ src = base / 'src'
 cdbasis = base / 'cdbasis'      # absolute --copy-dest basis
 dest = base / 'dest'
 outside = base / 'outside'
+# Bury the flipped dir below the receiver's held-dirfd cache depth (>64) so
+# held_dfd_for()/vfs_cached_dirfd() returns -1 for EVERY file deterministically
+# (not just on a cache-miss race): set_file_attrs() then takes the fd-less
+# metadata path on every push, so the only remaining race is the flip landing
+# during the lsetxattr -- a far stronger RED oracle, especially under -j load.
+DEEP = '/'.join(['d'] * 70)
+
 rmtree(base)
-(src / 'sub').mkdir(parents=True)
-(cdbasis / 'sub').mkdir(parents=True)
-dest.mkdir()
+(src / DEEP / 'sub').mkdir(parents=True)
+(cdbasis / DEEP / 'sub').mkdir(parents=True)
+(dest / DEEP).mkdir(parents=True)
 outside.mkdir()
 
 # Source + matching copy-dest basis (same content/mtime/mode so the generator
 # copies from the basis rather than transferring), both carrying the attacker-
 # chosen marker xattr.  A large payload widens the copy_file open->setxattr
 # window so the separate-process flipper can land inside it.
-payload = ('x' * 4096 + '\n') * 256
+payload = ('x' * 4096 + '\n') * 16  # ~64 KB: widens the per-file create->lsetxattr window
 try:
     for i in range(N):
-        s = src / 'sub' / f'f{i}'
-        b = cdbasis / 'sub' / f'f{i}'
+        s = src / DEEP / 'sub' / f'f{i}'
+        b = cdbasis / DEEP / 'sub' / f'f{i}'
         s.write_text(payload)
         b.write_text(payload)
         os.chmod(s, 0o644)
@@ -69,8 +77,8 @@ try:
 except OSError as e:
     test_skipped(f"filesystem does not support user xattrs ({e})")
 
-sub = dest / 'sub'           # the parent component the attacker flips
-link = dest / '.sublink'     # symlink -> outside, swapped in for `sub`
+sub = dest / DEEP / 'sub'           # the parent component the attacker flips
+link = dest / DEEP / '.sublink'     # symlink -> outside, swapped in for `sub`
 link.symlink_to(outside)
 
 
@@ -106,7 +114,7 @@ for i in range(N):
 
 # Separate-process flipper: flip dest/sub between a real directory and the
 # symlink->outside (atomic 3-rename swap), fast enough to win the window
-# between copy_file's confined open and copy_xattrs' setxattr.  It self-
+# between the confined create and set_file_attrs' fd-less metadata setxattr.  It self-
 # terminates when the test process goes away (getppid changes) and after a
 # hard deadline, so a killed test can't leak an orphan (see start_path_flipper).
 flip_code = (
@@ -138,11 +146,10 @@ try:
         marked = outside_marked()
         if marked:
             test_fail(
-                "copy_xattrs parent-symlink race: the attacker-chosen marker "
+                "metadata xattr parent-symlink race: the attacker-chosen marker "
                 f"xattr was written onto files OUTSIDE the destination tree "
-                f"({marked}) -- copy_altdest_file's copy_xattrs() re-resolved "
-                "the dest path with lsetxattr and followed a flipped dest/sub "
-                "symlink.")
+                f"({marked}) -- a confined receiver's set_file_attrs() fell back to "
+                "a path-based lsetxattr and followed a flipped dest/sub symlink.")
 finally:
     flip.terminate()
     try:
