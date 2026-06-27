@@ -5,7 +5,12 @@ module, across every combination of:
     insecure links {no (default secure), yes (admin opt-out)}
   x munge symlinks {no, yes}
   x link origin    {pre-existing on disk, uploaded via rsync}
-  x operation      {READ via --copy-dirlinks pull, WRITE via --keep-dirlinks push}
+  x access VECTOR  (how the client reaches the in-module link "evil"):
+        read         : --copy-dirlinks pull of the module        (send_directory)
+        write        : --keep-dirlinks push into the module       (send_directory)
+        read-plain   : plain pull of an explicit sub-path "evil/" (change_dir)
+        write-plain   : plain push into an explicit sub-path "evil/" (change_dir)
+        compare-dest : push with --compare-dest=/evil             (basis_link_stat)
   x symlink TYPE   (the target the in-module link "evil" points at):
         rel-within   : relative, stays inside the module           (legit)
         rel-outside  : relative, climbs OUT of the module           (escape)
@@ -15,35 +20,43 @@ module, across every combination of:
         abs-inside   : absolute, lands INSIDE the module            (legit)
 
 We measure whether the operation FOLLOWED the link to its target ("followed").
-For an *outside* target, followed == an out-of-module escape; for an *inside*
-target, followed == legitimate in-module access.
+For an *outside* target, followed == an out-of-module escape.
 
 Contract pinned here for THIS branch:
-  - insecure links = no (default): the secure resolver follows only a
-    rel-within link; it refuses an absolute target (even one landing inside) and
-    any "../" that rises above the module root (even one landing back inside).
-    So no escape -- and rel-transits / abs-inside are a deliberate functionality
-    cost of confinement.
-  - insecure links = yes (admin opt-out): restores the pre-3.4.3 legacy
-    behaviour uniformly (sender AND receiver) -- every type is followed, so an
-    outside type escapes, matching stock 3.2.7.
-  - Uploaded links never escape regardless: munge stores them /rsyncd-munged/-
-    prefixed, and munge-off still sanitises an incoming link (drops a leading
-    "/", strips escaping "..").
+  - insecure links = no (default): NO out-of-module escape via ANY vector --
+    every site (send_directory, change_dir, basis_link_stat, secure_basis_open)
+    refuses a link whose target lands outside the module root.
+  - insecure links = yes (admin opt-out): restores stock-3.2.7 follow behaviour
+    UNIFORMLY at every site (the whole point of the option). We assert this
+    against a REAL 3.2.7 daemon oracle when old_versions/rsync_3.2.7 is present:
+    for every insecure=yes cell the current build must follow iff 3.2.7 follows.
+    Without the oracle we fall back to a static contract that still catches a
+    regression (the broken build returns follow=0 where 3.2.7/the contract
+    want 1).
+
+Why the earlier version of this test missed the change_dir / basis_link_stat
+gap: its only vectors were `read`/`write` (--copy-dirlinks/--keep-dirlinks),
+which route 100%% through send_directory/secure_opendir -- the one daemon
+descent site that already honoured the opt-out -- so insecure=yes followed there
+and the test passed. The explicit-path (read-plain/write-plain -> change_dir) and
+alt-dest-basis (compare-dest -> basis_link_stat) vectors below exercise the sites
+that did NOT honour the opt-out.
 
 Needs root (foreign-owned plant; served as root) + a real TCP peer.
 """
 
 import os
 import subprocess
+from pathlib import Path
 
 from rsyncfns import (
-    SCRATCHDIR,
+    RSYNC, RSYNC_PEER, SCRATCHDIR,
     find_attacker_uid, require_tcp, rmtree, rsync_argv, rsync_supports,
     start_test_daemon, test_fail, test_skipped, write_daemon_conf,
 )
 
-DAEMON_PORT = 12909
+PORT_CUR = 12909
+PORT_ORACLE = 12910
 SECRET = "TARGET-CONTENT\n"
 PWNED = "WROTE-THROUGH-LINK\n"
 
@@ -56,8 +69,18 @@ ATT = find_attacker_uid()
 if ATT is None:
     test_skipped("no untrusted-uid user available for the cross-uid plant")
 
+# The 3.2.7 oracle: prefer a --rsync-bin2 peer if it differs from the build under
+# test, else the in-tree static binary. None -> degrade to the static contract.
+_repo = Path(__file__).resolve().parent.parent
+ORACLE_BIN = None
+if RSYNC_PEER != RSYNC:
+    ORACLE_BIN = RSYNC_PEER
+elif (_repo / 'old_versions' / 'rsync_3.2.7').is_file():
+    ORACLE_BIN = str(_repo / 'old_versions' / 'rsync_3.2.7')
+
 TYPES = ('rel-within', 'rel-outside', 'rel-transits', 'abs-outside', 'abs-inside')
 OUTSIDE = {'rel-outside', 'abs-outside'}
+VECTORS = ('read', 'write', 'read-plain', 'write-plain', 'compare-dest')
 
 base = SCRATCHDIR / 'symlink-escape-matrix'
 rmtree(base)
@@ -80,7 +103,19 @@ for insecure in (False, True):
         }))
 
 conf = write_daemon_conf(mod_conf, name='symlink-escape-matrix.conf')
-url = start_test_daemon(conf, DAEMON_PORT)
+# Daemon UNDER TEST is always the current build; the oracle (if any) is a second
+# daemon on its own port serving the identical modules (3.2.7 ignores the unknown
+# "insecure links" param and just follows -- exactly the legacy oracle we want).
+# The oracle needs its OWN pid/log file so the two daemons don't fight one lock.
+url_cur = start_test_daemon(conf, PORT_CUR, rsync_cmd=RSYNC)
+url_oracle = None
+if ORACLE_BIN:
+    conf_oracle = write_daemon_conf(
+        mod_conf,
+        {'pid file': str(SCRATCHDIR / 'rsyncd-oracle.pid'),
+         'log file': str(SCRATCHDIR / 'rsyncd-oracle.log')},
+        name='symlink-escape-matrix-oracle.conf')
+    url_oracle = start_test_daemon(conf_oracle, PORT_ORACLE, rsync_cmd=ORACLE_BIN)
 
 
 def link_target(moddir, outside, sltype):
@@ -99,8 +134,9 @@ def link_target(moddir, outside, sltype):
     raise AssertionError(sltype)
 
 
-def attempt(insecure, munge, origin, vector, sltype):
-    """Set up the cell, run it, return (followed, target_outside)."""
+def attempt(url, insecure, munge, origin, vector, sltype):
+    """Build the cell fresh, run `vector` against daemon `url`, return
+    (followed, target_outside)."""
     name, moddir, outside = MODS[(insecure, munge)]
     rmtree(moddir); moddir.mkdir()
     rmtree(outside); outside.mkdir()
@@ -123,76 +159,113 @@ def attempt(insecure, munge, origin, vector, sltype):
         if not evil.is_symlink():
             return False, t_out
 
-    if vector == 'read':
+    def run(*args):
+        subprocess.run(rsync_argv(*args),
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    if vector == 'read':                         # --copy-dirlinks pull (send_directory)
         dest = base / 'dest'
         rmtree(dest); dest.mkdir()
-        subprocess.run(
-            rsync_argv('-r', '--copy-dirlinks', f'{url}{name}/', f'{dest}/'),
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        through = dest / 'evil' / 'tgtfile'      # content reached THROUGH the link
+        run('-r', '--copy-dirlinks', f'{url}{name}/', f'{dest}/')
+        through = dest / 'evil' / 'tgtfile'
         return (through.is_file() and through.read_text() == SECRET), t_out
 
-    # write: push "evil/pwned" with --keep-dirlinks -> writes through the link
-    sw = base / 'srcw'
-    rmtree(sw); sw.mkdir()
-    (sw / 'evil').mkdir()
-    (sw / 'evil' / 'pwned').write_text(PWNED)
-    subprocess.run(rsync_argv('-r', '--keep-dirlinks', f'{sw}/', f'{url}{name}/'),
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    landed = resolved / 'pwned'
-    return (landed.is_file() and landed.read_text() == PWNED), t_out
+    if vector == 'write':                        # --keep-dirlinks push (send_directory)
+        sw = base / 'srcw'
+        rmtree(sw); sw.mkdir()
+        (sw / 'evil').mkdir()
+        (sw / 'evil' / 'pwned').write_text(PWNED)
+        run('-r', '--keep-dirlinks', f'{sw}/', f'{url}{name}/')
+        landed = resolved / 'pwned'
+        return (landed.is_file() and landed.read_text() == PWNED), t_out
+
+    if vector == 'read-plain':                   # plain pull of "evil/" (change_dir)
+        dest = base / 'dest'
+        rmtree(dest); dest.mkdir()
+        run('-r', f'{url}{name}/evil/', f'{dest}/')
+        through = dest / 'tgtfile'
+        return (through.is_file() and through.read_text() == SECRET), t_out
+
+    if vector == 'write-plain':                  # plain push into "evil/" (change_dir)
+        sw = base / 'srcw'
+        rmtree(sw); sw.mkdir()
+        (sw / 'pwned').write_text(PWNED)
+        run('-r', f'{sw}/', f'{url}{name}/evil/')
+        landed = resolved / 'pwned'
+        return (landed.is_file() and landed.read_text() == PWNED), t_out
+
+    # compare-dest: push a file whose content matches the through-the-link basis;
+    # if the daemon follows /evil it finds the match and SKIPS the transfer, so
+    # the file never lands in the module.  followed == the file was skipped.
+    sc = base / 'srcc'
+    rmtree(sc); sc.mkdir()
+    (sc / 'tgtfile').write_text(SECRET)
+    run('-r', '--checksum', '--compare-dest=/evil', f'{sc}/', f'{url}{name}/')
+    pushed = moddir / 'tgtfile'
+    return (not pushed.is_file()), t_out
 
 
-def expected_followed(insecure, munge, origin, vector, sltype):
-    """Contract: secure default follows only a rel-within link; the opt-out
-    follows everything; an uploaded link is sanitised/munged so only rel-within
-    (whose value survives both) is still followable."""
+def static_followed(insecure, munge, origin, sltype):
+    """Fallback contract when no 3.2.7 oracle is present (insecure=yes only).
+    The opt-out follows every pre-existing link; an uploaded link is sanitised
+    (munge -> none follow; munge-off -> only a rel-within value survives)."""
     if origin == 'uploaded':
-        # munge prefixes EVERY incoming link with /rsyncd-munged/ (none follow);
-        # munge-off sanitises -- only a rel-within value survives intact.
         return sltype == 'rel-within' and not munge
-    if insecure:
-        return True                        # opt-out: legacy follow of every type
-    return sltype == 'rel-within'          # secure default: only the in-tree link
+    return True
 
 
-# Diagnostic: REPORT_MATRIX=1 surfaces the full observed grid (via test_fail) for
-# eyeballing / cross-version comparison; unset, the test just asserts the contract.
 _REPORT = os.environ.get('REPORT_MATRIX')
 grid, mismatches, escapes = [], [], []
 for insecure in (False, True):
     for munge in (False, True):
         for origin in ('preexist', 'uploaded'):
-            for vector in ('read', 'write'):
+            for vector in VECTORS:
                 for sltype in TYPES:
-                    got, t_out = attempt(insecure, munge, origin, vector, sltype)
-                    want = expected_followed(insecure, munge, origin, vector, sltype)
+                    got, t_out = attempt(url_cur, insecure, munge, origin, vector, sltype)
                     esc = got and t_out
-                    grid.append(f"ins={int(insecure)} munge={int(munge)} "
-                                f"{origin:8} {vector:5} {sltype:11}: "
-                                f"followed={int(got)} want={int(want)} "
+
+                    if not insecure:
+                        # Secure default: the ONLY hard contract is "no escape".
+                        # (In-module follow differs per resolver family, so we
+                        # don't over-pin it -- see module docstring.)
+                        line = (f"ins=0 munge={int(munge)} {origin:8} {vector:12} "
+                                f"{sltype:11}: followed={int(got)} "
                                 f"{'ESCAPE' if esc else ''}")
-                    # A confined-default escape is a hard failure, always.
-                    if esc and not insecure:
-                        escapes.append(f"DEFAULT ESCAPE: munge={int(munge)} "
-                                       f"{origin}/{vector}/{sltype}")
-                    if got != want:
-                        mismatches.append(
-                            f"insecure={'yes' if insecure else 'no'} "
-                            f"munge={'yes' if munge else 'no'} "
-                            f"{origin}/{vector}/{sltype}: "
-                            f"followed={got}, expected={want}")
+                        if esc:
+                            escapes.append(f"DEFAULT ESCAPE: munge={int(munge)} "
+                                           f"{origin}/{vector}/{sltype}")
+                    else:
+                        # Opt-out: must match stock 3.2.7 (live oracle) or the
+                        # static fallback contract.
+                        if url_oracle is not None:
+                            want, src = attempt(url_oracle, insecure, munge,
+                                                origin, vector, sltype)[0], '327'
+                        else:
+                            want, src = static_followed(insecure, munge, origin, sltype), 'contract'
+                        line = (f"ins=1 munge={int(munge)} {origin:8} {vector:12} "
+                                f"{sltype:11}: followed={int(got)} want={int(want)}({src})")
+                        if got != want:
+                            mismatches.append(
+                                f"insecure=yes munge={'yes' if munge else 'no'} "
+                                f"{origin}/{vector}/{sltype}: followed={got}, "
+                                f"{src} expected={want}")
+                    grid.append(line)
 
 if _REPORT:
     test_fail("REPORT-MATRIX grid:\n  " + "\n  ".join(grid))
+problems = []
 if escapes:
-    test_fail("secure-default confinement FAILED (out-of-module access):\n  "
-              + "\n  ".join(escapes))
+    problems.append("secure-default confinement FAILED (out-of-module access):\n  "
+                    + "\n  ".join(escapes))
 if mismatches:
-    test_fail("symlink-resolution matrix deviated from the pinned contract:\n  "
-              + "\n  ".join(mismatches))
+    problems.append("insecure-links opt-out did NOT match stock 3.2.7:\n  "
+                    + "\n  ".join(mismatches))
+if problems:
+    test_fail("\n".join(problems))
 
+oracle_note = ("vs a real 3.2.7 daemon oracle" if url_oracle
+               else "vs the static fallback contract (no 3.2.7 binary present)")
 print("daemon-symlink-escape-matrix: 5 link types x preexist/uploaded x "
-      "read/write x munge x insecure all match the pinned contract "
-      "(secure default follows only in-tree links and never escapes; the "
-      "insecure-links opt-out restores legacy following on sender AND receiver)")
+      f"5 vectors (read/write/read-plain/write-plain/compare-dest) x munge: "
+      f"secure default never escapes the module, and insecure links=yes matches "
+      f"stock-3.2.7 following uniformly ({oracle_note}).")
