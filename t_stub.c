@@ -81,7 +81,7 @@ filter_rule_list daemon_filter_list;
 	return 0;
 }
 
- int copy_xattrs(UNUSED(const char *source), UNUSED(const char *dest), UNUSED(int dest_fd))
+ int copy_xattrs(UNUSED(const char *source), UNUSED(int source_fd), UNUSED(const char *dest), UNUSED(int dest_fd))
 {
 	return -1;
 }

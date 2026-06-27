@@ -461,7 +461,7 @@ static inline int xattrs_differ(const char *fname, struct file_struct *file, sta
 {
 	if (preserve_xattrs) {
 		if (!XATTR_READY(*sxp))
-			get_xattr(fname, sxp);
+			get_xattr(fname, -1, sxp);
 		if (xattr_diff(file, sxp, 0))
 			return 1;
 	}
@@ -570,7 +570,7 @@ void itemize(const char *fnamecmp, struct file_struct *file, int ndx, int statre
 #ifdef SUPPORT_XATTRS
 		if (preserve_xattrs) {
 			if (!XATTR_READY(*sxp))
-				get_xattr(fnamecmp, sxp);
+				get_xattr(fnamecmp, -1, sxp);
 			if (xattr_diff(file, sxp, 1))
 				iflags |= ITEM_REPORT_XATTR;
 		}
@@ -1402,7 +1402,7 @@ static int gen_entry_chmod(const char *fname, struct file_struct *file, mode_t m
 static int gen_entry_copy_xattrs(const char *src, const char *fname, struct file_struct *file)
 {
 	int dfd = held_dfd_for(fname, file);
-	int xfd = -1, ret;
+	int xfd = -1, sfd = -1, ret;
 	if (dfd >= 0) {
 		const char *slash = strrchr(fname, '/');
 		xfd = openat(dfd, slash ? slash + 1 : fname,
@@ -1419,7 +1419,44 @@ static int gen_entry_copy_xattrs(const char *src, const char *fname, struct file
 			return -1;
 		}
 	}
-	ret = copy_xattrs(src, fname, xfd);
+	/* Pin the SOURCE (alt-dest basis) leaf too so the xattr READ can't be raced
+	 * out of tree (copy_file does the same for its content+xattr source).  A
+	 * relative basis goes through the RESOLVE_BENEATH resolver; an absolute one
+	 * through the operator ownership walk.  Refuse (don't path-read) when we are
+	 * meant to confine but can't pin; a non-hardened receiver path-reads (sfd<0). */
+#if defined AT_FDCWD && defined O_NOFOLLOW
+	if (secure_relpath_active() && src && *src && !symlink_optout_allowed()) {
+		int odir = 0;
+#ifdef O_DIRECTORY
+		if (S_ISDIR(file->mode))	/* secure_relative_open rejects a dir leaf without this */
+			odir = O_DIRECTORY;
+#endif
+		if (src[0] != '/')
+			sfd = secure_relative_open(NULL, src, O_RDONLY | O_NOFOLLOW | odir, 0);
+		else {
+			int save = operator_path_resolve, sdfd, e;
+			const char *leaf;
+			operator_path_resolve = 1;
+			sdfd = owner_walk_parent(src, &leaf);
+			operator_path_resolve = save;
+			if (sdfd >= 0) {
+				sfd = openat(sdfd, leaf, O_RDONLY | O_NOFOLLOW | odir | O_NONBLOCK | O_NOCTTY | O_CLOEXEC);
+				e = errno; close(sdfd); errno = e;
+			}
+		}
+		if (sfd < 0) {
+			rsyserr(FERROR_XFER, errno,
+				"gen_entry_copy_xattrs: secure open of basis %s failed",
+				full_fname(src));
+			if (xfd >= 0)
+				close(xfd);
+			return -1;
+		}
+	}
+#endif
+	ret = copy_xattrs(src, sfd, fname, xfd);
+	if (sfd >= 0)
+		close(sfd);
 	if (xfd >= 0)
 		close(xfd);
 	return ret;
@@ -2225,7 +2262,14 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		 * copied the xattrs through its own held fd -- don't repeat it
 		 * with a path-based set a parent-symlink race could redirect. */
 		if (preserve_xattrs && f_copy >= 0) {
-			copy_xattrs(fname, backupptr, f_copy);
+			/* Read fname's xattrs through a confined fd so the copy onto the
+			 * held backup fd can't be fed an out-of-module source by a raced
+			 * parent symlink; a hardened race skips rather than path-reads. */
+			int bfd = backup_source_fd(fname);
+			if (!backup_metadata_hardened() || bfd >= 0)
+				copy_xattrs(fname, bfd, backupptr, f_copy);
+			if (bfd >= 0)
+				close(bfd);
 			preserve_xattrs = 0;
 		}
 #endif
