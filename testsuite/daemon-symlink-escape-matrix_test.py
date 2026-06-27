@@ -78,6 +78,16 @@ if RSYNC_PEER != RSYNC:
 elif (_repo / 'old_versions' / 'rsync_3.2.7').is_file():
     ORACLE_BIN = str(_repo / 'old_versions' / 'rsync_3.2.7')
 
+# The in-tree oracle is a Linux x86-64 static binary, so on a non-Linux runner
+# (BSD/macOS/Solaris) it is present but cannot exec.  Probe it and degrade to the
+# static contract on any exec failure rather than crashing with ENOEXEC.
+if ORACLE_BIN:
+    try:
+        subprocess.run([ORACLE_BIN, '--version'],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
+    except OSError:
+        ORACLE_BIN = None
+
 TYPES = ('rel-within', 'rel-outside', 'rel-transits', 'abs-outside', 'abs-inside')
 OUTSIDE = {'rel-outside', 'abs-outside'}
 VECTORS = ('read', 'write', 'read-plain', 'write-plain', 'compare-dest')
