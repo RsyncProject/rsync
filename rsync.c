@@ -572,18 +572,22 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	 * O_NOFOLLOW open refuses it -- otherwise the lchown would launder it. */
 	op_pin = operator_path_resolve && dfd < 0 && !symlink_optout_allowed()
 	      && (S_ISREG(new_mode) || S_ISDIR(new_mode) || S_ISFIFO(new_mode));
-	if (op_pin && am_root >= 0) {
+	if (op_pin) {
 		op_leaf_fd = do_open_at(fname, O_RDONLY | O_NONBLOCK | O_NOCTTY | O_CLOEXEC, 0);
 		/* When running as root (the uid-0 trust-laundering case) an O_RDONLY open
 		 * of a real owned reg/dir/fifo leaf never fails for permission reasons, so
 		 * ANY failure here means the leaf is being raced (a symlink refused by
 		 * O_NOFOLLOW / owner-walk -> ELOOP, or vanished mid-flip -> ENOENT):
-		 * refuse, never redirect via a re-resolvable path.  A non-root operator
-		 * cannot launder a uid-0 symlink, but can still hit a legitimate EACCES on
-		 * an owned-but-unreadable leaf; there we only treat the explicit
-		 * symlink-race signal (ELOOP) as a refusal and otherwise fall back to the
-		 * legacy path op rather than spuriously failing a real file. */
-		if (op_leaf_fd < 0 && (am_root > 0 || errno == ELOOP))
+		 * refuse, never redirect via a re-resolvable path.  --fake-super
+		 * (am_root < 0) is the same: the daemon owns the freshly-staged leaf it is
+		 * about to set %stat/ACL/xattr metadata on, so any open failure is a race
+		 * -- refuse rather than fall through to a path-based sys_lsetxattr that a
+		 * flipped parent could redirect outside the module.  A plain non-root
+		 * operator (am_root == 0) can still hit a legitimate EACCES on an
+		 * owned-but-unreadable leaf; there we only treat the explicit symlink-race
+		 * signal (ELOOP) as a refusal and otherwise fall back to the legacy path
+		 * op rather than spuriously failing a real file. */
+		if (op_leaf_fd < 0 && (am_root != 0 || errno == ELOOP))
 			op_refuse = 1;
 #if defined SUPPORT_XATTRS || defined SUPPORT_ACLS
 		if (op_leaf_fd >= 0)
