@@ -395,23 +395,32 @@ The following are documented as out of scope for this release:
 * The operator-directory ownership walk refuses a foreign-owned symlink on a
   `--backup-dir`/`--temp-dir`/`--partial-dir`/`--link/compare/copy-dest` path, so
   a *statically planted* symlink is rejected and the dependent operation does not
-  escape.  Two narrow follow-on operations re-resolve the (now-validated)
-  operator path by name and are not themselves placed under the ownership walk,
-  leaving a *post-validation* parent-component race:
+  escape.  Both the data writes and the *source-metadata reads* of those
+  operations are now confined to held no-follow fds: the `--copy-dest`
+  `copy_file()`/`copy_xattrs()` source read goes through the held basis content fd
+  (`sys_fgetxattr`), and `make_backup()` reads the backed-up file's ACL/xattrs
+  through a `backup_source_fd()`-pinned fd -- so a parent-component flip can no
+  longer redirect them to disclose an out-of-module value.  Two narrow follow-ons
+  re-resolve the (now-validated) operator path by name and remain a
+  *post-validation* parent-component race:
     * the in-place backup (`--inplace --backup`) writes the backup file's data
       through a confined create, but its `set_file_attrs()` metadata set
-      (chmod/chown/times) re-resolves the `--backup-dir` path afterwards; and
-    * a `--copy-dest` basis read passes the confined `basis_link_stat()` check,
-      but the subsequent `copy_file()`/`copy_xattrs()` re-resolves the basis path.
-  Neither is routed through operator mode because doing so would force the shared
-  `copy_xattrs()`/`set_file_attrs()` path off its held-O_NOFOLLOW-fd xattr write
-  and re-open the very parent-symlink xattr race that
-  `copy-xattrs-symlink-race` pins closed.  An attacker who flips a parent
-  component in the window *after* the confined data write/stat can thus still
-  redirect those metadata/copy operations outside the tree.  This is the same
-  local-attacker post-confinement TOCTOU class as the ACL/crtimes residuals
-  below; the data-write escapes are closed, and `--insecure-links` (or a module's
-  `insecure links = yes`) is orthogonal to it.
+      (chmod/chown/times) re-resolves the `--backup-dir` path by name afterwards
+      (it is not placed under operator mode, which would force the shared
+      `set_file_attrs()` path off its held-O_NOFOLLOW-fd xattr write and re-open
+      the very parent-symlink xattr race `copy-xattrs-symlink-race` pins closed); and
+    * the abbreviated-xattr optimisation reuses a basis xattr value for the
+      destination only when its checksum matches the digest the sender sent; that
+      basis read (`rsync_xal_set()`) re-resolves the basis path by name.  This is a
+      *constrained checksum-oracle*, not a disclosure: it confirms that some raced
+      out-of-module xattr hashes to a value the sender already chose, rather than
+      copying an unknown value onto a readable file, and needs a colluding sender
+      plus a local racer.
+  An attacker who flips a parent component in the window *after* the confined data
+  write/stat can thus still affect those narrow metadata/oracle operations.  This
+  is the same local-attacker post-confinement TOCTOU class as the ACL/crtimes
+  residuals below; the data-write and direct source-read escapes are closed, and
+  `--insecure-links` (or a module's `insecure links = yes`) is orthogonal to it.
 
 * POSIX ACL application (`-A`/`--acls`) is race-safe on every Linux kernel —
   6.13+ via the `*xattrat` syscalls (or a patched libacl's `*_at` bindings), and

@@ -451,7 +451,7 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 			if (preserve_xattrs) {
 				free_xattr(sxp);
 				if (!XATTR_READY(alt_sx))
-					get_xattr(cmpbuf, sxp);
+					get_xattr(cmpbuf, -1, sxp);
 				else {
 					sxp->xattr = alt_sx.xattr;
 					alt_sx.xattr = NULL;
