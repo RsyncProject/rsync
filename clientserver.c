@@ -1040,14 +1040,17 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 		}
 	}
 
-	/* Enable secure symlink handling for any non-chrooted daemon module.
-	 * This prevents TOCTOU race attacks where an attacker could switch a
-	 * directory to a symlink between path validation and file open.
-	 * Match the gate used by the do_*_at() wrappers in syscall.c
-	 * (am_daemon && !am_chrooted) -- the protection has nothing to do
-	 * with symlink munging, so a module configured with
-	 * "munge symlinks = false" must still get the secure-open path. */
-	use_secure_symlinks = am_daemon && (!am_chrooted || module_dirlen);
+	/* Enable secure symlink handling for any non-chrooted daemon module, and
+	 * for a chroot module with a /./ inner boundary (module_dirlen) -- there
+	 * the kernel chroot confines the outer path but not the inner module, so
+	 * the receiver finish/rename path must still resolve beneath the module
+	 * root.  This prevents TOCTOU race attacks where an attacker could switch a
+	 * directory to a symlink between path validation and file open.  Match the
+	 * gate in secure_relpath_active() (syscall.c) -- the protection has nothing
+	 * to do with symlink munging, so a module configured with "munge symlinks =
+	 * false" must still get the secure-open path. */
+	use_secure_symlinks = am_daemon && (!am_chrooted || module_dirlen)
+			    && !symlink_optout_allowed();
 
 	if (gid_list.count) {
 		gid_t *gid_array = gid_list.items;

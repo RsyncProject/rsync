@@ -104,6 +104,21 @@ static int secure_basis_open(const char *basedir, const char *relpath, int flags
 	extern int am_daemon, am_chrooted;
 	extern unsigned int module_dirlen;
 
+	/* "insecure links = yes": restore the 3.2.7 plain open so an operator/peer
+	 * alt-dest basis follows symlinks like legacy rsync, the same opt-out the
+	 * other daemon symlink sites honour. */
+	if (symlink_optout_allowed()) {
+		if (basedir) {
+			char fullpath[MAXPATHLEN];
+			if (pathjoin(fullpath, sizeof fullpath, basedir, relpath) >= sizeof fullpath) {
+				errno = ENAMETOOLONG;
+				return -1;
+			}
+			return do_open(fullpath, flags, mode);
+		}
+		return do_open(relpath, flags, mode);
+	}
+
 	/* A peer-supplied --partial-dir basis/staging path (operator_path_resolve set
 	 * by recv_files) may be absolute (module_dir-prefixed on a non-chroot daemon)
 	 * and traverse a symlink the secure_relative_open path can't confine: resolve
