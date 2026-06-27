@@ -502,6 +502,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	int op_refuse = 0;       /* pin open hit the symlink-race signal: refuse, don't redirect */
 #if defined SUPPORT_XATTRS || defined SUPPORT_ACLS
 	int held_fd = -1; /* held O_NOFOLLOW fd for fd-based xattr/ACL ops, or -1 */
+	int xattr_refuse = 0; /* no confined fd for a slashed path: skip path-based xattr/ACL */
 #endif
 
 	if (!sxp) {
@@ -551,6 +552,34 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 # endif
 	    ))
 		held_fd = openat(dfd, leaf, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_NOCTTY | O_CLOEXEC);
+
+	/* If the held-fd pin above missed (no cached dir fd -- a path deeper than the
+	 * dirfd cache, or a raced leaf) but we are a confined receiver on a
+	 * non-operator path, re-pin the leaf through the secure resolver so the
+	 * xattr/ACL ops below drive fsetxattr off a confined fd -- NOT a raw path-based
+	 * lsetxattr, which re-resolves the parent and lets a flipped dest/sub symlink
+	 * land the xattr OUTSIDE the tree (copy-xattrs-symlink-race).  If the secure
+	 * re-pin also fails (a genuinely raced parent/leaf symlink), held_fd stays -1
+	 * and xattr_refuse skips the path-based ops rather than redirecting them.
+	 * (chmod/chown/times stay safe via their secure path wrappers; operator paths
+	 * use op_pin/op_refuse below.) */
+	if (held_fd < 0 && !operator_path_resolve && secure_relpath_active()
+	 && (S_ISREG(sxp->st.st_mode) || S_ISDIR(sxp->st.st_mode) || S_ISFIFO(sxp->st.st_mode))
+	 && (preserve_xattrs || am_root < 0
+# ifdef SUPPORT_ACLS
+	     || (preserve_acls && am_root >= 0)
+# endif
+	    )) {
+		int odir = 0;
+# ifdef O_DIRECTORY
+		if (S_ISDIR(sxp->st.st_mode))
+			odir = O_DIRECTORY;
+# endif
+		held_fd = secure_relative_open(NULL, fname,
+			O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_NOCTTY | O_CLOEXEC | odir, 0);
+		if (held_fd < 0 && strchr(fname, '/'))
+			xattr_refuse = 1;
+	}
 #endif
 
 	/* A cross-tree operator path (an absolute --backup-dir/--temp-dir/--*-dest
@@ -603,7 +632,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		new_mode = tweak_mode(new_mode, daemon_chmod_modes);
 
 #ifdef SUPPORT_ACLS
-	if (preserve_acls && !S_ISLNK(file->mode) && !ACL_READY(*sxp) && !op_refuse)
+	if (preserve_acls && !S_ISLNK(file->mode) && !ACL_READY(*sxp) && !op_refuse && !xattr_refuse)
 		get_acl_fdat(held_fd, dfd, leaf, fname, sxp);
 #endif
 
@@ -665,9 +694,9 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	}
 
 #ifdef SUPPORT_XATTRS
-	if (am_root < 0 && !op_refuse)
+	if (am_root < 0 && !op_refuse && !xattr_refuse)
 		set_stat_xattr(fname, file, new_mode, held_fd);
-	if (preserve_xattrs && fnamecmp && !op_refuse)
+	if (preserve_xattrs && fnamecmp && !op_refuse && !xattr_refuse)
 		set_xattr(fname, file, fnamecmp, sxp, held_fd);
 #endif
 
@@ -752,7 +781,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	 * If set_acl() changes permission bits in the process of setting
 	 * an access ACL, it changes sxp->st.st_mode so we know whether we
 	 * need to chmod(). */
-	if (preserve_acls && !S_ISLNK(new_mode) && !op_refuse) {
+	if (preserve_acls && !S_ISLNK(new_mode) && !op_refuse && !xattr_refuse) {
 		if (set_acl_fdat(held_fd, dfd, leaf, fname, file, sxp, new_mode) > 0)
 			updated |= UPDATED_ACLS;
 	}
