@@ -174,6 +174,19 @@ are length-bounded; peer-requested xattr expansion is capped; and rsync-ssl in
 stunnel mode now requires certificate verification unless an explicit insecure
 opt-out is set.
 
+A second-pass source audit (reported by Leonid Bugaev) hardened several memory-
+safety and robustness paths: the hashtable and file-list size computations are
+guarded against a 32-bit integer overflow that a peer's entry count could
+otherwise wrap into an under-allocation; a non-positive `MSG_IO_TIMEOUT` from the
+peer is rejected rather than disabling the receiver's own I/O timeout; and the
+`SIGUSR2` handler is now async-signal-safe (it only sets a flag, deferring the
+summary/close-out work to safe poll points).  Separately, the xattr/ACL metadata
+copy now reads the *source* through a held no-follow fd as well as writing the
+destination through one -- closing a parent-symlink race on the `--copy-dest` and
+backup source -- and the cross-tree operator-path metadata apply is now fd-pinned
+under `--fake-super` too (previously it fell back to a path-based set for a
+`fake super = yes` daemon staging through an absolute `--temp-dir`/`--backup-dir`).
+
 ### BEHAVIOR CHANGES:
 
 - A non-daemon receiver follows an operator-named symlinked destination directory

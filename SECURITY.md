@@ -400,7 +400,14 @@ The following are documented as out of scope for this release:
   `copy_file()`/`copy_xattrs()` source read goes through the held basis content fd
   (`sys_fgetxattr`), and `make_backup()` reads the backed-up file's ACL/xattrs
   through a `backup_source_fd()`-pinned fd -- so a parent-component flip can no
-  longer redirect them to disclose an out-of-module value.  Two narrow follow-ons
+  longer redirect them to disclose an out-of-module value.  The cross-tree
+  metadata *apply* on those leaves (the `%stat`/ACL/xattr write on a
+  `--temp-dir`/`--backup-dir` staging file) is fd-pinned the same way, now
+  including under `--fake-super`: the `set_file_attrs()` no-follow leaf fd was
+  previously opened only when `am_root >= 0`, so a `fake super = yes` daemon fell
+  back to a path-based `sys_lsetxattr()`/chmod a raced parent could redirect; the
+  pin is now opened for fake-super too (a raced leaf is refused, not redirected).
+  Two narrow follow-ons
   re-resolve the (now-validated) operator path by name and remain a
   *post-validation* parent-component race:
     * the in-place backup (`--inplace --backup`) writes the backup file's data
