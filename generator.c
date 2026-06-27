@@ -1453,8 +1453,11 @@ static int gen_entry_rename(const char *opath, const char *npath, struct file_st
 
 #ifdef SUPPORT_XATTRS
 /* Copy xattrs from src onto fname through a held, O_NOFOLLOW-opened fd so a
- * parent-symlink race can't redirect the setxattr; falls back to path-based
- * when no held dir fd is available (matches set_file_attrs' held-fd open). */
+ * parent-symlink race can't redirect the setxattr.  A hardened receiver always
+ * uses a confined fd -- via the cached dir fd, or a secure re-pin when that
+ * misses -- and refuses rather than path-write if it can't pin; only a
+ * non-hardened receiver falls back to the path-based copy (matches
+ * set_file_attrs' held-fd handling). */
 static int gen_entry_copy_xattrs(const char *src, const char *fname, struct file_struct *file)
 {
 	int dfd = held_dfd_for(fname, file);
@@ -1467,14 +1470,35 @@ static int gen_entry_copy_xattrs(const char *src, const char *fname, struct file
 			/* We hold a confined parent dirfd but couldn't pin the
 			 * leaf (e.g. it was raced to a symlink) -- refuse rather
 			 * than fall back to a path-based set that would follow the
-			 * parent components.  Only a missing held dirfd (dfd < 0,
-			 * non-hardened receiver) uses the path-based fallback. */
+			 * parent components. */
 			rsyserr(FERROR_XFER, errno,
 				"gen_entry_copy_xattrs: openat(%s) failed",
 				full_fname(fname));
 			return -1;
 		}
 	}
+#if defined AT_FDCWD && defined O_NOFOLLOW
+	else if (secure_relpath_active()) {
+		/* No cached parent dirfd (a path deeper than the dirfd cache, or a raced
+		 * parent) but we must confine: re-pin the dest leaf through the secure
+		 * resolver so copy_xattrs uses fsetxattr, not a path-based lsetxattr a
+		 * flipped parent could redirect out of tree.  A raced parent/leaf makes
+		 * this fail -> refuse rather than path-write. */
+		int odir = 0;
+# ifdef O_DIRECTORY
+		if (S_ISDIR(file->mode))
+			odir = O_DIRECTORY;
+# endif
+		xfd = secure_relative_open(NULL, fname,
+			O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_NOCTTY | O_CLOEXEC | odir, 0);
+		if (xfd < 0) {
+			rsyserr(FERROR_XFER, errno,
+				"gen_entry_copy_xattrs: secure open of %s failed",
+				full_fname(fname));
+			return -1;
+		}
+	}
+#endif
 	/* Pin the SOURCE (alt-dest basis) leaf too so the xattr READ can't be raced
 	 * out of tree (copy_file does the same for its content+xattr source).  A
 	 * relative basis goes through the RESOLVE_BENEATH resolver; an absolute one
