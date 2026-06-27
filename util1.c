@@ -1306,7 +1306,7 @@ int change_dir(const char *dir, int set_path_only)
 			 * branch still anchors at the operator-trusted
 			 * directory rather than wherever the kernel CWD
 			 * happens to be. */
-			if (am_daemon && (!am_chrooted || module_dirlen)) {
+			if (am_daemon && (!am_chrooted || module_dirlen) && !symlink_optout_allowed()) {
 				const char *basedir = NULL;
 				char prefix[MAXPATHLEN];
 				int dfd;
@@ -1328,6 +1328,11 @@ int change_dir(const char *dir, int set_path_only)
 					chdir_failed = fchdir(dfd) != 0;
 					close(dfd);
 				}
+			} else if (am_daemon && symlink_optout_allowed()) {
+				/* "insecure links = yes": restore the 3.2.7 follow-any-symlink
+				 * traversal with a plain chdir to the accumulated path, the same
+				 * legacy behaviour the per-operation sites grant under the opt-out. */
+				chdir_failed = chdir(curr_dir) != 0;
 			} else if (!am_chrooted && !am_sender && !insecure_links) {
 				/* Non-daemon receiver: confine the operator-named relative
 				 * destination like the absolute case above -- refuse a component

@@ -82,6 +82,13 @@ static int secure_sender_parent_fd(struct file_struct *file, const char *fname, 
 		return -1;
 	}
 
+	/* "insecure links = yes" / --insecure-links: restore the 3.2.7 plain re-stat
+	 * by declining the confined parent (errno=0 makes the caller use do_lstat). */
+	if (symlink_optout_allowed()) {
+		errno = 0;
+		return -1;
+	}
+
 	if (!am_daemon || !module_dir || module_dir[0] != '/') {
 		/* Local (non-daemon) sender: there is no module root to anchor at, but
 		 * still confine the parent via the shared held ancestor-dirfd stack
