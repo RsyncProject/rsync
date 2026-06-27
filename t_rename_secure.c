@@ -79,6 +79,30 @@ static void check_rename(const char *label, const char *old_path,
 		label, old_path, new_path, expect_ok ? "succeeded" : "rejected");
 }
 
+/* Like check_rename() but with explicit per-operand policy flags, for the
+ * two-path per-side split (PR #30). */
+static void check_rename_flags(const char *label, const char *old_path,
+			       const char *new_path, int old_flags, int new_flags,
+			       int expect_ok)
+{
+	int rc, got_ok, saved_errno;
+
+	errno = 0;
+	rc = vfs_rename_at(old_path, new_path, old_flags, new_flags);
+	saved_errno = errno;
+	got_ok = rc == 0;
+
+	if (got_ok != expect_ok) {
+		fprintf(stderr, "FAIL [%s]: rename %s -> %s (of=%d nf=%d) rc=%d errno=%d (%s), expected %s\n",
+			label, old_path, new_path, old_flags, new_flags, rc, saved_errno,
+			strerror(saved_errno), expect_ok ? "success" : "rejection");
+		errs++;
+		return;
+	}
+	fprintf(stderr, "OK   [%s]: rename %s -> %s %s\n",
+		label, old_path, new_path, expect_ok ? "succeeded" : "rejected");
+}
+
 static void check_vulnerable_rename(const char *label, const char *old_path,
 				    const char *new_path)
 {
@@ -198,6 +222,38 @@ int main(int argc, char **argv)
 		     "top-old", "top-new", 1);
 	check_exists("F source consumed", "top-old", 0);
 	check_exists("F destination created", "top-new", 1);
+
+	/* Per-operand policy split (PR #30): the NEW side's policy must be independent
+	 * of the OLD side's.  oplink is a caller-owned (uid0/euid) symlink that ESCAPES
+	 * the tree (-> ../trap): the ownership walk (operator policy) follows the
+	 * operator's own symlink, but the secure receiver resolve (transfer, flag 0)
+	 * refuses it because it leaves the cwd anchor.  PS-refuse and PS-follow rename
+	 * to the SAME oplink/ path with the SAME operator old side, differing ONLY in
+	 * the new-side flag -- so the per-side flag, not a whole-call flag, decides.
+	 * The old single-flag API applied VFS_OPERATOR_PATH to both operands, so it
+	 * would have followed oplink in PS-refuse too (PS-refuse is RED on that code).
+	 * Run non-daemon (the regime where an operator basis/backup path legitimately
+	 * carries the operator's own uid0/euid symlinks). */
+	{
+		struct stat lst;
+		if (lstat("oplink", &lst) == 0 && S_ISLNK(lst.st_mode)) {
+			int save_daemon = am_daemon;
+			am_daemon = 0;
+
+			check_rename_flags("PS-refuse: new side transfer refuses an escaping owned symlink",
+				"realdir/perside-src2", "oplink/tr-out",
+				VFS_OPERATOR_PATH, 0, 0);
+			check_exists("PS-refuse out-of-tree dest absent", "../trap/tr-out", 0);
+			check_exists("PS-refuse source preserved", "realdir/perside-src2", 1);
+
+			check_rename_flags("PS-follow: new side operator follows the same owned symlink",
+				"realdir/perside-src3", "oplink/op-out",
+				VFS_OPERATOR_PATH, VFS_OPERATOR_PATH, 1);
+			check_exists("PS-follow out-of-tree dest created (operator's own symlink)", "../trap/op-out", 1);
+
+			am_daemon = save_daemon;
+		}
+	}
 
 	if (errs)
 		fprintf(stderr, "%d failure(s)\n", errs);

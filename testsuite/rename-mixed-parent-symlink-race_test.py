@@ -31,6 +31,14 @@ trap_outside.mkdir(parents=True)
 (mod / 'top-old').write_text("top-old\n")
 os.symlink('../trap', mod / 'escape_link')
 
+# Per-operand policy split (PR #30): a caller-owned symlink that ESCAPES the tree
+# (-> ../trap).  The ownership walk (operator) follows the operator's own symlink;
+# the secure receiver resolve (transfer, flag 0) refuses it.  The harness
+# PS-refuse/PS-follow checks rename to oplink/ under each new-side policy.
+os.symlink('../trap', mod / 'oplink')
+for n in ('perside-src2', 'perside-src3'):
+    (mod / 'realdir' / n).write_text(n + "\n")
+
 proc = subprocess.run([str(TOOLDIR / 't_rename_secure'), str(mod)])
 if proc.returncode == 77:
     test_skipped("t_rename_secure skipped")
