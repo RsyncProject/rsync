@@ -568,30 +568,26 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	    ))
 		held_fd = openat(dfd, leaf, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_NOCTTY | O_CLOEXEC);
 
-	/* If the held-fd pin above missed (no cached dir fd -- a path deeper than the
-	 * dirfd cache, or a raced leaf) but we are a confined receiver on a
-	 * non-operator path, re-pin the leaf through the secure resolver so the
-	 * xattr/ACL ops below drive fsetxattr off a confined fd -- NOT a raw path-based
-	 * lsetxattr, which re-resolves the parent and lets a flipped dest/sub symlink
-	 * land the xattr OUTSIDE the tree (copy-xattrs-symlink-race).  If the secure
-	 * re-pin also fails (a genuinely raced parent/leaf symlink), held_fd stays -1
-	 * and xattr_refuse skips the path-based ops rather than redirecting them.
-	 * (chmod/chown/times stay safe via their secure path wrappers; operator paths
-	 * use op_pin/op_refuse below.) */
-	if (held_fd < 0 && !operator_path_resolve && secure_relpath_active()
+	/* If the held-fd pin above missed (no cached dir fd, or a raced leaf) but we
+	 * are a confined receiver on a non-operator path, re-pin the leaf through the
+	 * secure resolver so the xattr/ACL ops below drive fsetxattr off a confined fd
+	 * -- NOT a raw path-based lsetxattr, which re-resolves the parent and lets a
+	 * flipped dest/sub symlink land the xattr OUTSIDE the tree (copy-xattrs-
+	 * symlink-race).  A confined receiver normally always has the cached pin; a
+	 * miss here is a raced parent/leaf.  If the secure re-pin also fails (the
+	 * parent/leaf is a symlink), held_fd stays -1 and xattr_refuse below skips the
+	 * path-based ops rather than redirecting them.  (chmod/chown/times stay safe
+	 * via their secure path wrappers; operator paths use op_pin/op_refuse.) */
+	if (held_fd < 0 && !(flags & ATTRS_OPERATOR_PATH) && vfs_relpath_active()
 	 && (S_ISREG(sxp->st.st_mode) || S_ISDIR(sxp->st.st_mode) || S_ISFIFO(sxp->st.st_mode))
 	 && (preserve_xattrs || am_root < 0
 # ifdef SUPPORT_ACLS
 	     || (preserve_acls && am_root >= 0)
 # endif
 	    )) {
-		int odir = 0;
-# ifdef O_DIRECTORY
-		if (S_ISDIR(sxp->st.st_mode))
-			odir = O_DIRECTORY;
-# endif
-		held_fd = secure_relative_open(NULL, fname,
-			O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_NOCTTY | O_CLOEXEC | odir, 0);
+		held_fd = vfs_resolve_open(NULL, fname,
+			O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_NOCTTY | O_CLOEXEC
+			| (S_ISDIR(sxp->st.st_mode) ? O_DIRECTORY : 0), 0);
 		if (held_fd < 0 && strchr(fname, '/'))
 			xattr_refuse = 1;
 	}

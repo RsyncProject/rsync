@@ -1513,18 +1513,18 @@ static int gen_entry_copy_xattrs(const char *src, const char *fname, struct file
 		}
 	}
 #if defined AT_FDCWD && defined O_NOFOLLOW
-	else if (secure_relpath_active()) {
-		/* No cached parent dirfd (a path deeper than the dirfd cache, or a raced
-		 * parent) but we must confine: re-pin the dest leaf through the secure
-		 * resolver so copy_xattrs uses fsetxattr, not a path-based lsetxattr a
-		 * flipped parent could redirect out of tree.  A raced parent/leaf makes
-		 * this fail -> refuse rather than path-write. */
+	else if (vfs_relpath_active()) {
+		/* No cached parent dirfd (e.g. a path deeper than the dirfd cache, or a
+		 * raced parent) but we must confine: re-pin the dest leaf through the
+		 * secure resolver so copy_xattrs uses fsetxattr, not a path-based
+		 * lsetxattr a flipped parent could redirect out of tree.  A raced
+		 * parent/leaf makes this fail -> refuse rather than path-write. */
 		int odir = 0;
 # ifdef O_DIRECTORY
 		if (S_ISDIR(file->mode))
 			odir = O_DIRECTORY;
 # endif
-		xfd = secure_relative_open(NULL, fname,
+		xfd = vfs_resolve_open(NULL, fname,
 			O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_NOCTTY | O_CLOEXEC | odir, 0);
 		if (xfd < 0) {
 			rsyserr(FERROR_XFER, errno,
