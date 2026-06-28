@@ -642,6 +642,29 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	if (daemon_chmod_modes && !S_ISLNK(new_mode))
 		new_mode = tweak_mode(new_mode, daemon_chmod_modes);
 
+#if (defined SUPPORT_XATTRS || defined SUPPORT_ACLS) && defined STRICT_CONFINEMENT
+	/* Enforce the pin/re-pin invariant: for a confined, pinnable, non-operator
+	 * leaf with metadata work pending, the held-fd pin/re-pin above must have
+	 * produced a confined fd (held_fd >= 0) or set xattr_refuse.  Reaching here
+	 * with neither means the xattr/ACL setters would take their raw path-based
+	 * branch (the copy-xattrs fallback class) -- abort so the suite catches the
+	 * regression.  The clause mirrors the pin condition (excluding no-metadata-
+	 * work, symlink/operator/opt-out, etc.); it is intentionally a touch broader
+	 * than "the next setter definitely path-writes" (set_xattr is skipped when
+	 * fnamecmp == NULL; a native ACL may still take a dirfd+leaf route), but a
+	 * confined slashed path only reaches here once the invariant is already
+	 * broken, so it cannot false-abort a legitimate transfer. */
+	if (held_fd < 0 && !op_refuse && !xattr_refuse && !(flags & ATTRS_OPERATOR_PATH)
+	 && (S_ISREG(sxp->st.st_mode) || S_ISDIR(sxp->st.st_mode) || S_ISFIFO(sxp->st.st_mode))
+	 && (preserve_xattrs || am_root < 0
+#  ifdef SUPPORT_ACLS
+	     || (preserve_acls && am_root >= 0)
+#  endif
+	    )
+	 && vfs_must_be_confined(fname, 0))
+		vfs_strict_confine_fail(fname, "xattr/ACL set");
+#endif
+
 #ifdef SUPPORT_ACLS
 	if (preserve_acls && !S_ISLNK(file->mode) && !ACL_READY(*sxp) && !op_refuse && !xattr_refuse)
 		get_acl_fdat(held_fd, dfd, leaf, fname, sxp);

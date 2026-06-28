@@ -1567,6 +1567,13 @@ static int gen_entry_copy_xattrs(const char *src, const char *fname, struct file
 		}
 	}
 #endif
+#ifdef STRICT_CONFINEMENT
+	/* In the confined regime the dfd/re-pin paths above yield xfd >= 0 or already
+	 * returned -1; reaching copy_xattrs with xfd < 0 while confined would let it
+	 * path-write the dest xattrs (the copy-xattrs fallback class) -- abort. */
+	if (xfd < 0 && vfs_must_be_confined(fname, 0))
+		vfs_strict_confine_fail(fname, "gen_entry_copy_xattrs dest");
+#endif
 	ret = copy_xattrs(src, sfd, fname, xfd);
 	if (sfd >= 0)
 		close(sfd);
