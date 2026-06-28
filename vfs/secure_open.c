@@ -62,6 +62,43 @@ int vfs_symlink_optout_allowed(void)
 	return insecure_links;
 }
 
+/* STRICT_CONFINEMENT enforcement predicate (no effect on production behaviour).
+ * True when `path` is a relative, multi-component path that the receiver-side
+ * confinement is meant to protect -- i.e. a metadata op on it was expected to go
+ * through a confined fd, never a raw path-based syscall.  False for: a build
+ * lacking the *at/O_NOFOLLOW primitives (the portability-fallback regime), an
+ * operator-supplied path (its own ownership walk governs it), an absolute path,
+ * and a top-level (no-slash) path with no parent component to flip. */
+int vfs_must_be_confined(const char *path, int is_operator)
+{
+#if defined(O_NOFOLLOW) && defined(O_DIRECTORY) && defined(AT_FDCWD)
+	if (is_operator)
+		return 0;
+	if (!path || !*path || *path == '/')
+		return 0;
+	if (!strchr(path, '/'))
+		return 0;
+	return vfs_relpath_active();
+#else
+	(void)path; (void)is_operator;
+	return 0;
+#endif
+}
+
+#ifdef STRICT_CONFINEMENT
+/* The strict build's hard stop: a confined-regime path-based metadata op was
+ * about to run where a confined fd was required.  Loudly fail (the test suite
+ * then catches the reintroduced fallback) rather than silently doing an
+ * unconfined op a flipped parent could redirect outside the tree. */
+void vfs_strict_confine_fail(const char *path, const char *what)
+{
+	rprintf(FERROR,
+		"STRICT_CONFINEMENT violation: unconfined path-based %s on confined path \"%s\"\n",
+		what ? what : "metadata op", path ? path : "(null)");
+	abort();
+}
+#endif
+
 /*
   open a file relative to a base directory. The basedir can be NULL,
   in which case the current working directory is used. The relpath

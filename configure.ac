@@ -106,6 +106,12 @@ dnl by default (the knob only REMOVES a tier when explicitly disabled).
 AC_ARG_ENABLE(openat2,
 	AS_HELP_STRING([--disable-openat2],[do not use Linux openat2(RESOLVE_BENEATH); force the portable resolver (for exercising the fallback tier)]))
 
+AC_ARG_ENABLE(strict-confinement,
+	AS_HELP_STRING([--enable-strict-confinement],[abort if a confined receiver ever does a raw path-based metadata op (a CI/dev hardening check; no effect on a normal build)]))
+if test x"$enable_strict_confinement" = x"yes"; then
+    AC_DEFINE(STRICT_CONFINEMENT, 1, [Define to abort on a confined-regime raw path-based metadata op (CI hardening check)])
+fi
+
 AC_MSG_CHECKING([if md2man can create manpages])
 if test x"$ac_cv_path_PYTHON3" = x; then
     AC_MSG_RESULT(no - python3 not found)

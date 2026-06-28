@@ -115,6 +115,15 @@ int vfs_symlink_optout_allowed(void);
 int vfs_resolve_open(const char *basedir, const char *relpath, int flags, mode_t mode);
 int vfs_resolve_open_at(int anchor_fd, const char *relpath, int flags, mode_t mode);
 
+/* STRICT_CONFINEMENT enforcement (vfs/secure_open.c): a build-time-gated CI
+ * harness that turns a confined-regime raw path metadata op into a hard failure.
+ * vfs_must_be_confined() is the predicate; vfs_strict_confine_fail() the hard
+ * stop, only compiled/called under STRICT_CONFINEMENT. */
+int vfs_must_be_confined(const char *path, int is_operator);
+#ifdef STRICT_CONFINEMENT
+void vfs_strict_confine_fail(const char *path, const char *what);
+#endif
+
 /* Operator-supplied-path resolution by ownership (vfs/owner_walk.c). */
 int vfs_open_owner_walk(const char *path, int flags, mode_t mode, int is_operator);
 int vfs_owner_walk_parent(const char *path, const char **bname, int is_operator);
