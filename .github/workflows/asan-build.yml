@@ -57,7 +57,7 @@ jobs:
         CC=clang \
         CFLAGS="-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer -g -O1 -DNDEBUG" \
         LDFLAGS="-fsanitize=address,undefined" \
-        ./configure --with-rrsync --disable-md2man
+        ./configure --with-rrsync --disable-md2man --enable-strict-confinement
     - name: make
       # check-progs builds rsync plus the test helper programs (tls, trimslash,
       # t_unsafe, ...) that runtests.py requires; plain "make" builds only rsync
