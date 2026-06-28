@@ -107,7 +107,7 @@ static int vfs__mknod_secure(const char *pathname, mode_t mode, dev_t dev, int f
 {
 	/* HAVE_MKNODAT: older Darwin declares AT_FDCWD but not mknodat(), so
 	 * the at-variant won't build there; fall back to the plain mknod (#896). */
-#if defined(AT_FDCWD) && defined(HAVE_MKNODAT)
+#if defined AT_FDCWD && defined HAVE_MKNODAT
 	char dirpath[MAXPATHLEN];
 	const char *bname;
 	const char *slash;

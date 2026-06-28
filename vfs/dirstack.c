@@ -41,6 +41,14 @@ int path_has_dotdot_component(const char *path)
 	return 0;
 }
 
+/* True if `path` lies within directory `root` (path == root, or path begins
+ * with root followed by '/').  `rootlen` is strlen(root). */
+static int path_within(const char *root, size_t rootlen, const char *path)
+{
+	return strncmp(path, root, rootlen) == 0
+	    && (path[rootlen] == '\0' || path[rootlen] == '/');
+}
+
 /* Refuse (return 1) when the ABSOLUTE resolved path `abspath` lands OUTSIDE the
  * serving module's root, for an operator/peer-supplied path that must stay in the
  * module (--partial-dir/--backup-dir/alt-basis: is_operator).  An
@@ -58,8 +66,7 @@ int abspath_excluded_by_module(const char *abspath, int is_operator)
 		return 0;
 	if (vfs.module_dirlen <= 1)			/* module root is "/": nothing is outside */
 		return 0;
-	if (strncmp(abspath, vfs.module_dir, vfs.module_dirlen) == 0
-	 && (abspath[vfs.module_dirlen] == '\0' || abspath[vfs.module_dirlen] == '/'))
+	if (path_within(vfs.module_dir, vfs.module_dirlen, abspath))
 		return 0;			/* inside the module: name-based exclude is not a boundary */
 	/* Not under the module root.  An ABSOLUTE walk passes through the module
 	 * root's ancestors ("/", "/home", ...) on the way down -- those are not
@@ -69,9 +76,7 @@ int abspath_excluded_by_module(const char *abspath, int is_operator)
 	 * opens (--log-file, --*-from, lock/motd) may legitimately live elsewhere.
 	 * The --insecure-links / "insecure links = yes" opt-out short-circuits
 	 * before we get here. */
-	size_t alen = strlen(abspath);
-	if (alen == 0
-	 || (strncmp(abspath, vfs.module_dir, alen) == 0 && vfs.module_dir[alen] == '/'))
+	if (path_within(abspath, strlen(abspath), vfs.module_dir))
 		return 0;			/* ancestor of the module root: still descending */
 	return is_operator ? 1 : 0;
 }

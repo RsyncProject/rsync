@@ -24,8 +24,7 @@ extern int preallocate_files;
 extern int preserve_xattrs;
 
 /* Read @p len bytes at @p ptr from descriptor @p desc, retrying if interrupted.
- * Returns the number of bytes read (0 = EOF), or <0 on error.  Derived from GNU
- * C's cccp.c. */
+ * Returns the number of bytes read (0 = EOF), or <0 on error. */
 static int safe_read(int desc, char *ptr, size_t len)
 {
 	int n_chars;

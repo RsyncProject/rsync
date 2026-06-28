@@ -70,6 +70,10 @@
 #define VFS_OPERATOR_PATH  (1<<1)  /* operator-supplied path: ownership walk + module confinement */
 #define VFS_REMOVEDIR      (1<<2)  /* unlink op targets a directory (AT_REMOVEDIR) */
 
+/* Sentinel for dpc.anchor meaning "no anchor cached" -- a non-NULL, non-pointer
+ * value so it can never alias a real anchor path (NULL is a valid anchor: cwd). */
+#define VFS_DPC_ANCHOR_NONE  ((const char *)-2)
+
 /* The single global VFS state instance (defined in vfs/vfs.c).
  *
  * Only curr_dir/curr_dir_len are read by mainline code; the dpc cache and the
@@ -82,7 +86,7 @@ struct vfs {
 
 	/* VFS-INTERNAL: held ancestor-dirfd cache. */
 	struct {
-		const char *anchor;	/* anchor path, or sentinel (char *)-2 = none */
+		const char *anchor;	/* anchor path, or VFS_DPC_ANCHOR_NONE */
 		int base;		/* owned anchor dir fd, or -1 */
 		int fd[VFS_DPC_MAXDEPTH];	/* fd after components 0..i */
 		char name[VFS_DPC_MAXDEPTH][256];	/* component names */

@@ -17,9 +17,12 @@
 #include "ifuncs.h"
 #include "vfs/vfs_internal.h"
 
-/* Fill buf with len random bytes.  Prefers /dev/urandom for cryptographic
- * quality; falls back to rand() if /dev/urandom cannot be opened or read
- * (e.g. inside a chroot or container without /dev populated). */
+/* Fill buf with len random bytes for the mkstemp-style temp-name suffix.  Only
+ * collision avoidance is needed here -- the O_EXCL|O_NOFOLLOW create is the real
+ * guard against a guessed/pre-planted name -- so an rand() fallback is fine when
+ * /dev/urandom can't be opened or read (e.g. a chroot/container without /dev).
+ * We read /dev/urandom directly rather than probing getrandom()/arc4random_buf()
+ * to match authenticate.c and avoid new configure checks. */
 static void rand_bytes(unsigned char *buf, size_t len)
 {
 #ifndef O_CLOEXEC

@@ -2,8 +2,6 @@
  * vfs/fileio.c - fd-based file-data ops: ftruncate, lseek, fallocate,
  * hole-punching.
  *
- * Moved verbatim out of syscall.c.
- *
  * Copyright (C) 1998-2022 Andrew Tridgell, Martin Pool, Wayne Davison
  * Copyright (C) 2026 Wayne Davison, Andrew Tridgell
  *
@@ -109,6 +107,23 @@ OFF_T vfs_fallocate(int fd, OFF_T offset, OFF_T length)
 }
 #endif
 
+/* Write all @len bytes from @ptr to @fd, retrying short writes and EINTR.
+ * Returns 0 on success, -1 on error. */
+static int safe_write(int fd, const char *ptr, size_t len)
+{
+	while (len > 0) {
+		int wrote = write(fd, ptr, len);
+		if (wrote <= 0) {
+			if (wrote < 0 && errno == EINTR)
+				continue;
+			return -1;
+		}
+		ptr += wrote;
+		len -= wrote;
+	}
+	return 0;
+}
+
 /* Punch a hole at pos for len bytes. The current file position must be at pos and will be
  * changed to be at pos + len. */
 int vfs_punch_hole(int fd, OFF_T pos, OFF_T len)
@@ -136,13 +151,9 @@ int vfs_punch_hole(int fd, OFF_T pos, OFF_T len)
 		memset(zeros, 0, sizeof zeros);
 		while (len > 0) {
 			int chunk = len > (int)sizeof zeros ? (int)sizeof zeros : len;
-			int wrote = write(fd, zeros, chunk);
-			if (wrote <= 0) {
-				if (wrote < 0 && errno == EINTR)
-					continue;
+			if (safe_write(fd, zeros, chunk) < 0)
 				return -1;
-			}
-			len -= wrote;
+			len -= chunk;
 		}
 	}
 	return 0;

@@ -2,7 +2,7 @@
  * vfs/chmod.c - chmod wrappers (path, parent-resolved, held-dirfd).
  *
  * Includes the platform-specific lchmod/setattrlist/SYS_fchmodat2 handling and
- * the leaf-safe do_fchmodat_nofollow helper.  Moved verbatim out of syscall.c.
+ * the leaf-safe do_fchmodat_nofollow helper.
  *
  * Copyright (C) 1998-2022 Andrew Tridgell, Martin Pool, Wayne Davison
  * Copyright (C) 2026 Wayne Davison, Andrew Tridgell

@@ -17,7 +17,7 @@
  * the t_*_secure test harnesses, which never run main() and so never call
  * vfs_init(). */
 struct vfs vfs = {
-	.dpc = { .base = -1, .anchor = (const char *)-2 },
+	.dpc = { .base = -1, .anchor = VFS_DPC_ANCHOR_NONE },
 	.module_dirfd = -1,
 };
 
@@ -27,7 +27,7 @@ struct vfs vfs = {
 void vfs_init(void)
 {
 	vfs.dpc.base = -1;
-	vfs.dpc.anchor = (const char *)-2;
+	vfs.dpc.anchor = VFS_DPC_ANCHOR_NONE;
 	vfs.dpc.depth = 0;
 	vfs.module_dir = NULL;
 	vfs.module_dirlen = 0;

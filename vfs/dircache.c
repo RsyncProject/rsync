@@ -106,7 +106,7 @@ void vfs_dircache_reset(void)
 	if (vfs.dpc.base >= 0)
 		close(vfs.dpc.base);
 	vfs.dpc.base = -1;
-	vfs.dpc.anchor = (const char *)-2;
+	vfs.dpc.anchor = VFS_DPC_ANCHOR_NONE;
 }
 
 /* Resolve directory `dirpath` beneath `anchor` (NULL = cwd, else an absolute
