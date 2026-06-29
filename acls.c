@@ -1213,7 +1213,7 @@ static int set_rsync_acl(int fd, int dirfd, const char *leaf, const char *fname,
 		 * the legacy path fallback (op_pin am_root != 0 rule). */
 		if (fd >= 0)
 			rc = sys_acl_delete_def_fd(fd);
-		else if (secure_relpath_active() && am_root) {
+		else if (vfs_relpath_active() && am_root) {
 			errno = ELOOP;
 			rc = -1;
 		} else
@@ -1334,7 +1334,7 @@ static int set_rsync_acl(int fd, int dirfd, const char *leaf, const char *fname,
 				sxp->st.st_mode = cur_mode;
 			return 0;
 		}
-		if (secure_relpath_active() && am_root) {
+		if (vfs_relpath_active() && am_root) {
 			/* Real root always can open its own freshly-staged reg/dir/fifo leaf,
 			 * so a missing held fd on a confined receiver means the leaf was raced
 			 * to a symlink; sys_acl_set_file() follows the leaf, so refuse rather
