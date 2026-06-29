@@ -274,21 +274,32 @@ ssize_t sys_fgetxattr(int filedes, const char *name, void *value, size_t size)
 static int write_xattr(int attrfd, const void *value, size_t size)
 {
 	size_t bufpos;
+	int ret = 0, saved_errno = 0;
 
 	for (bufpos = 0; bufpos < size; ) {
-		ssize_t cnt = write(attrfd, (char*)value + bufpos, size);
-		if (cnt <= 0) {
-			if (cnt < 0 && errno == EINTR)
+		ssize_t cnt = write(attrfd, (const char *)value + bufpos, size - bufpos);
+		if (cnt < 0) {
+			if (errno == EINTR)
 				continue;
-			bufpos = -1;
+			ret = -1;
+			saved_errno = errno;
+			break;
+		}
+		if (cnt == 0) {
+			ret = -1;
+			saved_errno = EIO;
 			break;
 		}
 		bufpos += cnt;
 	}
 
-	close(attrfd);
+	/* Don't let close() clobber the write error; do report a close() failure. */
+	if (close(attrfd) < 0 && ret == 0)
+		return -1;
+	if (ret < 0 && saved_errno)
+		errno = saved_errno;
 
-	return bufpos > 0 ? 0 : -1;
+	return ret;
 }
 
 int sys_lsetxattr(const char *path, const char *name, const void *value, size_t size)
