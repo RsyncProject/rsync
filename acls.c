@@ -589,7 +589,11 @@ static int get_rsync_acl(int fd, int dirfd, const char *leaf, const char *fname,
 	SMB_ACL_T sacl;
 
 #ifndef SUPPORT_ACL_FD
-	(void)fd; (void)dirfd; (void)leaf;
+#ifndef HAVE_SOLARIS_ACLS
+	(void)fd; /* Solaris drives the ACL via facl(2) on fd but has no SUPPORT_ACL_FD. */
+#endif
+	(void)dirfd;
+	(void)leaf;
 #endif
 
 #ifdef SUPPORT_XATTRS
@@ -629,6 +633,33 @@ static int get_rsync_acl(int fd, int dirfd, const char *leaf, const char *fname,
 		}
 		free(buf);
 		return 0;
+	}
+#endif
+
+#ifdef HAVE_SOLARIS_ACLS
+	/* Solaris has no libacl *_at; read the ACL through the held fd via facl(2)
+	 * when we have one.  With no held fd this branch is skipped and the path-based
+	 * call below reads the ACL (acceptable: a read can't redirect a write out of
+	 * the tree). */
+	if (fd >= 0) {
+		if ((sacl = sys_acl_get_fd_type(fd, type)) != 0) {
+			BOOL ok = unpack_smb_acl(sacl, racl);
+
+			sys_acl_free_acl(sacl);
+			if (!ok) {
+				rsyserr(FERROR_XFER, errno, "get_acl: unpack_smb_acl(%s)", fname);
+				return -1;
+			}
+			return 0;
+		}
+		if (no_acl_syscall_error(errno)) {
+			if (type == SMB_ACL_TYPE_ACCESS)
+				rsync_acl_fake_perms(racl, mode);
+			return 0;
+		}
+		rsyserr(FERROR_XFER, errno, "get_acl: sys_acl_get_fd_type(%s, %s)",
+			fname, str_acl_type(type));
+		return -1;
 	}
 #endif
 
@@ -1136,7 +1167,11 @@ static int set_rsync_acl(int fd, int dirfd, const char *leaf, const char *fname,
 			 acl_duo *duo_item, SMB_ACL_TYPE_T type, stat_x *sxp, mode_t mode)
 {
 #ifndef SUPPORT_ACL_FD
-	(void)fd; (void)dirfd; (void)leaf;
+#ifndef HAVE_SOLARIS_ACLS
+	(void)fd; /* Solaris drives the ACL via facl(2) on fd but has no SUPPORT_ACL_FD. */
+#endif
+	(void)dirfd;
+	(void)leaf;
 #endif
 	if (type == SMB_ACL_TYPE_DEFAULT
 	 && duo_item->racl.user_obj == NO_ENTRY) {
@@ -1170,6 +1205,18 @@ static int set_rsync_acl(int fd, int dirfd, const char *leaf, const char *fname,
 			rc = xacl_del_default_at(dirfd, leaf);
 		else
 #endif /* HAVE_LIBACL_AT */
+#endif
+#ifdef HAVE_SOLARIS_ACLS
+		/* Solaris: delete the default ACL through the held fd via facl(2).  For a
+		 * root receiver a missing held fd means the leaf was raced, so refuse rather
+		 * than let the path-based delete follow it; a plain non-root receiver keeps
+		 * the legacy path fallback (op_pin am_root != 0 rule). */
+		if (fd >= 0)
+			rc = sys_acl_delete_def_fd(fd);
+		else if (secure_relpath_active() && am_root) {
+			errno = ELOOP;
+			rc = -1;
+		} else
 #endif
 			rc = sys_acl_delete_def_file(fname);
 		if (rc < 0) {
@@ -1274,6 +1321,33 @@ static int set_rsync_acl(int fd, int dirfd, const char *leaf, const char *fname,
 		 * it is the only way to honour --acls where no race-safe primitive
 		 * exists. */
 #endif /* HAVE_LIBACL_AT */
+#endif
+#ifdef HAVE_SOLARIS_ACLS
+		/* Solaris: apply the ACL through the held fd via facl(2). */
+		if (fd >= 0) {
+			if (sys_acl_set_fd_type(fd, type, duo_item->sacl) < 0) {
+				rsyserr(FERROR_XFER, errno, "set_acl: sys_acl_set_fd_type(%s, %s)",
+					fname, str_acl_type(type));
+				return -1;
+			}
+			if (type == SMB_ACL_TYPE_ACCESS)
+				sxp->st.st_mode = cur_mode;
+			return 0;
+		}
+		if (secure_relpath_active() && am_root) {
+			/* Real root always can open its own freshly-staged reg/dir/fifo leaf,
+			 * so a missing held fd on a confined receiver means the leaf was raced
+			 * to a symlink; sys_acl_set_file() follows the leaf, so refuse rather
+			 * than write the attacker-supplied ACL onto a redirected inode (covers
+			 * the top-level no-slash entry the caller's slashed-path xattr_refuse
+			 * gate misses).  A plain non-root receiver keeps the path-based fallback
+			 * for a legitimately un-pinnable owned leaf (e.g. a 0300 dir), matching
+			 * the operator-path op_pin rule (am_root != 0). */
+			errno = ELOOP;
+			rsyserr(FERROR_XFER, errno, "set_acl: refusing path-based ACL on %s (no held fd)",
+				fname);
+			return -1;
+		}
 #endif
 		if (sys_acl_set_file(fname, type, duo_item->sacl) < 0) {
 			rsyserr(FERROR_XFER, errno, "set_acl: sys_acl_set_file(%s, %s)",

@@ -301,6 +301,11 @@ int sys_acl_valid(SMB_ACL_T theacl);
 int sys_acl_set_file(const char *name, SMB_ACL_TYPE_T acltype, SMB_ACL_T theacl);
 int sys_acl_set_fd(int fd, SMB_ACL_T theacl);
 int sys_acl_delete_def_file(const char *name);
+#ifdef HAVE_SOLARIS_ACLS
+SMB_ACL_T sys_acl_get_fd_type(int fd, SMB_ACL_TYPE_T type);
+int sys_acl_set_fd_type(int fd, SMB_ACL_TYPE_T type, SMB_ACL_T theacl);
+int sys_acl_delete_def_fd(int fd);
+#endif
 int sys_acl_free_acl(SMB_ACL_T the_acl);
 int no_acl_syscall_error(int err);
 
