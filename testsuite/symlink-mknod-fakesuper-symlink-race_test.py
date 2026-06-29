@@ -41,7 +41,7 @@ def run_helper(args, label):
 # TEST_SYMLINK_PLACEHOLDER) so we set up and assert only what applies here. The
 # device (do_mknod) placeholder is unconditional, so it is always exercised.
 try:
-    _config_h = (SRCDIR / 'config.h').read_text()
+    _config_h = (TOOLDIR / 'config.h').read_text()
 except OSError:
     _config_h = ''
 symlink_placeholders = ('#define NO_SYMLINK_XATTRS 1' in _config_h
