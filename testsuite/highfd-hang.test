@@ -1,0 +1,65 @@
+#! /bin/sh
+
+. "$suitedir/rsync.fns"
+
+makepath "$fromdir" "$todir"
+
+python3 - "$RSYNC" "$fromdir" "$todir" <<'PY'
+import os
+import resource
+import shlex
+import subprocess
+import sys
+
+rsync, source, destination = sys.argv[1:]
+rsync = shlex.split(rsync)
+limit = 1024 + 80
+soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+needed = limit + 64
+if soft < needed:
+    if hard != resource.RLIM_INFINITY and hard < needed:
+        raise SystemExit(77)
+    resource.setrlimit(resource.RLIMIT_NOFILE, (needed, hard))
+
+for index in range(20):
+    with open(os.path.join(source, "file%d" % index), "wb") as stream:
+        stream.write(os.urandom(1000))
+
+descriptors = []
+try:
+    while True:
+        descriptor = os.open(os.devnull, os.O_RDONLY)
+        os.set_inheritable(descriptor, True)
+        descriptors.append(descriptor)
+        if descriptor >= limit:
+            break
+    try:
+        result = subprocess.run(
+            rsync + ["-a", source + "/", destination + "/"],
+            close_fds=False,
+            timeout=30,
+        )
+    except subprocess.TimeoutExpired:
+        raise SystemExit("rsync hung with a descriptor above FD_SETSIZE")
+finally:
+    for descriptor in descriptors:
+        os.close(descriptor)
+
+if result.returncode:
+    raise SystemExit("rsync exited with status %d" % result.returncode)
+for index in range(20):
+    name = "file%d" % index
+    with open(os.path.join(source, name), "rb") as stream:
+        expected = stream.read()
+    with open(os.path.join(destination, name), "rb") as stream:
+        actual = stream.read()
+    if actual != expected:
+        raise SystemExit("%s differs after the high-descriptor transfer" % name)
+PY
+status=$?
+
+case $status in
+0) ;;
+77) test_skipped "The descriptor limit is below FD_SETSIZE" ;;
+*) test_fail "The high-descriptor transfer failed" ;;
+esac
