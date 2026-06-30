@@ -44,6 +44,29 @@ extern struct stats stats;
 
 #define TRADITIONAL_TABLESIZE (1<<16)
 
+/* The maximum number of same-weak-checksum candidates we will compare
+ * against at a single file offset before giving up and rolling forward a
+ * byte.  A weak checksum that collides thousands of times (very common in
+ * disk/VM images, which contain large runs of identical blocks) would
+ * otherwise turn hash_search()'s inner loop into an O(file_size *
+ * chain_length) scan, pegging a CPU at 100% for hours with no apparent
+ * progress (issue #217).
+ *
+ * Concretely, a synthetic 40000-block basis whose blocks all share one weak
+ * checksum took ~18.4s to sync a 60KB source on a modern x86_64 box before
+ * this cap and ~0.7s after it -- and the unbounded cost grows with the
+ * square of the file size, which is what produced the multi-hour "hangs"
+ * reported against real multi-GB images.
+ *
+ * Capping the per-offset work keeps the search bounded; any block we skip
+ * over is simply sent as literal data, so the result is always correct --
+ * only the transfer size is (slightly) affected.  This is purely a
+ * sender-side search limit: it changes no checksum, emitted byte, or
+ * protocol field, so a capped sender interoperates with any receiver. */
+#ifndef MAX_CHAIN_LEN
+#define MAX_CHAIN_LEN 1024
+#endif
+
 static uint32 tablesize;
 static int32 *hash_table;
 
@@ -182,6 +205,7 @@ static void hash_search(int f,struct sum_struct *s,
 		int done_csum2 = 0;
 		uint32 hash_entry;
 		int32 i, *prev;
+		int32 chain_len = 0;
 
 		if (DEBUG_GTE(DELTASUM, 4)) {
 			rprintf(FINFO, "offset=%s sum=%04x%04x\n",
@@ -217,6 +241,14 @@ static void hash_search(int f,struct sum_struct *s,
 
 			if (sum != s->sums[i].sum1)
 				continue;
+
+			/* Bound the work spent on a single pathological hash
+			 * bucket.  If this weak checksum matches more than
+			 * MAX_CHAIN_LEN records, stop scanning and treat this
+			 * offset as a non-match (issue #217).  The skipped data
+			 * is sent literally, never corrupted. */
+			if (++chain_len > MAX_CHAIN_LEN)
+				break;
 
 			/* also make sure the two blocks are the same length */
 			l = (int32)MIN((OFF_T)s->blength, len-offset);
