@@ -75,11 +75,47 @@ int sparse_end(int f, OFF_T size, int updating_basis_or_equiv)
 /* Note that the offset is just the caller letting us know where
  * the current file position is in the file. The use_seek arg tells
  * us that we should seek over matching data instead of writing it. */
+/* Flush any deferred run of zero bytes as a hole, advancing the file
+ * position past it (both do_lseek() and do_punch_hole() move the offset). */
+static int flush_sparse_hole(int f)
+{
+	if (!sparse_seek)
+		return 0;
+	if (sparse_past_write >= preallocated_len) {
+		if (do_lseek(f, sparse_seek, SEEK_CUR) < 0) {
+			sparse_seek = 0;
+			return -1;
+		}
+	} else if (do_punch_hole(f, sparse_past_write, sparse_seek) < 0) {
+		sparse_seek = 0;
+		return -1;
+	}
+	sparse_seek = 0;
+	return 0;
+}
+
+static int full_sparse_write(int f, const char *buf, int len)
+{
+	while (len > 0) {
+		int ret = write(f, buf, len);
+		if (ret <= 0) {
+			if (ret < 0 && errno == EINTR)
+				continue;
+			sparse_seek = 0;
+			return -1;
+		}
+		buf += ret;
+		len -= ret;
+	}
+	return 0;
+}
+
 static int write_sparse(int f, int use_seek, OFF_T offset, const char *buf, int len)
 {
-	int l1 = 0, l2 = 0;
-	int ret;
+	int l1, l2, i, start, end;
 
+	/* Always treat a leading and trailing run of zeros as a (deferred)
+	 * hole, since they may merge with holes in the adjacent write calls. */
 	for (l1 = 0; l1 < len && buf[l1] == 0; l1++) {}
 	for (l2 = 0; l2 < len-l1 && buf[len-(l2+1)] == 0; l2++) {}
 
@@ -88,36 +124,57 @@ static int write_sparse(int f, int use_seek, OFF_T offset, const char *buf, int 
 	if (l1 == len)
 		return len;
 
-	if (sparse_seek) {
-		if (sparse_past_write >= preallocated_len) {
-			if (do_lseek(f, sparse_seek, SEEK_CUR) < 0)
-				return -1;
-		} else if (do_punch_hole(f, sparse_past_write, sparse_seek) < 0) {
-			sparse_seek = 0;
-			return -1;
-		}
-	}
-	sparse_seek = l2;
-	sparse_past_write = offset + len - l2;
-
 	if (use_seek) {
-		/* The in-place data already matches. */
+		/* The in-place data already matches, so just flush any pending
+		 * hole and seek over the middle without rescanning it. */
+		if (flush_sparse_hole(f) < 0)
+			return -1;
+		sparse_seek = l2;
+		sparse_past_write = offset + len - l2;
 		if (do_lseek(f, len - (l1+l2), SEEK_CUR) < 0)
 			return -1;
 		return len;
 	}
 
-	while ((ret = write(f, buf + l1, len - (l1+l2))) <= 0) {
-		if (ret < 0 && errno == EINTR)
+	/* Scan the middle [l1, len-l2) for interior runs of zeros that are at
+	 * least SPARSE_WRITE_SIZE long (the same hole granularity rsync has
+	 * always used).  Each non-zero span -- which may include shorter zero
+	 * runs not worth a hole -- is emitted with a single write() rather than
+	 * being chopped into SPARSE_WRITE_SIZE-byte writes, which made a copy of
+	 * a large non-sparse file issue ~one write() syscall per KiB. */
+	start = l1;
+	end = len - l2;
+	for (i = l1; i < end; ) {
+		int z;
+		if (buf[i] != 0) {
+			i++;
 			continue;
-		sparse_seek = 0;
-		return ret;
+		}
+		for (z = 1; i + z < end && buf[i+z] == 0; z++) {}
+		if (z < SPARSE_WRITE_SIZE) {
+			i += z;
+			continue;
+		}
+		if (i > start) {
+			if (flush_sparse_hole(f) < 0)
+				return -1;
+			if (full_sparse_write(f, buf + start, i - start) < 0)
+				return -1;
+			sparse_past_write = offset + i;
+		}
+		sparse_seek += z;
+		i += z;
+		start = i;
+	}
+	if (end > start) {
+		if (flush_sparse_hole(f) < 0)
+			return -1;
+		if (full_sparse_write(f, buf + start, end - start) < 0)
+			return -1;
 	}
 
-	if (ret != (int)(len - (l1+l2))) {
-		sparse_seek = 0;
-		return l1+ret;
-	}
+	sparse_seek = l2;
+	sparse_past_write = offset + len - l2;
 
 	return len;
 }
@@ -153,8 +210,10 @@ int write_file(int f, int use_seek, OFF_T offset, const char *buf, int len)
 	while (len > 0) {
 		int r1;
 		if (sparse_files > 0) {
-			int len1 = MIN(len, SPARSE_WRITE_SIZE);
-			r1 = write_sparse(f, use_seek, offset, buf, len1);
+			/* write_sparse() handles the whole span itself, scanning
+			 * for holes and coalescing the non-zero data into large
+			 * write()s instead of SPARSE_WRITE_SIZE-byte dribbles. */
+			r1 = write_sparse(f, use_seek, offset, buf, len);
 			offset += r1;
 		} else {
 			if (!wf_writeBuf) {
