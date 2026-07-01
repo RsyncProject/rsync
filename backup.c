@@ -275,6 +275,31 @@ static int make_backup_inner(const char *fname, BOOL prefer_rename)
 	if (!(buf = get_backup_name(fname)))
 		return 0;
 
+#ifdef SUPPORT_LINKS
+	/* Honor --safe-links BEFORE the hard-link / rename fast path.  When
+	 * CAN_HARDLINK_SYMLINK is defined, link_or_rename() would otherwise
+	 * hard-link an escaping symlink (e.g. ../../etc/passwd) into the backup
+	 * area and "goto success", skipping the safe_symlinks check in the
+	 * copy-fallback path below -- silently preserving an unsafe link that
+	 * --safe-links was meant to drop.  Match the copy path: don't back up an
+	 * unsafe symlink. */
+	if (preserve_links && S_ISLNK(sx.st.st_mode) && safe_symlinks) {
+		char lnkbuf[MAXPATHLEN];
+		int llen = do_readlink(fname, lnkbuf, MAXPATHLEN - 1);
+		if (llen > 0) {
+			lnkbuf[llen] = '\0';
+			if (unsafe_symlink(lnkbuf, fname)) {
+				if (INFO_GTE(SYMSAFE, 1)) {
+					rprintf(FINFO, "not backing up unsafe symlink \"%s\" -> \"%s\"\n",
+						fname, lnkbuf);
+				}
+				ret = 2;
+				goto success;
+			}
+		}
+	}
+#endif
+
 	/* Try a hard-link or a rename first.  Using rename is not atomic, but
 	 * is more efficient than forcing a copy for larger files when no hard-
 	 * linking is possible. */
