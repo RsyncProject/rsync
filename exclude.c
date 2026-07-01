@@ -1351,7 +1351,7 @@ static filter_rule *parse_rule_tok(const char **rulestr_ptr,
 		len = strlen((char*)s);
 
 	if (rule->rflags & FILTRULE_CLEAR_LIST) {
-		if (!(rule->rflags & FILTRULE_NO_PREFIXES)
+		if (!(template->rflags & FILTRULE_NO_PREFIXES)
 		 && !(xflags & XFLG_OLD_PREFIXES) && len) {
 			rprintf(FERROR,
 				"'!' rule has trailing characters: %s\n", *rulestr_ptr);
