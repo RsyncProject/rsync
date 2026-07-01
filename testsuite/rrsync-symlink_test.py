@@ -36,10 +36,9 @@ import os
 import shlex
 import subprocess
 import time
-from pathlib import Path
 
 from rsyncfns import (
-    RACE_TIMEOUT, RSYNC, SCRATCHDIR, proc_self_fd_pins, rmtree,
+    RACE_TIMEOUT, RSYNC, SCRATCHDIR, patched_rrsync, proc_self_fd_pins, rmtree,
     start_path_flipper, stop_flipper, test_fail, test_skipped,
 )
 
@@ -87,17 +86,8 @@ fake_rsync.write_text(
 )
 fake_rsync.chmod(0o755)
 
-# Patched rrsync: RSYNC → fake_rsync.
-src_rrsync = Path(__file__).resolve().parent.parent / 'support' / 'rrsync'
-test_rrsync = base / 'test_rrsync'
-test_rrsync.write_text(
-    src_rrsync.read_text().replace(
-        "RSYNC = '/usr/bin/rsync'",
-        f"RSYNC = {str(fake_rsync)!r}",
-        1,
-    )
-)
-test_rrsync.chmod(0o755)
+# Patched rrsync: RSYNC → fake_rsync (via the shared, path-robust helper).
+test_rrsync = patched_rrsync(base, rsync_path=str(fake_rsync))
 
 
 flip = start_path_flipper(real_path, evil_path)

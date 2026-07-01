@@ -1768,15 +1768,22 @@ def expect_fail(argv, text, env=None, cwd=None):
 def patched_rrsync(workdir, rsync_path=None):
     # The stub rsync just has to exec successfully; the BSDs keep true(1) in
     # /usr/bin, not /bin, so resolve it on PATH rather than hard-coding /bin/true.
+    import re
     if rsync_path is None:
         rsync_path = shutil.which('true') or '/usr/bin/true'
     src = SRCDIR / 'support' / 'rrsync'
     dst = Path(workdir) / 'rrsync-under-test'
-    dst.write_text(src.read_text().replace(
-        "RSYNC = '/usr/bin/rsync'",
-        f"RSYNC = {rsync_path!r}",
-        1,
-    ))
+    # Rewrite rrsync's hardcoded RSYNC path to our stub by matching the assignment
+    # line, not its value: a distro/port (e.g. FreeBSD's net/rsync) may ship a
+    # different path (/usr/local/bin/rsync), and a value-specific str.replace()
+    # would silently no-op and leave rrsync exec'ing the real rsync -- a
+    # server-mode hang.  A callable replacement avoids re backslash-escaping.
+    text, n = re.subn(r"(?m)^RSYNC\s*=.*$",
+                      lambda _m: f"RSYNC = {rsync_path!r}",
+                      src.read_text())
+    if n != 1:
+        test_fail(f"patched_rrsync: expected exactly one 'RSYNC =' line in {src}, found {n}")
+    dst.write_text(text)
     dst.chmod(0o755)
     return dst
 
