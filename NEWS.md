@@ -334,6 +334,10 @@ modtime.
 
 ### BUG FIXES:
 
+- Fixed a bypass of `--safe-links` when `--backup` is also used on a system that supports hard-linking symlinks (Linux, macOS).  An escaping symlink that should have been skipped was silently preserved in the backup area.
+
+- Fixed a spurious abort when using `-C` (cvs-exclude) mode with a `.cvsignore` file that contained a `!` (clear-list) token.
+
 - Fixed a regression introduced by the 3.4.0 secure_relative_open()
   CVE fix where legitimate directory symlinks on the receiver side
   (e.g. when using `-K` / `--copy-dirlinks`) caused "failed
