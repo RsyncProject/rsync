@@ -1057,9 +1057,14 @@ int clean_fname(char *name, int flags)
 				while (s > limit && s[-1] != '/')
 					s--;
 
-				/* If found prior '/', or we reached the start, adjust t. */
-				if (s != t - 1 && (s <= name || *s == '/')) {
-					t = (s == name) ? name : s + 1;
+				/* If found prior '/', or we reached the start, adjust t.
+				 * After the backward walk, s points at the first char of the
+				 * prior component and s[-1] is its leading '/' -- so test
+				 * s[-1] (not *s) and reset t to s (not s+1) to actually drop
+				 * the component; the old off-by-one left CFN_COLLAPSE_DOT_DOT_DIRS
+				 * dead for multi-component and absolute paths. */
+				if (s != t - 1 && (s <= name || s[-1] == '/')) {
+					t = (s == name) ? name : s;
 					f += 2;
 					continue;
 				}
