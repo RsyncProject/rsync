@@ -89,6 +89,11 @@ static int dowild(const uchar *p, const uchar *text, const uchar*const *a)
 	    p_ch = *++p;
 	    /* FALLTHROUGH */
 	  default:
+	    /* iwildmatch() folds the text to lower case above; fold the pattern
+	     * char too so matching is truly case-insensitive (not just text-side).
+	     * Without this an upper-case "hosts deny" token fails OPEN. */
+	    if (force_lower_case && ISUPPER(p_ch))
+		p_ch = tolower(p_ch);
 	    if (t_ch != p_ch)
 		return FALSE;
 	    continue;
