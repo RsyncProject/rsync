@@ -2610,7 +2610,16 @@ char *safe_arg(const char *opt, const char *arg)
 			escape_leading_tilde = 1;
 		}
 		for (f = arg; *f; f++) {
-			if (strchr(escapes, *f))
+			if (*f == '\\') {
+				/* Mirror the writer below: in filename mode a backslash
+				 * before a wildcard is not doubled, so don't reserve a slot
+				 * for it.  The "f[1] &&" also avoids the strchr(WILD_CHARS,
+				 * '\0') footgun (which matches the terminator) on a trailing
+				 * backslash -- otherwise the counter and writer disagree and
+				 * an uninitialized heap byte leaks into the result. */
+				if (!is_filename_arg || !(f[1] && strchr(WILD_CHARS, f[1])))
+					extras++;
+			} else if (strchr(escapes, *f))
 				extras++;
 		}
 	}
@@ -2635,7 +2644,7 @@ char *safe_arg(const char *opt, const char *arg)
 			*t++ = '\\';
 		while (*f) {
 			if (*f == '\\') {
-				if (!is_filename_arg || !strchr(WILD_CHARS, f[1]))
+				if (!is_filename_arg || !(f[1] && strchr(WILD_CHARS, f[1])))
 					*t++ = '\\';
 			} else if (strchr(escapes, *f))
 				*t++ = '\\';
