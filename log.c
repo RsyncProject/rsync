@@ -119,12 +119,20 @@ static char const *rerr_name(int code)
 	return NULL;
 }
 
+static void filtered_fwrite(FILE *f, const char *in_buf, int in_len, int use_isprint, int escape_c1, char end_char);
+
 static void logit(int priority, const char *buf)
 {
 	if (logfile_was_closed)
 		logfile_reopen();
 	if (logfile_fp) {
-		fprintf(logfile_fp, "%s [%d] %s", timestring(time(NULL)), (int)getpid(), buf);
+		/* Escape control chars in the message so an attacker-controlled
+		 * filename can't inject terminal escapes into the log an admin later
+		 * cat's (CWE-117); keep the trailing newline raw via end_char. */
+		int len = strlen(buf);
+		char trailing = len && (buf[len-1] == '\n' || buf[len-1] == '\r') ? buf[--len] : '\0';
+		fprintf(logfile_fp, "%s [%d] ", timestring(time(NULL)), (int)getpid());
+		filtered_fwrite(logfile_fp, buf, len, 0, 1, trailing);
 		fflush(logfile_fp);
 	} else {
 		syslog(priority, "%s", buf);
@@ -230,7 +238,7 @@ void logfile_reopen(void)
 	}
 }
 
-static void filtered_fwrite(FILE *f, const char *in_buf, int in_len, int use_isprint, char end_char)
+static void filtered_fwrite(FILE *f, const char *in_buf, int in_len, int use_isprint, int escape_c1, char end_char)
 {
 	char outbuf[1024], *ob = outbuf;
 	const char *end = in_buf + in_len;
@@ -242,7 +250,8 @@ static void filtered_fwrite(FILE *f, const char *in_buf, int in_len, int use_isp
 		}
 		if ((in_buf < end - 4 && *in_buf == '\\' && in_buf[1] == '#'
 		  && isDigit(in_buf + 2) && isDigit(in_buf + 3) && isDigit(in_buf + 4))
-		 || (*in_buf != '\t' && ((use_isprint && !isPrint(in_buf)) || *(uchar*)in_buf < ' ')))
+		 || (*in_buf != '\t' && ((use_isprint && !isPrint(in_buf)) || *(uchar*)in_buf < ' '
+		  || (escape_c1 && *(uchar*)in_buf >= 0x80 && *(uchar*)in_buf <= 0x9f))))
 			ob += snprintf(ob, 6, "\\#%03o", *(uchar*)in_buf++);
 		else
 			*ob++ = *in_buf++;
@@ -389,7 +398,7 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 			ierrno = errno;
 			if (outbuf.len) {
 				char trailing = inbuf.len ? '\0' : trailing_CR_or_NL;
-				filtered_fwrite(f, convbuf, outbuf.len, 0, trailing);
+				filtered_fwrite(f, convbuf, outbuf.len, 0, 0, trailing);
 				if (trailing) {
 					trailing_CR_or_NL = '\0';
 					fflush(f);
@@ -412,7 +421,7 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 	} else
 #endif
 	{
-		filtered_fwrite(f, buf, len, !allow_8bit_chars, trailing_CR_or_NL);
+		filtered_fwrite(f, buf, len, !allow_8bit_chars, 0, trailing_CR_or_NL);
 		if (trailing_CR_or_NL)
 			fflush(f);
 	}
