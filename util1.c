@@ -617,16 +617,33 @@ int robust_rename(const char *from, const char *to, const char *partialptr,
 			errno = ETXTBSY;
 			break;
 #endif
-		case EXDEV:
+		case EXDEV: {
+			int save = operator_path_resolve, rc;
 			if (partialptr) {
 				if (!handle_partial_dir(partialptr,PDIR_CREATE))
 					return -2;
 				to = partialptr;
 			}
-			if (copy_file(from, to, -1, mode) != 0)
+			/* Cross-fs fallback: copy then unlink.  An absolute --temp-dir
+			 * source / --partial-dir dest is an operator path whose parents
+			 * do_open_at()/do_unlink_at() would otherwise follow via plain libc
+			 * -- confine them through the ownership walk so a raced parent
+			 * symlink can't redirect the dest-write or the source-unlink out of
+			 * the module.  copy_file already confines the source READ; a
+			 * relative in-module path stays on the secure_relative_open arm, so
+			 * only flip the flag for an absolute (operator) path. */
+			if (to && *to == '/')
+				operator_path_resolve = 1;
+			rc = copy_file(from, to, -1, mode);
+			operator_path_resolve = save;
+			if (rc != 0)
 				return -2;
+			if (from && *from == '/')
+				operator_path_resolve = 1;
 			do_unlink_at(from);
+			operator_path_resolve = save;
 			return 1;
+		}
 		default:
 			return -1;
 		}
