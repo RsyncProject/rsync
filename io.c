@@ -1581,6 +1581,7 @@ static void read_a_msg(void)
 		if (msg_bytes != 4)
 			goto invalid_msg;
 		val = raw_read_int();
+		val &= IOERR_VALID_MASK;
 		io_error |= val;
 		if (am_receiver)
 			send_msg_int(MSG_IO_ERROR, val);
