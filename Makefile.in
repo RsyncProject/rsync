@@ -58,13 +58,13 @@ TLS_OBJ = tls.o syscall.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/perms
 # Programs we must have to run the test cases
 CHECK_PROGS = rsync$(EXEEXT) tls$(EXEEXT) getgroups$(EXEEXT) getfsdev$(EXEEXT) \
 	testrun$(EXEEXT) trimslash$(EXEEXT) t_unsafe$(EXEEXT) t_chmod_secure$(EXEEXT) \
-	t_rename_secure$(EXEEXT) t_symlink_secure$(EXEEXT) t_secure_relpath$(EXEEXT) t_acl$(EXEEXT) t_hashtable_overflow$(EXEEXT) t_iwildmatch$(EXEEXT) wildtest$(EXEEXT) simdtest$(EXEEXT)
+	t_rename_secure$(EXEEXT) t_symlink_secure$(EXEEXT) t_secure_relpath$(EXEEXT) t_acl$(EXEEXT) t_hashtable_overflow$(EXEEXT) t_iwildmatch$(EXEEXT) t_safe_arg$(EXEEXT) wildtest$(EXEEXT) simdtest$(EXEEXT)
 
 CHECK_SYMLINKS = testsuite/chown-fake_test.py testsuite/devices-fake_test.py \
 	testsuite/xattrs-hlink_test.py testsuite/exclude-lsh_test.py
 
 # Objects for CHECK_PROGS to clean
-CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o t_chmod_secure.o t_rename_secure.o t_symlink_secure.o t_secure_relpath.o t_acl.o t_hashtable_overflow.o t_iwildmatch.o trimslash.o wildtest.o
+CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o t_chmod_secure.o t_rename_secure.o t_symlink_secure.o t_secure_relpath.o t_acl.o t_hashtable_overflow.o t_iwildmatch.o t_safe_arg.o trimslash.o wildtest.o
 # Compile-only feature-shape checks.
 CHECK_COMPILE_OBJS=syscall-no-at-fdcwd.o
 
@@ -216,6 +216,15 @@ t_hashtable_overflow$(EXEEXT): $(T_HASHTABLE_OVERFLOW_OBJ)
 T_IWILDMATCH_OBJ = t_iwildmatch.o lib/wildmatch.o
 t_iwildmatch$(EXEEXT): $(T_IWILDMATCH_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_IWILDMATCH_OBJ) $(LIBS)
+
+# safe_arg lives in options.c; compile it with per-function sections so the
+# linker's --gc-sections drops the rest of the option parser (and its heavy
+# popt/io/filter deps), leaving just safe_arg + new_array to link.
+t_safe_arg_options.o: options.c
+	$(CC) -I. $(CFLAGS) -ffunction-sections -fdata-sections -c $(srcdir)/options.c -o t_safe_arg_options.o
+T_SAFE_ARG_OBJ = t_safe_arg.o t_safe_arg_options.o util2.o lib/compat.o lib/snprintf.o lib/wildmatch.o
+t_safe_arg$(EXEEXT): $(T_SAFE_ARG_OBJ)
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,--gc-sections -o $@ $(T_SAFE_ARG_OBJ) $(LIBS)
 
 T_CHMOD_SECURE_OBJ = t_chmod_secure.o syscall.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o
 t_chmod_secure$(EXEEXT): $(T_CHMOD_SECURE_OBJ)
