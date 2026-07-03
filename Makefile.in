@@ -221,14 +221,16 @@ T_CLEAN_FNAME_OBJ = t_clean_fname.o syscall.o util1.o util2.o t_stub.o lib/compa
 t_clean_fname$(EXEEXT): $(T_CLEAN_FNAME_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_CLEAN_FNAME_OBJ) $(LIBS)
 
-# safe_arg lives in options.c; compile it with per-function sections so the
-# linker's --gc-sections drops the rest of the option parser (and its heavy
-# popt/io/filter deps), leaving just safe_arg + new_array to link.
-t_safe_arg_options.o: options.c
-	$(CC) -I. $(CFLAGS) -ffunction-sections -fdata-sections -c $(srcdir)/options.c -o t_safe_arg_options.o
-T_SAFE_ARG_OBJ = t_safe_arg.o t_safe_arg_options.o util2.o lib/compat.o lib/snprintf.o lib/wildmatch.o
+# safe_arg lives in options.c alongside the whole option parser.  Rather than
+# rely on a non-portable linker --gc-sections to drop the parser (GNU ld only;
+# macOS ld64 and the cygwin PE linker do not), link the real rsync objects so
+# every dep resolves.  t_safe_arg_main.o is main.c with main() renamed out, to
+# supply main.c's globals while letting t_safe_arg.o provide the test's main().
+t_safe_arg_main.o: main.c $(HEADERS)
+	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) -Dmain=rsync_unused_main -c $(srcdir)/main.c -o t_safe_arg_main.o
+T_SAFE_ARG_OBJ = t_safe_arg.o t_safe_arg_main.o $(filter-out main.o,$(OBJS))
 t_safe_arg$(EXEEXT): $(T_SAFE_ARG_OBJ)
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,--gc-sections -o $@ $(T_SAFE_ARG_OBJ) $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_SAFE_ARG_OBJ) $(LIBS)
 
 T_CHMOD_SECURE_OBJ = t_chmod_secure.o syscall.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o
 t_chmod_secure$(EXEEXT): $(T_CHMOD_SECURE_OBJ)

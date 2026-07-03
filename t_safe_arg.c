@@ -5,33 +5,15 @@
  * deterministic non-NUL; then any extra byte makes the output differ from the
  * expected exact quoting.  Exits 0 if all outputs are exact, 1 otherwise. */
 
-#define main rsync_main
+/* We link the real rsync objects (see the Makefile), so safe_arg() and all its
+ * globals come from options.o/exclude.o/etc; we only declare what we touch. */
 #include "rsync.h"
-#undef main
 
 #include <stdio.h>
 
 extern char *safe_arg(const char *opt, const char *arg);
 extern int protect_args, old_style_args, am_sender, relative_paths;
-int trust_sender_args = 0;   /* defined outside options.c; provide it here */
-
-/* Minimal stubs pulled in via new_array()'s error path (can't link t_stub.o:
- * its globals collide with the full options.o we link for safe_arg). */
-void rprintf(UNUSED(enum logcode code), const char *format, ...)
-{
-	va_list ap;
-	va_start(ap, format);
-	vfprintf(stderr, format, ap);
-	va_end(ap);
-}
-void _exit_cleanup(int code, const char *file, int line)
-{
-	fprintf(stderr, "exit(%d): %s(%d)\n", code, file, line);
-	exit(code);
-}
-const char *who_am_i(void) { return "tester"; }
-int csum_len_for_type(int cst, int flg) { return cst || !flg ? 16 : 1; }
-int canonical_checksum(int cst) { return cst ? 0 : 0; }
+extern int trust_sender_args;
 
 static const struct { const char *arg, *exp; } cases[] = {
 	{ "\\*",    "\\*" },      /* backslash+wildcard: NOT doubled */
