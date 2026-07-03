@@ -19,12 +19,15 @@
 # Exit codes: 0 pass, 1 fail, 77 skip (killable daemon testing not possible --
 # the test needs --use-tcp so it can SIGKILL the sender process directly).
 
+import os
+import re
+import signal
 import subprocess
 import sys
 import time
 
 from rsyncfns import (
-    FROMDIR, TODIR, claim_ports, make_data_file, makepath, rmtree,
+    FROMDIR, SCRATCHDIR, TODIR, claim_ports, make_data_file, makepath, rmtree,
     rsync_argv, start_rsyncd, test_fail, test_skipped, build_rsyncd_conf,
     USE_TCP,
 )
@@ -97,7 +100,23 @@ client = subprocess.Popen(
 # (the path that exercises the io_error -> exit-code mapping).
 time.sleep(2)
 
-# Kill the sender (daemon) mid-transfer.
+# Kill the sender mid-transfer.  rsyncd forks a child per connection, so the
+# actual sender is NOT `daemon` (the listener) -- killing only the listener
+# leaves the child streaming and the receiver never sees EOF.  The child logs
+# "[pid] rsync on <module>/" to the daemon log; kill that pid (plus the
+# listener).  The daemon shares this test's process group, so killpg is not an
+# option (it would kill the test itself).
+child_pids = []
+try:
+    logtext = (SCRATCHDIR / 'rsyncd.log').read_text()
+    child_pids = [int(pid) for pid in re.findall(r'\[(\d+)\] rsync on ', logtext)]
+except OSError:
+    pass
+for pid in child_pids:
+    try:
+        os.kill(pid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError):
+        pass
 if daemon.poll() is None:
     daemon.kill()
     try:

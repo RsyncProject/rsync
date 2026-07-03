@@ -33,10 +33,15 @@ p = subprocess.run(
 if p.returncode != 0:
     test_fail(f"rsync exited {p.returncode}:\n{p.stderr}")
 
-expected = '100% done percentfile'
-if expected not in p.stdout:
+# %f expands to the transfer-relative path, which includes leading directories
+# when the source is addressed by an absolute path (as here) -- so don't pin the
+# exact filename.  The point of this test is the escape: "100% done " with a
+# single literal percent followed by a space (a broken %% consumes the space or
+# leaves a doubled percent), plus the transferred file name somewhere.
+if '100% done ' not in p.stdout or 'percentfile' not in p.stdout:
     test_fail(
-        f"expected {expected!r} in --out-format output, got:\n{p.stdout}"
+        "expected '100% done ' (a single literal percent) and 'percentfile' in "
+        f"--out-format output, got:\n{p.stdout}"
     )
 
 print("ki58-log-format-percent: %% literal-percent escape verified")
