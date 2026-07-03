@@ -777,6 +777,9 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 				}
 			}
 			break;
+		case '%':
+			n = "%";
+			break;
 		}
 
 		/* "n" is the string to be inserted in place of this % code. */
