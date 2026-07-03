@@ -14,6 +14,12 @@ static const struct { const char *p, *t; int exp; } cases[] = {
 	{ "*.EXAMPLE.COM", "foo.example.com",  1 },
 	{ "*.example.com", "FOO.EXAMPLE.COM",  1 },
 	{ "*.BADDOMAIN.COM", "x.baddomain.com", 1 }, /* the access-control case */
+	{ "[A-Z]bc",       "abc",              1 },  /* upper-case range folds     */
+	{ "[ABC]xy",       "bxy",              1 },  /* upper-case class-member folds */
+	{ "x[A-Z]z",       "xyz",              1 },  /* range mid-pattern           */
+	{ "[a-z]BC",       "abc",              1 },  /* mixed: class + literal fold */
+	{ "[\\A]bc",       "abc",              1 },  /* escaped class member folds  */
+	{ "[A-Z]bc",       "5bc",              0 },  /* negative: digit not in range */
 };
 
 int main(int argc, char *argv[])
