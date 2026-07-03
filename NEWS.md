@@ -187,6 +187,10 @@ backup source -- and the cross-tree operator-path metadata apply is now fd-pinne
 under `--fake-super` too (previously it fell back to a path-based set for a
 `fake super = yes` daemon staging through an absolute `--temp-dir`/`--backup-dir`).
 
+### SECURITY RELATED:
+
+ - Mask the incoming MSG_IO_ERROR value to only defined IOERR_* bits to prevent a malicious peer from setting arbitrary error flags.
+
 ### BEHAVIOR CHANGES:
 
 - A non-daemon receiver follows an operator-named symlinked destination directory

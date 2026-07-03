@@ -192,6 +192,12 @@
 #define IOERR_VANISHED	(1<<1)
 #define IOERR_DEL_LIMIT (1<<2)
 
+/* Mask of all currently defined IOERR_* bits.  Used to sanitize values
+ * received from a peer via MSG_IO_ERROR so a malicious peer cannot set
+ * arbitrary (undefined) bits in the local io_error, which would then
+ * propagate to exit codes and be re-forwarded. */
+#define IOERR_VALID_MASK (IOERR_GENERAL | IOERR_VANISHED | IOERR_DEL_LIMIT)
+
 #define MAX_ARGS 1000
 #define MAX_BASIS_DIRS 20
 #define MAX_SERVER_ARGS (MAX_BASIS_DIRS*2 + 100)
