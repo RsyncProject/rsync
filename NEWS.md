@@ -342,6 +342,10 @@ modtime.
 
 - Fixed a spurious abort when using `-C` (cvs-exclude) mode with a `.cvsignore` file that contained a `!` (clear-list) token.
 
+- Updated the `--max-alloc` documentation to reflect that 0 is now rejected (CVE-2026-53794).
+
+- Fixed the EXIT VALUES table: removed nonexistent code 6, added missing codes 15/16/19, corrected SIGUSR1 classification.
+
 - Fixed a regression introduced by the 3.4.0 secure_relative_open()
   CVE fix where legitimate directory symlinks on the receiver side
   (e.g. when using `-K` / `--copy-dirlinks`) caused "failed
