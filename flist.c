@@ -2934,7 +2934,7 @@ struct file_list *recv_file_list(int f, int dir_ndx)
 			if ((flags = read_varint(f)) == 0) {
 				int err = read_varint(f);
 				if (!ignore_errors)
-					io_error |= err;
+					io_error |= err & IOERR_VALID_MASK;
 				break;
 			}
 		} else {
@@ -2952,7 +2952,7 @@ struct file_list *recv_file_list(int f, int dir_ndx)
 				}
 				err = read_varint(f);
 				if (!ignore_errors)
-					io_error |= err;
+					io_error |= err & IOERR_VALID_MASK;
 				break;
 			}
 		}
@@ -3055,7 +3055,7 @@ struct file_list *recv_file_list(int f, int dir_ndx)
 		/* Recv the io_error flag */
 		int err = read_int(f);
 		if (!ignore_errors)
-			io_error |= err;
+			io_error |= err & IOERR_VALID_MASK;
 	} else if (inc_recurse && flist->ndx_start == 1) {
 		/* The first inc_recurse flist has no parent in dir_flist; a
 		 * malicious peer can send a "." entry whose mode is not a
