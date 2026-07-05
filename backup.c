@@ -286,16 +286,23 @@ static int make_backup_inner(const char *fname, BOOL prefer_rename)
 	if (preserve_links && S_ISLNK(sx.st.st_mode) && safe_symlinks) {
 		char lnkbuf[MAXPATHLEN];
 		int llen = do_readlink(fname, lnkbuf, MAXPATHLEN - 1);
-		if (llen > 0) {
-			lnkbuf[llen] = '\0';
-			if (unsafe_symlink(lnkbuf, fname)) {
-				if (INFO_GTE(SYMSAFE, 1)) {
-					rprintf(FINFO, "not backing up unsafe symlink \"%s\" -> \"%s\"\n",
-						fname, lnkbuf);
-				}
-				ret = 2;
-				goto success;
+		/* A failed readlink means we can't verify the target, so fail
+		 * closed: skip the backup rather than let the hard-link fast path
+		 * preserve a possibly-unsafe symlink unchecked. */
+		if (llen <= 0) {
+			if (INFO_GTE(SYMSAFE, 1))
+				rprintf(FINFO, "not backing up symlink with unreadable target \"%s\"\n", fname);
+			ret = 2;
+			goto success;
+		}
+		lnkbuf[llen] = '\0';
+		if (unsafe_symlink(lnkbuf, fname)) {
+			if (INFO_GTE(SYMSAFE, 1)) {
+				rprintf(FINFO, "not backing up unsafe symlink \"%s\" -> \"%s\"\n",
+					fname, lnkbuf);
 			}
+			ret = 2;
+			goto success;
 		}
 	}
 #endif
