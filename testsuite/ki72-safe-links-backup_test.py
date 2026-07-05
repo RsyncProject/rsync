@@ -96,5 +96,34 @@ if os.readlink(bak) != ESCAPE_TARGET:
     test_fail("KI-72: backup symlink points to %r, expected %r"
               % (os.readlink(bak), ESCAPE_TARGET))
 
+# ---------------------------------------------------------------------------
+# 3. WITH --safe-links, a SAFE (in-tree) symlink must STILL be backed up.
+#    The fix skips the backup for an unsafe OR unreadable link; this guards
+#    against it over-blocking and dropping legitimate safe symlinks too.
+# ---------------------------------------------------------------------------
+rmtree(base)
+src = base / 'src'
+dest = base / 'dest'
+src.mkdir(parents=True)
+dest.mkdir(parents=True)
+(src / 'keep.txt').write_text('source regular file\n')
+(src / 'link').write_text('replacement regular file\n')
+# An in-tree (safe) symlink in dest that gets replaced -> must be backed up.
+os.symlink('keep.txt', dest / 'link')
+
+proc = run(src, dest, '--safe-links')
+if proc.returncode != 0:
+    test_fail("KI-72: rsync exited %d backing up a safe symlink\n%s%s"
+              % (proc.returncode, proc.stdout, proc.stderr))
+
+bak = dest / 'link.bak'
+if not os.path.islink(bak):
+    test_fail("KI-72: a SAFE symlink was wrongly dropped from the backup area "
+              "under --safe-links (%s missing or not a symlink) -- the fix is "
+              "over-blocking." % bak)
+if os.readlink(bak) != 'keep.txt':
+    test_fail("KI-72: safe backup symlink points to %r, expected 'keep.txt'"
+              % os.readlink(bak))
+
 print("ki72-safe-links-backup: --safe-links drops an escaping symlink from the "
-      "backup area while a plain --backup preserves it")
+      "backup area, preserves a safe one, while a plain --backup preserves both")
