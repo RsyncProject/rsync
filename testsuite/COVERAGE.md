@@ -93,17 +93,19 @@ Status legend: ✓ property asserted · `~` shallow / by an existing ported test
 | --max-alloc | — | — | — | ✗ |
 
 ### Filtering
-| option | test(s) | depth | x-dir | notes / gap |
-|---|---|---|---|---|
+| option | test(s)             | depth | x-dir | notes / gap |
+|---|---------------------|--|---|---|
 | -f, --filter / -F | filter-depth*new*, merge | Y | — | ✓ deep per-dir merge |
 | --exclude / --include | filter-depth*new*, exclude, exclude-lsh | Y | — | ✓ |
 | --exclude-from / --include-from | files-from-depth*new* | Y | — | ✓ |
-| -C, --cvs-exclude | cvs-exclude*new* | Y | — | ✓ incl. deep .cvsignore |
+| -C, --cvs-exclude | cvs-exclude*new*    | Y | — | ✓ incl. deep .cvsignore |
 | --files-from | files-from-depth*new* | Y | — | ✓ |
 | -0, --from0 | files-from-depth*new* | Y | — | ✓ |
-| --max-size / --min-size | size-filter*new* | Y | — | ✓ |
-| --existing / --ignore-existing | delete-deep*new* | Y | — | ✓ |
-| --ignore-missing-args / --delete-missing-args | — | — | — | ✗ |
+| --max-size / --min-size | size-filter*new*    | Y | — | ✓ |
+| --data-transfer-limit | transfer-limit*new* | — | — | ✓ |
+| --delay-transfer-limit-check | delay-transfer-limit-check*new* | — | — | ✓ |
+| --existing / --ignore-existing | delete-deep*new*    | Y | — | ✓ |
+| --ignore-missing-args / --delete-missing-args | —                   | — | — | ✗ |
 
 ### Deletion
 | option | test(s) | depth | x-dir | notes / gap |
