@@ -16,9 +16,9 @@ from rsyncfns import (
 
 src = FROMDIR
 dest = TODIR
-TESTFILE1 = "testfile1"
-TESTFILE2 = "testfile2"
-TESTFILE3 = "testfile3"
+TESTFILE1 = 'testfile1'
+TESTFILE2 = 'testfile2'
+TESTFILE3 = 'testfile3'
 FILE1_SIZE = 400 * 1024  # 400KB
 FILE2_SIZE = 200 * 1024  # 200KB
 FILE3_SIZE = 100 * 1024  # 100KB
@@ -32,7 +32,7 @@ make_data_file(src / TESTFILE1, FILE1_SIZE)
 make_data_file(src / TESTFILE2, FILE2_SIZE)
 make_data_file(src / TESTFILE3, FILE3_SIZE)
 
-# Test --data-transfer-limit stops the transfer between files
+# Test --delay-transfer-limit-check allows the first two transfers to succeed but stops at the third transfer.
 proc = run_rsync(
     '-a',
     '--whole-file',
@@ -44,22 +44,22 @@ proc = run_rsync(
     capture_output=True
 )
 
-if proc.returncode == 0:
-    test_fail("--data-transfer-limit did not cause a non-zero exit code.")
+if proc.returncode != 26:
+    test_fail(f'Exit status 26 expected; got: {proc.returncode} instead.')
 
 # The first file should be transferred
 dest_file1 = dest / TESTFILE1
 if not dest_file1.exists() or dest_file1.stat().st_size != FILE1_SIZE:
-    test_fail("The first file was not transferred.")
+    test_fail('The first file was not transferred.')
 
 # The second file should be transferred
 dest_file2 = dest / TESTFILE2
 if not dest_file2.exists():
-    test_fail("The second file was not transferred")
+    test_fail('The second file was not transferred')
 
 # The third file should not be transferred and rsync should exit with code 26
 dest_file3 = dest / TESTFILE3
 if dest_file3.exists():
-    test_fail("The third file was transferred, but it should have been skipped.")
+    test_fail('The third file was transferred, but it should have been skipped.')
 
-print("transfer_limit_test: --delay-transfer-limit-check verified")
+print('transfer_limit_test: --delay-transfer-limit-check verified')
