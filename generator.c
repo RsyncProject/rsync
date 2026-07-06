@@ -100,21 +100,19 @@ extern char *tmpdir;
 extern char *basis_dir[MAX_BASIS_DIRS+1];
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern filter_rule_list filter_list, daemon_filter_list;
-static int64 stop_after_data_transferred_data = 0;
+static int64 total_transferred_data = 0;
 extern int data_transfer_limit_reached;
-extern int64 data_transfer_limit;
-extern int delay_transfer_limit_check;
 static int data_transfer_limit_msg_sent = 0;
 
-static int data_transfer_limit_would_be_exceeded(struct file_struct *file)
+static int file_will_exceed_data_transfer_limit(struct file_struct *file)
 {
 	if (data_transfer_limit < 0)
 		return 0;
 
 	if (delay_transfer_limit_check)
-		return stop_after_data_transferred_data >= data_transfer_limit;
+		return total_transferred_data >= data_transfer_limit;
 
-	return stop_after_data_transferred_data + F_LENGTH(file) > data_transfer_limit;
+	return total_transferred_data + F_LENGTH(file) > data_transfer_limit;
 }
 
 
@@ -1955,8 +1953,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	if (DEBUG_GTE(DELTASUM, 2))
 		rprintf(FINFO, "generating and sending sums for %d\n", ndx);
 
-  notify_others:
-	if (data_transfer_limit_would_be_exceeded(file)) {
+notify_others:
+	if (file_will_exceed_data_transfer_limit(file)) {
 		rprintf(FINFO,
 			"recv_generator: transferring %s would exceed data transfer limit. Not transferred; stopping all remaining transfers.\n",
 			fname);
@@ -1990,7 +1988,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		free_stat_x(&real_sx);
 	}
 
-	stop_after_data_transferred_data += F_LENGTH(file);
+	total_transferred_data += F_LENGTH(file);
 
 	if (!do_xfers) {
 #ifdef SUPPORT_HARD_LINKS

@@ -299,7 +299,7 @@ enum msgcode {
 	MSG_SUCCESS=100,/* successfully updated indicated flist index */
 	MSG_DELETED=101,/* successfully deleted a file on receiving side */
 	MSG_NO_SEND=102,/* sender failed to open a file we wanted */
-	MSG_DATA_LIMIT_REACHED=69, /* transfer limit reached */
+	MSG_DATA_LIMIT_REACHED=62, /* transfer limit reached */
 };
 
 enum filetype {
