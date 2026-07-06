@@ -1293,8 +1293,21 @@ int read_line(int fd, char *buf, size_t bufsiz, int flags)
 	return s - buf;
 }
 
+/* Reverse safe_arg()'s backslash escaping of a daemon option arg, the way a
+ * remote shell un-escapes args for the ssh transport.  In place; \X -> X. */
+static void unbackslash_arg(char *s)
+{
+	char *f = s, *t = s;
+	while (*f) {
+		if (*f == '\\' && f[1])
+			f++;
+		*t++ = *f++;
+	}
+	*t = '\0';
+}
+
 void read_args(int f_in, char *mod_name, char *buf, size_t bufsiz, int rl_nulls,
-	       char ***argv_p, int *argc_p, char **request_p)
+	       int unescape, char ***argv_p, int *argc_p, char **request_p)
 {
 	int maxargs = MAX_ARGS;
 	int dot_pos = 0, argc = 0, request_len = 0;
@@ -1336,6 +1349,11 @@ void read_args(int f_in, char *mod_name, char *buf, size_t bufsiz, int rl_nulls,
 				glob_expand(buf, &argv, &argc, &maxargs);
 		} else {
 			p = strdup(buf);
+			/* An option arg the client escaped with safe_arg() (no
+			 * remote shell un-escapes it for a daemon).  File args
+			 * after the dot are handled by glob_expand() below. */
+			if (unescape)
+				unbackslash_arg(p);
 			argv[argc++] = p;
 			if (*p == '.' && p[1] == '\0')
 				dot_pos = argc;
@@ -2153,7 +2171,7 @@ void write_int(int f, int32 x)
 
 void write_varint(int f, int32 x)
 {
-	char b[5];
+	char b[5] = {0}; /* {0} only to satisfy the analyzer: it doesn't model SIVAL initialising b[1..4] */
 	uchar bit;
 	int cnt;
 
@@ -2175,7 +2193,7 @@ void write_varint(int f, int32 x)
 
 void write_varlong(int f, int64 x, uchar min_bytes)
 {
-	char b[9];
+	char b[9] = {0}; /* {0} only to satisfy the analyzer: it doesn't model SIVAL64 initialising b[1..8] */
 	uchar bit;
 	int cnt = 8;
 

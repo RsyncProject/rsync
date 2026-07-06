@@ -362,6 +362,7 @@ void send_files(int f_in, int f_out)
 			 * Reconstruct the full path relative to module_dir
 			 * from F_PATHNAME (path) and f_name (fname). */
 			char secure_path[MAXPATHLEN];
+			const char *relp;
 			int slen = snprintf(secure_path, sizeof secure_path, "%s%s%s", path, slash, fname);
 			if (slen >= (int)sizeof secure_path) {
 				io_error |= IOERR_GENERAL;
@@ -371,7 +372,13 @@ void send_files(int f_in, int f_out)
 					send_msg_int(MSG_NO_SEND, ndx);
 				continue;
 			}
-			fd = secure_relative_open(module_dir, secure_path, O_RDONLY, 0);
+			/* A module with `path = /` makes F_PATHNAME absolute, so the
+			 * joined path starts with '/'; strip leading slashes to a
+			 * module-relative path that secure_relative_open accepts (#897). */
+			relp = secure_path;
+			while (*relp == '/')
+				relp++;
+			fd = secure_relative_open(module_dir, relp, O_RDONLY, 0);
 		} else {
 			fd = do_open_checklinks(fname);
 		}

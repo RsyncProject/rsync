@@ -41,8 +41,8 @@ extern filter_rule_list daemon_filter_list;
 
 int sanitize_paths = 0;
 
-char curr_dir[MAXPATHLEN];
-unsigned int curr_dir_len;
+extern char curr_dir[MAXPATHLEN];   /* defined in syscall.c */
+extern unsigned int curr_dir_len;
 int curr_dir_depth; /* This is only set for a sanitizing daemon. */
 
 /* Set a fd into nonblocking mode. */
@@ -524,7 +524,7 @@ int robust_unlink(const char *fname)
 		snprintf(&path[pos], MAX_RENAMES_DIGITS+1, "%03d", counter);
 		if (++counter >= MAX_RENAMES)
 			counter = 1;
-	} while ((rc = access(path, 0)) == 0 && counter != start);
+	} while (access(path, 0) == 0 && counter != start);
 
 	if (INFO_GTE(MISC, 1)) {
 		rprintf(FWARNING, "renaming %s to %s because of text busy\n",
@@ -1788,8 +1788,6 @@ void *expand_item_list(item_list *lp, size_t item_size, const char *desc, int in
 				new_ptr == lp->items ? " not" : "");
 		}
 
-		memset((char *)new_ptr + lp->malloced * item_size, 0,
-		       (expand_size - lp->malloced) * item_size);
 		lp->items = new_ptr;
 		lp->malloced = expand_size;
 	}

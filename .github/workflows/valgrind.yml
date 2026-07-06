@@ -1,0 +1,96 @@
+name: Valgrind memcheck
+
+on:
+  push:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/valgrind.yml'
+  pull_request:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/valgrind.yml'
+  schedule:
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+
+jobs:
+  memcheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        privilege: [ user, root ]
+        transport: [ pipe, tcp ]
+    name: memcheck (${{ matrix.privilege }}, ${{ matrix.transport }})
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: prep
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y valgrind acl libacl1-dev attr libattr1-dev \
+          liblz4-dev libzstd-dev libxxhash-dev python3-cmarkgfm openssl
+        echo "/usr/local/bin" >>"$GITHUB_PATH"
+    - name: configure
+      run: ./configure --with-rrsync --enable-debug
+    - name: make
+      run: make check-progs   # builds rsync + the test helper programs runtests.py needs
+    - name: info
+      run: ./rsync --version
+
+    # Run the whole suite under valgrind.  We gate on memory *errors* (uninit
+    # reads, invalid read/write, bad frees, uninit syscall params), not leaks:
+    # rsync deliberately leaves file-list/socket/option memory unfreed at exit
+    # (short-lived process; the OS reclaims), so --leak-check=no avoids a sea of
+    # by-design "definitely lost" reports.  Functional pass/fail is covered by
+    # the other workflows, so the suite is allowed to finish regardless of
+    # per-test results; the scan step below is the gate.  --error-exitcode=0
+    # keeps valgrind from perturbing test exit codes; the bundled
+    # testsuite/valgrind.supp silences known-benign reports.
+    - name: run testsuite under valgrind
+      run: |
+        SUDO=
+        [ "${{ matrix.privilege }}" = root ] && SUDO="sudo -E"
+        TCP=
+        [ "${{ matrix.transport }}" = tcp ] && TCP="--use-tcp"
+        $SUDO ./runtests.py --valgrind \
+          --valgrind-opts="--leak-check=no --error-exitcode=0" \
+          $TCP -j8 --preserve-scratch || true
+
+    - name: scan for unsuppressed valgrind errors
+      run: |
+        sudo chown -R "$USER" testtmp 2>/dev/null || true
+        mapfile -t logs < <(find testtmp -name 'valgrind.*.log' 2>/dev/null)
+        if [ "${#logs[@]}" -eq 0 ]; then
+          echo "::error::no valgrind logs were produced -- the suite did not run"
+          exit 1
+        fi
+        echo "scanned ${#logs[@]} valgrind log(s)"
+        bad=()
+        for f in "${logs[@]}"; do
+          grep -qE 'ERROR SUMMARY: [1-9][0-9]* errors' "$f" && bad+=("$f")
+        done
+        if [ "${#bad[@]}" -ne 0 ]; then
+          echo "::error::valgrind reported unsuppressed errors in ${#bad[@]} run(s)"
+          for f in "${bad[@]}"; do
+            echo "===== $f ====="
+            sed 's/==[0-9]*== //' "$f" | grep -A18 \
+              -E 'depends on uninitialised|points to uninitialised|Invalid (read|write|free)|lost in loss record|Mismatched free' \
+              | head -60
+          done
+          exit 1
+        fi
+        echo "valgrind clean: no unsuppressed errors"
+
+    - name: upload valgrind logs on failure
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: valgrind-logs-${{ matrix.privilege }}-${{ matrix.transport }}
+        path: testtmp/**/valgrind.*.log
+        if-no-files-found: ignore
+        retention-days: 7

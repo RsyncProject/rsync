@@ -66,6 +66,7 @@ extern int inplace;
 extern int append_mode;
 extern int make_backups;
 extern int csum_length;
+extern int xfer_sum_len;
 extern int ignore_times;
 extern int size_only;
 extern OFF_T max_size;
@@ -714,6 +715,11 @@ static void sum_sizes_sqroot(struct sum_struct *sum, int64 len)
 {
 	int32 blength;
 	int s2length;
+	/* The strong sum can be no longer than the negotiated checksum digest:
+	 * a short checksum (e.g. xxh64 = 8 bytes, when xxh128/xxh3 are absent)
+	 * makes xfer_sum_len < SUM_LENGTH, and the sender rejects an s2length
+	 * larger than xfer_sum_len (io.c). */
+	int max_s2length = MIN(SUM_LENGTH, xfer_sum_len);
 	int64 l;
 
 	if (len < 0) {
@@ -729,8 +735,7 @@ static void sum_sizes_sqroot(struct sum_struct *sum, int64 len)
 	else {
 		int32 max_blength = protocol_version < 30 ? OLD_MAX_BLOCK_SIZE : MAX_BLOCK_SIZE;
 		int32 c;
-		int cnt;
-		for (c = 1, l = len, cnt = 0; l >>= 2; c <<= 1, cnt++) {}
+		for (c = 1, l = len; l >>= 2; c <<= 1) {}
 		if (c < 0 || c >= max_blength)
 			blength = max_blength;
 		else {
@@ -748,7 +753,7 @@ static void sum_sizes_sqroot(struct sum_struct *sum, int64 len)
 	if (protocol_version < 27) {
 		s2length = csum_length;
 	} else if (csum_length == SUM_LENGTH) {
-		s2length = SUM_LENGTH;
+		s2length = max_s2length;
 	} else {
 		int32 c;
 		int b = BLOCKSUM_BIAS;
@@ -757,7 +762,7 @@ static void sum_sizes_sqroot(struct sum_struct *sum, int64 len)
 		/* add a bit, subtract rollsum, round up. */
 		s2length = (b + 1 - 32 + 7) / 8; /* --optimize in compiler-- */
 		s2length = MAX(s2length, csum_length);
-		s2length = MIN(s2length, SUM_LENGTH);
+		s2length = MIN(s2length, max_s2length);
 	}
 
 	sum->flength	= len;
@@ -1241,7 +1246,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	static int need_fuzzy_dirlist = 0;
 	struct file_struct *fuzzy_file = NULL;
 	int fd = -1, f_copy = -1;
-	stat_x sx, real_sx;
+	stat_x sx = {0}, real_sx;
 	STRUCT_STAT partial_st;
 	struct file_struct *back_file = NULL;
 	int statret, real_ret, stat_errno;
@@ -1648,6 +1653,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	 || (preserve_specials && ftype == FT_SPECIAL)) {
 		dev_t rdev;
 		int del_for_flag;
+		/* Whether the dest existed, captured before the type-mismatch
+		 * flip below clears statret -- so atomic_create() gets a delete
+		 * flag (and reads sx.st) only when sx.st was actually stat'd. */
+		int dest_existed = (statret == 0);
 		if (ftype == FT_DEVICE) {
 			uint32 *devp = F_RDEV_P(file);
 			rdev = MAKEDEV(DEV_MAJOR(devp), DEV_MINOR(devp));
@@ -1694,7 +1703,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				fname, (int)file->mode,
 				(long)major(rdev), (long)minor(rdev));
 		}
-		if (atomic_create(file, fname, NULL, NULL, rdev, &sx, del_for_flag)) {
+		if (atomic_create(file, fname, NULL, NULL, rdev, &sx, dest_existed ? del_for_flag : 0)) {
 			set_file_attrs(fname, file, NULL, NULL, 0);
 			if (itemizing) {
 				itemize(fnamecmp, file, ndx, statret, &sx,
@@ -1738,7 +1747,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		goto cleanup;
 	}
 
-	if (update_only > 0 && statret == 0 && file->modtime - sx.st.st_mtime < modify_window) {
+	if (update_only > 0 && statret == 0 && stype == ftype
+	 && file->modtime - sx.st.st_mtime < modify_window) {
 		if (INFO_GTE(SKIP, 1))
 			rprintf(FINFO, "%s is newer\n", fname);
 #ifdef SUPPORT_HARD_LINKS
@@ -2423,7 +2433,7 @@ void generate_files(int f_out, const char *local_name)
 		write_ndx(f_out, NDX_DONE);
 
 	if (protocol_version >= 31 && EARLY_DELETE_DONE_MSG()) {
-		if ((INFO_GTE(STATS, 2) && (delete_mode || force_delete)) || read_batch)
+		if (delete_mode || force_delete || read_batch)
 			write_del_stats(f_out);
 		if (EARLY_DELAY_DONE_MSG()) /* Can't send this before delay */
 			write_ndx(f_out, NDX_DONE);
@@ -2468,7 +2478,7 @@ void generate_files(int f_out, const char *local_name)
 
 	if (protocol_version >= 31) {
 		if (!EARLY_DELETE_DONE_MSG()) {
-			if (INFO_GTE(STATS, 2) || read_batch)
+			if (delete_mode || force_delete || read_batch)
 				write_del_stats(f_out);
 			write_ndx(f_out, NDX_DONE);
 		}

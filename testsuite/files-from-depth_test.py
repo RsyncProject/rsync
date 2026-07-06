@@ -44,6 +44,32 @@ for rel in listed:
 for rel in unlisted:
     assert_not_exists(TODIR / rel, label=f'--from0 excluded {rel}')
 
+# --- comments: line mode and --from0 both ignore them -----------------------
+rmtree(TODIR)
+(src / '#ignored').write_text('hash ignored\n')
+(src / ';ignored').write_text('semi ignored\n')
+commented = SCRATCHDIR / 'files-commented.lst'
+commented.write_text('\n'.join(['', ';ignored', '#ignored', *listed]) + '\n')
+run_rsync('-a', f'--files-from={commented}', f'{src}/', f'{TODIR}/')
+for rel in listed:
+    assert_same(TODIR / rel, src / rel, label=f'--files-from comment list {rel}')
+for rel in unlisted:
+    assert_not_exists(TODIR / rel, label=f'--files-from comment list excluded {rel}')
+for rel in ['#ignored', ';ignored']:
+    assert_not_exists(TODIR / rel, label=f'--files-from comment list skipped {rel}')
+
+rmtree(TODIR)
+comments0 = SCRATCHDIR / 'files-comments0.lst'
+comments0.write_bytes(
+    b'\0;ignored\0#ignored\0' + b'\0'.join(p.encode() for p in listed) + b'\0')
+run_rsync('-a', '--from0', f'--files-from={comments0}', f'{src}/', f'{TODIR}/')
+for rel in listed:
+    assert_same(TODIR / rel, src / rel, label=f'--from0 comment list {rel}')
+for rel in unlisted:
+    assert_not_exists(TODIR / rel, label=f'--from0 comment list excluded {rel}')
+for rel in ['#ignored', ';ignored']:
+    assert_not_exists(TODIR / rel, label=f'--from0 comment list skipped {rel}')
+
 # --- --exclude-from drops matching files at depth ---------------------------
 seed()
 (src / 'a.skip').write_text('s\n')

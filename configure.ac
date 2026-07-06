@@ -103,10 +103,6 @@ dnl (and coverage-counted) without needing a pre-5.6 kernel. Behaviour-neutral
 dnl by default (the knob only REMOVES a tier when explicitly disabled).
 AC_ARG_ENABLE(openat2,
 	AS_HELP_STRING([--disable-openat2],[do not use Linux openat2(RESOLVE_BENEATH); force the portable resolver (for exercising the fallback tier)]))
-if test x"$enable_openat2" != x"no"; then
-	AC_DEFINE([HAVE_OPENAT2], 1,
-		[Define to use Linux openat2(RESOLVE_BENEATH) in secure_relative_open where available.])
-fi
 
 AC_MSG_CHECKING([if md2man can create manpages])
 if test x"$ac_cv_path_PYTHON3" = x; then
@@ -357,6 +353,28 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[ ]], [[return 0;]])],
 CFLAGS="$OLD_CFLAGS"
 AC_SUBST(NOEXECSTACK)
 
+dnl We need both the SYS_openat2 syscall number and <linux/openat2.h> (for
+dnl struct open_how / RESOLVE_BENEATH); some setups have one without the other.
+AC_CACHE_CHECK([for openat2],rsync_cv_HAVE_OPENAT2,[
+    AC_COMPILE_IFELSE([
+        AC_LANG_PROGRAM([[
+#include <sys/syscall.h>
+#include <linux/openat2.h>
+]], [[
+struct open_how how;
+how.resolve = RESOLVE_BENEATH;
+return SYS_openat2 + (int)how.resolve;
+]])
+    ],
+    [rsync_cv_HAVE_OPENAT2=yes], [rsync_cv_HAVE_OPENAT2=no])
+])
+if test x"$enable_openat2" != x"no"; then
+    if test x"$rsync_cv_HAVE_OPENAT2" = x"yes"; then
+      AC_DEFINE([HAVE_OPENAT2], 1,
+        [Define to use Linux openat2(RESOLVE_BENEATH) in secure_relative_open where available.])
+    fi
+fi
+
 # arrgh. libc in some old debian version screwed up the largefile
 # stuff, getting byte range locking wrong
 AC_CACHE_CHECK([for broken largefile support],rsync_cv_HAVE_BROKEN_LARGEFILE,[
@@ -414,21 +432,17 @@ AS_HELP_STRING([--disable-ipv6],[disable to omit ipv6 support]),
 	;;
   esac ],
 
-  AC_RUN_IFELSE([AC_LANG_SOURCE([[ /* AF_INET6 availability check */
-#include <stdlib.h>
+  AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 #include <sys/types.h>
 #include <sys/socket.h>
-int main()
-{
-   if (socket(AF_INET6, SOCK_STREAM, 0) < 0)
-     exit(1);
-   else
-     exit(0);
-}
+#include <netinet/in.h>
+]], [[
+struct sockaddr_in6 sa6;
+(void)sa6;
+(void)AF_INET6;
 ]])],
   [AC_MSG_RESULT(yes)
-  AC_DEFINE(INET6, 1, true if you have IPv6)],
-  [AC_MSG_RESULT(no)],
+  AC_DEFINE(INET6, 1, [true if you have IPv6])],
   [AC_MSG_RESULT(no)]
 ))
 
@@ -914,7 +928,7 @@ AC_FUNC_UTIME_NULL
 AC_FUNC_ALLOCA
 AC_CHECK_FUNCS(waitpid wait4 getcwd chown chmod lchmod mknod mkfifo \
     fchmod fstat ftruncate strchr readlink link utime utimes lutimes strftime \
-    chflags getattrlist mktime innetgr linkat \
+    chflags getattrlist mktime innetgr linkat mknodat mkfifoat \
     memmove lchown vsnprintf snprintf vasprintf asprintf setsid strpbrk \
     strlcat strlcpy stpcpy strtol mallinfo mallinfo2 getgroups setgroups geteuid getegid \
     setlocale setmode open64 lseek64 mkstemp64 mtrace va_copy __va_copy \

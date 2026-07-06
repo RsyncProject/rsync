@@ -1,0 +1,64 @@
+name: Test fleettest harness
+
+# Bitrot check for testsuite/fleettest.py (the developer fleet CI harness).
+# fleettest is meant to be run by developers on a modern Ubuntu box, so this
+# job runs only on ubuntu-latest: it stands up a one-host "fleet" of two
+# targets that both ssh to localhost and runs a real fleettest pass against it.
+# It does not run on the BSD/Solaris/macOS/Cygwin matrix.
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - 'testsuite/fleettest.py'
+      - '.github/workflows/fleettest.yml'
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'testsuite/fleettest.py'
+      - '.github/workflows/fleettest.yml'
+  workflow_dispatch:
+  schedule:
+    - cron: '17 7 * * 1'
+
+jobs:
+  fleettest:
+    runs-on: ubuntu-latest
+    name: fleettest against localhost
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: prep
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gcc g++ gawk autoconf automake \
+          acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev \
+          python3-cmarkgfm openssl rsync openssh-server
+    - name: set up ssh to localhost
+      run: |
+        mkdir -p ~/.ssh && chmod 700 ~/.ssh
+        ssh-keygen -t ed25519 -N '' -f ~/.ssh/id_ed25519
+        cat ~/.ssh/id_ed25519.pub >> ~/.ssh/authorized_keys
+        chmod 600 ~/.ssh/authorized_keys
+        sudo systemctl start ssh || sudo service ssh start
+        # fleettest connects with `ssh -o BatchMode=yes localhost`, which won't
+        # answer a host-key prompt -- so pre-trust localhost in known_hosts.
+        ssh-keyscan -H localhost 127.0.0.1 >> ~/.ssh/known_hosts 2>/dev/null
+        ssh -o BatchMode=yes -o ConnectTimeout=15 localhost 'echo ssh-to-localhost-ok'
+    - name: write localhost fleet config
+      run: |
+        cat > fleettest-ci.json <<'EOF'
+        { "targets": [
+          { "name": "local-a", "ssh_host": "localhost", "workflow": "none.yml",
+            "configure_flags": [], "builddir": "rsync-citest-a", "privilege": "sudo" },
+          { "name": "local-b", "ssh_host": "localhost", "workflow": "none.yml",
+            "configure_flags": [], "builddir": "rsync-citest-b", "privilege": "sudo" }
+        ] }
+        EOF
+    - name: fleettest --list (config sanity)
+      run: python3 testsuite/fleettest.py --fleet fleettest-ci.json --list
+    - name: run fleettest against localhost
+      # Two targets both on localhost exercise the parallel multi-target path
+      # and the per-run dir / port isolation; exit 0 iff every cell is OK.
+      run: python3 testsuite/fleettest.py --fleet fleettest-ci.json --timing

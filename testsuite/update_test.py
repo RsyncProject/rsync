@@ -40,6 +40,22 @@ os.utime(TODIR / deep, (st.st_atime, st.st_mtime - 100))    # dest mtime older
 run_rsync('-a', '-u', f'{src}/', f'{TODIR}/')
 assert_same(TODIR / deep, src / deep, label='-u updated an older dest file')
 
+# A newer destination symlink is still replaced by a source regular file
+# because a file-format difference is always important enough to update.
+rmtree(src)
+rmtree(TODIR)
+makepath(src, TODIR)
+(src / 'foo').write_text("regular source file\n")
+os.symlink('/should/not/exist', TODIR / 'foo')
+st = os.stat(src / 'foo')
+os.utime(TODIR / 'foo', (st.st_atime, st.st_mtime + 100),
+         follow_symlinks=False)
+run_rsync('-a', '-u', f'{src}/', f'{TODIR}/')
+if os.path.islink(TODIR / 'foo'):
+    test_fail("-u skipped a source file over a newer destination symlink")
+assert_same(TODIR / 'foo', src / 'foo',
+            label='-u replaced a newer dest symlink with a regular file')
+
 # --- --force replaces a non-empty dest directory with a file at depth -------
 rmtree(src)
 rmtree(TODIR)

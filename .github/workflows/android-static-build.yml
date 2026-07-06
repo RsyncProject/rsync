@@ -21,7 +21,7 @@ on:
       - '.github/workflows/*.yml'
       - '!.github/workflows/android-static-build.yml'
   schedule:
-    - cron: '42 8 * * *'
+    - cron: '42 8 * * 1'
   workflow_dispatch:
 
 env:

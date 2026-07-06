@@ -802,7 +802,8 @@ static int socketpair_tcp(int fd[2])
 	 * the local address of our connecting end (fd[1]), and both must be
 	 * loopback.  If they differ, someone else connected first; fail closed. */
 	{
-		struct sockaddr_in accepted_peer, our_local;
+		/* {0}: the analyzer doesn't model getpeername/getsockname filling these. */
+		struct sockaddr_in accepted_peer = {0}, our_local = {0};
 		socklen_t plen = sizeof accepted_peer;
 		socklen_t llen = sizeof our_local;
 

@@ -99,6 +99,27 @@ static int updating_basis_or_equiv;
  * Anything else is a straight pass-through that preserves the strict contract. */
 static int secure_basis_open(const char *basedir, const char *relpath, int flags, mode_t mode)
 {
+	extern int am_daemon, am_chrooted;
+
+	/* The confined resolver is only needed for the sanitizing daemon
+	 * (am_daemon && !am_chrooted, i.e. use_secure_symlinks).  Local /
+	 * remote-shell mode has no module boundary, and "use chroot = yes" makes
+	 * the kernel root the boundary, so there an alt-dest basis like
+	 * --link-dest=../01 must resolve against the cwd as a bare open did before
+	 * the hardening (confining it would reject the legitimate sibling "..",
+	 * #915). */
+	if (!am_daemon || am_chrooted) {
+		if (basedir) {
+			char fullpath[MAXPATHLEN];
+			if (pathjoin(fullpath, sizeof fullpath, basedir, relpath) >= sizeof fullpath) {
+				errno = ENAMETOOLONG;
+				return -1;
+			}
+			return do_open(fullpath, flags, mode);
+		}
+		return do_open(relpath, flags, mode);
+	}
+
 	if (!basedir && relpath && *relpath == '/') {
 		const char *slash = strrchr(relpath, '/');
 		const char *leaf = slash + 1;
@@ -402,16 +423,32 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 
 		stats.matched_data += len;
 
-		/* A block match can only be honored if we actually mapped the
-		 * basis. If we didn't (basis open failed), the sender should
-		 * never have been told a basis existed -- treat it as a protocol
-		 * inconsistency rather than silently omitting these bytes from
-		 * the verification checksum (which yields a spurious failure) or
-		 * leaving a hole in the output. */
+		/* A block match with no mapped basis is a protocol inconsistency
+		 * ONLY when we are actually producing output (fd != -1): the
+		 * generator told the sender a basis existed but the receiver could
+		 * not open it, so honoring the match would silently omit these
+		 * bytes from the verification checksum (a spurious failure) or
+		 * leave a hole in the output. Fail cleanly in that case.
+		 *
+		 * On the DISCARD path (fd == -1, fname == NULL) there is no output
+		 * and no verification: discard_receive_data() deliberately drains a
+		 * delta the receiver never intends to write (basis fstat failed,
+		 * basis is a directory, output open failed, batch skip, ...). The
+		 * sender does not know the data is being discarded and streams an
+		 * ordinary delta, so a match token here is NORMAL protocol, not
+		 * malformed. Absorb it benignly (advance the offset and continue),
+		 * as the pre-existing "if (mapbuf)" guards did before this check was
+		 * added in 31fbb17d -- erroring would wrongly break legitimate
+		 * transfers, and full_fname(fname) with fname==NULL would
+		 * dereference NULL (a receiver crash on a normal transfer). */
 		if (!mapbuf) {
-			rprintf(FERROR, "got a block match with no basis file for %s [%s]\n",
-				full_fname(fname), who_am_i());
-			exit_cleanup(RERR_PROTOCOL);
+			if (fd != -1) {
+				rprintf(FERROR, "got a block match with no basis file for %s [%s]\n",
+					full_fname(fname), who_am_i());
+				exit_cleanup(RERR_PROTOCOL);
+			}
+			offset += len;
+			continue;
 		}
 
 		if (DEBUG_GTE(DELTASUM, 3)) {
@@ -859,7 +896,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 				basedir = basis_dir[0];
 				fnamecmp = fname;
 				fnamecmp_type = FNAMECMP_BASIS_DIR_LOW;
-				fd1 = secure_relative_open(basedir, fnamecmp, O_RDONLY, 0);
+				fd1 = secure_basis_open(basedir, fnamecmp, O_RDONLY, 0);
 			}
 		}
 
@@ -942,11 +979,40 @@ int recv_files(int f_in, int f_out, char *local_name)
 			if (fd2 == -1 && errno == EACCES) {
 				/* Maybe the error was due to protected_regular setting? */
 				if (use_secure_symlinks)
-					fd2 = secure_relative_open(NULL, fname, O_WRONLY, 0600);
+					fd2 = secure_relative_open(NULL, fnametmp, O_WRONLY, 0600);
 				else
-					fd2 = do_open(fname, O_WRONLY, 0600);
+					fd2 = do_open(fnametmp, O_WRONLY, 0600);
 			}
 #endif
+			if (fd2 == -1 && errno == EACCES) {
+				/* A read-only existing file: make it writable, then retry
+				 * (its mode is restored after the transfer).  On a
+				 * non-chroot daemon fchmod() a no-follow fd rather than
+				 * chmod the path, so a symlink raced into fnametmp can't
+				 * redirect the chmod (do_chmod_at follows the final link). */
+				int errno_save = errno, chmod_ok;
+				if (use_secure_symlinks) {
+#ifdef O_NOFOLLOW
+					int cfd = secure_relative_open(NULL, fnametmp, O_RDONLY|O_NOFOLLOW, 0);
+					chmod_ok = cfd != -1 && fchmod(cfd, 0600) == 0;
+					if (cfd != -1)
+						close(cfd);
+#else
+					/* Without O_NOFOLLOW the resolver's oldest fallback would
+					 * follow a raced symlink, so fail closed rather than
+					 * chmod through it. */
+					chmod_ok = 0;
+#endif
+				} else
+					chmod_ok = do_chmod_at(fnametmp, 0600) == 0;
+				if (chmod_ok) {
+					if (use_secure_symlinks)
+						fd2 = secure_relative_open(NULL, fnametmp, O_WRONLY, 0600);
+					else
+						fd2 = do_open(fnametmp, O_WRONLY, 0600);
+				} else
+					errno = errno_save;
+			}
 			if (fd2 == -1) {
 				rsyserr(FERROR_XFER, errno, "open %s failed",
 					full_fname(fnametmp));

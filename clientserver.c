@@ -270,11 +270,14 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 		FILE *f = fopen(early_input_file, "rb");
 		if (!f || do_fstat(fileno(f), &st) < 0) {
 			rsyserr(FERROR, errno, "failed to open %s", early_input_file);
+			if (f)
+				fclose(f);
 			return -1;
 		}
 		early_input_len = st.st_size;
 		if (early_input_len > (int)sizeof line) {
 			rprintf(FERROR, "%s is > %d bytes.\n", early_input_file, (int)sizeof line);
+			fclose(f);
 			return -1;
 		}
 		if (early_input_len > 0) {
@@ -283,6 +286,7 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 				int len;
 				if (feof(f)) {
 					rprintf(FERROR, "Early EOF in %s\n", early_input_file);
+					fclose(f);
 					return -1;
 				}
 				len = fread(line, 1, early_input_len, f);
@@ -1070,7 +1074,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 
 	io_printf(f_out, "@RSYNCD: OK\n");
 
-	read_args(f_in, name, line, sizeof line, rl_nulls, &argv, &argc, &request);
+	read_args(f_in, name, line, sizeof line, rl_nulls, 1, &argv, &argc, &request);
 	orig_argv = argv;
 
 	save_munge_symlinks = munge_symlinks;
@@ -1080,7 +1084,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	if (protect_args && ret) {
 		orig_early_argv = orig_argv;
 		protect_args = 2;
-		read_args(f_in, name, line, sizeof line, 1, &argv, &argc, &request);
+		read_args(f_in, name, line, sizeof line, 1, 0, &argv, &argc, &request);
 		orig_argv = argv;
 		ret = parse_arguments(&argc, (const char ***) &argv);
 	} else

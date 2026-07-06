@@ -31,6 +31,11 @@ import subprocess
 import sys
 import threading
 
+# Share the test exit-code enum with the test helpers. exitcodes.py lives in
+# testsuite/ (next to this script); it has no import-time side effects.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'testsuite'))
+from exitcodes import Exit
+
 
 def parse_args():
     p = argparse.ArgumentParser(description='Run rsync test suite')
@@ -58,6 +63,9 @@ def parse_args():
                    help='Stop after first test failure')
     p.add_argument('--timeout', type=int, default=300, metavar='SECS',
                    help='Per-test timeout in seconds (default: 300)')
+    p.add_argument('--race-timeout', type=float, default=5.0, metavar='SECS',
+                   help='Budget (seconds) a TOCTOU symlink-race test may spend '
+                        'trying to win its race before concluding (default: 5)')
     p.add_argument('--rsync-bin', default=None, metavar='PATH',
                    help='Path to rsync binary (default: ./rsync)')
     p.add_argument('--rsync-bin2', default=None, metavar='PATH',
@@ -183,35 +191,31 @@ _PY_TEST_SUFFIX = '_test.py'
 
 
 def _is_test_path(path):
-    base = os.path.basename(path)
-    return base.endswith('.test') or base.endswith(_PY_TEST_SUFFIX)
+    return os.path.basename(path).endswith(_PY_TEST_SUFFIX)
 
 
 def _testbase(path):
     """Strip the test extension to get the canonical test name."""
     base = os.path.basename(path)
-    if base.endswith('.test'):
-        return base[:-len('.test')]
     if base.endswith(_PY_TEST_SUFFIX):
         return base[:-len(_PY_TEST_SUFFIX)]
     return base
 
 
 def collect_tests(suitedir, patterns):
-    """Collect test scripts (.test or _test.py) matching the given patterns."""
+    """Collect test scripts (_test.py) matching the given patterns."""
     if not patterns:
-        candidates = (glob.glob(os.path.join(suitedir, '*.test'))
-                      + glob.glob(os.path.join(suitedir, '*' + _PY_TEST_SUFFIX)))
+        candidates = glob.glob(os.path.join(suitedir, '*' + _PY_TEST_SUFFIX))
         tests = sorted(p for p in candidates if _is_test_path(p))
     else:
         seen = set()
         tests = []
         for pat in patterns:
             # Accept either bare name ("mkpath"), explicit extension, or glob.
-            if pat.endswith('.test') or pat.endswith('.py'):
+            if pat.endswith('.py'):
                 pats = [pat]
             else:
-                pats = [pat + '.test', pat + _PY_TEST_SUFFIX]
+                pats = [pat + _PY_TEST_SUFFIX]
             for p in pats:
                 for m in sorted(glob.glob(os.path.join(suitedir, p))):
                     if _is_test_path(m) and m not in seen:
@@ -242,18 +246,18 @@ def parse_expect_result(path):
                     f"{path}:{lineno}: expected '<testname> "
                     f"<{'|'.join(_VALID_OUTCOMES)}>', got: {raw.rstrip()}\n"
                 )
-                sys.exit(2)
+                sys.exit(Exit.ERROR)
             expect[fields[0]] = fields[1]
     return expect
 
 
 def outcome_of(result):
     """Map a per-test exit code to an outcome string."""
-    if result == 0:
+    if result == Exit.PASS:
         return 'pass'
-    if result == 77:
+    if result == Exit.SKIP:
         return 'skip'
-    if result == 78:
+    if result == Exit.XFAIL:
         return 'xfail'
     return 'fail'
 
@@ -262,8 +266,19 @@ def build_rsync_cmd(rsync_bin, args, scratchbase):
     """Build the RSYNC command string for tests."""
     parts = []
     if args.valgrind:
-        vlog = os.path.join(scratchbase, 'valgrind.%p.log')
+        # Logs go in a world-writable+sticky subdir so that rsync children
+        # which drop privileges (the setpriv cap-drop in partial_nowrite, a
+        # daemon dropping to the module's uid) can still create their log file
+        # even when scratchbase itself is root-owned.
+        vgdir = os.path.join(scratchbase, 'valgrind-logs')
+        os.makedirs(vgdir, exist_ok=True)
+        os.chmod(vgdir, 0o1777)
+        vlog = os.path.join(vgdir, 'valgrind.%p.log')
         vopts = f'--log-file={vlog}'
+        supp = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            'testsuite', 'valgrind.supp')
+        if os.path.exists(supp):
+            vopts += f' --suppressions={supp}'
         if args.valgrind_opts:
             vopts += ' ' + args.valgrind_opts
         parts.append(f'valgrind {vopts}')
@@ -321,7 +336,7 @@ def run_one_test(testscript, testbase, scratchdir, base_env, timeout,
     # Build output text
     output_parts = []
 
-    show_log = always_log or (result not in (0, 77, 78))
+    show_log = always_log or (result not in (Exit.PASS, Exit.SKIP, Exit.XFAIL))
     if show_log:
         output_parts.append(f'----- {testbase} log follows')
         try:
@@ -338,9 +353,9 @@ def run_one_test(testscript, testbase, scratchdir, base_env, timeout,
             output_parts.append(f'----- {testbase} rsyncd.log ends')
 
     skipped_reason = ''
-    if result == 0:
+    if result == Exit.PASS:
         output_parts.append(f'PASS    {testbase}')
-    elif result == 77:
+    elif result == Exit.SKIP:
         whyfile = os.path.join(scratchdir, 'whyskipped')
         try:
             with open(whyfile) as f:
@@ -348,7 +363,7 @@ def run_one_test(testscript, testbase, scratchdir, base_env, timeout,
         except FileNotFoundError:
             pass
         output_parts.append(f'SKIP    {testbase} ({skipped_reason})')
-    elif result == 78:
+    elif result == Exit.XFAIL:
         output_parts.append(f'XFAIL   {testbase}')
     else:
         output_parts.append(f'FAIL    {testbase}')
@@ -407,13 +422,13 @@ def main():
 
     if not os.path.isfile(rsync_bin):
         sys.stderr.write(f"rsync_bin {rsync_bin} is not a file\n")
-        sys.exit(2)
+        sys.exit(Exit.ERROR)
     if not os.path.isfile(rsync_bin2):
         sys.stderr.write(f"rsync_bin2 {rsync_bin2} is not a file\n")
-        sys.exit(2)
+        sys.exit(Exit.ERROR)
     if not os.path.isdir(srcdir):
         sys.stderr.write(f"srcdir {srcdir} is not a directory\n")
-        sys.exit(2)
+        sys.exit(Exit.ERROR)
 
     # Helper programs the test scripts invoke directly. Missing any of these
     # would cause many tests to fail with confusing "not found" errors, so
@@ -430,7 +445,7 @@ def main():
             f"Build them with: make {' '.join(missing)}\n"
             f"or run the full test target: make check\n"
         )
-        sys.exit(2)
+        sys.exit(Exit.ERROR)
 
     testuser = get_testuser()
 
@@ -446,7 +461,7 @@ def main():
     print(f'    os={subprocess.check_output(["uname", "-a"], text=True).strip()}')
     print(f'    preserve_scratch={"yes" if args.preserve_scratch else "no"}')
     if args.valgrind:
-        print(f'    valgrind=enabled (logs in valgrind.*.log)')
+        print(f'    valgrind=enabled (logs in valgrind-logs/valgrind.*.log)')
     if args.parallel > 1:
         print(f'    parallel={args.parallel}')
     print(f'    daemon_transport={"tcp (loopback)" if args.use_tcp else "pipe (secure default)"}')
@@ -475,6 +490,7 @@ def main():
         'scratchbase': scratchbase,
         'suitedir': suitedir,
         'TESTRUN_TIMEOUT': str(args.timeout),
+        'race_timeout': str(args.race_timeout),
         'HOME': scratchbase,
         'PYTHONPATH': pythonpath,
     })
@@ -535,34 +551,40 @@ def main():
     passed = 0
     failed = 0
     skipped = 0
+    xfailed = 0
     skipped_list = []
     outcomes = {}  # testbase -> actual outcome string ('pass'/'skip'/'fail'/'xfail')
 
     def process_result(tr):
         """Process a TestResult and update counters. Returns True if the test
         should count as a failure for --stop-on-fail purposes."""
-        nonlocal passed, failed, skipped
+        nonlocal passed, failed, skipped, xfailed
         with _print_lock:
             if tr.output:
                 print(tr.output)
         scratchdir = os.path.join(scratchbase, tr.testbase)
         oc = outcome_of(tr.result)
         outcomes[tr.testbase] = oc
-        if tr.result == 0:
+        if tr.result == Exit.PASS:
             passed += 1
-        elif tr.result == 77:
+        elif tr.result == Exit.SKIP:
             skipped_list.append(tr.testbase)
             skipped += 1
+        elif tr.result == Exit.XFAIL:
+            # XFAIL: an expected failure (a known, documented residual the test
+            # asserts against). Reported distinctly but does NOT fail the suite;
+            # when the underlying issue is fixed the test returns 0 instead.
+            xfailed += 1
         else:
             failed += 1
-        if tr.result in (0, 77) and not args.preserve_scratch \
+        if tr.result in (Exit.PASS, Exit.SKIP, Exit.XFAIL) and not args.preserve_scratch \
                 and os.path.isdir(scratchdir):
             subprocess.run(['rm', '-rf', scratchdir], capture_output=True)
         # With a manifest, only a mismatch is a "failure" (an expected fail is
-        # fine); without one, any non-pass/non-skip result is a failure.
+        # fine); without one, any non-pass/non-skip/non-xfail result is a failure.
         if expect is not None:
             return mismatch(tr.testbase, oc)
-        return tr.result not in (0, 77)
+        return tr.result not in (Exit.PASS, Exit.SKIP, Exit.XFAIL)
 
     if args.parallel > 1:
         # Parallel execution
@@ -605,7 +627,7 @@ def main():
     # Check valgrind logs for errors
     vg_errors = 0
     if args.valgrind:
-        for vlog in sorted(glob.glob(os.path.join(scratchbase, 'valgrind.*.log'))):
+        for vlog in sorted(glob.glob(os.path.join(scratchbase, 'valgrind-logs', 'valgrind.*.log'))):
             try:
                 with open(vlog) as f:
                     content = f.read()
@@ -624,10 +646,12 @@ def main():
     print(f'      {passed} passed')
     if failed > 0:
         print(f'      {failed} failed')
+    if xfailed > 0:
+        print(f'      {xfailed} xfailed (expected)')
     if skipped > 0:
         print(f'      {skipped} skipped')
     if vg_errors > 0:
-        print(f'      {vg_errors} valgrind error(s) found (see logs in {scratchbase})')
+        print(f'      {vg_errors} valgrind error(s) found (see logs in {os.path.join(scratchbase, "valgrind-logs")})')
 
     if expect is not None:
         # Version-mixing mode: the run is judged purely on whether each test's

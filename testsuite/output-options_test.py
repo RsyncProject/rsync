@@ -108,7 +108,7 @@ make_data_file(src / 'big', 50_000)
 plain = out('-a', '--stats', f'{src}/', f'{TODIR}/').stdout
 rmtree(TODIR)
 human = out('-a', '-h', '--stats', f'{src}/', f'{TODIR}/').stdout
-suffix_re = r'Total file size: [\d.]+[KMG]'
+suffix_re = r'Total file size: [\d.,]+[KMG]'
 if not re.search(suffix_re, human):
     test_fail(f"-h did not use a human-readable unit suffix:\n{human}")
 if re.search(suffix_re, plain):

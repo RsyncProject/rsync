@@ -1,0 +1,72 @@
+name: rsync ASan+UBSan (clang)
+
+on:
+  push:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/asan-build.yml'
+  pull_request:
+    branches: [ master ]
+    paths-ignore:
+      - '.github/workflows/*.yml'
+      - '!.github/workflows/asan-build.yml'
+  schedule:
+    # Weekly (Mon 09:42 UTC): catch breakage from a moving ubuntu-latest/clang
+    # toolchain (a new clang can add a UBSan check, or change ASan behaviour)
+    # that no code push would otherwise trigger.  Push/PR already gate every
+    # code change, so daily would just re-run an unchanged tree.
+    - cron: '42 9 * * 1'
+  workflow_dispatch:
+
+jobs:
+  asan:
+    runs-on: ubuntu-latest
+    name: rsync ASan+UBSan (clang)
+    env:
+      # rsync intentionally leaks small allocations at process exit, so leak
+      # detection would be all noise; chase only memory-safety errors.
+      ASAN_OPTIONS: detect_leaks=0:abort_on_error=1
+      # UBSan is a gate: -fno-sanitize-recover=undefined (below) aborts on the
+      # first finding and halt_on_error=1 makes that fatal, so any undefined
+      # behaviour fails the run.  This needs the tree to be UBSan-clean: the
+      # remaining findings are fixed in code (hashtable/mdfour shifts, xattrs,
+      # and log.c's file_struct, kept aligned via rounding.h); only byteorder.h's
+      # intentional unaligned accessors are suppressed, with no_sanitize.
+      UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: prep
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev openssl
+        echo "/usr/local/bin" >>"$GITHUB_PATH"
+    - name: configure
+      # -DNDEBUG builds as a shipped release does (assert() compiled out), so
+      # AddressSanitizer catches the over-reads/over-writes that an "assert()
+      # instead of a real bounds check" bug would cause in a production build.
+      # UBSan rides along on the same build; -fno-sanitize-recover=undefined
+      # makes any undefined behaviour abort (and thus fail the run) instead of
+      # merely printing it.
+      run: |
+        CC=clang \
+        CFLAGS="-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer -g -O1 -DNDEBUG" \
+        LDFLAGS="-fsanitize=address,undefined" \
+        ./configure --with-rrsync --disable-md2man
+    - name: make
+      # check-progs builds rsync plus the test helper programs (tls, trimslash,
+      # t_unsafe, ...) that runtests.py requires; plain "make" builds only rsync
+      # and runtests aborts on the missing helpers.
+      run: make check-progs
+    - name: info
+      run: ./rsync --version
+    - name: check (stdio-pipe transport)
+      # ASan+UBSan-instrumented coverage of the transfer, daemon, sender,
+      # receiver and metadata paths over the default stdio-pipe transport.
+      run: ./runtests.py --rsync-bin="$PWD/rsync" -j8
+    - name: check (TCP daemon transport)
+      # --use-tcp also exercises the loopback rsyncd listener and the client's
+      # TCP connection path.
+      run: ./runtests.py --rsync-bin="$PWD/rsync" --use-tcp -j8

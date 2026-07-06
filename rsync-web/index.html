@@ -26,6 +26,58 @@ License</A> and is currently being maintained by
 <img src="badge.svg">
 </a></div>
 
+<h3>Rsync version 3.4.4 released</h3>
+<i class=date>June 8th, 2026</i>
+
+<p>Rsync version 3.4.4 has been released. This is a regression fix
+  release for the issues that have been reported with the 3.4.3
+  security release. Many thanks to everyone who reported the issues
+  (see <a href="https://download.samba.org/pub/rsync/NEWS#3.4.4">NEWS.md</a>
+  for credits).<p>
+    The 3.4.3 release had so many issues for two main reasons:
+    <ul>
+      <li>the 3.4 testsuite did not have broad enough coverage to
+        catch the regressions notices by users
+      <li>the nature of a security release prevents wide beta testing,
+        resulting in not enough manual testing in disparate environments
+    </ul>
+    To fix this for future releases we have greatly expanded the test
+    suite for 3.5 (currently in master) and grown the development
+    team, especially with more people with security expertise.
+    Thanks for your patience!
+
+
+<p>See the <a href="https://download.samba.org/pub/rsync/NEWS#3.4.4">3.4.4 NEWS</a> for a detailed changelog.
+The latest manpages are also available for:<ul>
+<li><a href="https://download.samba.org/pub/rsync/rsync.1"><b>rsync</b>(1)</a>
+<li><a href="https://download.samba.org/pub/rsync/rsync-ssl.1"><b>rsync-ssl</b>(1)</a>
+<li><a href="https://download.samba.org/pub/rsync/rsyncd.conf.5"><b>rsyncd.conf</b>(5)</a>
+<li><a href="https://download.samba.org/pub/rsync/rrsync.1"><b>rrsync</b>(1)</a>
+</ul>
+
+<p>The source tar is available here:
+<b><a href="https://download.samba.org/pub/rsync/src/rsync-3.4.4.tar.gz">rsync-3.4.4.tar.gz</a>
+(<a href="https://download.samba.org/pub/rsync/src/rsync-3.4.4.tar.gz.asc">signature</a>)</b>,
+and the diffs from version 3.4.3 are available here:
+<b><a href="https://download.samba.org/pub/rsync/src-diffs/rsync-3.4.3-3.4.4.diffs.gz">rsync-3.4.3-3.4.4.diffs.gz</a>
+(<a href="https://download.samba.org/pub/rsync/src-diffs/rsync-3.4.3-3.4.4.diffs.gz.asc">signature</a>)</b>.
+
+<p>Patch sets are also available for the older stable series, for
+distributors not yet able to move to 3.4.4.  Each is GPG signed.  The
+<i>full</i> set applies to a pristine release tarball; the <i>update</i>
+set has only the patches added since the previous security release:<ul>
+<li>rsync 3.2.7:
+<b><a href="https://download.samba.org/pub/rsync/src/rsync-3.2.7-full.tar.gz">rsync-3.2.7-full.tar.gz</a>
+(<a href="https://download.samba.org/pub/rsync/src/rsync-3.2.7-full.tar.gz.asc">signature</a>)</b>,
+<b><a href="https://download.samba.org/pub/rsync/src/rsync-3.2.7-update.tar.gz">rsync-3.2.7-update.tar.gz</a>
+(<a href="https://download.samba.org/pub/rsync/src/rsync-3.2.7-update.tar.gz.asc">signature</a>)</b>
+<li>rsync 3.4.1:
+<b><a href="https://download.samba.org/pub/rsync/src/rsync-3.4.1-full.tar.gz">rsync-3.4.1-full.tar.gz</a>
+(<a href="https://download.samba.org/pub/rsync/src/rsync-3.4.1-full.tar.gz.asc">signature</a>)</b>,
+<b><a href="https://download.samba.org/pub/rsync/src/rsync-3.4.1-update.tar.gz">rsync-3.4.1-update.tar.gz</a>
+(<a href="https://download.samba.org/pub/rsync/src/rsync-3.4.1-update.tar.gz.asc">signature</a>)</b>
+</ul>
+
 <h3>Rsync version 3.4.3 released</h3>
 <i class=date>May 20th, 2026</i>
 

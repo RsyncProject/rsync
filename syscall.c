@@ -536,7 +536,9 @@ int do_mknod(const char *pathname, mode_t mode, dev_t dev)
 */
 int do_mknod_at(const char *pathname, mode_t mode, dev_t dev)
 {
-#ifdef AT_FDCWD
+	/* HAVE_MKNODAT: older Darwin declares AT_FDCWD but not mknodat(), so
+	 * the at-variant won't build there; fall back to do_mknod() (#896). */
+#if defined(AT_FDCWD) && defined(HAVE_MKNODAT)
 	extern int am_daemon, am_chrooted;
 	char dirpath[MAXPATHLEN];
 	const char *bname;
@@ -598,7 +600,7 @@ int do_mknod_at(const char *pathname, mode_t mode, dev_t dev)
 		return ret;
 	}
 
-#if !defined MKNOD_CREATES_FIFOS && defined HAVE_MKFIFO
+#if !defined MKNOD_CREATES_FIFOS && defined HAVE_MKFIFO && defined HAVE_MKFIFOAT
 	if (S_ISFIFO(mode))
 		ret = mkfifoat(dfd, bname, mode);
 	else
@@ -1706,6 +1708,19 @@ static int path_has_dotdot_component(const char *path)
 }
 
 #if defined(__linux__) && defined(HAVE_OPENAT2)
+/* openat2(RESOLVE_BENEATH) via the raw syscall, gated on openat2_usable() so a
+ * seccomp filter that traps openat2 with SIGSYS (e.g. the Android sandbox)
+ * makes us report ENOSYS and fall back rather than killing the process.  Only
+ * the openat2 call is gated here; a plain openat() is always safe to attempt. */
+static int openat2_beneath(int dirfd, const char *path, const struct open_how *how)
+{
+	if (!openat2_usable()) {
+		errno = ENOSYS;
+		return -1;
+	}
+	return syscall(SYS_openat2, dirfd, path, how, sizeof *how);
+}
+
 static int secure_relative_open_linux(const char *basedir, const char *relpath, int flags, mode_t mode)
 {
 	struct open_how how;
@@ -1734,12 +1749,12 @@ static int secure_relative_open_linux(const char *basedir, const char *relpath, 
 		memset(&bhow, 0, sizeof bhow);
 		bhow.flags = O_RDONLY | O_DIRECTORY;
 		bhow.resolve = RESOLVE_BENEATH | RESOLVE_NO_MAGICLINKS;
-		dirfd = syscall(SYS_openat2, AT_FDCWD, basedir, &bhow, sizeof bhow);
+		dirfd = openat2_beneath(AT_FDCWD, basedir, &bhow);
 		if (dirfd == -1)
 			return -1;
 	}
 
-	retfd = syscall(SYS_openat2, dirfd, relpath, &how, sizeof how);
+	retfd = openat2_beneath(dirfd, relpath, &how);
 
 	if (dirfd != AT_FDCWD)
 		close(dirfd);
@@ -1780,13 +1795,68 @@ static int secure_relative_open_resolve_beneath(const char *basedir, const char 
 }
 #endif
 
+/* The logical current directory (maintained by change_dir() in util1.c).
+ * Defined here -- rather than in util1.c -- so the test helpers that link
+ * syscall.o but not util1.o (tls, trimslash) get the definition without a
+ * weak-symbol fallback, which is not portable to PE/COFF targets (Cygwin). */
+char curr_dir[MAXPATHLEN];
+unsigned int curr_dir_len;
+
 int secure_relative_open(const char *basedir, const char *relpath, int flags, mode_t mode)
 {
+	extern int am_daemon, am_chrooted;
+	extern char *module_dir;
+	extern unsigned int module_dirlen;
+	char modrel_buf[MAXPATHLEN];
+	int reanchored = 0;
+
 	if (!relpath || relpath[0] == '/') {
 		// must be a relative path
 		errno = EINVAL;
 		return -1;
 	}
+
+	/* Sanitizing daemon only (am_daemon && !am_chrooted).  Here we have chdir'd
+	 * into a sub-dir of the module (the transfer destination), so a relative
+	 * alt-dest like "../01" may legitimately climb to a sibling that is still
+	 * inside the module (#915).  Confining beneath the cwd would reject that
+	 * climb.  Re-anchor at the module root -- the real trust boundary -- by
+	 * prefixing the cwd's module-relative path (from rsync's logical curr_dir[],
+	 * a guaranteed lexical prefix of module_dir, unlike getcwd()) and resolving
+	 * beneath module_dir; RESOLVE_BENEATH then allows in-module climbs and still
+	 * rejects escapes.  Only for paths that contain "..".  module_dirlen is 0 for
+	 * a `path = /` module (clientserver.c), so we gate on module_dir, not its
+	 * length, to cover that case too -- the prefix check below treats
+	 * module_dirlen 0 as "module root is /". */
+	if (am_daemon && !am_chrooted
+	 && module_dir && module_dir[0] == '/'
+	 && (basedir == NULL || basedir[0] != '/')
+	 && (path_has_dotdot_component(relpath)
+	  || (basedir && path_has_dotdot_component(basedir)))) {
+		const char *p;
+		int n;
+		if (curr_dir_len >= module_dirlen
+		 && strncmp(curr_dir, module_dir, module_dirlen) == 0
+		 && (curr_dir[module_dirlen] == '\0' || curr_dir[module_dirlen] == '/')) {
+			for (p = curr_dir + module_dirlen; *p == '/'; p++) {}
+			if (basedir)
+				n = snprintf(modrel_buf, sizeof modrel_buf, "%s%s%s/%s",
+					     p, *p ? "/" : "", basedir, relpath);
+			else
+				n = snprintf(modrel_buf, sizeof modrel_buf, "%s%s%s",
+					     p, *p ? "/" : "", relpath);
+			if (n < 0 || n >= (int)sizeof modrel_buf) {
+				errno = ENAMETOOLONG;
+				return -1;
+			}
+			basedir = module_dir;	/* absolute, operator-trusted anchor */
+			relpath = modrel_buf;
+			reanchored = 1;
+		}
+		/* else: cwd not under module root as expected -- fall through to the
+		 * front-door rejection below (fail safe). */
+	}
+
 	/* Reject any path with a literal ".." component (bare "..",
 	 * "../foo", "foo/..", "foo/../bar", "subdir/.."). The previous
 	 * substring-based check caught only "../" prefix and "/../"
@@ -1795,14 +1865,19 @@ int secure_relative_open(const char *basedir, const char *relpath, int flags, mo
 	 * and pre-5.6 Linux. RESOLVE_BENEATH on Linux/FreeBSD/macOS
 	 * catches some of these in-kernel with EXDEV, but the front
 	 * door must reject them consistently with EINVAL across all
-	 * platforms so callers can rely on the validation. */
-	if (path_has_dotdot_component(relpath)) {
-		errno = EINVAL;
-		return -1;
-	}
-	if (basedir && basedir[0] != '/' && path_has_dotdot_component(basedir)) {
-		errno = EINVAL;
-		return -1;
+	 * platforms so callers can rely on the validation.  Skipped for a
+	 * re-anchored path: its ".." is deliberate, stays within the module,
+	 * and is adjudicated by RESOLVE_BENEATH below (the portable fallback
+	 * re-rejects it -- see there). */
+	if (!reanchored) {
+		if (path_has_dotdot_component(relpath)) {
+			errno = EINVAL;
+			return -1;
+		}
+		if (basedir && basedir[0] != '/' && path_has_dotdot_component(basedir)) {
+			errno = EINVAL;
+			return -1;
+		}
 	}
 
 #if defined(__linux__) && defined(HAVE_OPENAT2)
@@ -1820,6 +1895,21 @@ int secure_relative_open(const char *basedir, const char *relpath, int flags, mo
 #ifdef O_RESOLVE_BENEATH
 	return secure_relative_open_resolve_beneath(basedir, relpath, flags, mode);
 #endif
+
+	/* Portable fallback only (no kernel RESOLVE_BENEATH): the per-component
+	 * O_NOFOLLOW walk below can't adjudicate ".." safely, so reject it here --
+	 * even for a re-anchored path.  This re-breaks --link-dest=../01 on
+	 * openat2/O_RESOLVE_BENEATH-less platforms (NetBSD/OpenBSD/Solaris/Cygwin/
+	 * pre-5.6 Linux), trading function for safety; on the kernel paths above
+	 * RESOLVE_BENEATH already allowed the in-module climb. */
+	if (path_has_dotdot_component(relpath)) {
+		errno = EINVAL;
+		return -1;
+	}
+	if (basedir && basedir[0] != '/' && path_has_dotdot_component(basedir)) {
+		errno = EINVAL;
+		return -1;
+	}
 
 #if !defined(O_NOFOLLOW) || !defined(O_DIRECTORY) || !defined(AT_FDCWD)
 	// really old system, all we can do is live with the risks
