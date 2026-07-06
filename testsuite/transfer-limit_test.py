@@ -26,7 +26,7 @@ makepath(dest)
 make_data_file(src / TESTFILE1, FILE1_SIZE)
 make_data_file(src / TESTFILE2, FILE2_SIZE)
 
-# Test --data-transfer-limit stops the transfer between files
+# Test --data-transfer-limit stops the transfer of files if the next file would exceed the specified limit.
 proc = run_rsync(
     '-a',
     '--whole-file',

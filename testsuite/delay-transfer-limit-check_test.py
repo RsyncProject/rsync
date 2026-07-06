@@ -32,7 +32,8 @@ make_data_file(src / TESTFILE1, FILE1_SIZE)
 make_data_file(src / TESTFILE2, FILE2_SIZE)
 make_data_file(src / TESTFILE3, FILE3_SIZE)
 
-# Test --delay-transfer-limit-check allows the first two transfers to succeed but stops at the third transfer.
+# Test --delay-transfer-limit-check allows transfers to continue as long as the transfer limit has not yet been reached.
+# Transfers will stop only after the limit has been reached.
 proc = run_rsync(
     '-a',
     '--whole-file',
