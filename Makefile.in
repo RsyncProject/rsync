@@ -109,7 +109,7 @@ install-ssl-daemon: stunnel-rsyncd.conf
 install-all: install install-ssl-daemon
 
 install-strip:
-	$(MAKE) INSTALL_STRIP='-s' install
+	$(MAKE) INSTALL_STRIP='-s --strip-program=$(or $(STRIP),strip)' install
 
 .PHONY: uninstall
 uninstall:
