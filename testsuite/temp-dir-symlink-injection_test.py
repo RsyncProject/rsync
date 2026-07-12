@@ -19,6 +19,9 @@ import os
 import subprocess
 import time
 
+import filecmp
+import sys
+
 from rsyncfns import (
     SCRATCHDIR, RACE_TIMEOUT, find_attacker_uid,
     rmtree, rsync_argv, test_fail, test_skipped,
@@ -31,6 +34,7 @@ if ATT_UID is None:
     test_skipped("no untrusted-uid user available for cross-uid plant")
 
 NFILES = 40
+PINNED = 1000000000
 
 base = SCRATCHDIR / 'tmpdir-inject'
 src = base / 'src'
@@ -55,8 +59,9 @@ def build():
 
 
 def push():
-    subprocess.run(rsync_argv('-r', f'--temp-dir={td}', f'{src}/', f'{dest}/'),
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return subprocess.run(
+        rsync_argv('-r', f'--temp-dir={td}', f'{src}/', f'{dest}/'),
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 
 
 def injected():
@@ -95,7 +100,25 @@ ATTACK = (
 )
 
 build()
-atk = subprocess.Popen(['python3', '-c', ATTACK, str(td), str(tdlink), str(outside)])
+os.utime(td, (PINNED, PINNED))
+before = td.stat().st_mtime_ns
+proc = push()
+if proc.returncode != 0:
+    test_fail("positive control: clean --temp-dir transfer failed "
+              f"(rc={proc.returncode}):\n{proc.stdout or ''}")
+if td.stat().st_mtime_ns == before:
+    test_fail(
+        "positive control: --temp-dir did not create or remove a temp file "
+        f"in {td}; the test would not exercise the temp->final rename source")
+for i in range(NFILES):
+    target = dest / f'f{i}'
+    if not target.is_file():
+        test_fail(f"positive control: --temp-dir did not create {target}")
+    if not filecmp.cmp(src / f'f{i}', target, shallow=False):
+        test_fail(f"positive control: destination content differs for {target}")
+
+atk = subprocess.Popen([sys.executable, '-c', ATTACK,
+                        str(td), str(tdlink), str(outside)])
 try:
     deadline = time.monotonic() + max(RACE_TIMEOUT, 15.0)
     while time.monotonic() < deadline:

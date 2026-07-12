@@ -6,7 +6,9 @@ from rsyncfns import (
 )
 
 DAEMON_PORT = 12961
-SECRET = "PROTECTED-IN-EXCLUDED-SUBTREE\n"
+SECRET = "PROTECTED-OUTSIDE-MODULE\n"
+PUSHED = "NEW\n"
+OLD_DEST = "OLD-DESTINATION-FILE-CONTENT\n"
 
 base = SCRATCHDIR / 'partialdirdaemon'
 rmtree(base)
@@ -15,31 +17,41 @@ base.mkdir()
 mod = base / 'mod'
 secret = base / 'secret'
 if secret.exists():
-    rmtree(secret)# excluded subtree (exclude = /secret/)
+    rmtree(secret)
 secret.mkdir(parents=True)
 
 victim = secret / 'f0'
 victim.write_text(SECRET)                    # a file the partial must not clobber
 mod.mkdir()
-(mod / 'f0').write_text("OLD-DESTINATION-FILE-CONTENT\n")
+dest = mod / 'f0'
+dest.write_text(OLD_DEST)
 
-blink = mod / 'blink'                        # euid-owned symlink -> excluded subtree
+blink = mod / 'blink'                        # euid-owned symlink -> outside module
 os.symlink(f'{secret}', blink)
 
 src = base / 'src'
 src.mkdir()
-(src / 'f0').write_text("NEW\n")
+(src / 'f0').write_text(PUSHED)
 
 conf = write_daemon_conf(
     [('mod', {'path': str(mod), 'read only': 'no'})])
 url = start_test_daemon(conf, DAEMON_PORT)
 
-subprocess.run(
-    rsync_argv('-a', '--partial', '--partial-dir=/blink', f'{src}/', f'{url}mod/'),
+proc = subprocess.run(
+    rsync_argv('-a', '--delay-updates', '--partial-dir=/blink',
+               f'{src}/', f'{url}mod/'),
     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
+dest_after = dest.read_text() if dest.exists() else None
+if proc.returncode == 0 or dest_after != OLD_DEST:
+    test_fail(
+        "the daemon did not reject the forced --partial-dir staging path: "
+        f"rsync exited {proc.returncode} and {dest} is now {dest_after!r}. "
+        "If the operand were ignored, the upload would replace the destination "
+        f"with {PUSHED!r}.")
+
 after = victim.read_text() if victim.exists() else None
-if after is None:
+if after != SECRET:
     test_fail(
         "the daemon followed a --partial-dir symlink outside the module: "
         f"{victim} is now {after!r} (a peer backed up over a file the module "

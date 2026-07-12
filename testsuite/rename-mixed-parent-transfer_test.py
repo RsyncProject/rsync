@@ -53,6 +53,8 @@ if ATT_UID is None:
 
 
 DAEMON_PORT = 12903
+OLD = "INSIDE_MODULE_DATA\n"
+NEW = "NEW_PUSHED_DATA\n"
 
 mod = SCRATCHDIR / 'module'
 outside = SCRATCHDIR / 'outside'
@@ -65,15 +67,10 @@ for d in (mod, outside, src):
 
 # The existing in-module file the daemon will overwrite (and thus back up).
 # Its content is what an attacker would relocate outside the module.
-(mod / 'foo').write_text("INSIDE_MODULE_DATA\n")
-
-# The attacker-planted backup-dir symlink, pointing outside the module, owned by
-# the attacker uid (not root, the uid the module is served as).
-os.symlink(str(outside), mod / 'bdir')
-os.lchown(mod / 'bdir', ATT_UID, ATT_UID)
+(mod / 'foo').write_text(OLD)
 
 # A different source so the push genuinely overwrites foo and triggers backup.
-(src / 'foo').write_text("NEW_PUSHED_DATA\n")
+(src / 'foo').write_text(NEW)
 
 # Serve the module as root so the daemon euid differs from the attacker uid; the
 # ownership walk must then refuse the foreign-owned backup-dir symlink.  Use
@@ -85,15 +82,46 @@ conf = write_daemon_conf([
 ])
 daemon_url = start_test_daemon(conf, DAEMON_PORT).rstrip('/')
 
+
+def push_with_backup():
+    return subprocess.run(
+        rsync_argv('-t', '--backup', '--backup-dir=bdir',
+                   f'{src}/foo', f'{daemon_url}/upload/'),
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+
+
+# Positive control: a real backup-dir must receive the original file, proving
+# this transfer shape exercises --backup-dir and the mixed-parent backup rename.
+(mod / 'bdir').mkdir()
+proc = push_with_backup()
+if proc.returncode != 0:
+    test_fail("positive control: daemon --backup-dir transfer failed "
+              f"(rc={proc.returncode}):\n{proc.stdout or ''}")
+backup = mod / 'bdir' / 'foo'
+if not backup.is_file():
+    test_fail("positive control: --backup-dir=bdir did not create "
+              f"{backup}; the test would not exercise the backup rename path")
+if backup.read_text() != OLD:
+    test_fail("positive control: backup content differs from the original "
+              f"module/foo content: {backup.read_text()!r}")
+if (mod / 'foo').read_text() != NEW:
+    test_fail("positive control: module/foo was not overwritten by the "
+              "daemon transfer")
+
+rmtree(mod / 'bdir')
+(mod / 'foo').write_text(OLD)
+
+# The attacker-planted backup-dir symlink, pointing outside the module, owned by
+# the attacker uid (not root, the uid the module is served as).
+os.symlink(str(outside), mod / 'bdir')
+os.lchown(mod / 'bdir', ATT_UID, ATT_UID)
+
 # Push the changed file straight into the module root with backups enabled and
 # a backup-dir relative to the module root. The transfer may report an error on
-# the fixed binary (the secure backup rename is refused), so we ignore its exit
-# status and judge solely by where the files end up.
-subprocess.run(
-    rsync_argv('-t', '--backup', '--backup-dir=bdir',
-               f'{src}/foo', f'{daemon_url}/upload/'),
-    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-)
+# the fixed binary (the secure backup rename is refused), so the security oracle
+# is where the files end up.
+proc = push_with_backup()
+attack_out = proc.stdout or ''
 
 # The escape: the original in-module file was renamed out through the bdir
 # symlink into the outside-the-module directory.
@@ -110,3 +138,14 @@ if os.path.lexists(outside / 'foo'):
 leaked = os.listdir(outside)
 if leaked:
     test_fail(f"unexpected files escaped the module into {outside}: {leaked}")
+
+try:
+    final = (mod / 'foo').read_text()
+except (OSError, UnicodeError) as exc:
+    test_fail("foreign-owned --backup-dir symlink transfer left module/foo "
+              f"unreadable ({exc!r}; rc={proc.returncode}):\n{attack_out}")
+if final == NEW:
+    test_fail("foreign-owned --backup-dir symlink transfer overwrote module/foo "
+              "without taking or refusing the backup through bdir; the "
+              f"--backup-dir path may not have been exercised "
+              f"(rc={proc.returncode}):\n{attack_out}")

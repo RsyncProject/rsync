@@ -59,8 +59,9 @@ def build():
 
 
 def push():
-    subprocess.run(rsync_argv('-rt', f'--copy-dest={cd}', f'{src}/', f'{dest}/'),
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return subprocess.run(
+        rsync_argv('-rt', f'--copy-dest={cd}', f'{src}/', f'{dest}/'),
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 
 
 def leaked():
@@ -75,9 +76,20 @@ def leaked():
 
 # Positive control: a clean push with cd a real dir copies the in-tree basis.
 build()
-push()
-if not any((dest / f'f{i}').exists() for i in range(NFILES)):
-    test_fail("positive control: --copy-dest produced no destination files")
+proc = push()
+if proc.returncode != 0:
+    test_fail("positive control: clean --copy-dest transfer failed "
+              f"(rc={proc.returncode}):\n{proc.stdout or ''}")
+for i in range(NFILES):
+    target = dest / f'f{i}'
+    if not target.is_file():
+        test_fail(f"positive control: --copy-dest did not create {target}")
+    got = target.read_text()
+    if got != 'BAS\n':
+        test_fail(
+            "positive control: clean --copy-dest did not copy the in-tree "
+            f"basis for {target} (got {got!r}); the test would not exercise "
+            "copy_file()'s basis read path")
 
 flip = start_c_flipper(cd, cdlink)
 try:
