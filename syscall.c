@@ -27,7 +27,9 @@
 #undef AT_FDCWD
 #undef AT_SYMLINK_NOFOLLOW
 #undef HAVE_LINKAT
+#undef HAVE_OPENAT2
 #undef HAVE_UTIMENSAT
+#undef O_RESOLVE_BENEATH
 #endif
 
 #if !defined MKNOD_CREATES_SOCKETS && defined HAVE_SYS_UN_H
