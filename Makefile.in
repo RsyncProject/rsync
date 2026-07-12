@@ -65,12 +65,18 @@ CHECK_SYMLINKS = testsuite/chown-fake_test.py testsuite/devices-fake_test.py \
 
 # Objects for CHECK_PROGS to clean
 CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o t_chmod_secure.o t_secure_relpath.o trimslash.o wildtest.o
+# Compile-only feature-shape checks.
+CHECK_COMPILE_OBJS=syscall-no-at-fdcwd.o
 
 # note that the -I. is needed to handle config.h when using VPATH
 .c.o:
 @OBJ_SAVE@
 	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) -c $< @CC_SHOBJ_FLAG@
 @OBJ_RESTORE@
+
+syscall-no-at-fdcwd.o: syscall.c $(HEADERS)
+	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) \
+	    -DRSYNC_TEST_NO_AT_FDCWD -c $(srcdir)/syscall.c -o $@
 
 # NOTE: consider running "packaging/smart-make" instead of "make" to auto-handle
 # any changes to configure.sh and the main Makefile prior to a "make all".
@@ -300,7 +306,7 @@ rrsync.1: support/rrsync.1.md md-convert Makefile
 
 .PHONY: clean
 clean: cleantests
-	rm -f *~ $(OBJS) $(CHECK_PROGS) $(CHECK_OBJS) $(CHECK_SYMLINKS) @MAKE_RRSYNC@ \
+	rm -f *~ $(OBJS) $(CHECK_PROGS) $(CHECK_OBJS) $(CHECK_COMPILE_OBJS) $(CHECK_SYMLINKS) @MAKE_RRSYNC@ \
 		git-version.h rounding rounding.h *.old rsync*.1 rsync*.5 @MAKE_RRSYNC_1@ \
 		*.html daemon-parm.h help-*.h default-*.h proto.h proto.h-tstamp
 	rm -f *.gcno *.gcda lib/*.gcno lib/*.gcda zlib/*.gcno zlib/*.gcda popt/*.gcno popt/*.gcda
@@ -378,18 +384,18 @@ COVERAGE_EXCLUDE = -e '(^|/)zlib/' -e '(^|/)popt/' \
 # WITHOUT running it. Used by CI jobs that invoke runtests.py directly with
 # custom options (e.g. the version-mix workflow's --rsync-bin2/--expect-result).
 .PHONY: check-progs
-check-progs: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
+check-progs: all $(CHECK_PROGS) $(CHECK_COMPILE_OBJS) $(CHECK_SYMLINKS)
 
 .PHONY: check
-check: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
+check: all $(CHECK_PROGS) $(CHECK_COMPILE_OBJS) $(CHECK_SYMLINKS)
 	$(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(CHECK_J)
 
 .PHONY: check29
-check29: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
+check29: all $(CHECK_PROGS) $(CHECK_COMPILE_OBJS) $(CHECK_SYMLINKS)
 	$(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(CHECK_J) --protocol=29
 
 .PHONY: check30
-check30: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
+check30: all $(CHECK_PROGS) $(CHECK_COMPILE_OBJS) $(CHECK_SYMLINKS)
 	$(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(CHECK_J) --protocol=30
 
 # Whole-suite gcov coverage report (HTML, with branch + decision coverage).

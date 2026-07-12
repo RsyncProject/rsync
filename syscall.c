@@ -22,6 +22,14 @@
 
 #include "rsync.h"
 
+/* Exercise the pre-*at() portability tier on modern build hosts. */
+#ifdef RSYNC_TEST_NO_AT_FDCWD
+#undef AT_FDCWD
+#undef AT_SYMLINK_NOFOLLOW
+#undef HAVE_LINKAT
+#undef HAVE_UTIMENSAT
+#endif
+
 #if !defined MKNOD_CREATES_SOCKETS && defined HAVE_SYS_UN_H
 #include <sys/un.h>
 #endif
@@ -426,7 +434,7 @@ int do_lchown(const char *path, uid_t owner, gid_t group)
 */
 int do_lchown_at(const char *fname, uid_t owner, gid_t group)
 {
-#ifdef AT_FDCWD
+#if defined AT_FDCWD && defined AT_SYMLINK_NOFOLLOW
 	extern int am_daemon, am_chrooted;
 	char dirpath[MAXPATHLEN];
 	const char *bname;
@@ -1181,6 +1189,7 @@ static int do_xstat_at(const char *path, STRUCT_STAT *st, int at_flags, int (*fa
 	errno = e;
 	return ret;
 #else
+	(void)at_flags;
 	return fallback(path, st);
 #endif
 }
@@ -1192,8 +1201,10 @@ int do_stat_at(const char *path, STRUCT_STAT *st)
 
 int do_lstat_at(const char *path, STRUCT_STAT *st)
 {
-#ifdef SUPPORT_LINKS
+#if defined SUPPORT_LINKS && defined AT_FDCWD && defined AT_SYMLINK_NOFOLLOW
 	return do_xstat_at(path, st, AT_SYMLINK_NOFOLLOW, do_lstat);
+#elif defined SUPPORT_LINKS
+	return do_lstat(path, st);
 #else
 	return do_xstat_at(path, st, 0, do_stat);
 #endif
@@ -2007,6 +2018,7 @@ cleanup:
 #endif // O_NOFOLLOW, O_DIRECTORY
 }
 
+#if defined O_NOFOLLOW && defined O_DIRECTORY && defined AT_FDCWD
 /* Fill buf with len random bytes.  Prefers /dev/urandom for cryptographic
  * quality; falls back to rand() if /dev/urandom cannot be opened or read
  * (e.g. inside a chroot or container without /dev populated). */
@@ -2027,6 +2039,7 @@ static void rand_bytes(unsigned char *buf, size_t len)
 		buf[i] = (unsigned char)rand();
 	}
 }
+#endif
 
 /*
   Secure version of mkstemp that prevents symlink attacks on parent directories.
