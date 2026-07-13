@@ -21,6 +21,7 @@ LIBOBJDIR=lib/
 
 INSTALLCMD=@INSTALL@
 INSTALLMAN=@INSTALL@
+STRIP=@STRIP@
 
 srcdir=@srcdir@
 MKDIR_P=@MKDIR_P@
@@ -109,7 +110,8 @@ install-ssl-daemon: stunnel-rsyncd.conf
 install-all: install install-ssl-daemon
 
 install-strip:
-	$(MAKE) INSTALL_STRIP='-s --strip-program=$(or $(STRIP),strip)' install
+	$(MAKE) install
+	$(STRIP) $(DESTDIR)$(bindir)/rsync$(EXEEXT)
 
 .PHONY: uninstall
 uninstall:
