@@ -38,7 +38,7 @@ if 'Makefile: Makefile.in config.status configure.sh config.h.in\n' not in makef
              'Makefile:\n', 1)
 )
 
-for name in (source_rsync.name, 'rsync-ssl', 'rrsync', 'rsync.1',
+for name in (source_rsync.name, 'install-sh', 'rsync-ssl', 'rrsync', 'rsync.1',
              'rsync-ssl.1', 'rsyncd.conf.5', 'rrsync.1'):
     source = TOOLDIR / name
     if not source.is_file():
