@@ -23,6 +23,7 @@
 #include "lib/wildmatch.c"
 
 #include <popt.h>
+#include <stdbool.h>
 
 #ifdef COMPARE_WITH_FNMATCH
 #include <fnmatch.h>
@@ -31,8 +32,6 @@ int fnmatch_errors = 0;
 #endif
 
 int wildmatch_errors = 0;
-
-typedef char bool;
 
 int output_iterations = 0;
 int explode_mod = 0;
