@@ -1,20 +1,19 @@
 #!/usr/bin/env python3
 # Verifies: SW-REQ-114
 #
-# A malicious peer must not be able to make rsync exit with an arbitrary
-# (non-RERR_*) value via the MSG_IO_ERROR path.  When MSG_IO_ERROR arrives,
-# io.c OR's the wire value into the local io_error; without masking, a peer
-# could set arbitrary bits.  The fix masks the incoming value to the defined
-# IOERR_* bits (IOERR_VALID_MASK), and cleanup.c only ever maps those defined
-# bits onto the documented RERR_* exit codes -- so the receiver's exit code is
-# always a known RERR_* value, never an out-of-range garbage number.
+# When MSG_IO_ERROR arrives, io.c OR's the wire value into the local io_error.
+# Without masking, a malicious peer could set arbitrary (undefined) bits, which
+# would then be stored and re-forwarded upstream in the local io_error.  The fix
+# masks the incoming value to the defined IOERR_* bits (IOERR_VALID_MASK).  (The
+# exit code itself is already safe: cleanup.c maps only the three defined bits
+# onto RERR_* constants, so undefined bits never become the exit status -- the
+# mask is about not storing/propagating junk, not about the exit value.)
 #
-# This drives that invariant end-to-end: it starts a real daemon (the sender
-# for a download), begins a transfer, then kills the sender mid-transfer.  The
-# receiver must exit with a value in the documented RERR_* set.  (Protocol-
-# level crafting of MSG_IO_ERROR is covered by the msg-io-* crafted-server
-# tests; this test locks the observable exit-code invariant from the
-# receiver's side.)
+# This is only an interrupted-transfer exit-code smoke test: it starts a real
+# daemon (the sender for a download), begins a transfer, then kills the sender
+# mid-transfer and asserts the receiver exits with a documented RERR_* value.
+# It does NOT craft a hostile MSG_IO_ERROR frame, so it does not exercise the
+# mask itself (no test does yet) -- it just guards the normal-peer exit path.
 #
 # Exit codes: 0 pass, 1 fail, 77 skip (killable daemon testing not possible --
 # the test needs --use-tcp so it can SIGKILL the sender process directly).
