@@ -43,8 +43,9 @@ LIBOBJ=lib/wildmatch.o lib/compat.o lib/snprintf.o lib/mdfour.o lib/md5.o \
 	lib/permstring.o lib/pool_alloc.o lib/sysacls.o lib/sysxattrs.o lib/acl.o @LIBOBJS@
 zlib_OBJS=zlib/deflate.o zlib/inffast.o zlib/inflate.o zlib/inftrees.o \
 	zlib/trees.o zlib/zutil.o zlib/adler32.o zlib/compress.o zlib/crc32.o
-OBJS1=flist.o rsync.o generator.o receiver.o cleanup.o sender.o exclude.o \
-	util1.o util2.o main.o checksum.o match.o syscall.o log.o backup.o delete.o
+OBJS1_NO_MAIN=flist.o rsync.o generator.o receiver.o cleanup.o sender.o exclude.o \
+	util1.o util2.o checksum.o match.o syscall.o log.o backup.o delete.o
+OBJS1=$(OBJS1_NO_MAIN) main.o
 OBJS2=options.o io.o compat.o hlink.o token.o uidlist.o socket.o hashtable.o \
 	usage.o fileio.o batch.o clientname.o chmod.o acls.o xattrs.o
 OBJS3=progress.o pipe.o @MD5_ASM@ @ROLL_SIMD@ @ROLL_ASM@
@@ -226,9 +227,11 @@ t_clean_fname$(EXEEXT): $(T_CLEAN_FNAME_OBJ)
 # macOS ld64 and the cygwin PE linker do not), link the real rsync objects so
 # every dep resolves.  t_safe_arg_main.o is main.c with main() renamed out, to
 # supply main.c's globals while letting t_safe_arg.o provide the test's main().
+# OBJS minus main.o is spelled out via OBJS1_NO_MAIN because $(filter-out) is
+# GNU-make-only; BSD and Solaris make expand it to nothing.
 t_safe_arg_main.o: main.c $(HEADERS)
 	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) -Dmain=rsync_unused_main -c $(srcdir)/main.c -o t_safe_arg_main.o
-T_SAFE_ARG_OBJ = t_safe_arg.o t_safe_arg_main.o $(filter-out main.o,$(OBJS))
+T_SAFE_ARG_OBJ = t_safe_arg.o t_safe_arg_main.o $(OBJS1_NO_MAIN) $(OBJS2) $(OBJS3) $(DAEMON_OBJ) $(LIBOBJ) @BUILD_ZLIB@ @BUILD_POPT@
 t_safe_arg$(EXEEXT): $(T_SAFE_ARG_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_SAFE_ARG_OBJ) $(LIBS)
 
