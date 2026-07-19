@@ -516,12 +516,17 @@ void remember_initial_stats(void)
 	initial_data_written = total_data_written;
 }
 
+/* Size of log_formatted()'s per-escape "fmt" scratch buffer.  log_format_has()
+ * must bound its width-digit scan to the same limit so the two parsers agree on
+ * where an escape letter falls (see the digit loop in each). */
+#define LOG_FMT_SIZE 32
+
 /* A generic logging routine for send/recv, with parameter substitiution. */
 static void log_formatted(enum logcode code, const char *format, const char *op,
 			  struct file_struct *file, const char *fname, int iflags,
 			  const char *hlink)
 {
-	char buf[MAXPATHLEN+1024], buf2[MAXPATHLEN], fmt[32];
+	char buf[MAXPATHLEN+1024], buf2[MAXPATHLEN], fmt[LOG_FMT_SIZE];
 	char *p, *s, *c;
 	const char *n;
 	size_t len, total;
@@ -813,21 +818,33 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 int log_format_has(const char *format, char esc)
 {
 	const char *p;
+	int width;
 
 	if (!format)
 		return 0;
 
 	for (p = format; (p = strchr(p, '%')) != NULL; ) {
 		for (p++; *p == '\''; p++) {} /*SHARED ITERATOR*/
-		if (*p == '-')
+		/* Mirror log_formatted()'s width-digit scan exactly (c starts at
+		 * fmt+1, so width starts at 1): both must stop at the same digit
+		 * or they disagree on where the escape letter is, which for %C
+		 * can leave sender_keeps_checksum unset and over-read F_SUM. */
+		width = 1;
+		if (*p == '-') {
 			p++;
-		while (isDigit(p))
+			width++;
+		}
+		while (isDigit(p) && width < LOG_FMT_SIZE - 8) {
 			p++;
+			width++;
+		}
 		while (*p == '\'') p++;
 		if (!*p)
 			break;
 		if (*p == esc)
 			return 1;
+		if (*p == '%')	/* %% is a literal '%', not the start of an escape */
+			p++;
 	}
 	return 0;
 }
