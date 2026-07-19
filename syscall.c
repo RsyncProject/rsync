@@ -630,32 +630,47 @@ int do_symlink_at(const char *lnk, const char *path)
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
 
-	if (!secure_relpath_active())
-		return do_symlink(lnk, path);
-
-	if (!path || !*path || *path == '/')
-		return do_symlink(lnk, path);
-
-	/* A path with a slash needs secure_relative_open to confine its parent;
-	 * a top-level path is in CWD (AT_FDCWD), no parent to subvert.  The leaf
-	 * is protected below either way (symlinkat() won't follow it; the
-	 * fake-super openat() uses O_NOFOLLOW). */
-	slash = strrchr(path, '/');
-	if (slash) {
-		dlen = slash - path;
-		if (dlen >= sizeof dirpath) {
-			errno = ENAMETOOLONG;
-			return -1;
-		}
-		memcpy(dirpath, path, dlen);
-		dirpath[dlen] = '\0';
-		bname = slash + 1;
-		dfd = secure_relative_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
+#if defined O_NOFOLLOW && defined O_DIRECTORY
+	if (operator_path_resolve) {
+		/* Operator path (e.g. an absolute --backup-dir): confine the
+		 * parent with the ownership walk, then fall through to the shared
+		 * leaf-creation below so fake-super emulation is preserved. */
+		if (symlink_optout_allowed())
+			return do_symlink(lnk, path);
+		dfd = owner_walk_parent(path, &bname);
 		if (dfd < 0)
 			return -1;
 		owns = True;
-	} else {
-		bname = path;
+	} else
+#endif
+	{
+		if (!secure_relpath_active())
+			return do_symlink(lnk, path);
+
+		if (!path || !*path || *path == '/')
+			return do_symlink(lnk, path);
+
+		/* A path with a slash needs secure_relative_open to confine its
+		 * parent; a top-level path is in CWD (AT_FDCWD), no parent to
+		 * subvert.  The leaf is protected below either way (symlinkat()
+		 * won't follow it; the fake-super openat() uses O_NOFOLLOW). */
+		slash = strrchr(path, '/');
+		if (slash) {
+			dlen = slash - path;
+			if (dlen >= sizeof dirpath) {
+				errno = ENAMETOOLONG;
+				return -1;
+			}
+			memcpy(dirpath, path, dlen);
+			dirpath[dlen] = '\0';
+			bname = slash + 1;
+			dfd = secure_relative_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
+			if (dfd < 0)
+				return -1;
+			owns = True;
+		} else {
+			bname = path;
+		}
 	}
 
 #if defined NO_SYMLINK_XATTRS || defined NO_SYMLINK_USER_XATTRS
@@ -1193,6 +1208,21 @@ int do_rmdir_at(const char *pathname)
 
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
+
+#if defined O_NOFOLLOW && defined O_DIRECTORY
+	if (operator_path_resolve) {
+		if (symlink_optout_allowed())
+			return do_rmdir(pathname);
+		dfd = owner_walk_parent(pathname, &bname);
+		if (dfd < 0)
+			return -1;
+		ret = unlinkat(dfd, bname, AT_REMOVEDIR);
+		e = errno;
+		close(dfd);
+		errno = e;
+		return ret;
+	}
+#endif
 
 	if (!secure_relpath_active())
 		return rmdir(pathname);
