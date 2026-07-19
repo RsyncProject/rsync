@@ -194,8 +194,9 @@
 
 /* Mask of all currently defined IOERR_* bits.  Used to sanitize values
  * received from a peer via MSG_IO_ERROR so a malicious peer cannot set
- * arbitrary (undefined) bits in the local io_error, which would then
- * propagate to exit codes and be re-forwarded. */
+ * arbitrary (undefined) bits in the local io_error, which would then be
+ * stored and re-forwarded upstream.  (Undefined bits never reach the exit
+ * code: cleanup.c maps only these defined bits onto RERR_* values.) */
 #define IOERR_VALID_MASK (IOERR_GENERAL | IOERR_VANISHED | IOERR_DEL_LIMIT)
 
 #define MAX_ARGS 1000
