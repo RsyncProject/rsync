@@ -48,6 +48,10 @@ aclocal.m4
 /t_rename_secure
 /t_secure_relpath
 /t_symlink_secure
+/t_hashtable_overflow
+/t_iwildmatch
+/t_clean_fname
+/t_safe_arg
 /simdtest
 /wildtest
 /getfsdev
