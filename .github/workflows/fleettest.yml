@@ -13,7 +13,6 @@ on:
       - 'testsuite/fleettest.py'
       - '.github/workflows/fleettest.yml'
   pull_request:
-    branches: [ master ]
     paths:
       - 'testsuite/fleettest.py'
       - '.github/workflows/fleettest.yml'

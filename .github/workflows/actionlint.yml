@@ -14,7 +14,6 @@ on:
       - '.github/actionlint.yaml'
       - '.github/actionlint.yml'
   pull_request:
-    branches: [ master ]
     paths:
       - '.github/workflows/*.yml'
       - '.github/actionlint.yaml'

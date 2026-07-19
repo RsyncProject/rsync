@@ -28,7 +28,6 @@ on:
       - '.github/workflows/*.yml'
       - '!.github/workflows/ubuntu-version-mix.yml'
   pull_request:
-    branches: [ master ]
     paths-ignore:
       - '.github/workflows/*.yml'
       - '!.github/workflows/ubuntu-version-mix.yml'

@@ -16,7 +16,6 @@ on:
       - '.github/workflows/*.yml'
       - '!.github/workflows/android-static-build.yml'
   pull_request:
-    branches: [ master ]
     paths-ignore:
       - '.github/workflows/*.yml'
       - '!.github/workflows/android-static-build.yml'

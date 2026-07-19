@@ -7,7 +7,6 @@ on:
       - '.github/workflows/*.yml'
       - '!.github/workflows/asan-build.yml'
   pull_request:
-    branches: [ master ]
     paths-ignore:
       - '.github/workflows/*.yml'
       - '!.github/workflows/asan-build.yml'
