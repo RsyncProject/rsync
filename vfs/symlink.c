@@ -152,7 +152,7 @@ static int vfs__symlink_secure(const char *lnk, const char *path, int flags)
 	errno = e;
 	return ret;
 #else
-	return vfs_symlink(lnk, path);
+	return vfs__symlink_plain(lnk, path);
 #endif
 }
 
