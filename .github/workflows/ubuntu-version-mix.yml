@@ -28,6 +28,7 @@ on:
       - '.github/workflows/*.yml'
       - '!.github/workflows/ubuntu-version-mix.yml'
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
     paths-ignore:
       - '.github/workflows/*.yml'
       - '!.github/workflows/ubuntu-version-mix.yml'
@@ -36,6 +37,9 @@ on:
 
 jobs:
   version-mix:
+    # temporary gate: PR CI runs only for PRs labeled 'run-ci', to save CI
+    # minutes; labels need triage access, so fork PRs can't self-enable.
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'run-ci')
     runs-on: ubuntu-latest
     name: rsync version-mix
     steps:

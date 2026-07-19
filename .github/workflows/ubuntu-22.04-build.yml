@@ -11,6 +11,7 @@ on:
       - '.github/workflows/*.yml'
       - '!.github/workflows/ubuntu-22.04-build.yml'
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
     paths-ignore:
       - '.github/workflows/*.yml'
       - '!.github/workflows/ubuntu-22.04-build.yml'
@@ -19,6 +20,9 @@ on:
 
 jobs:
   test:
+    # temporary gate: PR CI runs only for PRs labeled 'run-ci', to save CI
+    # minutes; labels need triage access, so fork PRs can't self-enable.
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'run-ci')
     runs-on: ubuntu-22.04
     name: Test rsync on Ubuntu 22.04
     steps:
