@@ -39,6 +39,13 @@ jobs:
           ./configure --with-rrsync --disable-zstd --disable-md2man --disable-xxhash --disable-lz4
           make
           ./rsync --version
+          # The flipper (symlink-race) tests are excluded on OpenBSD, as on the
+          # fleet's OpenBSD box: this kernel has a connect()-under-rename-load
+          # lost-wakeup and an FFS rename-storm corruption that hang them to
+          # the 300s timeout for non-rsync reasons (see
+          # dev-notes/openbsd-connect-lost-wakeup-report.txt); the protections
+          # they exercise are verified on the Linux/BSD boxes.
+          export RSYNC_EXCLUDE=acl-symlink-race,sender-readlink-atfd,sender-remove-source-secure
           make check
           # The --use-tcp daemon tests run at -j2 here (vs -j8 elsewhere): this
           # job runs inside a nested VM, and at -j8 the many concurrent loopback
