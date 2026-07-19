@@ -14,7 +14,7 @@ import subprocess
 
 from rsyncfns import (
     FROMDIR, TODIR,
-    makepath, rmtree, rsync_argv, test_fail,
+    forced_protocol, makepath, rmtree, rsync_argv, test_fail,
 )
 
 src = FROMDIR
@@ -110,14 +110,22 @@ def checksum_for(fmt):
         test_fail(f"no '<hex> percentfile' in --out-format={fmt!r} output:\n{r.stdout}")
     return m.group(1)
 
-# The over-wide format renders its width digits literally, so the digest is the
-# trailing run of hex; compare that tail against the plain %C digest.
-plain = checksum_for('%C')
-wide = checksum_for('%' + '0' * 30 + '%C')
-if not wide.endswith(plain):
-    test_fail(
-        f"over-wide %C rendered ...{wide[-len(plain):]!r} but plain %C rendered "
-        f"{plain!r}: log_format_has()/log_formatted() disagree on the escape position"
-    )
+# The over-wide %C check needs %C to actually render a hex digest, which only
+# happens for a canonical checksum: at protocol < 30 the negotiated file checksum
+# is a non-canonical MD4 variant and %C (via sum_as_hex) renders empty, so there
+# is no digest to compare and no F_SUM read to over-run.  Skip that sub-case
+# there; at protocol 30+ checksum_for() still fails on a missing digest, so a
+# real regression is caught.  The %% literal checks above are protocol-independent.
+proto = forced_protocol()
+if proto is None or proto >= 30:
+    # The over-wide format renders its width digits literally, so the digest is
+    # the trailing run of hex; compare that tail against the plain %C digest.
+    plain = checksum_for('%C')
+    wide = checksum_for('%' + '0' * 30 + '%C')
+    if not wide.endswith(plain):
+        test_fail(
+            f"over-wide %C rendered ...{wide[-len(plain):]!r} but plain %C rendered "
+            f"{plain!r}: log_format_has()/log_formatted() disagree on the escape position"
+        )
 
 print("ki58-log-format-percent: %% literal-percent escape verified")
