@@ -15,6 +15,7 @@ on:
       - '.github/workflows/*.yml'
       - '!.github/workflows/stable-testsuite.yml'
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
     branches: [ v3.2.7-sec-patches2 ]
     paths-ignore:
       - '.github/workflows/*.yml'
@@ -25,6 +26,9 @@ on:
 
 jobs:
   stable-testsuite:
+    # temporary gate: PR CI runs only for PRs labeled 'run-ci', to save CI
+    # minutes; labels need triage access, so fork PRs can't self-enable.
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'run-ci')
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
