@@ -643,13 +643,13 @@ int robust_rename(const char *from, const char *to, const char *partialptr,
 			 * the module.  copy_file already confines the source READ; a
 			 * relative in-module path stays on the secure_relative_open arm, so
 			 * only flip the flag for an absolute (operator) path. */
-			if (to && *to == '/')
+			if (*to == '/')
 				operator_path_resolve = 1;
 			rc = copy_file(from, to, -1, mode);
 			operator_path_resolve = save;
 			if (rc != 0)
 				return -2;
-			if (from && *from == '/')
+			if (*from == '/')
 				operator_path_resolve = 1;
 			do_unlink_at(from);
 			operator_path_resolve = save;
