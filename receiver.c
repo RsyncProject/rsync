@@ -452,12 +452,6 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 					i, big_num(offset));
 			}
 
-			if (offset + i > total_size) {
-				rprintf(FERROR, "received more data than file length %s [%s]\n",
-					big_num(total_size), who_am_i());
-				exit_cleanup(RERR_PROTOCOL);
-			}
-
 			stats.literal_data += i;
 			cleanup_got_literal = 1;
 
@@ -479,12 +473,6 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 		len = sum.blength;
 		if (i == (int)sum.count-1 && sum.remainder != 0)
 			len = sum.remainder;
-
-		if (offset + len > total_size) {
-			rprintf(FERROR, "received more data than file length %s [%s]\n",
-				big_num(total_size), who_am_i());
-			exit_cleanup(RERR_PROTOCOL);
-		}
 
 		stats.matched_data += len;
 
