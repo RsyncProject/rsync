@@ -125,9 +125,18 @@ int robust_rename(const char *from, const char *to, const char *partialptr,
 					return -2;
 				to = partialptr;
 			}
-			if (copy_file(from, to, -1, mode, 0) != 0)
+			/* Cross-fs fallback: copy then unlink.  An absolute --temp-dir
+			 * source / --partial-dir dest is an operator path whose parents
+			 * the plain-libc arm would otherwise follow -- confine them
+			 * through the ownership walk (VFS_OPERATOR_PATH) so a raced
+			 * parent symlink can't redirect the dest-write or the
+			 * source-unlink out of the module.  copy_file already confines
+			 * the source READ; a relative in-module path stays on the
+			 * secure-relative arm, so only flag an absolute (operator)
+			 * path. */
+			if (copy_file(from, to, -1, mode, *to == '/' ? VFS_OPERATOR_PATH : 0) != 0)
 				return -2;
-			vfs_unlink(VFS_AT_FDCWD, from, 0);
+			vfs_unlink(VFS_AT_FDCWD, from, *from == '/' ? VFS_OPERATOR_PATH : 0);
 			return 1;
 		default:
 			return -1;

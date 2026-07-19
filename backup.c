@@ -289,7 +289,7 @@ static int make_backup_inner(const char *fname, BOOL prefer_rename)
 	 * unsafe symlink. */
 	if (preserve_links && S_ISLNK(sx.st.st_mode) && safe_symlinks) {
 		char lnkbuf[MAXPATHLEN];
-		int llen = do_readlink(fname, lnkbuf, MAXPATHLEN - 1);
+		int llen = vfs_readlink(fname, lnkbuf, MAXPATHLEN - 1);
 		/* A failed readlink means we can't verify the target, so fail
 		 * closed: skip the backup rather than let the hard-link fast path
 		 * preserve a possibly-unsafe symlink unchecked. */
@@ -375,9 +375,7 @@ static int make_backup_inner(const char *fname, BOOL prefer_rename)
 			}
 			ret = 2;
 		} else {
-			/* symlink has no ownership-walk branch (see vfs/symlink.c), so
-			 * flags=0 reproduces the old vfs_symlink_at behavior here. */
-			if (vfs_symlink(sl, VFS_AT_FDCWD, buf, 0) < 0)
+			if (vfs_symlink(sl, VFS_AT_FDCWD, buf, VFS_OPERATOR_PATH) < 0)
 				rsyserr(FERROR, errno, "link %s -> \"%s\"", full_fname(buf), sl);
 			else if (DEBUG_GTE(BACKUP, 1))
 				rprintf(FINFO, "make_backup: SYMLINK %s successful.\n", fname);

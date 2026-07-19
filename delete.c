@@ -228,7 +228,9 @@ enum delret delete_item(char *fbuf, uint16 mode, uint16 flags)
 		const char *leaf;
 		int dfd = del_held_dfd(fbuf, &leaf);
 		what = "rmdir";
-		ok = (dfd >= 0 ? vfs_unlink(dfd, leaf, VFS_REMOVEDIR) : vfs_unlink(VFS_AT_FDCWD, fbuf, VFS_REMOVEDIR)) == 0;
+		ok = (dfd >= 0 ? vfs_unlink(dfd, leaf, VFS_REMOVEDIR)
+		   : vfs_unlink(VFS_AT_FDCWD, fbuf,
+				VFS_REMOVEDIR | ((flags & DEL_FOR_BACKUP) ? VFS_OPERATOR_PATH : 0))) == 0;
 	} else {
 		if (make_backups > 0 && !(flags & DEL_FOR_BACKUP) && (backup_dir || !is_backup_file(fbuf))) {
 			what = "make_backup";

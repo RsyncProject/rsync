@@ -27,7 +27,7 @@
  *                           it (from vfs_opendir/vfs_get_dirfd); no resolution.
  *
  * The operator-path policy is this explicit per-call flag, never ambient state.
- * VFS_REMOVEDIR turns vfs_unlink into rmdir.  chmod/lchown/symlink have no
+ * VFS_REMOVEDIR turns vfs_unlink into rmdir.  chmod/lchown have no
  * ownership-walk branch (VFS_OPERATOR_PATH resolves as the default secure walk).
  * Two-path ops (vfs_rename_at, vfs_link_at) and open (distinct nofollow/
  * checklinks variants) keep explicit forms + a vfs_flags arg; vfs_fstat and the

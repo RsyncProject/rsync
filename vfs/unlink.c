@@ -19,8 +19,9 @@
 /* Secure receiver-side resolve for an unlink/rmdir.  unlink() resolves parent
  * components, so a parent-symlink swap can delete an outside file under the
  * daemon's authority -- defence is to resolve the parent securely and unlinkat()
- * the leaf.  unlink (not rmdir) honours the operator ownership walk; the rmdir
- * path has no owner-walk branch (pre-existing -- matched the old vfs_rmdir_at).
+ * the leaf.  Both unlink and rmdir honour the operator ownership walk
+ * (VFS_OPERATOR_PATH): a foreign-owned parent component is refused while the
+ * operator's own is followed, absolute and relative alike.
  * Falls through to a plain unlink()/rmdir() in non-daemon/sender, chrooted,
  * no-parent and absolute-path cases. */
 static int vfs__unlink_secure(const char *path, int flags)
@@ -32,13 +33,13 @@ static int vfs__unlink_secure(const char *path, int flags)
 	int dfd, ret, e, atflag = rmdir_op ? AT_REMOVEDIR : 0;
 	size_t dlen;
 
-	if (!rmdir_op && (flags & VFS_OPERATOR_PATH)) {
+	if (flags & VFS_OPERATOR_PATH) {
 		if (vfs_symlink_optout_allowed())
-			return unlink(path);
+			return rmdir_op ? rmdir(path) : unlink(path);
 		dfd = vfs_owner_walk_parent(path, &bname, 1);
 		if (dfd < 0)
 			return -1;
-		ret = unlinkat(dfd, bname, 0);
+		ret = unlinkat(dfd, bname, atflag);
 		e = errno;
 		close(dfd);
 		errno = e;
@@ -75,7 +76,7 @@ static int vfs__unlink_secure(const char *path, int flags)
 /* Unified unlink/rmdir.  dirfd == VFS_AT_FDCWD resolves `path`; a real held
  * dirfd makes `path` a single component removed directly under it.  flags:
  * VFS_REMOVEDIR (rmdir/AT_REMOVEDIR instead of unlink), VFS_ALLOW_SYMLINK
- * (trusted, plain), VFS_OPERATOR_PATH (operator path; unlink only), default 0
+ * (trusted, plain), VFS_OPERATOR_PATH (operator path: ownership walk), default 0
  * (secure receiver resolve). */
 int vfs_unlink(int dirfd, const char *path, int flags)
 {

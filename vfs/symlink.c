@@ -63,13 +63,8 @@ static int vfs__symlink_plain(const char *lnk, const char *path)
   bare-path vfs_symlink() there, whose plain open() followed such a
   symlink.
 */
-/* NOTE: unlike vfs_mkdir/vfs_mknod, the symlink secure path has no ownership-walk
- * branch -- VFS_OPERATOR_PATH is accepted but resolves the same as the default
- * secure receiver walk (the link target is stored verbatim and never resolved at
- * creation; only the parent dir is confined).  Pre-existing asymmetry. */
 static int vfs__symlink_secure(const char *lnk, const char *path, int flags)
 {
-	(void)flags;
 #ifdef AT_FDCWD
 	char dirpath[MAXPATHLEN];
 	const char *bname;
@@ -81,32 +76,48 @@ static int vfs__symlink_secure(const char *lnk, const char *path, int flags)
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
 
-	if (!vfs_relpath_active())
-		return vfs__symlink_plain(lnk, path);
-
-	if (!path || !*path || *path == '/')
-		return vfs__symlink_plain(lnk, path);
-
-	/* A path with a slash needs vfs_resolve_open to confine its parent;
-	 * a top-level path is in CWD (AT_FDCWD), no parent to subvert.  The leaf
-	 * is protected below either way (symlinkat() won't follow it; the
-	 * fake-super openat() uses O_NOFOLLOW). */
-	slash = strrchr(path, '/');
-	if (slash) {
-		dlen = slash - path;
-		if (dlen >= sizeof dirpath) {
-			errno = ENAMETOOLONG;
-			return -1;
-		}
-		memcpy(dirpath, path, dlen);
-		dirpath[dlen] = '\0';
-		bname = slash + 1;
-		dfd = vfs_resolve_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
+#if defined O_NOFOLLOW && defined O_DIRECTORY
+	if (flags & VFS_OPERATOR_PATH) {
+		/* Operator path (e.g. an absolute --backup-dir): confine the
+		 * parent with the ownership walk, then fall through to the shared
+		 * leaf-creation below so fake-super emulation is preserved. */
+		if (vfs_symlink_optout_allowed())
+			return vfs__symlink_plain(lnk, path);
+		dfd = vfs_owner_walk_parent(path, &bname, 1);
 		if (dfd < 0)
 			return -1;
 		owns = True;
-	} else {
-		bname = path;
+	} else
+#endif
+	{
+		(void)flags;
+		if (!vfs_relpath_active())
+			return vfs__symlink_plain(lnk, path);
+
+		if (!path || !*path || *path == '/')
+			return vfs__symlink_plain(lnk, path);
+
+		/* A path with a slash needs vfs_resolve_open to confine its
+		 * parent; a top-level path is in CWD (AT_FDCWD), no parent to
+		 * subvert.  The leaf is protected below either way (symlinkat()
+		 * won't follow it; the fake-super openat() uses O_NOFOLLOW). */
+		slash = strrchr(path, '/');
+		if (slash) {
+			dlen = slash - path;
+			if (dlen >= sizeof dirpath) {
+				errno = ENAMETOOLONG;
+				return -1;
+			}
+			memcpy(dirpath, path, dlen);
+			dirpath[dlen] = '\0';
+			bname = slash + 1;
+			dfd = vfs_resolve_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
+			if (dfd < 0)
+				return -1;
+			owns = True;
+		} else {
+			bname = path;
+		}
 	}
 
 #if defined NO_SYMLINK_XATTRS || defined NO_SYMLINK_USER_XATTRS
@@ -229,8 +240,8 @@ static int vfs__symlink_atfd(const char *lnk, int dfd, const char *name)
 
 /* Unified symlink creation.  dirfd == VFS_AT_FDCWD resolves `path`; a real held
  * dirfd makes `path` a single validated component under it.  flags:
- * VFS_ALLOW_SYMLINK (trusted, plain symlink), default 0 (secure receiver
- * resolve).  See the note on vfs__symlink_secure re VFS_OPERATOR_PATH. */
+ * VFS_ALLOW_SYMLINK (trusted, plain symlink), VFS_OPERATOR_PATH (operator
+ * path: ownership walk), default 0 (secure receiver resolve). */
 int vfs_symlink(const char *lnk, int dirfd, const char *path, int flags)
 {
 	if (dirfd != VFS_AT_FDCWD) {

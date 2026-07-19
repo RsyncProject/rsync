@@ -1095,7 +1095,7 @@ int handle_partial_dir(const char *fname, int create)
 			return 0;
 		}
 	} else
-		vfs_unlink(VFS_AT_FDCWD, dir, VFS_REMOVEDIR);
+		vfs_unlink(VFS_AT_FDCWD, dir, VFS_REMOVEDIR | VFS_OPERATOR_PATH);
 	*fn = '/';
 
 	return 1;
