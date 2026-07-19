@@ -220,7 +220,7 @@ specified on the command-line.
 
 If you need a particular file to be transferred prior to another, the
 only way to be guaranteed of that is to separate the files into
-different rsync calls.  If it sufficient for the destination files to
+different rsync calls.  If it is sufficient for the destination files to
 appear at almost the same time, consider using
 [`--delay-updates`](#opt), which doesn't affect the sorted transfer order, but
 does make the final file-updating phase happen much more rapidly.
@@ -254,8 +254,7 @@ rsync process to access files beyond the bounds of what was requested.
 Rsync ensures that the list of files being
 transferred stays within the requested tree, and will abort when a
 file list contains an absolute or relative path that tries to escape
-the top of the transfer, that is, which are not contained within the
-destination directory.  It also verifies that no extra source arguments
+the top of the transfer.  It also verifies that no extra source arguments
 were added to the transfer and that the file list obeys the exclude rules
 that were sent to the sender.
 
@@ -318,7 +317,9 @@ that is needed.  You can
 pin the choice with [`--checksum-choice`](#opt) (`--cc`, e.g. `--cc=sha1` or one
 of the xxHash variants) or constrain negotiation with the
 [`RSYNC_CHECKSUM_LIST`](#) environment variable; only very old peers fall back to
-MD4/MD5.
+MD4/MD5.  This pre-transfer "does this file need updating?" checksum is separate
+from the whole-file checksum rsync normally computes to verify each transferred
+file afterward (verification is off when `--checksum-choice=none` is forced).
 
 ### Protocol version
 
@@ -372,7 +373,7 @@ hierarchies on a system in a controlled way, without having to provide
 shell access to the system.  Each directory hierarchy is called a
 "module".  The names, directories, access permissions and so on for
 each module are defined by the rsync daemon configuration file,
-described in [**rsyncd.conf**(5)](rsyncd.conf.5)).
+described in [**rsyncd.conf**(5)](rsyncd.conf.5).
 Connections to an rsync daemon typically use TCP port 873.  The
 administrator of the system would normally arrange for the rsync
 daemon to be running;
@@ -726,9 +727,8 @@ sign) if you want the local shell to expand it.
 0.  `--version`, `-V`
 
     Print the rsync version plus other info and exit.  When repeated, the
-    information is output is a JSON format that is still fairly readable.
-    This option is only available in the client; it is ignored if sent
-    to the server.
+    information is output in a JSON format that is still fairly readable
+    (client side only).
 
     The output includes a list of compiled-in capabilities, a list of
     optimizations, the default list of checksum algorithms, the default list of
@@ -926,7 +926,7 @@ sign) if you want the local shell to expand it.
     file that has the same size as the corresponding sender's file: files with
     either a changed size or a changed checksum are selected for transfer.
 
-    Note that rsync always verifies that each _transferred_ file was correctly
+    Note that rsync normally verifies that each _transferred_ file was correctly
     reconstructed on the receiving side by checking a whole-file checksum that
     is generated as the file is transferred, but that automatic
     after-the-transfer verification has nothing to do with this option's
@@ -1319,7 +1319,7 @@ sign) if you want the local shell to expand it.
     transfer, since there are no symlinks left in the transfer.
 
     This option does not change the handling of existing symlinks on the
-    receiving side.  
+    receiving side.
 
     See the [`--keep-dirlinks`](#opt) (`-K`) if you need a symlink to a
     directory to be treated as a real directory on the receiving side.
@@ -1388,7 +1388,7 @@ sign) if you want the local shell to expand it.
     following options: `--backup-dir`, `--temp-dir`/`-T`,
     `--partial-dir`, `--link-dest`, `--compare-dest`, `--copy-dest`, `--log-file`,
     `--password-file`, `--files-from`, `--include-from`, `--exclude-from`,
-    `--filter` merge files, `--write-batch` and`--read-batch`.
+    `--filter` merge files, `--write-batch` and `--read-batch`.
 
     `--insecure-links` turns that defence off, restoring the historical behaviour
     of following any symlink in those paths.  Use it only when you fully trust
@@ -1759,13 +1759,15 @@ sign) if you want the local shell to expand it.
     Note that if this option is not used,
     the optimization that excludes files that have not been modified cannot be
     effective; in other words, a missing `-t` (or [`-a`](#opt)) will cause the
-    transfer to behave as if it used [`--ignore-times`](#opt) (`-I`),
+    next transfer to behave as if it used [`--ignore-times`](#opt) (`-I`),
     causing all files to be updated. (Although rsync's delta-transfer algorithm
     will make the update fairly efficient if the files haven't actually
     changed, you're much better off using `-t`.)
 
-    If the remote rsync is an older version prior to 3.0.0 (March 2008), the
-    range of modification times that can be conveyed is restricted.  If you
+    If the negotiated protocol is older than 30 -- usually because the remote
+    rsync is older than 3.0.0 (March 2008), but also if [`--protocol`](#opt)
+    forces it -- the range of modification times that can be conveyed is
+    restricted.  If you
     have files dated older than 1970, make sure your rsync executables are
     upgraded so that the full range of dates can be conveyed.
 
@@ -1865,7 +1867,7 @@ sign) if you want the local shell to expand it.
 
     If combined with [`--inplace`](#opt) the file created may not end up with
     sparse blocks (depending on the filesystem type and kernel version),
-    unless [`--whole-file`](#opt) option is also in effect.  Note that versions
+    unless the [`--whole-file`](#opt) option is also in effect.  Note that versions
     of rsync older than 3.1.3 (January 2018) will reject the combination of
     `--sparse` and [`--inplace`](#opt).
 
@@ -2208,6 +2210,10 @@ sign) if you want the local shell to expand it.
 
     You may specify `--max-delete=0` to be warned
     about any extraneous files in the destination without removing any of them.
+    CAUTION: a client rsync older than 3.0.0 (March 2008) treats
+    `--max-delete=0` as unlimited, so use `--max-delete=-1` if the command
+    might be run by such an old rsync.  (A 3.0.0 or newer client protects an
+    older remote by forwarding the option as `--max-delete=-1`.)
 
 0.  `--max-size=SIZE`
 
@@ -2255,7 +2261,12 @@ sign) if you want the local shell to expand it.
     See the [`--max-size`](#opt) option for a description of how SIZE can be
     specified.  The default suffix if none is given is bytes.
 
-    A value of 0 is interpreted as no limit.
+    Beginning in 3.2.7, a value of 0 was an easy way to specify SIZE_MAX (the
+    largest limit possible).  However, beginning with 3.5.0, a value of 0 is
+    rejected as invalid for security reasons (a 0-byte cap could be used to
+    disable the allocation limit, which could lead to a denial-of-service via
+    memory exhaustion).  Use an explicit very large value if you want a very
+    high limit.
 
     You can set a default value using the environment variable
     [`RSYNC_MAX_ALLOC`](#) using the same SIZE values as supported by this
@@ -3423,7 +3434,8 @@ sign) if you want the local shell to expand it.
       sense) were deleted.  The total count will be
       followed by a list of counts by filetype (if the total is non-zero).
       Note that this line is only output if deletions are in effect, and only
-      if the remote rsync is 3.1.0 (September 2013) or newer.
+      if the negotiated protocol is at least 31 (the default when both sides
+      are 3.1.0, September 2013, or newer).
     - `Number of regular files transferred` is the count of normal files that
       were updated via rsync's delta-transfer algorithm, which does not include
       directories, symlinks, etc.
