@@ -100,6 +100,21 @@ extern char *tmpdir;
 extern char *basis_dir[MAX_BASIS_DIRS+1];
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern filter_rule_list filter_list, daemon_filter_list;
+static int64 total_transferred_data = 0;
+extern int data_transfer_limit_reached;
+static int data_transfer_limit_msg_sent = 0;
+
+static int file_will_exceed_data_transfer_limit(struct file_struct *file)
+{
+	if (data_transfer_limit < 0)
+		return 0;
+
+	if (delay_transfer_limit_check)
+		return total_transferred_data >= data_transfer_limit;
+
+	return total_transferred_data + F_LENGTH(file) > data_transfer_limit;
+}
+
 
 int maybe_ATTRS_REPORT = 0;
 int maybe_ATTRS_ACCURATE_TIME = 0;
@@ -1245,6 +1260,15 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	if (DEBUG_GTE(GENR, 1))
 		rprintf(FINFO, "recv_generator(%s,%d)\n", fname, ndx);
 
+
+	if (data_transfer_limit_reached) {
+#ifdef SUPPORT_HARD_LINKS
+		if (preserve_hard_links && F_IS_HLINKED(file))
+			handle_skipped_hlink(file, itemizing, code, f_out);
+#endif
+		return;
+	}
+
 	if (list_only) {
 		if (is_dir < 0
 		 || (is_dir && !implied_dirs && file->flags & FLAG_IMPLIED_DIR))
@@ -1929,7 +1953,19 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	if (DEBUG_GTE(DELTASUM, 2))
 		rprintf(FINFO, "generating and sending sums for %d\n", ndx);
 
-  notify_others:
+notify_others:
+	if (file_will_exceed_data_transfer_limit(file)) {
+		rprintf(FINFO,
+			"recv_generator: transferring %s would exceed data transfer limit. Not transferred; stopping all remaining transfers.\n",
+			fname);
+		data_transfer_limit_reached = 1;
+		if (!data_transfer_limit_msg_sent) {
+			send_msg_int(MSG_DATA_LIMIT_REACHED, 0);
+			io_flush(MSG_FLUSH);
+			data_transfer_limit_msg_sent = 1;
+		}
+		goto cleanup;
+	}
 	if (remove_source_files && !delay_updates && !phase && !dry_run)
 		increment_active_files(ndx, itemizing, code);
 	if (inc_recurse && (!dry_run || write_batch < 0))
@@ -1951,6 +1987,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			fuzzy_file ? fuzzy_file->basename : NULL);
 		free_stat_x(&real_sx);
 	}
+
+	total_transferred_data += F_LENGTH(file);
 
 	if (!do_xfers) {
 #ifdef SUPPORT_HARD_LINKS
@@ -2174,8 +2212,7 @@ void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
 			continue;
 		}
 #endif
-
-		if (check_redo && (ndx = get_redo_num()) != -1) {
+		if (!data_transfer_limit_reached && check_redo && (ndx = get_redo_num()) != -1) {
 			OFF_T save_max_size = max_size;
 			OFF_T save_min_size = min_size;
 			csum_length = SUM_LENGTH;
@@ -2370,7 +2407,7 @@ void generate_files(int f_out, const char *local_name)
 		}
 	} while ((cur_flist = cur_flist->next) != NULL);
 
-	if (delete_during)
+	if (delete_during && !data_transfer_limit_reached)
 		delete_in_dir(NULL, NULL, dev_zero);
 	phase++;
 	if (DEBUG_GTE(GENR, 1))
@@ -2425,9 +2462,9 @@ void generate_files(int f_out, const char *local_name)
 	info_levels[INFO_FLIST] = save_info_flist;
 	info_levels[INFO_PROGRESS] = save_info_progress;
 
-	if (delete_during == 2)
+	if (delete_during == 2 && !data_transfer_limit_reached)
 		do_delayed_deletions(fbuf);
-	if (delete_after && !solo_file && file_total > 0)
+	if (delete_after && !solo_file && file_total > 0 && !data_transfer_limit_reached)
 		do_delete_pass();
 
 	if (max_delete >= 0 && skipped_deletes) {

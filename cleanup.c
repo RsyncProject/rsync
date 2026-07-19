@@ -34,6 +34,7 @@ extern int protocol_version;
 extern int output_needs_newline;
 extern char *partial_dir;
 extern char *logfile_name;
+extern int data_transfer_limit_reached;
 
 int called_from_signal_handler = 0;
 BOOL shutting_down = False;
@@ -210,6 +211,8 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 		if (exit_code == 0) {
 			if (code)
 				exit_code = code;
+			if (data_transfer_limit_reached)
+				exit_code = RERR_DATA_LIMIT;
 			if (io_error & IOERR_DEL_LIMIT)
 				exit_code = RERR_DEL_LIMIT;
 			if (io_error & IOERR_VANISHED)

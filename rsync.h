@@ -299,6 +299,7 @@ enum msgcode {
 	MSG_SUCCESS=100,/* successfully updated indicated flist index */
 	MSG_DELETED=101,/* successfully deleted a file on receiving side */
 	MSG_NO_SEND=102,/* sender failed to open a file we wanted */
+	MSG_DATA_LIMIT_REACHED=62, /* transfer limit reached */
 };
 
 enum filetype {
@@ -845,6 +846,8 @@ extern int gid_ndx;
 extern int acls_ndx;
 extern int xattrs_ndx;
 extern int file_sum_extra_cnt;
+extern int64 data_transfer_limit;
+extern int delay_transfer_limit_check;
 
 #ifdef USE_FLEXIBLE_ARRAY
 #define FILE_STRUCT_LEN (sizeof (struct file_struct))

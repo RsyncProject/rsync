@@ -65,6 +65,7 @@ extern BOOL flush_ok_after_signal;
 extern struct stats stats;
 extern time_t stop_at_utime;
 extern struct file_list *cur_flist;
+extern int data_transfer_limit_reached;
 #ifdef ICONV_OPTION
 extern int filesfrom_convert;
 extern iconv_t ic_send, ic_recv;
@@ -1680,6 +1681,13 @@ static void read_a_msg(void)
 			}
 			first_message = 0;
 		}
+		break;
+	case MSG_DATA_LIMIT_REACHED:
+		if (msg_bytes != 4)
+			goto invalid_msg;
+		raw_read_int();
+		iobuf.in_multiplexed = 1;
+		data_transfer_limit_reached = 1;
 		break;
 	case MSG_ERROR_EXIT:
 		if (msg_bytes == 4)

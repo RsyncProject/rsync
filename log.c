@@ -99,6 +99,7 @@ struct {
 	{ RERR_VANISHED   , "some files vanished before they could be transferred" },
 	{ RERR_DEL_LIMIT  , "the --max-delete limit stopped deletions" },
 	{ RERR_TIMEOUT    , "timeout in data send/receive" },
+	{ RERR_DATA_LIMIT , "the --data-transfer-limit stopped transfers" },
 	{ RERR_CONTIMEOUT , "timeout waiting for daemon connection" },
 	{ RERR_CMD_FAILED , "remote shell failed" },
 	{ RERR_CMD_KILLED , "remote shell killed" },
