@@ -153,7 +153,14 @@ int vfs_lstat(int dirfd, const char *path, STRUCT_STAT *st, int flags)
 		}
 # if defined SUPPORT_LINKS && defined AT_SYMLINK_NOFOLLOW
 		return fstatat(dirfd, path, st, AT_SYMLINK_NOFOLLOW);
+# elif defined SUPPORT_LINKS
+		/* No AT_SYMLINK_NOFOLLOW: an fstatat via a held dirfd cannot honour
+		 * lstat's no-follow contract, so fail loud rather than silently
+		 * follow the leaf (mirrors the held-fd vfs_lchown ENOSYS arm); a
+		 * symlink-sensitive caller must use the path-based form. */
+		(void)dirfd; errno = ENOSYS; return -1;
 # else
+		/* No link support: nothing to follow, fstatat == lstat. */
 		return fstatat(dirfd, path, st, 0);
 # endif
 #else

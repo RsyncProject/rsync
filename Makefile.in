@@ -91,11 +91,13 @@ all: Makefile rsync$(EXEEXT) stunnel-rsyncd.conf @MAKE_RRSYNC@ @MAKE_MAN@
 # make have no pattern rules); the last object compiled is left as the target.
 # $(VFS_OBJ:.o=.c) is POSIX suffix substitution, portable across makes.
 vfs-no-at-fdcwd.o: $(VFS_OBJ:.o=.c) $(HEADERS) vfs/vfs.h vfs/vfs_internal.h
+	@rm -f $@ $@.tmp
 	@for f in $(VFS_OBJ:.o=.c); do \
 	    echo "  no-AT_FDCWD compile-check: $$f"; \
 	    $(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) \
-	        -DRSYNC_TEST_NO_AT_FDCWD -c $(srcdir)/$$f -o $@ || exit 1; \
+	        -DRSYNC_TEST_NO_AT_FDCWD -c $(srcdir)/$$f -o $@.tmp || exit 1; \
 	done
+	@mv $@.tmp $@
 
 .PHONY: install
 install: all
@@ -371,7 +373,7 @@ rrsync.1: support/rrsync.1.md md-convert Makefile
 
 .PHONY: clean
 clean: cleantests
-	rm -f *~ $(OBJS) $(VFS_OBJ) libvfs.a $(CHECK_PROGS) $(CHECK_OBJS) $(CHECK_COMPILE_OBJS) $(CHECK_SYMLINKS) @MAKE_RRSYNC@ \
+	rm -f *~ $(OBJS) $(VFS_OBJ) libvfs.a $(CHECK_PROGS) $(CHECK_OBJS) $(CHECK_COMPILE_OBJS) $(CHECK_COMPILE_OBJS:.o=.o.tmp) $(CHECK_SYMLINKS) @MAKE_RRSYNC@ \
 		git-version.h rounding rounding.h *.old rsync*.1 rsync*.5 @MAKE_RRSYNC_1@ \
 		*.html daemon-parm.h help-*.h default-*.h proto.h proto.h-tstamp
 	rm -f *.gcno *.gcda lib/*.gcno lib/*.gcda zlib/*.gcno zlib/*.gcda popt/*.gcno popt/*.gcda vfs/*.gcno vfs/*.gcda
