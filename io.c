@@ -31,7 +31,15 @@
 #include "ifuncs.h"
 #include "inums.h"
 
-/** If no timeout is specified then use a 60 second select timeout */
+#include <poll.h>
+
+/* Readiness bits we act on.  poll() can report POLLERR/POLLHUP/POLLNVAL even
+ * when they were not requested, and POLLPRI stands in for select()'s old
+ * exception set. */
+#define POLL_RD_BITS (POLLIN | POLLPRI | POLLERR | POLLHUP)
+#define POLL_WR_BITS (POLLOUT | POLLERR | POLLHUP)
+
+/** If no timeout is specified then use a 60 second I/O timeout */
 #define SELECT_TIMEOUT 60
 
 extern int bwlimit;
@@ -113,6 +121,19 @@ static xbuf ff_xb = EMPTY_XBUF;
 static xbuf iconv_buf = EMPTY_XBUF;
 #endif
 static int select_timeout = SELECT_TIMEOUT;
+
+/* Turn select_timeout (in seconds) into a poll() millisecond count, keeping it
+ * positive and bounded.  A negative count means "wait forever" to poll(), which
+ * would bypass our keepalives and timeout enforcement entirely. */
+static int poll_timeout_ms(void)
+{
+	int secs = select_timeout;
+
+	if (secs <= 0 || secs > SELECT_TIMEOUT)
+		secs = SELECT_TIMEOUT;
+	return secs * 1000;
+}
+
 static int active_filecnt = 0;
 static OFF_T active_bytecnt = 0;
 static int first_message = 1;
@@ -243,31 +264,32 @@ static size_t safe_read(int fd, char *buf, size_t len)
 	assert(fd != iobuf.in_fd);
 
 	while (1) {
-		struct timeval tv;
-		fd_set r_fds, e_fds;
+		struct pollfd pfd;
 		int cnt;
 
-		FD_ZERO(&r_fds);
-		FD_SET(fd, &r_fds);
-		FD_ZERO(&e_fds);
-		FD_SET(fd, &e_fds);
-		tv.tv_sec = select_timeout;
-		tv.tv_usec = 0;
+		/* We use poll() rather than select() so that a high-numbered fd
+		 * (>= FD_SETSIZE) cannot overflow an fd_set bitmap. */
+		pfd.fd = fd;
+		pfd.events = POLLIN | POLLPRI;
+		pfd.revents = 0;
 
-		cnt = select(fd+1, &r_fds, NULL, &e_fds, &tv);
+		cnt = poll(&pfd, 1, poll_timeout_ms());
 		if (cnt <= 0) {
-			if (cnt < 0 && errno == EBADF) {
-				rsyserr(FERROR, errno, "safe_read select failed");
+			if (cnt < 0 && errno != EINTR && errno != EAGAIN) {
+				rsyserr(FERROR, errno, "safe_read poll failed");
 				exit_cleanup(RERR_FILEIO);
 			}
 			check_timeout(1, MSK_ALLOW_FLUSH);
 			continue;
 		}
 
-		/*if (FD_ISSET(fd, &e_fds))
-			rprintf(FINFO, "select exception on fd %d\n", fd); */
+		/* An invalid fd is reported here rather than via poll()'s return. */
+		if (pfd.revents & POLLNVAL) {
+			rsyserr(FERROR, EBADF, "safe_read poll failed");
+			exit_cleanup(RERR_FILEIO);
+		}
 
-		if (FD_ISSET(fd, &r_fds)) {
+		if (pfd.revents & POLL_RD_BITS) {
 			ssize_t n = read(fd, buf + got, len - got);
 			if (DEBUG_GTE(IO, 2)) {
 				rprintf(FINFO, "[%s] safe_read(%d)=%" SIZE_T_FMT_MOD "d\n",
@@ -332,19 +354,18 @@ static void safe_write(int fd, const char *buf, size_t len)
 	}
 
 	while (len) {
-		struct timeval tv;
-		fd_set w_fds;
+		struct pollfd pfd;
 		int cnt;
 
-		FD_ZERO(&w_fds);
-		FD_SET(fd, &w_fds);
-		tv.tv_sec = select_timeout;
-		tv.tv_usec = 0;
+		/* poll() avoids the FD_SETSIZE limit that select() imposes. */
+		pfd.fd = fd;
+		pfd.events = POLLOUT;
+		pfd.revents = 0;
 
-		cnt = select(fd + 1, NULL, &w_fds, NULL, &tv);
+		cnt = poll(&pfd, 1, poll_timeout_ms());
 		if (cnt <= 0) {
-			if (cnt < 0 && errno == EBADF) {
-				rsyserr(FERROR, errno, "safe_write select failed on %s", what_fd_is(fd));
+			if (cnt < 0 && errno != EINTR && errno != EAGAIN) {
+				rsyserr(FERROR, errno, "safe_write poll failed on %s", what_fd_is(fd));
 				exit_cleanup(RERR_FILEIO);
 			}
 			if (io_timeout)
@@ -352,7 +373,12 @@ static void safe_write(int fd, const char *buf, size_t len)
 			continue;
 		}
 
-		if (FD_ISSET(fd, &w_fds)) {
+		if (pfd.revents & POLLNVAL) {
+			rsyserr(FERROR, EBADF, "safe_write poll failed on %s", what_fd_is(fd));
+			exit_cleanup(RERR_FILEIO);
+		}
+
+		if (pfd.revents & POLL_WR_BITS) {
 			n = write(fd, buf, len);
 			if (n < 0) {
 				if (errno == EINTR)
@@ -561,9 +587,8 @@ static void handle_kill_signal(BOOL flush_ok)
  * unused raw data in the buf would prevent the reading of socket data. */
 static char *perform_io(size_t needed, int flags)
 {
-	fd_set r_fds, e_fds, w_fds;
-	struct timeval tv;
-	int cnt, max_fd;
+	struct pollfd pfds[3];
+	int cnt, max_fd, npfds, poll_timeout, in_pollpos, out_pollpos, ff_pollpos;
 	size_t empty_buf_len = 0;
 	xbuf *out;
 	char *data;
@@ -656,13 +681,15 @@ static char *perform_io(size_t needed, int flags)
 		}
 
 		max_fd = -1;
+		npfds = 0;
+		in_pollpos = out_pollpos = ff_pollpos = -1;
 
-		FD_ZERO(&r_fds);
-		FD_ZERO(&e_fds);
 		if (iobuf.in_fd >= 0 && iobuf.in.size - iobuf.in.len) {
 			if (!read_batch || batch_fd >= 0) {
-				FD_SET(iobuf.in_fd, &r_fds);
-				FD_SET(iobuf.in_fd, &e_fds);
+				pfds[npfds].fd = iobuf.in_fd;
+				pfds[npfds].events = POLLIN | POLLPRI;
+				pfds[npfds].revents = 0;
+				in_pollpos = npfds++;
 			}
 			if (iobuf.in_fd > max_fd)
 				max_fd = iobuf.in_fd;
@@ -670,12 +697,14 @@ static char *perform_io(size_t needed, int flags)
 
 		/* Only do more filesfrom processing if there is enough room in the out buffer. */
 		if (ff_forward_fd >= 0 && iobuf.out.size - iobuf.out.len > FILESFROM_BUFLEN*2) {
-			FD_SET(ff_forward_fd, &r_fds);
+			pfds[npfds].fd = ff_forward_fd;
+			pfds[npfds].events = POLLIN;
+			pfds[npfds].revents = 0;
+			ff_pollpos = npfds++;
 			if (ff_forward_fd > max_fd)
 				max_fd = ff_forward_fd;
 		}
 
-		FD_ZERO(&w_fds);
 		if (iobuf.out_fd >= 0) {
 			if (iobuf.raw_flushing_ends_before
 			 || (!iobuf.msg.len && iobuf.out.len > iobuf.out_empty_len && !(flags & PIO_NEED_MSGROOM))) {
@@ -715,7 +744,18 @@ static char *perform_io(size_t needed, int flags)
 			} else
 				out = NULL;
 			if (out) {
-				FD_SET(iobuf.out_fd, &w_fds);
+				/* A direct daemon connection uses one fd for both
+				 * directions; give it a single row with both events
+				 * rather than two rows carrying different masks. */
+				if (in_pollpos >= 0 && iobuf.out_fd == iobuf.in_fd) {
+					pfds[in_pollpos].events |= POLLOUT;
+					out_pollpos = in_pollpos;
+				} else {
+					pfds[npfds].fd = iobuf.out_fd;
+					pfds[npfds].events = POLLOUT;
+					pfds[npfds].revents = 0;
+					out_pollpos = npfds++;
+				}
 				if (iobuf.out_fd > max_fd)
 					max_fd = iobuf.out_fd;
 			}
@@ -752,16 +792,15 @@ static char *perform_io(size_t needed, int flags)
 
 		if (extra_flist_sending_enabled) {
 			if (file_total - file_old_total < MAX_FILECNT_LOOKAHEAD && IN_MULTIPLEXED_AND_READY)
-				tv.tv_sec = 0;
+				poll_timeout = 0;
 			else {
 				extra_flist_sending_enabled = False;
-				tv.tv_sec = select_timeout;
+				poll_timeout = poll_timeout_ms();
 			}
 		} else
-			tv.tv_sec = select_timeout;
-		tv.tv_usec = 0;
+			poll_timeout = poll_timeout_ms();
 
-		cnt = select(max_fd + 1, &r_fds, &w_fds, &e_fds, &tv);
+		cnt = poll(pfds, npfds, poll_timeout);
 
 		if (cnt <= 0) {
 			if (cnt < 0 && errno == EBADF) {
@@ -774,11 +813,29 @@ static char *perform_io(size_t needed, int flags)
 				extra_flist_sending_enabled = !flist_eof;
 			} else
 				check_timeout((flags & PIO_NEED_INPUT) != 0, 0);
-			FD_ZERO(&r_fds); /* Just in case... */
-			FD_ZERO(&w_fds);
+			/* Just in case... */
+			if (in_pollpos >= 0)
+				pfds[in_pollpos].revents = 0;
+			if (ff_pollpos >= 0)
+				pfds[ff_pollpos].revents = 0;
+			if (out_pollpos >= 0)
+				pfds[out_pollpos].revents = 0;
 		}
 
-		if (iobuf.in_fd >= 0 && FD_ISSET(iobuf.in_fd, &r_fds)) {
+		if (cnt > 0) {
+			/* poll() reports a bad fd here, not via its return value. */
+			int p;
+			for (p = 0; p < npfds; p++) {
+				if (pfds[p].revents & POLLNVAL) {
+					msgs2stderr = 1;
+					rsyserr(FERROR, EBADF, "perform_io: poll reported an invalid fd");
+					exit_cleanup(RERR_SOCKETIO);
+				}
+			}
+		}
+
+		if (iobuf.in_fd >= 0 && in_pollpos >= 0
+		 && pfds[in_pollpos].revents & POLL_RD_BITS) {
 			size_t len, pos = iobuf.in.pos + iobuf.in.len;
 			ssize_t n;
 			if (pos >= iobuf.in.size) {
@@ -827,7 +884,7 @@ static char *perform_io(size_t needed, int flags)
 			exit_cleanup(RERR_TIMEOUT);
 		}
 
-		if (out && FD_ISSET(iobuf.out_fd, &w_fds)) {
+		if (out && out_pollpos >= 0 && pfds[out_pollpos].revents & POLL_WR_BITS) {
 			size_t len = iobuf.raw_flushing_ends_before ? iobuf.raw_flushing_ends_before - out->pos : out->len;
 			ssize_t n;
 
@@ -888,7 +945,8 @@ static char *perform_io(size_t needed, int flags)
 				wait_for_receiver(); /* generator only */
 		}
 
-		if (ff_forward_fd >= 0 && FD_ISSET(ff_forward_fd, &r_fds)) {
+		if (ff_forward_fd >= 0 && ff_pollpos >= 0
+		 && pfds[ff_pollpos].revents & POLL_RD_BITS) {
 			/* This can potentially flush all output and enable
 			 * multiplexed output, so keep this last in the loop
 			 * and be sure to not cache anything that would break
@@ -1147,8 +1205,11 @@ void io_set_sock_fds(int f_in, int f_out)
 
 void set_io_timeout(int secs)
 {
+	if (secs < 0)
+		secs = 0;
 	io_timeout = secs;
-	allowed_lull = (io_timeout + 1) / 2;
+	/* Round up without overflowing when secs is near INT_MAX. */
+	allowed_lull = secs / 2 + secs % 2;
 
 	if (!io_timeout || allowed_lull > SELECT_TIMEOUT)
 		select_timeout = SELECT_TIMEOUT;
@@ -1553,7 +1614,10 @@ static void read_a_msg(void)
 			goto invalid_msg;
 		val = raw_read_int();
 		iobuf.in_multiplexed = 1;
-		if (!io_timeout || io_timeout > val) {
+		/* Ignore a non-positive value: it would otherwise disable our
+		 * timeout entirely (and a negative one used to be rejected by
+		 * select(), but would make poll() wait forever). */
+		if (val > 0 && (!io_timeout || io_timeout > val)) {
 			if (INFO_GTE(MISC, 2))
 				rprintf(FINFO, "Setting --timeout=%d to match server\n", val);
 			set_io_timeout(val);
