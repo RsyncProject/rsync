@@ -1004,13 +1004,16 @@ int clean_fname(char *name, int flags)
 					f += 2;
 					continue;
 				}
-				/* backing up for ".." — avoid reading before 'name' */
+				/* backing up for ".." — avoid reading before 'name'.
+				 * The loop stops with 's' pointing at the start of the
+				 * preceding component (just past its '/'), or at 'limit'. */
 				while (s > limit && s[-1] != '/')
 					s--;
 
-				/* If found prior '/', or we reached the start, adjust t. */
-				if (s != t - 1 && (s <= name || *s == '/')) {
-					t = (s == name) ? name : s + 1;
+				/* If we backed up over a real component (found a prior
+				 * '/' or reached the start of the name), drop it. */
+				if (s != t - 1 && (s == name || s[-1] == '/')) {
+					t = s;
 					f += 2;
 					continue;
 				}
