@@ -189,7 +189,65 @@ under `--fake-super` too (previously it fell back to a path-based set for a
 
 ### SECURITY RELATED:
 
- - Mask the incoming MSG_IO_ERROR value to only defined IOERR_* bits to prevent a malicious peer from setting arbitrary error flags.
+- Mask a peer-supplied I/O-error value to the defined `IOERR_*` bits, both the
+  incoming `MSG_IO_ERROR` message (`io.c`) and the file-list trailer (`flist.c`),
+  so a malicious peer cannot set arbitrary (undefined) error flags that would be
+  stored in the local `io_error` and re-forwarded upstream.  (Undefined bits
+  never reached the exit code, which maps only the defined bits.)  Reported by
+  Leonid Bugaev.
+
+- Escape control characters in filenames written to the log file (CWE-117 log
+  injection): a transferred name containing control bytes -- C0 (tab excepted)
+  and C1 `0x80`-`0x9f`, including CSI `0x9b` -- could otherwise inject terminal
+  escape sequences into an administrator's terminal when the log is viewed.
+  Reported by Leonid Bugaev.
+
+- Close a `--safe-links` bypass in `--backup`: when symlinks can be hard-linked,
+  `make_backup()`'s link/rename fast path hard-linked an unsafe (out-of-tree)
+  symlink into the backup area and skipped the `safe_symlinks` check the copy
+  path applies, silently preserving a link `--safe-links` was meant to drop.  The
+  safe-links check now runs before the fast path, and a symlink whose target is
+  unreadable is failed closed rather than backed up unchecked.  Reported by
+  Leonid Bugaev.
+
+- Extend the operator-directory ownership walk to the backup leaf sinks:
+  `do_symlink_at()` (backing a symlink up into an operator `--backup-dir`) and
+  `do_rmdir_at()` (removing a pre-existing backup directory) now resolve their
+  parent through the same ownership walk, so a foreign-owned parent symlink no
+  longer redirects the backup symlink-create or directory-removal outside the
+  backup tree.  `--insecure-links` (or a module's `insecure links = yes`) restores
+  the legacy follow.  Reported by Omar Elsayed (seks99x).
+
+- Confine an absolute operator source/destination through the ownership walk in
+  `robust_rename()`'s cross-filesystem (EXDEV) copy fallback, so a raced parent
+  symlink cannot redirect the fallback copy or its source unlink out of the tree.
+  Reported by Leonid Bugaev.
+
+- Bound the number of equal-weak-checksum blocks examined per offset in
+  `hash_search()` (issue #217), so a crafted or degenerate checksum set with a
+  very long equal-checksum chain cannot drive the sender's per-offset
+  match-verify into a quadratic blow-up (CPU DoS).  Fix by Stuart Inglis.
+
+### BUG FIXES:
+
+- Fix an off-by-one in `clean_fname()`'s `..`-collapse path normalization.
+  Reported by Leonid Bugaev.
+
+- `--out-format` / `--log-file-format` now emit a literal `%` for `%%` instead of
+  mis-parsing the following character (added by Leonid Bugaev); a follow-up bounds
+  `log_format_has()`'s width-digit scan to match `log_formatted()`, closing a `%C`
+  read past the checksum field.
+
+- A CVS `.cvsignore` (or `-C`) file containing a `!` clear-list token no longer
+  aborts with a spurious "rule has trailing characters" error.  Reported by
+  Leonid Bugaev.
+
+- `--chmod=a+s` now sets both the setuid and setgid bits, matching `chmod(1)`
+  (it previously set setuid only).  Reported by Leonid Bugaev.
+
+- Case-insensitive wildcard matching (used by daemon `hosts allow`/`hosts deny`
+  rules) now folds characters inside a `[...]` bracket expression, not just
+  literal pattern characters.  Reported by Leonid Bugaev.
 
 ### BEHAVIOR CHANGES:
 

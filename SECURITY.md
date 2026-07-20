@@ -79,6 +79,19 @@ unbounded merge-file and suffix-list recursion, and several bounded
 out-of-bounds writes driven by peer-supplied lengths or option arguments. Each
 is fixed at the root with a bounds or validity check plus a defence-in-depth
 guard at the use site, and carries a regression test.
+
+Two further peer-input hardenings in this release: a peer-supplied I/O-error
+value (the `MSG_IO_ERROR` message and the file-list trailer) is masked to the
+defined `IOERR_*` bits, so a peer cannot set arbitrary error flags in the local
+`io_error` that would be stored and re-forwarded upstream; and control
+characters in a (peer-controlled) filename written to the log file are escaped,
+so a name carrying C0/C1 terminal-escape bytes cannot inject sequences into an
+administrator's terminal when the log is viewed (CWE-117). The number of
+equal-weak-checksum blocks `hash_search()` examines per offset is also bounded
+(issue #217), so a crafted or degenerate checksum set with a very long
+equal-checksum chain cannot drive the sender's per-offset match-verify into a
+quadratic walk and pin one connection's CPU.
+
 Contributors adding code that consumes peer input should validate it at the
 point of receipt rather than relying on a downstream check.
 
