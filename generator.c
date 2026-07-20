@@ -115,6 +115,71 @@ static int need_retouch_dir_times;
 static int need_retouch_dir_perms;
 static const char *solo_file = NULL;
 
+/* Directories that matched the --compare-dest hierarchy.  We still create them
+ * normally (so a changed descendant has a home, with the right attributes) and
+ * then remove the ones that turned out to hold nothing at all. */
+static char **prune_dirs = NULL;
+static int prune_dirs_cnt = 0, prune_dirs_alloc = 0;
+
+static void remember_prune_dir(const char *fname)
+{
+	if (prune_dirs_cnt >= prune_dirs_alloc) {
+		prune_dirs_alloc = prune_dirs_alloc ? prune_dirs_alloc * 2 : 128;
+		prune_dirs = realloc_array(prune_dirs, char *, prune_dirs_alloc);
+	}
+	if (!(prune_dirs[prune_dirs_cnt] = strdup(fname)))
+		out_of_memory("remember_prune_dir");
+	prune_dirs_cnt++;
+}
+
+static int prune_dir_cmp(const void *a, const void *b)
+{
+	/* Descending, so that a child sorts before its parent. */
+	return strcmp(*(char *const *)b, *(char *const *)a);
+}
+
+/* Drop any --compare-dest directory that ended up with nothing in it.  rmdir()
+ * simply fails (harmlessly) on one that did receive content, and the descending
+ * sort means we try a child before its parent, so nested runs collapse. */
+static void prune_compare_dest_dirs(void)
+{
+	int i;
+
+	if (!prune_dirs_cnt)
+		return;
+
+	qsort(prune_dirs, prune_dirs_cnt, sizeof prune_dirs[0], prune_dir_cmp);
+	for (i = 0; i < prune_dirs_cnt; i++) {
+		char *fname = prune_dirs[i], *slash;
+		char parent[MAXPATHLEN];
+		STRUCT_STAT pst;
+		int got_parent;
+
+		/* Removing an entry changes the containing dir's mtime, which we
+		 * must not disturb, so save it and put it back afterwards. */
+		if ((slash = strrchr(fname, '/')) != NULL && slash != fname) {
+			int plen = slash - fname;
+			if (plen >= (int)sizeof parent)
+				plen = sizeof parent - 1;
+			memcpy(parent, fname, plen);
+			parent[plen] = '\0';
+		} else
+			strlcpy(parent, slash ? "/" : ".", sizeof parent);
+		got_parent = link_stat(parent, &pst, 0) == 0;
+
+		if (do_rmdir(fname) == 0) {
+			if (DEBUG_GTE(GENR, 1))
+				rprintf(FINFO, "pruned empty --compare-dest dir: %s\n", fname);
+			if (got_parent)
+				set_times(parent, &pst);
+		}
+		free(fname);
+	}
+	free(prune_dirs);
+	prune_dirs = NULL;
+	prune_dirs_cnt = prune_dirs_alloc = 0;
+}
+
 /* Forward declarations. */
 #ifdef SUPPORT_HARD_LINKS
 static void handle_skipped_hlink(struct file_struct *file, int itemizing,
@@ -1471,6 +1536,14 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				itemizing = 0;
 				code = FNONE;
 				statret = 1;
+				/* With --compare-dest the destination receives only
+				 * what differs, so a dir that matches the compare
+				 * hierarchy does not belong there unless something
+				 * below it turns out to differ.  We can only know
+				 * that once the transfer is done, so create it now
+				 * and drop it later if it is still empty. */
+				if (alt_dest_type == COMPARE_DEST && !dry_run)
+					remember_prune_dir(fname);
 			} else if (j >= 0) {
 				statret = 1;
 				fnamecmp = fnamecmpbuf;
@@ -2452,6 +2525,8 @@ void generate_files(int f_out, const char *local_name)
 	if ((need_retouch_dir_perms || need_retouch_dir_times)
 	 && dir_tweaking && (!inc_recurse || delete_during == 2))
 		touch_up_dirs(dir_flist, -1);
+
+	prune_compare_dest_dirs();
 
 	if (DEBUG_GTE(GENR, 1))
 		rprintf(FINFO, "generate_files finished\n");

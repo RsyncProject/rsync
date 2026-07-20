@@ -40,8 +40,13 @@ time.sleep(1)
 os.utime(FROMDIR / 'dir' / 'text')
 os.utime(FROMDIR / 'likely')
 
-# chkdir: what a vanilla copy would produce, minus /text and etc-ltr-list.
-run_rsync('-av', '--exclude=/text', '--exclude=etc-ltr-list',
+# chkdir: what --compare-dest should leave behind.  That is a vanilla copy
+# minus the files alt1/alt2 already provide (/text and etc-ltr-list) and --
+# because --compare-dest populates the destination with just the differences --
+# minus any directory that is thereby left with nothing to transfer, which is
+# what -m (--prune-empty-dirs) expresses.  Here that drops dir/subdir/subsubdir
+# (it held only etc-ltr-list) and emptydir (empty in the source to begin with).
+run_rsync('-av', '-m', '--exclude=/text', '--exclude=etc-ltr-list',
           f'{FROMDIR}/', f'{CHKDIR}/')
 
 # Stacked --compare-dest: dest grows just the deltas alt1+alt2 don't have.
