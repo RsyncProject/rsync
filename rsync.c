@@ -409,7 +409,21 @@ int read_ndx_and_attrs(int f_in, int f_out, int *iflag_ptr, uchar *type_ptr, cha
 		if ((len = read_vstring(f_in, buf, MAXPATHLEN)) < 0)
 			exit_cleanup(RERR_PROTOCOL);
 
-		if (sanitize_paths) {
+		/* For a basis type (FNAMECMP_FUZZY and the alt-dest FNAMECMP_FUZZY+N)
+		 * the xname is a peer-supplied leaf name that the receiver joins to
+		 * an operator-chosen basedir (--link-dest / --compare-dest /
+		 * --copy-dest, or the fuzzy dir) and opens as the delta basis.  It
+		 * must never contain a ".." (or leading "/") that escapes that dir:
+		 * a malicious sender could otherwise walk the receiver's filesystem
+		 * -- e.g. --link-dest=/backup with an xname of "../../etc/shadow" --
+		 * and read an out-of-tree file as the basis (client-side
+		 * arbitrary-read / FIFO-hang).  Sanitize it always, not only in the
+		 * daemon (sanitize_paths) case: the operator basedir may legitimately
+		 * be relative (#915), but the wire-supplied leaf never needs "..".
+		 * Only the basis types use xname as a path; other ITEM_XNAME_FOLLOWS
+		 * uses (the hard-link "=> target" display name, which is often empty)
+		 * are not paths and must be left byte-for-byte. */
+		if (fnamecmp_type >= FNAMECMP_FUZZY) {
 			sanitize_path(buf, buf, "", 0, SP_DEFAULT);
 			len = strlen(buf);
 		}
