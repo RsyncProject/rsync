@@ -365,16 +365,26 @@ RSYNC_RSH in the environment will not turn on this functionality.) For example:
 
 >     rsync -av --rsh=ssh host::module /dest
 
-If you need to specify a different remote-shell user, keep in mind that the
-user@ prefix in front of the host is specifying the rsync-user value (for a
-module that requires user-based authentication).  This means that you must give
-the '-l user' option to ssh when specifying the remote-shell, as in this
-example that uses the short version of the [`--rsh`](#opt) option:
+A "user@" prefix in front of the host serves two purposes at once in this mode:
+it is the rsync-user value (used to log in to a module that requires user-based
+authentication) and, by default, it is also passed to the remote shell as the
+login user.  So the simple form
+
+>     rsync -av --rsh=ssh user@host::module /dest
+
+runs `ssh -l user host` and offers "user" as the rsync-user to the module; the
+two are forced to be the same name.
+
+If you need the remote-shell (ssh) login to use a different name than the
+rsync-user, give an explicit '-l' option to ssh in the remote-shell command.
+When ssh is already told which user to log in as, rsync does not add its own
+'-l', so the "user@" prefix is then used only as the rsync-user.  For example,
+using the short version of the [`--rsh`](#opt) option:
 
 >     rsync -av -e "ssh -l ssh-user" rsync-user@host::module /dest
 
-The "ssh-user" will be used at the ssh level; the "rsync-user" will be used to
-log-in to the "module".
+Here "ssh-user" is used at the ssh level while "rsync-user" is used to log in to
+the "module".
 
 In this setup, the daemon is started by the ssh command that is accessing the
 system (which can be forced via the `~/.ssh/authorized_keys` file, if desired).
