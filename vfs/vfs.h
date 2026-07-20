@@ -47,6 +47,22 @@
 #ifndef RSYNC_VFS_H
 #define RSYNC_VFS_H
 
+/* Exercise the pre-*at() portability tier on modern build hosts.  rsync.h pulls
+ * this header in after the system headers that define AT_FDCWD, so stripping the
+ * *at primitives here strips them for the whole translation unit -- including
+ * the VFS_AT_FDCWD sentinel below, which then takes its no-AT_FDCWD value.  The
+ * CHECK_COMPILE_OBJS target compiles every vfs/ source with this flag to keep
+ * the fallback arms building.  (Was syscall.c's top before the split into vfs/;
+ * it must precede the VFS_AT_FDCWD definition.) */
+#ifdef RSYNC_TEST_NO_AT_FDCWD
+#undef AT_FDCWD
+#undef AT_SYMLINK_NOFOLLOW
+#undef HAVE_LINKAT
+#undef HAVE_OPENAT2
+#undef HAVE_UTIMENSAT
+#undef O_RESOLVE_BENEATH
+#endif
+
 /* Max held ancestor-dirfd cache depth (was DPC_MAXDEPTH in syscall.c). */
 #define VFS_DPC_MAXDEPTH 64
 

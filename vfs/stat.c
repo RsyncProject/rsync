@@ -106,6 +106,7 @@ static int do_xstat_at(const char *path, STRUCT_STAT *st, int at_flags, int (*fa
 	errno = e;
 	return ret;
 #else
+	(void)at_flags; (void)vfs_flags;
 	return fallback(path, st);
 #endif
 }
@@ -150,7 +151,7 @@ int vfs_lstat(int dirfd, const char *path, STRUCT_STAT *st, int flags)
 			errno = EINVAL;
 			return -1;
 		}
-# ifdef SUPPORT_LINKS
+# if defined SUPPORT_LINKS && defined AT_SYMLINK_NOFOLLOW
 		return fstatat(dirfd, path, st, AT_SYMLINK_NOFOLLOW);
 # else
 		return fstatat(dirfd, path, st, 0);
@@ -161,8 +162,10 @@ int vfs_lstat(int dirfd, const char *path, STRUCT_STAT *st, int flags)
 	}
 	if (flags & VFS_ALLOW_SYMLINK)
 		return vfs__lstat_plain(path, st);
-#ifdef SUPPORT_LINKS
+#if defined SUPPORT_LINKS && defined AT_FDCWD && defined AT_SYMLINK_NOFOLLOW
 	return do_xstat_at(path, st, AT_SYMLINK_NOFOLLOW, vfs__lstat_plain, flags);
+#elif defined SUPPORT_LINKS
+	return vfs__lstat_plain(path, st);
 #else
 	return do_xstat_at(path, st, 0, vfs__stat_plain, flags);
 #endif

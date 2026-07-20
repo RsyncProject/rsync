@@ -34,7 +34,7 @@ static int vfs__lchown_plain(const char *path, uid_t owner, gid_t group)
 static int vfs__lchown_secure(const char *path, uid_t owner, gid_t group, int flags)
 {
 	(void)flags;
-#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY && defined AT_SYMLINK_NOFOLLOW
 	char dirpath[MAXPATHLEN];
 	const char *bname, *slash;
 	int dfd, ret, e;
@@ -78,7 +78,7 @@ int vfs_lchown(int dirfd, const char *path, uid_t owner, gid_t group, int flags)
 	RETURN_ERROR_IF_NULL(path);
 
 	if (dirfd != VFS_AT_FDCWD) {
-#ifdef AT_FDCWD
+#if defined AT_FDCWD && defined AT_SYMLINK_NOFOLLOW
 		/* Held-fd: reject empty, multi-component and ".." (writing the
 		 * parent of the pinned dir); "." (chown the dir itself) is a
 		 * legitimate single-component op. */

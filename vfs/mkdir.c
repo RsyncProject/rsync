@@ -23,6 +23,7 @@
  * /dev/urandom can't be opened or read (e.g. a chroot/container without /dev).
  * We read /dev/urandom directly rather than probing getrandom()/arc4random_buf()
  * to match authenticate.c and avoid new configure checks. */
+#ifdef AT_FDCWD	/* only vfs_mkstemp_atfd's held-dirfd create loop uses this */
 static void rand_bytes(unsigned char *buf, size_t len)
 {
 #ifndef O_CLOEXEC
@@ -40,6 +41,7 @@ static void rand_bytes(unsigned char *buf, size_t len)
 		buf[i] = (unsigned char)rand();
 	}
 }
+#endif
 
 void trim_trailing_slashes(char *name)
 {
