@@ -5,7 +5,7 @@ AC_INIT([rsync],[ ],[https://rsync.samba.org/bug-tracking.html])
 AC_C_BIGENDIAN
 AC_HEADER_DIRENT
 AC_HEADER_SYS_WAIT
-AC_CHECK_HEADERS(sys/fcntl.h sys/select.h fcntl.h sys/time.h sys/unistd.h \
+AC_CHECK_HEADERS(poll.h sys/fcntl.h sys/select.h fcntl.h sys/time.h sys/unistd.h \
     unistd.h utime.h compat.h sys/param.h ctype.h sys/wait.h sys/stat.h \
     sys/ioctl.h sys/filio.h string.h stdlib.h sys/socket.h sys/mode.h grp.h \
     sys/un.h sys/attr.h arpa/inet.h arpa/nameser.h locale.h sys/types.h \
@@ -909,6 +909,12 @@ AC_HAVE_TYPE([struct stat64], [#include <stdio.h>
 
 # if we can't find strcasecmp, look in -lresolv (for Unixware at least)
 #
+dnl rsync's I/O readiness loops use poll() rather than select() so that a
+dnl file descriptor at or above FD_SETSIZE cannot overflow an fd_set (which
+dnl is undefined behaviour and could hang the transfer).  poll() is in
+dnl POSIX.1-2001; fail early and clearly if this target lacks it.
+AC_CHECK_FUNCS([poll], , [AC_MSG_ERROR([rsync requires poll(); please report the platform to the rsync developers])])
+
 AC_CHECK_FUNCS(strcasecmp)
 if test x"$ac_cv_func_strcasecmp" = x"no"; then
     AC_CHECK_LIB(resolv, strcasecmp)

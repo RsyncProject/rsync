@@ -25,6 +25,7 @@
  * emulate it using the KAME implementation. */
 
 #include "rsync.h"
+#include <poll.h>
 #include "itypes.h"
 #include "ifuncs.h"
 #ifdef HAVE_NETINET_IN_SYSTM_H
@@ -626,8 +627,8 @@ static void sigchld_handler(UNUSED(int val))
 
 void start_accept_loop(int port, int (*fn)(int, int))
 {
-	fd_set deffds;
-	int *sp, maxfd, i;
+	struct pollfd *pfds;
+	int *sp, nsp, i;
 
 #ifdef HAVE_SIGACTION
 	sigact.sa_flags = SA_NOCLDSTOP;
@@ -639,8 +640,12 @@ void start_accept_loop(int port, int (*fn)(int, int))
 		exit_cleanup(RERR_SOCKETIO);
 
 	/* ready to listen */
-	FD_ZERO(&deffds);
-	for (i = 0, maxfd = -1; sp[i] >= 0; i++) {
+	for (nsp = 0; sp[nsp] >= 0; nsp++) {}
+	/* poll() rather than select(): a listening fd at or above FD_SETSIZE
+	 * would overflow an fd_set, which is undefined behaviour (issue #231). */
+	if (!(pfds = new_array(struct pollfd, nsp ? nsp : 1)))
+		out_of_memory("start_accept_loop");
+	for (i = 0; sp[i] >= 0; i++) {
 		if (listen(sp[i], lp_listen_backlog()) < 0) {
 			rsyserr(FERROR, errno, "listen() on socket failed");
 #ifdef INET6
@@ -650,36 +655,32 @@ void start_accept_loop(int port, int (*fn)(int, int))
 #endif
 			exit_cleanup(RERR_SOCKETIO);
 		}
-		FD_SET(sp[i], &deffds);
-		if (maxfd < sp[i])
-			maxfd = sp[i];
+		pfds[i].fd = sp[i];
+		pfds[i].events = POLLIN;
+		pfds[i].revents = 0;
 	}
 
 	/* now accept incoming connections - forking a new process
 	 * for each incoming connection */
 	while (1) {
-		fd_set fds;
 		pid_t pid;
 		int fd;
 		struct sockaddr_storage addr;
 		socklen_t addrlen = sizeof addr;
 
-		/* close log file before the potentially very long select so
+		/* close log file before the potentially very long wait so the
 		 * file can be trimmed by another process instead of growing
 		 * forever */
 		logfile_close();
 
-#ifdef FD_COPY
-		FD_COPY(&deffds, &fds);
-#else
-		fds = deffds;
-#endif
+		for (i = 0; i < nsp; i++)
+			pfds[i].revents = 0;
 
-		if (select(maxfd + 1, &fds, NULL, NULL, NULL) < 1)
+		if (poll(pfds, nsp, -1) < 1)
 			continue;
 
-		for (i = 0, fd = -1; sp[i] >= 0; i++) {
-			if (FD_ISSET(sp[i], &fds)) {
+		for (i = 0, fd = -1; i < nsp; i++) {
+			if (pfds[i].revents & (POLLIN | POLLERR | POLLHUP)) {
 				fd = accept(sp[i], (struct sockaddr *)&addr, &addrlen);
 				break;
 			}
