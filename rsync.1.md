@@ -2687,6 +2687,8 @@ expand it.
     transfer.
 
     If _DIR_ is a relative path, it is relative to the destination directory.
+    If _DIR_ begins with `: `, the rest of the path is instead relative to
+    each destination file's containing directory.
     See also [`--copy-dest`](#opt) and [`--link-dest`](#opt).
 
     NOTE: beginning with version 3.1.0, rsync will remove a file from a
@@ -2708,6 +2710,8 @@ expand it.
     try to speed up the transfer.
 
     If _DIR_ is a relative path, it is relative to the destination directory.
+    If _DIR_ begins with `: `, the rest of the path is instead relative to
+    each destination file's containing directory.
     See also [`--compare-dest`](#opt) and [`--link-dest`](#opt).
 
 0.  `--link-dest=DIR`
@@ -2745,6 +2749,8 @@ expand it.
     the file is updated.
 
     If _DIR_ is a relative path, it is relative to the destination directory.
+    If _DIR_ begins with `: `, the rest of the path is instead relative to
+    each destination file's containing directory.
     See also [`--compare-dest`](#opt) and [`--copy-dest`](#opt).
 
     Note that rsync versions prior to 2.6.1 had a bug that could prevent

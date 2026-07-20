@@ -44,6 +44,8 @@ size_t max_alloc = (size_t)-1; /* test helpers are not memory-constrained;
 				* per-component fallback of secure_relative_open()
 				* hits at its first my_strdup() call. */
 char *partial_dir;
+char *basis_dir[MAX_BASIS_DIRS+1];
+int basis_dir_perdir[MAX_BASIS_DIRS+1];
 char *module_dir;
 /* curr_dir[]/curr_dir_len (read by secure_relative_open) are defined in
  * syscall.c, which every helper links -- no stub needed here. */

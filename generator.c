@@ -960,7 +960,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 	int j = 0;
 
 	do {
-		pathjoin(cmpbuf, MAXPATHLEN, basis_dir[j], fname);
+		pathjoin_altdest(cmpbuf, MAXPATHLEN, j, fname);
 		if (link_stat(cmpbuf, &sxp->st, 0) < 0 || !S_ISREG(sxp->st.st_mode))
 			continue;
 		if (match_level == 0) {
@@ -986,7 +986,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 
 	if (j != best_match) {
 		j = best_match;
-		pathjoin(cmpbuf, MAXPATHLEN, basis_dir[j], fname);
+		pathjoin_altdest(cmpbuf, MAXPATHLEN, j, fname);
 		if (link_stat(cmpbuf, &sxp->st, 0) < 0)
 			goto got_nothing_for_ya;
 	}
@@ -1081,7 +1081,7 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 	}
 
 	do {
-		pathjoin(cmpbuf, MAXPATHLEN, basis_dir[j], fname);
+		pathjoin_altdest(cmpbuf, MAXPATHLEN, j, fname);
 		if (link_stat(cmpbuf, &sxp->st, 0) < 0)
 			continue;
 		if (ftype != get_file_type(sxp->st.st_mode))
@@ -1108,7 +1108,7 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 
 	if (j != best_match) {
 		j = best_match;
-		pathjoin(cmpbuf, MAXPATHLEN, basis_dir[j], fname);
+		pathjoin_altdest(cmpbuf, MAXPATHLEN, j, fname);
 		if (link_stat(cmpbuf, &sxp->st, 0) < 0)
 			return -1;
 	}
@@ -1773,7 +1773,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			int i;
 			strlcpy(fnamecmpbuf, dn, sizeof fnamecmpbuf);
 			for (i = 0; i < fuzzy_basis; i++) {
-				if (i && pathjoin(fnamecmpbuf, MAXPATHLEN, basis_dir[i-1], dn) >= MAXPATHLEN)
+				if (i && pathjoin_altdest_dir(fnamecmpbuf, MAXPATHLEN, i-1, dn) >= MAXPATHLEN)
 					continue;
 				fuzzy_dirlist[i] = get_dirlist(fnamecmpbuf, -1, GDL_IGNORE_FILTER_RULES | GDL_PERHAPS_DIR);
 				if (fuzzy_dirlist[i] && fuzzy_dirlist[i]->used == 0) {
