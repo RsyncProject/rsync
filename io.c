@@ -1169,8 +1169,24 @@ void io_set_sock_fds(int f_in, int f_out)
 
 void set_io_timeout(int secs)
 {
+	/* A negative timeout is meaningless; treat it as "no timeout" rather than
+	 * letting it drive allowed_lull / select_timeout negative (a tight loop).
+	 * (--timeout is parsed by options.c as a plain int, so it can be negative.) */
+	if (secs < 0)
+		secs = 0;
 	io_timeout = secs;
-	allowed_lull = (io_timeout + 1) / 2;
+	/* Compute ceil(io_timeout/2) in a wider type: io_timeout can be INT_MAX
+	 * (a peer's MSG_IO_TIMEOUT -- now capped in read_a_msg() -- or an operator
+	 * --timeout, which options.c parses unbounded), and a plain "io_timeout + 1"
+	 * would overflow to a negative allowed_lull / select_timeout, trapping the
+	 * process in a tight select()-EINVAL loop (and firing a keepalive flood). */
+	allowed_lull = (int)(((int64)io_timeout + 1) / 2);
+	/* The generator and sender derive an int loop-check limit as
+	 * allowed_lull * 5; keep allowed_lull small enough that that product can't
+	 * overflow either.  The cap is invisible to real use -- allowed_lull is the
+	 * keep-alive half-interval and INT_MAX/5 seconds is over 13 years. */
+	if (allowed_lull > INT_MAX / 5)
+		allowed_lull = INT_MAX / 5;
 
 	if (!io_timeout || allowed_lull > SELECT_TIMEOUT)
 		select_timeout = SELECT_TIMEOUT;
