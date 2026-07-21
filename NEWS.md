@@ -1,3 +1,20 @@
+# NEWS for rsync 3.4.4 (UNRELEASED)
+
+## Changes in this version:
+
+### ENHANCEMENTS:
+
+- Added SHA-3 (FIPS 202) as an opt-in `--checksum-choice` algorithm
+  family: `sha3-256`, `sha3-384`, and `sha3-512`. The implementation
+  uses OpenSSL EVP and so requires that rsync be built with OpenSSL
+  support and linked against libcrypto >= 1.1.1. Like `sha256` and
+  `sha512`, SHA-3 is never picked by `auto` negotiation; it must be
+  explicitly requested on both ends (e.g.
+  `--checksum-choice=sha3-256`) or made part of the
+  `RSYNC_CHECKSUM_LIST` environment override.
+
+------------------------------------------------------------------------------
+
 # NEWS for rsync 3.4.3 (20 May 2026)
 
 ## Changes in this version:
@@ -116,7 +133,6 @@ reported by Aisle Research via Michal Ruprich), and a NULL-check on
 `localtime_r()` in `timestring()` to keep a malicious server from
 crashing the client by advertising a file with an out-of-range
 modtime.
-
 ### BUG FIXES:
 
 - Fixed a regression introduced by the 3.4.0 secure_relative_open()

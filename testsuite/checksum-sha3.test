@@ -1,0 +1,60 @@
+#!/bin/sh
+
+# Test SHA-3 checksum support (sha3-256, sha3-384, sha3-512).
+#
+# Requires rsync to be built with OpenSSL support and linked against a
+# libcrypto that exposes the SHA-3 family (OpenSSL 1.1.1 or newer).
+# The test probes for SHA-3 by asking rsync to use it on a no-op copy;
+# if the local rsync rejects the choice (e.g. no OpenSSL at build time,
+# or older libcrypto), the test is skipped rather than failed.
+
+. "$suitedir/rsync.fns"
+
+probe() {
+    $RSYNC --checksum-choice="$1" --help >/dev/null 2>&1 || return 1
+    # --help doesn't actually parse the choice; force a real parse.
+    mkdir -p "$tmpdir/probe.src"
+    : > "$tmpdir/probe.src/x"
+    rm -rf "$tmpdir/probe.dst"
+    $RSYNC -a --checksum-choice="$1" "$tmpdir/probe.src/" "$tmpdir/probe.dst/" 2>"$outfile"
+    rc=$?
+    rm -rf "$tmpdir/probe.src" "$tmpdir/probe.dst"
+    if [ $rc -ne 0 ] && grep -q 'unknown checksum name' "$outfile"; then
+        return 1
+    fi
+    return $rc
+}
+
+if ! probe sha3-256; then
+    test_skipped "rsync was not built with OpenSSL SHA-3 support"
+fi
+
+mkdir "$fromdir"
+mkdir "$fromdir/sub"
+# Mix of empty, small, and chunk-spanning sizes (CHUNK_SIZE is 32k internally).
+: > "$fromdir/empty"
+echo "hello sha-3" > "$fromdir/small"
+dd if=/dev/urandom of="$fromdir/big" bs=1024 count=70 2>/dev/null
+
+for algo in sha3-256 sha3-384 sha3-512; do
+    rm -rf "$todir"
+
+    # Whole-file path (transfer checksum only).
+    checkit "$RSYNC -a --checksum-choice=$algo '$fromdir/' '$todir/'" "$fromdir" "$todir"
+
+    # Pre-transfer + transfer checksum path (-c forces file_checksum to run).
+    rm -rf "$todir"
+    checkit "$RSYNC -ac --checksum-choice=$algo '$fromdir/' '$todir/'" "$fromdir" "$todir"
+
+    # --checksum-choice with distinct xfer,file pair.
+    rm -rf "$todir"
+    checkit "$RSYNC -ac --checksum-choice=$algo,$algo '$fromdir/' '$todir/'" "$fromdir" "$todir"
+done
+
+# Delta-update path: mutate the destination, re-sync with SHA-3, confirm match.
+rm -rf "$todir"
+$RSYNC -a --checksum-choice=sha3-256 "$fromdir/" "$todir/" || test_fail "initial sync failed"
+echo "modified locally" >> "$todir/small"
+checkit "$RSYNC -a --checksum-choice=sha3-256 '$fromdir/' '$todir/'" "$fromdir" "$todir"
+
+exit 0
