@@ -1594,8 +1594,12 @@ static void read_a_msg(void)
 		iobuf.in_multiplexed = 1;
 		/* The peer may only ask us to use a SHORTER timeout (a stricter cap); a
 		 * non-positive value would disable our --timeout entirely, letting a
-		 * malicious server hang the client indefinitely, so ignore it. */
-		if (val <= 0)
+		 * malicious server hang the client indefinitely, so ignore it.  A very
+		 * large value (near INT_MAX) would overflow the (io_timeout + 1) / 2
+		 * computation in set_io_timeout(), wrapping allowed_lull and
+		 * select_timeout negative and trapping the client in a tight select()
+		 * loop (EINVAL on negative tv_sec). Cap at 24 hours. */
+		if (val <= 0 || val > 86400)
 			break;
 		if (!io_timeout || io_timeout > val) {
 			if (INFO_GTE(MISC, 2))
