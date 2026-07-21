@@ -1864,7 +1864,7 @@ def run_checked(argv):
     return proc, (proc.stdout or '') + (proc.stderr or '')
 
 
-def build_patched_rsync(name, replacements):
+def build_patched_rsync(name, replacements, append_cflags=None):
     # Cygwin can't reliably rebuild a single patched unit from the copied tree:
     # make leaves the copied object in place (coarse NTFS mtimes) so the patch is
     # silently absent, and forcing the rebuild trips gcc-13's -fno-common link
@@ -1895,6 +1895,25 @@ def build_patched_rsync(name, replacements):
         if old not in text:
             test_skipped(f"{name}: could not find patch target in {relpath}: {old!r}")
         path.write_text(text.replace(old, new, 1))
+
+    # Optionally append compiler flags (e.g. -fwrapv) to the already-configured
+    # CFLAGS line in the copied Makefile.  This preserves the platform's
+    # configure-chosen flags and just adds to them, unlike a `make CFLAGS=...`
+    # override which would drop them.
+    if append_cflags:
+        import re
+        mkpath = work / 'Makefile'
+        mk = mkpath.read_text()
+        mk2 = re.sub(r'(?m)^(CFLAGS=.*)$', r'\1 ' + append_cflags, mk, count=1)
+        if mk2 == mk:
+            test_skipped(f"{name}: could not append {append_cflags!r} to CFLAGS in the Makefile")
+        mkpath.write_text(mk2)
+        # The copied tree carries prebuilt objects compiled with the ORIGINAL
+        # flags; since the sources aren't newer, make would reuse them and the
+        # appended flag would silently apply to nothing.  Drop them so every
+        # unit recompiles with the new CFLAGS.
+        for obj in work.rglob('*.o'):
+            obj.unlink()
 
     env = {**os.environ, 'CCACHE_DISABLE': '1'}
     build = subprocess.run(['make', '-j2', 'rsync'], cwd=str(work), env=env,
