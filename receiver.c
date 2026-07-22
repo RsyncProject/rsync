@@ -961,7 +961,12 @@ int recv_files(int f_in, int f_out, char *local_name)
 		 * trusted absolute fnamecmp (e.g. an absolute --partial-dir basis). */
 		{
 			int bdfd;
-			if (!basedir && (bdfd = held_dfd_for(fnamecmp, file)) >= 0) {
+			if (fnamecmp_type == FNAMECMP_PARTIAL_DIR
+			 && fnamecmp && *fnamecmp != '/') {
+				/* The relative partial path contains peer-derived directory
+				 * components.  It is not an operator-trusted path as a whole. */
+				fd1 = secure_relative_open(NULL, fnamecmp, O_RDONLY, 0);
+			} else if (!basedir && (bdfd = held_dfd_for(fnamecmp, file)) >= 0) {
 				const char *slash;
 				assert(fnamecmp != NULL); /* set on every path above */
 				slash = strrchr(fnamecmp, '/');
@@ -981,6 +986,19 @@ int recv_files(int f_in, int f_out, char *local_name)
 				fd1 = secure_basis_open(basedir, fnamecmp, O_RDONLY, 0);
 				operator_path_resolve = 0;
 			}
+		}
+		if (fnamecmp_type == FNAMECMP_PARTIAL_DIR && fd1 == -1) {
+			/* The sender may claim a partial basis even when the generator's
+			 * confined lookup rejected it.  Do not retain that path for direct
+			 * output or post-transfer cleanup.  A daemon rejects its unsafe
+			 * peer option; a pull client can safely receive a no-basis update. */
+			if (am_daemon) {
+				rprintf(FERROR,
+					"rsync: refusing unconfined partial basis for %s\n", fname);
+				exit_cleanup(RERR_PROTOCOL);
+			}
+			fnamecmp = fname;
+			fnamecmp_type = FNAMECMP_FNAME;
 		}
 
 		if (fd1 == -1 && protocol_version < 29) {
@@ -1009,7 +1027,10 @@ int recv_files(int f_in, int f_out, char *local_name)
 			fnamecmp = fnamecmpbuf;
 		}
 
-		one_inplace = inplace_partial && fnamecmp_type == FNAMECMP_PARTIAL_DIR;
+		/* A peer's basis selector cannot enable direct output through a path
+		 * that the confined basis open did not validate. */
+		one_inplace = inplace_partial && fnamecmp_type == FNAMECMP_PARTIAL_DIR
+			   && fd1 != -1;
 		updating_basis_or_equiv = one_inplace
 		    || (inplace && (fnamecmp == fname || fnamecmp_type == FNAMECMP_BACKUP));
 
