@@ -27,6 +27,7 @@
 extern int module_id;
 extern int local_server;
 extern int sanitize_paths;
+extern int operator_path_resolve;
 extern int trust_sender_args;
 extern int trust_sender_filter;
 extern unsigned int module_dirlen;
@@ -2546,8 +2547,17 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			}
 			/* Operator-supplied path that may transit attacker-writable
 			 * parents; refuse symlinks not owned by uid 0 or our euid,
-			 * as for --exclude-from/--include-from/--filter in exclude.c. */
+			 * as for --exclude-from/--include-from/--filter in exclude.c.
+			 * A daemon reads this list from a CLIENT-requested path
+			 * (--files-from=:LIST) and it must stay inside the module:
+			 * operator_path_resolve makes the ownership walk also refuse a
+			 * (trusted-owned) symlink that redirects the list outside the
+			 * module root -- e.g. a root-owned backup symlink. No-op off a
+			 * daemon (the module-root check only fires when am_daemon). */
+			int save_opr = operator_path_resolve;
+			operator_path_resolve = 1;
 			filesfrom_fd = open_no_attacker_symlinks(files_from, O_RDONLY|O_BINARY, 0);
+			operator_path_resolve = save_opr;
 			if (filesfrom_fd < 0) {
 				snprintf(err_buf, sizeof err_buf,
 					"failed to open files-from file %s: %s\n",
