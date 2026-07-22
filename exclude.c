@@ -1053,6 +1053,21 @@ int is_implied_parent_dir(const char *name)
 	if (!implied_filter_list.head)
 		return 0;
 
+	/* The receiver exempts its synthetic transfer-root entry from the
+	 * requested-name filter.  Treat it as parent-only unless an empty/root
+	 * source argument added the root-content rule. */
+	if ((name[0] == '.' && name[1] == '\0')
+	 || (name[0] == '/' && name[1] == '.' && name[2] == '\0')) {
+		for (ent = implied_filter_list.head; ent; ent = ent->next) {
+			if (!(ent->rflags & FILTRULE_INCLUDE))
+				continue;
+			if (strcmp(ent->pattern, "/**") == 0
+			 || strcmp(ent->pattern, "/*") == 0)
+				return 0;
+		}
+		return 1;
+	}
+
 	for (ent = implied_filter_list.head; ent; ent = ent->next) {
 		if (ent->rflags & (FILTRULE_PERDIR_MERGE | FILTRULE_CVS_IGNORE))
 			continue;

@@ -1255,13 +1255,17 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 			} else if (xflags & XMIT_TOP_DIR)
 				file->flags |= FLAG_IMPLIED_DIR;
 		} else if (xflags & XMIT_TOP_DIR) {
-			in_del_hier = recurse;
-			del_hier_name_len = F_DEPTH(file) == 0 ? 0 : l1 + l2;
-			if (relative_paths && del_hier_name_len > 2
-			    && lastname[del_hier_name_len-1] == '.'
-			    && lastname[del_hier_name_len-2] == '/')
-				del_hier_name_len -= 2;
-			file->flags |= FLAG_TOP_DIR | FLAG_CONTENT_DIR;
+			if (implied_filter_list.head && is_implied_parent_dir(thisname))
+				file->flags |= FLAG_IMPLIED_DIR;
+			else {
+				in_del_hier = recurse;
+				del_hier_name_len = F_DEPTH(file) == 0 ? 0 : l1 + l2;
+				if (relative_paths && del_hier_name_len > 2
+				    && lastname[del_hier_name_len-1] == '.'
+				    && lastname[del_hier_name_len-2] == '/')
+					del_hier_name_len -= 2;
+				file->flags |= FLAG_TOP_DIR | FLAG_CONTENT_DIR;
+			}
 		} else if (in_del_hier) {
 			if (!relative_paths || !del_hier_name_len
 			 || (l1 >= del_hier_name_len
