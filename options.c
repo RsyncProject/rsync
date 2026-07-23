@@ -89,6 +89,7 @@ int preallocate_files = 0;
 int do_compression = 0;
 int do_compression_level = CLVL_NOT_SPECIFIED;
 int do_compression_threads = 0; /*n = 0 use rsync thread, n >= 1 spawn n threads for compression */
+#define MAX_DAEMON_COMPRESSION_THREADS 8
 int am_root = 0; /* 0 = normal, 1 = root, 2 = --super, -1 = --fake-super */
 int am_server = 0;
 int am_sender = 0;
@@ -2131,6 +2132,12 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		}
 		if (do_compression_threads < 0)
 			do_compression_threads = 0;
+		/* A daemon client controls the server-side sender arguments.  Keep one
+		 * unauthenticated connection from asking Zstandard to materialize its
+		 * implementation maximum (currently hundreds) of worker threads.  Local
+		 * and remote-shell invocations retain the operator-requested value. */
+		if (am_daemon && do_compression_threads > MAX_DAEMON_COMPRESSION_THREADS)
+			do_compression_threads = MAX_DAEMON_COMPRESSION_THREADS;
 	}
 
 #ifdef HAVE_SETVBUF
