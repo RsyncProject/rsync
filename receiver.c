@@ -989,10 +989,12 @@ int recv_files(int f_in, int f_out, char *local_name)
 		}
 		if (fnamecmp_type == FNAMECMP_PARTIAL_DIR && fd1 == -1) {
 			/* The sender may claim a partial basis even when the generator's
-			 * confined lookup rejected it.  Do not retain that path for direct
-			 * output or post-transfer cleanup.  A daemon rejects its unsafe
-			 * peer option; a pull client can safely receive a no-basis update. */
-			if (am_daemon) {
+			 * confined lookup rejected it.  Drop that path as the delta basis
+			 * and in-place output target.  A daemon that negotiated in-place
+			 * partial updates rejects the unsafe peer option; otherwise (a pre-30
+			 * peer, where no in-place partial redirect is possible, or a pull
+			 * client) fall back to a safe no-basis update. */
+			if (am_daemon && inplace_partial) {
 				rprintf(FERROR,
 					"rsync: refusing unconfined partial basis for %s\n", fname);
 				exit_cleanup(RERR_PROTOCOL);
