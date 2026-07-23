@@ -22,7 +22,7 @@ export RSYNC_PASSWORD=XXXXXX
 ########################################################################
 
 BACKUPDIR=`date +%A`
-OPTS="--force --ignore-errors --delete-excluded --exclude-from=$EXCLUDES 
+OPTS="--force --ignore-errors --delete-excluded --exclude-from=$EXCLUDES
       --delete --backup --backup-dir=/$BACKUPDIR -a"
 
 export PATH=$PATH:/bin:/usr/bin:/usr/local/bin

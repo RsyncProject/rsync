@@ -2,7 +2,7 @@
  */
 
 /* (C) 1998-2000 Red Hat, Inc. -- Licensing details are in the COPYING
-   file accompanying popt source distributions, available from 
+   file accompanying popt source distributions, available from
    ftp://ftp.rpm.org/pub/rpm/dist. */
 
 #ifndef H_POPT
@@ -21,8 +21,8 @@
 #define POPT_ARG_LONG		 3U	/*!< arg ==> long */
 #define POPT_ARG_INCLUDE_TABLE	 4U	/*!< arg points to table */
 #define POPT_ARG_CALLBACK	 5U	/*!< table-wide callback... must be
-					   set first in table; arg points 
-					   to callback, descrip points to 
+					   set first in table; arg points
+					   to callback, descrip points to
 					   callback data to pass */
 #define POPT_ARG_INTL_DOMAIN     6U	/*!< set the translation domain
 					   for this table and any
@@ -173,7 +173,7 @@ typedef struct poptOption * poptOption;
 /**
  */
 enum poptCallbackReason {
-    POPT_CALLBACK_REASON_PRE	= 0, 
+    POPT_CALLBACK_REASON_PRE	= 0,
     POPT_CALLBACK_REASON_POST	= 1,
     POPT_CALLBACK_REASON_OPTION = 2
 };
@@ -190,7 +190,7 @@ extern "C" {
  * @param arg		@todo Document.
  * @param data		@todo Document.
  */
-typedef void (*poptCallbackType) (poptContext con, 
+typedef void (*poptCallbackType) (poptContext con,
 		enum poptCallbackReason reason,
 		const struct poptOption * opt,
 		const char * arg,
@@ -391,7 +391,7 @@ int poptParseArgvString(const char * s,
 		int * argcPtr, const char *** argvPtr);
 
 /**
- * Parses an input configuration file and returns an string that is a 
+ * Parses an input configuration file and returns an string that is a
  * command line.  For use with popt.  You must free the return value when done.
  *
  * Given the file:
@@ -400,14 +400,14 @@ int poptParseArgvString(const char * s,
     #   this one too
 aaa
   bbb
-    ccc   
+    ccc
 bla=bla
 
 this_is   =   fdsafdas
-     bad_line=        
+     bad_line=
   really bad line
   really bad line  = again
-5555=   55555   
+5555=   55555
   test = with lots of spaces
 \endverbatim
 *
@@ -419,12 +419,12 @@ this_is   =   fdsafdas
 * Passing this to poptParseArgvString() yields an argv of:
 \verbatim
 '--aaa'
-'--bbb' 
-'--ccc' 
-'--bla=bla' 
-'--this_is=fdsafdas' 
-'--5555=55555' 
-'--test=with lots of spaces' 
+'--bbb'
+'--ccc'
+'--bla=bla'
+'--this_is=fdsafdas'
+'--5555=55555'
+'--test=with lots of spaces'
 \endverbatim
  *
  * @bug NULL is returned if file line is too long.

@@ -1,7 +1,7 @@
 Compiling rsync for MS Windows 95
 =================================
 
-Caveat: 
+Caveat:
 There are no doubt other ways to do this, but I have not tried them.
 
 This will produce an rsync binary which runs under win95/NT which can _send_
@@ -17,13 +17,13 @@ Step 1. Get the Cygnus development kit
 --------------------------------------
 
 If you do not already know about this wonderful project undertaken by cygnus,
-grab the latest copy of the gnu-win32 runtime system from 
+grab the latest copy of the gnu-win32 runtime system from
 
     http://www.cygnus.com/misc/gnu-win32/
 
 You will want the CDK-B19.EXE self-installing binary (be warned - it's 12M
 in size) which contains gcc+binutils+DLLs required by the system. Read the
-instructions about this and install it. You will then have something which 
+instructions about this and install it. You will then have something which
 looks _very_ close to a UNIX box as far as any UNIX software ic concerned.
 
 Also grab the updated version (B19.1) of the DLL as this fixes some problems
@@ -67,7 +67,7 @@ will probably run into these things also...
 
 1. rsync will not _receive_ data onto a windows box. It seems to do everything
    ok, but then hangs at the last step and no files actually appear. When
-   transferring via my modem, I can see data being received, but it never 
+   transferring via my modem, I can see data being received, but it never
    appears in my directory.
 
 NOTE: This now appears to be fixed.
@@ -103,7 +103,7 @@ NOTE: This now appears to be fixed.
    which is then run by bash and calls the ssh binary (wherever you have
    installed it).
 
-   I suspect that there is a better way, but I have not yet had time to 
+   I suspect that there is a better way, but I have not yet had time to
    look for it.
 
 

@@ -16,11 +16,11 @@ the backup. This is the script I use on one of those machines.
     done
 
     DAY=`date "+%A"`
-    
+
     rsync -a --delete /usr/local/apache /data2/backups/$DAY
     rsync -a --delete /data/solid /data2/backups/$DAY
 
-   
+
 
 The first part does the backup on the spare disk. The second part
 backs up the critical parts to daily directories.  I also backup the

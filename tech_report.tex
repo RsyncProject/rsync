@@ -82,13 +82,13 @@ The rsync algorithm consists of the following steps:
   128-bit MD4 checksum.
 
 \item $\beta$ sends these checksums to $\alpha$.
-  
+
 \item $\alpha$ searches through $A$ to find all blocks of length $S$
   bytes (at any offset, not just multiples of $S$) that have the same
   weak and strong checksum as one of the blocks of $B$. This can be
   done in a single pass very quickly using a special property of the
   rolling checksum described below.
-  
+
 \item $\alpha$ sends $\beta$ a sequence of instructions for
   constructing a copy of $A$.  Each instruction is either a reference
   to a block of $B$, or literal data.  Literal data is sent only for
@@ -120,7 +120,7 @@ $$ b(k,l) = (\sum_{i=k}^l (l-i+1)X_i) \bmod M $$
 $$ s(k,l) = a(k,l) + 2^{16} b(k,l) $$
 
 where $s(k,l)$ is the rolling checksum of the bytes $X_k \ldots X_l$.
-For simplicity and speed, we use $M = 2^{16}$.  
+For simplicity and speed, we use $M = 2^{16}$.
 
 The important property of this checksum is that successive values can
 be computed very efficiently using the recurrence relations
@@ -198,11 +198,11 @@ gain a considerable latency advantage by pipelining the process.
 This involves $\beta$ initiating two independent processes. One of the
 processes generates and sends the checksums to $\alpha$ while the
 other receives the difference information from $\alpha$ and
-reconstructs the files. 
+reconstructs the files.
 
 If the communications link is buffered then these two processes can
 proceed independently and the link should be kept fully utilised in
-both directions for most of the time. 
+both directions for most of the time.
 
 \section{Results}
 
@@ -270,7 +270,7 @@ rolling checksum plus 16 bytes for the 128-bit MD4 checksum.
 
 The number of false alarms was less than $1/1000$ of the number of
 true matches, indicating that the 32-bit rolling checksum is quite
-good at screening out false matches. 
+good at screening out false matches.
 
 The number of tag hits indicates that the second level of the
 checksum search algorithm was invoked about once every 50

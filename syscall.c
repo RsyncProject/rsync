@@ -1978,7 +1978,7 @@ int secure_relative_open(const char *basedir, const char *relpath, int flags, mo
 		if (dirfd != AT_FDCWD) close(dirfd);
 		return -1;
 	}
-	
+
 	for (const char *part = strtok(path_copy, "/");
 	     part != NULL;
 	     part = strtok(NULL, "/"))
