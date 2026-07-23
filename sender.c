@@ -107,6 +107,17 @@ static int secure_sender_parent_fd(struct file_struct *file, const char *fname, 
 			}
 			memcpy(dir, fname, dlen);
 			dir[dlen] = '\0';
+			/* An absolute --relative name is still rooted at / after
+			 * change_pathname().  Resolving its parent through the cwd-backed
+			 * dirfd cache would re-anchor cleanup at the sender's working
+			 * directory and can remove a same-named, unrelated entry there. */
+			if (*fname == '/') {
+				const char *rel = dir;
+				while (*rel == '/')
+					rel++;
+				return secure_relative_open("/", rel,
+					O_RDONLY | O_DIRECTORY, 0);
+			}
 			/* held_dir_path_fd returns a cache-OWNED fd; the caller closes
 			 * what we return, so hand back an owned dup and leave the cache's
 			 * dirfd intact.  An uncacheable (very deep) dir declines with
