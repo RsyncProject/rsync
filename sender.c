@@ -172,15 +172,12 @@ static int secure_sender_parent_fd(struct file_struct *file, const char *fname, 
 #endif
 }
 
+/* Go through the do_*() wrapper rather than a raw unlinkat(): it carries the
+ * dry_run no-op and the read-only/list-only refusal that do_unlink() applies
+ * on the non-fd path, plus the missing-AT_FDCWD fallback. */
 static int secure_remove_source_file(int dfd, const char *bname)
 {
-#ifdef AT_FDCWD
-	return unlinkat(dfd, bname, 0);
-#else
-	(void)dfd; (void)bname;
-	errno = ENOSYS;
-	return -1;
-#endif
+	return do_unlink_atfd(dfd, bname, 0);
 }
 
 /* Open `relpath` (relative to `anchor`: NULL=cwd, else an absolute trusted root)
