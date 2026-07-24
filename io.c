@@ -59,6 +59,7 @@ extern int xfer_sum_len;
 extern int daemon_connection;
 extern int protocol_version;
 extern int remove_source_files;
+extern int write_batch;
 extern int preserve_hard_links;
 extern BOOL extra_flist_sending_enabled;
 extern BOOL flush_ok_after_signal;
@@ -1092,6 +1093,13 @@ void send_msg_int(enum msgcode code, int num)
 
 void send_msg_success(const char *fname, int num)
 {
+	/* Batch-only mode has not duplicated anything on the receiving side yet.
+	 * The receiver still reports success to the generator for file-list and
+	 * hard-link bookkeeping, but the generator must not turn that status into
+	 * sender-side removal. */
+	if (am_generator && write_batch < 0 && remove_source_files)
+		return;
+
 	if (local_server) {
 		STRUCT_STAT st;
 
@@ -1131,7 +1139,7 @@ static void got_flist_entry_status(enum festatus status, int ndx)
 
 	switch (status) {
 	case FES_SUCCESS:
-		if (remove_source_files) {
+		if (remove_source_files && write_batch >= 0) {
 			if (local_server)
 				send_msg(MSG_SUCCESS, num_dev_ino_buf, sizeof num_dev_ino_buf, -1);
 			else
