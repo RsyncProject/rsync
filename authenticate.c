@@ -22,6 +22,13 @@
 #include "itypes.h"
 #include "ifuncs.h"
 
+/* O_CLOEXEC is absent on some still-supported targets.  The random-source fd
+ * is read and closed synchronously, so the established zero-value fallback is
+ * sufficient without adding a configure dependency. */
+#ifndef O_CLOEXEC
+#define O_CLOEXEC 0
+#endif
+
 extern int read_only;
 extern char *password_file;
 extern struct name_num_obj valid_auth_checksums;
