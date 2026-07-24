@@ -1111,8 +1111,19 @@ int do_mknod_at(const char *pathname, mode_t mode, dev_t dev)
 		dfd = owner_walk_parent(pathname, &bname);
 		if (dfd < 0)
 			return -1;
-		ret = mknodat(dfd, bname, mode, dev);
-		if (ret < 0) {
+		if (am_root < 0) {
+			/* Fake-super represents a special file with an inert regular
+			 * placeholder.  Keep that representation when the destination
+			 * is an operator path, but create it relative to the verified
+			 * parent so the confinement guarantee is unchanged. */
+			int fd = openat(dfd, bname,
+				O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW,
+				S_IWUSR | S_IRUSR);
+			ret = fd < 0 ? -1 : close(fd);
+		} else {
+			ret = mknodat(dfd, bname, mode, dev);
+		}
+		if (ret < 0 && am_root >= 0) {
 			/* mknodat() can't make a FIFO/socket on the BSDs/macOS/
 			 * Solaris (EINVAL); retry race-safely on the held dirfd,
 			 * mirroring the secure-relpath path below.  Without this a
