@@ -965,6 +965,25 @@ int do_lchown_at(const char *fname, uid_t owner, gid_t group)
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
 
+#if defined O_NOFOLLOW && defined O_DIRECTORY
+	/* Operator-supplied path: resolve the parent via the ownership walk, as
+	 * the other do_*_at() wrappers do.  Without this the caller's
+	 * operator_path_resolve has no effect here, and an absolute name would
+	 * fall straight through to the unconfined full-path do_lchown(). */
+	if (operator_path_resolve && fname && *fname) {
+		if (symlink_optout_allowed())
+			return do_lchown(fname, owner, group);
+		dfd = owner_walk_parent(fname, &bname);
+		if (dfd < 0)
+			return -1;
+		ret = fchownat(dfd, bname, owner, group, AT_SYMLINK_NOFOLLOW);
+		e = errno;
+		close(dfd);
+		errno = e;
+		return ret;
+	}
+#endif
+
 	if (!secure_relpath_active())
 		return do_lchown(fname, owner, group);
 
@@ -1510,6 +1529,26 @@ int do_chmod_at(const char *fname, mode_t mode)
 
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
+
+#if defined O_NOFOLLOW && defined O_DIRECTORY
+	/* Operator-supplied path: resolve the parent via the ownership walk, as
+	 * the other do_*_at() wrappers do.  Without this the caller's
+	 * operator_path_resolve has no effect here, and an absolute name would
+	 * fall straight through to the unconfined full-path do_chmod().
+	 * S_ISLNK(mode) still needs do_chmod()'s lchmod()/setattrlist() handling. */
+	if (operator_path_resolve && fname && *fname && !S_ISLNK(mode)) {
+		if (symlink_optout_allowed())
+			return do_chmod(fname, mode);
+		dfd = owner_walk_parent(fname, &bname);
+		if (dfd < 0)
+			return -1;
+		ret = do_fchmodat_nofollow(dfd, bname, mode);
+		e = errno;
+		close(dfd);
+		errno = e;
+		return ret;
+	}
+#endif
 
 	/* Only the daemon-without-chroot case is exposed to the symlink-
 	 * race attack: a chroot already confines the receiver, and a
