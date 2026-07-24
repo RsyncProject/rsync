@@ -53,6 +53,7 @@ extern int inplace;
 extern int inplace_partial;
 extern int batch_fd;
 extern char *module_dir;
+extern int module_dirfd;
 extern int write_batch;
 extern int file_old_total;
 extern BOOL want_progress_now;
@@ -286,7 +287,14 @@ static int sender_open_copylinks_confined(const char *anchor, const char *relpat
 			dir[0] = '\0';
 			bname = cur;
 		}
-		if ((pdfd = secure_relative_open(anchor, dir, O_RDONLY | O_DIRECTORY, 0)) < 0)
+		if (am_daemon && module_dirfd >= 0 && module_dir
+		 && strcmp(anchor, module_dir) == 0)
+			pdfd = secure_relative_open_at_beneath(module_dirfd, dir,
+					O_RDONLY | O_DIRECTORY, 0);
+		else
+			pdfd = secure_relative_open(anchor, dir,
+					O_RDONLY | O_DIRECTORY, 0);
+		if (pdfd < 0)
 			return -1;
 		n = do_readlink_atfd(pdfd, bname, tgt, sizeof tgt - 1);
 		e = errno;

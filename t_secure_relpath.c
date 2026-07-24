@@ -99,6 +99,44 @@ static void check_basedir(const char *basedir)
 	fprintf(stderr, "OK   [basedir=%-12s]: rejected with EINVAL\n", basedir);
 }
 
+static void check_beneath_dotdot(void)
+{
+	STRUCT_STAT ast, fst;
+	int anchor, fd;
+
+	anchor = open(".", O_RDONLY | O_DIRECTORY);
+	if (anchor < 0 || fstat(anchor, &ast) < 0) {
+		perror("open/fstat anchor");
+		errs++;
+		return;
+	}
+
+	fd = secure_relative_open_at_beneath(anchor, "alias/../subdir",
+					     O_RDONLY | O_DIRECTORY, 0);
+	if (fd < 0 || fstat(fd, &fst) < 0 || fst.st_dev != ast.st_dev
+	 || fst.st_ino == ast.st_ino) {
+		fprintf(stderr, "FAIL [beneath safe]: in-anchor '..' was not resolved\n");
+		errs++;
+	} else
+		fprintf(stderr, "OK   [beneath safe]: in-anchor '..' resolved\n");
+	if (fd >= 0)
+		close(fd);
+
+	errno = 0;
+	fd = secure_relative_open_at_beneath(anchor, "../outside",
+					     O_RDONLY | O_DIRECTORY, 0);
+	if (fd >= 0 || errno != ELOOP) {
+		fprintf(stderr, "FAIL [beneath escape]: rc=%d errno=%d, expected -1/ELOOP\n",
+			fd, errno);
+		if (fd >= 0)
+			close(fd);
+		errs++;
+	} else
+		fprintf(stderr, "OK   [beneath escape]: climb above anchor refused\n");
+
+	close(anchor);
+}
+
 int main(int argc, char **argv)
 {
 	if (argc != 2) {
@@ -119,6 +157,7 @@ int main(int argc, char **argv)
 	am_chrooted = 0;
 
 	mkdir("subdir", 0755);
+	symlink("subdir", "alias");
 
 	/* Each of these relpaths must be rejected with EINVAL at the
 	 * secure_relative_open() front door. ".." is the actual one-level
@@ -144,6 +183,11 @@ int main(int argc, char **argv)
 	check_basedir("../subdir");
 	check_basedir("subdir/..");
 	check_basedir("foo/../bar");
+
+	/* A followed symlink target is the one caller that legitimately carries
+	 * literal '..'.  Its dedicated fd-anchored entry point must preserve an
+	 * in-tree climb while refusing to pop above the anchor. */
+	check_beneath_dotdot();
 
 	if (errs)
 		fprintf(stderr, "\n%d failure(s)\n", errs);

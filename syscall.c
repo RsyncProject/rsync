@@ -3033,18 +3033,16 @@ int secure_relative_open(const char *basedir, const char *relpath, int flags, mo
 #endif // O_NOFOLLOW, O_DIRECTORY
 }
 
-/* Like secure_relative_open() but anchored at an already-open directory fd
- * (borrowed -- the caller keeps ownership) rather than a basedir path.  Lets a
- * caller pin the trust root once -- e.g. a daemon's module root opened while
- * still privileged, or reached by climbing ".." up from the cwd -- and resolve a
- * relative path beneath it without re-walking (and re-permission-checking) the
- * absolute path as a dropped-privilege uid.  `relpath` must be relative and must
- * not contain a literal ".." component (a ".." inside a followed in-tree symlink
- * target is still handled by the walk). */
-int secure_relative_open_at(int anchor_fd, const char *relpath, int flags, mode_t mode)
+/* Common fd-anchored resolver.  A caller may explicitly allow literal ".."
+ * components when the fd itself is the confinement boundary: secure_walk_at()
+ * resolves each one by popping its held-dirfd stack and refuses a pop above the
+ * anchor.  Other callers retain the front-door validation used by
+ * secure_relative_open(). */
+static int secure_relative_open_at_internal(int anchor_fd, const char *relpath,
+					    int flags, mode_t mode, int allow_dotdot)
 {
 #if !defined(O_NOFOLLOW) || !defined(O_DIRECTORY) || !defined(AT_FDCWD)
-	(void)anchor_fd; (void)relpath; (void)flags; (void)mode;
+	(void)anchor_fd; (void)relpath; (void)flags; (void)mode; (void)allow_dotdot;
 	errno = ENOSYS;
 	return -1;
 #else
@@ -3053,7 +3051,7 @@ int secure_relative_open_at(int anchor_fd, const char *relpath, int flags, mode_
 		errno = EINVAL;
 		return -1;
 	}
-	if (path_has_dotdot_component(relpath)) {
+	if (!allow_dotdot && path_has_dotdot_component(relpath)) {
 		errno = EINVAL;
 		return -1;
 	}
@@ -3066,6 +3064,27 @@ int secure_relative_open_at(int anchor_fd, const char *relpath, int flags, mode_
 	 * exclude-aware refusal is a no-op for this entry point. */
 	return secure_walk_at(anchor_fd, NULL, relpath, flags, mode, &hops);
 #endif
+}
+
+/* Like secure_relative_open() but anchored at an already-open directory fd
+ * (borrowed -- the caller keeps ownership) rather than a basedir path.  Lets a
+ * caller pin the trust root once -- e.g. a daemon's module root opened while
+ * still privileged -- and resolve a relative path beneath it without re-walking
+ * the absolute path as a dropped-privilege uid.  The ordinary entry point keeps
+ * rejecting literal ".." components as suspicious caller input. */
+int secure_relative_open_at(int anchor_fd, const char *relpath, int flags, mode_t mode)
+{
+	return secure_relative_open_at_internal(anchor_fd, relpath, flags, mode, 0);
+}
+
+/* Resolve a path that may contain literal ".." beneath a trusted anchor fd.
+ * Used for a followed symlink target, where parent-relative components are
+ * normal pathname semantics.  The held-fd stack still refuses every escape
+ * above anchor_fd. */
+int secure_relative_open_at_beneath(int anchor_fd, const char *relpath,
+				    int flags, mode_t mode)
+{
+	return secure_relative_open_at_internal(anchor_fd, relpath, flags, mode, 1);
 }
 
 #if defined O_NOFOLLOW && defined O_DIRECTORY && defined AT_FDCWD
