@@ -1416,8 +1416,8 @@ int do_chmod(const char *path, mode_t mode)
  * exists we skip with a warning rather than follow the leaf. */
 static int do_fchmodat_nofollow(int dfd, const char *name, mode_t mode)
 {
-	mode &= CHMOD_BITS;
 #if defined AT_FDCWD && defined AT_SYMLINK_NOFOLLOW
+	mode &= CHMOD_BITS;
 # if defined __linux__
 	{
 		STRUCT_STAT st;
@@ -1463,6 +1463,8 @@ static int do_fchmodat_nofollow(int dfd, const char *name, mode_t mode)
 	return fchmodat(dfd, name, mode, AT_SYMLINK_NOFOLLOW);
 # endif
 #else
+	(void)dfd;
+	(void)mode;
 	/* No symlink-safe chmod primitive here: skip rather than follow the leaf. */
 	rprintf(FWARNING, "do_chmod: no symlink-safe chmod for \"%s\"; mode not set\n", name);
 	return 1;
