@@ -1063,7 +1063,12 @@ int recv_files(int f_in, int f_out, char *local_name)
 		 * trusted absolute fnamecmp (e.g. an absolute --partial-dir basis). */
 		{
 			int bdfd;
-			if (!basedir && (bdfd = vfs_cached_dirfd(fnamecmp, file)) >= 0) {
+			if (fnamecmp_type == FNAMECMP_PARTIAL_DIR
+			 && fnamecmp && *fnamecmp != '/') {
+				/* The relative partial path contains peer-derived directory
+				 * components.  It is not an operator-trusted path as a whole. */
+				fd1 = vfs_resolve_open(NULL, fnamecmp, O_RDONLY, 0);
+			} else if (!basedir && (bdfd = vfs_cached_dirfd(fnamecmp, file)) >= 0) {
 				const char *slash;
 				assert(fnamecmp != NULL); /* set on every path above */
 				slash = strrchr(fnamecmp, '/');
