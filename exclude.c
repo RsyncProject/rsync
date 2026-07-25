@@ -41,6 +41,7 @@ extern int sanitize_paths;
 extern int protocol_version;
 extern int trust_sender_args;
 extern int module_id;
+extern int operator_path_resolve;
 
 extern char curr_dir[MAXPATHLEN];
 extern unsigned int curr_dir_len;
@@ -1553,7 +1554,12 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 			open_path = line;
 		} else
 			open_path = fname;
+        
+		int save_opr = operator_path_resolve;
+		operator_path_resolve = 1;
 		fd = open_no_attacker_symlinks(open_path, O_RDONLY, 0);
+		operator_path_resolve = save_opr;
+		
 		if (fd < 0)
 			fp = NULL;
 		else if (!(fp = fdopen(fd, "rb")))
