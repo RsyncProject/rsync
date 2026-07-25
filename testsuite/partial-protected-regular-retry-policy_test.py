@@ -256,4 +256,10 @@ if observed == new_source:
 if observed != secret_data:
     test_fail(f'outside-policy target has unexpected contents after retry: '
               f'rc={result.returncode}, output={result.stdout!r}')
+# Anti-vacuity, checked only after the escape assertions above: a vulnerable
+# build runs no ownership walk at all, so this must not pre-empt them.
+if not foreign_check_marker.exists():
+    test_fail('inconclusive: the recovery never inspected the raced partial-dir '
+              f'symlink, so no ownership check ran: rc={result.returncode}, '
+              f'output={result.stdout!r}')
 print('EACCES recovery retained partial-dir ownership policy')
