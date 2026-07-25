@@ -73,10 +73,12 @@ if sentinel.exists():
         f"single-quoted %RSYNC_USER_NAME% hook (rc={proc.returncode}):\n"
         f"{proc.stderr}"
     )
-if proc.returncode != 0:
+# The username carries shell syntax, so the daemon refuses it rather than
+# trying to quote it; the transfer must fail closed.
+if proc.returncode == 0:
     test_fail(
-        "context-aware hook expansion prevented injection but broke the transfer "
+        "daemon accepted an authenticated username holding shell syntax "
         f"(rc={proc.returncode}):\n{proc.stderr}"
     )
 
-print("single-quoted daemon hook expansion kept the username as literal data")
+print("single-quoted daemon hook refused a username holding shell syntax")

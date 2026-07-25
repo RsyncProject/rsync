@@ -170,10 +170,35 @@ enum shell_quote_context {
 	SHELL_DOUBLE_QUOTED
 };
 
+/* Characters that can turn a substituted value into shell syntax rather than
+ * data, in any quoting context.  Quoting alone cannot be relied on here:
+ * context-aware escaping is correct for exactly one level of shell parsing,
+ * and a hook such as `sh -c '... %RSYNC_USER_NAME% ...'` re-parses the word in
+ * a second shell that sees the value bare.  Peer-supplied values carrying any
+ * of these are refused instead.  Word-splitting and glob characters are left
+ * alone: they cannot execute anything, and paths legitimately contain them. */
+static int shell_unsafe_value(const char *val)
+{
+	const char *s;
+
+	for (s = val; *s; s++) {
+		if (strchr("'\"`$\\;&|<>()", *s)
+		 || (unsigned char)*s < 0x20 || (unsigned char)*s == 0x7f)
+			return 1;
+	}
+	return 0;
+}
+
 static char *expand_vars_shell_escape(const char *val, int quote_context)
 {
 	const char *s;
 	char *ret, *t;
+	/* A double-quoted value is deliberately BOTH backslash-escaped and
+	 * wrapped in single quotes.  The wrap is redundant for one level of
+	 * shell parsing (and shows up as literal quotes in the value), but a
+	 * hook such as `sh -c "... %RSYNC_USER_NAME% ..."` re-parses the word
+	 * in a second shell, where the backslashes are already gone and only
+	 * the quotes still protect it. */
 	size_t len = quote_context == SHELL_SINGLE_QUOTED ? 0 : 2;
 
 	for (s = val; *s; s++) {
@@ -233,8 +258,17 @@ static char *expand_vars(const char *str, int shell_escape)
 					 * params (path, uid, gid, ...) leave them verbatim --
 					 * quoting there would corrupt the value (e.g. a documented
 					 * `path = /home/%RSYNC_USER_NAME%` would become /home/'x'). */
-					if (shell_escape && strncmp(t, "RSYNC_", 6) == 0)
+					if (shell_escape && strncmp(t, "RSYNC_", 6) == 0) {
+						if (shell_unsafe_value(val)) {
+							/* Fail closed: the hook may be an access
+							 * check, so skipping it is not an option. */
+							rprintf(FLOG,
+								"refusing to run shell hook: %%%s%% holds a shell metacharacter\n",
+								t);
+							exit_cleanup(RERR_UNSUPPORTED);
+						}
 						val = escaped = expand_vars_shell_escape(val, quote_context);
+					}
 					len = strlcpy(t, val, bufsize+1);
 					if (escaped)
 						free(escaped);
@@ -249,17 +283,25 @@ static char *expand_vars(const char *str, int shell_escape)
 		}
 		if (shell_escape) {
 			if (quote_context == SHELL_SINGLE_QUOTED) {
+				/* Nothing is special inside '...', not even a backslash;
+				 * only the closing quote ends it. */
 				if (*f == '\'')
 					quote_context = SHELL_UNQUOTED;
 			} else if (escaped_char)
 				escaped_char = 0;
 			else if (*f == '\\')
 				escaped_char = 1;
-			else if (*f == '\'')
+			else if (quote_context == SHELL_DOUBLE_QUOTED) {
+				/* A single quote inside "..." is literal and must not be
+				 * taken as opening a single-quoted run -- doing so would
+				 * de-sync the tracker and escape a later value for the
+				 * wrong context. */
+				if (*f == '"')
+					quote_context = SHELL_UNQUOTED;
+			} else if (*f == '\'')
 				quote_context = SHELL_SINGLE_QUOTED;
 			else if (*f == '"')
-				quote_context = quote_context == SHELL_DOUBLE_QUOTED
-					? SHELL_UNQUOTED : SHELL_DOUBLE_QUOTED;
+				quote_context = SHELL_DOUBLE_QUOTED;
 		}
 		*t++ = *f++;
 		bufsize--;
