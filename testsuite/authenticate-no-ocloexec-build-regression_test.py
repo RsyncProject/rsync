@@ -10,8 +10,37 @@ from pathlib import Path
 from rsyncfns import SCRATCHDIR, rmtree, test_fail, test_skipped
 
 
+def makefile_vars(repo, names):
+    """Read variables out of the tree's configured Makefile.
+
+    The probe has to compile the production translation unit the same way the
+    build does.  Where a dependency lives outside the default search path --
+    openssl from brew on macOS, say -- configure records that in CPPFLAGS, and
+    a probe that hard-codes its own include list fails to find <openssl/sha.h>
+    for reasons that have nothing to do with O_CLOEXEC.
+    """
+    found = {}
+    makefile = repo / "Makefile"
+    if makefile.exists():
+        for line in makefile.read_text(errors="replace").splitlines():
+            for name in names:
+                if line.startswith(name + "="):
+                    found[name] = line[len(name) + 1:].strip()
+    return found
+
+
+repo = Path(os.environ.get(
+    "RSYNC_SOURCE_UNDER_TEST", Path(__file__).resolve().parent.parent))
+source_path = repo / "authenticate.c"
+config_path = repo / "config.h"
+if not source_path.exists() or not config_path.exists():
+    test_skipped(f"configured rsync source tree unavailable at {repo}")
+
+build_vars = makefile_vars(repo, ("CC", "CPPFLAGS"))
+
+
 def compiler():
-    value = os.environ.get("CC")
+    value = os.environ.get("CC") or build_vars.get("CC")
     if value:
         return shlex.split(value)
     for name in ("cc", "clang", "gcc"):
@@ -24,13 +53,6 @@ def compiler():
 cc = compiler()
 if not cc:
     test_skipped("no C compiler available for the O_CLOEXEC feature probe")
-
-repo = Path(os.environ.get(
-    "RSYNC_SOURCE_UNDER_TEST", Path(__file__).resolve().parent.parent))
-source_path = repo / "authenticate.c"
-config_path = repo / "config.h"
-if not source_path.exists() or not config_path.exists():
-    test_skipped(f"configured rsync source tree unavailable at {repo}")
 
 base = SCRATCHDIR / "authenticate-no-ocloexec-build-regression"
 rmtree(base)
@@ -49,6 +71,7 @@ probe_c.write_text(source)
 
 includes = [f"-I{repo}", f"-I{repo / 'popt'}", f"-I{repo / 'zlib'}",
             "-DHAVE_CONFIG_H", "-O0", "-g", "-Wall", "-Wextra"]
+includes += shlex.split(build_vars.get("CPPFLAGS", ""))
 build = subprocess.run(
     cc + includes + ["-c", str(probe_c), "-o", str(probe_o)],
     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
