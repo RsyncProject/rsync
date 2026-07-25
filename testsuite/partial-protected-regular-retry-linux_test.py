@@ -38,6 +38,7 @@ if _proto is not None and _proto < 30:
 hook_code = r'''
 #define _GNU_SOURCE
 #include <sys/stat.h>
+#include <sys/syscall.h>
 #include <sys/types.h>
 #include <dlfcn.h>
 #include <errno.h>
@@ -56,11 +57,37 @@ static int (*real_openat)(int, const char *, int, ...);
 static int (*real_fstatat)(int, const char *, struct stat *, int);
 static int (*real_fxstatat)(int, int, const char *, struct stat *, int);
 
+/* Resolve on demand rather than trusting our constructor to have run.  A
+ * preloaded open() interposes for the whole process the moment the loader maps
+ * us, including calls made from OTHER libraries' constructors -- and the order
+ * constructors run between unrelated shared objects is unspecified.  On
+ * AlmaLinux 8, OPENSSL_init_library() calls open() from its constructor before
+ * ours runs, so a plain "resolved in the constructor" pointer is still NULL and
+ * the process dies with SIGSEGV inside the loader. */
+static void hook_resolve(void)
+{
+    if (!real_open)     real_open     = dlsym(RTLD_NEXT, "open");
+    if (!real_openat)   real_openat   = dlsym(RTLD_NEXT, "openat");
+    if (!real_fstatat)  real_fstatat  = dlsym(RTLD_NEXT, "fstatat");
+    if (!real_fxstatat) real_fxstatat = dlsym(RTLD_NEXT, "__fxstatat");
+}
+
+/* Last-resort passthrough if even dlsym() is unusable this early.  openat(2)
+ * rather than open(2): open is not a syscall on every architecture. */
+static int raw_openat(int dfd, const char *path, int flags, mode_t mode)
+{
+    return (int)syscall(SYS_openat, dfd, path, flags, mode);
+}
+
 static void mark(const char *path)
 {
     int fd;
-    if (path && real_open
-        && (fd = real_open(path, O_WRONLY | O_CREAT | O_EXCL, 0600)) >= 0)
+    hook_resolve();
+    if (!path)
+        return;
+    fd = real_open ? real_open(path, O_WRONLY | O_CREAT | O_EXCL, 0600)
+                   : raw_openat(AT_FDCWD, path, O_WRONLY | O_CREAT | O_EXCL, 0600);
+    if (fd >= 0)
         close(fd);
 }
 
@@ -116,10 +143,13 @@ static int is_victim_write(const char *path, int flags)
 
 int openat(int dfd, const char *path, int flags, ...)
 {
-    const char *partial = getenv("RSYNC_PARTIAL_RETRY_DIR");
-    const char *secret = getenv("RSYNC_PARTIAL_RETRY_SECRET");
+    const char *partial, *secret;
     mode_t mode = 0;
     int fd, saved_errno;
+
+    hook_resolve();
+    partial = getenv("RSYNC_PARTIAL_RETRY_DIR");
+    secret = getenv("RSYNC_PARTIAL_RETRY_SECRET");
 
     if (flags & O_CREAT) {
         va_list ap;
@@ -134,7 +164,8 @@ int openat(int dfd, const char *path, int flags, ...)
             return -1;
     }
 
-    fd = real_openat(dfd, path, flags, mode);
+    fd = real_openat ? real_openat(dfd, path, flags, mode)
+                     : raw_openat(dfd, path, flags, mode);
     saved_errno = errno;
 
     /* An unconfined retry resolves the swapped parent and lands in the secret
@@ -154,6 +185,8 @@ int open(const char *path, int flags, ...)
     mode_t mode = 0;
     int fd, saved_errno;
 
+    hook_resolve();
+
     if (flags & O_CREAT) {
         va_list ap;
         va_start(ap, flags);
@@ -167,7 +200,8 @@ int open(const char *path, int flags, ...)
             return -1;
     }
 
-    fd = real_open(path, flags, mode);
+    fd = real_open ? real_open(path, flags, mode)
+                   : raw_openat(AT_FDCWD, path, flags, mode);
     saved_errno = errno;
 
     /* The pre-fix recovery uses plain open() on the full pathname, which walks
@@ -197,6 +231,7 @@ int fstatat(int dfd, const char *path, struct stat *st, int flags)
 {
     int rc, saved_errno;
 
+    hook_resolve();
     if (!real_fstatat) {
         errno = ENOSYS;
         return -1;
@@ -213,6 +248,7 @@ int __fxstatat(int ver, int dfd, const char *path, struct stat *st, int flags)
 {
     int rc, saved_errno;
 
+    hook_resolve();
     if (!real_fxstatat) {
         errno = ENOSYS;
         return -1;
@@ -226,10 +262,7 @@ int __fxstatat(int ver, int dfd, const char *path, struct stat *st, int flags)
 
 __attribute__((constructor)) static void hook_loaded(void)
 {
-    real_open = dlsym(RTLD_NEXT, "open");
-    real_openat = dlsym(RTLD_NEXT, "openat");
-    real_fstatat = dlsym(RTLD_NEXT, "fstatat");
-    real_fxstatat = dlsym(RTLD_NEXT, "__fxstatat");
+    hook_resolve();
     mark(getenv("RSYNC_PARTIAL_RETRY_LOAD_MARKER"));
 }
 
