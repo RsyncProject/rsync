@@ -389,7 +389,7 @@ def _reap_stale_daemons() -> 'None':
                 pass
 
 
-def _probe_bindable(port: int, _reaped: bool = False) -> 'None':
+def _probe_bindable(port: int, _reaped: bool = False, fatal: bool = True) -> bool:
     """Confirm `port` is actually free once we hold its claim_ports() lock.
 
     The byte-range lock only coordinates *live* test drivers, and the kernel
@@ -412,15 +412,16 @@ def _probe_bindable(port: int, _reaped: bool = False) -> 'None':
     s.setsockopt(_socket.SOL_SOCKET, _socket.SO_REUSEADDR, 1)
     try:
         s.bind(('127.0.0.1', port))
-        return
+        return True
     except OSError as e:
         err = e
     finally:
         s.close()
     # Bound by a squatter. If it's our own stranded orphan, kill it and retry once.
     if not _reaped and _reap_orphan_daemon(port):
-        _probe_bindable(port, _reaped=True)
-        return
+        return _probe_bindable(port, _reaped=True, fatal=fatal)
+    if not fatal:
+        return False
     test_fail(
         f"port {port} was claimed for this run but something is still bound "
         f"to 127.0.0.1:{port} ({err.strerror}). The claim_ports() lock only "
@@ -428,6 +429,7 @@ def _probe_bindable(port: int, _reaped: bool = False) -> 'None':
         "means an orphaned 'rsync --daemon' from a previously killed run "
         f"(find it with `fstat | grep {port}` / `netstat -an | grep {port}` "
         "and kill it, or run `fleettest.py --cleanup`), then retry.")
+    return False
 
 
 def claim_ports(*ports: int) -> 'None':
@@ -473,6 +475,40 @@ def claim_ports(*ports: int) -> 'None':
         # The lock only proves no other live test run owns the port; an orphaned
         # daemon from a killed run can still squat it (see _probe_bindable).
         _probe_bindable(port)
+
+
+def claim_free_port(preferred: int) -> int:
+    """Claim `preferred`, or a nearby port if something else is squatting it.
+
+    claim_ports() fails loudly on an occupied port, which is right for a test
+    that binds the port itself: it must not silently drift away from the number
+    it is about to bind.  start_test_daemon() owns both the bind and the URL it
+    hands back, so it can simply move instead -- and needs to, because a fixed
+    test port can be permanently held by unrelated software on a shared CI box
+    (a vendor service was found sitting on 13010 on the Windows/Cygwin target),
+    which no amount of orphan reaping will free.
+
+    Returns the port actually claimed.
+    """
+    global _port_lock_fd, _reaped_stale
+    if _port_lock_fd is None:
+        _port_lock_fd = _open_lock_file()
+    if not _reaped_stale:
+        _reaped_stale = True
+        _reap_stale_daemons()
+    candidates = [preferred] + [preferred + off for off in (1000, 2000, 3000, 4000)]
+    for port in candidates:
+        if not 1024 < port < 65536:
+            continue
+        fcntl.lockf(_port_lock_fd, fcntl.LOCK_EX, 1, port)
+        if _probe_bindable(port, fatal=False):
+            return port
+    test_fail(
+        f"no usable TCP port near {preferred}: every candidate "
+        f"({', '.join(str(p) for p in candidates)}) is bound by something "
+        "outside the testsuite.  Check with `netstat -an` and free one, or "
+        "run `fleettest.py --cleanup` if they are stranded test daemons.")
+    return preferred
 
 
 # --- standalone rsyncd helpers ---------------------------------------------
@@ -600,7 +636,7 @@ def start_test_daemon(conf_path, port: int, rsync_cmd: str = None) -> str:
     """
     daemon_cmd = rsync_cmd or RSYNC_PEER
     if USE_TCP:
-        claim_ports(port)
+        port = claim_free_port(port)
         start_rsyncd(conf_path, port, daemon_cmd)
         return f'rsync://localhost:{port}/'
     os.environ['RSYNC_CONNECT_PROG'] = f'{daemon_cmd} --config={conf_path} --daemon'
