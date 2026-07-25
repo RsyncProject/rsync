@@ -4,10 +4,19 @@
 import os
 
 from rsyncfns import (
-    SCRATCHDIR, makepath, rmtree, test_fail, write_daemon_conf,
+    SCRATCHDIR, forced_protocol, makepath, rmtree, test_fail, test_skipped,
+    write_daemon_conf,
 )
 from stdio_daemon import finish_stdio_daemon, start_stdio_daemon
 
+# The hand-rolled client below speaks protocol 30 and greets with it, so a run
+# that pins the daemon lower cannot complete the handshake and just times out.
+# The behaviour under test is not protocol-specific -- the sibling
+# daemon-copylinks-parent-escape drives the same paths with the real client at
+# whatever protocol the run selects.
+_proto = forced_protocol()
+if _proto is not None and _proto < 30:
+    test_skipped(f'the stdio_daemon client speaks protocol 30 (forced {_proto})')
 
 PAYLOAD = 'safe-parent-relative-target\n'
 
