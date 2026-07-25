@@ -122,6 +122,42 @@ static void check_beneath_dotdot(void)
 	if (fd >= 0)
 		close(fd);
 
+	/* A bare final ".." must be refused whatever flags the caller passes.  The
+	 * leaf fast paths in secure_walk_at() openat() the final component
+	 * directly, so before they learned to defer a literal ".." to ds_descend()
+	 * an O_NOFOLLOW caller got back the anchor's own parent, and a caller
+	 * without O_DIRECTORY opened it transiently.  Only the O_DIRECTORY form
+	 * was ever refused. */
+	{
+		static const struct { const char *label; int flags; } dotdot_cases[] = {
+			{ "O_DIRECTORY",            O_RDONLY | O_DIRECTORY },
+			{ "O_DIRECTORY|O_NOFOLLOW", O_RDONLY | O_DIRECTORY | O_NOFOLLOW },
+			{ "no O_DIRECTORY",         O_RDONLY },
+		};
+		unsigned ci;
+		for (ci = 0; ci < sizeof dotdot_cases / sizeof *dotdot_cases; ci++) {
+			int dfd;
+			errno = 0;
+			dfd = secure_relative_open_at_beneath(anchor, "..",
+							      dotdot_cases[ci].flags, 0);
+			if (dfd >= 0) {
+				STRUCT_STAT dst;
+				int above = fstat(dfd, &dst) == 0 && dst.st_ino != ast.st_ino;
+				fprintf(stderr, "FAIL [beneath bare-dotdot %s]: rc=%d%s\n",
+					dotdot_cases[ci].label, dfd,
+					above ? " -- resolved ABOVE the anchor" : "");
+				errs++;
+				close(dfd);
+			} else if (errno != ELOOP) {
+				fprintf(stderr, "FAIL [beneath bare-dotdot %s]: errno=%d, expected ELOOP\n",
+					dotdot_cases[ci].label, errno);
+				errs++;
+			} else
+				fprintf(stderr, "OK   [beneath bare-dotdot %s]: refused with ELOOP\n",
+					dotdot_cases[ci].label);
+		}
+	}
+
 	errno = 0;
 	fd = secure_relative_open_at_beneath(anchor, "../outside",
 					     O_RDONLY | O_DIRECTORY, 0);

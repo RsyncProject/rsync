@@ -2832,6 +2832,25 @@ static int secure_walk_at(int anchor_fd, const char *anchor_abspath,
 		int is_last = (size_t)(part - path_copy) == last_off;
 		saw_component = 1;
 
+		/* A literal "." or ".." is a movement, not a name to open.  It must go
+		 * through ds_descend(), which refuses to pop above the anchor, BEFORE
+		 * the leaf fast paths below -- those openat() the component directly,
+		 * so a final ".." would otherwise hand back the anchor's own parent
+		 * (with O_NOFOLLOW) or open it transiently (without O_DIRECTORY). */
+		if (part[0] == '.'
+		 && (part[1] == '\0' || (part[1] == '.' && part[2] == '\0'))) {
+			if (ds_descend(&ds, part, hops) < 0)
+				goto cleanup;
+			if (is_last) {
+				if (flags & O_DIRECTORY)
+					retfd = ds_take(&ds);
+				else
+					errno = EISDIR;
+				goto cleanup;
+			}
+			continue;
+		}
+
 		/* File leaf (final component, caller did not ask for O_DIRECTORY):
 		 * never follow a symlink leaf. */
 		if (is_last && !(flags & O_DIRECTORY)) {
