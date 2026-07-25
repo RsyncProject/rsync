@@ -42,6 +42,7 @@ extern int munge_symlinks;
 extern int use_secure_symlinks;
 extern int open_noatime;
 extern int sanitize_paths;
+extern int daemon_config_filter_file;
 extern int numeric_ids;
 extern int filesfrom_fd;
 extern int remote_protocol;
@@ -899,6 +900,11 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	} else
 		set_filter_dir(module_dir, module_dirlen);
 
+	/* Everything loaded from here to the end of the exclude block is the
+	 * operator's own configuration, so it keeps the ownership walk without the
+	 * module-confinement parse_filter_file() applies to peer-driven merges. */
+	daemon_config_filter_file = 1;
+
 	p = lp_filter(module_id);
 	parse_filter_str(&daemon_filter_list, p, rule_template(FILTRULE_WORD_SPLIT),
 		XFLG_ABS_IF_SLASH | XFLG_DIR2WILD3);
@@ -919,6 +925,8 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	p = lp_exclude(module_id);
 	parse_filter_str(&daemon_filter_list, p, rule_template(FILTRULE_WORD_SPLIT),
 		XFLG_ABS_IF_SLASH | XFLG_DIR2WILD3 | XFLG_OLD_PREFIXES);
+
+	daemon_config_filter_file = 0;
 
 	log_init(1);
 
