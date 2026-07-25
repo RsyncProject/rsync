@@ -124,6 +124,20 @@
       "expect_skip_extra": ["daemon-max-alloc-zero"]
     },
     {
+      "_comment": "AlmaLinux 8 (RHEL 8 rebuild): the oldest active LTS in the Fedora/RHEL family, for backport coverage. glibc 2.28 / gcc 8.5. The CI job runs in an almalinux:8 container; this is the VM equivalent. python3 must be the python39 module (alternatives --set python3 /usr/bin/python3.9) -- the stock 3.6 is too old for runtests.py.",
+      "name": "almalinux-8",
+      "ssh_host": "root@almalinux-8",
+      "workflow": "almalinux-8-build.yml",
+      "configure_flags": [
+        "--with-rrsync"
+      ],
+      "_expect_skip_extra_comment": "Box-specific, not workflow-specific: this VM has no separate filesystem for a cross-device temp dir, and daemon-max-alloc-zero needs the old static client that the source-only fleet push omits (.gitattributes export-ignore), as on ubuntu-2004. fs.protected_regular is enabled in /etc/sysctl.d/90-rsync-fleettest.conf so protected-regular runs here rather than skipping.",
+      "expect_skip_extra": [
+        "chmod-temp-dir",
+        "daemon-max-alloc-zero"
+      ]
+    },
+    {
       "_comment": "macOS: brew is not on the non-interactive ssh PATH, so put it on PATH for the whole build and pass brew include/lib dirs to configure.",
       "name": "mac2",
       "ssh_host": "runner@mac2",
