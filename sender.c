@@ -113,6 +113,17 @@ static int secure_sender_parent_fd(struct file_struct *file, const char *fname, 
 			 * directory and can remove a same-named, unrelated entry there. */
 			if (*fname == '/') {
 				const char *rel = dir;
+#ifdef __CYGWIN__
+				/* clean_fname() keeps exactly two leading slashes here,
+				 * because //server/share is a separate UNC namespace.
+				 * Stripping them and anchoring at "/" would resolve a
+				 * different object entirely, so decline (errno 0) and let
+				 * the caller fall back to the path-based cleanup. */
+				if (fname[1] == '/' && fname[2] != '/') {
+					errno = 0;
+					return -1;
+				}
+#endif
 				while (*rel == '/')
 					rel++;
 				return secure_relative_open("/", rel,
