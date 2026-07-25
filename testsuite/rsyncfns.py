@@ -1931,6 +1931,21 @@ def build_patched_rsync(name, replacements, append_cflags=None):
         if old not in text:
             test_skipped(f"{name}: could not find patch target in {relpath}: {old!r}")
         path.write_text(text.replace(old, new, 1))
+        # Drop the copied object for this unit.  copytree() preserves mtimes, so
+        # on a target whose clock lags the host that pushed the tree -- or one
+        # with coarse mtime granularity -- the prebuilt .o can look NEWER than
+        # the just-patched .c, make reuses it, and the patch is silently absent.
+        # The test then exercises an unmodified peer and reports a vacuous
+        # result instead of a real one.
+        obj = (work / relpath).with_suffix('.o')
+        if obj.exists():
+            obj.unlink()
+
+    # Same hazard at the link step: a prebuilt binary with a future mtime looks
+    # up to date even once its objects have been rebuilt.
+    for stale in (work / 'rsync', work / 'rsync.exe'):
+        if stale.exists():
+            stale.unlink()
 
     # Optionally append compiler flags (e.g. -fwrapv) to the already-configured
     # CFLAGS line in the copied Makefile.  This preserves the platform's
