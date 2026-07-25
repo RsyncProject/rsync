@@ -287,7 +287,10 @@ static int sender_open_copylinks_confined(const char *anchor, const char *relpat
 			dir[0] = '\0';
 			bname = cur;
 		}
-		if (am_daemon && module_dirfd >= 0 && module_dir
+		/* anchor is checked explicitly: the resolver treats a NULL anchor as
+		 * "relative to cwd", so it is a legal argument for the else branch --
+		 * only this branch would hand it to strcmp(). */
+		if (am_daemon && module_dirfd >= 0 && module_dir && anchor
 		 && strcmp(anchor, module_dir) == 0)
 			pdfd = secure_relative_open_at_beneath(module_dirfd, dir,
 					O_RDONLY | O_DIRECTORY, 0);
