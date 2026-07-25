@@ -36,6 +36,8 @@
 
 import os
 import subprocess
+import time
+from pathlib import Path
 import sys
 
 from rsyncfns import (
@@ -87,23 +89,31 @@ makepath(serversrc)
 makepath(linkdest)
 makepath(dest)
 (serversrc / 'file').write_text("from the server\n")
-for f in (escape, decoy):
-    if os.path.lexists(f):
-        os.unlink(f)
-os.mkfifo(escape)
-os.mkfifo(decoy)
 
 
 # A helper that blocks in open(fifo, O_WRONLY) until some reader opens the FIFO,
 # then records the flag.  Terminated below if no reader ever appears.
 WRITER = ("import os,sys\n"
+          "open(sys.argv[3],'w').close()\n"   # ready: about to block in open()
           "fd=os.open(sys.argv[1],os.O_WRONLY)\n"
           "open(sys.argv[2],'w').close()\n"
           "os.close(fd)\n")
 
 
 def spawn(fifo, flag):
-    return subprocess.Popen([sys.executable, '-c', WRITER, str(fifo), str(flag)])
+    ready = Path(str(flag) + '.ready')
+    if ready.exists():
+        ready.unlink()
+    proc = subprocess.Popen(
+        [sys.executable, '-c', WRITER, str(fifo), str(flag), str(ready)])
+    # Wait until the helper is actually at its blocking open().  Starting the
+    # transfer before that lets the receiver come and go while nothing is
+    # watching the FIFO, and the run reports a vacuous result -- which is what
+    # made this test flaky on the slower fleet VMs.
+    deadline = time.time() + 30
+    while not ready.exists() and proc.poll() is None and time.time() < deadline:
+        time.sleep(0.02)
+    return proc
 
 
 def settle(w):
@@ -125,29 +135,55 @@ def reap(w):
             w.wait()
 
 
-esc_w = spawn(escape, esc_flag)
-dec_w = spawn(decoy, dec_flag)
-proc = None
-try:
-    conf = write_daemon_conf(
-        [('m', {'path': str(serversrc), 'read only': 'yes', 'use chroot': 'no'})],
-        name='mal-xname-rsyncd.conf')
-    os.environ['RSYNC_CONNECT_PROG'] = f'{mal_rsync} --config={conf} --daemon'
-    os.environ['RSYNC_MAL_XNAME'] = '../secret'   # from basis_dir[0] == linkdest
-    proc = subprocess.run(
-        rsync_argv('-a', f'--link-dest={linkdest}',
-                   'rsync://localhost/m/file', str(dest) + '/'),
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=120)
-    settle(esc_w)
-    settle(dec_w)
-finally:
-    os.environ.pop('RSYNC_MAL_XNAME', None)
-    os.environ.pop('RSYNC_CONNECT_PROG', None)
-    reap(esc_w)
-    reap(dec_w)
-    for f in (escape, decoy):
+def attempt():
+    """One injection run.  Returns the receiver's CompletedProcess.
+
+    Re-creates the FIFOs and flags each time so a retry starts clean.
+    """
+    for f in (escape, decoy, esc_flag, dec_flag):
         if os.path.lexists(f):
             os.unlink(f)
+    rmtree(dest)
+    makepath(dest)
+    os.mkfifo(escape)
+    os.mkfifo(decoy)
+    esc_w = spawn(escape, esc_flag)
+    dec_w = spawn(decoy, dec_flag)
+    proc = None
+    try:
+        conf = write_daemon_conf(
+            [('m', {'path': str(serversrc), 'read only': 'yes', 'use chroot': 'no'})],
+            name='mal-xname-rsyncd.conf')
+        os.environ['RSYNC_CONNECT_PROG'] = f'{mal_rsync} --config={conf} --daemon'
+        os.environ['RSYNC_MAL_XNAME'] = '../secret'  # from basis_dir[0] == linkdest
+        proc = subprocess.run(
+            rsync_argv('-a', f'--link-dest={linkdest}',
+                       'rsync://localhost/m/file', str(dest) + '/'),
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=120)
+        settle(esc_w)
+        settle(dec_w)
+    finally:
+        os.environ.pop('RSYNC_MAL_XNAME', None)
+        os.environ.pop('RSYNC_CONNECT_PROG', None)
+        reap(esc_w)
+        reap(dec_w)
+        for f in (escape, decoy):
+            if os.path.lexists(f):
+                os.unlink(f)
+    return proc
+
+
+# A run where NEITHER fifo was opened proves nothing: the injection did not
+# take effect, so there was no traversal attempt to confine.  That is a setup
+# failure, not a security signal, and on the slower fleet VMs it happens often
+# enough to make the test unusable -- so retry it.  An ESCAPE is never retried:
+# the loop stops the moment the escape flag appears.
+attempts = 0
+for _try in range(6):
+    attempts += 1
+    proc = attempt()
+    if esc_flag.is_file() or dec_flag.is_file():
+        break
 
 
 # -- Oracle -------------------------------------------------------------------
@@ -170,7 +206,9 @@ if not dec_flag.is_file():
     test_fail(
         "the crafted xname never reached the receiver's basis open (neither the "
         "escape nor the decoy FIFO was opened) -- the instrumented-sender "
-        f"injection did not take effect, so this run is vacuous.  Receiver rc="
+        f"injection did not take effect, so this run is vacuous after "
+        f"{attempts} attempt(s).  This is a harness failure, NOT a traversal: "
+        "an escape is reported separately and is never retried.  Receiver rc="
         f"{proc.returncode if proc else 'n/a'}.  Output tail:\n{out_tail}")
 
 if proc.returncode != 0:
