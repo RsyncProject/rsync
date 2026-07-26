@@ -1995,6 +1995,15 @@ int secure_relative_open(const char *basedir, const char *relpath, int flags, mo
 			goto cleanup;
 		}
 		if (next_fd == -1) {
+			/* Final component that does not exist yet: if the caller
+			 * wants a file (not O_DIRECTORY), open/create it here with
+			 * O_NOFOLLOW so O_CREAT works and a pre-planted symlink at
+			 * the name is still refused.  A missing *intermediate*
+			 * component (more path follows) stays a genuine ENOENT. */
+			if (errno == ENOENT && !(flags & O_DIRECTORY)
+			 && strtok(NULL, "/") == NULL) {
+				retfd = openat(dirfd, part, flags | O_NOFOLLOW, mode);
+			}
 			goto cleanup;
 		}
 		if (dirfd != AT_FDCWD) close(dirfd);
