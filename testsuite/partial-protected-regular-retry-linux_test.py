@@ -64,12 +64,20 @@ static int (*real_fxstatat)(int, int, const char *, struct stat *, int);
  * AlmaLinux 8, OPENSSL_init_library() calls open() from its constructor before
  * ours runs, so a plain "resolved in the constructor" pointer is still NULL and
  * the process dies with SIGSEGV inside the loader. */
+/* If dlsym() itself reaches an interposed function, the nested wrapper must
+ * not recurse back into resolution -- it takes the raw path instead. */
+static __thread int hook_resolving;
+
 static void hook_resolve(void)
 {
+    if (hook_resolving)
+        return;
+    hook_resolving = 1;
     if (!real_open)     real_open     = dlsym(RTLD_NEXT, "open");
     if (!real_openat)   real_openat   = dlsym(RTLD_NEXT, "openat");
     if (!real_fstatat)  real_fstatat  = dlsym(RTLD_NEXT, "fstatat");
     if (!real_fxstatat) real_fxstatat = dlsym(RTLD_NEXT, "__fxstatat");
+    hook_resolving = 0;
 }
 
 /* Last-resort passthrough if even dlsym() is unusable this early.  openat(2)
@@ -135,6 +143,14 @@ static int swap_and_deny(void)
     return 0;   /* caller falls through to the real call */
 }
 
+#ifdef O_TMPFILE
+/* O_TMPFILE is (__O_TMPFILE | O_DIRECTORY) on Linux, so a plain & test would
+ * also match an ordinary O_DIRECTORY open. */
+# define HOOK_TAKES_MODE(f) (((f) & O_CREAT) || (((f) & O_TMPFILE) == O_TMPFILE))
+#else
+# define HOOK_TAKES_MODE(f) ((f) & O_CREAT)
+#endif
+
 static int is_victim_write(const char *path, int flags)
 {
     return path && strcmp(path, "victim") == 0
@@ -151,7 +167,7 @@ int openat(int dfd, const char *path, int flags, ...)
     partial = getenv("RSYNC_PARTIAL_RETRY_DIR");
     secret = getenv("RSYNC_PARTIAL_RETRY_SECRET");
 
-    if (flags & O_CREAT) {
+    if (HOOK_TAKES_MODE(flags)) {
         va_list ap;
         va_start(ap, flags);
         mode = (mode_t)va_arg(ap, int);
@@ -187,7 +203,7 @@ int open(const char *path, int flags, ...)
 
     hook_resolve();
 
-    if (flags & O_CREAT) {
+    if (HOOK_TAKES_MODE(flags)) {
         va_list ap;
         va_start(ap, flags);
         mode = (mode_t)va_arg(ap, int);
@@ -331,6 +347,14 @@ def run():
         held.rename(partial)
 
     ctx = f'rc={result.returncode}, output={result.stdout!r}'
+    # A negative returncode is death by signal.  That is never a reason to skip:
+    # the hook killing the process under test is a bug in the hook, and reporting
+    # it as "not loaded" is exactly how a SIGSEGV on AlmaLinux 8 hid for weeks --
+    # the marker is written by the hook, so a crash before that looks identical
+    # to the hook never having loaded.
+    if result.returncode is not None and result.returncode < 0:
+        test_fail(f'rsync died by signal {-result.returncode} under the '
+                  f'LD_PRELOAD hook ({ctx})')
     if not markers['load'].exists():
         test_skipped(f'LD_PRELOAD hook was not loaded ({ctx})')
     if not markers['eacces'].exists():
