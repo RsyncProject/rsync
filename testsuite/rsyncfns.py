@@ -1714,21 +1714,35 @@ def proc_self_fd_pins() -> bool:
     inode-pin relies on.  macOS/BSD lack the directory; Solaris HAS /proc/self/fd
     but its entries are not such symlinks.  Mirrors rrsync's own HAVE_PROC_SELF_FD
     probe so the rrsync race test runs only where the protection actually exists
-    (it falls through unpinned, by design, elsewhere).  Cached."""
+    (it falls through unpinned, by design, elsewhere).  Cached.
+
+    A correct readlink does not prove the fd pins anything, and two platforms
+    get this wrong in opposite directions: NetBSD makes the entry a symlink for
+    directories only (readlink of a regular file's entry fails with EINVAL),
+    while Cygwin's readlink is right but opening the magic link RE-RESOLVES the
+    path, so a rename under a held fd reaches the replacement. Only Linux gives
+    the inode-bound magic link, so require that and keep the probes as a guard
+    for Linux-like environments without /proc."""
     global _psf_cache
     if _psf_cache is not None:
         return _psf_cache
-    try:
-        fd = os.open('/', os.O_RDONLY)
-    except OSError:
+    if not sys.platform.startswith(('linux', 'android')):
         _psf_cache = False
         return _psf_cache
-    try:
-        _psf_cache = (os.readlink('/proc/self/fd/%d' % fd) == '/')
-    except OSError:
-        _psf_cache = False
-    finally:
-        os.close(fd)
+
+    def resolves(path):
+        try:
+            fd = os.open(path, os.O_RDONLY)
+        except OSError:
+            return False
+        try:
+            return os.readlink('/proc/self/fd/%d' % fd) == os.path.realpath(path)
+        except OSError:
+            return False
+        finally:
+            os.close(fd)
+
+    _psf_cache = resolves('/') and resolves(os.path.realpath(__file__))
     return _psf_cache
 
 

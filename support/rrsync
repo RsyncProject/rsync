@@ -157,17 +157,38 @@ client_relative = False
 # the actual behaviour once against a known fd. Where it works we pin (and a
 # later readlink failure is an anomaly that fails closed); where it does not we
 # fall through to the unhardened path.
+#
+# A correct readlink is NOT sufficient evidence that the fd pins anything, and
+# the two platforms that get this wrong fail in opposite directions:
+#
+#   * NetBSD makes the entry a symlink for DIRECTORIES only -- readlink of a
+#     regular file's entry fails with EINVAL, so a directory-only probe claims
+#     support that is not there and every pull of a file dies in the post-pin
+#     check.
+#   * Cygwin's readlink returns the right path, but opening the magic link
+#     RE-RESOLVES it: rename the directory out from under a held fd and the
+#     magic link reaches the replacement. The pin silently protects nothing.
+#
+# Only the Linux kernel gives the inode-bound magic link this relies on, so
+# require that explicitly and keep the runtime probes as a guard for Linux-like
+# environments where /proc is absent or restricted (containers, seccomp).
 def _probe_proc_self_fd():
-    try:
-        fd = os.open('/', os.O_RDONLY)
-    except OSError:
+    if not sys.platform.startswith(('linux', 'android')):
         return False
-    try:
-        return os.readlink('/proc/self/fd/%d' % fd) == '/'
-    except OSError:
-        return False
-    finally:
-        os.close(fd)
+
+    def resolves(path):
+        try:
+            fd = os.open(path, os.O_RDONLY)
+        except OSError:
+            return False
+        try:
+            return os.readlink('/proc/self/fd/%d' % fd) == os.path.realpath(path)
+        except OSError:
+            return False
+        finally:
+            os.close(fd)
+
+    return resolves('/') and resolves(os.path.realpath(__file__))
 
 HAVE_PROC_SELF_FD = _probe_proc_self_fd()
 
