@@ -357,6 +357,11 @@ def validated_arg(opt, arg, typ=3, wild=False):
     if opt != 'arg': # arg values already have their backslashes removed.
         arg = DE_BACKSLASH_RE.sub(r'\1', arg)
 
+    # "-" is rsync's read-the-list-from-stdin sentinel, not a pathname: a pull
+    # with a local --files-from sends exactly "--files-from=-" to the server.
+    if opt == '--files-from' and arg == '-':
+        return arg
+
     orig_arg = arg
     if arg.startswith('./'):
         arg = arg[1:]
