@@ -117,9 +117,16 @@ a symlink that a privileged rsync then follows:
 - CVE-2026-53783 (MEDIUM): rrsync restricted-directory escape.  It validated each
   argument with `realpath()` and then exec'd rsync against the same name (a
   TOCTOU window), and left dangerous options enabled in a restricted subdir.
-  rrsync now inode-pins each validated component and exec's against the pinned
-  fd, denies `--copy-unsafe-links`, forces `--no-D`, and refuses a symlinked
-  `--log-file`.
+  rrsync now inode-pins the validated path and roots the argument it hands rsync
+  at that pinned fd, denies `--copy-unsafe-links`, forces `--no-D`, and refuses a
+  symlinked `--log-file`.  The pin relies on Linux's `/proc/self/fd` magic links
+  being bound to the open inode, so it is Linux-only; on the BSDs, macOS, Solaris
+  and Cygwin rrsync passes the `realpath()`-validated name as it always did.
+  Two limits are worth stating: under `--relative` only the anchor the
+  transmitted name starts from is pinned, so a component below it can still be
+  raced, and the final component of an ordinary sender argument is not pinned
+  either (rsync does not follow a symlink there, and the options that would
+  change that are refused in a restricted dir).
 
 Daemon protocol / identity:
 
