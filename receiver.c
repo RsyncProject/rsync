@@ -197,6 +197,95 @@ static int secure_recv_open(const char *path, int flags, mode_t mode, int owner_
 	return fd;
 }
 
+/* Open a read-only regular file for an in-place update without leaving its
+ * mode relaxed while protocol data is received.  Once a writable descriptor is
+ * open, later writes no longer depend on the pathname's permission bits, so
+ * restore the exact prior mode before returning to the transfer loop -- an
+ * abort (peer EOF, checksum failure, a signal) must not strand the file at
+ * 0600.  Requires a regular file: O_NOFOLLOW refuses a symlink at the leaf but
+ * not a directory swapped in after the type probe. */
+static int open_readonly_inplace(const char *fname, int one_inplace)
+{
+	STRUCT_STAT cst;
+	mode_t prior_mode;
+	int cfd = -1, fd = -1;
+	int open_errno, restore_errno;
+
+	if (use_secure_symlinks || one_inplace) {
+#ifdef O_NOFOLLOW
+		cfd = secure_recv_open(fname, O_RDONLY|O_NOFOLLOW, 0, one_inplace);
+		if (cfd < 0)
+			goto failed;
+		if (do_fstat(cfd, &cst) < 0 || !S_ISREG(cst.st_mode)) {
+			errno = EACCES;	/* refused: not the read-only regular file we recover */
+			goto failed;
+		}
+		prior_mode = cst.st_mode & CHMOD_BITS;
+		if (prior_mode & S_IWUSR) {
+			/* Already owner-writable, so adding S_IWUSR cannot be what an
+			 * EACCES is about (an ACL, or the parent dir).  Don't touch the
+			 * mode for nothing: each chmod risks losing a special bit. */
+			errno = EACCES;
+			goto failed;
+		}
+		if (fchmod(cfd, prior_mode | S_IWUSR) < 0)
+			goto failed;
+		fd = secure_recv_open(fname, O_WRONLY, 0600, one_inplace);
+		open_errno = errno;
+		if (fchmod(cfd, prior_mode) < 0) {
+			restore_errno = errno;
+			if (fd >= 0)
+				close(fd);
+			fd = -1;
+			open_errno = restore_errno;
+		}
+		close(cfd);
+		errno = open_errno;
+		return fd;
+#else
+		/* Without O_NOFOLLOW the resolver's oldest fallback would follow a
+		 * raced symlink, so fail closed rather than chmod through it. */
+		errno = EACCES;
+		return -1;
+#endif
+	}
+
+	/* Local and chrooted transfers retain the existing pathname semantics.
+	 * Note the S_ISREG test here is a type check on a stable path, NOT race
+	 * protection: do_stat() follows a leaf symlink and each call below
+	 * re-resolves the name.  The fd-based branch above is the one that
+	 * pins an inode; a chroot is what confines this one. */
+	if (do_stat(fname, &cst) < 0) {
+		errno = EACCES;
+		return -1;
+	}
+	if (!S_ISREG(cst.st_mode) || (cst.st_mode & CHMOD_BITS & S_IWUSR)) {
+		errno = EACCES;
+		return -1;
+	}
+	prior_mode = cst.st_mode & CHMOD_BITS;
+	if (do_chmod_at(fname, prior_mode | S_IWUSR) < 0)
+		return -1;
+	fd = do_open(fname, O_WRONLY, 0600);
+	open_errno = errno;
+	if (do_chmod_at(fname, prior_mode) < 0) {
+		restore_errno = errno;
+		if (fd >= 0)
+			close(fd);
+		fd = -1;
+		open_errno = restore_errno;
+	}
+	errno = open_errno;
+	return fd;
+
+  failed:
+	open_errno = errno;
+	if (cfd >= 0)
+		close(cfd);
+	errno = open_errno;
+	return -1;
+}
+
 /* get_tmpname() - create a tmp filename for a given filename
  *
  * If a tmpdir is defined, use that as the directory to put it in.  Otherwise,
@@ -1128,35 +1217,10 @@ int recv_files(int f_in, int f_out, char *local_name)
 			}
 #endif
 			if (fd2 == -1 && errno == EACCES) {
-				/* A read-only existing file: make it writable, then retry
-				 * (its mode is restored after the transfer).  On a
-				 * non-chroot daemon fchmod() a no-follow fd rather than
-				 * chmod the path, so a symlink raced into fnametmp can't
-				 * redirect the chmod (do_chmod_at follows the final link). */
-				int errno_save = errno, chmod_ok;
-				if (use_secure_symlinks || one_inplace) {
-#ifdef O_NOFOLLOW
-					int cfd = secure_recv_open(fnametmp, O_RDONLY|O_NOFOLLOW,
-								   0, one_inplace);
-					chmod_ok = cfd != -1 && fchmod(cfd, 0600) == 0;
-					if (cfd != -1)
-						close(cfd);
-#else
-					/* Without O_NOFOLLOW the resolver's oldest fallback would
-					 * follow a raced symlink, so fail closed rather than
-					 * chmod through it. */
-					chmod_ok = 0;
-#endif
-				} else
-					chmod_ok = do_chmod_at(fnametmp, 0600) == 0;
-				if (chmod_ok) {
-					if (use_secure_symlinks || one_inplace)
-						fd2 = secure_recv_open(fnametmp, O_WRONLY, 0600,
-								      one_inplace);
-					else
-						fd2 = do_open(fnametmp, O_WRONLY, 0600);
-				} else
-					errno = errno_save;
+				/* Temporarily add owner-write access only long enough to open
+				 * a writable descriptor; the helper restores the old mode
+				 * before any network data is consumed, including on failure. */
+				fd2 = open_readonly_inplace(fnametmp, one_inplace);
 			}
 			if (fd2 == -1) {
 				rsyserr(FERROR_XFER, errno, "open %s failed",
