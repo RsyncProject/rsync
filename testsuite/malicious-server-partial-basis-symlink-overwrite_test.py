@@ -79,34 +79,104 @@ def serve():
         )
         peer.send_data(parent.encode() + entry.encode() + rp.end_of_flist())
 
-        # Wait for the client's generator to request this exact file.  Its
-        # strict destination open correctly rejects the symlinked partial basis
-        # and requests a new-file transfer.  The bug is that the receiver does
-        # not bind the sender's response basis type to that request, so the
-        # malicious sender can substitute FNAMECMP_PARTIAL_DIR below.  The
-        # exploit therefore uses a solicited transfer index, not an unsolicited
-        # transfer record.
-        requested = bytearray()
-        # The generator's first positive index is encoded relative to -1, so
-        # index 1 is the one-byte delta 2.  Spell it directly to avoid changing
-        # the peer object's independent outgoing-index state.
-        marker = b'\x02' + rp.w_shortint(
-            rp.ITEM_TRANSFER | rp.ITEM_IS_NEW)
+        # Wait for the client's generator to request this exact file, and
+        # read the request properly rather than hunting for a byte pattern:
+        # the generator first sends its filter list (rsync auto-adds a
+        # perishable exclude for the partial dir, "-p .rsync-partial/"), and
+        # only then the index and its item flags.
+        #
+        # Which basis the generator names varies between environments, and
+        # both outcomes are worth driving:
+        #
+        #   * no ITEM_BASIS_TYPE_FOLLOWS -- it asked for a plain new-file
+        #     transfer, so the forged response below SUBSTITUTES a partial
+        #     basis it never requested.  That is the unbound-basis-type bug.
+        #   * ITEM_BASIS_TYPE_FOLLOWS + FNAMECMP_PARTIAL_DIR -- it noticed the
+        #     planted partial file and asked for that basis itself, so the
+        #     response is no longer substituting anything and the test instead
+        #     proves the receiver CONFINES a basis it did request.
+        #
+        # Either way the receiver must not follow the symlink, which is what
+        # the assertions after the transfer check.  Anything else named as the
+        # basis means the fixture changed under us and is a failure.
+        # DaemonReceiver speaks the raw socket; the de-multiplexing and the
+        # primitive reads live on DaemonClient, so spell the few we need here.
+        mux = bytearray()
+
+        def read_data(n):
+            while len(mux) < n:
+                word = struct.unpack('<I', peer._recv_exact(4))[0]
+                payload = peer._recv_exact(word & 0xFFFFFF)
+                if (word >> 24) - rp.MPLEX_BASE == rp.MSG_DATA:
+                    mux.extend(payload)
+                # anything else is a log/info frame: not part of the stream
+            out = bytes(mux[:n])
+            del mux[:n]
+            return out
+
+        def r_int():
+            return struct.unpack('<i', read_data(4))[0]
+
+        def r_shortint():
+            return struct.unpack('<H', read_data(2))[0]
+
+        def r_byte():
+            return read_data(1)[0]
+
+        def r_ndx():
+            # io.c read_ndx() at protocol >= 30, for the first positive index
+            # only: this reads one request and never resumes, so it needs no
+            # running previous-index state.
+            b0 = read_data(1)[0]
+            if b0 == 0:
+                raise RuntimeError('generator sent NDX_DONE before requesting '
+                                   'anything')
+            if b0 == 0xFF:
+                raise RuntimeError('generator sent a negative index first')
+            if b0 == 0xFE:
+                b = read_data(2)
+                if b[0] & 0x80:
+                    rest = read_data(2)
+                    return (((b[0] & 0x7F) << 24) | b[1]
+                            | (rest[0] << 8) | (rest[1] << 16))
+                return (b[0] << 8) + b[1] - 1
+            return b0 - 1
+
         peer.sock.settimeout(10)
         try:
-            while marker not in requested:
-                hdr = peer._recv_exact(4)
-                word = struct.unpack('<I', hdr)[0]
-                length = word & 0xFFFFFF
-                tag = (word >> 24) - rp.MPLEX_BASE
-                payload = peer._recv_exact(length)
-                if tag == rp.MSG_DATA:
-                    requested += payload
-                if len(requested) > 1024 * 1024:
-                    raise RuntimeError('generator request exceeded 1 MiB')
+            # The filter list: int32 length + payload, terminated by a zero.
+            while True:
+                n = r_int()
+                if n == 0:
+                    break
+                if not 0 < n <= 4096:
+                    raise RuntimeError(f'implausible filter-rule length {n}')
+                read_data(n)
+
+            ndx = r_ndx()
+            if ndx != 1:
+                raise RuntimeError(f'generator asked for index {ndx}, not 1')
+            iflags = r_shortint()
+            if not (iflags & rp.ITEM_TRANSFER):
+                raise RuntimeError(
+                    f'generator did not ask to transfer index 1 '
+                    f'(item flags 0x{iflags:04x})')
+            requested_basis = rp.FNAMECMP_FNAME
+            if iflags & rp.ITEM_BASIS_TYPE_FOLLOWS:
+                requested_basis = r_byte()
+                if requested_basis != FNAMECMP_PARTIAL_DIR:
+                    raise RuntimeError(
+                        'generator named basis type '
+                        f'0x{requested_basis:02x}, expected either none or '
+                        f'FNAMECMP_PARTIAL_DIR (0x{FNAMECMP_PARTIAL_DIR:02x})')
+            if iflags & rp.ITEM_XNAME_FOLLOWS:
+                ln = r_byte()
+                if ln == 0xFF:
+                    ln = r_byte() + 0x80
+                read_data(ln)
         except TimeoutError as exc:
             raise RuntimeError(
-                f'generator did not request file index 1; data={requested.hex()}'
+                'generator never requested index 1'
             ) from exc
 
         response = bytearray()
