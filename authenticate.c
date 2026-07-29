@@ -347,7 +347,13 @@ char *auth_server(int f_in, int f_out, int module, const char *host,
 
 	users = strdup(users);
 
-	for (tok = strtok(users, " ,\t"); tok; tok = strtok(NULL, " ,\t")) {
+	/* conf_strtok() honours the documented leading-comma form: a value that
+	 * starts with a comma splits on commas ALONE, so an entry may contain
+	 * spaces -- which is how a group name with a space is written.  Splitting
+	 * on whitespace here tore such an entry apart, so the rule the admin wrote
+	 * never matched and a rule they never wrote appeared from its tail.  The
+	 * daemon's gid field already uses this parser (clientserver.c). */
+	for (tok = conf_strtok(users); tok; tok = conf_strtok(NULL)) {
 		char *opts;
 		/* See if the user appended :deny, :ro, or :rw. */
 		if ((opts = strchr(tok, ':')) != NULL) {
