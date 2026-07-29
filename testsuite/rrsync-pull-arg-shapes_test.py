@@ -18,6 +18,7 @@ independent of which pin the implementation chooses.
 
 import os
 import shlex
+import stat
 import subprocess
 
 from rsyncfns import (
@@ -188,14 +189,28 @@ for label, argv, expect in CASES:
 # O_RDONLY, and opening a FIFO blocks until a writer appears, so naming one hung
 # rrsync before exec and an authorised user could pile up stuck processes.
 #
-# Only the hang is asserted, not the delivered tree: rrsync forces --no-D in a
-# restricted dir, which makes what a special file does on the wire a policy
-# question rather than a fixed one -- and at protocol 29/30 that combination
-# currently fails the transfer outright, which is tracked separately.
-proc = subprocess.run(rsync_argv('-a', '-e', str(rsh), 'dummy:afifo',
-                                 str(dest) + '/'),
-                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                      text=True, timeout=60)
+# It must also arrive.  rrsync denies device/special CREATION on the receiving
+# side only, so a pull carries the client's own -D and delivers the FIFO, which
+# is what a pristine 3.4.4 rrsync does.  While --no-D was forced here too, the
+# file list desynchronised -- the sender omitted the rdev fields the client's
+# receiver still read -- and this could assert nothing beyond "did not hang":
+# it overflowed at protocol 29/30 and, as root, deadlocked instead.
+rmtree(dest)
+dest.mkdir()
+try:
+    proc = subprocess.run(rsync_argv('-a', '-e', str(rsh), 'dummy:afifo',
+                                     str(dest) + '/'),
+                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                          text=True, timeout=60)
+except subprocess.TimeoutExpired:
+    test_fail('pulling a FIFO hung: either the wrapper opened it and blocked '
+              'for a writer, or the file list desynchronised and both ends '
+              'stalled')
+ctx = f'rc={proc.returncode}, output={proc.stdout.strip()[:200]!r}'
+if proc.returncode != 0:
+    test_fail(f'pulling a FIFO failed ({ctx})')
+if not stat.S_ISFIFO(os.lstat(dest / 'afifo').st_mode):
+    test_fail(f'pulling a FIFO delivered {describe(dest / "afifo")} ({ctx})')
 
 # The kinds, the symlink targets and the file contents are asserted by
 # check_kinds() on every case above, rather than spot-checked on a few here.

@@ -486,14 +486,24 @@ def main():
     if not saw_the_dot_arg:
         die("invalid rsync-command syntax or options")
 
-    if args.dir != '/':
-        # A restricted dir denies device/special creation, but `-a` (-rlptgoD)
+    if args.dir != '/' and not am_sender:
+        # A restricted dir denies device/special CREATION, but `-a` (-rlptgoD)
         # bundles -D into the client's short-option string, so rejecting -D
-        # outright would break every `rsync -a` to/from a restricted rrsync.
-        # Force --no-D instead: it follows the client's options, so it strips
-        # the device/special semantics (devices/specials are skipped, not
-        # created) while the rest of the transfer proceeds normally.
-        rsync_opts.append('--no-D')
+        # outright would break every `rsync -a` to a restricted rrsync.
+        #
+        # --no-D cannot do this job: preserve_devices/preserve_specials also
+        # frame the file list's rdev fields, and only this end of the
+        # connection gets the option, so the client's -D sender writes rdev
+        # that a --no-D receiver never reads.  That desynchronises the list --
+        # a FIFO hangs the transfer at protocol 29 and corrupts it at 30, a
+        # device node breaks EVERY protocol.  --drop-D refuses the creation
+        # while leaving the wire format alone.  (Needs rsync 3.5.0+, which is
+        # what rrsync is installed alongside.)
+        #
+        # Only on the receiving side: creation happens where files are
+        # written, so a sender has nothing to deny -- --drop-D would be a
+        # no-op there.
+        rsync_opts.append('--drop-D')
 
     if args.munge:
         rsync_opts.append('--munge-links')
