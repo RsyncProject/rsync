@@ -96,6 +96,14 @@ The remainder of this manpage is dedicated to using the rrsync script.
     Enforce `--ignore-existing` on the server. Prevents overwriting existing
     files when the server is the receiver.
 
+    Because `--ignore-existing` protects only the file being transferred, this
+    also refuses the options that can reach a *different* existing file in the
+    restricted dir: `--log-file`, `--partial-dir`, `--delay-updates`, and
+    backup mode (`-b`, `--backup-dir`, whose published backup replaces whatever
+    already occupies the backup name). Resumable uploads with an explicit
+    `--partial-dir`, `--delay-updates`, and server-side logging are therefore
+    unavailable under this option.
+
 0.  `-help`, `-h`
 
     Output this help message and exit.
