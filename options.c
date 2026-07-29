@@ -60,6 +60,7 @@ int preserve_perms = 0;
 int preserve_executability = 0;
 int preserve_devices = 0;
 int preserve_specials = 0;
+int drop_devices = 0;
 int preserve_uid = 0;
 int preserve_gid = 0;
 int preserve_mtimes = 0;
@@ -681,6 +682,8 @@ static struct poptOption long_options[] = {
   {"no-write-devices", 0,  POPT_ARG_VAL,    &write_devices, 0, 0, 0 },
   {"specials",         0,  POPT_ARG_VAL,    &preserve_specials, 1, 0, 0 },
   {"no-specials",      0,  POPT_ARG_VAL,    &preserve_specials, 0, 0, 0 },
+  {"drop-D",           0,  POPT_ARG_VAL,    &drop_devices, 1, 0, 0 },
+  {"no-drop-D",        0,  POPT_ARG_VAL,    &drop_devices, 0, 0, 0 },
   {"links",           'l', POPT_ARG_VAL,    &preserve_links, 1, 0, 0 },
   {"no-links",         0,  POPT_ARG_VAL,    &preserve_links, 0, 0, 0 },
   {"no-l",             0,  POPT_ARG_VAL,    &preserve_links, 0, 0, 0 },

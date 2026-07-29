@@ -563,6 +563,7 @@ has its own detailed description later in this manpage.
 --copy-devices           copy device contents as a regular file
 --write-devices          write to devices as files (implies --inplace)
 --specials               preserve special files
+--drop-D                 receiver refuses to create devices/specials
 -D                       same as --devices --specials
 --times, -t              preserve modification times
 --atimes, -U             preserve access (use) times
@@ -1730,6 +1731,36 @@ sign) if you want the local shell to expand it.
 
     The `-D` option is equivalent to "[`--devices`](#opt)
     [`--specials`](#opt)".
+
+0.  `--drop-D`
+
+    This tells the receiving rsync to refuse to create device files and
+    special files, whatever the transfer requested.  Entries for them are
+    skipped exactly as if [`-D`](#opt) had not been used, with the usual
+    "non-regular file" warning.
+
+    This differs from `--no-D` in that it changes only what is created, not
+    how the file list is encoded.  `--no-D` also turns off the rdev fields
+    that devices and special files carry on the wire, so applying it to one
+    end of a connection alone leaves the two ends disagreeing about the
+    encoding and the transfer fails.  `--drop-D` can therefore be added on the
+    receiving side by itself, which is what it exists for -- the `rrsync`
+    wrapper uses it to stop a restricted directory's clients creating device
+    and special files in it.  Nodes already present there are left alone.
+
+    Because it only withholds creation, it has no effect on a sending rsync.
+
+    This option is not forwarded to the remote side, since its whole purpose
+    is to be applied to one end of a connection by itself.  It therefore
+    affects the rsync process you give it to and no other: on a local copy, or
+    on the receiving end of a `--server` invocation such as the one rrsync
+    builds.  To set it on a remote receiver from the command line, send it
+    explicitly with [`--remote-option`](#opt) (`-M`):
+
+    >     rsync -av -M--drop-D src/ host:dest/
+
+    Passing a plain `--drop-D` to a push affects only the local sender, where
+    it does nothing.
 
 0.  `--copy-devices`
 

@@ -42,6 +42,7 @@ extern int preserve_xattrs;
 extern int preserve_links;
 extern int preserve_devices;
 extern int preserve_specials;
+extern int drop_devices;
 extern int preserve_hard_links;
 extern int preserve_executability;
 extern int preserve_perms;
@@ -1954,8 +1955,14 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		goto cleanup;
 	}
 
-	if ((am_root && preserve_devices && ftype == FT_DEVICE)
-	 || (preserve_specials && ftype == FT_SPECIAL)) {
+	/* --drop-D refuses to CREATE devices/specials without touching
+	 * preserve_devices/preserve_specials, which also frame the file list's
+	 * rdev fields -- clearing those on one end of a connection alone
+	 * desynchronises it.  Falls through to the "skipping non-regular file"
+	 * path below, exactly as --no-D reaches it. */
+	if (!drop_devices
+	 && ((am_root && preserve_devices && ftype == FT_DEVICE)
+	  || (preserve_specials && ftype == FT_SPECIAL))) {
 		dev_t rdev;
 		int del_for_flag;
 		/* Whether the dest existed, captured before the type-mismatch
