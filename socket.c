@@ -147,6 +147,41 @@ static int establish_proxy_connection(int fd, char *host, int port, char *proxy_
 	return 0;
 }
 
+static char *shell_quote_connect_host(const char *host)
+{
+	const char *s;
+	char *quoted, *t;
+	size_t len = 2; /* surrounding single quotes */
+
+	for (s = host; *s; s++)
+		len += *s == '\'' ? 4 : 1;
+	quoted = new_array(char, len + 1);
+	t = quoted;
+	*t++ = '\'';
+	for (s = host; *s; s++) {
+		if (*s == '\'') {
+			memcpy(t, "'\\''", 4);
+			t += 4;
+		} else
+			*t++ = *s;
+	}
+	*t++ = '\'';
+	*t = '\0';
+	return quoted;
+}
+
+static int shell_unsafe_connect_host(const char *host)
+{
+	const unsigned char *s;
+
+	for (s = (const unsigned char *)host; *s; s++) {
+		if (!((*s >= 'a' && *s <= 'z') || (*s >= 'A' && *s <= 'Z')
+		 || (*s >= '0' && *s <= '9') || strchr("._:-%", *s)))
+			return 1;
+	}
+	return 0;
+}
+
 
 /* Try to set the local address for a newly-created socket.
  * Return -1 if this fails. */
@@ -360,7 +395,12 @@ int open_socket_out_wrapped(char *host, int port, const char *bind_addr, int af_
 	char *prog = getenv("RSYNC_CONNECT_PROG");
 
 	if (prog && strchr(prog, '%')) {
-		int hlen = strlen(host);
+		if (shell_unsafe_connect_host(host)) {
+			rprintf(FERROR, "unsafe host characters for RSYNC_CONNECT_PROG\n");
+			return -1;
+		}
+		char *qhost = shell_quote_connect_host(host);
+		int hlen = strlen(qhost);
 		int len = strlen(prog) + 1;
 		char *f, *t;
 		for (f = prog; *f; f++) {
@@ -381,7 +421,7 @@ int open_socket_out_wrapped(char *host, int port, const char *bind_addr, int af_
 					/* Just skips the extra '%'. */
 					break;
 				case 'H':
-					memcpy(t, host, hlen);
+					memcpy(t, qhost, hlen);
 					t += hlen;
 					continue;
 				default:
@@ -392,6 +432,7 @@ int open_socket_out_wrapped(char *host, int port, const char *bind_addr, int af_
 			*t++ = *f;
 		}
 		*t = '\0';
+		free(qhost);
 	}
 
 	if (DEBUG_GTE(CONNECT, 1)) {
