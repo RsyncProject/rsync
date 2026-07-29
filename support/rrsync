@@ -257,6 +257,124 @@ def pin_dir(path, orig_arg):
     pinned_dirs[key] = fd
     return fd
 
+# Checked receiver-side directory options, split by what rsync does with a
+# missing one.  It creates these itself on demand, so rrsync creates and pins
+# them (0700 for the partial dir, which is what rsync uses -- partial files are
+# incomplete copies of the peer's data and rsync deliberately does not publish
+# them to the rest of the machine).
+CREATE_DIR_MODE = {'--backup-dir': 0o777, '--partial-dir': 0o700}
+# It requires this one to exist already, so a missing one stays an error.
+MUST_EXIST_DIR_OPTS = ('--temp-dir',)
+# And it only READS through these: a missing one is the ordinary first-run case
+# and must keep working, so stand in an empty directory rather than refusing.
+EMPTY_BASIS_OPTS = ('--link-dest', '--compare-dest', '--copy-dest')
+
+def pinned_empty_dir(orig_arg):
+    """Pin an empty unlinked directory to stand in for a missing basis dir.
+
+    A basis lookup cannot tell an empty directory from a missing one, so this
+    preserves "first run has no basis" exactly -- but without leaving a name
+    the peer can win: the directory is created inside the restricted dir,
+    opened, then unlinked while we keep the fd, so what rsync is handed has no
+    path at all for an in-band symlink to take over.
+    """
+    name = '.rrsync-empty-basis.%d' % os.getpid()
+    rootfd = os.open('.', os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.mkdir(name, 0o700, dir_fd=rootfd)
+    except FileExistsError:
+        pass   # our own leftover, or something planted; the open decides
+    except OSError as e:
+        os.close(rootfd)
+        die('unable to create basis placeholder:', orig_arg, e.strerror)
+    try:
+        fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_DIRECTORY,
+                     dir_fd=rootfd)
+    except OSError as e:
+        os.close(rootfd)
+        die('unable to pin basis placeholder:', orig_arg, e.strerror)
+    try:
+        os.rmdir(name, dir_fd=rootfd)
+    except FileNotFoundError:
+        pass   # already gone; we hold the inode either way
+    except OSError as e:
+        # The whole point is that rsync gets an inode with no name.  If the
+        # name survives, the peer can still reach and fill the directory, so
+        # this is not a placeholder we can safely hand over.
+        os.close(rootfd)
+        os.close(fd)
+        die('unable to detach basis placeholder:', orig_arg, e.strerror)
+    os.close(rootfd)
+    if os.listdir(fd):
+        os.close(fd)
+        die('basis placeholder is not empty:', orig_arg)
+    make_inheritable(fd)
+    pinned_fds.append(fd)
+    return '/proc/self/fd/%d' % fd
+
+def create_pinned_dir(path, orig_arg, mode):
+    """Create a missing receiver-option directory and return a pin of it.
+
+    rsync makes --backup-dir/--partial-dir itself and then works inside it, so
+    the parent-pinned /proc/self/fd/<parent>/<leaf> spelling is not enough: the
+    same transfer can plant a symlink at <leaf> first and rsync would create
+    through it, outside the restricted dir.  Creating it here, beneath the
+    already-pinned parent, means the name is a real directory before rsync ever
+    looks at it, and the O_NOFOLLOW reopen proves we hold what we made rather
+    than something that raced in between.
+    """
+    # Walk down from the restricted dir a component at a time, creating what
+    # is missing.  rsync builds a whole missing --backup-dir hierarchy itself
+    # (backup.c make_bak_dir()), so stopping at "the immediate parent must
+    # exist" would refuse a first-use dated/nested name that works today.
+    #
+    # O_NOFOLLOW on every component costs nothing and rules out a symlink
+    # anywhere along the way: `path` is a realpath, so none of its components
+    # is legitimately a symlink, and each open is relative to the fd we are
+    # already holding rather than to a name that could be reshaped underneath.
+    fd = os.open('.', os.O_RDONLY | os.O_DIRECTORY)   # the chdir'd restricted dir
+    for comp in os.path.relpath(path, args.dir).split(os.sep):
+        if comp in ('', '.', '..'):
+            os.close(fd)
+            die('bad receiver option path:', orig_arg)
+        try:
+            nfd = os.open(comp, os.O_RDONLY | os.O_NOFOLLOW | os.O_DIRECTORY,
+                          dir_fd=fd)
+        except FileNotFoundError:
+            try:
+                os.mkdir(comp, mode, dir_fd=fd)
+            except FileExistsError:
+                pass   # raced in; the open below decides if it is usable
+            except OSError as e:
+                os.close(fd)
+                die('unable to create receiver option dir:',
+                    orig_arg, e.strerror)
+            try:
+                nfd = os.open(comp,
+                              os.O_RDONLY | os.O_NOFOLLOW | os.O_DIRECTORY,
+                              dir_fd=fd)
+            except OSError as e:
+                os.close(fd)
+                die('receiver option path is not a usable directory:',
+                    orig_arg, e.strerror)
+        except OSError as e:
+            os.close(fd)
+            die('receiver option path is not a usable directory:',
+                orig_arg, e.strerror)
+        os.close(fd)
+        fd = nfd
+    try:
+        dpath = os.readlink('/proc/self/fd/%d' % fd)
+    except OSError as e:
+        os.close(fd)
+        die('post-pin readlink failed (race?):', orig_arg, e.strerror)
+    if dpath != args.dir and not dpath.startswith(args.dir_slash):
+        os.close(fd)
+        die('post-pin path escaped tree (race?):', orig_arg, dpath)
+    make_inheritable(fd)
+    pinned_fds.append(fd)
+    return '/proc/self/fd/%d' % fd
+
 # sender_pinned_arg() verdicts that are not a rewritten argument.
 KEEP_LEAF_PIN = 'keep'          # hand rsync the leaf's own /proc/self/fd/N
 LEAF_PIN_UNUSABLE = 'unusable'  # no pin for this shape; keep the plain name
@@ -675,6 +793,8 @@ def validated_arg(opt, arg, typ=3, wild=False):
                 if am_sender:
                     die('post-realpath open failed (race detected):',
                         orig_arg, 'No such file or directory')
+                if opt in MUST_EXIST_DIR_OPTS:
+                    die('receiver option path does not exist:', orig_arg)
                 # Receiver-side new destination: the leaf has no inode to pin
                 # yet, but pin its existing PARENT directory and route the
                 # exec'd rsync's creation through /proc/self/fd/<parent>/<leaf>,
@@ -684,7 +804,24 @@ def validated_arg(opt, arg, typ=3, wild=False):
                 # (a deeper -R new path), fall through unpinned as before.
                 fd = None
                 leaf = os.path.basename(real_arg)
-                if HAVE_PROC_SELF_FD and leaf and leaf not in ('.', '..'):
+                if opt in CREATE_DIR_MODE or opt in EMPTY_BASIS_OPTS:
+                    # An auxiliary directory the peer can supply mid-transfer.
+                    # The parent-pinned spelling below is not enough for these:
+                    # the same transfer can plant a symlink at <leaf> first,
+                    # and rsync would create or read through it, outside the
+                    # tree.  Both answers below hand rsync an inode instead of
+                    # a name, so without that primitive there is no safe way to
+                    # proceed -- refuse rather than pass the name through.
+                    if not HAVE_PROC_SELF_FD:
+                        die('receiver option path does not exist:', orig_arg)
+                    if opt in CREATE_DIR_MODE:
+                        if not leaf or leaf in ('.', '..'):
+                            die('bad receiver option path:', orig_arg)
+                        arg = create_pinned_dir(real_arg, orig_arg,
+                                                CREATE_DIR_MODE[opt])
+                    else:
+                        arg = pinned_empty_dir(orig_arg)
+                elif HAVE_PROC_SELF_FD and leaf and leaf not in ('.', '..'):
                     try:
                         pfd = os.open(os.path.dirname(real_arg) or '/',
                                       os.O_RDONLY | os.O_NOFOLLOW | os.O_DIRECTORY)
