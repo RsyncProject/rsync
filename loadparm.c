@@ -175,14 +175,13 @@ enum shell_quote_context {
  * context-aware escaping is correct for exactly one level of shell parsing,
  * and a hook such as `sh -c '... %RSYNC_USER_NAME% ...'` re-parses the word in
  * a second shell that sees the value bare.  Peer-supplied values carrying any
- * of these are refused instead.  Word-splitting and glob characters are left
- * alone: they cannot execute anything, and paths legitimately contain them. */
+ * of these are refused instead. */
 static int shell_unsafe_value(const char *val)
 {
 	const char *s;
 
 	for (s = val; *s; s++) {
-		if (strchr("'\"`$\\;&|<>()", *s)
+		if (strchr("'\"`$\\;&|<>()*?[]# ", *s)
 		 || (unsigned char)*s < 0x20 || (unsigned char)*s == 0x7f)
 			return 1;
 	}
