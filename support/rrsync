@@ -393,8 +393,19 @@ def main():
     if args.ro:
         long_opts['log-file'] = -1
 
+    global short_disabled
+    if args.no_overwrite:
+        # --ignore-existing guards only the live transfer destination.  These
+        # options append to, consume, move or remove other existing objects in
+        # the restricted dir.  Backup mode belongs here too: publishing a
+        # backup onto a name that already exists deletes what is there
+        # (backup.c make_backup()), and deletion backs files up as well
+        # (delete.c), so an unrelated --delete can land on a protected name.
+        long_opts['log-file'] = long_opts['partial-dir'] = long_opts['delay-updates'] = -1
+        long_opts['backup-dir'] = -1
+        short_disabled += 'b'   # must precede the short_no_arg_re build below
+
     if args.dir != '/':
-        global short_disabled
         short_disabled += short_disabled_subdir
         long_opts['copy-unsafe-links'] = -1
 
