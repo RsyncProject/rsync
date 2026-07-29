@@ -171,6 +171,18 @@ static char *shell_quote_connect_host(const char *host)
 	return quoted;
 }
 
+static int shell_unsafe_connect_host(const char *host)
+{
+	const unsigned char *s;
+
+	for (s = (const unsigned char *)host; *s; s++) {
+		if (!((*s >= 'a' && *s <= 'z') || (*s >= 'A' && *s <= 'Z')
+		 || (*s >= '0' && *s <= '9') || strchr("._:-%", *s)))
+			return 1;
+	}
+	return 0;
+}
+
 
 /* Try to set the local address for a newly-created socket.
  * Return -1 if this fails. */
@@ -384,6 +396,10 @@ int open_socket_out_wrapped(char *host, int port, const char *bind_addr, int af_
 	char *prog = getenv("RSYNC_CONNECT_PROG");
 
 	if (prog && strchr(prog, '%')) {
+		if (shell_unsafe_connect_host(host)) {
+			rprintf(FERROR, "unsafe host characters for RSYNC_CONNECT_PROG\n");
+			return -1;
+		}
 		char *qhost = shell_quote_connect_host(host);
 		int hlen = strlen(qhost);
 		int len = strlen(prog) + 1;
