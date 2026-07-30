@@ -73,6 +73,7 @@ import dataclasses
 import fnmatch
 import json
 import os
+import shlex
 import re
 import secrets
 import signal
@@ -134,6 +135,7 @@ class Target:
     configure_flags: list[str]
     make: str = "make"            # e.g. "gmake" on the BSDs/Solaris
     env_prefix: str = ""          # exported before configure AND make (e.g. PATH)
+    scratchbase: str = ""         # run the tests' scratch trees here (e.g. another filesystem)
     configure_pre: str = ""       # shell run before ./configure (env exports, brew)
     python: str = "python3"
     rsync_bin: str = "rsync"      # "rsync.exe" on Cygwin
@@ -165,6 +167,10 @@ class Target:
     # pins -- a pass with no matching workflow step stays unpinned (see
     # workflow_skip_for).
     expect_skip_extra: list[str] = dataclasses.field(default_factory=list)
+    # ...and the mirror: entries the workflow expects to skip which this target
+    # actually RUNS (a relocated scratch can satisfy a condition the
+    # workflow's host cannot, e.g. a cross-device copy).
+    expect_skip_omit: list[str] = dataclasses.field(default_factory=list)
     # Test-name globs this box never runs (passed to runtests as RSYNC_EXCLUDE),
     # for tests unreliable on this platform for a non-rsync reason -- e.g. the
     # daemon+flipper symlink-race tests on openbsd, which the platform's kernel
@@ -286,20 +292,26 @@ def parse_workflow_skip(workflow: str, make_target: str = "check") -> str | None
 
 def workflow_skip_for(t: "Target", make_target: str = "check") -> str | None:
     """The target's expected-skip csv for a `make <target>` pass: its workflow's
-    RSYNC_EXPECT_SKIPPED plus any per-target expect_skip_extra (old-box-only skips
-    the workflow omits).
+    RSYNC_EXPECT_SKIPPED, plus any per-target expect_skip_extra (old-box-only
+    skips the workflow omits) and minus any expect_skip_omit (tests the workflow
+    expects to skip which this target can actually run).
+
+    The workflow spec is now mostly @FILE references, which are expanded on the
+    target rather than here, so an omission cannot be done by set subtraction:
+    the name to drop lives inside a file we deliberately do not read.  It is
+    emitted as a '-name' token instead, which runtests.py applies after every
+    addition.
 
     None (no oracle) when the workflow has no such step -- e.g. a protocols=[29]
     target whose workflow has no check29 line.  The extras alone would be a
     near-empty expected set and so a guaranteed mismatch; a lane the workflow
     does not pin is simply not pinned here either."""
     base = parse_workflow_skip(t.workflow, make_target)
-    if base is None or not t.expect_skip_extra:
+    if base is None or not (t.expect_skip_extra or t.expect_skip_omit):
         return base
-    items = set(t.expect_skip_extra)
-    if base:
-        items |= set(base.split(","))
-    return ",".join(sorted(items))
+    items = sorted(set(t.expect_skip_extra) | ({base} if base else set()))
+    items += [f"-{n}" for n in sorted(set(t.expect_skip_omit))]
+    return ",".join(items)
 
 
 # ---------------------------------------------------------------------------
@@ -361,6 +373,10 @@ def test_script(t: Target, transport: str, skip_csv: str | None, jobs: int,
     # PYTHONDONTWRITEBYTECODE: don't drop root-owned __pycache__/*.pyc into the
     # tree (a sudo run would, breaking the next non-root push --delete).
     env = "PYTHONDONTWRITEBYTECODE=1 "
+    if t.scratchbase:
+        # Must travel in `env`, not env_prefix: the sudo branch below runs
+        # `sudo -n env ...`, which drops whatever the outer shell exported.
+        env += f"scratchbase={shlex.quote(t.scratchbase)} "
     excl = _exclude_csv(t)
     if excl:
         env += f"RSYNC_EXCLUDE={excl} "
@@ -396,10 +412,17 @@ def nonroot_test_script(t: Target, names: list[str]) -> str:
     pre = f'{t.env_prefix}; ' if t.env_prefix else ''
     _e = _exclude_csv(t)
     excl = f'RSYNC_EXCLUDE={_e} ' if _e else ''
-    runtests = (f'PYTHONDONTWRITEBYTECODE=1 {excl}{t.python} runtests.py '
+    sb = f'scratchbase={shlex.quote(t.scratchbase)} ' if t.scratchbase else ''
+    runtests = (f'PYTHONDONTWRITEBYTECODE=1 {sb}{excl}{t.python} runtests.py '
                 f'--rsync-bin="$PWD/{t.rsync_bin}" {" ".join(names)}')
+    # A relocated scratch lives outside builddir, so clearing ./testtmp alone
+    # leaves the prior sudo run's root-owned tree in place and the non-root
+    # pass cannot create anything under it.
+    extra_rm = (f'sudo -n rm -rf {shlex.quote(t.scratchbase + "/testtmp")}\n'
+                if t.scratchbase else '')
     return (f'cd {t.builddir} || exit 3\n'
             f'sudo -n rm -rf testtmp\n'
+            f'{extra_rm}'
             f'{pre}{runtests}\n')
 
 
