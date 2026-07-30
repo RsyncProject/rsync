@@ -25,10 +25,12 @@
 #             absolute partial-dir reused across runs), so the receiver lstats and
 #             stages into it; followed == the staged file advances the leaf's mtime.
 
+import os
 import subprocess
-import time
 
 from rsyncfns import rsync_argv, run_symlink_matrix, plant_operator_symlink
+
+PINNED = 1000000000   # 2001-09-09; any later mtime means it was touched
 
 
 def _setup(ctx):
@@ -62,10 +64,13 @@ def case_reuse(ctx):
     # it.  Followed == the staged file advances the out-of-tree leaf's mtime.
     opt, escape = _setup(ctx)
     escape.mkdir(parents=True, exist_ok=True)
-    before = escape.stat().st_mtime_ns
-    time.sleep(0.01)
+    # Pinned epoch rather than a sub-second delta: on a 1-second-granularity
+    # filesystem such as HFS+ a same-second change is invisible, and the delta
+    # test then reports a followed symlink as refused.
+    os.utime(escape, (PINNED, PINNED))
+    pinned = escape.stat().st_mtime   # what the fs actually stored
     _run(ctx, opt)
-    return escape.stat().st_mtime_ns != before
+    return escape.stat().st_mtime != pinned
 
 
 run_symlink_matrix('--partial-dir', case_create, paths=('abs',), wheres=('parent',),
