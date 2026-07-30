@@ -137,7 +137,19 @@ function rsync_ssl_helper {
     fi
 
     if [[ $RSYNC_SSL_TYPE == openssl ]]; then
-	exec $RSYNC_SSL_OPENSSL s_client $caopt $certopt $keyopt -quiet -verify_quiet -servername $hostname -verify_hostname $hostname -connect $hostname:$port
+	if echo "$hostname" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$|^[0-9a-fA-F:]+$'; then
+	    verify_opt="-verify_ip $hostname"
+	    if echo "$hostname" | grep -q ':'; then
+		# IPv6
+		connect="[$hostname]:$port"
+	    else
+		connect="$hostname:$port"
+	    fi
+	else
+	    verify_opt="-verify_hostname $hostname"
+	    connect="$hostname:$port"
+	fi
+	exec $RSYNC_SSL_OPENSSL s_client $caopt $certopt $keyopt -quiet -verify_quiet -servername $hostname $verify_opt -connect "$connect"
     elif [[ $RSYNC_SSL_TYPE == gnutls ]]; then
 	exec $RSYNC_SSL_GNUTLS --logfile=/dev/null $gnutls_cert_opt $gnutls_key_opt $gnutls_opts $hostname:$port
     else
