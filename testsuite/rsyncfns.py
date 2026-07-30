@@ -20,6 +20,7 @@ from __future__ import annotations
 import atexit
 import fcntl
 import filecmp
+import errno
 import os
 import platform
 import shlex
@@ -2153,6 +2154,34 @@ def devices_supported() -> bool:
         except (PermissionError, OSError):
             return False
     return True
+
+
+def hardlink_symlinks_supported(where=None) -> bool:
+    """True if THIS FILESYSTEM can hard-link a symlink.
+
+    rsync's own "hardlink_symlinks" capability is a build-time answer and says
+    nothing about the filesystem underneath: HFS+ returns ENOTSUP for
+    link()-ing a symlink where APFS and Linux succeed.  Probe where the test
+    data will actually live, not where the source tree is."""
+    d = tempfile.mkdtemp(prefix='rsync-hlsym.', dir=str(where) if where else None)
+    try:
+        link, hard = os.path.join(d, 's'), os.path.join(d, 'h')
+        os.symlink('target-need-not-exist', link)
+        try:
+            os.link(link, hard, follow_symlinks=False)
+        except NotImplementedError:
+            return False
+        except OSError as e:
+            # Only "the filesystem cannot do this" answers the question.  EPERM,
+            # ENOSPC, EMLINK, EIO or a quota refusal would otherwise be reported
+            # as a capability difference and quietly reshape the caller's
+            # expectations, so let those propagate.
+            if e.errno in (errno.ENOTSUP, getattr(errno, 'EOPNOTSUPP', errno.ENOTSUP)):
+                return False
+            raise
+        return True
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
 
 
 def owners_supported() -> bool:

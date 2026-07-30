@@ -11,7 +11,7 @@ import shutil
 from rsyncfns import (
     CHKFILE, FROMDIR, RSYNC, SCRATCHDIR, SRCDIR, TMPDIR, TODIR,
     all_plus, allspace, dots,
-    checkdiff, cp_p, makepath, run_rsync, v_filt,
+    checkdiff, cp_p, makepath, run_rsync, v_filt, hardlink_symlinks_supported, test_xfail,
 )
 
 
@@ -40,6 +40,19 @@ if to2dir.is_file():
 vv = run_rsync('-VV', check=True, capture_output=True).stdout
 hardlink_symlinks = '"hardlink_symlinks": true' in vv
 symtimes_supported = '"symtimes": true' in vv
+# The build capability drives rsync's ITEMISATION, so the expectations below
+# follow it -- but the filesystem holding the test data still has to perform
+# the link.  HFS+ returns ENOTSUP, and rsync reports that as FERROR_XFER and
+# exits 23 even though it then creates the symlink correctly; a build WITHOUT
+# the capability, and a regular file in the same position, both fall back to a
+# copy instead.  So this is an rsync gap, not an expectation mismatch, and the
+# symlink expectations are threaded through every assertion here rather than
+# confined to one.  XFAIL rather than skip: the failure stays visible and
+# turns back into a pass by itself once rsync falls back on ENOTSUP.
+if hardlink_symlinks and not hardlink_symlinks_supported(SCRATCHDIR):
+    test_xfail('rsync hard-links symlinks in this build, but this filesystem '
+               'returns ENOTSUP and rsync fails the transfer (exit 23) instead '
+               'of falling back to a copy the way it does for regular files')
 
 if hardlink_symlinks:
     L = 'hL'
