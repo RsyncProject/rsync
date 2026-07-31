@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""A metacharacter-free peer value still selects a command in a nested shell.
+"""A peer value with no EXECUTING character still selects a command.
 
 `pre-xfer exec = sh -c '.../%RSYNC_USER_NAME% ...'` re-parses the substituted
 word in a SECOND shell.  rsync escapes for the quoting context it sees, which is
 correct for the outer shell only; the inner one gets the value bare.  A username
-of `touc?` therefore carries no character that can execute in one level of
-parsing, yet the inner shell glob-expands `<dir>/touc?` to `<dir>/touch` and
-runs it.  The substitution has stopped being data and has chosen the command.
+of `touc?` carries nothing that can execute in one level of parsing -- which
+is why the original character set let it through -- yet the inner shell
+glob-expands `<dir>/touc?` to `<dir>/touch` and runs it.  ('?' is refused now,
+which is what this test pins; it was not when the hole was found.)  The substitution has stopped being data and has chosen the command.
 
 Two things this test has to avoid.
 
@@ -23,6 +24,7 @@ than /usr/bin/touch -- a hardcoded system path would make the whole thing hinge
 on a binary the build never guaranteed.
 """
 
+import os
 import subprocess
 
 from rsyncfns import (
@@ -47,8 +49,9 @@ victim = bindir / 'touch'
 victim.write_text('#!/bin/sh\n: > "$1"\n')
 victim.chmod(0o755)
 
-# No character from shell_unsafe_value()'s set appears in this username: it is
-# data to the outer shell and a pathname expansion in the nested one.
+# Data to the outer shell, a pathname expansion in the nested one.  '?' IS in
+# shell_unsafe_value()'s set today -- that is the point: this asserts it stays
+# there.
 user = 'touc?'
 password = 'known-password'
 secrets = base / 'secrets'
@@ -60,7 +63,11 @@ pwfile.chmod(0o600)
 
 # --- positive control: the attack must be live in this environment ---------
 control = base / 'control-marker'
-subprocess.run(['sh', '-c', f"sh -c '{bindir}/touc? {control}'"],
+# The OUTER shell must be the one rsync would use -- shell_exec() honours
+# RSYNC_SHELL -- or the control can succeed on /bin/sh while rsync's hook path
+# could not have run at all, and "the attack is live here" would be false.
+outer = os.environ.get('RSYNC_SHELL') or '/bin/sh'
+subprocess.run([outer, '-c', f"sh -c '{bindir}/touc? {control}'"],
                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 if not control.exists():
     test_fail(f'the nested-shell glob did not select {victim} in this '
