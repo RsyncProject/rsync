@@ -35,7 +35,10 @@ def expand(text_spec, srcdir=None, suitedir=None):
 
 def write(name, body):
     p = SCRATCHDIR / name
-    p.write_text(body)
+    if isinstance(body, bytes):
+        p.write_bytes(body)
+    else:
+        p.write_text(body)
     return '@' + str(p)
 
 
@@ -60,6 +63,7 @@ for what, arg, suite in (
     ('stale name in a list', write('stale.txt', 'gone-away-test\n'), None),
     ('empty file', write('empty.txt', ''), None),
     ('comments only', write('comments.txt', '# nothing here\n\n'), None),
+    ('not valid text', write('binary.txt', b'acls\n\xff\xfe not utf-8\n'), None),
     ('empty entry', 'acls,,sparse', None),
     ('trailing comma', 'acls,', None),
     ('leading comma', ',acls', None),
