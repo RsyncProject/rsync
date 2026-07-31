@@ -128,6 +128,19 @@ a symlink that a privileged rsync then follows:
   either (rsync does not follow a symlink there, and the options that would
   change that are refused in a restricted dir).
 
+- A filter rule that failed to parse was echoed back verbatim, including when
+  the rule came from a merge file's contents.  A per-directory merge rule names
+  a file the peer chooses and travels over the protocol rather than in an
+  argument, so this let a peer read back any line of any file the server process
+  could open that is not valid filter syntax -- through an `rrsync` restricted
+  account as well as a daemon module, since neither confines a merge open that
+  the wrapper never sees.  A syntax error in a rule read from a file now reports
+  the file and line rather than the text; a rule given as an argument is still
+  shown.  The `--debug=FILTER` traces print the same file-derived text, so
+  `rrsync` now refuses a peer-selected `--debug` (a stock client never sends
+  one).  An operator who turns debugging on for their own server still sees the
+  rule text.
+
 Daemon protocol / identity:
 
 - CVE-2026-53786 (LOW-MEDIUM): A client-supplied `--filter` merge file bypassed

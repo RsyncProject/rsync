@@ -46,6 +46,96 @@ extern int operator_path_resolve;
 /* Set while the daemon loads its own filter parameters; see parse_filter_file(). */
 int daemon_config_filter_file = 0;
 
+/* Where the rule text now being parsed came from, when that is a file's
+ * CONTENTS rather than an argument.  A rule that fails to parse used to be
+ * echoed back verbatim, and the peer chooses which file gets merged (a
+ * per-directory merge rule travels over the protocol, so no argument of ours
+ * ever names it), which made the filter parser a read-any-line oracle: any
+ * line that is not valid filter syntax came straight back in the error.
+ * Report where the bad rule is, not what it says. */
+static int rule_src_in_file = 0;   /* parsing a file's contents right now */
+static const char *rule_src_file = NULL;   /* ...and its name is safe to show */
+static int rule_src_line = 0;
+/* Where a file whose own name we must NOT print was named, which is a location
+ * we CAN print: it keeps the diagnostic useful without echoing the pathname a
+ * merge rule supplied. */
+static const char *rule_src_named_at = NULL;
+
+/* True while the text we are handling came out of a file's contents: either we
+ * are parsing that file right now, or this is a deferred per-dir merge whose
+ * NAME came from one and which carries the provenance on the rule. */
+#define TEXT_FROM_FILE(template) \
+	(rule_src_in_file \
+	 || ((template) && (template)->rflags & FILTRULE_FROM_FILE))
+
+/* "FILE line N", or just "FILE" when the count is not a line count. */
+static const char *rule_src_where(void)
+{
+	static char buf[MAXPATHLEN + 32];
+
+	if (!rule_src_file) {
+		if (!rule_src_named_at)
+			return "a file read earlier";   /* origin not retained */
+		snprintf(buf, sizeof buf, "a file named at %s", rule_src_named_at);
+		return buf;
+	}
+	if (rule_src_line < 0)
+		return rule_src_file;
+	snprintf(buf, sizeof buf, "%s line %d", rule_src_file, rule_src_line);
+	return buf;
+}
+
+/* THE chokepoint.  Every diagnostic string that is, or is built from, a filter
+ * rule's own text -- a pattern, a merge-file name, a path composed from one --
+ * must be passed through rule_text() on its way to rprintf().  When the rule
+ * came from an argument the text is returned unchanged, because it is the
+ * user's own and hiding it only makes typos harder to fix.  When it came from
+ * a FILE's contents it is replaced by a description of where it came from,
+ * because the peer chooses which file gets merged and any line of it that
+ * reaches a message is a line the peer can read back.
+ *
+ * Doing it here rather than at each site is the point: a message added later
+ * cannot reintroduce the leak by forgetting to check, and there is one place
+ * to audit.  `template' is the rule the text belongs to, or NULL when the only
+ * thing that matters is whether we are parsing a file right now.
+ *
+ * The returned buffer is rotated, so two calls in one rprintf() are safe. */
+static const char *rule_text_len(const filter_rule *template,
+				 const char *text, int len)
+{
+	static char buf[2][BIGPATHBUFLEN];
+	static int which = 0;
+	char *b = buf[which];
+
+	which ^= 1;
+	if (!TEXT_FROM_FILE(template)) {
+		if (len < 0)
+			return text;
+		snprintf(b, sizeof buf[0], "%.*s", len, text);
+		return b;
+	}
+	snprintf(b, sizeof buf[0], "<rule from %s>", rule_src_where());
+	return b;
+}
+
+static const char *rule_text(const filter_rule *template, const char *text)
+{
+	return rule_text_len(template, text, -1);
+}
+
+/* For the extra detail some messages add ABOUT the text -- a character of it,
+ * an offset into it.  Dropped along with the text it describes. */
+static const char *rule_detail(const filter_rule *template, const char *detail)
+{
+	return TEXT_FROM_FILE(template) ? "" : detail;
+}
+
+static void filter_rule_err(const char *msg, const char *rulestr)
+{
+	rprintf(FERROR, "%s: %s\n", msg, rule_text(NULL, rulestr));
+	exit_cleanup(RERR_SYNTAX);
+}
+
 extern char curr_dir[MAXPATHLEN];
 extern unsigned int curr_dir_len;
 extern unsigned int module_dirlen;
@@ -178,10 +268,10 @@ static void add_rule(filter_rule_list *listp, const char *pat, unsigned int pat_
 	else
 		mention_rule_suffix = DEBUG_GTE(FILTER, 2) ? "" : NULL;
 	if (mention_rule_suffix) {
-		rprintf(FINFO, "[%s] add_rule(%s%.*s%s)%s%s\n",
-			who_am_i(), get_rule_prefix(rule, pat, 0, NULL),
-			(int)pat_len, pat, (rule->rflags & FILTRULE_DIRECTORY) ? "/" : "",
-			listp->debug_type, mention_rule_suffix);
+		rprintf(FINFO, "[%s] add_rule(%s%s)%s%s\n",
+			who_am_i(), rule_detail(rule, get_rule_prefix(rule, pat, 0, NULL)),
+			rule_text_len(rule, pat, (int)pat_len),
+			listp->debug_type, rule_detail(rule, mention_rule_suffix));
 	}
 
 	/* These flags also indicate that we're reading a list that
@@ -286,7 +376,7 @@ static void add_rule(filter_rule_list *listp, const char *pat, unsigned int pat_
 		}
 
 		lp = new_array0(filter_rule_list, 1);
-		if (asprintf(&lp->debug_type, " [per-dir %s]", cp) < 0)
+		if (asprintf(&lp->debug_type, " [per-dir %s]", rule_text(rule, cp)) < 0)
 			out_of_memory("add_rule");
 		rule->u.mergelist = lp;
 
@@ -603,7 +693,8 @@ static void pop_filter_list(filter_rule_list *listp)
  * value and will be updated with the length of the resulting name.  We
  * always return a name that is null terminated, even if the merge_file
  * name was not. */
-static char *parse_merge_name(const char *merge_file, unsigned int *len_ptr,
+static char *parse_merge_name(const filter_rule *template,
+			      const char *merge_file, unsigned int *len_ptr,
 			      unsigned int prefix_skip)
 {
 	static char buf[MAXPATHLEN];
@@ -634,7 +725,7 @@ static char *parse_merge_name(const char *merge_file, unsigned int *len_ptr,
 		}
 		if (!sanitize_path(fn, merge_file, r, dirbuf_depth, SP_DEFAULT)) {
 			rprintf(FERROR, "merge-file name overflows: %s\n",
-				merge_file);
+				rule_text(template, merge_file));
 			return NULL;
 		}
 		fn_len = strlen(fn);
@@ -647,7 +738,8 @@ static char *parse_merge_name(const char *merge_file, unsigned int *len_ptr,
 	if (fn != buf) {
 		int d_len = dirbuf_len - prefix_skip;
 		if (d_len + fn_len >= MAXPATHLEN) {
-			rprintf(FERROR, "merge-file name overflows: %s\n", fn);
+			rprintf(FERROR, "merge-file name overflows: %s\n",
+				rule_text(template, fn));
 			return NULL;
 		}
 		memcpy(buf, dirbuf + prefix_skip, d_len);
@@ -697,7 +789,7 @@ static BOOL setup_merge_file(int mergelist_num, filter_rule *ex,
 	char *x, *y, *pat = ex->pattern;
 	unsigned int len;
 
-	if (!(x = parse_merge_name(pat, NULL, 0)) || *x != '/')
+	if (!(x = parse_merge_name(ex, pat, NULL, 0)) || *x != '/')
 		return 0;
 
 	if (DEBUG_GTE(FILTER, 2)) {
@@ -823,7 +915,7 @@ void *push_local_filters(const char *dir, unsigned int dirlen)
 			io_error |= IOERR_GENERAL;
 			rprintf(FERROR,
 			    "cannot add local filter rules in long-named directory: %s\n",
-			    full_fname(dirbuf));
+			    rule_text(ex, full_fname(dirbuf)));
 		}
 		dirbuf[dirbuf_len] = '\0';
 	}
@@ -1006,8 +1098,8 @@ static void report_filter_result(enum logcode code, char const *name,
 			      : "file";
 		rprintf(code, "[%s] %sing %s %s because of pattern %s%s%s\n",
 		    w, actions[*w=='g'][!(ent->rflags & FILTRULE_INCLUDE)],
-		    t, name, ent->pattern,
-		    ent->rflags & FILTRULE_DIRECTORY ? "/" : "", type);
+		    t, name, rule_text(ent, ent->pattern),
+		    rule_detail(ent, ent->rflags & FILTRULE_DIRECTORY ? "/" : ""), type);
 	}
 }
 
@@ -1169,6 +1261,8 @@ static filter_rule *parse_rule_tok(const char **rulestr_ptr,
 	/* Inherit from the template.  Don't inherit FILTRULES_SIDES; we check
 	 * that later. */
 	rule->rflags = template->rflags & FILTRULES_FROM_CONTAINER;
+	if (rule_src_in_file)
+		rule->rflags |= FILTRULE_FROM_FILE;   /* before parse_merge_name() */
 
 	/* Figure out what kind of a filter rule "s" is pointing at.  Note
 	 * that if FILTRULE_NO_PREFIXES is set, the rule is either an include
@@ -1266,8 +1360,7 @@ static filter_rule *parse_rule_tok(const char **rulestr_ptr,
 			rule->rflags |= FILTRULE_CLEAR_LIST;
 			break;
 		default:
-			rprintf(FERROR, "Unknown filter rule: `%s'\n", *rulestr_ptr);
-			exit_cleanup(RERR_SYNTAX);
+			filter_rule_err("Unknown filter rule", *rulestr_ptr);
 		}
 		while (ch != '!' && *++s && *s != ' ' && *s != '_') {
 			if (template->rflags & FILTRULE_WORD_SPLIT && isspace(*s)) {
@@ -1276,11 +1369,15 @@ static filter_rule *parse_rule_tok(const char **rulestr_ptr,
 			}
 			switch (*s) {
 			default:
-			    invalid:
-				rprintf(FERROR,
-					"invalid modifier '%c' at position %d in filter rule: %s\n",
-					*s, (int)(s - (const uchar *)*rulestr_ptr), *rulestr_ptr);
+			    invalid: {
+				char where[32];
+				snprintf(where, sizeof where, " '%c' at position %d",
+					 *s, (int)(s - (const uchar *)*rulestr_ptr));
+				rprintf(FERROR, "invalid modifier%s in filter rule: %s\n",
+					rule_detail(NULL, where),
+					rule_text(NULL, *rulestr_ptr));
 				exit_cleanup(RERR_SYNTAX);
+			    }
 			case '-':
 				if (!BITS_SETnUNSET(rule->rflags, FILTRULE_MERGE_FILE, FILTRULE_NO_PREFIXES))
 					goto invalid;
@@ -1352,10 +1449,8 @@ static filter_rule *parse_rule_tok(const char **rulestr_ptr,
 			/* The filter and template both specify side(s).  This
 			 * is dodgy (and won't work correctly if the template is
 			 * a one-sided per-dir merge rule), so reject it. */
-			rprintf(FERROR,
-				"specified-side merge file contains specified-side filter: %s\n",
-				*rulestr_ptr);
-			exit_cleanup(RERR_SYNTAX);
+			filter_rule_err("specified-side merge file contains specified-side filter",
+					*rulestr_ptr);
 		}
 		rule->rflags |= template->rflags & FILTRULES_SIDES;
 	}
@@ -1372,15 +1467,12 @@ static filter_rule *parse_rule_tok(const char **rulestr_ptr,
 	if (rule->rflags & FILTRULE_CLEAR_LIST) {
 		if (!(template->rflags & FILTRULE_NO_PREFIXES)
 		 && !(xflags & XFLG_OLD_PREFIXES) && len) {
-			rprintf(FERROR,
-				"'!' rule has trailing characters: %s\n", *rulestr_ptr);
-			exit_cleanup(RERR_SYNTAX);
+			filter_rule_err("'!' rule has trailing characters", *rulestr_ptr);
 		}
 		if (len > 1)
 			rule->rflags &= ~FILTRULE_CLEAR_LIST;
 	} else if (!len && !(rule->rflags & FILTRULE_CVS_IGNORE)) {
-		rprintf(FERROR, "unexpected end of filter rule: %s\n", *rulestr_ptr);
-		exit_cleanup(RERR_SYNTAX);
+		filter_rule_err("unexpected end of filter rule", *rulestr_ptr);
 	}
 
 	/* --delete-excluded turns an un-modified include/exclude into a sender-side rule.  */
@@ -1439,8 +1531,8 @@ void parse_filter_str(filter_rule_list *listp, const char *rulestr,
 			break;
 
 		if (pat_len >= MAXPATHLEN) {
-			rprintf(FERROR, "discarding over-long filter: %.*s\n",
-				(int)pat_len, pat);
+			rprintf(FERROR, "discarding over-long filter: %s\n",
+				rule_text_len(NULL, pat, (int)pat_len));
 		    free_continue:
 			free_filter(rule);
 			continue;
@@ -1477,7 +1569,7 @@ void parse_filter_str(filter_rule_list *listp, const char *rulestr,
 				if (parent_dirscan) {
 					const char *p;
 					unsigned int len = pat_len;
-					if ((p = parse_merge_name(pat, &len, module_dirlen)))
+					if ((p = parse_merge_name(rule, pat, &len, module_dirlen)))
 						add_rule(listp, p, len, rule, 0);
 					else
 						free_filter(rule);
@@ -1486,7 +1578,7 @@ void parse_filter_str(filter_rule_list *listp, const char *rulestr,
 			} else {
 				const char *p;
 				unsigned int len = pat_len;
-				if ((p = parse_merge_name(pat, &len, 0)))
+				if ((p = parse_merge_name(rule, pat, &len, 0)))
 					parse_filter_file(listp, p, rule, XFLG_FATAL_ERRORS);
 				free_filter(rule);
 				continue;
@@ -1507,6 +1599,14 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 	char line[BIGPATHBUFLEN];
 	char *eob = line + sizeof line - 1;
 	BOOL word_split = (template->rflags & FILTRULE_WORD_SPLIT) != 0;
+	const char *save_src_file, *save_src_named_at;
+	int save_src_line, save_src_in_file;
+	int named_by_file;
+	int pending = EOF;
+	char named_at[MAXPATHLEN + 32];
+	/* Our own copy: fname may point into parse_merge_name()'s static buffer,
+	 * which a merge rule inside THIS file overwrites while we still need it. */
+	char src_name[MAXPATHLEN];
 
 	if (!fname || !*fname)
 		return;
@@ -1514,7 +1614,7 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 	if (merge_depth >= MAX_MERGE_DEPTH) {
 		rprintf(FERROR,
 			"[%s] merge-file include depth limit (%d) exceeded at %s\n",
-			who_am_i(), MAX_MERGE_DEPTH, fname);
+			who_am_i(), MAX_MERGE_DEPTH, rule_text(template, fname));
 		/* Match the failed-open path below: abort under a fatal
 		 * (operator-supplied) merge, otherwise drop the rule. */
 		if (xflags & XFLG_FATAL_ERRORS)
@@ -1547,9 +1647,12 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 				 * below, so it neither errors out nor leaks a
 				 * fatal-vs-silent oracle. */
 				if (DEBUG_GTE(FILTER, 2)) {
-					rprintf(FINFO,
-						"[%s] parse_filter_file(%s) hidden by daemon filter\n",
-						who_am_i(), fname);
+					/* Same rule as everywhere else: the name is
+					 * file content when a rule we read named it,
+					 * and so is "the daemon filter hides it". */
+					rprintf(FINFO, "[%s] parse_filter_file(%s)%s\n",
+						who_am_i(), rule_text(template, fname),
+						rule_detail(template, " hidden by daemon filter"));
 				}
 				merge_depth--;
 				return;
@@ -1583,17 +1686,31 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 		fp = stdin;
 
 	if (DEBUG_GTE(FILTER, 2)) {
+		/* The name is file CONTENT when a rule we read named it, and a
+		 * word-split per-dir merge turns every word of a file into one
+		 * of these -- so the trace would echo what the syntax errors no
+		 * longer do.  Say where it came from instead. */
 		rprintf(FINFO, "[%s] parse_filter_file(%s,%x,%x)%s\n",
-			who_am_i(), fname, template->rflags, xflags,
-			fp ? "" : " [not found]");
+			who_am_i(), rule_text(template, fname), template->rflags, xflags,
+			rule_detail(template, fp ? "" : " [not found]"));
 	}
 
 	if (!fp) {
 		if (xflags & XFLG_FATAL_ERRORS) {
-			rsyserr(FERROR, errno,
-				"failed to open %sclude file %s",
-				template->rflags & FILTRULE_INCLUDE ? "in" : "ex",
-				fname);
+			/* rule_src_file is still the PARENT's context here: when it
+			 * is set, this name came out of a file we read, so neither
+			 * the name nor errno (an existence oracle) may be shown. */
+			if (TEXT_FROM_FILE(template)) {
+				/* errno too: it answers "does this path exist". */
+				rprintf(FERROR, "failed to open %sclude file %s\n",
+					template->rflags & FILTRULE_INCLUDE ? "in" : "ex",
+					rule_text(template, fname));
+			} else {
+				rsyserr(FERROR, errno,
+					"failed to open %sclude file %s",
+					template->rflags & FILTRULE_INCLUDE ? "in" : "ex",
+					fname);
+			}
 			exit_cleanup(RERR_FILEIO);
 		}
 		merge_depth--;
@@ -1601,11 +1718,43 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 	}
 	dirbuf[dirbuf_len] = '\0';
 
+	/* Rule text from here on is this file's contents, not an argument, so
+	 * a syntax error must not echo it.  Saved and restored because a merge
+	 * rule inside this file can bring us back in for another file. */
+	save_src_in_file = rule_src_in_file;
+	save_src_file = rule_src_file;
+	save_src_line = rule_src_line;
+	/* If a rule we read named THIS file, our own path is file content too:
+	 * track the location for provenance but do not put it in a message. */
+	named_by_file = TEXT_FROM_FILE(template);
+	save_src_named_at = rule_src_named_at;
+	if (named_by_file) {
+		/* Snapshot where we were told to merge this, before that state
+		 * is replaced below (rule_src_where returns a static buffer).
+		 * A DEFERRED merge has no live location to point at -- the file
+		 * that named it was read and finished long ago -- so leave the
+		 * generic description rather than nesting two vague ones. */
+		if (rule_src_in_file) {
+			strlcpy(named_at, rule_src_where(), sizeof named_at);
+			rule_src_named_at = named_at;
+		} else
+			rule_src_named_at = NULL;
+	}
+	strlcpy(src_name, fname, sizeof src_name);
+	rule_src_in_file = 1;
+	rule_src_file = named_by_file ? NULL : src_name;
+	rule_src_line = word_split ? -1 : 0;   /* -1: tokens, not lines */
+
 	while (1) {
 		char *s = line;
 		int ch, overflow = 0;
+		if (rule_src_line >= 0)
+			rule_src_line++;
 		while (1) {
-			if ((ch = getc(fp)) == EOF) {
+			if (pending != EOF) {   /* a CR lookahead we could not push back */
+				ch = pending;
+				pending = EOF;
+			} else if ((ch = getc(fp)) == EOF) {
 				if (ferror(fp) && errno == EINTR) {
 					clearerr(fp);
 					continue;
@@ -1614,24 +1763,49 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 			}
 			if (word_split && isspace(ch))
 				break;
-			if (eol_nulls? !ch : (ch == '\n' || ch == '\r'))
+			if (eol_nulls? !ch : (ch == '\n' || ch == '\r')) {
+				if (ch == '\r') {   /* CRLF is one line, not two */
+					int nxt;
+					while ((nxt = getc(fp)) == EOF
+					    && ferror(fp) && errno == EINTR)
+						clearerr(fp);
+					if (nxt == EOF) {
+						if (!ferror(fp))
+							ch = EOF;   /* real end of file */
+					} else if (nxt != '\n' && ungetc(nxt, fp) == EOF) {
+						/* Pushback failed: hand it to the
+						 * NEXT rule, where it belongs --
+						 * appending it here would both
+						 * corrupt this rule and skip the
+						 * s < eob bound below. */
+						pending = nxt;
+					}
+				}
 				break;
+			}
 			if (s < eob)
 				*s++ = ch;
 			else
 				overflow = 1;
 		}
 		if (overflow) {
-			rprintf(FERROR, "discarding over-long filter: %s...\n", line);
+			rprintf(FERROR, "discarding over-long filter: %s\n",
+				rule_text_len(NULL, line, 0));
 			s = line;
 		}
 		*s = '\0';
 		/* Skip an empty token and (when line parsing) comments. */
-		if (*line && (word_split || (*line != ';' && *line != '#')))
+		if (*line && (word_split || (*line != ';' && *line != '#'))) {
+			rule_src_file = named_by_file ? NULL : src_name;
 			parse_filter_str(listp, line, template, xflags);
+		}
 		if (ch == EOF)
 			break;
 	}
+	rule_src_in_file = save_src_in_file;
+	rule_src_file = save_src_file;
+	rule_src_line = save_src_line;
+	rule_src_named_at = save_src_named_at;
 	fclose(fp);
 	merge_depth--;
 }
