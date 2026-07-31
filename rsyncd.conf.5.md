@@ -1145,15 +1145,22 @@ in the values of parameters.  See that section for details.
     data any more -- it chooses the command.
 
     Because rsync cannot escape for an unknown number of shell passes, a value
-    carrying any character that is active in a shell is refused outright, and
+    carrying any character that a shell could act on is refused outright, and
     the transfer is aborted with
 
     >     refusing to run shell hook: %VAR% holds a shell metacharacter
 
+    The refused characters are whitespace, the quoting and expansion characters
+    `'` `"` `` ` `` `$` `\`, the separators `;` `&` `|`, redirections `<` `>`,
+    parentheses, the pattern characters `*` `?` `[` `]`, `#`, `!`, `~`, `{` `}`,
+    and any control character.  Some of those are harmless on their own and are
+    refused for what a *second* shell would do with them -- `!` negates in
+    command position, so a hook written as an access check can be turned from a
+    denial into an approval, and `~` is tilde-expanded.
+
     This applies to EVERY `%RSYNC_*%` value, including ones you supplied
-    yourself.  In particular a module whose `path` contains a space, a `*`, a
-    `?`, a `[`, a `]` or a `#` cannot be interpolated into one of these
-    commands: `path = /srv/My Backups` with a command mentioning
+    yourself.  In particular a module whose `path` contains any of them cannot
+    be interpolated into one of these commands: `path = /srv/My Backups` with a command mentioning
     `%RSYNC_MODULE_PATH%` will refuse every transfer of that module, not just a
     hostile one.  The restriction is deliberate -- rsync cannot tell your space
     from an attacker's once both are inside the same string, and `path` itself
@@ -1161,7 +1168,9 @@ in the values of parameters.  See that section for details.
 
     If you need such a value in a hook, pass it through the environment instead
     of interpolating it: the same names are exported to the command, so
-    `$RSYNC_MODULE_PATH` inside your script is both safe and unrestricted.
+    `"$RSYNC_MODULE_PATH"` inside your script is unrestricted by this check.
+    Quote it there as shown -- rsync no longer has any say in how your script
+    splits the value.
 
     Even though the commands can be associated with a particular module, they
     are run using the permissions of the user that started the daemon (not the
