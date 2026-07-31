@@ -41,10 +41,12 @@ it is what makes two independent additions land on different lines.
 
 `runtests.py` exits 2 on anything malformed — an unreadable file, an empty or
 comment-only one, an empty entry (`a,,b`, which is what an unset variable
-expands to), an unsorted or duplicated name, a stale name. None of those may
-quietly shrink the expected set, because a smaller expectation is a weaker
-oracle. A wholly empty `RSYNC_EXPECT_SKIPPED` is still the legitimate "expect
-no skips at all".
+expands to), an unsorted or duplicated name, a stale name. The set comparison
+is exact, so a truncated list would not pass unnoticed; it would surface as a
+page of "unexpected skips" naming every test the list lost, which reads like a
+suite-wide regression rather than a bad list. Failing at the source says what
+actually happened. A wholly empty `RSYNC_EXPECT_SKIPPED` is still the
+legitimate "expect no skips at all".
 
 Relative `@FILE` paths resolve against `srcdir`, so out-of-tree builds and
 `make installcheck` work.

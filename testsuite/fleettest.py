@@ -161,7 +161,9 @@ class Target:
     # Test names this specific box skips beyond what its workflow lists -- e.g. an
     # old-kernel fleet box (no openat2/RESOLVE_BENEATH) skips the RB-conditional
     # symlink-race tests that the workflow's newer CI runner actually runs.  Merged
-    # into RSYNC_EXPECT_SKIPPED for the pipe and protocol passes.
+    # into RSYNC_EXPECT_SKIPPED for each pipe/protocol pass the workflow itself
+    # pins -- a pass with no matching workflow step stays unpinned (see
+    # workflow_skip_for).
     expect_skip_extra: list[str] = dataclasses.field(default_factory=list)
     # Test-name globs this box never runs (passed to runtests as RSYNC_EXCLUDE),
     # for tests unreliable on this platform for a non-rsync reason -- e.g. the

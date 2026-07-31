@@ -318,7 +318,7 @@ def expand_skip_spec(spec, srcdir, suitedir):
         try:
             with open(path) as f:
                 lines = f.readlines()
-        except OSError as e:
+        except (OSError, UnicodeDecodeError) as e:
             die(f'{tok}: cannot read skip list: {e}')
         prev = None
         found = 0
@@ -344,7 +344,9 @@ def expand_skip_spec(spec, srcdir, suitedir):
         if name in seen:
             continue
         seen[name] = where
-        if '/' in name or os.sep in name or name in ('.', '..'):
+        # A plain test name: no path, and no comma (which the expanded csv,
+        # and the summary the fleet parses back, use as the separator).
+        if ',' in name or '/' in name or os.sep in name or name in ('.', '..'):
             die(f'{where}: not a test name: {name!r}')
         if not os.path.isfile(os.path.join(suitedir, name + '_test.py')):
             die(f'{where}: no such test: {name}')

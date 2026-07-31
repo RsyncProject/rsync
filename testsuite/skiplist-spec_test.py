@@ -24,10 +24,11 @@ SUITE = str(SRC / 'testsuite')
 ERROR = f'exit:{runtests.Exit.ERROR}'
 
 
-def expand(text_spec, srcdir=None):
+def expand(text_spec, srcdir=None, suitedir=None):
     """expand_skip_spec, but reporting a SystemExit as a string."""
     try:
-        return runtests.expand_skip_spec(text_spec, srcdir or str(SRC), SUITE)
+        return runtests.expand_skip_spec(text_spec, srcdir or str(SRC),
+                                         suitedir or SUITE)
     except SystemExit as e:
         return f'exit:{e.code}'
 
@@ -38,26 +39,36 @@ def write(name, body):
     return '@' + str(p)
 
 
+# A stand-in suite whose entries make each malformed name *look* real, so that
+# removing the guard for it cannot be masked by the "no such test" check.
+FAKE = SCRATCHDIR / 'fakesuite'
+FAKE.mkdir(exist_ok=True)
+(FAKE / 'acls sparse_test.py').write_text('')   # if the one-name-per-line
+(FAKE / 'foo,bar_test.py').write_text('')       # ... comma and
+(FAKE / 'adir_test.py').mkdir(exist_ok=True)    # ... regular-file guards went
+
 # --- a bad spec must be a hard error, never a silently smaller expectation --
 #
 # The sorted/duplicate cases use real test names in descending order, so that
 # dropping the sort check cannot be masked by the stale-name check.
 
-for what, arg in (
-    ('missing file', '@testsuite/skiplist/does-not-exist.txt'),
-    ('unknown test name', 'no-such-test-here'),
-    ('unsorted list', write('unsorted.txt', 'sparse\nacls\n')),
-    ('duplicate entry', write('dup.txt', 'acls\nacls\n')),
-    ('two names on a line', write('twonames.txt', 'acls sparse\n')),
-    ('stale name in a list', write('stale.txt', 'gone-away-test\n')),
-    ('empty file', write('empty.txt', '')),
-    ('comments only', write('comments.txt', '# nothing here\n\n')),
-    ('empty entry', 'acls,,sparse'),
-    ('trailing comma', 'acls,'),
-    ('leading comma', ',acls'),
-    ('path in a name', '../testsuite/acls'),
+for what, arg, suite in (
+    ('missing file', '@testsuite/skiplist/does-not-exist.txt', None),
+    ('unknown test name', 'no-such-test-here', None),
+    ('unsorted list', write('unsorted.txt', 'sparse\nacls\n'), None),
+    ('duplicate entry', write('dup.txt', 'acls\nacls\n'), None),
+    ('stale name in a list', write('stale.txt', 'gone-away-test\n'), None),
+    ('empty file', write('empty.txt', ''), None),
+    ('comments only', write('comments.txt', '# nothing here\n\n'), None),
+    ('empty entry', 'acls,,sparse', None),
+    ('trailing comma', 'acls,', None),
+    ('leading comma', ',acls', None),
+    ('path in a name', '../testsuite/acls', None),
+    ('two names on a line', write('twonames.txt', 'acls sparse\n'), str(FAKE)),
+    ('comma in a name', write('comma.txt', 'foo,bar\n'), str(FAKE)),
+    ('a directory, not a test', 'adir', str(FAKE)),
 ):
-    got = expand(arg)
+    got = expand(arg, suitedir=suite)
     if got != ERROR:
         test_fail(f'{what}: expected a hard error, got {got!r}')
 
@@ -77,13 +88,21 @@ for what, arg, want in (
         test_fail(f'{what}: expected {want!r}, got {got!r}')
 
 # A relative @FILE resolves against srcdir, not the cwd: `make check` in an
-# out-of-tree build directory would otherwise not find the lists.  Passing a
-# relative srcdir too is what `make installcheck` does.
-for label, srcdir in (('absolute srcdir', str(SRC)),
-                      ('relative srcdir', os.path.relpath(SRC))):
-    got = expand('@testsuite/skiplist/common.txt', srcdir)
-    if got.startswith('exit:') or not got:
-        test_fail(f'relative @FILE did not resolve against {label}: {got!r}')
+# out-of-tree build directory would otherwise not find the lists.  srcdir is
+# itself relative under `make installcheck` (--srcdir=../src), so check a
+# non-trivial one too -- in-tree, os.path.relpath() would just be ".".
+got = expand('@testsuite/skiplist/common.txt', str(SRC))
+if got.startswith('exit:') or not got:
+    test_fail(f'relative @FILE did not resolve against srcdir: {got!r}')
+
+cwd = os.getcwd()
+try:
+    os.chdir(SRC.parent)
+    got = expand('@testsuite/skiplist/common.txt', SRC.name)
+finally:
+    os.chdir(cwd)
+if got.startswith('exit:') or not got:
+    test_fail(f'@FILE did not resolve against a relative srcdir: {got!r}')
 
 # --- the committed lists ---------------------------------------------------
 
