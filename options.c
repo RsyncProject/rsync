@@ -36,6 +36,7 @@ extern filter_rule_list daemon_filter_list;
 
 int make_backups = 0;
 
+
 /**
  * If 1, send the whole file as literal data rather than trying to
  * create an incremental diff.
@@ -603,7 +604,7 @@ enum {OPT_SERVER = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_NO_D, OPT_APPEND, OPT_NO_ICONV, OPT_INFO, OPT_DEBUG, OPT_BLOCK_SIZE,
       OPT_USERMAP, OPT_GROUPMAP, OPT_CHOWN, OPT_BWLIMIT, OPT_STDERR,
       OPT_OLD_COMPRESS, OPT_NEW_COMPRESS, OPT_NO_COMPRESS, OPT_OLD_ARGS,
-      OPT_STOP_AFTER, OPT_STOP_AT,
+      OPT_STOP_AFTER, OPT_STOP_AT, OPT_NICE, OPT_NO_NICE,
       OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
@@ -859,6 +860,9 @@ static struct poptOption long_options[] = {
   {"remote-option",   'M', POPT_ARG_STRING, 0, 'M', 0, 0 },
   {"protocol",         0,  POPT_ARG_INT,    &protocol_version, 0, 0, 0 },
   {"checksum-seed",    0,  POPT_ARG_INT,    &checksum_seed, 0, 0, 0 },
+  {"nice",             0,  POPT_ARG_STRING, 0, OPT_NICE, 0, 0 },
+  {"no-nice",          0,  POPT_ARG_NONE,   0, OPT_NO_NICE, 0, 0 },
+  {0,                 'Q', POPT_ARG_NONE,   0, 'Q', 0, 0 },
   {"server",           0,  POPT_ARG_NONE,   0, OPT_SERVER, 0, 0 },
   {"sender",           0,  POPT_ARG_NONE,   0, OPT_SENDER, 0, 0 },
   /* All the following options switch us into daemon-mode option-parsing. */
@@ -1459,6 +1463,14 @@ char *alt_dest_opt(int type)
 }
 
 /**
+ * Returns a string representation for the current function as client or server
+ */
+const char * client_or_server_string()
+{
+	return am_server ? "server" : "client";
+}
+
+/**
  * Process command line arguments.  Called on both local and remote.
  *
  * @retval 1 if all options are OK; with globals set to appropriate
@@ -1703,6 +1715,37 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 
 		case 'q':
 			quiet++;
+			break;
+
+		case 'Q':
+			/*
+			 * Turn nice on with default prio and turn ionice on (idle).
+			 */
+			niceness_turn_on();
+			break;
+
+		case OPT_NICE:
+			/*
+			 * Parse parameters for nice and set the following fields:
+			   - nice_local
+			   - ionice_local
+			   - nice_remote
+			   - ionice_remote
+			 */
+			arg = poptGetOptArg(pc);
+			if (!niceness_parse_argument(arg)) {
+				snprintf(err_buf, sizeof err_buf,
+					"Invalid argument passed to --nice (%s)\n",
+					arg);
+				goto cleanup;
+			}
+			break;
+
+		case OPT_NO_NICE:
+			/*
+			 * Turn off nice and ionice
+			 */
+			niceness_turn_off();
 			break;
 
 		case 'x':
@@ -3166,6 +3209,14 @@ void server_options(char **args, int *argc_p)
 
 	if (mkpath_dest_arg && am_sender)
 		args[ac++] = "--mkpath";
+
+	if (niceness.nice_remote || niceness.ionice_remote) {
+		const char *ionice_str = niceness.ionice_remote ? intToIoniceValueString(niceness.ionice_remote):"";
+		const char *slash_str = niceness.ionice_remote ? "/":"";
+		if (asprintf(&arg, "--nice=local:%d%s%s", niceness.nice_remote, slash_str, ionice_str) < 0)
+			goto oom;
+		args[ac++] = arg;
+	}
 
 	if (ac > MAX_SERVER_ARGS) { /* Not possible... */
 		rprintf(FERROR, "argc overflow in server_options().\n");
