@@ -1950,8 +1950,10 @@ int main(int argc,char *argv[])
 #ifdef ICONV_CONST
 		setup_iconv();
 #endif
-	} else if (am_daemon)
+	} else if (am_daemon) {
+		niceness_renice_and_ionice_me();
 		return daemon_main();
+	}
 
 	if (am_server && protect_args) {
 		char buf[MAXPATHLEN];
@@ -1962,6 +1964,8 @@ int main(int argc,char *argv[])
 			exit_cleanup(RERR_SYNTAX);
 		}
 	}
+
+	niceness_renice_and_ionice_me();
 
 	if (argc < 1) {
 		usage(FERROR);
