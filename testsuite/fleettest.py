@@ -26,17 +26,23 @@ Source = `git archive HEAD` of the rsync tree (the current directory, or --repo
 PATH) -- source-only, no .o/binaries are ever pushed.
 
 Every run uses its own randomly-named build directory on each target
-(<builddir>-<run_id>), so two or three fleettest runs can share the same fleet
-without interfering: each pushes, builds and tests in isolation. The run dir is
-removed when the run ends -- on success or failure, and best-effort on
+(<builddir>-<run_id>-<target>), so two or three fleettest runs can share the same
+fleet without interfering: each pushes, builds and tests in isolation. The run dir
+is removed when the run ends -- on success or failure, and best-effort on
 Ctrl-C/kill (pass --keep to retain it for inspection). A run that is hard-killed
 (SIGKILL), or signalled mid-push, or whose ssh dies during cleanup can leave a
-stray <builddir>-<id> behind -- plus an orphaned path-flipper or test rsyncd on
-platforms without a parent-death backstop; sweep all of those (root-owned files
-included, via sudo -n) with `fleettest.py --cleanup` (optionally scoped with
---targets). Run --cleanup between runs, not during one: its process kills are
-host-global and would also catch a concurrent run's flipper/daemon. Because each
-run starts from a fresh dir, every build is a full configure + build.
+stray <builddir>-<id>-<target> behind -- plus an orphaned path-flipper or test
+rsyncd on platforms without a parent-death backstop; sweep all of those
+(root-owned files included, via sudo -n) with `fleettest.py --cleanup` (optionally
+scoped with --targets). Run --cleanup between runs, not during one: its process
+kills are host-global and would also catch a concurrent run's flipper/daemon.
+Because each run starts from a fresh dir, every build is a full configure + build.
+
+Targets run concurrently, EXCEPT that targets naming the same machine run one
+after another. More than one target may point at a single host -- a variant that
+tests the same build on a different filesystem does -- and those cannot overlap:
+they would fight over the fixed ports the daemon tests claim, and over any other
+host-global state.
 
 PROVISIONING: each target must have the build toolchain its workflow's prepare
 step installs -- the target regenerates its own configure/proto.h/man pages, so
@@ -848,6 +854,13 @@ _cleanup_lock = threading.Lock()
 _cleanup_done = False
 
 
+def _dirsafe(name: str) -> str:
+    """A target name reduced to what is safe in a remote path we later rm -rf.
+    Anything outside [A-Za-z0-9._-] becomes '_', so a name cannot introduce a
+    path separator, a shell metacharacter, or a leading dash."""
+    return re.sub(r'[^A-Za-z0-9._-]', '_', name).lstrip('-') or 'target'
+
+
 def _unsafe_builddir(path: str) -> bool:
     """True if `path` is too broad to feed to `rm -rf` -- empty, root, $HOME, or
     an absolute path sitting directly under / (e.g. /tmp). A real run dir is
@@ -1087,11 +1100,15 @@ def main() -> int:
     args.transports = ["pipe", "tcp"] if args.transport == "both" else [args.transport]
 
     # Give this run its own build dir on every target so concurrent runs don't
-    # collide: <builddir>-<run_id>. The base name is the prefix --cleanup globs.
+    # collide, and name it after the target too, because two targets can share
+    # one machine: <builddir>-<run_id>-<target>. Without the target part they
+    # would push into the same tree, and the second would inherit the first's
+    # config.h/Makefile and never reconfigure with its own flags. The base name
+    # is still the prefix --cleanup globs.
     args.run_id = secrets.token_hex(3)
     for t in chosen:
-        t.builddir = f"{t.builddir}-{args.run_id}"
-    log(f"run {args.run_id}: build dir <target>:{chosen[0].builddir} "
+        t.builddir = f"{t.builddir}-{args.run_id}-{_dirsafe(t.name)}"
+    log(f"run {args.run_id}: build dir <target>:{chosen[0].builddir.rsplit('-', 1)[0]}-<target> "
         f"(removed at exit; --keep to retain)")
 
     # Remove each run dir when we exit -- success or failure, and best-effort on
@@ -1134,18 +1151,45 @@ def main() -> int:
         # Tests that opt into the non-root pass (same for every target).
         args.nonroot_tests = discover_nonroot_tests(Path(staging) / "testsuite")
 
-        results: list[TargetResult] = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=len(chosen)) as ex:
-            futs = {ex.submit(run_target, t, args, staging): t for t in chosen}
-            for fut in concurrent.futures.as_completed(futs):
-                t = futs[fut]
+        # Targets are grouped by machine, and a machine's targets run one after
+        # another. Two targets CAN name the same host -- an alternate-filesystem
+        # variant of another target does exactly that -- and running those at
+        # the same time breaks both: they would fight over the fixed ports the
+        # daemon tests claim, and over any other host-global state. Different
+        # machines still run concurrently, which is where the parallelism was.
+        groups: dict[str, list[Target]] = {}
+        for t in chosen:
+            groups.setdefault(t.ssh_host or "<local>", []).append(t)
+        for host, ts in groups.items():
+            if len(ts) > 1:
+                log(f"[{host}] {len(ts)} targets on one machine, run in "
+                    f"sequence: {', '.join(x.name for x in ts)}")
+
+        def run_group(ts: 'list[Target]') -> 'list[TargetResult]':
+            out = []
+            for t in ts:
                 try:
-                    results.append(fut.result())
+                    out.append(run_target(t, args, staging))
                 except Exception as e:  # never let one target kill the run
                     r = TargetResult(t.name)
                     r.reachable = False
                     r.error = f"harness exception: {e!r}"
-                    results.append(r)
+                    out.append(r)
+            return out
+
+        results: list[TargetResult] = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(groups)) as ex:
+            futs = {ex.submit(run_group, ts): ts for ts in groups.values()}
+            for fut in concurrent.futures.as_completed(futs):
+                ts = futs[fut]
+                try:
+                    results.extend(fut.result())
+                except Exception as e:  # a whole group died: account for each
+                    for t in ts:
+                        r = TargetResult(t.name)
+                        r.reachable = False
+                        r.error = f"harness exception: {e!r}"
+                        results.append(r)
     finally:
         subprocess.run(["rm", "-rf", staging])
 
