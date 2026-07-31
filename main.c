@@ -1929,6 +1929,8 @@ int main(int argc,char *argv[])
 	if (write_batch < 0)
 		dry_run = 1;
 
+	niceness_renice_and_ionice_me();
+
 	if (am_server) {
 #ifdef ICONV_CONST
 		setup_iconv();
