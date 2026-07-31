@@ -53,7 +53,8 @@ OBJS3=progress.o pipe.o @MD5_ASM@ @ROLL_SIMD@ @ROLL_ASM@
 DAEMON_OBJ = params.o loadparm.o clientserver.o access.o connection.o authenticate.o
 popt_OBJS= popt/popt.o  popt/poptconfig.o \
 	popt/popthelp.o popt/poptparse.o popt/poptint.o
-OBJS=$(OBJS1) $(OBJS2) $(OBJS3) $(DAEMON_OBJ) $(LIBOBJ) @BUILD_ZLIB@ @BUILD_POPT@
+NICENESS_OBJS = niceness/ionice_string.o niceness/niceness.o niceness/niceness_syscall.o niceness/parse_arguments.o
+OBJS=$(OBJS1) $(OBJS2) $(OBJS3) $(DAEMON_OBJ) $(NICENESS_OBJS) $(LIBOBJ) @BUILD_ZLIB@ @BUILD_POPT@
 
 TLS_OBJ = tls.o syscall.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/permstring.o lib/sysxattrs.o @BUILD_POPT@
 
@@ -233,7 +234,7 @@ t_clean_fname$(EXEEXT): $(T_CLEAN_FNAME_OBJ)
 # GNU-make-only; BSD and Solaris make expand it to nothing.
 t_safe_arg_main.o: main.c $(HEADERS)
 	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) -Dmain=rsync_unused_main -c $(srcdir)/main.c -o t_safe_arg_main.o
-T_SAFE_ARG_OBJ = t_safe_arg.o t_safe_arg_main.o $(OBJS1_NO_MAIN) $(OBJS2) $(OBJS3) $(DAEMON_OBJ) $(LIBOBJ) @BUILD_ZLIB@ @BUILD_POPT@
+T_SAFE_ARG_OBJ = t_safe_arg.o t_safe_arg_main.o $(OBJS1_NO_MAIN) $(OBJS2) $(OBJS3) $(DAEMON_OBJ) $(NICENESS_OBJS) $(LIBOBJ) @BUILD_ZLIB@ @BUILD_POPT@
 t_safe_arg$(EXEEXT): $(T_SAFE_ARG_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_SAFE_ARG_OBJ) $(LIBS)
 
