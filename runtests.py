@@ -81,7 +81,11 @@ def parse_args():
     p.add_argument('--protocol', type=int, default=None, metavar='VER',
                    help='Force protocol version (adds --protocol=VER to rsync)')
     p.add_argument('--expect-skipped', default=None, metavar='LIST',
-                   help='Comma-separated list of expected-skipped tests')
+                   help='Comma-separated list of expected-skipped tests. An '
+                        '@FILE entry reads a skip list (one test per line, '
+                        '"#" comments); relative paths resolve against srcdir '
+                        'and several may be composed, e.g. '
+                        '@testsuite/skiplist/linux.txt,@testsuite/skiplist/proto29.txt')
     p.add_argument('--expect-result', default=None, metavar='FILE',
                    help='Path to an expected-outcome manifest (one '
                         '"<testname> <pass|skip|fail|xfail>" per line). When '
@@ -271,6 +275,66 @@ def parse_expect_result(path):
     return expect
 
 
+def expand_skip_spec(spec, srcdir, suitedir):
+    """Expand an RSYNC_EXPECT_SKIPPED spec into a normalised csv.
+
+    The spec is a comma-separated list of test names and/or '@FILE' skip-list
+    references.  A skip-list file holds one test name per line ('#' starts a
+    comment; blank lines are ignored), which is what keeps two branches from
+    colliding: adding a test edits one line of one file rather than a shared
+    3 KB csv.  Several may be composed, e.g.
+        RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/linux.txt,@.../proto29.txt
+    Relative paths resolve against srcdir (not the cwd) so out-of-tree builds
+    and `make installcheck` work.
+
+    Entries must name a real test, and each file must be sorted and free of
+    duplicates: unsorted files defeat the point (everyone appends to the same
+    last line), and a stale name would otherwise fail as a skip mismatch far
+    from its cause.  Exits 2 on any of those.
+    """
+    def die(msg):
+        sys.stderr.write(msg + '\n')
+        sys.exit(Exit.ERROR)
+
+    names = []
+    for tok in (t.strip() for t in spec.split(',')):
+        if not tok:
+            continue
+        if not tok.startswith('@'):
+            names.append((tok, 'RSYNC_EXPECT_SKIPPED'))
+            continue
+        path = tok[1:]
+        if not os.path.isabs(path):
+            path = os.path.join(srcdir, path)
+        try:
+            with open(path) as f:
+                lines = f.readlines()
+        except OSError as e:
+            die(f'{tok}: cannot read skip list: {e}')
+        prev = None
+        for lineno, raw in enumerate(lines, 1):
+            name = raw.split('#', 1)[0].strip()
+            if not name:
+                continue
+            where = f'{path}:{lineno}'
+            if len(name.split()) != 1:
+                die(f'{where}: expected one test name per line, got: {raw.rstrip()}')
+            if prev is not None and name <= prev:
+                die(f'{where}: skip lists must be sorted and duplicate-free '
+                    f'({name!r} follows {prev!r})')
+            prev = name
+            names.append((name, where))
+
+    seen = {}
+    for name, where in names:
+        if name in seen:
+            continue
+        seen[name] = where
+        if not os.path.exists(os.path.join(suitedir, name + '_test.py')):
+            die(f'{where}: no such test: {name}')
+    return ','.join(sorted(seen))
+
+
 def outcome_of(result):
     """Map a per-test exit code to an outcome string."""
     if result == Exit.PASS:
@@ -449,6 +513,8 @@ def main():
         rsync_bin2 = os.path.abspath(rsync_bin2)
 
     suitedir = os.path.join(srcdir, 'testsuite')
+    if args.expect_skipped != 'IGNORE':
+        args.expect_skipped = expand_skip_spec(args.expect_skipped, srcdir, suitedir)
     scratchbase = os.path.join(os.environ.get('scratchbase', tooldir), 'testtmp')
     os.makedirs(scratchbase, exist_ok=True)
 

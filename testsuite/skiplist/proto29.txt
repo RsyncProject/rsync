@@ -1,0 +1,16 @@
+# Tests expected to SKIP.  One name per line, '#' starts a comment; the file
+# must stay sorted and duplicate-free (runtests.py enforces both).  Referenced
+# from a workflow as RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/<file>[,@...].
+# See testsuite/skiplist/README.md.
+#
+# Additions for a --protocol=29 run (make check29), on top of the platform
+# files.  These tests transfer something the 29 wire format cannot carry
+# (ACLs, xattrs) or drive a helper that speaks 30+, so they gate on the
+# protocol regardless of platform.
+
+acl-symlink-race  # ACL transfer requires protocol 30+ (negotiated 29)
+acls-unpinnable  # ACL transfer requires protocol 30+ (negotiated 29)
+daemon-copylinks-parent-target-regression  # the stdio_daemon client speaks protocol 30 (forced 29)
+partial-protected-regular-retry-linux  # one-inplace partial staging needs protocol >= 30 (forced 29)
+scanner-batch-flag-mismatch  # xattrs (-X) need protocol 30+
+symlink-exclude-xattr  # xattr (-X) transfer requires protocol 30+ (negotiated 29)

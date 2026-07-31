@@ -128,7 +128,12 @@ precondition and otherwise `SKIP` — read the individual test scripts for detai
 
 **Skip enforcement:** on a full run, set `RSYNC_EXPECT_SKIPPED=a,b,c` (or
 `--expect-skipped a,b,c`) and the run fails if the set of skipped tests does not
-match. This is how the CI workflows pin each platform's expected skip set.
+match. This is how the CI workflows pin each platform's expected skip set. An
+`@FILE` entry reads a skip list (one test per line) instead, and several may be
+composed: the workflows use
+`@testsuite/skiplist/common.txt,@testsuite/skiplist/linux.txt`. Keeping the
+lists one-name-per-line is what stops two branches that each add a skipping test
+from conflicting -- see `testsuite/skiplist/README.md`.
 
 ### Scratch dirs and debugging
 
@@ -182,10 +187,12 @@ fleet-config change.
 
 A target with `"protocols": [30, 29]` runs one extra stdio-pipe pass per listed
 version, each forcing that older wire version with `runtests --protocol=N` — the
-fleet analogue of a workflow's `check30`/`check29` steps. The passes reuse the
-same parsed `RSYNC_EXPECT_SKIPPED` list as the pipe run and show up as `protoNN`
-columns in the report (and `--timing` breakdown). Targets that don't set
-`protocols` show `-` there.
+fleet analogue of a workflow's `check30`/`check29` steps. Each pass takes the
+`RSYNC_EXPECT_SKIPPED` spec from the workflow's own `check30`/`check29` step, so
+a lane with extra protocol-gated skips (`check29` adds
+`@testsuite/skiplist/proto29.txt`) is enforced correctly. They show up as
+`protoNN` columns in the report (and `--timing` breakdown); targets that don't
+set `protocols` show `-` there.
 
 Run it from inside a checkout (it builds the current directory's HEAD; use
 `--repo PATH` for another tree):

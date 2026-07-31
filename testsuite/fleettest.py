@@ -13,8 +13,8 @@ list (matching the workflows), so only test FAILs matter there.
 
 A target may also list older "protocols" (e.g. [30, 29]) in the fleet config:
 each runs as an extra stdio-pipe pass with runtests --protocol=N (the fleet
-analogue of a workflow's check30/check29 steps), using the same parsed skip list
-as the pipe run, and shows up as a protoNN column in the report.
+analogue of a workflow's check30/check29 steps), using that step's own parsed
+skip list, and shows up as a protoNN column in the report.
 
 The fleet -- which machines, how to reach and build each -- is read from a JSON
 config: ~/.fleettest.json if present, else fleettest.json next to this script,
@@ -261,12 +261,16 @@ def push_argv(target: Target, staging: str) -> list[str]:
 # ---------------------------------------------------------------------------
 
 def parse_workflow_skip(workflow: str, make_target: str = "check") -> str | None:
-    """Return the literal RSYNC_EXPECT_SKIPPED csv for the given `make <target>`
+    """Return the literal RSYNC_EXPECT_SKIPPED spec for the given `make <target>`
     step (check / check30 / check29), or None if that step leaves it unset.  The
     protocol passes have their own check30/check29 lines (e.g. an xattr/ACL test
     that runs at proto 30 but skips at 29), so they must be parsed separately from
     the plain pipe `make check`.  The trailing '? tolerates a `bash -c '... make
-    check'` wrapper (e.g. Cygwin)."""
+    check'` wrapper (e.g. Cygwin).
+
+    The spec is passed through to the remote runtests.py verbatim; @FILE entries
+    (testsuite/skiplist/*.txt) are expanded there, against the staged tree, so
+    the list always matches the tests that shipped with it."""
     path = WORKFLOWS / workflow
     try:
         text = path.read_text()
