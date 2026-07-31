@@ -1171,31 +1171,75 @@ def xattrs_supported() -> bool:
     return False  # NetBSD/etc.: not yet ported
 
 
+class XattrError(OSError):
+    """An xattr CLI refused an operation.
+
+    Deliberately an OSError: on Linux xattr_set() calls os.setxattr(), where a
+    refusal IS an OSError, so callers write `except OSError`.  Every other
+    platform shells out, and a bare CalledProcessError -- not an OSError --
+    sails straight past that handler.  A refusal the suite tolerates on Linux
+    would then be fatal everywhere else.
+
+    .errno is set only when the tool named one.  Most of these tools report a
+    message rather than a number, and guessing an errno from localised
+    strerror text would be worse than admitting we do not know, so a caller
+    that switches on .errno must cope with None.
+    """
+
+
+def _tool_errno(tool: str, msg: str) -> 'int | None':
+    """The errno a tool named for itself, or None if it named none.
+
+    Only macOS's xattr(1) reports one, as "xattr: [Errno 13] Permission
+    denied: '/some/path'".  Match that tool's own prefix, and only on the
+    first line: the rest of the line is a filename, and a file can perfectly
+    well be called "[Errno 5]" -- searching the whole message would let the
+    file being operated on dictate the errno we report.
+    """
+    if tool != 'xattr' or not msg:
+        return None
+    import re
+    m = re.match(r'xattr: \[Errno (\d+)\]', msg.splitlines()[0])
+    return int(m.group(1)) if m else None
+
+
+def _xattr_run(argv, **kwargs) -> 'None':
+    """Run an xattr CLI, raising XattrError rather than CalledProcessError."""
+    proc = subprocess.run(argv, capture_output=True, text=True, **kwargs)
+    if proc.returncode == 0:
+        return
+    msg = (proc.stderr or proc.stdout or '').strip()
+    err = XattrError(f'{argv[0]} exited {proc.returncode}'
+                     + (f': {msg}' if msg else ''))
+    err.errno = _tool_errno(argv[0], msg)
+    raise err
+
+
 def xattr_set(name: str, value: str, *paths) -> 'None':
-    """Set the user-namespace xattr `name` (logical) = `value` on each path."""
+    """Set the user-namespace xattr `name` (logical) = `value` on each path.
+
+    Raises OSError (see XattrError) on every platform if the set is refused."""
     full = _xattr_full(name)
     for p in paths:
         p = str(p)
         if _SYSTEM == 'Linux':
             os.setxattr(p, full.encode(), value.encode())
         elif _CYGWIN:
-            subprocess.run(['setfattr', '-n', full, '-v', value, p],
-                           check=True)
+            _xattr_run(['setfattr', '-n', full, '-v', value, p])
         elif _SYSTEM == 'Darwin':
-            subprocess.run(['xattr', '-w', full, value, p], check=True)
+            _xattr_run(['xattr', '-w', full, value, p])
         elif _SYSTEM == 'FreeBSD':
-            subprocess.run(['setextattr', '-h', 'user', full, value, p],
-                           check=True)
+            _xattr_run(['setextattr', '-h', 'user', full, value, p])
         elif _SYSTEM == 'SunOS':
             # Solaris extended attributes are a per-file namespace; runat
             # cd's into it and runs a shell that reads the script on stdin
             # (the -c form mangles args). Pass name/value via the environment
             # to dodge quoting; printf writes the value with no trailing
             # newline, matching the byte-exact value other platforms store.
-            subprocess.run(
+            _xattr_run(
                 ['runat', p, '/bin/sh'],
-                input='printf %s "$XVAL" > "$XNAME"\n', text=True,
-                env={**os.environ, 'XNAME': full, 'XVAL': value}, check=True)
+                input='printf %s "$XVAL" > "$XNAME"\n',
+                env={**os.environ, 'XNAME': full, 'XVAL': value})
         else:
             raise NotImplementedError(f"xattr_set on {_SYSTEM}")
 
