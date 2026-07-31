@@ -1136,6 +1136,33 @@ in the values of parameters.  See that section for details.
     - `RSYNC_RAW_STATUS`: (post-xfer only) the raw exit value from
       **waitpid()**.
 
+    A `%VAR%` reference expanded into one of these commands is escaped for the
+    quoting context it appears in, which is correct for the single shell that
+    runs the command.  It is not correct for a command that starts a SECOND
+    shell, such as `sh -c '... %RSYNC_USER_NAME% ...'`: the outer shell consumes
+    the escaping, and the inner one sees the value bare.  A value of `touc?`
+    would then be glob-expanded against `/usr/bin/`, so the substitution is not
+    data any more -- it chooses the command.
+
+    Because rsync cannot escape for an unknown number of shell passes, a value
+    carrying any character that is active in a shell is refused outright, and
+    the transfer is aborted with
+
+    >     refusing to run shell hook: %VAR% holds a shell metacharacter
+
+    This applies to EVERY `%RSYNC_*%` value, including ones you supplied
+    yourself.  In particular a module whose `path` contains a space, a `*`, a
+    `?`, a `[`, a `]` or a `#` cannot be interpolated into one of these
+    commands: `path = /srv/My Backups` with a command mentioning
+    `%RSYNC_MODULE_PATH%` will refuse every transfer of that module, not just a
+    hostile one.  The restriction is deliberate -- rsync cannot tell your space
+    from an attacker's once both are inside the same string, and `path` itself
+    may be built from a peer value such as `path = /home/%RSYNC_USER_NAME%`.
+
+    If you need such a value in a hook, pass it through the environment instead
+    of interpolating it: the same names are exported to the command, so
+    `$RSYNC_MODULE_PATH` inside your script is both safe and unrestricted.
+
     Even though the commands can be associated with a particular module, they
     are run using the permissions of the user that started the daemon (not the
     module's uid/gid setting) without any chroot restrictions.
