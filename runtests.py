@@ -85,7 +85,10 @@ def parse_args():
                         '@FILE entry reads a skip list (one test per line, '
                         '"#" comments); relative paths resolve against srcdir '
                         'and several may be composed, e.g. '
-                        '@testsuite/skiplist/linux.txt,@testsuite/skiplist/proto29.txt')
+                        '@testsuite/skiplist/linux.txt,@testsuite/skiplist/proto29.txt. '
+                        'A -NAME entry removes a name the rest of the spec '
+                        'added, for a host that can really run a test its '
+                        'platform list expects to skip.')
     p.add_argument('--expect-result', default=None, metavar='FILE',
                    help='Path to an expected-outcome manifest (one '
                         '"<testname> <pass|skip|fail|xfail>" per line). When '
@@ -278,14 +281,16 @@ def parse_expect_result(path):
 def expand_skip_spec(spec, srcdir, suitedir):
     """Expand an RSYNC_EXPECT_SKIPPED spec into a normalised csv.
 
-    The spec is a comma-separated list of test names and/or '@FILE' skip-list
-    references.  A skip-list file holds one test name per line ('#' starts a
+    The spec is a comma-separated list of test names, '@FILE' skip-list
+    references, and '-name' removals.  A skip-list file holds one test name per line ('#' starts a
     comment; blank lines are ignored), which is what keeps two branches from
     colliding: adding a test edits one line of one file rather than a shared
     3 KB csv.  Several may be composed, e.g.
         RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/linux.txt,@.../proto29.txt
     Relative paths resolve against srcdir (not the cwd) so out-of-tree builds
-    and `make installcheck` work.
+    and `make installcheck` work.  A '-name' entry removes a name the rest of
+    the spec added, for a host that can genuinely run a test its platform list
+    expects to skip; it is applied last, and must actually remove something.
 
     Entries must name a real test, and each file must be non-empty, sorted and
     free of duplicates: unsorted files defeat the point (everyone appends to
@@ -305,10 +310,20 @@ def expand_skip_spec(spec, srcdir, suitedir):
         return ''
 
     names = []
+    drop = []
     for tok in (t.strip() for t in spec.split(',')):
         if not tok:
             die('RSYNC_EXPECT_SKIPPED: empty entry (an unset variable?): '
                 f'{spec!r}')
+        if tok.startswith('-'):
+            # '-name' removes a name a composed list added, for a host that
+            # really can run a test its platform list expects to skip (e.g. a
+            # scratch dir on a second filesystem makes a cross-device copy
+            # work).  Subtraction cannot be done by whoever composes the spec,
+            # because the name lives inside an @FILE that is only expanded
+            # here.  Applied after every addition, so order does not matter.
+            drop.append((tok[1:], tok))
+            continue
         if not tok.startswith('@'):
             names.append((tok, 'RSYNC_EXPECT_SKIPPED'))
             continue
@@ -350,6 +365,16 @@ def expand_skip_spec(spec, srcdir, suitedir):
             die(f'{where}: not a test name: {name!r}')
         if not os.path.isfile(os.path.join(suitedir, name + '_test.py')):
             die(f'{where}: no such test: {name}')
+    for name, tok in drop:
+        # Every removal must remove something.  A name the spec never added is
+        # stale (the list stopped expecting that skip, or it is misspelled), and
+        # a repeated removal is the same no-op written twice.  Shrinking the
+        # expected set is precisely what must not happen quietly, so neither is
+        # allowed to sit in a config unnoticed.
+        if name not in seen:
+            die(f'RSYNC_EXPECT_SKIPPED: {tok!r} removes a name that nothing '
+                f'added: {name}')
+        del seen[name]
     return ','.join(sorted(seen))
 
 

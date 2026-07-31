@@ -142,4 +142,25 @@ if wf:
     orphans = sorted({p.name for p in lists} - referenced)
     if orphans:
         test_fail(f'skip lists no workflow references: {", ".join(orphans)}')
+# '-name' removals.  fleettest emits these for a host that can genuinely run a
+# test its platform list expects to skip; the name being dropped lives inside an
+# @FILE, so no composer can subtract it before runtests expands the spec.
+common = SRC / 'testsuite' / 'skiplist' / 'common.txt'
+if common.is_file():
+    full = expand('@' + str(common))
+    victim = full.split(',')[0]
+    got = expand(f'@{common},-{victim}')
+    if got == full or victim in got.split(','):
+        test_fail(f'-{victim} did not remove it from the expanded list')
+    if len(got.split(',')) != len(full.split(',')) - 1:
+        test_fail(f'-{victim} removed more than the one name')
+    # Order must not matter: removals apply after every addition.
+    if expand(f'-{victim},@{common}') != got:
+        test_fail('a removal before the list it removes from behaved differently')
+    # A removal that removes nothing is stale, and shrinking the expected set
+    # quietly is the whole failure mode this parser exists to prevent.
+    for stale in (f'@{common},-no-such-test-here', f'@{common},-{victim},-{victim}'):
+        if expand(stale) != ERROR:
+            test_fail(f'a stale removal was accepted: {stale!r}')
+
 print(f'ok: {len(lists)} skip lists, {refs} workflow references')
