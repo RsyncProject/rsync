@@ -287,19 +287,28 @@ def expand_skip_spec(spec, srcdir, suitedir):
     Relative paths resolve against srcdir (not the cwd) so out-of-tree builds
     and `make installcheck` work.
 
-    Entries must name a real test, and each file must be sorted and free of
-    duplicates: unsorted files defeat the point (everyone appends to the same
-    last line), and a stale name would otherwise fail as a skip mismatch far
-    from its cause.  Exits 2 on any of those.
+    Entries must name a real test, and each file must be non-empty, sorted and
+    free of duplicates: unsorted files defeat the point (everyone appends to
+    the same last line), and a stale name would otherwise fail as a skip
+    mismatch far from its cause.  Exits 2 on any of those -- nothing malformed
+    may quietly shrink the expected set, which would disarm the oracle.
     """
     def die(msg):
         sys.stderr.write(msg + '\n')
         sys.exit(Exit.ERROR)
 
+    # An entirely empty spec is the legitimate "expect no skips at all".  An
+    # empty entry *within* a spec is not: it is what an unset shell variable
+    # expands to, and silently dropping it would quietly shrink the expected
+    # set.
+    if not spec.strip():
+        return ''
+
     names = []
     for tok in (t.strip() for t in spec.split(',')):
         if not tok:
-            continue
+            die('RSYNC_EXPECT_SKIPPED: empty entry (an unset variable?): '
+                f'{spec!r}')
         if not tok.startswith('@'):
             names.append((tok, 'RSYNC_EXPECT_SKIPPED'))
             continue
@@ -312,6 +321,7 @@ def expand_skip_spec(spec, srcdir, suitedir):
         except OSError as e:
             die(f'{tok}: cannot read skip list: {e}')
         prev = None
+        found = 0
         for lineno, raw in enumerate(lines, 1):
             name = raw.split('#', 1)[0].strip()
             if not name:
@@ -323,14 +333,20 @@ def expand_skip_spec(spec, srcdir, suitedir):
                 die(f'{where}: skip lists must be sorted and duplicate-free '
                     f'({name!r} follows {prev!r})')
             prev = name
+            found += 1
             names.append((name, where))
+        # A truncated or emptied list must not read as "expect no skips".
+        if not found:
+            die(f'{path}: skip list contains no test names')
 
     seen = {}
     for name, where in names:
         if name in seen:
             continue
         seen[name] = where
-        if not os.path.exists(os.path.join(suitedir, name + '_test.py')):
+        if '/' in name or os.sep in name or name in ('.', '..'):
+            die(f'{where}: not a test name: {name!r}')
+        if not os.path.isfile(os.path.join(suitedir, name + '_test.py')):
             die(f'{where}: no such test: {name}')
     return ','.join(sorted(seen))
 

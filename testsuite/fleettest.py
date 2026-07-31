@@ -285,9 +285,14 @@ def parse_workflow_skip(workflow: str, make_target: str = "check") -> str | None
 def workflow_skip_for(t: "Target", make_target: str = "check") -> str | None:
     """The target's expected-skip csv for a `make <target>` pass: its workflow's
     RSYNC_EXPECT_SKIPPED plus any per-target expect_skip_extra (old-box-only skips
-    the workflow omits)."""
+    the workflow omits).
+
+    None (no oracle) when the workflow has no such step -- e.g. a protocols=[29]
+    target whose workflow has no check29 line.  The extras alone would be a
+    near-empty expected set and so a guaranteed mismatch; a lane the workflow
+    does not pin is simply not pinned here either."""
     base = parse_workflow_skip(t.workflow, make_target)
-    if not t.expect_skip_extra:
+    if base is None or not t.expect_skip_extra:
         return base
     items = set(t.expect_skip_extra)
     if base:
