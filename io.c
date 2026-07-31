@@ -2091,7 +2091,7 @@ void write_sum_head(int f, struct sum_struct *sum)
  * for slow periods.  But arguably this is a feature.  In addition, we
  * ought to take the time used to write the data into account.
  *
- * During some phases of big transfers (file FOO is uptodate) this is
+ * During some phases of big transfers (file FOO is up-to-date) this is
  * called with a small bytes_written every time.  As the kernel has to
  * round small waits up to guarantee that we actually wait at least the
  * requested number of microseconds, this can become grossly inaccurate.

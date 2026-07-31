@@ -230,7 +230,7 @@ filtered_excl.write_text(
 def run_with_stdin_filter(args, label="merge"):
     """Run rsync with `args`, feeding `filtered_excl` content on stdin
     (which `merge_-` in the filter list picks up). checkit-equivalent
-    that also re-uses CHKDIR/TODIR for the listing comparison."""
+    that also reuses CHKDIR/TODIR for the listing comparison."""
     print(f"Running: rsync {' '.join(args)}")
     with open(filtered_excl, 'rb') as inp:
         proc = subprocess.run(rsync_argv(*args), stdin=inp)

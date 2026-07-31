@@ -673,7 +673,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		if (updated)
 			rprintf(FCLIENT, "%s\n", fname);
 		else
-			rprintf(FCLIENT, "%s is uptodate\n", fname);
+			rprintf(FCLIENT, "%s is up-to-date\n", fname);
 	}
   cleanup:
 	if (sxp == &sx2)

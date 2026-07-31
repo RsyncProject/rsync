@@ -35,9 +35,9 @@ CFLAGS_OLD="-I. -I./zlib -O2 -g -std=gnu11 -fcommon -DHAVE_CONFIG_H -Wno-error \
 -Wno-incompatible-pointer-types -Wno-implicit-function-declaration -Wno-int-conversion"
 
 cleanup() {
-    cd "$REPO"
-    git worktree remove --force "$WORKTREE" 2>/dev/null || true
-    git worktree prune 2>/dev/null || true
+  cd "$REPO"
+  git worktree remove --force "$WORKTREE" 2>/dev/null || true
+  git worktree prune 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -45,15 +45,15 @@ echo ">>> checking out $TAG into $WORKTREE"
 # prefer an exact tag to avoid ambiguity with similarly-named branches
 REF="$TAG"
 if git -C "$REPO" rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
-    REF="refs/tags/$TAG"
+  REF="refs/tags/$TAG"
 fi
 git -C "$REPO" worktree add --detach "$WORKTREE" "$REF"
 cd "$WORKTREE"
 
 # --- workaround 1: K&R lseek64 redeclaration clashes with glibc's prototype ---
 if grep -q 'off64_t lseek64();' syscall.c 2>/dev/null; then
-    echo ">>> patching syscall.c lseek64 redeclaration"
-    perl -0pi -e 's/#ifdef HAVE_LSEEK64\n#if !SIZEOF_OFF64_T\n\tOFF_T lseek64\(\);\n#else\n\toff64_t lseek64\(\);\n#endif\n\treturn lseek64/#ifdef HAVE_LSEEK64\n\treturn lseek64/' syscall.c
+  echo ">>> patching syscall.c lseek64 redeclaration"
+  perl -0pi -e 's/#ifdef HAVE_LSEEK64\n#if !SIZEOF_OFF64_T\n\tOFF_T lseek64\(\);\n#else\n\toff64_t lseek64\(\);\n#endif\n\treturn lseek64/#ifdef HAVE_LSEEK64\n\treturn lseek64/' syscall.c
 fi
 
 # --- workaround 0: pre-3.0 tags ship configure.in, not a generated configure.
@@ -63,12 +63,12 @@ fi
 # so neutralize the AC_LIBOBJ replacements before regenerating.
 OLD_TREE=0
 if [ ! -f ./configure ] && { [ -f configure.in ] || [ -f configure.ac ]; }; then
-    OLD_TREE=1
-    acsrc=configure.ac; [ -f configure.in ] && acsrc=configure.in
-    echo ">>> generating configure for an old tag (autoheader/autoconf)"
-    sed -i 's#AC_LIBOBJ(lib/[a-zA-Z_]*)#:#g' "$acsrc"
-    autoheader 2>/dev/null || true
-    autoconf 2>/dev/null || { echo "autoconf failed"; exit 1; }
+  OLD_TREE=1
+  acsrc=configure.ac; [ -f configure.in ] && acsrc=configure.in
+  echo ">>> generating configure for an old tag (autoheader/autoconf)"
+  sed -i 's#AC_LIBOBJ(lib/[a-zA-Z_]*)#:#g' "$acsrc"
+  autoheader 2>/dev/null || true
+  autoconf 2>/dev/null || { echo "autoconf failed"; exit 1; }
 fi
 
 CONF_ARGS=(--disable-md2man --with-included-zlib=yes --with-included-popt=yes)
@@ -76,49 +76,49 @@ CONF_ARGS=(--disable-md2man --with-included-zlib=yes --with-included-popt=yes)
 # linking libcrypto.a statically drags in jitterentropy + zlib's uncompress,
 # which aren't resolvable here. Drop it when the flag exists.
 if ./configure --help 2>/dev/null | grep -q -- '--disable-openssl'; then
-    echo ">>> disabling openssl for self-contained static link"
-    CONF_ARGS+=(--disable-openssl)
+  echo ">>> disabling openssl for self-contained static link"
+  CONF_ARGS+=(--disable-openssl)
 fi
 
 echo ">>> configure (bundled zlib + popt, static-friendly)"
 ./configure "${CONF_ARGS[@]}" \
-    >"$WORKTREE/conf.log" 2>&1 || { tail -20 "$WORKTREE/conf.log"; exit 1; }
+  >"$WORKTREE/conf.log" 2>&1 || { tail -20 "$WORKTREE/conf.log"; exit 1; }
 
 # --- workaround 2: modern glibc only has the 2-arg gettimeofday ---------------
 if grep -q '/\* #undef HAVE_GETTIMEOFDAY_TZ \*/' config.h; then
-    echo ">>> forcing HAVE_GETTIMEOFDAY_TZ (configure misdetects it)"
-    sed -i 's|/\* #undef HAVE_GETTIMEOFDAY_TZ \*/|#define HAVE_GETTIMEOFDAY_TZ 1|' config.h
+  echo ">>> forcing HAVE_GETTIMEOFDAY_TZ (configure misdetects it)"
+  sed -i 's|/\* #undef HAVE_GETTIMEOFDAY_TZ \*/|#define HAVE_GETTIMEOFDAY_TZ 1|' config.h
 fi
 
 # --- workaround 4 (old trees only): generate proto.h if the tree has no make
 # rule for it, and stub a vendored lib/addrinfo.h that the git tag dropped
 # (modern glibc supplies struct addrinfo / sockaddr_storage, so empty is right).
 if [ "$OLD_TREE" = 1 ]; then
-    if [ ! -f proto.h ] && [ -f mkproto.awk ]; then
-        echo ">>> generating proto.h"
-        cat ./*.c ./lib/compat.c 2>/dev/null | awk -f ./mkproto.awk > proto.h
-    fi
-    if grep -q 'include "lib/addrinfo.h"' rsync.h 2>/dev/null && [ ! -f lib/addrinfo.h ]; then
-        echo ">>> stubbing lib/addrinfo.h"
-        echo '/* emptied: modern glibc provides struct addrinfo */' > lib/addrinfo.h
-    fi
+  if [ ! -f proto.h ] && [ -f mkproto.awk ]; then
+    echo ">>> generating proto.h"
+    cat ./*.c ./lib/compat.c 2>/dev/null | awk -f ./mkproto.awk > proto.h
+  fi
+  if grep -q 'include "lib/addrinfo.h"' rsync.h 2>/dev/null && [ ! -f lib/addrinfo.h ]; then
+    echo ">>> stubbing lib/addrinfo.h"
+    echo '/* emptied: modern glibc provides struct addrinfo */' > lib/addrinfo.h
+  fi
 fi
 
 echo ">>> building (static)"
 make -j"$(nproc)" CFLAGS="$CFLAGS_OLD" LDFLAGS="-static" \
-    >"$WORKTREE/make.log" 2>&1 || { grep -E 'error:|\*\*\*' "$WORKTREE/make.log" | head; exit 1; }
+  >"$WORKTREE/make.log" 2>&1 || { grep -E 'error:|\*\*\*' "$WORKTREE/make.log" | head; exit 1; }
 
 # verify it's actually static before we keep it
 if ldd ./rsync 2>&1 | grep -qv 'not a dynamic executable'; then
-    echo "ERROR: binary is not statically linked:" >&2
-    ldd ./rsync >&2
-    exit 1
+  echo "ERROR: binary is not statically linked:" >&2
+  ldd ./rsync >&2
+  exit 1
 fi
 
 GOT="$(./rsync --version | head -1 | awk '{print $3}')"
 if [ "$GOT" != "$VERSION" ]; then
-    echo "ERROR: built version '$GOT' != requested '$VERSION'" >&2
-    exit 1
+  echo "ERROR: built version '$GOT' != requested '$VERSION'" >&2
+  exit 1
 fi
 
 cp ./rsync "$OUT"

@@ -8,13 +8,13 @@ exit_code=4 # same as a daemon that refuses an option
 
 # e.g. byte_escape 29 => \035
 function byte_escape {
-    echo -ne "\\0$(printf "%o" $1)"
+  echo -ne "\\0$(printf "%o" "$1")"
 }
 
 msg="$1"
 if [ "${#msg}" -gt 254 ]; then
-    # truncate a message that is too long for this naive script to handle
-    msg="${msg:0:251}..."
+  # truncate a message that is too long for this naive script to handle
+  msg="${msg:0:251}..."
 fi
 msglen=$(( ${#msg} + 1 )) # add 1 for the newline we append below
 

@@ -32,7 +32,7 @@ the result.
   ***************************************************************************/
 void base64_encode(const char *buf, int len, char *out, int pad)
 {
-	char *b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+	static const char * const b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 	int bit_offset, byte_offset, idx, i;
 	const uchar *d = (const uchar *)buf;
 	int bytes = (len*8 + 5)/6;
@@ -105,7 +105,7 @@ static const char *check_secret(int module, const char *user, const char *group,
 	const char *fname = lp_secrets_file(module);
 	STRUCT_STAT st;
 	int ok = 1;
-	int user_len = strlen(user);
+	int user_len = (user != NULL) ? strlen(user) : 0;
 	int group_len = group ? strlen(group) : 0;
 	char *err;
 	FILE *fh;
@@ -130,8 +130,8 @@ static const char *check_secret(int module, const char *user, const char *group,
 		return "ignoring secrets file";
 	}
 
-	if (*user == '#') {
-		/* Reject attempt to match a comment. */
+	if (user == NULL || *user == '#') {
+		/* Reject attempt to match a comment or empty string. */
 		fclose(fh);
 		return "invalid username";
 	}
@@ -173,7 +173,8 @@ static const char *check_secret(int module, const char *user, const char *group,
 static const char *getpassf(const char *filename)
 {
 	STRUCT_STAT st;
-	char buffer[512], *p;
+	char buffer[512];
+        const *p;
 	int n;
 
 	if (!filename)

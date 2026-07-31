@@ -1540,7 +1540,7 @@ local void fill_window(deflate_state *s)
  * Copy without compression as much as possible from the input stream, return
  * the current block state.
  * This function does not insert new strings in the dictionary since
- * uncompressible data is probably not useful. This function is used
+ * incompressible data is probably not useful. This function is used
  * only for the level=0 compression option.
  * NOTE: this function should be optimized to avoid extra copying from
  * window to pending_buf.

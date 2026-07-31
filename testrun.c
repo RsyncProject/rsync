@@ -8,7 +8,7 @@
  int main(int argc, char *argv[])
 {
 	pid_t pid;
-	char *timeout_env;
+	const char *timeout_env;
 	int status, timeout_secs, slept = 0;
 
 	if (argc < 2) {

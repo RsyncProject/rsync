@@ -28,4 +28,3 @@ The rsync maintainers hope to fix this problem in the future by either
 merging our changes into the upstream version, or backing them out of
 rsync in a way that preserves wire compatibility.  But in the meantime
 this version must be maintained in parallel.
-

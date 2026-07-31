@@ -48,7 +48,7 @@ POPT_dgettext(const char * dom, const char * str)
     char * codeset = NULL;
     char * retval = NULL;
 
-    if (!dom) 
+    if (!dom)
 	dom = textdomain(NULL);
     codeset = bind_textdomain_codeset(dom, NULL);
     bind_textdomain_codeset(dom, "UTF-8");
@@ -82,7 +82,7 @@ strdup_locale_from_utf8 (char * istr)
     if (codeset != NULL && strcmp(codeset, "UTF-8") != 0
      && (cd = iconv_open(codeset, "UTF-8")) != (iconv_t)-1)
     {
-	char * shift_pin = NULL;
+	const char * shift_pin = NULL;
 	size_t db = strlen(istr);
 	char * dstr = malloc((db + 1) * sizeof(*dstr));
 	char * dstr_tmp;
@@ -122,7 +122,7 @@ strdup_locale_from_utf8 (char * istr)
 		pout = dstr + used;
 		ob = db - used;
 		continue;
-	    }   break;
+	    }   // break;  // Already has continue
 	    case EINVAL:
 	    case EILSEQ:
 	    default:
@@ -161,7 +161,8 @@ POPT_fprintf (FILE * stream, const char * format, ...)
      * to do with whether the final '\0' is counted (or not). The code
      * below already adds +1 for the (possibly already counted) trailing NUL.
      */
-    while ((b = realloc(b, nb+1)) != NULL) {
+    while ((ob = realloc(b, nb+1)) != NULL) {
+	b = ob; /* reallocation was successful */
 	va_start(ap, format);
 	rc = vsnprintf(b, nb, format, ap);
 	va_end(ap);
@@ -172,6 +173,11 @@ POPT_fprintf (FILE * stream, const char * format, ...)
 	} else 		/* glibc 2.0 */
 	    nb += (nb < (size_t)100 ? (size_t)100 : nb);
 	ob = b;
+    }
+    if (ob == NULL && b != NULL) {
+        /* Re-alloc failed, free memory */
+        free(b);
+        b = NULL;
     }
 #endif
 

@@ -20,31 +20,31 @@ echo
 echo "This will setup an rsync daemon in $dir"
 
 if [ $# = 0 ]; then
-	IFS='' read -p 'Module name to create (or return to exit): ' module
-	[ ! "$module" ] && exit
+  IFS='' read -r -p 'Module name to create (or return to exit): ' module
+  [ ! "$module" ] && exit
 else
-	module="$1"
-	shift
+  module="$1"
+  shift
 fi
 
 if [ $# = 0 ]; then
-	IFS='' read -p 'Port number the daemon should listen on [873]: ' port
+  IFS='' read -r -p 'Port number the daemon should listen on [873]: ' port
 else
-	port="$1"
-	shift
+  port="$1"
+  shift
 fi
 [ "$port" ] || port=873
 
 if [ $# = 0 ]; then
-	IFS='' read -p 'User name for authentication (empty for none): ' user
+  IFS='' read -r -p 'User name for authentication (empty for none): ' user
 else
-	user="$1"
-	shift
+  user="$1"
+  shift
 fi
 
 if [ "$user" ]; then
-	IFS='' read -s -p 'Desired password: ' password
-	echo
+  IFS='' read -r -s -p 'Desired password: ' password
+  echo
 fi
 
 rsync="$1"
@@ -66,14 +66,14 @@ use chroot = no
 EOF
 
 if [ "$user" ]; then
-	cat >>rsyncd.conf <<-EOF
+  cat >>rsyncd.conf <<-EOF
 	    auth users = $user
 	    secrets file = $module.secrets
 	EOF
-	touch "$module".secrets
-	chmod go-rwx "$module".secrets
-	echo "$user:$password" >"$module".secrets
-	user="$user@"
+  touch "$module".secrets
+  chmod go-rwx "$module".secrets
+  echo "$user:$password" >"$module".secrets
+  user="$user@"
 fi
 
 cat >start <<EOF
@@ -99,28 +99,28 @@ chmod +x stop
 path="rsync://$user$(hostname):$port/$module/"
 
 if ./start; then
-	sleep .2
-	echo
-	echo "I ran the start command for the daemon.  The log file rsyncd.log says:"
-	echo
-	cat rsyncd.log
-	echo
-	echo "You can start and stop it with ./start and ./stop respectively."
-	echo "You can customize the configuration file rsyncd.conf."
-	echo
-	echo "Give rsync the following path to access the module:"
-	echo "    $path"
-	echo
-	if [ "$user" ]; then
-		echo "Let's test the daemon now.  Enter the password you chose at the prompt."
-	else
-		echo "Let's test the daemon now."
-	fi
-	echo
-	echo '$' $rsync --list-only "$path"
-	$rsync --list-only "$path"
-	echo
-	echo "You should see an empty folder; it's $moduledir."
+  sleep .2
+  echo
+  echo "I ran the start command for the daemon.  The log file rsyncd.log says:"
+  echo
+  cat rsyncd.log
+  echo
+  echo "You can start and stop it with ./start and ./stop respectively."
+  echo "You can customize the configuration file rsyncd.conf."
+  echo
+  echo "Give rsync the following path to access the module:"
+  echo "    $path"
+  echo
+  if [ "$user" ]; then
+    echo "Let's test the daemon now.  Enter the password you chose at the prompt."
+  else
+    echo "Let's test the daemon now."
+  fi
+  echo
+  echo '$' "$rsync" --list-only "$path"
+  $rsync --list-only "$path"
+  echo
+  echo "You should see an empty folder; it's $moduledir."
 else
-	echo "Something went wrong.  Do you see an error message?"
+  echo "Something went wrong.  Do you see an error message?"
 fi

@@ -45,7 +45,7 @@ def parse_args():
                    help='Comma-separated test names/globs to skip entirely: '
                         'they are not run and not reported as skipped. Useful '
                         'for tests that cannot work in a given build/CI '
-                        'environment (e.g. a restricted buildd chroot). '
+                        'environment (e.g. a restricted build chroot). '
                         'Falls back to the RSYNC_EXCLUDE environment variable.')
     p.add_argument('-j', '--parallel', type=int, default=1, metavar='N',
                    help='Run up to N tests in parallel (default: 1)')

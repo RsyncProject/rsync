@@ -1421,7 +1421,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		if (!implied_dirs && file->flags & FLAG_IMPLIED_DIR)
 			goto cleanup;
 		if (am_root < 0) {
-			/* For --fake-super, the dir must be useable by the copying
+			/* For --fake-super, the dir must be usable by the copying
 			 * user, just like it would be for root. */
 			added_perms = S_IRUSR|S_IWUSR|S_IXUSR;
 		} else

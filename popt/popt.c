@@ -142,7 +142,7 @@ static void invokeCallbacksOPTION(poptContext con,
 	    {	const void *cbData = (cbopt->descrip ? cbopt->descrip : myData);
 		cbarg.cb(con, POPT_CALLBACK_REASON_OPTION,
 			myOpt, con->os->nextArg, cbData);
-		/* Terminate (unless explcitly continuing). */
+		/* Terminate (unless explicitly continuing). */
 		if (!CBF_ISSET(cbopt, CONTINUE))
 		    return;
 	    }
@@ -378,7 +378,7 @@ static int handleAlias(poptContext con,
     con->os->currAlias = con->aliases + i;
     {	const char ** av;
 	int ac = con->os->currAlias->argc;
-	/* Append --foo=bar arg to alias argv array (if present). */ 
+	/* Append --foo=bar arg to alias argv array (if present). */
 	if (longName && nextArg != NULL && *nextArg != '\0') {
 	    av = malloc((ac + 1 + 1) * sizeof(*av));
 	    if (av != NULL) {	/* XXX won't happen. */
@@ -408,7 +408,8 @@ static int handleAlias(poptContext con,
 static
 const char * findProgramPath(const char * argv0)
 {
-    char *path = NULL, *s = NULL, *se;
+    char *path = NULL, *se;
+    const char *s = NULL;
     char *t = NULL;
 
     if (argv0 == NULL) return NULL;	/* XXX can't happen */
@@ -581,12 +582,12 @@ findOption(const struct poptOption * opt,
 	     && callbackData && *callbackData == NULL)
 		*callbackData = opt->descrip;
 	    return opt2;
-	}   break;
+	}   // break; // Already continues or returns
 	case POPT_ARG_CALLBACK:
 	    cb = opt;
 	    cbarg.ptr = opt->arg;
 	    continue;
-	    break;
+	    // break; // Already continues
 	default:
 	    break;
 	}
@@ -804,7 +805,7 @@ int poptBitsDel(poptBits bits, const char * s)
 int poptBitsIntersect(poptBits *ap, const poptBits b)
 {
     __pbm_bits *abits;
-    __pbm_bits *bbits;
+    const __pbm_bits *bbits;
     __pbm_bits rc = 0;
     size_t nw = (__PBM_IX(_poptBitsM-1) + 1);
     size_t i;
@@ -824,7 +825,7 @@ int poptBitsIntersect(poptBits *ap, const poptBits b)
 int poptBitsUnion(poptBits *ap, const poptBits b)
 {
     __pbm_bits *abits;
-    __pbm_bits *bbits;
+    const __pbm_bits *bbits;
     __pbm_bits rc = 0;
     size_t nw = (__PBM_IX(_poptBitsM-1) + 1);
     size_t i;
@@ -864,7 +865,8 @@ int poptSaveBits(poptBits * bitsp,
 		UNUSED(unsigned int argInfo), const char * s)
 {
     char *tbuf = NULL;
-    char *t, *te;
+    const char *t;
+    char *te;
     int rc = 0;
 
     if (bitsp == NULL || s == NULL || *s == '\0' || _poptBitsNew(bitsp))
@@ -906,7 +908,7 @@ int poptSaveString(const char *** argvp,
     if (*argvp != NULL)
     while ((*argvp)[argc] != NULL)
 	argc++;
- 
+
     if ((*argvp = xrealloc(*argvp, (argc + 1 + 1) * sizeof(**argvp))) != NULL) {
 	(*argvp)[argc++] = xstrdup(val);
 	(*argvp)[argc  ] = NULL;
@@ -1405,7 +1407,7 @@ int poptGetNextOpt(poptContext con)
 		    {
 			poptStripArg(con, con->os->next);
 		    }
-		
+
 		    if (con->os->argv != NULL) {	/* XXX can't happen */
 			if (F_ISSET(opt, OPTIONAL) &&
 			    con->os->argv[con->os->next][0] == '-') {
@@ -1546,7 +1548,7 @@ poptContext poptFreeContext(poptContext con)
     con->otherHelp = _free(con->otherHelp);
     con->execPath = _free(con->execPath);
     con->arg_strip = PBM_FREE(con->arg_strip);
-    
+
     con = _free(con);
     return con;
 }
@@ -1696,19 +1698,19 @@ int poptStrippedArgv(poptContext con, int argc, char ** argv)
     int numargs = argc;
     int j = 1;
     int i;
-    
+
     if (con->arg_strip)
     for (i = 1; i < argc; i++) {
 	if (PBM_ISSET(i, con->arg_strip))
 	    numargs--;
     }
-    
+
     for (i = 1; i < argc; i++) {
 	if (con->arg_strip && PBM_ISSET(i, con->arg_strip))
 	    continue;
 	argv[j] = (j < numargs) ? argv[i] : NULL;
 	j++;
     }
-    
+
     return numargs;
 }

@@ -272,7 +272,7 @@ static void become_copy_as_user()
 			exit_cleanup(RERR_SYNTAX);
 		}
 	} else {
-		struct passwd *pw;
+		const struct passwd *pw;
 		if ((pw = getpwuid(uid)) == NULL) {
 			rsyserr(FERROR, errno, "getpwuid failed");
 			exit_cleanup(RERR_SYNTAX);
@@ -925,7 +925,7 @@ static void read_final_goodbye(int f_in, int f_out)
 
 static void do_server_sender(int f_in, int f_out, int argc, char *argv[])
 {
-	struct file_list *flist;
+	const struct file_list *flist;
 	char *dir;
 
 	if (DEBUG_GTE(SEND, 1))
@@ -1284,7 +1284,7 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
  * for rsyncd, remote-shell, and local connections. */
 int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 {
-	struct file_list *flist = NULL;
+	struct file_list *flist;
 	int exit_code = 0, exit_code2 = 0;
 	char *local_name = NULL;
 

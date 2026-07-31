@@ -6,7 +6,7 @@
 
 
 \makeatletter
-\count@=\the\catcode`\_ \catcode`\_=8 
+\count@=\the\catcode`\_ \catcode`\_=8
 \newenvironment{tex2html_wrap}{}{} \catcode`\_=\count@
 \makeatother
 \let\mathon=$
@@ -63,12 +63,12 @@
   \ifdim\hsize>\wd\sizebox \hrule depth1pt\fi}}}
 \def\centerinlinemath{%\dimen1=\ht\sizebox
   \dimen1=\ifdim\ht\sizebox<\dp\sizebox \dp\sizebox\else\ht\sizebox\fi
-  \advance\dimen1by.5pt \vrule width0pt height\dimen1 depth\dimen1 
+  \advance\dimen1by.5pt \vrule width0pt height\dimen1 depth\dimen1
  \dp\sizebox=\dimen1\ht\sizebox=\dimen1\relax}
 
 \def\lthtmlcheckvsize{\ifdim\ht\sizebox<\vsize\expandafter\vfill
   \else\expandafter\vss\fi}%
-\makeatletter \tracingstats = 1 
+\makeatletter \tracingstats = 1
 
 
 \begin{document}

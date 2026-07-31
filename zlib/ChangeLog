@@ -34,7 +34,7 @@ Changes in 1.2.7.1 (24 Mar 2013)
 - Clean up the usage of z_const and respect const usage within zlib
 - Clean up examples/gzlog.[ch] comparisons of different types
 - Avoid shift equal to bits in type (caused endless loop)
-- Fix unintialized value bug in gzputc() introduced by const patches
+- Fix uninitialized value bug in gzputc() introduced by const patches
 - Fix memory allocation error in examples/zran.c [Nor]
 - Fix bug where gzopen(), gzclose() would write an empty file
 - Fix bug in gzclose() when gzwrite() runs out of memory
@@ -53,7 +53,7 @@ Changes in 1.2.7.1 (24 Mar 2013)
 - Fix types in contrib/minizip to match result of get_crc_table()
 - Simplify contrib/vstudio/vc10 with 'd' suffix
 - Add TOP support to win32/Makefile.msc
-- Suport i686 and amd64 assembler builds in CMakeLists.txt
+- Support i686 and amd64 assembler builds in CMakeLists.txt
 - Fix typos in the use of _LARGEFILE64_SOURCE in zconf.h
 - Add vc11 and vc12 build files to contrib/vstudio
 - Add gzvprintf() as an undocumented function in zlib
@@ -194,7 +194,7 @@ Changes in 1.2.5.2 (17 Dec 2011)
 - Add a transparent write mode to gzopen() when 'T' is in the mode
 - Update python link in zlib man page
 - Get inffixed.h and MAKEFIXED result to match
-- Add a ./config --solo option to make zlib subset with no libary use
+- Add a ./config --solo option to make zlib subset with no library use
 - Add undocumented inflateResetKeep() function for CAB file decoding
 - Add --cover option to ./configure for gcc coverage testing
 - Add #define ZLIB_CONST option to use const in the z_stream interface
@@ -260,7 +260,7 @@ Changes in 1.2.5.1 (10 Sep 2011)
 - Check that pointers fit in ints when gzprint() compiled old style
 - Add dummy name before $(SHAREDLIBV) in Makefile [Bar-Lev, Bowler]
 - Delete line in configure that adds -L. libz.a to LDFLAGS [Weigelt]
-- Add debug records in assmebler code [Londer]
+- Add debug records in assembler code [Londer]
 - Update RFC references to use http://tools.ietf.org/html/... [Li]
 - Add --archs option, use of libtool to configure for Mac OS X [Borstel]
 
@@ -927,7 +927,7 @@ Changes in 1.2.0.1 (17 March 2003)
     - Include additional header file on VMS for off_t typedef
 - Try to use _vsnprintf where it supplants vsprintf [Vollant]
 - Add some casts in inffast.c
-- Enchance comments in zlib.h on what happens if gzprintf() tries to
+- Enhance comments in zlib.h on what happens if gzprintf() tries to
   write more than 4095 bytes before compression
 - Remove unused state from inflateBackEnd()
 - Remove exit(0) from minigzip.c, example.c
@@ -1461,7 +1461,7 @@ Changes in 0.4:
 - renamed deflateOptions as deflateInit2, call one or the other but not both
 - added the method parameter for deflateInit2.
 - added inflateInit2
-- simplied considerably deflateInit and inflateInit by not supporting
+- simplified considerably deflateInit and inflateInit by not supporting
   user-provided history buffer. This is supported only in deflateInit2
   and inflateInit2.
 

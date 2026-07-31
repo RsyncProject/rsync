@@ -61,7 +61,7 @@ static inline char * stpcpy (char *dest, const char * src) {
 #endif
 
 #if !defined(__GNUC__) && !defined(__attribute__)
-#define __attribute__(x) 
+#define __attribute__(x)
 #endif
 #define UNUSED(x) x __attribute__((__unused__))
 #define FORMAT(a, b, c) __attribute__((__format__ (a, b, c)))

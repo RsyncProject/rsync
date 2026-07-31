@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# config.sh.in 
+# config.sh.in
 
 # This file is processed by config.status to produce config.status,
 # containing autoconf-determined values needed by the test scripts.
