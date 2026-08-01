@@ -1250,8 +1250,10 @@ void set_io_timeout(int secs)
 	/* Compute ceil(io_timeout/2) in a wider type: io_timeout can be INT_MAX
 	 * (a peer's MSG_IO_TIMEOUT -- now capped in read_a_msg() -- or an operator
 	 * --timeout, which options.c parses unbounded), and a plain "io_timeout + 1"
-	 * would overflow to a negative allowed_lull / select_timeout, trapping the
-	 * process in a tight select()-EINVAL loop (and firing a keepalive flood). */
+	 * would overflow to a negative allowed_lull / select_timeout.  poll() now
+	 * takes a millisecond count where negative means "wait forever", so this
+	 * would hang the process rather than spin it -- and it still fires a
+	 * keepalive flood.  poll_timeout_ms() clamps as well; keep both. */
 	allowed_lull = (int)(((int64)io_timeout + 1) / 2);
 	/* The generator and sender derive an int loop-check limit as
 	 * allowed_lull * 5; keep allowed_lull small enough that that product can't
@@ -1685,8 +1687,8 @@ static void read_a_msg(void)
 		 * malicious server hang the client indefinitely, so ignore it.  A very
 		 * large value (near INT_MAX) would overflow the (io_timeout + 1) / 2
 		 * computation in set_io_timeout(), wrapping allowed_lull and
-		 * select_timeout negative and trapping the client in a tight select()
-		 * loop (EINVAL on negative tv_sec). Cap at 24 hours. */
+		 * select_timeout negative -- which poll() reads as "wait forever",
+		 * hanging the client.  Cap at 24 hours. */
 		if (val <= 0 || val > 86400)
 			break;
 		if (!io_timeout || io_timeout > val) {
