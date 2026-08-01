@@ -3780,8 +3780,10 @@ int do_mknod_atfd(int dfd, const char *name, mode_t mode, dev_t dev)
 	}
 
 	/* Try mknodat first; on failure retry race-safely with the type-
-	 * specific primitive (see do_mknod()). */
-#ifdef HAVE_MKNOD
+	 * specific primitive (see do_mknod()).  HAVE_MKNODAT, not HAVE_MKNOD:
+	 * older Darwin has mknod() but not mknodat(), so keying off the former
+	 * compiles a call that then fails to link (#161). */
+#ifdef HAVE_MKNODAT
 	if (mknodat(dfd, name, mode, dev) == 0)
 		return 0;
 #endif
@@ -3795,9 +3797,11 @@ int do_mknod_atfd(int dfd, const char *name, mode_t mode, dev_t dev)
 		errno = EOPNOTSUPP;
 		return -1;
 	}
-#ifdef HAVE_MKNOD
+#ifdef HAVE_MKNODAT
 	return -1;	/* mknodat()'s errno (regular/device node) */
 #else
+	/* Must match the guard above: reporting "mknodat()'s errno" where the
+	 * call was never compiled would return a stale errno. */
 	(void)dev;
 	errno = ENOSYS;
 	return -1;
