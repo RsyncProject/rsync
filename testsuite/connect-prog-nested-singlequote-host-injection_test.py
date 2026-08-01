@@ -15,6 +15,7 @@ perfectly.
 """
 
 import os
+import shlex
 import subprocess
 
 from rsyncfns import SCRATCHDIR, rmtree, rsync_argv, test_fail, test_skipped
@@ -31,7 +32,7 @@ seen = base / 'seen'
 probe = base / 'probe.sh'
 # Records and exits: anything that keeps reading stdin would hang the
 # transfer until the harness timeout instead of failing fast.
-probe.write_text(f'#!/bin/sh\nprintf %s "$1" > {seen}\n')
+probe.write_text(f'#!/bin/sh\nprintf %s "$1" > {shlex.quote(str(seen))}\n')
 probe.chmod(0o755)
 
 

@@ -15,6 +15,7 @@ the manual has to change with it.
 """
 
 import os
+import shlex
 import subprocess
 
 from rsyncfns import (
@@ -64,13 +65,14 @@ if REFUSAL not in log_text:
 # The manual offers this as the way to use such a value, so it has to work.
 hook = base / 'hook.sh'
 witness = base / 'saw.txt'
-hook.write_text(f'#!/bin/sh\nprintf %s "$RSYNC_MODULE_PATH" > {witness}\n')
+hook.write_text(f'#!/bin/sh\nprintf %s "$RSYNC_MODULE_PATH" > {shlex.quote(str(witness))}\n')
 hook.chmod(0o755)
 
 dest2 = base / 'dest2'
 makepath(dest2)
 conf2 = write_daemon_conf([
-    ('m', {'path': str(module), 'read only': 'yes', 'pre-xfer exec': str(hook)}),
+    ('m', {'path': str(module), 'read only': 'yes',
+           'pre-xfer exec': shlex.quote(str(hook))}),
 ], globals={'pid file': str(base / 'rsyncd2.pid')},
     name='exec-metachar-environment.conf')
 url2 = start_test_daemon(conf2, 12992)

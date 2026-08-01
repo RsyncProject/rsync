@@ -13,6 +13,7 @@
 # host string before exec'ing the helper.
 
 import os
+import shlex
 import re
 import subprocess
 
@@ -24,7 +25,7 @@ base.mkdir(parents=True)
 
 argv_capture = base / 'openssl_argv'
 fake_openssl = base / 'fake_openssl'
-fake_openssl.write_text(f"#!/bin/sh\nprintf '%s\\n' \"$@\" > {argv_capture}\nexit 0\n")
+fake_openssl.write_text(f"#!/bin/sh\nprintf '%s\\n' \"$@\" > {shlex.quote(str(argv_capture))}\nexit 0\n")
 fake_openssl.chmod(0o755)
 
 # An unfixed rsync-ssl: drop the validate_ssl_hostname guard so the host string

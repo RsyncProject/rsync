@@ -22,6 +22,7 @@
 # simulation); skips otherwise.
 
 import os
+import shlex
 import pwd
 import subprocess
 import time
@@ -66,7 +67,7 @@ moddir.mkdir()
 # input after the NUL-terminated arg list) to a capture file we can inspect.
 capture = base / 'early_capture'
 hook = base / 'earlyhook.sh'
-hook.write_text(f'#!/bin/sh\ncat > {capture} 2>/dev/null\nexit 0\n')
+hook.write_text(f'#!/bin/sh\ncat > {shlex.quote(str(capture))} 2>/dev/null\nexit 0\n')
 hook.chmod(0o755)
 
 conf = write_daemon_conf([

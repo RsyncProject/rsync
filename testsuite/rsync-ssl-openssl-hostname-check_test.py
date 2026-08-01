@@ -8,6 +8,7 @@
 # A fake openssl echoes its argv to a capture file via RSYNC_SSL_OPENSSL.
 
 import os
+import shlex
 import subprocess
 
 from rsyncfns import SCRATCHDIR, SRCDIR, rmtree, test_fail
@@ -18,7 +19,7 @@ base.mkdir(parents=True)
 
 args_capture = base / 'openssl_args'
 fake_openssl = base / 'fake_openssl'
-fake_openssl.write_text(f'#!/bin/sh\necho "$@" > {args_capture}\nexit 0\n')
+fake_openssl.write_text(f'#!/bin/sh\necho "$@" > {shlex.quote(str(args_capture))}\nexit 0\n')
 fake_openssl.chmod(0o755)
 ca = base / 'ca.pem'
 ca.write_text("dummy-ca\n")
