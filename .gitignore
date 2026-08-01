@@ -45,6 +45,17 @@ aclocal.m4
 /t_unsafe
 /wildtest
 /getfsdev
+/simdtest
+/t_acl
+/t_chmod_secure
+/t_clean_fname
+/t_hashtable_overflow
+/t_iwildmatch
+/t_rename_secure
+/t_safe_arg
+/t_safe_arg_main
+/t_secure_relpath
+/t_symlink_secure
 /rounding.h
 /doc/rsync.pdf
 /doc/rsync.ps
