@@ -247,7 +247,13 @@
         "crtimes"
       ],
       "env_prefix": "export PATH=/opt/local/bin:/opt/local/sbin:$PATH",
-      "configure_pre": "CPPFLAGS=\"-I/opt/local/include\"; LDFLAGS=\"-L/opt/local/lib\"; export CPPFLAGS LDFLAGS;"
+      "configure_pre": "CPPFLAGS=\"-I/opt/local/include\"; LDFLAGS=\"-L/opt/local/lib\"; export CPPFLAGS LDFLAGS;",
+      "expect_skip_extra": [
+        "symlink-mknod-fakesuper-symlink-race"
+      ],
+      "expect_skip_omit": [
+        "sender-remove-source-root-anchor"
+      ]
     },
     {
       "_comment": "Cygwin: non-root plain user (no sudo), binary is rsync.exe.",
