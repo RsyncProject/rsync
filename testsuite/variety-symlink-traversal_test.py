@@ -26,7 +26,7 @@ from rsyncfns import (
     RSYNC, RSYNC_PEER, SRCDIR, SCRATCHDIR,
     make_variety_tree, compare_trees, rmtree,
     xattrs_supported, acls_supported, devices_supported, owners_supported,
-    test_skipped, test_fail,
+    test_skipped, test_fail, split_rsync_cmd,
 )
 
 SSH = str(SRCDIR / 'support' / 'lsh.sh')
@@ -154,7 +154,7 @@ def case_receiver_intermediate():
                 out['new'][1], out['old'][1], out['new'][2], out['old'][2])
 
 
-if shlex.split(RSYNC) == shlex.split(RSYNC_PEER):
+if split_rsync_cmd(RSYNC) == split_rsync_cmd(RSYNC_PEER):
     test_skipped("no old peer selected (RSYNC_PEER == RSYNC); nothing to "
                  "compare for symlink-traversal divergence")
 

@@ -34,7 +34,7 @@ from rsyncfns import (
     make_variety_tree, compare_trees, rmtree,
     xattrs_supported, acls_supported, devices_supported, owners_supported,
     write_daemon_conf, start_test_daemon,
-    test_fail,
+    test_fail, split_rsync_cmd,
 )
 
 SSH = str(SRCDIR / 'support' / 'lsh.sh')
@@ -46,7 +46,7 @@ def _peer_has(feature):
     Pre-3.2.0 peers have no -VV, so this is False -- we then skip -X/-A for
     them, which is correct (we can't compare a feature one side can't carry)."""
     try:
-        vv = subprocess.run(shlex.split(RSYNC_PEER) + ['-VV'],
+        vv = subprocess.run(split_rsync_cmd(RSYNC_PEER) + ['-VV'],
                             capture_output=True, text=True)
         return f'"{feature}": true' in vv.stdout
     except OSError:

@@ -83,7 +83,7 @@ from rsyncfns import (  # noqa: E402
     require_tcp,
     rmtree,
     test_fail,
-    test_skipped,
+    test_skipped, split_rsync_cmd,
 )
 
 
@@ -341,7 +341,7 @@ daemon_env.update(
         "LEAF_TYPE_RACE_DONE_FIFO": os.fspath(done_fifo.resolve()),
     }
 )
-daemon_command = shlex.split(RSYNC_PEER) + [
+daemon_command = split_rsync_cmd(RSYNC_PEER) + [
     "--daemon",
     "--no-detach",
     f"--config={config}",
@@ -359,7 +359,7 @@ daemon_stderr = b""
 try:
     wait_for_port(daemon)
     client = subprocess.run(
-        shlex.split(RSYNC)
+        split_rsync_cmd(RSYNC)
         + [
             "-rt",
             "--inplace",

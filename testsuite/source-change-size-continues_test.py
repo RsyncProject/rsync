@@ -22,7 +22,7 @@ import sys
 
 from rsyncfns import (
     RSYNC, SCRATCHDIR, assert_same, make_data_file, makepath, rmtree,
-    rsync_argv, test_fail, test_skipped,
+    rsync_argv, test_fail, test_skipped, split_rsync_cmd,
 )
 
 
@@ -154,7 +154,7 @@ def build_shim():
     return sofile
 
 
-first = shlex.split(RSYNC)[0] if RSYNC else ''
+first = split_rsync_cmd(RSYNC)[0] if RSYNC else ''
 if os.path.basename(first) == 'valgrind':
     test_skipped('LD_PRELOAD read hook is not meaningful under valgrind')
 

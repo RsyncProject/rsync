@@ -80,6 +80,24 @@ RSYNC = _required('RSYNC')         # full command line, possibly with valgrind/p
 RSYNC_PEER = os.environ.get('RSYNC_PEER', RSYNC)
 
 
+def split_rsync_cmd(cmd: str) -> list:
+    """Split an rsync command string into argv, tolerating spaces in the path.
+
+    RSYNC may be a wrapper command ('valgrind --tool=memcheck /build/rsync'),
+    which has to be split, or a plain path to the binary, which must not be if
+    it contains a space -- shlex.split() would turn '/ws test/rsync' into two
+    nonexistent programs.  A path that exists is one word by definition, so
+    check that first and only fall back to splitting for a real command line.
+
+    Call this at use time, never once at import: tests such as chown-fake
+    append ' --fake-super' to rsyncfns.RSYNC part-way through, and a cached
+    split would keep handing back the pre-mutation command.
+    """
+    if os.path.isfile(cmd):
+        return [cmd]
+    return shlex.split(cmd)
+
+
 def _under_valgrind():
     """True when the runner wrapped rsync in valgrind (runtests.py --valgrind).
 
@@ -680,7 +698,7 @@ def rsync_argv(*args: str) -> list:
     is appended verbatim, so callers should pass tokens already split (no
     embedded option/value joined by spaces).
     """
-    return shlex.split(RSYNC) + list(args)
+    return split_rsync_cmd(RSYNC) + list(args)
 
 
 import functools as _functools

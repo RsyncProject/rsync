@@ -26,7 +26,7 @@ import time
 from rsyncfns import (
     FROMDIR, RSYNC_PEER, SCRATCHDIR,
     claim_ports, make_tree, makepath, require_tcp, rmtree, rsync_argv,
-    test_fail, test_skipped, write_daemon_conf,
+    test_fail, test_skipped, write_daemon_conf, split_rsync_cmd,
 )
 
 # A standalone --daemon detaches via become_daemon(); on cygwin that becomes a
@@ -68,7 +68,7 @@ conf = write_daemon_conf(
 # become_daemon()'s PARENT: it forks, gcov_flush()es, and _exit(0)s
 # immediately; the detached CHILD writes the pid file and listens.
 launcher = subprocess.run(
-    shlex.split(RSYNC_PEER) + ['--daemon', f'--config={conf}'],
+    split_rsync_cmd(RSYNC_PEER) + ['--daemon', f'--config={conf}'],
     capture_output=True, text=True, timeout=15,
 )
 if launcher.returncode != 0:

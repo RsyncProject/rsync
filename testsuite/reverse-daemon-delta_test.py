@@ -28,7 +28,7 @@ import subprocess
 
 from rsyncfns import (
     FROMDIR, RSYNC, RSYNC_PEER, TMPDIR,
-    build_rsyncd_conf, makepath, make_data_file, start_test_daemon, test_fail,
+    build_rsyncd_conf, makepath, make_data_file, start_test_daemon, test_fail, split_rsync_cmd,
 )
 
 DAEMON_PORT = 12894
@@ -56,7 +56,7 @@ def make_versions(path_old, path_new):
 def peer_client(args, label):
     """Run the OLD client (RSYNC_PEER) and return (sent, received) wire bytes
     parsed from rsync's summary line. Fails the test on non-zero exit."""
-    argv = shlex.split(RSYNC_PEER) + args
+    argv = split_rsync_cmd(RSYNC_PEER) + args
     # Force C locale: rsync groups the "sent/received N bytes" numbers per the
     # locale (e.g. de_DE uses '.' for thousands), which would break parsing.
     proc = subprocess.run(argv, stdout=subprocess.PIPE,

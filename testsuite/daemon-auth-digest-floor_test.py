@@ -29,7 +29,7 @@ import subprocess
 from rsyncfns import (
     FROMDIR, RSYNC, SCRATCHDIR, SRCDIR,
     make_tree, makepath, rmtree, run_rsync, rsync_argv, start_test_daemon,
-    test_fail, test_skipped, write_daemon_conf,
+    test_fail, test_skipped, write_daemon_conf, split_rsync_cmd,
 )
 
 DAEMON_PORT = 12953
@@ -82,7 +82,7 @@ def push(module, dest, rsync_cmd=None):
         # 'valgrind <opts> .../rsync', not a bare binary) with the old static
         # rsync; keep only the transfer args that rsync_argv appended.  The old
         # fixture binary is run directly, not under valgrind.
-        argv = [rsync_cmd] + list(argv[len(shlex.split(RSYNC)):])
+        argv = [rsync_cmd] + list(argv[len(split_rsync_cmd(RSYNC)):])
     return subprocess.run(argv, stdout=subprocess.DEVNULL,
                           stderr=subprocess.PIPE, text=True)
 
