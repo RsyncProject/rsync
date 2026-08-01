@@ -895,7 +895,14 @@ dnl rsync's I/O readiness loops use poll() rather than select() so that a
 dnl file descriptor at or above FD_SETSIZE cannot overflow an fd_set (which
 dnl is undefined behaviour and could hang the transfer).  poll() is in
 dnl POSIX.1-2001; fail early and clearly if this target lacks it.
+dnl
+dnl io.c and socket.c include <poll.h> unconditionally, so the HEADER has to
+dnl be required too: a system that exposes poll() through some other header
+dnl would otherwise pass configure and then fail to compile.
 AC_CHECK_FUNCS([poll], , [AC_MSG_ERROR([rsync requires poll(); please report the platform to the rsync developers])])
+if test x"$ac_cv_header_poll_h" != x"yes"; then
+    AC_MSG_ERROR([rsync requires <poll.h>; please report the platform to the rsync developers])
+fi
 
 AC_CHECK_FUNCS(strcasecmp)
 if test x"$ac_cv_func_strcasecmp" = x"no"; then
