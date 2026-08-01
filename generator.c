@@ -1422,7 +1422,16 @@ static int gen_entry_mknod(const char *path, struct file_struct *file, mode_t mo
 	/* do_mknod_atfd can't create a socket (no portable bindat); fall back. */
 	if (!S_ISSOCK(mode) && (dfd = held_dfd_for(path, file)) >= 0) {
 		const char *slash = strrchr(path, '/');
-		return do_mknod_atfd(dfd, slash ? slash + 1 : path, mode, rdev);
+		int ret = do_mknod_atfd(dfd, slash ? slash + 1 : path, mode, rdev);
+		/* ENOSYS here is not "this call failed" -- it is "this platform
+		 * compiled no fd-relative create at all" (no mknodat, no
+		 * mkfifoat; older macOS).  SECURITY.md's rule for that case is to
+		 * keep the operation working and accept the residual, so fall
+		 * through to the path-based variant, which degrades the same way.
+		 * Every other errno is a real failure and must not be retried
+		 * through the unconfined path. */
+		if (ret == 0 || errno != ENOSYS)
+			return ret;
 	}
 	return do_mknod_at(path, mode, rdev);
 }

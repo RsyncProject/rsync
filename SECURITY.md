@@ -377,6 +377,19 @@ The following are documented as out of scope for this release:
   development/interoperability target, not a privilege boundary host, so this is
   accepted for this release.
 
+* On a platform with no `mknodat()` at all -- macOS before 13 is the
+  supported example, where `mknod()` and `mkfifo()` exist but neither
+  `mknodat()` nor `mkfifoat()` does -- `do_mknod_at()` compiles down to
+  plain `do_mknod()`.  The whole confinement (the held-dirfd walk, the
+  `O_NOFOLLOW` leaf create, the fake-super placeholder's `openat()`) is
+  compiled out rather than failing at run time, so creating a device node
+  or FIFO resolves the final component by path and a pre-planted symlink
+  at the basename is followed.  Transferring specials there
+  (`--devices`, `--specials`, and `--fake-super` placeholders) carries the
+  parent-symlink race in full.  `symlink-mknod-fakesuper-symlink-race`
+  skips itself on such a build, since the property it asserts is one the
+  build deliberately does not have.
+
 * On platforms where `mknod()`/`mknodat()` cannot create a socket inode
   (the BSDs, macOS, Solaris), a transferred socket is recreated with
   `socket()` + `unlink` + `bind(path)`, which cannot be confined (there is

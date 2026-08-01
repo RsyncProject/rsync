@@ -84,6 +84,14 @@ int main(int argc, char **argv)
 #ifndef AT_FDCWD
 	fprintf(stderr, "SKIP: AT_FDCWD not available\n");
 	return 77;
+#elif !defined(HAVE_MKNODAT)
+	/* Without mknodat() do_mknod_at() IS do_mknod() -- the confinement is
+	 * compiled out, not failing.  SECURITY.md keeps the operation working
+	 * and accepts the residual there, so the checks below would assert a
+	 * property this build deliberately does not have. */
+	fprintf(stderr, "SKIP: no mknodat(); do_mknod_at() is the unconfined "
+		"fallback by design (see SECURITY.md)\n");
+	return 77;
 #else
 	int poc = 0;
 	const char *moddir;
