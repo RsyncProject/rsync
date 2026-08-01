@@ -449,7 +449,7 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 		int i;
 		for (i = 0; i < xfer_sum_len && sender_file_sum[i] == 0; i++) {}
 		memset(sender_file_sum, 0, xfer_sum_len);
-		if (i == xfer_sum_len)
+		if (i == xfer_sum_len && i > 0)
 			sender_file_sum[i-1]++;
 	}
 
