@@ -26,10 +26,10 @@ from rsyncfns import (
     RSYNC, RSYNC_PEER, SRCDIR, SCRATCHDIR,
     make_variety_tree, compare_trees, rmtree,
     xattrs_supported, acls_supported, devices_supported, owners_supported,
-    test_skipped, test_fail, split_rsync_cmd,
+    test_skipped, test_fail, split_rsync_cmd, rsh_cmd,
 )
 
-SSH = str(SRCDIR / 'support' / 'lsh.sh')
+SSH = rsh_cmd()
 WITH_X = xattrs_supported()
 WITH_A = acls_supported()
 

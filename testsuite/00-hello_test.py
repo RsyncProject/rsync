@@ -9,12 +9,12 @@ import os
 
 from rsyncfns import (
     FROMDIR, RSYNC, RSYNC_PEER, SRCDIR, TODIR,
-    checkit, run_rsync, test_fail,
+    checkit, run_rsync, test_fail, rsync_path_arg, rsh_cmd,
 )
 
 
 # Set RSYNC_RSH so rsync picks up lsh.sh for the "lh:" hosts below.
-os.environ['RSYNC_RSH'] = str(SRCDIR / 'support' / 'lsh.sh')
+os.environ['RSYNC_RSH'] = rsh_cmd()
 
 # Basic help dumps must not crash.
 if run_rsync('--version', check=False).returncode != 0:
@@ -39,7 +39,7 @@ def append_line(line: str) -> None:
 
 def copy_weird(args: list, src_host: str, dst_host: str) -> None:
     checkit(
-        [*args, f'--rsync-path={RSYNC_PEER}',
+        [*args, f'--rsync-path={rsync_path_arg()}',
          f'{src_host}{weird_dir}/',
          f'{dst_host}{TODIR / weird_name}'],
         FROMDIR, TODIR,
@@ -70,7 +70,7 @@ print('test6')
 saved = os.getcwd()
 os.chdir(FROMDIR)
 try:
-    run_rsync('-ai', '--old-args', f'--rsync-path={RSYNC_PEER}',
+    run_rsync('-ai', '--old-args', f'--rsync-path={rsync_path_arg()}',
               'lh:one two', f'{TODIR}/')
 finally:
     os.chdir(saved)
@@ -91,7 +91,7 @@ from rsyncfns import rsync_argv
 os.chdir(FROMDIR)
 try:
     subprocess.run(
-        rsync_argv('-ai', f'--rsync-path={RSYNC_PEER}',
+        rsync_argv('-ai', f'--rsync-path={rsync_path_arg()}',
                    'lh:one two', f'{TODIR}/'),
         env=env, check=True,
     )

@@ -34,10 +34,10 @@ from rsyncfns import (
     make_variety_tree, compare_trees, rmtree,
     xattrs_supported, acls_supported, devices_supported, owners_supported,
     write_daemon_conf, start_test_daemon,
-    test_fail, split_rsync_cmd,
+    test_fail, split_rsync_cmd, rsh_cmd,
 )
 
-SSH = str(SRCDIR / 'support' / 'lsh.sh')
+SSH = rsh_cmd()
 DAEMON_PORT_OLD = 12931
 DAEMON_PORT_NEW = 12932
 

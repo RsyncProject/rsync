@@ -23,6 +23,7 @@ import filecmp
 import errno
 import os
 import platform
+import re
 import shlex
 import shutil
 import signal
@@ -95,6 +96,14 @@ def split_rsync_cmd(cmd: str) -> list:
     """
     if os.path.isfile(cmd):
         return [cmd]
+    # The path may be followed by options -- chown-fake and friends append
+    # ' --fake-super' to RSYNC -- so the whole string is no longer a filename.
+    # Take the longest leading run that names an existing file as the program
+    # and split only what follows.
+    for m in reversed(list(re.finditer(r'\s+', cmd))):
+        head = cmd[:m.start()]
+        if os.path.isfile(head):
+            return [head] + shlex.split(cmd[m.start():])
     return shlex.split(cmd)
 
 
@@ -658,7 +667,10 @@ def start_test_daemon(conf_path, port: int, rsync_cmd: str = None) -> str:
         port = claim_free_port(port)
         start_rsyncd(conf_path, port, daemon_cmd)
         return f'rsync://localhost:{port}/'
-    os.environ['RSYNC_CONNECT_PROG'] = f'{daemon_cmd} --config={conf_path} --daemon'
+    # RSYNC_CONNECT_PROG is run by a shell, so every word has to survive
+    # re-parsing: a build path with a space would otherwise exec its prefix.
+    os.environ['RSYNC_CONNECT_PROG'] = (
+        f'{rsync_path_arg(daemon_cmd)} --config={shlex.quote(str(conf_path))} --daemon')
     return 'rsync://localhost/'
 
 
@@ -677,7 +689,7 @@ def require_asan(reason: str, which: str = None) -> 'None':
     pass RSYNC to check the client side. Detection runs the binary with
     ASAN_OPTIONS=help=1, which makes an instrumented binary print the ASan
     flag help banner to stderr."""
-    cmd = shlex.split(which or RSYNC_PEER)
+    cmd = split_rsync_cmd(which or RSYNC_PEER)
     try:
         r = subprocess.run(cmd + ['--version'],
                            env={**os.environ, 'ASAN_OPTIONS': 'help=1'},
@@ -688,6 +700,30 @@ def require_asan(reason: str, which: str = None) -> 'None':
         return
     if b'AddressSanitizer' not in r.stderr:
         test_skipped(reason)
+
+
+def rsh_cmd(cmd: str = None, *opts: str) -> str:
+    """Build an RSYNC_RSH / --rsh value, quoted for rsync's own tokenizer.
+
+    rsync splits this string on spaces itself -- honouring ' and ", see do_cmd()
+    in main.c -- so a remote-shell path containing a space must be quoted or
+    rsync execs only the first word.  The testsuite's srcdir can contain one.
+    """
+    if cmd is None:
+        cmd = str(SRCDIR / 'support' / 'lsh.sh')
+    return ' '.join([shlex.quote(cmd), *opts])
+
+
+def rsync_path_arg(cmd: str = None) -> str:
+    """Value for --rsync-path, quoted for the shell that will re-parse it.
+
+    --rsync-path is a command line run by the remote shell, not a filename, so
+    rsync hands it over unquoted and the far side word-splits it.  A build path
+    containing a space therefore needs quoting here, while a wrapper command
+    ('valgrind ... /build/rsync') must stay several words.  Splitting and
+    re-joining with shlex gives both: each word is quoted only if it needs it.
+    """
+    return shlex.join(split_rsync_cmd(RSYNC_PEER if cmd is None else cmd))
 
 
 def rsync_argv(*args: str) -> list:

@@ -8,6 +8,7 @@ file can land on a protected name that the source itself also carries.
 """
 
 import os
+import shlex
 import signal
 import subprocess
 import sys
@@ -23,7 +24,7 @@ if '--shell' in sys.argv:
     flags = env.get('RRSYNC_FLAGS', '-wo -no-overwrite -no-lock').split()
     os.execve(wrapper, [wrapper, *flags, root], env)
 
-from rsyncfns import RSYNC, SCRATCHDIR, makepath, patched_rrsync, rmtree, rsync_argv
+from rsyncfns import RSYNC, SCRATCHDIR, makepath, patched_rrsync, rmtree, rsync_argv, rsync_path_arg
 
 base = SCRATCHDIR / 'rrsync-no-overwrite-backup-collision'
 rmtree(base)
@@ -46,10 +47,10 @@ plant(root)
 # while rrsync hands its RSYNC to execlp() as a single executable name, so it
 # has to be wrapped before patched_rrsync() sees it.
 shim = base / 'rsync-shim'
-shim.write_text('#!/bin/sh\nexec ' + RSYNC + ' "$@"\n')
+shim.write_text('#!/bin/sh\nexec ' + rsync_path_arg(RSYNC) + ' "$@"\n')
 shim.chmod(0o755)
 wrapper = patched_rrsync(base, rsync_path=str(shim))
-rsh = f'{sys.executable} {os.path.abspath(__file__)} --shell'
+rsh = f'{shlex.quote(sys.executable)} {shlex.quote(os.path.abspath(__file__))} --shell'
 env = {**os.environ, 'RRSYNC_WRAPPER': str(wrapper), 'RRSYNC_ROOT': str(root)}
 
 # The stock client sends -b inside the remote short-option bundle, so the

@@ -10,6 +10,7 @@ out-of-tree content lands where it can be read back.
 """
 
 import os
+import shlex
 import signal
 import subprocess
 import sys
@@ -25,7 +26,8 @@ if '--shell' in sys.argv:
     os.execve(wrapper, [wrapper, '-wo', root], env)
 
 from rsyncfns import (RSYNC, SCRATCHDIR, makepath, patched_rrsync,
-                      proc_self_fd_pins, rmtree, rsync_argv)
+                      proc_self_fd_pins, rmtree, rsync_argv, rsync_path_arg,
+)
 
 T = 1234567890
 
@@ -59,10 +61,10 @@ os.utime(outside / 'f0', (T, T))
 # while rrsync hands its RSYNC to execlp() as a single executable name, so it
 # has to be wrapped before patched_rrsync() sees it.
 shim = base / 'rsync-shim'
-shim.write_text('#!/bin/sh\nexec ' + RSYNC + ' "$@"\n')
+shim.write_text('#!/bin/sh\nexec ' + rsync_path_arg(RSYNC) + ' "$@"\n')
 shim.chmod(0o755)
 wrapper = patched_rrsync(base, rsync_path=str(shim))
-rsh = f'{sys.executable} {os.path.abspath(__file__)} --shell'
+rsh = f'{shlex.quote(sys.executable)} {shlex.quote(os.path.abspath(__file__))} --shell'
 env = {**os.environ, 'RRSYNC_WRAPPER': str(wrapper), 'RRSYNC_ROOT': str(root)}
 
 got = subprocess.run(

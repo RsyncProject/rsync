@@ -23,7 +23,7 @@ import subprocess
 
 from rsyncfns import (
     RSYNC, SCRATCHDIR, forced_protocol, makepath, patched_rrsync, rmtree,
-    rsync_argv, test_fail,
+    rsync_argv, test_fail, rsync_path_arg,
 )
 
 base = SCRATCHDIR / 'rrsync-arg-shapes'
@@ -53,7 +53,7 @@ xonly.mkdir()
 xonly.chmod(0o111)
 
 shim = base / 'rsync-shim'
-shim.write_text('#!/bin/sh\nexec ' + RSYNC + ' "$@"\n')
+shim.write_text('#!/bin/sh\nexec ' + rsync_path_arg(RSYNC) + ' "$@"\n')
 shim.chmod(0o755)
 
 rrsync = patched_rrsync(base, rsync_path=str(shim))

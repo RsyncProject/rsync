@@ -35,6 +35,7 @@
 #   - neither flag -> the injection never took effect -> FAIL (vacuous)
 
 import os
+import shlex
 import subprocess
 import time
 from pathlib import Path
@@ -154,7 +155,7 @@ def attempt():
         conf = write_daemon_conf(
             [('m', {'path': str(serversrc), 'read only': 'yes', 'use chroot': 'no'})],
             name='mal-xname-rsyncd.conf')
-        os.environ['RSYNC_CONNECT_PROG'] = f'{mal_rsync} --config={conf} --daemon'
+        os.environ['RSYNC_CONNECT_PROG'] = f'{shlex.quote(str(mal_rsync))} --config={shlex.quote(str(conf))} --daemon'
         os.environ['RSYNC_MAL_XNAME'] = '../secret'  # from basis_dir[0] == linkdest
         proc = subprocess.run(
             rsync_argv('-a', f'--link-dest={linkdest}',

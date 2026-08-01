@@ -7,10 +7,10 @@
 import os
 import subprocess
 from rsyncfns import (
-    FROMDIR, RSYNC_PEER, SRCDIR, SCRATCHDIR, makepath, rmtree, rsync_argv, test_fail,
+    FROMDIR, RSYNC_PEER, SRCDIR, SCRATCHDIR, makepath, rmtree, rsync_argv, test_fail, rsync_path_arg, rsh_cmd,
 )
 
-LSH = str(SRCDIR / 'support' / 'lsh.sh')
+LSH = rsh_cmd()
 os.environ['RSYNC_RSH'] = LSH
 
 src = FROMDIR
@@ -27,7 +27,7 @@ def run(label, extra, local=False):
         argv = rsync_argv('-a', *extra, f'{src}/', f'{dest}/')
     else:
         argv = rsync_argv('-a', *extra, '-e', LSH,
-                          f'--rsync-path={RSYNC_PEER}', f'{src}/', f'localhost:{dest}/')
+                          f'--rsync-path={rsync_path_arg()}', f'{src}/', f'localhost:{dest}/')
     r = subprocess.run(argv, capture_output=True, text=True)
     if r.returncode < 0 or r.returncode >= 128:
         test_fail(f'{label}: rsync crashed (rc={r.returncode}): {r.stderr.strip()[:200]}')

@@ -25,7 +25,7 @@ import shlex
 import subprocess
 
 from rsyncfns import (
-    RSYNC, SCRATCHDIR, makepath, patched_rrsync, rmtree, rsync_argv, test_fail,
+    RSYNC, SCRATCHDIR, makepath, patched_rrsync, rmtree, rsync_argv, test_fail, rsync_path_arg,
 )
 
 DATA = 'FILES-FROM-CONTENT\n'
@@ -47,7 +47,7 @@ listfile.write_text('f1\nf2\n')
 # $RSYNC may carry a wrapper (valgrind, --protocol=N); rrsync wants a single
 # executable, so hand it a shim that re-expands the whole command line.
 shim = base / 'rsync-shim'
-shim.write_text('#!/bin/sh\nexec ' + RSYNC + ' "$@"\n')
+shim.write_text('#!/bin/sh\nexec ' + rsync_path_arg(RSYNC) + ' "$@"\n')
 shim.chmod(0o755)
 
 rrsync = patched_rrsync(base, rsync_path=str(shim))

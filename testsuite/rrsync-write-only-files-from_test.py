@@ -2,6 +2,7 @@
 """A forced rrsync -wo endpoint must not return a local --files-from file."""
 
 import os
+import shlex
 import signal
 import subprocess
 import sys
@@ -16,7 +17,7 @@ if '--shell' in sys.argv:
     wrapper, root = env['RRSYNC_WRAPPER'], env['RRSYNC_ROOT']
     os.execve(wrapper, [wrapper, '-wo', '-no-lock', root], env)
 
-from rsyncfns import RSYNC, SCRATCHDIR, makepath, patched_rrsync, rmtree, rsync_argv
+from rsyncfns import RSYNC, SCRATCHDIR, makepath, patched_rrsync, rmtree, rsync_argv, rsync_path_arg
 
 base = SCRATCHDIR / 'rrsync-write-only-files-from'
 rmtree(base)
@@ -30,10 +31,10 @@ secret_name = 'SERVER-ONLY-SECRET-NAME'
 # while rrsync hands its RSYNC to execlp() as a single executable name, so it
 # has to be wrapped before patched_rrsync() sees it.
 shim = base / 'rsync-shim'
-shim.write_text('#!/bin/sh\nexec ' + RSYNC + ' "$@"\n')
+shim.write_text('#!/bin/sh\nexec ' + rsync_path_arg(RSYNC) + ' "$@"\n')
 shim.chmod(0o755)
 wrapper = patched_rrsync(base, rsync_path=str(shim))
-rsh = f'{sys.executable} {os.path.abspath(__file__)} --shell'
+rsh = f'{shlex.quote(sys.executable)} {shlex.quote(os.path.abspath(__file__))} --shell'
 env = {**os.environ, 'RRSYNC_WRAPPER': str(wrapper), 'RRSYNC_ROOT': str(root)}
 got = subprocess.run(
     rsync_argv('-r', '--files-from=:protected-list',

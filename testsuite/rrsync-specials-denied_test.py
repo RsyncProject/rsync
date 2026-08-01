@@ -34,7 +34,7 @@ import subprocess
 
 from rsyncfns import (
     RSYNC, RSYNC_PREFIX, SCRATCHDIR, patched_rrsync, rmtree, rsync_argv,
-    test_fail, xattr_set, xattrs_supported,
+    test_fail, xattr_set, xattrs_supported, rsync_path_arg,
 )
 
 base = SCRATCHDIR / 'rrsync-specials'
@@ -113,7 +113,7 @@ served.mkdir()
 pushwrap = base / 'pushwrap'
 pushwrap.mkdir()
 shim = base / 'rsync-shim'
-shim.write_text('#!/bin/sh\nexec ' + RSYNC + ' "$@"\n')
+shim.write_text('#!/bin/sh\nexec ' + rsync_path_arg(RSYNC) + ' "$@"\n')
 shim.chmod(0o755)
 rrsync_push = patched_rrsync(pushwrap, rsync_path=str(shim))
 rsh = base / 'fake-rsh'
@@ -175,7 +175,7 @@ if xattrs_supported():
         devwrap = base / 'devwrap'
         devwrap.mkdir()
         devshim = base / 'rsync-shim-fake'
-        devshim.write_text('#!/bin/sh\nexec ' + RSYNC + ' --fake-super "$@"\n')
+        devshim.write_text('#!/bin/sh\nexec ' + rsync_path_arg(RSYNC) + ' --fake-super "$@"\n')
         devshim.chmod(0o755)
         rrsync_dev = patched_rrsync(devwrap, rsync_path=str(devshim))
         devrsh = base / 'fake-rsh-dev'

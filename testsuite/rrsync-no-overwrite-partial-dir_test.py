@@ -2,6 +2,7 @@
 """rrsync -no-overwrite must protect existing partial-dir files too."""
 
 import os
+import shlex
 import signal
 import subprocess
 import sys
@@ -17,7 +18,7 @@ if '--shell' in sys.argv:
     flags = env.get('RRSYNC_FLAGS', '-wo -no-overwrite -no-lock').split()
     os.execve(wrapper, [wrapper, *flags, root], env)
 
-from rsyncfns import RSYNC, SCRATCHDIR, makepath, patched_rrsync, rmtree, rsync_argv
+from rsyncfns import RSYNC, SCRATCHDIR, makepath, patched_rrsync, rmtree, rsync_argv, rsync_path_arg
 
 base = SCRATCHDIR / 'rrsync-no-overwrite-partial-dir'
 rmtree(base)
@@ -32,10 +33,10 @@ protected.write_bytes(b'POLICY')
 # while rrsync hands its RSYNC to execlp() as a single executable name, so it
 # has to be wrapped before patched_rrsync() sees it.
 shim = base / 'rsync-shim'
-shim.write_text('#!/bin/sh\nexec ' + RSYNC + ' "$@"\n')
+shim.write_text('#!/bin/sh\nexec ' + rsync_path_arg(RSYNC) + ' "$@"\n')
 shim.chmod(0o755)
 wrapper = patched_rrsync(base, rsync_path=str(shim))
-rsh = f'{sys.executable} {os.path.abspath(__file__)} --shell'
+rsh = f'{shlex.quote(sys.executable)} {shlex.quote(os.path.abspath(__file__))} --shell'
 env = {**os.environ, 'RRSYNC_WRAPPER': str(wrapper), 'RRSYNC_ROOT': str(root)}
 got = subprocess.run(
     rsync_argv('-rI', '--partial', '--partial-dir=protected',

@@ -38,7 +38,7 @@ import time
 from rsyncfns import (
     RACE_TIMEOUT, RSYNC, SCRATCHDIR, makepath, patched_rrsync,
     proc_self_fd_pins, rmtree, rsync_argv, start_path_flipper, stop_flipper,
-    test_fail, test_skipped,
+    test_fail, test_skipped, rsync_path_arg,
 )
 
 if not proc_self_fd_pins():
@@ -58,7 +58,7 @@ makepath(restricted, outside / 'dir', dest)
 (outside / 'dir' / 'loot').write_text(MARKER + '\n')
 
 shim = base / 'rsync-shim'
-shim.write_text('#!/bin/sh\nexec ' + RSYNC + ' "$@"\n')
+shim.write_text('#!/bin/sh\nexec ' + rsync_path_arg(RSYNC) + ' "$@"\n')
 shim.chmod(0o755)
 
 rrsync = patched_rrsync(base, rsync_path=str(shim))

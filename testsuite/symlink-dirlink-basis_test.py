@@ -19,7 +19,7 @@ import time
 
 from rsyncfns import (
     RSYNC, SCRATCHDIR, RSYNC_PEER, SRCDIR, TMPDIR,
-    make_data_file, rsync_argv, test_fail,
+    make_data_file, rsync_argv, test_fail, rsync_path_arg, rsh_cmd,
 )
 
 
@@ -28,7 +28,7 @@ from rsyncfns import (
 # target off held dirfds (issue #715), so this transfer through a dir-symlinked
 # basis succeeds uniformly.
 
-os.environ['RSYNC_RSH'] = str(SRCDIR / 'support' / 'lsh.sh')
+os.environ['RSYNC_RSH'] = rsh_cmd()
 # HOME -> SCRATCHDIR is set up by rsyncfns import.
 
 srcbase = TMPDIR / 'src_files'  # avoid clash with the runner's $scratchdir/src symlink
@@ -50,7 +50,7 @@ def push(*args, label: str) -> None:
     os.chdir(srcbase)
     try:
         proc = subprocess.run(
-            rsync_argv(f'--rsync-path={RSYNC_PEER}', *args),
+            rsync_argv(f'--rsync-path={rsync_path_arg()}', *args),
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
         )
         print(proc.stdout, end='')

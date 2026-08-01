@@ -42,6 +42,7 @@
 #     diagnostic).
 
 import os
+import shlex
 import shutil
 import subprocess
 
@@ -126,7 +127,7 @@ conf = write_daemon_conf(
             'read only': 'yes',
             'use chroot': 'no'})],
     name='mal-rsyncd.conf')
-os.environ['RSYNC_CONNECT_PROG'] = f'{mal_rsync} --config={conf} --daemon'
+os.environ['RSYNC_CONNECT_PROG'] = f'{shlex.quote(str(mal_rsync))} --config={shlex.quote(str(conf))} --daemon'
 
 
 # -- The attack pull: -rR --delete from the malicious daemon -----------------

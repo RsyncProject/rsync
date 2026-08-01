@@ -9,7 +9,7 @@
 import os
 import subprocess
 
-from rsyncfns import SCRATCHDIR, SRCDIR, rmtree, rsync_argv, test_fail
+from rsyncfns import SCRATCHDIR, SRCDIR, rmtree, rsync_argv, test_fail, rsh_cmd
 
 base = SCRATCHDIR / 'remote-shell-newline'
 rmtree(base)
@@ -19,7 +19,7 @@ src.mkdir(parents=True)
 sentinel = base / 'pwned'
 
 env = os.environ.copy()
-env['RSYNC_RSH'] = f"{SRCDIR / 'support' / 'lsh.sh'} --no-cd"
+env['RSYNC_RSH'] = rsh_cmd(None, '--no-cd')
 dest = f"lh:{base}/dest\ntouch {sentinel}\n#"
 subprocess.run(rsync_argv('-a', f'{src}/', dest),
                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
