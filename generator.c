@@ -1416,6 +1416,34 @@ static int gen_entry_symlink(const char *slnk, const char *path, struct file_str
 	return do_symlink_at(slnk, path);
 }
 
+/* True when this build compiled no fd-relative primitive able to create this
+ * kind of node.  That is a property of the build, not of the call, so it is
+ * decided here rather than inferred from an errno. */
+static int no_atfd_mknod_primitive(mode_t mode)
+{
+#ifndef AT_FDCWD
+	(void)mode;
+	return 1;
+#else
+	/* --fake-super creates the placeholder with openat(), which exists
+	 * wherever AT_FDCWD does, so a failure there is a real failure and is
+	 * deliberately NOT retried unconfined -- even though a runtime denial
+	 * (a seccomp policy permitting open() but not openat()) would then fail
+	 * a create that the errno-based test used to let through. */
+	if (am_root < 0)
+		return 0;
+# ifdef HAVE_MKNODAT
+	(void)mode;
+	return 0;
+# elif defined(HAVE_MKFIFOAT)
+	return !S_ISFIFO(mode);	/* FIFOs are covered; device nodes are not */
+# else
+	(void)mode;
+	return 1;
+# endif
+#endif
+}
+
 static int gen_entry_mknod(const char *path, struct file_struct *file, mode_t mode, dev_t rdev)
 {
 	int dfd;
@@ -1423,14 +1451,14 @@ static int gen_entry_mknod(const char *path, struct file_struct *file, mode_t mo
 	if (!S_ISSOCK(mode) && (dfd = held_dfd_for(path, file)) >= 0) {
 		const char *slash = strrchr(path, '/');
 		int ret = do_mknod_atfd(dfd, slash ? slash + 1 : path, mode, rdev);
-		/* ENOSYS here is not "this call failed" -- it is "this platform
-		 * compiled no fd-relative create at all" (no mknodat, no
-		 * mkfifoat; older macOS).  SECURITY.md's rule for that case is to
-		 * keep the operation working and accept the residual, so fall
-		 * through to the path-based variant, which degrades the same way.
-		 * Every other errno is a real failure and must not be retried
-		 * through the unconfined path. */
-		if (ret == 0 || errno != ENOSYS)
+		/* Fall through to the unconfined path-based create only where this
+		 * build compiled no fd-relative primitive for this kind of node --
+		 * SECURITY.md's rule for a platform that cannot be secure at all.
+		 * Testing errno == ENOSYS is not that test: a live mknodat() or
+		 * mkfifoat() can return ENOSYS too (an unimplemented FUSE mknod,
+		 * or seccomp), which would drop confinement on a platform that
+		 * does have the secure primitive. */
+		if (ret == 0 || !no_atfd_mknod_primitive(mode))
 			return ret;
 	}
 	return do_mknod_at(path, mode, rdev);

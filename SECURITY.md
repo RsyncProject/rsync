@@ -379,16 +379,25 @@ The following are documented as out of scope for this release:
 
 * On a platform with no `mknodat()` at all -- macOS before 13 is the
   supported example, where `mknod()` and `mkfifo()` exist but neither
-  `mknodat()` nor `mkfifoat()` does -- `do_mknod_at()` compiles down to
-  plain `do_mknod()`.  The whole confinement (the held-dirfd walk, the
-  `O_NOFOLLOW` leaf create, the fake-super placeholder's `openat()`) is
-  compiled out rather than failing at run time, so creating a device node
-  or FIFO resolves the final component by path and a pre-planted symlink
-  at the basename is followed.  Transferring specials there
-  (`--devices`, `--specials`, and `--fake-super` placeholders) carries the
-  parent-symlink race in full.  `symlink-mknod-fakesuper-symlink-race`
-  skips itself on such a build, since the property it asserts is one the
-  build deliberately does not have.
+  `mknodat()` nor `mkfifoat()` does -- creating a device node or FIFO
+  falls back to plain `do_mknod()`, which resolves the whole path by name.
+  What is lost is the *pinned parent*: the directory components are
+  re-resolved by the kernel at create time, so an attacker who can swap a
+  parent component races the create and can place the node outside the
+  transfer.  The final component is not at risk -- `mknod()` and
+  `mkfifo()` do not follow a symlink at the leaf, they fail `EEXIST`.
+  Where `AT_FDCWD` exists -- which is every platform rsync 3.5.0 supports,
+  macOS 10.13 included -- fake-super placeholders still return through
+  `openat(..., O_NOFOLLOW)`, reached before either `*at` primitive is
+  tested, so ordinary in-tree placeholder creation stays confined;
+  fake-super loses parent confinement and the `O_NOFOLLOW` leaf only on the
+  paths that reach plain `do_mknod()` (the cache-declined/cross-tree
+  wrapper and the backup paths).  On a build with no `AT_FDCWD` at all
+  there is no fd-relative primitive of any kind, so nothing above applies
+  and every special-file create, fake-super included, is unconfined.  Transferring specials there (`--devices`, `--specials`) carries
+  the parent-component race.  `symlink-mknod-fakesuper-symlink-race` skips
+  itself on such a build, since the property it asserts is one the build
+  deliberately does not have.
 
 * On platforms where `mknod()`/`mknodat()` cannot create a socket inode
   (the BSDs, macOS, Solaris), a transferred socket is recreated with
