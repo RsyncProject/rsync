@@ -25,6 +25,7 @@ we cannot (no compiler, or the fd limit cannot be raised far enough).
 
 import os
 import resource
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -38,9 +39,15 @@ TIMEOUT = 30  # poll() build: ~instant; the bug: hangs (or aborts)
 
 def probe_fd_setsize():
     """Ask the C library for FD_SETSIZE rather than assuming a value."""
-    cc = os.environ.get('CC') or shutil.which('cc') or shutil.which('gcc')
+    # CC is a command, not a filename: "ccache gcc" and "gcc -m32" are both
+    # ordinary values, and passing either to subprocess as one argv[0] looks
+    # for a program with a space in its name.
+    cc = shlex.split(os.environ.get('CC') or '')
     if not cc:
-        return None
+        found = shutil.which('cc') or shutil.which('gcc')
+        if not found:
+            return None
+        cc = [found]
     with tempfile.TemporaryDirectory() as td:
         src = os.path.join(td, 'fdss.c')
         exe = os.path.join(td, 'fdss')
@@ -48,10 +55,13 @@ def probe_fd_setsize():
             f.write('#include <stdio.h>\n'
                     '#include <sys/select.h>\n'
                     'int main(void){ printf("%d\\n", (int)FD_SETSIZE); return 0; }\n')
-        if subprocess.run([cc, src, '-o', exe],
-                          capture_output=True).returncode != 0:
-            return None
-        proc = subprocess.run([exe], capture_output=True, text=True)
+        try:
+            if subprocess.run(cc + [src, '-o', exe],
+                              capture_output=True).returncode != 0:
+                return None
+            proc = subprocess.run([exe], capture_output=True, text=True)
+        except OSError:
+            return None          # CC names something we cannot execute
         if proc.returncode != 0:
             return None
         try:
