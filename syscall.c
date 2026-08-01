@@ -3786,11 +3786,14 @@ int do_mknod_atfd(int dfd, const char *name, mode_t mode, dev_t dev)
 		return (close(fd) < 0) ? -1 : 0;
 	}
 
-#if !defined MKNOD_CREATES_FIFOS && defined HAVE_MKFIFO
+#if !defined MKNOD_CREATES_FIFOS && defined HAVE_MKFIFOAT
 	if (S_ISFIFO(mode))
 		return mkfifoat(dfd, name, mode);
 #endif
-#ifdef HAVE_MKNOD
+	/* HAVE_MKNODAT/HAVE_MKFIFOAT, not HAVE_MKNOD/HAVE_MKFIFO: older Darwin
+	 * has mknod()/mkfifo() but neither *at() form, so keying off the former
+	 * compiles calls that then fail to link (#161). */
+#ifdef HAVE_MKNODAT
 	return mknodat(dfd, name, mode, dev);
 #else
 	(void)dev;
