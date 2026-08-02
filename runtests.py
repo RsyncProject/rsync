@@ -31,6 +31,7 @@ import signal
 import subprocess
 import sys
 import threading
+import time
 
 # Share the test exit-code enum with the test helpers. exitcodes.py lives in
 # testsuite/ (next to this script); it has no import-time side effects.
@@ -62,6 +63,10 @@ def parse_args():
                    help='Show test logs even for passing tests')
     p.add_argument('--stop-on-fail', action='store_true',
                    help='Stop after first test failure')
+    p.add_argument('--timing', action='store_true',
+                   help='After the run, report each test\'s wall-clock time, '
+                        'slowest first. With -j N the report also shows how '
+                        'much of the run the slowest test alone accounts for.')
     p.add_argument('--timeout', type=int, default=300, metavar='SECS',
                    help='Per-test timeout in seconds (default: 300)')
     p.add_argument('--race-timeout', type=float, default=5.0, metavar='SECS',
@@ -378,6 +383,35 @@ def expand_skip_spec(spec, srcdir, suitedir):
     return ','.join(sorted(seen))
 
 
+_TIMING_TOP = 25
+
+
+def print_timing_report(durations, outcomes, run_wall, parallel):
+    """Report per-test wall-clock, slowest first (--timing).
+
+    With -j N the run cannot finish sooner than its slowest single test, so the
+    tail matters as much as the total: a 300s test pins the whole suite to 300s
+    no matter how many workers there are. The footer gives both bounds -- the
+    serial sum (what one worker would take) and that floor -- so it is obvious
+    whether a slow run wants more parallelism or a faster individual test."""
+    if not durations:
+        return
+    ranked = sorted(durations.items(), key=lambda kv: kv[1], reverse=True)
+    total = sum(durations.values())
+    print(f'----- slowest tests (of {len(ranked)}, wall-clock each):')
+    for name, secs in ranked[:_TIMING_TOP]:
+        print(f'      {secs:7.1f}s  {name:<32} {outcomes.get(name, "?")}')
+    print(f'      serial sum {total:.0f}s over {len(ranked)} tests; '
+          f'run took {run_wall:.0f}s with -j{parallel}')
+    slowest, slowest_secs = ranked[0]
+    if parallel > 1:
+        # The floor: even with unlimited workers the suite cannot beat its
+        # longest single test.
+        print(f'      floor {slowest_secs:.0f}s ({slowest}) = '
+              f'{100.0 * slowest_secs / run_wall:.0f}% of this run; '
+              f'ideal at -j{parallel} is {total / parallel:.0f}s')
+
+
 def outcome_of(result):
     """Map a per-test exit code to an outcome string."""
     if result == Exit.PASS:
@@ -417,13 +451,15 @@ def build_rsync_cmd(rsync_bin, args, scratchbase):
 
 class TestResult:
     """Result of a single test execution."""
-    __slots__ = ('testbase', 'result', 'output', 'skipped_reason')
+    __slots__ = ('testbase', 'result', 'output', 'skipped_reason', 'duration')
 
-    def __init__(self, testbase, result, output='', skipped_reason=''):
+    def __init__(self, testbase, result, output='', skipped_reason='',
+                 duration=0.0):
         self.testbase = testbase
         self.result = result
         self.output = output
         self.skipped_reason = skipped_reason
+        self.duration = duration
 
 
 def run_one_test(testscript, testbase, scratchdir, base_env, timeout,
@@ -433,6 +469,7 @@ def run_one_test(testscript, testbase, scratchdir, base_env, timeout,
     This function is safe to call from multiple threads — it uses only
     per-test state (unique scratchdir, copy of env).
     """
+    started = time.monotonic()
     prep_scratch(scratchdir, srcdir, tooldir, setfacl_nodef)
 
     env = base_env.copy()
@@ -513,7 +550,8 @@ def run_one_test(testscript, testbase, scratchdir, base_env, timeout,
     else:
         output_parts.append(f'FAIL    {testbase}')
 
-    return TestResult(testbase, result, '\n'.join(output_parts), skipped_reason)
+    return TestResult(testbase, result, '\n'.join(output_parts), skipped_reason,
+                      time.monotonic() - started)
 
 
 # Lock for serializing output in parallel mode
@@ -701,6 +739,7 @@ def main():
     xfailed = 0
     skipped_list = []
     outcomes = {}  # testbase -> actual outcome string ('pass'/'skip'/'fail'/'xfail')
+    durations = {}  # testbase -> wall-clock seconds (for --timing)
 
     def process_result(tr):
         """Process a TestResult and update counters. Returns True if the test
@@ -712,6 +751,7 @@ def main():
         scratchdir = os.path.join(scratchbase, tr.testbase)
         oc = outcome_of(tr.result)
         outcomes[tr.testbase] = oc
+        durations[tr.testbase] = tr.duration
         if tr.result == Exit.PASS:
             passed += 1
         elif tr.result == Exit.SKIP:
@@ -732,6 +772,8 @@ def main():
         if expect is not None:
             return mismatch(tr.testbase, oc)
         return tr.result not in (Exit.PASS, Exit.SKIP, Exit.XFAIL)
+
+    run_started = time.monotonic()
 
     if args.parallel > 1:
         # Parallel execution
@@ -771,6 +813,8 @@ def main():
             if is_fail and args.stop_on_fail:
                 break
 
+    run_wall = time.monotonic() - run_started
+
     # Check valgrind logs for errors
     vg_errors = 0
     if args.valgrind:
@@ -799,6 +843,9 @@ def main():
         print(f'      {skipped} skipped')
     if vg_errors > 0:
         print(f'      {vg_errors} valgrind error(s) found (see logs in {os.path.join(scratchbase, "valgrind-logs")})')
+
+    if args.timing:
+        print_timing_report(durations, outcomes, run_wall, args.parallel)
 
     if expect is not None:
         # Version-mixing mode: the run is judged purely on whether each test's

@@ -86,6 +86,8 @@ Useful options:
 - `--log-level N`, `--always-log` — more verbose output / show logs for passing tests too
 - `--stop-on-fail` — stop after the first failure
 - `--timeout SECS` — per-test timeout (default 300)
+- `--timing` — after the run, list the tests by wall-clock, slowest first, with
+  the serial sum and the floor set by the single longest test
 - `--valgrind`, `--valgrind-opts OPTS` — run rsync under valgrind
 - `--rsync-bin PATH`, `--tooldir DIR`, `--srcdir DIR` — locate the binary / build / source dirs
 - `--expect-skipped LIST` — see skip enforcement below
