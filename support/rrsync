@@ -51,7 +51,7 @@ long_opts = {
   'copy-devices': -1,
   'copy-unsafe-links': 0,
   'daemon': -1,
-  'debug': 1,
+  'debug': -1,
   'delay-updates': 0,
   'delete': 0,
   'delete-after': 0,
