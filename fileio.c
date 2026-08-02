@@ -106,6 +106,19 @@ static int full_sparse_write(int f, const char *buf, int len)
 	return 0;
 }
 
+/* Emit one span of data that is not being turned into a hole.  For an in-place
+ * update (use_seek) the bytes on disk already match, so we only need to move
+ * past them; otherwise we write them out.  Either way a deferred hole is
+ * flushed first so that the span lands at the right offset. */
+static int emit_sparse_span(int f, int use_seek, const char *buf, int len)
+{
+	if (flush_sparse_hole(f) < 0)
+		return -1;
+	if (use_seek)
+		return do_lseek(f, len, SEEK_CUR) < 0 ? -1 : 0;
+	return full_sparse_write(f, buf, len);
+}
+
 static int write_sparse(int f, int use_seek, OFF_T offset, const char *buf, int len)
 {
 	int l1, l2, i, start, end;
@@ -120,24 +133,16 @@ static int write_sparse(int f, int use_seek, OFF_T offset, const char *buf, int 
 	if (l1 == len)
 		return len;
 
-	if (use_seek) {
-		/* The in-place data already matches, so just flush any pending
-		 * hole and seek over the middle without rescanning it. */
-		if (flush_sparse_hole(f) < 0)
-			return -1;
-		sparse_seek = l2;
-		sparse_past_write = offset + len - l2;
-		if (do_lseek(f, len - (l1+l2), SEEK_CUR) < 0)
-			return -1;
-		return len;
-	}
-
 	/* Scan the middle [l1, len-l2) for interior runs of zeros that are at
-	 * least SPARSE_WRITE_SIZE long (the same hole granularity rsync has
-	 * always used).  Each non-zero span -- which may include shorter zero
-	 * runs not worth a hole -- is emitted with a single write() rather than
-	 * being chopped into SPARSE_WRITE_SIZE-byte writes, which made a copy of
-	 * a large non-sparse file issue ~one write() syscall per KiB. */
+	 * least SPARSE_WRITE_SIZE long (the hole granularity rsync has always
+	 * used) and defer those as holes.  Everything in between -- which may
+	 * include shorter zero runs not worth a hole -- is emitted in one go,
+	 * rather than being chopped into SPARSE_WRITE_SIZE-byte pieces, which
+	 * made copying a large non-sparse file cost ~one write() per KiB.
+	 *
+	 * The matched (use_seek) case runs through the same scan: its interior
+	 * zero runs still have to be punched out, which is what --inplace
+	 * --sparse relies on to keep a hole-y basis file sparse. */
 	start = l1;
 	end = len - l2;
 	for (i = l1; i < end; ) {
@@ -152,9 +157,7 @@ static int write_sparse(int f, int use_seek, OFF_T offset, const char *buf, int 
 			continue;
 		}
 		if (i > start) {
-			if (flush_sparse_hole(f) < 0)
-				return -1;
-			if (full_sparse_write(f, buf + start, i - start) < 0)
+			if (emit_sparse_span(f, use_seek, buf + start, i - start) < 0)
 				return -1;
 			sparse_past_write = offset + i;
 		}
@@ -163,9 +166,7 @@ static int write_sparse(int f, int use_seek, OFF_T offset, const char *buf, int 
 		start = i;
 	}
 	if (end > start) {
-		if (flush_sparse_hole(f) < 0)
-			return -1;
-		if (full_sparse_write(f, buf + start, end - start) < 0)
+		if (emit_sparse_span(f, use_seek, buf + start, end - start) < 0)
 			return -1;
 	}
 
