@@ -17,6 +17,7 @@ daemon-chroot  # daemon chroot path needs the real start_daemon socket flow
 daemon-chroot-acl  # needs a real TCP peer address for reverse-DNS hostname ACL; run with --use-tcp
 daemon-deny-dns-failopen  # hosts deny DNS-failure matching needs a real TCP peer
 daemon-dot-file-force-wipe  # the malicious daemon client needs a real TCP socket; run with --use-tcp
+daemon-handshake-timeout  # stalling the pre-transfer handshake needs a real listening socket; run with --use-tcp
 daemon-http-proxy  # RSYNC_PROXY uses open_socket_out(), needs a real TCP connect
 daemon-leaf-type-race-fchmod  # leaf-type authority proof currently requires Darwin
 daemon-module-options  # motd/socket-options need a real socket
