@@ -513,6 +513,13 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	int op_leaf_fd = -1;     /* O_NOFOLLOW fd pinning a cross-tree operator leaf */
 	int op_pin = 0;          /* drive chmod/chown off op_leaf_fd for a cross-tree leaf */
 	int op_refuse = 0;       /* pin open hit the symlink-race signal: refuse, don't redirect */
+	/* The ownership walk for the path-based chmod/chown fallbacks below.  op_pin
+	 * covers a reg/dir/fifo leaf with a pinned fd, but a symlink or device leaf
+	 * never enters it, and a non-root operator can fail the pin open with a plain
+	 * EACCES and fall through -- both must still resolve the operator path via the
+	 * walk rather than a bare lchown()/chmod().  (vfs_chmod's operator branch skips
+	 * S_ISLNK itself, so a symlink-as-object keeps the lchmod/setattrlist path.) */
+	int op_vfs = (flags & ATTRS_OPERATOR_PATH) ? VFS_OPERATOR_PATH : 0;
 #if defined SUPPORT_XATTRS || defined SUPPORT_ACLS
 	int held_fd = -1; /* held O_NOFOLLOW fd for fd-based xattr/ACL ops, or -1 */
 	int xattr_refuse = 0; /* no confined fd for a slashed path: skip path-based xattr/ACL */
@@ -697,7 +704,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 			if ((op_leaf_fd >= 0 ? vfs_fchown(op_leaf_fd, uid, gid)
 			     : op_refuse ? (errno = ELOOP, -1)
 			     : dfd >= 0 ? vfs_lchown(dfd, leaf, uid, gid, 0)
-					: vfs_lchown(VFS_AT_FDCWD, fname, uid, gid, 0)) != 0) {
+					: vfs_lchown(VFS_AT_FDCWD, fname, uid, gid, op_vfs)) != 0) {
 				/* We shouldn't have attempted to change uid
 				 * or gid unless have the privilege. */
 				rsyserr(FERROR_XFER, errno, "%s %s failed",
@@ -827,7 +834,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 			: op_leaf_fd >= 0 ? vfs_fchmod(op_leaf_fd, new_mode)
 			: op_refuse ? (errno = ELOOP, -1)
 			: dfd >= 0 && !S_ISLNK(new_mode) ? vfs_chmod(dfd, leaf, new_mode, 0)
-			: vfs_chmod(VFS_AT_FDCWD, fname, new_mode, 0);
+			: vfs_chmod(VFS_AT_FDCWD, fname, new_mode, op_vfs);
 		if (ret < 0) {
 			rsyserr(FERROR_XFER, errno,
 				"failed to set permissions on %s",
