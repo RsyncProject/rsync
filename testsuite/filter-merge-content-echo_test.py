@@ -249,3 +249,46 @@ assert 'discarding over-long filter' in out, f'expected the over-long path: out=
 assert out.count('Q') > maxpath, (
     'the over-long argument rule was truncated more aggressively than before, '
     f'losing the user\'s own text: {out.count("Q")} Qs of {maxpath + 200}')
+
+# The ":e" modifier synthesizes a SECOND rule -- an exclude for the merge
+# file's own basename -- by hand, with no template to inherit from.  Built
+# that way it carried no provenance, so once parsing finished it looked
+# argument-origin and the match trace printed a merge file's text verbatim.
+# Plain -vv reaches this; no --debug is involved.
+#
+# The pattern is a glob whose literal text cannot appear anywhere else: the
+# file it matches is named without the brackets, so finding the bracketed
+# form in the output can only mean the rule text was echoed.
+SELF_PATTERN = 'excl-self-[x]9'
+SELF_MATCHED = 'excl-self-x9'
+rmtree(src)
+makepath(src)
+(src / 'f').write_bytes(b'keep\n')
+(src / SELF_MATCHED).write_bytes(b'hidden\n')
+(src / '.rsync-filter').write_text(':e ' + SELF_PATTERN + '\n')
+got = subprocess.run(rsync_argv('-r', '-F', '-vv', f'{src}/', f'{dest}/'),
+                     capture_output=True, text=True, timeout=30)
+out = got.stdout + got.stderr
+assert got.returncode == 0, f'the :e transfer failed: out={out!r}'
+assert 'because of' in out, (
+    f'no match was reported, so this case exercises nothing: out={out!r}')
+assert SELF_PATTERN not in out, (
+    'the exclude-self rule that ":e" builds by hand echoed a merge file\'s '
+    f'text at plain -vv, so it carries no provenance: out={out!r}')
+
+# A per-directory merge file's fname points INTO dirbuf, which is cut back to
+# the directory before the location is recorded.  Copying it after the cut
+# left the location naming the DIRECTORY, losing the filename -- no leak, but
+# it breaks the "redact what, keep where" bargain the rest of this relies on.
+rmtree(src)
+makepath(src)
+(src / 'f').write_bytes(b'x\n')
+(src / '.rsync-filter').write_text('Zbad-perdir\n')
+got = subprocess.run(rsync_argv('-r', '-F', f'{src}/', f'{dest}/'),
+                     capture_output=True, text=True, timeout=30)
+out = got.stdout + got.stderr
+assert got.returncode != 0 and 'Zbad-perdir' not in out, (
+    f'the per-dir rule text was echoed: rc={got.returncode}, out={out!r}')
+assert '.rsync-filter line 1' in out, (
+    'the location names the directory instead of the merge file, so it no '
+    f'longer says which file to fix: out={out!r}')

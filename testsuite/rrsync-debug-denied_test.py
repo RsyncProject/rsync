@@ -3,9 +3,14 @@
 
 Defence in depth, not the fix: what actually stops a merge file's contents
 coming back is the redaction in exclude.c (see filter-merge-content-echo).
-This closes the rest of the FILTER trace family for a restricted account --
-merge-file openability, the server's absolute paths, mergelist bookkeeping --
-none of which a peer has any business selecting.
+
+This closes ONE spelling of the control -- an explicit -M--debug -- and no
+more.  It does not close the FILTER trace family: options.c maps verbosity
+onto the debug flags, so -vvv still raises a restricted server to FILTER2 and
+forwards it, and the trace metadata (merge-file openability, the server's
+absolute paths, mergelist bookkeeping) comes back with it.  Rule TEXT stays
+redacted at every verbosity, which is the property that matters and which
+filter-merge-content-echo pins.  Do not read this test as sealing -vvv.
 
 It costs nothing: server_options() forwards --info but never --debug, so no
 stock client sends one, and the only way it reaches a server is a peer asking
@@ -62,8 +67,9 @@ assert "'debug': -1," in wrapper.read_text(), (
     "support/rrsync no longer disables 'debug' -- a cull-options regeneration "
     'probably restored it')
 
-# Ordinary transfers, including -vv, must be unaffected.
-for extra in ([], ['-vv']):
+# Ordinary transfers must be unaffected -- including -vvv, which reaches
+# FILTER2 by verbosity alone and so must NOT be caught by the refusal above.
+for extra in ([], ['-vv'], ['-vvv']):
     ok = subprocess.run(
         rsync_argv('-r', *extra, '-e', rsh, f'{src}/', 'ignored:'),
         env=env, capture_output=True, text=True, timeout=20)
