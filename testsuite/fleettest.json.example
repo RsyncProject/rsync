@@ -229,7 +229,7 @@
         "backup-crossdev-copy",
         "chmod-temp-dir"
       ],
-      "_skip_comment": "itemize XFAILs here (rsync fails rather than falls back when the filesystem cannot hard-link a symlink), while the two omitted entries are macOS-wide expected-skips that this target RUNS: the separate volume supplies the cross-device conditions mac2 lacks."
+      "_skip_comment": "The two omitted entries are macOS-wide expected-skips that this target RUNS: the separate volume supplies the cross-device conditions mac2 lacks. (itemize used to XFAIL here, before --link-dest learned to fall back when the filesystem cannot hard-link a symlink.)"
     },
     {
       "_comment": "The x86-64 Mac (macOS 10.13).  The ONLY target that can build the x86-64 md5 assembly -- mac2 is arm64, where configure refuses --enable-md5-asm outright.  MacPorts supplies autotools, python3 and the crypto/hash libs the stock 10.13 image lacks, and is not on the non-interactive ssh PATH, so put it there for the whole run.  --enable-roll-simd is NOT set: clang has no Mach-O function multiversioning, so the target(\"default\") probe cannot compile here with any clang, and --enable-roll-asm requires it.",

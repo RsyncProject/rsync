@@ -11,7 +11,7 @@ import shutil
 from rsyncfns import (
     CHKFILE, FROMDIR, RSYNC, SCRATCHDIR, SRCDIR, TMPDIR, TODIR,
     all_plus, allspace, dots,
-    checkdiff, cp_p, makepath, run_rsync, v_filt, hardlink_symlinks_supported, test_xfail,
+    checkdiff, cp_p, makepath, run_rsync, v_filt, hardlink_symlinks_supported,
 )
 
 
@@ -40,27 +40,20 @@ if to2dir.is_file():
 vv = run_rsync('-VV', check=True, capture_output=True).stdout
 hardlink_symlinks = '"hardlink_symlinks": true' in vv
 symtimes_supported = '"symtimes": true' in vv
-# The build capability drives rsync's ITEMISATION, so the expectations below
-# follow it -- but the filesystem holding the test data still has to perform
-# the link.  HFS+ returns ENOTSUP, and rsync reports that as FERROR_XFER and
-# exits 23 even though it then creates the symlink correctly; a build WITHOUT
-# the capability, and a regular file in the same position, both fall back to a
-# copy instead.  So this is an rsync gap, not an expectation mismatch, and the
-# symlink expectations are threaded through every assertion here rather than
-# confined to one.  XFAIL rather than skip: the failure stays visible and
-# turns back into a pass by itself once rsync falls back on ENOTSUP.
-if hardlink_symlinks and not hardlink_symlinks_supported(SCRATCHDIR):
-    test_xfail('rsync hard-links symlinks in this build, but this filesystem '
-               'returns ENOTSUP and rsync fails the transfer (exit 23) instead '
-               'of falling back to a copy the way it does for regular files')
-
 # The only itemisation difference between a platform that can hard-link a
 # symlink and one that cannot is the change-type letter where the symlink
 # itself is transferred: hL when it is hard-linked, cL when it is copied.
 # The attribute field, the "is uptodate" wording and the --copy-dest lines
 # are identical either way -- measured on macOS 10.13, the one platform that
 # lacks the capability (linkat(AT_FDCWD, sym, ..., 0) is EOPNOTSUPP there).
-L = 'hL' if hardlink_symlinks else 'cL'
+#
+# The two answers can disagree, so both are asked.  The build capability is
+# decided by configure on whatever filesystem the source tree sat on, while the
+# link happens on whichever filesystem holds the test data: macOS builds on APFS
+# (yes) and can write to HFS+ (ENOTSUP).  rsync falls back to a copy when the
+# filesystem refuses, so the letter follows the filesystem.
+L = ('hL' if hardlink_symlinks and hardlink_symlinks_supported(SCRATCHDIR)
+     else 'cL')
 
 if 'protocol=2' in RSYNC:
     T = '.T'
