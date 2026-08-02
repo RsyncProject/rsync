@@ -133,13 +133,24 @@ a symlink that a privileged rsync then follows:
   a file the peer chooses and travels over the protocol rather than in an
   argument, so this let a peer read back any line of any file the server process
   could open that is not valid filter syntax -- through an `rrsync` restricted
-  account as well as a daemon module, since neither confines a merge open that
+  account as well as a daemon module, since neither confined a merge open that
   the wrapper never sees.  A syntax error in a rule read from a file now reports
   the file and line rather than the text; a rule given as an argument is still
   shown.  The `--debug=FILTER` traces print the same file-derived text, so
   `rrsync` now refuses a peer-selected `--debug` (a stock client never sends
   one).  An operator who turns debugging on for their own server still sees the
   rule text.
+
+- Redacting those diagnostics did not close the merge route on its own, because
+  the worst shape produces no diagnostic at all: an exclude-only merge (the `-`
+  modifier) makes every line of the file a pattern, so nothing fails to parse
+  and the peer reads the contents off which of its own names went missing from
+  the file list.  Through an `rrsync` restricted account that needs no
+  `--delete` and no verbosity on a pull.  The open is now confined rather than
+  the disclosure suppressed: rsync gained `--confine-root=DIR`, which refuses an
+  operator- or peer-supplied path that resolves outside DIR, and `rrsync` passes
+  its restricted directory.  A merge file inside that directory keeps working.
+  A daemon already had this through its module root and is unaffected.
 
 Daemon protocol / identity:
 
