@@ -264,6 +264,15 @@ under `--fake-super` too (previously it fell back to a path-based set for a
 - Fix an off-by-one in `clean_fname()`'s `..`-collapse path normalization.
   Reported by Leonid Bugaev.
 
+- The AVX2 rolling-checksum assembly (`--enable-roll-asm`) read up to 64 bytes
+  past the end of the buffer it was given.  The loop is software-pipelined and
+  preloaded the 64 bytes after the ones it was folding in, so its last iteration
+  always reached beyond the data -- the remainder is by construction under 64
+  bytes.  It normally landed in slack inside rsync's map window and went
+  unnoticed; where the buffer ended at a page boundary it was a SIGSEGV mid
+  transfer, reported on macOS x86-64 by Roland Kletzing.  Reported checksums are
+  unchanged.
+
 - `--link-dest` no longer fails the transfer when the destination refuses to
   hard-link a symlink, device node, FIFO or socket.  Whether rsync hard-links
   those at all was decided at build time, on whatever filesystem the source tree
