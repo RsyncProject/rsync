@@ -320,6 +320,11 @@ def sender_pinned_arg(fd, arg, orig_arg, has_slash, has_slash_dot):
     # Tie the pinned directory to the inode realpath() validated: resolving
     # `check` beneath the held fd cannot be redirected above the leaf, so if it
     # does not reach the same file, something was flipped -- fail closed.
+    # fd is None for a leaf we deliberately never opened (a symlink, or a
+    # device/FIFO/socket): there is no inode to compare against, and the leaf
+    # was never going to be content-opened by the sender either.
+    if fd is None:
+        return pinned
     try:
         st = os.stat(check, dir_fd=dfd)
     except OSError as e:
@@ -588,12 +593,50 @@ def validated_arg(opt, arg, typ=3, wild=False):
             # that don't exist yet (receiver-side new dest) os.open
             # fails -- we skip pinning there; the new-dest race is a
             # separate concern.
-            try:
+            # Only a regular file or directory gets its CONTENT opened.  A
+            # sender needs neither for anything else: rsync transmits a symlink
+            # by its target string and skips a device/FIFO/socket under the
+            # forced --no-D.  Opening them here is also actively wrong --
+            # O_RDONLY on a FIFO blocks until a writer appears, so naming an
+            # in-tree FIFO wedged rrsync before exec, and a dangling symlink
+            # resolved to a missing target and was reported as a race.  3.4.4
+            # transfers both.  These shapes take the parent pin, which is what
+            # confines them anyway.
+            # NOT for a trailing "/" or "/." argument: rsync opens that one and
+            # DOES follow a symlink there, so its leaf pin is load-bearing --
+            # rrsync-sender-leaf-flip proves a raced flip leaks the outside
+            # directory's content without it.
+            sender_leaf_unopened = False
+            # Not gated on HAVE_PROC_SELF_FD: this is a decision about what
+            # rsync does with the argument, not about whether we can pin it, so
+            # it has to hold on the BSDs, macOS, Solaris and Cygwin too -- where
+            # otherwise a dangling symlink still resolved to nothing and died.
+            if (am_sender and opt == 'arg'
+                    and not arg_has_trailing_slash
+                    and not arg_has_trailing_slash_dot):
                 try:
-                    fd = os.open(real_arg, os.O_RDONLY | os.O_NOFOLLOW)
+                    lst = os.lstat(arg)
+                except OSError:
+                    lst = None
+                if lst is not None and not (stat.S_ISREG(lst.st_mode)
+                                            or stat.S_ISDIR(lst.st_mode)):
+                    sender_leaf_unopened = True
+            try:
+                if sender_leaf_unopened:
+                    raise InterruptedError()   # jump to the sender-pin branch
+                try:
+                    # O_NONBLOCK so a special file that raced in after the
+                    # lstat above still cannot block this open.
+                    fd = os.open(real_arg,
+                                 os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
                 except IsADirectoryError:
                     fd = os.open(real_arg,
                                  os.O_RDONLY | os.O_NOFOLLOW | os.O_DIRECTORY)
+            except InterruptedError:
+                # No CONTENT fd for this leaf -- but it is still named
+                # beneath a pinned directory below, not re-resolved from
+                # the tree root.
+                fd = None
             except FileNotFoundError:
                 # In --sender mode the path MUST exist (we're reading
                 # from it) -- ENOENT here means the rename-based race
@@ -638,7 +681,37 @@ def validated_arg(opt, arg, typ=3, wild=False):
                 # the pin (typically a symlink-flip on the leaf).
                 die('post-realpath open failed (race detected):',
                     orig_arg, e.strerror)
-            if fd is not None:
+            if am_sender and opt == 'arg':
+                logical = arg
+                if is_absolute_arg:
+                    if logical == args.dir:
+                        logical = ''
+                    elif logical.startswith(args.dir_slash):
+                        logical = logical[args.dir_slash_len:]
+            if fd is None and sender_leaf_unopened:
+                # A leaf we deliberately never opened is still spelled beneath
+                # a pinned directory: leaving the bare name for rsync to
+                # re-resolve puts every component back in play, which is
+                # CVE-2026-53783 -- measured at 3 leaks in 83 raced pulls with
+                # a dangling-symlink leaf whose parent was flipped to point
+                # outside the tree.  It costs nothing here: the directory is
+                # opened O_PATH, so the special file itself is never opened
+                # and a FIFO cannot block, and whatever the leaf turns into
+                # afterwards is reached only from beneath the held one.
+                #
+                # WHICH directory is sender_pinned_arg()'s decision, and it is
+                # the immediate parent for every shape EXCEPT a --relative
+                # argument with no client "/./": there the whole argument is
+                # the transmitted name, so only the anchor it starts from can
+                # be pinned and the components below it stay raceable.  That
+                # --relative limit predates this and is stated in NEWS.
+                if HAVE_PROC_SELF_FD:
+                    pinned = sender_pinned_arg(None, logical, orig_arg,
+                                               arg_has_trailing_slash,
+                                               arg_has_trailing_slash_dot)
+                    if pinned != LEAF_PIN_UNUSABLE:
+                        arg = pinned
+            elif fd is not None:
                 # The inode-pin trick (verify + route the exec'd rsync's open via
                 # the /proc/self/fd magic link) is Linux-only.  Where /proc/self/fd
                 # does not exist at all (the BSDs, Solaris, macOS, Cygwin, or a
@@ -665,12 +738,6 @@ def validated_arg(opt, arg, typ=3, wild=False):
                         die('post-pin path escaped tree (race?):',
                             orig_arg, pinned_path)
                     if am_sender and opt == 'arg':
-                        logical = arg
-                        if is_absolute_arg:
-                            if logical == args.dir:
-                                logical = ''
-                            elif logical.startswith(args.dir_slash):
-                                logical = logical[args.dir_slash_len:]
                         pinned = sender_pinned_arg(fd, logical, orig_arg,
                                                    arg_has_trailing_slash,
                                                    arg_has_trailing_slash_dot)
