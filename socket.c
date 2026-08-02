@@ -172,13 +172,45 @@ static char *shell_quote_connect_host(const char *host)
 	return quoted;
 }
 
+/* %H is substituted into a free-form command string that a shell then runs, and
+ * a hook of the form `sh -c '... %H ...'` re-parses the word in a nested shell
+ * where the quoting we added has already been consumed.  Restrict the host to
+ * characters that stay data through such a pass.  ('Any shell' is too strong a
+ * claim -- see the leading-'%' note below.)
+ *
+ * The set is deliberately a little wider than a DNS name: RSYNC_CONNECT_PROG
+ * exists for custom transports, where %H may be an alias the program resolves
+ * itself rather than a name the resolver ever sees, so '+' and '~' are allowed
+ * inside the string.  '%' is required for an IPv6 zone id (fe80::1%eth0) and is
+ * not special to a POSIX shell.
+ *
+ * The first character is checked separately, because several of the allowed
+ * ones change an argument's MEANING rather than its text, which no amount of
+ * quoting prevents.  Mid-word each is literal, which is why the set still
+ * allows them:
+ *   '-' and '+' both introduce options to plenty of programs -- `sh +x` is as
+ *       real as `sh -x`;
+ *   '~' is tilde-expanded by the nested shell, turning ~root into /root;
+ *   '%' is expanded by a nested fish, where %self becomes its pid (an IPv6
+ *       zone id has its '%' mid-word, so nothing legitimate is lost).
+ * An empty host is refused too: it survives a direct exec as an empty argument
+ * but vanishes entirely when a nested shell re-splits the command, shifting
+ * every argument after it.  None of these can begin a real hostname.
+ *
+ * This bounds what a SHELL can do with the value.  It cannot bound what the
+ * named program does with it -- something like "host:-rf" arrives intact, and a
+ * program that splits on ':' may reinterpret the tail.  That boundary belongs
+ * to whoever writes RSYNC_CONNECT_PROG. */
 static int shell_unsafe_connect_host(const char *host)
 {
 	const unsigned char *s;
 
+	if (!*host || strchr("-+~%", *host))
+		return 1;
+
 	for (s = (const unsigned char *)host; *s; s++) {
 		if (!((*s >= 'a' && *s <= 'z') || (*s >= 'A' && *s <= 'Z')
-		 || (*s >= '0' && *s <= '9') || strchr("._:-%", *s)))
+		 || (*s >= '0' && *s <= '9') || strchr("._:-%+~", *s)))
 			return 1;
 	}
 	return 0;
