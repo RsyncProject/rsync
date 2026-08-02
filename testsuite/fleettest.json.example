@@ -232,7 +232,7 @@
       "_skip_comment": "The two omitted entries are macOS-wide expected-skips that this target RUNS: the separate volume supplies the cross-device conditions mac2 lacks. (itemize used to XFAIL here, before --link-dest learned to fall back when the filesystem cannot hard-link a symlink.)"
     },
     {
-      "_comment": "The x86-64 Mac (macOS 10.13).  The ONLY target that can build the x86-64 md5 assembly -- mac2 is arm64, where configure refuses --enable-md5-asm outright.  MacPorts supplies autotools, python3 and the crypto/hash libs the stock 10.13 image lacks, and is not on the non-interactive ssh PATH, so put it there for the whole run.  --enable-roll-simd is NOT set: clang has no Mach-O function multiversioning, so the target(\"default\") probe cannot compile here with any clang, and --enable-roll-asm requires it.",
+      "_comment": "The x86-64 Mac (macOS 10.13).  The ONLY target that can build the x86-64 md5 assembly -- mac2 is arm64, where configure refuses --enable-md5-asm outright.  MacPorts supplies autotools, python3 and the crypto/hash libs the stock 10.13 image lacks, and is not on the non-interactive ssh PATH, so put it there for the whole run.  This target keeps the STOCK Apple compiler (clang 10, the 10.13 ceiling), which is what caught #161; it cannot build --enable-roll-simd, because a clang that old rejects configure's target(\"default\") multiversioning probe. That is a compiler-VERSION limit, not a Mach-O one -- see mac-x86-asm below, which builds the same source with MacPorts clang 19 and all three optimizations on.",
       "name": "mac-x86",
       "ssh_host": "tridge@mac",
       "workflow": "macos-build.yml",
@@ -253,6 +253,34 @@
       ],
       "expect_skip_omit": [
         "sender-remove-source-root-anchor"
+      ]
+    },
+    {
+      "_comment": "Same host and OS as mac-x86, built with the SIMD/asm optimizations ON. The only target that exercises --enable-roll-asm/--enable-md5-asm on Mach-O -- the combination Roland Kletzing reported in #160, where an AVX2 over-read (#178) survived two months precisely because nothing built with these flags. Needs MacPorts clang 19 via CC/CXX: Apple clang 10 cannot compile the function-multiversioning probe. Runs after mac-x86, since the harness never runs two targets on one machine at once.",
+      "name": "mac-x86-asm",
+      "ssh_host": "tridge@mac",
+      "workflow": "macos-build.yml",
+      "privilege": "sudo",
+      "configure_flags": [
+        "--with-rrsync",
+        "--enable-roll-simd",
+        "--enable-roll-asm",
+        "--enable-md5-asm",
+        "--disable-md2man"
+      ],
+      "_xfail_comment": "Same APFS birthtime caveat as mac2.",
+      "xfail": [
+        "crtimes"
+      ],
+      "env_prefix": "export PATH=/opt/local/bin:/opt/local/sbin:$PATH",
+      "configure_pre": "CC=clang-mp-19; CXX=clang++-mp-19; CPPFLAGS=\"-I/opt/local/include\"; LDFLAGS=\"-L/opt/local/lib\"; export CC CXX CPPFLAGS LDFLAGS;",
+      "expect_skip_extra": [
+        "symlink-mknod-fakesuper-symlink-race"
+      ],
+      "_expect_skip_omit_comment": "simd-checksum is a macOS-wide expected skip because simdtest is only built when SIMD is enabled -- which is the whole point of this target, so it RUNS here.",
+      "expect_skip_omit": [
+        "sender-remove-source-root-anchor",
+        "simd-checksum"
       ]
     },
     {
