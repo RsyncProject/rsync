@@ -539,8 +539,11 @@ def validated_arg(opt, arg, typ=3, wild=False):
 
     # "-" is rsync's read-the-list-from-stdin sentinel, not a pathname: a pull
     # with a local --files-from sends exactly "--files-from=-" to the server.
-    if opt == '--files-from' and arg == '-':
-        return arg
+    if opt == '--files-from':
+        if arg == '-':
+            return arg
+        if args.wo:
+            die('a write-only server cannot read a remote --files-from path')
 
     orig_arg = arg
     if arg.startswith('./'):
