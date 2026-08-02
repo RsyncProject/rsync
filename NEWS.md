@@ -264,6 +264,20 @@ under `--fake-super` too (previously it fell back to a path-based set for a
 - Fix an off-by-one in `clean_fname()`'s `..`-collapse path normalization.
   Reported by Leonid Bugaev.
 
+- `--link-dest` no longer fails the transfer when the destination refuses to
+  hard-link a symlink, device node, FIFO or socket.  Whether rsync hard-links
+  those at all was decided at build time, on whatever filesystem the source tree
+  happened to sit on, and one host can hold both answers -- macOS builds on
+  APFS, which can, and backs up to HFS+, which returns ENOTSUP.  Such an entry
+  is now copied, exactly as it already is in a build that cannot link them and
+  as a regular file in the same position already was; the run used to exit 23
+  even though the entry was then created correctly.  The fallback covers any
+  refusal, since the error does not identify one on its own: link(2) documents
+  EPERM both for a filesystem without hard links and for a permission refusal.
+  Still outstanding: under `-H`, a group of such entries hard-linked to each
+  other also needs a link within the destination, and where the destination
+  cannot hard-link the type at all, the members after the first are still lost.
+
 - `--out-format` / `--log-file-format` now emit a literal `%` for `%%` instead of
   mis-parsing the following character (added by Leonid Bugaev); a follow-up bounds
   `log_format_has()`'s width-digit scan to match `log_formatted()`, closing a `%C`
