@@ -183,6 +183,20 @@ static int secure_basis_open(const char *basedir, const char *relpath, int flags
 	return secure_relative_open(basedir, relpath, flags, mode);
 }
 
+/* Keep the ownership policy for every attempt to open a one-inplace partial
+ * output.  In particular, Linux's protected_regular compatibility retries
+ * must not downgrade an operator-path open to the ordinary path resolver. */
+static int secure_recv_open(const char *path, int flags, mode_t mode, int owner_walk)
+{
+	int fd, save = operator_path_resolve;
+
+	if (owner_walk)
+		operator_path_resolve = 1;
+	fd = secure_basis_open(NULL, path, flags, mode);
+	operator_path_resolve = save;
+	return fd;
+}
+
 /* get_tmpname() - create a tmp filename for a given filename
  *
  * If a tmpdir is defined, use that as the directory to put it in.  Otherwise,
@@ -1097,20 +1111,19 @@ int recv_files(int f_in, int f_out, char *local_name)
 			/* one_inplace stages into the operator/peer --partial-dir path:
 			 * resolve it with the ownership walk (exclude-aware) so it can't be
 			 * redirected through a symlink into an excluded subtree. */
-			if (one_inplace)
-				operator_path_resolve = 1;
 			if (secure_relpath_active())
-				fd2 = secure_basis_open(NULL, fnametmp, O_WRONLY|O_CREAT, 0600);
+				fd2 = secure_recv_open(fnametmp, O_WRONLY|O_CREAT, 0600,
+						       one_inplace);
 			else
 				fd2 = do_open(fnametmp, O_WRONLY|O_CREAT, 0600);
-			operator_path_resolve = 0;
 #ifdef linux
 			if (fd2 == -1 && errno == EACCES) {
 				/* Maybe the error was due to protected_regular setting? */
-				if (use_secure_symlinks)
-					fd2 = secure_relative_open(NULL, fname, O_WRONLY, 0600);
+				if (use_secure_symlinks || one_inplace)
+					fd2 = secure_recv_open(fnametmp, O_WRONLY, 0600,
+							       one_inplace);
 				else
-					fd2 = do_open(fname, O_WRONLY, 0600);
+					fd2 = do_open(fnametmp, O_WRONLY, 0600);
 			}
 #endif
 			if (fd2 == -1) {
