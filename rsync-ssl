@@ -26,7 +26,7 @@ function rsync_ssl_run {
 	;;
     esac
 
-    exec rsync --rsh="$0 --HELPER" "${@}"
+    exec rsync --rsh="'$0' --HELPER" "${@}"
 }
 
 function rsync_ssl_helper {
@@ -164,12 +164,12 @@ function rsync_ssl_helper {
     fi
 
     if [[ $RSYNC_SSL_TYPE == openssl ]]; then
-	exec $RSYNC_SSL_OPENSSL s_client $caopt $certopt $keyopt -quiet -verify_quiet -servername $hostname $openssl_host_opt -connect $hostname:$port
+	exec "$RSYNC_SSL_OPENSSL" s_client $caopt $certopt $keyopt -quiet -verify_quiet -servername $hostname $openssl_host_opt -connect $hostname:$port
     elif [[ $RSYNC_SSL_TYPE == gnutls ]]; then
-	exec $RSYNC_SSL_GNUTLS --logfile=/dev/null $gnutls_cert_opt $gnutls_key_opt $gnutls_opts $hostname:$port
+	exec "$RSYNC_SSL_GNUTLS" --logfile=/dev/null $gnutls_cert_opt $gnutls_key_opt $gnutls_opts $hostname:$port
     else
 	# devzero@web.de came up with this no-tmpfile calling syntax:
-	exec $RSYNC_SSL_STUNNEL -fd 10 11<&0 <<EOF 10<&0 0<&11 11<&-
+	exec "$RSYNC_SSL_STUNNEL" -fd 10 11<&0 <<EOF 10<&0 0<&11 11<&-
 foreground = yes
 debug = crit
 connect = $hostname:$port
