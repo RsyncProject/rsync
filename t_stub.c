@@ -41,6 +41,8 @@ size_t max_alloc = 0; /* max_alloc is needed when combined with util2.o */
 char *partial_dir;
 char *module_dir;
 int module_dirfd = -1;
+char *confine_root;
+unsigned int confine_rootlen = 0;
 /* curr_dir[]/curr_dir_len (read by secure_relative_open) are defined in
  * syscall.c, which every helper links -- no stub needed here. */
 filter_rule_list daemon_filter_list;

@@ -441,6 +441,8 @@ has its own detailed description later in this manpage.
 --copy-links, -L         transform symlink into referent file/dir
 --copy-unsafe-links      only "unsafe" symlinks are transformed
 --safe-links             ignore symlinks that point outside the tree
+--insecure-links         follow attacker-owned symlinks in operator paths
+--confine-root=DIR       refuse operator paths resolving outside DIR
 --munge-links            munge symlinks to make them safe & unusable
 --copy-dirlinks, -k      transform symlink to dir into referent dir
 --keep-dirlinks, -K      treat symlinked dir on receiver as dir
@@ -1249,6 +1251,68 @@ expand it.
     unexpected results.
 
     See the [SYMBOLIC LINKS](#) section for multi-option info.
+
+0.  `--insecure-links`
+
+    By default rsync resolves the directory and file paths that the **operator**
+    supplies on the command line -- `--backup-dir`, `--temp-dir`/`-T`,
+    `--partial-dir`, `--link-dest`/`--compare-dest`/`--copy-dest`, `--log-file`,
+    `--password-file`, `--files-from`/`--include-from`/`--exclude-from`,
+    `--filter` merge files, `--write-batch`/`--read-batch`, and the destination
+    directory it changes into -- with a defensive walk that **follows a symlink
+    component only when it is owned by uid&nbsp;0 or by the running user**, and
+    refuses one owned by any other user.  This stops an attacker who can write
+    inside one of those directories from planting (or racing in) a symlink that
+    redirects a privileged rsync to a target outside the intended tree, while
+    still honouring the operator's own symlinks (the `/var/backups -> /mnt/disk`
+    admin pattern).  The rule is the same for absolute and relative paths.
+
+    `--insecure-links` turns that defence off, restoring the historical behaviour
+    of following any symlink in those paths.  Use it only when you fully trust
+    every directory along each operator-supplied path -- it re-exposes the
+    symlink-redirection attacks the walk prevents.
+
+    The option is **local only**: it is not sent to the remote side of the
+    transfer (a remote-shell peer that needs the opt-out must set it there, e.g.
+    via [`--rsync-path`](#opt)), and a daemon never honours it -- a daemon that
+    receives `--insecure-links` from a client refuses the request.  A daemon
+    administrator who wants the legacy behaviour for a single trusted module sets
+    "`insecure links = yes`" in that module's **rsyncd.conf**(5) section instead;
+    a client can never enable it.
+
+    See the [SYMBOLIC LINKS](#) section for multi-option info.
+
+0.  `--confine-root=DIR`
+
+    This bounds where the paths listed under [`--insecure-links`](#opt) are
+    allowed to resolve: one that ends up outside DIR is refused, even if every
+    symlink along it was owned by a trusted user.  The ownership walk asks who
+    planted a link; this asks where the path came out.
+
+    DIR must be absolute.  Nothing is confined by default, and
+    `--confine-root=/` is a no-op.
+
+    It exists for a wrapper that serves a restricted directory over a remote
+    shell, `rrsync` being the one shipped here, which passes it automatically
+    whenever its restricted dir is not "`/`".  Such a wrapper can vet the argv
+    it is handed, but filter rules travel over the protocol instead: a client
+    can name a merge file outside the restricted dir in a dir-merge rule and
+    have the server read it in as filter rules.  On a pull that needs neither
+    `--delete` nor any verbosity, because an exclude-only merge (the "`-`"
+    modifier) makes every line a pattern, and the client reads the file's
+    contents off which of its own names went missing.  Confining the open is
+    what closes that; a merge file inside DIR keeps working as before.
+
+    A daemon ignores this option -- its module directory is already the
+    boundary, and the option arrives in a client-supplied argv, so honouring it
+    could only widen the module.
+
+    [`--insecure-links`](#opt) is refused alongside it.  That opt-out restores
+    the historical open, which skips the walk that enforces the root, so the two
+    together would silently mean no confinement at all.
+
+    Like [`--drop-D`](#opt), it is not forwarded to the remote side: it is meant
+    to be applied to one end of a connection by itself.
 
 0.  `--munge-links`
 
