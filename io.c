@@ -112,6 +112,11 @@ static struct {
 static time_t last_io_in;
 static time_t last_io_out;
 
+/* Absolute wall-clock bound for peer-controlled daemon handshake reads.
+ * This is deliberately separate from io_timeout: the latter is an idle
+ * transfer timeout and may be supplied by the module or client. */
+static time_t daemon_handshake_deadline;
+
 static int write_batch_monitor_in = -1;
 static int write_batch_monitor_out = -1;
 
@@ -134,6 +139,25 @@ static int poll_timeout_ms(void)
 	if (secs <= 0 || secs > SELECT_TIMEOUT)
 		secs = SELECT_TIMEOUT;
 	return secs * 1000;
+}
+
+static int handshake_poll_timeout_ms(void)
+{
+	time_t now, left;
+	int timeout = poll_timeout_ms();
+
+	if (!daemon_handshake_deadline)
+		return timeout;
+
+	now = time(NULL);
+	left = daemon_handshake_deadline - now;
+	if (left <= 0) {
+		rprintf(FERROR, "[%s] daemon handshake timeout -- exiting\n", who_am_i());
+		exit_cleanup(RERR_TIMEOUT);
+	}
+	if (left <= INT_MAX / 1000 && left * 1000 < timeout)
+		timeout = (int)left * 1000;
+	return timeout;
 }
 
 static int active_filecnt = 0;
@@ -284,7 +308,7 @@ static size_t safe_read(int fd, char *buf, size_t len)
 		pfd.events = POLLIN | POLLPRI;
 		pfd.revents = 0;
 
-		cnt = poll(&pfd, 1, poll_timeout_ms());
+		cnt = poll(&pfd, 1, handshake_poll_timeout_ms());
 		if (cnt <= 0) {
 			if (cnt < 0 && errno != EINTR && errno != EAGAIN) {
 				rsyserr(FERROR, errno, "safe_read poll failed");
@@ -1269,6 +1293,14 @@ void set_io_timeout(int secs)
 
 	if (read_batch)
 		allowed_lull = 0;
+}
+
+void set_daemon_handshake_timeout(int secs)
+{
+	if (secs > 0)
+		daemon_handshake_deadline = time(NULL) + secs;
+	else
+		daemon_handshake_deadline = 0;
 }
 
 static void check_for_d_option_error(const char *msg)

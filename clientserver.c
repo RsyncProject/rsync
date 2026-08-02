@@ -84,6 +84,21 @@ struct chmod_mode_struct *daemon_chmod_modes;
 #define EARLY_INPUT_CMD "#early_input="
 #define EARLY_INPUT_CMDLEN (sizeof EARLY_INPUT_CMD - 1)
 
+/* Fallback bound on each peer-driven daemon handshake phase when no positive
+ * "timeout" is configured.  A module value can shorten the pre-auth and
+ * argument-read phases, but cannot extend either beyond this limit. */
+#define DAEMON_HANDSHAKE_TIMEOUT 60
+
+static int daemon_handshake_timeout(int module)
+{
+	int timeout = lp_timeout(module);
+
+	/* "timeout" is parsed with atoi(), so negative values are possible. */
+	if (timeout <= 0 || timeout > DAEMON_HANDSHAKE_TIMEOUT)
+		timeout = DAEMON_HANDSHAKE_TIMEOUT;
+	return timeout;
+}
+
 /* module_dirlen is the length of the module_dir string when in daemon
  * mode and module_dir is not "/"; otherwise 0.  (Note that a chroot-
  * enabled module can have a non-"/" module_dir these days.) */
@@ -788,6 +803,9 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	}
 
 	read_only = lp_read_only(i); /* may also be overridden by auth_server() */
+	/* The module is now known, so its local timeout policy can tighten the
+	 * absolute deadline while the claimed slot is awaiting authentication. */
+	set_daemon_handshake_timeout(daemon_handshake_timeout(i));
 	auth_user = auth_server(f_in, f_out, i, host, addr, "@RSYNCD: AUTHREQD ");
 
 	if (!auth_user) {
@@ -795,6 +813,10 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 		return -1;
 	}
 	set_env_str("RSYNC_USER_NAME", auth_user);
+	/* Do not count local setup or operator hooks against a peer's read time.
+	 * In particular, the post-xfer parent and pre-xfer/name-converter children
+	 * are forked below and must never inherit an armed asynchronous deadline. */
+	set_daemon_handshake_timeout(0);
 
 	module_id = i;
 
@@ -1122,6 +1144,11 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 		}
 	}
 
+	/* This deadline is checked only in the read path, so the preceding local
+	 * setup and hooks can take as long as necessary.  Keep one absolute bound
+	 * across both read_args() calls: anonymous modules must not be able to pin
+	 * a max-connections slot by trickling an unterminated argument forever. */
+	set_daemon_handshake_timeout(daemon_handshake_timeout(module_id));
 	io_printf(f_out, "@RSYNCD: OK\n");
 
 	read_args(f_in, name, line, sizeof line, rl_nulls, 1, &argv, &argc, &request);
@@ -1139,6 +1166,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 		ret = parse_arguments(&argc, (const char ***) &argv);
 	} else
 		orig_early_argv = NULL;
+	set_daemon_handshake_timeout(0);
 
 	/* The default is to use the user's setting unless the module sets True or False. */
 	if (lp_open_noatime(module_id) >= 0)
@@ -1406,6 +1434,12 @@ int start_daemon(int f_in, int f_out)
 	if (!load_config(0))
 		exit_cleanup(RERR_SYNTAX);
 
+	/* Bound the handshake before ANY peer input is read -- the PROXY-protocol
+	 * header below is peer-supplied too, and was previously unbounded.  An
+	 * rsh-run daemon is not a listener and has no shared slot to exhaust. */
+	if (am_daemon > 0)
+		set_daemon_handshake_timeout(daemon_handshake_timeout(-1));
+
 	if (lp_proxy_protocol()) {
 		if (!proxy_peer_allowed(f_in) || !read_proxy_protocol_header(f_in))
 			return -1;
@@ -1495,6 +1529,7 @@ int start_daemon(int f_in, int f_out)
 		set_socket_options(f_in, "SO_KEEPALIVE");
 		set_nonblocking(f_in);
 	}
+
 
 	if (exchange_protocols(f_in, f_out, line, sizeof line, 0) < 0)
 		return -1;
