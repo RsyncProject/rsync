@@ -69,6 +69,9 @@ extern int module_id;
 extern unsigned int module_dirlen;
 extern char *module_dir;
 extern int module_dirfd;	/* daemon: served module root pinned by identity, or -1 */
+extern char *confine_root;	/* --confine-root, or NULL; see confinement_root() */
+extern unsigned int confine_rootlen;
+extern char curr_dir[MAXPATHLEN];	/* defined below; fwd-declared for the seed */
 extern int operator_path_resolve;	/* defined below; fwd-declared for the exclude check */
 
 #if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
@@ -123,44 +126,122 @@ int symlink_optout_allowed(void)
 	return insecure_links;
 }
 
-/* Refuse (return 1) when the ABSOLUTE resolved path `abspath` lands OUTSIDE the
- * serving module's root, for an operator/peer-supplied path that must stay in the
- * module (--partial-dir/--backup-dir/alt-basis: operator_path_resolve).  An
- * in-tree symlink owned by uid 0 / the euid is followed by design, so it can
- * redirect the resolved target outside the module; this catches that escape.
+/* The root an operator/peer-supplied path must stay under, or NULL when nothing
+ * is confined.  A daemon has the served module; a server launched by a wrapper
+ * with its own restricted directory (rrsync) gets one from --confine-root.
  *
- * This is module-ROOT confinement only.  The daemon exclude/filter list is a
- * name-based visibility filter, NOT a physical-path boundary: a symlink whose own
- * name is not excluded may still resolve into an excluded IN-module subtree,
- * exactly as in stock rsync.  The defense for a writable module is `munge
- * symlinks` (see rsyncd.conf(5)), not this walk.  No-op unless we're a daemon. */
-static int abspath_excluded_by_module(const char *abspath)
+ * A daemon never honours --confine-root: module_dir is the boundary there, and
+ * the option arrives in a peer-supplied argv, so obeying it could only loosen
+ * the module. */
+static const char *confinement_root(unsigned int *lenp)
 {
-	if (!am_daemon || !abspath || !module_dir)
+	if (am_daemon) {
+		*lenp = module_dirlen;
+		return module_dir;
+	}
+	*lenp = confine_rootlen;
+	return confine_root;
+}
+
+/* Split the "/proc/<self|pid>/fd" prefix off `p`, returning the tail -- "" for
+ * the pin directory itself, otherwise a string starting with '/'.  NULL when `p`
+ * is not in the fd-pin namespace at all. */
+static const char *fd_pin_tail(const char *p)
+{
+	const char *s;
+
+	if (strncmp(p, "/proc/", 6) != 0)
+		return NULL;
+	s = p + 6;
+	if (strncmp(s, "self/", 5) == 0)	/* "/proc/self/..." */
+		s += 4;
+	else {					/* "/proc/<pid>/..." */
+		const char *d = s;
+		while (*s >= '0' && *s <= '9')
+			s++;
+		if (s == d || *s != '/')
+			return NULL;
+	}
+	if (strncmp(s, "/fd", 3) != 0)
+		return NULL;
+	s += 3;
+	return (*s == '\0' || *s == '/') ? s : NULL;
+}
+
+/* An EXACT pin entry, "/proc/self/fd/7" -- the one spelling whose target is what
+ * confinement must judge.  rrsync also writes a pinned parent as
+ * ".../fd/7/<leaf>", but the walk resolves the magic link itself and checks the
+ * components past it, so only the bare entry is resolved here.  Requiring all
+ * digits keeps a planted name like ".../fd/outside-secret" out. */
+static int is_exact_fd_pin(const char *p)
+{
+	const char *tail = fd_pin_tail(p);
+
+	if (!tail || *tail != '/')
 		return 0;
-	if (module_dirlen <= 1)			/* module root is "/": nothing is outside */
+	for (++tail; *tail >= '0' && *tail <= '9'; tail++) {}
+	return *tail == '\0' && tail[-1] != '/';
+}
+
+/* Refuse (return 1) when the ABSOLUTE resolved path `abspath` lands OUTSIDE the
+ * confinement root, for an operator/peer-supplied path that must stay inside it
+ * (--partial-dir/--backup-dir/alt-basis/merge files: operator_path_resolve).  An
+ * in-tree symlink owned by uid 0 / the euid is followed by design, so it can
+ * redirect the resolved target outside the root; this catches that escape.
+ *
+ * This is ROOT confinement only.  The daemon exclude/filter list is a name-based
+ * visibility filter, NOT a physical-path boundary: a symlink whose own name is
+ * not excluded may still resolve into an excluded IN-tree subtree, exactly as in
+ * stock rsync.  The defense for a writable module is `munge symlinks` (see
+ * rsyncd.conf(5)), not this walk. */
+static int abspath_outside_confinement(const char *abspath)
+{
+	unsigned int rootlen;
+	const char *root = confinement_root(&rootlen);
+	char pinned[MAXPATHLEN];
+
+	if (!root || !abspath)
 		return 0;
-	if (strncmp(abspath, module_dir, module_dirlen) == 0
-	 && (abspath[module_dirlen] == '\0' || abspath[module_dirlen] == '/'))
-		return 0;			/* inside the module: name-based exclude is not a boundary */
-	/* Not under the module root.  An ABSOLUTE walk passes through the module
-	 * root's ancestors ("/", "/home", ...) on the way down -- those are not
-	 * "outside", just not-yet-arrived, so allow them.  A path that has truly
-	 * DIVERGED from the module tree is outside: refuse it for an operator/peer
-	 * path that must stay in the module (operator_path_resolve); other daemon
-	 * opens (--log-file, --*-from, lock/motd) may legitimately live elsewhere.
-	 * The --insecure-links / "insecure links = yes" opt-out short-circuits
-	 * before we get here. */
+	if (rootlen <= 1)			/* root is "/": nothing is outside */
+		return 0;
+	/* An fd pin (rrsync rewrites a validated option path to /proc/self/fd/N so
+	 * no later symlink can redirect it) is spelled outside the root by
+	 * construction.  Judge it by what it points AT rather than by its spelling,
+	 * so a pin is neither wrongly refused nor blindly trusted.  A pin we cannot
+	 * resolve to an absolute path is refused, not waved through: an unreadable
+	 * pin is exactly the case where we cannot say where the open would land. */
+	if (!am_daemon) {
+		const char *tail = fd_pin_tail(abspath);
+		if (tail && !*tail)
+			return 0;		/* the pin directory: transit, opens nothing */
+		if (is_exact_fd_pin(abspath)) {
+			ssize_t n = readlink(abspath, pinned, sizeof pinned - 1);
+			if (n <= 0 || pinned[0] != '/')
+				return operator_path_resolve ? 1 : 0;
+			pinned[n] = '\0';
+			abspath = pinned;
+		}
+	}
+	if (strncmp(abspath, root, rootlen) == 0
+	 && (abspath[rootlen] == '\0' || abspath[rootlen] == '/'))
+		return 0;			/* inside: name-based exclude is not a boundary */
+	/* Not under the root.  An ABSOLUTE walk passes through the root's ancestors
+	 * ("/", "/home", ...) on the way down -- those are not "outside", just
+	 * not-yet-arrived, so allow them.  A path that has truly DIVERGED is
+	 * outside: refuse it for an operator/peer path that must stay in the tree
+	 * (operator_path_resolve); other opens (--log-file, --*-from, lock/motd)
+	 * may legitimately live elsewhere.  The --insecure-links / "insecure links
+	 * = yes" opt-out short-circuits before we get here. */
 	size_t alen = strlen(abspath);
 	if (alen == 0
-	 || (strncmp(abspath, module_dir, alen) == 0 && module_dir[alen] == '/'))
-		return 0;			/* ancestor of the module root: still descending */
+	 || (strncmp(abspath, root, alen) == 0 && root[alen] == '/'))
+		return 0;			/* ancestor of the root: still descending */
 	return operator_path_resolve ? 1 : 0;
 }
 
 /* Advance the tracked absolute path `abspath` by one resolved component,
  * normalizing "." and ".." exactly as openat() does so the module-confinement
- * check (abspath_excluded_by_module) sees the REAL resolved target.  -1/
+ * check (abspath_outside_confinement) sees the REAL resolved target.  -1/
  * ENAMETOOLONG on overflow. */
 static int abspath_step(char *abspath, size_t cap, const char *comp, size_t comp_len)
 {
@@ -224,14 +305,36 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 	int dfd = AT_FDCWD;
 	int dfd_owns = 0;
 
-	/* Absolute module-relative path of the current dir, for the exclude-aware
-	 * refusal (abspath_excluded_by_module).  A relative operator path starts at
-	 * the daemon's cwd == the module root; an absolute one (or a followed
-	 * absolute symlink target) restarts at "/". */
+	/* Absolute path of the current dir, for the confinement refusal
+	 * (abspath_outside_confinement).  A relative operator path starts at the
+	 * daemon's cwd == the module root; an absolute one (or a followed absolute
+	 * symlink target) restarts at "/". */
 	char abspath[MAXPATHLEN];
 	abspath[0] = '\0';
 	if (am_daemon && module_dir && module_dir[0] == '/')
 		strlcpy(abspath, module_dir, sizeof abspath);	/* "/" for a path=/ module */
+	else if (confine_root) {
+		/* Unlike a daemon's, this cwd is not pinned to the root -- the receiver
+		 * chdir's into the destination -- so it has to be read, not assumed.
+		 * It must be the PHYSICAL cwd: curr_dir is the lexical name change_dir()
+		 * was given, so after descending a trusted symlink the tracker sits at a
+		 * different depth than the kernel, and a ".." that really escapes looks
+		 * like it landed inside.
+		 *
+		 * Without it there is nothing to measure against, and an empty tracker
+		 * does NOT deny by itself -- a leading ".." pops nothing and an empty
+		 * path reads as an ancestor of the root -- so refuse the open instead. */
+		if (!getcwd(abspath, sizeof abspath))
+			return -1;
+	}
+
+	/* An fd pin (rrsync rewrites an option path to /proc/self/fd/N so no
+	 * later symlink can redirect it) is spelled outside the root by
+	 * construction, so the walk has to be allowed through /proc/self/fd to
+	 * reach the magic link.  This only suspends the check for that prefix:
+	 * following the link restarts the walk at its absolute target, and every
+	 * component of THAT is checked, so a pin aimed outside is still refused. */
+	int pin_transit = !am_daemon && confine_root && fd_pin_tail(path) != NULL;
 
 	/* Path-walk state. `remaining` is the unconsumed tail; we splice
 	 * symlink targets back into it as we go. Sized 2x MAXPATHLEN so a
@@ -285,7 +388,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 					saved_errno = errno;
 					goto out;
 				}
-				if (abspath_excluded_by_module(abspath)) {
+				if (!pin_transit && abspath_outside_confinement(abspath)) {
 					saved_errno = ELOOP;
 					goto out;
 				}
@@ -340,6 +443,10 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 				}
 				dfd_owns = 1;
 				abspath[0] = '\0';	/* followed an absolute target: restart from "/" */
+				/* "self" resolves to "<pid>", still inside the pin;
+				 * the magic link itself lands elsewhere and ends the
+				 * exemption.  Never turns back on. */
+				pin_transit = pin_transit && fd_pin_tail(rebuilt) != NULL;
 				char *p = rebuilt;
 				while (*p == '/') p++;
 				strlcpy(remaining, p, sizeof remaining);
@@ -355,7 +462,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 				saved_errno = errno;
 				goto out;
 			}
-			if (abspath_excluded_by_module(abspath)) {
+			if (!pin_transit && abspath_outside_confinement(abspath)) {
 				saved_errno = ELOOP;
 				goto out;
 			}
@@ -379,7 +486,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 			saved_errno = errno;
 			goto out;
 		}
-		if (abspath_excluded_by_module(abspath)) {
+		if (!pin_transit && abspath_outside_confinement(abspath)) {
 			saved_errno = ELOOP;
 			goto out;
 		}
@@ -474,7 +581,7 @@ int owner_walk_parent(const char *path, const char **bname)
 	/* owner_walk only resolved the PARENT; check the resolved leaf too, so a
 	 * symlinked operator path cannot act on a leaf that resolves OUTSIDE the
 	 * module in an otherwise-served dir.  (The module exclude/filter is name-
-	 * based and not enforced here -- see abspath_excluded_by_module.) */
+	 * based and not enforced here -- see abspath_outside_confinement.) */
 	if (pabs[0]) {
 		char leafabs[MAXPATHLEN];
 		if (snprintf(leafabs, sizeof leafabs, "%s/%s", pabs, *bname) >= (int)sizeof leafabs) {
@@ -482,7 +589,7 @@ int owner_walk_parent(const char *path, const char **bname)
 			errno = ENAMETOOLONG;	/* fail closed, never skip the check */
 			return -1;
 		}
-		if (abspath_excluded_by_module(leafabs)) {
+		if (abspath_outside_confinement(leafabs)) {
 			close(dfd);
 			errno = ELOOP;
 			return -1;
@@ -2697,7 +2804,7 @@ struct dirstack {
 	int fds[DS_MAXDEPTH];	/* fds[0] = anchor (borrowed); fds[top] = current dir */
 	int top;
 	/* Absolute path of fds[top], maintained as we descend/pop, for the
-	 * exclude-aware refusal (abspath_excluded_by_module).  Empty unless the
+	 * exclude-aware refusal (abspath_outside_confinement).  Empty unless the
 	 * caller seeds it with the anchor's absolute path; then a followed symlink
 	 * that redirects the walk into a module-excluded dir is refused. */
 	char abspath[MAXPATHLEN];
@@ -2803,7 +2910,7 @@ static int ds_descend(struct dirstack *ds, const char *part, int *hops)
 			return -1;
 		/* exclude-aware: refuse descending into a module-hidden dir (catches a
 		 * symlink that redirected the walk into an excluded subtree). */
-		if (abspath_excluded_by_module(ds->abspath)) {
+		if (abspath_outside_confinement(ds->abspath)) {
 			errno = ELOOP;
 			return -1;
 		}
@@ -2933,7 +3040,7 @@ static int secure_walk_at(int anchor_fd, const char *anchor_abspath,
 				char leafabs[MAXPATHLEN];
 				if (snprintf(leafabs, sizeof leafabs, "%s/%s", ds.abspath, part)
 				      < (int)sizeof leafabs
-				 && abspath_excluded_by_module(leafabs)) {
+				 && abspath_outside_confinement(leafabs)) {
 					errno = ELOOP;
 					goto cleanup;
 				}
