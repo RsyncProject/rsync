@@ -61,6 +61,8 @@ int preserve_executability = 0;
 int preserve_devices = 0;
 int preserve_specials = 0;
 int drop_devices = 0;
+char *confine_root = NULL;		/* --confine-root: see syscall.c */
+unsigned int confine_rootlen = 0;
 int preserve_uid = 0;
 int preserve_gid = 0;
 int preserve_mtimes = 0;
@@ -683,6 +685,7 @@ static struct poptOption long_options[] = {
   {"no-specials",      0,  POPT_ARG_VAL,    &preserve_specials, 0, 0, 0 },
   {"drop-D",           0,  POPT_ARG_VAL,    &drop_devices, 1, 0, 0 },
   {"no-drop-D",        0,  POPT_ARG_VAL,    &drop_devices, 0, 0, 0 },
+  {"confine-root",     0,  POPT_ARG_STRING, &confine_root, 0, 0, 0 },
   {"links",           'l', POPT_ARG_VAL,    &preserve_links, 1, 0, 0 },
   {"no-links",         0,  POPT_ARG_VAL,    &preserve_links, 0, 0, 0 },
   {"no-l",             0,  POPT_ARG_VAL,    &preserve_links, 0, 0, 0 },
@@ -2363,6 +2366,26 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 				prefix);
 			exit_cleanup(RERR_UNSUPPORTED);
 		}
+	}
+
+	if (confine_root) {
+		/* A daemon already has module_dir for this job, and honouring a
+		 * peer-supplied root there could only loosen the module boundary. */
+		if (am_daemon)
+			confine_root = NULL;
+		else if (*confine_root != '/') {
+			snprintf(err_buf, sizeof err_buf,
+				 "--confine-root must be an absolute path\n");
+			return 0;
+		} else if (insecure_links) {
+			/* The opt-out restores the legacy open, which short-circuits the
+			 * walk that enforces the root -- so the pair would silently mean
+			 * no confinement at all.  Say so instead. */
+			snprintf(err_buf, sizeof err_buf,
+				 "--insecure-links cannot be combined with --confine-root\n");
+			return 0;
+		} else
+			confine_root = normalize_path(confine_root, True, &confine_rootlen);
 	}
 
 	if (sanitize_paths) {
