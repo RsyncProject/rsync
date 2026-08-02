@@ -4,7 +4,7 @@ import subprocess
 import time
 
 from rsyncfns import (
-    RACE_TIMEOUT, SCRATCHDIR, rmtree, rsync_argv,
+    race_budget, SCRATCHDIR, rmtree, rsync_argv,
     start_path_flipper, start_test_daemon, stop_flipper, test_fail,
     write_daemon_conf,
 )
@@ -33,7 +33,7 @@ url = start_test_daemon(conf, 12938)
 
 flip = start_path_flipper(mod / 'real', mod / 'evil')
 leaked = False
-deadline = time.monotonic() + RACE_TIMEOUT
+deadline = time.monotonic() + race_budget()
 try:
     while time.monotonic() < deadline:
         rmtree(dest)

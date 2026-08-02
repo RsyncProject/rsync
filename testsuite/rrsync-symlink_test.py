@@ -66,7 +66,7 @@ import subprocess
 import time
 
 from rsyncfns import (
-    RACE_TIMEOUT, SCRATCHDIR, patched_rrsync, proc_self_fd_pins, rmtree,
+    race_budget, SCRATCHDIR, patched_rrsync, proc_self_fd_pins, rmtree,
     start_path_flipper, stop_flipper, test_fail, test_skipped,
 )
 
@@ -122,7 +122,7 @@ test_rrsync = patched_rrsync(base, rsync_path=str(fake_rsync))
 def race(rrsync_flags, ssh_cmd):
     """Run rrsync in a loop against the flipping tree; True if the secret leaked."""
     env = {**os.environ, 'SSH_ORIGINAL_COMMAND': ssh_cmd}
-    deadline = time.monotonic() + RACE_TIMEOUT
+    deadline = time.monotonic() + race_budget()
     while time.monotonic() < deadline:
         proc = subprocess.run(
             [str(test_rrsync), *rrsync_flags, '-no-lock', str(restricted)],

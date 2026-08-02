@@ -12,7 +12,7 @@ import subprocess
 import time
 
 from rsyncfns import (
-    SCRATCHDIR, RACE_TIMEOUT, find_attacker_uid, rmtree,
+    SCRATCHDIR, race_budget, find_attacker_uid, rmtree,
     start_c_flipper, stop_flipper, test_fail, test_skipped,
 )
 
@@ -88,7 +88,7 @@ if escaped():
 
 # ---- THE LIVE RACE ---------------------------------------------------------
 
-deadline = time.monotonic() + max(RACE_TIMEOUT, 10.0)
+deadline = time.monotonic() + race_budget(10.0)
 flip = None
 
 try:

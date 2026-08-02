@@ -36,7 +36,7 @@ import subprocess
 import time
 
 from rsyncfns import (
-    RACE_TIMEOUT, RSYNC, SCRATCHDIR, makepath, patched_rrsync,
+    race_budget, RSYNC, SCRATCHDIR, makepath, patched_rrsync,
     proc_self_fd_pins, rmtree, rsync_argv, start_path_flipper, stop_flipper,
     test_fail, test_skipped, rsync_path_arg,
 )
@@ -88,7 +88,7 @@ def leaked_content():
 def race_pull(source, real_name, evil_name):
     flip = start_path_flipper(real_name, evil_name)
     try:
-        deadline = time.monotonic() + RACE_TIMEOUT
+        deadline = time.monotonic() + race_budget()
         while time.monotonic() < deadline:
             rmtree(dest)
             dest.mkdir()

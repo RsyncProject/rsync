@@ -20,7 +20,7 @@ import os
 import subprocess
 import time
 
-from rsyncfns import RACE_TIMEOUT, SCRATCHDIR, rmtree, rsync_argv, test_fail
+from rsyncfns import race_budget, SCRATCHDIR, rmtree, rsync_argv, test_fail
 
 # Unique per-invocation base: this test's rename storm can corrupt the `dest`
 # directory on some filesystems (OpenBSD FFS leaves an un-removable dir), and a
@@ -84,7 +84,7 @@ flip_code = (
 )
 flip = subprocess.Popen(['python3', '-c', flip_code, str(sub), str(link)])
 try:
-    deadline = time.monotonic() + max(RACE_TIMEOUT, 10.0)
+    deadline = time.monotonic() + race_budget(10.0)
     while time.monotonic() < deadline:
         # Start each round from a real (absent->mkdir'd) dest/sub so rsync sees a
         # directory at flist time; the flip then happens during the file writes.

@@ -22,7 +22,7 @@ import subprocess
 import time
 
 from rsyncfns import (
-    SCRATCHDIR, RACE_TIMEOUT,
+    SCRATCHDIR, race_budget,
     forced_protocol, get_rootgid, get_rootuid, get_testuid,
     rmtree, run_rsync, rsync_argv, start_path_flipper, stop_flipper,
     start_test_daemon, test_fail, test_skipped,
@@ -152,7 +152,7 @@ landed.unlink()
 # the privileged file. If set_acl() resolves the leaf while it is the symlink,
 # the marker ACL lands on the privileged file.
 flip = start_path_flipper(mod / 'victim', mod / '.evil')
-deadline = time.monotonic() + max(RACE_TIMEOUT, 10.0)
+deadline = time.monotonic() + race_budget(10.0)
 try:
     while time.monotonic() < deadline:
         push()

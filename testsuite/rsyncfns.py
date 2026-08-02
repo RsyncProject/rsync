@@ -21,6 +21,7 @@ import atexit
 import fcntl
 import filecmp
 import errno
+import math
 import os
 import platform
 import re
@@ -131,8 +132,45 @@ TLS_ARGS = os.environ.get('TLS_ARGS', '')
 USE_TCP = os.environ.get('RSYNC_TEST_USE_TCP') == '1'
 
 # Budget (seconds) a TOCTOU symlink-race test may spend trying to win its race
-# before giving up. Set by runtests.py --race-timeout (default 5).
-RACE_TIMEOUT = float(os.environ.get('race_timeout', '5'))
+# before giving up. Set by runtests.py --race-timeout; when the operator did not
+# pass it, each test keeps its own default (see race_budget).
+_RACE_TIMEOUT_SET = 'race_timeout' in os.environ
+try:
+    RACE_TIMEOUT = float(os.environ.get('race_timeout', '5'))
+except ValueError:
+    # A malformed value counts as NOT set, so every test keeps its own default.
+    # Falling back to the 5s baseline while still counting as "set" would
+    # silently cut a 10s or 15s oracle in half -- weakening a security test
+    # that nobody asked to shorten, which is the exact failure this knob's
+    # validation exists to prevent.
+    RACE_TIMEOUT = 5.0
+    _RACE_TIMEOUT_SET = False
+
+
+def race_budget(default: float = 5.0) -> float:
+    """Seconds this race test may spend trying to provoke an escape.
+
+    A race test is a NEGATIVE oracle: it passes by *failing* to break in before
+    the budget runs out, so it always spends the whole budget. The budget is
+    therefore the test's runtime -- these are the suite's slowest tests, which
+    is exactly why the knob has to work.
+
+    Tests needing longer than the 5s baseline to be a credible oracle pass their
+    own `default`. An explicit --race-timeout overrides every default, in both
+    directions: the old `max(RACE_TIMEOUT, 10.0)` idiom ignored the option below
+    10s, so the documented knob did nothing for most of these tests.
+
+    Lowering the budget weakens the oracle (fewer flips observed = less chance
+    of catching a regression), so the defaults here are deliberately generous.
+
+    A non-positive or non-finite budget is never a legitimate request: the race
+    loop would run zero times and the test would report PASS without testing
+    anything. runtests.py rejects that at the command line; ignoring it here too
+    keeps the guarantee when race_timeout arrives straight from the environment.
+    """
+    if _RACE_TIMEOUT_SET and math.isfinite(RACE_TIMEOUT) and RACE_TIMEOUT > 0:
+        return RACE_TIMEOUT
+    return default
 
 # Mnemonics for rsync's itemize-changes (-i / -ii) format:
 #   all_plus   ->  +++++++++   every attribute changed (an additive create)

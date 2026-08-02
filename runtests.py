@@ -26,6 +26,7 @@ import argparse
 import concurrent.futures
 import fnmatch
 import glob
+import math
 import os
 import signal
 import subprocess
@@ -37,6 +38,27 @@ import time
 # testsuite/ (next to this script); it has no import-time side effects.
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'testsuite'))
 from exitcodes import Exit
+
+
+def _race_seconds(text):
+    """argparse type for --race-timeout: a finite, strictly positive number.
+
+    A race test loops `while monotonic() < deadline`, so a budget of 0 (or a
+    negative, or a NaN, which fails every comparison) runs the body ZERO times
+    and the test reports PASS without ever exercising its oracle -- a silently
+    disarmed security test, which is worse than a slow one. Infinity would run
+    until the unrelated per-test timeout. The old max(RACE_TIMEOUT, 10.0) floor
+    used to make this unreachable; validating here restores that guarantee."""
+    try:
+        secs = float(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f'not a number: {text!r}')
+    if not math.isfinite(secs) or secs <= 0:
+        raise argparse.ArgumentTypeError(
+            f'must be a finite positive number of seconds, got {text!r}; '
+            'a zero/negative/NaN budget would make every race test pass '
+            'without running its race')
+    return secs
 
 
 def parse_args():
@@ -69,9 +91,13 @@ def parse_args():
                         'much of the run the slowest test alone accounts for.')
     p.add_argument('--timeout', type=int, default=300, metavar='SECS',
                    help='Per-test timeout in seconds (default: 300)')
-    p.add_argument('--race-timeout', type=float, default=5.0, metavar='SECS',
+    p.add_argument('--race-timeout', type=_race_seconds, default=None, metavar='SECS',
                    help='Budget (seconds) a TOCTOU symlink-race test may spend '
-                        'trying to win its race before concluding (default: 5)')
+                        'trying to win its race before concluding. Overrides '
+                        'every such test\'s own default (5-15s, the suite\'s '
+                        'slowest tests: a race test always spends its whole '
+                        'budget). Lowering it speeds the suite up but weakens '
+                        'the oracle. Unset: each test keeps its default.')
     p.add_argument('--rsync-bin', default=None, metavar='PATH',
                    help='Path to rsync binary (default: ./rsync)')
     p.add_argument('--rsync-bin2', default=None, metavar='PATH',
@@ -675,7 +701,6 @@ def main():
         'scratchbase': scratchbase,
         'suitedir': suitedir,
         'TESTRUN_TIMEOUT': str(args.timeout),
-        'race_timeout': str(args.race_timeout),
         'HOME': scratchbase,
         'PYTHONPATH': pythonpath,
     })
@@ -683,6 +708,14 @@ def main():
         # Opt-in: daemon tests start a real rsyncd on a claimed loopback port.
         # Default (unset) keeps the secure stdio-pipe transport.
         base_env['RSYNC_TEST_USE_TCP'] = '1'
+    if args.race_timeout is not None:
+        # Only exported when the operator actually passed --race-timeout: its
+        # mere presence is what tells a race test to override its own default.
+        base_env['race_timeout'] = str(args.race_timeout)
+    else:
+        # A stale value inherited from the environment would silently override
+        # every test's default; the flag is the only way to set this.
+        base_env.pop('race_timeout', None)
     for k, v in shconfig.items():
         if v:
             base_env[k] = v

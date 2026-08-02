@@ -32,7 +32,7 @@ import subprocess
 import time
 
 from rsyncfns import (
-    SCRATCHDIR, RACE_TIMEOUT, find_attacker_uid,
+    SCRATCHDIR, race_budget, find_attacker_uid,
     rmtree, rsync_argv, start_c_flipper, stop_flipper, test_fail, test_skipped,
 )
 
@@ -110,7 +110,7 @@ if escaped():
 # on a slow journaled fs; it degrades to the Python flipper where no compiler is.
 flip = start_c_flipper(sub, sublink)
 try:
-    deadline = time.monotonic() + max(RACE_TIMEOUT, 10.0)
+    deadline = time.monotonic() + race_budget(10.0)
     while time.monotonic() < deadline:
         # Re-dirty the dest files so every push triggers fresh backups.
         for i in range(80):

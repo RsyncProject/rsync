@@ -25,7 +25,7 @@ import subprocess
 import time
 
 from rsyncfns import (
-    RACE_TIMEOUT, SCRATCHDIR, rmtree, rsync_argv, test_fail, test_skipped,
+    race_budget, SCRATCHDIR, rmtree, rsync_argv, test_fail, test_skipped,
     xattr_set, xattrs_supported,
 )
 
@@ -133,7 +133,7 @@ flip_code = (
 )
 flip = subprocess.Popen(['python3', '-c', flip_code, str(sub), str(link)])
 try:
-    deadline = time.monotonic() + max(RACE_TIMEOUT, 10.0)
+    deadline = time.monotonic() + race_budget(10.0)
     while time.monotonic() < deadline:
         # Start each round from a real (absent->mkdir'd) dest/sub so the copy
         # opens a real directory; the flip then happens during the copy.

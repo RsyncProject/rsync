@@ -3,7 +3,7 @@ import subprocess
 import time
 
 from rsyncfns import (
-    SCRATCHDIR, RACE_TIMEOUT, find_attacker_uid, rmtree, rsync_argv,
+    SCRATCHDIR, race_budget, find_attacker_uid, rmtree, rsync_argv,
     start_c_flipper, stop_flipper, test_fail, test_skipped, start_test_daemon,
     write_daemon_conf,
 )
@@ -143,7 +143,7 @@ if not (sub / 'f0').is_symlink() or os.readlink(sub / 'f0') != f'{secret}':
 # lands in `sub`.  Reset the workspace only while the flipper is quiet so build()'s
 # rmtree/mkdir can't race the swapper.
 
-deadline = time.monotonic() + max(RACE_TIMEOUT, 10.0)
+deadline = time.monotonic() + race_budget(10.0)
 flip = None
 try:
     while time.monotonic() < deadline:

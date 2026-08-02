@@ -30,7 +30,7 @@ import subprocess
 import time
 
 from rsyncfns import (
-    SCRATCHDIR, RACE_TIMEOUT, rmtree, rsync_argv, rsync_supports,
+    SCRATCHDIR, race_budget, rmtree, rsync_argv, rsync_supports,
     start_path_flipper, stop_flipper, test_fail, test_xfail,
 )
 
@@ -89,7 +89,7 @@ extra = ['--no-inc-recursive'] if rsync_supports('--no-inc-recursive') else []
 
 flip = start_path_flipper(src / 'sub', src / 'evil')
 won = False
-deadline = time.monotonic() + RACE_TIMEOUT
+deadline = time.monotonic() + race_budget()
 try:
     while time.monotonic() < deadline:
         rmtree(dest)

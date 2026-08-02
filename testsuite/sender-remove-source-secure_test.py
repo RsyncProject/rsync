@@ -5,7 +5,7 @@ import subprocess
 import time
 
 from rsyncfns import (
-    RACE_TIMEOUT, SCRATCHDIR, rmtree, rsync_argv,
+    race_budget, SCRATCHDIR, rmtree, rsync_argv,
     start_path_flipper, start_test_daemon, stop_flipper, test_fail, test_xfail,
     write_daemon_conf,
 )
@@ -39,7 +39,7 @@ conf = write_daemon_conf([
 url = start_test_daemon(conf, 12937)
 
 flip = start_path_flipper(mod / 'real', mod / 'evil')
-deadline = time.monotonic() + RACE_TIMEOUT
+deadline = time.monotonic() + race_budget()
 try:
     while time.monotonic() < deadline and outside_file.exists():
         if not inside_file.exists() and (mod / 'real').is_dir() and not os.path.islink(mod / 'real'):
