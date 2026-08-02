@@ -43,6 +43,9 @@ extern int trust_sender_args;
 extern int module_id;
 extern int operator_path_resolve;
 
+/* Set while the daemon loads its own filter parameters; see parse_filter_file(). */
+int daemon_config_filter_file = 0;
+
 extern char curr_dir[MAXPATHLEN];
 extern unsigned int curr_dir_len;
 extern unsigned int module_dirlen;
@@ -1554,12 +1557,24 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 			open_path = line;
 		} else
 			open_path = fname;
-        
+
+		/* Confine the open to the module root.  The ownership walk on its own
+		 * is not enough for a peer-driven merge file: a non-chrooted daemon
+		 * writes --backup-dir entries as root, so a raced backup symlink is
+		 * ROOT-owned -- exactly what open_no_attacker_symlinks() treats as
+		 * trusted -- and naming it in a dir-merge rule would read an
+		 * out-of-module file in as filter rules (their text comes back to the
+		 * peer in "Unknown filter rule" errors).
+		 *
+		 * The daemon's own "filter"/"include from"/"exclude from" parameters
+		 * are exempt: those are operator-configured and legitimately live
+		 * outside the module (/etc/rsync/excludes and the like). */
 		int save_opr = operator_path_resolve;
-		operator_path_resolve = 1;
+		if (!daemon_config_filter_file)
+			operator_path_resolve = 1;
 		fd = open_no_attacker_symlinks(open_path, O_RDONLY, 0);
 		operator_path_resolve = save_opr;
-		
+
 		if (fd < 0)
 			fp = NULL;
 		else if (!(fp = fdopen(fd, "rb")))
