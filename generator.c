@@ -1198,8 +1198,10 @@ got_nothing_for_ya:
 }
 
 /* This is only called for non-regular files.  We return -2 if we've finished
- * handling the file, or -1 if no dest-linking occurred, or a non-negative
- * value if we found an alternate basis file. */
+ * handling the file, -3 if we matched one but the destination refused to
+ * hard-link it (the caller creates it instead, and must not report it again),
+ * or -1 if no dest-linking occurred, or a non-negative value if we found an
+ * alternate basis file. */
 static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 			 char *cmpbuf, stat_x *sxp, int itemizing,
 			 enum logcode code)
@@ -1254,6 +1256,7 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 	}
 
 	if (match_level == 3) {
+		int cannot_hardlink = 0;
 #ifdef SUPPORT_HARD_LINKS
 		if (alt_dest_type == LINK_DEST
 #ifndef CAN_HARDLINK_SYMLINK
@@ -1264,12 +1267,29 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 #endif
 		 && !S_ISDIR(file->mode)) {
 			if (do_link_at(cmpbuf, fname) < 0) {
-				rsyserr(FERROR_XFER, errno,
-					"failed to hard-link %s with %s",
-					cmpbuf, fname);
-				return j;
-			}
-			if (preserve_hard_links && F_IS_HLINKED(file))
+				/* CAN_HARDLINK_SYMLINK/_SPECIAL answer for whatever
+				 * filesystem the build tree sat on; the destination is
+				 * free to disagree, and one host can hold both (macOS
+				 * builds on APFS, backs up to HFS+).  A refusal here is
+				 * that same answer arriving late, so fall back to a copy
+				 * as a build without the macro does -- the caller creates
+				 * the entry either way, so failing the transfer only cost
+				 * the exit status.
+				 *
+				 * Every errno, as the regular-file path next door already
+				 * does (try_dests_reg -> hard_link_one -> try_a_copy).
+				 * Picking out the "cannot" errnos is not possible anyway:
+				 * link(2) documents EPERM both for a filesystem with no
+				 * hard-link support and for an ordinary permission
+				 * refusal, and FUSE reports ENOSYS for the same thing.
+				 *
+				 * The rest report themselves: ENOSPC/EDQUOT/EROFS fail the
+				 * copy too, EMLINK and EXDEV mean it was never linkable.
+				 * EIO alone goes unremarked, deliberately -- a diagnostic
+				 * here lands in --link-dest's itemised output. */
+				cannot_hardlink = 1;
+				match_level = 2;
+			} else if (preserve_hard_links && F_IS_HLINKED(file))
 				finish_hard_link(file, fname, ndx, NULL, itemizing, code, -1);
 		} else
 #endif
@@ -1285,7 +1305,11 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 			rprintf(FCLIENT, "%s%s is uptodate\n",
 				fname, ftype == FT_DIR ? "/" : "");
 		}
-		return -2;
+		/* -2 tells the caller the entry is already up to date, which for
+		 * --link-dest means "skip it".  We could not link it, so say -3
+		 * instead: no caller claims that, and the fall-through creates the
+		 * entry -- the same place a build without the macro ends up. */
+		return cannot_hardlink ? -3 : -2;
 	}
 
 	return j;
@@ -1953,7 +1977,14 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			}
 		} else if (basis_dir[0] != NULL) {
 			int j = try_dests_non(file, fname, ndx, fnamecmpbuf, &sx, itemizing, code);
-			if (j == -2) {
+			if (j == -3) {
+				/* The destination cannot hard-link this type.  Land exactly
+				 * where a build without CAN_HARDLINK_SYMLINK lands: create
+				 * the entry, but leave the reporting to the itemisation
+				 * try_dests_non() already emitted. */
+				itemizing = 0;
+				code = FNONE;
+			} else if (j == -2) {
 #ifndef CAN_HARDLINK_SYMLINK
 				if (alt_dest_type == LINK_DEST) {
 					/* Resort to --copy-dest behavior. */
@@ -2032,7 +2063,12 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			}
 		} else if (basis_dir[0] != NULL) {
 			int j = try_dests_non(file, fname, ndx, fnamecmpbuf, &sx, itemizing, code);
-			if (j == -2) {
+			if (j == -3) {
+				/* As above: a destination that cannot hard-link this type
+				 * behaves like a build without CAN_HARDLINK_SPECIAL. */
+				itemizing = 0;
+				code = FNONE;
+			} else if (j == -2) {
 #ifndef CAN_HARDLINK_SPECIAL
 				if (alt_dest_type == LINK_DEST) {
 					/* Resort to --copy-dest behavior. */

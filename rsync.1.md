@@ -2926,6 +2926,23 @@ sign) if you want the local shell to expand it.
     attributes updated.  If a match is not found, a basis file from one of the
     _DIRs_ will be selected to try to speed up the transfer.
 
+    Not every filesystem can hard-link a symlink, a device node, a FIFO or a
+    socket, and the destination need not agree with the one rsync was built on
+    -- macOS builds on APFS, which can, and may write to HFS+, which cannot.
+    Where the destination refuses to link such an entry, it is copied instead
+    and the transfer carries on, so only that entry loses the space saving.
+    This applies to any refusal, because the error alone does not identify one:
+    link(2) reports `EPERM` both for a filesystem without hard links and for an
+    ordinary permission refusal.  Regular files have always behaved this way.
+
+    One case is not covered.  With [`--hard-links`](#opt) (`-H`), a group of
+    such entries hard-linked to *each other* in the source needs a second link,
+    from the first member to the rest, inside the destination itself.  Where
+    that link is refused too -- a destination that cannot hard-link the type at
+    all -- the members after the first are not created and the transfer fails.
+    A `--link-dest` on another filesystem is fine: only the link to _DIR_ is
+    impossible there, and the ones within the destination still succeed.
+
     This option works best when copying into an empty destination hierarchy, as
     existing files may get their attributes tweaked, and that can affect
     alternate destination files via hard-links.  Also, itemizing of changes can
