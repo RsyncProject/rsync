@@ -195,12 +195,15 @@ char *get_backup_name(const char *fname)
 	if (backup_dir) {
 		static int initialized = 0;
 		if (!initialized) {
+			char dirbuf[MAXPATHLEN];
 			int ret;
+			if (strlcpy(dirbuf, backup_dir_buf, sizeof dirbuf) >= sizeof dirbuf) {
+				errno = ENAMETOOLONG;
+				return NULL;
+			}
 			if (backup_dir_len > 1)
-				backup_dir_buf[backup_dir_len-1] = '\0';
-			ret = make_path(backup_dir_buf, 0);
-			if (backup_dir_len > 1)
-				backup_dir_buf[backup_dir_len-1] = '/';
+				dirbuf[backup_dir_len-1] = '\0';
+			ret = make_path(dirbuf, 0);
 			if (ret < 0)
 				return NULL;
 			initialized = 1;
