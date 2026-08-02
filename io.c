@@ -102,6 +102,11 @@ static struct {
 static time_t last_io_in;
 static time_t last_io_out;
 
+/* Absolute wall-clock bound for peer-controlled daemon handshake reads.
+ * This is deliberately separate from io_timeout: the latter is an idle
+ * transfer timeout and may be supplied by the module or client. */
+static time_t daemon_handshake_deadline;
+
 static int write_batch_monitor_in = -1;
 static int write_batch_monitor_out = -1;
 
@@ -113,6 +118,29 @@ static xbuf ff_xb = EMPTY_XBUF;
 static xbuf iconv_buf = EMPTY_XBUF;
 #endif
 static int select_timeout = SELECT_TIMEOUT;
+
+static int handshake_select_timeout(void)
+{
+	time_t now, left;
+	int timeout = select_timeout;
+
+	if (timeout <= 0 || timeout > SELECT_TIMEOUT)
+		timeout = SELECT_TIMEOUT;
+
+	if (!daemon_handshake_deadline)
+		return timeout;
+
+	now = time(NULL);
+	left = daemon_handshake_deadline - now;
+	if (left <= 0) {
+		rprintf(FERROR, "[%s] daemon handshake timeout -- exiting\n", who_am_i());
+		exit_cleanup(RERR_TIMEOUT);
+	}
+	if (left < timeout)
+		timeout = (int)left;
+	return timeout;
+}
+
 static int active_filecnt = 0;
 static OFF_T active_bytecnt = 0;
 static int first_message = 1;
@@ -251,12 +279,12 @@ static size_t safe_read(int fd, char *buf, size_t len)
 		FD_SET(fd, &r_fds);
 		FD_ZERO(&e_fds);
 		FD_SET(fd, &e_fds);
-		tv.tv_sec = select_timeout;
+		tv.tv_sec = handshake_select_timeout();
 		tv.tv_usec = 0;
 
-		cnt = select(fd+1, &r_fds, NULL, &e_fds, &tv);
+		cnt = select(fd + 1, &r_fds, NULL, &e_fds, &tv);
 		if (cnt <= 0) {
-			if (cnt < 0 && errno == EBADF) {
+			if (cnt < 0 && errno != EINTR && errno != EAGAIN) {
 				rsyserr(FERROR, errno, "safe_read select failed");
 				exit_cleanup(RERR_FILEIO);
 			}
@@ -1173,6 +1201,14 @@ void set_io_timeout(int secs)
 
 	if (read_batch)
 		allowed_lull = 0;
+}
+
+void set_daemon_handshake_timeout(int secs)
+{
+	if (secs > 0)
+		daemon_handshake_deadline = time(NULL) + secs;
+	else
+		daemon_handshake_deadline = 0;
 }
 
 static void check_for_d_option_error(const char *msg)
