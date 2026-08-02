@@ -910,9 +910,54 @@ void option_error(void)
 }
 
 
+/* Does this row store a compile-time constant, and if so which?
+ *
+ * popt's `val` is not comparable across argInfo kinds.  For POPT_ARG_VAL it IS
+ * the value stored in `arg`; for the others a nonzero `val` is an action code
+ * handed to the parser's switch, and POPT_ARG_NONE with a destination stores 1
+ * regardless.  Comparing the raw field therefore misses aliases spelled with
+ * different table shapes -- --del is POPT_ARG_NONE/&delete_during/0 and
+ * --delete-during is POPT_ARG_VAL/&delete_during/1, and both set it to 1. */
+static int refuse_const_assign(const struct poptOption *op, int *valp)
+{
+	if (!op->arg)
+		return 0;
+	if (op->argInfo == POPT_ARG_VAL) {
+		*valp = op->val;
+		return 1;
+	}
+	/* A nonzero val here means the row ALSO runs a parser action, so it is
+	 * not merely an assignment and must not be folded in with one. */
+	if (op->argInfo == POPT_ARG_NONE && op->val == 0) {
+		*valp = 1;
+		return 1;
+	}
+	return 0;
+}
+
+/* Do two table rows name the same capability?  An exact refuse rule names a
+ * capability, not one spelling of it. */
+static int same_refuse_action(const struct poptOption *a, const struct poptOption *b)
+{
+	int a_val, b_val;
+
+	/* Constant assignments: same destination, same resulting value.  The
+	 * value check keeps opposite switches such as --foo and --no-foo apart,
+	 * since they differ only in what they store. */
+	if (refuse_const_assign(a, &a_val) && refuse_const_assign(b, &b_val))
+		return a->arg == b->arg && a_val == b_val;
+
+	/* Anything else has to match as a table entry: a row storing a runtime
+	 * value (POPT_ARG_INT, POPT_ARG_STRING) needs the same destination and
+	 * action code, and an action-only row the same nonzero code. */
+	if (a->argInfo != b->argInfo || a->val != b->val)
+		return 0;
+	return a->arg ? a->arg == b->arg : !b->arg && a->val != 0;
+}
+
 static void parse_one_refuse_match(int negated, const char *ref, const struct poptOption *list_end)
 {
-	struct poptOption *op;
+	struct poptOption *op, *matched_op = NULL;
 	char shortName[2];
 	int is_wild = strpbrk(ref, "*?[") != NULL;
 	int found_match = 0;
@@ -933,8 +978,21 @@ static void parse_one_refuse_match(int negated, const char *ref, const struct po
 			else if (!is_wild)
 				op->descrip = negated ? "a=" : "r=";
 			found_match = 1;
-			if (!is_wild)
+			if (!is_wild) {
+				matched_op = op;
 				break;
+			}
+		}
+	}
+
+	if (matched_op) {
+		for (op = long_options; op != list_end; op++) {
+			if (op == matched_op || !same_refuse_action(op, matched_op))
+				continue;
+			if (op->descrip[1] == '*')
+				op->descrip = negated ? "a*" : "r*";
+			else
+				op->descrip = negated ? "a=" : "r=";
 		}
 	}
 
