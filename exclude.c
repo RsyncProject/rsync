@@ -41,7 +41,6 @@ extern int sanitize_paths;
 extern int protocol_version;
 extern int trust_sender_args;
 extern int module_id;
-extern int operator_path_resolve;
 
 /* Set while the daemon loads its own filter parameters; see parse_filter_file(). */
 int daemon_config_filter_file = 0;
@@ -1663,7 +1662,18 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 			open_path = line;
 		} else
 			open_path = fname;
-		fd = vfs_open_owner_walk(open_path, O_RDONLY, 0, 0);
+		/* Confine the open to the module root.  The ownership walk on its own
+		 * is not enough for a peer-driven merge file: a non-chrooted daemon
+		 * writes --backup-dir entries as root, so a raced backup symlink is
+		 * ROOT-owned -- exactly what the ownership walk treats as trusted --
+		 * and naming it in a dir-merge rule would read an out-of-module file
+		 * in as filter rules (their text comes back to the peer in "Unknown
+		 * filter rule" errors).
+		 *
+		 * The daemon's own "filter"/"include from"/"exclude from" parameters
+		 * are exempt: those are operator-configured and legitimately live
+		 * outside the module (/etc/rsync/excludes and the like). */
+		fd = vfs_open_owner_walk(open_path, O_RDONLY, 0, !daemon_config_filter_file);
 		if (fd < 0)
 			fp = NULL;
 		else if (!(fp = fdopen(fd, "rb")))

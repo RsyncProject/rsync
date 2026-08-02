@@ -89,8 +89,8 @@ int main(int argc, char **argv)
 	const char *moddir;
 
 # if !defined(HAVE_MKNODAT) && !defined(TEST_SYMLINK_PLACEHOLDER)
-	/* Nothing left to assert: the do_mknod_at() checks need mknodat(), and
-	 * the do_symlink_at() ones are not compiled here.  Skip rather than
+	/* Nothing left to assert: the vfs_mknod() checks need mknodat(), and
+	 * the vfs_symlink() ones are not compiled here.  Skip rather than
 	 * pass vacuously. */
 	(void)argc; (void)argv;
 	fprintf(stderr, "SKIP: no mknodat() and no symlink placeholders -- "
@@ -141,11 +141,17 @@ int main(int argc, char **argv)
 	check_preserved("vfs_symlink slashed", "../outside/secret_sym2", "VICTIM_SYM2");
 #endif
 
+# ifdef HAVE_MKNODAT
+	/* Without mknodat() the secure vfs_mknod() IS the plain mknod(): the
+	 * confinement is compiled out by design (SECURITY.md), so these would
+	 * assert a property the build deliberately does not have.  The
+	 * vfs_symlink() checks above do not depend on it and still run. */
 	vfs_mknod(VFS_AT_FDCWD, "nodpath", S_IFCHR | 0600, 0, 0);
 	check_preserved("vfs_mknod bare", "../outside/secret_nod", "VICTIM_NOD");
 
 	vfs_mknod(VFS_AT_FDCWD, "sub/nodpath2", S_IFCHR | 0600, 0, 0);
 	check_preserved("vfs_mknod slashed", "../outside/secret_nod2", "VICTIM_NOD2");
+# endif
 
 	if (errs)
 		fprintf(stderr, "%d failure(s)\n", errs);

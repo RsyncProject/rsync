@@ -130,6 +130,7 @@ int vfs_relpath_active(void);
 int vfs_symlink_optout_allowed(void);
 int vfs_resolve_open(const char *basedir, const char *relpath, int flags, mode_t mode);
 int vfs_resolve_open_at(int anchor_fd, const char *relpath, int flags, mode_t mode);
+int vfs_resolve_open_at_beneath(int anchor_fd, const char *relpath, int flags, mode_t mode);
 
 /* STRICT_CONFINEMENT enforcement (vfs/secure_open.c): a build-time-gated CI
  * harness that turns a confined-regime raw path metadata op into a hard failure.

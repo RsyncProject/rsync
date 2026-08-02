@@ -111,7 +111,7 @@ static void check_beneath_dotdot(void)
 		return;
 	}
 
-	fd = secure_relative_open_at_beneath(anchor, "alias/../subdir",
+	fd = vfs_resolve_open_at_beneath(anchor, "alias/../subdir",
 					     O_RDONLY | O_DIRECTORY, 0);
 	if (fd < 0 || fstat(fd, &fst) < 0 || fst.st_dev != ast.st_dev
 	 || fst.st_ino == ast.st_ino) {
@@ -138,7 +138,7 @@ static void check_beneath_dotdot(void)
 		for (ci = 0; ci < sizeof dotdot_cases / sizeof *dotdot_cases; ci++) {
 			int dfd;
 			errno = 0;
-			dfd = secure_relative_open_at_beneath(anchor, "..",
+			dfd = vfs_resolve_open_at_beneath(anchor, "..",
 							      dotdot_cases[ci].flags, 0);
 			if (dfd >= 0) {
 				STRUCT_STAT dst;
@@ -159,7 +159,7 @@ static void check_beneath_dotdot(void)
 	}
 
 	errno = 0;
-	fd = secure_relative_open_at_beneath(anchor, "../outside",
+	fd = vfs_resolve_open_at_beneath(anchor, "../outside",
 					     O_RDONLY | O_DIRECTORY, 0);
 	if (fd >= 0 || errno != ELOOP) {
 		fprintf(stderr, "FAIL [beneath escape]: rc=%d errno=%d, expected -1/ELOOP\n",

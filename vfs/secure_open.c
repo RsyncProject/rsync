@@ -169,6 +169,25 @@ static int secure_walk_at(int anchor_fd, const char *anchor_abspath,
 		int is_last = (size_t)(part - path_copy) == last_off;
 		saw_component = 1;
 
+		/* A literal "." or ".." is a movement, not a name to open.  It must go
+		 * through ds_descend(), which refuses to pop above the anchor, BEFORE
+		 * the leaf fast paths below -- those openat() the component directly,
+		 * so a final ".." would otherwise hand back the anchor's own parent
+		 * (with O_NOFOLLOW) or open it transiently (without O_DIRECTORY). */
+		if (part[0] == '.'
+		 && (part[1] == '\0' || (part[1] == '.' && part[2] == '\0'))) {
+			if (ds_descend(&ds, part, hops) < 0)
+				goto cleanup;
+			if (is_last) {
+				if (flags & O_DIRECTORY)
+					retfd = ds_take(&ds);
+				else
+					errno = EISDIR;
+				goto cleanup;
+			}
+			continue;
+		}
+
 		/* File leaf (final component, caller did not ask for O_DIRECTORY):
 		 * never follow a symlink leaf. */
 		if (is_last && !(flags & O_DIRECTORY)) {
@@ -368,18 +387,16 @@ int vfs_resolve_open(const char *basedir, const char *relpath, int flags, mode_t
 #endif // O_NOFOLLOW, O_DIRECTORY
 }
 
-/* Like vfs_resolve_open() but anchored at an already-open directory fd
- * (borrowed -- the caller keeps ownership) rather than a basedir path.  Lets a
- * caller pin the trust root once -- e.g. a daemon's module root opened while
- * still privileged, or reached by climbing ".." up from the cwd -- and resolve a
- * relative path beneath it without re-walking (and re-permission-checking) the
- * absolute path as a dropped-privilege uid.  `relpath` must be relative and must
- * not contain a literal ".." component (a ".." inside a followed in-tree symlink
- * target is still handled by the walk). */
-int vfs_resolve_open_at(int anchor_fd, const char *relpath, int flags, mode_t mode)
+/* Common fd-anchored resolver.  A caller may explicitly allow literal ".."
+ * components when the fd itself is the confinement boundary: secure_walk_at()
+ * resolves each one by popping its held-dirfd stack and refuses a pop above the
+ * anchor.  Other callers retain the front-door validation used by
+ * vfs_resolve_open(). */
+static int vfs__resolve_open_at_internal(int anchor_fd, const char *relpath,
+					 int flags, mode_t mode, int allow_dotdot)
 {
 #if !defined(O_NOFOLLOW) || !defined(O_DIRECTORY) || !defined(AT_FDCWD)
-	(void)anchor_fd; (void)relpath; (void)flags; (void)mode;
+	(void)anchor_fd; (void)relpath; (void)flags; (void)mode; (void)allow_dotdot;
 	errno = ENOSYS;
 	return -1;
 #else
@@ -388,7 +405,7 @@ int vfs_resolve_open_at(int anchor_fd, const char *relpath, int flags, mode_t mo
 		errno = EINVAL;
 		return -1;
 	}
-	if (path_has_dotdot_component(relpath)) {
+	if (!allow_dotdot && path_has_dotdot_component(relpath)) {
 		errno = EINVAL;
 		return -1;
 	}
@@ -401,6 +418,27 @@ int vfs_resolve_open_at(int anchor_fd, const char *relpath, int flags, mode_t mo
 	 * exclude-aware refusal is a no-op for this entry point. */
 	return secure_walk_at(anchor_fd, NULL, relpath, flags, mode, &hops);
 #endif
+}
+
+/* Like vfs_resolve_open() but anchored at an already-open directory fd
+ * (borrowed -- the caller keeps ownership) rather than a basedir path.  Lets a
+ * caller pin the trust root once -- e.g. a daemon's module root opened while
+ * still privileged -- and resolve a relative path beneath it without re-walking
+ * the absolute path as a dropped-privilege uid.  The ordinary entry point keeps
+ * rejecting literal ".." components as suspicious caller input. */
+int vfs_resolve_open_at(int anchor_fd, const char *relpath, int flags, mode_t mode)
+{
+	return vfs__resolve_open_at_internal(anchor_fd, relpath, flags, mode, 0);
+}
+
+/* Resolve a path that may contain literal ".." beneath a trusted anchor fd.
+ * Used for a followed symlink target, where parent-relative components are
+ * normal pathname semantics.  The held-fd stack still refuses every escape
+ * above anchor_fd. */
+int vfs_resolve_open_at_beneath(int anchor_fd, const char *relpath,
+				int flags, mode_t mode)
+{
+	return vfs__resolve_open_at_internal(anchor_fd, relpath, flags, mode, 1);
 }
 
 /* Resolve ONE operand of a two-path op (rename/link) to a parent dirfd + leaf,

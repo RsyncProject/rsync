@@ -125,8 +125,19 @@ static int vfs__mknod_secure(const char *pathname, mode_t mode, dev_t dev, int f
 		dfd = vfs_owner_walk_parent(pathname, &bname, 1);
 		if (dfd < 0)
 			return -1;
-		ret = mknodat(dfd, bname, mode, dev);
-		if (ret < 0) {
+		if (am_root < 0) {
+			/* Fake-super represents a special file with an inert regular
+			 * placeholder.  Keep that representation when the destination
+			 * is an operator path, but create it relative to the verified
+			 * parent so the confinement guarantee is unchanged. */
+			int fd = openat(dfd, bname,
+				O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW,
+				S_IWUSR | S_IRUSR);
+			ret = fd < 0 ? -1 : close(fd);
+		} else {
+			ret = mknodat(dfd, bname, mode, dev);
+		}
+		if (ret < 0 && am_root >= 0) {
 			/* mknodat() can't make a FIFO/socket on the BSDs/macOS/
 			 * Solaris (EINVAL); retry race-safely on the held dirfd,
 			 * mirroring the secure-relpath path below.  Without this a
@@ -244,8 +255,10 @@ static int vfs__mknod_atfd(int dfd, const char *name, mode_t mode, dev_t dev)
 	}
 
 	/* Try mknodat first; on failure retry race-safely with the type-
-	 * specific primitive (see vfs_mknod()). */
-#ifdef HAVE_MKNOD
+	 * specific primitive (see vfs_mknod()).  HAVE_MKNODAT, not HAVE_MKNOD:
+	 * older Darwin has mknod() but not mknodat(), so keying off the former
+	 * compiles a call that then fails to link (#161). */
+#ifdef HAVE_MKNODAT
 	if (mknodat(dfd, name, mode, dev) == 0)
 		return 0;
 #endif
@@ -259,9 +272,11 @@ static int vfs__mknod_atfd(int dfd, const char *name, mode_t mode, dev_t dev)
 		errno = EOPNOTSUPP;
 		return -1;
 	}
-#ifdef HAVE_MKNOD
+#ifdef HAVE_MKNODAT
 	return -1;	/* mknodat()'s errno (regular/device node) */
 #else
+	/* Must match the guard above: reporting "mknodat()'s errno" where the
+	 * call was never compiled would return a stale errno. */
 	(void)dev;
 	errno = ENOSYS;
 	return -1;

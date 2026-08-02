@@ -27,18 +27,32 @@ static int vfs__lchown_plain(const char *path, uid_t owner, gid_t group)
 
 /* Secure receiver-side resolve: open the parent under vfs_resolve_open() and
  * fchownat(..., AT_SYMLINK_NOFOLLOW) so a parent-component symlink swap can't
- * redirect the chown outside the module.  Like vfs_chmod, lchown has no
- * ownership-walk branch (VFS_OPERATOR_PATH resolves the same as the default
- * secure walk).  Falls through to the plain lchown in non-daemon/sender,
- * chrooted, no-parent and absolute-path cases. */
+ * redirect the chown outside the module.  VFS_OPERATOR_PATH takes the ownership
+ * walk instead, as the other VFS wrappers do.  Falls through to the plain
+ * lchown in non-daemon/sender, chrooted, no-parent and absolute-path cases. */
 static int vfs__lchown_secure(const char *path, uid_t owner, gid_t group, int flags)
 {
-	(void)flags;
 #if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY && defined AT_SYMLINK_NOFOLLOW
 	char dirpath[MAXPATHLEN];
 	const char *bname, *slash;
 	int dfd, ret, e;
 	size_t dlen;
+
+	/* Operator-supplied path: without this branch the caller's
+	 * VFS_OPERATOR_PATH has no effect here and an absolute name would fall
+	 * straight through to the unconfined full-path lchown. */
+	if ((flags & VFS_OPERATOR_PATH) && path && *path) {
+		if (vfs_symlink_optout_allowed())
+			return vfs__lchown_plain(path, owner, group);
+		dfd = vfs_owner_walk_parent(path, &bname, 1);
+		if (dfd < 0)
+			return -1;
+		ret = fchownat(dfd, bname, owner, group, AT_SYMLINK_NOFOLLOW);
+		e = errno;
+		close(dfd);
+		errno = e;
+		return ret;
+	}
 
 	if (!vfs_relpath_active() || !*path || *path == '/')
 		return vfs__lchown_plain(path, owner, group);
@@ -63,6 +77,7 @@ static int vfs__lchown_secure(const char *path, uid_t owner, gid_t group, int fl
 	errno = e;
 	return ret;
 #else
+	(void)flags;
 	return vfs__lchown_plain(path, owner, group);
 #endif
 }

@@ -931,6 +931,11 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	 * include files just below, and the log file -- so they see the boundary. */
 	vfs_set_module_root(module_dir, module_dirlen, -1);
 
+	/* Everything loaded from here to the end of the exclude block is the
+	 * operator's own configuration, so it keeps the ownership walk without the
+	 * module-confinement parse_filter_file() applies to peer-driven merges. */
+	daemon_config_filter_file = 1;
+
 	p = lp_filter(module_id);
 	parse_filter_str(&daemon_filter_list, p, rule_template(FILTRULE_WORD_SPLIT),
 		XFLG_ABS_IF_SLASH | XFLG_DIR2WILD3);

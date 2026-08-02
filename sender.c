@@ -108,6 +108,28 @@ static int secure_sender_parent_fd(struct file_struct *file, const char *fname, 
 			}
 			memcpy(dir, fname, dlen);
 			dir[dlen] = '\0';
+			/* An absolute --relative name is still rooted at / after
+			 * change_pathname().  Resolving its parent through the cwd-backed
+			 * dirfd cache would re-anchor cleanup at the sender's working
+			 * directory and can remove a same-named, unrelated entry there. */
+			if (*fname == '/') {
+				const char *rel = dir;
+#ifdef __CYGWIN__
+				/* clean_fname() keeps exactly two leading slashes here,
+				 * because //server/share is a separate UNC namespace.
+				 * Stripping them and anchoring at "/" would resolve a
+				 * different object entirely, so decline (errno 0) and let
+				 * the caller fall back to the path-based cleanup. */
+				if (fname[1] == '/' && fname[2] != '/') {
+					errno = 0;
+					return -1;
+				}
+#endif
+				while (*rel == '/')
+					rel++;
+				return vfs_resolve_open("/", rel,
+					O_RDONLY | O_DIRECTORY, 0);
+			}
 			/* vfs_path_dirfd returns a cache-OWNED fd; the caller closes
 			 * what we return, so hand back an owned dup and leave the cache's
 			 * dirfd intact.  An uncacheable (very deep) dir declines with
@@ -173,12 +195,12 @@ static int secure_sender_parent_fd(struct file_struct *file, const char *fname, 
 #endif
 }
 
-/* Go through the do_*() wrapper rather than a raw unlinkat(): it carries the
- * dry_run no-op and the read-only/list-only refusal that do_unlink() applies
- * on the non-fd path, plus the missing-AT_FDCWD fallback. */
+/* Go through the VFS wrapper rather than a raw unlinkat(): it carries the
+ * dry_run no-op and the read-only/list-only refusal that the plain unlink path
+ * applies, plus the missing-AT_FDCWD fallback. */
 static int secure_remove_source_file(int dfd, const char *bname)
 {
-	return do_unlink_atfd(dfd, bname, 0);
+	return vfs_unlink(dfd, bname, 0);
 }
 
 /* Open `relpath` (relative to `anchor`: NULL=cwd, else an absolute trusted root)
@@ -265,7 +287,17 @@ static int sender_open_copylinks_confined(const char *anchor, const char *relpat
 			dir[0] = '\0';
 			bname = cur;
 		}
-		if ((pdfd = vfs_resolve_open(anchor, dir, O_RDONLY | O_DIRECTORY, 0)) < 0)
+		/* anchor is checked explicitly: the resolver treats a NULL anchor as
+		 * "relative to cwd", so it is a legal argument for the else branch --
+		 * only this branch would hand it to strcmp(). */
+		if (am_daemon && module_dirfd >= 0 && module_dir && anchor
+		 && strcmp(anchor, module_dir) == 0)
+			pdfd = vfs_resolve_open_at_beneath(module_dirfd, dir,
+					O_RDONLY | O_DIRECTORY, 0);
+		else
+			pdfd = vfs_resolve_open(anchor, dir,
+					O_RDONLY | O_DIRECTORY, 0);
+		if (pdfd < 0)
 			return -1;
 		n = vfs_readlink_atfd(pdfd, bname, tgt, sizeof tgt - 1);
 		e = errno;

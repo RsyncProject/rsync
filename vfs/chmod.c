@@ -74,20 +74,30 @@ static int vfs__chmod_plain(const char *path, mode_t mode)
  * attacker swapping the leaf to a symlink that fchmodat(...,0) would follow out
  * of the tree).
  *
- * Never follows the leaf: a regular file, dir or FIFO is pinned via
+ * Never follows the leaf: a regular file or dir is pinned via
  * openat(O_NOFOLLOW) and chmod'd with fchmod() (leaf-safe, every kernel, and
  * fakeroot-wrappable unlike the raw fchmodat2() syscall); a symlink leaf is
- * refused (ELOOP).  Other types or an open failure fall to
- * fchmodat(AT_SYMLINK_NOFOLLOW) (a real no-follow chmod on glibc>=2.32 /
- * Linux>=6.6), then the raw fchmodat2() syscall.  If no no-follow primitive
- * exists we skip with a warning rather than follow the leaf. */
+ * refused (ELOOP, or EMLINK/EFTYPE on the BSDs).  Other types or an open
+ * failure fall to fchmodat(AT_SYMLINK_NOFOLLOW) (a real no-follow chmod on
+ * glibc>=2.32 / Linux>=6.6), then the raw fchmodat2() syscall.  If no
+ * no-follow primitive exists we skip with a warning rather than follow the
+ * leaf.
+ *
+ * A FIFO takes the fd path on Linux and the pathname path elsewhere -- see the
+ * S_ISFIFO arm below for why, and for what that costs.  Note the type used to
+ * choose between them comes from the lstat above, so a leaf swapped between
+ * that and the open is classified by what it WAS: an observed regular file or
+ * dir that becomes a FIFO is still opened.  O_NOFOLLOW rejects symlinks, not
+ * type changes.  Constraining the open to the observed type would close that;
+ * it is not done here. */
 static int do_fchmodat_nofollow(int dfd, const char *name, mode_t mode)
 {
 #if defined AT_FDCWD && defined AT_SYMLINK_NOFOLLOW
 	mode &= CHMOD_BITS;
-# if defined __linux__
+# ifdef O_NOFOLLOW
 	{
 		STRUCT_STAT st;
+		int oflags = O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_NOCTTY;
 		if (vfs_lstat(dfd, name, &st, 0) < 0)
 			return -1;
 		if (S_ISLNK(st.st_mode)) {
@@ -95,18 +105,72 @@ static int do_fchmodat_nofollow(int dfd, const char *name, mode_t mode)
 			return -1;
 		}
 		if (S_ISREG(st.st_mode) || S_ISDIR(st.st_mode) || S_ISFIFO(st.st_mode)) {
-			int fd = openat(dfd, name, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_NOCTTY | O_CLOEXEC);
+			int fd;
+#  ifndef __linux__
+			/* Never open a FIFO here.  Opening one -- even O_NONBLOCK --
+			 * makes this process a reader for as long as the descriptor
+			 * lives, which wakes a writer blocked in open(O_WRONLY) and
+			 * can cost it a SIGPIPE or the bytes it writes before we
+			 * close.  The pathname call reaches the same end state
+			 * without that: it succeeds outright when the mode is
+			 * grantable, and when macOS refuses an ungrantable setgid
+			 * with EPERM (having applied nothing), asking again without
+			 * that bit gives exactly what fchmod() would have -- it drops
+			 * the bit it cannot grant and applies the ordinary ones.
+			 * Measured on macOS: fchmodat(2750) EPERM leaving 0600,
+			 * fchmodat(0750) ok giving 0750, for a FIFO and a directory
+			 * alike.
+			 *
+			 * This is a pathname call, so unlike the descriptor path it
+			 * does not pin the inode; a leaf swapped for another object
+			 * of the same name is chmod'd instead.  AT_SYMLINK_NOFOLLOW
+			 * still keeps it off a symlink's target.  That trade buys
+			 * away the reader hazard, and only for FIFOs.
+			 *
+			 * Only S_ISGID is retried.  An ungrantable S_ISUID would
+			 * still fail where fchmod() would have cleared it, but
+			 * setuid is meaningless on a FIFO and the behaviour is
+			 * undemonstrated, so it is not coded for.
+			 *
+			 * Linux keeps the fd-first order it has always had. */
+			if (S_ISFIFO(st.st_mode)) {
+				if (fchmodat(dfd, name, mode, AT_SYMLINK_NOFOLLOW) == 0)
+					return 0;
+				if (errno == EPERM && (mode & S_ISGID)
+				 && fchmodat(dfd, name, mode & ~S_ISGID,
+					     AT_SYMLINK_NOFOLLOW) == 0)
+					return 0;
+				return -1;
+			}
+#  endif
+#  ifdef O_CLOEXEC
+			oflags |= O_CLOEXEC;
+#  endif
+			fd = openat(dfd, name, oflags);
 			if (fd >= 0) {
 				int r = fchmod(fd, mode), e = errno;
 				close(fd);
 				errno = e;
 				return r;
 			}
-			if (errno == ELOOP)
+			/* A leaf swapped for a symlink between the lstat above and
+			 * this open: refuse rather than fall through.  The errno is
+			 * not the same everywhere -- Linux/Solaris ELOOP, FreeBSD
+			 * EMLINK, NetBSD EFTYPE. */
+			if (errno == ELOOP
+#  ifdef EMLINK
+			    || errno == EMLINK
+#  endif
+#  ifdef EFTYPE
+			    || errno == EFTYPE
+#  endif
+			   )
 				return -1;	/* raced to a symlink: refuse */
 			/* otherwise (e.g. EACCES on an unreadable file) fall through */
 		}
 	}
+# endif
+# if defined __linux__
 	{
 		int r = fchmodat(dfd, name, mode, AT_SYMLINK_NOFOLLOW);
 		if (r == 0)
@@ -166,7 +230,6 @@ static int do_fchmodat_nofollow(int dfd, const char *name, mode_t mode)
 */
 static int vfs__chmod_secure(const char *fname, mode_t mode, int flags)
 {
-	(void)flags;	/* chmod has no ownership-walk branch (like vfs_lchown) */
 #ifdef AT_FDCWD
 	char dirpath[MAXPATHLEN];
 	const char *bname;
@@ -176,6 +239,26 @@ static int vfs__chmod_secure(const char *fname, mode_t mode, int flags)
 
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
+
+#if defined O_NOFOLLOW && defined O_DIRECTORY
+	/* Operator-supplied path: resolve the parent via the ownership walk, as
+	 * the other VFS wrappers do.  Without this the caller's VFS_OPERATOR_PATH
+	 * has no effect here, and an absolute name would fall straight through to
+	 * the unconfined full-path chmod.  S_ISLNK(mode) still needs the plain
+	 * lchmod()/setattrlist() handling. */
+	if ((flags & VFS_OPERATOR_PATH) && fname && *fname && !S_ISLNK(mode)) {
+		if (vfs_symlink_optout_allowed())
+			return vfs__chmod_plain(fname, mode);
+		dfd = vfs_owner_walk_parent(fname, &bname, 1);
+		if (dfd < 0)
+			return -1;
+		ret = do_fchmodat_nofollow(dfd, bname, mode);
+		e = errno;
+		close(dfd);
+		errno = e;
+		return ret;
+	}
+#endif
 
 	/* Only the daemon-without-chroot case is exposed to the symlink-
 	 * race attack: a chroot already confines the receiver, and a
@@ -212,6 +295,7 @@ static int vfs__chmod_secure(const char *fname, mode_t mode, int flags)
 	errno = e;
 	return ret;
 #else
+	(void)flags;
 	return vfs__chmod_plain(fname, mode);
 #endif
 }

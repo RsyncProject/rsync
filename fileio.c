@@ -76,17 +76,17 @@ int sparse_end(int f, OFF_T size, int updating_basis_or_equiv)
  * the current file position is in the file. The use_seek arg tells
  * us that we should seek over matching data instead of writing it. */
 /* Flush any deferred run of zero bytes as a hole, advancing the file
- * position past it (both do_lseek() and do_punch_hole() move the offset). */
+ * position past it (both vfs_lseek() and vfs_punch_hole() move the offset). */
 static int flush_sparse_hole(int f)
 {
 	if (!sparse_seek)
 		return 0;
 	if (sparse_past_write >= preallocated_len) {
-		if (do_lseek(f, sparse_seek, SEEK_CUR) < 0) {
+		if (vfs_lseek(f, sparse_seek, SEEK_CUR) < 0) {
 			sparse_seek = 0;
 			return -1;
 		}
-	} else if (do_punch_hole(f, sparse_past_write, sparse_seek) < 0) {
+	} else if (vfs_punch_hole(f, sparse_past_write, sparse_seek) < 0) {
 		sparse_seek = 0;
 		return -1;
 	}
@@ -119,7 +119,7 @@ static int emit_sparse_span(int f, int use_seek, const char *buf, int len)
 	if (flush_sparse_hole(f) < 0)
 		return -1;
 	if (use_seek)
-		return do_lseek(f, len, SEEK_CUR) < 0 ? -1 : 0;
+		return vfs_lseek(f, len, SEEK_CUR) < 0 ? -1 : 0;
 	return full_sparse_write(f, buf, len);
 }
 
@@ -137,13 +137,23 @@ static int write_sparse(int f, int use_seek, OFF_T offset, const char *buf, int 
 	if (l1 == len)
 		return len;
 
-	if (sparse_seek) {
-		if (sparse_past_write >= preallocated_len) {
-			if (vfs_lseek(f, sparse_seek, SEEK_CUR) < 0)
-				return -1;
-		} else if (vfs_punch_hole(f, sparse_past_write, sparse_seek) < 0) {
-			sparse_seek = 0;
-			return -1;
+	/* Scan the middle [l1, len-l2) for interior runs of zeros that are at
+	 * least SPARSE_WRITE_SIZE long (the hole granularity rsync has always
+	 * used) and defer those as holes.  Everything in between -- which may
+	 * include shorter zero runs not worth a hole -- is emitted in one go,
+	 * rather than being chopped into SPARSE_WRITE_SIZE-byte pieces, which
+	 * made copying a large non-sparse file cost ~one write() per KiB.
+	 *
+	 * The matched (use_seek) case runs through the same scan: its interior
+	 * zero runs still have to be punched out, which is what --inplace
+	 * --sparse relies on to keep a hole-y basis file sparse. */
+	start = l1;
+	end = len - l2;
+	for (i = l1; i < end; ) {
+		int z;
+		if (buf[i] != 0) {
+			i++;
+			continue;
 		}
 		for (z = 1; i + z < end && buf[i+z] == 0; z++) {}
 		if (z < SPARSE_WRITE_SIZE) {
@@ -166,25 +176,6 @@ static int write_sparse(int f, int use_seek, OFF_T offset, const char *buf, int 
 
 	sparse_seek = l2;
 	sparse_past_write = offset + len - l2;
-
-	if (use_seek) {
-		/* The in-place data already matches. */
-		if (vfs_lseek(f, len - (l1+l2), SEEK_CUR) < 0)
-			return -1;
-		return len;
-	}
-
-	while ((ret = write(f, buf + l1, len - (l1+l2))) <= 0) {
-		if (ret < 0 && errno == EINTR)
-			continue;
-		sparse_seek = 0;
-		return ret;
-	}
-
-	if (ret != (int)(len - (l1+l2))) {
-		sparse_seek = 0;
-		return l1+ret;
-	}
 
 	return len;
 }

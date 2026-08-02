@@ -187,13 +187,8 @@ static int secure_basis_open(const char *basedir, const char *relpath, int flags
  * must not downgrade an operator-path open to the ordinary path resolver. */
 static int secure_recv_open(const char *path, int flags, mode_t mode, int owner_walk)
 {
-	int fd, save = operator_path_resolve;
-
-	if (owner_walk)
-		operator_path_resolve = 1;
-	fd = secure_basis_open(NULL, path, flags, mode);
-	operator_path_resolve = save;
-	return fd;
+	return secure_basis_open(NULL, path, flags, mode,
+				 owner_walk ? VFS_OPERATOR_PATH : 0);
 }
 
 /* Open a read-only regular file for an in-place update without leaving its
@@ -215,7 +210,7 @@ static int open_readonly_inplace(const char *fname, int one_inplace)
 		cfd = secure_recv_open(fname, O_RDONLY|O_NOFOLLOW, 0, one_inplace);
 		if (cfd < 0)
 			goto failed;
-		if (do_fstat(cfd, &cst) < 0 || !S_ISREG(cst.st_mode)) {
+		if (vfs_fstat(cfd, &cst) < 0 || !S_ISREG(cst.st_mode)) {
 			errno = EACCES;	/* refused: not the read-only regular file we recover */
 			goto failed;
 		}
@@ -251,10 +246,10 @@ static int open_readonly_inplace(const char *fname, int one_inplace)
 
 	/* Local and chrooted transfers retain the existing pathname semantics.
 	 * Note the S_ISREG test here is a type check on a stable path, NOT race
-	 * protection: do_stat() follows a leaf symlink and each call below
+	 * protection: vfs_stat() follows a leaf symlink and each call below
 	 * re-resolves the name.  The fd-based branch above is the one that
 	 * pins an inode; a chroot is what confines this one. */
-	if (do_stat(fname, &cst) < 0) {
+	if (vfs_stat(VFS_AT_FDCWD, fname, &cst, VFS_ALLOW_SYMLINK) < 0) {
 		errno = EACCES;
 		return -1;
 	}
@@ -263,11 +258,11 @@ static int open_readonly_inplace(const char *fname, int one_inplace)
 		return -1;
 	}
 	prior_mode = cst.st_mode & CHMOD_BITS;
-	if (do_chmod_at(fname, prior_mode | S_IWUSR) < 0)
+	if (vfs_chmod(VFS_AT_FDCWD, fname, prior_mode | S_IWUSR, 0) < 0)
 		return -1;
-	fd = do_open(fname, O_WRONLY, 0600);
+	fd = vfs_open(fname, O_WRONLY, 0600);
 	open_errno = errno;
-	if (do_chmod_at(fname, prior_mode) < 0) {
+	if (vfs_chmod(VFS_AT_FDCWD, fname, prior_mode, 0) < 0) {
 		restore_errno = errno;
 		if (fd >= 0)
 			close(fd);
@@ -1198,47 +1193,25 @@ int recv_files(int f_in, int f_out, char *local_name)
 			 * resolve it with the ownership walk (exclude-aware) so it can't be
 			 * redirected through a symlink into an excluded subtree. */
 			if (vfs_relpath_active())
-				fd2 = secure_basis_open(NULL, fnametmp, O_WRONLY|O_CREAT, 0600,
-					one_inplace ? VFS_OPERATOR_PATH : 0);
+				fd2 = secure_recv_open(fnametmp, O_WRONLY|O_CREAT, 0600,
+						      one_inplace);
 			else
 				fd2 = vfs_open(fnametmp, O_WRONLY|O_CREAT, 0600);
 #ifdef linux
 			if (fd2 == -1 && errno == EACCES) {
 				/* Maybe the error was due to protected_regular setting? */
-				if (use_secure_symlinks)
-					fd2 = vfs_resolve_open(NULL, fnametmp, O_WRONLY, 0600);
+				if (use_secure_symlinks || one_inplace)
+					fd2 = secure_recv_open(fnametmp, O_WRONLY, 0600,
+							      one_inplace);
 				else
 					fd2 = vfs_open(fnametmp, O_WRONLY, 0600);
 			}
 #endif
 			if (fd2 == -1 && errno == EACCES) {
-				/* A read-only existing file: make it writable, then retry
-				 * (its mode is restored after the transfer).  On a
-				 * non-chroot daemon fchmod() a no-follow fd rather than
-				 * chmod the path, so a symlink raced into fnametmp can't
-				 * redirect the chmod (vfs_chmod follows the final link). */
-				int errno_save = errno, chmod_ok;
-				if (use_secure_symlinks) {
-#ifdef O_NOFOLLOW
-					int cfd = vfs_resolve_open(NULL, fnametmp, O_RDONLY|O_NOFOLLOW, 0);
-					chmod_ok = cfd != -1 && fchmod(cfd, 0600) == 0;
-					if (cfd != -1)
-						close(cfd);
-#else
-					/* Without O_NOFOLLOW the resolver's oldest fallback would
-					 * follow a raced symlink, so fail closed rather than
-					 * chmod through it. */
-					chmod_ok = 0;
-#endif
-				} else
-					chmod_ok = vfs_chmod(VFS_AT_FDCWD, fnametmp, 0600, 0) == 0;
-				if (chmod_ok) {
-					if (use_secure_symlinks)
-						fd2 = vfs_resolve_open(NULL, fnametmp, O_WRONLY, 0600);
-					else
-						fd2 = vfs_open(fnametmp, O_WRONLY, 0600);
-				} else
-					errno = errno_save;
+				/* Temporarily add owner-write access only long enough to open
+				 * a writable descriptor; the helper restores the old mode
+				 * before any network data is consumed, including on failure. */
+				fd2 = open_readonly_inplace(fnametmp, one_inplace);
 			}
 			if (fd2 == -1) {
 				rsyserr(FERROR_XFER, errno, "open %s failed",
