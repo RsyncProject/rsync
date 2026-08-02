@@ -11,6 +11,11 @@ flags mirror that workflow, and the pipe-run RSYNC_EXPECT_SKIPPED list is PARSED
 from the workflow (not hardcoded). The --use-tcp run never sets an expected-skip
 list (matching the workflows), so only test FAILs matter there.
 
+The tcp pass runs only the tests that can reach the daemon transport, because it
+follows a full pipe pass over the very same build: --use-tcp is observable only
+through rsyncfns' start_test_daemon(), so a test that never calls it produces
+the same result twice. Pass --full-tcp to run the whole suite there anyway.
+
 A target may also list older "protocols" (e.g. [30, 29]) in the fleet config:
 each runs as an extra stdio-pipe pass with runtests --protocol=N (the fleet
 analogue of a workflow's check30/check29 steps), using that step's own parsed
@@ -110,6 +115,15 @@ XFAIL_GLOBS: list[str] = []
 # Set from --timing in main(). Also asks each target's runtests.py for its own
 # per-test wall-clock table, so a slow cell can be attributed to actual tests.
 TIMING = False
+
+# Set from --full-tcp in main(): run the WHOLE suite in the tcp pass rather than
+# only the tests that can observe the transport. The narrow pass is the default
+# because the tcp run follows a full pipe run over the very same build.
+FULL_TCP = False
+
+# The transports this run will execute (from --transport), needed in test_script
+# to tell "tcp after a pipe pass" from "tcp is the only pass".
+TRANSPORTS: list[str] = []
 
 # Set from --repo in main() (default: cwd). The harness builds whatever rsync
 # source tree these point at, so it must be run from inside an rsync checkout
@@ -411,7 +425,18 @@ def test_script(t: Target, transport: str, skip_csv: str | None, jobs: int,
     # which lands in the captured output: that is where a "this target is slow"
     # cell turns into "these tests are slow on this target".
     timing = " --timing" if TIMING and not only else ""
-    runtests = f'{t.python} runtests.py {rb}{tcp}{proto} -j {jobs}{timing}{names}'
+    # --use-tcp is observable only through start_test_daemon(), so when the tcp
+    # pass follows a full pipe pass over the same build, the tests that never
+    # reach it would just produce the same result twice: narrow it to the ones
+    # that can tell the difference. That reasoning depends ENTIRELY on the pipe
+    # pass having run -- under --transport tcp it is the only pass there is, and
+    # narrowing it would silently drop the other 186 tests from the run
+    # altogether. --full-tcp forces the full sweep either way.
+    narrow_tcp = (transport == "tcp" and not FULL_TCP and not only
+                  and "pipe" in TRANSPORTS)
+    only_daemon = " --daemon-tests-only" if narrow_tcp else ""
+    runtests = (f'{t.python} runtests.py {rb}{tcp}{proto} '
+                f'-j {jobs}{timing}{only_daemon}{names}')
     # env_prefix (e.g. a brew PATH) must reach the test too: some tests build a
     # helper binary on the fly (a test may invoke `make`, which needs gawk etc.),
     # so the build tools must be on PATH at test time.
@@ -1090,6 +1115,11 @@ def main() -> int:
                     "targets, then exit; run between runs, not during one "
                     "(kills are host-global)")
     ap.add_argument("--jobs", type=int, help="override -j for both transports")
+    ap.add_argument("--full-tcp", action="store_true",
+                    help="run the whole suite in the tcp pass. By default that "
+                    "pass runs only the tests that can reach the daemon "
+                    "transport, since the rest just repeat the pipe pass over "
+                    "the same build")
     ap.add_argument("--timing", action="store_true",
                     help="report per-target wall-clock (push/build/test) to find "
                     "the slowest target")
@@ -1112,10 +1142,11 @@ def main() -> int:
     ap.add_argument("--list", action="store_true", help="list targets and exit")
     args = ap.parse_args()
 
-    global SKIP_CSV, XFAIL_GLOBS, TIMING
+    global SKIP_CSV, XFAIL_GLOBS, TIMING, FULL_TCP
     SKIP_CSV = ",".join(s.strip() for s in (args.skip or "").split(",") if s.strip())
     XFAIL_GLOBS = [s.strip() for s in (args.xfail or "").split(",") if s.strip()]
     TIMING = args.timing
+    FULL_TCP = args.full_tcp
 
     global REPO, WORKFLOWS, TESTSUITE_REPO
     REPO = Path(args.repo).resolve() if args.repo else Path.cwd()
@@ -1182,6 +1213,11 @@ def main() -> int:
         return cleanup_remnants(chosen)
 
     args.transports = ["pipe", "tcp"] if args.transport == "both" else [args.transport]
+    global TRANSPORTS
+    TRANSPORTS = args.transports
+    if "tcp" in args.transports and "pipe" not in args.transports and not FULL_TCP:
+        log("note: --transport tcp is the only pass, so it runs the WHOLE suite "
+            "(the daemon-only narrowing needs a pipe pass to cover the rest)")
 
     # Give this run its own build dir on every target so concurrent runs don't
     # collide, and name it after the target too, because two targets can share

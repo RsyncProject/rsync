@@ -127,6 +127,13 @@ def parse_args():
                         "test's actual outcome is compared against its "
                         'expected one; any mismatch (including an unexpected '
                         'pass) fails the run. Used for version-mixing CI.')
+    p.add_argument('--daemon-tests-only', action='store_true',
+                   help='Run only the tests that can reach the daemon '
+                        'transport. Intended for a --use-tcp pass that follows '
+                        'a full default-transport run: the tests this drops '
+                        'never call start_test_daemon(), so they cannot observe '
+                        '--use-tcp and would just repeat themselves. Disables '
+                        'the expected-skip oracle (it describes a full run).')
     p.add_argument('--use-tcp', action='store_true',
                    help='Run daemon tests against a real rsyncd bound to '
                         '127.0.0.1 (non-default). The default is the secure '
@@ -280,6 +287,43 @@ def collect_tests(suitedir, patterns):
                         seen.add(m)
                         tests.append(m)
     return tests
+
+
+# Tokens through which a test can reach the daemon transport. --use-tcp works by
+# setting RSYNC_TEST_USE_TCP, which is read in exactly one place (rsyncfns
+# USE_TCP) and acted on in exactly one function (start_test_daemon): a test whose
+# source mentions none of these never gets there, so it behaves identically with
+# and without --use-tcp and running it a second time under TCP buys no coverage.
+#
+# The list is the closure of every rsyncfns helper that reaches USE_TCP,
+# start_rsyncd or claim_ports, plus the helper modules that open a daemon
+# connection themselves and the bare literals a test might use directly. It is
+# deliberately over-broad: a false positive only costs runtime, while a false
+# negative would silently drop real coverage.
+_DAEMON_API = (
+    'USE_TCP', 'require_tcp', 'start_test_daemon', 'start_rsyncd',
+    'claim_ports', 'claim_free_port', 'setup_chroot_inner',
+    'stdio_daemon', 'rsync_proto', 'DaemonClient',
+    'rsync://', '--daemon', 'rsyncd',
+)
+
+
+def select_daemon_tests(tests):
+    """Split `tests` into (daemon-transport tests, the rest).
+
+    Used by --daemon-tests-only so a TCP pass need not re-run the whole suite.
+    A test we cannot read is kept, not dropped -- the failure mode of this
+    filter must always be "ran too much"."""
+    keep, dropped = [], []
+    for path in tests:
+        try:
+            with open(path, errors='replace') as f:
+                text = f.read()
+        except OSError:
+            keep.append(path)
+            continue
+        (keep if any(tok in text for tok in _DAEMON_API) else dropped).append(path)
+    return keep, dropped
 
 
 _VALID_OUTCOMES = ('pass', 'skip', 'fail', 'xfail')
@@ -739,6 +783,17 @@ def main():
         if before != len(tests):
             print(f"Excluding {before - len(tests)} test(s) matching: "
                   f"{', '.join(excl)}")
+
+    # Narrow to the daemon-transport tests. The dropped count is always printed:
+    # a pass that silently ran a third of the suite would read in the report as
+    # if it had run all of it.
+    if args.daemon_tests_only:
+        tests, dropped = select_daemon_tests(tests)
+        print(f"Daemon-transport tests only: running {len(tests)}, skipping "
+              f"{len(dropped)} test(s) that cannot observe the transport")
+        # The expected-skip list describes a full run, so it cannot be enforced
+        # against a subset -- same rule as naming tests explicitly.
+        full_run = False
 
     # An expected-result manifest defines BOTH the run set (its keys) and the
     # expected per-test outcome (its values). Used for version-mixing runs.

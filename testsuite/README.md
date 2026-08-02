@@ -210,6 +210,7 @@ python3 testsuite/fleettest.py --targets NAME[,NAME]
 python3 testsuite/fleettest.py --fleet other.json --transport pipe
 python3 testsuite/fleettest.py --timing              # per-target wall-clock breakdown
 python3 testsuite/fleettest.py --keep-on-fail        # keep logs + tree where it broke
+python3 testsuite/fleettest.py --full-tcp            # whole suite in the tcp pass too
 ```
 
 `--timing` adds a per-target breakdown after the report — total wall-clock plus
@@ -218,6 +219,16 @@ run in parallel, so the whole run is gated by the slowest one; the phase columns
 show whether that target's hold-up is the push, the build, or a test pass. It
 also passes `--timing` down to each target's `runtests.py`, so the captured
 output attributes a slow pass to individual tests.
+
+The `tcp` pass runs **only the tests that can reach the daemon transport**, since
+it follows a full pipe pass over the very same build. `--use-tcp` is observable
+through exactly one path — `RSYNC_TEST_USE_TCP` is read once in `rsyncfns`
+(`USE_TCP`) and acted on once, in `start_test_daemon()` — so a test that never
+gets there produces an identical result twice. That drops 186 of the 340 tests
+and roughly a third of the pass's work; the count skipped is always printed.
+Pass `--full-tcp` to sweep the whole suite there anyway. The narrowing applies
+only when both transports run: under `--transport tcp` that pass is the only
+one, so it runs the whole suite regardless.
 
 `--keep-on-fail [DIR]` makes a failure inspectable without repeating the run.
 For every target that came back with anything unexpected it writes the full
