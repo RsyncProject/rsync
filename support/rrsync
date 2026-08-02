@@ -634,6 +634,15 @@ def main():
         # no-op there.
         rsync_opts.append('--drop-D')
 
+    if args.dir != '/':
+        # Filter rules travel over the protocol, not in the argv we validate, so
+        # a client can name a merge file outside the restricted dir and have the
+        # server read it in as rules -- a pull needs no --delete and no
+        # verbosity for that.  --confine-root bounds the server's own resolution
+        # of such paths, which is the only end that can see them.  Both
+        # directions: a dir-merge is read by whichever side the rule applies to.
+        rsync_opts.append('--confine-root=' + os.getcwd())
+
     if args.munge:
         rsync_opts.append('--munge-links')
     
