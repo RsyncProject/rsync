@@ -142,6 +142,14 @@ from argparse import RawTextHelpFormatter
 # TOCTOU.
 pinned_fds = []
 
+# Directory pins, keyed by (st_dev, st_ino), so a glob or a multi-arg command
+# whose args share a parent inherits one fd rather than one per arg.
+pinned_dirs = {}
+
+# Whether the client asked for --relative/-R, which decides how much of a
+# sender arg rsync transmits as the file's name (see sender_pinned_arg).
+client_relative = False
+
 # The inode-pin trick needs /proc/self/fd/N to be a Linux-style magic symlink
 # whose readlink yields the open file's real path. macOS/BSD lack the directory
 # entirely; Solaris HAS /proc/self/fd but its entries are not such symlinks (its
@@ -171,6 +179,134 @@ except:
 HAS_DOT_DOT_RE = re.compile(r'(^|/)\.\.(/|$)')
 LONG_OPT_RE = re.compile(r'^--([^=]+)(?:=(.*))?$')
 DE_BACKSLASH_RE = re.compile(r'\\(.)')
+
+def make_inheritable(fd):
+    """Clear FD_CLOEXEC so the exec'd rsync inherits `fd`.
+
+    os.set_inheritable() prefers ioctl(FIONCLEX), which an O_PATH descriptor
+    rejects with EBADF on older kernels; F_SETFD is one of the few operations
+    O_PATH always allows.
+    """
+    try:
+        os.set_inheritable(fd, True)
+    except OSError:
+        import fcntl
+        fcntl.fcntl(fd, fcntl.F_SETFD,
+                    fcntl.fcntl(fd, fcntl.F_GETFD) & ~fcntl.FD_CLOEXEC)
+
+def pin_dir(path, orig_arg):
+    """Inode-pin a directory and return an fd rsync will inherit.
+
+    The open resolves `path` normally -- including a symlink at its last
+    component, which is legitimate and which 3.4.4 accepts -- so a component
+    could be flipped first.  The readlink check afterwards is what makes that
+    safe: it proves the inode we ended up holding is inside the restricted
+    tree.  From then on the fd names that inode, not the path, so nothing above
+    it can be flipped again.
+
+    O_PATH, not O_RDONLY: reaching a known name beneath a directory needs only
+    search permission, and a mode 0111 parent is a perfectly ordinary way to
+    publish a file without letting it be listed.  An O_PATH directory fd is
+    just as firmly pinned when used as a /proc/self/fd/N/... prefix (the O_PATH
+    caveat in validated_arg() is about reopening the magic link as the file
+    itself, which is not what happens here).
+    """
+    flags = os.O_DIRECTORY | getattr(os, 'O_PATH', 0)
+    if not flags & getattr(os, 'O_PATH', 0):
+        flags |= os.O_RDONLY
+    try:
+        fd = os.open(path or '.', flags)
+    except OSError as e:
+        die('unable to pin sender path:', orig_arg, e.strerror)
+    try:
+        st = os.fstat(fd)
+        pinned_path = os.readlink('/proc/self/fd/%d' % fd)
+    except OSError as e:
+        os.close(fd)
+        die('post-pin readlink failed (race?):', orig_arg, e.strerror)
+    if pinned_path != args.dir and not pinned_path.startswith(args.dir_slash):
+        os.close(fd)
+        die('post-pin path escaped tree (race?):', orig_arg, pinned_path)
+    key = (st.st_dev, st.st_ino)
+    if key in pinned_dirs:
+        os.close(fd)
+        return pinned_dirs[key]
+    make_inheritable(fd)
+    pinned_fds.append(fd)
+    pinned_dirs[key] = fd
+    return fd
+
+# sender_pinned_arg() verdicts that are not a rewritten argument.
+KEEP_LEAF_PIN = 'keep'          # hand rsync the leaf's own /proc/self/fd/N
+LEAF_PIN_UNUSABLE = 'unusable'  # no pin for this shape; keep the plain name
+
+def sender_pinned_arg(fd, arg, orig_arg, has_slash, has_slash_dot):
+    """Return a source name rsync will both resolve safely and name correctly.
+
+    The obvious rewrite -- hand rsync /proc/self/fd/N for the leaf itself --
+    only works where rsync open()s the argument.  A sender lstat()s it first,
+    and lstat of a procfs magic link is always S_IFLNK, so rsync describes the
+    argument as a symlink instead of sending the file.  Which pin is usable
+    therefore depends on what rsync does with the argument:
+
+      * a trailing "/" or "/." directory is opened, not lstat()ed, and rsync
+        DOES follow a symlink there, so it keeps the leaf pin;
+      * anything else keeps the pin one level up and passes the leaf by name.
+        rsync will not follow a symlink at that position (it sends the symlink
+        itself), the follow options that would change that are already disabled
+        for a restricted dir, and its own leaf open is O_NOFOLLOW.
+
+    Under --relative the transmitted name is the whole argument rather than
+    its basename, so the pin has to move up to wherever that name starts and
+    the rest is spelled after a /./ marker, which is how rsync is told where
+    the transmitted portion begins.
+    """
+    if client_relative:
+        # Look for the marker in the argument as the client spelled it: the
+        # caller has already split off a trailing "/" or "/.", which is exactly
+        # what turns "sub/./" into a terminal marker.
+        full = arg + ('/' if has_slash else '/.' if has_slash_dot else '')
+        # rsync honours the FIRST /./, so split there and keep the client's
+        # marker rather than inserting a second, earlier one.
+        head, marker, tail = full.partition('/./')
+        if marker:
+            anchor, suffix = head, tail.rstrip('/')
+        else:
+            anchor, suffix = '', arg
+        if suffix.startswith('/'):
+            return LEAF_PIN_UNUSABLE
+        if suffix in ('', '.'):
+            # A terminal marker: everything the client wants transmitted starts
+            # at the argument itself, which is the directory we already pinned.
+            # The caller re-appends the trailing "/" or "/.".
+            dfd = pin_dir(anchor, orig_arg)
+            check = '.'
+            pinned = '/proc/self/fd/%d/.' % dfd
+        else:
+            dfd = pin_dir(anchor, orig_arg)
+            pinned = '/proc/self/fd/%d/./%s' % (dfd, suffix)
+            check = suffix
+    else:
+        if has_slash or has_slash_dot:
+            return KEEP_LEAF_PIN
+        anchor, _, leaf = arg.rpartition('/')
+        if not leaf or leaf in ('.', '..'):
+            return LEAF_PIN_UNUSABLE
+        dfd = pin_dir(anchor, orig_arg)
+        pinned = '/proc/self/fd/%d/%s' % (dfd, leaf)
+        check = leaf
+
+    # Tie the pinned directory to the inode realpath() validated: resolving
+    # `check` beneath the held fd cannot be redirected above the leaf, so if it
+    # does not reach the same file, something was flipped -- fail closed.
+    try:
+        st = os.stat(check, dir_fd=dfd)
+    except OSError as e:
+        die('post-pin stat failed (race?):', orig_arg, e.strerror)
+    leaf_st = os.fstat(fd)
+    if (st.st_dev, st.st_ino) != (leaf_st.st_dev, leaf_st.st_ino):
+        die('post-pin path changed (race?):', orig_arg, check)
+    return pinned
 
 def safe_open_logfile():
     nofollow = getattr(os, 'O_NOFOLLOW', 0)
@@ -249,6 +385,7 @@ def main():
     except OSError as e:
         die('unable to chdir to restricted dir:', str(e))
 
+    global client_relative
     rsync_opts = [ '--server' ]
     rsync_args = [ ]
     saw_the_dot_arg = False
@@ -271,7 +408,16 @@ def main():
                 saw_the_dot_arg = True
                 continue
             rsync_opts.append(arg)
-            if short_no_arg_re.match(arg) or short_with_num_re.match(arg):
+            sm = short_no_arg_re.match(arg)
+            if sm or short_with_num_re.match(arg):
+                if sm:
+                    # Scan the cluster's own letters only: the trailing
+                    # capability blob (-e.iLsfxC) is not a set of options.
+                    letters = arg[1:]
+                    if sm.group(1):
+                        letters = letters[:-len(sm.group(1))]
+                    if 'R' in letters:
+                        client_relative = True
                 continue
             disabled = False
             m = LONG_OPT_RE.match(arg)
@@ -281,6 +427,11 @@ def main():
                 ct = long_opts.get(opt, None)
                 if ct is None:
                     break # Generate generic failure due to unfinished arg parsing
+                # Last one wins, matching rsync's own option handling.
+                if opt == 'relative':
+                    client_relative = True
+                elif opt == 'no-relative':
+                    client_relative = False
                 if ct == 0:
                     continue
                 opt = '--' + opt
@@ -377,6 +528,7 @@ def validated_arg(opt, arg, typ=3, wild=False):
     for arg in got:
         if args.dir != '/' and arg != '.' and (typ == 3 or (typ == 2 and not am_sender)):
             arg_has_trailing_slash = arg.endswith('/')
+            arg_has_trailing_slash_dot = False
             if arg_has_trailing_slash:
                 arg = arg[:-1]
             else:
@@ -491,9 +643,30 @@ def validated_arg(opt, arg, typ=3, wild=False):
                         os.close(fd)
                         die('post-pin path escaped tree (race?):',
                             orig_arg, pinned_path)
-                    os.set_inheritable(fd, True)
-                    pinned_fds.append(fd)
-                    arg = '/proc/self/fd/%d' % fd
+                    if am_sender and opt == 'arg':
+                        logical = arg
+                        if is_absolute_arg:
+                            if logical == args.dir:
+                                logical = ''
+                            elif logical.startswith(args.dir_slash):
+                                logical = logical[args.dir_slash_len:]
+                        pinned = sender_pinned_arg(fd, logical, orig_arg,
+                                                   arg_has_trailing_slash,
+                                                   arg_has_trailing_slash_dot)
+                    else:
+                        pinned = KEEP_LEAF_PIN
+                    if pinned == KEEP_LEAF_PIN:
+                        os.set_inheritable(fd, True)
+                        pinned_fds.append(fd)
+                        arg = '/proc/self/fd/%d' % fd
+                    elif pinned == LEAF_PIN_UNUSABLE:
+                        # Nothing to spell beneath a held directory (a bare "."
+                        # or the tree root): keep the realpath-validated name,
+                        # which is what 3.4.4 passes.
+                        os.close(fd)
+                    else:
+                        os.close(fd)    # only needed to validate the pin
+                        arg = pinned
             if arg_has_trailing_slash:
                 arg += '/'
             elif arg_has_trailing_slash_dot:
