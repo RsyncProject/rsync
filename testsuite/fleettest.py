@@ -29,7 +29,15 @@ Every run uses its own randomly-named build directory on each target
 (<builddir>-<run_id>-<target>), so two or three fleettest runs can share the same
 fleet without interfering: each pushes, builds and tests in isolation. The run dir
 is removed when the run ends -- on success or failure, and best-effort on
-Ctrl-C/kill (pass --keep to retain it for inspection). A run that is hard-killed
+Ctrl-C/kill (pass --keep to retain it for inspection).
+
+--keep-on-fail is the cheaper half of --keep: only the targets that came back
+with something unexpected keep their run dir, and their full build/test output
+is also written locally under fleettest-logs/<run_id>/<target>/. A fleet run
+costs a full build on every machine, so re-running just to see why one test
+failed is expensive -- and a race test may not fail the same way twice.
+
+A run that is hard-killed
 (SIGKILL), or signalled mid-push, or whose ssh dies during cleanup can leave a
 stray <builddir>-<id>-<target> behind -- plus an orphaned path-flipper or test
 rsyncd on platforms without a parent-death backstop; sweep all of those
@@ -64,6 +72,8 @@ Usage (run from inside an rsync checkout, or pass --repo):
     python3 testsuite/fleettest.py --targets cygwin,freebsd
     python3 testsuite/fleettest.py --transport pipe
     python3 testsuite/fleettest.py --keep          # keep run dirs for inspection
+    python3 testsuite/fleettest.py --keep-on-fail  # ...but only where it broke
+    python3 testsuite/fleettest.py --timing        # per-target AND per-test times
     python3 testsuite/fleettest.py --cleanup       # sweep stray run dirs, exit
     python3 testsuite/fleettest.py --fleet my-fleet.json --list
 
@@ -96,6 +106,10 @@ from pathlib import Path
 # comma-separated test-name globs (fnmatch), applied across every target.
 SKIP_CSV = ""
 XFAIL_GLOBS: list[str] = []
+
+# Set from --timing in main(). Also asks each target's runtests.py for its own
+# per-test wall-clock table, so a slow cell can be attributed to actual tests.
+TIMING = False
 
 # Set from --repo in main() (default: cwd). The harness builds whatever rsync
 # source tree these point at, so it must be run from inside an rsync checkout
@@ -393,7 +407,11 @@ def test_script(t: Target, transport: str, skip_csv: str | None, jobs: int,
         names = " " + " ".join(only)
     elif skip_csv:
         env += f"RSYNC_EXPECT_SKIPPED={skip_csv} "
-    runtests = f'{t.python} runtests.py {rb}{tcp}{proto} -j {jobs}{names}'
+    # --timing makes the remote runtests print its own per-test wall-clock table,
+    # which lands in the captured output: that is where a "this target is slow"
+    # cell turns into "these tests are slow on this target".
+    timing = " --timing" if TIMING and not only else ""
+    runtests = f'{t.python} runtests.py {rb}{tcp}{proto} -j {jobs}{timing}{names}'
     # env_prefix (e.g. a brew PATH) must reach the test too: some tests build a
     # helper binary on the fly (a test may invoke `make`, which needs gawk etc.),
     # so the build tools must be on PATH at test time.
@@ -790,6 +808,57 @@ def print_report(results: list[TargetResult], args, fleet: list[Target]) -> bool
     return all_ok
 
 
+def target_ok(res: TargetResult) -> bool:
+    """True if this target produced no unexpected result at all -- reachable,
+    pushed, built, and every pass it ran was OK."""
+    if not (res.reachable and res.pushed and res.build_ok):
+        return False
+    return all(tr.ok for tr in res.transports.values())
+
+
+def keep_on_fail(results: list[TargetResult], args,
+                 chosen: list[Target]) -> list[str]:
+    """--keep-on-fail: for every target that did NOT come back clean, save its
+    full output locally and mark its remote run dir to survive the exit sweep.
+
+    A fleet run is expensive (a full configure + build on ten machines), and the
+    report only prints the names of failing tests -- so re-running was the only
+    way to see WHY one failed, at the cost of another full run, on a race test
+    that may not fail the same way twice.  Saving the raw output at the moment of
+    failure, and keeping the tree that produced it, makes that re-run
+    unnecessary.  Clean targets are untouched: they are still swept as usual.
+
+    Returns human-readable lines describing what was kept, for the report."""
+    failed = [r for r in results if not target_ok(r)]
+    if not failed:
+        return []
+    root = Path(args.keep_on_fail).expanduser() / args.run_id
+    notes: list[str] = []
+    for res in failed:
+        _retain_targets.add(res.target)
+        d = root / _dirsafe(res.target)
+        try:
+            d.mkdir(parents=True, exist_ok=True)
+            if res.error:
+                (d / "error.txt").write_text(res.error + "\n")
+            if res.build_log:
+                (d / "build.log").write_text(res.build_log)
+            for name, tr in res.transports.items():
+                (d / f"{name}.log").write_text(tr.raw)
+            saved = str(d)
+        except OSError as e:
+            saved = f"(could not write logs: {e})"
+        notes.append(f"{res.target}: logs {saved}")
+        # The remote tree is only meaningful if the run got far enough to make
+        # one; an unreachable or un-pushed target has nothing to keep.
+        if res.reachable and res.pushed:
+            t = next((x for x in chosen if x.name == res.target), None)
+            if t is not None:
+                where = f"{t.ssh_host}:{t.builddir}" if t.ssh_host else t.builddir
+                notes.append(f"{res.target}: run dir kept at {where}")
+    return notes
+
+
 # Phase columns for --timing, in execution order (push -> build -> tests).
 _TIMING_PHASES = ("push", "build", "pipe", "tcp", "nonroot")
 
@@ -852,6 +921,9 @@ def current_branch() -> str:
 _cleanup_targets: list[Target] = []
 _cleanup_lock = threading.Lock()
 _cleanup_done = False
+# Names of targets whose run dir must survive the exit sweep (--keep-on-fail,
+# populated once results are in). Everything else is removed as usual.
+_retain_targets: set[str] = set()
 
 
 def _dirsafe(name: str) -> str:
@@ -875,13 +947,17 @@ def _unsafe_builddir(path: str) -> bool:
 def cleanup_run() -> None:
     """Best-effort `rm -rf` of this run's dir on every chosen target. Idempotent
     (atexit + a signal handler may both call it). Each target removes only its
-    own <base>-<run_id> dir, so a concurrent run's dir is never touched."""
+    own <base>-<run_id> dir, so a concurrent run's dir is never touched.
+
+    Targets listed in _retain_targets are left alone -- that is --keep-on-fail
+    holding a failed target's tree (build output plus the scratch trees the
+    failing tests left) for a post-mortem."""
     global _cleanup_done
     with _cleanup_lock:
         if _cleanup_done or not _cleanup_targets:
             return
         _cleanup_done = True
-        targets = list(_cleanup_targets)
+        targets = [t for t in _cleanup_targets if t.name not in _retain_targets]
     for t in targets:
         if _unsafe_builddir(t.builddir):
             continue
@@ -1001,6 +1077,13 @@ def main() -> int:
     ap.add_argument("--transport", choices=["pipe", "tcp", "both"], default="both")
     ap.add_argument("--keep", action="store_true",
                     help="keep each run's build dir (default: remove it at exit)")
+    ap.add_argument("--keep-on-fail", nargs="?", const="fleettest-logs",
+                    metavar="DIR",
+                    help="for targets that came back with anything unexpected, "
+                    "save the full build/test output under DIR/<run-id>/<target>/ "
+                    "and keep that target's remote run dir (clean targets are "
+                    "swept as usual). Makes a failure inspectable without "
+                    "repeating the run. DIR defaults to ./fleettest-logs")
     ap.add_argument("--cleanup", action="store_true",
                     help="kill stray flippers/test daemons and remove stray "
                     "<builddir>-* run dirs (root-owned via sudo -n) on the "
@@ -1029,9 +1112,10 @@ def main() -> int:
     ap.add_argument("--list", action="store_true", help="list targets and exit")
     args = ap.parse_args()
 
-    global SKIP_CSV, XFAIL_GLOBS
+    global SKIP_CSV, XFAIL_GLOBS, TIMING
     SKIP_CSV = ",".join(s.strip() for s in (args.skip or "").split(",") if s.strip())
     XFAIL_GLOBS = [s.strip() for s in (args.xfail or "").split(",") if s.strip()]
+    TIMING = args.timing
 
     global REPO, WORKFLOWS, TESTSUITE_REPO
     REPO = Path(args.repo).resolve() if args.repo else Path.cwd()
@@ -1193,7 +1277,16 @@ def main() -> int:
     finally:
         subprocess.run(["rm", "-rf", staging])
 
+    # Before the exit sweep runs: mark failed targets' run dirs to survive and
+    # write their output locally, so the report can point at both.
+    kept = keep_on_fail(results, args, chosen) if args.keep_on_fail else []
+
     all_ok = print_report(results, args, fleet)
+    if kept:
+        print("==== KEPT FOR POST-MORTEM (--keep-on-fail) ====")
+        for k in kept:
+            print(f"    {k}")
+        print("=" * 64)
     if args.timing:
         print_timing(results)
     return 0 if all_ok else 1

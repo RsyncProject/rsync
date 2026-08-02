@@ -205,12 +205,23 @@ python3 testsuite/fleettest.py --list                # list configured targets
 python3 testsuite/fleettest.py --targets NAME[,NAME]
 python3 testsuite/fleettest.py --fleet other.json --transport pipe
 python3 testsuite/fleettest.py --timing              # per-target wall-clock breakdown
+python3 testsuite/fleettest.py --keep-on-fail        # keep logs + tree where it broke
 ```
 
 `--timing` adds a per-target breakdown after the report — total wall-clock plus
 the push / build / pipe / tcp / protoNN / nonroot phases, sorted slowest-first. Targets
 run in parallel, so the whole run is gated by the slowest one; the phase columns
-show whether that target's hold-up is the push, the build, or a test pass.
+show whether that target's hold-up is the push, the build, or a test pass. It
+also passes `--timing` down to each target's `runtests.py`, so the captured
+output attributes a slow pass to individual tests.
+
+`--keep-on-fail [DIR]` makes a failure inspectable without repeating the run.
+For every target that came back with anything unexpected it writes the full
+build and per-transport output to `DIR/<run_id>/<target>/` (default
+`./fleettest-logs`) and keeps that target's remote run dir, with the scratch
+trees its failing tests left behind. Targets that came back clean are swept as
+usual. This matters most for the race tests, which may not fail the same way
+twice — and because a re-run costs a full configure + build on every machine.
 
 Each run gets its own randomly-named build dir on every target
 (`<builddir>-<run_id>`), so two or three runs can share the same fleet without
