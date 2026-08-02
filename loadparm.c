@@ -164,25 +164,42 @@ static struct enum_list enum_syslog_facility[] = {
 
 /* Expand %VAR% references.  Any unknown vars or unrecognized
  * syntax leaves the raw chars unchanged. */
-static char *expand_vars_shell_escape(const char *val)
+enum shell_quote_context {
+	SHELL_UNQUOTED,
+	SHELL_SINGLE_QUOTED,
+	SHELL_DOUBLE_QUOTED
+};
+
+static char *expand_vars_shell_escape(const char *val, int quote_context)
 {
 	const char *s;
 	char *ret, *t;
-	size_t len = 2;
+	size_t len = quote_context == SHELL_SINGLE_QUOTED ? 0 : 2;
 
-	for (s = val; *s; s++)
-		len += *s == '\'' ? 4 : 1;
+	for (s = val; *s; s++) {
+		if (quote_context == SHELL_DOUBLE_QUOTED
+		 && strchr("\\\"`$", *s))
+			len += 2;
+		else
+			len += *s == '\'' ? 4 : 1;
+	}
 	ret = new_array(char, len + 1);
 	t = ret;
-	*t++ = '\'';
+	if (quote_context != SHELL_SINGLE_QUOTED)
+		*t++ = '\'';
 	for (s = val; *s; s++) {
-		if (*s == '\'') {
+		if (quote_context == SHELL_DOUBLE_QUOTED
+		 && strchr("\\\"`$", *s)) {
+			*t++ = '\\';
+			*t++ = *s;
+		} else if (*s == '\'') {
 			memcpy(t, "'\\''", 4);
 			t += 4;
 		} else
 			*t++ = *s;
 	}
-	*t++ = '\'';
+	if (quote_context != SHELL_SINGLE_QUOTED)
+		*t++ = '\'';
 	*t = '\0';
 	return ret;
 }
@@ -191,7 +208,7 @@ static char *expand_vars(const char *str, int shell_escape)
 {
 	char *buf, *t;
 	const char *f;
-	int bufsize;
+	int bufsize, quote_context = SHELL_UNQUOTED, escaped_char = 0;
 
 	if (!str || !strchr(str, '%'))
 		return (char *)str; /* TODO change return value to const char* at some point. */
@@ -210,14 +227,14 @@ static char *expand_vars(const char *str, int shell_escape)
 					char *escaped = NULL;
 					int len;
 					/* %RSYNC_*% values originate from the peer request/args.
-					 * When the result is fed to a shell-executed hook
-					 * (shell_escape), single-quote them so a value containing
-					 * shell metacharacters can't inject; for ordinary string
+					 * When the result is fed to a shell-executed hook, escape it
+					 * for the template's current shell quote context so a value
+					 * containing shell metacharacters can't inject.  For ordinary string
 					 * params (path, uid, gid, ...) leave them verbatim --
 					 * quoting there would corrupt the value (e.g. a documented
 					 * `path = /home/%RSYNC_USER_NAME%` would become /home/'x'). */
 					if (shell_escape && strncmp(t, "RSYNC_", 6) == 0)
-						val = escaped = expand_vars_shell_escape(val);
+						val = escaped = expand_vars_shell_escape(val, quote_context);
 					len = strlcpy(t, val, bufsize+1);
 					if (escaped)
 						free(escaped);
@@ -229,6 +246,20 @@ static char *expand_vars(const char *str, int shell_escape)
 					continue;
 				}
 			}
+		}
+		if (shell_escape) {
+			if (quote_context == SHELL_SINGLE_QUOTED) {
+				if (*f == '\'')
+					quote_context = SHELL_UNQUOTED;
+			} else if (escaped_char)
+				escaped_char = 0;
+			else if (*f == '\\')
+				escaped_char = 1;
+			else if (*f == '\'')
+				quote_context = SHELL_SINGLE_QUOTED;
+			else if (*f == '"')
+				quote_context = quote_context == SHELL_DOUBLE_QUOTED
+					? SHELL_UNQUOTED : SHELL_DOUBLE_QUOTED;
 		}
 		*t++ = *f++;
 		bufsize--;
