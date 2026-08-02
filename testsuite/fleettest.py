@@ -1008,6 +1008,18 @@ def _on_signal(signum, frame):
 # left blocked on a read when its test was killed (no I/O timeout). @BASE@ is
 # substituted with the target's run-dir prefix.
 _CLEANUP_SCRIPT = r'''fail=0
+# Cygwin signals are cooperative, so a process stuck in a Windows call ignores
+# even SIGKILL and pkill cannot touch it -- exactly how an orphaned test rsyncd
+# ends up squatting its port forever. Where taskkill exists, finish the job
+# through Windows using the winpid (4th column of `ps -W`).
+win_force() {
+  command -v taskkill >/dev/null 2>&1 || return 0
+  command -v ps >/dev/null 2>&1 || return 0
+  for p in $(pgrep -f "$1" 2>/dev/null); do
+    w=$(ps -W 2>/dev/null | awk -v x="$p" '$1==x {print $4}')
+    [ -n "$w" ] && taskkill /F /PID "$w" >/dev/null 2>&1
+  done
+}
 sweep() {
   command -v pgrep >/dev/null 2>&1 || return 0
   before=$(pgrep -f "$2" 2>/dev/null | wc -l | tr -d ' ')
@@ -1015,6 +1027,10 @@ sweep() {
   pkill -f "$2" 2>/dev/null
   sudo -n pkill -f "$2" 2>/dev/null
   sleep 1
+  if [ "$(pgrep -f "$2" 2>/dev/null | wc -l | tr -d ' ')" -gt 0 ] 2>/dev/null; then
+    win_force "$2"
+    sleep 1
+  fi
   after=$(pgrep -f "$2" 2>/dev/null | wc -l | tr -d ' ')
   killed=$((before - after))
   [ "$killed" -gt 0 ] 2>/dev/null && echo "KILLED $killed stray $1(s)"

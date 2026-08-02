@@ -370,13 +370,40 @@ def _pid_is_rsync(pid: int) -> bool:
     return False                       # no ps form worked -> don't kill
 
 
+def _wait_pid_gone(pid: int, timeout: float) -> bool:
+    """Poll up to `timeout` seconds for `pid` to stop being a live rsync.
+
+    SIGKILL is asynchronous: the process may still be visible for a moment
+    after it is signalled, so a single immediate check would call a dying
+    process "still alive"."""
+    deadline = time.monotonic() + timeout
+    while True:
+        if not _pid_is_rsync(pid):
+            return True
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(0.1)
+
+
 def _reap_group(pgid: int, pid: int) -> bool:
     """Kill the test's whole process group (daemon + its clients + flipper) when
     `pid` is still a live rsync -- the portable recycle guard, so we only ever
     signal a group still running our rsync.  killpg(pgid) sweeps the group in one
     shot (the test driver runs in its own session, so the group is exactly that
     test's tree); if the pgid is unusable, fall back to killing the daemon pid
-    alone.  Returns True if it signalled something."""
+    alone.
+
+    Returns True only when the daemon is CONFIRMED GONE, not merely when a
+    signal was accepted.  The caller clears the port's registry entry on a True
+    return, and that entry is the only handle anyone has on the process; on
+    Cygwin a signal is routinely accepted by a process that then ignores it, so
+    trusting the accept would discard the record while the port stays squatted
+    -- leaving an occupant nothing can identify or reap.
+
+    The confirmation is a bounded poll, not a single immediate check: SIGKILL is
+    asynchronous, so a process still winding down is normal and answering
+    "not gone" for it would make _probe_bindable() skip its retry and fail the
+    test for a port that was about to free itself."""
     if not _pid_is_rsync(pid):
         return False
     try:
@@ -388,8 +415,13 @@ def _reap_group(pgid: int, pid: int) -> bool:
         try:
             os.kill(pid, signal.SIGKILL)
         except OSError:
-            return False
-    return True
+            pass
+    if _wait_pid_gone(pid, 2.0):
+        return True
+    # Survived SIGKILL: on Cygwin that means it is stuck in a Windows call,
+    # where only Windows can end it.
+    _win_force_kill(pid)
+    return _wait_pid_gone(pid, 2.0)
 
 
 def _reap_orphan_daemon(port: int) -> bool:
@@ -582,7 +614,13 @@ def claim_free_port(preferred: int) -> int:
 def _set_pdeathsig() -> 'None':
     """Linux: ask the kernel to send SIGTERM to us if our parent dies.
     A no-op on every other platform. Used as preexec_fn so a kill -9 of
-    the test process doesn't strand the rsyncd we spawned."""
+    the test process doesn't strand the rsyncd we spawned.
+
+    The daemon deliberately stays in the TEST's process group: runtests.py
+    killpg's that group when a test times out, and that is what keeps a
+    timed-out test from stranding its daemon. Giving the daemon a group of
+    its own would put it out of reach of that sweep; its per-connection
+    children are handled by _daemon_children() instead."""
     if not sys.platform.startswith('linux'):
         return
     try:
@@ -594,9 +632,100 @@ def _set_pdeathsig() -> 'None':
         pass
 
 
+def _win_force_kill(pid: int) -> 'None':
+    """Cygwin last resort: terminate `pid` through Windows.
+
+    Cygwin signals are cooperative -- delivered via a helper thread in the
+    target -- so a process sitting in a Windows call ignores even SIGKILL.
+    Such a process keeps its listening socket and cannot be reaped by any
+    amount of kill/killpg/pkill. Map the cygwin pid to its Windows pid (the
+    4th column of `ps -W`) and let Windows do it. A no-op elsewhere."""
+    if not sys.platform.startswith('cygwin'):
+        return
+    try:
+        r = subprocess.run(['ps', '-W'], capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return
+    for line in r.stdout.splitlines():
+        f = line.split()
+        if len(f) >= 4 and f[0] == str(pid):
+            try:
+                subprocess.run(['taskkill', '/F', '/PID', f[3]],
+                               capture_output=True, timeout=10)
+            except (OSError, subprocess.SubprocessError):
+                pass
+            return
+
+
+def _daemon_children(pid: int) -> list:
+    """PIDs whose parent is `pid` -- the connection handlers rsyncd forked.
+
+    Cygwin's ps understands neither -A nor -o, but `ps -W` prints
+    PID PPID PGID WINPID as its first four columns; everywhere else POSIX
+    `ps -A -o pid=,ppid=` does the job. Returns [] if neither works: the
+    caller then just kills the parent, which is the old behaviour."""
+    argv = (['ps', '-W'] if sys.platform.startswith('cygwin')
+            else ['ps', '-A', '-o', 'pid=,ppid='])
+    try:
+        r = subprocess.run(argv, capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return []
+    kids = []
+    for line in r.stdout.splitlines():
+        f = line.split()
+        if len(f) >= 2 and f[1] == str(pid):
+            try:
+                kids.append(int(f[0]))
+            except ValueError:
+                pass
+    return kids
+
+
+def _kill_pid(pid: int) -> 'None':
+    """SIGTERM, then SIGKILL, then -- on Cygwin -- Windows.
+
+    Gated on _pid_is_rsync at every step: these pids were snapshotted before the
+    parent was killed, so between the snapshot and the signal a child can exit
+    and the kernel can hand its pid to something else. Re-checking that the pid
+    is STILL a live rsync before each signal keeps a recycled pid from getting
+    the harness to kill an unrelated process.
+
+    KNOWN LIMITATION: check-then-signal is inherently a TOCTOU, so the window is
+    narrowed to microseconds rather than closed -- the pid would have to be
+    recycled onto ANOTHER rsync in that gap to matter. Closing it properly needs
+    a stable process reference (pidfd, or a retained Windows handle), which is
+    per-platform machinery this suite has to run on seven of; the same guard is
+    what _reap_group() has always used."""
+    for sig in (signal.SIGTERM, signal.SIGKILL):
+        if not _pid_is_rsync(pid):
+            return          # gone, or the pid now belongs to someone else
+        try:
+            os.kill(pid, sig)
+        except OSError:
+            return          # already gone
+        time.sleep(0.3)
+    if _pid_is_rsync(pid):
+        _win_force_kill(pid)
+
+
 def _stop_rsyncd(proc) -> 'None':
+    """Stop the test daemon AND the connection handlers it forked.
+
+    Killing proc alone -- the only pid the Popen handle knows -- is what left
+    the orphan: rsyncd forks a child per connection, and one still winding up
+    or down when the test ends outlives the parent, inherits the listening
+    socket and squats the port. Snapshot the children BEFORE killing the
+    parent, because once it is gone they are reparented to init and no longer
+    identifiable as ours.
+
+    KNOWN LIMITATION: that is also why nothing is collected when the parent has
+    ALREADY exited on its own (it crashed, say) while a child still holds the
+    port -- by then the parent-child link this relies on is gone. The runner's
+    per-test-timeout killpg covers the common case, since the daemon stays in
+    the test's process group; `fleettest.py --cleanup` sweeps the rest."""
     if proc.poll() is not None:
         return
+    kids = _daemon_children(proc.pid)
     try:
         proc.terminate()
         proc.wait(timeout=2)
@@ -606,14 +735,36 @@ def _stop_rsyncd(proc) -> 'None':
             proc.wait(timeout=1)
         except (subprocess.TimeoutExpired, OSError):
             pass
+        _win_force_kill(proc.pid)
+    except OSError:
+        pass
+    for kid in kids:
+        _kill_pid(kid)
 
 
 def _cleanup_rsyncd(proc, port: int) -> 'None':
     """atexit handler: stop the daemon and clear its pid slot. A clean exit thus
     leaves no orphan to reap; only a SIGKILL (which skips atexit) leaves the slot
-    set -- exactly the case _reap_orphan_daemon() needs it for."""
+    set -- exactly the case _reap_orphan_daemon() needs it for.
+
+    The slot is kept only while it still NAMES something reapable -- i.e. our
+    daemon pid is somehow still a live rsync, which on Cygwin means it ignored
+    the kill. That is the only case where the record buys a later run anything.
+
+    Keying this on the port being busy instead looks safer but is worse: a port
+    sits in TIME_WAIT after a passing test, so a plain bind fails and a record
+    naming an already-dead pid is retained forever. Nothing ever clears such a
+    record, and if that pid is later recycled onto an unrelated rsync the stale
+    sweep would signal it. A record naming a dead process cannot help anyone --
+    every reaper rejects it at the _pid_is_rsync guard -- so clearing it is
+    strictly better.
+
+    KNOWN LIMITATION: if the daemon parent died on its own while a connection
+    child still held the port, that child is unreachable either way -- the
+    record only ever named the parent. `fleettest.py --cleanup` sweeps it."""
     _stop_rsyncd(proc)
-    _record_port_proc(port, 0, 0)
+    if not _pid_is_rsync(proc.pid):
+        _record_port_proc(port, 0, 0)
 
 
 def start_rsyncd(conf_path, port: int, rsync_cmd: str = None) -> 'subprocess.Popen':
