@@ -3786,13 +3786,18 @@ int do_mknod_atfd(int dfd, const char *name, mode_t mode, dev_t dev)
 		return (close(fd) < 0) ? -1 : 0;
 	}
 
-#if !defined MKNOD_CREATES_FIFOS && defined HAVE_MKFIFO
+/* HAVE_MKFIFOAT/HAVE_MKNODAT, not HAVE_MKFIFO/HAVE_MKNOD: older Darwin has
+ * mkfifo() and mknod() but neither *at() form, so keying off the former
+ * compiles calls that then fail to link (#161). */
+#if !defined MKNOD_CREATES_FIFOS && defined HAVE_MKFIFOAT
 	if (S_ISFIFO(mode))
 		return mkfifoat(dfd, name, mode);
 #endif
-#ifdef HAVE_MKNOD
+#ifdef HAVE_MKNODAT
 	return mknodat(dfd, name, mode, dev);
 #else
+	/* Must match the guard above: no fd-relative create was compiled, so the
+	 * caller falls back to the path-based variant. */
 	(void)dev;
 	errno = ENOSYS;
 	return -1;
