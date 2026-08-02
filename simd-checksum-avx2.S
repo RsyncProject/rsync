@@ -46,6 +46,14 @@ get_checksum1_avx2_asm:
 	vpxor	xmm1, xmm1, xmm1 # reset both partial sums accumulators.
 	vpxor	xmm4, xmm4, xmm4
 	mov	eax, [r8]
+	# The loop below is software-pipelined: it preloads the 64 bytes AFTER the
+	# ones it is folding in.  Run it one block short and finish that block in
+	# .last, which does not preload -- otherwise the final iteration reads 64
+	# bytes past the end of what the caller gave us.  The remainder (len & 63)
+	# is always under 64, so that read always crossed buf+len; it only faulted
+	# when the buffer happened to end at a page boundary.
+	sub	esi, 1
+	jz	.last
 	.p2align 4 		# should fit into the LSD allocation queue.
 .loop:
 	vpmaddubsw	ymm0, ymm15, ymm2  # s1 partial sums
@@ -70,10 +78,32 @@ get_checksum1_avx2_asm:
 	vpaddd ymm6, ymm10, ymm6  #  32*CHAR_OFFSET
 	vpaddd ymm1, ymm13, ymm1  # 528*CHAR_OFFSET
 #endif
-	vmovdqa ymm2, ymm8   # move the next 64 bytes 
+	vmovdqa ymm2, ymm8   # move the next 64 bytes
 	vmovdqa ymm3, ymm9   # into the right registers
 	sub	esi, 1
 	jnz	.loop
+
+	# The final 64 bytes, already in ymm2/ymm3.  Same arithmetic as the loop
+	# body with the preload, the prefetch and the loop control dropped.
+.last:
+	vpmaddubsw	ymm0, ymm15, ymm2  # s1 partial sums
+	vpmaddubsw	ymm5, ymm15, ymm3
+	vpaddd	ymm4, ymm4, ymm6
+	vpaddw	ymm5, ymm5, ymm0
+	vpsrld	ymm0, ymm5, 16
+	vpaddw	ymm5, ymm0, ymm5
+	vpaddd	ymm6, ymm5, ymm6
+	vpmaddubsw	ymm2, ymm7, ymm2  # s2 partial sums
+	vpmaddubsw	ymm3, ymm12, ymm3
+	vpaddw	ymm3, ymm2, ymm3
+	vpsrldq	ymm2, ymm3, 2
+	vpaddd	ymm3, ymm2, ymm3
+	vpaddd	ymm1, ymm1, ymm3
+
+#if CHAR_OFFSET != 0
+	vpaddd ymm6, ymm10, ymm6  #  32*CHAR_OFFSET
+	vpaddd ymm1, ymm13, ymm1  # 528*CHAR_OFFSET
+#endif
 
 	# now we reduce the partial sums.
 	vpslld	ymm3, ymm4, 6
