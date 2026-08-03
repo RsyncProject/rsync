@@ -233,6 +233,15 @@ under `--fake-super` too (previously it fell back to a path-based set for a
   escape sequences into an administrator's terminal when the log is viewed.
   Reported by Leonid Bugaev.
 
+- Stop `safe_arg()` leaking an uninitialized byte into a quoted filename.  In
+  filename mode the writer suppresses the escaping backslash before a wildcard,
+  but the counter that sized the buffer reserved a slot for every backslash, so
+  the two disagreed and left an uninitialized heap byte in the returned string
+  -- which is handed to the remote shell when `--protect-args` is off.  The
+  counter now mirrors the writer, and guarding the wildcard test with `f[1]`
+  also fixes a trailing backslash (previously `strchr()` matched the string
+  terminator, so the backslash was not doubled).  Reported by Leonid Bugaev.
+
 - Close a `--safe-links` bypass in `--backup`: when symlinks can be hard-linked,
   `make_backup()`'s link/rename fast path hard-linked an unsafe (out-of-tree)
   symlink into the backup area and skipped the `safe_symlinks` check the copy
