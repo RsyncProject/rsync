@@ -827,6 +827,11 @@ void set_socket_options(int fd, char *options)
 }
 
 
+/* How long socketpair_tcp() waits for its own loopback connection (seconds),
+ * and how long each poll() pass waits before re-checking the listen queue. */
+#define SOCKETPAIR_ACCEPT_TIMEOUT 60
+#define SOCKETPAIR_ACCEPT_SLICE 100
+
 /* This is like socketpair but uses tcp.  The function guarantees that nobody
  * else can attach to the socket, or if they do that this function fails and
  * the socket gets closed.  Returns 0 on success, -1 on failure.  The resulting
@@ -838,6 +843,7 @@ static int socketpair_tcp(int fd[2])
 	struct sockaddr_in sock2;
 	socklen_t socklen = sizeof sock;
 	int connect_done = 0;
+	int save_errno;
 
 	fd[0] = fd[1] = listener = -1;
 
@@ -869,8 +875,53 @@ static int socketpair_tcp(int fd[2])
 	} else
 		connect_done = 1;
 
-	if ((fd[0] = accept(listener, (struct sockaddr *)&sock2, &socklen)) == -1)
-		goto failed;
+	/* Wait for our own connection with a polled, non-blocking accept()
+	 * rather than a blocking one.  A blocking accept() here can sleep
+	 * forever on a connection the kernel has already completed (seen on
+	 * OpenBSD: both ends ESTABLISHED and the connection queued on the
+	 * listener, the accept()ing process still asleep), which hangs rsync
+	 * with no timeout to break it.  Re-checking the queue on each pass
+	 * turns a missed wakeup into another loop rather than a hang. */
+	set_nonblocking(listener);
+	{
+		struct pollfd pfd;
+		time_t deadline = time(NULL) + SOCKETPAIR_ACCEPT_TIMEOUT;
+		int ready_but_empty = 0;
+
+		pfd.fd = listener;
+		pfd.events = POLLIN;
+		while ((fd[0] = accept(listener, (struct sockaddr *)&sock2, &socklen)) == -1) {
+			int nready;
+
+			if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
+				goto failed;
+			/* Bound the wait by the clock, not by a count of passes: a
+			 * signal on every pass must not extend it, and a poll() that
+			 * returns at once must not consume it. */
+			if (time(NULL) >= deadline) {
+				errno = ETIMEDOUT;
+				goto failed;
+			}
+			if (ready_but_empty) {
+				/* The listener said ready, yet accept() found nothing
+				 * (the peer can reset first).  Pause instead of
+				 * spinning on a poll() that returns immediately.  A
+				 * signal only cuts the pause short -- the deadline
+				 * above, rechecked every pass, is the bound. */
+				if (poll(NULL, 0, SOCKETPAIR_ACCEPT_SLICE) < 0 && errno != EINTR)
+					goto failed;
+				ready_but_empty = 0;
+				continue;
+			}
+			pfd.revents = 0;
+			nready = poll(&pfd, 1, SOCKETPAIR_ACCEPT_SLICE);
+			if (nready < 0 && errno != EINTR)
+				goto failed;
+			ready_but_empty = nready > 0;
+		}
+	}
+	/* BSD gives the accepted fd the listener's non-blocking flag. */
+	set_blocking(fd[0]);
 
 	close(listener);
 	listener = -1;
@@ -886,12 +937,14 @@ static int socketpair_tcp(int fd[2])
 	return 0;
 
  failed:
+	save_errno = errno;	/* keep it: a failing close() would overwrite it */
 	if (fd[0] != -1)
 		close(fd[0]);
 	if (fd[1] != -1)
 		close(fd[1]);
 	if (listener != -1)
 		close(listener);
+	errno = save_errno;
 	return -1;
 }
 
