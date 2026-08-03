@@ -122,7 +122,7 @@ static int secure_basis_open(const char *basedir, const char *relpath, int flags
 	 * recv_files caller) may be absolute (module_dir-prefixed on a non-chroot
 	 * daemon) and traverse a symlink the vfs_resolve_open path can't confine:
 	 * resolve it with the ownership walk, which follows a uid0/euid-owned symlink
-	 * but refuses a foreign one AND (via abspath_excluded_by_module) refuses a
+	 * but refuses a foreign one AND (via abspath_outside_confinement) refuses a
 	 * target the module's exclude hides -- closing the partial-dir exclude bypass. */
 	if (is_operator) {
 		char fullpath[MAXPATHLEN];

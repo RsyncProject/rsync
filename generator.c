@@ -1266,12 +1266,29 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 			 * hard_link_one() path above and basis_link_stat's !am_daemon gate).
 			 * fname is the transfer destination (secure receiver resolve). */
 			if (vfs_link_at(cmpbuf, fname, !am_daemon ? VFS_OPERATOR_PATH : 0, 0) < 0) {
-				rsyserr(FERROR_XFER, errno,
-					"failed to hard-link %s with %s",
-					cmpbuf, fname);
-				return j;
-			}
-			if (preserve_hard_links && F_IS_HLINKED(file))
+				/* CAN_HARDLINK_SYMLINK/_SPECIAL answer for whatever
+				 * filesystem the build tree sat on; the destination is
+				 * free to disagree, and one host can hold both (macOS
+				 * builds on APFS, backs up to HFS+).  A refusal here is
+				 * that same answer arriving late, so fall back to a copy
+				 * as a build without the macro does -- the caller creates
+				 * the entry either way, so failing the transfer only cost
+				 * the exit status.
+				 *
+				 * Every errno, as the regular-file path next door already
+				 * does (try_dests_reg -> hard_link_one -> try_a_copy).
+				 * Picking out the "cannot" errnos is not possible anyway:
+				 * link(2) documents EPERM both for a filesystem with no
+				 * hard-link support and for an ordinary permission
+				 * refusal, and FUSE reports ENOSYS for the same thing.
+				 *
+				 * The rest report themselves: ENOSPC/EDQUOT/EROFS fail the
+				 * copy too, EMLINK and EXDEV mean it was never linkable.
+				 * EIO alone goes unremarked, deliberately -- a diagnostic
+				 * here lands in --link-dest's itemised output. */
+				cannot_hardlink = 1;
+				match_level = 2;
+			} else if (preserve_hard_links && F_IS_HLINKED(file))
 				finish_hard_link(file, fname, ndx, NULL, itemizing, code, -1);
 		} else
 #endif

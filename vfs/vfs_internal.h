@@ -33,6 +33,8 @@ extern int copy_links;
 extern int copy_unsafe_links;
 extern int insecure_links;
 extern int module_id;
+extern char *confine_root;	/* --confine-root, or NULL; see confinement_root() */
+extern unsigned int confine_rootlen;
 
 /* Dry-run / read-only guard macros shared by the syscall wrappers. */
 #define RETURN_ERROR_IF(x,e) \
@@ -52,7 +54,8 @@ extern int module_id;
 
 /* Module-confinement helpers (pure logic, always compiled). */
 int path_has_dotdot_component(const char *path);
-int abspath_excluded_by_module(const char *abspath, int is_operator);
+int abspath_outside_confinement(const char *abspath, int is_operator);
+const char *vfs_fd_pin_tail(const char *p);
 
 /* Per-operand parent resolver for the two-path ops (vfs_rename_at/vfs_link_at). */
 int vfs_twopath_side(const char *path, int side_flags, const char **bname,
@@ -76,7 +79,7 @@ struct dirstack {
 	int fds[DS_MAXDEPTH];	/* fds[0] = anchor (borrowed); fds[top] = current dir */
 	int top;
 	/* Absolute path of fds[top], maintained as we descend/pop, for the
-	 * exclude-aware refusal (abspath_excluded_by_module).  Empty unless the
+	 * exclude-aware refusal (abspath_outside_confinement).  Empty unless the
 	 * caller seeds it with the anchor's absolute path; then a followed symlink
 	 * that redirects the walk into a module-excluded dir is refused. */
 	char abspath[MAXPATHLEN];

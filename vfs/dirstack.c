@@ -60,24 +60,102 @@ static int path_within(const char *root, size_t rootlen, const char *path)
  * name is not excluded may still resolve into an excluded IN-module subtree,
  * exactly as in stock rsync.  The defense for a writable module is `munge
  * symlinks` (see rsyncd.conf(5)), not this walk.  No-op unless we're a daemon. */
-int abspath_excluded_by_module(const char *abspath, int is_operator)
+/* The root an operator/peer-supplied path must stay under, or NULL when nothing
+ * is confined.  A daemon has the served module; a server launched by a wrapper
+ * with its own restricted directory (rrsync) gets one from --confine-root.
+ *
+ * A daemon never honours --confine-root: vfs.module_dir is the boundary there,
+ * and the option arrives in a peer-supplied argv, so obeying it could only
+ * loosen the module. */
+static const char *confinement_root(unsigned int *lenp)
 {
-	if (!am_daemon || !abspath || !vfs.module_dir)
+	if (am_daemon) {
+		*lenp = vfs.module_dirlen;
+		return vfs.module_dir;
+	}
+	*lenp = confine_rootlen;
+	return confine_root;
+}
+
+/* Split the "/proc/<self|pid>/fd" prefix off `p`, returning the tail -- "" for
+ * the pin directory itself, otherwise a string starting with '/'.  NULL when `p`
+ * is not in the fd-pin namespace at all. */
+const char *vfs_fd_pin_tail(const char *p)
+{
+	const char *s;
+
+	if (strncmp(p, "/proc/", 6) != 0)
+		return NULL;
+	s = p + 6;
+	if (strncmp(s, "self/", 5) == 0)	/* "/proc/self/..." */
+		s += 4;
+	else {					/* "/proc/<pid>/..." */
+		const char *d = s;
+		while (*s >= '0' && *s <= '9')
+			s++;
+		if (s == d || *s != '/')
+			return NULL;
+	}
+	if (strncmp(s, "/fd", 3) != 0)
+		return NULL;
+	s += 3;
+	return (*s == '\0' || *s == '/') ? s : NULL;
+}
+
+/* An EXACT pin entry, "/proc/self/fd/7" -- the one spelling whose target is what
+ * confinement must judge.  rrsync also writes a pinned parent as
+ * ".../fd/7/<leaf>", but the walk resolves the magic link itself and checks the
+ * components past it, so only the bare entry is resolved here.  Requiring all
+ * digits keeps a planted name like ".../fd/outside-secret" out. */
+static int is_exact_fd_pin(const char *p)
+{
+	const char *tail = vfs_fd_pin_tail(p);
+
+	if (!tail || *tail != '/')
 		return 0;
-	if (vfs.module_dirlen <= 1)			/* module root is "/": nothing is outside */
+	for (++tail; *tail >= '0' && *tail <= '9'; tail++) {}
+	return *tail == '\0' && tail[-1] != '/';
+}
+
+int abspath_outside_confinement(const char *abspath, int is_operator)
+{
+	unsigned int rootlen;
+	const char *root = confinement_root(&rootlen);
+	char pinned[MAXPATHLEN];
+
+	if (!root || !abspath)
 		return 0;
-	if (path_within(vfs.module_dir, vfs.module_dirlen, abspath))
-		return 0;			/* inside the module: name-based exclude is not a boundary */
-	/* Not under the module root.  An ABSOLUTE walk passes through the module
-	 * root's ancestors ("/", "/home", ...) on the way down -- those are not
-	 * "outside", just not-yet-arrived, so allow them.  A path that has truly
-	 * DIVERGED from the module tree is outside: refuse it for an operator/peer
-	 * path that must stay in the module (is_operator); other daemon
-	 * opens (--log-file, --*-from, lock/motd) may legitimately live elsewhere.
-	 * The --insecure-links / "insecure links = yes" opt-out short-circuits
-	 * before we get here. */
-	if (path_within(abspath, strlen(abspath), vfs.module_dir))
-		return 0;			/* ancestor of the module root: still descending */
+	if (rootlen <= 1)			/* root is "/": nothing is outside */
+		return 0;
+	/* An fd pin (rrsync rewrites a validated option path to /proc/self/fd/N so
+	 * no later symlink can redirect it) is spelled outside the root by
+	 * construction.  Judge it by what it points AT rather than by its spelling,
+	 * so a pin is neither wrongly refused nor blindly trusted.  A pin we cannot
+	 * resolve to an absolute path is refused, not waved through: an unreadable
+	 * pin is exactly the case where we cannot say where the open would land. */
+	if (!am_daemon) {
+		const char *tail = vfs_fd_pin_tail(abspath);
+		if (tail && !*tail)
+			return 0;		/* the pin directory: transit, opens nothing */
+		if (is_exact_fd_pin(abspath)) {
+			ssize_t n = readlink(abspath, pinned, sizeof pinned - 1);
+			if (n <= 0 || pinned[0] != '/')
+				return is_operator ? 1 : 0;
+			pinned[n] = '\0';
+			abspath = pinned;
+		}
+	}
+	if (path_within(root, rootlen, abspath))
+		return 0;			/* inside: name-based exclude is not a boundary */
+	/* Not under the root.  An ABSOLUTE walk passes through the root's ancestors
+	 * ("/", "/home", ...) on the way down -- those are not "outside", just
+	 * not-yet-arrived, so allow them.  A path that has truly DIVERGED is
+	 * outside: refuse it for an operator/peer path that must stay in the tree
+	 * (is_operator); other opens (--log-file, --*-from, lock/motd) may
+	 * legitimately live elsewhere.  The --insecure-links / "insecure links =
+	 * yes" opt-out short-circuits before we get here. */
+	if (!*abspath || path_within(abspath, strlen(abspath), root))
+		return 0;			/* ancestor of the root: still descending */
 	return is_operator ? 1 : 0;
 }
 
@@ -197,7 +275,7 @@ int ds_descend(struct dirstack *ds, const char *part, int *hops)
 		 * symlink that redirected the walk into an excluded subtree). */
 		/* The strict resolver stays confined beneath the anchor (within the
 		 * module), so this never actually refuses; pass is_operator=0. */
-		if (abspath_excluded_by_module(ds->abspath, 0)) {
+		if (abspath_outside_confinement(ds->abspath, 0)) {
 			errno = ELOOP;
 			return -1;
 		}

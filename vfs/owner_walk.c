@@ -24,7 +24,7 @@
 
 /* Advance the tracked absolute path `abspath` by one resolved component,
  * normalizing "." and ".." exactly as openat() does so the module-confinement
- * check (abspath_excluded_by_module) sees the REAL resolved target.  -1/
+ * check (abspath_outside_confinement) sees the REAL resolved target.  -1/
  * ENAMETOOLONG on overflow. */
 static int abspath_step(char *abspath, size_t cap, const char *comp, size_t comp_len)
 {
@@ -88,14 +88,36 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 	int dfd = AT_FDCWD;
 	int dfd_owns = 0;
 
-	/* Absolute module-relative path of the current dir, for the exclude-aware
-	 * refusal (abspath_excluded_by_module).  A relative operator path starts at
-	 * the daemon's cwd == the module root; an absolute one (or a followed
-	 * absolute symlink target) restarts at "/". */
+	/* Absolute path of the current dir, for the confinement refusal
+	 * (abspath_outside_confinement).  A relative operator path starts at the
+	 * daemon's cwd == the module root; an absolute one (or a followed absolute
+	 * symlink target) restarts at "/". */
 	char abspath[MAXPATHLEN];
 	abspath[0] = '\0';
 	if (am_daemon && vfs.module_dir && vfs.module_dir[0] == '/')
 		strlcpy(abspath, vfs.module_dir, sizeof abspath);	/* "/" for a path=/ module */
+	else if (confine_root) {
+		/* Unlike a daemon's, this cwd is not pinned to the root -- the receiver
+		 * chdir's into the destination -- so it has to be read, not assumed.
+		 * It must be the PHYSICAL cwd: vfs.curr_dir is the lexical name
+		 * vfs_change_dir() was given, so after descending a trusted symlink the
+		 * tracker sits at a different depth than the kernel, and a ".." that
+		 * really escapes looks like it landed inside.
+		 *
+		 * Without it there is nothing to measure against, and an empty tracker
+		 * does NOT deny by itself -- a leading ".." pops nothing and an empty
+		 * path reads as an ancestor of the root -- so refuse the open instead. */
+		if (!getcwd(abspath, sizeof abspath))
+			return -1;
+	}
+
+	/* An fd pin (rrsync rewrites an option path to /proc/self/fd/N so no
+	 * later symlink can redirect it) is spelled outside the root by
+	 * construction, so the walk has to be allowed through /proc/self/fd to
+	 * reach the magic link.  This only suspends the check for that prefix:
+	 * following the link restarts the walk at its absolute target, and every
+	 * component of THAT is checked, so a pin aimed outside is still refused. */
+	int pin_transit = !am_daemon && confine_root && vfs_fd_pin_tail(path) != NULL;
 
 	/* Path-walk state. `remaining` is the unconsumed tail; we splice
 	 * symlink targets back into it as we go. Sized 2x MAXPATHLEN so a
@@ -149,7 +171,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 					saved_errno = errno;
 					goto out;
 				}
-				if (abspath_excluded_by_module(abspath, is_operator)) {
+				if (!pin_transit && abspath_outside_confinement(abspath, is_operator)) {
 					saved_errno = ELOOP;
 					goto out;
 				}
@@ -204,6 +226,10 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 				}
 				dfd_owns = 1;
 				abspath[0] = '\0';	/* followed an absolute target: restart from "/" */
+				/* "self" resolves to "<pid>", still inside the pin;
+				 * the magic link itself lands elsewhere and ends the
+				 * exemption.  Never turns back on. */
+				pin_transit = pin_transit && vfs_fd_pin_tail(rebuilt) != NULL;
 				char *p = rebuilt;
 				while (*p == '/') p++;
 				strlcpy(remaining, p, sizeof remaining);
@@ -219,7 +245,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 				saved_errno = errno;
 				goto out;
 			}
-			if (abspath_excluded_by_module(abspath, is_operator)) {
+			if (!pin_transit && abspath_outside_confinement(abspath, is_operator)) {
 				saved_errno = ELOOP;
 				goto out;
 			}
@@ -243,7 +269,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 			saved_errno = errno;
 			goto out;
 		}
-		if (abspath_excluded_by_module(abspath, is_operator)) {
+		if (!pin_transit && abspath_outside_confinement(abspath, is_operator)) {
 			saved_errno = ELOOP;
 			goto out;
 		}
@@ -337,7 +363,7 @@ int vfs_owner_walk_parent(const char *path, const char **bname, int is_operator)
 	/* owner_walk only resolved the PARENT; check the resolved leaf too, so a
 	 * symlinked operator path cannot act on a leaf that resolves OUTSIDE the
 	 * module in an otherwise-served dir.  (The module exclude/filter is name-
-	 * based and not enforced here -- see abspath_excluded_by_module.) */
+	 * based and not enforced here -- see abspath_outside_confinement.) */
 	if (pabs[0]) {
 		char leafabs[MAXPATHLEN];
 		if (snprintf(leafabs, sizeof leafabs, "%s/%s", pabs, *bname) >= (int)sizeof leafabs) {
@@ -345,7 +371,7 @@ int vfs_owner_walk_parent(const char *path, const char **bname, int is_operator)
 			errno = ENAMETOOLONG;	/* fail closed, never skip the check */
 			return -1;
 		}
-		if (abspath_excluded_by_module(leafabs, is_operator)) {
+		if (abspath_outside_confinement(leafabs, is_operator)) {
 			close(dfd);
 			errno = ELOOP;
 			return -1;
