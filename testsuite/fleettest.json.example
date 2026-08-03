@@ -227,9 +227,10 @@
       "scratchbase": "/Volumes/RsyncHFS",
       "expect_skip_omit": [
         "backup-crossdev-copy",
-        "chmod-temp-dir"
+        "chmod-temp-dir",
+        "operator-path-backup-chown"
       ],
-      "_skip_comment": "The two omitted entries are macOS-wide expected-skips that this target RUNS: the separate volume supplies the cross-device conditions mac2 lacks. (itemize used to XFAIL here, before --link-dest learned to fall back when the filesystem cannot hard-link a symlink.)"
+      "_skip_comment": "The three omitted entries are macOS-wide expected-skips that this target RUNS: the separate volume supplies the cross-device conditions mac2 lacks. (itemize used to XFAIL here, before --link-dest learned to fall back when the filesystem cannot hard-link a symlink.)"
     },
     {
       "_comment": "The x86-64 Mac (macOS 10.13).  The ONLY target that can build the x86-64 md5 assembly -- mac2 is arm64, where configure refuses --enable-md5-asm outright.  MacPorts supplies autotools, python3 and the crypto/hash libs the stock 10.13 image lacks, and is not on the non-interactive ssh PATH, so put it there for the whole run.  This target keeps the STOCK Apple compiler (clang 10, the 10.13 ceiling), which is what caught #161; it cannot build --enable-roll-simd, because a clang that old rejects configure's target(\"default\") multiversioning probe. That is a compiler-VERSION limit, not a Mach-O one -- see mac-x86-asm below, which builds the same source with MacPorts clang 19 and all three optimizations on.",
