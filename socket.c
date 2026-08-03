@@ -255,6 +255,68 @@ static void contimeout_handler(UNUSED(int val))
 	connect_timeout = -1;
 }
 
+/* How long each poll() pass waits before re-checking a pending connect(). */
+#define CONNECT_POLL_SLICE 100
+
+/* connect() to addr, waiting for completion with poll() rather than blocking
+ * in the kernel.  A blocking connect() can sleep forever on a connection that
+ * is already established (seen on OpenBSD, where the socket shows ESTABLISHED
+ * at both ends while connect() never returns); with no timeout set that hangs
+ * rsync for good.  Re-checking the socket on each pass costs a loop instead.
+ * Returns 0 on success, -1 with errno set on failure. */
+static int connect_polled(int s, const struct sockaddr *addr, socklen_t addrlen)
+{
+	struct pollfd pfd;
+	int save_errno;
+
+	set_nonblocking(s);
+
+	if (connect(s, addr, addrlen) == 0)
+		goto connected;
+	if (errno != EINPROGRESS && errno != EINTR)
+		goto failed;
+
+	pfd.fd = s;
+	pfd.events = POLLOUT;
+	while (1) {
+		int err = 0;
+		socklen_t errlen = sizeof err;
+
+		/* the --contimeout alarm fired: let the caller report it */
+		if (connect_timeout < 0) {
+			errno = ETIMEDOUT;
+			goto failed;
+		}
+		pfd.revents = 0;
+		if (poll(&pfd, 1, CONNECT_POLL_SLICE) < 0) {
+			if (errno == EINTR)
+				continue;
+			goto failed;
+		}
+		/* A finished slice is not a failure: loop so that poll() looks
+		 * at the socket again, which is what recovers a missed wakeup. */
+		if (!pfd.revents)
+			continue;
+		if (getsockopt(s, SOL_SOCKET, SO_ERROR, &err, &errlen) < 0)
+			goto failed;
+		if (err) {
+			errno = err;
+			goto failed;
+		}
+		break;
+	}
+
+ connected:
+	set_blocking(s);
+	return 0;
+
+ failed:
+	save_errno = errno;
+	set_blocking(s);
+	errno = save_errno;
+	return -1;
+}
+
 /* Open a socket to a tcp remote host with the specified port.
  *
  * Based on code from Warren.  Proxy support by Stephen Rothwell.
@@ -362,23 +424,20 @@ int open_socket_out(char *host, int port, const char *bind_addr, int af_hint)
 		}
 
 		set_socket_options(s, sockopts);
-		while (connect(s, res->ai_addr, res->ai_addrlen) < 0) {
+		if (connect_polled(s, res->ai_addr, res->ai_addrlen) < 0) {
 			if (connect_timeout < 0)
 				exit_cleanup(RERR_CONTIMEOUT);
-			if (errno == EINTR)
-				continue;
+			/* stash it before close()/alarm() can overwrite errno */
+			errnos[j] = errno;
 			close(s);
 			s = -1;
-			break;
 		}
 
 		if (connect_timeout > 0)
 			alarm(0);
 
-		if (s < 0) {
-			errnos[j] = errno;
+		if (s < 0)
 			continue;
-		}
 
 		if (proxied && establish_proxy_connection(s, host, port, proxy_user, proxy_pass) != 0) {
 			close(s);
