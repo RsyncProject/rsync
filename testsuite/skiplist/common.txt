@@ -46,6 +46,7 @@ proto-cleared-ndx  # the pure-Python sender needs a real TCP daemon; run with --
 proto-hlink-flag-oob  # the pure-Python sender needs a real TCP daemon; run with --use-tcp
 proto-hlink-gnum  # the pure-Python sender needs a real TCP daemon; run with --use-tcp
 proto-msg-info-assert  # the pure-Python sender needs a real TCP daemon; run with --use-tcp
+proto-parent-ndx-empty-dirflist  # the pure-Python sender needs a real TCP daemon; run with --use-tcp
 proto-sender-selftest  # the pure-Python sender needs a real TCP daemon; run with --use-tcp
 proto-subflist-freed  # the pure-Python sender needs a real TCP daemon; run with --use-tcp
 proxy-connect-request-too-long  # fake-proxy listener needs a real TCP socket; run with --use-tcp
