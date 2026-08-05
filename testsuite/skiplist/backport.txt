@@ -1,0 +1,29 @@
+# Tests from a NEWER rsync test suite that this backport branch cannot run.
+#
+# This is an EXCLUDE list, not an expected-skip list: fleettest reads it from
+# the BUILT tree (--repo) and passes the names to runtests.py as RSYNC_EXCLUDE,
+# so they are not run and not reported.  It has to be an exclude rather than an
+# expected-skip declaration because some of these FAIL rather than skip, and an
+# expected-skip list cannot describe a failure.
+#
+# One name per line, '#' starts a comment.  Only put a test here when it cannot
+# pass for a structural reason -- a fix or feature this branch does not carry,
+# or a helper its Makefile cannot build.  A test that fails for any other reason
+# is telling you something and must not be silenced here.
+
+# Unit-test helpers this branch's Makefile does not build (the suite added them
+# after 3.4.1; the tests skip with "<helper> not built").
+clean-fname-collapse
+hashtable-overflow
+iwildmatch-fold
+safe-arg-leak
+
+# Features and fixes not in 3.4.1.
+chmod-option                            # --chmod permission copy modes (3.5.0)
+preallocate                             # --preallocate --sparse hole punching (3.5.0)
+daemon-refuse-compress-threads-alias    # --compress-threads arrived in 3.4.2
+daemon-zstd-thread-exhaustion           # --compress-threads arrived in 3.4.2
+
+# The suite's per-platform skip lists describe the tests IT ships, so they do
+# not describe a build of this branch.
+skiplist-spec
