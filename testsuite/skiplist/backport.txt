@@ -33,3 +33,20 @@ rrsync-no-overwrite-backup-collision
 rrsync-no-overwrite-delay-updates
 rrsync-no-overwrite-logfile
 rrsync-no-overwrite-partial-dir
+
+# --- KNOWN BUG, DELIBERATELY ACCEPTED -------------------------------------
+# Everything above is a feature or helper this branch does not have.  This one
+# is different: it is a REAL DEFECT in this branch that we have chosen to ship.
+#
+# Any --remote-option (-M) on a LOCAL transfer makes the receiver write to the
+# process's current directory instead of the destination -- silently, with exit
+# 0 and a normal transfer summary.  fake-super-acl-xattr is simply the only
+# test in the 3.5.0 suite that uses -M on a local copy, so it is the only one
+# that catches it.  Stock 3.2.7 fails the same way when given -s; v3.4.1 and
+# 3.5.0 are unaffected; the breakage predates every security commit on this
+# branch.  Full analysis, including the strace and what was ruled out, is in
+# dev-notes/v327-backport-remote-option-wrong-dir.txt.
+#
+# Remove this line if that bug is ever fixed -- it is the only thing watching
+# for it.
+fake-super-acl-xattr
