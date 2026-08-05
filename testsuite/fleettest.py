@@ -110,6 +110,8 @@ from pathlib import Path
 # failures (a matching FAIL does not make a cell "not OK"). Both are
 # comma-separated test-name globs (fnmatch), applied across every target.
 SKIP_CSV = ""
+# Names from a backport tree's testsuite/skiplist/backport.txt (see main()).
+BACKPORT_EXCLUDE: list[str] = []
 XFAIL_GLOBS: list[str] = []
 
 # Set from --timing in main(). Also asks each target's runtests.py for its own
@@ -324,6 +326,31 @@ def parse_workflow_skip(workflow: str, make_target: str = "check") -> str | None
     return m.group(1) if m else None
 
 
+def _expand_spec_names(spec: str) -> set[str]:
+    """The test names a workflow's RSYNC_EXPECT_SKIPPED spec resolves to, by
+    reading its @FILE references out of the suite tree.  Only used to decide
+    which backport exclusions are actually IN the expected-skip set: runtests
+    rejects a '-name' that removes a name nothing added, so a removal may only
+    be emitted for a name the spec really contains."""
+    names: set[str] = set()
+    for tok in spec.split(","):
+        tok = tok.strip()
+        if not tok or tok.startswith("-"):
+            continue
+        if tok.startswith("@"):
+            f = TESTSUITE_REPO / tok[1:]
+            try:
+                for ln in f.read_text().splitlines():
+                    ln = ln.split("#", 1)[0].strip()
+                    if ln:
+                        names.add(ln)
+            except OSError:
+                pass
+        else:
+            names.add(tok)
+    return names
+
+
 def workflow_skip_for(t: "Target", make_target: str = "check") -> str | None:
     """The target's expected-skip csv for a `make <target>` pass: its workflow's
     RSYNC_EXPECT_SKIPPED, plus any per-target expect_skip_extra (old-box-only
@@ -341,10 +368,20 @@ def workflow_skip_for(t: "Target", make_target: str = "check") -> str | None:
     near-empty expected set and so a guaranteed mismatch; a lane the workflow
     does not pin is simply not pinned here either."""
     base = parse_workflow_skip(t.workflow, make_target)
-    if base is None or not (t.expect_skip_extra or t.expect_skip_omit):
+    # A backport-excluded test never runs, so it cannot skip either: drop it
+    # from the expected-skip set as well, or the oracle waits for a skip that
+    # can no longer happen.  Only for names the spec actually contains --
+    # runtests rejects a '-name' that removes a name nothing added.
+    in_spec = _expand_spec_names(base) if (base and BACKPORT_EXCLUDE) else set()
+    omit = set(t.expect_skip_omit) | (set(BACKPORT_EXCLUDE) & in_spec)
+    if base is None or not (t.expect_skip_extra or omit):
         return base
     items = sorted(set(t.expect_skip_extra) | ({base} if base else set()))
-    items += [f"-{n}" for n in sorted(set(t.expect_skip_omit))]
+    # A backport-excluded test cannot skip, because it never runs -- so it must
+    # also come OUT of the expected-skip set, or the oracle waits for a skip
+    # that can no longer happen.  The name usually lives inside an @FILE, so it
+    # is dropped with a '-name' token that runtests applies after expansion.
+    items += [f"-{n}" for n in sorted(omit)]
     return ",".join(items)
 
 
@@ -1158,7 +1195,7 @@ def main() -> int:
     ap.add_argument("--list", action="store_true", help="list targets and exit")
     args = ap.parse_args()
 
-    global SKIP_CSV, XFAIL_GLOBS, TIMING, FULL_TCP
+    global SKIP_CSV, XFAIL_GLOBS, TIMING, FULL_TCP, BACKPORT_EXCLUDE
     SKIP_CSV = ",".join(s.strip() for s in (args.skip or "").split(",") if s.strip())
     XFAIL_GLOBS = [s.strip() for s in (args.xfail or "").split(",") if s.strip()]
     TIMING = args.timing
@@ -1185,6 +1222,7 @@ def main() -> int:
         names = [x for x in names if x]
         if names:
             SKIP_CSV = ",".join(x for x in ([SKIP_CSV] + names) if x)
+            BACKPORT_EXCLUDE[:] = names
             print(f"[backport] excluding {len(names)} test(s) declared in "
                   f"{bp.relative_to(REPO)}")
     if not args.cleanup:
