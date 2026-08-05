@@ -110,7 +110,15 @@ if got.startswith('exit:') or not got:
 
 # --- the committed lists ---------------------------------------------------
 
-lists = sorted((SRC / 'testsuite' / 'skiplist').glob('*.txt'))
+# backport.txt is not an expected-skip list: it is an EXCLUDE list that a
+# backport branch ships to say which of this suite's tests it cannot run, and
+# fleettest reads it from the BUILT tree rather than from any workflow.  It only
+# appears here when a backport tree has been overlaid with this suite, so it is
+# exempt from the checks below that assume a workflow points at the file.
+BACKPORT_LIST = 'backport.txt'
+
+lists = sorted(p for p in (SRC / 'testsuite' / 'skiplist').glob('*.txt')
+               if p.name != BACKPORT_LIST)
 if len(lists) < 5:
     test_fail(f'expected the per-platform skip lists, found {lists}')
 for path in lists:

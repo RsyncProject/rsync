@@ -67,3 +67,29 @@ target with `"protocols": [29]` is only pinned if its workflow actually has a
 `make check29` step composing `proto29.txt`. Today only the Ubuntu workflows
 do; a macOS or Cygwin target set to run protocol 29 gets no expected-skip
 oracle for that pass rather than a wrong one.
+
+## `backport.txt` — a different thing in the same directory
+
+A backport branch (`v3.4.1-sec-patches3`, `v3.2.7-sec-patches3`) is tested with
+a NEWER suite than it shipped with, via
+`fleettest.py --repo <backport> --testsuite-repo <3.5.0>`. Such a tree cannot
+pass tests for fixes it does not carry, and cannot build unit-test helpers its
+Makefile has never heard of.
+
+Those branches each carry their own `testsuite/skiplist/backport.txt`. It is
+**not** an expected-skip list:
+
+* the other files here are `RSYNC_EXPECT_SKIPPED` oracles — "these should skip,
+  tell me if that changes";
+* `backport.txt` is an `RSYNC_EXCLUDE` list — "do not run these at all".
+
+It has to be an exclusion because some of the tests *fail* rather than skip on
+an older tree, and an expected-skip list cannot describe a failure.
+
+`fleettest.py` reads it from the tree being BUILT (`--repo`), not from the tree
+providing the suite, because only the built tree knows what it lacks. The
+overlay that puts a newer `testsuite/` onto an older tree is a merge with no
+delete, so a file that exists only on the backport survives it.
+
+`skiplist-spec` exempts this name from the rule that every committed list must
+be referenced by a workflow: nothing references it, by design.

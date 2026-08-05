@@ -1170,6 +1170,23 @@ def main() -> int:
     # The expected-skip lists travel with the suite, so read workflows from the
     # tree that provides the tests.
     WORKFLOWS = TESTSUITE_REPO / ".github" / "workflows"
+
+    # A tree that is OLDER than the suite being run against it -- a backport
+    # branch under --testsuite-repo -- cannot pass tests for fixes and features
+    # it does not carry, and cannot build the suite's newer unit-test helpers.
+    # It declares those in its own testsuite/skiplist/backport.txt, which is
+    # read from the BUILT tree, not the suite tree, because only the built tree
+    # knows what it lacks.  The names are excluded outright (RSYNC_EXCLUDE)
+    # rather than declared as expected skips: some of them fail rather than
+    # skip, and an expected-skip list cannot describe a failure.
+    bp = REPO / "testsuite" / "skiplist" / "backport.txt"
+    if bp.is_file():
+        names = [ln.split("#", 1)[0].strip() for ln in bp.read_text().splitlines()]
+        names = [x for x in names if x]
+        if names:
+            SKIP_CSV = ",".join(x for x in ([SKIP_CSV] + names) if x)
+            print(f"[backport] excluding {len(names)} test(s) declared in "
+                  f"{bp.relative_to(REPO)}")
     if not args.cleanup:
         # The Python test suite (runtests.py + testsuite/) comes from
         # TESTSUITE_REPO, so that is where runtests.py must live.  The build tree
