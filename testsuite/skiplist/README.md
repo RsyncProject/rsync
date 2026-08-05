@@ -93,3 +93,25 @@ delete, so a file that exists only on the backport survives it.
 
 `skiplist-spec` exempts this name from the rule that every committed list must
 be referenced by a workflow: nothing references it, by design.
+
+### Accepted breakage vs absent features
+
+`backport.txt` holds two different kinds of entry, and they must stay
+distinguishable:
+
+* **absent** — a fix, feature or helper the branch does not have. The test
+  could never pass and is not telling you anything.
+* **accepted breakage** — a real defect on that branch that we have chosen to
+  ship. The test *was* telling you something, and excluding it is a decision
+  rather than bookkeeping.
+
+Keep the second kind in its own commented section naming the defect and where
+it is written up. `v3.2.7-sec-patches3` has one today
+(`fake-super-acl-xattr`, the `--remote-option` local-transfer bug). A list that
+does not distinguish them turns "we know about this and accepted it" into "this
+test never applied here" within about one release.
+
+**CI for the backport branches**, when it is set up to run this suite against
+them, has to honour these lists the same way `fleettest.py` does — read
+`backport.txt` from the branch being built and pass it as `RSYNC_EXCLUDE`.
+A CI job that does not will fail on every one of these and be turned off.
