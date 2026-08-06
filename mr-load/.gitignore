@@ -4,6 +4,9 @@ scripts/rclone/rclone.conf
 *.log
 bronze_layer/
 artifacts/
+index*.csv
+# the filled ontology carries probed portal constants — only the skeleton is public
+ontology/miraex_ontology.yaml
 # private recon material stays out of this public repo
 *recon*.json
 *digest*

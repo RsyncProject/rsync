@@ -2,8 +2,16 @@
 # Modeled on the canonical icalps fixture (7_entity_icload_style.yaml) with
 # miraex_* naming. FILL_ME markers are portal constants that MUST be probed from
 # the live target portal (association type IDs, mirror columns) — icalps values
-# are portal-specific and non-transferable. Validate with:
+# are portal-specific and non-transferable.
+#
+# Copy to ontology/miraex_ontology.yaml (git-ignored — the filled file carries
+# probed portal constants that stay out of this public repo) when filling
+# FILL_ME values, then validate with:
 #   python -m ontology_substrate probe --ontology miraex_ontology.yaml --dry-run
+#
+# Cardinality convention: source:target reading. The substrate-documented value
+# vocabulary is 1:1 / 1:N / N:M — verify via the dry-run that "N:1" parses; if
+# it does not, flip the affected edges' source/target and use 1:N.
 
 target_system:
   adapter: hubspot
@@ -11,9 +19,11 @@ target_system:
     reconciliation_id_prefix: miraex_
 
 sync_provider:
-  # Pending BINDING-QUESTIONS Q1. direct_api => mirror_* fields stay null and
-  # the two-pass bridge collapses to a single natural-key pass.
-  adapter: direct_api   # or: stacksync
+  # RESOLVED (Q1, 2026-08-06): hybrid like icalps — CRM entities go through the
+  # mirror provider; the document entity bypasses it (direct API + ledger).
+  # Mirror record-id columns are per-connection constants: discover in Phase 0,
+  # then fill mirror_table/mirror_pk_col below for company/contact/deal.
+  adapter: stacksync
   config: {}
 
 layers:
@@ -36,7 +46,9 @@ layers:
 entities:
   - name: company
     bronze_table: Bronze_Company.csv
-    bronze_pk: odoo_company_id
+    bronze_pk: miraex_company_id  # curated master-list key (union of Odoo export,
+                                  # Drive folder names, summary sheets — Drive
+                                  # exports carry no source record ids)
     silver_table: stg_company_normalised
     silver_pk: miraex_company_id
     mirror_table: null            # FILL_ME if mirror mode
@@ -54,14 +66,16 @@ entities:
     silver_marts:
       - name: fair_contacts
         path: stg_fair_contacts
-        unique_id_pattern: "evt:<event|email hash>"   # sole dedup when dedup is off
+        unique_id_pattern: "evt:<sha1(event|email|name)[:12]>"   # sole dedup when dedup is off; single-sourced with PLAN.md/AGENTS.md
         scope: fair/exhibition ingests
         cardinality_note: contact may attend N events; event key is a property, not an entity (v1)
         write_mode: upsert
 
   - name: deal
     bronze_table: Bronze_Deal.csv
-    bronze_pk: odoo_deal_id
+    bronze_pk: miraex_deal_id   # SYNTHETIC (Q3): hash of normalised opportunity
+                                # name + business line — the Drive exports carry
+                                # no Odoo record ids; key frozen at first write
     silver_table: stg_deal_normalised
     silver_pk: miraex_deal_id
     mirror_table: null
@@ -81,7 +95,7 @@ edges:
   - name: contact_company
     source: contact
     target: company
-    cardinality: "1:N"            # confirm for fair contacts (Q: N:M?)
+    cardinality: "N:1"            # confirm for fair contacts (Q: N:M?)
     silver_source_fk: miraex_company_id
     expected_from: bronze
     types: []                     # FILL_ME: probe portal labels both directions
@@ -92,7 +106,8 @@ edges:
     cardinality: "N:1"
     silver_source_fk: miraex_company_id
     expected_from: bronze
-    portal_constraint: REJECT_on_missing_parent
+    # fk_violation_policy: REJECT (silver validation, schema_context precedent);
+    # portal_constraint is reserved for probed portal label limits (e.g. limit=1)
     types: []                     # FILL_ME
 
   - name: deal_contact
@@ -101,7 +116,7 @@ edges:
     cardinality: "N:1"            # confirm: multiple contacts per deal?
     silver_source_fk: miraex_contact_id
     expected_from: bronze
-    portal_constraint: WARN_on_missing_parent
+    # fk_violation_policy: WARN (silver validation)
     types: []                     # FILL_ME
 
   - name: document_company

@@ -18,12 +18,13 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 : "${MRLOAD_LOCAL_ROOT:?set MRLOAD_LOCAL_ROOT in .env (e.g. /srv/mr-load/drive)}"
 : "${RCLONE_CONFIG:=$HERE/rclone.conf}"
 export RCLONE_CONFIG
+mkdir -p "$MRLOAD_LOCAL_ROOT/logs"
 
 # tree name -> remote name (defined in rclone.conf with its own root_folder_id)
 declare -A TREES=(
-  [companies]="miraex-companies:"      # per-company folder tree
-  [opportunities]="miraex-ongoing:"    # per-opportunity YYYY_Partner tree
-  [tradeshows]="miraex-tradeshows:"    # per-event tree
+  [companies]="miraex-companies:"          # per-company folder tree
+  [opportunities]="miraex-opportunities:"  # per-opportunity YYYY_Partner tree
+  [tradeshows]="miraex-tradeshows:"        # per-event tree
 )
 
 LIVE=0
@@ -31,16 +32,19 @@ ONLY=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --live) LIVE=1 ;;
-    --tree) ONLY="$2"; shift ;;
+    --tree) ONLY="${2:?--tree requires a value}"; shift ;;
     *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
   shift
 done
+[ -z "$ONLY" ] || [ -n "${TREES[$ONLY]+x}" ] || {
+  echo "unknown tree: $ONLY (companies|opportunities|tradeshows)" >&2; exit 2;
+}
 
 FLAGS=(
   --checksum            # re-runs compare content, not just mtime/size
   --create-empty-src-dirs  # empty folders are part of the hierarchy we preserve
-  --drive-export-formats "docx,xlsx,pptx"  # native Google files -> Office
+  --drive-export-formats "docx,xlsx,pptx"  # provisional default pending BINDING-QUESTIONS (Library: native Google formats)
   --exclude-from "$HERE/exclude.txt"
   --transfers 4 --checkers 8
   --log-level INFO
@@ -56,4 +60,5 @@ for tree in "${!TREES[@]}"; do
     --log-file "$MRLOAD_LOCAL_ROOT/logs/sync_${tree}_$(date -u +%Y%m%dT%H%M%SZ).log"
 done
 
-echo "done. next: scripts/indexer/walk_index.py --root $MRLOAD_LOCAL_ROOT"
+echo "done. next (per tree): scripts/indexer/walk_index.py" \
+     "--root $MRLOAD_LOCAL_ROOT/companies --tree companies -o artifacts/index_companies.csv"

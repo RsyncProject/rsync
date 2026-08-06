@@ -17,6 +17,15 @@ relate to mr-load. Ten agents swept the five prior repos, the live portal, and t
 Drive estate. Results: `RETRIEVAL.md` (sanitized) + the operator's private digest.
 Re-run this team only if new prior-art repos surface.
 
+## Phase 0 — Foundations (operator-executed, no autonomous team)
+
+One-time setup is deliberately *not* delegated to agents (the prior project's
+boundary rule: schema-changing operations require per-operation human approval):
+reconciliation-property creation, portal constant discovery, sync-connection
+confirmation, staging schema install, sandbox verification. Agents may *prepare*
+artifacts for these steps (scripts, checklists, probe read-outs), but the operator
+executes them. Phase 0 blocks every team below.
+
 ---
 
 ## Team 1 — Companies
@@ -58,7 +67,7 @@ This is the critical team the plan calls for: it *decides*, then acts.
 
 | Agent | Mission | Output artifact |
 |---|---|---|
-| `export-negotiator` | Specify + validate the fresh Odoo export (record ids, dates, currency, stage vocabulary); inspect for the known CSV damage classes | export spec + damage report |
+| `source-validator` | Inventory + validate the Drive spreadsheet exports (Q3 resolved: no fresh Odoo export in v1); mint frozen synthetic `miraex_deal_id` keys; dedupe source rows keep-latest; inspect for the known CSV damage classes | source spec + damage report + key registry |
 | `property-replicator` | Minimal property set under a `miraex` group; sandbox-first creation; record everything created | property manifest |
 | `pipeline-builder` | Create Miraex pipeline(s) + stages; record IDs into the seed table | stage-map seed |
 | `stage-mapper` | Two-field (stage, outcome) → stage-id matrix; fail-loud on unknowns | mapper + seed export |
@@ -70,7 +79,7 @@ This is the critical team the plan calls for: it *decides*, then acts.
 | Agent | Mission | Output artifact |
 |---|---|---|
 | `sync-operator` | rclone config + per-tree sync to the Ubuntu server; dry-run diff first; handle shared-item roots; decide native-Google-format export policy | sync log + tree stats |
-| `indexer` | Walk the local tree; emit hierarchical path index rows with `fs:<sha1(relpath)[:12]>` ids; apply exclusion policy | `stg_library_normalised` rows |
+| `indexer` | Walk the local tree; emit hierarchical path index rows with tree-prefixed `fs:<sha1(tree/relpath)[:12]>` ids; apply exclusion policy | `stg_library_normalised` rows |
 | `fk-resolver` | Curated folder→company mapping + fuzzy assist for aliasing; unresolved folders skipped and reported, never guessed | mapping table + unresolved report |
 | `ontology-populator` | Declare document entity + document→company edge; FilesystemConnector; probe fill rates | ontology YAML + probe results |
 | `uploader` | Two-phase upload (file → note+association) with ledger, dry-run default, retry/backoff | ledger status report |

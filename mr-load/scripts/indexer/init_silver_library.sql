@@ -1,15 +1,22 @@
 -- mr-load library staging: hierarchical path index + FK resolution + ledgers.
--- Mirrors the icalps library silver/ledger DDL with miraex_* naming. {schema}
--- is substituted by the loader via allowlist-validated replace (never str.format
--- — literal braces in SQL comments break it; a prior-project lesson).
+-- Ledgers and exemptions mirror the proven icalps DDL with miraex_* naming; the
+-- path-index table adapts the icalps silver contract for a walked filesystem
+-- (no DB-supplied metadata), borrowing the materialized-path idiom from the
+-- prior hierarchy schema. {schema} is substituted by the loader via
+-- allowlist-validated replace (never str.format — literal braces in SQL
+-- comments break it; a prior-project lesson).
 
 CREATE SCHEMA IF NOT EXISTS {schema};
 
 -- The path index. One row per file in the rclone mirror; hierarchy carried by
 -- relative_path/path_segments (materialized-path style: segments '|'-joined,
--- queryable via string_to_array).
+-- queryable via string_to_array). Load walk_index.py CSVs with an explicit
+-- column list (the table interposes resolver columns absent from the CSV):
+--   COPY {schema}.stg_library_normalised (miraex_doc_id, tree, relative_path,
+--     file_name, path_segments, depth, company_key_raw, file_size, modified_at,
+--     excluded) FROM ... WITH (FORMAT csv, HEADER)
 CREATE TABLE IF NOT EXISTS {schema}.stg_library_normalised (
-    miraex_doc_id      TEXT PRIMARY KEY,           -- fs:<sha1(relpath)[:12]>
+    miraex_doc_id      TEXT PRIMARY KEY,           -- fs:<sha1(tree/relpath)[:12]>
     tree               TEXT NOT NULL,               -- companies|opportunities|tradeshows
     relative_path      TEXT NOT NULL,
     file_name          TEXT NOT NULL,

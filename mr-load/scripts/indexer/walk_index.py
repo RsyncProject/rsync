@@ -3,14 +3,23 @@
 
 Replicates the icalps library silver contract for a source with no DB metadata:
 walk the local mirror deterministically, emit one row per file with a stable
-synthetic id (``fs:<sha1(relpath)[:12]>`` — the prior walker.py idiom), the
-normalised relative path (the hierarchical index), and the company key extracted
-from the path (top-level folder segment by default). Output is a CSV shaped for
-``init_silver_library.sql``'s staging table; loading and FK resolution against
-``miraex_company_id`` happen downstream.
+synthetic id (``fs:<sha1(tree/relpath)[:12]>`` — the prior walker.py idiom, with
+the tree prefixed so identical relative paths in different trees cannot collide),
+the normalised relative path (the hierarchical index), and the company key
+extracted from the path (top-level folder segment by default). Output is a CSV
+shaped for ``init_silver_library.sql``'s staging table; load it with an explicit
+column list (the table has extra resolver columns), e.g.::
+
+  COPY {schema}.stg_library_normalised
+    (miraex_doc_id, tree, relative_path, file_name, path_segments, depth,
+     company_key_raw, file_size, modified_at, excluded)
+  FROM ... WITH (FORMAT csv, HEADER)
+
+FK resolution against ``miraex_company_id`` happens downstream.
 
 Usage:
-  walk_index.py --root /srv/mr-load/drive/companies --tree companies -o index.csv
+  walk_index.py --root /srv/mr-load/drive/companies --tree companies \
+      -o artifacts/index_companies.csv
 """
 from __future__ import annotations
 
@@ -21,14 +30,18 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-# Extension exclusion mirrors the prior project's image-exclusion set; extend
-# per the Phase 5 exclusion-policy decision (BINDING-QUESTIONS.md).
-EXCLUDED_EXTS = {".ds_store", ".ini", ".db", ".lnk", ".tmp"}
-# HubSpot file-upload hard cap; oversize files are indexed but flagged.
+# Exclusion-by-extension follows the prior walker's *pattern* (icalps excluded
+# image extensions); the actual mr-load extension policy is pending
+# (BINDING-QUESTIONS.md, Library section). Dotfiles have no pathlib suffix, so
+# junk files are matched by name separately.
+EXCLUDED_EXTS = {".ini", ".db", ".lnk", ".tmp"}
+EXCLUDED_NAMES = {".ds_store", "desktop.ini", "thumbs.db"}
+# Placeholder pre-upload size guard — the actual HubSpot Files API limit must be
+# verified and the exclusion policy decided (BINDING-QUESTIONS.md, Library).
 MAX_UPLOAD_BYTES = 100 * 1024 * 1024
 
 FIELDS = [
-    "miraex_doc_id",      # fs:<sha1(relpath)[:12]> — deterministic, re-run stable
+    "miraex_doc_id",      # fs:<sha1(tree/relpath)[:12]> — deterministic, re-run stable
     "tree",               # which mirror tree (companies|opportunities|tradeshows)
     "relative_path",      # normalised dir path, '/'-separated, no leading slash
     "file_name",
@@ -54,12 +67,12 @@ def walk(root: Path, tree: str):
         segments = relposix.split("/")
         stat = path.stat()
         excluded = ""
-        if path.suffix.lower() in EXCLUDED_EXTS:
+        if path.suffix.lower() in EXCLUDED_EXTS or path.name.lower() in EXCLUDED_NAMES:
             excluded = "ext"
         elif stat.st_size > MAX_UPLOAD_BYTES:
             excluded = "oversize"
         yield {
-            "miraex_doc_id": synthetic_id(relposix),
+            "miraex_doc_id": synthetic_id(f"{tree}/{relposix}"),
             "tree": tree,
             "relative_path": "/".join(segments[:-1]),
             "file_name": segments[-1],

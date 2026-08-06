@@ -11,12 +11,12 @@ Nothing writes to the live portal without passing its gates.
 **Objective**: resolve the architectural forks and create the substrate every later
 phase depends on.
 
-1. **Write-path decision** (the single biggest fork — see `BINDING-QUESTIONS.md` Q1):
-   - *Mirror mode*: reuse the sync-provider-mirrored Postgres (`INSERT … ON CONFLICT`
-     into mirror tables; sync checkpoint; two-pass association bridge), or
-   - *Direct-API mode*: CRM v3 batch upserts keyed on a unique custom idProperty +
-     v4 association API + per-object ledgers (`DirectAPISyncProvider` shape), or
-   - *Hybrid* (icalps precedent): mirror for CRM objects, direct API for files/notes.
+1. **Write-path decision — RESOLVED (2026-08-06): Hybrid, like icalps.**
+   Mirror-Postgres upserts for companies/contacts/deals (sync checkpoint +
+   two-pass association bridge apply); direct API + ledger for library
+   files/notes. Phase-0 consequence: stand up/confirm the Miraex sync connection
+   and *discover* its mirror record-id columns before any association SQL is
+   rendered.
 2. **Reconciliation properties**: create unique custom properties
    `miraex_company_id`, `miraex_contact_id`, `miraex_deal_id` (string, always the
    *source-system* id — never the HubSpot record id; the prior project's semantics
@@ -32,8 +32,10 @@ phase depends on.
    `MIRAEX_PROD_TOKEN`), replicate token-precedence (sandbox wins when both set)
    and the `SandboxOverrideMap` keyed by source id.
 
-**Gates**: portal constants captured into `ontology/miraex_ontology.yaml`; dry-run
-CLI validates the YAML (`python -m ontology_substrate probe --dry-run`).
+**Gates**: portal constants captured into `ontology/miraex_ontology.yaml` (copied
+from the committed skeleton; the filled file is git-ignored because it carries
+probed portal constants); dry-run CLI validates it
+(`python -m ontology_substrate probe --dry-run`).
 
 ---
 
@@ -57,9 +59,10 @@ in-flight duplicate-cleanup workstream.
    phone normalisation **re-parameterised for +41 default** (prior code assumed
    +33); enum value maps built from *observed* Odoo vocabulary, not idealized lists.
 4. **Dedup guard**: score against a *fresh* portal export (staleness window is a
-   known gap) with the weighted signals (domain/name/city/phone); handle the
-   pandas `'.0'` id artifact; decide probe-only vs live-blocking (Q5). Route
-   review-band hits to an operator artifact — never auto-merge.
+   known gap in the prior mechanism) with the weighted signals
+   (domain/name/city/phone); handle the pandas `'.0'` id artifact; decide
+   probe-only vs live-blocking (`BINDING-QUESTIONS.md` Q5). Route review-band
+   hits to an operator artifact — never auto-merge.
 5. **Gold**: upsert keyed on `miraex_company_id`; exclude sync-owned/HubSpot-owned
    columns from the update set; preview CSV before every live push.
 
@@ -76,8 +79,9 @@ required, but re-runs must not double-create.
 **Prior art**: none for fairs (net-new). Reuse: sparse-required-field precedent
 (PK-only mandate), person extraction column shape, bronze/silver conventions.
 The portal already has an **unused `event_*` property set on contacts**
-(event name/type/id enums, registration/attendance dates, registration status) —
-reuse and extend its enums rather than minting new properties (Q6).
+(`event_name` string; `event_type`/`event_id` enums; registration/attendance
+dates; registration-status enum) — reuse and extend its enums rather than
+minting new properties (`BINDING-QUESTIONS.md` Q6).
 
 1. **Harvest**: fair contact lists live in the Drive tradeshow trees and
    mass-emailing sheets. Normalise each list to a common contact schema tagged
@@ -135,8 +139,14 @@ custom property set is replicated and pipeline/stage IDs exist first.
 owner resolution (<5% unresolved gate + fallback owner), bronze watermark,
 `ON CONFLICT` upsert, import-flag failure catalog.
 
-1. **Fresh export**: current Drive exports lack record IDs and dates — request an
-   ID-bearing Odoo export (`crm.lead` + partner references with database ids) (Q3).
+1. **Source — RESOLVED (2026-08-06): load from the existing Drive exports**
+   (no fresh Odoo export for v1). Binding consequences: `miraex_deal_id` is a
+   *synthetic deterministic key* (hash of normalised opportunity name + business
+   line, frozen at first write); source duplicate rows deduped at silver
+   (keep-latest); deal→company FK is resolved by *name* against the Phase 1
+   company master with mandatory review of fuzzy matches; missing dates accepted
+   as lossy. A future ID-bearing export reconciles onto these keys — it never
+   replaces them.
 2. **Properties first**: declare the Miraex deal property set minimally (property
    sprawl was a real failure mode — a later cleanup had to delete dozens);
    create under a dedicated property group with the `miraex_*` prefix; the
@@ -167,14 +177,16 @@ using the proven two-phase pattern.
 DDL, FK view, two-phase uploader, ledger, gates, unmigrate) — source-agnostic once
 files are local; materialized-path hierarchy schema if a first-class tree is wanted.
 
-1. **rclone replication** (`scripts/rclone/`): per-tree sync (per-company tree,
-   per-opportunity tree, tradeshow tree — scope per Q4) onto the Ubuntu server;
-   shared-item trees need per-folder roots or drive membership; `--drive-export`
-   handling for native Google formats decided explicitly; checksum-based sync for
-   re-runs.
+1. **rclone replication** (`scripts/rclone/`) — **scope RESOLVED (2026-08-06):
+   per-company tree only for v1** (per-opportunity + tradeshow trees deferred;
+   tradeshow material still feeds Phase 2 directly). Sync onto the Ubuntu server
+   with `--drive-export-formats` for native Google files (provisional
+   docx/xlsx/pptx default pending the Library binding question) and
+   checksum-based re-runs; dry-run diff reviewed before the first live sync.
 2. **Classification/index** (`scripts/indexer/walk_index.py`): walk the local tree
    (sorted, deterministic), emit one row per file: synthetic stable id
-   `fs:<sha1(relpath)[:12]>`, normalised relative path, name, size, mtime, the
+   `fs:<sha1(tree/relpath)[:12]>` (tree-prefixed so identical relative paths in
+   different trees cannot collide), normalised relative path, name, size, mtime, the
    *company key extracted from the path* (top-level folder segment), and an
    exclusion flag (extension/size policy). Upsert into
    `staging_miraex.stg_library_normalised` (DDL in `scripts/indexer/`).

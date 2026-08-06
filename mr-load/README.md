@@ -2,10 +2,12 @@
 
 `mr-load` replicates the proven **icalps loading system** for a new source estate
 (Miraex): legacy CRM entities plus a document **library file system** whose index does
-not exist yet — only a Google Drive account holds the material. The prior project
-fetched files directly from a legacy database; this project instead **replicates the
-Drive folder structure onto local disk first (via rclone)**, then reuses the exact
-same downstream pattern: hierarchical path index + foreign-key association from each
+not exist yet — only a Google Drive account holds the material. In the prior project
+the legacy database supplied only per-file *metadata* (relative path, filename, CRM
+foreign keys) while binaries were read from a locally mounted file share; this
+project instead **replicates the Drive folder structure onto local disk first (via
+rclone)** and *derives* the index by walking it, then reuses the exact same
+downstream pattern: hierarchical path index + foreign-key association from each
 file to the CRM entity it pertains to.
 
 > Raw reconnaissance artifacts (portal IDs, Drive folder IDs, record IDs, contact
@@ -45,7 +47,7 @@ approach is the seedbed for goal (7).
 |---|---|
 | `RETRIEVAL.md` | Synthesis of the past-project retrieval (the "memories") |
 | `PLAN.md` | Phase-by-phase execution plan with gates and prior-art references |
-| `AGENTS.md` | The agent team scaffold — one team per phase |
+| `AGENTS.md` | The agent team scaffold — one team per part of the plan (Phase 0 is operator-executed setup) |
 | `BINDING-QUESTIONS.md` | Open requirements that bind the ETL design (awaiting answers) |
 | `scripts/rclone/` | Drive → local replication (skeleton, env-driven) |
 | `scripts/indexer/` | Hierarchical path indexer + staging DDL (skeleton) |

@@ -43,9 +43,12 @@ digest (with IDs and record-level findings) is retained privately by the operato
   (status/type enums, country ISO, LinkedIn URL canonicalisation, E.164 phones —
   **hardcoded French +33; must be re-parameterised for Swiss data**) → gold
   `INSERT … ON CONFLICT (legacy_id) DO UPDATE` into the mirror table.
-- **DedupeGuardrail**: candidates (NEW/MODIFIED) scored against a *fresh portal
-  export* after aggressive normalisation (mojibake repair → NFKD → lowercase →
-  charset strip; corporate-stopword name roots; float-artifact id fix). Score =
+- **DedupeGuardrail**: candidates (NEW/MODIFIED) scored against a HubSpot UI
+  export of existing portal companies (in icalps a *static* benchmark CSV — the
+  staleness window between export and load was an unguarded gap mr-load should
+  close by requiring a fresh export) after aggressive normalisation (mojibake
+  repair → NFKD → lowercase → charset strip; corporate-stopword name roots;
+  float-artifact id fix). Score =
   0.45·domain + 0.35·name-Levenshtein + 0.10·city + 0.10·phone; review ≥0.65,
   block ≥0.82. In icalps it was **probe-only** — production duplicate protection was
   watermark + unique-key upsert. mr-load must decide whether the guard goes
@@ -104,8 +107,8 @@ digest (with IDs and record-level findings) is retained privately by the operato
 - Echo-loop prevention: every mirror UPDATE guarded with `IS DISTINCT FROM`.
 - Runner: stage machine with JSON artifact per run, `--resume-from`, per-stage
   SKIPPED/WARNING/FAILED, `--preview`, `--approve-gold` hard gate. (Known drift bug:
-  the archived runner references two stages/hooks that don't exist in its enum —
-  reconcile before reuse.)
+  the archived runner references three stages and two hooks that don't exist in
+  its enum/dataclass — reconcile before reuse.)
 - **Goal (7) seam already exists**: `ontology_substrate.adapters` defines
   `SyncProviderAdapter` (mirror column per entity, boundary drift modes) with
   `StackSyncProviderAdapter` and `DirectAPISyncProvider` reference implementations —
@@ -132,15 +135,17 @@ digest (with IDs and record-level findings) is retained privately by the operato
   origin-discriminator enum, a dedicated brand-prefixed deal pipeline, default
   association types only. A **pre-existing Miraex company with a handful of
   associated contacts is already in the portal** — day-one dedup targets. A
-  duplicate-cleanup workstream is mid-flight on ~2.3k companies (staging properties
-  on records) — mr-load must coordinate, not fight it. An **unused `event_*`
+  duplicate-cleanup workstream is mid-flight on a subset of portal companies
+  (staging properties on records) — mr-load must coordinate, not fight it. An
+  **unused `event_*`
   fair/exhibition property set already exists on contacts** and can be reused.
   Legacy-id property semantics drifted between load waves (external id vs own
   record id) — mr-load must pin "always the source-system id" as a hard rule.
 - **Drive**: the Miraex sales estate has a numbered filing scheme with (a) a
-  per-company folder tree (~57 folders), (b) a per-opportunity tree (~75
-  `YYYY_Partner` folders, shared item-by-item — parents invisible; rclone needs
-  per-folder roots or drive membership), (c) per-tradeshow folders, and (d) Odoo
+  per-company folder tree (several dozen folders), (b) a per-opportunity tree
+  (dozens of `YYYY_Partner` folders, shared item-by-item — parents invisible;
+  rclone needs per-folder roots or drive membership), (c) per-tradeshow folders,
+  and (d) Odoo
   `crm.lead` exports that are **thin and dirty** (no record IDs, no dates,
   duplicate rows, inconsistent stage labels, revenue as formatted text) — a fresh
   ID-bearing export is strongly indicated. Company-name aliasing across trees

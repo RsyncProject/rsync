@@ -12,7 +12,11 @@ bridge) or directly via the HubSpot API (batch upsert by unique idProperty, v4
 association API, per-object ledgers)? Hybrid (mirror for CRM objects, direct API
 for files/notes) is the icalps precedent.
 **Binds**: the entire gold layer, association mechanism, checkpoint stage, goal-7
-scope. **Answer**: _pending_.
+scope.
+**Answer (2026-08-06)**: **Hybrid, like icalps** — mirror-Postgres upserts for
+companies/contacts/deals; direct API + ledger for library files/notes. Follow-up
+prerequisite: a sync connection for the Miraex objects must exist, and its mirror
+record-id columns + association type IDs are *discovered* constants (Phase 0).
 
 ## ★ Q2 — Target portal + sandbox
 
@@ -20,7 +24,11 @@ Same portal as the prior loading (where a Miraex company + contacts already exis
 implying brand-tagging + dedup-merge decisions) or a separate Miraex portal? Is a
 sandbox portal available for the sandbox-first ritual?
 **Binds**: dedup scope, origin tagging, property/pipeline naming, every discovered
-constant. **Answer**: _pending_.
+constant.
+**Answer (2026-08-06)**: **Same portal, sandbox-first** — every phase rehearses in
+the sandbox portal (round-trip → 1-row prod pilot → 10-row → full). The
+pre-existing Miraex records and the in-flight cleanup workstream are therefore
+in-scope dedup/blast-radius concerns from day one.
 
 ## ★ Q3 — Odoo export quality
 
@@ -28,7 +36,15 @@ Fresh ID-bearing export (crm.lead + partner references with database ids, create
 dates, currency, full stage vocabulary) or must the pipeline load from the stale
 Drive spreadsheets (no record IDs, no dates, duplicates, dirty labels)?
 **Binds**: `miraex_deal_id` viability, watermark/delta capability, FK resolution
-strategy, timeline. **Answer**: _pending_.
+strategy, timeline.
+**Answer (2026-08-06)**: **Load from the existing Drive files.** Consequences now
+binding: `miraex_deal_id` is *synthetic* (deterministic hash of normalised
+opportunity name + business line — frozen once first written), deal→company FK
+resolution is name-based against the company master with mandatory review of
+fuzzy matches, duplicate rows in the source must be deduped at silver with a
+keep-latest rule, and dates/create-date preservation are accepted as lossy.
+Re-runs remain safe only through the synthetic-key upsert; a later fresh export
+would be reconciled *onto* these keys, never replace them.
 
 ## ★ Q4 — Library scope + folder→company convention
 
@@ -37,7 +53,12 @@ per-opportunity tree / tradeshows / all), and how does a path resolve to a compa
 (curated mapping table — recommended given known aliasing — vs pure fuzzy match)?
 Will drive membership be granted so shared-item trees have stable parents?
 **Binds**: rclone config, indexer key extraction, FK resolver design, fill-rate
-gate. **Answer**: _pending_.
+gate.
+**Answer (2026-08-06)**: **Per-company tree only (v1)**, top-level folder segment
+= company key, resolved through a curated folder→`miraex_company_id` mapping
+table with fuzzy-assist review; unresolved folders skipped and reported. The
+per-opportunity and tradeshow trees are out of the v1 mirror (tradeshow material
+still feeds Phase 2 contact harvesting directly from Drive).
 
 ## Remaining binding questions by phase
 
@@ -50,8 +71,8 @@ gate. **Answer**: _pending_.
 - Which Postgres instance hosts `staging_miraex.*` (ledgers, hashes, index)?
 
 ### Companies
-- Dedup guard live-blocking (block ≥0.82 / review ≥0.65) or probe-only? Thresholds
-  recalibrated on Miraex data?
+- **Q5** — Dedup guard live-blocking (block ≥0.82 / review ≥0.65) or probe-only?
+  Thresholds recalibrated on Miraex data?
 - Authoritative dedup key hierarchy: `miraex_company_id` exact → domain → fuzzy?
 - Disposition of the pre-existing Miraex records: merge targets, enrich-canonical,
   or excluded?
@@ -64,7 +85,7 @@ gate. **Answer**: _pending_.
 
 ### Fair/exhibition contacts
 - Scope: which fairs/lists; Sensing business line in or out?
-- Reuse the existing `event_*` contact properties + extend enums, or new
+- **Q6** — Reuse the existing `event_*` contact properties + extend enums, or new
   `miraex_*` event properties?
 - Marketing-contact status policy (billable-contact inflation).
 - Confirm: dedup truly off even when emails collide with existing contacts?
