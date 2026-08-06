@@ -1,15 +1,46 @@
-# NEWS for rsync 3.5.0 (UNRELEASED)
+# NEWS for rsync 3.5.0 (13 Aug 2026)
 
 ## Changes in this version:
 
+### Thanks!
+
+This has been an extraordinary release developed over several months
+and I'd like to thank everyone who has helped make it possible. The
+volume of security isses we had to deal would have been quite
+overwhelming without the help that I've received.
+
+I'm particularly grateful to Zen Dodd (Tao), Omar Elsayed (seks99x),
+Will Sargeant, Paul Mackerras, Aleksa Sarai and Leonid Bugaev (buger)
+who joined the rsync admins group helping to triage all the issues,
+develop new tests, review PRs and helped develop the guidlines we used
+for the where to draw the line between a security issue and expected
+behaviour (a surprisingly difficult thing to do in some cases). You've
+all been a huge help and rsync is much better off for your assistance.
+
+A big thank you also to Fidel Casal from Trail of Bits who worked with
+us on the "Patch the Planet" program. Fidel provided a huge trove of
+valuable tests and security reports.
+
+Also a big thank you to Greg Kroah-Hartman for invaluable advice and
+security reports and to Stuart Inglis for particularly high quality
+bug reports and testing.
+
+Many thanks to everyone who submitted bug reports, credits are listed
+below against individual items.
+
+Finally, thank you to everyone who joined in the discussion and
+testing on the rsync-security mailing list, and to the rsync user
+community for your patience in waiting for this release.
+
 ### SECURITY FIXES:
 
-This release fixes 20 security issues found during a focused audit of rsync's
-path handling and daemon protocol, plus several robustness hardenings.  CVE IDs
-were assigned by VulnCheck (CNA); the precise "introduced in" version
-ranges accompany each advisory.  Every fix ships with a regression test in the
-test suite that fails on the unfixed tree.  Many thanks to the external
-researchers credited below.
+This release fixes 33 security issues found during a focused audit of rsync's
+path handling and daemon protocol, a companion daemon-protocol fuzzing pass, and
+reports from external researchers -- plus several robustness hardenings.  CVE
+IDs were assigned by VulnCheck (CNA); the precise "introduced in" version ranges
+accompany each advisory, and many are much narrower than "everything before
+3.5.0".  Every fix ships with a regression test in the test suite that fails on
+the unfixed tree.  Many thanks to the external researchers credited below.
 
 Link following (CWE-59/61) -- a local user who controls a path component plants
 a symlink that a privileged rsync then follows:
@@ -38,18 +69,18 @@ a symlink that a privileged rsync then follows:
   outside the destination tree.  `make_path()` now creates each component through
   the held-directory-fd primitive.  Reported by Omar Elsayed (seks99x).
 
-- CVE-2026-53784 (MEDIUM): Daemon module-root chdir escape under `use chroot =
+- CVE-2026-53784 (HIGH): Daemon module-root chdir escape under `use chroot =
   no`: a plain `chdir()` followed a planted parent-component symlink, serving
   files from outside the module.  The module-root chdir now goes through the
   secure resolver.
 
-- CVE-2026-53793 (MEDIUM-HIGH): Chroot `/./` inner-module escape -- a symlinked
+- CVE-2026-53793 (HIGH): Chroot `/./` inner-module escape -- a symlinked
   parent component inside the inner module reached a sibling outside it (the
   generator basis stat, the receiver write/finish path, the module chdir, and the
   receiver's delta-basis open).  The secure resolver is now engaged for all of
   those paths.
 
-- CVE-2026-53795 (MEDIUM-HIGH): An absolute `--temp-dir` or `--link-dest` disabled
+- CVE-2026-53795 (HIGH): An absolute `--temp-dir` or `--link-dest` disabled
   the receiver's rename/link confinement.  `do_rename_at()`/`do_link_at()` bailed
   to the unconfined path-based call whenever *either* path was absolute, so an
   absolute source (the temp file, or the link-dest basis) let `finish_transfer()`'s
@@ -58,7 +89,7 @@ a symlink that a privileged rsync then follows:
   the tree.  Each side is now confined independently.  Reported by Omar Elsayed
   (seks99x).
 
-- CVE-2026-53796 (MEDIUM-HIGH): A non-daemon receiver's one-time `chdir()` into the
+- CVE-2026-53796 (MEDIUM): A non-daemon receiver's one-time `chdir()` into the
   operator-named destination was not fully confined (a relative destination took a
   plain `chdir()`), so an attacker who raced the named destination from a directory
   to a symlink moved the receiver's CWD -- and every file it then created --
@@ -66,7 +97,7 @@ a symlink that a privileged rsync then follows:
   `O_NOFOLLOW` walk as the daemon module chdir (see BEHAVIOR CHANGES).  Reported by
   Omar Elsayed (seks99x).
 
-- CVE-2026-53797 (MEDIUM-HIGH): A non-daemon sender opened each transferred file's
+- CVE-2026-53797 (MEDIUM): A non-daemon sender opened each transferred file's
   content by path (leaf `O_NOFOLLOW` only), so a source parent component an
   unprivileged user raced to a symlink after the file-list scan was followed --
   reading a file from outside the source tree into an attacker-readable
@@ -74,7 +105,7 @@ a symlink that a privileged rsync then follows:
   `secure_relative_open()`; `-L` / `--copy-unsafe-links` / `-k` still follow, and
   `--insecure-links` restores the legacy open.
 
-- CVE-2026-53799 (MEDIUM-HIGH): Receiver ACL/xattr metadata application followed a
+- CVE-2026-53799 (MEDIUM): Receiver ACL/xattr metadata application followed a
   symlink race -> arbitrary ACL set (local privilege escalation).  When preserving
   metadata (`-A`/`--acls`, `-X`/`--xattrs`, or fake-super ACL-as-xattr), the
   receiver applied each entry's ACL/xattrs by path via `acl_set_file()` /
@@ -89,7 +120,7 @@ a symlink that a privileged rsync then follows:
   keep `--acls` functional -- a documented residual, refusable via `refuse options =
   acls`.
 
-- CVE-2026-53800 (MEDIUM-HIGH): Sender `--remove-source-files` unlink followed a
+- CVE-2026-53800 (MEDIUM): Sender `--remove-source-files` unlink followed a
   parent-component symlink race -> arbitrary file deletion outside the source tree.
   The post-send unlink and its same-file safety re-stat resolved by path relative to
   the process CWD, so an unprivileged user who raced a source parent into a symlink
@@ -100,7 +131,7 @@ a symlink that a privileged rsync then follows:
   (local sender), the safety re-stat is confined likewise, and the per-file dev/ino
   is only computed when `--remove-source-files` is in effect.
 
-- CVE-2026-53801 (MEDIUM-HIGH): Sender/daemon directory-scan enumeration escaped the
+- CVE-2026-53801 (MEDIUM): Sender/daemon directory-scan enumeration escaped the
   transfer root / module -> out-of-tree disclosure.  The sender enumerated each
   source directory with a plain `opendir()` on the accumulated path, not through the
   secure resolver (the enumeration sibling of the previous item, which confined only
@@ -114,7 +145,7 @@ a symlink that a privileged rsync then follows:
 
 `support/rrsync` (the restricted SSH wrapper):
 
-- CVE-2026-53783 (MEDIUM): rrsync restricted-directory escape.  It validated each
+- CVE-2026-53783 (HIGH): rrsync restricted-directory escape.  It validated each
   argument with `realpath()` and then exec'd rsync against the same name (a
   TOCTOU window), and left dangerous options enabled in a restricted subdir.
   rrsync now inode-pins the validated path and roots the argument it hands rsync
@@ -154,7 +185,7 @@ a symlink that a privileged rsync then follows:
 
 Daemon protocol / identity:
 
-- CVE-2026-53786 (LOW-MEDIUM): A client-supplied `--filter` merge file bypassed
+- CVE-2026-53786 (MEDIUM): A client-supplied `--filter` merge file bypassed
   the module filter list (it was checked against the module-prefixed path, which
   never matched a module rule).  The module-dir prefix is now stripped before the
   check.  Reported by Mitchell Benjamin (Revamp Studio).
@@ -170,20 +201,20 @@ Daemon protocol / identity:
   injection.  Converter tokens containing control characters are now rejected.
   Reported by Mitchell Benjamin (Revamp Studio).
 
-- CVE-2026-53789 (LOW-MEDIUM): A malicious daemon-sender could widen `--delete`
+- CVE-2026-53789 (MEDIUM): A malicious daemon-sender could widen `--delete`
   scope by omitting the "no content dir" flag on an implied parent, making the
   receiver run `delete_in_dir()` on it.  Implied-parent directories are now
   forced non-content on the receiver.  Reported by Mitchell Benjamin (Revamp
   Studio).
 
-- CVE-2026-53791 (MEDIUM): With `proxy protocol = true`, a client connecting
+- CVE-2026-53791 (CRITICAL): With `proxy protocol = true`, a client connecting
   directly (not via the trusted proxy) could send a PROXY header to spoof its
   source address and bypass host-based access control.  A forwarded address is
   now honoured only from a configured trusted-proxy peer.
 
 Injection and memory safety:
 
-- CVE-2026-53790 (MEDIUM): Command / argument injection via unquoted peer- or
+- CVE-2026-53790 (HIGH): Command / argument injection via unquoted peer- or
   host-controlled values -- the `RSYNC_CONNECT_PROG` `%H` host substitution, the
   daemon exec-hook `%RSYNC_*%` expansions, rsync-ssl hostspecs, and a missing
   newline/CR in remote-shell argument quoting.  Each sink is now quoted or
@@ -194,22 +225,102 @@ Injection and memory safety:
   block count > 0 but block length == 0 drove the sender's rolling-match
   arithmetic negative.  A zero block length is now rejected.
 
-- CVE-2026-53794 (LOW-MEDIUM): `--max-alloc=0` disabled the per-allocation size
+- CVE-2026-53794 (MEDIUM): `--max-alloc=0` disabled the per-allocation size
   cap (the defense behind CVE-2024-12084) and could be forwarded on the wire to
   an unpatched daemon.  A zero max-alloc is now rejected at both the client and
   the daemon.  Reported by Azizcan Dastan (Milenium Security).
 
-Robustness hardening (no CVE assigned): the daemon's early-protocol argument
-count is bounded; the `RSYNC_PROXY` CONNECT request and proxy response headers
-are length-bounded; peer-requested xattr expansion is capped; and rsync-ssl in
-stunnel mode now requires certificate verification unless an explicit insecure
-opt-out is set.
+Peer-triggerable memory corruption in the daemon protocol, found by a
+daemon-protocol fuzzing pass and reported by Greg Kroah-Hartman.  Each is a
+WRITE reachable from the wire, which is why these were split out from the
+crash-only findings in the same pass:
+
+- CVE-2026-70461 (HIGH): a one-byte heap out-of-bounds write in
+  `add_implied_include()`, driven by a peer-supplied filter rule whose trailing
+  backslash was not counted when sizing the copy.
+
+- CVE-2026-70458 (HIGH): an out-of-bounds write from a file entry marked
+  `FLAG_HLINKED` that the receiver accepted even though `-H` was not in effect,
+  so the hard-link extra slots it then wrote were never allocated.
+
+- CVE-2026-70456 (HIGH): an out-of-bounds heap write in `read_args()` when the
+  peer's argument count lands exactly on `maxargs` -- the trailing NULL went one
+  past the end of the array.
+
+- CVE-2026-70457 (MEDIUM): an attacker-chosen-offset write in
+  `parse_size_arg()`'s error formatting, reachable through an over-large
+  `--max-size` / `--min-size` / `--max-alloc` forwarded to a daemon.
+
+- CVE-2026-70459 (MEDIUM): a wild-pointer read crashing the per-connection
+  daemon child, from a crafted first incremental file list whose transfer root
+  is "." with a non-directory mode -- `parent_ndx` stayed 0 while `dir_flist`
+  was still empty, so the generator dereferenced a never-written slot.
+  Companion to CVE-2026-43620; reproduced on released 3.2.7, 3.4.0 and 3.4.1.
+
+Daemon availability and access control:
+
+- CVE-2026-70464 (HIGH): an unauthenticated peer could complete the `@RSYNCD`
+  greeting and then stall forever -- sending a line with no terminator, or
+  trickling NUL-terminated arguments into `read_args()` one byte at a time --
+  holding a per-connection child open past the module's `max connections`
+  limit.  The `timeout` parameter did not cover it, because `set_io_timeout()`
+  ran after the `read_args()` calls that needed covering.  A separate deadline
+  now spans both, and the early-protocol argument count is bounded.  Reported
+  independently by Chamal De Silva and by Michal Ruprich (Red Hat QE).
+
+- CVE-2026-70455 (HIGH): a daemon client could request an arbitrary Zstandard
+  worker count via `--compress-threads`; 256 was measured as 257 threads in a
+  single connection.  Now capped at 8 on a daemon, while local and
+  remote-shell invocations keep the operator's value.  Reported, fixed and
+  tested by Filipe Casal of Trail of Bits, in collaboration with OpenAI.
+
+- CVE-2026-70453 (HIGH): quadratic CPU exhaustion in `hash_search()` from a
+  crafted chain of equal weak checksums.  The chain walk is now bounded.  First
+  reported as a performance problem in public rsync issue #217 by heyciao
+  (2021); recognised as a security issue, bounded and regression-tested by
+  Stuart Inglis.  This one was already public and was not embargoed.
+
+- CVE-2026-70452 (HIGH): `hosts deny` failed OPEN when a configured hostname
+  could not be resolved -- with `forward lookup` enabled, which is the default,
+  an unresolvable deny token admitted the host it was meant to block.  It now
+  fails closed.  Sibling of CVE-2026-43617.  Reported by Leonid Bugaev.
+
+- CVE-2026-70463 (HIGH): `auth users` ignored its documented comma-only
+  parsing.  With a leading comma the split should be on commas alone, so that a
+  group name containing a space can be written; it split on whitespace too, so
+  a `deny` or `:ro` rule naming such a group was broken into two meaningless
+  tokens and never fired.  Reported by Andres Berbescu.
+
+- CVE-2026-70460 (HIGH): a peer-supplied `--partial-dir` or `--backup-dir` was
+  resolved by pathname, so an in-module symlink could redirect it and place
+  files outside the daemon's module root.  Those paths are now confined.
+  Reported by Omar Elsayed (seks99x).
+
+Client-side:
+
+- CVE-2026-70462 (MEDIUM): a peer-supplied `MSG_IO_TIMEOUT` defeated the
+  client's own I/O timeout -- a large value overflowed signed arithmetic, and a
+  non-positive value disabled the timeout outright.  The value is now capped on
+  receipt and the arithmetic made overflow-safe.  Reported by Z3R0S! (z3r0s6);
+  the non-positive case was reported by Leonid Bugaev.
+
+- CVE-2026-70454 (MEDIUM): `rsync-ssl` established an unauthenticated TLS
+  connection.  In stunnel mode it neither required CA verification nor bound
+  the certificate to the requested hostname, so an active network attacker
+  could impersonate the server; the openssl backend had a matching hostname
+  gap in 3.2.0 through 3.2.3 (found and fixed in 2020 by Matt McCutchen).
+  stunnel mode now requires certificate verification and hostname binding
+  unless an explicit insecure opt-out is set, and the GnuTLS backend is
+  refused conservatively rather than used unverified (Greg Kroah-Hartman).
+
+Robustness hardening (no CVE assigned): the `RSYNC_PROXY` CONNECT request and
+proxy response headers are length-bounded, and peer-requested xattr expansion is
+capped.
 
 A second-pass source audit (reported by Leonid Bugaev) hardened several memory-
 safety and robustness paths: the hashtable and file-list size computations are
 guarded against a 32-bit integer overflow that a peer's entry count could
-otherwise wrap into an under-allocation; a non-positive `MSG_IO_TIMEOUT` from the
-peer is rejected rather than disabling the receiver's own I/O timeout; and the
+otherwise wrap into an under-allocation, and the
 `SIGUSR2` handler is now async-signal-safe (it only sets a flag, deferring the
 summary/close-out work to safe poll points).  Separately, the xattr/ACL metadata
 copy now reads the *source* through a held no-follow fd as well as writing the
