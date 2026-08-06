@@ -3,20 +3,25 @@ name: Stable testsuite
 # Regression coverage for this stable-backport branch.  The branch keeps the old
 # shell test suite, so the modern Python suite is maintained separately on the
 # v34-stable-testsuite branch.  This job builds rsync from this branch and runs
-# that suite against the freshly-built binary (the same "testsuite from one
-# branch, code from another" split fleettest uses).  Helper programs and
-# config.h come from this branch's build (tooldir); the test scripts come from
-# the stable-testsuite checkout (--srcdir).
+# that suite against it.
+#
+# The suite is OVERLAID onto this checkout rather than run from its own
+# directory via --srcdir.  The tests resolve fixtures relative to the source
+# tree they live in (support/lsh.sh, support/rrsync, old_versions/), so running
+# them out of a second tree pairs this branch's binary with the other tree's
+# helpers -- which fails ~90 tests for reasons that have nothing to do with this
+# branch.  Overlaying gives one tree: this branch's code, the newer suite.
+# It is the same composition fleettest.py --testsuite-repo builds.
 
 on:
   push:
-    branches: [ v3.4.1-sec-patches2 ]
+    branches: [ v3.4.1-sec-patches3 ]
     paths-ignore:
       - '.github/workflows/*.yml'
       - '!.github/workflows/stable-testsuite.yml'
   pull_request:
     types: [opened, synchronize, reopened, labeled]
-    branches: [ v3.4.1-sec-patches2 ]
+    branches: [ v3.4.1-sec-patches3 ]
     paths-ignore:
       - '.github/workflows/*.yml'
       - '!.github/workflows/stable-testsuite.yml'
@@ -47,34 +52,38 @@ jobs:
         ref: v34-stable-testsuite
         path: stable-testsuite
         fetch-depth: 1
+    # Merge, never delete: testsuite/skiplist/backport.txt is ours and names the
+    # tests this base cannot run; runtests.py reads it from the built tree.
+    # old_versions/ holds the static peer binaries the version-mixing tests need
+    # -- they are export-ignore'd, so they must be copied, not git-archived.
+    - name: overlay the stable testsuite
+      run: |
+        cp -a stable-testsuite/runtests.py .
+        cp -a stable-testsuite/testsuite/. testsuite/
+        cp -a stable-testsuite/old_versions .
+        rm -rf stable-testsuite
     - name: prep
       run: |
         sudo apt-get update
         sudo apt-get install -y gcc g++ gawk autoconf automake \
           acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev \
           python3-cmarkgfm openssl
-        echo "/usr/local/bin" >>$GITHUB_PATH
+        echo "/usr/local/bin" >>"$GITHUB_PATH"
     - name: configure
       run: ./configure --with-rrsync
     - name: make check-progs
       run: make check-progs
     - name: info
       run: ./rsync --version
-    # Pipe transport (the secure stdio default).  The TCP-only daemon tests
-    # (daemon-access-ip, proxy-response-line-too-long) skip here and are run in
-    # the --use-tcp pass below; crtimes/daemon-chroot-acl/recv-discard-nullderef
-    # skip on the runner's filesystem / under root.
+    # Pipe transport (the secure stdio default).  The TCP-only daemon tests skip
+    # here and are covered by the --use-tcp pass below; the platform lists carry
+    # those names, and backport.txt (read from this tree) drops the tests this
+    # base cannot run.
     - name: run stable testsuite (pipe)
       run: |
-        sudo RSYNC_EXPECT_SKIPPED=crtimes,daemon-access-ip,daemon-chroot-acl,proxy-response-line-too-long,recv-discard-nullderef \
-          ./stable-testsuite/runtests.py \
-            --srcdir="$GITHUB_WORKSPACE/stable-testsuite" \
-            --rsync-bin="$GITHUB_WORKSPACE/rsync" \
-            -j16
+        sudo RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/common.txt,@testsuite/skiplist/linux.txt \
+          ./runtests.py -j16
     # TCP transport over loopback, exercising the daemon paths the pipe run skips.
     - name: run stable testsuite (tcp)
       run: |
-        sudo ./stable-testsuite/runtests.py \
-          --srcdir="$GITHUB_WORKSPACE/stable-testsuite" \
-          --rsync-bin="$GITHUB_WORKSPACE/rsync" \
-          --use-tcp -j8
+        sudo ./runtests.py --use-tcp -j8
