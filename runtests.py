@@ -453,6 +453,36 @@ def expand_skip_spec(spec, srcdir, suitedir):
     return ','.join(sorted(seen))
 
 
+def read_backport_exclude(tooldir, suitedir):
+    """Test names from the BUILD tree's testsuite/skiplist/backport.txt.
+
+    A stable-backport branch runs a newer suite than its own code, and this
+    file names the tests that base cannot run.  It lives in the tree being
+    built, not the suite tree, so it cannot be an @FILE in the expect-skipped
+    spec -- those resolve against srcdir.
+    """
+    path = os.path.join(tooldir, 'testsuite', 'skiplist', 'backport.txt')
+    if not os.path.isfile(path):
+        return set()
+    names = set()
+    with open(path) as f:
+        for lineno, raw in enumerate(f, 1):
+            name = raw.split('#', 1)[0].strip()
+            if not name:
+                continue
+            where = f'{path}:{lineno}'
+            if len(name.split()) != 1:
+                sys.stderr.write(f'{where}: expected one test name per line\n')
+                sys.exit(Exit.ERROR)
+            # A stale name here would silently exclude nothing, which is the
+            # failure this file exists to prevent.
+            if not os.path.isfile(os.path.join(suitedir, name + '_test.py')):
+                sys.stderr.write(f'{where}: no such test: {name}\n')
+                sys.exit(Exit.ERROR)
+            names.add(name)
+    return names
+
+
 _TIMING_TOP = 25
 
 
@@ -664,8 +694,18 @@ def main():
         rsync_bin2 = os.path.abspath(rsync_bin2)
 
     suitedir = os.path.join(srcdir, 'testsuite')
+    # A backport tree excludes what its base cannot run.  Those tests never
+    # run, so they must also drop out of the expected-skip set -- otherwise the
+    # oracle demands a skip from a test that was never started.
+    backport_excl = read_backport_exclude(tooldir, suitedir)
+    if backport_excl:
+        args.exclude = ','.join(x for x in (args.exclude,
+                                            ','.join(sorted(backport_excl))) if x)
     if args.expect_skipped != 'IGNORE':
         args.expect_skipped = expand_skip_spec(args.expect_skipped, srcdir, suitedir)
+        if backport_excl:
+            args.expect_skipped = ','.join(n for n in args.expect_skipped.split(',')
+                                           if n and n not in backport_excl)
     scratchbase = os.path.join(os.environ.get('scratchbase', tooldir), 'testtmp')
     os.makedirs(scratchbase, exist_ok=True)
 
