@@ -1,0 +1,20 @@
+# Copy to rclone.conf (git-ignored) and fill in. One remote per tree because the
+# per-opportunity and tradeshow trees are shared item-by-item (no visible parent):
+# each needs its own root_folder_id. Use a dedicated service/ops Google account
+# (prior-project runbook rule: no personal accounts, no tokens in shared docs).
+
+[miraex-companies]
+type = drive
+scope = drive.readonly
+root_folder_id = FILL_ME   # the per-company folder tree
+# team_drive = FILL_ME     # set instead of root_folder_id if drive membership is granted
+
+[miraex-ongoing]
+type = drive
+scope = drive.readonly
+root_folder_id = FILL_ME   # the per-opportunity YYYY_Partner tree
+
+[miraex-tradeshows]
+type = drive
+scope = drive.readonly
+root_folder_id = FILL_ME   # the per-event tradeshow tree

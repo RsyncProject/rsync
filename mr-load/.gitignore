@@ -1,0 +1,9 @@
+# secrets / local state — never committed
+scripts/rclone/.env
+scripts/rclone/rclone.conf
+*.log
+bronze_layer/
+artifacts/
+# private recon material stays out of this public repo
+*recon*.json
+*digest*

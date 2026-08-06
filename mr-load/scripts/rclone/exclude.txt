@@ -1,0 +1,8 @@
+# rclone exclude patterns for the Miraex mirror.
+# Extend after the first dry-run diff is reviewed.
+desktop.ini
+Thumbs.db
+.DS_Store
+~$*
+*.tmp
+*.lnk

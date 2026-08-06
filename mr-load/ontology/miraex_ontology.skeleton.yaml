@@ -1,0 +1,113 @@
+# Miraex ontology skeleton for the ontology_substrate package.
+# Modeled on the canonical icalps fixture (7_entity_icload_style.yaml) with
+# miraex_* naming. FILL_ME markers are portal constants that MUST be probed from
+# the live target portal (association type IDs, mirror columns) — icalps values
+# are portal-specific and non-transferable. Validate with:
+#   python -m ontology_substrate probe --ontology miraex_ontology.yaml --dry-run
+
+target_system:
+  adapter: hubspot
+  config:
+    reconciliation_id_prefix: miraex_
+
+sync_provider:
+  # Pending BINDING-QUESTIONS Q1. direct_api => mirror_* fields stay null and
+  # the two-pass bridge collapses to a single natural-key pass.
+  adapter: direct_api   # or: stacksync
+  config: {}
+
+layers:
+  - name: source_odoo
+    kind: csv_files
+    glob: "bronze_layer/odoo_*.csv"
+  - name: source_drive
+    kind: filesystem            # served by the new FilesystemConnector
+    glob: "drive/**"
+  - name: bronze
+    kind: csv_files
+    glob: "bronze_layer/Bronze_*.csv"
+  - name: silver
+    kind: postgres
+    schema: staging_miraex
+  - name: gold
+    kind: postgres_mirror_via_sync_provider   # or api snapshot exports in direct_api mode
+    schema: hubspot
+
+entities:
+  - name: company
+    bronze_table: Bronze_Company.csv
+    bronze_pk: odoo_company_id
+    silver_table: stg_company_normalised
+    silver_pk: miraex_company_id
+    mirror_table: null            # FILL_ME if mirror mode
+    mirror_pk_col: null
+    mirror_reconciliation_id_col: miraex_company_id
+
+  - name: contact                 # fair/exhibition contacts included
+    bronze_table: Bronze_Contact.csv
+    bronze_pk: miraex_contact_id  # odoo id or evt:<sha1> synthetic key
+    silver_table: stg_contact_normalised
+    silver_pk: miraex_contact_id
+    mirror_table: null
+    mirror_pk_col: null
+    mirror_reconciliation_id_col: miraex_contact_id
+    silver_marts:
+      - name: fair_contacts
+        path: stg_fair_contacts
+        unique_id_pattern: "evt:<event|email hash>"   # sole dedup when dedup is off
+        scope: fair/exhibition ingests
+        cardinality_note: contact may attend N events; event key is a property, not an entity (v1)
+        write_mode: upsert
+
+  - name: deal
+    bronze_table: Bronze_Deal.csv
+    bronze_pk: odoo_deal_id
+    silver_table: stg_deal_normalised
+    silver_pk: miraex_deal_id
+    mirror_table: null
+    mirror_pk_col: null
+    mirror_reconciliation_id_col: miraex_deal_id
+
+  - name: document                # the library file — Files+Notes carrier model
+    bronze_table: null            # source is the walked filesystem (source_drive)
+    bronze_pk: miraex_doc_id      # fs:<sha1(relpath)[:12]>
+    silver_table: stg_library_normalised
+    silver_pk: miraex_doc_id
+    mirror_table: null
+    mirror_pk_col: null
+    mirror_reconciliation_id_col: miraex_doc_id
+
+edges:
+  - name: contact_company
+    source: contact
+    target: company
+    cardinality: "1:N"            # confirm for fair contacts (Q: N:M?)
+    silver_source_fk: miraex_company_id
+    expected_from: bronze
+    types: []                     # FILL_ME: probe portal labels both directions
+
+  - name: deal_company
+    source: deal
+    target: company
+    cardinality: "N:1"
+    silver_source_fk: miraex_company_id
+    expected_from: bronze
+    portal_constraint: REJECT_on_missing_parent
+    types: []                     # FILL_ME
+
+  - name: deal_contact
+    source: deal
+    target: contact
+    cardinality: "N:1"            # confirm: multiple contacts per deal?
+    silver_source_fk: miraex_contact_id
+    expected_from: bronze
+    portal_constraint: WARN_on_missing_parent
+    types: []                     # FILL_ME
+
+  - name: document_company
+    source: document
+    target: company
+    cardinality: "N:1"
+    silver_source_fk: miraex_company_id   # resolved from path via map_folder_company
+    expected_from: bronze                 # denominator = filesystem count
+    types: []                     # v4 default association via note carrier
