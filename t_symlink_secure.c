@@ -88,6 +88,16 @@ int main(int argc, char **argv)
 	int poc = 0;
 	const char *moddir;
 
+# if !defined(HAVE_MKNODAT) && !defined(TEST_SYMLINK_PLACEHOLDER)
+	/* Nothing left to assert: the do_mknod_at() checks need mknodat(), and
+	 * the do_symlink_at() ones are not compiled here.  Skip rather than
+	 * pass vacuously. */
+	(void)argc; (void)argv;
+	fprintf(stderr, "SKIP: no mknodat() and no symlink placeholders -- "
+		"nothing this helper asserts applies to this build\n");
+	return 77;
+# endif
+
 	if (argc == 3 && strcmp(argv[1], "--poc") == 0) {
 		poc = 1;
 		moddir = argv[2];
@@ -131,11 +141,17 @@ int main(int argc, char **argv)
 	check_preserved("do_symlink_at slashed", "../outside/secret_sym2", "VICTIM_SYM2");
 #endif
 
+# ifdef HAVE_MKNODAT
+	/* Without mknodat() do_mknod_at() IS do_mknod(): the confinement is
+	 * compiled out by design (SECURITY.md), so these would assert a
+	 * property the build deliberately does not have.  The do_symlink_at()
+	 * checks above do not depend on it and still run. */
 	do_mknod_at("nodpath", S_IFCHR | 0600, 0);
 	check_preserved("do_mknod_at bare", "../outside/secret_nod", "VICTIM_NOD");
 
 	do_mknod_at("sub/nodpath2", S_IFCHR | 0600, 0);
 	check_preserved("do_mknod_at slashed", "../outside/secret_nod2", "VICTIM_NOD2");
+# endif
 
 	if (errs)
 		fprintf(stderr, "%d failure(s)\n", errs);
