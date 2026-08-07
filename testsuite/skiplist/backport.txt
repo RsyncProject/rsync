@@ -24,6 +24,7 @@ preallocate                             # --preallocate --sparse hole punching (
 daemon-refuse-compress-threads-alias    # --compress-threads arrived in 3.4.2
 daemon-zstd-thread-exhaustion           # --compress-threads arrived in 3.4.2
 partial_nowrite                         # receiver chmod-on-denied-open (3.5.0)
+partial-protected-regular-retry-policy  # EACCES recovery path (3.5.0, macOS-only test)
 
 # The suite's per-platform skip lists describe the tests IT ships, so they do
 # not describe a build of this branch.
