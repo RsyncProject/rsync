@@ -11,6 +11,7 @@
 
 checksum-zero-blocklen  # the pure-Python receiver needs a real TCP socket; run with --use-tcp
 chroot-basis-forge-inner-module  # the pure-Python sender needs a real TCP daemon; run with --use-tcp
+daemon-access-idn  # hosts allow/deny hostname matching needs a real TCP peer
 daemon-access-ip  # hosts allow/deny address matching needs a real TCP peer
 daemon-argv-limit  # raw malicious daemon client needs a real TCP daemon; run with --use-tcp
 daemon-chroot  # daemon chroot path needs the real start_daemon socket flow

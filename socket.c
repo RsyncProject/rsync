@@ -35,9 +35,6 @@
 #include <netinet/ip.h>
 #endif
 #include <netinet/tcp.h>
-#ifdef SUPPORT_IDN
-#include <idn2.h>
-#endif
 
 extern char *bind_address;
 extern char *sockopts;
@@ -347,13 +344,12 @@ int open_socket_out(char *host, int port, const char *bind_addr, int af_hint)
 	char buffer[1024];
 	char *proxy_user = NULL, *proxy_pass = NULL;
 #ifdef SUPPORT_IDN
-	char *idn, idn_host[1024];
+	char idn_host[1024];
 
-	if (idn2_lookup_ul(host, &idn, IDN2_NONTRANSITIONAL) == IDN2_OK) {
-		strlcpy(idn_host, idn, sizeof idn_host);
-		idn2_free(idn);
+	/* The resolver only speaks ASCII, so an IDN host goes out as A-labels.
+	 * An all-ASCII host is passed along untouched. */
+	if (idn_to_ascii(host, 1, idn_host, sizeof idn_host))
 		host = idn_host;
-	}
 #endif
 
 	/* if we have a RSYNC_PROXY env variable then redirect our

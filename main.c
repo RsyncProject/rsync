@@ -34,9 +34,6 @@
 #ifdef HAVE_SYS_RESOURCE_H
 #include <sys/resource.h>
 #endif
-#ifdef SUPPORT_IDN
-#include <idn2.h>
-#endif
 
 extern int dry_run;
 extern int list_only;
@@ -527,14 +524,12 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char **remote_argv, in
 #ifdef SUPPORT_IDN
 	char idn_machine[1024];
 
-	if (machine && daemon_connection > 0) {
-		char *idn;
-		if (idn2_lookup_ul(machine, &idn, IDN2_NONTRANSITIONAL) == IDN2_OK) {
-			strlcpy(idn_machine, idn, sizeof idn_machine);
-			idn2_free(idn);
-			machine = idn_machine;
-		}
-	}
+	/* A daemon-over-remote-shell host is ours to resolve, so give the helper
+	 * the A-label form.  A "host:path" transfer is left alone because that
+	 * name belongs to the user's ssh, which may be matching it against an
+	 * ssh_config Host pattern. */
+	if (machine && daemon_connection > 0 && idn_to_ascii(machine, 1, idn_machine, sizeof idn_machine))
+		machine = idn_machine;
 #endif
 
 	if (!read_batch && !local_server) {

@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 # Verify that rsync converts an IDN (internationalized domain name) host to
-# its IDNA A-label (Punycode) form.
+# its IDNA A-label (Punycode) form, and that it leaves an ASCII host name
+# alone.  Only the labels that are not ASCII get rewritten, so an address
+# literal, an already-punycoded name, and a name that isn't a valid IDN all
+# reach the resolver as typed.
 #
 # Two daemon connection methods carry the host name out of rsync, so both are
 # checked:
@@ -10,6 +13,8 @@
 #     loopback, so this part only runs under --use-tcp.
 # A plain remote-shell transfer (host:path) is intentionally left alone, since
 # that name belongs to the user's ssh.
+#
+# The daemon side of IDN -- hosts allow/deny matching -- is daemon-access-idn.
 
 import os
 import shlex
@@ -74,16 +79,41 @@ helper.write_text('#!/bin/sh\nprintf %s "$1" > "$IDN_RSH_OUT"\nexit 1\n')
 helper.chmod(0o755)
 
 hostfile = SCRATCHDIR / 'idn-rsh-host'
-if hostfile.exists():
-    hostfile.unlink()
 
-run_idn(f"rsync://{idn_host}/module/", f"--rsh={helper}",
-        extra_env={'IDN_RSH_OUT': str(hostfile)})
 
-got = hostfile.read_text() if hostfile.exists() else '<helper never ran>'
-if got != ascii_host:
-    test_fail(f"daemon-over-rsh sent host {got!r}, expected A-label {ascii_host!r}")
-print(f"OK: daemon-over-rsh (rsync-ssl style) host sent as {ascii_host}")
+def rsh_host(url_host):
+    """The host name rsync hands the --rsh helper for rsync://<url_host>/."""
+    if hostfile.exists():
+        hostfile.unlink()
+    run_idn(f"rsync://{url_host}/module/", f"--rsh={helper}",
+            extra_env={'IDN_RSH_OUT': str(hostfile)})
+    if not hostfile.exists():
+        test_fail(f"the --rsh helper never ran for {url_host!r}")
+    return hostfile.read_bytes().decode('utf-8', 'surrogateescape')
+
+
+def check_rsh(url_host, want, what):
+    got = rsh_host(url_host)
+    if got != want:
+        test_fail(f"daemon-over-rsh sent host {got!r} for {what} "
+                  f"({url_host!r}), expected {want!r}")
+    print(f"OK: {what} -> {got}")
+
+
+# A U-label becomes its A-label, case-folded by the IDNA mapping.  An ASCII
+# label is handed on byte for byte, case included, since DNS doesn't care.
+check_rsh(idn_host, ascii_host, "a Unicode host")
+check_rsh("ČIČKU.Example", "xn--iku-eqab.Example",
+          "a mixed-case Unicode host")
+check_rsh(ascii_host, ascii_host, "an already-punycoded host")
+check_rsh("XN--IKU-EQAB.Example", "XN--IKU-EQAB.Example",
+          "a mixed-case punycoded host")
+# A name that isn't a valid IDN goes out as-is instead of being rewritten into
+# some other name (the U+200B one would map to ".example"), so the resolver
+# fails on it just as it did before.
+check_rsh("xn--0.example", "xn--0.example", "an undecodable A-label")
+check_rsh("ـx.example", "ـx.example", "a label with a disallowed character")
+check_rsh("​.example", "​.example", "a label that maps to nothing")
 
 
 # --- direct daemon socket, observed via a dummy proxy -----------------------
