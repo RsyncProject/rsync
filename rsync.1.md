@@ -2418,6 +2418,12 @@ expand it.
       options are parsed (e.g. [`-a`](#opt) works the same before or after
       `--files-from`, as does `--no-R` and all other options).
 
+    Listing individual files with `--files-from` does not make unlisted
+    siblings eligible for deletion.  The [`--delete`](#opt) option only removes
+    entries from directories whose complete contents are being synchronised,
+    so list the directory itself and enable recursion if that deletion scope is
+    intended.
+
     The filenames that are read from the FILE are all relative to the source
     dir -- any leading slashes are removed and no ".." references are allowed
     to go higher than the source dir.  Blank entries are ignored, as are
