@@ -3,7 +3,8 @@
 # its IDNA A-label (Punycode) form, and that it leaves an ASCII host name
 # alone.  Only the labels that are not ASCII get rewritten, so an address
 # literal, an already-punycoded name, and a name that isn't a valid IDN all
-# reach the resolver as typed.
+# reach the resolver as typed.  A name typed with combining marks is normalized
+# on the way, so it converts the same as its precomposed spelling.
 #
 # Two daemon connection methods carry the host name out of rsync, so both are
 # checked:
@@ -55,6 +56,10 @@ if not utf8_locale:
 
 idn_host = "\u010ci\u010dku.example"
 ascii_host = "xn--iku-eqab.example"
+# The same name with each caron letter spelled as a plain "c" plus a combining
+# caron (U+030C).  Unicode calls the two spellings equivalent, so both have to
+# come out as the same A-label; libidn2 is what normalizes them.
+nfd_host = "c\u030ci" "c\u030cku.example"
 
 env = os.environ.copy()
 env['LC_ALL'] = utf8_locale
@@ -103,6 +108,9 @@ def check_rsh(url_host, want, what):
 # A U-label becomes its A-label, case-folded by the IDNA mapping.  An ASCII
 # label is handed on byte for byte, case included, since DNS doesn't care.
 check_rsh(idn_host, ascii_host, "a Unicode host")
+check_rsh(nfd_host, ascii_host, "a decomposed Unicode host")
+check_rsh("C\u030cI" "C\u030cKU.Example", "xn--iku-eqab.Example",
+          "a decomposed mixed-case Unicode host")
 check_rsh("ČIČKU.Example", "xn--iku-eqab.Example",
           "a mixed-case Unicode host")
 check_rsh(ascii_host, ascii_host, "an already-punycoded host")

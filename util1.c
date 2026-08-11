@@ -986,14 +986,18 @@ int idn_to_ascii(const char *name, int from_locale, char *buf, size_t buflen)
 			memcpy(buf + len, lab, lablen);
 			len += lablen;
 		} else {
+			/* IDN2_NFC_INPUT has libidn2 normalize the label, so a name
+			 * typed with combining marks folds to the same A-label as
+			 * its composed spelling.  IDN2_NONTRANSITIONAL asks for the
+			 * TR46 processing that everything else does these days. */
+			int flags = IDN2_NFC_INPUT | IDN2_NONTRANSITIONAL;
 			int rc;
 			if (lablen >= sizeof label)
 				return 0;
 			memcpy(label, lab, lablen);
 			label[lablen] = '\0';
-			rc = from_locale
-			   ? idn2_lookup_ul(label, &idn, IDN2_NONTRANSITIONAL)
-			   : idn2_to_ascii_8z(label, &idn, IDN2_NFC_INPUT | IDN2_NONTRANSITIONAL);
+			rc = from_locale ? idn2_lookup_ul(label, &idn, flags)
+					 : idn2_to_ascii_8z(label, &idn, flags);
 			if (rc != IDN2_OK)
 				return 0;
 			alen = strlen(idn);

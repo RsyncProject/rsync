@@ -416,9 +416,10 @@ If rsync was built with IDN support (look for "IDN" in `rsync --version`), the
 daemon host may contain non-ASCII characters: those labels are converted to
 their IDNA A-label ("Punycode") form before the name is looked up.  The name is
 read using your locale's character encoding, so be sure your locale is set
-correctly.  Only the non-ASCII labels change, so an address literal, a name you
-punycoded yourself, and a name that is not a valid IDN are all looked up just
-as you typed them.
+correctly.  A name typed with combining characters is normalized on the way, so
+it is looked up the same as its precomposed spelling.  Only the non-ASCII
+labels change, so an address literal, a name you punycoded yourself, and a name
+that is not a valid IDN are all looked up just as you typed them.
 
 This applies to the host of a daemon connection only.  The host of a plain
 remote-shell transfer (the single-colon syntax) is passed to your remote-shell

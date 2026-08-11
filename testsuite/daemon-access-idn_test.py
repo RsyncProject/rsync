@@ -114,6 +114,12 @@ modules = [
     # stay denied, and neither may be mistaken for a wildcard.
     ('idn-other',     {'hosts allow': 'čičku.example'}),
     ('idn-puny',      {'hosts allow': 'xn--iku-eqab.example'}),
+    # idn-other's token respelled with combining carons: an equivalent name
+    # under Unicode, so it has to be treated the same way.  (A decomposed
+    # token that *matches* isn't constructible here -- the peer name comes
+    # from DNS and is ASCII -- so idn_test checks the two spellings convert
+    # alike, and this checks the daemon agrees they don't match.)
+    ('idn-nfd',       {'hosts allow': 'c\u030ci' 'c\u030cku.example'}),
     # Tokens whose IDNA mapping yields ASCII the author never wrote.  Left
     # unconverted they match nothing; converted blindly, the first two would
     # allow every host and the third would read as an address/mask.
@@ -154,6 +160,7 @@ allowed('idn-mixedcase', "IDNA case-folds the token")
 denied('idn-deny', "hosts deny sees the folded token too")
 denied('idn-other', "a different IDN must not match the peer")
 denied('idn-puny', "an A-label for a different host must not match the peer")
+denied('idn-nfd', "a decomposed spelling of that name must not match either")
 denied('wide-star', "U+FF0A must not become a '*' that allows every host")
 denied('wide-star-dom', "U+FF0A must not become a wildcard label")
 denied('wide-mask', "U+FF0F must not become an address/mask separator")
