@@ -19,7 +19,7 @@ from rsyncfns import (
     start_test_daemon, test_fail,
 )
 
-DAEMON_PORT = 12897
+DAEMON_PORT = 12900
 
 noltfs_bin = str(TOOLDIR / 'rsync_noltfs')
 
@@ -43,7 +43,7 @@ url = start_test_daemon(conf, DAEMON_PORT)
 # --- 1. push: no-LTFS client → LTFS-capable server --------------------------
 
 res = subprocess.run(
-    [noltfs_bin, '-r', f'{FROMDIR}/', f'{url}test-to/'],
+    [noltfs_bin, '-rt', f'{FROMDIR}/', f'{url}test-to/'],
     capture_output=True, text=True,
 )
 if res.returncode != 0:
@@ -52,7 +52,7 @@ if res.returncode != 0:
         f"(exit {res.returncode}):\n{res.stderr}"
     )
 
-checkit(['-r', f'{FROMDIR}/', f'{TODIR}/'], FROMDIR, TODIR)
+checkit(['-rt', f'{FROMDIR}/', f'{TODIR}/'], FROMDIR, TODIR)
 
 # --- 2. pull: no-LTFS client ← LTFS-capable server --------------------------
 
@@ -62,7 +62,7 @@ with tempfile.TemporaryDirectory() as tmp:
     dst = Path(tmp) / 'pull-dst'
     dst.mkdir()
     res = subprocess.run(
-        [noltfs_bin, '-r', f'{url}test-to/', f'{dst}/'],
+        [noltfs_bin, '-rt', f'{url}test-to/', f'{dst}/'],
         capture_output=True, text=True,
     )
     if res.returncode != 0:
@@ -70,7 +70,7 @@ with tempfile.TemporaryDirectory() as tmp:
             f"no-LTFS client pull from LTFS-capable server failed "
             f"(exit {res.returncode}):\n{res.stderr}"
         )
-    checkit(['-r', f'{TODIR}/', f'{dst}/'], TODIR, dst)
+    checkit(['-rt', f'{TODIR}/', f'{dst}/'], TODIR, dst)
 
 print("ltfs-client-compat: no-LTFS client completed push and pull "
       "against LTFS-capable server without errors")
