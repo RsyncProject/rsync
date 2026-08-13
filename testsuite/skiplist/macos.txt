@@ -26,6 +26,7 @@ readonly-partial-abort-mode-regression  #
 rrsync-sender-leaf-flip
 rrsync-sender-parent-pin
 rrsync-symlink
+rrsync-userns-procfs
 sender-remove-source-root-anchor
 simd-checksum
 source-change-size-continues

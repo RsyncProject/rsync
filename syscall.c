@@ -401,9 +401,13 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 		}
 
 		if (S_ISLNK(lst.st_mode)) {
-			/* Symlink: untrusted owner is refused; trusted owner
-			 * is followed via readlinkat + splice. */
-			if (lst.st_uid != 0 && lst.st_uid != trusted_uid) {
+			/* Symlink: untrusted owner is refused; trusted owner is followed
+			 * via readlinkat + splice.  In a user namespace procfs reports
+			 * /proc/self with the overflow uid, so allow that exact component
+			 * while traversing a recognised fd pin. */
+			int proc_self_pin = pin_transit && strcmp(abspath, "/proc") == 0
+					  && strcmp(comp, "self") == 0;
+			if (!proc_self_pin && lst.st_uid != 0 && lst.st_uid != trusted_uid) {
 				saved_errno = ELOOP;
 				goto out;
 			}
