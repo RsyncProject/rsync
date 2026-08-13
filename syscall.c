@@ -291,6 +291,11 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 #ifndef O_CLOEXEC
 #define O_CLOEXEC 0
 #endif
+#ifdef O_PATH
+	const int dir_traverse_flags = O_PATH | O_DIRECTORY | O_CLOEXEC;
+#else
+	const int dir_traverse_flags = O_RDONLY | O_DIRECTORY | O_CLOEXEC;
+#endif
 	if (!path || !*path) {
 		errno = EINVAL;
 		return -1;
@@ -348,7 +353,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 
 	/* Absolute path: pin "/" as the starting dfd. */
 	if (remaining[0] == '/') {
-		dfd = open("/", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+		dfd = open("/", dir_traverse_flags);
 		if (dfd < 0)
 			return -1;
 		dfd_owns = 1;
@@ -435,7 +440,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 
 			if (target[0] == '/') {
 				if (dfd_owns) close(dfd);
-				dfd = open("/", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+				dfd = open("/", dir_traverse_flags);
 				if (dfd < 0) {
 					saved_errno = errno;
 					dfd_owns = 0;
@@ -490,7 +495,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 			saved_errno = ELOOP;
 			goto out;
 		}
-		int next = openat(dfd, comp, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+		int next = openat(dfd, comp, dir_traverse_flags | O_NOFOLLOW);
 		if (next < 0) {
 			saved_errno = errno;
 			goto out;
@@ -510,12 +515,12 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 	}
 
 	/* Path resolved entirely to a directory (no leaf component left).
-	 * If the caller wanted O_DIRECTORY we already hold the dirfd we
-	 * built up; otherwise it's an EISDIR. */
+	 * Reopen the held traversal fd with the caller's requested access mode;
+	 * an O_PATH fd is sufficient for traversal and fchdir but not operations
+	 * such as fchmod. */
 	if (flags & O_DIRECTORY) {
-		retfd = dfd;
-		dfd_owns = 0;	/* caller now owns it */
-		saved_errno = 0;
+		retfd = openat(dfd, ".", flags | O_NOFOLLOW, mode);
+		saved_errno = retfd < 0 ? errno : 0;
 		if (out_abs && out_cap)
 			/* Root-resolved (".." popped abspath empty) tracked daemon walk:
 			 * hand back "/" so owner_walk_parent still leaf-checks (path=/ bypass). */
