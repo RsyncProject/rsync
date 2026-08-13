@@ -57,7 +57,14 @@ def main():
             for fn in files:
                 if args.prefix:
                     fn = args.prefix + fn
-                mtime = os.lstat(fn).st_mtime
+                try:
+                    mtime = os.lstat(fn).st_mtime
+                except FileNotFoundError:
+                    # Tracked in git but absent from the tree we are stamping.
+                    # export-ignore in .gitattributes keeps rsync-web/ and the
+                    # old_versions/ binaries out of "git archive", so they have
+                    # no file here to give a commit time to.
+                    continue
                 if args.list:
                     print_line(fn, mtime, commit_time)
                 elif mtime != commit_time:
