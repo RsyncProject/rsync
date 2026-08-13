@@ -25,7 +25,7 @@ rsync version to be at least 3.2.0.
 
 ## OPTIONS
 
-If the **first** arg is a `--type=SSL_TYPE` option, the script will only use
+If an arg is a `--type=SSL_TYPE` option, the script will only use
 that particular program to open an ssl connection instead of trying to find an
 openssl or stunnel executable via a simple heuristic (assuming that the
 `RSYNC_SSL_TYPE` environment variable is not set as well -- see below).  This
