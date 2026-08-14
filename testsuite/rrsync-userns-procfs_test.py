@@ -81,28 +81,53 @@ if proc_uid in (0, os.geteuid()):
 base = Path(tempfile.mkdtemp(prefix='rsync-userns-procfs-'))
 src = base / 'src'
 dest = base / 'dest'
-makepath(src, dest)
+outside = base / 'outside'
+makepath(src, dest, outside)
 (src / 'file').write_text('content\n')
+
+fd_roots = ['/proc/self/fd']
+if Path('/dev/fd').exists():
+    fd_roots.append('/dev/fd')
 
 dest_fd = os.open(dest, os.O_RDONLY | os.O_DIRECTORY)
 try:
-    log_file = dest / 'rsync.log'
-    proc = subprocess.run(
-        rsync_argv('-a', f'--confine-root={dest}',
-                   f'--log-file=/proc/self/fd/{dest_fd}/rsync.log',
-                   str(src) + '/', str(dest) + '/'),
-        pass_fds=(dest_fd,),
-        capture_output=True,
-        text=True,
-    )
+    for index, fd_root in enumerate(fd_roots):
+        log_file = dest / f'rsync-{index}.log'
+        proc = subprocess.run(
+            rsync_argv('-a', f'--confine-root={dest}',
+                       f'--log-file={fd_root}/{dest_fd}/{log_file.name}',
+                       str(src) + '/', str(dest) + '/'),
+            pass_fds=(dest_fd,),
+            capture_output=True,
+            text=True,
+        )
+        ctx = (f'fd_root={fd_root!r}, rc={proc.returncode}, '
+               f'stderr={proc.stderr.strip()[:300]!r}')
+        if proc.returncode != 0:
+            test_fail(f'confined transfer through an fd pin failed ({ctx})')
+        if not log_file.is_file():
+            test_fail(f'confined log path through an fd pin was rejected ({ctx})')
+        if (dest / 'file').read_text() != 'content\n':
+            test_fail(f'confined transfer did not deliver the file ({ctx})')
 finally:
     os.close(dest_fd)
 
-ctx = f'rc={proc.returncode}, stderr={proc.stderr.strip()[:300]!r}'
-if proc.returncode != 0:
-    test_fail(f'confined transfer through an fd pin failed ({ctx})')
-if not log_file.is_file():
-    test_fail(f'confined log path through an fd pin was rejected ({ctx})')
-if (dest / 'file').read_text() != 'content\n':
-    test_fail(f'confined transfer did not deliver the file ({ctx})')
+outside_list = outside / 'files-from'
+outside_list.write_text('file\n')
+for fd_root in fd_roots:
+    outside_fd = os.open(outside_list, os.O_RDONLY)
+    try:
+        proc = subprocess.run(
+            rsync_argv('-a', f'--confine-root={dest}',
+                       f'--files-from={fd_root}/{outside_fd}',
+                       str(src) + '/', str(dest) + '/'),
+            pass_fds=(outside_fd,),
+            capture_output=True,
+            text=True,
+        )
+    finally:
+        os.close(outside_fd)
+    if proc.returncode == 0 or 'failed to open files-from file' not in proc.stderr:
+        test_fail(f'outside {fd_root} pin was not observably refused: '
+                  f'rc={proc.returncode}, stderr={proc.stderr!r}')
 rmtree(base)
