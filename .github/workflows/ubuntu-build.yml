@@ -36,6 +36,7 @@ jobs:
             artifact: ubuntu-22.04-bin
             nonroot: false
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
     name: ${{ matrix.name }}
     steps:
     - uses: actions/checkout@v4

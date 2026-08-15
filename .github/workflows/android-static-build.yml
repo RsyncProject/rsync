@@ -39,6 +39,7 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     name: ${{ matrix.abi }}
     strategy:
       fail-fast: false
