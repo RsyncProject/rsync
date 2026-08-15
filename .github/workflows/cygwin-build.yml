@@ -44,13 +44,28 @@ jobs:
           throw 'Cygwin setup SHA-512 mismatch'
         }
 
-        & $setup --quiet-mode --wait --no-admin --no-desktop --no-startmenu --no-shortcuts `
-          --root C:\tools\cygwin `
-          --local-package-dir (Join-Path $Env:RUNNER_TEMP 'cygwin-packages') `
-          --site https://mirrors.kernel.org/sourceware/cygwin/ `
-          --packages $packages
+        $arguments = @(
+          '--quiet-mode',
+          '--no-desktop',
+          '--no-startmenu',
+          '--no-shortcuts',
+          '--root', 'C:\tools\cygwin',
+          '--local-package-dir', (Join-Path $Env:RUNNER_TEMP 'cygwin-packages'),
+          '--site', 'https://mirrors.kernel.org/sourceware/cygwin/',
+          '--packages', $packages
+        )
+        $install = Start-Process -FilePath $setup -ArgumentList $arguments -Wait -PassThru -NoNewWindow
+        if ($install.ExitCode -ne 0) {
+          exit $install.ExitCode
+        }
+
+        $bash = 'C:\tools\cygwin\bin\bash.exe'
+        if (-not (Test-Path -LiteralPath $bash)) {
+          throw 'Cygwin setup did not install bash'
+        }
+        & $bash -lc 'command -v make aclocal gcc python3 >/dev/null'
         if ($LASTEXITCODE -ne 0) {
-          exit $LASTEXITCODE
+          throw 'Cygwin setup did not install all required build tools'
         }
 
         echo 'C:/tools/cygwin/bin' >>$Env:GITHUB_PATH
