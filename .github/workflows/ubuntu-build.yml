@@ -11,17 +11,31 @@ on:
       - '.github/workflows/*.yml'
       - '!.github/workflows/ubuntu-build.yml'
   pull_request:
-    types: [opened, synchronize, reopened]
+    branches: [ master ]
     paths-ignore:
       - '.github/workflows/*.yml'
       - '!.github/workflows/ubuntu-build.yml'
   schedule:
-    - cron: '42 8 * * *'
+    - cron: '42 8 * * 1'
 
 jobs:
   test:
-    runs-on: ubuntu-latest
-    name: Test rsync on Ubuntu
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            name: Test rsync on Ubuntu latest
+            artifact: ubuntu-bin
+            nonroot: true
+            install_smoke: true
+          - runner: ubuntu-22.04
+            name: Test rsync on Ubuntu 22.04
+            artifact: ubuntu-22.04-bin
+            nonroot: false
+            install_smoke: false
+    runs-on: ${{ matrix.runner }}
+    name: ${{ matrix.name }}
     steps:
     - uses: actions/checkout@v4
       with:
@@ -35,6 +49,35 @@ jobs:
       run: ./configure --with-rrsync
     - name: make
       run: make
+    - name: install/uninstall DESTDIR smoke test
+      if: matrix.install_smoke
+      run: |
+        set -e
+        tmp="$(mktemp -d)"
+        trap 'rm -rf "$tmp"' EXIT
+
+        make install-all DESTDIR="$tmp"
+
+        for path in \
+          /usr/local/bin/rsync \
+          /usr/local/bin/rsync-ssl \
+          /usr/local/bin/rrsync \
+          /usr/local/share/man/man1/rsync.1 \
+          /usr/local/share/man/man1/rsync-ssl.1 \
+          /usr/local/share/man/man1/rrsync.1 \
+          /usr/local/share/man/man5/rsyncd.conf.5 \
+          /etc/stunnel/rsyncd.conf
+        do
+          test -e "$tmp$path"
+        done
+
+        make uninstall-all DESTDIR="$tmp"
+
+        leftover="$(find "$tmp" -type f -print)"
+        if [ -n "$leftover" ]; then
+          printf '%s\n' "$leftover"
+          exit 1
+        fi
     - name: install
       run: sudo make install
     - name: info
@@ -52,6 +95,7 @@ jobs:
       # is env-dependent here (chroot-acl), so leave RSYNC_EXPECT_SKIPPED unset.
       run: sudo ./runtests.py --rsync-bin="$PWD/rsync" --use-tcp -j 8
     - name: check (non-root, targeted)
+      if: matrix.nonroot
       # Every run above is root (sudo), so privilege-sensitive tests never hit
       # their non-root path. Run those here as the unprivileged 'runner' user
       # (NO sudo). Explicit test names make runtests.py full_run False, so
@@ -73,7 +117,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         retention-days: 45
-        name: ubuntu-bin
+        name: ${{ matrix.artifact }}
         path: |
           rsync
           rsync-ssl
