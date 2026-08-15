@@ -17,6 +17,9 @@ on:
       - '!.github/workflows/scan-build.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   # GATING run: pinned clang-18 on a pinned runner so the checker set -- and
   # thus the expected zero -- is deterministic.  The tree is kept clean for
