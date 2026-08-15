@@ -31,6 +31,9 @@ on:
   schedule:
     - cron: '17 7 * * 1'
 
+permissions:
+  contents: read
+
 jobs:
   fleettest:
     runs-on: ubuntu-latest

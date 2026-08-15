@@ -19,6 +19,9 @@ on:
     - cron: '17 4 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   memcheck:
     runs-on: ubuntu-latest

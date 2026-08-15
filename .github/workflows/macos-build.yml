@@ -18,6 +18,9 @@ on:
   schedule:
     - cron: '42 8 * * *'
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: macos-latest
