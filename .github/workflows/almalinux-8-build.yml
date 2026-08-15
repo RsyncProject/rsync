@@ -30,6 +30,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     container:
       image: almalinux:8
     name: Test rsync on AlmaLinux 8

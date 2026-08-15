@@ -24,6 +24,7 @@ permissions:
 jobs:
   test:
     runs-on: macos-latest
+    timeout-minutes: 45
     name: Test rsync on macOS
     steps:
     - uses: actions/checkout@v4

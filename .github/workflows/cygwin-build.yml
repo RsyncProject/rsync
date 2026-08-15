@@ -24,6 +24,7 @@ permissions:
 jobs:
   test:
     runs-on: windows-2022
+    timeout-minutes: 60
     name: Test rsync on Cygwin
     steps:
     - uses: actions/checkout@v4

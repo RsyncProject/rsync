@@ -37,6 +37,7 @@ permissions:
 jobs:
   fleettest:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     name: fleettest against localhost
     steps:
     - uses: actions/checkout@v4

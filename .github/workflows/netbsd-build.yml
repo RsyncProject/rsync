@@ -24,6 +24,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     name: Test rsync on NetBSD
     steps:
     - uses: actions/checkout@v4
