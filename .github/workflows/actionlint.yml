@@ -30,6 +30,7 @@ permissions:
 jobs:
   actionlint:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     name: actionlint
     steps:
       - uses: actions/checkout@v4

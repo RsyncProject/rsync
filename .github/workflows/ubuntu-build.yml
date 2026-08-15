@@ -38,6 +38,7 @@ jobs:
             nonroot: false
             install_smoke: false
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
     name: ${{ matrix.name }}
     steps:
     - uses: actions/checkout@v4
