@@ -2610,6 +2610,12 @@ sign) if you want the local shell to expand it.
       options are parsed (e.g. [`-a`](#opt) works the same before or after
       `--files-from`, as does `--no-R` and all other options).
 
+    Listing individual files with `--files-from` does not make unlisted
+    siblings eligible for deletion.  The [`--delete`](#opt) option only removes
+    entries from directories whose complete contents are being synchronised,
+    so list the directory itself and enable recursion if that deletion scope is
+    intended.
+
     The filenames that are read from the FILE are all relative to the source
     directory: any leading slash is removed, and ".." components are resolved away so
     an entry cannot rise above the source directory -- e.g. "../foo" is taken as "foo"
