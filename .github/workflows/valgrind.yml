@@ -4,17 +4,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
+# ASan+UBSan remains the per-PR memory-safety gate. Run the four slower
+# Valgrind combinations daily and on demand instead of occupying PR runners.
 on:
-  push:
-    branches: [ master ]
-    paths-ignore:
-      - '.github/workflows/*.yml'
-      - '!.github/workflows/valgrind.yml'
-  pull_request:
-    types: [opened, synchronize, reopened]
-    paths-ignore:
-      - '.github/workflows/*.yml'
-      - '!.github/workflows/valgrind.yml'
   schedule:
     - cron: '17 4 * * *'
   workflow_dispatch:
