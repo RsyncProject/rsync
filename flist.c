@@ -33,7 +33,6 @@ extern int am_chrooted;
 extern char *module_dir;
 extern unsigned int module_dirlen;
 extern int module_dirfd;
-extern unsigned int curr_dir_len;
 extern int am_sender;
 extern int am_generator;
 extern int inc_recurse;
@@ -87,7 +86,6 @@ extern char *usermap, *groupmap;
 
 extern struct name_num_item *file_sum_nni;
 
-extern char curr_dir[MAXPATHLEN];
 
 extern struct chmod_mode_struct *chmod_modes;
 
@@ -250,8 +248,8 @@ static int scan_readlink(const char *path, char *linkbuf, size_t bufsiz)
 	 && strncmp(path, scan_dir_prefix, scan_dir_prefix_len) == 0
 	 && path[scan_dir_prefix_len] == '/'
 	 && strchr(path + scan_dir_prefix_len + 1, '/') == NULL)
-		return do_readlink_atfd(scan_dirfd, path + scan_dir_prefix_len + 1, linkbuf, bufsiz);
-	return do_readlink(path, linkbuf, bufsiz);
+		return vfs_readlink_atfd(scan_dirfd, path + scan_dir_prefix_len + 1, linkbuf, bufsiz);
+	return vfs_readlink(path, linkbuf, bufsiz);
 }
 
 static int readlink_stat(const char *path, STRUCT_STAT *stp, char *linkbuf)
@@ -269,7 +267,7 @@ static int readlink_stat(const char *path, STRUCT_STAT *stp, char *linkbuf)
 				rprintf(FINFO,"copying unsafe symlink \"%s\" -> \"%s\"\n",
 					path, linkbuf);
 			}
-			return x_stat(path, stp, NULL);
+			return x_stat(path, stp, NULL, 0);
 		}
 		if (munge_symlinks && am_sender && llen > SYMLINK_PREFIX_LEN
 		 && strncmp(linkbuf, SYMLINK_PREFIX, SYMLINK_PREFIX_LEN) == 0) {
@@ -279,7 +277,7 @@ static int readlink_stat(const char *path, STRUCT_STAT *stp, char *linkbuf)
 	}
 	return 0;
 #else
-	return x_stat(path, stp, NULL);
+	return x_stat(path, stp, NULL, 0);
 #endif
 }
 
@@ -287,17 +285,17 @@ int link_stat(const char *path, STRUCT_STAT *stp, int follow_dirlinks)
 {
 #ifdef SUPPORT_LINKS
 	if (copy_links)
-		return x_stat(path, stp, NULL);
-	if (x_lstat(path, stp, NULL) < 0)
+		return x_stat(path, stp, NULL, 0);
+	if (x_lstat(path, stp, NULL, 0) < 0)
 		return -1;
 	if (follow_dirlinks && S_ISLNK(stp->st_mode)) {
 		STRUCT_STAT st;
-		if (x_stat(path, &st, NULL) == 0 && S_ISDIR(st.st_mode))
+		if (x_stat(path, &st, NULL, 0) == 0 && S_ISDIR(st.st_mode))
 			*stp = st;
 	}
 	return 0;
 #else
-	return x_stat(path, stp, NULL);
+	return x_stat(path, stp, NULL, 0);
 #endif
 }
 
@@ -311,17 +309,17 @@ int link_stat_at(int dfd, const char *name, STRUCT_STAT *stp, int follow_dirlink
 {
 #ifdef SUPPORT_LINKS
 	if (copy_links)
-		return do_stat_atfd(dfd, name, stp);
-	if (do_lstat_atfd(dfd, name, stp) < 0)
+		return vfs_stat(dfd, name, stp, 0);
+	if (vfs_lstat(dfd, name, stp, 0) < 0)
 		return -1;
 	if (follow_dirlinks && S_ISLNK(stp->st_mode)) {
 		STRUCT_STAT st;
-		if (do_stat_atfd(dfd, name, &st) == 0 && S_ISDIR(st.st_mode))
+		if (vfs_stat(dfd, name, &st, 0) == 0 && S_ISDIR(st.st_mode))
 			*stp = st;
 	}
 	return 0;
 #else
-	return do_stat_atfd(dfd, name, stp);
+	return vfs_stat(dfd, name, stp, 0);
 #endif
 }
 
@@ -1449,7 +1447,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 			 * options was specified, so there's no need for the
 			 * extra lstat() if one of these options isn't on. */
 			if ((copy_links || copy_unsafe_links || copy_dirlinks)
-			 && x_lstat(thisname, &st, NULL) == 0
+			 && x_lstat(thisname, &st, NULL, 0) == 0
 			 && S_ISLNK(st.st_mode)) {
 				io_error |= IOERR_GENERAL;
 				rprintf(FERROR_XFER, "symlink has no referent: %s\n",
@@ -1564,7 +1562,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 
 	if (copy_devices && am_sender && IS_DEVICE(st.st_mode)) {
 		if (st.st_size == 0) {
-			int fd = do_open_checklinks(fname);
+			int fd = vfs_open_checklinks(fname);
 			if (fd >= 0) {
 				st.st_size = get_device_size(fd, fname);
 				close(fd);
@@ -1677,7 +1675,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 		F_ATIME(file) = st.st_atime;
 #ifdef SUPPORT_CRTIMES
 	if (crtimes_ndx)
-		F_CRTIME(file) = get_create_time(fname, &st);
+		F_CRTIME(file) = vfs_get_create_time(fname, &st);
 #endif
 
 	if (basename != thisname)
@@ -2015,14 +2013,14 @@ static void interpret_stat_error(const char *fname, int is_dir)
 
 #if defined HAVE_FDOPENDIR && defined HAVE_DIRFD
 /* Open a source directory for scanning confined beneath the transfer root.
- * secure_relative_open() does a per-component O_NOFOLLOW walk that refuses a
+ * vfs_resolve_open() does a per-component O_NOFOLLOW walk that refuses a
  * parent component raced into a symlink pointing out of the tree; fdopendir()
  * then turns the held fd into the DIR* the scan reads.  This mirrors the
  * sender's confined content open (sender.c): the directory enumeration must be
  * confined the same way, or a parent-symlink race (or, for a daemon following
  * mode, an in-module symlink to outside) lets the scan enumerate an out-of-tree
  * directory and leak its names/metadata/symlink targets.  O_DIRECTORY without
- * O_NOFOLLOW makes secure_relative_open() follow in-tree directory symlinks
+ * O_NOFOLLOW makes vfs_resolve_open() follow in-tree directory symlinks
  * beneath the anchor and refuse escapes, so this serves both the default
  * no-follow scan and a daemon's symlink-following scan (see the caller).
  * Returns NULL with errno set on failure, like opendir(). */
@@ -2033,9 +2031,9 @@ static DIR *secure_opendir(const char *fbuf)
 
 	if (am_daemon && (!am_chrooted || module_dirlen)
 	 && module_dir && module_dir[0] == '/' && *fbuf != '/' && module_dirfd >= 0
-	 && curr_dir_len >= module_dirlen
-	 && strncmp(curr_dir, module_dir, module_dirlen) == 0
-	 && (curr_dir[module_dirlen] == '\0' || curr_dir[module_dirlen] == '/')) {
+	 && vfs.curr_dir_len >= module_dirlen
+	 && strncmp(vfs.curr_dir, module_dir, module_dirlen) == 0
+	 && (vfs.curr_dir[module_dirlen] == '\0' || vfs.curr_dir[module_dirlen] == '/')) {
 		/* Daemon: anchor the confined scan at the module root pinned by identity
 		 * at module setup (module_dirfd, opened while the daemon was positioned
 		 * there and still privileged), and walk the module-relative path of the
@@ -2043,11 +2041,11 @@ static DIR *secure_opendir(const char *fbuf)
 		 * legitimate in-module ".." climb (sub/climb -> ../sibling) or an in-module
 		 * directory symlink is followed, and an escape refused -- without
 		 * re-walking the absolute module path as the dropped uid (the privilege-
-		 * drop EACCES), and without assuming the lexical curr_dir depth matches the
+		 * drop EACCES), and without assuming the lexical vfs.curr_dir depth matches the
 		 * real cwd (a followed in-module symlink can desync them; anchoring at the
 		 * pinned module root and walking down the logical path is correct either
 		 * way). */
-		const char *p = curr_dir + module_dirlen;
+		const char *p = vfs.curr_dir + module_dirlen;
 		char modrel[MAXPATHLEN];
 		while (*p == '/')
 			p++;
@@ -2056,7 +2054,7 @@ static DIR *secure_opendir(const char *fbuf)
 			errno = ENAMETOOLONG;
 			return NULL;
 		}
-		dfd = secure_relative_open_at(module_dirfd, *modrel ? modrel : ".",
+		dfd = vfs_resolve_open_at(module_dirfd, *modrel ? modrel : ".",
 					      O_RDONLY | O_DIRECTORY, 0);
 	} else if (*fbuf == '/') {
 		/* An absolute scan path (an absolute --relative / --files-from name, or a
@@ -2064,11 +2062,11 @@ static DIR *secure_opendir(const char *fbuf)
 		const char *relp = fbuf;
 		while (*relp == '/')
 			relp++;
-		dfd = secure_relative_open("/", relp, O_RDONLY | O_DIRECTORY, 0);
+		dfd = vfs_resolve_open("/", relp, O_RDONLY | O_DIRECTORY, 0);
 	} else {
 		/* Non-daemon (or chrooted) sender: confine beneath the cwd the sender
 		 * chdir'd into (the transfer root). */
-		dfd = secure_relative_open(NULL, fbuf, O_RDONLY | O_DIRECTORY, 0);
+		dfd = vfs_resolve_open(NULL, fbuf, O_RDONLY | O_DIRECTORY, 0);
 	}
 
 	if (dfd < 0)
@@ -2106,7 +2104,7 @@ static void send_directory(int f, struct file_list *flist, char *fbuf, int len,
 	/* Confine the enumeration beneath the transfer root.  secure_opendir()
 	 * follows in-tree directory symlinks (RESOLVE_BENEATH) and refuses one that
 	 * escapes, so it serves both modes:
-	 *   - a daemon/hardened sender (secure_relpath_active()) is confined to the
+	 *   - a daemon/hardened sender (vfs_relpath_active()) is confined to the
 	 *     module in EVERY mode -- including -L/--copy-dirlinks/--copy-unsafe-
 	 *     links, matching the content open (sender_open_copylinks_confined) --
 	 *     so a following mode cannot be lured to enumerate outside the module;
@@ -2118,7 +2116,7 @@ static void send_directory(int f, struct file_list *flist, char *fbuf, int len,
 	 * yes", admin-only) -- or a non-daemon --insecure-links -- uses the legacy
 	 * opendir() too, restoring the pre-hardening enumeration (re-opening the
 	 * escape; documented). */
-	if (f >= 0 && !symlink_optout_allowed() && (secure_relpath_active()
+	if (f >= 0 && !vfs_symlink_optout_allowed() && (vfs_relpath_active()
 		    || !(copy_links || copy_unsafe_links || copy_dirlinks || insecure_links)))
 		d = secure_opendir(fbuf);
 	else
@@ -2560,7 +2558,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	}
 
 	if (!orig_dir)
-		orig_dir = strdup(curr_dir);
+		orig_dir = strdup(vfs.curr_dir);
 
 	while (1) {
 		char fbuf[MAXPATHLEN], *fn, name_type;

@@ -63,18 +63,23 @@ static void del_chmod(const char *fbuf, mode_t mode)
 	const char *leaf;
 	int dfd = del_held_dfd(fbuf, &leaf);
 	if (dfd >= 0)
-		do_chmod_atfd(dfd, leaf, mode);
+		vfs_chmod(dfd, leaf, mode, 0);
 	else
-		do_chmod_at(fbuf, mode);
+		vfs_chmod(VFS_AT_FDCWD, fbuf, mode, 0);
 }
 
-static int del_unlink(const char *fbuf)
+/* vfs_flags carries VFS_OPERATOR_PATH for a backup-tree delete (DEL_FOR_BACKUP):
+ * the path-based fallback then resolves the leaf's parent via the ownership walk,
+ * matching the confinement the base gives this unlink under make_backup() (where
+ * the held dirfd is absent for a cross-tree --backup-dir leaf).  A held-dirfd
+ * delete is already confined, so it ignores the flag. */
+static int del_unlink(const char *fbuf, int vfs_flags)
 {
 	const char *leaf;
 	int dfd = del_held_dfd(fbuf, &leaf);
-	if (dfd >= 0 && do_unlink_atfd(dfd, leaf, 0) == 0)
+	if (dfd >= 0 && vfs_unlink(dfd, leaf, 0) == 0)
 		return 0;
-	return robust_unlink(fbuf);	/* fall back (ETXTBSY retry, or not held) */
+	return robust_unlink(fbuf, vfs_flags);	/* fall back (ETXTBSY retry, or not held) */
 }
 
 static inline int is_backup_file(char *fn)
@@ -133,7 +138,7 @@ static enum delret delete_dir_contents(char *fname, uint16 flags)
 	const char *save_del_prefix = del_dir_prefix;
 	int save_del_prefix_len = del_dir_prefix_len;
 	fname[dlen] = '\0';
-	del_dirfd = open_dir_secure(fname);
+	del_dirfd = vfs_opendir(fname);
 	fname[dlen] = '/';
 	del_dir_prefix = fname;
 	del_dir_prefix_len = dlen;
@@ -223,18 +228,20 @@ enum delret delete_item(char *fbuf, uint16 mode, uint16 flags)
 		const char *leaf;
 		int dfd = del_held_dfd(fbuf, &leaf);
 		what = "rmdir";
-		ok = (dfd >= 0 ? do_unlink_atfd(dfd, leaf, AT_REMOVEDIR) : do_rmdir_at(fbuf)) == 0;
+		ok = (dfd >= 0 ? vfs_unlink(dfd, leaf, VFS_REMOVEDIR)
+		   : vfs_unlink(VFS_AT_FDCWD, fbuf,
+				VFS_REMOVEDIR | ((flags & DEL_FOR_BACKUP) ? VFS_OPERATOR_PATH : 0))) == 0;
 	} else {
 		if (make_backups > 0 && !(flags & DEL_FOR_BACKUP) && (backup_dir || !is_backup_file(fbuf))) {
 			what = "make_backup";
 			ok = make_backup(fbuf, True);
 			if (ok == 2) {
 				what = "unlink";
-				ok = del_unlink(fbuf) == 0;
+				ok = del_unlink(fbuf, (flags & DEL_FOR_BACKUP) ? VFS_OPERATOR_PATH : 0) == 0;
 			}
 		} else {
 			what = "unlink";
-			ok = del_unlink(fbuf) == 0;
+			ok = del_unlink(fbuf, (flags & DEL_FOR_BACKUP) ? VFS_OPERATOR_PATH : 0) == 0;
 		}
 	}
 

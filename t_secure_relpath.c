@@ -1,5 +1,5 @@
 /*
- * Test harness for secure_relative_open()'s front-door input
+ * Test harness for vfs_resolve_open()'s front-door input
  * validation. Codex audit Finding 5 noted that the existing check
  *
  *     if (strncmp(relpath, "../", 3) == 0 || strstr(relpath, "/../"))
@@ -14,7 +14,7 @@
  * pre-5.6 Linux does not, so the validation must happen at the
  * front door.
  *
- * This helper invokes secure_relative_open() with each suspect
+ * This helper invokes vfs_resolve_open() with each suspect
  * input and checks both the failure (rc < 0) and the errno
  * (EINVAL means "rejected at the front door"). Pre-fix, the kernel
  * may reject with a different errno (EXDEV from RESOLVE_BENEATH);
@@ -47,7 +47,7 @@ static void check_relpath(const char *relpath)
 	int saved_errno;
 
 	errno = 0;
-	fd = secure_relative_open(NULL, relpath, O_RDONLY | O_DIRECTORY, 0);
+	fd = vfs_resolve_open(NULL, relpath, O_RDONLY | O_DIRECTORY, 0);
 	saved_errno = errno;
 
 	if (fd >= 0) {
@@ -76,7 +76,7 @@ static void check_basedir(const char *basedir)
 	int saved_errno;
 
 	errno = 0;
-	fd = secure_relative_open(basedir, "ok", O_RDONLY | O_DIRECTORY, 0);
+	fd = vfs_resolve_open(basedir, "ok", O_RDONLY | O_DIRECTORY, 0);
 	saved_errno = errno;
 
 	if (fd >= 0) {
@@ -111,7 +111,7 @@ static void check_beneath_dotdot(void)
 		return;
 	}
 
-	fd = secure_relative_open_at_beneath(anchor, "alias/../subdir",
+	fd = vfs_resolve_open_at_beneath(anchor, "alias/../subdir",
 					     O_RDONLY | O_DIRECTORY, 0);
 	if (fd < 0 || fstat(fd, &fst) < 0 || fst.st_dev != ast.st_dev
 	 || fst.st_ino == ast.st_ino) {
@@ -138,7 +138,7 @@ static void check_beneath_dotdot(void)
 		for (ci = 0; ci < sizeof dotdot_cases / sizeof *dotdot_cases; ci++) {
 			int dfd;
 			errno = 0;
-			dfd = secure_relative_open_at_beneath(anchor, "..",
+			dfd = vfs_resolve_open_at_beneath(anchor, "..",
 							      dotdot_cases[ci].flags, 0);
 			if (dfd >= 0) {
 				STRUCT_STAT dst;
@@ -159,7 +159,7 @@ static void check_beneath_dotdot(void)
 	}
 
 	errno = 0;
-	fd = secure_relative_open_at_beneath(anchor, "../outside",
+	fd = vfs_resolve_open_at_beneath(anchor, "../outside",
 					     O_RDONLY | O_DIRECTORY, 0);
 	if (fd >= 0 || errno != ELOOP) {
 		fprintf(stderr, "FAIL [beneath escape]: rc=%d errno=%d, expected -1/ELOOP\n",
@@ -184,7 +184,7 @@ int main(int argc, char **argv)
 		return 2;
 	}
 
-	/* secure_relative_open's daemon-only confinement protections only
+	/* vfs_resolve_open's daemon-only confinement protections only
 	 * fire when am_daemon && !am_chrooted (the threat model is the
 	 * daemon-no-chroot deployment), but the front-door input
 	 * validation runs unconditionally. We set am_daemon anyway so the
@@ -196,7 +196,7 @@ int main(int argc, char **argv)
 	symlink("subdir", "alias");
 
 	/* Each of these relpaths must be rejected with EINVAL at the
-	 * secure_relative_open() front door. ".." is the actual one-level
+	 * vfs_resolve_open() front door. ".." is the actual one-level
 	 * escape; the others ("subdir/..", "subdir/../subdir") resolve
 	 * back to the start dir on systems that allow them, but we still
 	 * reject them as defence-in-depth: a path containing a ".." token

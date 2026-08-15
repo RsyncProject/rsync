@@ -41,7 +41,6 @@ extern int sanitize_paths;
 extern int protocol_version;
 extern int trust_sender_args;
 extern int module_id;
-extern int operator_path_resolve;
 
 /* Set while the daemon loads its own filter parameters; see parse_filter_file(). */
 int daemon_config_filter_file = 0;
@@ -136,8 +135,6 @@ static void filter_rule_err(const char *msg, const char *rulestr)
 	exit_cleanup(RERR_SYNTAX);
 }
 
-extern char curr_dir[MAXPATHLEN];
-extern unsigned int curr_dir_len;
 extern unsigned int module_dirlen;
 
 filter_rule_list filter_list = { .debug_type = "" };
@@ -155,7 +152,7 @@ int trust_sender_filter = 0;
 #define SLASH_WILD3_SUFFIX "/***"
 
 /* The dirbuf is set by push_local_filters() to the current subdirectory
- * relative to curr_dir that is being processed.  The path always has a
+ * relative to vfs.curr_dir that is being processed.  The path always has a
  * trailing slash appended, and the variable dirbuf_len contains the length
  * of this path prefix.  The path is always absolute. */
 static char dirbuf[MAXPATHLEN+1];
@@ -757,9 +754,9 @@ void set_filter_dir(const char *dir, unsigned int dirlen)
 {
 	unsigned int len;
 	if (*dir != '/') {
-		memcpy(dirbuf, curr_dir, curr_dir_len);
-		dirbuf[curr_dir_len] = '/';
-		len = curr_dir_len + 1;
+		memcpy(dirbuf, vfs.curr_dir, vfs.curr_dir_len);
+		dirbuf[vfs.curr_dir_len] = '/';
+		len = vfs.curr_dir_len + 1;
 		if (len + dirlen >= MAXPATHLEN)
 			dirlen = 0;
 	} else
@@ -853,7 +850,7 @@ struct local_filter_state {
 
 /* Each time rsync changes to a new directory it call this function to
  * handle all the per-dir merge-files.  The "dir" value is the current path
- * relative to curr_dir (which might not be null-terminated).  We copy it
+ * relative to vfs.curr_dir (which might not be null-terminated).  We copy it
  * into dirbuf so that we can easily append a file name on the end. */
 void *push_local_filters(const char *dir, unsigned int dirlen)
 {
@@ -1020,10 +1017,10 @@ static int rule_matches(const char *fname, filter_rule *ex, int name_flags)
 		if ((p = strrchr(name,'/')) != NULL)
 			name = p+1;
 	} else if (ex->rflags & FILTRULE_ABS_PATH && *fname != '/'
-	    && curr_dir_len > module_dirlen + 1) {
+	    && vfs.curr_dir_len > module_dirlen + 1) {
 		/* If we're matching against an absolute-path pattern,
 		 * we need to prepend our full path info. */
-		strings[str_cnt++] = curr_dir + module_dirlen + 1;
+		strings[str_cnt++] = vfs.curr_dir + module_dirlen + 1;
 		strings[str_cnt++] = "/";
 	} else if (ex->rflags & FILTRULE_WILD2_PREFIX && *fname != '/') {
 		/* Allow "**"+"/" to match at the start of the string. */
@@ -1665,24 +1662,18 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 			open_path = line;
 		} else
 			open_path = fname;
-
 		/* Confine the open to the module root.  The ownership walk on its own
 		 * is not enough for a peer-driven merge file: a non-chrooted daemon
 		 * writes --backup-dir entries as root, so a raced backup symlink is
-		 * ROOT-owned -- exactly what open_no_attacker_symlinks() treats as
-		 * trusted -- and naming it in a dir-merge rule would read an
-		 * out-of-module file in as filter rules (their text comes back to the
-		 * peer in "Unknown filter rule" errors).
+		 * ROOT-owned -- exactly what the ownership walk treats as trusted --
+		 * and naming it in a dir-merge rule would read an out-of-module file
+		 * in as filter rules (their text comes back to the peer in "Unknown
+		 * filter rule" errors).
 		 *
 		 * The daemon's own "filter"/"include from"/"exclude from" parameters
 		 * are exempt: those are operator-configured and legitimately live
 		 * outside the module (/etc/rsync/excludes and the like). */
-		int save_opr = operator_path_resolve;
-		if (!daemon_config_filter_file)
-			operator_path_resolve = 1;
-		fd = open_no_attacker_symlinks(open_path, O_RDONLY, 0);
-		operator_path_resolve = save_opr;
-
+		fd = vfs_open_owner_walk(open_path, O_RDONLY, 0, !daemon_config_filter_file);
 		if (fd < 0)
 			fp = NULL;
 		else if (!(fp = fdopen(fd, "rb")))

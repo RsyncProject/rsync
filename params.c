@@ -416,7 +416,7 @@ static int include_config(char *include, int manage_globals)
     char *match = manage_globals ? "*.conf" : "*.inc";
     int ret;
 
-    if (do_stat(include, &sb) < 0) {
+    if (vfs_stat(VFS_AT_FDCWD, include, &sb, VFS_ALLOW_SYMLINK) < 0) {
 	rsyserr(FLOG, errno, "unable to stat config file \"%s\"", include);
 	return 0;
     }
@@ -583,7 +583,7 @@ static FILE *OpenConfFile( char *FileName )
   /* rsyncd.conf path (--config or default): a planted symlink could redirect
    * the daemon's config read.  Refuse symlinks not owned by uid 0 or euid. */
   {
-    int cfg_fd = open_no_attacker_symlinks( FileName, O_RDONLY, 0 );
+    int cfg_fd = vfs_open_owner_walk( FileName, O_RDONLY, 0 , 0);
     OpenedFile = cfg_fd >= 0 ? fdopen( cfg_fd, "r" ) : NULL;
     if( !OpenedFile && cfg_fd >= 0 )
       close( cfg_fd );

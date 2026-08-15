@@ -37,7 +37,6 @@ extern int omit_dir_times;
 extern int omit_link_times;
 extern int am_root;
 extern int am_server;
-extern int operator_path_resolve;
 extern int am_daemon;
 extern int am_sender;
 extern int am_receiver;
@@ -514,6 +513,13 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	int op_leaf_fd = -1;     /* O_NOFOLLOW fd pinning a cross-tree operator leaf */
 	int op_pin = 0;          /* drive chmod/chown off op_leaf_fd for a cross-tree leaf */
 	int op_refuse = 0;       /* pin open hit the symlink-race signal: refuse, don't redirect */
+	/* The ownership walk for the path-based chmod/chown fallbacks below.  op_pin
+	 * covers a reg/dir/fifo leaf with a pinned fd, but a symlink or device leaf
+	 * never enters it, and a non-root operator can fail the pin open with a plain
+	 * EACCES and fall through -- both must still resolve the operator path via the
+	 * walk rather than a bare lchown()/chmod().  (vfs_chmod's operator branch skips
+	 * S_ISLNK itself, so a symlink-as-object keeps the lchmod/setattrlist path.) */
+	int op_vfs = (flags & ATTRS_OPERATOR_PATH) ? VFS_OPERATOR_PATH : 0;
 #if defined SUPPORT_XATTRS || defined SUPPORT_ACLS
 	int held_fd = -1; /* held O_NOFOLLOW fd for fd-based xattr/ACL ops, or -1 */
 	int xattr_refuse = 0; /* no confined fd for a slashed path: skip path-based xattr/ACL */
@@ -526,7 +532,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		/* Stat through the entry's held dir fd (like gen_entry_stat) so we
 		 * don't re-walk the full path here; link_stat_at folds in no
 		 * fake-super xattr, so only when am_root >= 0. */
-		if (am_root >= 0 && (sdfd = held_dfd_for(fname, file)) >= 0) {
+		if (am_root >= 0 && (sdfd = vfs_cached_dirfd(fname, file)) >= 0) {
 			const char *sl = strrchr(fname, '/');
 			sret = link_stat_at(sdfd, sl ? sl + 1 : fname, &sx2.st, 0);
 		} else
@@ -546,7 +552,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	 * issue single-component *at() calls against it instead of re-resolving
 	 * the full path each time.  -1 => fall back to the full-path wrappers
 	 * (cross-tree path such as --temp-dir/--backup-dir, or gated off). */
-	dfd = held_dfd_for(fname, file);
+	dfd = vfs_cached_dirfd(fname, file);
 	if (dfd >= 0) {
 		const char *slash = strrchr(fname, '/');
 		leaf = slash ? slash + 1 : fname;
@@ -569,30 +575,26 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	    ))
 		held_fd = openat(dfd, leaf, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_NOCTTY | O_CLOEXEC);
 
-	/* If the held-fd pin above missed (no cached dir fd -- a path deeper than the
-	 * dirfd cache, or a raced leaf) but we are a confined receiver on a
-	 * non-operator path, re-pin the leaf through the secure resolver so the
-	 * xattr/ACL ops below drive fsetxattr off a confined fd -- NOT a raw path-based
-	 * lsetxattr, which re-resolves the parent and lets a flipped dest/sub symlink
-	 * land the xattr OUTSIDE the tree (copy-xattrs-symlink-race).  If the secure
-	 * re-pin also fails (a genuinely raced parent/leaf symlink), held_fd stays -1
-	 * and xattr_refuse skips the path-based ops rather than redirecting them.
-	 * (chmod/chown/times stay safe via their secure path wrappers; operator paths
-	 * use op_pin/op_refuse below.) */
-	if (held_fd < 0 && !operator_path_resolve && secure_relpath_active()
+	/* If the held-fd pin above missed (no cached dir fd, or a raced leaf) but we
+	 * are a confined receiver on a non-operator path, re-pin the leaf through the
+	 * secure resolver so the xattr/ACL ops below drive fsetxattr off a confined fd
+	 * -- NOT a raw path-based lsetxattr, which re-resolves the parent and lets a
+	 * flipped dest/sub symlink land the xattr OUTSIDE the tree (copy-xattrs-
+	 * symlink-race).  A confined receiver normally always has the cached pin; a
+	 * miss here is a raced parent/leaf.  If the secure re-pin also fails (the
+	 * parent/leaf is a symlink), held_fd stays -1 and xattr_refuse below skips the
+	 * path-based ops rather than redirecting them.  (chmod/chown/times stay safe
+	 * via their secure path wrappers; operator paths use op_pin/op_refuse.) */
+	if (held_fd < 0 && !(flags & ATTRS_OPERATOR_PATH) && vfs_relpath_active()
 	 && (S_ISREG(sxp->st.st_mode) || S_ISDIR(sxp->st.st_mode) || S_ISFIFO(sxp->st.st_mode))
 	 && (preserve_xattrs || am_root < 0
 # ifdef SUPPORT_ACLS
 	     || (preserve_acls && am_root >= 0)
 # endif
 	    )) {
-		int odir = 0;
-# ifdef O_DIRECTORY
-		if (S_ISDIR(sxp->st.st_mode))
-			odir = O_DIRECTORY;
-# endif
-		held_fd = secure_relative_open(NULL, fname,
-			O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_NOCTTY | O_CLOEXEC | odir, 0);
+		held_fd = vfs_resolve_open(NULL, fname,
+			O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_NOCTTY | O_CLOEXEC
+			| (S_ISDIR(sxp->st.st_mode) ? O_DIRECTORY : 0), 0);
 		if (held_fd < 0 && strchr(fname, '/'))
 			xattr_refuse = 1;
 	}
@@ -607,16 +609,16 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	 * operator owner-walk resolver and drive fchmod/fchown off that fd.  A raced
 	 * symlink leaf makes the open fail, leaving op_leaf_fd == -1: the metadata op
 	 * is then refused, never redirected.  --insecure-links opts back out (the
-	 * resolver in do_open_at honours it), and a genuine symlink leaf (a symlink
+	 * resolver in vfs_open_at honours it), and a genuine symlink leaf (a symlink
 	 * backup) keeps the existing l-variant path. */
 	/* Gate on the INTENDED type (new_mode), not the on-disk type (sxp->st): the
 	 * attacker controls the latter via the flip, and a dir component that has
 	 * just been flipped to a symlink must still take the pinned path so the
 	 * O_NOFOLLOW open refuses it -- otherwise the lchown would launder it. */
-	op_pin = operator_path_resolve && dfd < 0 && !symlink_optout_allowed()
+	op_pin = (flags & ATTRS_OPERATOR_PATH) && dfd < 0 && !vfs_symlink_optout_allowed()
 	      && (S_ISREG(new_mode) || S_ISDIR(new_mode) || S_ISFIFO(new_mode));
 	if (op_pin) {
-		op_leaf_fd = do_open_at(fname, O_RDONLY | O_NONBLOCK | O_NOCTTY | O_CLOEXEC, 0);
+		op_leaf_fd = vfs_open_at(fname, O_RDONLY | O_NONBLOCK | O_NOCTTY | O_CLOEXEC, 0, VFS_OPERATOR_PATH);
 		/* When running as root (the uid-0 trust-laundering case) an O_RDONLY open
 		 * of a real owned reg/dir/fifo leaf never fails for permission reasons, so
 		 * ANY failure here means the leaf is being raced (a symlink refused by
@@ -647,6 +649,29 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	if (daemon_chmod_modes && !S_ISLNK(new_mode))
 		new_mode = tweak_mode(new_mode, daemon_chmod_modes);
 
+#if (defined SUPPORT_XATTRS || defined SUPPORT_ACLS) && defined STRICT_CONFINEMENT
+	/* Enforce the pin/re-pin invariant: for a confined, pinnable, non-operator
+	 * leaf with metadata work pending, the held-fd pin/re-pin above must have
+	 * produced a confined fd (held_fd >= 0) or set xattr_refuse.  Reaching here
+	 * with neither means the xattr/ACL setters would take their raw path-based
+	 * branch (the copy-xattrs fallback class) -- abort so the suite catches the
+	 * regression.  The clause mirrors the pin condition (excluding no-metadata-
+	 * work, symlink/operator/opt-out, etc.); it is intentionally a touch broader
+	 * than "the next setter definitely path-writes" (set_xattr is skipped when
+	 * fnamecmp == NULL; a native ACL may still take a dirfd+leaf route), but a
+	 * confined slashed path only reaches here once the invariant is already
+	 * broken, so it cannot false-abort a legitimate transfer. */
+	if (held_fd < 0 && !op_refuse && !xattr_refuse && !(flags & ATTRS_OPERATOR_PATH)
+	 && (S_ISREG(sxp->st.st_mode) || S_ISDIR(sxp->st.st_mode) || S_ISFIFO(sxp->st.st_mode))
+	 && (preserve_xattrs || am_root < 0
+#  ifdef SUPPORT_ACLS
+	     || (preserve_acls && am_root >= 0)
+#  endif
+	    )
+	 && vfs_must_be_confined(fname, 0))
+		vfs_strict_confine_fail(fname, "xattr/ACL set");
+#endif
+
 #ifdef SUPPORT_ACLS
 	if (preserve_acls && !S_ISLNK(file->mode) && !ACL_READY(*sxp) && !op_refuse && !xattr_refuse)
 		get_acl_fdat(held_fd, dfd, leaf, fname, sxp);
@@ -676,10 +701,10 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		if (am_root >= 0) {
 			uid_t uid = change_uid ? (uid_t)F_OWNER(file) : sxp->st.st_uid;
 			gid_t gid = change_gid ? (gid_t)F_GROUP(file) : sxp->st.st_gid;
-			if ((op_leaf_fd >= 0 ? do_fchown(op_leaf_fd, uid, gid)
+			if ((op_leaf_fd >= 0 ? vfs_fchown(op_leaf_fd, uid, gid)
 			     : op_refuse ? (errno = ELOOP, -1)
-			     : dfd >= 0 ? do_lchown_atfd(dfd, leaf, uid, gid)
-					: do_lchown_at(fname, uid, gid)) != 0) {
+			     : dfd >= 0 ? vfs_lchown(dfd, leaf, uid, gid, 0)
+					: vfs_lchown(VFS_AT_FDCWD, fname, uid, gid, op_vfs)) != 0) {
 				/* We shouldn't have attempted to change uid
 				 * or gid unless have the privilege. */
 				rsyserr(FERROR_XFER, errno, "%s %s failed",
@@ -751,13 +776,13 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	if (crtimes_ndx && !(flags & ATTRS_SKIP_CRTIME)) {
 		time_t file_crtime = F_CRTIME(file);
 		if (sxp->crtime == 0)
-			sxp->crtime = get_create_time(fname, &sxp->st);
+			sxp->crtime = vfs_get_create_time(fname, &sxp->st);
 		if (!same_time(sxp->crtime, 0L, file_crtime, 0L)) {
 			if (
 #ifdef HAVE_GETATTRLIST
-			     do_setattrlist_crtime(fname, file_crtime) == 0
+			     vfs_setattrlist_crtime(fname, file_crtime) == 0
 #elif defined __CYGWIN__
-			     do_SetFileTime(fname, file_crtime) == 0
+			     vfs_SetFileTime(fname, file_crtime) == 0
 #else
 #error Unknown crtimes implementation
 #endif
@@ -770,7 +795,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		int ret;
 #ifdef HAVE_FUTIMENS
 		if (op_leaf_fd >= 0)
-			ret = do_futimens(op_leaf_fd, &sx2.st);
+			ret = vfs_futimens(op_leaf_fd, &sx2.st);
 		else
 #endif
 		if (op_refuse)
@@ -806,10 +831,10 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 #ifdef HAVE_CHMOD
 	if (!BITS_EQUAL(sxp->st.st_mode, new_mode, CHMOD_BITS)) {
 		int ret = am_root < 0 ? 0
-			: op_leaf_fd >= 0 ? do_fchmod(op_leaf_fd, new_mode)
+			: op_leaf_fd >= 0 ? vfs_fchmod(op_leaf_fd, new_mode)
 			: op_refuse ? (errno = ELOOP, -1)
-			: dfd >= 0 && !S_ISLNK(new_mode) ? do_chmod_atfd(dfd, leaf, new_mode)
-			: do_chmod_at(fname, new_mode);
+			: dfd >= 0 && !S_ISLNK(new_mode) ? vfs_chmod(dfd, leaf, new_mode, 0)
+			: vfs_chmod(VFS_AT_FDCWD, fname, new_mode, op_vfs);
 		if (ret < 0) {
 			rsyserr(FERROR_XFER, errno,
 				"failed to set permissions on %s",
@@ -907,10 +932,8 @@ int finish_transfer(const char *fname, const char *fnametmp,
 	 * dirfd, so resolve its metadata through the ownership walk (op_pin); a
 	 * flipped temp-dir parent then can't redirect the chmod/chown/times/etc.
 	 * (in-tree temps keep their held dirfd, so op_pin stays off there). */
-	operator_path_resolve = 1;
 	set_file_attrs(fnametmp, file, NULL, fnamecmp,
-		       ok_to_set_time ? ATTRS_ACCURATE_TIME : ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME | ATTRS_SKIP_CRTIME);
-	operator_path_resolve = 0;
+		       ATTRS_OPERATOR_PATH | (ok_to_set_time ? ATTRS_ACCURATE_TIME : ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME | ATTRS_SKIP_CRTIME));
 
 	/* move tmp file over real file */
 	if (DEBUG_GTE(RECV, 1))
@@ -922,7 +945,7 @@ int finish_transfer(const char *fname, const char *fnametmp,
 			full_fname(fnametmp), fname);
 		if (!partialptr || (ret == -2 && temp_copy_name)
 		 || robust_rename(fnametmp, partialptr, NULL, file->mode, file) < 0)
-			do_unlink_at(fnametmp);
+			vfs_unlink(VFS_AT_FDCWD, fnametmp, 0);
 		return 0;
 	}
 	if (ret == 0) {
@@ -938,7 +961,9 @@ int finish_transfer(const char *fname, const char *fnametmp,
 		       ok_to_set_time ? ATTRS_ACCURATE_TIME : ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME | ATTRS_SKIP_CRTIME);
 
 	if (temp_copy_name) {
-		if (do_rename_at(fnametmp, fname) < 0) {
+		/* temp_copy_name and fname both live in the dest tree here; flag 0 lets
+		 * vfs_twopath_side confine each side (absolute=owner-walk, relative=secure). */
+		if (vfs_rename_at(fnametmp, fname, 0, 0) < 0) {
 			rsyserr(FERROR_XFER, errno, "rename %s -> \"%s\"",
 				full_fname(fnametmp), fname);
 			return 0;

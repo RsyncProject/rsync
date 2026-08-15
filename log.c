@@ -55,7 +55,6 @@ extern iconv_t ic_chck;
 #ifdef ICONV_OPTION
 extern iconv_t ic_recv;
 #endif
-extern char curr_dir[MAXPATHLEN];
 extern char *full_module_path;
 extern unsigned int module_dirlen;
 extern char sender_file_sum[MAX_DIGEST_LEN];
@@ -166,8 +165,8 @@ static void logfile_open(void)
 	 * attacker-writable dirs; a planted symlink could redirect root's log
 	 * into e.g. /root/.ssh/authorized_keys.  Refuse symlinks not owned by
 	 * uid 0 or our euid. */
-	int fd = open_no_attacker_symlinks(logfile_name,
-						O_WRONLY | O_APPEND | O_CREAT, 0644);
+	int fd = vfs_open_owner_walk(logfile_name,
+						O_WRONLY | O_APPEND | O_CREAT, 0644, 0);
 	logfile_fp = fd >= 0 ? fdopen(fd, "a") : NULL;
 	if (!logfile_fp && fd >= 0)
 		close(fd);
@@ -648,7 +647,7 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 					n = buf2;
 			} else if (am_daemon && *c != '/') {
 				pathjoin(buf2, sizeof buf2,
-					 curr_dir + module_dirlen, c);
+					 vfs.curr_dir + module_dirlen, c);
 				clean_fname(buf2, 0);
 				if (fmt[1]) {
 					strlcpy(c, buf2, MAXPATHLEN);

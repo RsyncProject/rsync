@@ -34,7 +34,6 @@ extern int relative_paths;
 extern int preserve_xattrs;
 extern int omit_link_times;
 extern int preallocate_files;
-extern int operator_path_resolve;
 extern char *module_dir;
 extern unsigned int module_dirlen;
 extern char *partial_dir;
@@ -42,8 +41,6 @@ extern filter_rule_list daemon_filter_list;
 
 int sanitize_paths = 0;
 
-extern char curr_dir[MAXPATHLEN];   /* defined in syscall.c */
-extern unsigned int curr_dir_len;
 int curr_dir_depth; /* This is only set for a sanitizing daemon. */
 
 /* Set a fd into nonblocking mode. */
@@ -133,7 +130,7 @@ int set_times(const char *fname, STRUCT_STAT *stp)
 	switch (switch_step) {
 #ifdef HAVE_SETATTRLIST
 #include "case_N.h"
-		if (do_setattrlist_times(fname, stp) == 0)
+		if (vfs_setattrlist_times(fname, stp) == 0)
 			break;
 		if (errno != ENOSYS)
 			return -1;
@@ -142,7 +139,7 @@ int set_times(const char *fname, STRUCT_STAT *stp)
 
 #ifdef HAVE_UTIMENSAT
 #include "case_N.h"
-		if (do_utimensat_at(fname, stp) == 0)
+		if (vfs_utimensat_at(fname, stp) == 0)
 			break;
 		if (errno != ENOSYS)
 			return -1;
@@ -151,7 +148,7 @@ int set_times(const char *fname, STRUCT_STAT *stp)
 
 #ifdef HAVE_LUTIMES
 #include "case_N.h"
-		if (do_lutimes(fname, stp) == 0)
+		if (vfs_lutimes(fname, stp) == 0)
 			break;
 		if (errno != ENOSYS)
 			return -1;
@@ -168,10 +165,10 @@ int set_times(const char *fname, STRUCT_STAT *stp)
 
 #include "case_N.h"
 #ifdef HAVE_UTIMES
-		if (do_utimes(fname, stp) == 0)
+		if (vfs_utimes(fname, stp) == 0)
 			break;
 #else
-		if (do_utime(fname, stp) == 0)
+		if (vfs_utime(fname, stp) == 0)
 			break;
 #endif
 
@@ -189,7 +186,7 @@ int set_times(const char *fname, STRUCT_STAT *stp)
 int set_times_at(int dfd, const char *name, STRUCT_STAT *stp)
 {
 #if defined HAVE_UTIMENSAT && !defined HAVE_SETATTRLIST
-	int r = do_utimensat_atfd(dfd, name, stp);
+	int r = vfs_utimensat_atfd(dfd, name, stp);
 	if (r == 0)
 		return 0;
 	if (errno == ENOSYS)
@@ -199,91 +196,6 @@ int set_times_at(int dfd, const char *name, STRUCT_STAT *stp)
 	(void)dfd; (void)name; (void)stp;
 	return -2;
 #endif
-}
-
-/* Create any necessary directories in fname.  Any missing directories are
- * created with default permissions.  Returns < 0 on error, or the number
- * of directories created. */
-int make_path(char *fname, int flags)
-{
-	char *end, *p;
-	int ret = 0;
-
-	if (flags & MKP_SKIP_SLASH) {
-		while (*fname == '/')
-			fname++;
-	}
-
-	while (*fname == '.' && fname[1] == '/')
-		fname += 2;
-
-	if (flags & MKP_DROP_NAME) {
-		end = strrchr(fname, '/');
-		if (!end || end == fname)
-			return 0;
-		*end = '\0';
-	} else
-		end = fname + strlen(fname);
-
-	/* Try to find an existing dir, starting from the deepest dir. */
-	for (p = end; ; ) {
-		if (dry_run) {
-			STRUCT_STAT st;
-			if (do_stat(fname, &st) == 0) {
-				if (S_ISDIR(st.st_mode))
-					errno = EEXIST;
-				else
-					errno = ENOTDIR;
-			}
-		} else if (do_mkdir_at(fname, ACCESSPERMS) == 0) {
-			ret++;
-			break;
-		}
-
-		if (errno != ENOENT) {
-			STRUCT_STAT st;
-			if (errno != EEXIST || (do_stat(fname, &st) == 0 && !S_ISDIR(st.st_mode)))
-				ret = -ret - 1;
-			break;
-		}
-		while (1) {
-			if (p == fname) {
-				/* We got a relative path that doesn't exist, so assume that '.'
-				 * is there and just break out and create the whole thing. */
-				p = NULL;
-				goto double_break;
-			}
-			if (*--p == '/') {
-				if (p == fname) {
-					/* We reached the "/" dir, which we assume is there. */
-					goto double_break;
-				}
-				*p = '\0';
-				break;
-			}
-		}
-	}
-  double_break:
-
-	/* Make all the dirs that we didn't find on the way here. */
-	while (p != end) {
-		if (p)
-			*p = '/';
-		else
-			p = fname;
-		p += strlen(p);
-		if (ret < 0) /* Skip mkdir on error, but keep restoring the path. */
-			continue;
-		if (do_mkdir_at(fname, ACCESSPERMS) < 0)
-			ret = -ret - 1;
-		else
-			ret++;
-	}
-
-	if (flags & MKP_DROP_NAME)
-		*end = '/';
-
-	return ret;
 }
 
 /**
@@ -313,353 +225,6 @@ int full_write(int desc, const char *ptr, size_t len)
 		len -= written;
 	}
 	return total_written;
-}
-
-/**
- * Read @p len bytes at @p ptr from descriptor @p desc, retrying if
- * interrupted.
- *
- * @retval >0 the actual number of bytes read
- *
- * @retval 0 for EOF
- *
- * @retval <0 for an error.
- *
- * Derived from GNU C's cccp.c. */
-static int safe_read(int desc, char *ptr, size_t len)
-{
-	int n_chars;
-
-	if (len == 0)
-		return len;
-
-	do {
-		n_chars = read(desc, ptr, len);
-	} while (n_chars < 0 && errno == EINTR);
-
-	return n_chars;
-}
-
-/* Remove existing file @dest and reopen, creating a new file with @mode */
-static int unlink_and_reopen(const char *dest, mode_t mode)
-{
-	int ofd;
-
-	if (robust_unlink(dest) && errno != ENOENT) {
-		int save_errno = errno;
-		rsyserr(FERROR_XFER, errno, "unlink %s", full_fname(dest));
-		errno = save_errno;
-		return -1;
-	}
-
-#ifdef SUPPORT_XATTRS
-	if (preserve_xattrs)
-		mode |= S_IWUSR;
-#endif
-	mode &= INITACCESSPERMS;
-	/* Use do_open_at so the create/truncate goes through a secure
-	 * parent dirfd in the daemon-no-chroot deployment. Otherwise
-	 * an attacker could swap a parent component with a symlink in
-	 * the window between robust_unlink (which uses do_unlink_at,
-	 * already secure) and the create here, and redirect the new
-	 * file outside the module. */
-	if ((ofd = do_open_at(dest, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, mode)) < 0) {
-		int save_errno = errno;
-		rsyserr(FERROR_XFER, save_errno, "open %s", full_fname(dest));
-		errno = save_errno;
-		return -1;
-	}
-	return ofd;
-}
-
-/* Copy contents of file @source to file @dest with mode @mode.
- *
- * If @tmpfilefd is < 0, copy_file unlinks @dest and then opens a new
- * file with name @dest.
- *
- * Otherwise, copy_file writes to and closes the provided file
- * descriptor.
- *
- * In either case, if --xattrs are being preserved, the dest file will
- * have its xattrs set from the source file.
- *
- * This is used in conjunction with the --temp-dir, --backup, and
- * --copy-dest options. */
-int copy_file(const char *source, const char *dest, int tmpfilefd, mode_t mode)
-{
-	int ifd, ofd;
-	char buf[1024 * 8];
-	int len;   /* Number of bytes read into `buf'. */
-	OFF_T prealloc_len = 0, offset = 0;
-
-	/* For any hardened (non-chrooted) receiver, route the source open through
-	 * secure_relative_open so a parent-symlink on the source path (e.g.
-	 * --copy-dest=cd where cd is a symlink to an outside directory) cannot
-	 * redirect the read to a file the attacker should not see.  Plain
-	 * do_open_nofollow only refuses a final-component symlink; parents are
-	 * still followed.  An ABSOLUTE source is an operator basis (e.g. an absolute
-	 * --copy-dest): confine its parents via the ownership walk -- a foreign-owned
-	 * parent symlink is refused, the operator's own dirs/uid0/euid symlinks
-	 * followed -- so a flipped parent can't redirect the basis read out of tree.
-	 * operator_path_resolve is set only across the walk (so module-exclude is
-	 * enforced) and restored, leaving the caller's value for the dest side -- this
-	 * is why confining the source here does not re-open the copy_xattrs dest
-	 * race the way wrapping the whole copy_altdest_file would. */
-	if (secure_relpath_active() && source && *source && source[0] != '/')
-		ifd = secure_relative_open(NULL, source, O_RDONLY | O_NOFOLLOW, 0);
-#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
-	else if (secure_relpath_active() && source && source[0] == '/'
-	      && !symlink_optout_allowed()) {
-		int save = operator_path_resolve, dfd, e;
-		const char *leaf;
-		operator_path_resolve = 1;
-		dfd = owner_walk_parent(source, &leaf);
-		operator_path_resolve = save;
-		if (dfd < 0)
-			ifd = -1;
-		else {
-			ifd = openat(dfd, leaf, O_RDONLY | O_NOFOLLOW);
-			e = errno;
-			close(dfd);
-			errno = e;
-		}
-	}
-#endif
-	else
-		ifd = do_open_nofollow(source, O_RDONLY);
-	if (ifd < 0) {
-		int save_errno = errno;
-		rsyserr(FERROR_XFER, errno, "open %s", full_fname(source));
-		errno = save_errno;
-		return -1;
-	}
-
-	if (tmpfilefd >= 0) {
-		ofd = tmpfilefd;
-	} else {
-		ofd = unlink_and_reopen(dest, mode);
-		if (ofd < 0) {
-			int save_errno = errno;
-			close(ifd);
-			errno = save_errno;
-			return -1;
-		}
-	}
-
-#ifdef SUPPORT_PREALLOCATION
-	if (preallocate_files) {
-		STRUCT_STAT srcst;
-
-		/* Try to preallocate enough space for file's eventual length.  Can
-		 * reduce fragmentation on filesystems like ext4, xfs, and NTFS. */
-		if (do_fstat(ifd, &srcst) < 0)
-			rsyserr(FWARNING, errno, "fstat %s", full_fname(source));
-		else if (srcst.st_size > 0) {
-			prealloc_len = do_fallocate(ofd, 0, srcst.st_size);
-			if (prealloc_len < 0)
-				rsyserr(FWARNING, errno, "do_fallocate %s", full_fname(dest));
-		}
-	}
-#endif
-
-	while ((len = safe_read(ifd, buf, sizeof buf)) > 0) {
-		if (full_write(ofd, buf, len) < 0) {
-			int save_errno = errno;
-			rsyserr(FERROR_XFER, errno, "write %s", full_fname(dest));
-			close(ifd);
-			close(ofd);
-			errno = save_errno;
-			return -1;
-		}
-		offset += len;
-	}
-
-	if (len < 0) {
-		int save_errno = errno;
-		rsyserr(FERROR_XFER, errno, "read %s", full_fname(source));
-		close(ifd);
-		close(ofd);
-		errno = save_errno;
-		return -1;
-	}
-
-	/* Source file might have shrunk since we fstatted it.
-	 * Cut off any extra preallocated zeros from dest file. */
-	if (offset < prealloc_len) {
-#ifdef HAVE_FTRUNCATE
-		/* If we fail to truncate, the dest file may be wrong, so we
-		 * must trigger the "partial transfer" error. */
-		if (do_ftruncate(ofd, offset) < 0)
-			rsyserr(FERROR_XFER, errno, "ftruncate %s", full_fname(dest));
-#else
-		rprintf(FERROR_XFER, "no ftruncate for over-long pre-alloc: %s", full_fname(dest));
-#endif
-	}
-
-	if (do_fsync && fsync(ofd) < 0) {
-		int save_errno = errno;
-		rsyserr(FERROR, errno, "fsync failed on %s", full_fname(dest));
-		close(ofd);
-		close(ifd);	/* ifd is held open until after the xattr copy below */
-		errno = save_errno;
-		return -1;
-	}
-
-#ifdef SUPPORT_XATTRS
-	/* Read the source xattrs through the held source fd (ifd) and set them
-	 * through ofd while both are still held, so a parent-symlink race can't
-	 * redirect the read out of tree or the write onto a file outside it. */
-	if (preserve_xattrs)
-		copy_xattrs(source, ifd, dest, ofd);
-#endif
-
-	if (close(ifd) < 0) {
-		rsyserr(FWARNING, errno, "close failed on %s",
-			full_fname(source));
-	}
-
-	if (close(ofd) < 0) {
-		int save_errno = errno;
-		rsyserr(FERROR_XFER, errno, "close failed on %s", full_fname(dest));
-		errno = save_errno;
-		return -1;
-	}
-
-	return 0;
-}
-
-/* MAX_RENAMES should be 10**MAX_RENAMES_DIGITS */
-#define MAX_RENAMES_DIGITS 3
-#define MAX_RENAMES 1000
-
-/**
- * Robust unlink: some OS'es (HPUX) refuse to unlink busy files, so
- * rename to <path>/.rsyncNNN instead.
- *
- * Note that successive rsync runs will shuffle the filenames around a
- * bit as long as the file is still busy; this is because this function
- * does not know if the unlink call is due to a new file coming in, or
- * --delete trying to remove old .rsyncNNN files, hence it renames it
- * each time.
- **/
-int robust_unlink(const char *fname)
-{
-#ifndef ETXTBSY
-	return do_unlink_at(fname);
-#else
-	static int counter = 1;
-	int rc, pos, start;
-	char path[MAXPATHLEN];
-
-	rc = do_unlink_at(fname);
-	if (rc == 0 || errno != ETXTBSY)
-		return rc;
-
-	if ((pos = strlcpy(path, fname, MAXPATHLEN)) >= MAXPATHLEN)
-		pos = MAXPATHLEN - 1;
-
-	while (pos > 0 && path[pos-1] != '/')
-		pos--;
-	pos += strlcpy(path+pos, ".rsync", MAXPATHLEN-pos);
-
-	if (pos > (MAXPATHLEN-MAX_RENAMES_DIGITS-1)) {
-		errno = ETXTBSY;
-		return -1;
-	}
-
-	/* start where the last one left off to reduce chance of clashes */
-	start = counter;
-	do {
-		snprintf(&path[pos], MAX_RENAMES_DIGITS+1, "%03d", counter);
-		if (++counter >= MAX_RENAMES)
-			counter = 1;
-	} while (access(path, 0) == 0 && counter != start);
-
-	if (INFO_GTE(MISC, 1)) {
-		rprintf(FWARNING, "renaming %s to %s because of text busy\n",
-			fname, path);
-	}
-
-	/* maybe we should return rename()'s exit status? Nah. */
-	if (do_rename_at(fname, path) != 0) {
-		errno = ETXTBSY;
-		return -1;
-	}
-	return 0;
-#endif
-}
-
-/* Returns 0 on successful rename, 1 if we successfully copied the file
- * across filesystems, -2 if copy_file() failed, and -1 on other errors.
- * If partialptr is not NULL and we need to do a copy, copy the file into
- * the active partial-dir instead of over the destination file. */
-int robust_rename(const char *from, const char *to, const char *partialptr,
-		  int mode, struct file_struct *file)
-{
-	int tries = 4;
-
-	/* A resumed in-place partial-dir transfer might call us with from and
-	 * to pointing to the same buf if the transfer failed yet again. */
-	if (from == to)
-		return 0;
-
-	while (tries--) {
-		/* tmp -> final usually live in the entry's own dir: rename via the
-		 * held dir fd when both do, else the full-path wrapper. */
-		int ofd = held_dfd_for(from, file);
-		int nfd = held_dfd_for(to, file);
-		int rr;
-		if (ofd >= 0 && nfd >= 0) {
-			const char *os = strrchr(from, '/');
-			const char *ns = strrchr(to, '/');
-			rr = do_rename_atfd(ofd, os ? os + 1 : from, nfd, ns ? ns + 1 : to);
-		} else
-			rr = do_rename_at(from, to);
-		if (rr == 0)
-			return 0;
-
-		switch (errno) {
-#ifdef ETXTBSY
-		case ETXTBSY:
-			if (robust_unlink(to) != 0) {
-				errno = ETXTBSY;
-				return -1;
-			}
-			errno = ETXTBSY;
-			break;
-#endif
-		case EXDEV: {
-			int save = operator_path_resolve, rc;
-			if (partialptr) {
-				if (!handle_partial_dir(partialptr,PDIR_CREATE))
-					return -2;
-				to = partialptr;
-			}
-			/* Cross-fs fallback: copy then unlink.  An absolute --temp-dir
-			 * source / --partial-dir dest is an operator path whose parents
-			 * do_open_at()/do_unlink_at() would otherwise follow via plain libc
-			 * -- confine them through the ownership walk so a raced parent
-			 * symlink can't redirect the dest-write or the source-unlink out of
-			 * the module.  copy_file already confines the source READ; a
-			 * relative in-module path stays on the secure_relative_open arm, so
-			 * only flip the flag for an absolute (operator) path. */
-			if (*to == '/')
-				operator_path_resolve = 1;
-			rc = copy_file(from, to, -1, mode);
-			operator_path_resolve = save;
-			if (rc != 0)
-				return -2;
-			if (*from == '/')
-				operator_path_resolve = 1;
-			do_unlink_at(from);
-			operator_path_resolve = save;
-			return 1;
-		}
-		default:
-			return -1;
-		}
-	}
-	return -1;
 }
 
 static pid_t all_pids[10];
@@ -801,7 +366,7 @@ static inline void call_glob_match(const char *name, int len, int from_glob,
 		STRUCT_STAT st;
 		int is_dir;
 
-		if (do_stat(glob.arg_buf, &st) != 0)
+		if (vfs_stat(VFS_AT_FDCWD, glob.arg_buf, &st, VFS_ALLOW_SYMLINK) != 0)
 			return;
 		is_dir = S_ISDIR(st.st_mode) != 0;
 		if (arg && !is_dir)
@@ -1211,7 +776,7 @@ char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth, i
 }
 
 /* Like chdir(), but it keeps track of the current directory (in the
- * global "curr_dir"), and ensures that the path size doesn't overflow.
+ * global "vfs.curr_dir"), and ensures that the path size doesn't overflow.
  * Also cleans the path using the clean_fname() function. */
 int change_dir(const char *dir, int set_path_only)
 {
@@ -1221,11 +786,11 @@ int change_dir(const char *dir, int set_path_only)
 
 	if (!initialised) {
 		initialised = 1;
-		if (getcwd(curr_dir, sizeof curr_dir - 1) == NULL) {
+		if (getcwd(vfs.curr_dir, sizeof vfs.curr_dir - 1) == NULL) {
 			rsyserr(FERROR, errno, "getcwd()");
 			exit_cleanup(RERR_FILESELECT);
 		}
-		curr_dir_len = strlen(curr_dir);
+		vfs.curr_dir_len = strlen(vfs.curr_dir);
 	}
 
 	if (!dir)	/* this call was probably just to initialize */
@@ -1236,13 +801,13 @@ int change_dir(const char *dir, int set_path_only)
 		return 1;
 
 	if (*dir == '/') {
-		if (len >= sizeof curr_dir) {
+		if (len >= sizeof vfs.curr_dir) {
 			errno = ENAMETOOLONG;
 			return 0;
 		}
 		if (!set_path_only) {
 			/* The destination is operator-supplied (like --log-file et al.), so
-			 * resolve it with open_no_attacker_symlinks: walk each component
+			 * resolve it with vfs_open_owner_walk: walk each component
 			 * refusing a symlink not owned by uid 0 or our euid, then fchdir to
 			 * the result.  This still follows the operator's/root's own symlinked
 			 * dest -- the `/backup -> /mnt/disk` / `/var/www -> /srv/www` admin
@@ -1252,7 +817,7 @@ int change_dir(const char *dir, int set_path_only)
 			 * non-daemon receiver can opt back into the legacy plain chdir with
 			 * --insecure-links. */
 			if (am_daemon && !am_chrooted) {
-				int dfd = open_no_attacker_symlinks(dir, O_RDONLY | O_DIRECTORY, 0);
+				int dfd = vfs_open_owner_walk(dir, O_RDONLY | O_DIRECTORY, 0, 0);
 				if (dfd < 0)
 					return 0;
 				if (fchdir(dfd) != 0) {
@@ -1283,7 +848,7 @@ int change_dir(const char *dir, int set_path_only)
 				 * another uid.  A real dir is opened directly.  This closes the
 				 * destination chdir TOCTOU; --insecure-links keeps the plain
 				 * chdir for an operator whose dest is a foreign-owned symlink. */
-				dfd = open_no_attacker_symlinks(nf, O_RDONLY | O_DIRECTORY, 0);
+				dfd = vfs_open_owner_walk(nf, O_RDONLY | O_DIRECTORY, 0, 0);
 				if (dfd < 0)
 					return 0;
 				if (fchdir(dfd) != 0) {
@@ -1299,16 +864,16 @@ int change_dir(const char *dir, int set_path_only)
 			}
 		}
 		skipped_chdir = set_path_only;
-		memcpy(curr_dir, dir, len + 1);
+		memcpy(vfs.curr_dir, dir, len + 1);
 	} else {
-		unsigned int save_dir_len = curr_dir_len;
-		if (curr_dir_len + 1 + len >= sizeof curr_dir) {
+		unsigned int save_dir_len = vfs.curr_dir_len;
+		if (vfs.curr_dir_len + 1 + len >= sizeof vfs.curr_dir) {
 			errno = ENAMETOOLONG;
 			return 0;
 		}
-		if (!(curr_dir_len && curr_dir[curr_dir_len-1] == '/'))
-			curr_dir[curr_dir_len++] = '/';
-		memcpy(curr_dir + curr_dir_len, dir, len + 1);
+		if (!(vfs.curr_dir_len && vfs.curr_dir[vfs.curr_dir_len-1] == '/'))
+			vfs.curr_dir[vfs.curr_dir_len++] = '/';
+		memcpy(vfs.curr_dir + vfs.curr_dir_len, dir, len + 1);
 
 		if (!set_path_only) {
 			int chdir_failed;
@@ -1317,20 +882,20 @@ int change_dir(const char *dir, int set_path_only)
 			 * target -- otherwise CWD escapes the module and
 			 * every subsequent path-relative syscall (open,
 			 * chmod, lchown, ...) inherits the escape, which
-			 * defeats secure_relative_open's RESOLVE_BENEATH
+			 * defeats vfs_resolve_open's RESOLVE_BENEATH
 			 * anchor and re-opens the CVE-2026-29518 class of
 			 * symlink TOCTOU attacks. Use the secure resolver
 			 * to get a confined dirfd, then fchdir() to it.
 			 *
 			 * If skipped_chdir is set, a previous CD_SKIP_CHDIR
-			 * call buffered an absolute prefix in curr_dir
+			 * call buffered an absolute prefix in vfs.curr_dir
 			 * (e.g. change_pathname's CD_SKIP_CHDIR to orig_dir)
 			 * without syncing the kernel's CWD. Resolve `dir`
 			 * relative to that prefix as basedir so the secure
 			 * branch still anchors at the operator-trusted
 			 * directory rather than wherever the kernel CWD
 			 * happens to be. */
-			if (am_daemon && (!am_chrooted || module_dirlen) && !symlink_optout_allowed()) {
+			if (am_daemon && (!am_chrooted || module_dirlen) && !vfs_symlink_optout_allowed()) {
 				const char *basedir = NULL;
 				char prefix[MAXPATHLEN];
 				int dfd;
@@ -1340,11 +905,11 @@ int change_dir(const char *dir, int set_path_only)
 						chdir_failed = 1;
 						goto chdir_cleanup;
 					}
-					memcpy(prefix, curr_dir, save_dir_len);
+					memcpy(prefix, vfs.curr_dir, save_dir_len);
 					prefix[save_dir_len] = '\0';
 					basedir = prefix;
 				}
-				dfd = secure_relative_open(basedir, dir,
+				dfd = vfs_resolve_open(basedir, dir,
 					O_RDONLY | O_DIRECTORY, 0);
 				if (dfd < 0) {
 					chdir_failed = 1;
@@ -1352,19 +917,19 @@ int change_dir(const char *dir, int set_path_only)
 					chdir_failed = fchdir(dfd) != 0;
 					close(dfd);
 				}
-			} else if (am_daemon && symlink_optout_allowed()) {
+			} else if (am_daemon && vfs_symlink_optout_allowed()) {
 				/* "insecure links = yes": restore the 3.2.7 follow-any-symlink
 				 * traversal with a plain chdir to the accumulated path, the same
 				 * legacy behaviour the per-operation sites grant under the opt-out. */
-				chdir_failed = chdir(curr_dir) != 0;
+				chdir_failed = chdir(vfs.curr_dir) != 0;
 			} else if (!am_chrooted && !am_sender && !insecure_links) {
 				/* Non-daemon receiver: confine the operator-named relative
 				 * destination like the absolute case above -- refuse a component
 				 * symlink not owned by uid 0 or our euid, closing the
 				 * relative-dest chdir TOCTOU while still following the operator's
 				 * own symlinks.  --insecure-links keeps the plain chdir. */
-				int dfd = open_no_attacker_symlinks(curr_dir,
-					O_RDONLY | O_DIRECTORY, 0);
+				int dfd = vfs_open_owner_walk(vfs.curr_dir,
+					O_RDONLY | O_DIRECTORY, 0, 0);
 				if (dfd < 0)
 					chdir_failed = 1;
 				else {
@@ -1372,30 +937,30 @@ int change_dir(const char *dir, int set_path_only)
 					close(dfd);
 				}
 			} else {
-				chdir_failed = chdir(curr_dir) != 0;
+				chdir_failed = chdir(vfs.curr_dir) != 0;
 			}
 		chdir_cleanup:
 			if (chdir_failed) {
-				curr_dir_len = save_dir_len;
-				curr_dir[curr_dir_len] = '\0';
+				vfs.curr_dir_len = save_dir_len;
+				vfs.curr_dir[vfs.curr_dir_len] = '\0';
 				return 0;
 			}
 		}
 		skipped_chdir = set_path_only;
 	}
 
-	curr_dir_len = clean_fname(curr_dir, CFN_COLLAPSE_DOT_DOT_DIRS | CFN_DROP_TRAILING_DOT_DIR);
+	vfs.curr_dir_len = clean_fname(vfs.curr_dir, CFN_COLLAPSE_DOT_DOT_DIRS | CFN_DROP_TRAILING_DOT_DIR);
 	if (sanitize_paths) {
-		if (module_dirlen > curr_dir_len)
-			module_dirlen = curr_dir_len;
-		curr_dir_depth = count_dir_elements(curr_dir + module_dirlen);
+		if (module_dirlen > vfs.curr_dir_len)
+			module_dirlen = vfs.curr_dir_len;
+		curr_dir_depth = count_dir_elements(vfs.curr_dir + module_dirlen);
 	}
 
 	if (!set_path_only)	/* a real chdir invalidates the cwd-relative dir-fd stack */
-		reset_dir_fd_cache();
+		vfs_dircache_reset();
 
 	if (DEBUG_GTE(CHDIR, 1) && !set_path_only)
-		rprintf(FINFO, "[%s] change_dir(%s)\n", who_am_i(), curr_dir);
+		rprintf(FINFO, "[%s] change_dir(%s)\n", who_am_i(), vfs.curr_dir);
 
 	return 1;
 }
@@ -1408,12 +973,12 @@ char *normalize_path(char *path, BOOL force_newbuf, unsigned int *len_ptr)
 
 	if (*path != '/') { /* Make path absolute. */
 		int len = strlen(path);
-		if (curr_dir_len + 1 + len >= sizeof curr_dir)
+		if (vfs.curr_dir_len + 1 + len >= sizeof vfs.curr_dir)
 			return NULL;
-		curr_dir[curr_dir_len] = '/';
-		memcpy(curr_dir + curr_dir_len + 1, path, len + 1);
-		path = strdup(curr_dir);
-		curr_dir[curr_dir_len] = '\0';
+		vfs.curr_dir[vfs.curr_dir_len] = '/';
+		memcpy(vfs.curr_dir + vfs.curr_dir_len + 1, path, len + 1);
+		path = strdup(vfs.curr_dir);
+		vfs.curr_dir[vfs.curr_dir_len] = '\0';
 	} else if (force_newbuf)
 		path = strdup(path);
 
@@ -1445,7 +1010,7 @@ char *full_fname(const char *fn)
 	if (*fn == '/')
 		p1 = p2 = "";
 	else {
-		p1 = curr_dir + module_dirlen;
+		p1 = vfs.curr_dir + module_dirlen;
 		for (p2 = p1; *p2 == '/'; p2++) {}
 		if (*p2)
 			p2 = "/";
@@ -1515,26 +1080,22 @@ int handle_partial_dir(const char *fname, int create)
 	 * outside the tree): resolve it with the ownership walk -- follow a
 	 * uid0/euid-owned symlink, refuse a foreign one, absolute and relative alike.
 	 * --insecure-links (or a daemon module's "insecure links =") opts out. */
-	operator_path_resolve = 1;
 	if (create) {
 		STRUCT_STAT st;
-		int statret = do_lstat_at(dir, &st);
+		int statret = vfs_lstat(VFS_AT_FDCWD, dir, &st, VFS_OPERATOR_PATH);
 		if (statret == 0 && !S_ISDIR(st.st_mode)) {
-			if (do_unlink_at(dir) < 0) {
-				operator_path_resolve = 0;
+			if (vfs_unlink(VFS_AT_FDCWD, dir, VFS_OPERATOR_PATH) < 0) {
 				*fn = '/';
 				return 0;
 			}
 			statret = -1;
 		}
-		if (statret < 0 && do_mkdir_at(dir, 0700) < 0) {
-			operator_path_resolve = 0;
+		if (statret < 0 && vfs_mkdir(VFS_AT_FDCWD, dir, 0700, VFS_OPERATOR_PATH) < 0) {
 			*fn = '/';
 			return 0;
 		}
 	} else
-		do_rmdir_at(dir);
-	operator_path_resolve = 0;
+		vfs_unlink(VFS_AT_FDCWD, dir, VFS_REMOVEDIR | VFS_OPERATOR_PATH);
 	*fn = '/';
 
 	return 1;

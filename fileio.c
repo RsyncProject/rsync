@@ -45,17 +45,17 @@ int sparse_end(int f, OFF_T size, int updating_basis_or_equiv)
 	int ret = 0;
 
 	if (updating_basis_or_equiv) {
-		if (sparse_seek && do_punch_hole(f, sparse_past_write, sparse_seek) < 0)
+		if (sparse_seek && vfs_punch_hole(f, sparse_past_write, sparse_seek) < 0)
 			ret = -1;
 #ifdef HAVE_FTRUNCATE /* A compilation formality -- in-place requires ftruncate() */
 		else /* Just in case the original file was longer */
-			ret = do_ftruncate(f, size);
+			ret = vfs_ftruncate(f, size);
 #endif
 	} else if (sparse_seek) {
 #ifdef HAVE_FTRUNCATE
-		ret = do_ftruncate(f, size);
+		ret = vfs_ftruncate(f, size);
 #else
-		if (do_lseek(f, sparse_seek-1, SEEK_CUR) != size-1)
+		if (vfs_lseek(f, sparse_seek-1, SEEK_CUR) != size-1)
 			ret = -1;
 		else {
 			do {
@@ -76,17 +76,17 @@ int sparse_end(int f, OFF_T size, int updating_basis_or_equiv)
  * the current file position is in the file. The use_seek arg tells
  * us that we should seek over matching data instead of writing it. */
 /* Flush any deferred run of zero bytes as a hole, advancing the file
- * position past it (both do_lseek() and do_punch_hole() move the offset). */
+ * position past it (both vfs_lseek() and vfs_punch_hole() move the offset). */
 static int flush_sparse_hole(int f)
 {
 	if (!sparse_seek)
 		return 0;
 	if (sparse_past_write >= preallocated_len) {
-		if (do_lseek(f, sparse_seek, SEEK_CUR) < 0) {
+		if (vfs_lseek(f, sparse_seek, SEEK_CUR) < 0) {
 			sparse_seek = 0;
 			return -1;
 		}
-	} else if (do_punch_hole(f, sparse_past_write, sparse_seek) < 0) {
+	} else if (vfs_punch_hole(f, sparse_past_write, sparse_seek) < 0) {
 		sparse_seek = 0;
 		return -1;
 	}
@@ -119,7 +119,7 @@ static int emit_sparse_span(int f, int use_seek, const char *buf, int len)
 	if (flush_sparse_hole(f) < 0)
 		return -1;
 	if (use_seek)
-		return do_lseek(f, len, SEEK_CUR) < 0 ? -1 : 0;
+		return vfs_lseek(f, len, SEEK_CUR) < 0 ? -1 : 0;
 	return full_sparse_write(f, buf, len);
 }
 
@@ -262,7 +262,7 @@ int skip_matched(int fd, OFF_T offset, const char *buf, int len)
 	if (flush_write_file(fd) < 0)
 		return -1;
 
-	if ((pos = do_lseek(fd, len, SEEK_CUR)) != offset + len) {
+	if ((pos = vfs_lseek(fd, len, SEEK_CUR)) != offset + len) {
 		rsyserr(FERROR_XFER, errno, "lseek returned %s, not %s",
 			big_num(pos), big_num(offset));
 		return -1;
@@ -345,7 +345,7 @@ char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
 	}
 
 	if (map->p_fd_offset != read_start) {
-		OFF_T ret = do_lseek(map->fd, read_start, SEEK_SET);
+		OFF_T ret = vfs_lseek(map->fd, read_start, SEEK_SET);
 		if (ret != read_start) {
 			rsyserr(FERROR, errno, "lseek returned %s, not %s",
 				big_num(ret), big_num(read_start));

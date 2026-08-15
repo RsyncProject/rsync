@@ -60,6 +60,8 @@ AC_PROG_AWK
 AC_PROG_EGREP
 AC_PROG_INSTALL
 AC_PROG_MKDIR_P
+AC_CHECK_TOOL([AR], [ar], [ar])
+AC_PROG_RANLIB
 AC_SUBST(SHELL)
 AC_PATH_PROG([PERL], [perl])
 AC_PATH_PROG([PYTHON3], [python3])
@@ -103,6 +105,12 @@ dnl (and coverage-counted) without needing a pre-5.6 kernel. Behaviour-neutral
 dnl by default (the knob only REMOVES a tier when explicitly disabled).
 AC_ARG_ENABLE(openat2,
 	AS_HELP_STRING([--disable-openat2],[do not use Linux openat2(RESOLVE_BENEATH); force the portable resolver (for exercising the fallback tier)]))
+
+AC_ARG_ENABLE(strict-confinement,
+	AS_HELP_STRING([--enable-strict-confinement],[abort if a confined receiver ever does a raw path-based metadata op (a CI/dev hardening check; no effect on a normal build)]))
+if test x"$enable_strict_confinement" = x"yes"; then
+    AC_DEFINE(STRICT_CONFINEMENT, 1, [Define to abort on a confined-regime raw path-based metadata op (CI hardening check)])
+fi
 
 AC_MSG_CHECKING([if md2man can create manpages])
 if test x"$ac_cv_path_PYTHON3" = x; then
@@ -371,7 +379,7 @@ return SYS_openat2 + (int)how.resolve;
 if test x"$enable_openat2" != x"no"; then
     if test x"$rsync_cv_HAVE_OPENAT2" = x"yes"; then
       AC_DEFINE([HAVE_OPENAT2], 1,
-        [Define to use Linux openat2(RESOLVE_BENEATH) in secure_relative_open where available.])
+        [Define to use Linux openat2(RESOLVE_BENEATH) in vfs_resolve_open where available.])
     fi
 fi
 
@@ -1542,7 +1550,7 @@ case "$CC" in
     ;;
 esac
 
-AC_CONFIG_FILES([Makefile lib/dummy zlib/dummy popt/dummy shconfig])
+AC_CONFIG_FILES([Makefile lib/dummy zlib/dummy popt/dummy vfs/dummy shconfig])
 AC_OUTPUT
 
 AC_MSG_RESULT()

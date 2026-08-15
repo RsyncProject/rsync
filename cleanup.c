@@ -58,7 +58,7 @@ void close_all(void)
 
 	max_fd = sysconf(_SC_OPEN_MAX) - 1;
 	for (fd = max_fd; fd >= 0; fd--) {
-		if ((ret = do_fstat(fd, &st)) == 0) {
+		if ((ret = vfs_fstat(fd, &st)) == 0) {
 			if (is_a_socket(fd))
 				ret = shutdown(fd, 2);
 			ret = close(fd);
@@ -198,7 +198,7 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 		switch_step++;
 
 		if (cleanup_fname)
-			do_unlink_at(cleanup_fname);
+			vfs_unlink(VFS_AT_FDCWD, cleanup_fname, 0);
 		if (exit_code)
 			kill_all(SIGUSR1);
 		if (cleanup_pid && cleanup_pid == getpid()) {

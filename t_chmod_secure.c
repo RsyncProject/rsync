@@ -1,7 +1,7 @@
 /*
- * Test harness for do_chmod_at(). Confirms the symlink-TOCTOU
+ * Test harness for vfs_chmod(). Confirms the symlink-TOCTOU
  * primitive used by CVE-2026-29518 (and its incomplete-fix follow-up
- * for chmod) is closed by do_chmod_at(): a parent directory component
+ * for chmod) is closed by vfs_chmod(): a parent directory component
  * being a symlink that escapes the receiver's confinement must be
  * rejected, while a parent symlink that resolves *within* the tree
  * must still work (so legitimate dir-symlinks are not regressed).
@@ -31,7 +31,7 @@ short info_levels[COUNT_INFO], debug_levels[COUNT_DEBUG];
 static int errs = 0;
 
 
-/* Does do_chmod_at()'s leaf handling refuse to follow a symlink at the final
+/* Does vfs_chmod()'s leaf handling refuse to follow a symlink at the final
  * component? Yes wherever AT_SYMLINK_NOFOLLOW exists; otherwise the wrapper
  * falls back to a following fchmodat() (documented limitation). Mirrors the
  * #ifdef ladder in do_fchmodat_nofollow. */
@@ -85,9 +85,9 @@ int main(int argc, char **argv)
 		return 2;
 	}
 
-	/* Simulate the daemon-without-chroot deployment that do_chmod_at()
+	/* Simulate the daemon-without-chroot deployment that vfs_chmod()
 	 * defends. With am_daemon=0 or am_chrooted=1 the wrapper falls
-	 * through to plain do_chmod() and the symlink-race test would be
+	 * through to plain vfs_chmod() and the symlink-race test would be
 	 * meaningless. */
 	am_daemon = 1;
 	am_chrooted = 0;
@@ -112,26 +112,26 @@ int main(int argc, char **argv)
 	 * Solaris, older Cygwin, HPE NonStop, pre-5.6 Linux) -- which now follows
 	 * an in-tree directory symlink whose target is relative and ".."-free.
 	 * Escapes are still rejected on both paths (Scenario B). */
-	int rc = do_chmod_at("inside_link/sentinel", 0640);
+	int rc = vfs_chmod(VFS_AT_FDCWD, "inside_link/sentinel", 0640, 0);
 	check("A: legit dir-symlink within tree (followed)",
 	      rc, 1, "realdir/sentinel", 0640);
 
 	/* Scenario B: parent symlink escapes the tree -- chmod must be
 	 * rejected and the outside file's mode must be unchanged. */
-	rc = do_chmod_at("escape_link/sentinel", 0666);
+	rc = vfs_chmod(VFS_AT_FDCWD, "escape_link/sentinel", 0666, 0);
 	check("B: parent symlink escapes tree (the attack)",
 	      rc, 0, "../trap/sentinel", 0600);
 
 	/* Scenario C: plain relative path with no symlink components,
 	 * regression check that the safe wrapper doesn't break the
 	 * normal case. */
-	rc = do_chmod_at("realdir/sentinel", 0644);
+	rc = vfs_chmod(VFS_AT_FDCWD, "realdir/sentinel", 0644, 0);
 	check("C: plain relative path (regression check)",
 	      rc, 1, "realdir/sentinel", 0644);
 
 	/* Scenario D: top-level file, no parent directory component.
-	 * Falls back to do_chmod(); should succeed. */
-	rc = do_chmod_at("topfile", 0640);
+	 * Falls back to vfs_chmod(); should succeed. */
+	rc = vfs_chmod(VFS_AT_FDCWD, "topfile", 0640, 0);
 	check("D: top-level file, no parent component",
 	      rc, 1, "topfile", 0640);
 
@@ -141,12 +141,12 @@ int main(int argc, char **argv)
 	 * (refused on Linux, lchmod-the-symlink on *BSD/macOS), so assert only that
 	 * the outside target's mode is unchanged. */
 	if (leaf_chmod_nofollow_supported()) {
-		rc = do_chmod_at("realdir/leaflink", 0666);
+		rc = vfs_chmod(VFS_AT_FDCWD, "realdir/leaflink", 0666, 0);
 		check("E: leaf component is an escaping symlink (must not be followed)",
 		      rc, -1, "../trap/sentinel", 0600);
 	} else {
 		fprintf(stderr, "INFO: leaf-nofollow chmod unsupported here; "
-			"do_chmod_at follows a leaf symlink (documented limitation), "
+			"vfs_chmod follows a leaf symlink (documented limitation), "
 			"skipping scenario E\n");
 	}
 

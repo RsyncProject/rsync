@@ -19,6 +19,7 @@ dir-sgid
 fake-super-acl-xattr
 link-dest-symlink-enotsup                # the ENOTSUP hard-link hook is an LD_PRELOAD, Linux-only
 open-noatime
+operator-path-backup-chown
 partial-protected-regular-retry-linux
 preallocate
 protected-regular

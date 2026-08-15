@@ -19,7 +19,9 @@ from rsyncfns import (
     SCRATCHDIR, rmtree, rsync_argv, start_test_daemon, test_fail, write_daemon_conf,
 )
 
-DAEMON_PORT = 13010
+# Not 13000-13060: ASUS Armoury Crate on the Cygwin CI host parks localhost
+# listeners there (13010 among them).
+DAEMON_PORT = 12931
 
 # (module name, exclude pattern, expect the pushed file to land)
 CASES = [

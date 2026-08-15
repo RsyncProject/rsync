@@ -45,6 +45,7 @@ msg-io-timeout-overflow
 nondaemon-symlink-race
 nonroot-restrictive-perms
 open-noatime
+operator-path-backup-chown
 operator-path-backup-rmdir
 operator-path-backup-symlink
 operator-path-insecure-links-daemon

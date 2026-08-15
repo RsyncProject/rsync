@@ -30,7 +30,6 @@ extern int preserve_links;
 extern int safe_symlinks;
 extern int backup_dir_len;
 extern unsigned int backup_dir_remainder;
-extern int operator_path_resolve;
 extern char backup_dir_buf[MAXPATHLEN];
 extern char *backup_suffix;
 extern char *backup_dir;
@@ -44,19 +43,14 @@ extern char *backup_dir;
  * backup_metadata_hardened() to tell the two -1 cases apart). */
 int backup_metadata_hardened(void)
 {
-	return secure_relpath_active() && !symlink_optout_allowed();
+	return vfs_relpath_active() && !vfs_symlink_optout_allowed();
 }
 
 int backup_source_fd(const char *path)
 {
 #if defined AT_FDCWD && defined O_NOFOLLOW
-	if (backup_metadata_hardened() && path && *path) {
-		int save = operator_path_resolve, fd;
-		operator_path_resolve = 1;
-		fd = do_open_at(path, O_RDONLY | O_NONBLOCK | O_NOCTTY | O_CLOEXEC, 0);
-		operator_path_resolve = save;
-		return fd;
-	}
+	if (backup_metadata_hardened() && path && *path)
+		return vfs_open_at(path, O_RDONLY | O_NONBLOCK | O_NOCTTY | O_CLOEXEC, 0, VFS_OPERATOR_PATH);
 #endif
 	return -1;
 }
@@ -66,7 +60,7 @@ static int validate_backup_dir(void)
 {
 	STRUCT_STAT st;
 
-	if (do_lstat_at(backup_dir_buf, &st) < 0) {
+	if (vfs_lstat(VFS_AT_FDCWD, backup_dir_buf, &st, VFS_OPERATOR_PATH) < 0) {
 		if (errno == ENOENT)
 			return 0;
 		rsyserr(FERROR, errno, "backup lstat %s failed", backup_dir_buf);
@@ -125,7 +119,7 @@ static BOOL copy_valid_path(const char *fname)
 	for ( ; b; name = b + 1, b = strchr(name, '/')) {
 		*b = '\0';
 
-		while (do_mkdir_at(backup_dir_buf, ACCESSPERMS) < 0) {
+		while (vfs_mkdir(VFS_AT_FDCWD, backup_dir_buf, ACCESSPERMS, VFS_OPERATOR_PATH) < 0) {
 			if (errno == EEXIST) {
 				val = validate_backup_dir();
 				if (val > 0)
@@ -141,7 +135,7 @@ static BOOL copy_valid_path(const char *fname)
 
 		/* Try to transfer the directory settings of the actual dir
 		 * that the files are coming from. */
-		if (x_stat(rel, &sx.st, NULL) < 0)
+		if (x_stat(rel, &sx.st, NULL, VFS_OPERATOR_PATH) < 0)
 			rsyserr(FERROR, errno, "backup stat %s failed", full_fname(rel));
 		else {
 			struct file_struct *file;
@@ -170,7 +164,7 @@ static BOOL copy_valid_path(const char *fname)
 				close(bfd);
 			}
 #endif
-			set_file_attrs(backup_dir_buf, file, NULL, NULL, 0);
+			set_file_attrs(backup_dir_buf, file, NULL, NULL, ATTRS_OPERATOR_PATH);
 			unmake_file(file);
 		}
 
@@ -203,7 +197,7 @@ char *get_backup_name(const char *fname)
 			}
 			if (backup_dir_len > 1)
 				dirbuf[backup_dir_len-1] = '\0';
-			ret = make_path(dirbuf, 0);
+			ret = vfs_make_path(dirbuf, 0, VFS_OPERATOR_PATH);
 			if (ret < 0)
 				return NULL;
 			initialized = 1;
@@ -236,7 +230,11 @@ static inline int link_or_rename(const char *from, const char *to,
 		if (IS_SPECIAL(stp->st_mode) || IS_DEVICE(stp->st_mode))
 			return 0; /* Use copy code. */
 #endif
-		if (do_link_at(from, to) == 0) {
+		/* from = the live dest file being backed up (a transfer path); to = the
+		 * --backup-dir path (operator).  Per-operand policy keeps the transfer
+		 * source under the secure receiver resolve and only owner-walks the
+		 * operator backup parent. */
+		if (vfs_link_at(from, to, 0, VFS_OPERATOR_PATH) == 0) {
 			if (DEBUG_GTE(BACKUP, 1))
 				rprintf(FINFO, "make_backup: HLINK %s successful.\n", from);
 			return 2;
@@ -246,11 +244,12 @@ static inline int link_or_rename(const char *from, const char *to,
 			return 0;
 	}
 #endif
-	if (do_rename_at(from, to) == 0) {
+	if (vfs_rename_at(from, to, 0, VFS_OPERATOR_PATH) == 0) {
 		if (stp->st_nlink > 1 && !S_ISDIR(stp->st_mode)) {
 			/* If someone has hard-linked the file into the backup
-			 * dir, rename() might return success but do nothing! */
-			robust_unlink(from); /* Just in case... */
+			 * dir, rename() might return success but do nothing!  from is the
+			 * transfer-side source, so unlink it under the secure resolve (0). */
+			robust_unlink(from, 0); /* Just in case... */
 		}
 		if (DEBUG_GTE(BACKUP, 1))
 			rprintf(FINFO, "make_backup: RENAME %s successful.\n", from);
@@ -272,7 +271,7 @@ static int make_backup_inner(const char *fname, BOOL prefer_rename)
 
 	init_stat_x(&sx);
 	/* Return success if no file to keep. */
-	if (x_lstat(fname, &sx.st, NULL) < 0)
+	if (x_lstat(fname, &sx.st, NULL, VFS_OPERATOR_PATH) < 0)
 		return 3;
 
 	if (!(buf = get_backup_name(fname)))
@@ -288,7 +287,7 @@ static int make_backup_inner(const char *fname, BOOL prefer_rename)
 	 * unsafe symlink. */
 	if (preserve_links && S_ISLNK(sx.st.st_mode) && safe_symlinks) {
 		char lnkbuf[MAXPATHLEN];
-		int llen = do_readlink(fname, lnkbuf, MAXPATHLEN - 1);
+		int llen = vfs_readlink(fname, lnkbuf, MAXPATHLEN - 1);
 		/* A failed readlink means we can't verify the target, so fail
 		 * closed: skip the backup rather than let the hard-link fast path
 		 * preserve a possibly-unsafe symlink unchecked. */
@@ -317,7 +316,7 @@ static int make_backup_inner(const char *fname, BOOL prefer_rename)
 		goto success;
 	if (errno == EEXIST || errno == EISDIR) {
 		STRUCT_STAT bakst;
-		if (do_lstat_at(buf, &bakst) == 0) {
+		if (vfs_lstat(VFS_AT_FDCWD, buf, &bakst, VFS_OPERATOR_PATH) == 0) {
 			int flags = get_del_for_flag(bakst.st_mode) | DEL_FOR_BACKUP | DEL_RECURSE;
 			if (delete_item(buf, bakst.st_mode, flags) != 0)
 				return 0;
@@ -357,7 +356,7 @@ static int make_backup_inner(const char *fname, BOOL prefer_rename)
 	/* Check to see if this is a device file, or link */
 	if ((am_root && preserve_devices && IS_DEVICE(file->mode))
 	 || (preserve_specials && IS_SPECIAL(file->mode))) {
-		if (do_mknod_at(buf, file->mode, sx.st.st_rdev) < 0)
+		if (vfs_mknod(VFS_AT_FDCWD, buf, file->mode, sx.st.st_rdev, VFS_OPERATOR_PATH) < 0)
 			rsyserr(FERROR, errno, "mknod %s failed", full_fname(buf));
 		else if (DEBUG_GTE(BACKUP, 1))
 			rprintf(FINFO, "make_backup: DEVICE %s successful.\n", fname);
@@ -374,7 +373,7 @@ static int make_backup_inner(const char *fname, BOOL prefer_rename)
 			}
 			ret = 2;
 		} else {
-			if (do_symlink_at(sl, buf) < 0)
+			if (vfs_symlink(sl, VFS_AT_FDCWD, buf, VFS_OPERATOR_PATH) < 0)
 				rsyserr(FERROR, errno, "link %s -> \"%s\"", full_fname(buf), sl);
 			else if (DEBUG_GTE(BACKUP, 1))
 				rprintf(FINFO, "make_backup: SYMLINK %s successful.\n", fname);
@@ -398,7 +397,7 @@ static int make_backup_inner(const char *fname, BOOL prefer_rename)
 
 	/* Copy to backup tree if a file. */
 	if (!ret) {
-		if (copy_file(fname, buf, -1, file->mode) < 0) {
+		if (copy_file(fname, buf, -1, file->mode, VFS_OPERATOR_PATH) < 0) {
 			rsyserr(FERROR, errno, "keep_backup failed: %s -> \"%s\"",
 				full_fname(fname), buf);
 			unmake_file(file);
@@ -417,7 +416,7 @@ static int make_backup_inner(const char *fname, BOOL prefer_rename)
 
 	save_preserve_xattrs = preserve_xattrs;
 	preserve_xattrs = 0;
-	set_file_attrs(buf, file, NULL, fname, ATTRS_ACCURATE_TIME);
+	set_file_attrs(buf, file, NULL, fname, ATTRS_OPERATOR_PATH | ATTRS_ACCURATE_TIME);
 	preserve_xattrs = save_preserve_xattrs;
 
 	unmake_file(file);
@@ -442,8 +441,6 @@ int make_backup(const char *fname, BOOL prefer_rename)
 	 * symlink component is refused while the operator's own is followed --
 	 * absolute and relative alike.  --insecure-links / "insecure links ="
 	 * restores legacy following. */
-	operator_path_resolve = 1;
 	ret = make_backup_inner(fname, prefer_rename);
-	operator_path_resolve = 0;
 	return ret;
 }

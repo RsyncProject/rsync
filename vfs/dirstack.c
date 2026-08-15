@@ -1,0 +1,341 @@
+/*
+ * vfs/dirstack.c - race-safe component-walk primitives for rsync's VFS.
+ *
+ * The dirstack walks a relative path one component at a time, keeping an open
+ * dirfd for every ancestor from the anchor down, so a parent renamed mid-walk
+ * cannot redirect the climb (TOCTOU).  Plus the module-confinement helpers that
+ * decide whether a resolved absolute path has escaped the served module root.
+ * Moved verbatim out of syscall.c.
+ *
+ * Copyright (C) 1998-2022 Andrew Tridgell, Martin Pool, Wayne Davison
+ * Copyright (C) 2026 Wayne Davison, Andrew Tridgell
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ */
+
+#include "rsync.h"
+#include "vfs/vfs_internal.h"
+
+/* Returns 1 if path has any "/"-separated component that is exactly
+ * "..", 0 otherwise. Used by vfs_resolve_open's front-door
+ * validation to reject ".." inputs (bare "..", "foo/..", "subdir/..")
+ * for non-re-anchored paths; the walk itself resolves an in-tree ".."
+ * safely (ds_descend pops to the held parent) for a re-anchored path. */
+int path_has_dotdot_component(const char *path)
+{
+	const char *p = path;
+
+	while (*p) {
+		const char *q;
+		if (*p == '/') { p++; continue; }
+		q = p;
+		while (*q && *q != '/')
+			q++;
+		if (q - p == 2 && p[0] == '.' && p[1] == '.')
+			return 1;
+		p = q;
+	}
+	return 0;
+}
+
+/* True if `path` lies within directory `root` (path == root, or path begins
+ * with root followed by '/').  `rootlen` is strlen(root). */
+static int path_within(const char *root, size_t rootlen, const char *path)
+{
+	return strncmp(path, root, rootlen) == 0
+	    && (path[rootlen] == '\0' || path[rootlen] == '/');
+}
+
+/* Refuse (return 1) when the ABSOLUTE resolved path `abspath` lands OUTSIDE the
+ * serving module's root, for an operator/peer-supplied path that must stay in the
+ * module (--partial-dir/--backup-dir/alt-basis: is_operator).  An
+ * in-tree symlink owned by uid 0 / the euid is followed by design, so it can
+ * redirect the resolved target outside the module; this catches that escape.
+ *
+ * This is module-ROOT confinement only.  The daemon exclude/filter list is a
+ * name-based visibility filter, NOT a physical-path boundary: a symlink whose own
+ * name is not excluded may still resolve into an excluded IN-module subtree,
+ * exactly as in stock rsync.  The defense for a writable module is `munge
+ * symlinks` (see rsyncd.conf(5)), not this walk.  No-op unless we're a daemon. */
+/* The root an operator/peer-supplied path must stay under, or NULL when nothing
+ * is confined.  A daemon has the served module; a server launched by a wrapper
+ * with its own restricted directory (rrsync) gets one from --confine-root.
+ *
+ * A daemon never honours --confine-root: vfs.module_dir is the boundary there,
+ * and the option arrives in a peer-supplied argv, so obeying it could only
+ * loosen the module. */
+static const char *confinement_root(unsigned int *lenp)
+{
+	if (am_daemon) {
+		*lenp = vfs.module_dirlen;
+		return vfs.module_dir;
+	}
+	*lenp = confine_rootlen;
+	return confine_root;
+}
+
+/* Split the "/proc/<self|pid>/fd" prefix off `p`, returning the tail -- "" for
+ * the pin directory itself, otherwise a string starting with '/'.  NULL when `p`
+ * is not in the fd-pin namespace at all. */
+const char *vfs_fd_pin_tail(const char *p)
+{
+	const char *s;
+
+	if (strncmp(p, "/proc/", 6) != 0)
+		return NULL;
+	s = p + 6;
+	if (strncmp(s, "self/", 5) == 0)	/* "/proc/self/..." */
+		s += 4;
+	else {					/* "/proc/<pid>/..." */
+		const char *d = s;
+		while (*s >= '0' && *s <= '9')
+			s++;
+		if (s == d || *s != '/')
+			return NULL;
+	}
+	if (strncmp(s, "/fd", 3) != 0)
+		return NULL;
+	s += 3;
+	return (*s == '\0' || *s == '/') ? s : NULL;
+}
+
+/* An EXACT pin entry, "/proc/self/fd/7" -- the one spelling whose target is what
+ * confinement must judge.  rrsync also writes a pinned parent as
+ * ".../fd/7/<leaf>", but the walk resolves the magic link itself and checks the
+ * components past it, so only the bare entry is resolved here.  Requiring all
+ * digits keeps a planted name like ".../fd/outside-secret" out. */
+static int is_exact_fd_pin(const char *p)
+{
+	const char *tail = vfs_fd_pin_tail(p);
+
+	if (!tail || *tail != '/')
+		return 0;
+	for (++tail; *tail >= '0' && *tail <= '9'; tail++) {}
+	return *tail == '\0' && tail[-1] != '/';
+}
+
+int abspath_outside_confinement(const char *abspath, int is_operator)
+{
+	unsigned int rootlen;
+	const char *root = confinement_root(&rootlen);
+	char pinned[MAXPATHLEN];
+
+	if (!root || !abspath)
+		return 0;
+	if (rootlen <= 1)			/* root is "/": nothing is outside */
+		return 0;
+	/* An fd pin (rrsync rewrites a validated option path to /proc/self/fd/N so
+	 * no later symlink can redirect it) is spelled outside the root by
+	 * construction.  Judge it by what it points AT rather than by its spelling,
+	 * so a pin is neither wrongly refused nor blindly trusted.  A pin we cannot
+	 * resolve to an absolute path is refused, not waved through: an unreadable
+	 * pin is exactly the case where we cannot say where the open would land. */
+	if (!am_daemon) {
+		const char *tail = vfs_fd_pin_tail(abspath);
+		if (tail && !*tail)
+			return 0;		/* the pin directory: transit, opens nothing */
+		if (is_exact_fd_pin(abspath)) {
+			ssize_t n = readlink(abspath, pinned, sizeof pinned - 1);
+			if (n <= 0 || pinned[0] != '/')
+				return is_operator ? 1 : 0;
+			pinned[n] = '\0';
+			abspath = pinned;
+		}
+	}
+	if (path_within(root, rootlen, abspath))
+		return 0;			/* inside: name-based exclude is not a boundary */
+	/* Not under the root.  An ABSOLUTE walk passes through the root's ancestors
+	 * ("/", "/home", ...) on the way down -- those are not "outside", just
+	 * not-yet-arrived, so allow them.  A path that has truly DIVERGED is
+	 * outside: refuse it for an operator/peer path that must stay in the tree
+	 * (is_operator); other opens (--log-file, --*-from, lock/motd) may
+	 * legitimately live elsewhere.  The --insecure-links / "insecure links =
+	 * yes" opt-out short-circuits before we get here. */
+	if (!*abspath || path_within(abspath, strlen(abspath), root))
+		return 0;			/* ancestor of the root: still descending */
+	return is_operator ? 1 : 0;
+}
+
+#if defined(O_NOFOLLOW) && defined(O_DIRECTORY) && defined(AT_FDCWD)
+
+/* Open a trusted absolute anchor directory as an owned dirfd.  When the anchor is
+ * the served module root and the daemon pinned it by identity (vfs.module_dirfd), dup
+ * that fd rather than re-resolving the absolute path with openat(AT_FDCWD, ...) --
+ * which re-traverses the module's ancestors as the dropped-privilege module uid
+ * and EACCESes when the module sits under a non-traversable parent (a 0700 home).
+ * Functionally identical (same inode), just privilege-drop-safe.  Gated like its
+ * callers (the secure resolver and dpc_dir_fd both require these three). */
+int open_anchor_dirfd(const char *path)
+{
+	if (vfs.module_dirfd >= 0 && am_daemon && vfs.module_dir && strcmp(path, vfs.module_dir) == 0)
+		return dup(vfs.module_dirfd);
+	return openat(AT_FDCWD, path, O_RDONLY | O_DIRECTORY);
+}
+
+/* Append "/comp" to ds->abspath (no-op if it's unseeded/empty so non-daemon
+ * callers pay nothing).  Returns -1 (ENAMETOOLONG) on overflow. */
+static int ds_path_push(struct dirstack *ds, const char *comp)
+{
+	size_t al = strlen(ds->abspath);
+	if (al == 0)
+		return 0;		/* unseeded: tracking disabled for this walk */
+	size_t cl = strlen(comp);
+	if (al + 1 + cl >= sizeof ds->abspath) {
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+	ds->abspath[al] = '/';
+	memcpy(ds->abspath + al + 1, comp, cl + 1);
+	return 0;
+}
+
+/* Drop the last component of ds->abspath (mirrors a ".." pop). */
+static void ds_path_pop(struct dirstack *ds)
+{
+	char *slash;
+	if (!ds->abspath[0])
+		return;
+	slash = strrchr(ds->abspath, '/');
+	if (slash && slash != ds->abspath)
+		*slash = '\0';
+}
+
+/* Initialise with `anchor` (which may be AT_FDCWD) as the un-owned base.
+ * Returns int for caller symmetry, but cannot fail (the fd array is inline). */
+int ds_init(struct dirstack *ds, int anchor)
+{
+	ds->abspath[0] = '\0';
+	ds->fds[0] = anchor;
+	ds->top = 0;
+	return 0;
+}
+
+/* Close every pushed fd (but not the borrowed anchor at index 0). */
+void ds_free(struct dirstack *ds)
+{
+	while (ds->top > 0)
+		close(ds->fds[ds->top--]);
+}
+
+int ds_cur(struct dirstack *ds)
+{
+	return ds->fds[ds->top];
+}
+
+static int ds_push(struct dirstack *ds, int fd)
+{
+	if (ds->top + 1 >= DS_MAXDEPTH) {	/* deeper than we'll hold open */
+		close(fd);
+		errno = ENOMEM;
+		return -1;
+	}
+	ds->fds[++ds->top] = fd;
+	return 0;
+}
+
+/* Detach the current dir as an owned fd the caller must close.  At the anchor
+ * (top 0) the anchor is borrowed, so return a fresh dup of it instead. */
+int ds_take(struct dirstack *ds)
+{
+	if (ds->top > 0)
+		return ds->fds[ds->top--];
+	return openat(ds->fds[0], ".", O_RDONLY | O_DIRECTORY);
+}
+
+/* Descend one path component on the stack: "." stays, ".." pops to the pinned
+ * parent (ELOOP at the anchor), a real subdirectory is pushed, and an in-tree
+ * directory symlink is followed by walking its (relative, possibly
+ * ..-containing) target on the same stack.  Returns 0, or -1 with errno set:
+ * ELOOP for a refused/escaping symlink or a hop overrun, otherwise the
+ * underlying openat()/readlinkat() errno (ENOENT, a real ENOTDIR, EACCES). */
+int ds_descend(struct dirstack *ds, const char *part, int *hops)
+{
+	if (part[0] == '.' && part[1] == '\0')
+		return 0;				/* "." -- no movement */
+	if (part[0] == '.' && part[1] == '.' && part[2] == '\0') {
+		if (ds->top == 0) {			/* would rise above the anchor */
+			errno = ELOOP;
+			return -1;
+		}
+		close(ds->fds[ds->top--]);		/* pop to the held parent fd */
+		ds_path_pop(ds);
+		return 0;
+	}
+
+	int fd = openat(ds_cur(ds), part, O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+	if (fd != -1) {					/* a real subdirectory */
+		if (ds_push(ds, fd) < 0)
+			return -1;
+		if (ds_path_push(ds, part) < 0)
+			return -1;
+		/* exclude-aware: refuse descending into a module-hidden dir (catches a
+		 * symlink that redirected the walk into an excluded subtree). */
+		/* The strict resolver stays confined beneath the anchor (within the
+		 * module), so this never actually refuses; pass is_operator=0. */
+		if (abspath_outside_confinement(ds->abspath, 0)) {
+			errno = ELOOP;
+			return -1;
+		}
+		return 0;
+	}
+	/* O_NOFOLLOW refused a symlink (NOFOLLOW_HIT_SYMLINK: ELOOP on Linux, EMLINK
+	 * on FreeBSD, EFTYPE on NetBSD/OpenBSD), or O_DIRECTORY hit a non-directory
+	 * (ENOTDIR).  Either may be a symlink, so fall through to the readlink probe;
+	 * anything else is a hard error. */
+	if (errno != ENOTDIR && !NOFOLLOW_HIT_SYMLINK(errno)) {
+		if (errno == EMFILE || errno == ENFILE) {
+			/* The resolver holds one dirfd per path component, so a deep path
+			 * can exhaust descriptors where plain open() would not.  Hint at
+			 * the fix once -- otherwise "Too many open files" is opaque. */
+			static int warned = 0;
+			if (!warned) {
+				int e = errno;
+				warned = 1;
+				rprintf(FWARNING, "out of file descriptors resolving a deep path;"
+					" raise the open-file limit (e.g. `ulimit -n`)\n");
+				errno = e;
+			}
+		}
+		return -1;
+	}
+	int open_errno = errno;
+
+	char buf[MAXPATHLEN];
+	ssize_t n = readlinkat(ds_cur(ds), part, buf, sizeof buf - 1);
+	if (n < 0) {
+		if (errno == EINVAL)			/* not a symlink: a real non-dir */
+			errno = open_errno;
+		return -1;
+	}
+	if (n == 0 || (size_t)n >= sizeof buf - 1) {
+		errno = ELOOP;				/* empty or truncated target */
+		return -1;
+	}
+	buf[n] = '\0';
+	if (buf[0] == '/') {				/* absolute target: refuse */
+		errno = ELOOP;
+		return -1;
+	}
+	if (--(*hops) < 0) {
+		errno = ELOOP;
+		return -1;
+	}
+	return ds_walk_path(ds, buf, hops);
+}
+
+/* Walk every component of a relative path on the stack (used for the basedir,
+ * and for a followed symlink's target -- which may contain ".."). */
+int ds_walk_path(struct dirstack *ds, char *path, int *hops)
+{
+	char *save = NULL;
+	for (char *c = strtok_r(path, "/", &save); c; c = strtok_r(NULL, "/", &save)) {
+		if (ds_descend(ds, c, hops) < 0)
+			return -1;
+	}
+	return 0;
+}
+
+#endif /* O_NOFOLLOW && O_DIRECTORY && AT_FDCWD */

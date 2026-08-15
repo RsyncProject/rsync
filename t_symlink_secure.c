@@ -1,8 +1,8 @@
 /*
- * Test harness for the fake-super branches of do_symlink_at()/do_mknod_at().
+ * Test harness for the fake-super branches of vfs_symlink_at()/vfs_mknod_at().
  * Fake-super stores a symlink/device as a placeholder file, so the create
  * resolves the final component; the no-slash branch used to fall back to
- * do_symlink()/do_mknod(), whose plain open() followed a planted basename
+ * vfs_symlink()/vfs_mknod(), whose plain open() followed a planted basename
  * symlink and escaped the module. Checks the fixed wrappers refuse it;
  * --poc shows the old fallback escaping. Not linked into rsync. GPL version 2.
  */
@@ -12,7 +12,7 @@
 #include <sys/stat.h>
 
 /* The symlink placeholder (and thus this escape) exists only where symlink
- * xattrs are unavailable -- the same guard do_symlink() uses. Elsewhere
+ * xattrs are unavailable -- the same guard vfs_symlink() uses. Elsewhere
  * symlink() fails EEXIST on a planted link, so only the device path applies. */
 #if defined SUPPORT_LINKS && (defined NO_SYMLINK_XATTRS || defined NO_SYMLINK_USER_XATTRS)
 #define TEST_SYMLINK_PLACEHOLDER 1
@@ -89,8 +89,8 @@ int main(int argc, char **argv)
 	const char *moddir;
 
 # if !defined(HAVE_MKNODAT) && !defined(TEST_SYMLINK_PLACEHOLDER)
-	/* Nothing left to assert: the do_mknod_at() checks need mknodat(), and
-	 * the do_symlink_at() ones are not compiled here.  Skip rather than
+	/* Nothing left to assert: the vfs_mknod() checks need mknodat(), and
+	 * the vfs_symlink() ones are not compiled here.  Skip rather than
 	 * pass vacuously. */
 	(void)argc; (void)argv;
 	fprintf(stderr, "SKIP: no mknodat() and no symlink placeholders -- "
@@ -118,39 +118,39 @@ int main(int argc, char **argv)
 	am_root = -1;	/* fake-super: symlinks/devices stored as files */
 
 	if (poc) {
-		/* Pre-fix fallback: a no-slash path went to do_symlink()/do_mknod(),
+		/* Pre-fix fallback: a no-slash path went to vfs_symlink()/vfs_mknod(),
 		 * which open() the basename without O_NOFOLLOW. */
 #ifdef TEST_SYMLINK_PLACEHOLDER
-		do_symlink("VULN_SYM_PAYLOAD", "sympath");
-		check_clobbered("poc do_symlink bare", "../outside/secret_sym",
+		vfs_symlink("VULN_SYM_PAYLOAD", VFS_AT_FDCWD, "sympath", VFS_ALLOW_SYMLINK);
+		check_clobbered("poc vfs_symlink bare", "../outside/secret_sym",
 				"VULN_SYM_PAYLOAD");
 #endif
-		do_mknod("nodpath", S_IFCHR | 0600, 0);
-		check_clobbered("poc do_mknod bare", "../outside/secret_nod", "");
+		vfs_mknod(VFS_AT_FDCWD, "nodpath", S_IFCHR | 0600, 0, VFS_ALLOW_SYMLINK);
+		check_clobbered("poc vfs_mknod bare", "../outside/secret_nod", "");
 		return errs ? 1 : 0;
 	}
 
 	/* Fixed wrappers: a bare-path basename symlink must not be followed;
 	 * the victim outside the module stays untouched. */
 #ifdef TEST_SYMLINK_PLACEHOLDER
-	do_symlink_at("FIXED_SYM_PAYLOAD", "sympath");
-	check_preserved("do_symlink_at bare", "../outside/secret_sym", "VICTIM_SYM");
+	vfs_symlink("FIXED_SYM_PAYLOAD", VFS_AT_FDCWD, "sympath", 0);
+	check_preserved("vfs_symlink bare", "../outside/secret_sym", "VICTIM_SYM");
 
 	/* Slashed path for parity (already protected before the fix). */
-	do_symlink_at("FIXED_SYM_PAYLOAD", "sub/sympath2");
-	check_preserved("do_symlink_at slashed", "../outside/secret_sym2", "VICTIM_SYM2");
+	vfs_symlink("FIXED_SYM_PAYLOAD", VFS_AT_FDCWD, "sub/sympath2", 0);
+	check_preserved("vfs_symlink slashed", "../outside/secret_sym2", "VICTIM_SYM2");
 #endif
 
 # ifdef HAVE_MKNODAT
-	/* Without mknodat() do_mknod_at() IS do_mknod(): the confinement is
-	 * compiled out by design (SECURITY.md), so these would assert a
-	 * property the build deliberately does not have.  The do_symlink_at()
-	 * checks above do not depend on it and still run. */
-	do_mknod_at("nodpath", S_IFCHR | 0600, 0);
-	check_preserved("do_mknod_at bare", "../outside/secret_nod", "VICTIM_NOD");
+	/* Without mknodat() the secure vfs_mknod() IS the plain mknod(): the
+	 * confinement is compiled out by design (SECURITY.md), so these would
+	 * assert a property the build deliberately does not have.  The
+	 * vfs_symlink() checks above do not depend on it and still run. */
+	vfs_mknod(VFS_AT_FDCWD, "nodpath", S_IFCHR | 0600, 0, 0);
+	check_preserved("vfs_mknod bare", "../outside/secret_nod", "VICTIM_NOD");
 
-	do_mknod_at("sub/nodpath2", S_IFCHR | 0600, 0);
-	check_preserved("do_mknod_at slashed", "../outside/secret_nod2", "VICTIM_NOD2");
+	vfs_mknod(VFS_AT_FDCWD, "sub/nodpath2", S_IFCHR | 0600, 0, 0);
+	check_preserved("vfs_mknod slashed", "../outside/secret_nod2", "VICTIM_NOD2");
 # endif
 
 	if (errs)

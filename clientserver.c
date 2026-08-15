@@ -185,7 +185,7 @@ static int exchange_protocols(int f_in, int f_out, char *buf, size_t bufsiz, int
 			/* 'motd file = PATH': motd content is sent to every client, so
 			 * a planted symlink would leak the target's bytes.  Refuse
 			 * symlinks not owned by uid 0 or our euid. */
-			int motd_fd = open_no_attacker_symlinks(motd, O_RDONLY, 0);
+			int motd_fd = vfs_open_owner_walk(motd, O_RDONLY, 0, 0);
 			FILE *f = motd_fd >= 0 ? fdopen(motd_fd, "r") : NULL;
 			if (!f && motd_fd >= 0) close(motd_fd);
 			while (f && !feof(f)) {
@@ -300,10 +300,10 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 		STRUCT_STAT st;
 		/* --early-input-file=PATH: refuse symlinks not owned by uid 0 or
 		 * our euid anywhere in the path. */
-		int ei_fd = open_no_attacker_symlinks(early_input_file, O_RDONLY, 0);
+		int ei_fd = vfs_open_owner_walk(early_input_file, O_RDONLY, 0, 0);
 		FILE *f = ei_fd >= 0 ? fdopen(ei_fd, "rb") : NULL;
 		if (!f && ei_fd >= 0) close(ei_fd);
-		if (!f || do_fstat(fileno(f), &st) < 0) {
+		if (!f || vfs_fstat(fileno(f), &st) < 0) {
 			rsyserr(FERROR, errno, "failed to open %s", early_input_file);
 			if (f)
 				fclose(f);
@@ -925,6 +925,12 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	} else
 		set_filter_dir(module_dir, module_dirlen);
 
+	/* Snapshot the module root for the VFS confinement checks now that the
+	 * path is final.  The root dirfd is pinned later (below); this first call
+	 * must precede any VFS open of an operator-supplied path -- the filter/
+	 * include files just below, and the log file -- so they see the boundary. */
+	vfs_set_module_root(module_dir, module_dirlen, -1);
+
 	/* Everything loaded from here to the end of the exclude block is the
 	 * operator's own configuration, so it keeps the ownership walk without the
 	 * module-confinement parse_filter_file() applies to peer-driven merges. */
@@ -1064,6 +1070,8 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 #if defined HAVE_FDOPENDIR && defined O_DIRECTORY
 	module_dirfd = open(".", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
 #endif
+	/* Update the VFS snapshot with the now-pinned root dirfd. */
+	vfs_set_module_root(module_dir, module_dirlen, module_dirfd);
 	if (module_dirlen)
 		sanitize_paths = 1;
 
@@ -1073,7 +1081,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 		STRUCT_STAT st;
 		char prefix[SYMLINK_PREFIX_LEN]; /* NOT +1 ! */
 		strlcpy(prefix, SYMLINK_PREFIX, sizeof prefix); /* trim the trailing slash */
-		if (do_stat(prefix, &st) == 0 && S_ISDIR(st.st_mode)) {
+		if (vfs_stat(VFS_AT_FDCWD, prefix, &st, VFS_ALLOW_SYMLINK) == 0 && S_ISDIR(st.st_mode)) {
 			rprintf(FLOG, "Symlink munging is unsafe when a %s directory exists.\n",
 				prefix);
 			io_printf(f_out, "@ERROR: daemon security issue -- contact admin\n", name);
@@ -1087,11 +1095,11 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	 * the receiver finish/rename path must still resolve beneath the module
 	 * root.  This prevents TOCTOU race attacks where an attacker could switch a
 	 * directory to a symlink between path validation and file open.  Match the
-	 * gate in secure_relpath_active() (syscall.c) -- the protection has nothing
+	 * gate in vfs_relpath_active() (syscall.c) -- the protection has nothing
 	 * to do with symlink munging, so a module configured with "munge symlinks =
 	 * false" must still get the secure-open path. */
 	use_secure_symlinks = am_daemon && (!am_chrooted || module_dirlen)
-			    && !symlink_optout_allowed();
+			    && !vfs_symlink_optout_allowed();
 
 	if (gid_list.count) {
 		gid_t *gid_array = gid_list.items;
@@ -1477,7 +1485,7 @@ int start_daemon(int f_in, int f_out)
 		}
 		/* Deliberately do NOT set am_chrooted here.  am_chrooted
 		 * gates the per-module symlink-race defenses
-		 * (secure_relative_open() and the do_*_at() wrappers in
+		 * (vfs_resolve_open() and the do_*_at() wrappers in
 		 * syscall.c) and means "the kernel is enforcing path
 		 * confinement at the module boundary".  The daemon chroot
 		 * confines path resolution to the daemon-chroot directory,
@@ -1486,7 +1494,7 @@ int start_daemon(int f_in, int f_out)
 		 * subtrees and a sender-controlled symlink in module A
 		 * could redirect a syscall to module B (or to other files
 		 * inside the daemon chroot) without the per-module
-		 * defenses.  Leave am_chrooted=0 here so secure_relative_open()
+		 * defenses.  Leave am_chrooted=0 here so vfs_resolve_open()
 		 * still fires for "use chroot = no" modules. */
 		if (chdir("/") < 0) {
 			rsyserr(FLOG, errno, "daemon chdir(\"/\") failed");
@@ -1618,18 +1626,18 @@ static void create_pid_file(void)
 			dir = dirbuf;
 			base = slash + 1;
 		}
-		if ((pdfd = do_open(dir, O_RDONLY|O_DIRECTORY, 0)) < 0) {
+		if ((pdfd = vfs_open(dir, O_RDONLY|O_DIRECTORY, 0)) < 0) {
 			rsyserr(FLOG, errno, "failed to open pid-file directory \"%s\"", dir);
 			exit_cleanup(RERR_FILEIO);
 		}
 	}
-#define PID_LSTAT(stp) do_lstat_atfd(pdfd, base, stp)
-#define PID_UNLINK()   do_unlink_atfd(pdfd, base, 0)
-#define PID_OPEN()     do_open_atfd(pdfd, base, O_RDWR|O_CREAT, 0664)
+#define PID_LSTAT(stp) vfs_lstat(pdfd, base, stp, 0)
+#define PID_UNLINK()   vfs_unlink(pdfd, base, 0)
+#define PID_OPEN()     vfs_open_atfd(pdfd, base, O_RDWR|O_CREAT, 0664)
 #else
-#define PID_LSTAT(stp) do_lstat(base, stp)
+#define PID_LSTAT(stp) vfs_lstat(VFS_AT_FDCWD, base, stp, VFS_ALLOW_SYMLINK)
 #define PID_UNLINK()   unlink(base)
-#define PID_OPEN()     do_open(base, O_RDWR|O_CREAT|SAFE_NOFOLLOW, 0664)
+#define PID_OPEN()     vfs_open(base, O_RDWR|O_CREAT|SAFE_NOFOLLOW, 0664)
 #endif
 
 	/* These tests make sure that a temp-style lock dir is handled safely. */
@@ -1640,7 +1648,7 @@ static void create_pid_file(void)
 		fail = S_ISREG(st1.st_mode) ? "open" : "create";
 	else if (!lock_range(pid_file_fd, 0, 4))
 		fail = "lock";
-	else if (do_fstat(pid_file_fd, &st1) < 0)
+	else if (vfs_fstat(pid_file_fd, &st1) < 0)
 		fail = "fstat opened";
 	else if (st1.st_size > (int)sizeof pidbuf)
 		fail = "find small";
@@ -1651,7 +1659,7 @@ static void create_pid_file(void)
 	else if (st1.st_dev != st2.st_dev || st1.st_ino != st2.st_ino)
 		fail = "verify stat info for";
 #ifdef HAVE_FTRUNCATE
-	else if (do_ftruncate(pid_file_fd, 0) < 0)
+	else if (vfs_ftruncate(pid_file_fd, 0) < 0)
 		fail = "truncate";
 #endif
 	else {

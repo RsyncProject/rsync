@@ -160,11 +160,11 @@ static void list_file(const char *fname)
 	char linkbuf[4096];
 	int nsecs;
 
-	if (do_lstat(fname, &buf) < 0)
+	if (vfs_lstat(VFS_AT_FDCWD, fname, &buf, VFS_ALLOW_SYMLINK) < 0)
 		failed("stat", fname);
 #ifdef SUPPORT_CRTIMES
-	if (display_crtimes && (crtime = get_create_time(fname, &buf)) == 0)
-		failed("get_create_time", fname);
+	if (display_crtimes && (crtime = vfs_get_create_time(fname, &buf)) == 0)
+		failed("vfs_get_create_time", fname);
 #endif
 #ifdef SUPPORT_XATTRS
 	if (am_root < 0)
@@ -188,9 +188,9 @@ static void list_file(const char *fname)
 			buf.st_uid = buf.st_gid = 0;
 		strlcpy(linkbuf, " -> ", sizeof linkbuf);
 		/* const-cast required for silly UNICOS headers */
-		len = do_readlink((char*)fname, linkbuf+4, sizeof linkbuf - 4);
+		len = vfs_readlink((char*)fname, linkbuf+4, sizeof linkbuf - 4);
 		if (len == -1)
-			failed("do_readlink", fname);
+			failed("vfs_readlink", fname);
 		else
 			/* it's not nul-terminated */
 			linkbuf[4+len] = 0;

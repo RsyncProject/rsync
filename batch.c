@@ -251,7 +251,7 @@ void open_batch_files(void)
 
 		stringjoin(filename, sizeof filename, batch_name, ".sh", NULL);
 
-		batch_sh_fd = open_no_attacker_symlinks(filename, O_WRONLY | O_CREAT | O_TRUNC | O_BINARY, S_IRUSR | S_IWUSR | S_IXUSR);
+		batch_sh_fd = vfs_open_owner_walk(filename, O_WRONLY | O_CREAT | O_TRUNC | O_BINARY, S_IRUSR | S_IWUSR | S_IXUSR, 0);
 		if (batch_sh_fd < 0) {
 			rsyserr(FERROR, errno, "Batch file %s open error", full_fname(filename));
 			exit_cleanup(RERR_FILESELECT);
@@ -259,12 +259,12 @@ void open_batch_files(void)
 
 		/* O_BINARY: the batch stream is binary protocol data; without it
 		 * Cygwin et al apply CRLF translation and corrupt it.  Unlike
-		 * do_open(), open_no_attacker_symlinks passes flags verbatim. */
-		batch_fd = open_no_attacker_symlinks(batch_name, O_WRONLY | O_CREAT | O_TRUNC | O_BINARY, S_IRUSR | S_IWUSR);
+		 * vfs_open(), vfs_open_owner_walk passes flags verbatim. */
+		batch_fd = vfs_open_owner_walk(batch_name, O_WRONLY | O_CREAT | O_TRUNC | O_BINARY, S_IRUSR | S_IWUSR, 0);
 	} else if (strcmp(batch_name, "-") == 0)
 		batch_fd = STDIN_FILENO;
 	else
-		batch_fd = open_no_attacker_symlinks(batch_name, O_RDONLY | O_BINARY, S_IRUSR | S_IWUSR);
+		batch_fd = vfs_open_owner_walk(batch_name, O_RDONLY | O_BINARY, S_IRUSR | S_IWUSR, 0);
 
 	if (batch_fd < 0) {
 		rsyserr(FERROR, errno, "Batch file %s open error", full_fname(batch_name));
@@ -275,7 +275,7 @@ void open_batch_files(void)
 	 * non-regular files (FIFO, device, socket) at the batch path. */
 	if (!write_batch && batch_fd != STDIN_FILENO) {
 		STRUCT_STAT st;
-		if (do_fstat(batch_fd, &st) == 0 && !S_ISREG(st.st_mode)) {
+		if (vfs_fstat(batch_fd, &st) == 0 && !S_ISREG(st.st_mode)) {
 			rprintf(FERROR, "Batch file %s is not a regular file\n",
 				full_fname(batch_name));
 			exit_cleanup(RERR_FILEIO);

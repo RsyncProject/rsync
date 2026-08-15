@@ -70,7 +70,6 @@ extern int protect_args;
 extern int relative_paths;
 extern int sanitize_paths;
 extern int curr_dir_depth;
-extern unsigned int curr_dir_len;
 extern int module_id;
 extern int rsync_port;
 extern int whole_file;
@@ -106,7 +105,6 @@ extern char *password_file;
 extern char *backup_dir;
 extern char *copy_as;
 extern char *tmpdir;
-extern char curr_dir[MAXPATHLEN];
 extern char backup_dir_buf[MAXPATHLEN];
 extern char *basis_dir[MAX_BASIS_DIRS+1];
 extern struct file_list *first_flist;
@@ -737,13 +735,13 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 	}
 
 	/* See what currently exists at the destination. */
-	statret = do_stat(dest_path, &st);
+	statret = vfs_stat(VFS_AT_FDCWD, dest_path, &st, VFS_ALLOW_SYMLINK);
 	cp = strrchr(dest_path, '/');
 	trailing_slash = cp && !cp[1];
 
 	if (mkpath_dest_arg && statret < 0 && (cp || file_total > 1)) {
 		int save_errno = errno;
-		int ret = make_path(dest_path, file_total > 1 && !trailing_slash ? 0 : MKP_DROP_NAME);
+		int ret = vfs_make_path(dest_path, file_total > 1 && !trailing_slash ? 0 : MKP_DROP_NAME, 0);
 		if (ret < 0)
 			goto mkdir_error;
 		if (ret && (INFO_GTE(NAME, 1) || stdout_format_has_i)) {
@@ -754,7 +752,7 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 				*cp = '/';
 		}
 		if (ret)
-			statret = do_stat(dest_path, &st);
+			statret = vfs_stat(VFS_AT_FDCWD, dest_path, &st, VFS_ALLOW_SYMLINK);
 		else
 			errno = save_errno;
 	}
@@ -801,7 +799,7 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 			exit_cleanup(RERR_SYNTAX);
 		}
 
-		if (do_mkdir(dest_path, ACCESSPERMS) != 0) {
+		if (vfs_mkdir(VFS_AT_FDCWD, dest_path, ACCESSPERMS, VFS_ALLOW_SYMLINK) != 0) {
 		    mkdir_error:
 			rsyserr(FERROR, errno, "mkdir %s failed",
 				full_fname(dest_path));
@@ -840,7 +838,7 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 		dest_path = "/";
 
 	*cp = '\0';
-	if (dry_run && mkpath_dest_arg && do_stat(dest_path, &st) < 0) {
+	if (dry_run && mkpath_dest_arg && vfs_stat(VFS_AT_FDCWD, dest_path, &st, VFS_ALLOW_SYMLINK) < 0) {
 		/* --mkpath would have created this parent dir, but a dry run did
 		 * not, so don't chdir into it; flag the destination as not yet
 		 * present (as the dir-creation path above does) so the generator
@@ -862,12 +860,12 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 /* This function checks on our alternate-basis directories.  If we're in
  * dry-run mode and the destination dir does not yet exist, we'll try to
  * tweak any dest-relative paths to make them work for a dry-run (the
- * destination dir must be in curr_dir[] when this function is called).
+ * destination dir must be in vfs.curr_dir[] when this function is called).
  * We also warn about any arg that is non-existent or not a directory. */
 static void check_alt_basis_dirs(void)
 {
 	STRUCT_STAT st;
-	char *slash = strrchr(curr_dir, '/');
+	char *slash = strrchr(vfs.curr_dir, '/');
 	int j;
 
 	for (j = 0; j < basis_dir_cnt; j++) {
@@ -877,13 +875,13 @@ static void check_alt_basis_dirs(void)
 		if (bd_len > 1 && bdir[bd_len-1] == '/')
 			bdir[--bd_len] = '\0';
 		/* Make a relative --link-dest/--copy-dest/--compare-dest absolute
-		 * (vs the destination curr_dir).  These are operator-trusted roots, so
+		 * (vs the destination vfs.curr_dir).  These are operator-trusted roots, so
 		 * an absolute path makes the do_*_at() wrappers use plain resolution
 		 * rather than reject an operator '..' outside the dest tree (e.g.
 		 * --copy-dest=../to).  Skipped when sanitize_paths already confined
 		 * them; the dry_run>1 case keeps its leading-"../"-strip. */
 		if (*bdir != '/' && (dry_run > 1 || !sanitize_paths)) {
-			int len = curr_dir_len + 1 + bd_len + 1;
+			int len = vfs.curr_dir_len + 1 + bd_len + 1;
 			char *new = new_array(char, len);
 			if (dry_run > 1 && slash && strncmp(bdir, "../", 3) == 0) {
 				/* We want to remove only one leading "../" prefix for
@@ -891,13 +889,13 @@ static void check_alt_basis_dirs(void)
 				 * this ensures that any other ".." references get
 				 * evaluated the same as they would for a live copy. */
 				*slash = '\0';
-				pathjoin(new, len, curr_dir, bdir + 3);
+				pathjoin(new, len, vfs.curr_dir, bdir + 3);
 				*slash = '/';
 			} else
-				pathjoin(new, len, curr_dir, bdir);
+				pathjoin(new, len, vfs.curr_dir, bdir);
 			basis_dir[j] = bdir = new;
 		}
-		if (do_stat(bdir, &st) < 0)
+		if (vfs_stat(VFS_AT_FDCWD, bdir, &st, VFS_ALLOW_SYMLINK) < 0)
 			rprintf(FWARNING, "%s arg does not exist: %s\n", alt_dest_opt(0), bdir);
 		else if (!S_ISDIR(st.st_mode))
 			rprintf(FWARNING, "%s arg is not a dir: %s\n", alt_dest_opt(0), bdir);
@@ -1025,7 +1023,7 @@ static int do_recv(int f_in, int f_out, char *local_name)
 		int ret;
 		if (backup_dir_len > 1)
 			backup_dir_buf[backup_dir_len-1] = '\0';
-		ret = do_stat(backup_dir_buf, &st);
+		ret = vfs_stat(VFS_AT_FDCWD, backup_dir_buf, &st, VFS_ALLOW_SYMLINK);
 		if (ret != 0 || !S_ISDIR(st.st_mode)) {
 			if (ret == 0) {
 				rprintf(FERROR, "The backup-dir is not a directory: %s\n", backup_dir_buf);
@@ -1045,7 +1043,7 @@ static int do_recv(int f_in, int f_out, char *local_name)
 
 	if (tmpdir) {
 		STRUCT_STAT st;
-		int ret = do_stat(tmpdir, &st);
+		int ret = vfs_stat(VFS_AT_FDCWD, tmpdir, &st, VFS_ALLOW_SYMLINK);
 		if (ret < 0 || !S_ISDIR(st.st_mode)) {
 			if (ret == 0) {
 				rprintf(FERROR, "The temp-dir is not a directory: %s\n", tmpdir);
@@ -1782,7 +1780,7 @@ static void unset_env_var(const char *var)
 }
 
 
-/* The symlink-race-safe path resolver (secure_relative_open) holds one open
+/* The symlink-race-safe path resolver (vfs_resolve_open) holds one open
  * dirfd per path component while it walks a path, plus an ancestor-dirfd cache
  * -- far more descriptors than legacy rsync's single open().  On a host with a
  * low default soft limit (e.g. OpenBSD's 128) a deep tree can hit EMFILE.
@@ -1813,6 +1811,8 @@ int main(int argc,char *argv[])
 
 	raw_argc = argc;
 	raw_argv = argv;
+
+	vfs_init();
 
 	raise_fd_limit();
 

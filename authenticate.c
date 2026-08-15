@@ -156,7 +156,7 @@ static const char *check_secret(int module, const char *user, const char *group,
 	if (!fname || !*fname)
 		return "no secrets file";
 	{
-		int fd = open_no_attacker_symlinks(fname, O_RDONLY, 0);
+		int fd = vfs_open_owner_walk(fname, O_RDONLY, 0, 0);
 		if (fd < 0)
 			return "no secrets file";
 		fh = fdopen(fd, "r");
@@ -166,7 +166,7 @@ static const char *check_secret(int module, const char *user, const char *group,
 		}
 	}
 
-	if (do_fstat(fileno(fh), &st) == -1) {
+	if (vfs_fstat(fileno(fh), &st) == -1) {
 		rsyserr(FLOG, errno, "fstat(%s)", fname);
 		ok = 0;
 	} else if (lp_strict_modes(module)) {
@@ -239,10 +239,10 @@ static const char *getpassf(const char *filename)
 
 		/* --password-file=PATH client open.  Its first line is sent as the
 		 * auth response, so a planted symlink leaks the target's content
-		 * (e.g. shadow hashes) to a malicious daemon; the do_stat()
+		 * (e.g. shadow hashes) to a malicious daemon; the vfs_stat()
 		 * other-access check runs on the target mode and passes 0640
 		 * root:shadow.  Refuse symlinks not owned by uid 0 or our euid. */
-		if ((fd = open_no_attacker_symlinks(filename, O_RDONLY, 0)) < 0) {
+		if ((fd = vfs_open_owner_walk(filename, O_RDONLY, 0, 0)) < 0) {
 			rsyserr(FERROR, errno, "could not open password file %s", filename);
 			exit_cleanup(RERR_SYNTAX);
 		}
@@ -252,7 +252,7 @@ static const char *getpassf(const char *filename)
 		 * path between open and check can't make the owner/mode test
 		 * validate a different inode than the one we read the password
 		 * from. */
-		if (do_fstat(fd, &st) == -1) {
+		if (vfs_fstat(fd, &st) == -1) {
 			rsyserr(FERROR, errno, "fstat(%s)", filename);
 			exit_cleanup(RERR_SYNTAX);
 		}

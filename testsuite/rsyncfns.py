@@ -35,6 +35,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import zlib
 from pathlib import Path
 
 from exitcodes import Exit   # re-exported: tests may `from rsyncfns import Exit`
@@ -2193,7 +2194,12 @@ def setup_chroot_inner(name):
         ('mod', {'path': str(outer) + '/./inner', 'read only': 'no',
                  'use chroot': 'yes', 'munge symlinks': 'no'}),
     ], name=f'{name}.conf')
-    url = start_test_daemon(conf, 12940 + (abs(hash(name)) % 200))
+    # crc32, not hash(): str hash is per-process randomized (PYTHONHASHSEED),
+    # so the port would wander run to run -- and the old 12940+200 span reached
+    # into 13000+, where desktop bloatware (e.g. ASUS Armoury Crate on the
+    # Cygwin CI host) parks localhost listeners.  12800-12859 is otherwise
+    # unused by the suite.
+    url = start_test_daemon(conf, 12800 + (zlib.crc32(name.encode()) % 60))
     return base, inner, outside, src, url
 
 

@@ -223,6 +223,7 @@
 #define ATTRS_SKIP_MTIME	(1<<1)
 #define ATTRS_ACCURATE_TIME	(1<<2)
 #define ATTRS_SKIP_ATIME	(1<<3)
+#define ATTRS_OPERATOR_PATH	(1<<4)	/* fname is a cross-tree operator path: pin its leaf (op_pin) */
 #define ATTRS_SKIP_CRTIME	(1<<5)
 
 #define MSG_FLUSH	2
@@ -1237,12 +1238,13 @@ struct name_num_obj {
 
 #ifndef __cplusplus
 #include "proto.h"
+#include "vfs/vfs.h"
 #endif
 
 #ifndef SUPPORT_XATTRS
-#define x_stat(fn,fst,xst) do_stat(fn,fst)
-#define x_lstat(fn,fst,xst) do_lstat(fn,fst)
-#define x_fstat(fd,fst,xst) do_fstat(fd,fst)
+#define x_stat(fn,fst,xst,vfsflags) vfs_stat(VFS_AT_FDCWD, fn, fst, vfsflags)
+#define x_lstat(fn,fst,xst,vfsflags) vfs_lstat(VFS_AT_FDCWD, fn, fst, vfsflags)
+#define x_fstat(fd,fst,xst) vfs_fstat(fd,fst)
 #endif
 
 /* We have replacement versions of these if they're missing. */
@@ -1281,7 +1283,7 @@ extern int errno;
 #ifdef HAVE_READLINK
 #define SUPPORT_LINKS 1
 #if !defined NO_SYMLINK_XATTRS && !defined NO_SYMLINK_USER_XATTRS
-#define do_readlink(path, buf, bufsiz) readlink(path, buf, bufsiz)
+#define vfs_readlink(path, buf, bufsiz) readlink(path, buf, bufsiz)
 #endif
 #endif
 #ifdef HAVE_LINK

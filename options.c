@@ -27,7 +27,6 @@
 extern int module_id;
 extern int local_server;
 extern int sanitize_paths;
-extern int operator_path_resolve;
 extern int trust_sender_args;
 extern int trust_sender_filter;
 extern unsigned int module_dirlen;
@@ -61,7 +60,7 @@ int preserve_executability = 0;
 int preserve_devices = 0;
 int preserve_specials = 0;
 int drop_devices = 0;
-char *confine_root = NULL;		/* --confine-root: see syscall.c */
+char *confine_root = NULL;		/* --confine-root: see vfs/dirstack.c */
 unsigned int confine_rootlen = 0;
 int preserve_uid = 0;
 int preserve_gid = 0;
@@ -123,7 +122,7 @@ int am_daemon = 0;
  * clientserver.c. NOT set for the daemon-level "daemon chroot = /X"
  * chroot: that confines path resolution to /X, but module paths
  * /X/modA, /X/modB, etc. are not chroot boundaries, so the per-module
- * symlink-race defenses (secure_relative_open() / do_*_at() in
+ * symlink-race defenses (vfs_resolve_open() / do_*_at() in
  * syscall.c, gated by `am_daemon && !am_chrooted`) must still fire
  * even when the daemon is inside a daemon chroot. */
 int am_chrooted = 0;
@@ -331,7 +330,7 @@ static struct output_struct debug_words[COUNT_DEBUG+1] = {
 };
 
 static int verbose = 0;
-static int do_stats = 0;
+static int vfs_stats = 0;
 static int do_progress = 0;
 static int daemon_opt;   /* sets am_daemon after option error-reporting */
 static int F_option_cnt = 0;
@@ -621,7 +620,7 @@ static struct poptOption long_options[] = {
   {"quiet",           'q', POPT_ARG_NONE,   0, 'q', 0, 0 },
   {"motd",             0,  POPT_ARG_VAL,    &output_motd, 1, 0, 0 },
   {"no-motd",          0,  POPT_ARG_VAL,    &output_motd, 0, 0, 0 },
-  {"stats",            0,  POPT_ARG_NONE,   &do_stats, 0, 0, 0 },
+  {"stats",            0,  POPT_ARG_NONE,   &vfs_stats, 0, 0, 0 },
   {"human-readable",  'h', POPT_ARG_NONE,   0, 'h', 0, 0},
   {"no-human-readable",0,  POPT_ARG_VAL,    &human_readable, 0, 0, 0},
   {"no-h",             0,  POPT_ARG_VAL,    &human_readable, 0, 0, 0},
@@ -2178,7 +2177,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 
 	set_output_verbosity(verbose, DEFAULT_PRIORITY);
 
-	if (do_stats) {
+	if (vfs_stats) {
 		parse_output_words(info_words, info_levels,
 			verbose > 1 ? "stats3" : "stats2", DEFAULT_PRIORITY);
 	}
@@ -2372,7 +2371,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		STRUCT_STAT st;
 		char prefix[SYMLINK_PREFIX_LEN]; /* NOT +1 ! */
 		strlcpy(prefix, SYMLINK_PREFIX, sizeof prefix); /* trim the trailing slash */
-		if (do_stat(prefix, &st) == 0 && S_ISDIR(st.st_mode)) {
+		if (vfs_stat(VFS_AT_FDCWD, prefix, &st, VFS_ALLOW_SYMLINK) == 0 && S_ISDIR(st.st_mode)) {
 			rprintf(FERROR, "Symlink munging is unsafe when a %s directory exists.\n",
 				prefix);
 			exit_cleanup(RERR_UNSUPPORTED);
@@ -2645,14 +2644,11 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			 * as for --exclude-from/--include-from/--filter in exclude.c.
 			 * A daemon reads this list from a CLIENT-requested path
 			 * (--files-from=:LIST) and it must stay inside the module:
-			 * operator_path_resolve makes the ownership walk also refuse a
-			 * (trusted-owned) symlink that redirects the list outside the
-			 * module root -- e.g. a root-owned backup symlink. No-op off a
-			 * daemon (the module-root check only fires when am_daemon). */
-			int save_opr = operator_path_resolve;
-			operator_path_resolve = 1;
-			filesfrom_fd = open_no_attacker_symlinks(files_from, O_RDONLY|O_BINARY, 0);
-			operator_path_resolve = save_opr;
+			 * the is_operator walk also refuses a (trusted-owned) symlink
+			 * that redirects the list outside the module root -- e.g. a
+			 * root-owned backup symlink. No-op off a daemon (the module-root
+			 * check only fires when am_daemon). */
+			filesfrom_fd = vfs_open_owner_walk(files_from, O_RDONLY|O_BINARY, 0, 1);
 			if (filesfrom_fd < 0) {
 				snprintf(err_buf, sizeof err_buf,
 					"failed to open files-from file %s: %s\n",
@@ -3019,7 +3015,7 @@ void server_options(char **args, int *argc_p)
 			args[ac++] = "--super";
 		if (size_only)
 			args[ac++] = "--size-only";
-		if (do_stats)
+		if (vfs_stats)
 			args[ac++] = "--stats";
 	} else {
 		if (skip_compress)
