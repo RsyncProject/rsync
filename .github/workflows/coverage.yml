@@ -17,6 +17,7 @@ permissions:
 jobs:
   coverage:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     name: gcov coverage
     steps:
     - uses: actions/checkout@v4
