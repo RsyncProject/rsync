@@ -39,6 +39,9 @@ on:
   schedule:
     - cron: '52 8 * * 1'
 
+permissions:
+  contents: read
+
 jobs:
   version-mix:
     runs-on: ubuntu-latest
