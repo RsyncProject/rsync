@@ -20,8 +20,20 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
-    name: Test rsync on Ubuntu
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            name: Test rsync on Ubuntu latest
+            artifact: ubuntu-bin
+            nonroot: true
+          - runner: ubuntu-22.04
+            name: Test rsync on Ubuntu 22.04
+            artifact: ubuntu-22.04-bin
+            nonroot: false
+    runs-on: ${{ matrix.runner }}
+    name: ${{ matrix.name }}
     steps:
     - uses: actions/checkout@v4
       with:
@@ -51,6 +63,7 @@ jobs:
       # is env-dependent here (chroot-acl), so leave RSYNC_EXPECT_SKIPPED unset.
       run: sudo ./runtests.py --rsync-bin="$PWD/rsync" --use-tcp -j 8
     - name: check (non-root, targeted)
+      if: matrix.nonroot
       # Every run above is root (sudo), so privilege-sensitive tests never hit
       # their non-root path. Run those here as the unprivileged 'runner' user
       # (NO sudo). Explicit test names make runtests.py full_run False, so
@@ -72,7 +85,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         retention-days: 45
-        name: ubuntu-bin
+        name: ${{ matrix.artifact }}
         path: |
           rsync
           rsync-ssl

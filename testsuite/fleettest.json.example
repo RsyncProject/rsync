@@ -91,10 +91,10 @@
       ]
     },
     {
-      "_comment": "Ubuntu 18.04 older-LTS backport coverage on a root@ box; no 18.04 runner image exists so it mirrors the 22.04 workflow.",
+      "_comment": "Ubuntu 18.04 older-LTS backport coverage on a root@ box; no 18.04 runner image exists so it mirrors the 22.04 matrix lane.",
       "name": "ubuntu-1804",
       "ssh_host": "root@ubuntu-1804",
-      "workflow": "ubuntu-22.04-build.yml",
+      "workflow": "ubuntu-build.yml",
       "_python_comment": "18.04's default python3 is 3.6, but runtests.py uses subprocess capture_output (3.7+); run the suite under the 3.10 that's also installed.",
       "python": "python3.10",
       "_configure_flags_comment": "18.04's libzstd 1.3.3 lacks ZSTD_minCLevel (configure aborts), so disable zstd; also disable lz4 so the default -z compressor is zlib -- with lz4 as the default, compress-options' --compress-level=9 check fails since lz4 has no levels. xxhash is fine.",
@@ -110,10 +110,10 @@
       ]
     },
     {
-      "_comment": "Ubuntu 20.04 older-LTS backport coverage on a root@ box; no 20.04 runner image exists so it mirrors the 22.04 workflow.",
+      "_comment": "Ubuntu 20.04 older-LTS backport coverage on a root@ box; no 20.04 runner image exists so it mirrors the 22.04 matrix lane.",
       "name": "ubuntu-2004",
       "ssh_host": "root@ubuntu-2004",
-      "workflow": "ubuntu-22.04-build.yml",
+      "workflow": "ubuntu-build.yml",
       "configure_flags": [
         "--with-rrsync"
       ],
@@ -126,7 +126,7 @@
       "_comment": "Builds unprivileged (like a CI runner) and runs the suite via sudo; the nonroot pass reruns the privilege-sensitive tests as the ssh user. protocols: [30, 29] runs the check30/check29 passes on this NO-xattrat kernel: the CI's proto-29 step runs here, but the only other proto-29 fleet box (ubuntu-2604) is xattrat, so without this the (no-xattrat x proto-29) cell is uncovered.",
       "name": "ubuntu-2204",
       "ssh_host": "runner@ubuntu-2204",
-      "workflow": "ubuntu-22.04-build.yml",
+      "workflow": "ubuntu-build.yml",
       "privilege": "sudo",
       "nonroot": true,
       "protocols": [
