@@ -26,7 +26,17 @@ jobs:
       with:
         fetch-depth: 0
     - name: cygwin
-      run: choco install -y --no-progress cygwin cyg-get
+      run: |
+        for ($attempt = 1; $attempt -le 3; $attempt++) {
+          choco install -y --no-progress cygwin cyg-get
+          if ($LASTEXITCODE -eq 0) {
+            break
+          }
+          if ($attempt -eq 3) {
+            exit $LASTEXITCODE
+          }
+          Start-Sleep -Seconds (15 * $attempt)
+        }
     - name: prep
       run: |
         cyg-get make autoconf automake gcc-core attr libattr-devel python39 python39-pip libzstd-devel liblz4-devel libssl-devel libxxhash0 libxxhash-devel
