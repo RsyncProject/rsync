@@ -143,12 +143,17 @@ static const char *confinement_root(unsigned int *lenp)
 	return confine_root;
 }
 
-/* Split the "/proc/<self|pid>/fd" prefix off `p`, returning the tail -- "" for
- * the pin directory itself, otherwise a string starting with '/'.  NULL when `p`
- * is not in the fd-pin namespace at all. */
+/* Split a recognised fd-pin prefix off `p`, returning the tail -- "" for the
+ * pin directory itself, otherwise a string starting with '/'.  NULL when `p`
+ * is not in an fd-pin namespace. */
 static const char *fd_pin_tail(const char *p)
 {
 	const char *s;
+
+	if (strncmp(p, "/dev/fd", 7) == 0) {
+		s = p + 7;
+		return (*s == '\0' || *s == '/') ? s : NULL;
+	}
 
 	if (strncmp(p, "/proc/", 6) != 0)
 		return NULL;
@@ -168,8 +173,8 @@ static const char *fd_pin_tail(const char *p)
 	return (*s == '\0' || *s == '/') ? s : NULL;
 }
 
-/* An EXACT pin entry, "/proc/self/fd/7" -- the one spelling whose target is what
- * confinement must judge.  rrsync also writes a pinned parent as
+/* An EXACT pin entry, such as "/proc/self/fd/7" or "/dev/fd/7", whose target is
+ * what confinement must judge.  rrsync also writes a pinned parent as
  * ".../fd/7/<leaf>", but the walk resolves the magic link itself and checks the
  * components past it, so only the bare entry is resolved here.  Requiring all
  * digits keeps a planted name like ".../fd/outside-secret" out. */
@@ -406,9 +411,14 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 		}
 
 		if (S_ISLNK(lst.st_mode)) {
-			/* Symlink: untrusted owner is refused; trusted owner
-			 * is followed via readlinkat + splice. */
-			if (lst.st_uid != 0 && lst.st_uid != trusted_uid) {
+			/* Symlink: untrusted owner is refused; trusted owner is followed
+			 * via readlinkat + splice.  In a user namespace the /proc/self and
+			 * /dev/fd symlinks may report the overflow uid, so
+			 * allow those exact components while traversing a recognised pin. */
+			int namespace_pin = pin_transit
+				&& ((strcmp(abspath, "/proc") == 0 && strcmp(comp, "self") == 0)
+				 || (strcmp(abspath, "/dev") == 0 && strcmp(comp, "fd") == 0));
+			if (!namespace_pin && lst.st_uid != 0 && lst.st_uid != trusted_uid) {
 				saved_errno = ELOOP;
 				goto out;
 			}
