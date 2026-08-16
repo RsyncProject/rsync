@@ -49,11 +49,17 @@ if not _chown_5001(workdir / 'dst'):
     if not os.environ.get('RSYNC_UNSHARED'):
         unshare = shutil.which('unshare')
         if unshare is not None:
-            probe = subprocess.run(
-                [unshare, '--user', '--map-root-user',
-                 '--map-users', '5001:100000:1', 'true'],
-                capture_output=True,
-            )
+            try:
+                probe = subprocess.run(
+                    [unshare, '--user', '--map-root-user',
+                     '--map-users', '5001:100000:1', 'true'],
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=5,
+                )
+            except subprocess.TimeoutExpired:
+                test_skipped("Can't chown (unshare probe timed out)")
             if probe.returncode == 0:
                 print("Re-running under unshare with UID mapping...")
                 env = os.environ.copy()
