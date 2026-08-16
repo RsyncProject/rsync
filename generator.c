@@ -2527,8 +2527,6 @@ int atomic_create(struct file_struct *file, char *fname, const char *slnk, const
 	if (!skip_atomic) {
 		if (gen_entry_rename(tmpname, fname, file) < 0) {
 			char *full_tmpname = strdup(full_fname(tmpname));
-			if (full_tmpname == NULL)
-				out_of_memory("atomic_create");
 			rsyserr(FERROR_XFER, errno, "rename %s -> \"%s\" failed",
 				full_tmpname, full_fname(fname));
 			free(full_tmpname);
