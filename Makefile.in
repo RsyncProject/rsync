@@ -116,7 +116,8 @@ install-ssl-daemon: stunnel-rsyncd.conf
 
 install-all: install install-ssl-daemon
 
-install-strip: install
+install-strip:
+	$(MAKE) install
 	$(STRIP) $(DESTDIR)$(bindir)/rsync$(EXEEXT)
 
 .PHONY: uninstall
