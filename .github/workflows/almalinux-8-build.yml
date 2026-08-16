@@ -1,5 +1,9 @@
 name: Test rsync on AlmaLinux 8
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 # Older-LTS coverage on the Fedora/RHEL family to help with backporting
 # security fixes. AlmaLinux 8 is the RHEL 8 rebuild and is the oldest
 # active LTS in this family (RHEL 8 full support runs to 2029).
@@ -13,7 +17,7 @@ on:
       - '.github/workflows/*.yml'
       - '!.github/workflows/almalinux-8-build.yml'
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened]
     paths-ignore:
       - '.github/workflows/*.yml'
       - '!.github/workflows/almalinux-8-build.yml'
@@ -22,9 +26,6 @@ on:
 
 jobs:
   test:
-    # temporary gate: PR CI runs only for PRs labeled 'run-ci', to save CI
-    # minutes; labels need triage access, so fork PRs can't self-enable.
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'run-ci')
     runs-on: ubuntu-latest
     container:
       image: almalinux:8

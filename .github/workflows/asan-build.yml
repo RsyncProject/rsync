@@ -1,5 +1,9 @@
 name: rsync ASan+UBSan (clang)
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [ master ]
@@ -7,7 +11,7 @@ on:
       - '.github/workflows/*.yml'
       - '!.github/workflows/asan-build.yml'
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened]
     paths-ignore:
       - '.github/workflows/*.yml'
       - '!.github/workflows/asan-build.yml'
@@ -21,9 +25,6 @@ on:
 
 jobs:
   asan:
-    # temporary gate: PR CI runs only for PRs labeled 'run-ci', to save CI
-    # minutes; labels need triage access, so fork PRs can't self-enable.
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'run-ci')
     runs-on: ubuntu-latest
     name: rsync ASan+UBSan (clang)
     env:

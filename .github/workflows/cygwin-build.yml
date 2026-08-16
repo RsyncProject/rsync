@@ -1,5 +1,9 @@
 name: Test rsync on Cygwin
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [ master ]
@@ -7,7 +11,7 @@ on:
       - '.github/workflows/*.yml'
       - '!.github/workflows/cygwin-build.yml'
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened]
     paths-ignore:
       - '.github/workflows/*.yml'
       - '!.github/workflows/cygwin-build.yml'
@@ -16,9 +20,6 @@ on:
 
 jobs:
   test:
-    # temporary gate: PR CI runs only for PRs labeled 'run-ci', to save CI
-    # minutes; labels need triage access, so fork PRs can't self-enable.
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'run-ci')
     runs-on: windows-2022
     name: Test rsync on Cygwin
     steps:
@@ -26,11 +27,49 @@ jobs:
       with:
         fetch-depth: 0
     - name: cygwin
-      run: choco install -y --no-progress cygwin cyg-get
-    - name: prep
       run: |
-        cyg-get make autoconf automake gcc-core attr libattr-devel python39 python39-pip libzstd-devel liblz4-devel libssl-devel libxxhash0 libxxhash-devel
-        echo "C:/tools/cygwin/bin" >>$Env:GITHUB_PATH
+        $setup = Join-Path $Env:RUNNER_TEMP 'setup-x86_64.exe'
+        $sums = Join-Path $Env:RUNNER_TEMP 'cygwin-sha512.sum'
+        $packages = 'make,autoconf,automake,gcc-core,attr,libattr-devel,python39,python39-pip,libzstd-devel,liblz4-devel,libssl-devel,libxxhash0,libxxhash-devel'
+
+        Invoke-WebRequest https://cygwin.com/setup-x86_64.exe -OutFile $setup
+        Invoke-WebRequest https://cygwin.com/sha512.sum -OutFile $sums
+
+        $sum = Select-String -LiteralPath $sums -Pattern '^[0-9a-fA-F]{128}\s+\*?setup-x86_64\.exe$' | Select-Object -First 1
+        if (-not $sum) {
+          throw 'setup-x86_64.exe is missing from Cygwin sha512.sum'
+        }
+        $expected = ($sum.Line -split '\s+')[0]
+        $actual = (Get-FileHash -LiteralPath $setup -Algorithm SHA512).Hash
+        if ($actual -ine $expected) {
+          throw 'Cygwin setup SHA-512 mismatch'
+        }
+
+        $arguments = @(
+          '--quiet-mode',
+          '--no-desktop',
+          '--no-startmenu',
+          '--no-shortcuts',
+          '--root', 'C:\tools\cygwin',
+          '--local-package-dir', (Join-Path $Env:RUNNER_TEMP 'cygwin-packages'),
+          '--site', 'https://mirrors.kernel.org/sourceware/cygwin/',
+          '--packages', $packages
+        )
+        $install = Start-Process -FilePath $setup -ArgumentList $arguments -Wait -PassThru -NoNewWindow
+        if ($install.ExitCode -ne 0) {
+          exit $install.ExitCode
+        }
+
+        $bash = 'C:\tools\cygwin\bin\bash.exe'
+        if (-not (Test-Path -LiteralPath $bash)) {
+          throw 'Cygwin setup did not install bash'
+        }
+        & $bash -lc 'command -v make aclocal gcc python3 >/dev/null'
+        if ($LASTEXITCODE -ne 0) {
+          throw 'Cygwin setup did not install all required build tools'
+        }
+
+        echo 'C:/tools/cygwin/bin' >>$Env:GITHUB_PATH
     - name: commonmark
       run: bash -c 'python3 -mpip install --user commonmark'
     - name: configure

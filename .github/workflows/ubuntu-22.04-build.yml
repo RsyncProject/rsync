@@ -1,5 +1,9 @@
 name: Test rsync on Ubuntu 22.04
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 # Older-LTS coverage to help with backporting security fixes. ubuntu-22.04
 # is currently the oldest GitHub Actions runner image (20.04 was retired
 # in April 2025).
@@ -11,7 +15,7 @@ on:
       - '.github/workflows/*.yml'
       - '!.github/workflows/ubuntu-22.04-build.yml'
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened]
     paths-ignore:
       - '.github/workflows/*.yml'
       - '!.github/workflows/ubuntu-22.04-build.yml'
@@ -20,9 +24,6 @@ on:
 
 jobs:
   test:
-    # temporary gate: PR CI runs only for PRs labeled 'run-ci', to save CI
-    # minutes; labels need triage access, so fork PRs can't self-enable.
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'run-ci')
     runs-on: ubuntu-22.04
     name: Test rsync on Ubuntu 22.04
     steps:
