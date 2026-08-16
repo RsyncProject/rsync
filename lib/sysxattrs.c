@@ -45,14 +45,29 @@ int sys_lsetxattr(const char *path, const char *name, const void *value, size_t 
 	return lsetxattr(path, name, value, size, 0);
 }
 
+int sys_fsetxattr(int filedes, const char *name, const void *value, size_t size)
+{
+	return fsetxattr(filedes, name, value, size, 0);
+}
+
 int sys_lremovexattr(const char *path, const char *name)
 {
 	return lremovexattr(path, name);
 }
 
+int sys_fremovexattr(int filedes, const char *name)
+{
+	return fremovexattr(filedes, name);
+}
+
 ssize_t sys_llistxattr(const char *path, char *list, size_t size)
 {
 	return llistxattr(path, list, size);
+}
+
+ssize_t sys_flistxattr(int filedes, char *list, size_t size)
+{
+	return flistxattr(filedes, list, size);
 }
 
 #elif HAVE_OSX_XATTRS
@@ -89,14 +104,29 @@ int sys_lsetxattr(const char *path, const char *name, const void *value, size_t 
 	return setxattr(path, name, value, size, 0, XATTR_NOFOLLOW);
 }
 
+int sys_fsetxattr(int filedes, const char *name, const void *value, size_t size)
+{
+	return fsetxattr(filedes, name, value, size, 0, 0);
+}
+
 int sys_lremovexattr(const char *path, const char *name)
 {
 	return removexattr(path, name, XATTR_NOFOLLOW);
 }
 
+int sys_fremovexattr(int filedes, const char *name)
+{
+	return fremovexattr(filedes, name, 0);
+}
+
 ssize_t sys_llistxattr(const char *path, char *list, size_t size)
 {
 	return listxattr(path, list, size, XATTR_NOFOLLOW);
+}
+
+ssize_t sys_flistxattr(int filedes, char *list, size_t size)
+{
+	return flistxattr(filedes, list, size, 0);
 }
 
 #elif HAVE_FREEBSD_XATTRS
@@ -116,32 +146,42 @@ int sys_lsetxattr(const char *path, const char *name, const void *value, size_t 
 	return extattr_set_link(path, EXTATTR_NAMESPACE_USER, name, value, size);
 }
 
+int sys_fsetxattr(int filedes, const char *name, const void *value, size_t size)
+{
+	return extattr_set_fd(filedes, EXTATTR_NAMESPACE_USER, name, value, size);
+}
+
 int sys_lremovexattr(const char *path, const char *name)
 {
 	return extattr_delete_link(path, EXTATTR_NAMESPACE_USER, name);
 }
 
-ssize_t sys_llistxattr(const char *path, char *list, size_t size)
+int sys_fremovexattr(int filedes, const char *name)
+{
+	return extattr_delete_fd(filedes, EXTATTR_NAMESPACE_USER, name);
+}
+
+/* Turn the FreeBSD extattr_list_xx() output (a single length byte before each
+ * name, no '\0' terminator) into the series of null-terminated strings that the
+ * rest of rsync expects.  Since the size is unchanged, transform in place.
+ * Shared by the path and fd list variants. */
+static ssize_t freebsd_list_finish(char *list, size_t size, ssize_t len)
 {
 	unsigned char keylen;
-	ssize_t off, len = extattr_list_link(path, EXTATTR_NAMESPACE_USER, list, size);
+	ssize_t off;
 
 	if (len <= 0 || size == 0)
 		return len;
 
 	if ((size_t)len >= size) {
-		/* FreeBSD extattr_list_xx() returns 'size' as 'len' in case there are                                                              
-                   more data available, truncating the output, we solve this by signalling                                                          
-                   ERANGE in case len == size so that the code in xattrs.c will retry with                                                          
-                   a bigger buffer */
+		/* FreeBSD extattr_list_xx() returns 'size' as 'len' in case there are
+		   more data available, truncating the output, we solve this by signalling
+		   ERANGE in case len == size so that the code in xattrs.c will retry with
+		   a bigger buffer */
 		errno = ERANGE;
 		return -1;
 	}
 
-	/* FreeBSD puts a single-byte length before each string, with no '\0'
-	 * terminator.  We need to change this into a series of null-terminted
-	 * strings.  Since the size is the same, we can simply transform the
-	 * output in place. */
 	for (off = 0; off < len; off += keylen + 1) {
 		keylen = ((unsigned char*)list)[off];
 		if (off + keylen >= len) {
@@ -154,6 +194,18 @@ ssize_t sys_llistxattr(const char *path, char *list, size_t size)
 	}
 
 	return len;
+}
+
+ssize_t sys_llistxattr(const char *path, char *list, size_t size)
+{
+	return freebsd_list_finish(list, size,
+		extattr_list_link(path, EXTATTR_NAMESPACE_USER, list, size));
+}
+
+ssize_t sys_flistxattr(int filedes, char *list, size_t size)
+{
+	return freebsd_list_finish(list, size,
+		extattr_list_fd(filedes, EXTATTR_NAMESPACE_USER, list, size));
 }
 
 #elif HAVE_SOLARIS_XATTRS
@@ -217,29 +269,59 @@ ssize_t sys_fgetxattr(int filedes, const char *name, void *value, size_t size)
 	return read_xattr(attrfd, value, size);
 }
 
+/* Write a datum to the already-opened attribute fd, closing it.  Shared by the
+ * path- and fd-keyed setters below. */
+static int write_xattr(int attrfd, const void *value, size_t size)
+{
+	size_t bufpos;
+	int ret = 0, saved_errno = 0;
+
+	for (bufpos = 0; bufpos < size; ) {
+		ssize_t cnt = write(attrfd, (const char *)value + bufpos, size - bufpos);
+		if (cnt < 0) {
+			if (errno == EINTR)
+				continue;
+			ret = -1;
+			saved_errno = errno;
+			break;
+		}
+		if (cnt == 0) {
+			ret = -1;
+			saved_errno = EIO;
+			break;
+		}
+		bufpos += cnt;
+	}
+
+	/* Don't let close() clobber the write error; do report a close() failure. */
+	if (close(attrfd) < 0 && ret == 0)
+		return -1;
+	if (ret < 0 && saved_errno)
+		errno = saved_errno;
+
+	return ret;
+}
+
 int sys_lsetxattr(const char *path, const char *name, const void *value, size_t size)
 {
 	int attrfd;
-	size_t bufpos;
 	mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
 
 	if ((attrfd = attropen(path, name, O_CREAT|O_TRUNC|O_WRONLY, mode)) < 0)
 		return -1;
 
-	for (bufpos = 0; bufpos < size; ) {
-		ssize_t cnt = write(attrfd, (char*)value + bufpos, size - bufpos);
-		if (cnt <= 0) {
-			if (cnt < 0 && errno == EINTR)
-				continue;
-			close(attrfd);
-			return -1;
-		}
-		bufpos += cnt;
-	}
+	return write_xattr(attrfd, value, size);
+}
 
-	close(attrfd);
+int sys_fsetxattr(int filedes, const char *name, const void *value, size_t size)
+{
+	int attrfd;
+	mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
 
-	return 0;
+	if ((attrfd = openat(filedes, name, O_CREAT|O_TRUNC|O_WRONLY|O_XATTR, mode)) < 0)
+		return -1;
+
+	return write_xattr(attrfd, value, size);
 }
 
 int sys_lremovexattr(const char *path, const char *name)
@@ -257,17 +339,28 @@ int sys_lremovexattr(const char *path, const char *name)
 	return ret;
 }
 
-ssize_t sys_llistxattr(const char *path, char *list, size_t size)
+int sys_fremovexattr(int filedes, const char *name)
 {
 	int attrdirfd;
+	int ret;
+
+	if ((attrdirfd = openat(filedes, ".", O_RDONLY|O_XATTR, 0)) < 0)
+		return -1;
+
+	ret = unlinkat(attrdirfd, name, 0);
+
+	close(attrdirfd);
+
+	return ret;
+}
+
+/* List the names in an already-opened attribute-dir fd, consuming it.  Shared
+ * by the path- and fd-keyed listers below. */
+static ssize_t list_xattr(int attrdirfd, char *list, size_t size)
+{
 	DIR *dirp;
 	struct dirent *dp;
 	ssize_t ret = 0;
-
-	if ((attrdirfd = attropen(path, ".", O_RDONLY)) < 0) {
-		errno = ENOTSUP;
-		return -1;
-	}
 
 	if ((dirp = fdopendir(attrdirfd)) == NULL) {
 		close(attrdirfd);
@@ -296,9 +389,32 @@ ssize_t sys_llistxattr(const char *path, char *list, size_t size)
 	}
 
 	closedir(dirp);
-	close(attrdirfd);
 
 	return ret;
+}
+
+ssize_t sys_llistxattr(const char *path, char *list, size_t size)
+{
+	int attrdirfd;
+
+	if ((attrdirfd = attropen(path, ".", O_RDONLY)) < 0) {
+		errno = ENOTSUP;
+		return -1;
+	}
+
+	return list_xattr(attrdirfd, list, size);
+}
+
+ssize_t sys_flistxattr(int filedes, char *list, size_t size)
+{
+	int attrdirfd;
+
+	if ((attrdirfd = openat(filedes, ".", O_RDONLY|O_XATTR, 0)) < 0) {
+		errno = ENOTSUP;
+		return -1;
+	}
+
+	return list_xattr(attrdirfd, list, size);
 }
 
 #else

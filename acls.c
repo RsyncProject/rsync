@@ -21,6 +21,10 @@
 
 #include "rsync.h"
 #include "lib/sysacls.h"
+#include "lib/acl.h"
+#ifdef HAVE_LIBACL_AT
+#include <fcntl.h>	/* AT_EMPTY_PATH / AT_SYMLINK_NOFOLLOW */
+#endif
 
 #ifdef SUPPORT_ACLS
 
@@ -469,10 +473,128 @@ static int find_matching_rsync_acl(const rsync_acl *racl, SMB_ACL_TYPE_T type,
 	return *match;
 }
 
-static int get_rsync_acl(const char *fname, rsync_acl *racl,
-			 SMB_ACL_TYPE_T type, mode_t mode)
+/* These two bridge lib/acl.c's neutral (tag,perm,id) entry array; with
+ * HAVE_LIBACL_AT the libacl *_at path uses unpack_smb_acl/pack_smb_acl directly,
+ * so they are unused there. */
+#if defined(SUPPORT_ACL_FD) && !defined(HAVE_LIBACL_AT)
+/* Convert a packed system ACL into the neutral (tag,perm,id) entry array that
+ * lib/acl.c serializes.  Reuses pack_smb_acl()+change_sacl_perms() output so
+ * the bytes we write match exactly what acl_set_file() would have written.
+ * Returns the entry count and a malloc'd array in *ents_p, or -1 on error. */
+static int sacl_to_entries(SMB_ACL_T sacl, rsync_acl_ent **ents_p)
+{
+	static item_list ent_list = EMPTY_ITEM_LIST;
+	SMB_ACL_ENTRY_T entry;
+	rsync_acl_ent *out;
+	int rc;
+
+	ent_list.count = 0;
+	for (rc = sys_acl_get_entry(sacl, SMB_ACL_FIRST_ENTRY, &entry); rc == 1;
+	     rc = sys_acl_get_entry(sacl, SMB_ACL_NEXT_ENTRY, &entry)) {
+		SMB_ACL_TAG_T tag_type;
+		uint32 access;
+		id_t g_u_id;
+		rsync_acl_ent *e;
+		uint16_t tag;
+
+		if ((rc = sys_acl_get_info(entry, &tag_type, &access, &g_u_id)) != 0)
+			break;
+		switch (tag_type) {
+		case SMB_ACL_USER_OBJ: tag = RACL_USER_OBJ; break;
+		case SMB_ACL_USER: tag = RACL_USER; break;
+		case SMB_ACL_GROUP_OBJ: tag = RACL_GROUP_OBJ; break;
+		case SMB_ACL_GROUP: tag = RACL_GROUP; break;
+		case SMB_ACL_MASK: tag = RACL_MASK; break;
+		case SMB_ACL_OTHER: tag = RACL_OTHER; break;
+		default: continue; /* skip an unrecognized tag */
+		}
+		e = EXPAND_ITEM_LIST(&ent_list, rsync_acl_ent, -10);
+		e->tag = tag;
+		e->perm = access & 7;
+		e->id = (tag == RACL_USER || tag == RACL_GROUP) ? (uint32_t)g_u_id : RACL_UNDEFINED_ID;
+	}
+	if (rc) {
+		rsyserr(FERROR_XFER, errno, "sacl_to_entries: sys_acl_get_entry/info()");
+		return -1;
+	}
+
+	out = new_array(rsync_acl_ent, ent_list.count ? ent_list.count : 1);
+	if (ent_list.count)
+		memcpy(out, ent_list.items, ent_list.count * sizeof (rsync_acl_ent));
+	*ents_p = out;
+	return ent_list.count;
+}
+
+/* Unpack a neutral entry array (from lib/acl.c) into an rsync_acl, mirroring
+ * unpack_smb_acl()'s tag handling. */
+static BOOL unpack_acl_entries(const rsync_acl_ent *ents, int n, rsync_acl *racl)
+{
+	static item_list temp_ida_list = EMPTY_ITEM_LIST;
+	int i;
+
+	temp_ida_list.count = 0;
+	for (i = 0; i < n; i++) {
+		uint32 access = ents[i].perm & 7;
+		id_access *ida;
+
+		switch (ents[i].tag) {
+		case RACL_USER_OBJ:
+			if (racl->user_obj == NO_ENTRY)
+				racl->user_obj = access;
+			continue;
+		case RACL_GROUP_OBJ:
+			if (racl->group_obj == NO_ENTRY)
+				racl->group_obj = access;
+			continue;
+		case RACL_MASK:
+			if (racl->mask_obj == NO_ENTRY)
+				racl->mask_obj = access;
+			continue;
+		case RACL_OTHER:
+			if (racl->other_obj == NO_ENTRY)
+				racl->other_obj = access;
+			continue;
+		case RACL_USER:
+			access |= NAME_IS_USER;
+			break;
+		case RACL_GROUP:
+			break;
+		default:
+			continue;
+		}
+		ida = EXPAND_ITEM_LIST(&temp_ida_list, id_access, -10);
+		ida->id = ents[i].id;
+		ida->access = access;
+	}
+
+	if (temp_ida_list.count) {
+#ifdef SMB_ACL_NEED_SORT
+		if (temp_ida_list.count > 1)
+			qsort(temp_ida_list.items, temp_ida_list.count, sizeof (id_access), id_access_sorter);
+#endif
+		racl->names.idas = new_array(id_access, temp_ida_list.count);
+		memcpy(racl->names.idas, temp_ida_list.items, temp_ida_list.count * sizeof (id_access));
+	} else
+		racl->names.idas = NULL;
+	racl->names.count = temp_ida_list.count;
+	temp_ida_list.count = 0;
+
+	return True;
+}
+#endif /* SUPPORT_ACL_FD */
+
+static int get_rsync_acl(int fd, int dirfd, const char *leaf, const char *fname,
+			 rsync_acl *racl, SMB_ACL_TYPE_T type, mode_t mode)
 {
 	SMB_ACL_T sacl;
+
+#ifndef SUPPORT_ACL_FD
+#ifndef HAVE_SOLARIS_ACLS
+	(void)fd; /* Solaris drives the ACL via facl(2) on fd but has no SUPPORT_ACL_FD. */
+#endif
+	(void)dirfd;
+	(void)leaf;
+#endif
 
 #ifdef SUPPORT_XATTRS
 	/* --fake-super support: load ACLs from an xattr. */
@@ -481,7 +603,7 @@ static int get_rsync_acl(const char *fname, rsync_acl *racl,
 		size_t len;
 		int cnt;
 
-		if ((buf = get_xattr_acl(fname, type == SMB_ACL_TYPE_ACCESS, &len)) == NULL)
+		if ((buf = get_xattr_acl(fname, fd, type == SMB_ACL_TYPE_ACCESS, &len)) == NULL)
 			return 0;
 		cnt = (len - 4*4) / (4+4);
 		if (len < 4*4 || len != (size_t)cnt*(4+4) + 4*4) {
@@ -514,6 +636,107 @@ static int get_rsync_acl(const char *fname, rsync_acl *racl,
 	}
 #endif
 
+#ifdef HAVE_SOLARIS_ACLS
+	/* Solaris has no libacl *_at; read the ACL through the held fd via facl(2)
+	 * when we have one.  With no held fd this branch is skipped and the path-based
+	 * call below reads the ACL (acceptable: a read can't redirect a write out of
+	 * the tree). */
+	if (fd >= 0) {
+		if ((sacl = sys_acl_get_fd_type(fd, type)) != 0) {
+			BOOL ok = unpack_smb_acl(sacl, racl);
+
+			sys_acl_free_acl(sacl);
+			if (!ok) {
+				rsyserr(FERROR_XFER, errno, "get_acl: unpack_smb_acl(%s)", fname);
+				return -1;
+			}
+			return 0;
+		}
+		if (no_acl_syscall_error(errno)) {
+			if (type == SMB_ACL_TYPE_ACCESS)
+				rsync_acl_fake_perms(racl, mode);
+			return 0;
+		}
+		rsyserr(FERROR_XFER, errno, "get_acl: sys_acl_get_fd_type(%s, %s)",
+			fname, str_acl_type(type));
+		return -1;
+	}
+#endif
+
+#ifdef SUPPORT_ACL_FD
+#ifdef HAVE_LIBACL_AT
+	/* Read the ACL via the new libacl *_at calls; fd<0 && dirfd<0
+	 * (e.g. a synthetic dir) falls through to the path-based call below. */
+	if (fd >= 0 || dirfd >= 0) {
+		if (fd >= 0)
+			sacl = sys_acl_get_file_at(fd, "", AT_EMPTY_PATH, type);
+		else
+			sacl = sys_acl_get_file_at(dirfd, leaf, AT_SYMLINK_NOFOLLOW, type);
+		if (sacl != 0) {
+			BOOL ok = unpack_smb_acl(sacl, racl);
+			sys_acl_free_acl(sacl);
+			if (!ok) {
+				rsyserr(FERROR_XFER, errno, "get_acl: unpack_smb_acl(%s)", fname);
+				return -1;
+			}
+			return 0;
+		}
+		if (no_acl_syscall_error(errno)) {
+			if (type == SMB_ACL_TYPE_ACCESS)
+				rsync_acl_fake_perms(racl, mode);
+			return 0;
+		}
+		rsyserr(FERROR_XFER, errno, "get_acl: acl_get_file_at(%s, %s)",
+			fname, str_acl_type(type));
+		return -1;
+	}
+#else
+	/* Race-safe path: read the ACL through the held O_NOFOLLOW fd, or via
+	 * setxattrat(AT_SYMLINK_NOFOLLOW) on dirfd+leaf, instead of re-resolving
+	 * fname.  Only for real-root ACLs (am_root >= 0; the fake-super branch
+	 * above already returned). */
+	if (fd >= 0 || (dirfd >= 0 && xacl_at_available())) {
+		int is_def = type == SMB_ACL_TYPE_DEFAULT;
+		rsync_acl_ent *ents = NULL;
+		int n = 0, rc;
+
+		if (fd >= 0)
+			rc = xacl_get_fd(fd, is_def, &ents, &n);
+		else
+			rc = xacl_get_at(dirfd, leaf, is_def, &ents, &n);
+		if (rc < 0) {
+			if (no_acl_syscall_error(errno)) {
+				if (type == SMB_ACL_TYPE_ACCESS)
+					rsync_acl_fake_perms(racl, mode);
+				return 0;
+			}
+			rsyserr(FERROR_XFER, errno, "get_acl: xacl_get(%s, %s)",
+				fname, str_acl_type(type));
+			return -1;
+		}
+		if (n == 0) {
+			/* No explicit ACL: mirror libacl's mode-derived access ACL
+			 * (an absent default ACL stays empty). */
+			if (type == SMB_ACL_TYPE_ACCESS)
+				rsync_acl_fake_perms(racl, mode);
+		} else if (!unpack_acl_entries(ents, n, racl)) {
+			if (ents)
+				free(ents);
+			rsyserr(FERROR_XFER, errno, "get_acl: unpack_acl_entries(%s)", fname);
+			return -1;
+		}
+		if (ents)
+			free(ents);
+		return 0;
+	}
+	/* Neither a held fd nor a usable dirfd path (xacl_at_available() covers the
+	 * *xattrat syscalls AND the pre-6.13 /proc/self/fd compat, so this is the
+	 * BSDs / a /proc-less namespace / an un-pinnable entry): read the real
+	 * destination ACL via the path-based call rather than a mode-only fake, so
+	 * --acls stays functional where the race-safe primitive is unavailable. */
+#endif /* HAVE_LIBACL_AT */
+#endif
+
 	if ((sacl = sys_acl_get_file(fname, type)) != 0) {
 		BOOL ok = unpack_smb_acl(sacl, racl);
 
@@ -535,8 +758,10 @@ static int get_rsync_acl(const char *fname, rsync_acl *racl,
 	return 0;
 }
 
-/* Return the Access Control List for the given filename. */
-int get_acl(const char *fname, stat_x *sxp)
+/* Return the Access Control List for the given filename.  When a held
+ * O_NOFOLLOW fd (or a dirfd+leaf) is available, the ACL is read race-safely
+ * through it; otherwise (fd < 0 && dirfd < 0) the path-based fallback is used. */
+int get_acl_fdat(int fd, int dirfd, const char *leaf, const char *fname, stat_x *sxp)
 {
 	sxp->acc_acl = create_racl();
 
@@ -557,7 +782,7 @@ int get_acl(const char *fname, stat_x *sxp)
 	} else if (IS_MISSING_FILE(sxp->st))
 		return 0;
 
-	if (get_rsync_acl(fname, sxp->acc_acl, SMB_ACL_TYPE_ACCESS,
+	if (get_rsync_acl(fd, dirfd, leaf, fname, sxp->acc_acl, SMB_ACL_TYPE_ACCESS,
 			  sxp->st.st_mode) < 0) {
 		free_acl(sxp);
 		return -1;
@@ -565,7 +790,7 @@ int get_acl(const char *fname, stat_x *sxp)
 
 	if (S_ISDIR(sxp->st.st_mode)) {
 		sxp->def_acl = create_racl();
-		if (get_rsync_acl(fname, sxp->def_acl, SMB_ACL_TYPE_DEFAULT,
+		if (get_rsync_acl(fd, dirfd, leaf, fname, sxp->def_acl, SMB_ACL_TYPE_DEFAULT,
 				  sxp->st.st_mode) < 0) {
 			free_acl(sxp);
 			return -1;
@@ -573,6 +798,11 @@ int get_acl(const char *fname, stat_x *sxp)
 	}
 
 	return 0;
+}
+
+int get_acl(const char *fname, stat_x *sxp)
+{
+	return get_acl_fdat(-1, -1, NULL, fname, sxp);
 }
 
 /* === Send functions === */
@@ -933,17 +1163,60 @@ static mode_t change_sacl_perms(SMB_ACL_T sacl, rsync_acl *racl, mode_t old_mode
 }
 #endif
 
-static int set_rsync_acl(const char *fname, acl_duo *duo_item,
-			 SMB_ACL_TYPE_T type, stat_x *sxp, mode_t mode)
+static int set_rsync_acl(int fd, int dirfd, const char *leaf, const char *fname,
+			 acl_duo *duo_item, SMB_ACL_TYPE_T type, stat_x *sxp, mode_t mode)
 {
+#ifndef SUPPORT_ACL_FD
+#ifndef HAVE_SOLARIS_ACLS
+	(void)fd; /* Solaris drives the ACL via facl(2) on fd but has no SUPPORT_ACL_FD. */
+#endif
+	(void)dirfd;
+	(void)leaf;
+#endif
 	if (type == SMB_ACL_TYPE_DEFAULT
 	 && duo_item->racl.user_obj == NO_ENTRY) {
 		int rc;
 #ifdef SUPPORT_XATTRS
 		/* --fake-super support: delete default ACL from xattrs. */
 		if (am_root < 0)
-			rc = del_def_xattr_acl(fname);
+			rc = del_def_xattr_acl(fd, fname);
 		else
+#endif
+#ifdef SUPPORT_ACL_FD
+#ifdef HAVE_LIBACL_AT
+		/* Race-safe default-ACL delete via the new libacl *_at
+		 * calls (held fd via AT_EMPTY_PATH, dirfd+leaf via AT_SYMLINK_NOFOLLOW)
+		 * -- race-safe on every Linux kernel.  fd<0 && dirfd<0 falls to path. */
+		if (fd >= 0)
+			rc = sys_acl_delete_def_file_at(fd, "", AT_EMPTY_PATH);
+		else if (dirfd >= 0)
+			rc = sys_acl_delete_def_file_at(dirfd, leaf, AT_SYMLINK_NOFOLLOW);
+		else
+#else
+		/* Race-safe default-ACL delete via the held fd or dirfd+leaf.  Where
+		 * neither is available (xacl_at_available() is false -- the BSDs, a
+		 * /proc-less namespace, an un-pinnable entry; every Linux with procfs
+		 * takes the dirfd path via *xattrat or the /proc/self/fd compat) -- fall
+		 * back to the path-based call, preferring the documented --acls behaviour
+		 * over refusing it where the race-safe primitive is unavailable. */
+		if (fd >= 0)
+			rc = xacl_del_default_fd(fd);
+		else if (dirfd >= 0 && xacl_at_available())
+			rc = xacl_del_default_at(dirfd, leaf);
+		else
+#endif /* HAVE_LIBACL_AT */
+#endif
+#ifdef HAVE_SOLARIS_ACLS
+		/* Solaris: delete the default ACL through the held fd via facl(2).  For a
+		 * root receiver a missing held fd means the leaf was raced, so refuse rather
+		 * than let the path-based delete follow it; a plain non-root receiver keeps
+		 * the legacy path fallback (op_pin am_root != 0 rule). */
+		if (fd >= 0)
+			rc = sys_acl_delete_def_fd(fd);
+		else if (secure_relpath_active() && am_root) {
+			errno = ELOOP;
+			rc = -1;
+		} else
 #endif
 			rc = sys_acl_delete_def_file(fname);
 		if (rc < 0) {
@@ -972,7 +1245,7 @@ static int set_rsync_acl(const char *fname, acl_duo *duo_item,
 				SIVAL(bp, 4, ida->access);
 			}
 		}
-		rc = set_xattr_acl(fname, type == SMB_ACL_TYPE_ACCESS, buf, len);
+		rc = set_xattr_acl(fd, fname, type == SMB_ACL_TYPE_ACCESS, buf, len);
 		free(buf);
 		return rc;
 #endif
@@ -988,6 +1261,92 @@ static int set_rsync_acl(const char *fname, acl_duo *duo_item,
 			cur_mode = change_sacl_perms(duo_item->sacl, &duo_item->racl, cur_mode, mode);
 			if (cur_mode == (mode_t)-1)
 				return 0;
+		}
+#endif
+#ifdef SUPPORT_ACL_FD
+#ifdef HAVE_LIBACL_AT
+		/* Apply the packed/perm-reconciled ACL (duo_item->sacl)
+		 * through the new libacl *_at calls -- held fd via AT_EMPTY_PATH,
+		 * dirfd+leaf via AT_SYMLINK_NOFOLLOW -- race-safe on every Linux kernel,
+		 * and byte-identical to the path-based sys_acl_set_file() below. */
+		if (fd >= 0 || dirfd >= 0) {
+			int rc;
+
+			if (fd >= 0)
+				rc = sys_acl_set_file_at(fd, "", AT_EMPTY_PATH, type, duo_item->sacl);
+			else
+				rc = sys_acl_set_file_at(dirfd, leaf, AT_SYMLINK_NOFOLLOW, type, duo_item->sacl);
+			if (rc < 0) {
+				rsyserr(FERROR_XFER, errno, "set_acl: acl_set_file_at(%s, %s)",
+					fname, str_acl_type(type));
+				return -1;
+			}
+			if (type == SMB_ACL_TYPE_ACCESS)
+				sxp->st.st_mode = cur_mode;
+			return 0;
+		}
+#else
+		/* Race-safe write: serialize the packed (and perm-reconciled)
+		 * system ACL to the kernel xattr format and apply it through the
+		 * held fd or dirfd+leaf -- never re-resolving fname.  This matches
+		 * exactly what sys_acl_set_file() would have written. */
+		if (fd >= 0 || (dirfd >= 0 && xacl_at_available())) {
+			int is_def = type == SMB_ACL_TYPE_DEFAULT;
+			rsync_acl_ent *ents;
+			int n = sacl_to_entries(duo_item->sacl, &ents);
+			int rc;
+
+			if (n < 0)
+				return -1;
+			if (fd >= 0)
+				rc = xacl_set_fd(fd, is_def, ents, n);
+			else
+				rc = xacl_set_at(dirfd, leaf, is_def, ents, n);
+			free(ents);
+			if (rc < 0) {
+				rsyserr(FERROR_XFER, errno, "set_acl: xacl_set(%s, %s)",
+					fname, str_acl_type(type));
+				return -1;
+			}
+			if (type == SMB_ACL_TYPE_ACCESS)
+				sxp->st.st_mode = cur_mode;
+			return 0;
+		}
+		/* No held fd and no usable dirfd path (xacl_at_available() is false --
+		 * the BSDs, a /proc-less namespace, an un-pinnable entry; every Linux
+		 * with procfs took xacl_set_at() above via *xattrat or the /proc/self/fd
+		 * compat): prefer the documented --acls behaviour over refusing it and
+		 * fall back to the path-based set.  This re-resolves fname, so it still
+		 * carries the parent-symlink-race exposure on those remaining platforms;
+		 * it is the only way to honour --acls where no race-safe primitive
+		 * exists. */
+#endif /* HAVE_LIBACL_AT */
+#endif
+#ifdef HAVE_SOLARIS_ACLS
+		/* Solaris: apply the ACL through the held fd via facl(2). */
+		if (fd >= 0) {
+			if (sys_acl_set_fd_type(fd, type, duo_item->sacl) < 0) {
+				rsyserr(FERROR_XFER, errno, "set_acl: sys_acl_set_fd_type(%s, %s)",
+					fname, str_acl_type(type));
+				return -1;
+			}
+			if (type == SMB_ACL_TYPE_ACCESS)
+				sxp->st.st_mode = cur_mode;
+			return 0;
+		}
+		if (secure_relpath_active() && am_root) {
+			/* Real root always can open its own freshly-staged reg/dir/fifo leaf,
+			 * so a missing held fd on a confined receiver means the leaf was raced
+			 * to a symlink; sys_acl_set_file() follows the leaf, so refuse rather
+			 * than write the attacker-supplied ACL onto a redirected inode (covers
+			 * the top-level no-slash entry the caller's slashed-path xattr_refuse
+			 * gate misses).  A plain non-root receiver keeps the path-based fallback
+			 * for a legitimately un-pinnable owned leaf (e.g. a 0300 dir), matching
+			 * the operator-path op_pin rule (am_root != 0). */
+			errno = ELOOP;
+			rsyserr(FERROR_XFER, errno, "set_acl: refusing path-based ACL on %s (no held fd)",
+				fname);
+			return -1;
 		}
 #endif
 		if (sys_acl_set_file(fname, type, duo_item->sacl) < 0) {
@@ -1006,11 +1365,16 @@ static int set_rsync_acl(const char *fname, acl_duo *duo_item,
  * dir), and the regular mode bits on the file.  Call this with fname set to
  * NULL to just check if the ACL is different.
  *
+ * When a held O_NOFOLLOW fd (or a dirfd+leaf) is supplied, the ACL is applied
+ * race-safely through it; otherwise (fd < 0 && dirfd < 0) the path-based
+ * fallback is used.
+ *
  * If the ACL operation has a side-effect of changing the file's mode, the
  * sxp->st.st_mode value will be changed to match.
  *
  * Returns 0 for an unchanged ACL, 1 for changed, -1 for failed. */
-int set_acl(const char *fname, const struct file_struct *file, stat_x *sxp, mode_t new_mode)
+int set_acl_fdat(int fd, int dirfd, const char *leaf, const char *fname,
+		 const struct file_struct *file, stat_x *sxp, mode_t new_mode)
 {
 	int changed = 0;
 	int32 ndx;
@@ -1030,7 +1394,7 @@ int set_acl(const char *fname, const struct file_struct *file, stat_x *sxp, mode
 		if (!eq) {
 			changed = 1;
 			if (!dry_run && fname
-			 && set_rsync_acl(fname, duo_item, SMB_ACL_TYPE_ACCESS,
+			 && set_rsync_acl(fd, dirfd, leaf, fname, duo_item, SMB_ACL_TYPE_ACCESS,
 					  sxp, new_mode) < 0)
 				return -1;
 		}
@@ -1047,13 +1411,18 @@ int set_acl(const char *fname, const struct file_struct *file, stat_x *sxp, mode
 		if (!eq) {
 			changed = 1;
 			if (!dry_run && fname
-			 && set_rsync_acl(fname, duo_item, SMB_ACL_TYPE_DEFAULT,
+			 && set_rsync_acl(fd, dirfd, leaf, fname, duo_item, SMB_ACL_TYPE_DEFAULT,
 					  sxp, new_mode) < 0)
 				return -1;
 		}
 	}
 
 	return changed;
+}
+
+int set_acl(const char *fname, const struct file_struct *file, stat_x *sxp, mode_t new_mode)
+{
+	return set_acl_fdat(-1, -1, NULL, fname, file, sxp, new_mode);
 }
 
 /* Non-incremental recursion needs to convert all the received IDs.

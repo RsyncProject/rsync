@@ -51,7 +51,7 @@ long_opts = {
   'copy-devices': -1,
   'copy-unsafe-links': 0,
   'daemon': -1,
-  'debug': 1,
+  'debug': -1,
   'delay-updates': 0,
   'delete': 0,
   'delete-after': 0,
@@ -132,8 +132,65 @@ long_opts = {
 
 ### END of options data produced by the cull-options script. ###
 
-import os, sys, re, argparse, glob, socket, time, subprocess
+import os, sys, re, argparse, glob, socket, stat, time, subprocess
 from argparse import RawTextHelpFormatter
+
+# Held open across exec so rsync inherits them. Each entry pins a path
+# validated_arg() approved; the corresponding arg passed to rsync is
+# rewritten to /proc/self/fd/N so rsync's path resolution cannot be
+# race-flipped after rrsync's realpath check, closing the realpath-vs-exec
+# TOCTOU.
+pinned_fds = []
+
+# Directory pins, keyed by (st_dev, st_ino), so a glob or a multi-arg command
+# whose args share a parent inherits one fd rather than one per arg.
+pinned_dirs = {}
+
+# Whether the client asked for --relative/-R, which decides how much of a
+# sender arg rsync transmits as the file's name (see sender_pinned_arg).
+client_relative = False
+
+# The inode-pin trick needs /proc/self/fd/N to be a Linux-style magic symlink
+# whose readlink yields the open file's real path. macOS/BSD lack the directory
+# entirely; Solaris HAS /proc/self/fd but its entries are not such symlinks (its
+# readlink does not return the path), so an isdir() check is not enough -- probe
+# the actual behaviour once against a known fd. Where it works we pin (and a
+# later readlink failure is an anomaly that fails closed); where it does not we
+# fall through to the unhardened path.
+#
+# A correct readlink is NOT sufficient evidence that the fd pins anything, and
+# the two platforms that get this wrong fail in opposite directions:
+#
+#   * NetBSD makes the entry a symlink for DIRECTORIES only -- readlink of a
+#     regular file's entry fails with EINVAL, so a directory-only probe claims
+#     support that is not there and every pull of a file dies in the post-pin
+#     check.
+#   * Cygwin's readlink returns the right path, but opening the magic link
+#     RE-RESOLVES it: rename the directory out from under a held fd and the
+#     magic link reaches the replacement. The pin silently protects nothing.
+#
+# Only the Linux kernel gives the inode-bound magic link this relies on, so
+# require that explicitly and keep the runtime probes as a guard for Linux-like
+# environments where /proc is absent or restricted (containers, seccomp).
+def _probe_proc_self_fd():
+    if not sys.platform.startswith(('linux', 'android')):
+        return False
+
+    def resolves(path):
+        try:
+            fd = os.open(path, os.O_RDONLY)
+        except OSError:
+            return False
+        try:
+            return os.readlink('/proc/self/fd/%d' % fd) == os.path.realpath(path)
+        except OSError:
+            return False
+        finally:
+            os.close(fd)
+
+    return resolves('/') and resolves(os.path.realpath(__file__))
+
+HAVE_PROC_SELF_FD = _probe_proc_self_fd()
 
 try:
     from braceexpand import braceexpand
@@ -143,6 +200,275 @@ except:
 HAS_DOT_DOT_RE = re.compile(r'(^|/)\.\.(/|$)')
 LONG_OPT_RE = re.compile(r'^--([^=]+)(?:=(.*))?$')
 DE_BACKSLASH_RE = re.compile(r'\\(.)')
+
+def make_inheritable(fd):
+    """Clear FD_CLOEXEC so the exec'd rsync inherits `fd`.
+
+    os.set_inheritable() prefers ioctl(FIONCLEX), which an O_PATH descriptor
+    rejects with EBADF on older kernels; F_SETFD is one of the few operations
+    O_PATH always allows.
+    """
+    try:
+        os.set_inheritable(fd, True)
+    except OSError:
+        import fcntl
+        fcntl.fcntl(fd, fcntl.F_SETFD,
+                    fcntl.fcntl(fd, fcntl.F_GETFD) & ~fcntl.FD_CLOEXEC)
+
+def pin_dir(path, orig_arg):
+    """Inode-pin a directory and return an fd rsync will inherit.
+
+    The open resolves `path` normally -- including a symlink at its last
+    component, which is legitimate and which 3.4.4 accepts -- so a component
+    could be flipped first.  The readlink check afterwards is what makes that
+    safe: it proves the inode we ended up holding is inside the restricted
+    tree.  From then on the fd names that inode, not the path, so nothing above
+    it can be flipped again.
+
+    O_PATH, not O_RDONLY: reaching a known name beneath a directory needs only
+    search permission, and a mode 0111 parent is a perfectly ordinary way to
+    publish a file without letting it be listed.  An O_PATH directory fd is
+    just as firmly pinned when used as a /proc/self/fd/N/... prefix (the O_PATH
+    caveat in validated_arg() is about reopening the magic link as the file
+    itself, which is not what happens here).
+    """
+    flags = os.O_DIRECTORY | getattr(os, 'O_PATH', 0)
+    if not flags & getattr(os, 'O_PATH', 0):
+        flags |= os.O_RDONLY
+    try:
+        fd = os.open(path or '.', flags)
+    except OSError as e:
+        die('unable to pin sender path:', orig_arg, e.strerror)
+    try:
+        st = os.fstat(fd)
+        pinned_path = os.readlink('/proc/self/fd/%d' % fd)
+    except OSError as e:
+        os.close(fd)
+        die('post-pin readlink failed (race?):', orig_arg, e.strerror)
+    if pinned_path != args.dir and not pinned_path.startswith(args.dir_slash):
+        os.close(fd)
+        die('post-pin path escaped tree (race?):', orig_arg, pinned_path)
+    key = (st.st_dev, st.st_ino)
+    if key in pinned_dirs:
+        os.close(fd)
+        return pinned_dirs[key]
+    make_inheritable(fd)
+    pinned_fds.append(fd)
+    pinned_dirs[key] = fd
+    return fd
+
+# Checked receiver-side directory options, split by what rsync does with a
+# missing one.  It creates these itself on demand, so rrsync creates and pins
+# them (0700 for the partial dir, which is what rsync uses -- partial files are
+# incomplete copies of the peer's data and rsync deliberately does not publish
+# them to the rest of the machine).
+CREATE_DIR_MODE = {'--backup-dir': 0o777, '--partial-dir': 0o700}
+# It requires this one to exist already, so a missing one stays an error.
+MUST_EXIST_DIR_OPTS = ('--temp-dir',)
+# And it only READS through these: a missing one is the ordinary first-run case
+# and must keep working, so stand in an empty directory rather than refusing.
+EMPTY_BASIS_OPTS = ('--link-dest', '--compare-dest', '--copy-dest')
+
+def pinned_empty_dir(orig_arg):
+    """Pin an empty unlinked directory to stand in for a missing basis dir.
+
+    A basis lookup cannot tell an empty directory from a missing one, so this
+    preserves "first run has no basis" exactly -- but without leaving a name
+    the peer can win: the directory is created inside the restricted dir,
+    opened, then unlinked while we keep the fd, so what rsync is handed has no
+    path at all for an in-band symlink to take over.
+    """
+    name = '.rrsync-empty-basis.%d' % os.getpid()
+    rootfd = os.open('.', os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.mkdir(name, 0o700, dir_fd=rootfd)
+    except FileExistsError:
+        pass   # our own leftover, or something planted; the open decides
+    except OSError as e:
+        os.close(rootfd)
+        die('unable to create basis placeholder:', orig_arg, e.strerror)
+    try:
+        fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_DIRECTORY,
+                     dir_fd=rootfd)
+    except OSError as e:
+        os.close(rootfd)
+        die('unable to pin basis placeholder:', orig_arg, e.strerror)
+    try:
+        os.rmdir(name, dir_fd=rootfd)
+    except FileNotFoundError:
+        pass   # already gone; we hold the inode either way
+    except OSError as e:
+        # The whole point is that rsync gets an inode with no name.  If the
+        # name survives, the peer can still reach and fill the directory, so
+        # this is not a placeholder we can safely hand over.
+        os.close(rootfd)
+        os.close(fd)
+        die('unable to detach basis placeholder:', orig_arg, e.strerror)
+    os.close(rootfd)
+    if os.listdir(fd):
+        os.close(fd)
+        die('basis placeholder is not empty:', orig_arg)
+    make_inheritable(fd)
+    pinned_fds.append(fd)
+    return '/proc/self/fd/%d' % fd
+
+def create_pinned_dir(path, orig_arg, mode):
+    """Create a missing receiver-option directory and return a pin of it.
+
+    rsync makes --backup-dir/--partial-dir itself and then works inside it, so
+    the parent-pinned /proc/self/fd/<parent>/<leaf> spelling is not enough: the
+    same transfer can plant a symlink at <leaf> first and rsync would create
+    through it, outside the restricted dir.  Creating it here, beneath the
+    already-pinned parent, means the name is a real directory before rsync ever
+    looks at it, and the O_NOFOLLOW reopen proves we hold what we made rather
+    than something that raced in between.
+    """
+    # Walk down from the restricted dir a component at a time, creating what
+    # is missing.  rsync builds a whole missing --backup-dir hierarchy itself
+    # (backup.c make_bak_dir()), so stopping at "the immediate parent must
+    # exist" would refuse a first-use dated/nested name that works today.
+    #
+    # O_NOFOLLOW on every component costs nothing and rules out a symlink
+    # anywhere along the way: `path` is a realpath, so none of its components
+    # is legitimately a symlink, and each open is relative to the fd we are
+    # already holding rather than to a name that could be reshaped underneath.
+    fd = os.open('.', os.O_RDONLY | os.O_DIRECTORY)   # the chdir'd restricted dir
+    for comp in os.path.relpath(path, args.dir).split(os.sep):
+        if comp in ('', '.', '..'):
+            os.close(fd)
+            die('bad receiver option path:', orig_arg)
+        try:
+            nfd = os.open(comp, os.O_RDONLY | os.O_NOFOLLOW | os.O_DIRECTORY,
+                          dir_fd=fd)
+        except FileNotFoundError:
+            try:
+                os.mkdir(comp, mode, dir_fd=fd)
+            except FileExistsError:
+                pass   # raced in; the open below decides if it is usable
+            except OSError as e:
+                os.close(fd)
+                die('unable to create receiver option dir:',
+                    orig_arg, e.strerror)
+            try:
+                nfd = os.open(comp,
+                              os.O_RDONLY | os.O_NOFOLLOW | os.O_DIRECTORY,
+                              dir_fd=fd)
+            except OSError as e:
+                os.close(fd)
+                die('receiver option path is not a usable directory:',
+                    orig_arg, e.strerror)
+        except OSError as e:
+            os.close(fd)
+            die('receiver option path is not a usable directory:',
+                orig_arg, e.strerror)
+        os.close(fd)
+        fd = nfd
+    try:
+        dpath = os.readlink('/proc/self/fd/%d' % fd)
+    except OSError as e:
+        os.close(fd)
+        die('post-pin readlink failed (race?):', orig_arg, e.strerror)
+    if dpath != args.dir and not dpath.startswith(args.dir_slash):
+        os.close(fd)
+        die('post-pin path escaped tree (race?):', orig_arg, dpath)
+    make_inheritable(fd)
+    pinned_fds.append(fd)
+    return '/proc/self/fd/%d' % fd
+
+# sender_pinned_arg() verdicts that are not a rewritten argument.
+KEEP_LEAF_PIN = 'keep'          # hand rsync the leaf's own /proc/self/fd/N
+LEAF_PIN_UNUSABLE = 'unusable'  # no pin for this shape; keep the plain name
+
+def sender_pinned_arg(fd, arg, orig_arg, has_slash, has_slash_dot):
+    """Return a source name rsync will both resolve safely and name correctly.
+
+    The obvious rewrite -- hand rsync /proc/self/fd/N for the leaf itself --
+    only works where rsync open()s the argument.  A sender lstat()s it first,
+    and lstat of a procfs magic link is always S_IFLNK, so rsync describes the
+    argument as a symlink instead of sending the file.  Which pin is usable
+    therefore depends on what rsync does with the argument:
+
+      * a trailing "/" or "/." directory is opened, not lstat()ed, and rsync
+        DOES follow a symlink there, so it keeps the leaf pin;
+      * anything else keeps the pin one level up and passes the leaf by name.
+        rsync will not follow a symlink at that position (it sends the symlink
+        itself), the follow options that would change that are already disabled
+        for a restricted dir, and its own leaf open is O_NOFOLLOW.
+
+    Under --relative the transmitted name is the whole argument rather than
+    its basename, so the pin has to move up to wherever that name starts and
+    the rest is spelled after a /./ marker, which is how rsync is told where
+    the transmitted portion begins.
+    """
+    if client_relative:
+        # Look for the marker in the argument as the client spelled it: the
+        # caller has already split off a trailing "/" or "/.", which is exactly
+        # what turns "sub/./" into a terminal marker.
+        full = arg + ('/' if has_slash else '/.' if has_slash_dot else '')
+        # rsync honours the FIRST /./, so split there and keep the client's
+        # marker rather than inserting a second, earlier one.
+        head, marker, tail = full.partition('/./')
+        if marker:
+            anchor, suffix = head, tail.rstrip('/')
+        else:
+            anchor, suffix = '', arg
+        if suffix.startswith('/'):
+            return LEAF_PIN_UNUSABLE
+        if suffix in ('', '.'):
+            # A terminal marker: everything the client wants transmitted starts
+            # at the argument itself, which is the directory we already pinned.
+            # The caller re-appends the trailing "/" or "/.".
+            dfd = pin_dir(anchor, orig_arg)
+            check = '.'
+            pinned = '/proc/self/fd/%d/.' % dfd
+        else:
+            dfd = pin_dir(anchor, orig_arg)
+            pinned = '/proc/self/fd/%d/./%s' % (dfd, suffix)
+            check = suffix
+    else:
+        if has_slash or has_slash_dot:
+            return KEEP_LEAF_PIN
+        anchor, _, leaf = arg.rpartition('/')
+        if not leaf or leaf in ('.', '..'):
+            return LEAF_PIN_UNUSABLE
+        dfd = pin_dir(anchor, orig_arg)
+        pinned = '/proc/self/fd/%d/%s' % (dfd, leaf)
+        check = leaf
+
+    # Tie the pinned directory to the inode realpath() validated: resolving
+    # `check` beneath the held fd cannot be redirected above the leaf, so if it
+    # does not reach the same file, something was flipped -- fail closed.
+    # fd is None for a leaf we deliberately never opened (a symlink, or a
+    # device/FIFO/socket): there is no inode to compare against, and the leaf
+    # was never going to be content-opened by the sender either.
+    if fd is None:
+        return pinned
+    try:
+        st = os.stat(check, dir_fd=dfd)
+    except OSError as e:
+        die('post-pin stat failed (race?):', orig_arg, e.strerror)
+    leaf_st = os.fstat(fd)
+    if (st.st_dev, st.st_ino) != (leaf_st.st_dev, leaf_st.st_ino):
+        die('post-pin path changed (race?):', orig_arg, check)
+    return pinned
+
+def safe_open_logfile():
+    nofollow = getattr(os, 'O_NOFOLLOW', 0)
+    try:
+        st = os.lstat(LOGFILE)
+    except OSError:
+        return None
+    if not stat.S_ISREG(st.st_mode):
+        return None
+    try:
+        fd = os.open(LOGFILE, os.O_WRONLY | os.O_APPEND | nofollow)
+    except OSError:
+        return None
+    st2 = os.fstat(fd)
+    if not stat.S_ISREG(st2.st_mode) or st.st_dev != st2.st_dev or st.st_ino != st2.st_ino:
+        os.close(fd)
+        return None
+    return os.fdopen(fd, 'a')
 
 def main():
     if not os.path.isdir(args.dir):
@@ -185,9 +511,21 @@ def main():
     if args.ro:
         long_opts['log-file'] = -1
 
+    global short_disabled
+    if args.no_overwrite:
+        # --ignore-existing guards only the live transfer destination.  These
+        # options append to, consume, move or remove other existing objects in
+        # the restricted dir.  Backup mode belongs here too: publishing a
+        # backup onto a name that already exists deletes what is there
+        # (backup.c make_backup()), and deletion backs files up as well
+        # (delete.c), so an unrelated --delete can land on a protected name.
+        long_opts['log-file'] = long_opts['partial-dir'] = long_opts['delay-updates'] = -1
+        long_opts['backup-dir'] = -1
+        short_disabled += 'b'   # must precede the short_no_arg_re build below
+
     if args.dir != '/':
-        global short_disabled
         short_disabled += short_disabled_subdir
+        long_opts['copy-unsafe-links'] = -1
 
     short_no_arg_re = short_no_arg
     short_with_num_re = short_with_num
@@ -199,13 +537,14 @@ def main():
     short_no_arg_re = re.compile(r'^-(?=.)[%s]*(e\d*\.\w*)?$' % short_no_arg_re)
     short_with_num_re = re.compile(r'^-[%s]\d+$' % short_with_num_re)
 
-    log_fh = open(LOGFILE, 'a') if os.path.isfile(LOGFILE) else None
+    log_fh = safe_open_logfile()
 
     try:
         os.chdir(args.dir)
     except OSError as e:
         die('unable to chdir to restricted dir:', str(e))
 
+    global client_relative
     rsync_opts = [ '--server' ]
     rsync_args = [ ]
     saw_the_dot_arg = False
@@ -228,7 +567,16 @@ def main():
                 saw_the_dot_arg = True
                 continue
             rsync_opts.append(arg)
-            if short_no_arg_re.match(arg) or short_with_num_re.match(arg):
+            sm = short_no_arg_re.match(arg)
+            if sm or short_with_num_re.match(arg):
+                if sm:
+                    # Scan the cluster's own letters only: the trailing
+                    # capability blob (-e.iLsfxC) is not a set of options.
+                    letters = arg[1:]
+                    if sm.group(1):
+                        letters = letters[:-len(sm.group(1))]
+                    if 'R' in letters:
+                        client_relative = True
                 continue
             disabled = False
             m = LONG_OPT_RE.match(arg)
@@ -238,6 +586,11 @@ def main():
                 ct = long_opts.get(opt, None)
                 if ct is None:
                     break # Generate generic failure due to unfinished arg parsing
+                # Last one wins, matching rsync's own option handling.
+                if opt == 'relative':
+                    client_relative = True
+                elif opt == 'no-relative':
+                    client_relative = False
                 if ct == 0:
                     continue
                 opt = '--' + opt
@@ -261,6 +614,34 @@ def main():
 
     if not saw_the_dot_arg:
         die("invalid rsync-command syntax or options")
+
+    if args.dir != '/' and not am_sender:
+        # A restricted dir denies device/special CREATION, but `-a` (-rlptgoD)
+        # bundles -D into the client's short-option string, so rejecting -D
+        # outright would break every `rsync -a` to a restricted rrsync.
+        #
+        # --no-D cannot do this job: preserve_devices/preserve_specials also
+        # frame the file list's rdev fields, and only this end of the
+        # connection gets the option, so the client's -D sender writes rdev
+        # that a --no-D receiver never reads.  That desynchronises the list --
+        # a FIFO hangs the transfer at protocol 29 and corrupts it at 30, a
+        # device node breaks EVERY protocol.  --drop-D refuses the creation
+        # while leaving the wire format alone.  (Needs rsync 3.5.0+, which is
+        # what rrsync is installed alongside.)
+        #
+        # Only on the receiving side: creation happens where files are
+        # written, so a sender has nothing to deny -- --drop-D would be a
+        # no-op there.
+        rsync_opts.append('--drop-D')
+
+    if args.dir != '/':
+        # Filter rules travel over the protocol, not in the argv we validate, so
+        # a client can name a merge file outside the restricted dir and have the
+        # server read it in as rules -- a pull needs no --delete and no
+        # verbosity for that.  --confine-root bounds the server's own resolution
+        # of such paths, which is the only end that can see them.  Both
+        # directions: a dir-merge is read by whichever side the rule applies to.
+        rsync_opts.append('--confine-root=' + os.getcwd())
 
     if args.munge:
         rsync_opts.append('--munge-links')
@@ -289,7 +670,10 @@ def main():
     if args.no_lock:
         os.execlp(RSYNC, *cmd)
         die("execlp(", RSYNC, *cmd, ')  failed')
-    child = subprocess.run(cmd)
+    # pass_fds keeps the inode-pinning O_PATH fds open across the spawn so
+    # /proc/self/fd/N in the cmd resolves correctly in the child. See the
+    # pinned_fds comment near the top.
+    child = subprocess.run(cmd, pass_fds=tuple(pinned_fds))
     if child.returncode != 0:
         sys.exit(child.returncode)
 
@@ -297,6 +681,14 @@ def main():
 def validated_arg(opt, arg, typ=3, wild=False):
     if opt != 'arg': # arg values already have their backslashes removed.
         arg = DE_BACKSLASH_RE.sub(r'\1', arg)
+
+    # "-" is rsync's read-the-list-from-stdin sentinel, not a pathname: a pull
+    # with a local --files-from sends exactly "--files-from=-" to the server.
+    if opt == '--files-from':
+        if arg == '-':
+            return arg
+        if args.wo:
+            die('a write-only server cannot read a remote --files-from path')
 
     orig_arg = arg
     if arg.startswith('./'):
@@ -320,6 +712,7 @@ def validated_arg(opt, arg, typ=3, wild=False):
     for arg in got:
         if args.dir != '/' and arg != '.' and (typ == 3 or (typ == 2 and not am_sender)):
             arg_has_trailing_slash = arg.endswith('/')
+            arg_has_trailing_slash_dot = False
             if arg_has_trailing_slash:
                 arg = arg[:-1]
             else:
@@ -330,6 +723,215 @@ def validated_arg(opt, arg, typ=3, wild=False):
             if arg != real_arg and not real_arg.startswith(args.dir_slash):
                 if not (is_absolute_arg and real_arg == args.dir):
                     die('unsafe arg:', orig_arg, [arg, real_arg])
+            # Inode-pin the validated path so an attacker cannot flip a
+            # path component AFTER realpath validates it but BEFORE the
+            # exec'd rsync resolves it.
+            #
+            # CRITICAL: open with O_RDONLY (not O_PATH).  An O_PATH fd
+            # holds a path/dentry reference and /proc/self/fd/N for an
+            # O_PATH fd re-resolves the path on open -- which means the
+            # race window stays open across the exec.  A regular
+            # O_RDONLY fd holds an open file (inode-bound), and
+            # /proc/self/fd/N for a regular fd references the inode
+            # directly -- exactly the race-closing primitive we need.
+            #
+            # O_NOFOLLOW on this open means a symlink that raced into
+            # place between realpath and this open is refused at the
+            # leaf.  A subsequent fstat() + readlink-of-fd verifies the
+            # pinned inode is still within the restricted tree (a
+            # parent-component race that landed on an in-tree symlink
+            # but outside-tree target would surface here).
+            #
+            # /proc/self/fd/N then routes the exec'd rsync's open
+            # through the kernel's magic link to the SAME pinned inode
+            # regardless of any subsequent flip; the race is closed.
+            #
+            # Linux-only (O_PATH/proc trick is Linux specific); on
+            # non-Linux fall through to the unhardened path.  For paths
+            # that don't exist yet (receiver-side new dest) os.open
+            # fails -- we skip pinning there; the new-dest race is a
+            # separate concern.
+            # Only a regular file or directory gets its CONTENT opened.  A
+            # sender needs neither for anything else: rsync transmits a symlink
+            # by its target string and skips a device/FIFO/socket under the
+            # forced --no-D.  Opening them here is also actively wrong --
+            # O_RDONLY on a FIFO blocks until a writer appears, so naming an
+            # in-tree FIFO wedged rrsync before exec, and a dangling symlink
+            # resolved to a missing target and was reported as a race.  3.4.4
+            # transfers both.  These shapes take the parent pin, which is what
+            # confines them anyway.
+            # NOT for a trailing "/" or "/." argument: rsync opens that one and
+            # DOES follow a symlink there, so its leaf pin is load-bearing --
+            # rrsync-sender-leaf-flip proves a raced flip leaks the outside
+            # directory's content without it.
+            sender_leaf_unopened = False
+            # Not gated on HAVE_PROC_SELF_FD: this is a decision about what
+            # rsync does with the argument, not about whether we can pin it, so
+            # it has to hold on the BSDs, macOS, Solaris and Cygwin too -- where
+            # otherwise a dangling symlink still resolved to nothing and died.
+            if (am_sender and opt == 'arg'
+                    and not arg_has_trailing_slash
+                    and not arg_has_trailing_slash_dot):
+                try:
+                    lst = os.lstat(arg)
+                except OSError:
+                    lst = None
+                if lst is not None and not (stat.S_ISREG(lst.st_mode)
+                                            or stat.S_ISDIR(lst.st_mode)):
+                    sender_leaf_unopened = True
+            try:
+                if sender_leaf_unopened:
+                    raise InterruptedError()   # jump to the sender-pin branch
+                try:
+                    # O_NONBLOCK so a special file that raced in after the
+                    # lstat above still cannot block this open.
+                    fd = os.open(real_arg,
+                                 os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+                except IsADirectoryError:
+                    fd = os.open(real_arg,
+                                 os.O_RDONLY | os.O_NOFOLLOW | os.O_DIRECTORY)
+            except InterruptedError:
+                # No CONTENT fd for this leaf -- but it is still named
+                # beneath a pinned directory below, not re-resolved from
+                # the tree root.
+                fd = None
+            except FileNotFoundError:
+                # In --sender mode the path MUST exist (we're reading
+                # from it) -- ENOENT here means the rename-based race
+                # caught a transient gap in the flipper's swap.  Die.
+                if am_sender:
+                    die('post-realpath open failed (race detected):',
+                        orig_arg, 'No such file or directory')
+                if opt in MUST_EXIST_DIR_OPTS:
+                    die('receiver option path does not exist:', orig_arg)
+                # Receiver-side new destination: the leaf has no inode to pin
+                # yet, but pin its existing PARENT directory and route the
+                # exec'd rsync's creation through /proc/self/fd/<parent>/<leaf>,
+                # so a parent-component flip after realpath can't redirect the
+                # new file/dir out of the tree.  Linux-only (the /proc magic
+                # link); elsewhere, or if the parent itself doesn't exist yet
+                # (a deeper -R new path), fall through unpinned as before.
+                fd = None
+                leaf = os.path.basename(real_arg)
+                if opt in CREATE_DIR_MODE or opt in EMPTY_BASIS_OPTS:
+                    # An auxiliary directory the peer can supply mid-transfer.
+                    # The parent-pinned spelling below is not enough for these:
+                    # the same transfer can plant a symlink at <leaf> first,
+                    # and rsync would create or read through it, outside the
+                    # tree.  Both answers below hand rsync an inode instead of
+                    # a name, so without that primitive there is no safe way to
+                    # proceed -- refuse rather than pass the name through.
+                    if not HAVE_PROC_SELF_FD:
+                        die('receiver option path does not exist:', orig_arg)
+                    if opt in CREATE_DIR_MODE:
+                        if not leaf or leaf in ('.', '..'):
+                            die('bad receiver option path:', orig_arg)
+                        arg = create_pinned_dir(real_arg, orig_arg,
+                                                CREATE_DIR_MODE[opt])
+                    else:
+                        arg = pinned_empty_dir(orig_arg)
+                elif HAVE_PROC_SELF_FD and leaf and leaf not in ('.', '..'):
+                    try:
+                        pfd = os.open(os.path.dirname(real_arg) or '/',
+                                      os.O_RDONLY | os.O_NOFOLLOW | os.O_DIRECTORY)
+                    except OSError:
+                        pfd = -1
+                    if pfd >= 0:
+                        try:
+                            ppath = os.readlink('/proc/self/fd/%d' % pfd)
+                        except OSError as e:
+                            os.close(pfd)
+                            die('post-pin readlink failed (race?):',
+                                orig_arg, e.strerror)
+                        # The pinned parent must be the tree root or under it.
+                        if ppath != args.dir and not ppath.startswith(args.dir_slash):
+                            os.close(pfd)
+                            die('post-pin path escaped tree (race?):',
+                                orig_arg, ppath)
+                        os.set_inheritable(pfd, True)
+                        pinned_fds.append(pfd)
+                        arg = '/proc/self/fd/%d/%s' % (pfd, leaf)
+            except OSError as e:
+                # ELOOP or anything else is a race signal: realpath
+                # validated the path moments ago, but the open just
+                # failed -- something flipped between the check and
+                # the pin (typically a symlink-flip on the leaf).
+                die('post-realpath open failed (race detected):',
+                    orig_arg, e.strerror)
+            if am_sender and opt == 'arg':
+                logical = arg
+                if is_absolute_arg:
+                    if logical == args.dir:
+                        logical = ''
+                    elif logical.startswith(args.dir_slash):
+                        logical = logical[args.dir_slash_len:]
+            if fd is None and sender_leaf_unopened:
+                # A leaf we deliberately never opened is still spelled beneath
+                # a pinned directory: leaving the bare name for rsync to
+                # re-resolve puts every component back in play, which is
+                # CVE-2026-53783 -- measured at 3 leaks in 83 raced pulls with
+                # a dangling-symlink leaf whose parent was flipped to point
+                # outside the tree.  It costs nothing here: the directory is
+                # opened O_PATH, so the special file itself is never opened
+                # and a FIFO cannot block, and whatever the leaf turns into
+                # afterwards is reached only from beneath the held one.
+                #
+                # WHICH directory is sender_pinned_arg()'s decision, and it is
+                # the immediate parent for every shape EXCEPT a --relative
+                # argument with no client "/./": there the whole argument is
+                # the transmitted name, so only the anchor it starts from can
+                # be pinned and the components below it stay raceable.  That
+                # --relative limit predates this and is stated in NEWS.
+                if HAVE_PROC_SELF_FD:
+                    pinned = sender_pinned_arg(None, logical, orig_arg,
+                                               arg_has_trailing_slash,
+                                               arg_has_trailing_slash_dot)
+                    if pinned != LEAF_PIN_UNUSABLE:
+                        arg = pinned
+            elif fd is not None:
+                # The inode-pin trick (verify + route the exec'd rsync's open via
+                # the /proc/self/fd magic link) is Linux-only.  Where /proc/self/fd
+                # does not exist at all (the BSDs, Solaris, macOS, Cygwin, or a
+                # /proc-less namespace) we cannot pin -- fall through to the
+                # unhardened path (close the fd, keep the realpath-validated arg)
+                # per the design note above.  But where /proc/self/fd DOES exist
+                # (Linux), a readlink failure is an anomaly (sandbox/seccomp), not
+                # a no-proc platform: fail CLOSED rather than silently unharden.
+                if not HAVE_PROC_SELF_FD:
+                    os.close(fd)            # no /proc/self/fd: run unpinned
+                else:
+                    try:
+                        pinned_path = os.readlink('/proc/self/fd/%d' % fd)
+                    except OSError as e:
+                        os.close(fd)
+                        die('post-pin readlink failed (race?):',
+                            orig_arg, e.strerror)
+                    # The pinned inode must live under args.dir_slash (or BE
+                    # args.dir).  Catches a parent-component flip that landed
+                    # inside an in-tree path but pointed outside.
+                    if (not pinned_path.startswith(args.dir_slash)
+                        and pinned_path != args.dir):
+                        os.close(fd)
+                        die('post-pin path escaped tree (race?):',
+                            orig_arg, pinned_path)
+                    if am_sender and opt == 'arg':
+                        pinned = sender_pinned_arg(fd, logical, orig_arg,
+                                                   arg_has_trailing_slash,
+                                                   arg_has_trailing_slash_dot)
+                    else:
+                        pinned = KEEP_LEAF_PIN
+                    if pinned == KEEP_LEAF_PIN:
+                        os.set_inheritable(fd, True)
+                        pinned_fds.append(fd)
+                        arg = '/proc/self/fd/%d' % fd
+                    elif pinned == LEAF_PIN_UNUSABLE:
+                        # Nothing to spell beneath a held directory (a bare "."
+                        # or the tree root): keep the realpath-validated name,
+                        # which is what 3.4.4 passes.
+                        os.close(fd)
+                    else:
+                        os.close(fd)    # only needed to validate the pin
+                        arg = pinned
             if arg_has_trailing_slash:
                 arg += '/'
             elif arg_has_trailing_slash_dot:
@@ -346,13 +948,20 @@ def validated_arg(opt, arg, typ=3, wild=False):
 
 
 def lock_or_die(dirname):
-    import fcntl
+    import fcntl, errno
     global lock_handle
     lock_handle = os.open(dirname, os.O_RDONLY)
     try:
         fcntl.flock(lock_handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except:
-        die('Another instance of rrsync is already accessing this directory.')
+    except OSError as e:
+        if e.errno in (errno.EWOULDBLOCK, errno.EAGAIN, errno.EACCES):
+            die('Another instance of rrsync is already accessing this directory.')
+        # flock() is unavailable on this fd/platform -- e.g. Solaris returns
+        # EBADF for flock() on a directory fd. The single-run lock is a
+        # best-effort convenience (cf. -no-lock), not a security control, so
+        # proceed without it rather than abort every transfer.
+        os.close(lock_handle)
+        lock_handle = None
 
 
 def die(*msg):

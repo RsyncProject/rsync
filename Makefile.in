@@ -41,11 +41,12 @@ GENFILES=configure.sh aclocal.m4 config.h.in rsync.1 rsync.1.html \
 HEADERS=byteorder.h config.h errcode.h proto.h rsync.h ifuncs.h itypes.h inums.h \
 	lib/pool_alloc.h lib/mdigest.h lib/md-defines.h
 LIBOBJ=lib/wildmatch.o lib/compat.o lib/snprintf.o lib/mdfour.o lib/md5.o \
-	lib/permstring.o lib/pool_alloc.o lib/sysacls.o lib/sysxattrs.o @LIBOBJS@
+	lib/permstring.o lib/pool_alloc.o lib/sysacls.o lib/sysxattrs.o lib/acl.o @LIBOBJS@
 zlib_OBJS=zlib/deflate.o zlib/inffast.o zlib/inflate.o zlib/inftrees.o \
 	zlib/trees.o zlib/zutil.o zlib/adler32.o zlib/compress.o zlib/crc32.o
-OBJS1=flist.o rsync.o generator.o receiver.o cleanup.o sender.o exclude.o \
-	util1.o util2.o main.o checksum.o match.o syscall.o android.o log.o backup.o delete.o
+OBJS1_NO_MAIN=flist.o rsync.o generator.o receiver.o cleanup.o sender.o exclude.o \
+	util1.o util2.o checksum.o match.o syscall.o log.o backup.o delete.o
+OBJS1=$(OBJS1_NO_MAIN) main.o
 OBJS2=options.o io.o compat.o hlink.o token.o uidlist.o socket.o hashtable.o \
 	usage.o fileio.o batch.o clientname.o chmod.o acls.o xattrs.o
 OBJS3=progress.o pipe.o @MD5_ASM@ @ROLL_SIMD@ @ROLL_ASM@
@@ -54,18 +55,20 @@ popt_OBJS= popt/popt.o  popt/poptconfig.o \
 	popt/popthelp.o popt/poptparse.o popt/poptint.o
 OBJS=$(OBJS1) $(OBJS2) $(OBJS3) $(DAEMON_OBJ) $(LIBOBJ) @BUILD_ZLIB@ @BUILD_POPT@
 
-TLS_OBJ = tls.o syscall.o android.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/permstring.o lib/sysxattrs.o @BUILD_POPT@
+TLS_OBJ = tls.o syscall.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/permstring.o lib/sysxattrs.o @BUILD_POPT@
 
 # Programs we must have to run the test cases
 CHECK_PROGS = rsync$(EXEEXT) tls$(EXEEXT) getgroups$(EXEEXT) getfsdev$(EXEEXT) \
 	testrun$(EXEEXT) trimslash$(EXEEXT) t_unsafe$(EXEEXT) t_chmod_secure$(EXEEXT) \
-	t_secure_relpath$(EXEEXT) wildtest$(EXEEXT) simdtest$(EXEEXT)
+	t_rename_secure$(EXEEXT) t_symlink_secure$(EXEEXT) t_secure_relpath$(EXEEXT) t_acl$(EXEEXT) t_hashtable_overflow$(EXEEXT) t_iwildmatch$(EXEEXT) t_clean_fname$(EXEEXT) t_safe_arg$(EXEEXT) wildtest$(EXEEXT) simdtest$(EXEEXT)
 
 CHECK_SYMLINKS = testsuite/chown-fake_test.py testsuite/devices-fake_test.py \
 	testsuite/xattrs-hlink_test.py testsuite/exclude-lsh_test.py
 
 # Objects for CHECK_PROGS to clean
-CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o t_chmod_secure.o t_secure_relpath.o trimslash.o wildtest.o
+CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o t_chmod_secure.o t_rename_secure.o t_symlink_secure.o t_secure_relpath.o t_acl.o t_hashtable_overflow.o t_iwildmatch.o t_clean_fname.o t_safe_arg.o trimslash.o wildtest.o
+# Compile-only feature-shape checks.
+CHECK_COMPILE_OBJS=syscall-no-at-fdcwd.o
 
 # note that the -I. is needed to handle config.h when using VPATH
 .c.o:
@@ -77,6 +80,10 @@ CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o t_chmod_se
 # any changes to configure.sh and the main Makefile prior to a "make all".
 all: Makefile rsync$(EXEEXT) stunnel-rsyncd.conf @MAKE_RRSYNC@ @MAKE_MAN@
 .PHONY: all
+
+syscall-no-at-fdcwd.o: syscall.c $(HEADERS)
+	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) \
+	    -DRSYNC_TEST_NO_AT_FDCWD -c $(srcdir)/syscall.c -o $@
 
 .PHONY: install
 install: all
@@ -196,21 +203,62 @@ getgroups$(EXEEXT): getgroups.o
 getfsdev$(EXEEXT): getfsdev.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ getfsdev.o $(LIBS)
 
-TRIMSLASH_OBJ = trimslash.o syscall.o android.o util2.o t_stub.o lib/compat.o lib/snprintf.o
+TRIMSLASH_OBJ = trimslash.o syscall.o util2.o t_stub.o lib/compat.o lib/snprintf.o
 trimslash$(EXEEXT): $(TRIMSLASH_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(TRIMSLASH_OBJ) $(LIBS)
 
-T_UNSAFE_OBJ = t_unsafe.o syscall.o android.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o
+T_UNSAFE_OBJ = t_unsafe.o syscall.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o
 t_unsafe$(EXEEXT): $(T_UNSAFE_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_UNSAFE_OBJ) $(LIBS)
 
-T_CHMOD_SECURE_OBJ = t_chmod_secure.o syscall.o android.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o
+T_HASHTABLE_OVERFLOW_OBJ = t_hashtable_overflow.o hashtable.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o
+t_hashtable_overflow$(EXEEXT): $(T_HASHTABLE_OVERFLOW_OBJ)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_HASHTABLE_OVERFLOW_OBJ) $(LIBS)
+
+T_IWILDMATCH_OBJ = t_iwildmatch.o lib/wildmatch.o
+t_iwildmatch$(EXEEXT): $(T_IWILDMATCH_OBJ)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_IWILDMATCH_OBJ) $(LIBS)
+
+T_CLEAN_FNAME_OBJ = t_clean_fname.o syscall.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o
+t_clean_fname$(EXEEXT): $(T_CLEAN_FNAME_OBJ)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_CLEAN_FNAME_OBJ) $(LIBS)
+
+# safe_arg lives in options.c alongside the whole option parser.  Rather than
+# rely on a non-portable linker --gc-sections to drop the parser (GNU ld only;
+# macOS ld64 and the cygwin PE linker do not), link the real rsync objects so
+# every dep resolves.  t_safe_arg_main.o is main.c with main() renamed out, to
+# supply main.c's globals while letting t_safe_arg.o provide the test's main().
+# OBJS minus main.o is spelled out via OBJS1_NO_MAIN because $(filter-out) is
+# GNU-make-only; BSD and Solaris make expand it to nothing.
+t_safe_arg_main.o: main.c $(HEADERS)
+	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) -Dmain=rsync_unused_main -c $(srcdir)/main.c -o t_safe_arg_main.o
+T_SAFE_ARG_OBJ = t_safe_arg.o t_safe_arg_main.o $(OBJS1_NO_MAIN) $(OBJS2) $(OBJS3) $(DAEMON_OBJ) $(LIBOBJ) @BUILD_ZLIB@ @BUILD_POPT@
+t_safe_arg$(EXEEXT): $(T_SAFE_ARG_OBJ)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_SAFE_ARG_OBJ) $(LIBS)
+
+T_CHMOD_SECURE_OBJ = t_chmod_secure.o syscall.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o
 t_chmod_secure$(EXEEXT): $(T_CHMOD_SECURE_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_CHMOD_SECURE_OBJ) $(LIBS)
 
-T_SECURE_RELPATH_OBJ = t_secure_relpath.o syscall.o android.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o
+T_RENAME_SECURE_OBJ = t_rename_secure.o syscall.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o
+t_rename_secure$(EXEEXT): $(T_RENAME_SECURE_OBJ)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_RENAME_SECURE_OBJ) $(LIBS)
+
+T_SYMLINK_SECURE_OBJ = t_symlink_secure.o syscall.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o
+t_symlink_secure$(EXEEXT): $(T_SYMLINK_SECURE_OBJ)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_SYMLINK_SECURE_OBJ) $(LIBS)
+
+T_SECURE_RELPATH_OBJ = t_secure_relpath.o syscall.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o
 t_secure_relpath$(EXEEXT): $(T_SECURE_RELPATH_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_SECURE_RELPATH_OBJ) $(LIBS)
+
+# Unit test for lib/acl.c: compares our fd/at ACL ops against the system libacl
+# (linked via $(LIBS), which carries -lacl).  lib/acl.o references no rsync
+# globals, so this links with no stubs.  Self-skips (exit 77) when built
+# without SUPPORT_ACL_FD.
+T_ACL_OBJ = t_acl.o lib/acl.o
+t_acl$(EXEEXT): $(T_ACL_OBJ)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_ACL_OBJ) $(LIBS)
 
 .PHONY: conf
 conf: configure.sh config.h.in
@@ -301,7 +349,7 @@ rrsync.1: support/rrsync.1.md md-convert Makefile
 
 .PHONY: clean
 clean: cleantests
-	rm -f *~ $(OBJS) $(CHECK_PROGS) $(CHECK_OBJS) $(CHECK_SYMLINKS) @MAKE_RRSYNC@ \
+	rm -f *~ $(OBJS) $(CHECK_PROGS) $(CHECK_OBJS) $(CHECK_COMPILE_OBJS) $(CHECK_SYMLINKS) @MAKE_RRSYNC@ \
 		git-version.h rounding rounding.h *.old rsync*.1 rsync*.5 @MAKE_RRSYNC_1@ \
 		*.html daemon-parm.h help-*.h default-*.h proto.h proto.h-tstamp
 	rm -f *.gcno *.gcda lib/*.gcno lib/*.gcda zlib/*.gcno zlib/*.gcda popt/*.gcno popt/*.gcda
@@ -366,32 +414,43 @@ COVERAGE_J = $(CHECK_J)
 COVERAGE_DIR = coverage
 COVERAGE_RUNFLAGS =
 
-# Bundled third-party code that rsync ships but does not own; excluded from the
-# coverage report so the percentages reflect rsync's own source. zlib/ and popt/
-# are wholly vendored; the named lib/ files are PostgreSQL (getaddrinfo) and ISC
-# (inet_ntop/inet_pton) / standalone (getpass) imports. The other lib/*.c
-# (md5, mdfour, wildmatch, permstring, pool_alloc, snprintf, sysacls, sysxattrs,
-# compat) are rsync's own and stay in the report.
+# Excluded from the coverage report so the percentages reflect rsync's own
+# runtime source.  Three buckets:
+#  (1) Bundled third-party code rsync ships but does not own: zlib/, popt/, and
+#      the named lib/ imports (PostgreSQL getaddrinfo, ISC inet_ntop/inet_pton,
+#      standalone getpass).  The other lib/*.c are rsync's own and stay in.
+#  (2) Test-helper / build-time programs that link against rsync objects but are
+#      not the rsync runtime: t_*.c, tls.c, wildtest.c, testrun.c, getgroups.c,
+#      getfsdev.c, trimslash.c, rounding.c.  These have their own main() and are
+#      either driven directly by a test (counted there) or are configure-time
+#      probes; counting them as "rsync uncovered" is noise.
+#  (3) Compile-time-dead fallbacks under this build's config.h: lib/md5.c (the
+#      reference md5 -- openssl's EVP path is used when HAVE_OPENSSL) and
+#      lib/snprintf.c (only the #include line survives under
+#      HAVE_C99_VSNPRINTF).  Covering these would mean a separate non-openssl /
+#      non-C99 build, which is out of scope for this report.
 COVERAGE_EXCLUDE = -e '(^|/)zlib/' -e '(^|/)popt/' \
-	-e '(^|/)lib/(getaddrinfo|getpass|inet_ntop|inet_pton)\.'
+	-e '(^|/)lib/(getaddrinfo|getpass|inet_ntop|inet_pton)\.' \
+	-e '(^|/)(t_[a-z_]+|tls|wildtest|testrun|getgroups|getfsdev|trimslash|rounding)\.c$$' \
+	-e '(^|/)lib/(md5|snprintf)\.c$$'
 
 # Build everything the test suite needs (rsync + helper programs + symlinks)
 # WITHOUT running it. Used by CI jobs that invoke runtests.py directly with
 # custom options (e.g. the version-mix workflow's --rsync-bin2/--expect-result).
 .PHONY: check-progs
-check-progs: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
+check-progs: all $(CHECK_PROGS) $(CHECK_COMPILE_OBJS) $(CHECK_SYMLINKS)
 
 .PHONY: check
-check: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
-	$(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(CHECK_J)
+check: all $(CHECK_PROGS) $(CHECK_COMPILE_OBJS) $(CHECK_SYMLINKS)
+	"$(srcdir)/runtests.py" --rsync-bin="`pwd`/rsync$(EXEEXT)" -j $(CHECK_J)
 
 .PHONY: check29
-check29: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
-	$(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(CHECK_J) --protocol=29
+check29: all $(CHECK_PROGS) $(CHECK_COMPILE_OBJS) $(CHECK_SYMLINKS)
+	"$(srcdir)/runtests.py" --rsync-bin="`pwd`/rsync$(EXEEXT)" -j $(CHECK_J) --protocol=29
 
 .PHONY: check30
-check30: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
-	$(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(CHECK_J) --protocol=30
+check30: all $(CHECK_PROGS) $(CHECK_COMPILE_OBJS) $(CHECK_SYMLINKS)
+	"$(srcdir)/runtests.py" --rsync-bin="`pwd`/rsync$(EXEEXT)" -j $(CHECK_J) --protocol=30
 
 # Whole-suite gcov coverage report (HTML, with branch + decision coverage).
 # Requires a build configured with --enable-coverage and the `gcovr` tool
@@ -406,9 +465,23 @@ coverage: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	  *) echo "*** not a coverage build; reconfigure with --enable-coverage"; exit 1 ;; esac
 	@command -v gcovr >/dev/null 2>&1 || { echo "*** gcovr not found (pip install gcovr)"; exit 1; }
 	find . -name '*.gcda' -delete
-	@rc=0; $(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(COVERAGE_J) $(COVERAGE_RUNFLAGS) || rc=$$?; \
+	@# Daemon modules with `uid = <non-root>` setuid the per-connection child
+	@# (and so the forked generator/receiver), which then cannot create or
+	@# merge .gcda files in a root-owned build dir -- silently dropping ALL
+	@# coverage from those processes.  Make every .gcno's directory
+	@# world-writable so any uid can create the sibling .gcda, and set a
+	@# default ACL of o::rw so the .gcda are world-mergeable regardless of
+	@# the creator's umask (every test process resets umask to 022 via
+	@# rsyncfns.py, so a Makefile-level `umask 0` would not survive).
+	@find . -name '*.gcno' -printf '%h\n' 2>/dev/null | sort -u | \
+	  while read d; do \
+	    chmod a+rwx "$$d"; \
+	    setfacl -m 'd:u::rwx,d:g::rwx,d:o::rwx' "$$d" 2>/dev/null || true; \
+	  done
+	@rc=0; "$(srcdir)/runtests.py" --rsync-bin="`pwd`/rsync$(EXEEXT)" -j $(COVERAGE_J) $(COVERAGE_RUNFLAGS) || rc=$$?; \
 	  rm -rf $(COVERAGE_DIR) && mkdir -p $(COVERAGE_DIR); \
 	  gcovr --root $(srcdir) $(COVERAGE_EXCLUDE) --decisions --print-summary \
+	      --gcov-ignore-parse-errors=negative_hits.warn_once_per_file \
 	      --html-details -o $(COVERAGE_DIR)/index.html . || exit $$?; \
 	  echo "Coverage report written to $(COVERAGE_DIR)/index.html"; \
 	  if test $$rc != 0; then \
@@ -435,13 +508,21 @@ coverage-all: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	  *) echo "*** not a coverage build; reconfigure with --enable-coverage"; exit 1 ;; esac
 	@command -v gcovr >/dev/null 2>&1 || { echo "*** gcovr not found (pip install gcovr)"; exit 1; }
 	find . -name '*.gcda' -delete
+	@# See the `coverage` target above for why: setuid'd daemon children must
+	@# be able to create/merge .gcda owned by a different uid.
+	@find . -name '*.gcno' -printf '%h\n' 2>/dev/null | sort -u | \
+	  while read d; do \
+	    chmod a+rwx "$$d"; \
+	    setfacl -m 'd:u::rwx,d:g::rwx,d:o::rwx' "$$d" 2>/dev/null || true; \
+	  done
 	@rc=0; \
 	  for cfg in '' '--protocol=30' '--protocol=29' '--use-tcp'; do \
 	    echo "===== coverage-all: runtests.py $$cfg ====="; \
-	    $(srcdir)/runtests.py --rsync-bin=`pwd`/rsync$(EXEEXT) -j $(COVERAGE_J) $$cfg || rc=$$?; \
+	    "$(srcdir)/runtests.py" --rsync-bin="`pwd`/rsync$(EXEEXT)" -j $(COVERAGE_J) $$cfg || rc=$$?; \
 	  done; \
 	  rm -rf coverage-all && mkdir -p coverage-all; \
 	  gcovr --root $(srcdir) $(COVERAGE_EXCLUDE) --decisions --print-summary \
+	      --gcov-ignore-parse-errors=negative_hits.warn_once_per_file \
 	      --html-details -o coverage-all/index.html . || exit $$?; \
 	  echo "Merged coverage report written to coverage-all/index.html"; \
 	  if test $$rc != 0; then \
@@ -486,7 +567,7 @@ testsuite/exclude-lsh_test.py:
 
 .PHONY: installcheck
 installcheck: $(CHECK_PROGS) $(CHECK_SYMLINKS)
-	$(srcdir)/runtests.py --rsync-bin="$(bindir)/rsync$(EXEEXT)" --srcdir="$(srcdir)" --tooldir=`pwd` -j $(CHECK_J)
+	"$(srcdir)/runtests.py" --rsync-bin="$(bindir)/rsync$(EXEEXT)" --srcdir="$(srcdir)" --tooldir="`pwd`" -j $(CHECK_J)
 
 # TODO: Add 'dist' target; need to know which files will be included
 

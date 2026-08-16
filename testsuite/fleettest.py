@@ -11,10 +11,15 @@ flags mirror that workflow, and the pipe-run RSYNC_EXPECT_SKIPPED list is PARSED
 from the workflow (not hardcoded). The --use-tcp run never sets an expected-skip
 list (matching the workflows), so only test FAILs matter there.
 
+The tcp pass runs only the tests that can reach the daemon transport, because it
+follows a full pipe pass over the very same build: --use-tcp is observable only
+through rsyncfns' start_test_daemon(), so a test that never calls it produces
+the same result twice. Pass --full-tcp to run the whole suite there anyway.
+
 A target may also list older "protocols" (e.g. [30, 29]) in the fleet config:
 each runs as an extra stdio-pipe pass with runtests --protocol=N (the fleet
-analogue of a workflow's check30/check29 steps), using the same parsed skip list
-as the pipe run, and shows up as a protoNN column in the report.
+analogue of a workflow's check30/check29 steps), using that step's own parsed
+skip list, and shows up as a protoNN column in the report.
 
 The fleet -- which machines, how to reach and build each -- is read from a JSON
 config: ~/.fleettest.json if present, else fleettest.json next to this script,
@@ -26,17 +31,31 @@ Source = `git archive HEAD` of the rsync tree (the current directory, or --repo
 PATH) -- source-only, no .o/binaries are ever pushed.
 
 Every run uses its own randomly-named build directory on each target
-(<builddir>-<run_id>), so two or three fleettest runs can share the same fleet
-without interfering: each pushes, builds and tests in isolation. The run dir is
-removed when the run ends -- on success or failure, and best-effort on
-Ctrl-C/kill (pass --keep to retain it for inspection). A run that is hard-killed
+(<builddir>-<run_id>-<target>), so two or three fleettest runs can share the same
+fleet without interfering: each pushes, builds and tests in isolation. The run dir
+is removed when the run ends -- on success or failure, and best-effort on
+Ctrl-C/kill (pass --keep to retain it for inspection).
+
+--keep-on-fail is the cheaper half of --keep: only the targets that came back
+with something unexpected keep their run dir, and their full build/test output
+is also written locally under fleettest-logs/<run_id>/<target>/. A fleet run
+costs a full build on every machine, so re-running just to see why one test
+failed is expensive -- and a race test may not fail the same way twice.
+
+A run that is hard-killed
 (SIGKILL), or signalled mid-push, or whose ssh dies during cleanup can leave a
-stray <builddir>-<id> behind -- plus an orphaned path-flipper or test rsyncd on
-platforms without a parent-death backstop; sweep all of those (root-owned files
-included, via sudo -n) with `fleettest.py --cleanup` (optionally scoped with
---targets). Run --cleanup between runs, not during one: its process kills are
-host-global and would also catch a concurrent run's flipper/daemon. Because each
-run starts from a fresh dir, every build is a full configure + build.
+stray <builddir>-<id>-<target> behind -- plus an orphaned path-flipper or test
+rsyncd on platforms without a parent-death backstop; sweep all of those
+(root-owned files included, via sudo -n) with `fleettest.py --cleanup` (optionally
+scoped with --targets). Run --cleanup between runs, not during one: its process
+kills are host-global and would also catch a concurrent run's flipper/daemon.
+Because each run starts from a fresh dir, every build is a full configure + build.
+
+Targets run concurrently, EXCEPT that targets naming the same machine run one
+after another. More than one target may point at a single host -- a variant that
+tests the same build on a different filesystem does -- and those cannot overlap:
+they would fight over the fixed ports the daemon tests claim, and over any other
+host-global state.
 
 PROVISIONING: each target must have the build toolchain its workflow's prepare
 step installs -- the target regenerates its own configure/proto.h/man pages, so
@@ -58,6 +77,8 @@ Usage (run from inside an rsync checkout, or pass --repo):
     python3 testsuite/fleettest.py --targets cygwin,freebsd
     python3 testsuite/fleettest.py --transport pipe
     python3 testsuite/fleettest.py --keep          # keep run dirs for inspection
+    python3 testsuite/fleettest.py --keep-on-fail  # ...but only where it broke
+    python3 testsuite/fleettest.py --timing        # per-target AND per-test times
     python3 testsuite/fleettest.py --cleanup       # sweep stray run dirs, exit
     python3 testsuite/fleettest.py --fleet my-fleet.json --list
 
@@ -70,8 +91,10 @@ import argparse
 import atexit
 import concurrent.futures
 import dataclasses
+import fnmatch
 import json
 import os
+import shlex
 import re
 import secrets
 import signal
@@ -81,6 +104,28 @@ import tempfile
 import threading
 import time
 from pathlib import Path
+
+# Set from --skip / --xfail in main(). SKIP_CSV is passed to runtests as
+# RSYNC_EXCLUDE (tests dropped before running); XFAIL_GLOBS are tolerated
+# failures (a matching FAIL does not make a cell "not OK"). Both are
+# comma-separated test-name globs (fnmatch), applied across every target.
+SKIP_CSV = ""
+# Names from a backport tree's testsuite/skiplist/backport.txt (see main()).
+BACKPORT_EXCLUDE: list[str] = []
+XFAIL_GLOBS: list[str] = []
+
+# Set from --timing in main(). Also asks each target's runtests.py for its own
+# per-test wall-clock table, so a slow cell can be attributed to actual tests.
+TIMING = False
+
+# Set from --full-tcp in main(): run the WHOLE suite in the tcp pass rather than
+# only the tests that can observe the transport. The narrow pass is the default
+# because the tcp run follows a full pipe run over the very same build.
+FULL_TCP = False
+
+# The transports this run will execute (from --transport), needed in test_script
+# to tell "tcp after a pipe pass" from "tcp is the only pass".
+TRANSPORTS: list[str] = []
 
 # Set from --repo in main() (default: cwd). The harness builds whatever rsync
 # source tree these point at, so it must be run from inside an rsync checkout
@@ -126,6 +171,7 @@ class Target:
     configure_flags: list[str]
     make: str = "make"            # e.g. "gmake" on the BSDs/Solaris
     env_prefix: str = ""          # exported before configure AND make (e.g. PATH)
+    scratchbase: str = ""         # run the tests' scratch trees here (e.g. another filesystem)
     configure_pre: str = ""       # shell run before ./configure (env exports, brew)
     python: str = "python3"
     rsync_bin: str = "rsync"      # "rsync.exe" on Cygwin
@@ -150,6 +196,27 @@ class Target:
     # Use on a slow/loaded box where concurrency-sensitive tests occasionally
     # flake, instead of dropping the whole target to a lower -j. 0 => no retry.
     max_retry: int = 0
+    # Test names this specific box skips beyond what its workflow lists -- e.g. an
+    # old-kernel fleet box (no openat2/RESOLVE_BENEATH) skips the RB-conditional
+    # symlink-race tests that the workflow's newer CI runner actually runs.  Merged
+    # into RSYNC_EXPECT_SKIPPED for each pipe/protocol pass the workflow itself
+    # pins -- a pass with no matching workflow step stays unpinned (see
+    # workflow_skip_for).
+    expect_skip_extra: list[str] = dataclasses.field(default_factory=list)
+    # ...and the mirror: entries the workflow expects to skip which this target
+    # actually RUNS (a relocated scratch can satisfy a condition the
+    # workflow's host cannot, e.g. a cross-device copy).
+    expect_skip_omit: list[str] = dataclasses.field(default_factory=list)
+    # Test-name globs this box never runs (passed to runtests as RSYNC_EXCLUDE),
+    # for tests unreliable on this platform for a non-rsync reason -- e.g. the
+    # daemon+flipper symlink-race tests on openbsd, which the platform's kernel
+    # connect()-under-rename-load bug hangs (see dev-notes). Merged with --skip.
+    exclude: list[str] = dataclasses.field(default_factory=list)
+    # Test-name globs whose failure is tolerated on THIS box (merged with the
+    # global --xfail), for a known platform/version-specific failure that should
+    # not fail the cell -- e.g. crtimes on macOS for an older binary. The test
+    # still runs; if it passes, the entry is simply a no-op.
+    xfail: list[str] = dataclasses.field(default_factory=list)
 
 
 def load_fleet(path: Path) -> list[Target]:
@@ -237,20 +304,85 @@ def push_argv(target: Target, staging: str) -> list[str]:
 # workflow skip-list parsing
 # ---------------------------------------------------------------------------
 
-# The trailing '? tolerates a `bash -c '... make check'` wrapper (e.g. Cygwin).
-_SKIP_RE = re.compile(r"RSYNC_EXPECT_SKIPPED=(\S+)\s+make\s+check'?\s*$", re.M)
+def parse_workflow_skip(workflow: str, make_target: str = "check") -> str | None:
+    """Return the literal RSYNC_EXPECT_SKIPPED spec for the given `make <target>`
+    step (check / check30 / check29), or None if that step leaves it unset.  The
+    protocol passes have their own check30/check29 lines (e.g. an xattr/ACL test
+    that runs at proto 30 but skips at 29), so they must be parsed separately from
+    the plain pipe `make check`.  The trailing '? tolerates a `bash -c '... make
+    check'` wrapper (e.g. Cygwin).
 
-
-def parse_workflow_skip(workflow: str) -> str | None:
-    """Return the literal RSYNC_EXPECT_SKIPPED csv for the `make check` step, or
-    None if the workflow leaves it unset."""
+    The spec is passed through to the remote runtests.py verbatim; @FILE entries
+    (testsuite/skiplist/*.txt) are expanded there, against the staged tree, so
+    the list always matches the tests that shipped with it."""
     path = WORKFLOWS / workflow
     try:
         text = path.read_text()
     except OSError:
         return None
-    m = _SKIP_RE.search(text)
+    rx = re.compile(r"RSYNC_EXPECT_SKIPPED=(\S+)\s+make\s+"
+                    + re.escape(make_target) + r"'?\s*$", re.M)
+    m = rx.search(text)
     return m.group(1) if m else None
+
+
+def _expand_spec_names(spec: str) -> set[str]:
+    """The test names a workflow's RSYNC_EXPECT_SKIPPED spec resolves to, by
+    reading its @FILE references out of the suite tree.  Only used to decide
+    which backport exclusions are actually IN the expected-skip set: runtests
+    rejects a '-name' that removes a name nothing added, so a removal may only
+    be emitted for a name the spec really contains."""
+    names: set[str] = set()
+    for tok in spec.split(","):
+        tok = tok.strip()
+        if not tok or tok.startswith("-"):
+            continue
+        if tok.startswith("@"):
+            f = TESTSUITE_REPO / tok[1:]
+            try:
+                for ln in f.read_text().splitlines():
+                    ln = ln.split("#", 1)[0].strip()
+                    if ln:
+                        names.add(ln)
+            except OSError:
+                pass
+        else:
+            names.add(tok)
+    return names
+
+
+def workflow_skip_for(t: "Target", make_target: str = "check") -> str | None:
+    """The target's expected-skip csv for a `make <target>` pass: its workflow's
+    RSYNC_EXPECT_SKIPPED, plus any per-target expect_skip_extra (old-box-only
+    skips the workflow omits) and minus any expect_skip_omit (tests the workflow
+    expects to skip which this target can actually run).
+
+    The workflow spec is now mostly @FILE references, which are expanded on the
+    target rather than here, so an omission cannot be done by set subtraction:
+    the name to drop lives inside a file we deliberately do not read.  It is
+    emitted as a '-name' token instead, which runtests.py applies after every
+    addition.
+
+    None (no oracle) when the workflow has no such step -- e.g. a protocols=[29]
+    target whose workflow has no check29 line.  The extras alone would be a
+    near-empty expected set and so a guaranteed mismatch; a lane the workflow
+    does not pin is simply not pinned here either."""
+    base = parse_workflow_skip(t.workflow, make_target)
+    # A backport-excluded test never runs, so it cannot skip either: drop it
+    # from the expected-skip set as well, or the oracle waits for a skip that
+    # can no longer happen.  Only for names the spec actually contains --
+    # runtests rejects a '-name' that removes a name nothing added.
+    in_spec = _expand_spec_names(base) if (base and BACKPORT_EXCLUDE) else set()
+    omit = set(t.expect_skip_omit) | (set(BACKPORT_EXCLUDE) & in_spec)
+    if base is None or not (t.expect_skip_extra or omit):
+        return base
+    items = sorted(set(t.expect_skip_extra) | ({base} if base else set()))
+    # A backport-excluded test cannot skip, because it never runs -- so it must
+    # also come OUT of the expected-skip set, or the oracle waits for a skip
+    # that can no longer happen.  The name usually lives inside an @FILE, so it
+    # is dropped with a '-name' token that runtests applies after expansion.
+    items += [f"-{n}" for n in sorted(omit)]
+    return ",".join(items)
 
 
 # ---------------------------------------------------------------------------
@@ -275,6 +407,14 @@ def discover_nonroot_tests(testsuite_dir: Path) -> list[str]:
         except OSError:
             continue
     return names
+
+
+def _exclude_csv(t: "Target") -> str:
+    """RSYNC_EXCLUDE csv for a target: the global --skip globs plus this target's
+    per-box `exclude` list (tests it never runs, e.g. the openbsd kernel-bug
+    daemon+flipper races)."""
+    parts = [p for p in ([SKIP_CSV] + list(t.exclude)) if p]
+    return ",".join(parts)
 
 
 # ---------------------------------------------------------------------------
@@ -304,6 +444,13 @@ def test_script(t: Target, transport: str, skip_csv: str | None, jobs: int,
     # PYTHONDONTWRITEBYTECODE: don't drop root-owned __pycache__/*.pyc into the
     # tree (a sudo run would, breaking the next non-root push --delete).
     env = "PYTHONDONTWRITEBYTECODE=1 "
+    if t.scratchbase:
+        # Must travel in `env`, not env_prefix: the sudo branch below runs
+        # `sudo -n env ...`, which drops whatever the outer shell exported.
+        env += f"scratchbase={shlex.quote(t.scratchbase)} "
+    excl = _exclude_csv(t)
+    if excl:
+        env += f"RSYNC_EXCLUDE={excl} "
     # Named tests (a max_retry re-run) make runtests full_run False, so the
     # expected-skip list does not apply -- only the named tests' pass/fail matter.
     names = ""
@@ -311,7 +458,22 @@ def test_script(t: Target, transport: str, skip_csv: str | None, jobs: int,
         names = " " + " ".join(only)
     elif skip_csv:
         env += f"RSYNC_EXPECT_SKIPPED={skip_csv} "
-    runtests = f'{t.python} runtests.py {rb}{tcp}{proto} -j {jobs}{names}'
+    # --timing makes the remote runtests print its own per-test wall-clock table,
+    # which lands in the captured output: that is where a "this target is slow"
+    # cell turns into "these tests are slow on this target".
+    timing = " --timing" if TIMING and not only else ""
+    # --use-tcp is observable only through start_test_daemon(), so when the tcp
+    # pass follows a full pipe pass over the same build, the tests that never
+    # reach it would just produce the same result twice: narrow it to the ones
+    # that can tell the difference. That reasoning depends ENTIRELY on the pipe
+    # pass having run -- under --transport tcp it is the only pass there is, and
+    # narrowing it would silently drop the other 186 tests from the run
+    # altogether. --full-tcp forces the full sweep either way.
+    narrow_tcp = (transport == "tcp" and not FULL_TCP and not only
+                  and "pipe" in TRANSPORTS)
+    only_daemon = " --daemon-tests-only" if narrow_tcp else ""
+    runtests = (f'{t.python} runtests.py {rb}{tcp}{proto} '
+                f'-j {jobs}{timing}{only_daemon}{names}')
     # env_prefix (e.g. a brew PATH) must reach the test too: some tests build a
     # helper binary on the fly (a test may invoke `make`, which needs gawk etc.),
     # so the build tools must be on PATH at test time.
@@ -334,10 +496,19 @@ def nonroot_test_script(t: Target, names: list[str]) -> str:
     The prior sudo pipe/tcp runs left testtmp root-owned, so clear it (via sudo)
     before the non-root run recreates it."""
     pre = f'{t.env_prefix}; ' if t.env_prefix else ''
-    runtests = (f'PYTHONDONTWRITEBYTECODE=1 {t.python} runtests.py '
+    _e = _exclude_csv(t)
+    excl = f'RSYNC_EXCLUDE={_e} ' if _e else ''
+    sb = f'scratchbase={shlex.quote(t.scratchbase)} ' if t.scratchbase else ''
+    runtests = (f'PYTHONDONTWRITEBYTECODE=1 {sb}{excl}{t.python} runtests.py '
                 f'--rsync-bin="$PWD/{t.rsync_bin}" {" ".join(names)}')
+    # A relocated scratch lives outside builddir, so clearing ./testtmp alone
+    # leaves the prior sudo run's root-owned tree in place and the non-root
+    # pass cannot create anything under it.
+    extra_rm = (f'sudo -n rm -rf {shlex.quote(t.scratchbase + "/testtmp")}\n'
+                if t.scratchbase else '')
     return (f'cd {t.builddir} || exit 3\n'
             f'sudo -n rm -rf testtmp\n'
+            f'{extra_rm}'
             f'{pre}{runtests}\n')
 
 
@@ -371,6 +542,9 @@ class TransportResult:
     # were dropped from `failed`.  Surfaced in the report (a recovered flake is
     # noted, never silently hidden).
     recovered: list[str] = dataclasses.field(default_factory=list)
+    # Tests whose failure was tolerated via --xfail: dropped from `failed` (so the
+    # cell can still be OK) but surfaced in the report, never silently hidden.
+    xfailed_req: list[str] = dataclasses.field(default_factory=list)
 
     @property
     def skip_mismatch(self) -> bool:
@@ -382,20 +556,32 @@ class TransportResult:
                 and not self.failed and not self.skip_mismatch)
 
 
-def parse_transport(transport: str, r: CmdResult, skip_checked: bool) -> TransportResult:
+def parse_transport(transport: str, r: CmdResult, skip_checked: bool,
+                    xfail_extra: list[str] = ()) -> TransportResult:
     counts = {"passed": 0, "failed": 0, "xfailed": 0, "skipped": 0}
     for m in RE_COUNT.finditer(r.out):
         counts[m.group(2)] = int(m.group(1))
     failed = [m.group(2) for m in RE_RESULT.finditer(r.out)
               if m.group(1) in ("FAIL", "ERROR")]
+    # --xfail (global) plus this box's per-target xfail: drop tolerated failures
+    # from `failed` so they don't fail the cell.
+    xfail_globs = [*XFAIL_GLOBS, *xfail_extra]
+    xfailed_req = [f for f in failed
+                   if any(fnmatch.fnmatch(f, g) for g in xfail_globs)]
+    failed = [f for f in failed if f not in xfailed_req]
     exp = got = set()
     if skip_checked and RE_SKIP_HDR.search(r.out):
         em = RE_SKIP_EXP.search(r.out)
         gm = RE_SKIP_GOT.search(r.out)
         exp = _csv_set(em.group(1)) if em else set()
         got = _csv_set(gm.group(1)) if gm else set()
-    return TransportResult(transport, r.rc, r.timed_out, counts, failed,
-                           skip_checked, exp, got, r.out)
+    rc = r.rc
+    # runtests exits non-zero per failing test; if the only failures were
+    # tolerated, clear the stale code so the cell reads OK (cf. retry_failed).
+    if xfailed_req and not failed and rc != 0:
+        rc = 0
+    return TransportResult(transport, rc, r.timed_out, counts, failed,
+                           skip_checked, exp, got, r.out, xfailed_req=xfailed_req)
 
 
 def retry_failed(t: Target, label: str, tr: TransportResult, rerun) -> None:
@@ -488,14 +674,14 @@ def run_target(t: Target, args, staging: str) -> TargetResult:
         return res
 
     for transport in args.transports:
-        skip_csv = parse_workflow_skip(t.workflow) if transport == "pipe" else None
+        skip_csv = workflow_skip_for(t) if transport == "pipe" else None
         jobs = (args.jobs if args.jobs else
                 (t.tcp_jobs if transport == "tcp" else t.pipe_jobs))
         cmd = test_script(t, transport, skip_csv, jobs)
         t0 = time.monotonic()
         r = run_on(t, cmd, timeout=2400)
         res.timings[transport] = time.monotonic() - t0
-        tr = parse_transport(transport, r, skip_csv is not None)
+        tr = parse_transport(transport, r, skip_csv is not None, t.xfail)
         retry_failed(t, transport, tr, lambda names, tp=transport: run_on(
             t, test_script(t, tp, None, 1, only=names), timeout=1200))
         res.transports[transport] = tr
@@ -503,19 +689,20 @@ def run_target(t: Target, args, staging: str) -> TargetResult:
             f"({'ok' if tr.ok else 'ISSUE'})")
 
     # Extra older-protocol passes (mirroring the workflow's check30/check29
-    # steps): same stdio-pipe transport and skip list as `make check`, but with
-    # runtests --protocol=N forcing an older wire version. Only targets that list
-    # `protocols` opt in; skipped under --transport tcp (these are pipe runs).
+    # steps): same stdio-pipe transport, but each protocol uses its own
+    # check30/check29 skip list (a feature like xattrs/ACLs runs at proto 30 yet
+    # skips at 29). Only targets that list `protocols` opt in; skipped under
+    # --transport tcp (these are pipe runs).
     if t.protocols and "pipe" in args.transports:
-        skip_csv = parse_workflow_skip(t.workflow)
         jobs = args.jobs if args.jobs else t.pipe_jobs
         for proto in t.protocols:
             label = f"proto{proto}"
+            skip_csv = workflow_skip_for(t, f"check{proto}")
             cmd = test_script(t, "pipe", skip_csv, jobs, protocol=proto)
             t0 = time.monotonic()
             r = run_on(t, cmd, timeout=2400)
             res.timings[label] = time.monotonic() - t0
-            tr = parse_transport(label, r, skip_csv is not None)
+            tr = parse_transport(label, r, skip_csv is not None, t.xfail)
             retry_failed(t, label, tr, lambda names, pr=proto: run_on(
                 t, test_script(t, "pipe", None, 1, protocol=pr, only=names),
                 timeout=1200))
@@ -529,7 +716,7 @@ def run_target(t: Target, args, staging: str) -> TargetResult:
         t0 = time.monotonic()
         r = run_on(t, nonroot_test_script(t, args.nonroot_tests), timeout=2400)
         res.timings["nonroot"] = time.monotonic() - t0
-        tr = parse_transport("nonroot", r, skip_checked=False)
+        tr = parse_transport("nonroot", r, skip_checked=False, xfail_extra=t.xfail)
         retry_failed(t, "nonroot", tr, lambda names: run_on(
             t, nonroot_test_script(t, names), timeout=1200))
         res.transports["nonroot"] = tr
@@ -670,9 +857,68 @@ def print_report(results: list[TargetResult], args, fleet: list[Target]) -> bool
         for r in recovered:
             print(f"    {r}")
         print("=" * 64)
+    xfreq = [f"{res.target} / {transport}: {','.join(tr.xfailed_req)}"
+             for res in results for transport in transports
+             if (tr := res.transports.get(transport)) and tr.xfailed_req]
+    if xfreq:
+        print("==== XFAILED BY REQUEST (--xfail; failure tolerated, cell still OK) ====")
+        for r in xfreq:
+            print(f"    {r}")
+        print("=" * 64)
     print(f"{len(results)} targets x {len(transports)} transports = {cells} cells: "
           f"{ok_cells} OK, {cells - ok_cells} not OK")
     return all_ok
+
+
+def target_ok(res: TargetResult) -> bool:
+    """True if this target produced no unexpected result at all -- reachable,
+    pushed, built, and every pass it ran was OK."""
+    if not (res.reachable and res.pushed and res.build_ok):
+        return False
+    return all(tr.ok for tr in res.transports.values())
+
+
+def keep_on_fail(results: list[TargetResult], args,
+                 chosen: list[Target]) -> list[str]:
+    """--keep-on-fail: for every target that did NOT come back clean, save its
+    full output locally and mark its remote run dir to survive the exit sweep.
+
+    A fleet run is expensive (a full configure + build on ten machines), and the
+    report only prints the names of failing tests -- so re-running was the only
+    way to see WHY one failed, at the cost of another full run, on a race test
+    that may not fail the same way twice.  Saving the raw output at the moment of
+    failure, and keeping the tree that produced it, makes that re-run
+    unnecessary.  Clean targets are untouched: they are still swept as usual.
+
+    Returns human-readable lines describing what was kept, for the report."""
+    failed = [r for r in results if not target_ok(r)]
+    if not failed:
+        return []
+    root = Path(args.keep_on_fail).expanduser() / args.run_id
+    notes: list[str] = []
+    for res in failed:
+        _retain_targets.add(res.target)
+        d = root / _dirsafe(res.target)
+        try:
+            d.mkdir(parents=True, exist_ok=True)
+            if res.error:
+                (d / "error.txt").write_text(res.error + "\n")
+            if res.build_log:
+                (d / "build.log").write_text(res.build_log)
+            for name, tr in res.transports.items():
+                (d / f"{name}.log").write_text(tr.raw)
+            saved = str(d)
+        except OSError as e:
+            saved = f"(could not write logs: {e})"
+        notes.append(f"{res.target}: logs {saved}")
+        # The remote tree is only meaningful if the run got far enough to make
+        # one; an unreachable or un-pushed target has nothing to keep.
+        if res.reachable and res.pushed:
+            t = next((x for x in chosen if x.name == res.target), None)
+            if t is not None:
+                where = f"{t.ssh_host}:{t.builddir}" if t.ssh_host else t.builddir
+                notes.append(f"{res.target}: run dir kept at {where}")
+    return notes
 
 
 # Phase columns for --timing, in execution order (push -> build -> tests).
@@ -737,6 +983,16 @@ def current_branch() -> str:
 _cleanup_targets: list[Target] = []
 _cleanup_lock = threading.Lock()
 _cleanup_done = False
+# Names of targets whose run dir must survive the exit sweep (--keep-on-fail,
+# populated once results are in). Everything else is removed as usual.
+_retain_targets: set[str] = set()
+
+
+def _dirsafe(name: str) -> str:
+    """A target name reduced to what is safe in a remote path we later rm -rf.
+    Anything outside [A-Za-z0-9._-] becomes '_', so a name cannot introduce a
+    path separator, a shell metacharacter, or a leading dash."""
+    return re.sub(r'[^A-Za-z0-9._-]', '_', name).lstrip('-') or 'target'
 
 
 def _unsafe_builddir(path: str) -> bool:
@@ -753,13 +1009,17 @@ def _unsafe_builddir(path: str) -> bool:
 def cleanup_run() -> None:
     """Best-effort `rm -rf` of this run's dir on every chosen target. Idempotent
     (atexit + a signal handler may both call it). Each target removes only its
-    own <base>-<run_id> dir, so a concurrent run's dir is never touched."""
+    own <base>-<run_id> dir, so a concurrent run's dir is never touched.
+
+    Targets listed in _retain_targets are left alone -- that is --keep-on-fail
+    holding a failed target's tree (build output plus the scratch trees the
+    failing tests left) for a post-mortem."""
     global _cleanup_done
     with _cleanup_lock:
         if _cleanup_done or not _cleanup_targets:
             return
         _cleanup_done = True
-        targets = list(_cleanup_targets)
+        targets = [t for t in _cleanup_targets if t.name not in _retain_targets]
     for t in targets:
         if _unsafe_builddir(t.builddir):
             continue
@@ -778,11 +1038,25 @@ def _on_signal(signum, frame):
 # root-running test left), then RE-counts after a settle so we report what
 # actually died (KILLED = before-after) and flag any survivor (SURVIVED, sets
 # fail) instead of claiming success when pkill couldn't reach it. The patterns
-# use the pgrep self-exclusion trick -- 'r[e]name'/'det[a]ch' match a real
-# process's "rename"/"detach" but not the bracketed literal in this script's own
-# argv (run_on passes the whole script as the remote argv), so we never signal
-# ourselves. @BASE@ is substituted with the target's run-dir prefix.
+# use the pgrep self-exclusion trick -- 'r[e]name'/'det[a]ch'/'[l]ocalhost' match a
+# real process's "rename"/"detach"/"localhost" but not the bracketed literal in this
+# script's own argv (run_on passes the whole script as the remote argv), so we never
+# signal ourselves. The client sweep catches an orphaned `rsync rsync://localhost:N/`
+# left blocked on a read when its test was killed (no I/O timeout). @BASE@ is
+# substituted with the target's run-dir prefix.
 _CLEANUP_SCRIPT = r'''fail=0
+# Cygwin signals are cooperative, so a process stuck in a Windows call ignores
+# even SIGKILL and pkill cannot touch it -- exactly how an orphaned test rsyncd
+# ends up squatting its port forever. Where taskkill exists, finish the job
+# through Windows using the winpid (4th column of `ps -W`).
+win_force() {
+  command -v taskkill >/dev/null 2>&1 || return 0
+  command -v ps >/dev/null 2>&1 || return 0
+  for p in $(pgrep -f "$1" 2>/dev/null); do
+    w=$(ps -W 2>/dev/null | awk -v x="$p" '$1==x {print $4}')
+    [ -n "$w" ] && taskkill /F /PID "$w" >/dev/null 2>&1
+  done
+}
 sweep() {
   command -v pgrep >/dev/null 2>&1 || return 0
   before=$(pgrep -f "$2" 2>/dev/null | wc -l | tr -d ' ')
@@ -790,6 +1064,10 @@ sweep() {
   pkill -f "$2" 2>/dev/null
   sudo -n pkill -f "$2" 2>/dev/null
   sleep 1
+  if [ "$(pgrep -f "$2" 2>/dev/null | wc -l | tr -d ' ')" -gt 0 ] 2>/dev/null; then
+    win_force "$2"
+    sleep 1
+  fi
   after=$(pgrep -f "$2" 2>/dev/null | wc -l | tr -d ' ')
   killed=$((before - after))
   [ "$killed" -gt 0 ] 2>/dev/null && echo "KILLED $killed stray $1(s)"
@@ -800,6 +1078,7 @@ sweep() {
 }
 sweep flipper 'r[e]name.*r[e]name.*r[e]name'
 sweep daemon 'det[a]ch --address=127.0.0.1'
+sweep client 'rsync://[l]ocalhost'
 for d in @BASE@-*; do
   [ -e "$d" ] || continue
   if rm -rf -- "$d" 2>/dev/null || sudo -n rm -rf -- "$d" 2>/dev/null; then
@@ -876,12 +1155,24 @@ def main() -> int:
     ap.add_argument("--transport", choices=["pipe", "tcp", "both"], default="both")
     ap.add_argument("--keep", action="store_true",
                     help="keep each run's build dir (default: remove it at exit)")
+    ap.add_argument("--keep-on-fail", nargs="?", const="fleettest-logs",
+                    metavar="DIR",
+                    help="for targets that came back with anything unexpected, "
+                    "save the full build/test output under DIR/<run-id>/<target>/ "
+                    "and keep that target's remote run dir (clean targets are "
+                    "swept as usual). Makes a failure inspectable without "
+                    "repeating the run. DIR defaults to ./fleettest-logs")
     ap.add_argument("--cleanup", action="store_true",
                     help="kill stray flippers/test daemons and remove stray "
                     "<builddir>-* run dirs (root-owned via sudo -n) on the "
                     "targets, then exit; run between runs, not during one "
                     "(kills are host-global)")
     ap.add_argument("--jobs", type=int, help="override -j for both transports")
+    ap.add_argument("--full-tcp", action="store_true",
+                    help="run the whole suite in the tcp pass. By default that "
+                    "pass runs only the tests that can reach the daemon "
+                    "transport, since the rest just repeat the pipe pass over "
+                    "the same build")
     ap.add_argument("--timing", action="store_true",
                     help="report per-target wall-clock (push/build/test) to find "
                     "the slowest target")
@@ -892,8 +1183,23 @@ def main() -> int:
                     "suite against it, e.g. --repo ../rsync-v3.4 --testsuite-repo .")
     ap.add_argument("--fleet", help="fleet config JSON (default: ~/.fleettest.json, "
                     "else fleettest.json next to this script)")
+    ap.add_argument("--skip", metavar="LIST",
+                    help="comma-separated test-name globs to exclude from every "
+                    "run on every target (passed to runtests as RSYNC_EXCLUDE; "
+                    "the tests are not run). E.g. --skip 'chmod-option,prealloc*'")
+    ap.add_argument("--xfail", metavar="LIST",
+                    help="comma-separated test-name globs whose FAILURE is "
+                    "tolerated: a matching fail is listed but does not make a "
+                    "cell 'not OK'. For known stable-gap tests you still want to "
+                    "run. E.g. --xfail 'chmod-option,preallocate,crtimes'")
     ap.add_argument("--list", action="store_true", help="list targets and exit")
     args = ap.parse_args()
+
+    global SKIP_CSV, XFAIL_GLOBS, TIMING, FULL_TCP, BACKPORT_EXCLUDE
+    SKIP_CSV = ",".join(s.strip() for s in (args.skip or "").split(",") if s.strip())
+    XFAIL_GLOBS = [s.strip() for s in (args.xfail or "").split(",") if s.strip()]
+    TIMING = args.timing
+    FULL_TCP = args.full_tcp
 
     global REPO, WORKFLOWS, TESTSUITE_REPO
     REPO = Path(args.repo).resolve() if args.repo else Path.cwd()
@@ -901,6 +1207,24 @@ def main() -> int:
     # The expected-skip lists travel with the suite, so read workflows from the
     # tree that provides the tests.
     WORKFLOWS = TESTSUITE_REPO / ".github" / "workflows"
+
+    # A tree that is OLDER than the suite being run against it -- a backport
+    # branch under --testsuite-repo -- cannot pass tests for fixes and features
+    # it does not carry, and cannot build the suite's newer unit-test helpers.
+    # It declares those in its own testsuite/skiplist/backport.txt, which is
+    # read from the BUILT tree, not the suite tree, because only the built tree
+    # knows what it lacks.  The names are excluded outright (RSYNC_EXCLUDE)
+    # rather than declared as expected skips: some of them fail rather than
+    # skip, and an expected-skip list cannot describe a failure.
+    bp = REPO / "testsuite" / "skiplist" / "backport.txt"
+    if bp.is_file():
+        names = [ln.split("#", 1)[0].strip() for ln in bp.read_text().splitlines()]
+        names = [x for x in names if x]
+        if names:
+            SKIP_CSV = ",".join(x for x in ([SKIP_CSV] + names) if x)
+            BACKPORT_EXCLUDE[:] = names
+            print(f"[backport] excluding {len(names)} test(s) declared in "
+                  f"{bp.relative_to(REPO)}")
     if not args.cleanup:
         # The Python test suite (runtests.py + testsuite/) comes from
         # TESTSUITE_REPO, so that is where runtests.py must live.  The build tree
@@ -960,13 +1284,22 @@ def main() -> int:
         return cleanup_remnants(chosen)
 
     args.transports = ["pipe", "tcp"] if args.transport == "both" else [args.transport]
+    global TRANSPORTS
+    TRANSPORTS = args.transports
+    if "tcp" in args.transports and "pipe" not in args.transports and not FULL_TCP:
+        log("note: --transport tcp is the only pass, so it runs the WHOLE suite "
+            "(the daemon-only narrowing needs a pipe pass to cover the rest)")
 
     # Give this run its own build dir on every target so concurrent runs don't
-    # collide: <builddir>-<run_id>. The base name is the prefix --cleanup globs.
+    # collide, and name it after the target too, because two targets can share
+    # one machine: <builddir>-<run_id>-<target>. Without the target part they
+    # would push into the same tree, and the second would inherit the first's
+    # config.h/Makefile and never reconfigure with its own flags. The base name
+    # is still the prefix --cleanup globs.
     args.run_id = secrets.token_hex(3)
     for t in chosen:
-        t.builddir = f"{t.builddir}-{args.run_id}"
-    log(f"run {args.run_id}: build dir <target>:{chosen[0].builddir} "
+        t.builddir = f"{t.builddir}-{args.run_id}-{_dirsafe(t.name)}"
+    log(f"run {args.run_id}: build dir <target>:{chosen[0].builddir.rsplit('-', 1)[0]}-<target> "
         f"(removed at exit; --keep to retain)")
 
     # Remove each run dir when we exit -- success or failure, and best-effort on
@@ -1009,22 +1342,58 @@ def main() -> int:
         # Tests that opt into the non-root pass (same for every target).
         args.nonroot_tests = discover_nonroot_tests(Path(staging) / "testsuite")
 
-        results: list[TargetResult] = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=len(chosen)) as ex:
-            futs = {ex.submit(run_target, t, args, staging): t for t in chosen}
-            for fut in concurrent.futures.as_completed(futs):
-                t = futs[fut]
+        # Targets are grouped by machine, and a machine's targets run one after
+        # another. Two targets CAN name the same host -- an alternate-filesystem
+        # variant of another target does exactly that -- and running those at
+        # the same time breaks both: they would fight over the fixed ports the
+        # daemon tests claim, and over any other host-global state. Different
+        # machines still run concurrently, which is where the parallelism was.
+        groups: dict[str, list[Target]] = {}
+        for t in chosen:
+            groups.setdefault(t.ssh_host or "<local>", []).append(t)
+        for host, ts in groups.items():
+            if len(ts) > 1:
+                log(f"[{host}] {len(ts)} targets on one machine, run in "
+                    f"sequence: {', '.join(x.name for x in ts)}")
+
+        def run_group(ts: 'list[Target]') -> 'list[TargetResult]':
+            out = []
+            for t in ts:
                 try:
-                    results.append(fut.result())
+                    out.append(run_target(t, args, staging))
                 except Exception as e:  # never let one target kill the run
                     r = TargetResult(t.name)
                     r.reachable = False
                     r.error = f"harness exception: {e!r}"
-                    results.append(r)
+                    out.append(r)
+            return out
+
+        results: list[TargetResult] = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(groups)) as ex:
+            futs = {ex.submit(run_group, ts): ts for ts in groups.values()}
+            for fut in concurrent.futures.as_completed(futs):
+                ts = futs[fut]
+                try:
+                    results.extend(fut.result())
+                except Exception as e:  # a whole group died: account for each
+                    for t in ts:
+                        r = TargetResult(t.name)
+                        r.reachable = False
+                        r.error = f"harness exception: {e!r}"
+                        results.append(r)
     finally:
         subprocess.run(["rm", "-rf", staging])
 
+    # Before the exit sweep runs: mark failed targets' run dirs to survive and
+    # write their output locally, so the report can point at both.
+    kept = keep_on_fail(results, args, chosen) if args.keep_on_fail else []
+
     all_ok = print_report(results, args, fleet)
+    if kept:
+        print("==== KEPT FOR POST-MORTEM (--keep-on-fail) ====")
+        for k in kept:
+            print(f"    {k}")
+        print("=" * 64)
     if args.timing:
         print_timing(results)
     return 0 if all_ok else 1

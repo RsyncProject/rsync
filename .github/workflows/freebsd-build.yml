@@ -1,5 +1,9 @@
 name: Test rsync on FreeBSD
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [ master ]
@@ -7,7 +11,7 @@ on:
       - '.github/workflows/*.yml'
       - '!.github/workflows/freebsd-build.yml'
   pull_request:
-    branches: [ master ]
+    types: [opened, synchronize, reopened]
     paths-ignore:
       - '.github/workflows/*.yml'
       - '!.github/workflows/freebsd-build.yml'

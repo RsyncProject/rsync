@@ -19,10 +19,13 @@ checkit(['-aiv', '--delay-updates', f'{FROMDIR}/', f'{TODIR}/'], FROMDIR, TODIR)
 # destination file, then re-sync. --delay-updates should overwrite cleanly.
 (TODIR / '.~tmp~').mkdir(exist_ok=True)
 (TODIR / '.~tmp~' / 'foo').write_text("2\n")
-# Touch both to the same time so they look stale-but-recent.
-ref_st = os.stat('..')
-os.utime(TODIR / '.~tmp~' / 'foo', (ref_st.st_atime, ref_st.st_mtime))
-os.utime(TODIR / 'foo', (ref_st.st_atime, ref_st.st_mtime))
+# Touch both to a fixed time in the past so they look stale and the source's
+# fresh "3" clearly post-dates them.  (A real timestamp, not os.stat('..') --
+# whose shared parent dir is bumped by concurrent -j tests to ~now -- avoids a
+# same-second quick-check collision that would skip the update.)
+stale = 1_000_000_000  # 2001-09-09, well in the past
+os.utime(TODIR / '.~tmp~' / 'foo', (stale, stale))
+os.utime(TODIR / 'foo', (stale, stale))
 (FROMDIR / 'foo').write_text("3\n")
 
 checkit(['-aiv', '--delay-updates', f'{FROMDIR}/', f'{TODIR}/'], FROMDIR, TODIR)

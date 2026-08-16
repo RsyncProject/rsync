@@ -23,6 +23,7 @@
 #include "git-version.h"
 #include "default-cvsignore.h"
 #include "itypes.h"
+#include "lib/acl.h"
 
 extern struct name_num_obj valid_checksums, valid_compressions, valid_auth_checksums;
 
@@ -105,6 +106,23 @@ static void print_info_flags(enum logcode f)
 		"no "
 #endif
 			"ACLs",
+
+#ifdef SUPPORT_ACL_FD
+#ifdef HAVE_LIBACL_AT
+		/* The patched libacl *_at calls apply received ACLs race-safely
+		 * on every Linux kernel (compat layer below 6.13).  Emit ACL-at (true, so
+		 * the JSON "ACL_at": true lets acl-symlink-race assert) plus a
+		 * distinguishing libacl token. */
+		"ACL-at",
+		"ACL-libacl-at",
+#else
+		/* Runtime: are the *xattrat syscalls usable, so a received ACL is
+		 * applied race-safely (dirfd+leaf, AT_SYMLINK_NOFOLLOW) even when the
+		 * leaf can't be pinned?  False => ACLs are applied via the path on an
+		 * un-pinnable leaf, which carries the parent-symlink-race exposure. */
+		xacl_at_available() ? "ACL-at" : "no ACL-at",
+#endif
+#endif
 
 #ifndef SUPPORT_XATTRS
 		"no "

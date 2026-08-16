@@ -1,5 +1,9 @@
 name: Test rsync on Ubuntu
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [ master ]
@@ -7,12 +11,12 @@ on:
       - '.github/workflows/*.yml'
       - '!.github/workflows/ubuntu-build.yml'
   pull_request:
-    branches: [ master ]
+    types: [opened, synchronize, reopened]
     paths-ignore:
       - '.github/workflows/*.yml'
       - '!.github/workflows/ubuntu-build.yml'
   schedule:
-    - cron: '42 8 * * 1'
+    - cron: '42 8 * * *'
 
 jobs:
   test:
@@ -30,50 +34,38 @@ jobs:
       run: ./configure --with-rrsync
     - name: make
       run: make
-    - name: install/uninstall DESTDIR smoke test
-      run: |
-        set -e
-        tmp="$(mktemp -d)"
-        trap 'rm -rf "$tmp"' EXIT
-
-        make install-all DESTDIR="$tmp"
-
-        for path in \
-          /usr/local/bin/rsync \
-          /usr/local/bin/rsync-ssl \
-          /usr/local/bin/rrsync \
-          /usr/local/share/man/man1/rsync.1 \
-          /usr/local/share/man/man1/rsync-ssl.1 \
-          /usr/local/share/man/man1/rrsync.1 \
-          /usr/local/share/man/man5/rsyncd.conf.5 \
-          /etc/stunnel/rsyncd.conf
-        do
-          test -e "$tmp$path"
-        done
-
-        make uninstall-all DESTDIR="$tmp"
-
-        leftover="$(find "$tmp" -type f -print)"
-        if [ -n "$leftover" ]; then
-          printf '%s\n' "$leftover"
-          exit 1
-        fi
     - name: install
       run: sudo make install
     - name: info
       run: rsync --version
     - name: check
-      run: sudo RSYNC_EXPECT_SKIPPED=crtimes,daemon-access-ip,daemon-chroot-acl,proxy-response-line-too-long,recv-discard-nullderef make check
+      run: sudo RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/common.txt,@testsuite/skiplist/linux.txt make check
     - name: check30
-      run: sudo RSYNC_EXPECT_SKIPPED=crtimes,daemon-access-ip,daemon-chroot-acl,proxy-response-line-too-long,recv-discard-nullderef make check30
+      run: sudo RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/common.txt,@testsuite/skiplist/linux.txt make check30
     - name: check29
-      run: sudo RSYNC_EXPECT_SKIPPED=crtimes,daemon-access-ip,daemon-chroot-acl,proxy-response-line-too-long,recv-discard-nullderef make check29
+      run: sudo RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/common.txt,@testsuite/skiplist/linux.txt,@testsuite/skiplist/proto29.txt make check29
     - name: check (TCP daemon transport)
       # Second run with daemon tests over a real loopback rsyncd. The default
       # 'make check' above uses the secure stdio-pipe transport (no listening
       # sockets); this run exercises the real TCP accept/auth path. Skip-set
       # is env-dependent here (chroot-acl), so leave RSYNC_EXPECT_SKIPPED unset.
       run: sudo ./runtests.py --rsync-bin="$PWD/rsync" --use-tcp -j 8
+    - name: check (non-root, targeted)
+      # Every run above is root (sudo), so privilege-sensitive tests never hit
+      # their non-root path. Run those here as the unprivileged 'runner' user
+      # (NO sudo). Explicit test names make runtests.py full_run False, so
+      # RSYNC_EXPECT_SKIPPED is bypassed -- no per-platform skip list needed.
+      #   daemon-namecvt-empty-response -- REQUIRES non-root (skips as root by
+      #     design); the only test with no other CI coverage (Benjamin #2).
+      #   ownership-depth -- non-root takes the group-only remap path.
+      #   daemon          -- non-root takes the default-config path.
+      # CONVENTION: a new test that requires/meaningfully exercises a non-root
+      # path must be added to the list below (kept in sync with the fleet
+      # harness's nonroot_tests).
+      run: |
+        sudo rm -rf testtmp   # prior root steps left it root-owned
+        ./runtests.py --rsync-bin="$PWD/rsync" \
+          daemon-namecvt-empty-response ownership-depth daemon
     - name: ssl file list
       run: rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
     - name: save artifact

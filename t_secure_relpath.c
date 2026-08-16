@@ -99,6 +99,80 @@ static void check_basedir(const char *basedir)
 	fprintf(stderr, "OK   [basedir=%-12s]: rejected with EINVAL\n", basedir);
 }
 
+static void check_beneath_dotdot(void)
+{
+	STRUCT_STAT ast, fst;
+	int anchor, fd;
+
+	anchor = open(".", O_RDONLY | O_DIRECTORY);
+	if (anchor < 0 || fstat(anchor, &ast) < 0) {
+		perror("open/fstat anchor");
+		errs++;
+		return;
+	}
+
+	fd = secure_relative_open_at_beneath(anchor, "alias/../subdir",
+					     O_RDONLY | O_DIRECTORY, 0);
+	if (fd < 0 || fstat(fd, &fst) < 0 || fst.st_dev != ast.st_dev
+	 || fst.st_ino == ast.st_ino) {
+		fprintf(stderr, "FAIL [beneath safe]: in-anchor '..' was not resolved\n");
+		errs++;
+	} else
+		fprintf(stderr, "OK   [beneath safe]: in-anchor '..' resolved\n");
+	if (fd >= 0)
+		close(fd);
+
+	/* A bare final ".." must be refused whatever flags the caller passes.  The
+	 * leaf fast paths in secure_walk_at() openat() the final component
+	 * directly, so before they learned to defer a literal ".." to ds_descend()
+	 * an O_NOFOLLOW caller got back the anchor's own parent, and a caller
+	 * without O_DIRECTORY opened it transiently.  Only the O_DIRECTORY form
+	 * was ever refused. */
+	{
+		static const struct { const char *label; int flags; } dotdot_cases[] = {
+			{ "O_DIRECTORY",            O_RDONLY | O_DIRECTORY },
+			{ "O_DIRECTORY|O_NOFOLLOW", O_RDONLY | O_DIRECTORY | O_NOFOLLOW },
+			{ "no O_DIRECTORY",         O_RDONLY },
+		};
+		unsigned ci;
+		for (ci = 0; ci < sizeof dotdot_cases / sizeof *dotdot_cases; ci++) {
+			int dfd;
+			errno = 0;
+			dfd = secure_relative_open_at_beneath(anchor, "..",
+							      dotdot_cases[ci].flags, 0);
+			if (dfd >= 0) {
+				STRUCT_STAT dst;
+				int above = fstat(dfd, &dst) == 0 && dst.st_ino != ast.st_ino;
+				fprintf(stderr, "FAIL [beneath bare-dotdot %s]: rc=%d%s\n",
+					dotdot_cases[ci].label, dfd,
+					above ? " -- resolved ABOVE the anchor" : "");
+				errs++;
+				close(dfd);
+			} else if (errno != ELOOP) {
+				fprintf(stderr, "FAIL [beneath bare-dotdot %s]: errno=%d, expected ELOOP\n",
+					dotdot_cases[ci].label, errno);
+				errs++;
+			} else
+				fprintf(stderr, "OK   [beneath bare-dotdot %s]: refused with ELOOP\n",
+					dotdot_cases[ci].label);
+		}
+	}
+
+	errno = 0;
+	fd = secure_relative_open_at_beneath(anchor, "../outside",
+					     O_RDONLY | O_DIRECTORY, 0);
+	if (fd >= 0 || errno != ELOOP) {
+		fprintf(stderr, "FAIL [beneath escape]: rc=%d errno=%d, expected -1/ELOOP\n",
+			fd, errno);
+		if (fd >= 0)
+			close(fd);
+		errs++;
+	} else
+		fprintf(stderr, "OK   [beneath escape]: climb above anchor refused\n");
+
+	close(anchor);
+}
+
 int main(int argc, char **argv)
 {
 	if (argc != 2) {
@@ -119,6 +193,7 @@ int main(int argc, char **argv)
 	am_chrooted = 0;
 
 	mkdir("subdir", 0755);
+	symlink("subdir", "alias");
 
 	/* Each of these relpaths must be rejected with EINVAL at the
 	 * secure_relative_open() front door. ".." is the actual one-level
@@ -144,6 +219,11 @@ int main(int argc, char **argv)
 	check_basedir("../subdir");
 	check_basedir("subdir/..");
 	check_basedir("foo/../bar");
+
+	/* A followed symlink target is the one caller that legitimately carries
+	 * literal '..'.  Its dedicated fd-anchored entry point must preserve an
+	 * in-tree climb while refusing to pop above the anchor. */
+	check_beneath_dotdot();
 
 	if (errs)
 		fprintf(stderr, "\n%d failure(s)\n", errs);

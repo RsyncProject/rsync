@@ -6,6 +6,7 @@ environment (RSYNC_MODULE_NAME, RSYNC_EXIT_STATUS, ...), and a non-zero
 pre-xfer exec must abort the transfer.
 """
 
+import shlex
 import subprocess
 import time
 
@@ -48,16 +49,17 @@ def script(name, body):
     return p
 
 
-pre = script('pre.sh', f'echo "$RSYNC_MODULE_NAME" > {markers}/pre.out\nexit 0\n')
-post = script('post.sh', f'echo "$RSYNC_EXIT_STATUS" > {markers}/post.out\n'
+pre = script('pre.sh', f'echo "$RSYNC_MODULE_NAME" > {shlex.quote(str(markers / "pre.out"))}\nexit 0\n')
+post = script('post.sh', f'echo "$RSYNC_EXIT_STATUS" > {shlex.quote(str(markers / "post.out"))}\n'
                          'exit 0\n')
 prefail = script('prefail.sh', 'exit 1\n')
 
 conf = write_daemon_conf([
     ('hook', {'path': hookdir, 'read only': 'no',
-              'pre-xfer exec': pre, 'post-xfer exec': post}),
+              'pre-xfer exec': shlex.quote(str(pre)),
+               'post-xfer exec': shlex.quote(str(post))}),
     ('failhook', {'path': faildir, 'read only': 'no',
-                  'pre-xfer exec': prefail}),
+                  'pre-xfer exec': shlex.quote(str(prefail))}),
 ])
 url = start_test_daemon(conf, DAEMON_PORT)
 

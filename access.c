@@ -28,7 +28,7 @@ static int allow_forward_dns;
 
 extern const char undetermined_hostname[];
 
-static int match_hostname(const char **host_ptr, const char *addr, const char *tok)
+static int match_hostname(const char **host_ptr, const char *addr, const char *tok, int deny)
 {
 	struct hostent *hp;
 	unsigned int i;
@@ -54,8 +54,14 @@ static int match_hostname(const char **host_ptr, const char *addr, const char *t
 		return 0;
 
 	/* Now try forward-DNS on the token (config-specified hostname) and see if the IP matches. */
-	if (!(hp = gethostbyname(tok)))
-		return 0;
+	if (!(hp = gethostbyname(tok))) {
+		/* A deny-list hostname token we cannot resolve must fail CLOSED:
+		 * we can't prove the peer isn't the denied host, so treat the
+		 * unresolvable token as a match (deny).  Allow-list tokens keep
+		 * failing as a non-match.  Sibling of CVE-2026-43617, which fixed
+		 * only the reverse-lookup path. */
+		return deny;
+	}
 
 	for (i = 0; hp->h_addr_list[i] != NULL; i++) {
 		if (strcmp(addr, inet_ntoa(*(struct in_addr*)(hp->h_addr_list[i]))) == 0) {
@@ -243,7 +249,7 @@ static int match_address(const char *addr, char *tok)
 	return ret;
 }
 
-static int access_match(const char *list, const char *addr, const char **host_ptr)
+static int access_match(const char *list, const char *addr, const char **host_ptr, int deny)
 {
 	char *tok;
 	char *list2 = strdup(list);
@@ -251,7 +257,7 @@ static int access_match(const char *list, const char *addr, const char **host_pt
 	strlower(list2);
 
 	for (tok = strtok(list2, " ,\t"); tok; tok = strtok(NULL, " ,\t")) {
-		if (match_hostname(host_ptr, addr, tok) || match_address(addr, tok)) {
+		if (match_hostname(host_ptr, addr, tok, deny) || match_address(addr, tok)) {
 			free(list2);
 			return 1;
 		}
@@ -275,7 +281,7 @@ int allow_access(const char *addr, const char **host_ptr, int i)
 
 	/* If we match an allow-list item, we always allow access. */
 	if (allow_list) {
-		if (access_match(allow_list, addr, host_ptr))
+		if (access_match(allow_list, addr, host_ptr, 0))
 			return 1;
 		/* For an allow-list w/o a deny-list, disallow non-matches. */
 		if (!deny_list)
@@ -284,9 +290,17 @@ int allow_access(const char *addr, const char **host_ptr, int i)
 
 	/* If we match a deny-list item (and got past any allow-list
 	 * items), we always disallow access. */
-	if (deny_list && access_match(deny_list, addr, host_ptr))
+	if (deny_list && access_match(deny_list, addr, host_ptr, 1))
 		return 0;
 
 	/* Allow all other access. */
 	return 1;
+}
+
+int allow_proxy_protocol_peer(const char *list, const char *addr, const char **host_ptr)
+{
+	if (!list || !*list)
+		return 0;
+	allow_forward_dns = 0;
+	return access_match(list, addr, host_ptr, 0);
 }

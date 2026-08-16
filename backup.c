@@ -30,9 +30,36 @@ extern int preserve_links;
 extern int safe_symlinks;
 extern int backup_dir_len;
 extern unsigned int backup_dir_remainder;
+extern int operator_path_resolve;
 extern char backup_dir_buf[MAXPATHLEN];
 extern char *backup_suffix;
 extern char *backup_dir;
+
+/* Pin a backup SOURCE leaf with a confined O_NOFOLLOW fd (via the operator
+ * owner-walk resolver, like set_file_attrs's op_leaf_fd) so the ACL/xattr the
+ * backup caches off it are read through the held fd -- a parent-symlink race
+ * can't redirect the read out of the module.  Returns -1 for a non-hardened
+ * receiver (caller path-reads) or for a raced/absent leaf on a hardened one
+ * (caller skips the cache rather than read through a flippable path; use
+ * backup_metadata_hardened() to tell the two -1 cases apart). */
+int backup_metadata_hardened(void)
+{
+	return secure_relpath_active() && !symlink_optout_allowed();
+}
+
+int backup_source_fd(const char *path)
+{
+#if defined AT_FDCWD && defined O_NOFOLLOW
+	if (backup_metadata_hardened() && path && *path) {
+		int save = operator_path_resolve, fd;
+		operator_path_resolve = 1;
+		fd = do_open_at(path, O_RDONLY | O_NONBLOCK | O_NOCTTY | O_CLOEXEC, 0);
+		operator_path_resolve = save;
+		return fd;
+	}
+#endif
+	return -1;
+}
 
 /* Returns -1 on error, 0 on missing dir, and 1 on present dir. */
 static int validate_backup_dir(void)
@@ -120,18 +147,27 @@ static BOOL copy_valid_path(const char *fname)
 			struct file_struct *file;
 			if (!(file = make_file(rel, NULL, NULL, 0, NO_FILTERS)))
 				continue;
-#ifdef SUPPORT_ACLS
-			if (preserve_acls && !S_ISLNK(file->mode)) {
-				get_acl(rel, &sx);
-				cache_tmp_acl(file, &sx);
-				free_acl(&sx);
+#if defined SUPPORT_ACLS || defined SUPPORT_XATTRS
+			{	/* read the source dir's ACL/xattr through a confined fd */
+			int bfd = backup_source_fd(rel);
+			if (!backup_metadata_hardened() || bfd >= 0) {
+# ifdef SUPPORT_ACLS
+				if (preserve_acls && !S_ISLNK(file->mode)) {
+					get_acl_fdat(bfd, -1, NULL, rel, &sx);
+					cache_tmp_acl(file, &sx);
+					free_acl(&sx);
+				}
+# endif
+# ifdef SUPPORT_XATTRS
+				if (preserve_xattrs) {
+					get_xattr(rel, bfd, &sx);
+					cache_tmp_xattr(file, &sx);
+					free_xattr(&sx);
+				}
+# endif
 			}
-#endif
-#ifdef SUPPORT_XATTRS
-			if (preserve_xattrs) {
-				get_xattr(rel, &sx);
-				cache_tmp_xattr(file, &sx);
-				free_xattr(&sx);
+			if (bfd >= 0)
+				close(bfd);
 			}
 #endif
 			set_file_attrs(backup_dir_buf, file, NULL, NULL, 0);
@@ -159,12 +195,15 @@ char *get_backup_name(const char *fname)
 	if (backup_dir) {
 		static int initialized = 0;
 		if (!initialized) {
+			char dirbuf[MAXPATHLEN];
 			int ret;
+			if (strlcpy(dirbuf, backup_dir_buf, sizeof dirbuf) >= sizeof dirbuf) {
+				errno = ENAMETOOLONG;
+				return NULL;
+			}
 			if (backup_dir_len > 1)
-				backup_dir_buf[backup_dir_len-1] = '\0';
-			ret = make_path(backup_dir_buf, 0);
-			if (backup_dir_len > 1)
-				backup_dir_buf[backup_dir_len-1] = '/';
+				dirbuf[backup_dir_len-1] = '\0';
+			ret = make_path(dirbuf, 0);
 			if (ret < 0)
 				return NULL;
 			initialized = 1;
@@ -223,7 +262,7 @@ static inline int link_or_rename(const char *from, const char *to,
 /* Hard-link, rename, or copy an item to the backup name.  Returns 0 for
  * failure, 1 if item was moved, 2 if item was duplicated or hard linked
  * into backup area, or 3 if item doesn't exist or isn't a regular file. */
-int make_backup(const char *fname, BOOL prefer_rename)
+static int make_backup_inner(const char *fname, BOOL prefer_rename)
 {
 	stat_x sx;
 	struct file_struct *file;
@@ -238,6 +277,38 @@ int make_backup(const char *fname, BOOL prefer_rename)
 
 	if (!(buf = get_backup_name(fname)))
 		return 0;
+
+#ifdef SUPPORT_LINKS
+	/* Honor --safe-links BEFORE the hard-link / rename fast path.  When
+	 * CAN_HARDLINK_SYMLINK is defined, link_or_rename() would otherwise
+	 * hard-link an escaping symlink (e.g. ../../etc/passwd) into the backup
+	 * area and "goto success", skipping the safe_symlinks check in the
+	 * copy-fallback path below -- silently preserving an unsafe link that
+	 * --safe-links was meant to drop.  Match the copy path: don't back up an
+	 * unsafe symlink. */
+	if (preserve_links && S_ISLNK(sx.st.st_mode) && safe_symlinks) {
+		char lnkbuf[MAXPATHLEN];
+		int llen = do_readlink(fname, lnkbuf, MAXPATHLEN - 1);
+		/* A failed readlink means we can't verify the target, so fail
+		 * closed: skip the backup rather than let the hard-link fast path
+		 * preserve a possibly-unsafe symlink unchecked. */
+		if (llen <= 0) {
+			if (INFO_GTE(SYMSAFE, 1))
+				rprintf(FINFO, "not backing up symlink with unreadable target \"%s\"\n", fname);
+			ret = 2;
+			goto success;
+		}
+		lnkbuf[llen] = '\0';
+		if (unsafe_symlink(lnkbuf, fname)) {
+			if (INFO_GTE(SYMSAFE, 1)) {
+				rprintf(FINFO, "not backing up unsafe symlink \"%s\" -> \"%s\"\n",
+					fname, lnkbuf);
+			}
+			ret = 2;
+			goto success;
+		}
+	}
+#endif
 
 	/* Try a hard-link or a rename first.  Using rename is not atomic, but
 	 * is more efficient than forcing a copy for larger files when no hard-
@@ -259,18 +330,27 @@ int make_backup(const char *fname, BOOL prefer_rename)
 	if (!(file = make_file(fname, NULL, &sx.st, 0, NO_FILTERS)))
 		return 3; /* the file could have disappeared */
 
-#ifdef SUPPORT_ACLS
-	if (preserve_acls && !S_ISLNK(file->mode)) {
-		get_acl(fname, &sx);
-		cache_tmp_acl(file, &sx);
-		free_acl(&sx);
+#if defined SUPPORT_ACLS || defined SUPPORT_XATTRS
+	{	/* read the source file's ACL/xattr through a confined fd */
+	int bfd = backup_source_fd(fname);
+	if (!backup_metadata_hardened() || bfd >= 0) {
+# ifdef SUPPORT_ACLS
+		if (preserve_acls && !S_ISLNK(file->mode)) {
+			get_acl_fdat(bfd, -1, NULL, fname, &sx);
+			cache_tmp_acl(file, &sx);
+			free_acl(&sx);
+		}
+# endif
+# ifdef SUPPORT_XATTRS
+		if (preserve_xattrs) {
+			get_xattr(fname, bfd, &sx);
+			cache_tmp_xattr(file, &sx);
+			free_xattr(&sx);
+		}
+# endif
 	}
-#endif
-#ifdef SUPPORT_XATTRS
-	if (preserve_xattrs) {
-		get_xattr(fname, &sx);
-		cache_tmp_xattr(file, &sx);
-		free_xattr(&sx);
+	if (bfd >= 0)
+		close(bfd);
 	}
 #endif
 
@@ -351,5 +431,19 @@ int make_backup(const char *fname, BOOL prefer_rename)
   success:
 	if (INFO_GTE(BACKUP, 1))
 		rprintf(FINFO, "backed up %s to %s\n", fname, buf);
+	return ret;
+}
+
+int make_backup(const char *fname, BOOL prefer_rename)
+{
+	int ret;
+	/* The --backup-dir is an operator-supplied path: resolve it (and the
+	 * tail/rename beneath it) with the ownership walk so a foreign-owned
+	 * symlink component is refused while the operator's own is followed --
+	 * absolute and relative alike.  --insecure-links / "insecure links ="
+	 * restores legacy following. */
+	operator_path_resolve = 1;
+	ret = make_backup_inner(fname, prefer_rename);
+	operator_path_resolve = 0;
 	return ret;
 }

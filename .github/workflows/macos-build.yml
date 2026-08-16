@@ -1,5 +1,9 @@
 name: Test rsync on macOS
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [ master ]
@@ -7,12 +11,12 @@ on:
       - '.github/workflows/*.yml'
       - '!.github/workflows/macos-build.yml'
   pull_request:
-    branches: [ master ]
+    types: [opened, synchronize, reopened]
     paths-ignore:
       - '.github/workflows/*.yml'
       - '!.github/workflows/macos-build.yml'
   schedule:
-    - cron: '42 8 * * 1'
+    - cron: '42 8 * * *'
 
 jobs:
   test:
@@ -44,7 +48,7 @@ jobs:
       # chown-fake / devices-fake / xattrs / xattrs-hlink now RUN on macOS
       # (rsyncfns.py drives xattrs via the `xattr` command), verified on a
       # real macOS host, so they're no longer in the skip set.
-      run: sudo RSYNC_EXPECT_SKIPPED=acls-default,acls-depth,chmod-temp-dir,daemon-access-ip,daemon-chroot-acl,dir-sgid,open-noatime,preallocate,protected-regular,proxy-response-line-too-long,recv-discard-nullderef,simd-checksum,sparse make check
+      run: sudo RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/common.txt,@testsuite/skiplist/macos.txt make check
     - name: check (TCP daemon transport)
       # Second run with daemon tests over a real loopback rsyncd; the default
       # 'make check' above uses the secure stdio-pipe transport.

@@ -124,5 +124,33 @@ if can_punch and allocated(TODIR / deep) >= os.path.getsize(TODIR / deep):
               f"{allocated(TODIR / deep)} for a {os.path.getsize(TODIR / deep)}"
               "-byte file")
 
+# --- --inplace --sparse must punch interior holes in matched blocks ----------
+# Make source and destination byte-identical and densely allocated.  With
+# --block-size matching the pattern size, every block match is at the same
+# offset, so skip_matched() sends it through write_sparse(use_seek=1).  The
+# interior zero run must still be scanned and punched rather than merely
+# seeked over with the rest of the matching block.
+rmtree(src)
+rmtree(TODIR)
+makepath(src / 'd1' / 'd2' / 'd3', TODIR / 'd1' / 'd2' / 'd3')
+with open(src / deep, 'wb') as source, open(TODIR / deep, 'wb') as dest:
+    for _ in range(256):
+        block = os.urandom(4096) + b'\0' * 24576 + os.urandom(4096)
+        source.write(block)
+        dest.write(block)
+
+matched_size = os.path.getsize(TODIR / deep)
+matched_before = allocated(TODIR / deep)
+run_rsync('-a', '--ignore-times', '--inplace', '--sparse', '--no-whole-file',
+          '--block-size=32768', f'{src}/', f'{TODIR}/')
+assert_same(TODIR / deep, src / deep,
+            label='--inplace --sparse matched-block content')
+matched_after = allocated(TODIR / deep)
+if (can_punch and matched_before >= matched_size
+        and matched_after * 2 >= matched_before):
+    test_fail(f"--inplace --sparse left matching interior zero runs allocated: "
+              f"{matched_after} of {matched_before} bytes remain allocated "
+              f"after a {matched_size}-byte matched-block update")
+
 print("preallocate: --preallocate (do_fallocate) + sparse hole-punching "
       "(do_punch_hole) verified at depth")

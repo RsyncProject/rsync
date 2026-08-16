@@ -1,5 +1,9 @@
 name: Build static rsync for Android
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 # Cross-compiles statically-linked rsync binaries with the Android NDK,
 # suitable for dropping onto a phone (adb push / Termux) with no shared
 # libraries. arm64-v8a covers all modern phones; armeabi-v7a covers older
@@ -16,7 +20,7 @@ on:
       - '.github/workflows/*.yml'
       - '!.github/workflows/android-static-build.yml'
   pull_request:
-    branches: [ master ]
+    types: [opened, synchronize, reopened]
     paths-ignore:
       - '.github/workflows/*.yml'
       - '!.github/workflows/android-static-build.yml'

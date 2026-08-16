@@ -42,6 +42,7 @@ extern int munge_symlinks;
 extern int use_secure_symlinks;
 extern int open_noatime;
 extern int sanitize_paths;
+extern int daemon_config_filter_file;
 extern int numeric_ids;
 extern int filesfrom_fd;
 extern int remote_protocol;
@@ -70,6 +71,8 @@ extern gid_t our_gid;
 
 char *auth_user;
 char *daemon_auth_choices;
+/* read_args() enforces MAX_DAEMON_ARGS and reports "too many daemon arguments"
+ * before a daemon client can grow argv without bound. */
 int read_only = 0;
 int module_id = -1;
 int pid_file_fd = -1;
@@ -81,11 +84,32 @@ struct chmod_mode_struct *daemon_chmod_modes;
 #define EARLY_INPUT_CMD "#early_input="
 #define EARLY_INPUT_CMDLEN (sizeof EARLY_INPUT_CMD - 1)
 
+/* Fallback bound on each peer-driven daemon handshake phase when no positive
+ * "timeout" is configured.  A module value can shorten the pre-auth and
+ * argument-read phases, but cannot extend either beyond this limit. */
+#define DAEMON_HANDSHAKE_TIMEOUT 60
+
+static int daemon_handshake_timeout(int module)
+{
+	int timeout = lp_timeout(module);
+
+	/* "timeout" is parsed with atoi(), so negative values are possible. */
+	if (timeout <= 0 || timeout > DAEMON_HANDSHAKE_TIMEOUT)
+		timeout = DAEMON_HANDSHAKE_TIMEOUT;
+	return timeout;
+}
+
 /* module_dirlen is the length of the module_dir string when in daemon
  * mode and module_dir is not "/"; otherwise 0.  (Note that a chroot-
  * enabled module can have a non-"/" module_dir these days.) */
 char *module_dir = NULL;
 unsigned int module_dirlen = 0;
+/* An fd held open on the served module root, captured while the daemon is still
+ * positioned there (and privileged) -- so the sender's directory scan can be
+ * confined beneath the module by resolving module-relative paths against this fd,
+ * without re-walking (and re-permission-checking) the absolute module path as the
+ * dropped-privilege module uid.  -1 when not a daemon or not yet captured. */
+int module_dirfd = -1;
 
 char *full_module_path;
 
@@ -158,7 +182,12 @@ static int exchange_protocols(int f_in, int f_out, char *buf, size_t bufsiz, int
 	if (!am_client) {
 		char *motd = lp_motd_file();
 		if (motd && *motd) {
-			FILE *f = fopen(motd, "r");
+			/* 'motd file = PATH': motd content is sent to every client, so
+			 * a planted symlink would leak the target's bytes.  Refuse
+			 * symlinks not owned by uid 0 or our euid. */
+			int motd_fd = open_no_attacker_symlinks(motd, O_RDONLY, 0);
+			FILE *f = motd_fd >= 0 ? fdopen(motd_fd, "r") : NULL;
+			if (!f && motd_fd >= 0) close(motd_fd);
 			while (f && !feof(f)) {
 				int len = fread(buf, 1, bufsiz - 1, f);
 				if (len > 0)
@@ -262,22 +291,30 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 	if (!user)
 		user = getenv("LOGNAME");
 
-	if (exchange_protocols(f_in, f_out, line, sizeof line, 1) < 0)
+	if (exchange_protocols(f_in, f_out, line, sizeof line, 1) < 0) {
+		free(modname);
 		return -1;
+	}
 
 	if (early_input_file) {
 		STRUCT_STAT st;
-		FILE *f = fopen(early_input_file, "rb");
+		/* --early-input-file=PATH: refuse symlinks not owned by uid 0 or
+		 * our euid anywhere in the path. */
+		int ei_fd = open_no_attacker_symlinks(early_input_file, O_RDONLY, 0);
+		FILE *f = ei_fd >= 0 ? fdopen(ei_fd, "rb") : NULL;
+		if (!f && ei_fd >= 0) close(ei_fd);
 		if (!f || do_fstat(fileno(f), &st) < 0) {
 			rsyserr(FERROR, errno, "failed to open %s", early_input_file);
 			if (f)
 				fclose(f);
+			free(modname);
 			return -1;
 		}
 		early_input_len = st.st_size;
 		if (early_input_len > (int)sizeof line) {
 			rprintf(FERROR, "%s is > %d bytes.\n", early_input_file, (int)sizeof line);
 			fclose(f);
+			free(modname);
 			return -1;
 		}
 		if (early_input_len > 0) {
@@ -287,6 +324,7 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 				if (feof(f)) {
 					rprintf(FERROR, "Early EOF in %s\n", early_input_file);
 					fclose(f);
+					free(modname);
 					return -1;
 				}
 				len = fread(line, 1, early_input_len, f);
@@ -363,6 +401,7 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 	while (1) {
 		if (!read_line_old(f_in, line, sizeof line, 0)) {
 			rprintf(FERROR, "rsync: didn't get server startup line\n");
+			free(modname);
 			return -1;
 		}
 
@@ -386,6 +425,7 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 			rprintf(FERROR, "%s\n", line);
 			/* This is always fatal; the server will now
 			 * close the socket. */
+			free(modname);
 			return -1;
 		}
 
@@ -547,6 +587,7 @@ static pid_t start_pre_exec(const char *cmd, int *arg_fd_ptr, int *error_fd_ptr)
 
 		status = shell_exec(cmd);
 
+		gcov_flush();
 		if (!WIFEXITED(status))
 			_exit(1);
 		_exit(WEXITSTATUS(status));
@@ -762,6 +803,9 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	}
 
 	read_only = lp_read_only(i); /* may also be overridden by auth_server() */
+	/* The module is now known, so its local timeout policy can tighten the
+	 * absolute deadline while the claimed slot is awaiting authentication. */
+	set_daemon_handshake_timeout(daemon_handshake_timeout(i));
 	auth_user = auth_server(f_in, f_out, i, host, addr, "@RSYNCD: AUTHREQD ");
 
 	if (!auth_user) {
@@ -769,6 +813,10 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 		return -1;
 	}
 	set_env_str("RSYNC_USER_NAME", auth_user);
+	/* Do not count local setup or operator hooks against a peer's read time.
+	 * In particular, the post-xfer parent and pre-xfer/name-converter children
+	 * are forked below and must never inherit an armed asynchronous deadline. */
+	set_daemon_handshake_timeout(0);
 
 	module_id = i;
 
@@ -877,6 +925,11 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	} else
 		set_filter_dir(module_dir, module_dirlen);
 
+	/* Everything loaded from here to the end of the exclude block is the
+	 * operator's own configuration, so it keeps the ownership walk without the
+	 * module-confinement parse_filter_file() applies to peer-driven merges. */
+	daemon_config_filter_file = 1;
+
 	p = lp_filter(module_id);
 	parse_filter_str(&daemon_filter_list, p, rule_template(FILTRULE_WORD_SPLIT),
 		XFLG_ABS_IF_SLASH | XFLG_DIR2WILD3);
@@ -897,6 +950,8 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	p = lp_exclude(module_id);
 	parse_filter_str(&daemon_filter_list, p, rule_template(FILTRULE_WORD_SPLIT),
 		XFLG_ABS_IF_SLASH | XFLG_DIR2WILD3 | XFLG_OLD_PREFIXES);
+
+	daemon_config_filter_file = 0;
 
 	log_init(1);
 
@@ -931,6 +986,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 				set_env_num("RSYNC_EXIT_STATUS", status);
 				if (shell_exec(lp_postxfer_exec(module_id)) < 0)
 					status = -1;
+				gcov_flush();
 				_exit(status);
 			}
 		}
@@ -984,6 +1040,13 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	if (use_chroot) {
 		/* Cache timezone data before chroot makes /etc/localtime inaccessible */
 		tzset();
+		/* Flush gcov counters now: after chroot the build-tree .gcda
+		 * paths are unreachable, so everything this child has executed
+		 * so far (the whole rsync_module() pre-chroot path) would
+		 * otherwise be lost.  Post-chroot coverage from this child is
+		 * still unrecordable -- accepted, documented in
+		 * testsuite/COVERAGE.md. */
+		gcov_flush();
 		if (chroot(module_chdir)) {
 			rsyserr(FLOG, errno, "chroot(\"%s\") failed", module_chdir);
 			io_printf(f_out, "@ERROR: chroot failed\n");
@@ -995,6 +1058,12 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 
 	if (!change_dir(module_chdir, CD_NORMAL))
 		return path_failure(f_out, module_chdir, True);
+	/* Pin the module root by identity now -- cwd is the served root and we are
+	 * still privileged -- so the sender's later directory scans resolve against
+	 * this fd rather than re-walking the absolute module path post-setuid. */
+#if defined HAVE_FDOPENDIR && defined O_DIRECTORY
+	module_dirfd = open(".", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+#endif
 	if (module_dirlen)
 		sanitize_paths = 1;
 
@@ -1012,14 +1081,17 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 		}
 	}
 
-	/* Enable secure symlink handling for any non-chrooted daemon module.
-	 * This prevents TOCTOU race attacks where an attacker could switch a
-	 * directory to a symlink between path validation and file open.
-	 * Match the gate used by the do_*_at() wrappers in syscall.c
-	 * (am_daemon && !am_chrooted) -- the protection has nothing to do
-	 * with symlink munging, so a module configured with
-	 * "munge symlinks = false" must still get the secure-open path. */
-	use_secure_symlinks = am_daemon && !am_chrooted;
+	/* Enable secure symlink handling for any non-chrooted daemon module, and
+	 * for a chroot module with a /./ inner boundary (module_dirlen) -- there
+	 * the kernel chroot confines the outer path but not the inner module, so
+	 * the receiver finish/rename path must still resolve beneath the module
+	 * root.  This prevents TOCTOU race attacks where an attacker could switch a
+	 * directory to a symlink between path validation and file open.  Match the
+	 * gate in secure_relpath_active() (syscall.c) -- the protection has nothing
+	 * to do with symlink munging, so a module configured with "munge symlinks =
+	 * false" must still get the secure-open path. */
+	use_secure_symlinks = am_daemon && (!am_chrooted || module_dirlen)
+			    && !symlink_optout_allowed();
 
 	if (gid_list.count) {
 		gid_t *gid_array = gid_list.items;
@@ -1072,6 +1144,11 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 		}
 	}
 
+	/* This deadline is checked only in the read path, so the preceding local
+	 * setup and hooks can take as long as necessary.  Keep one absolute bound
+	 * across both read_args() calls: anonymous modules must not be able to pin
+	 * a max-connections slot by trickling an unterminated argument forever. */
+	set_daemon_handshake_timeout(daemon_handshake_timeout(module_id));
 	io_printf(f_out, "@RSYNCD: OK\n");
 
 	read_args(f_in, name, line, sizeof line, rl_nulls, 1, &argv, &argc, &request);
@@ -1089,6 +1166,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 		ret = parse_arguments(&argc, (const char ***) &argv);
 	} else
 		orig_early_argv = NULL;
+	set_daemon_handshake_timeout(0);
 
 	/* The default is to use the user's setting unless the module sets True or False. */
 	if (lp_open_noatime(module_id) >= 0)
@@ -1228,14 +1306,20 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	return 0;
 }
 
+static BOOL namecvt_safe_token(const char *s);
+
 BOOL namecvt_call(const char *cmd, const char **name_p, id_t *id_p)
 {
 	char buf[1024];
 	int got, len;
 
-	if (*name_p)
+	if (*name_p) {
+		if (!namecvt_safe_token(*name_p)) {
+			rprintf(FERROR, "invalid name-converter token: %s\n", *name_p);
+			return False;
+		}
 		len = snprintf(buf, sizeof buf, "%s %s\n", cmd, *name_p);
-	else
+	} else
 		len = snprintf(buf, sizeof buf, "%s %ld\n", cmd, (long)*id_p);
 	if (len >= (int)sizeof buf) {
 		rprintf(FERROR, "namecvt_call() request was too large.\n");
@@ -1252,11 +1336,36 @@ BOOL namecvt_call(const char *cmd, const char **name_p, id_t *id_p)
 	if (!read_line_old(namecvt_fd_ans, buf, sizeof buf, 0))
 		return False;
 
-	if (*name_p)
-		*id_p = (id_t)atol(buf);
-	else
+	if (*name_p) {
+		/* Name-to-id: an unknown name returns an empty line and atol("")=0
+		 * would map it to root, so validate strictly below (all digits, no
+		 * ERANGE, fits id_t). */
+		const char *p;
+		unsigned long v;
+		if (!*buf)
+			return False;
+		for (p = buf; *p; p++) {
+			if (*p < '0' || *p > '9')
+				return False;
+		}
+		errno = 0;
+		v = strtoul(buf, NULL, 10);
+		if (errno == ERANGE || v > (unsigned long)(id_t)-1)
+			return False;
+		*id_p = (id_t)v;
+	} else
 		*name_p = strdup(buf);
 
+	return True;
+}
+
+static BOOL namecvt_safe_token(const char *s)
+{
+	for (; *s; s++) {
+		unsigned char ch = (unsigned char)*s;
+		if (ch < ' ' || ch == 0x7f)
+			return False;
+	}
 	return True;
 }
 
@@ -1274,6 +1383,18 @@ static void send_listing(int fd)
 
 	if (protocol_version >= 25)
 		io_printf(fd,"@RSYNCD: EXIT\n");
+}
+
+static int proxy_peer_allowed(int fd)
+{
+	const char *host = undetermined_hostname;
+	const char *addr = client_addr(fd);
+
+	if (!allow_proxy_protocol_peer(lp_proxy_protocol_hosts(), addr, &host)) {
+		rprintf(FLOG, "proxy protocol rejected from untrusted peer %s (%s)\n", host, addr);
+		return 0;
+	}
+	return 1;
 }
 
 static int load_config(int globals_only)
@@ -1313,8 +1434,16 @@ int start_daemon(int f_in, int f_out)
 	if (!load_config(0))
 		exit_cleanup(RERR_SYNTAX);
 
-	if (lp_proxy_protocol() && !read_proxy_protocol_header(f_in))
-		return -1;
+	/* Bound the handshake before ANY peer input is read -- the PROXY-protocol
+	 * header below is peer-supplied too, and was previously unbounded.  An
+	 * rsh-run daemon is not a listener and has no shared slot to exhaust. */
+	if (am_daemon > 0)
+		set_daemon_handshake_timeout(daemon_handshake_timeout(-1));
+
+	if (lp_proxy_protocol()) {
+		if (!proxy_peer_allowed(f_in) || !read_proxy_protocol_header(f_in))
+			return -1;
+	}
 
 	/* Do reverse DNS lookup before chroot/setuid. The result is cached,
 	 * so the later client_name() call will use this cached value. This
@@ -1401,6 +1530,7 @@ int start_daemon(int f_in, int f_out)
 		set_nonblocking(f_in);
 	}
 
+
 	if (exchange_protocols(f_in, f_out, line, sizeof line, 0) < 0)
 		return -1;
 
@@ -1455,21 +1585,58 @@ static void create_pid_file(void)
 	char pidbuf[32];
 	STRUCT_STAT st1, st2;
 	char *fail = NULL;
+	const char *base = pid_file;
+	int pdfd = -1;
 
 	if (!pid_file || !*pid_file)
 		return;
 
 #ifdef O_NOFOLLOW
-#define SAFE_OPEN_FLAGS (O_CREAT|O_NOFOLLOW)
+#define SAFE_NOFOLLOW O_NOFOLLOW
 #else
-#define SAFE_OPEN_FLAGS (O_CREAT)
+#define SAFE_NOFOLLOW 0
+#endif
+
+#ifdef AT_FDCWD
+	/* Pin the parent directory so the existence check, open and re-stat below
+	 * all resolve the leaf against one stable directory inode, removing the
+	 * lstat->open path race.  The parent is operator-configured and trusted, so
+	 * it is opened following symlinks (e.g. a /var/run -> /run); only the leaf
+	 * is opened/checked O_NOFOLLOW (the do_*_atfd wrappers force that). */
+	{
+		const char *slash = strrchr(pid_file, '/');
+		char dirbuf[MAXPATHLEN];
+		const char *dir = ".";
+		if (slash) {
+			size_t dlen = slash == pid_file ? 1 : (size_t)(slash - pid_file);
+			if (dlen >= sizeof dirbuf) {
+				rprintf(FLOG, "pid file path is too long: %s\n", pid_file);
+				exit_cleanup(RERR_FILEIO);
+			}
+			memcpy(dirbuf, pid_file, dlen);
+			dirbuf[dlen] = '\0';
+			dir = dirbuf;
+			base = slash + 1;
+		}
+		if ((pdfd = do_open(dir, O_RDONLY|O_DIRECTORY, 0)) < 0) {
+			rsyserr(FLOG, errno, "failed to open pid-file directory \"%s\"", dir);
+			exit_cleanup(RERR_FILEIO);
+		}
+	}
+#define PID_LSTAT(stp) do_lstat_atfd(pdfd, base, stp)
+#define PID_UNLINK()   do_unlink_atfd(pdfd, base, 0)
+#define PID_OPEN()     do_open_atfd(pdfd, base, O_RDWR|O_CREAT, 0664)
+#else
+#define PID_LSTAT(stp) do_lstat(base, stp)
+#define PID_UNLINK()   unlink(base)
+#define PID_OPEN()     do_open(base, O_RDWR|O_CREAT|SAFE_NOFOLLOW, 0664)
 #endif
 
 	/* These tests make sure that a temp-style lock dir is handled safely. */
 	st1.st_mode = 0;
-	if (do_lstat(pid_file, &st1) == 0 && !S_ISREG(st1.st_mode) && unlink(pid_file) < 0)
+	if (PID_LSTAT(&st1) == 0 && !S_ISREG(st1.st_mode) && PID_UNLINK() < 0)
 		fail = "unlink";
-	else if ((pid_file_fd = do_open(pid_file, O_RDWR|SAFE_OPEN_FLAGS, 0664)) < 0)
+	else if ((pid_file_fd = PID_OPEN()) < 0)
 		fail = S_ISREG(st1.st_mode) ? "open" : "create";
 	else if (!lock_range(pid_file_fd, 0, 4))
 		fail = "lock";
@@ -1477,7 +1644,7 @@ static void create_pid_file(void)
 		fail = "fstat opened";
 	else if (st1.st_size > (int)sizeof pidbuf)
 		fail = "find small";
-	else if (do_lstat(pid_file, &st2) < 0)
+	else if (PID_LSTAT(&st2) < 0)
 		fail = "lstat";
 	else if (!S_ISREG(st1.st_mode))
 		fail = "avoid file overwrite race for";
@@ -1500,6 +1667,13 @@ static void create_pid_file(void)
 			 fail = "write";
 		cleanup_set_pid(pid); /* Mark the file for removal on exit, even if the write failed. */
 	}
+
+#undef PID_LSTAT
+#undef PID_UNLINK
+#undef PID_OPEN
+#undef SAFE_NOFOLLOW
+	if (pdfd >= 0)
+		close(pdfd);
 
 	if (fail) {
 		char msg[1024];
@@ -1524,6 +1698,7 @@ static void become_daemon(void)
 			fprintf(stderr, "failed to fork: %s\n", strerror(errno));
 			exit_cleanup(RERR_FILEIO);
 		}
+		gcov_flush();
 		_exit(0);
 	}
 
@@ -1568,6 +1743,17 @@ int daemon_main(void)
 		exit_cleanup(RERR_SYNTAX);
 	}
 	set_dparams(0);
+
+	/* "proxy protocol = true" with no trusted-proxy list rejects every
+	 * connection as an untrusted proxy peer (fail-closed).  That is intended,
+	 * but silent at startup, so warn the operator while stderr is still open. */
+	if (lp_proxy_protocol()
+	 && (!lp_proxy_protocol_hosts() || !*lp_proxy_protocol_hosts())) {
+		rprintf(FWARNING,
+			"\"proxy protocol = true\" but \"proxy protocol hosts\" is unset:"
+			" all connections will be rejected as untrusted proxy peers."
+			"  Set \"proxy protocol hosts\" to your trusted proxy's address.\n");
+	}
 
 	if (no_detach)
 		create_pid_file();

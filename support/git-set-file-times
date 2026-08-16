@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import os, re, argparse, subprocess
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 
 NULL_COMMIT_RE = re.compile(r'\0\0commit [a-f0-9]{40}$|\0$')
 
@@ -57,7 +57,14 @@ def main():
             for fn in files:
                 if args.prefix:
                     fn = args.prefix + fn
-                mtime = os.lstat(fn).st_mtime
+                try:
+                    mtime = os.lstat(fn).st_mtime
+                except FileNotFoundError:
+                    # Tracked in git but absent from the tree we are stamping.
+                    # export-ignore in .gitattributes keeps rsync-web/ and the
+                    # old_versions/ binaries out of "git archive", so they have
+                    # no file here to give a commit time to.
+                    continue
                 if args.list:
                     print_line(fn, mtime, commit_time)
                 elif mtime != commit_time:
@@ -74,7 +81,7 @@ def print_line(fn, mtime, commit_time):
     if args.list > 1:
         ts = str(commit_time).rjust(10)
     else:
-        ts = datetime.fromtimestamp(commit_time, UTC).strftime("%Y-%m-%d %H:%M:%S")
+        ts = datetime.fromtimestamp(commit_time, timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     chg = '.' if mtime == commit_time else '*'
     print(chg, ts, fn)
 

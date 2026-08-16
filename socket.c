@@ -25,6 +25,7 @@
  * emulate it using the KAME implementation. */
 
 #include "rsync.h"
+#include <poll.h>
 #include "itypes.h"
 #include "ifuncs.h"
 #ifdef HAVE_NETINET_IN_SYSTM_H
@@ -46,6 +47,7 @@ static struct sigaction sigact;
 #endif
 
 static int sock_exec(const char *prog);
+static char *shell_quote_connect_host(const char *host);
 
 #define PROXY_BUF_SIZE 1024
 
@@ -57,6 +59,15 @@ static int establish_proxy_connection(int fd, char *host, int port, char *proxy_
 	char *cp, buffer[PROXY_BUF_SIZE + 1];
 	char *authhdr, authbuf[PROXY_BUF_SIZE + 1];
 	int len;
+
+	/* Reject control bytes in the host so they can't be smuggled into the
+	 * HTTP CONNECT request line (CRLF header/request injection). */
+	for (cp = host; *cp; cp++) {
+		if ((unsigned char)*cp < 0x20 || (unsigned char)*cp == 0x7f) {
+			rprintf(FERROR, "invalid control character in proxy CONNECT host\n");
+			return -1;
+		}
+	}
 
 	if (proxy_user && proxy_pass) {
 		stringjoin(buffer, PROXY_BUF_SIZE,
@@ -77,7 +88,10 @@ static int establish_proxy_connection(int fd, char *host, int port, char *proxy_
 	}
 
 	len = snprintf(buffer, PROXY_BUF_SIZE, "CONNECT %s:%d HTTP/1.0%s%s\r\n\r\n", host, port, authhdr, authbuf);
-	assert(len > 0 && len < PROXY_BUF_SIZE);
+	if (len <= 0 || len >= PROXY_BUF_SIZE) {
+		rprintf(FERROR, "proxy CONNECT request too long\n");
+		return -1;
+	}
 	if (write(fd, buffer, len) != len) {
 		rsyserr(FERROR, errno, "failed to write to proxy");
 		return -1;
@@ -114,7 +128,7 @@ static int establish_proxy_connection(int fd, char *host, int port, char *proxy_
 	}
 	/* throw away the rest of the HTTP header */
 	while (1) {
-		for (cp = buffer; cp < &buffer[PROXY_BUF_SIZE]; cp++) {
+		for (cp = buffer; cp < &buffer[PROXY_BUF_SIZE - 1]; cp++) {
 			if (read(fd, cp, 1) != 1) {
 				rsyserr(FERROR, errno,
 					"failed to read from proxy");
@@ -123,10 +137,81 @@ static int establish_proxy_connection(int fd, char *host, int port, char *proxy_
 			if (*cp == '\n')
 				break;
 		}
+		if (cp == &buffer[PROXY_BUF_SIZE - 1]) {
+			rprintf(FERROR, "proxy response header line too long\n");
+			return -1;
+		}
 		if (cp > buffer && *cp == '\n')
 			cp--;
 		if (cp == buffer && (*cp == '\n' || *cp == '\r'))
 			break;
+	}
+	return 0;
+}
+
+static char *shell_quote_connect_host(const char *host)
+{
+	const char *s;
+	char *quoted, *t;
+	size_t len = 2; /* surrounding single quotes */
+
+	for (s = host; *s; s++)
+		len += *s == '\'' ? 4 : 1;
+	quoted = new_array(char, len + 1);
+	t = quoted;
+	*t++ = '\'';
+	for (s = host; *s; s++) {
+		if (*s == '\'') {
+			memcpy(t, "'\\''", 4);
+			t += 4;
+		} else
+			*t++ = *s;
+	}
+	*t++ = '\'';
+	*t = '\0';
+	return quoted;
+}
+
+/* %H is substituted into a free-form command string that a shell then runs, and
+ * a hook of the form `sh -c '... %H ...'` re-parses the word in a nested shell
+ * where the quoting we added has already been consumed.  Restrict the host to
+ * characters that stay data through such a pass.  ('Any shell' is too strong a
+ * claim -- see the leading-'%' note below.)
+ *
+ * The set is deliberately a little wider than a DNS name: RSYNC_CONNECT_PROG
+ * exists for custom transports, where %H may be an alias the program resolves
+ * itself rather than a name the resolver ever sees, so '+' and '~' are allowed
+ * inside the string.  '%' is required for an IPv6 zone id (fe80::1%eth0) and is
+ * not special to a POSIX shell.
+ *
+ * The first character is checked separately, because several of the allowed
+ * ones change an argument's MEANING rather than its text, which no amount of
+ * quoting prevents.  Mid-word each is literal, which is why the set still
+ * allows them:
+ *   '-' and '+' both introduce options to plenty of programs -- `sh +x` is as
+ *       real as `sh -x`;
+ *   '~' is tilde-expanded by the nested shell, turning ~root into /root;
+ *   '%' is expanded by a nested fish, where %self becomes its pid (an IPv6
+ *       zone id has its '%' mid-word, so nothing legitimate is lost).
+ * An empty host is refused too: it survives a direct exec as an empty argument
+ * but vanishes entirely when a nested shell re-splits the command, shifting
+ * every argument after it.  None of these can begin a real hostname.
+ *
+ * This bounds what a SHELL can do with the value.  It cannot bound what the
+ * named program does with it -- something like "host:-rf" arrives intact, and a
+ * program that splits on ':' may reinterpret the tail.  That boundary belongs
+ * to whoever writes RSYNC_CONNECT_PROG. */
+static int shell_unsafe_connect_host(const char *host)
+{
+	const unsigned char *s;
+
+	if (!*host || strchr("-+~%", *host))
+		return 1;
+
+	for (s = (const unsigned char *)host; *s; s++) {
+		if (!((*s >= 'a' && *s <= 'z') || (*s >= 'A' && *s <= 'Z')
+		 || (*s >= '0' && *s <= '9') || strchr("._:-%+~", *s)))
+			return 1;
 	}
 	return 0;
 }
@@ -168,6 +253,68 @@ int try_bind_local(int s, int ai_family, int ai_socktype,
 static void contimeout_handler(UNUSED(int val))
 {
 	connect_timeout = -1;
+}
+
+/* How long each poll() pass waits before re-checking a pending connect(). */
+#define CONNECT_POLL_SLICE 100
+
+/* connect() to addr, waiting for completion with poll() rather than blocking
+ * in the kernel.  A blocking connect() can sleep forever on a connection that
+ * is already established (seen on OpenBSD, where the socket shows ESTABLISHED
+ * at both ends while connect() never returns); with no timeout set that hangs
+ * rsync for good.  Re-checking the socket on each pass costs a loop instead.
+ * Returns 0 on success, -1 with errno set on failure. */
+static int connect_polled(int s, const struct sockaddr *addr, socklen_t addrlen)
+{
+	struct pollfd pfd;
+	int save_errno;
+
+	set_nonblocking(s);
+
+	if (connect(s, addr, addrlen) == 0)
+		goto connected;
+	if (errno != EINPROGRESS && errno != EINTR)
+		goto failed;
+
+	pfd.fd = s;
+	pfd.events = POLLOUT;
+	while (1) {
+		int err = 0;
+		socklen_t errlen = sizeof err;
+
+		/* the --contimeout alarm fired: let the caller report it */
+		if (connect_timeout < 0) {
+			errno = ETIMEDOUT;
+			goto failed;
+		}
+		pfd.revents = 0;
+		if (poll(&pfd, 1, CONNECT_POLL_SLICE) < 0) {
+			if (errno == EINTR)
+				continue;
+			goto failed;
+		}
+		/* A finished slice is not a failure: loop so that poll() looks
+		 * at the socket again, which is what recovers a missed wakeup. */
+		if (!pfd.revents)
+			continue;
+		if (getsockopt(s, SOL_SOCKET, SO_ERROR, &err, &errlen) < 0)
+			goto failed;
+		if (err) {
+			errno = err;
+			goto failed;
+		}
+		break;
+	}
+
+ connected:
+	set_blocking(s);
+	return 0;
+
+ failed:
+	save_errno = errno;
+	set_blocking(s);
+	errno = save_errno;
+	return -1;
 }
 
 /* Open a socket to a tcp remote host with the specified port.
@@ -277,23 +424,20 @@ int open_socket_out(char *host, int port, const char *bind_addr, int af_hint)
 		}
 
 		set_socket_options(s, sockopts);
-		while (connect(s, res->ai_addr, res->ai_addrlen) < 0) {
+		if (connect_polled(s, res->ai_addr, res->ai_addrlen) < 0) {
 			if (connect_timeout < 0)
 				exit_cleanup(RERR_CONTIMEOUT);
-			if (errno == EINTR)
-				continue;
+			/* stash it before close()/alarm() can overwrite errno */
+			errnos[j] = errno;
 			close(s);
 			s = -1;
-			break;
 		}
 
 		if (connect_timeout > 0)
 			alarm(0);
 
-		if (s < 0) {
-			errnos[j] = errno;
+		if (s < 0)
 			continue;
-		}
 
 		if (proxied && establish_proxy_connection(s, host, port, proxy_user, proxy_pass) != 0) {
 			close(s);
@@ -344,7 +488,12 @@ int open_socket_out_wrapped(char *host, int port, const char *bind_addr, int af_
 	char *prog = getenv("RSYNC_CONNECT_PROG");
 
 	if (prog && strchr(prog, '%')) {
-		int hlen = strlen(host);
+		if (shell_unsafe_connect_host(host)) {
+			rprintf(FERROR, "unsafe host characters for RSYNC_CONNECT_PROG\n");
+			return -1;
+		}
+		char *qhost = shell_quote_connect_host(host);
+		int hlen = strlen(qhost);
 		int len = strlen(prog) + 1;
 		char *f, *t;
 		for (f = prog; *f; f++) {
@@ -365,7 +514,7 @@ int open_socket_out_wrapped(char *host, int port, const char *bind_addr, int af_
 					/* Just skips the extra '%'. */
 					break;
 				case 'H':
-					memcpy(t, host, hlen);
+					memcpy(t, qhost, hlen);
 					t += hlen;
 					continue;
 				default:
@@ -376,6 +525,7 @@ int open_socket_out_wrapped(char *host, int port, const char *bind_addr, int af_
 			*t++ = *f;
 		}
 		*t = '\0';
+		free(qhost);
 	}
 
 	if (DEBUG_GTE(CONNECT, 1)) {
@@ -536,8 +686,8 @@ static void sigchld_handler(UNUSED(int val))
 
 void start_accept_loop(int port, int (*fn)(int, int))
 {
-	fd_set deffds;
-	int *sp, maxfd, i;
+	struct pollfd *pfds;
+	int *sp, nsp, i;
 
 #ifdef HAVE_SIGACTION
 	sigact.sa_flags = SA_NOCLDSTOP;
@@ -549,8 +699,12 @@ void start_accept_loop(int port, int (*fn)(int, int))
 		exit_cleanup(RERR_SOCKETIO);
 
 	/* ready to listen */
-	FD_ZERO(&deffds);
-	for (i = 0, maxfd = -1; sp[i] >= 0; i++) {
+	for (nsp = 0; sp[nsp] >= 0; nsp++) {}
+	/* poll() rather than select(): a listening fd at or above FD_SETSIZE
+	 * would overflow an fd_set, which is undefined behaviour (issue #231). */
+	if (!(pfds = new_array(struct pollfd, nsp ? nsp : 1)))
+		out_of_memory("start_accept_loop");
+	for (i = 0; sp[i] >= 0; i++) {
 		if (listen(sp[i], lp_listen_backlog()) < 0) {
 			rsyserr(FERROR, errno, "listen() on socket failed");
 #ifdef INET6
@@ -560,36 +714,32 @@ void start_accept_loop(int port, int (*fn)(int, int))
 #endif
 			exit_cleanup(RERR_SOCKETIO);
 		}
-		FD_SET(sp[i], &deffds);
-		if (maxfd < sp[i])
-			maxfd = sp[i];
+		pfds[i].fd = sp[i];
+		pfds[i].events = POLLIN;
+		pfds[i].revents = 0;
 	}
 
 	/* now accept incoming connections - forking a new process
 	 * for each incoming connection */
 	while (1) {
-		fd_set fds;
 		pid_t pid;
 		int fd;
 		struct sockaddr_storage addr;
 		socklen_t addrlen = sizeof addr;
 
-		/* close log file before the potentially very long select so
+		/* close log file before the potentially very long wait so the
 		 * file can be trimmed by another process instead of growing
 		 * forever */
 		logfile_close();
 
-#ifdef FD_COPY
-		FD_COPY(&deffds, &fds);
-#else
-		fds = deffds;
-#endif
+		for (i = 0; i < nsp; i++)
+			pfds[i].revents = 0;
 
-		if (select(maxfd + 1, &fds, NULL, NULL, NULL) < 1)
+		if (poll(pfds, nsp, -1) < 1)
 			continue;
 
-		for (i = 0, fd = -1; sp[i] >= 0; i++) {
-			if (FD_ISSET(sp[i], &fds)) {
+		for (i = 0, fd = -1; i < nsp; i++) {
+			if (pfds[i].revents & (POLLIN | POLLERR | POLLHUP)) {
 				fd = accept(sp[i], (struct sockaddr *)&addr, &addrlen);
 				break;
 			}
@@ -611,6 +761,7 @@ void start_accept_loop(int port, int (*fn)(int, int))
 			logfile_reopen();
 			ret = fn(fd, fd);
 			close_all();
+			gcov_flush();
 			_exit(ret);
 		} else if (pid < 0) {
 			rsyserr(FERROR, errno,
@@ -737,6 +888,11 @@ void set_socket_options(int fd, char *options)
 }
 
 
+/* How long socketpair_tcp() waits for its own loopback connection (seconds),
+ * and how long each poll() pass waits before re-checking the listen queue. */
+#define SOCKETPAIR_ACCEPT_TIMEOUT 60
+#define SOCKETPAIR_ACCEPT_SLICE 100
+
 /* This is like socketpair but uses tcp.  The function guarantees that nobody
  * else can attach to the socket, or if they do that this function fails and
  * the socket gets closed.  The anti-hijack guarantee is enforced after the
@@ -752,8 +908,9 @@ static int socketpair_tcp(int fd[2])
 	struct sockaddr_in sock2;
 	socklen_t socklen = sizeof sock;
 	int connect_done = 0;
+	int save_errno;
 
-	fd[0] = fd[1] = listener = -1;
+	fd[0] = fd[1] = -1;	/* listener is set by socket() below before any use */
 
 	memset(&sock, 0, sizeof sock);
 
@@ -783,8 +940,53 @@ static int socketpair_tcp(int fd[2])
 	} else
 		connect_done = 1;
 
-	if ((fd[0] = accept(listener, (struct sockaddr *)&sock2, &socklen)) == -1)
-		goto failed;
+	/* Wait for our own connection with a polled, non-blocking accept()
+	 * rather than a blocking one.  A blocking accept() here can sleep
+	 * forever on a connection the kernel has already completed (seen on
+	 * OpenBSD: both ends ESTABLISHED and the connection queued on the
+	 * listener, the accept()ing process still asleep), which hangs rsync
+	 * with no timeout to break it.  Re-checking the queue on each pass
+	 * turns a missed wakeup into another loop rather than a hang. */
+	set_nonblocking(listener);
+	{
+		struct pollfd pfd;
+		time_t deadline = time(NULL) + SOCKETPAIR_ACCEPT_TIMEOUT;
+		int ready_but_empty = 0;
+
+		pfd.fd = listener;
+		pfd.events = POLLIN;
+		while ((fd[0] = accept(listener, (struct sockaddr *)&sock2, &socklen)) == -1) {
+			int nready;
+
+			if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
+				goto failed;
+			/* Bound the wait by the clock, not by a count of passes: a
+			 * signal on every pass must not extend it, and a poll() that
+			 * returns at once must not consume it. */
+			if (time(NULL) >= deadline) {
+				errno = ETIMEDOUT;
+				goto failed;
+			}
+			if (ready_but_empty) {
+				/* The listener said ready, yet accept() found nothing
+				 * (the peer can reset first).  Pause instead of
+				 * spinning on a poll() that returns immediately.  A
+				 * signal only cuts the pause short -- the deadline
+				 * above, rechecked every pass, is the bound. */
+				if (poll(NULL, 0, SOCKETPAIR_ACCEPT_SLICE) < 0 && errno != EINTR)
+					goto failed;
+				ready_but_empty = 0;
+				continue;
+			}
+			pfd.revents = 0;
+			nready = poll(&pfd, 1, SOCKETPAIR_ACCEPT_SLICE);
+			if (nready < 0 && errno != EINTR)
+				goto failed;
+			ready_but_empty = nready > 0;
+		}
+	}
+	/* BSD gives the accepted fd the listener's non-blocking flag. */
+	set_blocking(fd[0]);
 
 	close(listener);
 	listener = -1;
@@ -823,12 +1025,14 @@ static int socketpair_tcp(int fd[2])
 	return 0;
 
  failed:
+	save_errno = errno;	/* keep it: a failing close() would overwrite it */
 	if (fd[0] != -1)
 		close(fd[0]);
 	if (fd[1] != -1)
 		close(fd[1]);
 	if (listener != -1)
 		close(listener);
+	errno = save_errno;
 	return -1;
 }
 

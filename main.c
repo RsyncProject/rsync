@@ -31,6 +31,9 @@
 #ifdef __TANDEM
 #include <floss.h(floss_execlp)>
 #endif
+#ifdef HAVE_SYS_RESOURCE_H
+#include <sys/resource.h>
+#endif
 
 extern int dry_run;
 extern int list_only;
@@ -48,6 +51,7 @@ extern int called_from_signal_handler;
 extern int need_messages_from_generator;
 extern int kluge_around_eof;
 extern int got_xfer_error;
+extern volatile sig_atomic_t got_sigusr2;
 extern int old_style_args;
 extern int msgs2stderr;
 extern int module_id;
@@ -712,20 +716,24 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 		dest_path = dot_dir_or_error();
 
 	if (daemon_filter_list.head) {
-		char *slash = strrchr(dest_path, '/');
+		/* Collapse ".." for the NAME-based daemon filter check so a "../excluded"
+		 * destination is matched by name, as stock rsync does on its sanitized
+		 * arg.  Done on a copy: the daemon exclude/filter is name-based (a symlink
+		 * whose own name is not excluded is still followed -- see rsyncd.conf(5)
+		 * "munge symlinks"), and the real dest_path is left for the resolver. */
+		char cleaned[MAXPATHLEN], *slash;
+		if (!sanitize_path(cleaned, dest_path, NULL, 0, SP_KEEP_DOT_DIRS))
+			strlcpy(cleaned, dest_path, sizeof cleaned);
+		slash = strrchr(cleaned, '/');
 		if (slash && (slash[1] == '\0' || (slash[1] == '.' && slash[2] == '\0')))
 			*slash = '\0';
-		else
-			slash = NULL;
-		if ((*dest_path != '.' || dest_path[1] != '\0')
-		 && (check_filter(&daemon_filter_list, FLOG, dest_path, 0) < 0
-		  || check_filter(&daemon_filter_list, FLOG, dest_path, 1) < 0)) {
+		if ((*cleaned != '.' || cleaned[1] != '\0')
+		 && (check_filter(&daemon_filter_list, FLOG, cleaned, 0) < 0
+		  || check_filter(&daemon_filter_list, FLOG, cleaned, 1) < 0)) {
 			rprintf(FERROR, "ERROR: daemon has excluded destination \"%s\"\n",
 				dest_path);
 			exit_cleanup(RERR_FILESELECT);
 		}
-		if (slash)
-			*slash = '/';
 	}
 
 	/* See what currently exists at the destination. */
@@ -739,10 +747,10 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 		if (ret < 0)
 			goto mkdir_error;
 		if (ret && (INFO_GTE(NAME, 1) || stdout_format_has_i)) {
-			if (file_total == 1 || trailing_slash)
+			if (cp && (file_total == 1 || trailing_slash))
 				*cp = '\0';
 			rprintf(FINFO, "created %d director%s for %s\n", ret, ret == 1 ? "y" : "ies", dest_path);
-			if (file_total == 1 || trailing_slash)
+			if (cp && (file_total == 1 || trailing_slash))
 				*cp = '/';
 		}
 		if (ret)
@@ -864,13 +872,20 @@ static void check_alt_basis_dirs(void)
 
 	for (j = 0; j < basis_dir_cnt; j++) {
 		char *bdir = basis_dir[j];
+		assert(bdir != NULL); /* option-supplied root; never NULL */
 		int bd_len = strlen(bdir);
 		if (bd_len > 1 && bdir[bd_len-1] == '/')
 			bdir[--bd_len] = '\0';
-		if (dry_run > 1 && *bdir != '/') {
+		/* Make a relative --link-dest/--copy-dest/--compare-dest absolute
+		 * (vs the destination curr_dir).  These are operator-trusted roots, so
+		 * an absolute path makes the do_*_at() wrappers use plain resolution
+		 * rather than reject an operator '..' outside the dest tree (e.g.
+		 * --copy-dest=../to).  Skipped when sanitize_paths already confined
+		 * them; the dry_run>1 case keeps its leading-"../"-strip. */
+		if (*bdir != '/' && (dry_run > 1 || !sanitize_paths)) {
 			int len = curr_dir_len + 1 + bd_len + 1;
 			char *new = new_array(char, len);
-			if (slash && strncmp(bdir, "../", 3) == 0) {
+			if (dry_run > 1 && slash && strncmp(bdir, "../", 3) == 0) {
 				/* We want to remove only one leading "../" prefix for
 				 * the directory we couldn't create in dry-run mode:
 				 * this ensures that any other ".." references get
@@ -1097,11 +1112,13 @@ static int do_recv(int f_in, int f_out, char *local_name)
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
-		/* Finally, we go to sleep until our parent kills us with a
-		 * USR2 signal.  We sleep for a short time, as on some OSes
-		 * a signal won't interrupt a sleep! */
-		while (1)
+		/* Finally, we go to sleep until our parent tells us to wrap up
+		 * with a USR2 signal.  We sleep for a short time, as on some OSes
+		 * a signal won't interrupt a sleep, then act on the flag the
+		 * (async-signal-safe) handler set. */
+		while (!got_sigusr2)
 			msleep(20);
+		receive_sigusr2();
 	}
 
 	am_generator = 1;
@@ -1227,15 +1244,25 @@ static void do_server_recv(int f_in, int f_out, int argc, char *argv[])
 		char **dir_p;
 		filter_rule_list *elp = &daemon_filter_list;
 
+		/* Collapse ".." and strip the module-dir prefix to get the module-relative
+		 * name, but keep a leading "/" for a "path = /" module (module_dirlen <= 1)
+		 * so an absolute (module-rooted) filter rule still matches. */
+		char clean[MAXPATHLEN], *dir;
 		for (dir_p = basis_dir; *dir_p; dir_p++) {
-			char *dir = *dir_p;
-			if (*dir == '/')
-				dir += module_dirlen;
+			if (!sanitize_path(clean, *dir_p, "/", 0, SP_DEFAULT))
+				strlcpy(clean, *dir_p, sizeof clean);
+			dir = clean + (*clean == '/' && module_dirlen > 1 ? module_dirlen : 0);
 			if (check_filter(elp, FLOG, dir, 1) < 0)
 				goto options_rejected;
 		}
-		if (partial_dir && *partial_dir == '/'
-		 && check_filter(elp, FLOG, partial_dir + module_dirlen, 1) < 0) {
+		if (partial_dir && *partial_dir == '/') {
+			if (!sanitize_path(clean, partial_dir, "/", 0, SP_DEFAULT))
+				strlcpy(clean, partial_dir, sizeof clean);
+			dir = clean + (*clean == '/' && module_dirlen > 1 ? module_dirlen : 0);
+			if (check_filter(elp, FLOG, dir, 1) < 0)
+				goto options_rejected;
+		}
+		if (0) {
 		    options_rejected:
 			rprintf(FERROR, "Your options have been rejected by the server.\n");
 			exit_cleanup(RERR_SYNTAX);
@@ -1269,6 +1296,17 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
 
 	if (am_sender) {
 		keep_dirlinks = 0; /* Must be disabled on the sender. */
+
+		/* Mirror client_run()'s sender_keeps_checksum check: a daemon-
+		 * as-sender with -c and a `log format` containing %C will read
+		 * F_SUM(file) in log_formatted(), so make_file() must allocate
+		 * SUM_EXTRA_CNT.  Without this, F_SUM() reads past the pool slot
+		 * and hex-encodes adjacent heap into the transfer log. */
+		if (always_checksum
+		 && (log_format_has(stdout_format, 'C')
+		  || log_format_has(logfile_format, 'C')))
+			sender_keeps_checksum = 1;
+
 		if (need_messages_from_generator)
 			io_start_multiplex_in(f_in);
 		else
@@ -1332,7 +1370,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 
 		become_copy_as_user();
 
-		flist = send_file_list(f_out, argc, argv);
+		send_file_list(f_out, argc, argv);
 		if (DEBUG_GTE(FLIST, 3))
 			rprintf(FINFO,"file list sent\n");
 
@@ -1622,14 +1660,24 @@ static void sigusr1_handler(UNUSED(int val))
 	exit_cleanup(RERR_SIGNAL1);
 }
 
+/* SIGUSR2 tells the receiver child to wrap up.  A signal handler must be
+ * async-signal-safe, so it only sets a flag here; receive_sigusr2() does the
+ * actual summary + shutdown (which use stdio/malloc/close) at a safe point in
+ * the receiver's post-transfer wait loops (read_final_goodbye via perform_io,
+ * and the trailing sleep). */
 static void sigusr2_handler(UNUSED(int val))
+{
+	got_sigusr2 = 1;
+}
+
+void receive_sigusr2(void)
 {
 	if (!am_server)
 		output_summary();
 	close_all();
 #ifdef GCOV_COVERAGE
-	/* The receiver child is killed here via SIGUSR2 and exits with _exit(),
-	 * bypassing the gcov atexit flush; without this it writes no .gcda. */
+	/* The receiver child exits with _exit() here, bypassing the gcov atexit
+	 * flush; without this it writes no .gcda. */
 	{ extern void __gcov_dump(void); __gcov_dump(); }
 #endif
 	if (got_xfer_error)
@@ -1734,12 +1782,39 @@ static void unset_env_var(const char *var)
 }
 
 
+/* The symlink-race-safe path resolver (secure_relative_open) holds one open
+ * dirfd per path component while it walks a path, plus an ancestor-dirfd cache
+ * -- far more descriptors than legacy rsync's single open().  On a host with a
+ * low default soft limit (e.g. OpenBSD's 128) a deep tree can hit EMFILE.
+ * Raise the soft RLIMIT_NOFILE toward the hard limit (unprivileged, per
+ * process; inherited by the sender/generator/receiver forks and daemon
+ * children), but cap it: some systems set an enormous hard limit (2^20+) that
+ * we don't want to adopt wholesale. */
+static void raise_fd_limit(void)
+{
+#if defined HAVE_GETRLIMIT && defined HAVE_SETRLIMIT && defined RLIMIT_NOFILE
+	struct rlimit rl;
+	rlim_t want = 4096; /* covers a MAXPATHLEN-deep walk + cache + headroom */
+
+	if (getrlimit(RLIMIT_NOFILE, &rl) < 0)
+		return;
+	if (want > rl.rlim_max)
+		want = rl.rlim_max; /* never exceed the (admin-set) hard limit */
+	if (rl.rlim_cur < want) { /* only ever raise, never lower an inherited limit */
+		rl.rlim_cur = want;
+		(void)setrlimit(RLIMIT_NOFILE, &rl); /* best-effort */
+	}
+#endif
+}
+
 int main(int argc,char *argv[])
 {
 	int ret;
 
 	raw_argc = argc;
 	raw_argv = argv;
+
+	raise_fd_limit();
 
 #ifdef HAVE_SIGACTION
 # ifdef HAVE_SIGPROCMASK

@@ -125,8 +125,22 @@ static void match_gnums(int32 *ndx_list, int ndx_count)
 		if (inc_recurse) {
 			node = hashtable_find(prior_hlinks, gnum, data_when_new);
 			if (node->data == data_when_new) {
+				if (gnum < hlink_flist->ndx_start) {
+					/* A non-first hard-link entry whose
+					 * gnum points before this flist's
+					 * ndx_start should already have been
+					 * recorded in prior_hlinks by an
+					 * earlier flist.  A peer that sends
+					 * such a back-reference on the first
+					 * flist (or to a gnum that was never
+					 * declared XMIT_HLINK_FIRST) is
+					 * misbehaving. */
+					rprintf(FERROR,
+					    "hard-link gnum %d precedes flist start %d\n",
+					    (int)gnum, (int)hlink_flist->ndx_start);
+					exit_cleanup(RERR_PROTOCOL);
+				}
 				node->data = new_array0(char, 5);
-				assert(gnum >= hlink_flist->ndx_start);
 				file->flags |= FLAG_HLINK_FIRST;
 				prev = -1;
 			} else if (CVAL(node->data, 0) == 0) {
@@ -406,7 +420,14 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 				}
 				break;
 			}
-			if (!quick_check_ok(FT_REG, cmpbuf, file, &alt_sx.st))
+			/* Content-based basis match only applies to regular
+			 * files: for a hard-linked symlink/device/special the
+			 * exact-inode check above is the only meaningful test,
+			 * and quick_check_ok(FT_REG, ...) would read F_SUM()
+			 * on a file_struct that has no SUM_EXTRA_CNT space
+			 * (recv_file_entry only allocates it for S_ISREG). */
+			if (!S_ISREG(file->mode)
+			 || !quick_check_ok(FT_REG, cmpbuf, file, &alt_sx.st))
 				continue;
 			statret = 1;
 			if (unchanged_attrs(cmpbuf, file, &alt_sx))
@@ -430,7 +451,7 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 			if (preserve_xattrs) {
 				free_xattr(sxp);
 				if (!XATTR_READY(alt_sx))
-					get_xattr(cmpbuf, sxp);
+					get_xattr(cmpbuf, -1, sxp);
 				else {
 					sxp->xattr = alt_sx.xattr;
 					alt_sx.xattr = NULL;

@@ -26,15 +26,39 @@ import argparse
 import concurrent.futures
 import fnmatch
 import glob
+import math
 import os
+import signal
 import subprocess
 import sys
 import threading
+import time
 
 # Share the test exit-code enum with the test helpers. exitcodes.py lives in
 # testsuite/ (next to this script); it has no import-time side effects.
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'testsuite'))
 from exitcodes import Exit
+
+
+def _race_seconds(text):
+    """argparse type for --race-timeout: a finite, strictly positive number.
+
+    A race test loops `while monotonic() < deadline`, so a budget of 0 (or a
+    negative, or a NaN, which fails every comparison) runs the body ZERO times
+    and the test reports PASS without ever exercising its oracle -- a silently
+    disarmed security test, which is worse than a slow one. Infinity would run
+    until the unrelated per-test timeout. The old max(RACE_TIMEOUT, 10.0) floor
+    used to make this unreachable; validating here restores that guarantee."""
+    try:
+        secs = float(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f'not a number: {text!r}')
+    if not math.isfinite(secs) or secs <= 0:
+        raise argparse.ArgumentTypeError(
+            f'must be a finite positive number of seconds, got {text!r}; '
+            'a zero/negative/NaN budget would make every race test pass '
+            'without running its race')
+    return secs
 
 
 def parse_args():
@@ -61,11 +85,19 @@ def parse_args():
                    help='Show test logs even for passing tests')
     p.add_argument('--stop-on-fail', action='store_true',
                    help='Stop after first test failure')
+    p.add_argument('--timing', action='store_true',
+                   help='After the run, report each test\'s wall-clock time, '
+                        'slowest first. With -j N the report also shows how '
+                        'much of the run the slowest test alone accounts for.')
     p.add_argument('--timeout', type=int, default=300, metavar='SECS',
                    help='Per-test timeout in seconds (default: 300)')
-    p.add_argument('--race-timeout', type=float, default=5.0, metavar='SECS',
+    p.add_argument('--race-timeout', type=_race_seconds, default=None, metavar='SECS',
                    help='Budget (seconds) a TOCTOU symlink-race test may spend '
-                        'trying to win its race before concluding (default: 5)')
+                        'trying to win its race before concluding. Overrides '
+                        'every such test\'s own default (5-15s, the suite\'s '
+                        'slowest tests: a race test always spends its whole '
+                        'budget). Lowering it speeds the suite up but weakens '
+                        'the oracle. Unset: each test keeps its default.')
     p.add_argument('--rsync-bin', default=None, metavar='PATH',
                    help='Path to rsync binary (default: ./rsync)')
     p.add_argument('--rsync-bin2', default=None, metavar='PATH',
@@ -80,7 +112,14 @@ def parse_args():
     p.add_argument('--protocol', type=int, default=None, metavar='VER',
                    help='Force protocol version (adds --protocol=VER to rsync)')
     p.add_argument('--expect-skipped', default=None, metavar='LIST',
-                   help='Comma-separated list of expected-skipped tests')
+                   help='Comma-separated list of expected-skipped tests. An '
+                        '@FILE entry reads a skip list (one test per line, '
+                        '"#" comments); relative paths resolve against srcdir '
+                        'and several may be composed, e.g. '
+                        '@testsuite/skiplist/linux.txt,@testsuite/skiplist/proto29.txt. '
+                        'A -NAME entry removes a name the rest of the spec '
+                        'added, for a host that can really run a test its '
+                        'platform list expects to skip.')
     p.add_argument('--expect-result', default=None, metavar='FILE',
                    help='Path to an expected-outcome manifest (one '
                         '"<testname> <pass|skip|fail|xfail>" per line). When '
@@ -88,6 +127,13 @@ def parse_args():
                         "test's actual outcome is compared against its "
                         'expected one; any mismatch (including an unexpected '
                         'pass) fails the run. Used for version-mixing CI.')
+    p.add_argument('--daemon-tests-only', action='store_true',
+                   help='Run only the tests that can reach the daemon '
+                        'transport. Intended for a --use-tcp pass that follows '
+                        'a full default-transport run: the tests this drops '
+                        'never call start_test_daemon(), so they cannot observe '
+                        '--use-tcp and would just repeat themselves. Disables '
+                        'the expected-skip oracle (it describes a full run).')
     p.add_argument('--use-tcp', action='store_true',
                    help='Run daemon tests against a real rsyncd bound to '
                         '127.0.0.1 (non-default). The default is the secure '
@@ -164,11 +210,30 @@ def get_testuser():
         return os.environ.get('LOGNAME', os.environ.get('USER', 'UNKNOWN'))
 
 
+def _move_aside(path):
+    """Rename an un-removable directory to a unique sibling so its name is free.
+
+    A rename-storm symlink-race test can corrupt a directory on some filesystems
+    (OpenBSD FFS soft-updates can leave an "empty" dir that still reports
+    ENOTEMPTY/EPERM and only fsck clears). `rm -rf` then can't remove it, but
+    renaming the top dir aside succeeds even with a corrupted descendant, freeing
+    the original name for a clean scratchdir."""
+    n = 0
+    while os.path.exists(f"{path}.corrupt.{os.getpid()}.{n}"):
+        n += 1
+    try:
+        os.rename(path, f"{path}.corrupt.{os.getpid()}.{n}")
+    except OSError:
+        pass
+
+
 def prep_scratch(scratchdir, srcdir, tooldir, setfacl_nodef):
     """Prepare a scratch directory for a test."""
     if os.path.isdir(scratchdir):
         subprocess.run(['chmod', '-R', 'u+rwX', scratchdir], capture_output=True)
         subprocess.run(['rm', '-rf', scratchdir], capture_output=True)
+        if os.path.isdir(scratchdir):
+            _move_aside(scratchdir)   # rm -rf left corrupted debris; don't inherit it
     os.makedirs(scratchdir, exist_ok=True)
     if setfacl_nodef:
         subprocess.run(setfacl_nodef + [scratchdir], capture_output=True)
@@ -224,6 +289,43 @@ def collect_tests(suitedir, patterns):
     return tests
 
 
+# Tokens through which a test can reach the daemon transport. --use-tcp works by
+# setting RSYNC_TEST_USE_TCP, which is read in exactly one place (rsyncfns
+# USE_TCP) and acted on in exactly one function (start_test_daemon): a test whose
+# source mentions none of these never gets there, so it behaves identically with
+# and without --use-tcp and running it a second time under TCP buys no coverage.
+#
+# The list is the closure of every rsyncfns helper that reaches USE_TCP,
+# start_rsyncd or claim_ports, plus the helper modules that open a daemon
+# connection themselves and the bare literals a test might use directly. It is
+# deliberately over-broad: a false positive only costs runtime, while a false
+# negative would silently drop real coverage.
+_DAEMON_API = (
+    'USE_TCP', 'require_tcp', 'start_test_daemon', 'start_rsyncd',
+    'claim_ports', 'claim_free_port', 'setup_chroot_inner',
+    'stdio_daemon', 'rsync_proto', 'DaemonClient',
+    'rsync://', '--daemon', 'rsyncd',
+)
+
+
+def select_daemon_tests(tests):
+    """Split `tests` into (daemon-transport tests, the rest).
+
+    Used by --daemon-tests-only so a TCP pass need not re-run the whole suite.
+    A test we cannot read is kept, not dropped -- the failure mode of this
+    filter must always be "ran too much"."""
+    keep, dropped = [], []
+    for path in tests:
+        try:
+            with open(path, errors='replace') as f:
+                text = f.read()
+        except OSError:
+            keep.append(path)
+            continue
+        (keep if any(tok in text for tok in _DAEMON_API) else dropped).append(path)
+    return keep, dropped
+
+
 _VALID_OUTCOMES = ('pass', 'skip', 'fail', 'xfail')
 
 
@@ -249,6 +351,165 @@ def parse_expect_result(path):
                 sys.exit(Exit.ERROR)
             expect[fields[0]] = fields[1]
     return expect
+
+
+def expand_skip_spec(spec, srcdir, suitedir):
+    """Expand an RSYNC_EXPECT_SKIPPED spec into a normalised csv.
+
+    The spec is a comma-separated list of test names, '@FILE' skip-list
+    references, and '-name' removals.  A skip-list file holds one test name per line ('#' starts a
+    comment; blank lines are ignored), which is what keeps two branches from
+    colliding: adding a test edits one line of one file rather than a shared
+    3 KB csv.  Several may be composed, e.g.
+        RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/linux.txt,@.../proto29.txt
+    Relative paths resolve against srcdir (not the cwd) so out-of-tree builds
+    and `make installcheck` work.  A '-name' entry removes a name the rest of
+    the spec added, for a host that can genuinely run a test its platform list
+    expects to skip; it is applied last, and must actually remove something.
+
+    Entries must name a real test, and each file must be non-empty, sorted and
+    free of duplicates: unsorted files defeat the point (everyone appends to
+    the same last line), and a stale name would otherwise fail as a skip
+    mismatch far from its cause.  Exits 2 on any of those -- nothing malformed
+    may quietly shrink the expected set, which would disarm the oracle.
+    """
+    def die(msg):
+        sys.stderr.write(msg + '\n')
+        sys.exit(Exit.ERROR)
+
+    # An entirely empty spec is the legitimate "expect no skips at all".  An
+    # empty entry *within* a spec is not: it is what an unset shell variable
+    # expands to, and silently dropping it would quietly shrink the expected
+    # set.
+    if not spec.strip():
+        return ''
+
+    names = []
+    drop = []
+    for tok in (t.strip() for t in spec.split(',')):
+        if not tok:
+            die('RSYNC_EXPECT_SKIPPED: empty entry (an unset variable?): '
+                f'{spec!r}')
+        if tok.startswith('-'):
+            # '-name' removes a name a composed list added, for a host that
+            # really can run a test its platform list expects to skip (e.g. a
+            # scratch dir on a second filesystem makes a cross-device copy
+            # work).  Subtraction cannot be done by whoever composes the spec,
+            # because the name lives inside an @FILE that is only expanded
+            # here.  Applied after every addition, so order does not matter.
+            drop.append((tok[1:], tok))
+            continue
+        if not tok.startswith('@'):
+            names.append((tok, 'RSYNC_EXPECT_SKIPPED'))
+            continue
+        path = tok[1:]
+        if not os.path.isabs(path):
+            path = os.path.join(srcdir, path)
+        try:
+            with open(path) as f:
+                lines = f.readlines()
+        except (OSError, UnicodeDecodeError) as e:
+            die(f'{tok}: cannot read skip list: {e}')
+        prev = None
+        found = 0
+        for lineno, raw in enumerate(lines, 1):
+            name = raw.split('#', 1)[0].strip()
+            if not name:
+                continue
+            where = f'{path}:{lineno}'
+            if len(name.split()) != 1:
+                die(f'{where}: expected one test name per line, got: {raw.rstrip()}')
+            if prev is not None and name <= prev:
+                die(f'{where}: skip lists must be sorted and duplicate-free '
+                    f'({name!r} follows {prev!r})')
+            prev = name
+            found += 1
+            names.append((name, where))
+        # A truncated or emptied list must not read as "expect no skips".
+        if not found:
+            die(f'{path}: skip list contains no test names')
+
+    seen = {}
+    for name, where in names:
+        if name in seen:
+            continue
+        seen[name] = where
+        # A plain test name: no path, and no comma (which the expanded csv,
+        # and the summary the fleet parses back, use as the separator).
+        if ',' in name or '/' in name or os.sep in name or name in ('.', '..'):
+            die(f'{where}: not a test name: {name!r}')
+        if not os.path.isfile(os.path.join(suitedir, name + '_test.py')):
+            die(f'{where}: no such test: {name}')
+    for name, tok in drop:
+        # Every removal must remove something.  A name the spec never added is
+        # stale (the list stopped expecting that skip, or it is misspelled), and
+        # a repeated removal is the same no-op written twice.  Shrinking the
+        # expected set is precisely what must not happen quietly, so neither is
+        # allowed to sit in a config unnoticed.
+        if name not in seen:
+            die(f'RSYNC_EXPECT_SKIPPED: {tok!r} removes a name that nothing '
+                f'added: {name}')
+        del seen[name]
+    return ','.join(sorted(seen))
+
+
+def read_backport_exclude(tooldir, suitedir):
+    """Test names from the BUILD tree's testsuite/skiplist/backport.txt.
+
+    A stable-backport branch runs a newer suite than its own code, and this
+    file names the tests that base cannot run.  It lives in the tree being
+    built, not the suite tree, so it cannot be an @FILE in the expect-skipped
+    spec -- those resolve against srcdir.
+    """
+    path = os.path.join(tooldir, 'testsuite', 'skiplist', 'backport.txt')
+    if not os.path.isfile(path):
+        return set()
+    names = set()
+    with open(path) as f:
+        for lineno, raw in enumerate(f, 1):
+            name = raw.split('#', 1)[0].strip()
+            if not name:
+                continue
+            where = f'{path}:{lineno}'
+            if len(name.split()) != 1:
+                sys.stderr.write(f'{where}: expected one test name per line\n')
+                sys.exit(Exit.ERROR)
+            # A stale name here would silently exclude nothing, which is the
+            # failure this file exists to prevent.
+            if not os.path.isfile(os.path.join(suitedir, name + '_test.py')):
+                sys.stderr.write(f'{where}: no such test: {name}\n')
+                sys.exit(Exit.ERROR)
+            names.add(name)
+    return names
+
+
+_TIMING_TOP = 25
+
+
+def print_timing_report(durations, outcomes, run_wall, parallel):
+    """Report per-test wall-clock, slowest first (--timing).
+
+    With -j N the run cannot finish sooner than its slowest single test, so the
+    tail matters as much as the total: a 300s test pins the whole suite to 300s
+    no matter how many workers there are. The footer gives both bounds -- the
+    serial sum (what one worker would take) and that floor -- so it is obvious
+    whether a slow run wants more parallelism or a faster individual test."""
+    if not durations:
+        return
+    ranked = sorted(durations.items(), key=lambda kv: kv[1], reverse=True)
+    total = sum(durations.values())
+    print(f'----- slowest tests (of {len(ranked)}, wall-clock each):')
+    for name, secs in ranked[:_TIMING_TOP]:
+        print(f'      {secs:7.1f}s  {name:<32} {outcomes.get(name, "?")}')
+    print(f'      serial sum {total:.0f}s over {len(ranked)} tests; '
+          f'run took {run_wall:.0f}s with -j{parallel}')
+    slowest, slowest_secs = ranked[0]
+    if parallel > 1:
+        # The floor: even with unlimited workers the suite cannot beat its
+        # longest single test.
+        print(f'      floor {slowest_secs:.0f}s ({slowest}) = '
+              f'{100.0 * slowest_secs / run_wall:.0f}% of this run; '
+              f'ideal at -j{parallel} is {total / parallel:.0f}s')
 
 
 def outcome_of(result):
@@ -290,13 +551,15 @@ def build_rsync_cmd(rsync_bin, args, scratchbase):
 
 class TestResult:
     """Result of a single test execution."""
-    __slots__ = ('testbase', 'result', 'output', 'skipped_reason')
+    __slots__ = ('testbase', 'result', 'output', 'skipped_reason', 'duration')
 
-    def __init__(self, testbase, result, output='', skipped_reason=''):
+    def __init__(self, testbase, result, output='', skipped_reason='',
+                 duration=0.0):
         self.testbase = testbase
         self.result = result
         self.output = output
         self.skipped_reason = skipped_reason
+        self.duration = duration
 
 
 def run_one_test(testscript, testbase, scratchdir, base_env, timeout,
@@ -306,6 +569,7 @@ def run_one_test(testscript, testbase, scratchdir, base_env, timeout,
     This function is safe to call from multiple threads — it uses only
     per-test state (unique scratchdir, copy of env).
     """
+    started = time.monotonic()
     prep_scratch(scratchdir, srcdir, tooldir, setfacl_nodef)
 
     env = base_env.copy()
@@ -319,18 +583,36 @@ def run_one_test(testscript, testbase, scratchdir, base_env, timeout,
         cmd = ['sh', '-e', testscript]
 
     logfile = os.path.join(scratchdir, 'test.log')
-    try:
-        with open(logfile, 'w') as log:
-            proc = subprocess.run(
-                cmd,
-                stdout=log, stderr=subprocess.STDOUT,
-                env=env, timeout=timeout,
-                cwd=env.get('TOOLDIR', '.')
-            )
-        result = proc.returncode
-    except subprocess.TimeoutExpired:
-        result = 1
-        with open(logfile, 'a') as log:
+    with open(logfile, 'w') as log:
+        # start_new_session: run the test driver as its own session/group leader
+        # so the daemon, clients and flipper it spawns inherit that group. A
+        # timeout then killpg's the whole tree (not just the driver), and the
+        # lock-file sweep can reap a SIGKILLed run's stranded group the same way.
+        proc = subprocess.Popen(
+            cmd,
+            stdout=log, stderr=subprocess.STDOUT,
+            env=env, cwd=env.get('TOOLDIR', '.'),
+            start_new_session=True,
+        )
+        try:
+            result = proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            # Reap the whole session group, but only if the driver really is its
+            # own group leader (start_new_session took) and that group isn't ours
+            # -- killpg of our own group would take down the runner.
+            try:
+                pgid = os.getpgid(proc.pid)
+            except OSError:
+                pgid = -1
+            if pgid == proc.pid and pgid != os.getpgrp():
+                try:
+                    os.killpg(pgid, signal.SIGKILL)
+                except OSError:
+                    proc.kill()
+            else:
+                proc.kill()
+            proc.wait()
+            result = 1
             log.write(f"\nTIMEOUT: test took over {timeout} seconds\n")
 
     # Build output text
@@ -368,7 +650,8 @@ def run_one_test(testscript, testbase, scratchdir, base_env, timeout,
     else:
         output_parts.append(f'FAIL    {testbase}')
 
-    return TestResult(testbase, result, '\n'.join(output_parts), skipped_reason)
+    return TestResult(testbase, result, '\n'.join(output_parts), skipped_reason,
+                      time.monotonic() - started)
 
 
 # Lock for serializing output in parallel mode
@@ -411,6 +694,18 @@ def main():
         rsync_bin2 = os.path.abspath(rsync_bin2)
 
     suitedir = os.path.join(srcdir, 'testsuite')
+    # A backport tree excludes what its base cannot run.  Those tests never
+    # run, so they must also drop out of the expected-skip set -- otherwise the
+    # oracle demands a skip from a test that was never started.
+    backport_excl = read_backport_exclude(tooldir, suitedir)
+    if backport_excl:
+        args.exclude = ','.join(x for x in (args.exclude,
+                                            ','.join(sorted(backport_excl))) if x)
+    if args.expect_skipped != 'IGNORE':
+        args.expect_skipped = expand_skip_spec(args.expect_skipped, srcdir, suitedir)
+        if backport_excl:
+            args.expect_skipped = ','.join(n for n in args.expect_skipped.split(',')
+                                           if n and n not in backport_excl)
     scratchbase = os.path.join(os.environ.get('scratchbase', tooldir), 'testtmp')
     os.makedirs(scratchbase, exist_ok=True)
 
@@ -490,7 +785,6 @@ def main():
         'scratchbase': scratchbase,
         'suitedir': suitedir,
         'TESTRUN_TIMEOUT': str(args.timeout),
-        'race_timeout': str(args.race_timeout),
         'HOME': scratchbase,
         'PYTHONPATH': pythonpath,
     })
@@ -498,6 +792,14 @@ def main():
         # Opt-in: daemon tests start a real rsyncd on a claimed loopback port.
         # Default (unset) keeps the secure stdio-pipe transport.
         base_env['RSYNC_TEST_USE_TCP'] = '1'
+    if args.race_timeout is not None:
+        # Only exported when the operator actually passed --race-timeout: its
+        # mere presence is what tells a race test to override its own default.
+        base_env['race_timeout'] = str(args.race_timeout)
+    else:
+        # A stale value inherited from the environment would silently override
+        # every test's default; the flag is the only way to set this.
+        base_env.pop('race_timeout', None)
     for k, v in shconfig.items():
         if v:
             base_env[k] = v
@@ -521,6 +823,17 @@ def main():
         if before != len(tests):
             print(f"Excluding {before - len(tests)} test(s) matching: "
                   f"{', '.join(excl)}")
+
+    # Narrow to the daemon-transport tests. The dropped count is always printed:
+    # a pass that silently ran a third of the suite would read in the report as
+    # if it had run all of it.
+    if args.daemon_tests_only:
+        tests, dropped = select_daemon_tests(tests)
+        print(f"Daemon-transport tests only: running {len(tests)}, skipping "
+              f"{len(dropped)} test(s) that cannot observe the transport")
+        # The expected-skip list describes a full run, so it cannot be enforced
+        # against a subset -- same rule as naming tests explicitly.
+        full_run = False
 
     # An expected-result manifest defines BOTH the run set (its keys) and the
     # expected per-test outcome (its values). Used for version-mixing runs.
@@ -554,6 +867,7 @@ def main():
     xfailed = 0
     skipped_list = []
     outcomes = {}  # testbase -> actual outcome string ('pass'/'skip'/'fail'/'xfail')
+    durations = {}  # testbase -> wall-clock seconds (for --timing)
 
     def process_result(tr):
         """Process a TestResult and update counters. Returns True if the test
@@ -565,6 +879,7 @@ def main():
         scratchdir = os.path.join(scratchbase, tr.testbase)
         oc = outcome_of(tr.result)
         outcomes[tr.testbase] = oc
+        durations[tr.testbase] = tr.duration
         if tr.result == Exit.PASS:
             passed += 1
         elif tr.result == Exit.SKIP:
@@ -586,6 +901,8 @@ def main():
             return mismatch(tr.testbase, oc)
         return tr.result not in (Exit.PASS, Exit.SKIP, Exit.XFAIL)
 
+    run_started = time.monotonic()
+
     if args.parallel > 1:
         # Parallel execution
         with concurrent.futures.ThreadPoolExecutor(max_workers=args.parallel) as executor:
@@ -593,7 +910,7 @@ def main():
             for testscript in tests:
                 testbase = _testbase(testscript)
                 scratchdir = os.path.join(scratchbase, testbase)
-                timeout = 600 if 'hardlinks' in testbase else args.timeout
+                timeout = 600 if ('hardlinks' in testbase or testbase == 'variety') else args.timeout
                 f = executor.submit(
                     run_one_test, testscript, testbase, scratchdir,
                     base_env, timeout, srcdir, tooldir, setfacl_nodef,
@@ -614,7 +931,7 @@ def main():
         for testscript in tests:
             testbase = _testbase(testscript)
             scratchdir = os.path.join(scratchbase, testbase)
-            timeout = 600 if 'hardlinks' in testbase else args.timeout
+            timeout = 600 if ('hardlinks' in testbase or testbase == 'variety') else args.timeout
             tr = run_one_test(
                 testscript, testbase, scratchdir,
                 base_env, timeout, srcdir, tooldir, setfacl_nodef,
@@ -623,6 +940,8 @@ def main():
             is_fail = process_result(tr)
             if is_fail and args.stop_on_fail:
                 break
+
+    run_wall = time.monotonic() - run_started
 
     # Check valgrind logs for errors
     vg_errors = 0
@@ -652,6 +971,9 @@ def main():
         print(f'      {skipped} skipped')
     if vg_errors > 0:
         print(f'      {vg_errors} valgrind error(s) found (see logs in {os.path.join(scratchbase, "valgrind-logs")})')
+
+    if args.timing:
+        print_timing_report(durations, outcomes, run_wall, args.parallel)
 
     if expect is not None:
         # Version-mixing mode: the run is judged purely on whether each test's

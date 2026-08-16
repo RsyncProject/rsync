@@ -1,0 +1,61 @@
+# Tests expected to SKIP.  One name per line, '#' starts a comment; the file
+# must stay sorted and duplicate-free (runtests.py enforces both).  Referenced
+# from a workflow as RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/<file>[,@...].
+# See testsuite/skiplist/README.md.
+#
+# Skipped on every platform that runs the oracle (Linux, macOS, Cygwin).
+# Mostly tests that need the real-TCP transport (require_tcp) or an ASan
+# build (require_asan), neither of which the default `make check` provides.
+# Reasons below are the ones this box reported; another platform may skip
+# the same test earlier for a different reason.
+
+checksum-zero-blocklen  # the pure-Python receiver needs a real TCP socket; run with --use-tcp
+chroot-basis-forge-inner-module  # the pure-Python sender needs a real TCP daemon; run with --use-tcp
+daemon-access-ip  # hosts allow/deny address matching needs a real TCP peer
+daemon-argv-limit  # raw malicious daemon client needs a real TCP daemon; run with --use-tcp
+daemon-chroot  # daemon chroot path needs the real start_daemon socket flow
+daemon-chroot-acl  # needs a real TCP peer address for reverse-DNS hostname ACL; run with --use-tcp
+daemon-deny-dns-failopen  # hosts deny DNS-failure matching needs a real TCP peer
+daemon-dot-file-force-wipe  # the malicious daemon client needs a real TCP socket; run with --use-tcp
+daemon-handshake-timeout  # stalling the pre-transfer handshake needs a real listening socket; run with --use-tcp
+daemon-http-proxy  # RSYNC_PROXY uses open_socket_out(), needs a real TCP connect
+daemon-leaf-type-race-fchmod  # leaf-type authority proof currently requires Darwin
+daemon-module-options  # motd/socket-options need a real socket
+daemon-namecvt-empty-response  # namecvt-empty-response test must run as a non-root user (sender uid/gid must differ from 0 to expose the bug)
+daemon-namecvt-newline-token  # the pure-Python sender needs a real TCP daemon; run with --use-tcp
+daemon-proxy-protocol  # PROXY-protocol header is read from a real TCP socket; run with --use-tcp
+daemon-refuse-compress-threads-alias  # the malicious receiver needs a real TCP daemon; run with --use-tcp
+daemon-standalone-detach  # standalone detaching daemon opens a real loopback listener; run with --use-tcp
+daemon-symlink-escape-matrix  # the daemon symlink-resolution flow needs a real TCP peer
+daemon-zstd-thread-exhaustion  # the malicious receiver needs a real TCP daemon; run with --use-tcp
+exclude-implied-trailing-backslash  # a real network rsync daemon is needed (am_server==0 per-module); run with --use-tcp
+inband-modname-leak  # the daemon @ERROR handshake needs a real TCP peer
+io-noop-flood-recursion  # the pure-Python client needs a real TCP daemon; run with --use-tcp
+io-nosend-flood-recursion  # the pure-Python client needs a real TCP daemon; run with --use-tcp
+io-readargs-argv-nullwrite  # the pure-Python client needs a real TCP daemon; run with --use-tcp
+ki62-io-error-mask  # needs --use-tcp to kill the daemon (sender) mid-transfer
+macos-setgid-ordinary-mode-regression  # macOS-specific fchmodat setgid behavior
+malicious-dot-dir-delete-scope  # the malicious sender needs a real TCP socket; run with --use-tcp
+malicious-dot-file-delete-scope  # the malicious sender needs a real TCP socket; run with --use-tcp
+malicious-server-partial-basis-symlink-overwrite  # the malicious sender needs a real TCP socket; run with --use-tcp
+match-append-empty-nullmap  # the pure-Python generator needs a real TCP daemon; run with --use-tcp
+match-want-i-nolen  # the pure-Python generator needs a real TCP daemon; run with --use-tcp
+peer-legacy-implied-delete-scope  # the malicious protocol-29 server needs TCP; run with --use-tcp
+proto-cleared-dirflist  # the pure-Python sender needs a real TCP daemon; run with --use-tcp
+proto-cleared-ndx  # the pure-Python sender needs a real TCP daemon; run with --use-tcp
+proto-hlink-flag-oob  # the pure-Python sender needs a real TCP daemon; run with --use-tcp
+proto-hlink-gnum  # the pure-Python sender needs a real TCP daemon; run with --use-tcp
+proto-msg-info-assert  # the pure-Python sender needs a real TCP daemon; run with --use-tcp
+proto-parent-ndx-empty-dirflist  # the pure-Python sender needs a real TCP daemon; run with --use-tcp
+proto-sender-selftest  # the pure-Python sender needs a real TCP daemon; run with --use-tcp
+proto-subflist-freed  # the pure-Python sender needs a real TCP daemon; run with --use-tcp
+proxy-connect-request-too-long  # fake-proxy listener needs a real TCP socket; run with --use-tcp
+proxy-protocol-trusted-peer  # PROXY protocol peer policy needs a real TCP daemon; run with --use-tcp
+proxy-response-header-too-long  # fake-proxy listener needs a real TCP socket; run with --use-tcp
+proxy-response-line-too-long  # fake-proxy listener needs a real TCP socket; run with --use-tcp
+recv-discard-nullderef  # root bypasses DAC: the unwritable dest dir wouldn't make the receiver's mkstemp fail, so the discard path (and the bug) is never reached
+recv-generator-acl-leak  # KI-23 real_sx ACL leak is only observable under AddressSanitizer/LSan
+uidlist-id0-name-leak  # KI-25 id-0 name leak is only observable under AddressSanitizer/LSan
+variety-symlink-traversal  # no old peer selected (RSYNC_PEER == RSYNC); nothing to compare for symlink-traversal divergence
+xattr-wire-cap  # the pure-Python daemon needs a real TCP socket; run with --use-tcp
+xrsync  # xrsync speaks the daemon protocol over a raw TCP socket; run with --use-tcp

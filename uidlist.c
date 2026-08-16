@@ -397,9 +397,11 @@ static void send_one_list(int f, struct idlist *idlist, int usernames)
 
 	/* Terminate the uid list with 0 (which was excluded above).
 	 * A modern rsync also sends the name of id 0. */
-	if (xmit_id0_names)
-		send_one_name(f, 0, usernames ? uid_to_user(0) : gid_to_group(0));
-	else
+	if (xmit_id0_names) {
+		const char *name = usernames ? uid_to_user(0) : gid_to_group(0);
+		send_one_name(f, 0, name);
+		free((char *)name);
+	} else
 		write_varint30(f, 0);
 }
 

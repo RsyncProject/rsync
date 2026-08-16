@@ -1,0 +1,33 @@
+# Tests expected to SKIP.  One name per line, '#' starts a comment; the file
+# must stay sorted and duplicate-free (runtests.py enforces both).  Referenced
+# from a workflow as RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/<file>[,@...].
+# See testsuite/skiplist/README.md.
+#
+# macOS-only additions to common.txt.
+
+acl-symlink-race
+acls-default
+acls-depth
+acls-unpinnable
+backup-acl-xattr-cache
+backup-crossdev-copy
+chmod-temp-dir
+copy-xattrs-symlink-race
+daemon-auth-group
+daemon-max-alloc-zero
+dir-sgid
+fake-super-acl-xattr
+link-dest-symlink-enotsup                # the ENOTSUP hard-link hook is an LD_PRELOAD, Linux-only
+open-noatime
+partial-protected-regular-retry-linux
+preallocate
+protected-regular
+readonly-partial-abort-mode-regression  # 
+rrsync-sender-leaf-flip
+rrsync-sender-parent-pin
+rrsync-symlink
+sender-remove-source-root-anchor
+simd-checksum
+source-change-size-continues
+sparse
+symlink-exclude-xattr

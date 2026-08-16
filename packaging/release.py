@@ -189,7 +189,10 @@ def step_2_prepare(args):
     tz_num   = tz_now[0:1].replace('+', '') + str(float(tz_now[1:3]) + float(tz_now[3:]) / 60)
 
     curversion = get_rsync_version()
-    lastversion, last_protocol_version, pdate = get_NEWS_version_info()
+    # Skip the version we are releasing: its NEWS entry may already be dated,
+    # in which case it would otherwise be taken for the previous release.
+    lastversion, last_protocol_version, pdate = get_NEWS_version_info(
+        skip_version=re.sub(r'(pre\d+|dev)$', '', curversion))
     protocol_version, subprotocol_version    = get_protocol_versions()
 
     # Default next version: bump preN, or move dev -> pre1.
@@ -337,8 +340,11 @@ def step_3_tweak(args):
                                  f"Unable to find SUBPROTOCOL_VERSION in {fn}")
         elif fn == 'NEWS.md':
             efv = re.escape(finalversion)
+            # Accept either "(UNRELEASED)" or an already-filled date, so a
+            # release entry that was dated by hand (or by an earlier run of
+            # this step) does not have to be reverted before releasing.
             x_re = re.compile(
-                r'^# NEWS for rsync %s \(UNRELEASED\)\s+## Changes in this version:\n' % efv
+                r'^# NEWS for rsync %s \((?:UNRELEASED|\d+ \w{3} \d{4})\)\s+## Changes in this version:\n' % efv
                 + r'(\n### PROTOCOL NUMBER:\s+- The protocol number was changed to \d+\.\n)?')
             rel_day = 'UNRELEASED' if pre else today
             repl = (f'# NEWS for rsync {finalversion} ({rel_day})\n\n'
@@ -346,7 +352,8 @@ def step_3_tweak(args):
             if proto_changed:
                 repl += f'\n### PROTOCOL NUMBER:\n\n - The protocol number was changed to {protocol_version}.\n'
             good_top = re.sub(r'\(.*?\)', '(UNRELEASED)', repl, 1)
-            msg = (f"The top of {fn} is not in the right format.  It should be:\n" + good_top)
+            msg = (f"The top of {fn} is not in the right format.  It should be:\n" + good_top
+                   + "(an already-filled release date in place of UNRELEASED is also accepted)")
             txt = replace_or_die(x_re, repl, txt, msg)
             x_re = re.compile(
                 r'^(\| )(\S{2} \S{3} \d{4})(\s+\|\s+%s\s+\| ).{11}(\s+\| )\S{2}(\s+\|+)$' % efv,

@@ -164,6 +164,7 @@ struct chmod_mode_struct *parse_chmod(const char *modestr,
 				break;
 			case 'a':
 				where |= 0111;
+				topbits |= 06000; /* a+s sets BOTH setuid and setgid (like chmod(1)) */
 				break;
 			case '+':
 				op = CHMOD_ADD;

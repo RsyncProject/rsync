@@ -31,7 +31,15 @@
 #include "ifuncs.h"
 #include "inums.h"
 
-/** If no timeout is specified then use a 60 second select timeout */
+#include <poll.h>
+
+/* Readiness bits we act on.  poll() can report POLLERR/POLLHUP/POLLNVAL even
+ * when they were not requested, and POLLPRI stands in for select()'s old
+ * exception set. */
+#define POLL_RD_BITS (POLLIN | POLLPRI | POLLERR | POLLHUP)
+#define POLL_WR_BITS (POLLOUT | POLLERR | POLLHUP)
+
+/** If no timeout is specified then use a 60 second I/O timeout */
 #define SELECT_TIMEOUT 60
 
 extern int bwlimit;
@@ -59,6 +67,7 @@ extern int xfer_sum_len;
 extern int daemon_connection;
 extern int protocol_version;
 extern int remove_source_files;
+extern int write_batch;
 extern int preserve_hard_links;
 extern BOOL extra_flist_sending_enabled;
 extern BOOL flush_ok_after_signal;
@@ -79,6 +88,7 @@ BOOL flist_receiving_enabled = False;
 /* Ignore an EOF error if non-zero. See whine_about_eof(). */
 int kluge_around_eof = 0;
 int got_kill_signal = -1; /* is set to 0 only after multiplexed I/O starts */
+volatile sig_atomic_t got_sigusr2 = 0; /* set by the async-signal-safe SIGUSR2 handler */
 
 int sock_f_in = -1;
 int sock_f_out = -1;
@@ -102,6 +112,11 @@ static struct {
 static time_t last_io_in;
 static time_t last_io_out;
 
+/* Absolute wall-clock bound for peer-controlled daemon handshake reads.
+ * This is deliberately separate from io_timeout: the latter is an idle
+ * transfer timeout and may be supplied by the module or client. */
+static time_t daemon_handshake_deadline;
+
 static int write_batch_monitor_in = -1;
 static int write_batch_monitor_out = -1;
 
@@ -113,6 +128,38 @@ static xbuf ff_xb = EMPTY_XBUF;
 static xbuf iconv_buf = EMPTY_XBUF;
 #endif
 static int select_timeout = SELECT_TIMEOUT;
+
+/* Turn select_timeout (in seconds) into a poll() millisecond count, keeping it
+ * positive and bounded.  A negative count means "wait forever" to poll(), which
+ * would bypass our keepalives and timeout enforcement entirely. */
+static int poll_timeout_ms(void)
+{
+	int secs = select_timeout;
+
+	if (secs <= 0 || secs > SELECT_TIMEOUT)
+		secs = SELECT_TIMEOUT;
+	return secs * 1000;
+}
+
+static int handshake_poll_timeout_ms(void)
+{
+	time_t now, left;
+	int timeout = poll_timeout_ms();
+
+	if (!daemon_handshake_deadline)
+		return timeout;
+
+	now = time(NULL);
+	left = daemon_handshake_deadline - now;
+	if (left <= 0) {
+		rprintf(FERROR, "[%s] daemon handshake timeout -- exiting\n", who_am_i());
+		exit_cleanup(RERR_TIMEOUT);
+	}
+	if (left <= INT_MAX / 1000 && left * 1000 < timeout)
+		timeout = (int)left * 1000;
+	return timeout;
+}
+
 static int active_filecnt = 0;
 static OFF_T active_bytecnt = 0;
 static int first_message = 1;
@@ -220,9 +267,15 @@ static NORETURN void whine_about_eof(BOOL allow_kluge)
 		int i;
 		if (kluge_around_eof > 0)
 			exit_cleanup(0);
-		/* If we're still here after 10 seconds, exit with an error. */
-		for (i = 10*1000/20; i--; )
+		/* The receiver is waiting here for the generator's SIGUSR2; act on it
+		 * (exit cleanly) the moment it arrives rather than sleeping the full
+		 * 10s and then erroring.  The async-signal-safe handler only sets the
+		 * flag, so this loop must poll it. */
+		for (i = 10*1000/20; i--; ) {
+			if (got_sigusr2)
+				receive_sigusr2();
 			msleep(20);
+		}
 	}
 
 	rprintf(FERROR, RSYNC_NAME ": connection unexpectedly closed "
@@ -243,31 +296,35 @@ static size_t safe_read(int fd, char *buf, size_t len)
 	assert(fd != iobuf.in_fd);
 
 	while (1) {
-		struct timeval tv;
-		fd_set r_fds, e_fds;
+		struct pollfd pfd;
 		int cnt;
 
-		FD_ZERO(&r_fds);
-		FD_SET(fd, &r_fds);
-		FD_ZERO(&e_fds);
-		FD_SET(fd, &e_fds);
-		tv.tv_sec = select_timeout;
-		tv.tv_usec = 0;
+		if (got_sigusr2)	/* receiver told to wrap up (e.g. a --read-batch fd) */
+			receive_sigusr2();
 
-		cnt = select(fd+1, &r_fds, NULL, &e_fds, &tv);
+		/* We use poll() rather than select() so that a high-numbered fd
+		 * (>= FD_SETSIZE) cannot overflow an fd_set bitmap. */
+		pfd.fd = fd;
+		pfd.events = POLLIN | POLLPRI;
+		pfd.revents = 0;
+
+		cnt = poll(&pfd, 1, handshake_poll_timeout_ms());
 		if (cnt <= 0) {
-			if (cnt < 0 && errno == EBADF) {
-				rsyserr(FERROR, errno, "safe_read select failed");
+			if (cnt < 0 && errno != EINTR && errno != EAGAIN) {
+				rsyserr(FERROR, errno, "safe_read poll failed");
 				exit_cleanup(RERR_FILEIO);
 			}
 			check_timeout(1, MSK_ALLOW_FLUSH);
 			continue;
 		}
 
-		/*if (FD_ISSET(fd, &e_fds))
-			rprintf(FINFO, "select exception on fd %d\n", fd); */
+		/* An invalid fd is reported here rather than via poll()'s return. */
+		if (pfd.revents & POLLNVAL) {
+			rsyserr(FERROR, EBADF, "safe_read poll failed");
+			exit_cleanup(RERR_FILEIO);
+		}
 
-		if (FD_ISSET(fd, &r_fds)) {
+		if (pfd.revents & POLL_RD_BITS) {
 			ssize_t n = read(fd, buf + got, len - got);
 			if (DEBUG_GTE(IO, 2)) {
 				rprintf(FINFO, "[%s] safe_read(%d)=%" SIZE_T_FMT_MOD "d\n",
@@ -315,6 +372,9 @@ static void safe_write(int fd, const char *buf, size_t len)
 
 	assert(fd != iobuf.out_fd);
 
+	if (got_sigusr2)	/* receiver told to wrap up before this (batch) write */
+		receive_sigusr2();
+
 	n = write(fd, buf, len);
 	if ((size_t)n == len)
 		return;
@@ -332,19 +392,21 @@ static void safe_write(int fd, const char *buf, size_t len)
 	}
 
 	while (len) {
-		struct timeval tv;
-		fd_set w_fds;
+		struct pollfd pfd;
 		int cnt;
 
-		FD_ZERO(&w_fds);
-		FD_SET(fd, &w_fds);
-		tv.tv_sec = select_timeout;
-		tv.tv_usec = 0;
+		if (got_sigusr2)	/* receiver told to wrap up (e.g. a --write-batch fd) */
+			receive_sigusr2();
 
-		cnt = select(fd + 1, NULL, &w_fds, NULL, &tv);
+		/* poll() avoids the FD_SETSIZE limit that select() imposes. */
+		pfd.fd = fd;
+		pfd.events = POLLOUT;
+		pfd.revents = 0;
+
+		cnt = poll(&pfd, 1, poll_timeout_ms());
 		if (cnt <= 0) {
-			if (cnt < 0 && errno == EBADF) {
-				rsyserr(FERROR, errno, "safe_write select failed on %s", what_fd_is(fd));
+			if (cnt < 0 && errno != EINTR && errno != EAGAIN) {
+				rsyserr(FERROR, errno, "safe_write poll failed on %s", what_fd_is(fd));
 				exit_cleanup(RERR_FILEIO);
 			}
 			if (io_timeout)
@@ -352,7 +414,12 @@ static void safe_write(int fd, const char *buf, size_t len)
 			continue;
 		}
 
-		if (FD_ISSET(fd, &w_fds)) {
+		if (pfd.revents & POLLNVAL) {
+			rsyserr(FERROR, EBADF, "safe_write poll failed on %s", what_fd_is(fd));
+			exit_cleanup(RERR_FILEIO);
+		}
+
+		if (pfd.revents & POLL_WR_BITS) {
 			n = write(fd, buf, len);
 			if (n < 0) {
 				if (errno == EINTR)
@@ -561,9 +628,8 @@ static void handle_kill_signal(BOOL flush_ok)
  * unused raw data in the buf would prevent the reading of socket data. */
 static char *perform_io(size_t needed, int flags)
 {
-	fd_set r_fds, e_fds, w_fds;
-	struct timeval tv;
-	int cnt, max_fd;
+	struct pollfd pfds[3];
+	int cnt, max_fd, npfds, poll_timeout, in_pollpos, out_pollpos, ff_pollpos;
 	size_t empty_buf_len = 0;
 	xbuf *out;
 	char *data;
@@ -656,13 +722,15 @@ static char *perform_io(size_t needed, int flags)
 		}
 
 		max_fd = -1;
+		npfds = 0;
+		in_pollpos = out_pollpos = ff_pollpos = -1;
 
-		FD_ZERO(&r_fds);
-		FD_ZERO(&e_fds);
 		if (iobuf.in_fd >= 0 && iobuf.in.size - iobuf.in.len) {
 			if (!read_batch || batch_fd >= 0) {
-				FD_SET(iobuf.in_fd, &r_fds);
-				FD_SET(iobuf.in_fd, &e_fds);
+				pfds[npfds].fd = iobuf.in_fd;
+				pfds[npfds].events = POLLIN | POLLPRI;
+				pfds[npfds].revents = 0;
+				in_pollpos = npfds++;
 			}
 			if (iobuf.in_fd > max_fd)
 				max_fd = iobuf.in_fd;
@@ -670,12 +738,14 @@ static char *perform_io(size_t needed, int flags)
 
 		/* Only do more filesfrom processing if there is enough room in the out buffer. */
 		if (ff_forward_fd >= 0 && iobuf.out.size - iobuf.out.len > FILESFROM_BUFLEN*2) {
-			FD_SET(ff_forward_fd, &r_fds);
+			pfds[npfds].fd = ff_forward_fd;
+			pfds[npfds].events = POLLIN;
+			pfds[npfds].revents = 0;
+			ff_pollpos = npfds++;
 			if (ff_forward_fd > max_fd)
 				max_fd = ff_forward_fd;
 		}
 
-		FD_ZERO(&w_fds);
 		if (iobuf.out_fd >= 0) {
 			if (iobuf.raw_flushing_ends_before
 			 || (!iobuf.msg.len && iobuf.out.len > iobuf.out_empty_len && !(flags & PIO_NEED_MSGROOM))) {
@@ -715,7 +785,18 @@ static char *perform_io(size_t needed, int flags)
 			} else
 				out = NULL;
 			if (out) {
-				FD_SET(iobuf.out_fd, &w_fds);
+				/* A direct daemon connection uses one fd for both
+				 * directions; give it a single row with both events
+				 * rather than two rows carrying different masks. */
+				if (in_pollpos >= 0 && iobuf.out_fd == iobuf.in_fd) {
+					pfds[in_pollpos].events |= POLLOUT;
+					out_pollpos = in_pollpos;
+				} else {
+					pfds[npfds].fd = iobuf.out_fd;
+					pfds[npfds].events = POLLOUT;
+					pfds[npfds].revents = 0;
+					out_pollpos = npfds++;
+				}
 				if (iobuf.out_fd > max_fd)
 					max_fd = iobuf.out_fd;
 			}
@@ -749,19 +830,20 @@ static char *perform_io(size_t needed, int flags)
 
 		if (got_kill_signal > 0)
 			handle_kill_signal(True);
+		if (got_sigusr2)
+			receive_sigusr2();
 
 		if (extra_flist_sending_enabled) {
 			if (file_total - file_old_total < MAX_FILECNT_LOOKAHEAD && IN_MULTIPLEXED_AND_READY)
-				tv.tv_sec = 0;
+				poll_timeout = 0;
 			else {
 				extra_flist_sending_enabled = False;
-				tv.tv_sec = select_timeout;
+				poll_timeout = poll_timeout_ms();
 			}
 		} else
-			tv.tv_sec = select_timeout;
-		tv.tv_usec = 0;
+			poll_timeout = poll_timeout_ms();
 
-		cnt = select(max_fd + 1, &r_fds, &w_fds, &e_fds, &tv);
+		cnt = poll(pfds, npfds, poll_timeout);
 
 		if (cnt <= 0) {
 			if (cnt < 0 && errno == EBADF) {
@@ -774,11 +856,29 @@ static char *perform_io(size_t needed, int flags)
 				extra_flist_sending_enabled = !flist_eof;
 			} else
 				check_timeout((flags & PIO_NEED_INPUT) != 0, 0);
-			FD_ZERO(&r_fds); /* Just in case... */
-			FD_ZERO(&w_fds);
+			/* Just in case... */
+			if (in_pollpos >= 0)
+				pfds[in_pollpos].revents = 0;
+			if (ff_pollpos >= 0)
+				pfds[ff_pollpos].revents = 0;
+			if (out_pollpos >= 0)
+				pfds[out_pollpos].revents = 0;
 		}
 
-		if (iobuf.in_fd >= 0 && FD_ISSET(iobuf.in_fd, &r_fds)) {
+		if (cnt > 0) {
+			/* poll() reports a bad fd here, not via its return value. */
+			int p;
+			for (p = 0; p < npfds; p++) {
+				if (pfds[p].revents & POLLNVAL) {
+					msgs2stderr = 1;
+					rsyserr(FERROR, EBADF, "perform_io: poll reported an invalid fd");
+					exit_cleanup(RERR_SOCKETIO);
+				}
+			}
+		}
+
+		if (iobuf.in_fd >= 0 && in_pollpos >= 0
+		 && pfds[in_pollpos].revents & POLL_RD_BITS) {
 			size_t len, pos = iobuf.in.pos + iobuf.in.len;
 			ssize_t n;
 			if (pos >= iobuf.in.size) {
@@ -827,7 +927,7 @@ static char *perform_io(size_t needed, int flags)
 			exit_cleanup(RERR_TIMEOUT);
 		}
 
-		if (out && FD_ISSET(iobuf.out_fd, &w_fds)) {
+		if (out && out_pollpos >= 0 && pfds[out_pollpos].revents & POLL_WR_BITS) {
 			size_t len = iobuf.raw_flushing_ends_before ? iobuf.raw_flushing_ends_before - out->pos : out->len;
 			ssize_t n;
 
@@ -878,6 +978,8 @@ static char *perform_io(size_t needed, int flags)
 
 		if (got_kill_signal > 0)
 			handle_kill_signal(True);
+		if (got_sigusr2)
+			receive_sigusr2();
 
 		/* We need to help prevent deadlock by doing what reading
 		 * we can whenever we are here trying to write. */
@@ -888,7 +990,8 @@ static char *perform_io(size_t needed, int flags)
 				wait_for_receiver(); /* generator only */
 		}
 
-		if (ff_forward_fd >= 0 && FD_ISSET(ff_forward_fd, &r_fds)) {
+		if (ff_forward_fd >= 0 && ff_pollpos >= 0
+		 && pfds[ff_pollpos].revents & POLL_RD_BITS) {
 			/* This can potentially flush all output and enable
 			 * multiplexed output, so keep this last in the loop
 			 * and be sure to not cache anything that would break
@@ -900,6 +1003,8 @@ static char *perform_io(size_t needed, int flags)
 
 	if (got_kill_signal > 0)
 		handle_kill_signal(True);
+	if (got_sigusr2)
+		receive_sigusr2();
 
 	data = iobuf.in.buf + iobuf.in.pos;
 
@@ -1070,17 +1175,30 @@ void send_msg_int(enum msgcode code, int num)
 
 void send_msg_success(const char *fname, int num)
 {
+	/* Batch-only mode has not duplicated anything on the receiving side yet.
+	 * The receiver still reports success to the generator for file-list and
+	 * hard-link bookkeeping, but the generator must not turn that status into
+	 * sender-side removal. */
+	if (am_generator && write_batch < 0 && remove_source_files)
+		return;
+
 	if (local_server) {
 		STRUCT_STAT st;
 
 		if (DEBUG_GTE(IO, 1))
 			rprintf(FINFO, "[%s] send_msg_success(%d)\n", who_am_i(), num);
 
-		if (stat(fname, &st) < 0)
-			memset(&st, 0, sizeof (STRUCT_STAT));
+		/* The dev/ino is consumed only by the sender's --remove-source-files
+		 * same-file safety check (successful_send), so skip the per-file
+		 * stat entirely otherwise -- it's sent but never read. */
+		if (remove_source_files && stat(fname, &st) == 0) {
+			SIVAL64(num_dev_ino_buf, 4, st.st_dev);
+			SIVAL64(num_dev_ino_buf, 4+8, st.st_ino);
+		} else {
+			SIVAL64(num_dev_ino_buf, 4, 0);
+			SIVAL64(num_dev_ino_buf, 4+8, 0);
+		}
 		SIVAL(num_dev_ino_buf, 0, num);
-		SIVAL64(num_dev_ino_buf, 4, st.st_dev);
-		SIVAL64(num_dev_ino_buf, 4+8, st.st_ino);
 		send_msg(MSG_SUCCESS, num_dev_ino_buf, sizeof num_dev_ino_buf, -1);
 	} else
 		send_msg_int(MSG_SUCCESS, num);
@@ -1103,7 +1221,7 @@ static void got_flist_entry_status(enum festatus status, int ndx)
 
 	switch (status) {
 	case FES_SUCCESS:
-		if (remove_source_files) {
+		if (remove_source_files && write_batch >= 0) {
 			if (local_server)
 				send_msg(MSG_SUCCESS, num_dev_ino_buf, sizeof num_dev_ino_buf, -1);
 			else
@@ -1147,8 +1265,26 @@ void io_set_sock_fds(int f_in, int f_out)
 
 void set_io_timeout(int secs)
 {
+	/* A negative timeout is meaningless; treat it as "no timeout" rather than
+	 * letting it drive allowed_lull / select_timeout negative (a tight loop).
+	 * (--timeout is parsed by options.c as a plain int, so it can be negative.) */
+	if (secs < 0)
+		secs = 0;
 	io_timeout = secs;
-	allowed_lull = (io_timeout + 1) / 2;
+	/* Compute ceil(io_timeout/2) in a wider type: io_timeout can be INT_MAX
+	 * (a peer's MSG_IO_TIMEOUT -- now capped in read_a_msg() -- or an operator
+	 * --timeout, which options.c parses unbounded), and a plain "io_timeout + 1"
+	 * would overflow to a negative allowed_lull / select_timeout.  poll() now
+	 * takes a millisecond count where negative means "wait forever", so this
+	 * would hang the process rather than spin it -- and it still fires a
+	 * keepalive flood.  poll_timeout_ms() clamps as well; keep both. */
+	allowed_lull = (int)(((int64)io_timeout + 1) / 2);
+	/* The generator and sender derive an int loop-check limit as
+	 * allowed_lull * 5; keep allowed_lull small enough that that product can't
+	 * overflow either.  The cap is invisible to real use -- allowed_lull is the
+	 * keep-alive half-interval and INT_MAX/5 seconds is over 13 years. */
+	if (allowed_lull > INT_MAX / 5)
+		allowed_lull = INT_MAX / 5;
 
 	if (!io_timeout || allowed_lull > SELECT_TIMEOUT)
 		select_timeout = SELECT_TIMEOUT;
@@ -1157,6 +1293,14 @@ void set_io_timeout(int secs)
 
 	if (read_batch)
 		allowed_lull = 0;
+}
+
+void set_daemon_handshake_timeout(int secs)
+{
+	if (secs > 0)
+		daemon_handshake_deadline = time(NULL) + secs;
+	else
+		daemon_handshake_deadline = 0;
 }
 
 static void check_for_d_option_error(const char *msg)
@@ -1305,6 +1449,8 @@ static void unbackslash_arg(char *s)
 	*t = '\0';
 }
 
+#define MAX_DAEMON_ARGS (MAX_ARGS * 16)
+
 void read_args(int f_in, char *mod_name, char *buf, size_t bufsiz, int rl_nulls,
 	       int unescape, char ***argv_p, int *argc_p, char **request_p)
 {
@@ -1327,6 +1473,11 @@ void read_args(int f_in, char *mod_name, char *buf, size_t bufsiz, int rl_nulls,
 	while (1) {
 		if (read_line(f_in, buf, bufsiz, rl_flags) == 0)
 			break;
+
+		if (mod_name && argc >= MAX_DAEMON_ARGS - 1) {
+			rprintf(FERROR, "too many daemon arguments\n");
+			exit_cleanup(RERR_PROTOCOL);
+		}
 
 		if (argc == maxargs-1) {
 			maxargs += MAX_ARGS;
@@ -1358,6 +1509,13 @@ void read_args(int f_in, char *mod_name, char *buf, size_t bufsiz, int rl_nulls,
 				dot_pos = argc;
 		}
 	}
+	/* glob_expand()/glob_match() reserve glob.argc+1 slots -- room for the
+	 * entry being added but not for this trailing NULL.  A post-dot line
+	 * whose " mod/" splits land argc on exactly maxargs (or any later
+	 * ENSURE_MEMSPACE doubling boundary) would otherwise make the next
+	 * store an 8-byte NULL write one slot past the argv allocation. */
+	if (argc >= maxargs)
+		argv = realloc_array(argv, char *, maxargs = argc + 1);
 	argv[argc] = NULL;
 
 	glob_expand(NULL, NULL, NULL, NULL);
@@ -1374,8 +1532,9 @@ BOOL io_start_buffering_out(int f_out)
 	if (iobuf.out.buf) {
 		if (iobuf.out_fd == -1)
 			iobuf.out_fd = f_out;
-		else
+		else if (iobuf.out_fd >= 0)
 			assert(f_out == iobuf.out_fd);
+		/* else out_fd == -2: peer already gone; leave it dead. */
 		return False;
 	}
 
@@ -1393,8 +1552,9 @@ BOOL io_start_buffering_in(int f_in)
 	if (iobuf.in.buf) {
 		if (iobuf.in_fd == -1)
 			iobuf.in_fd = f_in;
-		else
+		else if (iobuf.in_fd >= 0)
 			assert(f_in == iobuf.in_fd);
+		/* else in_fd == -2: peer already EOF'd; leave it dead. */
 		return False;
 	}
 
@@ -1543,16 +1703,26 @@ static void read_a_msg(void)
 		if (msg_bytes != 4)
 			goto invalid_msg;
 		val = raw_read_int();
-		iobuf.in_multiplexed = 1;
+		val &= IOERR_VALID_MASK;
 		io_error |= val;
 		if (am_receiver)
 			send_msg_int(MSG_IO_ERROR, val);
+		iobuf.in_multiplexed = 1;
 		break;
 	case MSG_IO_TIMEOUT:
 		if (msg_bytes != 4 || am_server || am_generator)
 			goto invalid_msg;
 		val = raw_read_int();
 		iobuf.in_multiplexed = 1;
+		/* The peer may only ask us to use a SHORTER timeout (a stricter cap); a
+		 * non-positive value would disable our --timeout entirely, letting a
+		 * malicious server hang the client indefinitely, so ignore it.  A very
+		 * large value (near INT_MAX) would overflow the (io_timeout + 1) / 2
+		 * computation in set_io_timeout(), wrapping allowed_lull and
+		 * select_timeout negative -- which poll() reads as "wait forever",
+		 * hanging the client.  Cap at 24 hours. */
+		if (val <= 0 || val > 86400)
+			break;
 		if (!io_timeout || io_timeout > val) {
 			if (INFO_GTE(MISC, 2))
 				rprintf(FINFO, "Setting --timeout=%d to match server\n", val);
@@ -1563,17 +1733,17 @@ static void read_a_msg(void)
 		/* Support protocol-30 keep-alive method. */
 		if (msg_bytes != 0)
 			goto invalid_msg;
-		iobuf.in_multiplexed = 1;
 		if (am_sender)
 			maybe_send_keepalive(time(NULL), MSK_ALLOW_FLUSH);
+		iobuf.in_multiplexed = 1;
 		break;
 	case MSG_DELETED:
 		if (msg_bytes >= sizeof data)
 			goto overflow;
 		if (am_generator) {
 			raw_read_buf(data, msg_bytes);
-			iobuf.in_multiplexed = 1;
 			send_msg(MSG_DELETED, data, msg_bytes, 1);
+			iobuf.in_multiplexed = 1;
 			break;
 		}
 #ifdef ICONV_OPTION
@@ -1611,7 +1781,6 @@ static void read_a_msg(void)
 		} else
 #endif
 			raw_read_buf(data, msg_bytes);
-		iobuf.in_multiplexed = 1;
 		/* A directory name was sent with the trailing null */
 		if (msg_bytes > 0 && !data[msg_bytes-1])
 			log_delete(data, S_IFDIR);
@@ -1619,6 +1788,7 @@ static void read_a_msg(void)
 			data[msg_bytes] = '\0';
 			log_delete(data, S_IFREG);
 		}
+		iobuf.in_multiplexed = 1;
 		break;
 	case MSG_SUCCESS:
 		if (msg_bytes != (local_server ? 4+8+8 : 4)) {
@@ -1640,11 +1810,11 @@ static void read_a_msg(void)
 		if (msg_bytes != 4)
 			goto invalid_msg;
 		val = raw_read_int();
-		iobuf.in_multiplexed = 1;
 		if (am_generator)
 			got_flist_entry_status(FES_NO_SEND, val);
 		else
 			send_msg_int(MSG_NO_SEND, val);
+		iobuf.in_multiplexed = 1;
 		break;
 	case MSG_ERROR_SOCKET:
 	case MSG_ERROR_UTF8:
@@ -2052,6 +2222,21 @@ void read_sum_head(int f, struct sum_struct *sum)
 			(long)sum->blength, who_am_i());
 		exit_cleanup(RERR_PROTOCOL);
 	}
+	if (sum->count && sum->blength == 0) {
+		rprintf(FERROR, "Invalid zero block length [%s]\n",
+			who_am_i());
+		exit_cleanup(RERR_PROTOCOL);
+	}
+#if SIZEOF_CAPITAL_OFF_T < 8
+	/* The append-mode callers compute (OFF_T)count * blength; on a 32-bit
+	 * OFF_T that product can wrap even though both factors are individually
+	 * in range, corrupting the lseek/loop bounds.  Reject it early. */
+	if (sum->blength > 0 && sum->count > MAX_INT32 / sum->blength) {
+		rprintf(FERROR, "checksum count*blength overflows OFF_T [%s]\n",
+			who_am_i());
+		exit_cleanup(RERR_PROTOCOL);
+	}
+#endif
 	sum->s2length = protocol_version < 27 ? csum_length : (int)read_int(f);
 	if (sum->s2length < 0 || sum->s2length > xfer_sum_len) {
 		rprintf(FERROR, "Invalid checksum length %d [%s]\n",
@@ -2366,6 +2551,7 @@ int32 read_ndx(int f)
 {
 	static int32 prev_positive = -1, prev_negative = 1;
 	int32 *prev_ptr, num;
+	uint32 unum;
 	char b[4];
 
 	if (protocol_version < 30)
@@ -2385,11 +2571,20 @@ int32 read_ndx(int f)
 			b[3] = CVAL(b, 0) & ~0x80;
 			b[0] = b[1];
 			read_buf(f, b+1, 2);
-			num = IVAL(b, 0);
+			unum = IVAL(b, 0);
 		} else
-			num = (UVAL(b,0)<<8) + UVAL(b,1) + *prev_ptr;
+			unum = (UVAL(b,0)<<8) + UVAL(b,1) + (uint32)*prev_ptr;
 	} else
-		num = UVAL(b, 0) + *prev_ptr;
+		unum = UVAL(b, 0) + (uint32)*prev_ptr;
+	/* A peer-supplied index that overflows a signed int32 (used unchecked as a
+	 * file-list index) is a protocol violation -- reject it here rather than
+	 * relying on every downstream consumer to bounds-check. */
+	if (unum > (uint32)MAX_INT32) {
+		rprintf(FERROR, "Invalid file index: %lu [%s]\n",
+			(unsigned long)unum, who_am_i());
+		exit_cleanup(RERR_PROTOCOL);
+	}
+	num = (int32)unum;
 	*prev_ptr = num;
 	if (prev_ptr == &prev_negative)
 		num = -num;

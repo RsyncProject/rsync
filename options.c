@@ -27,6 +27,7 @@
 extern int module_id;
 extern int local_server;
 extern int sanitize_paths;
+extern int operator_path_resolve;
 extern int trust_sender_args;
 extern int trust_sender_filter;
 extern unsigned int module_dirlen;
@@ -59,6 +60,9 @@ int preserve_perms = 0;
 int preserve_executability = 0;
 int preserve_devices = 0;
 int preserve_specials = 0;
+int drop_devices = 0;
+char *confine_root = NULL;		/* --confine-root: see syscall.c */
+unsigned int confine_rootlen = 0;
 int preserve_uid = 0;
 int preserve_gid = 0;
 int preserve_mtimes = 0;
@@ -87,6 +91,7 @@ int preallocate_files = 0;
 int do_compression = 0;
 int do_compression_level = CLVL_NOT_SPECIFIED;
 int do_compression_threads = 0; /*n = 0 use rsync thread, n >= 1 spawn n threads for compression */
+#define MAX_DAEMON_COMPRESSION_THREADS 8
 int am_root = 0; /* 0 = normal, 1 = root, 2 = --super, -1 = --fake-super */
 int am_server = 0;
 int am_sender = 0;
@@ -126,6 +131,7 @@ int connect_timeout = 0;
 int keep_partial = 0;
 int safe_symlinks = 0;
 int copy_unsafe_links = 0;
+int insecure_links = 0;
 int munge_symlinks = 0;
 int use_secure_symlinks = 0;
 int size_only = 0;
@@ -451,7 +457,10 @@ static void parse_output_words(struct output_struct *words, short *levels, const
 				len--;
 		}
 		lev = isDigit(str+len) ? atoi(str+len) : 1;
-		if (lev > MAX_OUT_LEVEL)
+		/* atoi() of an overflowing positive digit string can return a
+		 * negative int (LONG_MAX truncated on LP64); a negative lev
+		 * here later indexes counts[lev] in make_output_option(). */
+		if (lev > MAX_OUT_LEVEL || lev < 0)
 			lev = MAX_OUT_LEVEL;
 		if (len == 4 && strncasecmp(str, "help", 4) == 0) {
 			output_item_help(words);
@@ -676,12 +685,17 @@ static struct poptOption long_options[] = {
   {"no-write-devices", 0,  POPT_ARG_VAL,    &write_devices, 0, 0, 0 },
   {"specials",         0,  POPT_ARG_VAL,    &preserve_specials, 1, 0, 0 },
   {"no-specials",      0,  POPT_ARG_VAL,    &preserve_specials, 0, 0, 0 },
+  {"drop-D",           0,  POPT_ARG_VAL,    &drop_devices, 1, 0, 0 },
+  {"no-drop-D",        0,  POPT_ARG_VAL,    &drop_devices, 0, 0, 0 },
+  {"confine-root",     0,  POPT_ARG_STRING, &confine_root, 0, 0, 0 },
   {"links",           'l', POPT_ARG_VAL,    &preserve_links, 1, 0, 0 },
   {"no-links",         0,  POPT_ARG_VAL,    &preserve_links, 0, 0, 0 },
   {"no-l",             0,  POPT_ARG_VAL,    &preserve_links, 0, 0, 0 },
   {"copy-links",      'L', POPT_ARG_NONE,   &copy_links, 0, 0, 0 },
   {"copy-unsafe-links",0,  POPT_ARG_NONE,   &copy_unsafe_links, 0, 0, 0 },
   {"safe-links",       0,  POPT_ARG_NONE,   &safe_symlinks, 0, 0, 0 },
+  {"insecure-links",   0,  POPT_ARG_VAL,    &insecure_links, 1, 0, 0 },
+  {"no-insecure-links",0,  POPT_ARG_VAL,    &insecure_links, 0, 0, 0 },
   {"munge-links",      0,  POPT_ARG_VAL,    &munge_symlinks, 1, 0, 0 },
   {"no-munge-links",   0,  POPT_ARG_VAL,    &munge_symlinks, 0, 0, 0 },
   {"copy-dirlinks",   'k', POPT_ARG_NONE,   &copy_dirlinks, 0, 0, 0 },
@@ -904,9 +918,54 @@ void option_error(void)
 }
 
 
+/* Does this row store a compile-time constant, and if so which?
+ *
+ * popt's `val` is not comparable across argInfo kinds.  For POPT_ARG_VAL it IS
+ * the value stored in `arg`; for the others a nonzero `val` is an action code
+ * handed to the parser's switch, and POPT_ARG_NONE with a destination stores 1
+ * regardless.  Comparing the raw field therefore misses aliases spelled with
+ * different table shapes -- --del is POPT_ARG_NONE/&delete_during/0 and
+ * --delete-during is POPT_ARG_VAL/&delete_during/1, and both set it to 1. */
+static int refuse_const_assign(const struct poptOption *op, int *valp)
+{
+	if (!op->arg)
+		return 0;
+	if (op->argInfo == POPT_ARG_VAL) {
+		*valp = op->val;
+		return 1;
+	}
+	/* A nonzero val here means the row ALSO runs a parser action, so it is
+	 * not merely an assignment and must not be folded in with one. */
+	if (op->argInfo == POPT_ARG_NONE && op->val == 0) {
+		*valp = 1;
+		return 1;
+	}
+	return 0;
+}
+
+/* Do two table rows name the same capability?  An exact refuse rule names a
+ * capability, not one spelling of it. */
+static int same_refuse_action(const struct poptOption *a, const struct poptOption *b)
+{
+	int a_val, b_val;
+
+	/* Constant assignments: same destination, same resulting value.  The
+	 * value check keeps opposite switches such as --foo and --no-foo apart,
+	 * since they differ only in what they store. */
+	if (refuse_const_assign(a, &a_val) && refuse_const_assign(b, &b_val))
+		return a->arg == b->arg && a_val == b_val;
+
+	/* Anything else has to match as a table entry: a row storing a runtime
+	 * value (POPT_ARG_INT, POPT_ARG_STRING) needs the same destination and
+	 * action code, and an action-only row the same nonzero code. */
+	if (a->argInfo != b->argInfo || a->val != b->val)
+		return 0;
+	return a->arg ? a->arg == b->arg : !b->arg && a->val != 0;
+}
+
 static void parse_one_refuse_match(int negated, const char *ref, const struct poptOption *list_end)
 {
-	struct poptOption *op;
+	struct poptOption *op, *matched_op = NULL;
 	char shortName[2];
 	int is_wild = strpbrk(ref, "*?[") != NULL;
 	int found_match = 0;
@@ -927,8 +986,21 @@ static void parse_one_refuse_match(int negated, const char *ref, const struct po
 			else if (!is_wild)
 				op->descrip = negated ? "a=" : "r=";
 			found_match = 1;
-			if (!is_wild)
+			if (!is_wild) {
+				matched_op = op;
 				break;
+			}
+		}
+	}
+
+	if (matched_op) {
+		for (op = long_options; op != list_end; op++) {
+			if (op == matched_op || !same_refuse_action(op, matched_op))
+				continue;
+			if (op->descrip[1] == '*')
+				op->descrip = negated ? "a*" : "r*";
+			else
+				op->descrip = negated ? "a=" : "r=";
 		}
 	}
 
@@ -1008,6 +1080,11 @@ static void set_refuse_options(void)
 			parse_one_refuse_match(0, "iconv", list_end);
 #endif
 		parse_one_refuse_match(0, "log-file*", list_end);
+		/* A client must never disable the daemon's symlink confinement:
+		 * --insecure-links is a local-only flag, so the daemon hard-refuses it
+		 * (dropping the connection).  The daemon's own opt-out is the
+		 * "insecure links" module parameter, not this flag. */
+		parse_one_refuse_match(0, "insecure-links", list_end);
 	}
 
 #ifndef SUPPORT_ATIMES
@@ -1089,6 +1166,8 @@ static ssize_t parse_size_arg(const char *size_arg, char def_suf, const char *op
 	int reps, mult, len;
 	const char *arg, *err = "invalid", *min_max = NULL;
 	ssize_t limit = -1, size = 1;
+	ssize_t size_max = max_value >= 0 ? max_value : (ssize_t)(SIZE_MAX / 2);
+	double dsize;
 
 	for (arg = size_arg; isDigit(arg); arg++) {}
 	if (*arg == '.' || *arg == get_decimal_point()) /* backward compatibility: always allow '.' */
@@ -1123,11 +1202,38 @@ static ssize_t parse_size_arg(const char *size_arg, char def_suf, const char *op
 		mult = 1024, arg += 2;
 	else
 		goto failure;
-	while (reps--)
+	while (reps--) {
+		if (size > size_max / mult) {
+			err = "too large";
+			min_max = "max";
+			limit = max_value;
+			goto failure;
+		}
 		size *= mult;
-	size *= atof(size_arg);
-	if ((*arg == '+' || *arg == '-') && arg[1] == '1' && arg != size_arg)
-		size += atoi(arg), arg += 2;
+	}
+	errno = 0;
+	dsize = strtod(size_arg, NULL);
+	if (errno == ERANGE || dsize < 0 || dsize > (double)size_max / size
+	 || (max_value < 0 && dsize >= (double)size_max / size)) {
+		err = "too large";
+		min_max = "max";
+		limit = max_value;
+		goto failure;
+	}
+	size = (ssize_t)(dsize * size);
+	if ((*arg == '+' || *arg == '-') && arg[1] == '1' && arg != size_arg) {
+		if (*arg == '+') {
+			if (size == size_max) {
+				err = "too large";
+				min_max = "max";
+				limit = max_value;
+				goto failure;
+			}
+			size++;
+		} else
+			size--;
+		arg += 2;
+	}
 	if (*arg)
 		goto failure;
 	if (size < 0 || (max_value >= 0 && size > max_value)) {
@@ -1151,6 +1257,8 @@ failure:
 			min_max, do_big_num(limit, 3, NULL),
 			unlimited_0 && min_max[1] == 'i' ? " or 0 for unlimited" : "");
 	}
+	if (len < 0 || len > (int)sizeof err_buf - 2)
+		len = sizeof err_buf - 2;
 	err_buf[len] = '\n';
 	err_buf[len+1] = '\0';
 	return -1;
@@ -1959,6 +2067,10 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		ssize_t size = parse_size_arg(max_alloc_arg, 'B', "max-alloc", 1024*1024, -1, True);
 		if (size < 0)
 			goto cleanup;
+		if (size == 0) {
+			snprintf(err_buf, sizeof err_buf, "max-alloc must be greater than zero\n");
+			goto cleanup;
+		}
 		max_alloc = size;
 	}
 	if (!max_alloc)
@@ -2023,6 +2135,12 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		}
 		if (do_compression_threads < 0)
 			do_compression_threads = 0;
+		/* A daemon client controls the server-side sender arguments.  Keep one
+		 * unauthenticated connection from asking Zstandard to materialize its
+		 * implementation maximum (currently hundreds) of worker threads.  Local
+		 * and remote-shell invocations retain the operator-requested value. */
+		if (am_daemon && do_compression_threads > MAX_DAEMON_COMPRESSION_THREADS)
+			do_compression_threads = MAX_DAEMON_COMPRESSION_THREADS;
 	}
 
 #ifdef HAVE_SETVBUF
@@ -2261,6 +2379,26 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		}
 	}
 
+	if (confine_root) {
+		/* A daemon already has module_dir for this job, and honouring a
+		 * peer-supplied root there could only loosen the module boundary. */
+		if (am_daemon)
+			confine_root = NULL;
+		else if (*confine_root != '/') {
+			snprintf(err_buf, sizeof err_buf,
+				 "--confine-root must be an absolute path\n");
+			return 0;
+		} else if (insecure_links) {
+			/* The opt-out restores the legacy open, which short-circuits the
+			 * walk that enforces the root -- so the pair would silently mean
+			 * no confinement at all.  Say so instead. */
+			snprintf(err_buf, sizeof err_buf,
+				 "--insecure-links cannot be combined with --confine-root\n");
+			return 0;
+		} else
+			confine_root = normalize_path(confine_root, True, &confine_rootlen);
+	}
+
 	if (sanitize_paths) {
 		int i;
 		for (i = argc; i-- > 0; )
@@ -2272,21 +2410,26 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	}
 	if (daemon_filter_list.head && !am_sender) {
 		filter_rule_list *elp = &daemon_filter_list;
+		/* Strip the module-dir prefix to get the module-relative name, but keep a
+		 * leading "/" for a "path = /" module (module_dirlen <= 1) so an absolute
+		 * (module-rooted) filter rule still matches. */
 		if (tmpdir) {
-			char *dir;
+			char clean[MAXPATHLEN], *dir;
 			if (!*tmpdir)
 				goto options_rejected;
-			dir = tmpdir + (*tmpdir == '/' ? module_dirlen : 0);
-			clean_fname(dir, CFN_COLLAPSE_DOT_DOT_DIRS);
+			if (!sanitize_path(clean, tmpdir, "/", 0, SP_DEFAULT))
+				strlcpy(clean, tmpdir, sizeof clean);
+			dir = clean + (*clean == '/' && module_dirlen > 1 ? module_dirlen : 0);
 			if (check_filter(elp, FLOG, dir, 1) < 0)
 				goto options_rejected;
 		}
 		if (backup_dir) {
-			char *dir;
+			char clean[MAXPATHLEN], *dir;
 			if (!*backup_dir)
 				goto options_rejected;
-			dir = backup_dir + (*backup_dir == '/' ? module_dirlen : 0);
-			clean_fname(dir, CFN_COLLAPSE_DOT_DOT_DIRS);
+			if (!sanitize_path(clean, backup_dir, "/", 0, SP_DEFAULT))
+				strlcpy(clean, backup_dir, sizeof clean);
+			dir = clean + (*clean == '/' && module_dirlen > 1 ? module_dirlen : 0);
 			if (check_filter(elp, FLOG, dir, 1) < 0)
 				goto options_rejected;
 		}
@@ -2463,7 +2606,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 
 	if (files_from) {
 		char *h, *p;
-		int q;
+		int q = 0;
 		if (argc > 2 || (!am_daemon && !am_server && argc == 1)) {
 			usage(FERROR);
 			exit_cleanup(RERR_SYNTAX);
@@ -2497,7 +2640,19 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 				if (check_filter(&daemon_filter_list, FLOG, dir, 0) < 0)
 					goto options_rejected;
 			}
-			filesfrom_fd = open(files_from, O_RDONLY|O_BINARY);
+			/* Operator-supplied path that may transit attacker-writable
+			 * parents; refuse symlinks not owned by uid 0 or our euid,
+			 * as for --exclude-from/--include-from/--filter in exclude.c.
+			 * A daemon reads this list from a CLIENT-requested path
+			 * (--files-from=:LIST) and it must stay inside the module:
+			 * operator_path_resolve makes the ownership walk also refuse a
+			 * (trusted-owned) symlink that redirects the list outside the
+			 * module root -- e.g. a root-owned backup symlink. No-op off a
+			 * daemon (the module-root check only fires when am_daemon). */
+			int save_opr = operator_path_resolve;
+			operator_path_resolve = 1;
+			filesfrom_fd = open_no_attacker_symlinks(files_from, O_RDONLY|O_BINARY, 0);
+			operator_path_resolve = save_opr;
 			if (filesfrom_fd < 0) {
 				snprintf(err_buf, sizeof err_buf,
 					"failed to open files-from file %s: %s\n",
@@ -2537,7 +2692,7 @@ static char SPLIT_ARG_WHEN_OLD[1];
  **/
 char *safe_arg(const char *opt, const char *arg)
 {
-#define SHELL_CHARS "!#$&;|<>(){}\"'` \t\\"
+#define SHELL_CHARS "!#$&;|<>(){}\"\'` \t\n\r\\"
 #define WILD_CHARS  "*?[]" /* We don't allow remote brace expansion */
 	BOOL is_filename_arg = !opt;
 	char *escapes = is_filename_arg ? SHELL_CHARS : WILD_CHARS SHELL_CHARS;
@@ -2556,7 +2711,16 @@ char *safe_arg(const char *opt, const char *arg)
 			escape_leading_tilde = 1;
 		}
 		for (f = arg; *f; f++) {
-			if (strchr(escapes, *f))
+			if (*f == '\\') {
+				/* Mirror the writer below: in filename mode a backslash
+				 * before a wildcard is not doubled, so don't reserve a slot
+				 * for it.  The "f[1] &&" also avoids the strchr(WILD_CHARS,
+				 * '\0') footgun (which matches the terminator) on a trailing
+				 * backslash -- otherwise the counter and writer disagree and
+				 * an uninitialized heap byte leaks into the result. */
+				if (!is_filename_arg || !(f[1] && strchr(WILD_CHARS, f[1])))
+					extras++;
+			} else if (strchr(escapes, *f))
 				extras++;
 		}
 	}
@@ -2581,7 +2745,7 @@ char *safe_arg(const char *opt, const char *arg)
 			*t++ = '\\';
 		while (*f) {
 			if (*f == '\\') {
-				if (!is_filename_arg || !strchr(WILD_CHARS, f[1]))
+				if (!is_filename_arg || !(f[1] && strchr(WILD_CHARS, f[1])))
 					*t++ = '\\';
 			} else if (strchr(escapes, *f))
 				*t++ = '\\';
@@ -2621,7 +2785,10 @@ void server_options(char **args, int *argc_p)
 	if (protect_args)
 		argstr[x++] = 's';
 
-	for (i = 0; i < verbose; i++)
+	/* `verbose` is unbounded (one increment per -v on our own command
+	 * line), so an uncapped loop walks past argstr[64].  Anything beyond
+	 * level ~5 is meaningless to the server anyway. */
+	for (i = 0; i < verbose && i < 9; i++)
 		argstr[x++] = 'v';
 
 	if (quiet && msgs2stderr)
@@ -2897,6 +3064,11 @@ void server_options(char **args, int *argc_p)
 
 	if (copy_unsafe_links)
 		args[ac++] = "--copy-unsafe-links";
+
+	/* --insecure-links is NOT forwarded: it is a local-only opt-out.  A daemon
+	 * governs its own confinement via the "insecure links" module parameter and
+	 * drops a connection that sends --insecure-links; a remote-shell peer that
+	 * wants it must be given it on its own side (e.g. via --rsync-path). */
 
 	if (safe_symlinks)
 		args[ac++] = "--safe-links";

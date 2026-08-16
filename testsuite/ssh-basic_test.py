@@ -12,11 +12,11 @@ import subprocess
 
 from rsyncfns import (
     FROMDIR, SRCDIR, TODIR,
-    checkit, hands_setup, runtest, test_skipped,
+    checkit, hands_setup, runtest, test_skipped, rsync_path_arg, rsh_cmd,
 )
 
 
-SSH = str(SRCDIR / 'support' / 'lsh.sh')
+SSH = rsh_cmd()
 
 # Allow opting into real ssh via the shconfig variable, like the shell test.
 if os.environ.get('rsync_enable_ssh_tests') == 'yes':
@@ -42,13 +42,13 @@ from rsyncfns import RSYNC, RSYNC_PEER
 
 
 def _basic():
-    checkit(['-avH', '-e', SSH, f'--rsync-path={RSYNC_PEER}',
+    checkit(['-avH', '-e', SSH, f'--rsync-path={rsync_path_arg()}',
              f'{FROMDIR}/', f'localhost:{TODIR}'], FROMDIR, TODIR)
 
 
 def _delete_after_rename():
     shutil.move(str(TODIR / 'text'), str(TODIR / 'ThisShouldGo'))
-    checkit(['--delete', '-avH', '-e', SSH, f'--rsync-path={RSYNC_PEER}',
+    checkit(['--delete', '-avH', '-e', SSH, f'--rsync-path={rsync_path_arg()}',
              f'{FROMDIR}/', f'localhost:{TODIR}'], FROMDIR, TODIR)
 
 

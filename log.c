@@ -120,12 +120,20 @@ static char const *rerr_name(int code)
 	return NULL;
 }
 
+static void filtered_fwrite(FILE *f, const char *in_buf, int in_len, int use_isprint, int escape_c1, char end_char);
+
 static void logit(int priority, const char *buf)
 {
 	if (logfile_was_closed)
 		logfile_reopen();
 	if (logfile_fp) {
-		fprintf(logfile_fp, "%s [%d] %s", timestring(time(NULL)), (int)getpid(), buf);
+		/* Escape control chars in the message so an attacker-controlled
+		 * filename can't inject terminal escapes into the log an admin later
+		 * cat's (CWE-117); keep the trailing newline raw via end_char. */
+		int len = strlen(buf);
+		char trailing = len && (buf[len-1] == '\n' || buf[len-1] == '\r') ? buf[--len] : '\0';
+		fprintf(logfile_fp, "%s [%d] ", timestring(time(NULL)), (int)getpid());
+		filtered_fwrite(logfile_fp, buf, len, 0, 1, trailing);
 		fflush(logfile_fp);
 	} else {
 		syslog(priority, "%s", buf);
@@ -154,7 +162,15 @@ static void syslog_init()
 static void logfile_open(void)
 {
 	mode_t old_umask = umask(022 | orig_umask);
-	logfile_fp = fopen(logfile_name, "a");
+	/* --log-file/`log file =` are operator-supplied paths that may transit
+	 * attacker-writable dirs; a planted symlink could redirect root's log
+	 * into e.g. /root/.ssh/authorized_keys.  Refuse symlinks not owned by
+	 * uid 0 or our euid. */
+	int fd = open_no_attacker_symlinks(logfile_name,
+						O_WRONLY | O_APPEND | O_CREAT, 0644);
+	logfile_fp = fd >= 0 ? fdopen(fd, "a") : NULL;
+	if (!logfile_fp && fd >= 0)
+		close(fd);
 	umask(old_umask);
 	if (!logfile_fp) {
 		int fopen_errno = errno;
@@ -223,7 +239,7 @@ void logfile_reopen(void)
 	}
 }
 
-static void filtered_fwrite(FILE *f, const char *in_buf, int in_len, int use_isprint, char end_char)
+static void filtered_fwrite(FILE *f, const char *in_buf, int in_len, int use_isprint, int escape_c1, char end_char)
 {
 	char outbuf[1024], *ob = outbuf;
 	const char *end = in_buf + in_len;
@@ -235,7 +251,8 @@ static void filtered_fwrite(FILE *f, const char *in_buf, int in_len, int use_isp
 		}
 		if ((in_buf < end - 4 && *in_buf == '\\' && in_buf[1] == '#'
 		  && isDigit(in_buf + 2) && isDigit(in_buf + 3) && isDigit(in_buf + 4))
-		 || (*in_buf != '\t' && ((use_isprint && !isPrint(in_buf)) || *(uchar*)in_buf < ' ')))
+		 || (*in_buf != '\t' && ((use_isprint && !isPrint(in_buf)) || *(uchar*)in_buf < ' '
+		  || (escape_c1 && *(uchar*)in_buf >= 0x80 && *(uchar*)in_buf <= 0x9f))))
 			ob += snprintf(ob, 6, "\\#%03o", *(uchar*)in_buf++);
 		else
 			*ob++ = *in_buf++;
@@ -273,8 +290,12 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 		if (am_daemon > 0 && code != FCLIENT)
 			code = FLOG;
 	} else if (send_msgs_to_gen) {
-		assert(!is_utf8);
-		/* Pass the message to our sibling in native charset. */
+		/* Pass the message to our sibling in native charset.  is_utf8
+		 * may be set here if a malicious peer sends MSG_INFO/MSG_ERROR
+		 * to a daemon receiver (read_a_msg passes !am_generator); the
+		 * old assert(!is_utf8) made that a remotely-reachable abort.
+		 * Forwarding the bytes raw is safe -- the generator's rwrite()
+		 * gets is_utf8=0 and filtered_fwrite escapes non-printables. */
 		send_msg((enum msgcode)code, buf, len, 0);
 		return;
 	}
@@ -378,7 +399,7 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 			ierrno = errno;
 			if (outbuf.len) {
 				char trailing = inbuf.len ? '\0' : trailing_CR_or_NL;
-				filtered_fwrite(f, convbuf, outbuf.len, 0, trailing);
+				filtered_fwrite(f, convbuf, outbuf.len, 0, 0, trailing);
 				if (trailing) {
 					trailing_CR_or_NL = '\0';
 					fflush(f);
@@ -401,7 +422,7 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 	} else
 #endif
 	{
-		filtered_fwrite(f, buf, len, !allow_8bit_chars, trailing_CR_or_NL);
+		filtered_fwrite(f, buf, len, !allow_8bit_chars, 0, trailing_CR_or_NL);
 		if (trailing_CR_or_NL)
 			fflush(f);
 	}
@@ -505,12 +526,17 @@ void remember_initial_stats(void)
 	initial_data_written = total_data_written;
 }
 
+/* Size of log_formatted()'s per-escape "fmt" scratch buffer.  log_format_has()
+ * must bound its width-digit scan to the same limit so the two parsers agree on
+ * where an escape letter falls (see the digit loop in each). */
+#define LOG_FMT_SIZE 32
+
 /* A generic logging routine for send/recv, with parameter substitiution. */
 static void log_formatted(enum logcode code, const char *format, const char *op,
 			  struct file_struct *file, const char *fname, int iflags,
 			  const char *hlink)
 {
-	char buf[MAXPATHLEN+1024], buf2[MAXPATHLEN], fmt[32];
+	char buf[MAXPATHLEN+1024], buf2[MAXPATHLEN], fmt[LOG_FMT_SIZE];
 	char *p, *s, *c;
 	const char *n;
 	size_t len, total;
@@ -691,7 +717,7 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 		case 'C':
 			n = NULL;
 			if (S_ISREG(file->mode)) {
-				if (always_checksum)
+				if (always_checksum && !(iflags & ITEM_DELETED))
 					n = sum_as_hex(file_sum_nni->num, F_SUM(file), 1);
 				else if (iflags & ITEM_TRANSFER)
 					n = sum_as_hex(xfer_sum_nni->num, sender_file_sum, 0);
@@ -756,6 +782,9 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 				}
 			}
 			break;
+		case '%':
+			n = "%";
+			break;
 		}
 
 		/* "n" is the string to be inserted in place of this % code. */
@@ -799,21 +828,33 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 int log_format_has(const char *format, char esc)
 {
 	const char *p;
+	int width;
 
 	if (!format)
 		return 0;
 
 	for (p = format; (p = strchr(p, '%')) != NULL; ) {
 		for (p++; *p == '\''; p++) {} /*SHARED ITERATOR*/
-		if (*p == '-')
+		/* Mirror log_formatted()'s width-digit scan exactly (c starts at
+		 * fmt+1, so width starts at 1): both must stop at the same digit
+		 * or they disagree on where the escape letter is, which for %C
+		 * can leave sender_keeps_checksum unset and over-read F_SUM. */
+		width = 1;
+		if (*p == '-') {
 			p++;
-		while (isDigit(p))
+			width++;
+		}
+		while (isDigit(p) && width < LOG_FMT_SIZE - 8) {
 			p++;
+			width++;
+		}
 		while (*p == '\'') p++;
 		if (!*p)
 			break;
 		if (*p == esc)
 			return 1;
+		if (*p == '%')	/* %% is a literal '%', not the start of an escape */
+			p++;
 	}
 	return 0;
 }

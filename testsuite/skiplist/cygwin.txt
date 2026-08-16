@@ -1,0 +1,66 @@
+# Tests expected to SKIP.  One name per line, '#' starts a comment; the file
+# must stay sorted and duplicate-free (runtests.py enforces both).  Referenced
+# from a workflow as RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/<file>[,@...].
+# See testsuite/skiplist/README.md.
+#
+# Cygwin-only additions to common.txt.
+
+acl-symlink-race
+acls
+acls-default
+acls-depth
+acls-unpinnable
+backup-acl-xattr-cache
+backup-dir-symlink-race
+basis-xname-traversal
+batch-file-symlink
+chown
+chroot-alt-dest-inner-module
+chroot-copy-dest-inner-module
+chroot-link-dest-inner-module
+chroot-receiver-write-inner-module
+chroot-special-inner-module
+copy-dest-symlink-readleak
+copy-xattrs-symlink-race
+daemon-auth-group
+daemon-chroot-munge-default
+daemon-config-symlink
+daemon-max-alloc-zero
+daemon-module-chdir-symlink
+daemon-module-private-parent
+daemon-secrets-file-symlink
+devices
+dir-sgid
+early-input-symlink
+excludefrom-symlink
+fake-super-acl-xattr
+fake-super-backup-fifo-regression
+files-from-leak
+filter-leak
+filter-merge-symlink
+insecure-links-admin-optout
+link-dest-symlink-enotsup                # the ENOTSUP hard-link hook is an LD_PRELOAD, Linux-only
+log-file-symlink
+msg-io-timeout-overflow
+nondaemon-symlink-race
+nonroot-restrictive-perms
+open-noatime
+operator-path-backup-rmdir
+operator-path-backup-symlink
+operator-path-insecure-links-daemon
+partial-protected-regular-retry-linux
+partial-protected-regular-retry-policy  # deterministic partial EACCES recovery uses dyld interposing
+password-file-symlink
+protected-regular
+rename-mixed-parent-transfer
+rrsync-sender-leaf-flip
+rrsync-sender-parent-pin
+rrsync-symlink
+sender-remove-source-root-anchor
+simd-checksum
+source-change-size-continues
+symlink-dest-backupdir
+symlink-exclude-xattr
+symlink-race-dest
+symlink-race-relative-dest
+temp-dir-symlink-injection
