@@ -56,8 +56,8 @@ rename-mixed-parent-transfer
 rrsync-sender-leaf-flip
 rrsync-sender-parent-pin
 rrsync-symlink
-search-only-destination
 rrsync-userns-procfs
+search-only-destination
 sender-remove-source-root-anchor
 simd-checksum
 source-change-size-continues
