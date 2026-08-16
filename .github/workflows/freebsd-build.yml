@@ -18,9 +18,13 @@ on:
   schedule:
     - cron: '42 8 * * 1'
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     name: Test rsync on FreeBSD
     steps:
     - uses: actions/checkout@v4

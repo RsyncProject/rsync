@@ -31,9 +31,13 @@ on:
   schedule:
     - cron: '17 7 * * 1'
 
+permissions:
+  contents: read
+
 jobs:
   fleettest:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     name: fleettest against localhost
     steps:
     - uses: actions/checkout@v4

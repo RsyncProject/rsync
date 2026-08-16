@@ -6,10 +6,10 @@ Builds the committed HEAD of an rsync checkout on a fleet of remote machines
 --use-tcp) in parallel, and prints one report of only the UNEXPECTED results --
 a fast local pre-flight for the GitHub CI matrix.
 
-Each target maps 1:1 to a .github/workflows/*.yml job: the per-target configure
-flags mirror that workflow, and the pipe-run RSYNC_EXPECT_SKIPPED list is PARSED
-from the workflow (not hardcoded). The --use-tcp run never sets an expected-skip
-list (matching the workflows), so only test FAILs matter there.
+Each target maps to a .github/workflows/*.yml job or matrix lane: the per-target
+configure flags mirror that lane, and the pipe-run RSYNC_EXPECT_SKIPPED list is
+PARSED from the workflow (not hardcoded). The --use-tcp run never sets an
+expected-skip list (matching the workflows), so only test FAILs matter there.
 
 The tcp pass runs only the tests that can reach the daemon transport, because it
 follows a full pipe pass over the very same build: --use-tcp is observable only
@@ -167,7 +167,7 @@ PUSH_EXCLUDES = [
 class Target:
     name: str
     ssh_host: str | None          # null in JSON => run locally
-    workflow: str                 # filename under .github/workflows
+    workflow: str                 # workflow containing the matching job or matrix lane
     configure_flags: list[str]
     make: str = "make"            # e.g. "gmake" on the BSDs/Solaris
     env_prefix: str = ""          # exported before configure AND make (e.g. PATH)

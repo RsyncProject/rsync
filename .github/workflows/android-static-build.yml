@@ -28,6 +28,9 @@ on:
     - cron: '42 8 * * 1'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 env:
   # Minimum supported API level. 24 (Android 7.0) runs on every modern
   # phone while keeping broad reach; bump if you need newer Bionic APIs.
@@ -36,6 +39,7 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     name: ${{ matrix.abi }}
     strategy:
       fail-fast: false

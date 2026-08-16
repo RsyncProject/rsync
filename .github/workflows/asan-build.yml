@@ -23,9 +23,13 @@ on:
     - cron: '42 9 * * 1'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   asan:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     name: rsync ASan+UBSan (clang)
     env:
       # rsync intentionally leaks small allocations at process exit, so leak
