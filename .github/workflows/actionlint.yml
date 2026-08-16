@@ -1,5 +1,9 @@
 name: Lint GitHub Actions workflows
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 # Static-check the workflow YAML with rhysd/actionlint.  Catches missing
 # secrets, bad expressions, expression-type errors, unsupported runner
 # images, and (via embedded shellcheck) common pitfalls in `run:` scripts.
@@ -14,7 +18,7 @@ on:
       - '.github/actionlint.yaml'
       - '.github/actionlint.yml'
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened]
     paths:
       - '.github/workflows/*.yml'
       - '.github/actionlint.yaml'
@@ -25,9 +29,6 @@ permissions:
 
 jobs:
   actionlint:
-    # temporary gate: PR CI runs only for PRs labeled 'run-ci', to save CI
-    # minutes; labels need triage access, so fork PRs can't self-enable.
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'run-ci')
     runs-on: ubuntu-latest
     name: actionlint
     steps:

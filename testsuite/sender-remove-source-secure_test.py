@@ -48,6 +48,10 @@ try:
                 os.utime(inside_file, (st.st_atime, st.st_mtime))
             except FileNotFoundError:
                 pass
+            except PermissionError:
+                # Cygwin can report EACCES while the flipper swaps this path.
+                if not _CYGWIN:
+                    raise
         subprocess.run(
             rsync_argv('-a', '--remove-source-files', f'{url}src/real/file', str(dest) + '/'),
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, text=True)

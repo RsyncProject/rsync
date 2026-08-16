@@ -1,5 +1,9 @@
 name: rsync scan-build (clang analyzer)
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [ master ]
@@ -7,7 +11,7 @@ on:
       - '.github/workflows/*.yml'
       - '!.github/workflows/scan-build.yml'
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened]
     paths-ignore:
       - '.github/workflows/*.yml'
       - '!.github/workflows/scan-build.yml'
@@ -20,9 +24,6 @@ jobs:
   # when a new finding appears.  Pin both the analyzer (clang-18/clang-tools-18)
   # and the runner (ubuntu-24.04, whose apt repos carry those packages).
   gate-clang18:
-    # temporary gate: PR CI runs only for PRs labeled 'run-ci', to save CI
-    # minutes; labels need triage access, so fork PRs can't self-enable.
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'run-ci')
     runs-on: ubuntu-24.04
     name: scan-build gate (clang-18, pinned)
     steps:
@@ -64,9 +65,6 @@ jobs:
   # gate bump -- without blocking merges.  continue-on-error keeps a noisy or
   # broken run from affecting the workflow's required status.
   informational-latest:
-    # temporary gate: PR CI runs only for PRs labeled 'run-ci', to save CI
-    # minutes; labels need triage access, so fork PRs can't self-enable.
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'run-ci')
     runs-on: ubuntu-latest
     name: scan-build (latest clang, informational)
     continue-on-error: true

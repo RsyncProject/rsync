@@ -1,5 +1,9 @@
 name: Test fleettest harness
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 # Bitrot check for testsuite/fleettest.py (the developer fleet CI harness).
 # fleettest is meant to be run by developers on a modern Ubuntu box, so this
 # job runs only on ubuntu-latest: it stands up a one-host "fleet" of two
@@ -16,7 +20,7 @@ on:
       - 'testsuite/skiplist/**'
       - 'testsuite/skiplist-spec_test.py'
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened]
     paths:
       - 'testsuite/fleettest.py'
       - '.github/workflows/fleettest.yml'
@@ -29,9 +33,6 @@ on:
 
 jobs:
   fleettest:
-    # temporary gate: PR CI runs only for PRs labeled 'run-ci', to save CI
-    # minutes; labels need triage access, so fork PRs can't self-enable.
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'run-ci')
     runs-on: ubuntu-latest
     name: fleettest against localhost
     steps:
