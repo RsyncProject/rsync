@@ -227,8 +227,14 @@ if [[ "$1" == --HELPER ]]; then
 fi
 
 args=()
+dash_dash_seen=false
 for arg in "$@"; do
-    if [[ "$arg" == --type=* ]]; then
+    if [[ $dash_dash_seen == true ]]; then
+        args+=("$arg")
+    elif [[ "$arg" == "--" ]]; then
+        args+=("$arg")
+        dash_dash_seen=true
+    elif [[ "$arg" == --type=* ]]; then
         export RSYNC_SSL_TYPE="${arg#--type=}"
     else
         args+=("$arg")
