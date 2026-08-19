@@ -37,6 +37,17 @@ if _proto is not None and _proto < 30:
 
 hook_code = r'''
 #define _GNU_SOURCE
+/* Build the hook itself WITHOUT large-file redirection, whatever the compiler
+ * defaults to.  Debian's armhf/hppa/powerpc gcc predefines
+ * -D_FILE_OFFSET_BITS=64 -D_TIME_BITS=64 (check with "gcc -v -E -"), and under
+ * those macros glibc's __REDIRECT renames the DEFINITIONS below -- open()
+ * becomes open64(), fstatat() becomes __fstatat64_time64() -- which then
+ * collide with the explicit large-file wrappers further down ("symbol `open64'
+ * is already defined").  Undefining them here keeps each name declared exactly
+ * once, so the hook always exports both spellings and interposes whichever set
+ * the rsync under test was linked against. */
+#undef _FILE_OFFSET_BITS
+#undef _TIME_BITS
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
@@ -56,6 +67,9 @@ static int (*real_open)(const char *, int, ...);
 static int (*real_openat)(int, const char *, int, ...);
 static int (*real_fstatat)(int, const char *, struct stat *, int);
 static int (*real_fxstatat)(int, int, const char *, struct stat *, int);
+static int (*real_fstatat64)(int, const char *, struct stat64 *, int);
+static int (*real_fxstatat64)(int, int, const char *, struct stat64 *, int);
+static int (*real_fstatat64_time64)(int, const char *, struct stat64 *, int);
 
 /* Resolve on demand rather than trusting our constructor to have run.  A
  * preloaded open() interposes for the whole process the moment the loader maps
@@ -77,6 +91,10 @@ static void hook_resolve(void)
     if (!real_openat)   real_openat   = dlsym(RTLD_NEXT, "openat");
     if (!real_fstatat)  real_fstatat  = dlsym(RTLD_NEXT, "fstatat");
     if (!real_fxstatat) real_fxstatat = dlsym(RTLD_NEXT, "__fxstatat");
+    if (!real_fstatat64)  real_fstatat64  = dlsym(RTLD_NEXT, "fstatat64");
+    if (!real_fxstatat64) real_fxstatat64 = dlsym(RTLD_NEXT, "__fxstatat64");
+    if (!real_fstatat64_time64)
+        real_fstatat64_time64 = dlsym(RTLD_NEXT, "__fstatat64_time64");
     hook_resolving = 0;
 }
 
@@ -149,6 +167,10 @@ static int swap_and_deny(void)
 # define HOOK_TAKES_MODE(f) (((f) & O_CREAT) || (((f) & O_TMPFILE) == O_TMPFILE))
 #else
 # define HOOK_TAKES_MODE(f) ((f) & O_CREAT)
+#endif
+
+#ifndef O_LARGEFILE
+# define O_LARGEFILE 0
 #endif
 
 static int is_victim_write(const char *path, int flags)
@@ -231,6 +253,49 @@ int open(const char *path, int flags, ...)
     return fd;
 }
 
+/* --- large-file spellings -------------------------------------------------
+ * Which names the RECEIVER calls is settled by its own build: where off_t is
+ * not already 64 bits, configure's AC_SYS_LARGEFILE adds -D_FILE_OFFSET_BITS=64
+ * (i386, alpha, ...), and distro CPPFLAGS add it -- along with -D_TIME_BITS=64
+ * -- on the 64-bit time_t ports, so glibc redirects each open()/openat()/
+ * fstatat() call to open64()/openat64()/fstatat64()/__fstatat64_time64().
+ * "objdump -T rsync | grep UND" says which set a given build imports.
+ *
+ * Which names THIS HOOK exports is a different question with a different
+ * answer, settled by whatever the "cc" below it defaults to -- see the #undef
+ * at the top.  Nothing keeps the two in step, so define every spelling and let
+ * the loader match them up.  With only the unsuffixed ones the receiver's opens
+ * sail straight past the hook, no EACCES is ever injected, and the test reports
+ * "positive control failed" having exercised nothing at all.
+ *
+ * O_LARGEFILE is the only thing open64() adds over open(), so the wrappers
+ * below can hand the call to the unsuffixed interposer above. */
+int open64(const char *path, int flags, ...)
+{
+    mode_t mode = 0;
+
+    if (HOOK_TAKES_MODE(flags)) {
+        va_list ap;
+        va_start(ap, flags);
+        mode = (mode_t)va_arg(ap, int);
+        va_end(ap);
+    }
+    return open(path, flags | O_LARGEFILE, mode);
+}
+
+int openat64(int dfd, const char *path, int flags, ...)
+{
+    mode_t mode = 0;
+
+    if (HOOK_TAKES_MODE(flags)) {
+        va_list ap;
+        va_start(ap, flags);
+        mode = (mode_t)va_arg(ap, int);
+        va_end(ap);
+    }
+    return openat(dfd, path, flags | O_LARGEFILE, mode);
+}
+
 /* ona_open() decides via fstatat(..., AT_SYMLINK_NOFOLLOW) and refuses a
  * component owned by neither root nor the euid.  Model the attacker as a
  * different uid so a retry that kept the ownership walk refuses the swap. */
@@ -272,6 +337,68 @@ int __fxstatat(int ver, int dfd, const char *path, struct stat *st, int flags)
     rc = real_fxstatat(ver, dfd, path, st, flags);
     saved_errno = errno;
     model_foreign_owner(rc, path, st);
+    errno = saved_errno;
+    return rc;
+}
+
+/* The stat family's large-file spellings.  st_mode and st_uid sit ahead of the
+ * timestamps in every glibc struct stat layout, so the time32/time64 variants
+ * of the buffer are interchangeable for the two fields touched here. */
+static void model_foreign_owner64(int rc, const char *path, struct stat64 *st)
+{
+    if (rc == 0 && swapped && path && strcmp(path, "pdir") == 0
+        && S_ISLNK(st->st_mode)) {
+        st->st_uid = geteuid() + 1;
+        mark(getenv("RSYNC_PARTIAL_RETRY_FOREIGN_MARKER"));
+    }
+}
+
+int fstatat64(int dfd, const char *path, struct stat64 *st, int flags)
+{
+    int rc, saved_errno;
+
+    hook_resolve();
+    if (!real_fstatat64) {
+        errno = ENOSYS;
+        return -1;
+    }
+    rc = real_fstatat64(dfd, path, st, flags);
+    saved_errno = errno;
+    model_foreign_owner64(rc, path, st);
+    errno = saved_errno;
+    return rc;
+}
+
+int __fxstatat64(int ver, int dfd, const char *path, struct stat64 *st, int flags)
+{
+    int rc, saved_errno;
+
+    hook_resolve();
+    if (!real_fxstatat64) {
+        errno = ENOSYS;
+        return -1;
+    }
+    rc = real_fxstatat64(ver, dfd, path, st, flags);
+    saved_errno = errno;
+    model_foreign_owner64(rc, path, st);
+    errno = saved_errno;
+    return rc;
+}
+
+/* A 32-bit port built with -D_TIME_BITS=64 (Debian's armhf/armel/hppa/powerpc,
+ * ...) reaches fstatat() under this third name. */
+int __fstatat64_time64(int dfd, const char *path, struct stat64 *st, int flags)
+{
+    int rc, saved_errno;
+
+    hook_resolve();
+    if (!real_fstatat64_time64) {
+        errno = ENOSYS;
+        return -1;
+    }
+    rc = real_fstatat64_time64(dfd, path, st, flags);
+    saved_errno = errno;
+    model_foreign_owner64(rc, path, st);
     errno = saved_errno;
     return rc;
 }
