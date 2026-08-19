@@ -1252,7 +1252,7 @@ int change_dir(const char *dir, int set_path_only)
 			 * non-daemon receiver can opt back into the legacy plain chdir with
 			 * --insecure-links. */
 			if (am_daemon && !am_chrooted) {
-				int dfd = open_no_attacker_symlinks(dir, O_RDONLY | O_DIRECTORY, 0);
+				int dfd = open_no_attacker_symlinks_dirfd(dir);
 				if (dfd < 0)
 					return 0;
 				if (fchdir(dfd) != 0) {
@@ -1283,7 +1283,7 @@ int change_dir(const char *dir, int set_path_only)
 				 * another uid.  A real dir is opened directly.  This closes the
 				 * destination chdir TOCTOU; --insecure-links keeps the plain
 				 * chdir for an operator whose dest is a foreign-owned symlink. */
-				dfd = open_no_attacker_symlinks(nf, O_RDONLY | O_DIRECTORY, 0);
+				dfd = open_no_attacker_symlinks_dirfd(nf);
 				if (dfd < 0)
 					return 0;
 				if (fchdir(dfd) != 0) {
@@ -1344,8 +1344,7 @@ int change_dir(const char *dir, int set_path_only)
 					prefix[save_dir_len] = '\0';
 					basedir = prefix;
 				}
-				dfd = secure_relative_open(basedir, dir,
-					O_RDONLY | O_DIRECTORY, 0);
+				dfd = secure_relative_dirfd(basedir, dir);
 				if (dfd < 0) {
 					chdir_failed = 1;
 				} else {
@@ -1363,8 +1362,7 @@ int change_dir(const char *dir, int set_path_only)
 				 * symlink not owned by uid 0 or our euid, closing the
 				 * relative-dest chdir TOCTOU while still following the operator's
 				 * own symlinks.  --insecure-links keeps the plain chdir. */
-				int dfd = open_no_attacker_symlinks(curr_dir,
-					O_RDONLY | O_DIRECTORY, 0);
+				int dfd = open_no_attacker_symlinks_dirfd(curr_dir);
 				if (dfd < 0)
 					chdir_failed = 1;
 				else {

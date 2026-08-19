@@ -58,6 +58,7 @@ rrsync-sender-parent-pin
 rrsync-symlink
 rrsync-userns-procfs
 search-only-destination
+search-only-held-dirfd
 sender-remove-source-root-anchor
 simd-checksum
 source-change-size-continues
