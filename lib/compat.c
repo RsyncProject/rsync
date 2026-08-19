@@ -173,34 +173,44 @@ char *do_big_num(int64 num, int human_flag, const char *fract)
 	static unsigned int n;
 	char *s;
 	int len, negated;
+	uint64_t abs_num;
 
 	if (human_flag && !number_separator)
 		(void)get_number_separator();
 
 	n = (n + 1) % (sizeof bufs / sizeof bufs[0]);
+	abs_num = num < 0 ? 0 - (uint64_t)num : (uint64_t)num;
 
 	if (human_flag > 1) {
-		int mult = human_flag == 2 ? 1000 : 1024;
-		if (num >= mult || num <= -mult) {
-			double dnum = (double)num / mult;
-			char units;
-			if (num < 0)
-				dnum = -dnum;
-			if (dnum < mult)
-				units = 'K';
-			else if ((dnum /= mult) < mult)
-				units = 'M';
-			else if ((dnum /= mult) < mult)
-				units = 'G';
-			else if ((dnum /= mult) < mult)
-				units = 'T';
-			else {
-				dnum /= mult;
-				units = 'P';
+		unsigned int mult = human_flag == 2 ? 1000 : 1024;
+
+		char units[] = "\0KMGTPE";
+		char *unit = units;
+		uint64_t powi = 1;
+
+		for (;;) {
+			if (abs_num / mult < powi)
+				break;
+
+			if (unit[1] == '\0')
+				break;
+
+			powi *= mult;
+			++unit;
+		}
+		unit[1] = '\0';
+
+		if (powi > 1) {
+			unsigned int powj = 1, precision = 2;
+
+			for (; precision > 0; precision--) {
+				powj *= 10;
+				if (abs_num / powi < powj)
+					break;
 			}
-			if (num < 0)
-				dnum = -dnum;
-			snprintf(bufs[n], sizeof bufs[0], "%.2f%c", dnum, units);
+
+			snprintf(bufs[n], sizeof bufs[0], "%.*f%s%s", precision,
+				(double) num / powi, unit, *unit && mult == 1024 ? "i" : "");
 			return bufs[n];
 		}
 	}
