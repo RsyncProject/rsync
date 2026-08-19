@@ -38,12 +38,33 @@ if run_rsync('-a', '--preallocate', f'{src}/', f'{TODIR}/',
              check=False, capture_output=True).returncode != 0:
     test_skipped("--preallocate not supported on this platform")
 
-def fs_can_punch_holes():
-    """True only where the kernel can deallocate blocks via FALLOC_FL_PUNCH_HOLE
-    -- the mechanism do_punch_hole uses for --sparse. A filesystem may report
-    seek-based sparseness yet still keep every block on a punch (e.g. where
-    rsync's punch falls back to writing zeros), so probe the real capability and
-    assert the hole only where it actually frees blocks."""
+def punch_frees(offset, length, size):
+    """True where punching [offset, offset+length) out of a `size`-byte file
+    really deallocates blocks -- the mechanism do_punch_hole uses for --sparse.
+
+    Two separate things can leave st_blocks untouched, so each assertion below
+    probes the exact shape it relies on.  A filesystem may report seek-based
+    sparseness yet still keep every block on a punch (e.g. where rsync's punch
+    falls back to writing zeros), which a whole-file probe catches.  And a punch
+    only frees storage in whole allocation units, which are not always 4 KiB: a
+    tmpfs frees whole pages, 16 KiB on loongarch/loong64 (and 64 KiB on a
+    64k-page ppc64el or arm64 kernel), and a filesystem may be formatted with a
+    block size above the page size.  An interior run spanning no whole unit is
+    zeroed rather than deallocated, so st_blocks does not move and an assertion
+    phrased in st_blocks would report a hole-punching regression that is really
+    just the filesystem's granularity.
+
+    fallocate64() rather than fallocate(): where off_t is 32 bits the latter
+    takes 32-bit offsets, so ctypes' 64-bit arguments do not line up with what
+    it reads (on i386 it takes the high half of `offset` as its `length`) and
+    every probe fails with EINVAL -- which is why every assertion below has
+    silently done nothing on all the 32-bit ports.  fallocate64() takes off64_t
+    everywhere and is a plain alias of fallocate() where off_t is already 64
+    bits wide.
+
+    The probe data has to be incompressible: a filesystem that compresses
+    (btrfs with compress=) stores a run of one repeated byte in almost no
+    blocks, leaving a successful punch with nothing to free."""
     import ctypes
     import ctypes.util
     KEEP_SIZE, PUNCH_HOLE = 0x01, 0x02
@@ -52,12 +73,12 @@ def fs_can_punch_holes():
     try:
         libc = ctypes.CDLL(ctypes.util.find_library('c') or 'libc.so.6',
                            use_errno=True)
-        libc.fallocate.argtypes = [ctypes.c_int, ctypes.c_int,
-                                   ctypes.c_longlong, ctypes.c_longlong]
+        libc.fallocate64.argtypes = [ctypes.c_int, ctypes.c_int,
+                                     ctypes.c_longlong, ctypes.c_longlong]
         fd = os.open(p, os.O_CREAT | os.O_RDWR | os.O_TRUNC, 0o644)
-        os.write(fd, b'\xff' * 65536)
+        os.write(fd, os.urandom(size))
         before = os.fstat(fd).st_blocks
-        ret = libc.fallocate(fd, PUNCH_HOLE | KEEP_SIZE, 0, 65536)
+        ret = libc.fallocate64(fd, PUNCH_HOLE | KEEP_SIZE, offset, length)
         return ret == 0 and os.fstat(fd).st_blocks < before
     except (OSError, AttributeError, ValueError):
         return False
@@ -70,7 +91,7 @@ def fs_can_punch_holes():
             pass
 
 
-can_punch = fs_can_punch_holes()
+can_punch = punch_frees(0, 65536, 65536)
 
 
 def seed_plain(size=1_000_000):
@@ -139,6 +160,13 @@ with open(src / deep, 'wb') as source, open(TODIR / deep, 'wb') as dest:
         source.write(block)
         dest.write(block)
 
+# Only assert the interior punch where the filesystem can free a 24 KiB run
+# sitting 4 KiB into a 32 KiB block -- the exact shape written just above.
+can_punch_interior = can_punch and punch_frees(4096, 24576, 32768)
+if can_punch and not can_punch_interior:
+    print("preallocate: interior-hole assertion skipped: this filesystem's "
+          "allocation unit cannot free a 24 KiB run inside a 32 KiB block")
+
 matched_size = os.path.getsize(TODIR / deep)
 matched_before = allocated(TODIR / deep)
 run_rsync('-a', '--ignore-times', '--inplace', '--sparse', '--no-whole-file',
@@ -146,7 +174,7 @@ run_rsync('-a', '--ignore-times', '--inplace', '--sparse', '--no-whole-file',
 assert_same(TODIR / deep, src / deep,
             label='--inplace --sparse matched-block content')
 matched_after = allocated(TODIR / deep)
-if (can_punch and matched_before >= matched_size
+if (can_punch_interior and matched_before >= matched_size
         and matched_after * 2 >= matched_before):
     test_fail(f"--inplace --sparse left matching interior zero runs allocated: "
               f"{matched_after} of {matched_before} bytes remain allocated "
