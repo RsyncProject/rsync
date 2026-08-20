@@ -22,6 +22,7 @@ open-noatime
 partial-protected-regular-retry-linux
 preallocate
 protected-regular
+read-batch-pipe
 readonly-partial-abort-mode-regression  # 
 rrsync-sender-leaf-flip
 rrsync-sender-parent-pin
