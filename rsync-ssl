@@ -226,9 +226,20 @@ if [[ "$1" == --HELPER ]]; then
     rsync_ssl_helper "${@}"
 fi
 
-if [[ "$1" == --type=* ]]; then
-    export RSYNC_SSL_TYPE="${1/--type=/}"
-    shift
-fi
+args=()
+dash_dash_seen=false
+for arg in "$@"; do
+    if [[ $dash_dash_seen == true ]]; then
+        args+=("$arg")
+    elif [[ "$arg" == "--" ]]; then
+        args+=("$arg")
+        dash_dash_seen=true
+    elif [[ "$arg" == --type=* ]]; then
+        export RSYNC_SSL_TYPE="${arg#--type=}"
+    else
+        args+=("$arg")
+    fi
+done
+set -- "${args[@]}"
 
 rsync_ssl_run "${@}"

@@ -25,12 +25,15 @@ rsync version to be at least 3.2.0.
 
 ## OPTIONS
 
-If the **first** arg is a `--type=SSL_TYPE` option, the script will only use
+If an arg is a `--type=SSL_TYPE` option, the script will only use
 that particular program to open an ssl connection instead of trying to find an
 openssl or stunnel executable via a simple heuristic (assuming that the
 `RSYNC_SSL_TYPE` environment variable is not set as well -- see below).  This
 option must specify one of `openssl` or `stunnel`.  The equal sign is
-required for this particular option.
+required for this particular option.  The wrapper's option scan stops at a
+`--` argument: the `--` and everything after it are passed through to rsync
+unchanged, so a `--type=...` token after a `--` is not consumed by the
+wrapper.
 
 All the other options are passed through to the rsync command, so consult the
 **rsync**(1) manpage for more information on how it works.
