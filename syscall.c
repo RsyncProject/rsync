@@ -319,8 +319,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 	 * (abspath_outside_confinement).  A relative operator path starts at the
 	 * daemon's cwd == the module root; an absolute one (or a followed absolute
 	 * symlink target) restarts at "/". */
-	char abspath[MAXPATHLEN];
-	abspath[0] = '\0';
+	char abspath[MAXPATHLEN] = {0};
 	if (am_daemon && module_dir && module_dir[0] == '/')
 		strlcpy(abspath, module_dir, sizeof abspath);	/* "/" for a path=/ module */
 	else if (confine_root) {
@@ -344,7 +343,8 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 	 * reach the magic link.  This only suspends the check for that prefix:
 	 * following the link restarts the walk at its absolute target, and every
 	 * component of THAT is checked, so a pin aimed outside is still refused. */
-	int pin_transit = !am_daemon && confine_root && fd_pin_tail(path) != NULL;
+	const char *ptail = fd_pin_tail(path);
+	int pin_transit = !am_daemon && confine_root && ptail != NULL;
 
 	/* Path-walk state. `remaining` is the unconsumed tail; we splice
 	 * symlink targets back into it as we go. Sized 2x MAXPATHLEN so a
@@ -433,6 +433,44 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 				goto out;
 			}
 			target[n] = '\0';
+
+			/* Detect Linux kernel pseudo-paths (pipes, sockets, anon_inodes).
+			 * These are not real paths on disk and never contain slashes. */
+			const char *abstail = fd_pin_tail(abspath);
+			int is_fd_dir = (abstail != NULL && *abstail == '\0' && ptail != NULL);
+			if  (is_fd_dir && (strncmp(target, "pipe:[", 6) == 0 ||
+				 strncmp(target, "socket:[", 8) == 0 ||
+				 strncmp(target, "anon_inode:", 11) == 0)) {
+					if (confine_root) {
+				        /* If confine-root is active, we categorically
+                         * refuse to resolve kernel pseudo-paths. */
+						saved_errno = ENOENT;
+						goto out;        
+				    }
+					/* Safely reopen the descriptor (Symlink traversal).
+					 * Bash process substitution >(...) exposes /dev/fd/X as a symlink 
+					 * to a pipe (e.g., pipe:[12345]). If rsync attempts to open this 
+					 * with O_NOFOLLOW, the kernel will reject it with ELOOP.
+					 * We strip O_NOFOLLOW (using & ~O_NOFOLLOW) to allow proper 
+					 * kernel symlink resolution of the pseudo-path. */
+					retfd = openat(dfd, comp, (flags & ~O_NOFOLLOW) | O_CLOEXEC, mode);
+					/* POST-OPEN VERIFICATION: 
+                     * As an additional hardening measure against TOCTOU race conditions, 
+                     * we explicitly ensure we do not open a regular file or a directory. 
+                     * This prevents an attacker from swapping the FD to a sensitive 
+                     * file just before openat(), while still 
+                     * preserving legitimate support for pipes, sockets, and anon_inodes. */
+                    if (retfd >= 0) {
+                        STRUCT_STAT pst;
+                        if (fstat(retfd, &pst) < 0 || S_ISREG(pst.st_mode) || S_ISDIR(pst.st_mode)) {
+                            close(retfd);
+                            retfd = -1;
+                            errno = ELOOP;
+                        }
+                    }
+					saved_errno = retfd < 0 ? errno : 0;
+					goto out;
+			}
 
 			/* Splice: new `remaining` = <target> + <tail-after-comp>.
 			 * Absolute target restarts the walk from "/". */
