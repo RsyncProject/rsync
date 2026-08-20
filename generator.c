@@ -1052,7 +1052,7 @@ static int basis_link_stat(const char *path, STRUCT_STAT *stp)
 			if (dlen >= sizeof dir) { errno = ENAMETOOLONG; return -1; }
 			memcpy(dir, path, dlen);
 			dir[dlen] = '\0';
-			if ((dfd = secure_relative_open(NULL, dir, O_RDONLY | O_DIRECTORY, 0)) < 0)
+			if ((dfd = secure_relative_dirfd(NULL, dir)) < 0)
 				return -1;
 			r = link_stat_at(dfd, slash + 1, stp, 0);
 			e = errno;

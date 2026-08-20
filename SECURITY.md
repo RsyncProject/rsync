@@ -146,28 +146,29 @@ following symlinks by design.
 
 ### The mechanism
 
-Resolution of attacker-influenceable paths goes through `secure_relative_open()`
-and the `do_*_at()` wrappers in `syscall.c`, never a raw `open()`/`rename()`/
-`chmod()` on a full path string. The principle is: **trust the operator-named
-transfer root, and confine all resolution beneath it**, rejecting escapes via
-`..` above the anchor, absolute symlinks, or out-of-tree symlinks.
-`secure_relative_open()` resolves the parent directory by walking it one
-component at a time on a stack of held directory fds, then operates on the final
-component with an at-style call on the resulting directory fd.
+Resolution of attacker-influenceable paths goes through `secure_relative_open()`,
+`secure_relative_dirfd()`, and the `do_*_at()` wrappers in `syscall.c`, never a
+raw `open()`/`rename()`/`chmod()` on a full path string. The principle is:
+**trust the operator-named transfer root, and confine all resolution beneath
+it**, rejecting escapes via `..` above the anchor, absolute symlinks, or
+out-of-tree symlinks. `secure_relative_open()` opens the resolved endpoint with
+the caller's requested access. `secure_relative_dirfd()` instead returns
+traversal authority for `fchdir()` or an at-style operation on a known child;
+it does not imply permission to enumerate the directory.
 
 For per-entry work the receiver and generator go one step further and hold the
 parent directory open: `open_dir_secure()` resolves an entry's directory once
-(via `secure_relative_open()`), `held_dfd_for()` caches that descriptor for the
-duration of the entry, and every operation on the entry — `lstat`, the temp-file
-`mkstemp`, the temp->final `rename`, `chmod`/`chown`/`utimes`, `mkdir`, special-
-file and symlink creation, the delta-basis open, and the recursive delete — runs
-through that one held fd via an `*at()` call (`do_*_atfd()`). Because the
-descriptor is pinned to the directory inode, a parent component flipped to a
-symlink *after* the open cannot redirect any of those operations. The alternate-
-destination lookups are confined the same way (`basis_link_stat()` in
-`generator.c` and `secure_basis_open()` in `receiver.c`), so a peer-chosen
-`--link-dest`/`--compare-dest`/`--copy-dest` basis index cannot reach an
-out-of-module file through a symlinked parent.
+as traversal authority, `held_dfd_for()` caches that descriptor for the
+duration of the entry, and every operation on the entry — `lstat`, the
+temp-file `mkstemp`, the temp->final `rename`, `chmod`/`chown`/`utimes`,
+`mkdir`, special-file and symlink creation, the delta-basis open, and the
+recursive delete — runs through that one held fd via an `*at()` call
+(`do_*_atfd()`). Because the descriptor is pinned to the directory inode, a
+parent component flipped to a symlink *after* the open cannot redirect any of
+those operations. The alternate-destination lookups are confined the same way
+(`basis_link_stat()` in `generator.c` and `secure_basis_open()` in
+`receiver.c`), so a peer-chosen `--link-dest`/`--compare-dest`/`--copy-dest`
+basis index cannot reach an out-of-module file through a symlinked parent.
 
 The sender's source-directory *enumeration* is confined the same way as its
 content open. `send_directory()` opens each scanned directory through
@@ -190,13 +191,17 @@ symlink would otherwise introduce.
 ### Path resolution
 
 `secure_relative_open()` resolves a path with a single portable mechanism on
-every platform: a per-component walk on a stack of held directory fds. Each
-component is opened relative to the held parent with `openat(parent_fd,
-"component", O_NOFOLLOW)`; descending into a real subdirectory pushes its fd, a
-`..` pops back to the already-held parent (a pop at the anchor is refused), and an
-in-tree directory symlink is followed by reading its target and walking that off
-the same stack (absolute targets refused, symlink hops bounded). The final
-component is opened `O_NOFOLLOW`.
+every platform: a per-component walk on a stack of held directory fds. On
+Linux, anchors and traversal components use
+`O_PATH|O_DIRECTORY|O_NOFOLLOW`; other platforms retain the
+`O_RDONLY|O_DIRECTORY` fallback. Descending into a real subdirectory pushes
+its fd, a `..` pops back to the already-held parent (a pop at the anchor is
+refused), and an in-tree directory symlink is followed by reading its target
+and walking that off the same stack (absolute targets refused, symlink hops
+bounded). A final directory endpoint is reopened with the caller's requested
+flags. Thus `secure_opendir()` still receives a readable fd, while known-name
+operations beneath a searchable but unreadable directory do not require
+permission to list it.
 
 Because every component is opened relative to a *pinned* fd under `O_NOFOLLOW`,
 and `..` is resolved by the held-fd stack rather than by the kernel, the walk is
@@ -235,8 +240,9 @@ chmod-ing through a raced leaf symlink.
   influenced by the remote peer or by another local user, use a `do_*_at()`
   wrapper (or `secure_relative_open()`), not a raw full-path syscall.
 * When introducing a new operation, add a matching `do_<op>_at()` wrapper that
-  resolves the parent with `secure_relative_open()` and acts via an at-style call
-  on the returned dirfd.
+  resolves a parent used only as at-style authority with
+  `secure_relative_dirfd()`. Use `secure_relative_open()` when the returned fd
+  itself must be readable or otherwise support the caller's requested access.
 * Do not assume a non-daemon transfer is safe; the question is whether rsync has
   more authority than whoever controls the path components.
 * On platforms whose API lacks an at-style equivalent (e.g. `setattrlist()`),
