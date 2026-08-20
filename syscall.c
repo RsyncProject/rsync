@@ -319,8 +319,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 	 * (abspath_outside_confinement).  A relative operator path starts at the
 	 * daemon's cwd == the module root; an absolute one (or a followed absolute
 	 * symlink target) restarts at "/". */
-	char abspath[MAXPATHLEN];
-	abspath[0] = '\0';
+	char abspath[MAXPATHLEN] = {0};
 	if (am_daemon && module_dir && module_dir[0] == '/')
 		strlcpy(abspath, module_dir, sizeof abspath);	/* "/" for a path=/ module */
 	else if (confine_root) {
@@ -433,6 +432,30 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 				goto out;
 			}
 			target[n] = '\0';
+
+			/* Detect Linux kernel pseudo-paths (pipes, sockets, anon_inodes).
+			 * These are not real paths on disk and never contain slashes. */
+			const char *ptail = fd_pin_tail(abspath);
+			int is_fd_dir = (ptail != NULL && *ptail == '\0');
+			if  (is_fd_dir && (strncmp(target, "pipe:[", 6) == 0 ||
+				 strncmp(target, "socket:[", 8) == 0 ||
+				 strncmp(target, "anon_inode:", 11) == 0)) {
+					if (confine_root) {
+				         /* If confined to a root directory, we categorically
+                         * refuse to resolve kernel pseudo-paths. */
+						saved_errno = ENOENT;
+						goto out;        
+				    }
+					/* Safely reopen the descriptor (Symlink traversal).
+					* Bash process substitution >(...) exposes /dev/fd/X as a symlink 
+					* to a pipe (e.g., pipe:[12345]). If rsync attempts to open this 
+					* with O_NOFOLLOW, the kernel will reject it with ELOOP.
+					* We strip O_NOFOLLOW (using & ~O_NOFOLLOW) to allow proper 
+					* kernel symlink resolution of the pseudo-path. */
+					retfd = openat(dfd, comp, (flags & ~O_NOFOLLOW) | O_CLOEXEC, mode);
+					saved_errno = retfd < 0 ? errno : 0;
+					goto out;
+			}
 
 			/* Splice: new `remaining` = <target> + <tail-after-comp>.
 			 * Absolute target restarts the walk from "/". */
