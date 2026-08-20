@@ -156,6 +156,11 @@ static void print_info_flags(enum logcode f)
 #endif
 			"crtimes",
 
+#ifndef SUPPORT_IDN
+		"no "
+#endif
+			"IDN",
+
 	"*Optimizations",
 
 #ifndef USE_ROLL_SIMD

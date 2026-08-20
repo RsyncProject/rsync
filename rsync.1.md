@@ -412,6 +412,20 @@ when scripting rsync.
 WARNING: On some systems, environment variables are visible to all users.  On
 those systems using [`--password-file`](#opt) is recommended.
 
+If rsync was built with IDN support (look for "IDN" in `rsync --version`), the
+daemon host may contain non-ASCII characters: those labels are converted to
+their IDNA A-label ("Punycode") form before the name is looked up.  The name is
+read using your locale's character encoding, so be sure your locale is set
+correctly.  A name typed with combining characters is normalized on the way, so
+it is looked up the same as its precomposed spelling.  Only the non-ASCII
+labels change, so an address literal, a name you punycoded yourself, and a name
+that is not a valid IDN are all looked up just as you typed them.
+
+This applies to the host of a daemon connection only.  The host of a plain
+remote-shell transfer (the single-colon syntax) is passed to your remote-shell
+program unchanged, since that name may well be an ssh_config "Host" alias
+rather than a DNS name.
+
 You may establish the connection via a web proxy by setting the environment
 variable [`RSYNC_PROXY`](#) to a hostname:port pair pointing to your web proxy.
 Note that your web proxy's configuration must support proxy connections to port

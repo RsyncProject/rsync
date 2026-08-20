@@ -33,6 +33,9 @@ static int match_hostname(const char **host_ptr, const char *addr, const char *t
 	struct hostent *hp;
 	unsigned int i;
 	const char *host = *host_ptr;
+#ifdef SUPPORT_IDN
+	char idn_tok[1024];
+#endif
 
 	if (!host || !*host)
 		return 0;
@@ -40,6 +43,14 @@ static int match_hostname(const char **host_ptr, const char *addr, const char *t
 #ifdef HAVE_INNETGR
 	if (*tok == '@' && tok[1])
 		return innetgr(tok + 1, host, NULL, NULL);
+#endif
+
+#ifdef SUPPORT_IDN
+	/* A hostname reaches us from DNS as ASCII, so fold an IDN token to its
+	 * A-label form before comparing.  An all-ASCII token, and a token we
+	 * can't fold, are both left as they are. */
+	if (idn_to_ascii(tok, 0, idn_tok, sizeof idn_tok))
+		tok = idn_tok;
 #endif
 
 	/* First check if the reverse-DNS-determined hostname matches. */

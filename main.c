@@ -521,6 +521,16 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char **remote_argv, in
 	char *args[MAX_ARGS], *need_to_free = NULL;
 	pid_t pid;
 	int dash_l_set = 0;
+#ifdef SUPPORT_IDN
+	char idn_machine[1024];
+
+	/* A daemon-over-remote-shell host is ours to resolve, so give the helper
+	 * the A-label form.  A "host:path" transfer is left alone because that
+	 * name belongs to the user's ssh, which may be matching it against an
+	 * ssh_config Host pattern. */
+	if (machine && daemon_connection > 0 && idn_to_ascii(machine, 1, idn_machine, sizeof idn_machine))
+		machine = idn_machine;
+#endif
 
 	if (!read_batch && !local_server) {
 		char *t, *f, in_quote = '\0';

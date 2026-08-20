@@ -24,6 +24,9 @@
 #include "ifuncs.h"
 #include "itypes.h"
 #include "inums.h"
+#ifdef SUPPORT_IDN
+#include <idn2.h>
+#endif
 
 extern int dry_run;
 extern int module_id;
@@ -915,15 +918,109 @@ void glob_expand_module(char *base1, char *arg, char ***argv_p, int *argc_p, int
 
 /**
  * Convert a string to lower case
+ *
+ * Only ASCII is folded.  The hosts allow/deny list that calls this can hold
+ * UTF-8, and a per-byte fold via the locale's ctype would mangle it (in
+ * ISO-8859-1 the 0xC4 lead byte of "č" is an upper-case 'Ä').
  **/
 void strlower(char *s)
 {
 	while (*s) {
-		if (isUpper(s))
+		if (!(*(unsigned char *)s & 0x80) && isUpper(s))
 			*s = toLower(s);
 		s++;
 	}
 }
+
+#ifdef SUPPORT_IDN
+/* Does this label hold nothing but the [-a-z0-9] of an A-label? */
+static int is_a_label(const char *s)
+{
+	if (!*s)
+		return 0;
+
+	for ( ; *s; s++) {
+		if (!(*s >= 'a' && *s <= 'z') && !(*s >= '0' && *s <= '9') && *s != '-')
+			return 0;
+	}
+
+	return 1;
+}
+
+/**
+ * Convert the non-ASCII labels of a host name into their IDNA A-label
+ * (Punycode) form, putting the result in buf.  Returns 1 if buf was filled in,
+ * or 0 to tell the caller to keep the name it has.
+ *
+ * A label that is already ASCII is copied verbatim, so an address, a mask, an
+ * xn-- name, and any wildmatch characters come out just as they went in.  A
+ * converted label is only used if it comes back as a bare A-label: the IDNA
+ * mapping folds some non-ASCII characters onto ASCII ones (U+FF0A FULLWIDTH
+ * ASTERISK becomes '*'), and a hosts allow/deny entry must not pick up a
+ * wildcard that its author never typed.  Anything else leaves the name alone,
+ * which fails to match instead of matching too much.
+ *
+ * Set from_locale for a name that came from the command line, which is in the
+ * user's locale encoding; the daemon's config file is read as UTF-8.
+ **/
+int idn_to_ascii(const char *name, int from_locale, char *buf, size_t buflen)
+{
+	const char *lab, *end;
+	size_t len = 0;
+	int converted = 0;
+
+	for (lab = name; ; lab = end + 1) {
+		char label[256], *idn;
+		size_t lablen, alen;
+		int is_ascii = 1;
+
+		for (end = lab; *end && *end != '.'; end++) {
+			if (*(unsigned char *)end & 0x80)
+				is_ascii = 0;
+		}
+		lablen = end - lab;
+
+		if (is_ascii) {
+			if (len + lablen + 2 > buflen)
+				return 0;
+			memcpy(buf + len, lab, lablen);
+			len += lablen;
+		} else {
+			/* IDN2_NFC_INPUT has libidn2 normalize the label, so a name
+			 * typed with combining marks folds to the same A-label as
+			 * its composed spelling.  IDN2_NONTRANSITIONAL asks for the
+			 * TR46 processing that everything else does these days. */
+			int flags = IDN2_NFC_INPUT | IDN2_NONTRANSITIONAL;
+			int rc;
+			if (lablen >= sizeof label)
+				return 0;
+			memcpy(label, lab, lablen);
+			label[lablen] = '\0';
+			rc = from_locale ? idn2_lookup_ul(label, &idn, flags)
+					 : idn2_to_ascii_8z(label, &idn, flags);
+			if (rc != IDN2_OK)
+				return 0;
+			alen = strlen(idn);
+			if (!is_a_label(idn) || len + alen + 2 > buflen) {
+				idn2_free(idn);
+				return 0;
+			}
+			memcpy(buf + len, idn, alen);
+			len += alen;
+			idn2_free(idn);
+			converted = 1;
+		}
+
+		if (!*end)
+			break;
+		buf[len++] = '.';
+	}
+
+	buf[len] = '\0';
+
+	return converted;
+}
+#endif
 
 /**
  * Split a string into tokens based (usually) on whitespace & commas.  If the

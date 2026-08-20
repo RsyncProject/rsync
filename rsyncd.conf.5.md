@@ -853,6 +853,20 @@ in the values of parameters.  See that section for details.
     - an '@' followed by a netgroup name, which will match if the reverse DNS
       of the connecting IP is in the specified netgroup.
 
+    If rsync was built with IDN support (look for "IDN" in `rsync --version`),
+    a hostname pattern may contain non-ASCII characters: this file is read as
+    UTF-8, and each non-ASCII label is converted to its IDNA A-label
+    ("Punycode") form before matching, since the name the daemon has for a
+    client always reaches it from DNS as ASCII.  A pattern written with
+    combining characters is normalized on the way, so it matches the same as
+    its precomposed spelling.  Only those labels change, so an address, a
+    mask, an already-punycoded name, and the wildcard characters are all
+    matched exactly as written.  A pattern that cannot be converted that way
+    is matched as it stands, and thus matches nothing.  That includes a
+    pattern whose conversion would have introduced a character it was not
+    written with, such as the U+FF0A FULLWIDTH ASTERISK that the IDNA mapping
+    turns into a "*".
+
     Note IPv6 link-local addresses can have a scope in the address
     specification:
 

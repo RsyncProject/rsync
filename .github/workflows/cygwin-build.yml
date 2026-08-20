@@ -30,7 +30,7 @@ jobs:
       run: |
         $setup = Join-Path $Env:RUNNER_TEMP 'setup-x86_64.exe'
         $sums = Join-Path $Env:RUNNER_TEMP 'cygwin-sha512.sum'
-        $packages = 'make,autoconf,automake,gcc-core,attr,libattr-devel,python39,python39-pip,libzstd-devel,liblz4-devel,libssl-devel,libxxhash0,libxxhash-devel'
+        $packages = 'make,autoconf,automake,gcc-core,attr,libattr-devel,python39,python39-pip,libzstd-devel,liblz4-devel,libssl-devel,libxxhash0,libxxhash-devel,libidn2-devel'
 
         Invoke-WebRequest https://cygwin.com/setup-x86_64.exe -OutFile $setup
         Invoke-WebRequest https://cygwin.com/sha512.sum -OutFile $sums
