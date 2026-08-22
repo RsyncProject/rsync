@@ -2021,6 +2021,7 @@ sign) if you want the local shell to expand it.
     - `md5`
     - `md4`
     - `sha1`
+    - `sha256`
     - `none`
 
     Run `rsync --version` to see the default checksum list compiled into your
