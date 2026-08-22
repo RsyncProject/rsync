@@ -18,6 +18,9 @@ daemon-max-alloc-zero
 dir-sgid
 fake-super-acl-xattr
 link-dest-symlink-enotsup                # the ENOTSUP hard-link hook is an LD_PRELOAD, Linux-only
+ltfs-client-compat
+ltfs-daemon
+ltfs-local
 open-noatime
 partial-protected-regular-retry-linux
 preallocate
