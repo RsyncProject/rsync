@@ -23,6 +23,7 @@ different tests merge cleanly.
 | file | contents |
 | --- | --- |
 | `common.txt` | skipped on every platform that runs the oracle — mostly `require_tcp` / `require_asan` tests, which the default stdio-pipe `make check` cannot satisfy |
+| `almalinux-8.txt` | AlmaLinux 8 container additions |
 | `linux.txt` | Linux-only additions |
 | `macos.txt` | macOS-only additions |
 | `cygwin.txt` | Cygwin-only additions |
