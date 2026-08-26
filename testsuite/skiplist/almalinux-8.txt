@@ -6,3 +6,4 @@
 # AlmaLinux 8 container additions to common.txt and linux.txt.
 
 pseudo-paths  # Bash process substitution is unavailable in the AlmaLinux 8 container
+read-batch-pipe
