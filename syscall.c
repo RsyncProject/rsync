@@ -74,6 +74,20 @@ extern unsigned int confine_rootlen;
 extern char curr_dir[MAXPATHLEN];	/* defined below; fwd-declared for the seed */
 extern int operator_path_resolve;	/* defined below; fwd-declared for the exclude check */
 
+/* A directory fd used only for pathname traversal, fchdir(), or as *at()
+ * authority does not need read permission on Linux.  Keep the portable
+ * O_RDONLY fallback for systems without O_PATH. */
+static int directory_traverse_flags(void)
+{
+#if defined O_PATH && defined O_DIRECTORY
+	return O_PATH | O_DIRECTORY;
+#elif defined O_DIRECTORY
+	return O_RDONLY | O_DIRECTORY;
+#else
+	return O_RDONLY;
+#endif
+}
+
 #if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
 /* Open a trusted absolute anchor directory as an owned dirfd.  When the anchor is
  * the served module root and the daemon pinned it by identity (module_dirfd), dup
@@ -86,7 +100,7 @@ static int open_anchor_dirfd(const char *path)
 {
 	if (module_dirfd >= 0 && am_daemon && module_dir && strcmp(path, module_dir) == 0)
 		return dup(module_dirfd);
-	return openat(AT_FDCWD, path, O_RDONLY | O_DIRECTORY);
+	return openat(AT_FDCWD, path, directory_traverse_flags());
 }
 #endif
 
@@ -290,17 +304,13 @@ static int abspath_step(char *abspath, size_t cap, const char *comp, size_t comp
  * uses it to filter-check the (otherwise unchecked) leaf basename. */
 static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, size_t out_cap)
 {
-#if defined AT_FDCWD && defined O_NOFOLLOW
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
 	/* O_CLOEXEC predates some still-supported targets; mirror rand_bytes()'s
 	 * fallback in syscall.c so a build without it still compiles. */
 #ifndef O_CLOEXEC
 #define O_CLOEXEC 0
 #endif
-#ifdef O_PATH
-	const int dir_traverse_flags = O_PATH | O_DIRECTORY | O_CLOEXEC;
-#else
-	const int dir_traverse_flags = O_RDONLY | O_DIRECTORY | O_CLOEXEC;
-#endif
+	const int dir_traverse_flags = directory_traverse_flags() | O_CLOEXEC;
 	if (!path || !*path) {
 		errno = EINVAL;
 		return -1;
@@ -555,6 +565,14 @@ int open_no_attacker_symlinks(const char *path, int flags, mode_t mode)
 	return ona_open(path, flags, mode, NULL, 0);
 }
 
+/* Open a directory for traversal or as *at()/fchdir() authority.  Unlike an
+ * O_RDONLY directory endpoint, this accepts a searchable but unreadable
+ * directory on Linux. */
+int open_no_attacker_symlinks_dirfd(const char *path)
+{
+	return ona_open(path, directory_traverse_flags(), 0, NULL, 0);
+}
+
 /* When set, the do_*_at() wrappers resolve their path as an OPERATOR-supplied
  * directory path (an absolute or relative --backup-dir/--temp-dir/--*-dest)
  * using the ownership walk -- follow a symlink owned by uid 0 or our euid,
@@ -580,7 +598,7 @@ int owner_walk_parent(const char *path, const char **bname)
 	*bname = slash ? slash + 1 : path;
 	pabs[0] = '\0';
 	if (!slash)
-		dfd = ona_open(".", O_RDONLY | O_DIRECTORY, 0, pabs, sizeof pabs);
+		dfd = ona_open(".", directory_traverse_flags(), 0, pabs, sizeof pabs);
 	else {
 		dlen = slash == path ? 1 : (size_t)(slash - path); /* "/x" -> parent "/" */
 		if (dlen >= sizeof dir) {
@@ -589,7 +607,7 @@ int owner_walk_parent(const char *path, const char **bname)
 		}
 		memcpy(dir, path, dlen);
 		dir[dlen] = '\0';
-		dfd = ona_open(dir, O_RDONLY | O_DIRECTORY, 0, pabs, sizeof pabs);
+		dfd = ona_open(dir, directory_traverse_flags(), 0, pabs, sizeof pabs);
 	}
 	if (dfd < 0)
 		return -1;
@@ -718,7 +736,7 @@ int do_unlink_at(const char *path)
 	dirpath[dlen] = '\0';
 	bname = slash + 1;
 
-	dfd = secure_relative_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
+	dfd = secure_relative_dirfd(NULL, dirpath);
 	if (dfd < 0)
 		return -1;
 
@@ -825,7 +843,7 @@ int do_symlink_at(const char *lnk, const char *path)
 			memcpy(dirpath, path, dlen);
 			dirpath[dlen] = '\0';
 			bname = slash + 1;
-			dfd = secure_relative_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
+			dfd = secure_relative_dirfd(NULL, dirpath);
 			if (dfd < 0)
 				return -1;
 			owns = True;
@@ -1027,7 +1045,7 @@ int do_link_at(const char *old_path, const char *new_path)
 		memcpy(old_dirpath, old_path, old_dlen);
 		old_dirpath[old_dlen] = '\0';
 		old_bname = old_slash + 1;
-		old_dfd = secure_relative_open(NULL, old_dirpath, O_RDONLY | O_DIRECTORY, 0);
+		old_dfd = secure_relative_dirfd(NULL, old_dirpath);
 		if (old_dfd < 0)
 			return -1;
 		old_owns = True;
@@ -1066,7 +1084,7 @@ int do_link_at(const char *old_path, const char *new_path)
 		 && memcmp(old_dirpath, new_dirpath, old_dlen) == 0) {
 			new_dfd = old_dfd;
 		} else {
-			new_dfd = secure_relative_open(NULL, new_dirpath, O_RDONLY | O_DIRECTORY, 0);
+			new_dfd = secure_relative_dirfd(NULL, new_dirpath);
 			if (new_dfd < 0) {
 				e = errno;
 				if (old_owns) close(old_dfd);
@@ -1169,7 +1187,7 @@ int do_lchown_at(const char *fname, uid_t owner, gid_t group)
 	dirpath[dlen] = '\0';
 	bname = slash + 1;
 
-	dfd = secure_relative_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
+	dfd = secure_relative_dirfd(NULL, dirpath);
 	if (dfd < 0)
 		return -1;
 
@@ -1340,7 +1358,7 @@ int do_mknod_at(const char *pathname, mode_t mode, dev_t dev)
 		memcpy(dirpath, pathname, dlen);
 		dirpath[dlen] = '\0';
 		bname = slash + 1;
-		dfd = secure_relative_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
+		dfd = secure_relative_dirfd(NULL, dirpath);
 		if (dfd < 0)
 			return -1;
 		owns = True;
@@ -1462,7 +1480,7 @@ int do_rmdir_at(const char *pathname)
 	dirpath[dlen] = '\0';
 	bname = slash + 1;
 
-	dfd = secure_relative_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
+	dfd = secure_relative_dirfd(NULL, dirpath);
 	if (dfd < 0)
 		return -1;
 
@@ -1558,7 +1576,7 @@ int do_open_at(const char *pathname, int flags, mode_t mode)
 	dirpath[dlen] = '\0';
 	bname = slash + 1;
 
-	dfd = secure_relative_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
+	dfd = secure_relative_dirfd(NULL, dirpath);
 	if (dfd < 0)
 		return -1;
 
@@ -1840,7 +1858,7 @@ int do_chmod_at(const char *fname, mode_t mode)
 	dirpath[dlen] = '\0';
 	bname = slash + 1;
 
-	dfd = secure_relative_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
+	dfd = secure_relative_dirfd(NULL, dirpath);
 	if (dfd < 0)
 		return -1;
 
@@ -1957,7 +1975,7 @@ int do_rename_at(const char *old_path, const char *new_path)
 		memcpy(old_dirpath, old_path, old_dlen);
 		old_dirpath[old_dlen] = '\0';
 		old_bname = old_slash + 1;
-		old_dfd = secure_relative_open(NULL, old_dirpath, O_RDONLY | O_DIRECTORY, 0);
+		old_dfd = secure_relative_dirfd(NULL, old_dirpath);
 		if (old_dfd < 0)
 			return -1;
 		old_owns = True;
@@ -1996,7 +2014,7 @@ int do_rename_at(const char *old_path, const char *new_path)
 		 && memcmp(old_dirpath, new_dirpath, old_dlen) == 0) {
 			new_dfd = old_dfd;
 		} else {
-			new_dfd = secure_relative_open(NULL, new_dirpath, O_RDONLY | O_DIRECTORY, 0);
+			new_dfd = secure_relative_dirfd(NULL, new_dirpath);
 			if (new_dfd < 0) {
 				e = errno;
 				if (old_owns) close(old_dfd);
@@ -2127,7 +2145,7 @@ int do_mkdir_at(char *path, mode_t mode)
 	dirpath[dlen] = '\0';
 	bname = slash + 1;
 
-	dfd = secure_relative_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
+	dfd = secure_relative_dirfd(NULL, dirpath);
 	if (dfd < 0)
 		return -1;
 
@@ -2253,7 +2271,7 @@ static int do_xstat_at(const char *path, STRUCT_STAT *st, int at_flags, int (*fa
 	dirpath[dlen] = '\0';
 	bname = slash + 1;
 
-	dfd = secure_relative_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
+	dfd = secure_relative_dirfd(NULL, dirpath);
 	if (dfd < 0)
 		return -1;
 
@@ -2505,7 +2523,7 @@ int do_utimensat_at(const char *path, STRUCT_STAT *stp)
 	t[1].tv_nsec = 0;
 #endif
 
-	dfd = secure_relative_open(NULL, dirpath, O_RDONLY | O_DIRECTORY, 0);
+	dfd = secure_relative_dirfd(NULL, dirpath);
 	if (dfd < 0)
 		return -1;
 
@@ -2886,13 +2904,13 @@ static int ds_push(struct dirstack *ds, int fd)
 	return 0;
 }
 
-/* Detach the current dir as an owned fd the caller must close.  At the anchor
- * (top 0) the anchor is borrowed, so return a fresh dup of it instead. */
+/* Detach the current traversal dirfd as an owned fd the caller must close.  At
+ * the anchor (top 0) the anchor is borrowed, so open a fresh traversal fd. */
 static int ds_take(struct dirstack *ds)
 {
 	if (ds->top > 0)
 		return ds->fds[ds->top--];
-	return openat(ds->fds[0], ".", O_RDONLY | O_DIRECTORY);
+	return openat(ds->fds[0], ".", directory_traverse_flags());
 }
 
 static int ds_walk_path(struct dirstack *ds, char *path, int *hops);
@@ -2917,7 +2935,7 @@ static int ds_descend(struct dirstack *ds, const char *part, int *hops)
 		return 0;
 	}
 
-	int fd = openat(ds_cur(ds), part, O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+	int fd = openat(ds_cur(ds), part, directory_traverse_flags() | O_NOFOLLOW);
 	if (fd != -1) {					/* a real subdirectory */
 		if (ds_push(ds, fd) < 0)
 			return -1;
@@ -3040,7 +3058,7 @@ static int secure_walk_at(int anchor_fd, const char *anchor_abspath,
 				goto cleanup;
 			if (is_last) {
 				if (flags & O_DIRECTORY)
-					retfd = ds_take(&ds);
+					retfd = openat(ds_cur(&ds), ".", flags | O_NOFOLLOW, mode);
 				else
 					errno = EISDIR;
 				goto cleanup;
@@ -3060,7 +3078,8 @@ static int secure_walk_at(int anchor_fd, const char *anchor_abspath,
 					goto cleanup;
 				}
 			}
-			int next_fd = openat(ds_cur(&ds), part, O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+			int next_fd = openat(ds_cur(&ds), part,
+					     directory_traverse_flags() | O_NOFOLLOW);
 			if (next_fd == -1 && (errno == ENOTDIR || errno == ENOENT)) {
 				retfd = openat(ds_cur(&ds), part, flags | O_NOFOLLOW, mode);
 				goto cleanup;
@@ -3074,7 +3093,7 @@ static int secure_walk_at(int anchor_fd, const char *anchor_abspath,
 
 		/* O_DIRECTORY|O_NOFOLLOW leaf: the caller's O_NOFOLLOW governs the leaf. */
 		if (is_last && (flags & O_NOFOLLOW)) {
-			retfd = openat(ds_cur(&ds), part, O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+			retfd = openat(ds_cur(&ds), part, flags | O_NOFOLLOW, mode);
 			goto cleanup;
 		}
 
@@ -3086,17 +3105,17 @@ static int secure_walk_at(int anchor_fd, const char *anchor_abspath,
 			goto cleanup;
 		}
 		if (is_last) {
-			retfd = ds_take(&ds);
+			retfd = openat(ds_cur(&ds), ".", flags | O_NOFOLLOW, mode);
 			goto cleanup;
 		}
 	}
 
-	/* Empty relpath: hand back a real anchor for an O_DIRECTORY caller (ds_take
-	 * dups the borrowed anchor), else EISDIR.  An AT_FDCWD anchor is not a
-	 * resolvable target, so it fails rather than silently returning the cwd. */
+	/* Empty relpath: reopen the anchor with the caller's requested directory
+	 * access, else EISDIR.  An AT_FDCWD anchor is not a resolvable target, so it
+	 * fails rather than silently returning the cwd. */
 	if (!saw_component) {
 		if ((flags & O_DIRECTORY) && anchor_fd != AT_FDCWD)
-			retfd = ds_take(&ds);
+			retfd = openat(anchor_fd, ".", flags | O_NOFOLLOW, mode);
 		else
 			errno = EISDIR;
 	}
@@ -3249,6 +3268,14 @@ int secure_relative_open(const char *basedir, const char *relpath, int flags, mo
 #endif // O_NOFOLLOW, O_DIRECTORY
 }
 
+/* Resolve a directory for traversal or as *at()/fchdir() authority.  Callers
+ * that read directory entries or need a read-capable fd must continue to use
+ * secure_relative_open(..., O_RDONLY | O_DIRECTORY, ...). */
+int secure_relative_dirfd(const char *basedir, const char *relpath)
+{
+	return secure_relative_open(basedir, relpath, directory_traverse_flags(), 0);
+}
+
 /* Common fd-anchored resolver.  A caller may explicitly allow literal ".."
  * components when the fd itself is the confinement boundary: secure_walk_at()
  * resolves each one by popping its held-dirfd stack and refuses a pop above the
@@ -3301,6 +3328,12 @@ int secure_relative_open_at_beneath(int anchor_fd, const char *relpath,
 				    int flags, mode_t mode)
 {
 	return secure_relative_open_at_internal(anchor_fd, relpath, flags, mode, 1);
+}
+
+int secure_relative_dirfd_at_beneath(int anchor_fd, const char *relpath)
+{
+	return secure_relative_open_at_internal(anchor_fd, relpath,
+						directory_traverse_flags(), 0, 1);
 }
 
 #if defined O_NOFOLLOW && defined O_DIRECTORY && defined AT_FDCWD
@@ -3439,8 +3472,8 @@ int secure_mkstemp(char *template, mode_t perms, int operator_path)
 			dir = dirbuf;
 		}
 		dirfd = operator_path
-		      ? open_no_attacker_symlinks(dir, O_RDONLY | O_DIRECTORY, 0)
-		      : secure_relative_open(dir, ".", O_RDONLY | O_DIRECTORY, 0);
+		      ? open_no_attacker_symlinks_dirfd(dir)
+		      : secure_relative_dirfd(dir, ".");
 		if (dirfd < 0)
 			return -1;
 	}
@@ -3509,14 +3542,14 @@ int open_dir_secure(const char *dirname)
 
 	if (!dirname || !*dirname) {
 		/* The transfer root itself (file->dirname == NULL): the cwd. */
-		dfd = openat(AT_FDCWD, ".", O_RDONLY | O_DIRECTORY);
+		dfd = openat(AT_FDCWD, ".", directory_traverse_flags());
 	} else if (dirname[0] == '/') {
 		/* An absolute dirname is not expected for an in-transfer entry;
 		 * leave it to the legacy path. */
 		errno = 0;
 		return -1;
 	} else {
-		dfd = secure_relative_open(NULL, dirname, O_RDONLY | O_DIRECTORY, 0);
+		dfd = secure_relative_dirfd(NULL, dirname);
 	}
 
 	if (dfd >= 0) {
