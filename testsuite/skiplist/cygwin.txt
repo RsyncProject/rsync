@@ -25,7 +25,6 @@ copy-xattrs-symlink-race
 daemon-auth-group
 daemon-chroot-munge-default
 daemon-config-symlink
-daemon-max-alloc-zero
 daemon-module-chdir-symlink
 daemon-module-private-parent
 daemon-secrets-file-symlink
