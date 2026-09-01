@@ -3537,6 +3537,12 @@ sign) if you want the local shell to expand it.
       Note that this line is only output if deletions are in effect, and only
       if the negotiated protocol is at least 31 (the default when both sides
       are 3.1.0, September 2013, or newer).
+    - `Number of 4 KiB logical blocks touched` is the number of unique 4 KiB
+      logical file regions covered by rsync's own write operations. This metric
+      decouples network payload from the scope of local file modifications.
+      For example, a small amount of *Literal data* can result in a massive 
+      number of touched blocks if the modifications are highly scattered
+      across a file, especially when using `--inplace`.
     - `Number of regular files transferred` is the count of normal files that
       were updated via rsync's delta-transfer algorithm, which does not include
       directories, symlinks, etc.

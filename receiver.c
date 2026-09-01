@@ -471,6 +471,12 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 	char *data;
 	int32 i;
 	char *map = NULL;
+	 
+    /* Reset the 4K block tracker's per-file lifetime state.
+     * Placed here to guarantee a clean state for every new file payload,
+     * preventing bugs caused by POSIX file descriptor
+     * recycling when sequential files are assigned the same FD. */
+	reset_block_tracker();
 
 #ifdef SUPPORT_PREALLOCATION
 	if (preallocate_files && fd != -1 && total_size > 0 && (!inplace_sizing || total_size > size_r)) {

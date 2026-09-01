@@ -443,6 +443,9 @@ static void output_summary(void)
 			human_num(stats.total_transferred_size));
 		rprintf(FINFO,"Literal data: %s bytes\n",
 			human_num(stats.literal_data));
+		if (protocol_version >= 33) 
+             rprintf(FINFO,"Number of 4 KiB logical blocks touched: %s\n",
+                 comma_num(stats.touched_blocks_4k));
 		rprintf(FINFO,"Matched data: %s bytes\n",
 			human_num(stats.matched_data));
 		rprintf(FINFO,"File list size: %s\n",
@@ -1107,6 +1110,11 @@ static int do_recv(int f_in, int f_out, char *local_name)
 
 		write_int(f_out, NDX_DONE);
 		send_msg(MSG_STATS, (char*)&stats.total_read, sizeof stats.total_read, 0);
+		if(protocol_version >= 33) {
+		    char b[8];
+		    SIVAL64(b, 0, stats.touched_blocks_4k);
+		    send_msg(MSG_BLOCK_STATS, b, sizeof b, 0); 
+		}
 		io_flush(FULL_FLUSH);
 
 		/* Handle any keep-alive packets from the post-processing work

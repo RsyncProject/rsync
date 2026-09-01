@@ -111,7 +111,7 @@
 
 /* Update this if you make incompatible changes and ALSO update the
  * SUBPROTOCOL_VERSION if it is not a final (official) release. */
-#define PROTOCOL_VERSION 32
+#define PROTOCOL_VERSION 33
 
 /* This is used when working on a new protocol version or for any unofficial
  * protocol tweaks.  It should be a non-zero value for each pre-release repo
@@ -299,6 +299,7 @@ enum msgcode {
 	MSG_LOG=FLOG, MSG_CLIENT=FCLIENT, /* sibling logging */
 	MSG_REDO=9,	/* reprocess indicated flist index */
 	MSG_STATS=10,	/* message has stats data for generator */
+	MSG_BLOCK_STATS=11, /* message has block-level stats for sender */
 	MSG_IO_ERROR=22,/* the sending side had an I/O error */
 	MSG_IO_TIMEOUT=33,/* tell client about a daemon's timeout value */
 	MSG_NOOP=42,	/* a do-nothing message (legacy protocol-30 only) */
@@ -1080,6 +1081,7 @@ struct stats {
 	int64 total_read;
 	int64 literal_data;
 	int64 matched_data;
+	int64 touched_blocks_4k;
 	int64 flist_buildtime;
 	int64 flist_xfertime;
 	int64 flist_size;
