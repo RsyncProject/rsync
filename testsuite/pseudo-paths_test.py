@@ -13,7 +13,7 @@ if not sys.platform.startswith('linux'):
     test_skipped('Kernel pseudo-path string is a Linux-specific procfs feature')
     raise SystemExit(0)
 
-# We require bash specifically because standard POSIX /bin/sh does not 
+# We require bash specifically because standard POSIX /bin/sh does not
 # guarantee support for >(...) process substitution syntax.
 bash = shutil.which('bash')
 if bash is None:
@@ -98,7 +98,7 @@ except subprocess.TimeoutExpired:
 
 ctx_confined = f'rc={proc_confined.returncode}, stderr={proc_confined.stderr.strip()!r}'
 
-# Rsync considers log-file failure a warning, so it still exits 0. 
+# Rsync considers log-file failure a warning, so it still exits 0.
 stderr_lower = proc_confined.stderr.lower()
 if "no such file or directory" in stderr_lower and "failed to open" in stderr_lower:
     if log_out_confined.exists() and log_out_confined.stat().st_size > 0:
@@ -108,6 +108,31 @@ if "no such file or directory" in stderr_lower and "failed to open" in stderr_lo
 else:
     rmtree(base)
     test_fail(f'rsync failed to reject the pseudo-path or had an unexpected error ({ctx_confined})')
+
+# A pseudo-path is valid only when its descriptor number is the final component.
+rmtree(dest)
+makepath(dest)
+trailing_script = (
+    f'pipe_path=<(printf "transfer_me.txt\\n"); '
+    f'{rsync_base_cmd} --exclude-from="$pipe_path/trailing" {src_path} {dest_path}'
+)
+try:
+    proc_trailing = subprocess.run(
+        [bash, '-c', trailing_script],
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+except subprocess.TimeoutExpired:
+    rmtree(base)
+    test_fail('trailing-component pseudo-path test timed out')
+
+if proc_trailing.returncode == 0:
+    rmtree(base)
+    test_fail('/dev/fd/N/trailing unexpectedly opened descriptor N')
+if (dest / 'transfer_me.txt').exists():
+    rmtree(base)
+    test_fail('transfer continued after accepting a trailing pseudo-path component')
 
 rmtree(base)
 raise SystemExit(0)
