@@ -51,6 +51,7 @@ partial-protected-regular-retry-linux
 partial-protected-regular-retry-policy  # deterministic partial EACCES recovery uses dyld interposing
 password-file-symlink
 protected-regular
+pseudo-paths
 rename-mixed-parent-transfer
 rrsync-sender-leaf-flip
 rrsync-sender-parent-pin
