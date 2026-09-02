@@ -117,6 +117,13 @@ static time_t last_io_out;
  * transfer timeout and may be supplied by the module or client. */
 static time_t daemon_handshake_deadline;
 
+/* Wall-clock bound the client puts on establishing a daemon connection made
+ * through a remote shell (daemon_connection == 1): spawning the helper, its
+ * connect()/TLS handshake, and the exchange of the daemon greeting all happen
+ * before any buffered I/O begins, so --contimeout can time the whole phase the
+ * same way the socket path times its connect(). */
+static time_t client_connect_deadline;
+
 static int write_batch_monitor_in = -1;
 static int write_batch_monitor_out = -1;
 
@@ -146,17 +153,28 @@ static int handshake_poll_timeout_ms(void)
 	time_t now, left;
 	int timeout = poll_timeout_ms();
 
-	if (!daemon_handshake_deadline)
+	if (!daemon_handshake_deadline && !client_connect_deadline)
 		return timeout;
 
 	now = time(NULL);
-	left = daemon_handshake_deadline - now;
-	if (left <= 0) {
-		rprintf(FERROR, "[%s] daemon handshake timeout -- exiting\n", who_am_i());
-		exit_cleanup(RERR_TIMEOUT);
+	if (daemon_handshake_deadline) {
+		left = daemon_handshake_deadline - now;
+		if (left <= 0) {
+			rprintf(FERROR, "[%s] daemon handshake timeout -- exiting\n", who_am_i());
+			exit_cleanup(RERR_TIMEOUT);
+		}
+		if (left <= INT_MAX / 1000 && left * 1000 < timeout)
+			timeout = (int)left * 1000;
 	}
-	if (left <= INT_MAX / 1000 && left * 1000 < timeout)
-		timeout = (int)left * 1000;
+	if (client_connect_deadline) {
+		left = client_connect_deadline - now;
+		if (left <= 0) {
+			rprintf(FERROR, "[%s] connection timed out -- exiting\n", who_am_i());
+			exit_cleanup(RERR_CONTIMEOUT);
+		}
+		if (left <= INT_MAX / 1000 && left * 1000 < timeout)
+			timeout = (int)left * 1000;
+	}
 	return timeout;
 }
 
@@ -1301,6 +1319,14 @@ void set_daemon_handshake_timeout(int secs)
 		daemon_handshake_deadline = time(NULL) + secs;
 	else
 		daemon_handshake_deadline = 0;
+}
+
+void set_client_connect_timeout(int secs)
+{
+	if (secs > 0)
+		client_connect_deadline = time(NULL) + secs;
+	else
+		client_connect_deadline = 0;
 }
 
 static void check_for_d_option_error(const char *msg)
