@@ -127,8 +127,7 @@ static int secure_sender_parent_fd(struct file_struct *file, const char *fname, 
 #endif
 				while (*rel == '/')
 					rel++;
-				return secure_relative_open("/", rel,
-					O_RDONLY | O_DIRECTORY, 0);
+				return secure_relative_dirfd("/", rel);
 			}
 			/* held_dir_path_fd returns a cache-OWNED fd; the caller closes
 			 * what we return, so hand back an owned dup and leave the cache's
@@ -141,7 +140,7 @@ static int secure_sender_parent_fd(struct file_struct *file, const char *fname, 
 				return dup(dfd);
 			if (errno != 0)
 				return -1;
-			return secure_relative_open(NULL, dir, O_RDONLY | O_DIRECTORY, 0);
+			return secure_relative_dirfd(NULL, dir);
 		}
 		errno = 0;	/* top-level file: no parent component to confine */
 		return -1;
@@ -176,9 +175,9 @@ static int secure_sender_parent_fd(struct file_struct *file, const char *fname, 
 		}
 		memcpy(dir, relp, dlen);
 		dir[dlen] = '\0';
-		dfd = secure_relative_open(module_dir, dir, O_RDONLY | O_DIRECTORY, 0);
+		dfd = secure_relative_dirfd(module_dir, dir);
 	} else
-		dfd = secure_relative_open(module_dir, "", O_RDONLY | O_DIRECTORY, 0);
+		dfd = secure_relative_dirfd(module_dir, "");
 
 	/* The leaf is the same last component either way; take it from the caller's
 	 * persistent fname buffer, not the local secure_path. */
@@ -292,11 +291,9 @@ static int sender_open_copylinks_confined(const char *anchor, const char *relpat
 		 * only this branch would hand it to strcmp(). */
 		if (am_daemon && module_dirfd >= 0 && module_dir && anchor
 		 && strcmp(anchor, module_dir) == 0)
-			pdfd = secure_relative_open_at_beneath(module_dirfd, dir,
-					O_RDONLY | O_DIRECTORY, 0);
+			pdfd = secure_relative_dirfd_at_beneath(module_dirfd, dir);
 		else
-			pdfd = secure_relative_open(anchor, dir,
-					O_RDONLY | O_DIRECTORY, 0);
+			pdfd = secure_relative_dirfd(anchor, dir);
 		if (pdfd < 0)
 			return -1;
 		n = do_readlink_atfd(pdfd, bname, tgt, sizeof tgt - 1);
