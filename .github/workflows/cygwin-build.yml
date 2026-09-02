@@ -85,8 +85,9 @@ jobs:
       # (rsyncfns.py drives xattrs via getfattr/setfattr from the `attr`
       # package installed above), verified on a real Cygwin host. The real
       # chown/devices tests still skip (need root/mknod), as do the
-      # RESOLVE_BENEATH symlink-race tests.
-      run: bash -c 'RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/common.txt,@testsuite/skiplist/cygwin.txt make check'
+      # RESOLVE_BENEATH symlink-race tests. Cygwin runs non-root, so the
+      # namecvt empty-response regression can run despite its common root skip.
+      run: bash -c 'RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/common.txt,@testsuite/skiplist/cygwin.txt,-daemon-namecvt-empty-response make check'
     - name: check (TCP daemon transport)
       # Second run with daemon tests over a real loopback rsyncd; the default
       # 'make check' above uses the secure stdio-pipe transport.
