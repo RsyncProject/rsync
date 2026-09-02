@@ -62,7 +62,6 @@ sender-remove-source-root-anchor
 simd-checksum
 source-change-size-continues
 symlink-dest-backupdir
-symlink-exclude-xattr
 symlink-race-dest
 symlink-race-relative-dest
 temp-dir-symlink-injection
