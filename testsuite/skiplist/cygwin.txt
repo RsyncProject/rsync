@@ -25,7 +25,6 @@ copy-xattrs-symlink-race
 daemon-auth-group
 daemon-chroot-munge-default
 daemon-config-symlink
-daemon-max-alloc-zero
 daemon-module-chdir-symlink
 daemon-module-private-parent
 daemon-secrets-file-symlink
@@ -63,7 +62,6 @@ sender-remove-source-root-anchor
 simd-checksum
 source-change-size-continues
 symlink-dest-backupdir
-symlink-exclude-xattr
 symlink-race-dest
 symlink-race-relative-dest
 temp-dir-symlink-injection
