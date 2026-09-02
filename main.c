@@ -1644,6 +1644,14 @@ static int start_client(int argc, char *argv[])
 	(void)env_port;
 #endif
 
+	/* For a daemon reached through a remote shell, the "connection" rsync
+	 * waits on is: the helper is spawned, it establishes its own link (e.g.
+	 * rsync-ssl's openssl connect + TLS handshake), and the daemon greeting is
+	 * exchanged.  Bound that whole phase with --contimeout so the option
+	 * behaves for daemon-via-rsh the way it does for a socket connection. */
+	if (daemon_connection && connect_timeout > 0)
+		set_client_connect_timeout(connect_timeout);
+
 	pid = do_cmd(shell_cmd, shell_machine, shell_user, remote_argv, remote_argc, &f_in, &f_out);
 
 	/* if we're running an rsync server on the remote host over a
@@ -1651,6 +1659,7 @@ static int start_client(int argc, char *argv[])
 	if (daemon_connection) {
 		int tmpret;
 		tmpret = start_inband_exchange(f_in, f_out, shell_user, remote_argc, remote_argv);
+		set_client_connect_timeout(0);
 		if (tmpret < 0)
 			return tmpret;
 	}
