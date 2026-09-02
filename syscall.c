@@ -429,6 +429,10 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 				&& ((strcmp(abspath, "/proc") == 0 && strcmp(comp, "self") == 0)
 				 || (strcmp(abspath, "/dev") == 0 && strcmp(comp, "fd") == 0));
 			if (!namespace_pin && lst.st_uid != 0 && lst.st_uid != trusted_uid) {
+				rprintf(FERROR,
+					"refusing to follow a symlink owned by an untrusted user; "
+					"use --insecure-links locally or \"insecure links = yes\" in a "
+					"daemon module only if every path component is trusted\n");
 				saved_errno = ELOOP;
 				goto out;
 			}
