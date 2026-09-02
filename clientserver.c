@@ -1722,24 +1722,12 @@ static void become_daemon(void)
 	}
 }
 
-/* Inetd supplies one bidirectional socket on stdin and stdout. Other launchers
- * may use unrelated local sockets for process I/O, which must not select
- * inetd mode. */
-static int is_inetd_socket(void)
-{
-	STRUCT_STAT in_st, out_st;
-
-	if (!is_a_socket(STDIN_FILENO) || !is_a_socket(STDOUT_FILENO)
-	 || do_fstat(STDIN_FILENO, &in_st) < 0
-	 || do_fstat(STDOUT_FILENO, &out_st) < 0)
-		return 0;
-
-	return in_st.st_dev == out_st.st_dev && in_st.st_ino == out_st.st_ino;
-}
-
 int daemon_main(void)
 {
-	if (is_inetd_socket()) {
+	/* --no-detach explicitly requests a foreground standalone daemon. Honour
+	 * that mode before socket auto-detection because launchers such as ADB may
+	 * use a local socket for ordinary process input. */
+	if (!no_detach && is_a_socket(STDIN_FILENO)) {
 		int i;
 
 		/* we are running via inetd - close off stdout and

@@ -31,7 +31,7 @@ def start_stdio_daemon(conf, timeout=10, env=None):
     parent, child = socket.socketpair()
     try:
         proc = subprocess.Popen(
-            rsync_argv('--daemon', '--no-detach', f'--config={conf}'),
+            rsync_argv('--daemon', f'--config={conf}'),
             stdin=child.fileno(), stdout=child.fileno(),
             stderr=subprocess.PIPE, close_fds=True, env=env,
         )
@@ -60,4 +60,3 @@ def finish_stdio_daemon(client, proc, timeout=5):
             proc.kill()
             proc.wait(timeout=timeout)
     return proc.stderr.read().decode('utf-8', 'replace') if proc.stderr else ''
-

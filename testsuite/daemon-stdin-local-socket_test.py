@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""An unrelated local stdin socket must not make a daemon enter inetd mode."""
+"""--no-detach must select standalone mode even when stdin is a local socket."""
 
 import socket
 
@@ -25,8 +25,8 @@ try:
 except OSError as e:
     test_skipped(f'Unix-domain socket pairs are unavailable: {e}')
 try:
-    # ADB shell without a PTY similarly presents a local socket as fd 0 while
-    # stdout is separate. The daemon must ignore it and listen normally.
+    # ADB shell without a PTY similarly presents a local socket as fd 0. The
+    # explicit --no-detach mode must take precedence and listen normally.
     start_rsyncd(conf, port, rsync_cmd=RSYNC, stdin=child)
 finally:
     child.close()
