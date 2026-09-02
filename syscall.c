@@ -432,7 +432,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 				rprintf(FERROR,
 					"refusing to follow a symlink owned by an untrusted user; "
 					"use --insecure-links locally or \"insecure links = yes\" in a "
-					"daemon module only if every path component is trusted\n");
+					"daemon module ONLY if every path component is trusted\n");
 				saved_errno = ELOOP;
 				goto out;
 			}
