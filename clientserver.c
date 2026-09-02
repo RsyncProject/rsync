@@ -1722,27 +1722,24 @@ static void become_daemon(void)
 	}
 }
 
-/* Inetd supplies a connected IP stream on stdin. Other launchers may use a
- * local socket for process I/O, which must not select inetd mode. */
-static int is_inet_stream_socket(int fd)
+/* Inetd supplies one bidirectional socket on stdin and stdout. Other launchers
+ * may use unrelated local sockets for process I/O, which must not select
+ * inetd mode. */
+static int is_inetd_socket(void)
 {
-	struct sockaddr_storage ss;
-	struct sockaddr *sa = (struct sockaddr *)&ss;
-	socklen_t ss_len = sizeof ss;
-	int type;
-	socklen_t type_len = sizeof type;
+	STRUCT_STAT in_st, out_st;
 
-	if (getpeername(fd, (struct sockaddr *)&ss, &ss_len) < 0
-	 || getsockopt(fd, SOL_SOCKET, SO_TYPE, (char *)&type, &type_len) < 0)
+	if (!is_a_socket(STDIN_FILENO) || !is_a_socket(STDOUT_FILENO)
+	 || do_fstat(STDIN_FILENO, &in_st) < 0
+	 || do_fstat(STDOUT_FILENO, &out_st) < 0)
 		return 0;
 
-	return type == SOCK_STREAM
-	    && (sa->sa_family == AF_INET || sa->sa_family == AF_INET6);
+	return in_st.st_dev == out_st.st_dev && in_st.st_ino == out_st.st_ino;
 }
 
 int daemon_main(void)
 {
-	if (is_inet_stream_socket(STDIN_FILENO)) {
+	if (is_inetd_socket()) {
 		int i;
 
 		/* we are running via inetd - close off stdout and
