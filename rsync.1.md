@@ -2352,6 +2352,10 @@ sign) if you want the local shell to expand it.
     A value of 0 was accepted beginning in 3.2.3 and rejected in 3.5.0; the
     release after 3.5.0 accepts it again.
 
+    A daemon administrator who does not want clients to change the configured
+    allocation ceiling can set `refuse options = max-alloc` in the module's
+    `rsyncd.conf`.  This refuses every client-supplied value, including 0.
+
     You can set a default value using the environment variable
     [`RSYNC_MAX_ALLOC`](#) using the same SIZE values as supported by this
     option.  If the remote rsync doesn't understand the `--max-alloc` option,
