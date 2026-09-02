@@ -1612,7 +1612,7 @@ static int start_client(int argc, char *argv[])
 		exit_cleanup(RERR_SYNTAX);
 	}
 
-	if (connect_timeout) {
+	if (connect_timeout && !daemon_connection) {
 		rprintf(FERROR, "The --contimeout option may only be "
 				"used when connecting to an rsync daemon.\n");
 		exit_cleanup(RERR_SYNTAX);
