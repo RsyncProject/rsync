@@ -2199,8 +2199,19 @@ expand it.
     See the [`--max-size`](#opt) option for a description of how SIZE can be
     specified.  The default suffix if none is given is bytes.
 
-    Beginning in 3.2.7, a value of 0 is an easy way to specify SIZE_MAX (the
-    largest limit possible).
+    A value of 0 is an easy way to say "the largest limit this build supports".
+    It resolves to the same ceiling an explicit SIZE is checked against, so it
+    is never a higher limit than one you could have typed out yourself.
+
+    Because the option is passed to the remote rsync as you wrote it, each side
+    resolves a 0 against its own maximum.  That makes 0 the only spelling that
+    is correct for both ends of a transfer between hosts of different word
+    sizes: a literal value large enough to be useful on a 64-bit client is
+    rejected as too large by a 32-bit daemon.
+
+    A daemon administrator who does not want clients to change the configured
+    allocation ceiling can set `refuse options = max-alloc` in the module's
+    `rsyncd.conf`.  This refuses every client-supplied value, including 0.
 
     You can set a default value using the environment variable
     [`RSYNC_MAX_ALLOC`](#) using the same SIZE values as supported by this
