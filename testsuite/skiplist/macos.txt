@@ -14,7 +14,6 @@ backup-crossdev-copy
 chmod-temp-dir
 copy-xattrs-symlink-race
 daemon-auth-group
-daemon-max-alloc-zero
 dir-sgid
 fake-super-acl-xattr
 link-dest-symlink-enotsup                # the ENOTSUP hard-link hook is an LD_PRELOAD, Linux-only
