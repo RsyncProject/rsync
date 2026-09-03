@@ -119,24 +119,35 @@ static int secure_basis_open(const char *basedir, const char *relpath, int flags
 		return do_open(relpath, flags, mode);
 	}
 
-	/* A peer-supplied --partial-dir basis/staging path (operator_path_resolve set
-	 * by recv_files) may be absolute (module_dir-prefixed on a non-chroot daemon)
-	 * and traverse a symlink the secure_relative_open path can't confine: resolve
-	 * it with the ownership walk, which follows a uid0/euid-owned symlink but
-	 * refuses a foreign one AND (via abspath_excluded_by_module) refuses a target
-	 * the module's exclude hides -- closing the partial-dir exclude bypass. */
-	if (operator_path_resolve) {
-		char fullpath[MAXPATHLEN];
-		const char *p = relpath;
-		if (basedir) {
-			if (pathjoin(fullpath, sizeof fullpath, basedir, relpath) >= sizeof fullpath) {
-				errno = ENAMETOOLONG;
-				return -1;
-			}
+    /* A path with operator_path_resolve set (e.g. an absolute --partial-dir or alt-dest
+     * basis) may traverse a symlink the secure_relative_open path can't confine. We
+     * resolve the operator path with the ownership walk, which safely follows
+     * subdirectory and parent components if they are trusted (uid0/euid-owned) symlinks,
+     * but refuses a foreign one AND (via abspath_excluded_by_module) refuses a target
+     * the module's exclude hides -- closing the partial-dir exclude bypass.
+     * However, we strictly refuse to follow a leaf symlink coming from an operator
+     * path by enforcing O_NOFOLLOW, aligning it on operator-path behavior. */
+    if (operator_path_resolve) {
+        char fullpath[MAXPATHLEN];
+		const char* p = relpath;
+        int dfd, fd, e;
+        const char *leaf;
+        if (basedir) {
+            if (pathjoin(fullpath, sizeof fullpath, basedir, relpath) >= sizeof fullpath) {
+                errno = ENAMETOOLONG;
+                return -1;
+            }
 			p = fullpath;
-		}
-		return open_no_attacker_symlinks(p, flags, mode);
-	}
+        }
+        dfd = owner_walk_parent(p, &leaf);
+        if (dfd < 0)
+            return -1;
+        fd = openat(dfd, leaf, flags | O_NOFOLLOW, mode);
+        e = errno;
+        close(dfd);
+        errno = e; 
+        return fd;
+    }
 
 	/* The confined resolver is needed for the sanitizing daemon
 	 * (am_daemon && !am_chrooted) and for a /./ inner-module chroot
@@ -1085,7 +1096,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 				 * stronger confinement branch in secure_basis_open(), so only
 				 * route the alt-dest basedir read through the walk off-daemon. */
 				if ((basedir && !am_daemon) || fnamecmp_type == FNAMECMP_PARTIAL_DIR)
-					operator_path_resolve = 1;
+				    operator_path_resolve = 1;
 				fd1 = secure_basis_open(basedir, fnamecmp, O_RDONLY, 0);
 				operator_path_resolve = 0;
 			}
@@ -1133,8 +1144,9 @@ int recv_files(int f_in, int f_out, char *local_name)
 		}
 
 		/* A peer's basis selector cannot enable direct output through a path
-		 * that the confined basis open did not validate. */
-		one_inplace = inplace_partial && fnamecmp_type == FNAMECMP_PARTIAL_DIR
+		 * that the confined basis open did not validate. We also explicitly
+         * require partial_dir to be configured by the client */
+		one_inplace = inplace_partial && partial_dir && fnamecmp_type == FNAMECMP_PARTIAL_DIR
 			   && fd1 != -1;
 		updating_basis_or_equiv = one_inplace
 		    || (inplace && (fnamecmp == fname || fnamecmp_type == FNAMECMP_BACKUP));
