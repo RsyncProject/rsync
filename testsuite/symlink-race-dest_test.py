@@ -50,8 +50,20 @@ dest.mkdir(parents=True)
 os.symlink(outside, dest / 'sub')               # attacker-owned dest component
 os.lchown(dest / 'sub', ATT_UID, ATT_UID)
 
-subprocess.run(rsync_argv('-a', f'{src}/sub/', f'{dest}/sub/'),
-               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+proc = subprocess.run(
+    rsync_argv('-a', f'{src}/sub/', f'{dest}/sub/'),
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.PIPE,
+    text=True,
+)
+
+if proc.returncode == 0:
+    test_fail("attacker-owned destination symlink was not rejected")
+if "refusing to follow a symlink owned by an untrusted user" not in proc.stderr:
+    test_fail(
+        "untrusted destination symlink failure omitted the actionable "
+        f"diagnostic: {proc.stderr!r}"
+    )
 
 escaped = sorted(p.name for p in outside.iterdir())
 if escaped:
