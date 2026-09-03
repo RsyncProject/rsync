@@ -1727,7 +1727,7 @@ static void become_daemon(void)
 static int is_inetd_socket(int fd)
 {
 	int type;
-	struct sockaddr_storage peer;
+	struct sockaddr_storage peer = {0};
 	socklen_t type_len = sizeof type;
 	socklen_t peer_len = sizeof peer;
 

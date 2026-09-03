@@ -25,10 +25,10 @@ copy-xattrs-symlink-race
 daemon-auth-group
 daemon-chroot-munge-default
 daemon-config-symlink
-daemon-stdin-local-socket             # Cygwin Python has no AF_UNIX socketpair
 daemon-module-chdir-symlink
 daemon-module-private-parent
 daemon-secrets-file-symlink
+daemon-stdin-local-socket             # Cygwin Python has no AF_UNIX socketpair
 devices
 dir-sgid
 early-input-symlink
