@@ -21,6 +21,8 @@ open-noatime
 partial-protected-regular-retry-linux
 preallocate
 protected-regular
+pseudo-paths  # dynamically skips on runners lacking bash process substitution
+read-batch-pipe
 readonly-partial-abort-mode-regression  # 
 rrsync-sender-leaf-flip
 rrsync-sender-parent-pin

@@ -329,8 +329,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 	 * (abspath_outside_confinement).  A relative operator path starts at the
 	 * daemon's cwd == the module root; an absolute one (or a followed absolute
 	 * symlink target) restarts at "/". */
-	char abspath[MAXPATHLEN];
-	abspath[0] = '\0';
+	char abspath[MAXPATHLEN] = {0};
 	if (am_daemon && module_dir && module_dir[0] == '/')
 		strlcpy(abspath, module_dir, sizeof abspath);	/* "/" for a path=/ module */
 	else if (confine_root) {
@@ -354,7 +353,8 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 	 * reach the magic link.  This only suspends the check for that prefix:
 	 * following the link restarts the walk at its absolute target, and every
 	 * component of THAT is checked, so a pin aimed outside is still refused. */
-	int pin_transit = !am_daemon && confine_root && fd_pin_tail(path) != NULL;
+	const char *ptail = fd_pin_tail(path);
+	int pin_transit = !am_daemon && confine_root && ptail != NULL;
 
 	/* Path-walk state. `remaining` is the unconsumed tail; we splice
 	 * symlink targets back into it as we go. Sized 2x MAXPATHLEN so a
@@ -429,6 +429,10 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 				&& ((strcmp(abspath, "/proc") == 0 && strcmp(comp, "self") == 0)
 				 || (strcmp(abspath, "/dev") == 0 && strcmp(comp, "fd") == 0));
 			if (!namespace_pin && lst.st_uid != 0 && lst.st_uid != trusted_uid) {
+				rprintf(FERROR,
+					"refusing to follow a symlink owned by an untrusted user; "
+					"use --insecure-links locally or \"insecure links = yes\" in a "
+					"daemon module ONLY if every path component is trusted\n");
 				saved_errno = ELOOP;
 				goto out;
 			}
@@ -443,6 +447,41 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 				goto out;
 			}
 			target[n] = '\0';
+
+			/* Detect Linux kernel pseudo-paths (pipes, sockets, anon_inodes).
+			 * These are not real paths on disk and never contain slashes. */
+			const char *abstail = fd_pin_tail(abspath);
+			int is_fd_dir = (abstail != NULL && *abstail == '\0' && ptail != NULL);
+			if (is_fd_dir && (strncmp(target, "pipe:[", 6) == 0
+			    || strncmp(target, "socket:[", 8) == 0
+			    || strncmp(target, "anon_inode:", 11) == 0)) {
+				if (!is_last) {
+					saved_errno = ENOTDIR;
+					goto out;
+				}
+				if (confine_root) {
+					/* Anonymous objects cannot be proven to reside beneath
+					 * the confinement root. */
+					saved_errno = ENOENT;
+					goto out;
+				}
+				/* Process substitution exposes /dev/fd/X as a symlink to a
+				 * kernel object. Reopen the validated leaf without O_NOFOLLOW
+				 * so the kernel applies the caller's requested open flags. */
+				retfd = openat(dfd, comp, (flags & ~O_NOFOLLOW) | O_CLOEXEC, mode);
+				/* Refuse a descriptor that changed to a filesystem object
+				 * between validation and openat(). */
+				if (retfd >= 0) {
+					STRUCT_STAT pst;
+					if (fstat(retfd, &pst) < 0 || S_ISREG(pst.st_mode) || S_ISDIR(pst.st_mode)) {
+						close(retfd);
+						retfd = -1;
+						errno = ELOOP;
+					}
+				}
+				saved_errno = retfd < 0 ? errno : 0;
+				goto out;
+			}
 
 			/* Splice: new `remaining` = <target> + <tail-after-comp>.
 			 * Absolute target restarts the walk from "/". */

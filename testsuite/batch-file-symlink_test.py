@@ -209,7 +209,7 @@ proc = subprocess.run(
 # node fails first with ENXIO, which is an equally valid refusal at the open.
 # A clean (returncode 0) run would be the real failure -- rsync accepting the
 # device as a batch file.
-refused = ('is not a regular file' in proc.stderr
+refused = ('is neither a regular file nor a FIFO' in proc.stderr
            or ('open error' in proc.stderr and proc.returncode != 0))
 if not refused:
     test_fail(

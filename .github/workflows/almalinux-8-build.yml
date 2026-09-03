@@ -67,7 +67,7 @@ jobs:
       # crtimes-not-supported skip matches the other Linux jobs;
       # daemon-chroot-acl and proxy-response-line-too-long skip because
       # the default (secure) transport opens no listening socket.
-      run: RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/common.txt,@testsuite/skiplist/linux.txt make check
+      run: RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/common.txt,@testsuite/skiplist/linux.txt,@testsuite/skiplist/almalinux-8.txt make check
     - name: check (TCP daemon transport)
       # Second run exercising the real loopback-TCP daemon path.
       run: ./runtests.py --rsync-bin="$PWD/rsync" --use-tcp -j 8
