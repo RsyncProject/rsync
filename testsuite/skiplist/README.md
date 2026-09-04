@@ -28,6 +28,7 @@ different tests merge cleanly.
 | `macos.txt` | macOS-only additions |
 | `cygwin.txt` | Cygwin-only additions |
 | `proto29.txt` | additions for a `--protocol=29` run, on any platform |
+| `proto30.txt` | additions for a `--protocol=30` run, on any platform |
 
 Compose them with commas; the result is the union, so listing a test twice is
 harmless. Plain test names may be mixed in with `@FILE` entries.

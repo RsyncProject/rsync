@@ -472,6 +472,9 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 	int32 i;
 	char *map = NULL;
 
+	/* Reset the block tracker's per-file state in case the OS reuses an fd. */
+	reset_block_tracker();
+
 #ifdef SUPPORT_PREALLOCATION
 	if (preallocate_files && fd != -1 && total_size > 0 && (!inplace_sizing || total_size > size_r)) {
 		/* Try to preallocate enough space for file's eventual length.  Can
