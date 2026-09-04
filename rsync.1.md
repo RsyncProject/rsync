@@ -1755,20 +1755,20 @@ sign) if you want the local shell to expand it.
 0.  `--devices`
 
     This option causes rsync to transfer character and block device files to
-    the remote system to recreate these devices.  If the receiving rsync is not
-    being run as the super-user, rsync silently skips creating the device files
-    (see also the [`--super`](#opt) and [`--fake-super`](#opt) options).
+    the remote system to recreate these devices.  This option has no effect if
+    the receiving rsync is not run as the super-user and neither
+    [`--super`](#opt) nor [`--fake-super`](#opt) is in effect.
 
-    By default, rsync generates a "non-regular file" warning for each device
-    file encountered when this option is not set.  You can silence the warning
-    by specifying [`--info=nonreg0`](#opt).
+    When a device file is not created, rsync generates the usual "non-regular
+    file" warning.  You can silence the warning by specifying
+    [`--info=nonreg0`](#opt).
 
 0.  `--specials`
 
     This option causes rsync to transfer special files, such as named sockets
-    and fifos.  If the receiving rsync is not being run as the super-user,
-    rsync silently skips creating the special files (see also the
-    [`--super`](#opt) and [`--fake-super`](#opt) options).
+    and fifos.  Creating these files does not normally require super-user
+    privileges.  Use [`--drop-D`](#opt) to make the receiving rsync refuse to
+    create them regardless of what the transfer requested.
 
     By default, rsync generates a "non-regular file" warning for each special
     file encountered when this option is not set.  You can silence the warning
