@@ -1,4 +1,4 @@
-"""Launch one rsync daemon session over a local socketpair."""
+"""Launch one rsync daemon session over a loopback TCP connection."""
 
 import socket
 import subprocess
@@ -28,7 +28,19 @@ def _client_for_socket(sock, timeout=10):
 
 def start_stdio_daemon(conf, timeout=10, env=None):
     """Return ``(DaemonClient, Popen)`` for one daemon connection."""
-    parent, child = socket.socketpair()
+    listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    parent = None
+    try:
+        listener.bind(('127.0.0.1', 0))
+        listener.listen(1)
+        parent = socket.create_connection(listener.getsockname(), timeout)
+        child, _ = listener.accept()
+    except OSError:
+        if parent is not None:
+            parent.close()
+        raise
+    finally:
+        listener.close()
     try:
         proc = subprocess.Popen(
             rsync_argv('--daemon', '--no-detach', f'--config={conf}'),
@@ -60,4 +72,3 @@ def finish_stdio_daemon(client, proc, timeout=5):
             proc.kill()
             proc.wait(timeout=timeout)
     return proc.stderr.read().decode('utf-8', 'replace') if proc.stderr else ''
-
