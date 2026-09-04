@@ -15,7 +15,7 @@ for arg in rsync_args:
         prot_version = int(arg.split('=')[1])
         if prot_version < 33:
             test_skipped(f"Skipping write-touched-blocks: feature requires protocol 33, but CI forced {prot_version}")
-            
+
 src = FROMDIR
 makepath(src)
 
@@ -96,7 +96,7 @@ with open(sparse_src, 'wb') as f:
     f.seek(4 * 1024 * 1024, os.SEEK_CUR)  # The Hole (4 MiB of nothing)
     f.write(os.urandom(4096))             # Block 1026 (Data)
 
-# We must run this WITH --sparse (-S) and WITHOUT --inplace to force 
+# We must run this WITH --sparse (-S) and WITHOUT --inplace to force
 # the receiver to create a brand new sparse file from scratch using write_sparse().
 rsync_cmd = shlex.split(str(RSYNC))
 argv_sparse = rsync_cmd + ['-a', '--stats', '--sparse', str(sparse_src), str(sparse_dest)]
@@ -104,14 +104,14 @@ proc = subprocess.run(argv_sparse, stdout=subprocess.PIPE, stderr=subprocess.STD
 
 if proc.returncode != 0:
     test_fail(f"rsync failed on sparse test:\n{proc.stdout}")
-    
+
 # Even though the file is over 4 MiB in size, only 2 logical 4K blocks
 # should be written because the rest was skipped via lseek.
 if "Number of 4 KiB logical blocks touched: 2\n" not in proc.stdout:
     test_fail(f"Sparse check failed! Expected 2 logical blocks written. Output:\n{proc.stdout}")
 
 # TEST 6: Multiple Files
-# Creates two separate 4KB files. If the tracker fails to reset between 
+# Creates two separate 4KB files. If the tracker fails to reset between
 # files due to FD recycling, it will report 1 block instead of 2.
 fd_src_dir = src / 'fd_test'
 fd_dest_dir = SCRATCHDIR / 'fd_dest'

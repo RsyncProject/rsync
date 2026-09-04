@@ -3540,7 +3540,7 @@ sign) if you want the local shell to expand it.
     - `Number of 4 KiB logical blocks touched` is the number of unique 4 KiB
       logical file regions covered by rsync's own write operations. This metric
       decouples network payload from the scope of local file modifications.
-      For example, a small amount of *Literal data* can result in a massive 
+      For example, a small amount of *Literal data* can result in a massive
       number of touched blocks if the modifications are highly scattered
       across a file, especially when using `--inplace`.
     - `Number of regular files transferred` is the count of normal files that

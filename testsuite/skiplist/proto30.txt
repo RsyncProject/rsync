@@ -1,0 +1,9 @@
+# Tests expected to SKIP.  One name per line, '#' starts a comment; the file
+# must stay sorted and duplicate-free (runtests.py enforces both).  Referenced
+# from a workflow as RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/<file>[,@...].
+# See testsuite/skiplist/README.md.
+#
+# Additions for a --protocol=30 run (make check30), on top of the platform
+# files.
+
+write-touched-blocks  # logical-block statistics require protocol 33+ (forced 30)

@@ -34,6 +34,7 @@
 #define ALIGNED_LENGTH(len) ((((len) - 1) | (ALIGN_BOUNDARY-1)) + 1)
 
 extern int sparse_files;
+extern struct stats stats;
 
 OFF_T preallocated_len = 0;
 
@@ -165,7 +166,7 @@ static int write_sparse(int f, int use_seek, OFF_T offset, const char *buf, int 
 		}
 		if (i > start) {
 			if (!use_seek)
-			   track_block_touches(f, offset + start, i - start);
+				track_block_touches(f, offset + start, i - start);
 			if (emit_sparse_span(f, use_seek, buf + start, i - start) < 0)
 				return -1;
 			sparse_past_write = offset + i;
@@ -210,34 +211,34 @@ int flush_write_file(int f)
 
 void reset_block_tracker(void)
 {
-    last_tracked_fd = -1;
-    last_touched_blk = -1;
+	last_tracked_fd = -1;
+	last_touched_blk = -1;
 }
 
-void track_block_touches(int f, OFF_T offset, int32 len) 
+void track_block_touches(int f, OFF_T offset, int32 len)
 {
-    if (len <= 0) 
-	    return;
-    extern struct stats stats;
-    if (f != last_tracked_fd) {
-        last_tracked_fd = f;
-        last_touched_blk = -1;
-    }
-    int64 start_blk = offset / 4096;
-    int64 end_blk = start_blk + (((offset % 4096) + len - 1) / 4096);
-    int64 blocks_to_add = 0;
-    if (start_blk > last_touched_blk) 
-        blocks_to_add = (end_blk - start_blk + 1);
-    else if (end_blk > last_touched_blk) 
-        blocks_to_add = (end_blk - last_touched_blk); 
-    if (blocks_to_add > 0) {
-        if (INT64_MAX - stats.touched_blocks_4k < blocks_to_add)
-            stats.touched_blocks_4k = INT64_MAX; 
-        else
-            stats.touched_blocks_4k += blocks_to_add;
-    }
-    if (end_blk > last_touched_blk)
-        last_touched_blk = end_blk;
+	int64 start_blk, end_blk, blocks_to_add = 0;
+
+	if (len <= 0)
+		return;
+	if (f != last_tracked_fd) {
+		last_tracked_fd = f;
+		last_touched_blk = -1;
+	}
+	start_blk = offset / 4096;
+	end_blk = start_blk + (((offset % 4096) + len - 1) / 4096);
+	if (start_blk > last_touched_blk)
+		blocks_to_add = end_blk - start_blk + 1;
+	else if (end_blk > last_touched_blk)
+		blocks_to_add = end_blk - last_touched_blk;
+	if (blocks_to_add > 0) {
+		if (INT64_MAX - stats.touched_blocks_4k < blocks_to_add)
+			stats.touched_blocks_4k = INT64_MAX;
+		else
+			stats.touched_blocks_4k += blocks_to_add;
+	}
+	if (end_blk > last_touched_blk)
+		last_touched_blk = end_blk;
 }
 
 /* write_file does not allow incomplete writes.  It loops internally
@@ -247,9 +248,8 @@ int write_file(int f, int use_seek, OFF_T offset, const char *buf, int len)
 {
 	int ret = 0;
 
-    if (!use_seek && sparse_files == 0) {
-        track_block_touches(f, offset, len);
-	}
+	if (!use_seek && sparse_files == 0)
+		track_block_touches(f, offset, len);
 	while (len > 0) {
 		int r1;
 		if (sparse_files > 0) {

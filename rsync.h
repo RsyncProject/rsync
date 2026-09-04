@@ -125,7 +125,7 @@
  * All older protocol versions MUST be compatible with the final, official
  * release of the protocol, so don't tweak the code to change the protocol
  * behavior for an older protocol version. */
-#define SUBPROTOCOL_VERSION 0
+#define SUBPROTOCOL_VERSION 8392 /* For testing */
 
 /* We refuse to interoperate with versions that are not in this range.
  * Note that we assume we'll work with later versions: the onus is on
@@ -299,7 +299,7 @@ enum msgcode {
 	MSG_LOG=FLOG, MSG_CLIENT=FCLIENT, /* sibling logging */
 	MSG_REDO=9,	/* reprocess indicated flist index */
 	MSG_STATS=10,	/* message has stats data for generator */
-	MSG_BLOCK_STATS=11, /* message has block-level stats for sender */
+	MSG_BLOCK_STATS=11,/* message has block-level stats for sender */
 	MSG_IO_ERROR=22,/* the sending side had an I/O error */
 	MSG_IO_TIMEOUT=33,/* tell client about a daemon's timeout value */
 	MSG_NOOP=42,	/* a do-nothing message (legacy protocol-30 only) */

@@ -1693,15 +1693,16 @@ static void read_a_msg(void)
 		iobuf.in_multiplexed = 1;
 		break;
 	case MSG_BLOCK_STATS: {
-        if (msg_bytes != 8 || protocol_version < 33)
-            goto invalid_msg;
 		char b[8];
+
+		if (msg_bytes != 8 || protocol_version < 33 || (!am_generator && !am_sender))
+			goto invalid_msg;
 		raw_read_buf(b, 8);
 		stats.touched_blocks_4k = IVAL64(b, 0);
 		iobuf.in_multiplexed = 1;
-		if (am_server && am_generator) 
-			send_msg(MSG_BLOCK_STATS, b, sizeof b, 0);  
-        break;
+		if (am_server && am_generator)
+			send_msg(MSG_BLOCK_STATS, b, sizeof b, 0);
+		break;
 	}
 	case MSG_REDO:
 		if (msg_bytes != 4 || !am_generator)
