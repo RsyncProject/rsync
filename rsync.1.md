@@ -300,7 +300,8 @@ entirely.  See the [SYMBOLIC LINKS](#) section for how these interact.
 Separately, the directory and file paths that *you* supply on the command line --
 [`--backup-dir`](#opt), [`--temp-dir`](#opt), [`--partial-dir`](#opt), the
 [`--link-dest`](#opt)/[`--compare-dest`](#opt)/[`--copy-dest`](#opt) basis directories,
-[`--log-file`](#opt), [`--files-from`](#opt)/`--include-from`/`--exclude-from`,
+[`--log-file`](#opt), [`--password-file`](#opt),
+[`--files-from`](#opt)/`--include-from`/`--exclude-from`,
 [`--filter`](#opt) merge files, [`--write-batch`](#opt)/[`--read-batch`](#opt),
 and the destination itself -- are resolved so that a symlink component is followed
 only when it is owned by you or by root; an attacker-planted symlink along one of
