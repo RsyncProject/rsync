@@ -22,6 +22,7 @@ partial-protected-regular-retry-linux
 preallocate
 protected-regular
 pseudo-paths  # dynamically skips on runners lacking bash process substitution
+pseudo-paths-daemon
 read-batch-pipe
 readonly-partial-abort-mode-regression  # 
 rrsync-sender-leaf-flip

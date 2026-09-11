@@ -53,6 +53,7 @@ partial-protected-regular-retry-policy  # deterministic partial EACCES recovery 
 password-file-symlink
 protected-regular
 pseudo-paths
+pseudo-paths-daemon
 read-batch-pipe
 rename-mixed-parent-transfer
 rrsync-sender-leaf-flip
