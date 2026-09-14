@@ -207,7 +207,11 @@ static void check_sender_absolute_ancestor(void)
 		errs++;
 	} else {
 		fd = secure_relative_open("/", path + 1, O_RDONLY, 0);
-		if (fd >= 0 || errno != ELOOP) {
+		if (fd >= 0 || (errno != ELOOP && errno != EMLINK
+#ifdef EFTYPE
+		 && errno != EFTYPE
+#endif
+		)) {
 			fprintf(stderr, "FAIL [absolute sender leaf]: rc=%d errno=%d\n", fd, errno);
 			if (fd >= 0)
 				close(fd);
