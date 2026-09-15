@@ -230,6 +230,117 @@ static int scan_dirfd = -1;
 static const char *scan_dir_prefix;
 static int scan_dir_prefix_len;
 
+struct sender_source_root {
+	struct sender_source_root *next;
+	dev_t dev;
+	ino_t ino;
+	char path[1];
+};
+
+static struct sender_source_root *sender_source_roots;
+
+static int sender_source_full_path(const char *path, char *full, size_t full_size)
+{
+	size_t len;
+
+	if (*path == '/')
+		len = strlcpy(full, path, full_size);
+	else
+		len = pathjoin(full, full_size, curr_dir, path);
+	if (len >= full_size) {
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+	clean_fname(full, CFN_COLLAPSE_DOT_DOT_DIRS | CFN_DROP_TRAILING_DOT_DIR);
+	return 0;
+}
+
+static void remember_sender_source_root(const char *path, const STRUCT_STAT *st)
+{
+	struct sender_source_root *root;
+	char full[MAXPATHLEN];
+	size_t len;
+
+	if (sender_source_full_path(path, full, sizeof full) < 0)
+		overflow_exit("remember_sender_source_root");
+	len = strlen(full);
+
+	for (root = sender_source_roots; root; root = root->next) {
+		if (strcmp(root->path, full) == 0)
+			return;
+	}
+	root = (struct sender_source_root *)new_array(char, sizeof *root + len);
+	root->next = sender_source_roots;
+	root->dev = st->st_dev;
+	root->ino = st->st_ino;
+	memcpy(root->path, full, len + 1);
+	sender_source_roots = root;
+}
+
+int open_sender_source_path(const char *path, int flags, int *matched)
+{
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+	struct sender_source_root *root, *best = NULL;
+	STRUCT_STAT st;
+	char full[MAXPATHLEN], *rel;
+	size_t best_len = 0;
+	int rootfd, fd, saved_errno;
+
+	*matched = 0;
+	if (!sender_source_roots)
+		return -1;
+	if (sender_source_full_path(path, full, sizeof full) < 0)
+		return -1;
+	for (root = sender_source_roots; root; root = root->next) {
+		size_t len = strlen(root->path);
+		if (len > best_len && strncmp(full, root->path, len) == 0
+		 && (root->path[len-1] == '/' || full[len] == '\0' || full[len] == '/')) {
+			best = root;
+			best_len = len;
+		}
+	}
+	if (!best)
+		return -1;
+
+	*matched = 1;
+	rootfd = open(best->path, O_RDONLY | O_DIRECTORY);
+	if (rootfd < 0)
+		return -1;
+	if (do_fstat(rootfd, &st) < 0)
+		saved_errno = errno;
+	else if (st.st_dev != best->dev || st.st_ino != best->ino)
+		saved_errno = ELOOP;
+	else
+		saved_errno = 0;
+	if (saved_errno) {
+		close(rootfd);
+		errno = saved_errno;
+		return -1;
+	}
+	rel = full + best_len;
+	while (*rel == '/')
+		rel++;
+	fd = secure_relative_open_at(rootfd, *rel ? rel : ".", flags, 0);
+	saved_errno = errno;
+	close(rootfd);
+	errno = saved_errno;
+	return fd;
+#else
+	*matched = 0;
+	errno = ENOSYS;
+	return -1;
+#endif
+}
+
+void clear_sender_source_roots(void)
+{
+	while (sender_source_roots) {
+		struct sender_source_root *root = sender_source_roots;
+		sender_source_roots = root->next;
+		free(root);
+	}
+}
+
 static int scan_link_stat(const char *path, STRUCT_STAT *stp, int follow_dirlinks)
 {
 	/* Use the held scan fd only for a single component directly inside the
@@ -2028,10 +2139,14 @@ static void interpret_stat_error(const char *fname, int is_dir)
  * Returns NULL with errno set on failure, like opendir(). */
 static DIR *secure_opendir(const char *fbuf)
 {
-	int dfd, fl;
+	int dfd, fl, matched;
 	DIR *d;
 
-	if (am_daemon && (!am_chrooted || module_dirlen)
+	if (!am_daemon && am_sender
+	 && (dfd = open_sender_source_path(fbuf, O_RDONLY | O_DIRECTORY, &matched), matched)) {
+		/* The command-line directory is the operator-selected transfer root.
+		 * Follow that root, then keep every recursive scan beneath its held fd. */
+	} else if (am_daemon && (!am_chrooted || module_dirlen)
 	 && module_dir && module_dir[0] == '/' && *fbuf != '/' && module_dirfd >= 0
 	 && curr_dir_len >= module_dirlen
 	 && strncmp(curr_dir, module_dir, module_dirlen) == 0
@@ -2724,6 +2839,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			rprintf(FINFO, "skipping directory %s\n", fbuf);
 			continue;
 		}
+		if (!am_daemon && !use_ff_fd && S_ISDIR(st.st_mode))
+			remember_sender_source_root(fbuf, &st);
 
 		if (inc_recurse && relative_paths && *fbuf) {
 			if ((p = strchr(fbuf+1, '/')) != NULL) {
