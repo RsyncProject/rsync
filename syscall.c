@@ -3246,31 +3246,6 @@ int secure_relative_open(const char *basedir, const char *relpath, int flags, mo
 		flags |= O_NOATIME;
 #endif
 
-#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
-	if (!am_daemon && am_sender && basedir && strcmp(basedir, "/") == 0 && *relpath) {
-		/* Absolute sender names retain their ancestors with --relative.  Follow
-		 * trusted-owned ancestor symlinks, not a RESOLVE_BENEATH walk that rejects
-		 * /mnt/home -> /initrd/mnt/dev_save.  Daemon and cwd anchors stay confined. */
-		char fullpath[MAXPATHLEN];
-		const char *bname;
-		int dfd, fd, saved_errno;
-		if (snprintf(fullpath, sizeof fullpath, "/%s", relpath) >= (int)sizeof fullpath) {
-			errno = ENAMETOOLONG;
-			return -1;
-		}
-		if (flags & O_DIRECTORY)
-			return open_no_attacker_symlinks(fullpath, flags, mode);
-		dfd = owner_walk_parent(fullpath, &bname);
-		if (dfd < 0)
-			return -1;
-		fd = openat(dfd, bname, flags | O_NOFOLLOW, mode);
-		saved_errno = errno;
-		close(dfd);
-		errno = saved_errno;
-		return fd;
-	}
-#endif
-
 #if !defined(O_NOFOLLOW) || !defined(O_DIRECTORY) || !defined(AT_FDCWD)
 	// really old system, all we can do is live with the risks
 	if (!basedir) {

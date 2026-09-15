@@ -680,6 +680,7 @@ void send_files(int f_in, int f_out)
 			else
 				fd = sender_open_confined(module_dir, relp, O_RDONLY);
 		} else if (!copy_links && !copy_unsafe_links && !copy_dirlinks && !insecure_links) {
+			int matched;
 			/* Default symlink handling (no dir-link following): the scan
 			 * recorded this as a regular file.  Open it confined beneath the
 			 * transfer root: an in-tree symlinked parent (e.g. -R keeps one in
@@ -688,7 +689,10 @@ void send_files(int f_in, int f_out)
 			 * governs the leaf so a raced leaf symlink is refused.  A
 			 * symlink-following mode (-L/--copy-unsafe-links/-k) or
 			 * --insecure-links keeps the legacy open below. */
-			if (fname[0] == '/') {
+			fd = open_sender_source_path(fname, O_RDONLY | O_NOFOLLOW, &matched);
+			if (matched) {
+				/* The explicit source directory is the trust root. */
+			} else if (fname[0] == '/') {
 				/* --relative (or a --files-from absolute name) keeps the
 				 * full absolute path as fname; the transfer root is then "/",
 				 * so anchor the confined open there and strip the leading
@@ -809,6 +813,7 @@ void send_files(int f_in, int f_out)
 	if (DEBUG_GTE(SEND, 1))
 		rprintf(FINFO, "send files finished\n");
 
+	clear_sender_source_roots();
 	match_report();
 
 	write_ndx(f_out, NDX_DONE);

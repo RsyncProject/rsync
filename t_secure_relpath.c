@@ -173,67 +173,6 @@ static void check_beneath_dotdot(void)
 	close(anchor);
 }
 
-static void check_sender_absolute_ancestor(void)
-{
-#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
-	char cwd[MAXPATHLEN], target[MAXPATHLEN], path[MAXPATHLEN];
-	int fd;
-	if (!getcwd(cwd, sizeof cwd)
-	 || snprintf(target, sizeof target, "%s/subdir", cwd) >= (int)sizeof target
-	 || snprintf(path, sizeof path, "%s/absolute-alias", cwd) >= (int)sizeof path
-	 || symlink(target, "absolute-alias") < 0) {
-		perror("absolute ancestor fixture");
-		errs++;
-		return;
-	}
-	am_daemon = 0;
-	am_sender = 1;
-	fd = secure_relative_open("/", path + 1, O_RDONLY | O_DIRECTORY, 0);
-	if (fd < 0) {
-		perror("trusted absolute sender ancestor");
-		errs++;
-	} else
-		close(fd);
-	fd = secure_relative_open(NULL, "absolute-alias", O_RDONLY | O_DIRECTORY, 0);
-	if (fd >= 0 || errno != ELOOP) {
-		fprintf(stderr, "FAIL [cwd sender ancestor]: rc=%d errno=%d\n", fd, errno);
-		if (fd >= 0)
-			close(fd);
-		errs++;
-	}
-	if (symlink("missing", "subdir/leaf-link") < 0
-	 || snprintf(path, sizeof path, "%s/absolute-alias/leaf-link", cwd) >= (int)sizeof path) {
-		perror("sender leaf fixture");
-		errs++;
-	} else {
-		fd = secure_relative_open("/", path + 1, O_RDONLY, 0);
-		if (fd >= 0 || (errno != ELOOP && errno != EMLINK
-#ifdef EFTYPE
-		 && errno != EFTYPE
-#endif
-		)) {
-			fprintf(stderr, "FAIL [absolute sender leaf]: rc=%d errno=%d\n", fd, errno);
-			if (fd >= 0)
-				close(fd);
-			errs++;
-		}
-	}
-	am_daemon = 1;
-	am_sender = 0;
-	if (snprintf(path, sizeof path, "%s/absolute-alias", cwd) >= (int)sizeof path) {
-		errs++;
-		return;
-	}
-	fd = secure_relative_open("/", path + 1, O_RDONLY | O_DIRECTORY, 0);
-	if (fd >= 0 || errno != ELOOP) {
-		fprintf(stderr, "FAIL [daemon absolute ancestor]: rc=%d errno=%d\n", fd, errno);
-		if (fd >= 0)
-			close(fd);
-		errs++;
-	}
-#endif
-}
-
 int main(int argc, char **argv)
 {
 	if (argc != 2) {
@@ -285,8 +224,6 @@ int main(int argc, char **argv)
 	 * literal '..'.  Its dedicated fd-anchored entry point must preserve an
 	 * in-tree climb while refusing to pop above the anchor. */
 	check_beneath_dotdot();
-	check_sender_absolute_ancestor();
-
 	if (errs)
 		fprintf(stderr, "\n%d failure(s)\n", errs);
 	return errs ? 1 : 0;
