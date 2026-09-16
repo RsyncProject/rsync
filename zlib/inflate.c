@@ -221,6 +221,8 @@ int ZEXPORT inflatePrime(z_streamp strm, int bits, int value)
     struct inflate_state FAR *state;
 
     if (strm == Z_NULL || strm->state == Z_NULL) return Z_STREAM_ERROR;
+    if (bits == 0)
+        return Z_OK;
     state = (struct inflate_state FAR *)strm->state;
     if (bits < 0) {
         state->hold = 0;
