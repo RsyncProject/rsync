@@ -43,6 +43,26 @@ for link_name, link, cwd in (
         if not expected.is_file() or expected.read_text() != 'source contents\n':
             test_fail('relative source layout or contents changed')
 
+file_sources = (
+    ('absolute-file', str(absolute_link / 'My_Documents' / 'marker'), None),
+    ('relative-file', 'relative-home/My_Documents/marker', SCRATCHDIR),
+)
+for name, source_arg, cwd in file_sources:
+    dest = SCRATCHDIR / f'dest-{name}'
+    dest.mkdir()
+    proc = subprocess.run(
+        rsync_argv('-R', source_arg, str(dest) + '/'),
+        cwd=cwd, capture_output=True, text=True,
+    )
+    if proc.returncode:
+        test_fail(f'{name} transfer failed: {proc.stdout}{proc.stderr}')
+    if cwd is None:
+        expected = dest / str(absolute_link.relative_to('/')) / 'My_Documents' / 'marker'
+    else:
+        expected = dest / source_arg
+    if not expected.is_file() or expected.read_text() != 'source contents\n':
+        test_fail(f'{name} layout or contents changed')
+
 root_real = SCRATCHDIR / 'root-real'
 root_real.mkdir()
 (root_real / 'marker').write_text('source contents\n')
@@ -92,6 +112,18 @@ if os.geteuid() == 0:
             if proc.returncode or not expected.is_file():
                 test_fail(f'explicit untrusted-owned source link with {options} '
                           f'failed: {proc.stdout}{proc.stderr}')
+
+        dest = SCRATCHDIR / 'untrusted-file-dest'
+        dest.mkdir()
+        source_arg = str(untrusted_link / 'My_Documents' / 'marker')
+        proc = subprocess.run(
+            rsync_argv('-R', source_arg, str(dest) + '/'),
+            capture_output=True, text=True,
+        )
+        expected = dest / str(untrusted_link.relative_to('/')) / 'My_Documents' / 'marker'
+        if proc.returncode or not expected.is_file():
+            test_fail(f'explicit untrusted-owned file path failed: '
+                      f'{proc.stdout}{proc.stderr}')
 
 dest = SCRATCHDIR / 'remove-dest'
 dest.mkdir()

@@ -277,6 +277,30 @@ static void remember_sender_source_root(const char *path, const STRUCT_STAT *st)
 	sender_source_roots = root;
 }
 
+static void remember_sender_source_arg(const char *path, const STRUCT_STAT *st)
+{
+	STRUCT_STAT parent_st;
+	char full[MAXPATHLEN], *slash;
+
+	if (S_ISDIR(st->st_mode)) {
+		remember_sender_source_root(path, st);
+		return;
+	}
+	if (sender_source_full_path(path, full, sizeof full) < 0)
+		overflow_exit("remember_sender_source_arg");
+	slash = strrchr(full, '/');
+	if (!slash)
+		return;
+	if (slash == full)
+		slash[1] = '\0';
+	else
+		*slash = '\0';
+	/* The operator selected this parent as part of the source argument. Pin
+	 * its resolved identity while the file leaf remains O_NOFOLLOW later. */
+	if (do_stat(full, &parent_st) == 0 && S_ISDIR(parent_st.st_mode))
+		remember_sender_source_root(full, &parent_st);
+}
+
 int open_sender_source_path(const char *path, int flags, int *matched)
 {
 #if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
@@ -2839,8 +2863,9 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			rprintf(FINFO, "skipping directory %s\n", fbuf);
 			continue;
 		}
-		if (!am_daemon && !use_ff_fd && S_ISDIR(st.st_mode))
-			remember_sender_source_root(fbuf, &st);
+		if (!am_daemon && !use_ff_fd && st.st_mode != 0
+		 && (relative_paths || S_ISDIR(st.st_mode)))
+			remember_sender_source_arg(fbuf, &st);
 
 		if (inc_recurse && relative_paths && *fbuf) {
 			if ((p = strchr(fbuf+1, '/')) != NULL) {
