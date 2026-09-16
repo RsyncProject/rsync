@@ -56,6 +56,7 @@ extern char *module_dir;
 extern int module_dirfd;
 extern int write_batch;
 extern int file_old_total;
+extern char *files_from;
 extern BOOL want_progress_now;
 extern struct stats stats;
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
@@ -244,6 +245,34 @@ static int sender_open_confined(const char *anchor, const char *relpath, int fla
 	/* No *at() support: secure_relative_open is a plain open() here (no walk,
 	 * so nothing to amortise); use it directly to keep the anchor semantics. */
 	return secure_relative_open(anchor, relpath, flags | O_NOFOLLOW, 0);
+#endif
+}
+
+/* A --files-from entry is not itself operator authority, but its source base is.
+ * Follow only trusted-owned ancestor symlinks and keep the file leaf nofollow. */
+static int sender_open_filesfrom(const char *path, int flags)
+{
+#ifdef AT_FDCWD
+	const char *bname;
+	int dfd, fd, save_errno;
+
+#ifdef O_NOATIME
+	if (open_noatime)
+		flags |= O_NOATIME;
+#endif
+	dfd = owner_walk_parent(path, &bname);
+	if (dfd < 0)
+		return -1;
+	fd = openat(dfd, bname, flags | O_NOFOLLOW, 0);
+	save_errno = fd < 0 ? errno : 0;
+	close(dfd);
+	errno = save_errno;
+	return fd;
+#else
+#ifdef O_NOFOLLOW
+	flags |= O_NOFOLLOW;
+#endif
+	return open_no_attacker_symlinks(path, flags, 0);
 #endif
 }
 
@@ -689,21 +718,22 @@ void send_files(int f_in, int f_out)
 			 * governs the leaf so a raced leaf symlink is refused.  A
 			 * symlink-following mode (-L/--copy-unsafe-links/-k) or
 			 * --insecure-links keeps the legacy open below. */
-			fd = open_sender_source_path(fname, O_RDONLY | O_NOFOLLOW, &matched);
-			if (matched) {
-				/* The explicit source directory is the trust root. */
-			} else if (fname[0] == '/') {
-				/* --relative (or a --files-from absolute name) keeps the
-				 * full absolute path as fname; the transfer root is then "/",
-				 * so anchor the confined open there and strip the leading
-				 * slash to the module-relative path the resolver wants -- it
-				 * rejects an absolute relpath outright. */
-				const char *relp = fname;
-				while (*relp == '/')
-					relp++;
-				fd = sender_open_confined("/", relp, O_RDONLY);
-			} else
-				fd = sender_open_confined(NULL, fname, O_RDONLY);
+			if (files_from) {
+				fd = sender_open_filesfrom(fname, O_RDONLY);
+			} else {
+				fd = open_sender_source_path(fname, O_RDONLY | O_NOFOLLOW, &matched);
+				if (!matched) {
+					if (fname[0] == '/') {
+						/* --relative keeps the full absolute path as fname;
+						 * anchor at "/" and pass the resolver a relative path. */
+						const char *relp = fname;
+						while (*relp == '/')
+							relp++;
+						fd = sender_open_confined("/", relp, O_RDONLY);
+					} else
+						fd = sender_open_confined(NULL, fname, O_RDONLY);
+				}
+			}
 		} else {
 			fd = do_open_checklinks(fname);
 		}

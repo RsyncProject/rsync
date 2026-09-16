@@ -63,6 +63,20 @@ for name, source_arg, cwd in file_sources:
     if not expected.is_file() or expected.read_text() != 'source contents\n':
         test_fail(f'{name} layout or contents changed')
 
+files_from = SCRATCHDIR / 'files-from'
+files_from.write_text('relative-home/My_Documents/marker\n')
+dest = SCRATCHDIR / 'dest-files-from'
+dest.mkdir()
+proc = subprocess.run(
+    rsync_argv('-r', f'--files-from={files_from}',
+               str(SCRATCHDIR) + '/', str(dest) + '/'),
+    capture_output=True, text=True,
+)
+expected = dest / 'relative-home' / 'My_Documents' / 'marker'
+if proc.returncode or not expected.is_file() or expected.read_text() != 'source contents\n':
+    test_fail(f'files-from trusted ancestor transfer failed: '
+              f'{proc.stdout}{proc.stderr}')
+
 root_real = SCRATCHDIR / 'root-real'
 root_real.mkdir()
 (root_real / 'marker').write_text('source contents\n')
@@ -124,6 +138,18 @@ if os.geteuid() == 0:
         if proc.returncode or not expected.is_file():
             test_fail(f'explicit untrusted-owned file path failed: '
                       f'{proc.stdout}{proc.stderr}')
+
+        files_from.write_text('untrusted-home/My_Documents/marker\n')
+        dest = SCRATCHDIR / 'untrusted-files-from-dest'
+        dest.mkdir()
+        proc = subprocess.run(
+            rsync_argv('-r', f'--files-from={files_from}',
+                       str(SCRATCHDIR) + '/', str(dest) + '/'),
+            capture_output=True, text=True,
+        )
+        escaped = dest / 'untrusted-home' / 'My_Documents' / 'marker'
+        if proc.returncode == 0 or escaped.exists():
+            test_fail('files-from followed an untrusted-owned ancestor symlink')
 
 dest = SCRATCHDIR / 'remove-dest'
 dest.mkdir()
