@@ -110,29 +110,43 @@ static const char *confinement_root(unsigned int *lenp)
  * is not in an fd-pin namespace. */
 static const char *fd_pin_tail(const char *p)
 {
-	const char *s;
+    const char *s;
 
-	if (strncmp(p, "/dev/fd", 7) == 0) {
-		s = p + 7;
-		return (*s == '\0' || *s == '/') ? s : NULL;
-	}
+    /* Group all /dev/ checks under a single prefix comparison */
+    if (strncmp(p, "/dev/", 5) == 0) {
+        s = p + 5;
+        if (strncmp(s, "fd", 2) == 0) {
+            s += 2;
+            return (*s == '\0' || *s == '/') ? s : NULL;
+        }
+        if (strncmp(s, "std", 3) == 0) {
+            s += 3;
+            if (strncmp(s, "in", 3) == 0)
+                return "/0";
+            if (strncmp(s, "out", 4) == 0)
+                return "/1";
+            if (strncmp(s, "err", 4) == 0)
+                return "/2";
+        }
+        return NULL; /* Instantly reject any other /dev/ path */
+    }
 
-	if (strncmp(p, "/proc/", 6) != 0)
-		return NULL;
-	s = p + 6;
-	if (strncmp(s, "self/", 5) == 0)	/* "/proc/self/..." */
-		s += 4;
-	else {					/* "/proc/<pid>/..." */
-		const char *d = s;
-		while (*s >= '0' && *s <= '9')
-			s++;
-		if (s == d || *s != '/')
-			return NULL;
-	}
-	if (strncmp(s, "/fd", 3) != 0)
-		return NULL;
-	s += 3;
-	return (*s == '\0' || *s == '/') ? s : NULL;
+    if (strncmp(p, "/proc/", 6) != 0)
+        return NULL;
+    s = p + 6;
+    if (strncmp(s, "self/", 5) == 0)    /* "/proc/self/..." */
+        s += 4;
+    else {                  /* "/proc/<pid>/..." */
+        const char *d = s;
+        while (*s >= '0' && *s <= '9')
+            s++;
+        if (s == d || *s != '/')
+            return NULL;
+    }
+    if (strncmp(s, "/fd", 3) != 0)
+        return NULL;
+    s += 3;
+    return (*s == '\0' || *s == '/') ? s : NULL;
 }
 
 /* An EXACT pin entry, such as "/proc/self/fd/7" or "/dev/fd/7", whose target is
@@ -300,6 +314,10 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 			return -1;
 	}
 
+	/* Tracker: 1 if we are genuinely walking from the system root,
+     * 0 if we are walking a relative path where abspath_step will fake a '/' */
+	int is_anchored = (abspath[0] != '\0');
+
 	/* An fd pin (rrsync rewrites an option path to /proc/self/fd/N so no
 	 * later symlink can redirect it) is spelled outside the root by
 	 * construction, so the walk has to be allowed through /proc/self/fd to
@@ -325,6 +343,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 			return -1;
 		dfd_owns = 1;
 		abspath[0] = '\0';			/* now resolving from "/" */
+		is_anchored = 1;
 		char *p = remaining;
 		while (*p == '/') p++;
 		memmove(remaining, p, strlen(p) + 1);
@@ -374,12 +393,15 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 
 		if (S_ISLNK(lst.st_mode)) {
 			/* Symlink: untrusted owner is refused; trusted owner is followed
-			 * via readlinkat + splice.  In a user namespace the /proc/self and
-			 * /dev/fd symlinks may report the overflow uid, so
-			 * allow those exact components while traversing a recognised pin. */
-			int namespace_pin = pin_transit
-				&& ((strcmp(abspath, "/proc") == 0 && strcmp(comp, "self") == 0)
-				 || (strcmp(abspath, "/dev") == 0 && strcmp(comp, "fd") == 0));
+			 * via readlinkat + splice.  In a user namespace the /proc/self,
+			 * /dev/fd and /dev/std* symlinks may report the overflow uid, so
+             * allow those exact components while traversing a recognised pin. */
+            int namespace_pin = is_anchored
+                && ((strcmp(abspath, "/proc") == 0 && strcmp(comp, "self") == 0)
+                 || (strcmp(abspath, "/dev") == 0 && (strcmp(comp, "fd") == 0
+                    || strcmp(comp, "stdin") == 0
+                    || strcmp(comp, "stdout") == 0
+                    || strcmp(comp, "stderr") == 0)));
 			if (!namespace_pin && lst.st_uid != 0 && lst.st_uid != trusted_uid) {
 				rprintf(FERROR,
 					"refusing to follow a symlink owned by an untrusted user; "
@@ -399,6 +421,41 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 				goto out;
 			}
 			target[n] = '\0';
+
+			/* Detect Linux kernel pseudo-paths (pipes, sockets, anon_inodes).
+			 * These are not real paths on disk and never contain slashes. */
+			const char *abstail = fd_pin_tail(abspath);
+			int is_fd_dir = (abstail != NULL && *abstail == '\0' && is_anchored);
+			if (is_fd_dir && (strncmp(target, "pipe:[", 6) == 0
+			    || strncmp(target, "socket:[", 8) == 0
+			    || strncmp(target, "anon_inode:", 11) == 0)) {
+				if (!is_last) {
+					saved_errno = ENOTDIR;
+					goto out;
+				}
+				if (confine_root) {
+					/* Anonymous objects cannot be proven to reside beneath
+					 * the confinement root. */
+					saved_errno = ENOENT;
+					goto out;
+				}
+				/* Process substitution exposes /dev/fd/X as a symlink to a
+				 * kernel object. Reopen the validated leaf without O_NOFOLLOW
+				 * so the kernel applies the caller's requested open flags. */
+				retfd = openat(dfd, comp, (flags & ~O_NOFOLLOW) | O_CLOEXEC, mode);
+				/* Refuse a descriptor that changed to a filesystem object
+				 * between validation and openat(). */
+				if (retfd >= 0) {
+					STRUCT_STAT pst;
+					if (fstat(retfd, &pst) < 0 || S_ISREG(pst.st_mode) || S_ISDIR(pst.st_mode)) {
+						close(retfd);
+						retfd = -1;
+						errno = ELOOP;
+					}
+				}
+				saved_errno = retfd < 0 ? errno : 0;
+				goto out;
+			}
 
 			/* Splice: new `remaining` = <target> + <tail-after-comp>.
 			 * Absolute target restarts the walk from "/". */
@@ -427,6 +484,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 				/* "self" resolves to "<pid>", still inside the pin;
 				 * the magic link itself lands elsewhere and ends the
 				 * exemption.  Never turns back on. */
+				is_anchored = 1;
 				pin_transit = pin_transit && fd_pin_tail(rebuilt) != NULL;
 				char *p = rebuilt;
 				while (*p == '/') p++;
