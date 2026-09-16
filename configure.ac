@@ -264,6 +264,13 @@ AC_DEFINE_UNQUOTED(NOBODY_GROUP, "$NOBODY_GROUP", [unprivileged group for unpriv
 # rolling-checksum SIMD optimizations
 ROLL_SIMD=
 
+# Autoconf reports x86-64 as amd64 on FreeBSD, while the object-variable
+# suffixes in Makefile.in use x86_64 on every platform.
+asm_cpu="$host_cpu"
+if test x"$asm_cpu" = x"amd64"; then
+    asm_cpu=x86_64
+fi
+
 AC_MSG_CHECKING([whether to enable rolling-checksum SIMD optimizations])
 AC_ARG_ENABLE(roll-simd,
     AS_HELP_STRING([--enable-roll-simd],[enable/disable to control rolling-checksum SIMD optimizations (requires c++)]))
@@ -315,7 +322,7 @@ if test x"$enable_roll_simd" != x"no"; then
 	AC_LANG(C)
 	if test x"$CXX_OK" = x"yes"; then
 	    # AC_MSG_RESULT() is called below.
-	    ROLL_SIMD="$host_cpu"
+	    ROLL_SIMD="$asm_cpu"
 	elif test x"$enable_roll_simd" = x"yes"; then
 	    AC_MSG_RESULT(error)
 	    AC_MSG_ERROR(The rolling-checksum SIMD compilation test failed.
@@ -525,7 +532,7 @@ fi
 
 if test x"$enable_md5_asm" != x"no"; then
     if test x"$host_cpu" = x"x86_64" || test x"$host_cpu" = x"amd64"; then
-	MD5_ASM="$host_cpu"
+	MD5_ASM="$asm_cpu"
     elif test x"$enable_md5_asm" = x"yes"; then
         AC_MSG_RESULT(unavailable)
         AC_MSG_ERROR(The ASM optimizations are currently x86_64|amd64 only.
@@ -554,7 +561,7 @@ if test x"$ROLL_SIMD" = x""; then
 fi
 
 if test x"$enable_roll_asm" = x"yes"; then
-    ROLL_ASM="$host_cpu"
+    ROLL_ASM="$asm_cpu"
     AC_MSG_RESULT([yes ($ROLL_ASM)])
     AC_DEFINE(USE_ROLL_ASM, 1, [Define to 1 to enable rolling-checksum ASM optimizations (requires --enable-roll-simd)])
     ROLL_ASM='$(ROLL_ASM_'"$ROLL_ASM)"

@@ -35,7 +35,9 @@ jobs:
           pkg install -y bash autotools m4 devel/xxhash zstd liblz4 python3 archivers/liblz4 git
         run: |
           freebsd-version
-          ./configure --with-rrsync -disable-zstd --disable-md2man --disable-xxhash --disable-lz4 --disable-idn
+          ./configure --with-rrsync \
+            -disable-zstd --disable-md2man --disable-xxhash --disable-lz4 --disable-idn \
+            --enable-roll-simd --enable-roll-asm --enable-md5-asm
           make
           ./rsync --version
           make check
