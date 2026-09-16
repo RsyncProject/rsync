@@ -46,6 +46,7 @@ extern int recurse;
 extern int use_qsort;
 extern int xfer_dirs;
 extern int filesfrom_fd;
+extern char *files_from;
 extern int one_file_system;
 extern int copy_devices;
 extern int copy_dirlinks;
@@ -365,6 +366,54 @@ void clear_sender_source_roots(void)
 	}
 }
 
+static int filesfrom_owner_walk_active(void)
+{
+	return !am_daemon && am_sender && files_from
+	    && !copy_links && !copy_unsafe_links && !copy_dirlinks && !insecure_links;
+}
+
+static int filesfrom_link_stat(const char *path, STRUCT_STAT *stp, int follow_dirlinks)
+{
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+	const char *bname;
+	int dfd, ret, save_errno;
+
+	dfd = owner_walk_parent(path, &bname);
+	if (dfd < 0)
+		return -1;
+	if (am_root < 0) {
+		close(dfd);
+		return link_stat(path, stp, follow_dirlinks);
+	}
+	ret = link_stat_at(dfd, bname, stp, follow_dirlinks);
+	save_errno = ret < 0 ? errno : 0;
+	close(dfd);
+	errno = save_errno;
+	return ret;
+#else
+	return link_stat(path, stp, follow_dirlinks);
+#endif
+}
+
+static int filesfrom_readlink(const char *path, char *linkbuf, size_t bufsiz)
+{
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+	const char *bname;
+	int dfd, ret, save_errno;
+
+	dfd = owner_walk_parent(path, &bname);
+	if (dfd < 0)
+		return -1;
+	ret = do_readlink_atfd(dfd, bname, linkbuf, bufsiz);
+	save_errno = ret < 0 ? errno : 0;
+	close(dfd);
+	errno = save_errno;
+	return ret;
+#else
+	return do_readlink(path, linkbuf, bufsiz);
+#endif
+}
+
 static int scan_link_stat(const char *path, STRUCT_STAT *stp, int follow_dirlinks)
 {
 	/* Use the held scan fd only for a single component directly inside the
@@ -376,6 +425,8 @@ static int scan_link_stat(const char *path, STRUCT_STAT *stp, int follow_dirlink
 	 && path[scan_dir_prefix_len] == '/'
 	 && strchr(path + scan_dir_prefix_len + 1, '/') == NULL)
 		return link_stat_at(scan_dirfd, path + scan_dir_prefix_len + 1, stp, follow_dirlinks);
+	if (filesfrom_owner_walk_active())
+		return filesfrom_link_stat(path, stp, follow_dirlinks);
 	return link_stat(path, stp, follow_dirlinks);
 }
 
@@ -386,6 +437,8 @@ static int scan_readlink(const char *path, char *linkbuf, size_t bufsiz)
 	 && path[scan_dir_prefix_len] == '/'
 	 && strchr(path + scan_dir_prefix_len + 1, '/') == NULL)
 		return do_readlink_atfd(scan_dirfd, path + scan_dir_prefix_len + 1, linkbuf, bufsiz);
+	if (filesfrom_owner_walk_active())
+		return filesfrom_readlink(path, linkbuf, bufsiz);
 	return do_readlink(path, linkbuf, bufsiz);
 }
 
@@ -2149,7 +2202,7 @@ static void interpret_stat_error(const char *fname, int is_dir)
 }
 
 #if defined HAVE_FDOPENDIR && defined HAVE_DIRFD
-/* Open a source directory for scanning confined beneath the transfer root.
+/* Open a source directory for scanning under the applicable source authority.
  * secure_relative_open() does a per-component O_NOFOLLOW walk that refuses a
  * parent component raced into a symlink pointing out of the tree; fdopendir()
  * then turns the held fd into the DIR* the scan reads.  This mirrors the
@@ -2160,13 +2213,20 @@ static void interpret_stat_error(const char *fname, int is_dir)
  * O_NOFOLLOW makes secure_relative_open() follow in-tree directory symlinks
  * beneath the anchor and refuse escapes, so this serves both the default
  * no-follow scan and a daemon's symlink-following scan (see the caller).
+ * Files-from entries instead use the ownership walk: their source base is
+ * operator-selected, but each list entry may not be, so only trusted-owned
+ * symlinks are followed and a trusted link may retain its legacy target.
  * Returns NULL with errno set on failure, like opendir(). */
 static DIR *secure_opendir(const char *fbuf)
 {
 	int dfd, fl, matched;
 	DIR *d;
 
-	if (!am_daemon && am_sender
+	if (filesfrom_owner_walk_active()) {
+		/* The source base is operator-selected, while each list entry may not
+		 * be. Follow only trusted-owned symlinks while opening the directory. */
+		dfd = open_no_attacker_symlinks(fbuf, O_RDONLY | O_DIRECTORY, 0);
+	} else if (!am_daemon && am_sender
 	 && (dfd = open_sender_source_path(fbuf, O_RDONLY | O_DIRECTORY, &matched), matched)) {
 		/* The command-line directory is the operator-selected transfer root.
 		 * Follow that root, then keep every recursive scan beneath its held fd. */
@@ -2472,7 +2532,7 @@ static void send1extra(int f, struct file_struct *file, struct file_list *flist)
 	if (file->flags & FLAG_CONTENT_DIR) {
 		if (one_file_system) {
 			STRUCT_STAT st;
-			if (link_stat(fbuf, &st, copy_dirlinks) != 0) {
+			if (scan_link_stat(fbuf, &st, copy_dirlinks) != 0) {
 				interpret_stat_error(fbuf, True);
 				return;
 			}
@@ -2508,7 +2568,7 @@ static void send1extra(int f, struct file_struct *file, struct file_list *flist)
 		if (name_type != NORMAL_NAME) {
 			STRUCT_STAT st = {0};
 
-			if (name_type != MISSING_NAME && link_stat(fbuf, &st, 1) != 0) {
+			if (name_type != MISSING_NAME && scan_link_stat(fbuf, &st, 1) != 0) {
 				interpret_stat_error(fbuf, True);
 				continue;
 			}
@@ -2833,7 +2893,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		if (fn != fbuf)
 			memmove(fbuf, fn, len + 1);
 
-		if (link_stat(fbuf, &st, copy_dirlinks || name_type != NORMAL_NAME) != 0
+		if (scan_link_stat(fbuf, &st, copy_dirlinks || name_type != NORMAL_NAME) != 0
 		 || (name_type != DOTDIR_NAME && is_excluded(fbuf, S_ISDIR(st.st_mode) != 0, SERVER_FILTERS))
 		 || (relative_paths && path_is_daemon_excluded(fbuf, 1))) {
 			if (errno != ENOENT || missing_args == 0) {

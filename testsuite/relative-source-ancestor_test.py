@@ -77,6 +77,19 @@ if proc.returncode or not expected.is_file() or expected.read_text() != 'source 
     test_fail(f'files-from trusted ancestor transfer failed: '
               f'{proc.stdout}{proc.stderr}')
 
+files_from.write_text('relative-home/My_Documents/\n')
+dest = SCRATCHDIR / 'dest-files-from-dir'
+dest.mkdir()
+proc = subprocess.run(
+    rsync_argv('-r', f'--files-from={files_from}',
+               str(SCRATCHDIR) + '/', str(dest) + '/'),
+    capture_output=True, text=True,
+)
+expected = dest / 'relative-home' / 'My_Documents' / 'marker'
+if proc.returncode or not expected.is_file() or expected.read_text() != 'source contents\n':
+    test_fail(f'files-from trusted directory transfer failed: '
+              f'{proc.stdout}{proc.stderr}')
+
 root_real = SCRATCHDIR / 'root-real'
 root_real.mkdir()
 (root_real / 'marker').write_text('source contents\n')
@@ -150,6 +163,30 @@ if os.geteuid() == 0:
         escaped = dest / 'untrusted-home' / 'My_Documents' / 'marker'
         if proc.returncode == 0 or escaped.exists():
             test_fail('files-from followed an untrusted-owned ancestor symlink')
+
+        files_from.write_text('untrusted-home/My_Documents/\n')
+        dest = SCRATCHDIR / 'untrusted-files-from-dir-dest'
+        dest.mkdir()
+        proc = subprocess.run(
+            rsync_argv('-r', f'--files-from={files_from}',
+                       str(SCRATCHDIR) + '/', str(dest) + '/'),
+            capture_output=True, text=True,
+        )
+        escaped = dest / 'untrusted-home' / 'My_Documents' / 'marker'
+        if proc.returncode == 0 or escaped.exists():
+            test_fail('files-from enumerated an untrusted-owned ancestor symlink')
+
+        dest = SCRATCHDIR / 'insecure-files-from-dest'
+        dest.mkdir()
+        proc = subprocess.run(
+            rsync_argv('-r', '--insecure-links', f'--files-from={files_from}',
+                       str(SCRATCHDIR) + '/', str(dest) + '/'),
+            capture_output=True, text=True,
+        )
+        expected = dest / 'untrusted-home' / 'My_Documents' / 'marker'
+        if proc.returncode or not expected.is_file():
+            test_fail(f'files-from insecure-links opt-out failed: '
+                      f'{proc.stdout}{proc.stderr}')
 
 dest = SCRATCHDIR / 'remove-dest'
 dest.mkdir()

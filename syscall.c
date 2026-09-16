@@ -62,6 +62,7 @@ extern int preserve_executability;
 extern int open_noatime;
 extern int copy_links;
 extern int copy_unsafe_links;
+extern int copy_dirlinks;
 extern int am_daemon;
 extern int am_chrooted;
 extern int insecure_links;
@@ -69,6 +70,7 @@ extern int module_id;
 extern unsigned int module_dirlen;
 extern char *module_dir;
 extern int module_dirfd;	/* daemon: served module root pinned by identity, or -1 */
+extern char *files_from;
 extern char *confine_root;	/* --confine-root, or NULL; see confinement_root() */
 extern unsigned int confine_rootlen;
 extern char curr_dir[MAXPATHLEN];	/* defined below; fwd-declared for the seed */
@@ -3545,6 +3547,22 @@ int do_open_checklinks(const char *pathname)
 	if (copy_links || copy_unsafe_links) {
 		return do_open(pathname, O_RDONLY, 0);
 	}
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+	if (am_sender && !am_daemon && files_from
+	 && !copy_dirlinks && !symlink_optout_allowed()) {
+		const char *bname;
+		int dfd, fd, save_errno;
+
+		dfd = owner_walk_parent(pathname, &bname);
+		if (dfd < 0)
+			return -1;
+		fd = openat(dfd, bname, O_RDONLY | O_NOFOLLOW, 0);
+		save_errno = fd < 0 ? errno : 0;
+		close(dfd);
+		errno = save_errno;
+		return fd;
+	}
+#endif
 	return do_open_nofollow(pathname, O_RDONLY);
 }
 

@@ -248,34 +248,6 @@ static int sender_open_confined(const char *anchor, const char *relpath, int fla
 #endif
 }
 
-/* A --files-from entry is not itself operator authority, but its source base is.
- * Follow only trusted-owned ancestor symlinks and keep the file leaf nofollow. */
-static int sender_open_filesfrom(const char *path, int flags)
-{
-#ifdef AT_FDCWD
-	const char *bname;
-	int dfd, fd, save_errno;
-
-#ifdef O_NOATIME
-	if (open_noatime)
-		flags |= O_NOATIME;
-#endif
-	dfd = owner_walk_parent(path, &bname);
-	if (dfd < 0)
-		return -1;
-	fd = openat(dfd, bname, flags | O_NOFOLLOW, 0);
-	save_errno = fd < 0 ? errno : 0;
-	close(dfd);
-	errno = save_errno;
-	return fd;
-#else
-#ifdef O_NOFOLLOW
-	flags |= O_NOFOLLOW;
-#endif
-	return open_no_attacker_symlinks(path, flags, 0);
-#endif
-}
-
 /* Open the content of `relpath` for a symlink-following transfer mode (-L /
  * --copy-unsafe-links / -k) while staying confined beneath `anchor`.  The leaf
  * O_NOFOLLOW that sender_open_confined() applies refuses an in-tree symlink the
@@ -710,16 +682,12 @@ void send_files(int f_in, int f_out)
 				fd = sender_open_confined(module_dir, relp, O_RDONLY);
 		} else if (!copy_links && !copy_unsafe_links && !copy_dirlinks && !insecure_links) {
 			int matched;
-			/* Default symlink handling (no dir-link following): the scan
-			 * recorded this as a regular file.  Open it confined beneath the
-			 * transfer root: an in-tree symlinked parent (e.g. -R keeps one in
-			 * the path) is followed beneath the root, a parent raced into a
-			 * symlink pointing out of the tree is refused, and O_NOFOLLOW
-			 * governs the leaf so a raced leaf symlink is refused.  A
-			 * symlink-following mode (-L/--copy-unsafe-links/-k) or
-			 * --insecure-links keeps the legacy open below. */
+			/* A files-from entry follows only trusted-owned ancestors because
+			 * its source base is operator-selected but the entry itself may not
+			 * be. Other paths stay confined beneath their explicit transfer root.
+			 * Every file leaf remains O_NOFOLLOW. */
 			if (files_from) {
-				fd = sender_open_filesfrom(fname, O_RDONLY);
+				fd = do_open_checklinks(fname);
 			} else {
 				fd = open_sender_source_path(fname, O_RDONLY | O_NOFOLLOW, &matched);
 				if (!matched) {
