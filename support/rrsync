@@ -694,8 +694,13 @@ def validated_arg(opt, arg, typ=3, wild=False):
     if arg.startswith('./'):
         arg = arg[1:]
     arg = arg.replace('//', '/')
+    # One leading slash means the root of the restricted tree.
+    arg = re.sub(r'^/+', '/', arg)
     is_absolute_arg = args.absolute and opt == 'arg' and args.dir != '/' and (arg == args.dir or arg.startswith(args.dir_slash))
-    if not is_absolute_arg:
+    is_root_relative_arg = arg.startswith('/') and not is_absolute_arg
+    if is_root_relative_arg and args.dir != '/':
+        arg = args.dir + arg
+    elif not is_absolute_arg:
         arg = arg.lstrip('/')
     if args.dir != '/':
         if HAS_DOT_DOT_RE.search(arg):
