@@ -96,7 +96,7 @@ static int directory_traverse_flags(void)
  * and EACCESes when the module sits under a non-traversable parent (a 0700 home).
  * Functionally identical (same inode), just privilege-drop-safe.  Gated like its
  * callers (the secure resolver and dpc_dir_fd both require these three). */
-static int open_anchor_dirfd(const char *path)
+int open_anchor_dirfd(const char *path)
 {
 	if (module_dirfd >= 0 && am_daemon && module_dir && strcmp(path, module_dir) == 0)
 		return dup(module_dirfd);

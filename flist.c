@@ -327,7 +327,7 @@ int open_sender_source_path(const char *path, int flags, int *matched)
 		return -1;
 
 	*matched = 1;
-	rootfd = open(best->path, O_RDONLY | O_DIRECTORY);
+	rootfd = open_anchor_dirfd(best->path);
 	if (rootfd < 0)
 		return -1;
 	if (do_fstat(rootfd, &st) < 0)
