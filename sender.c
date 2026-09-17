@@ -91,6 +91,9 @@ static int secure_sender_parent_fd(struct file_struct *file, const char *fname, 
 		return -1;
 	}
 
+	if (filesfrom_owner_walk_active())
+		return owner_walk_parent(fname, bname_p);
+
 	if (!am_daemon || !module_dir || module_dir[0] != '/') {
 		/* Local (non-daemon) sender: there is no module root to anchor at, but
 		 * still confine the parent via the shared held ancestor-dirfd stack

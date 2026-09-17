@@ -90,6 +90,89 @@ if proc.returncode or not expected.is_file() or expected.read_text() != 'source 
     test_fail(f'files-from trusted directory transfer failed: '
               f'{proc.stdout}{proc.stderr}')
 
+remove_source = real / 'remove-marker'
+remove_source.write_text('remove contents\n')
+files_from.write_text('relative-home/remove-marker\n')
+dest = SCRATCHDIR / 'dest-files-from-remove'
+dest.mkdir()
+proc = subprocess.run(
+    rsync_argv('-r', '--remove-source-files', f'--files-from={files_from}',
+               str(SCRATCHDIR) + '/', str(dest) + '/'),
+    capture_output=True, text=True,
+)
+expected = dest / 'relative-home' / 'remove-marker'
+if proc.returncode or remove_source.exists() or not expected.is_file():
+    test_fail(f'files-from remove-source-files failed: '
+              f'{proc.stdout}{proc.stderr}')
+
+confined_root = SCRATCHDIR / 'confined-root'
+confined_root.mkdir()
+confined_outside = SCRATCHDIR / 'confined-outside'
+confined_outside.mkdir()
+(confined_outside / 'marker').write_text('outside contents\n')
+os.symlink(str(confined_outside), confined_root / 'outside-link')
+confined_inside = confined_root / 'inside'
+confined_inside.mkdir()
+(confined_inside / 'marker').write_text('inside contents\n')
+os.symlink(str(confined_inside), confined_root / 'inside-link')
+confined_files_from = confined_root / 'files-from'
+
+confined_files_from.write_text('inside-link/marker\n')
+dest = confined_root / 'confined-inside-dest'
+dest.mkdir()
+proc = subprocess.run(
+    rsync_argv('-r', f'--confine-root={confined_root}',
+               f'--files-from={confined_files_from}',
+               str(confined_root) + '/', str(dest) + '/'),
+    capture_output=True, text=True,
+)
+expected = dest / 'inside-link' / 'marker'
+if proc.returncode or not expected.is_file() or expected.read_text() != 'inside contents\n':
+    test_fail(f'files-from trusted in-root link failed under confinement: '
+              f'{proc.stdout}{proc.stderr}')
+
+confined_files_from.write_text('outside-link/marker\n')
+dest = confined_root / 'confined-outside-dest'
+dest.mkdir()
+proc = subprocess.run(
+    rsync_argv('-r', f'--confine-root={confined_root}',
+               f'--files-from={confined_files_from}',
+               str(confined_root) + '/', str(dest) + '/'),
+    capture_output=True, text=True,
+)
+escaped = dest / 'outside-link' / 'marker'
+if proc.returncode == 0 or escaped.exists():
+    test_fail(f'files-from followed a trusted link outside --confine-root: '
+              f'{proc.stdout}{proc.stderr}')
+
+confined_files_from.write_text('outside-link/\n')
+dest = confined_root / 'confined-outside-dir-dest'
+dest.mkdir()
+proc = subprocess.run(
+    rsync_argv('-r', f'--confine-root={confined_root}',
+               f'--files-from={confined_files_from}',
+               str(confined_root) + '/', str(dest) + '/'),
+    capture_output=True, text=True,
+)
+escaped = dest / 'outside-link' / 'marker'
+if proc.returncode == 0 or escaped.exists():
+    test_fail(f'files-from enumerated a trusted link outside --confine-root: '
+              f'{proc.stdout}{proc.stderr}')
+
+os.symlink(str(confined_root.parent), confined_root / 'ancestor-link')
+confined_files_from.write_text('ancestor-link/\n')
+dest = confined_root / 'confined-ancestor-dest'
+dest.mkdir()
+proc = subprocess.run(
+    rsync_argv('-d', f'--confine-root={confined_root}',
+               f'--files-from={confined_files_from}',
+               str(confined_root) + '/', str(dest) + '/'),
+    capture_output=True, text=True,
+)
+if proc.returncode == 0 or (dest / 'ancestor-link').exists():
+    test_fail(f'files-from accepted a trusted ancestor of --confine-root: '
+              f'{proc.stdout}{proc.stderr}')
+
 root_real = SCRATCHDIR / 'root-real'
 root_real.mkdir()
 (root_real / 'marker').write_text('source contents\n')
@@ -176,6 +259,19 @@ if os.geteuid() == 0:
         if proc.returncode == 0 or escaped.exists():
             test_fail('files-from enumerated an untrusted-owned ancestor symlink')
 
+        files_from.write_text('untrusted-home/\n')
+        dest = SCRATCHDIR / 'untrusted-files-from-leaf-dir-dest'
+        dest.mkdir()
+        proc = subprocess.run(
+            rsync_argv('-r', f'--files-from={files_from}',
+                       str(SCRATCHDIR) + '/', str(dest) + '/'),
+            capture_output=True, text=True,
+        )
+        escaped = dest / 'untrusted-home' / 'marker'
+        if proc.returncode == 0 or escaped.exists():
+            test_fail('files-from followed an untrusted-owned directory link')
+
+        files_from.write_text('untrusted-home/My_Documents/marker\n')
         dest = SCRATCHDIR / 'insecure-files-from-dest'
         dest.mkdir()
         proc = subprocess.run(

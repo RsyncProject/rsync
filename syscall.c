@@ -75,6 +75,7 @@ extern char *confine_root;	/* --confine-root, or NULL; see confinement_root() */
 extern unsigned int confine_rootlen;
 extern char curr_dir[MAXPATHLEN];	/* defined below; fwd-declared for the seed */
 extern int operator_path_resolve;	/* defined below; fwd-declared for the exclude check */
+extern int filesfrom_owner_walk_override;	/* defined below; used by files-from implied dirs */
 
 /* A directory fd used only for pathname traversal, fchdir(), or as *at()
  * authority does not need read permission on Linux.  Keep the portable
@@ -142,6 +143,16 @@ int symlink_optout_allowed(void)
 	return insecure_links;
 }
 
+/* A files-from entry is peer-selected, even when its source base was supplied
+ * by the operator.  Keep its ownership walk inside --confine-root when one is
+ * active. */
+int filesfrom_owner_walk_active(void)
+{
+	return !am_daemon && am_sender && files_from
+	    && !copy_unsafe_links && !copy_dirlinks && !insecure_links
+	    && (!copy_links || filesfrom_owner_walk_override);
+}
+
 /* The root an operator/peer-supplied path must stay under, or NULL when nothing
  * is confined.  A daemon has the served module; a server launched by a wrapper
  * with its own restricted directory (rrsync) gets one from --confine-root.
@@ -206,25 +217,29 @@ static int is_exact_fd_pin(const char *p)
 
 /* Refuse (return 1) when the ABSOLUTE resolved path `abspath` lands OUTSIDE the
  * confinement root, for an operator/peer-supplied path that must stay inside it
- * (--partial-dir/--backup-dir/alt-basis/merge files: operator_path_resolve).  An
+ * (--partial-dir/--backup-dir/alt-basis/merge files or files-from entries).  An
  * in-tree symlink owned by uid 0 / the euid is followed by design, so it can
  * redirect the resolved target outside the root; this catches that escape.
+ * `final` distinguishes a completed target from an ancestor crossed on the way
+ * to it.
  *
  * This is ROOT confinement only.  The daemon exclude/filter list is a name-based
  * visibility filter, NOT a physical-path boundary: a symlink whose own name is
  * not excluded may still resolve into an excluded IN-tree subtree, exactly as in
  * stock rsync.  The defense for a writable module is `munge symlinks` (see
  * rsyncd.conf(5)), not this walk. */
-static int abspath_outside_confinement(const char *abspath)
+static int abspath_outside_confinement(const char *abspath, int final)
 {
 	unsigned int rootlen;
 	const char *root = confinement_root(&rootlen);
 	char pinned[MAXPATHLEN];
+	int enforce;
 
 	if (!root || !abspath)
 		return 0;
 	if (rootlen <= 1)			/* root is "/": nothing is outside */
 		return 0;
+	enforce = operator_path_resolve || filesfrom_owner_walk_active();
 	/* An fd pin (rrsync rewrites a validated option path to /proc/self/fd/N so
 	 * no later symlink can redirect it) is spelled outside the root by
 	 * construction.  Judge it by what it points AT rather than by its spelling,
@@ -238,7 +253,7 @@ static int abspath_outside_confinement(const char *abspath)
 		if (is_exact_fd_pin(abspath)) {
 			ssize_t n = readlink(abspath, pinned, sizeof pinned - 1);
 			if (n <= 0 || pinned[0] != '/')
-				return operator_path_resolve ? 1 : 0;
+				return enforce ? 1 : 0;
 			pinned[n] = '\0';
 			abspath = pinned;
 		}
@@ -250,14 +265,43 @@ static int abspath_outside_confinement(const char *abspath)
 	 * ("/", "/home", ...) on the way down -- those are not "outside", just
 	 * not-yet-arrived, so allow them.  A path that has truly DIVERGED is
 	 * outside: refuse it for an operator/peer path that must stay in the tree
-	 * (operator_path_resolve); other opens (--log-file, --*-from, lock/motd)
+	 * (operator_path_resolve or filesfrom_owner_walk_active()); other opens
+	 * (--log-file, --*-from, lock/motd)
 	 * may legitimately live elsewhere.  The --insecure-links / "insecure links
 	 * = yes" opt-out short-circuits before we get here. */
 	size_t alen = strlen(abspath);
 	if (alen == 0
 	 || (strncmp(abspath, root, alen) == 0 && root[alen] == '/'))
-		return 0;			/* ancestor of the root: still descending */
-	return operator_path_resolve ? 1 : 0;
+		return enforce && final ? 1 : 0;	/* an ancestor is valid only while descending */
+	return enforce ? 1 : 0;
+}
+
+/* Check a completed path made from a tracked directory and one leaf. */
+static int check_abspath_leaf(const char *base, const char *leaf)
+{
+	char leafabs[MAXPATHLEN];
+	size_t baselen;
+	int n;
+
+	if (!base || !*base) {
+		if (abspath_outside_confinement(base, 1)) {
+			errno = ELOOP;
+			return -1;
+		}
+		return 0;
+	}
+	baselen = strlen(base);
+	n = snprintf(leafabs, sizeof leafabs, "%s%s%s", base,
+		     base[baselen - 1] == '/' ? "" : "/", leaf);
+	if (n < 0 || (size_t)n >= sizeof leafabs) {
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+	if (abspath_outside_confinement(leafabs, 1)) {
+		errno = ELOOP;
+		return -1;
+	}
+	return 0;
 }
 
 /* Advance the tracked absolute path `abspath` by one resolved component,
@@ -410,7 +454,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 					saved_errno = errno;
 					goto out;
 				}
-				if (!pin_transit && abspath_outside_confinement(abspath)) {
+				if (!pin_transit && abspath_outside_confinement(abspath, 1)) {
 					saved_errno = ELOOP;
 					goto out;
 				}
@@ -528,7 +572,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 				saved_errno = errno;
 				goto out;
 			}
-			if (!pin_transit && abspath_outside_confinement(abspath)) {
+			if (!pin_transit && abspath_outside_confinement(abspath, 1)) {
 				saved_errno = ELOOP;
 				goto out;
 			}
@@ -539,7 +583,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 			if (retfd >= 0 && out_abs && out_cap)
 				/* Root-resolved (".." popped abspath empty) tracked daemon walk:
 				 * hand back "/" so owner_walk_parent still leaf-checks (path=/ bypass). */
-				strlcpy(out_abs, (am_daemon && !abspath[0]) ? "/" : abspath, out_cap);
+				strlcpy(out_abs, !abspath[0] ? "/" : abspath, out_cap);
 			goto out;
 		}
 
@@ -552,7 +596,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 			saved_errno = errno;
 			goto out;
 		}
-		if (!pin_transit && abspath_outside_confinement(abspath)) {
+		if (!pin_transit && abspath_outside_confinement(abspath, 0)) {
 			saved_errno = ELOOP;
 			goto out;
 		}
@@ -580,12 +624,16 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 	 * an O_PATH fd is sufficient for traversal and fchdir but not operations
 	 * such as fchmod. */
 	if (flags & O_DIRECTORY) {
+		if (!pin_transit && abspath_outside_confinement(abspath, 1)) {
+			saved_errno = ELOOP;
+			goto out;
+		}
 		retfd = openat(dfd, ".", flags | O_NOFOLLOW, mode);
 		saved_errno = retfd < 0 ? errno : 0;
 		if (out_abs && out_cap)
 			/* Root-resolved (".." popped abspath empty) tracked daemon walk:
 			 * hand back "/" so owner_walk_parent still leaf-checks (path=/ bypass). */
-			strlcpy(out_abs, (am_daemon && !abspath[0]) ? "/" : abspath, out_cap);
+			strlcpy(out_abs, !abspath[0] ? "/" : abspath, out_cap);
 	} else {
 		saved_errno = EISDIR;
 	}
@@ -624,6 +672,7 @@ int open_no_attacker_symlinks_dirfd(const char *path)
  * relevant ops by backup.c et al.; the opt-out (--insecure-links / "insecure
  * links =") restores legacy following.  Default 0 (transfer-path resolver). */
 int operator_path_resolve = 0;
+int filesfrom_owner_walk_override = 0;
 
 #if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
 /* For an operator-supplied path: open its parent directory via the ownership
@@ -657,15 +706,8 @@ int owner_walk_parent(const char *path, const char **bname)
 	 * module in an otherwise-served dir.  (The module exclude/filter is name-
 	 * based and not enforced here -- see abspath_outside_confinement.) */
 	if (pabs[0]) {
-		char leafabs[MAXPATHLEN];
-		if (snprintf(leafabs, sizeof leafabs, "%s/%s", pabs, *bname) >= (int)sizeof leafabs) {
+		if (check_abspath_leaf(pabs, *bname) < 0) {
 			close(dfd);
-			errno = ENAMETOOLONG;	/* fail closed, never skip the check */
-			return -1;
-		}
-		if (abspath_outside_confinement(leafabs)) {
-			close(dfd);
-			errno = ELOOP;
 			return -1;
 		}
 	}
@@ -2892,12 +2934,14 @@ static int ds_path_push(struct dirstack *ds, const char *comp)
 	if (al == 0)
 		return 0;		/* unseeded: tracking disabled for this walk */
 	size_t cl = strlen(comp);
-	if (al + 1 + cl >= sizeof ds->abspath) {
+	size_t off = (al > 0 && ds->abspath[al - 1] == '/') ? al : al + 1;
+	if (off + cl >= sizeof ds->abspath) {
 		errno = ENAMETOOLONG;
 		return -1;
 	}
-	ds->abspath[al] = '/';
-	memcpy(ds->abspath + al + 1, comp, cl + 1);
+	if (off != al)
+		ds->abspath[al] = '/';
+	memcpy(ds->abspath + off, comp, cl + 1);
 	return 0;
 }
 
@@ -2984,7 +3028,7 @@ static int ds_descend(struct dirstack *ds, const char *part, int *hops)
 			return -1;
 		/* exclude-aware: refuse descending into a module-hidden dir (catches a
 		 * symlink that redirected the walk into an excluded subtree). */
-		if (abspath_outside_confinement(ds->abspath)) {
+		if (abspath_outside_confinement(ds->abspath, 0)) {
 			errno = ELOOP;
 			return -1;
 		}
@@ -3098,7 +3142,10 @@ static int secure_walk_at(int anchor_fd, const char *anchor_abspath,
 			if (ds_descend(&ds, part, hops) < 0)
 				goto cleanup;
 			if (is_last) {
-				if (flags & O_DIRECTORY)
+				if ((flags & O_DIRECTORY)
+				 && abspath_outside_confinement(ds.abspath, 1))
+					errno = ELOOP;
+				else if (flags & O_DIRECTORY)
 					retfd = openat(ds_cur(&ds), ".", flags | O_NOFOLLOW, mode);
 				else
 					errno = EISDIR;
@@ -3110,15 +3157,8 @@ static int secure_walk_at(int anchor_fd, const char *anchor_abspath,
 		/* File leaf (final component, caller did not ask for O_DIRECTORY):
 		 * never follow a symlink leaf. */
 		if (is_last && !(flags & O_DIRECTORY)) {
-			if (ds.abspath[0]) {
-				char leafabs[MAXPATHLEN];
-				if (snprintf(leafabs, sizeof leafabs, "%s/%s", ds.abspath, part)
-				      < (int)sizeof leafabs
-				 && abspath_outside_confinement(leafabs)) {
-					errno = ELOOP;
-					goto cleanup;
-				}
-			}
+			if (check_abspath_leaf(ds.abspath, part) < 0)
+				goto cleanup;
 			int next_fd = openat(ds_cur(&ds), part,
 					     directory_traverse_flags() | O_NOFOLLOW);
 			if (next_fd == -1 && (errno == ENOTDIR || errno == ENOENT)) {
@@ -3134,6 +3174,8 @@ static int secure_walk_at(int anchor_fd, const char *anchor_abspath,
 
 		/* O_DIRECTORY|O_NOFOLLOW leaf: the caller's O_NOFOLLOW governs the leaf. */
 		if (is_last && (flags & O_NOFOLLOW)) {
+			if (check_abspath_leaf(ds.abspath, part) < 0)
+				goto cleanup;
 			retfd = openat(ds_cur(&ds), part, flags | O_NOFOLLOW, mode);
 			goto cleanup;
 		}
@@ -3146,6 +3188,10 @@ static int secure_walk_at(int anchor_fd, const char *anchor_abspath,
 			goto cleanup;
 		}
 		if (is_last) {
+			if (abspath_outside_confinement(ds.abspath, 1)) {
+				errno = ELOOP;
+				goto cleanup;
+			}
 			retfd = openat(ds_cur(&ds), ".", flags | O_NOFOLLOW, mode);
 			goto cleanup;
 		}
@@ -3155,7 +3201,10 @@ static int secure_walk_at(int anchor_fd, const char *anchor_abspath,
 	 * access, else EISDIR.  An AT_FDCWD anchor is not a resolvable target, so it
 	 * fails rather than silently returning the cwd. */
 	if (!saw_component) {
-		if ((flags & O_DIRECTORY) && anchor_fd != AT_FDCWD)
+		if ((flags & O_DIRECTORY)
+		 && abspath_outside_confinement(ds.abspath, 1))
+			errno = ELOOP;
+		else if ((flags & O_DIRECTORY) && anchor_fd != AT_FDCWD)
 			retfd = openat(anchor_fd, ".", flags | O_NOFOLLOW, mode);
 		else
 			errno = EISDIR;
@@ -3551,12 +3600,16 @@ int do_open_checklinks(const char *pathname)
 	if (am_sender && !am_daemon && files_from
 	 && !copy_dirlinks && !symlink_optout_allowed()) {
 		const char *bname;
-		int dfd, fd, save_errno;
+		int dfd, fd, save_errno, open_flags = O_RDONLY | O_NOFOLLOW;
 
 		dfd = owner_walk_parent(pathname, &bname);
 		if (dfd < 0)
 			return -1;
-		fd = openat(dfd, bname, O_RDONLY | O_NOFOLLOW, 0);
+#ifdef O_NOATIME
+		if (open_noatime)
+			open_flags |= O_NOATIME;
+#endif
+		fd = openat(dfd, bname, open_flags, 0);
 		save_errno = fd < 0 ? errno : 0;
 		close(dfd);
 		errno = save_errno;

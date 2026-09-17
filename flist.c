@@ -71,6 +71,7 @@ extern int prune_empty_dirs;
 extern int copy_links;
 extern int copy_unsafe_links;
 extern int insecure_links;
+extern int filesfrom_owner_walk_override;
 extern int protocol_version;
 extern int sanitize_paths;
 extern int munge_symlinks;
@@ -239,6 +240,8 @@ struct sender_source_root {
 };
 
 static struct sender_source_root *sender_source_roots;
+static struct sender_source_root *sender_source_root_fd_owner;
+static int sender_source_root_fd = -1;
 
 static int sender_source_full_path(const char *path, char *full, size_t full_size)
 {
@@ -302,11 +305,47 @@ static void remember_sender_source_arg(const char *path, const STRUCT_STAT *st)
 		remember_sender_source_root(full, &parent_st);
 }
 
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+/* Keep one validated source root open at a time.  A descriptor per explicit
+ * argument would make a large argument list exhaust the process limit. */
+static int sender_source_root_fd_for(struct sender_source_root *root)
+{
+	STRUCT_STAT st;
+	int fd, fl, saved_errno;
+
+	if (sender_source_root_fd_owner == root && sender_source_root_fd >= 0)
+		return sender_source_root_fd;
+	if (sender_source_root_fd >= 0)
+		close(sender_source_root_fd);
+	sender_source_root_fd = -1;
+	sender_source_root_fd_owner = NULL;
+
+	fd = open_anchor_dirfd(root->path);
+	if (fd < 0)
+		return -1;
+	if (do_fstat(fd, &st) < 0)
+		saved_errno = errno;
+	else if (st.st_dev != root->dev || st.st_ino != root->ino)
+		saved_errno = ELOOP;
+	else
+		saved_errno = 0;
+	if (saved_errno) {
+		close(fd);
+		errno = saved_errno;
+		return -1;
+	}
+	if ((fl = fcntl(fd, F_GETFD)) >= 0)
+		fcntl(fd, F_SETFD, fl | FD_CLOEXEC);
+	sender_source_root_fd_owner = root;
+	sender_source_root_fd = fd;
+	return fd;
+}
+#endif
+
 int open_sender_source_path(const char *path, int flags, int *matched)
 {
 #if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
 	struct sender_source_root *root, *best = NULL;
-	STRUCT_STAT st;
 	char full[MAXPATHLEN], *rel;
 	size_t best_len = 0;
 	int rootfd, fd, saved_errno;
@@ -328,26 +367,14 @@ int open_sender_source_path(const char *path, int flags, int *matched)
 		return -1;
 
 	*matched = 1;
-	rootfd = open_anchor_dirfd(best->path);
+	rootfd = sender_source_root_fd_for(best);
 	if (rootfd < 0)
 		return -1;
-	if (do_fstat(rootfd, &st) < 0)
-		saved_errno = errno;
-	else if (st.st_dev != best->dev || st.st_ino != best->ino)
-		saved_errno = ELOOP;
-	else
-		saved_errno = 0;
-	if (saved_errno) {
-		close(rootfd);
-		errno = saved_errno;
-		return -1;
-	}
 	rel = full + best_len;
 	while (*rel == '/')
 		rel++;
 	fd = secure_relative_open_at(rootfd, *rel ? rel : ".", flags, 0);
 	saved_errno = errno;
-	close(rootfd);
 	errno = saved_errno;
 	return fd;
 #else
@@ -359,17 +386,15 @@ int open_sender_source_path(const char *path, int flags, int *matched)
 
 void clear_sender_source_roots(void)
 {
+	if (sender_source_root_fd >= 0)
+		close(sender_source_root_fd);
+	sender_source_root_fd = -1;
+	sender_source_root_fd_owner = NULL;
 	while (sender_source_roots) {
 		struct sender_source_root *root = sender_source_roots;
 		sender_source_roots = root->next;
 		free(root);
 	}
-}
-
-static int filesfrom_owner_walk_active(void)
-{
-	return !am_daemon && am_sender && files_from
-	    && !copy_links && !copy_unsafe_links && !copy_dirlinks && !insecure_links;
 }
 
 static int filesfrom_link_stat(const char *path, STRUCT_STAT *stp, int follow_dirlinks)
@@ -385,7 +410,19 @@ static int filesfrom_link_stat(const char *path, STRUCT_STAT *stp, int follow_di
 		close(dfd);
 		return link_stat(path, stp, follow_dirlinks);
 	}
-	ret = link_stat_at(dfd, bname, stp, follow_dirlinks);
+	ret = do_lstat_atfd(dfd, bname, stp);
+	/* A list-selected directory symlink is a path component too. Resolve it
+	 * through the ownership and confinement walk before following it. */
+	if (ret == 0 && S_ISLNK(stp->st_mode)
+	 && (follow_dirlinks || copy_links)) {
+		int targetfd = open_no_attacker_symlinks_dirfd(path);
+		if (targetfd >= 0) {
+			ret = do_fstat(targetfd, stp);
+			close(targetfd);
+		} else if (errno != ENOENT && errno != ENOTDIR && errno != EACCES) {
+			ret = -1;
+		}
+	}
 	save_errno = ret < 0 ? errno : 0;
 	close(dfd);
 	errno = save_errno;
@@ -420,7 +457,7 @@ static int scan_link_stat(const char *path, STRUCT_STAT *stp, int follow_dirlink
 	 * scanned dir, and only when am_root >= 0 (link_stat_at folds in no
 	 * fake-super %stat xattr; link_stat does so via get_stat_xattr, a no-op
 	 * once am_root >= 0). */
-	if (scan_dirfd >= 0 && am_root >= 0
+	if (scan_dirfd >= 0 && am_root >= 0 && !filesfrom_owner_walk_active()
 	 && strncmp(path, scan_dir_prefix, scan_dir_prefix_len) == 0
 	 && path[scan_dir_prefix_len] == '/'
 	 && strchr(path + scan_dir_prefix_len + 1, '/') == NULL)
@@ -432,7 +469,7 @@ static int scan_link_stat(const char *path, STRUCT_STAT *stp, int follow_dirlink
 
 static int scan_readlink(const char *path, char *linkbuf, size_t bufsiz)
 {
-	if (scan_dirfd >= 0 && am_root >= 0
+	if (scan_dirfd >= 0 && am_root >= 0 && !filesfrom_owner_walk_active()
 	 && strncmp(path, scan_dir_prefix, scan_dir_prefix_len) == 0
 	 && path[scan_dir_prefix_len] == '/'
 	 && strchr(path + scan_dir_prefix_len + 1, '/') == NULL)
@@ -2450,8 +2487,11 @@ static void send_implied_dirs(int f, struct file_list *flist, char *fname,
 	if (need_new_dir) {
 		int save_copy_links = copy_links;
 		int save_xfer_dirs = xfer_dirs;
+		int save_filesfrom_owner_walk = filesfrom_owner_walk_override;
 		char *slash;
 
+		if (filesfrom_owner_walk_active())
+			filesfrom_owner_walk_override = 1;
 		copy_links = xfer_dirs = 1;
 
 		*limit = '\0';
@@ -2480,6 +2520,7 @@ static void send_implied_dirs(int f, struct file_list *flist, char *fname,
 
 		copy_links = save_copy_links;
 		xfer_dirs = save_xfer_dirs;
+		filesfrom_owner_walk_override = save_filesfrom_owner_walk;
 
 		if (!inc_recurse)
 			goto done;
