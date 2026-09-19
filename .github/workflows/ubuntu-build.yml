@@ -42,7 +42,7 @@ jobs:
     - name: check
       run: sudo RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/common.txt,@testsuite/skiplist/linux.txt make check
     - name: check30
-      run: sudo RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/common.txt,@testsuite/skiplist/linux.txt make check30
+      run: sudo RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/common.txt,@testsuite/skiplist/linux.txt,@testsuite/skiplist/proto30.txt make check30
     - name: check29
       run: sudo RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/common.txt,@testsuite/skiplist/linux.txt,@testsuite/skiplist/proto29.txt make check29
     - name: check (TCP daemon transport)

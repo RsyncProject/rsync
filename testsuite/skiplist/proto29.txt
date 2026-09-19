@@ -14,3 +14,4 @@ daemon-copylinks-parent-target-regression  # the stdio_daemon client speaks prot
 partial-protected-regular-retry-linux  # one-inplace partial staging needs protocol >= 30 (forced 29)
 scanner-batch-flag-mismatch  # xattrs (-X) need protocol 30+
 symlink-exclude-xattr  # xattr (-X) transfer requires protocol 30+ (negotiated 29)
+write-touched-blocks  # logical-block statistics require protocol 33+ (forced 29)
