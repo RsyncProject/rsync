@@ -187,7 +187,9 @@ leak()
 # it should not trip the path-walker ELOOP block.
 
 local_files_from = root / 'local_files_from.txt'
-local_files_from.write_text("sub/f0\n")
+local_file = src / 'sub' / 'files-from-local'
+local_file.write_text('local files-from content\n')
+local_files_from.write_text('sub/files-from-local\n')
 
 local_proc = subprocess.run(
     rsync_argv('-a', f'--confine-root={base}', f'--files-from={local_files_from}',
@@ -195,11 +197,11 @@ local_proc = subprocess.run(
     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
 )
 
-if "Too many levels of symbolic links" in local_proc.stdout or "failed to open files-from file" in local_proc.stdout:
+copied = dest / 'sub' / 'files-from-local'
+if (local_proc.returncode != 0 or not copied.is_file()
+        or copied.read_text() != 'local files-from content\n'):
     test_fail(
-        "Local process improperly rejected an out-of-bounds --files-from file "
-        "specified by the operator due to an overly strict path-walker.\n"
+        "Local --files-from transfer did not copy the listed file while the "
+        "list was outside --confine-root.\n"
         f"Output: {local_proc.stdout}"
     )
-elif local_proc.returncode != 0:
-    test_fail(f"Local --confine-root run failed unexpectedly (rc={local_proc.returncode}).\nOutput: {local_proc.stdout}")
