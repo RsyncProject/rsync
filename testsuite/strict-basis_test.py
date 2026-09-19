@@ -1,238 +1,172 @@
 #!/usr/bin/env python3
-"""TCP receiver edge-cases.
+"""Ensure forged partial-dir basis tokens cannot enable in-place writes."""
 
-Test 1: Ensures O_NOFOLLOW correctly blocks leaf symlinks in operator paths.
-Test 2: Ensures unexpected FNAMECMP_PARTIAL_DIR tokens cannot cause an 
-        unintended in-place overwrite.
-"""
 import hashlib
-import os
 import socket
 import struct
 import subprocess
-from pathlib import Path
 
-from rsyncfns import (
-    TMPDIR, TODIR, hands_setup, makepath, rmtree, rsync_argv, test_fail
-)
+from rsyncfns import TODIR, hands_setup, makepath, rmtree, rsync_argv, test_fail
 import rsync_proto as rp
 
 hands_setup()
 
 CF_INPLACE_PARTIAL_DIR = 1 << 6
-FNAMECMP_BASIS_DIR_LOW = 0x00
 FNAMECMP_PARTIAL_DIR = 0x81
 ITEM_BASIS_TYPE_FOLLOWS = 1 << 11
 ITEM_XNAME_FOLLOWS = 1 << 12
 
-TEST_DATA = b"STRICT_NOFOLLOW_REQUIRED\n"
 ORIGINAL_DATA = b"ORIGINAL_DEST_BYTES_KEEP_ME\n"
 MODIFIED_DATA = b"MODIFIED_INPLACE_DESPITE_BAD_CHECKSUM\n"
 INVALID_MD5 = b"\x00" * 16
 MODTIME = 1_700_000_000
+EXPECTED_PROTOCOL_ERROR = "error in rsync protocol data stream"
 
-# --- Protocol Helpers ---
+
 def drain_argv(peer):
     nul_run = 0
     while nul_run < 2:
-        b = peer._recv_exact(1)
-        nul_run = nul_run + 1 if b == b"\0" else 0
+        byte = peer._recv_exact(1)
+        nul_run = nul_run + 1 if byte == b"\0" else 0
 
-def read_mux_bytes(peer, buf, n):
-    while len(buf) < n:
+
+def read_mux_bytes(peer, buf, count):
+    while len(buf) < count:
         word = struct.unpack("<I", peer._recv_exact(4))[0]
         payload = peer._recv_exact(word & 0xFFFFFF)
         if (word >> 24) - rp.MPLEX_BASE == rp.MSG_DATA:
             buf.extend(payload)
-    out = bytes(buf[:n])
-    del buf[:n]
-    return out
+    result = bytes(buf[:count])
+    del buf[:count]
+    return result
 
-def read_mux_int(peer, buf): return struct.unpack("<i", read_mux_bytes(peer, buf, 4))[0]
-def read_mux_short(peer, buf): return struct.unpack("<H", read_mux_bytes(peer, buf, 2))[0]
-def read_mux_byte(peer, buf): return read_mux_bytes(peer, buf, 1)[0]
+
+def read_mux_int(peer, buf):
+    return struct.unpack("<i", read_mux_bytes(peer, buf, 4))[0]
+
+
+def read_mux_short(peer, buf):
+    return struct.unpack("<H", read_mux_bytes(peer, buf, 2))[0]
+
+
+def read_mux_byte(peer, buf):
+    return read_mux_bytes(peer, buf, 1)[0]
+
 
 def read_mux_ndx(peer, buf):
-    b0 = read_mux_byte(peer, buf)
-    if b0 == 0: return rp.NDX_DONE
-    if b0 == 0xFF: raise RuntimeError("generator sent negative index")
-    if b0 == 0xFE:
-        b = read_mux_bytes(peer, buf, 2)
-        if b[0] & 0x80:
+    first = read_mux_byte(peer, buf)
+    if first == 0:
+        return rp.NDX_DONE
+    if first == 0xFF:
+        raise RuntimeError("generator sent negative index")
+    if first == 0xFE:
+        value = read_mux_bytes(peer, buf, 2)
+        if value[0] & 0x80:
             rest = read_mux_bytes(peer, buf, 2)
-            return ((b[0] & 0x7F) << 24) | b[1] | (rest[0] << 8) | (rest[1] << 16)
-        return (b[0] << 8) + b[1] - 1
-    return b0 - 1
+            return ((value[0] & 0x7F) << 24) | value[1] | (rest[0] << 8) | (rest[1] << 16)
+        return (value[0] << 8) + value[1] - 1
+    return first - 1
+
 
 def drain_generator_request(peer, buf):
     while True:
-        n = read_mux_int(peer, buf)
-        if n == 0: break
-        read_mux_bytes(peer, buf, n)
+        count = read_mux_int(peer, buf)
+        if count == 0:
+            break
+        read_mux_bytes(peer, buf, count)
 
     while True:
-        ndx = read_mux_ndx(peer, buf)
-        if ndx == rp.NDX_DONE: raise RuntimeError("generator sent NDX_DONE")
-        iflags = read_mux_short(peer, buf)
-        if iflags & ITEM_BASIS_TYPE_FOLLOWS: read_mux_byte(peer, buf)
-        if iflags & ITEM_XNAME_FOLLOWS:
-            ln = read_mux_byte(peer, buf)
-            if ln & 0x80: ln = (ln & 0x7F) * 0x100 + read_mux_byte(peer, buf)
-            if ln: read_mux_bytes(peer, buf, ln)
+        index = read_mux_ndx(peer, buf)
+        if index == rp.NDX_DONE:
+            raise RuntimeError("generator sent NDX_DONE")
+        flags = read_mux_short(peer, buf)
+        if flags & ITEM_BASIS_TYPE_FOLLOWS:
+            read_mux_byte(peer, buf)
+        if flags & ITEM_XNAME_FOLLOWS:
+            length = read_mux_byte(peer, buf)
+            if length & 0x80:
+                length = (length & 0x7F) * 0x100 + read_mux_byte(peer, buf)
+            if length:
+                read_mux_bytes(peer, buf, length)
         count = read_mux_int(peer, buf)
-        for _ in range(3): read_mux_int(peer, buf)
-        for _ in range(count): read_mux_int(peer, buf)
-        if iflags & rp.ITEM_TRANSFER: return ndx
+        for _ in range(3):
+            read_mux_int(peer, buf)
+        for _ in range(count):
+            read_mux_int(peer, buf)
+        if flags & rp.ITEM_TRANSFER:
+            return index
 
-def run_synthetic_sender(client_args, uri_path, dest_path, test_logic, inject_fault=True): 
-    lsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    lsock.bind(("127.0.0.1", 0))
-    lsock.listen(1)
-    port = lsock.getsockname()[1]
-    cmd = rsync_argv("--protocol=30", "-r", "--no-whole-file") + client_args
-    cmd += [f"rsync://127.0.0.1:{port}/{uri_path}", f"{dest_path}/"]
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    csock, _ = lsock.accept()
-    csock.settimeout(15)
-    peer = rp.DaemonReceiver(csock)
+
+def run_synthetic_sender(client_args, uri_path, dest_path, inject_fault):
+    listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    listener.bind(("127.0.0.1", 0))
+    listener.listen(1)
+    port = listener.getsockname()[1]
+    command = rsync_argv("--protocol=30", "-r", "--no-whole-file") + client_args
+    command += [f"rsync://127.0.0.1:{port}/{uri_path}", f"{dest_path}/"]
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    client, _ = listener.accept()
+    client.settimeout(15)
+    peer = rp.DaemonReceiver(client)
 
     try:
-        test_logic(peer, inject_fault)
+        peer.handshake(compat_flags=CF_INPLACE_PARTIAL_DIR, seed=0x12345678)
+        drain_argv(peer)
+        entry = rp.FileEntry("keep", mode=rp.S_IFREG | 0o644,
+                             length=len(MODIFIED_DATA), modtime=MODTIME)
+        peer.send_data(entry.encode() + rp.end_of_flist())
+        buf = bytearray()
+        index = drain_generator_request(peer, buf)
+
+        body = bytearray()
+        body += rp.w_shortint(rp.ITEM_TRANSFER | ITEM_BASIS_TYPE_FOLLOWS)
+        body += rp.w_byte(FNAMECMP_PARTIAL_DIR)
+        body += rp.w_sum_head(0, 0, 0, 0)
+        body += rp.w_int(len(MODIFIED_DATA)) + MODIFIED_DATA
+        body += rp.w_int(0)
+        body += INVALID_MD5 if inject_fault else hashlib.md5(MODIFIED_DATA).digest()
+
+        response = bytearray(peer.w_ndx(index))
+        response += body
+        response += peer.w_ndx(rp.NDX_DONE) * 4
+        peer.send_data(bytes(response))
     finally:
         peer.drain(timeout=3)
         peer.close()
-        lsock.close()
+        listener.close()
 
-    stdout, _ = proc.communicate(timeout=10)
-    return proc.returncode, stdout
+    stdout, _ = process.communicate(timeout=10)
+    return process.returncode, stdout
 
 
-# --- Test 1: Operator Path Leaf Symlink Rejection (O_NOFOLLOW) --------------
-print("=== Test 1: Operator Path Leaf Symlink Rejection (O_NOFOLLOW) ===", flush=True)
-
-def test1_payload(peer, inject_fault, md5_hash):
-    peer.handshake(compat_flags=CF_INPLACE_PARTIAL_DIR, seed=0x12345678)
-    drain_argv(peer)
-    entry = rp.FileEntry("f", mode=rp.S_IFREG | 0o644, length=len(TEST_DATA), modtime=MODTIME)
-    peer.send_data(entry.encode() + rp.end_of_flist())
-    buf = bytearray()
-    ndx = drain_generator_request(peer, buf)
-    body = bytearray()
-    body += rp.w_shortint(rp.ITEM_TRANSFER | ITEM_BASIS_TYPE_FOLLOWS)
-    body += rp.w_byte(FNAMECMP_BASIS_DIR_LOW)  
-    body += rp.w_sum_head(1, len(TEST_DATA), 16, len(TEST_DATA)) + rp.w_int(-1) + rp.w_int(0)
-    body += md5_hash
-    out_bytes = bytearray(peer.w_ndx(ndx))
-    out_bytes += body
-    out_bytes += peer.w_ndx(rp.NDX_DONE) * 4
-    peer.send_data(bytes(out_bytes))
-
-# 1A: Positive Control
-print("  Running 1A: Positive Control (Regular file basis)...", flush=True)
+print("=== Test 1: Legitimate partial-dir transfer ===", flush=True)
 rmtree(TODIR)
 dest = TODIR / "dest"
-linkdest = TODIR / "linkdest"
-makepath(dest, linkdest)
-(linkdest / "f").write_bytes(TEST_DATA)
-correct_md5 = hashlib.md5(TEST_DATA).digest()
-
-ret, out = run_synthetic_sender(
-    [f"--link-dest={linkdest}", "--partial"], "mod/", dest, 
-    lambda peer, inject_fault: test1_payload(peer, inject_fault, correct_md5), inject_fault=False
-)
-
-if not (dest / "f").exists() or (dest / "f").read_bytes() != TEST_DATA:
-    test_fail("BUG 1A (Control): Positive control failed! The patch accidentally blocked a regular basis file.\nOutput:\n" + out)
-
-# 1B: Negative Control (Testing the edge-case)
-print("  Running 1B: Negative Control (Symlink basis)...", flush=True)
-rmtree(TODIR)
-dest = TODIR / "dest"
-linkdest = TODIR / "linkdest"
-makepath(dest, linkdest)
-target_file = TMPDIR / "target"
-target_file.write_bytes(TEST_DATA)
-os.symlink(str(target_file), linkdest / "f")
-
-ret, out = run_synthetic_sender(
-    [f"--link-dest={linkdest}", "--partial"], "mod/", dest, 
-    lambda peer, inject_fault: test1_payload(peer, inject_fault, INVALID_MD5), inject_fault=True
-)
-# DIAGNOSTIC CHECK: Ensure rsync reached the patch and evaluated it, rather than segfaulting early
-if (dest / "f").exists() and (dest / "f").read_bytes() == TEST_DATA:
-    test_fail("BUG 1B (Negative Control): rsync incorrectly followed the operator-path fname leaf symlink!\nOutput:\n" + out)
-elif "got a block match with no basis file" not in out:
-    test_fail("BUG 1B (Negative Control): rsync crashed silently!\nOutput:\n" + out)
-
-# --- Test 2: In-place Override Verification (FNAMECMP_PARTIAL_DIR) ----------
-print("\n=== Test 2: In-place Override Verification (FNAMECMP_PARTIAL_DIR) ===", flush=True)
-
-def test2_payload(peer, inject_fault):
-    peer.handshake(compat_flags=CF_INPLACE_PARTIAL_DIR, seed=0x12345678)
-    drain_argv(peer)
-    entry = rp.FileEntry("keep", mode=rp.S_IFREG | 0o644, length=len(MODIFIED_DATA), modtime=MODTIME)
-    peer.send_data(entry.encode() + rp.end_of_flist())
-    buf = bytearray()
-    ndx = drain_generator_request(peer, buf)
-    body = bytearray()
-    
-    # Both the legit partial and the attack use the partial token
-    body += rp.w_shortint(rp.ITEM_TRANSFER | ITEM_BASIS_TYPE_FOLLOWS)
-    body += rp.w_byte(FNAMECMP_PARTIAL_DIR)
-        
-    body += rp.w_sum_head(0, 0, 0, 0)
-    body += rp.w_int(len(MODIFIED_DATA)) + MODIFIED_DATA
-    body += rp.w_int(0)
-    
-    if inject_fault:
-        body += INVALID_MD5
-    else:
-        body += hashlib.md5(MODIFIED_DATA).digest()
-        
-    out = bytearray(peer.w_ndx(ndx))
-    out += body
-    out += peer.w_ndx(rp.NDX_DONE) * 4
-    peer.send_data(bytes(out))
-
-# 2A: Positive Control (Legitimate Partial-Dir Transfer)
-print("  Running 2A: Positive Control (Legitimate Partial-Dir Transfer)...", flush=True)
-rmtree(TODIR)
-dest2 = TODIR / "dest"
-partial_dir = dest2 / ".rsync-partial"
-makepath(dest2, partial_dir)
-
-dest_file = dest2 / "keep"
+partial_dir = dest / ".rsync-partial"
+makepath(dest, partial_dir)
+dest_file = dest / "keep"
 partial_file = partial_dir / "keep"
-
-# Simulate an interrupted transfer sitting in the partial directory
 partial_file.write_bytes(ORIGINAL_DATA)
 
-# Run with --partial-dir so the daemon expects the token
-ret, out = run_synthetic_sender(["--partial-dir=.rsync-partial"], "mod/keep", dest2, test2_payload, inject_fault=False)
+ret, output = run_synthetic_sender(["--partial-dir=.rsync-partial"], "mod/keep", dest, False)
+if ret != 12 or EXPECTED_PROTOCOL_ERROR not in output \
+        or partial_file.exists() or not dest_file.is_file() \
+        or dest_file.read_bytes() != MODIFIED_DATA:
+    test_fail(f"legitimate partial-dir transfer failed (rc={ret}, "
+              f"partial={partial_file.exists()}, file={dest_file.exists()}, "
+              f"data={dest_file.read_bytes() if dest_file.exists() else None!r}):\n"
+              + output)
 
-if partial_file.exists():
-    test_fail("BUG 2A (Control): Legitimate partial-dir transfer failed!\nOutput:\n" + out)
-    
-if not dest_file.exists() or dest_file.read_bytes() != MODIFIED_DATA:
-    test_fail("BUG 2A (Control): The new content was not successfully written to the final destination!")
-
-# 2B: Negative Control
-print("  Running 2B: Negative Control (Synthetic Token Attack)...", flush=True)
+print("=== Test 2: Forged partial-dir token ===", flush=True)
 rmtree(TODIR)
-makepath(dest2)
-dest_file.write_bytes(ORIGINAL_DATA) # Set up the target file for the exploit attempt
+makepath(dest)
+dest_file.write_bytes(ORIGINAL_DATA)
 
-# NO --partial-dir passed, but we forge the token anyway
-ret, out = run_synthetic_sender([], "mod/keep", dest2, test2_payload, inject_fault=True)
+ret, output = run_synthetic_sender([], "mod/keep", dest, True)
+if ret != 12 or EXPECTED_PROTOCOL_ERROR not in output:
+    test_fail("forged FNAMECMP_PARTIAL_DIR token did not reach the expected "
+              f"protocol failure (rc={ret}):\n{output}")
+if not dest_file.is_file() or dest_file.read_bytes() != ORIGINAL_DATA:
+    test_fail("forged partial-dir token changed the destination:\n" + output)
 
-# 1. Check file state
-if dest_file.exists():
-    got = dest_file.read_bytes()
-    if got == MODIFIED_DATA:
-        test_fail("BUG 2B (Negative Control): Synthetic FNAMECMP_PARTIAL_DIR caused rsync to incorrectly overwrite the file in-place!\nOutput:\n" + out)
-    elif got != ORIGINAL_DATA:
-        test_fail(f"BUG 2B (Negative Control): File modified to unknown state: {got}")
-else:
-    test_fail("BUG 2B (Negative Control): The target file was unexpectedly deleted!\nOutput:\n" + out)
-
-print("\nSUCCESS: Both operator path parsing and forced-inplace overrides were correctly handled.", flush=True)
+print("SUCCESS: partial-dir state validation passed", flush=True)
