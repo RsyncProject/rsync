@@ -1424,10 +1424,13 @@ sign) if you want the local shell to expand it.
 
 0.  `--confine-root=DIR`
 
-    This bounds where the paths listed under [`--insecure-links`](#opt) are
-    allowed to resolve: one that ends up outside DIR is refused, even if every
-    symlink along it was owned by a trusted user.  The ownership walk asks who
-    planted a link; this asks where the path came out.
+    In the default symlink mode this bounds where operator option paths and
+    paths selected from a [`--files-from`](#opt) list are allowed to resolve:
+    one that ends up outside DIR is refused, even if every symlink along it was
+    owned by a trusted user. Explicit source roots remain operator-selected
+    transfer roots.
+    The ownership walk asks who planted a link; this asks where the path came
+    out.
 
     DIR must be absolute.  Nothing is confined by default, and
     `--confine-root=/` is a no-op.
