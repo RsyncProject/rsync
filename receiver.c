@@ -1134,7 +1134,8 @@ int recv_files(int f_in, int f_out, char *local_name)
 
 		/* A peer's basis selector cannot enable direct output through a path
 		 * that the confined basis open did not validate. */
-		one_inplace = inplace_partial && fnamecmp_type == FNAMECMP_PARTIAL_DIR
+		one_inplace = inplace_partial && partial_dir
+			   && fnamecmp_type == FNAMECMP_PARTIAL_DIR
 			   && fd1 != -1;
 		updating_basis_or_equiv = one_inplace
 		    || (inplace && (fnamecmp == fname || fnamecmp_type == FNAMECMP_BACKUP));
