@@ -179,3 +179,29 @@ if os.path.realpath(tgt) != os.path.realpath(str(secret)):
     test_fail(f"setup failed: backup symlink {files_from} -> {tgt}, not the out-of-module secret")
 
 leak()
+
+# ---- LOCAL COMMAND CONFINEMENT EDGE CASE -----------------------------------
+# A local operator invoking --confine-root should still be able to specify a
+# --files-from file that resides outside the confined boundary. The file is
+# opened locally by the operator, not as an operator-path via a daemon, so
+# it should not trip the path-walker ELOOP block.
+
+local_files_from = root / 'local_files_from.txt'
+local_file = src / 'sub' / 'files-from-local'
+local_file.write_text('local files-from content\n')
+local_files_from.write_text('sub/files-from-local\n')
+
+local_proc = subprocess.run(
+    rsync_argv('-a', f'--confine-root={base}', f'--files-from={local_files_from}',
+               f'{src}/', f'{dest}/'),
+    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+)
+
+copied = dest / 'sub' / 'files-from-local'
+if (local_proc.returncode != 0 or not copied.is_file()
+        or copied.read_text() != 'local files-from content\n'):
+    test_fail(
+        "Local --files-from transfer did not copy the listed file while the "
+        "list was outside --confine-root.\n"
+        f"Output: {local_proc.stdout}"
+    )
