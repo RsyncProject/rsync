@@ -79,8 +79,9 @@ if proc_uid in (0, os.geteuid()):
     test_skipped('/proc/self does not expose an overflow uid in this namespace')
 
 base = Path(tempfile.mkdtemp(prefix='rsync-userns-procfs-'))
-src = base / 'src'
-dest = base / 'dest'
+root = base / 'root'
+src = root / 'src'
+dest = root / 'dest'
 outside = base / 'outside'
 makepath(src, dest, outside)
 (src / 'file').write_text('content\n')
@@ -112,22 +113,33 @@ try:
 finally:
     os.close(dest_fd)
 
-outside_list = outside / 'files-from'
-outside_list.write_text('file\n')
-for fd_root in fd_roots:
-    outside_fd = os.open(outside_list, os.O_RDONLY)
-    try:
+backup_dir = root / 'backup'
+backup_dir.symlink_to(outside)
+(dest / 'test').write_text('old_content\n')
+(src / 'test').write_text('new_different_content\n')
+
+(outside / 'test').write_text('existing_backup\n')
+
+# Open an FD pointing to the confined root
+root_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
+try:
+    for fd_root in fd_roots:
         proc = subprocess.run(
-            rsync_argv('-a', f'--confine-root={dest}',
-                       f'--files-from={fd_root}/{outside_fd}',
+            rsync_argv('-a', '--backup', f'--confine-root={root}',
+                       f'--backup-dir={fd_root}/{root_fd}/backup/',
                        str(src) + '/', str(dest) + '/'),
-            pass_fds=(outside_fd,),
+            pass_fds=(root_fd,),
             capture_output=True,
             text=True,
         )
-    finally:
-        os.close(outside_fd)
-    if proc.returncode == 0 or 'failed to open files-from file' not in proc.stderr:
-        test_fail(f'outside {fd_root} pin was not observably refused: '
-                  f'rc={proc.returncode}, stderr={proc.stderr!r}')
+
+        # The transfer must fail because rsync attempts to unlink the pre-existing target file,
+        # forcing the path-walker to evaluate the FD pin + symlink and catching the escape.
+        if proc.returncode == 0:
+            test_fail(f'backup to outside symlink via {fd_root} pin was not observably refused: '
+                      f'rc={proc.returncode}, stderr={proc.stderr!r}')
+finally:
+    os.close(root_fd)
+
 rmtree(base)
+

@@ -2659,7 +2659,8 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			 * module root -- e.g. a root-owned backup symlink. No-op off a
 			 * daemon (the module-root check only fires when am_daemon). */
 			int save_opr = operator_path_resolve;
-			operator_path_resolve = 1;
+			/* The daemon process is the only case that the files-from path comes from an untrusted argument */
+			operator_path_resolve = am_daemon ? 1 : 0;
 			filesfrom_fd = open_no_attacker_symlinks(files_from, O_RDONLY|O_BINARY, 0);
 			operator_path_resolve = save_opr;
 			if (filesfrom_fd < 0) {
