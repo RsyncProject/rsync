@@ -143,8 +143,8 @@ static int secure_basis_open(const char *basedir, const char *relpath, int flags
 		dfd = owner_walk_parent(p, &leaf);
 		if (dfd < 0)
 			return -1;
-		fd = openat(dfd, leaf, flags | O_NOFOLLOW, mode);
-		saved_errno = errno;
+		fd = do_open_atfd(dfd, leaf, flags, mode);
+		saved_errno = fd < 0 ? errno : 0;
 		close(dfd);
 		errno = saved_errno;
 		return fd;
