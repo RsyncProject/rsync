@@ -40,7 +40,8 @@
         "--disable-zstd",
         "--disable-md2man",
         "--disable-xxhash",
-        "--disable-lz4"
+        "--disable-lz4",
+        "--disable-idn"
       ]
     },
     {
@@ -53,7 +54,8 @@
         "--disable-zstd",
         "--disable-md2man",
         "--disable-xxhash",
-        "--disable-lz4"
+        "--disable-lz4",
+        "--disable-idn"
       ]
     },
     {
@@ -74,7 +76,8 @@
         "--disable-zstd",
         "--disable-md2man",
         "--disable-xxhash",
-        "--disable-lz4"
+        "--disable-lz4",
+        "--disable-idn"
       ]
     },
     {
@@ -87,7 +90,8 @@
         "--disable-zstd",
         "--disable-md2man",
         "--disable-xxhash",
-        "--disable-lz4"
+        "--disable-lz4",
+        "--disable-idn"
       ]
     },
     {
