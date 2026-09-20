@@ -40,7 +40,8 @@
         "--disable-zstd",
         "--disable-md2man",
         "--disable-xxhash",
-        "--disable-lz4"
+        "--disable-lz4",
+        "--disable-idn"
       ]
     },
     {
@@ -53,7 +54,8 @@
         "--disable-zstd",
         "--disable-md2man",
         "--disable-xxhash",
-        "--disable-lz4"
+        "--disable-lz4",
+        "--disable-idn"
       ]
     },
     {
@@ -74,7 +76,8 @@
         "--disable-zstd",
         "--disable-md2man",
         "--disable-xxhash",
-        "--disable-lz4"
+        "--disable-lz4",
+        "--disable-idn"
       ]
     },
     {
@@ -87,7 +90,8 @@
         "--disable-zstd",
         "--disable-md2man",
         "--disable-xxhash",
-        "--disable-lz4"
+        "--disable-lz4",
+        "--disable-idn"
       ]
     },
     {
@@ -103,9 +107,8 @@
         "--disable-zstd",
         "--disable-lz4"
       ],
-      "_expect_skip_extra_comment": "daemon-max-alloc-zero needs the old static client (git-archive export-ignore'd); protected-regular's fs.protected_regular path is not exercised on this box.",
+      "_expect_skip_extra_comment": "protected-regular's fs.protected_regular path is not exercised on this box.",
       "expect_skip_extra": [
-        "daemon-max-alloc-zero",
         "protected-regular"
       ]
     },
@@ -116,10 +119,6 @@
       "workflow": "ubuntu-22.04-build.yml",
       "configure_flags": [
         "--with-rrsync"
-      ],
-      "_expect_skip_extra_comment": "The symlink-race tests now run on every platform (one portable race-free resolver), so only daemon-max-alloc-zero skips here: it needs the old static client, which git-archive omits (.gitattributes export-ignore) from the source-only fleet push.",
-      "expect_skip_extra": [
-        "daemon-max-alloc-zero"
       ]
     },
     {
@@ -135,10 +134,6 @@
       ],
       "configure_flags": [
         "--with-rrsync"
-      ],
-      "_expect_skip_extra_comment": "daemon-max-alloc-zero needs the old static client, which git-archive omits (.gitattributes export-ignore) from the source-only fleet push.",
-      "expect_skip_extra": [
-        "daemon-max-alloc-zero"
       ]
     },
     {
@@ -154,10 +149,6 @@
       ],
       "configure_flags": [
         "--with-rrsync"
-      ],
-      "_expect_skip_extra_comment": "daemon-max-alloc-zero needs the old static client, which git-archive omits (.gitattributes export-ignore) from the source-only fleet push.",
-      "expect_skip_extra": [
-        "daemon-max-alloc-zero"
       ]
     },
     {
@@ -173,10 +164,6 @@
       ],
       "configure_flags": [
         "--with-rrsync"
-      ],
-      "_expect_skip_extra_comment": "daemon-max-alloc-zero needs the old static client, which git-archive omits (.gitattributes export-ignore) from the source-only fleet push.",
-      "expect_skip_extra": [
-        "daemon-max-alloc-zero"
       ]
     },
     {
@@ -187,10 +174,9 @@
       "configure_flags": [
         "--with-rrsync"
       ],
-      "_expect_skip_extra_comment": "Box-specific, not workflow-specific: this VM has no separate filesystem for a cross-device temp dir, and daemon-max-alloc-zero needs the old static client that the source-only fleet push omits (.gitattributes export-ignore), as on ubuntu-2004. fs.protected_regular is enabled in /etc/sysctl.d/90-rsync-fleettest.conf so protected-regular runs here rather than skipping.",
+      "_expect_skip_extra_comment": "Box-specific, not workflow-specific: this VM has no separate filesystem for a cross-device temp dir. fs.protected_regular is enabled in /etc/sysctl.d/90-rsync-fleettest.conf so protected-regular runs here rather than skipping.",
       "expect_skip_extra": [
-        "chmod-temp-dir",
-        "daemon-max-alloc-zero"
+        "chmod-temp-dir"
       ]
     },
     {
@@ -284,11 +270,12 @@
       ]
     },
     {
-      "_comment": "Cygwin: non-root plain user (no sudo), binary is rsync.exe.",
+      "_comment": "Cygwin: non-root plain user (no sudo), binary is rsync.exe. The workflow installs only the python39 package, so pin python3.9 here too: the box's default python3 (3.12) has a working AF_UNIX socketpair, which makes daemon-stdin-local-socket run where cygwin.txt expects it to skip. Keep python39 current: the xattr tests need the os.getxattr that newer Cygwin builds (3.9.25+) expose.",
       "name": "cygwin",
       "ssh_host": "win11",
       "workflow": "cygwin-build.yml",
       "rsync_bin": "rsync.exe",
+      "python": "python3.9",
       "privilege": "user",
       "configure_flags": [
         "--with-rrsync"

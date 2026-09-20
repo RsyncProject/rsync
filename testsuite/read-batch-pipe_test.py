@@ -19,9 +19,13 @@ bash = shutil.which('bash')
 if bash is None:
     test_skipped('bash is unavailable, cannot test process substitution')
 
+# runtests.py exports POSIXLY_CORRECT=1, and bash before 5.1 disables process
+# substitution in POSIX mode -- the very syntax bash is required for here.
+bash_env = {k: v for k, v in os.environ.items() if k != 'POSIXLY_CORRECT'}
 # Verify the host bash actually supports process substitution
 probe = subprocess.run(
     [bash, '-c', 'cat <(echo "probe")'],
+    env=bash_env,
     capture_output=True)
 
 if probe.returncode != 0:
@@ -57,6 +61,7 @@ try:
     proc_read = subprocess.run(
         [bash, '-c', bash_script],
         capture_output=True,
+        env=bash_env,
         text=True,
         timeout=10,
     )

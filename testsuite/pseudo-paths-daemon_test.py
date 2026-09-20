@@ -21,7 +21,10 @@ if not bash:
     test_skipped('bash is not installed')
     raise SystemExit(0)
 
-probe_bash = subprocess.run([bash, '-c', 'echo "probe" > >(cat > /dev/null)'], capture_output=True)
+# runtests.py exports POSIXLY_CORRECT=1, and bash before 5.1 disables process
+# substitution in POSIX mode -- the very syntax bash is required for here.
+bash_env = {k: v for k, v in os.environ.items() if k != 'POSIXLY_CORRECT'}
+probe_bash = subprocess.run([bash, '-c', 'echo "probe" > >(cat > /dev/null)'], env=bash_env, capture_output=True)
 if probe_bash.returncode != 0:
     test_skipped('bash process substitution is not supported on this system')
     raise SystemExit(0)
@@ -86,7 +89,7 @@ use chroot = no
     cmd_host = f"{rsync_bin} --daemon --no-detach --config={conf_host} --port={port_host} --address=127.0.0.1 > >(cat > {out_host}) 2> {err_host} < /dev/null"
     
     # Executes directly as the host user
-    daemon_host = subprocess.Popen([bash, '-c', cmd_host], start_new_session=True)
+    daemon_host = subprocess.Popen([bash, '-c', cmd_host], env=bash_env, start_new_session=True)
     
     try:
         # Bounded readiness polling (Wait for daemon to bind to the port)
@@ -190,7 +193,7 @@ use chroot = no
     cmd_ns = f"{ns_rsync_bin} --daemon --no-detach --config={conf_ns} --port={port_ns} --address=127.0.0.1 > >(cat > {out_ns}) 2> {err_ns} < /dev/null"
     
     namespace_cmd = launcher + unshare_argv + [bash, '-c', cmd_ns]
-    daemon_ns = subprocess.Popen(namespace_cmd, stdin=subprocess.DEVNULL, start_new_session=True)
+    daemon_ns = subprocess.Popen(namespace_cmd, env=bash_env, stdin=subprocess.DEVNULL, start_new_session=True)
     
     try:
         for _ in range(50):

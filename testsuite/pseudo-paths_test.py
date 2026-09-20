@@ -21,10 +21,14 @@ bash = shutil.which('bash')
 if bash is None:
     test_skipped('bash is unavailable, cannot test process substitution')
 
+# runtests.py exports POSIXLY_CORRECT=1, and bash before 5.1 disables process
+# substitution in POSIX mode -- the very syntax bash is required for here.
+bash_env = {k: v for k, v in os.environ.items() if k != 'POSIXLY_CORRECT'}
 # Verify the host bash actually supports process substitution
 probe = subprocess.run(
     [bash, '-c', 'echo "probe" > >(cat > /dev/null)'],
-    capture_output=True
+    capture_output=True,
+    env=bash_env,
 )
 if probe.returncode != 0:
     test_skipped('bash process substitution is not supported on this system')
@@ -54,6 +58,7 @@ try:
     proc = subprocess.run(
         [bash, '-c', bash_script],
         capture_output=True,
+        env=bash_env,
         text=True,
         timeout=10,
     )
@@ -91,6 +96,7 @@ try:
     proc_confined = subprocess.run(
         [bash, '-c', bash_script_confined],
         capture_output=True,
+        env=bash_env,
         text=True,
         timeout=10,
     )
@@ -122,6 +128,7 @@ try:
     proc_trailing = subprocess.run(
         [bash, '-c', trailing_script],
         capture_output=True,
+        env=bash_env,
         text=True,
         timeout=10,
     )
@@ -148,7 +155,7 @@ makepath(dest)
 # 3A: --files-from=/dev/stdin
 # Piping printf directly into rsync forces /dev/stdin to resolve to pipe:[N]
 stdin_script = f'printf "stdin_test.txt\\n" | {rsync_base_cmd} --files-from=/dev/stdin {src_path} {dest_path}'
-proc_stdin = subprocess.run([bash, '-c', stdin_script], capture_output=True, text=True, timeout=10)
+proc_stdin = subprocess.run([bash, '-c', stdin_script], env=bash_env, capture_output=True, text=True, timeout=10)
 
 if proc_stdin.returncode != 0:
     test_fail(f'rsync failed to read --files-from=/dev/stdin (rc={proc_stdin.returncode}, stderr={proc_stdin.stderr.strip()!r})')
@@ -172,7 +179,7 @@ if symlink_list.is_symlink() or symlink_list.exists():
 symlink_list.symlink_to('/dev/stdin')
 
 symlink_script = f'printf "stdin_test.txt\\n" | {rsync_base_cmd} --files-from={shlex.quote(str(symlink_list))} {src_path} {dest_path}'
-proc_symlink = subprocess.run([bash, '-c', symlink_script], capture_output=True, text=True, timeout=10)
+proc_symlink = subprocess.run([bash, '-c', symlink_script], env=bash_env, capture_output=True, text=True, timeout=10)
 
 if proc_symlink.returncode != 0:
      test_fail(f'rsync failed with --files-from=rsync.list -> /dev/stdin (rc={proc_symlink.returncode}, stderr={proc_symlink.stderr.strip()!r})')
@@ -206,7 +213,7 @@ spoofed_symlink.symlink_to('pipe:[')
 
 # Run rsync using --files-from targeting the spoofed path.
 spoofed_script = f'cd {shlex.quote(str(base))} && {rsync_base_cmd} --files-from=dev/fd/99 {src_path} {dest_path}'
-proc_spoofed = subprocess.run([bash, '-c', spoofed_script], capture_output=True, text=True, timeout=10)
+proc_spoofed = subprocess.run([bash, '-c', spoofed_script], env=bash_env, capture_output=True, text=True, timeout=10)
 
 stderr_lower = proc_spoofed.stderr.lower()
 
@@ -300,6 +307,7 @@ try:
     proc_unshare_4a = subprocess.run(
         unshare_cmd_4a,
         capture_output=True,
+        env=bash_env,
         text=True,
         timeout=10,
     )
@@ -338,6 +346,7 @@ try:
     proc_unshare_4b = subprocess.run(
         unshare_cmd_4b,
         capture_output=True,
+        env=bash_env,
         text=True,
         timeout=10,
     )
