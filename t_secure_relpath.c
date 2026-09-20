@@ -224,7 +224,6 @@ int main(int argc, char **argv)
 	 * literal '..'.  Its dedicated fd-anchored entry point must preserve an
 	 * in-tree climb while refusing to pop above the anchor. */
 	check_beneath_dotdot();
-
 	if (errs)
 		fprintf(stderr, "\n%d failure(s)\n", errs);
 	return errs ? 1 : 0;
