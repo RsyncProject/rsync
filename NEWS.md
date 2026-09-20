@@ -1,3 +1,50 @@
+# NEWS for rsync 3.5.1 (UNRELEASED)
+
+## Changes in this version:
+
+### MAINTAINERS AND CONTRIBUTORS:
+
+Zen Dodd (@steadytao) now has release authority as an rsync maintainer.
+
+Thanks to Omar Elsayed (@seks99x) for the path-handling fixes and new block
+statistics and to Samuel Henrique (@samueloph) for the `--max-alloc=0` fix and
+test improvements.
+
+### BUG FIXES:
+- Fixed several path-handling regressions from 3.5.0. Explicit sender paths
+  can again traverse symlinked ancestors without weakening confinement of
+  paths found during recursive scans. Local and remote-shell `--files-from`
+  paths are handled as operator-supplied paths rather than paths beneath the
+  transfer root.
+- Fixed access to `/dev/stdin`, `/dev/stdout`, `/dev/stderr` and `/dev/fd/N`
+  when they refer to pipes or descriptors inside user namespaces. Reading
+  batch data from a FIFO or process substitution works again.
+- Restored `--max-alloc=0` as a spelling for the parser's maximum allocation
+  limit rather than disabling that limit.
+- Fixed restricted-root paths in `rrsync` and detection of an inetd connection
+  when a daemon is started with a local socket on standard input, as can
+  happen under ADB without a PTY.
+- Allowed `--contimeout` for daemon connections made through `--rsh` without
+  applying it to ordinary remote-shell transfers.
+- Tightened validation of partial-directory state and alternate-destination
+  paths on the receiver. An alternate-destination leaf symlink is no longer
+  followed as a basis file.
+- Fixed undefined shifts in the bundled zlib code and a FreeBSD amd64 build
+  failure involving the assembly and SIMD objects.
+
+### ENHANCEMENTS:
+- Added support for internationalised domain names when the required library
+  is available at build time.
+- Added the number of 4 KiB logical blocks touched to `--stats`. This counts
+  distinct logical file regions written by the receiver, not physical disk
+  blocks or disk I/O. It is reported when both peers negotiate protocol 33.
+  This release changes the protocol number from 32 to 33.
+
+### BUILD AND TESTS:
+- `install-strip` now honours `STRIP` including during cross-compilation.
+- Updated platform tests and fleet-test coverage for the 3.5.0 fixes.
+
+------------------------------------------------------------------------------
 # NEWS for rsync 3.5.0 (13 Aug 2026)
 
 ## Changes in this version:
@@ -925,7 +972,7 @@ to develop and test fixes.
 - CVE-2024-12084 - Heap Buffer Overflow in Checksum Parsing.
 
 - CVE-2024-12085 - Info Leak via uninitialized Stack contents defeats ASLR.
-  
+
 - CVE-2024-12086 - Server leaks arbitrary client files.
 
 - CVE-2024-12087 - Server can make client write files outside of destination directory using symbolic links.
@@ -5720,6 +5767,7 @@ to develop and test fixes.
 
 | RELEASE DATE | VER.   | DATE OF COMMIT\* | PROTOCOL    |
 |--------------|--------|------------------|-------------|
+| 21 Sep 2026  | 3.5.1  |                  | 33          |
 | 13 Aug 2026  | 3.5.0  |                  | 32          |
 | 08 Jun 2026  | 3.4.4  |                  | 32          |
 | 20 May 2026  | 3.4.3  |                  | 32          |
