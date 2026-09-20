@@ -73,8 +73,16 @@ if not shutil.which('gcc') and not shutil.which('cc'):
 # exactly the threat model.
 mal_src = SCRATCHDIR / 'mal-rsync'
 rmtree(mal_src)
-shutil.copytree(SRCDIR, mal_src, symlinks=True,
-                ignore=shutil.ignore_patterns('testtmp', '.git', 'auto-build-save'))
+try:
+    shutil.copytree(SRCDIR, mal_src, symlinks=True,
+                    ignore=shutil.ignore_patterns('testtmp', '.git', 'auto-build-save'))
+except shutil.Error as e:
+    # Cygwin's python 3.9 has os.listxattr, and copystat() on a fresh symlink
+    # fails with EACCES there.  The link itself was created, so only a
+    # non-symlink error means the copy is incomplete.
+    if any(not (os.path.islink(src) and os.path.islink(dst))
+           for src, dst, _why in e.args[0]):
+        raise
 
 flist_c = mal_src / 'flist.c'
 PATCH_OLD = "xflags = XMIT_TOP_DIR | XMIT_NO_CONTENT_DIR;"

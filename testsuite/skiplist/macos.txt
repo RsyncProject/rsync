@@ -21,7 +21,7 @@ open-noatime
 partial-protected-regular-retry-linux
 preallocate
 protected-regular
-pseudo-paths  # dynamically skips on runners lacking bash process substitution
+pseudo-paths  # Linux-only: procfs pseudo-paths
 pseudo-paths-daemon
 read-batch-pipe
 readonly-partial-abort-mode-regression  # 
