@@ -56,6 +56,7 @@ extern char *module_dir;
 extern int module_dirfd;
 extern int write_batch;
 extern int file_old_total;
+extern char *files_from;
 extern BOOL want_progress_now;
 extern struct stats stats;
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
@@ -89,6 +90,9 @@ static int secure_sender_parent_fd(struct file_struct *file, const char *fname, 
 		errno = 0;
 		return -1;
 	}
+
+	if (filesfrom_owner_walk_active())
+		return owner_walk_parent(fname, bname_p);
 
 	if (!am_daemon || !module_dir || module_dir[0] != '/') {
 		/* Local (non-daemon) sender: there is no module root to anchor at, but
@@ -680,26 +684,27 @@ void send_files(int f_in, int f_out)
 			else
 				fd = sender_open_confined(module_dir, relp, O_RDONLY);
 		} else if (!copy_links && !copy_unsafe_links && !copy_dirlinks && !insecure_links) {
-			/* Default symlink handling (no dir-link following): the scan
-			 * recorded this as a regular file.  Open it confined beneath the
-			 * transfer root: an in-tree symlinked parent (e.g. -R keeps one in
-			 * the path) is followed beneath the root, a parent raced into a
-			 * symlink pointing out of the tree is refused, and O_NOFOLLOW
-			 * governs the leaf so a raced leaf symlink is refused.  A
-			 * symlink-following mode (-L/--copy-unsafe-links/-k) or
-			 * --insecure-links keeps the legacy open below. */
-			if (fname[0] == '/') {
-				/* --relative (or a --files-from absolute name) keeps the
-				 * full absolute path as fname; the transfer root is then "/",
-				 * so anchor the confined open there and strip the leading
-				 * slash to the module-relative path the resolver wants -- it
-				 * rejects an absolute relpath outright. */
-				const char *relp = fname;
-				while (*relp == '/')
-					relp++;
-				fd = sender_open_confined("/", relp, O_RDONLY);
-			} else
-				fd = sender_open_confined(NULL, fname, O_RDONLY);
+			int matched;
+			/* A files-from entry follows only trusted-owned ancestors because
+			 * its source base is operator-selected but the entry itself may not
+			 * be. Other paths stay confined beneath their explicit transfer root.
+			 * Every file leaf remains O_NOFOLLOW. */
+			if (files_from) {
+				fd = do_open_checklinks(fname);
+			} else {
+				fd = open_sender_source_path(fname, O_RDONLY | O_NOFOLLOW, &matched);
+				if (!matched) {
+					if (fname[0] == '/') {
+						/* --relative keeps the full absolute path as fname;
+						 * anchor at "/" and pass the resolver a relative path. */
+						const char *relp = fname;
+						while (*relp == '/')
+							relp++;
+						fd = sender_open_confined("/", relp, O_RDONLY);
+					} else
+						fd = sender_open_confined(NULL, fname, O_RDONLY);
+				}
+			}
 		} else {
 			fd = do_open_checklinks(fname);
 		}
@@ -809,6 +814,7 @@ void send_files(int f_in, int f_out)
 	if (DEBUG_GTE(SEND, 1))
 		rprintf(FINFO, "send files finished\n");
 
+	clear_sender_source_roots();
 	match_report();
 
 	write_ndx(f_out, NDX_DONE);

@@ -300,7 +300,8 @@ entirely.  See the [SYMBOLIC LINKS](#) section for how these interact.
 Separately, the directory and file paths that *you* supply on the command line --
 [`--backup-dir`](#opt), [`--temp-dir`](#opt), [`--partial-dir`](#opt), the
 [`--link-dest`](#opt)/[`--compare-dest`](#opt)/[`--copy-dest`](#opt) basis directories,
-[`--log-file`](#opt), [`--files-from`](#opt)/`--include-from`/`--exclude-from`,
+[`--log-file`](#opt), [`--password-file`](#opt),
+[`--files-from`](#opt)/`--include-from`/`--exclude-from`,
 [`--filter`](#opt) merge files, [`--write-batch`](#opt)/[`--read-batch`](#opt),
 and the destination itself -- are resolved so that a symlink component is followed
 only when it is owned by you or by root; an attacker-planted symlink along one of
@@ -1423,10 +1424,13 @@ sign) if you want the local shell to expand it.
 
 0.  `--confine-root=DIR`
 
-    This bounds where the paths listed under [`--insecure-links`](#opt) are
-    allowed to resolve: one that ends up outside DIR is refused, even if every
-    symlink along it was owned by a trusted user.  The ownership walk asks who
-    planted a link; this asks where the path came out.
+    In the default symlink mode this bounds where operator option paths and
+    paths selected from a [`--files-from`](#opt) list are allowed to resolve:
+    one that ends up outside DIR is refused, even if every symlink along it was
+    owned by a trusted user. Explicit source roots remain operator-selected
+    transfer roots.
+    The ownership walk asks who planted a link; this asks where the path came
+    out.
 
     DIR must be absolute.  Nothing is confined by default, and
     `--confine-root=/` is a no-op.

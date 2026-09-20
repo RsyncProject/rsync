@@ -28,6 +28,7 @@ daemon-config-symlink
 daemon-module-chdir-symlink
 daemon-module-private-parent
 daemon-secrets-file-symlink
+daemon-stdin-local-socket             # Cygwin Python has no AF_UNIX socketpair
 devices
 dir-sgid
 early-input-symlink
@@ -52,6 +53,7 @@ partial-protected-regular-retry-policy  # deterministic partial EACCES recovery 
 password-file-symlink
 protected-regular
 pseudo-paths
+pseudo-paths-daemon
 read-batch-pipe
 rename-mixed-parent-transfer
 rrsync-sender-leaf-flip

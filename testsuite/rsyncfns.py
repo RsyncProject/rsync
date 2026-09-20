@@ -767,7 +767,8 @@ def _cleanup_rsyncd(proc, port: int) -> 'None':
         _record_port_proc(port, 0, 0)
 
 
-def start_rsyncd(conf_path, port: int, rsync_cmd: str = None) -> 'subprocess.Popen':
+def start_rsyncd(conf_path, port: int, rsync_cmd: str = None,
+                 stdin=subprocess.DEVNULL) -> 'subprocess.Popen':
     """Spawn `rsync --daemon --no-detach --address=127.0.0.1 --port=N
     --config=conf` and return the Popen handle after the port is accepting
     connections.
@@ -784,7 +785,8 @@ def start_rsyncd(conf_path, port: int, rsync_cmd: str = None) -> 'subprocess.Pop
     RSYNC_PEER (the peer side of a two-sided run), so ordinary daemon tests
     get current-client <-> peer-daemon. The reverse-direction test passes
     rsync_cmd=RSYNC to put the current build on the daemon side and drive with
-    the old client.
+    the old client. stdin may override the default /dev/null input when a test
+    needs to exercise daemon launch detection.
 
     This is only ever reached from start_test_daemon() in --use-tcp mode; the
     default (pipe) mode never starts a listening daemon.
@@ -797,7 +799,7 @@ def start_rsyncd(conf_path, port: int, rsync_cmd: str = None) -> 'subprocess.Pop
     ]
     proc = subprocess.Popen(
         argv,
-        stdin=subprocess.DEVNULL,
+        stdin=stdin,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         preexec_fn=_set_pdeathsig,

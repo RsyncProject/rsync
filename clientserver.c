@@ -1722,9 +1722,30 @@ static void become_daemon(void)
 	}
 }
 
+/* Inetd supplies a connected IP stream on stdin. Other launchers may use a
+ * local socket for process I/O, which must not select inetd mode. */
+static int is_inetd_socket(int fd)
+{
+	int type;
+	struct sockaddr_storage peer = {0};
+	socklen_t type_len = sizeof type;
+	socklen_t peer_len = sizeof peer;
+
+	if (getsockopt(fd, SOL_SOCKET, SO_TYPE, (char *)&type, &type_len) != 0
+	 || type != SOCK_STREAM
+	 || getpeername(fd, (struct sockaddr *)&peer, &peer_len) != 0)
+		return 0;
+
+	return peer.ss_family == AF_INET
+#ifdef INET6
+	    || peer.ss_family == AF_INET6
+#endif
+	    ;
+}
+
 int daemon_main(void)
 {
-	if (is_a_socket(STDIN_FILENO)) {
+	if (is_inetd_socket(STDIN_FILENO)) {
 		int i;
 
 		/* we are running via inetd - close off stdout and
