@@ -188,6 +188,13 @@ module uid even when the module sits under a directory that uid cannot traverse
 immune to the logical-path-versus-real-cwd skew a followed in-tree directory
 symlink would otherwise introduce.
 
+When a sender receives a `--files-from` list in the default symlink mode, the
+source base remains the operator's choice but each path selected by the list is
+checked with the ownership walk. A trusted ancestor symlink may still be
+followed; with `--confine-root` its resolved target must also remain under that
+root. The final content open remains `O_NOFOLLOW`, so a list entry cannot turn a
+leaf symlink into a file read.
+
 ### Path resolution
 
 `secure_relative_open()` resolves a path with a single portable mechanism on
