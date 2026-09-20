@@ -124,10 +124,15 @@ static int secure_basis_open(const char *basedir, const char *relpath, int flags
 	 * and traverse a symlink the secure_relative_open path can't confine: resolve
 	 * it with the ownership walk, which follows a uid0/euid-owned symlink but
 	 * refuses a foreign one AND (via abspath_excluded_by_module) refuses a target
-	 * the module's exclude hides -- closing the partial-dir exclude bypass. */
+	 * the module's exclude hides -- closing the partial-dir exclude bypass.  The
+	 * final component is opened with O_NOFOLLOW so an operator-path leaf symlink
+	 * cannot be selected as an alternate basis. */
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
 	if (operator_path_resolve) {
 		char fullpath[MAXPATHLEN];
 		const char *p = relpath;
+		const char *leaf;
+		int dfd, fd, saved_errno;
 		if (basedir) {
 			if (pathjoin(fullpath, sizeof fullpath, basedir, relpath) >= sizeof fullpath) {
 				errno = ENAMETOOLONG;
@@ -135,8 +140,16 @@ static int secure_basis_open(const char *basedir, const char *relpath, int flags
 			}
 			p = fullpath;
 		}
-		return open_no_attacker_symlinks(p, flags, mode);
+		dfd = owner_walk_parent(p, &leaf);
+		if (dfd < 0)
+			return -1;
+		fd = openat(dfd, leaf, flags | O_NOFOLLOW, mode);
+		saved_errno = errno;
+		close(dfd);
+		errno = saved_errno;
+		return fd;
 	}
+#endif
 
 	/* The confined resolver is needed for the sanitizing daemon
 	 * (am_daemon && !am_chrooted) and for a /./ inner-module chroot
