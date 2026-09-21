@@ -1,6 +1,10 @@
-# NEWS for rsync 3.5.1 (UNRELEASED)
+# NEWS for rsync 3.5.1 (21 Sep 2026)
 
 ## Changes in this version:
+
+### PROTOCOL NUMBER:
+
+- The protocol number was changed to 33.
 
 ### MAINTAINERS AND CONTRIBUTORS:
 
@@ -38,7 +42,6 @@ test improvements.
 - Added the number of 4 KiB logical blocks touched to `--stats`. This counts
   distinct logical file regions written by the receiver, not physical disk
   blocks or disk I/O. It is reported when both peers negotiate protocol 33.
-  This release changes the protocol number from 32 to 33.
 
 ### BUILD AND TESTS:
 - `install-strip` now honours `STRIP` including during cross-compilation.
@@ -5767,7 +5770,7 @@ to develop and test fixes.
 
 | RELEASE DATE | VER.   | DATE OF COMMIT\* | PROTOCOL    |
 |--------------|--------|------------------|-------------|
-| 21 Sep 2026  | 3.5.1  |                  | 33          |
+| 21 Sep 2026  | 3.5.1  | 21 Sep 2026      | 33          |
 | 13 Aug 2026  | 3.5.0  |                  | 32          |
 | 08 Jun 2026  | 3.4.4  |                  | 32          |
 | 20 May 2026  | 3.4.3  |                  | 32          |

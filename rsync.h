@@ -125,7 +125,7 @@
  * All older protocol versions MUST be compatible with the final, official
  * release of the protocol, so don't tweak the code to change the protocol
  * behavior for an older protocol version. */
-#define SUBPROTOCOL_VERSION 8392 /* For testing */
+#define SUBPROTOCOL_VERSION 0
 
 /* We refuse to interoperate with versions that are not in this range.
  * Note that we assume we'll work with later versions: the onus is on
