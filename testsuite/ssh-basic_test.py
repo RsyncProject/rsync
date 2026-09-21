@@ -7,6 +7,7 @@
 # a follow-up --delete pass cleans up after a destination-side rename.
 
 import os
+import shlex
 import shutil
 import subprocess
 
@@ -24,8 +25,10 @@ if os.environ.get('rsync_enable_ssh_tests') == 'yes':
     if real_ssh:
         SSH = real_ssh
 
+# SSH is quoted for rsync's own tokenizer (a build path with '~' or a space
+# comes out in quotes), so split it the same way before exec'ing it directly.
 probe = subprocess.run(
-    [SSH, '-oBatchMode yes', 'localhost', 'echo', 'yes'],
+    [*shlex.split(SSH), '-oBatchMode yes', 'localhost', 'echo', 'yes'],
     capture_output=True, text=True,
 )
 if probe.stdout.strip() != 'yes':
