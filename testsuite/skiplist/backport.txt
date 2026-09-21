@@ -25,6 +25,11 @@ daemon-refuse-compress-threads-alias    # --compress-threads arrived in 3.4.2
 daemon-zstd-thread-exhaustion           # --compress-threads arrived in 3.4.2
 partial_nowrite                         # receiver chmod-on-denied-open (3.5.0)
 partial-protected-regular-retry-policy  # EACCES recovery path (3.5.0, macOS-only test)
+contimeout-rsh                          # daemon-over-rsh timeout support (3.5.1)
+daemon-stdin-local-socket               # local-socket inetd detection (3.5.1)
+install-strip                           # configurable install-strip tool (3.5.1)
+rsync-ssl-type-option                   # flexible rsync-ssl --type placement (3.5.1)
+write-touched-blocks                    # protocol-33 logical-block statistics (3.5.1)
 
 # The suite's per-platform skip lists describe the tests IT ships, so they do
 # not describe a build of this branch.

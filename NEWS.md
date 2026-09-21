@@ -1,4 +1,31 @@
-# NEWS for rsync 3.2.7 SECURITY UPDATE (UNRELEASED)
+# NEWS for rsync 3.2.7-sec-patches4 (UNRELEASED)
+
+This update corrects regressions and edge cases in the path-confinement
+hardening published in `3.2.7-sec-patches3`. It contains no new features or
+protocol changes and is validated against the current security regression
+suite.
+
+## Corrections in this patch set:
+- Directory authority fds use search-only opens where supported, restoring
+  traversal through directories that are searchable but not readable.
+- Operator paths correctly handle `/dev/stdin`, `/dev/stdout`, `/dev/stderr`,
+  `/dev/fd/N`, process-substitution pipes and user-namespace fd pins without
+  weakening `--confine-root`.
+- FIFO and process-substitution input works again with `--read-batch`.
+- `--max-alloc=0` again means the largest limit supported by each peer while
+  retaining the hardened parser ceiling.
+- Restricted `rrsync` paths rooted at `/` are resolved beneath the configured
+  restricted directory rather than rejected or duplicated.
+- Local and remote-shell `--files-from` paths no longer receive the daemon's
+  module-boundary treatment. Daemon-controlled paths remain confined.
+- Explicit sender roots may traverse trusted-owned ancestor symlinks while
+  recursive scans and file leaves remain confined and race-resistant.
+- Alternate-destination leaves no longer follow symlinks and forged
+  partial-directory state cannot enable in-place output.
+- Untrusted-owner symlink refusals now include an actionable diagnostic.
+
+------------------------------------------------------------------------------
+# NEWS for rsync 3.2.7-sec-patches3
 
 This is a security-only update to the 3.2.7 release.  It backports the
 path-handling and daemon-protocol security fixes from the 3.5.0 audit onto the
