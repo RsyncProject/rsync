@@ -1333,10 +1333,12 @@ expand it.
 
 0.  `--confine-root=DIR`
 
-    This bounds where the paths listed under [`--insecure-links`](#opt) are
-    allowed to resolve: one that ends up outside DIR is refused, even if every
-    symlink along it was owned by a trusted user.  The ownership walk asks who
-    planted a link; this asks where the path came out.
+    In the default symlink mode this bounds where operator option paths and
+    paths selected from a [`--files-from`](#opt) list are allowed to resolve:
+    one that ends up outside DIR is refused, even if every symlink along it was
+    owned by a trusted user. Explicit source roots remain operator-selected
+    transfer roots. The ownership walk asks who planted a link; this asks where
+    the path came out.
 
     DIR must be absolute.  Nothing is confined by default, and
     `--confine-root=/` is a no-op.
@@ -2251,8 +2253,12 @@ expand it.
     See the [`--max-size`](#opt) option for a description of how SIZE can be
     specified.  The default suffix if none is given is bytes.
 
-    Beginning in 3.2.7, a value of 0 is an easy way to specify SIZE_MAX (the
-    largest limit possible).
+    A value of 0 means the largest limit this build supports. It resolves to
+    the same ceiling an explicit SIZE is checked against, so it cannot select
+    a limit higher than one that could be written explicitly. The literal 0 is
+    passed to the remote rsync, allowing each peer to resolve it for its own
+    word size. A daemon administrator can refuse all client-supplied values,
+    including 0, with `refuse options = max-alloc`.
 
     You can set a default value using the environment variable
     [`RSYNC_MAX_ALLOC`](#) using the same SIZE values as supported by this
