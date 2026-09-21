@@ -28,6 +28,7 @@ partial-protected-regular-retry-policy  # EACCES recovery path (3.5.0, macOS-onl
 contimeout-rsh                          # daemon-over-rsh timeout support (3.5.1)
 daemon-stdin-local-socket               # local-socket inetd detection (3.5.1)
 install-strip                           # configurable install-strip tool (3.5.1)
+idn                                     # IDN hostname support (3.5.1)
 rsync-ssl-type-option                   # flexible rsync-ssl --type placement (3.5.1)
 write-touched-blocks                    # protocol-33 logical-block statistics (3.5.1)
 
