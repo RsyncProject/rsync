@@ -1152,6 +1152,12 @@ static int count_args(const char **argv)
 	return i;
 }
 
+/* The largest value parse_size_arg() will accept when no explicit max_value is
+ * given.  It is SIZE_MAX/2 rather than SIZE_MAX because the parser computes and
+ * returns the size as a signed ssize_t (with a negative return meaning error),
+ * so this keeps every accepted size representable as a positive ssize_t. */
+#define SIZE_ARG_MAX ((ssize_t)(SIZE_MAX / 2))
+
 /* If the size_arg is an invalid string or the value is < min_value, an error
  * is put into err_buf & the return is -1.  Note that this parser does NOT
  * support negative numbers, so a min_value < 0 doesn't make any sense. */
@@ -1161,7 +1167,7 @@ static ssize_t parse_size_arg(const char *size_arg, char def_suf, const char *op
 	int reps, mult, len;
 	const char *arg, *err = "invalid", *min_max = NULL;
 	ssize_t limit = -1, size = 1;
-	ssize_t size_max = max_value >= 0 ? max_value : (ssize_t)(SIZE_MAX / 2);
+	ssize_t size_max = max_value >= 0 ? max_value : SIZE_ARG_MAX;
 	double dsize;
 
 	for (arg = size_arg; isDigit(arg); arg++) {}
@@ -2059,12 +2065,12 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		ssize_t size = parse_size_arg(max_alloc_arg, 'B', "max-alloc", 1024*1024, -1, True);
 		if (size < 0)
 			return 0;
-		if (size == 0) {
-			snprintf(err_buf, sizeof err_buf, "max-alloc must be greater than zero\n");
-			return 0;
-		}
 		max_alloc = size;
 	}
+	/* Resolve 0 to the parser's own ceiling while forwarding the literal 0 so
+	 * each peer chooses the ceiling appropriate to its word size. */
+	if (!max_alloc)
+		max_alloc = SIZE_ARG_MAX;
 
 	if (old_style_args < 0) {
 		if (!am_server && protect_args <= 0 && (arg = getenv("RSYNC_OLD_ARGS")) != NULL && *arg) {
@@ -2620,7 +2626,8 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			 * module root -- e.g. a root-owned backup symlink. No-op off a
 			 * daemon (the module-root check only fires when am_daemon). */
 			int save_opr = operator_path_resolve;
-			operator_path_resolve = 1;
+			/* The daemon process is the only case that the files-from path comes from an untrusted argument */
+			operator_path_resolve = am_daemon ? 1 : 0;
 			filesfrom_fd = open_no_attacker_symlinks(files_from, O_RDONLY|O_BINARY, 0);
 			operator_path_resolve = save_opr;
 			if (filesfrom_fd < 0) {
