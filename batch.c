@@ -271,12 +271,12 @@ void open_batch_files(void)
 		exit_cleanup(RERR_FILEIO);
 	}
 
-	/* --read-batch: the file's bytes drive the protocol parser, so refuse
-	 * non-regular files (FIFO, device, socket) at the batch path. */
+	/* --read-batch: the file's bytes drive the protocol parser,
+	 * allow FIFOs used by shell process substitution while continuing to reject other non-regular inputs. */
 	if (!write_batch && batch_fd != STDIN_FILENO) {
 		STRUCT_STAT st;
-		if (do_fstat(batch_fd, &st) == 0 && !S_ISREG(st.st_mode)) {
-			rprintf(FERROR, "Batch file %s is not a regular file\n",
+		if (do_fstat(batch_fd, &st) == 0 && !S_ISREG(st.st_mode) && !S_ISFIFO(st.st_mode)) {
+			rprintf(FERROR, "Batch file %s is neither a regular file nor a FIFO\n",
 				full_fname(batch_name));
 			exit_cleanup(RERR_FILEIO);
 		}

@@ -26,6 +26,7 @@ int inplace = 0;
 int am_daemon = 0;
 int am_chrooted = 0;
 int insecure_links = 0;
+int copy_dirlinks = 0;
 int modify_window = 0;
 int preallocate_files = 0;
 int protect_args = 0;
@@ -42,6 +43,7 @@ size_t max_alloc = (size_t)-1; /* unlimited: helpers link util2.o, where 0 makes
 			       * "exceeded --max-alloc=0" (hit on the
 			       * secure_relative_open() fallback path). */
 char *partial_dir;
+char *files_from;
 char *module_dir;
 int module_dirfd = -1;
 char *confine_root;

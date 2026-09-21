@@ -57,6 +57,7 @@ extern char *module_dir;
 extern int module_dirfd;
 extern int write_batch;
 extern int file_old_total;
+extern char *files_from;
 extern BOOL want_progress_now;
 extern struct stats stats;
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
@@ -248,11 +249,9 @@ static int sender_open_copylinks_confined(const char *anchor, const char *relpat
 		 * only this branch would hand it to strcmp(). */
 		if (am_daemon && module_dirfd >= 0 && module_dir && anchor
 		 && strcmp(anchor, module_dir) == 0)
-			pdfd = secure_relative_open_at_beneath(module_dirfd, dir,
-					O_RDONLY | O_DIRECTORY, 0);
+			pdfd = secure_relative_dirfd_at_beneath(module_dirfd, dir);
 		else
-			pdfd = secure_relative_open(anchor, dir,
-					O_RDONLY | O_DIRECTORY, 0);
+			pdfd = secure_relative_dirfd(anchor, dir);
 		if (pdfd < 0)
 			return -1;
 		n = readlinkat(pdfd, bname, tgt, sizeof tgt - 1);
@@ -480,15 +479,26 @@ void send_files(int f_in, int f_out)
 				fd = sender_open_copylinks_confined(module_dir, relp);
 			else
 				fd = secure_relative_open(module_dir, relp, O_RDONLY | O_NOFOLLOW, 0);
-		} else if (fname[0] != '/' && !copy_links && !copy_unsafe_links && !copy_dirlinks && !insecure_links) {
-			/* Default symlink handling (no -L/--copy-unsafe-links/-k follow):
-			 * the scan recorded this as a regular file under a real-directory
-			 * parent.  Open it confined beneath the transfer root that
-			 * change_pathname() chdir'd into, so a parent raced into a symlink
-			 * after the scan isn't followed out of the tree, and O_NOFOLLOW
-			 * refuses a raced leaf symlink.  A symlink-following mode keeps the
-			 * legacy open below. */
-			fd = secure_relative_open(NULL, fname, O_RDONLY | O_NOFOLLOW, 0);
+		} else if (!copy_links && !copy_unsafe_links && !copy_dirlinks && !insecure_links) {
+			int matched;
+			/* A files-from entry follows only trusted-owned ancestors because
+			 * its source base is operator-selected but the entry itself may not
+			 * be. Other paths stay confined beneath their explicit transfer root.
+			 * Every file leaf remains O_NOFOLLOW. */
+			if (files_from) {
+				fd = do_open_checklinks(fname);
+			} else {
+				fd = open_sender_source_path(fname, O_RDONLY | O_NOFOLLOW, &matched);
+				if (!matched) {
+					if (fname[0] == '/') {
+						const char *relp = fname;
+						while (*relp == '/')
+							relp++;
+						fd = secure_relative_open("/", relp, O_RDONLY | O_NOFOLLOW, 0);
+					} else
+						fd = secure_relative_open(NULL, fname, O_RDONLY | O_NOFOLLOW, 0);
+				}
+			}
 		} else {
 			fd = do_open_checklinks(fname);
 		}
@@ -598,6 +608,7 @@ void send_files(int f_in, int f_out)
 	if (DEBUG_GTE(SEND, 1))
 		rprintf(FINFO, "send files finished\n");
 
+	clear_sender_source_roots();
 	match_report();
 
 	write_ndx(f_out, NDX_DONE);
