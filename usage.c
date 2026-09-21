@@ -129,6 +129,11 @@ static void print_info_flags(enum logcode f)
 #endif
 			"xattrs",
 
+#ifndef SUPPORT_LTFS
+		"no "
+#endif
+			"ltfs",
+
 #ifdef RSYNC_USE_SECLUDED_ARGS
 		"default "
 #else
