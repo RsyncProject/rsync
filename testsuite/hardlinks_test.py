@@ -13,11 +13,11 @@ import subprocess
 
 from rsyncfns import (
     CHKDIR, FROMDIR, OUTFILE, RSYNC, RSYNC_PEER, SRCDIR, TODIR,
-    checkit, makepath, rsync_argv, test_fail, test_skipped,
+    checkit, makepath, rsync_argv, test_fail, test_skipped, rsync_path_arg, rsh_cmd,
 )
 
 
-SSH = str(SRCDIR / 'support' / 'lsh.sh')
+SSH = rsh_cmd()
 
 FROMDIR.mkdir(parents=True, exist_ok=True)
 name1 = FROMDIR / 'name1'
@@ -64,7 +64,7 @@ for x in chars:
 os.link(name1, FROMDIR / 'subdir' / 'down' / 'deep' / 'new-file')
 (TODIR / 'text').unlink()
 
-checkit(['-aHivve', SSH, '--debug=HLINK5', f'--rsync-path={RSYNC_PEER}',
+checkit(['-aHivve', SSH, '--debug=HLINK5', f'--rsync-path={rsync_path_arg()}',
          f'{FROMDIR}/', f'localhost:{TODIR}/'], FROMDIR, TODIR)
 
 # --link-dest and --copy-dest should also keep hard-linked entries.

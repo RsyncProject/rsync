@@ -44,6 +44,32 @@ struct align_test {
 #define PTR_ADD(b,o)	( (void*) ((char*)(b) + (o)) )
 #define PTR_SUB(b,o)	( (void*) ((char*)(b) - (o)) )
 
+/* Under AddressSanitizer, fence each pool_alloc() chunk with a poisoned
+ * redzone just below it (allocations grow downward from the top of an extent).
+ * A bump allocator hands out chunks from one big malloc, so ASan cannot see a
+ * write that underflows one chunk into its neighbour -- e.g. a miscomputed
+ * F_SUM() reaching before a file_struct's extras.  The redzone turns that into
+ * a hard ASan report.  We unpoison a whole extent whenever its space is reused
+ * (reset/reclaim), so legitimate later allocations never trip over old
+ * redzones; ASan unpoisons freed extents itself via free(). */
+#if defined(__SANITIZE_ADDRESS__)
+# define POOL_ASAN 1
+#elif defined(__has_feature)
+# if __has_feature(address_sanitizer)
+#  define POOL_ASAN 1
+# endif
+#endif
+
+#ifdef POOL_ASAN
+# include <sanitizer/asan_interface.h>
+# define POOL_REDZONE 16  /* >= the largest pool-relative underflow we guard */
+# define POOL_POISON(p,n)   ASAN_POISON_MEMORY_REGION((p), (n))
+# define POOL_UNPOISON(p,n) ASAN_UNPOISON_MEMORY_REGION((p), (n))
+#else
+# define POOL_POISON(p,n)   ((void)0)
+# define POOL_UNPOISON(p,n) ((void)0)
+#endif
+
 alloc_pool_t
 pool_create(size_t size, size_t quantum, void (*bomb)(const char*, const char*, int), int flags)
 {
@@ -165,7 +191,18 @@ pool_alloc(alloc_pool_t p, size_t len, const char *bomb_msg)
 
 	pool->extents->free -= len;
 
-	return PTR_ADD(pool->extents->start, pool->extents->free);
+	{
+		void *ret = PTR_ADD(pool->extents->start, pool->extents->free);
+#ifdef POOL_ASAN
+		size_t rz = pool->extents->free < POOL_REDZONE
+			  ? pool->extents->free : POOL_REDZONE;
+		if (rz) {
+			pool->extents->free -= rz;
+			POOL_POISON(PTR_ADD(pool->extents->start, pool->extents->free), rz);
+		}
+#endif
+		return ret;
+	}
 
   bomb_out:
 	if (pool->bomb)
@@ -214,6 +251,10 @@ pool_free(alloc_pool_t p, size_t len, void *addr)
 	}
 	if (!cur)
 		return;
+
+	/* This extent's space may be reused (and POOL_CLEAR may memset it)
+	 * below, so drop any redzones in it first. */
+	POOL_UNPOISON(cur->start, pool->size);
 
 	if (!prev) {
 		/* The "live" extent is kept ready for more allocations. */
@@ -271,6 +312,8 @@ pool_free_old(alloc_pool_t p, void *addr)
 	}
 	if (!cur)
 		return;
+
+	POOL_UNPOISON(cur->start, pool->size);
 
 	if (addr == PTR_ADD(cur->start, cur->free)) {
 		if (prev) {

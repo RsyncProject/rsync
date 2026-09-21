@@ -1,0 +1,10 @@
+# Tests expected to SKIP.  One name per line, '#' starts a comment; the file
+# must stay sorted and duplicate-free (runtests.py enforces both).  Referenced
+# from a workflow as RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/<file>[,@...].
+# See testsuite/skiplist/README.md.
+#
+# Linux-only additions to common.txt.
+
+crtimes  # Rsync is configured without crtimes support
+partial-protected-regular-retry-policy  # deterministic partial EACCES recovery uses dyld interposing
+readonly-partial-abort-mode-regression  # 

@@ -18,6 +18,7 @@ inheader {
     sub(/^CHAR\(/, "char ")
     sub(/^INTEGER\(/, "int ")
     sub(/^STRING\(/, "char *")
+    sub(/^STRING_SHELL\(/, "char *")
     protos = protos "\n" $0 (local ? "(int module_id);" : "(void);")
     next
 }

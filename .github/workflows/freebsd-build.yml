@@ -1,5 +1,9 @@
 name: Test rsync on FreeBSD
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [ master ]
@@ -7,12 +11,12 @@ on:
       - '.github/workflows/*.yml'
       - '!.github/workflows/freebsd-build.yml'
   pull_request:
-    branches: [ master ]
+    types: [opened, synchronize, reopened]
     paths-ignore:
       - '.github/workflows/*.yml'
       - '!.github/workflows/freebsd-build.yml'
   schedule:
-    - cron: '42 8 * * *'
+    - cron: '42 8 * * 1'
 
 jobs:
   test:
@@ -31,7 +35,9 @@ jobs:
           pkg install -y bash autotools m4 devel/xxhash zstd liblz4 python3 archivers/liblz4 git
         run: |
           freebsd-version
-          ./configure --with-rrsync -disable-zstd --disable-md2man --disable-xxhash --disable-lz4
+          ./configure --with-rrsync \
+            -disable-zstd --disable-md2man --disable-xxhash --disable-lz4 --disable-idn \
+            --enable-roll-simd --enable-roll-asm --enable-md5-asm
           make
           ./rsync --version
           make check

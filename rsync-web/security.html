@@ -12,13 +12,135 @@ h3 { margin-bottom: 0px; }
 
 <H2 align="center">Rsync Security Advisories</H2>
 
-<p>You should install a security fix for rsync when the rync you are running is:<ol>
-<li>older than 3.2.5 and pulling from an untrusted server
-<li>older than 3.2.5 and using the bundled zlib
-<li>older than 3.1.3 with --xattrs enabled
-<li>older than 3.1.3 with a writable rsync daemon
-<li>older than 2.6.6
-</ol>
+<p>If you are running an rsync older than 3.5.0, you should upgrade. 3.5.0
+fixes every issue listed on this page.
+
+<p>If you cannot upgrade, the advisories below give the affected versions and
+the conditions each issue needs. Several are only reachable in a non-default
+configuration, and some of the older ones can be mitigated from rsyncd.conf
+without an upgrade.
+
+<p><a name="s3_5_0"></a><hr>
+<h3>Security fixes in 3.5.0</h3>
+<i class=date>August 13th, 2026</i>
+
+<p>Rsync 3.5.0 fixes 33 security issues found during a focused audit of rsync's
+path handling and daemon protocol, a companion daemon-protocol fuzzing pass,
+and reports from external researchers. All releases up to and including 3.4.4
+are affected, except where an individual advisory gives a narrower range &mdash;
+many do, so check the advisory before deciding what needs patching.
+
+<p>Upgrade to 3.5.0. See the
+<a href="https://download.samba.org/pub/rsync/NEWS#3.5.0">3.5.0 NEWS</a> for the
+full changelog, and the
+<a href="https://github.com/RsyncProject/rsync/security/advisories">GitHub
+security advisories</a> for the individual reports.
+
+<p>Several of these are only reachable in a non-default configuration &mdash; a
+daemon with "use chroot = no", a writable module, an <b>rrsync</b> restricted
+account, "proxy protocol = true", or a configured name converter or exec hook.
+The advisories say which.
+
+<ul>
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-9cgc-64g4-3gv5">CVE-2026-53783</a> (HIGH) &mdash; rrsync restricted-directory escape (validation-vs-exec race + unsafe option allowlist)
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-ffg2-fr5g-3rxw">CVE-2026-53784</a> (HIGH) &mdash; Daemon module-root chdir escape under "use chroot = no"
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-pph3-7xmf-rrqg">CVE-2026-53785</a> (HIGH) &mdash; --relative implied-parent creation escapes the destination tree
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-mrc3-6cwx-hch6">CVE-2026-53786</a> (MEDIUM) &mdash; Daemon --filter merge file bypasses the module filter list
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-p4c5-8c68-5fjq">CVE-2026-53788</a> (MEDIUM) &mdash; Daemon name-converter accepts newline-bearing names into its line protocol
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-fxwg-7hmf-xh5q">CVE-2026-53789</a> (MEDIUM) &mdash; Malicious sender expands --delete scope by reclassifying an implied parent
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-5hcf-7xxm-rmqq">CVE-2026-53790</a> (HIGH) &mdash; Command / argument injection via unquoted peer- or host-controlled values
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-h2q9-5fr8-w635">CVE-2026-53791</a> (CRITICAL) &mdash; PROXY-protocol mode lets a direct client spoof the daemon's source address
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-cg57-rp9g-56hw">CVE-2026-53792</a> (MEDIUM) &mdash; Receiver-supplied zero checksum block length drives sender matching negative
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-wj7w-vh23-mm44">CVE-2026-53793</a> (HIGH) &mdash; Chroot "/./" inner-module escape via a parent-component symlink
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-p827-vwcp-m964">CVE-2026-53794</a> (MEDIUM) &mdash; Remote peer disables the per-allocation sanity cap via --max-alloc=0
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-m9vj-637x-v6pq">CVE-2026-53795</a> (HIGH) &mdash; Receiver write escape via an absolute --temp-dir / --link-dest disabling rename/link confinement
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-w75h-ccff-w53m">CVE-2026-53796</a> (MEDIUM) &mdash; Non-daemon receiver destination-chdir symlink race (TOCTOU)
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-3jj3-qvc7-jp6x">CVE-2026-53797</a> (MEDIUM) &mdash; Sender source-tree parent-component symlink race -&gt; out-of-tree disclosure
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-hx7p-3gvv-pqgv">CVE-2026-53798</a> (MEDIUM) &mdash; Daemon name-converter empty response maps an unknown name to uid/gid 0
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-phxh-hjqv-39c9">CVE-2026-53799</a> (MEDIUM) &mdash; Receiver ACL/xattr application follows a symlink-race -&gt; arbitrary ACL set (local privilege escalation)
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-v3vw-pvpg-chwh">CVE-2026-53800</a> (MEDIUM) &mdash; Sender --remove-source-files unlink follows a parent-component symlink race -&gt; arbitrary file deletion outside the source tree
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-mch3-qr4p-chgm">CVE-2026-53801</a> (MEDIUM) &mdash; Sender/daemon directory-scan enumeration escapes the transfer root / module -&gt; out-of-tree disclosure
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-4mfr-8jrv-49x4">CVE-2026-53802</a> (HIGH) &mdash; Arbitrary file read / transfer-shaping via symlinked operator-supplied input files
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-g9f4-7q66-9582">CVE-2026-53803</a> (HIGH) &mdash; Arbitrary file write / privilege escalation via symlinked operator-supplied output paths
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-6692-28cx-wpqq">CVE-2026-70452</a> (HIGH) &mdash; `hosts deny` fails OPEN when a configured hostname cannot be resolved, admitting the host it was meant to block
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-8x5r-mjx8-83hv">CVE-2026-70453</a> (HIGH) &mdash; Quadratic CPU exhaustion in hash_search() from a crafted equal-weak-checksum chain
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-3c3x-ww2w-5r5p">CVE-2026-70454</a> (MEDIUM) &mdash; rsync-ssl establishes an unauthenticated TLS connection (no CA verification; no stunnel hostname binding)
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-rjvj-qgqg-cvx9">CVE-2026-70455</a> (HIGH) &mdash; Peer-controlled Zstandard worker exhaustion on an rsync daemon
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-78jc-79jv-v6rw">CVE-2026-70456</a> (HIGH) &mdash; Remote out-of-bounds heap write in read_args() when the argument count lands exactly on maxargs
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-pg7g-xqmr-xpfh">CVE-2026-70457</a> (MEDIUM) &mdash; Attacker-chosen-offset write in parse_size_arg() error formatting
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-gg3m-4m9m-268h">CVE-2026-70458</a> (HIGH) &mdash; Out-of-bounds write from a FLAG_HLINKED file entry accepted without -H
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-p4v4-qxw9-q72m">CVE-2026-70459</a> (MEDIUM) &mdash; Per-connection daemon child crash from a crafted first incremental file list with a non-directory transfer root
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-w3xf-j2r2-gv4x">CVE-2026-70460</a> (HIGH) &mdash; Daemon module-root escape through a peer-supplied --partial-dir / --backup-dir resolving via an in-module symlink
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-jhxm-j4mq-3fj4">CVE-2026-70461</a> (HIGH) &mdash; Peer-driven one-byte heap out-of-bounds write in add_implied_include()
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-j9wh-5jmp-2m64">CVE-2026-70462</a> (MEDIUM) &mdash; Peer-supplied MSG_IO_TIMEOUT defeats the client's own I/O timeout (signed overflow, and a non-positive value)
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-pfj8-79vq-xgvr">CVE-2026-70463</a> (HIGH) &mdash; "auth users" ignores documented comma-only parsing, silently skipping a deny/read-only rule
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-hrwq-ccf7-rw5m">CVE-2026-70464</a> (HIGH) &mdash; Unauthenticated pre-transfer handshake DoS locks out an rsync daemon module
+</ul>
+
+<p><a name="s3_4_3"></a><hr>
+<h3>Security fixes in 3.4.3</h3>
+<i class=date>May 20th, 2026</i>
+
+<p>Rsync 3.4.3 fixes six security issues. Versions 3.4.2 and earlier are
+affected. See the
+<a href="https://download.samba.org/pub/rsync/NEWS#3.4.3">3.4.3 NEWS</a>.
+
+<ul>
+<li>CVE-2026-29518 &mdash; TOCTOU symlink race allowing local privilege
+escalation in daemon mode without chroot. Only "use chroot = no" is exposed.
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-g37v-g3gj-pmwq">CVE-2026-43618</a>
+&mdash; integer overflow in compressed-token decoding, allowing a malicious
+sender to disclose process memory to an authenticated daemon peer.
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-28pw-r563-rxvm">CVE-2026-43620</a>
+&mdash; out-of-bounds read in the receiver, letting a malicious server crash any
+client pulling from it.
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-4h9m-w5ff-j735">CVE-2026-43619</a>
+&mdash; symlink races on the remaining path-based system calls under
+"use chroot = no", generalising CVE-2026-29518.
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-rjfm-3w2m-jf4f">CVE-2026-43617</a>
+&mdash; hostname ACL bypass on a daemon with "daemon chroot" set where the
+chroot lacks the libc resolver files.
+<li><a href="https://github.com/RsyncProject/rsync/security/advisories/GHSA-8f85-j2cv-59m8">CVE-2026-45232</a>
+&mdash; off-by-one stack out-of-bounds write parsing an HTTP CONNECT proxy
+response. Client-side, and only when RSYNC_PROXY is set.
+</ul>
+
+<p><a name="s3_4_2"></a><hr>
+<h3>Security-related fixes in 3.4.2</h3>
+<i class=date>April 28th, 2026</i>
+
+<p>Several security-relevant defects were fixed in 3.4.2. None were assigned a
+CVE: rsync's fork-per-connection design scopes each of them to the attacker's
+own connection, which is equivalent to the client closing the socket itself.
+They were fixed as a matter of hygiene and to reduce the chance of a future
+exploitable combination. A signed integer overflow in the PROXY protocol v2
+header parser, an invalid access to the files array, and a negative token value
+accepted by the compressed-stream decoder. See the
+<a href="https://download.samba.org/pub/rsync/NEWS#3.4.2">3.4.2 NEWS</a>.
+
+<p><a name="s3_4_0"></a><hr>
+<h3>Security fixes in 3.4.0</h3>
+<i class=date>January 14th, 2025</i>
+
+<p>Rsync 3.4.0 fixes six security issues, the most serious of which allows a
+malicious server to write outside the destination directory on a client that
+pulls from it. Versions 3.3.0 and earlier are affected. See the
+<a href="https://download.samba.org/pub/rsync/NEWS#3.4.0">3.4.0 NEWS</a>.
+
+<ul>
+<li>CVE-2024-12084 &mdash; heap buffer overflow in the daemon's checksum
+handling.
+<li>CVE-2024-12085 &mdash; information leak from uninitialised stack memory
+when comparing file checksums.
+<li>CVE-2024-12086 &mdash; a malicious server could enumerate and read
+arbitrary files from the client.
+<li>CVE-2024-12087 &mdash; a malicious server could write outside the
+destination directory using --inc-recursive.
+<li>CVE-2024-12088 &mdash; --safe-links failed to verify symlink targets
+containing other symlinks, allowing a path-traversal write.
+<li>CVE-2024-12747 &mdash; symlink race in the sender when handling
+regular files.
+</ul>
 
 <p><a name="s3_2_5"></a><hr>
 <h3>Improved file-list validation in 3.2.5</h3>

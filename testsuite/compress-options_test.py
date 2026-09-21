@@ -49,7 +49,12 @@ for algo in compressors:
 
 # --- --compress-level (the requested level reaches the compressor) ----------
 rels = fresh()
-proc = run_rsync('-az', '--compress-level=9', '--debug=NSTR',
+# The default compressor can be lz4, which has no tunable levels and reports
+# level 0; pick a level-aware compressor so this verifies --compress-level reaches
+# a compressor that supports it.
+level_algo = next((a for a in ('zlibx', 'zlib') if a in compressors), None)
+level_args = [f'--compress-choice={level_algo}'] if level_algo else []
+proc = run_rsync('-az', *level_args, '--compress-level=9', '--debug=NSTR',
                  f'{src}/', f'{TODIR}/', capture_output=True)
 if not re.search(r'compress: \S+ \(level 9\)', proc.stdout):
     test_fail("--compress-level=9 was not applied; "

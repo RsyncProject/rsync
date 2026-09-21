@@ -22,6 +22,13 @@
 #include "itypes.h"
 #include "ifuncs.h"
 
+/* O_CLOEXEC is absent on some still-supported targets.  The random-source fd
+ * is read and closed synchronously, so the established zero-value fallback is
+ * sufficient without adding a configure dependency. */
+#ifndef O_CLOEXEC
+#define O_CLOEXEC 0
+#endif
+
 extern int read_only;
 extern char *password_file;
 extern struct name_num_obj valid_auth_checksums;
@@ -57,10 +64,31 @@ void base64_encode(const char *buf, int len, char *out, int pad)
 	out[i] = '\0';
 }
 
+/* Fill buf with len bytes from the kernel CSPRNG.  Returns 1 on success.
+ * We read /dev/urandom directly rather than depending on getrandom()/
+ * arc4random_buf() availability so this works on every platform rsync
+ * targets without new configure probes. */
+static int get_random_bytes(char *buf, int len)
+{
+	int fd = open("/dev/urandom", O_RDONLY | O_CLOEXEC);
+	int got = 0;
+	if (fd < 0)
+		return 0;
+	while (got < len) {
+		int n = read(fd, buf + got, len - got);
+		if (n <= 0)
+			break;
+		got += n;
+	}
+	close(fd);
+	return got == len;
+}
+
 /* Generate a challenge buffer and return it base64-encoded. */
 static void gen_challenge(const char *addr, char *challenge)
 {
 	char input[32];
+	char rnd[32];
 	char digest[MAX_DIGEST_LEN];
 	struct timeval tv;
 	int len;
@@ -74,6 +102,16 @@ static void gen_challenge(const char *addr, char *challenge)
 	SIVAL(input, 24, getpid());
 
 	len = sum_init(valid_auth_checksums.negotiated_nni, 0);
+	/* The challenge must be unpredictable to a network observer; addr+time
+	 * +pid alone is ~35 bits and lets an attacker enumerate the preimage
+	 * offline.  Hash 32 bytes from the kernel RNG first so the digest
+	 * carries full entropy, keeping the legacy inputs as a mix-in so a
+	 * urandom failure degrades to (never below) the old behaviour. */
+	if (get_random_bytes(rnd, sizeof rnd))
+		sum_update(rnd, sizeof rnd);
+	else
+		rprintf(FWARNING, "gen_challenge: /dev/urandom unavailable, "
+			"falling back to time-based challenge\n");
 	sum_update(input, sizeof input);
 	sum_end(digest);
 
@@ -110,8 +148,23 @@ static const char *check_secret(int module, const char *user, const char *group,
 	char *err;
 	FILE *fh;
 
-	if (!fname || !*fname || (fh = fopen(fname, "r")) == NULL)
+	/* Daemon 'secrets file = PATH' open.  A planted symlink would be
+	 * followed and the strict-modes fstat() check below runs on the target
+	 * inode, so a symlink to /etc/shadow (0640 root:shadow) would pass and
+	 * the daemon would auth against shadow hashes.  Refuse symlinks not
+	 * owned by uid 0 or our euid. */
+	if (!fname || !*fname)
 		return "no secrets file";
+	{
+		int fd = open_no_attacker_symlinks(fname, O_RDONLY, 0);
+		if (fd < 0)
+			return "no secrets file";
+		fh = fdopen(fd, "r");
+		if (!fh) {
+			close(fd);
+			return "no secrets file";
+		}
+	}
 
 	if (do_fstat(fileno(fh), &st) == -1) {
 		rsyserr(FLOG, errno, "fstat(%s)", fname);
@@ -184,13 +237,23 @@ static const char *getpassf(const char *filename)
 	} else {
 		int fd;
 
-		if ((fd = open(filename,O_RDONLY)) < 0) {
+		/* --password-file=PATH client open.  Its first line is sent as the
+		 * auth response, so a planted symlink leaks the target's content
+		 * (e.g. shadow hashes) to a malicious daemon; the do_stat()
+		 * other-access check runs on the target mode and passes 0640
+		 * root:shadow.  Refuse symlinks not owned by uid 0 or our euid. */
+		if ((fd = open_no_attacker_symlinks(filename, O_RDONLY, 0)) < 0) {
 			rsyserr(FERROR, errno, "could not open password file %s", filename);
 			exit_cleanup(RERR_SYNTAX);
 		}
 
-		if (do_stat(filename, &st) == -1) {
-			rsyserr(FERROR, errno, "stat(%s)", filename);
+		/* fstat the opened fd, not the pathname: a same-object check
+		 * (matching check_secret() above) so an attacker who swaps the
+		 * path between open and check can't make the owner/mode test
+		 * validate a different inode than the one we read the password
+		 * from. */
+		if (do_fstat(fd, &st) == -1) {
+			rsyserr(FERROR, errno, "fstat(%s)", filename);
 			exit_cleanup(RERR_SYNTAX);
 		}
 		if ((st.st_mode & 06) != 0) {
@@ -240,6 +303,35 @@ char *auth_server(int f_in, int f_out, int module, const char *host,
 		return "";
 
 	negotiate_daemon_auth(f_out, 0);
+
+	/* Enforce a configured minimum auth digest (default: none).  This refuses
+	 * a peer that negotiated -- or, via an omitted digest list / old protocol,
+	 * fell back to -- a digest weaker than the operator-required floor, e.g. a
+	 * client downgraded to md5/md4.  Lower rank == stronger (the auth list is
+	 * ordered strongest-first), so a higher rank than the floor is too weak. */
+	{
+		const char *min_digest = lp_auth_digest(module);
+		if (min_digest && *min_digest) {
+			int floor_rank = auth_digest_rank(min_digest);
+			int got_rank = auth_digest_rank(valid_auth_checksums.negotiated_nni->name);
+			if (floor_rank < 0) {
+				rprintf(FLOG, "auth failed on module %s from %s (%s): the "
+					"configured 'auth digest = %s' is not a supported digest "
+					"on this build\n",
+					lp_name(module), host, addr, min_digest);
+				return NULL;
+			}
+			if (got_rank < 0 || got_rank > floor_rank) {
+				rprintf(FLOG, "auth failed on module %s from %s (%s): negotiated "
+					"auth digest %s is weaker than the required "
+					"'auth digest = %s'\n",
+					lp_name(module), host, addr,
+					valid_auth_checksums.negotiated_nni->name, min_digest);
+				return NULL;
+			}
+		}
+	}
+
 	gen_challenge(addr, challenge);
 
 	io_printf(f_out, "%s%s\n", leader, challenge);
@@ -255,7 +347,13 @@ char *auth_server(int f_in, int f_out, int module, const char *host,
 
 	users = strdup(users);
 
-	for (tok = strtok(users, " ,\t"); tok; tok = strtok(NULL, " ,\t")) {
+	/* conf_strtok() honours the documented leading-comma form: a value that
+	 * starts with a comma splits on commas ALONE, so an entry may contain
+	 * spaces -- which is how a group name with a space is written.  Splitting
+	 * on whitespace here tore such an entry apart, so the rule the admin wrote
+	 * never matched and a rule they never wrote appeared from its tail.  The
+	 * daemon's gid field already uses this parser (clientserver.c). */
+	for (tok = conf_strtok(users); tok; tok = conf_strtok(NULL)) {
 		char *opts;
 		/* See if the user appended :deny, :ro, or :rw. */
 		if ((opts = strchr(tok, ':')) != NULL) {

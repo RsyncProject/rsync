@@ -1,5 +1,9 @@
 name: Coverage (Ubuntu)
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [ master ]
@@ -7,12 +11,12 @@ on:
       - '.github/workflows/*.yml'
       - '!.github/workflows/coverage.yml'
   pull_request:
-    branches: [ master ]
+    types: [opened, synchronize, reopened]
     paths-ignore:
       - '.github/workflows/*.yml'
       - '!.github/workflows/coverage.yml'
   schedule:
-    - cron: '42 9 * * *'
+    - cron: '42 9 * * 1'
   workflow_dispatch:
 
 jobs:
@@ -26,7 +30,7 @@ jobs:
     - name: prep
       run: |
         sudo apt-get update
-        sudo apt-get install -y acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev python3-cmarkgfm openssl gcovr
+        sudo apt-get install -y acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev libidn2-dev python3-cmarkgfm openssl gcovr
         echo "/usr/local/bin" >>"$GITHUB_PATH"
     - name: configure
       run: ./configure --enable-coverage --with-rrsync

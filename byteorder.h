@@ -68,10 +68,26 @@ SIVAL64(char *buf, int pos, int64 val)
 
 #else /* !CAREFUL_ALIGNMENT */
 
+/* We don't want false positives about alignment from UBSAN, see:
+   https://github.com/WayneD/rsync/issues/427#issuecomment-1375132291
+*/
+
+/* From https://gcc.gnu.org/onlinedocs/cpp/Common-Predefined-Macros.html */
+#ifndef GCC_VERSION
+#define GCC_VERSION (__GNUC__ * 10000 \
+                     + __GNUC_MINOR__ * 100 \
+                     + __GNUC_PATCHLEVEL__)
+#endif
+
 /* This handles things for architectures like the 386 that can handle alignment errors.
  * WARNING: This section is dependent on the length of an int32 (and thus a uint32)
  * being correct (4 bytes)!  Set CAREFUL_ALIGNMENT if it is not. */
 
+#ifdef __clang__
+__attribute__((no_sanitize("undefined")))
+#elif GCC_VERSION >= 409
+__attribute__((no_sanitize_undefined))
+#endif
 static inline uint32
 IVALu(const uchar *buf, int pos)
 {
@@ -83,6 +99,11 @@ IVALu(const uchar *buf, int pos)
 	return *u.num;
 }
 
+#ifdef __clang__
+__attribute__((no_sanitize("undefined")))
+#elif GCC_VERSION >= 409
+__attribute__((no_sanitize_undefined))
+#endif
 static inline void
 SIVALu(uchar *buf, int pos, uint32 val)
 {
@@ -94,6 +115,11 @@ SIVALu(uchar *buf, int pos, uint32 val)
 	*u.num = val;
 }
 
+#ifdef __clang__
+__attribute__((no_sanitize("undefined")))
+#elif GCC_VERSION >= 409
+__attribute__((no_sanitize_undefined))
+#endif
 static inline int64
 IVAL64(const char *buf, int pos)
 {
@@ -105,6 +131,11 @@ IVAL64(const char *buf, int pos)
 	return *u.num;
 }
 
+#ifdef __clang__
+__attribute__((no_sanitize("undefined")))
+#elif GCC_VERSION >= 409
+__attribute__((no_sanitize_undefined))
+#endif
 static inline void
 SIVAL64(char *buf, int pos, int64 val)
 {

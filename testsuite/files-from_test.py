@@ -7,11 +7,11 @@
 
 from rsyncfns import (
     CHKDIR, FROMDIR, RSYNC, RSYNC_PEER, SCRATCHDIR, SRCDIR, TODIR,
-    checkit, hands_setup, rmtree, run_rsync,
+    checkit, hands_setup, rmtree, run_rsync, rsync_path_arg, rsh_cmd,
 )
 
 
-SSH = str(SRCDIR / 'support' / 'lsh.sh')
+SSH = rsh_cmd()
 
 hands_setup()
 
@@ -44,7 +44,7 @@ for filehost in ('', 'localhost:'):
 
         rmtree(TODIR)
         checkit(
-            ['-avse', SSH, f'--rsync-path={RSYNC_PEER}',
+            ['-avse', SSH, f'--rsync-path={rsync_path_arg()}',
              f'--files-from={filehost}{filelist}',
              f'{srchost}{SCRATCHDIR}', f'{desthost}{TODIR}/'],
             CHKDIR, TODIR,

@@ -351,7 +351,7 @@ static int parse_negotiate_str(struct name_num_obj *nno, char *tmpbuf)
 			continue;
 		ret = nni;
 		best = nno->saw[nni->num];
-		if (best == 1 || am_server) /* The server side stops at the first acceptable client choice */
+		if (best == 1) /* Can't improve on our own #1 preference */
 			break;
 	}
 	if (ret) {
@@ -526,8 +526,11 @@ static void send_negotiate_str(int f_out, struct name_num_obj *nno, int ntype)
 			rprintf(FINFO, "Client %s list (on client): %s\n", nno->type, tmpbuf);
 	}
 
-	/* Each side sends their list of valid names to the other side and then both sides
-	 * pick the first name in the client's list that is also in the server's list. */
+	/* Each side sends their list of valid names to the other side and then each
+	 * side picks its own most-preferred name that also appears in the peer's
+	 * list.  Honest peers emit their list in table (strongest-first) order via
+	 * get_default_nno_list(), so both sides converge on the strongest mutual
+	 * choice; a peer that front-loads a weaker name only desyncs itself. */
 	if (do_negotiated_strings)
 		write_vstring(f_out, tmpbuf, len);
 }
@@ -585,14 +588,13 @@ void setup_protocol(int f_out,int f_in)
 		pathname_ndx = (file_extra_cnt += PTR_EXTRA_CNT);
 	else
 		depth_ndx = ++file_extra_cnt;
-	if (preserve_uid)
-		uid_ndx = ++file_extra_cnt;
-	if (preserve_gid)
-		gid_ndx = ++file_extra_cnt;
-	if (preserve_acls && !am_sender)
-		acls_ndx = ++file_extra_cnt;
-	if (preserve_xattrs)
-		xattrs_ndx = ++file_extra_cnt;
+	/* uid_ndx/gid_ndx/acls_ndx/xattrs_ndx are assigned AFTER
+	 * check_batch_flags() below: a batch file's stream-flags can flip
+	 * preserve_uid/gid/acls/xattrs on, and computing the *_ndx slots
+	 * before that leaves e.g. preserve_xattrs=1 with xattrs_ndx=0 -- so
+	 * F_XATTR(file) (= REQ_EXTRA(file, 0)) writes at offset 0 of every
+	 * file_struct, clobbering file->dirname.  Nothing between here and
+	 * check_batch_flags() reads file_extra_cnt or the *_ndx values. */
 
 	if (am_server)
 		set_allow_inc_recurse();
@@ -638,6 +640,15 @@ void setup_protocol(int f_out,int f_in)
 	}
 	if (read_batch)
 		check_batch_flags();
+
+	if (preserve_uid)
+		uid_ndx = ++file_extra_cnt;
+	if (preserve_gid)
+		gid_ndx = ++file_extra_cnt;
+	if (preserve_acls && !am_sender)
+		acls_ndx = ++file_extra_cnt;
+	if (preserve_xattrs)
+		xattrs_ndx = ++file_extra_cnt;
 
 	if (!saw_stderr_opt && protocol_version <= 28 && am_server)
 		msgs2stderr = 0; /* The client side may not have stderr setup for us. */

@@ -12,7 +12,7 @@ import time
 
 from rsyncfns import (
     CHKDIR, FROMDIR, RSYNC, RSYNC_PEER, SCRATCHDIR, SRCDIR, TMPDIR, TODIR,
-    checkit, hands_setup, rmtree, run_rsync, test_fail,
+    checkit, hands_setup, rmtree, run_rsync, test_fail, rsync_path_arg, rsh_cmd,
 )
 
 
@@ -20,7 +20,7 @@ alt1dir = TMPDIR / 'alt1'
 alt2dir = TMPDIR / 'alt2'
 alt3dir = TMPDIR / 'alt3'
 
-SSH = str(SRCDIR / 'support' / 'lsh.sh')
+SSH = rsh_cmd()
 
 hands_setup()
 
@@ -73,7 +73,7 @@ for maybe_inplace in ([], ['--inplace']):
     for srchost in ('', 'localhost:'):
         desthost = 'localhost:' if not srchost else ''
         rmtree(TODIR)
-        checkit(['-ave', SSH, f'--rsync-path={RSYNC_PEER}', *maybe_inplace,
+        checkit(['-ave', SSH, f'--rsync-path={rsync_path_arg()}', *maybe_inplace,
                  f'--copy-dest={alt3dir}',
                  f'{srchost}{FROMDIR}/', f'{desthost}{TODIR}/'],
                 FROMDIR, TODIR)

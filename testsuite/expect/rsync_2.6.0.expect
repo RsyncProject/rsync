@@ -30,4 +30,6 @@ hardlinks                    pass
 reverse-daemon-delta         pass
 sender-flist-symlink-leak    xfail   # peer vulnerable to May-2026 finding (fixed in current)
 ssh-basic                    pass
+variety                      xfail   # specials/devices split & keep-dirlinks absent in 2.6.0 (proto 27)
+variety-symlink-traversal    xfail   # keep-dirlinks absent in 2.6.0 (proto 27)
 symlink-dirlink-basis        xfail   # feature/negotiation absent in 2.6.0 (proto 27)

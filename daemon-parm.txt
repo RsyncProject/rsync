@@ -6,6 +6,7 @@ STRING	daemon_gid		NULL
 STRING	daemon_uid		NULL
 STRING	motd_file		NULL
 STRING	pid_file		NULL
+STRING	proxy_protocol_hosts	NULL
 STRING	socket_options		NULL
 
 INTEGER	listen_backlog		5
@@ -15,6 +16,7 @@ BOOL	proxy_protocol		False
 
 Locals: =================================================================
 
+STRING	auth_digest		NULL
 STRING	auth_users		NULL
 STRING	charset			NULL
 STRING	comment			NULL
@@ -55,6 +57,7 @@ BOOL	fake_super		False
 BOOL	forward_lookup		True
 BOOL	ignore_errors		False
 BOOL	ignore_nonreadable	False
+BOOL	insecure_links		False
 BOOL	list			True
 BOOL	read_only		True
 BOOL	reverse_lookup		True

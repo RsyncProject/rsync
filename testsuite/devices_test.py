@@ -7,7 +7,6 @@
 # user.rsync.%stat xattr instead of mknod-ing real devices.
 
 import os
-import subprocess
 import sys
 
 import rsyncfns
@@ -41,7 +40,7 @@ if fake_variant:
             xattr_set(f'{RSYNC_PREFIX}.%stat',
                       f"{mode:o} {major},{minor} 0:0", path)
             return True
-        except (OSError, subprocess.CalledProcessError):
+        except OSError:
             return False
 else:
     my_uid = os.getuid()

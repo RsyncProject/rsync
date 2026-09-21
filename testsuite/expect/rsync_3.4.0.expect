@@ -22,6 +22,8 @@ exclude                     pass
 files-from                  pass
 hardlinks                   pass
 ssh-basic                   pass
+variety                     pass
+variety-symlink-traversal   pass
 
 # issue #715, present in 3.4.0: updating a file through a -K (--copy-dirlinks)
 # directory symlink fails on the receiver because its secure_relative_open()

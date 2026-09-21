@@ -5,6 +5,7 @@
 # from source to destination (other permission changes ignored), while a
 # normal copy without -E should leave the destination permissions alone.
 
+import errno
 import os
 
 from rsyncfns import FROMDIR, TODIR, check_perms, run_rsync, test_skipped
@@ -15,11 +16,14 @@ FROMDIR.mkdir(parents=True, exist_ok=True)
 (FROMDIR / '2').write_text("#!/bin/sh\necho 'Program Two!'\n")
 
 # Setuid-and-rwx for owner, nothing else. Some platforms reject 1700 for
-# non-root callers (no permission to set sticky); the shell test treats
-# that case as a skip.
+# non-root callers (no permission to set sticky); FreeBSD rejects it with
+# EFTYPE rather than EPERM. Only skip on those; re-raise anything unexpected.
+_STICKY_SKIP_ERRNOS = {errno.EPERM, errno.EACCES, getattr(errno, 'EFTYPE', None)}
 try:
     os.chmod(FROMDIR / '1', 0o1700)
-except PermissionError:
+except OSError as e:
+    if e.errno not in _STICKY_SKIP_ERRNOS:
+        raise
     test_skipped("Can't chmod")
 os.chmod(FROMDIR / '2', 0o600)
 

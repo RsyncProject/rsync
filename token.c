@@ -163,6 +163,13 @@ static void add_nocompress_suffixes(const char *str)
 		} while (*++f != '/' && *f);
 		*t++ = '\0';
 
+		/* add_suffix() recurses once per character; an attacker-supplied
+		 * --skip-compress (from our own argv OR propagated to a daemon
+		 * receiver via server_options()) with one very long token
+		 * exhausts the stack.  Real file extensions are short -- cap
+		 * the recursion depth by truncating absurd suffixes. */
+		if (t - buf > 32 + 1)
+			buf[32] = '\0';
 		add_suffix(&suftree, *buf, buf+1);
 	}
 
@@ -292,14 +299,10 @@ static int32 simple_recv_token(int f, char **data)
 		int32 i = read_int(f);
 		if (i <= 0)
 			return i;
-		/* simple_send_token caps each literal chunk at CHUNK_SIZE;
-		 * reject anything larger so a hostile peer cannot drive the
-		 * read_buf below past our static CHUNK_SIZE buffer. */
-		if (i > CHUNK_SIZE) {
-			rprintf(FERROR, "invalid uncompressed token length %ld [%s]\n",
-				(long)i, who_am_i());
-			exit_cleanup(RERR_PROTOCOL);
-		}
+		/* A literal run may exceed CHUNK_SIZE: some peers (e.g. the
+		 * acrosync library) use a 64k block size.  The loop below reads
+		 * the run CHUNK_SIZE bytes at a time, so read_buf never writes
+		 * past the static CHUNK_SIZE buffer regardless of i. */
 		residue = i;
 	}
 

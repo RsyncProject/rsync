@@ -8,7 +8,6 @@
 
 import filecmp
 import os
-import platform
 import shutil
 import stat
 import subprocess
@@ -22,12 +21,6 @@ from rsyncfns import (
 
 DAEMON_PORT = 12884
 
-
-if platform.system() in ('SunOS', 'OpenBSD', 'NetBSD') or platform.system().startswith('CYGWIN'):
-    test_skipped(
-        f"secure_relative_open relies on RESOLVE_BENEATH-equivalent kernel "
-        f"support not available on {platform.system()}"
-    )
 
 mod = SCRATCHDIR / 'module'
 outside = SCRATCHDIR / 'outside'

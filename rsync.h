@@ -111,7 +111,7 @@
 
 /* Update this if you make incompatible changes and ALSO update the
  * SUBPROTOCOL_VERSION if it is not a final (official) release. */
-#define PROTOCOL_VERSION 32
+#define PROTOCOL_VERSION 33
 
 /* This is used when working on a new protocol version or for any unofficial
  * protocol tweaks.  It should be a non-zero value for each pre-release repo
@@ -191,6 +191,13 @@
 #define IOERR_GENERAL	(1<<0) /* For backward compatibility, this must == 1 */
 #define IOERR_VANISHED	(1<<1)
 #define IOERR_DEL_LIMIT (1<<2)
+
+/* Mask of all currently defined IOERR_* bits.  Used to sanitize values
+ * received from a peer via MSG_IO_ERROR so a malicious peer cannot set
+ * arbitrary (undefined) bits in the local io_error, which would then be
+ * stored and re-forwarded upstream.  (Undefined bits never reach the exit
+ * code: cleanup.c maps only these defined bits onto RERR_* values.) */
+#define IOERR_VALID_MASK (IOERR_GENERAL | IOERR_VANISHED | IOERR_DEL_LIMIT)
 
 #define MAX_ARGS 1000
 #define MAX_BASIS_DIRS 20
@@ -292,6 +299,7 @@ enum msgcode {
 	MSG_LOG=FLOG, MSG_CLIENT=FCLIENT, /* sibling logging */
 	MSG_REDO=9,	/* reprocess indicated flist index */
 	MSG_STATS=10,	/* message has stats data for generator */
+	MSG_BLOCK_STATS=11,/* message has block-level stats for sender */
 	MSG_IO_ERROR=22,/* the sending side had an I/O error */
 	MSG_IO_TIMEOUT=33,/* tell client about a daemon's timeout value */
 	MSG_NOOP=42,	/* a do-nothing message (legacy protocol-30 only) */
@@ -422,6 +430,16 @@ enum delret {
 #include <grp.h>
 #endif
 #include <errno.h>
+
+/* O_NOFOLLOW refuses a final-component symlink with ELOOP on Linux, EMLINK on
+ * FreeBSD, and EFTYPE on NetBSD/OpenBSD. Treat all three as "hit a symlink". A
+ * genuine EMLINK (too many hard links) is harmless where this is used: callers
+ * fall through to a readlink/lstat, which restores the real error. */
+#ifdef EFTYPE
+# define NOFOLLOW_HIT_SYMLINK(e) ((e) == ELOOP || (e) == EMLINK || (e) == EFTYPE)
+#else
+# define NOFOLLOW_HIT_SYMLINK(e) ((e) == ELOOP || (e) == EMLINK)
+#endif
 
 #ifdef HAVE_UTIME_H
 #include <utime.h>
@@ -698,6 +716,8 @@ typedef unsigned int size_t;
 # define SIZEOF_INT64 SIZEOF_OFF_T
 #endif
 
+#define MAX_INT32 ((int32)0x7fffffff)
+
 #define HT_KEY32 0
 #define HT_KEY64 1
 
@@ -718,7 +738,7 @@ struct ht_int64_node {
 	int64 key;
 };
 
-#define HT_NODE(tbl, bkts, i) ((void*)((char*)(bkts) + (i)*(tbl)->node_size))
+#define HT_NODE(tbl, bkts, i) ((void*)((char*)(bkts) + (size_t)(i)*(tbl)->node_size))
 #define HT_KEY(node, k64) ((k64)? ((struct ht_int64_node*)(node))->key \
 			 : (int64)((struct ht_int32_node*)(node))->key)
 
@@ -1033,6 +1053,7 @@ struct map_struct {
 #define FILTRULE_CLEAR_LIST	(1<<18)/* this item is the "!" token */
 #define FILTRULE_PERISHABLE	(1<<19)/* perishable if parent dir goes away */
 #define FILTRULE_XATTR		(1<<20)/* rule only applies to xattr names */
+#define FILTRULE_FROM_FILE	(1<<21)/* pattern text came from a file's contents */
 
 #define FILTRULES_SIDES (FILTRULE_SENDER_SIDE | FILTRULE_RECEIVER_SIDE)
 
@@ -1060,6 +1081,7 @@ struct stats {
 	int64 total_read;
 	int64 literal_data;
 	int64 matched_data;
+	int64 touched_blocks_4k;
 	int64 flist_buildtime;
 	int64 flist_xfertime;
 	int64 flist_size;
@@ -1154,6 +1176,20 @@ typedef struct {
 #define UNUSED(x) x __attribute__((__unused__))
 #ifndef NORETURN
 #define NORETURN __attribute__((__noreturn__))
+#endif
+
+/* Under --enable-coverage, gcov flushes counters via an atexit handler that
+ * _exit() bypasses.  Forked helpers that terminate via _exit() -- the
+ * pre/post-xfer-exec children, the become_daemon original process, the
+ * per-connection accept-loop child on early return -- must dump explicitly
+ * or their counters are lost, which systematically under-reports daemon-side
+ * coverage.  cleanup.c and main.c already inline this for the two main exit
+ * paths; this macro covers the rest.  No-op when not a coverage build. */
+#ifdef GCOV_COVERAGE
+extern void __gcov_dump(void);
+#define gcov_flush() __gcov_dump()
+#else
+#define gcov_flush() ((void)0)
 #endif
 
 typedef struct {

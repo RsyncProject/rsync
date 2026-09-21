@@ -9,3 +9,4 @@ sudo apt install -y libxxhash-dev
 sudo apt install -y libzstd-dev
 sudo apt install -y liblz4-dev
 sudo apt install -y libssl-dev
+sudo apt install -y libidn2-dev
