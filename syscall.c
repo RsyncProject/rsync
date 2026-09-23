@@ -365,11 +365,6 @@ static int abspath_step(char *abspath, size_t cap, const char *comp, size_t comp
 static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, size_t out_cap)
 {
 #if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
-	/* O_CLOEXEC predates some still-supported targets; mirror rand_bytes()'s
-	 * fallback in syscall.c so a build without it still compiles. */
-#ifndef O_CLOEXEC
-#define O_CLOEXEC 0
-#endif
 	const int dir_traverse_flags = directory_traverse_flags() | O_CLOEXEC;
 	if (!path || !*path) {
 		errno = EINVAL;
@@ -3455,9 +3450,6 @@ int secure_relative_dirfd_at_beneath(int anchor_fd, const char *relpath)
  * (e.g. inside a chroot or container without /dev populated). */
 static void rand_bytes(unsigned char *buf, size_t len)
 {
-#ifndef O_CLOEXEC
-#define O_CLOEXEC 0
-#endif
 	int fd = open("/dev/urandom", O_RDONLY | O_CLOEXEC);
 	if (fd >= 0) {
 		ssize_t n = read(fd, buf, len);
