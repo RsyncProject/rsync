@@ -58,13 +58,13 @@ base = SCRATCHDIR / "authenticate-no-ocloexec-build-regression"
 rmtree(base)
 base.mkdir(parents=True)
 
-# Model a libc that lacks O_CLOEXEC after all system headers have been read,
+# Model a libc that lacks O_CLOEXEC through the shared portability fallback,
 # then compile the real production translation unit rather than a code model.
 source = source_path.read_text()
 needle = '#include "rsync.h"\n'
 if source.count(needle) != 1:
     test_fail(f"cannot locate feature-injection point in {source_path}")
-source = source.replace(needle, needle + "#undef O_CLOEXEC\n", 1)
+source = source.replace(needle, "#define RSYNC_TEST_NO_O_CLOEXEC 1\n" + needle, 1)
 probe_c = base / "authenticate-no-ocloexec.c"
 probe_o = base / "authenticate-no-ocloexec.o"
 probe_c.write_text(source)

@@ -68,7 +68,7 @@ CHECK_SYMLINKS = testsuite/chown-fake_test.py testsuite/devices-fake_test.py \
 # Objects for CHECK_PROGS to clean
 CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o t_chmod_secure.o t_rename_secure.o t_symlink_secure.o t_secure_relpath.o t_acl.o t_hashtable_overflow.o t_iwildmatch.o t_clean_fname.o t_safe_arg.o trimslash.o wildtest.o
 # Compile-only feature-shape checks.
-CHECK_COMPILE_OBJS=syscall-no-at-fdcwd.o
+CHECK_COMPILE_OBJS=syscall-no-at-fdcwd.o rsync-no-o-cloexec.o
 
 # note that the -I. is needed to handle config.h when using VPATH
 .c.o:
@@ -84,6 +84,10 @@ all: Makefile rsync$(EXEEXT) stunnel-rsyncd.conf @MAKE_RRSYNC@ @MAKE_MAN@
 syscall-no-at-fdcwd.o: syscall.c $(HEADERS)
 	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) \
 	    -DRSYNC_TEST_NO_AT_FDCWD -c $(srcdir)/syscall.c -o $@
+
+rsync-no-o-cloexec.o: rsync.c $(HEADERS)
+	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) \
+	    -DRSYNC_TEST_NO_O_CLOEXEC -c $(srcdir)/rsync.c -o $@
 
 .PHONY: install
 install: all
