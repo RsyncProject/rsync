@@ -4133,6 +4133,8 @@ The options allowed when starting an rsync daemon are as follows:
     and the remote user is not the super-user; in that case the default is
     rsyncd.conf in the current directory (typically $HOME).
 
+	WARNING: The file is read on startup, but only partially, and then once per connection. It must be available to be reread, so bash process substitutions and other ephemeral files will be unreliable. There is no warning message when modified config is re-read.
+
 0.  `--dparam=OVERRIDE`, `-M`
 
     This option can be used to set a daemon-config parameter when starting up
