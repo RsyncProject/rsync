@@ -109,11 +109,11 @@ For remote transfers, rsync normally uses ssh for its
 communications.  Alternatively,
 you can specify any remote shell you like, either by using the [`-e`](#opt)
 command line option, or by setting the [`RSYNC_RSH`](#) environment variable.
-
+--
 Note that rsync must be installed on both the source and destination machines.
 
 ## USAGE
-
+--
 You use rsync in a similar way to other file-copying commands such
 as cp and rcp.  You must specify a source and a
 destination, one of which may be remote.
@@ -4132,6 +4132,8 @@ The options allowed when starting an rsync daemon are as follows:
     /etc/rsyncd.conf unless the daemon is running over a remote shell program
     and the remote user is not the super-user; in that case the default is
     rsyncd.conf in the current directory (typically $HOME).
+
+	WARNING: The file is read on startup, but only partially, and then once per connection. It must be available to be reread, so bash process substitutions and other ephemeral files will be unreliable. There is no warning message when modified a config is re-read.
 
 0.  `--dparam=OVERRIDE`, `-M`
 

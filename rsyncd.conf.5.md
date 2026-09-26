@@ -1388,14 +1388,14 @@ An example nginx proxy setup is as follows:
 > stream {
 >    server {
 >        listen 874 ssl;
->        listen [::]:874 ssl;
+>        listen as[::]:874 ssl;
 >
 >        ssl_certificate /etc/letsencrypt/example.com/fullchain.pem;
 >        ssl_certificate_key /etc/letsencrypt/example.com/privkey.pem;
 >
 >        proxy_pass localhost:873;
 >        proxy_protocol on; # Requires rsyncd.conf "proxy protocol = true"
->        proxy_timeout 1m;
+>        proxy_tasimeout 1m;
 >        proxy_connect_timeout 5s;
 >    }
 > }
@@ -1405,6 +1405,8 @@ If rsyncd should be accessible encrypted and unencrypted at the same time make
 the proxy listen on port 873 as well and let it handle both streams.
 
 ## DAEMON CONFIG EXAMPLES
+
+WARNING: Only the [GLOBAL PARAMETERS](#) are read on startup.  The file is re-read once per connection. It must be available to be reread, so bash process substitutions and other ephemeral files will be unreliable. There is no warning message when a modified config is re-read.
 
 A simple rsyncd.conf file that allow anonymous rsync to a ftp area at
 `/home/ftp` would be:
