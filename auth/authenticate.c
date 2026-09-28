@@ -21,6 +21,7 @@
 #include "rsync.h"
 #include "itypes.h"
 #include "ifuncs.h"
+#include "auth/auth.h"
 
 /* O_CLOEXEC is absent on some still-supported targets.  The random-source fd
  * is read and closed synchronously, so the established zero-value fallback is
@@ -32,6 +33,7 @@
 extern int read_only;
 extern char *password_file;
 extern struct name_num_obj valid_auth_checksums;
+extern int am_root;
 
 /***************************************************************************
 encode a buffer using base64 - simple and slow algorithm. null terminates
@@ -289,6 +291,7 @@ char *auth_server(int f_in, int f_out, int module, const char *host,
 		  const char *addr, const char *leader)
 {
 	char *users = lp_auth_users(module);
+	int use_pam = lp_use_pam(module);
 	char challenge[MAX_DIGEST_LEN*2];
 	char line[BIGPATHBUFLEN];
 	const char **auth_uid_groups = NULL;
@@ -414,7 +417,25 @@ char *auth_server(int f_in, int f_out, int module, const char *host,
 		err = "denied by rule";
 	else {
 		const char *group = group_match >= 0 ? auth_uid_groups[group_match] : NULL;
+		/* 1. Verify standard rsync credentials first */
 		err = check_secret(module, line, group, challenge, pass);
+		/* 2. Validate PAM requirements and account status */
+		if (!err && use_pam) {
+			if (am_root != 1)
+				err = "PAM enabled but daemon not running as root";
+#ifndef SUPPORT_PAM
+			else
+				err = "PAM enabled but rsync compiled without PAM support";
+#else
+			else {
+				/* If PAM fails, this points to our detailed static buffer.
+				   If it succeeds, it returns NULL and err remains NULL. */
+				const char *pam_err = rsync_pam_validate_account(line);
+				if (pam_err)
+					err = pam_err;
+			}
+#endif
+		}
 	}
 
 	force_memzero(challenge, sizeof challenge);

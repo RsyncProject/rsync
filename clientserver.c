@@ -22,6 +22,7 @@
 #include "rsync.h"
 #include "itypes.h"
 #include "ifuncs.h"
+#include "auth/auth.h"
 
 extern int quiet;
 extern int dry_run;

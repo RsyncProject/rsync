@@ -190,6 +190,9 @@ if test x"$with_secluded_args" = x"yes"; then
 	AC_DEFINE_UNQUOTED(RSYNC_USE_SECLUDED_ARGS, 1, [Define to 1 if --secluded-args should be the default])
 fi
 
+AC_ARG_WITH([pam],
+    AS_HELP_STRING([--without-pam], [disable PAM support (default is auto-detect)]))
+
 AC_ARG_WITH(rsync-path,
 	AS_HELP_STRING([--with-rsync-path=PATH],[set default --rsync-path to PATH (default: rsync)]),
 	[ RSYNC_PATH="$with_rsync_path" ],
@@ -480,6 +483,33 @@ elif test x"$ac_cv_header_zlib_h" != x"yes"; then
 fi
 if test x"$with_included_zlib" != x"yes"; then
     AC_CHECK_LIB(z, deflateParams, , [with_included_zlib=yes])
+fi
+
+if test x"$with_pam" != x"no"; then
+    AC_CHECK_LIB([pam], [pam_start], [
+        # Look for the cross-platform headers FIRST
+        AC_CHECK_HEADERS([security/pam_appl.h pam/pam_appl.h], [
+            # This triggers if EITHER header is found
+            pam_header_found=yes
+        ])
+
+        # Only define SUPPORT_PAM if the headers actually exist
+        if test x"$pam_header_found" = x"yes"; then
+            LIBS="-lpam $LIBS"
+            AC_DEFINE(SUPPORT_PAM, 1, [Define to 1 if PAM is installed])
+            with_pam=yes
+        else
+            if test x"$with_pam" = x"yes"; then
+                AC_MSG_ERROR([PAM support requested but pam_appl.h headers not found])
+            fi
+            with_pam=no
+        fi
+    ], [
+        if test x"$with_pam" = x"yes"; then
+            AC_MSG_ERROR([PAM support requested but libpam not found])
+        fi
+        with_pam=no
+    ])
 fi
 
 AC_MSG_CHECKING([whether to use included zlib])
