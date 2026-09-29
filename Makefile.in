@@ -61,7 +61,7 @@ TLS_OBJ = tls.o syscall.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/perms
 # Programs we must have to run the test cases
 CHECK_PROGS = rsync$(EXEEXT) tls$(EXEEXT) getgroups$(EXEEXT) getfsdev$(EXEEXT) \
 	testrun$(EXEEXT) trimslash$(EXEEXT) t_unsafe$(EXEEXT) t_chmod_secure$(EXEEXT) \
-	t_rename_secure$(EXEEXT) t_symlink_secure$(EXEEXT) t_secure_relpath$(EXEEXT) t_acl$(EXEEXT) t_hashtable_overflow$(EXEEXT) t_iwildmatch$(EXEEXT) t_clean_fname$(EXEEXT) t_safe_arg$(EXEEXT) wildtest$(EXEEXT) simdtest$(EXEEXT)
+	t_rename_secure$(EXEEXT) t_symlink_secure$(EXEEXT) t_secure_relpath$(EXEEXT) t_acl$(EXEEXT) t_hashtable_overflow$(EXEEXT) t_iwildmatch$(EXEEXT) t_clean_fname$(EXEEXT) t_safe_arg$(EXEEXT) wildtest$(EXEEXT) simdtest$(EXEEXT) pam_mock.so
 
 CHECK_SYMLINKS = testsuite/chown-fake_test.py testsuite/devices-fake_test.py \
 	testsuite/xattrs-hlink_test.py testsuite/exclude-lsh_test.py
@@ -550,6 +550,9 @@ simdtest$(EXEEXT): simd-checksum-x86_64.cpp $(HEADERS)
 	else \
 	    touch $@; \
 	fi
+
+pam_mock.so: $(srcdir)/testsuite/pam/pam_mock.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -shared -fPIC -o $@ $(srcdir)/testsuite/pam/pam_mock.c
 
 testsuite/chown-fake_test.py:
 	ln -s chown_test.py $(srcdir)/testsuite/chown-fake_test.py

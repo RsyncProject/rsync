@@ -13,7 +13,7 @@ AC_CHECK_HEADERS(poll.h sys/fcntl.h sys/select.h fcntl.h sys/time.h sys/unistd.h
     sys/acl.h acl/libacl.h attr/xattr.h sys/xattr.h sys/extattr.h dl.h \
     popt.h popt/popt.h linux/falloc.h netinet/in_systm.h netgroup.h \
     zlib.h xxhash.h openssl/md4.h openssl/md5.h zstd.h lz4.h sys/file.h \
-    sys/resource.h bsd/string.h idn2.h)
+    sys/resource.h bsd/string.h idn2.h security/pam_modules.h security/pam_appl.h pam/pam_appl.h)
 AC_CHECK_HEADERS([netinet/ip.h], [], [], [[#include <netinet/in.h>]])
 AC_HEADER_MAJOR_FIXED
 
@@ -189,9 +189,6 @@ AC_ARG_WITH(secluded-args,
 if test x"$with_secluded_args" = x"yes"; then
 	AC_DEFINE_UNQUOTED(RSYNC_USE_SECLUDED_ARGS, 1, [Define to 1 if --secluded-args should be the default])
 fi
-
-AC_ARG_WITH([pam],
-    AS_HELP_STRING([--without-pam], [disable PAM support (default is auto-detect)]))
 
 AC_ARG_WITH(rsync-path,
 	AS_HELP_STRING([--with-rsync-path=PATH],[set default --rsync-path to PATH (default: rsync)]),
@@ -485,33 +482,6 @@ if test x"$with_included_zlib" != x"yes"; then
     AC_CHECK_LIB(z, deflateParams, , [with_included_zlib=yes])
 fi
 
-if test x"$with_pam" != x"no"; then
-    AC_CHECK_LIB([pam], [pam_start], [
-        # Look for the cross-platform headers FIRST
-        AC_CHECK_HEADERS([security/pam_appl.h pam/pam_appl.h], [
-            # This triggers if EITHER header is found
-            pam_header_found=yes
-        ])
-
-        # Only define SUPPORT_PAM if the headers actually exist
-        if test x"$pam_header_found" = x"yes"; then
-            LIBS="-lpam $LIBS"
-            AC_DEFINE(SUPPORT_PAM, 1, [Define to 1 if PAM is installed])
-            with_pam=yes
-        else
-            if test x"$with_pam" = x"yes"; then
-                AC_MSG_ERROR([PAM support requested but pam_appl.h headers not found])
-            fi
-            with_pam=no
-        fi
-    ], [
-        if test x"$with_pam" = x"yes"; then
-            AC_MSG_ERROR([PAM support requested but libpam not found])
-        fi
-        with_pam=no
-    ])
-fi
-
 AC_MSG_CHECKING([whether to use included zlib])
 if test x"$with_included_zlib" = x"yes"; then
     AC_MSG_RESULT($srcdir/zlib)
@@ -680,6 +650,27 @@ if test x"$enable_idn" != x"no"; then
 	AC_MSG_RESULT(no)
 	err_msg="$err_msg$nl- Failed to find idn2.h for IDN support."
 	no_lib="$no_lib idn"
+    fi
+else
+    AC_MSG_RESULT(no)
+fi
+
+AC_MSG_CHECKING([whether to enable PAM support])
+AC_ARG_ENABLE([pam],
+        AS_HELP_STRING([--disable-pam], [disable to omit PAM support]))
+AH_TEMPLATE([SUPPORT_PAM],
+[Undefine if you do not want PAM support.  By default this is defined.])
+if test x"$enable_pam" != x"no"; then
+    if test x"$ac_cv_header_security_pam_appl_h" = x"yes" || test x"$ac_cv_header_pam_pam_appl_h" = x"yes"; then
+        AC_MSG_RESULT(yes)
+        AC_SEARCH_LIBS(pam_start, pam,
+            [AC_DEFINE(SUPPORT_PAM)],
+            [err_msg="$err_msg$nl- Failed to find pam_start function in pam lib.";
+             no_lib="$no_lib pam"])
+    else
+        AC_MSG_RESULT(no)
+        err_msg="$err_msg$nl- Failed to find pam_appl.h for PAM support."
+        no_lib="$no_lib pam"
     fi
 else
     AC_MSG_RESULT(no)

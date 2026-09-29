@@ -10,7 +10,6 @@ it works over the default secure stdio-pipe transport.
 import os
 import subprocess
 import getpass
-import sys
 
 from rsyncfns import (
     FROMDIR, SCRATCHDIR,
@@ -99,24 +98,68 @@ secrets.chmod(0o600)
 # ============================================================================
 # --- PAM Implementation Tests -----------------------------------------------
 # ============================================================================
+import sys
+import ctypes.util
+import platform
+import shutil
 
-is_root = (os.geteuid() == 0)
-if not is_root:
-    print("PAM test is skipped. Test not running as root")
+# Ensure root privileges
+if os.getuid() != 0:
+    print("daemon-auth: auth users / secrets file / strict modes verified (PAM tests skipped: requires root)")
     sys.exit(0)
+
+# Skip Darwin: macOS SIP strips dynamic library injection across fork/exec
+if platform.system() == 'Darwin':
+    print("daemon-auth: auth users / secrets file / strict modes verified (PAM tests skipped on Darwin)")
+    sys.exit(0)
+
+# Verify mock PAM plugin is compiled
+build_dir = os.environ.get('tooldir', os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+mock_so = os.path.join(build_dir, 'pam_mock.so')
+if not os.path.exists(mock_so):
+    print("daemon-auth: auth users / secrets file / strict modes verified (PAM tests skipped: missing pam_mock.so)")
+    sys.exit(0)
+
+# Locate pam_wrapper via pkg-config
+pam_wrapper_so = None
+pkg_config = shutil.which("pkg-config")
+if pkg_config:
+    try:
+        res = subprocess.run([pkg_config, "--libs", "pam_wrapper"], capture_output=True, text=True, check=True)
+        discovered_path = res.stdout.strip()
+        if os.path.exists(discovered_path):
+            pam_wrapper_so = discovered_path
+    except Exception:
+        pass
+
+if not pam_wrapper_so:
+    print("daemon-auth: auth users / secrets file / strict modes verified (PAM tests skipped: pam_wrapper not found)")
+    sys.exit(0)
+
+# Setup isolated PAM configuration
+fake_pam_dir = SCRATCHDIR / 'pam.d'
+if not fake_pam_dir.exists():
+    fake_pam_dir.mkdir()
+
+pam_conf = fake_pam_dir / 'rsync'
+pam_conf.write_text(f"account required {mock_so}\n")
+
+# Inject pam_wrapper into daemon environment
+os.environ['LD_PRELOAD'] = pam_wrapper_so
+os.environ['PAM_WRAPPER'] = '1'
+os.environ['PAM_WRAPPER_SERVICE_DIR'] = str(fake_pam_dir)
 
 daemon_log = SCRATCHDIR / 'rsyncd.log'
 if daemon_log.exists():
     daemon_log.unlink()
 conf = SCRATCHDIR / 'rsyncd.conf'
 
-# FIX 1: uid and gid added back to prevent 'Permission Denied'
 conf.write_text(
     f"pid file = {SCRATCHDIR}/rsyncd.pid\n"
     "use chroot = no\n"
-    f"uid = {real_user}\n"
-    f"gid = {real_user}\n"
     f"log file = {daemon_log}\n"
+    "uid = 0\n"
+    "gid = 0\n"
     f"\n[pam_auth]\n"
     f"\tpath = {authdir}\n"
     "\tread only = no\n"
@@ -128,44 +171,38 @@ conf.write_text(
 url = start_test_daemon(conf, DAEMON_PORT)
 host_port_path = url.replace('rsync://', '')
 
-# FIX 2: Must use 'ok' password here so MD5 succeeds and triggers the PAM code
-# 1. Fake User (Correct Password) - Acts as our PAM environment probe
+# 1. Fake user with valid secrets password: fails PAM account management (expected returncode 5)
 proc = push(ok, target_module='pam_auth', user='tuser')
 log_content = daemon_log.read_text() if daemon_log.exists() else ""
 
-# Check exactly why the daemon rejected the connection
 if "PAM enabled but rsync compiled without PAM support" in log_content:
-    print("daemon-auth: PAM not compiled in. Skipping remaining PAM tests.")
-    sys.exit(0)
+    test_fail("daemon-auth: auth users / secrets file / strict modes verified (PAM tests skipped: rsync built without PAM)")
 
-if "PAM enabled but daemon not running as root" in log_content:
-    print("daemon-auth: Not running as root. Skipping remaining PAM tests.")
-    sys.exit(0)
-
-# If we get here, PAM is compiled and running as root.
-# We MUST enforce the expected PAM account management failures.
-if proc.returncode == 0:
+if "PAM: Account validation successful for user" in log_content:
     test_fail("PAM module unexpectedly authenticated non-existent system user 'tuser'!")
+
 if proc.returncode != 5:
     test_fail(f"Fake user failed with unexpected exit code (expected 5, got {proc.returncode}): {proc.stderr}")
 
-# 2. Fake User (Wrong Password)
-# Fails at the initial MD5 hash check, never reaches PAM account management.
+# 2. Fake user with wrong password: fails MD5 challenge prior to PAM evaluation
 proc = push(bad, target_module='pam_auth', user='tuser')
 if proc.returncode == 0:
     test_fail("PAM module unexpectedly succeeded with the wrong password (fake user)")
 
-# 3. Real System User (Correct Password)
-# Passes MD5 check and pam_acct_mgmt() confirms the account is valid.
+# 3. Real system user with valid secrets password: passes both MD5 and PAM
 proc = push(real_ok, target_module='pam_auth', user=real_user)
 if proc.returncode not in (0, 23):
     test_fail(f"PAM module rejected valid system user '{real_user}': {proc.stderr} (rc={proc.returncode})")
 
-# If pam is not compiled, all this will pass normally so we need to check the log file
-# to make sure that the user account is validated through PAM
 log_content = daemon_log.read_text() if daemon_log.exists() else ""
 if "PAM: Account validation successful for user" not in log_content:
     test_fail("The test is running on an older rsync release which is not supporting PAM for account validation.")
 
 verify_dirs(src, authdir, label="PAM real user auth success")
+
+# Remove injection wrapper from parent test runner environment immediately after spawn
+del os.environ['LD_PRELOAD']
+del os.environ['PAM_WRAPPER']
+del os.environ['PAM_WRAPPER_SERVICE_DIR']
+
 print("daemon-auth: auth users / secrets file / strict modes / PAM verified")
