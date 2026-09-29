@@ -552,7 +552,7 @@ simdtest$(EXEEXT): simd-checksum-x86_64.cpp $(HEADERS)
 	fi
 
 pam_mock.so: $(srcdir)/testsuite/pam/pam_mock.c
-	$(CC) $(CFLAGS) $(CPPFLAGS) -shared -fPIC -o $@ $(srcdir)/testsuite/pam/pam_mock.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -I. -I$(srcdir) -shared -fPIC -o $@ $(srcdir)/testsuite/pam/pam_mock.c -lpam
 
 testsuite/chown-fake_test.py:
 	ln -s chown_test.py $(srcdir)/testsuite/chown-fake_test.py

@@ -11,13 +11,20 @@
 #  error "PAM is enabled, but no pam_appl.h header was found."
 #endif
 
+/* Handle Solaris dropping the const qualifier in pam_message */
+#if defined(__sun)
+#define PAM_MSG_CONST
+#else
+#define PAM_MSG_CONST const
+#endif
+
 /* 
  * A cross-platform dummy conversation function.
  * Completely eliminates the need for the Linux-only pam_misc.h and misc_conv.
  * If PAM attempts to interactively prompt for a password or display a message,
  * this instantly rejects it to prevent the background daemon from hanging.
  */
-static int rsync_pam_conv(int num_msg, const struct pam_message **msg,
+static int rsync_pam_conv(int num_msg, PAM_MSG_CONST struct pam_message **msg,
                           struct pam_response **resp, void *appdata_ptr)
 {
     /* Suppress unused variable warnings */
