@@ -26,6 +26,7 @@
 
 extern int module_id;
 extern int local_server;
+extern int local_server_shares_memory;
 extern int sanitize_paths;
 extern int operator_path_resolve;
 extern int trust_sender_args;
@@ -34,7 +35,7 @@ extern unsigned int module_dirlen;
 extern filter_rule_list filter_list;
 extern filter_rule_list daemon_filter_list;
 
-int make_backups = 0;
+RSYNC_TLS int make_backups = 0;
 
 /**
  * If 1, send the whole file as literal data rather than trying to
@@ -46,7 +47,7 @@ int make_backups = 0;
  **/
 int whole_file = -1;
 
-int append_mode = 0;
+RSYNC_TLS int append_mode = 0;
 int keep_dirlinks = 0;
 int copy_dirlinks = 0;
 int copy_links = 0;
@@ -138,7 +139,7 @@ int size_only = 0;
 int daemon_bwlimit = 0;
 int bwlimit = 0;
 int fuzzy_basis = 0;
-size_t bwlimit_writemax = 0;
+RSYNC_TLS size_t bwlimit_writemax = 0;
 int ignore_existing = 0;
 int ignore_non_existing = 0;
 int need_messages_from_generator = 0;
@@ -604,6 +605,10 @@ enum {OPT_SERVER = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_USERMAP, OPT_GROUPMAP, OPT_CHOWN, OPT_BWLIMIT, OPT_STDERR,
       OPT_OLD_COMPRESS, OPT_NEW_COMPRESS, OPT_NO_COMPRESS, OPT_OLD_ARGS,
       OPT_STOP_AFTER, OPT_STOP_AT,
+      /* append_mode and make_backups are set through the switch below rather
+       * than by popt writing to them directly, because both are RSYNC_TLS and
+       * a thread-local has no compile-time address for a static table. */
+      OPT_APPEND_VERIFY, OPT_NO_APPEND, OPT_BACKUP, OPT_NO_BACKUP,
       OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
@@ -730,8 +735,8 @@ static struct poptOption long_options[] = {
   {"inplace",          0,  POPT_ARG_VAL,    &inplace, 1, 0, 0 },
   {"no-inplace",       0,  POPT_ARG_VAL,    &inplace, 0, 0, 0 },
   {"append",           0,  POPT_ARG_NONE,   0, OPT_APPEND, 0, 0 },
-  {"append-verify",    0,  POPT_ARG_VAL,    &append_mode, 2, 0, 0 },
-  {"no-append",        0,  POPT_ARG_VAL,    &append_mode, 0, 0, 0 },
+  {"append-verify",    0,  POPT_ARG_NONE,   0, OPT_APPEND_VERIFY, 0, 0 },
+  {"no-append",        0,  POPT_ARG_NONE,   0, OPT_NO_APPEND, 0, 0 },
   {"del",              0,  POPT_ARG_NONE,   &delete_during, 0, 0, 0 },
   {"delete",           0,  POPT_ARG_NONE,   &delete_mode, 0, 0, 0 },
   {"delete-before",    0,  POPT_ARG_NONE,   &delete_before, 0, 0, 0 },
@@ -802,8 +807,8 @@ static struct poptOption long_options[] = {
   {"no-i",             0,  POPT_ARG_VAL,    &itemize_changes, 0, 0, 0 },
   {"bwlimit",          0,  POPT_ARG_STRING, &bwlimit_arg, OPT_BWLIMIT, 0, 0 },
   {"no-bwlimit",       0,  POPT_ARG_VAL,    &bwlimit, 0, 0, 0 },
-  {"backup",          'b', POPT_ARG_VAL,    &make_backups, 1, 0, 0 },
-  {"no-backup",        0,  POPT_ARG_VAL,    &make_backups, 0, 0, 0 },
+  {"backup",          'b', POPT_ARG_NONE,   0, OPT_BACKUP, 0, 0 },
+  {"no-backup",        0,  POPT_ARG_NONE,   0, OPT_NO_BACKUP, 0, 0 },
   {"backup-dir",       0,  POPT_ARG_STRING, &backup_dir, 0, 0, 0 },
   {"suffix",           0,  POPT_ARG_STRING, &backup_suffix, 0, 0, 0 },
   {"list-only",        0,  POPT_ARG_VAL,    &list_only, 2, 0, 0 },
@@ -1839,6 +1844,22 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 				append_mode = 1;
 			break;
 
+		case OPT_APPEND_VERIFY:
+			append_mode = 2;
+			break;
+
+		case OPT_NO_APPEND:
+			append_mode = 0;
+			break;
+
+		case OPT_BACKUP:
+			make_backups = 1;
+			break;
+
+		case OPT_NO_BACKUP:
+			make_backups = 0;
+			break;
+
 		case OPT_LINK_DEST:
 			want_dest_type = LINK_DEST;
 			goto set_dest_dir;
@@ -2393,7 +2414,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		 * peer-supplied root there could only loosen the module boundary. */
 		if (am_daemon)
 			confine_root = NULL;
-		else if (*confine_root != '/') {
+		else if (!IS_ABS_PATH(confine_root)) {
 			snprintf(err_buf, sizeof err_buf,
 				 "--confine-root must be an absolute path\n");
 			return 0;
@@ -2917,7 +2938,7 @@ void server_options(char **args, int *argc_p)
 	}
 #endif
 
-	if (protect_args && !local_server) /* unprotected args stop here */
+	if (protect_args && !LOCAL_SERVER_SHARES_STATE) /* unprotected args stop here */
 		args[ac++] = NULL;
 
 	if (list_only > 1)
@@ -3311,6 +3332,16 @@ static char *parse_hostspec(char *str, char **path_start_ptr, int *port_ptr)
 char *check_for_hostspec(char *s, char **host_ptr, int *port_ptr)
 {
 	char *path;
+
+	/* A local path that a port spells with a colon (a Windows drive, say)
+	 * must not be read as HOST:PATH.  Always false unless the platform
+	 * header says otherwise. */
+	if (IS_DRIVE_PATH(s)) {
+		*host_ptr = NULL;
+		if (port_ptr)
+			*port_ptr = 0;
+		return NULL;
+	}
 
 	if (port_ptr && strncasecmp(URL_PREFIX, s, strlen(URL_PREFIX)) == 0) {
 		*host_ptr = parse_hostspec(s + strlen(URL_PREFIX), &path, port_ptr);

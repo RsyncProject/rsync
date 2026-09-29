@@ -1,0 +1,15 @@
+/*
+ * Embeds rsync.manifest as the executable's application manifest.
+ *
+ * 1 is CREATEPROCESS_MANIFEST_RESOURCE_ID and 24 is RT_MANIFEST.  Going
+ * through a resource script rather than the linker's /MANIFESTINPUT keeps
+ * this working under any CMake generator: the Ninja generator drives the
+ * linker through a wrapper that does its own manifest pass, and passing
+ * /MANIFEST:EMBED as well leaves that pass with nothing to consume, which
+ * fails the relink.
+ *
+ * Copyright (C) 2026 Max Vilimpoc, rsync CMake/Windows port.
+ * Distributed under the same GPL-3.0-or-later terms as the rest of rsync.
+ */
+
+1 24 "rsync.manifest"

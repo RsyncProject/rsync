@@ -29,7 +29,7 @@
 extern int dry_run;
 extern int am_root;
 extern int am_sender;
-extern int am_generator;
+extern RSYNC_TLS int am_generator;
 extern int read_only;
 extern int list_only;
 extern int preserve_xattrs;

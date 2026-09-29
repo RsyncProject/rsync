@@ -23,13 +23,12 @@
 #include "rsync.h"
 
 extern int am_root;
-extern int make_backups;
+extern RSYNC_TLS int make_backups;
 extern int max_delete;
 extern char *backup_dir;
 extern char *backup_suffix;
 extern int backup_suffix_len;
-extern struct stats stats;
-
+extern RSYNC_TLS struct stats stats;
 int ignore_perishable = 0;
 int non_perishable_cnt = 0;
 int skipped_deletes = 0;

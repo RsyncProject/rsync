@@ -25,12 +25,13 @@
 
 extern int am_server;
 extern int am_sender;
-extern int am_generator;
+extern RSYNC_TLS int am_generator;
 extern int eol_nulls;
 extern int io_error;
 extern int xfer_dirs;
 extern int recurse;
 extern int local_server;
+extern int local_server_shares_memory;
 extern int prune_empty_dirs;
 extern int ignore_perishable;
 extern int relative_paths;
@@ -1946,7 +1947,7 @@ void send_filter_list(int f_out)
 	int receiver_wants_list = prune_empty_dirs
 	    || (delete_mode && (!delete_excluded || protocol_version >= 29));
 
-	if (local_server || (am_sender && !receiver_wants_list))
+	if (LOCAL_SERVER_SHARES_STATE || (am_sender && !receiver_wants_list))
 		f_out = -1;
 	if (cvs_exclude && am_sender) {
 		if (protocol_version >= 29)
@@ -1976,7 +1977,7 @@ void recv_filter_list(int f_in)
 	    || (delete_mode && (!delete_excluded || protocol_version >= 29));
 	unsigned int len;
 
-	if (!local_server && (am_sender || receiver_wants_list)) {
+	if (!LOCAL_SERVER_SHARES_STATE && (am_sender || receiver_wants_list)) {
 		while ((len = read_int(f_in)) != 0) {
 			if (len >= sizeof line)
 				overflow_exit("recv_rules");
@@ -1986,12 +1987,12 @@ void recv_filter_list(int f_in)
 	}
 
 	if (cvs_exclude) {
-		if (local_server || am_sender || protocol_version < 29)
+		if (LOCAL_SERVER_SHARES_STATE || am_sender || protocol_version < 29)
 			parse_filter_str(&filter_list, ":C", rule_template(0), 0);
-		if (local_server || am_sender)
+		if (LOCAL_SERVER_SHARES_STATE || am_sender)
 			parse_filter_str(&filter_list, "-C", rule_template(0), 0);
 	}
 
-	if (local_server) /* filter out any rules that aren't for us. */
+	if (LOCAL_SERVER_SHARES_STATE) /* filter out any rules that aren't for us. */
 		send_rules(-1, &filter_list);
 }

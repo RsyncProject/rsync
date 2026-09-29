@@ -24,7 +24,7 @@
 #include "ifuncs.h"
 #include "rounding.h"
 #include "inums.h"
-#include "io.h"
+#include "rsync-io.h"
 
 extern int am_root;
 extern int am_server;
@@ -35,7 +35,7 @@ extern unsigned int module_dirlen;
 extern int module_dirfd;
 extern unsigned int curr_dir_len;
 extern int am_sender;
-extern int am_generator;
+extern RSYNC_TLS int am_generator;
 extern int inc_recurse;
 extern int always_checksum;
 extern int module_id;
@@ -78,12 +78,12 @@ extern int munge_symlinks;
 extern int use_safe_inc_flist;
 extern int need_unsorted_flist;
 extern int sender_symlink_iconv;
-extern int output_needs_newline;
+extern RSYNC_TLS int output_needs_newline;
 extern int sender_keeps_checksum;
 extern int trust_sender_filter;
 extern int unsort_ndx;
 extern uid_t our_uid;
-extern struct stats stats;
+extern RSYNC_TLS struct stats stats;
 extern char *filesfrom_host;
 extern char *usermap, *groupmap;
 

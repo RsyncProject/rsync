@@ -43,17 +43,18 @@
 #define SELECT_TIMEOUT 60
 
 extern int bwlimit;
-extern size_t bwlimit_writemax;
+extern RSYNC_TLS size_t bwlimit_writemax;
 extern int io_timeout;
 extern int am_server;
 extern int am_sender;
-extern int am_receiver;
-extern int am_generator;
+extern RSYNC_TLS int am_receiver;
+extern RSYNC_TLS int am_generator;
 extern int local_server;
+extern int local_server_shares_memory;
 extern int msgs2stderr;
 extern int inc_recurse;
 extern int io_error;
-extern int batch_fd;
+extern RSYNC_TLS int batch_fd;
 extern int eol_nulls;
 extern int flist_eof;
 extern int file_total;
@@ -71,7 +72,7 @@ extern int write_batch;
 extern int preserve_hard_links;
 extern BOOL extra_flist_sending_enabled;
 extern BOOL flush_ok_after_signal;
-extern struct stats stats;
+extern RSYNC_TLS struct stats stats;
 extern time_t stop_at_utime;
 extern struct file_list *cur_flist;
 #ifdef ICONV_OPTION
@@ -79,26 +80,26 @@ extern int filesfrom_convert;
 extern iconv_t ic_send, ic_recv;
 #endif
 
-int csum_length = SHORT_SUM_LENGTH; /* initial value */
-int allowed_lull = 0;
-int msgdone_cnt = 0;
-int forward_flist_data = 0;
-BOOL flist_receiving_enabled = False;
+RSYNC_TLS int csum_length = SHORT_SUM_LENGTH; /* initial value */
+RSYNC_TLS int allowed_lull = 0;
+RSYNC_TLS int msgdone_cnt = 0;
+RSYNC_TLS int forward_flist_data = 0;
+RSYNC_TLS BOOL flist_receiving_enabled = False;
 
 /* Ignore an EOF error if non-zero. See whine_about_eof(). */
-int kluge_around_eof = 0;
-int got_kill_signal = -1; /* is set to 0 only after multiplexed I/O starts */
+RSYNC_TLS int kluge_around_eof = 0;
+RSYNC_TLS int got_kill_signal = -1; /* is set to 0 only after multiplexed I/O starts */
 volatile sig_atomic_t got_sigusr2 = 0; /* set by the async-signal-safe SIGUSR2 handler */
 
-int sock_f_in = -1;
-int sock_f_out = -1;
+RSYNC_TLS int sock_f_in = -1;
+RSYNC_TLS int sock_f_out = -1;
 
-int64 total_data_read = 0;
-int64 total_data_written = 0;
+RSYNC_TLS int64 total_data_read = 0;
+RSYNC_TLS int64 total_data_written = 0;
 
-char num_dev_ino_buf[4 + 8 + 8];
+RSYNC_TLS char num_dev_ino_buf[4 + 8 + 8];
 
-static struct {
+static RSYNC_TLS struct {
 	xbuf in, out, msg;
 	int in_fd;
 	int out_fd; /* Both "out" and "msg" go to this fd. */
@@ -109,8 +110,8 @@ static struct {
 	size_t raw_input_ends_before;    /* in the in xbuf */
 } iobuf = { .in_fd = -1, .out_fd = -1 };
 
-static time_t last_io_in;
-static time_t last_io_out;
+static RSYNC_TLS time_t last_io_in;
+static RSYNC_TLS time_t last_io_out;
 
 /* Absolute wall-clock bound for peer-controlled daemon handshake reads.
  * This is deliberately separate from io_timeout: the latter is an idle
@@ -124,17 +125,17 @@ static time_t daemon_handshake_deadline;
  * same way the socket path times its connect(). */
 static time_t client_connect_deadline;
 
-static int write_batch_monitor_in = -1;
-static int write_batch_monitor_out = -1;
+static RSYNC_TLS int write_batch_monitor_in = -1;
+static RSYNC_TLS int write_batch_monitor_out = -1;
 
-static int ff_forward_fd = -1;
-static int ff_reenable_multiplex = -1;
-static char ff_lastchar = '\0';
-static xbuf ff_xb = EMPTY_XBUF;
+static RSYNC_TLS int ff_forward_fd = -1;
+static RSYNC_TLS int ff_reenable_multiplex = -1;
+static RSYNC_TLS char ff_lastchar = '\0';
+static RSYNC_TLS xbuf ff_xb = EMPTY_XBUF;
 #ifdef ICONV_OPTION
-static xbuf iconv_buf = EMPTY_XBUF;
+static RSYNC_TLS xbuf iconv_buf = EMPTY_XBUF;
 #endif
-static int select_timeout = SELECT_TIMEOUT;
+static RSYNC_TLS int select_timeout = SELECT_TIMEOUT;
 
 /* Turn select_timeout (in seconds) into a poll() millisecond count, keeping it
  * positive and bounded.  A negative count means "wait forever" to poll(), which
@@ -178,9 +179,9 @@ static int handshake_poll_timeout_ms(void)
 	return timeout;
 }
 
-static int active_filecnt = 0;
-static OFF_T active_bytecnt = 0;
-static int first_message = 1;
+static RSYNC_TLS int active_filecnt = 0;
+static RSYNC_TLS OFF_T active_bytecnt = 0;
+static RSYNC_TLS int first_message = 1;
 
 static const char int_byte_extra[64] = {
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* (00 - 3F)/4 */
@@ -220,7 +221,7 @@ static const char int_byte_extra[64] = {
 
 enum festatus { FES_SUCCESS, FES_REDO, FES_NO_SEND };
 
-static flist_ndx_list redo_list, hlink_list;
+static RSYNC_TLS flist_ndx_list redo_list, hlink_list;
 
 static void read_a_msg(void);
 static void drain_multiplex_messages(void);
@@ -367,7 +368,7 @@ static size_t safe_read(int fd, char *buf, size_t len)
 
 static const char *what_fd_is(int fd)
 {
-	static char buf[20];
+	static RSYNC_TLS char buf[20];
 
 	if (fd == sock_f_out)
 		return "socket";
@@ -1200,7 +1201,7 @@ void send_msg_success(const char *fname, int num)
 	if (am_generator && write_batch < 0 && remove_source_files)
 		return;
 
-	if (local_server) {
+	if (LOCAL_SERVER_SHARES_STATE) {
 		STRUCT_STAT st;
 
 		if (DEBUG_GTE(IO, 1))
@@ -1209,7 +1210,7 @@ void send_msg_success(const char *fname, int num)
 		/* The dev/ino is consumed only by the sender's --remove-source-files
 		 * same-file safety check (successful_send), so skip the per-file
 		 * stat entirely otherwise -- it's sent but never read. */
-		if (remove_source_files && stat(fname, &st) == 0) {
+		if (remove_source_files && do_stat(fname, &st) == 0) {
 			SIVAL64(num_dev_ino_buf, 4, st.st_dev);
 			SIVAL64(num_dev_ino_buf, 4+8, st.st_ino);
 		} else {
@@ -1240,7 +1241,7 @@ static void got_flist_entry_status(enum festatus status, int ndx)
 	switch (status) {
 	case FES_SUCCESS:
 		if (remove_source_files && write_batch >= 0) {
-			if (local_server)
+			if (LOCAL_SERVER_SHARES_STATE)
 				send_msg(MSG_SUCCESS, num_dev_ino_buf, sizeof num_dev_ino_buf, -1);
 			else
 				send_msg_int(MSG_SUCCESS, ndx);
@@ -1829,7 +1830,7 @@ static void read_a_msg(void)
 		iobuf.in_multiplexed = 1;
 		break;
 	case MSG_SUCCESS:
-		if (msg_bytes != (local_server ? 4+8+8 : 4)) {
+		if (msg_bytes != (LOCAL_SERVER_SHARES_STATE ? 4+8+8 : 4)) {
 		  invalid_msg:
 			rprintf(FERROR, "invalid multi-message %d:%lu [%s%s]\n",
 				tag, (unsigned long)msg_bytes, who_am_i(),
@@ -2294,7 +2295,7 @@ void read_sum_head(int f, struct sum_struct *sum)
  * the generator and the sender. */
 void write_sum_head(int f, struct sum_struct *sum)
 {
-	static struct sum_struct null_sum;
+	static RSYNC_TLS struct sum_struct null_sum;
 
 	if (sum == NULL)
 		sum = &null_sum;
@@ -2322,8 +2323,8 @@ void write_sum_head(int f, struct sum_struct *sum)
  * sleep when the accumulated delay is at least 1 tenth of a second. */
 static void sleep_for_bwlimit(int bytes_written)
 {
-	static struct timeval prior_tv;
-	static long total_written = 0;
+	static RSYNC_TLS struct timeval prior_tv;
+	static RSYNC_TLS long total_written = 0;
 	struct timeval tv, start_tv;
 	long elapsed_usec, sleep_usec;
 
@@ -2540,7 +2541,7 @@ void write_vstring(int f, const char *str, int len)
 /* Send a file-list index using a byte-reduction method. */
 void write_ndx(int f, int32 ndx)
 {
-	static int32 prev_positive = -1, prev_negative = 1;
+	static RSYNC_TLS int32 prev_positive = -1, prev_negative = 1;
 	int32 diff, cnt = 0;
 	char b[6];
 
@@ -2587,7 +2588,7 @@ void write_ndx(int f, int32 ndx)
 /* Receive a file-list index using a byte-reduction method. */
 int32 read_ndx(int f)
 {
-	static int32 prev_positive = -1, prev_negative = 1;
+	static RSYNC_TLS int32 prev_positive = -1, prev_negative = 1;
 	int32 *prev_ptr, num;
 	uint32 unum;
 	char b[4];
@@ -2766,4 +2767,37 @@ void stop_write_batch(void)
 {
 	write_batch_monitor_out = -1;
 	write_batch_monitor_in = -1;
+}
+
+/* Give this thread private copies of the buffers reached through pointers in
+ * the TLS block.  win32_fork_thread() has just memcpy'd the parent's block, so
+ * every xbuf here still points at the parent's storage; fork() would have
+ * duplicated it.  Called on the receiver thread before any rsync code runs.
+ *
+ * The contents matter, not just the allocation: at the do_recv() hand-off
+ * these buffers can hold protocol bytes that have been read but not yet
+ * consumed. */
+static void clone_xbuf(xbuf *xb)
+{
+	char *old = xb->buf;
+
+	if (!old || !xb->size)
+		return;
+	xb->buf = new_array(char, xb->size);
+	memcpy(xb->buf, old, xb->size);
+}
+
+void io_fork_child_fixup(void)
+{
+	clone_xbuf(&iobuf.in);
+	clone_xbuf(&iobuf.out);
+	clone_xbuf(&iobuf.msg);
+	clone_xbuf(&ff_xb);
+#ifdef ICONV_OPTION
+	clone_xbuf(&iconv_buf);
+#endif
+
+	/* The generator owns these lists; the receiver starts with none. */
+	memset(&redo_list, 0, sizeof redo_list);
+	memset(&hlink_list, 0, sizeof hlink_list);
 }

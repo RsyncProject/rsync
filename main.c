@@ -23,7 +23,7 @@
 #include "rsync.h"
 #include "inums.h"
 #include "ifuncs.h"
-#include "io.h"
+#include "rsync-io.h"
 #if defined CONFIG_LOCALE && defined HAVE_LOCALE_H
 #include <locale.h>
 #endif
@@ -46,11 +46,11 @@ extern int inc_recurse;
 extern int blocking_io;
 extern int always_checksum;
 extern int remove_source_files;
-extern int output_needs_newline;
+extern RSYNC_TLS int output_needs_newline;
 extern int called_from_signal_handler;
 extern int need_messages_from_generator;
-extern int kluge_around_eof;
-extern int got_xfer_error;
+extern RSYNC_TLS int kluge_around_eof;
+extern RSYNC_TLS int got_xfer_error;
 extern volatile sig_atomic_t got_sigusr2;
 extern int old_style_args;
 extern int msgs2stderr;
@@ -76,26 +76,26 @@ extern int rsync_port;
 extern int whole_file;
 extern int read_batch;
 extern int write_batch;
-extern int batch_fd;
-extern int sock_f_in;
-extern int sock_f_out;
+extern RSYNC_TLS int batch_fd;
+extern RSYNC_TLS int sock_f_in;
+extern RSYNC_TLS int sock_f_out;
 extern int filesfrom_fd;
 extern int connect_timeout;
-extern int send_msgs_to_gen;
+extern RSYNC_TLS int send_msgs_to_gen;
 extern dev_t filesystem_dev;
-extern pid_t cleanup_child_pid;
-extern size_t bwlimit_writemax;
+extern RSYNC_TLS pid_t cleanup_child_pid;
+extern RSYNC_TLS size_t bwlimit_writemax;
 extern unsigned int module_dirlen;
-extern BOOL flist_receiving_enabled;
+extern RSYNC_TLS BOOL flist_receiving_enabled;
 extern BOOL want_progress_now;
-extern BOOL shutting_down;
+extern RSYNC_TLS BOOL shutting_down;
 extern int backup_dir_len;
 extern int basis_dir_cnt;
 extern int default_af_hint;
 extern int stdout_format_has_i;
 extern int trust_sender_filter;
 extern int trust_sender_args;
-extern struct stats stats;
+extern RSYNC_TLS struct stats stats;
 extern char *stdout_format;
 extern char *logfile_format;
 extern char *filesfrom_host;
@@ -114,8 +114,8 @@ extern filter_rule_list daemon_filter_list, implied_filter_list;
 
 uid_t our_uid;
 gid_t our_gid;
-int am_receiver = 0;  /* Only set to 1 after the receiver/generator fork. */
-int am_generator = 0; /* Only set to 1 after the receiver/generator fork. */
+RSYNC_TLS int am_receiver = 0;  /* Only set to 1 after the receiver/generator fork. */
+RSYNC_TLS int am_generator = 0; /* Only set to 1 after the receiver/generator fork. */
 int local_server = 0;
 int daemon_connection = 0; /* 0 = no daemon, 1 = daemon via remote shell, -1 = daemon via socket */
 mode_t orig_umask = 0;
@@ -135,6 +135,9 @@ char **raw_argv, **cooked_argv;
 #  define SIGACTMASK(n,h) SIGACTION(n,h)
 # endif
 static struct sigaction sigact;
+#else
+/* No sigaction(): SIGACTION() falls back to signal() and there is no mask. */
+# define SIGACTMASK(n,h) SIGACTION(n,h)
 #endif
 
 struct pid_status {
@@ -426,7 +429,7 @@ static const char *bytes_per_sec_human_dnum(void)
 	return human_dnum((total_written + total_read) / (0.5 + (endtime - starttime)), 2);
 }
 
-static void output_summary(void)
+void output_summary(void)
 {
 	if (INFO_GTE(STATS, 2)) {
 		rprintf(FCLIENT, "\n");
@@ -895,7 +898,7 @@ static void check_alt_basis_dirs(void)
 		 * rather than reject an operator '..' outside the dest tree (e.g.
 		 * --copy-dest=../to).  Skipped when sanitize_paths already confined
 		 * them; the dry_run>1 case keeps its leading-"../"-strip. */
-		if (*bdir != '/' && (dry_run > 1 || !sanitize_paths)) {
+		if (!IS_ABS_PATH(bdir) && (dry_run > 1 || !sanitize_paths)) {
 			int len = curr_dir_len + 1 + bd_len + 1;
 			char *new = new_array(char, len);
 			if (dry_run > 1 && slash && strncmp(bdir, "../", 3) == 0) {
@@ -918,7 +921,7 @@ static void check_alt_basis_dirs(void)
 }
 
 /* This is only called by the sender. */
-static void read_final_goodbye(int f_in, int f_out)
+void read_final_goodbye(int f_in, int f_out)
 {
 	int i, iflags, xlen;
 	uchar fnamecmp_type;
@@ -1012,6 +1015,52 @@ static void do_server_sender(int f_in, int f_out, int argc, char *argv[])
 	exit_cleanup(0);
 }
 
+/* The receiving half of do_recv(), which runs concurrently with the
+ * generator.  spawn_receiver_half() decides how the two are split -- a
+ * forked child on POSIX, a thread on Windows -- and receiver_half_finish()
+ * ends this half the way that split requires.  Both live in pipe.c, or in
+ * its platform counterpart. */
+void receiver_half(int f_in, int f_out, char *local_name,
+		   int error_pipe_r, int error_pipe_w)
+{
+	am_receiver = 1;
+	send_msgs_to_gen = am_server;
+
+	close_sibling_fd(error_pipe_r);
+
+	/* We can't let two processes write to the socket at one time. */
+	io_end_multiplex_out(MPLX_SWITCHING);
+	if (f_in != f_out)
+		close_sibling_fd(f_out);
+	sock_f_out = -1;
+	f_out = error_pipe_w;
+
+	bwlimit_writemax = 0; /* receiver doesn't need to do this */
+
+	if (read_batch)
+		io_start_buffering_in(f_in);
+	io_start_multiplex_out(f_out);
+
+	recv_files(f_in, f_out, local_name);
+	io_flush(FULL_FLUSH);
+	handle_stats(f_in);
+
+	if (output_needs_newline) {
+		fputc('\n', stdout);
+		output_needs_newline = 0;
+	}
+
+	write_int(f_out, NDX_DONE);
+	send_msg(MSG_STATS, (char*)&stats.total_read, sizeof stats.total_read, 0);
+	if (protocol_version >= 33) {
+		char b[8];
+		SIVAL64(b, 0, stats.touched_blocks_4k);
+		send_msg(MSG_BLOCK_STATS, b, sizeof b, 0);
+	}
+	io_flush(FULL_FLUSH);
+
+	receiver_half_finish(f_in, f_out);
+}
 
 static int do_recv(int f_in, int f_out, char *local_name)
 {
@@ -1075,68 +1124,11 @@ static int do_recv(int f_in, int f_out, char *local_name)
 
 	io_flush(FULL_FLUSH);
 
-	if ((pid = do_fork()) == -1) {
-		rsyserr(FERROR, errno, "fork failed in do_recv");
+	pid = spawn_receiver_half(f_in, f_out, local_name,
+				  error_pipe[0], error_pipe[1]);
+	if (pid == -1) {
+		rsyserr(FERROR, errno, "failed to start the receiver in do_recv");
 		exit_cleanup(RERR_IPC);
-	}
-
-	if (pid == 0) {
-		am_receiver = 1;
-		send_msgs_to_gen = am_server;
-
-		close(error_pipe[0]);
-
-		/* We can't let two processes write to the socket at one time. */
-		io_end_multiplex_out(MPLX_SWITCHING);
-		if (f_in != f_out)
-			close(f_out);
-		sock_f_out = -1;
-		f_out = error_pipe[1];
-
-		bwlimit_writemax = 0; /* receiver doesn't need to do this */
-
-		if (read_batch)
-			io_start_buffering_in(f_in);
-		io_start_multiplex_out(f_out);
-
-		recv_files(f_in, f_out, local_name);
-		io_flush(FULL_FLUSH);
-		handle_stats(f_in);
-
-		if (output_needs_newline) {
-			fputc('\n', stdout);
-			output_needs_newline = 0;
-		}
-
-		write_int(f_out, NDX_DONE);
-		send_msg(MSG_STATS, (char*)&stats.total_read, sizeof stats.total_read, 0);
-		if (protocol_version >= 33) {
-			char b[8];
-			SIVAL64(b, 0, stats.touched_blocks_4k);
-			send_msg(MSG_BLOCK_STATS, b, sizeof b, 0);
-		}
-		io_flush(FULL_FLUSH);
-
-		/* Handle any keep-alive packets from the post-processing work
-		 * that the generator does. */
-		if (protocol_version >= 29) {
-			kluge_around_eof = -1;
-
-			/* This should only get stopped via a USR2 signal. */
-			read_final_goodbye(f_in, f_out);
-
-			rprintf(FERROR, "Invalid packet at end of run [%s]\n",
-				who_am_i());
-			exit_cleanup(RERR_PROTOCOL);
-		}
-
-		/* Finally, we go to sleep until our parent tells us to wrap up
-		 * with a USR2 signal.  We sleep for a short time, as on some OSes
-		 * a signal won't interrupt a sleep, then act on the flag the
-		 * (async-signal-safe) handler set. */
-		while (!got_sigusr2)
-			msleep(20);
-		receive_sigusr2();
 	}
 
 	am_generator = 1;
@@ -1147,9 +1139,9 @@ static int do_recv(int f_in, int f_out, char *local_name)
 	if (write_batch && !am_server)
 		stop_write_batch();
 
-	close(error_pipe[1]);
+	close_sibling_fd(error_pipe[1]);
 	if (f_in != f_out)
-		close(f_in);
+		close_sibling_fd(f_in);
 	sock_f_in = -1;
 	f_in = error_pipe[0];
 
@@ -1841,6 +1833,7 @@ int main(int argc,char *argv[])
 	raw_argc = argc;
 	raw_argv = argv;
 
+	platform_init();
 	raise_fd_limit();
 
 #ifdef HAVE_SIGACTION
@@ -1912,6 +1905,8 @@ int main(int argc,char *argv[])
 		option_error();
 		exit_cleanup(RERR_SYNTAX);
 	}
+	platform_fix_path_args(argc, argv);
+
 	if (write_batch
 	 && poptDupArgv(argc, (const char **)argv, &cooked_argc, (const char ***)&cooked_argv) != 0)
 		out_of_memory("main");

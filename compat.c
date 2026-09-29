@@ -30,8 +30,9 @@ extern int inplace;
 extern int recurse;
 extern int use_qsort;
 extern int allow_inc_recurse;
+extern int inc_recurse_when_receiving;
 extern int preallocate_files;
-extern int append_mode;
+extern RSYNC_TLS int append_mode;
 extern int fuzzy_basis;
 extern int read_batch;
 extern int write_batch;
@@ -168,6 +169,13 @@ void set_allow_inc_recurse(void)
 		maybe_add_e_option(buf, sizeof buf);
 		client_info = *buf ? strdup(buf+1) : ""; /* The +1 skips the leading "e". */
 	}
+
+	/* Incremental recursion has the generator and the receiver each parse
+	 * and append file-list chunks after do_recv() splits them, which needs
+	 * the private address spaces that fork() provides.  A port that splits
+	 * with threads instead clears this. */
+	if (!am_sender && !inc_recurse_when_receiving)
+		allow_inc_recurse = 0;
 
 	if (!recurse || use_qsort)
 		allow_inc_recurse = 0;

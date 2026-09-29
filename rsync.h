@@ -347,6 +347,74 @@ enum delret {
 
 #include "config.h"
 
+/* ---- platform hooks ------------------------------------------------------
+ *
+ * A port supplies a header via config.h (see cmake/config.h.in) and overrides
+ * whichever of these it needs; the defaults below are the POSIX behaviour, so
+ * a platform that needs none of them changes nothing.  Keeping the variation
+ * here rather than as #ifdefs at each use site is what lets the rest of the
+ * tree stay platform-agnostic.  The Windows port defines all of these in
+ * win32/win32compat.h.
+ */
+
+/* Storage class for state that diverges between the generator and the
+ * receiver after do_recv() splits them.  Where that split is a fork() the
+ * two halves get separate address spaces and this is empty; a port that
+ * splits with threads instead makes it thread-local. */
+#ifndef RSYNC_TLS
+#define RSYNC_TLS
+#endif
+
+/* Is this local path absolute? */
+#ifndef IS_ABS_PATH
+#define IS_ABS_PATH(p) ((p)[0] == '/')
+#endif
+
+/* Does this argument name a local path that must not be mistaken for a
+ * HOST:PATH spec?  (On Windows, "C:\dir" is a drive, not a host.) */
+#ifndef IS_DRIVE_PATH
+#define IS_DRIVE_PATH(s) (0)
+#endif
+
+/* Called once at the top of main(), before anything else. */
+#ifndef platform_init
+#define platform_init() ((void)0)
+#endif
+
+/* Adjust the non-option arguments in place after they are parsed, for ports
+ * that spell paths differently than the wire protocol does. */
+#ifndef platform_fix_path_args
+#define platform_fix_path_args(argc, argv) ((void)0)
+#endif
+
+/* Can the receiver harden its destination chdir by resolving the path to a
+ * directory fd and fchdir()ing to it?  That is what closes the dest-chdir
+ * TOCTOU on POSIX.  It needs three things -- open() accepting a directory,
+ * O_NOFOLLOW/openat to make the walk refuse a raced symlink, and fchdir() --
+ * and a port with none of them (Windows) has to fall back to a plain
+ * chdir().  Nothing is given up there that was ever held: without AT_FDCWD
+ * the resolver degrades to a bare open() that checks no symlinks anyway. */
+#ifndef CHDIR_VIA_DIRFD
+#define CHDIR_VIA_DIRFD 1
+#endif
+
+/* Close an fd that belongs to the other half of the generator/receiver
+ * split.  With fork() the halves have separate fd tables and each closes
+ * what it does not need; a thread-based split shares one table, so a port
+ * that uses threads makes this a no-op. */
+#ifndef close_sibling_fd
+#define close_sibling_fd(fd) close(fd)
+#endif
+
+/* True when the server for a local copy inherited our parsed state, so
+ * things it already holds -- the filter list, the exact shape of a
+ * MSG_SUCCESS -- need not be transmitted.  local_child() forks on POSIX, so
+ * it does; a port that starts a separate process for it instead clears
+ * local_server_shares_memory, and those exchanges then happen over the pipe
+ * exactly as they would with a remote peer.  Both sides evaluate this the
+ * same way, which is what keeps the two ends of the protocol in step. */
+#define LOCAL_SERVER_SHARES_STATE (local_server && local_server_shares_memory)
+
 /* The default RSYNC_RSH is always set in config.h. */
 
 #include <stdio.h>
@@ -666,6 +734,10 @@ typedef unsigned int size_t;
 #endif
 #endif
 
+/* A platform header may define its own STRUCT_STAT (with OFF_T and
+ * SIZEOF_CAPITAL_OFF_T alongside it) when the system's struct stat cannot
+ * carry what rsync needs -- an inode wide enough for --hard-links, say. */
+#ifndef STRUCT_STAT
 #if SIZEOF_OFF_T == 8 || !SIZEOF_OFF64_T || !defined HAVE_STRUCT_STAT64
 #define OFF_T off_t
 #define STRUCT_STAT struct stat
@@ -675,6 +747,7 @@ typedef unsigned int size_t;
 #define STRUCT_STAT struct stat64
 #define USE_STAT64_FUNCS 1
 #define SIZEOF_CAPITAL_OFF_T SIZEOF_OFF64_T
+#endif
 #endif
 
 /* CAVEAT: on some systems, int64 will really be a 32-bit integer IFF

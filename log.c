@@ -28,7 +28,7 @@ extern int dry_run;
 extern int am_daemon;
 extern int am_server;
 extern int am_sender;
-extern int am_generator;
+extern RSYNC_TLS int am_generator;
 extern int local_server;
 extern int quiet;
 extern int module_id;
@@ -42,8 +42,8 @@ extern int stdout_format_has_o_or_i;
 extern int logfile_format_has_i;
 extern int logfile_format_has_o_or_i;
 extern int receiver_symlink_times;
-extern int64 total_data_written;
-extern int64 total_data_read;
+extern RSYNC_TLS int64 total_data_written;
+extern RSYNC_TLS int64 total_data_read;
 extern mode_t orig_umask;
 extern char *auth_user;
 extern char *stdout_format;
@@ -66,14 +66,14 @@ extern struct name_num_item *xfer_sum_nni, *file_sum_nni;
 static int log_initialised;
 static int logfile_was_closed;
 static FILE *logfile_fp;
-struct stats stats;
+RSYNC_TLS struct stats stats;
 
-int got_xfer_error = 0;
-int output_needs_newline = 0;
-int send_msgs_to_gen = 0;
+RSYNC_TLS int got_xfer_error = 0;
+RSYNC_TLS int output_needs_newline = 0;
+RSYNC_TLS int send_msgs_to_gen = 0;
 
-static int64 initial_data_written;
-static int64 initial_data_read;
+static RSYNC_TLS int64 initial_data_written;
+static RSYNC_TLS int64 initial_data_read;
 
 struct {
 	int code;

@@ -555,19 +555,19 @@ void file_checksum(const char *fname, const STRUCT_STAT *st_p, char *sum)
 	unmap_file(buf);
 }
 
-static int32 sumresidue;
-static md_context ctx_md;
+static RSYNC_TLS int32 sumresidue;
+static RSYNC_TLS md_context ctx_md;
 #ifdef SUPPORT_XXHASH
 static XXH64_state_t* xxh64_state;
 #endif
 #ifdef SUPPORT_XXH3
 static XXH3_state_t* xxh3_state;
 #endif
-static struct name_num_item *cur_sum_nni;
-int cur_sum_len;
+static RSYNC_TLS struct name_num_item *cur_sum_nni;
+RSYNC_TLS int cur_sum_len;
 
 #ifdef USE_OPENSSL
-static const EVP_MD *cur_sum_evp_md;
+static RSYNC_TLS const EVP_MD *cur_sum_evp_md;
 #endif
 
 /* Initialize a hash digest accumulator.  Data is supplied via

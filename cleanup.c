@@ -25,18 +25,18 @@
 extern int dry_run;
 extern int am_server;
 extern int am_daemon;
-extern int am_receiver;
+extern RSYNC_TLS int am_receiver;
 extern int am_sender;
 extern int io_error;
 extern int keep_partial;
-extern int got_xfer_error;
+extern RSYNC_TLS int got_xfer_error;
 extern int protocol_version;
-extern int output_needs_newline;
+extern RSYNC_TLS int output_needs_newline;
 extern char *partial_dir;
 extern char *logfile_name;
 
 int called_from_signal_handler = 0;
-BOOL shutting_down = False;
+RSYNC_TLS BOOL shutting_down = False;
 BOOL flush_ok_after_signal = False;
 
 #ifdef HAVE_SIGACTION
@@ -85,15 +85,15 @@ void close_all(void)
  * --partial is selected.  We need to ensure that the partial file is
  * kept if any real data has been transferred.
  **/
-int cleanup_got_literal = 0;
+RSYNC_TLS int cleanup_got_literal = 0;
 
-static const char *cleanup_fname;
-static const char *cleanup_new_fname;
-static struct file_struct *cleanup_file;
-static int cleanup_fd_r = -1, cleanup_fd_w = -1;
-static pid_t cleanup_pid = 0;
+static RSYNC_TLS const char *cleanup_fname;
+static RSYNC_TLS const char *cleanup_new_fname;
+static RSYNC_TLS struct file_struct *cleanup_file;
+static RSYNC_TLS int cleanup_fd_r = -1, cleanup_fd_w = -1;
+static RSYNC_TLS pid_t cleanup_pid = 0;
 
-pid_t cleanup_child_pid = -1;
+RSYNC_TLS pid_t cleanup_child_pid = -1;
 
 /**
  * Eventually calls exit(), passing @p code, therefore does not return.

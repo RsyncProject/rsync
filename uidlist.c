@@ -26,7 +26,7 @@
 #include "rsync.h"
 #include "ifuncs.h"
 #include "itypes.h"
-#include "io.h"
+#include "rsync-io.h"
 
 extern int am_root;
 extern int preserve_uid;

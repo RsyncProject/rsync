@@ -23,7 +23,7 @@
 #include "inums.h"
 
 extern int checksum_seed;
-extern int append_mode;
+extern RSYNC_TLS int append_mode;
 
 extern struct name_num_item *xfer_sum_nni;
 extern int xfer_sum_len;
@@ -40,8 +40,7 @@ static int total_false_alarms;
 static int total_hash_hits;
 static int total_matches;
 
-extern struct stats stats;
-
+extern RSYNC_TLS struct stats stats;
 #define TRADITIONAL_TABLESIZE (1<<16)
 
 /* The maximum number of same-weak-checksum candidates we will compare

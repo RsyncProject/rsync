@@ -37,7 +37,7 @@ extern int rsync_port;
 extern int protect_args;
 extern int ignore_errors;
 extern int preserve_xattrs;
-extern int kluge_around_eof;
+extern RSYNC_TLS int kluge_around_eof;
 extern int munge_symlinks;
 extern int use_secure_symlinks;
 extern int open_noatime;

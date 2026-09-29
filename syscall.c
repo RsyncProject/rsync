@@ -265,11 +265,17 @@ static int abspath_outside_confinement(const char *abspath, int final)
 		if (tail && !*tail)
 			return 0;		/* the pin directory: transit, opens nothing */
 		if (is_exact_fd_pin(abspath)) {
+#ifdef HAVE_READLINK
 			ssize_t n = readlink(abspath, pinned, sizeof pinned - 1);
 			if (n <= 0 || pinned[0] != '/')
 				return enforce ? 1 : 0;
 			pinned[n] = '\0';
 			abspath = pinned;
+#else
+			/* Native Windows has no /proc/self/fd or /dev/fd namespace.
+			 * Fail closed if a Unix-looking pin is nevertheless supplied. */
+			return enforce ? 1 : 0;
+#endif
 		}
 	}
 	if (strncmp(abspath, root, rootlen) == 0
