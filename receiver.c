@@ -21,6 +21,7 @@
 
 #include "rsync.h"
 #include "inums.h"
+#include <poll.h>
 
 extern int dry_run;
 extern int do_xfers;
@@ -73,6 +74,9 @@ extern struct name_num_item *xfer_sum_nni;
 extern int xfer_sum_len;
 extern int use_secure_symlinks;
 extern int operator_path_resolve;
+extern int xfer_parallel;
+extern int in_xfer_worker;
+extern int do_compression;
 
 static struct bitbag *delayed_bits = NULL;
 static int phase = 0, redoing = 0;
@@ -808,6 +812,627 @@ static int gen_wants_ndx(int desired_ndx, int flist_num)
  * main routine for receiver process.
  *
  * Receiver process runs on the same host as the generator process. */
+/*
+ * Phase 2b: concurrent receiver for whole-file transfers.  A small pool of
+ * persistent worker processes (forked once) each finalize one spooled file at
+ * a time.  The parent keeps sole ownership of the socket and normalizes each
+ * file's token stream into the uncompressed format on the worker's data pipe,
+ * so a worker's receive_data() consumes exactly one file's bytes per job.
+ * Delta/basis handling, partials, backups, xattrs/acls and sparse output are
+ * out of scope and rejected by parse_arguments() when --parallel is used.
+ */
+
+#define RCVP_W_MAX 8
+#define RCVP_OK 1
+#define RCVP_REDO 0
+#define RCVP_NOSEND -1
+#define RCVP_DELAYED 2
+
+struct rcvp_slot {
+	pid_t pid;
+	int req_wfd;   /* parent writes the job ndx */
+	int data_wfd;  /* parent writes the normalized token stream */
+	int busy;
+};
+
+static struct rcvp_slot rcvp_slots[RCVP_W_MAX];
+static int rcvp_nslots = 0;
+static int rcvp_result_rfd = -1;
+static int rcvp_result_wfd = -1;
+static int rcvp_active = 0;
+
+static void rcvp_drain(int blocking);
+
+static int rcvp_fd_ready(int fd, int blocking)
+{
+	struct pollfd pfd;
+	pfd.fd = fd;
+	pfd.events = POLLIN;
+	pfd.revents = 0;
+	if (poll(&pfd, 1, blocking ? -1 : 0) <= 0)
+		return 0;
+	return (pfd.revents & (POLLIN|POLLHUP|POLLERR)) != 0;
+}
+
+static void rcvp_report(int fd, int slot, int code, int32 ndx)
+{
+	char b[12];
+	size_t off = 0;
+	SIVAL(b, 0, slot);
+	SIVAL(b, 4, code);
+	SIVAL(b, 8, ndx);
+	while (off < 12) {
+		ssize_t n = write(fd, b + off, 12 - off);
+		if (n < 0) {
+			if (errno == EINTR)
+				continue;
+			_exit(1);
+		}
+		off += n;
+	}
+}
+
+/* Worker: read a job (ndx) then finalize that one file. */
+static void rcvp_worker_loop(int req_fd, int data_fd, int result_wfd, int slot)
+{
+	in_xfer_worker = 1;
+	do_compression = 0;      /* pipes carry the simple token format */
+	allowed_lull = 0;        /* never emit keepalives from a worker */
+	preserve_xattrs = 0;
+
+	while (1) {
+		char fname[MAXPATHLEN], fnametmpbuf[MAXPATHLEN];
+		char xname[MAXPATHLEN], basedirbuf[MAXPATHLEN], fnamecmpbuf[MAXPATHLEN];
+		char buf[CHUNK_SIZE];
+		char nb[24];
+		char *partialptr, *fnamecmp, *fnametmp;
+		const char *basedir = NULL;
+		STRUCT_STAT st;
+		struct file_struct *file;
+		int fd1, fd2, recv_ok, ndx, fnamecmp_type, xlen, got = 0;
+		int job_append, job_backups, job_sparse;
+		int one_inplace;
+
+		while (got < 24) {
+			int n = read(req_fd, nb + got, 24 - got);
+			if (n < 0 && errno == EINTR)
+				continue;
+			if (n <= 0)
+				_exit(0);
+			got += n;
+		}
+		ndx = IVAL(nb, 0);
+		fnamecmp_type = IVAL(nb, 4);
+		xlen = IVAL(nb, 8);
+		job_append = IVAL(nb, 12);
+		job_backups = IVAL(nb, 16);
+		job_sparse = IVAL(nb, 20);
+		if (ndx < 0)
+			_exit(0);
+		/* Apply the per-file state the parent computed (the FLAG_FILE_SENT
+		 * redo toggles), since a pre-forked worker cannot see flag changes. */
+		append_mode = job_append;
+		make_backups = job_backups;
+		sparse_files = job_sparse;
+		if (xlen < 0)
+			xlen = 0;
+		if (xlen >= (int)sizeof xname)
+			xlen = sizeof xname - 1;
+		got = 0;
+		while (got < xlen) {
+			int n = read(req_fd, xname + got, xlen - got);
+			if (n < 0 && errno == EINTR)
+				continue;
+			if (n <= 0)
+				_exit(0);
+			got += n;
+		}
+		xname[xlen] = '\0';
+
+		file = cur_flist->files[ndx - cur_flist->ndx_start];
+		f_name(file, fname);
+
+		/* Resolve the delta basis the same way the serial receiver does:
+		 * the destination file, a --backup copy, a --partial-dir file, a
+		 * --fuzzy match, or an alternate-destination basis dir. */
+		partialptr = partial_dir ? partial_dir_fname(fname) : fname;
+		fnamecmp = fname;
+		if (fnamecmp_type == FNAMECMP_FNAME) {
+			/* the destination file itself */
+		} else if (fnamecmp_type == FNAMECMP_PARTIAL_DIR)
+			fnamecmp = partialptr;
+		else if (fnamecmp_type == FNAMECMP_BACKUP) {
+			const char *bname = get_backup_name(fname);
+			if (bname)
+				fnamecmp = (char*)bname;
+		} else if (fnamecmp_type == FNAMECMP_FUZZY) {
+			if (file->dirname)
+				basedir = file->dirname;
+			fnamecmp = xname;
+		} else if (fnamecmp_type > FNAMECMP_FUZZY
+			&& fnamecmp_type - FNAMECMP_FUZZY <= basis_dir_cnt) {
+			int bd = fnamecmp_type - FNAMECMP_FUZZY - 1;
+			if (file->dirname) {
+				pathjoin(basedirbuf, sizeof basedirbuf, basis_dir[bd], file->dirname);
+				basedir = basedirbuf;
+			} else
+				basedir = basis_dir[bd];
+			fnamecmp = xname;
+		} else if (fnamecmp_type < basis_dir_cnt) {
+			basedir = basis_dir[fnamecmp_type];
+			fnamecmp = fname;
+		}
+		if (!fnamecmp || (daemon_filter_list.head
+		  && check_filter(&daemon_filter_list, FLOG, fnamecmp, 0) < 0)) {
+			fnamecmp = fname;
+			fnamecmp_type = FNAMECMP_FNAME;
+			basedir = NULL;
+		}
+
+		fd1 = -1;
+		if (fnamecmp_type == FNAMECMP_PARTIAL_DIR && fnamecmp && *fnamecmp != '/')
+			fd1 = secure_relative_open(NULL, fnamecmp, O_RDONLY, 0);
+		else {
+			int bdfd = basedir ? -1 : held_dfd_for(fnamecmp, file);
+			if (bdfd >= 0) {
+				const char *slash = strrchr(fnamecmp, '/');
+				fd1 = do_open_atfd(bdfd, slash ? slash + 1 : fnamecmp, O_RDONLY, 0);
+			} else {
+				if ((basedir && !am_daemon) || fnamecmp_type == FNAMECMP_PARTIAL_DIR)
+					operator_path_resolve = 1;
+				fd1 = secure_basis_open(basedir, fnamecmp, O_RDONLY, 0);
+				operator_path_resolve = 0;
+			}
+		}
+		if (fd1 >= 0 && (do_fstat(fd1, &st) != 0 || !S_ISREG(st.st_mode))) {
+			close(fd1);
+			fd1 = -1;
+		}
+		if (fd1 == -1) {
+			st.st_mode = 0;
+			st.st_size = 0;
+		}
+
+		/* The finalize/log paths want the basis as one full path string. */
+		if (basedir) {
+			pathjoin(fnamecmpbuf, sizeof fnamecmpbuf, basedir, fnamecmp);
+			fnamecmp = fnamecmpbuf;
+		}
+
+		one_inplace = inplace_partial && partial_dir
+			   && fnamecmp_type == FNAMECMP_PARTIAL_DIR
+			   && fd1 != -1;
+		updating_basis_or_equiv = one_inplace
+		    || (inplace && (fnamecmp == fname || fnamecmp_type == FNAMECMP_BACKUP));
+
+		if (!preserve_perms) {
+			int exists = fd1 != -1;
+			file->mode = dest_mode(file->mode, st.st_mode,
+					       (ACCESSPERMS & ~orig_umask), exists);
+		}
+
+		if (inplace || one_inplace) {
+			fnametmp = one_inplace ? partialptr : fname;
+			if (secure_relpath_active())
+				fd2 = secure_recv_open(fnametmp, O_WRONLY|O_CREAT, 0600, one_inplace);
+			else
+				fd2 = do_open(fnametmp, O_WRONLY|O_CREAT, 0600);
+#ifdef linux
+			if (fd2 == -1 && errno == EACCES) {
+				if (use_secure_symlinks || one_inplace)
+					fd2 = secure_recv_open(fnametmp, O_WRONLY, 0600, one_inplace);
+				else
+					fd2 = do_open(fnametmp, O_WRONLY, 0600);
+			}
+#endif
+			if (fd2 == -1 && errno == EACCES)
+				fd2 = open_readonly_inplace(fnametmp, one_inplace);
+			if (fd2 != -1 && updating_basis_or_equiv)
+				cleanup_set(NULL, NULL, file, fd1, fd2);
+		} else {
+			fnametmp = fnametmpbuf;
+			fd2 = open_tmpfile(fnametmp, fname, file);
+		}
+		if (fd2 == -1) {
+			if (fd1 != -1)
+				close(fd1);
+			while (read(data_fd, buf, sizeof buf) > 0) {}
+			rcvp_report(result_wfd, slot, RCVP_NOSEND, ndx);
+			continue;
+		}
+
+		recv_ok = receive_data(data_fd, fnamecmp, fd1, st.st_size, fname, fd2, file,
+				       inplace || one_inplace);
+		if (fd1 != -1)
+			close(fd1);
+		if (close(fd2) < 0)
+			recv_ok = 0;
+
+		if (recv_ok && delay_updates && partialptr) {
+			/* Stage the completed file into the partial dir; the parent
+			 * renames every staged file into place at phase 2. */
+			if (!handle_partial_dir(partialptr, PDIR_CREATE)) {
+				rprintf(FERROR,
+					"Unable to create partial-dir for %s -- discarding completed file.\n",
+					fname);
+				do_unlink_at(fnametmp);
+				recv_ok = 0;
+			} else if (!finish_transfer(partialptr, fnametmp, fnamecmp, NULL,
+						    file, 1, !partial_dir))
+				recv_ok = 0;
+			else {
+				rcvp_report(result_wfd, slot, RCVP_DELAYED, ndx);
+				continue;
+			}
+		}
+
+		if (recv_ok || inplace) {
+			if (partialptr == fname)
+				partialptr = NULL;
+			if (!finish_transfer(fname, fnametmp, fnamecmp, partialptr, file, recv_ok, 1))
+				recv_ok = 0;
+			else if (fnamecmp == partialptr) {
+				/* Consumed the --partial-dir basis. */
+				do_unlink_at(partialptr);
+				handle_partial_dir(partialptr, PDIR_DELETE);
+			}
+		} else if (keep_partial && partialptr) {
+			if (!handle_partial_dir(partialptr, PDIR_CREATE)) {
+				rprintf(FERROR,
+					"Unable to create partial-dir for %s -- discarding partial file.\n",
+					fname);
+				do_unlink_at(fnametmp);
+			} else if (!finish_transfer(partialptr, fnametmp, fnamecmp, NULL,
+						    file, 0, !partial_dir))
+				recv_ok = 0;
+		} else
+			do_unlink_at(fnametmp);
+
+		rcvp_report(result_wfd, slot, recv_ok ? RCVP_OK : RCVP_REDO, ndx);
+	}
+}
+
+/* Parent: copy one file's token stream from the socket into the worker pipe,
+ * normalized to the format receive_data() reads with do_compression off. */
+static void rcvp_spool(int f_in, int data_fd)
+{
+	struct sum_struct sum;
+	char *data;
+	int32 n;
+
+	read_sum_head(f_in, &sum);
+	write_sum_head(data_fd, &sum);
+
+	while (1) {
+		data = NULL;
+		n = recv_token(f_in, &data);
+		if (n == 0)
+			break;
+		if (n > 0) {
+			if (!data) {
+				rprintf(FERROR, "Invalid literal token with no data [%s]\n", who_am_i());
+				exit_cleanup(RERR_PROTOCOL);
+			}
+			stats.literal_data += n;
+			write_int(data_fd, n);
+			write_buf(data_fd, data, n);
+		} else {
+			/* Match token: the worker applies it against the basis.  Count
+			 * the bytes here since the worker's stats copy is discarded. */
+			int idx = -(n + 1);
+			int32 mlen = (idx == (int)sum.count - 1 && sum.remainder)
+				   ? sum.remainder : sum.blength;
+			stats.matched_data += mlen;
+			write_int(data_fd, n);
+		}
+		if (allowed_lull)
+			maybe_send_keepalive(time(NULL), MSK_ALLOW_FLUSH | MSK_ACTIVE_RECEIVER);
+		if (rcvp_active > 1)
+			rcvp_drain(0);
+	}
+	write_int(data_fd, 0);
+
+	read_buf(f_in, sender_file_sum, xfer_sum_len);
+	write_buf(data_fd, sender_file_sum, xfer_sum_len);
+}
+
+static void rcvp_handle_result(int slot, int code, int32 ndx)
+{
+	struct file_struct *file;
+	struct file_list *fl;
+	char fname[MAXPATHLEN];
+
+	fl = flist_for_ndx(ndx, "rcvp_handle_result");
+	file = fl->files[ndx - fl->ndx_start];
+	f_name(file, fname);
+
+	switch (code) {
+	case RCVP_OK:
+		/* The workers run with preserve_xattrs forced off (they cannot see
+		 * the per-file xattr data the parent read off the socket), so the
+		 * parent applies the xattrs once the file is in place. */
+#ifdef SUPPORT_XATTRS
+		if (preserve_xattrs)
+			set_file_attrs(fname, file, NULL, fname, 0);
+#endif
+		if (remove_source_files || inc_recurse
+		 || (preserve_hard_links && F_IS_HLINKED(file)))
+			send_msg_success(fname, ndx);
+		break;
+	case RCVP_DELAYED:
+		/* The worker staged the file in the partial dir; the parent applies
+		 * xattrs there (the worker cannot see the xattr data) and records
+		 * the index for the deferred rename at phase 2. */
+#ifdef SUPPORT_XATTRS
+		if (preserve_xattrs) {
+			char *pp = partial_dir ? partial_dir_fname(fname) : fname;
+			set_file_attrs(pp, file, NULL, fname, 0);
+		}
+#endif
+		if (delayed_bits)
+			bitbag_set_bit(delayed_bits, ndx);
+		break;
+	case RCVP_REDO:
+		send_msg_int(MSG_REDO, ndx);
+		file->flags |= FLAG_FILE_SENT;
+		break;
+	default:
+		if (inc_recurse)
+			send_msg_int(MSG_NO_SEND, ndx);
+		break;
+	}
+
+	if (slot >= 0 && slot < rcvp_nslots)
+		rcvp_slots[slot].busy = 0;
+}
+
+/* Reap finished workers.  With blocking set, wait for at least one result
+ * (then drain everything already available); otherwise only what is ready. */
+static void rcvp_drain(int blocking)
+{
+	while (rcvp_active > 0 && (blocking || rcvp_fd_ready(rcvp_result_rfd, 0))) {
+		char b[12];
+		int got = 0, slot, code, ndx;
+
+		while (got < 12) {
+			int n = read(rcvp_result_rfd, b + got, 12 - got);
+			if (n < 0 && errno == EINTR)
+				continue;
+			if (n <= 0)
+				exit_cleanup(RERR_IPC);
+			got += n;
+		}
+		slot = IVAL(b, 0);
+		code = IVAL(b, 4);
+		ndx = IVAL(b, 8);
+		rcvp_handle_result(slot, code, ndx);
+		rcvp_active--;
+	}
+	while (waitpid(-1, NULL, WNOHANG) > 0) {}
+}
+
+static int rcvp_free_slot(void)
+{
+	int i;
+	for (i = 0; i < rcvp_nslots; i++)
+		if (!rcvp_slots[i].busy)
+			return i;
+	return -1;
+}
+
+static void rcvp_start_pool(int W)
+{
+	int i;
+
+	for (i = 0; i < W; i++) {
+		int req[2], data[2];
+		pid_t pid;
+		if (pipe(req) < 0 || pipe(data) < 0) {
+			rsyserr(FERROR, errno, "pipe failed in recv_files_parallel");
+			exit_cleanup(RERR_IPC);
+		}
+		if ((pid = fork()) < 0) {
+			rsyserr(FERROR, errno, "fork failed in recv_files_parallel");
+			exit_cleanup(RERR_IPC);
+		}
+		if (pid == 0) {
+			close(req[1]);
+			close(data[1]);
+			close(rcvp_result_rfd);
+			rcvp_worker_loop(req[0], data[0], rcvp_result_wfd, i);
+			_exit(0);
+		}
+		close(req[0]);
+		close(data[0]);
+		rcvp_slots[i].pid = pid;
+		rcvp_slots[i].req_wfd = req[1];
+		rcvp_slots[i].data_wfd = data[1];
+		rcvp_slots[i].busy = 0;
+	}
+	rcvp_nslots = W;
+}
+
+static void rcvp_stop_pool(void)
+{
+	int i, status;
+	for (i = 0; i < rcvp_nslots; i++) {
+		write_int(rcvp_slots[i].req_wfd, -1);
+		close(rcvp_slots[i].req_wfd);
+		close(rcvp_slots[i].data_wfd);
+	}
+	for (i = 0; i < rcvp_nslots; i++)
+		wait_process(rcvp_slots[i].pid, &status, 0);
+	close(rcvp_result_wfd);
+	close(rcvp_result_rfd);
+}
+
+static int recv_files_parallel(int f_in, int f_out, char *local_name)
+{
+	int phase = 0, max_phase = protocol_version >= 29 ? 2 : 1;
+	int itemizing = am_server ? logfile_format_has_i : stdout_format_has_i;
+	int W = xfer_parallel > RCVP_W_MAX ? RCVP_W_MAX : xfer_parallel;
+	int rp[2];
+	int ndx, iflags, xlen, slot = -1;
+	uchar fnamecmp_type;
+	char xname[MAXPATHLEN], fbuf[MAXPATHLEN];
+	struct file_struct *file;
+
+	if (pipe(rp) < 0) {
+		rsyserr(FERROR, errno, "pipe failed in recv_files_parallel");
+		exit_cleanup(RERR_IPC);
+	}
+	rcvp_result_rfd = rp[0];
+	rcvp_result_wfd = rp[1];
+
+	if (DEBUG_GTE(RECV, 1))
+		rprintf(FINFO, "recv_files_parallel(%d) starting\n", cur_flist->used);
+
+	if (whole_file < 0)
+		whole_file = 0;
+
+	rcvp_start_pool(W);
+	progress_init();
+
+	if (delay_updates)
+		delayed_bits = bitbag_create(cur_flist->used + 1);
+
+	while (1) {
+		if (rcvp_active >= W || rcvp_free_slot() < 0) {
+			rcvp_drain(1);
+			continue;
+		}
+		if (rcvp_active > 0 && !io_input_available(f_in)) {
+			rcvp_drain(1);
+			continue;
+		}
+
+		ndx = read_ndx_and_attrs(f_in, f_out, &iflags, &fnamecmp_type, xname, &xlen);
+		if (ndx == NDX_DONE) {
+			while (rcvp_active > 0)
+				rcvp_drain(1);
+			if (!am_server && cur_flist) {
+				set_current_file_index(NULL, 0);
+				if (INFO_GTE(PROGRESS, 2))
+					end_progress(0);
+			}
+			if (++phase > max_phase)
+				break;
+			if (phase == 2 && delay_updates)
+				handle_delayed_updates(local_name);
+			write_int(f_out, NDX_DONE);
+			continue;
+		}
+
+		if (ndx - cur_flist->ndx_start >= 0)
+			file = cur_flist->files[ndx - cur_flist->ndx_start];
+		else if (cur_flist->parent_ndx < 0 || cur_flist->parent_ndx >= dir_flist->used)
+			exit_cleanup(RERR_PROTOCOL);
+		else
+			file = dir_flist->files[cur_flist->parent_ndx];
+		if (!F_IS_ACTIVE(file)) {
+			rprintf(FERROR, "rsync: refusing transfer of cleared file index %d\n", ndx);
+			exit_cleanup(RERR_PROTOCOL);
+		}
+
+#ifdef SUPPORT_XATTRS
+		if (preserve_xattrs && iflags & ITEM_REPORT_XATTR && do_xfers
+		 && !(want_xattr_optim && BITS_SET(iflags, ITEM_XNAME_FOLLOWS|ITEM_LOCAL_CHANGE)))
+			recv_xattr_request(file, f_in);
+#endif
+
+		if (!(iflags & ITEM_TRANSFER)) {
+			maybe_log_item(file, iflags, itemizing, xname);
+#ifdef SUPPORT_XATTRS
+			if (preserve_xattrs && iflags & ITEM_REPORT_XATTR && do_xfers
+			 && !BITS_SET(iflags, ITEM_XNAME_FOLLOWS|ITEM_LOCAL_CHANGE))
+				set_file_attrs(f_name(file, fbuf), file, NULL, f_name(file, fbuf), 0);
+#endif
+			if (iflags & ITEM_IS_NEW) {
+				stats.created_files++;
+				if (S_ISREG(file->mode)) {
+					/* Nothing further to count. */
+				} else if (S_ISDIR(file->mode))
+					stats.created_dirs++;
+#ifdef SUPPORT_LINKS
+				else if (S_ISLNK(file->mode))
+					stats.created_symlinks++;
+#endif
+				else if (IS_DEVICE(file->mode))
+					stats.created_devices++;
+				else
+					stats.created_specials++;
+			}
+			rcvp_drain(0);
+			continue;
+		}
+
+		slot = rcvp_free_slot();
+		if (slot < 0) {
+			rcvp_drain(1);
+			continue;
+		}
+
+		/* Mirror the serial receiver's per-file redo toggling here, in the
+		 * parent, and pass the resulting state to the worker (a pre-forked
+		 * worker cannot observe the parent's FLAG_FILE_SENT updates). */
+		if (file->flags & FLAG_FILE_SENT) {
+			if (csum_length == SHORT_SUM_LENGTH) {
+				if (keep_partial && !partial_dir)
+					make_backups = -make_backups;
+				if (append_mode)
+					sparse_files = -sparse_files;
+				append_mode = -append_mode;
+				csum_length = SUM_LENGTH;
+				redoing = 1;
+			}
+		} else {
+			if (csum_length != SHORT_SUM_LENGTH) {
+				if (keep_partial && !partial_dir)
+					make_backups = -make_backups;
+				if (append_mode)
+					sparse_files = -sparse_files;
+				append_mode = -append_mode;
+				csum_length = SHORT_SUM_LENGTH;
+				redoing = 0;
+			}
+			if (iflags & ITEM_IS_NEW)
+				stats.created_files++;
+		}
+
+		if (!am_server)
+			set_current_file_index(file, ndx);
+		stats.xferred_files++;
+		stats.total_transferred_size += F_LENGTH(file);
+		remember_initial_stats();
+
+		write_int(rcvp_slots[slot].req_wfd, ndx);
+		write_int(rcvp_slots[slot].req_wfd, (int)fnamecmp_type);
+		write_int(rcvp_slots[slot].req_wfd, xlen > 0 ? xlen : 0);
+		write_int(rcvp_slots[slot].req_wfd, append_mode);
+		write_int(rcvp_slots[slot].req_wfd, make_backups);
+		write_int(rcvp_slots[slot].req_wfd, sparse_files);
+		if (xlen > 0)
+			write_buf(rcvp_slots[slot].req_wfd, xname, xlen);
+		rcvp_slots[slot].busy = 1;
+		rcvp_active++;
+		rcvp_spool(f_in, rcvp_slots[slot].data_wfd);
+		rcvp_drain(0);
+	}
+
+	rcvp_stop_pool();
+
+	if (phase == 2 && delay_updates)
+		handle_delayed_updates(local_name);
+
+	if (make_backups < 0)
+		make_backups = -make_backups;
+
+	if (DEBUG_GTE(RECV, 1))
+		rprintf(FINFO, "recv_files finished\n");
+
+	return 0;
+}
+
 int recv_files(int f_in, int f_out, char *local_name)
 {
 	int fd1,fd2;
@@ -832,6 +1457,9 @@ int recv_files(int f_in, int f_out, char *local_name)
 
 	if (DEBUG_GTE(RECV, 1))
 		rprintf(FINFO, "recv_files(%d) starting\n", cur_flist->used);
+
+	if (xfer_parallel > 1)
+		return recv_files_parallel(f_in, f_out, local_name);
 
 	if (delay_updates)
 		delayed_bits = bitbag_create(cur_flist->used + 1);

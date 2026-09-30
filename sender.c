@@ -485,6 +485,73 @@ static void write_ndx_and_attrs(int f_out, int ndx, int iflags,
 #endif
 }
 
+/* Open a source file using the sender's hardened path-resolution rules.
+ * Returns the fd, or -1 with errno set (ENAMETOOLONG for an over-long joined
+ * path).  This is shared by the serial and concurrent transfer paths. */
+static int open_sender_source_file(const char *path, const char *slash, const char *fname)
+{
+	int fd;
+
+	if (symlink_optout_allowed()) {
+		/* Module opted out of symlink confinement ("insecure links =
+		 * yes", admin-only) -- or a non-daemon --insecure-links: legacy
+		 * unconfined open, restoring the pre-hardening content read
+		 * (re-opening the escape for that module; documented). */
+		fd = do_open_checklinks(fname);
+	} else if (secure_relpath_active()) {
+		/* Open from module root to prevent TOCTOU race where
+		 * change_pathname's chdir follows a directory symlink.
+		 * Reconstruct the full path relative to module_dir
+		 * from F_PATHNAME (path) and f_name (fname). */
+		char secure_path[MAXPATHLEN];
+		const char *relp;
+		int slen = snprintf(secure_path, sizeof secure_path, "%s%s%s", path, slash, fname);
+		if (slen >= (int)sizeof secure_path) {
+			errno = ENAMETOOLONG;
+			return -1;
+		}
+		/* A module with `path = /` makes F_PATHNAME absolute, so the
+		 * joined path starts with '/'; strip leading slashes to a
+		 * module-relative path that secure_relative_open accepts (#897). */
+		relp = secure_path;
+		while (*relp == '/')
+			relp++;
+		/* A symlink-following mode must follow an in-tree symlink leaf the
+		 * operator asked for, still confined to the module; the default
+		 * keeps the O_NOFOLLOW leaf so a raced leaf symlink is refused. */
+		if (copy_links || copy_unsafe_links || copy_dirlinks || insecure_links)
+			fd = sender_open_copylinks_confined(module_dir, relp);
+		else
+			fd = sender_open_confined(module_dir, relp, O_RDONLY);
+	} else if (!copy_links && !copy_unsafe_links && !copy_dirlinks && !insecure_links) {
+		int matched;
+		/* A files-from entry follows only trusted-owned ancestors because
+		 * its source base is operator-selected but the entry itself may not
+		 * be. Other paths stay confined beneath their explicit transfer root.
+		 * Every file leaf remains O_NOFOLLOW. */
+		if (files_from) {
+			fd = do_open_checklinks(fname);
+		} else {
+			fd = open_sender_source_path(fname, O_RDONLY | O_NOFOLLOW, &matched);
+			if (!matched) {
+				if (fname[0] == '/') {
+					/* --relative keeps the full absolute path as fname;
+					 * anchor at "/" and pass the resolver a relative path. */
+					const char *relp = fname;
+					while (*relp == '/')
+						relp++;
+					fd = sender_open_confined("/", relp, O_RDONLY);
+				} else
+					fd = sender_open_confined(NULL, fname, O_RDONLY);
+			}
+		}
+	} else {
+		fd = do_open_checklinks(fname);
+	}
+
+	return fd;
+}
+
 void send_files(int f_in, int f_out)
 {
 	int fd = -1;
@@ -648,65 +715,14 @@ void send_files(int f_in, int f_out)
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
-		if (symlink_optout_allowed()) {
-			/* Module opted out of symlink confinement ("insecure links =
-			 * yes", admin-only) -- or a non-daemon --insecure-links: legacy
-			 * unconfined open, restoring the pre-hardening content read
-			 * (re-opening the escape for that module; documented). */
-			fd = do_open_checklinks(fname);
-		} else if (secure_relpath_active()) {
-			/* Open from module root to prevent TOCTOU race where
-			 * change_pathname's chdir follows a directory symlink.
-			 * Reconstruct the full path relative to module_dir
-			 * from F_PATHNAME (path) and f_name (fname). */
-			char secure_path[MAXPATHLEN];
-			const char *relp;
-			int slen = snprintf(secure_path, sizeof secure_path, "%s%s%s", path, slash, fname);
-			if (slen >= (int)sizeof secure_path) {
-				io_error |= IOERR_GENERAL;
-				rprintf(FERROR_XFER, "path too long: %s%s%s\n", path, slash, fname);
-				free_sums(s);
-				if (protocol_version >= 30)
-					send_msg_int(MSG_NO_SEND, ndx);
-				continue;
-			}
-			/* A module with `path = /` makes F_PATHNAME absolute, so the
-			 * joined path starts with '/'; strip leading slashes to a
-			 * module-relative path that secure_relative_open accepts (#897). */
-			relp = secure_path;
-			while (*relp == '/')
-				relp++;
-			/* A symlink-following mode must follow an in-tree symlink leaf the
-			 * operator asked for, still confined to the module; the default
-			 * keeps the O_NOFOLLOW leaf so a raced leaf symlink is refused. */
-			if (copy_links || copy_unsafe_links || copy_dirlinks || insecure_links)
-				fd = sender_open_copylinks_confined(module_dir, relp);
-			else
-				fd = sender_open_confined(module_dir, relp, O_RDONLY);
-		} else if (!copy_links && !copy_unsafe_links && !copy_dirlinks && !insecure_links) {
-			int matched;
-			/* A files-from entry follows only trusted-owned ancestors because
-			 * its source base is operator-selected but the entry itself may not
-			 * be. Other paths stay confined beneath their explicit transfer root.
-			 * Every file leaf remains O_NOFOLLOW. */
-			if (files_from) {
-				fd = do_open_checklinks(fname);
-			} else {
-				fd = open_sender_source_path(fname, O_RDONLY | O_NOFOLLOW, &matched);
-				if (!matched) {
-					if (fname[0] == '/') {
-						/* --relative keeps the full absolute path as fname;
-						 * anchor at "/" and pass the resolver a relative path. */
-						const char *relp = fname;
-						while (*relp == '/')
-							relp++;
-						fd = sender_open_confined("/", relp, O_RDONLY);
-					} else
-						fd = sender_open_confined(NULL, fname, O_RDONLY);
-				}
-			}
-		} else {
-			fd = do_open_checklinks(fname);
+		fd = open_sender_source_file(path, slash, fname);
+		if (fd == -1 && errno == ENAMETOOLONG) {
+			io_error |= IOERR_GENERAL;
+			rprintf(FERROR_XFER, "path too long: %s%s%s\n", path, slash, fname);
+			free_sums(s);
+			if (protocol_version >= 30)
+				send_msg_int(MSG_NO_SEND, ndx);
+			continue;
 		}
 		if (fd == -1) {
 			if (errno == ENOENT) {

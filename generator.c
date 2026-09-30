@@ -2889,8 +2889,9 @@ void generate_files(int f_out, const char *local_name)
 				write_ndx(f_out, NDX_DONE);
 		}
 		/* Read MSG_DONE for delay-updates phase & prior messages. */
-		while (msgdone_cnt == 2)
+		while (msgdone_cnt == 2) {
 			wait_for_receiver();
+		}
 	}
 
 	info_levels[INFO_FLIST] = save_info_flist;

@@ -1,3 +1,23 @@
+# NEWS for rsync 3.5.1+ (unreleased)
+
+## Changes in this version:
+
+### ENHANCEMENTS:
+- Added a new `--parallel=NUM` (`-j NUM`) option that transfers up to NUM files
+  concurrently over the single connection. Both peers must be running this same
+  build. The receiving side uses a small pool of forked workers while the parent
+  keeps sole ownership of the socket; this mainly helps when the destination is
+  a high-latency or slow filesystem. The default (`-j1`) is unchanged. Because
+  the concurrent data plane is still under development, `--parallel` forces
+  `--no-inc-recursive` and rejects combinations it does not yet support
+  (`--acls`, the device options, and the batch options); see the manpage for
+  the full list.  `--inplace`, `--append`/`--append-verify`, `--partial`,
+  `--partial-dir`, `--backup`, `--backup-dir`, `--delete` (and its WHEN
+  variants), `--delay-updates`, `--hard-links`, `--xattrs`, `--fuzzy`,
+  `--compare-dest/--copy-dest/--link-dest`, `--sparse`, `--preallocate`,
+  `--compress`, `--checksum` and `--remove-source-files` are supported.
+
+--------------------------------------------------------------------------------
 # NEWS for rsync 3.5.1 (21 Sep 2026)
 
 ## Changes in this version:

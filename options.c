@@ -92,6 +92,8 @@ int do_compression = 0;
 int do_compression_level = CLVL_NOT_SPECIFIED;
 int do_compression_threads = 0; /*n = 0 use rsync thread, n >= 1 spawn n threads for compression */
 #define MAX_DAEMON_COMPRESSION_THREADS 8
+int xfer_parallel = 1; /* number of files to transfer concurrently (1 = serial) */
+#define MAX_XFER_PARALLEL 64
 int am_root = 0; /* 0 = normal, 1 = root, 2 = --super, -1 = --fake-super */
 int am_server = 0;
 int am_sender = 0;
@@ -782,6 +784,7 @@ static struct poptOption long_options[] = {
   {"zl",               0,  POPT_ARG_INT,    &do_compression_level, 0, 0, 0 },
   {"compress-threads", 0,  POPT_ARG_INT,    &do_compression_threads, 0, 0, 0 },
   {"zt",               0,  POPT_ARG_INT,    &do_compression_threads, 0, 0, 0 },
+  {"parallel",        'j', POPT_ARG_INT,    &xfer_parallel, 0, 0, 0 },
   {0,                 'P', POPT_ARG_NONE,   0, 'P', 0, 0 },
   {"progress",         0,  POPT_ARG_VAL,    &do_progress, 1, 0, 0 },
   {"no-progress",      0,  POPT_ARG_VAL,    &do_progress, 0, 0, 0 },
@@ -2299,6 +2302,33 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		goto cleanup;
 	}
 
+	if (xfer_parallel < 1) {
+		snprintf(err_buf, sizeof err_buf,
+			"--parallel must be at least 1.\n");
+		goto cleanup;
+	}
+	if (xfer_parallel > MAX_XFER_PARALLEL)
+		xfer_parallel = MAX_XFER_PARALLEL;
+	if (xfer_parallel > 1) {
+		/* These modes rely on strict per-file ordering or on a data plane
+		 * that the concurrent transfer code does not (yet) support. */
+		const char *bad = NULL;
+		if (read_batch || write_batch)
+			bad = read_batch ? "--read-batch" : "--write-batch";
+		else if (preserve_acls)
+			bad = "--acls";
+		else if (write_devices || copy_devices)
+			bad = write_devices ? "--write-devices" : "--copy-devices";
+		if (bad) {
+			snprintf(err_buf, sizeof err_buf,
+				"%s cannot be used with --parallel (use -j1).\n", bad);
+			goto cleanup;
+		}
+		/* The concurrent data plane currently requires a fully-materialized
+		 * file list. */
+		allow_inc_recurse = 0;
+	}
+
 	if (tmpdir && strlen(tmpdir) >= MAXPATHLEN - 10) {
 		snprintf(err_buf, sizeof err_buf,
 			 "the --temp-dir path is WAY too long.\n");
@@ -2974,6 +3004,12 @@ void server_options(char **args, int *argc_p)
 
 	if (bwlimit) {
 		if (asprintf(&arg, "--bwlimit=%d", bwlimit) < 0)
+			goto oom;
+		args[ac++] = arg;
+	}
+
+	if (xfer_parallel > 1) {
+		if (asprintf(&arg, "--parallel=%d", xfer_parallel) < 0)
 			goto oom;
 		args[ac++] = arg;
 	}

@@ -2677,6 +2677,27 @@ void io_printf(int fd, const char *format, ...)
 }
 
 /* Setup for multiplexing a MSG_* stream with the data stream. */
+/* Return non-zero if a control message from the peer is likely readable
+ * without blocking.  Used by the concurrent-transfer sender to decide whether
+ * it can prefetch another file or should keep draining its workers.  It is
+ * only meaningful for the socket input fd. */
+int io_input_available(int f)
+{
+	struct pollfd pfd;
+
+	if (f != iobuf.in_fd)
+		return 1;
+	if (iobuf.in.len != 0 || iobuf.raw_input_ends_before != 0)
+		return 1;
+
+	pfd.fd = f;
+	pfd.events = POLLIN;
+	pfd.revents = 0;
+	if (poll(&pfd, 1, 0) <= 0)
+		return 0;
+	return (pfd.revents & (POLLIN | POLLHUP | POLLERR)) != 0;
+}
+
 void io_start_multiplex_out(int fd)
 {
 	io_flush(FULL_FLUSH);

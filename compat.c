@@ -53,6 +53,7 @@ extern int delete_mode, delete_before, delete_during, delete_after;
 extern int do_compression;
 extern int do_compression_level;
 extern int do_compression_threads;
+extern int xfer_parallel;
 extern int saw_stderr_opt;
 extern int msgs2stderr;
 extern char *shell_cmd;
@@ -636,6 +637,12 @@ void setup_protocol(int f_out,int f_in)
 	if (protocol_version > PROTOCOL_VERSION) {
 		rprintf(FERROR, "--protocol must be no more than %d on the %s.\n",
 			PROTOCOL_VERSION, am_server? "Server" : "Client");
+		exit_cleanup(RERR_PROTOCOL);
+	}
+	if (xfer_parallel > 1 && protocol_version < 33) {
+		rprintf(FERROR,
+			"--parallel requires protocol >= 33 (negotiated %d on the %s).\n",
+			protocol_version, am_server? "Server" : "Client");
 		exit_cleanup(RERR_PROTOCOL);
 	}
 	if (read_batch)

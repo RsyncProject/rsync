@@ -71,6 +71,7 @@ struct stats stats;
 int got_xfer_error = 0;
 int output_needs_newline = 0;
 int send_msgs_to_gen = 0;
+int in_xfer_worker = 0; /* set in a concurrent-transfer worker to silence logging */
 
 static int64 initial_data_written;
 static int64 initial_data_read;
@@ -435,6 +436,11 @@ void rprintf(enum logcode code, const char *format, ...)
 	va_list ap;
 	char buf[BIGPATHBUFLEN];
 	size_t len;
+
+	/* A concurrent-transfer worker must not write to the multiplexed
+	 * socket stream; its findings are reported to the parent instead. */
+	if (in_xfer_worker)
+		return;
 
 	va_start(ap, format);
 	len = vsnprintf(buf, sizeof buf, format, ap);

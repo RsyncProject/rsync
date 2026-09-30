@@ -640,6 +640,7 @@ has its own detailed description later in this manpage.
 --compress-choice=STR    choose the compression algorithm (aka --zc)
 --compress-level=NUM     explicitly set compression level (aka --zl)
 --compress-threads=NUM   explicitly set compression threads (aka --zt)
+--parallel=NUM, -j       transfer up to NUM files concurrently
 --skip-compress=LIST     skip compressing files with suffix in LIST
 --cvs-exclude, -C        auto-ignore files in the same way CVS does
 --filter=RULE, -f        add a file-filtering RULE
@@ -2006,6 +2007,29 @@ sign) if you want the local shell to expand it.
     [`--inplace`](#opt)) or for testing the checksum-based update algorithm.
 
     See also the [`--whole-file`](#opt) option.
+
+0.  `--parallel=NUM`, `-j NUM`
+
+    Transfer up to NUM files concurrently over the single connection instead of
+    strictly one file at a time.  The receiving side forks a small pool of
+    worker processes, each of which finalizes one file at a time, while the
+    parent process keeps sole ownership of the socket and spools each file's
+    data to its worker.  This can speed up transfers whose destination is a
+    high-latency or slow filesystem (for example, a backup to a network or
+    Windows-backed mount), where per-file syscall latency dominates.
+
+    The default is 1, which preserves rsync's traditional behavior exactly.
+    Both ends must be running this same rsync build for the option to work.
+    Because the concurrent data plane is still under development, `--parallel`
+    currently forces `--no-inc-recursive` and rejects combinations whose
+    ordering or basis handling it does not yet implement: `--acls`,
+    `--write-devices`, `--copy-devices`, and the batch options.  Use `-j1` if
+    you need any of those.  Options such as `--inplace`, `--append` (and
+    `--append-verify`), `--partial`, `--partial-dir`, `--backup`,
+    `--backup-dir`, `--delete` (and its WHEN variants), `--delay-updates`,
+    `--hard-links`, `--xattrs`, `--fuzzy`, `--compare-dest`, `--copy-dest`,
+    `--link-dest`, `--sparse`, `--preallocate`, `--compress`, `--checksum` and
+    `--remove-source-files` are supported.
 
 0.  `--checksum-choice=STR`, `--cc=STR`
 
