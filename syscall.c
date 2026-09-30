@@ -32,7 +32,7 @@
 #undef O_RESOLVE_BENEATH
 #endif
 
-#if !defined MKNOD_CREATES_SOCKETS && defined HAVE_SYS_UN_H
+#ifdef HAVE_SYS_UN_H
 #include <sys/un.h>	/* for the socket+bind() fallback in do_mknod() */
 #endif
 #ifdef HAVE_SYS_ATTR_H
