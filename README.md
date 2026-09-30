@@ -1,5 +1,10 @@
-WHAT IS RSYNC?
---------------
+WHAT IS MRSYNC?
+---------------
+
+mrsync is a fork of rsync that transfers several files at the same time.  It
+is built from the upstream rsync 3.5.1 sources and follows them closely: the
+wire protocol is unchanged, and with the default options mrsync behaves
+exactly like rsync.  (The compiled program is still named `rsync`.)
 
 Rsync is a fast and extraordinarily versatile file copying tool for
 both remote and local files.
@@ -13,6 +18,41 @@ between two files normally requires local access to both files.
 
 A technical report describing the rsync algorithm is included with this
 package.
+
+
+DIFFERENCES FROM UPSTREAM RSYNC
+-------------------------------
+
+* **`--parallel=NUM`, `-j NUM` -- concurrent file transfer.**  Transfer up to
+  NUM files at once over a single connection instead of strictly one file at a
+  time.  The receiving side forks a small pool of worker processes, each of
+  which finalizes one file at a time, while the parent process keeps sole
+  ownership of the socket and spools each file's data to its worker.  This
+  mainly helps when the destination is a high-latency or slow filesystem (a
+  network or Windows-backed mount, for example), where per-file syscall
+  latency dominates.  The default is `-j1`, which preserves rsync's
+  traditional behavior exactly.
+
+  `--parallel` requires this same mrsync build on **both** ends of the
+  transfer.  It also forces `--no-inc-recursive`, and rejects the combinations
+  whose ordering or basis handling the concurrent data plane does not
+  implement yet: `--acls`, `--write-devices`, `--copy-devices`, and the batch
+  options (`--read-batch` / `--write-batch`).  Use `-j1` if you need any of
+  those.  `--inplace`, `--append` (and `--append-verify`), `--partial`,
+  `--partial-dir`, `--backup`, `--backup-dir`, `--delete` (and its WHEN
+  variants), `--delay-updates`, `--hard-links`, `--xattrs`, `--fuzzy`,
+  `--compare-dest`, `--copy-dest`, `--link-dest`, `--sparse`, `--preallocate`,
+  `--compress`, `--checksum` and `--remove-source-files` all work with `-j2+`.
+
+* **Nothing else.**  There are no other behavior changes, no renamed options
+  and no protocol divergence; upstream fixes and features are merged in as
+  they appear.
+
+For example, to push a tree to a remote host with 8 files in flight:
+
+    rsync -a -j8 src/ host:dest/
+
+See the `--parallel` entry in [rsync.1.md](rsync.1.md) for the full text.
 
 
 USAGE
@@ -116,6 +156,11 @@ the Internet for the error message you've received, or looking in the
 
 [5]: https://mail-archive.com/rsync@lists.samba.org/
 
+For problems specific to mrsync -- anything about `--parallel`, or anything
+else this fork changed -- please open an issue at
+<https://github.com/linhxxx/mrsync/issues>.  Everything else is upstream rsync,
+so the upstream bug-tracking page is the right place for it.
+
 To send a bug report, follow the instructions on the bug-tracking
 page of the web site.
 
@@ -126,10 +171,10 @@ For security issues please email details of the issue to <rsync.project@gmail.co
 GIT REPOSITORY
 --------------
 
-If you want to get the very latest version of rsync direct from the
-source code repository, then you will need to use git.  The git repo
-is hosted [on GitHub][6] and [on Samba's site][7].
+mrsync itself lives [on GitHub][6m].  It is forked from [upstream rsync][6],
+which is also [mirrored on Samba's site][7].
 
+[6m]: https://github.com/linhxxx/mrsync
 [6]: https://github.com/RsyncProject/rsync
 [7]: https://git.samba.org/?p=rsync.git;a=summary
 
