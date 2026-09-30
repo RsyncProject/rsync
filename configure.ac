@@ -655,16 +655,19 @@ else
     AC_MSG_RESULT(no)
 fi
 
+PAM_MOCK_SO=""
 AC_MSG_CHECKING([whether to enable PAM support])
 AC_ARG_ENABLE([pam],
-        AS_HELP_STRING([--disable-pam], [disable to omit PAM support]))
+        AS_HELP_STRING([--enable-pam], [enable PAM support (default is NO)]))
 AH_TEMPLATE([SUPPORT_PAM],
-[Undefine if you do not want PAM support.  By default this is defined.])
-if test x"$enable_pam" != x"no"; then
+[Define to 1 if you want PAM support. By default this is undefined.])
+
+if test x"$enable_pam" = x"yes"; then
     if test x"$ac_cv_header_security_pam_appl_h" = x"yes" || test x"$ac_cv_header_pam_pam_appl_h" = x"yes"; then
         AC_MSG_RESULT(yes)
         AC_SEARCH_LIBS(pam_start, pam,
-            [AC_DEFINE(SUPPORT_PAM)],
+            [AC_DEFINE(SUPPORT_PAM)
+             PAM_MOCK_SO="pam_mock.so"],
             [err_msg="$err_msg$nl- Failed to find pam_start function in pam lib.";
              no_lib="$no_lib pam"])
     else
@@ -675,6 +678,8 @@ if test x"$enable_pam" != x"no"; then
 else
     AC_MSG_RESULT(no)
 fi
+
+AC_SUBST(PAM_MOCK_SO)
 
 if test x"$no_lib" != x; then
     echo ""

@@ -34,8 +34,6 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 #else
 /* 
  * If PAM is disabled or headers are missing, we compile an empty file 
- * to prevent compiler errors. ISO C forbids an empty translation unit, 
- * so we provide a dummy typedef.
- */
+ * to prevent compiler errors. */
 typedef int make_iso_compilers_happy;
 #endif

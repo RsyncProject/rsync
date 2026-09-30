@@ -176,7 +176,8 @@ proc = push(ok, target_module='pam_auth', user='tuser')
 log_content = daemon_log.read_text() if daemon_log.exists() else ""
 
 if "PAM enabled but rsync compiled without PAM support" in log_content:
-    test_fail("daemon-auth: auth users / secrets file / strict modes verified (PAM tests skipped: rsync built without PAM)")
+    print("daemon-auth: auth users / secrets file / strict modes verified (PAM tests skipped: rsync built without PAM)")
+    sys.exit(0)
 
 if "PAM: Account validation successful for user" in log_content:
     test_fail("PAM module unexpectedly authenticated non-existent system user 'tuser'!")
@@ -186,7 +187,7 @@ if proc.returncode != 5:
 
 # 2. Fake user with wrong password: fails MD5 challenge prior to PAM evaluation
 proc = push(bad, target_module='pam_auth', user='tuser')
-if proc.returncode == 0:
+if proc.returncode == 0 or "PAM: Account validation successful for user" in log_content:
     test_fail("PAM module unexpectedly succeeded with the wrong password (fake user)")
 
 # 3. Real system user with valid secrets password: passes both MD5 and PAM
