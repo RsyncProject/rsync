@@ -3444,7 +3444,7 @@ int secure_relative_dirfd_at_beneath(int anchor_fd, const char *relpath)
 						directory_traverse_flags(), 0, 1);
 }
 
-#if defined O_NOFOLLOW && defined O_DIRECTORY && defined AT_FDCWD
+#if defined O_NOFOLLOW && defined AT_FDCWD
 /* Fill buf with len random bytes.  Prefers /dev/urandom for cryptographic
  * quality; falls back to rand() if /dev/urandom cannot be opened or read
  * (e.g. inside a chroot or container without /dev populated). */
@@ -3471,7 +3471,7 @@ static void rand_bytes(unsigned char *buf, size_t len)
  * This is the create loop shared with secure_mkstemp(). */
 int do_mkstemp_atfd(int dfd, char *filename, mode_t perms)
 {
-#ifdef AT_FDCWD
+#if defined O_NOFOLLOW && defined AT_FDCWD
 	static const char letters[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 	size_t filename_len = strlen(filename);
 	char *suffix;
