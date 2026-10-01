@@ -502,7 +502,6 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 		dfd_owns = 1;
 #ifndef __CYGWIN__
 		abspath[0] = '\0';			/* now resolving from "/" */
-		is_anchored = 1;
 		char *p = remaining;
 		while (*p == '/') p++;
 		memmove(remaining, p, strlen(p) + 1);
