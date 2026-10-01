@@ -31,7 +31,7 @@ def makefile_vars(repo, names):
 
 repo = Path(os.environ.get(
     "RSYNC_SOURCE_UNDER_TEST", Path(__file__).resolve().parent.parent))
-source_path = repo / "auth" / "authenticate.c"
+source_path = repo / "authenticate.c"
 config_path = repo / "config.h"
 if not source_path.exists() or not config_path.exists():
     test_skipped(f"configured rsync source tree unavailable at {repo}")

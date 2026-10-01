@@ -3,8 +3,17 @@
 #ifdef SUPPORT_PAM
 
 #define PAM_SM_ACCOUNT
-#include <security/pam_appl.h>
-#include <security/pam_modules.h>
+#if defined(HAVE_SECURITY_PAM_APPL_H)
+#  include <security/pam_appl.h>
+#elif defined(HAVE_PAM_PAM_APPL_H)
+#  include <pam/pam_appl.h>
+#endif
+
+#if defined(HAVE_SECURITY_PAM_MODULES_H)
+#  include <security/pam_modules.h>
+#elif defined(HAVE_PAM_PAM_MODULES_H)
+#  include <pam/pam_modules.h>
+#endif
 #include <pwd.h>
 #include <stddef.h>
 

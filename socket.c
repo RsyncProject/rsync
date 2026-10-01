@@ -28,7 +28,6 @@
 #include <poll.h>
 #include "itypes.h"
 #include "ifuncs.h"
-#include "auth/auth.h"
 #ifdef HAVE_NETINET_IN_SYSTM_H
 #include <netinet/in_systm.h>
 #endif

@@ -103,11 +103,6 @@ import ctypes.util
 import platform
 import shutil
 
-# Ensure root privileges
-if os.getuid() != 0:
-    print("daemon-auth: auth users / secrets file / strict modes verified (PAM tests skipped: requires root)")
-    sys.exit(0)
-
 # Skip Darwin: macOS SIP strips dynamic library injection across fork/exec
 if platform.system() == 'Darwin':
     print("daemon-auth: auth users / secrets file / strict modes verified (PAM tests skipped on Darwin)")
@@ -125,10 +120,20 @@ pam_wrapper_so = None
 pkg_config = shutil.which("pkg-config")
 if pkg_config:
     try:
+        # First try: --libs
         res = subprocess.run([pkg_config, "--libs", "pam_wrapper"], capture_output=True, text=True, check=True)
         discovered_path = res.stdout.strip()
-        if os.path.exists(discovered_path):
+
+        if os.path.isabs(discovered_path) and os.path.exists(discovered_path):
             pam_wrapper_so = discovered_path
+        else:
+            # Second try: --variable=libdir (incase --libs returned -L flags)
+            res_libdir = subprocess.run([pkg_config, "--variable=libdir", "pam_wrapper"], capture_output=True, text=True, check=True)
+            libdir = res_libdir.stdout.strip()
+            if libdir:
+                candidate = os.path.join(libdir, "libpam_wrapper.so")
+                if os.path.exists(candidate):
+                    pam_wrapper_so = candidate
     except Exception:
         pass
 
@@ -158,8 +163,8 @@ conf.write_text(
     f"pid file = {SCRATCHDIR}/rsyncd.pid\n"
     "use chroot = no\n"
     f"log file = {daemon_log}\n"
-    "uid = 0\n"
-    "gid = 0\n"
+    f"uid = {os.getuid()}\n"
+    f"gid = {os.getgid()}\n"
     f"\n[pam_auth]\n"
     f"\tpath = {authdir}\n"
     "\tread only = no\n"
@@ -171,9 +176,12 @@ conf.write_text(
 url = start_test_daemon(conf, DAEMON_PORT)
 host_port_path = url.replace('rsync://', '')
 
+def reload_log_file():
+    return daemon_log.read_text() if daemon_log.exists() else ""
+
 # 1. Fake user with valid secrets password: fails PAM account management (expected returncode 5)
 proc = push(ok, target_module='pam_auth', user='tuser')
-log_content = daemon_log.read_text() if daemon_log.exists() else ""
+log_content = reload_log_file()
 
 if "PAM enabled but rsync compiled without PAM support" in log_content:
     print("daemon-auth: auth users / secrets file / strict modes verified (PAM tests skipped: rsync built without PAM)")
@@ -187,6 +195,7 @@ if proc.returncode != 5:
 
 # 2. Fake user with wrong password: fails MD5 challenge prior to PAM evaluation
 proc = push(bad, target_module='pam_auth', user='tuser')
+log_content = reload_log_file()
 if proc.returncode == 0 or "PAM: Account validation successful for user" in log_content:
     test_fail("PAM module unexpectedly succeeded with the wrong password (fake user)")
 
@@ -195,7 +204,7 @@ proc = push(real_ok, target_module='pam_auth', user=real_user)
 if proc.returncode not in (0, 23):
     test_fail(f"PAM module rejected valid system user '{real_user}': {proc.stderr} (rc={proc.returncode})")
 
-log_content = daemon_log.read_text() if daemon_log.exists() else ""
+log_content = reload_log_file()
 if "PAM: Account validation successful for user" not in log_content:
     test_fail("The test is running on an older rsync release which is not supporting PAM for account validation.")
 
