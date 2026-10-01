@@ -774,6 +774,20 @@ in the values of parameters.  See that section for details.
     the exact check.  If the file is not found or is rejected, no logins for an
     "[auth users](#)" module will be possible.
 
+    0.  `use pam`
+
+    This parameter determines whether the rsync daemon will utilize Pluggable
+    Authentication Modules (PAM) for account validation. If "use pam" is true,
+    rsync will invoke the PAM account management subsystem (`pam_acct_mgmt`)
+    after a user successfully authenticates. This allows administrators to
+    enforce system-level access policies (such as locked, expired, or disabled
+    accounts) without duplicating those controls inside rsync.
+
+    Note that this is strictly for account management, not primary password
+    authentication. Password verification is always handled by rsync's internal
+    challenge-response mechanism using the "[secrets file](#)" parameter. The
+    default is false.
+
 0.  `auth digest`
 
     This parameter sets the *minimum* message digest that the daemon will accept

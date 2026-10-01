@@ -13,7 +13,7 @@ AC_CHECK_HEADERS(poll.h sys/fcntl.h sys/select.h fcntl.h sys/time.h sys/unistd.h
     sys/acl.h acl/libacl.h attr/xattr.h sys/xattr.h sys/extattr.h dl.h \
     popt.h popt/popt.h linux/falloc.h netinet/in_systm.h netgroup.h \
     zlib.h xxhash.h openssl/md4.h openssl/md5.h zstd.h lz4.h sys/file.h \
-    sys/resource.h bsd/string.h idn2.h)
+    sys/resource.h bsd/string.h idn2.h security/pam_modules.h security/pam_appl.h pam/pam_appl.h)
 AC_CHECK_HEADERS([netinet/ip.h], [], [], [[#include <netinet/in.h>]])
 AC_HEADER_MAJOR_FIXED
 
@@ -654,6 +654,32 @@ if test x"$enable_idn" != x"no"; then
 else
     AC_MSG_RESULT(no)
 fi
+
+PAM_MOCK_SO=""
+AC_MSG_CHECKING([whether to enable PAM support])
+AC_ARG_ENABLE([pam],
+        AS_HELP_STRING([--enable-pam], [enable PAM support (default is NO)]))
+AH_TEMPLATE([SUPPORT_PAM],
+[Define to 1 if you want PAM support. By default this is undefined.])
+
+if test x"$enable_pam" = x"yes"; then
+    if test x"$ac_cv_header_security_pam_appl_h" = x"yes" || test x"$ac_cv_header_pam_pam_appl_h" = x"yes"; then
+        AC_MSG_RESULT(yes)
+        AC_SEARCH_LIBS(pam_start, pam,
+            [AC_DEFINE(SUPPORT_PAM)
+             PAM_MOCK_SO="pam_mock.so"],
+            [err_msg="$err_msg$nl- Failed to find pam_start function in pam lib.";
+             no_lib="$no_lib pam"])
+    else
+        AC_MSG_RESULT(no)
+        err_msg="$err_msg$nl- Failed to find pam_appl.h for PAM support."
+        no_lib="$no_lib pam"
+    fi
+else
+    AC_MSG_RESULT(no)
+fi
+
+AC_SUBST(PAM_MOCK_SO)
 
 if test x"$no_lib" != x; then
     echo ""

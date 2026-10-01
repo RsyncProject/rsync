@@ -64,6 +64,7 @@ BOOL	reverse_lookup		True
 BOOL	strict_modes		True
 BOOL	transfer_logging	False
 BOOL	write_only		False
+BOOL	use_pam			False
 
 BOOL3	munge_symlinks		Unset
 BOOL3	numeric_ids		Unset
