@@ -187,7 +187,8 @@ static void emit_filelist_progress(int count)
 		return;
 	if (output_needs_newline == 2) /* avoid a newline in the middle of this filelist-progress output */
 		output_needs_newline = 0;
-	rprintf(FCLIENT, " %d files...\r", count);
+	rprintf(FCLIENT, " %d files...", count);
+	rput_progress();
 	output_needs_newline = 2;
 }
 

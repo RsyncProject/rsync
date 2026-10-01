@@ -120,7 +120,7 @@ static char const *rerr_name(int code)
 	return NULL;
 }
 
-static void filtered_fwrite(FILE *f, const char *in_buf, int in_len, int use_isprint, int escape_c1, char end_char);
+static void filtered_fwrite(FILE *f, const char *in_buf, int in_len, int use_isprint, char end_char);
 
 static void logit(int priority, const char *buf)
 {
@@ -133,7 +133,7 @@ static void logit(int priority, const char *buf)
 		int len = strlen(buf);
 		char trailing = len && (buf[len-1] == '\n' || buf[len-1] == '\r') ? buf[--len] : '\0';
 		fprintf(logfile_fp, "%s [%d] ", timestring(time(NULL)), (int)getpid());
-		filtered_fwrite(logfile_fp, buf, len, 0, 1, trailing);
+		filtered_fwrite(logfile_fp, buf, len, 0, trailing);
 		fflush(logfile_fp);
 	} else {
 		syslog(priority, "%s", buf);
@@ -239,27 +239,102 @@ void logfile_reopen(void)
 	}
 }
 
-static void filtered_fwrite(FILE *f, const char *in_buf, int in_len, int use_isprint, int escape_c1, char end_char)
+/* Decode one RFC 3629 UTF-8 character.  Invalid, overlong, surrogate and
+ * out-of-range sequences return 0 so their bytes are filtered individually. */
+static size_t strict_utf8_char_len(const char *buf, size_t len, uint32 *codepoint)
 {
-	char outbuf[1024], *ob = outbuf;
-	const char *end = in_buf + in_len;
-	while (in_buf < end) {
-		if (ob - outbuf >= (int)sizeof outbuf - 10) {
-			if (fwrite(outbuf, ob - outbuf, 1, f) != 1)
-				exit_cleanup(RERR_MESSAGEIO);
-			ob = outbuf;
-		}
-		if ((in_buf < end - 4 && *in_buf == '\\' && in_buf[1] == '#'
-		  && isDigit(in_buf + 2) && isDigit(in_buf + 3) && isDigit(in_buf + 4))
-		 || (*in_buf != '\t' && ((use_isprint && !isPrint(in_buf)) || *(uchar*)in_buf < ' '
-		  || (escape_c1 && *(uchar*)in_buf >= 0x80 && *(uchar*)in_buf <= 0x9f))))
-			ob += snprintf(ob, 6, "\\#%03o", *(uchar*)in_buf++);
-		else
-			*ob++ = *in_buf++;
+	const uchar *s = (const uchar *)buf;
+
+	if (!len)
+		return 0;
+	if (s[0] < 0x80) {
+		*codepoint = s[0];
+		return 1;
 	}
-	if (end_char) /* The "- 10" above means that there is always room for one more char here. */
-		*ob++ = end_char;
-	if (ob != outbuf && fwrite(outbuf, ob - outbuf, 1, f) != 1)
+	if (s[0] >= 0xc2 && s[0] <= 0xdf && len >= 2
+	 && s[1] >= 0x80 && s[1] <= 0xbf) {
+		*codepoint = (uint32)(s[0] & 0x1f) << 6 | (s[1] & 0x3f);
+		return 2;
+	}
+	if (s[0] >= 0xe0 && s[0] <= 0xef && len >= 3
+	 && s[1] >= (s[0] == 0xe0 ? 0xa0 : 0x80)
+	 && s[1] <= (s[0] == 0xed ? 0x9f : 0xbf)
+	 && s[2] >= 0x80 && s[2] <= 0xbf) {
+		*codepoint = (uint32)(s[0] & 0x0f) << 12
+			   | (uint32)(s[1] & 0x3f) << 6 | (s[2] & 0x3f);
+		return 3;
+	}
+	if (s[0] >= 0xf0 && s[0] <= 0xf4 && len >= 4
+	 && s[1] >= (s[0] == 0xf0 ? 0x90 : 0x80)
+	 && s[1] <= (s[0] == 0xf4 ? 0x8f : 0xbf)
+	 && s[2] >= 0x80 && s[2] <= 0xbf
+	 && s[3] >= 0x80 && s[3] <= 0xbf) {
+		*codepoint = (uint32)(s[0] & 0x07) << 18
+			   | (uint32)(s[1] & 0x3f) << 12
+			   | (uint32)(s[2] & 0x3f) << 6 | (s[3] & 0x3f);
+		return 4;
+	}
+	return 0;
+}
+
+static size_t filtered_char_len(const char *buf, size_t len, int use_isprint,
+				int *escape)
+{
+	uchar byte = *(const uchar *)buf;
+	uint32 codepoint;
+	size_t char_len = !use_isprint && byte >= 0x80
+		? strict_utf8_char_len(buf, len, &codepoint) : 0;
+
+	if (char_len) {
+		*escape = codepoint >= 0x80 && codepoint <= 0x9f;
+		return char_len;
+	}
+	*escape = (len > 4 && *buf == '\\' && buf[1] == '#'
+		   && isDigit(buf + 2) && isDigit(buf + 3) && isDigit(buf + 4))
+	       || (*buf != '\t' && ((use_isprint && !isPrint(buf)) || byte < ' '
+		   || byte == 0x7f || (byte >= 0x80 && byte <= 0x9f)));
+	return 1;
+}
+
+static void filtered_fwrite(FILE *f, const char *in_buf, int in_len, int use_isprint, char end_char)
+{
+	char outbuf[1024], *out = outbuf;
+	const char *end = in_buf + in_len;
+
+	while (in_buf < end) {
+		int escape;
+		size_t i, char_len = filtered_char_len(
+			in_buf, (size_t)(end - in_buf), use_isprint, &escape);
+		size_t out_size = escape ? char_len * 5 : char_len;
+
+		if ((size_t)(outbuf + sizeof outbuf - out) < out_size) {
+			if (out != outbuf && fwrite(outbuf, (size_t)(out - outbuf), 1, f) != 1)
+				exit_cleanup(RERR_MESSAGEIO);
+			out = outbuf;
+		}
+		if (escape) {
+			for (i = 0; i < char_len; i++) {
+				uchar byte = (uchar)in_buf[i];
+				*out++ = '\\';
+				*out++ = '#';
+				*out++ = (char)('0' + ((byte >> 6) & 7));
+				*out++ = (char)('0' + ((byte >> 3) & 7));
+				*out++ = (char)('0' + (byte & 7));
+			}
+		} else {
+			memcpy(out, in_buf, char_len);
+			out += char_len;
+		}
+		in_buf += char_len;
+	}
+	if (end_char && out == outbuf + sizeof outbuf) {
+		if (fwrite(outbuf, sizeof outbuf, 1, f) != 1)
+			exit_cleanup(RERR_MESSAGEIO);
+		out = outbuf;
+	}
+	if (end_char)
+		*out++ = end_char;
+	if (out != outbuf && fwrite(outbuf, (size_t)(out - outbuf), 1, f) != 1)
 		exit_cleanup(RERR_MESSAGEIO);
 }
 
@@ -268,7 +343,7 @@ static void filtered_fwrite(FILE *f, const char *in_buf, int in_len, int use_isp
  * can happen with certain fatal conditions. */
 void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 {
-	char trailing_CR_or_NL;
+	char trailing_NL;
 	FILE *f = msgs2stderr == 1 ? stderr : stdout;
 #ifdef ICONV_OPTION
 	iconv_t ic = is_utf8 && ic_recv != (iconv_t)-1 ? ic_recv : ic_chck;
@@ -377,13 +452,7 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 		output_needs_newline = 0;
 	}
 
-	trailing_CR_or_NL = len && (buf[len-1] == '\n' || buf[len-1] == '\r') ? buf[--len] : '\0';
-
-	if (len && buf[0] == '\r') {
-		fputc('\r', f);
-		buf++;
-		len--;
-	}
+	trailing_NL = len && buf[len-1] == '\n' ? buf[--len] : '\0';
 
 #ifdef ICONV_CONST
 	if (ic != (iconv_t)-1) {
@@ -398,10 +467,10 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 			iconvbufs(ic, &inbuf, &outbuf, inbuf.pos ? 0 : ICB_INIT);
 			ierrno = errno;
 			if (outbuf.len) {
-				char trailing = inbuf.len ? '\0' : trailing_CR_or_NL;
-				filtered_fwrite(f, convbuf, outbuf.len, 0, 0, trailing);
+				char trailing = inbuf.len ? '\0' : trailing_NL;
+				filtered_fwrite(f, convbuf, outbuf.len, 0, trailing);
 				if (trailing) {
-					trailing_CR_or_NL = '\0';
+					trailing_NL = '\0';
 					fflush(f);
 				}
 				outbuf.len = 0;
@@ -415,17 +484,28 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 			}
 		}
 
-		if (trailing_CR_or_NL) {
-			fputc(trailing_CR_or_NL, f);
+		if (trailing_NL) {
+			fputc(trailing_NL, f);
 			fflush(f);
 		}
 	} else
 #endif
 	{
-		filtered_fwrite(f, buf, len, !allow_8bit_chars, 0, trailing_CR_or_NL);
-		if (trailing_CR_or_NL)
+		filtered_fwrite(f, buf, len, !allow_8bit_chars, trailing_NL);
+		if (trailing_NL)
 			fflush(f);
 	}
+}
+
+/* Emit the carriage return owned by rsync's progress displays. */
+void rput_progress(void)
+{
+	FILE *f = msgs2stderr == 1 ? stderr : stdout;
+
+	if (quiet)
+		return;
+	if (fputc('\r', f) == EOF || fflush(f) == EOF)
+		exit_cleanup(RERR_MESSAGEIO);
 }
 
 /* This is the rsync debugging function. Call it with FINFO, FERROR_*,

@@ -98,6 +98,13 @@ p = out('-a', '--progress', f'{src}/', f'{TODIR}/')
 if '100%' not in p.stdout:
     test_fail(f"--progress did not show a percentage:\n{p.stdout}")
 
+# --quiet must suppress the progress carriage return as well as its text.
+rmtree(TODIR)
+p = out('-a', '-q', '--progress', f'{src}/', f'{TODIR}/')
+if p.stdout != '':
+    test_fail(f"--quiet --progress produced stdout: {p.stdout!r}")
+verify_dirs(src, TODIR, label='--quiet --progress still transferred')
+
 # --- -h / --human-readable formats byte counts with a unit suffix -----------
 # Without -h, --stats prints grouped digits ("50,000 bytes"); with -h it uses a
 # K/M/G suffix ("50.00K"). Use a file big enough that the two forms differ.

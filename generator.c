@@ -395,8 +395,10 @@ static void do_delete_pass(void)
 	}
 	delete_in_dir(NULL, NULL, dev_zero);
 
-	if (INFO_GTE(FLIST, 2) && !am_server)
-		rprintf(FINFO, "                    \r");
+	if (INFO_GTE(FLIST, 2) && !am_server) {
+		rprintf(FINFO, "                    ");
+		rput_progress();
+	}
 }
 
 static inline int mtime_differs(STRUCT_STAT *stp, struct file_struct *file)
