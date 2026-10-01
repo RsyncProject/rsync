@@ -346,6 +346,65 @@ static int abspath_step(char *abspath, size_t cap, const char *comp, size_t comp
 	return 0;
 }
 
+/* Return the length of a //server/share root, or 0 when path is not a
+ * complete UNC path.  Kept platform-independent so the parser is testable on
+ * every build host; only Cygwin uses the result for path resolution. */
+size_t unc_root_len(const char *path)
+{
+	const char *server_end, *share_end;
+
+	if (!path || path[0] != '/' || path[1] != '/' || path[2] == '/')
+		return 0;
+	server_end = strchr(path + 2, '/');
+	if (!server_end || server_end == path + 2 || server_end[1] == '\0'
+	 || server_end[1] == '/')
+		return 0;
+	share_end = strchr(server_end + 1, '/');
+	return share_end ? (size_t)(share_end - path) : strlen(path);
+}
+
+#if defined __CYGWIN__ && defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+/* Pin an absolute path's root and remove it from remaining.  Cygwin's UNC
+ * namespace has a //server/share root which must not be collapsed into /. */
+static int ona_open_absolute_root(char *remaining, char *abspath, size_t abspath_cap,
+				  int dir_traverse_flags)
+{
+	size_t root_len = unc_root_len(remaining);
+	int dfd;
+
+	if (root_len) {
+		char root[MAXPATHLEN];
+		char *tail;
+
+		if (root_len >= sizeof root) {
+			errno = ENAMETOOLONG;
+			return -1;
+		}
+		memcpy(root, remaining, root_len);
+		root[root_len] = '\0';
+		dfd = open(root, dir_traverse_flags);
+		if (dfd < 0)
+			return -1;
+		strlcpy(abspath, root, abspath_cap);
+		tail = remaining + root_len;
+		while (*tail == '/')
+			tail++;
+		memmove(remaining, tail, strlen(tail) + 1);
+		return dfd;
+	}
+
+	dfd = open("/", dir_traverse_flags);
+	if (dfd >= 0) {
+		char *tail = remaining;
+		abspath[0] = '\0';
+		while (*tail == '/')
+			tail++;
+		memmove(remaining, tail, strlen(tail) + 1);
+	}
+	return dfd;
+}
+#endif
+
 /* Open an operator-supplied path, refusing to traverse any symlink (parent or
  * leaf) not owned by uid 0 or our euid.  A trusted-owned symlink (e.g. root's
  * /var/log -> /data/log) is still followed; an untrusted one fails ELOOP.
@@ -432,15 +491,23 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 
 	/* Absolute path: pin "/" as the starting dfd. */
 	if (remaining[0] == '/') {
+#ifdef __CYGWIN__
+		dfd = ona_open_absolute_root(remaining, abspath, sizeof abspath,
+					     dir_traverse_flags);
+#else
 		dfd = open("/", dir_traverse_flags);
+#endif
 		if (dfd < 0)
 			return -1;
 		dfd_owns = 1;
+#ifndef __CYGWIN__
 		abspath[0] = '\0';			/* now resolving from "/" */
 		is_anchored = 1;
 		char *p = remaining;
 		while (*p == '/') p++;
 		memmove(remaining, p, strlen(p) + 1);
+#endif
+		is_anchored = 1;
 	}
 
 	int loops = 40;	/* SYMLOOP_MAX-ish; breaks symlink cycles. Counts symlink
@@ -567,13 +634,20 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 
 			if (target[0] == '/') {
 				if (dfd_owns) close(dfd);
+#ifdef __CYGWIN__
+				strlcpy(remaining, rebuilt, sizeof remaining);
+				dfd = ona_open_absolute_root(remaining, abspath, sizeof abspath,
+							     dir_traverse_flags);
+#else
 				dfd = open("/", dir_traverse_flags);
+#endif
 				if (dfd < 0) {
 					saved_errno = errno;
 					dfd_owns = 0;
 					goto out;
 				}
 				dfd_owns = 1;
+#ifndef __CYGWIN__
 				abspath[0] = '\0';	/* followed an absolute target: restart from "/" */
 				/* "self" resolves to "<pid>", still inside the pin;
 				 * the magic link itself lands elsewhere and ends the
@@ -583,6 +657,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 				char *p = rebuilt;
 				while (*p == '/') p++;
 				strlcpy(remaining, p, sizeof remaining);
+#endif
 			} else {
 				strlcpy(remaining, rebuilt, sizeof remaining);
 			}
