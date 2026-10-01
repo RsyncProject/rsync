@@ -298,7 +298,8 @@ static size_t filtered_char_len(const char *buf, size_t len, int use_isprint,
 
 static void filtered_fwrite(FILE *f, const char *in_buf, int in_len, int use_isprint, char end_char)
 {
-	char outbuf[1024], *out = outbuf;
+	char outbuf[1024];
+	size_t out_len = 0;
 	const char *end = in_buf + in_len;
 
 	while (in_buf < end) {
@@ -307,34 +308,38 @@ static void filtered_fwrite(FILE *f, const char *in_buf, int in_len, int use_isp
 			in_buf, (size_t)(end - in_buf), use_isprint, &escape);
 		size_t out_size = escape ? char_len * 5 : char_len;
 
-		if ((size_t)(outbuf + sizeof outbuf - out) < out_size) {
-			if (out != outbuf && fwrite(outbuf, (size_t)(out - outbuf), 1, f) != 1)
+		if (sizeof outbuf - out_len < out_size) {
+			if (out_len > sizeof outbuf)
 				exit_cleanup(RERR_MESSAGEIO);
-			out = outbuf;
+			if (out_len && fwrite(outbuf, 1, out_len, f) != out_len)
+				exit_cleanup(RERR_MESSAGEIO);
+			out_len = 0;
 		}
 		if (escape) {
 			for (i = 0; i < char_len; i++) {
 				uchar byte = (uchar)in_buf[i];
-				*out++ = '\\';
-				*out++ = '#';
-				*out++ = (char)('0' + ((byte >> 6) & 7));
-				*out++ = (char)('0' + ((byte >> 3) & 7));
-				*out++ = (char)('0' + (byte & 7));
+				outbuf[out_len++] = '\\';
+				outbuf[out_len++] = '#';
+				outbuf[out_len++] = (char)('0' + ((byte >> 6) & 7));
+				outbuf[out_len++] = (char)('0' + ((byte >> 3) & 7));
+				outbuf[out_len++] = (char)('0' + (byte & 7));
 			}
 		} else {
-			memcpy(out, in_buf, char_len);
-			out += char_len;
+			memcpy(outbuf + out_len, in_buf, char_len);
+			out_len += char_len;
 		}
 		in_buf += char_len;
 	}
-	if (end_char && out == outbuf + sizeof outbuf) {
-		if (fwrite(outbuf, sizeof outbuf, 1, f) != 1)
+	if (end_char && out_len == sizeof outbuf) {
+		if (fwrite(outbuf, 1, out_len, f) != out_len)
 			exit_cleanup(RERR_MESSAGEIO);
-		out = outbuf;
+		out_len = 0;
 	}
 	if (end_char)
-		*out++ = end_char;
-	if (out != outbuf && fwrite(outbuf, (size_t)(out - outbuf), 1, f) != 1)
+		outbuf[out_len++] = end_char;
+	if (out_len > sizeof outbuf)
+		exit_cleanup(RERR_MESSAGEIO);
+	if (out_len && fwrite(outbuf, 1, out_len, f) != out_len)
 		exit_cleanup(RERR_MESSAGEIO);
 }
 
