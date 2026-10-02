@@ -35,8 +35,11 @@ def check_locale_case(label, locale_names, name, expected, rejected):
     env['LC_ALL'] = locale_name
 
     try:
-        subprocess.run([b'touch', os.fsencode(case_src) + b'/' + name],
-                       env=env, check=True)
+        create = subprocess.run(
+            [b'touch', os.fsencode(case_src) + b'/' + name], env=env,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if create.returncode != 0:
+            return False
         proc = subprocess.run(
             rsync_argv('-av', '--8-bit-output', str(case_src) + '/',
                        str(case_dst) + '/'),
@@ -47,8 +50,11 @@ def check_locale_case(label, locale_names, name, expected, rejected):
         if expected not in output or rejected in output:
             test_fail(f"incorrect filtering under {locale_name}: {output!r}")
     finally:
-        subprocess.run([b'rm', b'-rf', b'--', os.fsencode(case)], env=env,
-                       check=True)
+        cleanup = subprocess.run(
+            [b'rm', b'-rf', b'--', os.fsencode(case)], env=env,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if cleanup.returncode != 0:
+            test_fail(f"cleanup failed under {locale_name}: {cleanup.stderr!r}")
     return True
 
 base = SCRATCHDIR / 'output-control-chars'
