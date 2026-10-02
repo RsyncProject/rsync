@@ -24,6 +24,13 @@
 #include "inums.h"
 #include "rounding.h"	/* EXTRA_ROUNDING, so log_delete() aligns its file_struct */
 
+#if defined HAVE_WCHAR_H && defined HAVE_MBRTOWC
+#include <wchar.h>
+typedef mbstate_t filter_mbstate;
+#else
+typedef int filter_mbstate;
+#endif
+
 extern int dry_run;
 extern int am_daemon;
 extern int am_server;
@@ -131,7 +138,7 @@ static void logit(int priority, const char *buf)
 		 * filename can't inject terminal escapes into the log an admin later
 		 * cat's (CWE-117); keep the trailing newline raw via end_char. */
 		int len = strlen(buf);
-		char trailing = len && (buf[len-1] == '\n' || buf[len-1] == '\r') ? buf[--len] : '\0';
+		char trailing = len && buf[len-1] == '\n' ? buf[--len] : '\0';
 		fprintf(logfile_fp, "%s [%d] ", timestring(time(NULL)), (int)getpid());
 		filtered_fwrite(logfile_fp, buf, len, 0, trailing);
 		fflush(logfile_fp);
@@ -239,54 +246,43 @@ void logfile_reopen(void)
 	}
 }
 
-/* Decode one RFC 3629 UTF-8 character.  Invalid, overlong, surrogate and
- * out-of-range sequences return 0 so their bytes are filtered individually. */
-static size_t strict_utf8_char_len(const char *buf, size_t len, uint32 *codepoint)
+/* Decode one character using the active locale. Invalid or incomplete input
+ * returns 0 so its bytes are filtered individually. */
+static size_t locale_char_len(const char *buf, size_t len, filter_mbstate *state,
+			      int *is_control)
 {
-	const uchar *s = (const uchar *)buf;
+#if defined HAVE_WCHAR_H && defined HAVE_MBRTOWC
+	wchar_t wc;
+	size_t char_len = mbrtowc(&wc, buf, len, state);
 
-	if (!len)
+	if (char_len == (size_t)-1 || char_len == (size_t)-2) {
+		memset(state, 0, sizeof *state);
 		return 0;
-	if (s[0] < 0x80) {
-		*codepoint = s[0];
-		return 1;
 	}
-	if (s[0] >= 0xc2 && s[0] <= 0xdf && len >= 2
-	 && s[1] >= 0x80 && s[1] <= 0xbf) {
-		*codepoint = (uint32)(s[0] & 0x1f) << 6 | (s[1] & 0x3f);
-		return 2;
-	}
-	if (s[0] >= 0xe0 && s[0] <= 0xef && len >= 3
-	 && s[1] >= (s[0] == 0xe0 ? 0xa0 : 0x80)
-	 && s[1] <= (s[0] == 0xed ? 0x9f : 0xbf)
-	 && s[2] >= 0x80 && s[2] <= 0xbf) {
-		*codepoint = (uint32)(s[0] & 0x0f) << 12
-			   | (uint32)(s[1] & 0x3f) << 6 | (s[2] & 0x3f);
-		return 3;
-	}
-	if (s[0] >= 0xf0 && s[0] <= 0xf4 && len >= 4
-	 && s[1] >= (s[0] == 0xf0 ? 0x90 : 0x80)
-	 && s[1] <= (s[0] == 0xf4 ? 0x8f : 0xbf)
-	 && s[2] >= 0x80 && s[2] <= 0xbf
-	 && s[3] >= 0x80 && s[3] <= 0xbf) {
-		*codepoint = (uint32)(s[0] & 0x07) << 18
-			   | (uint32)(s[1] & 0x3f) << 12
-			   | (uint32)(s[2] & 0x3f) << 6 | (s[3] & 0x3f);
-		return 4;
-	}
+	if (char_len == 0)
+		char_len = 1;
+	*is_control = wc != L'\t'
+		&& (wc < L' ' || (wc >= 0x7f && wc <= 0x9f));
+	return char_len;
+#else
+	(void)buf;
+	(void)len;
+	(void)state;
+	(void)is_control;
 	return 0;
+#endif
 }
 
 static size_t filtered_char_len(const char *buf, size_t len, int use_isprint,
-				int *escape)
+				filter_mbstate *state, int *escape)
 {
 	uchar byte = *(const uchar *)buf;
-	uint32 codepoint;
+	int is_control = 0;
 	size_t char_len = !use_isprint && byte >= 0x80
-		? strict_utf8_char_len(buf, len, &codepoint) : 0;
+		? locale_char_len(buf, len, state, &is_control) : 0;
 
 	if (char_len) {
-		*escape = codepoint >= 0x80 && codepoint <= 0x9f;
+		*escape = is_control;
 		return char_len;
 	}
 	*escape = (len > 4 && *buf == '\\' && buf[1] == '#'
@@ -299,18 +295,22 @@ static size_t filtered_char_len(const char *buf, size_t len, int use_isprint,
 static void filtered_fwrite(FILE *f, const char *in_buf, int in_len, int use_isprint, char end_char)
 {
 	char outbuf[1024];
+	filter_mbstate state;
 	size_t out_len = 0;
 	const char *end = in_buf + in_len;
+	memset(&state, 0, sizeof state);
 
 	while (in_buf < end) {
 		int escape;
 		size_t i, char_len = filtered_char_len(
-			in_buf, (size_t)(end - in_buf), use_isprint, &escape);
-		size_t out_size = escape ? char_len * 5 : char_len;
+			in_buf, (size_t)(end - in_buf), use_isprint, &state, &escape);
+		size_t expansion = escape ? 5 : 1;
+		size_t out_size;
 
+		if (out_len > sizeof outbuf || char_len > sizeof outbuf / expansion)
+			exit_cleanup(RERR_MESSAGEIO);
+		out_size = char_len * expansion;
 		if (sizeof outbuf - out_len < out_size) {
-			if (out_len > sizeof outbuf)
-				exit_cleanup(RERR_MESSAGEIO);
 			if (out_len && fwrite(outbuf, 1, out_len, f) != out_len)
 				exit_cleanup(RERR_MESSAGEIO);
 			out_len = 0;

@@ -13,7 +13,7 @@ AC_CHECK_HEADERS(poll.h sys/fcntl.h sys/select.h fcntl.h sys/time.h sys/unistd.h
     sys/acl.h acl/libacl.h attr/xattr.h sys/xattr.h sys/extattr.h dl.h \
     popt.h popt/popt.h linux/falloc.h netinet/in_systm.h netgroup.h \
     zlib.h xxhash.h openssl/md4.h openssl/md5.h zstd.h lz4.h sys/file.h \
-    sys/resource.h bsd/string.h idn2.h)
+    sys/resource.h bsd/string.h idn2.h wchar.h)
 AC_CHECK_HEADERS([netinet/ip.h], [], [], [[#include <netinet/in.h>]])
 AC_HEADER_MAJOR_FIXED
 
@@ -978,7 +978,7 @@ AC_CHECK_FUNCS(waitpid wait4 getcwd chown chmod lchmod mknod mkfifo fdopendir \
     seteuid strerror putenv iconv_open locale_charset nl_langinfo getxattr \
     extattr_get_link sigaction sigprocmask setattrlist getgrouplist \
     initgroups utimensat futimens posix_fallocate attropen setvbuf nanosleep usleep \
-    setenv unsetenv)
+    setenv unsetenv mbrtowc)
 
 dnl dirfd() is a macro or static inline on several systems (the BSDs), so the
 dnl default AC_CHECK_FUNCS link probe -- which declares `char dirfd(void);` and
