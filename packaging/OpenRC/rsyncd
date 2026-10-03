@@ -1,0 +1,14 @@
+#!/sbin/openrc-run
+
+supervisor=supervise-daemon
+
+description="fast remote file copy program daemon"
+command=/usr/bin/rsync
+command_args="--daemon ${OPTS}"
+command_args_foreground="--no-detach"
+required_files=/etc/rsyncd.conf
+no_new_privs=1
+
+depend() {
+    after net
+}
