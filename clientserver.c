@@ -1607,6 +1607,13 @@ static void create_pid_file(void)
 		const char *slash = strrchr(pid_file, '/');
 		char dirbuf[MAXPATHLEN];
 		const char *dir = ".";
+		int dir_flags = O_RDONLY;
+#ifdef O_DIRECTORY
+		dir_flags |= O_DIRECTORY;
+#elif defined O_NONBLOCK
+		/* Avoid blocking on a non-directory special file before fstat below. */
+		dir_flags |= O_NONBLOCK;
+#endif
 		if (slash) {
 			size_t dlen = slash == pid_file ? 1 : (size_t)(slash - pid_file);
 			if (dlen >= sizeof dirbuf) {
@@ -1618,7 +1625,25 @@ static void create_pid_file(void)
 			dir = dirbuf;
 			base = slash + 1;
 		}
-		if ((pdfd = do_open(dir, O_RDONLY|O_DIRECTORY, 0)) < 0) {
+		pdfd = do_open(dir, dir_flags, 0);
+#ifndef O_DIRECTORY
+		if (pdfd >= 0) {
+			STRUCT_STAT dir_st;
+			int save_errno;
+			if (do_fstat(pdfd, &dir_st) < 0)
+				save_errno = errno;
+			else if (!S_ISDIR(dir_st.st_mode))
+				save_errno = ENOTDIR;
+			else
+				save_errno = 0;
+			if (save_errno) {
+				close(pdfd);
+				pdfd = -1;
+				errno = save_errno;
+			}
+		}
+#endif
+		if (pdfd < 0) {
 			rsyserr(FLOG, errno, "failed to open pid-file directory \"%s\"", dir);
 			exit_cleanup(RERR_FILEIO);
 		}
