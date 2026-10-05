@@ -8,3 +8,4 @@
 crtimes  # Rsync is configured without crtimes support
 partial-protected-regular-retry-policy  # deterministic partial EACCES recovery uses dyld interposing
 readonly-partial-abort-mode-regression  # 
+symlink-unix-perms  # platform does not support changing symlink permissions

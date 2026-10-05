@@ -68,4 +68,5 @@ source-change-size-continues
 symlink-dest-backupdir
 symlink-race-dest
 symlink-race-relative-dest
+symlink-unix-perms  # platform does not support changing symlink permissions
 temp-dir-symlink-injection
