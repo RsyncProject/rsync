@@ -2,7 +2,6 @@
 
 import errno
 import os
-import random
 import stat
 import sys
 
@@ -94,7 +93,7 @@ symlinks = [
     [ testdirectory, 0o1407 ],
     [ testdirectory, 0o2470 ],
     [ testdirectory, 0o4777 ],
-    [ testfile, 0o7777 ]
+    [ testfile, 0o7777 ],
 ]
 
 #   Actually create the test symlinks in the source directory.
@@ -102,12 +101,7 @@ symlinks = [
 for n, symlink in enumerate(symlinks):
     target, access = symlink
 
-    if target == 'directory':
-        isdir = True
-    else:
-        isdir = False
-
-    os.symlink(f'{target}', FROMDIR / f'symlink-{n}', target_is_directory=f'{isdir}')
+    os.symlink(target, FROMDIR / f'symlink-{n}', target_is_directory=(target == testdirectory))
     os.chmod(FROMDIR / f'symlink-{n}', access, follow_symlinks=False)
 
 #   Now, use rsync to copy the source directory to the destination.
