@@ -74,7 +74,7 @@ BOOL extra_flist_sending_enabled;
 
 static int secure_sender_parent_fd(struct file_struct *file, const char *fname, const char **bname_p)
 {
-#ifdef AT_FDCWD
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
 	const char *path, *slash, *relp, *bslash, *fslash;
 	char secure_path[MAXPATHLEN];
 	int dfd, fl, slen;

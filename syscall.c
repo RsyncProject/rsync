@@ -424,11 +424,6 @@ static int ona_open_absolute_root(char *remaining, char *abspath, size_t abspath
 static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, size_t out_cap)
 {
 #if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
-	/* O_CLOEXEC predates some still-supported targets; mirror rand_bytes()'s
-	 * fallback in syscall.c so a build without it still compiles. */
-#ifndef O_CLOEXEC
-#define O_CLOEXEC 0
-#endif
 	const int dir_traverse_flags = directory_traverse_flags() | O_CLOEXEC;
 	if (!path || !*path) {
 		errno = EINVAL;
@@ -3525,15 +3520,12 @@ int secure_relative_dirfd_at_beneath(int anchor_fd, const char *relpath)
 						directory_traverse_flags(), 0, 1);
 }
 
-#if defined O_NOFOLLOW && defined O_DIRECTORY && defined AT_FDCWD
+#if defined O_NOFOLLOW && defined AT_FDCWD
 /* Fill buf with len random bytes.  Prefers /dev/urandom for cryptographic
  * quality; falls back to rand() if /dev/urandom cannot be opened or read
  * (e.g. inside a chroot or container without /dev populated). */
 static void rand_bytes(unsigned char *buf, size_t len)
 {
-#ifndef O_CLOEXEC
-#define O_CLOEXEC 0
-#endif
 	int fd = open("/dev/urandom", O_RDONLY | O_CLOEXEC);
 	if (fd >= 0) {
 		ssize_t n = read(fd, buf, len);
@@ -3555,7 +3547,7 @@ static void rand_bytes(unsigned char *buf, size_t len)
  * This is the create loop shared with secure_mkstemp(). */
 int do_mkstemp_atfd(int dfd, char *filename, mode_t perms)
 {
-#ifdef AT_FDCWD
+#if defined O_NOFOLLOW && defined AT_FDCWD
 	static const char letters[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 	size_t filename_len = strlen(filename);
 	char *suffix;
