@@ -139,6 +139,9 @@ up2.mkdir()
 (up2 / 'src-newness').touch()
 (up1 / 'same-newness').touch()
 (up2 / 'same-newness').touch()
+# Give both files the same mtime; otherwise two touch calls could straddle a
+# second boundary and --update would see the destination as newer.
+shutil.copystat(up1 / 'same-newness', up2 / 'same-newness')
 (up1 / 'extra-src').touch()
 (up2 / 'extra-dest').touch()
 
