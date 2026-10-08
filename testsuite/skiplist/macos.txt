@@ -20,6 +20,7 @@ daemon-chroot-cwd                      # Linux interposition
 dir-sgid
 fake-super-acl-xattr
 hardlinks-emlink-recovery                # LD_PRELOAD hook
+iconv                                    # raw filename bytes unavailable
 link-dest-symlink-enotsup                # the ENOTSUP hard-link hook is an LD_PRELOAD, Linux-only
 open-noatime
 partial-protected-regular-retry-linux
