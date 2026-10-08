@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import socket
+import time
 
 from rsyncfns import SCRATCHDIR, claim_ports, require_tcp, start_rsyncd, test_fail
 
@@ -23,6 +24,7 @@ log file = {log}
 start_rsyncd(conf, PORT)
 
 with socket.create_connection(('127.0.0.1', PORT), timeout=5) as s:
+    s.settimeout(30)
     greeting = s.recv(4096)
     if not greeting.startswith(b'@RSYNCD:'):
         test_fail(f"unexpected daemon greeting: {greeting!r}")
@@ -35,12 +37,18 @@ with socket.create_connection(('127.0.0.1', PORT), timeout=5) as s:
     payload = b''.join(b'a%05d\0' % i for i in range(17000)) + b'\0'
     s.sendall(payload)
     try:
-        s.recv(4096)
-    except (ConnectionResetError, BrokenPipeError):
+        s.shutdown(socket.SHUT_WR)
+    except OSError:
         pass
 
-text = log.read_text(errors='replace')
-if 'too many daemon arguments' not in text:
-    test_fail("daemon did not reject the malicious client's oversized argv list")
+deadline = time.monotonic() + 30
+while time.monotonic() < deadline:
+    if log.exists() and 'too many daemon arguments' in log.read_text(errors='replace'):
+        break
+    time.sleep(0.05)
+else:
+    text = log.read_text(errors='replace') if log.exists() else ''
+    test_fail("daemon did not reject the malicious client's oversized argv "
+              f"list. Daemon log:\n{text}")
 
 print("daemon-argv-limit: malicious client argv flood is rejected")
