@@ -6,8 +6,6 @@
 # instead of re-transferring (and --delete-delay still removes the stale
 # basis file at the end).
 
-import time
-
 from rsyncfns import (
     FROMDIR, SRCDIR, TODIR, cp_p, cp_touch, run_rsync, test_fail, verify_dirs,
 )
@@ -18,7 +16,6 @@ TODIR.mkdir(parents=True, exist_ok=True)
 
 cp_p(SRCDIR / 'rsync.c', FROMDIR / 'rsync.c')
 cp_touch(FROMDIR / 'rsync.c', TODIR / 'rsync2.c')
-time.sleep(1)
 
 # Drive rsync directly (rather than checkit) so we can capture --debug=FUZZY:
 # a final tree match alone would also be produced by a full transfer that

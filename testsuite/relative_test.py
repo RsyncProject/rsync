@@ -8,7 +8,6 @@
 
 import os
 import subprocess
-import time
 
 from rsyncfns import (
     CHKDIR, FROMDIR, OUTFILE, TMPDIR, TODIR,
@@ -51,8 +50,6 @@ os.chdir(FROMDIR)
 # chkdir: same shape as a --include=/down/ --exclude=/* sync of fromdir.
 run_rsync('-ai', '--include=/down/', '--exclude=/*',
           f'{FROMDIR}/', f'{CHKDIR}/')
-
-time.sleep(1)
 
 print("Test basic relative:")
 checkit(['-avR', f'./{deepstr}', str(TODIR)], CHKDIR, TODIR)
