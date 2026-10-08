@@ -27,12 +27,13 @@ jobs:
     timeout-minutes: 45
     name: Test rsync on OpenBSD
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       with:
         fetch-depth: 0
+        persist-credentials: false
     - name: Test in OpenBSD VM
       id: test
-      uses: vmactions/openbsd-vm@v1
+      uses: vmactions/openbsd-vm@5f7b2c933b8846a138361d6843c52af4bef5d945 # v1.4.8
       with:
         usesh: true
         prepare: |
@@ -63,7 +64,7 @@ jobs:
           ./runtests.py --rsync-bin=`pwd`/rsync --use-tcp -j 2
           ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
     - name: save artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
       with:
         retention-days: 45
         name: openbsd-bin

@@ -27,12 +27,13 @@ jobs:
     timeout-minutes: 45
     name: Test rsync on NetBSD
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       with:
         fetch-depth: 0
+        persist-credentials: false
     - name: Test in NetBSD VM
       id: test
-      uses: vmactions/netbsd-vm@v1
+      uses: vmactions/netbsd-vm@c8a0d7ddb84619a7a8cc4e652efa7950b3fd9f92 # v1.5.2
       with:
         usesh: true
         prepare: |
@@ -47,7 +48,7 @@ jobs:
           ./runtests.py --rsync-bin=`pwd`/rsync --use-tcp -j 8
           ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
     - name: save artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
       with:
         retention-days: 45
         name: netbsd-bin
