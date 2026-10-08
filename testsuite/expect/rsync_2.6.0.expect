@@ -27,6 +27,7 @@ daemon-refuse-compress       xfail   # feature/negotiation absent in 2.6.0 (prot
 exclude                      pass
 files-from                   xfail   # feature/negotiation absent in 2.6.0 (proto 27)
 hardlinks                    pass
+old-dirs                     pass
 reverse-daemon-delta         pass
 sender-flist-symlink-leak    xfail   # peer vulnerable to May-2026 finding (fixed in current)
 ssh-basic                    pass

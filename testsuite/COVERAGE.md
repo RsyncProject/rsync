@@ -33,7 +33,7 @@ Status legend: ✓ property asserted · `~` shallow / by an existing ported test
 | --no-implied-dirs | relative-implied*new* | Y | — | ✓ (proto 30+; proto 29 rejects multi-component path) |
 | --inc-recursive / --no-inc-recursive | hardlinks | Y | — | `~` exercised, not isolated |
 | -d, --dirs | dirs*new* | Y | — | ✓ no-recurse top layer |
-| --old-dirs / --old-d | — | — | — | ✗ |
+| --old-dirs / --old-d | old-dirs | `~` | — | ✓ both mixed-version remote directions |
 | -m, --prune-empty-dirs | prune-empty-dirs*new* | Y | — | ✓ incl. filter-emptied chains |
 
 ### Links
