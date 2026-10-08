@@ -137,11 +137,15 @@ up1.mkdir()
 up2.mkdir()
 (up1 / 'dst-newness').touch()
 (up2 / 'src-newness').touch()
-(up1 / 'same-newness').touch()
-(up2 / 'same-newness').touch()
+same_src = up1 / 'same-newness'
+same_dst = up2 / 'same-newness'
+same_src.touch()
+same_dst.touch()
 # Give both files the same mtime; otherwise two touch calls could straddle a
 # second boundary and --update would see the destination as newer.
-shutil.copystat(up1 / 'same-newness', up2 / 'same-newness')
+src_stat = same_src.stat()
+dst_stat = same_dst.stat()
+os.utime(same_dst, ns=(dst_stat.st_atime_ns, src_stat.st_mtime_ns))
 (up1 / 'extra-src').touch()
 (up2 / 'extra-dest').touch()
 
