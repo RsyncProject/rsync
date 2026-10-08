@@ -65,7 +65,7 @@ Status legend: ✓ property asserted · `~` shallow / by an existing ported test
 | -o, --owner | chown, ownership-depth*new* | Y | — | ✓ uid map root-gated |
 | -g, --group | chgrp, ownership-depth*new* | Y | — | ✓ group remap non-root |
 | --super / --fake-super | chown, chown-fake | `~` | — | `~` |
-| --numeric-ids | — | — | — | ✗ client; daemon `numeric ids` also ✗ |
+| --numeric-ids | ownership-depth | Y | — | ✓ client uid/gid mapping |
 | --usermap / --groupmap | ownership-depth*new* | Y | — | ✓ groupmap non-root; usermap root-gated |
 | --chown | ownership-depth*new* | Y | — | ✓ group half |
 | -D / --devices / --specials | devices, devices-fake | `~` | — | `~` root/device-gated |
@@ -88,8 +88,9 @@ Status legend: ✓ property asserted · `~` shallow / by an existing ported test
 | -W, --whole-file | (used widely; --no-whole-file ubiquitous) | n/a | — | `~` |
 | --mkpath | mkpath | `~` | — | `~` |
 | -x, --one-file-system | — | — | — | ✗ (needs a mount boundary) |
-| --preallocate / --fsync | — | — | — | ✗ |
-| -B, --block-size | — | — | — | ✗ |
+| --preallocate | preallocate | Y | — | ✓ allocation and delta-update paths |
+| --fsync | — | — | — | ✗ |
+| -B, --block-size | hashsearch-chain, compress-zlib-insert, preallocate | Y | — | ✓ |
 | --max-alloc | max-alloc-zero | — | — | ✓ zero resolves to each peer's supported ceiling; values above the limit are rejected |
 
 ### Filtering
@@ -103,7 +104,8 @@ Status legend: ✓ property asserted · `~` shallow / by an existing ported test
 | -0, --from0 | files-from-depth*new* | Y | — | ✓ |
 | --max-size / --min-size | size-filter*new* | Y | — | ✓ |
 | --existing / --ignore-existing | delete-deep*new* | Y | — | ✓ |
-| --ignore-missing-args / --delete-missing-args | — | — | — | ✗ |
+| --ignore-missing-args | — | — | — | ✗ |
+| --delete-missing-args | delete-missing-args-files-from | `~` | — | ✓ with `--files-from` |
 
 ### Deletion
 | option | test(s) | depth | x-dir | notes / gap |
@@ -148,12 +150,14 @@ Status legend: ✓ property asserted · `~` shallow / by an existing ported test
 | --write-batch / --only-write-batch / --read-batch | batch-mode | `~` |
 | -e, --rsh / --rsync-path | ssh-basic, many | `~` |
 | --protocol | check29 / check30 (whole suite) | ✓ |
-| --address / --port | daemon tests under --use-tcp | `~` |
+| --address / --port | daemon-address-family, daemon-standalone-detach | ✓ explicit IPv4/IPv6 and config-derived binding |
 | --password-file | daemon-auth*new* | ✓ |
-| --early-input / daemon `early exec` | — | ✗ |
-| --sockopts / --blocking-io / --timeout / --contimeout | — | ✗ |
-| -4/-6, --ipv4/--ipv6 | — | ✗ |
-| --stop-after / --stop-at | — | ✗ |
+| --early-input / daemon `early exec` | daemon-early-exec-nameconv, early-input-symlink | ✓ data delivery and confined input path |
+| --sockopts | daemon-module-options | ✓ client and daemon socket options |
+| --blocking-io | — | ✗ |
+| --timeout / --contimeout | daemon-handshake-timeout, msg-io-timeout-{zero,overflow}, contimeout-rsh | ✓ precedence, bounds and remote-shell daemon path |
+| -4/-6, --ipv4/--ipv6 | daemon-address-family | ✓ IPv4 and IPv6 daemon binding and client connection |
+| --stop-after / --stop-at | stop-time | ✓ future, past and duration parsing |
 | --bwlimit | partial*new* (used, not asserted) | `~` |
 | --copy-as | — | ✗ root-gated |
 | --iconv | — | ✗ |
@@ -179,26 +183,32 @@ Status legend: ✓ property asserted · `~` shallow / by an existing ported test
 | strict modes | daemon-auth*new* | ✓ rejects world-readable secrets |
 | refuse options | daemon-refuse*new*, daemon-refuse-compress | ✓ named/wildcard/allow-list |
 | pre-xfer exec / post-xfer exec | daemon-exec*new* | ✓ env + abort |
-| early exec | — | ✗ (needs --early-input) |
+| early exec | daemon-early-exec-nameconv | ✓ environment and `--early-input` bytes |
 | hosts allow / hosts deny | daemon (allow), daemon-chroot-acl (deny) | `~` (needs --use-tcp for real peer) |
 | reverse lookup / forward lookup | daemon-chroot-acl | `~` reverse only |
 | log file / transfer logging / log format | daemon | `~` set, not asserted |
 | max verbosity | daemon | `~` |
 | comment | daemon, daemon-access*new* | ✓ |
-| numeric ids | — | ✗ (hard to observe non-root) |
-| fake super | chown-fake (client side) | ✗ as daemon param |
-| timeout / max connections / lock file | — | ✗ (need --use-tcp + concurrency) |
+| numeric ids | daemon-early-exec-nameconv, daemon-namecvt-* | ✓ `numeric ids = no` conversion path |
+| fake super | chown-fake, daemon-namecvt-empty-response | ✓ client and daemon parameter |
+| timeout | daemon-handshake-timeout | ✓ handshake and transfer precedence, including zero |
+| max connections / lock file | daemon-include-maxconn, daemon-connection-limits | ✓ sequential reuse, concurrent refusal and release |
 | temp dir / open noatime / ignore errors / ignore nonreadable | — | ✗ |
-| charset / name converter / dont compress | — | ✗ |
+| charset | — | ✗ |
+| name converter | daemon-early-exec-nameconv, daemon-namecvt-* | ✓ success, empty and malformed responses |
+| dont compress | daemon-module-options | `~` configured but compression choice is not asserted |
 | uid / gid / daemon uid / daemon gid / daemon chroot | build_rsyncd_conf (uid/gid when root), daemon-chroot-acl | `~` root-gated |
-| motd file / pid file / port / address / socket options / listen backlog / proxy protocol / syslog facility / syslog tag | — | ✗ (server-startup/connection params) |
+| motd file | daemon-module-options | ✓ banner content asserted |
+| socket options | daemon-module-options | `~` live socket path; kernel effects are not introspected |
+| pid file / port / address | daemon-standalone-detach, daemon-address-family | ✓ configuration and CLI binding paths |
+| proxy protocol | daemon-proxy-protocol, proxy-protocol-trusted-peer | ✓ enabled, disabled and trusted-peer policy |
+| listen backlog / syslog facility / syslog tag | — | ✗ |
 
 ---
 
 ## Known gaps worth a future pass
-* Connection/timeout params (`--timeout`, `--contimeout`, daemon `timeout`,
-  `max connections`) need a real socket + concurrency (run under `--use-tcp`).
 * Root-only behaviours (`-o`/`--usermap` uid remap, real devices, `use chroot
   = yes`, daemon uid/gid) skip as non-root; run the suite as root to cover.
-* `--ignore-errors`, `-x/--one-file-system`, `--numeric-ids` have no dedicated
-  test yet (lower restructure risk).
+* `--ignore-errors` and `-x/--one-file-system` have no dedicated test yet.
+* `--fsync`, `--blocking-io`, daemon charset and daemon listen/syslog settings
+  remain unisolated.
