@@ -184,23 +184,33 @@ char *do_big_num(int64 num, int human_flag, const char *fract)
 	if (human_flag > 1) {
 		unsigned int mult = human_flag == 2 ? 1000 : 1024;
 
-		if (abs_num >= mult) {
-			const char* units = " KMGTPE";
-			uint64_t powi = 1;
+		char units[] = "\0KMGTPE";
+		char *unit = units;
+		uint64_t powi = 1;
 
-			for (;;) {
-				if (abs_num / mult < powi)
+		for (;;) {
+			if (abs_num / mult < powi)
+				break;
+
+			if (unit[1] == '\0')
+				break;
+
+			powi *= mult;
+			++unit;
+		}
+		unit[1] = '\0';
+
+		if (powi > 1) {
+			unsigned int powj = 1, precision = 2;
+
+			for (; precision > 0; precision--) {
+				powj *= 10;
+				if (abs_num / powi < powj)
 					break;
-
-				if (units[1] == '\0')
-					break;
-
-				powi *= mult;
-				++units;
 			}
 
-			snprintf(bufs[n], sizeof bufs[0], "%.2f%c",
-				(double) num / powi, *units);
+			snprintf(bufs[n], sizeof bufs[0], "%.*f%s%s", precision,
+				(double) num / powi, unit, *unit && mult == 1024 ? "i" : "");
 			return bufs[n];
 		}
 	}
