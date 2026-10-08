@@ -35,7 +35,7 @@ jobs:
       id: test
       uses: vmactions/freebsd-vm@c46abacb49f09938ca4e1702d15d836285d694cc # v1.5.9
       with:
-        usesh: true
+        cache-after-prepare: true
         prepare: |
           pkg install -y bash autotools m4 devel/xxhash zstd liblz4 python3 archivers/liblz4 git
         run: |
