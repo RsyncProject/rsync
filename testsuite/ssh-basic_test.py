@@ -7,13 +7,16 @@
 # a follow-up --delete pass cleans up after a destination-side rename.
 
 import os
+import re
 import shlex
 import shutil
 import subprocess
 
+import rsyncfns
 from rsyncfns import (
-    FROMDIR, SRCDIR, TODIR,
+    FROMDIR, RSYNC, RSYNC_PEER, SRCDIR, TODIR,
     checkit, hands_setup, runtest, test_skipped, rsync_path_arg, rsh_cmd,
+    split_rsync_cmd,
 )
 
 
@@ -38,10 +41,26 @@ if probe.stdout.strip() != 'yes':
 
 print(f"Using remote shell: {SSH}")
 
+# Rsync 2.x cannot negotiate setting symlink mtimes. Comparing them only
+# passes when both links happen to be created in the same second.
+compare_link_times = '-l' in shlex.split(rsyncfns.TLS_ARGS)
+peer_version = subprocess.run(
+    [*split_rsync_cmd(RSYNC_PEER), '--version'],
+    capture_output=True, text=True,
+)
+match = re.search(r'rsync\s+version\s+(\d+)\.(\d+)\.(\d+)',
+                  peer_version.stdout)
+if peer_version.returncode == 0 and match and int(match.group(1)) < 3:
+    rsyncfns.TLS_ARGS = ' '.join(
+        arg for arg in shlex.split(rsyncfns.TLS_ARGS) if arg != '-l'
+    )
+
 hands_setup()
+if compare_link_times:
+    os.utime(FROMDIR / 'nolf-symlink', (1_000_000_000, 1_000_000_000),
+             follow_symlinks=False)
 
 # RSYNC may be a multi-word command line; pass it through --rsync-path.
-from rsyncfns import RSYNC, RSYNC_PEER
 
 
 def _basic():
