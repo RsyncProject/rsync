@@ -104,7 +104,7 @@ Status legend: ✓ property asserted · `~` shallow / by an existing ported test
 | -0, --from0 | files-from-depth*new* | Y | — | ✓ |
 | --max-size / --min-size | size-filter*new* | Y | — | ✓ |
 | --existing / --ignore-existing | delete-deep*new* | Y | — | ✓ |
-| --ignore-missing-args | — | — | — | ✗ |
+| --ignore-missing-args | ignore-missing-args | Y | — | ✓ direct, remote-shell and `--files-from` sources |
 | --delete-missing-args | delete-missing-args-files-from | `~` | — | ✓ with `--files-from` |
 
 ### Deletion
