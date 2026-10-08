@@ -169,20 +169,28 @@ invoke('-s', convert, '-e', ssh, rpath,
 assert_only_names(arg_pull, (UTF8_NAME,), '--secluded-args')
 assert_file(arg_pull, UTF8_NAME, '--secluded-args')
 
-# An invalid UTF-8 source name is omitted and reported without disturbing an
-# existing destination entry.
+# An invalid UTF-8 source name is omitted and reported. The resulting I/O error
+# blocks deletion unless --ignore-errors explicitly permits it.
 invalid_src = base / 'invalid-src'
 invalid_dst = base / 'invalid-dst'
 makepath(invalid_src, invalid_dst)
 write_raw(invalid_src, b'bad-\xff')
+(invalid_src / 'sentinel').write_bytes(b'keep\n')
 (invalid_dst / 'sentinel').write_bytes(b'keep\n')
-proc = invoke('-r', convert, '-e', ssh, rpath,
+(invalid_dst / 'stale').write_bytes(b'do not delete yet\n')
+proc = invoke('-r', '--delete', convert, '-e', ssh, rpath,
               f'{invalid_src}/', f'localhost:{invalid_dst}/', expected=23)
 if b'cannot convert filename' not in proc.stderr:
     test_fail('invalid UTF-8 filename did not report a conversion failure')
-assert_only_names(invalid_dst, (b'sentinel',), 'invalid filename')
+assert_only_names(invalid_dst, (b'sentinel', b'stale'), 'I/O-safe deletion')
 if (invalid_dst / 'sentinel').read_bytes() != b'keep\n':
     test_fail('invalid filename transfer changed the existing destination')
+
+invoke('-r', '--delete', '--ignore-errors', convert, '-e', ssh, rpath,
+       f'{invalid_src}/', f'localhost:{invalid_dst}/', expected=23)
+assert_only_names(invalid_dst, (b'sentinel',), '--ignore-errors')
+if (invalid_dst / 'sentinel').read_bytes() != b'keep\n':
+    test_fail('--ignore-errors changed the retained payload')
 
 # An explicit --no-iconv overrides the environment default on both sides.
 noiconv_dst = base / 'noiconv-dst'
@@ -199,7 +207,10 @@ if os.readlink(raw_path(noiconv_dst, b'link')) != UTF8_TARGET:
 # A daemon module's charset overrides the remote charset supplied by the
 # client. Supplying only the local charset exercises that daemon contract.
 daemon_dst = base / 'daemon-dst'
-makepath(daemon_dst)
+daemon_ignore_dst = base / 'daemon-ignore-dst'
+makepath(daemon_dst, daemon_ignore_dst)
+(daemon_ignore_dst / 'sentinel').write_bytes(b'keep\n')
+(daemon_ignore_dst / 'stale').write_bytes(b'delete through module policy\n')
 conf = write_daemon_conf([
     ('encoded', {
         'path': str(daemon_dst),
@@ -207,6 +218,12 @@ conf = write_daemon_conf([
         'charset': 'ISO-8859-1',
         # Isolate charset conversion from the daemon's symlink munging.
         'munge symlinks': 'no',
+    }),
+    ('encoded-ignore', {
+        'path': str(daemon_ignore_dst),
+        'read only': 'no',
+        'charset': 'ISO-8859-1',
+        'ignore errors': 'yes',
     }),
 ], name='iconv-rsyncd.conf')
 url = start_test_daemon(conf, 18732)
@@ -219,4 +236,10 @@ actual_target = os.readlink(raw_path(daemon_dst, b'link'))
 if actual_target != daemon_target:
     test_fail(f'daemon: symlink target {actual_target!r}, expected {daemon_target!r}')
 
-print('iconv: filenames, arguments, file lists, symlinks, errors and daemon charset')
+invoke('-r', '--delete', '--iconv=UTF-8', f'{invalid_src}/',
+       f'{url}encoded-ignore/', expected=23)
+assert_only_names(daemon_ignore_dst, (b'sentinel',), 'daemon ignore errors')
+if (daemon_ignore_dst / 'sentinel').read_bytes() != b'keep\n':
+    test_fail('daemon ignore errors changed the retained payload')
+
+print('iconv: names, arguments, file lists, symlinks, error deletion and daemon charset')

@@ -116,7 +116,7 @@ Status legend: ✓ property asserted · `~` shallow / by an existing ported test
 | --max-delete | delete-deep*new* | Y | — | ✓ caps deletions |
 | --remove-source-files | delete | `~` | — | `~` |
 | --force | update*new* | Y | — | ✓ replaces a non-empty dir with a file |
-| --ignore-errors | — | — | — | ✗ (client; daemon `ignore errors` also ✗) |
+| --ignore-errors | iconv | — | — | ✓ deletion proceeds after sender I/O error |
 
 ### Comparison / checksum / compression
 | option | test(s) | depth | x-dir | notes / gap |
@@ -193,7 +193,7 @@ Status legend: ✓ property asserted · `~` shallow / by an existing ported test
 | fake super | chown-fake, daemon-namecvt-empty-response | ✓ client and daemon parameter |
 | timeout | daemon-handshake-timeout | ✓ handshake and transfer precedence, including zero |
 | max connections / lock file | daemon-include-maxconn, daemon-connection-limits | ✓ sequential reuse, concurrent refusal and release |
-| temp dir / open noatime / ignore errors / ignore nonreadable | — | ✗ |
+| temp dir / open noatime / ignore errors / ignore nonreadable | iconv (ignore errors) | `~` ignore errors asserted; remaining parameters uncovered |
 | charset | iconv | ✓ module charset overrides the client remote charset |
 | name converter | daemon-early-exec-nameconv, daemon-namecvt-* | ✓ success, empty and malformed responses |
 | dont compress | daemon-module-options | `~` configured but compression choice is not asserted |
