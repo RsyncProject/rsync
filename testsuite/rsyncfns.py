@@ -788,8 +788,8 @@ def start_rsyncd(conf_path, port: int, rsync_cmd: str = None,
     the old client. stdin may override the default /dev/null input when a test
     needs to exercise daemon launch detection.
 
-    This is only ever reached from start_test_daemon() in --use-tcp mode; the
-    default (pipe) mode never starts a listening daemon.
+    start_test_daemon() calls this only in --use-tcp mode. Tests which require
+    a real protocol peer may call it directly in either suite transport.
     """
     if address not in ('127.0.0.1', '::1'):
         test_fail(f"test daemon address is not loopback: {address}")
