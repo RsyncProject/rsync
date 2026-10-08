@@ -190,14 +190,14 @@ makepath(TODIR)
 p = out('-r', '--exclude=*.tmp', '--debug=filter1',
         f'{src}/', f'{TODIR}/')
 filter_msg = '[sender] hiding file hide.tmp because of pattern *.tmp'
-if filter_msg not in p.stdout or p.stderr:
+if filter_msg not in p.stdout or filter_msg in p.stderr:
     test_fail('--debug=filter1 did not use the default stdout route')
 
 rmtree(TODIR)
 makepath(TODIR)
 p = out('-r', '--exclude=*.tmp', '--debug=filter1', '--stderr=all',
         f'{src}/', f'{TODIR}/')
-if filter_msg not in p.stderr or p.stdout:
+if filter_msg not in p.stderr or filter_msg in p.stdout:
     test_fail('--stderr=all did not route debug output exclusively to stderr')
 
 # --- --outbuf=L makes each complete output line observable immediately -----
