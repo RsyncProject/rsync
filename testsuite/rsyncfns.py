@@ -768,18 +768,19 @@ def _cleanup_rsyncd(proc, port: int) -> 'None':
 
 
 def start_rsyncd(conf_path, port: int, rsync_cmd: str = None,
-                 stdin=subprocess.DEVNULL) -> 'subprocess.Popen':
-    """Spawn `rsync --daemon --no-detach --address=127.0.0.1 --port=N
+                 stdin=subprocess.DEVNULL,
+                 address: str = '127.0.0.1') -> 'subprocess.Popen':
+    """Spawn `rsync --daemon --no-detach --address=ADDRESS --port=N
     --config=conf` and return the Popen handle after the port is accepting
     connections.
 
-    The daemon is bound to LOOPBACK ONLY (--address=127.0.0.1): without it,
-    rsync --daemon binds 0.0.0.0 and the test modules would be reachable from
-    the whole LAN. The daemon is killed automatically when this Python
-    process exits (atexit). On Linux, the kernel also signals SIGTERM to the
-    daemon if the parent dies abruptly (PR_SET_PDEATHSIG), so a SIGKILL on
-    the test process doesn't strand the daemon either. The caller is expected
-    to have already claim_ports()'d `port`.
+    ADDRESS must be IPv4 or IPv6 loopback. Without an explicit address, rsync
+    binds every interface and exposes test modules to the LAN. The daemon is
+    killed automatically when this Python process exits (atexit). On Linux,
+    the kernel also signals SIGTERM to the daemon if the parent dies abruptly
+    (PR_SET_PDEATHSIG), so a SIGKILL on the test process doesn't strand the
+    daemon either. The caller is expected to have already claim_ports()'d
+    `port`.
 
     rsync_cmd selects the binary to run as the daemon; it defaults to
     RSYNC_PEER (the peer side of a two-sided run), so ordinary daemon tests
@@ -788,12 +789,15 @@ def start_rsyncd(conf_path, port: int, rsync_cmd: str = None,
     the old client. stdin may override the default /dev/null input when a test
     needs to exercise daemon launch detection.
 
-    This is only ever reached from start_test_daemon() in --use-tcp mode; the
-    default (pipe) mode never starts a listening daemon.
+    start_test_daemon() calls this only in --use-tcp mode. Tests which require
+    a real protocol peer may call it directly in either suite transport.
     """
+    if address not in ('127.0.0.1', '::1'):
+        test_fail('refusing to expose test daemon on non-loopback address '
+                  f'{address!r}')
     argv = shlex.split(rsync_cmd or RSYNC_PEER) + [
         '--daemon', '--no-detach',
-        '--address=127.0.0.1',
+        f'--address={address}',
         f'--port={port}',
         f'--config={conf_path}',
     ]
@@ -820,14 +824,14 @@ def start_rsyncd(conf_path, port: int, rsync_cmd: str = None,
                 f"(status={proc.returncode})"
             )
         try:
-            with _socket.create_connection(('127.0.0.1', port), timeout=0.5):
+            with _socket.create_connection((address, port), timeout=0.5):
                 return proc
         except OSError as e:
             last_err = e
             time.sleep(0.05)
 
     _stop_rsyncd(proc)
-    test_fail(f"rsyncd never listened on 127.0.0.1:{port}: {last_err}")
+    test_fail(f"rsyncd never listened on {address}:{port}: {last_err}")
 
 
 def start_test_daemon(conf_path, port: int, rsync_cmd: str = None) -> str:
