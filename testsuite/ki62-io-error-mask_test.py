@@ -86,18 +86,12 @@ claim_ports(PORT)
 daemon = start_rsyncd(conf, PORT)
 
 # --bwlimit keeps the transfer slow enough to guarantee the sender is
-# mid-stream when we SIGKILL it.  --info=progress gives a heartbeat we could
-# observe, but the bwlimit + short sleep is enough on loopback.
+# mid-stream when we SIGKILL it.
 client = subprocess.Popen(
     rsync_argv('-a', '--bwlimit=64', '--timeout=60',
                f'rsync://127.0.0.1:{PORT}/test-from/', f'{TODIR}/'),
     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
 )
-
-# Let the receiver get past the handshake and into the data stream before we
-# cut the sender off, so the death is observed as a mid-transfer stream error
-# (the path that exercises the io_error -> exit-code mapping).
-time.sleep(2)
 
 # Kill the sender mid-transfer.  rsyncd forks a child per connection, so the
 # actual sender is NOT `daemon` (the listener) -- killing only the listener
@@ -106,11 +100,22 @@ time.sleep(2)
 # listener).  The daemon shares this test's process group, so killpg is not an
 # option (it would kill the test itself).
 child_pids = []
-try:
-    logtext = (SCRATCHDIR / 'rsyncd.log').read_text()
-    child_pids = [int(pid) for pid in re.findall(r'\[(\d+)\] rsync on ', logtext)]
-except OSError:
-    pass
+deadline = time.monotonic() + 10
+while time.monotonic() < deadline:
+    try:
+        logtext = (SCRATCHDIR / 'rsyncd.log').read_text()
+        child_pids = [int(pid) for pid in re.findall(r'\[(\d+)\] rsync on ', logtext)]
+    except OSError:
+        pass
+    if child_pids:
+        break
+    if client.poll() is not None:
+        break
+    time.sleep(0.05)
+if not child_pids:
+    client.kill()
+    out, _ = client.communicate()
+    test_fail(f"daemon sender did not start before the transfer exited:\n{out}")
 for pid in child_pids:
     try:
         os.kill(pid, signal.SIGKILL)

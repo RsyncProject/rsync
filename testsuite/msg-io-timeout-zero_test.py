@@ -55,8 +55,8 @@ f.write(b"@RSYNCD: 32.0 sha256\n"); f.flush()
 f.readline(); f.readline()
 f.write(b"@RSYNCD: OK\n"); f.flush()
 conn.setblocking(False)
-dl, quiet = time.time() + 4.0, 0.0
-while time.time() < dl:
+dl, quiet = time.monotonic() + 4.0, 0.0
+while time.monotonic() < dl:
     r, _, _ = select.select([conn], [], [], 0.1)
     if r:
         try:
