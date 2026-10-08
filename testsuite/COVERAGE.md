@@ -160,8 +160,8 @@ Status legend: ✓ property asserted · `~` shallow / by an existing ported test
 | --stop-after / --stop-at | stop-time | ✓ future, past and duration parsing |
 | --bwlimit | partial*new* (used, not asserted) | `~` |
 | --copy-as | — | ✗ root-gated |
-| --iconv | — | ✗ |
-| -s/--secluded-args, --old-args, --trust-sender | (default arg-protection exercised) | `~` |
+| --iconv | iconv | ✓ filenames, arguments, file lists, protocol 30+ symlink targets and invalid input; macOS raw-byte fixture unavailable |
+| -s/--secluded-args, --old-args, --trust-sender | iconv (-s); default arg protection | `~` secluded filename conversion asserted; old/trust not isolated |
 
 ---
 
@@ -194,7 +194,7 @@ Status legend: ✓ property asserted · `~` shallow / by an existing ported test
 | timeout | daemon-handshake-timeout | ✓ handshake and transfer precedence, including zero |
 | max connections / lock file | daemon-include-maxconn, daemon-connection-limits | ✓ sequential reuse, concurrent refusal and release |
 | temp dir / open noatime / ignore errors / ignore nonreadable | — | ✗ |
-| charset | — | ✗ |
+| charset | iconv | ✓ module charset overrides the client remote charset |
 | name converter | daemon-early-exec-nameconv, daemon-namecvt-* | ✓ success, empty and malformed responses |
 | dont compress | daemon-module-options | `~` configured but compression choice is not asserted |
 | uid / gid / daemon uid / daemon gid / daemon chroot | build_rsyncd_conf (uid/gid when root), daemon-chroot-acl | `~` root-gated |
