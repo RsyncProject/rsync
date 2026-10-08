@@ -8,7 +8,6 @@
 
 import os
 import shutil
-import time
 
 from rsyncfns import (
     CHKDIR, FROMDIR, RSYNC, RSYNC_PEER, SCRATCHDIR, SRCDIR, TMPDIR, TODIR,
@@ -36,9 +35,9 @@ run_rsync('-av', '--include=etc-ltr-list', '--include=*/', '--exclude=*',
 alt3dir.mkdir()
 (alt3dir / 'likely').write_text("This is a test file\n")
 
-time.sleep(1)
-os.utime(FROMDIR / 'dir' / 'text')
-os.utime(FROMDIR / 'likely')
+for path in (FROMDIR / 'dir' / 'text', FROMDIR / 'likely'):
+    st = path.stat()
+    os.utime(path, (st.st_atime, st.st_mtime + 10))
 
 # chkdir: what a vanilla copy would produce, minus /text and etc-ltr-list.
 run_rsync('-av', '--exclude=/text', '--exclude=etc-ltr-list',

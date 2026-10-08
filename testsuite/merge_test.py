@@ -7,7 +7,6 @@
 # the canonical case.
 
 import os
-import time
 
 from rsyncfns import (
     CHKDIR, TMPDIR, TODIR,
@@ -70,9 +69,6 @@ cp_touch('from1/dir-and-not-dir/inside', str(CHKDIR / 'dir-and-not-dir'))
 for src in ('from2/sub1/uno', 'from3/sub1/dos', 'from2/sub1/tres'):
     cp_touch(src, str(CHKDIR / 'sub1'))
 cp_touch('from3/sub2/subby', str(CHKDIR / 'sub2'))
-
-# Make sure time has moved on before the rsync runs.
-time.sleep(1)
 
 # Pre-sync directory-only updates to flatten directory-time differences,
 # matching the shell test's --existing -f 'exclude,! */' preparation.

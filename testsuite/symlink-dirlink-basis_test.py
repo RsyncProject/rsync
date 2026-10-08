@@ -15,7 +15,6 @@
 import filecmp
 import os
 import subprocess
-import time
 
 from rsyncfns import (
     RSYNC, SCRATCHDIR, RSYNC_PEER, SRCDIR, TMPDIR,
@@ -40,6 +39,11 @@ def make_testfile(path) -> None:
     """~32 KiB of non-trivial content -- large enough to trigger rsync's
     block-matching delta path."""
     make_data_file(path, 32768)
+
+
+def advance_mtime(path) -> None:
+    st = path.stat()
+    os.utime(path, (st.st_atime, st.st_mtime + 10))
 
 
 def push(*args, label: str) -> None:
@@ -79,8 +83,7 @@ assert_same("test 1 initial", srcbase / 'dir' / 'file', home / 'real-dir' / 'fil
 # Trigger delta transfer.
 with open(srcbase / 'dir' / 'file', 'ab') as f:
     f.write(b"appended update\n")
-time.sleep(1)
-(srcbase / 'dir' / 'file').touch()
+advance_mtime(srcbase / 'dir' / 'file')
 
 push('-KRlptv', 'dir/file', 'localhost:', label="test 1 update")
 assert_same("test 1 update", srcbase / 'dir' / 'file', home / 'real-dir' / 'file')
@@ -89,8 +92,7 @@ assert_same("test 1 update", srcbase / 'dir' / 'file', home / 'real-dir' / 'file
 # Test 2: compression.
 with open(srcbase / 'dir' / 'file', 'ab') as f:
     f.write(b"another line\n")
-time.sleep(1)
-(srcbase / 'dir' / 'file').touch()
+advance_mtime(srcbase / 'dir' / 'file')
 
 push('-KRlptzv', 'dir/file', 'localhost:', label="test 2")
 assert_same("test 2", srcbase / 'dir' / 'file', home / 'real-dir' / 'file')
@@ -107,8 +109,7 @@ push('-KRlptv', 'nested/sub/data.txt', 'localhost:', label="test 3 initial")
 
 with open(srcbase / 'nested' / 'sub' / 'data.txt', 'ab') as f:
     f.write(b"appended nested\n")
-time.sleep(1)
-(srcbase / 'nested' / 'sub' / 'data.txt').touch()
+advance_mtime(srcbase / 'nested' / 'sub' / 'data.txt')
 
 push('-KRlptv', 'nested/sub/data.txt', 'localhost:', label="test 3 update")
 assert_same("test 3 update",
@@ -126,8 +127,7 @@ push('-KRlptv', 'dir/file', 'localhost:', label="test 4 initial")
 old_content = (srcbase / 'dir' / 'file').read_bytes()   # the backup should hold this
 with open(srcbase / 'dir' / 'file', 'ab') as f:
     f.write(b"backup update\n")
-time.sleep(1)
-(srcbase / 'dir' / 'file').touch()
+advance_mtime(srcbase / 'dir' / 'file')
 
 push('-KRlptv', '--backup', 'dir/file', 'localhost:', label="test 4 update")
 assert_same("test 4 update", srcbase / 'dir' / 'file', home / 'real-dir' / 'file')
@@ -147,8 +147,7 @@ push('-KRlptv', '--inplace', 'dir/file', 'localhost:', label="test 5 initial")
 
 with open(srcbase / 'dir' / 'file', 'ab') as f:
     f.write(b"inplace update\n")
-time.sleep(1)
-(srcbase / 'dir' / 'file').touch()
+advance_mtime(srcbase / 'dir' / 'file')
 
 push('-KRlptv', '--inplace', 'dir/file', 'localhost:', label="test 5 update")
 assert_same("test 5 update", srcbase / 'dir' / 'file', home / 'real-dir' / 'file')
@@ -162,8 +161,7 @@ push('-Rlptv', 'topfile', 'localhost:', label="test 6 initial")
 
 with open(srcbase / 'topfile', 'ab') as f:
     f.write(b"toplevel update\n")
-time.sleep(1)
-(srcbase / 'topfile').touch()
+advance_mtime(srcbase / 'topfile')
 
 push('-Rlptv', 'topfile', 'localhost:', label="test 6 update")
 assert_same("test 6 update", srcbase / 'topfile', home / 'topfile')
@@ -178,8 +176,7 @@ push('-KRlptv', '--protocol=28', '--partial-dir=.rsync-partial',
 
 with open(srcbase / 'dir' / 'file', 'ab') as f:
     f.write(b"partial-dir update\n")
-time.sleep(1)
-(srcbase / 'dir' / 'file').touch()
+advance_mtime(srcbase / 'dir' / 'file')
 
 push('-KRlptv', '--protocol=28', '--partial-dir=.rsync-partial',
      'dir/file', 'localhost:', label="test 7 update")
@@ -194,8 +191,7 @@ push('-KRlptv', '--protocol=28', 'dir/file', 'localhost:', label="test 8 initial
 
 with open(srcbase / 'dir' / 'file', 'ab') as f:
     f.write(b"proto28 update\n")
-time.sleep(1)
-(srcbase / 'dir' / 'file').touch()
+advance_mtime(srcbase / 'dir' / 'file')
 
 push('-KRlptv', '--protocol=28', 'dir/file', 'localhost:', label="test 8 update")
 assert_same("test 8 update", srcbase / 'dir' / 'file', home / 'real-dir' / 'file')

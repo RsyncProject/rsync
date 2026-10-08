@@ -92,14 +92,19 @@ checkdiff(['-iplrH', f'{FROMDIR}/', f'{TODIR}/'],
 # Re-touch dirs, permute config2 again and replace the symlink target.
 run_rsync('-a', '-f', '-! */', f'{FROMDIR}/', str(TODIR))
 cp_p(SRCDIR / 'config.sub', FROMDIR / 'foo' / 'config2')
-import time
-time.sleep(1)  # to provoke a directory mtime change below
 (TODIR / 'foo' / 'sym').unlink()
 old_umask = os.umask(0)
 try:
     os.symlink('../bar/baz', TODIR / 'foo' / 'sym')
 finally:
     os.umask(old_umask)
+src_foo = (FROMDIR / 'foo').stat()
+os.utime(TODIR / 'foo', (src_foo.st_atime, src_foo.st_mtime + 10))
+if symtimes_supported:
+    src_sym = os.stat(FROMDIR / 'foo' / 'sym', follow_symlinks=False)
+    os.utime(TODIR / 'foo' / 'sym',
+             (src_sym.st_atime, src_sym.st_mtime + 10),
+             follow_symlinks=False)
 os.chmod(FROMDIR / 'foo' / 'config2', 0o600)
 os.chmod(TODIR / 'bar' / 'baz' / 'rsync', 0o777)
 
@@ -141,13 +146,17 @@ checkdiff(['-ivvplrtH', f'{FROMDIR}/', f'{TODIR}/'],
 
 # Permute one perm and re-touch a file; expect just those two itemizes.
 os.chmod(TODIR / 'foo' / 'config1', 0o757)
-(TODIR / 'foo' / 'config2').touch()
+src_config2 = (FROMDIR / 'foo' / 'config2').stat()
+os.utime(TODIR / 'foo' / 'config2',
+         (src_config2.st_atime, src_config2.st_mtime + 10))
 checkdiff(['-vplrtH', f'{FROMDIR}/', f'{TODIR}/'],
           "foo/config2\n",
           filter=v_filt)
 
 os.chmod(TODIR / 'foo' / 'config1', 0o757)
-(TODIR / 'foo' / 'config2').touch()
+src_config2 = (FROMDIR / 'foo' / 'config2').stat()
+os.utime(TODIR / 'foo' / 'config2',
+         (src_config2.st_atime, src_config2.st_mtime + 10))
 checkdiff(['-iplrtH', f'{FROMDIR}/', f'{TODIR}/'],
           f".f...p{dots} foo/config1\n"
           f">f..t.{dots} foo/config2\n")

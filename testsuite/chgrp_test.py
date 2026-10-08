@@ -33,6 +33,4 @@ for g in groups:
         if proc.returncode != 0:
             test_fail("Can't chgrp")
 
-time.sleep(2)
-
 checkit(['-rtgpvvv', f'{FROMDIR}/', f'{TODIR}/'], FROMDIR, TODIR)

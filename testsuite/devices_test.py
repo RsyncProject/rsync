@@ -109,11 +109,18 @@ checkdiff(['-ai', f'{FROMDIR}/block', f'{TODIR}/block2'],
 checkdiff(['-ai', f'{FROMDIR}/block2', f'{TODIR}/block'],
           f"cD{all_plus} block2\n")
 
-import time
-time.sleep(1)
+ref = (TODIR / 'block').stat()
+os.utime(FROMDIR / 'block3', (ref.st_atime, ref.st_mtime + 10),
+         follow_symlinks=False)
 
 checkdiff(['-Di', f'{FROMDIR}/block3', f'{TODIR}/block'],
           f"cDc.T.{dots} block3\n")
+
+for source, destination in ((FROMDIR / 'block', TODIR / 'block'),
+                            (FROMDIR, TODIR)):
+    st = source.stat()
+    os.utime(destination, (st.st_atime, st.st_mtime + 10),
+             follow_symlinks=False)
 
 # Build the expected -aiHvv listing.
 chkfile_lines = [
