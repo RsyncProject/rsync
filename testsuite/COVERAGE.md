@@ -141,8 +141,8 @@ Status legend: ✓ property asserted · `~` shallow / by an existing ported test
 | --progress / -P | output-options*new* | ✓ (--progress) |
 | -h, --human-readable / -8, --8-bit-output | output-options*new* | ✓ smoke |
 | --version / --help | output-options*new* | ✓ |
-| --info / --debug / --stderr / --no-motd / --outbuf | — | ✗ |
-| -M, --remote-option / --log-file / --log-file-format | — | ✗ (daemon `log file` covered) |
+| --info / --debug / --stderr / --no-motd / --outbuf | output-options, daemon-module-options | ✓ output selection, routing, MOTD suppression and line buffering |
+| -M, --remote-option / --log-file / --log-file-format | remote-logging | ✓ client and remote-shell sender/receiver logs |
 
 ### Batch / connection / misc
 | option | test(s) | notes / gap |
