@@ -27,6 +27,7 @@ daemon-refuse-compress       pass
 exclude                      pass
 files-from                   pass
 hardlinks                    pass
+old-dirs                     pass
 reverse-daemon-delta         pass
 sender-flist-symlink-leak    xfail   # peer vulnerable to May-2026 finding (fixed in current)
 ssh-basic                    pass

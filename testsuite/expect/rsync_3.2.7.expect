@@ -21,6 +21,7 @@ daemon-refuse-compress      pass
 exclude                     pass
 files-from                  pass
 hardlinks                   pass
+old-dirs                    pass
 ssh-basic                   pass
 symlink-dirlink-basis       pass
 variety                     pass

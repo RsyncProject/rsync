@@ -19,6 +19,7 @@ daemon-refuse               pass
 exclude                     pass
 files-from                  pass
 hardlinks                   pass
+old-dirs                    pass
 ssh-basic                   pass
 variety                     pass
 variety-symlink-traversal   pass
