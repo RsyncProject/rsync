@@ -35,7 +35,7 @@ jobs:
       id: test
       uses: vmactions/openbsd-vm@5f7b2c933b8846a138361d6843c52af4bef5d945 # v1.4.8
       with:
-        usesh: true
+        cache-after-prepare: true
         prepare: |
           pkg_add -I bash autoconf%2.71 automake%1.16
         run: |

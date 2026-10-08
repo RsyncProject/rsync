@@ -35,7 +35,7 @@ jobs:
       id: test
       uses: vmactions/netbsd-vm@c8a0d7ddb84619a7a8cc4e652efa7950b3fd9f92 # v1.5.2
       with:
-        usesh: true
+        cache-after-prepare: true
         prepare: |
           PATH=/usr/sbin:$PATH pkg_add autoconf automake python312
           ln -sf /usr/pkg/bin/python3.12 /usr/pkg/bin/python3
