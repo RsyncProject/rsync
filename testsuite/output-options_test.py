@@ -4,7 +4,8 @@
 These options control rsync's OUTPUT, not its path handling, so they are
 checked for the documented output shape rather than at depth:
   --version, --help, --itemize-changes (-i), --dry-run (-n), --stats,
-  --out-format, --list-only, --quiet (-q), --progress, -h, -8.
+  --out-format, --list-only, --quiet (-q), --progress, -h, -8, --info,
+  --debug, --stderr, --outbuf.
 
 Every rsync run that is expected to succeed has its exit status checked (a
 silent failure must not pass as "no output"), and the format-changing options
@@ -13,6 +14,7 @@ silent failure must not pass as "no output"), and the format-changing options
 
 import os
 import re
+import select
 import subprocess
 
 from rsyncfns import (
@@ -172,5 +174,69 @@ if weird_ok:
             test_fail("-8 should leave the high-bit name byte unescaped, but "
                       f"the \\#371 escape was still present:\n{esc.stdout!r}")
 
+# --- --info and --debug select output without blanket verbosity ------------
+rmtree(src)
+rmtree(TODIR)
+makepath(src, TODIR)
+(src / 'keep').write_text('keep\n')
+(src / 'hide.tmp').write_text('hide\n')
+
+p = out('-r', '--info=name1', f'{src}/', f'{TODIR}/')
+if 'keep' not in p.stdout or 'hide.tmp' not in p.stdout:
+    test_fail(f"--info=name1 did not report transferred names:\n{p.stdout}")
+
+rmtree(TODIR)
+makepath(TODIR)
+p = out('-r', '--exclude=*.tmp', '--debug=filter1',
+        f'{src}/', f'{TODIR}/')
+filter_msg = '[sender] hiding file hide.tmp because of pattern *.tmp'
+if filter_msg not in p.stdout or p.stderr:
+    test_fail('--debug=filter1 did not use the default stdout route')
+
+rmtree(TODIR)
+makepath(TODIR)
+p = out('-r', '--exclude=*.tmp', '--debug=filter1', '--stderr=all',
+        f'{src}/', f'{TODIR}/')
+if filter_msg not in p.stderr or p.stdout:
+    test_fail('--stderr=all did not route debug output exclusively to stderr')
+
+# --- --outbuf=L makes each complete output line observable immediately -----
+rmtree(src)
+rmtree(TODIR)
+makepath(src, TODIR)
+(src / 'a-small').write_text('small\n')
+make_data_file(src / 'z-large', 256 * 1024)
+proc = subprocess.Popen(
+    rsync_argv('-r', '--outbuf=L', '--out-format=%n', '--bwlimit=128',
+               f'{src}/', f'{TODIR}/'),
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    text=True,
+)
+ready, _, _ = select.select([proc.stdout], [], [], 5)
+if not ready:
+    proc.kill()
+    proc.communicate()
+    test_fail('--outbuf=L did not flush a complete output line within 5 seconds')
+first_line = proc.stdout.readline()
+if not first_line.strip() or not first_line.endswith('\n'):
+    proc.kill()
+    proc.communicate()
+    test_fail(f'--outbuf=L returned an incomplete line: {first_line!r}')
+if proc.poll() is not None:
+    stdout, stderr = proc.communicate()
+    test_fail('--outbuf=L transfer finished before buffering could be observed: '
+              f'{first_line + stdout!r} {stderr!r}')
+try:
+    stdout, stderr = proc.communicate(timeout=10)
+except subprocess.TimeoutExpired:
+    proc.kill()
+    proc.communicate()
+    test_fail('--outbuf=L transfer did not finish within 10 seconds')
+if proc.returncode != 0:
+    test_fail(f'--outbuf=L transfer exited {proc.returncode}: {stderr}')
+if not (TODIR / 'z-large').is_file():
+    test_fail('--outbuf=L transfer did not finish copying the payload')
+
 print("output-options: version/help/-i/-n/--stats/--out-format/--list-only/"
-      "-q/--progress/-h/-8 verified")
+      "-q/--progress/-h/-8/--info/--debug/--stderr/--outbuf verified")

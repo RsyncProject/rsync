@@ -97,6 +97,21 @@ if 'inmod' not in r.stdout or 'outmod' not in r.stdout:
 if 'incoming-chmod test module' not in r.stdout:
     test_fail(f"module comment missing from listing:\n{r.stdout!r}")
 
+# --no-motd suppresses the banner during a real module transfer.
+nomotd_dst = SCRATCHDIR / 'pull-no-motd'
+makepath(nomotd_dst)
+r = subprocess.run(rsync_argv('-r', '--no-motd', f'{url}outmod/',
+                             f'{nomotd_dst}/'),
+                   capture_output=True, text=True)
+if r.returncode != 0:
+    test_fail(f"module transfer with --no-motd failed (rc={r.returncode}):\n"
+              f"{r.stderr}")
+if 'TEST MOTD BANNER' in r.stdout + r.stderr:
+    test_fail(f"--no-motd did not suppress the banner:\n{r.stdout!r}\n{r.stderr!r}")
+nomotd_file = nomotd_dst / 'o0'
+if not nomotd_file.is_file() or nomotd_file.read_text() != 'out\n':
+    test_fail('--no-motd module transfer did not copy the payload')
+
 # --- incoming chmod: push, then check Fu+x,g-w,o=r applied -----------------
 r = subprocess.run(
     rsync_argv('-rzp', '--sockopts=SO_KEEPALIVE,SO_SNDBUF=8192',
