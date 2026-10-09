@@ -6,12 +6,15 @@
     "Required target fields are name, ssh_host, workflow and configure_flags.",
     "Set ssh_host to null for a local target. workflow names a file under .github/workflows.",
     "Optional fields mirror the Target dataclass defaults in fleettest.py.",
+    "Set profiles for targets mapped to a workflow matrix.",
     "",
     "nonroot reruns tests marked fleet_nonroot as the SSH user after privileged passes.",
     "",
     "protocols adds one pipe pass per version and uses the matching workflow policy.",
     "",
     "max_retry reruns a failed test alone and reports recovered tests separately.",
+    "",
+    "unsupported_extra permits capabilities missing only on one fleet host.",
     "",
     "Keys starting with \"_\" are comments. See testsuite/README.md."
   ],
@@ -85,6 +88,7 @@
       "name": "ubuntu-1804",
       "ssh_host": "root@ubuntu-1804",
       "workflow": "ubuntu-build.yml",
+      "profiles": ["non-asan", "root", "self-peer", "linux", "no-zstd-threads"],
       "_python_comment": "The stock Python 3.6 is too old for the runner. Use the installed Python 3.10.",
       "python": "python3.10",
       "_configure_flags_comment": "Disable zstd because 1.3.3 lacks ZSTD_minCLevel. Disable lz4 so compression-level tests use zlib.",
@@ -92,10 +96,6 @@
         "--with-rrsync",
         "--disable-zstd",
         "--disable-lz4"
-      ],
-      "_expect_skip_extra_comment": "This host does not expose the protected_regular condition.",
-      "expect_skip_extra": [
-        "protected-regular"
       ],
       "unsupported_extra": [
         "protected_regular"
@@ -106,6 +106,7 @@
       "name": "ubuntu-2004",
       "ssh_host": "root@ubuntu-2004",
       "workflow": "ubuntu-build.yml",
+      "profiles": ["non-asan", "root", "self-peer", "linux", "no-zstd-threads"],
       "configure_flags": [
         "--with-rrsync"
       ]
@@ -115,6 +116,7 @@
       "name": "ubuntu-2204",
       "ssh_host": "runner@ubuntu-2204",
       "workflow": "ubuntu-build.yml",
+      "profiles": ["non-asan", "root", "self-peer", "linux", "no-zstd-threads"],
       "privilege": "sudo",
       "nonroot": true,
       "protocols": [
@@ -130,6 +132,7 @@
       "name": "ubuntu-2404",
       "ssh_host": "runner@ubuntu-2404",
       "workflow": "ubuntu-build.yml",
+      "profiles": ["non-asan", "root", "self-peer", "linux"],
       "privilege": "sudo",
       "nonroot": true,
       "protocols": [
@@ -145,6 +148,7 @@
       "name": "ubuntu-2604",
       "ssh_host": "runner@ubuntu-2604",
       "workflow": "ubuntu-build.yml",
+      "profiles": ["non-asan", "root", "self-peer", "linux"],
       "privilege": "sudo",
       "nonroot": true,
       "protocols": [
@@ -163,10 +167,7 @@
       "configure_flags": [
         "--with-rrsync"
       ],
-      "_expect_skip_extra_comment": "This VM has no second filesystem for the cross-device temporary-directory test. protected_regular is enabled separately.",
-      "expect_skip_extra": [
-        "chmod-temp-dir"
-      ],
+      "_unsupported_extra_comment": "This VM has no second filesystem for the cross-device temporary-directory test.",
       "unsupported_extra": [
         "cross_device"
       ]
@@ -202,12 +203,7 @@
       "xfail": [
         "crtimes"
       ],
-      "scratchbase": "/Volumes/RsyncHFS",
-      "expect_skip_omit": [
-        "backup-crossdev-copy",
-        "chmod-temp-dir"
-      ],
-      "_skip_comment": "The HFS+ volume supplies the cross-device conditions missing from the APFS target."
+      "scratchbase": "/Volumes/RsyncHFS"
     },
     {
       "_comment": "macOS 10.13 on x86-64 with Apple Clang 10. This target covers MD5 assembly but cannot compile the SIMD multiversioning probe.",
@@ -226,14 +222,8 @@
       ],
       "env_prefix": "export PATH=/opt/local/bin:/opt/local/sbin:$PATH",
       "configure_pre": "CPPFLAGS=\"-I/opt/local/include\"; LDFLAGS=\"-L/opt/local/lib\"; export CPPFLAGS LDFLAGS;",
-      "expect_skip_extra": [
-        "symlink-mknod-fakesuper-symlink-race"
-      ],
       "unsupported_extra": [
         "symlink_mknod"
-      ],
-      "expect_skip_omit": [
-        "sender-remove-source-root-anchor"
       ]
     },
     {
@@ -255,16 +245,8 @@
       ],
       "env_prefix": "export PATH=/opt/local/bin:/opt/local/sbin:$PATH",
       "configure_pre": "CC=clang-mp-19; CXX=clang++-mp-19; CPPFLAGS=\"-I/opt/local/include\"; LDFLAGS=\"-L/opt/local/lib\"; export CC CXX CPPFLAGS LDFLAGS;",
-      "expect_skip_extra": [
-        "symlink-mknod-fakesuper-symlink-race"
-      ],
       "unsupported_extra": [
         "symlink_mknod"
-      ],
-      "_expect_skip_omit_comment": "simd-checksum runs here because this target enables SIMD.",
-      "expect_skip_omit": [
-        "sender-remove-source-root-anchor",
-        "simd-checksum"
       ]
     },
     {

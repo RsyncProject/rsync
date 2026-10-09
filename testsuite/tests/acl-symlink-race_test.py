@@ -41,9 +41,8 @@ if not shutil.which('setfacl') or not shutil.which('getfacl'):
 # Protocol gate FIRST: this test transfers an ACL over the wire, which requires
 # protocol 30+ regardless of the host's ACL capability.  It MUST precede the
 # ACL_at check below: on a no-xattrat box that check short-circuits to a PASS,
-# so if it ran first a proto-29 run would PASS where an xattrat box SKIPs --
-# diverging from the kernel-independent RSYNC_EXPECT_SKIPPED check29 list and
-# failing CI on the no-xattrat Ubuntu runners.
+# so if it ran first a proto-29 run would PASS where an xattrat box reports the
+# protocol requirement as unsupported.
 proto = forced_protocol()
 if proto is not None and proto < 30:
     test_skipped(f"ACL transfer requires protocol 30+ (negotiated {proto})",

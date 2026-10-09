@@ -15,26 +15,24 @@ on:
     branches: [ master ]
     paths:
       - 'testsuite/fleettest.py'
+      - 'testsuite/fleettest.json.example'
       - '.github/workflows/fleettest.yml'
       - 'testsuite/runtests.py'
       - 'testsuite/harness/**'
       - 'testsuite/profiles/**'
       - 'testsuite/tests/**'
       - 'testsuite/exitcodes.py'
-      - 'testsuite/skiplist/**'
-      - 'testsuite/tests/skiplist-spec_test.py'
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
       - 'testsuite/fleettest.py'
+      - 'testsuite/fleettest.json.example'
       - '.github/workflows/fleettest.yml'
       - 'testsuite/runtests.py'
       - 'testsuite/harness/**'
       - 'testsuite/profiles/**'
       - 'testsuite/tests/**'
       - 'testsuite/exitcodes.py'
-      - 'testsuite/skiplist/**'
-      - 'testsuite/tests/skiplist-spec_test.py'
   workflow_dispatch:
   schedule:
     - cron: '17 7 * * 1'
@@ -74,9 +72,11 @@ jobs:
         cat > fleettest-ci.json <<'EOF'
         { "targets": [
           { "name": "local-a", "ssh_host": "localhost", "workflow": "none.yml",
-            "configure_flags": [], "builddir": "rsync-citest-a", "privilege": "sudo" },
+            "configure_flags": ["--with-rrsync"], "profiles": ["non-asan", "root", "self-peer", "linux"],
+            "builddir": "rsync-citest-a", "privilege": "sudo" },
           { "name": "local-b", "ssh_host": "localhost", "workflow": "none.yml",
-            "configure_flags": [], "builddir": "rsync-citest-b", "privilege": "sudo" }
+            "configure_flags": ["--with-rrsync"], "profiles": ["non-asan", "root", "self-peer", "linux"],
+            "builddir": "rsync-citest-b", "privilege": "sudo" }
         ] }
         EOF
     - name: fleettest --list (config sanity)
