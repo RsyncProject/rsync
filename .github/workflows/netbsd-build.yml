@@ -31,6 +31,14 @@ jobs:
       with:
         fetch-depth: 0
         persist-credentials: false
+    - name: prepare VM host
+      timeout-minutes: 10
+      run: |
+        packages=(qemu-utils qemu-system-x86 ovmf)
+        sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "${packages[@]}" || {
+          sudo apt-get update -q
+          sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "${packages[@]}"
+        }
     - name: Test in NetBSD VM
       id: test
       uses: vmactions/netbsd-vm@c8a0d7ddb84619a7a8cc4e652efa7950b3fd9f92 # v1.5.2
