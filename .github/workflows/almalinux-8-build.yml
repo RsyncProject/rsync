@@ -69,10 +69,10 @@ jobs:
       run: ./rsync --version
     - name: check
       # In the container we already run as root, so no sudo. The
-      # crtimes-not-supported skip matches the other Linux jobs;
+      # crtimes remains unsupported as on the other Linux jobs;
       # daemon-chroot-acl and proxy-response-line-too-long skip because
       # the default (secure) transport opens no listening socket.
-      run: RSYNC_TEST_PROFILES=pipe,non-asan,root,self-peer,linux,no-zstd-threads RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/common.txt,@testsuite/skiplist/linux.txt make check
+      run: RSYNC_TEST_PROFILES=pipe,non-asan,root,self-peer,linux,no-zstd-threads make check
     - name: check (TCP daemon transport)
       # Second run exercising the real loopback-TCP daemon path.
       run: RSYNC_TEST_PROFILES=non-asan,root,self-peer,linux,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp -j 8

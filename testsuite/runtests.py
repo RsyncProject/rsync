@@ -122,7 +122,7 @@ def parse_args():
                         '@FILE entry reads a skip list (one test per line, '
                         '"#" comments); relative paths resolve against srcdir '
                         'and several may be composed, e.g. '
-                        '@testsuite/skiplist/linux.txt,@testsuite/skiplist/proto29.txt. '
+                        '@expected-skips.txt,@protocol-skips.txt. '
                         'A -NAME entry removes a name the rest of the spec '
                         'added, for a host that can really run a test its '
                         'platform list expects to skip.')
@@ -348,22 +348,16 @@ def describe_tests(tests):
 def expand_skip_spec(spec, srcdir, suitedir):
     """Expand an RSYNC_EXPECT_SKIPPED spec into a normalised csv.
 
-    The spec is a comma-separated list of test names, '@FILE' skip-list
-    references, and '-name' removals.  A skip-list file holds one test name per line ('#' starts a
-    comment; blank lines are ignored), which is what keeps two branches from
-    colliding: adding a test edits one line of one file rather than a shared
-    3 KB csv.  Several may be composed, e.g.
-        RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/linux.txt,@.../proto29.txt
+    The spec is a comma-separated list of test names, '@FILE' references and
+    '-name' removals. A file holds one test name per line; '#' starts a comment
+    and blank lines are ignored. Several files may be composed.
     Relative paths resolve against srcdir (not the cwd) so out-of-tree builds
     and `make installcheck` work.  A '-name' entry removes a name the rest of
     the spec added, for a host that can genuinely run a test its platform list
     expects to skip; it is applied last, and must actually remove something.
 
-    Entries must name a real test, and each file must be non-empty, sorted and
-    free of duplicates: unsorted files defeat the point (everyone appends to
-    the same last line), and a stale name would otherwise fail as a skip
-    mismatch far from its cause.  Exits 2 on any of those -- nothing malformed
-    may quietly shrink the expected set, which would disarm the oracle.
+    Entries must name a real test. Each file must be non-empty, sorted and free
+    of duplicates. Malformed input exits 2 rather than weakening the check.
     """
     def die(msg):
         sys.stderr.write(msg + '\n')

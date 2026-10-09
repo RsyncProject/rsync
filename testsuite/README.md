@@ -8,7 +8,6 @@ Rsync's automated tests live here. Bug fixes should include a regression test wh
 - `testsuite/rsyncfns.py` contains the legacy test helpers
 - `testsuite/harness/` contains metadata, profile, result and receipt support
 - `testsuite/profiles/` records platform capabilities and peer deviations
-- `testsuite/skiplist/` contains the temporary expected-skip lists
 - `testsuite/fleettest.py` runs the suite across the maintainer fleet
 - `testsuite/abdiff.py` compares two rsync versions over the same transfers
 - [COVERAGE.md](COVERAGE.md) records option and daemon-parameter coverage
@@ -72,15 +71,13 @@ Profiles compose by name. For example `--profiles=linux,peer-3.4.1` combines the
 
 An unsupported result is accepted only when the test declares the capability and the active profile permits its absence. A generic skip is a profile error. Receipts retain the raw outcome and the profile verdict.
 
-CI also compares the exact skipped-test list while profiles are being rolled out. See [skiplist/README.md](skiplist/README.md).
-
 ## Scratch data and requirements
 
 Tests use `testtmp/<name>/`; failed scratch directories remain for inspection. The suite needs Python 3, `/bin/sh` and the normal build toolchain. ACL and extended-attribute tests also need the platform ACL and attr tools.
 
 ## Fleet testing
 
-`testsuite/fleettest.py` builds the committed revision on configured hosts and runs the same pipe, TCP, protocol and non-root lanes used by CI. Configuration is read from `~/.fleettest.json` then `testsuite/fleettest.json` or from the path passed to `--fleet`.
+`testsuite/fleettest.py` builds the committed revision on configured hosts and runs the same pipe, TCP, protocol and non-root lanes used by CI. Profiled passes validate their receipts. A target mapped to a workflow matrix declares its selected profiles in the fleet configuration. Configuration is read from `~/.fleettest.json` then `testsuite/fleettest.json` or from the path passed to `--fleet`.
 
 Start with the checked-in example:
 ```sh

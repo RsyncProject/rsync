@@ -7,8 +7,8 @@ Builds the committed HEAD of an rsync checkout on a fleet of remote machines
 a fast local pre-flight for the GitHub CI matrix.
 
 Each target maps to a .github/workflows/*.yml job or matrix lane. Configure
-flags, capability profiles and the transitional pipe-run skip oracle are parsed
-from that workflow. The --use-tcp run sets neither policy, matching CI.
+flags and static capability profiles are parsed from that workflow. Targets for
+matrix workflows declare the selected profiles in the fleet config.
 
 The tcp pass runs only the tests that can reach the daemon transport, because it
 follows a full pipe pass over the very same build: --use-tcp is observable only
@@ -17,8 +17,8 @@ the same result twice. Pass --full-tcp to run the whole suite there anyway.
 
 A target may also list older "protocols" (e.g. [30, 29]) in the fleet config:
 each runs as an extra stdio-pipe pass with runtests --protocol=N (the fleet
-analogue of a workflow's check30/check29 steps), using that step's own parsed
-skip list, and shows up as a protoNN column in the report.
+analogue of a workflow's check30/check29 steps) and shows up as a protoNN
+column in the report.
 
 The fleet -- which machines, how to reach and build each -- is read from a JSON
 config: ~/.fleettest.json if present, else fleettest.json next to this script,
@@ -91,6 +91,7 @@ import atexit
 import concurrent.futures
 import dataclasses
 import fnmatch
+import functools
 import json
 import os
 import shlex
@@ -104,15 +105,13 @@ import threading
 import time
 from pathlib import Path
 
-from harness import read_requirements
+from harness import load_profile, read_requirements
 
 # Set from --skip / --xfail in main(). SKIP_CSV is passed to runtests as
 # RSYNC_EXCLUDE (tests dropped before running); XFAIL_GLOBS are tolerated
 # failures (a matching FAIL does not make a cell "not OK"). Both are
 # comma-separated test-name globs (fnmatch), applied across every target.
 SKIP_CSV = ""
-# Names from a backport tree's testsuite/skiplist/backport.txt (see main()).
-BACKPORT_EXCLUDE: list[str] = []
 XFAIL_GLOBS: list[str] = []
 
 # Set from --timing in main(). Also asks each target's runtests.py for its own
@@ -127,6 +126,9 @@ FULL_TCP = False
 # The transports this run will execute (from --transport), needed in test_script
 # to tell "tcp after a pipe pass" from "tcp is the only pass".
 TRANSPORTS: list[str] = []
+
+RECEIPT_BEGIN = '----- fleettest receipt begin -----'
+RECEIPT_END = '----- fleettest receipt end -----'
 
 # Set from --repo in main() (default: cwd). The harness builds whatever rsync
 # source tree these point at, so it must be run from inside an rsync checkout
@@ -169,6 +171,8 @@ class Target:
     ssh_host: str | None          # null in JSON => run locally
     workflow: str                 # workflow containing the matching job or matrix lane
     configure_flags: list[str]
+    # Base profiles for a workflow matrix; transport and protocol are added per pass.
+    profiles: list[str] = dataclasses.field(default_factory=list)
     make: str = "make"            # e.g. "gmake" on the BSDs/Solaris
     env_prefix: str = ""          # exported before configure AND make (e.g. PATH)
     scratchbase: str = ""         # run the tests' scratch trees here (e.g. another filesystem)
@@ -196,19 +200,8 @@ class Target:
     # Use on a slow/loaded box where concurrency-sensitive tests occasionally
     # flake, instead of dropping the whole target to a lower -j. 0 => no retry.
     max_retry: int = 0
-    # Test names this specific box skips beyond what its workflow lists -- e.g. an
-    # old-kernel fleet box (no openat2/RESOLVE_BENEATH) skips the RB-conditional
-    # symlink-race tests that the workflow's newer CI runner actually runs.  Merged
-    # into RSYNC_EXPECT_SKIPPED for each pipe/protocol pass the workflow itself
-    # pins -- a pass with no matching workflow step stays unpinned (see
-    # workflow_skip_for).
-    expect_skip_extra: list[str] = dataclasses.field(default_factory=list)
-    # Capabilities absent on this box which explain expect_skip_extra.
+    # Capabilities absent on this box beyond those in its profiles.
     unsupported_extra: list[str] = dataclasses.field(default_factory=list)
-    # ...and the mirror: entries the workflow expects to skip which this target
-    # actually RUNS (a relocated scratch can satisfy a condition the
-    # workflow's host cannot, e.g. a cross-device copy).
-    expect_skip_omit: list[str] = dataclasses.field(default_factory=list)
     # Test-name globs this box never runs (passed to runtests as RSYNC_EXCLUDE),
     # for tests unreliable on this platform for a non-rsync reason -- e.g. the
     # daemon+flipper symlink-race tests on openbsd, which the platform's kernel
@@ -306,28 +299,6 @@ def push_argv(target: Target, staging: str) -> list[str]:
 # workflow policy parsing
 # ---------------------------------------------------------------------------
 
-def parse_workflow_skip(workflow: str, make_target: str = "check") -> str | None:
-    """Return the literal RSYNC_EXPECT_SKIPPED spec for the given `make <target>`
-    step (check / check30 / check29), or None if that step leaves it unset.  The
-    protocol passes have their own check30/check29 lines (e.g. an xattr/ACL test
-    that runs at proto 30 but skips at 29), so they must be parsed separately from
-    the plain pipe `make check`.  The trailing '? tolerates a `bash -c '... make
-    check'` wrapper (e.g. Cygwin).
-
-    The spec is passed through to the remote runtests.py verbatim; @FILE entries
-    (testsuite/skiplist/*.txt) are expanded there, against the staged tree, so
-    the list always matches the tests that shipped with it."""
-    path = WORKFLOWS / workflow
-    try:
-        text = path.read_text()
-    except OSError:
-        return None
-    rx = re.compile(r"RSYNC_EXPECT_SKIPPED=(\S+)\s+make\s+"
-                    + re.escape(make_target) + r"'?\s*$", re.M)
-    m = rx.search(text)
-    return m.group(1) if m else None
-
-
 def parse_workflow_profiles(workflow: str, make_target: str = "check") -> str | None:
     path = WORKFLOWS / workflow
     try:
@@ -349,63 +320,17 @@ def tcp_profiles(workflow: str) -> str | None:
     return ','.join(names)
 
 
-def _expand_spec_names(spec: str) -> set[str]:
-    """The test names a workflow's RSYNC_EXPECT_SKIPPED spec resolves to, by
-    reading its @FILE references out of the suite tree.  Only used to decide
-    which backport exclusions are actually IN the expected-skip set: runtests
-    rejects a '-name' that removes a name nothing added, so a removal may only
-    be emitted for a name the spec really contains."""
-    names: set[str] = set()
-    for tok in spec.split(","):
-        tok = tok.strip()
-        if not tok or tok.startswith("-"):
-            continue
-        if tok.startswith("@"):
-            f = TESTSUITE_REPO / tok[1:]
-            try:
-                for ln in f.read_text().splitlines():
-                    ln = ln.split("#", 1)[0].strip()
-                    if ln:
-                        names.add(ln)
-            except OSError:
-                pass
-        else:
-            names.add(tok)
-    return names
-
-
-def workflow_skip_for(t: "Target", make_target: str = "check") -> str | None:
-    """The target's expected-skip csv for a `make <target>` pass: its workflow's
-    RSYNC_EXPECT_SKIPPED, plus any per-target expect_skip_extra (old-box-only
-    skips the workflow omits) and minus any expect_skip_omit (tests the workflow
-    expects to skip which this target can actually run).
-
-    The workflow spec is now mostly @FILE references, which are expanded on the
-    target rather than here, so an omission cannot be done by set subtraction:
-    the name to drop lives inside a file we deliberately do not read.  It is
-    emitted as a '-name' token instead, which runtests.py applies after every
-    addition.
-
-    None (no oracle) when the workflow has no such step -- e.g. a protocols=[29]
-    target whose workflow has no check29 line.  The extras alone would be a
-    near-empty expected set and so a guaranteed mismatch; a lane the workflow
-    does not pin is simply not pinned here either."""
-    base = parse_workflow_skip(t.workflow, make_target)
-    # A backport-excluded test never runs, so it cannot skip either: drop it
-    # from the expected-skip set as well, or the oracle waits for a skip that
-    # can no longer happen.  Only for names the spec actually contains --
-    # runtests rejects a '-name' that removes a name nothing added.
-    in_spec = _expand_spec_names(base) if (base and BACKPORT_EXCLUDE) else set()
-    omit = set(t.expect_skip_omit) | (set(BACKPORT_EXCLUDE) & in_spec)
-    if base is None or not (t.expect_skip_extra or omit):
-        return base
-    items = sorted(set(t.expect_skip_extra) | ({base} if base else set()))
-    # A backport-excluded test cannot skip, because it never runs -- so it must
-    # also come OUT of the expected-skip set, or the oracle waits for a skip
-    # that can no longer happen.  The name usually lives inside an @FILE, so it
-    # is dropped with a '-name' token that runtests applies after expansion.
-    items += [f"-{n}" for n in sorted(omit)]
-    return ",".join(items)
+def target_profiles(target: Target, transport: str, protocol: int | None = None) -> str | None:
+    if target.profiles:
+        names = ([] if transport == 'tcp' else ['pipe']) + list(target.profiles)
+        if protocol is not None:
+            names.append(f'protocol-{protocol}')
+        return ','.join(dict.fromkeys(names))
+    if protocol is not None:
+        return parse_workflow_profiles(target.workflow, f'check{protocol}')
+    if transport == 'tcp':
+        return tcp_profiles(target.workflow)
+    return parse_workflow_profiles(target.workflow)
 
 
 # ---------------------------------------------------------------------------
@@ -440,21 +365,35 @@ def _exclude_csv(t: "Target") -> str:
     return ",".join(parts)
 
 
+@functools.cache
+def known_test_policy() -> tuple[frozenset[str], frozenset[str]]:
+    test_paths = sorted((TESTSUITE_REPO / 'testsuite' / 'tests').glob('*_test.py'))
+    requirements = [read_requirements(path) for path in test_paths]
+    features = {feature for metadata in requirements if metadata
+                for feature in metadata['features']}
+    tests = {path.name[:-len('_test.py')] for path in test_paths}
+    return frozenset(tests), frozenset(features)
+
+
 def validate_target_capabilities(target: "Target") -> str | None:
-    capabilities = set(target.unsupported_extra)
-    explained = set()
-    for name in target.expect_skip_extra:
-        path = TESTSUITE_REPO / 'testsuite' / 'tests' / f'{name}_test.py'
-        if not path.is_file():
-            return f'{target.name}: unknown expect_skip_extra test {name}'
-        metadata = read_requirements(path)
-        matches = set(metadata['features'] if metadata else ()) & capabilities
-        if not matches:
-            return f'{target.name}: no unsupported_extra capability explains {name}'
-        explained.update(matches)
-    unused = capabilities - explained
-    if unused:
-        return f'{target.name}: unused unsupported_extra: {", ".join(sorted(unused))}'
+    if (not isinstance(target.profiles, list)
+            or not all(isinstance(name, str) and name for name in target.profiles)):
+        return f'{target.name}: profiles must be a list of names'
+    known_tests, features = known_test_policy()
+    unknown = set(target.unsupported_extra) - set(features)
+    if unknown:
+        return f'{target.name}: unknown unsupported_extra: {", ".join(sorted(unknown))}'
+    if len(target.profiles) != len(set(target.profiles)) or any(not name for name in target.profiles):
+        return f'{target.name}: profiles must be non-empty and unique'
+    try:
+        for name in target.profiles:
+            load_profile(TESTSUITE_REPO / 'testsuite' / 'profiles' / f'{name}.json', known_tests)
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        return f'{target.name}: {error}'
+    for transport in ('pipe', 'tcp'):
+        profiles = target_profiles(target, transport)
+        if profiles and '${{' in profiles:
+            return f'{target.name}: matrix workflow requires explicit target profiles'
     return None
 
 
@@ -476,7 +415,7 @@ def build_script(t: Target) -> str:
     )
 
 
-def test_script(t: Target, transport: str, skip_csv: str | None, profiles: str | None, jobs: int,
+def test_script(t: Target, transport: str, profiles: str | None, jobs: int,
                 protocol: int | None = None, only: list[str] | None = None) -> str:
     rb = f'--rsync-bin="$PWD/{t.rsync_bin}"'
     tcp = " --use-tcp" if transport == "tcp" else ""
@@ -496,13 +435,9 @@ def test_script(t: Target, transport: str, skip_csv: str | None, profiles: str |
         env += f"RSYNC_TEST_PROFILES={profiles} "
     if t.unsupported_extra:
         env += f"RSYNC_TEST_UNSUPPORTED={','.join(t.unsupported_extra)} "
-    # Named tests (a max_retry re-run) make runtests full_run False, so the
-    # expected-skip list does not apply -- only the named tests' pass/fail matter.
     names = ""
     if only:
         names = " " + " ".join(only)
-    elif skip_csv:
-        env += f"RSYNC_EXPECT_SKIPPED={skip_csv} "
     # --timing makes the remote runtests print its own per-test wall-clock table,
     # which lands in the captured output: that is where a "this target is slow"
     # cell turns into "these tests are slow on this target".
@@ -517,8 +452,13 @@ def test_script(t: Target, transport: str, skip_csv: str | None, profiles: str |
     narrow_tcp = (transport == "tcp" and not FULL_TCP and not only
                   and "pipe" in TRANSPORTS)
     only_daemon = " --daemon-tests-only" if narrow_tcp else ""
+    receipt = None
+    if profiles:
+        label = f'proto{protocol}' if protocol is not None else transport
+        receipt = f'.fleettest-{label}-receipt.json'
+    receipt_arg = f' --receipt={receipt}' if receipt else ''
     runtests = (f'{t.python} testsuite/runtests.py {rb}{tcp}{proto} '
-                f'-j {jobs}{timing}{only_daemon}{names}')
+                f'-j {jobs}{timing}{only_daemon}{receipt_arg}{names}')
     # env_prefix (e.g. a brew PATH) must reach the test too: some tests build a
     # helper binary on the fly (a test may invoke `make`, which needs gawk etc.),
     # so the build tools must be on PATH at test time.
@@ -531,13 +471,24 @@ def test_script(t: Target, transport: str, skip_csv: str | None, profiles: str |
         cmd = f"{pre}sudo -n env {path_pass}{env}{runtests}"
     else:
         cmd = pre + env + runtests
-    return f'cd {t.builddir} || exit 3\n{cmd}\n'
+    if not receipt:
+        return f'cd {t.builddir} || exit 3\n{cmd}\n'
+    remove = 'sudo -n rm -f' if t.privilege == 'sudo' else 'rm -f'
+    return (f'cd {t.builddir} || exit 3\n'
+            f'{remove} {receipt}\n'
+            f'{cmd}\n'
+            f'rc=$?\n'
+            f"printf '\\n%s\\n' '{RECEIPT_BEGIN}'\n"
+            f'if ! cat {receipt}; then rc=1; fi\n'
+            f"printf '\\n%s\\n' '{RECEIPT_END}'\n"
+            f'{remove} {receipt}\n'
+            f'exit $rc\n')
 
 
 def nonroot_test_script(t: Target, names: list[str]) -> str:
     """Run the given tests as the (non-root) ssh user -- the fleet analogue of a
-    workflow's non-root check step. Explicit test names make runtests.py
-    full_run False, so no RSYNC_EXPECT_SKIPPED is involved; only FAILs matter.
+    workflow's non-root check step. Explicit test names run without profile
+    policy because this is a focused secondary pass.
     The prior sudo pipe/tcp runs left testtmp root-owned, so clear it (via sudo)
     before the non-root run recreates it."""
     pre = f'{t.env_prefix}; ' if t.env_prefix else ''
@@ -563,13 +514,26 @@ def nonroot_test_script(t: Target, names: list[str]) -> str:
 
 RE_RESULT = re.compile(r"^(PASS|FAIL|ERROR|XFAIL|SKIP)\s+(\S+)", re.M)
 RE_COUNT = re.compile(r"^\s+(\d+)\s+(passed|failed|xfailed|skipped)\b", re.M)
-RE_SKIP_HDR = re.compile(r"^----- skipped results:", re.M)
-RE_SKIP_EXP = re.compile(r"^\s+expected:\s*(.*)$", re.M)
-RE_SKIP_GOT = re.compile(r"^\s+got:\s*(.*)$", re.M)
 
 
-def _csv_set(s: str) -> set[str]:
-    return {x for x in s.strip().split(",") if x}
+def parse_receipt(raw: str) -> tuple[dict | None, str]:
+    start = raw.rfind(RECEIPT_BEGIN)
+    if start < 0:
+        return None, 'missing profile receipt'
+    start += len(RECEIPT_BEGIN)
+    end = raw.find(RECEIPT_END, start)
+    if end < 0:
+        return None, 'unterminated profile receipt'
+    try:
+        receipt = json.loads(raw[start:end].strip())
+    except json.JSONDecodeError as error:
+        return None, f'invalid profile receipt: {error}'
+    if (not isinstance(receipt, dict) or receipt.get('schema') != 1
+            or not isinstance(receipt.get('run'), dict)
+            or not isinstance(receipt.get('tests'), list)
+            or not isinstance(receipt.get('summary'), dict)):
+        return None, 'invalid profile receipt structure'
+    return receipt, ''
 
 
 @dataclasses.dataclass
@@ -579,9 +543,8 @@ class TransportResult:
     timed_out: bool
     counts: dict[str, int]
     failed: list[str]
-    skip_checked: bool
-    skip_expected: set[str]
-    skip_got: set[str]
+    profile_errors: list[str]
+    receipt_error: str
     raw: str
     # Tests that failed the initial run but passed on a max_retry re-run, so they
     # were dropped from `failed`.  Surfaced in the report (a recovered flake is
@@ -592,16 +555,12 @@ class TransportResult:
     xfailed_req: list[str] = dataclasses.field(default_factory=list)
 
     @property
-    def skip_mismatch(self) -> bool:
-        return self.skip_checked and self.skip_expected != self.skip_got
-
-    @property
     def ok(self) -> bool:
         return (not self.timed_out and self.exit_code == 0
-                and not self.failed and not self.skip_mismatch)
+                and not self.failed and not self.profile_errors and not self.receipt_error)
 
 
-def parse_transport(transport: str, r: CmdResult, skip_checked: bool,
+def parse_transport(transport: str, r: CmdResult, profiled: bool,
                     xfail_extra: list[str] = ()) -> TransportResult:
     counts = {"passed": 0, "failed": 0, "xfailed": 0, "skipped": 0}
     for m in RE_COUNT.finditer(r.out):
@@ -614,19 +573,55 @@ def parse_transport(transport: str, r: CmdResult, skip_checked: bool,
     xfailed_req = [f for f in failed
                    if any(fnmatch.fnmatch(f, g) for g in xfail_globs)]
     failed = [f for f in failed if f not in xfailed_req]
-    exp = got = set()
-    if skip_checked and RE_SKIP_HDR.search(r.out):
-        em = RE_SKIP_EXP.search(r.out)
-        gm = RE_SKIP_GOT.search(r.out)
-        exp = _csv_set(em.group(1)) if em else set()
-        got = _csv_set(gm.group(1)) if gm else set()
+    profile_errors: list[str] = []
+    receipt_error = ''
+    if profiled:
+        receipt, receipt_error = parse_receipt(r.out)
+        if receipt:
+            summary = receipt['summary']
+            run = receipt['run']
+            records = receipt['tests']
+            expected_transport = 'tcp' if transport == 'tcp' else 'pipe'
+            summary_exit = summary.get('exit_code')
+            if not run.get('profiles'):
+                receipt_error = 'profile receipt contains no profiles'
+            elif run.get('transport') != expected_transport:
+                receipt_error = (f'profile receipt transport is {run.get("transport")!r}, '
+                                 f'want {expected_transport!r}')
+            elif not isinstance(summary_exit, int) or summary_exit % 256 != r.rc:
+                receipt_error = (f'profile receipt exit is {summary_exit!r}, '
+                                 f'want {r.rc}')
+            if not all(isinstance(record, dict) for record in records):
+                receipt_error = 'profile receipt contains an invalid test record'
+            else:
+                mismatches = summary.get('mismatches', [])
+                if not isinstance(mismatches, list) or not all(isinstance(item, dict)
+                                                               for item in mismatches):
+                    receipt_error = 'profile receipt contains invalid mismatches'
+                    mismatches = []
+                profile_errors = sorted(
+                    {record.get('name', '') for record in records
+                     if record.get('verdict') in ('profile_error', 'xpass') and record.get('name')}
+                    | {item.get('name', '') for item in mismatches
+                       if item.get('verdict') in ('profile_error', 'xpass') and item.get('name')})
+                try:
+                    counts = {
+                        'passed': int(summary.get('passed', 0)),
+                        'failed': int(summary.get('failed', 0)),
+                        'xfailed': int(summary.get('xfailed', 0)),
+                        'skipped': (int(summary.get('skipped', 0))
+                                    + int(summary.get('unsupported', 0))),
+                    }
+                except (TypeError, ValueError):
+                    receipt_error = 'profile receipt contains invalid counts'
     rc = r.rc
     # runtests exits non-zero per failing test; if the only failures were
     # tolerated, clear the stale code so the cell reads OK (cf. retry_failed).
     if xfailed_req and not failed and rc != 0:
         rc = 0
     return TransportResult(transport, rc, r.timed_out, counts, failed,
-                           skip_checked, exp, got, r.out, xfailed_req=xfailed_req)
+                           profile_errors, receipt_error, r.out,
+                           xfailed_req=xfailed_req)
 
 
 def retry_failed(t: Target, label: str, tr: TransportResult, rerun) -> None:
@@ -651,9 +646,11 @@ def retry_failed(t: Target, label: str, tr: TransportResult, rerun) -> None:
         if not remaining:
             break
     tr.failed = remaining
+    if tr.recovered:
+        tr.profile_errors = [name for name in tr.profile_errors if name not in tr.recovered]
     # The initial run's non-zero exit was the now-recovered failures; once they
-    # all pass on retry the cell is OK, so clear the stale exit code (only the
-    # failed tests can make runtests exit non-zero on a no-skip-list re-run).
+    # all pass on retry the cell is OK so clear the stale exit code (only the
+    # failed tests can make the focused rerun exit non-zero).
     if not remaining and tr.recovered and tr.exit_code != 0:
         tr.exit_code = 0
 
@@ -719,40 +716,35 @@ def run_target(t: Target, args, staging: str) -> TargetResult:
         return res
 
     for transport in args.transports:
-        skip_csv = workflow_skip_for(t) if transport == "pipe" else None
-        profiles = (parse_workflow_profiles(t.workflow) if transport == "pipe"
-                    else tcp_profiles(t.workflow))
+        profiles = target_profiles(t, transport)
         jobs = (args.jobs if args.jobs else
                 (t.tcp_jobs if transport == "tcp" else t.pipe_jobs))
-        cmd = test_script(t, transport, skip_csv, profiles, jobs)
+        cmd = test_script(t, transport, profiles, jobs)
         t0 = time.monotonic()
         r = run_on(t, cmd, timeout=2400)
         res.timings[transport] = time.monotonic() - t0
-        tr = parse_transport(transport, r, skip_csv is not None, t.xfail)
+        tr = parse_transport(transport, r, bool(profiles), t.xfail)
         retry_failed(t, transport, tr, lambda names, tp=transport, pf=profiles: run_on(
-            t, test_script(t, tp, None, pf, 1, only=names), timeout=1200))
+            t, test_script(t, tp, pf, 1, only=names), timeout=1200))
         res.transports[transport] = tr
         log(f"[{t.name}] {transport} done "
             f"({'ok' if tr.ok else 'ISSUE'})")
 
     # Extra older-protocol passes (mirroring the workflow's check30/check29
-    # steps): same stdio-pipe transport, but each protocol uses its own
-    # check30/check29 skip list (a feature like xattrs/ACLs runs at proto 30 yet
-    # skips at 29). Only targets that list `protocols` opt in; skipped under
-    # --transport tcp (these are pipe runs).
+    # steps). Only targets that list `protocols` opt in; skipped under
+    # --transport tcp because these are pipe runs.
     if t.protocols and "pipe" in args.transports:
         jobs = args.jobs if args.jobs else t.pipe_jobs
         for proto in t.protocols:
             label = f"proto{proto}"
-            skip_csv = workflow_skip_for(t, f"check{proto}")
-            profiles = parse_workflow_profiles(t.workflow, f"check{proto}")
-            cmd = test_script(t, "pipe", skip_csv, profiles, jobs, protocol=proto)
+            profiles = target_profiles(t, 'pipe', proto)
+            cmd = test_script(t, "pipe", profiles, jobs, protocol=proto)
             t0 = time.monotonic()
             r = run_on(t, cmd, timeout=2400)
             res.timings[label] = time.monotonic() - t0
-            tr = parse_transport(label, r, skip_csv is not None, t.xfail)
+            tr = parse_transport(label, r, bool(profiles), t.xfail)
             retry_failed(t, label, tr, lambda names, pr=proto, pf=profiles: run_on(
-                t, test_script(t, "pipe", None, pf, 1, protocol=pr, only=names),
+                t, test_script(t, "pipe", pf, 1, protocol=pr, only=names),
                 timeout=1200))
             res.transports[label] = tr
             log(f"[{t.name}] {label} done "
@@ -764,7 +756,7 @@ def run_target(t: Target, args, staging: str) -> TargetResult:
         t0 = time.monotonic()
         r = run_on(t, nonroot_test_script(t, args.nonroot_tests), timeout=2400)
         res.timings["nonroot"] = time.monotonic() - t0
-        tr = parse_transport("nonroot", r, skip_checked=False, xfail_extra=t.xfail)
+        tr = parse_transport("nonroot", r, profiled=False, xfail_extra=t.xfail)
         retry_failed(t, "nonroot", tr, lambda names: run_on(
             t, nonroot_test_script(t, names), timeout=1200))
         res.transports["nonroot"] = tr
@@ -793,8 +785,10 @@ def cell_status(res: TargetResult, transport: str) -> str:
         return "TIMEOUT"
     if tr.failed:
         return f"FAIL({len(tr.failed)})"
-    if tr.skip_mismatch:
-        return "SKIP-MISMATCH"
+    if tr.receipt_error:
+        return "RECEIPT-ERROR"
+    if tr.profile_errors:
+        return f"PROFILE({len(tr.profile_errors)})"
     if tr.exit_code != 0:
         return f"EXIT({tr.exit_code})"
     return "OK"
@@ -818,9 +812,8 @@ def print_report(results: list[TargetResult], args, fleet: list[Target]) -> bool
     print(f"rsync fleet CI — branch {current_branch()} — {ts}")
     print(f"source: HEAD   run: {args.run_id}   "
           f"transports: {','.join(args.transports)}")
-    print("(A target's pipe capability profiles and transitional skip-set come "
-          "from its workflow. The 'nonroot' "
-          "column runs the privilege-sensitive tests as the unprivileged user; "
+    print("(A target's capability profiles come from its workflow or fleet entry. "
+          "The 'nonroot' column runs the privilege-sensitive tests as the unprivileged user; "
           "'-' = N/A.)")
     print("=" * 64)
 
@@ -867,19 +860,13 @@ def print_report(results: list[TargetResult], args, fleet: list[Target]) -> bool
             if tr.failed:
                 details.append(f"{res.target} / {transport} — {len(tr.failed)} failed:\n    "
                                + " ".join(tr.failed))
-            if tr.skip_mismatch:
-                extra = tr.skip_got - tr.skip_expected
-                missing = tr.skip_expected - tr.skip_got
-                diff = []
-                if extra:
-                    diff.append(f"unexpected skips: {','.join(sorted(extra))}")
-                if missing:
-                    diff.append(f"expected-but-ran: {','.join(sorted(missing))}")
-                details.append(f"{res.target} / {transport} — skip mismatch ("
-                               + "; ".join(diff) + ")\n"
-                               f"    expected: {','.join(sorted(tr.skip_expected))}\n"
-                               f"    got:      {','.join(sorted(tr.skip_got))}")
-            elif not tr.failed and not tr.timed_out and tr.exit_code != 0:
+            if tr.receipt_error:
+                details.append(f"{res.target} / {transport} - {tr.receipt_error}")
+            if tr.profile_errors:
+                details.append(f"{res.target} / {transport} - profile errors:\n    "
+                               + " ".join(tr.profile_errors))
+            if (not tr.failed and not tr.timed_out and not tr.profile_errors
+                    and not tr.receipt_error and tr.exit_code != 0):
                 details.append(f"{res.target} / {transport} — runtests exit {tr.exit_code}")
 
     # Exclude N/A ("-") cells (e.g. the nonroot column for targets that don't
@@ -1243,7 +1230,7 @@ def main() -> int:
     ap.add_argument("--list", action="store_true", help="list targets and exit")
     args = ap.parse_args()
 
-    global SKIP_CSV, XFAIL_GLOBS, TIMING, FULL_TCP, BACKPORT_EXCLUDE
+    global SKIP_CSV, XFAIL_GLOBS, TIMING, FULL_TCP
     SKIP_CSV = ",".join(s.strip() for s in (args.skip or "").split(",") if s.strip())
     XFAIL_GLOBS = [s.strip() for s in (args.xfail or "").split(",") if s.strip()]
     TIMING = args.timing
@@ -1252,8 +1239,7 @@ def main() -> int:
     global REPO, WORKFLOWS, TESTSUITE_REPO
     REPO = Path(args.repo).resolve() if args.repo else Path.cwd()
     TESTSUITE_REPO = Path(args.testsuite_repo).resolve() if args.testsuite_repo else REPO
-    # The expected-skip lists travel with the suite, so read workflows from the
-    # tree that provides the tests.
+    # Read workflow profile policy from the tree that provides the tests.
     WORKFLOWS = TESTSUITE_REPO / ".github" / "workflows"
 
     # A tree that is OLDER than the suite being run against it -- a backport
@@ -1262,15 +1248,13 @@ def main() -> int:
     # It declares those in its own testsuite/skiplist/backport.txt, which is
     # read from the BUILT tree, not the suite tree, because only the built tree
     # knows what it lacks.  The names are excluded outright (RSYNC_EXCLUDE)
-    # rather than declared as expected skips: some of them fail rather than
-    # skip, and an expected-skip list cannot describe a failure.
+    # rather than permitted as unsupported: some fail rather than skip.
     bp = REPO / "testsuite" / "skiplist" / "backport.txt"
     if bp.is_file():
         names = [ln.split("#", 1)[0].strip() for ln in bp.read_text().splitlines()]
         names = [x for x in names if x]
         if names:
             SKIP_CSV = ",".join(x for x in ([SKIP_CSV] + names) if x)
-            BACKPORT_EXCLUDE[:] = names
             print(f"[backport] excluding {len(names)} test(s) declared in "
                   f"{bp.relative_to(REPO)}")
     if not args.cleanup:
@@ -1303,12 +1287,15 @@ def main() -> int:
 
     if args.list:
         for t in fleet:
+            if error := validate_target_capabilities(t):
+                print(error, file=sys.stderr)
+                return 2
             host = t.ssh_host or "(local)"
-            skip = parse_workflow_skip(t.workflow)
+            profiles = target_profiles(t, 'pipe')
             proto = (",".join(f"proto{p}" for p in t.protocols)
                      if t.protocols else "none")
             print(f"{t.name:12} {host:18} {t.make:6} "
-                  f"pipe-skip={'set' if skip else 'unset'} protocols={proto}")
+                  f"profiles={profiles or 'none'} protocols={proto}")
         return 0
 
     chosen = fleet
