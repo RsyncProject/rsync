@@ -1454,16 +1454,54 @@ def _tool_errno(tool: str, msg: str) -> 'int | None':
     return int(m.group(1)) if m else None
 
 
-def _xattr_run(argv, **kwargs) -> 'None':
-    """Run an xattr CLI, raising XattrError rather than CalledProcessError."""
-    proc = subprocess.run(argv, capture_output=True, text=True, **kwargs)
+def _xattr_process(argv, **kwargs):
+    proc = subprocess.run(argv, capture_output=True, **kwargs)
     if proc.returncode == 0:
-        return
+        return proc
     msg = (proc.stderr or proc.stdout or '').strip()
+    if isinstance(msg, bytes):
+        msg = msg.decode('utf-8', 'replace')
     err = XattrError(f'{argv[0]} exited {proc.returncode}'
                      + (f': {msg}' if msg else ''))
     err.errno = _tool_errno(argv[0], msg)
     raise err
+
+
+def _xattr_run(argv, **kwargs) -> 'None':
+    """Run an xattr CLI, raising XattrError rather than CalledProcessError."""
+    _xattr_process(argv, text=True, **kwargs)
+
+
+def xattr_get(name: str, path) -> bytes:
+    """Return a user-namespace xattr value."""
+    full = _xattr_full(name)
+    path = str(path)
+    if _SYSTEM == 'Linux':
+        return os.getxattr(path, full)
+    if _CYGWIN:
+        argv = ['getfattr', '--only-values', '-n', full, path]
+        kwargs = {}
+    elif _SYSTEM == 'Darwin':
+        argv = ['xattr', '-px', full, path]
+        kwargs = {}
+    elif _SYSTEM == 'FreeBSD':
+        argv = ['getextattr', '-qqh', 'user', full, path]
+        kwargs = {}
+    elif _SYSTEM == 'SunOS':
+        argv = ['runat', path, '/bin/sh']
+        kwargs = {'input': b'cat "$XNAME"\n',
+                  'env': {**os.environ, 'XNAME': full}}
+    else:
+        raise NotImplementedError(f'xattr_get on {_SYSTEM}')
+    proc = _xattr_process(argv, **kwargs)
+    if _SYSTEM == 'Darwin':
+        try:
+            return bytes.fromhex(proc.stdout.decode('ascii'))
+        except (UnicodeDecodeError, ValueError) as error:
+            err = XattrError('xattr returned invalid hexadecimal')
+            err.errno = None
+            raise err from error
+    return proc.stdout
 
 
 def xattr_set(name: str, value: str, *paths) -> 'None':

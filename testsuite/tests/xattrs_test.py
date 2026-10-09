@@ -14,7 +14,7 @@ import sys
 from rsyncfns import (
     CHKDIR, FROMDIR, RSYNC_PREFIX, RUSR, SCRATCHDIR, TMPDIR, TODIR, TOOLDIR,
     checkit, cp_touch, makepath, run_rsync, test_fail, test_skipped,
-    xattr_set as xset, xattr_dump, xattrs_supported,
+    xattr_get, xattr_set as xset, xattr_dump, xattrs_supported,
 )
 
 
@@ -61,6 +61,8 @@ try:
     xset('foo', 'foo', 'file0')
 except OSError:
     test_skipped("Unable to set an xattr", capability='xattr_runtime')
+if xattr_get('foo', 'file0') != b'foo':
+    test_fail('Unable to read an xattr')
 xset('bar', 'bar', 'file0')
 
 xset('short', 'this is short', 'file1')

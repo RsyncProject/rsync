@@ -45,9 +45,8 @@ import re
 import subprocess
 
 from rsyncfns import (
-    RSYNC_PREFIX, SCRATCHDIR, _xattr_full, makepath, rmtree, rsync_argv,
-    start_test_daemon, test_fail, test_skipped, write_daemon_conf,
-    xattrs_supported,
+    RSYNC_PREFIX, SCRATCHDIR, makepath, rmtree, rsync_argv, start_test_daemon,
+    test_fail, test_skipped, write_daemon_conf, xattr_get, xattrs_supported,
 )
 
 # Skips as root (see the my_uid==0 guard below), so the fleet harness reruns it
@@ -59,12 +58,6 @@ DAEMON_PORT = 12904
 if not xattrs_supported():
     test_skipped("namecvt-empty-response test requires xattr support to "
                  "read fake-super metadata", capability='xattr_runtime')
-
-if not hasattr(os, 'getxattr'):
-    # CPython exposes os.getxattr only on Linux; the OS (e.g. Cygwin) may have
-    # xattrs yet no Python binding to read the fake-super %stat metadata.
-    test_skipped("this Python build lacks os.getxattr to read fake-super metadata",
-                 capability='xattr_runtime')
 
 my_uid = os.getuid()
 my_gid = os.getgid()
@@ -151,9 +144,8 @@ if not stored.is_file():
 # So we check: if an xattr IS present, parse it and confirm it does not
 # encode 0:0.  If no xattr is present we infer the namecvt path did not
 # fabricate a phantom id=0 -- the metadata simply matches reality.
-xkey = _xattr_full(RSYNC_PREFIX + '.%stat')   # 'user.rsync.%stat' on Linux
 try:
-    raw = os.getxattr(str(stored), xkey)
+    raw = xattr_get(RSYNC_PREFIX + '.%stat', stored)
     xval = raw.decode('utf-8', 'surrogateescape')
 except OSError:
     xval = None
