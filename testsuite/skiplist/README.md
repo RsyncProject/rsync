@@ -1,118 +1,56 @@
-# Expected-skip lists
+# Transitional skip lists
 
-`runtests.py` checks, on a full run, that the set of tests which skipped is
-*exactly* the set that was expected. That oracle is what stops a test from
-quietly turning into a permanent no-op: if a test starts skipping (a probe
-regresses, a helper goes missing) the run fails instead of reporting green.
+Profiles decide whether an `UNSUPPORTED` result is valid. The files in this directory remain as a temporary exact-name comparison while every CI lane moves to profiles. `skiplist-spec` checks that both policies describe the same tests.
 
-The expected set is passed in `RSYNC_EXPECT_SKIPPED`. It used to be one huge
-comma-separated line per CI job, duplicated across seven workflow steps, which
-meant every branch that added a skipping test edited the same line in the same
-files and conflicted with every other such branch. The lists now live here, one
-test name per line, and a workflow step references them:
+New policy belongs in test metadata and profiles. Update these lists only to keep the transitional comparison aligned.
 
+## Files
+
+File | Purpose
+--- | ---
+common.txt | Tests unsupported in every default pipe lane
+linux.txt | Linux additions
+macos.txt | macOS additions
+cygwin.txt | Cygwin additions
+proto29.txt | Protocol 29 additions
+proto30.txt | Protocol 30 additions
+
+CI passes one or more files through `RSYNC_EXPECT_SKIPPED`:
 ```yaml
 run: RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/common.txt,@testsuite/skiplist/linux.txt make check
 ```
 
-Adding a test therefore touches one line of one file, and two branches adding
-different tests merge cleanly.
+Comma-separated files and plain test names form one union. A `-name` entry removes a test after every addition has been expanded.
 
-## Files
+## Format
 
-| file | contents |
-| --- | --- |
-| `common.txt` | skipped on every platform that runs the oracle — mostly `require_tcp` / `require_asan` tests, which the default stdio-pipe `make check` cannot satisfy |
-| `linux.txt` | Linux-only additions |
-| `macos.txt` | macOS-only additions |
-| `cygwin.txt` | Cygwin-only additions |
-| `proto29.txt` | additions for a `--protocol=29` run, on any platform |
-| `proto30.txt` | additions for a `--protocol=30` run, on any platform |
+Each non-comment line contains one test name. A `# reason` comment records why the temporary entry exists. The executable capability remains in the test and its permitted absence remains in the profile.
 
-Compose them with commas; the result is the union, so listing a test twice is
-harmless. Plain test names may be mixed in with `@FILE` entries.
+Lists must be non-empty, sorted and free of duplicates. Every entry must match `testsuite/tests/<name>_test.py`. The parser rejects unreadable files, empty entries, invalid names, stale names and removals which match nothing.
 
-## Format rules
+Relative `@FILE` paths resolve against `srcdir` so out-of-tree builds and `make installcheck` use the source lists.
 
-One test name per line. `#` starts a comment; a trailing `# reason` is
-encouraged — it is the only place the reason for the expectation is recorded.
-Each file must be **sorted and duplicate-free**, and every name must be a plain
-test name matching a real `testsuite/<name>_test.py`. Sorting is not cosmetic:
-it is what makes two independent additions land on different lines.
+## Updating policy
 
-`runtests.py` exits 2 on anything malformed — an unreadable file, an empty or
-comment-only one, an empty entry (`a,,b`, which is what an unset variable
-expands to), an unsorted or duplicated name, a stale name. The set comparison
-is exact, so a truncated list would not pass unnoticed; it would surface as a
-page of "unexpected skips" naming every test the list lost, which reads like a
-suite-wide regression rather than a bad list. Failing at the source says what
-actually happened. A wholly empty `RSYNC_EXPECT_SKIPPED` is still the
-legitimate "expect no skips at all".
+Fix an avoidable skip rather than recording it. When a platform genuinely lacks a capability:
 
-Relative `@FILE` paths resolve against `srcdir`, so out-of-tree builds and
-`make installcheck` work.
+1. Declare the capability in the test.
+2. Add it to the narrowest applicable profile.
+3. Add the test name to the matching transitional list.
+4. Run `skiplist-spec` and the affected platform lane.
 
-## Changing a list
+Do not use a broad capability to permit an unrelated skip.
 
-If a test newly skips on a platform, prefer fixing the test so it does not skip.
-When the skip is legitimate, add the name to the narrowest file that fits, with
-a reason. Do not paper over a mismatch by adding a name you cannot explain — an
-unexpected skip is usually a real regression in that test's setup.
+`fleettest.py` reads the list from each target's workflow. A machine-specific `expect_skip_extra` entry also needs an `unsupported_extra` capability declared by the affected test.
 
-`testsuite/fleettest.py` reads these same lists (through each target's
-workflow), and merges per-box `expect_skip_extra` from `fleettest.json` on top
-for facts that are true of one machine rather than one platform.
+Protocol passes use the policy from the matching workflow step. A target is not given a protocol skip oracle when its workflow has no corresponding protocol step.
 
-Fleet takes each pass's spec from the workflow step of the same name, so a
-target with `"protocols": [29]` is only pinned if its workflow actually has a
-`make check29` step composing `proto29.txt`. Today only the Ubuntu workflows
-do; a macOS or Cygwin target set to run protocol 29 gets no expected-skip
-oracle for that pass rather than a wrong one.
+## Backport exclusions
 
-## `backport.txt` — a different thing in the same directory
+`backport.txt` has a different contract. It is read from the branch being built and passed as `RSYNC_EXCLUDE` when a newer testsuite runs against that branch. Excluded tests do not run at all.
 
-A backport branch (`v3.4.1-sec-patches3`, `v3.2.7-sec-patches3`) is tested with
-a NEWER suite than it shipped with, via
-`fleettest.py --repo <backport> --testsuite-repo <3.5.0>`. Such a tree cannot
-pass tests for fixes it does not carry, and cannot build unit-test helpers its
-Makefile has never heard of.
+Use this file only when the older branch lacks a fix, feature or helper required by the newer suite or when a documented defect has been accepted for that branch. Keep accepted defects in a separate commented section with a reference to the decision.
 
-Those branches each carry their own `testsuite/skiplist/backport.txt`. It is
-**not** an expected-skip list:
+The overlay used by fleettest merges the newer `testsuite/` into the older tree without deleting branch files. This keeps the built branch's `backport.txt` available to the run.
 
-* the other files here are `RSYNC_EXPECT_SKIPPED` oracles — "these should skip,
-  tell me if that changes";
-* `backport.txt` is an `RSYNC_EXCLUDE` list — "do not run these at all".
-
-It has to be an exclusion because some of the tests *fail* rather than skip on
-an older tree, and an expected-skip list cannot describe a failure.
-
-`fleettest.py` reads it from the tree being BUILT (`--repo`), not from the tree
-providing the suite, because only the built tree knows what it lacks. The
-overlay that puts a newer `testsuite/` onto an older tree is a merge with no
-delete, so a file that exists only on the backport survives it.
-
-`skiplist-spec` exempts this name from the rule that every committed list must
-be referenced by a workflow: nothing references it, by design.
-
-### Accepted breakage vs absent features
-
-`backport.txt` holds two different kinds of entry, and they must stay
-distinguishable:
-
-* **absent** — a fix, feature or helper the branch does not have. The test
-  could never pass and is not telling you anything.
-* **accepted breakage** — a real defect on that branch that we have chosen to
-  ship. The test *was* telling you something, and excluding it is a decision
-  rather than bookkeeping.
-
-Keep the second kind in its own commented section naming the defect and where
-it is written up. `v3.2.7-sec-patches3` has one today
-(`fake-super-acl-xattr`, the `--remote-option` local-transfer bug). A list that
-does not distinguish them turns "we know about this and accepted it" into "this
-test never applied here" within about one release.
-
-**CI for the backport branches**, when it is set up to run this suite against
-them, has to honour these lists the same way `fleettest.py` does — read
-`backport.txt` from the branch being built and pass it as `RSYNC_EXCLUDE`.
-A CI job that does not will fail on every one of these and be turned off.
+`skiplist-spec` does not require `backport.txt` to appear in a workflow because it belongs to the built branch rather than the normal CI skip policy.
