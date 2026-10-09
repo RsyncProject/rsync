@@ -13,7 +13,10 @@ import sys
 import tempfile
 from pathlib import Path
 
-from rsyncfns import SCRATCHDIR, rmtree, rsync_argv, run_rsync, test_fail, test_skipped
+from rsyncfns import (
+    SCRATCHDIR, rmtree, rsync_argv, rsync_argv_for, rsync_command_binary,
+    run_rsync, test_fail, test_skipped, under_valgrind,
+)
 
 version = json.loads(run_rsync('-VV', capture_output=True).stdout)
 search_only_dirs = version['capabilities']['search_only_dirs']
@@ -41,6 +44,17 @@ src.mkdir(parents=True)
 dest.mkdir(parents=True)
 (src / 'probe').write_text('search-only destination\n')
 
+local_rsync = None
+if launcher and under_valgrind():
+    local_rsync = base / 'rsync-bin'
+    shutil.copy2(rsync_command_binary(), local_rsync)
+    local_rsync.chmod(0o755)
+    os.chown(local_rsync, 65534, 65534)
+
+
+def command(*args):
+    return rsync_argv_for(local_rsync, *args) if local_rsync else rsync_argv(*args)
+
 if os.geteuid() == 0:
     for path in (src, src / 'probe', dest):
         os.chown(path, 65534, 65534)
@@ -60,7 +74,7 @@ try:
             test_fail(f'search-only permission probe failed with exit {probe.returncode}')
 
         proc = subprocess.run(
-            launcher + rsync_argv('-a', f'{src}/', f'{dest}/'),
+            launcher + command('-a', f'{src}/', f'{dest}/'),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,

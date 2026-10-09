@@ -9,23 +9,18 @@
 # errors out non-zero). Accepting it would mean the name was mis-collapsed.
 
 import os
-import shlex
 import subprocess
 
-from rsyncfns import RSYNC, TMPDIR, test_fail, split_rsync_cmd
+from rsyncfns import TMPDIR, rsync_argv, test_fail
 
 
 workdir = TMPDIR / 'workdir'
 (workdir / 'mod').mkdir(parents=True, exist_ok=True)
 os.chdir(workdir)
 
-# RSYNC may be a multi-word command (e.g. valgrind + rsync); take just the
-# binary path, matching the shell test's `echo $RSYNC | sed 's/ .*//'`.
-rsync_bin = split_rsync_cmd(RSYNC)[0]
-
 proc = subprocess.run(
-    [rsync_bin, '--server', '--sender', '-vlr',
-     '--filter=merge a/../test', '.', 'mod/'],
+    rsync_argv('--server', '--sender', '-vlr',
+               '--filter=merge a/../test', '.', 'mod/'),
     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
 )
 

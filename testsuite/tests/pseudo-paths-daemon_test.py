@@ -1,6 +1,7 @@
 """Regression test for daemon log file silent failures with process substitution and pipes."""
 
 import os
+import shlex
 import signal
 import shutil
 import socket
@@ -10,7 +11,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from rsyncfns import makepath, rmtree, rsync_argv, test_fail, test_skipped
+from rsyncfns import makepath, rmtree, rsync_argv, rsync_command_binary, test_fail, test_skipped
 
 if not sys.platform.startswith('linux'):
     test_skipped('Namespace daemon testing is a Linux-specific feature', capability='proc_fd')
@@ -58,7 +59,7 @@ try:
     tf.write_text('data\n')
     tf.chmod(0o777)
 
-    rsync_bin = rsync_argv()[0]
+    rsync_bin = rsync_command_binary()
     if not Path(rsync_bin).exists():
         test_fail(f"rsync binary not found at {rsync_bin}")
 
@@ -86,7 +87,13 @@ read only = no
 use chroot = no
 """)
 
-    cmd_host = f"{rsync_bin} --daemon --no-detach --config={conf_host} --port={port_host} --address=127.0.0.1 > >(cat > {out_host}) 2> {err_host} < /dev/null"
+    daemon_host_argv = rsync_argv(
+        '--daemon', '--no-detach', f'--config={conf_host}',
+        f'--port={port_host}', '--address=127.0.0.1',
+    )
+    cmd_host = (f'{shlex.join(daemon_host_argv)} '
+                f'> >(cat > {shlex.quote(str(out_host))}) '
+                f'2> {shlex.quote(str(err_host))} < /dev/null')
     
     # Executes directly as the host user
     daemon_host = subprocess.Popen([bash, '-c', cmd_host], env=bash_env, start_new_session=True)
@@ -104,7 +111,7 @@ use chroot = no
         else:
             test_fail("Host Daemon failed to bind to port within the timeout period.")
 
-        client_cmd_host = [rsync_bin, '-a', str(ws_src) + '/', f'rsync://127.0.0.1:{port_host}/test-from/']
+        client_cmd_host = rsync_argv('-a', str(ws_src) + '/', f'rsync://127.0.0.1:{port_host}/test-from/')
         client_proc = subprocess.run(client_cmd_host, capture_output=True, text=True)
         
         if client_proc.returncode != 0:
@@ -190,7 +197,13 @@ read only = no
 use chroot = no
 """)
 
-    cmd_ns = f"{ns_rsync_bin} --daemon --no-detach --config={conf_ns} --port={port_ns} --address=127.0.0.1 > >(cat > {out_ns}) 2> {err_ns} < /dev/null"
+    daemon_ns_argv = [
+        str(ns_rsync_bin), '--daemon', '--no-detach', f'--config={conf_ns}',
+        f'--port={port_ns}', '--address=127.0.0.1',
+    ]
+    cmd_ns = (f'{shlex.join(daemon_ns_argv)} '
+              f'> >(cat > {shlex.quote(str(out_ns))}) '
+              f'2> {shlex.quote(str(err_ns))} < /dev/null')
     
     namespace_cmd = launcher + unshare_argv + [bash, '-c', cmd_ns]
     daemon_ns = subprocess.Popen(namespace_cmd, env=bash_env, stdin=subprocess.DEVNULL, start_new_session=True)

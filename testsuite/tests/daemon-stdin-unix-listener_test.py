@@ -9,7 +9,7 @@ import tempfile
 
 from rsyncfns import (
     SCRATCHDIR, claim_free_port, rmtree, rsync_argv, test_fail,
-    test_skipped, write_daemon_conf,
+    test_skipped, under_valgrind, write_daemon_conf,
 )
 
 if not hasattr(socket, 'AF_UNIX'):
@@ -29,6 +29,7 @@ port = claim_free_port(12980)
 
 
 def check_listener(address, label):
+    timeout = 10 if under_valgrind() else 2
     listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     child = None
@@ -51,7 +52,7 @@ def check_listener(address, label):
         child.close()
         child = None
 
-        client.settimeout(2)
+        client.settimeout(timeout)
         try:
             greeting = client.recv(256)
         except socket.timeout:
@@ -65,14 +66,14 @@ def check_listener(address, label):
         listener.close()
         if proc is not None:
             try:
-                proc.wait(timeout=2)
+                proc.wait(timeout=timeout)
             except subprocess.TimeoutExpired:
                 proc.terminate()
                 try:
-                    proc.wait(timeout=2)
+                    proc.wait(timeout=timeout)
                 except subprocess.TimeoutExpired:
                     proc.kill()
-                    proc.wait(timeout=2)
+                    proc.wait(timeout=timeout)
 
 
 with tempfile.TemporaryDirectory(prefix='rsync-listener-') as tmpdir:
