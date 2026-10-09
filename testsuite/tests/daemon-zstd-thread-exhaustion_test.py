@@ -38,7 +38,7 @@ claim_ports(PORT)
 
 version = json.loads(run_rsync('-VV', check=True, capture_output=True).stdout)
 if 'zstd' not in version.get('compress_list', []):
-    test_skipped('this build does not include Zstandard')
+    test_skipped('this build does not include Zstandard', capability='zstd_threads')
 
 base = SCRATCHDIR / 'daemon-zstd-thread-exhaustion'
 rmtree(base)
@@ -130,7 +130,8 @@ if observed < 2:
     # hold for a reason that has nothing to do with the cap, so do not claim
     # to have tested it.
     test_skipped('this build creates no Zstandard worker threads, so a bound '
-                 f'on them cannot be demonstrated (observed {observed})')
+                 f'on them cannot be demonstrated (observed {observed})',
+                 capability='zstd_threads')
 if observed > MAX_SAFE_THREADS:
     test_fail(
         f'one unauthenticated daemon client requested {REQUESTED_THREADS} '
