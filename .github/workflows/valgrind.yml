@@ -29,8 +29,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        privilege: [ user, root ]
-        transport: [ pipe, tcp ]
+        include:
+          - privilege: user
+            transport: pipe
+            profiles: pipe,non-asan,nonroot,self-peer,linux,valgrind
+          - privilege: user
+            transport: tcp
+            profiles: non-asan,nonroot,self-peer,linux,valgrind
+          - privilege: root
+            transport: pipe
+            profiles: pipe,non-asan,root,self-peer,linux,valgrind
+          - privilege: root
+            transport: tcp
+            profiles: non-asan,root,self-peer,linux,valgrind
     name: memcheck (${{ matrix.privilege }}, ${{ matrix.transport }})
     steps:
     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -54,22 +65,22 @@ jobs:
     # reads, invalid read/write, bad frees, uninit syscall params), not leaks:
     # rsync deliberately leaves file-list/socket/option memory unfreed at exit
     # (short-lived process; the OS reclaims), so --leak-check=no avoids a sea of
-    # by-design "definitely lost" reports.  Functional pass/fail is covered by
-    # the other workflows, so the suite is allowed to finish regardless of
-    # per-test results; the scan step below is the gate.  --error-exitcode=0
-    # keeps valgrind from perturbing test exit codes; the bundled
-    # testsuite/valgrind.supp silences known-benign reports.
+    # by-design "definitely lost" reports. Functional failures and profile
+    # mismatches remain fatal. --error-exitcode=0 preserves each test's own exit
+    # status while the runner and scan step inspect every Valgrind log.
     - name: run testsuite under valgrind
       run: |
         SUDO=
         [ "${{ matrix.privilege }}" = root ] && SUDO="sudo -E"
         TCP=
         [ "${{ matrix.transport }}" = tcp ] && TCP="--use-tcp"
-        $SUDO ./testsuite/runtests.py --valgrind \
+        $SUDO env RSYNC_TEST_PROFILES=${{ matrix.profiles }} ./testsuite/runtests.py --valgrind \
           --valgrind-opts="--leak-check=no --error-exitcode=0" \
-          $TCP -j8 --preserve-scratch || true
+          $TCP -j2 --preserve-scratch \
+          --receipt=test-results/valgrind-${{ matrix.privilege }}-${{ matrix.transport }}.json
 
     - name: scan for unsuppressed valgrind errors
+      if: always()
       run: |
         sudo chown -R "$USER" testtmp 2>/dev/null || true
         mapfile -t logs < <(find testtmp -name 'valgrind.*.log' 2>/dev/null)
@@ -94,11 +105,13 @@ jobs:
         fi
         echo "valgrind clean: no unsuppressed errors"
 
-    - name: upload valgrind logs on failure
-      if: failure()
+    - name: upload valgrind evidence
+      if: always()
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
       with:
         name: valgrind-logs-${{ matrix.privilege }}-${{ matrix.transport }}
-        path: testtmp/**/valgrind.*.log
+        path: |
+          testtmp/**/valgrind.*.log
+          test-results/*.json
         if-no-files-found: ignore
-        retention-days: 7
+        retention-days: 45

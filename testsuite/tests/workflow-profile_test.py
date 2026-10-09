@@ -29,6 +29,16 @@ PLATFORM_WORKFLOWS = {
     'openbsd-build.yml': PLATFORM_PROFILES | {'openbsd'},
     'solaris-build.yml': PLATFORM_PROFILES | {'solaris'},
 }
+REQUIRED_WORKFLOW_PROFILES = {
+    **PLATFORM_WORKFLOWS,
+    'asan-build.yml': {'nonroot', 'self-peer', 'linux'},
+}
+VALGRIND_PROFILES = {
+    frozenset({'pipe', 'non-asan', 'nonroot', 'self-peer', 'linux', 'valgrind'}),
+    frozenset({'non-asan', 'nonroot', 'self-peer', 'linux', 'valgrind'}),
+    frozenset({'pipe', 'non-asan', 'root', 'self-peer', 'linux', 'valgrind'}),
+    frozenset({'non-asan', 'root', 'self-peer', 'linux', 'valgrind'}),
+}
 
 
 def profile_specs(line, matrix_profiles):
@@ -66,7 +76,7 @@ for path in workflows:
             runtests.load_profile(SRC / 'testsuite' / 'profiles' / f'{name}.json', known_tests)
         references += 1
 
-    required = PLATFORM_WORKFLOWS.get(path.name)
+    required = REQUIRED_WORKFLOW_PROFILES.get(path.name)
     if required:
         missing = required - names
         if missing:
@@ -75,6 +85,16 @@ for path in workflows:
             test_fail(f'{path.name}: profile receipts are not retained')
         if not any('if: always()' in line for line in lines):
             test_fail(f'{path.name}: failed profile receipts are not retained')
+
+    if path.name == 'valgrind.yml':
+        actual = {frozenset(value.split(',')) for value in matrix_profiles}
+        if actual != VALGRIND_PROFILES:
+            test_fail('valgrind.yml: incomplete profile matrix')
+        if not any('--receipt=' in line for line in lines):
+            test_fail('valgrind.yml: profile receipts are not written')
+        if not any('if: always()' in line for line in lines):
+            test_fail('valgrind.yml: diagnostic evidence is not retained')
+        continue
 
     pipe = next((line for line in profile_lines
                  if '--use-tcp' not in line and ('runtests.py' in line
@@ -159,7 +179,7 @@ if workflows:
     for target in fleet:
         if error := fleettest.validate_target_capabilities(target):
             test_fail(error)
-        required = PLATFORM_WORKFLOWS.get(target.workflow)
+        required = REQUIRED_WORKFLOW_PROFILES.get(target.workflow)
         if required:
             pipe_profiles = set(fleettest.target_profiles(target, 'pipe').split(','))
             tcp_profiles = set(fleettest.target_profiles(target, 'tcp').split(','))
