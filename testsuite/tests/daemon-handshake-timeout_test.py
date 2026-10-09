@@ -14,7 +14,7 @@ import time
 
 from rsyncfns import (
     RSYNC, SCRATCHDIR, makepath, require_tcp, rmtree, start_test_daemon,
-    test_fail, write_daemon_conf,
+    test_fail, under_valgrind, write_daemon_conf,
 )
 
 require_tcp("raw stalled clients need a real TCP daemon; run with --use-tcp")
@@ -208,7 +208,8 @@ def observe_close(sock, expected, label, *, trickle=None, must_close=True,
 
     # A refusal, parse error, or unrelated daemon failure must not pass as a
     # timeout.  Leave margin for one-second time() granularity in the daemon.
-    minimum = max(0.5, expected - 1.25)
+    margin = 2.5 if under_valgrind() else 1.25
+    minimum = max(0.5, expected - margin)
     if closed < minimum:
         test_fail(f"{label}: connection closed after {closed:.2f}s, before the "
                   f"expected timeout window ({minimum:.2f}s); this was not the "

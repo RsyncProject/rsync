@@ -108,7 +108,15 @@ def split_rsync_cmd(cmd: str) -> list:
     return shlex.split(cmd)
 
 
-def _under_valgrind():
+def rsync_command_binary(cmd: str = None) -> str:
+    """Return the rsync executable from a possibly wrapped command."""
+    for arg in reversed(split_rsync_cmd(RSYNC if cmd is None else cmd)):
+        if os.path.isfile(arg):
+            return arg
+    raise ValueError('rsync command contains no executable file')
+
+
+def under_valgrind():
     """True when the runner wrapped rsync in valgrind (runtests.py --valgrind).
 
     Match the wrapper's program name (first token of RSYNC or RSYNC_PEER), not a
@@ -932,6 +940,14 @@ def rsync_argv(*args: str) -> list:
     embedded option/value joined by spaces).
     """
     return split_rsync_cmd(RSYNC) + list(args)
+
+
+def rsync_argv_for(binary, *args: str, command: str = None) -> list:
+    """Replace rsync in a wrapped command and append transfer arguments."""
+    command = RSYNC if command is None else command
+    argv = split_rsync_cmd(command)
+    argv[argv.index(rsync_command_binary(command))] = os.fspath(binary)
+    return argv + list(args)
 
 
 import functools as _functools
@@ -2222,7 +2238,7 @@ def run_proxy_probe(port, host, expected):
 def setup_chroot_inner(name):
     if get_testuid() != get_rootuid():
         test_skipped("chroot /./ module regression requires root", capability='root')
-    if _under_valgrind():
+    if under_valgrind():
         # The daemon's per-connection child chroots into the module, after
         # which valgrind can no longer create its absolute --log-file %p path
         # and the child dies (the transfer then resets) -- skip under valgrind.

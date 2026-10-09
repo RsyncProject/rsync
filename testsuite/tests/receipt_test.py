@@ -3,12 +3,12 @@
 
 import json
 import os
+import shlex
 import subprocess
 import sys
-from pathlib import Path
 
 from harness import Exit, TestContext, parse_peer_banner, requires, run
-from rsyncfns import RSYNC, split_rsync_cmd, test_fail
+from rsyncfns import rsync_argv_for, rsync_command_binary, test_fail
 
 
 @requires(features={'remote-shell'}, protocols={27, 28, 29, 30, 31, 32, 33}, transports={'pipe'}, min_peer='2.6.0', mutates={'filesystem', 'process'}, tags={'harness'})
@@ -16,7 +16,12 @@ def test(context: TestContext):
     receipt = context.scratch / 'run.json'
     env = os.environ.copy()
     env['scratchbase'] = str(context.scratch / 'nested')
-    binary = next(part for part in split_rsync_cmd(RSYNC) if Path(part).is_file())
+    binary = rsync_command_binary()
+    replacement = context.scratch / 'replacement-rsync'
+    wrapped = shlex.join(['valgrind', '--quiet', binary, '--protocol=29'])
+    replaced = rsync_argv_for(replacement, '--version', command=wrapped)
+    if replaced != ['valgrind', '--quiet', str(replacement), '--protocol=29', '--version']:
+        test_fail('wrapped rsync binary was not replaced in place')
     banner = subprocess.run([binary, '--version'], capture_output=True, text=True, check=True).stdout
     peer, protocol = parse_peer_banner(banner)
     profile = context.scratch / f'peer-{peer}.json'

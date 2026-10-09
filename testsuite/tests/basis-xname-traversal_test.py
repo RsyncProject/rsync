@@ -29,7 +29,7 @@ import subprocess
 
 from rsyncfns import (
     SCRATCHDIR, build_patched_rsync, forced_protocol, makepath, rmtree,
-    rsync_argv, test_fail, test_skipped, write_daemon_conf,
+    rsync_argv_for, test_fail, test_skipped, write_daemon_conf,
 )
 
 # Gates ----------------------------------------------------------------------
@@ -99,9 +99,8 @@ os.environ['RSYNC_CONNECT_PROG'] = f'{shlex.quote(str(mal_rsync))} --config={shl
 os.environ['RSYNC_MAL_XNAME'] = '../secret'  # from basis_dir[0] == linkdest
 os.environ['RSYNC_BASIS_TRACE'] = str(trace_file)
 try:
-    argv = rsync_argv('-a', f'--link-dest={linkdest}',
-                      'rsync://localhost/m/file', str(dest) + '/')
-    argv[0] = str(mal_rsync)
+    argv = rsync_argv_for(mal_rsync, '-a', f'--link-dest={linkdest}',
+                          'rsync://localhost/m/file', str(dest) + '/')
     proc = subprocess.run(
         argv,
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=120)

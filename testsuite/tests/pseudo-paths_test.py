@@ -9,7 +9,8 @@ import tempfile
 from pathlib import Path
 
 from rsyncfns import (
-    SCRATCHDIR, makepath, rmtree, rsync_argv, test_fail, test_skipped,
+    SCRATCHDIR, makepath, rmtree, rsync_argv, rsync_command_binary,
+    test_fail, test_skipped,
 )
 if not sys.platform.startswith('linux'):
     test_skipped('Kernel pseudo-path string is a Linux-specific procfs feature', capability='proc_fd')
@@ -290,7 +291,7 @@ try:
     sf.chmod(0o777)
 
     local_bin = ws_base / 'rsync-bin'
-    shutil.copy2(rsync_argv()[0], local_bin)
+    shutil.copy2(rsync_command_binary(), local_bin)
     local_bin.chmod(0o777)
 
     cmd_prefix = shlex.join([str(local_bin), '-a'])

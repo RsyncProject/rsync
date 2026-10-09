@@ -15,7 +15,8 @@ import tempfile
 from pathlib import Path
 
 from rsyncfns import (
-    SCRATCHDIR, forced_protocol, rmtree, rsync_argv, test_fail, test_skipped,
+    SCRATCHDIR, forced_protocol, rmtree, rsync_argv, rsync_argv_for,
+    rsync_command_binary, test_fail, test_skipped, under_valgrind,
 )
 
 if not sys.platform.startswith('linux'):
@@ -65,6 +66,17 @@ incoming.write_text('created beneath write-search-only destination\n')
     'created beneath nested write-search-only parent\n'
 )
 
+local_rsync = None
+if launcher and under_valgrind():
+    local_rsync = base / 'rsync-bin'
+    shutil.copy2(rsync_command_binary(), local_rsync)
+    local_rsync.chmod(0o755)
+    os.chown(local_rsync, 65534, 65534)
+
+
+def command(*args):
+    return rsync_argv_for(local_rsync, *args) if local_rsync else rsync_argv(*args)
+
 if os.geteuid() == 0:
     for root, dirs, files in os.walk(base):
         os.chown(root, 65534, 65534)
@@ -103,7 +115,7 @@ try:
     # Keep received implied dirs usable on systems without a safe fchmodat2.
     # The source remains mode 0111, so sender traversal coverage is unchanged.
     exact = subprocess.run(
-        launcher + rsync_argv(
+        launcher + command(
             '-aR', '--chmod=Du+rw', 'xonly/exact', f'{exact_dest}/',
         ),
         cwd=src,
@@ -123,7 +135,7 @@ try:
         )
 
     tree = subprocess.run(
-        launcher + rsync_argv(
+        launcher + command(
             '-aR', '--chmod=Du+rw', 'xonly/readable/', f'{tree_dest}/',
         ),
         cwd=src,
@@ -143,7 +155,7 @@ try:
         )
 
     unreadable = subprocess.run(
-        launcher + rsync_argv(
+        launcher + command(
             '-a', 'xonly/', f'{unreadable_dest}/',
         ),
         cwd=src,
@@ -157,7 +169,7 @@ try:
         )
 
     receiver = subprocess.run(
-        launcher + rsync_argv(
+        launcher + command(
             '-t', str(incoming), f'{write_only_dest}/',
         ),
         stdout=subprocess.PIPE,
@@ -179,7 +191,7 @@ try:
     proto = forced_protocol()
     if proto is None or proto >= 30:
         nested_receiver = subprocess.run(
-            launcher + rsync_argv(
+            launcher + command(
                 '-tR', '--no-implied-dirs', 'nested/known', f'{nested_dest}/',
             ),
             cwd=src,
