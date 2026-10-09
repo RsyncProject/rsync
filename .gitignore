@@ -1,5 +1,6 @@
 *.[oa]
 *~
+__pycache__/
 dummy
 ID
 Makefile

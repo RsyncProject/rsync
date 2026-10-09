@@ -53,11 +53,11 @@ jobs:
       # chown-fake / devices-fake / xattrs / xattrs-hlink now RUN on macOS
       # (rsyncfns.py drives xattrs via the `xattr` command), verified on a
       # real macOS host, so they're no longer in the skip set.
-      run: sudo RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/common.txt,@testsuite/skiplist/macos.txt make check
+      run: sudo RSYNC_TEST_PROFILES=pipe,non-asan,root,self-peer,macos RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/common.txt,@testsuite/skiplist/macos.txt make check
     - name: check (TCP daemon transport)
       # Second run with daemon tests over a real loopback rsyncd; the default
       # 'make check' above uses the secure stdio-pipe transport.
-      run: sudo ./runtests.py --rsync-bin="$PWD/rsync" --use-tcp -j 8
+      run: sudo RSYNC_TEST_PROFILES=non-asan,root,self-peer,macos ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp -j 8
     - name: ssl file list
       run: rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
     - name: save artifact

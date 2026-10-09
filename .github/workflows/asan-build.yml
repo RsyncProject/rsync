@@ -74,8 +74,8 @@ jobs:
     - name: check (stdio-pipe transport)
       # ASan+UBSan-instrumented coverage of the transfer, daemon, sender,
       # receiver and metadata paths over the default stdio-pipe transport.
-      run: ./runtests.py --rsync-bin="$PWD/rsync" -j8
+      run: ./testsuite/runtests.py --rsync-bin="$PWD/rsync" -j8
     - name: check (TCP daemon transport)
       # --use-tcp also exercises the loopback rsyncd listener and the client's
       # TCP connection path.
-      run: ./runtests.py --rsync-bin="$PWD/rsync" --use-tcp -j8
+      run: ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp -j8
