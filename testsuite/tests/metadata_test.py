@@ -24,13 +24,24 @@ def test(context: TestContext):
 
     alias = context.scratch / 'alias_test.py'
     alias.symlink_to(module.name)
-    if read_requirements(alias) is not None:
-        test_fail('link alias inherited target metadata')
+    if read_requirements(alias) != read_requirements(module):
+        test_fail('link alias did not inherit target metadata')
 
     placeholder = context.scratch / 'placeholder_test.py'
     placeholder.write_text(module.name)
-    if placeholder_target(placeholder) != module or read_requirements(placeholder) is not None:
-        test_fail('link placeholder was not isolated')
+    if placeholder_target(placeholder) != module or read_requirements(placeholder) != read_requirements(module):
+        test_fail('placeholder did not inherit target metadata')
+
+    cycle_a = context.scratch / 'cycle-a_test.py'
+    cycle_b = context.scratch / 'cycle-b_test.py'
+    cycle_a.write_text(cycle_b.name)
+    cycle_b.write_text(cycle_a.name)
+    try:
+        read_requirements(cycle_a)
+    except ValueError:
+        pass
+    else:
+        test_fail('placeholder cycle was accepted')
 
     inferred = context.scratch / 'inferred_test.py'
     inferred.write_text("require_tcp('tcp')\nrequire_asan('asan')\n"

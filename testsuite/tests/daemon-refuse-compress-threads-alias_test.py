@@ -39,7 +39,7 @@ claim_ports(PORT)
 
 version = json.loads(run_rsync('-VV', check=True, capture_output=True).stdout)
 if 'zstd' not in version.get('compress_list', []):
-    test_skipped('this build does not include Zstandard')
+    test_skipped('this build does not include Zstandard', capability='zstd_threads')
 
 base = SCRATCHDIR / 'daemon-refuse-compress-threads-alias'
 rmtree(base)

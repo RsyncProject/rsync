@@ -92,8 +92,21 @@ def placeholder_target(path):
 
 def read_requirements(path) -> Optional[dict]:
     path = Path(path)
-    if path.is_symlink() or placeholder_target(path):
-        return None
+    seen = set()
+    while True:
+        if path in seen:
+            raise ValueError(f'{path}: placeholder cycle')
+        seen.add(path)
+        if path.is_symlink():
+            try:
+                path = path.resolve(strict=True)
+            except (OSError, RuntimeError) as error:
+                raise ValueError(f'{path}: invalid test link') from error
+            continue
+        target = placeholder_target(path)
+        if not target:
+            break
+        path = target
     tree = ast.parse(path.read_text(encoding='utf-8'), filename=str(path))
     requirements = None
     for node in tree.body:

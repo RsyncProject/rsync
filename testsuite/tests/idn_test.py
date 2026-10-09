@@ -31,7 +31,7 @@ from rsyncfns import (
 
 
 if '"IDN": true' not in run_rsync('-VV', check=True, capture_output=True).stdout:
-    test_skipped("rsync built without IDN support")
+    test_skipped("rsync built without IDN support", capability='idn')
 
 
 def find_utf8_locale():

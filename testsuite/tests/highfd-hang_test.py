@@ -72,7 +72,7 @@ def probe_fd_setsize():
 
 fd_setsize = probe_fd_setsize()
 if not fd_setsize:
-    test_skipped("could not determine FD_SETSIZE (no usable C compiler)")
+    test_skipped("could not determine FD_SETSIZE (no usable C compiler)", capability='high_fd')
 
 # Push rsync's descriptors comfortably past the limit.
 ndummy = fd_setsize + 80
@@ -82,7 +82,8 @@ soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
 if soft < want:
     if hard != resource.RLIM_INFINITY and hard < want:
         test_skipped(f"RLIMIT_NOFILE hard cap {hard} < {want}; cannot place fds "
-                     f"above FD_SETSIZE ({fd_setsize}) to exercise issue #231")
+                     f"above FD_SETSIZE ({fd_setsize}) to exercise issue #231",
+                     capability='high_fd')
     resource.setrlimit(resource.RLIMIT_NOFILE, (want, hard))
 
 rmtree(FROMDIR)

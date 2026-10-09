@@ -24,7 +24,7 @@ from rsyncfns import (
 
 vv = json.loads(run_rsync('-VV', check=True, capture_output=True).stdout)
 if 'xxh64' not in vv.get('checksum_list', []):
-    test_skipped("xxh64 not in this build's checksum list (no xxhash)")
+    test_skipped("xxh64 not in this build's checksum list (no xxhash)", capability='xxhash')
 
 src, dst = FROMDIR, TODIR
 rmtree(src)

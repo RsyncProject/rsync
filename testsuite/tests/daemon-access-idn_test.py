@@ -34,7 +34,7 @@ require_tcp("hosts allow/deny hostname matching needs a real TCP peer")
 
 if '"IDN": true' not in subprocess.run(rsync_argv('-VV'), capture_output=True,
                                        text=True).stdout:
-    test_skipped("rsync built without IDN support")
+    test_skipped("rsync built without IDN support", capability='idn')
 
 src = FROMDIR
 rmtree(src)
