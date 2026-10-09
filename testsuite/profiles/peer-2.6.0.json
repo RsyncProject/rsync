@@ -1,0 +1,28 @@
+{
+  "peer": "2.6.0",
+  "protocol": 27,
+  "xfail": {
+    "alt-dest": "peer-feature-gap",
+    "alt-dest-symlink-race": "pre-hardening",
+    "batch-mode": "peer-feature-gap",
+    "chdir-symlink-race": "pre-hardening",
+    "chmod-option": "peer-feature-gap",
+    "copy-dest-source-symlink": "pre-hardening",
+    "daemon": "peer-feature-gap",
+    "daemon-access": "peer-feature-gap",
+    "daemon-config": "peer-feature-gap",
+    "daemon-exec": "peer-feature-gap",
+    "daemon-filter": "peer-feature-gap",
+    "daemon-gzip-download": "peer-feature-gap",
+    "daemon-gzip-upload": "peer-feature-gap",
+    "daemon-munge": "peer-feature-gap",
+    "daemon-refuse": "peer-feature-gap",
+    "daemon-refuse-compress": "peer-feature-gap",
+    "files-from": "peer-feature-gap",
+    "sender-flist-symlink-leak": "pre-hardening",
+    "smoke": "peer-feature-gap",
+    "symlink-dirlink-basis": "peer-feature-gap",
+    "variety": "peer-feature-gap",
+    "variety-symlink-traversal": "peer-feature-gap"
+  }
+}

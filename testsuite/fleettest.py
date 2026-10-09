@@ -6,10 +6,9 @@ Builds the committed HEAD of an rsync checkout on a fleet of remote machines
 --use-tcp) in parallel, and prints one report of only the UNEXPECTED results --
 a fast local pre-flight for the GitHub CI matrix.
 
-Each target maps to a .github/workflows/*.yml job or matrix lane: the per-target
-configure flags mirror that lane, and the pipe-run RSYNC_EXPECT_SKIPPED list is
-PARSED from the workflow (not hardcoded). The --use-tcp run never sets an
-expected-skip list (matching the workflows), so only test FAILs matter there.
+Each target maps to a .github/workflows/*.yml job or matrix lane. Configure
+flags, capability profiles and the transitional pipe-run skip oracle are parsed
+from that workflow. The --use-tcp run sets neither policy, matching CI.
 
 The tcp pass runs only the tests that can reach the daemon transport, because it
 follows a full pipe pass over the very same build: --use-tcp is observable only
@@ -105,6 +104,8 @@ import threading
 import time
 from pathlib import Path
 
+from harness import read_requirements
+
 # Set from --skip / --xfail in main(). SKIP_CSV is passed to runtests as
 # RSYNC_EXCLUDE (tests dropped before running); XFAIL_GLOBS are tolerated
 # failures (a matching FAIL does not make a cell "not OK"). Both are
@@ -131,9 +132,8 @@ TRANSPORTS: list[str] = []
 # source tree these point at, so it must be run from inside an rsync checkout
 # or given --repo PATH.
 REPO = Path.cwd()
-# Source tree providing the test suite (runtests.py + testsuite/). Defaults to
-# REPO; --testsuite-repo decouples it so one tree is built and another's suite is
-# run against the result.
+# Source tree providing testsuite/. Defaults to REPO; --testsuite-repo decouples
+# it so one tree is built and another's suite runs against the result.
 TESTSUITE_REPO = REPO
 WORKFLOWS = TESTSUITE_REPO / ".github" / "workflows"
 
@@ -203,6 +203,8 @@ class Target:
     # pins -- a pass with no matching workflow step stays unpinned (see
     # workflow_skip_for).
     expect_skip_extra: list[str] = dataclasses.field(default_factory=list)
+    # Capabilities absent on this box which explain expect_skip_extra.
+    unsupported_extra: list[str] = dataclasses.field(default_factory=list)
     # ...and the mirror: entries the workflow expects to skip which this target
     # actually RUNS (a relocated scratch can satisfy a condition the
     # workflow's host cannot, e.g. a cross-device copy).
@@ -301,7 +303,7 @@ def push_argv(target: Target, staging: str) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# workflow skip-list parsing
+# workflow policy parsing
 # ---------------------------------------------------------------------------
 
 def parse_workflow_skip(workflow: str, make_target: str = "check") -> str | None:
@@ -324,6 +326,27 @@ def parse_workflow_skip(workflow: str, make_target: str = "check") -> str | None
                     + re.escape(make_target) + r"'?\s*$", re.M)
     m = rx.search(text)
     return m.group(1) if m else None
+
+
+def parse_workflow_profiles(workflow: str, make_target: str = "check") -> str | None:
+    path = WORKFLOWS / workflow
+    try:
+        text = path.read_text()
+    except OSError:
+        return None
+    rx = re.compile(r"RSYNC_TEST_PROFILES=(\S+).*?\s+make\s+"
+                    + re.escape(make_target) + r"'?\s*$", re.M)
+    match = rx.search(text)
+    return match.group(1) if match else None
+
+
+def tcp_profiles(workflow: str) -> str | None:
+    profiles = parse_workflow_profiles(workflow)
+    if not profiles:
+        return None
+    names = [name for name in profiles.split(',')
+             if name != 'pipe' and not name.startswith('protocol-')]
+    return ','.join(names)
 
 
 def _expand_spec_names(spec: str) -> set[str]:
@@ -398,9 +421,9 @@ _NONROOT_RE = re.compile(r"^[ \t]*fleet_nonroot[ \t]*=[ \t]*True\b", re.M)
 
 def discover_nonroot_tests(testsuite_dir: Path) -> list[str]:
     """Return the names (without the _test.py suffix) of the tests under
-    testsuite_dir that declare `fleet_nonroot = True`."""
+    testsuite_dir/tests that declare `fleet_nonroot = True`."""
     names = []
-    for p in sorted(testsuite_dir.glob("*_test.py")):
+    for p in sorted((testsuite_dir / 'tests').glob('*_test.py')):
         try:
             if _NONROOT_RE.search(p.read_text(errors="replace")):
                 names.append(p.name[: -len("_test.py")])
@@ -415,6 +438,24 @@ def _exclude_csv(t: "Target") -> str:
     daemon+flipper races)."""
     parts = [p for p in ([SKIP_CSV] + list(t.exclude)) if p]
     return ",".join(parts)
+
+
+def validate_target_capabilities(target: "Target") -> str | None:
+    capabilities = set(target.unsupported_extra)
+    explained = set()
+    for name in target.expect_skip_extra:
+        path = TESTSUITE_REPO / 'testsuite' / 'tests' / f'{name}_test.py'
+        if not path.is_file():
+            return f'{target.name}: unknown expect_skip_extra test {name}'
+        metadata = read_requirements(path)
+        matches = set(metadata['features'] if metadata else ()) & capabilities
+        if not matches:
+            return f'{target.name}: no unsupported_extra capability explains {name}'
+        explained.update(matches)
+    unused = capabilities - explained
+    if unused:
+        return f'{target.name}: unused unsupported_extra: {", ".join(sorted(unused))}'
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -435,7 +476,7 @@ def build_script(t: Target) -> str:
     )
 
 
-def test_script(t: Target, transport: str, skip_csv: str | None, jobs: int,
+def test_script(t: Target, transport: str, skip_csv: str | None, profiles: str | None, jobs: int,
                 protocol: int | None = None, only: list[str] | None = None) -> str:
     rb = f'--rsync-bin="$PWD/{t.rsync_bin}"'
     tcp = " --use-tcp" if transport == "tcp" else ""
@@ -451,6 +492,10 @@ def test_script(t: Target, transport: str, skip_csv: str | None, jobs: int,
     excl = _exclude_csv(t)
     if excl:
         env += f"RSYNC_EXCLUDE={excl} "
+    if profiles:
+        env += f"RSYNC_TEST_PROFILES={profiles} "
+    if t.unsupported_extra:
+        env += f"RSYNC_TEST_UNSUPPORTED={','.join(t.unsupported_extra)} "
     # Named tests (a max_retry re-run) make runtests full_run False, so the
     # expected-skip list does not apply -- only the named tests' pass/fail matter.
     names = ""
@@ -472,7 +517,7 @@ def test_script(t: Target, transport: str, skip_csv: str | None, jobs: int,
     narrow_tcp = (transport == "tcp" and not FULL_TCP and not only
                   and "pipe" in TRANSPORTS)
     only_daemon = " --daemon-tests-only" if narrow_tcp else ""
-    runtests = (f'{t.python} runtests.py {rb}{tcp}{proto} '
+    runtests = (f'{t.python} testsuite/runtests.py {rb}{tcp}{proto} '
                 f'-j {jobs}{timing}{only_daemon}{names}')
     # env_prefix (e.g. a brew PATH) must reach the test too: some tests build a
     # helper binary on the fly (a test may invoke `make`, which needs gawk etc.),
@@ -499,7 +544,7 @@ def nonroot_test_script(t: Target, names: list[str]) -> str:
     _e = _exclude_csv(t)
     excl = f'RSYNC_EXCLUDE={_e} ' if _e else ''
     sb = f'scratchbase={shlex.quote(t.scratchbase)} ' if t.scratchbase else ''
-    runtests = (f'PYTHONDONTWRITEBYTECODE=1 {sb}{excl}{t.python} runtests.py '
+    runtests = (f'PYTHONDONTWRITEBYTECODE=1 {sb}{excl}{t.python} testsuite/runtests.py '
                 f'--rsync-bin="$PWD/{t.rsync_bin}" {" ".join(names)}')
     # A relocated scratch lives outside builddir, so clearing ./testtmp alone
     # leaves the prior sudo run's root-owned tree in place and the non-root
@@ -675,15 +720,17 @@ def run_target(t: Target, args, staging: str) -> TargetResult:
 
     for transport in args.transports:
         skip_csv = workflow_skip_for(t) if transport == "pipe" else None
+        profiles = (parse_workflow_profiles(t.workflow) if transport == "pipe"
+                    else tcp_profiles(t.workflow))
         jobs = (args.jobs if args.jobs else
                 (t.tcp_jobs if transport == "tcp" else t.pipe_jobs))
-        cmd = test_script(t, transport, skip_csv, jobs)
+        cmd = test_script(t, transport, skip_csv, profiles, jobs)
         t0 = time.monotonic()
         r = run_on(t, cmd, timeout=2400)
         res.timings[transport] = time.monotonic() - t0
         tr = parse_transport(transport, r, skip_csv is not None, t.xfail)
-        retry_failed(t, transport, tr, lambda names, tp=transport: run_on(
-            t, test_script(t, tp, None, 1, only=names), timeout=1200))
+        retry_failed(t, transport, tr, lambda names, tp=transport, pf=profiles: run_on(
+            t, test_script(t, tp, None, pf, 1, only=names), timeout=1200))
         res.transports[transport] = tr
         log(f"[{t.name}] {transport} done "
             f"({'ok' if tr.ok else 'ISSUE'})")
@@ -698,13 +745,14 @@ def run_target(t: Target, args, staging: str) -> TargetResult:
         for proto in t.protocols:
             label = f"proto{proto}"
             skip_csv = workflow_skip_for(t, f"check{proto}")
-            cmd = test_script(t, "pipe", skip_csv, jobs, protocol=proto)
+            profiles = parse_workflow_profiles(t.workflow, f"check{proto}")
+            cmd = test_script(t, "pipe", skip_csv, profiles, jobs, protocol=proto)
             t0 = time.monotonic()
             r = run_on(t, cmd, timeout=2400)
             res.timings[label] = time.monotonic() - t0
             tr = parse_transport(label, r, skip_csv is not None, t.xfail)
-            retry_failed(t, label, tr, lambda names, pr=proto: run_on(
-                t, test_script(t, "pipe", None, 1, protocol=pr, only=names),
+            retry_failed(t, label, tr, lambda names, pr=proto, pf=profiles: run_on(
+                t, test_script(t, "pipe", None, pf, 1, protocol=pr, only=names),
                 timeout=1200))
             res.transports[label] = tr
             log(f"[{t.name}] {label} done "
@@ -770,8 +818,8 @@ def print_report(results: list[TargetResult], args, fleet: list[Target]) -> bool
     print(f"rsync fleet CI — branch {current_branch()} — {ts}")
     print(f"source: HEAD   run: {args.run_id}   "
           f"transports: {','.join(args.transports)}")
-    print("(A target's pipe skip-set is only enforced when its workflow sets "
-          "RSYNC_EXPECT_SKIPPED; otherwise only FAILs matter. The 'nonroot' "
+    print("(A target's pipe capability profiles and transitional skip-set come "
+          "from its workflow. The 'nonroot' "
           "column runs the privilege-sensitive tests as the unprivileged user; "
           "'-' = N/A.)")
     print("=" * 64)
@@ -1178,7 +1226,7 @@ def main() -> int:
                     "the slowest target")
     ap.add_argument("--repo", help="rsync source tree to build (default: cwd)")
     ap.add_argument("--testsuite-repo",
-                    help="rsync tree to take runtests.py + testsuite/ from "
+                    help="rsync tree to take testsuite/ from "
                     "(default: --repo). Build one tree and run another's test "
                     "suite against it, e.g. --repo ../rsync-v3.4 --testsuite-repo .")
     ap.add_argument("--fleet", help="fleet config JSON (default: ~/.fleettest.json, "
@@ -1226,12 +1274,10 @@ def main() -> int:
             print(f"[backport] excluding {len(names)} test(s) declared in "
                   f"{bp.relative_to(REPO)}")
     if not args.cleanup:
-        # The Python test suite (runtests.py + testsuite/) comes from
-        # TESTSUITE_REPO, so that is where runtests.py must live.  The build tree
-        # (REPO) only has to be a buildable rsync source -- it may be an older
-        # release whose runtests.py predates the Python suite, or lacks it.
-        if not (TESTSUITE_REPO / "runtests.py").is_file():
-            print(f"{TESTSUITE_REPO} has no runtests.py; run from inside a "
+        # TESTSUITE_REPO provides testsuite/ so that tree must contain runtests.py.
+        # REPO only has to be buildable rsync source and may predate this suite.
+        if not (TESTSUITE_REPO / "testsuite" / "runtests.py").is_file():
+            print(f"{TESTSUITE_REPO} has no testsuite/runtests.py; run from inside a "
                   f"checkout or pass --testsuite-repo a tree with the Python "
                   f"test suite", file=sys.stderr)
             return 2
@@ -1275,6 +1321,12 @@ def main() -> int:
             print(f"known: {', '.join(by_name)}", file=sys.stderr)
             return 2
         chosen = [by_name[w] for w in want]
+
+    for target in chosen:
+        error = validate_target_capabilities(target)
+        if error:
+            print(error, file=sys.stderr)
+            return 2
 
     if args.cleanup:
         # Sweep every <builddir>-* run dir on the selected targets. NB: this
@@ -1326,13 +1378,13 @@ def main() -> int:
             print(f"git archive failed: {ar.stderr}", file=sys.stderr)
             return 2
 
-        # --testsuite-repo: overlay another tree's runtests.py + testsuite/ onto
+        # --testsuite-repo: overlay another tree's testsuite/ onto
         # the built source (merge, no delete). Build REPO's rsync, but run
         # TESTSUITE_REPO's suite against it. The leftover .test files from REPO
-        # are ignored by a Python runtests.py (it globs *_test.py).
+        # are ignored by a Python runtests.py (it globs tests/*_test.py).
         if TESTSUITE_REPO != REPO:
             ov = subprocess.run(
-                f"git -C {TESTSUITE_REPO} archive HEAD -- runtests.py testsuite "
+                f"git -C {TESTSUITE_REPO} archive HEAD -- testsuite "
                 f"| tar -x -C {staging}",
                 shell=True, capture_output=True, text=True)
             if ov.returncode != 0:

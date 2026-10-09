@@ -1,31 +1,17 @@
 {
   "_comment": [
-    "Example fleet definition for testsuite/fleettest.py -- this is one",
-    "maintainer's setup. Copy (or symlink) this file to testsuite/fleettest.json",
-    "and edit it for your own machines, or point at another file with --fleet PATH.",
-    "fleettest.json is git-ignored; this .example is the committed template.",
+    "Copy this file to testsuite/fleettest.json and edit it for the available hosts.",
+    "Use --fleet PATH to select another file. fleettest.json is ignored by Git.",
     "",
-    "Each object under \"targets\" maps to fields of the Target dataclass in",
-    "fleettest.py. Required: name, ssh_host (null = run locally), workflow",
-    "(a file under .github/workflows, whose configure flags and RSYNC_EXPECT_SKIPPED",
-    "this target mirrors), configure_flags. Optional (with defaults): make (\"make\"),",
-    "python (\"python3\"), rsync_bin (\"rsync\"; \"rsync.exe\" on Cygwin), privilege",
-    "(\"root\" | \"sudo\" | \"user\"), pipe_jobs/tcp_jobs (8), builddir (\"rsync-citest\",",
-    "relative to the remote $HOME), env_prefix, configure_pre, nonroot, protocols,",
-    "max_retry.",
+    "Required target fields are name, ssh_host, workflow and configure_flags.",
+    "Set ssh_host to null for a local target. workflow names a file under .github/workflows.",
+    "Optional fields mirror the Target dataclass defaults in fleettest.py.",
     "",
-    "nonroot: true reruns -- as the non-root ssh user, after the sudo runs -- the",
-    "tests that declare `fleet_nonroot = True` at module level (so the set is",
-    "maintained in the test files, not here).",
+    "nonroot reruns tests marked fleet_nonroot as the SSH user after privileged passes.",
     "",
-    "protocols: [30, 29] adds one extra stdio-pipe test pass per listed version,",
-    "each run with runtests --protocol=N (the fleet analogue of a workflow's",
-    "check30/check29 steps) and shown as a protoNN column.",
+    "protocols adds one pipe pass per version and uses the matching workflow policy.",
     "",
-    "max_retry: N (default 0) re-runs each failed test on its own up to N more",
-    "times and drops any that then pass (listed under RECOVERED, not hidden). Use",
-    "on a slow/loaded box where concurrency-sensitive tests occasionally flake,",
-    "instead of dropping the whole target to a lower pipe_jobs/tcp_jobs.",
+    "max_retry reruns a failed test alone and reports recovered tests separately.",
     "",
     "Keys starting with \"_\" are comments. See testsuite/README.md."
   ],
@@ -59,7 +45,7 @@
       ]
     },
     {
-      "_comment": "Nested-VM OpenBSD. max_retry re-runs a flaky test on its own. The daemon+flipper symlink-race tests are excluded here: this box's kernel has a connect()-under-rename-load lost-wakeup (and an FFS rename-storm corruption) that hangs them for non-rsync reasons (see dev-notes/openbsd-connect-lost-wakeup-report.txt); the protections they check are verified on the Linux/BSD boxes.",
+      "_comment": "The nested OpenBSD VM excludes three rename-race tests because of a kernel lost wake-up and FFS rename-storm corruption. See dev-notes/openbsd-connect-lost-wakeup-report.txt.",
       "name": "openbsd",
       "ssh_host": "root@openbsd",
       "workflow": "openbsd-build.yml",
@@ -95,25 +81,28 @@
       ]
     },
     {
-      "_comment": "Ubuntu 18.04 older-LTS backport coverage on a root@ box; no 18.04 runner image exists so it mirrors the 22.04 matrix lane.",
+      "_comment": "Ubuntu 18.04 coverage using the Ubuntu workflow because no matching hosted runner exists.",
       "name": "ubuntu-1804",
       "ssh_host": "root@ubuntu-1804",
       "workflow": "ubuntu-build.yml",
-      "_python_comment": "18.04's default python3 is 3.6, but runtests.py uses subprocess capture_output (3.7+); run the suite under the 3.10 that's also installed.",
+      "_python_comment": "The stock Python 3.6 is too old for the runner. Use the installed Python 3.10.",
       "python": "python3.10",
-      "_configure_flags_comment": "18.04's libzstd 1.3.3 lacks ZSTD_minCLevel (configure aborts), so disable zstd; also disable lz4 so the default -z compressor is zlib -- with lz4 as the default, compress-options' --compress-level=9 check fails since lz4 has no levels. xxhash is fine.",
+      "_configure_flags_comment": "Disable zstd because 1.3.3 lacks ZSTD_minCLevel. Disable lz4 so compression-level tests use zlib.",
       "configure_flags": [
         "--with-rrsync",
         "--disable-zstd",
         "--disable-lz4"
       ],
-      "_expect_skip_extra_comment": "protected-regular's fs.protected_regular path is not exercised on this box.",
+      "_expect_skip_extra_comment": "This host does not expose the protected_regular condition.",
       "expect_skip_extra": [
         "protected-regular"
+      ],
+      "unsupported_extra": [
+        "protected_regular"
       ]
     },
     {
-      "_comment": "Ubuntu 20.04 older-LTS backport coverage on a root@ box; no 20.04 runner image exists so it mirrors the 22.04 matrix lane.",
+      "_comment": "Ubuntu 20.04 coverage using the Ubuntu workflow because no matching hosted runner exists.",
       "name": "ubuntu-2004",
       "ssh_host": "root@ubuntu-2004",
       "workflow": "ubuntu-build.yml",
@@ -122,7 +111,7 @@
       ]
     },
     {
-      "_comment": "Builds unprivileged (like a CI runner) and runs the suite via sudo; the nonroot pass reruns the privilege-sensitive tests as the ssh user. protocols: [30, 29] runs the check30/check29 passes on this NO-xattrat kernel: the CI's proto-29 step runs here, but the only other proto-29 fleet box (ubuntu-2604) is xattrat, so without this the (no-xattrat x proto-29) cell is uncovered.",
+      "_comment": "Build unprivileged then run the main suite through sudo. Protocol 29 and 30 runs cover a kernel without xattrat.",
       "name": "ubuntu-2204",
       "ssh_host": "runner@ubuntu-2204",
       "workflow": "ubuntu-build.yml",
@@ -137,7 +126,7 @@
       ]
     },
     {
-      "_comment": "Noble (24.04), kernel 6.8 -- a NO-xattrat kernel like ubuntu-2204 but with modern userspace; mirrors ubuntu-build.yml.",
+      "_comment": "Ubuntu 24.04 with kernel 6.8 and no xattrat support.",
       "name": "ubuntu-2404",
       "ssh_host": "runner@ubuntu-2404",
       "workflow": "ubuntu-build.yml",
@@ -152,7 +141,7 @@
       ]
     },
     {
-      "_comment": "Modern Ubuntu (mirrors ubuntu-build.yml). protocols: [30, 29] also runs the workflow's check30/check29 passes as extra stdio-pipe runs.",
+      "_comment": "Current Ubuntu coverage with protocol 29 and 30 pipe passes.",
       "name": "ubuntu-2604",
       "ssh_host": "runner@ubuntu-2604",
       "workflow": "ubuntu-build.yml",
@@ -167,20 +156,23 @@
       ]
     },
     {
-      "_comment": "AlmaLinux 8 (RHEL 8 rebuild): the oldest active LTS in the Fedora/RHEL family, for backport coverage. glibc 2.28 / gcc 8.5. The CI job runs in an almalinux:8 container; this is the VM equivalent. python3 must be the python39 module (alternatives --set python3 /usr/bin/python3.9) -- the stock 3.6 is too old for runtests.py.",
+      "_comment": "AlmaLinux 8 coverage with glibc 2.28, GCC 8.5 and the Python 3.9 module. The stock Python 3.6 is unsupported.",
       "name": "almalinux-8",
       "ssh_host": "root@almalinux-8",
       "workflow": "almalinux-8-build.yml",
       "configure_flags": [
         "--with-rrsync"
       ],
-      "_expect_skip_extra_comment": "Box-specific, not workflow-specific: this VM has no separate filesystem for a cross-device temp dir. fs.protected_regular is enabled in /etc/sysctl.d/90-rsync-fleettest.conf so protected-regular runs here rather than skipping.",
+      "_expect_skip_extra_comment": "This VM has no second filesystem for the cross-device temporary-directory test. protected_regular is enabled separately.",
       "expect_skip_extra": [
         "chmod-temp-dir"
+      ],
+      "unsupported_extra": [
+        "cross_device"
       ]
     },
     {
-      "_comment": "macOS: brew is not on the non-interactive ssh PATH, so put it on PATH for the whole build and pass brew include/lib dirs to configure.",
+      "_comment": "Add Homebrew to the non-interactive SSH path and pass its include and library directories to configure.",
       "name": "mac2",
       "ssh_host": "runner@mac2",
       "workflow": "macos-build.yml",
@@ -190,13 +182,13 @@
       "configure_flags": [
         "--with-rrsync"
       ],
-      "_xfail_comment": "crtimes uses APFS birthtime via setattrlist; older backport binaries (3.4.x/3.2.7) drive it differently than current rsync, so the 3.5.0 testsuite's crtimes check fails here. Tolerated -- it passes for a current binary, where this entry is a no-op.",
+      "_xfail_comment": "Older peers handle APFS birthtime differently. Current rsync passes this test.",
       "xfail": [
         "crtimes"
       ]
     },
     {
-      "_comment": "Same host and build as mac2, but the tests' scratch trees live on an HFS+ volume instead of APFS -- runtests.py honours $scratchbase, so only the data under test moves.  The setup VERIFIES the mount rather than assuming it: a stale directory or a name collision mounting at 'RsyncHFS 1' would otherwise leave the tests on APFS reporting green, which is exactly how the first version of this target lied.  Ownership must be on too: a user-attached image mounts 'noowners', under which every uid/gid and permission check is meaningless -- that alone caused 28 of the 31 failures the first honest run produced.",
+      "_comment": "Run scratch data on an HFS+ image. The setup verifies the mount and enables ownership so permission tests remain meaningful.",
       "name": "mac2-hfs",
       "ssh_host": "runner@mac2",
       "workflow": "macos-build.yml",
@@ -215,10 +207,10 @@
         "backup-crossdev-copy",
         "chmod-temp-dir"
       ],
-      "_skip_comment": "The two omitted entries are macOS-wide expected-skips that this target RUNS: the separate volume supplies the cross-device conditions mac2 lacks. (itemize used to XFAIL here, before --link-dest learned to fall back when the filesystem cannot hard-link a symlink.)"
+      "_skip_comment": "The HFS+ volume supplies the cross-device conditions missing from the APFS target."
     },
     {
-      "_comment": "The x86-64 Mac (macOS 10.13).  The ONLY target that can build the x86-64 md5 assembly -- mac2 is arm64, where configure refuses --enable-md5-asm outright.  MacPorts supplies autotools, python3 and the crypto/hash libs the stock 10.13 image lacks, and is not on the non-interactive ssh PATH, so put it there for the whole run.  This target keeps the STOCK Apple compiler (clang 10, the 10.13 ceiling), which is what caught #161; it cannot build --enable-roll-simd, because a clang that old rejects configure's target(\"default\") multiversioning probe. That is a compiler-VERSION limit, not a Mach-O one -- see mac-x86-asm below, which builds the same source with MacPorts clang 19 and all three optimizations on.",
+      "_comment": "macOS 10.13 on x86-64 with Apple Clang 10. This target covers MD5 assembly but cannot compile the SIMD multiversioning probe.",
       "name": "mac-x86",
       "ssh_host": "tridge@mac",
       "workflow": "macos-build.yml",
@@ -237,12 +229,15 @@
       "expect_skip_extra": [
         "symlink-mknod-fakesuper-symlink-race"
       ],
+      "unsupported_extra": [
+        "symlink_mknod"
+      ],
       "expect_skip_omit": [
         "sender-remove-source-root-anchor"
       ]
     },
     {
-      "_comment": "Same host and OS as mac-x86, built with the SIMD/asm optimizations ON. The only target that exercises --enable-roll-asm/--enable-md5-asm on Mach-O -- the combination Roland Kletzing reported in #160, where an AVX2 over-read (#178) survived two months precisely because nothing built with these flags. Needs MacPorts clang 19 via CC/CXX: Apple clang 10 cannot compile the function-multiversioning probe. Runs after mac-x86, since the harness never runs two targets on one machine at once.",
+      "_comment": "The same x86-64 Mac built with MacPorts Clang 19, rolling SIMD, rolling assembly and MD5 assembly. This covers the Mach-O combination from issues 160 and 178.",
       "name": "mac-x86-asm",
       "ssh_host": "tridge@mac",
       "workflow": "macos-build.yml",
@@ -263,14 +258,17 @@
       "expect_skip_extra": [
         "symlink-mknod-fakesuper-symlink-race"
       ],
-      "_expect_skip_omit_comment": "simd-checksum is a macOS-wide expected skip because simdtest is only built when SIMD is enabled -- which is the whole point of this target, so it RUNS here.",
+      "unsupported_extra": [
+        "symlink_mknod"
+      ],
+      "_expect_skip_omit_comment": "simd-checksum runs here because this target enables SIMD.",
       "expect_skip_omit": [
         "sender-remove-source-root-anchor",
         "simd-checksum"
       ]
     },
     {
-      "_comment": "Cygwin: non-root plain user (no sudo), binary is rsync.exe. The workflow installs only the python39 package, so pin python3.9 here too: the box's default python3 (3.12) has a working AF_UNIX socketpair, which makes daemon-stdin-local-socket run where cygwin.txt expects it to skip. Keep python39 current: the xattr tests need the os.getxattr that newer Cygwin builds (3.9.25+) expose.",
+      "_comment": "Cygwin runs unprivileged with rsync.exe and Python 3.9 to match the workflow capability set. Keep Python 3.9 current enough to expose os.getxattr.",
       "name": "cygwin",
       "ssh_host": "win11",
       "workflow": "cygwin-build.yml",

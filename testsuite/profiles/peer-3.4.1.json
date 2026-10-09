@@ -1,0 +1,11 @@
+{
+  "peer": "3.4.1",
+  "protocol": 32,
+  "xfail": {
+    "alt-dest-symlink-race": "pre-3.4.3",
+    "chdir-symlink-race": "pre-3.4.3",
+    "copy-dest-source-symlink": "pre-3.4.3",
+    "sender-flist-symlink-leak": "pre-3.4.3",
+    "symlink-dirlink-basis": "issue-715"
+  }
+}

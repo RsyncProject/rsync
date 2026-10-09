@@ -65,7 +65,7 @@ jobs:
         [ "${{ matrix.privilege }}" = root ] && SUDO="sudo -E"
         TCP=
         [ "${{ matrix.transport }}" = tcp ] && TCP="--use-tcp"
-        $SUDO ./runtests.py --valgrind \
+        $SUDO ./testsuite/runtests.py --valgrind \
           --valgrind-opts="--leak-check=no --error-exitcode=0" \
           $TCP -j8 --preserve-scratch || true
 

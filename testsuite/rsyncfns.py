@@ -196,8 +196,10 @@ def test_fail(msg: str) -> 'None':
     sys.exit(Exit.FAIL)
 
 
-def test_skipped(msg: str) -> 'None':
+def test_skipped(msg: str, capability: str = None) -> 'None':
     sys.stderr.write(msg.rstrip() + '\n')
+    if capability:
+        (TMPDIR / 'unsupported').write_text(capability + '\n')
     (TMPDIR / 'whyskipped').write_text(msg.rstrip() + '\n')
     sys.exit(Exit.SKIP)
 
@@ -875,7 +877,7 @@ def require_tcp(reason: str) -> 'None':
     pipe equivalent (the fake-proxy listener; the reverse-DNS hostname-ACL
     daemon test)."""
     if not USE_TCP:
-        test_skipped(reason)
+        test_skipped(reason, capability='tcp')
 
 
 def require_asan(reason: str, which: str = None) -> 'None':
@@ -891,10 +893,10 @@ def require_asan(reason: str, which: str = None) -> 'None':
                            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
                            timeout=15)
     except Exception:
-        test_skipped(reason)
+        test_skipped(reason, capability='asan')
         return
     if b'AddressSanitizer' not in r.stderr:
-        test_skipped(reason)
+        test_skipped(reason, capability='asan')
 
 
 def rsh_cmd(cmd: str = None, *opts: str) -> str:
@@ -2181,12 +2183,13 @@ def run_proxy_probe(port, host, expected):
 
 def setup_chroot_inner(name):
     if get_testuid() != get_rootuid():
-        test_skipped("chroot /./ module regression requires root")
+        test_skipped("chroot /./ module regression requires root", capability='root')
     if _under_valgrind():
         # The daemon's per-connection child chroots into the module, after
         # which valgrind can no longer create its absolute --log-file %p path
         # and the child dies (the transfer then resets) -- skip under valgrind.
-        test_skipped("daemon chroot prevents valgrind from writing its per-process log")
+        test_skipped("daemon chroot prevents valgrind from writing its per-process log",
+                     capability='chroot')
     base = SCRATCHDIR / name
     outer = base / 'outer'
     inner = outer / 'inner'
@@ -2218,13 +2221,15 @@ def build_patched_rsync(name, replacements, append_cflags=None):
     if sys.platform == 'cygwin' or platform.system().startswith('CYGWIN'):
         test_skipped(f"{name}: build_patched_rsync is unreliable on Cygwin "
                      "(prebuilt-object staleness / -fno-common relink); the "
-                     "patched-peer fix is validated on the POSIX targets")
+                     "patched-peer fix is validated on the POSIX targets",
+                     capability='native_build')
     if not (SRCDIR / 'Makefile').is_file():
-        test_skipped(f"{name}: needs a configured rsync source tree with a Makefile")
+        test_skipped(f"{name}: needs a configured rsync source tree with a Makefile",
+                     capability='native_build')
     if not shutil.which('make'):
-        test_skipped(f"{name}: make(1) not on PATH")
+        test_skipped(f"{name}: make(1) not on PATH", capability='native_build')
     if not shutil.which('gcc') and not shutil.which('cc'):
-        test_skipped(f"{name}: no C compiler on PATH")
+        test_skipped(f"{name}: no C compiler on PATH", capability='native_build')
 
     work = SCRATCHDIR / name
     rmtree(work)
@@ -2237,7 +2242,8 @@ def build_patched_rsync(name, replacements, append_cflags=None):
         path = work / relpath
         text = path.read_text()
         if old not in text:
-            test_skipped(f"{name}: could not find patch target in {relpath}: {old!r}")
+            test_skipped(f"{name}: could not find patch target in {relpath}: {old!r}",
+                         capability='native_build')
         path.write_text(text.replace(old, new, 1))
         # Drop the copied object for this unit.  copytree() preserves mtimes, so
         # on a target whose clock lags the host that pushed the tree -- or one
@@ -2265,7 +2271,8 @@ def build_patched_rsync(name, replacements, append_cflags=None):
         mk = mkpath.read_text()
         mk2 = re.sub(r'(?m)^(CFLAGS=.*)$', r'\1 ' + append_cflags, mk, count=1)
         if mk2 == mk:
-            test_skipped(f"{name}: could not append {append_cflags!r} to CFLAGS in the Makefile")
+            test_skipped(f"{name}: could not append {append_cflags!r} to CFLAGS in the Makefile",
+                         capability='native_build')
         mkpath.write_text(mk2)
         # The copied tree carries prebuilt objects compiled with the ORIGINAL
         # flags; since the sources aren't newer, make would reuse them and the
@@ -2281,7 +2288,8 @@ def build_patched_rsync(name, replacements, append_cflags=None):
     if build.returncode != 0 or not rsync.is_file() or not os.access(rsync, os.X_OK):
         test_skipped(
             f"{name}: patched rsync build failed (rc={build.returncode}). "
-            "Tail of build output:\n" + '\n'.join(build.stdout.splitlines()[-20:]))
+            "Tail of build output:\n" + '\n'.join(build.stdout.splitlines()[-20:]),
+            capability='native_build')
     return rsync
 
 

@@ -1,0 +1,15 @@
+{
+  "peer": "3.1.0",
+  "protocol": 31,
+  "xfail": {
+    "alt-dest-symlink-race": "pre-hardening",
+    "chdir-symlink-race": "pre-hardening",
+    "copy-dest-source-symlink": "pre-hardening",
+    "daemon": "peer-feature-gap",
+    "daemon-gzip-download": "peer-feature-gap",
+    "daemon-gzip-upload": "peer-feature-gap",
+    "daemon-refuse": "peer-feature-gap",
+    "daemon-refuse-compress": "peer-feature-gap",
+    "sender-flist-symlink-leak": "pre-hardening"
+  }
+}

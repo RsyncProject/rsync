@@ -1,0 +1,6 @@
+{
+  "protocol": 30,
+  "unsupported": {
+    "protocol_33": "protocol below 33"
+  }
+}

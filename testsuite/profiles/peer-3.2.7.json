@@ -1,0 +1,10 @@
+{
+  "peer": "3.2.7",
+  "protocol": 31,
+  "xfail": {
+    "alt-dest-symlink-race": "pre-hardening",
+    "chdir-symlink-race": "pre-hardening",
+    "copy-dest-source-symlink": "pre-hardening",
+    "sender-flist-symlink-leak": "pre-hardening"
+  }
+}
