@@ -6,6 +6,7 @@
     "group_auth": "no Linux group-auth fixture",
     "linux_acl": "no Linux ACL semantics",
     "linux_interpose": "no Linux interposition",
+    "linux_nss_chroot": "no Linux NSS chroot",
     "linux_xattr": "no Linux xattr semantics",
     "noatime": "no O_NOATIME",
     "preallocate": "no preallocation support",

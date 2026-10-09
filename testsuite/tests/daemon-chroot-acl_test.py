@@ -29,7 +29,8 @@ require_tcp("needs a real TCP peer address for reverse-DNS hostname ACL; "
             "run with --use-tcp")
 
 if platform.system() != 'Linux':
-    test_skipped("test is Linux-specific (uses chroot+unshare)")
+    test_skipped("test is Linux-specific (uses chroot+unshare)",
+                 capability='linux_nss_chroot')
 
 # Need CAP_SYS_CHROOT. Re-exec under a user namespace if not root.
 def _can_chroot() -> bool:
@@ -56,7 +57,8 @@ if not _can_chroot():
                      sys.executable, __file__],
                     env,
                 )
-    test_skipped("need CAP_SYS_CHROOT (root or unshare --user --map-root-user)")
+    test_skipped("need CAP_SYS_CHROOT (root or unshare --user --map-root-user)",
+                 capability='chroot')
 
 
 # Find what 127.0.0.1 reverse-resolves to.
@@ -74,7 +76,7 @@ def _client_hostname() -> str:
 
 client_hostname = _client_hostname()
 if not client_hostname or client_hostname == '127.0.0.1':
-    test_skipped("no reverse DNS for 127.0.0.1")
+    test_skipped("no reverse DNS for 127.0.0.1", capability='linux_nss_chroot')
 
 chrootdir = SCRATCHDIR / 'chroot'
 rmtree(chrootdir)
