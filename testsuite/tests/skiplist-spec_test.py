@@ -7,6 +7,7 @@
 
 import importlib.util
 import os
+import re
 from pathlib import Path
 
 from rsyncfns import SCRATCHDIR, SRCDIR, test_fail
@@ -22,6 +23,10 @@ spec.loader.exec_module(runtests)
 
 SUITE = str(SRC / 'testsuite')
 ERROR = f'exit:{runtests.Exit.ERROR}'
+PROFILE_ASSIGNMENT = re.compile(
+    r'RSYNC_TEST_PROFILES=(\S*\$\{\{\s*matrix\.profiles\s*\}\}\S*|\S+)')
+MATRIX_PROFILE = re.compile(r'\$\{\{\s*matrix\.profiles\s*\}\}')
+MATRIX_PROFILE_VALUE = re.compile(r'^\s+profiles:\s+(\S+)\s*$')
 
 
 def expand(text_spec, srcdir=None, suitedir=None):
@@ -40,6 +45,18 @@ def write(name, body):
     else:
         p.write_text(body)
     return '@' + str(p)
+
+
+def profile_specs(line, matrix_profiles):
+    match = PROFILE_ASSIGNMENT.search(line)
+    if not match:
+        test_fail('invalid RSYNC_TEST_PROFILES assignment')
+    spec = match.group(1)
+    if not MATRIX_PROFILE.search(spec):
+        return [spec]
+    if not matrix_profiles:
+        test_fail('matrix profile expression has no values')
+    return [MATRIX_PROFILE.sub(value, spec) for value in matrix_profiles]
 
 
 # A stand-in suite whose entries make each malformed name *look* real, so that
@@ -143,7 +160,10 @@ requirements = {runtests._testbase(path): runtests.read_requirements(path) for p
 wf = sorted((SRC / '.github' / 'workflows').glob('*.yml'))
 refs, referenced = 0, set()
 for path in wf:
-    for line in path.read_text().splitlines():
+    lines = path.read_text().splitlines()
+    matrix_profiles = sorted(match.group(1) for line in lines
+                             if (match := MATRIX_PROFILE_VALUE.match(line)))
+    for line in lines:
         if 'RSYNC_EXPECT_SKIPPED=' not in line:
             continue
         arg = line.split('RSYNC_EXPECT_SKIPPED=', 1)[1].split()[0]
@@ -156,19 +176,19 @@ for path in wf:
                 referenced.add(Path(tok[1:]).name)
         if 'RSYNC_TEST_PROFILES=' not in line:
             test_fail(f'{path.name}: skip policy has no capability profiles')
-        profile_arg = line.split('RSYNC_TEST_PROFILES=', 1)[1].split()[0]
-        profiles = [
-            runtests.load_profile(SRC / 'testsuite' / 'profiles' / f'{name}.json', known_tests)
-            for name in profile_arg.split(',')
-        ]
-        _, _, unsupported, _ = runtests.merge_profiles(profiles)
-        permitted = {name for name, metadata in requirements.items()
-                     if metadata and set(metadata['features']) & set(unsupported)}
-        expected = set(got.split(','))
-        if permitted != expected:
-            missing = ','.join(sorted(expected - permitted)) or '-'
-            extra = ','.join(sorted(permitted - expected)) or '-'
-            test_fail(f'{path.name}: profile policy differs: missing={missing} extra={extra}')
+        for profile_arg in profile_specs(line, matrix_profiles):
+            profiles = [
+                runtests.load_profile(SRC / 'testsuite' / 'profiles' / f'{name}.json', known_tests)
+                for name in profile_arg.split(',')
+            ]
+            _, _, unsupported, _ = runtests.merge_profiles(profiles)
+            permitted = {name for name, metadata in requirements.items()
+                         if metadata and set(metadata['features']) & set(unsupported)}
+            expected = set(got.split(','))
+            if permitted != expected:
+                missing = ','.join(sorted(expected - permitted)) or '-'
+                extra = ','.join(sorted(permitted - expected)) or '-'
+                test_fail(f'{path.name}: profile policy differs: missing={missing} extra={extra}')
 if wf:
     if refs == 0:
         test_fail('no workflow references RSYNC_EXPECT_SKIPPED any more')
@@ -177,6 +197,8 @@ if wf:
         test_fail(f'skip lists no workflow references: {", ".join(orphans)}')
     for path in wf:
         lines = path.read_text().splitlines()
+        matrix_profiles = sorted(match.group(1) for line in lines
+                                 if (match := MATRIX_PROFILE_VALUE.match(line)))
         base = next((line for line in lines
                      if 'RSYNC_EXPECT_SKIPPED=' in line
                      and (line.rstrip().endswith('make check') or line.rstrip().endswith("make check'"))), None)
@@ -185,11 +207,13 @@ if wf:
         tcp = next((line for line in lines if '--use-tcp' in line), None)
         if not tcp or 'RSYNC_TEST_PROFILES=' not in tcp:
             test_fail(f'{path.name}: TCP pass has no capability profiles')
-        base_names = base.split('RSYNC_TEST_PROFILES=', 1)[1].split()[0].split(',')
-        expected_tcp = [name for name in base_names
-                        if name != 'pipe' and not name.startswith('protocol-')]
-        tcp_names = tcp.split('RSYNC_TEST_PROFILES=', 1)[1].split()[0].split(',')
-        if tcp_names != expected_tcp:
+        expected_tcp = {
+            tuple(name for name in spec.split(',')
+                  if name != 'pipe' and not name.startswith('protocol-'))
+            for spec in profile_specs(base, matrix_profiles)
+        }
+        tcp_profiles = {tuple(spec.split(',')) for spec in profile_specs(tcp, matrix_profiles)}
+        if tcp_profiles != expected_tcp:
             test_fail(f'{path.name}: TCP profiles differ from pipe profiles')
 # '-name' removals.  fleettest emits these for a host that can genuinely run a
 # test its platform list expects to skip; the name being dropped lives inside an
