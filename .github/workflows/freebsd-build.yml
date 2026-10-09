@@ -31,6 +31,14 @@ jobs:
       with:
         fetch-depth: 0
         persist-credentials: false
+    - name: prepare VM host
+      timeout-minutes: 10
+      run: |
+        packages=(qemu-utils qemu-system-x86 ovmf)
+        sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "${packages[@]}" || {
+          sudo apt-get update -q
+          sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "${packages[@]}"
+        }
     - name: Test in FreeBSD VM
       id: test
       uses: vmactions/freebsd-vm@c46abacb49f09938ca4e1702d15d836285d694cc # v1.5.9

@@ -31,6 +31,14 @@ jobs:
       with:
         fetch-depth: 0
         persist-credentials: false
+    - name: prepare VM host
+      timeout-minutes: 10
+      run: |
+        packages=(qemu-utils qemu-system-x86 ovmf)
+        sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "${packages[@]}" || {
+          sudo apt-get update -q
+          sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "${packages[@]}"
+        }
     - name: Test in OpenBSD VM
       id: test
       uses: vmactions/openbsd-vm@5f7b2c933b8846a138361d6843c52af4bef5d945 # v1.4.8
