@@ -1,6 +1,7 @@
 {
   "unsupported": {
     "acl": "no usable ACL fixture",
+    "atomic_flipper": "no atomic rename exchange",
     "crtimes": "no creation times",
     "darwin": "not Darwin",
     "darwin_interpose": "no dyld interposition",

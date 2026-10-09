@@ -1,5 +1,11 @@
 {
   "unsupported": {
-    "root": "running without root privileges"
+    "chroot": "no usable chroot fixture",
+    "cross_uid": "no cross-UID fixture",
+    "group_auth": "no group-auth fixture",
+    "ownership": "no Unix ownership fixture",
+    "protected_regular": "no protected_regular sysctl",
+    "root": "running without root privileges",
+    "root_anchor": "no root-anchored source fixture"
   }
 }

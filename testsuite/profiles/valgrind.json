@@ -1,0 +1,6 @@
+{
+  "unsupported": {
+    "chroot": "no usable chroot fixture",
+    "linux_interpose": "no interposition under Valgrind"
+  }
+}
