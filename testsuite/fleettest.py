@@ -302,13 +302,18 @@ def push_argv(target: Target, staging: str) -> list[str]:
 def parse_workflow_profiles(workflow: str, make_target: str = "check") -> str | None:
     path = WORKFLOWS / workflow
     try:
-        text = path.read_text()
+        lines = path.read_text().splitlines()
     except OSError:
         return None
-    rx = re.compile(r"RSYNC_TEST_PROFILES=(\S+).*?\s+make\s+"
-                    + re.escape(make_target) + r"'?\s*$", re.M)
-    match = rx.search(text)
-    return match.group(1) if match else None
+    make_call = re.compile(r'\bmake\s+' + re.escape(make_target) + r'(?:\s|[\'\"]|$)')
+    for line in lines:
+        match = re.search(r'RSYNC_TEST_PROFILES=(\S+)', line)
+        if not match:
+            continue
+        direct = make_target == 'check' and 'runtests.py' in line and '--use-tcp' not in line
+        if direct or make_call.search(line):
+            return match.group(1)
+    return None
 
 
 def tcp_profiles(workflow: str) -> str | None:

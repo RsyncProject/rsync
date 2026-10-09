@@ -22,6 +22,13 @@ PROFILE_ASSIGNMENT = re.compile(
     r'RSYNC_TEST_PROFILES=(\S*\$\{\{\s*matrix\.profiles\s*\}\}\S*|\S+)')
 MATRIX_PROFILE = re.compile(r'\$\{\{\s*matrix\.profiles\s*\}\}')
 MATRIX_PROFILE_VALUE = re.compile(r'^\s+profiles:\s+(\S+)\s*$')
+PLATFORM_PROFILES = {'non-asan', 'root', 'self-peer', 'no-idn', 'no-xxhash', 'no-zstd-threads'}
+PLATFORM_WORKFLOWS = {
+    'freebsd-build.yml': PLATFORM_PROFILES | {'freebsd'},
+    'netbsd-build.yml': PLATFORM_PROFILES | {'netbsd'},
+    'openbsd-build.yml': PLATFORM_PROFILES | {'openbsd'},
+    'solaris-build.yml': PLATFORM_PROFILES | {'solaris'},
+}
 
 
 def profile_specs(line, matrix_profiles):
@@ -52,14 +59,27 @@ for path in workflows:
     matrix_profiles = sorted(match.group(1) for line in lines
                              if (match := MATRIX_PROFILE_VALUE.match(line)))
     profile_lines = [line for line in lines if 'RSYNC_TEST_PROFILES=' in line]
-    for line in profile_lines:
-        for value in profile_specs(line, matrix_profiles):
-            for name in value.split(','):
-                runtests.load_profile(SRC / 'testsuite' / 'profiles' / f'{name}.json', known_tests)
-            references += 1
+    specs = [value for line in profile_lines for value in profile_specs(line, matrix_profiles)]
+    names = {name for value in specs for name in value.split(',')}
+    for value in specs:
+        for name in value.split(','):
+            runtests.load_profile(SRC / 'testsuite' / 'profiles' / f'{name}.json', known_tests)
+        references += 1
+
+    required = PLATFORM_WORKFLOWS.get(path.name)
+    if required:
+        missing = required - names
+        if missing:
+            test_fail(f'{path.name}: missing profiles: {", ".join(sorted(missing))}')
+        if not any('test-results/*.json' in line for line in lines):
+            test_fail(f'{path.name}: profile receipts are not retained')
+        if not any('if: always()' in line for line in lines):
+            test_fail(f'{path.name}: failed profile receipts are not retained')
 
     pipe = next((line for line in profile_lines
-                 if line.rstrip().endswith('make check') or line.rstrip().endswith("make check'")), None)
+                 if '--use-tcp' not in line and ('runtests.py' in line
+                                                  or line.rstrip().endswith('make check')
+                                                  or line.rstrip().endswith("make check'"))), None)
     if not pipe:
         continue
     tcp = next((line for line in profile_lines if '--use-tcp' in line), None)
@@ -73,6 +93,8 @@ for path in workflows:
     actual = {tuple(value.split(',')) for value in profile_specs(tcp, matrix_profiles)}
     if actual != expected:
         test_fail(f'{path.name}: TCP profiles differ from pipe profiles')
+    if required and ('--receipt=' not in pipe or '--receipt=' not in tcp):
+        test_fail(f'{path.name}: profiled transport has no receipt')
 
 if workflows and not references:
     test_fail('no workflow profile references found')
@@ -137,5 +159,11 @@ if workflows:
     for target in fleet:
         if error := fleettest.validate_target_capabilities(target):
             test_fail(error)
+        required = PLATFORM_WORKFLOWS.get(target.workflow)
+        if required:
+            pipe_profiles = set(fleettest.target_profiles(target, 'pipe').split(','))
+            tcp_profiles = set(fleettest.target_profiles(target, 'tcp').split(','))
+            if pipe_profiles != required | {'pipe'} or tcp_profiles != required:
+                test_fail(f'{target.name}: fleet profiles differ from workflow')
 
 print(f'ok: {references} workflow profile references')

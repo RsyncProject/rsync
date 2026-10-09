@@ -51,7 +51,7 @@ jobs:
           export AUTOCONF_VERSION=2.71
           export AUTOMAKE_VERSION=1.16
           ./configure --with-rrsync --disable-zstd --disable-md2man --disable-xxhash --disable-lz4 --disable-idn
-          make
+          make check-progs
           ./rsync --version
           # The flipper (symlink-race) tests are excluded on OpenBSD, as on the
           # fleet's OpenBSD box: this kernel has a connect()-under-rename-load
@@ -60,18 +60,19 @@ jobs:
           # dev-notes/openbsd-connect-lost-wakeup-report.txt); the protections
           # they exercise are verified on the Linux/BSD boxes.
           export RSYNC_EXCLUDE=acl-symlink-race,sender-readlink-atfd,sender-remove-source-secure
-          make check
+          RSYNC_TEST_PROFILES=pipe,non-asan,root,self-peer,openbsd,no-idn,no-xxhash,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --receipt=test-results/openbsd-pipe.json -j 8
           # The --use-tcp daemon tests run at -j2 here (vs -j8 elsewhere): this
           # job runs inside a nested VM, and at -j8 the many concurrent loopback
           # daemons occasionally lose a connection-handshake timing race under
           # that resource pressure, hanging one test to the 300s timeout. It is
           # an environment artifact, not an rsync bug (the handshake is
           # deadlock-free and unreproducible elsewhere, even pinned to 1 CPU at
-          # -j8); -j2 keeps the VM from over-subscribing. The pipe `make check`
-          # above stays at the default parallelism.
-          ./testsuite/runtests.py --rsync-bin=`pwd`/rsync --use-tcp -j 2
+          # -j8); -j2 keeps the VM from over-subscribing. The pipe pass above
+          # stays at the default parallelism.
+          RSYNC_TEST_PROFILES=non-asan,root,self-peer,openbsd,no-idn,no-xxhash,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp --receipt=test-results/openbsd-tcp.json -j 2
           ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
     - name: save artifact
+      if: always()
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
       with:
         retention-days: 45
@@ -84,3 +85,4 @@ jobs:
           rsyncd.conf.5
           rrsync.1
           rrsync
+          test-results/*.json
