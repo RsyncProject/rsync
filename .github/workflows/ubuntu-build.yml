@@ -32,11 +32,13 @@ jobs:
             artifact: ubuntu-bin
             nonroot: true
             install_smoke: true
+            profiles: non-asan,root,self-peer,linux
           - runner: ubuntu-22.04
             name: Test rsync on Ubuntu 22.04
             artifact: ubuntu-22.04-bin
             nonroot: false
             install_smoke: false
+            profiles: non-asan,root,self-peer,linux,no-zstd-threads
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     name: ${{ matrix.name }}
@@ -88,17 +90,17 @@ jobs:
     - name: info
       run: rsync --version
     - name: check
-      run: sudo RSYNC_TEST_PROFILES=pipe,non-asan,root,self-peer,linux RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/common.txt,@testsuite/skiplist/linux.txt make check
+      run: sudo RSYNC_TEST_PROFILES=pipe,${{ matrix.profiles }} RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/common.txt,@testsuite/skiplist/linux.txt make check
     - name: check30
-      run: sudo RSYNC_TEST_PROFILES=pipe,non-asan,root,self-peer,linux,protocol-30 RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/common.txt,@testsuite/skiplist/linux.txt,@testsuite/skiplist/proto30.txt make check30
+      run: sudo RSYNC_TEST_PROFILES=pipe,${{ matrix.profiles }},protocol-30 RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/common.txt,@testsuite/skiplist/linux.txt,@testsuite/skiplist/proto30.txt make check30
     - name: check29
-      run: sudo RSYNC_TEST_PROFILES=pipe,non-asan,root,self-peer,linux,protocol-29 RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/common.txt,@testsuite/skiplist/linux.txt,@testsuite/skiplist/proto29.txt make check29
+      run: sudo RSYNC_TEST_PROFILES=pipe,${{ matrix.profiles }},protocol-29 RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/common.txt,@testsuite/skiplist/linux.txt,@testsuite/skiplist/proto29.txt make check29
     - name: check (TCP daemon transport)
       # Second run with daemon tests over a real loopback rsyncd. The default
       # 'make check' above uses the secure stdio-pipe transport (no listening
       # sockets); this run exercises the real TCP accept/auth path. Skip-set
       # is env-dependent here (chroot-acl), so leave RSYNC_EXPECT_SKIPPED unset.
-      run: sudo RSYNC_TEST_PROFILES=non-asan,root,self-peer,linux ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp -j 8
+      run: sudo RSYNC_TEST_PROFILES=${{ matrix.profiles }} ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp -j 8
     - name: check (non-root, targeted)
       if: matrix.nonroot
       # Every run above is root (sudo), so privilege-sensitive tests never hit
