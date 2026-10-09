@@ -36,7 +36,7 @@ import rsync_proto as rp
 PORT = 12973
 require_tcp("the pure-Python sender needs a real TCP daemon; run with --use-tcp")
 if get_testuid() != get_rootuid():
-    test_skipped("the /./ inner-module chroot regression requires root")
+    test_skipped("the /./ inner-module chroot regression requires root", capability='root')
 claim_ports(PORT)
 
 base = SCRATCHDIR / 'chroot-basis-forge'

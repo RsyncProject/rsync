@@ -62,12 +62,14 @@ PWNED = "WROTE-THROUGH-LINK\n"
 
 require_tcp("the daemon symlink-resolution flow needs a real TCP peer")
 if os.geteuid() != 0:
-    test_skipped("requires root to plant a foreign-owned symlink and serve as root")
+    test_skipped("requires root to plant a foreign-owned symlink and serve as root",
+                 capability='root')
 if not rsync_supports('--copy-dirlinks'):
     test_skipped("rsync lacks --copy-dirlinks")
 ATT = find_attacker_uid()
 if ATT is None:
-    test_skipped("no untrusted-uid user available for the cross-uid plant")
+    test_skipped("no untrusted-uid user available for the cross-uid plant",
+                 capability='cross_uid')
 
 # The 3.2.7 oracle: prefer a --rsync-bin2 peer if it differs from the build under
 # test, else the in-tree static binary. None -> degrade to the static contract.

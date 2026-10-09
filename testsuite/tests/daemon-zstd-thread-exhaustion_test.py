@@ -112,7 +112,7 @@ if thread_count(child_pid) < 0:
     c.close()
     test_skipped("counting a process's threads is unsupported on "
                  f'{sys.platform}, so a bound on the worker pool cannot be '
-                 'observed here')
+                 'observed here', capability='thread_count')
 
 observed = 0
 for _ in range(100):
