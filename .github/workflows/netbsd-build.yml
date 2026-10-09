@@ -50,12 +50,13 @@ jobs:
         run: |
           uname -a
           ./configure --with-rrsync --disable-zstd --disable-md2man --disable-xxhash --disable-lz4 --disable-idn
-          make
+          make check-progs
           ./rsync --version
-          make check
-          ./testsuite/runtests.py --rsync-bin=`pwd`/rsync --use-tcp -j 8
+          RSYNC_TEST_PROFILES=pipe,non-asan,root,self-peer,netbsd,no-idn,no-xxhash,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --receipt=test-results/netbsd-pipe.json -j 8
+          RSYNC_TEST_PROFILES=non-asan,root,self-peer,netbsd,no-idn,no-xxhash,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp --receipt=test-results/netbsd-tcp.json -j 8
           ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
     - name: save artifact
+      if: always()
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
       with:
         retention-days: 45
@@ -68,3 +69,4 @@ jobs:
           rsyncd.conf.5
           rrsync.1
           rrsync
+          test-results/*.json
