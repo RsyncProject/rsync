@@ -18,6 +18,7 @@
     "daemon-munge": "peer-feature-gap",
     "daemon-refuse": "peer-feature-gap",
     "daemon-refuse-compress": "peer-feature-gap",
+    "exclude-lsh": "peer-feature-gap",
     "files-from": "peer-feature-gap",
     "sender-flist-symlink-leak": "pre-hardening",
     "smoke": "peer-feature-gap",
