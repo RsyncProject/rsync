@@ -621,6 +621,7 @@ has its own detailed description later in this manpage.
 --partial                keep partially transferred files
 --partial-dir=DIR        put a partially transferred file into DIR
 --delay-updates          put all updated files into place at end
+--delay-symlinks         create symlinks after all files are in place
 --prune-empty-dirs, -m   prune empty directory chains from file-list
 --numeric-ids            don't map uid/gid values by user/group name
 --usermap=STRING         custom username mapping
@@ -1012,6 +1013,7 @@ sign) if you want the local shell to expand it.
     - [`--delete-after`](#opt)
     - [`--prune-empty-dirs`](#opt)
     - [`--delay-updates`](#opt)
+    - [`--delay-symlinks`](#opt)
 
     In order to be compatible with incremental recursion,
     [`--delete-during`](#opt) is the default delete mode for [`--delete`](#opt).
@@ -3737,6 +3739,29 @@ sign) if you want the local shell to expand it.
     See also the "atomic-rsync" python script in the "support" subdirectory for an
     update algorithm that is even closer to atomic (it uses [`--link-dest`](#opt)
     and a parallel hierarchy of files).
+
+0.  `--delay-symlinks`
+
+    This option tells the receiving rsync to hold back the creation of new and
+    changed symlinks until every other file in the transfer has been put into
+    place, including the renames done by [`--delay-updates`](#opt).  Without
+    it, a symlink is created as soon as rsync reaches it in the file list, so
+    for the rest of the transfer it can point at a file that hasn't arrived
+    yet.
+
+    If a symlink is moved to a new target and the old target is deleted, also
+    use [`--delete-delay`](#opt) or [`--delete-after`](#opt), since the default
+    [`--delete-during`](#opt) can remove the old target while the old symlink
+    still points at it.
+
+    This option implies [`--no-inc-recursive`](#opt) since it needs the full
+    file list in memory in order to be able to iterate over it at the end.
+
+    Conflicts with [`--remove-source-files`](#opt), [`--hard-links`](#opt),
+    [`--compare-dest`](#opt), [`--copy-dest`](#opt), and [`--link-dest`](#opt).
+    This option is incompatible with rsync versions prior to 2.6.4 (March
+    2005), and when the receiving side is remote, the remote rsync must also
+    support this option.
 
 0.  `--prune-empty-dirs`, `-m`
 
