@@ -28,6 +28,22 @@ if not os.environ.get('RSYNC_USERNS_PROCFS'):
     child_test = launch_dir / testfile.name
     for source in (testfile, suitedir / 'rsyncfns.py', suitedir / 'exitcodes.py'):
         shutil.copy2(source, launch_dir / source.name)
+    shutil.copytree(
+        suitedir / 'harness',
+        launch_dir / 'harness',
+        ignore=shutil.ignore_patterns('__pycache__', '*.pyc'),
+    )
+    env['PYTHONPATH'] = str(launch_dir)
+    import_probe = subprocess.run(
+        [sys.executable, '-c', 'import rsyncfns'],
+        cwd=launch_dir,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    if import_probe.returncode != 0:
+        rmtree(launch_dir)
+        test_fail('staged test harness is incomplete:\n' + import_probe.stderr)
     rsync_cmd = shlex.split(env['RSYNC'])
     for i, arg in enumerate(rsync_cmd):
         if Path(arg).name in ('rsync', 'rsync.exe') and Path(arg).is_file():
