@@ -29,6 +29,7 @@ import glob
 import json
 import math
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -41,7 +42,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from harness import (
     Exit, Outcome, TestResult, applies_to_peer, load_profile, merge_profiles, parse_peer_banner,
-    placeholder_target, read_requirements, verdict_of, write_receipt,
+    placeholder_target, read_requirements, resolve_test_path, verdict_of, write_receipt,
 )
 
 
@@ -306,8 +307,9 @@ _DAEMON_API = (
     'USE_TCP', 'require_tcp', 'start_test_daemon', 'start_rsyncd',
     'claim_ports', 'claim_free_port', 'setup_chroot_inner',
     'stdio_daemon', 'rsync_proto', 'DaemonClient',
-    'rsync://', '--daemon', 'rsyncd',
+    'rsync://', 'rsyncd',
 )
+_DAEMON_OPTION = re.compile(r'(?<![\w-])--daemon(?![\w-])')
 
 
 def select_daemon_tests(tests):
@@ -327,12 +329,13 @@ def select_daemon_tests(tests):
                 keep.append(path)
                 continue
         try:
-            with open(path, errors='replace') as f:
+            with open(resolve_test_path(path), errors='replace') as f:
                 text = f.read()
         except OSError:
             keep.append(path)
             continue
-        (keep if any(tok in text for tok in _DAEMON_API) else dropped).append(path)
+        uses_daemon = any(tok in text for tok in _DAEMON_API) or bool(_DAEMON_OPTION.search(text))
+        (keep if uses_daemon else dropped).append(path)
     return keep, dropped
 
 

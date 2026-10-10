@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Test metadata schema"""
 
-from harness import TestContext, applies_to_peer, metadata, placeholder_target, read_requirements, requires, run
+from harness import TestContext, applies_to_peer, metadata, placeholder_target, read_requirements, requires, resolve_test_path, run
 from rsyncfns import test_fail
 
 
@@ -24,12 +24,13 @@ def test(context: TestContext):
 
     alias = context.scratch / 'alias_test.py'
     alias.symlink_to(module.name)
-    if read_requirements(alias) != read_requirements(module):
+    if resolve_test_path(alias) != module or read_requirements(alias) != read_requirements(module):
         test_fail('link alias did not inherit target metadata')
 
     placeholder = context.scratch / 'placeholder_test.py'
     placeholder.write_text(module.name)
-    if placeholder_target(placeholder) != module or read_requirements(placeholder) != read_requirements(module):
+    if (placeholder_target(placeholder) != module or resolve_test_path(placeholder) != module
+            or read_requirements(placeholder) != read_requirements(module)):
         test_fail('placeholder did not inherit target metadata')
 
     cycle_a = context.scratch / 'cycle-a_test.py'

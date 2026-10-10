@@ -46,11 +46,13 @@ The runner accepts names and shell patterns:
 ./testsuite/runtests.py 'xattr*'
 ```
 
-The main controls are `-j`, `--rsync-bin`, `--rsync-bin2`, `--protocol`, `--profiles`, `--use-tcp`, `--race-timeout`, `--receipt`, `--describe-tests` and `--valgrind`. Run `./testsuite/runtests.py --help` for the full list.
+The main controls are `-j`, `--rsync-bin`, `--rsync-bin2`, `--protocol`, `--profiles`, `--use-tcp`, `--daemon-tests-only`, `--race-timeout`, `--receipt`, `--describe-tests` and `--valgrind`. Run `./testsuite/runtests.py --help` for the full list.
 
 ## TCP daemon mode
 
 `--use-tcp` starts unauthenticated test daemons on loopback addresses and some fixtures enable unsafe daemon options. Other local users can reach those listeners, so use the default pipe transport on shared hosts.
+
+`--daemon-tests-only` is for a TCP pass that follows a full pipe pass. It omits tests that cannot observe the transport choice.
 
 ## Results and profiles
 

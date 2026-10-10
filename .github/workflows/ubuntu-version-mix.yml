@@ -58,7 +58,7 @@ jobs:
           profile="peer-${name#rsync_}"
           for transport in pipe tcp; do
             tcp=()
-            [ "$transport" = tcp ] && tcp=(--use-tcp)
+            [ "$transport" = tcp ] && tcp=(--use-tcp --daemon-tests-only)
             echo "::group::$name ($transport): $("$peer" --version | head -1)"
             if ! ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --rsync-bin2="$PWD/$peer" \
                   --profiles="linux,$profile" --receipt="test-results/version-mix/$name-$transport.json" \
