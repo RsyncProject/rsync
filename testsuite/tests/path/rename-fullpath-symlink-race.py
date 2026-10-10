@@ -4,7 +4,8 @@ import os
 import subprocess
 import time
 
-from harness.rsync import race_budget, SCRATCHDIR, rmtree, rsync_argv, test_fail
+from harness.mutation import race_budget
+from harness.rsync import SCRATCHDIR, rmtree, rsync_argv, test_fail
 
 base = SCRATCHDIR / f'rename-fullpath-{os.getpid()}'
 src = base / 'src'

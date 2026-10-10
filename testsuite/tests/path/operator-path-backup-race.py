@@ -4,8 +4,8 @@ import os
 import subprocess
 import time
 
-from harness.rsync import (SCRATCHDIR, find_attacker_uid, race_budget, rmtree, rsync_argv,
-                      start_c_flipper, stop_flipper, test_fail, test_skipped)
+from harness.mutation import find_attacker_uid, race_budget, start_c_flipper, stop_flipper
+from harness.rsync import SCRATCHDIR, rmtree, rsync_argv, test_fail, test_skipped
 
 if os.geteuid() != 0:
     test_skipped('backup parent race requires root', capability='cross_uid')

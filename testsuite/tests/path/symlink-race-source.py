@@ -5,10 +5,8 @@ import platform
 import subprocess
 import time
 
-from harness.rsync import (
-    SCRATCHDIR, race_budget, rmtree, rsync_argv, rsync_supports,
-    start_path_flipper, stop_flipper, test_fail, test_xfail,
-)
+from harness.mutation import race_budget, start_path_flipper, stop_flipper
+from harness.rsync import SCRATCHDIR, rmtree, rsync_argv, rsync_supports, test_fail, test_xfail
 
 _CYGWIN = platform.system().startswith('CYGWIN')
 

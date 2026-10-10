@@ -4,9 +4,9 @@ import os
 import subprocess
 from pathlib import Path
 
+from harness.mutation import find_attacker_uid
 from harness.rsync import (
-    RSYNC, RSYNC_PEER, SCRATCHDIR,
-    find_attacker_uid, require_tcp, rmtree, rsync_argv, rsync_supports,
+    RSYNC, RSYNC_PEER, SCRATCHDIR, require_tcp, rmtree, rsync_argv, rsync_supports,
     start_test_daemon, test_fail, test_skipped, write_daemon_conf,
 )
 

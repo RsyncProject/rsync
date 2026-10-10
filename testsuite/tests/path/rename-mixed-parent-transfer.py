@@ -3,9 +3,10 @@
 import os
 import subprocess
 
+from harness.mutation import find_attacker_uid
 from harness.rsync import (
-    SCRATCHDIR, find_attacker_uid,
-    rmtree, rsync_argv, start_test_daemon, test_fail, test_skipped, write_daemon_conf,
+    SCRATCHDIR, rmtree, rsync_argv, start_test_daemon, test_fail, test_skipped,
+    write_daemon_conf,
 )
 
 if os.geteuid() != 0:

@@ -3,11 +3,9 @@ from __future__ import annotations
 import errno
 import filecmp
 import functools as _functools
-import math
 import os
 import platform
 import re
-import shlex
 import shutil
 import socket as _socket
 import stat
@@ -68,18 +66,6 @@ def under_valgrind():
 
 TLS_ARGS = os.environ.get('TLS_ARGS', '')
 
-_RACE_TIMEOUT_SET = 'race_timeout' in os.environ
-try:
-    RACE_TIMEOUT = float(os.environ.get('race_timeout', '5'))
-except ValueError:
-    RACE_TIMEOUT = 5.0
-    _RACE_TIMEOUT_SET = False
-
-def race_budget(default: float = 5.0) -> float:
-    if _RACE_TIMEOUT_SET and math.isfinite(RACE_TIMEOUT) and RACE_TIMEOUT > 0:
-        return RACE_TIMEOUT
-    return default
-
 all_plus = '+++++++++'
 allspace = '         '
 dots = '.....'
@@ -113,149 +99,6 @@ def forced_protocol():
 def run_rsync(*args: str, check: bool = True,
               capture_output: bool = False) -> subprocess.CompletedProcess:
     return _run_rsync(RSYNC, *args, check=check, capture_output=capture_output)
-
-def start_path_flipper(name_a, name_b):
-    code = (
-        "import os, sys, time\n"
-        "a, b = sys.argv[1], sys.argv[2]\n"
-        "tmp = a + '.flip'\n"
-        "parent = os.getppid()\n"
-        "deadline = time.monotonic() + 300\n"
-        "while os.getppid() == parent and time.monotonic() < deadline:\n"
-        "    try:\n"
-        "        os.rename(a, tmp); os.rename(b, a); os.rename(tmp, b)\n"
-        "    except OSError:\n"
-        "        pass\n"
-    )
-    return subprocess.Popen([sys.executable, '-c', code, str(name_a), str(name_b)])
-
-def stop_flipper(proc):
-    proc.terminate()
-    try:
-        proc.wait(timeout=2)
-    except subprocess.TimeoutExpired:
-        proc.kill()
-        proc.wait()
-
-_C_FLIPPER_SRC = r'''
-/* testsuite flipper: repeatedly swap two sibling names a<->b so a shared path
- * keeps flipping (typically real-dir <-> symlink) under a running rsync.
- * Prefers atomic renameat2(RENAME_EXCHANGE); falls back to a 3-rename dance.
- * Self-terminates when its parent (the test) goes away, plus a deadline
- * backstop, so a killed test never leaks an orphan that poisons later tests.
- * Built on demand by rsync.compile_c_flipper(); not linked into rsync. */
-#define _GNU_SOURCE 1
-#include "config.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <errno.h>
-#include <time.h>
-#include <sys/stat.h>
-#if defined(__linux__)
-# include <sys/syscall.h>
-# ifndef RENAME_EXCHANGE
-#  define RENAME_EXCHANGE (1 << 1)
-# endif
-#endif
-
-static double mono(void) {
-    struct timespec t;
-    clock_gettime(CLOCK_MONOTONIC, &t);
-    return t.tv_sec + t.tv_nsec / 1e9;
-}
-
-static int use_exchange = 1;
-
-static void flip(const char *a, const char *b) {
-#if defined(__linux__) && defined(SYS_renameat2)
-    if (use_exchange) {
-        if (syscall(SYS_renameat2, AT_FDCWD, a, AT_FDCWD, b, RENAME_EXCHANGE) == 0)
-            return;
-        if (errno == ENOSYS || errno == EINVAL || errno == EOPNOTSUPP)
-            use_exchange = 0;   /* kernel or filesystem lacks EXCHANGE */
-        else
-            return;             /* transient race error such as ENOENT: retry */
-    }
-#endif
-    {
-        char tmp[4096];
-        if (snprintf(tmp, sizeof tmp, "%s.flip", a) >= (int)sizeof tmp)
-            return;                 /* too long: don't act on a truncated name */
-        rmdir(tmp); unlink(tmp);    /* clear a stale scratch from a wedged half-swap */
-        if (rename(a, tmp) != 0) {
-            mkdir(a, 0700);         /* a was consumed: recreate so the next loop swaps */
-            return;
-        }
-        if (rename(b, a) != 0)
-            rename(tmp, a);         /* b gone: restore a, retry next loop */
-        else
-            rename(tmp, b);         /* complete the swap */
-    }
-}
-
-int main(int argc, char **argv) {
-    if (argc < 3) {
-        fprintf(stderr, "usage: %s PATH_A PATH_B\n", argv[0]);
-        return 2;
-    }
-    const char *a = argv[1], *b = argv[2];
-    pid_t parent = getppid();
-    double deadline = mono() + 300.0;   /* backstop if never reaped */
-    while (getppid() == parent && mono() < deadline)
-        flip(a, b);
-    return 0;
-}
-'''
-
-_c_flipper_bin = None
-
-def _detect_cc():
-    cc = os.environ.get('CC')
-    if cc:
-        return cc
-    import re
-
-    for d in (TOOLDIR, SRCDIR):
-        mk = d / 'Makefile'
-        if mk.is_file():
-            m = re.search(r'(?m)^CC\s*=\s*(.+?)\s*$', mk.read_text())
-            if m and m.group(1):
-                return m.group(1)
-    for c in ('cc', 'gcc', 'clang'):
-        if shutil.which(c):
-            return c
-    return None
-
-def compile_c_flipper():
-    global _c_flipper_bin
-    if _c_flipper_bin is not None:
-        return _c_flipper_bin or None
-    cc = _detect_cc()
-    src = SCRATCHDIR / 't_flipper.c'
-    out = SCRATCHDIR / ('t_flipper' + ('.exe' if os.name == 'nt' else ''))
-    if not cc:
-        _c_flipper_bin = ''
-        return None
-    src.write_text(_C_FLIPPER_SRC)
-
-    cmd = (shlex.split(cc)
-           + ['-O2', f'-I{TOOLDIR}', f'-I{SRCDIR}', '-o', str(out), str(src)])
-    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                          text=True)
-    if proc.returncode != 0 or not os.access(out, os.X_OK):
-        _c_flipper_bin = ''
-        return None
-    _c_flipper_bin = str(out)
-    return _c_flipper_bin
-
-def start_c_flipper(name_a, name_b):
-    binpath = compile_c_flipper()
-    if binpath:
-        return subprocess.Popen([binpath, str(name_a), str(name_b)])
-    return start_path_flipper(name_a, name_b)
 
 def get_testuid() -> int:
     return os.getuid()
@@ -782,86 +625,6 @@ def build_patched_rsync(name, replacements, append_cflags=None):
             "Tail of build output:\n" + '\n'.join(build.stdout.splitlines()[-20:]),
             capability='native_build')
     return rsync
-
-def find_attacker_uid():
-    import pwd
-    for nm in ('nobody', 'nfsnobody', 'daemon'):
-        try:
-            u = pwd.getpwnam(nm).pw_uid
-        except KeyError:
-            continue
-        if u != 0 and u != os.geteuid():
-            return u
-    return None
-
-def run_symlink_matrix(option, case, *, paths=('abs', 'rel'),
-                       wheres=('leaf', 'parent'), label=''):
-    import re
-    import types
-    tag = option + (f' [{label}]' if label else '')
-    euid = os.geteuid()
-    att = find_attacker_uid() if euid == 0 else None
-    slug = re.sub(r'[^a-z0-9]+', '-', tag.lower()).strip('-')
-
-    for abspath in paths:
-        for where in wheres:
-            for insecure in (False, True):
-                owners = ('self', 'cross') if att is not None else ('self',)
-                for owner in owners:
-                    base = SCRATCHDIR / (f"{slug}-{owner}-{abspath}-{where}-"
-                                         + ('ins' if insecure else 'safe'))
-                    rmtree(base)
-                    base.mkdir(parents=True)
-                    ctx = types.SimpleNamespace(
-                        base=base, outside=base / 'outside', plant=base / 'plant',
-                        owner=owner, att_uid=att, abspath=abspath, where=where,
-                        insecure=insecure)
-                    ctx.outside.mkdir()
-                    ctx.plant.mkdir()
-
-                    def plant_link(at, target, _c=ctx):
-                        os.symlink(target, at)
-                        if _c.owner == 'cross':
-                            os.lchown(at, _c.att_uid, _c.att_uid)
-                    ctx.plant_link = plant_link
-
-                    followed = bool(case(ctx))
-                    expect = insecure or owner == 'self'
-                    cell = f"{abspath} {where} {'insecure' if insecure else 'safe'}"
-                    if followed and not expect:
-                        test_fail(
-                            f"{tag}: CROSS-UID {cell}: the planted symlink was "
-                            "FOLLOWED (op escaped to outside/). An operator path "
-                            "must refuse a symlink not owned by uid 0 or the euid.")
-                    if not followed and expect:
-                        why = ("--insecure-links did not restore symlink following"
-                               if insecure else
-                               "the operator's OWN (euid-owned) symlink was refused")
-                        test_fail(f"{tag}: {('CROSS' if owner=='cross' else 'SAME')}"
-                                  f"-UID {cell}: {why}.")
-    if att is None and euid != 0:
-        print(f"{tag}: same-uid cells confirmed; cross-uid cells need root (skipped)")
-
-def plant_operator_symlink(ctx, rel_anchor, kind='dir'):
-    base = ctx.plant if ctx.abspath == 'abs' else rel_anchor
-    if kind == 'file':
-        victim = ctx.outside / 'victim'
-        if ctx.where == 'leaf':
-            link = base / 'osl'
-            ctx.plant_link(link, victim)
-            return (str(link) if ctx.abspath == 'abs' else 'osl'), victim
-        link = base / 'opd'
-        ctx.plant_link(link, ctx.outside)
-        return ((str(link / 'victim') if ctx.abspath == 'abs' else 'opd/victim'),
-                victim)
-    if ctx.where == 'leaf':
-        link = base / 'osl'
-        ctx.plant_link(link, ctx.outside)
-        return (str(link) if ctx.abspath == 'abs' else 'osl'), ctx.outside
-    link = base / 'opd'
-    ctx.plant_link(link, ctx.outside)
-    return ((str(link / 'sub') if ctx.abspath == 'abs' else 'opd/sub'),
-            ctx.outside / 'sub')
 
 def acls_supported() -> bool:
     vv = run_rsync('-VV', check=True, capture_output=True).stdout

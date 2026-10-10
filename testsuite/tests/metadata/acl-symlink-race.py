@@ -6,11 +6,10 @@ import shutil
 import subprocess
 import time
 
+from harness.mutation import race_budget, start_path_flipper, stop_flipper
 from harness.rsync import (
-    SCRATCHDIR, acl_get, acl_set, race_budget,
-    forced_protocol, get_rootgid, get_rootuid, get_testuid,
-    rmtree, run_rsync, rsync_argv, start_path_flipper, stop_flipper,
-    start_test_daemon, test_fail, test_skipped,
+    SCRATCHDIR, acl_get, acl_set, forced_protocol, get_rootgid, get_rootuid, get_testuid,
+    rmtree, rsync_argv, run_rsync, start_test_daemon, test_fail, test_skipped,
 )
 
 DAEMON_PORT = 12896

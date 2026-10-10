@@ -2,7 +2,8 @@
 
 import subprocess
 
-from harness.rsync import rsync_argv, run_symlink_matrix, plant_operator_symlink
+from harness.mutation import plant_operator_symlink, run_symlink_matrix
+from harness.rsync import rsync_argv
 
 NFILES = 6
 

@@ -4,10 +4,8 @@ import os
 import subprocess
 import time
 
-from harness.rsync import (
-    SCRATCHDIR, race_budget, rmtree, rsync_argv, rsync_supports,
-    start_path_flipper, stop_flipper, test_fail,
-)
+from harness.mutation import race_budget, start_path_flipper, stop_flipper
+from harness.rsync import SCRATCHDIR, rmtree, rsync_argv, rsync_supports, test_fail
 
 MARKER = "XFIL-OUTSIDE-SYMLINK-TARGET-do-not-copy"
 NKEEP = 64

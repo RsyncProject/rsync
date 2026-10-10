@@ -5,9 +5,9 @@ import platform
 import subprocess
 import time
 
+from harness.mutation import race_budget
 from harness.rsync import (
-    race_budget, SCRATCHDIR, rmtree, rsync_argv, test_fail, test_skipped,
-    xattr_set, xattrs_supported,
+    SCRATCHDIR, rmtree, rsync_argv, test_fail, test_skipped, xattr_set, xattrs_supported,
 )
 
 MARKER = 'user.marker'
