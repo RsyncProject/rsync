@@ -171,7 +171,7 @@ if not files_from:
     # window may never be hit within the budget.  Can't mount the attack here, so
     # there's nothing to assert -- skip rather than fail.
     test_skipped("race did not produce a root-owned backup symlink (no atomic flipper?)",
-                 capability='cross_uid')
+                 capability='atomic_flipper')
 
 # Non-vacuous GREEN precondition: the symlink we exploit must genuinely target a
 # secret OUTSIDE the module, so marker-absence proves module-root confinement
