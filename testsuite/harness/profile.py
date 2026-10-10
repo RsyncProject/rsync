@@ -56,7 +56,7 @@ def parse_peer_banner(text):
 def merge_profiles(profiles):
     peer = None
     protocol = None
-    unsupported = {}
+    unsupported = set()
     xfail = {}
     for profile in profiles:
         if profile.peer:
@@ -67,10 +67,7 @@ def merge_profiles(profiles):
             if protocol and protocol != profile.protocol:
                 raise ValueError(f'conflicting protocols: {protocol}, {profile.protocol}')
             protocol = profile.protocol
-        for capability, reason in profile.unsupported.items():
-            if capability in unsupported and unsupported[capability] != reason:
-                raise ValueError(f'{capability}: conflicting unsupported reasons')
-            unsupported[capability] = reason
+        unsupported.update(profile.unsupported)
         for test, reason in profile.xfail.items():
             if test in xfail and xfail[test] != reason:
                 raise ValueError(f'{test}: conflicting xfail reasons')
