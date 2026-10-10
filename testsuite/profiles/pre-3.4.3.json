@@ -1,0 +1,7 @@
+{
+  "xfail": {
+    "alt-dest-symlink-race": "pre-3.4.3",
+    "chdir-symlink-race": "pre-3.4.3",
+    "sender-flist-symlink-leak": "pre-3.4.3"
+  }
+}

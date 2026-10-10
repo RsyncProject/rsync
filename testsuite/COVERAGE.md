@@ -9,11 +9,11 @@ Path depth is deep, shallow, untested or N/A. Auxiliary tree is outside, inside 
 Option | Tests | Path depth | Auxiliary tree | Coverage
 --- | --- | --- | --- | ---
 -a, --archive | many | deep | N/A | Covered throughout the suite
--r, --recursive | hands, delete-deep | deep | N/A | Covered
--R, --relative | relative, relative-implied | deep | N/A | Covered with implied-directory attributes
+-r, --recursive | basic-transfer, delete-deep | deep | N/A | Covered
+-R, --relative | relative-paths, relative-implied | deep | N/A | Covered with implied-directory attributes
 --no-implied-dirs | relative-implied | deep | N/A | Covered for protocol 30 and later; protocol 29 rejects the multi-component case
 --inc-recursive, --no-inc-recursive, --no-i-r | hardlinks | deep | N/A | Partial: exercised but not isolated
--d, --dirs | dirs | deep | N/A | Covered without recursion
+-d, --dirs | nonrecursive-directories | deep | N/A | Covered without recursion
 --old-dirs, --old-d | old-dirs | shallow | N/A | Covered in both mixed-version remote directions
 -m, --prune-empty-dirs | prune-empty-dirs | deep | N/A | Covered with filter-emptied chains
 
@@ -26,10 +26,10 @@ Option | Tests | Path depth | Auxiliary tree | Coverage
 -k, --copy-dirlinks | links | deep | N/A | Covered
 -K, --keep-dirlinks | symlink-dirlink-basis | deep | N/A | Covered for issue 715; unavailable without the secure path resolver
 -H, --hard-links | hardlinks, hardlinks-deep | deep | outside | Covered across directories
---copy-unsafe-links | unsafe-links | shallow | N/A | Partial
+--copy-unsafe-links | safe-links | shallow | N/A | Partial
 --safe-links | safe-links | shallow | N/A | Partial
 --insecure-links | operator-path tests, insecure-links-admin-optout | deep | N/A | Covered for the local opt-out and daemon refusal
---confine-root | files-from-leak, relative-source-ancestor, rrsync-merge-file-confine | deep | N/A | Covered for direct arguments, files-from and restricted shells
+--confine-root | filter-file-confinement, relative-source-ancestor, rrsync-merge-file-confine | deep | N/A | Covered for direct arguments, files-from and restricted shells
 --munge-links | daemon-munge | N/A | N/A | Partial: daemon behaviour is covered but the client option is not isolated
 
 ## Metadata, permissions and ownership
@@ -69,7 +69,7 @@ Option | Tests | Path depth | Auxiliary tree | Coverage
 --inplace | inplace, alt-dest | deep | inside only | Covered with inode preservation
 --append, --append-verify | append | deep | inside only | Covered; the verification split needs protocol 30 or later
 -b, --backup, --backup-dir, --suffix | backup, backup-deep | deep | outside | Covered
---compare-dest, --copy-dest, --link-dest | alt-dest, alt-dest-deep | deep | outside | Covered for skip, copy and hard-link behaviour
+--compare-dest, --copy-dest, --link-dest | alt-dest, alt-dest-deep, alt-dest-module-escape, operator-path-alt-dest | deep | outside | Covered for skip, copy, hard-link and confinement behaviour
 -y, --fuzzy | fuzzy | shallow | N/A | Partial
 -u, --update | update | deep | N/A | Covered for newer and older destinations
 -W, --whole-file, --no-whole-file | many | N/A | N/A | Partial: widely exercised but not isolated
@@ -84,7 +84,7 @@ Option | Tests | Path depth | Auxiliary tree | Coverage
 
 Option | Tests | Path depth | Auxiliary tree | Coverage
 --- | --- | --- | --- | ---
--f, --filter, -F | filter-depth, merge | deep | N/A | Covered for deep per-directory merges
+-f, --filter, -F | filter-depth, multiple-sources | deep | N/A | Covered for deep per-directory merges
 --exclude, --include | filter-depth, exclude, exclude-lsh | deep | N/A | Covered
 --exclude-from, --include-from | files-from-depth | deep | N/A | Covered
 -C, --cvs-exclude | cvs-exclude | deep | N/A | Covered with nested .cvsignore
@@ -111,12 +111,12 @@ Option | Tests | Path depth | Auxiliary tree | Coverage
 
 Option | Tests | Path depth | Auxiliary tree | Coverage
 --- | --- | --- | --- | ---
--c, --checksum | compare | deep | N/A | Covered for same-metadata content changes
--I, --ignore-times | compare | deep | N/A | Covered
---size-only | compare | deep | N/A | Covered
--@, --modify-window | compare | deep | N/A | Covered
+-c, --checksum | comparison-options | deep | N/A | Covered for same-metadata content changes
+-I, --ignore-times | comparison-options | deep | N/A | Covered
+--size-only | comparison-options | deep | N/A | Covered
+-@, --modify-window | comparison-options | deep | N/A | Covered
 --checksum-choice, --checksum-seed | compress-options | deep | N/A | Covered for advertised algorithms
--z, --compress | daemon-gzip-download, daemon-gzip-upload, daemon-refuse-compress | shallow | N/A | Partial
+-z, --compress | daemon-gzip, daemon-refuse-compress | shallow | N/A | Partial
 --compress-choice, --compress-level, --skip-compress | compress-options | deep | N/A | Covered
 --compress-threads | daemon-refuse-compress-threads-alias, daemon-zstd-thread-exhaustion | N/A | N/A | Partial: refusal and the daemon worker limit are covered
 
@@ -163,14 +163,14 @@ Option | Tests | Coverage
 
 Parameter | Tests | Coverage
 --- | --- | ---
-path | daemon-access and daemon tests | Covered with nested paths
-read only | daemon-access, daemon | Covered
+path | daemon-access and daemon-basics | Covered with nested paths
+read only | daemon-access, daemon-basics | Covered
 write only | daemon-access | Covered
-list | daemon-access, daemon | Covered for hidden but usable modules
+list | daemon-access, daemon-basics | Covered for hidden but usable modules
 use chroot | sender-flist-symlink-leak, daemon-chroot-acl | Partial: the enabled case needs root
 insecure links | insecure-links-admin-optout, daemon-symlink-escape-matrix | Covered for the administrative opt-out
 munge symlinks | daemon-munge | Covered for prefix addition and removal
-exclude, include | daemon-filter, daemon | Covered for exclusion
+exclude, include | daemon-filter, daemon-basics | Covered for exclusion
 filter, exclude from, include from | none | Missing as daemon parameters
 incoming chmod | daemon-filter, chmod-option | Covered
 outgoing chmod | daemon-filter | Covered
@@ -180,15 +180,15 @@ strict modes | daemon-auth | Covered for unsafe secrets-file modes
 refuse options | daemon-refuse, daemon-refuse-compress | Covered for names, wildcards and allow lists
 pre-xfer exec, post-xfer exec | daemon-exec | Covered for environment and abort behaviour
 early exec | daemon-early-exec-nameconv | Covered for environment and early input
-hosts allow, hosts deny | daemon, daemon-chroot-acl | Partial: a real TCP peer is required
+hosts allow, hosts deny | daemon-basics, daemon-chroot-acl | Partial: a real TCP peer is required
 reverse lookup, forward lookup | daemon-chroot-acl | Partial: reverse lookup only
-log file, transfer logging, log format | daemon | Partial: configured but not asserted
-max verbosity | daemon | Partial
-comment | daemon, daemon-access | Covered
+log file, transfer logging, log format | daemon-basics | Partial: configured but not asserted
+max verbosity | daemon-basics | Partial
+comment | daemon-basics, daemon-access | Covered
 numeric ids | daemon-early-exec-nameconv, daemon-namecvt tests | Covered for numeric ids = no
 fake super | chown-fake, daemon-namecvt-empty-response | Covered
 timeout | daemon-handshake-timeout | Covered with zero and precedence
-max connections, lock file | daemon-include-maxconn, daemon-connection-limits | Covered for refusal and slot reuse
+max connections, lock file | daemon-connection-limits | Covered for refusal and slot reuse
 temp dir, open noatime, ignore errors, ignore nonreadable | iconv | Partial: ignore errors is asserted
 charset | iconv | Covered for module override of the remote charset
 name converter | daemon-early-exec-nameconv, daemon-namecvt tests | Covered for success, empty and malformed responses

@@ -45,7 +45,7 @@ test improvements.
 
 ### BUILD AND TESTS:
 - `install-strip` now honours `STRIP` including during cross-compilation.
-- Updated platform tests and fleet-test coverage for the 3.5.0 fixes.
+- Updated platform tests for the 3.5.0 fixes.
 
 ------------------------------------------------------------------------------
 # NEWS for rsync 3.5.0 (13 Aug 2026)

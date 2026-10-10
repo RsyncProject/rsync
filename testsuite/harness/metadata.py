@@ -6,18 +6,12 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Callable, Iterable, Optional
 
-
-_TEST_SUFFIX = '_test.py'
-
-
 @dataclass(frozen=True)
 class Requirements:
     features: tuple[str, ...] = ()
     protocols: tuple[int, ...] = ()
     transports: tuple[str, ...] = ()
     min_peer: Optional[str] = None
-    root: Optional[bool] = None
-    parallel: bool = True
     cost: str = 'normal'
     mutates: tuple[str, ...] = ()
     tags: tuple[str, ...] = ()
@@ -33,11 +27,8 @@ class Requirements:
         if self.min_peer is not None and (not isinstance(self.min_peer, str)
                                           or not re.fullmatch(r'\d+(?:\.\d+)+', self.min_peer)):
             raise ValueError('invalid minimum peer')
-        if (self.root is not None and not isinstance(self.root, bool)) or not isinstance(self.parallel, bool):
-            raise ValueError('invalid execution requirement')
         if self.cost not in ('normal', 'expensive', 'stress'):
             raise ValueError('invalid cost')
-
 
 def _ordered(values: Iterable) -> tuple:
     if not isinstance(values, (tuple, list, set, frozenset)):
@@ -47,18 +38,15 @@ def _ordered(values: Iterable) -> tuple:
     except TypeError as error:
         raise ValueError('metadata collection values must share a type') from error
 
-
-def _requirements(*, features=(), protocols=(), transports=(), min_peer=None, root=None,
-                  parallel=True, cost='normal', mutates=(), tags=()):
+def metadata(*, features=(), protocols=(), transports=(), min_peer=None,
+             cost='normal', mutates=(), tags=()):
     return Requirements(_ordered(features), _ordered(protocols), _ordered(transports), min_peer,
-                        root, parallel, cost, _ordered(mutates), _ordered(tags))
+                        cost, _ordered(mutates), _ordered(tags))
 
-
-def requires(*, features=(), protocols=(), transports=(), min_peer=None, root=None,
-             parallel=True, cost='normal', mutates=(), tags=()):
-    requirements = _requirements(features=features, protocols=protocols, transports=transports,
-                                 min_peer=min_peer, root=root, parallel=parallel, cost=cost,
-                                 mutates=mutates, tags=tags)
+def requires(*, features=(), protocols=(), transports=(), min_peer=None,
+             cost='normal', mutates=(), tags=()):
+    requirements = metadata(features=features, protocols=protocols, transports=transports,
+                            min_peer=min_peer, cost=cost, mutates=mutates, tags=tags)
 
     def decorate(function: Callable) -> Callable:
         function.__test_requirements__ = requirements
@@ -66,18 +54,9 @@ def requires(*, features=(), protocols=(), transports=(), min_peer=None, root=No
 
     return decorate
 
-
-def metadata(*, features=(), protocols=(), transports=(), min_peer=None, root=None,
-             parallel=True, cost='normal', mutates=(), tags=()):
-    return _requirements(features=features, protocols=protocols, transports=transports,
-                         min_peer=min_peer, root=root, parallel=parallel, cost=cost,
-                         mutates=mutates, tags=tags)
-
-
 def describe(function: Callable) -> dict:
     requirements = getattr(function, '__test_requirements__', Requirements())
     return asdict(requirements)
-
 
 def placeholder_target(path):
     path = Path(path)
@@ -87,22 +66,20 @@ def placeholder_target(path):
         name = path.read_text(encoding='utf-8').strip()
     except (OSError, UnicodeError):
         return None
-    if not name.endswith('_test.py') or Path(name).name != name or name == path.name:
+    if not name.endswith('.py') or Path(name).name != name or name == path.name:
         return None
     target = path.with_name(name)
     return target if target.is_file() else None
 
-
 def test_name(path) -> str:
     name = Path(path).name
-    if not name.endswith(_TEST_SUFFIX):
+    if not name.endswith('.py'):
         raise ValueError(f'{path}: not a test script')
-    return name[:-len(_TEST_SUFFIX)]
-
+    return Path(name).stem
 
 def discover_tests(directory) -> list[Path]:
     directory = Path(directory)
-    paths = sorted(path for path in directory.rglob(f'*{_TEST_SUFFIX}') if not path.is_dir())
+    paths = sorted(path for path in directory.rglob('*.py') if not path.is_dir())
     names = {}
     for path in paths:
         name = test_name(path)
@@ -110,7 +87,6 @@ def discover_tests(directory) -> list[Path]:
             raise ValueError(f'duplicate test name {name!r}: {names[name]} and {path}')
         names[name] = path
     return [names[name] for name in sorted(names)]
-
 
 def resolve_test_path(path):
     path = Path(path)
@@ -129,7 +105,6 @@ def resolve_test_path(path):
         if not target:
             return path
         path = target
-
 
 def read_requirements(path) -> Optional[dict]:
     path = resolve_test_path(path)
@@ -178,7 +153,6 @@ def read_requirements(path) -> Optional[dict]:
     values = asdict(requirements or Requirements())
     values['features'] = tuple(sorted(features))
     return values
-
 
 def applies_to_peer(requirements, peer, protocol, transport=None):
     if not requirements or 'version-mix' not in requirements['tags']:

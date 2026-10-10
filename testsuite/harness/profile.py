@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-
 @dataclass(frozen=True)
 class Profile:
     name: str
@@ -15,15 +14,13 @@ class Profile:
     unsupported: dict
     xfail: dict
 
-
-def _strings(path, field, values):
+def _mapping(path, field, values):
     if not isinstance(values, dict):
         raise ValueError(f'{path}: invalid {field}')
     if not all(isinstance(key, str) and key and isinstance(value, str) and value
                for key, value in values.items()):
         raise ValueError(f'{path}: invalid {field}')
     return dict(values)
-
 
 def load_profile(path, tests):
     path = Path(path)
@@ -42,13 +39,12 @@ def load_profile(path, tests):
         raise ValueError(f'{path}: peer profile requires protocol')
     if peer is not None and path.stem != f'peer-{peer}':
         raise ValueError(f'{path}: peer does not match profile name')
-    unsupported = _strings(path, 'unsupported', data.get('unsupported', {}))
-    xfail = _strings(path, 'xfail', data.get('xfail', {}))
+    unsupported = _mapping(path, 'unsupported', data.get('unsupported', {}))
+    xfail = _mapping(path, 'xfail', data.get('xfail', {}))
     unknown = set(xfail) - set(tests)
     if unknown:
         raise ValueError(f'{path}: unknown tests: {", ".join(sorted(unknown))}')
     return Profile(path.stem, peer, protocol, unsupported, xfail)
-
 
 def parse_peer_banner(text):
     match = re.search(r'^rsync\s+version\s+(\d+(?:\.\d+)+)(?:-\S+)?\s+protocol\s+version\s+(\d+)\s*$',
@@ -56,7 +52,6 @@ def parse_peer_banner(text):
     if not match:
         raise ValueError('invalid rsync version banner')
     return match.group(1), int(match.group(2))
-
 
 def merge_profiles(profiles):
     peer = None

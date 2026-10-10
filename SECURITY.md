@@ -386,7 +386,7 @@ The following are documented as out of scope for this release:
   sender's content open), because the descriptor is not bound to the original
   inode.  The parent-component symlink-race tests are therefore not enforced on
   Cygwin (see the `cygwin` test profile and the Cygwin-only xfail in
-  `symlink-race-source_test.py`).  Cygwin is a
+  `symlink-race-source.py`).  Cygwin is a
   development/interoperability target, not a privilege boundary host, so this is
   accepted for this release.
 

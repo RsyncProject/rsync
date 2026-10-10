@@ -2,12 +2,8 @@
   "peer": "3.2.0",
   "protocol": 31,
   "xfail": {
-    "alt-dest-symlink-race": "pre-hardening",
-    "chdir-symlink-race": "pre-hardening",
     "chmod-option": "peer-feature-gap",
-    "copy-dest-source-symlink": "pre-hardening",
-    "daemon": "peer-feature-gap",
-    "daemon-refuse-compress": "peer-feature-gap",
-    "sender-flist-symlink-leak": "pre-hardening"
+    "daemon-basics": "peer-feature-gap",
+    "daemon-refuse-compress": "peer-feature-gap"
   }
 }
