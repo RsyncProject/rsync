@@ -4,12 +4,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
-# Static-check the workflow YAML with rhysd/actionlint.  Catches missing
-# secrets, bad expressions, expression-type errors, unsupported runner
-# images, and (via embedded shellcheck) common pitfalls in `run:` scripts.
-# Trigger only on changes under .github/workflows/ so the rest of the
-# matrix isn't billed when nothing here moves.
-
 on:
   push:
     branches: [ master ]

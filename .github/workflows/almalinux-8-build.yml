@@ -4,12 +4,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
-# Older-LTS coverage on the Fedora/RHEL family to help with backporting
-# security fixes. AlmaLinux 8 is the RHEL 8 rebuild and is the oldest
-# active LTS in this family (RHEL 8 full support runs to 2029).
-# GitHub Actions has no native runner for this family, so the job runs
-# inside an almalinux:8 container hosted on ubuntu-latest.
-
 on:
   push:
     branches: [ master ]
@@ -36,19 +30,14 @@ jobs:
     name: Test rsync on AlmaLinux 8
     steps:
     - name: install git
-      # actions/checkout needs git in the container before the checkout step.
       run: dnf -y install git
     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       with:
         fetch-depth: 0
         persist-credentials: false
     - name: prep
-      # PowerTools is needed for libzstd-devel etc; xxhash and lz4 dev
-      # headers live in EPEL on RHEL 8. The default python3 on RHEL 8
-      # is 3.6, which is too old for runtests.py (uses capture_output=
-      # / text= introduced in 3.7), so install python39 and point
-      # /usr/bin/python3 at it.
       run: |
+        # RHEL 8's default Python is too old for the test runner
         dnf -y install epel-release
         dnf config-manager --set-enabled powertools
         dnf -y install gcc gcc-c++ make autoconf automake m4 \
@@ -68,13 +57,8 @@ jobs:
     - name: info
       run: ./rsync --version
     - name: check
-      # In the container we already run as root, so no sudo. The
-      # crtimes remains unsupported as on the other Linux jobs;
-      # daemon-chroot-acl and proxy-response-line-too-long skip because
-      # the default (secure) transport opens no listening socket.
       run: RSYNC_TEST_PROFILES=pipe,non-asan,root,self-peer,linux,no-zstd-threads make check
     - name: check (TCP daemon transport)
-      # Second run exercising the real loopback-TCP daemon path.
       run: RSYNC_TEST_PROFILES=non-asan,root,self-peer,linux,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp --daemon-tests-only -j 8
     - name: ssl file list
       run: ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true

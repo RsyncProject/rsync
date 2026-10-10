@@ -43,11 +43,6 @@ jobs:
       run: make
     - name: info
       run: rsync --version
-    # Two coverage runs: the default pipe transport, then a second pass over a
-    # real loopback rsyncd (--use-tcp) which also exercises the require_tcp-only
-    # tests. gcovr's --print-summary line/branch/decision totals go to the step
-    # log (and the job summary below), so the numbers are visible in CI.
-    # `make coverage` exits with the suite's status, so a regression fails CI.
     - name: coverage (pipe transport)
       run: |
         set -o pipefail
