@@ -7,10 +7,8 @@ import time
 import filecmp
 import sys
 
-from harness.rsync import (
-    SCRATCHDIR, race_budget, find_attacker_uid,
-    rmtree, rsync_argv, test_fail, test_skipped,
-)
+from harness.mutation import find_attacker_uid, race_budget
+from harness.rsync import SCRATCHDIR, rmtree, rsync_argv, test_fail, test_skipped
 
 if os.geteuid() != 0:
     test_skipped("requires root to plant a temp-dir symlink owned by a non-self uid",

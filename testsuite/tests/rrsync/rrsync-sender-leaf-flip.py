@@ -5,10 +5,10 @@ import shlex
 import subprocess
 import time
 
+from harness.mutation import race_budget, start_path_flipper, stop_flipper
 from harness.rsync import (
-    race_budget, RSYNC, SCRATCHDIR, makepath, patched_rrsync,
-    proc_self_fd_pins, rmtree, rsync_argv, start_path_flipper, stop_flipper,
-    test_fail, test_skipped, rsync_path_arg,
+    RSYNC, SCRATCHDIR, makepath, patched_rrsync, proc_self_fd_pins, rmtree, rsync_argv,
+    rsync_path_arg, test_fail, test_skipped,
 )
 
 if not proc_self_fd_pins():

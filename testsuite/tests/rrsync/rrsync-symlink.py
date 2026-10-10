@@ -4,9 +4,9 @@ import os
 import subprocess
 import time
 
+from harness.mutation import race_budget, start_path_flipper, stop_flipper
 from harness.rsync import (
-    race_budget, SCRATCHDIR, patched_rrsync, proc_self_fd_pins, rmtree,
-    start_path_flipper, stop_flipper, test_fail, test_skipped,
+    SCRATCHDIR, patched_rrsync, proc_self_fd_pins, rmtree, test_fail, test_skipped,
 )
 
 if not proc_self_fd_pins():

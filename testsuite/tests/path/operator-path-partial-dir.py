@@ -3,7 +3,8 @@
 import os
 import subprocess
 
-from harness.rsync import rsync_argv, run_symlink_matrix, plant_operator_symlink
+from harness.mutation import plant_operator_symlink, run_symlink_matrix
+from harness.rsync import rsync_argv
 
 PINNED = 1000000000
 
@@ -35,8 +36,8 @@ def case_reuse(ctx):
     _run(ctx, opt)
     return escape.stat().st_mtime != pinned
 
-run_symlink_matrix('--partial-dir', case_create, paths=('abs',), wheres=('parent',),
+run_symlink_matrix('--partial-dir', case_create, paths=('abs',), locations=('parent',),
                    label='create')
-run_symlink_matrix('--partial-dir', case_reuse, paths=('abs',), wheres=('parent',),
+run_symlink_matrix('--partial-dir', case_reuse, paths=('abs',), locations=('parent',),
                    label='reuse')
 print("--partial-dir symlink policy (abs, parent; create + reuse): enforced")

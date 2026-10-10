@@ -4,9 +4,9 @@ import os
 import subprocess
 import time
 
+from harness.mutation import find_attacker_uid, race_budget, start_c_flipper, stop_flipper
 from harness.rsync import (
-    SCRATCHDIR, race_budget, find_attacker_uid, rmtree, rsync_argv,
-    start_c_flipper, stop_flipper, test_fail, test_skipped, start_test_daemon,
+    SCRATCHDIR, rmtree, rsync_argv, start_test_daemon, test_fail, test_skipped,
     write_daemon_conf,
 )
 

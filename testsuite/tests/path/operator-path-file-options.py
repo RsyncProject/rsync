@@ -2,7 +2,8 @@
 
 import subprocess
 
-from harness.rsync import plant_operator_symlink, rsync_argv, run_symlink_matrix
+from harness.mutation import plant_operator_symlink, run_symlink_matrix
+from harness.rsync import rsync_argv
 
 def check(option):
     def case(context):

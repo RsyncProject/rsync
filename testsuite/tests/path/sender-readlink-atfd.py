@@ -4,10 +4,9 @@ import os
 import subprocess
 import time
 
+from harness.mutation import race_budget, start_path_flipper, stop_flipper
 from harness.rsync import (
-    race_budget, SCRATCHDIR, rmtree, rsync_argv,
-    start_path_flipper, start_test_daemon, stop_flipper, test_fail,
-    write_daemon_conf,
+    SCRATCHDIR, rmtree, rsync_argv, start_test_daemon, test_fail, write_daemon_conf,
 )
 
 base = SCRATCHDIR / 'sender-readlink'
