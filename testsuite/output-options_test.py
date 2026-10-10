@@ -144,6 +144,20 @@ if 'Total file size: 1,000 bytes' not in below_threshold:
     test_fail("-hh should preserve raw byte formatting below the binary-unit "
               f"threshold:\n{below_threshold}")
 
+# File-list counts are grouped like other counts, and never get a unit suffix.
+rmtree(src)
+rmtree(TODIR)
+makepath(src)
+for i in range(999):
+    (src / f'f{i}').touch()
+counts = out('-a', '-hh', '--progress', '--no-i-r', f'{src}/', f'{TODIR}/').stdout
+if '1,000 files to consider' not in counts:
+    test_fail(f"file-list count was not grouped:\n{counts}")
+rmtree(TODIR)
+counts = out('-a', '--no-h', '--progress', '--no-i-r', f'{src}/', f'{TODIR}/').stdout
+if '1000 files to consider' not in counts:
+    test_fail(f"--no-h file-list count was not plain digits:\n{counts}")
+
 # --- -8 / --8-bit-output leaves high-bit filename bytes unescaped ------------
 # rsync escapes non-printable name bytes as \#NNN; -8 prints 8-bit bytes raw.
 # This needs a filename containing a high-bit byte and a C locale (where such a

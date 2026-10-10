@@ -187,7 +187,7 @@ static void emit_filelist_progress(int count)
 		return;
 	if (output_needs_newline == 2) /* avoid a newline in the middle of this filelist-progress output */
 		output_needs_newline = 0;
-	rprintf(FCLIENT, " %d files...", count);
+	rprintf(FCLIENT, " %s files...", comma_num(count));
 	rput_progress();
 	output_needs_newline = 2;
 }
@@ -203,8 +203,8 @@ static void finish_filelist_progress(const struct file_list *flist)
 	output_needs_newline = 0;
 	if (INFO_GTE(FLIST, 2)) {
 		/* This overwrites the progress line */
-		rprintf(FINFO, "%d file%sto consider\n",
-			flist->used, flist->used == 1 ? " " : "s ");
+		rprintf(FINFO, "%s file%sto consider\n",
+			comma_num(flist->used), flist->used == 1 ? " " : "s ");
 	} else {
 		rprintf(FINFO, "done\n");
 	}

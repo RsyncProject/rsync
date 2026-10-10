@@ -3621,6 +3621,9 @@ sign) if you want the local shell to expand it.
     523M -> 1.24G -> ...).
     Additionally an `i` is appended in level-3 to indicate the binary base.
     The same file would output as 1.17Mi in level-3.
+    Counts, such as the number of files, never get a unit suffix: in levels 2
+    and 3 they are shown as in level 1 (for example: 523,297,101 files to
+    consider).
 
     Backward compatibility note: versions of rsync prior to 3.1.0 (September 2013) do not
     support human-readable level 1, and they default to level 0.  Thus,

@@ -2905,8 +2905,8 @@ void generate_files(int f_out, const char *local_name)
 
 	if (max_delete >= 0 && skipped_deletes) {
 		rprintf(FWARNING,
-			"Deletions stopped due to --max-delete limit (%d skipped)\n",
-			skipped_deletes);
+			"Deletions stopped due to --max-delete limit (%s skipped)\n",
+			comma_num(skipped_deletes));
 		io_error |= IOERR_DEL_LIMIT;
 	}
 

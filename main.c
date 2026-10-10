@@ -762,7 +762,7 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 		if (ret && (INFO_GTE(NAME, 1) || stdout_format_has_i)) {
 			if (cp && (file_total == 1 || trailing_slash))
 				*cp = '\0';
-			rprintf(FINFO, "created %d director%s for %s\n", ret, ret == 1 ? "y" : "ies", dest_path);
+			rprintf(FINFO, "created %s director%s for %s\n", comma_num(ret), ret == 1 ? "y" : "ies", dest_path);
 			if (cp && (file_total == 1 || trailing_slash))
 				*cp = '/';
 		}
