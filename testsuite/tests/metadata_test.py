@@ -45,8 +45,9 @@ def test(context: TestContext):
 
     inferred = context.scratch / 'inferred_test.py'
     inferred.write_text("require_tcp('tcp')\nrequire_asan('asan')\n"
+                        "setup_chroot_inner('chroot')\n"
                         "test_skipped('root', capability='nonroot')\n")
-    if read_requirements(inferred)['features'] != ('asan', 'nonroot', 'tcp'):
+    if read_requirements(inferred)['features'] != ('asan', 'chroot', 'nonroot', 'root', 'tcp'):
         test_fail('capability metadata was not inferred')
 
     invalid_capability = context.scratch / 'invalid_capability_test.py'

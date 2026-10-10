@@ -513,7 +513,10 @@ def build_rsync_cmd(rsync_bin, args, scratchbase):
         vopts = f'--log-file={vlog}'
         supp = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'valgrind.supp')
         if os.path.exists(supp):
-            vopts += f' --suppressions={supp}'
+            local_supp = os.path.join(vgdir, 'valgrind.supp')
+            shutil.copyfile(supp, local_supp)
+            os.chmod(local_supp, 0o644)
+            vopts += f' --suppressions={local_supp}'
         if args.valgrind_opts:
             vopts += ' ' + args.valgrind_opts
         parts.append(f'valgrind {vopts}')

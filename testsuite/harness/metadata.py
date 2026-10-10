@@ -138,7 +138,7 @@ def read_requirements(path) -> Optional[dict]:
         elif node.func.id == 'require_asan':
             features.add('asan')
         elif node.func.id == 'setup_chroot_inner':
-            features.add('root')
+            features.update(('chroot', 'root'))
         elif node.func.id == 'build_patched_rsync':
             features.add('native_build')
         elif node.func.id == 'test_skipped':
