@@ -5,9 +5,10 @@ import importlib.util
 import json
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 import fleettest
-from rsyncfns import SRCDIR, test_fail
+from rsyncfns import SCRATCHDIR, SRCDIR, test_fail
 
 SRC = Path(SRCDIR).resolve()
 fleettest.REPO = SRC
@@ -90,6 +91,14 @@ for path in workflows:
         actual = {frozenset(value.split(',')) for value in matrix_profiles}
         if actual != VALGRIND_PROFILES:
             test_fail('valgrind.yml: incomplete profile matrix')
+        workflow = '\n'.join(lines)
+        if ('VALGRIND_SCRATCH: /tmp/' not in workflow
+                or 'scratchbase="$VALGRIND_SCRATCH"' not in workflow):
+            test_fail('valgrind.yml: scratch is not accessible after dropping privileges')
+        if 'find testtmp' in workflow or 'testtmp/**/' in workflow:
+            test_fail('valgrind.yml: evidence collection traverses test fixtures')
+        if 'test-results/valgrind-logs/*.log' not in workflow:
+            test_fail('valgrind.yml: logs are not staged for artefact upload')
         if not any('--receipt=' in line for line in lines):
             test_fail('valgrind.yml: profile receipts are not written')
         if not any('if: always()' in line for line in lines):
@@ -118,6 +127,13 @@ for path in workflows:
 
 if workflows and not references:
     test_fail('no workflow profile references found')
+
+valgrind_scratch = SCRATCHDIR / 'valgrind-command'
+valgrind_args = SimpleNamespace(valgrind=True, valgrind_opts='', protocol=None)
+valgrind_cmd = runtests.build_rsync_cmd('/tmp/rsync', valgrind_args, str(valgrind_scratch))
+local_supp = valgrind_scratch / 'valgrind-logs' / 'valgrind.supp'
+if not local_supp.is_file() or f'--suppressions={local_supp}' not in valgrind_cmd:
+    test_fail('valgrind suppression file is not available to dropped processes')
 
 receipt = {
     'schema': 1,

@@ -28,12 +28,15 @@ import subprocess
 from rsyncfns import (
     SCRATCHDIR, FROMDIR,
     claim_ports, get_rootuid, get_testuid, make_tree, makepath, require_tcp,
-    rmtree, rsync_argv, start_test_daemon, test_fail, test_skipped,
+    rmtree, rsync_argv, start_test_daemon, test_fail, test_skipped, under_valgrind,
     write_daemon_conf,
 )
 
 if get_testuid() != get_rootuid():
     test_skipped("use chroot = yes needs root (CAP_SYS_CHROOT)", capability='root')
+if under_valgrind():
+    test_skipped("per-process Valgrind logs are outside the daemon chroot",
+                 capability='chroot')
 
 # Probe chroot() directly so a rootless/seccomp'd container that maps uid 0
 # but withholds CAP_SYS_CHROOT skips cleanly instead of failing.
