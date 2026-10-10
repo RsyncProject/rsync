@@ -3,12 +3,18 @@
 
 import json
 
-from harness import Exit, Outcome, TestContext, TestResult, requires, run, verdict_of, write_receipt
-from rsyncfns import test_fail
+from harness import (Exit, Outcome, TestContext, TestResult, requires, run, test_fail, test_skipped,
+                     test_xfail, verdict_of, write_receipt)
+from rsyncfns import test_fail as legacy_test_fail
+from rsyncfns import test_skipped as legacy_test_skipped
+from rsyncfns import test_xfail as legacy_test_xfail
 
 
 @requires(protocols={27, 28, 29, 30, 31, 32, 33}, transports={'pipe'}, min_peer='2.6.0', tags={'harness'})
 def test(context: TestContext):
+    if (legacy_test_fail, legacy_test_skipped, legacy_test_xfail) != (test_fail, test_skipped, test_xfail):
+        test_fail('legacy result helpers are not harness exports')
+
     cases = (
         (Exit.PASS, '', Outcome.PASS), (Exit.FAIL, '', Outcome.FAIL),
         (Exit.ERROR, '', Outcome.ERROR), (Exit.SKIP, '', Outcome.SKIP),

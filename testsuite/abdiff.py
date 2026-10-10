@@ -13,7 +13,7 @@ silently changes what a benign `rsync -a` transfers).
 
 This is a developer tool, NOT a runtests.py test (it does not end in _test.py and
 imports nothing from the test harness).  Findings are printed and appended to a
-log; minimise each into a testsuite/tests/*_test.py.
+log; minimise each into a test under testsuite/tests/.
 
 Usage:
     testsuite/abdiff.py [--rsync-a ./rsync] [--rsync-b old_versions/rsync_3.4.1]

@@ -12,7 +12,7 @@
 
 """rsync test runner.
 
-Invokes test scripts from testsuite/ and reports results.
+Invokes test scripts from testsuite/tests/ and reports results.
 Can be called by 'make check' or directly.
 
 Usage:
@@ -41,8 +41,9 @@ import time
 # testsuite/ (next to this script); it has no import-time side effects.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from harness import (
-    Exit, Outcome, TestResult, applies_to_peer, load_profile, merge_profiles, parse_peer_banner,
-    placeholder_target, read_requirements, resolve_test_path, verdict_of, write_receipt,
+    Exit, Outcome, TestResult, applies_to_peer, discover_tests, load_profile, merge_profiles,
+    parse_peer_banner, placeholder_target, read_requirements, resolve_test_path, test_name,
+    verdict_of, write_receipt,
 )
 
 
@@ -257,38 +258,30 @@ def prep_scratch(scratchdir, srcdir, tooldir, setfacl_nodef):
 _PY_TEST_SUFFIX = '_test.py'
 
 
-def _is_test_path(path):
-    return os.path.basename(path).endswith(_PY_TEST_SUFFIX)
-
-
 def _testbase(path):
     """Strip the test extension to get the canonical test name."""
     base = os.path.basename(path)
     if base.endswith(_PY_TEST_SUFFIX):
-        return base[:-len(_PY_TEST_SUFFIX)]
+        return test_name(path)
     return base
 
 
 def collect_tests(suitedir, patterns):
     """Collect test scripts (_test.py) matching the given patterns."""
     testdir = os.path.join(suitedir, 'tests')
+    candidates = [str(path) for path in discover_tests(testdir)]
     if not patterns:
-        candidates = glob.glob(os.path.join(testdir, '*' + _PY_TEST_SUFFIX))
-        tests = sorted(p for p in candidates if _is_test_path(p))
+        tests = candidates
     else:
         seen = set()
         tests = []
         for pat in patterns:
             # Accept either bare name ("mkpath"), explicit extension, or glob.
-            if pat.endswith('.py'):
-                pats = [pat]
-            else:
-                pats = [pat + _PY_TEST_SUFFIX]
-            for p in pats:
-                for m in sorted(glob.glob(os.path.join(testdir, p))):
-                    if _is_test_path(m) and m not in seen:
-                        seen.add(m)
-                        tests.append(m)
+            pattern = pat if pat.endswith('.py') else pat + _PY_TEST_SUFFIX
+            for path in candidates:
+                if fnmatch.fnmatch(os.path.basename(path), pattern) and path not in seen:
+                    seen.add(path)
+                    tests.append(path)
     return tests
 
 
@@ -373,6 +366,11 @@ def expand_skip_spec(spec, srcdir, suitedir):
     if not spec.strip():
         return ''
 
+    try:
+        known_tests = {test_name(path) for path in discover_tests(os.path.join(suitedir, 'tests'))}
+    except ValueError as error:
+        die(str(error))
+
     names = []
     drop = []
     for tok in (t.strip() for t in spec.split(',')):
@@ -427,7 +425,7 @@ def expand_skip_spec(spec, srcdir, suitedir):
         # and the summary the fleet parses back, use as the separator).
         if ',' in name or '/' in name or os.sep in name or name in ('.', '..'):
             die(f'{where}: not a test name: {name!r}')
-        if not os.path.isfile(os.path.join(suitedir, 'tests', name + '_test.py')):
+        if name not in known_tests:
             die(f'{where}: no such test: {name}')
     for name, tok in drop:
         # Every removal must remove something.  A name the spec never added is
@@ -453,6 +451,11 @@ def read_backport_exclude(tooldir, suitedir):
     path = os.path.join(tooldir, 'testsuite', 'skiplist', 'backport.txt')
     if not os.path.isfile(path):
         return set()
+    try:
+        known_tests = {test_name(test) for test in discover_tests(os.path.join(suitedir, 'tests'))}
+    except ValueError as error:
+        sys.stderr.write(f'{error}\n')
+        sys.exit(Exit.ERROR)
     names = set()
     with open(path) as f:
         for lineno, raw in enumerate(f, 1):
@@ -465,7 +468,7 @@ def read_backport_exclude(tooldir, suitedir):
                 sys.exit(Exit.ERROR)
             # A stale name here would silently exclude nothing, which is the
             # failure this file exists to prevent.
-            if not os.path.isfile(os.path.join(suitedir, 'tests', name + '_test.py')):
+            if name not in known_tests:
                 sys.stderr.write(f'{where}: no such test: {name}\n')
                 sys.exit(Exit.ERROR)
             names.add(name)
@@ -812,7 +815,12 @@ def main():
         base_env['RUNSHFLAGS'] = '-e -x'
 
     # Collect tests
-    tests = collect_tests(suitedir, args.tests)
+    try:
+        all_tests = collect_tests(suitedir, [])
+        tests = all_tests if not args.tests else collect_tests(suitedir, args.tests)
+    except ValueError as error:
+        sys.stderr.write(f'runtests.py: {error}\n')
+        sys.exit(Exit.ERROR)
     full_run = len(args.tests) == 0
 
     # Drop excluded tests entirely (matched by basename against name/glob).
@@ -826,7 +834,6 @@ def main():
                   f"{', '.join(excl)}")
 
     profiles = []
-    all_tests = collect_tests(suitedir, [])
     known_tests = {_testbase(test) for test in all_tests}
     for item in (value.strip() for value in args.profiles.split(',')):
         if not item:

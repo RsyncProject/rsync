@@ -29,8 +29,7 @@ def makefile_vars(repo, names):
     return found
 
 
-repo = Path(os.environ.get(
-    "RSYNC_SOURCE_UNDER_TEST", Path(__file__).resolve().parents[2]))
+repo = Path(os.environ.get('RSYNC_SOURCE_UNDER_TEST', os.environ['srcdir']))
 source_path = repo / "authenticate.c"
 config_path = repo / "config.h"
 if not source_path.exists() or not config_path.exists():

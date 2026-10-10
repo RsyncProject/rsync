@@ -62,8 +62,10 @@ CHECK_PROGS = rsync$(EXEEXT) tls$(EXEEXT) getgroups$(EXEEXT) getfsdev$(EXEEXT) \
 	testrun$(EXEEXT) trimslash$(EXEEXT) t_unsafe$(EXEEXT) t_chmod_secure$(EXEEXT) \
 	t_rename_secure$(EXEEXT) t_symlink_secure$(EXEEXT) t_secure_relpath$(EXEEXT) t_acl$(EXEEXT) t_hashtable_overflow$(EXEEXT) t_iwildmatch$(EXEEXT) t_clean_fname$(EXEEXT) t_safe_arg$(EXEEXT) wildtest$(EXEEXT) simdtest$(EXEEXT)
 
-CHECK_SYMLINKS = testsuite/tests/chown-fake_test.py testsuite/tests/devices-fake_test.py \
-	testsuite/tests/xattrs-hlink_test.py testsuite/tests/exclude-lsh_test.py
+CHECK_SYMLINKS = testsuite/tests/metadata/chown-fake_test.py \
+	testsuite/tests/metadata/devices-fake_test.py \
+	testsuite/tests/metadata/xattrs-hlink_test.py \
+	testsuite/tests/transfer/exclude-lsh_test.py
 
 # Objects for CHECK_PROGS to clean
 CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o t_chmod_secure.o t_rename_secure.o t_symlink_secure.o t_secure_relpath.o t_acl.o t_hashtable_overflow.o t_iwildmatch.o t_clean_fname.o t_safe_arg.o trimslash.o wildtest.o
@@ -550,17 +552,17 @@ simdtest$(EXEEXT): simd-checksum-x86_64.cpp $(HEADERS)
 	    touch $@; \
 	fi
 
-testsuite/tests/chown-fake_test.py:
-	ln -s chown_test.py $(srcdir)/testsuite/tests/chown-fake_test.py
+testsuite/tests/metadata/chown-fake_test.py:
+	ln -s chown_test.py $(srcdir)/testsuite/tests/metadata/chown-fake_test.py
 
-testsuite/tests/devices-fake_test.py:
-	ln -s devices_test.py $(srcdir)/testsuite/tests/devices-fake_test.py
+testsuite/tests/metadata/devices-fake_test.py:
+	ln -s devices_test.py $(srcdir)/testsuite/tests/metadata/devices-fake_test.py
 
-testsuite/tests/xattrs-hlink_test.py:
-	ln -s xattrs_test.py $(srcdir)/testsuite/tests/xattrs-hlink_test.py
+testsuite/tests/metadata/xattrs-hlink_test.py:
+	ln -s xattrs_test.py $(srcdir)/testsuite/tests/metadata/xattrs-hlink_test.py
 
-testsuite/tests/exclude-lsh_test.py:
-	ln -s exclude_test.py $(srcdir)/testsuite/tests/exclude-lsh_test.py
+testsuite/tests/transfer/exclude-lsh_test.py:
+	ln -s exclude_test.py $(srcdir)/testsuite/tests/transfer/exclude-lsh_test.py
 
 # This does *not* depend on building or installing: you can use it to
 # check a version installed from a binary or some other source tree,

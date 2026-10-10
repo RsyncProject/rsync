@@ -3,16 +3,18 @@
 Rsync's automated tests live here. Bug fixes should include a regression test when practical.
 
 ## Layout
-- `testsuite/tests/` contains the test scripts. Test names end in `_test.py`
+- `testsuite/tests/` groups test scripts by the subsystem they exercise. Test names end in `_test.py`
 - `testsuite/runtests.py` discovers and runs tests
-- `testsuite/rsyncfns.py` contains the legacy test helpers
-- `testsuite/harness/` contains metadata, profile, result and receipt support
+- `testsuite/rsyncfns.py` keeps legacy helper imports working during migration
+- `testsuite/harness/` contains filesystem, metadata, profile, result and receipt support
 - `testsuite/profiles/` records platform capabilities and peer deviations
 - `testsuite/fleettest.py` runs the suite across the maintainer fleet
 - `testsuite/abdiff.py` compares two rsync versions over the same transfers
 - [COVERAGE.md](COVERAGE.md) records option and daemon-parameter coverage
 
 Some tests also use C helpers built with rsync.
+
+The test groups are `build`, `daemon`, `harness`, `metadata`, `path`, `protocol`, `rrsync` and `transfer`. The group does not form part of a test name. Selectors, profiles and receipts continue to use the filename without `_test.py`. Security, compatibility and cost remain test metadata because they apply across those groups.
 
 ## Writing tests
 
@@ -109,4 +111,4 @@ testsuite/abdiff.py --loop --timelimit 3600 --cost
 
 The available transports are local copy, `support/lsh.sh`, a pipe daemon, a TCP daemon and rrsync. Pair each binary with the matching rrsync script when testing that transport.
 
-Historical binaries live in `old_versions/` -- Investigate differences and confirm the intended behaviour before adding a focused test under `testsuite/tests/`
+Historical binaries live in `old_versions/` -- Investigate differences and confirm the intended behaviour before adding a focused test under the relevant `testsuite/tests/` group

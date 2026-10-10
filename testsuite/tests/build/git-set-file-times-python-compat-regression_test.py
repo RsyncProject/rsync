@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 
-source_dir = Path(os.environ.get("srcdir", Path(__file__).resolve().parents[2]))
+source_dir = Path(os.environ['srcdir'])
 script = source_dir / "support" / "git-set-file-times"
 proc = subprocess.run(
     [sys.executable, str(script), "--help"],

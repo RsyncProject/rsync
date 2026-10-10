@@ -2,14 +2,15 @@
 
 import json
 
-from harness import TestContext, applies_to_peer, load_profile, merge_profiles, parse_peer_banner, read_requirements, requires, run
+from harness import (TestContext, applies_to_peer, discover_tests, load_profile, merge_profiles,
+                     parse_peer_banner, read_requirements, requires, run, test_name)
 from rsyncfns import test_fail
 
 
 @requires(protocols={27, 28, 29, 30, 31, 32, 33}, transports={'pipe'}, min_peer='2.6.0', tags={'harness'})
 def test(context: TestContext):
-    test_paths = list((context.repository / 'testsuite' / 'tests').glob('*_test.py'))
-    requirements = {path.name[:-len('_test.py')]: read_requirements(path) for path in test_paths}
+    test_paths = discover_tests(context.repository / 'testsuite' / 'tests')
+    requirements = {test_name(path): read_requirements(path) for path in test_paths}
     tests = set(requirements)
     paths = sorted((context.repository / 'testsuite' / 'profiles').glob('*.json'))
     profiles = [load_profile(path, tests) for path in paths]
