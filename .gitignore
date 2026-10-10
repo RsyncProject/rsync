@@ -1,5 +1,6 @@
 *.[oa]
 *~
+__pycache__/
 dummy
 ID
 Makefile
@@ -63,8 +64,6 @@ aclocal.m4
 /testsuite/chown-fake.test
 /testsuite/devices-fake.test
 /testsuite/xattrs-hlink.test
-/testsuite/fleettest.json
-/fleettest-logs
 /patches
 /patches.gen
 /build

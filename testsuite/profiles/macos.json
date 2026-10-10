@@ -1,0 +1,25 @@
+{
+  "unsupported": {
+    "backup_metadata": "no backup metadata fixture",
+    "cross_device": "no writable cross-device fixture",
+    "directory_sgid": "no directory setgid semantics",
+    "group_auth": "no Linux group-auth fixture",
+    "linux_acl": "no Linux ACL semantics",
+    "linux_interpose": "no Linux interposition",
+    "linux_nss_chroot": "no Linux NSS chroot",
+    "linux_xattr": "no Linux xattr semantics",
+    "noatime": "no O_NOATIME",
+    "preallocate": "no preallocation support",
+    "proc_fd": "no procfs descriptors",
+    "protected_regular": "no protected_regular sysctl",
+    "raw_filename_bytes": "no raw filename bytes",
+    "root_anchor": "no root-anchored source fixture",
+    "search_only": "no Linux search-only fixture",
+    "setgid_semantics": "setgid differential unavailable",
+    "simd": "no SIMD test build",
+    "sparse": "no sparse-file fixture",
+    "symlink_xattr": "no symlink xattr fixture",
+    "ungrantable_group": "no ungrantable group",
+    "user_namespace": "no user namespaces"
+  }
+}

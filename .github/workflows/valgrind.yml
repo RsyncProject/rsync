@@ -19,20 +19,37 @@ on:
     - cron: '17 4 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   memcheck:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        privilege: [ user, root ]
-        transport: [ pipe, tcp ]
+        include:
+          - privilege: user
+            transport: pipe
+            profiles: pipe,non-asan,nonroot,self-peer,linux,valgrind
+          - privilege: user
+            transport: tcp
+            profiles: non-asan,nonroot,self-peer,linux,valgrind
+          - privilege: root
+            transport: pipe
+            profiles: pipe,non-asan,root,self-peer,linux,valgrind
+          - privilege: root
+            transport: tcp
+            profiles: non-asan,root,self-peer,linux,valgrind
     name: memcheck (${{ matrix.privilege }}, ${{ matrix.transport }})
+    env:
+      VALGRIND_SCRATCH: /tmp/rsync-valgrind-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.privilege }}-${{ matrix.transport }}
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       with:
         fetch-depth: 0
+        persist-credentials: false
     - name: prep
       run: |
         sudo apt-get update
@@ -46,33 +63,36 @@ jobs:
     - name: info
       run: ./rsync --version
 
-    # Run the whole suite under valgrind.  We gate on memory *errors* (uninit
-    # reads, invalid read/write, bad frees, uninit syscall params), not leaks:
-    # rsync deliberately leaves file-list/socket/option memory unfreed at exit
-    # (short-lived process; the OS reclaims), so --leak-check=no avoids a sea of
-    # by-design "definitely lost" reports.  Functional pass/fail is covered by
-    # the other workflows, so the suite is allowed to finish regardless of
-    # per-test results; the scan step below is the gate.  --error-exitcode=0
-    # keeps valgrind from perturbing test exit codes; the bundled
-    # testsuite/valgrind.supp silences known-benign reports.
+    # Gate memory errors rather than intentional process-exit leaks
     - name: run testsuite under valgrind
       run: |
-        SUDO=
-        [ "${{ matrix.privilege }}" = root ] && SUDO="sudo -E"
-        TCP=
-        [ "${{ matrix.transport }}" = tcp ] && TCP="--use-tcp"
-        $SUDO ./runtests.py --valgrind \
+        mkdir -p test-results/valgrind-logs
+        SUDO=()
+        [ "${{ matrix.privilege }}" = root ] && SUDO=(sudo -E)
+        TCP=()
+        [ "${{ matrix.transport }}" = tcp ] && TCP=(--use-tcp --daemon-tests-only)
+        "${SUDO[@]}" env RSYNC_TEST_PROFILES=${{ matrix.profiles }} scratchbase="$VALGRIND_SCRATCH" \
+          ./testsuite/runtests.py --valgrind \
           --valgrind-opts="--leak-check=no --error-exitcode=0" \
-          $TCP -j8 --preserve-scratch || true
+          "${TCP[@]}" -j2 --timeout=600 --preserve-scratch \
+          --receipt=test-results/valgrind-${{ matrix.privilege }}-${{ matrix.transport }}.json
 
     - name: scan for unsuppressed valgrind errors
+      if: always()
       run: |
-        sudo chown -R "$USER" testtmp 2>/dev/null || true
-        mapfile -t logs < <(find testtmp -name 'valgrind.*.log' 2>/dev/null)
+        log_dir="$VALGRIND_SCRATCH/testtmp/valgrind-logs"
+        if [ -d "$log_dir" ]; then
+          sudo chown -R "$USER" "$log_dir"
+        fi
+        shopt -s nullglob
+        logs=("$log_dir"/valgrind.*.log)
         if [ "${#logs[@]}" -eq 0 ]; then
           echo "::error::no valgrind logs were produced -- the suite did not run"
           exit 1
         fi
+        evidence_dir=test-results/valgrind-logs
+        mkdir -p "$evidence_dir"
+        cp -- "${logs[@]}" "$evidence_dir/"
         echo "scanned ${#logs[@]} valgrind log(s)"
         bad=()
         for f in "${logs[@]}"; do
@@ -90,11 +110,13 @@ jobs:
         fi
         echo "valgrind clean: no unsuppressed errors"
 
-    - name: upload valgrind logs on failure
-      if: failure()
-      uses: actions/upload-artifact@v4
+    - name: upload valgrind evidence
+      if: always()
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
       with:
         name: valgrind-logs-${{ matrix.privilege }}-${{ matrix.transport }}
-        path: testtmp/**/valgrind.*.log
+        path: |
+          test-results/valgrind-logs/*.log
+          test-results/*.json
         if-no-files-found: ignore
-        retention-days: 7
+        retention-days: 45

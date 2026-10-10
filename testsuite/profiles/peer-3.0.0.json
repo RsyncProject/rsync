@@ -1,0 +1,13 @@
+{
+  "peer": "3.0.0",
+  "protocol": 30,
+  "xfail": {
+    "batch-mode": "peer-feature-gap",
+    "chmod-option": "peer-feature-gap",
+    "daemon-basics": "peer-feature-gap",
+    "daemon-config": "peer-feature-gap",
+    "daemon-filter": "peer-feature-gap",
+    "daemon-gzip": "peer-feature-gap",
+    "daemon-refuse": "peer-feature-gap"
+  }
+}

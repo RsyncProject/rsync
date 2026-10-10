@@ -1,0 +1,32 @@
+{
+  "unsupported": {
+    "acl": "no POSIX ACL tools",
+    "backup_metadata": "no backup metadata fixture",
+    "cross_uid": "no cross-UID fixture",
+    "dac_restriction": "no Unix DAC restriction",
+    "darwin": "not Darwin",
+    "darwin_interpose": "no dyld interposition",
+    "device_nodes": "no Unix device nodes",
+    "directory_sgid": "no directory setgid semantics",
+    "group_auth": "no group-auth fixture",
+    "interpose": "no native interposition",
+    "linux_acl": "no Linux ACL semantics",
+    "linux_interpose": "no Linux interposition",
+    "linux_nss_chroot": "no Linux NSS chroot",
+    "linux_xattr": "no Linux xattr semantics",
+    "native_build": "no reliable patched build",
+    "noatime": "no O_NOATIME",
+    "ownership": "no Unix ownership fixture",
+    "posix_detach": "no POSIX daemon detach",
+    "proc_fd": "no procfs descriptors",
+    "protected_regular": "no protected_regular sysctl",
+    "root_anchor": "no root-anchored source fixture",
+    "search_only": "no Linux search-only fixture",
+    "simd": "no SIMD test build",
+    "symlink_mode": "no symlink chmod",
+    "thread_count": "no process thread count",
+    "unix_listener": "no named Unix listener passing",
+    "unix_socketpair": "no Unix socketpair",
+    "user_namespace": "no user namespaces"
+  }
+}

@@ -18,31 +18,45 @@ on:
   schedule:
     - cron: '42 8 * * 1'
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     name: Test rsync on Solaris
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       with:
         fetch-depth: 0
+        persist-credentials: false
+    - name: prepare VM host
+      timeout-minutes: 10
+      run: |
+        packages=(qemu-utils qemu-system-x86 ovmf)
+        sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "${packages[@]}" || {
+          sudo apt-get update -q
+          sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "${packages[@]}"
+        }
     - name: Test in Solaris VM
       id: test
-      uses: vmactions/solaris-vm@v1
+      uses: vmactions/solaris-vm@87d3c436511cef802cd1637f86f73b1a97715c8c # v1.4.1
       with:
-        usesh: true
+        cache-after-prepare: true
         prepare: |
           pkg install bash automake gnu-m4 pkg://solaris/runtime/python-35 autoconf gcc git
         run: |
           uname -a
           ./configure --with-rrsync -disable-zstd --disable-md2man --disable-xxhash --disable-lz4 --disable-idn
-          make
+          make check-progs
           ./rsync --version
-          make check
-          ./runtests.py --rsync-bin=`pwd`/rsync --use-tcp -j 8
+          RSYNC_TEST_PROFILES=pipe,non-asan,root,self-peer,solaris,no-idn,no-xxhash,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --receipt=test-results/solaris-pipe.json -j 8
+          RSYNC_TEST_PROFILES=non-asan,root,self-peer,solaris,no-idn,no-xxhash,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp --daemon-tests-only --receipt=test-results/solaris-tcp.json -j 8
           ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
     - name: save artifact
-      uses: actions/upload-artifact@v4
+      if: always()
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
       with:
         retention-days: 45
         name: solaris-bin
@@ -54,3 +68,4 @@ jobs:
           rsyncd.conf.5
           rrsync.1
           rrsync
+          test-results/*.json

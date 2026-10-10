@@ -1,0 +1,34 @@
+# Reports outside rsync. runtests.py --valgrind loads this file automatically
+# CI disables leak checking, so the leak stanzas apply only to manual audits
+
+# Bundled popt retains alias strings until process exit
+{
+   rsync-popt-alias-leak
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   fun:my_alloc
+   fun:my_strdup
+   fun:popt_unalias
+   fun:parse_arguments
+   fun:main
+}
+
+# libxxhash returns an aligned interior pointer for the XXH3 state
+{
+   xxhash-createstate-aligned
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:malloc
+   fun:XXH3_createState
+}
+
+# libfakeroot leaves padding in its SysV message buffer uninitialised
+{
+   fakeroot-msgsnd-padding
+   Memcheck:Param
+   msgsnd(msgp->mtext)
+   fun:msgsnd
+   ...
+   obj:*libfakeroot*
+}
