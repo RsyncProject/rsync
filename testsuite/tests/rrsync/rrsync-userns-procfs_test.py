@@ -24,7 +24,7 @@ if not os.environ.get('RSYNC_USERNS_PROCFS'):
     launch_dir = Path(tempfile.mkdtemp(prefix='rsync-userns-launch-'))
     launch_dir.chmod(0o755)
     testfile = Path(__file__).resolve()
-    suitedir = testfile.parent.parent
+    suitedir = Path(os.environ['suitedir'])
     child_test = launch_dir / testfile.name
     for source in (testfile, suitedir / 'rsyncfns.py', suitedir / 'exitcodes.py'):
         shutil.copy2(source, launch_dir / source.name)

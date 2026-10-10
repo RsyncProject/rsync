@@ -105,7 +105,7 @@ import threading
 import time
 from pathlib import Path
 
-from harness import load_profile, read_requirements
+from harness import discover_tests, load_profile, read_requirements, test_name
 
 # Set from --skip / --xfail in main(). SKIP_CSV is passed to runtests as
 # RSYNC_EXCLUDE (tests dropped before running); XFAIL_GLOBS are tolerated
@@ -353,10 +353,10 @@ def discover_nonroot_tests(testsuite_dir: Path) -> list[str]:
     """Return the names (without the _test.py suffix) of the tests under
     testsuite_dir/tests that declare `fleet_nonroot = True`."""
     names = []
-    for p in sorted((testsuite_dir / 'tests').glob('*_test.py')):
+    for p in discover_tests(testsuite_dir / 'tests'):
         try:
             if _NONROOT_RE.search(p.read_text(errors="replace")):
-                names.append(p.name[: -len("_test.py")])
+                names.append(test_name(p))
         except OSError:
             continue
     return names
@@ -372,11 +372,11 @@ def _exclude_csv(t: "Target") -> str:
 
 @functools.cache
 def known_test_policy() -> tuple[frozenset[str], frozenset[str]]:
-    test_paths = sorted((TESTSUITE_REPO / 'testsuite' / 'tests').glob('*_test.py'))
+    test_paths = discover_tests(TESTSUITE_REPO / 'testsuite' / 'tests')
     requirements = [read_requirements(path) for path in test_paths]
     features = {feature for metadata in requirements if metadata
                 for feature in metadata['features']}
-    tests = {path.name[:-len('_test.py')] for path in test_paths}
+    tests = {test_name(path) for path in test_paths}
     return frozenset(tests), frozenset(features)
 
 
@@ -1373,7 +1373,7 @@ def main() -> int:
         # --testsuite-repo: overlay another tree's testsuite/ onto
         # the built source (merge, no delete). Build REPO's rsync, but run
         # TESTSUITE_REPO's suite against it. The leftover .test files from REPO
-        # are ignored by a Python runtests.py (it globs tests/*_test.py).
+        # are ignored by runtests.py because they do not end in _test.py.
         if TESTSUITE_REPO != REPO:
             ov = subprocess.run(
                 f"git -C {TESTSUITE_REPO} archive HEAD -- testsuite "

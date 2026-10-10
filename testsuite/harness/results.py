@@ -1,5 +1,6 @@
 import enum
 import os
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -72,6 +73,25 @@ class TestResult:
         if expected:
             data['expected'] = expected
         return data
+
+
+def test_fail(msg: str) -> None:
+    sys.stderr.write(msg.rstrip() + '\n')
+    sys.exit(Exit.FAIL)
+
+
+def test_skipped(msg: str, capability: str = None) -> None:
+    sys.stderr.write(msg.rstrip() + '\n')
+    scratch = Path(os.environ['scratchdir'])
+    if capability:
+        (scratch / 'unsupported').write_text(capability + '\n')
+    (scratch / 'whyskipped').write_text(msg.rstrip() + '\n')
+    sys.exit(Exit.SKIP)
+
+
+def test_xfail(msg: str) -> None:
+    sys.stderr.write(msg.rstrip() + '\n')
+    sys.exit(Exit.XFAIL)
 
 
 def unsupported(capability: str) -> None:

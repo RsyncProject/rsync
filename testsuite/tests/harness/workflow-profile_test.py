@@ -57,6 +57,14 @@ def profile_specs(line, matrix_profiles):
 
 test_paths = runtests.collect_tests(str(SRC / 'testsuite'), [])
 known_tests = {runtests._testbase(path) for path in test_paths}
+recursive_suite = SCRATCHDIR / 'recursive-suite'
+recursive_test = recursive_suite / 'tests' / 'daemon' / 'nested_test.py'
+recursive_test.parent.mkdir(parents=True)
+recursive_test.write_text('')
+if runtests.collect_tests(str(recursive_suite), []) != [str(recursive_test)]:
+    test_fail('recursive test discovery failed')
+if runtests.collect_tests(str(recursive_suite), ['nested']) != [str(recursive_test)]:
+    test_fail('basename selection failed for a nested test')
 daemon_paths, independent_paths = runtests.select_daemon_tests(test_paths)
 daemon_tests = {runtests._testbase(path) for path in daemon_paths}
 independent_tests = {runtests._testbase(path) for path in independent_paths}

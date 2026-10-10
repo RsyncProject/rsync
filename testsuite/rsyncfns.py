@@ -1,8 +1,7 @@
-"""Shared helpers for rsync's Python test scripts.
+"""Legacy helpers for rsync's Python test scripts.
 
-This is the Python counterpart of testsuite/rsync.fns. It exposes only what
-the Python-rewritten tests actually need; grow it as more shell tests are
-ported.
+New framework code belongs in testsuite/harness. Imports remain available here
+while existing tests migrate.
 
 Conventions matching the shell harness:
   * Exit codes (see the Exit enum): 0=pass, 1=fail, 2=error, 77=skip, 78=xfail.
@@ -37,7 +36,11 @@ import tempfile
 import time
 from pathlib import Path
 
-from exitcodes import Exit   # re-exported: tests may `from rsyncfns import Exit`
+from harness.filesystem import (assert_exists, assert_hardlinked, assert_is_symlink, assert_mode,
+                                assert_mtime_close, assert_not_exists, assert_not_hardlinked,
+                                assert_same, cp_p, is_a_link, make_data_file, make_text_file,
+                                make_tree, makepath, rmtree, walk_dirs, walk_files)
+from harness.results import Exit, test_fail, test_skipped, test_xfail
 
 
 # --- environment -----------------------------------------------------------
@@ -195,26 +198,6 @@ TODIR = SCRATCHDIR / 'to'
 CHKDIR = SCRATCHDIR / 'chk'
 CHKFILE = SCRATCHDIR / 'rsync.chk'
 OUTFILE = SCRATCHDIR / 'rsync.out'
-
-
-# --- result reporting ------------------------------------------------------
-
-def test_fail(msg: str) -> 'None':
-    sys.stderr.write(msg.rstrip() + '\n')
-    sys.exit(Exit.FAIL)
-
-
-def test_skipped(msg: str, capability: str = None) -> 'None':
-    sys.stderr.write(msg.rstrip() + '\n')
-    if capability:
-        (TMPDIR / 'unsupported').write_text(capability + '\n')
-    (TMPDIR / 'whyskipped').write_text(msg.rstrip() + '\n')
-    sys.exit(Exit.SKIP)
-
-
-def test_xfail(msg: str) -> 'None':
-    sys.stderr.write(msg.rstrip() + '\n')
-    sys.exit(Exit.XFAIL)
 
 
 # --- rsync invocation ------------------------------------------------------
@@ -1014,26 +997,6 @@ def run_rsync(*args: str, check: bool = True,
     return proc
 
 
-# --- filesystem helpers ----------------------------------------------------
-
-def makepath(*paths) -> 'None':
-    """Equivalent of rsync.fns makepath: mkdir -p, but for multiple paths."""
-    for p in paths:
-        os.makedirs(p, exist_ok=True)
-
-
-def rmtree(path) -> 'None':
-    """Remove a tree if it exists, ignoring missing entries."""
-    p = Path(path)
-    if p.exists() or p.is_symlink():
-        shutil.rmtree(p, ignore_errors=True)
-
-
-def is_a_link(path) -> bool:
-    """True if 'path' is a symbolic link (dangling or not)."""
-    return os.path.islink(path)
-
-
 def start_path_flipper(name_a, name_b):
     """Spawn a separate PROCESS that repeatedly swaps two sibling paths
     name_a <-> name_b in a tight rename loop, for TOCTOU symlink-race tests:
@@ -1218,68 +1181,6 @@ def start_c_flipper(name_a, name_b):
     if binpath:
         return subprocess.Popen([binpath, str(name_a), str(name_b)])
     return start_path_flipper(name_a, name_b)
-
-
-def cp_p(src, dst) -> 'None':
-    """Equivalent of rsync.fns cp_p: copy preserving mode + timestamps."""
-    shutil.copy2(src, dst)
-
-
-def make_data_file(path, size: int) -> 'None':
-    """Equivalent of rsync.fns make_data_file: create `path` with `size`
-    bytes of non-trivial content suitable for rsync's delta algorithm.
-
-    Prefers /dev/urandom for speed. Falls back to a deterministic LCG
-    seeded from PID and the destination path so successive calls produce
-    distinct content -- matching the shell helper.
-    """
-    path = str(path)
-    if os.path.exists('/dev/urandom'):
-        try:
-            with open('/dev/urandom', 'rb') as src, open(path, 'wb') as dst:
-                remaining = size
-                while remaining:
-                    chunk = src.read(min(remaining, 1 << 16))
-                    if not chunk:
-                        break
-                    dst.write(chunk)
-                    remaining -= len(chunk)
-            if remaining == 0:
-                return
-        except OSError:
-            pass
-
-    # Fallback: BSD-LCG to printable-ASCII (33..126), so output stays
-    # exactly `size` bytes regardless of awk/utf8 quirks the shell
-    # version worked around.
-    path_seed = int.from_bytes(path.encode(), 'big') & 0xFFFFFFFF
-    state = (os.getpid() + path_seed) % 2147483648
-    with open(path, 'wb') as f:
-        out = bytearray(size)
-        for i in range(size):
-            state = (state * 1103515245 + 12345) % 2147483648
-            out[i] = ((state >> 16) % 94) + 33
-        f.write(bytes(out))
-
-
-def make_text_file(path, lines: int = 100) -> 'None':
-    """Write a predictable, self-contained text file of `lines` lines.
-
-    This replaces the old habit of capturing `ls -l /etc` / `ls -l /bin`
-    (falling back to `ls /`) into the test tree. Those tied the fixtures
-    to the host filesystem layout: the directories are absent or
-    unreadable on Android/Termux and other minimal environments, where
-    `ls /` fails outright, and the captured content was never
-    reproducible. The output here is deterministic and depends on nothing
-    outside the suite, so every platform builds the identical fixture.
-    """
-    content = ''.join(
-        "line %06d  the quick brown fox jumps over the lazy dog  %d %d\n"
-        % (i, (i * 31) % 97, (i * 131) % 89)
-        for i in range(1, lines + 1)
-    )
-    with open(str(path), 'w') as f:
-        f.write(content)
 
 
 def get_testuid() -> int:
@@ -1921,138 +1822,6 @@ def check_perms(path, expected: str) -> 'None':
         print(f"permissions: {perms} on {path}")
         print(f"should be:   {expected}")
         test_fail(f"check_perms failed for {path}")
-
-
-# --- depth / cross-dir coverage helpers ------------------------------------
-# Added for the option-coverage expansion (see testsuite/COVERAGE.md).
-# The path-handling restructure changes how parent components resolve, so its
-# bugs surface only at DEPTH and across directory boundaries -- these helpers
-# build trees with an entry at every level and assert the concrete property an
-# option controls (not just dest == src).
-
-def make_tree(root, depth: int = 3, *, data: bool = False,
-              content_lines: int = 20, data_size: int = 4096,
-              dirname: str = 'd', leaf: str = 'f'):
-    """Create a layered directory tree with one regular file at every level.
-
-    For depth=3 under `root`:
-        root/f0
-        root/d1/f1
-        root/d1/d2/f2
-        root/d1/d2/d3/f3
-    so an option's effect can be checked at the tree root AND >=3 levels deep
-    (the parent-component resolution the path restructure rewrites).
-
-    Returns (dirs, files): `dirs` the created subdirectories outermost-first,
-    `files` the regular files shallow-first. Content is deterministic
-    (make_text_file) unless data=True (make_data_file, delta-friendly).
-    """
-    root = Path(root)
-    root.mkdir(parents=True, exist_ok=True)
-    dirs = []
-    files = []
-    cur = root
-    for level in range(depth + 1):
-        f = cur / f'{leaf}{level}'
-        if data:
-            make_data_file(f, data_size)
-        else:
-            make_text_file(f, content_lines)
-        files.append(f)
-        if level < depth:
-            cur = cur / f'{dirname}{level + 1}'
-            cur.mkdir(exist_ok=True)
-            dirs.append(cur)
-    return dirs, files
-
-
-def walk_files(root) -> list:
-    """Every regular (non-symlink) file under `root`, sorted, recursively.
-    For asserting a per-entry property holds at every depth."""
-    root = Path(root)
-    return sorted(p for p in root.rglob('*')
-                  if p.is_file() and not p.is_symlink())
-
-
-def walk_dirs(root) -> list:
-    """Every subdirectory under `root`, sorted, recursively."""
-    root = Path(root)
-    return sorted(p for p in root.rglob('*')
-                  if p.is_dir() and not p.is_symlink())
-
-
-def _tag(label: str) -> str:
-    return f"{label}: " if label else ""
-
-
-def assert_same(a, b, label: str = '') -> 'None':
-    """Fail unless files `a` and `b` have byte-identical content."""
-    if not filecmp.cmp(str(a), str(b), shallow=False):
-        test_fail(f"{_tag(label)}content differs between {a} and {b}")
-
-
-def assert_mode(path, expected_octal: int, label: str = '') -> 'None':
-    """Fail unless the permission bits (low 12) of `path` equal expected_octal
-    (pass an int like 0o644). Does not follow symlinks."""
-    mode = stat.S_IMODE(os.stat(path, follow_symlinks=False).st_mode)
-    if mode != expected_octal:
-        test_fail(f"{_tag(label)}mode {mode:04o} != expected "
-                  f"{expected_octal:04o} on {path}")
-
-
-def assert_mtime_close(a, b, tol: float = 1.0, label: str = '') -> 'None':
-    """Fail unless the mtimes of `a` and `b` are within `tol` seconds.
-    `b` may be a number (an explicit epoch mtime) instead of a path."""
-    ma = os.stat(a, follow_symlinks=False).st_mtime
-    mb = b if isinstance(b, (int, float)) else os.stat(
-        b, follow_symlinks=False).st_mtime
-    if abs(ma - mb) > tol:
-        test_fail(f"{_tag(label)}mtime {ma} vs {mb} differ by > {tol}s "
-                  f"(checking {a})")
-
-
-def assert_is_symlink(path, target: str = None, label: str = '') -> 'None':
-    """Fail unless `path` is a symlink (optionally pointing exactly at
-    `target`)."""
-    if not os.path.islink(path):
-        test_fail(f"{_tag(label)}{path} is not a symlink")
-    if target is not None:
-        actual = os.readlink(path)
-        if actual != target:
-            test_fail(f"{_tag(label)}{path} -> {actual!r}, "
-                      f"expected {target!r}")
-
-
-def assert_hardlinked(a, b, label: str = '') -> 'None':
-    """Fail unless `a` and `b` are the same inode (a hard link / --link-dest
-    result)."""
-    sa = os.stat(a, follow_symlinks=False)
-    sb = os.stat(b, follow_symlinks=False)
-    if (sa.st_dev, sa.st_ino) != (sb.st_dev, sb.st_ino):
-        test_fail(f"{_tag(label)}{a} and {b} are not hard-linked "
-                  f"(ino {sa.st_ino} vs {sb.st_ino})")
-
-
-def assert_not_hardlinked(a, b, label: str = '') -> 'None':
-    """Fail if `a` and `b` share an inode (e.g. --copy-dest must copy, not
-    link)."""
-    sa = os.stat(a, follow_symlinks=False)
-    sb = os.stat(b, follow_symlinks=False)
-    if (sa.st_dev, sa.st_ino) == (sb.st_dev, sb.st_ino):
-        test_fail(f"{_tag(label)}{a} and {b} unexpectedly share "
-                  f"inode {sa.st_ino}")
-
-
-def assert_exists(path, label: str = '') -> 'None':
-    """Fail unless `path` exists (a symlink counts even if dangling)."""
-    if not os.path.lexists(path):
-        test_fail(f"{_tag(label)}{path} does not exist")
-
-
-def assert_not_exists(path, label: str = '') -> 'None':
-    """Fail if `path` exists (a dangling symlink counts as existing)."""
-    if os.path.lexists(path):
-        test_fail(f"{_tag(label)}{path} exists but should not")
 
 
 _psf_cache = None

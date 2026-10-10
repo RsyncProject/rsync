@@ -73,7 +73,7 @@ if ATT is None:
 
 # The 3.2.7 oracle: prefer a --rsync-bin2 peer if it differs from the build under
 # test, else the in-tree static binary. None -> degrade to the static contract.
-_repo = Path(__file__).resolve().parents[2]
+_repo = Path(os.environ['srcdir'])
 ORACLE_BIN = None
 if RSYNC_PEER != RSYNC:
     ORACLE_BIN = RSYNC_PEER

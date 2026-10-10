@@ -7,6 +7,9 @@ from pathlib import Path
 from typing import Callable, Iterable, Optional
 
 
+_TEST_SUFFIX = '_test.py'
+
+
 @dataclass(frozen=True)
 class Requirements:
     features: tuple[str, ...] = ()
@@ -88,6 +91,25 @@ def placeholder_target(path):
         return None
     target = path.with_name(name)
     return target if target.is_file() else None
+
+
+def test_name(path) -> str:
+    name = Path(path).name
+    if not name.endswith(_TEST_SUFFIX):
+        raise ValueError(f'{path}: not a test script')
+    return name[:-len(_TEST_SUFFIX)]
+
+
+def discover_tests(directory) -> list[Path]:
+    directory = Path(directory)
+    paths = sorted(path for path in directory.rglob(f'*{_TEST_SUFFIX}') if not path.is_dir())
+    names = {}
+    for path in paths:
+        name = test_name(path)
+        if name in names:
+            raise ValueError(f'duplicate test name {name!r}: {names[name]} and {path}')
+        names[name] = path
+    return [names[name] for name in sorted(names)]
 
 
 def resolve_test_path(path):

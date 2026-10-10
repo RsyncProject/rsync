@@ -34,6 +34,8 @@ def write(name, body):
 fake = SCRATCHDIR / 'fakesuite'
 tests = fake / 'tests'
 tests.mkdir(parents=True, exist_ok=True)
+(tests / 'nested').mkdir()
+(tests / 'nested' / 'nested_test.py').write_text('')
 (tests / 'acls sparse_test.py').write_text('')
 (tests / 'foo,bar_test.py').write_text('')
 (tests / 'adir_test.py').mkdir(exist_ok=True)
@@ -69,11 +71,13 @@ for what, value, want in (
     got = expand(value)
     if got != want:
         test_fail(f'{what}: expected {want!r}, got {got!r}')
+if expand('nested', suitedir=str(fake)) != 'nested':
+    test_fail('nested test name was not accepted')
 
 backport = SCRATCHDIR / 'backport'
 (backport / 'testsuite' / 'skiplist').mkdir(parents=True, exist_ok=True)
-(backport / 'testsuite' / 'skiplist' / 'backport.txt').write_text('acls\n')
-if runtests.read_backport_exclude(str(backport), SUITE) != {'acls'}:
+(backport / 'testsuite' / 'skiplist' / 'backport.txt').write_text('nested\n')
+if runtests.read_backport_exclude(str(backport), str(fake)) != {'nested'}:
     test_fail('backport exclusions were not read from the build tree')
 
 relative = SCRATCHDIR / 'relative'

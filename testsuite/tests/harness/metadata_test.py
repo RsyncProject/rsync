@@ -1,20 +1,41 @@
 #!/usr/bin/env python3
 """Test metadata schema"""
 
-from harness import TestContext, applies_to_peer, metadata, placeholder_target, read_requirements, requires, resolve_test_path, run
+from harness import (TestContext, applies_to_peer, discover_tests, metadata, placeholder_target,
+                     read_requirements, requires, resolve_test_path, run, test_name)
 from rsyncfns import test_fail
 
 
 @requires(protocols={27, 28, 29, 30, 31, 32, 33}, transports={'pipe'}, min_peer='2.6.0', tags={'harness'})
 def test(context: TestContext):
-    metadata = read_requirements(context.repository / 'testsuite' / 'tests' / 'smoke_test.py')
-    if metadata['min_peer'] != '2.6.0' or metadata['transports'] != ('pipe', 'tcp'):
+    discovery = context.scratch / 'discovery'
+    first = discovery / 'transfer' / 'first_test.py'
+    second = discovery / 'daemon' / 'second_test.py'
+    first.parent.mkdir(parents=True)
+    second.parent.mkdir(parents=True)
+    first.write_text('')
+    second.write_text('')
+    paths = discover_tests(discovery)
+    if paths != [first, second] or [test_name(path) for path in paths] != ['first', 'second']:
+        test_fail('nested tests were not discovered in basename order')
+    duplicate = discovery / 'build' / 'first_test.py'
+    duplicate.parent.mkdir()
+    duplicate.write_text('')
+    try:
+        discover_tests(discovery)
+    except ValueError:
+        pass
+    else:
+        test_fail('duplicate test names were accepted')
+
+    requirements = read_requirements(context.repository / 'testsuite' / 'tests' / 'transfer' / 'smoke_test.py')
+    if requirements['min_peer'] != '2.6.0' or requirements['transports'] != ('pipe', 'tcp'):
         test_fail('smoke metadata was not discovered')
-    if not applies_to_peer(metadata, '2.6.0', 27, 'pipe'):
+    if not applies_to_peer(requirements, '2.6.0', 27, 'pipe'):
         test_fail('matching peer metadata was rejected')
-    if (applies_to_peer(metadata, '2.5.0', 27, 'pipe')
-            or applies_to_peer(metadata, '2.6.0', 26, 'pipe')
-            or applies_to_peer(metadata, '2.6.0', 27, 'socket')):
+    if (applies_to_peer(requirements, '2.5.0', 27, 'pipe')
+            or applies_to_peer(requirements, '2.6.0', 26, 'pipe')
+            or applies_to_peer(requirements, '2.6.0', 27, 'socket')):
         test_fail('inapplicable peer metadata was accepted')
 
     module = context.scratch / 'module_test.py'
