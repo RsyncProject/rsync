@@ -3756,10 +3756,15 @@ sign) if you want the local shell to expand it.
     for the rest of the transfer it can point at a file that hasn't arrived
     yet.
 
+    This narrows the window in which the destination is inconsistent; it does
+    not make the update atomic.  A transfer that is interrupted before the end
+    leaves new symlinks missing and changed symlinks pointing at their old
+    targets.
+
     If a symlink is moved to a new target and the old target is deleted, also
-    use [`--delete-delay`](#opt) or [`--delete-after`](#opt), since the default
-    [`--delete-during`](#opt) can remove the old target while the old symlink
-    still points at it.
+    use [`--delete-delay`](#opt) or [`--delete-after`](#opt), since
+    [`--delete-before`](#opt) and the default [`--delete-during`](#opt) can
+    remove the old target while the old symlink still points at it.
 
     This option implies [`--no-inc-recursive`](#opt) since it needs the full
     file list in memory in order to be able to iterate over it at the end.
