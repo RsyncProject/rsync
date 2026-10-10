@@ -76,7 +76,7 @@ jobs:
         SUDO=
         [ "${{ matrix.privilege }}" = root ] && SUDO="sudo -E"
         TCP=
-        [ "${{ matrix.transport }}" = tcp ] && TCP="--use-tcp"
+        [ "${{ matrix.transport }}" = tcp ] && TCP="--use-tcp --daemon-tests-only"
         $SUDO env RSYNC_TEST_PROFILES=${{ matrix.profiles }} scratchbase="$VALGRIND_SCRATCH" \
           ./testsuite/runtests.py --valgrind \
           --valgrind-opts="--leak-check=no --error-exitcode=0" \

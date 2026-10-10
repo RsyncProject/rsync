@@ -90,7 +90,7 @@ def placeholder_target(path):
     return target if target.is_file() else None
 
 
-def read_requirements(path) -> Optional[dict]:
+def resolve_test_path(path):
     path = Path(path)
     seen = set()
     while True:
@@ -105,8 +105,12 @@ def read_requirements(path) -> Optional[dict]:
             continue
         target = placeholder_target(path)
         if not target:
-            break
+            return path
         path = target
+
+
+def read_requirements(path) -> Optional[dict]:
+    path = resolve_test_path(path)
     tree = ast.parse(path.read_text(encoding='utf-8'), filename=str(path))
     requirements = None
     for node in tree.body:

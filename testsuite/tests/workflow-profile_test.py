@@ -14,6 +14,7 @@ SRC = Path(SRCDIR).resolve()
 fleettest.REPO = SRC
 fleettest.TESTSUITE_REPO = SRC
 fleettest.WORKFLOWS = SRC / '.github' / 'workflows'
+fleettest.TRANSPORTS = ['pipe', 'tcp']
 fleettest.known_test_policy.cache_clear()
 spec = importlib.util.spec_from_file_location('runtests', SRC / 'testsuite' / 'runtests.py')
 runtests = importlib.util.module_from_spec(spec)
@@ -56,6 +57,38 @@ def profile_specs(line, matrix_profiles):
 
 test_paths = runtests.collect_tests(str(SRC / 'testsuite'), [])
 known_tests = {runtests._testbase(path) for path in test_paths}
+daemon_paths, independent_paths = runtests.select_daemon_tests(test_paths)
+daemon_tests = {runtests._testbase(path) for path in daemon_paths}
+independent_tests = {runtests._testbase(path) for path in independent_paths}
+required_daemon_tests = {
+    'chroot-alt-dest-inner-module', 'daemon-auth', 'idn', 'proto-cleared-dirflist',
+}
+required_independent_tests = {'filter-merge-content-echo', 'workflow-profile'}
+if not required_daemon_tests <= daemon_tests or not required_independent_tests <= independent_tests:
+    test_fail('daemon test selection dropped coverage or retained a duplicate')
+
+# Only the generated fixtures should be daemon-sensitive.
+daemon_call = 'start_test' + '_daemon(None, 1)\n'
+selector_target = SCRATCHDIR / 'selector-daemon-target_test.py'
+selector_target.write_text(daemon_call)
+selector_alias = SCRATCHDIR / 'selector-daemon-alias_test.py'
+selector_alias.write_text(selector_target.name)
+daemon_option = SCRATCHDIR / 'selector-daemon-option_test.py'
+daemon_option.write_text("args = ['--" + "daemon']\n")
+selected, _ = runtests.select_daemon_tests([str(selector_alias), str(daemon_option)])
+if selected != [str(selector_alias), str(daemon_option)]:
+    test_fail('daemon test selection missed a placeholder or exact option')
+
+pipe_only = SCRATCHDIR / 'selector-pipe-only_test.py'
+pipe_only.write_text("from harness import metadata\nmetadata(transports={'pipe'})\n"
+                     + daemon_call)
+tcp_only = SCRATCHDIR / 'selector-tcp-only_test.py'
+tcp_only.write_text("from harness import metadata\n"
+                    "metadata(transports={'tcp'}, tags={'daemon'})\n")
+selected, dropped = runtests.select_daemon_tests([str(pipe_only), str(tcp_only)])
+if selected != [str(tcp_only)] or dropped != [str(pipe_only)]:
+    test_fail('daemon test selection ignored transport metadata')
+
 references = 0
 workflows = sorted((SRC / '.github' / 'workflows').glob('*.yml'))
 legacy_lists = [path for path in (SRC / 'testsuite' / 'skiplist').glob('*.txt')
@@ -65,8 +98,12 @@ if legacy_lists:
 
 for path in workflows:
     lines = path.read_text().splitlines()
+    workflow = '\n'.join(lines)
     if any('RSYNC_EXPECT_SKIPPED=' in line for line in lines):
         test_fail(f'{path.name}: transitional expected-skip policy remains')
+    if (path.name == 'ubuntu-version-mix.yml'
+            and 'tcp=(--use-tcp --daemon-tests-only)' not in workflow):
+        test_fail('ubuntu-version-mix.yml: TCP pass repeats transport-independent tests')
     matrix_profiles = sorted(match.group(1) for line in lines
                              if (match := MATRIX_PROFILE_VALUE.match(line)))
     profile_lines = [line for line in lines if 'RSYNC_TEST_PROFILES=' in line]
@@ -91,10 +128,11 @@ for path in workflows:
         actual = {frozenset(value.split(',')) for value in matrix_profiles}
         if actual != VALGRIND_PROFILES:
             test_fail('valgrind.yml: incomplete profile matrix')
-        workflow = '\n'.join(lines)
         if ('VALGRIND_SCRATCH: /tmp/' not in workflow
                 or 'scratchbase="$VALGRIND_SCRATCH"' not in workflow):
             test_fail('valgrind.yml: scratch is not accessible after dropping privileges')
+        if 'TCP="--use-tcp --daemon-tests-only"' not in workflow:
+            test_fail('valgrind.yml: TCP pass repeats transport-independent tests')
         if 'find testtmp' in workflow or 'testtmp/**/' in workflow:
             test_fail('valgrind.yml: evidence collection traverses test fixtures')
         if 'test-results/valgrind-logs/*.log' not in workflow:
@@ -116,8 +154,8 @@ for path in workflows:
     tcp = next((line for line in profile_lines if '--use-tcp' in line), None)
     if not tcp:
         test_fail(f'{path.name}: profiled pipe pass has no profiled TCP pass')
-    if path.name == 'asan-build.yml' and '--daemon-tests-only' not in tcp:
-        test_fail('asan-build.yml: TCP pass repeats transport-independent tests')
+    if '--daemon-tests-only' not in tcp:
+        test_fail(f'{path.name}: TCP pass repeats transport-independent tests')
     expected = {
         tuple(name for name in value.split(',')
               if name != 'pipe' and not name.startswith('protocol-'))
@@ -131,6 +169,10 @@ for path in workflows:
 
 if workflows and not references:
     test_fail('no workflow profile references found')
+
+makefile = (SRC / 'Makefile.in').read_text()
+if "'--use-tcp --daemon-tests-only'" not in makefile:
+    test_fail('coverage-all repeats transport-independent tests over TCP')
 
 valgrind_scratch = SCRATCHDIR / 'valgrind-command'
 valgrind_args = SimpleNamespace(valgrind=True, valgrind_opts='', protocol=None)
@@ -194,6 +236,10 @@ if workflows:
     script = fleettest.test_script(target, 'pipe', profiles, 1)
     if 'RSYNC_EXPECT_SKIPPED' in script or '--receipt=.fleettest-pipe-receipt.json' not in script:
         test_fail('fleet script does not use a profile receipt')
+    tcp_profiles = fleettest.target_profiles(target, 'tcp')
+    tcp_script = fleettest.test_script(target, 'tcp', tcp_profiles, 1)
+    if '--daemon-tests-only' not in tcp_script:
+        test_fail('fleet TCP pass repeats transport-independent tests')
 
     fleet = fleettest.load_fleet(SRC / 'testsuite' / 'fleettest.json.example')
     for target in fleet:

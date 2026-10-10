@@ -99,7 +99,7 @@ jobs:
       # Second run with daemon tests over a real loopback rsyncd. The default
       # 'make check' above uses the secure stdio-pipe transport (no listening
       # sockets); this run exercises the real TCP accept/auth path.
-      run: sudo RSYNC_TEST_PROFILES=${{ matrix.profiles }} ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp -j 8
+      run: sudo RSYNC_TEST_PROFILES=${{ matrix.profiles }} ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp --daemon-tests-only -j 8
     - name: check (non-root, targeted)
       if: matrix.nonroot
       # Every run above is root (sudo), so privilege-sensitive tests never hit

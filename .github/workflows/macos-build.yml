@@ -57,7 +57,7 @@ jobs:
     - name: check (TCP daemon transport)
       # Second run with daemon tests over a real loopback rsyncd; the default
       # 'make check' above uses the secure stdio-pipe transport.
-      run: sudo RSYNC_TEST_PROFILES=non-asan,root,self-peer,macos ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp -j 8
+      run: sudo RSYNC_TEST_PROFILES=non-asan,root,self-peer,macos ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp --daemon-tests-only -j 8
     - name: ssl file list
       run: rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
     - name: save artifact

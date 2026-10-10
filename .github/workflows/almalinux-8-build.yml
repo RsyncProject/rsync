@@ -75,7 +75,7 @@ jobs:
       run: RSYNC_TEST_PROFILES=pipe,non-asan,root,self-peer,linux,no-zstd-threads make check
     - name: check (TCP daemon transport)
       # Second run exercising the real loopback-TCP daemon path.
-      run: RSYNC_TEST_PROFILES=non-asan,root,self-peer,linux,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp -j 8
+      run: RSYNC_TEST_PROFILES=non-asan,root,self-peer,linux,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp --daemon-tests-only -j 8
     - name: ssl file list
       run: ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
     - name: save artifact

@@ -53,7 +53,7 @@ jobs:
           make check-progs
           ./rsync --version
           RSYNC_TEST_PROFILES=pipe,non-asan,root,self-peer,netbsd,no-idn,no-xxhash,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --receipt=test-results/netbsd-pipe.json -j 8
-          RSYNC_TEST_PROFILES=non-asan,root,self-peer,netbsd,no-idn,no-xxhash,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp --receipt=test-results/netbsd-tcp.json -j 8
+          RSYNC_TEST_PROFILES=non-asan,root,self-peer,netbsd,no-idn,no-xxhash,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp --daemon-tests-only --receipt=test-results/netbsd-tcp.json -j 8
           ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
     - name: save artifact
       if: always()

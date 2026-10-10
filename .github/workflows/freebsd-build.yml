@@ -54,7 +54,7 @@ jobs:
           make check-progs
           ./rsync --version
           RSYNC_TEST_PROFILES=pipe,non-asan,root,self-peer,freebsd,no-idn,no-xxhash,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --receipt=test-results/freebsd-pipe.json -j 8
-          RSYNC_TEST_PROFILES=non-asan,root,self-peer,freebsd,no-idn,no-xxhash,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp --receipt=test-results/freebsd-tcp.json -j 8
+          RSYNC_TEST_PROFILES=non-asan,root,self-peer,freebsd,no-idn,no-xxhash,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp --daemon-tests-only --receipt=test-results/freebsd-tcp.json -j 8
           ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
     - name: save artifact
       if: always()

@@ -517,7 +517,7 @@ coverage-all: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	    setfacl -m 'd:u::rwx,d:g::rwx,d:o::rwx' "$$d" 2>/dev/null || true; \
 	  done
 	@rc=0; \
-	  for cfg in '' '--protocol=30' '--protocol=29' '--use-tcp'; do \
+	  for cfg in '' '--protocol=30' '--protocol=29' '--use-tcp --daemon-tests-only'; do \
 	    echo "===== coverage-all: runtests.py $$cfg ====="; \
 	    "$(srcdir)/testsuite/runtests.py" --rsync-bin="`pwd`/rsync$(EXEEXT)" -j $(COVERAGE_J) $$cfg || rc=$$?; \
 	  done; \
