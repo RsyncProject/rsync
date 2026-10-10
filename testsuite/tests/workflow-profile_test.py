@@ -99,6 +99,8 @@ for path in workflows:
             test_fail('valgrind.yml: evidence collection traverses test fixtures')
         if 'test-results/valgrind-logs/*.log' not in workflow:
             test_fail('valgrind.yml: logs are not staged for artefact upload')
+        if 'mkdir -p test-results/valgrind-logs' not in workflow:
+            test_fail('valgrind.yml: root jobs own the evidence directory')
         if not any('--receipt=' in line for line in lines):
             test_fail('valgrind.yml: profile receipts are not written')
         if not any('if: always()' in line for line in lines):
