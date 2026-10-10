@@ -63,13 +63,7 @@ jobs:
     - name: info
       run: ./rsync --version
 
-    # Run the whole suite under valgrind.  We gate on memory *errors* (uninit
-    # reads, invalid read/write, bad frees, uninit syscall params), not leaks:
-    # rsync deliberately leaves file-list/socket/option memory unfreed at exit
-    # (short-lived process; the OS reclaims), so --leak-check=no avoids a sea of
-    # by-design "definitely lost" reports. Functional failures and profile
-    # mismatches remain fatal. --error-exitcode=0 preserves each test's own exit
-    # status while the runner and scan step inspect every Valgrind log.
+    # Gate memory errors rather than intentional process-exit leaks
     - name: run testsuite under valgrind
       run: |
         mkdir -p test-results/valgrind-logs
