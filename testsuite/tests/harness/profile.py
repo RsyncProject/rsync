@@ -29,6 +29,9 @@ def test(context: TestContext):
     peer, protocol, unsupported, xfail = merge_profiles(environment)
     if peer or protocol or not unsupported or xfail:
         test_fail('platform profile composition failed')
+    _, _, unsupported, _ = merge_profiles([by_name['nonroot'], by_name['cygwin']])
+    if 'device_nodes' not in unsupported:
+        test_fail('overlapping unsupported capabilities were dropped')
     for profile in profiles:
         if profile.peer and any(not applies_to_peer(requirements[name], profile.peer, profile.protocol)
                                 for name in profile.xfail):
