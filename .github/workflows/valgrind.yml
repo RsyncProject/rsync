@@ -72,6 +72,7 @@ jobs:
     # status while the runner and scan step inspect every Valgrind log.
     - name: run testsuite under valgrind
       run: |
+        mkdir -p test-results/valgrind-logs
         SUDO=
         [ "${{ matrix.privilege }}" = root ] && SUDO="sudo -E"
         TCP=
