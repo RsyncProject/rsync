@@ -131,7 +131,7 @@ for path in workflows:
         if ('VALGRIND_SCRATCH: /tmp/' not in workflow
                 or 'scratchbase="$VALGRIND_SCRATCH"' not in workflow):
             test_fail('valgrind.yml: scratch is not accessible after dropping privileges')
-        if 'TCP="--use-tcp --daemon-tests-only"' not in workflow:
+        if 'TCP=(--use-tcp --daemon-tests-only)' not in workflow:
             test_fail('valgrind.yml: TCP pass repeats transport-independent tests')
         if 'find testtmp' in workflow or 'testtmp/**/' in workflow:
             test_fail('valgrind.yml: evidence collection traverses test fixtures')
