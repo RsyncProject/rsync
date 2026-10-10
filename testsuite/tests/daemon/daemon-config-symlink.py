@@ -4,9 +4,10 @@ import os
 import pwd
 import subprocess
 
+from harness.daemon_config import write_daemon_conf
 from harness.rsync import (
-    FROMDIR, SCRATCHDIR, make_tree, rmtree, rsync_argv, start_test_daemon,
-    test_fail, test_skipped, write_daemon_conf,
+    FROMDIR, SCRATCHDIR, make_tree, rmtree, rsync_argv, start_test_daemon, test_fail,
+    test_skipped,
 )
 
 DAEMON_PORT = 12901
@@ -57,7 +58,7 @@ os.lchown(lock_plant, NOBODY_UID, NOBODY_UID)
 conf = write_daemon_conf(
     [('mod', {'path': modpath, 'read only': 'yes',
               'max connections': '5'})],
-    globals={'motd file': str(motd_plant),
+    global_options={'motd file': str(motd_plant),
              'lock file': str(lock_plant)},
 )
 url = start_test_daemon(conf, DAEMON_PORT)

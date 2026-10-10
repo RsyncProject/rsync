@@ -5,10 +5,8 @@ import subprocess
 import time
 
 from harness.mutation import find_attacker_uid, race_budget, start_c_flipper, stop_flipper
-from harness.rsync import (
-    SCRATCHDIR, rmtree, rsync_argv, start_test_daemon, test_fail, test_skipped,
-    write_daemon_conf,
-)
+from harness.daemon_config import write_daemon_conf
+from harness.rsync import SCRATCHDIR, rmtree, rsync_argv, start_test_daemon, test_fail, test_skipped
 
 PORT = 13333
 

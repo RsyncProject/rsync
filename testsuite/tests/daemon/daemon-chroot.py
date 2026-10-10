@@ -4,11 +4,11 @@ import ctypes
 import os
 import subprocess
 
+from harness.daemon_config import write_daemon_conf
 from harness.rsync import (
-    SCRATCHDIR, FROMDIR,
-    claim_ports, get_rootuid, get_testuid, make_tree, makepath, require_tcp,
-    rmtree, rsync_argv, start_test_daemon, test_fail, test_skipped, under_valgrind,
-    write_daemon_conf,
+    FROMDIR, SCRATCHDIR, claim_ports, get_rootuid, get_testuid, make_tree, makepath,
+    require_tcp, rmtree, rsync_argv, start_test_daemon, test_fail, test_skipped,
+    under_valgrind,
 )
 
 if get_testuid() != get_rootuid():

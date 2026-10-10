@@ -3,20 +3,10 @@
 import os
 import subprocess
 
+from harness.daemon_config import build_rsyncd_conf
 from harness.rsync import (
-    FROMDIR,
-    RSYNC_PEER,
-    SCRATCHDIR,
-    TODIR,
-    build_rsyncd_conf,
-    get_rootuid,
-    get_testuid,
-    makepath,
-    rsync_argv,
-    run_rsync,
-    start_test_daemon,
-    test_fail,
-    rsh_cmd,
+    FROMDIR, RSYNC_PEER, SCRATCHDIR, TODIR, get_rootuid, get_testuid, makepath, rsh_cmd,
+    rsync_argv, run_rsync, start_test_daemon, test_fail,
 )
 from harness import metadata
 

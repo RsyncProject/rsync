@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
+from harness.daemon_config import write_daemon_conf
 from harness.rsync import (
-    SCRATCHDIR, checkit, make_tree, rmtree, start_test_daemon, test_fail,
-    test_skipped, walk_files, write_daemon_conf,
+    SCRATCHDIR, checkit, make_tree, rmtree, start_test_daemon, test_fail, test_skipped,
+    walk_files,
 )
 
 DEPTH = 70

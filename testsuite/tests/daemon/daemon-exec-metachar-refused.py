@@ -4,9 +4,9 @@ import os
 import subprocess
 from pathlib import Path
 
+from harness.daemon_config import write_daemon_conf
 from harness.rsync import (
-    FROMDIR, SCRATCHDIR, make_tree, makepath, rmtree, rsync_argv,
-    start_test_daemon, test_fail, write_daemon_conf,
+    FROMDIR, SCRATCHDIR, make_tree, makepath, rmtree, rsync_argv, start_test_daemon, test_fail,
 )
 
 PORT = 12943

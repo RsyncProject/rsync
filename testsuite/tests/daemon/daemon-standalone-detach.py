@@ -8,10 +8,10 @@ import socket
 import subprocess
 import time
 
+from harness.daemon_config import write_daemon_conf
 from harness.rsync import (
-    FROMDIR, RSYNC_PEER, SCRATCHDIR,
-    claim_ports, make_tree, makepath, require_tcp, rmtree, rsync_argv,
-    test_fail, test_skipped, write_daemon_conf, split_rsync_cmd,
+    FROMDIR, RSYNC_PEER, SCRATCHDIR, claim_ports, make_tree, makepath, require_tcp, rmtree,
+    rsync_argv, split_rsync_cmd, test_fail, test_skipped,
 )
 
 if platform.system().startswith('CYGWIN'):
@@ -37,7 +37,7 @@ for p in (pidfile, logfile):
 
 conf = write_daemon_conf(
     [('mod', {'path': str(dest), 'read only': 'no', 'use chroot': 'no'})],
-    globals={
+    global_options={
         'port': str(PORT),
         'address': '127.0.0.1',
         'pid file': str(pidfile),

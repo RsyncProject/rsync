@@ -5,10 +5,8 @@ import shlex
 import shutil
 import subprocess
 
-from harness.rsync import (
-    SCRATCHDIR, SRCDIR, makepath, rmtree, rsync_argv,
-    test_fail, test_skipped, write_daemon_conf,
-)
+from harness.daemon_config import write_daemon_conf
+from harness.rsync import SCRATCHDIR, SRCDIR, makepath, rmtree, rsync_argv, test_fail, test_skipped
 
 if not (SRCDIR / 'flist.c').is_file() or not (SRCDIR / 'Makefile').is_file():
     test_skipped("malicious-sender-delete-scope: needs a writable rsync "

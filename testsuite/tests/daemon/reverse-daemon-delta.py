@@ -5,9 +5,10 @@ import os
 import re
 import subprocess
 
+from harness.daemon_config import build_rsyncd_conf
 from harness.rsync import (
-    FROMDIR, RSYNC, RSYNC_PEER, TMPDIR,
-    build_rsyncd_conf, makepath, make_data_file, start_test_daemon, test_fail, split_rsync_cmd,
+    FROMDIR, RSYNC, RSYNC_PEER, TMPDIR, make_data_file, makepath, split_rsync_cmd,
+    start_test_daemon, test_fail,
 )
 from harness import metadata
 

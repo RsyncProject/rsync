@@ -3,10 +3,8 @@
 import socket
 import struct
 
-from harness.rsync import (
-    SCRATCHDIR, claim_ports, makepath, require_tcp, start_rsyncd, test_fail,
-    write_daemon_conf,
-)
+from harness.daemon_config import write_daemon_conf
+from harness.rsync import SCRATCHDIR, claim_ports, makepath, require_tcp, start_rsyncd, test_fail
 
 PORT_OK = 19873
 PORT_NOHOSTS = 19874
@@ -24,7 +22,7 @@ conf_ok = write_daemon_conf(
         'use chroot': 'no',
         'hosts allow': '10.0.0.0/8, fd00::/8',
     })],
-    globals={
+    global_options={
         'proxy protocol': 'yes',
         'proxy protocol hosts': '127.0.0.0/8',
         'reverse lookup': 'no',
@@ -36,7 +34,7 @@ start_rsyncd(conf_ok, PORT_OK)
 
 conf_nohosts = write_daemon_conf(
     [('mod', {'path': str(base / 'mod'), 'read only': 'yes', 'use chroot': 'no'})],
-    globals={
+    global_options={
         'proxy protocol': 'yes',
         'reverse lookup': 'no',
         'hosts allow': '',

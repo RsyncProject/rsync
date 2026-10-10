@@ -3,9 +3,9 @@
 import socket
 import stat
 
+from harness.daemon_config import write_daemon_conf
 from harness.rsync import (
-    SCRATCHDIR, makepath, rmtree, rsync_argv, start_test_daemon, test_skipped, test_fail,
-    write_daemon_conf,
+    SCRATCHDIR, makepath, rmtree, rsync_argv, start_test_daemon, test_fail, test_skipped,
 )
 import subprocess
 

@@ -2,10 +2,8 @@
 
 import socket
 
-from harness.rsync import (
-    RSYNC, SCRATCHDIR, claim_free_port, rmtree, start_rsyncd,
-    test_skipped, write_daemon_conf,
-)
+from harness.daemon_config import write_daemon_conf
+from harness.rsync import RSYNC, SCRATCHDIR, claim_free_port, rmtree, start_rsyncd, test_skipped
 
 if not hasattr(socket, 'AF_UNIX') or not hasattr(socket, 'socketpair'):
     test_skipped('Unix-domain socket pairs are unavailable', capability='unix_socketpair')

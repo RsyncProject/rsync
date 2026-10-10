@@ -2,17 +2,10 @@
 
 import subprocess
 
+from harness.daemon_config import write_daemon_conf
 from harness.rsync import (
-    FROMDIR,
-    SCRATCHDIR,
-    make_tree,
-    makepath,
-    rmtree,
-    rsync_argv,
-    start_test_daemon,
-    test_fail,
+    FROMDIR, SCRATCHDIR, make_tree, makepath, rmtree, rsync_argv, start_test_daemon, test_fail,
     verify_dirs,
-    write_daemon_conf,
 )
 from harness import metadata
 

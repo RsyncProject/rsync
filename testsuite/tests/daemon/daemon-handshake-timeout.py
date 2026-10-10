@@ -5,9 +5,10 @@ from pathlib import Path
 import socket
 import time
 
+from harness.daemon_config import write_daemon_conf
 from harness.rsync import (
-    RSYNC, SCRATCHDIR, makepath, require_tcp, rmtree, start_test_daemon,
-    test_fail, under_valgrind, write_daemon_conf,
+    RSYNC, SCRATCHDIR, makepath, require_tcp, rmtree, start_test_daemon, test_fail,
+    under_valgrind,
 )
 
 require_tcp("raw stalled clients need a real TCP daemon; run with --use-tcp")
@@ -204,7 +205,7 @@ conf_fast = write_daemon_conf(
         ('clientlow', {'path': str(mod), 'timeout': '8', 'read only': 'yes'}),
         ('modulelow', {'path': str(mod), 'timeout': '3', 'read only': 'yes'}),
     ],
-    globals={
+    global_options={
         'timeout': str(FAST),
         'pid file': str(base / 'fast.pid'),
         'log file': str(base / 'fast.log'),
@@ -226,7 +227,7 @@ conf_args = write_daemon_conf(
             'secrets file': str(secrets),
         }),
     ],
-    globals={
+    global_options={
         'timeout': '20',
         'pid file': str(base / 'args.pid'),
         'log file': str(base / 'args.log'),
@@ -276,7 +277,7 @@ stalled_transfer(port_fast, 'zero', 4,
 
 conf_default = write_daemon_conf(
     [('default', {'path': str(mod), 'read only': 'yes'})],
-    globals={
+    global_options={
         'pid file': str(base / 'default.pid'),
         'log file': str(base / 'default.log'),
     },

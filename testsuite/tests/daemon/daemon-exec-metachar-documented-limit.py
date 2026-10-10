@@ -4,10 +4,8 @@ import os
 import shlex
 import subprocess
 
-from harness.rsync import (
-    SCRATCHDIR, makepath, rmtree, rsync_argv, start_test_daemon, test_fail,
-    write_daemon_conf,
-)
+from harness.daemon_config import write_daemon_conf
+from harness.rsync import SCRATCHDIR, makepath, rmtree, rsync_argv, start_test_daemon, test_fail
 
 REFUSAL = 'holds a shell metacharacter'
 
@@ -52,7 +50,7 @@ makepath(dest2)
 conf2 = write_daemon_conf([
     ('m', {'path': str(module), 'read only': 'yes',
            'pre-xfer exec': shlex.quote(str(hook))}),
-], globals={'pid file': str(base / 'rsyncd2.pid')},
+], global_options={'pid file': str(base / 'rsyncd2.pid')},
     name='exec-metachar-environment.conf')
 url2 = start_test_daemon(conf2, 12992)
 
@@ -80,7 +78,7 @@ for ch in ('*', '?', '[', ']', '#', '!', '~', '{', '}'):
     c = write_daemon_conf([
         ('m', {'path': str(mod), 'read only': 'yes',
                'pre-xfer exec': "sh -c 'printf %s \"%RSYNC_MODULE_PATH%\" >/dev/null'"}),
-    ], globals={'pid file': str(base / f'pid{ord(ch)}'), 'log file': str(chlog)},
+    ], global_options={'pid file': str(base / f'pid{ord(ch)}'), 'log file': str(chlog)},
         name=f'exec-metachar-{ord(ch)}.conf')
     u = start_test_daemon(c, port)
     port += 1

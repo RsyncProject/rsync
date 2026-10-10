@@ -2,9 +2,9 @@
 
 import socket
 
+from harness.daemon_config import write_daemon_conf
 from harness.rsync import (
-    FROMDIR, RSYNC, SCRATCHDIR, claim_ports, make_tree, rmtree, run_rsync,
-    start_rsyncd, write_daemon_conf,
+    FROMDIR, RSYNC, SCRATCHDIR, claim_ports, make_tree, rmtree, run_rsync, start_rsyncd,
 )
 
 PORT4 = 13020
@@ -16,7 +16,7 @@ make_tree(FROMDIR, depth=1)
 modules = [('module', {'path': str(FROMDIR), 'read only': 'yes'})]
 conf4 = write_daemon_conf(
     modules,
-    globals={
+    global_options={
         'pid file': str(SCRATCHDIR / 'rsyncd-v4.pid'),
         'log file': str(SCRATCHDIR / 'rsyncd-v4.log'),
         'hosts allow': '127.0.0.0/8',
@@ -25,7 +25,7 @@ conf4 = write_daemon_conf(
 )
 conf6 = write_daemon_conf(
     modules,
-    globals={
+    global_options={
         'pid file': str(SCRATCHDIR / 'rsyncd-v6.pid'),
         'log file': str(SCRATCHDIR / 'rsyncd-v6.log'),
         'hosts allow': '::1',

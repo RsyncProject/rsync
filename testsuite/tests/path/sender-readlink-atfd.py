@@ -5,9 +5,8 @@ import subprocess
 import time
 
 from harness.mutation import race_budget, start_path_flipper, stop_flipper
-from harness.rsync import (
-    SCRATCHDIR, rmtree, rsync_argv, start_test_daemon, test_fail, write_daemon_conf,
-)
+from harness.daemon_config import write_daemon_conf
+from harness.rsync import SCRATCHDIR, rmtree, rsync_argv, start_test_daemon, test_fail
 
 base = SCRATCHDIR / 'sender-readlink'
 mod = base / 'module'

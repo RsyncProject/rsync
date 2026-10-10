@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 
-from harness.rsync import SCRATCHDIR, makepath, rmtree, run_rsync, start_test_daemon, test_fail, test_skipped, write_daemon_conf
+from harness.daemon_config import write_daemon_conf
+from harness.rsync import (
+    SCRATCHDIR, makepath, rmtree, run_rsync, start_test_daemon, test_fail, test_skipped,
+)
 
 if ' ' in str(SCRATCHDIR):
     test_skipped("rsyncd.conf exclude cannot represent a path containing spaces")

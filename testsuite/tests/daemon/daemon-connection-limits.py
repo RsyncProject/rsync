@@ -3,9 +3,9 @@
 import socket
 import time
 
+from harness.daemon_config import write_daemon_conf
 from harness.rsync import (
-    FROMDIR, RSYNC, SCRATCHDIR, claim_ports, make_tree, rmtree, start_rsyncd,
-    test_fail, write_daemon_conf,
+    FROMDIR, RSYNC, SCRATCHDIR, claim_ports, make_tree, rmtree, start_rsyncd, test_fail,
 )
 
 PORT = 13022

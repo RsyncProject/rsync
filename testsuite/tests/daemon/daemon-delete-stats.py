@@ -2,10 +2,10 @@
 
 import subprocess
 
+from harness.daemon_config import build_rsyncd_conf
 from harness.rsync import (
-    FROMDIR, TODIR,
-    build_rsyncd_conf, forced_protocol, makepath, rmtree, rsync_argv,
-    start_test_daemon, test_fail,
+    FROMDIR, TODIR, forced_protocol, makepath, rmtree, rsync_argv, start_test_daemon,
+    test_fail,
 )
 
 DAEMON_PORT = 12899

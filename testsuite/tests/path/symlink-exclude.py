@@ -2,7 +2,8 @@
 
 import os
 
-from harness.rsync import SCRATCHDIR, makepath, rmtree, run_rsync, start_test_daemon, test_fail, write_daemon_conf
+from harness.daemon_config import write_daemon_conf
+from harness.rsync import SCRATCHDIR, makepath, rmtree, run_rsync, start_test_daemon, test_fail
 
 base = SCRATCHDIR / 'symlink-exclude'
 rmtree(base)

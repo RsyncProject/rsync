@@ -3,9 +3,10 @@
 import os
 import time
 
+from harness.daemon_config import write_daemon_conf
 from harness.rsync import (
-    SCRATCHDIR, claim_ports, get_rootuid, get_testuid, makepath, require_tcp,
-    rmtree, start_test_daemon, test_fail, test_skipped, write_daemon_conf,
+    SCRATCHDIR, claim_ports, get_rootuid, get_testuid, makepath, require_tcp, rmtree,
+    start_test_daemon, test_fail, test_skipped,
 )
 from harness import protocol as rp
 

@@ -6,9 +6,9 @@ import subprocess
 import sys
 import tempfile
 
+from harness.daemon_config import write_daemon_conf
 from harness.rsync import (
-    SCRATCHDIR, claim_free_port, rmtree, rsync_argv, test_fail,
-    test_skipped, under_valgrind, write_daemon_conf,
+    SCRATCHDIR, claim_free_port, rmtree, rsync_argv, test_fail, test_skipped, under_valgrind,
 )
 
 if not hasattr(socket, 'AF_UNIX'):
