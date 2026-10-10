@@ -3,10 +3,10 @@
 import os
 import subprocess
 
+from harness.daemon_config import write_daemon_conf
 from harness.rsync import (
-    FROMDIR, RSYNC, SCRATCHDIR, SRCDIR,
-    make_tree, makepath, rmtree, run_rsync, rsync_argv, start_test_daemon,
-    test_fail, test_skipped, write_daemon_conf, split_rsync_cmd,
+    FROMDIR, RSYNC, SCRATCHDIR, SRCDIR, make_tree, makepath, rmtree, rsync_argv, run_rsync,
+    split_rsync_cmd, start_test_daemon, test_fail, test_skipped,
 )
 
 DAEMON_PORT = 12953

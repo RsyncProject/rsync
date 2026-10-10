@@ -109,64 +109,6 @@ def get_rootuid() -> int:
 def get_rootgid() -> int:
     return 0
 
-def build_rsyncd_conf() -> Path:
-    conf = SCRATCHDIR / 'test-rsyncd.conf'
-    pidfile = SCRATCHDIR / 'rsyncd.pid'
-    logfile = SCRATCHDIR / 'rsyncd.log'
-
-    my_uid = get_testuid()
-    root_uid = get_rootuid()
-    root_gid = get_rootgid()
-
-    uid_line = f'uid = {root_uid}' if my_uid == root_uid else ''
-    gid_line = f'gid = {root_gid}' if my_uid == root_uid else ''
-
-    conf.write_text(f"""\
-pid file = {pidfile}
-use chroot = no
-munge symlinks = no
-hosts allow = localhost 127.0.0.0/8
-log file = {logfile}
-transfer logging = yes
-exclude = ? foobar.baz
-max verbosity = 4
-{uid_line}
-{gid_line}
-
-[test-from]
-\tpath = {FROMDIR}
-\tlog format = %i %h [%a] %m (%u) %l %f%L
-\tread only = yes
-\tcomment = r/o
-
-[test-to]
-\tpath = {TODIR}
-\tlog format = %i %h [%a] %m (%u) %l %f%L
-\tread only = no
-\tcomment = r/w
-
-[test-scratch]
-\tpath = {SCRATCHDIR}
-\tlog format = %i %h [%a] %m (%u) %l %f%L
-\tread only = no
-
-[test-hidden]
-\tpath = {FROMDIR}
-\tlist = no
-""")
-
-    ignore23 = SCRATCHDIR / 'ignore23'
-    ignore23.write_text(
-        '#!/bin/sh\n'
-        'if "${@}"; then exit; fi\n'
-        'ret=$?\n'
-        'if test $ret = 23; then exit; fi\n'
-        'exit $ret\n'
-    )
-    ignore23.chmod(0o755)
-
-    return conf
-
 def rsync_getgroups() -> list:
     out = subprocess.check_output([str(TOOLDIR / 'getgroups')], text=True)
     return out.split()
@@ -424,50 +366,6 @@ def proc_self_fd_pins() -> bool:
     _psf_cache = resolves('/') and resolves(os.path.realpath(__file__))
     return _psf_cache
 
-def write_daemon_conf(modules, globals=None, *,
-                      name: str = 'test-rsyncd.conf') -> Path:
-    conf = SCRATCHDIR / name
-    pidfile = SCRATCHDIR / 'rsyncd.pid'
-    logfile = SCRATCHDIR / 'rsyncd.log'
-
-    g = {
-        'pid file': str(pidfile),
-        'use chroot': 'no',
-        'hosts allow': 'localhost 127.0.0.0/8',
-        'log file': str(logfile),
-        'max verbosity': '4',
-    }
-    if globals:
-        g.update(globals)
-    if get_testuid() == get_rootuid():
-        g.setdefault('uid', str(get_rootuid()))
-        g.setdefault('gid', str(get_rootgid()))
-    else:
-        g.pop('uid', None)
-        g.pop('gid', None)
-
-    lines = []
-    lines += [f'{k} = {v}' for k, v in g.items()]
-    lines.append('')
-    for mod_name, params in modules:
-        lines.append(f'[{mod_name}]')
-        lines += [f'\t{k} = {v}' for k, v in params.items()]
-        lines.append('')
-    conf.write_text('\n'.join(lines) + '\n')
-
-    ignore23 = SCRATCHDIR / 'ignore23'
-    if not ignore23.exists():
-        ignore23.write_text(
-            '#!/bin/sh\n'
-            'if "${@}"; then exit; fi\n'
-            'ret=$?\n'
-            'if test $ret = 23; then exit; fi\n'
-            'exit $ret\n'
-        )
-        ignore23.chmod(0o755)
-
-    return conf
-
 def expect_fail(argv, text, env=None, cwd=None):
     proc = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                           text=True, env=env, cwd=cwd)
@@ -502,68 +400,6 @@ def run_rrsync_denied(command, expected):
     rrsync = patched_rrsync(base)
     env = {**os.environ, 'SSH_ORIGINAL_COMMAND': command}
     expect_fail([str(rrsync), '-ro', '-no-lock', str(restricted)], expected, env=env)
-
-def make_proxy_server(port, response):
-    listener = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM)
-    listener.setsockopt(_socket.SOL_SOCKET, _socket.SO_REUSEADDR, 1)
-    listener.bind(('127.0.0.1', port))
-    listener.listen(1)
-
-    def serve():
-        conn, _ = listener.accept()
-        try:
-            conn.recv(65536)
-            conn.sendall(response)
-        finally:
-            try:
-                conn.close()
-            finally:
-                listener.close()
-
-    import threading
-    t = threading.Thread(target=serve)
-    t.daemon = True
-    t.start()
-    return t
-
-def run_proxy_probe(port, host, expected):
-    env = {**os.environ, 'RSYNC_PROXY': f'127.0.0.1:{port}'}
-    proc = subprocess.run(
-        rsync_argv(f'rsync://{host}/mod/', str(SCRATCHDIR / 'proxy-out')),
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
-    out = (proc.stdout or '') + (proc.stderr or '')
-    if proc.returncode == 0:
-        test_fail(f"proxy probe unexpectedly succeeded:\n{out}")
-    if expected not in out:
-        test_fail(f"expected {expected!r} in proxy probe output:\n{out}")
-    return proc
-
-def setup_chroot_inner(name):
-    if get_testuid() != get_rootuid():
-        test_skipped("chroot /./ module regression requires root", capability='root')
-    if under_valgrind():
-        test_skipped("daemon chroot prevents valgrind from writing its per-process log",
-                     capability='chroot')
-    base = SCRATCHDIR / name
-    outer = base / 'outer'
-    inner = outer / 'inner'
-    outside = outer / 'outside'
-    src = base / 'src'
-    rmtree(base)
-    makepath(inner, outside, src)
-    os.symlink('../outside', inner / 'linkparent')
-    conf = write_daemon_conf([
-        ('mod', {'path': str(outer) + '/./inner', 'read only': 'no',
-                 'use chroot': 'yes', 'munge symlinks': 'no'}),
-    ], globals={'pid file': str(base / 'rsyncd.pid'),
-                'log file': str(base / 'rsyncd.log')},
-       name=f'{name}.conf')
-    url = start_test_daemon(conf, 12940 + (abs(hash(name)) % 200))
-    return base, inner, outside, src, url
-
-def run_checked(argv):
-    proc = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    return proc, (proc.stdout or '') + (proc.stderr or '')
 
 def build_patched_rsync(name, replacements, append_cflags=None):
     if sys.platform == 'cygwin' or platform.system().startswith('CYGWIN'):

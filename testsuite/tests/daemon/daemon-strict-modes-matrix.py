@@ -4,9 +4,9 @@ import os
 import subprocess
 
 from harness.mutation import find_attacker_uid
+from harness.daemon_config import write_daemon_conf
 from harness.rsync import (
     FROMDIR, SCRATCHDIR, make_tree, makepath, rmtree, rsync_argv, start_test_daemon, test_fail,
-    write_daemon_conf,
 )
 
 DAEMON_PORT = 12910

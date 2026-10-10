@@ -47,6 +47,10 @@ def run_rsync(command: str, *args: str, check: bool = True,
         test_fail(f"rsync exited {result.returncode}: {' '.join(argv)}")
     return result
 
+def capture_command(argv):
+    result = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    return result, (result.stdout or '') + (result.stderr or '')
+
 @functools.lru_cache(maxsize=64)
 def rsync_supports(command: str, flag: str) -> bool:
     try:

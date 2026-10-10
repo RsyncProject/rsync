@@ -4,10 +4,8 @@ import os
 import pwd
 import subprocess
 
-from harness.rsync import (
-    SCRATCHDIR, rmtree, rsync_argv, start_test_daemon, test_fail,
-    test_skipped, write_daemon_conf,
-)
+from harness.daemon_config import write_daemon_conf
+from harness.rsync import SCRATCHDIR, rmtree, rsync_argv, start_test_daemon, test_fail, test_skipped
 
 DAEMON_PORT = 12900
 CANARY = "audit_escape_canary"

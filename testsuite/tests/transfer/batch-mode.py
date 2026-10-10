@@ -3,10 +3,10 @@
 import os
 import subprocess
 
+from harness.daemon_config import build_rsyncd_conf
 from harness.rsync import (
-    CHKDIR, FROMDIR, SCRATCHDIR, TMPDIR, TODIR,
-    build_rsyncd_conf, checkit, hands_setup, rmtree,
-    rsync_argv, run_rsync, start_test_daemon, test_fail, verify_dirs,
+    CHKDIR, FROMDIR, SCRATCHDIR, TMPDIR, TODIR, checkit, hands_setup, rmtree, rsync_argv,
+    run_rsync, start_test_daemon, test_fail, verify_dirs,
 )
 from harness import metadata
 

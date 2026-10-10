@@ -2,10 +2,8 @@
 
 import os
 
-from harness.rsync import (
-    SCRATCHDIR, forced_protocol, makepath, rmtree, test_fail, test_skipped,
-    write_daemon_conf,
-)
+from harness.daemon_config import write_daemon_conf
+from harness.rsync import SCRATCHDIR, forced_protocol, makepath, rmtree, test_fail, test_skipped
 from harness.daemon import finish_stdio_daemon, start_stdio_daemon
 
 _proto = forced_protocol()

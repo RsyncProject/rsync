@@ -3,7 +3,8 @@
 import os
 import shutil
 
-from harness.rsync import run_checked, setup_chroot_inner
+from harness.daemon_config import setup_chroot_inner
+from harness.process import capture_command
 from harness.rsync import makepath, rsync_argv, test_fail
 
 for option in ('compare', 'copy', 'link'):
@@ -15,8 +16,8 @@ for option in ('compare', 'copy', 'link'):
         (outside / 'file').write_text('escape\n')
         mtime = (source / 'file').stat().st_mtime
         os.utime(outside / 'file', (mtime, mtime))
-    _, output = run_checked(rsync_argv('-a', f'--{option}-dest=../linkparent',
-                                       f'{source}/', f'{url}mod/destination/'))
+    _, output = capture_command(rsync_argv('-a', f'--{option}-dest=../linkparent',
+                                           f'{source}/', f'{url}mod/destination/'))
     result = inner / 'destination' / 'file'
     if not result.exists():
         test_fail(f'{option}-dest suppressed destination creation:\n{output}')

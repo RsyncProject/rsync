@@ -3,11 +3,10 @@
 import os
 import subprocess
 
+from harness.daemon_config import write_daemon_conf
 from harness.rsync import (
-    RSYNC, RSYNC_PEER, SCRATCHDIR,
-    makepath, rmtree, rsync_argv, rsync_path_arg, rsh_cmd,
+    RSYNC, RSYNC_PEER, SCRATCHDIR, makepath, rmtree, rsh_cmd, rsync_argv, rsync_path_arg,
     split_rsync_cmd, start_test_daemon, test_fail, test_skipped,
-    write_daemon_conf,
 )
 
 UTF8_NAME = b'caf\xc3\xa9.txt'

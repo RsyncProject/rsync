@@ -2,10 +2,10 @@
 
 import subprocess
 
+from harness.daemon_config import write_daemon_conf
 from harness.rsync import (
-    SCRATCHDIR, FROMDIR,
-    claim_ports, make_tree, makepath, require_tcp, rmtree, rsync_argv,
-    start_test_daemon, test_fail, write_daemon_conf,
+    FROMDIR, SCRATCHDIR, claim_ports, make_tree, makepath, require_tcp, rmtree, rsync_argv,
+    start_test_daemon, test_fail,
 )
 
 require_tcp("motd/socket-options need a real socket")
@@ -46,7 +46,7 @@ mods = [
 ]
 conf = write_daemon_conf(
     mods,
-    globals={
+    global_options={
         'motd file': str(motd),
         'socket options': 'SO_KEEPALIVE SO_RCVBUF=8192 SO_BROADCAST NOSUCHOPT',
     },

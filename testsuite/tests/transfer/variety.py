@@ -6,23 +6,11 @@ import shlex
 import subprocess
 import sys
 
+from harness.daemon_config import write_daemon_conf
 from harness.rsync import (
-    RSYNC,
-    RSYNC_PEER,
-    SCRATCHDIR,
-    USE_TCP,
-    make_variety_tree,
-    compare_trees,
-    rmtree,
-    xattrs_supported,
-    acls_supported,
-    devices_supported,
-    owners_supported,
-    write_daemon_conf,
-    start_test_daemon,
-    test_fail,
-    split_rsync_cmd,
-    rsh_cmd,
+    RSYNC, RSYNC_PEER, SCRATCHDIR, USE_TCP, acls_supported, compare_trees, devices_supported,
+    make_variety_tree, owners_supported, rmtree, rsh_cmd, split_rsync_cmd, start_test_daemon,
+    test_fail, xattrs_supported,
 )
 from harness import metadata
 
@@ -110,7 +98,7 @@ def _make_conf(role):
     return write_daemon_conf([
         ('vsrc', {'path': str(TR), 'read only': 'yes'}),
         ('vdst', {'path': str(VDST_BASE), 'read only': 'no'}),
-    ], globals={
+    ], global_options={
         'munge symlinks': 'no',
         'pid file': str(SCRATCHDIR / f'rsyncd-{role}.pid'),
         'log file': str(SCRATCHDIR / f'rsyncd-{role}.log'),

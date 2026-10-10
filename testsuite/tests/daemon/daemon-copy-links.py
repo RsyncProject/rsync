@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
+from harness.daemon_config import write_daemon_conf
 from harness.rsync import (
-    SCRATCHDIR, assert_same, makepath, rmtree, run_rsync, start_test_daemon,
-    test_fail, write_daemon_conf,
+    SCRATCHDIR, assert_same, makepath, rmtree, run_rsync, start_test_daemon, test_fail,
 )
 
 base = SCRATCHDIR / 'daemon-copy-links'

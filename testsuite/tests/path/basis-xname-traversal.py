@@ -4,9 +4,10 @@ import os
 import shlex
 import subprocess
 
+from harness.daemon_config import write_daemon_conf
 from harness.rsync import (
-    SCRATCHDIR, build_patched_rsync, forced_protocol, makepath, rmtree,
-    rsync_argv_for, test_fail, test_skipped, write_daemon_conf,
+    SCRATCHDIR, build_patched_rsync, forced_protocol, makepath, rmtree, rsync_argv_for,
+    test_fail, test_skipped,
 )
 
 _proto = forced_protocol()

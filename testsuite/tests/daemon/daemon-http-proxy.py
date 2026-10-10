@@ -7,10 +7,10 @@ import socket
 import subprocess
 import threading
 
+from harness.daemon_config import write_daemon_conf
 from harness.rsync import (
-    SCRATCHDIR, FROMDIR,
-    claim_ports, make_tree, makepath, require_tcp, rmtree, rsync_argv,
-    start_test_daemon, test_fail, write_daemon_conf,
+    FROMDIR, SCRATCHDIR, claim_ports, make_tree, makepath, require_tcp, rmtree, rsync_argv,
+    start_test_daemon, test_fail,
 )
 
 require_tcp("RSYNC_PROXY uses open_socket_out(), needs a real TCP connect")

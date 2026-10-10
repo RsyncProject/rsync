@@ -3,10 +3,8 @@
 import socket
 import subprocess
 
-from harness.rsync import (
-    SCRATCHDIR, claim_free_port, rmtree, rsync_argv, test_fail,
-    write_daemon_conf,
-)
+from harness.daemon_config import write_daemon_conf
+from harness.rsync import SCRATCHDIR, claim_free_port, rmtree, rsync_argv, test_fail
 
 base = SCRATCHDIR / 'daemon-stdin-inetd'
 rmtree(base)

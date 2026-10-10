@@ -7,10 +7,10 @@ import subprocess
 import sys
 import time
 
+from harness.daemon_config import build_rsyncd_conf
 from harness.rsync import (
-    FROMDIR, SCRATCHDIR, TODIR, claim_ports, make_data_file, makepath, rmtree,
-    rsync_argv, start_rsyncd, test_fail, test_skipped, build_rsyncd_conf,
-    USE_TCP,
+    FROMDIR, SCRATCHDIR, TODIR, USE_TCP, claim_ports, make_data_file, makepath, rmtree,
+    rsync_argv, start_rsyncd, test_fail, test_skipped,
 )
 
 KNOWN_RERR = {
