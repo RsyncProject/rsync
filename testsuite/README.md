@@ -5,8 +5,8 @@ Rsync's automated tests live here. Bug fixes should include a regression test wh
 ## Layout
 - `testsuite/tests/` groups test scripts by the subsystem they exercise. Test names end in `_test.py`
 - `testsuite/runtests.py` discovers and runs tests
-- `testsuite/rsyncfns.py` keeps legacy helper imports working during migration
-- `testsuite/harness/` contains filesystem, metadata, profile, result and receipt support
+- `testsuite/rsyncfns.py` contains helpers not yet moved into the harness
+- `testsuite/harness/` contains filesystem, metadata, process, profile, result and receipt support
 - `testsuite/profiles/` records platform capabilities and peer deviations
 - `testsuite/fleettest.py` runs the suite across the maintainer fleet
 - `testsuite/abdiff.py` compares two rsync versions over the same transfers

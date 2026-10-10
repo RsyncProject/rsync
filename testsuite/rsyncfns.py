@@ -17,9 +17,10 @@ Conventions matching the shell harness:
 from __future__ import annotations
 
 import atexit
+import errno
 import fcntl
 import filecmp
-import errno
+import functools as _functools
 import math
 import os
 import platform
@@ -40,6 +41,12 @@ from harness.filesystem import (assert_exists, assert_hardlinked, assert_is_syml
                                 assert_mtime_close, assert_not_exists, assert_not_hardlinked,
                                 assert_same, cp_p, is_a_link, make_data_file, make_text_file,
                                 make_tree, makepath, rmtree, walk_dirs, walk_files)
+from harness.process import (forced_protocol as _forced_protocol, rsh_cmd as _rsh_cmd,
+                             rsync_argv as _rsync_argv, rsync_argv_for as _rsync_argv_for,
+                             rsync_command_binary as _rsync_command_binary,
+                             rsync_path_arg as _rsync_path_arg, rsync_supports as _rsync_supports,
+                             run_rsync as _run_rsync, split_rsync_cmd,
+                             under_valgrind as _under_valgrind)
 from harness.results import Exit, test_fail, test_skipped, test_xfail
 
 
@@ -85,51 +92,12 @@ RSYNC = _required('RSYNC')         # full command line, possibly with valgrind/p
 RSYNC_PEER = os.environ.get('RSYNC_PEER', RSYNC)
 
 
-def split_rsync_cmd(cmd: str) -> list:
-    """Split an rsync command string into argv, tolerating spaces in the path.
-
-    RSYNC may be a wrapper command ('valgrind --tool=memcheck /build/rsync'),
-    which has to be split, or a plain path to the binary, which must not be if
-    it contains a space -- shlex.split() would turn '/ws test/rsync' into two
-    nonexistent programs.  A path that exists is one word by definition, so
-    check that first and only fall back to splitting for a real command line.
-
-    Call this at use time, never once at import: tests such as chown-fake
-    append ' --fake-super' to rsyncfns.RSYNC part-way through, and a cached
-    split would keep handing back the pre-mutation command.
-    """
-    if os.path.isfile(cmd):
-        return [cmd]
-    # The path may be followed by options -- chown-fake and friends append
-    # ' --fake-super' to RSYNC -- so the whole string is no longer a filename.
-    # Take the longest leading run that names an existing file as the program
-    # and split only what follows.
-    for m in reversed(list(re.finditer(r'\s+', cmd))):
-        head = cmd[:m.start()]
-        if os.path.isfile(head):
-            return [head] + shlex.split(cmd[m.start():])
-    return shlex.split(cmd)
-
-
 def rsync_command_binary(cmd: str = None) -> str:
-    """Return the rsync executable from a possibly wrapped command."""
-    for arg in reversed(split_rsync_cmd(RSYNC if cmd is None else cmd)):
-        if os.path.isfile(arg):
-            return arg
-    raise ValueError('rsync command contains no executable file')
+    return _rsync_command_binary(RSYNC if cmd is None else cmd)
 
 
 def under_valgrind():
-    """True when the runner wrapped rsync in valgrind (runtests.py --valgrind).
-
-    Match the wrapper's program name (first token of RSYNC or RSYNC_PEER), not a
-    bare 'valgrind' substring, so an rsync path that merely contains the word
-    does not false-trigger.
-    """
-    for cmd in (RSYNC, RSYNC_PEER):
-        if os.path.basename(shlex.split(cmd)[0]) == 'valgrind':
-            return True
-    return False
+    return _under_valgrind(RSYNC, RSYNC_PEER)
 
 # TLS_ARGS controls how the 'tls' helper formats listings (e.g. --atimes,
 # -l, -L). Tests that exercise non-default rsync features (atimes, etc.)
@@ -891,110 +859,33 @@ def require_asan(reason: str, which: str = None) -> 'None':
 
 
 def rsh_cmd(cmd: str = None, *opts: str) -> str:
-    """Build an RSYNC_RSH / --rsh value, quoted for rsync's own tokenizer.
-
-    rsync splits this string on spaces itself -- honouring ' and ", see do_cmd()
-    in main.c -- so a remote-shell path containing a space must be quoted or
-    rsync execs only the first word.  The testsuite's srcdir can contain one.
-    """
-    if cmd is None:
-        cmd = str(SRCDIR / 'support' / 'lsh.sh')
-    return ' '.join([shlex.quote(cmd), *opts])
+    command = str(SRCDIR / 'support' / 'lsh.sh') if cmd is None else cmd
+    return _rsh_cmd(command, *opts)
 
 
 def rsync_path_arg(cmd: str = None) -> str:
-    """Value for --rsync-path, quoted for the shell that will re-parse it.
-
-    --rsync-path is a command line run by the remote shell, not a filename, so
-    rsync hands it over unquoted and the far side word-splits it.  A build path
-    containing a space therefore needs quoting here, while a wrapper command
-    ('valgrind ... /build/rsync') must stay several words.  Splitting and
-    re-joining with shlex gives both: each word is quoted only if it needs it.
-    """
-    return shlex.join(split_rsync_cmd(RSYNC_PEER if cmd is None else cmd))
+    return _rsync_path_arg(RSYNC_PEER if cmd is None else cmd)
 
 
 def rsync_argv(*args: str) -> list:
-    """Return the argv for invoking rsync with the given extra arguments.
-
-    RSYNC may be a multi-word command (e.g. 'valgrind ... /build/rsync'); we
-    shlex-split it so subprocess sees a proper argv list. Each *args entry
-    is appended verbatim, so callers should pass tokens already split (no
-    embedded option/value joined by spaces).
-    """
-    return split_rsync_cmd(RSYNC) + list(args)
+    return _rsync_argv(RSYNC, *args)
 
 
 def rsync_argv_for(binary, *args: str, command: str = None) -> list:
-    """Replace rsync in a wrapped command and append transfer arguments."""
-    command = RSYNC if command is None else command
-    argv = split_rsync_cmd(command)
-    argv[argv.index(rsync_command_binary(command))] = os.fspath(binary)
-    return argv + list(args)
+    return _rsync_argv_for(RSYNC if command is None else command, binary, *args)
 
 
-import functools as _functools
-
-
-@_functools.lru_cache(maxsize=64)
 def rsync_supports(flag: str) -> bool:
-    """Does the configured rsync binary accept ``flag``?
-
-    Probes by invoking ``rsync <flag> --version`` and checking the exit code +
-    stderr.  C rsync accepts every flag we'd care about and exits 0 before
-    --version prints; other implementations (gokrazy/rsync, openrsync) reject
-    unsupported flags with "unknown option" / "unrecognized option" /
-    "no such option" and a non-zero exit.
-
-    Used by tests that want to *optionally* pass a hardening flag like
-    `--no-inc-recursive` (only meaningful where the implementation has
-    incremental recursion to disable).  When the probe is inconclusive (e.g.
-    timeout) the helper returns True so tests fall back to today's C-rsync
-    behaviour.
-    """
-    try:
-        r = subprocess.run(rsync_argv(flag, '--version'),
-                           capture_output=True, text=True, timeout=5)
-    except (subprocess.TimeoutExpired, OSError):
-        return True
-    if r.returncode == 0:
-        return True
-    stderr = (r.stderr or '').lower()
-    for marker in ('unknown option', 'unrecognized option', 'no such option'):
-        if marker in stderr:
-            return False
-    # Non-zero exit but no recognizable "unknown" marker -- assume supported.
-    return True
+    return _rsync_supports(RSYNC, flag)
 
 
 def forced_protocol():
-    """The protocol version pinned via --protocol=N in the RSYNC command, or
-    None when the run isn't pinning one (so the binary negotiates its newest).
-    Protocol-sensitive tests use this to gate sub-cases -- e.g. the split
-    between --append and --append-verify only exists at protocol >= 30; at
-    protocol 29 plain --append behaves like the old verifying append."""
-    import re
-    m = re.search(r'--protocol[ =](\d+)', RSYNC)
-    return int(m.group(1)) if m else None
+    return _forced_protocol(RSYNC)
 
 
 def run_rsync(*args: str, check: bool = True,
               capture_output: bool = False) -> subprocess.CompletedProcess:
-    """Run rsync with the given arguments.
-
-    By default, stdout/stderr inherit (so the runner captures them in the
-    per-test log). Set capture_output=True if the test needs to inspect the
-    output. If check is True (the default), a non-zero exit calls
-    test_fail() with the rsync command line.
-    """
-    argv = rsync_argv(*args)
-    if capture_output:
-        proc = subprocess.run(argv, capture_output=True, text=True)
-    else:
-        proc = subprocess.run(argv)
-    if check and proc.returncode != 0:
-        test_fail(f"rsync exited {proc.returncode}: {' '.join(argv)}")
-    return proc
+    return _run_rsync(RSYNC, *args, check=check, capture_output=capture_output)
 
 
 def start_path_flipper(name_a, name_b):
