@@ -73,14 +73,14 @@ jobs:
     - name: run testsuite under valgrind
       run: |
         mkdir -p test-results/valgrind-logs
-        SUDO=
-        [ "${{ matrix.privilege }}" = root ] && SUDO="sudo -E"
-        TCP=
-        [ "${{ matrix.transport }}" = tcp ] && TCP="--use-tcp --daemon-tests-only"
-        $SUDO env RSYNC_TEST_PROFILES=${{ matrix.profiles }} scratchbase="$VALGRIND_SCRATCH" \
+        SUDO=()
+        [ "${{ matrix.privilege }}" = root ] && SUDO=(sudo -E)
+        TCP=()
+        [ "${{ matrix.transport }}" = tcp ] && TCP=(--use-tcp --daemon-tests-only)
+        "${SUDO[@]}" env RSYNC_TEST_PROFILES=${{ matrix.profiles }} scratchbase="$VALGRIND_SCRATCH" \
           ./testsuite/runtests.py --valgrind \
           --valgrind-opts="--leak-check=no --error-exitcode=0" \
-          $TCP -j2 --timeout=600 --preserve-scratch \
+          "${TCP[@]}" -j2 --timeout=600 --preserve-scratch \
           --receipt=test-results/valgrind-${{ matrix.privilege }}-${{ matrix.transport }}.json
 
     - name: scan for unsuppressed valgrind errors
