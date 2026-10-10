@@ -29,6 +29,7 @@ daemon-module-chdir-symlink
 daemon-module-private-parent
 daemon-secrets-file-symlink
 daemon-stdin-local-socket             # Cygwin Python has no AF_UNIX socketpair
+daemon-stdin-unix-listener            # Cygwin cannot pass a named AF_UNIX listener as daemon stdin
 devices
 dir-sgid
 early-input-symlink

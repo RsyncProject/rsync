@@ -22,6 +22,9 @@
 #include "rsync.h"
 #include "itypes.h"
 #include "ifuncs.h"
+#ifdef HAVE_SYS_UN_H
+#include <sys/un.h>
+#endif
 
 extern int quiet;
 extern int dry_run;
@@ -1722,8 +1725,10 @@ static void become_daemon(void)
 	}
 }
 
-/* Inetd supplies a connected IP stream on stdin. Other launchers may use a
- * local socket for process I/O, which must not select inetd mode. */
+/* Inetd supplies a connected IP stream on stdin. Socket activation may also
+ * supply a connected Unix stream whose local endpoint has a name. Other
+ * launchers may use an unnamed local socket for process I/O, which must not
+ * select inetd mode. */
 static int is_inetd_socket(int fd)
 {
 	int type;
@@ -1736,11 +1741,38 @@ static int is_inetd_socket(int fd)
 	 || getpeername(fd, (struct sockaddr *)&peer, &peer_len) != 0)
 		return 0;
 
-	return peer.ss_family == AF_INET
+	if (peer.ss_family == AF_INET
 #ifdef INET6
-	    || peer.ss_family == AF_INET6
+	 || peer.ss_family == AF_INET6
 #endif
-	    ;
+	)
+		return 1;
+
+#ifdef HAVE_SYS_UN_H
+	if (peer.ss_family == AF_UNIX) {
+		struct sockaddr_storage local = {0};
+		struct sockaddr_un *local_un = (struct sockaddr_un *)&local;
+		socklen_t local_len = sizeof local;
+		size_t path_len, i;
+
+		if (getsockname(fd, (struct sockaddr *)&local, &local_len) != 0
+		 || local.ss_family != AF_UNIX)
+			return 0;
+
+		if (local_len <= (socklen_t)offsetof(struct sockaddr_un, sun_path))
+			return 0;
+		path_len = (size_t)local_len - offsetof(struct sockaddr_un, sun_path);
+		if (path_len > sizeof local_un->sun_path)
+			path_len = sizeof local_un->sun_path;
+		for (i = 0; i < path_len; i++) {
+			if (local_un->sun_path[i] != '\0')
+				return 1;
+		}
+		return 0;
+	}
+#endif
+
+	return 0;
 }
 
 int daemon_main(void)
