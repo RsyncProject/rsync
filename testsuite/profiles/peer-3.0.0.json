@@ -2,17 +2,12 @@
   "peer": "3.0.0",
   "protocol": 30,
   "xfail": {
-    "alt-dest-symlink-race": "pre-hardening",
     "batch-mode": "peer-feature-gap",
-    "chdir-symlink-race": "pre-hardening",
     "chmod-option": "peer-feature-gap",
-    "copy-dest-source-symlink": "pre-hardening",
-    "daemon": "peer-feature-gap",
+    "daemon-basics": "peer-feature-gap",
     "daemon-config": "peer-feature-gap",
     "daemon-filter": "peer-feature-gap",
-    "daemon-gzip-download": "peer-feature-gap",
-    "daemon-gzip-upload": "peer-feature-gap",
-    "daemon-refuse": "peer-feature-gap",
-    "sender-flist-symlink-leak": "pre-hardening"
+    "daemon-gzip": "peer-feature-gap",
+    "daemon-refuse": "peer-feature-gap"
   }
 }

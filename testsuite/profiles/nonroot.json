@@ -2,6 +2,7 @@
   "unsupported": {
     "chroot": "no usable chroot fixture",
     "cross_uid": "no cross-UID fixture",
+    "device_nodes": "cannot create device nodes",
     "group_auth": "no group-auth fixture",
     "ownership": "no Unix ownership fixture",
     "protected_regular": "no protected_regular sysctl",

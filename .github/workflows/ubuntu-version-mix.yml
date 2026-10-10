@@ -4,9 +4,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
-# Run the current suite against every retained peer over pipe and TCP transports.
-# Test metadata selects applicable coverage while peer profiles record deviations.
-
 on:
   push:
     branches: [ master ]
@@ -42,7 +39,6 @@ jobs:
     - name: configure
       run: ./configure --with-rrsync
     - name: make
-      # Build rsync and the helpers used by direct runner invocations.
       run: make check-progs
     - name: info
       run: ./rsync --version | head -1
@@ -61,7 +57,7 @@ jobs:
             [ "$transport" = tcp ] && tcp=(--use-tcp --daemon-tests-only)
             echo "::group::$name ($transport): $("$peer" --version | head -1)"
             if ! ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --rsync-bin2="$PWD/$peer" \
-                  --profiles="linux,$profile" --receipt="test-results/version-mix/$name-$transport.json" \
+                  --profiles="linux,pre-3.4.3,$profile" --receipt="test-results/version-mix/$name-$transport.json" \
                   "${tcp[@]}" -j 8; then
               echo "::error::version-mix failed: $name ($transport)"
               rc=1

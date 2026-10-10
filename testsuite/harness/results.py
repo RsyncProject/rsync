@@ -1,48 +1,27 @@
 import enum
+import json
 import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from exitcodes import Exit
-
-
-class Outcome(str, enum.Enum):
-    PASS = 'pass'
-    FAIL = 'fail'
-    ERROR = 'error'
-    SKIP = 'skip'
-    UNSUPPORTED = 'unsupported'
-    XFAIL = 'xfail'
-    XPASS = 'xpass'
-    PROFILE_ERROR = 'profile_error'
-
-
-def outcome_of(exit_code, unsupported=''):
-    if exit_code == Exit.PASS:
-        return Outcome.PASS
-    if exit_code == Exit.ERROR:
-        return Outcome.ERROR
-    if exit_code == Exit.SKIP:
-        return Outcome.UNSUPPORTED if unsupported else Outcome.SKIP
-    if exit_code == Exit.XFAIL:
-        return Outcome.XFAIL
-    return Outcome.FAIL
-
+class Exit(enum.IntEnum):
+    PASS = 0
+    FAIL = 1
+    ERROR = 2
+    SKIP = 77
+    XFAIL = 78
 
 def verdict_of(outcome, expected):
-    if expected == 'fail' or (expected and expected.startswith('xfail')):
-        if outcome in (Outcome.FAIL, Outcome.XFAIL):
-            return Outcome.XFAIL
-        return Outcome.XPASS if outcome == Outcome.PASS else Outcome.PROFILE_ERROR
+    if expected and expected.startswith('xfail'):
+        if outcome in ('fail', 'xfail'):
+            return 'xfail'
+        return 'xpass' if outcome == 'pass' else 'profile_error'
     if expected and expected.startswith('unsupported'):
-        return Outcome.UNSUPPORTED if outcome == Outcome.UNSUPPORTED else Outcome.PROFILE_ERROR
-    if expected == 'skip':
-        return Outcome.SKIP if outcome == Outcome.SKIP else Outcome.PROFILE_ERROR
-    if expected == 'pass' and outcome in (Outcome.SKIP, Outcome.UNSUPPORTED, Outcome.XFAIL):
-        return Outcome.PROFILE_ERROR
+        return 'unsupported' if outcome == 'unsupported' else 'profile_error'
+    if expected == 'pass' and outcome in ('skip', 'unsupported', 'xfail'):
+        return 'profile_error'
     return outcome
-
 
 @dataclass
 class TestResult:
@@ -55,14 +34,22 @@ class TestResult:
 
     @property
     def outcome(self):
-        return outcome_of(self.exit_code, self.unsupported)
+        if self.exit_code == Exit.PASS:
+            return 'pass'
+        if self.exit_code == Exit.ERROR:
+            return 'error'
+        if self.exit_code == Exit.SKIP:
+            return 'unsupported' if self.unsupported else 'skip'
+        if self.exit_code == Exit.XFAIL:
+            return 'xfail'
+        return 'fail'
 
     def record(self, expected=None):
         verdict = verdict_of(self.outcome, expected)
         data = {
             'name': self.name,
-            'outcome': self.outcome.value,
-            'verdict': verdict.value,
+            'outcome': self.outcome,
+            'verdict': verdict,
             'exit_code': int(self.exit_code),
             'duration_seconds': round(self.duration, 6),
         }
@@ -74,28 +61,33 @@ class TestResult:
             data['expected'] = expected
         return data
 
+def write_receipt(path, data):
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary = target.with_name(f'.{target.name}.{os.getpid()}.tmp')
+    try:
+        with temporary.open('x', encoding='utf-8') as stream:
+            json.dump(data, stream, indent=2, sort_keys=True)
+            stream.write('\n')
+        os.replace(temporary, target)
+    finally:
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
 
 def test_fail(msg: str) -> None:
     sys.stderr.write(msg.rstrip() + '\n')
     sys.exit(Exit.FAIL)
 
-
 def test_skipped(msg: str, capability: str = None) -> None:
     sys.stderr.write(msg.rstrip() + '\n')
     scratch = Path(os.environ['scratchdir'])
     if capability:
-        (scratch / 'unsupported').write_text(capability + '\n')
-    (scratch / 'whyskipped').write_text(msg.rstrip() + '\n')
+        (scratch / 'unsupported').write_text(capability + '\n', encoding='utf-8')
+    (scratch / 'whyskipped').write_text(msg.rstrip() + '\n', encoding='utf-8')
     sys.exit(Exit.SKIP)
-
 
 def test_xfail(msg: str) -> None:
     sys.stderr.write(msg.rstrip() + '\n')
     sys.exit(Exit.XFAIL)
-
-
-def unsupported(capability: str) -> None:
-    scratch = Path(os.environ['scratchdir'])
-    (scratch / 'unsupported').write_text(capability + '\n', encoding='utf-8')
-    (scratch / 'whyskipped').write_text(capability + '\n', encoding='utf-8')
-    raise SystemExit(Exit.SKIP)
