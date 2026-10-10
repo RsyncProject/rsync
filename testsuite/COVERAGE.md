@@ -1,5 +1,3 @@
-# Test coverage
-
 Covered means a test directly checks the behaviour. Partial means the option is exercised without covering its whole contract. Missing identifies work still to do.
 
 Path depth is deep, shallow, untested or N/A. Auxiliary tree is outside, inside only, untested or N/A depending on where the relevant backup, basis, partial or temporary tree is exercised.

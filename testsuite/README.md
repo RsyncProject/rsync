@@ -1,6 +1,6 @@
 # rsync testsuite
 
-Rsync's automated tests live here. Bug fixes should include a regression test when practical.
+Rsync's automated tests live here. Bug fixes **should** include a regression test when practical.
 
 ## Layout
 - `testsuite/tests/` groups test scripts by the subsystem they exercise
@@ -88,6 +88,4 @@ python3 -m testsuite.tools.compare_versions --sweep all -j5
 python3 -m testsuite.tools.compare_versions --loop --timelimit 3600 --cost
 ```
 
-The available transports are local copy, `support/lsh.sh`, a pipe daemon, a TCP daemon and rrsync. Pair each binary with the matching rrsync script when testing that transport.
-
-Historical binaries live in `old_versions/`. Investigate differences and confirm the intended behaviour before adding a focused test under the relevant `testsuite/tests/` group.
+The available transports are local copy, `support/lsh.sh`, a pipe daemon, a TCP daemon and rrsync. Pair each binary with the matching rrsync script when testing that transport. Historical binaries live in `old_versions/`. Investigate differences and confirm the intended behaviour before adding a focused test under the relevant `testsuite/tests/` group.
