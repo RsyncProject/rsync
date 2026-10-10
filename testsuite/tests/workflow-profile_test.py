@@ -116,6 +116,8 @@ for path in workflows:
     tcp = next((line for line in profile_lines if '--use-tcp' in line), None)
     if not tcp:
         test_fail(f'{path.name}: profiled pipe pass has no profiled TCP pass')
+    if path.name == 'asan-build.yml' and '--daemon-tests-only' not in tcp:
+        test_fail('asan-build.yml: TCP pass repeats transport-independent tests')
     expected = {
         tuple(name for name in value.split(',')
               if name != 'pipe' and not name.startswith('protocol-'))

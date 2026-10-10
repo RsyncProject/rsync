@@ -76,9 +76,9 @@ jobs:
       # receiver and metadata paths over the default stdio-pipe transport.
       run: RSYNC_TEST_PROFILES=pipe,nonroot,self-peer,linux ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --receipt=test-results/asan-pipe.json -j8
     - name: check (TCP daemon transport)
-      # --use-tcp also exercises the loopback rsyncd listener and the client's
-      # TCP connection path.
-      run: RSYNC_TEST_PROFILES=nonroot,self-peer,linux ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp --receipt=test-results/asan-tcp.json -j8
+      # The pipe pass covers transport-independent behaviour. This pass selects
+      # tests that can reach the loopback daemon and client TCP path.
+      run: RSYNC_TEST_PROFILES=nonroot,self-peer,linux ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp --daemon-tests-only --receipt=test-results/asan-tcp.json -j8
     - name: upload receipts
       if: always()
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
