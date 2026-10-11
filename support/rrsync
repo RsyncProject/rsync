@@ -52,6 +52,7 @@ long_opts = {
   'copy-unsafe-links': 0,
   'daemon': -1,
   'debug': -1,
+  'delay-symlinks': 0,
   'delay-updates': 0,
   'delete': 0,
   'delete-after': 0,
@@ -519,7 +520,11 @@ def main():
         # backup onto a name that already exists deletes what is there
         # (backup.c make_backup()), and deletion backs files up as well
         # (delete.c), so an unrelated --delete can land on a protected name.
+        # --delay-symlinks creates its symlinks at the end of the transfer and
+        # replaces whatever has appeared at that name since the
+        # --ignore-existing check.
         long_opts['log-file'] = long_opts['partial-dir'] = long_opts['delay-updates'] = -1
+        long_opts['delay-symlinks'] = -1
         long_opts['backup-dir'] = -1
         short_disabled += 'b'   # must precede the short_no_arg_re build below
 

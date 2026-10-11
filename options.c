@@ -151,6 +151,7 @@ int blocking_io = -1;
 int checksum_seed = 0;
 int inplace = 0;
 int delay_updates = 0;
+int delay_symlinks = 0;
 int32 block_size = 0;
 time_t stop_at_utime = 0;
 char *skip_compress = NULL;
@@ -790,6 +791,8 @@ static struct poptOption long_options[] = {
   {"partial-dir",      0,  POPT_ARG_STRING, &partial_dir, 0, 0, 0 },
   {"delay-updates",    0,  POPT_ARG_VAL,    &delay_updates, 1, 0, 0 },
   {"no-delay-updates", 0,  POPT_ARG_VAL,    &delay_updates, 0, 0, 0 },
+  {"delay-symlinks",   0,  POPT_ARG_VAL,    &delay_symlinks, 1, 0, 0 },
+  {"no-delay-symlinks",0,  POPT_ARG_VAL,    &delay_symlinks, 0, 0, 0 },
   {"prune-empty-dirs",'m', POPT_ARG_VAL,    &prune_empty_dirs, 1, 0, 0 },
   {"no-prune-empty-dirs",0,POPT_ARG_VAL,    &prune_empty_dirs, 0, 0, 0 },
   {"no-m",             0,  POPT_ARG_VAL,    &prune_empty_dirs, 0, 0, 0 },
@@ -2292,6 +2295,22 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			remove_source_files == 1 ? "source" : "sent");
 		goto cleanup;
 	}
+	if (delay_symlinks && remove_source_files) {
+		snprintf(err_buf, sizeof err_buf,
+			"--delay-symlinks cannot be used with --remove-%s-files\n",
+			remove_source_files == 1 ? "source" : "sent");
+		goto cleanup;
+	}
+	if (delay_symlinks && preserve_hard_links) {
+		snprintf(err_buf, sizeof err_buf,
+			"--delay-symlinks cannot be used with --hard-links\n");
+		goto cleanup;
+	}
+	if (delay_symlinks && basis_dir_cnt) {
+		snprintf(err_buf, sizeof err_buf,
+			"--delay-symlinks cannot be used with %s\n", alt_dest_opt(0));
+		goto cleanup;
+	}
 	if (batch_name && strlen(batch_name) > MAX_BATCH_NAME_LEN) {
 		snprintf(err_buf, sizeof err_buf,
 			"the batch-file name must be %d characters or less.\n",
@@ -3068,6 +3087,9 @@ void server_options(char **args, int *argc_p)
 			args[ac++] = "--delay-updates";
 	} else if (keep_partial && am_sender)
 		args[ac++] = "--partial";
+
+	if (delay_symlinks && am_sender)
+		args[ac++] = "--delay-symlinks";
 
 	if (ignore_errors)
 		args[ac++] = "--ignore-errors";

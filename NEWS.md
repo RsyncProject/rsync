@@ -9,6 +9,8 @@
   `B/s`. Example output includes `46.7M`, `48.8Mi`, `782,448B` and
   `113,295B/s`. File-list, created-directory and skipped-deletion counts also
   use thousands separators.
+- Added `--delay-symlinks` to defer creating new and changed symlinks until
+  other transferred files are in place.
 
 ------------------------------------------------------------------------------
 
