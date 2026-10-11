@@ -14,7 +14,6 @@
 # with it -- no timing is involved.
 
 import os
-import shutil
 import subprocess
 import sys
 import time
@@ -288,7 +287,7 @@ os.unlink(TODIR / 'current')
 (TODIR / 'current' / 'sub' / 'file').write_text("in the way\n")
 plain = SCRATCHDIR / 'to-plain'
 rmtree(plain)
-shutil.copytree(TODIR, plain, symlinks=True)
+run_rsync('-a', f'{TODIR}/', f'{plain}/')
 
 
 def deletion_stats(*args):
