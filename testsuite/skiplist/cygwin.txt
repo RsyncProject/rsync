@@ -10,6 +10,7 @@ acls
 acls-default
 acls-depth
 acls-unpinnable
+append-abort-mid-write  # the mid-write hook is an LD_PRELOAD, Linux-only
 backup-acl-xattr-cache
 backup-dir-symlink-race
 basis-xname-traversal
