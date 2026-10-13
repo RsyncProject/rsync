@@ -2,6 +2,13 @@
 
 ## Changes in this version:
 
+### BUG FIXES:
+- Fixed a `--files-from` pull from a subdirectory of a daemon module
+  (`rsync://host/mod/subdir/`). Each listed file was looked up at the module
+  root, so it was reported as vanished, or a same-named file from the module
+  root was sent in its place. `--remove-source-files` now also removes the
+  sent files in that subdirectory.
+
 ### ENHANCEMENTS:
 - Human-readable output now uses dynamic precision to show three significant
   digits and appends `i` to binary unit suffixes. `--progress` uses the same
