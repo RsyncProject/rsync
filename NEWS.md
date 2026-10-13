@@ -3,11 +3,10 @@
 ## Changes in this version:
 
 ### BUG FIXES:
-- Fixed a `--files-from` pull from a subdirectory of a daemon module
-  (`rsync://host/mod/subdir/`). Each listed file was looked up at the module
-  root, so it was reported as vanished, or a same-named file from the module
-  root was sent in its place. `--remove-source-files` now also removes the
-  sent files in that subdirectory.
+- Fixed a `--files-from` pull from a subdirectory of a daemon module, which
+  read each listed file from the module root instead.  It could send, and with
+  `--remove-source-files` delete, a same-named file the module's filter
+  excludes.
 
 ### ENHANCEMENTS:
 - Human-readable output now uses dynamic precision to show three significant

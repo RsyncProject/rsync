@@ -74,29 +74,19 @@ BOOL extra_flist_sending_enabled;
  * machine holding the source files.
  **/
 
-/* Build fname's path relative to module_dir in buf.  A missing or relative
- * F_PATHNAME is relative to orig_dir, which is a module subdirectory for a
- * source like "module/subdir/".  A module with `path = /` makes F_PATHNAME
- * absolute; leading slashes are stripped so secure_relative_open() accepts
- * the result (#897).  Returns NULL if the path doesn't fit. */
-static const char *module_relative_path(char *buf, size_t bufsize, struct file_struct *file, const char *fname)
+/* A relative F_PATHNAME is relative to orig_dir, which can be a subdirectory
+ * of the module, as in "module/subdir/". */
+static const char *orig_subdir(const char *path)
 {
-	const char *path = F_PATHNAME(file) ? F_PATHNAME(file) : "";
-	const char *base = *path == '/' ? "" : orig_dir + module_dirlen;
-	int len = snprintf(buf, bufsize, "%s/%s%s%s", base, path, *path ? "/" : "", fname);
-	if (len < 0 || len >= (int)bufsize)
-		return NULL;
-	while (*buf == '/')
-		buf++;
-	return buf;
+	return *path == '/' ? "" : orig_dir + module_dirlen;
 }
 
 static int secure_sender_parent_fd(struct file_struct *file, const char *fname, const char **bname_p)
 {
 #ifdef AT_FDCWD
-	const char *relp, *bslash, *fslash;
+	const char *path, *slash, *relp, *bslash, *fslash;
 	char secure_path[MAXPATHLEN];
-	int dfd, fl;
+	int dfd, fl, slen;
 
 	if (!fname || !*fname) {
 		errno = 0;
@@ -172,13 +162,21 @@ static int secure_sender_parent_fd(struct file_struct *file, const char *fname, 
 	/* Resolve the file's parent anchored at the absolute module root, never the
 	 * process CWD: on cygwin the CWD is path-based, so a removal that trusted
 	 * openat(".") could be raced (a parent-symlink flip) into unlinking outside
-	 * the module.  Reconstruct the module-relative path (as send_files does)
-	 * and walk it confined beneath module_dir -- the per-component O_NOFOLLOW
-	 * walk refuses the flipped symlink. */
-	if (!(relp = module_relative_path(secure_path, sizeof secure_path, file, fname))) {
+	 * the module.  Reconstruct the module-relative path from F_PATHNAME + f_name
+	 * (as send_files does) and walk it confined beneath module_dir -- the
+	 * per-component O_NOFOLLOW walk refuses the flipped symlink. */
+	path = F_PATHNAME(file);
+	if (!path)
+		path = "";
+	slash = *path ? "/" : "";
+	slen = snprintf(secure_path, sizeof secure_path, "%s/%s%s%s", orig_subdir(path), path, slash, fname);
+	if (slen < 0 || slen >= (int)sizeof secure_path) {
 		errno = ENAMETOOLONG;
 		return -1;
 	}
+	relp = secure_path;
+	while (*relp == '/')
+		relp++;
 
 	bslash = strrchr(relp, '/');
 	if (bslash) {
@@ -667,10 +665,13 @@ void send_files(int f_in, int f_out)
 			fd = do_open_checklinks(fname);
 		} else if (secure_relpath_active()) {
 			/* Open from module root to prevent TOCTOU race where
-			 * change_pathname's chdir follows a directory symlink. */
+			 * change_pathname's chdir follows a directory symlink.
+			 * Reconstruct the full path relative to module_dir
+			 * from F_PATHNAME (path) and f_name (fname). */
 			char secure_path[MAXPATHLEN];
-			const char *relp = module_relative_path(secure_path, sizeof secure_path, file, fname);
-			if (!relp) {
+			const char *relp;
+			int slen = snprintf(secure_path, sizeof secure_path, "%s/%s%s%s", orig_subdir(path), path, slash, fname);
+			if (slen >= (int)sizeof secure_path) {
 				io_error |= IOERR_GENERAL;
 				rprintf(FERROR_XFER, "path too long: %s%s%s\n", path, slash, fname);
 				free_sums(s);
@@ -678,6 +679,12 @@ void send_files(int f_in, int f_out)
 					send_msg_int(MSG_NO_SEND, ndx);
 				continue;
 			}
+			/* A module with `path = /` makes F_PATHNAME absolute, so the
+			 * joined path starts with '/'; strip leading slashes to a
+			 * module-relative path that secure_relative_open accepts (#897). */
+			relp = secure_path;
+			while (*relp == '/')
+				relp++;
 			/* A symlink-following mode must follow an in-tree symlink leaf the
 			 * operator asked for, still confined to the module; the default
 			 * keeps the O_NOFOLLOW leaf so a raced leaf symlink is refused. */
