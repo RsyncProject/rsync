@@ -9,6 +9,7 @@ acl-symlink-race
 acls-default
 acls-depth
 acls-unpinnable
+append-abort-mid-write  # the mid-write hook is an LD_PRELOAD, Linux-only
 backup-acl-xattr-cache
 backup-crossdev-copy
 chmod-temp-dir
