@@ -1,0 +1,250 @@
+#! /bin/sh
+
+. "$suitedir/rsync.fns"
+
+python3 - "$RSYNC" "$scratchdir" <<'PY'
+import hashlib
+import os
+import shlex
+import shutil
+import signal
+import struct
+import subprocess
+import sys
+import time
+
+rsync = shlex.split(sys.argv[1])
+scratch = sys.argv[2]
+
+if not sys.platform.startswith("linux"):
+    raise SystemExit(77)
+if os.path.basename(rsync[0]) == "valgrind":
+    raise SystemExit(77)
+
+shim_source = r'''
+#define _GNU_SOURCE 1
+#include <dlfcn.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <limits.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <unistd.h>
+
+static ssize_t (*real_write)(int, const void *, size_t);
+static char target_path[PATH_MAX];
+static int held;
+
+static void note(const char *env, const char *text)
+{
+	const char *path = getenv(env);
+	int fd;
+
+	if (!path || !*path)
+		return;
+	fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+	if (fd >= 0) {
+		(void)real_write(fd, text, strlen(text));
+		(void)close(fd);
+	}
+}
+
+__attribute__((constructor))
+static void init(void)
+{
+	const char *target = getenv("RSYNC_MIDWRITE_TARGET");
+
+	real_write = (ssize_t (*)(int, const void *, size_t))
+		dlsym(RTLD_NEXT, "write");
+	if (target && *target && !realpath(target, target_path)) {
+		strncpy(target_path, target, sizeof target_path - 1);
+		target_path[sizeof target_path - 1] = '\0';
+	}
+	note("RSYNC_MIDWRITE_LOADED", "loaded\n");
+}
+
+static int fd_is_target(int fd)
+{
+	char procpath[64];
+	char actual[PATH_MAX];
+	ssize_t n;
+
+	if (!target_path[0])
+		return 0;
+	snprintf(procpath, sizeof procpath, "/proc/self/fd/%d", fd);
+	n = readlink(procpath, actual, sizeof actual - 1);
+	if (n < 0)
+		return 0;
+	actual[n] = '\0';
+	return strcmp(actual, target_path) == 0;
+}
+
+static void hold(void)
+{
+	const char *release = getenv("RSYNC_MIDWRITE_RELEASE");
+	struct timespec tick = { 0, 10 * 1000 * 1000 };
+	char pid[32];
+	int i;
+
+	snprintf(pid, sizeof pid, "%d\n", (int)getpid());
+	note("RSYNC_MIDWRITE_HELD", pid);
+	for (i = 0; release && i < 6000 && access(release, F_OK) != 0; i++)
+		nanosleep(&tick, NULL);
+}
+
+ssize_t write(int fd, const void *buf, size_t count)
+{
+	sigset_t all, old;
+	ssize_t ret;
+	int saved_errno;
+
+	if (!real_write) {
+		errno = EIO;
+		return -1;
+	}
+	if (held || count < 65536 || !fd_is_target(fd))
+		return real_write(fd, buf, count);
+
+	held = 1;
+	sigfillset(&all);
+	sigprocmask(SIG_BLOCK, &all, &old);
+	ret = real_write(fd, buf, count);
+	saved_errno = errno;
+	hold();
+	sigprocmask(SIG_SETMASK, &old, NULL);
+	errno = saved_errno;
+	return ret;
+}
+'''
+
+
+def wait_for(path, process, timeout):
+    deadline = time.monotonic() + timeout
+    while not os.path.exists(path):
+        if process.poll() is not None or time.monotonic() >= deadline:
+            return False
+        time.sleep(0.01)
+    return True
+
+
+def process_gone(pid):
+    try:
+        with open("/proc/%d/stat" % pid) as stream:
+            return stream.read().rsplit(")", 1)[1].split()[0] == "Z"
+    except FileNotFoundError:
+        return True
+
+
+compiler = os.environ.get("CC")
+if compiler:
+    compiler = shlex.split(compiler)
+else:
+    compiler = None
+    for name in ("cc", "gcc", "clang"):
+        path = shutil.which(name)
+        if path:
+            compiler = [path]
+            break
+if not compiler:
+    raise SystemExit(77)
+
+cfile = os.path.join(scratch, "midwrite.c")
+shim = os.path.join(scratch, "midwrite.so")
+with open(cfile, "w") as stream:
+    stream.write(shim_source)
+result = subprocess.run(
+    compiler + ["-shared", "-fPIC", "-O2", "-Wall", "-Wextra",
+                "-o", shim, cfile, "-ldl"],
+    stdout=subprocess.PIPE,
+    stderr=subprocess.STDOUT,
+    universal_newlines=True,
+)
+if result.returncode or not os.path.isfile(shim):
+    raise SystemExit(77)
+
+for mode in ("--append", "--inplace"):
+    base = os.path.join(scratch, mode[2:])
+    source = os.path.join(base, "source")
+    destination = os.path.join(base, "destination")
+    shutil.rmtree(base, ignore_errors=True)
+    os.makedirs(source)
+    os.makedirs(destination)
+
+    source_file = os.path.join(source, "file")
+    destination_file = os.path.join(destination, "file")
+    data = b"".join(
+        hashlib.sha256(struct.pack(">I", index)).digest()
+        for index in range(4 * 1024 * 1024 // 32)
+    )
+    with open(source_file, "wb") as stream:
+        stream.write(data)
+    with open(destination_file, "wb") as stream:
+        stream.write(data[:1024 * 1024])
+
+    loaded = os.path.join(base, "loaded")
+    held_file = os.path.join(base, "held")
+    release = os.path.join(base, "release")
+    env = os.environ.copy()
+    env.update({
+        "LD_PRELOAD": shim,
+        "RSYNC_MIDWRITE_TARGET": os.path.realpath(destination_file),
+        "RSYNC_MIDWRITE_LOADED": loaded,
+        "RSYNC_MIDWRITE_HELD": held_file,
+        "RSYNC_MIDWRITE_RELEASE": release,
+    })
+
+    process = subprocess.Popen(
+        rsync + ["-a", mode, source + "/", destination + "/"],
+        env=env,
+    )
+    try:
+        if not wait_for(held_file, process, 60):
+            if not os.path.exists(loaded):
+                raise SystemExit(77)
+            raise SystemExit("%s receiver did not reach the held write" % mode)
+        with open(held_file) as stream:
+            receiver = int(stream.read())
+        os.kill(receiver, signal.SIGUSR1)
+    finally:
+        with open(release, "w"):
+            pass
+
+    try:
+        process.wait(timeout=60)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        raise SystemExit("%s transfer did not stop after SIGUSR1" % mode)
+
+    deadline = time.monotonic() + 30
+    while not process_gone(receiver):
+        if time.monotonic() >= deadline:
+            raise SystemExit("%s receiver did not exit" % mode)
+        time.sleep(0.01)
+    if process.returncode == 0:
+        raise SystemExit("%s transfer succeeded after its receiver was aborted" % mode)
+
+    with open(destination_file, "rb") as stream:
+        partial = stream.read()
+    if len(partial) > len(data) or partial != data[:len(partial)]:
+        raise SystemExit("%s left duplicated data after the abort" % mode)
+
+    result = subprocess.run(
+        rsync + ["-a", mode, source + "/", destination + "/"],
+    )
+    if result.returncode:
+        raise SystemExit("%s retry exited with status %d" % (mode, result.returncode))
+    with open(destination_file, "rb") as stream:
+        if stream.read() != data:
+            raise SystemExit("%s retry produced the wrong file" % mode)
+PY
+status=$?
+
+case $status in
+0) ;;
+77) test_skipped "The signal-write hook is unavailable" ;;
+*) test_fail "The interrupted append or inplace transfer duplicated data" ;;
+esac

@@ -162,7 +162,8 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 				cleanup_fd_r = -1;
 			}
 			if (cleanup_fd_w != -1) {
-				flush_write_file(cleanup_fd_w);
+				if (!called_from_signal_handler)
+					flush_write_file(cleanup_fd_w);
 				close(cleanup_fd_w);
 				cleanup_fd_w = -1;
 			}
