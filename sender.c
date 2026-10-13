@@ -74,8 +74,7 @@ BOOL extra_flist_sending_enabled;
  * machine holding the source files.
  **/
 
-/* A relative F_PATHNAME is relative to orig_dir, which can be a subdirectory
- * of the module, as in "module/subdir/". */
+/* The module subdir (orig_dir) that a relative F_PATHNAME is under, or "" if absolute. */
 static const char *orig_subdir(const char *path)
 {
 	return *path == '/' ? "" : orig_dir + module_dirlen;

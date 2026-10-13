@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-# A --files-from pull from a daemon module's subdirectory must send and remove
-# the listed file there, not a same-named file at the module root that the
-# module's filter excludes.
+# --files-from from a module subdir must not send or remove a filter-excluded module-root file.
 
 import shutil
 
 from rsyncfns import (
-    SCRATCHDIR, assert_exists, assert_not_exists, makepath, rmtree, run_rsync,
+    SCRATCHDIR, assert_exists, assert_not_exists, makepath, run_rsync,
     start_test_daemon, test_fail, write_daemon_conf,
 )
 
@@ -16,7 +14,6 @@ module = SCRATCHDIR / 'module'
 listed = module / 'subdir' / 'file.txt'
 excluded = module / 'file.txt'
 dst = SCRATCHDIR / 'dst'
-rmtree(module)
 makepath(listed.parent)
 listed.write_text("listed\n")
 excluded.write_text("hidden\n")
