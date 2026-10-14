@@ -2,6 +2,11 @@
 
 ## Changes in this version:
 
+### BUG FIXES:
+- Fixed a daemon receiver stack overflow when queued deletion output reached
+  `--max-alloc`. Quiet daemon transfers no longer queue deletion messages
+  unless the client requested them.
+
 ### ENHANCEMENTS:
 - Human-readable output now uses dynamic precision to show three significant
   digits and appends `i` to binary unit suffixes. `--progress` uses the same
