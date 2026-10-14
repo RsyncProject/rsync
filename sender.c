@@ -54,6 +54,8 @@ extern int inplace_partial;
 extern int batch_fd;
 extern int use_secure_symlinks;
 extern char *module_dir;
+extern unsigned int module_dirlen;
+extern const char *orig_dir;
 extern int module_dirfd;
 extern int write_batch;
 extern int file_old_total;
@@ -71,6 +73,272 @@ BOOL extra_flist_sending_enabled;
  * and transmits them to the receiver.  The sender process runs on the
  * machine holding the source files.
  **/
+
+/* The module subdir (orig_dir) that a relative F_PATHNAME is under, or "" if absolute. */
+static const char *orig_subdir(const char *path)
+{
+	return *path == '/' ? "" : orig_dir + module_dirlen;
+}
+
+static int secure_sender_parent_fd(struct file_struct *file, const char *fname, const char **bname_p)
+{
+#ifdef AT_FDCWD
+	const char *path, *slash, *relp, *bslash, *fslash;
+	char secure_path[MAXPATHLEN];
+	int dfd, fl, slen;
+
+	if (!fname || !*fname) {
+		errno = 0;
+		return -1;
+	}
+
+	/* "insecure links = yes" / --insecure-links: restore the 3.2.7 plain re-stat
+	 * by declining the confined parent (errno=0 makes the caller use do_lstat). */
+	if (symlink_optout_allowed()) {
+		errno = 0;
+		return -1;
+	}
+
+	if (filesfrom_owner_walk_active())
+		return owner_walk_parent(fname, bname_p);
+
+	if (!am_daemon || !module_dir || module_dir[0] != '/') {
+		/* Local (non-daemon) sender: there is no module root to anchor at, but
+		 * still confine the parent via the shared held ancestor-dirfd stack
+		 * (anchor = cwd, the transfer root set by change_pathname) so the
+		 * --remove-source-files re-stat below won't follow an attacker-planted
+		 * parent symlink.  Best-effort: an uncacheable (very deep) path declines
+		 * to -1 and the caller falls back to the path-based stat. */
+		const char *fslash = strrchr(fname, '/');
+		*bname_p = fslash ? fslash + 1 : fname;
+		if (fslash) {
+			char dir[MAXPATHLEN];
+			size_t dlen = (size_t)(fslash - fname);
+			if (dlen >= sizeof dir) {
+				errno = ENAMETOOLONG;
+				return -1;
+			}
+			memcpy(dir, fname, dlen);
+			dir[dlen] = '\0';
+			/* An absolute --relative name is still rooted at / after
+			 * change_pathname().  Resolving its parent through the cwd-backed
+			 * dirfd cache would re-anchor cleanup at the sender's working
+			 * directory and can remove a same-named, unrelated entry there. */
+			if (*fname == '/') {
+				const char *rel = dir;
+#ifdef __CYGWIN__
+				/* clean_fname() keeps exactly two leading slashes here,
+				 * because //server/share is a separate UNC namespace.
+				 * Stripping them and anchoring at "/" would resolve a
+				 * different object entirely, so decline (errno 0) and let
+				 * the caller fall back to the path-based cleanup. */
+				if (fname[1] == '/' && fname[2] != '/') {
+					errno = 0;
+					return -1;
+				}
+#endif
+				while (*rel == '/')
+					rel++;
+				return secure_relative_dirfd("/", rel);
+			}
+			/* held_dir_path_fd returns a cache-OWNED fd; the caller closes
+			 * what we return, so hand back an owned dup and leave the cache's
+			 * dirfd intact.  An uncacheable (very deep) dir declines with
+			 * errno 0 -- fall back to the full confined walk (an owned fd,
+			 * matching the sender's content open) so deep paths stay confined
+			 * too; a real error propagates. */
+			dfd = held_dir_path_fd(NULL, dir);
+			if (dfd >= 0)
+				return dup(dfd);
+			if (errno != 0)
+				return -1;
+			return secure_relative_dirfd(NULL, dir);
+		}
+		errno = 0;	/* top-level file: no parent component to confine */
+		return -1;
+	}
+
+	/* Resolve the file's parent anchored at the absolute module root, never the
+	 * process CWD: on cygwin the CWD is path-based, so a removal that trusted
+	 * openat(".") could be raced (a parent-symlink flip) into unlinking outside
+	 * the module.  Reconstruct the module-relative path from F_PATHNAME + f_name
+	 * (as send_files does) and walk it confined beneath module_dir -- the
+	 * per-component O_NOFOLLOW walk refuses the flipped symlink. */
+	path = F_PATHNAME(file);
+	if (!path)
+		path = "";
+	slash = *path ? "/" : "";
+	slen = snprintf(secure_path, sizeof secure_path, "%s/%s%s%s", orig_subdir(path), path, slash, fname);
+	if (slen < 0 || slen >= (int)sizeof secure_path) {
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+	relp = secure_path;
+	while (*relp == '/')
+		relp++;
+
+	bslash = strrchr(relp, '/');
+	if (bslash) {
+		char dir[MAXPATHLEN];
+		size_t dlen = (size_t)(bslash - relp);
+		if (dlen >= sizeof dir) {
+			errno = ENAMETOOLONG;
+			return -1;
+		}
+		memcpy(dir, relp, dlen);
+		dir[dlen] = '\0';
+		dfd = secure_relative_dirfd(module_dir, dir);
+	} else
+		dfd = secure_relative_dirfd(module_dir, "");
+
+	/* The leaf is the same last component either way; take it from the caller's
+	 * persistent fname buffer, not the local secure_path. */
+	fslash = strrchr(fname, '/');
+	*bname_p = fslash ? fslash + 1 : fname;
+
+	if (dfd >= 0 && (fl = fcntl(dfd, F_GETFD)) >= 0)
+		fcntl(dfd, F_SETFD, fl | FD_CLOEXEC);
+	return dfd;
+#else
+	(void)file; (void)fname; (void)bname_p;
+	errno = 0;
+	return -1;
+#endif
+}
+
+/* Go through the do_*() wrapper rather than a raw unlinkat(): it carries the
+ * dry_run no-op and the read-only/list-only refusal that do_unlink() applies
+ * on the non-fd path, plus the missing-AT_FDCWD fallback. */
+static int secure_remove_source_file(int dfd, const char *bname)
+{
+	return do_unlink_atfd(dfd, bname, 0);
+}
+
+/* Open `relpath` (relative to `anchor`: NULL=cwd, else an absolute trusted root)
+ * with `flags`, opening the leaf via the shared held ancestor-dirfd stack
+ * (held_dir_path_fd) so a directory is walked once, not once per file.  The leaf
+ * semantics are identical to secure_relative_open() -- it always O_NOFOLLOWs a
+ * file leaf and folds in O_NOATIME, both preserved here.  An uncacheable path
+ * (held_dir_path_fd returns -1) falls back to the full confined walk. */
+static int sender_open_confined(const char *anchor, const char *relpath, int flags)
+{
+#ifdef AT_FDCWD
+	const char *slash = strrchr(relpath, '/');
+	const char *bname;
+	char dirbuf[MAXPATHLEN];
+	const char *dir;
+	int dfd;
+
+	if (slash) {
+		size_t dlen = slash - relpath;
+		if (dlen >= sizeof dirbuf) {
+			errno = ENAMETOOLONG;
+			return -1;
+		}
+		memcpy(dirbuf, relpath, dlen);
+		dirbuf[dlen] = '\0';
+		dir = dirbuf;
+		bname = slash + 1;
+	} else {
+		dir = "";		/* file directly in the anchor dir */
+		bname = relpath;
+	}
+
+#ifdef O_NOATIME
+	if (open_noatime)
+		flags |= O_NOATIME;
+#endif
+	dfd = held_dir_path_fd(anchor, dir);
+	if (dfd < 0)
+		return secure_relative_open(anchor, relpath, flags | O_NOFOLLOW, 0);
+	return openat(dfd, bname, flags | O_NOFOLLOW, 0);
+#else
+	/* No *at() support: secure_relative_open is a plain open() here (no walk,
+	 * so nothing to amortise); use it directly to keep the anchor semantics. */
+	return secure_relative_open(anchor, relpath, flags | O_NOFOLLOW, 0);
+#endif
+}
+
+/* Open the content of `relpath` for a symlink-following transfer mode (-L /
+ * --copy-unsafe-links / -k) while staying confined beneath `anchor`.  The leaf
+ * O_NOFOLLOW that sender_open_confined() applies refuses an in-tree symlink the
+ * operator explicitly asked to follow, so resolve the link ourselves: read it,
+ * refuse an absolute or "../"-escaping target (a module escape), and re-resolve
+ * the relative target through secure_relative_open() -- which follows in-tree
+ * links and rejects an escape above the anchor -- looping for a symlink chain.
+ * The final open is still O_NOFOLLOW, so a raced flip at the resolved leaf is
+ * refused.  This keeps the module boundary while honouring --copy-links. */
+static int sender_open_copylinks_confined(const char *anchor, const char *relpath)
+{
+#if defined AT_FDCWD && defined O_NOFOLLOW
+	char cur[MAXPATHLEN];
+	int hops = 32;
+	int extra = 0;
+#ifdef O_NOATIME
+	if (open_noatime)
+		extra |= O_NOATIME;
+#endif
+	if (strlcpy(cur, relpath, sizeof cur) >= sizeof cur) {
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+	while (hops-- > 0) {
+		const char *slash = strrchr(cur, '/');
+		const char *bname;
+		char dir[MAXPATHLEN], tgt[MAXPATHLEN];
+		int pdfd, fd, e;
+		ssize_t n;
+		if (slash) {
+			size_t dlen = slash - cur;
+			if (dlen >= sizeof dir) { errno = ENAMETOOLONG; return -1; }
+			memcpy(dir, cur, dlen);
+			dir[dlen] = '\0';
+			bname = slash + 1;
+		} else {
+			dir[0] = '\0';
+			bname = cur;
+		}
+		/* anchor is checked explicitly: the resolver treats a NULL anchor as
+		 * "relative to cwd", so it is a legal argument for the else branch --
+		 * only this branch would hand it to strcmp(). */
+		if (am_daemon && module_dirfd >= 0 && module_dir && anchor
+		 && strcmp(anchor, module_dir) == 0)
+			pdfd = secure_relative_dirfd_at_beneath(module_dirfd, dir);
+		else
+			pdfd = secure_relative_dirfd(anchor, dir);
+		if (pdfd < 0)
+			return -1;
+		n = do_readlink_atfd(pdfd, bname, tgt, sizeof tgt - 1);
+		e = errno;
+		if (n < 0) {
+			/* EINVAL: not a symlink -> the resolved target file.  Open it
+			 * O_NOFOLLOW (a raced symlink flip is still refused). */
+			fd = e == EINVAL
+			   ? openat(pdfd, bname, O_RDONLY | O_NOFOLLOW | O_BINARY | extra, 0)
+			   : -1;
+			close(pdfd);
+			if (n < 0 && e != EINVAL)
+				errno = e;
+			return fd;
+		}
+		close(pdfd);
+		tgt[n] = '\0';
+		if (tgt[0] == '/') {		/* absolute target escapes the module */
+			errno = ELOOP;
+			return -1;
+		}
+		if ((size_t)snprintf(cur, sizeof cur, "%s%s%s",
+				     dir, *dir ? "/" : "", tgt) >= sizeof cur) {
+			errno = ENAMETOOLONG;
+			return -1;
+		}
+	}
+	errno = ELOOP;
+	return -1;
+#else
+	return secure_relative_open(anchor, relpath, O_RDONLY | O_NOFOLLOW, 0);
+#endif
+}
 
 /**
  * Receive the checksums for a buffer
@@ -459,7 +727,7 @@ void send_files(int f_in, int f_out)
 			 * from F_PATHNAME (path) and f_name (fname). */
 			char secure_path[MAXPATHLEN];
 			const char *relp;
-			int slen = snprintf(secure_path, sizeof secure_path, "%s%s%s", path, slash, fname);
+			int slen = snprintf(secure_path, sizeof secure_path, "%s/%s%s%s", orig_subdir(path), path, slash, fname);
 			if (slen >= (int)sizeof secure_path) {
 				io_error |= IOERR_GENERAL;
 				rprintf(FERROR_XFER, "path too long: %s%s%s\n", path, slash, fname);
