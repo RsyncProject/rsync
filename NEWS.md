@@ -2,6 +2,12 @@
 
 ## Changes in this version:
 
+### BUG FIXES:
+- Fixed a `--files-from` pull from a subdirectory of a daemon module, which
+  read each listed file from the module root instead.  It could send, and with
+  `--remove-source-files` delete, a same-named file the module's filter
+  excludes.
+
 ### ENHANCEMENTS:
 - Human-readable output now uses dynamic precision to show three significant
   digits and appends `i` to binary unit suffixes. `--progress` uses the same

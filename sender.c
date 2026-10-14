@@ -53,6 +53,8 @@ extern int inplace;
 extern int inplace_partial;
 extern int batch_fd;
 extern char *module_dir;
+extern unsigned int module_dirlen;
+extern const char *orig_dir;
 extern int module_dirfd;
 extern int write_batch;
 extern int file_old_total;
@@ -71,6 +73,12 @@ BOOL extra_flist_sending_enabled;
  * and transmits them to the receiver.  The sender process runs on the
  * machine holding the source files.
  **/
+
+/* The module subdir (orig_dir) that a relative F_PATHNAME is under, or "" if absolute. */
+static const char *orig_subdir(const char *path)
+{
+	return *path == '/' ? "" : orig_dir + module_dirlen;
+}
 
 static int secure_sender_parent_fd(struct file_struct *file, const char *fname, const char **bname_p)
 {
@@ -160,7 +168,7 @@ static int secure_sender_parent_fd(struct file_struct *file, const char *fname, 
 	if (!path)
 		path = "";
 	slash = *path ? "/" : "";
-	slen = snprintf(secure_path, sizeof secure_path, "%s%s%s", path, slash, fname);
+	slen = snprintf(secure_path, sizeof secure_path, "%s/%s%s%s", orig_subdir(path), path, slash, fname);
 	if (slen < 0 || slen >= (int)sizeof secure_path) {
 		errno = ENAMETOOLONG;
 		return -1;
@@ -661,7 +669,7 @@ void send_files(int f_in, int f_out)
 			 * from F_PATHNAME (path) and f_name (fname). */
 			char secure_path[MAXPATHLEN];
 			const char *relp;
-			int slen = snprintf(secure_path, sizeof secure_path, "%s%s%s", path, slash, fname);
+			int slen = snprintf(secure_path, sizeof secure_path, "%s/%s%s%s", orig_subdir(path), path, slash, fname);
 			if (slen >= (int)sizeof secure_path) {
 				io_error |= IOERR_GENERAL;
 				rprintf(FERROR_XFER, "path too long: %s%s%s\n", path, slash, fname);

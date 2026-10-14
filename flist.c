@@ -585,7 +585,8 @@ static inline int is_excluded(const char *fname, int is_dir, int filter_level)
 static void send_directory(int f, struct file_list *flist,
 			   char *fbuf, int len, int flags);
 
-static const char *pathname, *orig_dir;
+static const char *pathname;
+const char *orig_dir;
 static int pathname_len;
 
 /* Make sure flist can hold at least flist->used + extra entries. */
