@@ -60,6 +60,7 @@ extern int logfile_format_has_o_or_i;
 extern char *bind_address;
 extern char *config_file;
 extern char *logfile_format;
+extern char *stdout_format;
 extern char *files_from;
 extern char *tmpdir;
 extern char *early_input_file;
@@ -1222,6 +1223,11 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	}
 
 #ifndef DEBUG
+	/* Remember an explicit deletion-output request before max verbosity
+	 * clamps INFO_DEL.  stdout_format is also the server-side marker used
+	 * to decide whether deletion names need to be sent to the client. */
+	if (protocol_version >= 29 && INFO_GTE(DEL, 1) && !stdout_format)
+		stdout_format = "X";
 	/* don't allow the logs to be flooded too fast */
 	limit_output_verbosity(lp_max_verbosity(module_id));
 #endif

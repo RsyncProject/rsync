@@ -3,6 +3,9 @@
 ## Changes in this version:
 
 ### BUG FIXES:
+- Fixed a daemon receiver stack overflow when queued deletion output reached
+  `--max-alloc`. Quiet daemon transfers no longer queue deletion messages
+  unless the client requested them.
 - Fixed a `--files-from` pull from a subdirectory of a daemon module, which
   read each listed file from the module root instead.  It could send, and with
   `--remove-source-files` delete, a same-named file the module's filter
