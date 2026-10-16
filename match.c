@@ -277,7 +277,7 @@ static void hash_search(int f,struct sum_struct *s,
 			 * the adjacent want_i optimization. */
 			if (updating_basis_file) {
 				/* All the generator's chunks start at blength boundaries. */
-				while (aligned_offset < offset) {
+				while (aligned_offset < offset && aligned_i < s->count) {
 					aligned_offset += s->blength;
 					aligned_i++;
 				}
