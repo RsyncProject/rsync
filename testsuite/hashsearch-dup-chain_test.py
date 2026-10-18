@@ -7,8 +7,13 @@ Covers:
    buried behind > MAX_CHAIN_LEN duplicate colliding blocks (B, E) in the same
    hash bucket.
 3. `--inplace` SUMFLG_SAME_OFFSET preservation: mutating the chain on duplicate
-   false alarms must never unlink a basis block carrying SUMFLG_SAME_OFFSET,
-   even when a later duplicate in the basis file gets overwritten on disk.
+   false alarms must never let an unpinned node unlink a basis block carrying
+   SUMFLG_SAME_OFFSET when the unpinned duplicate later gets overwritten.
+4. `--inplace` duplicate SUMFLG_SAME_OFFSET unlinking: when > MAX_CHAIN_LEN
+   duplicate blocks all match in-place (earning SUMFLG_SAME_OFFSET), keeping
+   the first pinned representative must unlink the remaining pinned duplicates
+   so valid blocks behind them are still reached and matched with bounded
+   false_alarms.
 """
 
 import re
@@ -142,7 +147,7 @@ dst3.write_bytes(block_a + block_y + block_a + (block_y * N_TAIL) + (block_b * 1
 # - Block 0: A (matches Block 0 in-place -> sets SUMFLG_SAME_OFFSET on Block 0,
 #   and unlinks the 1,199 duplicate B blocks ahead of it)
 # - Block 1: D (collides with A & B -> walks [B -> Block 2 (A) -> Block 0 (A)];
-#   must NOT unlink Block 0 because Block 0 has SUMFLG_SAME_OFFSET!)
+#   must NOT let unpinned Block 2 unlink pinned Block 0!)
 # - Block 2: X (overwrites Block 2 on disk, expiring Block 2 once offset > 2*BLOCK)
 # - Blocks 3..22: 20 blocks of A (must match surviving Block 0!)
 src3.write_bytes(block_a + block_d + block_x + (block_a * N_TAIL))
@@ -165,7 +170,56 @@ if literal3 != expected_literal3 or matched3 != expected_matched3:
 
 assert_same(dst3, src3, label='Case 3: --inplace SUMFLG_SAME_OFFSET preservation')
 
+# ---------------------------------------------------------------------------
+# Case 4: --inplace unlinking of > MAX_CHAIN_LEN pinned SUMFLG_SAME_OFFSET dups
+# ---------------------------------------------------------------------------
+src4 = FROMDIR / 'inplace_pinned_dups.bin'
+dst4 = TODIR / 'inplace_pinned_dups.bin'
+
+N_PINNED_DUPS = 1500  # > MAX_CHAIN_LEN (1024)
+N_TRAIL_A = 16
+
+# DST: [Block 0: A] + [Blocks 1..1500: B] + [Block 1501: A]
+# Chain starts as: [1501: A] -> [1500..1: B] -> [0: A]
+# - At Block 0 (A): matches [1501: A] at chain head, swaps to aligned_i = 0,
+#   setting SUMFLG_SAME_OFFSET on Block 0 (A) without walking [1500..1: B].
+# - At Blocks 1..1500 (B): matches [1500: B], swaps to aligned_i = 1..1500,
+#   setting SUMFLG_SAME_OFFSET on ALL 1,500 B blocks!
+# - At Block 1501 (X): overwrites Block 1501 on disk (expiring [1501: A]).
+# - At Blocks 1502..1517 (16 x A): [1501: A] is expired, and all 1,500 B blocks
+#   carry SUMFLG_SAME_OFFSET. Keeping [1500: B] (last_false_flags & SUMFLG_SAME_OFFSET)
+#   must unlink the other 1,499 pinned B blocks so [0: A] is reached and matched!
+dst4.write_bytes(block_a + (block_b * N_PINNED_DUPS) + block_a)
+src4.write_bytes(block_a + (block_b * N_PINNED_DUPS) + block_x + (block_a * N_TRAIL_A))
+
+proc4 = run_rsync('-a', '-I', '--inplace', '--no-whole-file',
+                  f'--block-size={BLOCK}', '--no-compress',
+                  '--stats', '--debug=deltasum1',
+                  f'{src4}', f'{dst4}', capture_output=True)
+
+_, false_alarms4, literal4, matched4 = parse_stats(proc4.stdout + proc4.stderr)
+
+expected_literal4 = 1 * BLOCK             # Only Block 1501 (X)
+expected_matched4 = (1 + N_PINNED_DUPS + N_TRAIL_A) * BLOCK
+
+if literal4 != expected_literal4 or matched4 != expected_matched4:
+    test_fail(
+        f"Case 4 (--inplace pinned duplicate unlinking) failed: "
+        f"literal={literal4} (expected {expected_literal4}), "
+        f"matched={matched4} (expected {expected_matched4})")
+
+# 1,500 B blocks each hit [1501: A] once (1,500), plus 16 trailing A blocks
+# each hit [1500: B] once (16) = 1,516 false_alarms (vs > 17,000 if not unlinked).
+MAX_EXPECTED_ALARMS4 = N_PINNED_DUPS + (N_TRAIL_A * 2)
+if false_alarms4 > MAX_EXPECTED_ALARMS4:
+    test_fail(
+        f"Case 4 pinned duplicates were not unlinked: "
+        f"false_alarms={false_alarms4} (expected <= {MAX_EXPECTED_ALARMS4})")
+
+assert_same(dst4, src4, label='Case 4: --inplace pinned duplicate unlinking')
+
 print(
     f"dup-chain test passed: forward_alarms={false_alarms1}, "
-    f"interleaved_alarms={false_alarms2}, inplace_matched={matched3}"
+    f"interleaved_alarms={false_alarms2}, inplace_matched={matched3}, "
+    f"pinned_dups_matched={matched4} (alarms={false_alarms4})"
 )

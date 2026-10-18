@@ -168,6 +168,7 @@ static void hash_search(int f,struct sum_struct *s,
 	char sum2[MAX_DIGEST_LEN];
 	int32 consecutive_false_offsets = 0;
 	uint32 s1, s2, sum;
+	uchar last_false_flags = 0;
 	int more;
 	schar *map;
 
@@ -251,7 +252,8 @@ static void hash_search(int f,struct sum_struct *s,
 			}
 
 			if (last_false_sum2
-			 && !(s->sums[i].flags & SUMFLG_SAME_OFFSET)
+			 && (!(s->sums[i].flags & SUMFLG_SAME_OFFSET)
+			  || (last_false_flags & SUMFLG_SAME_OFFSET))
 			 && memcmp(sum2_at(s, i), last_false_sum2, s->s2length) == 0) {
 				*prev = s->sums[i].chain;
 				continue;
@@ -281,6 +283,7 @@ static void hash_search(int f,struct sum_struct *s,
 			if (memcmp(sum2, sum2_at(s, i), s->s2length) != 0) {
 				false_alarms++;
 				last_false_sum2 = sum2_at(s, i);
+				last_false_flags = s->sums[i].flags;
 				continue;
 			}
 
