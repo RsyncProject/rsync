@@ -26,6 +26,7 @@
 extern int am_server;
 extern int flist_eof;
 extern int quiet;
+extern int human_readable;
 extern int need_unsorted_flist;
 extern int output_needs_newline;
 extern int stdout_format_has_i;
@@ -69,9 +70,10 @@ static unsigned long msdiff(struct timeval *t1, struct timeval *t2)
 static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now, int is_last)
 {
 	char rembuf[64], eol[128];
+	const char *rate_str;
 	unsigned long diff;
 	double rate, remain;
-	int pct;
+	int pct, rate_human_level;
 
 	if (is_last) {
 		int len = snprintf(eol, sizeof eol,
@@ -115,9 +117,13 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now, int is_l
 
 	output_needs_newline = 0;
 	pct = ofs == size ? 100 : (int) (100.0 * ofs / size);
+	/* Keep progress rates scaled while byte counts retain the level-1 default. */
+	rate_human_level = human_readable == 1 ? 2 : human_readable;
+	rate_str = rate >= INT64_MAX ? ">MAX "
+		: do_big_num((int64)rate, rate_human_level, NULL);
 	rput_progress();
 	rprintf(FCLIENT, "%15sB %3d%% %7sB/s %s%s", human_num(ofs), pct,
-		rate >= INT64_MAX ? ">MAX " : human_num((int64)rate), rembuf, eol);
+		rate_str, rembuf, eol);
 	if (!is_last && !quiet) {
 		output_needs_newline = 1;
 		rflush(FCLIENT);
