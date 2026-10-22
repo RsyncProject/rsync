@@ -28,7 +28,7 @@ def skip(msg: str) -> 'None':
     raise SystemExit(0)
 
 if not sys.platform.startswith('linux'):
-    skip('Skipping test, because niceness test should be tested on Linux only')
+    skip('Skipping test, because niceness test should be tested with strace on Linux only')
 
 # Basic help dumps must not crash when using any niceness option.
 if run_rsync('-Q', '--version', check=False).returncode != 0:
