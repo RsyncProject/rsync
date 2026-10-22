@@ -26,6 +26,7 @@ pseudo-paths  # Linux-only: procfs pseudo-paths
 pseudo-paths-daemon
 read-batch-pipe
 readonly-partial-abort-mode-regression  # 
+rrsync-receiver-file-arg
 rrsync-sender-leaf-flip
 rrsync-sender-parent-pin
 rrsync-symlink
