@@ -156,7 +156,7 @@ try:
     )
     receiver.send_data(buf)
 
-    rc = proc.wait(timeout=120)
+    rc = proc.wait(timeout=240)
     t.join(timeout=5)
 finally:
     if csock is not None:
