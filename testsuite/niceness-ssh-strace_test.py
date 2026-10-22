@@ -26,8 +26,10 @@ def skip(msg: str) -> 'None':
     test_skipped(msg)
     raise SystemExit(0)
 
-if sys.platform in ["solaris"]:
+if sys.platform.startswith(('solaris', 'Solaris')):
 	skip("niceness-ssh-strace test not supported on " + sys.platform)
+
+print(f"Now running the tests on platform: {sys.platform}")
 
 # Basic help dumps must not crash when using any niceness option.
 if run_rsync('-Q', '--version', check=False).returncode != 0:
