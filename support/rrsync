@@ -376,7 +376,7 @@ def create_pinned_dir(path, orig_arg, mode):
     pinned_fds.append(fd)
     return '/proc/self/fd/%d' % fd
 
-# sender_pinned_arg() verdicts that are not a rewritten argument.
+# Pinned-argument verdicts that are not a rewritten argument.
 KEEP_LEAF_PIN = 'keep'          # hand rsync the leaf's own /proc/self/fd/N
 LEAF_PIN_UNUSABLE = 'unusable'  # no pin for this shape; keep the plain name
 
@@ -452,6 +452,22 @@ def sender_pinned_arg(fd, arg, orig_arg, has_slash, has_slash_dot):
     if (st.st_dev, st.st_ino) != (leaf_st.st_dev, leaf_st.st_ino):
         die('post-pin path changed (race?):', orig_arg, check)
     return pinned
+
+def receiver_pinned_arg(fd, arg, orig_arg):
+    """Keep existing file destinations writable beneath a pinned parent."""
+    leaf_st = os.fstat(fd)
+    if stat.S_ISDIR(leaf_st.st_mode):
+        return KEEP_LEAF_PIN
+
+    parent, leaf = os.path.split(arg)
+    dfd = pin_dir(parent, orig_arg)
+    try:
+        st = os.stat(leaf, dir_fd=dfd, follow_symlinks=False)
+    except OSError as e:
+        die('post-pin stat failed (race?):', orig_arg, e.strerror)
+    if (st.st_dev, st.st_ino) != (leaf_st.st_dev, leaf_st.st_ino):
+        die('post-pin path changed (race?):', orig_arg, leaf)
+    return '/proc/self/fd/%d/%s' % (dfd, leaf)
 
 def safe_open_logfile():
     nofollow = getattr(os, 'O_NOFOLLOW', 0)
@@ -928,6 +944,8 @@ def validated_arg(opt, arg, typ=3, wild=False):
                         pinned = sender_pinned_arg(fd, logical, orig_arg,
                                                    arg_has_trailing_slash,
                                                    arg_has_trailing_slash_dot)
+                    elif opt == 'arg':
+                        pinned = receiver_pinned_arg(fd, real_arg, orig_arg)
                     else:
                         pinned = KEEP_LEAF_PIN
                     if pinned == KEEP_LEAF_PIN:
