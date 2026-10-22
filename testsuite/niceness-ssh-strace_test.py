@@ -16,7 +16,6 @@ from rsyncfns import (
     checkit, hands_setup, run_rsync, test_fail, test_skipped, rsync_path_arg, rsh_cmd
 )
 
-
 # Helper function
 def fail(msg: str) -> 'None':
     print('### TEST FAILURE ### ' + msg + '\n')
@@ -26,6 +25,9 @@ def skip(msg: str) -> 'None':
     print('### TEST SKIPPED ### ' + msg + '\n')
     test_skipped(msg)
     raise SystemExit(0)
+
+if sys.platform in ["solaris"]:
+	skip("niceness-ssh-strace test not supported on " + sys.platform)
 
 # Basic help dumps must not crash when using any niceness option.
 if run_rsync('-Q', '--version', check=False).returncode != 0:
