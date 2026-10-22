@@ -437,3 +437,13 @@ run_rsync_nice_test("Test with real rsync nice remote (ionice rejected)", [ '--n
     "ionice_local_strace": "<not set>",
     "nice_remote_strace": "5=0",
     "ionice_remote_strace": "IOPRIO_CLASS_RT,6=-1EPERM(Operationnotpermitted)"});
+
+run_rsync_nice_test("Test with real rsync nice local+remote (all rejected)", [ '--nice=local:-2/rt_3,remote:-4/rt_5' ], {
+    "nice_local":"-2 failed",
+    "ionice_local":"rt_3 failed",
+    "nice_remote":"-4 failed",
+    "ionice_remote":"rt_5 failed",
+    "nice_local_strace": "-2=-1EACCES(Permissiondenied)",
+    "ionice_local_strace": "IOPRIO_CLASS_RT,3=-1EPERM(Operationnotpermitted)",
+    "nice_remote_strace": "-4=-1EACCES(Permissiondenied)",
+    "ionice_remote_strace": "IOPRIO_CLASS_RT,5=-1EPERM(Operationnotpermitted)"});
