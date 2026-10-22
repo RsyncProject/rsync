@@ -386,7 +386,6 @@ run_rsync_nice_test("Test with real rsync nice remote successfully", [ '--nice=r
     "nice_remote_strace": "5=0",
     "ionice_remote_strace": "IOPRIO_CLASS_BE,6=0"});
 
-
 run_rsync_nice_test("Test with real rsync nice local+remote successfully", [ '--nice=local:1/be_2,remote:5/be_6' ], {
     "nice_local":"1",
     "ionice_local":"be_2",
@@ -397,6 +396,15 @@ run_rsync_nice_test("Test with real rsync nice local+remote successfully", [ '--
     "nice_remote_strace": "5=0",
     "ionice_remote_strace": "IOPRIO_CLASS_BE,6=0"});
 
+run_rsync_nice_test("Test with real rsync nice local+remote successfully with -s ", [ '--nice=local:1/be_2,remote:5/be_6', '-s' ], {
+    "nice_local":"1",
+    "ionice_local":"be_2",
+    "nice_remote":"5",
+    "ionice_remote":"be_6",
+    "nice_local_strace": "1=0",
+    "ionice_local_strace": "IOPRIO_CLASS_BE,2=0",
+    "nice_remote_strace": "5=0",
+    "ionice_remote_strace": "IOPRIO_CLASS_BE,6=0"});
 
 run_rsync_nice_test("Test with real rsync nice local (nice rejected)", [ '--nice=local:-4/idle' ], {
     "nice_local":"-4 failed",
@@ -439,6 +447,16 @@ run_rsync_nice_test("Test with real rsync nice remote (ionice rejected)", [ '--n
     "ionice_remote_strace": "IOPRIO_CLASS_RT,6=-1EPERM(Operationnotpermitted)"});
 
 run_rsync_nice_test("Test with real rsync nice local+remote (all rejected)", [ '--nice=local:-2/rt_3,remote:-4/rt_5' ], {
+    "nice_local":"-2 failed",
+    "ionice_local":"rt_3 failed",
+    "nice_remote":"-4 failed",
+    "ionice_remote":"rt_5 failed",
+    "nice_local_strace": "-2=-1EACCES(Permissiondenied)",
+    "ionice_local_strace": "IOPRIO_CLASS_RT,3=-1EPERM(Operationnotpermitted)",
+    "nice_remote_strace": "-4=-1EACCES(Permissiondenied)",
+    "ionice_remote_strace": "IOPRIO_CLASS_RT,5=-1EPERM(Operationnotpermitted)"});
+
+run_rsync_nice_test("Test with real rsync nice local+remote (all rejected, -s)", [ '--nice=local:-2/rt_3,remote:-4/rt_5', '-s' ], {
     "nice_local":"-2 failed",
     "ionice_local":"rt_3 failed",
     "nice_remote":"-4 failed",
