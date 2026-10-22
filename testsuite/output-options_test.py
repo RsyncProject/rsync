@@ -95,7 +95,7 @@ verify_dirs(src, TODIR, label='--quiet still transferred')
 # --- --progress shows a percentage ------------------------------------------
 rmtree(TODIR)
 p = out('-a', '--progress', f'{src}/', f'{TODIR}/')
-progress_re = r'[\d.,]+B\s+100%\s+[\d.,]+B/s\s+\d+:\d\d:\d\d'
+progress_re = r'[\d.,]+B\s+100%\s+[\d.,]+(?:[KMGTPE]i?)?B/s\s+\d+:\d\d:\d\d'
 if not re.search(progress_re, p.stdout):
     test_fail(f"--progress did not show the expected final shape:\n{p.stdout}")
 
@@ -121,6 +121,17 @@ if not re.search(suffix_re, human):
     test_fail(f"-h did not use a human-readable unit suffix:\n{human}")
 if re.search(suffix_re, plain):
     test_fail(f"--stats without -h unexpectedly used a unit suffix:\n{plain}")
+
+for label, options, progress_re in (
+    ('default', (), r'50[,.]000B\s+100%\s+[\d.,]+[KMGTPE]B/s'),
+    ('--no-h', ('--no-h',), r'50000B\s+100%\s+\d+B/s'),
+    ('-h', ('-h',), r'50\.0KB\s+100%\s+[\d.,]+[KMGTPE]B/s'),
+    ('-hh', ('-hh',), r'48\.8KiB\s+100%\s+[\d.,]+[KMGTPE]iB/s'),
+):
+    rmtree(TODIR)
+    progress = out('-a', '--progress', *options, f'{src}/', f'{TODIR}/').stdout
+    if not re.search(progress_re, progress):
+        test_fail(f"{label} progress output has the wrong units:\n{progress}")
 
 rmtree(TODIR)
 human_binary = out('-a', '-hh', '--stats', f'{src}/', f'{TODIR}/').stdout

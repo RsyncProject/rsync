@@ -3613,7 +3613,9 @@ sign) if you want the local shell to expand it.
 
     The default is human-readable level 1.  Each `-h` option increases the
     level by one.  You can take the level down to 0 (to output numbers as pure
-    digits) by specifying the `--no-human-readable` (`--no-h`) option.
+    digits) by specifying the `--no-human-readable` (`--no-h`) option.  Progress
+    rates are an exception: the default and `-h` use level 2, `--no-h` uses
+    level 0 and `-hh` uses level 3.
 
     The unit letters that are appended in levels 2 and 3 are: `K` (kilo), `M`
     (mega), `G` (giga), `T` (tera), `P` (peta) or `E` (exa). For example, a
@@ -3821,12 +3823,16 @@ sign) if you want the local shell to expand it.
     While rsync is transferring a regular file, it updates a progress line that
     looks like this:
 
-    >     782,448B  63% 113,295B/s    0:00:04
+    >     782,448B  63%    113KB/s    0:00:04
 
     In this example, the receiver has reconstructed 782,448 bytes or 63% of the
-    sender's file, which is being reconstructed at a rate of 113,295 bytes
+    sender's file, which is being reconstructed at a rate of 113 kilobytes
     per second, and the transfer will finish in 4 seconds if the current rate
     is maintained until the end.
+
+    Progress rates are scaled in decimal units by default.  `--no-h` keeps the
+    rate in bytes per second, while `-hh` uses binary units such as `KiB/s` and
+    `MiB/s`.
 
     These statistics can be misleading if rsync's delta-transfer algorithm is
     in use.  For example, if the sender's file consists of the basis file
@@ -3838,10 +3844,10 @@ sign) if you want the local shell to expand it.
     When the file transfer finishes, rsync replaces the progress line with a
     summary line that looks like this:
 
-    >     1,238,099B 100% 149,893B/s    0:00:08  (xfr#5, to-chk=169/396)
+    >     1,238,099B 100%    150KB/s    0:00:08  (xfr#5, to-chk=169/396)
 
     In this example, the file was 1,238,099 bytes long in total, the average
-    rate of transfer for the whole file was 149,893 bytes per second over the
+    rate of transfer for the whole file was 150 kilobytes per second over the
     8 seconds that it took to complete, it was the 5th transfer of a
     regular file during the current rsync session, and there are 169 more files
     for the receiver to check (to see if they are up-to-date or not) remaining
