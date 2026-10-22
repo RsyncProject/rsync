@@ -55,10 +55,16 @@ for source in ('file', 'stdin'):
                               stdin=stdin if source == 'file' else None,
                               stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
                               text=False, timeout=20,
-                              env={**os.environ, 'RSYNC_PASSWORD': 'wrong-fallback'})
+                              env={**os.environ, 'RSYNC_PASSWORD':
+                                   'wrong-fallback' if succeeds else PASSWORD.decode()})
         passed = proc.returncode == 0
         if passed != succeeds:
             test_fail(f'{source}/{name}: expected success={succeeds}, '
+                      f'rc={proc.returncode}, stderr={proc.stderr!r}')
+
+        if not succeeds and (proc.returncode != 1
+                             or b'failed to read a password' not in proc.stderr):
+            test_fail(f'{source}/{name}: expected password read failure, '
                       f'rc={proc.returncode}, stderr={proc.stderr!r}')
 
 print('password-file: first-line behavior matches for files and stdin')
