@@ -47,7 +47,7 @@ jobs:
         dnf -y install epel-release
         dnf config-manager --set-enabled powertools
         dnf -y install gcc gcc-c++ make autoconf automake m4 \
-            python39 python39-pip diffutils \
+            python39 python39-pip diffutils strace \
             openssl openssl-devel \
             attr libattr-devel acl libacl-devel \
             zstd libzstd-devel \
