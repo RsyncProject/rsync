@@ -53,14 +53,12 @@ probe = subprocess.run(
     capture_output=True, text=True,
 )
 if probe.stdout.strip() != 'yes':
-    test_skipped(
-        "Skipping SSH tests because ssh connection to localhost not authorised"
-    )
+    skip("Skipping SSH tests because ssh connection to localhost not authorised")
 
 STRACE=shutil.which('strace')
 
 if STRACE is None:
-    test_skipped( "Skipping SSH tests because strace is not available" )
+    skip("Skipping SSH tests because strace is not available")
 
 
 print(f"Using remote shell: {SSH}")
@@ -94,7 +92,7 @@ def run_rsync_nice_test(testname: str, args: list, expected_result: dict[str, st
     for remote_line in probe.stdout.splitlines():
         print("stdout line: "+remote_line);
         if 'nice not supported for' in remote_line:
-            test_skipped("Skipping tests because niceness is not supported on this platform")
+            skip("Skipping tests because niceness is not supported on this platform")
         if 'opening connection using' in remote_line:
             actual_remote_args = remote_line.strip()
         elif 'client to new priority' in remote_line:
@@ -110,11 +108,11 @@ def run_rsync_nice_test(testname: str, args: list, expected_result: dict[str, st
     for remote_line in probe.stderr.splitlines():
         print("stderr line: "+remote_line);
         if 'nice not supported for' in remote_line:
-            test_skipped("Skipping tests because niceness is not supported on this platform")
+            skip("Skipping tests because niceness is not supported on this platform")
         if 'Host key verification failed' in remote_line:
-            test_skipped("Skipping tests because ssh could not establish connection: Host key verification failed")
+            skip("Skipping tests because ssh could not establish connection: Host key verification failed")
         if 'error creating process trace' in remote_line:
-            test_skipped("Skipping tests because strace could not create a process trace")
+            skip("Skipping tests because strace could not create a process trace")
         if 'setpriority(PRIO_PROCESS, 0,'  in remote_line:
             result["nice_strace"] = remote_line.split("(PRIO_PROCESS, 0,", 1)[1].replace(" ", "").replace(")=", "=")
         elif 'ioprio_set(IOPRIO_WHO_PROCESS, 0, IOPRIO_PRIO_VALUE'  in remote_line:
