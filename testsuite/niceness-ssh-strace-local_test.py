@@ -16,13 +16,19 @@ from rsyncfns import (
     checkit, hands_setup, run_rsync, test_fail, test_skipped, rsync_path_arg, rsh_cmd
 )
 
-test_skipped("Skipping tests to see, if build succeeds")
-
 
 # Helper function
 def fail(msg: str) -> 'None':
     print('### TEST FAILURE ### ' + msg + '\n')
     test_fail(msg)
+
+def skip(msg: str) -> 'None':
+    print('### TEST SKIPPED ### ' + msg + '\n')
+    test_skipped(msg)
+    raise SystemExit(0)
+
+if not sys.platform.startswith('linux'):
+    skip('Skipping test, because niceness test should be tested on Linux only')
 
 # Basic help dumps must not crash when using any niceness option.
 if run_rsync('-Q', '--version', check=False).returncode != 0:
