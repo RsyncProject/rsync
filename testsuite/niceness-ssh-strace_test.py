@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Python handling of niceness options like --nice or --ionice.
+# Python testing of system calls of --nice options with ssh and strace
 #
 # Foundational smoke test: --version / --info=help / --debug=help all
 # work with --nice or --ionice without crash,
@@ -136,7 +136,7 @@ def run_rsync_local_test(testname: str, args: list, expected: dict[str, str]) ->
     (FROMDIR / 'wasMitX.txt').write_bytes(b"x" * 10_000)
     (FROMDIR / '2.txt').write_text("Testfile2'\n")
 
-    probe = run_strace_rsync(*['-nvvr', '--bwlimit=1K', '--no-compress', '--whole-file', *args, f'--rsync-path={rsync_path_arg()}', f'{FROMDIR}/', f'localhost:{TODIR}/'], check=False, capture_output=True)
+    probe = run_strace_rsync(*['-nvvr', '-e', SSH, *args, f'--rsync-path={rsync_path_arg()}', f'{FROMDIR}/', f'localhost:{TODIR}/'], check=False, capture_output=True)
     print('stdout')
     print(probe.stdout)
     print('stderr')
@@ -233,7 +233,7 @@ def run_rsync_remote_test(testname: str, args: list, expected: dict[str, str]) -
     (FROMDIR / 'wasMitX.txt').write_bytes(b"x" * 10_000)
     (FROMDIR / '2.txt').write_text("Testfile2'\n")
 
-    probe = run_rsync(*['-nvvr', '--bwlimit=1K', '--no-compress', '--whole-file', *args, f'--rsync-path=strace -e trace=setpriority,getpriority,ioprio_set,ioprio_get {rsync_path_arg()}', f'{FROMDIR}/', f'localhost:{TODIR}/'], check=False, capture_output=True)
+    probe = run_rsync(*['-nvvr', '-e', SSH, *args, f'--rsync-path=strace -e trace=setpriority,getpriority,ioprio_set,ioprio_get {rsync_path_arg()}', f'{FROMDIR}/', f'localhost:{TODIR}/'], check=False, capture_output=True)
     print('stdout')
     print(probe.stdout)
     print('stderr')
