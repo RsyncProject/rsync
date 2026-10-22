@@ -26,7 +26,7 @@ def skip(msg: str) -> 'None':
     test_skipped(msg)
     raise SystemExit(0)
 
-if sys.platform.startswith(('solaris', 'Solaris')):
+if sys.platform.startswith(('solaris', 'sunos5')):
 	skip("niceness-ssh-strace test not supported on " + sys.platform)
 
 print(f"Now running the tests on platform: {sys.platform}")
