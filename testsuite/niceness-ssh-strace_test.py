@@ -214,7 +214,7 @@ def run_rsync_local_test(testname: str, args: list, expected: dict[str, str]) ->
     else:
         print('### TEST ' + testname + ': FAILED ###\n')
         sys.stdout.flush()
-        fail('### TEST ' + testname +": \nExpected: "+ str(expected_result) + " \nbut was : " + str(result))
+        fail('### TEST ' + testname +": \nExpected as user: "+ str(expected_result) + " \nbut was        : " + str(result) +": \nExpected as root: "+ str(expected_result_as_root))
     print('### TEST ' + testname + ' END ###\n')
     sys.stderr.flush()
     sys.stdout.flush()
@@ -306,7 +306,7 @@ def run_rsync_remote_test(testname: str, args: list, expected: dict[str, str]) -
     else:
         print('### TEST ' + testname + ': FAILED ###\n')
         sys.stdout.flush()
-        fail('### TEST ' + testname +": \nExpected: "+ str(expected_result) + " \nbut was : " + str(result))
+        fail('### TEST ' + testname +": \nExpected as user: "+ str(expected_result) + " \nbut was        : " + str(result) +": \nExpected as root: "+ str(expected_result_as_root))
     print('### TEST ' + testname + ' END ###\n')
     sys.stderr.flush()
     sys.stdout.flush()
