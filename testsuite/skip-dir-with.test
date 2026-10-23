@@ -1,0 +1,69 @@
+#!/bin/sh
+
+# Copyright (C) 2025 Allan Clark
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Test rsync handling of --skip-dir-with option, which skips directories
+# containing a specified marker file.
+
+. "$suitedir/rsync.fns"
+
+# Build some files/dirs/links to copy
+makepath "$fromdir/dir1"
+makepath "$fromdir/dir2"
+makepath "$fromdir/dir3"
+makepath "$fromdir/dir4/subdir"
+
+# Add content to the directories
+echo "file1" > "$fromdir/dir1/file1.txt"
+echo "file2" > "$fromdir/dir2/file2.txt"
+echo "file3" > "$fromdir/dir3/file3.txt"
+echo "file4" > "$fromdir/dir4/file4.txt"
+echo "subfile" > "$fromdir/dir4/subdir/subfile.txt"
+
+# Create marker files
+touch "$fromdir/dir2/.marker"
+touch "$fromdir/dir4/subdir/.different_marker"
+
+# Test 1: Using .marker to skip dir2
+$RSYNC -a --skip-dir-with=.marker "$fromdir/" "$todir/"
+
+# Verify that dir2 was skipped
+test -d "$todir/dir2" && test_fail "dir2 with .marker was not skipped"
+test -d "$todir/dir1" || test_fail "dir1 should have been copied"
+test -d "$todir/dir3" || test_fail "dir3 should have been copied"
+test -d "$todir/dir4" || test_fail "dir4 should have been copied"
+
+# Cleanup
+rm -rf "$todir"/*
+
+# Test 2: Using .different_marker to skip subdir
+$RSYNC -a --skip-dir-with=.different_marker "$fromdir/" "$todir/"
+
+# Verify that dir4/subdir was skipped
+test -d "$todir/dir4/subdir" && test_fail "dir4/subdir with .different_marker was not skipped"
+test -d "$todir/dir1" || test_fail "dir1 should have been copied"
+test -d "$todir/dir2" || test_fail "dir2 should have been copied"
+test -d "$todir/dir3" || test_fail "dir3 should have been copied"
+test -f "$todir/dir4/file4.txt" || test_fail "dir4/file4.txt should have been copied"
+
+# Cleanup
+rm -rf "$todir"/*
+
+# Add more marker files for third test
+touch "$fromdir/dir1/.common_marker" 
+touch "$fromdir/dir3/.common_marker"
+
+# Test 3: Using .common_marker to skip multiple directories
+$RSYNC -a --skip-dir-with=.common_marker "$fromdir/" "$todir/"
+
+# Verify that both dir1 and dir3 were skipped
+test -d "$todir/dir1" && test_fail "dir1 with .common_marker was not skipped"
+test -d "$todir/dir3" && test_fail "dir3 with .common_marker was not skipped"
+test -d "$todir/dir2" || test_fail "dir2 should have been copied"
+test -d "$todir/dir4" || test_fail "dir4 should have been copied"
+
+# Success!
+exit 0 
