@@ -126,6 +126,10 @@ def run_strace_rsync(*args: str, check: bool = True,
         test_fail(f"rsync exited {proc.returncode}: {' '.join(argv)}")
     return proc
 
+def expected_strace_result_as_root(string: str) -> str:
+	if str == "<not set>":
+		return string
+	return string.split("=", 1)[0]+'=0'
 
 def run_rsync_local_test(testname: str, args: list, expected: dict[str, str]) -> None:
 
@@ -156,8 +160,8 @@ def run_rsync_local_test(testname: str, args: list, expected: dict[str, str]) ->
     expected_result["ionice_strace"] = expected["ionice_local_strace"]
 
     expected_result_as_root = {key: expected[key].replace(" failed", "") for key in ["nice_local", "ionice_local", "nice_remote", "ionice_remote"] if key in expected}
-    expected_result_as_root["nice_strace"] = expected["nice_local_strace"].split("=", 1)[0]+'=0'
-    expected_result_as_root["ionice_strace"] = expected["ionice_local_strace"].split("=", 1)[0]+'=0'
+    expected_result_as_root["nice_strace"] = expected_strace_result_as_root(expected["nice_local_strace"])
+    expected_result_as_root["ionice_strace"] = expected_strace_result_as_root(expected["ionice_local_strace"])
 
     for remote_line in probe.stdout.splitlines():
         print("stdout line: "+remote_line);
@@ -248,8 +252,8 @@ def run_rsync_remote_test(testname: str, args: list, expected: dict[str, str]) -
     expected_result["ionice_strace"] = expected["ionice_remote_strace"]
 
     expected_result_as_root = {key: expected[key].replace(" failed", "") for key in ["nice_local", "ionice_local", "nice_remote", "ionice_remote"] if key in expected}
-    expected_result_as_root["nice_strace"] = expected["nice_remote_strace"].split("=", 1)[0]+'=0'
-    expected_result_as_root["ionice_strace"] = expected["ionice_remote_strace"].split("=", 1)[0]+'=0'
+    expected_result_as_root["nice_strace"] = expected_strace_result_as_root(expected["nice_remote_strace"])
+    expected_result_as_root["ionice_strace"] = expected_strace_result_as_root(expected["ionice_remote_strace"])
 
     for remote_line in probe.stdout.splitlines():
         print("stdout line: "+remote_line);
