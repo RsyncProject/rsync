@@ -271,8 +271,10 @@ static const char *getpassf(const char *filename)
 
 	if (n > 0) {
 		buffer[n] = '\0';
-		if ((p = strtok(buffer, "\n\r")) != NULL)
-			return strdup(p);
+		p = buffer + strcspn(buffer, "\n\r");
+		*p = '\0';
+		if (buffer[0] != '\0')
+			return strdup(buffer);
 	}
 
 	rprintf(FERROR, "ERROR: failed to read a password from %s\n", filename);
