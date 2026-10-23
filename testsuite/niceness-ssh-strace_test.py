@@ -127,7 +127,7 @@ def run_strace_rsync(*args: str, check: bool = True,
     return proc
 
 def expected_strace_result_as_root(string: str) -> str:
-	if str == "<not set>":
+	if string == "<not set>":
 		return string
 	return string.split("=", 1)[0]+'=0'
 
