@@ -44,6 +44,7 @@ insecure-links-admin-optout
 link-dest-symlink-enotsup                # the ENOTSUP hard-link hook is an LD_PRELOAD, Linux-only
 log-file-symlink
 msg-io-timeout-overflow
+niceness-ssh-strace                      # Skipping tests because strace cannot create a process trace
 nondaemon-symlink-race
 nonroot-restrictive-perms
 open-noatime
