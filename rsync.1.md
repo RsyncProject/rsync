@@ -686,6 +686,8 @@ has its own detailed description later in this manpage.
 --checksum-seed=NUM      set block/file checksum seed (advanced)
 --ipv4, -4               prefer IPv4
 --ipv6, -6               prefer IPv6
+--nice=SETTINGS          adjust rsync CPU and I/O priorities
+--no-nice                clear earlier --nice settings
 --version, -V            print the version + other info and exit
 --help, -h (*)           show this help (* -h is help only on its own)
 ```
@@ -706,6 +708,8 @@ accepted:
 --log-file=FILE          override the "log file" setting
 --log-file-format=FMT    override the "log format" setting
 --sockopts=OPTIONS       specify custom TCP options
+--nice=SETTINGS          adjust daemon process CPU and I/O priorities
+--no-nice                clear earlier --nice settings
 --verbose, -v            increase verbosity
 --ipv4, -4               prefer IPv4
 --ipv6, -6               prefer IPv6
@@ -4130,6 +4134,43 @@ sign) if you want the local shell to expand it.
     applications that want repeatable block checksums, or in the case where the
     user wants a more random checksum seed.  Setting NUM to 0 causes rsync to
     use the default of **time**() for checksum seed.
+
+0.  `--nice=SETTINGS`
+
+    Adjust the CPU and I/O scheduling priority of the local process, the remote
+    process or both.  SETTINGS is a comma-separated list.  Each setting is
+    `TARGET`, `PRIORITY` or `TARGET:PRIORITY`.  `TARGET` is `local`, `remote` or
+    `all`.  Omitting `TARGET` applies the priority to both processes.  A
+    target-only setting uses `19/idle`.  Target names and I/O values are
+    case-insensitive.
+
+    `PRIORITY` is a CPU nice value from -20 to 19, an I/O value or both
+    separated by `/`.  I/O values are `none`, `idle`, `rt_0` through `rt_7` and
+    `be_0` through `be_7`.  `none` restores the kernel-derived I/O priority.
+    Higher nice values and higher `rt` or `be` suffixes mean lower priority.
+    Raising priority may require additional privilege.
+
+    A setting that specifies only CPU or I/O priority leaves the other component
+    unchanged.  For example,
+    `--nice=remote:5 --nice=remote:idle` requests remote CPU priority 5 and
+    remote idle I/O priority.  Later settings replace earlier values for the
+    same component.  `--no-nice` clears all earlier settings.
+
+    Examples:
+
+        --nice=19/idle
+        --nice=local:10,remote:idle
+        --nice=local:19/be_7,remote:5
+
+    The remote rsync must support this option before a remote setting can be
+    used.  Daemon clients may keep or lower the daemon worker's inherited
+    priorities but cannot raise them.  A daemon administrator can also refuse
+    the option with `refuse options = nice`.  When starting a daemon, the local
+    setting is applied before it accepts client settings.  A standalone listener
+    passes that priority to its workers.  The remote setting has no meaning.
+
+    If a priority change is unsupported or fails, rsync warns and continues the
+    transfer.
 
 ## DAEMON OPTIONS
 

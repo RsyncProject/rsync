@@ -157,6 +157,7 @@ Status legend: ✓ property asserted · `~` shallow / by an existing ported test
 | --bwlimit | partial*new* (used, not asserted) | `~` |
 | --copy-as | — | ✗ root-gated |
 | --iconv | — | ✗ |
+| --nice / --no-nice | niceness | ✓ local, remote shell, local server, daemon and rrsync |
 | -s/--secluded-args, --old-args, --trust-sender | (default arg-protection exercised) | `~` |
 
 ---
