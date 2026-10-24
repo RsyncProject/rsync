@@ -604,7 +604,7 @@ enum {OPT_SERVER = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_NO_D, OPT_APPEND, OPT_NO_ICONV, OPT_INFO, OPT_DEBUG, OPT_BLOCK_SIZE,
       OPT_USERMAP, OPT_GROUPMAP, OPT_CHOWN, OPT_BWLIMIT, OPT_STDERR,
       OPT_OLD_COMPRESS, OPT_NEW_COMPRESS, OPT_NO_COMPRESS, OPT_OLD_ARGS,
-      OPT_STOP_AFTER, OPT_STOP_AT,
+      OPT_STOP_AFTER, OPT_STOP_AT, OPT_NICE, OPT_NO_NICE,
       OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
@@ -862,6 +862,8 @@ static struct poptOption long_options[] = {
   {"remote-option",   'M', POPT_ARG_STRING, 0, 'M', 0, 0 },
   {"protocol",         0,  POPT_ARG_INT,    &protocol_version, 0, 0, 0 },
   {"checksum-seed",    0,  POPT_ARG_INT,    &checksum_seed, 0, 0, 0 },
+  {"nice",             0,  POPT_ARG_STRING, 0, OPT_NICE, 0, 0 },
+  {"no-nice",          0,  POPT_ARG_NONE,   0, OPT_NO_NICE, 0, 0 },
   {"server",           0,  POPT_ARG_NONE,   0, OPT_SERVER, 0, 0 },
   {"sender",           0,  POPT_ARG_NONE,   0, OPT_SENDER, 0, 0 },
   /* All the following options switch us into daemon-mode option-parsing. */
@@ -889,6 +891,8 @@ static const struct poptOption long_daemon_options[] = {
   {"port",             0,  POPT_ARG_INT,    &rsync_port, 0, 0, 0 },
   {"sockopts",         0,  POPT_ARG_STRING, &sockopts, 0, 0, 0 },
   {"protocol",         0,  POPT_ARG_INT,    &protocol_version, 0, 0, 0 },
+  {"nice",             0,  POPT_ARG_STRING, 0, OPT_NICE, 0, 0 },
+  {"no-nice",          0,  POPT_ARG_NONE,   0, OPT_NO_NICE, 0, 0 },
   {"server",           0,  POPT_ARG_NONE,   &am_server, 0, 0, 0 },
   {"temp-dir",        'T', POPT_ARG_STRING, &tmpdir, 0, 0, 0 },
   {"verbose",         'v', POPT_ARG_NONE,   0, 'v', 0, 0 },
@@ -900,6 +904,17 @@ static const struct poptOption long_daemon_options[] = {
 
 
 static char err_buf[200];
+
+static int parse_niceness_option(poptContext pc)
+{
+	const char *arg = poptGetOptArg(pc);
+
+	if (niceness_parse(arg))
+		return 1;
+	snprintf(err_buf, sizeof err_buf,
+		"Invalid argument passed to --nice (%s)\n", arg);
+	return 0;
+}
 
 
 /**
@@ -1574,6 +1589,15 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 					verbose++;
 					break;
 
+				case OPT_NICE:
+					if (!parse_niceness_option(pc))
+						goto cleanup;
+					break;
+
+				case OPT_NO_NICE:
+					niceness_reset();
+					break;
+
 				default:
 					rprintf(FERROR,
 						"rsync: %s: %s (in daemon mode)\n",
@@ -1712,6 +1736,15 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 
 		case 'q':
 			quiet++;
+			break;
+
+		case OPT_NICE:
+			if (!parse_niceness_option(pc))
+				goto cleanup;
+			break;
+
+		case OPT_NO_NICE:
+			niceness_reset();
 			break;
 
 		case 'x':
@@ -2219,6 +2252,9 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		poptFreeContext(pc);
 		return 1;
 	}
+	if (am_daemon && module_id >= 0
+	 && !niceness_check_daemon_request(err_buf, sizeof err_buf))
+		goto cleanup;
 
 	/* Because popt 1.19 has started to free the returned args data, we now
 	 * make a copy of the array and then do an immediate cleanup. */
@@ -3198,6 +3234,9 @@ void server_options(char **args, int *argc_p)
 
 	if (mkpath_dest_arg && am_sender)
 		args[ac++] = "--mkpath";
+
+	if ((arg = niceness_remote_option()) != NULL)
+		args[ac++] = arg;
 
 	if (ac > MAX_SERVER_ARGS) { /* Not possible... */
 		rprintf(FERROR, "argc overflow in server_options().\n");

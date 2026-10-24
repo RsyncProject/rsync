@@ -35,7 +35,8 @@ short_with_num = '@B' # DO NOT REMOVE ANY
 
 # To disable a long-named option, change its value to a -1.  The values mean:
 # 0 = the option has no arg; 1 = the arg doesn't need any checking; 2 = only
-# check the arg when receiving; and 3 = always check the arg.
+# check the path arg when receiving; 3 = always check the path arg; and 4 =
+# allow only a non-elevating --nice setting.
 long_opts = {
   'append': 0,
   'backup-dir': 2,
@@ -93,6 +94,7 @@ long_opts = {
   'msgs2stderr': 0,
   'munge-links': 0,
   'new-compress': 0,
+  'nice': 4,
   'no-W': 0,
   'no-implied-dirs': 0,
   'no-msgs2stderr': 0,
@@ -702,6 +704,11 @@ def main():
 def validated_arg(opt, arg, typ=3, wild=False):
     if opt != 'arg': # arg values already have their backslashes removed.
         arg = DE_BACKSLASH_RE.sub(r'\1', arg)
+
+    if typ == 4:
+        if not re.fullmatch(r'(?i:local(?::(?:19(?:/idle)?|idle))?)', arg):
+            die('unsafe --nice setting:', arg)
+        return arg
 
     # "-" is rsync's read-the-list-from-stdin sentinel, not a pathname: a pull
     # with a local --files-from sends exactly "--files-from=-" to the server.
