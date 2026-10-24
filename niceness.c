@@ -9,36 +9,19 @@
 #ifdef HAVE_SYS_SYSCALL_H
 #include <sys/syscall.h>
 #endif
-
 extern int am_server;
 extern int am_daemon;
 
 #define PRIORITY_UNSET (-100)
 #define DEFAULT_NICE 19
 
-#if defined HAVE_GETPRIORITY && defined HAVE_SYS_RESOURCE_H
-#define SUPPORT_GET_PRIORITY 1
-#endif
-
-#if defined SUPPORT_GET_PRIORITY && defined HAVE_SETPRIORITY
+#if defined HAVE_SETPRIORITY && defined HAVE_SYS_RESOURCE_H
 #define SUPPORT_NICE_PRIORITY 1
 #endif
 
 #if defined HAVE_LINUX_IOPRIO_H && defined HAVE_SYS_SYSCALL_H \
- && defined SUPPORT_GET_PRIORITY \
- && defined SYS_ioprio_get && defined SYS_ioprio_set \
- && defined IOPRIO_PRIO_CLASS \
- && defined IOPRIO_PRIO_DATA && defined IOPRIO_PRIO_VALUE
+ && defined SYS_ioprio_set && defined IOPRIO_PRIO_VALUE
 #define SUPPORT_IO_PRIORITY 1
-#endif
-
-#ifdef SUPPORT_IO_PRIORITY
-#ifdef IOPRIO_PRIO_LEVEL
-#define RSYNC_IOPRIO_LEVEL(value) IOPRIO_PRIO_LEVEL(value)
-#else
-/* Older headers expose the whole data field; the level is its low 3 bits. */
-#define RSYNC_IOPRIO_LEVEL(value) (IOPRIO_PRIO_DATA(value) & 7)
-#endif
 #endif
 
 enum io_priority_class {
@@ -266,120 +249,21 @@ char *niceness_remote_option(void)
 	return arg;
 }
 
-#ifdef SUPPORT_IO_PRIORITY
-static int effective_io_priority(int class, int data, int cpu, int *rank_p, int *data_p)
-{
-	if (class == IOPRIO_CLASS_NONE) {
-		class = IOPRIO_CLASS_BE;
-		data = (cpu + 20) / 5;
-		if (data > 7)
-			data = 7;
-	}
-
-	switch (class) {
-	case IOPRIO_CLASS_RT:
-		*rank_p = 0;
-		break;
-	case IOPRIO_CLASS_BE:
-		*rank_p = 1;
-		break;
-	case IOPRIO_CLASS_IDLE:
-		*rank_p = 2;
-		data = 0;
-		break;
-	default:
-		return 0;
-	}
-	*data_p = data;
-	return 1;
-}
-
-static int requested_io_priority(const struct priority_setting *setting, int cpu,
-		int *rank_p, int *data_p)
-{
-	int class;
-
-	switch (setting->io_class) {
-	case IO_PRIORITY_NONE:
-		class = IOPRIO_CLASS_NONE;
-		break;
-	case IO_PRIORITY_REALTIME:
-		class = IOPRIO_CLASS_RT;
-		break;
-	case IO_PRIORITY_BEST_EFFORT:
-		class = IOPRIO_CLASS_BE;
-		break;
-	case IO_PRIORITY_IDLE:
-		class = IOPRIO_CLASS_IDLE;
-		break;
-	default:
-		return 0;
-	}
-	return effective_io_priority(class, setting->io_data, cpu, rank_p, data_p);
-}
-#endif
-
 int niceness_check_daemon_request(char *err_buf, size_t err_len)
 {
 	struct priority_setting *setting = &priorities.local;
 
-	if (setting->cpu == PRIORITY_UNSET && setting->io_class == PRIORITY_UNSET)
-		return 1;
-
-#if defined SUPPORT_NICE_PRIORITY || defined SUPPORT_IO_PRIORITY
-	int current_cpu;
-
-	errno = 0;
-	current_cpu = getpriority(PRIO_PROCESS, 0);
-	if (errno) {
-		snprintf(err_buf, err_len, "cannot inspect daemon process priority: %s\n",
-			strerror(errno));
+	if (setting->cpu != PRIORITY_UNSET && setting->cpu != DEFAULT_NICE) {
+		snprintf(err_buf, err_len,
+			"daemon clients may only request CPU nice 19\n");
 		return 0;
 	}
-#endif
-
-#ifdef SUPPORT_NICE_PRIORITY
-	if (setting->cpu != PRIORITY_UNSET && setting->cpu < current_cpu) {
-		snprintf(err_buf, err_len, "--nice cannot raise daemon CPU priority\n");
+	if (setting->io_class != PRIORITY_UNSET
+	 && setting->io_class != IO_PRIORITY_IDLE) {
+		snprintf(err_buf, err_len,
+			"daemon clients may only request idle I/O priority\n");
 		return 0;
 	}
-#endif
-
-#ifdef SUPPORT_IO_PRIORITY
-	if (setting->io_class != PRIORITY_UNSET) {
-		int raw = syscall(SYS_ioprio_get, IOPRIO_WHO_PROCESS, 0);
-		int requested_cpu = current_cpu;
-		int current_rank, current_data, requested_rank, requested_data;
-
-		if (raw < 0) {
-			snprintf(err_buf, err_len, "cannot inspect daemon I/O priority: %s\n",
-				strerror(errno));
-			return 0;
-		}
-#ifdef SUPPORT_NICE_PRIORITY
-		if (setting->cpu != PRIORITY_UNSET)
-			requested_cpu = setting->cpu;
-#endif
-		/* IOPRIO_CLASS_NONE derives its level from CPU nice. */
-		if (!effective_io_priority(IOPRIO_PRIO_CLASS(raw), RSYNC_IOPRIO_LEVEL(raw),
-			current_cpu, &current_rank, &current_data)
-		 || !requested_io_priority(setting, requested_cpu,
-			&requested_rank, &requested_data)) {
-			snprintf(err_buf, err_len, "unsupported daemon I/O priority class\n");
-			return 0;
-		}
-		if (requested_rank < current_rank
-		 || (requested_rank == current_rank && requested_data < current_data)) {
-			snprintf(err_buf, err_len, "--nice cannot raise daemon I/O priority\n");
-			return 0;
-		}
-	}
-#endif
-
-#if !defined SUPPORT_NICE_PRIORITY && !defined SUPPORT_IO_PRIORITY
-	(void)err_buf;
-	(void)err_len;
-#endif
 
 	return 1;
 }

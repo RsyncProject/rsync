@@ -5,11 +5,12 @@ import os
 import shlex
 import shutil
 import subprocess
+import sys
 
 from rsyncfns import (
     FROMDIR, RSYNC, SCRATCHDIR, TODIR, build_rsyncd_conf, hands_setup,
     patched_rrsync, rsync_argv, rsync_path_arg, rsh_cmd, run_rsync,
-    start_test_daemon, test_fail, write_daemon_conf,
+    start_test_daemon, test_fail,
 )
 
 
@@ -64,6 +65,8 @@ for value in invalid:
     if proc.returncode == 0 or 'Invalid argument passed to --nice' not in output(proc):
         test_fail(f'invalid --nice value was accepted: {value!r}')
 
+# In Turkish, ASCII I lowercases to a dotless i rather than i. Option names use
+# ASCII syntax, so their case matching must remain locale-independent.
 saved_locale = locale.setlocale(locale.LC_CTYPE)
 turkish_locale = None
 try:
@@ -196,16 +199,6 @@ proc = run_rsync(
 if io_supported and 'set server I/O priority to none' not in output(proc):
     test_fail(f'remote I/O priority was not reset:\n{output(proc)}')
 
-cpu_raise_denied = False
-if cpu_supported:
-    proc = run_rsync(
-        '-nr', '--debug=CMD1', '--nice=local:-1', f'{FROMDIR}/', f'{TODIR}/',
-        check=False, capture_output=True,
-    )
-    if proc.returncode != 0:
-        test_fail(f'local priority probe failed:\n{output(proc)}')
-    cpu_raise_denied = 'failed to set client CPU priority to -1' in output(proc)
-
 conf = build_rsyncd_conf()
 with conf.open('a') as fh:
     fh.write(f'''\
@@ -220,11 +213,9 @@ with conf.open('a') as fh:
     read only = yes
     hosts allow = *
 ''')
-daemon_start_cpu = -1 if cpu_raise_denied else 17
-daemon_raise_cpu = -1 if cpu_raise_denied else 16
 daemon_rsh = (
     f'{rsync_path_arg(RSYNC)} --config={shlex.quote(str(conf))} '
-    f'--daemon --nice=local:{daemon_start_cpu}/idle'
+    f'--daemon --nice=local:19/be_7'
 )
 proc = run_rsync(
     '-nr', '--debug=CMD1', '-M--debug=CMD1', '--nice=remote:19/idle',
@@ -237,64 +228,63 @@ if cpu_supported and 'set daemon CPU priority to 19' not in text:
 if io_supported and 'set daemon I/O priority to idle' not in text:
     test_fail(f'remote-shell daemon I/O priority was not applied:\n{text}')
 
-daemon_log = SCRATCHDIR / 'rsyncd.log'
-if not io_supported:
-    startup_message = 'cannot set daemon I/O priority to idle: operation is not supported'
-elif not cpu_supported:
-    startup_message = (f'cannot set daemon CPU priority to {daemon_start_cpu}: '
-                       'operation is not supported')
-elif cpu_raise_denied:
-    startup_message = f'failed to set daemon CPU priority to {daemon_start_cpu}'
-else:
-    startup_message = None
-if startup_message and startup_message not in daemon_log.read_text():
-    test_fail(f'remote-shell daemon startup priority missed its configured log:\n'
-              f'{daemon_log.read_text()}')
-
-proc = run_rsync(
-    '-nr', f'--nice=remote:{daemon_raise_cpu}/be_7', f'--rsh={rsh}',
-    f'--rsync-path={daemon_rsh}', 'localhost::test-nice-rsh/',
-    f'{SCRATCHDIR}/daemon-rsh-copy/', check=False, capture_output=True,
+idle_code = (
+    'import os\n'
+    'os.sched_setscheduler(0, os.SCHED_IDLE, os.sched_param(0))\n'
 )
-text = output(proc)
-if cpu_supported or io_supported:
-    rejected = ('--nice cannot raise daemon CPU priority' in text
-                or '--nice cannot raise daemon I/O priority' in text)
-    if proc.returncode == 0 or not rejected:
-        test_fail(f'remote-shell daemon accepted a priority increase:\n{text}')
+sched_idle = False
+if hasattr(os, 'sched_setscheduler') and hasattr(os, 'SCHED_IDLE'):
+    probe = subprocess.run(
+        [sys.executable, '-c', idle_code], stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL, timeout=20,
+    )
+    sched_idle = probe.returncode == 0
 
+if sched_idle:
+    idle_wrapper = SCRATCHDIR / 'sched-idle-rsync.py'
+    idle_wrapper.write_text(
+        idle_code + 'import sys\nos.execvp(sys.argv[1], sys.argv[1:])\n'
+    )
+    idle_command = shlex.join([sys.executable, str(idle_wrapper), *shlex.split(RSYNC)])
+    idle_daemon_rsh = (
+        f'{idle_command} --config={shlex.quote(str(conf))} --daemon'
+    )
+    proc = run_rsync(
+        '-nr', '--nice=remote:be_7', f'--rsh={rsh}',
+        f'--rsync-path={idle_daemon_rsh}', 'localhost::test-nice-rsh/',
+        f'{SCRATCHDIR}/idle-daemon-copy/', check=False, capture_output=True,
+    )
+    if proc.returncode == 0 or 'daemon clients may only request idle I/O priority' not in output(proc):
+        test_fail(f'SCHED_IDLE daemon accepted an I/O priority increase:\n{output(proc)}')
+
+daemon_log = SCRATCHDIR / 'rsyncd.log'
 daemon_log.unlink()
 daemon_url = start_test_daemon(
-    conf, 12898, rsync_cmd=f'{RSYNC} --nice=local:{daemon_start_cpu}/idle',
+    conf, 12898, rsync_cmd=f'{RSYNC} --nice=local:19/be_7',
 )
-proc = run_rsync(
-    '-nr', '--debug=CMD1', '-M--debug=CMD1', '--nice=remote:19/idle',
-    f'{daemon_url}test-from/', f'{SCRATCHDIR}/daemon-copy/', capture_output=True,
-)
-text = output(proc)
-if cpu_supported and 'set daemon CPU priority to 19' not in text:
-    test_fail(f'daemon CPU priority was not lowered:\n{text}')
-if io_supported and 'set daemon I/O priority to idle' not in text:
-    test_fail(f'daemon I/O priority was not lowered:\n{text}')
-if startup_message and startup_message not in daemon_log.read_text():
-    test_fail(f'daemon startup priority missed its configured log:\n'
-              f'{daemon_log.read_text()}')
+for setting in ('19', 'idle', '19/idle'):
+    proc = run_rsync(
+        '-nr', '--debug=CMD1', '-M--debug=CMD1', f'--nice=remote:{setting}',
+        f'{daemon_url}test-from/', f'{SCRATCHDIR}/daemon-copy/',
+        capture_output=True,
+    )
+    text = output(proc)
+    if setting == '19/idle':
+        if cpu_supported and 'set daemon CPU priority to 19' not in text:
+            test_fail(f'daemon CPU priority was not lowered:\n{text}')
+        if io_supported and 'set daemon I/O priority to idle' not in text:
+            test_fail(f'daemon I/O priority was not lowered:\n{text}')
 
-proc = run_rsync(
-    '-nr', f'--nice=remote:{daemon_raise_cpu}', f'{daemon_url}test-from/',
-    f'{SCRATCHDIR}/daemon-copy/', check=False, capture_output=True,
-)
-if cpu_supported:
-    if proc.returncode == 0 or '--nice cannot raise daemon CPU priority' not in output(proc):
-        test_fail(f'daemon accepted a CPU priority increase:\n{output(proc)}')
-
-proc = run_rsync(
-    '-nr', '--nice=remote:be_7', f'{daemon_url}test-from/',
-    f'{SCRATCHDIR}/daemon-copy/', check=False, capture_output=True,
-)
-if io_supported:
-    if proc.returncode == 0 or '--nice cannot raise daemon I/O priority' not in output(proc):
-        test_fail(f'daemon accepted an I/O priority increase:\n{output(proc)}')
+for setting, message in (
+    ('18', 'daemon clients may only request CPU nice 19'),
+    ('be_7', 'daemon clients may only request idle I/O priority'),
+):
+    proc = run_rsync(
+        '-nr', f'--nice=remote:{setting}', f'{daemon_url}test-from/',
+        f'{SCRATCHDIR}/daemon-copy/', check=False, capture_output=True,
+    )
+    if proc.returncode == 0 or message not in output(proc):
+        test_fail(f'daemon accepted unsafe --nice setting {setting!r}:\n{output(proc)}')
 
 proc = run_rsync(
     '-nr', '--nice=remote:19', f'{daemon_url}test-nice-refused/',
@@ -302,30 +292,3 @@ proc = run_rsync(
 )
 if proc.returncode == 0 or 'server is configured to refuse --nice' not in output(proc):
     test_fail(f'daemon did not refuse --nice:\n{output(proc)}')
-
-compound_conf = write_daemon_conf(
-    [('test-from', {'path': FROMDIR, 'read only': 'yes'})],
-    globals={
-        'pid file': SCRATCHDIR / 'compound-rsyncd.pid',
-        'log file': SCRATCHDIR / 'compound-rsyncd.log',
-    },
-    name='compound-rsyncd.conf',
-)
-compound_daemon_url = start_test_daemon(
-    compound_conf, 12998, rsync_cmd=f'{RSYNC} --nice=local:0/be_7',
-)
-compound_rejected = io_supported and not cpu_supported
-proc = run_rsync(
-    '-nr', '--debug=CMD1', '-M--debug=CMD1', '--nice=remote:19/none',
-    f'{compound_daemon_url}test-from/', f'{SCRATCHDIR}/compound-daemon-copy/',
-    check=not compound_rejected, capture_output=True,
-)
-text = output(proc)
-if compound_rejected:
-    if proc.returncode == 0 or '--nice cannot raise daemon I/O priority' not in text:
-        test_fail(f'compound daemon priority was not rejected safely:\n{text}')
-else:
-    if cpu_supported and 'set daemon CPU priority to 19' not in text:
-        test_fail(f'compound daemon CPU priority was not lowered:\n{text}')
-    if io_supported and 'set daemon I/O priority to none' not in text:
-        test_fail(f'compound daemon I/O priority was not retained safely:\n{text}')

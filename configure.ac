@@ -978,7 +978,7 @@ AC_CHECK_FUNCS(waitpid wait4 getcwd chown chmod lchmod mknod mkfifo fdopendir \
     seteuid strerror putenv iconv_open locale_charset nl_langinfo getxattr \
     extattr_get_link sigaction sigprocmask setattrlist getgrouplist \
     initgroups utimensat futimens posix_fallocate attropen setvbuf nanosleep usleep \
-    setenv unsetenv mbrtowc getpriority setpriority)
+    setenv unsetenv mbrtowc setpriority)
 
 dnl dirfd() is a macro or static inline on several systems (the BSDs), so the
 dnl default AC_CHECK_FUNCS link probe -- which declares `char dirfd(void);` and

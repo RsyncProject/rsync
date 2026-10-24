@@ -4163,11 +4163,11 @@ sign) if you want the local shell to expand it.
         --nice=local:19/be_7,remote:5
 
     The remote rsync must support this option before a remote setting can be
-    used.  Daemon clients may keep or lower the daemon worker's inherited
-    priorities but cannot raise them.  A daemon administrator can also refuse
-    the option with `refuse options = nice`.  When starting a daemon, the local
-    setting is applied before it accepts client settings.  A standalone listener
-    passes that priority to its workers.  The remote setting has no meaning.
+    used.  Daemon clients may request only CPU nice 19, idle I/O priority or
+    both.  A daemon administrator can also refuse the option with
+    `refuse options = nice`.  When starting a daemon, the local setting is
+    applied before it accepts client settings.  A standalone listener passes
+    that priority to its workers.  A daemon's remote setting has no meaning.
 
     If a priority change is unsupported or fails, rsync warns and continues the
     transfer.

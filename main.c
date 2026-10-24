@@ -1309,6 +1309,8 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
 
 	if (protocol_version >= 23)
 		io_start_multiplex_out(f_out);
+	/* Priority diagnostics need the negotiated message channel.
+	 * File-list work starts below. */
 	niceness_apply();
 	if (am_daemon && io_timeout && protocol_version >= 31)
 		send_msg_int(MSG_IO_TIMEOUT, io_timeout);
