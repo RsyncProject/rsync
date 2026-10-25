@@ -30,8 +30,7 @@ extern const char undetermined_hostname[];
 
 static int match_hostname(const char **host_ptr, const char *addr, const char *tok, int deny)
 {
-	struct hostent *hp;
-	unsigned int i;
+	struct addrinfo hints, *res, *res0;
 	const char *host = *host_ptr;
 #ifdef SUPPORT_IDN
 	char idn_tok[1024];
@@ -65,7 +64,10 @@ static int match_hostname(const char **host_ptr, const char *addr, const char *t
 		return 0;
 
 	/* Now try forward-DNS on the token (config-specified hostname) and see if the IP matches. */
-	if (!(hp = gethostbyname(tok))) {
+	memset(&hints, 0, sizeof hints);
+	hints.ai_family = PF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	if (getaddrinfo(tok, NULL, &hints, &res0) != 0) {
 		/* A deny-list hostname token we cannot resolve must fail CLOSED:
 		 * we can't prove the peer isn't the denied host, so treat the
 		 * unresolvable token as a match (deny).  Allow-list tokens keep
@@ -74,16 +76,33 @@ static int match_hostname(const char **host_ptr, const char *addr, const char *t
 		return deny;
 	}
 
-	for (i = 0; hp->h_addr_list[i] != NULL; i++) {
-		if (strcmp(addr, inet_ntoa(*(struct in_addr*)(hp->h_addr_list[i]))) == 0) {
+	for (res = res0; res; res = res->ai_next) {
+		char res_addr[128];
+		const void *src_addr;
+
+		switch (res->ai_family) {
+		  case AF_INET:
+			src_addr = &((struct sockaddr_in *)res->ai_addr)->sin_addr;
+			break;
+		  case AF_INET6:
+			src_addr = &((struct sockaddr_in6 *)res->ai_addr)->sin6_addr;
+			break;
+		  default:
+			continue;
+		}
+		if (!inet_ntop(res->ai_family, src_addr, res_addr, sizeof res_addr))
+			continue;
+		if (strcmp(addr, res_addr) == 0) {
 			/* If reverse lookups are off, we'll use the conf-specified
 			 * hostname in preference to UNDETERMINED. */
 			if (host == undetermined_hostname)
 				*host_ptr = strdup(tok);
+			freeaddrinfo(res0);
 			return 1;
 		}
 	}
 
+	freeaddrinfo(res0);
 	return 0;
 }
 
