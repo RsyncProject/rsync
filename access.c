@@ -30,7 +30,9 @@ extern const char undetermined_hostname[];
 
 static int match_hostname(const char **host_ptr, const char *addr, const char *tok, int deny)
 {
-	struct addrinfo hints, *res, *res0;
+	struct addrinfo hints, *res, *res0, *resa = NULL;
+	const char *a = NULL;
+	int addrlen = 0;
 	const char *host = *host_ptr;
 #ifdef SUPPORT_IDN
 	char idn_tok[1024];
@@ -76,30 +78,61 @@ static int match_hostname(const char **host_ptr, const char *addr, const char *t
 		return deny;
 	}
 
-	for (res = res0; res; res = res->ai_next) {
-		char res_addr[128];
-		const void *src_addr;
-
-		switch (res->ai_family) {
-		  case AF_INET:
-			src_addr = &((struct sockaddr_in *)res->ai_addr)->sin_addr;
+	/* Parse the peer address once so the resolved addresses below can be
+	 * compared against it in binary form by family, as match_address()
+	 * does, rather than by comparing formatted strings. */
+	memset(&hints, 0, sizeof hints);
+	hints.ai_family = PF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+#ifdef AI_NUMERICHOST
+	hints.ai_flags = AI_NUMERICHOST;
+#endif
+	if (getaddrinfo(addr, NULL, &hints, &resa) == 0) {
+		switch (resa->ai_family) {
+		  case PF_INET:
+			a = (char *)&((struct sockaddr_in *)resa->ai_addr)->sin_addr;
+			addrlen = 4;
 			break;
-		  case AF_INET6:
-			src_addr = &((struct sockaddr_in6 *)res->ai_addr)->sin6_addr;
+#ifdef INET6
+		  case PF_INET6:
+			a = (char *)&((struct sockaddr_in6 *)resa->ai_addr)->sin6_addr;
+			addrlen = 16;
 			break;
+#endif
 		  default:
-			continue;
+			break;
 		}
-		if (!inet_ntop(res->ai_family, src_addr, res_addr, sizeof res_addr))
-			continue;
-		if (strcmp(addr, res_addr) == 0) {
-			/* If reverse lookups are off, we'll use the conf-specified
-			 * hostname in preference to UNDETERMINED. */
-			if (host == undetermined_hostname)
-				*host_ptr = strdup(tok);
-			freeaddrinfo(res0);
-			return 1;
+	}
+
+	if (a) {
+		for (res = res0; res; res = res->ai_next) {
+			const char *t = NULL;
+
+			if (res->ai_family != resa->ai_family)
+				continue;
+			switch (res->ai_family) {
+			  case PF_INET:
+				t = (char *)&((struct sockaddr_in *)res->ai_addr)->sin_addr;
+				break;
+#ifdef INET6
+			  case PF_INET6:
+				t = (char *)&((struct sockaddr_in6 *)res->ai_addr)->sin6_addr;
+				break;
+#endif
+			  default:
+				continue;
+			}
+			if (memcmp(a, t, addrlen) == 0) {
+				/* If reverse lookups are off, we'll use the conf-specified
+				 * hostname in preference to UNDETERMINED. */
+				if (host == undetermined_hostname)
+					*host_ptr = strdup(tok);
+				freeaddrinfo(resa);
+				freeaddrinfo(res0);
+				return 1;
+			}
 		}
+		freeaddrinfo(resa);
 	}
 
 	freeaddrinfo(res0);
