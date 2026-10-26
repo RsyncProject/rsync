@@ -72,6 +72,7 @@ CHECK_COMPILE_OBJS=syscall-no-at-fdcwd.o syscall-no-o-directory.o \
 	authenticate-no-o-cloexec.o rsync-no-o-cloexec.o clientserver-no-o-directory.o \
 	flist-no-o-directory.o generator-no-o-directory.o sender-no-o-directory.o \
 	lib/acl-no-o-directory.o
+CHECK_COMPILE_OBJS=syscall-no-at-fdcwd.o access-no-inet6.o
 
 # note that the -I. is needed to handle config.h when using VPATH
 .c.o:
@@ -119,6 +120,9 @@ sender-no-o-directory.o: sender.c $(HEADERS)
 lib/acl-no-o-directory.o: lib/acl.c $(HEADERS)
 	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) \
 	    -DRSYNC_TEST_NO_O_DIRECTORY -c $(srcdir)/lib/acl.c -o $@
+access-no-inet6.o: access.c $(HEADERS)
+	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) \
+	    -DRSYNC_TEST_NO_INET6 -c $(srcdir)/access.c -o $@
 
 .PHONY: install
 install: all
