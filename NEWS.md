@@ -1,8 +1,20 @@
-# NEWS for UNRELEASED
+# NEWS for rsync 3.5.2 (?? ??? 2026)
 
 ## Changes in this version:
 
 ### BUG FIXES:
+- Fixed interrupted `--append` and `--inplace` transfers writing the final
+  256 KiB buffer twice. An interrupted destination now remains a clean prefix
+  which the next transfer can resume or repair.
+- Fixed uploads through `rrsync` when the destination file already exists.
+  Existing files are now reached beneath a pinned parent directory instead of
+  being passed as an unwritable `/proc/self/fd/N` destination.
+- Fixed poor matching performance on large sparse and repeated-block files
+  when duplicate checksum chains exhausted the search limit. Hash-search work
+  is now bounded without hiding valid basis blocks behind duplicates.
+- Prevented the `--inplace` matcher from advancing its aligned basis index
+  beyond the available checksum entries. This avoids signed overflow on large
+  source files when the peer supplies a small block count.
 - Fixed a daemon receiver stack overflow when queued deletion output reached
   `--max-alloc`. Quiet daemon transfers no longer queue deletion messages
   unless the client requested them.
@@ -10,6 +22,21 @@
   read each listed file from the module root instead.  It could send, and with
   `--remove-source-files` delete, a same-named file the module's filter
   excludes.
+- Fixed password files whose first line is empty. The parser no longer skips
+  the empty line and uses a later password.
+- Escaped terminal control characters in filenames and diagnostics written to
+  standard output, standard error and log files while preserving printable
+  text in the active locale.
+- Preserved Cygwin and MSYS2 UNC roots during ownership-checked path walks.
+- Restored daemon startup from accepted named Unix sockets on standard input,
+  including filesystem and Linux abstract sockets used for socket activation.
+  Unnamed local socket pairs remain non-daemon channels.
+- Fixed forward-DNS hostname entries in daemon `hosts allow` and `hosts deny`
+  lists for IPv6 peers. Address comparison is now binary and family-aware.
+- Preserved Unix symlink permissions on systems which require `fchmodat()` to
+  change the mode of a symlink rather than its target.
+- Restored builds on systems without `O_CLOEXEC` or `O_DIRECTORY`, including
+  Solaris 10.
 
 ### ENHANCEMENTS:
 - Human-readable output now uses dynamic precision to show three significant
@@ -19,7 +46,10 @@
   `113,295B/s`. File-list, created-directory and skipped-deletion counts also
   use thousands separators.
 - Added `--delay-symlinks` to defer creating new and changed symlinks until
-  other transferred files are in place.
+  other transferred files are in place. It implies `--no-inc-recursive` and
+  requires protocol 29 or newer with support on the receiving side. It cannot
+  be combined with `--remove-source-files`, `--hard-links`, `--compare-dest`,
+  `--copy-dest` or `--link-dest`.
 
 ------------------------------------------------------------------------------
 
@@ -5795,6 +5825,7 @@ to develop and test fixes.
 
 | RELEASE DATE | VER.   | DATE OF COMMIT\* | PROTOCOL    |
 |--------------|--------|------------------|-------------|
+| ?? ??? 2026  | 3.5.2  |                  | 33          |
 | 21 Sep 2026  | 3.5.1  | 21 Sep 2026      | 33          |
 | 13 Aug 2026  | 3.5.0  |                  | 32          |
 | 08 Jun 2026  | 3.4.4  |                  | 32          |
