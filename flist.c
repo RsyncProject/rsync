@@ -218,6 +218,227 @@ static int scan_dirfd = -1;
 static const char *scan_dir_prefix;
 static int scan_dir_prefix_len;
 
+struct sender_source_root {
+	struct sender_source_root *next;
+	dev_t dev;
+	ino_t ino;
+	char path[1];
+};
+
+static struct sender_source_root *sender_source_roots;
+static struct sender_source_root *sender_source_root_fd_owner;
+static int sender_source_root_fd = -1;
+
+static int sender_source_full_path(const char *path, char *full, size_t full_size)
+{
+	size_t len;
+
+	if (*path == '/')
+		len = strlcpy(full, path, full_size);
+	else
+		len = pathjoin(full, full_size, curr_dir, path);
+	if (len >= full_size) {
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+	clean_fname(full, CFN_COLLAPSE_DOT_DOT_DIRS | CFN_DROP_TRAILING_DOT_DIR);
+	return 0;
+}
+
+static void remember_sender_source_root(const char *path, const STRUCT_STAT *st)
+{
+	struct sender_source_root *root;
+	char full[MAXPATHLEN];
+	size_t len;
+
+	if (sender_source_full_path(path, full, sizeof full) < 0)
+		overflow_exit("remember_sender_source_root");
+	len = strlen(full);
+
+	for (root = sender_source_roots; root; root = root->next) {
+		if (strcmp(root->path, full) == 0)
+			return;
+	}
+	root = (struct sender_source_root *)new_array(char, sizeof *root + len);
+	root->next = sender_source_roots;
+	root->dev = st->st_dev;
+	root->ino = st->st_ino;
+	memcpy(root->path, full, len + 1);
+	sender_source_roots = root;
+}
+
+static void remember_sender_source_arg(const char *path, const STRUCT_STAT *st)
+{
+	STRUCT_STAT parent_st;
+	char full[MAXPATHLEN], *slash;
+
+	if (S_ISDIR(st->st_mode)) {
+		remember_sender_source_root(path, st);
+		return;
+	}
+	if (sender_source_full_path(path, full, sizeof full) < 0)
+		overflow_exit("remember_sender_source_arg");
+	slash = strrchr(full, '/');
+	if (!slash)
+		return;
+	if (slash == full)
+		slash[1] = '\0';
+	else
+		*slash = '\0';
+	/* The operator selected this parent as part of the source argument. Pin
+	 * its resolved identity while the file leaf remains O_NOFOLLOW later. */
+	if (do_stat(full, &parent_st) == 0 && S_ISDIR(parent_st.st_mode))
+		remember_sender_source_root(full, &parent_st);
+}
+
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+/* Keep one validated source root open at a time.  A descriptor per explicit
+ * argument would make a large argument list exhaust the process limit. */
+static int sender_source_root_fd_for(struct sender_source_root *root)
+{
+	STRUCT_STAT st;
+	int fd, fl, saved_errno;
+
+	if (sender_source_root_fd_owner == root && sender_source_root_fd >= 0)
+		return sender_source_root_fd;
+	if (sender_source_root_fd >= 0)
+		close(sender_source_root_fd);
+	sender_source_root_fd = -1;
+	sender_source_root_fd_owner = NULL;
+
+	fd = open_anchor_dirfd(root->path);
+	if (fd < 0)
+		return -1;
+	if (do_fstat(fd, &st) < 0)
+		saved_errno = errno;
+	else if (st.st_dev != root->dev || st.st_ino != root->ino)
+		saved_errno = ELOOP;
+	else
+		saved_errno = 0;
+	if (saved_errno) {
+		close(fd);
+		errno = saved_errno;
+		return -1;
+	}
+	if ((fl = fcntl(fd, F_GETFD)) >= 0)
+		fcntl(fd, F_SETFD, fl | FD_CLOEXEC);
+	sender_source_root_fd_owner = root;
+	sender_source_root_fd = fd;
+	return fd;
+}
+#endif
+
+int open_sender_source_path(const char *path, int flags, int *matched)
+{
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+	struct sender_source_root *root, *best = NULL;
+	char full[MAXPATHLEN], *rel;
+	size_t best_len = 0;
+	int rootfd, fd, saved_errno;
+
+	*matched = 0;
+	if (!sender_source_roots)
+		return -1;
+	if (sender_source_full_path(path, full, sizeof full) < 0)
+		return -1;
+	for (root = sender_source_roots; root; root = root->next) {
+		size_t len = strlen(root->path);
+		if (len > best_len && strncmp(full, root->path, len) == 0
+		 && (root->path[len-1] == '/' || full[len] == '\0' || full[len] == '/')) {
+			best = root;
+			best_len = len;
+		}
+	}
+	if (!best)
+		return -1;
+
+	*matched = 1;
+	rootfd = sender_source_root_fd_for(best);
+	if (rootfd < 0)
+		return -1;
+	rel = full + best_len;
+	while (*rel == '/')
+		rel++;
+	fd = secure_relative_open_at(rootfd, *rel ? rel : ".", flags, 0);
+	saved_errno = errno;
+	errno = saved_errno;
+	return fd;
+#else
+	(void)path;
+	(void)flags;
+	*matched = 0;
+	errno = ENOSYS;
+	return -1;
+#endif
+}
+
+void clear_sender_source_roots(void)
+{
+	if (sender_source_root_fd >= 0)
+		close(sender_source_root_fd);
+	sender_source_root_fd = -1;
+	sender_source_root_fd_owner = NULL;
+	while (sender_source_roots) {
+		struct sender_source_root *root = sender_source_roots;
+		sender_source_roots = root->next;
+		free(root);
+	}
+}
+
+static int filesfrom_link_stat(const char *path, STRUCT_STAT *stp, int follow_dirlinks)
+{
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+	const char *bname;
+	int dfd, ret, save_errno;
+
+	dfd = owner_walk_parent(path, &bname);
+	if (dfd < 0)
+		return -1;
+	if (am_root < 0) {
+		close(dfd);
+		return link_stat(path, stp, follow_dirlinks);
+	}
+	ret = do_lstat_atfd(dfd, bname, stp);
+	/* A list-selected directory symlink is a path component too. Resolve it
+	 * through the ownership and confinement walk before following it. */
+	if (ret == 0 && S_ISLNK(stp->st_mode)
+	 && (follow_dirlinks || copy_links)) {
+		int targetfd = open_no_attacker_symlinks_dirfd(path);
+		if (targetfd >= 0) {
+			ret = do_fstat(targetfd, stp);
+			close(targetfd);
+		} else if (errno != ENOENT && errno != ENOTDIR && errno != EACCES) {
+			ret = -1;
+		}
+	}
+	save_errno = ret < 0 ? errno : 0;
+	close(dfd);
+	errno = save_errno;
+	return ret;
+#else
+	return link_stat(path, stp, follow_dirlinks);
+#endif
+}
+
+static int filesfrom_readlink(const char *path, char *linkbuf, size_t bufsiz)
+{
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+	const char *bname;
+	int dfd, ret, save_errno;
+
+	dfd = owner_walk_parent(path, &bname);
+	if (dfd < 0)
+		return -1;
+	ret = do_readlink_atfd(dfd, bname, linkbuf, bufsiz);
+	save_errno = ret < 0 ? errno : 0;
+	close(dfd);
+	errno = save_errno;
+	return ret;
+#else
+	return do_readlink(path, linkbuf, bufsiz);
+#endif
+}
+
 static int scan_link_stat(const char *path, STRUCT_STAT *stp, int follow_dirlinks)
 {
 	/* Use the held scan fd only for a single component directly inside the
@@ -2005,10 +2226,25 @@ static void interpret_stat_error(const char *fname, int is_dir)
  * Returns NULL with errno set on failure, like opendir(). */
 static DIR *secure_opendir(const char *fbuf)
 {
-	int dfd, fl;
+	int dfd, fl, matched;
+	int dir_flags = O_RDONLY;
 	DIR *d;
 
-	if (am_daemon && (!am_chrooted || module_dirlen)
+#ifdef O_DIRECTORY
+	dir_flags |= O_DIRECTORY;
+#elif defined O_NONBLOCK
+	/* Avoid blocking on a raced special file before fdopendir validates it. */
+	dir_flags |= O_NONBLOCK;
+#endif
+	if (filesfrom_owner_walk_active()) {
+		/* The source base is operator-selected, while each list entry may not
+		 * be. Follow only trusted-owned symlinks while opening the directory. */
+		dfd = open_no_attacker_symlinks(fbuf, dir_flags, 0);
+	} else if (!am_daemon && am_sender
+	 && (dfd = open_sender_source_path(fbuf, dir_flags, &matched), matched)) {
+		/* The command-line directory is the operator-selected transfer root.
+		 * Follow that root, then keep every recursive scan beneath its held fd. */
+	} else if (am_daemon && (!am_chrooted || module_dirlen)
 	 && module_dir && module_dir[0] == '/' && *fbuf != '/' && module_dirfd >= 0
 	 && curr_dir_len >= module_dirlen
 	 && strncmp(curr_dir, module_dir, module_dirlen) == 0
@@ -2034,18 +2270,18 @@ static DIR *secure_opendir(const char *fbuf)
 			return NULL;
 		}
 		dfd = secure_relative_open_at(module_dirfd, *modrel ? modrel : ".",
-					      O_RDONLY | O_DIRECTORY, 0);
+					      dir_flags, 0);
 	} else if (*fbuf == '/') {
 		/* An absolute scan path (an absolute --relative / --files-from name, or a
 		 * "/" transfer root): anchor at "/" -- operator-named, trusted. */
 		const char *relp = fbuf;
 		while (*relp == '/')
 			relp++;
-		dfd = secure_relative_open("/", relp, O_RDONLY | O_DIRECTORY, 0);
+		dfd = secure_relative_open("/", relp, dir_flags, 0);
 	} else {
 		/* Non-daemon (or chrooted) sender: confine beneath the cwd the sender
 		 * chdir'd into (the transfer root). */
-		dfd = secure_relative_open(NULL, fbuf, O_RDONLY | O_DIRECTORY, 0);
+		dfd = secure_relative_open(NULL, fbuf, dir_flags, 0);
 	}
 
 	if (dfd < 0)
