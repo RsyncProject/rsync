@@ -20,6 +20,9 @@
 
 #include "rsync.h"
 #include "ifuncs.h"
+#ifdef RSYNC_TEST_NO_INET6
+#undef INET6
+#endif
 #ifdef HAVE_NETGROUP_H
 #include <netgroup.h>
 #endif
@@ -115,9 +118,17 @@ static int match_hostname(const char **host_ptr, const char *addr, const char *t
 				t = (char *)&((struct sockaddr_in *)res->ai_addr)->sin_addr;
 				break;
 #ifdef INET6
-			  case PF_INET6:
-				t = (char *)&((struct sockaddr_in6 *)res->ai_addr)->sin6_addr;
+			  case PF_INET6: {
+				const struct sockaddr_in6 *peer6 = (const struct sockaddr_in6 *)resa->ai_addr;
+				const struct sockaddr_in6 *resolved6 = (const struct sockaddr_in6 *)res->ai_addr;
+
+#ifdef HAVE_SOCKADDR_IN6_SCOPE_ID
+				if (resolved6->sin6_scope_id && peer6->sin6_scope_id != resolved6->sin6_scope_id)
+					continue;
+#endif
+				t = (char *)&resolved6->sin6_addr;
 				break;
+			  }
 #endif
 			  default:
 				continue;
@@ -132,9 +143,10 @@ static int match_hostname(const char **host_ptr, const char *addr, const char *t
 				return 1;
 			}
 		}
-		freeaddrinfo(resa);
 	}
 
+	if (resa)
+		freeaddrinfo(resa);
 	freeaddrinfo(res0);
 	return 0;
 }

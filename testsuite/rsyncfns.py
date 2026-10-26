@@ -768,12 +768,12 @@ def _cleanup_rsyncd(proc, port: int) -> 'None':
 
 
 def start_rsyncd(conf_path, port: int, rsync_cmd: str = None,
-                 stdin=subprocess.DEVNULL) -> 'subprocess.Popen':
-    """Spawn `rsync --daemon --no-detach --address=127.0.0.1 --port=N
+                 stdin=subprocess.DEVNULL, address: str = '127.0.0.1') -> 'subprocess.Popen':
+    """Spawn `rsync --daemon --no-detach --address=ADDRESS --port=N
     --config=conf` and return the Popen handle after the port is accepting
     connections.
 
-    The daemon is bound to LOOPBACK ONLY (--address=127.0.0.1): without it,
+    The daemon is bound to LOOPBACK ONLY: without an explicit address,
     rsync --daemon binds 0.0.0.0 and the test modules would be reachable from
     the whole LAN. The daemon is killed automatically when this Python
     process exits (atexit). On Linux, the kernel also signals SIGTERM to the
@@ -791,9 +791,11 @@ def start_rsyncd(conf_path, port: int, rsync_cmd: str = None,
     This is only ever reached from start_test_daemon() in --use-tcp mode; the
     default (pipe) mode never starts a listening daemon.
     """
+    if address not in ('127.0.0.1', '::1'):
+        test_fail(f"test daemon address is not loopback: {address}")
     argv = shlex.split(rsync_cmd or RSYNC_PEER) + [
         '--daemon', '--no-detach',
-        '--address=127.0.0.1',
+        f'--address={address}',
         f'--port={port}',
         f'--config={conf_path}',
     ]
@@ -820,17 +822,18 @@ def start_rsyncd(conf_path, port: int, rsync_cmd: str = None,
                 f"(status={proc.returncode})"
             )
         try:
-            with _socket.create_connection(('127.0.0.1', port), timeout=0.5):
+            with _socket.create_connection((address, port), timeout=0.5):
                 return proc
         except OSError as e:
             last_err = e
             time.sleep(0.05)
 
     _stop_rsyncd(proc)
-    test_fail(f"rsyncd never listened on 127.0.0.1:{port}: {last_err}")
+    test_fail(f"rsyncd never listened on {address}:{port}: {last_err}")
 
 
-def start_test_daemon(conf_path, port: int, rsync_cmd: str = None) -> str:
+def start_test_daemon(conf_path, port: int, rsync_cmd: str = None,
+                      address: str = '127.0.0.1') -> str:
     """Bring up the test daemon and return a URL prefix for client commands.
 
     rsync_cmd selects the daemon-side binary (default RSYNC_PEER); pass
@@ -844,11 +847,11 @@ def start_test_daemon(conf_path, port: int, rsync_cmd: str = None) -> str:
         'rsync://localhost/'. Another local user can't reach it; nothing is
         listening.
 
-      * --use-tcp -- starts a real rsyncd bound to 127.0.0.1 on the given
-        claim_ports()-reserved port. Returns 'rsync://localhost:PORT/'. Bound
-        to loopback so off-host/LAN access is impossible; a same-host user
-        could still connect during the test window, which is the documented,
-        accepted cost of explicitly opting into TCP.
+      * --use-tcp -- starts a real rsyncd bound to IPv4 loopback by default,
+        or to the selected loopback address, on the claim_ports()-reserved
+        port. Off-host/LAN access is impossible; a same-host user could still
+        connect during the test window, which is the documented, accepted cost
+        of explicitly opting into TCP.
 
     Build URLs as f"{prefix}module/path". `port` is only used (and claimed)
     in --use-tcp mode.
@@ -856,8 +859,9 @@ def start_test_daemon(conf_path, port: int, rsync_cmd: str = None) -> str:
     daemon_cmd = rsync_cmd or RSYNC_PEER
     if USE_TCP:
         port = claim_free_port(port)
-        start_rsyncd(conf_path, port, daemon_cmd)
-        return f'rsync://localhost:{port}/'
+        start_rsyncd(conf_path, port, daemon_cmd, address=address)
+        host = 'localhost' if address == '127.0.0.1' else f'[{address}]'
+        return f'rsync://{host}:{port}/'
     # RSYNC_CONNECT_PROG is run by a shell, so every word has to survive
     # re-parsing: a build path with a space would otherwise exec its prefix.
     os.environ['RSYNC_CONNECT_PROG'] = (
