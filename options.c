@@ -2838,11 +2838,20 @@ void server_options(char **args, int *argc_p)
 	char *arg;
 	int i, x;
 
+	/* Keep every append inside the range reserved by the caller. */
+#define ADD_SERVER_ARG(value) do { \
+		if (ac >= MAX_SERVER_ARGS) { \
+			rprintf(FERROR, "argc overflow in server_options().\n"); \
+			exit_cleanup(RERR_MALLOC); \
+		} \
+		args[ac++] = (value); \
+	} while (0)
+
 	/* This should always remain first on the server's command-line. */
-	args[ac++] = "--server";
+	ADD_SERVER_ARG("--server");
 
 	if (!am_sender)
-		args[ac++] = "--sender";
+		ADD_SERVER_ARG("--sender");
 
 	x = 1;
 	argstr[0] = '-';
@@ -2959,7 +2968,7 @@ void server_options(char **args, int *argc_p)
 	x += maybe_add_e_option(argstr + x, (int)sizeof argstr - x);
 
 	if (x > 1)
-		args[ac++] = argstr;
+		ADD_SERVER_ARG(argstr);
 
 #ifdef ICONV_OPTION
 	if (iconv_opt) {
@@ -2968,170 +2977,170 @@ void server_options(char **args, int *argc_p)
 			set++;
 		else
 			set = iconv_opt;
-		args[ac++] = safe_arg("--iconv", set);
+		ADD_SERVER_ARG(safe_arg("--iconv", set));
 	}
 #endif
 
 	if (protect_args && !local_server) /* unprotected args stop here */
-		args[ac++] = NULL;
+		ADD_SERVER_ARG(NULL);
 
 	if (list_only > 1)
-		args[ac++] = "--list-only";
+		ADD_SERVER_ARG("--list-only");
 
 	/* This makes sure that the remote rsync can handle deleting with -d
 	 * sans -r because the --no-r option was added at the same time. */
 	if (xfer_dirs && !recurse && delete_mode && am_sender)
-		args[ac++] = "--no-r";
+		ADD_SERVER_ARG("--no-r");
 
 	if (do_compression && do_compression_level != CLVL_NOT_SPECIFIED) {
 		if (asprintf(&arg, "--compress-level=%d", do_compression_level) < 0)
 			goto oom;
-		args[ac++] = arg;
+		ADD_SERVER_ARG(arg);
 	}
 
 	if (preserve_devices) {
 		/* Note: sending "--devices" would not be backward-compatible. */
 		if (!preserve_specials)
-			args[ac++] = "--no-specials"; /* -D is already set. */
+			ADD_SERVER_ARG("--no-specials"); /* -D is already set. */
 	} else if (preserve_specials)
-		args[ac++] = "--specials";
+		ADD_SERVER_ARG("--specials");
 
 	/* The server side doesn't use our log-format, but in certain
 	 * circumstances they need to know a little about the option. */
 	if (stdout_format && am_sender) {
 		/* Use --log-format, not --out-format, for compatibility. */
 		if (stdout_format_has_i > 1)
-			args[ac++] = "--log-format=%i%I";
+			ADD_SERVER_ARG("--log-format=%i%I");
 		else if (stdout_format_has_i)
-			args[ac++] = "--log-format=%i";
+			ADD_SERVER_ARG("--log-format=%i");
 		else if (stdout_format_has_o_or_i)
-			args[ac++] = "--log-format=%o";
+			ADD_SERVER_ARG("--log-format=%o");
 		else if (!verbose)
-			args[ac++] = "--log-format=X";
+			ADD_SERVER_ARG("--log-format=X");
 	}
 
 	if (msgs2stderr == 1)
-		args[ac++] = "--msgs2stderr";
+		ADD_SERVER_ARG("--msgs2stderr");
 	else if (msgs2stderr == 0)
-		args[ac++] = "--no-msgs2stderr";
+		ADD_SERVER_ARG("--no-msgs2stderr");
 
 	if (block_size) {
 		if (asprintf(&arg, "-B%u", (int)block_size) < 0)
 			goto oom;
-		args[ac++] = arg;
+		ADD_SERVER_ARG(arg);
 	}
 
 	if (io_timeout) {
 		if (asprintf(&arg, "--timeout=%d", io_timeout) < 0)
 			goto oom;
-		args[ac++] = arg;
+		ADD_SERVER_ARG(arg);
 	}
 
 	if (bwlimit) {
 		if (asprintf(&arg, "--bwlimit=%d", bwlimit) < 0)
 			goto oom;
-		args[ac++] = arg;
+		ADD_SERVER_ARG(arg);
 	}
 
 	if (backup_dir) {
 		/* This split idiom allows for ~/path expansion via the shell. */
-		args[ac++] = "--backup-dir";
-		args[ac++] = safe_arg("", backup_dir);
+		ADD_SERVER_ARG("--backup-dir");
+		ADD_SERVER_ARG(safe_arg("", backup_dir));
 	}
 
 	/* Only send --suffix if it specifies a non-default value. */
 	if (strcmp(backup_suffix, backup_dir ? "" : BACKUP_SUFFIX) != 0)
-		args[ac++] = safe_arg("--suffix", backup_suffix);
+		ADD_SERVER_ARG(safe_arg("--suffix", backup_suffix));
 
 	if (checksum_choice)
-		args[ac++] = safe_arg("--checksum-choice", checksum_choice);
+		ADD_SERVER_ARG(safe_arg("--checksum-choice", checksum_choice));
 
 	if (do_compression == CPRES_ZLIBX)
-		args[ac++] = "--new-compress";
+		ADD_SERVER_ARG("--new-compress");
 	else if (compress_choice && do_compression == CPRES_ZLIB)
-		args[ac++] = "--old-compress";
+		ADD_SERVER_ARG("--old-compress");
 	else if (compress_choice)
-		args[ac++] = safe_arg("--compress-choice", compress_choice);
+		ADD_SERVER_ARG(safe_arg("--compress-choice", compress_choice));
 
 	if (am_sender) {
 		if (max_delete > 0) {
 			if (asprintf(&arg, "--max-delete=%d", max_delete) < 0)
 				goto oom;
-			args[ac++] = arg;
+			ADD_SERVER_ARG(arg);
 		} else if (max_delete == 0)
-			args[ac++] = "--max-delete=-1";
+			ADD_SERVER_ARG("--max-delete=-1");
 		if (min_size >= 0)
-			args[ac++] = safe_arg("--min-size", min_size_arg);
+			ADD_SERVER_ARG(safe_arg("--min-size", min_size_arg));
 		if (max_size >= 0)
-			args[ac++] = safe_arg("--max-size", max_size_arg);
+			ADD_SERVER_ARG(safe_arg("--max-size", max_size_arg));
 		if (delete_before)
-			args[ac++] = "--delete-before";
+			ADD_SERVER_ARG("--delete-before");
 		else if (delete_during == 2)
-			args[ac++] = "--delete-delay";
+			ADD_SERVER_ARG("--delete-delay");
 		else if (delete_during)
-			args[ac++] = "--delete-during";
+			ADD_SERVER_ARG("--delete-during");
 		else if (delete_after)
-			args[ac++] = "--delete-after";
+			ADD_SERVER_ARG("--delete-after");
 		else if (delete_mode && !delete_excluded)
-			args[ac++] = "--delete";
+			ADD_SERVER_ARG("--delete");
 		if (delete_excluded)
-			args[ac++] = "--delete-excluded";
+			ADD_SERVER_ARG("--delete-excluded");
 		if (force_delete)
-			args[ac++] = "--force";
+			ADD_SERVER_ARG("--force");
 		if (write_batch < 0)
-			args[ac++] = "--only-write-batch=X";
+			ADD_SERVER_ARG("--only-write-batch=X");
 		if (am_root > 1)
-			args[ac++] = "--super";
+			ADD_SERVER_ARG("--super");
 		if (size_only)
-			args[ac++] = "--size-only";
+			ADD_SERVER_ARG("--size-only");
 		if (do_stats)
-			args[ac++] = "--stats";
+			ADD_SERVER_ARG("--stats");
 	} else {
 		if (skip_compress)
-			args[ac++] = safe_arg("--skip-compress", skip_compress);
+			ADD_SERVER_ARG(safe_arg("--skip-compress", skip_compress));
 	}
 
 	if (max_alloc_arg && max_alloc != DEFAULT_MAX_ALLOC)
-		args[ac++] = safe_arg("--max-alloc", max_alloc_arg);
+		ADD_SERVER_ARG(safe_arg("--max-alloc", max_alloc_arg));
 
 	/* --delete-missing-args needs the cooperation of both sides, but
 	 * the sender can handle --ignore-missing-args by itself. */
 	if (missing_args == 2)
-		args[ac++] = "--delete-missing-args";
+		ADD_SERVER_ARG("--delete-missing-args");
 	else if (missing_args == 1 && !am_sender)
-		args[ac++] = "--ignore-missing-args";
+		ADD_SERVER_ARG("--ignore-missing-args");
 
 	if (modify_window_set && am_sender) {
 		char *fmt = modify_window < 0 ? "-@%d" : "--modify-window=%d";
 		if (asprintf(&arg, fmt, modify_window) < 0)
 			goto oom;
-		args[ac++] = arg;
+		ADD_SERVER_ARG(arg);
 	}
 
 	if (checksum_seed) {
 		if (asprintf(&arg, "--checksum-seed=%d", checksum_seed) < 0)
 			goto oom;
-		args[ac++] = arg;
+		ADD_SERVER_ARG(arg);
 	}
 
 	if (partial_dir && am_sender) {
 		if (partial_dir != tmp_partialdir) {
-			args[ac++] = "--partial-dir";
-			args[ac++] = safe_arg("", partial_dir);
+			ADD_SERVER_ARG("--partial-dir");
+			ADD_SERVER_ARG(safe_arg("", partial_dir));
 		}
 		if (delay_updates)
-			args[ac++] = "--delay-updates";
+			ADD_SERVER_ARG("--delay-updates");
 	} else if (keep_partial && am_sender)
-		args[ac++] = "--partial";
+		ADD_SERVER_ARG("--partial");
 
 	if (delay_symlinks && am_sender)
-		args[ac++] = "--delay-symlinks";
+		ADD_SERVER_ARG("--delay-symlinks");
 
 	if (ignore_errors)
-		args[ac++] = "--ignore-errors";
+		ADD_SERVER_ARG("--ignore-errors");
 
 	if (copy_unsafe_links)
-		args[ac++] = "--copy-unsafe-links";
+		ADD_SERVER_ARG("--copy-unsafe-links");
 
 	/* --insecure-links is NOT forwarded: it is a local-only opt-out.  A daemon
 	 * governs its own confinement via the "insecure links" module parameter and
@@ -3139,35 +3148,35 @@ void server_options(char **args, int *argc_p)
 	 * wants it must be given it on its own side (e.g. via --rsync-path). */
 
 	if (safe_symlinks)
-		args[ac++] = "--safe-links";
+		ADD_SERVER_ARG("--safe-links");
 
 	if (numeric_ids)
-		args[ac++] = "--numeric-ids";
+		ADD_SERVER_ARG("--numeric-ids");
 
 	if (use_qsort)
-		args[ac++] = "--use-qsort";
+		ADD_SERVER_ARG("--use-qsort");
 
 	if (am_sender) {
 		if (usermap)
-			args[ac++] = safe_arg("--usermap", usermap);
+			ADD_SERVER_ARG(safe_arg("--usermap", usermap));
 
 		if (groupmap)
-			args[ac++] = safe_arg("--groupmap", groupmap);
+			ADD_SERVER_ARG(safe_arg("--groupmap", groupmap));
 
 		if (ignore_existing)
-			args[ac++] = "--ignore-existing";
+			ADD_SERVER_ARG("--ignore-existing");
 
 		/* Backward compatibility: send --existing, not --ignore-non-existing. */
 		if (ignore_non_existing)
-			args[ac++] = "--existing";
+			ADD_SERVER_ARG("--existing");
 
 		if (tmpdir) {
-			args[ac++] = "--temp-dir";
-			args[ac++] = safe_arg("", tmpdir);
+			ADD_SERVER_ARG("--temp-dir");
+			ADD_SERVER_ARG(safe_arg("", tmpdir));
 		}
 
 		if (do_fsync)
-			args[ac++] = "--fsync";
+			ADD_SERVER_ARG("--fsync");
 
 		if (basis_dir[0]) {
 			/* the server only needs this option if it is not the sender,
@@ -3175,8 +3184,8 @@ void server_options(char **args, int *argc_p)
 			 *   option, so don't send it if client is the sender.
 			 */
 			for (i = 0; i < basis_dir_cnt; i++) {
-				args[ac++] = alt_dest_opt(0);
-				args[ac++] = safe_arg("", basis_dir[i]);
+				ADD_SERVER_ARG(alt_dest_opt(0));
+				ADD_SERVER_ARG(safe_arg("", basis_dir[i]));
 			}
 		}
 	}
@@ -3185,63 +3194,58 @@ void server_options(char **args, int *argc_p)
 	where = (am_server ? W_CLI : W_SRV) | (am_sender ? W_REC : W_SND);
 	arg = make_output_option(info_words, info_levels, where);
 	if (arg)
-		args[ac++] = arg;
+		ADD_SERVER_ARG(arg);
 
 	if (append_mode) {
 		if (append_mode > 1)
-			args[ac++] = "--append";
-		args[ac++] = "--append";
+			ADD_SERVER_ARG("--append");
+		ADD_SERVER_ARG("--append");
 	} else if (inplace) {
-		args[ac++] = "--inplace";
+		ADD_SERVER_ARG("--inplace");
 		/* Work around a bug in older rsync versions (on the remote side) for --inplace --sparse */
 		if (sparse_files && !whole_file && am_sender)
-			args[ac++] = "--no-W";
+			ADD_SERVER_ARG("--no-W");
 	}
 
 	if (files_from && (!am_sender || filesfrom_host)) {
 		if (filesfrom_host) {
-			args[ac++] = "--files-from";
-			args[ac++] = safe_arg("", files_from);
+			ADD_SERVER_ARG("--files-from");
+			ADD_SERVER_ARG(safe_arg("", files_from));
 			if (eol_nulls)
-				args[ac++] = "--from0";
+				ADD_SERVER_ARG("--from0");
 		} else {
-			args[ac++] = "--files-from=-";
-			args[ac++] = "--from0";
+			ADD_SERVER_ARG("--files-from=-");
+			ADD_SERVER_ARG("--from0");
 		}
 		if (!relative_paths)
-			args[ac++] = "--no-relative";
+			ADD_SERVER_ARG("--no-relative");
 	}
 	/* It's OK that this checks the upper-bound of the protocol_version. */
 	if (relative_paths && !implied_dirs && (!am_sender || protocol_version >= 30))
-		args[ac++] = "--no-implied-dirs";
+		ADD_SERVER_ARG("--no-implied-dirs");
 
 	if (write_devices && am_sender)
-		args[ac++] = "--write-devices";
+		ADD_SERVER_ARG("--write-devices");
 
 	if (remove_source_files == 1)
-		args[ac++] = "--remove-source-files";
+		ADD_SERVER_ARG("--remove-source-files");
 	else if (remove_source_files)
-		args[ac++] = "--remove-sent-files";
+		ADD_SERVER_ARG("--remove-sent-files");
 
 	if (copy_devices && !am_sender)
-		args[ac++] = "--copy-devices";
+		ADD_SERVER_ARG("--copy-devices");
 
 	if (preallocate_files && am_sender)
-		args[ac++] = "--preallocate";
+		ADD_SERVER_ARG("--preallocate");
 
 	if (open_noatime && preserve_atimes <= 1)
-		args[ac++] = "--open-noatime";
+		ADD_SERVER_ARG("--open-noatime");
 
 	if (mkpath_dest_arg && am_sender)
-		args[ac++] = "--mkpath";
+		ADD_SERVER_ARG("--mkpath");
 
 	if ((arg = niceness_remote_option()) != NULL)
-		args[ac++] = arg;
-
-	if (ac > MAX_SERVER_ARGS) { /* Not possible... */
-		rprintf(FERROR, "argc overflow in server_options().\n");
-		exit_cleanup(RERR_MALLOC);
-	}
+		ADD_SERVER_ARG(arg);
 
 	if (remote_option_cnt) {
 		int j;
@@ -3250,8 +3254,10 @@ void server_options(char **args, int *argc_p)
 			exit_cleanup(RERR_SYNTAX);
 		}
 		for (j = 1; j <= remote_option_cnt; j++)
-			args[ac++] = safe_arg(SPLIT_ARG_WHEN_OLD, remote_options[j]);
+			ADD_SERVER_ARG(safe_arg(SPLIT_ARG_WHEN_OLD, remote_options[j]));
 	}
+
+#undef ADD_SERVER_ARG
 
 	*argc_p = ac;
 	return;
