@@ -13,6 +13,7 @@ config.h.in.old
 config.log
 config.status
 aclocal.m4
+__pycache__
 /proto.h
 /proto.h-tstamp
 /rsync*.[15]
