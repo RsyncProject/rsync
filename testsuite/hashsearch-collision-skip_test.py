@@ -55,15 +55,15 @@ def make_block(perturb_offset: int = -1, fill: int = C_BYTE) -> bytes:
 
 def parse_stats(out: str):
     m_delta = re.search(r'hash_hits=(\d+)\s+false_alarms=(\d+)', out)
-    m_lit = re.search(r'Literal data:\s*([\d,]+)\s*bytes', out)
-    m_match = re.search(r'Matched data:\s*([\d,]+)\s*bytes', out)
+    m_lit = re.search(r'Literal data:\s*([\d,.]+)\s*bytes', out)
+    m_match = re.search(r'Matched data:\s*([\d,.]+)\s*bytes', out)
     if not m_delta or not m_lit or not m_match:
         test_fail(f"could not find deltasum/stats in rsync output:\n{out}")
     return (
         int(m_delta.group(1)),
         int(m_delta.group(2)),
-        int(m_lit.group(1).replace(',', '')),
-        int(m_match.group(1).replace(',', '')),
+        int(m_lit.group(1).replace(',', '').replace('.', '')),
+        int(m_match.group(1).replace(',', '').replace('.', '')),
     )
 
 

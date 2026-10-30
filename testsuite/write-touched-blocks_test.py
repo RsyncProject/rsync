@@ -2,6 +2,7 @@ import os
 import shlex
 import subprocess
 import sys
+import re
 from pathlib import Path
 
 from rsyncfns import (
@@ -82,7 +83,8 @@ base_file.write_bytes(os.urandom(4 * 1024 * 1024))
 proc = run_client(base_file, dest_full)
 if proc.returncode != 0:
     test_fail(f"rsync failed on full write test:\n{proc.stdout}")
-if "Number of 4 KiB logical blocks touched: 1,024\n" not in proc.stdout:
+#if "Number of 4 KiB logical blocks touched: 1,024\n" not in proc.stdout:
+if not re.search(r'Number of 4 KiB logical blocks touched: 1[,.]024\n', proc.stdout):
     test_fail(f"Full write check failed! Expected 1,024 blocks. Output:\n{proc.stdout}")
 
 # TEST 5: Sparse File Write (Hole skipping)
