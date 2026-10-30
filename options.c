@@ -2838,7 +2838,8 @@ void server_options(char **args, int *argc_p)
 	char *arg;
 	int i, x;
 
-	/* Keep every append inside the range reserved by the caller. */
+	/* Keep every append inside the caller's reserved range.  The do-while
+	 * makes the macro one statement so it is safe in unbraced conditionals. */
 #define ADD_SERVER_ARG(value) do { \
 		if (ac >= MAX_SERVER_ARGS) { \
 			rprintf(FERROR, "argc overflow in server_options().\n"); \
