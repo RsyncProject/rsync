@@ -129,6 +129,10 @@ uses when running the server command.  A few extra convenience options are also
 included to help it to interact with BackupPC and accept some convenient user
 overrides.
 
+The [`--nice`](rsync.1#opt--nice) option is limited to local CPU nice 19, idle
+I/O priority or both.  Other values could raise the server process priority and
+are rejected.
+
 The script (or a copy of it) can be manually edited if you want it to customize
 the option handling.
 
