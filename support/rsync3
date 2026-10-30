@@ -1,0 +1,77 @@
+#!/bin/bash
+
+# Remote-to-remote invocation of rsync, with the help of SSH's -R.
+# Use like 'rsync', but you're allowed to specify a 'remote:' on both ends.
+#
+# Copyright (C) 2023  Bearstech
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+# Pick a listening port on the source target, let's hope it's available.
+# (only binds on 127.0.0.1, should not have security/firewalling issues)
+port=45997
+
+# Turn $@ into a list because it's easier to pick the last elements this way
+# Also intercept our own flag(s).
+opt=()
+opt_nocheck=
+for a in "$@"; do
+  case "$a" in
+    # The SSH client will tell 'Warning: Permanently added <hostkey>' but it's a lie
+    "-Y") opt_nocheck=" -o StrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null";;
+       *) opt+=("$a");;
+  esac
+done
+
+if [ ${#opt[@]} -lt 2 ]; then
+  cat <<EOF >&2
+Remote-to-remote rsync invocation. Only works with the SSH transport on both
+ends. The trafic to/from both ends is relayed through this host, like with
+'scp -3'. The source server must (obviously) trust the destination SSH server
+hostkey.
+
+Usage: rsync3 [-Y] [rsync args] source:/path... destination:[/path2...}
+
+  -Y  skip destination's SSH hostkey checking on source server
+
+EOF
+  exit 1
+fi 
+
+# Separate host and paths in targets
+src="${opt[-2]}"; src_host="${src%%:*}"; src_path="${src#*:}"
+dst="${opt[-1]}"; dst_host="${dst%%:*}"; dst_path="${dst#*:}"
+if [ "$src" = "$src_host" ] || [ "$dst" = "$dst_host" ]; then
+  echo "Error: rsync3 must be invoked with both remote source and destination" >&2
+  exit 1
+fi
+
+# Since the destination is interpreted on the src_host, we must pre-resolve the
+# user-login here if it was implicit. Otherwise it's not what the user meant.
+dst_user="${dst_host%%@*}"
+dst_host="${dst_host#*@}"
+if [ "$dst_user" = "$dst_host" ]; then
+  dst_user="$(whoami)"
+fi
+
+# Build modified rsync args, re-quote them in order whitespace in args survive
+# through SSH/shell passing.
+opt[-2]="$src_path"
+opt[-1]="$dst_user@127.0.0.1:$dst_path"
+rsync="rsync -e 'ssh -p $port$opt_nocheck'"
+for a in "${opt[@]}"; do
+  rsync="$rsync $(printf %q "$a")"
+done
+
+exec ssh -A -R 127.0.0.1:$port:"$dst_host":22 "$src_host" "$rsync"
