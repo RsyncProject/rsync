@@ -335,6 +335,7 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 				F_HL_PREV(file) = F_HL_PREV(prev_file);
 				F_HL_PREV(prev_file) = ndx;
 				file->flags |= FLAG_FILE_SENT;
+				file->flags |= FLAG_HLINK_WAIT;
 				cur_flist->in_progress++;
 				if (DEBUG_GTE(HLINK, 2)) {
 					rprintf(FINFO, "hlink for %d (%s,%d): waiting for %d\n",
@@ -535,7 +536,10 @@ void finish_hard_link(struct file_struct *file, const char *fname, int fin_ndx,
 		prev_statret = link_stat(f_name(file, prev_name), &prev_sx.st, 0);
 		val = maybe_hard_link(file, ndx, prev_name, prev_statret, &prev_sx,
 				      our_name, stp, fname, itemizing, code);
-		flist->in_progress--;
+		if (file->flags & FLAG_HLINK_WAIT) {
+			file->flags &= ~FLAG_HLINK_WAIT;
+			flist->in_progress--;
+		}
 		free_stat_x(&prev_sx);
 		if (val < 0)
 			continue;
@@ -555,9 +559,16 @@ void finish_hard_link(struct file_struct *file, const char *fname, int fin_ndx,
 			exit_cleanup(RERR_MESSAGEIO);
 		}
 		if (CVAL(node->data, 0) != 0) {
-			rprintf(FERROR, "Hlink node data for %d already has path=%s (%s)\n",
+			/* A finished leader was already recorded for this group.
+			 * This can happen when an earlier member of the group failed
+			 * to hard-link (e.g. EMLINK or EXDEV) and was written as a
+			 * regular file, then finished.  Keep the original leader's
+			 * path and tolerate the duplicate finish instead of aborting
+			 * the whole transfer.  (Upstream: RsyncProject/rsync#741.) */
+			rprintf(FINFO,
+				"hlink: group %d already finished at path=%s (%s); ignoring duplicate finish\n",
 				gnum, (char*)node->data, f_name(file, prev_name));
-			exit_cleanup(RERR_MESSAGEIO);
+			return;
 		}
 		free(node->data);
 		node->data = strdup(our_name);

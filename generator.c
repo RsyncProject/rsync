@@ -2253,6 +2253,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	if (statret != 0) {
 #ifdef SUPPORT_HARD_LINKS
 		if (preserve_hard_links && F_HLINK_NOT_LAST(file)) {
+			file->flags |= FLAG_HLINK_WAIT;
 			cur_flist->in_progress++;
 			goto cleanup;
 		}
@@ -2358,6 +2359,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		/* pretend the file didn't exist */
 #ifdef SUPPORT_HARD_LINKS
 		if (preserve_hard_links && F_HLINK_NOT_LAST(file)) {
+			file->flags |= FLAG_HLINK_WAIT;
 			cur_flist->in_progress++;
 			goto cleanup;
 		}
@@ -2595,7 +2597,10 @@ static void handle_skipped_hlink(struct file_struct *file, int itemizing,
 		return;
 
 	file = cur_flist->files[new_last_ndx - cur_flist->ndx_start];
-	cur_flist->in_progress--; /* undo prior increment */
+	if (file->flags & FLAG_HLINK_WAIT) {
+		file->flags &= ~FLAG_HLINK_WAIT;
+		cur_flist->in_progress--; /* undo prior increment */
+	}
 	f_name(file, fbuf);
 	recv_generator(fbuf, file, new_last_ndx, itemizing, code, f_out);
 
