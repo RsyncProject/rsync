@@ -528,7 +528,15 @@ void finish_hard_link(struct file_struct *file, const char *fname, int fin_ndx,
 
 	while ((ndx = prev_ndx) >= 0) {
 		int val;
-		flist = flist_for_ndx(ndx, "finish_hard_link");
+		flist = flist_for_ndx(ndx, NULL);
+		if (!flist) {
+			/* The group can span file-lists, and the list holding an
+			 * earlier member may have been released by the time this
+			 * finish runs.  The chain only moves to earlier ndx
+			 * values, so everything from here on is already finished
+			 * and there is nothing left to re-link. */
+			break;
+		}
 		file = flist->files[ndx - flist->ndx_start];
 		file->flags = (file->flags & ~FLAG_HLINK_FIRST) | FLAG_HLINK_DONE;
 		prev_ndx = F_HL_PREV(file);
@@ -559,16 +567,17 @@ void finish_hard_link(struct file_struct *file, const char *fname, int fin_ndx,
 			exit_cleanup(RERR_MESSAGEIO);
 		}
 		if (CVAL(node->data, 0) != 0) {
-			/* A finished leader was already recorded for this group.
-			 * This can happen when an earlier member of the group failed
-			 * to hard-link (e.g. EMLINK or EXDEV) and was written as a
-			 * regular file, then finished.  Keep the original leader's
-			 * path and tolerate the duplicate finish instead of aborting
-			 * the whole transfer.  (Upstream: RsyncProject/rsync#741.) */
+			/* An earlier member of this group already finished and
+			 * recorded its path as the group's root.  That member
+			 * could not be hard-linked to the original root (e.g.
+			 * EMLINK or EXDEV), so it was written as a regular
+			 * file: it, not the stale root, is the only inode this
+			 * group can still link to.  Re-root the group here so
+			 * that later members link to this live file.
+			 * (Upstream: RsyncProject/rsync#741.) */
 			rprintf(FINFO,
-				"hlink: group %d already finished at path=%s (%s); ignoring duplicate finish\n",
-				gnum, (char*)node->data, f_name(file, prev_name));
-			return;
+				"hlink: group %d already finished at %s; re-rooting at %s (%s)\n",
+				gnum, (char*)node->data, our_name, f_name(file, prev_name));
 		}
 		free(node->data);
 		node->data = strdup(our_name);
