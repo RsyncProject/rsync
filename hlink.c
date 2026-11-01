@@ -278,6 +278,13 @@ static char *check_prior(struct file_struct *file, int gnum,
 		F_HL_PREV(file) = prev_ndx = F_HL_PREV(fp);
 	}
 
+	if (prev_ndx >= 0) {
+		/* The prior member is no longer in a live file-list, which
+		 * only happens once all of its files have completed: cut the
+		 * stale index instead of retaining it. */
+		F_HL_PREV(file) = -1;
+	}
+
 	if (inc_recurse
 	 && (node = hashtable_find(prior_hlinks, gnum, NULL)) != NULL) {
 		assert(node->data != NULL);
@@ -332,7 +339,13 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 				/* Add ourselves to the list of files that will
 				 * be updated when the transfer completes, and
 				 * mark ourself as waiting for the transfer. */
-				F_HL_PREV(file) = F_HL_PREV(prev_file);
+				if (F_HL_PREV(prev_file) >= 0
+				 && flist_for_ndx(F_HL_PREV(prev_file), NULL))
+					F_HL_PREV(file) = F_HL_PREV(prev_file);
+				else
+					/* prev_file's prior member (if any) is
+					 * already finished: cut the chain here. */
+					F_HL_PREV(file) = -1;
 				F_HL_PREV(prev_file) = ndx;
 				file->flags |= FLAG_FILE_SENT;
 				file->flags |= FLAG_HLINK_WAIT;
@@ -530,11 +543,12 @@ void finish_hard_link(struct file_struct *file, const char *fname, int fin_ndx,
 		int val;
 		flist = flist_for_ndx(ndx, NULL);
 		if (!flist) {
-			/* The group can span file-lists, and the list holding an
-			 * earlier member may have been released by the time this
-			 * finish runs.  The chain only moves to earlier ndx
-			 * values, so everything from here on is already finished
-			 * and there is nothing left to re-link. */
+			/* The list holding an earlier member was released, which
+			 * only happens once all of its files have completed, so
+			 * everything from here on is already finished and there
+			 * is nothing left to re-link.  Stale indexes are cut in
+			 * check_prior() and in the FLAG_HLINK_WAIT re-point;
+			 * stop the walk here rather than aborting. */
 			break;
 		}
 		file = flist->files[ndx - flist->ndx_start];
