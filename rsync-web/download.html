@@ -44,16 +44,18 @@ Once you have the source, read the <a
 href="https://download.samba.org/pub/rsync/INSTALL">INSTALL.md</a> file for
 details on some development libraries that you will need to build it.
 
-<h2>The GPG Signing Key</h2>
+<h2>Release signing keys</h2>
 
-The GPG signing key that is used to sign the release files is available from the public pgp key-server
-network.  If you have automatic key-fetching enabled, just running a normal
-"gpg&nbsp;--verify" will grab my key automatically.
-Or, feel free to grab <a href="https://opencoder.net/WayneDavison.key">the gpp
-  key for Wayne Davison</a> manually.<p>
+<p>Release files include detached OpenPGP signatures. Releases from 3.5.1
+onward are signed by Zen Dodd using fingerprint
+<a href="https://keys.openpgp.org/vks/v1/by-fingerprint/C0E1054505704F757D925AB26A64E8AA2EFBCF5D"><code>C0E1 0545 0570 4F75 7D92 5AB2 6A64 E8AA 2EFB CF5D</code></a>.
 
-From 3.4.0 and later releases will be signed by Andrew
-Tridgell. Please fetch the key for andrew@tridgell.net from https://keys.openpgp.org/
+<p>Releases from 3.4.0 through 3.5.0 were signed by Andrew Tridgell using
+fingerprint
+<a href="https://keys.openpgp.org/vks/v1/by-fingerprint/9FEF112DCE19A0DC7E882CB81BB24997A8535F6F"><code>9FEF 112D CE19 A0DC 7E88 2CB8 1BB2 4997 A853 5F6F</code></a>.
+Earlier releases were signed by
+Wayne Davison; his <a href="https://opencoder.net/WayneDavison.key">public key</a>
+is also available directly.
 
 <h2>Binaries</h2>
 

@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 
-# Step-based release script for rsync.  Each step is a separate invocation
-# selected by a --step-N-XX option, so the maintainer drives the release
-# manually one piece at a time.
+# Phase-based release script for rsync.  The prepare-pr phase updates tracked
+# release files for review.  After that PR is merged, stage-release creates
+# the signed tag and release artefacts without publishing them.  The final
+# publish-release phase updates the public mirrors after confirmation.
 #
-# All persistent state and working files live in ../release/ (a sibling of
-# the rsync git checkout):
+# Persistent state and working files live in a release/ directory beside the
+# primary rsync checkout. Worktrees share that directory. RSYNC_RELEASE_DIR
+# can override it.
 #
 #   ../release/rsync-ftp/       mirror of samba.org:/home/ftp/pub/rsync
 #   ../release/rsync-html/      release-time snapshot of the html site
@@ -16,29 +18,46 @@
 #
 # Run "packaging/release.py --list" to see the step list.
 
-import os, sys, re, argparse, glob, shutil, json, signal, subprocess
+import os, sys, re, argparse, glob, shutil, json, signal, subprocess, filecmp
 from datetime import datetime
 
 sys.path = ['packaging'] + sys.path
 
 from pkglib import (
     warn, die, cmd_run, cmd_chk, cmd_txt, cmd_txt_chk, cmd_pipe,
-    check_git_state, get_rsync_version,
+    get_rsync_version,
     get_NEWS_version_info, get_protocol_versions,
 )
 
 # ---------- Paths ----------
 
-RELEASE_DIR = os.path.realpath('../release')
+def default_release_dir():
+    override = os.environ.get('RSYNC_RELEASE_DIR')
+    if override:
+        return os.path.realpath(override)
+    checkout = os.path.realpath('.')
+    project_dir = os.path.dirname(checkout)
+    if os.path.basename(project_dir) == 'worktrees':
+        project_dir = os.path.dirname(project_dir)
+    try:
+        proc = subprocess.run(
+            ['git', 'rev-parse', '--path-format=absolute', '--git-common-dir'],
+            check=True, capture_output=True, encoding='utf-8')
+        common_dir = os.path.realpath(proc.stdout.strip())
+        return os.path.realpath(os.path.join(os.path.dirname(common_dir), '..', 'release'))
+    except (OSError, subprocess.SubprocessError):
+        return os.path.join(project_dir, 'release')
+
+
+RELEASE_DIR = default_release_dir()
 FTP_DIR     = os.path.join(RELEASE_DIR, 'rsync-ftp')
 HTML_DIR    = os.path.join(RELEASE_DIR, 'rsync-html')
 WORK_DIR    = os.path.join(RELEASE_DIR, 'work')
 STATE_FILE  = os.path.join(RELEASE_DIR, 'release-state.json')
 
 # The rsync-web/ subdirectory in the rsync source tree is the source-of-truth
-# for the git-tracked html content.  step-1-fetch snapshots it into HTML_DIR
-# for the release flow, where it can be edited or augmented with server-side
-# content before step-11-push-html sends it to samba.org.
+# for the git-tracked html content.  stage-release snapshots it into HTML_DIR
+# for the release flow and augments it with filtered server-side content.
 HTML_SRC = os.path.realpath('rsync-web')
 
 FTP_REMOTE_PATH  = '/home/ftp/pub/rsync'
@@ -47,7 +66,7 @@ HTML_REMOTE_PATH = '/home/httpd/html/rsync'
 # Files that ./configure + make produce and that the release tarball / diff
 # need to bundle alongside the git-tracked source.  Mirrors the GENFILES
 # definition in Makefile.in (with rrsync.1{,.html} since we always configure
-# --with-rrsync in --step-4-build).
+# --with-rrsync during the release build).
 GEN_FILES = [
     'configure.sh',
     'aclocal.m4',
@@ -58,23 +77,13 @@ GEN_FILES = [
     'rrsync.1',    'rrsync.1.html',
 ]
 
-# ---------- Step registry ----------
+# ---------- Phase registry ----------
 
-STEPS = [
-    ('step-1-fetch',       'mirror ../release/rsync-ftp from samba.org and snapshot ../release/rsync-html from rsync-web/'),
-    ('step-2-prepare',     'gather release info interactively and write release-state.json'),
-    ('step-3-tweak',       'update version.h, rsync.h, NEWS.md, and packaging/*.spec'),
-    ('step-4-build',       'run smart-make + make gen'),
-    ('step-5-commit',      'git commit -a (commit the prepared release changes)'),
-    ('step-6-tag',         'create the gpg-signed git tag'),
-    ('step-7-tarball',     'build the source tarball and diffs.gz against the previous release'),
-    ('step-8-update-ftp',  'refresh README/NEWS/INSTALL/html in the ftp dir, regen ChangeLog.gz, gpg-sign tarballs'),
-    ('step-9-toplinks',    'hard-link top-level release files (final releases only)'),
-    ('step-10-push-ftp',   'rsync ../release/rsync-ftp/ to samba.org'),
-    ('step-11-push-html',  'rsync ../release/rsync-html/ to samba.org (after any manual edits)'),
-    ('step-12-push-git',   'print the git push commands for you to run'),
+PHASES = [
+    ('prepare-pr',      'update tracked release files and run the release build'),
+    ('stage-release',   'fetch mirrors, verify the merged PR, tag, build and sign artefacts'),
+    ('publish-release', 'publish the FTP and website trees and print final release actions'),
 ]
-STEP_FLAGS = [s[0] for s in STEPS]
 
 DASH_LINE = '=' * 74
 
@@ -82,7 +91,7 @@ DASH_LINE = '=' * 74
 
 def load_state():
     if not os.path.isfile(STATE_FILE):
-        die(f"{STATE_FILE} not found.  Run --step-2-prepare first.")
+        die(f"{STATE_FILE} not found. Run --prepare-pr first.")
     with open(STATE_FILE, 'r', encoding='utf-8') as fh:
         return json.load(fh)
 
@@ -119,6 +128,15 @@ def section(title):
     print(f"\n{DASH_LINE}\n== {title}\n{DASH_LINE}")
 
 
+def verify_html_snapshot():
+    tracked = cmd_txt_chk(['git', 'ls-files', '-z', '--', 'rsync-web']).out.split('\0')
+    for source in filter(None, tracked):
+        relative = os.path.relpath(os.path.realpath(source), HTML_SRC)
+        staged = os.path.join(HTML_DIR, relative)
+        if not os.path.isfile(staged) or not filecmp.cmp(source, staged, shallow=False):
+            die(f"Staged website file differs from reviewed source: {source}")
+
+
 def confirm(prompt, default_no=True):
     suffix = '[n] ' if default_no else '[y] '
     ans = input(f"{prompt} {suffix}").strip().lower()
@@ -139,9 +157,9 @@ def step_1_fetch(args):
         os.makedirs(FTP_DIR)
     # packaging/ftp.filt is the authoritative copy of the .filt filter file
     # that controls which subtrees rsync excludes from the FTP mirror.
-    # Seed FTP_DIR/.filt from it so the bundled version is what step-1's
-    # rsync uses here, and so step-10-push-ftp propagates it back to the
-    # server.  --exclude=/.filt below stops the server's copy from
+    # Seed FTP_DIR/.filt from it so the bundled version is used for the pull
+    # and later propagated back to the server during publication.
+    # --exclude=/.filt below stops the server's copy from
     # overwriting our bundled one on the way down.
     filt = os.path.join(FTP_DIR, '.filt')
     bundled_filt = os.path.realpath('packaging/ftp.filt')
@@ -151,22 +169,27 @@ def step_1_fetch(args):
     cmd_chk(['rsync', '-aivOHP', f'-f:_{filt}', '--exclude=/.filt',
              f'{host}:{FTP_REMOTE_PATH}/', f'{FTP_DIR}/'])
 
-    section(f"Snapshotting html dir from {HTML_SRC} into {HTML_DIR}")
+    section(f"Fetching server-only html content into {HTML_DIR}")
     if not os.path.isdir(HTML_SRC):
         die(f"{HTML_SRC} not found.  This should be the in-tree rsync-web/ "
             f"subdirectory; something is wrong with your checkout.")
+    if os.path.isdir(HTML_DIR):
+        shutil.rmtree(HTML_DIR)
     os.makedirs(HTML_DIR, exist_ok=True)
-    cmd_chk(['rsync', '-aiv', f'{HTML_SRC}/', f'{HTML_DIR}/'])
 
-    # Then mirror non-git html content from the server, skipping files that
-    # the html git already provides (driven by the 'filt' file in HTML_DIR).
-    filt = os.path.join(HTML_DIR, 'filt')
+    # Mirror non-git content from the server first. The reviewed rsync-web
+    # source is overlaid afterwards and therefore remains authoritative.
+    filt = os.path.join(HTML_SRC, 'filt')
     if os.path.exists(filt):
-        tmp_filt = os.path.join(HTML_DIR, 'tmp-filt')
+        tmp_filt = os.path.join(WORK_DIR, 'html-pull.filt')
         cmd_chk(f"sed -n -e 's/[-P]/H/p' '{filt}' >'{tmp_filt}'")
         cmd_chk(['rsync', '-aivOHP', f'-f._{tmp_filt}',
                  f'{host}:{HTML_REMOTE_PATH}/', f'{HTML_DIR}/'])
         os.unlink(tmp_filt)
+
+    section(f"Overlaying reviewed html from {HTML_SRC}")
+    cmd_chk(['rsync', '-aiv', f'{HTML_SRC}/', f'{HTML_DIR}/'])
+    verify_html_snapshot()
 
     print(f"\nFetch complete.  Local dirs are now in {RELEASE_DIR}.")
 
@@ -177,22 +200,24 @@ def step_2_prepare(args):
     require_top_of_checkout()
     os.makedirs(RELEASE_DIR, exist_ok=True)
 
-    if not os.path.isdir(FTP_DIR):
-        die(f"{FTP_DIR} does not exist.  Run --step-1-fetch first.")
-
     now = datetime.now().astimezone()
     cl_today = now.strftime('* %a %b %d %Y')
     year     = now.strftime('%Y')
     ztoday   = now.strftime('%d %b %Y')
     today    = ztoday.lstrip('0')
+    web_today = f'{now.day} {now.strftime("%B %Y")}'
     tz_now   = now.strftime('%z')
     tz_num   = tz_now[0:1].replace('+', '') + str(float(tz_now[1:3]) + float(tz_now[3:]) / 60)
 
     curversion = get_rsync_version()
+    with open('NEWS.md', 'r', encoding='utf-8') as fh:
+        news_top = fh.readline()
+    m = re.match(r'^# NEWS for rsync (\d+\.\d+\.\d+)', news_top)
+    news_version = m[1] if m else None
     # Skip the version we are releasing: its NEWS entry may already be dated,
     # in which case it would otherwise be taken for the previous release.
     lastversion, last_protocol_version, pdate = get_NEWS_version_info(
-        skip_version=re.sub(r'(pre\d+|dev)$', '', curversion))
+        skip_version=news_version or re.sub(r'(pre\d+|dev)$', '', curversion))
     protocol_version, subprotocol_version    = get_protocol_versions()
 
     # Default next version: bump preN, or move dev -> pre1.
@@ -202,6 +227,8 @@ def step_2_prepare(args):
         version = re.sub(r'pre\d+', 'pre' + str(int(m[1]) + 1), version)
     else:
         version = version.replace('dev', 'pre1')
+        if version == curversion and news_version and news_version != curversion:
+            version = news_version
 
     print(f"\nCurrent version (version.h): {curversion}")
     print(f"Last released version (NEWS.md): {lastversion}")
@@ -273,6 +300,7 @@ def step_2_prepare(args):
         'srcdiffdir':         srcdiffdir,
         'lastsrcdir':         lastsrcdir,
         'today':              today,
+        'web_today':          web_today,
         'ztoday':             ztoday,
         'cl_today':           cl_today,
         'year':               year,
@@ -285,7 +313,7 @@ def step_2_prepare(args):
     for k in ('version', 'lastversion', 'release', 'srcdir', 'srcdiffdir', 'lastsrcdir',
               'protocol_version', 'proto_changed', 'proto_change_date'):
         print(f"  {k}: {state[k]}")
-    print(f"\nWrote {STATE_FILE}.  Re-run --step-2-prepare to change anything.")
+    print(f"\nWrote {STATE_FILE}. Re-run --prepare-pr to change anything.")
 
 
 # ---------- Step 3: tweak version files ----------
@@ -317,6 +345,8 @@ def step_3_tweak(args):
     }
 
     tweak_files = ['version.h', 'rsync.h', 'NEWS.md']
+    if not pre:
+        tweak_files += ['rsync-web/index.html', 'rsync-web/security.html']
     tweak_files += glob.glob('packaging/*.spec')
     tweak_files += glob.glob('packaging/*/*.spec')
 
@@ -344,7 +374,7 @@ def step_3_tweak(args):
             # release entry that was dated by hand (or by an earlier run of
             # this step) does not have to be reverted before releasing.
             x_re = re.compile(
-                r'^# NEWS for rsync %s \((?:UNRELEASED|\d+ \w{3} \d{4})\)\s+## Changes in this version:\n' % efv
+                r'^# NEWS for rsync %s \((?:UNRELEASED|\?\? \?\?\? \d{4}|\d+ \w{3} \d{4})\)\s+## Changes in this version:\n' % efv
                 + r'(\n### PROTOCOL NUMBER:\s+- The protocol number was changed to \d+\.\n)?')
             rel_day = 'UNRELEASED' if pre else today
             repl = (f'# NEWS for rsync {finalversion} ({rel_day})\n\n'
@@ -362,6 +392,15 @@ def step_3_tweak(args):
                               + proto_change_date + m[4] + protocol_version + m[5])
             txt = replace_or_die(x_re, repl, txt,
                                  f'Unable to find "| ?? ??? {year} | {finalversion} | ... |" line in {fn}')
+        elif fn in ('rsync-web/index.html', 'rsync-web/security.html'):
+            heading = (f'Rsync version {version} released'
+                       if fn.endswith('index.html') else f'Security fix in {version}')
+            x_re = re.compile(
+                rf'(<h3>{re.escape(heading)}</h3>\s*'
+                r'<i class=date>)(?:\?\? \?\?\? \d{4}|\d+ \w+ \d{4})(</i>)')
+            txt = replace_or_die(
+                x_re, rf'\g<1>{state["web_today"]}\2', txt,
+                f'Unable to find the {version} release date in {fn}')
         elif '.spec' in fn:
             for var, val in specvars.items():
                 x_re = re.compile(r'^%s .*' % re.escape(var), re.M)
@@ -404,18 +443,83 @@ def step_4_build(args):
     cmd_chk(['make', 'gen'])
 
 
-# ---------- Step 5: commit ----------
+# ---------- Step 5: verify merged release source ----------
 
-def step_5_commit(args):
+def step_5_verify(args):
     require_top_of_checkout()
     state = load_state()
     version = state['version']
+    finalversion = state['finalversion']
+    lastversion = state['lastversion']
+    pre = state['pre']
+    master_branch = state['master_branch']
 
-    section("git status")
-    cmd_run(['git', 'status'])
-    if not confirm("Commit all current changes with the release message?"):
-        die("Aborted.")
-    cmd_chk(['git', 'commit', '-a', '-m', f'Preparing for release of {version} [buildall]'])
+    branch = cmd_txt_chk(['git', 'branch', '--show-current']).out.strip()
+    if branch != master_branch:
+        die(f"Release staging requires branch {master_branch}, not {branch}.")
+    dirty = cmd_txt_chk(['git', 'status', '--porcelain=v1']).out
+    if dirty:
+        die("Release staging requires a clean checkout:\n" + dirty)
+    cmd_chk(['git', 'fetch', 'origin', master_branch])
+    head = cmd_txt_chk(['git', 'rev-parse', 'HEAD']).out.strip()
+    upstream = cmd_txt_chk(['git', 'rev-parse', f'origin/{master_branch}']).out.strip()
+    if head != upstream:
+        die(f"Release commit {head} does not match origin/{master_branch} at {upstream}.")
+
+    if get_rsync_version() != version:
+        die(f"version.h reports {get_rsync_version()}, expected {version}.")
+    if not pre:
+        release_day = datetime.now().astimezone().strftime('%d %b %Y').lstrip('0')
+        if state['today'] != release_day:
+            die(f"Release metadata is dated {state['today']}, not {release_day}. "
+                "Prepare a corrected release PR before staging.")
+
+    expected_news = (f'# NEWS for rsync {finalversion} (UNRELEASED)'
+                     if pre else f'# NEWS for rsync {finalversion} ({state["today"]})')
+    checks = {
+        'NEWS.md': [expected_news],
+        'packaging/lsb/rsync.spec': [f'Version: {finalversion}', f'Released {version}.'],
+    }
+    if not pre:
+        checks['rsync-web/index.html'] = [
+            f'Rsync version {version} released',
+            f'<i class=date>{state["web_today"]}</i>',
+            f'rsync-{version}.tar.gz',
+            f'rsync-{lastversion}-{version}.diffs.gz',
+        ]
+        checks['rsync-web/security.html'] = [
+            f'Security fix in {version}',
+            f'<i class=date>{state["web_today"]}</i>',
+            'CVE-2026-119741',
+        ]
+
+    for fn, required in checks.items():
+        with open(fn, 'r', encoding='utf-8') as fh:
+            txt = fh.read()
+        for value in required:
+            if value not in txt:
+                die(f'{fn} does not contain the expected release text: {value}')
+
+    section(f"Release source verified for {version}")
+
+
+def release_preflight():
+    missing = [command for command in ('fakeroot', 'git', 'gpg', 'gzip', 'rsync', 'sed', 'tar')
+               if not shutil.which(command)]
+    if missing:
+        die("Missing release commands: " + ', '.join(missing))
+    section("Checking release markdown conversion")
+    cmd_chk(['./md-convert', '--test', 'NEWS.md'])
+
+
+def verify_artefact_inputs():
+    state = load_state()
+    required = list(GEN_FILES)
+    required.append(os.path.join(
+        FTP_DIR, state['lastsrcdir'], f'rsync-{state["lastversion"]}.tar.gz'))
+    missing = [fn for fn in required if not os.path.isfile(fn)]
+    if missing:
+        die("Missing release inputs:\n  " + '\n  '.join(missing))
 
 
 # ---------- Step 6: tag ----------
@@ -426,11 +530,22 @@ def step_6_tag(args):
     version = state['version']
     v_ver = 'v' + version
 
+    head = cmd_txt_chk(['git', 'rev-parse', 'HEAD']).out.strip()
     out = cmd_txt_chk(['git', 'tag', '-l', v_ver]).out
     if out.strip():
-        if not confirm(f"Tag {v_ver} already exists.  Delete and recreate?"):
-            die("Aborted.")
-        cmd_chk(['git', 'tag', '-d', v_ver])
+        target = cmd_txt_chk(['git', 'rev-list', '-n', '1', v_ver]).out.strip()
+        if target != head:
+            die(f"Tag {v_ver} already exists at {target}, not release commit {head}.")
+        section(f"Reusing signed tag {v_ver}")
+        cmd_chk(['git', 'tag', '-v', v_ver])
+        return
+
+    remote = cmd_txt(['git', 'ls-remote', '--exit-code', '--tags', 'origin',
+                      f'refs/tags/{v_ver}'], capture='combined')
+    if remote.rc == 0:
+        die(f"Tag {v_ver} already exists on origin. Refusing to recreate it.")
+    if remote.rc != 2:
+        die(f"Unable to check whether {v_ver} exists on origin:\n{remote.out}")
 
     # Prime the gpg agent so the actual tag signing won't prompt.
     section("Priming gpg agent")
@@ -509,7 +624,7 @@ def step_7_tarball(args):
     cmd_chk(['fakeroot', 'tar', '-C', WORK_DIR, '-czf', srctar_file,
              '--exclude=.github', rsync_ver])
 
-    # Leave staging in place; --step-8-update-ftp does its own thing.
+    # Leave staging in place for the FTP refresh.
     print(f"\nCreated:\n  {srctar_file}\n  {diff_file}")
 
 
@@ -545,7 +660,7 @@ def step_8_update_ftp(args):
 
     for fn in (srctar_file, diff_file):
         if not os.path.isfile(fn):
-            die(f"Missing file to sign: {fn}.  Did --step-7-tarball run successfully?")
+            die(f"Missing file to sign: {fn}. The artefact build did not complete.")
         asc_fn = fn + '.asc'
         if os.path.lexists(asc_fn):
             os.unlink(asc_fn)
@@ -601,7 +716,7 @@ def step_9_toplinks(args):
 def step_10_push_ftp(args):
     host = require_samba_host()
     if not os.path.isdir(FTP_DIR):
-        die(f"{FTP_DIR} does not exist.  Run --step-1-fetch first.")
+        die(f"{FTP_DIR} does not exist. Run --stage-release first.")
     section(f"rsync ftp dir to {host}")
     rsync_with_confirm(['-aivOHP', '--chown=:rsync', '--del',
                         f'-f._{os.path.join(FTP_DIR, ".filt")}',
@@ -613,7 +728,7 @@ def step_10_push_ftp(args):
 def step_11_push_html(args):
     host = require_samba_host()
     if not os.path.isdir(HTML_DIR):
-        die(f"{HTML_DIR} does not exist.  Run --step-1-fetch first.")
+        die(f"{HTML_DIR} does not exist. Run --stage-release first.")
     section(f"rsync html dir to {host}")
     filt = os.path.join(HTML_DIR, 'filt')
     rsync_with_confirm(['-aivOHP', '--chown=:rsync', '--del',
@@ -621,24 +736,21 @@ def step_11_push_html(args):
                         f'{HTML_DIR}/', f'{host}:{HTML_REMOTE_PATH}/'])
 
 
-# ---------- Step 12: print push-git instructions ----------
+# ---------- Step 12: print final release instructions ----------
 
-def step_12_push_git(args):
+def step_12_finish(args):
     state = load_state()
     version = state['version']
-    master_branch = state['master_branch']
     v_ver = 'v' + version
 
     print(f"""\
 {DASH_LINE}
-Run these from the rsync-git checkout (this script does not push for you):
+The release PR has already updated master. Push the signed tag from this checkout:
 
-    git push origin {master_branch}
     git push origin {v_ver}
 
 If you have a 'samba' remote configured (git.samba.org:/data/git/rsync.git):
 
-    git push samba {master_branch}
     git push samba {v_ver}
 
 Then upload the tarball + .asc to the GitHub release for {v_ver},
@@ -657,21 +769,69 @@ def rsync_with_confirm(rsync_args):
         cmd_run(['rsync', *rsync_args])
 
 
-# ---------- dispatch ----------
+# ---------- phases ----------
 
-STEP_FUNCS = {
-    'step-1-fetch':       step_1_fetch,
-    'step-2-prepare':     step_2_prepare,
-    'step-3-tweak':       step_3_tweak,
-    'step-4-build':       step_4_build,
-    'step-5-commit':      step_5_commit,
-    'step-6-tag':         step_6_tag,
-    'step-7-tarball':     step_7_tarball,
-    'step-8-update-ftp':  step_8_update_ftp,
-    'step-9-toplinks':    step_9_toplinks,
-    'step-10-push-ftp':   step_10_push_ftp,
-    'step-11-push-html':  step_11_push_html,
-    'step-12-push-git':   step_12_push_git,
+def phase_prepare_pr(args):
+    step_2_prepare(args)
+    step_3_tweak(args)
+    step_4_build(args)
+    section("Release PR source prepared")
+    print("Review the rsync-web release announcement in this PR before merging it.")
+
+
+def phase_stage_release(args):
+    step_4_build(args)
+    step_5_verify(args)
+    release_preflight()
+    step_1_fetch(args)
+    verify_artefact_inputs()
+    step_6_tag(args)
+    step_7_tarball(args)
+    step_8_update_ftp(args)
+    step_9_toplinks(args)
+    state = load_state()
+    state['staged_commit'] = cmd_txt_chk(['git', 'rev-parse', 'HEAD']).out.strip()
+    save_state(state)
+
+
+def phase_publish_release(args):
+    state = load_state()
+    dirty = cmd_txt_chk(['git', 'status', '--porcelain=v1']).out
+    if dirty:
+        die("Release publication requires a clean checkout:\n" + dirty)
+    head = cmd_txt_chk(['git', 'rev-parse', 'HEAD']).out.strip()
+    if state.get('staged_commit') != head:
+        die("The current commit was not staged by --stage-release.")
+
+    version = state['version']
+    lastversion = state['lastversion']
+    tag = 'v' + version
+    target = cmd_txt_chk(['git', 'rev-list', '-n', '1', tag]).out.strip()
+    if target != head:
+        die(f"Tag {tag} does not point to staged commit {head}.")
+    cmd_chk(['git', 'tag', '-v', tag])
+
+    artefacts = [
+        os.path.join(FTP_DIR, state['srcdir'], f'rsync-{version}.tar.gz'),
+        os.path.join(FTP_DIR, state['srcdiffdir'],
+                     f'rsync-{lastversion}-{version}.diffs.gz'),
+    ]
+    for fn in artefacts:
+        if not os.path.isfile(fn) or not os.path.isfile(fn + '.asc'):
+            die(f"Missing staged release artefact or signature: {fn}")
+        cmd_chk(['gpg', '--verify', fn + '.asc', fn])
+
+    verify_html_snapshot()
+
+    step_10_push_ftp(args)
+    step_11_push_html(args)
+    step_12_finish(args)
+
+
+PHASE_FUNCS = {
+    'prepare-pr': phase_prepare_pr,
+    'stage-release': phase_stage_release,
+    'publish-release': phase_publish_release,
 }
 
 
@@ -681,31 +841,31 @@ def signal_handler(sig, frame):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Step-based release script for rsync.",
+        description="Phase-based release script for rsync.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="Run --list to see the steps.  Each invocation runs exactly one --step-* option.")
+        epilog="Run --list to see the release phases. Each invocation runs one phase.")
     parser.add_argument('--branch', '-b', dest='master_branch', default='master',
                         help="The branch to release (default: master).")
     parser.add_argument('--list', action='store_true',
-                        help="List all release steps and exit.")
+                        help="List all release phases and exit.")
     grp = parser.add_mutually_exclusive_group()
-    for flag, descr in STEPS:
-        grp.add_argument('--' + flag, dest='step', action='store_const',
+    for flag, descr in PHASES:
+        grp.add_argument('--' + flag, dest='phase', action='store_const',
                          const=flag, help=descr)
     args = parser.parse_args()
 
     if args.list:
-        print("Release steps:")
-        for flag, descr in STEPS:
+        print("Release phases:")
+        for flag, descr in PHASES:
             print(f"  --{flag:18s} {descr}")
         return
 
-    if not args.step:
-        parser.error("pick one --step-N-XX option (or --list to see them).")
+    if not args.phase:
+        parser.error("pick one release phase (or --list to see them).")
 
     signal.signal(signal.SIGINT, signal_handler)
     os.environ['LESS'] = 'mqeiXR'
-    STEP_FUNCS[args.step](args)
+    PHASE_FUNCS[args.phase](args)
 
 
 if __name__ == '__main__':

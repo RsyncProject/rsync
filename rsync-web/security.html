@@ -12,13 +12,28 @@ h3 { margin-bottom: 0px; }
 
 <H2 align="center">Rsync Security Advisories</H2>
 
-<p>If you are running an rsync older than 3.5.0, you should upgrade. 3.5.0
+<p>If you are running an rsync older than 3.5.2, you should upgrade. 3.5.2
 fixes every issue listed on this page.
 
 <p>If you cannot upgrade, the advisories below give the affected versions and
 the conditions each issue needs. Several are only reachable in a non-default
 configuration, and some of the older ones can be mitigated from rsyncd.conf
 without an upgrade.
+
+<p><a name="s3_5_2"></a><hr>
+<h3>Security fix in 3.5.2</h3>
+<i class=date>4 November 2026</i>
+
+<p>Rsync 3.5.2 bounds sender-side checksum work that remained after the
+CVE-2026-70453 mitigation. Versions through 3.5.1 are affected.
+
+<ul>
+<li><a href="https://www.cve.org/CVERecord?id=CVE-2026-119741">CVE-2026-119741</a>
+(HIGH) &mdash; a malicious receiver can supply weak checksums which collide
+with consecutive rolling windows and make the sender calculate a full strong
+checksum at every byte offset. Repeating this across public daemon connections
+can exhaust host CPU.
+</ul>
 
 <p><a name="s3_5_0"></a><hr>
 <h3>Security fixes in 3.5.0</h3>
