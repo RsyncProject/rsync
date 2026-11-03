@@ -1,4 +1,4 @@
-# NEWS for rsync 3.5.2 (?? ??? 2026)
+# NEWS for rsync 3.5.2 (4 Nov 2026)
 
 ## Changes in this version:
 
@@ -5837,7 +5837,7 @@ to develop and test fixes.
 
 | RELEASE DATE | VER.   | DATE OF COMMIT\* | PROTOCOL    |
 |--------------|--------|------------------|-------------|
-| ?? ??? 2026  | 3.5.2  |                  | 33          |
+| 04 Nov 2026  | 3.5.2  |                  | 33          |
 | 21 Sep 2026  | 3.5.1  | 21 Sep 2026      | 33          |
 | 13 Aug 2026  | 3.5.0  |                  | 32          |
 | 08 Jun 2026  | 3.4.4  |                  | 32          |

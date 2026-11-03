@@ -91,7 +91,7 @@ equal-weak-checksum blocks `hash_search()` examines per offset is also bounded
 (CVE-2026-70453, issue #217), and consecutive weak-checksum collisions cannot
 force a full strong-checksum calculation at every byte offset
 (CVE-2026-119741). These bounds prevent a crafted checksum set from pinning a
-sender process in `hash_search()`.
+sender process in `hash_search()`
 
 Contributors adding code that consumes peer input should validate it at the
 point of receipt rather than relying on a downstream check.

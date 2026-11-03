@@ -35,6 +35,10 @@ def default_release_dir():
     override = os.environ.get('RSYNC_RELEASE_DIR')
     if override:
         return os.path.realpath(override)
+    checkout = os.path.realpath('.')
+    project_dir = os.path.dirname(checkout)
+    if os.path.basename(project_dir) == 'worktrees':
+        project_dir = os.path.dirname(project_dir)
     try:
         proc = subprocess.run(
             ['git', 'rev-parse', '--path-format=absolute', '--git-common-dir'],
@@ -42,7 +46,7 @@ def default_release_dir():
         common_dir = os.path.realpath(proc.stdout.strip())
         return os.path.realpath(os.path.join(os.path.dirname(common_dir), '..', 'release'))
     except (OSError, subprocess.SubprocessError):
-        return os.path.realpath('../release')
+        return os.path.join(project_dir, 'release')
 
 
 RELEASE_DIR = default_release_dir()
