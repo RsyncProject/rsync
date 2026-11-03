@@ -478,7 +478,7 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 
 	if (maybe_hard_link(file, ndx, fname, statret, sxp, prev_name, &prev_st,
 			    realname, itemizing, code) < 0)
-		return -1;
+		return 0;
 
 	if (remove_source_files == 1 && do_xfers)
 		send_msg_success(fname, ndx);
