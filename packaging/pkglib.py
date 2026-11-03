@@ -211,7 +211,7 @@ def get_NEWS_version_info(skip_version=None):
 
     skip_version lets the caller exclude the version it is about to release.
     Its NEWS entry may already carry a release date -- dated by hand, or by an
-    earlier run of --step-3-tweak -- and would otherwise be reported as the
+    earlier run of --prepare-pr -- and would otherwise be reported as the
     PREVIOUS release, which is both wrong and fatal when it has no table row yet.
     """
     rel_re = re.compile(r'^\| \S{2} \w{3} \d{4}\s+\|\s+(?P<ver>\d+\.\d+\.\d+)\s+\|\s+(?P<pdate>\d{2} \w{3} \d{4})?\s+\|\s+(?P<pver>\d+)\s+\|')
