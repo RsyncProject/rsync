@@ -12,6 +12,9 @@
   excludes.
 
 ### ENHANCEMENTS:
+- Added `--nice` to adjust CPU and I/O scheduling priorities for local and
+  remote rsync processes. Daemon clients and rrsync cannot raise server-side
+  priorities.
 - Human-readable output now uses dynamic precision to show three significant
   digits and appends `i` to binary unit suffixes. `--progress` uses the same
   formatter for transfer rates and labels byte counts and rates with `B` and
@@ -73,6 +76,7 @@ test improvements.
 - Updated platform tests and fleet-test coverage for the 3.5.0 fixes.
 
 ------------------------------------------------------------------------------
+
 # NEWS for rsync 3.5.0 (13 Aug 2026)
 
 ## Changes in this version:
