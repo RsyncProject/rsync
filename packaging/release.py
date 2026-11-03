@@ -342,7 +342,7 @@ def step_3_tweak(args):
 
     tweak_files = ['version.h', 'rsync.h', 'NEWS.md']
     if not pre:
-        tweak_files.append('rsync-web/index.html')
+        tweak_files += ['rsync-web/index.html', 'rsync-web/security.html']
     tweak_files += glob.glob('packaging/*.spec')
     tweak_files += glob.glob('packaging/*/*.spec')
 
@@ -388,9 +388,11 @@ def step_3_tweak(args):
                               + proto_change_date + m[4] + protocol_version + m[5])
             txt = replace_or_die(x_re, repl, txt,
                                  f'Unable to find "| ?? ??? {year} | {finalversion} | ... |" line in {fn}')
-        elif fn == 'rsync-web/index.html':
+        elif fn in ('rsync-web/index.html', 'rsync-web/security.html'):
+            heading = (f'Rsync version {version} released'
+                       if fn.endswith('index.html') else f'Security fix in {version}')
             x_re = re.compile(
-                rf'(<h3>Rsync version {re.escape(version)} released</h3>\s*'
+                rf'(<h3>{re.escape(heading)}</h3>\s*'
                 r'<i class=date>)(?:\?\? \?\?\? \d{4}|\d+ \w+ \d{4})(</i>)')
             txt = replace_or_die(
                 x_re, rf'\g<1>{state["web_today"]}\2', txt,
@@ -480,6 +482,11 @@ def step_5_verify(args):
             f'<i class=date>{state["web_today"]}</i>',
             f'rsync-{version}.tar.gz',
             f'rsync-{lastversion}-{version}.diffs.gz',
+        ]
+        checks['rsync-web/security.html'] = [
+            f'Security fix in {version}',
+            f'<i class=date>{state["web_today"]}</i>',
+            'CVE-2026-119741',
         ]
 
     for fn, required in checks.items():

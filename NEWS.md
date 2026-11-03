@@ -10,8 +10,11 @@
   Existing files are now reached beneath a pinned parent directory instead of
   being passed as an unwritable `/proc/self/fd/N` destination.
 - Fixed poor matching performance on large sparse and repeated-block files
-  when duplicate checksum chains exhausted the search limit. Hash-search work
-  is now bounded without hiding valid basis blocks behind duplicates.
+  when duplicate checksum chains exhausted the search limit. Valid basis
+  blocks are no longer hidden behind duplicate entries.
+- Bounded strong-checksum work when a malicious receiver supplies weak
+  checksums that collide with consecutive rolling windows
+  (CVE-2026-119741).
 - Prevented the `--inplace` matcher from advancing its aligned basis index
   beyond the available checksum entries. This avoids signed overflow on large
   source files when the peer supplies a small block count.
