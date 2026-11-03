@@ -78,12 +78,18 @@ extern int operator_path_resolve;	/* defined below; fwd-declared for the exclude
 extern int filesfrom_owner_walk_override;	/* defined below; used by files-from implied dirs */
 
 /* A directory fd used only for pathname traversal, fchdir(), or as *at()
- * authority does not need read permission on Linux.  Keep the portable
- * O_RDONLY fallback for systems without O_PATH. */
+ * authority does not need read permission: use O_PATH where available (Linux,
+ * FreeBSD 13.1+), and O_SEARCH (which includes O_DIRECTORY) on macOS, where it
+ * needs only search permission from macOS 13 and older kernels ignore it.  Not
+ * elsewhere: illumos checks search permission before O_DIRECTORY, so probing a
+ * regular file fails with EACCES instead of the ENOTDIR the resolvers expect.
+ * Keep the portable O_RDONLY fallback for other systems. */
 static int directory_traverse_flags(void)
 {
 #if defined O_PATH && defined O_DIRECTORY
 	return O_PATH | O_DIRECTORY;
+#elif defined O_SEARCH && defined __APPLE__
+	return O_SEARCH;
 #elif defined O_DIRECTORY
 	return O_RDONLY | O_DIRECTORY;
 #else

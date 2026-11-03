@@ -897,6 +897,18 @@ def require_asan(reason: str, which: str = None) -> 'None':
         test_skipped(reason)
 
 
+def require_search_only_traversal() -> 'None':
+    """Skip the test (exit 77) unless rsync's held directory fds need only
+    search permission: O_PATH on Linux and FreeBSD, O_SEARCH on macOS 13+
+    (Darwin 22).  Older macOS ignores O_SEARCH, and other systems open them
+    O_RDONLY, so traversal there still needs read permission."""
+    if sys.platform.startswith(('linux', 'freebsd')):
+        return
+    if sys.platform == 'darwin' and int(platform.release().split('.')[0]) >= 22:
+        return
+    test_skipped('held directory fds need read permission on this platform')
+
+
 def rsh_cmd(cmd: str = None, *opts: str) -> str:
     """Build an RSYNC_RSH / --rsh value, quoted for rsync's own tokenizer.
 

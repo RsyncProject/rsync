@@ -53,6 +53,14 @@ jobs:
       # Second run with daemon tests over a real loopback rsyncd; the default
       # 'make check' above uses the secure stdio-pipe transport.
       run: sudo ./runtests.py --rsync-bin="$PWD/rsync" --use-tcp -j 8
+    - name: check (non-root, targeted)
+      # The runs above are root and macOS has no setpriv, so the search-only
+      # tests skip there; run them as the unprivileged 'runner' user. Explicit
+      # test names bypass RSYNC_EXPECT_SKIPPED.
+      run: |
+        sudo rm -rf testtmp   # prior root steps left it root-owned
+        ./runtests.py --rsync-bin="$PWD/rsync" \
+          search-only-destination search-only-held-dirfd
     - name: ssl file list
       run: rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
     - name: save artifact

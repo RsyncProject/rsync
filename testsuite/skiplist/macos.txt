@@ -32,8 +32,8 @@ rrsync-sender-leaf-flip
 rrsync-sender-parent-pin
 rrsync-symlink
 rrsync-userns-procfs
-search-only-destination
-search-only-held-dirfd
+search-only-destination  # root run lacks setpriv; see the non-root step
+search-only-held-dirfd   # root run lacks setpriv; see the non-root step
 sender-remove-source-root-anchor
 simd-checksum
 source-change-size-continues
