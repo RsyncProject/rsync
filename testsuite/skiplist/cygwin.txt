@@ -44,6 +44,9 @@ hardlinks-emlink-recovery                # LD_PRELOAD hook
 insecure-links-admin-optout
 link-dest-symlink-enotsup                # the ENOTSUP hard-link hook is an LD_PRELOAD, Linux-only
 log-file-symlink
+ltfs-client-compat
+ltfs-daemon
+ltfs-local
 msg-io-timeout-overflow
 nondaemon-symlink-race
 nonroot-restrictive-perms
