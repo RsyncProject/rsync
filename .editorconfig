@@ -1,0 +1,40 @@
+# EditorConfig is a file format and collection of text editor plugins
+# for maintaining consistent coding styles between different editors
+# and IDEs. Most popular editors support this either natively or via
+# plugin.
+#
+# Check https://editorconfig.org for details.
+#
+# Emacs: you need https://github.com/10sr/editorconfig-custom-majormode-el
+# to automatically enable the appropriate major-mode for your files
+# that aren't already caught by your existing config.
+#
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Native rsync C and Header files
+[*.{c,h}]
+indent_style = tab
+indent_size = 8
+tab_width = 8
+emacs_mode = c
+
+# Vendored popt library
+# In practice the files look like a mix of tabs and spaces
+[popt/**/*.{c,h}]
+indent_style = space
+indent_size = 4
+tab_width = 8
+emacs_mode = c
+
+# Vendored zlib library
+[zlib/**/*.{c,h}]
+indent_style = space
+indent_size = 4
+tab_width = 8
+emacs_mode = c
