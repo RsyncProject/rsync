@@ -81,7 +81,7 @@ def print_line(fn, mtime, commit_time):
     if args.list > 1:
         ts = str(commit_time).rjust(10)
     else:
-        ts = datetime.fromtimestamp(commit_time, timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        ts = datetime.fromtimestamp(commit_time, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     chg = '.' if mtime == commit_time else '*'
     print(chg, ts, fn)
 
