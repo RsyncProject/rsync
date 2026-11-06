@@ -35,7 +35,10 @@
 
 extern int sparse_files;
 extern struct stats stats;
+extern int stream_timeout;
+extern int stream_pipe_sz;
 
+int eof_reached = 0;
 OFF_T preallocated_len = 0;
 
 static OFF_T sparse_seek = 0;
@@ -330,6 +333,21 @@ struct map_struct *map_file(int fd, OFF_T len, int32 read_size, int32 blk_size)
 	map->file_size = len;
 	map->def_window_size = ALIGNED_LENGTH(read_size);
 
+	if (is_stream()) {
+		eof_reached = 0;
+#ifdef F_SETPIPE_SZ
+		if (fcntl(map->fd, F_SETPIPE_SZ, stream_pipe_sz) < 0) {
+			if (stream_pipe_sz != DEFAULT_STREAM_PIPE_SZ || errno != EPERM)
+				rsyserr(FWARNING, errno, "Warning: could not resize pipe buffer to %d bytes, using OS default",
+						stream_pipe_sz);
+		} else if (INFO_GTE(MISC, 1)) {
+			rprintf(FINFO, "Stream pipe buffer resized to %d bytes\n", stream_pipe_sz);
+		}
+#else
+		rprintf(FWARNING, "Warning: F_SETPIPE_SZ is not supported on this platform, using OS default pipe buffer size\n");
+#endif
+	}
+
 	return map;
 }
 
@@ -386,21 +404,64 @@ char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
 		exit_cleanup(RERR_FILEIO);
 	}
 
-	if (map->p_fd_offset != read_start) {
-		OFF_T ret = do_lseek(map->fd, read_start, SEEK_SET);
-		if (ret != read_start) {
-			rsyserr(FERROR, errno, "lseek returned %s, not %s",
-				big_num(ret), big_num(read_start));
+    if (map->p_fd_offset != read_start) {
+        if (is_stream()) {
+			rprintf(FERROR, "stream-source illegal seek from %s to %s\n",
+				big_num(map->p_fd_offset), big_num(read_start));
 			exit_cleanup(RERR_FILEIO);
-		}
-		map->p_fd_offset = read_start;
-	}
+		} else {
+            OFF_T ret = do_lseek(map->fd, read_start, SEEK_SET);
+            if (ret != read_start) {
+                rsyserr(FERROR, errno, "lseek returned %s, not %s",
+                    big_num(ret), big_num(read_start));
+                exit_cleanup(RERR_FILEIO);
+            }
+            map->p_fd_offset = read_start;
+        }
+    }
 	map->p_offset = window_start;
 	map->p_len = window_size;
 
 	while (read_size > 0) {
-		int32 nread = read(map->fd, map->p + read_offset, read_size);
+		if (is_stream() && !eof_reached && stream_timeout > 0) {
+			fd_set rfds;
+			struct timeval tv;
+
+			FD_ZERO(&rfds);
+			FD_SET(map->fd, &rfds);
+			tv.tv_sec = stream_timeout;
+			tv.tv_usec = 0;
+
+			int res = select(map->fd + 1, &rfds, NULL, NULL, &tv);
+			if (res == 0) {
+				rprintf(FERROR, "Stream timed out after %d seconds waiting for data\n",
+					stream_timeout);
+				exit_cleanup(RERR_TIMEOUT);
+			} else if (res < 0) {
+				if (errno == EINTR)
+					continue;
+				rsyserr(FERROR, errno, "select failed on stream");
+				exit_cleanup(RERR_FILEIO);
+			}
+		}
+		int32 nread = eof_reached ? 0 : read(map->fd, map->p + read_offset, read_size);
 		if (nread <= 0) {
+			/* Retry if a blocking pipe read was interrupted by a signal. */
+			if (nread < 0 && errno == EINTR)
+				continue;
+			/* On early EOF from a FIFO/pipe, shrink file_size and window
+			 * length to the actual bytes read so far and zero the tail. */
+			if (is_stream() && nread == 0) {
+				if (!eof_reached && INFO_GTE(MISC, 1)) {
+					rprintf(FINFO, "Stream reached early EOF at %s bytes (ceiling was %s)\n",
+						big_num(map->p_fd_offset), big_num(map->file_size));
+				}
+				eof_reached = 1;
+				map->file_size = map->p_fd_offset;
+				map->p_len = read_offset;
+				memset(map->p + read_offset, 0, read_size);
+				break;
+			}
 			if (!map->status)
 				map->status = nread ? errno : ENODATA;
 			/* The best we can do is zero the buffer -- the file
