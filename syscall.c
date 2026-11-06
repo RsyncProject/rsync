@@ -1806,6 +1806,8 @@ int do_chmod(const char *path, mode_t mode)
 				code = 1;
 # elif defined AT_FDCWD && defined AT_SYMLINK_NOFOLLOW
 			code = fchmodat(AT_FDCWD, path, mode & CHMOD_BITS, AT_SYMLINK_NOFOLLOW);
+			if (code < 0 && (errno == ENOTSUP || errno == EOPNOTSUPP || errno == ENOSYS))
+				code = 1;
 # else
 			code = 1;
 # endif
