@@ -42,6 +42,13 @@ jobs:
           ./rsync --version
           make check
           ./runtests.py --rsync-bin=`pwd`/rsync --use-tcp -j 8
+          # Non-root, targeted: without setpriv the root runs skip the
+          # search-only tests. Run them as uid 65534 from a copy under /tmp,
+          # which that uid can traverse, without root's PATH (/root/bin).
+          rm -rf /tmp/rsync-nonroot && cp -Rp . /tmp/rsync-nonroot
+          rm -rf /tmp/rsync-nonroot/testtmp && chown -R 65534:65534 /tmp/rsync-nonroot
+          (cd /tmp/rsync-nonroot && env HOME=/tmp/rsync-nonroot PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin python3 -c 'import os, sys; os.setgroups([]); os.setgid(65534); os.setuid(65534); os.execv(sys.executable, [sys.executable] + sys.argv[1:])' \
+            runtests.py --rsync-bin=/tmp/rsync-nonroot/rsync search-only-destination search-only-held-dirfd)
           ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
     - name: save artifact
       uses: actions/upload-artifact@v4

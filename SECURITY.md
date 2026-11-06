@@ -200,9 +200,14 @@ leaf symlink into a file read.
 
 `secure_relative_open()` resolves a path with a single portable mechanism on
 every platform: a per-component walk on a stack of held directory fds. On
-Linux, anchors and traversal components use
-`O_PATH|O_DIRECTORY|O_NOFOLLOW`; other platforms retain the
-`O_RDONLY|O_DIRECTORY` fallback. Descending into a real subdirectory pushes
+systems with `O_PATH` (Linux, FreeBSD 13.1+), anchors and traversal components
+use `O_PATH|O_DIRECTORY|O_NOFOLLOW`, even though FreeBSD also defines
+`O_SEARCH`. macOS uses `O_SEARCH|O_NOFOLLOW` (`O_SEARCH` includes
+`O_DIRECTORY`), which needs only search permission from macOS 13; older kernels
+ignore it and require read permission. Other platforms retain the
+`O_RDONLY|O_DIRECTORY` fallback, including illumos/Solaris, whose `O_SEARCH`
+checks search permission before `O_DIRECTORY` and so fails a regular file with
+`EACCES` rather than the `ENOTDIR` the walk expects. Descending into a real subdirectory pushes
 its fd, a `..` pops back to the already-held parent (a pop at the anchor is
 refused), and an in-tree directory symlink is followed by reading its target
 and walking that off the same stack (absolute targets refused, symlink hops

@@ -8,14 +8,19 @@ must use directory descriptors that require search permission only.
 import os
 import shutil
 import subprocess
-import sys
 import tempfile
 from pathlib import Path
 
-from rsyncfns import SCRATCHDIR, rmtree, rsync_argv, test_fail, test_skipped
+from rsyncfns import (
+    SCRATCHDIR, require_search_only_traversal, rmtree, rsync_argv, test_fail,
+    test_skipped,
+)
 
-if not sys.platform.startswith('linux'):
-    test_skipped('search-only-destination is Linux-specific')
+require_search_only_traversal()
+
+# Root runs need setpriv to drop privileges, which macOS and FreeBSD lack;
+# the fleet harness and the workflows' non-root steps cover them.
+fleet_nonroot = True
 
 launcher = []
 if os.geteuid() == 0:
