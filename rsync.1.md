@@ -618,6 +618,10 @@ has its own detailed description later in this manpage.
 --max-size=SIZE          don't transfer any file larger than SIZE
 --min-size=SIZE          don't transfer any file smaller than SIZE
 --max-alloc=SIZE         change a limit relating to memory alloc
+--stream-source          treat source as a live FIFO/pipe stream
+--stream-max-size=SIZE   max stream size ceiling (required with --stream-source)
+--stream-timeout=SECONDS abort stream if idle for SECONDS (default 30, 0=none)
+--stream-pipe-sz=SIZE    set pipe buffer size on Linux (default 1M, 64K-16M)
 --partial                keep partially transferred files
 --partial-dir=DIR        put a partially transferred file into DIR
 --delay-updates          put all updated files into place at end
@@ -4171,6 +4175,105 @@ sign) if you want the local shell to expand it.
 
     If a priority change is unsupported or fails, rsync warns and continues the
     transfer.
+
+0.  `--stream-source`
+
+    This option tells rsync to read a single named pipe (FIFO) on the local
+    sender and transfer its contents as a regular file to the destination.
+    Because pipes are non-seekable and report a length of 0 in `stat(2)`, this
+    mode requires [`--stream-max-size`](#opt) to define an upper byte ceiling
+    for the transfer.
+
+    When `--stream-source` is enabled, rsync automatically implies
+    [`--ignore-times`](#opt) (`-I`) and clears `--update`, `--links`,
+    `--specials`, and `--devices` so that the stream is never skipped by
+    quick-check comparisons or copied as a special FIFO node.  Both whole-file
+    transfers ([`--whole-file`](#opt)) and block-level delta transfers
+    (`--no-whole-file` and [`--inplace`](#opt)) are supported over
+    unidirectional streams without seeking on the source file descriptor.
+
+    Because a FIFO can only be read once sequentially and its final size is not
+    known until EOF, `--stream-source` cannot be combined with directory
+    recursion (`-r`, `-a`, `-d`, `--files-from`), multi-pass or append options
+    (`-c`, `--append`, `--append-verify`, batch mode), `--remove-source-files`,
+    or options whose semantics require a known source size up front
+    (`--size-only`, `--max-size`, `--min-size`, `-y`/`--fuzzy`,
+    `--preallocate`).  While `-a` is rejected because it implies `-r` and
+    `--specials`, individual metadata options such as `-p`, `-t`, `-o`, `-g`,
+    and `--chmod` can be used normally.
+
+    If the source argument is a symbolic link pointing to a pipe (such as
+    `/dev/stdin` or a shell process substitution `<(cmd)`), you must also
+    specify [`--copy-links`](#opt) (`-L`) so that rsync dereferences the
+    symlink to the underlying FIFO rather than skipping it as a non-regular
+    file.
+
+    For example, streaming a named pipe to a remote host using block-level
+    delta transfers in-place:
+
+    >     rsync --stream-source --stream-max-size=10G --no-whole-file --inplace \
+    >         /tmp/db_dump.fifo host:/backups/db_dump.sql
+
+    Or streaming from standard input or a process substitution using `-L`:
+
+    >     pg_dump mydb | rsync -L --stream-source --stream-max-size=10G \
+    >         /dev/stdin host:/backups/mydb.sql
+    >
+    >     rsync -L --stream-source --stream-max-size=500M \
+    >         <(tar -cf - /etc) host:/backups/etc.tar
+
+    This option is restricted to a local sender (local-to-local, remote-shell
+    push, or rsync-daemon push) and cannot be used when the sender is remote.
+
+0.  `--stream-max-size=SIZE`
+
+    This option specifies the maximum byte ceiling to read from a source FIFO
+    when [`--stream-source`](#opt) is active.  It is mandatory whenever
+    `--stream-source` is used.
+
+    `SIZE` acts as an upper bound rather than an exact file size:
+
+    - If the input stream reaches EOF before `SIZE` bytes are read, the
+      transfer completes cleanly at EOF and the destination file is sized to
+      the exact number of bytes received.  On the sender side, transfer
+      statistics (`--stats`) are reconciled to the actual number of bytes read
+      at EOF.  However, because `SIZE` is transmitted in the initial file list
+      without modifying the wire protocol, the advertised ceiling still
+      controls `%l` format logging, transfer progress percentages, and
+      receiver-side (or daemon-side) total-size statistics.
+    - If the input stream produces more than `SIZE` bytes, rsync stops reading
+      at `SIZE` bytes, logs a warning indicating that `--stream-max-size` was
+      exceeded, and finalizes the destination file at that ceiling length.
+
+    The `SIZE` value can be suffixed with a unit multiplier such as `K` (or
+    `KiB`), `M` (or `MiB`), or `G` (or `GiB`).  See the [`--max-size`](#opt)
+    option for a full description of all available suffixes.
+
+0.  `--stream-timeout=SECONDS`
+
+    This option specifies the maximum number of seconds that the sender will
+    wait for data when reading from a source FIFO when [`--stream-source`](#opt)
+    is active.  If no data arrives from the upstream writer process within the
+    specified time, rsync aborts the transfer with an error.
+
+    The default timeout is 30 seconds.  Specifying a value of 0 (or a negative
+    value) disables the stream read timeout, causing rsync to wait indefinitely
+    for pipe data.
+
+0.  `--stream-pipe-sz=SIZE`
+
+    This option instructs rsync to resize the kernel pipe buffer
+    (`fcntl(fd, F_SETPIPE_SZ, SIZE)`) on the source FIFO on Linux when
+    [`--stream-source`](#opt) is active.  Increasing the pipe buffer size
+    reduces context switching and prevents the upstream writer process from
+    blocking frequently during high-throughput delta transfers.
+
+    The default pipe buffer size is 1048576 bytes (1 MiB).  The specified
+    `SIZE` must be between 65536 bytes (64 KiB) and 16777216 bytes (16 MiB).
+    If the kernel rejects the requested size (for example, when `SIZE` exceeds
+    `/proc/sys/fs/pipe-max-size` and the user lacks `CAP_SYS_RESOURCE`), rsync
+    continues with the existing kernel pipe buffer size.  On non-Linux systems
+    where `F_SETPIPE_SZ` is unavailable, this option has no effect.
 
 ## DAEMON OPTIONS
 

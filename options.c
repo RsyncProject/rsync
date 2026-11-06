@@ -117,6 +117,12 @@ int human_readable = 1;
 int recurse = 0;
 int mkpath_dest_arg = 0;
 int allow_inc_recurse = 1;
+int stream_source_mode = 0;
+int stream_timeout = DEFAULT_STREAM_TIMEOUT;
+OFF_T stream_max_size = 0;
+int stream_pipe_sz = -1;
+char *stream_max_size_arg = NULL;
+char *stream_pipe_sz_arg = NULL;
 int xfer_dirs = -1;
 int am_daemon = 0;
 /* Set after a successful per-module chroot ("use chroot = yes") in
@@ -724,6 +730,10 @@ static struct poptOption long_options[] = {
   {"max-size",         0,  POPT_ARG_STRING, &max_size_arg, OPT_MAX_SIZE, 0, 0 },
   {"min-size",         0,  POPT_ARG_STRING, &min_size_arg, OPT_MIN_SIZE, 0, 0 },
   {"max-alloc",        0,  POPT_ARG_STRING, &max_alloc_arg, 0, 0, 0 },
+  {"stream-source",    0,  POPT_ARG_VAL,    &stream_source_mode, 1, 0, 0 },
+  {"stream-max-size",  0,  POPT_ARG_STRING, &stream_max_size_arg, 0, 0, 0 },
+  {"stream-timeout",   0,  POPT_ARG_INT,    &stream_timeout, 0, 0, 0 },
+  {"stream-pipe-sz",   0,  POPT_ARG_STRING, &stream_pipe_sz_arg, 0, 0, 0 },
   {"sparse",          'S', POPT_ARG_VAL,    &sparse_files, 1, 0, 0 },
   {"no-sparse",        0,  POPT_ARG_VAL,    &sparse_files, 0, 0, 0 },
   {"no-S",             0,  POPT_ARG_VAL,    &sparse_files, 0, 0, 0 },
@@ -2725,6 +2735,79 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 				goto cleanup;
 			}
 		}
+	}
+	if (stream_source_mode) {
+		if (am_daemon || am_server) {
+			snprintf(err_buf, sizeof err_buf,
+				"--stream-source cannot be used in server or daemon mode\n");
+			goto cleanup;
+		}
+		if (!stream_max_size_arg) {
+			snprintf(err_buf, sizeof err_buf,
+				"--stream-source requires a positive --stream-max-size\n");
+			goto cleanup;
+		}
+		if ((stream_max_size = parse_size_arg(stream_max_size_arg, 'b', "stream-max-size", 1, -1, False)) < 0)
+			goto cleanup;
+
+		if (stream_timeout == -1)
+			stream_timeout = DEFAULT_STREAM_TIMEOUT;
+		else if (stream_timeout < 0)
+			stream_timeout = 0;
+
+		if (!stream_pipe_sz_arg)
+			stream_pipe_sz = DEFAULT_STREAM_PIPE_SZ;
+		else {
+			ssize_t sz = parse_size_arg(stream_pipe_sz_arg, 'b', "stream-pipe-sz",
+						    MIN_STREAM_PIPE_SZ, MAX_STREAM_PIPE_SZ, False);
+			if (sz < 0)
+				goto cleanup;
+			stream_pipe_sz = (int)sz;
+		}
+		if (recurse || xfer_dirs > 1) {
+			snprintf(err_buf, sizeof err_buf,
+				"--stream-source cannot be used with --recursive (-r), --archive (-a), or --dirs (-d)\n");
+			goto cleanup;
+		}
+		if (append_mode) {
+			snprintf(err_buf, sizeof err_buf,
+				"--stream-source cannot be used with --append\n");
+			goto cleanup;
+		}
+		if (always_checksum) {
+			snprintf(err_buf, sizeof err_buf,
+				"--stream-source cannot be used with --checksum (-c)\n");
+			goto cleanup;
+		}
+		if (size_only || max_size_arg || min_size_arg || fuzzy_basis || preallocate_files) {
+			snprintf(err_buf, sizeof err_buf,
+				"--stream-source cannot be used with file-size-dependent options (--size-only, --max-size, --min-size, --fuzzy, --preallocate)\n");
+			goto cleanup;
+		}
+		if (files_from) {
+			snprintf(err_buf, sizeof err_buf,
+				"--stream-source cannot be used with --files-from\n");
+			goto cleanup;
+		}
+		if (remove_source_files) {
+			snprintf(err_buf, sizeof err_buf,
+				"--stream-source cannot be used with --remove-%s-files\n",
+				remove_source_files == 1 ? "source" : "sent");
+			goto cleanup;
+		}
+		if (write_batch || read_batch) {
+			snprintf(err_buf, sizeof err_buf,
+				"--stream-source cannot be used with batch mode\n");
+			goto cleanup;
+		}
+		ignore_times = 1;
+		update_only = 0;
+		preserve_specials = 0;
+		preserve_devices = 0;
+	} else if (stream_max_size_arg || stream_pipe_sz_arg || stream_timeout != DEFAULT_STREAM_TIMEOUT) {
+		snprintf(err_buf, sizeof err_buf,
+			"stream option(s) cannot be used without --stream-source\n");
+		goto cleanup;
 	}
 
 	if (trust_sender || am_server || read_batch)

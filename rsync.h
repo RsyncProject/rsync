@@ -26,6 +26,11 @@
 #define RSYNC_RSH_ENV "RSYNC_RSH"
 #define RSYNC_RSH_IO_ENV "RSYNC_RSH_IO"
 
+#define DEFAULT_STREAM_TIMEOUT 30
+#define DEFAULT_STREAM_PIPE_SZ (1024 * 1024)
+#define MIN_STREAM_PIPE_SZ (64 * 1024)
+#define MAX_STREAM_PIPE_SZ (16 * 1024 * 1024)
+
 #define RSYNC_NAME "rsync"
 /* RSYNCD_SYSCONF is now set in config.h */
 #define RSYNCD_USERCONF "rsyncd.conf"
