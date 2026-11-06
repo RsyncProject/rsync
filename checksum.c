@@ -60,6 +60,9 @@ struct name_num_item valid_checksums_items[] = {
 #ifdef SHA_DIGEST_LENGTH
 	{ CSUM_SHA1, NNI_EVP, "sha1", NULL },
 #endif
+#ifdef SHA256_DIGEST_LENGTH
+	{ CSUM_SHA256, NNI_EVP, "sha256", NULL },
+#endif
 	{ CSUM_NONE, 0, "none", NULL },
 	{ 0, 0, NULL, NULL }
 };
