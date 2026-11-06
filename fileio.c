@@ -38,6 +38,7 @@ extern struct stats stats;
 extern int stream_timeout;
 extern int stream_pipe_sz;
 
+int eof_reached = 0;
 OFF_T preallocated_len = 0;
 
 static OFF_T sparse_seek = 0;
@@ -333,6 +334,7 @@ struct map_struct *map_file(int fd, OFF_T len, int32 read_size, int32 blk_size)
 	map->def_window_size = ALIGNED_LENGTH(read_size);
 
 	if (is_stream()) {
+		eof_reached = 0;
 #ifdef F_SETPIPE_SZ
 		if (fcntl(map->fd, F_SETPIPE_SZ, stream_pipe_sz) < 0) {
 			if (stream_pipe_sz != DEFAULT_STREAM_PIPE_SZ || errno != EPERM)
@@ -421,7 +423,7 @@ char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
 	map->p_len = window_size;
 
 	while (read_size > 0) {
-		if (is_stream() && stream_timeout > 0) {
+		if (is_stream() && !eof_reached && stream_timeout > 0) {
 			fd_set rfds;
 			struct timeval tv;
 
@@ -442,7 +444,7 @@ char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
 				exit_cleanup(RERR_FILEIO);
 			}
 		}
-		int32 nread = read(map->fd, map->p + read_offset, read_size);
+		int32 nread = eof_reached ? 0 : read(map->fd, map->p + read_offset, read_size);
 		if (nread <= 0) {
 			/* Retry if a blocking pipe read was interrupted by a signal. */
 			if (nread < 0 && errno == EINTR)
@@ -450,10 +452,11 @@ char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
 			/* On early EOF from a FIFO/pipe, shrink file_size and window
 			 * length to the actual bytes read so far and zero the tail. */
 			if (is_stream() && nread == 0) {
-				if (INFO_GTE(MISC, 1)) {
+				if (!eof_reached && INFO_GTE(MISC, 1)) {
 					rprintf(FINFO, "Stream reached early EOF at %s bytes (ceiling was %s)\n",
 						big_num(map->p_fd_offset), big_num(map->file_size));
 				}
+				eof_reached = 1;
 				map->file_size = map->p_fd_offset;
 				map->p_len = read_offset;
 				memset(map->p + read_offset, 0, read_size);

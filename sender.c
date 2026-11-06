@@ -46,6 +46,7 @@ extern int whole_file;
 extern int allowed_lull;
 extern int copy_devices;
 extern int preserve_xattrs;
+extern int eof_reached;
 extern int protocol_version;
 extern int remove_source_files;
 extern int updating_basis_file;
@@ -815,7 +816,7 @@ void send_files(int f_in, int f_out)
 				stats.total_size -= diff;
 				stats.total_transferred_size -= diff;
 				st.st_size = mbuf->file_size;
-			} else {
+			} else if (!eof_reached) {
 				char extra;
 				ssize_t n;
 				do {

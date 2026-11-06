@@ -79,7 +79,7 @@ static int32 *hash_table;
  * (map_ptr() shrinks buf->file_size to the actual bytes read on pipe EOF). */
 static int stream_early_EOF(struct map_struct *buf, OFF_T len)
 {
-	return is_stream() && buf->file_size < len;
+	return is_stream() && buf && buf->file_size < len;
 }
 
 static void build_hash_table(struct sum_struct *s)
@@ -528,7 +528,7 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 			/* Pre-read the next chunk on a stream before calling matched() so
 			 * that if the pipe hits early EOF mid-chunk, buf->file_size and len
 			 * shrink before matched() tries to flush up to 'j'. */
-			if (is_stream()) {
+			if (is_stream() && buf) {
 				map_ptr(buf, last_match, (int32)MIN((OFF_T)CHUNK_SIZE, len - last_match));
 				if (buf->file_size < len)
 					len = buf->file_size;
