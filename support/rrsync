@@ -35,7 +35,8 @@ short_with_num = '@B' # DO NOT REMOVE ANY
 
 # To disable a long-named option, change its value to a -1.  The values mean:
 # 0 = the option has no arg; 1 = the arg doesn't need any checking; 2 = only
-# check the arg when receiving; and 3 = always check the arg.
+# check the path arg when receiving; 3 = always check the path arg; and 4 =
+# allow only a non-elevating --nice setting.
 long_opts = {
   'append': 0,
   'backup-dir': 2,
@@ -52,6 +53,7 @@ long_opts = {
   'copy-unsafe-links': 0,
   'daemon': -1,
   'debug': -1,
+  'delay-symlinks': 0,
   'delay-updates': 0,
   'delete': 0,
   'delete-after': 0,
@@ -92,6 +94,7 @@ long_opts = {
   'msgs2stderr': 0,
   'munge-links': 0,
   'new-compress': 0,
+  'nice': 4,
   'no-W': 0,
   'no-implied-dirs': 0,
   'no-msgs2stderr': 0,
@@ -375,7 +378,7 @@ def create_pinned_dir(path, orig_arg, mode):
     pinned_fds.append(fd)
     return '/proc/self/fd/%d' % fd
 
-# sender_pinned_arg() verdicts that are not a rewritten argument.
+# Pinned-argument verdicts that are not a rewritten argument.
 KEEP_LEAF_PIN = 'keep'          # hand rsync the leaf's own /proc/self/fd/N
 LEAF_PIN_UNUSABLE = 'unusable'  # no pin for this shape; keep the plain name
 
@@ -452,6 +455,22 @@ def sender_pinned_arg(fd, arg, orig_arg, has_slash, has_slash_dot):
         die('post-pin path changed (race?):', orig_arg, check)
     return pinned
 
+def receiver_pinned_arg(fd, arg, orig_arg):
+    """Keep existing file destinations writable beneath a pinned parent."""
+    leaf_st = os.fstat(fd)
+    if stat.S_ISDIR(leaf_st.st_mode):
+        return KEEP_LEAF_PIN
+
+    parent, leaf = os.path.split(arg)
+    dfd = pin_dir(parent, orig_arg)
+    try:
+        st = os.stat(leaf, dir_fd=dfd, follow_symlinks=False)
+    except OSError as e:
+        die('post-pin stat failed (race?):', orig_arg, e.strerror)
+    if (st.st_dev, st.st_ino) != (leaf_st.st_dev, leaf_st.st_ino):
+        die('post-pin path changed (race?):', orig_arg, leaf)
+    return '/proc/self/fd/%d/%s' % (dfd, leaf)
+
 def safe_open_logfile():
     nofollow = getattr(os, 'O_NOFOLLOW', 0)
     try:
@@ -519,7 +538,11 @@ def main():
         # backup onto a name that already exists deletes what is there
         # (backup.c make_backup()), and deletion backs files up as well
         # (delete.c), so an unrelated --delete can land on a protected name.
+        # --delay-symlinks creates its symlinks at the end of the transfer and
+        # replaces whatever has appeared at that name since the
+        # --ignore-existing check.
         long_opts['log-file'] = long_opts['partial-dir'] = long_opts['delay-updates'] = -1
+        long_opts['delay-symlinks'] = -1
         long_opts['backup-dir'] = -1
         short_disabled += 'b'   # must precede the short_no_arg_re build below
 
@@ -681,6 +704,11 @@ def main():
 def validated_arg(opt, arg, typ=3, wild=False):
     if opt != 'arg': # arg values already have their backslashes removed.
         arg = DE_BACKSLASH_RE.sub(r'\1', arg)
+
+    if typ == 4:
+        if not re.fullmatch(r'(?i:local(?::(?:19(?:/idle)?|idle))?)', arg):
+            die('unsafe --nice setting:', arg)
+        return arg
 
     # "-" is rsync's read-the-list-from-stdin sentinel, not a pathname: a pull
     # with a local --files-from sends exactly "--files-from=-" to the server.
@@ -923,6 +951,8 @@ def validated_arg(opt, arg, typ=3, wild=False):
                         pinned = sender_pinned_arg(fd, logical, orig_arg,
                                                    arg_has_trailing_slash,
                                                    arg_has_trailing_slash_dot)
+                    elif opt == 'arg':
+                        pinned = receiver_pinned_arg(fd, real_arg, orig_arg)
                     else:
                         pinned = KEEP_LEAF_PIN
                     if pinned == KEEP_LEAF_PIN:

@@ -10,5 +10,5 @@ from .profile import load_profile, merge_profiles, parse_peer_banner
 from .process import (forced_protocol, process_thread_count, rsh_cmd, rsync_argv,
                       rsync_argv_for, rsync_command_binary, rsync_path_arg, rsync_supports,
                       run_rsync, split_rsync_cmd, under_valgrind)
-from .results import (Exit, TestResult, test_fail, test_skipped, test_xfail, verdict_of,
+from .results import (Exit, TestResult, test_error, test_fail, test_skipped, test_xfail, verdict_of,
                       write_receipt)

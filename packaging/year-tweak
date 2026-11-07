@@ -9,6 +9,7 @@ from datetime import datetime
 
 def main():
     latest_year = '2000'
+    saw_file = False
 
     proc = subprocess.Popen('support/git-set-file-times --list'.split(), stdout=subprocess.PIPE, encoding='utf-8')
     for line in proc.stdout:
@@ -17,9 +18,13 @@ def main():
             print("Failed to parse line from git-set-file-times:", line)
             sys.exit(1)
         m = argparse.Namespace(**m.groupdict())
+        saw_file = True
         if m.year > latest_year:
             latest_year = m.year
     proc.communicate()
+    if proc.returncode != 0 or not saw_file:
+        print("support/git-set-file-times failed", file=sys.stderr)
+        sys.exit(1)
 
     fn = 'latest-year.h'
     with open(fn, 'r', encoding='utf-8') as fh:

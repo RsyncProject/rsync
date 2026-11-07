@@ -88,9 +88,10 @@ characters in a (peer-controlled) filename written to the log file are escaped,
 so a name carrying C0/C1 terminal-escape bytes cannot inject sequences into an
 administrator's terminal when the log is viewed (CWE-117). The number of
 equal-weak-checksum blocks `hash_search()` examines per offset is also bounded
-(issue #217), so a crafted or degenerate checksum set with a very long
-equal-checksum chain cannot drive the sender's per-offset match-verify into a
-quadratic walk and pin one connection's CPU.
+(CVE-2026-70453, issue #217), and consecutive weak-checksum collisions cannot
+force a full strong-checksum calculation at every byte offset
+(CVE-2026-119741). These bounds prevent a crafted checksum set from pinning a
+sender process in `hash_search()`
 
 Contributors adding code that consumes peer input should validate it at the
 point of receipt rather than relying on a downstream check.
@@ -385,8 +386,8 @@ The following are documented as out of scope for this release:
   can still slip past confinement that is anchored at the process CWD (e.g. the
   sender's content open), because the descriptor is not bound to the original
   inode.  The parent-component symlink-race tests are therefore not enforced on
-  Cygwin (see the `cygwin` test profile and the Cygwin-only xfail in
-  `symlink-race-source.py`).  Cygwin is a
+  Cygwin (see the `dirfd_pinning` capability in the `cygwin` test profile).
+  Cygwin is a
   development/interoperability target, not a privilege boundary host, so this is
   accepted for this release.
 

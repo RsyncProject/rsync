@@ -1087,11 +1087,16 @@ void noop_io_until_death(void)
 /* Buffer a message for the multiplexed output stream.  Is not used for (normal) MSG_DATA. */
 int send_msg(enum msgcode code, const char *buf, size_t len, int convert)
 {
+	static int growing_msg_buffer;
 	char *hdr;
 	size_t needed, pos;
 	BOOL want_debug = DEBUG_GTE(IO, 1) && convert >= 0 && (msgs2stderr == 1 || code != MSG_INFO);
 
 	if (!OUT_MULTIPLEXED)
+		return 0;
+	/* A fatal realloc_xbuf() failure is reported via rprintf(), which would
+	 * otherwise call send_msg() again and try to grow the same full buffer. */
+	if (growing_msg_buffer)
 		return 0;
 
 	if (want_debug) {
@@ -1118,7 +1123,9 @@ int send_msg(enum msgcode code, const char *buf, size_t len, int convert)
 		else { /* We sometimes allow the iobuf.msg size to increase to avoid a deadlock. */
 			size_t old_size = iobuf.msg.size;
 			restore_iobuf_size(&iobuf.msg);
+			growing_msg_buffer = 1;
 			realloc_xbuf(&iobuf.msg, iobuf.msg.size * 2);
+			growing_msg_buffer = 0;
 			if (iobuf.msg.pos + iobuf.msg.len > old_size)
 				memcpy(iobuf.msg.buf + old_size, iobuf.msg.buf, iobuf.msg.pos + iobuf.msg.len - old_size);
 		}

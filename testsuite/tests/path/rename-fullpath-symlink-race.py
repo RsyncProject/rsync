@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 
 import os
+import platform
 import subprocess
 import time
 
 from harness.mutation import race_budget
-from harness.rsync import SCRATCHDIR, rmtree, rsync_argv, test_fail
+from harness.rsync import SCRATCHDIR, rmtree, rsync_argv, test_fail, test_skipped
+
+_CYGWIN = platform.system().startswith('CYGWIN')
 
 base = SCRATCHDIR / f'rename-fullpath-{os.getpid()}'
 src = base / 'src'
@@ -66,6 +69,8 @@ try:
         escaped = sorted(p.name for p in outside.iterdir()
                          if p.is_file() and not p.is_symlink())
         if escaped:
+            if _CYGWIN:
+                test_skipped('Cygwin renameat followed a swapped parent symlink', capability='dirfd_pinning')
             test_fail(
                 f'final rename escaped the destination through a flipped symlink: {escaped}')
 finally:
@@ -74,3 +79,4 @@ finally:
         flip.wait(timeout=5)
     except subprocess.TimeoutExpired:
         flip.kill()
+        flip.wait()

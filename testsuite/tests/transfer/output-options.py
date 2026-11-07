@@ -85,7 +85,7 @@ verify_dirs(src, TODIR, label='--quiet still transferred')
 
 rmtree(TODIR)
 p = out('-a', '--progress', f'{src}/', f'{TODIR}/')
-progress_re = r'[\d.,]+B\s+100%\s+[\d.,]+B/s\s+\d+:\d\d:\d\d'
+progress_re = r'[\d,.]+B\s+100%\s+[\d,.]+(?:[KMGTPE]i?)?B/s\s+\d+:\d\d:\d\d'
 if not re.search(progress_re, p.stdout):
     test_fail(f"--progress did not show the expected final shape:\n{p.stdout}")
 
@@ -102,15 +102,26 @@ make_data_file(src / 'big', 50_000)
 plain = out('-a', '--stats', f'{src}/', f'{TODIR}/').stdout
 rmtree(TODIR)
 human = out('-a', '-h', '--stats', f'{src}/', f'{TODIR}/').stdout
-suffix_re = r'Total file size: [\d.,]+[KMG]'
+suffix_re = r'Total file size: [\d,.]+[KMG]'
 if not re.search(suffix_re, human):
     test_fail(f"-h did not use a human-readable unit suffix:\n{human}")
 if re.search(suffix_re, plain):
     test_fail(f"--stats without -h unexpectedly used a unit suffix:\n{plain}")
 
+for label, options, progress_re in (
+    ('default', (), r'50[,.]000B\s+100%\s+[\d,.]+[KMGTPE]B/s'),
+    ('--no-h', ('--no-h',), r'50000B\s+100%\s+\d+B/s'),
+    ('-h', ('-h',), r'50[,.]0KB\s+100%\s+[\d,.]+[KMGTPE]B/s'),
+    ('-hh', ('-hh',), r'48[,.]8KiB\s+100%\s+[\d,.]+[KMGTPE]iB/s'),
+):
+    rmtree(TODIR)
+    progress = out('-a', '--progress', *options, f'{src}/', f'{TODIR}/').stdout
+    if not re.search(progress_re, progress):
+        test_fail(f"{label} progress output has the wrong units:\n{progress}")
+
 rmtree(TODIR)
 human_binary = out('-a', '-hh', '--stats', f'{src}/', f'{TODIR}/').stdout
-if 'Total file size: 48.8Ki bytes' not in human_binary:
+if not re.search(r'Total file size: 48[,.]8Ki bytes', human_binary):
     test_fail(f"-hh did not use dynamic binary-unit precision:\n{human_binary}")
 
 rmtree(src)
@@ -118,7 +129,7 @@ rmtree(TODIR)
 makepath(src)
 make_data_file(src / 'threshold', 1024)
 threshold = out('-a', '-hh', '--stats', f'{src}/', f'{TODIR}/').stdout
-if 'Total file size: 1.00Ki bytes' not in threshold:
+if not re.search(r'Total file size: 1[,.]00Ki bytes', threshold):
     test_fail(f"-hh did not show an exact-threshold binary unit:\n{threshold}")
 
 rmtree(src)
@@ -126,9 +137,23 @@ rmtree(TODIR)
 makepath(src)
 make_data_file(src / 'below-threshold', 1000)
 below_threshold = out('-a', '-hh', '--stats', f'{src}/', f'{TODIR}/').stdout
-if 'Total file size: 1,000 bytes' not in below_threshold:
+if not re.search(r'Total file size: 1[,.]000 bytes', below_threshold):
     test_fail("-hh should preserve raw byte formatting below the binary-unit "
               f"threshold:\n{below_threshold}")
+
+# File-list counts are grouped like other counts, and never get a unit suffix.
+rmtree(src)
+rmtree(TODIR)
+makepath(src)
+for i in range(999):
+    (src / f'f{i}').touch()
+counts = out('-a', '-hh', '--progress', '--no-i-r', f'{src}/', f'{TODIR}/').stdout
+if not re.search(r'1[,.]000 files to consider', counts):
+    test_fail(f"file-list count was not grouped:\n{counts}")
+rmtree(TODIR)
+counts = out('-a', '--no-h', '--progress', '--no-i-r', f'{src}/', f'{TODIR}/').stdout
+if '1000 files to consider' not in counts:
+    test_fail(f"--no-h file-list count was not plain digits:\n{counts}")
 
 rmtree(src)
 rmtree(TODIR)

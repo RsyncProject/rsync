@@ -6,7 +6,7 @@ import subprocess
 import time
 
 from harness.mutation import race_budget, start_path_flipper, stop_flipper
-from harness.rsync import SCRATCHDIR, rmtree, rsync_argv, rsync_supports, test_fail, test_xfail
+from harness.rsync import SCRATCHDIR, rmtree, rsync_argv, rsync_supports, test_fail, test_skipped
 
 _CYGWIN = platform.system().startswith('CYGWIN')
 
@@ -61,10 +61,10 @@ finally:
 
 if won:
     if _CYGWIN:
-        test_xfail(
+        test_skipped(
             f"cygwin: source-tree parent-flip race still leaks ({SECRET!r}); the "
             "confined sender open is compiled in but Cygwin's symlink emulation "
-            "does not enforce it -- documented platform residual.")
+            "does not enforce it -- documented platform residual.", capability='dirfd_pinning')
     test_fail(
         f"source-tree TOCTOU: content from outside the source tree ({SECRET!r}) "
         "was copied into the output -- the sender followed a parent-component "

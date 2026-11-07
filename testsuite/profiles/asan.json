@@ -1,0 +1,5 @@
+{
+  "unsupported": {
+    "linux_interpose": "no interposition under AddressSanitizer"
+  }
+}

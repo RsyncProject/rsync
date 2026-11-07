@@ -17,6 +17,8 @@ def verdict_of(outcome, expected):
         if outcome in ('fail', 'xfail'):
             return 'xfail'
         return 'xpass' if outcome == 'pass' else 'profile_error'
+    if outcome == 'xfail':
+        return 'profile_error'
     if expected and expected.startswith('unsupported'):
         return 'unsupported' if outcome == 'unsupported' else 'profile_error'
     if expected == 'pass' and outcome in ('skip', 'unsupported', 'xfail'):
@@ -36,13 +38,13 @@ class TestResult:
     def outcome(self):
         if self.exit_code == Exit.PASS:
             return 'pass'
-        if self.exit_code == Exit.ERROR:
-            return 'error'
+        if self.exit_code == Exit.FAIL:
+            return 'fail'
         if self.exit_code == Exit.SKIP:
             return 'unsupported' if self.unsupported else 'skip'
         if self.exit_code == Exit.XFAIL:
             return 'xfail'
-        return 'fail'
+        return 'error'
 
     def record(self, expected=None):
         verdict = verdict_of(self.outcome, expected)
@@ -79,6 +81,10 @@ def write_receipt(path, data):
 def test_fail(msg: str) -> None:
     sys.stderr.write(msg.rstrip() + '\n')
     sys.exit(Exit.FAIL)
+
+def test_error(msg: str) -> None:
+    sys.stderr.write(msg.rstrip() + '\n')
+    sys.exit(Exit.ERROR)
 
 def test_skipped(msg: str, capability: str = None) -> None:
     sys.stderr.write(msg.rstrip() + '\n')

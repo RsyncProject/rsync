@@ -71,7 +71,7 @@ Exit codes are 0 for pass, 1 for fail, 2 for error, 77 for skip and 78 for expec
 
 Profiles compose by name. For example `--profiles=linux,peer-3.4.1` combines the Linux capabilities with the known deviations for that peer. Tests tagged `version-mix` are selected from metadata.
 
-An unsupported result is accepted only when the test declares the capability and the active profile permits its absence. A generic skip is a profile error. Receipts retain the raw outcome and the profile verdict.
+An unsupported result is accepted only when the test declares the capability and the active profile permits its absence. A generic skip is a profile error. Expected failures require a named defect in the active profile; errors and skips do not satisfy that expectation. Receipts retain the raw outcome and the profile verdict.
 
 ## Scratch data and requirements
 

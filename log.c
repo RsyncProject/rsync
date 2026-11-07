@@ -995,15 +995,18 @@ void log_delete(const char *fname, int mode)
 
 	file->mode = mode;
 
-	if (am_server && protocol_version >= 29 && len < MAXPATHLEN) {
-		if (S_ISDIR(mode))
-			len++; /* directories include trailing null */
-		send_msg(MSG_DELETED, fname, len, am_generator);
-	} else if (!INFO_GTE(DEL, 1) && !stdout_format)
-		;
-	else {
-		fmt = stdout_format_has_o_or_i ? stdout_format : "deleting %n";
-		log_formatted(FCLIENT, fmt, "del.", file, fname, ITEM_DELETED, NULL);
+	if (INFO_GTE(DEL, 1) || stdout_format) {
+		if (am_server && protocol_version >= 29 && len < MAXPATHLEN) {
+			/* The generator may be unable to flush these messages until
+			 * the sender's file list is complete.  Only queue names that
+			 * the client requested as per-item output. */
+			if (S_ISDIR(mode))
+				len++; /* directories include trailing null */
+			send_msg(MSG_DELETED, fname, len, am_generator);
+		} else {
+			fmt = stdout_format_has_o_or_i ? stdout_format : "deleting %n";
+			log_formatted(FCLIENT, fmt, "del.", file, fname, ITEM_DELETED, NULL);
+		}
 	}
 
 	if (!logfile_name || dry_run || !logfile_format)

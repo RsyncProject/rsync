@@ -187,7 +187,7 @@ static void emit_filelist_progress(int count)
 		return;
 	if (output_needs_newline == 2) /* avoid a newline in the middle of this filelist-progress output */
 		output_needs_newline = 0;
-	rprintf(FCLIENT, " %d files...", count);
+	rprintf(FCLIENT, " %s files...", comma_num(count));
 	rput_progress();
 	output_needs_newline = 2;
 }
@@ -203,8 +203,8 @@ static void finish_filelist_progress(const struct file_list *flist)
 	output_needs_newline = 0;
 	if (INFO_GTE(FLIST, 2)) {
 		/* This overwrites the progress line */
-		rprintf(FINFO, "%d file%sto consider\n",
-			flist->used, flist->used == 1 ? " " : "s ");
+		rprintf(FINFO, "%s file%sto consider\n",
+			comma_num(flist->used), flist->used == 1 ? " " : "s ");
 	} else {
 		rprintf(FINFO, "done\n");
 	}
@@ -379,6 +379,8 @@ int open_sender_source_path(const char *path, int flags, int *matched)
 	errno = saved_errno;
 	return fd;
 #else
+	(void)path;
+	(void)flags;
 	*matched = 0;
 	errno = ENOSYS;
 	return -1;
@@ -585,7 +587,8 @@ static inline int is_excluded(const char *fname, int is_dir, int filter_level)
 static void send_directory(int f, struct file_list *flist,
 			   char *fbuf, int len, int flags);
 
-static const char *pathname, *orig_dir;
+static const char *pathname;
+const char *orig_dir;
 static int pathname_len;
 
 /* Make sure flist can hold at least flist->used + extra entries. */
@@ -2258,14 +2261,21 @@ static void interpret_stat_error(const char *fname, int is_dir)
 static DIR *secure_opendir(const char *fbuf)
 {
 	int dfd, fl, matched;
+	int dir_flags = O_RDONLY;
 	DIR *d;
 
+#ifdef O_DIRECTORY
+	dir_flags |= O_DIRECTORY;
+#elif defined O_NONBLOCK
+	/* Avoid blocking on a raced special file before fdopendir validates it. */
+	dir_flags |= O_NONBLOCK;
+#endif
 	if (filesfrom_owner_walk_active()) {
 		/* The source base is operator-selected, while each list entry may not
 		 * be. Follow only trusted-owned symlinks while opening the directory. */
-		dfd = open_no_attacker_symlinks(fbuf, O_RDONLY | O_DIRECTORY, 0);
+		dfd = open_no_attacker_symlinks(fbuf, dir_flags, 0);
 	} else if (!am_daemon && am_sender
-	 && (dfd = open_sender_source_path(fbuf, O_RDONLY | O_DIRECTORY, &matched), matched)) {
+	 && (dfd = open_sender_source_path(fbuf, dir_flags, &matched), matched)) {
 		/* The command-line directory is the operator-selected transfer root.
 		 * Follow that root, then keep every recursive scan beneath its held fd. */
 	} else if (am_daemon && (!am_chrooted || module_dirlen)
@@ -2294,18 +2304,18 @@ static DIR *secure_opendir(const char *fbuf)
 			return NULL;
 		}
 		dfd = secure_relative_open_at(module_dirfd, *modrel ? modrel : ".",
-					      O_RDONLY | O_DIRECTORY, 0);
+					      dir_flags, 0);
 	} else if (*fbuf == '/') {
 		/* An absolute scan path (an absolute --relative / --files-from name, or a
 		 * "/" transfer root): anchor at "/" -- operator-named, trusted. */
 		const char *relp = fbuf;
 		while (*relp == '/')
 			relp++;
-		dfd = secure_relative_open("/", relp, O_RDONLY | O_DIRECTORY, 0);
+		dfd = secure_relative_open("/", relp, dir_flags, 0);
 	} else {
 		/* Non-daemon (or chrooted) sender: confine beneath the cwd the sender
 		 * chdir'd into (the transfer root). */
-		dfd = secure_relative_open(NULL, fbuf, O_RDONLY | O_DIRECTORY, 0);
+		dfd = secure_relative_open(NULL, fbuf, dir_flags, 0);
 	}
 
 	if (dfd < 0)

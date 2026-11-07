@@ -22,13 +22,6 @@
 #include "itypes.h"
 #include "ifuncs.h"
 
-/* O_CLOEXEC is absent on some still-supported targets.  The random-source fd
- * is read and closed synchronously, so the established zero-value fallback is
- * sufficient without adding a configure dependency. */
-#ifndef O_CLOEXEC
-#define O_CLOEXEC 0
-#endif
-
 extern int read_only;
 extern char *password_file;
 extern struct name_num_obj valid_auth_checksums;
@@ -271,8 +264,10 @@ static const char *getpassf(const char *filename)
 
 	if (n > 0) {
 		buffer[n] = '\0';
-		if ((p = strtok(buffer, "\n\r")) != NULL)
-			return strdup(p);
+		p = buffer + strcspn(buffer, "\n\r");
+		*p = '\0';
+		if (buffer[0] != '\0')
+			return strdup(buffer);
 	}
 
 	rprintf(FERROR, "ERROR: failed to read a password from %s\n", filename);

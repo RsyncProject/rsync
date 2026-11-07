@@ -402,10 +402,15 @@ int xacl_del_default_at(int dirfd, const char *leaf)
  * work race-safely via the /proc compat on a pre-6.13 kernel. */
 static int proc_self_fd_usable(void)
 {
-	int dfd = open(".", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+	int open_flags = O_RDONLY | O_CLOEXEC;
+	int dfd;
 	char p[64];
 	int usable = 0;
 
+#ifdef O_DIRECTORY
+	open_flags |= O_DIRECTORY;
+#endif
+	dfd = open(".", open_flags);
 	if (dfd < 0)
 		return 0;
 	if (snprintf(p, sizeof p, "/proc/self/fd/%d/.", dfd) < (int)sizeof p) {

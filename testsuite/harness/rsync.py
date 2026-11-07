@@ -30,7 +30,7 @@ from .process import (forced_protocol as _forced_protocol, rsh_cmd as _rsh_cmd,
                       rsync_path_arg as _rsync_path_arg, rsync_supports as _rsync_supports,
                       run_rsync as _run_rsync, split_rsync_cmd,
                       under_valgrind as _under_valgrind)
-from .results import Exit, test_fail, test_skipped, test_xfail
+from .results import Exit, test_error, test_fail, test_skipped, test_xfail
 from .xattrs import (
     RSYNC_PREFIX, RUSR, dump_values as xattr_dump, get_value as xattr_get,
     is_supported as xattrs_supported, set_value as xattr_set,

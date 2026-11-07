@@ -8,6 +8,7 @@
     "darwin_interpose": "no dyld interposition",
     "device_nodes": "no Unix device nodes",
     "directory_sgid": "no directory setgid semantics",
+    "dirfd_pinning": "no inode-pinned directories",
     "group_auth": "no group-auth fixture",
     "interpose": "no native interposition",
     "linux_acl": "no Linux ACL semantics",

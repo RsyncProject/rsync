@@ -323,12 +323,15 @@ def start_rsyncd(config, port, rsync_cmd=None, stdin=subprocess.DEVNULL,
     _stop(proc)
     test_fail(f'rsyncd never listened on {address}:{port}: {failure}')
 
-def start_test_daemon(config, port, rsync_cmd=None):
+def start_test_daemon(config, port, rsync_cmd=None, address='127.0.0.1'):
+    if address not in ('127.0.0.1', '::1'):
+        test_fail(f'refusing non-loopback test daemon address {address!r}')
     command = rsync_cmd or RSYNC_PEER
     if USE_TCP:
         port = claim_free_port(port)
-        start_rsyncd(config, port, command)
-        return f'rsync://localhost:{port}/'
+        start_rsyncd(config, port, command, address=address)
+        host = 'localhost' if address == '127.0.0.1' else f'[{address}]'
+        return f'rsync://{host}:{port}/'
     os.environ['RSYNC_CONNECT_PROG'] = (
         f'{rsync_path_arg(command)} --config={shlex.quote(str(config))} --daemon')
     return 'rsync://localhost/'

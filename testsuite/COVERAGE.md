@@ -23,7 +23,8 @@ Option | Tests | Path depth | Auxiliary tree | Coverage
 -L, --copy-links | links | deep | N/A | Covered for file and directory links
 -k, --copy-dirlinks | links | deep | N/A | Covered
 -K, --keep-dirlinks | symlink-dirlink-basis | deep | N/A | Covered for issue 715; unavailable without the secure path resolver
--H, --hard-links | hardlinks, hardlinks-deep | deep | outside | Covered across directories
+-H, --hard-links | hardlinks, hardlinks-deep, hardlinks-emlink-recovery | deep | outside | Covered across directories and hard-link creation failure
+--delay-symlinks | delay-symlinks, delay-symlinks-remote, rrsync-no-overwrite-delay-symlinks | shallow | N/A | Covered for creation order, remote propagation and restricted-shell refusal
 --copy-unsafe-links | safe-links | shallow | N/A | Partial
 --safe-links | safe-links | shallow | N/A | Partial
 --insecure-links | operator-path tests, insecure-links-admin-optout | deep | N/A | Covered for the local opt-out and daemon refusal
@@ -34,7 +35,7 @@ Option | Tests | Path depth | Auxiliary tree | Coverage
 
 Option | Tests | Path depth | Auxiliary tree | Coverage
 --- | --- | --- | --- | ---
--p, --perms | metadata-depth | deep | N/A | Covered with exact per-entry modes
+-p, --perms | metadata-depth, symlink-receiver-perms | deep | N/A | Covered with exact per-entry modes and unsupported symlink chmod
 -E, --executability | executability | shallow | N/A | Partial
 --chmod | metadata-depth, chmod-option | deep | N/A | Covered
 -A, --acls | acls, acls-depth | deep | N/A | Covered when ACL support is available
@@ -65,7 +66,7 @@ Option | Tests | Path depth | Auxiliary tree | Coverage
 --partial-dir | partial, symlink-dirlink-basis | deep | outside | Covered for relative and absolute partial directories with delta resume
 --delay-updates | delay-updates, delay-updates-deep | deep | inside only | Covered for per-directory staging
 --inplace | inplace, alt-dest | deep | inside only | Covered with inode preservation
---append, --append-verify | append | deep | inside only | Covered; the verification split needs protocol 30 or later
+--append, --append-verify | append, append-abort-mid-write | deep | inside only | Covered for interrupted writes; the verification split needs protocol 30 or later
 -b, --backup, --backup-dir, --suffix | backup, backup-deep | deep | outside | Covered
 --compare-dest, --copy-dest, --link-dest | alt-dest, alt-dest-deep, alt-dest-module-escape, operator-path-alt-dest | deep | outside | Covered for skip, copy, hard-link and confinement behaviour
 -y, --fuzzy | fuzzy | shallow | N/A | Partial
@@ -86,7 +87,7 @@ Option | Tests | Path depth | Auxiliary tree | Coverage
 --exclude, --include | filter-depth, exclude, exclude-lsh | deep | N/A | Covered
 --exclude-from, --include-from | files-from-depth | deep | N/A | Covered
 -C, --cvs-exclude | cvs-exclude | deep | N/A | Covered with nested .cvsignore
---files-from | files-from-depth | deep | N/A | Covered
+--files-from | files-from-depth, daemon-files-from-subdir | deep | N/A | Covered for nested paths and daemon module subdirectories
 -0, --from0 | files-from-depth | deep | N/A | Covered
 --max-size, --min-size | size-filter | deep | N/A | Covered
 --existing, --ignore-non-existing, --ignore-existing | delete-deep | deep | N/A | Covered
@@ -145,7 +146,8 @@ Option | Tests | Coverage
 --daemon, --config, --detach, --no-detach | daemon-standalone-detach, daemon-stdin tests | Covered for detached, foreground and inherited-socket startup
 --dparam | none | Missing
 --address, --port | daemon-address-family, daemon-standalone-detach | Covered for IPv4, IPv6 and configured binding
---password-file | daemon-auth | Covered
+--password-file | daemon-auth, password-file-first-line | Covered for authentication and first-line parsing
+--nice, --no-nice | niceness | Covered for local, remote-shell, daemon and restricted-shell priorities
 --early-input | daemon-early-exec-nameconv, early-input-symlink | Covered for data delivery and confined input paths
 --sockopts | daemon-module-options | Covered for client and daemon configuration
 --blocking-io | none | Missing

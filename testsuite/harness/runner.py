@@ -24,6 +24,7 @@ import subprocess
 import sys
 import threading
 import time
+from pathlib import Path
 
 from .metadata import (applies_to_peer, discover_tests, placeholder_target,
                        read_requirements, resolve_test_path, test_name)
@@ -211,8 +212,13 @@ def prep_scratch(scratchdir, srcdir, tooldir, setfacl_nodef):
             os.symlink(os.path.join(tooldir, srcdir), src_link)
 
 def collect_tests(suitedir, patterns):
+    legacy = sorted(Path(suitedir).glob('*_test.py'))
+    if legacy:
+        raise ValueError('tests outside tests/: ' + ', '.join(path.name for path in legacy))
     testdir = os.path.join(suitedir, 'tests')
     candidates = [str(path) for path in discover_tests(testdir)]
+    if not candidates:
+        raise ValueError(f'no tests found in {testdir}')
     if not patterns:
         tests = candidates
     else:
@@ -325,13 +331,14 @@ def run_one_test(testscript, testbase, scratchdir, base_env, timeout,
 
     env = base_env.copy()
     env['scratchdir'] = scratchdir
+    env['TESTRUN_TIMEOUT'] = str(timeout)
 
     target = placeholder_target(testscript)
     if target:
         testscript = os.path.join(scratchdir, os.path.basename(testscript))
         shutil.copyfile(target, testscript)
 
-    cmd = [sys.executable, testscript]
+    cmd = [sys.executable, os.path.join(_SUITE_DIR, 'harness', 'execute.py'), testscript]
 
     logfile = os.path.join(scratchdir, 'test.log')
     with open(logfile, 'w') as log:
@@ -356,7 +363,7 @@ def run_one_test(testscript, testbase, scratchdir, base_env, timeout,
             else:
                 proc.kill()
             proc.wait()
-            result = 1
+            result = Exit.ERROR
             log.write(f"\nTIMEOUT: test took over {timeout} seconds\n")
 
     output_parts = []
@@ -398,7 +405,8 @@ def run_one_test(testscript, testbase, scratchdir, base_env, timeout,
     elif result == Exit.XFAIL:
         output_parts.append(f'XFAIL   {testbase}')
     else:
-        output_parts.append(f'FAIL    {testbase}')
+        label = 'FAIL' if result == Exit.FAIL else 'ERROR'
+        output_parts.append(f'{label}    {testbase}')
 
     return TestResult(testbase, result, '\n'.join(output_parts), skipped_reason,
                       unsupported, time.monotonic() - started)
@@ -571,8 +579,13 @@ def main():
     args = parse_args()
     apply_environment_defaults(args)
     tooldir, srcdir, suitedir, rsync_bin, rsync_bin2 = resolve_run_paths(args)
+    try:
+        all_tests = collect_tests(suitedir, [])
+        tests = all_tests if not args.tests else collect_tests(suitedir, args.tests)
+    except ValueError as error:
+        sys.stderr.write(f'runtests.py: {error}\n')
+        sys.exit(Exit.ERROR)
     if args.describe_tests:
-        tests = collect_tests(suitedir, args.tests)
         excluded = [item.strip() for item in args.exclude.split(',') if item.strip()]
         if excluded:
             tests = [path for path in tests
@@ -595,13 +608,6 @@ def main():
         args, tooldir, srcdir, suitedir, scratchbase,
         rsync_cmd, rsync_peer_cmd, tls_args, shconfig, setfacl_nodef,
     )
-
-    try:
-        all_tests = collect_tests(suitedir, [])
-        tests = all_tests if not args.tests else collect_tests(suitedir, args.tests)
-    except ValueError as error:
-        sys.stderr.write(f'runtests.py: {error}\n')
-        sys.exit(Exit.ERROR)
 
     excl = [e.strip() for e in args.exclude.split(',') if e.strip()]
     if excl:
@@ -630,15 +636,17 @@ def main():
         metadata = metadata_by_test.get(name) or {}
         return max(args.timeout, 600) if metadata.get('cost') == 'expensive' else args.timeout
 
-    def mismatch(testbase, actual, unsupported=''):
-        if actual == 'unsupported':
-            metadata = metadata_by_test.get(testbase) or {}
-            return unsupported not in profile_unsupported or unsupported not in metadata.get('features', ())
-        if actual == 'skip':
-            return True
-        if testbase in profile_xfail:
-            return actual not in ('fail', 'xfail')
-        return actual != 'pass'
+    def expected_outcome(name, unsupported=''):
+        if name in profile_xfail:
+            return f'xfail:{profile_xfail[name]}'
+        metadata = metadata_by_test.get(name) or {}
+        if unsupported in profile_unsupported and unsupported in metadata.get('features', ()):
+            return f'unsupported:{unsupported}'
+        return 'pass'
+
+    def mismatch(name, actual, unsupported=''):
+        verdict = verdict_of(actual, expected_outcome(name, unsupported))
+        return verdict not in ('pass', 'xfail', 'unsupported')
 
     test_order = {test_name(test): index for index, test in enumerate(tests)}
 
@@ -663,23 +671,23 @@ def main():
         test_results[result.name] = result
         unsupported_outcomes[result.name] = result.unsupported
         durations[result.name] = result.duration
-        if result.exit_code == Exit.PASS:
+        expected = expected_outcome(result.name, result.unsupported) if profiles else None
+        verdict = verdict_of(outcome, expected)
+        if verdict == 'pass':
             passed += 1
-        elif result.exit_code == Exit.SKIP:
-            if result.unsupported:
-                unsupported_count += 1
-            else:
-                skipped += 1
-        elif result.exit_code == Exit.XFAIL:
+        elif verdict == 'unsupported':
+            unsupported_count += 1
+        elif verdict == 'skip':
+            skipped += 1
+        elif verdict == 'xfail':
             xfailed += 1
         else:
             failed += 1
-        if result.exit_code in (Exit.PASS, Exit.SKIP, Exit.XFAIL) and not args.preserve_scratch \
-                and os.path.isdir(scratchdir):
+        is_failure = (mismatch(result.name, outcome, result.unsupported) if profiles
+                      else verdict not in ('pass', 'skip', 'unsupported'))
+        if not is_failure and not args.preserve_scratch and os.path.isdir(scratchdir):
             subprocess.run(['rm', '-rf', scratchdir], capture_output=True)
-        if profiles:
-            return mismatch(result.name, outcome, result.unsupported)
-        return result.exit_code not in (Exit.PASS, Exit.SKIP, Exit.XFAIL)
+        return is_failure
 
     run_started = time.monotonic()
 
@@ -752,14 +760,6 @@ def main():
     if args.timing:
         print_timing_report(durations, outcomes, run_wall, args.parallel)
 
-    def expected_outcome(name):
-        if name in profile_xfail:
-            return f'xfail:{profile_xfail[name]}'
-        capability = unsupported_outcomes.get(name, '')
-        if capability and capability in profile_unsupported:
-            return f'unsupported:{capability}'
-        return 'pass'
-
     def emit_receipt(exit_code, mismatches=()):
         if not args.receipt:
             return
@@ -767,7 +767,8 @@ def main():
         records = []
         verdicts = {}
         for name in ordered:
-            record = test_results[name].record(expected_outcome(name) if profiles else None)
+            expected = expected_outcome(name, unsupported_outcomes.get(name, '')) if profiles else None
+            record = test_results[name].record(expected)
             if metadata_by_test.get(name):
                 record['requirements'] = metadata_by_test[name]
             records.append(record)
@@ -808,7 +809,7 @@ def main():
             actual = outcomes.get(name, 'notrun')
             unsupported = unsupported_outcomes.get(name, '')
             if actual == 'notrun' or mismatch(name, actual, unsupported):
-                expected = expected_outcome(name)
+                expected = expected_outcome(name, unsupported)
                 verdict = ('profile_error' if actual == 'notrun'
                            else verdict_of(actual, expected))
                 mismatches.append((name, expected, actual, verdict))
@@ -817,7 +818,7 @@ def main():
             for name, expected, actual, verdict in mismatches:
                 print(f'      {verdict.upper()} {name}: expected {expected}, got {actual}')
         print('-' * 60)
-        exit_code = len(mismatches) + vg_errors
+        exit_code = int(bool(mismatches or vg_errors))
         emit_receipt(exit_code, ({'name': name, 'expected': expected,
                                   'actual': actual, 'verdict': verdict}
                                  for name, expected, actual, verdict in mismatches))
@@ -826,7 +827,7 @@ def main():
 
     print('-' * 60)
 
-    exit_code = failed + vg_errors
+    exit_code = int(bool(failed or vg_errors))
     emit_receipt(exit_code)
     print(f'overall result is {exit_code}')
     sys.exit(exit_code)

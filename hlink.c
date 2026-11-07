@@ -278,6 +278,13 @@ static char *check_prior(struct file_struct *file, int gnum,
 		F_HL_PREV(file) = prev_ndx = F_HL_PREV(fp);
 	}
 
+	if (prev_ndx >= 0) {
+		/* The prior member is no longer in a live file-list, which
+		 * only happens once all of its files have completed: cut the
+		 * stale index instead of retaining it. */
+		F_HL_PREV(file) = -1;
+	}
+
 	if (inc_recurse
 	 && (node = hashtable_find(prior_hlinks, gnum, NULL)) != NULL) {
 		assert(node->data != NULL);
@@ -332,9 +339,16 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 				/* Add ourselves to the list of files that will
 				 * be updated when the transfer completes, and
 				 * mark ourself as waiting for the transfer. */
-				F_HL_PREV(file) = F_HL_PREV(prev_file);
+				if (F_HL_PREV(prev_file) >= 0
+				 && flist_for_ndx(F_HL_PREV(prev_file), NULL))
+					F_HL_PREV(file) = F_HL_PREV(prev_file);
+				else
+					/* prev_file's prior member (if any) is
+					 * already finished: cut the chain here. */
+					F_HL_PREV(file) = -1;
 				F_HL_PREV(prev_file) = ndx;
 				file->flags |= FLAG_FILE_SENT;
+				file->flags |= FLAG_HLINK_WAIT;
 				cur_flist->in_progress++;
 				if (DEBUG_GTE(HLINK, 2)) {
 					rprintf(FINFO, "hlink for %d (%s,%d): waiting for %d\n",
@@ -464,7 +478,7 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 
 	if (maybe_hard_link(file, ndx, fname, statret, sxp, prev_name, &prev_st,
 			    realname, itemizing, code) < 0)
-		return -1;
+		return 0;
 
 	if (remove_source_files == 1 && do_xfers)
 		send_msg_success(fname, ndx);
@@ -527,7 +541,16 @@ void finish_hard_link(struct file_struct *file, const char *fname, int fin_ndx,
 
 	while ((ndx = prev_ndx) >= 0) {
 		int val;
-		flist = flist_for_ndx(ndx, "finish_hard_link");
+		flist = flist_for_ndx(ndx, NULL);
+		if (!flist) {
+			/* The list holding an earlier member was released, which
+			 * only happens once all of its files have completed, so
+			 * everything from here on is already finished and there
+			 * is nothing left to re-link.  Stale indexes are cut in
+			 * check_prior() and in the FLAG_HLINK_WAIT re-point;
+			 * stop the walk here rather than aborting. */
+			break;
+		}
 		file = flist->files[ndx - flist->ndx_start];
 		file->flags = (file->flags & ~FLAG_HLINK_FIRST) | FLAG_HLINK_DONE;
 		prev_ndx = F_HL_PREV(file);
@@ -535,7 +558,10 @@ void finish_hard_link(struct file_struct *file, const char *fname, int fin_ndx,
 		prev_statret = link_stat(f_name(file, prev_name), &prev_sx.st, 0);
 		val = maybe_hard_link(file, ndx, prev_name, prev_statret, &prev_sx,
 				      our_name, stp, fname, itemizing, code);
-		flist->in_progress--;
+		if (file->flags & FLAG_HLINK_WAIT) {
+			file->flags &= ~FLAG_HLINK_WAIT;
+			flist->in_progress--;
+		}
 		free_stat_x(&prev_sx);
 		if (val < 0)
 			continue;
@@ -555,9 +581,17 @@ void finish_hard_link(struct file_struct *file, const char *fname, int fin_ndx,
 			exit_cleanup(RERR_MESSAGEIO);
 		}
 		if (CVAL(node->data, 0) != 0) {
-			rprintf(FERROR, "Hlink node data for %d already has path=%s (%s)\n",
-				gnum, (char*)node->data, f_name(file, prev_name));
-			exit_cleanup(RERR_MESSAGEIO);
+			/* An earlier member of this group already finished and
+			 * recorded its path as the group's root.  That member
+			 * could not be hard-linked to the original root (e.g.
+			 * EMLINK or EXDEV), so it was written as a regular
+			 * file: it, not the stale root, is the only inode this
+			 * group can still link to.  Re-root the group here so
+			 * that later members link to this live file.
+			 * (Upstream: RsyncProject/rsync#741.) */
+			rprintf(FINFO,
+				"hlink: group %d already finished at %s; re-rooting at %s (%s)\n",
+				gnum, (char*)node->data, our_name, f_name(file, prev_name));
 		}
 		free(node->data);
 		node->data = strdup(our_name);

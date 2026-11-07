@@ -49,7 +49,7 @@ OBJS1_NO_MAIN=flist.o rsync.o generator.o receiver.o cleanup.o sender.o exclude.
 OBJS1=$(OBJS1_NO_MAIN) main.o
 OBJS2=options.o io.o compat.o hlink.o token.o uidlist.o socket.o hashtable.o \
 	usage.o fileio.o batch.o clientname.o chmod.o acls.o xattrs.o
-OBJS3=progress.o pipe.o @MD5_ASM@ @ROLL_SIMD@ @ROLL_ASM@
+OBJS3=progress.o pipe.o niceness.o @MD5_ASM@ @ROLL_SIMD@ @ROLL_ASM@
 DAEMON_OBJ = params.o loadparm.o clientserver.o access.o connection.o authenticate.o
 popt_OBJS= popt/popt.o  popt/poptconfig.o \
 	popt/popthelp.o popt/poptparse.o popt/poptint.o
@@ -70,7 +70,10 @@ CHECK_SYMLINKS = testsuite/tests/metadata/chown-fake.py \
 # Objects for CHECK_PROGS to clean
 CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o t_chmod_secure.o t_rename_secure.o t_symlink_secure.o t_secure_relpath.o t_acl.o t_hashtable_overflow.o t_iwildmatch.o t_clean_fname.o t_safe_arg.o trimslash.o wildtest.o
 # Compile-only feature-shape checks.
-CHECK_COMPILE_OBJS=syscall-no-at-fdcwd.o
+CHECK_COMPILE_OBJS=syscall-no-at-fdcwd.o syscall-no-o-directory.o \
+	authenticate-no-o-cloexec.o rsync-no-o-cloexec.o clientserver-no-o-directory.o \
+	flist-no-o-directory.o generator-no-o-directory.o sender-no-o-directory.o \
+	lib/acl-no-o-directory.o access-no-inet6.o
 
 # note that the -I. is needed to handle config.h when using VPATH
 .c.o:
@@ -86,6 +89,41 @@ all: Makefile rsync$(EXEEXT) stunnel-rsyncd.conf @MAKE_RRSYNC@ @MAKE_MAN@
 syscall-no-at-fdcwd.o: syscall.c $(HEADERS)
 	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) \
 	    -DRSYNC_TEST_NO_AT_FDCWD -c $(srcdir)/syscall.c -o $@
+
+syscall-no-o-directory.o: syscall.c $(HEADERS)
+	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) \
+	    -DRSYNC_TEST_NO_O_DIRECTORY -c $(srcdir)/syscall.c -o $@
+
+authenticate-no-o-cloexec.o: authenticate.c $(HEADERS)
+	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) \
+	    -DRSYNC_TEST_NO_O_CLOEXEC -c $(srcdir)/authenticate.c -o $@
+
+rsync-no-o-cloexec.o: rsync.c $(HEADERS)
+	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) \
+	    -DRSYNC_TEST_NO_O_CLOEXEC -c $(srcdir)/rsync.c -o $@
+
+clientserver-no-o-directory.o: clientserver.c $(HEADERS)
+	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) \
+	    -DRSYNC_TEST_NO_O_DIRECTORY -c $(srcdir)/clientserver.c -o $@
+
+flist-no-o-directory.o: flist.c $(HEADERS)
+	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) \
+	    -DRSYNC_TEST_NO_O_DIRECTORY -c $(srcdir)/flist.c -o $@
+
+generator-no-o-directory.o: generator.c $(HEADERS)
+	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) \
+	    -DRSYNC_TEST_NO_O_DIRECTORY -c $(srcdir)/generator.c -o $@
+
+sender-no-o-directory.o: sender.c $(HEADERS)
+	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) \
+	    -DRSYNC_TEST_NO_O_DIRECTORY -c $(srcdir)/sender.c -o $@
+
+lib/acl-no-o-directory.o: lib/acl.c $(HEADERS)
+	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) \
+	    -DRSYNC_TEST_NO_O_DIRECTORY -c $(srcdir)/lib/acl.c -o $@
+access-no-inet6.o: access.c $(HEADERS)
+	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) \
+	    -DRSYNC_TEST_NO_INET6 -c $(srcdir)/access.c -o $@
 
 .PHONY: install
 install: all

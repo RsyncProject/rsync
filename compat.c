@@ -36,6 +36,7 @@ extern int fuzzy_basis;
 extern int read_batch;
 extern int write_batch;
 extern int delay_updates;
+extern int delay_symlinks;
 extern int checksum_seed;
 extern int basis_dir_cnt;
 extern int prune_empty_dirs;
@@ -173,7 +174,7 @@ void set_allow_inc_recurse(void)
 		allow_inc_recurse = 0;
 	else if (!am_sender
 	 && (delete_before || delete_after
-	  || delay_updates || prune_empty_dirs))
+	  || delay_updates || delay_symlinks || prune_empty_dirs))
 		allow_inc_recurse = 0;
 	else if (am_server && strchr(client_info, 'i') == NULL)
 		allow_inc_recurse = 0;
@@ -715,6 +716,14 @@ void setup_protocol(int f_out,int f_in)
 		if (prune_empty_dirs) {
 			rprintf(FERROR,
 				"--prune-empty-dirs requires protocol 29 or higher"
+				" (negotiated %d).\n",
+				protocol_version);
+			exit_cleanup(RERR_PROTOCOL);
+		}
+
+		if (delay_symlinks) {
+			rprintf(FERROR,
+				"--delay-symlinks requires protocol 29 or higher"
 				" (negotiated %d).\n",
 				protocol_version);
 			exit_cleanup(RERR_PROTOCOL);

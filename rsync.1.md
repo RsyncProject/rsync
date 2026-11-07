@@ -621,6 +621,7 @@ has its own detailed description later in this manpage.
 --partial                keep partially transferred files
 --partial-dir=DIR        put a partially transferred file into DIR
 --delay-updates          put all updated files into place at end
+--delay-symlinks         create symlinks after all files are in place
 --prune-empty-dirs, -m   prune empty directory chains from file-list
 --numeric-ids            don't map uid/gid values by user/group name
 --usermap=STRING         custom username mapping
@@ -685,6 +686,8 @@ has its own detailed description later in this manpage.
 --checksum-seed=NUM      set block/file checksum seed (advanced)
 --ipv4, -4               prefer IPv4
 --ipv6, -6               prefer IPv6
+--nice=SETTINGS          adjust rsync CPU and I/O priorities
+--no-nice                clear earlier --nice settings
 --version, -V            print the version + other info and exit
 --help, -h (*)           show this help (* -h is help only on its own)
 ```
@@ -705,6 +708,8 @@ accepted:
 --log-file=FILE          override the "log file" setting
 --log-file-format=FMT    override the "log format" setting
 --sockopts=OPTIONS       specify custom TCP options
+--nice=SETTINGS          adjust daemon process CPU and I/O priorities
+--no-nice                clear earlier --nice settings
 --verbose, -v            increase verbosity
 --ipv4, -4               prefer IPv4
 --ipv6, -6               prefer IPv6
@@ -1012,6 +1017,7 @@ sign) if you want the local shell to expand it.
     - [`--delete-after`](#opt)
     - [`--prune-empty-dirs`](#opt)
     - [`--delay-updates`](#opt)
+    - [`--delay-symlinks`](#opt)
 
     In order to be compatible with incremental recursion,
     [`--delete-during`](#opt) is the default delete mode for [`--delete`](#opt).
@@ -3611,7 +3617,9 @@ sign) if you want the local shell to expand it.
 
     The default is human-readable level 1.  Each `-h` option increases the
     level by one.  You can take the level down to 0 (to output numbers as pure
-    digits) by specifying the `--no-human-readable` (`--no-h`) option.
+    digits) by specifying the `--no-human-readable` (`--no-h`) option.  Progress
+    rates are an exception: the default and `-h` use level 2, `--no-h` uses
+    level 0 and `-hh` uses level 3.
 
     The unit letters that are appended in levels 2 and 3 are: `K` (kilo), `M`
     (mega), `G` (giga), `T` (tera), `P` (peta) or `E` (exa). For example, a
@@ -3621,6 +3629,9 @@ sign) if you want the local shell to expand it.
     523M -> 1.24G -> ...).
     Additionally an `i` is appended in level-3 to indicate the binary base.
     The same file would output as 1.17Mi in level-3.
+    Counts, such as the number of files, never get a unit suffix: in levels 2
+    and 3 they are shown as in level 1 (for example: 523,297,101 files to
+    consider).
 
     Backward compatibility note: versions of rsync prior to 3.1.0 (September 2013) do not
     support human-readable level 1, and they default to level 0.  Thus,
@@ -3742,6 +3753,34 @@ sign) if you want the local shell to expand it.
     update algorithm that is even closer to atomic (it uses [`--link-dest`](#opt)
     and a parallel hierarchy of files).
 
+0.  `--delay-symlinks`
+
+    This option tells the receiving rsync to hold back the creation of new and
+    changed symlinks until every other file in the transfer has been put into
+    place, including the renames done by [`--delay-updates`](#opt).  Without
+    it, a symlink is created as soon as rsync reaches it in the file list, so
+    for the rest of the transfer it can point at a file that hasn't arrived
+    yet.
+
+    This narrows the window in which the destination is inconsistent; it does
+    not make the update atomic.  A transfer that is interrupted before the end
+    leaves new symlinks missing and changed symlinks pointing at their old
+    targets.
+
+    If a symlink is moved to a new target and the old target is deleted, also
+    use [`--delete-delay`](#opt) or [`--delete-after`](#opt), since
+    [`--delete-before`](#opt) and the default [`--delete-during`](#opt) can
+    remove the old target while the old symlink still points at it.
+
+    This option implies [`--no-inc-recursive`](#opt) since it needs the full
+    file list in memory in order to be able to iterate over it at the end.
+
+    Conflicts with [`--remove-source-files`](#opt), [`--hard-links`](#opt),
+    [`--compare-dest`](#opt), [`--copy-dest`](#opt), and [`--link-dest`](#opt).
+    This option is incompatible with rsync versions prior to 2.6.4 (March
+    2005), and when the receiving side is remote, the remote rsync must also
+    support this option.
+
 0.  `--prune-empty-dirs`, `-m`
 
     This option tells the receiving rsync to get rid of empty directories from
@@ -3788,12 +3827,16 @@ sign) if you want the local shell to expand it.
     While rsync is transferring a regular file, it updates a progress line that
     looks like this:
 
-    >     782,448B  63% 113,295B/s    0:00:04
+    >     782,448B  63%    113KB/s    0:00:04
 
     In this example, the receiver has reconstructed 782,448 bytes or 63% of the
-    sender's file, which is being reconstructed at a rate of 113,295 bytes
+    sender's file, which is being reconstructed at a rate of 113 kilobytes
     per second, and the transfer will finish in 4 seconds if the current rate
     is maintained until the end.
+
+    Progress rates are scaled in decimal units by default.  `--no-h` keeps the
+    rate in bytes per second, while `-hh` uses binary units such as `KiB/s` and
+    `MiB/s`.
 
     These statistics can be misleading if rsync's delta-transfer algorithm is
     in use.  For example, if the sender's file consists of the basis file
@@ -3805,10 +3848,10 @@ sign) if you want the local shell to expand it.
     When the file transfer finishes, rsync replaces the progress line with a
     summary line that looks like this:
 
-    >     1,238,099B 100% 149,893B/s    0:00:08  (xfr#5, to-chk=169/396)
+    >     1,238,099B 100%    150KB/s    0:00:08  (xfr#5, to-chk=169/396)
 
     In this example, the file was 1,238,099 bytes long in total, the average
-    rate of transfer for the whole file was 149,893 bytes per second over the
+    rate of transfer for the whole file was 150 kilobytes per second over the
     8 seconds that it took to complete, it was the 5th transfer of a
     regular file during the current rsync session, and there are 169 more files
     for the receiver to check (to see if they are up-to-date or not) remaining
@@ -4091,6 +4134,43 @@ sign) if you want the local shell to expand it.
     applications that want repeatable block checksums, or in the case where the
     user wants a more random checksum seed.  Setting NUM to 0 causes rsync to
     use the default of **time**() for checksum seed.
+
+0.  `--nice=SETTINGS`
+
+    Adjust the CPU and I/O scheduling priority of the local process, the remote
+    process or both.  SETTINGS is a comma-separated list.  Each setting is
+    `TARGET`, `PRIORITY` or `TARGET:PRIORITY`.  `TARGET` is `local`, `remote` or
+    `all`.  Omitting `TARGET` applies the priority to both processes.  A
+    target-only setting uses `19/idle`.  Target names and I/O values are
+    case-insensitive.
+
+    `PRIORITY` is a CPU nice value from -20 to 19, an I/O value or both
+    separated by `/`.  I/O values are `none`, `idle`, `rt_0` through `rt_7` and
+    `be_0` through `be_7`.  `none` restores the kernel-derived I/O priority.
+    Higher nice values and higher `rt` or `be` suffixes mean lower priority.
+    Raising priority may require additional privilege.
+
+    A setting that specifies only CPU or I/O priority leaves the other component
+    unchanged.  For example,
+    `--nice=remote:5 --nice=remote:idle` requests remote CPU priority 5 and
+    remote idle I/O priority.  Later settings replace earlier values for the
+    same component.  `--no-nice` clears all earlier settings.
+
+    Examples:
+
+        --nice=19/idle
+        --nice=local:10,remote:idle
+        --nice=local:19/be_7,remote:5
+
+    The remote rsync must support this option before a remote setting can be
+    used.  Daemon clients may request only CPU nice 19, idle I/O priority or
+    both.  A daemon administrator can also refuse the option with
+    `refuse options = nice`.  When starting a daemon, the local setting is
+    applied before it accepts client settings.  A standalone listener passes
+    that priority to its workers.  A daemon's remote setting has no meaning.
+
+    If a priority change is unsupported or fails, rsync warns and continues the
+    transfer.
 
 ## DAEMON OPTIONS
 

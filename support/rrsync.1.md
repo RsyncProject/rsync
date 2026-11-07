@@ -98,11 +98,13 @@ The remainder of this manpage is dedicated to using the rrsync script.
 
     Because `--ignore-existing` protects only the file being transferred, this
     also refuses the options that can reach a *different* existing file in the
-    restricted dir: `--log-file`, `--partial-dir`, `--delay-updates`, and
-    backup mode (`-b`, `--backup-dir`, whose published backup replaces whatever
+    restricted dir: `--log-file`, `--partial-dir`, `--delay-updates`,
+    `--delay-symlinks` (which creates its symlinks at the end of the transfer,
+    replacing whatever has appeared at that name since the check), and backup
+    mode (`-b`, `--backup-dir`, whose published backup replaces whatever
     already occupies the backup name). Resumable uploads with an explicit
-    `--partial-dir`, `--delay-updates`, and server-side logging are therefore
-    unavailable under this option.
+    `--partial-dir`, `--delay-updates`, `--delay-symlinks`, and server-side
+    logging are therefore unavailable under this option.
 
 0.  `-help`, `-h`
 
@@ -126,6 +128,10 @@ The rrsync script accepts just a subset of rsync's options that the real rsync
 uses when running the server command.  A few extra convenience options are also
 included to help it to interact with BackupPC and accept some convenient user
 overrides.
+
+The [`--nice`](rsync.1#opt--nice) option is limited to local CPU nice 19, idle
+I/O priority or both.  Other values could raise the server process priority and
+are rejected.
 
 The script (or a copy of it) can be manually edited if you want it to customize
 the option handling.

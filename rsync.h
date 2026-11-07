@@ -93,6 +93,7 @@
 #define FLAG_TIME_FAILED (1<<11)/* generator */
 #define FLAG_MOD_NSEC (1<<12)	/* sender/receiver/generator */
 #define FLAG_GOT_DIR_FLIST (1<<13)/* sender/receiver/generator - dir_flist only */
+#define FLAG_HLINK_WAIT (1<<14) /* generator (w/FLAG_HLINKED): counted in in_progress, pending hard-link processing */
 
 /* These flags are passed to functions but not stored. */
 
@@ -409,6 +410,21 @@ enum delret {
 #ifdef HAVE_SYS_FCNTL_H
 #include <sys/fcntl.h>
 #endif
+#endif
+
+/* O_CLOEXEC is absent on some still-supported targets.  Defining it to zero
+ * preserves the open flags there; the test macro exercises that fallback on
+ * build hosts that provide O_CLOEXEC. */
+#ifdef RSYNC_TEST_NO_O_CLOEXEC
+#undef O_CLOEXEC
+#endif
+#ifndef O_CLOEXEC
+#define O_CLOEXEC 0
+#endif
+
+/* Exercise the O_DIRECTORY portability path on build hosts that provide it. */
+#ifdef RSYNC_TEST_NO_O_DIRECTORY
+#undef O_DIRECTORY
 #endif
 
 #ifdef HAVE_SYS_IOCTL_H

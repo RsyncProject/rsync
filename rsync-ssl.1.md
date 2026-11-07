@@ -129,11 +129,9 @@ rsyncd.conf](rsyncd.conf.5#SSL_TLS_Daemon_Setup).
 
 ## CAVEATS
 
-Note that using an stunnel connection requires at least version 4 of stunnel,
-which should be the case on modern systems.  Also, it does not verify a
-connection against the CA certificate collection, so it only encrypts the
-connection without any cert validation unless you have specified the
-certificate environment options.
+The stunnel backend requires stunnel 4 or newer.  It also requires
+`RSYNC_SSL_CA_CERT` unless `RSYNC_SSL_ALLOW_INSECURE_STUNNEL=1` explicitly
+opts out of server-certificate validation.
 
 This script also supports a `--type=gnutls` option, but at the time of this
 release the gnutls-cli command was dropping output, making it unusable.  If

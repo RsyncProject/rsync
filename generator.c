@@ -58,6 +58,7 @@ extern int msgdone_cnt;
 extern int ignore_errors;
 extern int remove_source_files;
 extern int delay_updates;
+extern int delay_symlinks;
 extern int update_only;
 extern int human_readable;
 extern int ignore_existing;
@@ -117,14 +118,48 @@ static int need_retouch_dir_times;
 static int need_retouch_dir_perms;
 static const char *solo_file = NULL;
 
+/* With --delay-symlinks, new and changed symlinks are deferred here and created
+ * only after the receiver has put every file into place (including any
+ * --delay-updates renames).  Each entry keeps what recv_generator() needs to
+ * itemize and log the link once it has been created. */
+struct deferred_symlink {
+	struct file_struct *file;
+	int ndx;
+	char *fname;
+	int itemizing;
+	enum logcode code;
+};
+static int defer_symlinks;
+static item_list deferred_symlinks = EMPTY_ITEM_LIST;
+
+#ifdef SUPPORT_LINKS
+static void defer_symlink(struct file_struct *file, int ndx, const char *fname,
+			  int itemizing, enum logcode code)
+{
+	struct deferred_symlink *ds
+	    = EXPAND_ITEM_LIST(&deferred_symlinks, struct deferred_symlink, 100);
+
+	ds->file = file;
+	ds->ndx = ndx;
+	if (!(ds->fname = strdup(fname)))
+		out_of_memory("defer_symlink");
+	ds->itemizing = itemizing;
+	ds->code = code;
+}
+#endif
+
 /* Forward declarations. */
 #ifdef SUPPORT_HARD_LINKS
 static void handle_skipped_hlink(struct file_struct *file, int itemizing,
 				 enum logcode code, int f_out);
 #endif
 
-#define EARLY_DELAY_DONE_MSG() (!delay_updates)
-#define EARLY_DELETE_DONE_MSG() (!(delete_during == 2 || delete_after))
+/* Deferred symlinks are created and itemized in the delay-updates phase, so
+ * that phase must not be ended early either, and the deletion stats must wait
+ * for any directory that a deferred symlink replaces. */
+#define EARLY_DELAY_DONE_MSG() (!delay_updates && !defer_symlinks)
+#define EARLY_DELETE_DONE_MSG() \
+	(!(delete_during == 2 || delete_after || defer_symlinks))
 
 static int start_delete_delay_temp(void)
 {
@@ -964,9 +999,9 @@ static int copy_altdest_file(const char *src, const char *dest, struct file_stru
 static int basis_link_stat(const char *path, STRUCT_STAT *stp)
 {
 	extern int am_chrooted;
-	extern int operator_path_resolve;
 	extern unsigned int module_dirlen;
 #if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+	extern int operator_path_resolve;
 	/* The basis dir (--link-dest/--compare-dest/--copy-dest) is an operator-
 	 * supplied path.  For a non-daemon receiver, resolve it with the ownership
 	 * walk: a symlink component owned by uid 0 or the euid (the operator's own
@@ -1568,7 +1603,7 @@ static int gen_entry_copy_xattrs(const char *src, const char *fname, struct file
 	 * relative basis goes through the RESOLVE_BENEATH resolver; an absolute one
 	 * through the operator ownership walk.  Refuse (don't path-read) when we are
 	 * meant to confine but can't pin; a non-hardened receiver path-reads (sfd<0). */
-#if defined AT_FDCWD && defined O_NOFOLLOW
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
 	if (secure_relpath_active() && src && *src && !symlink_optout_allowed()) {
 		int odir = 0;
 #ifdef O_DIRECTORY
@@ -2001,6 +2036,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				fnamecmp = fnamecmpbuf;
 			}
 		}
+		if (defer_symlinks) {
+			defer_symlink(file, ndx, fname, itemizing, code);
+			goto cleanup;
+		}
 		if (atomic_create(file, fname, sl, NULL, MAKEDEV(0, 0), &sx, statret == 0 ? DEL_FOR_SYMLINK : 0)) {
 			set_file_attrs(fname, file, NULL, NULL, 0);
 			if (itemizing) {
@@ -2214,6 +2253,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	if (statret != 0) {
 #ifdef SUPPORT_HARD_LINKS
 		if (preserve_hard_links && F_HLINK_NOT_LAST(file)) {
+			file->flags |= FLAG_HLINK_WAIT;
 			cur_flist->in_progress++;
 			goto cleanup;
 		}
@@ -2319,6 +2359,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		/* pretend the file didn't exist */
 #ifdef SUPPORT_HARD_LINKS
 		if (preserve_hard_links && F_HLINK_NOT_LAST(file)) {
+			file->flags |= FLAG_HLINK_WAIT;
 			cur_flist->in_progress++;
 			goto cleanup;
 		}
@@ -2529,8 +2570,6 @@ int atomic_create(struct file_struct *file, char *fname, const char *slnk, const
 	if (!skip_atomic) {
 		if (gen_entry_rename(tmpname, fname, file) < 0) {
 			char *full_tmpname = strdup(full_fname(tmpname));
-			if (full_tmpname == NULL)
-				out_of_memory("atomic_create");
 			rsyserr(FERROR_XFER, errno, "rename %s -> \"%s\" failed",
 				full_tmpname, full_fname(fname));
 			free(full_tmpname);
@@ -2556,7 +2595,10 @@ static void handle_skipped_hlink(struct file_struct *file, int itemizing,
 		return;
 
 	file = cur_flist->files[new_last_ndx - cur_flist->ndx_start];
-	cur_flist->in_progress--; /* undo prior increment */
+	if (file->flags & FLAG_HLINK_WAIT) {
+		file->flags &= ~FLAG_HLINK_WAIT;
+		cur_flist->in_progress--; /* undo prior increment */
+	}
 	f_name(file, fbuf);
 	recv_generator(fbuf, file, new_last_ndx, itemizing, code, f_out);
 
@@ -2715,6 +2757,46 @@ void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
 	}
 }
 
+/* Create the symlinks deferred by recv_generator(), then itemize and log each
+ * one as recv_generator() would have.  We re-stat each destination because the
+ * transfer may have changed what's there.  A link that can't be created is
+ * reported as an error and not itemized. */
+static void create_deferred_symlinks(void)
+{
+#ifdef SUPPORT_LINKS
+	struct deferred_symlink *ds = deferred_symlinks.items;
+	size_t i;
+
+	for (i = 0; i < deferred_symlinks.count; i++) {
+		struct file_struct *file = ds[i].file;
+		/* atomic_create() can delete a directory in the way, which builds
+		 * its entries' paths in this buffer, so it must be MAXPATHLEN. */
+		char fname[MAXPATHLEN];
+		stat_x sx;
+		int statret;
+
+		strlcpy(fname, ds[i].fname, sizeof fname);
+		free(ds[i].fname);
+		init_stat_x(&sx);
+		statret = gen_entry_stat(fname, file, &sx.st, 0);
+		if (atomic_create(file, fname, F_SYMLINK(file), NULL, MAKEDEV(0, 0),
+				  &sx, statret == 0 ? DEL_FOR_SYMLINK : 0)) {
+			set_file_attrs(fname, file, NULL, NULL, 0);
+			if (ds[i].itemizing) {
+				if (statret == 0 && !S_ISLNK(sx.st.st_mode))
+					statret = -1;
+				itemize(fname, file, ds[i].ndx, statret, &sx,
+					ITEM_LOCAL_CHANGE|ITEM_REPORT_CHANGE, 0, NULL);
+			}
+			if (ds[i].code != FNONE && INFO_GTE(NAME, 1))
+				rprintf(ds[i].code, "%s -> %s\n", fname, F_SYMLINK(file));
+		}
+		free_stat_x(&sx);
+	}
+	deferred_symlinks.count = 0;
+#endif
+}
+
 void generate_files(int f_out, const char *local_name)
 {
 	int i, ndx, next_loopchk = 0;
@@ -2748,6 +2830,8 @@ void generate_files(int f_out, const char *local_name)
 	symlink_timeset_failed_flags = ITEM_REPORT_TIME
 	    | (protocol_version >= 30 || !am_server ? ITEM_REPORT_TIMEFAIL : 0);
 	implied_dirs_are_missing = relative_paths && !implied_dirs && protocol_version < 30;
+	/* A dry run creates nothing, so its symlinks take the normal path. */
+	defer_symlinks = delay_symlinks && !dry_run;
 
 	if (DEBUG_GTE(GENR, 1))
 		rprintf(FINFO, "generator starting pid=%d\n", (int)getpid());
@@ -2881,6 +2965,12 @@ void generate_files(int f_out, const char *local_name)
 		wait_for_receiver();
 	}
 
+	/* The receiver has now put every file into place, including any
+	 * --delay-updates renames, and the sender is still reading the itemized
+	 * output, so the deferred symlinks can be created and reported. */
+	if (defer_symlinks)
+		create_deferred_symlinks();
+
 	if (protocol_version >= 29) {
 		phase++;
 		if (DEBUG_GTE(GENR, 1))
@@ -2905,8 +2995,8 @@ void generate_files(int f_out, const char *local_name)
 
 	if (max_delete >= 0 && skipped_deletes) {
 		rprintf(FWARNING,
-			"Deletions stopped due to --max-delete limit (%d skipped)\n",
-			skipped_deletes);
+			"Deletions stopped due to --max-delete limit (%s skipped)\n",
+			comma_num(skipped_deletes));
 		io_error |= IOERR_DEL_LIMIT;
 	}
 
