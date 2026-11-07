@@ -1020,6 +1020,17 @@ struct sum_buf {
 	short flags;		/**< flag bits */
 };
 
+/* --era needs dm-era, which only standard Linux has (Android does not). */
+#if defined __linux__ && !defined __ANDROID__
+#define SUPPORT_ERA 1
+#endif
+
+/* --era: "<era> <time> <era-device-id>" on each destination file, recording
+ * the sender's era (and when it started) from which the file's content is
+ * known to be current. */
+#define ERA_XATTR "user.rsync.era"
+#define ERA_STATE_LEN 336	/* "<era> <time> " + a dm uuid or name id */
+
 struct sum_struct {
 	OFF_T flength;		/**< total file length */
 	struct sum_buf *sums;	/**< points to info for each chunk */
@@ -1028,6 +1039,16 @@ struct sum_struct {
 	int32 blength;		/**< block_length */
 	int32 remainder;	/**< flength % block_length */
 	int s2length;		/**< sum2_length */
+	char era_state[ERA_STATE_LEN]; /**< --era request: the destination's ERA_XATTR */
+};
+
+/* An --era request is a sum head with blocks but no strong sums. */
+#define IS_ERA_REQUEST(s) (era_mode && (s)->count > 0 && (s)->s2length == 0)
+
+/* Byte ranges of a file that --era says may have changed (sorted). */
+struct era_ranges {
+	int n, alloc;
+	OFF_T *off, *len;
 };
 
 struct map_struct {

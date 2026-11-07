@@ -54,6 +54,8 @@ extern int keep_partial;
 extern int checksum_seed;
 extern int whole_file;
 extern int inplace;
+extern int era_mode;
+extern int do_compression;
 extern int inplace_partial;
 extern int allowed_lull;
 extern int delay_updates;
@@ -471,6 +473,10 @@ int open_tmpfile(char *fnametmp, const char *fname, struct file_struct *file)
 	return fd;
 }
 
+/* --era: the sender said the destination may get the file-list mtime. */
+extern int modify_window;
+static int era_mtime_ok = 1;
+
 static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 			const char *fname, int fd, struct file_struct *file, int inplace_sizing)
 {
@@ -484,9 +490,29 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 	char *data;
 	int32 i;
 	char *map = NULL;
+	int era_stream;
 
 	/* Reset the block tracker's per-file state in case the OS reuses an fd. */
 	reset_block_tracker();
+
+	/* Read the head before touching the output: an --era sender may
+	 * decline, and then the file must be left exactly as it was. */
+	read_sum_head(f_in, &sum);
+	era_stream = IS_ERA_REQUEST(&sum);
+	era_mtime_ok = 1;
+	if (era_stream) {
+		int b = read_byte(f_in);
+		if (!b)
+			return -2;
+		era_mtime_ok = b != 2;
+	}
+	if (era_mode) {
+		/* The file is not current with any era while it changes. */
+		if (read_vstring(f_in, sum.era_state, sizeof sum.era_state) < 0)
+			exit_cleanup(RERR_PROTOCOL);
+		if (fd != -1)
+			era_put_state(fd, fname, "");
+	}
 
 #ifdef SUPPORT_PREALLOCATION
 	if (preallocate_files && fd != -1 && total_size > 0 && (!inplace_sizing || total_size > size_r)) {
@@ -506,8 +532,6 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 			preallocated_len = size_r;
 	} else
 		preallocated_len = 0;
-
-	read_sum_head(f_in, &sum);
 
 	if (fd_r >= 0 && size_r > 0) {
 		int32 read_size = MAX(sum.blength * 2, 16*1024);
@@ -630,11 +654,22 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 				updating_basis_or_equiv && offset == offset2 ? " (seek)" : "");
 		}
 
+		/* --era: an unchanged block in place needs no read and no write
+		 * (old-style zlib must still see the data to keep in sync). */
+		if (era_stream && updating_basis_or_equiv && offset == offset2
+		 && fd != -1 && do_compression != CPRES_ZLIB) {
+			if (skip_matched(fd, offset, NULL, len) < 0)
+				goto report_write_error;
+			offset += len;
+			continue;
+		}
+
 		if (mapbuf) {
 			map = map_ptr(mapbuf,offset2,len);
 
 			see_token(map, len);
-			sum_update(map, len);
+			if (!era_stream) /* --era sums only the literal data */
+				sum_update(map, len);
 		}
 
 		if (updating_basis_or_equiv) {
@@ -689,6 +724,8 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 		rprintf(FINFO,"got file_sum\n");
 	if (fd != -1 && memcmp(file_sum1, sender_file_sum, xfer_sum_len) != 0)
 		return 0;
+	if (era_mode && fd != -1 && *sum.era_state)
+		era_put_state(fd, fname, sum.era_state);
 	return 1;
 }
 
@@ -1287,6 +1324,20 @@ int recv_files(int f_in, int f_out, char *local_name)
 			write_devices_saved_mode = 0;
 		}
 
+		if (recv_ok == -2) {
+			/* --era: the sender declined and nothing was written.
+			 * Have the generator redo this file the normal way. */
+			if (fd1 != -1)
+				close(fd1);
+			close(fd2);
+			if (!inplace && !one_inplace)
+				do_unlink_at(fnametmp);
+			cleanup_disable();
+			send_msg_int(MSG_REDO, ndx);
+			file->flags |= FLAG_FILE_SENT;
+			continue;
+		}
+
 		log_item(log_code, file, iflags, NULL);
 		if (want_progress_now)
 			instant_progress(fname);
@@ -1300,9 +1351,16 @@ int recv_files(int f_in, int f_out, char *local_name)
 		}
 
 		if ((recv_ok && (!delay_updates || !partialptr)) || inplace) {
+			/* --era: an mtime the next quick check sees as different */
+			time_t era_back = era_mtime_ok ? 0 : 1 + MAX(modify_window, 0);
+			int ok;
+
 			if (partialptr == fname)
 				partialptr = NULL;
-			if (!finish_transfer(fname, fnametmp, fnamecmp, partialptr, file, recv_ok, 1))
+			file->modtime -= era_back;
+			ok = finish_transfer(fname, fnametmp, fnamecmp, partialptr, file, recv_ok, 1);
+			file->modtime += era_back;
+			if (!ok)
 				recv_ok = -1;
 			else if (fnamecmp == partialptr) {
 				if (!one_inplace) {

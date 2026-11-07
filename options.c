@@ -150,6 +150,7 @@ int modify_window = 0;
 int blocking_io = -1;
 int checksum_seed = 0;
 int inplace = 0;
+int era_mode = 0;
 int delay_updates = 0;
 int delay_symlinks = 0;
 int32 block_size = 0;
@@ -730,6 +731,8 @@ static struct poptOption long_options[] = {
   {"preallocate",      0,  POPT_ARG_NONE,   &preallocate_files, 0, 0, 0},
   {"inplace",          0,  POPT_ARG_VAL,    &inplace, 1, 0, 0 },
   {"no-inplace",       0,  POPT_ARG_VAL,    &inplace, 0, 0, 0 },
+  {"era",              0,  POPT_ARG_VAL,    &era_mode, 1, 0, 0 },
+  {"no-era",           0,  POPT_ARG_VAL,    &era_mode, 0, 0, 0 },
   {"append",           0,  POPT_ARG_NONE,   0, OPT_APPEND, 0, 0 },
   {"append-verify",    0,  POPT_ARG_VAL,    &append_mode, 2, 0, 0 },
   {"no-append",        0,  POPT_ARG_VAL,    &append_mode, 0, 0, 0 },
@@ -2624,6 +2627,29 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		inplace = 1;
 	}
 
+	if (era_mode) {
+#ifndef SUPPORT_ERA
+		snprintf(err_buf, sizeof err_buf, "--era is only supported on standard Linux (not Android or other systems)\n");
+		goto cleanup;
+#endif
+		const char *bad = append_mode ? "--append" : sparse_files > 0 ? "--sparse"
+				: whole_file > 0 ? "--whole-file"
+				: write_batch ? "--write-batch" : read_batch ? "--read-batch"
+				: write_devices ? "--write-devices" : NULL;
+		if (bad) {
+			snprintf(err_buf, sizeof err_buf, "--era cannot be used with %s\n", bad);
+			goto cleanup;
+		}
+		if (refused_inplace) {
+			create_refuse_error(refused_inplace);
+			goto cleanup;
+		}
+		/* Unchanged blocks are left in place rather than copied, and
+		 * --era needs the delta machinery, even for a local copy. */
+		inplace = 1;
+		whole_file = 0;
+	}
+
 	if (delay_updates && !partial_dir)
 		partial_dir = tmp_partialdir;
 
@@ -3202,6 +3228,8 @@ void server_options(char **args, int *argc_p)
 			ADD_SERVER_ARG("--append");
 		ADD_SERVER_ARG("--append");
 	} else if (inplace) {
+		if (era_mode)
+			ADD_SERVER_ARG("--era");
 		ADD_SERVER_ARG("--inplace");
 		/* Work around a bug in older rsync versions (on the remote side) for --inplace --sparse */
 		if (sparse_files && !whole_file && am_sender)

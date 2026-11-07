@@ -552,6 +552,7 @@ has its own detailed description later in this manpage.
 --suffix=SUFFIX          backup suffix (default ~ w/o --backup-dir)
 --update, -u             skip files that are newer on the receiver
 --inplace                update destination files in-place
+--era                    find changed data with dm-era (implies --inplace)
 --append                 append data onto shorter files
 --append-verify          --append w/old data in file checksum
 --dirs, -d               transfer directories without recursing
@@ -1234,6 +1235,80 @@ sign) if you want the local shell to expand it.
     The option implies [`--partial`](#opt) (since an interrupted transfer does
     not delete the file), but conflicts with [`--partial-dir`](#opt) and
     [`--delay-updates`](#opt).
+
+0.  `--era`
+
+    This option finds the changed parts of a large file without reading it.
+    It is meant for keeping a copy that nobody else changes up to date, such
+    as a backup of VM images, when the source filesystem sits on the Linux
+    dm-era device-mapper target.
+
+    Normally rsync finds the differences in a file by reading the whole file
+    on both sides and computing checksums.  dm-era records, for every block
+    of the source device, the era (a counter) in which it was last written.
+    With `--era`, the receiving side sends the era recorded on the
+    destination file instead of checksums, and the sender looks up which
+    blocks of the source file were written in that era or later.  Only those
+    blocks are read and sent; the receiver leaves all other blocks in place
+    without reading or rewriting them.
+
+    The era is kept in an extended attribute of each destination file,
+    `user.rsync.era`, as "_ERA_ _TIME_ _DEVICE-ID_".  The receiver removes it before
+    it changes a file, and sets it again once the file is complete, so a
+    file left half-updated by an interrupted run has no era and is next
+    updated with the normal algorithm.  [`--xattrs`](#opt) neither copies nor
+    removes this attribute.  Each file is only re-sent the blocks that
+    changed since it was itself last updated.
+
+    Each run takes a dm-era metadata snapshot of every era device it uses,
+    which starts a new era.  The snapshot's era is the one recorded on the
+    files updated from it.  The era numbers and times are kept in a log per
+    device, `/var/lib/rsync/era/<device-id>`.  A destination file's era is
+    only accepted if the log has that era with the same start time, so
+    deleting the log makes every file do one normal update, even after the
+    era metadata was recreated and era numbers start over.  The log file also serializes runs, since
+    dm-era allows only one metadata snapshot per device.
+
+    A file is sent with the normal rsync algorithm instead when `--era`
+    cannot be used for it: the source is not on a dm-era device (or is on an
+    unsupported device stack), the destination file has no era (every file
+    needs one normal update after `--era` is first used, which records its
+    era), or its era is from another era device or not in the log.  Use
+    `--info=misc2` to see the reason for each declined file.  This happens
+    automatically, at the cost of a second pass over those files.
+
+    A source file that was being written while the era snapshot was taken,
+    such as the disk image of a running VM, is still updated incrementally.
+    Writes that the snapshot missed are recorded in a later era, so the
+    destination is given an mtime slightly earlier than the source's, and
+    the next run sends the file again.  As with any rsync of a file that is
+    in use, the copy need not be internally consistent.
+
+    Both sides must run on standard Linux; `--era` is not available on
+    Android or other systems.  The sending side must run as root, and
+    needs `era_invalidate` from thin-provisioning-tools.  If it is missing,
+    rsync stops with an error rather than silently doing a slower transfer.
+    The destination filesystem must support user extended attributes; if it
+    does not, rsync also stops with an error.  To keep the era state of a
+    destination that cannot hold extended attributes, some other store would
+    have to be added.
+
+    **The destination must never be changed except by rsync.**  rsync
+    assumes that every destination file is exactly what it last sent and
+    never compares the unchanged blocks.  Editing a destination file in
+    place, or restoring it from elsewhere while keeping its
+    `user.rsync.era`, is not detected and never repaired.  A normal rsync
+    update (without `--era`) is safe.  To recover a destination that may
+    have been changed, remove the attribute (`setfattr -x user.rsync.era`)
+    or run rsync once without `--era`, adding `--checksum` if the mtimes
+    cannot be trusted.  Creating source files by reflink or deduplication
+    can hide changes.  If the destination
+    machine can crash, consider [`--fsync`](#opt), so that a file's era is
+    never stored before its data.
+
+    This option implies [`--inplace`](#opt) and [`--no-whole-file`](#opt),
+    and cannot be combined with [`--whole-file`](#opt), [`--sparse`](#opt),
+    [`--append`](#opt), [`--write-devices`](#opt), or batch mode.
 
 0.  `--append`
 

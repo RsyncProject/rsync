@@ -32,6 +32,7 @@ extern int use_qsort;
 extern int allow_inc_recurse;
 extern int preallocate_files;
 extern int append_mode;
+extern int era_mode;
 extern int fuzzy_basis;
 extern int read_batch;
 extern int write_batch;
@@ -675,6 +676,13 @@ void setup_protocol(int f_out,int f_in)
 		if (preserve_xattrs && !local_server) {
 			rprintf(FERROR,
 				"--xattrs requires protocol 30 or higher"
+				" (negotiated %d).\n",
+				protocol_version);
+			exit_cleanup(RERR_PROTOCOL);
+		}
+		if (era_mode) {
+			rprintf(FERROR,
+				"--era requires protocol 30 or higher"
 				" (negotiated %d).\n",
 				protocol_version);
 			exit_cleanup(RERR_PROTOCOL);

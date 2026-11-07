@@ -66,6 +66,7 @@ extern int ignore_non_existing;
 extern int want_xattr_optim;
 extern int modify_window;
 extern int inplace;
+extern int era_mode;
 extern int append_mode;
 extern int make_backups;
 extern int csum_length;
@@ -869,6 +870,36 @@ static int generate_and_send_sums(int fd, OFF_T len, int f_out, int f_copy)
 }
 
 
+/*
+ * --era: instead of checksums, send a sum head with no strong sums (the
+ * block layout the sender may refer to) followed by the destination's
+ * ERA_XATTR.  The sender works out the changed ranges itself and refers to
+ * unchanged blocks, so the destination file never has to be read.  Without
+ * the xattr there is nothing to go on, so the file uses normal sums.
+ */
+static int send_era_request(int f_out, const char *fname, STRUCT_STAT *st)
+{
+	/* Block references cost nothing to compute, and holes and unwritten
+	 * extents are always sent, rounded out to whole blocks, so use small
+	 * blocks rather than sum_sizes_sqroot()'s. */
+	const int32 blength = 16384;
+	struct sum_struct sum;
+	char state[ERA_STATE_LEN];
+	int64 count = (st->st_size + blength - 1) / blength;
+
+	if (count <= 0 || count > MAX_INT32 || era_get_state(fname, state) < 0)
+		return -1;
+	memset(&sum, 0, sizeof sum);
+	sum.flength = st->st_size;
+	sum.blength = blength;
+	sum.remainder = (int32)(st->st_size % blength);
+	sum.count = (int32)count;
+	sum.s2length = 0;
+	write_sum_head(f_out, &sum);
+	write_vstring(f_out, state, strlen(state));
+	return 0;
+}
+
 /* Try to find a filename in the same dir as "fname" with a similar name. */
 static struct file_struct *find_fuzzy(struct file_struct *file, struct file_list *dirlist_array[], uchar *fnamecmp_type_ptr)
 {
@@ -1395,6 +1426,7 @@ static void list_file_entry(struct file_struct *f)
 }
 
 static int phase = 0;
+static int redoing = 0; /* a redo can come while phase is still 0 */
 static int dflt_perms;
 
 static int implied_dirs_are_missing;
@@ -2444,6 +2476,9 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		write_sum_head(f_out, NULL);
 	else if (sx.st.st_size <= 0) {
 		write_sum_head(f_out, NULL);
+	} else if (era_mode && !phase && !redoing && fnamecmp_type == FNAMECMP_FNAME && f_copy < 0
+		&& send_era_request(f_out, fname, &sx.st) == 0) {
+		/* The sender may decline; the file is then redone normally. */
 	} else {
 		if (generate_and_send_sums(fd, sx.st.st_size, f_out, f_copy) < 0) {
 			rprintf(FWARNING,
@@ -2713,7 +2748,9 @@ void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
 				strlcpy(fbuf, solo_file, sizeof fbuf);
 			else
 				f_name(file, fbuf);
+			redoing = 1;
 			recv_generator(fbuf, file, ndx, itemizing, code, sock_f_out);
+			redoing = 0;
 			cur_flist->to_redo--;
 
 			cur_flist = flist;

@@ -143,6 +143,11 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 #include "case_N.h"
 		switch_step++;
 
+		era_cleanup(); /* drop a held dm-era metadata snapshot */
+
+#include "case_N.h"
+		switch_step++;
+
 		if (cleanup_child_pid != -1) {
 			int status;
 			int pid = wait_process(cleanup_child_pid, &status, WNOHANG);

@@ -26,6 +26,7 @@
 
 #ifdef SUPPORT_XATTRS
 
+extern int era_mode;
 extern int dry_run;
 extern int am_root;
 extern int am_sender;
@@ -268,6 +269,9 @@ static int rsync_xal_get(const char *fname, int fd, item_list *xalp)
 		else if (user_only ? !HAS_PREFIX(name, USER_PREFIX) : HAS_PREFIX(name, SYSTEM_PREFIX))
 			continue;
 #endif
+		/* --era's own state is never copied or removed by -X. */
+		if (era_mode && strcmp(name, ERA_XATTR) == 0)
+			continue;
 
 		/* No rsync.%FOO attributes are copied w/o 2 -X options. */
 		if (name_len > RPRE_LEN && name[RPRE_LEN] == '%' && HAS_PREFIX(name, RSYNC_PREFIX)) {
@@ -381,6 +385,9 @@ int copy_xattrs(const char *source, int source_fd, const char *dest, int dest_fd
 		else if (user_only ? !HAS_PREFIX(name, USER_PREFIX) : HAS_PREFIX(name, SYSTEM_PREFIX))
 			continue;
 #endif
+		/* --era's own state is never copied or removed by -X. */
+		if (era_mode && strcmp(name, ERA_XATTR) == 0)
+			continue;
 
 		datum_len = 0;
 		if (!(ptr = get_xattr_data(source, source_fd, name, &datum_len, 0)))
@@ -1084,6 +1091,9 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 		else if (user_only ? !HAS_PREFIX(name, USER_PREFIX) : HAS_PREFIX(name, SYSTEM_PREFIX))
 			continue;
 #endif
+		/* --era's own state is never copied or removed by -X. */
+		if (era_mode && strcmp(name, ERA_XATTR) == 0)
+			continue;
 		if (am_root < 0 && name_len > RPRE_LEN && name[RPRE_LEN] == '%' && strcmp(name, XSTAT_ATTR) == 0)
 			continue;
 

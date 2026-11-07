@@ -414,6 +414,25 @@ static void hash_search(int f,struct sum_struct *s,
 }
 
 
+/* Finish the whole-file checksum and send it.  If we had a read error,
+ * send a bad checksum.  We use all bits off as long as the checksum
+ * doesn't happen to be that, in which case we turn the last 0 bit into
+ * a 1. */
+static void send_file_sum(int f, struct map_struct *buf)
+{
+	sum_end(sender_file_sum);
+
+	if (buf && buf->status != 0 && xfer_sum_len > 0) {
+		int i;
+		for (i = 0; i < xfer_sum_len && sender_file_sum[i] == 0; i++) {}
+		memset(sender_file_sum, 0, xfer_sum_len);
+		if (i == xfer_sum_len && i > 0)
+			sender_file_sum[i-1]++;
+	}
+
+	write_buf(f, sender_file_sum, xfer_sum_len);
+}
+
 /**
  * Scan through a origin file, looking for sections that match
  * checksums from the generator, and transmit either literal or token
@@ -485,22 +504,9 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 		matched(f, s, buf, len, -1);
 	}
 
-	sum_end(sender_file_sum);
-
-	/* If we had a read error, send a bad checksum.  We use all bits
-	 * off as long as the checksum doesn't happen to be that, in
-	 * which case we turn the last 0 bit into a 1. */
-	if (buf && buf->status != 0) {
-		int i;
-		for (i = 0; i < xfer_sum_len && sender_file_sum[i] == 0; i++) {}
-		memset(sender_file_sum, 0, xfer_sum_len);
-		if (i == xfer_sum_len && i > 0)
-			sender_file_sum[i-1]++;
-	}
-
 	if (DEBUG_GTE(DELTASUM, 2))
 		rprintf(FINFO,"sending file_sum\n");
-	write_buf(f, sender_file_sum, xfer_sum_len);
+	send_file_sum(f, buf);
 
 	if (DEBUG_GTE(DELTASUM, 2)) {
 		rprintf(FINFO, "false_alarms=%d hash_hits=%d matches=%d\n",
@@ -510,6 +516,57 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 	total_hash_hits += hash_hits;
 	total_false_alarms += false_alarms;
 	total_matches += matches;
+	stats.literal_data += data_transfer;
+}
+
+/*
+ * --era: send the file using the ranges era_file_ranges() found.  Block i
+ * of the destination is referred to (not sent) when it lies entirely in an
+ * unchanged range; everything else is sent as literal data.  Only literal
+ * data goes into the whole-file checksum, on both sides, so neither side
+ * has to read the unchanged blocks.
+ */
+void era_send_file(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len,
+		   struct era_ranges *dirty)
+{
+	OFF_T pos = 0, lit = 0; /* literal data is pending from lit to pos */
+	int32 i, r = 0;
+
+	data_transfer = 0;
+	sum_init(xfer_sum_nni, checksum_seed);
+
+	for (i = 0; pos < len; i++) {
+		int32 blen = i == s->count - 1 && s->remainder ? s->remainder : s->blength;
+
+		while (r < dirty->n && dirty->off[r] + dirty->len[r] <= pos)
+			r++;
+		if (i < s->count && pos == (OFF_T)i * s->blength && pos + blen <= len
+		 && (r == dirty->n || dirty->off[r] >= pos + blen)) {
+			/* pending literal data goes out with the block reference */
+			send_token(f, i, buf, lit, (int32)(pos - lit), blen);
+			stats.matched_data += blen;
+			pos = lit = pos + blen;
+		} else {
+			int32 n = (int32)MIN((OFF_T)s->blength, len - pos);
+
+			sum_update(map_ptr(buf, pos, n), n);
+			data_transfer += n;
+			pos += n;
+			/* Flush whole chunks, but keep some data pending: a literal-only
+			 * token followed by an empty one confuses the lz4 receiver. */
+			if (pos - lit > 4 * CHUNK_SIZE) {
+				int32 n2 = (int32)((pos - lit - 1) / CHUNK_SIZE * CHUNK_SIZE);
+
+				send_token(f, -2, buf, lit, n2, 0);
+				lit += n2;
+			}
+		}
+		if (buf && INFO_GTE(PROGRESS, 1))
+			show_progress(pos, buf->file_size);
+	}
+	send_token(f, -1, buf, lit, (int32)(len - lit), 0);
+
+	send_file_sum(f, buf);
 	stats.literal_data += data_transfer;
 }
 

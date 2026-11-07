@@ -161,6 +161,11 @@ static void print_info_flags(enum logcode f)
 #endif
 			"IDN",
 
+#ifndef SUPPORT_ERA
+		"no "
+#endif
+			"dm-era",
+
 	"*Optimizations",
 
 #ifndef USE_ROLL_SIMD
