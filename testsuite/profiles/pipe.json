@@ -1,0 +1,5 @@
+{
+  "unsupported": {
+    "tcp": "pipe transport"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "unsupported": {
+    "acl": "no usable ACL fixture",
+    "atomic_flipper": "no atomic rename exchange",
+    "crtimes": "no creation times",
+    "darwin": "not Darwin",
+    "darwin_interpose": "no dyld interposition",
+    "directory_sgid": "no directory setgid semantics",
+    "group_auth": "no Linux group-auth fixture",
+    "high_fd": "no descriptors above FD_SETSIZE",
+    "iconv": "no working iconv support",
+    "interpose": "no supported interposition fixture",
+    "linux_acl": "no Linux ACL semantics",
+    "linux_interpose": "no Linux interposition",
+    "linux_nss_chroot": "no Linux NSS chroot",
+    "linux_xattr": "no Linux xattr semantics",
+    "noatime": "no O_NOATIME",
+    "preallocate": "no preallocation support",
+    "proc_fd": "no procfs descriptors",
+    "protected_regular": "no protected_regular sysctl",
+    "search_only": "no Linux search-only fixture",
+    "simd": "no SIMD test build",
+    "symlink_xattr": "no symlink xattr fixture",
+    "user_namespace": "no user namespaces",
+    "xattr_runtime": "no user xattr fixture",
+    "xattr_wire": "no xattr wire fixture"
+  }
+}

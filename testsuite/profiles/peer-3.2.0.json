@@ -1,0 +1,9 @@
+{
+  "peer": "3.2.0",
+  "protocol": 31,
+  "xfail": {
+    "chmod-option": "peer-feature-gap",
+    "daemon-basics": "peer-feature-gap",
+    "daemon-refuse-compress": "peer-feature-gap"
+  }
+}

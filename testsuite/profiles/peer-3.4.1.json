@@ -1,0 +1,7 @@
+{
+  "peer": "3.4.1",
+  "protocol": 32,
+  "xfail": {
+    "symlink-dirlink-basis": "issue-715"
+  }
+}

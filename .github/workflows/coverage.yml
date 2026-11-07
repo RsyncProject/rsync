@@ -19,14 +19,19 @@ on:
     - cron: '42 9 * * 1'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   coverage:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     name: gcov coverage
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       with:
         fetch-depth: 0
+        persist-credentials: false
     - name: prep
       run: |
         sudo apt-get update
@@ -38,11 +43,6 @@ jobs:
       run: make
     - name: info
       run: rsync --version
-    # Two coverage runs: the default pipe transport, then a second pass over a
-    # real loopback rsyncd (--use-tcp) which also exercises the require_tcp-only
-    # tests. gcovr's --print-summary line/branch/decision totals go to the step
-    # log (and the job summary below), so the numbers are visible in CI.
-    # `make coverage` exits with the suite's status, so a regression fails CI.
     - name: coverage (pipe transport)
       run: |
         set -o pipefail
@@ -67,7 +67,7 @@ jobs:
         } >> "$GITHUB_STEP_SUMMARY"
     - name: upload HTML reports
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
       with:
         retention-days: 45
         name: coverage-html

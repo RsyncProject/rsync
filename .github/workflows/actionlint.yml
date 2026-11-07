@@ -4,12 +4,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
-# Static-check the workflow YAML with rhysd/actionlint.  Catches missing
-# secrets, bad expressions, expression-type errors, unsupported runner
-# images, and (via embedded shellcheck) common pitfalls in `run:` scripts.
-# Trigger only on changes under .github/workflows/ so the rest of the
-# matrix isn't billed when nothing here moves.
-
 on:
   push:
     branches: [ master ]
@@ -30,16 +24,20 @@ permissions:
 jobs:
   actionlint:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     name: actionlint
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
       - name: install actionlint
-        # Pin a version so this job is reproducible; bump deliberately.
-        # The download script verifies a SHA256 of the release tarball.
         run: |
-          bash <(curl --proto '=https' --tlsv1.2 -fsSL \
-              https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) \
-              1.7.12
+          archive=actionlint_1.7.12_linux_amd64.tar.gz
+          curl --proto '=https' --tlsv1.2 -fsSLO \
+            "https://github.com/rhysd/actionlint/releases/download/v1.7.12/$archive"
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $archive" \
+            | sha256sum --check --strict
+          tar -xzf "$archive" actionlint
           echo "$PWD" >>"$GITHUB_PATH"
       - name: actionlint --version
         run: actionlint -version

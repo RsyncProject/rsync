@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+
+import os
+import shlex
+import subprocess
+import time
+
+from harness.mutation import race_budget, start_path_flipper, stop_flipper
+from harness.rsync import (
+    RSYNC, SCRATCHDIR, makepath, patched_rrsync, proc_self_fd_pins, rmtree, rsync_argv,
+    rsync_path_arg, test_fail, test_skipped,
+)
+
+if not proc_self_fd_pins():
+    test_skipped("rrsync's realpath-vs-exec inode-pin needs /proc/self/fd "
+                 "(Linux); unhardened fallback elsewhere by design", capability='proc_fd')
+
+MARKER = 'AUDIT_RRSYNC_LEAF_FLIP_MARKER_DO_NOT_DISCLOSE'
+
+base = SCRATCHDIR / 'rrsync-leaf-flip'
+rmtree(base)
+restricted = base / 'restricted'
+outside = base / 'outside'
+dest = base / 'dest'
+makepath(restricted, outside / 'dir', dest)
+
+(outside / 'secret').write_text(MARKER + '\n')
+(outside / 'dir' / 'loot').write_text(MARKER + '\n')
+
+shim = base / 'rsync-shim'
+shim.write_text('#!/bin/sh\nexec ' + rsync_path_arg(RSYNC) + ' "$@"\n')
+shim.chmod(0o755)
+
+rrsync = patched_rrsync(base, rsync_path=str(shim))
+
+rsh = base / 'fake-rsh'
+rsh.write_text(
+    '#!/bin/sh\n'
+    'shift\n'
+    'SSH_ORIGINAL_COMMAND="$*"\n'
+    'export SSH_ORIGINAL_COMMAND\n'
+    'exec %s -ro %s\n' % (shlex.quote(str(rrsync)), shlex.quote(str(restricted))))
+rsh.chmod(0o755)
+
+def leaked_content():
+    for path in dest.rglob('*'):
+        if path.is_file() and not path.is_symlink():
+            try:
+                if MARKER in path.read_text():
+                    return str(path.relative_to(dest))
+            except (OSError, UnicodeDecodeError):
+                pass
+    return None
+
+def race_pull(source, real_name, evil_name):
+    flip = start_path_flipper(real_name, evil_name)
+    try:
+        deadline = time.monotonic() + race_budget()
+        while time.monotonic() < deadline:
+            rmtree(dest)
+            dest.mkdir()
+            subprocess.run(rsync_argv('-a', '-e', str(rsh), source,
+                                      str(dest) + '/'),
+                           stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL)
+            got = leaked_content()
+            if got:
+                return got
+    finally:
+        stop_flipper(flip)
+    return None
+
+real_file = restricted / 'target'
+real_file.write_text('benign_in_tree_content\n')
+evil_file = restricted / 'evil'
+os.symlink(str(outside / 'secret'), evil_file)
+
+got = race_pull('dummy:target', real_file, evil_file)
+if got:
+    test_fail(f'a raced leaf flip leaked outside content to {got!r}: the '
+              'sender read through a symlink substituted at the source '
+              'argument after rrsync validated it')
+
+rmtree(real_file)
+rmtree(evil_file)
+
+real_dir = restricted / 'dir'
+makepath(real_dir)
+(real_dir / 'ok').write_text('benign\n')
+evil_dir = restricted / 'evildir'
+os.symlink(str(outside / 'dir'), evil_dir)
+
+got = race_pull('dummy:dir/', real_dir, evil_dir)
+if got:
+    test_fail(f'a raced trailing-slash directory flip leaked outside content '
+              f'to {got!r}: the leaf pin did not hold')
+
+print('rrsync sender pulls leak no outside content when the last component is raced')
