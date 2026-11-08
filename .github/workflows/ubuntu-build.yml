@@ -52,10 +52,11 @@ jobs:
         sudo apt-get update
         sudo apt-get install acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev libidn2-dev python3-cmarkgfm openssl
         echo "/usr/local/bin" >>"$GITHUB_PATH"
+        mkdir -p "$RUNNER_TEMP/rsync-checks"
     - name: configure
       run: ./configure --with-rrsync
     - name: make
-      run: make
+      run: make check-progs
     - name: install/uninstall DESTDIR smoke test
       if: matrix.install_smoke
       run: |
@@ -88,29 +89,27 @@ jobs:
     - name: install
       run: sudo make install
     - name: info
-      run: rsync --version
+      run: ./rsync --version
     - name: check
-      run: sudo RSYNC_TEST_PROFILES=pipe,${{ matrix.profiles }} make check
+      run: sudo sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,${{ matrix.profiles }}" "$RUNNER_TEMP/rsync-checks/root-pipe" -j8
     - name: check30
-      run: sudo RSYNC_TEST_PROFILES=pipe,${{ matrix.profiles }},protocol-30 make check30
+      run: sudo sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,${{ matrix.profiles }},protocol-30" "$RUNNER_TEMP/rsync-checks/root-protocol-30" --protocol=30 -j8
     - name: check29
-      run: sudo RSYNC_TEST_PROFILES=pipe,${{ matrix.profiles }},protocol-29 make check29
+      run: sudo sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,${{ matrix.profiles }},protocol-29" "$RUNNER_TEMP/rsync-checks/root-protocol-29" --protocol=29 -j8
     - name: check (TCP daemon transport)
-      run: sudo RSYNC_TEST_PROFILES=${{ matrix.profiles }} ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp --daemon-tests-only -j 8
+      run: sudo sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "${{ matrix.profiles }}" "$RUNNER_TEMP/rsync-checks/root-tcp" --use-tcp --daemon-tests-only -j8
     - name: check (non-root, targeted)
       if: matrix.nonroot
-      run: |
-        # Prior matrix steps leave root-owned scratch
-        sudo rm -rf testtmp
-        ./testsuite/runtests.py --rsync-bin="$PWD/rsync" \
-          daemon-namecvt-empty-response ownership-depth daemon-basics
+      run: sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,non-asan,nonroot,self-peer,linux" "$RUNNER_TEMP/rsync-checks/nonroot-targeted" daemon-namecvt-empty-response ownership-depth daemon-basics
     - name: ssl file list
       run: rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
     - name: save artifact
+      if: always()
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
       with:
         retention-days: 45
         name: ${{ matrix.artifact }}
+        if-no-files-found: error
         path: |
           rsync
           rsync-ssl
@@ -119,3 +118,14 @@ jobs:
           rsyncd.conf.5
           rrsync.1
           rrsync
+    - name: save test results
+      if: always()
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      with:
+        retention-days: 45
+        name: ${{ matrix.artifact }}-results
+        if-no-files-found: error
+        path: |
+          config.log
+          ${{ runner.temp }}/rsync-checks/*/receipt.json
+          ${{ runner.temp }}/rsync-checks/*/run.log
