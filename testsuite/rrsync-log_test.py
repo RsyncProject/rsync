@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """rrsync -log must record every transfer in the admin's log file.
 
-The client's own --log-file is refused while -log is in force.
+The client's own --log-file is refused while -log is in force, and a FILE
+the client could redirect (inside the restricted dir, behind a symlink, or in
+a bind mount of the restricted dir) is refused outright.
 """
 
 import os
 import shlex
+import shutil
 import signal
 import subprocess
 import sys
@@ -72,3 +75,45 @@ plain = subprocess.run(
 assert plain.returncode == 0 and (root / 'mine.log').exists(), (
     f'without -log the client --log-file must be accepted: rc={plain.returncode}, '
     f'stderr={plain.stderr!r}')
+
+# A log inside the restricted dir could be replaced by a client symlink.
+inside_log = shlex.quote(str(root / 'transfer.log'))
+inside_env = {**env, 'RRSYNC_FLAGS': f'-wo -no-lock -log {inside_log}'}
+inside = subprocess.run(
+    rsync_argv('-r', '-e', rsh, f'{src}/', 'ignored:'),
+    env=inside_env, capture_output=True, text=True, timeout=20)
+assert inside.returncode != 0 and 'must be outside the restricted directory' in inside.stderr, (
+    f'rrsync accepted a -log FILE inside DIR: rc={inside.returncode}, stderr={inside.stderr!r}')
+assert not (root / 'transfer.log').exists()
+
+# Nor may the path pass through DIR by way of a symlink: the client's own
+# symlink in DIR would decide where the log is written.
+elsewhere = base / 'elsewhere'
+makepath(elsewhere)
+os.symlink(elsewhere, root / 'planted')
+os.symlink(root / 'planted', base / 'via')
+via_log = shlex.quote(str(base / 'via' / 'transfer.log'))
+via_env = {**env, 'RRSYNC_FLAGS': f'-wo -no-lock -log {via_log}'}
+via = subprocess.run(
+    rsync_argv('-r', '-e', rsh, f'{src}/', 'ignored:'),
+    env=via_env, capture_output=True, text=True, timeout=20)
+assert via.returncode != 0 and 'must not contain a symlink' in via.stderr, (
+    f'rrsync accepted a -log path through DIR: rc={via.returncode}, stderr={via.stderr!r}')
+assert not (elsewhere / 'transfer.log').exists()
+
+# DIR reached through a bind mount is still DIR.  An unprivileged bind mount
+# needs a user namespace, so this part runs only where unshare can make one.
+unshare = shutil.which('unshare')
+userns = [unshare, '--user', '--map-root-user', '--mount'] if unshare else None
+if userns and subprocess.run(userns + ['true'], capture_output=True).returncode == 0:
+    bind = base / 'bind'
+    makepath(bind)
+    script = 'mount --bind "$1" "$2" && exec "$3" -wo -no-lock -log "$2/transfer.log" "$1"'
+    bound = subprocess.run(
+        userns + ['sh', '-c', script, 'sh', str(root), str(bind), str(wrapper)],
+        env={**os.environ, 'SSH_ORIGINAL_COMMAND': 'rsync --server -r . .'},
+        stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=20)
+    assert bound.returncode != 0 and 'must be outside the restricted directory' in bound.stderr, (
+        f'rrsync accepted a -log FILE in a bind mount of DIR: rc={bound.returncode}, '
+        f'stderr={bound.stderr!r}')
+    assert not (root / 'transfer.log').exists()

@@ -493,6 +493,21 @@ def main():
     if not os.path.isdir(args.dir):
         die("Restricted directory does not exist!")
 
+    if args.log:
+        # The client can plant symlinks in DIR, so a log path that reaches DIR
+        # by any route (a symlink, a bind mount) could be redirected.
+        if args.log != os.path.realpath(args.log):
+            die("the -log FILE path must not contain a symlink")
+        dir_st = os.stat(args.dir)
+        path = args.log
+        while path != '/':
+            try:
+                if os.path.samestat(os.stat(path), dir_st):
+                    die("the -log FILE must be outside the restricted directory")
+            except OSError:
+                pass   # a missing component cannot be DIR
+            path = os.path.dirname(path)
+
     # The format of the environment variables set by sshd:
     #   SSH_ORIGINAL_COMMAND:
     #     rsync --server          -vlogDtpre.iLsfxCIvu --etc . ARG  # push
