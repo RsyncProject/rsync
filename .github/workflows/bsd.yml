@@ -86,14 +86,27 @@ jobs:
           prepare: |
             PATH=/usr/sbin:$PATH pkg_add autoconf automake python312
             ln -sf /usr/pkg/bin/python3.12 /usr/pkg/bin/python3
+            /usr/sbin/useradd -m -d /home/rsynctest -g =uid -s /bin/sh rsynctest
           run: |
             uname -a
             ./configure --with-rrsync --disable-zstd --disable-md2man --disable-xxhash --disable-lz4 --disable-idn
             make check-progs
             ./rsync --version
-            RSYNC_TEST_PROFILES=pipe,non-asan,root,self-peer,netbsd,no-idn,no-xxhash,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --receipt=test-results/netbsd-pipe.json -j 8
-            RSYNC_TEST_PROFILES=non-asan,root,self-peer,netbsd,no-idn,no-xxhash,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp --daemon-tests-only --receipt=test-results/netbsd-tcp.json -j 8
+            mkdir -p test-results/nonroot
+            chown rsynctest:rsynctest test-results/nonroot
+            export profiles=non-asan,self-peer,netbsd,no-idn,no-xxhash,no-zstd-threads
+            status=0
+            sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,root,$profiles" "$PWD/test-results/root/pipe" -j8 || status=1
+            sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "root,$profiles" "$PWD/test-results/root/tcp" --use-tcp --daemon-tests-only -j8 || status=1
+            su rsynctest -c '
+              set -eu
+              status=0
+              sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,nonroot,$profiles" "$PWD/test-results/nonroot/pipe" -j8 || status=1
+              sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "nonroot,$profiles" "$PWD/test-results/nonroot/tcp" --use-tcp --daemon-tests-only -j8 || status=1
+              exit "$status"
+            ' || status=1
             ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
+            exit "$status"
       - name: Upload binaries
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -108,7 +121,17 @@ jobs:
             rsyncd.conf.5
             rrsync.1
             rrsync
-            test-results/*.json
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          retention-days: 45
+          name: netbsd-results
+          if-no-files-found: error
+          path: |
+            config.log
+            test-results/*/*/receipt.json
+            test-results/*/*/run.log
 
   openbsd:
     runs-on: ubuntu-latest

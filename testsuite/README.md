@@ -54,6 +54,8 @@ The native check recipe in testsuite/tools/check.sh takes a build directory, exe
 
 [ci.yml](../.github/workflows/ci.yml) owns events, schedules and cancellation. macOS, Cygwin and Solaris run as direct jobs. Local composite actions hold the macOS and Cygwin steps; other job families use reusable workflows. Pull requests, master pushes and manual runs select every job; scheduled runs select the relevant daily or weekly jobs.
 
+Ubuntu and NetBSD have separate root and non-root pipe and TCP passes. Each pass retains its receipt and log.
+
 The final Required check validates all selected job results and permits only the declared scheduled omissions. The latest Clang analysis remains advisory. Workflow lint also tests the result gate against failures, cancellation, missing results and unexpected skips.
 
 ## TCP daemon mode
@@ -78,6 +80,8 @@ PROFILE_ERROR | The result disagreed with the active profile
 Exit codes are 0 for pass, 1 for fail, 2 for error, 77 for skip and 78 for expected failure.
 
 Profiles compose by name. For example `--profiles=linux,peer-3.4.1` combines the Linux capabilities with the known deviations for that peer. Tests tagged `version-mix` are selected from metadata.
+
+The root and nonroot profiles must match the effective UID and cannot be combined. Permission tests still check the filesystem restrictions they need.
 
 An unsupported result is accepted only when the test declares the capability and the active profile permits its absence. A generic skip is a profile error. Expected failures require a named defect in the active profile; errors and skips do not satisfy that expectation. Receipts retain the raw outcome and the profile verdict, executable hashes and effective UID. Where Git can identify the source checkout, they also record its revision and whether the working tree has changes. Those fields are null when Git metadata is unavailable.
 

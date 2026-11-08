@@ -30,15 +30,13 @@ jobs:
           - runner: ubuntu-latest
             name: Ubuntu (latest)
             artifact: ubuntu-bin
-            nonroot: true
             install_smoke: true
-            profiles: non-asan,root,self-peer,linux
+            profiles: non-asan,self-peer,linux
           - runner: ubuntu-22.04
             name: Ubuntu (22.04)
             artifact: ubuntu-22.04-bin
-            nonroot: false
             install_smoke: false
-            profiles: non-asan,root,self-peer,linux,no-zstd-threads
+            profiles: non-asan,self-peer,linux,no-zstd-threads
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     name: ${{ matrix.name }}
@@ -91,16 +89,17 @@ jobs:
       - name: Version
         run: ./rsync --version
       - name: Tests (pipe)
-        run: sudo sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,${{ matrix.profiles }}" "$RUNNER_TEMP/rsync-checks/root-pipe" -j8
+        run: sudo sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,root,${{ matrix.profiles }}" "$RUNNER_TEMP/rsync-checks/root-pipe" -j8
       - name: Tests (protocol 30)
-        run: sudo sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,${{ matrix.profiles }},protocol-30" "$RUNNER_TEMP/rsync-checks/root-protocol-30" --protocol=30 -j8
+        run: sudo sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,root,${{ matrix.profiles }},protocol-30" "$RUNNER_TEMP/rsync-checks/root-protocol-30" --protocol=30 -j8
       - name: Tests (protocol 29)
-        run: sudo sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,${{ matrix.profiles }},protocol-29" "$RUNNER_TEMP/rsync-checks/root-protocol-29" --protocol=29 -j8
+        run: sudo sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,root,${{ matrix.profiles }},protocol-29" "$RUNNER_TEMP/rsync-checks/root-protocol-29" --protocol=29 -j8
       - name: Tests (TCP)
-        run: sudo sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "${{ matrix.profiles }}" "$RUNNER_TEMP/rsync-checks/root-tcp" --use-tcp --daemon-tests-only -j8
-      - name: Targeted tests (non-root)
-        if: matrix.nonroot
-        run: sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,non-asan,nonroot,self-peer,linux" "$RUNNER_TEMP/rsync-checks/nonroot-targeted" daemon-namecvt-empty-response ownership-depth daemon-basics
+        run: sudo sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "root,${{ matrix.profiles }}" "$RUNNER_TEMP/rsync-checks/root-tcp" --use-tcp --daemon-tests-only -j8
+      - name: Tests (non-root pipe)
+        run: sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,nonroot,${{ matrix.profiles }}" "$RUNNER_TEMP/rsync-checks/nonroot-pipe" -j8
+      - name: Tests (non-root TCP)
+        run: sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "nonroot,${{ matrix.profiles }}" "$RUNNER_TEMP/rsync-checks/nonroot-tcp" --use-tcp --daemon-tests-only -j8
       - name: TLS listing (optional)
         run: rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
       - name: Upload binaries
