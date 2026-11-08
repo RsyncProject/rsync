@@ -14,6 +14,7 @@ import argparse
 import concurrent.futures
 import fnmatch
 import glob
+import hashlib
 import json
 import math
 import os
@@ -318,6 +319,27 @@ def binary_identity(path):
     except ValueError as error:
         raise ValueError(f'cannot determine rsync version from {path}') from error
 
+def file_digest(path):
+    digest = hashlib.sha256()
+    with open(path, 'rb') as stream:
+        for block in iter(lambda: stream.read(65536), b''):
+            digest.update(block)
+    return digest.hexdigest()
+
+def source_identity(srcdir):
+    if not (Path(srcdir) / '.git').exists():
+        return None, None
+    command = ['git', '--no-optional-locks', '-c', f'safe.directory={Path(srcdir).resolve()}',
+               '-C', str(srcdir)]
+    try:
+        revision = subprocess.run(command + ['rev-parse', '--verify', 'HEAD'],
+                                  capture_output=True, text=True, check=True, timeout=30).stdout.strip()
+        status = subprocess.run(command + ['status', '--porcelain'],
+                                capture_output=True, text=True, check=True, timeout=30).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None, None
+    return revision, bool(status)
+
 def run_one_test(testscript, testbase, scratchdir, base_env, timeout,
                  srcdir, tooldir, setfacl_nodef, always_log):
     started = time.monotonic()
@@ -526,6 +548,8 @@ def configure_profiles(args, suitedir, srcdir, all_tests, tests,
             path = item if os.path.isabs(item) else os.path.join(srcdir, item)
         profiles.append(load_profile(path, known_tests))
 
+    if args.profiles and not profiles:
+        raise ValueError('no profiles selected')
     peer, profile_protocol, unsupported, xfail = merge_profiles(profiles)
     effective_protocol = args.protocol
     transport = 'tcp' if args.use_tcp else 'pipe'
@@ -583,6 +607,15 @@ def main():
     rsync_cmd = build_rsync_cmd(rsync_bin, args, scratchbase)
     rsync_peer_cmd = build_rsync_cmd(rsync_bin2, args, scratchbase)
     validate_run_paths(tooldir, srcdir, rsync_bin, rsync_bin2)
+    identity = {}
+    if args.receipt:
+        try:
+            revision, dirty = source_identity(srcdir)
+            identity = {'source_revision': revision, 'source_dirty': dirty, 'euid': os.geteuid(),
+                        'binary_sha256': file_digest(rsync_bin), 'peer_sha256': file_digest(rsync_bin2)}
+        except OSError as error:
+            sys.stderr.write(f'runtests.py: cannot identify test inputs: {error}\n')
+            sys.exit(Exit.ERROR)
     print_run_header(args, tooldir, srcdir, scratchbase, rsync_cmd, rsync_peer_cmd, tls_args)
     base_env = build_test_environment(
         args, tooldir, srcdir, suitedir, scratchbase,
@@ -617,6 +650,9 @@ def main():
         tests, dropped = select_daemon_tests(tests)
         print(f"Daemon-transport tests only: running {len(tests)}, skipping "
               f"{len(dropped)} test(s) that cannot observe the transport")
+    if not tests:
+        sys.stderr.write('runtests.py: no tests selected\n')
+        sys.exit(Exit.ERROR)
     metadata_by_test = {test_name(test): read_requirements(test) for test in tests}
 
     def timeout_for(name):
@@ -768,6 +804,7 @@ def main():
         data = {
             'schema': 1,
             'run': {
+                **identity,
                 'binary': rsync_cmd,
                 'peer': rsync_peer_cmd,
                 'peer_version': profile_peer,

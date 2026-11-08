@@ -48,6 +48,8 @@ The runner accepts names and shell patterns:
 
 The main controls are `-j`, `--rsync-bin`, `--rsync-bin2`, `--protocol`, `--profiles`, `--use-tcp`, `--daemon-tests-only`, `--race-timeout`, `--receipt`, `--describe-tests` and `--valgrind`. Run `./testsuite/runtests.py --help` for the full list.
 
+The native check recipe in testsuite/tools/check.sh takes a build directory, executable, profile list and fresh output directory. Remaining arguments go to the runner. The recipe saves run.log and receipt.json alongside isolated scratch data. Root and non-root runs use different output directories. Some mutation tests still require a configured source directory.
+
 ## TCP daemon mode
 
 `--use-tcp` starts unauthenticated test daemons on loopback addresses and some fixtures enable unsafe daemon options. Other local users can reach those listeners, so use the default pipe transport on shared hosts.
@@ -71,7 +73,7 @@ Exit codes are 0 for pass, 1 for fail, 2 for error, 77 for skip and 78 for expec
 
 Profiles compose by name. For example `--profiles=linux,peer-3.4.1` combines the Linux capabilities with the known deviations for that peer. Tests tagged `version-mix` are selected from metadata.
 
-An unsupported result is accepted only when the test declares the capability and the active profile permits its absence. A generic skip is a profile error. Receipts retain the raw outcome and the profile verdict.
+An unsupported result is accepted only when the test declares the capability and the active profile permits its absence. A generic skip is a profile error. Expected failures require a named defect in the active profile; errors and skips do not satisfy that expectation. Receipts retain the raw outcome and the profile verdict, executable hashes and effective UID. Where Git can identify the source checkout, they also record its revision and whether the working tree has changes. Those fields are null when Git metadata is unavailable.
 
 ## Scratch data and requirements
 
