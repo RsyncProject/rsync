@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import socket
 import stat
 
@@ -14,14 +15,16 @@ dst = SCRATCHDIR / 'sock-dst'
 rmtree(src)
 rmtree(dst)
 makepath(src, dst)
-sock_path = src / 's'
 s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+previous = os.getcwd()
 try:
-    s.bind(str(sock_path))
+    os.chdir(src)
+    s.bind('s')
 except OSError as e:
     test_skipped(f"cannot create unix-domain socket fixture: {e}")
 finally:
     s.close()
+    os.chdir(previous)
 
 conf = write_daemon_conf([
     ('sock', {'path': str(dst), 'read only': 'no', 'use chroot': 'no'}),
