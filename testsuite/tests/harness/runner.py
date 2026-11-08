@@ -34,6 +34,20 @@ def test(context: TestContext):
                 tests, tests, '', '')
         if 'fixture' in configured[4]:
             test_fail('an environment override changed profile capabilities')
+    for uid in (0, 1000, 65534):
+        for names in ('root', 'nonroot', 'root,nonroot', 'nonroot,root', 'linux'):
+            args = SimpleNamespace(profiles=names, protocol=None, use_tcp=False)
+            valid = names == 'linux' or names == ('root' if uid == 0 else 'nonroot')
+            with patch.object(runner.os, 'geteuid', return_value=uid):
+                try:
+                    runner.configure_profiles(args, str(context.repository / 'testsuite'),
+                                              str(context.repository), tests, tests, '', '')
+                except ValueError:
+                    if valid:
+                        test_fail(f'{names} rejected effective UID {uid}')
+                else:
+                    if not valid:
+                        test_fail(f'{names} accepted effective UID {uid}')
     try:
         runner.collect_tests(str(context.repository / 'testsuite'), ['missing-test'])
     except ValueError:
@@ -83,6 +97,21 @@ def test(context: TestContext):
     command = [sys.executable, str(context.repository / 'testsuite' / 'runtests.py'), 'smoke',
                f'--rsync-bin={binary}', f'--rsync-bin2={binary}', f'--tooldir={context.tools}',
                f'--srcdir={context.repository}', f'--profiles={profile}', f'--receipt={receipt}']
+    role = 'root' if os.geteuid() == 0 else 'nonroot'
+    for names in ('root,nonroot', 'nonroot' if role == 'root' else 'root'):
+        result = subprocess.run(command + [f'--profiles={names}'], env=nested_env,
+                                capture_output=True, text=True)
+        if result.returncode != Exit.ERROR or 'profile' not in result.stderr:
+            test_fail(f'an invalid privilege profile was accepted: {names}')
+        if receipt.exists():
+            test_fail('an invalid privilege profile produced a test receipt')
+    result = subprocess.run(command + [f'--profiles={role}'], env=nested_env,
+                            capture_output=True, text=True)
+    if result.returncode:
+        test_fail(f'{role} run failed: {result.stdout}{result.stderr}')
+    data = json.loads(receipt.read_text())
+    if data['run']['euid'] != os.geteuid() or data['run']['profiles'] != [role]:
+        test_fail('the receipt identifies the wrong privilege profile')
     profile.write_text(json.dumps({'peer': peer, 'protocol': protocol + 1}))
     mismatch = subprocess.run(command, env=nested_env, capture_output=True, text=True)
     if mismatch.returncode != Exit.ERROR or 'profile protocol' not in mismatch.stderr:

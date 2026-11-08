@@ -550,6 +550,12 @@ def configure_profiles(args, suitedir, srcdir, all_tests, tests,
 
     if args.profiles and not profiles:
         raise ValueError('no profiles selected')
+    roles = {profile.name for profile in profiles} & {'root', 'nonroot'}
+    if len(roles) > 1:
+        raise ValueError('root and nonroot profiles conflict')
+    for role in roles:
+        if (role == 'root') != (os.geteuid() == 0):
+            raise ValueError(f'{role} profile does not match effective UID {os.geteuid()}')
     peer, profile_protocol, unsupported, xfail = merge_profiles(profiles)
     effective_protocol = args.protocol
     transport = 'tcp' if args.use_tcp else 'pipe'
