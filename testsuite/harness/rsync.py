@@ -201,7 +201,9 @@ def checkit(args, expected_dir, actual_dir, skip_file_diff: bool = False,
     print(f"Running: rsync {' '.join(args)}")
     proc = subprocess.run(rsync_argv(*args))
     if proc.returncode not in allowed_codes:
-        failed.append(f"status={proc.returncode}")
+        test_fail(f"Failed: status={proc.returncode}")
+    if not os.path.isdir(actual_dir):
+        test_fail(f"Failed: destination directory missing: {actual_dir}")
 
     if ls_from is None:
         ls_from = rsync_ls_lR(expected_dir)
