@@ -5,7 +5,7 @@ rrsync - a script to setup restricted rsync users via ssh logins
 ## SYNOPSIS
 
 ```
-rrsync [-ro|-wo] [-munge] [-absolute] [-no-del] [-no-lock] [-no-overwrite] DIR
+rrsync [-ro|-wo] [-munge] [-absolute] [-no-del] [-no-lock] [-no-overwrite] [-log FILE] DIR
 ```
 
 The single non-option argument specifies the restricted _DIR_ to use. It can be
@@ -105,6 +105,14 @@ The remainder of this manpage is dedicated to using the rrsync script.
     already occupies the backup name). Resumable uploads with an explicit
     `--partial-dir`, `--delay-updates`, `--delay-symlinks`, and server-side
     logging are therefore unavailable under this option.
+
+0.  `-log FILE`
+
+    Log every transfer to _FILE_ using rsync's [`--log-file`](rsync.1#opt),
+    in its default "%i %n%L" format, so each file sent, received or deleted
+    gets a line.  _FILE_ can be relative to the user's home directory or an
+    absolute path.  The client's own `--log-file` option is refused while this
+    is in force.
 
 0.  `-help`, `-h`
 
