@@ -5,6 +5,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 from unittest.mock import patch
 
@@ -83,17 +84,21 @@ def test(context: TestContext):
         test_fail('runner arguments changed the recipe inputs')
     invoke(['sh', str(recipe), str(context.tools), binary, 'pipe,self-peer',
             str(context.scratch / 'long-parent' / ('directory' * 15)), 'daemon-unix-socket-atfd'], True)
+    if os.geteuid() == 0 and sys.platform == 'linux':
+        private = context.scratch / 'private-home'
+        build = private / 'build'
+        build.mkdir(parents=True)
+        shutil.copy2(binary, build / 'rsync')
+        for name in ('tls', 'trimslash', 't_unsafe', 't_chmod_secure', 't_secure_relpath',
+                     'wildtest', 'getgroups', 'getfsdev', 'config.h', 'shconfig'):
+            shutil.copy2(context.tools / name, build / name)
+        private.chmod(0o700)
+        os.chown(private, 65534, 65534)
+        invoke(['sh', str(recipe), str(build), str(build / 'rsync'), 'pipe,self-peer',
+                str(private / 'results'), 'partial-no-write'], True)
     blocked = context.scratch / 'not-a-directory'
     blocked.touch()
     invoke(attempt('not-a-directory/result'), False)
-    if os.geteuid() != 0:
-        blocked = context.scratch / 'read-only'
-        blocked.mkdir(mode=0o500)
-        try:
-            invoke(attempt('read-only/result'), False)
-        finally:
-            blocked.chmod(0o700)
-
     fixture = context.scratch / 'fixture'
     tools = fixture / 'testsuite' / 'tools'
     tests = fixture / 'testsuite' / 'tests'

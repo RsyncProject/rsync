@@ -77,7 +77,7 @@ An unsupported result is accepted only when the test declares the capability and
 
 ## Scratch data and requirements
 
-Tests use `testtmp/<name>/`; failed scratch directories remain for inspection. The suite needs Python 3, `/bin/sh` and the normal build toolchain. ACL and extended-attribute tests also need the platform ACL and attr tools.
+Tests use `testtmp/<name>/`; failed scratch directories remain for inspection. The suite needs Python 3, `/bin/sh` and the normal build toolchain. ACL and extended-attribute tests also need the platform ACL and attr tools. Linux root permission tests require `setpriv`.
 
 ## Differential testing
 

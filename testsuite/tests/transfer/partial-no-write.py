@@ -1,58 +1,54 @@
 #!/usr/bin/env python3
 
+from contextlib import ExitStack
 import os
 from pathlib import Path
+import shlex
 import shutil
-import subprocess
 import sys
 import tempfile
 
-from harness.rsync import make_data_file, cp_p, makepath, checkit, RSYNC, TMPDIR, get_testuid, get_rootuid
+from harness import TestContext, requires, run, rsync
+from harness.rsync import checkit, cp_p, make_data_file, makepath, rsync_argv_for, rsync_command_binary, test_error
 
-BASEDIR = TMPDIR
+@requires(transports={'pipe'}, mutates={'filesystem', 'process'}, tags={'transfer'})
+def test(context: TestContext):
+    original = rsync.RSYNC
+    with ExitStack() as cleanup:
+        base = context.scratch
+        prefix = []
+        if os.geteuid() == 0 and sys.platform == 'linux':
+            setpriv = shutil.which('setpriv')
+            if not setpriv:
+                test_error('setpriv is required to enforce read-only files as root')
+            base = Path(cleanup.enter_context(tempfile.TemporaryDirectory(prefix='rsync-partial-', dir='/tmp')))
+            binary = base / 'rsync'
+            shutil.copy2(rsync_command_binary(), binary)
+            prefix = [setpriv, '--inh-caps', '-all', '--bounding-set', '-all']
 
-FROMDIR = BASEDIR / 'from'
-TODIR = BASEDIR / 'to'
+        source, destination = base / 'from', base / 'to'
+        makepath(source, destination / '.~tmp~')
+        (destination / '.~tmp~').chmod(0o700)
+        make_data_file(source / 'some_file', 1024 * 1024)
+        (source / 'some_file').chmod(0o444)
+        partial = destination / '.~tmp~' / 'some_file'
+        cp_p(source / 'some_file', partial)
 
-makepath(FROMDIR)
-makepath(TODIR)
+        if prefix:
+            probe = ('if ! test -f "$1" || ! test -r "$1" || test -w "$1"; then\n'
+                     '    echo "read-only partial fixture is not enforced" >&2\n'
+                     '    exit 1\n'
+                     'fi\n'
+                     'shift\n'
+                     'exec "$@"')
+            rsync.RSYNC = shlex.join([*prefix, 'sh', '-c', probe, 'sh', str(partial), *rsync_argv_for(binary)])
+        previous = os.getcwd()
+        try:
+            os.chdir(base)
+            checkit(['-avv', '--partial', '--delay-updates', f'{source}/', f'{destination}/'], source, destination)
+        finally:
+            os.chdir(previous)
+            rsync.RSYNC = original
 
-makepath(FROMDIR)
-make_data_file(FROMDIR / 'some_file', 1 * 1024 * 1024)
-os.chmod(FROMDIR / 'some_file', 0o444)
-
-makepath(TODIR / '.~tmp~')
-os.chmod(TODIR / '.~tmp~', 0o700)
-cp_p(FROMDIR / 'some_file', TODIR / '.~tmp~' / 'some_file')
-
-is_root = get_testuid() == get_rootuid()
-
-_cwd_st = os.stat(os.getcwd())
-_cwd_traversable = ((_cwd_st.st_uid == 0 and _cwd_st.st_mode & 0o100)
-                    or _cwd_st.st_mode & 0o001)
-if (is_root and sys.platform == 'linux' and hasattr(os, 'unshare')
-        and shutil.which('setpriv') and _cwd_traversable):
-    try:
-        cwd = Path(os.getcwd())
-        chown_target = None
-        for p in reversed(cwd.parents):
-            st = p.stat()
-            if not (st.st_uid == 0 or st.st_mode & 0o005):
-                chown_target = p
-                break
-        if chown_target is not None:
-            os.unshare(os.CLONE_NEWNS)
-            subprocess.run(['mount', '--make-rprivate', '/'], check=True)
-            tempdir = tempfile.mkdtemp()
-            subprocess.run(['mount', '--bind', cwd, tempdir], check=True)
-            subprocess.run(['mount', '-t', 'tmpfs', '-o', 'mode=0755', 'tmpfs', chown_target], check=True)
-            makepath(cwd)
-            subprocess.run(['mount', '--bind', tempdir, cwd], check=True)
-            subprocess.run(['umount', tempdir], check=True)
-            os.rmdir(tempdir)
-        from harness import rsync
-        rsync.RSYNC = "setpriv --inh-caps -all --bounding-set -all " + RSYNC
-    except (OSError, subprocess.CalledProcessError):
-        pass
-
-checkit(['-avv', '--partial', '--delay-updates', f'{FROMDIR}/', f'{TODIR}/'], FROMDIR, TODIR)
+if __name__ == '__main__':
+    run(test)
