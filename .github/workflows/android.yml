@@ -1,23 +1,11 @@
-name: Build static rsync for Android
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: true
+name: Android
 
 on:
-  push:
-    branches: [ master ]
-    paths-ignore:
-      - '.github/workflows/*.yml'
-      - '!.github/workflows/android-static-build.yml'
-  pull_request:
-    types: [opened, synchronize, reopened]
-    paths-ignore:
-      - '.github/workflows/*.yml'
-      - '!.github/workflows/android-static-build.yml'
-  schedule:
-    - cron: '42 8 * * 1'
-  workflow_dispatch:
+  workflow_call:
+    outputs:
+      jobs:
+        description: Job results
+        value: ${{ toJSON(jobs) }}
 
 permissions:
   contents: read
@@ -29,7 +17,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    name: ${{ matrix.abi }}
+    name: ${{ matrix.abi }} (build)
     strategy:
       fail-fast: false
       matrix:
@@ -46,10 +34,10 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Install build prerequisites
+      - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y autoconf automake gawk qemu-user-static
 
-      - name: Configure and build (${{ matrix.abi }})
+      - name: Build
         shell: bash
         run: |
           set -euo pipefail
@@ -101,7 +89,7 @@ jobs:
           ( cd dist && sha256sum "$out" > "$out.sha256" )
           echo "ARTIFACT_NAME=rsync-android-${{ matrix.abi }}" >>"$GITHUB_ENV"
 
-      - name: Upload artifact
+      - name: Upload binary
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           retention-days: 45

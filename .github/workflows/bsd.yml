@@ -1,0 +1,164 @@
+name: BSD
+
+on:
+  workflow_call:
+    outputs:
+      jobs:
+        description: Job results
+        value: ${{ toJSON(jobs) }}
+
+permissions:
+  contents: read
+
+jobs:
+  freebsd:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    name: FreeBSD
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prepare VM host
+        timeout-minutes: 10
+        run: |
+          packages=(qemu-utils qemu-system-x86 ovmf)
+          sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "${packages[@]}" || {
+            sudo apt-get update -q
+            sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "${packages[@]}"
+          }
+      - name: Build and test
+        id: test
+        uses: vmactions/freebsd-vm@c46abacb49f09938ca4e1702d15d836285d694cc # v1.5.9
+        with:
+          cache-after-prepare: true
+          prepare: |
+            pkg install -y bash autotools m4 devel/xxhash zstd liblz4 python3 archivers/liblz4 git
+          run: |
+            freebsd-version
+            ./configure --with-rrsync \
+              -disable-zstd --disable-md2man --disable-xxhash --disable-lz4 --disable-idn \
+              --enable-roll-simd --enable-roll-asm --enable-md5-asm
+            make check-progs
+            ./rsync --version
+            RSYNC_TEST_PROFILES=pipe,non-asan,root,self-peer,freebsd,no-idn,no-xxhash,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --receipt=test-results/freebsd-pipe.json -j 8
+            RSYNC_TEST_PROFILES=non-asan,root,self-peer,freebsd,no-idn,no-xxhash,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp --daemon-tests-only --receipt=test-results/freebsd-tcp.json -j 8
+            ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
+      - name: Upload binaries
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          retention-days: 45
+          name: freebsd-bin
+          path: |
+            rsync
+            rsync-ssl
+            rsync.1
+            rsync-ssl.1
+            rsyncd.conf.5
+            rrsync.1
+            rrsync
+            test-results/*.json
+
+  netbsd:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    name: NetBSD
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prepare VM host
+        timeout-minutes: 10
+        run: |
+          packages=(qemu-utils qemu-system-x86 ovmf)
+          sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "${packages[@]}" || {
+            sudo apt-get update -q
+            sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "${packages[@]}"
+          }
+      - name: Build and test
+        id: test
+        uses: vmactions/netbsd-vm@c8a0d7ddb84619a7a8cc4e652efa7950b3fd9f92 # v1.5.2
+        with:
+          cache-after-prepare: true
+          prepare: |
+            PATH=/usr/sbin:$PATH pkg_add autoconf automake python312
+            ln -sf /usr/pkg/bin/python3.12 /usr/pkg/bin/python3
+          run: |
+            uname -a
+            ./configure --with-rrsync --disable-zstd --disable-md2man --disable-xxhash --disable-lz4 --disable-idn
+            make check-progs
+            ./rsync --version
+            RSYNC_TEST_PROFILES=pipe,non-asan,root,self-peer,netbsd,no-idn,no-xxhash,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --receipt=test-results/netbsd-pipe.json -j 8
+            RSYNC_TEST_PROFILES=non-asan,root,self-peer,netbsd,no-idn,no-xxhash,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp --daemon-tests-only --receipt=test-results/netbsd-tcp.json -j 8
+            ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
+      - name: Upload binaries
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          retention-days: 45
+          name: netbsd-bin
+          path: |
+            rsync
+            rsync-ssl
+            rsync.1
+            rsync-ssl.1
+            rsyncd.conf.5
+            rrsync.1
+            rrsync
+            test-results/*.json
+
+  openbsd:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    name: OpenBSD
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prepare VM host
+        timeout-minutes: 10
+        run: |
+          packages=(qemu-utils qemu-system-x86 ovmf)
+          sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "${packages[@]}" || {
+            sudo apt-get update -q
+            sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "${packages[@]}"
+          }
+      - name: Build and test
+        id: test
+        uses: vmactions/openbsd-vm@5f7b2c933b8846a138361d6843c52af4bef5d945 # v1.4.8
+        with:
+          cache-after-prepare: true
+          prepare: |
+            pkg_add -I bash autoconf%2.71 automake%1.16
+          run: |
+            uname -a
+            export AUTOCONF_VERSION=2.71
+            export AUTOMAKE_VERSION=1.16
+            ./configure --with-rrsync --disable-zstd --disable-md2man --disable-xxhash --disable-lz4 --disable-idn
+            make check-progs
+            ./rsync --version
+            # OpenBSD rename storms can hang these races outside rsync
+            export RSYNC_EXCLUDE=acl-symlink-race,sender-readlink-atfd,sender-remove-source-secure
+            RSYNC_TEST_PROFILES=pipe,non-asan,root,self-peer,openbsd,no-idn,no-xxhash,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --receipt=test-results/openbsd-pipe.json -j 8
+            # Keep nested-VM loopback daemons below the observed lost-wakeup threshold
+            RSYNC_TEST_PROFILES=non-asan,root,self-peer,openbsd,no-idn,no-xxhash,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp --daemon-tests-only --receipt=test-results/openbsd-tcp.json -j 2
+            ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
+      - name: Upload binaries
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          retention-days: 45
+          name: openbsd-bin
+          path: |
+            rsync
+            rsync-ssl
+            rsync.1
+            rsync-ssl.1
+            rsyncd.conf.5
+            rrsync.1
+            rrsync
+            test-results/*.json

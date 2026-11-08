@@ -1,0 +1,186 @@
+name: Linux
+
+on:
+  workflow_call:
+    inputs:
+      ubuntu:
+        required: true
+        type: boolean
+      almalinux:
+        required: true
+        type: boolean
+    outputs:
+      jobs:
+        description: Job results
+        value: ${{ toJSON(jobs) }}
+      inputs:
+        description: Job selections
+        value: ${{ toJSON(inputs) }}
+
+permissions:
+  contents: read
+
+jobs:
+  ubuntu:
+    if: ${{ inputs.ubuntu }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            name: Ubuntu (latest)
+            artifact: ubuntu-bin
+            nonroot: true
+            install_smoke: true
+            profiles: non-asan,root,self-peer,linux
+          - runner: ubuntu-22.04
+            name: Ubuntu (22.04)
+            artifact: ubuntu-22.04-bin
+            nonroot: false
+            install_smoke: false
+            profiles: non-asan,root,self-peer,linux,no-zstd-threads
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    name: ${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev libidn2-dev python3-cmarkgfm openssl
+          echo "/usr/local/bin" >>"$GITHUB_PATH"
+          mkdir -p "$RUNNER_TEMP/rsync-checks"
+      - name: Configure
+        run: ./configure --with-rrsync
+      - name: Build
+        run: make check-progs
+      - name: Installation smoke test
+        if: matrix.install_smoke
+        run: |
+          set -e
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+
+          make install-all DESTDIR="$tmp"
+
+          for path in \
+            /usr/local/bin/rsync \
+            /usr/local/bin/rsync-ssl \
+            /usr/local/bin/rrsync \
+            /usr/local/share/man/man1/rsync.1 \
+            /usr/local/share/man/man1/rsync-ssl.1 \
+            /usr/local/share/man/man1/rrsync.1 \
+            /usr/local/share/man/man5/rsyncd.conf.5 \
+            /etc/stunnel/rsyncd.conf
+          do
+            test -e "$tmp$path"
+          done
+
+          make uninstall-all DESTDIR="$tmp"
+
+          leftover="$(find "$tmp" -type f -print)"
+          if [ -n "$leftover" ]; then
+            printf '%s\n' "$leftover"
+            exit 1
+          fi
+      - name: Install
+        run: sudo make install
+      - name: Version
+        run: ./rsync --version
+      - name: Tests (pipe)
+        run: sudo sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,${{ matrix.profiles }}" "$RUNNER_TEMP/rsync-checks/root-pipe" -j8
+      - name: Tests (protocol 30)
+        run: sudo sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,${{ matrix.profiles }},protocol-30" "$RUNNER_TEMP/rsync-checks/root-protocol-30" --protocol=30 -j8
+      - name: Tests (protocol 29)
+        run: sudo sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,${{ matrix.profiles }},protocol-29" "$RUNNER_TEMP/rsync-checks/root-protocol-29" --protocol=29 -j8
+      - name: Tests (TCP)
+        run: sudo sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "${{ matrix.profiles }}" "$RUNNER_TEMP/rsync-checks/root-tcp" --use-tcp --daemon-tests-only -j8
+      - name: Targeted tests (non-root)
+        if: matrix.nonroot
+        run: sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,non-asan,nonroot,self-peer,linux" "$RUNNER_TEMP/rsync-checks/nonroot-targeted" daemon-namecvt-empty-response ownership-depth daemon-basics
+      - name: TLS listing (optional)
+        run: rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
+      - name: Upload binaries
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          retention-days: 45
+          name: ${{ matrix.artifact }}
+          if-no-files-found: error
+          path: |
+            rsync
+            rsync-ssl
+            rsync.1
+            rsync-ssl.1
+            rsyncd.conf.5
+            rrsync.1
+            rrsync
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          retention-days: 45
+          name: ${{ matrix.artifact }}-results
+          if-no-files-found: error
+          path: |
+            config.log
+            ${{ runner.temp }}/rsync-checks/*/receipt.json
+            ${{ runner.temp }}/rsync-checks/*/run.log
+
+  almalinux:
+    if: ${{ inputs.almalinux }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    container:
+      image: almalinux:8
+    name: AlmaLinux 8
+    steps:
+      - name: Install Git
+        run: dnf -y install git
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install dependencies
+        run: |
+          # RHEL 8's default Python is too old for the test runner
+          dnf -y install epel-release
+          dnf config-manager --set-enabled powertools
+          dnf -y install gcc gcc-c++ make autoconf automake m4 \
+              python39 python39-pip diffutils \
+              openssl openssl-devel \
+              attr libattr-devel acl libacl-devel \
+              zstd libzstd-devel \
+              lz4 lz4-devel \
+              xxhash xxhash-devel \
+              libidn2 libidn2-devel
+          alternatives --set python3 /usr/bin/python3.9
+          pip3 install commonmark
+      - name: Configure
+        run: ./configure --with-rrsync
+      - name: Build
+        run: make
+      - name: Version
+        run: ./rsync --version
+      - name: Tests (pipe)
+        run: RSYNC_TEST_PROFILES=pipe,non-asan,root,self-peer,linux,no-zstd-threads make check
+      - name: Tests (TCP)
+        run: RSYNC_TEST_PROFILES=non-asan,root,self-peer,linux,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp --daemon-tests-only -j 8
+      - name: TLS listing (optional)
+        run: ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
+      - name: Upload binaries
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          retention-days: 45
+          name: almalinux-8-bin
+          path: |
+            rsync
+            rsync-ssl
+            rsync.1
+            rsync-ssl.1
+            rsyncd.conf.5
+            rrsync.1
+            rrsync

@@ -50,6 +50,12 @@ The main controls are `-j`, `--rsync-bin`, `--rsync-bin2`, `--protocol`, `--prof
 
 The native check recipe in testsuite/tools/check.sh takes a build directory, executable, profile list and fresh output directory. Remaining arguments go to the runner. The recipe saves run.log and receipt.json alongside isolated scratch data. Root and non-root runs use different output directories. Some mutation tests still require a configured source directory.
 
+## CI
+
+[ci.yml](../.github/workflows/ci.yml) owns events, schedules and cancellation. Reusable workflows group platform, diagnostic and version-mixing jobs. Pull requests, master pushes and manual runs select every job; scheduled runs select the relevant daily or weekly jobs.
+
+The final CI check requires selected jobs to finish successfully and permits only the declared scheduled omissions. The latest Clang analysis remains advisory. Workflow lint also tests the result gate against failures, cancellation, missing results and unexpected skips.
+
 ## TCP daemon mode
 
 `--use-tcp` starts unauthenticated test daemons on loopback addresses and some fixtures enable unsafe daemon options. Other local users can reach those listeners, so use the default pipe transport on shared hosts.

@@ -1,0 +1,318 @@
+name: Diagnostics
+
+on:
+  workflow_call:
+    inputs:
+      lint:
+        required: true
+        type: boolean
+      asan:
+        required: true
+        type: boolean
+      coverage:
+        required: true
+        type: boolean
+      scan_pinned:
+        required: true
+        type: boolean
+      scan_latest:
+        required: true
+        type: boolean
+      valgrind:
+        required: true
+        type: boolean
+    outputs:
+      jobs:
+        description: Job results
+        value: ${{ toJSON(jobs) }}
+      inputs:
+        description: Job selections
+        value: ${{ toJSON(inputs) }}
+      advisory:
+        description: Advisory job
+        value: scan_latest
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    if: ${{ inputs.lint }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    name: Workflow lint
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Install actionlint
+        run: |
+          archive=actionlint_1.7.12_linux_amd64.tar.gz
+          curl --proto '=https' --tlsv1.2 -fsSLO \
+            "https://github.com/rhysd/actionlint/releases/download/v1.7.12/$archive"
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $archive" \
+            | sha256sum --check --strict
+          tar -xzf "$archive" actionlint
+          echo "$PWD" >>"$GITHUB_PATH"
+      - name: Version
+        run: actionlint -version
+      - name: Check workflows
+        run: actionlint -color
+      - name: Check result gate
+        run: sh .github/test-results.sh
+
+  asan:
+    if: ${{ inputs.asan }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    name: ASan + UBSan
+    env:
+      # Process-exit leaks are intentional; memory errors remain fatal
+      ASAN_OPTIONS: detect_leaks=0:abort_on_error=1
+      UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev libidn2-dev openssl
+          echo "/usr/local/bin" >>"$GITHUB_PATH"
+      - name: Configure
+        # Exercise release behaviour with assertions disabled
+        run: |
+          CC=clang \
+          CFLAGS="-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer -g -O1 -DNDEBUG" \
+          LDFLAGS="-fsanitize=address,undefined" \
+          ./configure --with-rrsync --disable-md2man
+      - name: Build
+        run: make check-progs
+      - name: Version
+        run: ./rsync --version
+      - name: Tests (pipe)
+        run: RSYNC_TEST_PROFILES=pipe,nonroot,self-peer,linux,asan ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --receipt=test-results/asan-pipe.json -j8
+      - name: Tests (TCP)
+        run: RSYNC_TEST_PROFILES=nonroot,self-peer,linux,asan ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp --daemon-tests-only --receipt=test-results/asan-tcp.json -j8
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          retention-days: 45
+          name: asan-receipts
+          path: test-results/*.json
+
+  coverage:
+    if: ${{ inputs.coverage }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    name: Coverage
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev libidn2-dev python3-cmarkgfm openssl gcovr
+          echo "/usr/local/bin" >>"$GITHUB_PATH"
+      - name: Configure
+        run: ./configure --enable-coverage --with-rrsync
+      - name: Build
+        run: make
+      - name: Version
+        run: rsync --version
+      - name: Coverage (pipe)
+        run: |
+          set -o pipefail
+          sudo make coverage 2>&1 | tee cov-pipe.log
+      - name: Coverage (TCP)
+        run: |
+          set -o pipefail
+          sudo make coverage-tcp 2>&1 | tee cov-tcp.log
+      - name: Coverage summary
+        if: always()
+        run: |
+          {
+            echo "## gcov coverage"
+            echo "### Pipe transport (\`make coverage\`)"
+            echo '```'
+            grep -E '^(lines|functions|branches|decisions):' cov-pipe.log || echo '(no summary -- see step log)'
+            echo '```'
+            echo "### TCP transport (\`make coverage-tcp\`)"
+            echo '```'
+            grep -E '^(lines|functions|branches|decisions):' cov-tcp.log || echo '(no summary -- see step log)'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          retention-days: 45
+          name: coverage-html
+          path: |
+            coverage
+            coverage-tcp
+
+  scan_pinned:
+    if: ${{ inputs.scan_pinned }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    name: Clang 18
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-18 clang-tools-18 acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev libidn2-dev libpopt-dev openssl
+      - name: Configure
+        run: scan-build-18 ./configure --with-rrsync --disable-md2man
+      - name: Analyse
+        run: |
+          set -o pipefail
+          status=0
+          scan-build-18 --status-bugs -o "$PWD/scan-report" make check-progs -j"$(nproc)" 2>&1 | tee scan-build.out || status=$?
+          echo '## scan-build gate (clang-18)' >>"$GITHUB_STEP_SUMMARY"
+          grep -E 'scan-build: .* bugs? found|scan-build: No bugs found' scan-build.out >>"$GITHUB_STEP_SUMMARY" || true
+          exit $status
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: scan-build-report-clang18
+          path: scan-report
+          if-no-files-found: ignore
+
+  scan_latest:
+    if: ${{ inputs.scan_latest }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    name: Clang (latest, advisory)
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang clang-tools acl libacl1-dev attr libattr1-dev liblz4-dev libidn2-dev libzstd-dev libxxhash-dev libpopt-dev openssl
+      - name: Configure
+        run: scan-build ./configure --with-rrsync --disable-md2man
+      - name: Analyse
+        run: |
+          scan-build -o "$PWD/scan-report" make check-progs -j"$(nproc)" 2>&1 | tee scan-build.out
+          echo '## scan-build informational (latest clang)' >>"$GITHUB_STEP_SUMMARY"
+          grep -E 'scan-build: .* bugs? found|scan-build: No bugs found' scan-build.out >>"$GITHUB_STEP_SUMMARY" || true
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: scan-build-report-latest
+          path: scan-report
+          if-no-files-found: ignore
+
+  valgrind:
+    if: ${{ inputs.valgrind }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - privilege: user
+            transport: pipe
+            profiles: pipe,non-asan,nonroot,self-peer,linux,valgrind
+          - privilege: user
+            transport: tcp
+            profiles: non-asan,nonroot,self-peer,linux,valgrind
+          - privilege: root
+            transport: pipe
+            profiles: pipe,non-asan,root,self-peer,linux,valgrind
+          - privilege: root
+            transport: tcp
+            profiles: non-asan,root,self-peer,linux,valgrind
+    name: Valgrind (${{ matrix.privilege }}, ${{ matrix.transport }})
+    env:
+      VALGRIND_SCRATCH: /tmp/rsync-valgrind-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.privilege }}-${{ matrix.transport }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y valgrind acl libacl1-dev attr libattr1-dev \
+            liblz4-dev libzstd-dev libxxhash-dev libidn2-dev python3-cmarkgfm openssl
+          echo "/usr/local/bin" >>"$GITHUB_PATH"
+      - name: Configure
+        run: ./configure --with-rrsync --enable-debug
+      - name: Build
+        run: make check-progs   # builds rsync + the test helper programs runtests.py needs
+      - name: Version
+        run: ./rsync --version
+
+      # Gate memory errors rather than intentional process-exit leaks
+      - name: Tests
+        run: |
+          mkdir -p test-results/valgrind-logs
+          SUDO=()
+          [ "${{ matrix.privilege }}" = root ] && SUDO=(sudo -E)
+          TCP=()
+          [ "${{ matrix.transport }}" = tcp ] && TCP=(--use-tcp --daemon-tests-only)
+          "${SUDO[@]}" env RSYNC_TEST_PROFILES=${{ matrix.profiles }} scratchbase="$VALGRIND_SCRATCH" \
+            ./testsuite/runtests.py --valgrind \
+            --valgrind-opts="--leak-check=no --error-exitcode=0" \
+            "${TCP[@]}" -j2 --timeout=600 --preserve-scratch \
+            --receipt=test-results/valgrind-${{ matrix.privilege }}-${{ matrix.transport }}.json
+
+      - name: Check memory errors
+        if: always()
+        run: |
+          log_dir="$VALGRIND_SCRATCH/testtmp/valgrind-logs"
+          if [ -d "$log_dir" ]; then
+            sudo chown -R "$USER" "$log_dir"
+          fi
+          shopt -s nullglob
+          logs=("$log_dir"/valgrind.*.log)
+          if [ "${#logs[@]}" -eq 0 ]; then
+            echo "::error::no valgrind logs were produced -- the suite did not run"
+            exit 1
+          fi
+          evidence_dir=test-results/valgrind-logs
+          mkdir -p "$evidence_dir"
+          cp -- "${logs[@]}" "$evidence_dir/"
+          echo "scanned ${#logs[@]} valgrind log(s)"
+          bad=()
+          for f in "${logs[@]}"; do
+            grep -qE 'ERROR SUMMARY: [1-9][0-9]* errors' "$f" && bad+=("$f")
+          done
+          if [ "${#bad[@]}" -ne 0 ]; then
+            echo "::error::valgrind reported unsuppressed errors in ${#bad[@]} run(s)"
+            for f in "${bad[@]}"; do
+              echo "===== $f ====="
+              sed 's/==[0-9]*== //' "$f" | grep -A18 \
+                -E 'depends on uninitialised|points to uninitialised|Invalid (read|write|free)|lost in loss record|Mismatched free' \
+                | head -60
+            done
+            exit 1
+          fi
+          echo "valgrind clean: no unsuppressed errors"
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: valgrind-logs-${{ matrix.privilege }}-${{ matrix.transport }}
+          path: |
+            test-results/valgrind-logs/*.log
+            test-results/*.json
+          if-no-files-found: ignore
+          retention-days: 45

@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+  schedule:
+    - cron: '42 8 * * 0,2-6'
+    - cron: '42 8 * * 1'
+    - cron: '52 8 * * 1'
+    - cron: '42 9 * * 1'
+    - cron: '17 4 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Linux
+    if: &daily ${{ github.event_name != 'schedule' || github.event.schedule == '42 8 * * 0,2-6' || github.event.schedule == '42 8 * * 1' }}
+    uses: ./.github/workflows/linux.yml
+    with:
+      ubuntu: &weekly ${{ github.event_name != 'schedule' || github.event.schedule == '42 8 * * 1' }}
+      almalinux: *daily
+
+  bsd:
+    name: BSD
+    if: *weekly
+    uses: ./.github/workflows/bsd.yml
+
+  macos:
+    name: macOS
+    if: *daily
+    uses: ./.github/workflows/macos.yml
+
+  cygwin:
+    name: Cygwin
+    if: *daily
+    uses: ./.github/workflows/cygwin.yml
+
+  solaris:
+    name: Solaris
+    if: *weekly
+    uses: ./.github/workflows/solaris.yml
+
+  android:
+    name: Android
+    if: *weekly
+    uses: ./.github/workflows/android.yml
+
+  versions:
+    name: Versions
+    if: &versions ${{ github.event_name != 'schedule' || github.event.schedule == '52 8 * * 1' }}
+    uses: ./.github/workflows/versions.yml
+
+  diagnostics:
+    name: Diagnostics
+    if: &diagnostics ${{ github.event_name != 'schedule' || github.event.schedule == '42 9 * * 1' || github.event.schedule == '17 4 * * *' }}
+    uses: ./.github/workflows/diagnostics.yml
+    with:
+      lint: &regular ${{ github.event_name != 'schedule' }}
+      asan: &instrumented ${{ github.event_name != 'schedule' || github.event.schedule == '42 9 * * 1' }}
+      coverage: *instrumented
+      scan_pinned: *regular
+      scan_latest: *regular
+      valgrind: ${{ github.event_name != 'schedule' || github.event.schedule == '17 4 * * *' }}
+
+  result:
+    name: CI
+    if: always()
+    needs: [linux, bsd, macos, cygwin, solaris, android, versions, diagnostics]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CI_EXPECT_LINUX: *daily
+      CI_EXPECT_BSD: *weekly
+      CI_EXPECT_MACOS: *daily
+      CI_EXPECT_CYGWIN: *daily
+      CI_EXPECT_SOLARIS: *weekly
+      CI_EXPECT_ANDROID: *weekly
+      CI_EXPECT_VERSIONS: *versions
+      CI_EXPECT_DIAGNOSTICS: *diagnostics
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Check results
+        env:
+          CI_RESULTS: ${{ toJSON(needs) }}
+        run: printf '%s\n' "$CI_RESULTS" | jq -er -f .github/check-results.jq
