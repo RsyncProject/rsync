@@ -16,7 +16,6 @@
     "preallocate": "no preallocation support",
     "proc_fd": "no procfs descriptors",
     "protected_regular": "no protected_regular sysctl",
-    "search_only": "no Linux search-only fixture",
     "simd": "no SIMD test build",
     "symlink_xattr": "no symlink xattr fixture",
     "user_namespace": "no user namespaces"

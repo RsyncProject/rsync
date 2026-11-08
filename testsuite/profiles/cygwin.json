@@ -21,7 +21,7 @@
     "proc_fd": "no procfs descriptors",
     "protected_regular": "no protected_regular sysctl",
     "root_anchor": "no root-anchored source fixture",
-    "search_only": "no Linux search-only fixture",
+    "search_only": "no search-only permissions",
     "simd": "no SIMD test build",
     "symlink_mode": "no symlink chmod",
     "thread_count": "no process thread count",

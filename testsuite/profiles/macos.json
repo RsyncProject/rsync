@@ -14,7 +14,6 @@
     "protected_regular": "no protected_regular sysctl",
     "raw_filename_bytes": "no raw filename bytes",
     "root_anchor": "no root-anchored source fixture",
-    "search_only": "no Linux search-only fixture",
     "setgid_semantics": "setgid differential unavailable",
     "simd": "no SIMD test build",
     "sparse": "no sparse-file fixture",
