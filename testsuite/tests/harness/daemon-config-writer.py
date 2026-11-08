@@ -35,6 +35,8 @@ def test(context: TestContext):
     for section in ('test-from', 'test-to', 'test-scratch', 'test-hidden'):
         if f'[{section}]' not in text:
             test_fail(f'standard configuration omitted {section}')
+    if (context.scratch / 'ignore23').exists():
+        test_fail('daemon configuration created an exit-status wrapper')
 
 if __name__ == '__main__':
     run(test)

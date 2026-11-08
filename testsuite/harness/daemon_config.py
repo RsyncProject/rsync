@@ -10,19 +10,6 @@ SCRATCHDIR = Path(os.environ['scratchdir'])
 FROMDIR = SCRATCHDIR / 'from'
 TODIR = SCRATCHDIR / 'to'
 
-def _write_ignore23():
-    path = SCRATCHDIR / 'ignore23'
-    if path.exists():
-        return
-    path.write_text(
-        '#!/bin/sh\n'
-        'if "${@}"; then exit; fi\n'
-        'ret=$?\n'
-        'if test $ret = 23; then exit; fi\n'
-        'exit $ret\n'
-    )
-    path.chmod(0o755)
-
 def write_daemon_conf(modules, global_options=None, *,
                       name: str = 'test-rsyncd.conf') -> Path:
     options = {
@@ -49,7 +36,6 @@ def write_daemon_conf(modules, global_options=None, *,
         lines.append('')
     path = SCRATCHDIR / name
     path.write_text('\n'.join(lines) + '\n')
-    _write_ignore23()
     return path
 
 def build_rsyncd_conf() -> Path:

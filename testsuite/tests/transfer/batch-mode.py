@@ -5,7 +5,7 @@ import subprocess
 
 from harness.daemon_config import build_rsyncd_conf
 from harness.rsync import (
-    CHKDIR, FROMDIR, SCRATCHDIR, TMPDIR, TODIR, checkit, hands_setup, rmtree, rsync_argv,
+    CHKDIR, FROMDIR, TMPDIR, TODIR, checkit, hands_setup, rmtree,
     run_rsync, start_test_daemon, test_fail, verify_dirs,
 )
 from harness import metadata
@@ -68,11 +68,5 @@ verify_dirs(CHKDIR, TODIR, label="do-nothing re-run of batch")
 rmtree(TODIR)
 TODIR.mkdir()
 print("Test daemon recv --write-batch:")
-ignore23 = SCRATCHDIR / 'ignore23'
-proc = subprocess.run(
-    [str(ignore23), *rsync_argv('-av', '--write-batch=BATCH',
-                                 f'{FROMDIR}/', f'{url}test-to')],
-)
-if proc.returncode != 0:
-    test_fail(f"daemon recv --write-batch exited {proc.returncode}")
-verify_dirs(CHKDIR, TODIR, label="daemon recv --write-batch")
+checkit(['-av', '--write-batch=BATCH', f'{FROMDIR}/', f'{url}test-to'],
+        CHKDIR, TODIR, allowed_codes=(0, 23))
