@@ -52,9 +52,9 @@ The native check recipe in testsuite/tools/check.sh takes a build directory, exe
 
 ## CI
 
-[ci.yml](../.github/workflows/ci.yml) owns events, schedules and cancellation. Reusable workflows group platform, diagnostic and version-mixing jobs. Pull requests, master pushes and manual runs select every job; scheduled runs select the relevant daily or weekly jobs.
+[ci.yml](../.github/workflows/ci.yml) owns events, schedules and cancellation. macOS, Cygwin and Solaris run as direct jobs. Local composite actions hold the macOS and Cygwin steps; other job families use reusable workflows. Pull requests, master pushes and manual runs select every job; scheduled runs select the relevant daily or weekly jobs.
 
-The final CI check requires selected jobs to finish successfully and permits only the declared scheduled omissions. The latest Clang analysis remains advisory. Workflow lint also tests the result gate against failures, cancellation, missing results and unexpected skips.
+The final Required check validates all selected job results and permits only the declared scheduled omissions. The latest Clang analysis remains advisory. Workflow lint also tests the result gate against failures, cancellation, missing results and unexpected skips.
 
 ## TCP daemon mode
 

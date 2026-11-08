@@ -35,19 +35,105 @@ jobs:
     uses: ./.github/workflows/bsd.yml
 
   macos:
-    name: macOS
     if: *daily
-    uses: ./.github/workflows/macos.yml
+    runs-on: macos-latest
+    timeout-minutes: 45
+    name: macOS
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Build and test
+        uses: ./.github/actions/macos
+      - name: Upload binaries
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          retention-days: 45
+          name: macos-bin
+          path: |
+            rsync
+            rsync-ssl
+            rsync.1
+            rsync-ssl.1
+            rsyncd.conf.5
+            rrsync.1
+            rrsync
 
   cygwin:
-    name: Cygwin
     if: *daily
-    uses: ./.github/workflows/cygwin.yml
+    runs-on: windows-2022
+    timeout-minutes: 60
+    name: Cygwin
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Build and test
+        uses: ./.github/actions/cygwin
+      - name: Upload binaries
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          retention-days: 45
+          name: cygwin-bin
+          path: |
+            rsync.exe
+            rsync-ssl
+            rsync.1
+            rsync-ssl.1
+            rsyncd.conf.5
+            rrsync.1
+            rrsync
 
   solaris:
-    name: Solaris
     if: *weekly
-    uses: ./.github/workflows/solaris.yml
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    name: Solaris
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prepare VM host
+        timeout-minutes: 10
+        run: |
+          packages=(qemu-utils qemu-system-x86 ovmf)
+          sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "${packages[@]}" || {
+            sudo apt-get update -q
+            sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "${packages[@]}"
+          }
+      - name: Build and test
+        id: test
+        uses: vmactions/solaris-vm@87d3c436511cef802cd1637f86f73b1a97715c8c # v1.4.1
+        with:
+          cache-after-prepare: true
+          prepare: |
+            pkg install bash automake gnu-m4 pkg://solaris/runtime/python-35 autoconf gcc git
+          run: |
+            uname -a
+            ./configure --with-rrsync -disable-zstd --disable-md2man --disable-xxhash --disable-lz4 --disable-idn
+            make check-progs
+            ./rsync --version
+            RSYNC_TEST_PROFILES=pipe,non-asan,root,self-peer,solaris,no-idn,no-xxhash,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --receipt=test-results/solaris-pipe.json -j 8
+            RSYNC_TEST_PROFILES=non-asan,root,self-peer,solaris,no-idn,no-xxhash,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp --daemon-tests-only --receipt=test-results/solaris-tcp.json -j 8
+            ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
+      - name: Upload binaries
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          retention-days: 45
+          name: solaris-bin
+          path: |
+            rsync
+            rsync-ssl
+            rsync.1
+            rsync-ssl.1
+            rsyncd.conf.5
+            rrsync.1
+            rrsync
+            test-results/*.json
 
   android:
     name: Android
@@ -71,13 +157,14 @@ jobs:
       scan_latest: *regular
       valgrind: ${{ github.event_name != 'schedule' || github.event.schedule == '17 4 * * *' }}
 
-  result:
-    name: CI
+  required:
+    name: Required
     if: always()
     needs: [linux, bsd, macos, cygwin, solaris, android, versions, diagnostics]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
+      CI_DIRECT_JOBS: '["macos","cygwin","solaris"]'
       CI_EXPECT_LINUX: *daily
       CI_EXPECT_BSD: *weekly
       CI_EXPECT_MACOS: *daily
