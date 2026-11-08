@@ -26,6 +26,14 @@ def test(context: TestContext):
         test_fail('runner settings were overridden by shconfig')
 
     tests = runner.collect_tests(str(context.repository / 'testsuite'), [])
+    for names in ('', 'linux'):
+        args = SimpleNamespace(profiles=names, protocol=None, use_tcp=False)
+        with patch.dict('os.environ', {'RSYNC_TEST_UNSUPPORTED': 'fixture'}):
+            configured = runner.configure_profiles(
+                args, str(context.repository / 'testsuite'), str(context.repository),
+                tests, tests, '', '')
+        if 'fixture' in configured[4]:
+            test_fail('an environment override changed profile capabilities')
     try:
         runner.collect_tests(str(context.repository / 'testsuite'), ['missing-test'])
     except ValueError:

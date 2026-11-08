@@ -527,13 +527,6 @@ def configure_profiles(args, suitedir, srcdir, all_tests, tests,
         profiles.append(load_profile(path, known_tests))
 
     peer, profile_protocol, unsupported, xfail = merge_profiles(profiles)
-    extra = [value.strip() for value in os.environ.get(
-        'RSYNC_TEST_UNSUPPORTED', '').split(',') if value.strip()]
-    if extra and not profiles:
-        raise ValueError('RSYNC_TEST_UNSUPPORTED requires an active profile')
-    for capability in extra:
-        unsupported.setdefault(capability, 'target-specific absence')
-
     effective_protocol = args.protocol
     transport = 'tcp' if args.use_tcp else 'pipe'
     if profile_protocol and not peer:
