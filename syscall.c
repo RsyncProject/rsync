@@ -65,6 +65,7 @@ extern int copy_unsafe_links;
 extern int copy_dirlinks;
 extern int am_daemon;
 extern int am_chrooted;
+extern int munge_symlinks;
 extern int insecure_links;
 extern int module_id;
 extern unsigned int module_dirlen;
@@ -975,6 +976,7 @@ int do_symlink_at(const char *lnk, const char *path)
 #ifdef AT_FDCWD
 	extern int am_daemon, am_chrooted;
 	char dirpath[MAXPATHLEN];
+	char munged[MAXPATHLEN];
 	const char *bname;
 	const char *slash;
 	int dfd = AT_FDCWD, ret, e;
@@ -1052,6 +1054,22 @@ int do_symlink_at(const char *lnk, const char *path)
 		return ret;
 	}
 #endif
+    /* Ensure the daemon or munge_symlinks mode never creates an unmunged
+	 * symlink on disk (e.g., via make_backup_inner() copying an unmunged
+	 * local symlink), while avoiding double-munging links already prefixed
+	 * by recv_file_entry(). */
+	if (munge_symlinks) {
+		size_t lnk_len = strlen(lnk);
+		if (lnk_len <= SYMLINK_PREFIX_LEN
+		 || strncmp(lnk, SYMLINK_PREFIX, SYMLINK_PREFIX_LEN) != 0) {
+			if (lnk_len + SYMLINK_PREFIX_LEN >= sizeof munged) {
+				errno = ENAMETOOLONG;
+				return -1;
+			}
+			snprintf(munged, sizeof munged, "%s%s", SYMLINK_PREFIX, lnk);
+			lnk = munged;
+		}
+	}
 
 	ret = symlinkat(lnk, dfd, bname);
 	e = errno;
