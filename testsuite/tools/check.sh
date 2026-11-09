@@ -30,7 +30,7 @@ cd "$build"
 
 status=0
 unset whichtests
-scratchbase="$output/scratch" python3 "$source/testsuite/runtests.py" \
+scratchbase="$output/scratch" python3 -S "$source/testsuite/runtests.py" \
     "$@" \
     --srcdir="$source" --tooldir="$build" --rsync-bin="$binary" \
     --profiles="$profiles" --receipt="$output/receipt.json" \

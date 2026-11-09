@@ -19,6 +19,7 @@
     "noatime": "no O_NOATIME",
     "preallocate": "no preallocation support",
     "proc_fd": "no procfs descriptors",
+    "setpriv": "no setpriv launcher",
     "simd": "no SIMD test build",
     "symlink_xattr": "no symlink xattr fixture"
   }

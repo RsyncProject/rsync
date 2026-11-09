@@ -88,14 +88,17 @@ def test(context: TestContext):
             valid = names == 'linux' or names == ('root' if uid == 0 else 'nonroot')
             with patch.object(runner.os, 'geteuid', return_value=uid):
                 try:
-                    runner.configure_profiles(args, str(context.repository / 'testsuite'),
-                                              str(context.repository), tests, tests, '', '')
+                    configured = runner.configure_profiles(args, str(context.repository / 'testsuite'),
+                                                           str(context.repository), tests, tests, '', '')
                 except ValueError:
                     if valid:
                         test_fail(f'{names} rejected effective UID {uid}')
                 else:
                     if not valid:
                         test_fail(f'{names} accepted effective UID {uid}')
+                    if uid == 0 and names == 'root' and not any(
+                            test_name(path) == 'search-only-held-dirfd' for path in configured[0]):
+                        test_fail('root profile dropped search-only coverage which can use setpriv')
     try:
         runner.collect_tests(str(context.repository / 'testsuite'), ['missing-test'])
     except ValueError:
@@ -309,6 +312,12 @@ def test(context: TestContext):
     if result.returncode:
         test_fail(f'script identity or sibling imports changed: {result.stdout}{result.stderr}')
     sibling.unlink()
+
+    (testdir / 'conditional.py').write_text('import sys\nassert sys.flags.no_site\n')
+    result = subprocess.run([sys.executable, '-S', *command[1:]], env=nested_env,
+                            capture_output=True, text=True)
+    if result.returncode:
+        test_fail(f'test execution enabled site packages: {result.stdout}{result.stderr}')
 
     (testdir / 'conditional.py').write_text(
         "import os\nfrom harness import metadata\nmetadata(cost='expensive')\n"

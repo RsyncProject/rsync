@@ -18,6 +18,7 @@
     "noatime": "no O_NOATIME",
     "preallocate": "no preallocation support",
     "proc_fd": "no procfs descriptors",
+    "setpriv": "no setpriv launcher",
     "symlink_xattr": "no symlink xattr fixture",
     "xattr_runtime": "no user xattr fixture"
   }

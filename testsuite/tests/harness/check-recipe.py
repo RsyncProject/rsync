@@ -31,7 +31,16 @@ def test(context: TestContext):
             test_fail(f'missing recipe diagnostic: {message}\n{result.stdout}{result.stderr}')
         return result
 
+    python_dir = context.scratch / 'python'
+    python_dir.mkdir()
+    python = python_dir / 'python3'
+    python.write_text(f'#!{sys.executable}\nimport os, sys\n'
+                      'assert sys.argv[1] == "-S"\n'
+                      'os.execv(sys.executable, [sys.executable, *sys.argv[1:]])\n')
+    python.chmod(0o755)
+    env['PATH'] = str(python_dir) + os.pathsep + os.environ['PATH']
     invoke(command + ['cli-transfers', '-j2'], True)
+    env['PATH'] = os.environ['PATH']
     receipt = json.loads((output / 'receipt.json').read_text())
     identity = receipt['run']
     digest = hashlib.sha256(Path(binary).read_bytes()).hexdigest()

@@ -21,6 +21,7 @@
     "preallocate": "no preallocation support",
     "proc_fd": "no procfs descriptors",
     "search_only": "no race-safe search-only directory descriptors",
+    "setpriv": "no setpriv launcher",
     "simd": "no SIMD test build",
     "symlink_xattr": "no symlink xattr fixture",
     "xattr_runtime": "no user xattr fixture",

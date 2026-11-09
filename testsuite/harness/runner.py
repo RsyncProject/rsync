@@ -383,7 +383,7 @@ def run_one_test(testscript, testbase, scratchdir, base_env, timeout,
         testscript = os.path.join(scratchdir, os.path.basename(testscript))
         shutil.copyfile(target, testscript)
 
-    cmd = [sys.executable, os.path.join(_SUITE_DIR, 'harness', 'execute.py'), testscript]
+    cmd = [sys.executable, '-S', os.path.join(_SUITE_DIR, 'harness', 'execute.py'), testscript]
 
     logfile = os.path.join(scratchdir, 'test.log')
     with open(logfile, 'w') as log:

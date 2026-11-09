@@ -19,10 +19,10 @@ search_only_dirs = version['capabilities']['search_only_dirs']
 launcher = []
 if os.geteuid() == 0:
     if not sys.platform.startswith('linux'):
-        test_skipped('requires a non-root test process on this platform', capability='nonroot')
+        test_skipped('no non-root launcher on this platform', capability='setpriv')
     setpriv = shutil.which('setpriv')
     if setpriv is None:
-        test_skipped('setpriv is unavailable for the root-run testsuite', capability='search_only')
+        test_skipped('setpriv is unavailable for the root-run testsuite', capability='setpriv')
     launcher = [setpriv, '--reuid=65534', '--regid=65534', '--clear-groups']
 
 external_base = os.geteuid() == 0
