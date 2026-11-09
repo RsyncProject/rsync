@@ -246,22 +246,22 @@ jobs:
           name: version-mix-receipts
           path: test-results/version-mix
 
-  diagnostics:
-    name: Diagnostics
-    if: &diagnostics ${{ github.event_name != 'schedule' || github.event.schedule == '42 9 * * 1' || github.event.schedule == '17 4 * * *' }}
-    uses: ./.github/workflows/diagnostics.yml
+  analysis:
+    name: Analysis
+    if: &analysis ${{ github.event_name != 'schedule' || github.event.schedule == '42 9 * * 1' || github.event.schedule == '17 4 * * *' }}
+    uses: ./.github/workflows/analysis.yml
     with:
       lint: &regular ${{ github.event_name != 'schedule' }}
       asan: &instrumented ${{ github.event_name != 'schedule' || github.event.schedule == '42 9 * * 1' }}
       coverage: *instrumented
-      scan_pinned: *regular
-      scan_latest: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && github.event.schedule == '42 9 * * 1') }}
+      clang_scan: *regular
+      clang_forward: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && github.event.schedule == '42 9 * * 1') }}
       valgrind: ${{ github.event_name != 'schedule' || github.event.schedule == '17 4 * * *' }}
 
   required:
     name: Required
     if: always()
-    needs: [linux, bsd, macos, cygwin, solaris, android, versions, diagnostics]
+    needs: [linux, bsd, macos, cygwin, solaris, android, versions, analysis]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     env:
@@ -273,7 +273,7 @@ jobs:
       CI_EXPECT_SOLARIS: *weekly
       CI_EXPECT_ANDROID: *weekly
       CI_EXPECT_VERSIONS: *versions
-      CI_EXPECT_DIAGNOSTICS: *diagnostics
+      CI_EXPECT_ANALYSIS: *analysis
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

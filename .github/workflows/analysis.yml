@@ -1,4 +1,4 @@
-name: Diagnostics
+name: Analysis
 
 on:
   workflow_call:
@@ -12,10 +12,10 @@ on:
       coverage:
         required: true
         type: boolean
-      scan_pinned:
+      clang_scan:
         required: true
         type: boolean
-      scan_latest:
+      clang_forward:
         required: true
         type: boolean
       valgrind:
@@ -28,9 +28,9 @@ on:
       inputs:
         description: Job selections
         value: ${{ toJSON(inputs) }}
-      advisory:
-        description: Advisory job
-        value: scan_latest
+      non_blocking:
+        description: Non-blocking job
+        value: clang_forward
 
 permissions:
   contents: read
@@ -40,7 +40,7 @@ jobs:
     if: ${{ inputs.lint }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    name: Workflow lint
+    name: Workflow validation
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -66,7 +66,7 @@ jobs:
     if: ${{ inputs.asan }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    name: ASan + UBSan
+    name: Sanitisers (ASan and UBSan)
     env:
       # Process-exit leaks are intentional; memory errors remain fatal
       ASAN_OPTIONS: detect_leaks=0:abort_on_error=1
@@ -108,7 +108,7 @@ jobs:
     if: ${{ inputs.coverage }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    name: Coverage
+    name: Coverage (gcov)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -157,11 +157,11 @@ jobs:
             coverage
             coverage-tcp
 
-  scan_pinned:
-    if: ${{ inputs.scan_pinned }}
+  clang_scan:
+    if: ${{ inputs.clang_scan }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    name: Clang 18
+    name: Clang scan-build 18
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -189,11 +189,11 @@ jobs:
           path: scan-report
           if-no-files-found: ignore
 
-  scan_latest:
-    if: ${{ inputs.scan_latest }}
+  clang_forward:
+    if: ${{ inputs.clang_forward }}
     runs-on: ubuntu-26.04
     timeout-minutes: 45
-    name: Clang (Ubuntu 26.04, advisory)
+    name: Clang scan-build (Ubuntu 26.04, non-blocking)
     continue-on-error: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -209,13 +209,13 @@ jobs:
       - name: Analyse
         run: |
           scan-build -o "$PWD/scan-report" make check-progs -j"$(nproc)" 2>&1 | tee scan-build.out
-          echo '## scan-build informational (latest clang)' >>"$GITHUB_STEP_SUMMARY"
+          echo '## scan-build forward check' >>"$GITHUB_STEP_SUMMARY"
           grep -E 'scan-build: .* bugs? found|scan-build: No bugs found' scan-build.out >>"$GITHUB_STEP_SUMMARY" || true
       - name: Upload report
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: scan-build-report-latest
+          name: scan-build-report-forward
           path: scan-report
           if-no-files-found: ignore
 

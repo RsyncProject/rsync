@@ -69,7 +69,7 @@ Each matrix entry checks its OS release and architecture and has separate artefa
 
 Alpine uses pinned official musl images. Its AMD64 and x86 jobs build and execute the same root and non-root pipe and TCP passes as Ubuntu, including protocol 29 and 30. The x86 job also verifies a 32-bit process with 64-bit file offsets.
 
-Ubuntu 24.04 AMD64 checks the installed `rsync` and `rsync-ssl` against a local TLS daemon. The fixture accepts a trusted certificate, rejects an unknown CA and a hostname mismatch and checks the hostname-only and full-verification opt-outs. It does not contact a public rsync service.
+Each Ubuntu row checks the installed `rsync` and `rsync-ssl` against a local TLS daemon. The fixture accepts a trusted certificate, rejects an unknown CA and a hostname mismatch and checks the hostname-only and full-verification opt-outs. It does not contact a public rsync service.
 
 Ubuntu, macOS and the BSD guests have separate root and non-root pipe and TCP passes. Each pass retains its receipt and log. macOS, FreeBSD and OpenBSD also check the built binary's required features with testsuite/tools/check-features.py, using capability and algorithm names from `rsync -VV`.
 
@@ -79,7 +79,7 @@ VM guest scripts record their exit status before returning control to the VM act
 
 BSD and macOS jobs retain dirfd-probe.tsv alongside their test results. `make dirfd-probe` builds a standalone tool which takes an existing writable scratch directory and refuses root. Its rows record directory-open flags, identity checks, known-file reads, creation, fchdir, search-permission revocation and O_NOFOLLOW. Operation columns use zero for success and errno values for failure; N/A marks undefined flags and unattempted operations.
 
-The final Required check validates all selected job results and permits only the declared scheduled omissions. The Ubuntu 26.04 Clang analysis runs weekly and remains advisory. Workflow lint also tests the result gate against failures, cancellation, missing results and unexpected skips.
+The final Required check validates all selected job results and permits only the declared scheduled omissions. The Ubuntu 26.04 Clang scan runs weekly and remains non-blocking. Workflow validation also tests the result gate against failures, cancellation, missing results and unexpected skips.
 
 ## TCP daemon mode
 
