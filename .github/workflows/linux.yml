@@ -35,13 +35,13 @@ jobs:
             machine: x86_64
             runner: ubuntu-26.04
             install_smoke: true
-            profiles: non-asan,self-peer,linux
+            profiles: non-asan,self-peer,linux,no-userns
           - release: '24.04'
             arch: amd64
             machine: x86_64
             runner: ubuntu-24.04
             install_smoke: true
-            profiles: non-asan,self-peer,linux
+            profiles: non-asan,self-peer,linux,no-userns
           - release: '22.04'
             arch: amd64
             machine: x86_64
@@ -53,13 +53,13 @@ jobs:
             machine: aarch64
             runner: ubuntu-26.04-arm
             install_smoke: true
-            profiles: non-asan,self-peer,linux,no-simd
+            profiles: non-asan,self-peer,linux,no-simd,no-userns
           - release: '24.04'
             arch: arm64
             machine: aarch64
             runner: ubuntu-24.04-arm
             install_smoke: true
-            profiles: non-asan,self-peer,linux,no-simd
+            profiles: non-asan,self-peer,linux,no-simd,no-userns
           - release: '22.04'
             arch: arm64
             machine: aarch64
@@ -202,9 +202,9 @@ jobs:
       - name: Version
         run: ./rsync --version
       - name: Tests (root pipe)
-        run: RSYNC_TEST_PROFILES=pipe,non-asan,root,self-peer,linux,no-zstd-threads make check
+        run: RSYNC_TEST_PROFILES=pipe,non-asan,root,self-peer,linux,no-zstd-threads,no-userns make check
       - name: Tests (root TCP)
-        run: RSYNC_TEST_PROFILES=non-asan,root,self-peer,linux,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp --daemon-tests-only -j 8
+        run: RSYNC_TEST_PROFILES=non-asan,root,self-peer,linux,no-zstd-threads,no-userns ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp --daemon-tests-only -j 8
       - name: TLS listing (optional)
         run: ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
       - name: Upload binaries
@@ -235,13 +235,13 @@ jobs:
             apk_arch: x86_64
             bits: 64
             image: alpine@sha256:0f49f331d9212aff11b932863be4eb01cdf962969aa86dab7d1ee21ac6f5f52b
-            profiles: non-asan,self-peer,linux,no-simd,docker-default
+            profiles: non-asan,self-peer,linux,no-simd,no-userns
           - arch: x86
             platform: linux/386
             apk_arch: x86
             bits: 32
             image: alpine@sha256:55d68c85222dd92297b0f8885354739d89f0dc17fc2f903c49dc1d9c129c3d6a
-            profiles: non-asan,self-peer,linux,no-simd,docker-default
+            profiles: non-asan,self-peer,linux,no-simd,no-userns
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -259,7 +259,7 @@ jobs:
           BITS: ${{ matrix.bits }}
           PROFILES: ${{ matrix.profiles }}
         run: |
-          docker run --rm --platform "${{ matrix.platform }}" \
+          docker run --rm -i --platform "${{ matrix.platform }}" \
             -e APK_ARCH -e BITS -e PROFILES -e RSYNC_TEST_TMP=/dev/shm \
             -v "$PWD:/source:ro" \
             -v "$RUNNER_TEMP/rsync-alpine-${{ matrix.arch }}:/results" \
