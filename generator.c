@@ -801,7 +801,7 @@ static int generate_and_send_sums(int fd, OFF_T len, int f_out, int f_copy)
 	for (i = 0; i < sum.count; i++) {
 		int32 n1 = (int32)MIN(len, (OFF_T)sum.blength);
 		char *map = map_ptr(mapbuf, offset, n1);
-		char sum2[SUM_LENGTH];
+		char sum2[MAX_DIGEST_LEN];
 		uint32 sum1;
 
 		len -= n1;
@@ -963,9 +963,9 @@ static int copy_altdest_file(const char *src, const char *dest, struct file_stru
 static int basis_link_stat(const char *path, STRUCT_STAT *stp)
 {
 	extern int am_chrooted;
-	extern int operator_path_resolve;
 	extern unsigned int module_dirlen;
 #if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+	extern int operator_path_resolve;
 	/* The basis dir (--link-dest/--compare-dest/--copy-dest) is an operator-
 	 * supplied path.  For a non-daemon receiver, resolve it with the ownership
 	 * walk: a symlink component owned by uid 0 or the euid (the operator's own
@@ -1473,7 +1473,7 @@ static int gen_entry_copy_xattrs(const char *src, const char *fname, struct file
 	 * relative basis goes through the RESOLVE_BENEATH resolver; an absolute one
 	 * through the operator ownership walk.  Refuse (don't path-read) when we are
 	 * meant to confine but can't pin; a non-hardened receiver path-reads (sfd<0). */
-#if defined AT_FDCWD && defined O_NOFOLLOW
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
 	if (secure_relpath_active() && src && *src && !symlink_optout_allowed()) {
 		int odir = 0;
 #ifdef O_DIRECTORY

@@ -65,12 +65,52 @@ CHECK_SYMLINKS = testsuite/chown-fake.test testsuite/devices-fake.test testsuite
 
 # Objects for CHECK_PROGS to clean
 CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o t_chmod_secure.o t_rename_secure.o t_symlink_secure.o t_secure_relpath.o t_acl.o trimslash.o wildtest.o
+CHECK_COMPILE_OBJS=syscall-no-o-directory.o authenticate-no-o-cloexec.o \
+	rsync-no-o-cloexec.o clientserver-no-o-directory.o \
+	flist-no-o-directory.o generator-no-o-directory.o \
+	sender-no-o-directory.o lib/acl-no-o-directory.o access-no-inet6.o
 
 # note that the -I. is needed to handle config.h when using VPATH
 .c.o:
 @OBJ_SAVE@
 	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) -c $< @CC_SHOBJ_FLAG@
 @OBJ_RESTORE@
+
+syscall-no-o-directory.o: syscall.c $(HEADERS)
+	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) \
+	    -DRSYNC_TEST_NO_O_DIRECTORY -c $(srcdir)/syscall.c -o $@
+
+authenticate-no-o-cloexec.o: authenticate.c $(HEADERS)
+	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) \
+	    -DRSYNC_TEST_NO_O_CLOEXEC -c $(srcdir)/authenticate.c -o $@
+
+rsync-no-o-cloexec.o: rsync.c $(HEADERS)
+	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) \
+	    -DRSYNC_TEST_NO_O_CLOEXEC -c $(srcdir)/rsync.c -o $@
+
+clientserver-no-o-directory.o: clientserver.c $(HEADERS)
+	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) \
+	    -DRSYNC_TEST_NO_O_DIRECTORY -c $(srcdir)/clientserver.c -o $@
+
+flist-no-o-directory.o: flist.c $(HEADERS)
+	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) \
+	    -DRSYNC_TEST_NO_O_DIRECTORY -c $(srcdir)/flist.c -o $@
+
+generator-no-o-directory.o: generator.c $(HEADERS)
+	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) \
+	    -DRSYNC_TEST_NO_O_DIRECTORY -c $(srcdir)/generator.c -o $@
+
+sender-no-o-directory.o: sender.c $(HEADERS)
+	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) \
+	    -DRSYNC_TEST_NO_O_DIRECTORY -c $(srcdir)/sender.c -o $@
+
+lib/acl-no-o-directory.o: lib/acl.c $(HEADERS)
+	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) \
+	    -DRSYNC_TEST_NO_O_DIRECTORY -c $(srcdir)/lib/acl.c -o $@
+
+access-no-inet6.o: access.c $(HEADERS)
+	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) \
+	    -DRSYNC_TEST_NO_INET6 -c $(srcdir)/access.c -o $@
 
 # NOTE: consider running "packaging/smart-make" instead of "make" to auto-handle
 # any changes to configure.sh and the main Makefile prior to a "make all".
@@ -308,7 +348,7 @@ rrsync.1: support/rrsync.1.md md-convert Makefile
 
 .PHONY: clean
 clean: cleantests
-	rm -f *~ $(OBJS) $(CHECK_PROGS) $(CHECK_OBJS) $(CHECK_SYMLINKS) @MAKE_RRSYNC@ \
+	rm -f *~ $(OBJS) $(CHECK_PROGS) $(CHECK_OBJS) $(CHECK_COMPILE_OBJS) $(CHECK_SYMLINKS) @MAKE_RRSYNC@ \
 		git-version.h rounding rounding.h *.old rsync*.1 rsync*.5 @MAKE_RRSYNC_1@ \
 		*.html daemon-parm.h help-*.h default-*.h proto.h proto.h-tstamp
 
@@ -355,18 +395,18 @@ test: check
 # an external harness (e.g. fleettest.py) can invoke runtests.py with its own
 # options.
 .PHONY: check-progs
-check-progs: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
+check-progs: all $(CHECK_PROGS) $(CHECK_COMPILE_OBJS) $(CHECK_SYMLINKS)
 
 .PHONY: check
-check: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
+check: all $(CHECK_PROGS) $(CHECK_COMPILE_OBJS) $(CHECK_SYMLINKS)
 	rsync_bin=`pwd`/rsync$(EXEEXT) $(srcdir)/runtests.sh
 
 .PHONY: check29
-check29: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
+check29: all $(CHECK_PROGS) $(CHECK_COMPILE_OBJS) $(CHECK_SYMLINKS)
 	rsync_bin=`pwd`/rsync$(EXEEXT) $(srcdir)/runtests.sh --protocol=29
 
 .PHONY: check30
-check30: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
+check30: all $(CHECK_PROGS) $(CHECK_COMPILE_OBJS) $(CHECK_SYMLINKS)
 	rsync_bin=`pwd`/rsync$(EXEEXT) $(srcdir)/runtests.sh --protocol=30
 
 wildtest.o: wildtest.c t_stub.o lib/wildmatch.c rsync.h config.h

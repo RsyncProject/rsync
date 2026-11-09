@@ -921,6 +921,175 @@ if test x"$rsync_cv_HAVE_DIRFD" = x"yes"; then
     AC_DEFINE([HAVE_DIRFD], 1, [Define to 1 if you have a working dirfd() (function or macro).])
 fi
 
+dnl The confined resolver needs a directory descriptor which can be opened with
+dnl search permission alone and which still rechecks search permission when it
+dnl is used.  A defined O_SEARCH is not sufficient: NetBSD 11 discards it and
+dnl POSIX permits an O_SEARCH descriptor to bypass later permission checks.
+AC_CACHE_CHECK([for race-safe search-only directory descriptors],
+  [rsync_cv_search_only_dirfd_flag], [
+    rm -f conftest.search-only
+    AC_RUN_IFELSE([AC_LANG_SOURCE([[
+#define _GNU_SOURCE 1
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+#ifndef O_CLOEXEC
+#define O_CLOEXEC 0
+#endif
+
+static int check_flag(int flag)
+{
+    struct stat expected, observed;
+    char base[] = "/tmp/rsync-search-only.XXXXXX";
+    int root = -1, control = -1, cwd = -1, fd = -1, child = -1;
+    int dropped = 0, result = 1;
+    gid_t saved_gid = getegid();
+
+    if (!mkdtemp(base))
+        goto out;
+    root = open(base, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    cwd = open(".", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    if (root < 0 || cwd < 0 || mkdirat(root, "dir", 0700) < 0
+     || symlinkat("dir", root, "link") < 0)
+        goto out;
+    control = openat(root, "dir", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    if (control < 0 || fstat(control, &expected) < 0)
+        goto out;
+    child = openat(control, "known", O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
+    if (child < 0 || write(child, "x", 1) != 1)
+        goto out;
+    if (geteuid() == 0) {
+        if (fchown(root, 65534, 65534) < 0
+         || fchown(control, 65534, 65534) < 0
+         || fchown(child, 65534, 65534) < 0)
+            goto out;
+    }
+    if (close(child) < 0)
+        goto out;
+    child = -1;
+    if (geteuid() == 0) {
+        if (setegid(65534) < 0)
+            goto out;
+        if (seteuid(65534) < 0) {
+            setegid(saved_gid);
+            goto out;
+        }
+        dropped = 1;
+    }
+    if (fchmod(control, 0100) < 0)
+        goto out;
+    fd = openat(root, "dir", flag | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    if (fd < 0 || fstat(fd, &observed) < 0
+     || expected.st_dev != observed.st_dev || expected.st_ino != observed.st_ino)
+        goto out;
+    child = openat(fd, "known", O_RDONLY | O_CLOEXEC);
+    if (child < 0 || close(child) < 0)
+        goto out;
+    child = -1;
+    if (fchmod(control, 0300) < 0)
+        goto out;
+    child = openat(fd, "new", O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
+    if (child < 0 || close(child) < 0 || unlinkat(fd, "new", 0) < 0)
+        goto out;
+    child = -1;
+    if (fchmod(control, 0000) < 0)
+        goto out;
+    child = openat(fd, "known", O_RDONLY | O_CLOEXEC);
+    if (child >= 0 || (errno != EACCES && errno != EPERM))
+        goto out;
+    if (fchdir(fd) == 0) {
+        fchdir(cwd);
+        goto out;
+    }
+    if (errno != EACCES && errno != EPERM)
+        goto out;
+    if (fchmod(control, 0700) < 0)
+        goto out;
+    child = openat(root, "link", flag | O_DIRECTORY | O_CLOEXEC);
+    if (child < 0 || close(child) < 0)
+        goto out;
+    child = -1;
+    child = openat(root, "link", flag | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    if (child >= 0)
+        goto out;
+    result = 0;
+out:
+    if (dropped && (seteuid(0) < 0 || setegid(saved_gid) < 0))
+        result = 1;
+    if (child >= 0 && close(child) < 0)
+        result = 1;
+    if (fd >= 0 && close(fd) < 0)
+        result = 1;
+    if (control >= 0) {
+        if (fchmod(control, 0700) < 0)
+            result = 1;
+        if (unlinkat(control, "new", 0) < 0 && errno != ENOENT)
+            result = 1;
+        if (unlinkat(control, "known", 0) < 0 && errno != ENOENT)
+            result = 1;
+        if (close(control) < 0)
+            result = 1;
+    }
+    if (root >= 0) {
+        if (unlinkat(root, "link", 0) < 0 && errno != ENOENT)
+            result = 1;
+        if (unlinkat(root, "dir", AT_REMOVEDIR) < 0 && errno != ENOENT)
+            result = 1;
+        if (close(root) < 0)
+            result = 1;
+    }
+    if (cwd >= 0 && close(cwd) < 0)
+        result = 1;
+    if (rmdir(base) < 0 && errno != ENOENT)
+        result = 1;
+    return result;
+}
+
+int main(void)
+{
+    const char *name = NULL;
+#ifdef O_PATH
+    if (check_flag(O_PATH) == 0)
+        name = "O_PATH";
+#endif
+#ifdef O_SEARCH
+    if (!name && check_flag(O_SEARCH) == 0)
+        name = "O_SEARCH";
+#endif
+    if (name) {
+        FILE *out = fopen("conftest.search-only", "w");
+        if (!out || fprintf(out, "%s\n", name) < 0 || fclose(out) < 0)
+            return 1;
+        return 0;
+    }
+    return 1;
+}
+]])],
+      [rsync_cv_search_only_dirfd_flag=`cat conftest.search-only`],
+      [rsync_cv_search_only_dirfd_flag=no],
+      [case "$host_os" in
+         linux*|android*)
+           AC_LINK_IFELSE([AC_LANG_PROGRAM([[
+#define _GNU_SOURCE 1
+#include <fcntl.h>
+]], [[return openat(AT_FDCWD, ".", O_PATH | O_DIRECTORY | O_NOFOLLOW) < -1;]])],
+             [rsync_cv_search_only_dirfd_flag=O_PATH],
+             [rsync_cv_search_only_dirfd_flag=no])
+           ;;
+         *) rsync_cv_search_only_dirfd_flag=no ;;
+       esac])
+    rm -f conftest.search-only
+  ])
+if test x"$rsync_cv_search_only_dirfd_flag" != x"no"; then
+    AC_DEFINE_UNQUOTED([SEARCH_ONLY_DIRFD_FLAG], [$rsync_cv_search_only_dirfd_flag],
+      [Open flag for race-safe search-only directory descriptors.])
+fi
+
 dnl cygwin iconv.h defines iconv_open as libiconv_open
 if test x"$ac_cv_func_iconv_open" != x"yes"; then
     AC_CHECK_FUNC(libiconv_open, [ac_cv_func_iconv_open=yes; AC_DEFINE(HAVE_ICONV_OPEN, 1)])
