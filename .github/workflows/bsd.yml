@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: sh
+
 jobs:
   freebsd:
     strategy:
@@ -27,10 +31,10 @@ jobs:
       - name: Prepare VM host
         timeout-minutes: 10
         run: |
-          packages=(qemu-utils qemu-system-x86 ovmf)
-          sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "${packages[@]}" || {
+          set -- qemu-utils qemu-system-x86 ovmf
+          sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "$@" || {
             sudo apt-get update -q
-            sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "${packages[@]}"
+            sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "$@"
           }
       - name: Build and test
         id: test
@@ -139,10 +143,10 @@ jobs:
       - name: Prepare VM host
         timeout-minutes: 10
         run: |
-          packages=(qemu-utils qemu-system-x86 ovmf)
-          sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "${packages[@]}" || {
+          set -- qemu-utils qemu-system-x86 ovmf
+          sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "$@" || {
             sudo apt-get update -q
-            sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "${packages[@]}"
+            sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "$@"
           }
       - name: Build and test
         id: test
@@ -228,10 +232,10 @@ jobs:
       - name: Prepare VM host
         timeout-minutes: 10
         run: |
-          packages=(qemu-utils qemu-system-x86 ovmf)
-          sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "${packages[@]}" || {
+          set -- qemu-utils qemu-system-x86 ovmf
+          sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "$@" || {
             sudo apt-get update -q
-            sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "${packages[@]}"
+            sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "$@"
           }
       - name: Build and test
         id: test

@@ -35,6 +35,10 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: sh
+
 jobs:
   lint:
     if: ${{ inputs.lint }}
@@ -61,6 +65,8 @@ jobs:
         run: actionlint -color -ignore '^label "ubuntu-26\.04(-arm)?" is unknown\.'
       - name: Check result gate
         run: sh .github/test-results.sh
+      - name: Check Python runtime
+        run: python3 -S testsuite/runtests.py --describe-tests > /dev/null
 
   asan:
     if: ${{ inputs.asan }}
@@ -126,10 +132,12 @@ jobs:
       - name: Version
         run: rsync --version
       - name: Coverage (root pipe)
+        shell: bash
         run: |
           set -o pipefail
           sudo env RSYNC_TEST_PROFILES=pipe,non-asan,root,self-peer,linux,no-userns make coverage 2>&1 | tee cov-pipe.log
       - name: Coverage (root TCP)
+        shell: bash
         run: |
           set -o pipefail
           sudo env RSYNC_TEST_PROFILES=non-asan,root,self-peer,linux,no-userns make coverage-tcp 2>&1 | tee cov-tcp.log
@@ -174,6 +182,7 @@ jobs:
       - name: Configure
         run: scan-build-18 ./configure --with-rrsync --disable-md2man
       - name: Analyse
+        shell: bash
         run: |
           set -o pipefail
           status=0
@@ -207,6 +216,7 @@ jobs:
       - name: Configure
         run: scan-build ./configure --with-rrsync --disable-md2man
       - name: Analyse
+        shell: bash
         run: |
           scan-build -o "$PWD/scan-report" make check-progs -j"$(nproc)" 2>&1 | tee scan-build.out
           echo '## scan-build forward check' >>"$GITHUB_STEP_SUMMARY"
@@ -262,6 +272,7 @@ jobs:
 
       # Gate memory errors rather than intentional process-exit leaks
       - name: Tests
+        shell: bash
         run: |
           mkdir -p test-results/valgrind-logs
           SUDO=()
@@ -276,6 +287,7 @@ jobs:
 
       - name: Check memory errors
         if: always()
+        shell: bash
         run: |
           log_dir="$VALGRIND_SCRATCH/testtmp/valgrind-logs"
           if [ -d "$log_dir" ]; then

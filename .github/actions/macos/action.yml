@@ -5,14 +5,14 @@ runs:
   using: composite
   steps:
     - name: Install dependencies
-      shell: bash -e {0}
+      shell: sh -e {0}
       run: |
         brew install automake openssl xxhash zstd lz4 libidn2
         pip3 install --user --break-system-packages commonmark
         echo "$(brew --prefix)/bin" >>"$GITHUB_PATH"
         mkdir -p "$RUNNER_TEMP/rsync-checks"
     - name: Configure
-      shell: bash -e {0}
+      shell: sh -e {0}
       run: |
         BREW_PREFIX=$(brew --prefix)
         OPENSSL_PREFIX=$(brew --prefix openssl)
@@ -21,35 +21,35 @@ runs:
         ./configure --with-rrsync --enable-iconv --enable-acl-support --enable-xattr-support
     - name: Build
       id: build
-      shell: bash -e {0}
+      shell: sh -e {0}
       run: make check-progs
     - name: Install
-      shell: bash -e {0}
+      shell: sh -e {0}
       run: sudo make install
     - name: Version
-      shell: bash -e {0}
+      shell: sh -e {0}
       run: |
         /usr/local/bin/rsync --version
         python3 testsuite/tools/check-features.py "$PWD/rsync" zstd lz4 xxh128 xxh3 xxh64 iconv IDN ACLs xattrs > "$RUNNER_TEMP/rsync-checks/features.json"
     - name: Directory descriptors
       if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-      shell: bash -e {0}
+      shell: sh -e {0}
       run: |
         make dirfd-probe
         "$PWD/dirfd-probe" "$RUNNER_TEMP/rsync-checks" > "$RUNNER_TEMP/rsync-checks/dirfd-probe.tsv"
     - name: Tests (non-root pipe)
       if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-      shell: bash -e {0}
+      shell: sh -e {0}
       run: sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,non-asan,nonroot,self-peer,macos" "$RUNNER_TEMP/rsync-checks/nonroot-pipe" -j8
     - name: Tests (non-root TCP)
       if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-      shell: bash -e {0}
+      shell: sh -e {0}
       run: sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "non-asan,nonroot,self-peer,macos" "$RUNNER_TEMP/rsync-checks/nonroot-tcp" --use-tcp --daemon-tests-only -j8
     - name: Tests (root pipe)
       if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-      shell: bash -e {0}
+      shell: sh -e {0}
       run: sudo sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,non-asan,root,self-peer,macos" "$RUNNER_TEMP/rsync-checks/root-pipe" -j8
     - name: Tests (root TCP)
       if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-      shell: bash -e {0}
+      shell: sh -e {0}
       run: sudo sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "non-asan,root,self-peer,macos" "$RUNNER_TEMP/rsync-checks/root-tcp" --use-tcp --daemon-tests-only -j8

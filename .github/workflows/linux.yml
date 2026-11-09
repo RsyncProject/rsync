@@ -23,6 +23,10 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: sh
+
 jobs:
   ubuntu:
     if: ${{ inputs.ubuntu }}

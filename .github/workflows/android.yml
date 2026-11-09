@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: sh
+
 env:
   ANDROID_API: 24
 
@@ -38,9 +42,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y autoconf automake gawk qemu-user-static
 
       - name: Build
-        shell: bash
         run: |
-          set -euo pipefail
+          set -eu
           NDK="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_ROOT}"
           TC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
           export CC="$TC/${{ matrix.triple }}${ANDROID_API}-clang"
@@ -79,9 +82,8 @@ jobs:
             echo "WARNING: qemu smoke test did not run cleanly (check on a real device)"
 
       - name: Package
-        shell: bash
         run: |
-          set -euo pipefail
+          set -eu
           VER=$(sed -n 's/.*RSYNC_VERSION "\([^"]*\)".*/\1/p' version.h)
           out="rsync-${VER}-android-${{ matrix.abi }}"
           mkdir -p dist

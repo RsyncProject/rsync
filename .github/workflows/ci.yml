@@ -16,6 +16,10 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: sh
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
@@ -136,10 +140,10 @@ jobs:
       - name: Prepare VM host
         timeout-minutes: 10
         run: |
-          packages=(qemu-utils qemu-system-x86 ovmf)
-          sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "${packages[@]}" || {
+          set -- qemu-utils qemu-system-x86 ovmf
+          sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "$@" || {
             sudo apt-get update -q
-            sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "${packages[@]}"
+            sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "$@"
           }
       - name: Build and test
         id: test
@@ -214,7 +218,7 @@ jobs:
       - name: Build
         run: make check-progs
       - name: Version
-        run: ./rsync --version | head -1
+        run: ./rsync --version
       - name: Validate profiles
         run: ./testsuite/runtests.py profile --rsync-bin="$PWD/rsync"
       - name: Tests (non-root pipe and TCP)
@@ -226,12 +230,13 @@ jobs:
             name=$(basename "$peer")
             profile="peer-${name#rsync_}"
             for transport in pipe tcp; do
-              tcp=()
-              [ "$transport" = tcp ] && tcp=(--use-tcp --daemon-tests-only)
-              echo "::group::$name ($transport): $("$peer" --version | head -1)"
+              set --
+              [ "$transport" = tcp ] && set -- --use-tcp --daemon-tests-only
+              echo "::group::$name ($transport)"
+              "$peer" --version
               if ! ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --rsync-bin2="$PWD/$peer" \
                     --profiles="linux,pre-3.4.3,$profile" --receipt="test-results/version-mix/$name-$transport.json" \
-                    "${tcp[@]}" -j 8; then
+                    "$@" -j 8; then
                 echo "::error::version-mix failed: $name ($transport)"
                 rc=1
               fi
