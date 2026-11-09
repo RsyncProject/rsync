@@ -1,4 +1,6 @@
-Covered means a test directly checks the behaviour. Partial means the option is exercised without covering its whole contract. Missing identifies work still to do.
+# Options and daemon parameters
+
+Covered means a test directly checks the stated behaviour. Partial means the assertions leave part of that behaviour unchecked. Missing identifies an option or parameter without a focused test. Test names refer to scripts under testsuite/tests; forced-protocol suite runs are listed by their Make targets.
 
 Path depth is deep, shallow, untested or N/A. Auxiliary tree is outside, inside only, untested or N/A depending on where the relevant backup, basis, partial or temporary tree is exercised.
 
@@ -6,7 +8,7 @@ Path depth is deep, shallow, untested or N/A. Auxiliary tree is outside, inside 
 
 Option | Tests | Path depth | Auxiliary tree | Coverage
 --- | --- | --- | --- | ---
--a, --archive | many | deep | N/A | Covered throughout the suite
+-a, --archive | local-transfers, metadata-depth | deep | N/A | Covered for file data and metadata
 -r, --recursive | local-transfers, delete-deep | deep | N/A | Covered
 -R, --relative | relative-paths, relative-implied | deep | N/A | Covered with implied-directory attributes
 --no-implied-dirs | relative-implied | deep | N/A | Covered for protocol 30 and later; protocol 29 rejects the multi-component case
@@ -27,7 +29,7 @@ Option | Tests | Path depth | Auxiliary tree | Coverage
 --delay-symlinks | delay-symlinks, delay-symlinks-remote, rrsync-no-overwrite-delay-symlinks | shallow | N/A | Covered for creation order, remote propagation and restricted-shell refusal
 --copy-unsafe-links | safe-links | shallow | N/A | Partial
 --safe-links | safe-links | shallow | N/A | Partial
---insecure-links | operator-path tests, insecure-links-admin-optout | deep | N/A | Covered for the local opt-out and daemon refusal
+--insecure-links | operator-path-file-options, operator-path-insecure-links-refused, insecure-links-admin-optout | deep | N/A | Covered for the local opt-out and daemon refusal
 --confine-root | filter-file-confinement, relative-source-ancestor, rrsync-merge-file-confine | deep | N/A | Covered for direct arguments, files-from and restricted shells
 --munge-links | daemon-munge | N/A | N/A | Partial: daemon behaviour is covered but the client option is not isolated
 
@@ -51,7 +53,7 @@ Option | Tests | Path depth | Auxiliary tree | Coverage
 --super, --fake-super | chown, chown-fake | shallow | N/A | Partial
 --numeric-ids | ownership-depth | deep | N/A | Covered for client UID and GID mapping
 --usermap, --groupmap | ownership-depth | deep | N/A | Covered; user mapping needs root
---chown | ownership-depth | deep | N/A | Partial: group handling is covered
+--chown | ownership-depth | deep | N/A | Covered for group remapping and root-only owner remapping
 -D, --devices, --specials | devices, devices-fake | shallow | N/A | Partial and privilege-dependent
 --drop-D | rrsync-specials-denied | N/A | N/A | Covered for restricted receivers
 --copy-devices, --write-devices | none | untested | N/A | Missing
@@ -71,7 +73,7 @@ Option | Tests | Path depth | Auxiliary tree | Coverage
 --compare-dest, --copy-dest, --link-dest | alt-dest, alt-dest-deep, alt-dest-module-escape, operator-path-alt-dest | deep | outside | Covered for skip, copy, hard-link and confinement behaviour
 -y, --fuzzy | fuzzy | shallow | N/A | Partial
 -u, --update | update | deep | N/A | Covered for newer and older destinations
--W, --whole-file, --no-whole-file | many | N/A | N/A | Partial: widely exercised but not isolated
+-W, --whole-file, --no-whole-file | local-transfers, checksum-chain-limit | N/A | N/A | Partial: forced delta transfer is covered; explicit whole-file mode is not
 --mkpath | mkpath | shallow | N/A | Partial
 -x, --one-file-system | none | untested | untested | Missing; needs a mount boundary
 --preallocate | preallocate | deep | N/A | Covered for allocation and delta updates
@@ -123,7 +125,7 @@ Option | Tests | Path depth | Auxiliary tree | Coverage
 
 Option | Tests | Coverage
 --- | --- | ---
--v, --verbose | many | Partial: used widely but verbosity levels are not isolated
+-v, --verbose | local-transfers, hard-links | Partial: verbosity levels are not compared
 -i, --itemize-changes | output-options, itemize | Covered
 -n, --dry-run | output-options | Covered
 --stats | output-options | Covered
@@ -141,9 +143,9 @@ Option | Tests | Coverage
 Option | Tests | Coverage
 --- | --- | ---
 --write-batch, --only-write-batch, --read-batch | batch-mode | Partial
--e, --rsh, --rsync-path | remote-shell-transfers and many others | Partial
---protocol | check29 and check30 | Covered across the selected suite
---daemon, --config, --detach, --no-detach | daemon-standalone-detach, daemon-stdin tests | Covered for detached, foreground and inherited-socket startup
+-e, --rsh, --rsync-path | remote-shell-transfers | Covered for remote-shell transfer and deletion
+--protocol | make check29, make check30 | Covered by forced-protocol suite runs
+--daemon, --config, --detach, --no-detach | daemon-standalone-detach, daemon-stdin-inetd, daemon-stdin-local-socket, daemon-stdin-unix-listener | Covered for detached, foreground and inherited-socket startup
 --dparam | none | Missing
 --address, --port | daemon-address-family, daemon-standalone-detach | Covered for IPv4, IPv6 and configured binding
 --password-file | daemon-auth, password-file-first-line | Covered for authentication and first-line parsing
@@ -163,7 +165,7 @@ Option | Tests | Coverage
 
 Parameter | Tests | Coverage
 --- | --- | ---
-path | daemon-access and daemon-listings | Covered with nested paths
+path | daemon-access, daemon-listings | Covered with nested paths
 read only | daemon-access, daemon-listings | Covered
 write only | daemon-access | Covered
 list | daemon-access, daemon-listings | Covered for hidden but usable modules
@@ -180,20 +182,20 @@ strict modes | daemon-auth | Covered for unsafe secrets-file modes
 refuse options | daemon-refuse, daemon-refuse-compress | Covered for names, wildcards and allow lists
 pre-xfer exec, post-xfer exec | daemon-exec | Covered for environment and abort behaviour
 early exec | daemon-early-exec-nameconv | Covered for environment and early input
-hosts allow, hosts deny | daemon-listings, daemon-chroot-acl | Partial: a real TCP peer is required
-reverse lookup, forward lookup | daemon-chroot-acl | Partial: reverse lookup only
+hosts allow, hosts deny | daemon-access-ip, daemon-access-hostname, daemon-chroot-acl | Covered for address, CIDR and hostname rules over TCP
+reverse lookup, forward lookup | daemon-chroot-acl, daemon-access-hostname | Covered for reverse lookup in a chroot and forward lookup enabled or disabled
 log file, transfer logging, log format | daemon-listings | Partial: configured but not asserted
 max verbosity | daemon-listings | Partial
 comment | daemon-listings, daemon-access | Covered
-numeric ids | daemon-early-exec-nameconv, daemon-namecvt tests | Covered for numeric ids = no
+numeric ids | daemon-early-exec-nameconv, daemon-namecvt-empty-response | Partial: numeric ids = no is exercised with name conversion
 fake super | chown-fake, daemon-namecvt-empty-response | Covered
 timeout | daemon-handshake-timeout | Covered with zero and precedence
 max connections, lock file | daemon-connection-limits | Covered for refusal and slot reuse
 temp dir, open noatime, ignore errors, ignore nonreadable | iconv | Partial: ignore errors is asserted
 charset | iconv | Covered for module override of the remote charset
-name converter | daemon-early-exec-nameconv, daemon-namecvt tests | Covered for success, empty and malformed responses
+name converter | daemon-early-exec-nameconv, daemon-namecvt-empty-response, daemon-namecvt-newline-token | Covered for mapping, empty responses and newline-bearing requests
 dont compress | daemon-module-options | Partial: configured but compression choice is not asserted
-uid, gid, daemon uid, daemon gid, daemon chroot | build_rsyncd_conf, daemon-chroot-acl | Partial and root-gated
+uid, gid, daemon uid, daemon gid, daemon chroot | daemon-listings, daemon-chroot-acl | Partial: transfer and access checks run but effective worker IDs are not asserted
 motd file | daemon-module-options | Covered for banner content
 socket options | daemon-module-options | Partial: the live socket path runs but kernel effects are not inspected
 pid file, port, address | daemon-standalone-detach, daemon-address-family | Covered for configuration and CLI paths
