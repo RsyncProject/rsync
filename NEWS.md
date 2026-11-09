@@ -1,4 +1,30 @@
-# NEWS for rsync 3.2.7-sec-patches4 (UNRELEASED)
+# NEWS for rsync 3.2.7-sec-patches5 (UNRELEASED)
+
+This update adds checksum and access-control fixes plus portability
+corrections to `3.2.7-sec-patches4`.
+
+## Security fixes
+- Enlarged the rolling strong-checksum buffers so a peer-negotiated SHA-1
+  checksum cannot write a 20-byte digest into a 16-byte buffer.
+- Bounded work in `hash_search()` when a peer supplies repeated weak-checksum
+  collisions and retained valid matches behind duplicate chain entries
+  (CVE-2026-119741).
+- Applied hostname-based daemon allow and deny rules to IPv6 peers. A matching
+  `hosts deny` hostname previously failed open for IPv6.
+- Resolved relative `--files-from` entries beneath the requested daemon module
+  subdirectory rather than the module root, preserving module filters.
+
+## Corrections in this patch set
+- Restricted uploads can replace an existing file beneath its pinned parent.
+- Cygwin ownership walks preserve `//server/share` as the UNC root.
+- Builds without `O_CLOEXEC` or `O_DIRECTORY` retain their supported fallback
+  paths.
+- Search-only directory descriptors are used only after configure verifies
+  their lookup, creation, permission and no-follow behaviour. Other kernels
+  continue to fail closed.
+
+------------------------------------------------------------------------------
+# NEWS for rsync 3.2.7-sec-patches4
 
 This update corrects regressions and edge cases in the path-confinement
 hardening published in `3.2.7-sec-patches3`. It contains no new features or
