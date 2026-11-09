@@ -40,7 +40,7 @@ jobs:
     if: ${{ inputs.lint }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    name: Workflow validation
+    name: Workflow lint
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -66,7 +66,7 @@ jobs:
     if: ${{ inputs.asan }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    name: Sanitisers (ASan and UBSan)
+    name: ASan + UBSan
     env:
       # Process-exit leaks are intentional; memory errors remain fatal
       ASAN_OPTIONS: detect_leaks=0:abort_on_error=1
@@ -108,7 +108,7 @@ jobs:
     if: ${{ inputs.coverage }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    name: Coverage (gcov)
+    name: Coverage
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -161,7 +161,7 @@ jobs:
     if: ${{ inputs.clang_scan }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    name: Clang scan-build 18
+    name: Clang 18
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -193,7 +193,7 @@ jobs:
     if: ${{ inputs.clang_forward }}
     runs-on: ubuntu-26.04
     timeout-minutes: 45
-    name: Clang scan-build (Ubuntu 26.04, non-blocking)
+    name: Clang (Ubuntu 26.04)
     continue-on-error: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
