@@ -494,10 +494,11 @@ def main():
         die("Restricted directory does not exist!")
 
     if args.log:
-        # The client can plant symlinks in DIR, so a log path that reaches DIR
-        # by any route (a symlink, a bind mount) could be redirected.
-        if args.log != os.path.realpath(args.log):
-            die("the -log FILE path must not contain a symlink")
+        if args.dir == '/':
+            die("-log cannot be used when DIR is /")
+        # rsync gets the resolved path, so a symlink the client plants in DIR
+        # later cannot redirect it; DIR may not be among its ancestors.
+        args.log = os.path.realpath(args.log)
         dir_st = os.stat(args.dir)
         path = args.log
         while path != '/':

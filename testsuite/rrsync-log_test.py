@@ -2,8 +2,8 @@
 """rrsync -log must record every transfer in the admin's log file.
 
 The client's own --log-file is refused while -log is in force, and a FILE
-the client could redirect (inside the restricted dir, behind a symlink, or in
-a bind mount of the restricted dir) is refused outright.
+that resolves inside the restricted dir (directly, through a symlink, or in a
+bind mount of it) is refused outright, as is -log with DIR /.
 """
 
 import os
@@ -86,20 +86,39 @@ assert inside.returncode != 0 and 'must be outside the restricted directory' in 
     f'rrsync accepted a -log FILE inside DIR: rc={inside.returncode}, stderr={inside.stderr!r}')
 assert not (root / 'transfer.log').exists()
 
-# Nor may the path pass through DIR by way of a symlink: the client's own
-# symlink in DIR would decide where the log is written.
-elsewhere = base / 'elsewhere'
-makepath(elsewhere)
-os.symlink(elsewhere, root / 'planted')
-os.symlink(root / 'planted', base / 'via')
-via_log = shlex.quote(str(base / 'via' / 'transfer.log'))
-via_env = {**env, 'RRSYNC_FLAGS': f'-wo -no-lock -log {via_log}'}
-via = subprocess.run(
+# A symlink outside DIR is fine (like /var -> /private/var on macOS): the log
+# goes where it resolves.
+real = base / 'real'
+makepath(real)
+os.symlink(real, base / 'alias')
+alias_log = shlex.quote(str(base / 'alias' / 'transfer.log'))
+alias_env = {**env, 'RRSYNC_FLAGS': f'-wo -no-lock -log {alias_log}'}
+alias = subprocess.run(
     rsync_argv('-r', '-e', rsh, f'{src}/', 'ignored:'),
-    env=via_env, capture_output=True, text=True, timeout=20)
-assert via.returncode != 0 and 'must not contain a symlink' in via.stderr, (
-    f'rrsync accepted a -log path through DIR: rc={via.returncode}, stderr={via.stderr!r}')
-assert not (elsewhere / 'transfer.log').exists()
+    env=alias_env, capture_output=True, text=True, timeout=20)
+assert alias.returncode == 0 and (real / 'transfer.log').exists(), (
+    f'rrsync refused a -log path through a symlink outside DIR: rc={alias.returncode}, '
+    f'stderr={alias.stderr!r}')
+
+# A symlink that resolves into DIR is refused like a FILE inside DIR.
+os.symlink(root, base / 'into')
+into_log = shlex.quote(str(base / 'into' / 'transfer.log'))
+into_env = {**env, 'RRSYNC_FLAGS': f'-wo -no-lock -log {into_log}'}
+into = subprocess.run(
+    rsync_argv('-r', '-e', rsh, f'{src}/', 'ignored:'),
+    env=into_env, capture_output=True, text=True, timeout=20)
+assert into.returncode != 0 and 'must be outside the restricted directory' in into.stderr, (
+    f'rrsync accepted a -log path that resolves into DIR: rc={into.returncode}, '
+    f'stderr={into.stderr!r}')
+assert not (root / 'transfer.log').exists()
+
+# With DIR / no path is outside it.
+slash_env = {**env, 'RRSYNC_ROOT': '/'}
+slash = subprocess.run(
+    rsync_argv('-r', '-e', rsh, f'{src}/', 'ignored:'),
+    env=slash_env, capture_output=True, text=True, timeout=20)
+assert slash.returncode != 0 and '-log cannot be used when DIR is /' in slash.stderr, (
+    f'rrsync accepted -log with DIR /: rc={slash.returncode}, stderr={slash.stderr!r}')
 
 # DIR reached through a bind mount is still DIR.  An unprivileged bind mount
 # needs a user namespace, so this part runs only where unshare can make one.

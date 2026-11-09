@@ -112,7 +112,8 @@ The remainder of this manpage is dedicated to using the rrsync script.
     in its default "%i %n%L" format, so each file sent, received or deleted
     gets a line.  _FILE_ can be relative to the user's home directory or an
     absolute path.  The client's own `--log-file` option is refused while this
-    is in force.  _FILE_ must be outside _DIR_, with no symlink in its path.
+    is in force.  _FILE_ is resolved before use and must be outside _DIR_,
+    and `-log` cannot be used when _DIR_ is `/`.
 
 0.  `-help`, `-h`
 
