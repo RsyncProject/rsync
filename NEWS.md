@@ -1,4 +1,4 @@
-# NEWS for rsync 3.4.1-sec-patches5 (UNRELEASED)
+# NEWS for rsync 3.4.1-sec-patches5
 
 This update adds checksum and access-control fixes plus portability
 corrections to `3.4.1-sec-patches4`.
@@ -7,6 +7,8 @@ corrections to `3.4.1-sec-patches4`.
 - Bounded work in `hash_search()` when a peer supplies repeated weak-checksum
   collisions and retained valid matches behind duplicate chain entries
   (CVE-2026-119741).
+- Bounded `--inplace` alignment tracking by the peer-supplied block count to
+  prevent the block index overflowing on files larger than 2 GiB.
 - Applied hostname-based daemon allow and deny rules to IPv6 peers. A matching
   `hosts deny` hostname previously failed open for IPv6.
 - Resolved relative `--files-from` entries beneath the requested daemon module
