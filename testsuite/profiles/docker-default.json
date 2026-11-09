@@ -1,0 +1,5 @@
+{
+  "unsupported": {
+    "user_namespace": "default Docker seccomp blocks unshare"
+  }
+}

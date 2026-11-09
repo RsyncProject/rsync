@@ -28,6 +28,7 @@ jobs:
     with:
       ubuntu: &weekly ${{ github.event_name != 'schedule' || github.event.schedule == '42 8 * * 1' }}
       almalinux: *daily
+      alpine: *weekly
 
   bsd:
     name: BSD

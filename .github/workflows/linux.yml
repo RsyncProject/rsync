@@ -9,6 +9,9 @@ on:
       almalinux:
         required: true
         type: boolean
+      alpine:
+        required: true
+        type: boolean
     outputs:
       jobs:
         description: Job results
@@ -217,3 +220,111 @@ jobs:
             rsyncd.conf.5
             rrsync.1
             rrsync
+
+  alpine:
+    if: ${{ inputs.alpine }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    name: Alpine 3.24.4 ${{ matrix.arch == 'amd64' && 'AMD64' || 'x86' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+            apk_arch: x86_64
+            bits: 64
+            image: alpine@sha256:0f49f331d9212aff11b932863be4eb01cdf962969aa86dab7d1ee21ac6f5f52b
+            profiles: non-asan,self-peer,linux,no-simd,docker-default
+          - arch: x86
+            platform: linux/386
+            apk_arch: x86
+            bits: 32
+            image: alpine@sha256:55d68c85222dd92297b0f8885354739d89f0dc17fc2f903c49dc1d9c129c3d6a
+            profiles: non-asan,self-peer,linux,no-simd,docker-default
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prepare host
+        run: |
+          sudo sysctl -w fs.protected_regular=2
+          mkdir -p "$RUNNER_TEMP/rsync-alpine-${{ matrix.arch }}"
+          docker pull --platform "${{ matrix.platform }}" "${{ matrix.image }}"
+          test "$(docker image inspect "${{ matrix.image }}" --format '{{.Os}}/{{.Architecture}}')" = '${{ matrix.platform }}'
+      - name: Build and test
+        env:
+          APK_ARCH: ${{ matrix.apk_arch }}
+          BITS: ${{ matrix.bits }}
+          PROFILES: ${{ matrix.profiles }}
+        run: |
+          docker run --rm --platform "${{ matrix.platform }}" \
+            -e APK_ARCH -e BITS -e PROFILES -e RSYNC_TEST_TMP=/dev/shm \
+            -v "$PWD:/source:ro" \
+            -v "$RUNNER_TEMP/rsync-alpine-${{ matrix.arch }}:/results" \
+            "${{ matrix.image }}" sh -euxs <<'ALPINE'
+          apk add --no-cache \
+            acl acl-dev attr attr-dev autoconf automake bash build-base diffutils file gawk git \
+            libidn2-dev linux-headers lz4-dev musl-locales openssl-dev py3-commonmark python3 setpriv \
+            xxhash-dev zstd-dev
+          test "$(apk --print-arch)" = "$APK_ARCH"
+
+          cp -a /source /work
+          cd /work
+          git config --global --add safe.directory /work
+          ./configure --with-rrsync --enable-iconv --enable-acl-support --enable-xattr-support
+          make -j4 check-progs
+          file rsync
+          file rsync | grep -q "ELF $BITS-bit"
+          python3 -c "import struct; assert struct.calcsize('P') * 8 == $BITS"
+          ./rsync -VV | python3 -c 'import json,sys; value=json.load(sys.stdin); assert value["capabilities"]["file_bits"] == 64'
+          python3 testsuite/tools/check-features.py "$PWD/rsync" \
+            zstd lz4 xxh128 xxh3 xxh64 iconv IDN ACLs xattrs > /results/features.json
+
+          addgroup -S rsynctest
+          addgroup -S rsynctest-extra
+          adduser -S -D -h /home/rsynctest -G rsynctest rsynctest
+          addgroup rsynctest rsynctest-extra
+          mkdir -p /results/root /results/nonroot
+          chown rsynctest:rsynctest /results/nonroot
+
+          status=0
+          sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,root,$PROFILES" /results/root/pipe -j4 || status=1
+          sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,root,$PROFILES,protocol-30" /results/root/protocol-30 --protocol=30 -j4 || status=1
+          sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,root,$PROFILES,protocol-29" /results/root/protocol-29 --protocol=29 -j4 || status=1
+          sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "root,$PROFILES" /results/root/tcp --use-tcp --daemon-tests-only -j4 || status=1
+          su -m rsynctest -s /bin/sh -c '
+            export HOME=/home/rsynctest
+            status=0
+            sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,nonroot,$PROFILES" /results/nonroot/pipe -j4 || status=1
+            sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "nonroot,$PROFILES" /results/nonroot/tcp --use-tcp --daemon-tests-only -j4 || status=1
+            exit "$status"
+          ' || status=1
+
+          mkdir -p /results/bin
+          cp rsync rsync-ssl rsync.1 rsync-ssl.1 rsyncd.conf.5 rrsync.1 rrsync /results/bin/
+          cp config.log /results/
+          chmod -R a+rX /results
+          exit "$status"
+          ALPINE
+      - name: Upload binaries
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          retention-days: 45
+          name: alpine-3.24.4-${{ matrix.arch }}-bin
+          if-no-files-found: error
+          path: ${{ runner.temp }}/rsync-alpine-${{ matrix.arch }}/bin
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          retention-days: 45
+          name: alpine-3.24.4-${{ matrix.arch }}-results
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/rsync-alpine-${{ matrix.arch }}/config.log
+            ${{ runner.temp }}/rsync-alpine-${{ matrix.arch }}/features.json
+            ${{ runner.temp }}/rsync-alpine-${{ matrix.arch }}/*/*/receipt.json
+            ${{ runner.temp }}/rsync-alpine-${{ matrix.arch }}/*/*/run.log

@@ -59,12 +59,15 @@ The native check recipe in testsuite/tools/check.sh takes a build directory, exe
 Family | Versions and architectures
 --- | ---
 Ubuntu | 22.04, 24.04 and 26.04 on AMD64 and ARM64
+Alpine | 3.24.4 on AMD64 and x86
 FreeBSD | 14.5 and 15.1 on AMD64
 NetBSD | 10.2, 11.0 and 11.1 on AMD64
 OpenBSD | 7.9 and 8.0 on AMD64
 macOS | 15 and 26 on AMD64 and ARM64
 
 Each matrix entry checks its OS release and architecture and has separate artefacts. Matrix failures do not cancel the remaining entries.
+
+Alpine uses pinned official musl images. Its AMD64 and x86 jobs build and execute the same root and non-root pipe and TCP passes as Ubuntu, including protocol 29 and 30. The x86 job also verifies a 32-bit process with 64-bit file offsets.
 
 Ubuntu, macOS and the BSD guests have separate root and non-root pipe and TCP passes. Each pass retains its receipt and log. macOS, FreeBSD and OpenBSD also check the built binary's required features with testsuite/tools/check-features.py, using capability and algorithm names from `rsync -VV`.
 
