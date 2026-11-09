@@ -1,11 +1,4 @@
 #!/usr/bin/env python3
-"""Known-name operations must not require permission to list parent dirs.
-
-The confined resolver holds directory descriptors to prevent symlink races.
-Supported kernels provide a descriptor which can open a known file beneath a
-searchable directory or create one beneath a writable/searchable directory
-without requiring permission to list that directory.
-"""
 
 import json
 import os
@@ -20,7 +13,7 @@ from harness.rsync import (
     rsync_command_binary, run_rsync, test_fail, test_skipped, under_valgrind,
 )
 
-version = json.loads(run_rsync('-VV', capture_output=True).stdout)
+version = json.loads(run_rsync('-VV', check=True, capture_output=True).stdout)
 search_only_dirs = version['capabilities']['search_only_dirs']
 
 launcher = []
@@ -118,6 +111,29 @@ try:
     permission_probe(search_parent, '-r', 1, 'search-only destination parent')
     permission_probe(search_parent, '-x', 0, 'search-only destination parent')
 
+    if not search_only_dirs:
+        unsupported_cases = (
+            ('mode 0111 destination parent',
+             command('-t', str(incoming), f'{search_dest}/'),
+             search_dest / 'incoming', None),
+            ('mode 0333 destination',
+             command('-t', str(incoming), f'{write_only_dest}/'),
+             write_only_dest / 'incoming', None),
+            ('known source beneath mode 0111 parent',
+             command('-aR', '--chmod=Du+rw', 'xonly/exact', f'{exact_dest}/'),
+             exact_dest / 'xonly' / 'exact', src),
+        )
+        for label, argv, result, cwd in unsupported_cases:
+            proc = subprocess.run(
+                launcher + argv,
+                cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if proc.returncode == 0 or result.exists():
+                failures.append(f'{label} did not fail closed')
+        if failures:
+            test_fail('\n'.join(failures))
+        test_skipped('kernel has no race-safe search-only directory descriptor',
+                     capability='search_only')
+
     search_receiver = subprocess.run(
         launcher + command('-t', str(incoming), f'{search_dest}/'),
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -130,19 +146,6 @@ try:
             f'rc={search_receiver.returncode}, stderr={search_receiver.stderr.strip()!r}, '
             f'content={search_content!r}')
 
-    if not search_only_dirs:
-        unsupported = subprocess.run(
-            launcher + rsync_argv('-t', str(incoming), f'{write_only_dest}/'),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-        if unsupported.returncode == 0 or (write_only_dest / 'incoming').exists():
-            test_fail('unsupported search-only traversal did not fail closed')
-        test_skipped('kernel has no race-safe search-only directory descriptor')
-
-    # Keep received implied dirs usable on systems without a safe fchmodat2.
-    # The source remains mode 0111, so sender traversal coverage is unchanged.
     exact = subprocess.run(
         launcher + command(
             '-aR', '--chmod=Du+rw', 'xonly/exact', f'{exact_dest}/',

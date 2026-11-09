@@ -8,6 +8,7 @@ def test(context: TestContext):
         (Exit.PASS, '', 'pass'), (Exit.FAIL, '', 'fail'),
         (Exit.ERROR, '', 'error'), (Exit.SKIP, '', 'skip'),
         (Exit.SKIP, 'acl', 'unsupported'), (Exit.XFAIL, '', 'xfail'),
+        (3, '', 'error'), (-15, '', 'error'),
     )
     for exit_code, unsupported, expected in cases:
         result = TestResult('case', exit_code, unsupported=unsupported)
@@ -17,6 +18,11 @@ def test(context: TestContext):
     verdicts = (
         ('pass', 'xfail:issue-1', 'xpass'),
         ('fail', 'xfail:issue-1', 'xfail'),
+        ('xfail', 'xfail:issue-1', 'xfail'),
+        ('xfail', 'pass', 'profile_error'),
+        ('xfail', None, 'profile_error'),
+        ('error', 'xfail:issue-1', 'profile_error'),
+        ('unsupported', 'xfail:issue-1', 'profile_error'),
         ('unsupported', 'pass', 'profile_error'),
         ('unsupported', 'unsupported:acl', 'unsupported'),
     )

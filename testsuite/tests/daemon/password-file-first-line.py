@@ -4,10 +4,14 @@
 import os
 import subprocess
 
-from rsyncfns import (
+from harness import metadata
+from harness.daemon_config import write_daemon_conf
+from harness.rsync import (
     SCRATCHDIR, makepath, rmtree, rsync_argv, start_test_daemon,
-    test_fail, write_daemon_conf,
+    test_fail,
 )
+
+metadata(protocols={27, 28, 29, 30, 31, 32, 33}, transports={'pipe', 'tcp'}, min_peer='2.6.0', tags={'version-mix'})
 
 DAEMON_PORT = 12904
 USER = 'tuser'

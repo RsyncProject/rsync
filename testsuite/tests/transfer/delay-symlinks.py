@@ -18,16 +18,19 @@ import subprocess
 import sys
 import time
 
-from rsyncfns import (
+from harness import metadata
+from harness.rsync import (
     FROMDIR, SCRATCHDIR, TODIR,
     assert_is_symlink, assert_same, checkit, forced_protocol, make_data_file,
     rmtree, rsh_cmd, rsync_argv, rsync_path_arg, run_rsync, test_fail,
     test_skipped,
 )
 
+metadata(protocols={29, 30, 31, 32, 33}, transports={'pipe', 'tcp'}, min_peer='3.5.2', tags={'version-mix'})
+
 proto = forced_protocol()
 if proto is not None and proto < 29:
-    test_skipped(f"--delay-symlinks requires protocol 29+ (negotiated {proto})")
+    test_skipped(f'--delay-symlinks requires protocol 29+ (negotiated {proto})', capability='protocol_29')
 
 os.environ['RSYNC_RSH'] = rsh_cmd()
 

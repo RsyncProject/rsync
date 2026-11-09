@@ -7,7 +7,7 @@ import time
 
 from harness.mutation import race_budget, start_path_flipper, stop_flipper
 from harness.daemon_config import write_daemon_conf
-from harness.rsync import SCRATCHDIR, rmtree, rsync_argv, start_test_daemon, test_fail, test_xfail
+from harness.rsync import SCRATCHDIR, rmtree, rsync_argv, start_test_daemon, test_fail, test_skipped
 
 _CYGWIN = platform.system().startswith('CYGWIN')
 
@@ -54,8 +54,7 @@ finally:
 
 if not outside_file.exists():
     if _CYGWIN:
-        test_xfail("cygwin: --remove-source-files parent-flip race still unlinks "
-                   "the outside victim -- documented Cygwin platform residual")
+        test_skipped('Cygwin source cleanup followed a swapped parent symlink', capability='dirfd_pinning')
     test_fail("daemon sender --remove-source-files cleanup unlinked the outside victim through a raced parent symlink")
 
 print("sender-remove-source-secure: remove-source cleanup did not unlink outside the module")

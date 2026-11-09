@@ -14,9 +14,10 @@ files.  --delete-excluded and --backup-dir mirror the reported daemon failure.
 
 import subprocess
 
-from rsyncfns import (
+from harness.daemon_config import build_rsyncd_conf
+from harness.rsync import (
     FROMDIR, SCRATCHDIR, TODIR,
-    build_rsyncd_conf, makepath, rmtree, rsync_argv, start_test_daemon,
+    makepath, rmtree, rsync_argv, start_test_daemon,
     test_fail,
 )
 

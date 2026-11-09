@@ -3,10 +3,14 @@
 
 import shutil
 
-from rsyncfns import (
+from harness import metadata
+from harness.daemon_config import write_daemon_conf
+from harness.rsync import (
     SCRATCHDIR, assert_exists, assert_not_exists, makepath, run_rsync,
-    start_test_daemon, test_fail, write_daemon_conf,
+    start_test_daemon, test_fail,
 )
+
+metadata(protocols={29, 30, 31, 32, 33}, transports={'pipe', 'tcp'}, min_peer='3.0.0', tags={'version-mix'})
 
 DAEMON_PORT = 12912
 

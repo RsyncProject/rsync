@@ -66,7 +66,7 @@ Option | Tests | Path depth | Auxiliary tree | Coverage
 --partial-dir | partial, symlink-dirlink-basis | deep | outside | Covered for relative and absolute partial directories with delta resume
 --delay-updates | delay-updates, delay-updates-deep | deep | inside only | Covered for per-directory staging
 --inplace | inplace, alt-dest | deep | inside only | Covered with inode preservation
---append, --append-verify | append | deep | inside only | Covered; the verification split needs protocol 30 or later
+--append, --append-verify | append, append-abort-mid-write | deep | inside only | Covered for interrupted writes; the verification split needs protocol 30 or later
 -b, --backup, --backup-dir, --suffix | backup, backup-deep | deep | outside | Covered
 --compare-dest, --copy-dest, --link-dest | alt-dest, alt-dest-deep, alt-dest-module-escape, operator-path-alt-dest | deep | outside | Covered for skip, copy, hard-link and confinement behaviour
 -y, --fuzzy | fuzzy | shallow | N/A | Partial
@@ -87,7 +87,7 @@ Option | Tests | Path depth | Auxiliary tree | Coverage
 --exclude, --include | filter-depth, exclude, exclude-remote-shell | deep | N/A | Covered
 --exclude-from, --include-from | files-from-depth | deep | N/A | Covered
 -C, --cvs-exclude | cvs-exclude | deep | N/A | Covered with nested .cvsignore
---files-from | files-from-depth | deep | N/A | Covered
+--files-from | files-from-depth, daemon-files-from-subdir | deep | N/A | Covered for nested paths and daemon module subdirectories
 -0, --from0 | files-from-depth | deep | N/A | Covered
 --max-size, --min-size | size-filter | deep | N/A | Covered
 --existing, --ignore-non-existing, --ignore-existing | delete-deep | deep | N/A | Covered
@@ -146,7 +146,8 @@ Option | Tests | Coverage
 --daemon, --config, --detach, --no-detach | daemon-standalone-detach, daemon-stdin tests | Covered for detached, foreground and inherited-socket startup
 --dparam | none | Missing
 --address, --port | daemon-address-family, daemon-standalone-detach | Covered for IPv4, IPv6 and configured binding
---password-file | daemon-auth | Covered
+--password-file | daemon-auth, password-file-first-line | Covered for authentication and first-line parsing
+--nice, --no-nice | niceness | Covered for local, remote-shell, daemon and restricted-shell priorities
 --early-input | daemon-early-exec-nameconv, early-input-symlink | Covered for data delivery and confined input paths
 --sockopts | daemon-module-options | Covered for client and daemon configuration
 --blocking-io | none | Missing

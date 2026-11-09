@@ -4,7 +4,7 @@
 import socket
 import subprocess
 
-from rsyncfns import (
+from harness.rsync import (
     FROMDIR, SCRATCHDIR, RSYNC,
     make_tree, require_tcp, rmtree, rsync_argv, start_test_daemon,
     test_fail, test_skipped,
@@ -19,7 +19,7 @@ try:
         with socket.socket(family, socket.SOCK_STREAM) as probe:
             probe.bind((address, 0))
 except OSError:
-    test_skipped("IPv4 or IPv6 loopback is unavailable")
+    test_skipped('IPv4 or IPv6 loopback is unavailable', capability='ipv6_loopback')
 
 
 def loopback_name(family, address):
@@ -30,7 +30,7 @@ def loopback_name(family, address):
             continue
         if any(item[0] == family and item[4][0] == address for item in answers):
             return candidate
-    test_skipped(f"no local hostname resolves to {address}")
+    test_skipped(f'no local hostname resolves to {address}', capability='loopback_dns')
 
 
 host4 = loopback_name(socket.AF_INET, '127.0.0.1')

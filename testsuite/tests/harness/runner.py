@@ -95,7 +95,7 @@ def test(context: TestContext):
     independent = {test_name(path) for path in independent}
     if not {'daemon-auth', 'idn', 'protocol-refusals', 'inplace-checksum-bounds', 'daemon-access-hostname'} <= daemon:
         test_fail('daemon test selection dropped coverage')
-    if {'filter-merge-content-echo', 'runner'} > independent:
+    if not {'filter-merge-content-echo', 'runner'} <= independent:
         test_fail('daemon test selection retained transport-independent tests')
 
     daemon_call = 'start_test_daemon(None, 1)\n'

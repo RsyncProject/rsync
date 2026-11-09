@@ -7,11 +7,15 @@ import shutil
 import subprocess
 import sys
 
-from rsyncfns import (
-    FROMDIR, RSYNC, SCRATCHDIR, TODIR, build_rsyncd_conf, hands_setup,
+from harness import metadata
+from harness.daemon_config import build_rsyncd_conf
+from harness.rsync import (
+    FROMDIR, RSYNC, SCRATCHDIR, TODIR, hands_setup,
     patched_rrsync, rsync_argv, rsync_path_arg, rsh_cmd, run_rsync,
     start_test_daemon, test_fail,
 )
+
+metadata(transports={'pipe', 'tcp'}, min_peer='3.5.2', tags={'version-mix'})
 
 
 def output(proc):

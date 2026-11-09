@@ -22,14 +22,17 @@ if '--shell' in sys.argv:
     flags = env.get('RRSYNC_FLAGS', '-wo -no-overwrite -no-lock').split()
     os.execve(wrapper, [wrapper, *flags, root], env)
 
-from rsyncfns import (
+from harness import metadata
+from harness.rsync import (
     RSYNC, SCRATCHDIR, forced_protocol, makepath, patched_rrsync, rmtree,
     rsync_argv, rsync_path_arg, test_skipped,
 )
 
+metadata(protocols={29, 30, 31, 32, 33}, transports={'pipe', 'tcp'}, min_peer='3.5.2', tags={'version-mix'})
+
 proto = forced_protocol()
 if proto is not None and proto < 29:
-    test_skipped(f"--delay-symlinks requires protocol 29+ (negotiated {proto})")
+    test_skipped(f'--delay-symlinks requires protocol 29+ (negotiated {proto})', capability='protocol_29')
 
 base = SCRATCHDIR / 'rrsync-no-overwrite-delay-symlinks'
 rmtree(base)

@@ -23,7 +23,7 @@ Verifies that when rolling across unmatched constant-checksum collision runs:
 
 import re
 
-from rsyncfns import (
+from harness.rsync import (
     FROMDIR, TODIR, assert_same, rmtree, run_rsync, test_fail,
 )
 

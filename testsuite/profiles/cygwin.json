@@ -16,6 +16,7 @@
     "dac_restriction": "no Unix DAC restriction",
     "device_nodes": "no Unix device nodes",
     "directory_sgid": "no directory setgid semantics",
+    "dirfd_pinning": "no inode-pinned directories",
     "group_auth": "no group-auth fixture",
     "interpose": "no native interposition",
     "native_build": "no reliable patched build",

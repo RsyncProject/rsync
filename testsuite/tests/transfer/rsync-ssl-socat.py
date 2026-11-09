@@ -11,7 +11,7 @@ import shutil
 import subprocess
 import sys
 
-from rsyncfns import SCRATCHDIR, SRCDIR, test_fail
+from harness.rsync import SCRATCHDIR, SRCDIR, test_fail
 
 
 RSYNC_SSL = SRCDIR / 'rsync-ssl'

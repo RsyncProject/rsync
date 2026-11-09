@@ -4,7 +4,7 @@ import os
 import stat
 import struct
 
-from rsyncfns import SCRATCHDIR, makepath, run_rsync, test_fail
+from harness.rsync import SCRATCHDIR, makepath, run_rsync, test_fail
 
 source = SCRATCHDIR / 'source'
 destination = SCRATCHDIR / 'destination'

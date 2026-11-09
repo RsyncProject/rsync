@@ -154,6 +154,7 @@ rmtree(TODIR)
 counts = out('-a', '--no-h', '--progress', '--no-i-r', f'{src}/', f'{TODIR}/').stdout
 if '1000 files to consider' not in counts:
     test_fail(f"--no-h file-list count was not plain digits:\n{counts}")
+
 rmtree(src)
 rmtree(TODIR)
 makepath(src)

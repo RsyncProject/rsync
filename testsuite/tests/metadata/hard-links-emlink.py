@@ -4,13 +4,13 @@ import os
 import platform
 import subprocess
 
-from rsyncfns import SCRATCHDIR, makepath, rmtree, rsync_argv, test_fail, test_skipped
+from harness.rsync import SCRATCHDIR, makepath, rmtree, rsync_argv, test_error, test_fail, test_skipped
 
 
 if platform.system() != 'Linux':
-    test_skipped('the LD_PRELOAD link hook is Linux-only')
+    test_skipped('the LD_PRELOAD link hook is Linux-only', capability='linux_interpose')
 if os.environ.get('ASAN_OPTIONS'):
-    test_skipped('the LD_PRELOAD link hook conflicts with AddressSanitizer')
+    test_skipped('the LD_PRELOAD link hook conflicts with AddressSanitizer', capability='linux_interpose')
 
 hook_code = r'''
 #define _GNU_SOURCE
@@ -91,7 +91,7 @@ build = subprocess.run(
     ['cc', '-shared', '-fPIC', '-o', str(hook_lib), str(hook_src), '-ldl'],
     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 if build.returncode != 0:
-    test_skipped(f'cannot build the LD_PRELOAD link hook: {build.stdout!r}')
+    test_error(f'cannot build the LD_PRELOAD link hook: {build.stdout!r}')
 
 marker = base / 'hook-fired'
 env = os.environ.copy()

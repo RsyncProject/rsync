@@ -6,14 +6,22 @@ hash_search(), `aligned_i` is bounded by `s->count` and cannot overflow a
 32-bit signed integer on files > 2 GiB.
 """
 
+import os
 import socket
 import struct
 import subprocess
 import threading
+import time
 
-from rsyncfns import FROMDIR, TODIR, TOOLDIR, rmtree, test_fail
+from harness import metadata
+from harness.rsync import (FROMDIR, TODIR, forced_protocol, require_tcp, rmtree,
+                           rsync_argv, test_fail, test_skipped)
 
-RSYNC_BIN = str(TOOLDIR / 'rsync')
+metadata(cost='expensive', transports={'tcp'}, tags={'daemon', 'regression'})
+require_tcp('crafted checksum peer needs TCP')
+protocol = forced_protocol()
+if protocol is not None and protocol < 30:
+    test_skipped('crafted checksum peer requires protocol 30', capability='protocol_30')
 
 MPLEX_BASE = 7
 MSG_DATA = 0
@@ -92,6 +100,9 @@ BIG_SIZE = (1 << 31) + 64       # 2 GiB + 64 bytes
 NEEDLE_OFFSET = (1 << 31) + 8   # Matching byte past 2^31
 NEEDLE_BYTE = b'\x01'
 
+# Leave time for sender shutdown and drain-thread cleanup
+deadline = time.monotonic() + max(1, int(os.environ.get('TESTRUN_TIMEOUT', '300')) - 15)
+
 rmtree(FROMDIR)
 rmtree(TODIR)
 FROMDIR.mkdir(parents=True, exist_ok=True)
@@ -112,17 +123,17 @@ lsock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 lsock.bind(('127.0.0.1', 0))
 port = lsock.getsockname()[1]
 lsock.listen(1)
-lsock.settimeout(30)
+lsock.settimeout(min(30, max(1, deadline - time.monotonic())))
 
 csock = None
 t = None
 rc = None
 logf = open(out_log, 'wb')
 proc = subprocess.Popen(
-    [
-        RSYNC_BIN, '-a', '--inplace', '--debug=deltasum1',
+    rsync_argv(
+        '-a', '--inplace', '--debug=deltasum1',
         str(bigfile), f'rsync://127.0.0.1:{port}/mod/',
-    ],
+    ),
     stdout=logf,
     stderr=logf,
 )
@@ -134,7 +145,7 @@ try:
 
     def drain_stream():
         try:
-            csock.settimeout(90)
+            csock.settimeout(max(1, deadline - time.monotonic()))
             while csock.recv(1 << 20):
                 pass
         except OSError:
@@ -156,7 +167,7 @@ try:
     )
     receiver.send_data(buf)
 
-    rc = proc.wait(timeout=240)
+    rc = proc.wait(timeout=max(1, deadline - time.monotonic()))
     t.join(timeout=5)
 finally:
     if csock is not None:

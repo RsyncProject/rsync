@@ -26,9 +26,9 @@ import subprocess
 import sys
 import time
 
-from rsyncfns import (
+from harness.rsync import (
     RSYNC, SCRATCHDIR, assert_same, make_data_file, makepath, rmtree,
-    rsync_argv, run_rsync, split_rsync_cmd, test_fail, test_skipped,
+    rsync_argv, run_rsync, split_rsync_cmd, test_error, test_fail, test_skipped,
 )
 
 
@@ -148,10 +148,10 @@ def compiler():
 def build_shim():
     if not sys.platform.startswith('linux'):
         test_skipped('the mid-write hook is an LD_PRELOAD shim that matches '
-                     'the destination fd through /proc/self/fd')
+                     'the destination fd through /proc/self/fd', capability='linux_interpose')
     cc = compiler()
     if not cc:
-        test_skipped('no C compiler available to build the mid-write shim')
+        test_skipped('no C compiler available to build the mid-write shim', capability='native_build')
 
     cfile = SCRATCHDIR / 'midwrite.c'
     sofile = SCRATCHDIR / 'midwrite.so'
@@ -161,8 +161,7 @@ def build_shim():
               '-o', str(sofile), str(cfile), '-ldl'],
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     if proc.returncode != 0 or not sofile.is_file():
-        test_skipped('could not build the mid-write shim:\n'
-                     + (proc.stdout or '').strip())
+        test_error('could not build the mid-write shim:\n' + (proc.stdout or '').strip())
     return sofile
 
 
@@ -220,7 +219,7 @@ def abort_mid_write(mode):
             time.sleep(0.01)
         if not loaded.exists():
             test_skipped('mid-write shim was not loaded; rsync may be static '
-                         'or the platform ignored LD_PRELOAD')
+                         'or the platform ignored LD_PRELOAD', capability='linux_interpose')
         if not held.is_file():
             test_fail(f'{mode}: the receiver never wrote to the destination '
                       'file, so the shim could not hold it')
@@ -255,7 +254,7 @@ def abort_mid_write(mode):
 
 
 if os.path.basename(split_rsync_cmd(RSYNC)[0]) == 'valgrind':
-    test_skipped('the LD_PRELOAD write hook is not meaningful under valgrind')
+    test_skipped('the LD_PRELOAD write hook is not meaningful under valgrind', capability='linux_interpose')
 
 shim = build_shim()
 for mode in ('--append', '--inplace'):

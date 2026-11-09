@@ -6,13 +6,13 @@ import shlex
 import subprocess
 import time
 
-from rsyncfns import (
+from harness.rsync import (
     SCRATCHDIR, makepath, patched_rrsync, proc_self_fd_pins, rmtree,
     rsync_argv, test_fail, test_skipped,
 )
 
 if not proc_self_fd_pins():
-    test_skipped('requires /proc/self/fd directory pins')
+    test_skipped('requires /proc/self/fd directory pins', capability='proc_fd')
 
 base = SCRATCHDIR / 'rrsync-receiver-file'
 rmtree(base)
