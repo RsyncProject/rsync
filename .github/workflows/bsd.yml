@@ -46,7 +46,17 @@ jobs:
           run: |
             mkdir -p test-results
             result=$PWD/test-results/status
-            trap 'status=$?; printf "%s\n" "$status" > "$result"; exit 0' EXIT
+            cross_device=
+            finish() {
+              status=$?
+              if [ -n "$cross_device" ]; then
+                umount "$cross_device" || status=1
+                rmdir "$cross_device" || status=1
+              fi
+              printf "%s\n" "$status" > "$result"
+              exit 0
+            }
+            trap finish EXIT
             freebsd-version
             uname -a
             test "$(uname -s)" = FreeBSD
@@ -55,6 +65,10 @@ jobs:
               '${{ matrix.release }}'|'${{ matrix.release }}-RELEASE'*) ;;
               *) echo 'Unexpected FreeBSD release' >&2; exit 1 ;;
             esac
+            cross_device=$(mktemp -d /tmp/rsync-cross-device.XXXXXX)
+            mount -t tmpfs -o size=256m,mode=1777,nosuid tmpfs "$cross_device"
+            export RSYNC_TEST_TMP=$cross_device
+            df -T . "$RSYNC_TEST_TMP"
             CPPFLAGS="-I/usr/local/include" LDFLAGS="-L/usr/local/lib" \
             ./configure --with-rrsync \
               --disable-md2man --enable-iconv --enable-acl-support --enable-xattr-support \

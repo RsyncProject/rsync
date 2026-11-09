@@ -13,7 +13,7 @@ from harness.rsync import (
 
 scratch_dev = os.stat(SCRATCHDIR).st_dev
 TMPFS = None
-for cand in ('/dev/shm', '/run/shm', os.environ.get('TMPDIR', '/tmp')):
+for cand in filter(None, (os.environ.get('RSYNC_TEST_TMP'), '/dev/shm', '/run/shm', os.environ.get('TMPDIR', '/tmp'))):
     try:
         if os.stat(cand).st_dev != scratch_dev and os.access(cand, os.W_OK):
             TMPFS = cand

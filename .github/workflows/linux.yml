@@ -51,6 +51,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev libidn2-dev python3-cmarkgfm openssl
+          sudo sysctl -w fs.protected_regular=2
           echo "/usr/local/bin" >>"$GITHUB_PATH"
           mkdir -p "$RUNNER_TEMP/rsync-checks"
       - name: Configure

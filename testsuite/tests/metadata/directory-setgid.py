@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 
 import os
+import stat
 import subprocess
 
 from harness.rsync import (
-    SCRATCHDIR, check_perms, run_rsync, test_fail, test_skipped,
+    SCRATCHDIR, assert_mode, check_perms, run_rsync, test_fail, test_skipped,
 )
 
 old_umask = os.umask(0o077)
@@ -12,7 +13,7 @@ old_umask = os.umask(0o077)
 prim = os.getgid()
 alt_gid = next((g for g in os.getgroups() if g != prim), None)
 
-def testit(dirname, dirperms, file_expected, prog_expected, dir_expected, setgid):
+def testit(dirname, dirperms, file_expected, prog_expected, setgid):
     todir = SCRATCHDIR / dirname
     todir.mkdir()
     if setgid and alt_gid is not None:
@@ -22,23 +23,27 @@ def testit(dirname, dirperms, file_expected, prog_expected, dir_expected, setgid
     else:
         subprocess.run(['chmod', dirperms, str(todir)], check=True)
 
+    reference = todir / 'reference'
+    reference.mkdir(mode=0o700)
+    (reference / 'dir').mkdir(mode=0o700)
+    expected_dirs = {'to': reference.stat(), 'to/dir': (reference / 'dir').stat()}
+    (reference / 'dir').rmdir()
+    reference.rmdir()
+
     run_rsync('-rvv', str(SCRATCHDIR / 'dir'),
               str(SCRATCHDIR / 'file'),
               str(SCRATCHDIR / 'program'),
               f'{todir}/to/')
 
-    check_perms(todir / 'to', dir_expected)
-    check_perms(todir / 'to' / 'dir', dir_expected)
+    for sub, expected in expected_dirs.items():
+        path = todir / sub
+        assert_mode(path, stat.S_IMODE(expected.st_mode))
+        gid = path.stat().st_gid
+        if setgid and gid != expected.st_gid:
+            test_fail(f"{dirname}: {sub} gid is {gid}, expected {expected.st_gid} "
+                      "(setgid inheritance)")
     check_perms(todir / 'to' / 'file', file_expected)
     check_perms(todir / 'to' / 'program', prog_expected)
-
-    if setgid:
-        expect_gid = os.stat(todir).st_gid
-        for sub in ('to', 'to/dir'):
-            g = os.stat(todir / sub).st_gid
-            if g != expect_gid:
-                test_fail(f"{dirname}: {sub} gid is {g}, expected {expect_gid} "
-                          "(setgid inheritance)")
 
 src_dir = SCRATCHDIR / 'dir'
 src_dir.mkdir()
@@ -63,13 +68,8 @@ os.chmod(SCRATCHDIR / 'program', 0o775)
 if not (os.stat(src_dir).st_mode & 0o2000):
     test_skipped("The directory setgid bit vanished!", capability='directory_sgid')
 
-(src_dir / 'blah').mkdir()
-if not (os.stat(src_dir / 'blah').st_mode & 0o2000):
-    test_skipped("Your filesystem doesn't use directory setgid; maybe it's BSD.",
-                 capability='directory_sgid')
-
-testit('setgid-off', 0o700, 'rw-------', 'rwx------', 'rwx------', setgid=False)
-testit('setgid-on', 'u=rwx,g=rw,g+s,o-rwx', 'rw-------', 'rwx------', 'rwx--S---',
+testit('setgid-off', 0o700, 'rw-------', 'rwx------', setgid=False)
+testit('setgid-on', 'u=rwx,g=rw,g+s,o-rwx', 'rw-------', 'rwx------',
        setgid=True)
 
 os.umask(old_umask)
