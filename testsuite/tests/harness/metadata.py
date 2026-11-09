@@ -33,7 +33,7 @@ def test(context: TestContext):
                          "def test(context): pass\n")
     requirements = read_requirements(decorated)
     if requirements['min_peer'] != '2.6.0' or requirements['transports'] != ('pipe', 'tcp'):
-        test_fail('smoke metadata was not discovered')
+        test_fail('decorated metadata was not discovered')
     if not applies_to_peer(requirements, '2.6.0', 27, 'pipe'):
         test_fail('matching peer metadata was rejected')
     if (applies_to_peer(requirements, '2.5.0', 27, 'pipe')

@@ -32,7 +32,7 @@ metadata(features={'filters', 'remote-shell'}, transports={'pipe', 'tcp'}, min_p
 os.environ['CVSIGNORE'] = '*.junk'
 
 script_name = os.path.basename(sys.argv[0] if sys.argv[0] else __file__)
-if 'lsh' in script_name:
+if 'remote-shell' in script_name:
     os.environ['RSYNC_RSH'] = rsh_cmd()
     rpath = [f'--rsync-path={rsync_path_arg()}']
     host = 'lh:'

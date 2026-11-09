@@ -17,7 +17,7 @@ if not xattrs_supported():
                  "tooling on this platform)", capability='xattr_runtime')
 
 script_name = os.path.basename(sys.argv[0] if sys.argv[0] else __file__)
-hlink_variant = 'hlink' in script_name
+hlink_variant = 'hard-links' in script_name
 
 lnkdir = TMPDIR / 'lnk'
 makepath(lnkdir, FROMDIR / 'foo' / 'bar')

@@ -50,5 +50,5 @@ if not forwarded:
         "rwrite() assert(!is_utf8) (the marker never reached the generator).\n"
         f"daemon log:\n{log_text}")
 
-print("msg-info-forwarding: daemon receiver forwarded a peer MSG_INFO without "
+print("info-message-forwarding: daemon receiver forwarded a peer MSG_INFO without "
       "aborting (the rwrite assert is gone).")

@@ -7,10 +7,10 @@ Path depth is deep, shallow, untested or N/A. Auxiliary tree is outside, inside 
 Option | Tests | Path depth | Auxiliary tree | Coverage
 --- | --- | --- | --- | ---
 -a, --archive | many | deep | N/A | Covered throughout the suite
--r, --recursive | basic-transfer, delete-deep | deep | N/A | Covered
+-r, --recursive | local-transfers, delete-deep | deep | N/A | Covered
 -R, --relative | relative-paths, relative-implied | deep | N/A | Covered with implied-directory attributes
 --no-implied-dirs | relative-implied | deep | N/A | Covered for protocol 30 and later; protocol 29 rejects the multi-component case
---inc-recursive, --no-inc-recursive, --no-i-r | hardlinks | deep | N/A | Partial: exercised but not isolated
+--inc-recursive, --no-inc-recursive, --no-i-r | hard-links | deep | N/A | Partial: exercised but not isolated
 -d, --dirs | nonrecursive-directories | deep | N/A | Covered without recursion
 --old-dirs, --old-d | old-dirs | shallow | N/A | Covered in both mixed-version remote directions
 -m, --prune-empty-dirs | prune-empty-dirs | deep | N/A | Covered with filter-emptied chains
@@ -23,7 +23,8 @@ Option | Tests | Path depth | Auxiliary tree | Coverage
 -L, --copy-links | links | deep | N/A | Covered for file and directory links
 -k, --copy-dirlinks | links | deep | N/A | Covered
 -K, --keep-dirlinks | symlink-dirlink-basis | deep | N/A | Covered for issue 715; unavailable without the secure path resolver
--H, --hard-links | hardlinks, hardlinks-deep | deep | outside | Covered across directories
+-H, --hard-links | hard-links, hard-links-depth, hard-links-emlink | deep | outside | Covered across directories and hard-link creation failure
+--delay-symlinks | delay-symlinks, delay-symlinks-remote, rrsync-no-overwrite-delay-symlinks | shallow | N/A | Covered for creation order, remote propagation and restricted-shell refusal
 --copy-unsafe-links | safe-links | shallow | N/A | Partial
 --safe-links | safe-links | shallow | N/A | Partial
 --insecure-links | operator-path tests, insecure-links-admin-optout | deep | N/A | Covered for the local opt-out and daemon refusal
@@ -34,7 +35,7 @@ Option | Tests | Path depth | Auxiliary tree | Coverage
 
 Option | Tests | Path depth | Auxiliary tree | Coverage
 --- | --- | --- | --- | ---
--p, --perms | metadata-depth | deep | N/A | Covered with exact per-entry modes
+-p, --perms | metadata-depth, symlink-receiver-permissions | deep | N/A | Covered with exact per-entry modes and unsupported symlink chmod
 -E, --executability | executability | shallow | N/A | Partial
 --chmod | metadata-depth, chmod-option | deep | N/A | Covered
 -A, --acls | acls, acls-depth | deep | N/A | Covered when ACL support is available
@@ -75,7 +76,7 @@ Option | Tests | Path depth | Auxiliary tree | Coverage
 -x, --one-file-system | none | untested | untested | Missing; needs a mount boundary
 --preallocate | preallocate | deep | N/A | Covered for allocation and delta updates
 --fsync | none | untested | N/A | Missing
--B, --block-size | hashsearch-chain, compress-zlib-insert, preallocate | deep | N/A | Covered
+-B, --block-size | checksum-chain-limit, compress-zlib-insert, preallocate | deep | N/A | Covered
 --max-alloc | max-alloc-zero | N/A | N/A | Covered for zero and values above the peer limit
 
 ## Filtering
@@ -83,7 +84,7 @@ Option | Tests | Path depth | Auxiliary tree | Coverage
 Option | Tests | Path depth | Auxiliary tree | Coverage
 --- | --- | --- | --- | ---
 -f, --filter, -F | filter-depth, multiple-sources | deep | N/A | Covered for deep per-directory merges
---exclude, --include | filter-depth, exclude, exclude-lsh | deep | N/A | Covered
+--exclude, --include | filter-depth, exclude, exclude-remote-shell | deep | N/A | Covered
 --exclude-from, --include-from | files-from-depth | deep | N/A | Covered
 -C, --cvs-exclude | cvs-exclude | deep | N/A | Covered with nested .cvsignore
 --files-from | files-from-depth | deep | N/A | Covered
@@ -140,7 +141,7 @@ Option | Tests | Coverage
 Option | Tests | Coverage
 --- | --- | ---
 --write-batch, --only-write-batch, --read-batch | batch-mode | Partial
--e, --rsh, --rsync-path | ssh-basic and many others | Partial
+-e, --rsh, --rsync-path | remote-shell-transfers and many others | Partial
 --protocol | check29 and check30 | Covered across the selected suite
 --daemon, --config, --detach, --no-detach | daemon-standalone-detach, daemon-stdin tests | Covered for detached, foreground and inherited-socket startup
 --dparam | none | Missing
@@ -149,26 +150,26 @@ Option | Tests | Coverage
 --early-input | daemon-early-exec-nameconv, early-input-symlink | Covered for data delivery and confined input paths
 --sockopts | daemon-module-options | Covered for client and daemon configuration
 --blocking-io | none | Missing
---timeout, --contimeout | daemon-handshake-timeout, msg-io-timeout-zero, msg-io-timeout-overflow, contimeout-rsh | Covered for precedence, bounds and remote-shell daemon paths
+--timeout, --contimeout | daemon-handshake-timeout, io-timeout-zero, io-timeout-bounds, remote-shell-connect-timeout | Covered for precedence, bounds and remote-shell daemon paths
 -4, -6, --ipv4, --ipv6 | daemon-address-family | Covered for daemon binding and client connection
 --stop-after, --stop-at | stop-time | Covered for future, past and duration parsing
 --bwlimit | partial | Partial: used but not asserted directly
 --copy-as | none | Missing and root-gated
 --iconv | iconv | Covered for names, arguments, file lists, protocol 30 link targets and invalid input; the raw-byte fixture is unavailable on macOS
--s, --secluded-args, --old-args, --trust-sender | iconv, smoke | Partial: secluded and legacy argument handling are asserted; trust-sender is not isolated
+-s, --secluded-args, --old-args, --trust-sender | iconv, cli-transfers | Partial: secluded and legacy argument handling are asserted; trust-sender is not isolated
 
 ## Daemon parameters
 
 Parameter | Tests | Coverage
 --- | --- | ---
-path | daemon-access and daemon-basics | Covered with nested paths
-read only | daemon-access, daemon-basics | Covered
+path | daemon-access and daemon-listings | Covered with nested paths
+read only | daemon-access, daemon-listings | Covered
 write only | daemon-access | Covered
-list | daemon-access, daemon-basics | Covered for hidden but usable modules
+list | daemon-access, daemon-listings | Covered for hidden but usable modules
 use chroot | sender-flist-symlink-leak, daemon-chroot-acl | Partial: the enabled case needs root
 insecure links | insecure-links-admin-optout, daemon-symlink-escape-matrix | Covered for the administrative opt-out
 munge symlinks | daemon-munge | Covered for prefix addition and removal
-exclude, include | daemon-filter, daemon-basics | Covered for exclusion
+exclude, include | daemon-filter, daemon-listings | Covered for exclusion
 filter, exclude from, include from | none | Missing as daemon parameters
 incoming chmod | daemon-filter, chmod-option | Covered
 outgoing chmod | daemon-filter | Covered
@@ -178,11 +179,11 @@ strict modes | daemon-auth | Covered for unsafe secrets-file modes
 refuse options | daemon-refuse, daemon-refuse-compress | Covered for names, wildcards and allow lists
 pre-xfer exec, post-xfer exec | daemon-exec | Covered for environment and abort behaviour
 early exec | daemon-early-exec-nameconv | Covered for environment and early input
-hosts allow, hosts deny | daemon-basics, daemon-chroot-acl | Partial: a real TCP peer is required
+hosts allow, hosts deny | daemon-listings, daemon-chroot-acl | Partial: a real TCP peer is required
 reverse lookup, forward lookup | daemon-chroot-acl | Partial: reverse lookup only
-log file, transfer logging, log format | daemon-basics | Partial: configured but not asserted
-max verbosity | daemon-basics | Partial
-comment | daemon-basics, daemon-access | Covered
+log file, transfer logging, log format | daemon-listings | Partial: configured but not asserted
+max verbosity | daemon-listings | Partial
+comment | daemon-listings, daemon-access | Covered
 numeric ids | daemon-early-exec-nameconv, daemon-namecvt tests | Covered for numeric ids = no
 fake super | chown-fake, daemon-namecvt-empty-response | Covered
 timeout | daemon-handshake-timeout | Covered with zero and precedence

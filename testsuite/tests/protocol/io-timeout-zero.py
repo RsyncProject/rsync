@@ -80,7 +80,7 @@ try:
     elapsed = time.monotonic() - t0
     how = "timed out (kept --timeout)" if 'timeout' in out.lower() \
         else "exited without timing out (crafted handshake may not have engaged)"
-    print(f"msg-io-timeout-zero: client self-exited in {elapsed:.1f}s -- {how}; "
+    print(f"io-timeout-zero: client self-exited in {elapsed:.1f}s -- {how}; "
           "MSG_IO_TIMEOUT(0) did not disable the client timeout")
 finally:
     srv.terminate()

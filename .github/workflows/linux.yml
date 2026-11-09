@@ -41,7 +41,7 @@ jobs:
             profiles: non-asan,self-peer,linux,no-zstd-threads
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
-    name: Ubuntu ${{ matrix.release }} (AMD64)
+    name: Ubuntu ${{ matrix.release }} AMD64
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -57,7 +57,7 @@ jobs:
         run: ./configure --with-rrsync
       - name: Build
         run: make check-progs
-      - name: Installation smoke test
+      - name: Installation check
         if: matrix.install_smoke
         run: |
           set -e
@@ -97,13 +97,13 @@ jobs:
           test "$VERSION_ID" = "${{ matrix.release }}"
           test "$(uname -m)" = x86_64
           ./rsync --version
-      - name: Tests (pipe)
+      - name: Tests (root pipe)
         run: sudo sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,root,${{ matrix.profiles }}" "$RUNNER_TEMP/rsync-checks/root-pipe" -j8
       - name: Tests (protocol 30)
         run: sudo sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,root,${{ matrix.profiles }},protocol-30" "$RUNNER_TEMP/rsync-checks/root-protocol-30" --protocol=30 -j8
       - name: Tests (protocol 29)
         run: sudo sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,root,${{ matrix.profiles }},protocol-29" "$RUNNER_TEMP/rsync-checks/root-protocol-29" --protocol=29 -j8
-      - name: Tests (TCP)
+      - name: Tests (root TCP)
         run: sudo sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "root,${{ matrix.profiles }}" "$RUNNER_TEMP/rsync-checks/root-tcp" --use-tcp --daemon-tests-only -j8
       - name: Tests (non-root pipe)
         run: sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,nonroot,${{ matrix.profiles }}" "$RUNNER_TEMP/rsync-checks/nonroot-pipe" -j8
@@ -173,9 +173,9 @@ jobs:
         run: make
       - name: Version
         run: ./rsync --version
-      - name: Tests (pipe)
+      - name: Tests (root pipe)
         run: RSYNC_TEST_PROFILES=pipe,non-asan,root,self-peer,linux,no-zstd-threads make check
-      - name: Tests (TCP)
+      - name: Tests (root TCP)
         run: RSYNC_TEST_PROFILES=non-asan,root,self-peer,linux,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp --daemon-tests-only -j 8
       - name: TLS listing (optional)
         run: ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true

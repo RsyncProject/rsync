@@ -14,6 +14,8 @@ Some tests also use C helpers built with rsync.
 
 The test groups are build, daemon, harness, metadata, path, protocol, rrsync and transfer. The group does not form part of a test name. Selectors, profiles and receipts use the filename without a `.py` file ending. Security, compatibility and cost remain test metadata because they apply across those groups.
 
+Test filenames describe the behaviour under test, use lowercase words separated by hyphens and remain unique across groups.
+
 ## Writing tests
 
 A regression test should assert the behaviour being fixed. A final source and destination comparison can miss the actual bug.
@@ -60,7 +62,7 @@ Ubuntu | 22.04, 24.04 and 26.04 on AMD64
 FreeBSD | 14.5 and 15.1 on AMD64
 NetBSD | 10.2, 11.0 and 11.1 on AMD64
 OpenBSD | 7.9 and 8.0 on AMD64
-macOS | 15 and 26 on Intel and ARM64
+macOS | 15 and 26 on AMD64 and ARM64
 
 Each matrix entry checks its OS release and architecture and has separate artefacts. Matrix failures do not cancel the remaining entries.
 

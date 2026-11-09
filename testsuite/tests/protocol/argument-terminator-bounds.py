@@ -62,5 +62,5 @@ if 'AddressSanitizer' in reports:
         "allocation when a post-dot glob landed argc exactly on maxargs:\n"
         + reports[:1500])
 
-print("io-readargs-argv-nullwrite: the trailing argv NULL stays in bounds when a "
+print("argument-terminator-bounds: the trailing argv NULL stays in bounds when a "
       "post-dot glob fills argv to maxargs.")

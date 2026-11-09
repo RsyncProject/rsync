@@ -44,6 +44,6 @@ if elapsed >= 15:
     test_fail(f"--contimeout=1 took {elapsed:.1f}s; the timeout did not bound "
               "the connection establishment phase")
 
-print("contimeout-rsh: --contimeout is accepted for a daemon-via-rsh "
+print("remote-shell-connect-timeout: --contimeout is accepted for a daemon-via-rsh "
       "connection, rejected for a non-daemon remote shell, and times out a "
       "connection that never establishes")

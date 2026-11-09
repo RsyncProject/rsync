@@ -46,4 +46,4 @@ finally:
 if leaked:
     test_fail("daemon sender readlink followed a raced parent symlink and sent the outside symlink target")
 
-print("sender-readlink-atfd: symlink target reads did not leak through a raced parent")
+print("sender-symlink-target-race: symlink target reads did not leak through a raced parent")

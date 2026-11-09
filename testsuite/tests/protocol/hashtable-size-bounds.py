@@ -14,7 +14,7 @@ proc = subprocess.run([str(helper)], stdout=subprocess.PIPE, stderr=subprocess.P
                       timeout=30)
 rc = proc.returncode
 if rc == RERR_MALLOC:
-    print("hashtable-overflow: hashtable_create rejected the oversized size "
+    print("hashtable-size-bounds: hashtable_create rejected the oversized size "
           "(exited RERR_MALLOC) instead of under-allocating")
 elif rc < 0:
     test_fail(f"t_hashtable_overflow crashed (signal {-rc}): the hashtable "

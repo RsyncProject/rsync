@@ -53,5 +53,5 @@ if 'AddressSanitizer' in text:
         "sent without -H -- the FLAG_HLINKED pool underflow is unguarded:\n"
         + text[:1500])
 
-print("hardlink-flag-oob: XMIT_HLINKED-without-H entry parsed with no "
+print("hard-link-flag-bounds: XMIT_HLINKED-without-H entry parsed with no "
       "pool underflow (FLAG_HLINKED gated on preserve_hard_links).")

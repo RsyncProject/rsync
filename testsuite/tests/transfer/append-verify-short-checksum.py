@@ -27,5 +27,5 @@ run_rsync('-a', '--append-verify', '--checksum-choice=xxh64', '--no-whole-file',
           f'{src}/', f'{dst}/')
 assert_same(dst / 'f', src / 'f', label='append-verify xxh64 redo')
 
-print("append-shortsum: --append-verify with an 8-byte (xxh64) checksum no "
+print("append-verify-short-checksum: --append-verify with an 8-byte (xxh64) checksum no "
       "longer overflows the block s2length")

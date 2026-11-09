@@ -63,9 +63,6 @@ __pycache__
 /doc/rsync.pdf
 /doc/rsync.ps
 /support/savetransfer
-/testsuite/chown-fake.test
-/testsuite/devices-fake.test
-/testsuite/xattrs-hlink.test
 /patches
 /patches.gen
 /build

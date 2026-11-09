@@ -24,11 +24,11 @@ def test(context: TestContext):
         recipe = context.repository / 'testsuite' / 'tools' / 'check.sh'
         command = ['sh', str(recipe), str(context.tools), rsync_command_binary(), 'pipe,self-peer']
         env = {**os.environ, 'LC_ALL': 'C'}
-        control = subprocess.run(command + [str(context.scratch / 'control'), 'smoke'],
+        control = subprocess.run(command + [str(context.scratch / 'control'), 'cli-transfers'],
                                  env=env, capture_output=True, text=True, timeout=60)
         if control.returncode:
             test_fail(f'permission control failed: {control.stdout}{control.stderr}')
-        result = subprocess.run(command + [str(blocked / 'result'), 'smoke'],
+        result = subprocess.run(command + [str(blocked / 'result'), 'cli-transfers'],
                                 env=env, capture_output=True, text=True, timeout=60)
         if not result.returncode or 'Permission denied' not in result.stderr:
             test_fail(f'write permission failure was not reported: {result.stdout}{result.stderr}')

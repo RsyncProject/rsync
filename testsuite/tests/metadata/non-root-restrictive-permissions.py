@@ -77,5 +77,5 @@ if not (dest / 'restricted' / 'inner').is_file():
 if stat.S_IMODE(os.stat(dest / 'restricted').st_mode) != 0o500:
     test_fail("restricted/ perms not re-restored on the second pass")
 
-print(f"nonroot-restrictive-perms: gen_entry_chmod widen+restore (0500 dir), "
+print(f"non-root-restrictive-permissions: gen_entry_chmod widen+restore (0500 dir), "
       f"del_chmod on 0444 file, as uid={U.pw_uid}({U.pw_name})")

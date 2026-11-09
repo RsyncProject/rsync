@@ -64,10 +64,10 @@ runs:
     - name: Version
       shell: pwsh
       run: bash -c '/usr/local/bin/rsync --version'
-    - name: Tests (pipe)
+    - name: Tests (non-root pipe)
       shell: pwsh
       run: bash -c 'RSYNC_TEST_PROFILES=pipe,non-asan,nonroot,self-peer,cygwin make check'
-    - name: Tests (TCP)
+    - name: Tests (non-root TCP)
       shell: pwsh
       run: bash -c 'RSYNC_TEST_PROFILES=non-asan,nonroot,self-peer,cygwin ./testsuite/runtests.py --rsync-bin=`pwd`/rsync.exe --use-tcp --daemon-tests-only -j 8'
     - name: TLS listing (optional)

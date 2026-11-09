@@ -26,4 +26,4 @@ rmtree(TODIR)
 run_rsync('-a', f'{src}/', f'{TODIR}/')
 assert_not_hardlinked(TODIR / a, TODIR / b, label='no -H => separate inodes')
 
-print("hardlinks-deep: -H preserves a cross-directory hard link at depth")
+print("hard-links-depth: -H preserves a cross-directory hard link at depth")

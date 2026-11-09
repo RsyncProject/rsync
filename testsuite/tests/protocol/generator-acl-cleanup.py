@@ -47,4 +47,4 @@ if 'recv_generator' in reports:
     test_fail("recv_generator leaked real_sx ACL data on the directory path (KI-23):\n"
               + reports[:1500])
 
-print("recv-generator-acl-leak: recv_generator does not leak real_sx ACL data")
+print("generator-acl-cleanup: recv_generator does not leak real_sx ACL data")

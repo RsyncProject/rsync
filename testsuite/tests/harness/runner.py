@@ -80,7 +80,7 @@ def test(context: TestContext):
     daemon, independent = runner.select_daemon_tests(tests)
     daemon = {test_name(path) for path in daemon}
     independent = {test_name(path) for path in independent}
-    if {'daemon-auth', 'idn', 'protocol-refusals'} > daemon:
+    if not {'daemon-auth', 'idn', 'protocol-refusals', 'inplace-checksum-bounds', 'daemon-access-hostname'} <= daemon:
         test_fail('daemon test selection dropped coverage')
     if {'filter-merge-content-echo', 'runner'} > independent:
         test_fail('daemon test selection retained transport-independent tests')
@@ -117,7 +117,7 @@ def test(context: TestContext):
     banner = subprocess.run([binary, '--version'], capture_output=True, text=True, check=True).stdout
     peer, protocol = parse_peer_banner(banner)
     profile = context.scratch / f'peer-{peer}.json'
-    command = [sys.executable, str(context.repository / 'testsuite' / 'runtests.py'), 'smoke',
+    command = [sys.executable, str(context.repository / 'testsuite' / 'runtests.py'), 'cli-transfers',
                f'--rsync-bin={binary}', f'--rsync-bin2={binary}', f'--tooldir={context.tools}',
                f'--srcdir={context.repository}', f'--profiles={profile}', f'--receipt={receipt}']
     role = 'root' if os.geteuid() == 0 else 'nonroot'
@@ -146,12 +146,12 @@ def test(context: TestContext):
     if result.returncode:
         test_fail(f'nested runner failed: {result.stdout}{result.stderr}')
     data = json.loads(receipt.read_text())
-    if (data['summary']['exit_code'] or data['run']['selected'] != ['smoke']
+    if (data['summary']['exit_code'] or data['run']['selected'] != ['cli-transfers']
             or data['run']['peer_version'] != peer or data['run']['protocol'] != protocol
             or data['run']['profiles'] != [f'peer-{peer}']
             or data['summary']['verdicts'] != {'pass': 1}):
         test_fail('receipt summary or selection is wrong')
-    if (data['tests'][0]['name'] != 'smoke' or data['tests'][0]['outcome'] != 'pass'
+    if (data['tests'][0]['name'] != 'cli-transfers' or data['tests'][0]['outcome'] != 'pass'
             or data['tests'][0]['expected'] != 'pass'
             or list(context.scratch.glob(f'.{receipt.name}.*.tmp'))):
         test_fail('receipt result is wrong')

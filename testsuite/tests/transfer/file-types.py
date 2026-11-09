@@ -159,12 +159,12 @@ for prof in WIRE_PROFILES:
         run_scenario('daemon', direction, prof, PAIRINGS)
 
 if results:
-    msg = [f"variety: {len(results)} case(s) diverged from the all-old "
+    msg = [f"file-types: {len(results)} case(s) diverged from the all-old "
            f"reference (peer={RSYNC_PEER!r}):"]
     for label, diffs in results:
         msg.append(f"\n========== {label} ==========")
         msg.extend(diffs)
     test_fail('\n'.join(msg))
 
-print("variety: OK -- current rsync reproduces the all-old result on every "
+print("file-types: OK -- current rsync reproduces the all-old result on every "
       "local/remote/daemon scenario and new/old role pairing")

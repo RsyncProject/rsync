@@ -35,5 +35,5 @@ if not re.search(r'--max-size=9{100,}', out):
         f"(rc={proc.returncode}); parse_size_arg likely aborted on the "
         f"unclamped err_buf[len] out-of-bounds write.\noutput:\n{out}")
 
-print("daemon-size-arg-overflow: oversized --max-size rejected by the daemon "
+print("daemon-size-argument-bounds: oversized --max-size rejected by the daemon "
       "after parse_size_arg ran to completion (err_buf length is clamped).")

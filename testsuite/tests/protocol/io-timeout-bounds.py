@@ -44,5 +44,5 @@ if not (dst / 'file').is_file():
     test_fail(f"rsync returned 0 under --timeout={INT_MAX} but did not copy the "
               f"file.  Output tail:\n" + '\n'.join(out.splitlines()[-20:]))
 
-print("msg-io-timeout-overflow: -fwrapv rsync absorbed --timeout=INT_MAX without "
+print("io-timeout-bounds: -fwrapv rsync absorbed --timeout=INT_MAX without "
       "spinning; the copy completed normally.")

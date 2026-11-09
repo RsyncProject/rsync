@@ -18,7 +18,7 @@ jobs:
         release: ['14.5', '15.1']
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    name: FreeBSD ${{ matrix.release }} (AMD64)
+    name: FreeBSD ${{ matrix.release }} AMD64
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -117,7 +117,7 @@ jobs:
         release: ['10.2', '11.0', '11.1']
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    name: NetBSD ${{ matrix.release }} (AMD64)
+    name: NetBSD ${{ matrix.release }} AMD64
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -207,7 +207,7 @@ jobs:
         release: ['7.9', '8.0']
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    name: OpenBSD ${{ matrix.release }} (AMD64)
+    name: OpenBSD ${{ matrix.release }} AMD64
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -252,7 +252,7 @@ jobs:
             chown rsynctest:rsynctest test-results/nonroot
             export profiles=non-asan,self-peer,openbsd
             # OpenBSD rename storms can hang these races outside rsync
-            export RSYNC_EXCLUDE=acl-symlink-race,sender-readlink-atfd,sender-remove-source-secure
+            export RSYNC_EXCLUDE=acl-symlink-race,sender-symlink-target-race,sender-remove-source-secure
             status=0
             make dirfd-probe || status=1
             sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,root,$profiles" "$PWD/test-results/root/pipe" -j8 || status=1

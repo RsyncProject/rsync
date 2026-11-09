@@ -31,12 +31,12 @@ def test(context: TestContext):
             test_fail(f'missing recipe diagnostic: {message}\n{result.stdout}{result.stderr}')
         return result
 
-    invoke(command + ['smoke', '-j2'], True)
+    invoke(command + ['cli-transfers', '-j2'], True)
     receipt = json.loads((output / 'receipt.json').read_text())
     identity = receipt['run']
     digest = hashlib.sha256(Path(binary).read_bytes()).hexdigest()
     if (identity['binary_sha256'] != digest or identity['peer_sha256'] != digest
-            or identity['euid'] != os.geteuid() or identity['selected'] != ['smoke']
+            or identity['euid'] != os.geteuid() or identity['selected'] != ['cli-transfers']
             or receipt['summary']['verdicts'] != {'pass': 1}):
         test_fail('recipe receipt identifies the wrong run')
     if identity['source_revision'] is not None and not isinstance(identity['source_dirty'], bool):
@@ -61,13 +61,13 @@ def test(context: TestContext):
     if not (output / 'run.log').is_file() or not (output / 'scratch' / 'testtmp').is_dir():
         test_fail('recipe did not isolate its log and scratch')
     original = (output / 'receipt.json').read_bytes()
-    invoke(command + ['smoke'], False)
+    invoke(command + ['cli-transfers'], False)
     if (output / 'receipt.json').read_bytes() != original:
         test_fail('recipe overwrote an existing result')
 
     def attempt(name, binary_path=binary, profiles='pipe,self-peer', extra=()):
         return ['sh', str(recipe), str(context.tools), binary_path, profiles,
-                str(context.scratch / name), 'smoke', *extra]
+                str(context.scratch / name), 'cli-transfers', *extra]
 
     invoke(attempt('missing-binary', str(context.scratch / 'absent')), False, 'Not an executable file:')
     wrong = context.scratch / 'wrong-rsync'

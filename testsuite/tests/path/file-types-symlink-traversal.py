@@ -137,11 +137,11 @@ case_receiver_root()
 case_receiver_intermediate()
 
 if findings:
-    msg = [f"variety-symlink-traversal: {len(findings)} traversal case(s) "
+    msg = [f"file-types-symlink-traversal: {len(findings)} traversal case(s) "
            f"diverge between current and peer={RSYNC_PEER!r}:"]
     for case, desc in findings:
         msg.append(f"\n========== {case} ==========")
         msg.append(desc)
     test_fail("\n".join(msg))
 
-print("variety-symlink-traversal: current and peer agree on all traversal cases")
+print("file-types-symlink-traversal: current and peer agree on all traversal cases")
