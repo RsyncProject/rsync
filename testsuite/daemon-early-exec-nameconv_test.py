@@ -103,8 +103,12 @@ if got != 'early|EARLY-PAYLOAD':
 # the incoming id is NON-zero, so the source tree needs a non-root owner.
 # Pick any non-root passwd entry that exists in this environment; skip the
 # name-converter half if there isn't one (or we can't chown).
-nonroot = next((p for p in pwd.getpwall() if p.pw_uid != 0 and p.pw_gid != 0), None)
-if not owners_supported() or nonroot is None:
+# Account enumeration may block on network name services. It is unnecessary
+# when the existing ownership-capability check already excludes this half.
+nonroot = None
+if owners_supported():
+    nonroot = next((p for p in pwd.getpwall() if p.pw_uid != 0 and p.pw_gid != 0), None)
+if nonroot is None:
     print("daemon-early-exec-nameconv: early-exec ok; "
           "name-converter SKIPPED (no non-root passwd entry / cannot chown)")
     raise SystemExit(0)
