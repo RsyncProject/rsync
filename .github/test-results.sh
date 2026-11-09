@@ -8,15 +8,15 @@ if ! test -f "$root/.github/check-results.jq"; then
 fi
 scratch=$(mktemp -d)
 trap 'rm -f "$scratch/out" "$scratch/err"; rmdir "$scratch"' 0
-export CI_EXPECT_LINUX=true CI_EXPECT_ANALYSIS=true CI_EXPECT_BSD=false CI_EXPECT_CYGWIN=true CI_EXPECT_VERSIONS=true
+export CI_EXPECT_LINUX=true CI_EXPECT_DIAGNOSTICS=true CI_EXPECT_BSD=false CI_EXPECT_CYGWIN=true CI_EXPECT_VERSIONS=true
 export CI_DIRECT_JOBS='["cygwin","versions"]'
 data=$(jq -n '{
     linux: {result: "success", outputs: {
         jobs: ({ubuntu: {result: "success"}, almalinux: {result: "skipped"}} | tojson),
         inputs: ({ubuntu: true, almalinux: false} | tojson)}},
-    analysis: {result: "success", outputs: {
-        jobs: ({clang_scan: {result: "success"}, clang_forward: {result: "failure"}, asan: {result: "skipped"}} | tojson),
-        inputs: ({clang_scan: true, clang_forward: true, asan: false} | tojson), non_blocking: "clang_forward"}},
+    diagnostics: {result: "success", outputs: {
+        jobs: ({scan_pinned: {result: "success"}, scan_latest: {result: "failure"}, asan: {result: "skipped"}} | tojson),
+        inputs: ({scan_pinned: true, scan_latest: true, asan: false} | tojson), advisory: "scan_latest"}},
     bsd: {result: "skipped", outputs: {}},
     cygwin: {result: "success", outputs: {}},
     versions: {result: "success", outputs: {}}
@@ -38,8 +38,8 @@ check() {
 }
 
 check pass '.'
-check pass '.analysis.outputs.jobs |= (fromjson | .clang_forward.result = "success" | tojson)'
-check pass '.analysis.outputs.inputs |= (fromjson | .clang_forward = false | tojson) | .analysis.outputs.jobs |= (fromjson | .clang_forward.result = "skipped" | tojson)'
+check pass '.diagnostics.outputs.jobs |= (fromjson | .scan_latest.result = "success" | tojson)'
+check pass '.diagnostics.outputs.inputs |= (fromjson | .scan_latest = false | tojson) | .diagnostics.outputs.jobs |= (fromjson | .scan_latest.result = "skipped" | tojson)'
 CI_EXPECT_BSD=true check pass '.bsd = {result: "success", outputs: {jobs: ({test: {result: "success"}} | tojson)}}'
 check fail 'del(.linux)'
 check fail '.extra = {result: "success", outputs: {}}'
@@ -63,12 +63,12 @@ check fail '.linux.outputs.jobs |= (fromjson | .ubuntu.result = "skipped" | tojs
 check fail '.linux.outputs.jobs |= (fromjson | .ubuntu.result = "cancelled" | tojson)'
 check fail '.linux.outputs.jobs |= (fromjson | del(.ubuntu) | tojson)'
 check fail '.linux.outputs.jobs |= (fromjson | .almalinux.result = "success" | tojson)'
-check fail '.analysis.outputs.non_blocking = ""'
-check fail '.analysis.outputs.non_blocking = "unknown"'
-check fail 'del(.analysis.outputs.non_blocking)'
-check fail '.analysis.outputs.jobs |= (fromjson | .clang_scan.result = "failure" | tojson)'
-check fail '.analysis.outputs.jobs |= (fromjson | .clang_forward.result = "cancelled" | tojson)'
-check fail '.analysis.outputs.jobs |= (fromjson | .clang_forward.result = "skipped" | tojson)'
+check fail '.diagnostics.outputs.advisory = ""'
+check fail '.diagnostics.outputs.advisory = "unknown"'
+check fail 'del(.diagnostics.outputs.advisory)'
+check fail '.diagnostics.outputs.jobs |= (fromjson | .scan_pinned.result = "failure" | tojson)'
+check fail '.diagnostics.outputs.jobs |= (fromjson | .scan_latest.result = "cancelled" | tojson)'
+check fail '.diagnostics.outputs.jobs |= (fromjson | .scan_latest.result = "skipped" | tojson)'
 check fail '.bsd.result = "cancelled"'
 check fail '.cygwin.result = "failure"'
 check fail '.cygwin.result = "cancelled"'
@@ -82,8 +82,8 @@ CI_EXPECT_VERSIONS=false check pass '.versions.result = "skipped"'
 CI_EXPECT_VERSIONS=false check fail '.'
 CI_EXPECT_CYGWIN=false check pass '.cygwin.result = "skipped"'
 CI_EXPECT_CYGWIN=false check fail '.'
-CI_EXPECT_ANALYSIS=false check pass '.analysis = {result: "skipped", outputs: {}}'
-CI_EXPECT_ANALYSIS=false check fail '.'
+CI_EXPECT_DIAGNOSTICS=false check pass '.diagnostics = {result: "skipped", outputs: {}}'
+CI_EXPECT_DIAGNOSTICS=false check fail '.'
 check fail 'del(.linux.outputs.jobs) | .linux.outputs.kind = "direct"'
 CI_DIRECT_JOBS='[]' check fail '.'
 CI_DIRECT_JOBS='["missing"]' check fail '.'
@@ -91,6 +91,6 @@ CI_DIRECT_JOBS='["cygwin","versions","linux"]' check fail '.'
 CI_DIRECT_JOBS='{}' check fail '.'
 CI_DIRECT_JOBS='not JSON' check fail '.'
 check fail '{}'
-export CI_EXPECT_LINUX=false CI_EXPECT_ANALYSIS=false CI_EXPECT_CYGWIN=false CI_EXPECT_VERSIONS=false
+export CI_EXPECT_LINUX=false CI_EXPECT_DIAGNOSTICS=false CI_EXPECT_CYGWIN=false CI_EXPECT_VERSIONS=false
 check fail 'with_entries(.value = {result: "skipped", outputs: {}})'
 echo 'CI result checks passed'

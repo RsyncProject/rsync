@@ -12,10 +12,10 @@ on:
       coverage:
         required: true
         type: boolean
-      clang_scan:
+      scan_pinned:
         required: true
         type: boolean
-      clang_forward:
+      scan_latest:
         required: true
         type: boolean
       valgrind:
@@ -28,9 +28,9 @@ on:
       inputs:
         description: Job selections
         value: ${{ toJSON(inputs) }}
-      non_blocking:
-        description: Non-blocking job
-        value: clang_forward
+      advisory:
+        description: Advisory job
+        value: scan_latest
 
 permissions:
   contents: read
@@ -157,8 +157,8 @@ jobs:
             coverage
             coverage-tcp
 
-  clang_scan:
-    if: ${{ inputs.clang_scan }}
+  scan_pinned:
+    if: ${{ inputs.scan_pinned }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     name: Clang 18
@@ -189,8 +189,8 @@ jobs:
           path: scan-report
           if-no-files-found: ignore
 
-  clang_forward:
-    if: ${{ inputs.clang_forward }}
+  scan_latest:
+    if: ${{ inputs.scan_latest }}
     runs-on: ubuntu-26.04
     timeout-minutes: 45
     name: Clang (Ubuntu 26.04)
