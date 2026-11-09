@@ -54,7 +54,9 @@ The native check recipe in testsuite/tools/check.sh takes a build directory, exe
 
 [ci.yml](../.github/workflows/ci.yml) owns events, schedules and cancellation. macOS, Cygwin and Solaris run as direct jobs. Local composite actions hold the macOS and Cygwin steps; other job families use reusable workflows. Pull requests, master pushes and manual runs select every job; scheduled runs select the relevant daily or weekly jobs.
 
-Ubuntu and NetBSD have separate root and non-root pipe and TCP passes. Each pass retains its receipt and log.
+Ubuntu, macOS and the BSD guests have separate root and non-root pipe and TCP passes. Each pass retains its receipt and log. macOS, FreeBSD and OpenBSD also check the built binary's required features with testsuite/tools/check-features.py, using capability and algorithm names from `rsync -VV`.
+
+VM guest scripts record their exit status before returning control to the VM action so failed runs still copy their results back. The host checks that status after the copy completes; a missing or non-zero status fails the job.
 
 The final Required check validates all selected job results and permits only the declared scheduled omissions. The latest Clang analysis remains advisory. Workflow lint also tests the result gate against failures, cancellation, missing results and unexpected skips.
 

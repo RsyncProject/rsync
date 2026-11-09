@@ -8,7 +8,6 @@
     "directory_sgid": "no directory setgid semantics",
     "group_auth": "no Linux group-auth fixture",
     "high_fd": "no descriptors above FD_SETSIZE",
-    "iconv": "no working iconv support",
     "interpose": "no supported interposition fixture",
     "linux_acl": "no Linux ACL semantics",
     "linux_interpose": "no Linux interposition",

@@ -59,6 +59,18 @@ jobs:
             rsyncd.conf.5
             rrsync.1
             rrsync
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          retention-days: 45
+          name: macos-results
+          if-no-files-found: error
+          path: |
+            config.log
+            ${{ runner.temp }}/rsync-checks/features.json
+            ${{ runner.temp }}/rsync-checks/*/receipt.json
+            ${{ runner.temp }}/rsync-checks/*/run.log
 
   cygwin:
     if: *daily
@@ -112,13 +124,20 @@ jobs:
           prepare: |
             pkg install bash automake gnu-m4 pkg://solaris/runtime/python-35 autoconf gcc git
           run: |
+            mkdir -p test-results
+            result=$PWD/test-results/status
+            trap 'status=$?; printf "%s\n" "$status" > "$result"; exit 0' EXIT
             uname -a
-            ./configure --with-rrsync -disable-zstd --disable-md2man --disable-xxhash --disable-lz4 --disable-idn
+            ./configure --with-rrsync --disable-zstd --disable-md2man --disable-xxhash --disable-lz4 --disable-idn
             make check-progs
             ./rsync --version
-            RSYNC_TEST_PROFILES=pipe,non-asan,root,self-peer,solaris,no-idn,no-xxhash,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --receipt=test-results/solaris-pipe.json -j 8
-            RSYNC_TEST_PROFILES=non-asan,root,self-peer,solaris,no-idn,no-xxhash,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp --daemon-tests-only --receipt=test-results/solaris-tcp.json -j 8
+            status=0
+            sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,non-asan,root,self-peer,solaris,no-idn,no-xxhash,no-zstd-threads" "$PWD/test-results/root/pipe" -j8 || status=1
+            sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "non-asan,root,self-peer,solaris,no-idn,no-xxhash,no-zstd-threads" "$PWD/test-results/root/tcp" --use-tcp --daemon-tests-only -j8 || status=1
             ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
+            exit "$status"
+      - name: Check result
+        run: test "$(cat test-results/status)" = 0
       - name: Upload binaries
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -133,7 +152,18 @@ jobs:
             rsyncd.conf.5
             rrsync.1
             rrsync
-            test-results/*.json
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          retention-days: 45
+          name: solaris-results
+          if-no-files-found: error
+          path: |
+            config.log
+            test-results/status
+            test-results/*/*/receipt.json
+            test-results/*/*/run.log
 
   android:
     name: Android

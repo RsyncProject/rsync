@@ -34,17 +34,39 @@ jobs:
         with:
           cache-after-prepare: true
           prepare: |
-            pkg install -y bash autotools m4 devel/xxhash zstd liblz4 python3 archivers/liblz4 git
+            pkg install -y bash autotools m4 xxhash zstd liblz4 libidn2 libiconv python3 git
+            /usr/sbin/pw groupadd rsynctest
+            /usr/sbin/pw groupadd rsynctest-extra
+            /usr/sbin/pw useradd rsynctest -g rsynctest -G rsynctest-extra -m -d /home/rsynctest -s /bin/sh -w no
           run: |
+            mkdir -p test-results
+            result=$PWD/test-results/status
+            trap 'status=$?; printf "%s\n" "$status" > "$result"; exit 0' EXIT
             freebsd-version
+            CPPFLAGS="-I/usr/local/include" LDFLAGS="-L/usr/local/lib" \
             ./configure --with-rrsync \
-              -disable-zstd --disable-md2man --disable-xxhash --disable-lz4 --disable-idn \
+              --disable-md2man --enable-iconv --enable-acl-support --enable-xattr-support \
               --enable-roll-simd --enable-roll-asm --enable-md5-asm
             make check-progs
             ./rsync --version
-            RSYNC_TEST_PROFILES=pipe,non-asan,root,self-peer,freebsd,no-idn,no-xxhash,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --receipt=test-results/freebsd-pipe.json -j 8
-            RSYNC_TEST_PROFILES=non-asan,root,self-peer,freebsd,no-idn,no-xxhash,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp --daemon-tests-only --receipt=test-results/freebsd-tcp.json -j 8
+            python3 testsuite/tools/check-features.py "$PWD/rsync" zstd lz4 xxh128 xxh3 xxh64 iconv IDN ACLs xattrs > test-results/features.json
+            mkdir test-results/nonroot
+            chown rsynctest:rsynctest test-results/nonroot
+            export profiles=non-asan,self-peer,freebsd
+            status=0
+            sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,root,$profiles" "$PWD/test-results/root/pipe" -j8 || status=1
+            sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "root,$profiles" "$PWD/test-results/root/tcp" --use-tcp --daemon-tests-only -j8 || status=1
+            su rsynctest -c '
+              set -eu
+              status=0
+              sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,nonroot,$profiles" "$PWD/test-results/nonroot/pipe" -j8 || status=1
+              sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "nonroot,$profiles" "$PWD/test-results/nonroot/tcp" --use-tcp --daemon-tests-only -j8 || status=1
+              exit "$status"
+            ' || status=1
             ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
+            exit "$status"
+      - name: Check result
+        run: test "$(cat test-results/status)" = 0
       - name: Upload binaries
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -59,7 +81,19 @@ jobs:
             rsyncd.conf.5
             rrsync.1
             rrsync
-            test-results/*.json
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          retention-days: 45
+          name: freebsd-results
+          if-no-files-found: error
+          path: |
+            config.log
+            test-results/status
+            test-results/features.json
+            test-results/*/*/receipt.json
+            test-results/*/*/run.log
 
   netbsd:
     runs-on: ubuntu-latest
@@ -86,8 +120,12 @@ jobs:
           prepare: |
             PATH=/usr/sbin:$PATH pkg_add autoconf automake python312
             ln -sf /usr/pkg/bin/python3.12 /usr/pkg/bin/python3
-            /usr/sbin/useradd -m -d /home/rsynctest -g =uid -s /bin/sh rsynctest
+            /usr/sbin/groupadd rsynctest-extra
+            /usr/sbin/useradd -m -d /home/rsynctest -g =uid -G rsynctest-extra -s /bin/sh rsynctest
           run: |
+            mkdir -p test-results
+            result=$PWD/test-results/status
+            trap 'status=$?; printf "%s\n" "$status" > "$result"; exit 0' EXIT
             uname -a
             ./configure --with-rrsync --disable-zstd --disable-md2man --disable-xxhash --disable-lz4 --disable-idn
             make check-progs
@@ -107,6 +145,8 @@ jobs:
             ' || status=1
             ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
             exit "$status"
+      - name: Check result
+        run: test "$(cat test-results/status)" = 0
       - name: Upload binaries
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -130,6 +170,7 @@ jobs:
           if-no-files-found: error
           path: |
             config.log
+            test-results/status
             test-results/*/*/receipt.json
             test-results/*/*/run.log
 
@@ -156,20 +197,43 @@ jobs:
         with:
           cache-after-prepare: true
           prepare: |
-            pkg_add -I bash autoconf%2.71 automake%1.16
+            pkg_add -I bash autoconf%2.71 automake%1.16 xxhash zstd lz4 libidn2 libiconv git
+            /usr/sbin/groupadd rsynctest-extra
+            /usr/sbin/useradd -m -d /home/rsynctest -g =uid -G rsynctest-extra -s /bin/sh rsynctest
           run: |
+            mkdir -p test-results
+            result=$PWD/test-results/status
+            trap 'status=$?; printf "%s\n" "$status" > "$result"; exit 0' EXIT
             uname -a
             export AUTOCONF_VERSION=2.71
             export AUTOMAKE_VERSION=1.16
-            ./configure --with-rrsync --disable-zstd --disable-md2man --disable-xxhash --disable-lz4 --disable-idn
+            # Match the OpenBSD port's header-only xxhash linkage
+            CPPFLAGS="-I/usr/local/include -DXXH_INLINE_ALL=1" LDFLAGS="-L/usr/local/lib" \
+              ac_cv_search_XXH64_createState= \
+              ./configure --with-rrsync --disable-md2man --enable-iconv
             make check-progs
             ./rsync --version
+            python3 testsuite/tools/check-features.py "$PWD/rsync" zstd lz4 xxh128 xxh3 xxh64 iconv IDN > test-results/features.json
+            mkdir test-results/nonroot
+            chown rsynctest:rsynctest test-results/nonroot
+            export profiles=non-asan,self-peer,openbsd
             # OpenBSD rename storms can hang these races outside rsync
             export RSYNC_EXCLUDE=acl-symlink-race,sender-readlink-atfd,sender-remove-source-secure
-            RSYNC_TEST_PROFILES=pipe,non-asan,root,self-peer,openbsd,no-idn,no-xxhash,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --receipt=test-results/openbsd-pipe.json -j 8
+            status=0
+            sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,root,$profiles" "$PWD/test-results/root/pipe" -j8 || status=1
             # Keep nested-VM loopback daemons below the observed lost-wakeup threshold
-            RSYNC_TEST_PROFILES=non-asan,root,self-peer,openbsd,no-idn,no-xxhash,no-zstd-threads ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp --daemon-tests-only --receipt=test-results/openbsd-tcp.json -j 2
+            sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "root,$profiles" "$PWD/test-results/root/tcp" --use-tcp --daemon-tests-only -j2 || status=1
+            su rsynctest -c '
+              set -eu
+              status=0
+              sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,nonroot,$profiles" "$PWD/test-results/nonroot/pipe" -j8 || status=1
+              sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "nonroot,$profiles" "$PWD/test-results/nonroot/tcp" --use-tcp --daemon-tests-only -j2 || status=1
+              exit "$status"
+            ' || status=1
             ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
+            exit "$status"
+      - name: Check result
+        run: test "$(cat test-results/status)" = 0
       - name: Upload binaries
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -184,4 +248,16 @@ jobs:
             rsyncd.conf.5
             rrsync.1
             rrsync
-            test-results/*.json
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          retention-days: 45
+          name: openbsd-results
+          if-no-files-found: error
+          path: |
+            config.log
+            test-results/status
+            test-results/features.json
+            test-results/*/*/receipt.json
+            test-results/*/*/run.log

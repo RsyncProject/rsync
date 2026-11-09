@@ -10,6 +10,7 @@ runs:
         brew install automake openssl xxhash zstd lz4 libidn2
         pip3 install --user --break-system-packages commonmark
         echo "$(brew --prefix)/bin" >>"$GITHUB_PATH"
+        mkdir -p "$RUNNER_TEMP/rsync-checks"
     - name: Configure
       shell: bash -e {0}
       run: |
@@ -17,22 +18,35 @@ runs:
         OPENSSL_PREFIX=$(brew --prefix openssl)
         CPPFLAGS="-I${BREW_PREFIX}/include -I${OPENSSL_PREFIX}/include" \
         LDFLAGS="-L${BREW_PREFIX}/lib -L${OPENSSL_PREFIX}/lib" \
-        ./configure --with-rrsync
+        ./configure --with-rrsync --enable-iconv --enable-acl-support --enable-xattr-support
     - name: Build
+      id: build
       shell: bash -e {0}
-      run: make
+      run: make check-progs
     - name: Install
       shell: bash -e {0}
       run: sudo make install
     - name: Version
       shell: bash -e {0}
-      run: rsync --version
-    - name: Tests (pipe)
+      run: |
+        /usr/local/bin/rsync --version
+        python3 testsuite/tools/check-features.py "$PWD/rsync" zstd lz4 xxh128 xxh3 xxh64 iconv IDN ACLs xattrs > "$RUNNER_TEMP/rsync-checks/features.json"
+    - name: Tests (non-root pipe)
+      if: ${{ !cancelled() && steps.build.outcome == 'success' }}
       shell: bash -e {0}
-      run: sudo RSYNC_TEST_PROFILES=pipe,non-asan,root,self-peer,macos make check
-    - name: Tests (TCP)
+      run: sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,non-asan,nonroot,self-peer,macos" "$RUNNER_TEMP/rsync-checks/nonroot-pipe" -j8
+    - name: Tests (non-root TCP)
+      if: ${{ !cancelled() && steps.build.outcome == 'success' }}
       shell: bash -e {0}
-      run: sudo RSYNC_TEST_PROFILES=non-asan,root,self-peer,macos ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp --daemon-tests-only -j 8
+      run: sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "non-asan,nonroot,self-peer,macos" "$RUNNER_TEMP/rsync-checks/nonroot-tcp" --use-tcp --daemon-tests-only -j8
+    - name: Tests (root pipe)
+      if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+      shell: bash -e {0}
+      run: sudo sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,non-asan,root,self-peer,macos" "$RUNNER_TEMP/rsync-checks/root-pipe" -j8
+    - name: Tests (root TCP)
+      if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+      shell: bash -e {0}
+      run: sudo sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "non-asan,root,self-peer,macos" "$RUNNER_TEMP/rsync-checks/root-tcp" --use-tcp --daemon-tests-only -j8
     - name: TLS listing (optional)
       shell: bash -e {0}
-      run: rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
+      run: /usr/local/bin/rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
