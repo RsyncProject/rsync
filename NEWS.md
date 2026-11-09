@@ -1,3 +1,13 @@
+# NEWS for UNRELEASED
+
+## Changes in this version:
+
+### BUG FIXES:
+- Preserved known-name operations beneath searchable but unreadable directories
+  on macOS. Native configuration now proves lookup, creation,
+  permission-revocation and no-follow behaviour before selecting a traversal
+  descriptor. Unverified targets fail closed instead of using raceable paths.
+
 # NEWS for rsync 3.5.2 (4 Nov 2026)
 
 ## Changes in this version:

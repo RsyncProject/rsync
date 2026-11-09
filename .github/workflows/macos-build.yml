@@ -44,6 +44,10 @@ jobs:
       run: sudo make install
     - name: info
       run: rsync --version
+    - name: check search-only directories
+      run: |
+        ./runtests.py --rsync-bin="$PWD/rsync" \
+          search-only-destination search-only-held-dirfd
     - name: check
       # chown-fake / devices-fake / xattrs / xattrs-hlink now RUN on macOS
       # (rsyncfns.py drives xattrs via the `xattr` command), verified on a

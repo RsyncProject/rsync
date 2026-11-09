@@ -2,11 +2,12 @@
 """Known-name operations must not require permission to list parent dirs.
 
 The confined resolver holds directory descriptors to prevent symlink races.
-On Linux, those traversal and *at() anchor descriptors can use O_PATH: opening
-a known file beneath a searchable directory, or creating one beneath a
-writable/searchable directory, does not require directory read permission.
+Supported kernels provide a descriptor which can open a known file beneath a
+searchable directory or create one beneath a writable/searchable directory
+without requiring permission to list that directory.
 """
 
+import json
 import os
 import shutil
 import subprocess
@@ -15,14 +16,16 @@ import tempfile
 from pathlib import Path
 
 from rsyncfns import (
-    SCRATCHDIR, forced_protocol, rmtree, rsync_argv, test_fail, test_skipped,
+    SCRATCHDIR, forced_protocol, rmtree, rsync_argv, run_rsync, test_fail, test_skipped,
 )
 
-if not sys.platform.startswith('linux'):
-    test_skipped('search-only held-dirfd coverage is Linux-specific')
+version = json.loads(run_rsync('-VV', capture_output=True).stdout)
+search_only_dirs = version['capabilities']['search_only_dirs']
 
 launcher = []
 if os.geteuid() == 0:
+    if not sys.platform.startswith('linux'):
+        test_skipped('requires a non-root test process on this platform')
     setpriv = shutil.which('setpriv')
     if setpriv is None:
         test_skipped('setpriv is unavailable for the root-run testsuite')
@@ -99,6 +102,17 @@ try:
     permission_probe(nested_parent, '-r', 1, 'nested write-search-only mode')
     permission_probe(nested_parent, '-w', 0, 'nested write-search-only mode')
     permission_probe(nested_parent, '-x', 0, 'nested write-search-only mode')
+
+    if not search_only_dirs:
+        unsupported = subprocess.run(
+            launcher + rsync_argv('-t', str(incoming), f'{write_only_dest}/'),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if unsupported.returncode == 0 or (write_only_dest / 'incoming').exists():
+            test_fail('unsupported search-only traversal did not fail closed')
+        test_skipped('kernel has no race-safe search-only directory descriptor')
 
     # Keep received implied dirs usable on systems without a safe fchmodat2.
     # The source remains mode 0111, so sender traversal coverage is unchanged.
