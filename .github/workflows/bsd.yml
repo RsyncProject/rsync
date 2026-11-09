@@ -16,11 +16,11 @@ jobs:
       fail-fast: false
       matrix:
         release: ['14.5', '15.1']
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     name: FreeBSD ${{ matrix.release }} AMD64
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -97,7 +97,7 @@ jobs:
         run: test "$(cat test-results/status)" = 0
       - name: Upload binaries
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           retention-days: 45
           name: freebsd-${{ matrix.release }}-amd64-bin
@@ -111,7 +111,7 @@ jobs:
             rrsync
       - name: Upload results
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           retention-days: 45
           name: freebsd-${{ matrix.release }}-amd64-results
@@ -129,11 +129,11 @@ jobs:
       fail-fast: false
       matrix:
         release: ['10.2', '11.0', '11.1']
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     name: NetBSD ${{ matrix.release }} AMD64
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -188,7 +188,7 @@ jobs:
         run: test "$(cat test-results/status)" = 0
       - name: Upload binaries
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           retention-days: 45
           name: netbsd-${{ matrix.release }}-amd64-bin
@@ -202,7 +202,7 @@ jobs:
             rrsync
       - name: Upload results
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           retention-days: 45
           name: netbsd-${{ matrix.release }}-amd64-results
@@ -219,11 +219,11 @@ jobs:
       fail-fast: false
       matrix:
         release: ['7.9', '8.0']
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     name: OpenBSD ${{ matrix.release }} AMD64
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -286,7 +286,7 @@ jobs:
         run: test "$(cat test-results/status)" = 0
       - name: Upload binaries
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           retention-days: 45
           name: openbsd-${{ matrix.release }}-amd64-bin
@@ -300,7 +300,7 @@ jobs:
             rrsync
       - name: Upload results
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           retention-days: 45
           name: openbsd-${{ matrix.release }}-amd64-results

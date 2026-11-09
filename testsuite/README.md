@@ -77,7 +77,7 @@ VM guest scripts record their exit status before returning control to the VM act
 
 BSD and macOS jobs retain dirfd-probe.tsv alongside their test results. `make dirfd-probe` builds a standalone tool which takes an existing writable scratch directory and refuses root. Its rows record directory-open flags, identity checks, known-file reads, creation, fchdir, search-permission revocation and O_NOFOLLOW. Operation columns use zero for success and errno values for failure; N/A marks undefined flags and unattempted operations.
 
-The final Required check validates all selected job results and permits only the declared scheduled omissions. The latest Clang analysis remains advisory. Workflow lint also tests the result gate against failures, cancellation, missing results and unexpected skips.
+The final Required check validates all selected job results and permits only the declared scheduled omissions. The Ubuntu 26.04 Clang analysis runs weekly and remains advisory. Workflow lint also tests the result gate against failures, cancellation, missing results and unexpected skips.
 
 ## TCP daemon mode
 

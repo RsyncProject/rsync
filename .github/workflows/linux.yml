@@ -70,7 +70,7 @@ jobs:
     timeout-minutes: 45
     name: Ubuntu ${{ matrix.release }} ${{ matrix.arch == 'amd64' && 'AMD64' || 'ARM64' }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -141,7 +141,7 @@ jobs:
         run: rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
       - name: Upload binaries
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           retention-days: 45
           name: ubuntu-${{ matrix.release }}-${{ matrix.arch }}-bin
@@ -156,7 +156,7 @@ jobs:
             rrsync
       - name: Upload results
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           retention-days: 45
           name: ubuntu-${{ matrix.release }}-${{ matrix.arch }}-results
@@ -168,7 +168,7 @@ jobs:
 
   almalinux:
     if: ${{ inputs.almalinux }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     container:
       image: almalinux:8
@@ -176,7 +176,7 @@ jobs:
     steps:
       - name: Install Git
         run: dnf -y install git
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -208,7 +208,7 @@ jobs:
       - name: TLS listing (optional)
         run: ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
       - name: Upload binaries
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           retention-days: 45
           name: almalinux-8-bin
@@ -243,7 +243,7 @@ jobs:
             image: alpine@sha256:55d68c85222dd92297b0f8885354739d89f0dc17fc2f903c49dc1d9c129c3d6a
             profiles: non-asan,self-peer,linux,no-simd,no-userns
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -310,7 +310,7 @@ jobs:
           ALPINE
       - name: Upload binaries
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           retention-days: 45
           name: alpine-3.24.4-${{ matrix.arch }}-bin
@@ -318,7 +318,7 @@ jobs:
           path: ${{ runner.temp }}/rsync-alpine-${{ matrix.arch }}/bin
       - name: Upload results
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           retention-days: 45
           name: alpine-3.24.4-${{ matrix.arch }}-results

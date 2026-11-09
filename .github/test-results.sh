@@ -39,6 +39,7 @@ check() {
 
 check pass '.'
 check pass '.diagnostics.outputs.jobs |= (fromjson | .scan_latest.result = "success" | tojson)'
+check pass '.diagnostics.outputs.inputs |= (fromjson | .scan_latest = false | tojson) | .diagnostics.outputs.jobs |= (fromjson | .scan_latest.result = "skipped" | tojson)'
 CI_EXPECT_BSD=true check pass '.bsd = {result: "success", outputs: {jobs: ({test: {result: "success"}} | tojson)}}'
 check fail 'del(.linux)'
 check fail '.extra = {result: "success", outputs: {}}'

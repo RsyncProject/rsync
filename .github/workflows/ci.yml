@@ -57,7 +57,7 @@ jobs:
     timeout-minutes: 45
     name: macOS ${{ matrix.release }} ${{ matrix.arch == 'x86_64' && 'AMD64' || 'ARM64' }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -71,7 +71,7 @@ jobs:
       - name: Build and test
         uses: ./.github/actions/macos
       - name: Upload binaries
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           retention-days: 45
           name: macos-${{ matrix.release }}-${{ matrix.arch }}-bin
@@ -85,7 +85,7 @@ jobs:
             rrsync
       - name: Upload results
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           retention-days: 45
           name: macos-${{ matrix.release }}-${{ matrix.arch }}-results
@@ -103,14 +103,14 @@ jobs:
     timeout-minutes: 60
     name: Cygwin
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
       - name: Build and test
         uses: ./.github/actions/cygwin
       - name: Upload binaries
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           retention-days: 45
           name: cygwin-bin
@@ -125,11 +125,11 @@ jobs:
 
   solaris:
     if: *weekly
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     name: Solaris
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -165,7 +165,7 @@ jobs:
         run: test "$(cat test-results/status)" = 0
       - name: Upload binaries
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           retention-days: 45
           name: solaris-bin
@@ -179,7 +179,7 @@ jobs:
             rrsync
       - name: Upload results
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           retention-days: 45
           name: solaris-results
@@ -198,10 +198,10 @@ jobs:
   versions:
     name: Version mix
     if: &versions ${{ github.event_name != 'schedule' || github.event.schedule == '52 8 * * 1' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -242,7 +242,7 @@ jobs:
           exit $rc
       - name: Upload results
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: version-mix-receipts
           path: test-results/version-mix
@@ -256,14 +256,14 @@ jobs:
       asan: &instrumented ${{ github.event_name != 'schedule' || github.event.schedule == '42 9 * * 1' }}
       coverage: *instrumented
       scan_pinned: *regular
-      scan_latest: *regular
+      scan_latest: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && github.event.schedule == '42 9 * * 1') }}
       valgrind: ${{ github.event_name != 'schedule' || github.event.schedule == '17 4 * * *' }}
 
   required:
     name: Required
     if: always()
     needs: [linux, bsd, macos, cygwin, solaris, android, versions, diagnostics]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     env:
       CI_DIRECT_JOBS: '["macos","cygwin","solaris","versions"]'
@@ -276,7 +276,7 @@ jobs:
       CI_EXPECT_VERSIONS: *versions
       CI_EXPECT_DIAGNOSTICS: *diagnostics
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Check results
