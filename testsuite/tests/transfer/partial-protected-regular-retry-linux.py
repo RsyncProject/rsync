@@ -49,9 +49,11 @@ static int (*real_open)(const char *, int, ...);
 static int (*real_openat)(int, const char *, int, ...);
 static int (*real_fstatat)(int, const char *, struct stat *, int);
 static int (*real_fxstatat)(int, int, const char *, struct stat *, int);
+#ifdef __GLIBC__
 static int (*real_fstatat64)(int, const char *, struct stat64 *, int);
 static int (*real_fxstatat64)(int, int, const char *, struct stat64 *, int);
 static int (*real_fstatat64_time64)(int, const char *, struct stat64 *, int);
+#endif
 
 /* Resolve on demand rather than trusting our constructor to have run.  A
  * preloaded open() interposes for the whole process the moment the loader maps
@@ -73,10 +75,12 @@ static void hook_resolve(void)
     if (!real_openat)   real_openat   = dlsym(RTLD_NEXT, "openat");
     if (!real_fstatat)  real_fstatat  = dlsym(RTLD_NEXT, "fstatat");
     if (!real_fxstatat) real_fxstatat = dlsym(RTLD_NEXT, "__fxstatat");
+#ifdef __GLIBC__
     if (!real_fstatat64)  real_fstatat64  = dlsym(RTLD_NEXT, "fstatat64");
     if (!real_fxstatat64) real_fxstatat64 = dlsym(RTLD_NEXT, "__fxstatat64");
     if (!real_fstatat64_time64)
         real_fstatat64_time64 = dlsym(RTLD_NEXT, "__fstatat64_time64");
+#endif
     hook_resolving = 0;
 }
 
@@ -323,9 +327,10 @@ int __fxstatat(int ver, int dfd, const char *path, struct stat *st, int flags)
     return rc;
 }
 
-/* The stat family's large-file spellings.  st_mode and st_uid sit ahead of the
- * timestamps in every glibc struct stat layout, so the time32/time64 variants
- * of the buffer are interchangeable for the two fields touched here. */
+/* The glibc stat family's large-file spellings.  st_mode and st_uid sit ahead
+ * of the timestamps in every glibc struct stat layout, so the time32/time64
+ * variants of the buffer are interchangeable for the two fields touched. */
+#ifdef __GLIBC__
 static void model_foreign_owner64(int rc, const char *path, struct stat64 *st)
 {
     if (rc == 0 && swapped && path && strcmp(path, "pdir") == 0
@@ -384,6 +389,7 @@ int __fstatat64_time64(int dfd, const char *path, struct stat64 *st, int flags)
     errno = saved_errno;
     return rc;
 }
+#endif
 
 __attribute__((constructor)) static void hook_loaded(void)
 {

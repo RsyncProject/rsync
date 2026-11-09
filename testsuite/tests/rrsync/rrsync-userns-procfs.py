@@ -70,8 +70,8 @@ if not os.environ.get('RSYNC_USERNS_PROCFS'):
     )
     if probe.returncode != 0:
         rmtree(launch_dir)
-        print(f'user namespaces unavailable (rc={probe.returncode})')
-        raise SystemExit(0)
+        test_skipped(f'user namespaces unavailable (rc={probe.returncode})',
+                     capability='user_namespace')
     try:
         proc = subprocess.run(
             launcher + unshare_argv

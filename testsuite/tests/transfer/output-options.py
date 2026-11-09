@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 
 import os
-import platform
 import re
 import select
 import subprocess
 
 from harness.rsync import (
-    FROMDIR, TODIR,
+    FROMDIR, TODIR, TOOLDIR,
     assert_not_exists, make_data_file, make_tree, makepath, rmtree, rsync_argv,
     test_fail, verify_dirs,
 )
@@ -49,8 +48,9 @@ p = out('-a', '--stats', f'{src}/', f'{TODIR}/')
 if 'Number of files:' not in p.stdout or 'Total file size:' not in p.stdout:
     test_fail(f"--stats output missing expected lines:\n{p.stdout}")
 
-if platform.system() == 'Linux':
-    stats = out('-r', '--info=stats3', f'{src}/', f'{TODIR}/').stdout
+config_h = (TOOLDIR / 'config.h').read_text()
+stats = out('-r', '--info=stats3', f'{src}/', f'{TODIR}/').stdout
+if '#define HAVE_MALLINFO 1' in config_h or '#define HAVE_MALLINFO2 1' in config_h:
     if stats.count('heap statistics') < 3:
         test_fail('--info=stats3 did not emit allocator statistics')
 

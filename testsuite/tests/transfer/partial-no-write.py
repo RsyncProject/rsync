@@ -35,7 +35,11 @@ def test(context: TestContext):
         cp_p(source / 'some_file', partial)
 
         if prefix:
-            probe = ('if ! test -f "$1" || ! test -r "$1" || test -w "$1"; then\n'
+            probe = ('if ! test -f "$1" || ! test -r "$1"; then\n'
+                     '    echo "read-only partial fixture is not enforced" >&2\n'
+                     '    exit 1\n'
+                     'fi\n'
+                     'if (printf x >>"$1") 2>/dev/null; then\n'
                      '    echo "read-only partial fixture is not enforced" >&2\n'
                      '    exit 1\n'
                      'fi\n'

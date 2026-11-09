@@ -6,8 +6,11 @@ import subprocess
 from harness.rsync import SCRATCHDIR, rmtree, rsync_argv, test_fail
 
 def available_locales():
-    proc = subprocess.run(['locale', '-a'], stdout=subprocess.PIPE,
-                          stderr=subprocess.DEVNULL)
+    try:
+        proc = subprocess.run(['locale', '-a'], stdout=subprocess.PIPE,
+                              stderr=subprocess.DEVNULL)
+    except FileNotFoundError:
+        return {}
     if proc.returncode != 0:
         return {}
     return {name.lower(): name for name in proc.stdout.decode('ascii', 'ignore').splitlines()}

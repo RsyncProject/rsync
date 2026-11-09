@@ -68,7 +68,7 @@ os.chown(dest_nonroot, U.pw_uid, U.pw_gid)
 mods = [
     ('gauth', {
         'path': str(dest_g), 'read only': 'no', 'use chroot': 'no',
-        'auth users': f'@{G.gr_name}, @ro*:ro',
+        'auth users': f'@ro*:ro, @{G.gr_name}',
         'secrets file': str(secrets), 'strict modes': 'no',
     }),
     ('gidstar', {
