@@ -103,20 +103,29 @@ The remainder of this manpage is dedicated to using the rrsync script.
     replacing whatever has appeared at that name since the check), and backup
     mode (`-b`, `--backup-dir`, whose published backup replaces whatever
     already occupies the backup name). Resumable uploads with an explicit
-    `--partial-dir`, `--delay-updates`, `--delay-symlinks`, and server-side
-    logging are therefore unavailable under this option.
+    `--partial-dir`, `--delay-updates`, `--delay-symlinks` and client-selected
+    log files are therefore unavailable under this option. Administrator logging
+    with [`-log FILE`](#opt) remains available.
 
 0.  `-log FILE`
 
-    Log every transfer to _FILE_ using rsync's [`--log-file`](rsync.1#opt),
-    in its default "%i %n%L" format, so each file sent, received or deleted
-    gets a line.  _FILE_ can be relative to the user's home directory or an
-    absolute path.  The client's own `--log-file` option is refused while this
-    is in force.  _FILE_ is resolved one component at a time and refused if
-    any step enters _DIR_, and `-log` cannot be used when _DIR_ is `/`.
-    rrsync opens _FILE_ before running rsync and refuses the transfer if it
-    cannot.  After that, write errors are handled as for rsync's
-    `--log-file`: they are not reported and do not stop the transfer.
+    Write server-side transfer records to _FILE_ using rsync's
+    [`--log-file`](rsync.1#opt). The default "%i %n%L" format records files sent,
+    received or deleted, with timestamps and process IDs. The client's own
+    `--log-file` is refused. This works with `-ro`, `-wo` and `-no-overwrite`.
+
+    _FILE_ must be a regular file outside _DIR_. It can be absolute or relative
+    to the user's home directory. rrsync resolves symlinks before `..` and
+    refuses paths that pass through _DIR_. `-log` is refused when _DIR_ is `/`.
+    Symlinks must be owned by root or the user running rrsync. Keep the log and
+    its parent directories out of untrusted users' reach, including
+    through hard links or bind mounts; rrsync cannot detect every such alias.
+
+    rrsync checks that _FILE_ can be opened before starting the transfer.
+    Rsync then opens the file itself. Logging is best-effort: a later open or
+    write failure can leave a successful transfer with incomplete or missing
+    records. Use rsync's exit status to determine whether a transfer succeeded.
+    This option does not provide a tamper-resistant audit trail.
 
 0.  `-help`, `-h`
 
