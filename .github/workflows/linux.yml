@@ -28,20 +28,44 @@ jobs:
       matrix:
         include:
           - release: '26.04'
+            arch: amd64
+            machine: x86_64
             runner: ubuntu-26.04
             install_smoke: true
             profiles: non-asan,self-peer,linux
           - release: '24.04'
+            arch: amd64
+            machine: x86_64
             runner: ubuntu-24.04
             install_smoke: true
             profiles: non-asan,self-peer,linux
           - release: '22.04'
+            arch: amd64
+            machine: x86_64
             runner: ubuntu-22.04
             install_smoke: false
             profiles: non-asan,self-peer,linux,no-zstd-threads
+          - release: '26.04'
+            arch: arm64
+            machine: aarch64
+            runner: ubuntu-26.04-arm
+            install_smoke: true
+            profiles: non-asan,self-peer,linux,no-simd
+          - release: '24.04'
+            arch: arm64
+            machine: aarch64
+            runner: ubuntu-24.04-arm
+            install_smoke: true
+            profiles: non-asan,self-peer,linux,no-simd
+          - release: '22.04'
+            arch: arm64
+            machine: aarch64
+            runner: ubuntu-22.04-arm
+            install_smoke: false
+            profiles: non-asan,self-peer,linux,no-simd,no-zstd-threads
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
-    name: Ubuntu ${{ matrix.release }} AMD64
+    name: Ubuntu ${{ matrix.release }} ${{ matrix.arch == 'amd64' && 'AMD64' || 'ARM64' }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -96,7 +120,7 @@ jobs:
           uname -a
           test "$ID" = ubuntu
           test "$VERSION_ID" = "${{ matrix.release }}"
-          test "$(uname -m)" = x86_64
+          test "$(uname -m)" = "${{ matrix.machine }}"
           ./rsync --version
       - name: Tests (root pipe)
         run: sudo sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,root,${{ matrix.profiles }}" "$RUNNER_TEMP/rsync-checks/root-pipe" -j8
@@ -117,7 +141,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           retention-days: 45
-          name: ubuntu-${{ matrix.release }}-amd64-bin
+          name: ubuntu-${{ matrix.release }}-${{ matrix.arch }}-bin
           if-no-files-found: error
           path: |
             rsync
@@ -132,7 +156,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           retention-days: 45
-          name: ubuntu-${{ matrix.release }}-amd64-results
+          name: ubuntu-${{ matrix.release }}-${{ matrix.arch }}-results
           if-no-files-found: error
           path: |
             config.log

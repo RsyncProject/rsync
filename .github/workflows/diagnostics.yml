@@ -58,7 +58,7 @@ jobs:
       - name: Version
         run: actionlint -version
       - name: Check workflows
-        run: actionlint -color -ignore '^label "ubuntu-26\.04" is unknown\.'
+        run: actionlint -color -ignore '^label "ubuntu-26\.04(-arm)?" is unknown\.'
       - name: Check result gate
         run: sh .github/test-results.sh
 

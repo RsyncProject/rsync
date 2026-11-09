@@ -58,7 +58,7 @@ The native check recipe in testsuite/tools/check.sh takes a build directory, exe
 
 Family | Versions and architectures
 --- | ---
-Ubuntu | 22.04, 24.04 and 26.04 on AMD64
+Ubuntu | 22.04, 24.04 and 26.04 on AMD64 and ARM64
 FreeBSD | 14.5 and 15.1 on AMD64
 NetBSD | 10.2, 11.0 and 11.1 on AMD64
 OpenBSD | 7.9 and 8.0 on AMD64
