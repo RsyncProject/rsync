@@ -59,6 +59,42 @@ extern char *confine_root;	/* --confine-root, or NULL; see confinement_root() */
 extern unsigned int confine_rootlen;
 extern char curr_dir[MAXPATHLEN];	/* defined below; fwd-declared for the seed */
 
+/* A traversal descriptor does not need directory read permission when
+ * configure found a flag which preserves later search-permission checks. */
+static int directory_traverse_flags(void)
+{
+#if defined SEARCH_ONLY_DIRFD_FLAG && defined O_DIRECTORY
+	return SEARCH_ONLY_DIRFD_FLAG | O_DIRECTORY;
+#elif defined O_DIRECTORY
+	return O_RDONLY | O_DIRECTORY;
+#else
+	return O_RDONLY;
+#endif
+}
+
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+/* Open a trusted absolute anchor directory as an owned dirfd.  When the anchor is
+ * the served module root and the daemon pinned it by identity (module_dirfd), dup
+ * that fd rather than re-resolving the absolute path with openat(AT_FDCWD, ...) --
+ * which re-traverses the module's ancestors as the dropped-privilege module uid
+ * and EACCESes when the module sits under a non-traversable parent (a 0700 home).
+ * Functionally identical (same inode), just privilege-drop-safe.  Gated like its
+ * callers (the secure resolver and dpc_dir_fd both require these three). */
+int open_anchor_dirfd(const char *path)
+{
+	if (module_dirfd >= 0 && am_daemon && module_dir && strcmp(path, module_dir) == 0)
+		return dup(module_dirfd);
+	return openat(AT_FDCWD, path, directory_traverse_flags());
+}
+#endif
+
+/* Single gate for whether path resolution must be hardened against
+ * parent-component symlink races (TOCTOU).  Used by the do_*_at()/do_*_atfd()
+ * wrappers and the receiver's secure-open/secure-mkstemp choices.  Hardens
+ * every non-chrooted receiver (a chroot is its own confinement); the sender is
+ * excluded so it still follows -L/--copy-links symlinks.  A daemon chroot with
+ * an inner-module /./ boundary still needs these checks because the kernel
+ * chroot confines the outer path, not the inner module. */
 int secure_relpath_active(void)
 {
 	/* The "insecure links" / --insecure-links opt-out restores the legacy
@@ -642,6 +678,14 @@ out:
 int open_no_attacker_symlinks(const char *path, int flags, mode_t mode)
 {
 	return ona_open(path, flags, mode, NULL, 0);
+}
+
+/* Open a directory for traversal or as *at()/fchdir() authority.  Unlike an
+ * O_RDONLY directory endpoint, this accepts a searchable but unreadable
+ * directory when the kernel provides a safe search-only descriptor. */
+int open_no_attacker_symlinks_dirfd(const char *path)
+{
+	return ona_open(path, directory_traverse_flags(), 0, NULL, 0);
 }
 
 /* When set, the do_*_at() wrappers resolve their path as an OPERATOR-supplied

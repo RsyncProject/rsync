@@ -102,6 +102,11 @@ static void print_info_flags(enum logcode f)
 #endif
 			"append",
 
+#ifndef SEARCH_ONLY_DIRFD_FLAG
+		"no "
+#endif
+			"search-only-dirs",
+
 #ifndef SUPPORT_ACLS
 		"no "
 #endif

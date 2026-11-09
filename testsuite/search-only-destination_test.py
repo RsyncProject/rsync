@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """The receiver must traverse a searchable but unreadable destination parent.
 
-Android exposes /sdcard through such a path, so the race-safe destination walk
-must use directory descriptors that require search permission only.
+Android exposes /sdcard through such a path. Kernels which provide a race-safe
+search-only directory descriptor must therefore support this destination walk.
 """
 
+import json
 import os
 import shutil
 import subprocess
@@ -12,13 +13,15 @@ import sys
 import tempfile
 from pathlib import Path
 
-from rsyncfns import SCRATCHDIR, rmtree, rsync_argv, test_fail, test_skipped
+from rsyncfns import SCRATCHDIR, rmtree, rsync_argv, run_rsync, test_fail, test_skipped
 
-if not sys.platform.startswith('linux'):
-    test_skipped('search-only-destination is Linux-specific')
+version = json.loads(run_rsync('-VV', capture_output=True).stdout)
+search_only_dirs = version['capabilities']['search_only_dirs']
 
 launcher = []
 if os.geteuid() == 0:
+    if not sys.platform.startswith('linux'):
+        test_skipped('requires a non-root test process on this platform')
     setpriv = shutil.which('setpriv')
     if setpriv is None:
         test_skipped('setpriv is unavailable for the root-run testsuite')
@@ -61,6 +64,10 @@ try:
             stderr=subprocess.PIPE,
             text=True,
         )
+        if not search_only_dirs:
+            if proc.returncode == 0 or (dest / 'probe').exists():
+                test_fail('unsupported search-only traversal did not fail closed')
+            test_skipped('kernel has no race-safe search-only directory descriptor')
     finally:
         parent.chmod(0o755)
     copied = (dest / 'probe').read_text() if (dest / 'probe').is_file() else None
