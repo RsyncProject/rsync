@@ -55,6 +55,11 @@ closed rather than applied through a raced symlink, but only as a rare backstop:
 the common file/dir/FIFO case is secured on every platform via `fchmod` on a held
 fd, so no real functionality is lost.
 
+The parent-path resolver is also fail-closed when the kernel cannot provide a
+pinned search-only directory descriptor. A pathname fallback would apply to
+every leaf operation, including creation, rename and hard-link operations, and
+could therefore redirect changes outside the transfer root.
+
 This trade-off applies only to these local-attacker residual classes. Remotely
 reachable defects — memory safety, authentication bypass, protocol parsing, input
 bounds — are fixed unconditionally on all platforms, never left as a residual.
@@ -198,30 +203,32 @@ leaf symlink into a file read.
 
 ### Path resolution
 
-`secure_relative_open()` resolves a path with a single portable mechanism on
-every platform: a per-component walk on a stack of held directory fds. On
-Linux, anchors and traversal components use
-`O_PATH|O_DIRECTORY|O_NOFOLLOW`; other platforms retain the
-`O_RDONLY|O_DIRECTORY` fallback. Descending into a real subdirectory pushes
+`secure_relative_open()` resolves a path with a per-component walk on a stack
+of held directory fds. Native configuration selects a search-only open flag
+only after proving known-name lookup, creation, permission revocation and
+no-follow behaviour. Linux and FreeBSD use `O_PATH`; current macOS uses
+`O_SEARCH`. Cross-built Linux also uses `O_PATH`; unverified cross targets stay
+fail-closed. Other platforms use `O_RDONLY|O_DIRECTORY`. Descending into a real
+subdirectory pushes
 its fd, a `..` pops back to the already-held parent (a pop at the anchor is
 refused), and an in-tree directory symlink is followed by reading its target
 and walking that off the same stack (absolute targets refused, symlink hops
 bounded). A final directory endpoint is reopened with the caller's requested
-flags. Thus `secure_opendir()` still receives a readable fd, while known-name
-operations beneath a searchable but unreadable directory do not require
-permission to list it.
+flags. Thus `secure_opendir()` still receives a readable fd, while supported
+kernels allow known-name operations beneath a searchable but unreadable
+directory without permission to list it.
 
 Because every component is opened relative to a *pinned* fd under `O_NOFOLLOW`,
 and `..` is resolved by the held-fd stack rather than by the kernel, the walk is
 race-free by construction: no rename or symlink swap of any path name can redirect
 resolution outside the anchor subtree, and no kernel "beneath" primitive
 (`openat2(RESOLVE_BENEATH)` / `openat(O_RESOLVE_BENEATH)`) is required. The
-confinement is therefore uniform across Linux, the BSDs, macOS and
-Solaris/illumos, on old and new kernels alike, with nothing to probe or fall back
-to at runtime (and so no `openat2`/seccomp interaction to worry about in sandboxed
-environments).  Cygwin is the exception, because its directory descriptors and
-symlink emulation do not give the held-fd walk the same inode pinning — see the
-Cygwin residual below.
+confinement remains descriptor-based on every platform. A kernel without a
+working search-only descriptor, including the tested NetBSD and OpenBSD
+releases, cannot traverse a directory which denies read permission. Rsync fails
+closed there rather than falling back to a raceable pathname. This limitation is
+reported as the `search-only-dirs` capability. Cygwin remains an exception to
+the descriptor-pinning model; see the Cygwin residual below.
 
 Legitimate *in-tree* directory symlinks are followed, so `--keep-dirlinks` /
 `--copy-links` and a symlinked module path keep working. A relative alternate-dest
