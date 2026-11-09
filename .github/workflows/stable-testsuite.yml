@@ -15,13 +15,13 @@ name: Stable testsuite
 
 on:
   push:
-    branches: [ v3.4.1-sec-patches4 ]
+    branches: [ v3.4.1-sec-patches5 ]
     paths-ignore:
       - '.github/workflows/*.yml'
       - '!.github/workflows/stable-testsuite.yml'
   pull_request:
     types: [opened, synchronize, reopened, labeled]
-    branches: [ v3.4.1-sec-patches4 ]
+    branches: [ v3.4.1-sec-patches5 ]
     paths-ignore:
       - '.github/workflows/*.yml'
       - '!.github/workflows/stable-testsuite.yml'
@@ -38,7 +38,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-latest, ubuntu-22.04 ]
+        os: [ ubuntu-24.04, ubuntu-22.04 ]
     name: Stable testsuite on ${{ matrix.os }}
     steps:
     - name: checkout code
@@ -58,9 +58,13 @@ jobs:
     # -- they are export-ignore'd, so they must be copied, not git-archived.
     - name: overlay the stable testsuite
       run: |
+        mkdir branch-tests
+        find testsuite -maxdepth 1 -type f -name '*_test.py' -exec cp -a {} branch-tests/ \;
         cp -a stable-testsuite/runtests.py .
         cp -a stable-testsuite/testsuite/. testsuite/
         cp -a stable-testsuite/old_versions .
+        cp -a branch-tests/. testsuite/
+        rm -rf branch-tests
         rm -rf stable-testsuite
     - name: prep
       run: |
@@ -81,7 +85,7 @@ jobs:
     # base cannot run.
     - name: run stable testsuite (pipe)
       run: |
-        sudo RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/common.txt,@testsuite/skiplist/linux.txt \
+        sudo RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/common.txt,@testsuite/skiplist/linux.txt,daemon-access-hostname \
           ./runtests.py -j16
     # TCP transport over loopback, exercising the daemon paths the pipe run skips.
     - name: run stable testsuite (tcp)
