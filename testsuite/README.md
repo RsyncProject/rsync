@@ -52,7 +52,17 @@ The native check recipe in testsuite/tools/check.sh takes a build directory, exe
 
 ## CI
 
-[ci.yml](../.github/workflows/ci.yml) owns events, schedules and cancellation. macOS, Cygwin and Solaris run as direct jobs. Local composite actions hold the macOS and Cygwin steps; other job families use reusable workflows. Pull requests, master pushes and manual runs select every job; scheduled runs select the relevant daily or weekly jobs.
+[ci.yml](../.github/workflows/ci.yml) owns events, schedules and cancellation. macOS, Cygwin, Solaris and Version mix run as direct jobs. Local composite actions hold the macOS and Cygwin steps; the remaining job families use reusable workflows. Pull requests, master pushes and manual runs select every job; scheduled runs select the relevant daily or weekly jobs.
+
+Family | Versions and architectures
+--- | ---
+Ubuntu | 22.04, 24.04 and 26.04 on AMD64
+FreeBSD | 14.5 and 15.1 on AMD64
+NetBSD | 10.2, 11.0 and 11.1 on AMD64
+OpenBSD | 7.9 and 8.0 on AMD64
+macOS | 15 and 26 on Intel and ARM64
+
+Each matrix entry checks its OS release and architecture and has separate artefacts. Matrix failures do not cancel the remaining entries.
 
 Ubuntu, macOS and the BSD guests have separate root and non-root pipe and TCP passes. Each pass retains its receipt and log. macOS, FreeBSD and OpenBSD also check the built binary's required features with testsuite/tools/check-features.py, using capability and algorithm names from `rsync -VV`.
 

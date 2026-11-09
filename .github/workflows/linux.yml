@@ -27,19 +27,21 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: ubuntu-latest
-            name: Ubuntu (latest)
-            artifact: ubuntu-bin
+          - release: '26.04'
+            runner: ubuntu-26.04
             install_smoke: true
             profiles: non-asan,self-peer,linux
-          - runner: ubuntu-22.04
-            name: Ubuntu (22.04)
-            artifact: ubuntu-22.04-bin
+          - release: '24.04'
+            runner: ubuntu-24.04
+            install_smoke: true
+            profiles: non-asan,self-peer,linux
+          - release: '22.04'
+            runner: ubuntu-22.04
             install_smoke: false
             profiles: non-asan,self-peer,linux,no-zstd-threads
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
-    name: ${{ matrix.name }}
+    name: Ubuntu ${{ matrix.release }} (AMD64)
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -87,7 +89,14 @@ jobs:
       - name: Install
         run: sudo make install
       - name: Version
-        run: ./rsync --version
+        run: |
+          . /etc/os-release
+          printf '%s %s\n' "$ID" "$VERSION_ID"
+          uname -a
+          test "$ID" = ubuntu
+          test "$VERSION_ID" = "${{ matrix.release }}"
+          test "$(uname -m)" = x86_64
+          ./rsync --version
       - name: Tests (pipe)
         run: sudo sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,root,${{ matrix.profiles }}" "$RUNNER_TEMP/rsync-checks/root-pipe" -j8
       - name: Tests (protocol 30)
@@ -107,7 +116,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           retention-days: 45
-          name: ${{ matrix.artifact }}
+          name: ubuntu-${{ matrix.release }}-amd64-bin
           if-no-files-found: error
           path: |
             rsync
@@ -122,7 +131,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           retention-days: 45
-          name: ${{ matrix.artifact }}-results
+          name: ubuntu-${{ matrix.release }}-amd64-results
           if-no-files-found: error
           path: |
             config.log

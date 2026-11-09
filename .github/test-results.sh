@@ -8,8 +8,8 @@ if ! test -f "$root/.github/check-results.jq"; then
 fi
 scratch=$(mktemp -d)
 trap 'rm -f "$scratch/out" "$scratch/err"; rmdir "$scratch"' 0
-export CI_EXPECT_LINUX=true CI_EXPECT_DIAGNOSTICS=true CI_EXPECT_BSD=false CI_EXPECT_CYGWIN=true
-export CI_DIRECT_JOBS='["cygwin"]'
+export CI_EXPECT_LINUX=true CI_EXPECT_DIAGNOSTICS=true CI_EXPECT_BSD=false CI_EXPECT_CYGWIN=true CI_EXPECT_VERSIONS=true
+export CI_DIRECT_JOBS='["cygwin","versions"]'
 data=$(jq -n '{
     linux: {result: "success", outputs: {
         jobs: ({ubuntu: {result: "success"}, almalinux: {result: "skipped"}} | tojson),
@@ -18,7 +18,8 @@ data=$(jq -n '{
         jobs: ({scan_pinned: {result: "success"}, scan_latest: {result: "failure"}, asan: {result: "skipped"}} | tojson),
         inputs: ({scan_pinned: true, scan_latest: true, asan: false} | tojson), advisory: "scan_latest"}},
     bsd: {result: "skipped", outputs: {}},
-    cygwin: {result: "success", outputs: {}}
+    cygwin: {result: "success", outputs: {}},
+    versions: {result: "success", outputs: {}}
 }')
 
 check() {
@@ -70,15 +71,21 @@ check fail '.cygwin.result = "failure"'
 check fail '.cygwin.result = "cancelled"'
 check fail '.cygwin.result = "skipped"'
 check fail '.cygwin.outputs.jobs = ({test: {result: "success"}} | tojson)'
+check fail '.versions.result = "failure"'
+check fail '.versions.result = "cancelled"'
+check fail '.versions.result = "skipped"'
+check fail '.versions.outputs.jobs = ({test: {result: "success"}} | tojson)'
+CI_EXPECT_VERSIONS=false check pass '.versions.result = "skipped"'
+CI_EXPECT_VERSIONS=false check fail '.'
 CI_EXPECT_CYGWIN=false check pass '.cygwin.result = "skipped"'
 CI_EXPECT_CYGWIN=false check fail '.'
 check fail 'del(.linux.outputs.jobs) | .linux.outputs.kind = "direct"'
 CI_DIRECT_JOBS='[]' check fail '.'
 CI_DIRECT_JOBS='["missing"]' check fail '.'
-CI_DIRECT_JOBS='["cygwin","linux"]' check fail '.'
+CI_DIRECT_JOBS='["cygwin","versions","linux"]' check fail '.'
 CI_DIRECT_JOBS='{}' check fail '.'
 CI_DIRECT_JOBS='not JSON' check fail '.'
 check fail '{}'
-export CI_EXPECT_LINUX=false CI_EXPECT_DIAGNOSTICS=false CI_EXPECT_CYGWIN=false
+export CI_EXPECT_LINUX=false CI_EXPECT_DIAGNOSTICS=false CI_EXPECT_CYGWIN=false CI_EXPECT_VERSIONS=false
 check fail 'with_entries(.value = {result: "skipped", outputs: {}})'
 echo 'CI result checks passed'
