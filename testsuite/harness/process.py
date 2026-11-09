@@ -79,8 +79,12 @@ def forced_protocol(command: str):
 
 def process_thread_count(pid: int) -> int:
     if sys.platform == 'darwin':
-        result = subprocess.run(['ps', '-M', str(pid)], capture_output=True, text=True)
+        result = subprocess.run(['ps', '-M', str(pid)], capture_output=True, text=True, timeout=5)
         return max(0, len(result.stdout.splitlines()) - 1)
+    if sys.platform.startswith(('freebsd', 'openbsd')):
+        result = subprocess.run(['ps', '-H', '-p', str(pid), '-o', 'tid='],
+                                capture_output=True, text=True, timeout=5)
+        return len(result.stdout.split()) if result.returncode == 0 else 0
     if sys.platform.startswith('linux'):
         try:
             with open(f'/proc/{pid}/status') as stream:

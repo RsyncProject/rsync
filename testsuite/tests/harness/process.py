@@ -7,7 +7,7 @@ import sys
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from harness import daemon
+from harness import daemon, process
 from harness import (Exit, TestContext, forced_protocol, requires, rsh_cmd, rsync_argv,
                      rsync_argv_for, rsync_command_binary, rsync_path_arg, rsync_supports, run,
                      run_rsync, split_rsync_cmd, test_fail, under_valgrind)
@@ -87,6 +87,19 @@ def test(context: TestContext):
             test_fail('a failed command reported the wrong result')
     else:
         test_fail('a failed command did not stop the test')
+
+    for platform in ('freebsd14', 'openbsd7'):
+        for output, expected in (('  123\n  124\n', 2), ('123\n', 1), ('', 0)):
+            with patch.object(process.sys, 'platform', platform), patch.object(process.subprocess, 'run') as ps:
+                ps.return_value = SimpleNamespace(returncode=0, stdout=output)
+                if process.process_thread_count(123) != expected:
+                    test_fail(f'{platform} reported the wrong thread count')
+                ps.assert_called_once_with(['ps', '-H', '-p', '123', '-o', 'tid='],
+                                           capture_output=True, text=True, timeout=5)
+        with patch.object(process.sys, 'platform', platform), patch.object(process.subprocess, 'run') as ps:
+            ps.return_value = SimpleNamespace(returncode=1, stdout='')
+            if process.process_thread_count(123) != 0:
+                test_fail(f'{platform} reported threads for a missing process')
 
 if __name__ == '__main__':
     run(test)

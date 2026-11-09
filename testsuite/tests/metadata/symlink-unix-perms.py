@@ -59,7 +59,14 @@ for n, symlink in enumerate(symlinks):
     target, access = symlink
 
     os.symlink(target, FROMDIR / f'symlink-{n}', target_is_directory=(target == testdirectory))
-    os.chmod(FROMDIR / f'symlink-{n}', access, follow_symlinks=False)
+    try:
+        os.chmod(FROMDIR / f'symlink-{n}', access, follow_symlinks=False)
+    except OSError as e:
+        if (os.geteuid() == 0 or e.errno != getattr(errno, 'EFTYPE', -1)
+                or not (access & stat.S_ISVTX)):
+            raise
+        # NetBSD reserves sticky bits on non-directories for root
+        os.chmod(FROMDIR / f'symlink-{n}', access & ~stat.S_ISVTX, follow_symlinks=False)
 
 run_rsync('-av', f'{FROMDIR}/', f'{TODIR}/')
 
