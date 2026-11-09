@@ -112,6 +112,33 @@ assert into.returncode != 0 and 'must be outside the restricted directory' in in
     f'stderr={into.stderr!r}')
 assert not (root / 'transfer.log').exists()
 
+# Nor may the path pass through DIR on its way out: the client's symlink in
+# DIR would decide where the log is written, even outside DIR.
+stolen = base / 'stolen'
+os.symlink(stolen, root / 'f')
+os.symlink(root / 'f', base / 'reg')
+reg_log = shlex.quote(str(base / 'reg'))
+reg_env = {**env, 'RRSYNC_FLAGS': f'-wo -no-lock -log {reg_log}'}
+reg = subprocess.run(
+    rsync_argv('-r', '-e', rsh, f'{src}/', 'ignored:'),
+    env=reg_env, capture_output=True, text=True, timeout=20)
+assert reg.returncode != 0 and 'must be outside the restricted directory' in reg.stderr, (
+    f'rrsync accepted a -log path that passes through DIR: rc={reg.returncode}, '
+    f'stderr={reg.stderr!r}')
+assert not stolen.exists()
+
+# A log that cannot be opened stops the transfer instead of being skipped.
+(root / 'sub' / 'b.txt').unlink()
+nolog = shlex.quote(str(base / 'missing-dir' / 'transfer.log'))
+nolog_env = {**env, 'RRSYNC_FLAGS': f'-wo -no-lock -log {nolog}'}
+unlogged = subprocess.run(
+    rsync_argv('-r', '-e', rsh, f'{src}/', 'ignored:'),
+    env=nolog_env, capture_output=True, text=True, timeout=20)
+assert unlogged.returncode != 0 and 'cannot open the -log FILE' in unlogged.stderr, (
+    f'rrsync ran a transfer it could not log: rc={unlogged.returncode}, '
+    f'stderr={unlogged.stderr!r}')
+assert not (root / 'sub' / 'b.txt').exists()
+
 # With DIR / no path is outside it.
 slash_env = {**env, 'RRSYNC_ROOT': '/'}
 slash = subprocess.run(

@@ -112,8 +112,11 @@ The remainder of this manpage is dedicated to using the rrsync script.
     in its default "%i %n%L" format, so each file sent, received or deleted
     gets a line.  _FILE_ can be relative to the user's home directory or an
     absolute path.  The client's own `--log-file` option is refused while this
-    is in force.  _FILE_ is resolved before use and must be outside _DIR_,
-    and `-log` cannot be used when _DIR_ is `/`.
+    is in force.  _FILE_ is resolved one component at a time and refused if
+    any step enters _DIR_, and `-log` cannot be used when _DIR_ is `/`.
+    rrsync opens _FILE_ before running rsync and refuses the transfer if it
+    cannot.  After that, write errors are handled as for rsync's
+    `--log-file`: they are not reported and do not stop the transfer.
 
 0.  `-help`, `-h`
 

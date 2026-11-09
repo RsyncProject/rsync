@@ -489,6 +489,43 @@ def safe_open_logfile():
         return None
     return os.fdopen(fd, 'a')
 
+def resolve_log_path(path, dir_st):
+    """Resolve the -log FILE one component at a time, as the kernel does.
+
+    Refuse it if any step enters DIR (by device and inode, so a bind mount of
+    DIR counts too): from there the client decides where the path leads, even
+    when the final path is outside DIR."""
+    todo = [c for c in path.split('/') if c]
+    done = '/'
+    hops = 0
+    while todo:
+        comp = todo.pop(0)
+        if comp == '.':
+            continue
+        if comp == '..':
+            done = os.path.dirname(done)
+            continue
+        cand = os.path.join(done, comp)
+        try:
+            st = os.lstat(cand)
+        except FileNotFoundError:
+            return os.path.join(cand, *todo)   # the open below creates or fails
+        except OSError as e:
+            die("cannot resolve the -log FILE", cand + ':', e.strerror)
+        if stat.S_ISLNK(st.st_mode):
+            hops += 1
+            if hops > 40:
+                die("too many symlinks in the -log FILE path")
+            target = os.readlink(cand)
+            if target.startswith('/'):
+                done = '/'
+            todo = [c for c in target.split('/') if c] + todo
+            continue
+        if os.path.samestat(st, dir_st):
+            die("the -log FILE must be outside the restricted directory")
+        done = cand
+    return done
+
 def main():
     if not os.path.isdir(args.dir):
         die("Restricted directory does not exist!")
@@ -496,18 +533,17 @@ def main():
     if args.log:
         if args.dir == '/':
             die("-log cannot be used when DIR is /")
-        # rsync gets the resolved path, so a symlink the client plants in DIR
-        # later cannot redirect it; DIR may not be among its ancestors.
-        args.log = os.path.realpath(args.log)
-        dir_st = os.stat(args.dir)
-        path = args.log
-        while path != '/':
-            try:
-                if os.path.samestat(os.stat(path), dir_st):
-                    die("the -log FILE must be outside the restricted directory")
-            except OSError:
-                pass   # a missing component cannot be DIR
-            path = os.path.dirname(path)
+        args.log = resolve_log_path(args.log, os.stat(args.dir))
+        # Opened here so a log that cannot be written stops the transfer, and
+        # handed to rsync as the open file where rrsync pins paths.
+        try:
+            fd = os.open(args.log, os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW, 0o644)
+        except OSError as e:
+            die("cannot open the -log FILE", args.log + ':', e.strerror)
+        make_inheritable(fd)
+        pinned_fds.append(fd)
+        if HAVE_PROC_SELF_FD:
+            args.log = '/proc/self/fd/%d' % fd
 
     # The format of the environment variables set by sshd:
     #   SSH_ORIGINAL_COMMAND:
