@@ -1,0 +1,5 @@
+{
+  "not_applicable": {
+    "linux_interpose": "no interposition under AddressSanitizer"
+  }
+}

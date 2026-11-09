@@ -11,6 +11,7 @@ class Profile:
     name: str
     peer: Optional[str]
     protocol: Optional[int]
+    not_applicable: dict
     unsupported: dict
     xfail: dict
 
@@ -27,7 +28,7 @@ def load_profile(path, tests):
     data = json.loads(path.read_text(encoding='utf-8'))
     if not isinstance(data, dict):
         raise ValueError(f'{path}: profile must be an object')
-    if set(data) - {'peer', 'protocol', 'unsupported', 'xfail'}:
+    if set(data) - {'peer', 'protocol', 'not_applicable', 'unsupported', 'xfail'}:
         raise ValueError(f'{path}: unknown profile field')
     peer = data.get('peer')
     if peer is not None and (not isinstance(peer, str) or not re.fullmatch(r'\d+(?:\.\d+)+', peer)):
@@ -39,12 +40,13 @@ def load_profile(path, tests):
         raise ValueError(f'{path}: peer profile requires protocol')
     if peer is not None and path.stem != f'peer-{peer}':
         raise ValueError(f'{path}: peer does not match profile name')
+    not_applicable = _mapping(path, 'not_applicable', data.get('not_applicable', {}))
     unsupported = _mapping(path, 'unsupported', data.get('unsupported', {}))
     xfail = _mapping(path, 'xfail', data.get('xfail', {}))
     unknown = set(xfail) - set(tests)
     if unknown:
         raise ValueError(f'{path}: unknown tests: {", ".join(sorted(unknown))}')
-    return Profile(path.stem, peer, protocol, unsupported, xfail)
+    return Profile(path.stem, peer, protocol, not_applicable, unsupported, xfail)
 
 def parse_peer_banner(text):
     match = re.search(r'^rsync\s+version\s+(\d+(?:\.\d+)+)(?:-\S+)?\s+protocol\s+version\s+(\d+)\s*$',
@@ -56,6 +58,7 @@ def parse_peer_banner(text):
 def merge_profiles(profiles):
     peer = None
     protocol = None
+    not_applicable = {}
     unsupported = set()
     xfail = {}
     for profile in profiles:
@@ -67,9 +70,14 @@ def merge_profiles(profiles):
             if protocol and protocol != profile.protocol:
                 raise ValueError(f'conflicting protocols: {protocol}, {profile.protocol}')
             protocol = profile.protocol
+        for capability, reason in profile.not_applicable.items():
+            not_applicable.setdefault(capability, set()).add(reason)
         unsupported.update(profile.unsupported)
         for test, reason in profile.xfail.items():
             if test in xfail and xfail[test] != reason:
                 raise ValueError(f'{test}: conflicting xfail reasons')
             xfail[test] = reason
-    return peer, protocol, unsupported, xfail
+    unsupported.difference_update(not_applicable)
+    reasons = {capability: tuple(sorted(values))
+               for capability, values in not_applicable.items()}
+    return peer, protocol, reasons, unsupported, xfail

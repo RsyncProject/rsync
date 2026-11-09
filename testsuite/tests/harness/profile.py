@@ -16,28 +16,46 @@ def test(context: TestContext):
     if not any(profile.peer for profile in profiles) or not any(profile.unsupported for profile in profiles):
         test_fail('profile set is incomplete')
     features = {feature for values in requirements.values() if values for feature in values['features']}
+    structural = {'asan', 'legacy_peer', 'nonroot', 'protocol_30', 'protocol_33', 'root', 'tcp'}
     for profile in profiles:
-        unknown = set(profile.unsupported) - features
+        unknown = (set(profile.not_applicable) | set(profile.unsupported)) - features
         if unknown:
             test_fail(f'{profile.name} permits unknown capabilities: {", ".join(sorted(unknown))}')
+        misplaced = set(profile.unsupported) & structural
+        if misplaced:
+            test_fail(f'{profile.name} treats structural requirements as unsupported: '
+                      f'{", ".join(sorted(misplaced))}')
+        merge_profiles([profile])
     peers = {profile.peer for profile in profiles if profile.peer}
     archived = {path.name[len('rsync_'):] for path in (context.repository / 'old_versions').glob('rsync_*')}
     if archived and peers != archived:
         test_fail('peer profiles do not match archived binaries')
     by_name = {profile.name: profile for profile in profiles}
     environment = [by_name[name] for name in ('linux', 'non-asan', 'pipe', 'root', 'self-peer')]
-    peer, protocol, unsupported, xfail = merge_profiles(environment)
-    if peer or protocol or not unsupported or xfail:
+    peer, protocol, not_applicable, unsupported, xfail = merge_profiles(environment)
+    expected_n_a = {'asan', 'darwin', 'darwin_interpose', 'legacy_peer', 'nonroot', 'tcp'}
+    if peer or protocol or set(not_applicable) != expected_n_a or not unsupported or xfail:
         test_fail('platform profile composition failed')
-    _, _, unsupported, _ = merge_profiles([by_name['nonroot'], by_name['cygwin']])
-    if 'device_nodes' not in unsupported:
-        test_fail('overlapping unsupported capabilities were dropped')
+    _, _, not_applicable, unsupported, _ = merge_profiles([by_name['nonroot'], by_name['cygwin']])
+    if 'device_nodes' not in not_applicable or 'device_nodes' in unsupported:
+        test_fail('N/A did not take precedence over unsupported')
     for profile in profiles:
         if profile.peer and any(not applies_to_peer(requirements[name], profile.peer, profile.protocol)
                                 for name in profile.xfail):
             test_fail(f'{profile.name} has an inapplicable deviation')
     if parse_peer_banner('rsync  version 3.5.1-gabc  protocol version 33') != ('3.5.1', 33):
         test_fail('version banner was not parsed')
+
+    n_a_path = context.scratch / 'n-a.json'
+    n_a_path.write_text(json.dumps({'not_applicable': {'tcp': 'pipe transport'}}))
+    n_a = load_profile(n_a_path, tests)
+    if n_a.not_applicable != {'tcp': 'pipe transport'}:
+        test_fail('N/A requirements were not loaded')
+    conflict_path = context.scratch / 'conflict.json'
+    conflict_path.write_text(json.dumps({'not_applicable': {'tcp': 'different reason'}}))
+    combined = merge_profiles([n_a, load_profile(conflict_path, tests)])[2]
+    if combined['tcp'] != ('different reason', 'pipe transport'):
+        test_fail('composed N/A reasons were lost')
 
     def reject(name, data):
         path = context.scratch / name
@@ -55,6 +73,7 @@ def test(context: TestContext):
     reject('missing-protocol.json', {'peer': '3.4.1'})
     reject('wrong-name.json', {'peer': '3.4.1', 'protocol': 32})
     reject('protocol.json', {'protocol': True})
+    reject('not-applicable.json', {'not_applicable': {'tcp': ''}})
     reject('unsupported.json', {'unsupported': {'acl': ''}})
     reject('xfail.json', {'xfail': {'missing-test': 'issue-1'}})
 

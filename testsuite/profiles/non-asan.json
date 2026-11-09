@@ -1,5 +1,5 @@
 {
-  "unsupported": {
+  "not_applicable": {
     "asan": "no AddressSanitizer"
   }
 }

@@ -1,6 +1,6 @@
 {
   "protocol": 29,
-  "unsupported": {
+  "not_applicable": {
     "protocol_30": "protocol below 30",
     "protocol_33": "protocol below 33"
   }

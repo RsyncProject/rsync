@@ -89,8 +89,9 @@ The final Required check validates all selected job results and permits only the
 
 ## Results and profiles
 
-Result | Meaning
+Label | Meaning
 --- | ---
+N/A | The active profile excludes the test before execution
 PASS | The assertion passed
 FAIL | The assertion failed
 ERROR | The test environment or harness failed
@@ -102,11 +103,11 @@ PROFILE_ERROR | The result disagreed with the active profile
 
 Exit codes are 0 for pass, 1 for fail, 2 for error, 77 for skip and 78 for expected failure.
 
-Profiles compose by name. For example `--profiles=linux,peer-3.4.1` combines the Linux capabilities with the known deviations for that peer. Tests tagged `version-mix` are selected from metadata.
+Profiles compose by name. For example `--profiles=linux,peer-3.4.1` combines the Linux capabilities with the known deviations for that peer. Tests tagged `version-mix` are selected from metadata. Transport, privilege, instrumentation, protocol and operating-system requirements which do not apply are recorded as N/A and are not executed.
 
 The root and nonroot profiles must match the effective UID and cannot be combined. Permission tests still check the filesystem restrictions they need.
 
-An unsupported result is accepted only when the test declares the capability and the active profile permits its absence. A generic skip is a profile error. Expected failures require a named defect in the active profile; errors and skips do not satisfy that expectation. Receipts retain the raw outcome and the profile verdict, executable hashes and effective UID. Where Git can identify the source checkout, they also record its revision and whether the working tree has changes. Those fields are null when Git metadata is unavailable.
+An unsupported result is accepted only when the test declares the capability and the active profile permits its absence. A generic skip is a profile error. Expected failures require a named defect in the active profile; errors and skips do not satisfy that expectation. Receipts retain N/A selections, raw outcomes, profile verdicts, executable hashes and effective UID. Where Git can identify the source checkout, they also record its revision and whether the working tree has changes. Those fields are null when Git metadata is unavailable.
 
 ## Scratch data and requirements
 

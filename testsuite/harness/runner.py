@@ -267,6 +267,25 @@ def select_daemon_tests(tests):
         (keep if uses_daemon else dropped).append(path)
     return keep, dropped
 
+def select_applicable_tests(tests, not_applicable):
+    selected = []
+    excluded = {}
+    capabilities_to_exclude = set(not_applicable)
+    for path in tests:
+        requirements = read_requirements(path) or {}
+        capabilities = sorted(set(requirements.get('features', ())) & capabilities_to_exclude)
+        if not capabilities:
+            selected.append(path)
+            continue
+        for capability in capabilities:
+            excluded.setdefault(capability, []).append(test_name(path))
+    details = [
+        {'capability': capability, 'reasons': list(not_applicable[capability]),
+         'tests': excluded[capability]}
+        for capability in sorted(excluded)
+    ]
+    return selected, details
+
 def describe_tests(tests):
     descriptions = []
     for path in tests:
@@ -560,7 +579,8 @@ def configure_profiles(args, suitedir, srcdir, all_tests, tests,
     for role in roles:
         if (role == 'root') != (os.geteuid() == 0):
             raise ValueError(f'{role} profile does not match effective UID {os.geteuid()}')
-    peer, profile_protocol, unsupported, xfail = merge_profiles(profiles)
+    peer, profile_protocol, not_applicable, unsupported, xfail = merge_profiles(profiles)
+    tests, excluded = select_applicable_tests(tests, not_applicable)
     effective_protocol = args.protocol
     transport = 'tcp' if args.use_tcp else 'pipe'
     if profile_protocol and not peer:
@@ -571,7 +591,7 @@ def configure_profiles(args, suitedir, srcdir, all_tests, tests,
         effective_protocol = profile_protocol
 
     if not peer:
-        return tests, profiles, peer, effective_protocol, unsupported, xfail, transport
+        return tests, profiles, peer, effective_protocol, unsupported, xfail, transport, excluded
 
     _, current_protocol = binary_identity(rsync_bin)
     actual_peer, actual_peer_protocol = binary_identity(rsync_bin2)
@@ -592,7 +612,7 @@ def configure_profiles(args, suitedir, srcdir, all_tests, tests,
                                 effective_protocol, transport)]
     if not tests:
         raise ValueError(f'no tests apply to peer {peer}')
-    return tests, profiles, peer, effective_protocol, unsupported, xfail, transport
+    return tests, profiles, peer, effective_protocol, unsupported, xfail, transport, excluded
 
 def main():
     args = parse_args()
@@ -648,21 +668,24 @@ def main():
             print(f"Excluding {before - len(tests)} test(s) matching: "
                   f"{', '.join(excl)}")
 
+    if args.daemon_tests_only:
+        tests, dropped = select_daemon_tests(tests)
+        print(f'Daemon-transport tests only: running {len(tests)}, skipping '
+              f'{len(dropped)} test(s) that cannot observe the transport')
+
     try:
         (tests, profiles, profile_peer, effective_protocol,
-         profile_unsupported, profile_xfail, transport) = configure_profiles(
+         profile_unsupported, profile_xfail, transport,
+         not_applicable) = configure_profiles(
             args, suitedir, srcdir, all_tests, tests, rsync_bin, rsync_bin2)
     except (OSError, ValueError, json.JSONDecodeError) as error:
         sys.stderr.write(f'runtests.py: {error}\n')
         sys.exit(Exit.ERROR)
 
-    if args.daemon_tests_only:
-        tests, dropped = select_daemon_tests(tests)
-        print(f"Daemon-transport tests only: running {len(tests)}, skipping "
-              f"{len(dropped)} test(s) that cannot observe the transport")
     if not tests:
         sys.stderr.write('runtests.py: no tests selected\n')
         sys.exit(Exit.ERROR)
+    not_applicable_count = len({name for group in not_applicable for name in group['tests']})
     metadata_by_test = {test_name(test): read_requirements(test) for test in tests}
 
     def timeout_for(name):
@@ -785,6 +808,8 @@ def main():
         print(f'      {skipped} skipped')
     if unsupported_count > 0:
         print(f'      {unsupported_count} unsupported')
+    if not_applicable_count > 0:
+        print(f'      {not_applicable_count} N/A')
     if vg_errors > 0:
         print(f'      {vg_errors} valgrind error(s) found (see logs in {os.path.join(scratchbase, "valgrind-logs")})')
 
@@ -812,7 +837,7 @@ def main():
             records.append(record)
             verdicts[record['verdict']] = verdicts.get(record['verdict'], 0) + 1
         data = {
-            'schema': 1,
+            'schema': 2,
             'run': {
                 **identity,
                 'binary': rsync_cmd,
@@ -824,6 +849,7 @@ def main():
                 'parallel': args.parallel,
                 'valgrind': args.valgrind,
                 'selected': list(test_order),
+                'not_applicable': not_applicable,
             },
             'tests': records,
             'summary': {
@@ -832,6 +858,10 @@ def main():
                 'skipped': skipped,
                 'unsupported': unsupported_count,
                 'xfailed': xfailed,
+                'not_applicable': not_applicable_count,
+                'not_applicable_reasons': {
+                    group['capability']: len(group['tests']) for group in not_applicable
+                },
                 'verdicts': verdicts,
                 'valgrind_errors': vg_errors,
                 'duration_seconds': round(run_wall, 6),

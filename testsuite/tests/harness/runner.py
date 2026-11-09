@@ -57,6 +57,19 @@ def test(context: TestContext):
                 tests, tests, '', '')
         if 'fixture' in configured[4]:
             test_fail('an environment override changed profile capabilities')
+
+    n_a_profile = context.scratch / 'n-a.json'
+    n_a_profile.write_text(json.dumps({'not_applicable': {'tcp': 'pipe transport'}}))
+    tcp_test = next(path for path in tests if test_name(path) == 'daemon-access-hostname')
+    ordinary_test = next(path for path in tests if test_name(path) == 'runner')
+    args = SimpleNamespace(profiles=str(n_a_profile), protocol=None, use_tcp=False)
+    configured = runner.configure_profiles(
+        args, str(context.repository / 'testsuite'), str(context.repository),
+        tests, [tcp_test, ordinary_test], '', '')
+    if configured[0] != [ordinary_test] or configured[7] != [{
+            'capability': 'tcp', 'reasons': ['pipe transport'],
+            'tests': ['daemon-access-hostname']}]:
+        test_fail(f'N/A test selection is wrong: {configured[0]}, {configured[7]}')
     for uid in (0, 1000, 65534):
         for names in ('root', 'nonroot', 'root,nonroot', 'nonroot,root', 'linux'):
             args = SimpleNamespace(profiles=names, protocol=None, use_tcp=False)
@@ -155,6 +168,169 @@ def test(context: TestContext):
             or data['tests'][0]['expected'] != 'pass'
             or list(context.scratch.glob(f'.{receipt.name}.*.tmp'))):
         test_fail('receipt result is wrong')
+
+    fixture = context.scratch / 'self-xfail'
+    testdir = fixture / 'testsuite' / 'tests'
+    testdir.mkdir(parents=True)
+    profile = fixture / 'profile.json'
+    receipt = fixture / 'receipt.json'
+    command = [sys.executable, str(context.repository / 'testsuite' / 'runtests.py'), 'conditional',
+               f'--rsync-bin={binary}', f'--tooldir={context.tools}', f'--srcdir={fixture}',
+               f'--profiles={profile}', f'--receipt={receipt}']
+    xfail = {'xfail': {'conditional': 'issue-1'}}
+    cases = (
+        (78, {}, 1, 'xfail', 'profile_error', 'pass'),
+        (78, xfail, 0, 'xfail', 'xfail', 'xfail:issue-1'),
+        (1, xfail, 0, 'fail', 'xfail', 'xfail:issue-1'),
+        (0, xfail, 1, 'pass', 'xpass', 'xfail:issue-1'),
+        (2, xfail, 1, 'error', 'profile_error', 'xfail:issue-1'),
+        (3, xfail, 1, 'error', 'profile_error', 'xfail:issue-1'),
+        (256, {}, 1, 'error', 'error', 'pass'),
+        (77, xfail, 1, 'skip', 'profile_error', 'xfail:issue-1'),
+    )
+    for code, policy, exit_code, outcome, verdict, expected in cases:
+        (testdir / 'conditional.py').write_text(f'raise SystemExit({code})\n')
+        profile.write_text(json.dumps(policy))
+        result = subprocess.run(command, env=nested_env, capture_output=True, text=True)
+        if result.returncode != exit_code:
+            test_fail(f'wrong runner exit for {code}: {result.stdout}{result.stderr}')
+        data = json.loads(receipt.read_text())
+        record = data['tests'][0]
+        if (record['outcome'], record['verdict'], record['expected']) != (outcome, verdict, expected):
+            test_fail(f'wrong receipt for {code}: {record}')
+        counts = data['summary']
+        if (counts['failed'] != exit_code or counts['xfailed'] != (verdict == 'xfail')
+                or counts['passed'] != (verdict == 'pass')):
+            test_fail(f'wrong summary for {code}: {counts}')
+
+    (testdir / 'conditional.py').write_text('raise SystemExit(78)\n')
+    result = subprocess.run(command + ['--profiles='], env=nested_env,
+                            capture_output=True, text=True)
+    record = json.loads(receipt.read_text())['tests'][0]
+    if (result.returncode != 1 or record['outcome'] != 'xfail'
+            or record['verdict'] != 'profile_error' or 'expected' in record):
+        test_fail('an unprofiled xfail was accepted')
+
+    unsupported = ('import os\nfrom pathlib import Path\n'
+                   'Path(os.environ["scratchdir"], "unsupported").write_text("fixture\\n")\n'
+                   'raise SystemExit(77)\n')
+    allowed = {'unsupported': {'fixture': 'test-fixture'}}
+    cases = (
+        ({}, True, 1, 'profile_error', 'pass'),
+        (allowed, True, 0, 'unsupported', 'unsupported:fixture'),
+        (allowed, False, 1, 'profile_error', 'pass'),
+        ({**allowed, **xfail}, True, 1, 'profile_error', 'xfail:issue-1'),
+    )
+    for policy, declared, exit_code, verdict, expected in cases:
+        prefix = "from harness import metadata\nmetadata(features={'fixture'})\n" if declared else ''
+        (testdir / 'conditional.py').write_text(prefix + unsupported)
+        profile.write_text(json.dumps(policy))
+        result = subprocess.run(command, env=nested_env, capture_output=True, text=True)
+        if result.returncode != exit_code:
+            test_fail(f'wrong unsupported exit: {result.stdout}{result.stderr}')
+        record = json.loads(receipt.read_text())['tests'][0]
+        if (record['outcome'], record['verdict'], record['expected']) != ('unsupported', verdict, expected):
+            test_fail(f'wrong unsupported receipt: {record}')
+
+    ordinary = testdir / 'ordinary.py'
+    ordinary.write_text('raise SystemExit(0)\n')
+    (testdir / 'conditional.py').write_text(
+        "from harness import metadata\nmetadata(features={'fixture'})\nraise SystemExit(1)\n")
+    profile.write_text(json.dumps({'not_applicable': {'fixture': 'fixture partition'}}))
+    selection = command.copy()
+    selection[2:3] = ['conditional', 'ordinary']
+    result = subprocess.run(selection, env=nested_env, capture_output=True, text=True)
+    data = json.loads(receipt.read_text())
+    if (result.returncode or data['schema'] != 2 or data['run']['selected'] != ['ordinary']
+            or data['run']['not_applicable'] != [{
+                'capability': 'fixture', 'reasons': ['fixture partition'],
+                'tests': ['conditional']}]
+            or data['summary']['not_applicable'] != 1
+            or data['summary']['not_applicable_reasons'] != {'fixture': 1}
+            or [record['name'] for record in data['tests']] != ['ordinary']):
+        test_fail(f'N/A receipt is wrong: {data}')
+    (testdir / 'conditional.py').write_text('raise SystemExit(1)\n')
+    result = subprocess.run(selection, env=nested_env, capture_output=True, text=True)
+    data = json.loads(receipt.read_text())
+    if (result.returncode != Exit.FAIL
+            or data['run']['selected'] != ['conditional', 'ordinary']
+            or data['run']['not_applicable']
+            or data['summary']['not_applicable']
+            or [record['name'] for record in data['tests']] != ['conditional', 'ordinary']):
+        test_fail(f'applicable test was not restored to the run: {data}')
+    ordinary.unlink()
+
+    profile.write_text(json.dumps(xfail))
+    cases = (
+        ("raise RuntimeError('fixture failed')\n", []),
+        ('import rsync_missing_fixture_module\n', []),
+        ('def broken(\n', []),
+        ('raise KeyboardInterrupt\n', []),
+        ('import os, signal\nos.kill(os.getpid(), signal.SIGTERM)\n', []),
+        ('import signal\nsignal.pause()\n', ['--timeout=1']),
+    )
+    for source, options in cases:
+        (testdir / 'conditional.py').write_text(source)
+        result = subprocess.run(command + options, env=nested_env,
+                                capture_output=True, text=True)
+        record = json.loads(receipt.read_text())['tests'][0]
+        if result.returncode != Exit.FAIL or record['outcome'] != 'error' or record['verdict'] != 'profile_error':
+            test_fail(f'a terminated test was accepted as an expected failure: {record}')
+
+    (testdir / 'conditional.py').write_text('assert False\n')
+    result = subprocess.run(command, env=nested_env, capture_output=True, text=True)
+    record = json.loads(receipt.read_text())['tests'][0]
+    if result.returncode or record['outcome'] != 'fail' or record['verdict'] != 'xfail':
+        test_fail('an assertion failure was not retained as a test failure')
+
+    profile.write_text('{}')
+    sibling = testdir / 'sibling.py'
+    sibling.write_text('value = 42\n')
+    (testdir / 'conditional.py').write_text(
+        'import subprocess, sys\nfrom pathlib import Path\nfrom sibling import value\n'
+        'assert value == 42\nassert sys.argv[0] == __file__\n'
+        'assert sys.path[0] == str(Path(__file__).parent)\n'
+        'if len(sys.argv) == 1:\n'
+        '    subprocess.run([sys.executable, __file__, "child"], check=True)\n'
+        'else:\n    assert sys.argv[1:] == ["child"]\n')
+    result = subprocess.run(command, env=nested_env, capture_output=True, text=True)
+    if result.returncode:
+        test_fail(f'script identity or sibling imports changed: {result.stdout}{result.stderr}')
+    sibling.unlink()
+
+    (testdir / 'conditional.py').write_text(
+        "import os\nfrom harness import metadata\nmetadata(cost='expensive')\n"
+        "assert os.environ['TESTRUN_TIMEOUT'] == '600'\n")
+    result = subprocess.run(command + ['--timeout=3'], env=nested_env,
+                            capture_output=True, text=True)
+    if result.returncode:
+        test_fail(f'the allotted timeout was not passed to the test: {result.stdout}{result.stderr}')
+
+    legacy = fixture / 'testsuite' / 'forgotten_test.py'
+    legacy.write_text('raise SystemExit(0)\n')
+    result = subprocess.run(command, env=nested_env, capture_output=True, text=True)
+    if result.returncode != Exit.ERROR or 'forgotten_test.py' not in result.stderr:
+        test_fail('a test outside the discovery directory was ignored')
+    result = subprocess.run(command + ['--describe-tests'], env=nested_env,
+                            capture_output=True, text=True)
+    if result.returncode != Exit.ERROR or 'forgotten_test.py' not in result.stderr:
+        test_fail('test descriptions ignored a misplaced test')
+    legacy.unlink()
+    (testdir / 'conditional.py').unlink()
+    result = subprocess.run(command, env=nested_env, capture_output=True, text=True)
+    if result.returncode != Exit.ERROR or 'no tests found' not in result.stderr:
+        test_fail('an empty discovery directory was accepted')
+
+    for index in range(256):
+        (testdir / f'failure-{index}.py').write_text('raise SystemExit(1)\n')
+    failures = command[:2] + ['failure-*', '-j8'] + command[3:]
+    for policy in (f'--profiles={profile}', '--profiles='):
+        result = subprocess.run(failures + [policy], env=nested_env,
+                                capture_output=True, text=True)
+        summary = json.loads(receipt.read_text())['summary']
+        if result.returncode != Exit.FAIL or summary['exit_code'] != Exit.FAIL or summary['failed'] != 256:
+            test_fail(f'256 failures returned {result.returncode}; '
+                      f'receipt exit={summary["exit_code"]}, failed={summary["failed"]}')
 
 if __name__ == '__main__':
     run(test)
