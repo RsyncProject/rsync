@@ -30,4 +30,6 @@ hardlinks                    pass
 reverse-daemon-delta         pass
 sender-flist-symlink-leak    xfail   # peer vulnerable to May-2026 finding (fixed in current)
 ssh-basic                    pass
+variety                      pass
+variety-symlink-traversal    pass
 symlink-dirlink-basis        pass

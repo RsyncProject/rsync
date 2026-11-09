@@ -16,8 +16,11 @@
 ssize_t sys_lgetxattr(const char *path, const char *name, void *value, size_t size);
 ssize_t sys_fgetxattr(int filedes, const char *name, void *value, size_t size);
 int sys_lsetxattr(const char *path, const char *name, const void *value, size_t size);
+int sys_fsetxattr(int filedes, const char *name, const void *value, size_t size);
 int sys_lremovexattr(const char *path, const char *name);
+int sys_fremovexattr(int filedes, const char *name);
 ssize_t sys_llistxattr(const char *path, char *list, size_t size);
+ssize_t sys_flistxattr(int filedes, char *list, size_t size);
 
 #else
 

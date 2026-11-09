@@ -34,6 +34,49 @@ int ignore_perishable = 0;
 int non_perishable_cnt = 0;
 int skipped_deletes = 0;
 
+/* Held fd of the directory whose contents delete_dir_contents() is currently
+ * removing, so delete_item()'s per-entry rmdir/unlink/chmod go through it
+ * instead of re-resolving the full path for every entry.  Set (with save/
+ * restore across the recursion) around the delete loop; -1 outside a recursive
+ * delete or when the secure resolver is gated off (chroot / non-receiver) or
+ * the path doesn't live directly in that dir. */
+static int del_dirfd = -1;
+static const char *del_dir_prefix;
+static int del_dir_prefix_len;
+
+/* If `path` is a single component directly inside the dir being deleted,
+ * point *leaf at its basename and return the held dir fd; else return -1. */
+static int del_held_dfd(const char *path, const char **leaf)
+{
+	if (del_dirfd >= 0
+	 && strncmp(path, del_dir_prefix, del_dir_prefix_len) == 0
+	 && path[del_dir_prefix_len] == '/'
+	 && strchr(path + del_dir_prefix_len + 1, '/') == NULL) {
+		*leaf = path + del_dir_prefix_len + 1;
+		return del_dirfd;
+	}
+	return -1;
+}
+
+static void del_chmod(const char *fbuf, mode_t mode)
+{
+	const char *leaf;
+	int dfd = del_held_dfd(fbuf, &leaf);
+	if (dfd >= 0)
+		do_chmod_atfd(dfd, leaf, mode);
+	else
+		do_chmod_at(fbuf, mode);
+}
+
+static int del_unlink(const char *fbuf)
+{
+	const char *leaf;
+	int dfd = del_held_dfd(fbuf, &leaf);
+	if (dfd >= 0 && do_unlink_atfd(dfd, leaf, 0) == 0)
+		return 0;
+	return robust_unlink(fbuf);	/* fall back (ETXTBSY retry, or not held) */
+}
+
 static inline int is_backup_file(char *fn)
 {
 	int k = strlen(fn) - backup_suffix_len;
@@ -83,6 +126,18 @@ static enum delret delete_dir_contents(char *fname, uint16 flags)
 	flags = (flags & ~(DEL_RECURSE|DEL_MAKE_ROOM|DEL_NO_UID_WRITE))
 	      | DEL_DIR_IS_EMPTY;
 
+	/* Hold this dir open so the per-entry chmod/rmdir/unlink below (and in
+	 * delete_item) become *at() calls against it rather than re-resolving the
+	 * full path for every entry.  Save/restore around the recursion. */
+	int save_del_dirfd = del_dirfd;
+	const char *save_del_prefix = del_dir_prefix;
+	int save_del_prefix_len = del_dir_prefix_len;
+	fname[dlen] = '\0';
+	del_dirfd = open_dir_secure(fname);
+	fname[dlen] = '/';
+	del_dir_prefix = fname;
+	del_dir_prefix_len = dlen;
+
 	for (j = dirlist->used; j--; ) {
 		struct file_struct *fp = dirlist->files[j];
 
@@ -98,7 +153,7 @@ static enum delret delete_dir_contents(char *fname, uint16 flags)
 
 		strlcpy(p, fp->basename, remainder);
 		if (!(fp->mode & S_IWUSR) && !am_root && fp->flags & FLAG_OWNED_BY_US)
-			do_chmod_at(fname, fp->mode | S_IWUSR);
+			del_chmod(fname, fp->mode | S_IWUSR);
 		/* Save stack by recursing to ourself directly. */
 		if (S_ISDIR(fp->mode)) {
 			if (delete_dir_contents(fname, flags | DEL_RECURSE) != DR_SUCCESS)
@@ -107,6 +162,12 @@ static enum delret delete_dir_contents(char *fname, uint16 flags)
 		if (delete_item(fname, fp->mode, flags) != DR_SUCCESS)
 			ret = DR_NOT_EMPTY;
 	}
+
+	if (del_dirfd >= 0)
+		close(del_dirfd);
+	del_dirfd = save_del_dirfd;
+	del_dir_prefix = save_del_prefix;
+	del_dir_prefix_len = save_del_prefix_len;
 
 	fname[dlen] = '\0';
 
@@ -139,7 +200,7 @@ enum delret delete_item(char *fbuf, uint16 mode, uint16 flags)
 	}
 
 	if (flags & DEL_NO_UID_WRITE)
-		do_chmod_at(fbuf, mode | S_IWUSR);
+		del_chmod(fbuf, mode | S_IWUSR);
 
 	if (S_ISDIR(mode) && !(flags & DEL_DIR_IS_EMPTY)) {
 		/* This only happens on the first call to delete_item() since
@@ -159,19 +220,21 @@ enum delret delete_item(char *fbuf, uint16 mode, uint16 flags)
 	}
 
 	if (S_ISDIR(mode)) {
+		const char *leaf;
+		int dfd = del_held_dfd(fbuf, &leaf);
 		what = "rmdir";
-		ok = do_rmdir_at(fbuf) == 0;
+		ok = (dfd >= 0 ? do_unlink_atfd(dfd, leaf, AT_REMOVEDIR) : do_rmdir_at(fbuf)) == 0;
 	} else {
 		if (make_backups > 0 && !(flags & DEL_FOR_BACKUP) && (backup_dir || !is_backup_file(fbuf))) {
 			what = "make_backup";
 			ok = make_backup(fbuf, True);
 			if (ok == 2) {
 				what = "unlink";
-				ok = robust_unlink(fbuf) == 0;
+				ok = del_unlink(fbuf) == 0;
 			}
 		} else {
 			what = "unlink";
-			ok = robust_unlink(fbuf) == 0;
+			ok = del_unlink(fbuf) == 0;
 		}
 	}
 

@@ -90,7 +90,7 @@ Status legend: ✓ property asserted · `~` shallow / by an existing ported test
 | -x, --one-file-system | — | — | — | ✗ (needs a mount boundary) |
 | --preallocate / --fsync | — | — | — | ✗ |
 | -B, --block-size | — | — | — | ✗ |
-| --max-alloc | — | — | — | ✗ |
+| --max-alloc | max-alloc-zero | — | — | ✓ zero resolves to each peer's supported ceiling; values above the limit are rejected |
 
 ### Filtering
 | option | test(s) | depth | x-dir | notes / gap |
@@ -157,6 +157,7 @@ Status legend: ✓ property asserted · `~` shallow / by an existing ported test
 | --bwlimit | partial*new* (used, not asserted) | `~` |
 | --copy-as | — | ✗ root-gated |
 | --iconv | — | ✗ |
+| --nice / --no-nice | niceness | ✓ local, remote shell, local server, daemon and rrsync |
 | -s/--secluded-args, --old-args, --trust-sender | (default arg-protection exercised) | `~` |
 
 ---

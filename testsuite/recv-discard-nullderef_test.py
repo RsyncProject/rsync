@@ -38,7 +38,7 @@ import tempfile
 from rsyncfns import (
     SCRATCHDIR, RSYNC, TMPDIR,
     get_testuid, get_rootuid, makepath, start_test_daemon, write_daemon_conf,
-    test_fail, test_skipped,
+    test_fail, test_skipped, split_rsync_cmd,
 )
 
 DAEMON_PORT = 12895
@@ -90,7 +90,7 @@ except OSError:
     pass  # EACCES -- good, the precondition is enforced
 
 try:
-    argv = shlex.split(RSYNC) + [
+    argv = split_rsync_cmd(RSYNC) + [
         '--no-whole-file', '-a',
         str(src), f'{url}recvdiscard/d/f',
     ]

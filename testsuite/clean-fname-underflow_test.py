@@ -12,7 +12,7 @@ import os
 import shlex
 import subprocess
 
-from rsyncfns import RSYNC, TMPDIR, test_fail
+from rsyncfns import RSYNC, TMPDIR, test_fail, split_rsync_cmd
 
 
 workdir = TMPDIR / 'workdir'
@@ -21,7 +21,7 @@ os.chdir(workdir)
 
 # RSYNC may be a multi-word command (e.g. valgrind + rsync); take just the
 # binary path, matching the shell test's `echo $RSYNC | sed 's/ .*//'`.
-rsync_bin = shlex.split(RSYNC)[0]
+rsync_bin = split_rsync_cmd(RSYNC)[0]
 
 proc = subprocess.run(
     [rsync_bin, '--server', '--sender', '-vlr',

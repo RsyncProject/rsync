@@ -16,14 +16,14 @@ import subprocess
 from rsyncfns import (
     CHKFILE, FROMDIR, OUTFILE, RSYNC, RSYNC_PEER, SCRATCHDIR, SRCDIR, TODIR,
     build_rsyncd_conf, get_rootuid, get_testuid, makepath,
-    rsync_argv, run_rsync, start_test_daemon, test_fail,
+    rsync_argv, run_rsync, start_test_daemon, test_fail, rsh_cmd,
 )
 
 
 DAEMON_PORT = 12877
 
 
-SSH = f"{SRCDIR / 'support' / 'lsh.sh'} --no-cd"
+SSH = rsh_cmd(None, '--no-cd')
 
 
 def listed_paths(text: str) -> set:

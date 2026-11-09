@@ -22,6 +22,8 @@ exclude                     pass
 files-from                  pass
 hardlinks                   pass
 ssh-basic                   pass
+variety                     pass
+variety-symlink-traversal   pass
 symlink-dirlink-basis       pass
 
 # --- May-2026 security fixes absent in 3.3.0 (peer is vulnerable) ---

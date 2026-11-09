@@ -19,25 +19,16 @@ import time
 
 from rsyncfns import (
     RSYNC, SCRATCHDIR, RSYNC_PEER, SRCDIR, TMPDIR,
-    make_data_file, resolve_beneath_supported, rsync_argv, test_fail,
-    test_skipped,
+    make_data_file, rsync_argv, test_fail, rsync_path_arg, rsh_cmd,
 )
 
 
-# Following an in-tree directory symlink under the secure resolver needs a
-# kernel "beneath" primitive (RESOLVE_BENEATH/O_RESOLVE_BENEATH). Probe the
-# actual binary rather than guessing from the platform name: this also skips
-# correctly on Linux < 5.6, a seccomp-blocked openat2, and a --disable-openat2
-# build, where the portable O_NOFOLLOW fallback rejects the in-tree symlink
-# (issue #715).
-if not resolve_beneath_supported():
-    test_skipped(
-        "this rsync can't follow an in-tree directory symlink under its "
-        "secure resolver (no RESOLVE_BENEATH equivalent / --disable-openat2); "
-        "issue #715 still affects this configuration"
-    )
+# The secure resolver follows an in-tree directory symlink (the basis dir) on
+# every platform: the per-component walk readlinks the symlink and walks its
+# target off held dirfds (issue #715), so this transfer through a dir-symlinked
+# basis succeeds uniformly.
 
-os.environ['RSYNC_RSH'] = str(SRCDIR / 'support' / 'lsh.sh')
+os.environ['RSYNC_RSH'] = rsh_cmd()
 # HOME -> SCRATCHDIR is set up by rsyncfns import.
 
 srcbase = TMPDIR / 'src_files'  # avoid clash with the runner's $scratchdir/src symlink
@@ -59,7 +50,7 @@ def push(*args, label: str) -> None:
     os.chdir(srcbase)
     try:
         proc = subprocess.run(
-            rsync_argv(f'--rsync-path={RSYNC_PEER}', *args),
+            rsync_argv(f'--rsync-path={rsync_path_arg()}', *args),
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
         )
         print(proc.stdout, end='')

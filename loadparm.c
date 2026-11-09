@@ -164,11 +164,81 @@ static const struct enum_list enum_syslog_facility[] = {
 
 /* Expand %VAR% references.  Any unknown vars or unrecognized
  * syntax leaves the raw chars unchanged. */
-static char *expand_vars(const char *str)
+enum shell_quote_context {
+	SHELL_UNQUOTED,
+	SHELL_SINGLE_QUOTED,
+	SHELL_DOUBLE_QUOTED
+};
+
+/* Characters that can turn a substituted value into shell syntax rather than
+ * data, in any quoting context.  Quoting alone cannot be relied on here:
+ * context-aware escaping is correct for exactly one level of shell parsing,
+ * and a hook such as `sh -c '... %RSYNC_USER_NAME% ...'` re-parses the word in
+ * a second shell that sees the value bare.  Peer-supplied values carrying any
+ * of these are refused instead. */
+static int shell_unsafe_value(const char *val)
+{
+	const char *s;
+
+	for (s = val; *s; s++) {
+		/* '!' negates in command position (a hook `sh -c '%VAR% false'`
+		 * becomes `! false` and reports success, inverting an access
+		 * check); '~' is tilde-expanded; '{' and '}' brace-expand in
+		 * bash and zsh.  None of them execute anything on their own,
+		 * which is why a set built from the obvious metacharacters
+		 * missed them. */
+		if (strchr("'\"`$\\;&|<>()*?[]# !~{}", *s)
+		 || (unsigned char)*s < 0x20 || (unsigned char)*s == 0x7f)
+			return 1;
+	}
+	return 0;
+}
+
+static char *expand_vars_shell_escape(const char *val, int quote_context)
+{
+	const char *s;
+	char *ret, *t;
+	/* A double-quoted value is deliberately BOTH backslash-escaped and
+	 * wrapped in single quotes.  The wrap is redundant for one level of
+	 * shell parsing (and shows up as literal quotes in the value), but a
+	 * hook such as `sh -c "... %RSYNC_USER_NAME% ..."` re-parses the word
+	 * in a second shell, where the backslashes are already gone and only
+	 * the quotes still protect it. */
+	size_t len = quote_context == SHELL_SINGLE_QUOTED ? 0 : 2;
+
+	for (s = val; *s; s++) {
+		if (quote_context == SHELL_DOUBLE_QUOTED
+		 && strchr("\\\"`$", *s))
+			len += 2;
+		else
+			len += *s == '\'' ? 4 : 1;
+	}
+	ret = new_array(char, len + 1);
+	t = ret;
+	if (quote_context != SHELL_SINGLE_QUOTED)
+		*t++ = '\'';
+	for (s = val; *s; s++) {
+		if (quote_context == SHELL_DOUBLE_QUOTED
+		 && strchr("\\\"`$", *s)) {
+			*t++ = '\\';
+			*t++ = *s;
+		} else if (*s == '\'') {
+			memcpy(t, "'\\''", 4);
+			t += 4;
+		} else
+			*t++ = *s;
+	}
+	if (quote_context != SHELL_SINGLE_QUOTED)
+		*t++ = '\'';
+	*t = '\0';
+	return ret;
+}
+
+static char *expand_vars(const char *str, int shell_escape)
 {
 	char *buf, *t;
 	const char *f;
-	int bufsize;
+	int bufsize, quote_context = SHELL_UNQUOTED, escaped_char = 0;
 
 	if (!str || !strchr(str, '%'))
 		return (char *)str; /* TODO change return value to const char* at some point. */
@@ -184,7 +254,29 @@ static char *expand_vars(const char *str)
 				strlcpy(t, f+1, percent - f);
 				val = getenv(t);
 				if (val) {
-					int len = strlcpy(t, val, bufsize+1);
+					char *escaped = NULL;
+					int len;
+					/* %RSYNC_*% values originate from the peer request/args.
+					 * When the result is fed to a shell-executed hook, escape it
+					 * for the template's current shell quote context so a value
+					 * containing shell metacharacters can't inject.  For ordinary string
+					 * params (path, uid, gid, ...) leave them verbatim --
+					 * quoting there would corrupt the value (e.g. a documented
+					 * `path = /home/%RSYNC_USER_NAME%` would become /home/'x'). */
+					if (shell_escape && strncmp(t, "RSYNC_", 6) == 0) {
+						if (shell_unsafe_value(val)) {
+							/* Fail closed: the hook may be an access
+							 * check, so skipping it is not an option. */
+							rprintf(FLOG,
+								"refusing to run shell hook: %%%s%% holds a shell metacharacter\n",
+								t);
+							exit_cleanup(RERR_UNSUPPORTED);
+						}
+						val = escaped = expand_vars_shell_escape(val, quote_context);
+					}
+					len = strlcpy(t, val, bufsize+1);
+					if (escaped)
+						free(escaped);
 					if (len > bufsize)
 						break;
 					bufsize -= len;
@@ -193,6 +285,28 @@ static char *expand_vars(const char *str)
 					continue;
 				}
 			}
+		}
+		if (shell_escape) {
+			if (quote_context == SHELL_SINGLE_QUOTED) {
+				/* Nothing is special inside '...', not even a backslash;
+				 * only the closing quote ends it. */
+				if (*f == '\'')
+					quote_context = SHELL_UNQUOTED;
+			} else if (escaped_char)
+				escaped_char = 0;
+			else if (*f == '\\')
+				escaped_char = 1;
+			else if (quote_context == SHELL_DOUBLE_QUOTED) {
+				/* A single quote inside "..." is literal and must not be
+				 * taken as opening a single-quoted run -- doing so would
+				 * de-sync the tracker and escape a later value for the
+				 * wrong context. */
+				if (*f == '"')
+					quote_context = SHELL_UNQUOTED;
+			} else if (*f == '\'')
+				quote_context = SHELL_SINGLE_QUOTED;
+			else if (*f == '"')
+				quote_context = SHELL_DOUBLE_QUOTED;
 		}
 		*t++ = *f++;
 		bufsize--;
@@ -213,7 +327,10 @@ static char *expand_vars(const char *str)
 /* Each "char* foo" has an associated "BOOL foo_EXP" that tracks if the string has been expanded yet or not. */
 
 /* NOTE: use this function and all the FN_{GLOBAL,LOCAL} ones WITHOUT a trailing semicolon! */
-#define RETURN_EXPANDED(val) {if (!val ## _EXP) {val = expand_vars(val); val ## _EXP = True;} return val ? val : "";}
+#define RETURN_EXPANDED(val) {if (!val ## _EXP) {val = expand_vars(val, 0); val ## _EXP = True;} return val ? val : "";}
+/* Variant for params whose expansion is fed to a shell-executed hook: quote
+ * %RSYNC_*% peer-controlled values to prevent shell injection. */
+#define RETURN_EXPANDED_SHELL(val) {if (!val ## _EXP) {val = expand_vars(val, 1); val ## _EXP = True;} return val ? val : "";}
 
 /* In this section all the functions that are used to access the
  * parameters from the rest of the program are defined. */
@@ -229,6 +346,8 @@ static char *expand_vars(const char *str)
 
 #define FN_LOCAL_STRING(fn_name, val) \
  char *fn_name(int i) {if (LP_SNUM_OK(i) && iSECTION(i).val) RETURN_EXPANDED(iSECTION(i).val) else RETURN_EXPANDED(Vars.l.val)}
+#define FN_LOCAL_STRING_SHELL(fn_name, val) \
+ char *fn_name(int i) {if (LP_SNUM_OK(i) && iSECTION(i).val) RETURN_EXPANDED_SHELL(iSECTION(i).val) else RETURN_EXPANDED_SHELL(Vars.l.val)}
 #define FN_LOCAL_BOOL(fn_name, val) \
  BOOL fn_name(int i) {return LP_SNUM_OK(i)? iSECTION(i).val : Vars.l.val;}
 #define FN_LOCAL_CHAR(fn_name, val) \
@@ -410,7 +529,7 @@ static BOOL do_parameter(char *parmname, char *parmvalue)
 		break;
 	default:
 		/* expand any %VAR% strings now */
-		parmvalue = expand_vars(parmvalue);
+		parmvalue = expand_vars(parmvalue, 0);
 		break;
 	}
 

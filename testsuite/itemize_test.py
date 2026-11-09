@@ -11,7 +11,7 @@ import shutil
 from rsyncfns import (
     CHKFILE, FROMDIR, RSYNC, SCRATCHDIR, SRCDIR, TMPDIR, TODIR,
     all_plus, allspace, dots,
-    checkdiff, cp_p, makepath, run_rsync, v_filt,
+    checkdiff, cp_p, makepath, run_rsync, v_filt, hardlink_symlinks_supported,
 )
 
 
@@ -40,19 +40,20 @@ if to2dir.is_file():
 vv = run_rsync('-VV', check=True, capture_output=True).stdout
 hardlink_symlinks = '"hardlink_symlinks": true' in vv
 symtimes_supported = '"symtimes": true' in vv
-
-if hardlink_symlinks:
-    L = 'hL'
-    sym_dots = allspace
-    L_sym_dots = '.L' + allspace
-    is_uptodate = 'is uptodate'
-    chkfile_extra = ''  # no extra trailing line
-else:
-    L = 'cL'
-    sym_dots = 'c.t.' + dots
-    L_sym_dots = 'cL' + sym_dots
-    is_uptodate = '-> ../bar/baz/rsync'
-    chkfile_extra = f"cL{sym_dots} foo/sym {is_uptodate}\n"
+# The only itemisation difference between a platform that can hard-link a
+# symlink and one that cannot is the change-type letter where the symlink
+# itself is transferred: hL when it is hard-linked, cL when it is copied.
+# The attribute field, the "is uptodate" wording and the --copy-dest lines
+# are identical either way -- measured on macOS 10.13, the one platform that
+# lacks the capability (linkat(AT_FDCWD, sym, ..., 0) is EOPNOTSUPP there).
+#
+# The two answers can disagree, so both are asked.  The build capability is
+# decided by configure on whatever filesystem the source tree sat on, while the
+# link happens on whichever filesystem holds the test data: macOS builds on APFS
+# (yes) and can write to HFS+ (ENOTSUP).  rsync falls back to a copy when the
+# filesystem refuses, so the letter follows the filesystem.
+L = ('hL' if hardlink_symlinks and hardlink_symlinks_supported(SCRATCHDIR)
+     else 'cL')
 
 if 'protocol=2' in RSYNC:
     T = '.T'
@@ -162,14 +163,13 @@ checkdiff(['-ivvplrtH', '--copy-dest=../to', f'{FROMDIR}/', f'{to2dir}/'],
           f"cf{allspace} foo/config1\n"
           f"cf{allspace} foo/config2\n"
           f"hf{allspace} foo/extra => foo/config1\n"
-          f"cL{sym_dots} foo/sym -> ../bar/baz/rsync\n",
+          f"cL{allspace} foo/sym -> ../bar/baz/rsync\n",
           filter=v_filt)
 
 shutil.rmtree(to2dir, ignore_errors=True)
 checkdiff(['-iplrtH', '--copy-dest=../to', f'{FROMDIR}/', f'{to2dir}/'],
           f"created directory {to2dir}\n"
-          f"hf{allspace} foo/extra => foo/config1\n"
-          + chkfile_extra)
+          f"hf{allspace} foo/extra => foo/config1\n")
 
 shutil.rmtree(to2dir, ignore_errors=True)
 checkdiff(['-vvplrtH', f'--copy-dest={TODIR}', f'{FROMDIR}/', f'{to2dir}/'],
@@ -180,7 +180,7 @@ checkdiff(['-vvplrtH', f'--copy-dest={TODIR}', f'{FROMDIR}/', f'{to2dir}/'],
           "foo/ is uptodate\n"
           "foo/config1 is uptodate\n"
           "foo/config2 is uptodate\n"
-          f"foo/sym {is_uptodate}\n"
+          f"foo/sym is uptodate\n"
           "foo/extra => foo/config1\n",
           filter=v_filt)
 
@@ -196,18 +196,16 @@ checkdiff(['-ivvplrtH', f'--link-dest={TODIR}', f'{FROMDIR}/', f'{to2dir}/'],
           f"hf{allspace} foo/config1\n"
           f"hf{allspace} foo/config2\n"
           f"hf{allspace} foo/extra => foo/config1\n"
-          f"{L}{sym_dots} foo/sym -> ../bar/baz/rsync\n",
+          f"{L}{allspace} foo/sym -> ../bar/baz/rsync\n",
           filter=v_filt)
 
 shutil.rmtree(to2dir, ignore_errors=True)
 checkdiff(['-iplrtH', '--dry-run', '--link-dest=../to', f'{FROMDIR}/', f'{to2dir}/'],
-          f"created directory {to2dir}\n"
-          + chkfile_extra)
+          f"created directory {to2dir}\n")
 
 shutil.rmtree(to2dir, ignore_errors=True)
 checkdiff(['-iplrtH', '--link-dest=../to', f'{FROMDIR}/', f'{to2dir}/'],
-          f"created directory {to2dir}\n"
-          + chkfile_extra)
+          f"created directory {to2dir}\n")
 
 shutil.rmtree(to2dir, ignore_errors=True)
 checkdiff(['-vvplrtH', f'--link-dest={TODIR}', f'{FROMDIR}/', f'{to2dir}/'],
@@ -219,7 +217,7 @@ checkdiff(['-vvplrtH', f'--link-dest={TODIR}', f'{FROMDIR}/', f'{to2dir}/'],
           "foo/config1 is uptodate\n"
           "foo/config2 is uptodate\n"
           "foo/extra is uptodate\n"
-          f"foo/sym {is_uptodate}\n",
+          f"foo/sym is uptodate\n",
           filter=v_filt)
 
 
@@ -234,13 +232,12 @@ checkdiff(['-ivvplrtH', f'--compare-dest={TODIR}', f'{FROMDIR}/', f'{to2dir}/'],
           f".f{allspace} foo/config1\n"
           f".f{allspace} foo/config2\n"
           f".f{allspace} foo/extra\n"
-          f"{L_sym_dots} foo/sym -> ../bar/baz/rsync\n",
+          f".L{allspace} foo/sym -> ../bar/baz/rsync\n",
           filter=v_filt)
 
 shutil.rmtree(to2dir, ignore_errors=True)
 checkdiff(['-iplrtH', f'--compare-dest={TODIR}', f'{FROMDIR}/', f'{to2dir}/'],
-          f"created directory {to2dir}\n"
-          + chkfile_extra)
+          f"created directory {to2dir}\n")
 
 shutil.rmtree(to2dir, ignore_errors=True)
 checkdiff(['-vvplrtH', f'--compare-dest={TODIR}', f'{FROMDIR}/', f'{to2dir}/'],
@@ -252,5 +249,5 @@ checkdiff(['-vvplrtH', f'--compare-dest={TODIR}', f'{FROMDIR}/', f'{to2dir}/'],
           "foo/config1 is uptodate\n"
           "foo/config2 is uptodate\n"
           "foo/extra is uptodate\n"
-          f"foo/sym {is_uptodate}\n",
+          f"foo/sym is uptodate\n",
           filter=v_filt)

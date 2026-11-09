@@ -23,6 +23,8 @@ files-from                  pass
 hardlinks                   pass
 ssh-basic                   pass
 symlink-dirlink-basis       pass
+variety                     pass
+variety-symlink-traversal   pass
 
 # --- May-2026 security fixes absent in 3.2.7 (peer is vulnerable) ---
 alt-dest-symlink-race       xfail   # --link-dest basis lookup follows basedir symlink (escape)

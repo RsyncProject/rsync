@@ -49,7 +49,7 @@ with open({str(output_path)!r}, 'w', encoding='utf-8') as out:
 ''')
 
 
-fake_socat = argv_capture_script(FAKEBIN / 'socat', HELPER_ARGV)
+fake_socat = argv_capture_script(FAKEBIN / 'socat helper', HELPER_ARGV)
 
 FALLBACKBIN = SCRATCHDIR / 'fallbackbin'
 FALLBACKBIN.mkdir()
@@ -120,6 +120,15 @@ want = [
 ]
 if argv != want:
     test_fail(f'unexpected socat argv for host name: {argv!r}')
+
+HELPER_ARGV.unlink()
+proc = subprocess.run(
+    [str(RSYNC_SSL), '--HELPER', 'example.com,verify=0', 'rsync', '--server', '--daemon', '.'],
+    env=clean_env(RSYNC_SSL_TYPE='socat', RSYNC_SSL_SOCAT=str(fake_socat)),
+    capture_output=True, text=True,
+)
+if proc.returncode == 0 or 'invalid rsync-ssl hostname' not in proc.stderr or HELPER_ARGV.exists():
+    test_fail(f'socat accepted an invalid hostname: {proc.stderr}')
 
 
 # --- explicit CA/cert/key/port are preserved and IP addresses disable SNI ----

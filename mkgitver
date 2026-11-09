@@ -7,10 +7,20 @@ if [ ! -f git-version.h ]; then
 fi
 
 if test -d "$srcdir/.git" || test -f "$srcdir/.git"; then
-    gitver=`git describe --abbrev=8 2>/dev/null`
-    # NOTE: I'm avoiding "|" in sed since I'm not sure if sed -r is portable and "\|" fails on some OSes.
-    verchk=`echo "$gitver-" | sed -n '/^v3\.[0-9][0-9]*\.[0-9][0-9]*\(pre[0-9]*\)*-/p'`
-    if [ -n "$verchk" ]; then
+    # Identify a git build by the development version from version.h plus the
+    # exact commit (e.g. "3.5.0dev-g1234abcd"), rather than the nearest release
+    # tag that `git describe` would pick: that tag can sit far behind a rebased
+    # development branch and then misnames the line you are actually on (showing,
+    # say, 3.4.3 for a 3.5.0dev tree).  This also works in a shallow/tag-less
+    # clone.  A release tarball has no .git, so git-version.h stays empty and
+    # rsync prints the plain RSYNC_VERSION.
+    # cd into the subshell rather than "git -C" (avoids needing a newer git).
+    gitsha=`(cd "$srcdir" && git rev-parse --short=8 HEAD) 2>/dev/null`
+    # Tolerate any preprocessor spacing and a trailing comment; capture only the
+    # quoted value.  Empty (define missing/unmatched) -> leave RSYNC_GITVER unset.
+    rsyncver=`sed -n 's/^[[:space:]]*#[[:space:]]*define[[:space:]][[:space:]]*RSYNC_VERSION[[:space:]][[:space:]]*"\([^"]*\)".*/\1/p' "$srcdir/version.h"`
+    if [ -n "$gitsha" ] && [ -n "$rsyncver" ]; then
+	gitver="$rsyncver-g$gitsha"
 	echo "#define RSYNC_GITVER \"$gitver\"" >git-version.h.new
 	if ! diff git-version.h.new git-version.h >/dev/null; then
 	    echo "Updating git-version.h"

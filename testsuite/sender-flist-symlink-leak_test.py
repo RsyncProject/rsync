@@ -11,26 +11,17 @@
 # failed at secure_relative_open.
 
 import os
-import platform
 import subprocess
 
 from rsyncfns import (
     SCRATCHDIR,
     rsync_argv, get_testuid, get_rootuid, get_rootgid,
-    rmtree, start_test_daemon, test_fail, test_skipped,
+    rmtree, start_test_daemon, test_fail,
 )
 
 
 DAEMON_PORT = 12881
 
-
-# Platforms without RESOLVE_BENEATH equivalents fall back to a per-
-# component walk that this test is not in scope for.
-if platform.system() in ('SunOS', 'OpenBSD', 'NetBSD') or platform.system().startswith('CYGWIN'):
-    test_skipped(
-        f"secure change_dir relies on RESOLVE_BENEATH-equivalent kernel "
-        f"support not available on {platform.system()}"
-    )
 
 mod = SCRATCHDIR / 'module'
 outside = SCRATCHDIR / 'outside'

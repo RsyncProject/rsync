@@ -1,5 +1,9 @@
 name: Test rsync on Solaris
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [ master ]
@@ -7,12 +11,12 @@ on:
       - '.github/workflows/*.yml'
       - '!.github/workflows/solaris-build.yml'
   pull_request:
-    branches: [ master ]
+    types: [opened, synchronize, reopened]
     paths-ignore:
       - '.github/workflows/*.yml'
       - '!.github/workflows/solaris-build.yml'
   schedule:
-    - cron: '42 8 * * *'
+    - cron: '42 8 * * 1'
 
 jobs:
   test:
@@ -31,7 +35,7 @@ jobs:
           pkg install bash automake gnu-m4 pkg://solaris/runtime/python-35 autoconf gcc git
         run: |
           uname -a
-          ./configure --with-rrsync -disable-zstd --disable-md2man --disable-xxhash --disable-lz4
+          ./configure --with-rrsync -disable-zstd --disable-md2man --disable-xxhash --disable-lz4 --disable-idn
           make
           ./rsync --version
           make check

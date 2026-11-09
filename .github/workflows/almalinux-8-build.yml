@@ -1,5 +1,9 @@
 name: Test rsync on AlmaLinux 8
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 # Older-LTS coverage on the Fedora/RHEL family to help with backporting
 # security fixes. AlmaLinux 8 is the RHEL 8 rebuild and is the oldest
 # active LTS in this family (RHEL 8 full support runs to 2029).
@@ -13,7 +17,7 @@ on:
       - '.github/workflows/*.yml'
       - '!.github/workflows/almalinux-8-build.yml'
   pull_request:
-    branches: [ master ]
+    types: [opened, synchronize, reopened]
     paths-ignore:
       - '.github/workflows/*.yml'
       - '!.github/workflows/almalinux-8-build.yml'
@@ -48,7 +52,8 @@ jobs:
             attr libattr-devel acl libacl-devel \
             zstd libzstd-devel \
             lz4 lz4-devel \
-            xxhash xxhash-devel
+            xxhash xxhash-devel \
+            libidn2 libidn2-devel
         alternatives --set python3 /usr/bin/python3.9
         pip3 install commonmark
     - name: configure
@@ -62,7 +67,7 @@ jobs:
       # crtimes-not-supported skip matches the other Linux jobs;
       # daemon-chroot-acl and proxy-response-line-too-long skip because
       # the default (secure) transport opens no listening socket.
-      run: RSYNC_EXPECT_SKIPPED=crtimes,daemon-access-ip,daemon-chroot-acl,proxy-response-line-too-long,recv-discard-nullderef make check
+      run: RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/common.txt,@testsuite/skiplist/linux.txt make check
     - name: check (TCP daemon transport)
       # Second run exercising the real loopback-TCP daemon path.
       run: ./runtests.py --rsync-bin="$PWD/rsync" --use-tcp -j 8

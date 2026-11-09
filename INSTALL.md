@@ -114,6 +114,16 @@ checksums.
 
 [4]: https://www.openssl.org/docs/man1.0.2/man3/crypto.html
 
+## libidn2
+
+The [libidn2 library][5] converts an internationalized domain name into the
+IDNA A-label ("Punycode") form that a resolver understands.  Installing this
+development library lets rsync connect to a daemon whose name has non-ASCII
+characters in it, and lets a daemon's "hosts allow" & "hosts deny" settings be
+written the same way.
+
+[5]: https://www.gnu.org/software/libidn/#libidn2
+
 ## Package summary
 
 To help you get the libraries installed, here are some package install commands
@@ -131,6 +141,7 @@ like.
     >     sudo apt install -y libzstd-dev
     >     sudo apt install -y liblz4-dev
     >     sudo apt install -y libssl-dev
+    >     sudo apt install -y libidn2-dev
 
 Or run support/install_deps_ubuntu.sh
 
@@ -144,6 +155,7 @@ Or run support/install_deps_ubuntu.sh
     >     sudo yum -y install libzstd-devel
     >     sudo yum -y install lz4-devel
     >     sudo yum -y install openssl-devel
+    >     sudo yum -y install libidn2-devel
     >     python3 -mpip install --user commonmark
 
  -  For Fedora 33:
@@ -154,6 +166,7 @@ Or run support/install_deps_ubuntu.sh
     >     sudo dnf -y install libzstd-devel
     >     sudo dnf -y install lz4-devel
     >     sudo dnf -y install openssl-devel
+    >     sudo dnf -y install libidn2-devel
 
  -  For FreeBSD (this assumes that the python3 version is 3.7):
 
@@ -161,6 +174,7 @@ Or run support/install_deps_ubuntu.sh
     >     sudo pkg install -y xxhash
     >     sudo pkg install -y zstd
     >     sudo pkg install -y liblz4
+    >     sudo pkg install -y libidn2
 
  -  For macOS:
 
@@ -169,6 +183,7 @@ Or run support/install_deps_ubuntu.sh
     >     brew install zstd
     >     brew install lz4
     >     brew install openssl
+    >     brew install libidn2
 
  -  For Cygwin (with all cygwin programs stopped, run the appropriate setup program from a cmd shell):
 
@@ -177,6 +192,7 @@ Or run support/install_deps_ubuntu.sh
     >     setup-x86_64 --quiet-mode -P libzstd-devel
     >     setup-x86_64 --quiet-mode -P liblz4-devel
     >     setup-x86_64 --quiet-mode -P libssl-devel
+    >     setup-x86_64 --quiet-mode -P libidn2-devel
 
     Sometimes cygwin has commonmark packaged and sometimes it doesn't. Now that
     its python38 has stabilized, you could install python38-commonmark. Or just

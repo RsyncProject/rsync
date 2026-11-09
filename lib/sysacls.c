@@ -180,6 +180,26 @@ int sys_acl_free_acl(SMB_ACL_T the_acl)
 	return acl_free(the_acl);
 }
 
+#ifdef HAVE_LIBACL_AT
+/* Dirfd/AT-flag ACL ops via the new libacl,
+ * race-safe on every Linux kernel.  at_flags is AT_SYMLINK_NOFOLLOW (dirfd+leaf)
+ * or AT_EMPTY_PATH (operate on an open fd passed as dirfd, path ""). */
+SMB_ACL_T sys_acl_get_file_at(int dirfd, const char *path_p, int at_flags, SMB_ACL_TYPE_T type)
+{
+	return acl_get_file_at(dirfd, path_p, at_flags, type);
+}
+
+int sys_acl_set_file_at(int dirfd, const char *path_p, int at_flags, SMB_ACL_TYPE_T type, SMB_ACL_T theacl)
+{
+	return acl_set_file_at(dirfd, path_p, at_flags, type, theacl);
+}
+
+int sys_acl_delete_def_file_at(int dirfd, const char *path_p, int at_flags)
+{
+	return acl_delete_def_file_at(dirfd, path_p, at_flags);
+}
+#endif /* HAVE_LIBACL_AT */
+
 #elif defined(HAVE_TRU64_ACLS) /*--------------------------------------------*/
 /*
  * The interface to DEC/Compaq Tru64 UNIX ACLs
@@ -479,12 +499,20 @@ SMB_ACL_T sys_acl_get_file(const char *path_p, SMB_ACL_TYPE_T type)
 	return acl_d;
 }
 
-#if 0
-SMB_ACL_T sys_acl_get_fd(int fd)
+#ifdef HAVE_SOLARIS_ACLS
+/* facl(2)-based ACL read on a held fd (no path re-resolution).  Solaris stores
+ * the access and default ACLs as one combined ACL; split out the requested half. */
+SMB_ACL_T sys_acl_get_fd_type(int fd, SMB_ACL_TYPE_T type)
 {
 	SMB_ACL_T	acl_d;
 	int		count;		/* # of ACL entries allocated	*/
 	int		naccess;	/* # of access ACL entries	*/
+	int		ndefault;	/* # of default ACL entries	*/
+
+	if (type != SMB_ACL_TYPE_ACCESS && type != SMB_ACL_TYPE_DEFAULT) {
+		errno = EINVAL;
+		return NULL;
+	}
 
 	count = INITIAL_ACL_SIZE;
 	if ((acl_d = sys_acl_init(count)) == NULL) {
@@ -511,16 +539,38 @@ SMB_ACL_T sys_acl_get_fd(int fd)
 	}
 
 	/*
-	 * calculate the number of access ACL entries
+	 * calculate the number of access and default ACL entries
 	 */
 	for (naccess = 0; naccess < count; naccess++) {
 		if (acl_d->acl[naccess].a_type & ACL_DEFAULT)
 			break;
 	}
+	ndefault = count - naccess;
 
-	acl_d->count = naccess;
+	if (type == SMB_ACL_TYPE_DEFAULT) {
+		int	i, j;
+
+		/*
+		 * Default ACL entries follow the access entries in the combined
+		 * Solaris ACL; move them to the front of the wrapper and clear
+		 * ACL_DEFAULT so the caller sees a plain default ACL.
+		 */
+		for (i = 0, j = naccess; i < ndefault; i++, j++) {
+			acl_d->acl[i] = acl_d->acl[j];
+			acl_d->acl[i].a_type &= ~ACL_DEFAULT;
+		}
+
+		acl_d->count = ndefault;
+	} else {
+		acl_d->count = naccess;
+	}
 
 	return acl_d;
+}
+
+SMB_ACL_T sys_acl_get_fd(int fd)
+{
+	return sys_acl_get_fd_type(fd, SMB_ACL_TYPE_ACCESS);
 }
 #endif
 
@@ -728,14 +778,108 @@ int sys_acl_set_file(const char *name, SMB_ACL_TYPE_T type, SMB_ACL_T acl_d)
 	return ret;
 }
 
-#if 0
-int sys_acl_set_fd(int fd, SMB_ACL_T acl_d)
+#ifdef HAVE_SOLARIS_ACLS
+/* facl(2)-based ACL write on a held fd (no path re-resolution).  Setting an ACL
+ * on a directory replaces the combined access+default set, so for a dir read the
+ * other half through the fd, merge, and write the combined ACL back.  Mirrors the
+ * path-based sys_acl_set_file() below. */
+int sys_acl_set_fd_type(int fd, SMB_ACL_TYPE_T type, SMB_ACL_T acl_d)
 {
+	struct stat	s;
+	struct acl	*acl_p;
+	int		acl_count;
+	struct acl	*acl_buf	= NULL;
+	int		ret;
+
+	if (type != SMB_ACL_TYPE_ACCESS && type != SMB_ACL_TYPE_DEFAULT) {
+		errno = EINVAL;
+		return -1;
+	}
+
 	if (acl_sort(acl_d) != 0) {
 		return -1;
 	}
 
-	return facl(fd, SETACL, acl_d->count, &acl_d->acl[0]);
+	acl_p		= &acl_d->acl[0];
+	acl_count	= acl_d->count;
+
+	if (fstat(fd, &s) != 0) {
+		return -1;
+	}
+	if (S_ISDIR(s.st_mode)) {
+		SMB_ACL_T	acc_acl;
+		SMB_ACL_T	def_acl;
+		SMB_ACL_T	tmp_acl;
+		int		i;
+
+		if (type == SMB_ACL_TYPE_ACCESS) {
+			acc_acl = acl_d;
+			def_acl = tmp_acl = sys_acl_get_fd_type(fd, SMB_ACL_TYPE_DEFAULT);
+		} else {
+			def_acl = acl_d;
+			acc_acl = tmp_acl = sys_acl_get_fd_type(fd, SMB_ACL_TYPE_ACCESS);
+		}
+
+		if (tmp_acl == NULL) {
+			return -1;
+		}
+
+		acl_count = acc_acl->count + def_acl->count;
+		acl_p = acl_buf = SMB_MALLOC_ARRAY(struct acl, acl_count);
+
+		if (acl_buf == NULL) {
+			sys_acl_free_acl(tmp_acl);
+			errno = ENOMEM;
+			return -1;
+		}
+
+		/* Concatenate access + default, then mark the default half. */
+		memcpy(&acl_buf[0], &acc_acl->acl[0],
+			acc_acl->count * sizeof acl_buf[0]);
+		memcpy(&acl_buf[acc_acl->count], &def_acl->acl[0],
+			def_acl->count * sizeof acl_buf[0]);
+
+		for (i = acc_acl->count; i < acl_count; i++) {
+			acl_buf[i].a_type |= ACL_DEFAULT;
+		}
+
+		sys_acl_free_acl(tmp_acl);
+
+	} else if (type != SMB_ACL_TYPE_ACCESS) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	ret = facl(fd, SETACL, acl_count, acl_p);
+
+	SAFE_FREE(acl_buf);
+
+	return ret;
+}
+
+int sys_acl_set_fd(int fd, SMB_ACL_T acl_d)
+{
+	return sys_acl_set_fd_type(fd, SMB_ACL_TYPE_ACCESS, acl_d);
+}
+
+int sys_acl_delete_def_fd(int fd)
+{
+	SMB_ACL_T	acl_d;
+	int		ret;
+
+	/*
+	 * Fetching the access ACL through the fd and rewriting it deletes the
+	 * default ACL, without re-resolving the path.
+	 */
+	if ((acl_d = sys_acl_get_fd_type(fd, SMB_ACL_TYPE_ACCESS)) == NULL) {
+		return -1;
+	}
+
+	ret = facl(fd, SETACL, acl_d->count, acl_d->acl);
+
+	sys_acl_free_acl(acl_d);
+
+	return ret;
 }
 #endif
 

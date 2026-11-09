@@ -9,6 +9,39 @@ is gone). Shared helpers live in `testsuite/rsyncfns.py`. A handful of C helper
 programs (`tls`, `getgroups`, `trimslash`, …) are built alongside `rsync` and
 used by some tests. Coverage notes are in [COVERAGE.md](COVERAGE.md).
 
+## Writing tests
+
+Favour readability — a test is also documentation of the behaviour it pins, so
+prefer clarity over cleverness:
+
+* When a test writes an `rsyncd.conf`, write it as a triple-quoted f-string so
+  the actual config is readable top-to-bottom, with module parameters indented
+  with plain spaces. Don't build it from adjacent string literals full of `\n`
+  (and `\t`) escapes. The daemon's parser accepts space-indented parameters.
+* Better still, use the structured helpers in `rsyncfns.py` when a stock config
+  will do: `write_daemon_conf(modules, globals)` (per-test modules/params) or
+  `build_rsyncd_conf()` (the four standard modules). They also handle the
+  root-only `uid`/`gid` lines for you (needed so a `use chroot = no` daemon run
+  as root can read a root-owned module).
+* For config that varies (e.g. those root-only `uid`/`gid` lines), interpolate a
+  single optional block that expands when needed and is an empty string
+  otherwise, rather than splicing pieces together:
+
+  ```python
+  root = get_testuid() == get_rootuid()
+  ids = f"uid = {get_rootuid()}\ngid = {get_rootgid()}" if root else ""
+  conf.write_text(f"""\
+  pid file = {base}/rsyncd.pid
+  use chroot = no
+  {ids}
+  log file = {base}/rsyncd.log
+
+  [m]
+      path = {mod}
+      read only = yes
+  """)
+  ```
+
 ## Running the tests
 
 ### Via make
@@ -53,6 +86,12 @@ Useful options:
 - `--log-level N`, `--always-log` — more verbose output / show logs for passing tests too
 - `--stop-on-fail` — stop after the first failure
 - `--timeout SECS` — per-test timeout (default 300)
+- `--timing` — after the run, list the tests by wall-clock, slowest first, with
+  the serial sum and the floor set by the single longest test
+- `--race-timeout SECS` — budget a TOCTOU race test may spend trying to win its
+  race. These are the suite's slowest tests: a race test is a negative oracle,
+  so it passes by spending its *whole* budget (5–15s each by default). Lowering
+  this speeds the suite up and weakens the oracle in equal measure.
 - `--valgrind`, `--valgrind-opts OPTS` — run rsync under valgrind
 - `--rsync-bin PATH`, `--tooldir DIR`, `--srcdir DIR` — locate the binary / build / source dirs
 - `--expect-skipped LIST` — see skip enforcement below
@@ -95,7 +134,12 @@ precondition and otherwise `SKIP` — read the individual test scripts for detai
 
 **Skip enforcement:** on a full run, set `RSYNC_EXPECT_SKIPPED=a,b,c` (or
 `--expect-skipped a,b,c`) and the run fails if the set of skipped tests does not
-match. This is how the CI workflows pin each platform's expected skip set.
+match. This is how the CI workflows pin each platform's expected skip set. An
+`@FILE` entry reads a skip list (one test per line) instead, and several may be
+composed: the workflows use
+`@testsuite/skiplist/common.txt,@testsuite/skiplist/linux.txt`. Keeping the
+lists one-name-per-line is what stops two branches that each add a skipping test
+from conflicting -- see `testsuite/skiplist/README.md`.
 
 ### Scratch dirs and debugging
 
@@ -149,10 +193,12 @@ fleet-config change.
 
 A target with `"protocols": [30, 29]` runs one extra stdio-pipe pass per listed
 version, each forcing that older wire version with `runtests --protocol=N` — the
-fleet analogue of a workflow's `check30`/`check29` steps. The passes reuse the
-same parsed `RSYNC_EXPECT_SKIPPED` list as the pipe run and show up as `protoNN`
-columns in the report (and `--timing` breakdown). Targets that don't set
-`protocols` show `-` there.
+fleet analogue of a workflow's `check30`/`check29` steps. Each pass takes the
+`RSYNC_EXPECT_SKIPPED` spec from the workflow's own `check30`/`check29` step, so
+a lane with extra protocol-gated skips (`check29` adds
+`@testsuite/skiplist/proto29.txt`) is enforced correctly. They show up as
+`protoNN` columns in the report (and `--timing` breakdown); targets that don't
+set `protocols` show `-` there.
 
 Run it from inside a checkout (it builds the current directory's HEAD; use
 `--repo PATH` for another tree):
@@ -163,12 +209,34 @@ python3 testsuite/fleettest.py --list                # list configured targets
 python3 testsuite/fleettest.py --targets NAME[,NAME]
 python3 testsuite/fleettest.py --fleet other.json --transport pipe
 python3 testsuite/fleettest.py --timing              # per-target wall-clock breakdown
+python3 testsuite/fleettest.py --keep-on-fail        # keep logs + tree where it broke
+python3 testsuite/fleettest.py --full-tcp            # whole suite in the tcp pass too
 ```
 
 `--timing` adds a per-target breakdown after the report — total wall-clock plus
 the push / build / pipe / tcp / protoNN / nonroot phases, sorted slowest-first. Targets
 run in parallel, so the whole run is gated by the slowest one; the phase columns
-show whether that target's hold-up is the push, the build, or a test pass.
+show whether that target's hold-up is the push, the build, or a test pass. It
+also passes `--timing` down to each target's `runtests.py`, so the captured
+output attributes a slow pass to individual tests.
+
+The `tcp` pass runs **only the tests that can reach the daemon transport**, since
+it follows a full pipe pass over the very same build. `--use-tcp` is observable
+through exactly one path — `RSYNC_TEST_USE_TCP` is read once in `rsyncfns`
+(`USE_TCP`) and acted on once, in `start_test_daemon()` — so a test that never
+gets there produces an identical result twice. That drops 186 of the 340 tests
+and roughly a third of the pass's work; the count skipped is always printed.
+Pass `--full-tcp` to sweep the whole suite there anyway. The narrowing applies
+only when both transports run: under `--transport tcp` that pass is the only
+one, so it runs the whole suite regardless.
+
+`--keep-on-fail [DIR]` makes a failure inspectable without repeating the run.
+For every target that came back with anything unexpected it writes the full
+build and per-transport output to `DIR/<run_id>/<target>/` (default
+`./fleettest-logs`) and keeps that target's remote run dir, with the scratch
+trees its failing tests left behind. Targets that came back clean are swept as
+usual. This matters most for the race tests, which may not fail the same way
+twice — and because a re-run costs a full configure + build on every machine.
 
 Each run gets its own randomly-named build dir on every target
 (`<builddir>-<run_id>`), so two or three runs can share the same fleet without
@@ -184,3 +252,53 @@ Each target must be provisioned with the build toolchain its workflow installs
 (autoconf, automake, a C compiler, perl, a python3 markdown module such as
 cmarkgfm or commonmark unless the flags pass `--disable-md2man`, and the dev
 libraries its configure flags enable). A missing piece shows up as `BUILD-FAIL`.
+
+## Differential regression hunting (abdiff.py)
+
+`testsuite/abdiff.py` is a developer tool — **not** a `*_test.py`, so `runtests.py`
+ignores it. It hunts *regressions* by running the **same benign transfer** with
+two rsync binaries (`A` = the build under test, `B` = a baseline) and comparing
+the OUTCOME. The oracle is: for a benign input, a correctness/behaviour change
+between the builds must be **invisible**, so A and B must produce an identical
+result. Any divergence is a regression candidate to investigate and, if real,
+minimize into a `*_test.py`.
+
+It compares exit code, stderr (error markers + normalised text), `--stats`
+"Literal data", the destination tree (content + full metadata: mode/uid/gid/
+mtime/size/symlink target/xattrs/ACLs/hardlink grouping), the `--itemize` list,
+and — with `--cost` — peak process-group RSS (a resource-regression oracle that
+functional comparison misses). A **stability gate** runs each binary several
+times and escalates on a candidate diff; nondeterministic scenarios are
+quarantined `FLAKY`, never reported as regressions.
+
+Run it from the build directory (so `./rsync` and `old_versions/` resolve):
+
+```sh
+testsuite/abdiff.py                       # default: ./rsync vs old_versions/rsync_3.4.1
+testsuite/abdiff.py --sweep all -j5       # broad single pass, 5-way parallel
+testsuite/abdiff.py --loop --timelimit 3600 --cost   # hunt for an hour, resource oracle on
+testsuite/abdiff.py --list --sweep all    # list scenarios without running
+```
+
+Each finding is classed `DIFF` (regression candidate), `ALLOW` (an intentional,
+documented behaviour change listed in the tool's allowlist), `BETTER` (A succeeds
+where B fails), `FLAKY`, or `TIMEOUT`. Findings are printed and appended to a
+per-run `abdiff-log_<TIME>.txt` (and the curated `--findings` log).
+
+Key options: `-j N` parallelism; `--sweep NAME|all`; `--loop` (endless
+random + systematic-combo stream) bounded by `--timelimit SECS`; `--cost`
+(+`--scale N` for the large-tree fixtures); `--repeat N` (stability samples);
+`--rsync-a`/`--rsync-b` the two binaries. Run **as root** to fold in the
+owner/device/specials/fake-super and chroot-daemon sweeps automatically.
+
+Transport lanes (a feature broken only over the wire is invisible to a local
+copy): local, an ssh split (`support/lsh.sh`), a stdio-pipe daemon, a **real TCP
+daemon** (bound port + greeting/handshake, and an auth challenge-response
+variant), and the restricted **rrsync** wrapper (`support/rrsh.sh`). rrsync's
+behaviour ships in the *script*, so pair each binary with its own version's
+rrsync via `--rrsync-a`/`--rrsync-b` (give B's rrsync, e.g. one extracted from
+that release's `support/rrsync`).
+
+Cross-version baselines are the static binaries already in `old_versions/`;
+`old_versions/build_static.sh` builds more from a git tag (and you can grab a
+matching `support/rrsync` from the same tag for the rrsync lane).

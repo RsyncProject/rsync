@@ -1,5 +1,9 @@
 name: Test rsync on Ubuntu 22.04
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 # Older-LTS coverage to help with backporting security fixes. ubuntu-22.04
 # is currently the oldest GitHub Actions runner image (20.04 was retired
 # in April 2025).
@@ -11,7 +15,7 @@ on:
       - '.github/workflows/*.yml'
       - '!.github/workflows/ubuntu-22.04-build.yml'
   pull_request:
-    branches: [ master ]
+    types: [opened, synchronize, reopened]
     paths-ignore:
       - '.github/workflows/*.yml'
       - '!.github/workflows/ubuntu-22.04-build.yml'
@@ -28,7 +32,8 @@ jobs:
         fetch-depth: 0
     - name: prep
       run: |
-        sudo apt-get install acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev python3-cmarkgfm openssl
+        sudo apt-get update
+        sudo apt-get install acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev libidn2-dev python3-cmarkgfm openssl
         echo "/usr/local/bin" >>"$GITHUB_PATH"
     - name: configure
       run: ./configure --with-rrsync
@@ -39,11 +44,11 @@ jobs:
     - name: info
       run: rsync --version
     - name: check
-      run: sudo RSYNC_EXPECT_SKIPPED=crtimes,daemon-access-ip,daemon-chroot-acl,proxy-response-line-too-long,recv-discard-nullderef make check
+      run: sudo RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/common.txt,@testsuite/skiplist/linux.txt make check
     - name: check30
-      run: sudo RSYNC_EXPECT_SKIPPED=crtimes,daemon-access-ip,daemon-chroot-acl,proxy-response-line-too-long,recv-discard-nullderef make check30
+      run: sudo RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/common.txt,@testsuite/skiplist/linux.txt,@testsuite/skiplist/proto30.txt make check30
     - name: check29
-      run: sudo RSYNC_EXPECT_SKIPPED=crtimes,daemon-access-ip,daemon-chroot-acl,proxy-response-line-too-long,recv-discard-nullderef make check29
+      run: sudo RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/common.txt,@testsuite/skiplist/linux.txt,@testsuite/skiplist/proto29.txt make check29
     - name: check (TCP daemon transport)
       # Second run with daemon tests over a real loopback rsyncd; the default
       # 'make check' above uses the secure stdio-pipe transport.

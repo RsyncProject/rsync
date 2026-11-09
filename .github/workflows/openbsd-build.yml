@@ -1,5 +1,9 @@
 name: Test rsync on OpenBSD
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [ master ]
@@ -7,12 +11,12 @@ on:
       - '.github/workflows/*.yml'
       - '!.github/workflows/openbsd-build.yml'
   pull_request:
-    branches: [ master ]
+    types: [opened, synchronize, reopened]
     paths-ignore:
       - '.github/workflows/*.yml'
       - '!.github/workflows/openbsd-build.yml'
   schedule:
-    - cron: '42 8 * * *'
+    - cron: '42 8 * * 1'
 
 jobs:
   test:
@@ -33,9 +37,16 @@ jobs:
           uname -a
           export AUTOCONF_VERSION=2.71
           export AUTOMAKE_VERSION=1.16
-          ./configure --with-rrsync --disable-zstd --disable-md2man --disable-xxhash --disable-lz4
+          ./configure --with-rrsync --disable-zstd --disable-md2man --disable-xxhash --disable-lz4 --disable-idn
           make
           ./rsync --version
+          # The flipper (symlink-race) tests are excluded on OpenBSD, as on the
+          # fleet's OpenBSD box: this kernel has a connect()-under-rename-load
+          # lost-wakeup and an FFS rename-storm corruption that hang them to
+          # the 300s timeout for non-rsync reasons (see
+          # dev-notes/openbsd-connect-lost-wakeup-report.txt); the protections
+          # they exercise are verified on the Linux/BSD boxes.
+          export RSYNC_EXCLUDE=acl-symlink-race,sender-readlink-atfd,sender-remove-source-secure
           make check
           # The --use-tcp daemon tests run at -j2 here (vs -j8 elsewhere): this
           # job runs inside a nested VM, and at -j8 the many concurrent loopback
