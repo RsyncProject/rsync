@@ -16,7 +16,7 @@ def test(context: TestContext):
             test_fail(f'{exit_code} normalised as {result.outcome}')
 
     verdicts = (
-        ('pass', 'xfail:issue-1', 'xpass'),
+        ('pass', 'xfail:issue-1', 'unexpected_pass'),
         ('fail', 'xfail:issue-1', 'xfail'),
         ('xfail', 'xfail:issue-1', 'xfail'),
         ('xfail', 'pass', 'profile_error'),

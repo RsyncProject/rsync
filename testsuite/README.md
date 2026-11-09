@@ -98,7 +98,7 @@ ERROR | The test environment or harness failed
 SKIP | The test did not run
 UNSUPPORTED | A declared capability was unavailable
 XFAIL | A known defect reproduced
-XPASS | A known defect no longer reproduced
+UNEXPECTED_PASS | A known defect no longer reproduced
 PROFILE_ERROR | The result disagreed with the active profile
 
 Exit codes are 0 for pass, 1 for fail, 2 for error, 77 for skip and 78 for expected failure.

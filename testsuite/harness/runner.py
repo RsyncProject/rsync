@@ -589,6 +589,10 @@ def configure_profiles(args, suitedir, srcdir, all_tests, tests,
             raise ValueError(f'{role} profile does not match effective UID {os.geteuid()}')
     peer, profile_protocol, not_applicable, unsupported, xfail = merge_profiles(profiles)
     tests, excluded = select_applicable_tests(tests, not_applicable)
+    excluded_names = {name for group in excluded for name in group['tests']}
+    invalid = sorted(set(xfail) & excluded_names)
+    if invalid:
+        raise ValueError(f'expected failures do not apply: {", ".join(invalid)}')
     effective_protocol = args.protocol
     transport = 'tcp' if args.use_tcp else 'pipe'
     if profile_protocol and not peer:

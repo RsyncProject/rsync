@@ -26,6 +26,8 @@ def test(context: TestContext):
             test_fail(f'{profile.name} treats structural requirements as unsupported: '
                       f'{", ".join(sorted(misplaced))}')
         merge_profiles([profile])
+        if 'peer-feature-gap' in profile.xfail.values():
+            test_fail(f'{profile.name} retains a generic expected-failure reason')
     peers = {profile.peer for profile in profiles if profile.peer}
     archived = {path.name[len('rsync_'):] for path in (context.repository / 'old_versions').glob('rsync_*')}
     if archived and peers != archived:

@@ -16,7 +16,7 @@ def verdict_of(outcome, expected):
     if expected and expected.startswith('xfail'):
         if outcome in ('fail', 'xfail'):
             return 'xfail'
-        return 'xpass' if outcome == 'pass' else 'profile_error'
+        return 'unexpected_pass' if outcome == 'pass' else 'profile_error'
     if outcome == 'xfail':
         return 'profile_error'
     if expected and expected.startswith('unsupported'):

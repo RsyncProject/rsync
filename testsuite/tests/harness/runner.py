@@ -70,6 +70,18 @@ def test(context: TestContext):
             'capability': 'tcp', 'reasons': ['pipe transport'],
             'tests': ['daemon-access-hostname']}]:
         test_fail(f'N/A test selection is wrong: {configured[0]}, {configured[7]}')
+    n_a_profile.write_text(json.dumps({
+        'not_applicable': {'tcp': 'pipe transport'},
+        'xfail': {'daemon-access-hostname': 'issue-1'},
+    }))
+    try:
+        runner.configure_profiles(
+            args, str(context.repository / 'testsuite'), str(context.repository),
+            tests, [tcp_test, ordinary_test], '', '')
+    except ValueError:
+        pass
+    else:
+        test_fail('an expected failure was attached to an N/A test')
     for uid in (0, 1000, 65534):
         for names in ('root', 'nonroot', 'root,nonroot', 'nonroot,root', 'linux'):
             args = SimpleNamespace(profiles=names, protocol=None, use_tcp=False)
@@ -182,7 +194,7 @@ def test(context: TestContext):
         (78, {}, 1, 'xfail', 'profile_error', 'pass'),
         (78, xfail, 0, 'xfail', 'xfail', 'xfail:issue-1'),
         (1, xfail, 0, 'fail', 'xfail', 'xfail:issue-1'),
-        (0, xfail, 1, 'pass', 'xpass', 'xfail:issue-1'),
+        (0, xfail, 1, 'pass', 'unexpected_pass', 'xfail:issue-1'),
         (2, xfail, 1, 'error', 'profile_error', 'xfail:issue-1'),
         (3, xfail, 1, 'error', 'profile_error', 'xfail:issue-1'),
         (256, {}, 1, 'error', 'error', 'pass'),

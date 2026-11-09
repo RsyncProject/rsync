@@ -2,12 +2,12 @@
   "peer": "3.0.0",
   "protocol": 30,
   "xfail": {
-    "batch-mode": "peer-feature-gap",
-    "chmod-option": "peer-feature-gap",
-    "daemon-listings": "peer-feature-gap",
-    "daemon-config": "peer-feature-gap",
-    "daemon-filter": "peer-feature-gap",
-    "daemon-gzip": "peer-feature-gap",
-    "daemon-refuse": "peer-feature-gap"
+    "batch-mode": "batch-format-compatibility",
+    "chmod-option": "daemon-chmod-semantics",
+    "daemon-listings": "daemon-listing-semantics",
+    "daemon-config": "included-module-listing",
+    "daemon-filter": "incoming-chmod-semantics",
+    "daemon-gzip": "compression-negotiation",
+    "daemon-refuse": "refuse-options-semantics"
   }
 }
