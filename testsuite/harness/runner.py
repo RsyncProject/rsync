@@ -128,12 +128,16 @@ def find_setfacl_nodef(scratchbase):
         ['setfacl', '-k', scratchbase],
         ['setfacl', '-s', 'u::7,g::5,o:5', scratchbase],
     ]:
+        if shutil.which(cmd[0]) is None:
+            continue
         try:
             result = subprocess.run(cmd, capture_output=True, timeout=5)
             if result.returncode == 0:
                 return cmd[:2]
         except (FileNotFoundError, subprocess.TimeoutExpired):
             continue
+    if shutil.which('setfacl') is None:
+        return None
     try:
         r = subprocess.run(['setfacl', '--help'], capture_output=True, text=True, timeout=5)
         if '-k,' in r.stdout or '-k,' in r.stderr:

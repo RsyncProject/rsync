@@ -25,6 +25,29 @@ def test(context: TestContext):
     if env['RUNSHFLAGS'] != '-e -x' or env['setfacl_nodef'] != 'setfacl -k':
         test_fail('runner settings were overridden by shconfig')
 
+    blocked = context.scratch / 'private-path'
+    blocked.mkdir()
+    commands = context.scratch / 'acl-tools'
+    commands.mkdir()
+    command = commands / 'setfacl'
+    command.write_text('#!/bin/sh\nexit 0\n')
+    command.chmod(0o755)
+    blocked.chmod(0)
+    try:
+        with patch.dict(os.environ, {'PATH': str(blocked) + os.pathsep + str(commands)}):
+            if runner.find_setfacl_nodef(str(context.scratch)) != ['setfacl', '-k']:
+                test_fail('an inaccessible PATH entry prevented ACL tool discovery')
+    finally:
+        blocked.chmod(0o755)
+    with patch.object(runner.shutil, 'which', return_value=str(command)):
+        with patch.object(runner.subprocess, 'run', side_effect=PermissionError('blocked executable')):
+            try:
+                runner.find_setfacl_nodef(str(context.scratch))
+            except PermissionError:
+                pass
+            else:
+                test_fail('an execution failure was treated as a missing ACL tool')
+
     tests = runner.collect_tests(str(context.repository / 'testsuite'), [])
     for names in ('', 'linux'):
         args = SimpleNamespace(profiles=names, protocol=None, use_tcp=False)
