@@ -92,6 +92,7 @@ jobs:
           path: |
             config.log
             ${{ runner.temp }}/rsync-checks/features.json
+            ${{ runner.temp }}/rsync-checks/dirfd-probe.tsv
             ${{ runner.temp }}/rsync-checks/*/receipt.json
             ${{ runner.temp }}/rsync-checks/*/run.log
 

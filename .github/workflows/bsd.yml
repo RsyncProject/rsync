@@ -66,11 +66,13 @@ jobs:
             chown rsynctest:rsynctest test-results/nonroot
             export profiles=non-asan,self-peer,freebsd
             status=0
+            make dirfd-probe || status=1
             sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,root,$profiles" "$PWD/test-results/root/pipe" -j8 || status=1
             sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "root,$profiles" "$PWD/test-results/root/tcp" --use-tcp --daemon-tests-only -j8 || status=1
             su rsynctest -c '
               set -eu
               status=0
+              "$PWD/dirfd-probe" "$PWD/test-results/nonroot" > "$PWD/test-results/nonroot/dirfd-probe.tsv" || status=1
               sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,nonroot,$profiles" "$PWD/test-results/nonroot/pipe" -j8 || status=1
               sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "nonroot,$profiles" "$PWD/test-results/nonroot/tcp" --use-tcp --daemon-tests-only -j8 || status=1
               exit "$status"
@@ -104,6 +106,7 @@ jobs:
             config.log
             test-results/status
             test-results/features.json
+            test-results/nonroot/dirfd-probe.tsv
             test-results/*/*/receipt.json
             test-results/*/*/run.log
 
@@ -154,11 +157,13 @@ jobs:
             chown rsynctest:rsynctest test-results/nonroot
             export profiles=non-asan,self-peer,netbsd,no-idn,no-xxhash,no-zstd-threads
             status=0
+            make dirfd-probe || status=1
             sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,root,$profiles" "$PWD/test-results/root/pipe" -j8 || status=1
             sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "root,$profiles" "$PWD/test-results/root/tcp" --use-tcp --daemon-tests-only -j8 || status=1
             su rsynctest -c '
               set -eu
               status=0
+              "$PWD/dirfd-probe" "$PWD/test-results/nonroot" > "$PWD/test-results/nonroot/dirfd-probe.tsv" || status=1
               sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,nonroot,$profiles" "$PWD/test-results/nonroot/pipe" -j8 || status=1
               sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "nonroot,$profiles" "$PWD/test-results/nonroot/tcp" --use-tcp --daemon-tests-only -j8 || status=1
               exit "$status"
@@ -191,6 +196,7 @@ jobs:
           path: |
             config.log
             test-results/status
+            test-results/nonroot/dirfd-probe.tsv
             test-results/*/*/receipt.json
             test-results/*/*/run.log
 
@@ -248,12 +254,14 @@ jobs:
             # OpenBSD rename storms can hang these races outside rsync
             export RSYNC_EXCLUDE=acl-symlink-race,sender-readlink-atfd,sender-remove-source-secure
             status=0
+            make dirfd-probe || status=1
             sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,root,$profiles" "$PWD/test-results/root/pipe" -j8 || status=1
             # Keep nested-VM loopback daemons below the observed lost-wakeup threshold
             sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "root,$profiles" "$PWD/test-results/root/tcp" --use-tcp --daemon-tests-only -j2 || status=1
             su rsynctest -c '
               set -eu
               status=0
+              "$PWD/dirfd-probe" "$PWD/test-results/nonroot" > "$PWD/test-results/nonroot/dirfd-probe.tsv" || status=1
               sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,nonroot,$profiles" "$PWD/test-results/nonroot/pipe" -j8 || status=1
               sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "nonroot,$profiles" "$PWD/test-results/nonroot/tcp" --use-tcp --daemon-tests-only -j2 || status=1
               exit "$status"
@@ -287,5 +295,6 @@ jobs:
             config.log
             test-results/status
             test-results/features.json
+            test-results/nonroot/dirfd-probe.tsv
             test-results/*/*/receipt.json
             test-results/*/*/run.log

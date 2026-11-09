@@ -47,6 +47,7 @@ __pycache__
 /t_unsafe
 /wildtest
 /getfsdev
+/dirfd-probe
 /simdtest
 /t_acl
 /t_chmod_secure

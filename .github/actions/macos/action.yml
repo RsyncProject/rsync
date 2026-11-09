@@ -31,6 +31,12 @@ runs:
       run: |
         /usr/local/bin/rsync --version
         python3 testsuite/tools/check-features.py "$PWD/rsync" zstd lz4 xxh128 xxh3 xxh64 iconv IDN ACLs xattrs > "$RUNNER_TEMP/rsync-checks/features.json"
+    - name: Directory descriptors
+      if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+      shell: bash -e {0}
+      run: |
+        make dirfd-probe
+        "$PWD/dirfd-probe" "$RUNNER_TEMP/rsync-checks" > "$RUNNER_TEMP/rsync-checks/dirfd-probe.tsv"
     - name: Tests (non-root pipe)
       if: ${{ !cancelled() && steps.build.outcome == 'success' }}
       shell: bash -e {0}
