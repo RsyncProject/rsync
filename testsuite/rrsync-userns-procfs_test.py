@@ -9,7 +9,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from rsyncfns import makepath, rmtree, rsync_argv, test_fail, test_skipped
+from rsyncfns import join_and_quote, makepath, rmtree, rsync_argv, test_fail, test_skipped
 
 
 if not sys.platform.startswith('linux'):
@@ -39,7 +39,7 @@ if not os.environ.get('RSYNC_USERNS_PROCFS'):
     else:
         rmtree(launch_dir)
         test_fail(f'cannot locate the rsync executable in {env["RSYNC"]!r}')
-    env['RSYNC'] = shlex.join(rsync_cmd)
+    env['RSYNC'] = join_and_quote(rsync_cmd)
     launcher = []
     if os.geteuid() == 0:
         setpriv = shutil.which('setpriv')

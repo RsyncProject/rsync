@@ -40,6 +40,21 @@ from pathlib import Path
 from exitcodes import Exit   # re-exported: tests may `from rsyncfns import Exit`
 
 
+# --- Python 3.7 compatibility ----------------------------------------------
+
+# If shlex.join is not found (Python <= 3.7), implement it. The implementation
+# is taken "as is" from Python's stdlib. Otherwise, this function is just a
+# wrapper.
+if hasattr(shlex, 'join'):
+    def join_and_quote(split_command: list[str]) -> str:
+        """Return a shell-escaped string from *split_command*."""
+        return shlex.join(split_command)
+else:
+    def join_and_quote(split_command: list[str]) -> str:
+        """Return a shell-escaped string from *split_command*."""
+        return ' '.join(shlex.quote(arg) for arg in split_command)
+
+
 # --- environment -----------------------------------------------------------
 
 def _required(name: str) -> str:
@@ -918,7 +933,7 @@ def rsync_path_arg(cmd: str = None) -> str:
     ('valgrind ... /build/rsync') must stay several words.  Splitting and
     re-joining with shlex gives both: each word is quoted only if it needs it.
     """
-    return shlex.join(split_rsync_cmd(RSYNC_PEER if cmd is None else cmd))
+    return join_and_quote(split_rsync_cmd(RSYNC_PEER if cmd is None else cmd))
 
 
 def rsync_argv(*args: str) -> list:

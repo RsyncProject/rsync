@@ -44,6 +44,8 @@ import sys
 import tempfile
 import time
 
+from rsyncfns import join_and_quote
+
 # ---------------------------------------------------------------------------
 # Test-tree generation (ported from gentestdata.py, kept self-contained).
 # ---------------------------------------------------------------------------
@@ -274,7 +276,7 @@ def time_transfer(binary, rsync_args, src, dest, timeout):
     if r.returncode != 0:
         raise RuntimeError(
             f"{binary.label} ({binary.path}) rsync exited {r.returncode}:\n"
-            f"  cmd: {shlex.join(argv)}\n"
+            f"  cmd: {join_and_quote(argv)}\n"
             f"  {(r.stderr or r.stdout).strip()}")
     return elapsed
 

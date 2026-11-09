@@ -9,7 +9,7 @@ import sys
 
 from rsyncfns import (
     FROMDIR, RSYNC, SCRATCHDIR, TODIR, build_rsyncd_conf, hands_setup,
-    patched_rrsync, rsync_argv, rsync_path_arg, rsh_cmd, run_rsync,
+    join_and_quote, patched_rrsync, rsync_argv, rsync_path_arg, rsh_cmd, run_rsync,
     start_test_daemon, test_fail,
 )
 
@@ -245,7 +245,7 @@ if sched_idle:
     idle_wrapper.write_text(
         idle_code + 'import sys\nos.execvp(sys.argv[1], sys.argv[1:])\n'
     )
-    idle_command = shlex.join([sys.executable, str(idle_wrapper), *shlex.split(RSYNC)])
+    idle_command = join_and_quote([sys.executable, str(idle_wrapper), *shlex.split(RSYNC)])
     idle_daemon_rsh = (
         f'{idle_command} --config={shlex.quote(str(conf))} --daemon'
     )

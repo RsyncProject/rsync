@@ -9,7 +9,7 @@ import tempfile
 from pathlib import Path
 
 from rsyncfns import (
-    SCRATCHDIR, makepath, rmtree, rsync_argv, test_fail, test_skipped,
+    SCRATCHDIR, join_and_quote, makepath, rmtree, rsync_argv, test_fail, test_skipped,
 )
 if not sys.platform.startswith('linux'):
     test_skipped('Kernel pseudo-path string is a Linux-specific procfs feature')
@@ -42,7 +42,7 @@ makepath(src, dest)
 
 (src / 'transfer_me.txt').write_text('sync this\n')
 
-rsync_base_cmd = shlex.join(rsync_argv('-a'))
+rsync_base_cmd = join_and_quote(rsync_argv('-a'))
 src_path = shlex.quote(str(src) + '/')
 dest_path = shlex.quote(str(dest) + '/')
 
@@ -293,7 +293,7 @@ try:
     shutil.copy2(rsync_argv()[0], local_bin)
     local_bin.chmod(0o777)
 
-    cmd_prefix = shlex.join([str(local_bin), '-a'])
+    cmd_prefix = join_and_quote([str(local_bin), '-a'])
     s_path = shlex.quote(str(ws_src) + '/')
     d_path = shlex.quote(str(ws_dest) + '/')
 

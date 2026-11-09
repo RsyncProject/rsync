@@ -3,12 +3,11 @@
 import errno
 import os
 import platform
-import shlex
 import signal
 import subprocess
 import sys
 
-from rsyncfns import FROMDIR, SCRATCHDIR, SRCDIR, rsync_argv, start_test_daemon, test_fail, test_skipped
+from rsyncfns import FROMDIR, SCRATCHDIR, SRCDIR, join_and_quote, rsync_argv, start_test_daemon, test_fail, test_skipped
 
 
 def test():
@@ -85,8 +84,8 @@ def test():
     early = SCRATCHDIR / 'early-input'
     early.write_bytes(bytes(range(256)))
     captured = SCRATCHDIR / 'early-received'
-    hook = shlex.join([sys.executable, '-S', '-c',
-                      f'import sys; from pathlib import Path; Path({str(captured)!r}).write_bytes(sys.stdin.buffer.read())'])
+    hook = join_and_quote([sys.executable, '-S', '-c',
+                          f'import sys; from pathlib import Path; Path({str(captured)!r}).write_bytes(sys.stdin.buffer.read())'])
     config.write_text(config_text + f'early exec = {hook}\n')
     arguments = [f'--early-input={early}', f'{url}files/']
     invoke('early-input control', arguments, early, -1, success=True)

@@ -8,7 +8,7 @@ import tempfile
 import sys
 from pathlib import Path
 
-from rsyncfns import SCRATCHDIR, makepath, rmtree, rsync_argv, test_fail, test_skipped
+from rsyncfns import SCRATCHDIR, join_and_quote, makepath, rmtree, rsync_argv, test_fail, test_skipped
 
 # We require bash specifically because standard POSIX /bin/sh does not
 # guarantee support for <(...) process substitution syntax.
@@ -50,7 +50,7 @@ rmtree(dest)
 makepath(dest)
 
 # 3. Now we can test reading it via bash process substitution
-rsync_base_cmd = shlex.join(rsync_argv('-a'))
+rsync_base_cmd = join_and_quote(rsync_argv('-a'))
 batch_path = shlex.quote(str(batch_file))
 dest_path = shlex.quote(str(dest) + '/')
 
