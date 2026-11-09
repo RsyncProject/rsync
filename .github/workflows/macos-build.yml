@@ -39,7 +39,7 @@ jobs:
         LDFLAGS="-L${BREW_PREFIX}/lib -L${OPENSSL_PREFIX}/lib" \
         ./configure --with-rrsync
     - name: make
-      run: make
+      run: make check-progs
     - name: install
       run: sudo make install
     - name: info
