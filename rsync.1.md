@@ -231,23 +231,67 @@ Dedicate a "host1-files" dir to the remote content:
 
 See the [`--trust-sender`](#opt) option for additional details.
 
-CAUTION: it is not particularly safe to use rsync to copy files from a
-case-preserving filesystem to a case-ignoring filesystem.  If you must perform
-such a copy, you should either disable symlinks via `--no-links` or enable the
-munging of symlinks via [`--munge-links`](#opt) (and make sure you use the
-right local or remote option).  This will prevent rsync from doing potentially
-dangerous things if a symlink name overlaps with a file or directory. It does
-not, however, ensure that you get a full copy of all the files (since that may
-not be possible when the names overlap). A potentially better solution is to
-list all the source files and create a safe list of filenames that you pass to
-the [`--files-from`](#opt) option.  Any files that conflict in name would need
-to be copied to different destination directories using more than one copy.
+### Copying between case-preserving and case-insensitive filesystems
 
-While a copy of a case-ignoring filesystem to a case-ignoring filesystem can
-work out fairly well, if no `--delete-during` or `--delete-before` option is
-active, rsync can potentially update an existing file on the receiveing side
-without noticing that the upper-/lower-case of the filename should be changed
-to match the sender.
+Copying from case-preserving to case-insensitive filesystems requires
+caution because it is possible for the name of a symbolic link to
+overlap with the name of a file or directory once the case
+distinctions are removed, which can cause potentially dangerous
+results such as files being written outside the destination directory
+hierarchy.
+Either disable symlinks via `--no-links` or enable the munging of
+symlinks via [`--munge-links`](#opt) on the side which owns the source tree.
+This does not ensure that every source file can be represented when names
+overlap. A safe list supplied through [`--files-from`](#opt) can separate
+conflicting names into different destination directories.
+
+Even between case-insensitive filesystems, rsync can update an existing file
+without changing the filename's case to match the sender unless
+`--delete-during` or `--delete-before` is active.
+
+### Symbolic links
+
+[`--archive`](#opt) (`-a`) includes [`--links`](#opt) (`-l`), which copies
+symlinks as symlinks rather than copying their targets. It does not imply
+[`--safe-links`](#opt): links pointing outside the copied tree are preserved
+unless that option is requested. [`--munge-links`](#opt) stores symlinks in an
+unusable but recoverable form; `--no-links` drops them entirely.
+
+For example, `rsync -ax SRC HOST:DEST` preserves the symlinks inside `SRC`
+without `--insecure-links`. A symlink in the path leading to `DEST` is different:
+rsync must follow it to reach the destination. By default it follows that link
+only if it is owned by root or the user running the receiver. A symlink owned
+by another user is refused. The explicit source argument selects the transfer
+root and is not subject to this ownership check. The `-x` option does not change
+these rules.
+
+The same ownership check applies to auxiliary files and directories; see
+[`--insecure-links`](#opt). That option disables the check and should only be
+used when every directory along those paths is trusted. Root confinement is a
+separate restriction described under [`--confine-root`](#opt) and in
+[**rsyncd.conf**(5)](rsyncd.conf.5).
+
+### Use strong checksums
+
+Rsync auto-negotiates the strongest checksum that both ends support; keeping
+both local and remote rsync versions reasonably current is usually sufficient.
+The choice can be pinned with [`--checksum-choice`](#opt) (`--cc`) using a
+value such as `sha1` or one of the xxHash variants. The
+[`RSYNC_CHECKSUM_LIST`](#) environment variable can constrain negotiation; only
+very old peers fall back to MD4/MD5. This pre-transfer "does this file need
+updating?" checksum is separate
+from the whole-file checksum rsync normally computes to verify each transferred
+file afterwards (verification is off when `--checksum-choice=none` is forced).
+
+### Protocol version
+
+The client and server automatically negotiate the newest protocol they both
+support. A current pair therefore uses the most recent shared version;
+[`--protocol`](#opt) only *forces an older* version for compatibility and should
+not be used to downgrade a connection.  Avoiding old protocols is therefore a
+matter of running a current rsync on both ends (a protocol below 30 also forces
+the weak MD4 authentication digest on a daemon connection -- see the AUTHENTICATION
+STRENGTH section of [**rsyncd.conf**(5)](rsyncd.conf.5)).
 
 ## ADVANCED USAGE
 
@@ -1237,15 +1281,22 @@ expand it.
     which point outside the copied tree.  All absolute symlinks are also
     ignored.
 
+    This option applies only to symlink entries received in the file list. It
+    does not control symlink components in the destination or other protected
+    operator-supplied paths; those are handled by the default ownership check
+    described under [`--insecure-links`](#opt).
+
     Since this ignoring is happening on the receiving side, it will still be
     effective even when the sending side has munged symlinks (when it is using
     [`--munge-links`](#opt)). It also affects deletions, since the file being
     present in the transfer prevents any matching file on the receiver from
     being deleted when the symlink is deemed to be unsafe and is skipped.
 
-    This option must be combined with [`--links`](#opt) (or
-    [`--archive`](#opt)) to have any symlinks in the transfer to conditionally
-    ignore. Its effect is superseded by [`--copy-unsafe-links`](#opt).
+    This option has no effect unless it is combined with [`--links`](#opt) or
+    an option that implies [`--links`](#opt) such as [`--archive`](#opt)
+    because without [`--links`](#opt) there will not be any symlinks in the
+    transfer. [`--archive`](#opt) does not itself enable `--safe-links`.
+    [`--copy-unsafe-links`](#opt) takes precedence over `--safe-links`.
 
     Using this option in conjunction with [`--relative`](#opt) may give
     unexpected results.
@@ -1254,58 +1305,58 @@ expand it.
 
 0.  `--insecure-links`
 
-    By default rsync resolves the directory and file paths that the **operator**
-    supplies on the command line -- `--backup-dir`, `--temp-dir`/`-T`,
-    `--partial-dir`, `--link-dest`/`--compare-dest`/`--copy-dest`, `--log-file`,
-    `--password-file`, `--files-from`/`--include-from`/`--exclude-from`,
-    `--filter` merge files, `--write-batch`/`--read-batch`, and the destination
-    directory it changes into -- with a defensive walk that **follows a symlink
-    component only when it is owned by uid&nbsp;0 or by the running user**, and
-    refuses one owned by any other user.  This stops an attacker who can write
-    inside one of those directories from planting (or racing in) a symlink that
-    redirects a privileged rsync to a target outside the intended tree, while
-    still honouring the operator's own symlinks (the `/var/backups -> /mnt/disk`
-    admin pattern).  The rule is the same for absolute and relative paths.
+    Allow rsync to follow symlinks owned by other users in the destination and
+    auxiliary paths. By default each symlink followed in these paths must be
+    owned by root or by the effective user running that rsync process. The rule
+    applies to absolute and relative paths.
 
-    `--insecure-links` turns that defence off, restoring the historical behaviour
-    of following any symlink in those paths.  Use it only when you fully trust
-    every directory along each operator-supplied path -- it re-exposes the
-    symlink-redirection attacks the walk prevents.
+    The checked directories are the destination and those named by
+    `--backup-dir`, `--temp-dir` (`-T`), `--partial-dir`, `--link-dest`,
+    `--compare-dest` and `--copy-dest`.
+
+    The check also covers files named by `--log-file`, `--password-file`,
+    `--files-from`, `--include-from`, `--exclude-from`, `--write-batch`,
+    `--read-batch` and merge files read by `--filter`. Files supplied locally
+    before the transfer can live outside the transfer tree. A list or merge file
+    selected by a daemon client must stay inside the module. Paths selected from
+    a `--files-from` list and merge files read during the transfer can also be
+    confined by [`--confine-root`](#opt).
+
+    This option is not needed to preserve symlink entries with [`--links`](#opt)
+    or [`--archive`](#opt): those entries are recreated without following their
+    targets. Use `--insecure-links` only when every directory along the paths
+    rsync will follow is trusted.
 
     A build without `AT_FDCWD`, `O_NOFOLLOW` or `O_DIRECTORY` refuses protected
     path operations with `ENOSYS`. This option explicitly requests the legacy
     fallback instead.
 
     The option is **local only**: it is not sent to the remote side of the
-    transfer (a remote-shell peer that needs the opt-out must set it there, e.g.
-    via [`--rsync-path`](#opt)), and a daemon never honours it -- a daemon that
-    receives `--insecure-links` from a client refuses the request.  A daemon
-    administrator who wants the legacy behaviour for a single trusted module sets
-    "`insecure links = yes`" in that module's **rsyncd.conf**(5) section instead;
-    a client can never enable it.
+    transfer. A remote-shell peer that needs the opt-out must set it there using
+    [`--rsync-path`](#opt). A daemon refuses `--insecure-links` from a client.
+    Its administrator can enable `insecure links = yes` for a trusted module in
+    [**rsyncd.conf**(5)](rsyncd.conf.5); a client cannot enable it.
 
     See the [SYMBOLIC LINKS](#) section for multi-option info.
 
 0.  `--confine-root=DIR`
 
-    This bounds where the paths listed under [`--insecure-links`](#opt) are
-    allowed to resolve: one that ends up outside DIR is refused, even if every
-    symlink along it was owned by a trusted user.  The ownership walk asks who
-    planted a link; this asks where the path came out.
+    In the default symlink mode this bounds paths used for backups, partial files,
+    alternate-destination lookups, merge files read during the transfer and
+    entries selected from a [`--files-from`](#opt) list. Such a path is refused
+    if it resolves outside DIR, even when its symlinks are owned by root or the
+    running user. Explicit source arguments still select their own transfer roots.
 
-    DIR must be absolute.  Nothing is confined by default, and
-    `--confine-root=/` is a no-op.
+    Files opened locally before the transfer, such as log files, password files,
+    batch files and file lists, are checked for symlink ownership but may reside
+    outside DIR. A local `--files-from` list can therefore live outside DIR even
+    when the paths read from it are confined.
 
-    It exists for a wrapper that serves a restricted directory over a remote
-    shell, `rrsync` being the one shipped here, which passes it automatically
-    whenever its restricted dir is not "`/`".  Such a wrapper can vet the argv
-    it is handed, but filter rules travel over the protocol instead: a client
-    can name a merge file outside the restricted dir in a dir-merge rule and
-    have the server read it in as filter rules.  On a pull that needs neither
-    `--delete` nor any verbosity, because an exclude-only merge (the "`-`"
-    modifier) makes every line a pattern, and the client reads the file's
-    contents off which of its own names went missing.  Confining the open is
-    what closes that; a merge file inside DIR keeps working as before.
+    DIR must be absolute. `--confine-root=/` adds no restriction.
+
+    Restricted-shell wrappers such as `rrsync` use this option to constrain
+    paths received over the protocol. `rrsync` sets DIR to its restricted
+    directory unless that directory is `/`.
 
     A daemon ignores this option -- its module directory is already the
     boundary, and the option arrives in a client-supplied argv, so honouring it
@@ -4680,6 +4731,9 @@ The original batch mode in rsync was based on "rsync+", but the latest
 version uses a new implementation.
 
 ## SYMBOLIC LINKS
+
+This section describes symlink entries in the transfer. Symlink components in
+operator-supplied paths are handled separately; see [`--insecure-links`](#opt).
 
 Three basic behaviors are possible when rsync encounters a symbolic
 link in the source directory.
