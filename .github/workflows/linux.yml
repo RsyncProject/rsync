@@ -125,6 +125,13 @@ jobs:
           test "$VERSION_ID" = "${{ matrix.release }}"
           test "$(uname -m)" = "${{ matrix.machine }}"
           ./rsync --version
+      - name: Installed TLS check
+        if: matrix.release == '24.04' && matrix.arch == 'amd64'
+        run: |
+          python3 testsuite/tools/check-rsync-ssl.py \
+            --rsync /usr/local/bin/rsync \
+            --rsync-ssl /usr/local/bin/rsync-ssl \
+            --openssl /usr/bin/openssl
       - name: Tests (root pipe)
         run: sudo sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,root,${{ matrix.profiles }}" "$RUNNER_TEMP/rsync-checks/root-pipe" -j8
       - name: Tests (protocol 30)
@@ -137,8 +144,6 @@ jobs:
         run: sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,nonroot,${{ matrix.profiles }}" "$RUNNER_TEMP/rsync-checks/nonroot-pipe" -j8
       - name: Tests (non-root TCP)
         run: sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "nonroot,${{ matrix.profiles }}" "$RUNNER_TEMP/rsync-checks/nonroot-tcp" --use-tcp --daemon-tests-only -j8
-      - name: TLS listing (optional)
-        run: rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
       - name: Upload binaries
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -205,8 +210,6 @@ jobs:
         run: RSYNC_TEST_PROFILES=pipe,non-asan,root,self-peer,linux,no-zstd-threads,no-userns make check
       - name: Tests (root TCP)
         run: RSYNC_TEST_PROFILES=non-asan,root,self-peer,linux,no-zstd-threads,no-userns ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp --daemon-tests-only -j 8
-      - name: TLS listing (optional)
-        run: ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
       - name: Upload binaries
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

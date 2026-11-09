@@ -53,6 +53,3 @@ runs:
       if: ${{ !cancelled() && steps.build.outcome == 'success' }}
       shell: bash -e {0}
       run: sudo sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "non-asan,root,self-peer,macos" "$RUNNER_TEMP/rsync-checks/root-tcp" --use-tcp --daemon-tests-only -j8
-    - name: TLS listing (optional)
-      shell: bash -e {0}
-      run: /usr/local/bin/rsync-ssl --no-motd download.samba.org::rsyncftp/ || true

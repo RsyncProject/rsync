@@ -91,7 +91,6 @@ jobs:
               sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "nonroot,$profiles" "$PWD/test-results/nonroot/tcp" --use-tcp --daemon-tests-only -j8 || status=1
               exit "$status"
             ' || status=1
-            ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
             exit "$status"
       - name: Check result
         run: test "$(cat test-results/status)" = 0
@@ -182,7 +181,6 @@ jobs:
               sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "nonroot,$profiles" "$PWD/test-results/nonroot/tcp" --use-tcp --daemon-tests-only -j8 || status=1
               exit "$status"
             ' || status=1
-            ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
             exit "$status"
       - name: Check result
         run: test "$(cat test-results/status)" = 0
@@ -280,7 +278,6 @@ jobs:
               sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "nonroot,$profiles" "$PWD/test-results/nonroot/tcp" --use-tcp --daemon-tests-only -j2 || status=1
               exit "$status"
             ' || status=1
-            ./rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
             exit "$status"
       - name: Check result
         run: test "$(cat test-results/status)" = 0

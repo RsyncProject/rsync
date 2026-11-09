@@ -70,6 +70,3 @@ runs:
     - name: Tests (non-root TCP)
       shell: pwsh
       run: bash -c 'RSYNC_TEST_PROFILES=non-asan,nonroot,self-peer,cygwin ./testsuite/runtests.py --rsync-bin=`pwd`/rsync.exe --use-tcp --daemon-tests-only -j 8'
-    - name: TLS listing (optional)
-      shell: pwsh
-      run: bash -c 'PATH="/usr/local/bin:$PATH" rsync-ssl --no-motd download.samba.org::rsyncftp/ || true'

@@ -69,6 +69,8 @@ Each matrix entry checks its OS release and architecture and has separate artefa
 
 Alpine uses pinned official musl images. Its AMD64 and x86 jobs build and execute the same root and non-root pipe and TCP passes as Ubuntu, including protocol 29 and 30. The x86 job also verifies a 32-bit process with 64-bit file offsets.
 
+Ubuntu 24.04 AMD64 checks the installed `rsync` and `rsync-ssl` against a local TLS daemon. The fixture accepts a trusted certificate, rejects an unknown CA and a hostname mismatch and checks the hostname-only and full-verification opt-outs. It does not contact a public rsync service.
+
 Ubuntu, macOS and the BSD guests have separate root and non-root pipe and TCP passes. Each pass retains its receipt and log. macOS, FreeBSD and OpenBSD also check the built binary's required features with testsuite/tools/check-features.py, using capability and algorithm names from `rsync -VV`.
 
 FreeBSD guests provide a bounded tmpfs through RSYNC_TEST_TMP for cross-device tests. Directory inheritance is checked against native filesystem operations. Ubuntu jobs enable fs.protected_regular before testing.
