@@ -8,7 +8,9 @@ import sys
 import tempfile
 from pathlib import Path
 
-from harness.rsync import makepath, rmtree, rsync_argv, test_fail, test_skipped
+from harness.filesystem import makepath, rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(features={'user_namespace'}, transports={'pipe'})

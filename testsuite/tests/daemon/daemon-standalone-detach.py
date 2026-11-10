@@ -9,10 +9,12 @@ import subprocess
 import time
 
 from harness.daemon_config import write_daemon_conf
-from harness.rsync import (
-    FROMDIR, RSYNC_PEER, SCRATCHDIR, claim_ports, make_tree, makepath, require_tcp, rmtree,
-    rsync_argv, split_rsync_cmd, test_fail, test_skipped,
-)
+from harness.daemon import claim_ports, require_tcp
+from harness.environment import FROMDIR, RSYNC_PEER, SCRATCHDIR
+from harness.filesystem import make_tree, makepath, rmtree
+from harness.process import split_rsync_cmd
+from harness.results import test_fail, test_skipped
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(features={'posix_detach', 'tcp'}, transports={'tcp'})

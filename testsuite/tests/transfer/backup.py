@@ -4,10 +4,11 @@ import re
 import shutil
 import subprocess
 
-from harness.rsync import (
-    CHKDIR, FROMDIR, OUTFILE, SRCDIR, TMPDIR, TODIR,
-    checkit, cp_touch, makepath, rsync_argv, test_fail, verify_dirs,
-)
+from harness.comparison import checkit, verify_dirs
+from harness.environment import CHKDIR, FROMDIR, OUTFILE, SRCDIR, TMPDIR, TODIR
+from harness.filesystem import cp_touch, makepath
+from harness.results import test_fail
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(transports={'pipe'})

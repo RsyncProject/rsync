@@ -4,11 +4,11 @@ import os
 import platform
 import subprocess
 
-from harness.rsync import (
-    SCRATCHDIR, FROMDIR,
-    acls_supported, makepath, rmtree, rsync_argv,
-    test_fail, test_skipped, xattrs_supported,
-)
+from harness.environment import FROMDIR, SCRATCHDIR
+from harness.filesystem import acls_supported, makepath, rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import rsync_argv
+from harness.xattrs import is_supported as xattrs_supported
 from harness import metadata
 
 metadata(features={'acl', 'linux_xattr', 'xattr'}, transports={'pipe'})

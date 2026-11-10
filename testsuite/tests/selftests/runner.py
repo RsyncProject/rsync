@@ -7,9 +7,12 @@ import sys
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from harness import runner
-from harness import Exit, TestContext, parse_peer_banner, requires, run, test_name
-from harness.rsync import rsync_command_binary, test_fail
+from harness import config, runner
+from harness import Exit, TestContext, requires, run
+from harness.metadata import test_name
+from harness.profile import parse_peer_banner
+from harness.results import test_fail
+from harness.rsync import rsync_command_binary
 
 @requires(features={'remote-shell'}, transports={'pipe'}, mutates={'filesystem', 'process'}, tags={'harness'})
 def test(context: TestContext):
@@ -34,29 +37,29 @@ def test(context: TestContext):
     commands = context.scratch / 'acl-tools'
     commands.mkdir()
     command = commands / 'setfacl'
-    command.write_text('#!/bin/sh\nexit 0\n')
+    command.write_text(f'#!{sys.executable}\nraise SystemExit(0)\n')
     command.chmod(0o755)
     blocked.chmod(0)
     try:
         with patch.dict(os.environ, {'PATH': str(blocked) + os.pathsep + str(commands)}):
-            if runner.find_setfacl_nodef(str(context.scratch)) != ['setfacl', '-k']:
+            if config.find_setfacl_nodef(str(context.scratch)) != ['setfacl', '-k']:
                 test_fail('an inaccessible PATH entry prevented ACL tool discovery')
     finally:
         blocked.chmod(0o755)
     with patch.object(runner.shutil, 'which', return_value=str(command)):
         with patch.object(runner.subprocess, 'run', side_effect=PermissionError('blocked executable')):
             try:
-                runner.find_setfacl_nodef(str(context.scratch))
+                config.find_setfacl_nodef(str(context.scratch))
             except PermissionError:
                 pass
             else:
                 test_fail('an execution failure was treated as a missing ACL tool')
 
-    tests = runner.collect_tests(str(context.repository / 'testsuite'), [])
+    tests = config.collect_tests(str(context.repository / 'testsuite'), [])
     for names in ('', 'linux'):
         args = SimpleNamespace(profiles=names, protocol=None, use_tcp=False)
         with patch.dict('os.environ', {'RSYNC_TEST_UNSUPPORTED': 'fixture'}):
-            configured = runner.configure_profiles(
+            configured = config.configure_profiles(
                 args, str(context.repository / 'testsuite'), str(context.repository),
                 tests, tests, '', '')
         if 'fixture' in configured[4]:
@@ -67,7 +70,7 @@ def test(context: TestContext):
     tcp_test = next(path for path in tests if test_name(path) == 'daemon-access-hostname')
     ordinary_test = next(path for path in tests if test_name(path) == 'runner')
     args = SimpleNamespace(profiles=str(n_a_profile), protocol=None, use_tcp=False)
-    configured = runner.configure_profiles(
+    configured = config.configure_profiles(
         args, str(context.repository / 'testsuite'), str(context.repository),
         tests, [tcp_test, ordinary_test], '', '')
     if configured[0] != [ordinary_test] or configured[7] != [{
@@ -79,7 +82,7 @@ def test(context: TestContext):
         'xfail': {'daemon-access-hostname': 'issue-1'},
     }))
     try:
-        runner.configure_profiles(
+        config.configure_profiles(
             args, str(context.repository / 'testsuite'), str(context.repository),
             tests, [tcp_test, ordinary_test], '', '')
     except ValueError:
@@ -92,7 +95,7 @@ def test(context: TestContext):
             valid = names == 'linux' or names == ('root' if uid == 0 else 'nonroot')
             with patch.object(runner.os, 'geteuid', return_value=uid):
                 try:
-                    configured = runner.configure_profiles(args, str(context.repository / 'testsuite'),
+                    configured = config.configure_profiles(args, str(context.repository / 'testsuite'),
                                                            str(context.repository), tests, tests, '', '')
                 except ValueError:
                     if valid:
@@ -107,12 +110,12 @@ def test(context: TestContext):
                             test_name(path) for path in configured[0]}:
                         test_fail('non-root profile dropped fake-super metadata coverage')
     try:
-        runner.collect_tests(str(context.repository / 'testsuite'), ['missing-test'])
+        config.collect_tests(str(context.repository / 'testsuite'), ['missing-test'])
     except ValueError:
         pass
     else:
         test_fail('an unmatched explicit test selector was accepted')
-    daemon, independent = runner.select_daemon_tests(tests)
+    daemon, independent = config.select_daemon_tests(tests)
     daemon = {test_name(path) for path in daemon}
     independent = {test_name(path) for path in independent}
     if not {'daemon-auth', 'idn', 'protocol-refusals', 'inplace-checksum-bounds', 'daemon-access-hostname'} <= daemon:
@@ -127,7 +130,7 @@ def test(context: TestContext):
     target.write_text(daemon_call)
     alias.write_text(target.name)
     option.write_text("from harness import metadata\nmetadata(transports={'tcp'})\nargs = ['--" + "daemon']\n")
-    selected, _ = runner.select_daemon_tests([str(alias), str(option)])
+    selected, _ = config.select_daemon_tests([str(alias), str(option)])
     if selected != [str(alias), str(option)]:
         test_fail('daemon test selection missed an alias or option')
 
@@ -135,7 +138,7 @@ def test(context: TestContext):
     tcp_only = context.scratch / 'tcp-only.py'
     pipe_only.write_text("from harness import metadata\nmetadata(transports={'pipe'})\n" + daemon_call)
     tcp_only.write_text("from harness import metadata\nmetadata(transports={'tcp'}, tags={'daemon'})\n")
-    selected, dropped = runner.select_daemon_tests([str(pipe_only), str(tcp_only)])
+    selected, dropped = config.select_daemon_tests([str(pipe_only), str(tcp_only)])
     if selected != [str(tcp_only)] or dropped != [str(pipe_only)]:
         test_fail('daemon test selection ignored transport metadata')
 
@@ -158,7 +161,7 @@ def test(context: TestContext):
     wrong_peer.write_text('different executable\n')
     self_args = SimpleNamespace(profiles='self-peer', protocol=None, use_tcp=False)
     try:
-        runner.configure_profiles(self_args, str(context.repository / 'testsuite'), str(context.repository),
+        config.configure_profiles(self_args, str(context.repository / 'testsuite'), str(context.repository),
                                   tests, [ordinary_test], binary, str(wrong_peer))
     except ValueError:
         pass
@@ -169,16 +172,16 @@ def test(context: TestContext):
     directory.mkdir(parents=True)
     archived = directory / 'rsync_3.2.7'
     executed = context.scratch / 'archive-executed'
-    archived.write_text(f'#!/bin/sh\ntouch "{executed}"\n'
-                         "printf 'rsync  version 3.2.7  protocol version 31\\n'\n")
+    archived.write_text(f'#!{sys.executable}\nfrom pathlib import Path\nPath({str(executed)!r}).touch()\n'
+                        'print("rsync  version 3.2.7  protocol version 31")\n')
     archived.chmod(0o755)
     record = {'source': 'a' * 40, 'protocol': 31, 'sha256': runner.file_digest(archived),
               'recipe': 'b' * 64, 'compiler': 'test compiler', 'target': 'test target', 'libc': 'test libc'}
     (directory / 'binaries.json').write_text(json.dumps({archived.name: record}))
     archived.write_text(archived.read_text() + '# changed\n')
     try:
-        runner.validate_run_paths(str(context.tools), str(archive), binary, str(archived))
-        runner.binary_identity(str(archived))
+        config.validate_run_paths(str(context.tools), str(archive), binary, str(archived))
+        config.binary_identity(str(archived))
     except ValueError:
         pass
     else:
@@ -189,8 +192,8 @@ def test(context: TestContext):
     (directory / 'binaries.json').write_text(json.dumps({archived.name: record}))
     with patch.object(runner.subprocess, 'check_output', return_value='b' * 40):
         try:
-            runner.validate_run_paths(str(context.tools), str(archive), binary, str(archived))
-            runner.binary_identity(str(archived))
+            config.validate_run_paths(str(context.tools), str(archive), binary, str(archived))
+            config.binary_identity(str(archived))
         except ValueError:
             pass
         else:
@@ -198,7 +201,7 @@ def test(context: TestContext):
     if executed.exists():
         test_fail('an archived peer ran before its source was checked')
     with patch.object(runner.subprocess, 'check_output', return_value='a' * 40):
-        runner.validate_run_paths(str(context.tools), str(archive), binary, str(archived))
+        config.validate_run_paths(str(context.tools), str(archive), binary, str(archived))
     if not executed.is_file():
         test_fail('a qualified archived peer was not checked')
     executed.unlink()
@@ -206,7 +209,7 @@ def test(context: TestContext):
     (directory / 'binaries.json').write_text(json.dumps({archived.name: record}))
     with patch.object(runner.subprocess, 'check_output', return_value='a' * 40):
         try:
-            runner.validate_run_paths(str(context.tools), str(archive), binary, str(archived))
+            config.validate_run_paths(str(context.tools), str(archive), binary, str(archived))
         except ValueError:
             pass
         else:
@@ -220,8 +223,8 @@ def test(context: TestContext):
     for primary, peer in ((binary, str(archived)), (str(archived), binary)):
         with patch.object(runner.subprocess, 'check_output', return_value='a' * 40):
             try:
-                runner.validate_run_paths(str(context.tools), str(archive), primary, peer)
-                runner.binary_identity(str(archived))
+                config.validate_run_paths(str(context.tools), str(archive), primary, peer)
+                config.binary_identity(str(archived))
             except ValueError:
                 pass
             else:

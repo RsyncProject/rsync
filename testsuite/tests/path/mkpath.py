@@ -5,10 +5,10 @@ import os
 import shutil
 from pathlib import Path
 
-from harness.rsync import (
-    FROMDIR, SRCDIR, TMPDIR, TODIR,
-    makepath, rmtree, run_rsync, test_fail,
-)
+from harness.environment import FROMDIR, SRCDIR, TMPDIR, TODIR
+from harness.filesystem import makepath, rmtree
+from harness.results import test_fail
+from harness.rsync import run_rsync
 from harness import metadata
 
 metadata(transports={'pipe'})

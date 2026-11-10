@@ -4,7 +4,9 @@ import os
 import shutil
 import subprocess
 
-from harness.rsync import SCRATCHDIR, patched_rrsync, test_fail, test_skipped
+from fixtures.rrsync import patched_rrsync
+from harness.environment import SCRATCHDIR
+from harness.results import test_fail, test_skipped
 from harness import metadata
 
 metadata(transports={'pipe'})

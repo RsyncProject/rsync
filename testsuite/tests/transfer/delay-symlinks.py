@@ -19,12 +19,11 @@ import sys
 import time
 
 from harness import metadata
-from harness.rsync import (
-    FROMDIR, SCRATCHDIR, TODIR,
-    assert_is_symlink, assert_same, checkit, forced_protocol, make_data_file,
-    rmtree, rsh_cmd, rsync_argv, rsync_path_arg, run_rsync, test_fail,
-    test_skipped,
-)
+from harness.comparison import checkit
+from harness.environment import FROMDIR, SCRATCHDIR, TODIR
+from harness.filesystem import assert_is_symlink, assert_same, make_data_file, rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import forced_protocol, rsh_cmd, rsync_argv, rsync_path_arg, run_rsync
 
 metadata(protocols={29, 30, 31, 32, 33}, transports={'pipe', 'tcp'}, min_peer='3.5.2', tags={'version-mix'})
 

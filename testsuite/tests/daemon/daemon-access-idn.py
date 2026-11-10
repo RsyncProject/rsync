@@ -4,11 +4,11 @@ import re
 import subprocess
 
 from harness.daemon import probe_module
-from harness.rsync import (
-    FROMDIR, SCRATCHDIR,
-    claim_ports, make_tree, require_tcp, rmtree, rsync_argv, start_rsyncd,
-    start_test_daemon, test_fail, test_skipped,
-)
+from harness.daemon import claim_ports, require_tcp, start_rsyncd, start_test_daemon
+from harness.environment import FROMDIR, SCRATCHDIR
+from harness.filesystem import make_tree, rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(features={'idn', 'tcp'}, transports={'tcp'})

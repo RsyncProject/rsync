@@ -6,19 +6,13 @@ import shlex
 import shutil
 import subprocess
 
-from harness import rsync
-from harness.rsync import (
-    FROMDIR,
-    RSYNC_PEER,
-    TODIR,
-    checkit,
-    hands_setup,
-    runtest,
-    test_skipped,
-    rsync_path_arg,
-    rsh_cmd,
-    split_rsync_cmd,
-)
+from harness import environment
+from fixtures.trees import hands_setup
+from harness.comparison import checkit
+from harness.environment import FROMDIR, TODIR
+from harness.process import split_rsync_cmd
+from harness.results import test_skipped
+from harness.rsync import rsh_cmd, rsync_path_arg, runtest
 from harness import metadata
 
 metadata(features={'remote-shell'}, transports={'pipe', 'tcp'}, min_peer='2.6.0', mutates={'environment', 'filesystem', 'process'}, tags={'compatibility', 'transfer', 'version-mix'})
@@ -41,13 +35,13 @@ if probe.stdout.strip() != 'yes':
 
 print(f"Using remote shell: {SSH}")
 
-listing_args = shlex.split(rsync.TLS_ARGS)
+listing_args = shlex.split(environment.TLS_ARGS)
 compare_link_times = any(arg in ('-l', '--link-times') for arg in listing_args)
 if compare_link_times:
-    banner = subprocess.check_output(split_rsync_cmd(RSYNC_PEER) + ['--version'], text=True, timeout=10)
+    banner = subprocess.check_output(split_rsync_cmd(environment.RSYNC_PEER) + ['--version'], text=True, timeout=10)
     compare_link_times = re.search(r'(?<!no )\bsymtimes\b', ' '.join(banner.split())) is not None
     if not compare_link_times:
-        rsync.TLS_ARGS = shlex.join(arg for arg in listing_args if arg not in ('-l', '--link-times'))
+        environment.TLS_ARGS = shlex.join(arg for arg in listing_args if arg not in ('-l', '--link-times'))
 hands_setup()
 if compare_link_times:
     os.utime(FROMDIR / 'nolf-symlink', (1_000_000_000, 1_000_000_000), follow_symlinks=False)

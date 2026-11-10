@@ -3,7 +3,9 @@
 import os
 
 from harness import metadata
-from harness.rsync import FROMDIR, TODIR, checkit, test_skipped
+from harness.comparison import checkit
+from harness.environment import FROMDIR, TODIR
+from harness.results import test_skipped
 
 metadata(features={'ownership'}, transports={'pipe'})
 

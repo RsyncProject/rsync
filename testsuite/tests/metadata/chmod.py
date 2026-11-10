@@ -2,7 +2,10 @@
 
 import os
 
-from harness.rsync import FROMDIR, TODIR, checkit, hands_setup, set_supported_mode
+from fixtures.trees import hands_setup
+from harness.comparison import checkit
+from harness.environment import FROMDIR, TODIR
+from harness.filesystem import set_supported_mode
 from harness import metadata
 
 metadata(transports={'pipe'})

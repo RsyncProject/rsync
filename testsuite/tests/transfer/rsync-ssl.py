@@ -4,8 +4,11 @@ import os
 import re
 import shlex
 import subprocess
+import sys
 
-from harness.rsync import SCRATCHDIR, SRCDIR, rmtree, test_fail
+from harness.environment import SCRATCHDIR, SRCDIR
+from harness.filesystem import rmtree
+from harness.results import test_fail
 from harness import metadata
 
 metadata(transports={'pipe', 'tcp'})
@@ -30,7 +33,8 @@ openssl_dir.mkdir()
 openssl_args = openssl_dir / 'args'
 fake_openssl = executable(
     openssl_dir / 'openssl',
-    f"#!/bin/sh\nprintf '%s\\n' \"$@\" > {shlex.quote(str(openssl_args))}\n",
+    f'#!{sys.executable}\nimport sys\nfrom pathlib import Path\n'
+    f'Path({str(openssl_args)!r}).write_text("".join(arg + "\\n" for arg in sys.argv[1:]))\n',
 )
 ca = openssl_dir / 'ca.pem'
 ca.write_text('dummy-ca\n')
@@ -124,8 +128,9 @@ rsync_args = type_dir / 'args'
 ssl_type = type_dir / 'type'
 executable(
     fake_bin / 'rsync',
-    f"#!/bin/sh\nprintf '%s\\n' \"$@\" > {shlex.quote(str(rsync_args))}\n"
-    f"printf '%s\\n' \"${{RSYNC_SSL_TYPE-UNSET}}\" > {shlex.quote(str(ssl_type))}\n",
+    f'#!{sys.executable}\nimport os, sys\nfrom pathlib import Path\n'
+    f'Path({str(rsync_args)!r}).write_text("".join(arg + "\\n" for arg in sys.argv[1:]))\n'
+    f'Path({str(ssl_type)!r}).write_text(os.environ.get("RSYNC_SSL_TYPE", "UNSET") + "\\n")\n',
 )
 type_env = {**os.environ, 'PATH': str(fake_bin) + os.pathsep + os.environ.get('PATH', '')}
 for name in ('RSYNC_SSL_TYPE', 'RSYNC_SSL_OPENSSL', 'RSYNC_SSL_STUNNEL'):

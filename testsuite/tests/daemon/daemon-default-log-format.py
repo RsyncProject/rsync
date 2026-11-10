@@ -2,8 +2,11 @@
 
 from harness import metadata
 from harness.daemon_config import write_daemon_conf
-from harness.rsync import (FROMDIR, SCRATCHDIR, TODIR, assert_same, run_rsync,
-                          start_test_daemon, test_fail)
+from harness.daemon import start_test_daemon
+from harness.environment import FROMDIR, SCRATCHDIR, TODIR
+from harness.filesystem import assert_same
+from harness.results import test_fail
+from harness.rsync import run_rsync
 
 metadata(features={'daemon'}, transports={'pipe'}, min_peer='2.6.0', tags={'configuration', 'daemon', 'version-mix'})
 

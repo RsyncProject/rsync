@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 
-from harness.rsync import SCRATCHDIR, makepath, rmtree, run_rsync, test_fail
+from harness.environment import SCRATCHDIR
+from harness.filesystem import makepath, rmtree
+from harness.results import test_fail
+from harness.rsync import run_rsync
 from harness import metadata
 
 metadata(transports={'pipe'})

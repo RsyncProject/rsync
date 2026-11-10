@@ -7,10 +7,11 @@ import pwd
 import subprocess
 
 from harness.daemon_config import write_daemon_conf
-from harness.rsync import (
-    FROMDIR, SCRATCHDIR, make_tree, makepath, owners_supported, rmtree, rsync_argv,
-    start_test_daemon, test_fail, test_skipped, write_text_file,
-)
+from harness.daemon import start_test_daemon
+from harness.environment import FROMDIR, SCRATCHDIR
+from harness.filesystem import make_tree, makepath, owners_supported, rmtree, write_text_file
+from harness.results import test_fail, test_skipped
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(features={'group_auth'}, transports={'pipe', 'tcp'})

@@ -6,10 +6,11 @@ import subprocess
 
 from harness import metadata
 from harness.daemon_config import write_daemon_conf
-from harness.rsync import (
-    SCRATCHDIR, makepath, rmtree, rsync_argv, start_test_daemon,
-    test_fail,
-)
+from harness.daemon import start_test_daemon
+from harness.environment import SCRATCHDIR
+from harness.filesystem import makepath, rmtree
+from harness.results import test_fail
+from harness.rsync import rsync_argv
 
 metadata(protocols={27, 28, 29, 30, 31, 32, 33}, transports={'pipe', 'tcp'}, min_peer='2.6.0', tags={'version-mix'})
 

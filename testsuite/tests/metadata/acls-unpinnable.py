@@ -4,10 +4,10 @@ import os
 import platform
 import shutil
 
-from harness.rsync import (
-    SCRATCHDIR, acl_get, acl_set, forced_protocol, rmtree, run_rsync,
-    test_fail, test_skipped,
-)
+from harness.environment import SCRATCHDIR
+from harness.filesystem import acl_get, acl_set, rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import forced_protocol, run_rsync
 from harness import metadata
 
 metadata(features={'linux_acl', 'protocol_30'}, transports={'pipe'})

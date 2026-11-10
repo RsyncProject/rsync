@@ -2,10 +2,11 @@
 
 import os
 
-from harness.rsync import (
-    SCRATCHDIR, get_rootgid, get_rootuid, get_testuid, makepath, rmtree,
-    run_rsync, start_test_daemon, test_fail,
-)
+from harness.daemon import start_test_daemon
+from harness.environment import SCRATCHDIR
+from harness.filesystem import makepath, rmtree
+from harness.results import test_fail
+from harness.rsync import run_rsync
 from harness import metadata
 
 metadata(transports={'pipe', 'tcp'})
@@ -29,8 +30,8 @@ os.symlink(MARKER, outside / 'xfil_link')
 (outside / 'xfil_dir' / 'inner').write_text("x\n")
 (outside / 'xfil_file').write_text("x\n")
 
-root = get_testuid() == get_rootuid()
-ids = f"uid = {get_rootuid()}\ngid = {get_rootgid()}" if root else ""
+root = os.getuid() == 0
+ids = f"uid = {0}\ngid = {0}" if root else ""
 
 conf = base / 'daemon-scan.conf'
 conf.write_text(f"""\

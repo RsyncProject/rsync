@@ -7,7 +7,10 @@ import subprocess
 import sys
 
 from harness import protocol as rp
-from harness.rsync import SCRATCHDIR, makepath, rmtree, rsync_argv, test_fail, test_skipped
+from harness.environment import SCRATCHDIR
+from harness.filesystem import makepath, rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(features={'nonroot'}, transports={'pipe'})

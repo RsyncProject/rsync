@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 
 from harness.daemon_config import write_daemon_conf
-from harness.rsync import (
-    SCRATCHDIR, checkit, make_tree, rmtree, start_test_daemon, test_fail, test_skipped,
-    walk_files,
-)
+from harness.comparison import checkit
+from harness.daemon import start_test_daemon
+from harness.environment import SCRATCHDIR
+from harness.filesystem import make_tree, rmtree, walk_files
+from harness.results import test_fail, test_skipped
 from harness import metadata
 
 metadata(transports={'pipe', 'tcp'})

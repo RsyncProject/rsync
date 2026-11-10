@@ -3,11 +3,11 @@
 import os
 import sys
 
-from harness.rsync import (
-    FROMDIR, TODIR,
-    make_tree, rmtree, run_rsync, test_fail, test_skipped,
-    walk_dirs, walk_files, xattr_dump, xattr_set, xattrs_supported,
-)
+from harness.environment import FROMDIR, TODIR
+from harness.filesystem import make_tree, rmtree, walk_dirs, walk_files
+from harness.results import test_fail, test_skipped
+from harness.rsync import run_rsync
+from harness.xattrs import dump_values as xattr_dump, set_value as xattr_set, is_supported as xattrs_supported
 from harness import metadata
 
 metadata(features={'xattr_runtime'}, transports={'pipe'})

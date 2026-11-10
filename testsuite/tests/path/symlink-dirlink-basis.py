@@ -4,15 +4,10 @@ import filecmp
 import os
 import subprocess
 
-from harness.rsync import (
-    SCRATCHDIR,
-    TMPDIR,
-    make_data_file,
-    rsync_argv,
-    test_fail,
-    rsync_path_arg,
-    rsh_cmd,
-)
+from harness.environment import SCRATCHDIR, TMPDIR
+from harness.filesystem import make_data_file
+from harness.results import test_fail
+from harness.rsync import rsh_cmd, rsync_argv, rsync_path_arg
 from harness import metadata
 
 metadata(features={'remote-shell', 'symlink'}, transports={'pipe', 'tcp'}, min_peer='2.6.3', mutates={'filesystem', 'process'}, tags={'compatibility', 'security', 'transfer', 'version-mix'})

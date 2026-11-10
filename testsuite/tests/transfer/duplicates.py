@@ -3,10 +3,10 @@
 import os
 import subprocess
 
-from harness.rsync import (
-    FROMDIR, TODIR,
-    rsync_argv, rsync_ls_lR, test_fail,
-)
+from harness.comparison import rsync_ls_lR
+from harness.environment import FROMDIR, TODIR
+from harness.results import test_fail
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(transports={'pipe'})

@@ -5,7 +5,6 @@ import re
 import shlex
 import subprocess
 import sys
-
 from .results import test_fail
 
 def file_digest(path):
@@ -102,3 +101,13 @@ def process_thread_count(pid: int) -> int:
         match = re.search(r'^Threads:\s+(\d+)', status, re.M)
         return int(match.group(1)) if match else 0
     return -1
+
+def expect_fail(argv, text, env=None, cwd=None):
+    proc = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          text=True, env=env, cwd=cwd)
+    out = (proc.stdout or '') + (proc.stderr or '')
+    if proc.returncode == 0:
+        test_fail(f"command unexpectedly succeeded: {argv!r}\n{out}")
+    if text not in out:
+        test_fail(f"expected {text!r} in command output:\n{out}")
+    return proc

@@ -6,9 +6,11 @@ import subprocess
 import time
 
 from harness.mutation import race_budget
-from harness.rsync import (
-    SCRATCHDIR, rmtree, rsync_argv, test_fail, test_skipped, xattr_set, xattrs_supported,
-)
+from harness.environment import SCRATCHDIR
+from harness.filesystem import rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import rsync_argv
+from harness.xattrs import set_value as xattr_set, is_supported as xattrs_supported
 from harness import metadata
 
 metadata(features={'linux_xattr', 'xattr'}, transports={'pipe'})

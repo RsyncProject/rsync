@@ -3,8 +3,11 @@
 import os
 import subprocess
 
-from harness.rsync import (FROMDIR, SCRATCHDIR, TODIR, TOOLDIR, checkit, hands_setup,
-                      set_supported_mode, test_skipped)
+from fixtures.trees import hands_setup
+from harness.comparison import checkit
+from harness.environment import FROMDIR, SCRATCHDIR, TODIR, TOOLDIR
+from harness.filesystem import set_supported_mode
+from harness.results import test_skipped
 from harness import metadata
 
 metadata(features={'cross_device'}, transports={'pipe'})

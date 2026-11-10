@@ -2,9 +2,10 @@
 
 import json
 
-from harness import (TestContext, applies_to_peer, discover_tests, load_profile, merge_profiles,
-                     parse_peer_banner, read_requirements, requires, run, test_name)
-from harness.rsync import test_fail
+from harness import TestContext, requires, run
+from harness.metadata import applies_to_peer, discover_tests, read_requirements, test_name
+from harness.profile import load_profile, merge_profiles, parse_peer_banner
+from harness.results import test_fail
 from harness.process import file_digest
 from harness.profile import load_binaries
 

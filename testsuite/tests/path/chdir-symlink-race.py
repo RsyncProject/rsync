@@ -5,7 +5,11 @@ import os
 import shutil
 import subprocess
 
-from harness.rsync import SCRATCHDIR, make_data_file, rmtree, rsync_argv, start_test_daemon, test_fail
+from harness.daemon import start_test_daemon
+from harness.environment import SCRATCHDIR
+from harness.filesystem import make_data_file, rmtree
+from harness.results import test_fail
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(features={'daemon', 'symlink'}, transports={'pipe', 'tcp'}, min_peer='2.6.0', cost='expensive', mutates={'filesystem', 'process', 'socket'}, tags={'daemon', 'security', 'version-mix'})

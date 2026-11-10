@@ -1,10 +1,11 @@
 #!/usr/bin/python3
 
 import subprocess
-from harness.rsync import (
-    FROMDIR, SCRATCHDIR, forced_protocol, makepath, rmtree, run_rsync, rsync_argv,
-    test_fail, test_skipped, xattr_set, xattrs_supported,
-)
+from harness.environment import FROMDIR, SCRATCHDIR
+from harness.filesystem import makepath, rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import forced_protocol, rsync_argv, run_rsync
+from harness.xattrs import set_value as xattr_set, is_supported as xattrs_supported
 from harness import metadata
 
 metadata(features={'protocol_30', 'xattr_runtime'}, transports={'pipe'})

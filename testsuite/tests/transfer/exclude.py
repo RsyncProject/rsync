@@ -6,25 +6,11 @@ import subprocess
 import sys
 import time
 
-from harness.rsync import (
-    CHKDIR,
-    FROMDIR,
-    SCRATCHDIR,
-    TODIR,
-    all_plus,
-    allspace,
-    dots,
-    cp_touch,
-    checkdiff,
-    checkit,
-    makepath,
-    rsync_argv,
-    run_rsync,
-    test_fail,
-    verify_dirs,
-    rsync_path_arg,
-    rsh_cmd,
-)
+from harness.comparison import checkdiff, checkit, verify_dirs
+from harness.environment import CHKDIR, FROMDIR, SCRATCHDIR, TODIR, all_plus, allspace, dots
+from harness.filesystem import cp_touch, makepath
+from harness.results import test_fail
+from harness.rsync import rsh_cmd, rsync_argv, rsync_path_arg, run_rsync
 from harness import metadata
 
 metadata(features={'filters', 'remote-shell'}, transports={'pipe', 'tcp'}, min_peer='2.6.0', mutates={'environment', 'filesystem', 'process'}, tags={'compatibility', 'transfer', 'version-mix'})

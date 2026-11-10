@@ -4,9 +4,10 @@ import os
 import signal
 import subprocess
 
-from harness.rsync import (
-    SCRATCHDIR, build_patched_rsync, makepath, rmtree, test_fail,
-)
+from harness.environment import SCRATCHDIR
+from harness.filesystem import makepath, rmtree
+from harness.mutation import build_patched_rsync
+from harness.results import test_fail
 from harness import metadata
 
 metadata(features={'native_build'}, transports={'pipe'})

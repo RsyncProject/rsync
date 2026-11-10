@@ -2,7 +2,8 @@
 
 from unittest.mock import patch
 
-from harness import TestContext, requires, run, test_fail
+from harness import TestContext, requires, run
+from harness.results import test_fail
 from harness.daemon_config import build_rsyncd_conf, write_daemon_conf
 
 @requires(transports={'pipe'}, mutates={'filesystem'}, tags={'harness'})

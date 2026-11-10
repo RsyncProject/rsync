@@ -8,9 +8,11 @@ import sys
 import tempfile
 from pathlib import Path
 
+from harness.environment import SCRATCHDIR
+from harness.filesystem import rmtree
+from harness.results import test_fail, test_skipped
 from harness.rsync import (
-    SCRATCHDIR, forced_protocol, rmtree, rsync_argv, rsync_argv_for,
-    rsync_command_binary, run_rsync, test_fail, test_skipped, under_valgrind,
+    forced_protocol, rsync_argv, rsync_argv_for, rsync_command_binary, run_rsync, under_valgrind,
 )
 from harness import metadata
 

@@ -2,10 +2,12 @@
 
 import os
 from harness.daemon_config import write_daemon_conf
-from harness.rsync import (
-    SCRATCHDIR, forced_protocol, rmtree, run_rsync, start_test_daemon, test_fail,
-    test_skipped, xattr_get, xattr_set, xattrs_supported,
-)
+from harness.daemon import start_test_daemon
+from harness.environment import SCRATCHDIR
+from harness.filesystem import rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import forced_protocol, run_rsync
+from harness.xattrs import get_value as xattr_get, set_value as xattr_set, is_supported as xattrs_supported
 from harness import metadata
 
 metadata(features={'protocol_30', 'xattr_runtime'}, transports={'pipe', 'tcp'})

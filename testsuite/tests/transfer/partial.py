@@ -5,11 +5,10 @@ import signal
 import subprocess
 import time
 
-from harness.rsync import (
-    FROMDIR, SCRATCHDIR, TODIR,
-    assert_same, make_data_file, makepath, rmtree, rsync_argv, run_rsync,
-    test_fail,
-)
+from harness.environment import FROMDIR, SCRATCHDIR, TODIR
+from harness.filesystem import assert_same, make_data_file, makepath, rmtree
+from harness.results import test_fail
+from harness.rsync import rsync_argv, run_rsync
 from harness import metadata
 
 metadata(transports={'pipe'})

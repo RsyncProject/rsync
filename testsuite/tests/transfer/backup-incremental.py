@@ -2,10 +2,11 @@
 
 import os
 
-from harness.rsync import (
-    SCRATCHDIR, assert_not_exists, assert_trees_equal, make_data_file,
-    make_text_file, makepath, rmtree, run_rsync, test_fail,
-)
+from harness.comparison import assert_trees_equal
+from harness.environment import SCRATCHDIR
+from harness.filesystem import assert_not_exists, make_data_file, make_text_file, makepath, rmtree
+from harness.results import test_fail
+from harness.rsync import run_rsync
 from harness import metadata
 
 metadata(transports={'pipe'})

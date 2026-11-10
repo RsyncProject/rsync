@@ -5,10 +5,11 @@ import subprocess
 import time
 
 from harness.daemon_config import write_daemon_conf
-from harness.rsync import (
-    FROMDIR, SCRATCHDIR, make_tree, makepath, rmtree, rsync_argv, start_test_daemon, test_fail,
-    write_text_file,
-)
+from harness.daemon import start_test_daemon
+from harness.environment import FROMDIR, SCRATCHDIR
+from harness.filesystem import make_tree, makepath, rmtree, write_text_file
+from harness.results import test_fail
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(features={'daemon', 'exec-hooks'}, transports={'pipe', 'tcp'}, min_peer='2.6.6', mutates={'filesystem', 'process', 'socket'}, tags={'daemon', 'process', 'version-mix'})

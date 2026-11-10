@@ -23,10 +23,11 @@ if '--shell' in sys.argv:
     os.execve(wrapper, [wrapper, *flags, root], env)
 
 from harness import metadata
-from harness.rsync import (
-    RSYNC, SCRATCHDIR, forced_protocol, makepath, patched_rrsync, rmtree,
-    rsync_argv, rsync_path_arg, test_skipped,
-)
+from fixtures.rrsync import rsync_wrapper, patched_rrsync
+from harness.environment import RSYNC, SCRATCHDIR
+from harness.filesystem import makepath, rmtree
+from harness.results import test_skipped
+from harness.rsync import forced_protocol, rsync_argv, rsync_path_arg
 
 metadata(protocols={29, 30, 31, 32, 33}, transports={'pipe', 'tcp'}, min_peer='3.5.2', tags={'version-mix'})
 
@@ -45,8 +46,7 @@ os.symlink('target', src / 'link')
 # while rrsync hands its RSYNC to execlp() as a single executable name, so it
 # has to be wrapped before patched_rrsync() sees it.
 shim = base / 'rsync-shim'
-shim.write_text('#!/bin/sh\nexec ' + rsync_path_arg(RSYNC) + ' "$@"\n')
-shim.chmod(0o755)
+rsync_wrapper(shim)
 wrapper = patched_rrsync(base, rsync_path=str(shim))
 rsh = f'{shlex.quote(sys.executable)} {shlex.quote(os.path.abspath(__file__))} --shell'
 

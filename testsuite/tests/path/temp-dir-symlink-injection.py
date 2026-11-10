@@ -8,7 +8,10 @@ import filecmp
 import sys
 
 from harness.mutation import find_attacker_uid, race_budget
-from harness.rsync import SCRATCHDIR, rmtree, rsync_argv, test_fail, test_skipped
+from harness.environment import SCRATCHDIR
+from harness.filesystem import rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(features={'cross_uid'}, transports={'pipe'})

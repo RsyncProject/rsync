@@ -21,7 +21,7 @@ After the helpers are built, the runner accepts individual test names and shell 
 
 Direct runner invocations are serial unless given `-j`. Out-of-tree builds use the source path to runtests.py with `--srcdir`, `--tooldir` and `--rsync-bin`. Some mutation tests require the source directory to be configured too. The installcheck target tests the installed binary.
 
-The runner and tests use Python 3 and its standard library. Test subprocesses disable site packages with `-S`. POSIX shell handles portable build and invocation steps; rsync-ssl and checks using Bash features require Bash. CommonMark is a man-page build dependency. ACL and extended-attribute tests need the corresponding platform tools. Linux root permission tests require setpriv.
+The runner, tests and CI helpers use Python 3.9 or later and its standard library. Test subprocesses disable site packages with `-S`. Shell remains in package bootstrap, build commands and tests which exercise shell behaviour. CommonMark is a man-page build dependency. ACL and extended-attribute tests need the corresponding platform tools. Linux root permission tests require setpriv.
 
 Scratch data defaults to `testtmp/<name>/`. Failed tests retain their scratch directories. Root and non-root runs need separate scratch directories.
 
@@ -33,19 +33,19 @@ Historical binaries live in `old_versions/`. The runner's `--rsync-bin2` option 
 
 ## Writing a test
 
-Tests live under testsuite/tests in the build, daemon, harness, metadata, path, protocol, rrsync and transfer groups. Filenames describe the behaviour, use lowercase words separated by hyphens and must be unique across groups. Selectors, profiles and receipts use the filename without its `.py` ending. [COVERAGE.md](COVERAGE.md) lists the option and daemon-parameter assertions.
+Tests live under testsuite/tests in the build, daemon, metadata, path, protocol, rrsync, selftests and transfer groups. The selftests group checks the harness and its tools. Reusable support lives in testsuite/harness; fixture data and specialised fixture builders live in testsuite/fixtures. Filenames describe the behaviour, use lowercase words separated by hyphens and must be unique across groups. Selectors, profiles and receipts use the filename without its `.py` ending. [COVERAGE.md](COVERAGE.md) lists the option and daemon-parameter assertions.
 
 Bug fixes should include a regression which fails for the original bug. Assert the affected behaviour directly; a final source and destination comparison can miss ordering, confinement or reporting failures.
 
 Function-based tests use one `@requires(...)` decorator. Module tests use one top-level `metadata(...)` call. Declare required features, transports, protocols, peer versions, capabilities and tags. Declare any capability passed to `test_skipped()`. Use `require_tcp()` and `require_asan()` for those requirements. Security, compatibility and cost remain metadata rather than separate test groups.
 
-Use TestContext or the paths in harness.rsync for scratch data and `write_daemon_conf()` or `build_rsyncd_conf()` for ordinary daemon configurations. Tests must tolerate parallel execution and clean up their processes, sockets and temporary files. Do not write into the source tree or use sleeps to force ordering or timestamp changes.
+Use TestContext or the paths in harness.environment for scratch data and `write_daemon_conf()` or `build_rsyncd_conf()` for ordinary daemon configurations. Tests must tolerate parallel execution and clean up their processes, sockets and temporary files. Do not write into the source tree or use sleeps to force ordering or timestamp changes.
 
 ## Profiles and results
 
 Profiles compose by name through `--profiles`. Platform profiles describe permitted capability gaps; peer profiles record known version differences. The root and nonroot profiles must match the effective UID and cannot be combined. Peer runs select applicable tests from version-mix metadata.
 
-CI uses [tools/check.sh](tools/check.sh) to run composed profiles. It takes the build directory, binary, profile list and a fresh output directory, followed by runner options. Each run saves run.log, receipt.json and isolated scratch data. The recipe checks the receipt's results, executable identity and profiles before returning.
+CI invokes [tools/check.py](tools/check.py) with Python to run composed profiles. It takes the build directory, binary, profile list and a fresh output directory, followed by runner options. Each run saves run.log, receipt.json and isolated scratch data. The launcher checks the receipt's results, executable identity and profiles before returning.
 
 Label | Meaning
 --- | ---
@@ -71,7 +71,7 @@ Environment | Versions and architectures
 --- | ---
 Ubuntu | 22.04, 24.04 and 26.04 on AMD64 and ARM64
 AlmaLinux | 8 on AMD64
-Alpine | 3.24.4 on AMD64 and x86
+Alpine | 3.24.4 on AMD64 and X86-32
 FreeBSD | 14.5 and 15.1 on AMD64
 NetBSD | 10.2, 11.0 and 11.1 on AMD64
 OpenBSD | 7.9 and 8.0 on AMD64

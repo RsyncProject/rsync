@@ -7,10 +7,11 @@ import subprocess
 import time
 
 from harness.mutation import race_budget, start_path_flipper, stop_flipper
-from harness.rsync import (
-    SCRATCHDIR, acl_get, acl_set, forced_protocol, get_rootgid, get_rootuid, get_testuid,
-    rmtree, rsync_argv, run_rsync, start_test_daemon, test_fail, test_skipped,
-)
+from harness.daemon import start_test_daemon
+from harness.environment import SCRATCHDIR
+from harness.filesystem import acl_get, acl_set, rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import forced_protocol, rsync_argv, run_rsync
 from harness import metadata
 
 metadata(features={'linux_acl', 'protocol_30'}, transports={'pipe', 'tcp'})
@@ -60,9 +61,9 @@ if not acl_set(f'user:{MARKER_UID}:rwx', victim_src):
 
 os.symlink(str(priv), mod / '.evil')
 
-my_uid = get_testuid()
-root_uid = get_rootuid()
-root_gid = get_rootgid()
+my_uid = os.getuid()
+root_uid = 0
+root_gid = 0
 uid_line = f"uid = {root_uid}"
 gid_line = f"gid = {root_gid}"
 if my_uid != root_uid:

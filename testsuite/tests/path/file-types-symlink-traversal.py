@@ -4,22 +4,14 @@ import os
 import shlex
 import subprocess
 
-from harness.rsync import (
-    RSYNC,
-    RSYNC_PEER,
-    SCRATCHDIR,
-    make_variety_tree,
-    compare_trees,
-    rmtree,
-    xattrs_supported,
-    acls_supported,
-    devices_supported,
-    owners_supported,
-    test_skipped,
-    test_fail,
-    split_rsync_cmd,
-    rsh_cmd,
-)
+from fixtures.trees import make_variety_tree
+from harness.comparison import compare_trees
+from harness.environment import RSYNC, RSYNC_PEER, SCRATCHDIR
+from harness.filesystem import acls_supported, devices_supported, owners_supported, rmtree
+from harness.process import split_rsync_cmd
+from harness.results import test_fail, test_skipped
+from harness.rsync import rsh_cmd
+from harness.xattrs import is_supported as xattrs_supported
 from harness import metadata
 
 metadata(features={'remote-shell', 'symlink'}, transports={'pipe', 'tcp'}, min_peer='2.6.0', cost='expensive', mutates={'filesystem', 'process'}, tags={'compatibility', 'security', 'transfer', 'version-mix'})

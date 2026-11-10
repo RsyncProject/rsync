@@ -2,10 +2,10 @@
 
 import time
 
-from harness.rsync import (
-    SCRATCHDIR, claim_ports, makepath, require_tcp, rmtree, start_rsyncd,
-    test_fail,
-)
+from harness.daemon import claim_ports, require_tcp, start_rsyncd
+from harness.environment import SCRATCHDIR
+from harness.filesystem import makepath, rmtree
+from harness.results import test_fail
 from harness import protocol as rp
 from harness import metadata
 

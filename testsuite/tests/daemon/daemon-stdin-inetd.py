@@ -4,7 +4,11 @@ import socket
 import subprocess
 
 from harness.daemon_config import write_daemon_conf
-from harness.rsync import SCRATCHDIR, claim_free_port, rmtree, rsync_argv, test_fail
+from harness.daemon import claim_free_port
+from harness.environment import SCRATCHDIR
+from harness.filesystem import rmtree
+from harness.results import test_fail
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(transports={'pipe', 'tcp'})

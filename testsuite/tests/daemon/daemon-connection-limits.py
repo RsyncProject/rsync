@@ -4,9 +4,10 @@ import socket
 import time
 
 from harness.daemon_config import write_daemon_conf
-from harness.rsync import (
-    FROMDIR, RSYNC, SCRATCHDIR, claim_ports, make_tree, rmtree, start_rsyncd, test_fail,
-)
+from harness.daemon import claim_ports, start_rsyncd
+from harness.environment import FROMDIR, RSYNC, SCRATCHDIR
+from harness.filesystem import make_tree, rmtree
+from harness.results import test_fail
 from harness import metadata
 
 metadata(transports={'pipe', 'tcp'})

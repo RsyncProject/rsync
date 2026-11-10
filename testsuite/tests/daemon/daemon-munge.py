@@ -4,10 +4,11 @@ import os
 import subprocess
 
 from harness.daemon_config import write_daemon_conf
-from harness.rsync import (
-    FROMDIR, SCRATCHDIR, assert_is_symlink, make_tree, makepath, rmtree, rsync_argv,
-    start_test_daemon, test_fail,
-)
+from harness.daemon import start_test_daemon
+from harness.environment import FROMDIR, SCRATCHDIR
+from harness.filesystem import assert_is_symlink, make_tree, makepath, rmtree
+from harness.results import test_fail
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(features={'daemon', 'symlink'}, transports={'pipe', 'tcp'}, min_peer='3.0.0', mutates={'filesystem', 'process', 'socket'}, tags={'daemon', 'security', 'version-mix'})

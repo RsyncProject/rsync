@@ -4,12 +4,13 @@ import os
 import shutil
 import subprocess
 
-from harness import rsync
-from harness.rsync import (
-    CHKDIR, FROMDIR, OUTFILE, TMPDIR, TODIR,
-    checkit, hands_setup, makepath, rsync_argv,
-    run_rsync, test_fail,
-)
+from harness import environment
+from fixtures.trees import hands_setup
+from harness.comparison import checkit
+from harness.environment import CHKDIR, FROMDIR, OUTFILE, TMPDIR, TODIR
+from harness.filesystem import makepath
+from harness.results import test_fail
+from harness.rsync import rsync_argv, run_rsync
 from harness import metadata
 
 metadata(transports={'pipe'})
@@ -20,12 +21,12 @@ extradir = TMPDIR / 'extra'
 
 makepath(deepdir, extradir / deepstr, CHKDIR)
 
-real_fromdir = rsync.FROMDIR
+real_fromdir = environment.FROMDIR
 try:
-    rsync.FROMDIR = deepdir
+    environment.FROMDIR = deepdir
     hands_setup()
 finally:
-    rsync.FROMDIR = real_fromdir
+    environment.FROMDIR = real_fromdir
 
 extrafile = extradir / deepstr / 'extra.added.value'
 extrafile.write_text("wowza\n")

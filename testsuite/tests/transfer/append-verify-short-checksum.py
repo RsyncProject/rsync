@@ -2,10 +2,10 @@
 
 import json
 
-from harness.rsync import (
-    FROMDIR, TODIR, assert_same, make_data_file, rmtree, run_rsync,
-    test_skipped,
-)
+from harness.environment import FROMDIR, TODIR
+from harness.filesystem import assert_same, make_data_file, rmtree
+from harness.results import test_skipped
+from harness.rsync import run_rsync
 from harness import metadata
 
 metadata(features={'xxhash'}, transports={'pipe'})

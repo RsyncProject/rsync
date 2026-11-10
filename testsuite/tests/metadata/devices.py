@@ -4,7 +4,7 @@ import os
 
 from fixtures.devices import check_devices
 from harness import metadata
-from harness.rsync import test_skipped
+from harness.results import test_skipped
 
 metadata(features={'device_nodes'}, transports={'pipe'})
 

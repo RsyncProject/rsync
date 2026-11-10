@@ -5,10 +5,12 @@ import re
 import subprocess
 
 from harness.daemon_config import write_daemon_conf
-from harness.rsync import (
-    RSYNC_PREFIX, SCRATCHDIR, makepath, rmtree, rsync_argv, start_test_daemon, test_fail,
-    test_skipped, xattr_get, xattrs_supported,
-)
+from harness.daemon import start_test_daemon
+from harness.environment import SCRATCHDIR
+from harness.filesystem import makepath, rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import rsync_argv
+from harness.xattrs import RSYNC_PREFIX, get_value as xattr_get, is_supported as xattrs_supported
 from harness import metadata
 
 metadata(features={'nonroot', 'xattr_runtime'}, transports={'pipe', 'tcp'})

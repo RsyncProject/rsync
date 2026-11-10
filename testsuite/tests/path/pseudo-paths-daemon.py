@@ -11,7 +11,9 @@ import tempfile
 import time
 from pathlib import Path
 
-from harness.rsync import makepath, rmtree, rsync_argv, rsync_command_binary, test_fail, test_skipped
+from harness.filesystem import makepath, rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import rsync_argv, rsync_command_binary
 from harness import metadata
 
 metadata(features={'proc_fd'}, transports={'pipe', 'tcp'})

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
 import json
-import shlex
 import subprocess
 import sys
 
 from harness import TestContext, requires, run
-from harness.rsync import rsync_command_binary, test_fail
+from harness.results import test_fail
+from harness.rsync import rsync_command_binary
 
 @requires(transports={'pipe'}, mutates={'filesystem', 'process'}, tags={'harness'})
 def test(context: TestContext):
@@ -36,7 +36,7 @@ def test(context: TestContext):
     fake = context.scratch / 'rsync'
     version = {'capabilities': {'enabled': True, 'disabled': False, 'bits': 64},
                'checksum_list': ['checksum'], 'compress_list': ['compression']}
-    fake.write_text('#!/bin/sh\nprintf "%s\\n" ' + shlex.quote(json.dumps(version)) + '\n')
+    fake.write_text(f'#!{sys.executable}\nprint({json.dumps(version)!r})\n')
     fake.chmod(0o755)
     check(fake, ['enabled', 'checksum', 'compression'], True)
     for feature in ('disabled', 'bits', 'missing-feature'):
@@ -44,11 +44,11 @@ def test(context: TestContext):
     for field in ('checksum_list', 'compress_list'):
         feature = version[field][0]
         malformed = {**version, field: {feature: False}}
-        fake.write_text('#!/bin/sh\nprintf "%s\\n" ' + shlex.quote(json.dumps(malformed)) + '\n')
+        fake.write_text(f'#!{sys.executable}\nprint({json.dumps(malformed)!r})\n')
         check(fake, [feature], False)
-    fake.write_text('#!/bin/sh\nprintf "%s\\n" not-json\n')
+    fake.write_text(f'#!{sys.executable}\nprint("not-json")\n')
     check(fake, ['enabled'], False)
-    fake.write_text('#!/bin/sh\nexit 7\n')
+    fake.write_text(f'#!{sys.executable}\nraise SystemExit(7)\n')
     check(fake, ['enabled'], False)
 
 if __name__ == '__main__':

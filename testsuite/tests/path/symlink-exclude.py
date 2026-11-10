@@ -3,7 +3,11 @@
 import os
 
 from harness.daemon_config import write_daemon_conf
-from harness.rsync import SCRATCHDIR, makepath, rmtree, run_rsync, start_test_daemon, test_fail
+from harness.daemon import start_test_daemon
+from harness.environment import SCRATCHDIR
+from harness.filesystem import makepath, rmtree
+from harness.results import test_fail
+from harness.rsync import run_rsync
 from harness import metadata
 
 metadata(transports={'pipe', 'tcp'})

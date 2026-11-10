@@ -5,16 +5,16 @@ import os
 import subprocess
 
 from harness.daemon_config import write_daemon_conf
-from harness.rsync import (
-    FROMDIR, SCRATCHDIR, claim_ports, get_rootuid, get_testuid, make_tree, makepath,
-    require_tcp, rmtree, rsync_argv, start_test_daemon, test_fail, test_skipped,
-    under_valgrind,
-)
+from harness.daemon import claim_ports, require_tcp, start_test_daemon
+from harness.environment import FROMDIR, SCRATCHDIR
+from harness.filesystem import make_tree, makepath, rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import rsync_argv, under_valgrind
 from harness import metadata
 
 metadata(features={'chroot', 'root', 'tcp'}, transports={'tcp'})
 
-if get_testuid() != get_rootuid():
+if os.getuid() != 0:
     test_skipped("use chroot = yes needs root (CAP_SYS_CHROOT)", capability='root')
 if under_valgrind():
     test_skipped("per-process Valgrind logs are outside the daemon chroot",

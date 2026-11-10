@@ -6,7 +6,9 @@ import subprocess
 import threading
 
 from harness.daemon import claim_ports, require_tcp
-from harness.rsync import SCRATCHDIR, rsync_argv, test_fail
+from harness.environment import SCRATCHDIR
+from harness.results import test_fail
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(features={'tcp'}, transports={'tcp'})

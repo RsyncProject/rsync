@@ -57,16 +57,11 @@ def racer_main(argv: list[str]) -> int:
 if len(sys.argv) > 1 and sys.argv[1] == "--racer":
     sys.exit(racer_main(sys.argv[2:]))
 
-from harness.rsync import (  # noqa: E402
-    RSYNC,
-    RSYNC_PEER,
-    SCRATCHDIR,
-    claim_ports,
-    require_tcp,
-    rmtree,
-    test_fail,
-    test_skipped, split_rsync_cmd,
-)
+from harness.daemon import claim_ports, require_tcp
+from harness.environment import RSYNC, RSYNC_PEER, SCRATCHDIR
+from harness.filesystem import rmtree
+from harness.process import split_rsync_cmd
+from harness.results import test_fail, test_skipped
 from harness import metadata
 
 metadata(features={'darwin', 'nonroot', 'sandbox_exec', 'tcp'}, transports={'tcp'})

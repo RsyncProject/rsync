@@ -4,9 +4,10 @@ import os
 import platform
 import subprocess
 
-from harness.rsync import (
-    SCRATCHDIR, forced_protocol, rmtree, rsync_argv, test_fail, test_skipped,
-)
+from harness.environment import SCRATCHDIR
+from harness.filesystem import rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import forced_protocol, rsync_argv
 from harness import metadata
 
 metadata(features={'linux_interpose', 'protocol_30'}, transports={'pipe'})

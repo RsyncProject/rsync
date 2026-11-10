@@ -4,7 +4,10 @@ import os
 import shutil
 import time
 
-from harness.rsync import FROMDIR, TODIR, checkit, rsync_getgroups, test_fail
+from harness.comparison import checkit
+from harness.environment import FROMDIR, TODIR
+from harness.results import test_fail
+from harness.rsync import rsync_getgroups
 from harness import metadata
 
 metadata(transports={'pipe'})

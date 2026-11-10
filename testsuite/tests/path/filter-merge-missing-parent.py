@@ -3,7 +3,9 @@
 import os
 import subprocess
 
-from harness.rsync import TMPDIR, rsync_argv, test_fail
+from harness.environment import TMPDIR
+from harness.results import test_fail
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(transports={'pipe'})

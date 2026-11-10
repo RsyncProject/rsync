@@ -5,7 +5,10 @@ import subprocess
 
 from harness.mutation import find_attacker_uid
 from harness.daemon_config import write_daemon_conf
-from harness.rsync import SCRATCHDIR, rsync_argv, start_test_daemon, test_fail, test_skipped
+from harness.daemon import start_test_daemon
+from harness.environment import SCRATCHDIR
+from harness.results import test_fail, test_skipped
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(features={'cross_uid'}, transports={'pipe', 'tcp'})

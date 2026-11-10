@@ -3,7 +3,9 @@
 import os
 import subprocess
 
-from harness.rsync import SCRATCHDIR, TOOLDIR, rmtree, test_fail
+from harness.environment import SCRATCHDIR, TOOLDIR
+from harness.filesystem import rmtree
+from harness.results import test_fail
 from harness import metadata
 
 metadata(transports={'pipe'})

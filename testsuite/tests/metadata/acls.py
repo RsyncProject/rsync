@@ -3,7 +3,10 @@
 import os
 import subprocess
 
-from harness.rsync import FROMDIR, SCRATCHDIR, TODIR, makepath, run_rsync, test_fail, test_skipped
+from harness.environment import FROMDIR, SCRATCHDIR, TODIR
+from harness.filesystem import makepath
+from harness.results import test_fail, test_skipped
+from harness.rsync import run_rsync
 from harness import metadata
 
 metadata(features={'acl'}, transports={'pipe'})

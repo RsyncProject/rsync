@@ -2,7 +2,8 @@
 
 from copy import deepcopy
 
-from harness import Exit, TestContext, TestResult, requires, run, test_fail, verdict_of
+from harness import Exit, TestContext, requires, run
+from harness.results import TestResult, test_fail, verdict_of
 from harness.results import read_receipt, write_receipt
 
 @requires(transports={'pipe'}, tags={'harness'})

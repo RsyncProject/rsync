@@ -2,10 +2,10 @@
 
 import os
 
-from harness.rsync import (
-    FROMDIR, TODIR,
-    allocated_size, assert_same, makepath, rmtree, run_rsync, test_fail, test_skipped,
-)
+from harness.environment import FROMDIR, TODIR
+from harness.filesystem import allocated_size, assert_same, makepath, rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import run_rsync
 from harness import metadata
 
 metadata(features={'sparse'}, transports={'pipe'})

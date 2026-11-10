@@ -6,7 +6,10 @@ import shutil
 import subprocess
 
 from harness.daemon_config import write_daemon_conf
-from harness.rsync import SCRATCHDIR, SRCDIR, makepath, rmtree, rsync_argv, test_fail, test_skipped
+from harness.environment import SCRATCHDIR, SRCDIR
+from harness.filesystem import makepath, rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(transports={'pipe', 'tcp'})

@@ -15,7 +15,11 @@ if '--shell' in sys.argv:
     wrapper, root = env['RRSYNC_WRAPPER'], env['RRSYNC_ROOT']
     os.execve(wrapper, [wrapper, '-wo', root], env)
 
-from harness.rsync import RSYNC, SCRATCHDIR, makepath, patched_rrsync, rmtree, rsync_argv, test_fail
+from fixtures.rrsync import rsync_wrapper, patched_rrsync
+from harness.environment import RSYNC, SCRATCHDIR
+from harness.filesystem import makepath, rmtree
+from harness.results import test_fail
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(transports={'pipe'})
@@ -28,8 +32,7 @@ makepath(src, root)
 (src / 'f').write_bytes(b'hi\n')
 
 shim = base / 'rsync-shim'
-shim.write_text('#!/bin/sh\nexec ' + RSYNC + ' "$@"\n')
-shim.chmod(0o755)
+rsync_wrapper(shim)
 wrapper = patched_rrsync(base, rsync_path=str(shim))
 rsh = f'{sys.executable} {os.path.abspath(__file__)} --shell'
 env = {**os.environ, 'RRSYNC_WRAPPER': str(wrapper), 'RRSYNC_ROOT': str(root)}

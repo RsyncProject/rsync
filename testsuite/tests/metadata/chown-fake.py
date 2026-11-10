@@ -2,16 +2,18 @@
 
 import os
 
-from harness import metadata, rsync
-from harness.rsync import (FROMDIR, RSYNC_PREFIX, TODIR, checkit, test_skipped,
-                          xattr_set, xattrs_supported)
+from harness import metadata, environment
+from harness.comparison import checkit
+from harness.environment import FROMDIR, TODIR
+from harness.results import test_skipped
+from harness.xattrs import RSYNC_PREFIX, set_value as xattr_set, is_supported as xattrs_supported
 
 metadata(features={'xattr_runtime'}, transports={'pipe'})
 
 if not xattrs_supported():
     test_skipped('fake ownership tests need xattrs', capability='xattr_runtime')
-rsync.RSYNC += ' --fake-super'
-rsync.TLS_ARGS = (rsync.TLS_ARGS + ' --fake-super').strip()
+environment.RSYNC += ' --fake-super'
+environment.TLS_ARGS = (environment.TLS_ARGS + ' --fake-super').strip()
 FROMDIR.mkdir(parents=True)
 for name, uid, gid in (('name1', 5000, 5002), ('name2', 5001, 5003)):
     path = FROMDIR / name

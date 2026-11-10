@@ -6,12 +6,13 @@ import re
 import sys
 import time
 
-from harness.rsync import (
-    SCRATCHDIR, claim_ports, require_tcp, rmtree, run_rsync,
-    start_rsyncd, test_fail, test_skipped,
-)
+from harness.daemon import claim_ports, require_tcp, start_rsyncd
+from harness.environment import SCRATCHDIR
+from harness.filesystem import rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import run_rsync
 from harness import protocol as rp
-from harness import process_thread_count
+from harness.process import process_thread_count
 from harness import metadata
 
 metadata(features={'tcp', 'zstd_threads'}, transports={'tcp'})

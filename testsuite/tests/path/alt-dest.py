@@ -2,19 +2,12 @@
 
 import os
 
-from harness.rsync import (
-    CHKDIR,
-    FROMDIR,
-    TMPDIR,
-    TODIR,
-    checkit,
-    hands_setup,
-    rmtree,
-    run_rsync,
-    test_fail,
-    rsync_path_arg,
-    rsh_cmd,
-)
+from fixtures.trees import hands_setup
+from harness.comparison import checkit
+from harness.environment import CHKDIR, FROMDIR, TMPDIR, TODIR
+from harness.filesystem import rmtree
+from harness.results import test_fail
+from harness.rsync import rsh_cmd, rsync_path_arg, run_rsync
 from harness import metadata
 
 metadata(features={'alt-dest', 'remote-shell'}, transports={'pipe', 'tcp'}, min_peer='2.6.0', mutates={'filesystem', 'process'}, tags={'compatibility', 'transfer', 'version-mix'})

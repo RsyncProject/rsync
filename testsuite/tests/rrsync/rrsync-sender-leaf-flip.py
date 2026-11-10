@@ -6,10 +6,11 @@ import subprocess
 import time
 
 from harness.mutation import race_budget, start_path_flipper, stop_flipper
-from harness.rsync import (
-    RSYNC, SCRATCHDIR, makepath, patched_rrsync, proc_self_fd_pins, rmtree, rsync_argv,
-    rsync_path_arg, test_fail, test_skipped,
-)
+from fixtures.rrsync import rrsync_shell, rsync_wrapper, patched_rrsync
+from harness.environment import RSYNC, SCRATCHDIR
+from harness.filesystem import makepath, proc_self_fd_pins, rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import rsync_argv, rsync_path_arg
 from harness import metadata
 
 metadata(features={'proc_fd'}, transports={'pipe'})
@@ -31,19 +32,12 @@ makepath(restricted, outside / 'dir', dest)
 (outside / 'dir' / 'loot').write_text(MARKER + '\n')
 
 shim = base / 'rsync-shim'
-shim.write_text('#!/bin/sh\nexec ' + rsync_path_arg(RSYNC) + ' "$@"\n')
-shim.chmod(0o755)
+rsync_wrapper(shim)
 
 rrsync = patched_rrsync(base, rsync_path=str(shim))
 
 rsh = base / 'fake-rsh'
-rsh.write_text(
-    '#!/bin/sh\n'
-    'shift\n'
-    'SSH_ORIGINAL_COMMAND="$*"\n'
-    'export SSH_ORIGINAL_COMMAND\n'
-    'exec %s -ro %s\n' % (shlex.quote(str(rrsync)), shlex.quote(str(restricted))))
-rsh.chmod(0o755)
+rrsync_shell(rsh, rrsync, restricted, '-ro')
 
 def leaked_content():
     for path in dest.rglob('*'):

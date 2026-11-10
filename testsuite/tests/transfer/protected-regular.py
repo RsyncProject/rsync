@@ -6,7 +6,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-from harness.rsync import TMPDIR, run_rsync, test_fail, test_skipped
+from harness.environment import TMPDIR
+from harness.results import test_fail, test_skipped
+from harness.rsync import run_rsync
 from harness import metadata
 
 metadata(features={'protected_regular'}, transports={'pipe'})

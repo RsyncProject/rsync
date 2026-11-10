@@ -3,10 +3,11 @@
 import os
 import shlex
 
-from harness.rsync import (
-    SCRATCHDIR, SRCDIR, expect_fail, rsh_cmd, rmtree, rsync_argv,
-    rsync_path_arg, run_rsync, test_fail,
-)
+from harness.environment import SCRATCHDIR, SRCDIR
+from harness.filesystem import rmtree
+from harness.process import expect_fail
+from harness.results import test_fail
+from harness.rsync import rsh_cmd, rsync_argv, rsync_path_arg, run_rsync
 from harness import metadata
 
 metadata(transports={'pipe'})

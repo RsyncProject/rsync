@@ -6,10 +6,14 @@ import shutil
 import subprocess
 import sys
 
-from harness.rsync import (
-    CHKDIR, FROMDIR, RSYNC_PREFIX, RUSR, SCRATCHDIR, TMPDIR, TODIR, TOOLDIR,
-    checkit, cp_touch, makepath, run_rsync, test_fail, test_skipped,
-    xattr_get, xattr_set as xset, xattr_dump, xattrs_supported,
+from harness.comparison import checkit
+from harness.environment import CHKDIR, FROMDIR, SCRATCHDIR, TMPDIR, TODIR, TOOLDIR
+from harness.filesystem import cp_touch, makepath
+from harness.results import test_fail, test_skipped
+from harness.rsync import run_rsync
+from harness.xattrs import (
+    RSYNC_PREFIX, RUSR, dump_values as xattr_dump, get_value as xattr_get,
+    is_supported as xattrs_supported, set_value as xset,
 )
 from harness import metadata
 
@@ -166,7 +170,7 @@ if got != expected:
 
 if dashH:
     ls_to = SCRATCHDIR / 'ls-to'
-    from harness.rsync import rsync_ls_lR
+    from harness.comparison import rsync_ls_lR
     ls_to.write_text(rsync_ls_lR(TODIR))
     one_link = []
     for line in ls_to.read_text().splitlines():

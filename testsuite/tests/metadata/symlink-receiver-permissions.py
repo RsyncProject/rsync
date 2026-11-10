@@ -4,7 +4,10 @@ import os
 import stat
 import struct
 
-from harness.rsync import SCRATCHDIR, makepath, run_rsync, test_fail
+from harness.environment import SCRATCHDIR
+from harness.filesystem import makepath
+from harness.results import test_fail
+from harness.rsync import run_rsync
 from harness import metadata
 
 metadata(transports={'pipe'})

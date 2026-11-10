@@ -5,7 +5,10 @@ import subprocess
 import time
 
 from harness.mutation import race_budget, start_path_flipper, stop_flipper
-from harness.rsync import SCRATCHDIR, rmtree, rsync_argv, rsync_supports, test_fail
+from harness.environment import SCRATCHDIR
+from harness.filesystem import rmtree
+from harness.results import test_fail
+from harness.rsync import rsync_argv, rsync_supports
 from harness import metadata
 
 metadata(transports={'pipe'})

@@ -4,10 +4,12 @@ import os
 import subprocess
 
 from harness.daemon_config import write_daemon_conf
-from harness.rsync import (
-    FROMDIR, RSYNC, SCRATCHDIR, SRCDIR, make_tree, makepath, rmtree, rsync_argv, run_rsync,
-    split_rsync_cmd, start_test_daemon, test_fail, test_skipped,
-)
+from harness.daemon import start_test_daemon
+from harness.environment import FROMDIR, RSYNC, SCRATCHDIR, SRCDIR
+from harness.filesystem import make_tree, makepath, rmtree
+from harness.process import split_rsync_cmd
+from harness.results import test_fail, test_skipped
+from harness.rsync import rsync_argv, run_rsync
 from harness import metadata
 
 metadata(transports={'pipe', 'tcp'})

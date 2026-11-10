@@ -6,8 +6,10 @@ import re
 import shlex
 import shutil
 import subprocess
+import sys
 
-from harness.rsync import SCRATCHDIR, SRCDIR, TOOLDIR, test_fail
+from harness.environment import SCRATCHDIR, SRCDIR, TOOLDIR
+from harness.results import test_fail
 from harness import metadata
 
 metadata(transports={'pipe', 'tcp'})
@@ -73,7 +75,8 @@ for strip_name in ('strip', 'aarch64-linux-gnu-strip'):
     destdir = SCRATCHDIR / 'roots' / strip_name
     strip_log = SCRATCHDIR / f'{strip_name}.log'
     strip = tools / strip_name
-    strip.write_text('#!/bin/sh\nprintf \'%s\\n\' "$@" >"$STRIP_LOG"\n')
+    strip.write_text(f'#!{sys.executable}\nimport os, sys\nfrom pathlib import Path\n'
+                     'Path(os.environ["STRIP_LOG"]).write_text("".join(arg + "\\n" for arg in sys.argv[1:]))\n')
     strip.chmod(0o755)
 
     env = os.environ.copy()

@@ -5,10 +5,11 @@ import shlex
 import subprocess
 
 from harness.daemon_config import write_daemon_conf
-from harness.rsync import (
-    SCRATCHDIR, build_patched_rsync, forced_protocol, makepath, rmtree, rsync_argv_for,
-    test_fail, test_skipped,
-)
+from harness.environment import SCRATCHDIR
+from harness.filesystem import makepath, rmtree
+from harness.mutation import build_patched_rsync
+from harness.results import test_fail, test_skipped
+from harness.rsync import forced_protocol, rsync_argv_for
 from harness import metadata
 
 metadata(features={'native_build'}, transports={'pipe', 'tcp'})

@@ -4,10 +4,12 @@ import socket
 import subprocess
 import threading
 
-from harness.rsync import (
-    SCRATCHDIR, claim_ports, forced_protocol, makepath, require_tcp, rmtree,
-    rsync_argv, test_fail, test_skipped, xattrs_supported,
-)
+from harness.daemon import claim_ports, require_tcp
+from harness.environment import SCRATCHDIR
+from harness.filesystem import makepath, rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import forced_protocol, rsync_argv
+from harness.xattrs import is_supported as xattrs_supported
 from harness import protocol as rp
 from harness import metadata
 

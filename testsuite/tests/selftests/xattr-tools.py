@@ -3,7 +3,8 @@
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from harness import TestContext, requires, run, test_fail
+from harness import TestContext, requires, run
+from harness.results import test_fail
 from harness import xattrs
 
 @requires(transports={'pipe'}, tags={'harness'})

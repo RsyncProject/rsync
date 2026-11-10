@@ -4,10 +4,11 @@ import glob
 import os
 import subprocess
 
-from harness.rsync import (
-    FROMDIR, SCRATCHDIR, RSYNC,
-    require_asan, rmtree, rsync_argv, test_fail,
-)
+from harness.daemon import require_asan
+from harness.environment import FROMDIR, RSYNC, SCRATCHDIR
+from harness.filesystem import rmtree
+from harness.results import test_fail
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(features={'asan'}, transports={'pipe'})

@@ -5,9 +5,11 @@ import pwd
 import subprocess
 
 from harness.daemon_config import write_daemon_conf
-from harness.rsync import (
-    SCRATCHDIR, makepath, rmtree, rsync_argv, start_test_daemon, test_fail, test_skipped,
-)
+from harness.daemon import start_test_daemon
+from harness.environment import SCRATCHDIR
+from harness.filesystem import makepath, rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(features={'root'}, transports={'pipe', 'tcp'})

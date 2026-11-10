@@ -4,10 +4,11 @@ import os
 import shlex
 import subprocess
 
-from harness.rsync import (
-    RSYNC, SCRATCHDIR, makepath, patched_rrsync, rmtree, rsync_argv,
-    rsync_path_arg, test_fail,
-)
+from fixtures.rrsync import rrsync_shell, rsync_wrapper, patched_rrsync
+from harness.environment import RSYNC, SCRATCHDIR
+from harness.filesystem import makepath, rmtree
+from harness.results import test_fail
+from harness.rsync import rsync_argv, rsync_path_arg
 from harness import metadata
 
 metadata(transports={'pipe'})
@@ -29,28 +30,14 @@ os.utime(restricted / 'previous' / 'file', (T, T))
 os.utime(source / 'file', (T, T))
 
 shim = base / 'rsync-shim'
-shim.write_text('#!/bin/sh\nexec ' + rsync_path_arg(RSYNC) + ' "$@"\n')
-shim.chmod(0o755)
+rsync_wrapper(shim)
 rrsync = patched_rrsync(base, rsync_path=str(shim))
 
 rsh = base / 'fake-rsh'
-rsh.write_text(
-    '#!/bin/sh\n'
-    'shift\n'
-    'SSH_ORIGINAL_COMMAND="$*"\n'
-    'export SSH_ORIGINAL_COMMAND\n'
-    'exec %s %s\n' % (shlex.quote(str(rrsync)), shlex.quote(str(restricted))))
-rsh.chmod(0o755)
+rrsync_shell(rsh, rrsync, restricted)
 
 rsh_absolute = base / 'fake-rsh-absolute'
-rsh_absolute.write_text(
-    '#!/bin/sh\n'
-    'shift\n'
-    'SSH_ORIGINAL_COMMAND="$*"\n'
-    'export SSH_ORIGINAL_COMMAND\n'
-    'exec %s -absolute %s\n'
-    % (shlex.quote(str(rrsync)), shlex.quote(str(restricted))))
-rsh_absolute.chmod(0o755)
+rrsync_shell(rsh_absolute, rrsync, restricted, '-absolute')
 
 def run(*args):
     return subprocess.run(

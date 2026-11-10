@@ -5,10 +5,9 @@ import re
 import shlex
 import subprocess
 
-from harness.rsync import (
-    FROMDIR, RSYNC, SCRATCHDIR,
-    makepath, test_fail, test_skipped
-)
+from harness.environment import FROMDIR, RSYNC, SCRATCHDIR
+from harness.filesystem import makepath
+from harness.results import test_fail, test_skipped
 from harness import metadata
 
 metadata(features={'protocol_33'}, transports={'pipe'})

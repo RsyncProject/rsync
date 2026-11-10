@@ -6,15 +6,11 @@ import socket
 import struct
 import subprocess
 
-from harness.rsync import (
-    TODIR,
-    hands_setup,
-    makepath,
-    rmtree,
-    rsync_argv,
-    test_fail,
-    test_skipped,
-)
+from fixtures.trees import hands_setup
+from harness.environment import TODIR
+from harness.filesystem import makepath, rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import rsync_argv
 from harness import protocol as rp
 from harness import metadata
 

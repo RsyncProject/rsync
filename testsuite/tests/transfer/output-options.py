@@ -5,11 +5,11 @@ import re
 import select
 import subprocess
 
-from harness.rsync import (
-    FROMDIR, TODIR, TOOLDIR,
-    assert_not_exists, make_data_file, make_tree, makepath, rmtree, rsync_argv,
-    test_fail, verify_dirs,
-)
+from harness.comparison import verify_dirs
+from harness.environment import FROMDIR, TODIR, TOOLDIR
+from harness.filesystem import assert_not_exists, make_data_file, make_tree, makepath, rmtree
+from harness.results import test_fail
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(transports={'pipe'})

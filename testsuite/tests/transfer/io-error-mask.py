@@ -8,10 +8,11 @@ import sys
 import time
 
 from harness.daemon_config import build_rsyncd_conf
-from harness.rsync import (
-    FROMDIR, SCRATCHDIR, TODIR, USE_TCP, claim_ports, make_data_file, makepath, rmtree,
-    rsync_argv, start_rsyncd, test_fail, test_skipped,
-)
+from harness.daemon import USE_TCP, claim_ports, start_rsyncd
+from harness.environment import FROMDIR, SCRATCHDIR, TODIR
+from harness.filesystem import make_data_file, makepath, rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(features={'tcp'}, transports={'tcp'})

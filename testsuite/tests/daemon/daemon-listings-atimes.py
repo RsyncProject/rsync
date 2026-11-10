@@ -2,7 +2,10 @@
 
 from harness import metadata
 from harness.daemon_config import write_daemon_conf
-from harness.rsync import FROMDIR, run_rsync, start_test_daemon, test_fail, test_skipped
+from harness.daemon import start_test_daemon
+from harness.environment import FROMDIR
+from harness.results import test_fail, test_skipped
+from harness.rsync import run_rsync
 
 metadata(features={'atimes', 'daemon'}, transports={'pipe', 'tcp'}, min_peer='3.2.0', tags={'daemon', 'version-mix'})
 

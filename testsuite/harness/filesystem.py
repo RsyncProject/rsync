@@ -1,10 +1,19 @@
+import errno
 import filecmp
+import functools
 import os
+import platform
 import shutil
+import socket
 import stat
+import subprocess
+import sys
+import tempfile
 from pathlib import Path
-
 from .results import test_fail
+
+_SYSTEM = platform.system()
+_CYGWIN = _SYSTEM.startswith('CYGWIN')
 
 def makepath(*paths) -> None:
     for path in paths:
@@ -164,3 +173,115 @@ def assert_exists(path, label: str = '') -> None:
 def assert_not_exists(path, label: str = '') -> None:
     if os.path.lexists(path):
         test_fail(f'{_tag(label)}{path} exists but should not')
+
+_psf_cache = None
+
+def cp_touch(src, dst) -> None:
+    shutil.copy2(src, dst)
+    if os.path.isdir(dst):
+        dst = os.path.join(dst, os.path.basename(src))
+    st = os.stat(dst, follow_symlinks=False)
+    os.utime(src, ns=(st.st_atime_ns, st.st_mtime_ns), follow_symlinks=False)
+    os.utime(dst, ns=(st.st_atime_ns, st.st_mtime_ns), follow_symlinks=False)
+
+def proc_self_fd_pins() -> bool:
+    global _psf_cache
+    if _psf_cache is not None:
+        return _psf_cache
+    if not sys.platform.startswith(('linux', 'android')):
+        _psf_cache = False
+        return _psf_cache
+
+    def resolves(path):
+        try:
+            fd = os.open(path, os.O_RDONLY)
+        except OSError:
+            return False
+        try:
+            return os.readlink('/proc/self/fd/%d' % fd) == os.path.realpath(path)
+        except OSError:
+            return False
+        finally:
+            os.close(fd)
+
+    _psf_cache = resolves('/') and resolves(os.path.realpath(__file__))
+    return _psf_cache
+
+def acls_supported() -> bool:
+    from .rsync import run_rsync
+    vv = run_rsync('-VV', check=True, capture_output=True).stdout
+    if '"ACLs": true' not in vv:
+        return False
+    if _SYSTEM in ('Linux', 'FreeBSD') or _CYGWIN:
+        return (shutil.which('setfacl') is not None
+                and shutil.which('getfacl') is not None)
+    if _SYSTEM == 'Darwin':
+        return shutil.which('chmod') is not None
+    return False
+
+@functools.lru_cache(maxsize=1)
+def devices_supported() -> bool:
+    if os.geteuid() != 0 or not hasattr(os, 'mknod'):
+        return False
+    with tempfile.TemporaryDirectory(prefix='rsync-devprobe.') as d:
+        try:
+            os.mknod(os.path.join(d, 'p'), 0o600 | stat.S_IFCHR, os.makedev(1, 3))
+        except (PermissionError, OSError):
+            return False
+    return True
+
+def hardlink_symlinks_supported(where=None) -> bool:
+    d = tempfile.mkdtemp(prefix='rsync-hlsym.', dir=str(where) if where else None)
+    try:
+        link, hard = os.path.join(d, 's'), os.path.join(d, 'h')
+        os.symlink('target-need-not-exist', link)
+        try:
+            os.link(link, hard, follow_symlinks=False)
+        except NotImplementedError:
+            return False
+        except OSError as e:
+            if e.errno in (errno.ENOTSUP, getattr(errno, 'EOPNOTSUPP', errno.ENOTSUP)):
+                return False
+            raise
+        return True
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+def owners_supported() -> bool:
+    return os.geteuid() == 0
+
+def make_fifo(path) -> None:
+    os.mkfifo(str(path))
+
+def make_socket(path) -> None:
+    path = Path(path)
+    old = os.getcwd()
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        os.chdir(path.parent)
+        s.bind(path.name)
+    finally:
+        s.close()
+        os.chdir(old)
+
+def make_device(path, kind: str, major: int, minor: int,
+                mode: int = 0o644) -> None:
+    fmt = stat.S_IFCHR if kind == 'c' else stat.S_IFBLK
+    os.mknod(str(path), mode | fmt, os.makedev(major, minor))
+
+def _acl_env() -> dict:
+    env = dict(os.environ)
+    env.pop('POSIXLY_CORRECT', None)
+    env['LC_ALL'] = 'C'
+    return env
+
+def acl_set(spec: str, path) -> bool:
+    if not (_SYSTEM in ('Linux', 'FreeBSD') or _CYGWIN):
+        return False
+    proc = subprocess.run(['setfacl', '-m', spec, str(path)],
+                          capture_output=True, text=True, env=_acl_env())
+    return proc.returncode == 0
+
+def acl_get(path) -> str:
+    return subprocess.run(['getfacl', str(path)], capture_output=True,
+                          text=True, env=_acl_env()).stdout

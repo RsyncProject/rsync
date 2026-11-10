@@ -3,9 +3,10 @@
 import os
 import socket as _socket
 
-from harness.rsync import (
-    SCRATCHDIR, assert_same, rmtree, run_rsync, test_fail, test_skipped,
-)
+from harness.environment import SCRATCHDIR
+from harness.filesystem import assert_same, rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import run_rsync
 from harness import metadata
 
 metadata(transports={'pipe'})

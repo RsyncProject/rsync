@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
-from harness.rsync import (
-    FROMDIR, SCRATCHDIR, make_tree, makepath, rmtree, run_rsync, start_test_daemon, test_fail,
-)
+from harness.daemon import start_test_daemon
+from harness.environment import FROMDIR, SCRATCHDIR
+from harness.filesystem import make_tree, makepath, rmtree
+from harness.results import test_fail
+from harness.rsync import run_rsync
 from harness import metadata
 
 metadata(features={'daemon'}, transports={'pipe', 'tcp'}, min_peer='2.6.0', mutates={'filesystem', 'process', 'socket'}, tags={'configuration', 'daemon', 'version-mix'})

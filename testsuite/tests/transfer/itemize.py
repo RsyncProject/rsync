@@ -3,23 +3,10 @@
 import os
 import shutil
 
-from harness.rsync import (
-    FROMDIR,
-    RSYNC,
-    SCRATCHDIR,
-    SRCDIR,
-    TMPDIR,
-    TODIR,
-    all_plus,
-    allspace,
-    dots,
-    checkdiff,
-    cp_p,
-    makepath,
-    run_rsync,
-    v_filt,
-    hardlink_symlinks_supported,
-)
+from harness.comparison import checkdiff, v_filt
+from harness.environment import FROMDIR, RSYNC, SCRATCHDIR, SRCDIR, TMPDIR, TODIR, all_plus, allspace, dots
+from harness.filesystem import cp_p, hardlink_symlinks_supported, makepath
+from harness.rsync import run_rsync
 from harness import metadata
 
 metadata(transports={'pipe'})

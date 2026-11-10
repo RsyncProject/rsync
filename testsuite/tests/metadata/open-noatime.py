@@ -6,8 +6,10 @@ import platform
 import shlex
 import subprocess
 
-from harness import rsync
-from harness.rsync import FROMDIR, TMPDIR, TODIR, TOOLDIR, run_rsync, test_fail, test_skipped
+from harness import environment
+from harness.environment import FROMDIR, TMPDIR, TODIR, TOOLDIR
+from harness.results import test_fail, test_skipped
+from harness.rsync import run_rsync
 from harness import metadata
 
 metadata(features={'noatime'}, transports={'pipe'})
@@ -27,10 +29,10 @@ atime = datetime.datetime(2001, 2, 3, 17, 17, 42).timestamp()
 mtime = foo.stat().st_mtime
 os.utime(foo, (atime, mtime))
 
-rsync.TLS_ARGS = '--atimes'
+environment.TLS_ARGS = '--atimes'
 
 def _tls_listing(path: str) -> str:
-    cmd = [str(TOOLDIR / 'tls')] + shlex.split(rsync.TLS_ARGS) + [str(path)]
+    cmd = [str(TOOLDIR / 'tls')] + shlex.split(environment.TLS_ARGS) + [str(path)]
     return subprocess.check_output(cmd, text=True)
 
 before = _tls_listing(foo)

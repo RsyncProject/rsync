@@ -2,17 +2,9 @@
 
 import os
 
-from harness.rsync import (
-    FROMDIR,
-    TODIR,
-    assert_mode,
-    assert_mtime_close,
-    make_tree,
-    rmtree,
-    run_rsync,
-    walk_dirs,
-    walk_files,
-)
+from harness.environment import FROMDIR, TODIR
+from harness.filesystem import assert_mode, assert_mtime_close, make_tree, rmtree, walk_dirs, walk_files
+from harness.rsync import run_rsync
 from harness import metadata
 
 metadata(transports={'pipe'})

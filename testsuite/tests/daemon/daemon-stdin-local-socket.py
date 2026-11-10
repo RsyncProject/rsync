@@ -3,7 +3,10 @@
 import socket
 
 from harness.daemon_config import write_daemon_conf
-from harness.rsync import RSYNC, SCRATCHDIR, claim_free_port, rmtree, start_rsyncd, test_skipped
+from harness.daemon import claim_free_port, start_rsyncd
+from harness.environment import RSYNC, SCRATCHDIR
+from harness.filesystem import rmtree
+from harness.results import test_skipped
 from harness import metadata
 
 metadata(features={'unix_socketpair'}, transports={'pipe', 'tcp'})

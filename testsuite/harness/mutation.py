@@ -1,5 +1,6 @@
 import math
 import os
+import platform
 import re
 import shlex
 import shutil
@@ -9,10 +10,9 @@ import threading
 import time
 from pathlib import Path
 from types import SimpleNamespace
-
 from .filesystem import make_data_file, rmtree
 from .process import rsync_argv
-from .results import test_fail
+from .results import test_fail, test_skipped
 
 TARGET = 'zzz_target'
 
@@ -287,3 +287,65 @@ def assert_no_protocol_abort(result):
         test_fail(f'transfer ended with a protocol error:\n{output}')
     if result.returncode not in (0, 23, 24):
         test_fail(f'unexpected rsync exit {result.returncode}:\n{output}')
+
+def build_patched_rsync(name, replacements, append_cflags=None):
+    from .environment import SCRATCHDIR, SRCDIR
+    if sys.platform == 'cygwin' or platform.system().startswith('CYGWIN'):
+        test_skipped(f"{name}: build_patched_rsync is unreliable on Cygwin "
+                     "(prebuilt-object staleness / -fno-common relink); the "
+                     "patched-peer fix is validated on the POSIX targets",
+                     capability='native_build')
+    if not (SRCDIR / 'Makefile').is_file():
+        test_skipped(f"{name}: needs a configured rsync source tree with a Makefile",
+                     capability='native_build')
+    if not shutil.which('make'):
+        test_skipped(f"{name}: make(1) not on PATH", capability='native_build')
+    if not shutil.which('gcc') and not shutil.which('cc'):
+        test_skipped(f"{name}: no C compiler on PATH", capability='native_build')
+
+    work = SCRATCHDIR / name
+    rmtree(work)
+    shutil.copytree(
+        SRCDIR, work, symlinks=True,
+        ignore=shutil.ignore_patterns(
+            'testtmp', '.git', 'auto-build-save', 'autom4te.cache', '__pycache__'))
+
+    for relpath, old, new in replacements:
+        path = work / relpath
+        text = path.read_text()
+        if old not in text:
+            test_skipped(f"{name}: could not find patch target in {relpath}: {old!r}",
+                         capability='native_build')
+        path.write_text(text.replace(old, new, 1))
+
+        obj = (work / relpath).with_suffix('.o')
+        if obj.exists():
+            obj.unlink()
+
+    for stale in (work / 'rsync', work / 'rsync.exe'):
+        if stale.exists():
+            stale.unlink()
+
+    if append_cflags:
+        import re
+        mkpath = work / 'Makefile'
+        mk = mkpath.read_text()
+        mk2 = re.sub(r'(?m)^(CFLAGS=.*)$', r'\1 ' + append_cflags, mk, count=1)
+        if mk2 == mk:
+            test_skipped(f"{name}: could not append {append_cflags!r} to CFLAGS in the Makefile",
+                         capability='native_build')
+        mkpath.write_text(mk2)
+
+        for obj in work.rglob('*.o'):
+            obj.unlink()
+
+    env = {**os.environ, 'CCACHE_DISABLE': '1'}
+    build = subprocess.run(['make', '-j2', 'rsync'], cwd=str(work), env=env,
+                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    rsync = work / 'rsync'
+    if build.returncode != 0 or not rsync.is_file() or not os.access(rsync, os.X_OK):
+        test_skipped(
+            f"{name}: patched rsync build failed (rc={build.returncode}). "
+            "Tail of build output:\n" + '\n'.join(build.stdout.splitlines()[-20:]),
+            capability='native_build')
+    return rsync

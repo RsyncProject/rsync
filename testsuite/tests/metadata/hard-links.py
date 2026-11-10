@@ -4,20 +4,11 @@ import os
 import shutil
 import subprocess
 
-from harness.rsync import (
-    CHKDIR,
-    FROMDIR,
-    OUTFILE,
-    SRCDIR,
-    TODIR,
-    checkit,
-    makepath,
-    rsync_argv,
-    test_fail,
-    test_skipped,
-    rsync_path_arg,
-    rsh_cmd,
-)
+from harness.comparison import checkit
+from harness.environment import CHKDIR, FROMDIR, OUTFILE, SRCDIR, TODIR
+from harness.filesystem import makepath
+from harness.results import test_fail, test_skipped
+from harness.rsync import rsh_cmd, rsync_argv, rsync_path_arg
 from harness import metadata
 
 metadata(features={'hardlinks', 'remote-shell'}, transports={'pipe', 'tcp'}, min_peer='2.6.0', cost='expensive', mutates={'filesystem', 'process'}, tags={'compatibility', 'metadata', 'transfer', 'version-mix'})

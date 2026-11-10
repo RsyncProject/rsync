@@ -2,10 +2,13 @@
 
 import os
 
-from harness import (TestContext, assert_exists, assert_hardlinked, assert_is_symlink, assert_mode,
-                     assert_mtime_close, assert_not_exists, assert_not_hardlinked, assert_same, cp_p,
-                     is_a_link, make_data_file, make_text_file, make_tree, makepath, requires, rmtree,
-                     run, test_fail, walk_dirs, walk_files, write_text_file)
+from harness import TestContext, requires, run
+from harness.filesystem import (
+    assert_exists, assert_hardlinked, assert_is_symlink, assert_mode, assert_mtime_close,
+    assert_not_exists, assert_not_hardlinked, assert_same, cp_p, is_a_link, make_data_file, make_text_file,
+    make_tree, makepath, rmtree, walk_dirs, walk_files, write_text_file,
+)
+from harness.results import test_fail
 
 @requires(transports={'pipe'}, tags={'harness'})
 def test(context: TestContext):

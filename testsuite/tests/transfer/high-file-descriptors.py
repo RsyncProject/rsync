@@ -7,9 +7,10 @@ import shutil
 import subprocess
 import tempfile
 
-from harness.rsync import (
-    FROMDIR, TODIR, rmtree, rsync_argv, test_fail, test_skipped,
-)
+from harness.environment import FROMDIR, TODIR
+from harness.filesystem import rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(features={'high_fd'}, transports={'pipe'})

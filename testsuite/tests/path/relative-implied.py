@@ -2,10 +2,9 @@
 
 import os
 
-from harness.rsync import (
-    SCRATCHDIR, TODIR,
-    assert_mode, assert_same, forced_protocol, makepath, rmtree, run_rsync,
-)
+from harness.environment import SCRATCHDIR, TODIR
+from harness.filesystem import assert_mode, assert_same, makepath, rmtree
+from harness.rsync import forced_protocol, run_rsync
 from harness import metadata
 
 metadata(transports={'pipe'})

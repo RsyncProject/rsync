@@ -1,8 +1,10 @@
 import os
 import sys
 
-from harness.rsync import (CHKDIR, FROMDIR, TODIR, all_plus, allspace, dots, checkdiff,
-                           rsync_ls_lR, run_rsync, test_fail, test_skipped, v_filt)
+from harness.comparison import checkdiff, rsync_ls_lR, v_filt
+from harness.environment import CHKDIR, FROMDIR, TODIR, all_plus, allspace, dots
+from harness.results import test_fail, test_skipped
+from harness.rsync import run_rsync
 
 def check_devices(make_special):
     vv = run_rsync('-VV', check=True, capture_output=True)

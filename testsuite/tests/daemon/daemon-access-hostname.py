@@ -4,11 +4,11 @@
 import socket
 import subprocess
 
-from harness.rsync import (
-    FROMDIR, SCRATCHDIR, RSYNC,
-    make_tree, require_tcp, rmtree, rsync_argv, start_test_daemon,
-    test_fail, test_skipped,
-)
+from harness.daemon import require_tcp, start_test_daemon
+from harness.environment import FROMDIR, RSYNC, SCRATCHDIR
+from harness.filesystem import make_tree, rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(features={'ipv6_loopback', 'loopback_dns', 'tcp'}, transports={'tcp'})

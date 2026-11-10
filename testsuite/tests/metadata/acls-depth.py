@@ -3,11 +3,10 @@
 import shutil
 import subprocess
 
-from harness.rsync import (
-    FROMDIR, TODIR,
-    make_tree, rmtree, run_rsync, test_fail, test_skipped,
-    walk_dirs, walk_files,
-)
+from harness.environment import FROMDIR, TODIR
+from harness.filesystem import make_tree, rmtree, walk_dirs, walk_files
+from harness.results import test_fail, test_skipped
+from harness.rsync import run_rsync
 from harness import metadata
 
 metadata(features={'linux_acl'}, transports={'pipe'})

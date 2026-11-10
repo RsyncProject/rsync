@@ -16,22 +16,24 @@ import time
 from pathlib import Path
 from unittest.mock import patch
 
-from harness import Exit, TestContext, requires, run, runner, test_error
-from harness.rsync import rsync_command_binary, test_fail
+from harness import Exit, TestContext, requires, run, runner
+from harness.results import test_error
+from harness.results import test_fail
+from harness.rsync import rsync_command_binary
 
 @requires(transports={'pipe'}, mutates={'filesystem', 'process'}, tags={'harness'})
 def test(context: TestContext):
-    recipe = context.repository / 'testsuite' / 'tools' / 'check.sh'
+    recipe = context.repository / 'testsuite' / 'tools' / 'check.py'
     if not recipe.is_file():
         test_fail('shared check recipe is missing')
     binary = rsync_command_binary()
     output = context.scratch / 'native run'
-    command = ['sh', str(recipe), str(context.tools), binary, 'pipe,self-peer', str(output)]
+    command = [sys.executable, '-S', str(recipe), str(context.tools), binary, 'pipe,self-peer', str(output)]
     env = os.environ.copy()
     env['whichtests'] = 'must-not-run'
     env['PYTHONUNBUFFERED'] = '1'
 
-    def invoke(args, success, message=None, timeout=60):
+    def invoke(args, success, message=None, timeout=60, input=None):
         print(f'recipe: {shlex.join(args)}', flush=True)
         cancelled = False
 
@@ -43,16 +45,18 @@ def test(context: TestContext):
         proc = None
         try:
             proc = subprocess.Popen(args, env=env, cwd=context.scratch, stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE, text=True, start_new_session=True)
+                                    stderr=subprocess.PIPE, stdin=subprocess.PIPE if input is not None else None,
+                                    text=True, start_new_session=True)
             deadline = time.monotonic() + timeout
             while True:
                 remaining = deadline - time.monotonic()
                 if cancelled or remaining <= 0:
                     raise subprocess.TimeoutExpired(args, timeout)
                 try:
-                    stdout, stderr = proc.communicate(timeout=min(remaining, 0.25))
+                    stdout, stderr = proc.communicate(input=input, timeout=min(remaining, 0.25))
                     break
                 except subprocess.TimeoutExpired:
+                    input = None
                     continue
         except BaseException as error:
             stdout = stderr = ''
@@ -71,7 +75,7 @@ def test(context: TestContext):
             if isinstance(error, subprocess.TimeoutExpired):
                 reason = 'cancelled' if cancelled else f'timed out after {timeout} seconds'
                 diagnostic = f'recipe {reason}: {shlex.join(args)}\n{stdout}{stderr}'
-                output = Path(args[5])
+                output = Path(args[6])
                 for path in [output / 'run.log', *sorted(output.glob('scratch/testtmp/*/test.log'))]:
                     try:
                         with path.open('rb') as log:
@@ -94,16 +98,7 @@ def test(context: TestContext):
             test_fail(f'missing recipe diagnostic: {message}\n{result.stdout}{result.stderr}')
         return result
 
-    python_dir = context.scratch / 'python'
-    python_dir.mkdir()
-    python = python_dir / 'python3'
-    python.write_text(f'#!{sys.executable}\nimport os, sys\n'
-                      'assert sys.argv[1] == "-S"\n'
-                      'os.execv(sys.executable, [sys.executable, *sys.argv[1:]])\n')
-    python.chmod(0o755)
-    env['PATH'] = str(python_dir) + os.pathsep + os.environ['PATH']
     invoke(command + ['cli-transfers', '-j2'], True)
-    env['PATH'] = os.environ['PATH']
     receipt = json.loads((output / 'receipt.json').read_text())
     identity = receipt['run']
     digest = hashlib.sha256(Path(binary).read_bytes()).hexdigest()
@@ -138,15 +133,15 @@ def test(context: TestContext):
         test_fail('recipe overwrote an existing result')
 
     def attempt(name, binary_path=binary, profiles='pipe,self-peer', extra=()):
-        return ['sh', str(recipe), str(context.tools), binary_path, profiles,
+        return [sys.executable, '-S', str(recipe), str(context.tools), binary_path, profiles,
                 str(context.scratch / name), 'cli-transfers', *extra]
 
     invoke(attempt('missing-binary', str(context.scratch / 'absent')), False, 'Not an executable file:')
     wrong = context.scratch / 'wrong-rsync'
-    wrong.write_text('#!/bin/sh\nexit 1\n')
+    wrong.write_text(f'#!{sys.executable}\nraise SystemExit(1)\n')
     wrong.chmod(0o755)
     invoke(attempt('wrong-binary', str(wrong)), False, '--version failed')
-    invoke(attempt('no-profile', profiles=''), False, 'Usage: check.sh')
+    invoke(attempt('no-profile', profiles=''), False, 'Usage: check.py')
     invoke(attempt('empty-profiles', profiles=' , '), False, 'no profiles selected')
     invoke(attempt('no-tests', extra=('--exclude=*',)), False, 'no tests selected')
     invoke(attempt('fixed-inputs', extra=(f'--receipt={context.scratch / "elsewhere.json"}',
@@ -154,7 +149,7 @@ def test(context: TestContext):
     fixed = json.loads((context.scratch / 'fixed-inputs' / 'receipt.json').read_text())
     if fixed['run']['binary_sha256'] != digest or fixed['run']['profiles'] != ['pipe', 'self-peer']:
         test_fail('runner arguments changed the recipe inputs')
-    invoke(['sh', str(recipe), str(context.tools), binary, 'pipe,self-peer',
+    invoke([sys.executable, '-S', str(recipe), str(context.tools), binary, 'pipe,self-peer',
             str(context.scratch / 'long-parent' / ('directory' * 15)), 'daemon-unix-socket-atfd'], True)
     if os.geteuid() == 0 and sys.platform == 'linux':
         private = context.scratch / 'private-home'
@@ -166,7 +161,7 @@ def test(context: TestContext):
             shutil.copy2(context.tools / name, build / name)
         private.chmod(0o700)
         os.chown(private, 65534, 65534)
-        invoke(['sh', str(recipe), str(build), str(build / 'rsync'), 'pipe,self-peer',
+        invoke([sys.executable, '-S', str(recipe), str(build), str(build / 'rsync'), 'pipe,self-peer',
                 str(private / 'results'), 'partial-no-write'], True)
     blocked = context.scratch / 'not-a-directory'
     blocked.touch()
@@ -176,17 +171,21 @@ def test(context: TestContext):
     tests = fixture / 'testsuite' / 'tests'
     tools.mkdir(parents=True)
     tests.mkdir()
-    shutil.copyfile(recipe, tools / 'check.sh')
+    shutil.copyfile(recipe, tools / 'check.py')
     (fixture / 'testsuite' / 'runtests.py').write_text('raise SystemExit(0)\n')
-    invoke(['sh', str(tools / 'check.sh'), str(context.tools), binary, 'pipe,self-peer',
+    invoke([sys.executable, '-S', str(tools / 'check.py'), str(context.tools), binary, 'pipe,self-peer',
             str(context.scratch / 'missing-receipt')], False, 'Missing test receipt:')
     shutil.copyfile(context.repository / 'testsuite' / 'runtests.py', fixture / 'testsuite' / 'runtests.py')
     (tests / 'first.py').write_text('raise SystemExit(1)\n')
     (tests / 'second.py').write_text('raise SystemExit(0)\n')
     profile = fixture / 'profile.json'
     profile.write_text('{}\n')
+    (tests / 'stdin.py').write_text('import sys\nassert sys.stdin.read() == "retained input"\n')
+    invoke([sys.executable, '-S', str(tools / 'check.py'), str(context.tools), binary,
+            str(profile), str(context.scratch / 'stdin'), 'stdin'], True, input='retained input')
+    (tests / 'stdin.py').unlink()
     output = context.scratch / 'incomplete'
-    result = invoke(['sh', str(tools / 'check.sh'), str(context.tools), binary,
+    result = invoke([sys.executable, '-S', str(tools / 'check.py'), str(context.tools), binary,
                      str(profile), str(output), '--stop-on-fail'], False)
     receipt = json.loads((output / 'receipt.json').read_text())
     if (result.returncode != 1 or receipt['run']['selected'] != ['first', 'second']
@@ -195,21 +194,23 @@ def test(context: TestContext):
     if receipt['run']['source_revision'] is not None or receipt['run']['source_dirty'] is not None:
         test_fail('a non-checkout source acquired its parent revision')
 
-    (tools / 'check.sh').write_text("alias stop='kill -STOP'\n" + recipe.read_text())
-    invoke(['sh', str(tools / 'check.sh'), str(context.tools), binary,
-            str(profile), str(context.scratch / 'shell-alias'), 'second'], True)
+    (fixture / 'testsuite' / 'runtests.py').write_text(
+        'import sys\nassert sys.flags.no_site\nfrom harness import runner\nrunner.main()\n')
+    invoke([sys.executable, '-S', str(tools / 'check.py'), str(context.tools), binary,
+            str(profile), str(context.scratch / 'no-site'), 'second'], True)
 
     (fixture / 'testsuite' / 'runtests.py').write_text(
         "import sys\nfrom pathlib import Path\nfrom harness import runner\n"
         "if '--check-receipt' not in sys.argv:\n"
         "    runner.write_receipt = lambda path, data: Path(path).write_text('invalid receipt')\n"
         "runner.main()\n")
-    invoke(['sh', str(tools / 'check.sh'), str(context.tools), binary,
+    invoke([sys.executable, '-S', str(tools / 'check.py'), str(context.tools), binary,
             str(profile), str(context.scratch / 'invalid-receipt'), 'second'], False,
            'invalid test receipt')
 
-    (tools / 'check.sh').write_text(recipe.read_text().replace(
-        'set -eu\n', "set -eu\nprintf 'outer stdout\\n'\nprintf 'outer stderr\\n' >&2\n", 1))
+    (tools / 'check.py').write_text(recipe.read_text().replace(
+        'import sys\n', 'import sys\nprint("outer stdout", flush=True)\n'
+        'print("outer stderr", file=sys.stderr, flush=True)\n', 1))
     (fixture / 'testsuite' / 'runtests.py').write_text(
         'import fcntl, os, signal, sys\nfrom pathlib import Path\nfrom harness import runner\n'
         'output = Path(next(arg.split("=", 1)[1] for arg in sys.argv if arg.startswith("--receipt="))).parent\n'
@@ -273,7 +274,7 @@ def test(context: TestContext):
         try:
             with patch.object(subprocess.Popen, 'communicate', expire), redirect_stderr(diagnostic):
                 try:
-                    invoke(['sh', str(tools / 'check.sh'), str(context.tools), binary,
+                    invoke([sys.executable, '-S', str(tools / 'check.py'), str(context.tools), binary,
                             str(profile), str(output), *[root.name for root in roots], f'-j{parallel}'],
                            False, timeout=0.01)
                 except SystemExit as error:

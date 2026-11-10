@@ -7,11 +7,15 @@ import subprocess
 import sys
 
 from harness.daemon_config import write_daemon_conf
-from harness.rsync import (
-    RSYNC, RSYNC_PEER, SCRATCHDIR, USE_TCP, acls_supported, compare_trees, devices_supported,
-    make_variety_tree, owners_supported, rmtree, rsh_cmd, split_rsync_cmd, start_test_daemon,
-    test_fail, xattrs_supported,
-)
+from fixtures.trees import make_variety_tree
+from harness.comparison import compare_trees
+from harness.daemon import USE_TCP, start_test_daemon
+from harness.environment import RSYNC, RSYNC_PEER, SCRATCHDIR
+from harness.filesystem import acls_supported, devices_supported, owners_supported, rmtree
+from harness.process import split_rsync_cmd
+from harness.results import test_fail
+from harness.rsync import rsh_cmd
+from harness.xattrs import is_supported as xattrs_supported
 from harness import metadata
 
 metadata(features={'daemon', 'filesystem-specials', 'remote-shell'}, transports={'pipe', 'tcp'}, min_peer='2.6.0', cost='expensive', mutates={'filesystem', 'process', 'socket'}, tags={'compatibility', 'metadata', 'transfer', 'version-mix'})

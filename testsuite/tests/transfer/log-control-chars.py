@@ -2,7 +2,9 @@
 
 import os
 
-from harness.rsync import SCRATCHDIR, run_rsync, test_fail, test_skipped
+from harness.environment import SCRATCHDIR
+from harness.results import test_fail, test_skipped
+from harness.rsync import run_rsync
 from harness import metadata
 
 metadata(transports={'pipe'})

@@ -4,7 +4,10 @@ import errno
 import os
 import stat
 
-from harness.rsync import FROMDIR, SCRATCHDIR, TODIR, assert_mode, run_rsync, test_fail, test_skipped
+from harness.environment import FROMDIR, SCRATCHDIR, TODIR
+from harness.filesystem import assert_mode
+from harness.results import test_fail, test_skipped
+from harness.rsync import run_rsync
 from harness import metadata
 
 metadata(features={'symlink_mode'}, transports={'pipe'})

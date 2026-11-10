@@ -6,10 +6,11 @@ import re
 import subprocess
 
 from harness.daemon_config import build_rsyncd_conf
-from harness.rsync import (
-    FROMDIR, RSYNC, RSYNC_PEER, TMPDIR, make_data_file, makepath, split_rsync_cmd,
-    start_test_daemon, test_fail,
-)
+from harness.daemon import start_test_daemon
+from harness.environment import FROMDIR, RSYNC, RSYNC_PEER, TMPDIR
+from harness.filesystem import make_data_file, makepath
+from harness.process import split_rsync_cmd
+from harness.results import test_fail
 from harness import metadata
 
 metadata(features={'compression', 'daemon', 'remote-shell'}, transports={'pipe', 'tcp'}, min_peer='2.6.0', mutates={'filesystem', 'process', 'socket'}, tags={'compatibility', 'daemon', 'transfer', 'version-mix'})

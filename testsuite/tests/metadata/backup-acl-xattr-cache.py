@@ -2,11 +2,11 @@
 
 import os
 
-from harness.rsync import (
-    SCRATCHDIR,
-    acls_supported, xattrs_supported, acl_set, xattr_set,
-    makepath, rmtree, rsync_argv, test_fail, test_skipped,
-)
+from harness.environment import SCRATCHDIR
+from harness.filesystem import acl_set, acls_supported, makepath, rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import rsync_argv
+from harness.xattrs import set_value as xattr_set, is_supported as xattrs_supported
 import subprocess
 from harness import metadata
 

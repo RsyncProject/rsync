@@ -3,7 +3,10 @@
 import os
 
 from harness.daemon_config import write_daemon_conf
-from harness.rsync import SCRATCHDIR, forced_protocol, makepath, rmtree, test_fail, test_skipped
+from harness.environment import SCRATCHDIR
+from harness.filesystem import makepath, rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import forced_protocol
 from harness.daemon import finish_stdio_daemon, start_stdio_daemon
 from harness import metadata
 

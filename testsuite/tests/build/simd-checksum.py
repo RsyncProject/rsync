@@ -3,7 +3,8 @@
 import os
 import subprocess
 
-from harness.rsync import TOOLDIR, test_fail, test_skipped
+from harness.environment import TOOLDIR
+from harness.results import test_fail, test_skipped
 from harness import metadata
 
 metadata(features={'simd'}, transports={'pipe'})

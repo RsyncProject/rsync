@@ -5,10 +5,11 @@ import shlex
 import stat
 import subprocess
 
-from harness.rsync import (
-    RSYNC, SCRATCHDIR, forced_protocol, makepath, patched_rrsync, rmtree,
-    rsync_argv, test_fail, rsync_path_arg,
-)
+from fixtures.rrsync import rrsync_shell, rsync_wrapper, patched_rrsync
+from harness.environment import RSYNC, SCRATCHDIR
+from harness.filesystem import makepath, rmtree
+from harness.results import test_fail
+from harness.rsync import forced_protocol, rsync_argv, rsync_path_arg
 from harness import metadata
 
 metadata(transports={'pipe'})
@@ -32,19 +33,12 @@ xonly.mkdir()
 xonly.chmod(0o111)
 
 shim = base / 'rsync-shim'
-shim.write_text('#!/bin/sh\nexec ' + rsync_path_arg(RSYNC) + ' "$@"\n')
-shim.chmod(0o755)
+rsync_wrapper(shim)
 
 rrsync = patched_rrsync(base, rsync_path=str(shim))
 
 rsh = base / 'fake-rsh'
-rsh.write_text(
-    '#!/bin/sh\n'
-    'shift\n'
-    'SSH_ORIGINAL_COMMAND="$*"\n'
-    'export SSH_ORIGINAL_COMMAND\n'
-    'exec %s %s\n' % (shlex.quote(str(rrsync)), shlex.quote(str(restricted))))
-rsh.chmod(0o755)
+rrsync_shell(rsh, rrsync, restricted)
 
 def pull(*args):
     rmtree(dest)

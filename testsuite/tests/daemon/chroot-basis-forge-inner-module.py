@@ -4,10 +4,10 @@ import os
 import time
 
 from harness.daemon_config import write_daemon_conf
-from harness.rsync import (
-    SCRATCHDIR, claim_ports, get_rootuid, get_testuid, makepath, require_tcp, rmtree,
-    start_test_daemon, test_fail, test_skipped,
-)
+from harness.daemon import claim_ports, require_tcp, start_test_daemon
+from harness.environment import SCRATCHDIR
+from harness.filesystem import makepath, rmtree
+from harness.results import test_fail, test_skipped
 from harness import protocol as rp
 from harness import metadata
 
@@ -15,7 +15,7 @@ metadata(features={'root', 'tcp'}, transports={'tcp'})
 
 PORT = 12973
 require_tcp("the pure-Python sender needs a real TCP daemon; run with --use-tcp")
-if get_testuid() != get_rootuid():
+if os.getuid() != 0:
     test_skipped("the /./ inner-module chroot regression requires root", capability='root')
 claim_ports(PORT)
 

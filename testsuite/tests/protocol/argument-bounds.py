@@ -2,16 +2,10 @@
 
 import os
 import subprocess
-from harness.rsync import (
-    FROMDIR,
-    SCRATCHDIR,
-    makepath,
-    rmtree,
-    rsync_argv,
-    test_fail,
-    rsync_path_arg,
-    rsh_cmd,
-)
+from harness.environment import FROMDIR, SCRATCHDIR
+from harness.filesystem import makepath, rmtree
+from harness.results import test_fail
+from harness.rsync import rsh_cmd, rsync_argv, rsync_path_arg
 from harness import metadata
 
 metadata(transports={'pipe'})

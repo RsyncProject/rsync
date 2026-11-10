@@ -2,10 +2,10 @@
 
 import os
 
-from harness.rsync import (
-    CHKDIR, TMPDIR, TODIR,
-    checkit, cp_touch, run_rsync,
-)
+from harness.comparison import checkit
+from harness.environment import CHKDIR, TMPDIR, TODIR
+from harness.filesystem import cp_touch
+from harness.rsync import run_rsync
 from harness import metadata
 
 metadata(transports={'pipe'})

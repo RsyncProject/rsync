@@ -5,10 +5,11 @@ import os
 import shutil
 import subprocess
 
-from harness.rsync import (
-    SCRATCHDIR, RSYNC,
-    acls_supported, require_asan, rmtree, rsync_argv, test_fail, test_skipped,
-)
+from harness.daemon import require_asan
+from harness.environment import RSYNC, SCRATCHDIR
+from harness.filesystem import acls_supported, rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(features={'asan'}, transports={'pipe'})

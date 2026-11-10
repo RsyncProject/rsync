@@ -7,10 +7,11 @@ import subprocess
 import time
 
 from harness.daemon_config import write_daemon_conf
-from harness.rsync import (
-    FROMDIR, SCRATCHDIR, make_tree, rmtree, rsync_argv, start_test_daemon, test_fail,
-    test_skipped,
-)
+from harness.daemon import start_test_daemon
+from harness.environment import FROMDIR, SCRATCHDIR
+from harness.filesystem import make_tree, rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(features={'cross_uid'}, transports={'pipe', 'tcp'})

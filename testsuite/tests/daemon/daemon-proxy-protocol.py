@@ -4,7 +4,10 @@ import socket
 import struct
 
 from harness.daemon_config import write_daemon_conf
-from harness.rsync import SCRATCHDIR, claim_ports, makepath, require_tcp, start_rsyncd, test_fail
+from harness.daemon import claim_ports, require_tcp, start_rsyncd
+from harness.environment import SCRATCHDIR
+from harness.filesystem import makepath
+from harness.results import test_fail
 from harness import metadata
 
 metadata(features={'tcp'}, transports={'tcp'})

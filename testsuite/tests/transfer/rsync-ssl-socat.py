@@ -11,7 +11,8 @@ import shutil
 import subprocess
 import sys
 
-from harness.rsync import SCRATCHDIR, SRCDIR, test_fail
+from harness.environment import SCRATCHDIR, SRCDIR
+from harness.results import test_fail
 from harness import metadata
 
 metadata(transports={'pipe', 'tcp'})

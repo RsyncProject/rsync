@@ -6,10 +6,11 @@ import shutil
 import subprocess
 import sys
 
-from harness.rsync import (
-    SCRATCHDIR, TODIR,
-    require_tcp, rmtree, rsync_argv, start_test_daemon, test_fail, test_skipped,
-)
+from harness.daemon import require_tcp, start_test_daemon
+from harness.environment import SCRATCHDIR, TODIR
+from harness.filesystem import rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(features={'chroot', 'linux_nss_chroot', 'tcp'}, transports={'tcp'})

@@ -13,11 +13,10 @@ import subprocess
 import sys
 
 from harness import metadata
-from harness.rsync import (
-    FROMDIR, SCRATCHDIR, SRCDIR, TODIR,
-    forced_protocol, rmtree, rsh_cmd, rsync_path_arg, run_rsync, test_fail,
-    test_skipped,
-)
+from harness.environment import FROMDIR, SCRATCHDIR, SRCDIR, TODIR
+from harness.filesystem import rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import forced_protocol, rsh_cmd, rsync_path_arg, run_rsync
 
 metadata(protocols={29, 30, 31, 32, 33}, transports={'pipe', 'tcp'}, min_peer='3.5.2', tags={'version-mix'})
 

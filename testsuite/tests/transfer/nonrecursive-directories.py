@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
-from harness.rsync import (
-    FROMDIR, TODIR,
-    assert_same, make_tree, rmtree, run_rsync, test_fail,
-)
+from harness.environment import FROMDIR, TODIR
+from harness.filesystem import assert_same, make_tree, rmtree
+from harness.results import test_fail
+from harness.rsync import run_rsync
 from harness import metadata
 
 metadata(transports={'pipe'})

@@ -2,10 +2,12 @@
 
 import subprocess
 
-from harness.rsync import (
-    CHKDIR, FROMDIR, TMPDIR, TODIR,
-    checkit, hands_setup, makepath, rsync_argv, test_fail,
-)
+from fixtures.trees import hands_setup
+from harness.comparison import checkit
+from harness.environment import CHKDIR, FROMDIR, TMPDIR, TODIR
+from harness.filesystem import makepath
+from harness.results import test_fail
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(transports={'pipe'})

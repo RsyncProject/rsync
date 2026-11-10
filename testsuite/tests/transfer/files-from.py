@@ -1,17 +1,10 @@
 #!/usr/bin/env python3
 
-from harness.rsync import (
-    CHKDIR,
-    FROMDIR,
-    SCRATCHDIR,
-    TODIR,
-    checkit,
-    hands_setup,
-    rmtree,
-    run_rsync,
-    rsync_path_arg,
-    rsh_cmd,
-)
+from fixtures.trees import hands_setup
+from harness.comparison import checkit
+from harness.environment import CHKDIR, FROMDIR, SCRATCHDIR, TODIR
+from harness.filesystem import rmtree
+from harness.rsync import rsh_cmd, rsync_path_arg, run_rsync
 from harness import metadata
 
 metadata(features={'files-from', 'remote-shell'}, transports={'pipe', 'tcp'}, min_peer='2.6.0', mutates={'filesystem', 'process'}, tags={'compatibility', 'transfer', 'version-mix'})

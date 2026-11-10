@@ -2,9 +2,11 @@
 
 import os
 import subprocess
+import sys
 
 from harness import TestContext, requires, run
-from harness.rsync import rsync_command_binary, test_fail, test_skipped
+from harness.results import test_fail, test_skipped
+from harness.rsync import rsync_command_binary
 
 @requires(features={'nonroot', 'dac_restriction'}, transports={'pipe'}, mutates={'filesystem', 'process'}, tags={'harness'})
 def test(context: TestContext):
@@ -21,8 +23,8 @@ def test(context: TestContext):
         else:
             probe.rmdir()
             test_skipped('directory writes are not restricted', capability='dac_restriction')
-        recipe = context.repository / 'testsuite' / 'tools' / 'check.sh'
-        command = ['sh', str(recipe), str(context.tools), rsync_command_binary(), 'pipe,self-peer']
+        recipe = context.repository / 'testsuite' / 'tools' / 'check.py'
+        command = [sys.executable, '-S', str(recipe), str(context.tools), rsync_command_binary(), 'pipe,self-peer']
         env = {**os.environ, 'LC_ALL': 'C'}
         control = subprocess.run(command + [str(context.scratch / 'control'), 'cli-transfers'],
                                  env=env, capture_output=True, text=True, timeout=60)

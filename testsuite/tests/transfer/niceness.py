@@ -9,11 +9,12 @@ import sys
 
 from harness import metadata
 from harness.daemon_config import build_rsyncd_conf
-from harness.rsync import (
-    FROMDIR, RSYNC, SCRATCHDIR, TODIR, hands_setup,
-    patched_rrsync, rsync_argv, rsync_path_arg, rsh_cmd, run_rsync,
-    start_test_daemon, test_fail,
-)
+from fixtures.rrsync import patched_rrsync
+from fixtures.trees import hands_setup
+from harness.daemon import start_test_daemon
+from harness.environment import FROMDIR, RSYNC, SCRATCHDIR, TODIR
+from harness.results import test_fail
+from harness.rsync import rsh_cmd, rsync_argv, rsync_path_arg, run_rsync
 
 metadata(transports={'pipe', 'tcp'}, min_peer='3.5.2', tags={'version-mix'})
 

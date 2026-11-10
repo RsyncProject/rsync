@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
-from harness.rsync import (
-    FROMDIR, SRCDIR, TODIR, cp_p, cp_touch, run_rsync, test_fail, verify_dirs,
-)
+from harness.comparison import verify_dirs
+from harness.environment import FROMDIR, SRCDIR, TODIR
+from harness.filesystem import cp_p, cp_touch
+from harness.results import test_fail
+from harness.rsync import run_rsync
 from harness import metadata
 
 metadata(transports={'pipe'})

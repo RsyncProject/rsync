@@ -5,10 +5,10 @@ import re
 import shlex
 import subprocess
 
-from harness.rsync import (
-    SCRATCHDIR,
-    check_perms, run_rsync, test_fail, test_skipped,
-)
+from harness.comparison import check_perms
+from harness.environment import SCRATCHDIR
+from harness.results import test_fail, test_skipped
+from harness.rsync import run_rsync
 from harness import metadata
 
 metadata(features={'linux_acl'}, transports={'pipe'})

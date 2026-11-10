@@ -4,10 +4,13 @@ import os
 import subprocess
 
 from harness.daemon_config import build_rsyncd_conf
-from harness.rsync import (
-    CHKDIR, FROMDIR, TMPDIR, TODIR, checkit, hands_setup, rmtree,
-    run_rsync, start_test_daemon, test_fail, verify_dirs,
-)
+from fixtures.trees import hands_setup
+from harness.comparison import checkit, verify_dirs
+from harness.daemon import start_test_daemon
+from harness.environment import CHKDIR, FROMDIR, TMPDIR, TODIR
+from harness.filesystem import rmtree
+from harness.results import test_fail
+from harness.rsync import run_rsync
 from harness import metadata
 
 metadata(features={'batch', 'daemon'}, transports={'pipe', 'tcp'}, min_peer='2.6.0', mutates={'filesystem', 'process', 'socket'}, tags={'compatibility', 'daemon', 'transfer', 'version-mix'})

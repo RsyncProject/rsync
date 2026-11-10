@@ -5,9 +5,10 @@ import os
 from contextlib import redirect_stdout
 
 from harness.daemon_config import write_daemon_conf
-from harness.rsync import (
-    SCRATCHDIR, claim_ports, makepath, require_tcp, rmtree, start_test_daemon, test_fail,
-)
+from harness.daemon import claim_ports, require_tcp, start_test_daemon
+from harness.environment import SCRATCHDIR
+from harness.filesystem import makepath, rmtree
+from harness.results import test_fail
 from harness import protocol as rp
 from harness import protocol_client
 from harness import metadata

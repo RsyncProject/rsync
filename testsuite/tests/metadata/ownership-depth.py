@@ -3,17 +3,16 @@
 import grp
 import os
 
-from harness.rsync import (
-    FROMDIR, TODIR,
-    get_rootuid, get_testuid, make_tree, rmtree, rsync_getgroups, run_rsync,
-    test_fail, test_skipped, walk_dirs, walk_files,
-)
+from harness.environment import FROMDIR, TODIR
+from harness.filesystem import make_tree, rmtree, walk_dirs, walk_files
+from harness.results import test_fail, test_skipped
+from harness.rsync import rsync_getgroups, run_rsync
 from harness import metadata
 
 metadata(transports={'pipe'})
 
 src = FROMDIR
-is_root = get_testuid() == get_rootuid()
+is_root = os.getuid() == 0
 prim = os.getgid()
 
 def seed():
@@ -42,7 +41,7 @@ except KeyError:
 
 if is_root:
     target_gid = 1 if prim == 0 else 0
-    target_uid = 1 if get_testuid() == 0 else 0
+    target_uid = 1 if os.getuid() == 0 else 0
 
     entries = seed()
     run_rsync('-a', f'--groupmap={prim}:{target_gid}', f'{src}/', f'{TODIR}/')

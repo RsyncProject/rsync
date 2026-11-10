@@ -3,11 +3,11 @@
 import os
 import subprocess
 
-from harness.rsync import (
-    SCRATCHDIR,
-    rsync_argv, get_testuid, get_rootuid, get_rootgid,
-    rmtree, start_test_daemon, test_fail,
-)
+from harness.daemon import start_test_daemon
+from harness.environment import SCRATCHDIR
+from harness.filesystem import rmtree
+from harness.results import test_fail
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(features={'daemon', 'symlink'}, transports={'pipe', 'tcp'}, min_peer='2.6.0', mutates={'filesystem', 'process', 'socket'}, tags={'daemon', 'security', 'version-mix'})
@@ -34,9 +34,9 @@ os.symlink(str(outside), mod / 'cd')
 (mod / 'realdir').mkdir()
 (mod / 'realdir' / 'in_module.txt').write_text("INSIDE_THE_MODULE\n")
 
-my_uid = get_testuid()
-root_uid = get_rootuid()
-root_gid = get_rootgid()
+my_uid = os.getuid()
+root_uid = 0
+root_gid = 0
 uid_line = f"uid = {root_uid}"
 gid_line = f"gid = {root_gid}"
 if my_uid != root_uid:

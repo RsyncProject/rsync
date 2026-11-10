@@ -4,10 +4,11 @@ import shlex
 import subprocess
 
 from harness.daemon_config import build_rsyncd_conf
-from harness.rsync import (
-    FROMDIR, RSYNC_PEER, TODIR, makepath, rsh_cmd, rsync_path_arg,
-    rsync_argv, start_test_daemon, test_fail,
-)
+from harness.daemon import start_test_daemon
+from harness.environment import FROMDIR, RSYNC_PEER, TODIR
+from harness.filesystem import makepath
+from harness.results import test_fail
+from harness.rsync import rsh_cmd, rsync_argv, rsync_path_arg
 from harness import metadata
 
 metadata(features={'daemon'}, transports={'pipe', 'tcp'}, min_peer='2.6.0', mutates={'filesystem', 'process', 'socket'}, tags={'compatibility', 'daemon', 'version-mix'})

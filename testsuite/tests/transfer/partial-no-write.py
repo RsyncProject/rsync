@@ -8,12 +8,15 @@ import shutil
 import sys
 import tempfile
 
-from harness import TestContext, requires, run, rsync
-from harness.rsync import checkit, cp_p, make_data_file, makepath, rsync_argv_for, rsync_command_binary, test_error
+from harness import TestContext, requires, run, environment
+from harness.comparison import checkit
+from harness.filesystem import cp_p, make_data_file, makepath
+from harness.results import test_error
+from harness.rsync import rsync_argv_for, rsync_command_binary
 
 @requires(transports={'pipe'}, mutates={'filesystem', 'process'}, tags={'transfer'})
 def test(context: TestContext):
-    original = rsync.RSYNC
+    original = environment.RSYNC
     with ExitStack() as cleanup:
         base = context.scratch
         prefix = []
@@ -45,14 +48,14 @@ def test(context: TestContext):
                      'fi\n'
                      'shift\n'
                      'exec "$@"')
-            rsync.RSYNC = shlex.join([*prefix, 'sh', '-c', probe, 'sh', str(partial), *rsync_argv_for(binary)])
+            environment.RSYNC = shlex.join([*prefix, 'sh', '-c', probe, 'sh', str(partial), *rsync_argv_for(binary)])
         previous = os.getcwd()
         try:
             os.chdir(base)
             checkit(['-avv', '--partial', '--delay-updates', f'{source}/', f'{destination}/'], source, destination)
         finally:
             os.chdir(previous)
-            rsync.RSYNC = original
+            environment.RSYNC = original
 
 if __name__ == '__main__':
     run(test)

@@ -4,7 +4,9 @@ import os
 import subprocess
 
 from harness import TestContext, requires, run
-from harness.rsync import checkit, rsync_argv, rsync_path_arg, rsh_cmd, run_rsync, test_fail
+from harness.comparison import checkit
+from harness.results import test_fail
+from harness.rsync import rsh_cmd, rsync_argv, rsync_path_arg, run_rsync
 
 @requires(features={'remote-shell'}, transports={'pipe', 'tcp'}, min_peer='2.6.0', mutates={'environment', 'filesystem'}, tags={'compatibility', 'smoke', 'transfer', 'version-mix'})
 def test(context: TestContext):

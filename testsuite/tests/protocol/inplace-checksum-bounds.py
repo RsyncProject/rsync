@@ -14,8 +14,11 @@ import threading
 import time
 
 from harness import metadata
-from harness.rsync import (FROMDIR, TODIR, forced_protocol, require_tcp, rmtree,
-                           rsync_argv, test_fail, test_skipped)
+from harness.daemon import require_tcp
+from harness.environment import FROMDIR, TODIR
+from harness.filesystem import rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import forced_protocol, rsync_argv
 
 metadata(cost='expensive', transports={'tcp'}, tags={'daemon', 'regression'})
 require_tcp('crafted checksum peer needs TCP')

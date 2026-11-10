@@ -5,10 +5,11 @@ import os
 import subprocess
 import time
 
-from harness.rsync import (
-    SCRATCHDIR, claim_ports, makepath, require_asan, require_tcp, rsync_argv,
-    start_rsyncd, test_fail,
-)
+from harness.daemon import claim_ports, require_asan, require_tcp, start_rsyncd
+from harness.environment import SCRATCHDIR
+from harness.filesystem import makepath
+from harness.results import test_fail
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(features={'asan', 'tcp'}, transports={'tcp'})

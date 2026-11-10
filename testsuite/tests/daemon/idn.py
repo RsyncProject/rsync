@@ -7,10 +7,10 @@ import subprocess
 import sys
 import threading
 
-from harness.rsync import (
-    RSYNC, SCRATCHDIR, USE_TCP, claim_ports, run_rsync,
-    test_fail, test_skipped,
-)
+from harness.daemon import USE_TCP, claim_ports
+from harness.environment import RSYNC, SCRATCHDIR
+from harness.results import test_fail, test_skipped
+from harness.rsync import run_rsync
 from harness import metadata
 
 metadata(features={'idn'}, transports={'pipe', 'tcp'})
@@ -54,8 +54,10 @@ def run_idn(url, *extra, extra_env=None):
     argv += [url.encode('utf-8'), out_dir]
     return subprocess.run(argv, capture_output=True, env=e, timeout=30)
 
-helper = SCRATCHDIR / 'idn-rsh.sh'
-helper.write_text('#!/bin/sh\nprintf %s "$1" > "$IDN_RSH_OUT"\nexit 1\n')
+helper = SCRATCHDIR / 'idn-rsh'
+helper.write_text(f'#!{sys.executable}\nimport os, sys\nfrom pathlib import Path\n'
+                  'Path(os.environ["IDN_RSH_OUT"]).write_bytes(os.fsencode(sys.argv[1]))\n'
+                  'raise SystemExit(1)\n')
 helper.chmod(0o755)
 
 hostfile = SCRATCHDIR / 'idn-rsh-host'

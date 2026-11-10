@@ -3,10 +3,9 @@
 import os
 
 from harness import metadata
-from harness.rsync import (
-    FROMDIR, TODIR,
-    assert_hardlinked, assert_not_hardlinked, makepath, rmtree, run_rsync,
-)
+from harness.environment import FROMDIR, TODIR
+from harness.filesystem import assert_hardlinked, assert_not_hardlinked, makepath, rmtree
+from harness.rsync import run_rsync
 
 src = FROMDIR
 metadata(features={'hardlinks'}, transports={'pipe'}, cost='expensive', mutates={'filesystem'}, tags={'metadata'})

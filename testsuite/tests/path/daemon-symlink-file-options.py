@@ -6,11 +6,11 @@ import shutil
 import stat
 import subprocess
 
-from harness.rsync import (
-    SCRATCHDIR,
-    get_rootgid, get_rootuid, get_testuid,
-    rmtree, rsync_argv, start_test_daemon, test_fail, test_skipped,
-)
+from harness.daemon import start_test_daemon
+from harness.environment import SCRATCHDIR
+from harness.filesystem import rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(features={'daemon', 'symlink'}, transports={'pipe', 'tcp'}, min_peer='2.6.0', cost='expensive', mutates={'filesystem', 'process', 'socket'}, tags={'daemon', 'security', 'version-mix'})
@@ -43,9 +43,9 @@ def verify_outside_unchanged_or_absent(label: str, target: str) -> None:
     if (outside / target).exists() or (outside / target).is_symlink():
         test_fail(f"{label}: outside/{target} was created -- daemon followed the cd symlink")
 
-my_uid = get_testuid()
-root_uid = get_rootuid()
-root_gid = get_rootgid()
+my_uid = os.getuid()
+root_uid = 0
+root_gid = 0
 uid_line = f"uid = {root_uid}"
 gid_line = f"gid = {root_gid}"
 if my_uid != root_uid:

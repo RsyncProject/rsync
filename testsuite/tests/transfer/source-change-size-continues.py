@@ -6,10 +6,11 @@ import shutil
 import subprocess
 import sys
 
-from harness.rsync import (
-    RSYNC, SCRATCHDIR, assert_same, make_data_file, makepath, rmtree,
-    rsync_argv, test_fail, test_skipped, split_rsync_cmd,
-)
+from harness.environment import RSYNC, SCRATCHDIR
+from harness.filesystem import assert_same, make_data_file, makepath, rmtree
+from harness.process import split_rsync_cmd
+from harness.results import test_fail, test_skipped
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(features={'linux_interpose'}, transports={'pipe'})

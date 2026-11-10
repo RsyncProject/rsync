@@ -3,11 +3,14 @@
 import os
 import shlex
 import subprocess
+import sys
 
-from harness.rsync import (
-    RSYNC, RSYNC_PREFIX, SCRATCHDIR, patched_rrsync, rmtree, rsync_argv,
-    test_fail, xattr_set, xattrs_supported, rsync_path_arg,
-)
+from fixtures.rrsync import rrsync_shell, rsync_wrapper, patched_rrsync
+from harness.environment import RSYNC, SCRATCHDIR
+from harness.filesystem import rmtree
+from harness.results import test_fail
+from harness.rsync import rsync_argv, rsync_path_arg
+from harness.xattrs import RSYNC_PREFIX, set_value as xattr_set, is_supported as xattrs_supported
 from harness import metadata
 
 metadata(transports={'pipe'})
@@ -34,7 +37,8 @@ if (without / 'evil_fifo').exists():
 
 record = base / 'argv'
 stub = base / 'rsync-record'
-stub.write_text('#!/bin/sh\nprintf \'%s\\n\' "$@" >' + str(record) + '\n')
+stub.write_text(f'#!{sys.executable}\nimport sys\nfrom pathlib import Path\n'
+                f'Path({str(record)!r}).write_text("".join(arg + "\\n" for arg in sys.argv[1:]))\n')
 stub.chmod(0o755)
 rrsync = patched_rrsync(base, rsync_path=str(stub))
 restricted = base / 'restricted'
@@ -69,17 +73,10 @@ served.mkdir()
 pushwrap = base / 'pushwrap'
 pushwrap.mkdir()
 shim = base / 'rsync-shim'
-shim.write_text('#!/bin/sh\nexec ' + rsync_path_arg(RSYNC) + ' "$@"\n')
-shim.chmod(0o755)
+rsync_wrapper(shim)
 rrsync_push = patched_rrsync(pushwrap, rsync_path=str(shim))
 rsh = base / 'fake-rsh'
-rsh.write_text(
-    '#!/bin/sh\n'
-    'shift\n'
-    'SSH_ORIGINAL_COMMAND="$*"\n'
-    'export SSH_ORIGINAL_COMMAND\n'
-    'exec %s %s\n' % (shlex.quote(str(rrsync_push)), shlex.quote(str(served))))
-rsh.chmod(0o755)
+rrsync_shell(rsh, rrsync_push, served)
 
 proc = subprocess.run(
     rsync_argv('-rlptgoD', '--specials', '-e', str(rsh), f'{src}/', 'dummy:.'),
@@ -112,18 +109,10 @@ if xattrs_supported():
         devwrap = base / 'devwrap'
         devwrap.mkdir()
         devshim = base / 'rsync-shim-fake'
-        devshim.write_text('#!/bin/sh\nexec ' + rsync_path_arg(RSYNC) + ' --fake-super "$@"\n')
-        devshim.chmod(0o755)
+        rsync_wrapper(devshim, '--fake-super')
         rrsync_dev = patched_rrsync(devwrap, rsync_path=str(devshim))
         devrsh = base / 'fake-rsh-dev'
-        devrsh.write_text(
-            '#!/bin/sh\n'
-            'shift\n'
-            'SSH_ORIGINAL_COMMAND="$*"\n'
-            'export SSH_ORIGINAL_COMMAND\n'
-            'exec %s %s\n' % (shlex.quote(str(rrsync_dev)),
-                               shlex.quote(str(devserved))))
-        devrsh.chmod(0o755)
+        rrsync_shell(devrsh, rrsync_dev, devserved)
         proc = subprocess.run(
             rsync_argv('--fake-super', '-rlptgoD', '--specials', '-e',
                        str(devrsh), f'{devsrc}/', 'dummy:.'),

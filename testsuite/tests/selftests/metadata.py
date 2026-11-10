@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
-from harness import (TestContext, applies_to_peer, discover_tests, metadata, placeholder_target,
-                     read_requirements, requires, resolve_test_path, run, test_name)
-from harness.rsync import test_fail
+from harness import TestContext, metadata, requires, run
+from harness.metadata import (
+    applies_to_peer, discover_tests, placeholder_target, read_requirements, resolve_test_path, test_name,
+)
+from harness.results import test_fail
 
 @requires(transports={'pipe'}, tags={'harness'})
 def test(context: TestContext):

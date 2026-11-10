@@ -2,9 +2,9 @@
 
 import socket
 
-from harness.rsync import (
-    SCRATCHDIR, claim_ports, require_tcp, start_rsyncd, test_fail,
-)
+from harness.daemon import claim_ports, require_tcp, start_rsyncd
+from harness.environment import SCRATCHDIR
+from harness.results import test_fail
 from harness import metadata
 
 metadata(features={'tcp'}, transports={'tcp'})

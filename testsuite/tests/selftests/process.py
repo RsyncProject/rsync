@@ -8,9 +8,12 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from harness import daemon, process
-from harness import (Exit, TestContext, forced_protocol, requires, rsh_cmd, rsync_argv,
-                     rsync_argv_for, rsync_command_binary, rsync_path_arg, rsync_supports, run,
-                     run_rsync, split_rsync_cmd, test_fail, under_valgrind)
+from harness import Exit, TestContext, requires, run
+from harness.process import (
+    forced_protocol, rsh_cmd, rsync_argv, rsync_argv_for, rsync_command_binary, rsync_path_arg,
+    rsync_supports, run_rsync, split_rsync_cmd, under_valgrind,
+)
+from harness.results import test_fail
 
 @requires(transports={'pipe'}, tags={'harness'})
 def test(context: TestContext):

@@ -6,10 +6,11 @@ import shlex
 import subprocess
 import time
 
-from harness.rsync import (
-    SCRATCHDIR, makepath, patched_rrsync, proc_self_fd_pins, rmtree,
-    rsync_argv, test_fail, test_skipped,
-)
+from fixtures.rrsync import rrsync_shell, patched_rrsync
+from harness.environment import SCRATCHDIR
+from harness.filesystem import makepath, proc_self_fd_pins, rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(features={'proc_fd'}, transports={'pipe'})
@@ -45,10 +46,7 @@ os.execvp(cmd[0], cmd + sys.argv[1:])
 shim.chmod(0o755)
 rrsync = patched_rrsync(base, rsync_path=str(shim))
 rsh = base / 'fake-rsh'
-rsh.write_text('#!/bin/sh\nshift\nSSH_ORIGINAL_COMMAND="$*"\n'
-               'export SSH_ORIGINAL_COMMAND\nexec %s -no-lock %s\n'
-               % (shlex.quote(str(rrsync)), shlex.quote(str(restricted))))
-rsh.chmod(0o755)
+rrsync_shell(rsh, rrsync, restricted, '-no-lock')
 
 
 def command(src, dest, *options):

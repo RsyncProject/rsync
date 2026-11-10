@@ -3,10 +3,12 @@
 import os
 
 from harness.daemon_config import build_rsyncd_conf
-from harness.rsync import (
-    FROMDIR, SCRATCHDIR, TODIR, check_perms, checkit, makepath, rmtree, run_rsync,
-    start_test_daemon, test_fail,
-)
+from harness.comparison import check_perms, checkit
+from harness.daemon import start_test_daemon
+from harness.environment import FROMDIR, SCRATCHDIR, TODIR
+from harness.filesystem import makepath, rmtree
+from harness.results import test_fail
+from harness.rsync import run_rsync
 from harness import metadata
 
 metadata(features={'chmod', 'daemon'}, transports={'pipe', 'tcp'}, min_peer='2.6.7', mutates={'filesystem', 'process', 'socket'}, tags={'daemon', 'metadata', 'version-mix'})

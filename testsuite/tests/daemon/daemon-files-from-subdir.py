@@ -5,10 +5,11 @@ import shutil
 
 from harness import metadata
 from harness.daemon_config import write_daemon_conf
-from harness.rsync import (
-    SCRATCHDIR, assert_exists, assert_not_exists, makepath, run_rsync,
-    start_test_daemon, test_fail,
-)
+from harness.daemon import start_test_daemon
+from harness.environment import SCRATCHDIR
+from harness.filesystem import assert_exists, assert_not_exists, makepath
+from harness.results import test_fail
+from harness.rsync import run_rsync
 
 metadata(protocols={29, 30, 31, 32, 33}, transports={'pipe', 'tcp'}, min_peer='3.0.0', tags={'version-mix'})
 

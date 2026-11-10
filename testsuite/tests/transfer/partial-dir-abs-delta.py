@@ -4,9 +4,10 @@ import filecmp
 import shutil
 import subprocess
 
-from harness.rsync import (
-    SCRATCHDIR, make_data_file, makepath, rmtree, rsync_argv, test_fail,
-)
+from harness.environment import SCRATCHDIR
+from harness.filesystem import make_data_file, makepath, rmtree
+from harness.results import test_fail
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(transports={'pipe'})

@@ -2,7 +2,8 @@
 
 import os
 
-from harness.rsync import FROMDIR, TODIR, checkit
+from harness.comparison import checkit
+from harness.environment import FROMDIR, TODIR
 from harness import metadata
 
 metadata(transports={'pipe'})

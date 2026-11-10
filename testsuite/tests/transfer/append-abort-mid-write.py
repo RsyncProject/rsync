@@ -26,10 +26,11 @@ import subprocess
 import sys
 import time
 
-from harness.rsync import (
-    RSYNC, SCRATCHDIR, assert_same, make_data_file, makepath, rmtree,
-    rsync_argv, run_rsync, split_rsync_cmd, test_error, test_fail, test_skipped,
-)
+from harness.environment import RSYNC, SCRATCHDIR
+from harness.filesystem import assert_same, make_data_file, makepath, rmtree
+from harness.process import split_rsync_cmd
+from harness.results import test_error, test_fail, test_skipped
+from harness.rsync import rsync_argv, run_rsync
 from harness import metadata
 
 metadata(features={'linux_interpose', 'native_build'}, transports={'pipe'})

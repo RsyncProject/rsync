@@ -5,10 +5,10 @@ import stat
 import subprocess
 import time
 
-from harness.rsync import (
-    SCRATCHDIR, makepath, patched_rrsync, proc_self_fd_pins, rmtree, test_fail,
-    test_skipped,
-)
+from fixtures.rrsync import patched_rrsync
+from harness.environment import SCRATCHDIR
+from harness.filesystem import makepath, proc_self_fd_pins, rmtree
+from harness.results import test_fail, test_skipped
 from harness import metadata
 
 metadata(features={'proc_fd'}, transports={'pipe'})

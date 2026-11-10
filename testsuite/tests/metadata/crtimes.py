@@ -3,9 +3,11 @@
 import datetime
 import os
 
-from harness import rsync
+from harness import environment
 from harness import TestContext, requires, run
-from harness.rsync import checkit, run_rsync, test_skipped
+from harness.comparison import checkit
+from harness.results import test_skipped
+from harness.rsync import run_rsync
 
 @requires(features={'crtimes'}, transports={'pipe'}, mutates={'filesystem'}, tags={'metadata'})
 def test(context: TestContext):
@@ -24,7 +26,7 @@ def test(context: TestContext):
     set_time(context.source, datetime.datetime(2002, 2, 2, 22, 22, 22))
     set_time(source, datetime.datetime(2001, 11, 11, 11, 11, 11))
     set_time(source, datetime.datetime(2002, 12, 12, 22, 22, 22))
-    rsync.TLS_ARGS = '--crtimes'
+    environment.TLS_ARGS = '--crtimes'
     checkit(['-rtgvvv', '--crtimes', f'{context.source}/', f'{context.destination}/'], context.source, context.destination)
 
 if __name__ == '__main__':

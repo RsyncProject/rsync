@@ -2,7 +2,8 @@
 
 from harness.daemon_config import setup_chroot_inner
 from harness.process import capture_command
-from harness.rsync import rsync_argv, test_fail
+from harness.results import test_fail
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(features={'chroot', 'root'}, transports={'pipe', 'tcp'})

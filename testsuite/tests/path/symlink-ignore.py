@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 
-from harness.rsync import (
-    FROMDIR, TODIR,
-    build_symlinks, is_a_link, run_rsync, test_fail,
-)
+from fixtures.trees import build_symlinks
+from harness.environment import FROMDIR, TODIR
+from harness.filesystem import is_a_link
+from harness.results import test_fail
+from harness.rsync import run_rsync
 from harness import metadata
 
 metadata(transports={'pipe'})

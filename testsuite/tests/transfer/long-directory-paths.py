@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 
-from harness.rsync import (FROMDIR, TODIR, checkit, hands_setup, make_text_file,
-                      test_skipped)
+from fixtures.trees import hands_setup
+from harness.comparison import checkit
+from harness.environment import FROMDIR, TODIR
+from harness.filesystem import make_text_file
+from harness.results import test_skipped
 from harness import metadata
 
 metadata(transports={'pipe'})

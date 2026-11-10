@@ -3,7 +3,10 @@
 import os
 import shutil
 
-from harness.rsync import FROMDIR, TMPDIR, TODIR, checkit, hands_setup, run_rsync
+from fixtures.trees import hands_setup
+from harness.comparison import checkit
+from harness.environment import FROMDIR, TMPDIR, TODIR
+from harness.rsync import run_rsync
 from harness import metadata
 
 metadata(transports={'pipe'})
