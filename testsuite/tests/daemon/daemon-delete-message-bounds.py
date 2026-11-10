@@ -26,7 +26,7 @@ metadata(transports={'pipe', 'tcp'})
 
 
 DAEMON_PORT = 12969
-FILE_COUNT = 1400
+FILE_COUNT = 2200
 
 src = FROMDIR
 dst = TODIR / 'current'
@@ -44,7 +44,7 @@ makepath(src, dst)
 def populate():
     deep = dst / 'runs'
     for i in range(10):
-        deep /= f'd{i}-' + 'x' * 76
+        deep /= f'd{i}-' + 'x' * 48
     makepath(deep)
     for i in range(FILE_COUNT):
         (deep / f'stale-{i:04d}').touch()

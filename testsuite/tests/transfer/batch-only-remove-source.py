@@ -30,11 +30,12 @@ destination_link_b = destination / 'one' / 'two' / 'linked-b'
 destination_link_a.write_bytes(destination_bytes)
 destination_link_b.write_bytes(destination_bytes)
 
+# Batch option names are limited to 256 bytes.
 batch = base / 'transfer.batch'
 write = subprocess.run(
-    rsync_argv('-aH', f'--only-write-batch={batch}',
+    rsync_argv('-aH', f'--only-write-batch={batch.name}',
                '--remove-source-files', f'{source}/', f'{destination}/'),
-    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, cwd=base)
 if write.returncode != 0:
     test_fail(f'batch-only transfer exited {write.returncode}:\n{write.stdout}')
 if destination_file.read_bytes() != destination_bytes:
@@ -57,8 +58,8 @@ if source_link_a.stat().st_ino != source_link_b.stat().st_ino:
     test_fail('batch-only transfer broke the retained source hard link')
 
 replay = subprocess.run(
-    rsync_argv('-aH', f'--read-batch={batch}', f'{destination}/'),
-    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    rsync_argv('-aH', f'--read-batch={batch.name}', f'{destination}/'),
+    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, cwd=base)
 if replay.returncode != 0:
     test_fail(f'batch replay exited {replay.returncode}:\n{replay.stdout}')
 if destination_file.read_bytes() != source_bytes:

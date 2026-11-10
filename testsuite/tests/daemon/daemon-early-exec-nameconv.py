@@ -69,8 +69,10 @@ got = em.read_text()
 if got != 'early|EARLY-PAYLOAD':
     test_fail(f"early-exec env/--early-input wrong: {got!r}")
 
-nonroot = next((p for p in pwd.getpwall() if p.pw_uid != 0 and p.pw_gid != 0), None)
-if not owners_supported() or nonroot is None:
+nonroot = None
+if owners_supported():
+    nonroot = next((p for p in pwd.getpwall() if p.pw_uid != 0 and p.pw_gid != 0), None)
+if nonroot is None:
     print("daemon-early-exec-nameconv: early-exec ok; "
           "name-converter SKIPPED (no non-root passwd entry / cannot chown)")
     raise SystemExit(0)
