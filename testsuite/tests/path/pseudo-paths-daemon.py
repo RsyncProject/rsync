@@ -11,12 +11,15 @@ import tempfile
 import time
 from pathlib import Path
 
+from harness.daemon import require_tcp
 from harness.filesystem import makepath, rmtree
 from harness.results import test_fail, test_skipped
 from harness.rsync import rsync_argv, rsync_command_binary
 from harness import metadata
 
-metadata(features={'proc_fd'}, transports={'pipe', 'tcp'})
+metadata(features={'proc_fd', 'tcp'}, transports={'tcp'})
+
+require_tcp('namespace daemon checks require real TCP listeners')
 
 if not sys.platform.startswith('linux'):
     test_skipped('Namespace daemon testing is a Linux-specific feature', capability='proc_fd')

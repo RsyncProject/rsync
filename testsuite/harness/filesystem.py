@@ -283,5 +283,5 @@ def acl_set(spec: str, path) -> bool:
     return proc.returncode == 0
 
 def acl_get(path) -> str:
-    return subprocess.run(['getfacl', str(path)], capture_output=True,
+    return subprocess.run(['getfacl', str(path)], capture_output=True, check=True,
                           text=True, env=_acl_env()).stdout

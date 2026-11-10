@@ -4,13 +4,16 @@ import os
 import socket
 import subprocess
 
+from harness.daemon import require_tcp
 from harness.environment import SCRATCHDIR
 from harness.filesystem import rmtree
 from harness.results import test_fail, test_skipped
 from harness.rsync import rsync_argv
 from harness import metadata
 
-metadata(transports={'pipe', 'tcp'})
+metadata(features={'tcp'}, transports={'tcp'})
+
+require_tcp('proxy checks require a real TCP listener')
 
 base = SCRATCHDIR / 'proxy-crlf'
 rmtree(base)

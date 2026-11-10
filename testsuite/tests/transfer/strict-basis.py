@@ -6,6 +6,7 @@ import socket
 import struct
 import subprocess
 
+from harness.daemon import require_tcp
 from fixtures.trees import hands_setup
 from harness.environment import TODIR
 from harness.filesystem import makepath, rmtree
@@ -14,7 +15,9 @@ from harness.rsync import rsync_argv
 from harness import protocol as rp
 from harness import metadata
 
-metadata(transports={'pipe', 'tcp'})
+metadata(features={'tcp'}, transports={'tcp'})
+
+require_tcp('synthetic sender checks require real TCP listeners')
 
 hands_setup()
 

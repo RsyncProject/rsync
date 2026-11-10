@@ -138,9 +138,29 @@ def test(context: TestContext):
     tcp_only = context.scratch / 'tcp-only.py'
     pipe_only.write_text("from harness import metadata\nmetadata(transports={'pipe'})\n" + daemon_call)
     tcp_only.write_text("from harness import metadata\nmetadata(transports={'tcp'}, tags={'daemon'})\n")
+    unclassified = context.scratch / 'unclassified.py'
+    unclassified.write_text("from harness import metadata\nmetadata()\n")
     selected, dropped = config.select_daemon_tests([str(pipe_only), str(tcp_only)])
     if selected != [str(tcp_only)] or dropped != [str(pipe_only)]:
         test_fail('daemon test selection ignored transport metadata')
+    for use_tcp, expected, excluded in (
+            (False, [str(pipe_only)], ['tcp-only']),
+            (True, [str(tcp_only)], ['pipe-only'])):
+        args = SimpleNamespace(profiles='linux', protocol=None, use_tcp=use_tcp)
+        configured = config.configure_profiles(
+            args, str(context.repository / 'testsuite'), str(context.repository),
+            [*tests, str(pipe_only), str(tcp_only)], [str(pipe_only), str(tcp_only)], '', '')
+        if configured[0] != expected or configured[7][-1] != {
+                'capability': 'transport',
+                'reasons': [f"not applicable to {'tcp' if use_tcp else 'pipe'} transport"],
+                'tests': excluded}:
+            test_fail('active transport did not filter declared test transports')
+    try:
+        config.select_transport_tests([str(unclassified)], 'pipe')
+    except ValueError:
+        pass
+    else:
+        test_fail('test without a declared transport was accepted')
 
     valgrind = SimpleNamespace(valgrind=True, valgrind_opts='', protocol=None)
     command = runner.build_rsync_cmd('/tmp/rsync', valgrind, str(context.scratch / 'valgrind'))
@@ -323,7 +343,8 @@ def test(context: TestContext):
         ({**allowed, **xfail}, True, 1, 'profile_error', 'xfail:issue-1'),
     )
     for policy, declared, exit_code, verdict, expected in cases:
-        prefix = "from harness import metadata\nmetadata(features={'fixture'})\n" if declared else ''
+        prefix = ("from harness import metadata\n"
+                  "metadata(features={'fixture'}, transports={'pipe'})\n") if declared else ''
         (testdir / 'conditional.py').write_text(prefix + unsupported)
         profile.write_text(json.dumps(policy))
         result = invoke(command)
@@ -336,7 +357,8 @@ def test(context: TestContext):
     ordinary = testdir / 'ordinary.py'
     ordinary.write_text('raise SystemExit(0)\n')
     (testdir / 'conditional.py').write_text(
-        "from harness import metadata\nmetadata(features={'fixture'})\nraise SystemExit(1)\n")
+        "from harness import metadata\n"
+        "metadata(features={'fixture'}, transports={'pipe'})\nraise SystemExit(1)\n")
     profile.write_text(json.dumps({'not_applicable': {'fixture': 'fixture partition'}}))
     selection = command.copy()
     selection[2:3] = ['conditional', 'ordinary']
@@ -407,7 +429,8 @@ def test(context: TestContext):
         test_fail(f'test execution enabled site packages: {result.stdout}{result.stderr}')
 
     (testdir / 'conditional.py').write_text(
-        "import os\nfrom harness import metadata\nmetadata(cost='expensive')\n"
+        "import os\nfrom harness import metadata\n"
+        "metadata(cost='expensive', transports={'pipe'})\n"
         "assert os.environ['TESTRUN_TIMEOUT'] == '600'\n")
     result = invoke(command + ['--timeout=3'])
     if result.returncode:

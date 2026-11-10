@@ -3,17 +3,19 @@
 import socket
 
 from harness.daemon_config import write_daemon_conf
-from harness.daemon import claim_ports, start_rsyncd
+from harness.daemon import claim_ports, require_tcp, start_rsyncd
 from harness.environment import FROMDIR, RSYNC, SCRATCHDIR
 from harness.filesystem import make_tree, rmtree
+from harness.results import test_fail
 from harness.rsync import run_rsync
 from harness import metadata
 
-metadata(transports={'pipe', 'tcp'})
+metadata(features={'tcp'}, transports={'tcp'})
 
 PORT4 = 13020
 PORT6 = 13021
 claim_ports(PORT4, PORT6)
+require_tcp('address-family checks require real TCP listeners')
 
 rmtree(FROMDIR)
 make_tree(FROMDIR, depth=1)
@@ -39,6 +41,9 @@ conf6 = write_daemon_conf(
 
 start_rsyncd(conf4, PORT4, rsync_cmd=RSYNC, address='127.0.0.1')
 run_rsync('-4', '--list-only', f'rsync://127.0.0.1:{PORT4}/module/')
+if run_rsync('-6', '--list-only', f'rsync://127.0.0.1:{PORT4}/module/',
+             check=False, capture_output=True).returncode == 0:
+    test_fail('-6 accepted an IPv4-only daemon address')
 
 ipv6_tested = False
 if socket.has_ipv6:
@@ -51,6 +56,9 @@ if socket.has_ipv6:
     else:
         start_rsyncd(conf6, PORT6, rsync_cmd=RSYNC, address='::1')
         run_rsync('-6', '--list-only', f'rsync://[::1]:{PORT6}/module/')
+        if run_rsync('-4', '--list-only', f'rsync://[::1]:{PORT6}/module/',
+                     check=False, capture_output=True).returncode == 0:
+            test_fail('-4 accepted an IPv6-only daemon address')
         ipv6_tested = True
 
 print('explicit IPv4 daemon connection succeeded' +

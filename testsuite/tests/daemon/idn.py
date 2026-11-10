@@ -7,13 +7,15 @@ import subprocess
 import sys
 import threading
 
-from harness.daemon import USE_TCP, claim_ports
+from harness.daemon import claim_ports, require_tcp
 from harness.environment import RSYNC, SCRATCHDIR
 from harness.results import test_fail, test_skipped
 from harness.rsync import run_rsync
 from harness import metadata
 
-metadata(features={'idn'}, transports={'pipe', 'tcp'})
+metadata(features={'idn', 'tcp'}, transports={'tcp'})
+
+require_tcp('IDN proxy checks require a real TCP listener')
 
 if '"IDN": true' not in run_rsync('-VV', check=True, capture_output=True).stdout:
     test_skipped("rsync built without IDN support", capability='idn')
@@ -90,10 +92,6 @@ check_rsh("XN--IKU-EQAB.Example", "XN--IKU-EQAB.Example",
 check_rsh("xn--0.example", "xn--0.example", "an undecodable A-label")
 check_rsh("ـx.example", "ـx.example", "a label with a disallowed character")
 check_rsh("​.example", "​.example", "a label that maps to nothing")
-
-if not USE_TCP:
-    print("direct-socket proxy check needs --use-tcp; skipping that part")
-    sys.exit(0)
 
 PROXY_PORT = 13335
 claim_ports(PROXY_PORT)

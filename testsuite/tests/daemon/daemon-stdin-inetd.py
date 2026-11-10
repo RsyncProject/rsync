@@ -4,16 +4,17 @@ import socket
 import subprocess
 
 from harness.daemon_config import write_daemon_conf
-from harness.daemon import claim_free_port
+from harness.daemon import claim_free_port, require_tcp
 from harness.environment import SCRATCHDIR
 from harness.filesystem import rmtree
 from harness.results import test_fail
 from harness.rsync import rsync_argv
 from harness import metadata
 
-metadata(transports={'pipe', 'tcp'})
+metadata(features={'tcp'}, transports={'tcp'})
 
 base = SCRATCHDIR / 'daemon-stdin-inetd'
+require_tcp('inetd checks require inherited TCP sockets')
 rmtree(base)
 module = base / 'module'
 module.mkdir(parents=True)

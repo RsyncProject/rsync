@@ -202,12 +202,13 @@ def select_daemon_tests(tests):
         (keep if applicable else dropped).append(path)
     return keep, dropped
 
-def select_applicable_tests(tests, not_applicable):
+def select_applicable_tests(tests, not_applicable, requirements_by_path=None):
     selected = []
     excluded = {}
     capabilities_to_exclude = set(not_applicable)
     for path in tests:
-        requirements = read_requirements(path) or {}
+        requirements = (requirements_by_path.get(os.fspath(path))
+                        if requirements_by_path is not None else read_requirements(path)) or {}
         capabilities = sorted(set(requirements.get('features', ())) & capabilities_to_exclude)
         if not capabilities:
             selected.append(path)
@@ -219,6 +220,24 @@ def select_applicable_tests(tests, not_applicable):
          'tests': excluded[capability]}
         for capability in sorted(excluded)
     ]
+    return selected, details
+
+def select_transport_tests(tests, transport, requirements_by_path=None):
+    selected, excluded = [], []
+    for path in tests:
+        requirements = (requirements_by_path.get(os.fspath(path))
+                        if requirements_by_path is not None else read_requirements(path))
+        if requirements and not requirements['transports']:
+            raise ValueError(f'{path}: no transports declared')
+        if not requirements or transport in requirements['transports']:
+            selected.append(path)
+        else:
+            excluded.append(test_name(path))
+    details = [] if not excluded else [{
+        'capability': 'transport',
+        'reasons': [f'not applicable to {transport} transport'],
+        'tests': excluded,
+    }]
     return selected, details
 
 def describe_tests(tests):
@@ -316,6 +335,9 @@ def validate_run_paths(tooldir, srcdir, rsync_bin, rsync_bin2):
 
 def configure_profiles(args, suitedir, srcdir, all_tests, tests,
                        rsync_bin, rsync_bin2):
+    requirements_by_path = {
+        os.fspath(path): read_requirements(path) for path in tests
+    }
     known_tests = {test_name(test) for test in all_tests}
     profiles = []
     for item in (value.strip() for value in args.profiles.split(',')):
@@ -340,13 +362,15 @@ def configure_profiles(args, suitedir, srcdir, all_tests, tests,
     if any(profile.name == 'self-peer' for profile in profiles):
         if peer or file_digest(rsync_bin) != file_digest(rsync_bin2):
             raise ValueError('self-peer profile requires the same executable in both roles')
-    tests, excluded = select_applicable_tests(tests, not_applicable)
+    transport = 'tcp' if args.use_tcp else 'pipe'
+    tests, excluded = select_applicable_tests(tests, not_applicable, requirements_by_path)
+    tests, transport_excluded = select_transport_tests(tests, transport, requirements_by_path)
+    excluded.extend(transport_excluded)
     excluded_names = {name for group in excluded for name in group['tests']}
     invalid = sorted(set(xfail) & excluded_names)
     if invalid:
         raise ValueError(f'expected failures do not apply: {", ".join(invalid)}')
     effective_protocol = args.protocol
-    transport = 'tcp' if args.use_tcp else 'pipe'
     if profile_protocol and not peer:
         if args.protocol != profile_protocol:
             raise ValueError(
@@ -366,7 +390,13 @@ def configure_profiles(args, suitedir, srcdir, all_tests, tests,
             f'profile protocol {profile_protocol} does not match {actual_peer_protocol}')
     effective_protocol = min(current_protocol, actual_peer_protocol,
                              args.protocol if args.protocol is not None else current_protocol)
-    requirements = {test_name(test): read_requirements(test) for test in all_tests}
+    for test in all_tests:
+        key = os.fspath(test)
+        if key not in requirements_by_path:
+            requirements_by_path[key] = read_requirements(test)
+    requirements = {
+        test_name(test): requirements_by_path[os.fspath(test)] for test in all_tests
+    }
     missing = [name for name, values in requirements.items() if not values or not values['transports']]
     if missing:
         raise ValueError(f'tests without transport metadata: {", ".join(sorted(missing))}')

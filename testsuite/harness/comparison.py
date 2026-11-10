@@ -15,7 +15,10 @@ def rsync_ls_lR(directory) -> str:
         raise FileNotFoundError(directory)
     excluded = {'.git', 'auto-build-save', 'testtmp'}
     entries = ['.']
-    for parent, dirs, files in os.walk(directory):
+    def walk_error(error):
+        raise error
+
+    for parent, dirs, files in os.walk(directory, onerror=walk_error):
         dirs[:] = [name for name in dirs if name not in excluded]
         for name in [*dirs, *files]:
             if name not in excluded:
@@ -28,8 +31,11 @@ def rsync_ls_lR(directory) -> str:
     size = 0
 
     def listing(paths):
-        return subprocess.run([*command, *paths], capture_output=True, encoding='utf-8',
-                              errors='backslashreplace', cwd=directory).stdout
+        result = subprocess.run([*command, *paths], capture_output=True, encoding='utf-8',
+                                errors='backslashreplace', cwd=directory)
+        if result.returncode:
+            test_fail(f"metadata listing exited {result.returncode}:\n{result.stderr}")
+        return result.stdout
 
     for name in entries:
         length = len(os.fsencode(name)) + 1
@@ -199,38 +205,32 @@ def check_perms(path, expected: str) -> None:
         test_fail(f"check_perms failed for {path}")
 
 def _acl_sig(path) -> str:
+    if environment._SYSTEM == 'Darwin':
+        result = subprocess.run(['ls', '-lde', str(path)], capture_output=True, text=True)
+        if result.returncode:
+            raise OSError(result.stderr.strip() or 'cannot read ACL')
+        return ';'.join(line.strip() for line in result.stdout.splitlines()[1:] if line.strip())
     if not (environment._SYSTEM in ('Linux', 'FreeBSD') or environment._CYGWIN):
         return ''
-    try:
-        out = acl_get(path)
-    except OSError:
-        return ''
+    out = acl_get(path)
     return ';'.join(sorted(l for l in out.splitlines()
                            if l.strip() and not l.startswith('#')))
 
 def _xattr_sig(path) -> str:
     p = str(path)
-    if environment._SYSTEM == 'Linux':
-        try:
-            names = sorted(n for n in os.listxattr(p, follow_symlinks=False)
-                           if n.startswith('user.'))
-        except OSError:
-            return ''
+    if hasattr(os, 'listxattr') and not environment._CYGWIN:
+        names = sorted(os.listxattr(p, follow_symlinks=False))
+        if environment._SYSTEM == 'Linux':
+            names = [name for name in names if name.startswith('user.')]
         out = []
-        for n in names:
-            try:
-                v = os.getxattr(p, n, follow_symlinks=False)
-            except OSError:
-                continue
-            out.append(n + '=' + v.decode('utf-8', 'surrogateescape'))
+        for name in names:
+            value = os.getxattr(p, name, follow_symlinks=False)
+            out.append(name + '=' + value.decode('utf-8', 'surrogateescape'))
         return ';'.join(out)
     if environment._CYGWIN:
-        try:
-            d = subprocess.check_output(
-                ['getfattr', '--no-dereference', '-d', p],
-                text=True, stderr=subprocess.DEVNULL)
-        except (subprocess.CalledProcessError, OSError):
-            return ''
+        d = subprocess.check_output(
+            ['getfattr', '--no-dereference', '-d', p],
+            text=True, stderr=subprocess.DEVNULL)
         return ';'.join(sorted(l for l in d.splitlines()
                                if l and not l.startswith('# file:')))
     return ''

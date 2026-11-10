@@ -7,6 +7,7 @@ import os
 import shlex
 import subprocess
 import sys
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from harness import Exit, TestContext, environment, requires, run
@@ -35,6 +36,17 @@ def test(context: TestContext):
             test_fail('directory listing ignored changed TLS arguments')
     finally:
         environment.TLS_ARGS = previous
+    with patch('harness.comparison.subprocess.run') as run_listing:
+        run_listing.return_value = SimpleNamespace(returncode=17, stdout='', stderr='probe failed')
+        output = StringIO()
+        try:
+            with redirect_stderr(output):
+                rsync_ls_lR(listing)
+        except SystemExit as error:
+            if error.code != Exit.FAIL or 'metadata listing exited 17' not in output.getvalue():
+                test_fail(f'wrong metadata probe failure: {output.getvalue()}')
+        else:
+            test_fail('a failed metadata probe produced an empty listing')
     context.expected.mkdir()
     (context.expected / 'file').write_text('contents\n')
     cases = (

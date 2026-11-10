@@ -4,16 +4,17 @@ import socket
 import time
 
 from harness.daemon_config import write_daemon_conf
-from harness.daemon import claim_ports, start_rsyncd
+from harness.daemon import claim_ports, require_tcp, start_rsyncd
 from harness.environment import FROMDIR, RSYNC, SCRATCHDIR
 from harness.filesystem import make_tree, rmtree
 from harness.results import test_fail
 from harness import metadata
 
-metadata(transports={'pipe', 'tcp'})
+metadata(features={'tcp'}, transports={'tcp'})
 
 PORT = 13022
 claim_ports(PORT)
+require_tcp('connection-limit checks require a real TCP listener')
 
 rmtree(FROMDIR)
 make_tree(FROMDIR, depth=1)

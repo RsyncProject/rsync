@@ -4,23 +4,26 @@ import subprocess
 import sys
 import time
 
-from harness.daemon import claim_ports
+from harness.daemon import claim_ports, require_tcp
 from harness.environment import SCRATCHDIR
 from harness.filesystem import rmtree
 from harness.results import test_fail, test_skipped
 from harness.rsync import rsync_argv
 from harness import metadata
 
-metadata(transports={'pipe', 'tcp'})
+metadata(features={'tcp'}, transports={'tcp'})
 
 PORT = 18367
 claim_ports(PORT)
+require_tcp('the crafted server requires a real TCP connection')
 
 CLIENT_TIMEOUT = 3
 HOLD = 25
 WATCHDOG = 12
+TIMEOUT_EXIT = 30
 
 dst = SCRATCHDIR / 'destination'
+armed = SCRATCHDIR / 'armed'
 rmtree(dst)
 dst.mkdir(parents=True)
 
@@ -32,7 +35,7 @@ def hdr(t, n):
     return bytes([v & 0xff, (v >> 8) & 0xff, (v >> 16) & 0xff, (v >> 24) & 0xff])
 def le32(v):
     return bytes([v & 0xff, (v >> 8) & 0xff, (v >> 16) & 0xff, (v >> 24) & 0xff])
-port, hold = int(sys.argv[1]), float(sys.argv[2])
+port, hold, marker = int(sys.argv[1]), float(sys.argv[2]), sys.argv[3]
 srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 srv.bind(("127.0.0.1", port)); srv.listen(1); srv.settimeout(20.0)
@@ -58,11 +61,12 @@ while time.monotonic() < dl:
 conn.setblocking(True); conn.settimeout(5.0)
 f.write(b"\x00"); f.write(le32(42)); f.flush()        # compat_flags=0, checksum_seed
 f.write(hdr(MSG_IO_TIMEOUT, 4)); f.write(le32(0)); f.flush()
+open(marker, "w").close()
 time.sleep(hold)
 f.close(); conn.close(); srv.close()
 '''
 
-srv = subprocess.Popen([sys.executable, '-c', SERVER, str(PORT), str(HOLD)],
+srv = subprocess.Popen([sys.executable, '-c', SERVER, str(PORT), str(HOLD), str(armed)],
                        stderr=subprocess.PIPE)
 try:
     line = srv.stderr.readline()
@@ -83,10 +87,15 @@ try:
 
     out = (proc.stdout or b'').decode('utf-8', 'replace')
     elapsed = time.monotonic() - t0
-    how = "timed out (kept --timeout)" if 'timeout' in out.lower() \
-        else "exited without timing out (crafted handshake may not have engaged)"
-    print(f"io-timeout-zero: client self-exited in {elapsed:.1f}s -- {how}; "
-          "MSG_IO_TIMEOUT(0) did not disable the client timeout")
+    if not armed.is_file():
+        test_fail(f"crafted server never sent MSG_IO_TIMEOUT(0):\n{out}")
+    if proc.returncode != TIMEOUT_EXIT or 'timeout' not in out.lower():
+        test_fail(f"client did not retain its timeout after MSG_IO_TIMEOUT(0): "
+                  f"rc={proc.returncode}, elapsed={elapsed:.1f}s\n{out}")
+    if elapsed < CLIENT_TIMEOUT - 0.5:
+        test_fail(f"client exited after {elapsed:.1f}s, before its {CLIENT_TIMEOUT}s timeout")
+    print(f"io-timeout-zero: client timed out in {elapsed:.1f}s after "
+          "MSG_IO_TIMEOUT(0)")
 finally:
     srv.terminate()
     try:
