@@ -2,10 +2,13 @@
 
 import os
 from pathlib import Path
+import resource
+import subprocess
 import threading
+import time
 
 from rsyncfns import (
-    FROMDIR, TODIR, assert_same, rmtree, run_rsync, test_fail, test_skipped,
+    FROMDIR, TODIR, assert_same, rmtree, rsync_argv, run_rsync, test_fail, test_skipped,
 )
 
 if not hasattr(os, 'mkfifo'):
@@ -16,9 +19,93 @@ if _probe.returncode != 0 or '--stream-source' not in _probe.stdout:
     test_skipped('rsync binary does not support --stream-source')
 
 
-def expect_fail(label: str, *args, expected_err: str = ''):
+def run_high_fd_stream_test():
+    target_fds = 2048
+    soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+    if soft < target_fds + 64:
+        new_soft = min(hard, target_fds + 128) if hard != resource.RLIM_INFINITY else target_fds + 128
+        if new_soft < target_fds + 64:
+            print(f"[SKIP] High-FD test requires RLIMIT_NOFILE >= {target_fds + 64} (hard={hard})", flush=True)
+            return
+        resource.setrlimit(resource.RLIMIT_NOFILE, (new_soft, hard))
+
+    label = f"High inherited descriptors (>= {target_fds}) stream transfer"
     print(f"[RUN] {label}", flush=True)
-    proc = run_rsync(*args, capture_output=True, check=False)
+    if dst.exists():
+        dst.unlink()
+
+    created_fds = []
+    occupied_fds = []
+    writer_exc = []
+
+    def writer():
+        try:
+            fd = os.open(fifo, os.O_WRONLY)
+            try:
+                os.write(fd, payload_4k)
+            finally:
+                os.close(fd)
+        except Exception as exc:
+            writer_exc.append(exc)
+
+    pipe_r, pipe_w = os.pipe()
+    created_fds.extend([pipe_r, pipe_w])
+    try:
+        while True:
+            dup_fd = os.dup(pipe_r)
+            created_fds.append(dup_fd)
+            if dup_fd >= target_fds:
+                break
+
+        for fd in range(3, target_fds + 1):
+            try:
+                os.fstat(fd)
+                occupied_fds.append(fd)
+            except OSError:
+                pass
+
+        t = threading.Thread(target=writer, daemon=True)
+        t.start()
+        argv = rsync_argv(
+            '--stream-source',
+            '--stream-max-size=1M',
+            '--stream-timeout=10',
+            f'{fifo}',
+            f'{dst}',
+        )
+        proc = subprocess.run(
+            argv,
+            pass_fds=occupied_fds,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        t.join(timeout=10)
+    finally:
+        for fd in created_fds:
+            os.close(fd)
+
+    if proc.returncode != 0:
+        test_fail(
+            f"[FAIL] {label}: rsync exited with code {proc.returncode}\n"
+            f"--- stdout ---\n{proc.stdout}\n"
+            f"--- stderr ---\n{proc.stderr}"
+        )
+    if writer_exc:
+        test_fail(f"[FAIL] {label}: FIFO writer failed: {writer_exc[0]}")
+    assert_same(dst, ref_4k, label="high-fd stream transfer")
+    print(f"[PASS] {label}", flush=True)
+
+
+def expect_fail(label: str, *args, expected_err: str = '', timeout: float = 30.0):
+    print(f"[RUN] {label}", flush=True)
+    argv = rsync_argv(*args)
+    proc = subprocess.run(
+        argv,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
     if proc.returncode == 0:
         test_fail(
             f"[FAIL] {label}: expected non-zero exit code, got 0\n"
@@ -36,7 +123,7 @@ def expect_fail(label: str, *args, expected_err: str = ''):
     return proc
 
 
-def run_stream_transfer(label: str, fifo_path: Path, payload: bytes, dst_path: Path, *extra_args):
+def run_stream_transfer(label: str, fifo_path: Path, payload: bytes, dst_path: Path, *extra_args, expect_success: bool = True):
     print(f"[RUN] {label}", flush=True)
     writer_exc = []
 
@@ -67,15 +154,21 @@ def run_stream_transfer(label: str, fifo_path: Path, payload: bytes, dst_path: P
         check=False,
     )
     t.join(timeout=10)
-    if proc.returncode != 0:
+    if writer_exc:
+        test_fail(f"[FAIL] {label}: FIFO writer failed: {writer_exc[0]}")
+    if expect_success and proc.returncode != 0:
         test_fail(
             f"[FAIL] {label}: rsync exited with code {proc.returncode}\n"
             f"--- stdout ---\n{proc.stdout}\n"
             f"--- stderr ---\n{proc.stderr}"
         )
-    if writer_exc:
-        test_fail(f"[FAIL] {label}: FIFO writer failed: {writer_exc[0]}")
-    print(f"[PASS] {label}", flush=True)
+    if not expect_success and proc.returncode == 0:
+        test_fail(
+            f"[FAIL] {label}: expected non-zero exit code, got 0\n"
+            f"--- stdout ---\n{proc.stdout}\n"
+            f"--- stderr ---\n{proc.stderr}"
+        )
+    print(f"[PASS] {label} (exit={proc.returncode})", flush=True)
     return proc
 
 
@@ -85,8 +178,10 @@ FROMDIR.mkdir(parents=True, exist_ok=True)
 TODIR.mkdir(parents=True, exist_ok=True)
 
 fifo = FROMDIR / 'stream.fifo'
+fifo2 = FROMDIR / 'stream2.fifo'
 try:
     os.mkfifo(fifo)
+    os.mkfifo(fifo2)
 except OSError as exc:
     test_skipped(f"cannot create FIFO in test filesystem: {exc}")
 
@@ -116,7 +211,7 @@ print(f"[PASS] {label}", flush=True)
 # ---------------------------------------------------------------------------
 # Part 2: Sub-options used without --stream-source must be refused
 # ---------------------------------------------------------------------------
-for sub_opt in ('--stream-max-size=1M', '--stream-timeout=5', '--stream-pipe-sz=1M'):
+for sub_opt in ('--stream-max-size=1M', '--stream-timeout=30', '--stream-pipe-sz=1M'):
     expect_fail(
         f"Refuse {sub_opt} without --stream-source",
         sub_opt, f'{reg_src}', f'{dst}',
@@ -124,7 +219,7 @@ for sub_opt in ('--stream-max-size=1M', '--stream-timeout=5', '--stream-pipe-sz=
     )
 
 # ---------------------------------------------------------------------------
-# Part 3: --stream-max-size validation (missing, <= 0, invalid, truncation log)
+# Part 3: --stream-max-size validation (missing, <= 0, invalid, exact, excess)
 # ---------------------------------------------------------------------------
 expect_fail(
     "Missing --stream-max-size with --stream-source",
@@ -138,26 +233,72 @@ for bad_max in ('0', '0B', '-1', '-10M', 'invalid'):
         '--stream-source', f'--stream-max-size={bad_max}', f'{fifo}', f'{dst}',
     )
 
-# Stream exceeding --stream-max-size logs warning and stops at limit
+# Exact-limit stream completes cleanly without hanging
+exact_1k = b'E' * 1024
+ref_exact_1k = FROMDIR / 'ref_exact_1k.bin'
+ref_exact_1k.write_bytes(exact_1k)
 if dst.exists():
     dst.unlink()
-over_payload = b'X' * 4096
-ref_1k = FROMDIR / 'ref_1k.bin'
-ref_1k.write_bytes(over_payload[:1024])
 
+run_stream_transfer(
+    "Exact-limit stream (--stream-max-size=1024) completes cleanly",
+    fifo, exact_1k, dst,
+    '--stream-max-size=1024', '--stream-timeout=5',
+)
+assert_same(dst, ref_exact_1k, label="exact stream-max-size=1024")
+
+# Stream exceeding --stream-max-size fails before finalisation and does not commit truncated output
+sentinel_bytes = b'ORIGINAL_INTACT_DESTINATION_CONTENT'
+ref_sentinel = FROMDIR / 'ref_sentinel.bin'
+ref_sentinel.write_bytes(sentinel_bytes)
+dst.write_bytes(sentinel_bytes)
+
+over_payload = b'X' * 4096
 proc_over = run_stream_transfer(
-    "Stream exceeding --stream-max-size=1024 logs and stops at limit",
+    "Stream exceeding --stream-max-size=1024 fails without committing truncated output",
     fifo, over_payload, dst,
-    '--stream-max-size=1024',
+    '--stream-max-size=1024', '--stream-timeout=5',
+    expect_success=False,
 )
 combined_over = (proc_over.stdout + proc_over.stderr).lower()
-if 'exceeded' not in combined_over and 'limit' not in combined_over:
+if 'exceeded' not in combined_over:
     test_fail(
-        f"[FAIL] Expected warning when stream exceeds --stream-max-size, got:\n"
+        f"[FAIL] Expected error mentioning 'exceeded' when stream exceeds --stream-max-size, got:\n"
         f"--- stdout ---\n{proc_over.stdout}\n"
         f"--- stderr ---\n{proc_over.stderr}"
     )
-assert_same(dst, ref_1k, label="stream-max-size=1024 cap")
+assert_same(dst, ref_sentinel, label="existing dst preserved on oversized stream failure")
+
+# Exact-limit stream that stalls before EOF hits --stream-timeout before finalisation
+dst.write_bytes(sentinel_bytes)
+exact_stall_stop = threading.Event()
+
+
+def exact_limit_stalled_writer():
+    try:
+        fd = os.open(fifo, os.O_WRONLY)
+        try:
+            os.write(fd, exact_1k)
+            exact_stall_stop.wait(timeout=5)
+        finally:
+            os.close(fd)
+    except Exception:
+        pass
+
+
+t_exact_stall = threading.Thread(target=exact_limit_stalled_writer, daemon=True)
+t_exact_stall.start()
+try:
+    expect_fail(
+        "Exact-limit stalled stream hits --stream-timeout=1 before finalisation",
+        '--stream-source', '--stream-max-size=1024', '--stream-timeout=1',
+        f'{fifo}', f'{dst}',
+        expected_err='timed out',
+    )
+finally:
+    exact_stall_stop.set()
+    t_exact_stall.join(timeout=5)
+assert_same(dst, ref_sentinel, label="existing dst preserved on exact-limit stall timeout")
 
 # ---------------------------------------------------------------------------
 # Part 4: --stream-pipe-sz min/max bounds (64KB .. 16MB)
@@ -184,17 +325,46 @@ for valid_pipe_sz in ('64K', '65536', '1M', '16M', '16777216'):
     assert_same(dst, ref_4k, label=f"pipe-sz={valid_pipe_sz}")
 
 # ---------------------------------------------------------------------------
-# Part 5: --stream-timeout (<= 0 disables timeout; positive expires on stall)
+# Part 5: --stream-timeout (<= 0 disables timeout on paused stream; > 0 expires)
 # ---------------------------------------------------------------------------
 for no_timeout in ('0', '-1'):
+    label = f"Paused stream succeeds with disabled --stream-timeout={no_timeout}"
+    print(f"[RUN] {label}", flush=True)
     if dst.exists():
         dst.unlink()
-    run_stream_transfer(
-        f"Disabled timeout with --stream-timeout={no_timeout}",
-        fifo, payload_4k, dst,
-        '--stream-max-size=1M', f'--stream-timeout={no_timeout}',
+    writer_exc = []
+
+    def delayed_writer():
+        try:
+            fd = os.open(fifo, os.O_WRONLY)
+            try:
+                os.write(fd, payload_4k[:2048])
+                time.sleep(1.2)
+                os.write(fd, payload_4k[2048:])
+            finally:
+                os.close(fd)
+        except Exception as exc:
+            writer_exc.append(exc)
+
+    t_delayed = threading.Thread(target=delayed_writer, daemon=True)
+    t_delayed.start()
+    proc_nt = run_rsync(
+        '--stream-source', '--stream-max-size=1M', f'--stream-timeout={no_timeout}',
+        f'{fifo}', f'{dst}',
+        capture_output=True,
+        check=False,
     )
+    t_delayed.join(timeout=10)
+    if writer_exc:
+        test_fail(f"[FAIL] {label}: FIFO writer failed: {writer_exc[0]}")
+    if proc_nt.returncode != 0:
+        test_fail(
+            f"[FAIL] {label}: rsync exited with code {proc_nt.returncode}\n"
+            f"--- stdout ---\n{proc_nt.stdout}\n"
+            f"--- stderr ---\n{proc_nt.stderr}"
+        )
     assert_same(dst, ref_4k, label=f"timeout={no_timeout}")
+    print(f"[PASS] {label}", flush=True)
 
 stall_stop = threading.Event()
 
@@ -266,9 +436,19 @@ expect_fail(
     f'{fifo}', f'{dst}',
 )
 
+# Reject multiple sources before opening either FIFO
 expect_fail(
-    "Refuse multiple sources with --stream-source",
+    "Refuse multiple FIFO sources (fifo, fifo2) before opening either FIFO",
+    '--stream-source', '--stream-max-size=1M', f'{fifo}', f'{fifo2}', f'{TODIR}/',
+    expected_err='multiple',
+    timeout=5.0,
+)
+
+expect_fail(
+    "Refuse multiple mixed sources (fifo, reg_src) with --stream-source",
     '--stream-source', '--stream-max-size=1M', f'{fifo}', f'{reg_src}', f'{TODIR}/',
+    expected_err='multiple',
+    timeout=5.0,
 )
 
 expect_fail(
@@ -300,3 +480,5 @@ expect_fail(
     '--stream-source', '--stream-max-size=1M', 'rsync://localhost/module/stream.fifo', f'{dst}',
     expected_err='--stream-source',
 )
+
+run_high_fd_stream_test()

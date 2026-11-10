@@ -810,24 +810,11 @@ void send_files(int f_in, int f_out)
 
 		match_sums(f_xfer, s, mbuf, st.st_size);
 		/* Update the stats for right tracking. */
-		if (is_stream() && mbuf) {
-			if (mbuf->file_size < st.st_size) {
-				OFF_T diff = st.st_size - mbuf->file_size;
-				stats.total_size -= diff;
-				stats.total_transferred_size -= diff;
-				st.st_size = mbuf->file_size;
-			} else if (!eof_reached) {
-				char extra;
-				ssize_t n;
-				do {
-					n = read(fd, &extra, 1);
-				} while (n < 0 && errno == EINTR);
-				if (n > 0) {
-					rprintf(FWARNING,
-						"Warning: stream source exceeded --stream-max-size=%s, stopping at limit\n",
-						big_num(stream_max_size));
-				}
-			}
+		if (is_stream() && mbuf && mbuf->file_size < st.st_size) {
+			OFF_T diff = st.st_size - mbuf->file_size;
+			stats.total_size -= diff;
+			stats.total_transferred_size -= diff;
+			st.st_size = mbuf->file_size;
 		}
 		if (INFO_GTE(PROGRESS, 1))
 			end_progress(st.st_size);

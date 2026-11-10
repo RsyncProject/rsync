@@ -21,6 +21,7 @@
 
 #include "rsync.h"
 #include "inums.h"
+#include <poll.h>
 
 #ifndef ENODATA
 #define ENODATA EAGAIN
@@ -316,6 +317,37 @@ int skip_matched(int fd, OFF_T offset, const char *buf, int len)
 	return 0;
 }
 
+void wait_stream_fd(int fd)
+{
+	if (!is_stream() || eof_reached || stream_timeout <= 0)
+		return;
+
+	int timeout_ms = stream_timeout > INT_MAX / 1000
+		       ? INT_MAX
+		       : stream_timeout * 1000;
+
+	for (;;) {
+		struct pollfd pfd;
+		pfd.fd = fd;
+		pfd.events = POLLIN;
+		pfd.revents = 0;
+
+		int res = poll(&pfd, 1, timeout_ms);
+		if (res == 0) {
+			rprintf(FERROR, "Stream timed out after %d seconds waiting for data\n",
+				stream_timeout);
+			exit_cleanup(RERR_TIMEOUT);
+		}
+		if (res < 0) {
+			if (errno == EINTR)
+				continue;
+			rsyserr(FERROR, errno, "poll failed on stream");
+			exit_cleanup(RERR_FILEIO);
+		}
+		break;
+	}
+}
+
 /* This provides functionality somewhat similar to mmap() but using read().
  * It gives sliding window access to a file.  mmap() is not used because of
  * the possibility of another program (such as a mailer) truncating the
@@ -423,27 +455,7 @@ char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
 	map->p_len = window_size;
 
 	while (read_size > 0) {
-		if (is_stream() && !eof_reached && stream_timeout > 0) {
-			fd_set rfds;
-			struct timeval tv;
-
-			FD_ZERO(&rfds);
-			FD_SET(map->fd, &rfds);
-			tv.tv_sec = stream_timeout;
-			tv.tv_usec = 0;
-
-			int res = select(map->fd + 1, &rfds, NULL, NULL, &tv);
-			if (res == 0) {
-				rprintf(FERROR, "Stream timed out after %d seconds waiting for data\n",
-					stream_timeout);
-				exit_cleanup(RERR_TIMEOUT);
-			} else if (res < 0) {
-				if (errno == EINTR)
-					continue;
-				rsyserr(FERROR, errno, "select failed on stream");
-				exit_cleanup(RERR_FILEIO);
-			}
-		}
+		wait_stream_fd(map->fd);
 		int32 nread = eof_reached ? 0 : read(map->fd, map->p + read_offset, read_size);
 		if (nread <= 0) {
 			/* Retry if a blocking pipe read was interrupted by a signal. */

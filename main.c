@@ -1569,6 +1569,10 @@ static int start_client(int argc, char *argv[])
 		char *dummy_host;
 		int dummy_port = rsync_port;
 		int i;
+		if (stream_source_mode && argc > 1) {
+            rprintf(FERROR, "--stream-source cannot be used with multiple sources\n");
+            exit_cleanup(RERR_SYNTAX);
+        }
 		if (!argv[0][0])
 			goto invalid_empty;
 		/* For local source, extra source args must not have hostspec. */

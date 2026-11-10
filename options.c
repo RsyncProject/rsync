@@ -119,6 +119,7 @@ int mkpath_dest_arg = 0;
 int allow_inc_recurse = 1;
 int stream_source_mode = 0;
 int stream_timeout = DEFAULT_STREAM_TIMEOUT;
+static int stream_timeout_seen = 0;
 OFF_T stream_max_size = 0;
 int stream_pipe_sz = -1;
 char *stream_max_size_arg = NULL;
@@ -611,7 +612,7 @@ enum {OPT_SERVER = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_USERMAP, OPT_GROUPMAP, OPT_CHOWN, OPT_BWLIMIT, OPT_STDERR,
       OPT_OLD_COMPRESS, OPT_NEW_COMPRESS, OPT_NO_COMPRESS, OPT_OLD_ARGS,
       OPT_STOP_AFTER, OPT_STOP_AT, OPT_NICE, OPT_NO_NICE,
-      OPT_REFUSED_BASE = 9000};
+      OPT_STREAM_TIMEOUT, OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
   /* longName, shortName, argInfo, argPtr, value, descrip, argDesc */
@@ -732,7 +733,7 @@ static struct poptOption long_options[] = {
   {"max-alloc",        0,  POPT_ARG_STRING, &max_alloc_arg, 0, 0, 0 },
   {"stream-source",    0,  POPT_ARG_VAL,    &stream_source_mode, 1, 0, 0 },
   {"stream-max-size",  0,  POPT_ARG_STRING, &stream_max_size_arg, 0, 0, 0 },
-  {"stream-timeout",   0,  POPT_ARG_INT,    &stream_timeout, 0, 0, 0 },
+  {"stream-timeout",   0,  POPT_ARG_INT,    &stream_timeout, OPT_STREAM_TIMEOUT, 0, 0 },
   {"stream-pipe-sz",   0,  POPT_ARG_STRING, &stream_pipe_sz_arg, 0, 0, 0 },
   {"sparse",          'S', POPT_ARG_VAL,    &sparse_files, 1, 0, 0 },
   {"no-sparse",        0,  POPT_ARG_VAL,    &sparse_files, 0, 0, 0 },
@@ -1878,6 +1879,10 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			break;
 		}
 
+		case OPT_STREAM_TIMEOUT:
+			stream_timeout_seen = 1;
+			break;
+
 		case OPT_APPEND:
 			if (am_server)
 				append_mode++;
@@ -2750,9 +2755,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		if ((stream_max_size = parse_size_arg(stream_max_size_arg, 'b', "stream-max-size", 1, -1, False)) < 0)
 			goto cleanup;
 
-		if (stream_timeout == -1)
-			stream_timeout = DEFAULT_STREAM_TIMEOUT;
-		else if (stream_timeout < 0)
+		if (stream_timeout <= 0)
 			stream_timeout = 0;
 
 		if (!stream_pipe_sz_arg)
@@ -2804,7 +2807,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		update_only = 0;
 		preserve_specials = 0;
 		preserve_devices = 0;
-	} else if (stream_max_size_arg || stream_pipe_sz_arg || stream_timeout != DEFAULT_STREAM_TIMEOUT) {
+	} else if (stream_max_size_arg || stream_pipe_sz_arg || stream_timeout_seen) {
 		snprintf(err_buf, sizeof err_buf,
 			"stream option(s) cannot be used without --stream-source\n");
 		goto cleanup;

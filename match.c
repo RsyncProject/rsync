@@ -28,6 +28,9 @@ extern int append_mode;
 extern struct name_num_item *xfer_sum_nni;
 extern int xfer_sum_len;
 
+extern int eof_reached;
+extern OFF_T stream_max_size;
+
 int updating_basis_file;
 char sender_file_sum[MAX_DIGEST_LEN];
 
@@ -538,6 +541,26 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 			matched(f, s, buf, j, -2);
 		}
 		matched(f, s, buf, len, -1);
+	}
+
+	if (is_stream() && buf && !eof_reached) {
+		char extra;
+		ssize_t n;
+		wait_stream_fd(buf->fd);
+		do {
+			n = read(buf->fd, &extra, 1);
+		} while (n < 0 && errno == EINTR);
+		if (n < 0) {
+			rsyserr(FERROR, errno, "read failed on stream");
+			exit_cleanup(RERR_FILEIO);
+		}
+		if (n > 0) {
+			rprintf(FERROR,
+				"stream source exceeded --stream-max-size=%s\n",
+				big_num(stream_max_size));
+			exit_cleanup(RERR_FILEIO);
+		}
+		eof_reached = 1;
 	}
 
 	sum_end(sender_file_sum);

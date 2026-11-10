@@ -4222,8 +4222,9 @@ sign) if you want the local shell to expand it.
     >     rsync -L --stream-source --stream-max-size=500M \
     >         <(tar -cf - /etc) host:/backups/etc.tar
 
-    This option is restricted to a local sender (local-to-local, remote-shell
-    push, or rsync-daemon push) and cannot be used when the sender is remote.
+    This option requires exactly one source argument and is restricted to a
+    local sender (local-to-local, remote-shell push, or rsync-daemon push);
+    multiple sources and remote senders are rejected.
 
 0.  `--stream-max-size=SIZE`
 
@@ -4233,17 +4234,19 @@ sign) if you want the local shell to expand it.
 
     `SIZE` acts as an upper bound rather than an exact file size:
 
-    - If the input stream reaches EOF before `SIZE` bytes are read, the
-      transfer completes cleanly at EOF and the destination file is sized to
-      the exact number of bytes received.  On the sender side, transfer
-      statistics (`--stats`) are reconciled to the actual number of bytes read
-      at EOF.  However, because `SIZE` is transmitted in the initial file list
-      without modifying the wire protocol, the advertised ceiling still
-      controls `%l` format logging, transfer progress percentages, and
-      receiver-side (or daemon-side) total-size statistics.
-    - If the input stream produces more than `SIZE` bytes, rsync stops reading
-      at `SIZE` bytes, logs a warning indicating that `--stream-max-size` was
-      exceeded, and finalizes the destination file at that ceiling length.
+    - If the input stream reaches EOF at or before `SIZE` bytes are read, the
+      transfer completes cleanly and the destination file is sized to the exact
+      number of bytes received.  On the sender side, transfer statistics
+      (`--stats`) are reconciled to the actual number of bytes read at EOF.
+      However, because `SIZE` is transmitted in the initial file list without
+      modifying the wire protocol, the advertised ceiling still controls `%l`
+      format logging, transfer progress percentages, and receiver-side (or
+      daemon-side) total-size statistics.
+    - If the input stream produces more than `SIZE` bytes, rsync aborts the
+      transfer with a file I/O error (exit code 11) before finalizing the
+      update, leaving any existing destination file untouched (unless
+      [`--inplace`](#opt) is active, which writes directly to the destination
+      file during transfer).
 
     The `SIZE` value can be suffixed with a unit multiplier such as `K` (or
     `KiB`), `M` (or `MiB`), or `G` (or `GiB`).  See the [`--max-size`](#opt)
