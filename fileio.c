@@ -18,6 +18,10 @@
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, visit the http://fsf.org website.
  */
+#ifdef __APPLE__
+#define _DARWIN_UNLIMITED_SELECT 1
+#define FD_SETSIZE 65536
+#endif
 
 #include "rsync.h"
 #include "inums.h"
@@ -322,6 +326,37 @@ void wait_stream_fd(int fd)
 	if (!is_stream() || eof_reached || stream_timeout <= 0)
 		return;
 
+#ifdef __APPLE__
+	if (fd < 0 || fd >= FD_SETSIZE) {
+		rprintf(FERROR, "stream fd %d exceeds FD_SETSIZE (%d)\n",
+			fd, (int)FD_SETSIZE);
+		exit_cleanup(RERR_FILEIO);
+	}
+
+	for (;;) {
+		fd_set rfds;
+		struct timeval tv;
+
+		FD_ZERO(&rfds);
+		FD_SET(fd, &rfds);
+		tv.tv_sec = stream_timeout;
+		tv.tv_usec = 0;
+
+		int res = select(fd + 1, &rfds, NULL, NULL, &tv);
+		if (res == 0) {
+			rprintf(FERROR, "Stream timed out after %d seconds waiting for data\n",
+				stream_timeout);
+			exit_cleanup(RERR_TIMEOUT);
+		}
+		if (res < 0) {
+			if (errno == EINTR)
+				continue;
+			rsyserr(FERROR, errno, "select failed on stream");
+			exit_cleanup(RERR_FILEIO);
+		}
+		break;
+	}
+#else
 	int timeout_ms = stream_timeout > INT_MAX / 1000
 		       ? INT_MAX
 		       : stream_timeout * 1000;
@@ -346,6 +381,7 @@ void wait_stream_fd(int fd)
 		}
 		break;
 	}
+#endif
 }
 
 /* This provides functionality somewhat similar to mmap() but using read().
