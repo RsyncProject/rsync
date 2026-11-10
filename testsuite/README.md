@@ -25,14 +25,11 @@ The runner and tests use Python 3 and its standard library. Test subprocesses di
 
 Scratch data defaults to `testtmp/<name>/`. Failed tests retain their scratch directories. Root and non-root runs need separate scratch directories.
 
+During execution, SIGTERM stops queued tests and terminates active test process groups. Incomplete runs fail.
+
 The `--use-tcp` option starts unauthenticated test daemons on loopback addresses and some fixtures enable unsafe daemon options. Other local users can reach those listeners. Use the default pipe transport on shared hosts. The `--daemon-tests-only` option limits a follow-up TCP pass to tests which can observe the transport choice.
 
-The manual version-comparison tool runs the same transfer with two binaries and compares data, metadata and diagnostics. Its options are available from the repository root:
-```sh
-python3 -m testsuite.tools.compare_versions --help
-```
-
-Historical binaries live in `old_versions/`. Differential findings need investigation before becoming regression assertions. Pair each binary with its matching rrsync script when comparing restricted-shell behaviour. Optional memory measurements use Linux procfs.
+Historical binaries live in `old_versions/`. The runner's `--rsync-bin2` option selects a second binary for mixed-version tests.
 
 ## Writing a test
 
@@ -48,7 +45,7 @@ Use TestContext or the paths in harness.rsync for scratch data and `write_daemon
 
 Profiles compose by name through `--profiles`. Platform profiles describe permitted capability gaps; peer profiles record known version differences. The root and nonroot profiles must match the effective UID and cannot be combined. Peer runs select applicable tests from version-mix metadata.
 
-CI uses [tools/check.sh](tools/check.sh) to run composed profiles. It takes the build directory, binary, profile list and a fresh output directory, followed by runner options. Each run saves run.log, receipt.json and isolated scratch data.
+CI uses [tools/check.sh](tools/check.sh) to run composed profiles. It takes the build directory, binary, profile list and a fresh output directory, followed by runner options. Each run saves run.log, receipt.json and isolated scratch data. The recipe checks the receipt's results, executable identity and profiles before returning.
 
 Label | Meaning
 --- | ---
@@ -86,4 +83,4 @@ Ubuntu, Alpine, macOS and BSD jobs run separate root and non-root pipe and TCP p
 
 Android jobs cross-compile ARM64 and ARMv7 binaries. They do not execute the testsuite in Android or Termux. Native transfers between different operating systems and release-archive qualification remain missing.
 
-Ubuntu, Alpine, macOS, BSD and Solaris passes retain logs and receipts. Cygwin currently retains only workflow logs. BSD and macOS jobs also retain dirfd-probe.tsv for directory-descriptor capability checks. The Required job rejects failed or missing selected checks. Workflow tests cover its failure and skip handling.
+Native passes retain logs and receipts. BSD and macOS jobs also retain dirfd-probe.tsv for directory-descriptor capability checks. The Required job rejects failed or missing selected checks. Workflow tests cover its failure and skip handling.
