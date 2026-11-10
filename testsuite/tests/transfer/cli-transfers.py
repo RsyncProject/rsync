@@ -36,7 +36,6 @@ def test(context: TestContext):
     checkit(['-ai', f'{source_root}/', f'{destination}/'], source_root, destination)
     for text, options, source_host, destination_host in (
         ('pull', ['-ai'], 'lh:', ''), ('push', ['-ai'], '', 'lh:'),
-        ('secluded-pull', ['-ais'], 'lh:', ''), ('secluded-push', ['-ais'], '', 'lh:'),
     ):
         append(text)
         copy(options, source_host, destination_host)

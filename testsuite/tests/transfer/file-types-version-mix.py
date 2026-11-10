@@ -18,7 +18,7 @@ from harness.rsync import rsh_cmd
 from harness.xattrs import is_supported as xattrs_supported
 from harness import metadata
 
-metadata(features={'daemon', 'filesystem-specials', 'remote-shell'}, transports={'pipe', 'tcp'}, min_peer='2.6.0', cost='expensive', mutates={'filesystem', 'process', 'socket'}, tags={'compatibility', 'metadata', 'transfer', 'version-mix'})
+metadata(features={'daemon', 'filesystem-specials', 'legacy_peer', 'remote-shell'}, transports={'pipe', 'tcp'}, min_peer='3.0.0', cost='expensive', mutates={'filesystem', 'process', 'socket'}, tags={'compatibility', 'metadata', 'transfer', 'version-mix'})
 
 SSH = rsh_cmd()
 DAEMON_PORT_OLD = 12931
@@ -72,8 +72,6 @@ PROFILES = {
 }
 WIRE_PROFILES = ('P1-full', 'P2-links', 'P5-noimplied')
 PAIRINGS = (('old', 'old'), ('new', 'old'), ('old', 'new'), ('new', 'new'))
-if RSYNC == RSYNC_PEER:
-    PAIRINGS = (('old', 'old'), ('new', 'new'))
 
 results = []
 
@@ -165,12 +163,12 @@ for prof in WIRE_PROFILES:
         run_scenario('daemon', direction, prof, PAIRINGS)
 
 if results:
-    msg = [f"file-types: {len(results)} case(s) diverged from the all-old "
+    msg = [f"file-types-version-mix: {len(results)} case(s) diverged from the all-old "
            f"reference (peer={RSYNC_PEER!r}):"]
     for label, diffs in results:
         msg.append(f"\n========== {label} ==========")
         msg.extend(diffs)
     test_fail('\n'.join(msg))
 
-print("file-types: OK -- current rsync reproduces the all-old result on every "
+print("file-types-version-mix: current rsync reproduces the all-old result on every "
       "local/remote/daemon scenario and new/old role pairing")

@@ -8,6 +8,7 @@ import subprocess
 
 from harness import environment
 from harness.environment import FROMDIR, TMPDIR, TODIR, TOOLDIR
+from harness.filesystem import assert_same
 from harness.results import test_fail, test_skipped
 from harness.rsync import run_rsync
 from harness import metadata
@@ -26,8 +27,13 @@ foo = FROMDIR / 'foo'
 foo.write_text("content\n")
 
 atime = datetime.datetime(2001, 2, 3, 17, 17, 42).timestamp()
-mtime = foo.stat().st_mtime
-os.utime(foo, (atime, mtime))
+mtime_ns = foo.stat().st_mtime_ns
+os.utime(foo, ns=(int(atime * 1_000_000_000), mtime_ns))
+original_atime = foo.stat().st_atime_ns
+foo.read_bytes()
+if foo.stat().st_atime_ns == original_atime:
+    test_skipped("filesystem does not update access times", capability='noatime')
+os.utime(foo, ns=(original_atime, mtime_ns))
 
 environment.TLS_ARGS = '--atimes'
 
@@ -53,3 +59,4 @@ if before != after:
     )
     print(diff.stdout)
     test_fail("source atime changed across rsync --open-noatime run")
+assert_same(TODIR / foo.name, foo, label='--open-noatime transfer')

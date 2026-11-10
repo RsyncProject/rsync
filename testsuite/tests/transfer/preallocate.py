@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 
 import os
+import subprocess
+import time
 
 from harness.environment import FROMDIR, TODIR
 from harness.filesystem import allocated_size, assert_same, make_data_file, makepath, rmtree
 from harness.results import test_fail, test_skipped
-from harness.rsync import run_rsync
+from harness.rsync import rsync_argv, run_rsync
 from harness import metadata
 
 metadata(features={'preallocate'}, transports={'pipe'})
@@ -20,6 +22,49 @@ makepath(src)
 if run_rsync('-a', '--preallocate', f'{src}/', f'{TODIR}/',
              check=False, capture_output=True).returncode != 0:
     test_skipped("--preallocate not supported on this platform", capability='preallocate')
+
+def allocation_while_running(options):
+    size = 4 * 1024 * 1024
+    rmtree(src)
+    rmtree(TODIR)
+    makepath(src, TODIR)
+    probe = src / 'allocation-probe'
+    make_data_file(probe, size)
+    process = subprocess.Popen(
+        rsync_argv('-a', '--bwlimit=512', *options, str(probe), f'{TODIR}/'),
+        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    try:
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            candidates = list(TODIR.iterdir())
+            if candidates and candidates[0].stat().st_size:
+                if process.poll() is not None:
+                    break
+                return allocated_size(candidates[0]), size
+            if process.poll() is not None:
+                break
+            time.sleep(0.01)
+        stderr = process.stderr.read() if process.poll() is not None and process.stderr else ''
+        test_fail(f"allocation probe ended before transfer was in progress: {stderr}")
+    finally:
+        if process.poll() is None:
+            process.terminate()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
+        if process.stderr:
+            process.stderr.close()
+
+ordinary_allocation, allocation_size = allocation_while_running(())
+preallocated, _ = allocation_while_running(('--preallocate',))
+if ordinary_allocation >= allocation_size:
+    test_fail("ordinary transfer allocated the complete fixture before the probe; "
+              "--preallocate cannot be distinguished")
+if preallocated <= ordinary_allocation:
+    test_fail(f"--preallocate reserved {preallocated} bytes while an ordinary "
+              f"transfer reserved {ordinary_allocation} of {allocation_size} bytes")
 
 def punch_frees(offset, length, size):
     import ctypes

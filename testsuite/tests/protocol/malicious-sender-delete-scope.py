@@ -2,58 +2,22 @@
 
 import os
 import shlex
-import shutil
 import subprocess
 
 from harness.daemon_config import write_daemon_conf
-from harness.environment import SCRATCHDIR, SRCDIR
+from harness.environment import SCRATCHDIR
 from harness.filesystem import makepath, rmtree
-from harness.results import test_fail, test_skipped
+from harness.mutation import build_patched_rsync
+from harness.results import test_fail
 from harness.rsync import rsync_argv
 from harness import metadata
 
-metadata(transports={'pipe', 'tcp'})
+metadata(features={'native_build'}, transports={'pipe', 'tcp'})
 
-if not (SRCDIR / 'flist.c').is_file() or not (SRCDIR / 'Makefile').is_file():
-    test_skipped("malicious-sender-delete-scope: needs a writable rsync "
-                 f"source tree at SRCDIR={SRCDIR} with Makefile + flist.c; "
-                 "the patched-sender build relies on it.")
-if not shutil.which('make'):
-    test_skipped("malicious-sender-delete-scope: make(1) not on PATH")
-if not shutil.which('gcc') and not shutil.which('cc'):
-    test_skipped("malicious-sender-delete-scope: no C compiler on PATH")
-
-mal_src = SCRATCHDIR / 'mal-rsync'
-rmtree(mal_src)
-try:
-    shutil.copytree(SRCDIR, mal_src, symlinks=True,
-                    ignore=shutil.ignore_patterns('testtmp', '.git', 'auto-build-save'))
-except shutil.Error as e:
-    if any(not (os.path.islink(src) and os.path.islink(dst))
-           for src, dst, _why in e.args[0]):
-        raise
-
-flist_c = mal_src / 'flist.c'
 PATCH_OLD = "xflags = XMIT_TOP_DIR | XMIT_NO_CONTENT_DIR;"
 PATCH_NEW = "xflags = XMIT_TOP_DIR; /* malicious-sender PoC: drop NO_CONTENT_DIR */"
-text = flist_c.read_text()
-if PATCH_OLD not in text:
-    test_skipped(
-        "malicious-sender-delete-scope: could not find the implied-parent "
-        "encoding literal in flist.c -- upstream rename?  Looking for: "
-        f"{PATCH_OLD!r}.  Update PATCH_OLD in this test if the assignment "
-        "changed shape.")
-flist_c.write_text(text.replace(PATCH_OLD, PATCH_NEW, 1))
-
-build = subprocess.run(['make', '-j2', 'rsync'], cwd=str(mal_src),
-                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                       text=True)
-mal_rsync = mal_src / 'rsync'
-if build.returncode != 0 or not mal_rsync.is_file() or not os.access(mal_rsync, os.X_OK):
-    test_skipped(
-        "malicious-sender-delete-scope: malicious-sender build failed.  "
-        f"`make rsync` rc={build.returncode}.  Tail of build output:\n"
-        + '\n'.join(build.stdout.splitlines()[-20:]))
+mal_rsync = build_patched_rsync(
+    'malicious-sender-delete-scope', [('flist.c', PATCH_OLD, PATCH_NEW)])
 
 base = SCRATCHDIR / 'mal-test'
 rmtree(base)

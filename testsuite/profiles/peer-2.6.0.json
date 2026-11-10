@@ -10,9 +10,6 @@
     "daemon-refuse-compress": "peer-feature-gap",
     "exclude-remote-shell": "peer-feature-gap",
     "files-from": "peer-feature-gap",
-    "cli-transfers": "peer-feature-gap",
-    "daemon-root-filter": "pre-3.0.3-daemon-filter",
-    "file-types": "peer-feature-gap",
-    "file-types-symlink-traversal": "peer-feature-gap"
+    "daemon-root-filter": "pre-3.0.3-daemon-filter"
   }
 }
