@@ -31,7 +31,7 @@ cd "$build"
 status=0
 unset whichtests
 pid=
-stop() {
+terminate() {
     trap '' TERM
     child=${pid:-${!:-}}
     if test -n "$child"; then
@@ -40,7 +40,7 @@ stop() {
     fi
     exit 143
 }
-trap stop TERM
+trap terminate TERM
 scratchbase="$output/scratch" python3 -S "$source/testsuite/runtests.py" \
     "$@" \
     --srcdir="$source" --tooldir="$build" --rsync-bin="$binary" \

@@ -19,7 +19,8 @@ if proto is not None and proto < 30:
                  capability='protocol_30')
 
 DAEMON_PORT = 12992
-XNAME = 'rsync.marker'
+# rsync. encodes non-user namespaces on platforms without Linux-style prefixes
+XNAME = 'marker'
 
 base = SCRATCHDIR / 'symlink-exclude-xattr'
 rmtree(base)

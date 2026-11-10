@@ -22,7 +22,7 @@ makepath(src)
 for i in range(40):
     f = src / f'f{i:03d}'
     f.write_text('x\n')
-    xattr_set('rsync.marker', 'v', f)
+    xattr_set('marker', 'v', f)
 
 batch = SCRATCHDIR / 'xbatch'
 wb_dest = SCRATCHDIR / 'wb-dest'

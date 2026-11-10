@@ -15,24 +15,24 @@ def test(context: TestContext):
             pass
         else:
             test_fail('an xattr namespace prefix was accepted as a relative name')
-    for linux, expected in ((True, 'user.rsync.marker'), (False, 'rsync.marker')):
+    for linux, expected in ((True, 'user.marker'), (False, 'marker')):
         with patch.object(xattrs, 'LINUX_NAMESPACE', linux):
-            if xattrs._full_name('rsync.marker') != expected:
+            if xattrs._full_name('marker') != expected:
                 test_fail('the user namespace was applied incorrectly')
     path = context.scratch / 'file'
     for system, write, read, value in (
-        ('FreeBSD', ['setextattr', '-h', 'user', 'rsync.marker', 'value', str(path)],
-         ['getextattr', '-qqh', 'user', 'rsync.marker', str(path)], b'value'),
-        ('Darwin', ['xattr', '-w', 'rsync.marker', 'value', str(path)],
-         ['xattr', '-px', 'rsync.marker', str(path)], b'76616c7565'),
+        ('FreeBSD', ['setextattr', '-h', 'user', 'marker', 'value', str(path)],
+         ['getextattr', '-qqh', 'user', 'marker', str(path)], b'value'),
+        ('Darwin', ['xattr', '-w', 'marker', 'value', str(path)],
+         ['xattr', '-px', 'marker', str(path)], b'76616c7565'),
     ):
         with patch.object(xattrs, 'SYSTEM', system), patch.object(xattrs, 'CYGWIN', False), \
                 patch.object(xattrs, 'LINUX_NAMESPACE', False), patch.object(xattrs, '_run') as tool:
-            xattrs.set_value('rsync.marker', 'value', path)
+            xattrs.set_value('marker', 'value', path)
             tool.assert_called_once_with(write, text=True)
             tool.reset_mock()
             tool.return_value = SimpleNamespace(stdout=value)
-            if xattrs.get_value('rsync.marker', path) != b'value':
+            if xattrs.get_value('marker', path) != b'value':
                 test_fail(f'{system} changed the xattr value')
             tool.assert_called_once_with(read)
 

@@ -195,6 +195,10 @@ def test(context: TestContext):
     if receipt['run']['source_revision'] is not None or receipt['run']['source_dirty'] is not None:
         test_fail('a non-checkout source acquired its parent revision')
 
+    (tools / 'check.sh').write_text("alias stop='kill -STOP'\n" + recipe.read_text())
+    invoke(['sh', str(tools / 'check.sh'), str(context.tools), binary,
+            str(profile), str(context.scratch / 'shell-alias'), 'second'], True)
+
     (fixture / 'testsuite' / 'runtests.py').write_text(
         "import sys\nfrom pathlib import Path\nfrom harness import runner\n"
         "if '--check-receipt' not in sys.argv:\n"
@@ -271,9 +275,16 @@ def test(context: TestContext):
             if not all(word in text for word in ('timed out', output.name, 'outer stdout',
                                                  'outer stderr', 'run.log', 'test ready', 'child ready')):
                 test_fail(f'recipe timeout lost its diagnostics: {text}')
-            if locked(output / 'runner.lock') or any(
-                    locked(root / name) for root in roots for name in ('test.lock', 'child.lock')):
-                test_fail('recipe timeout left nested processes running')
+            locks = [output / 'runner.lock', *[root / name for root in roots for name in ('test.lock', 'child.lock')]]
+            deadline = time.monotonic() + 5
+            while True:
+                held = [path for path in locks if locked(path)]
+                if not held:
+                    break
+                if time.monotonic() >= deadline:
+                    test_fail('recipe timeout left nested processes running: '
+                              + ', '.join(str(path.relative_to(output)) for path in held) + '\n' + text)
+                time.sleep(0.01)
         finally:
             for root in roots:
                 if (root / 'test.pid').exists() and any(
