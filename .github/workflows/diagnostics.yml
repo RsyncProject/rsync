@@ -50,21 +50,17 @@ jobs:
         with:
           persist-credentials: false
       - name: Install actionlint
-        run: |
-          archive=actionlint_1.7.12_linux_amd64.tar.gz
-          curl --proto '=https' --tlsv1.2 -fsSLO \
-            --retry 4 --retry-max-time 120 --connect-timeout 15 --max-time 60 \
-            "https://github.com/rhysd/actionlint/releases/download/v1.7.12/$archive"
-          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $archive" \
-            | sha256sum --check --strict
-          tar -xzf "$archive" actionlint
-          echo "$PWD" >>"$GITHUB_PATH"
+        run: python3 -S .github/scripts/diagnostics.py install-actionlint
       - name: Version
         run: actionlint -version
       - name: Check workflows
         run: actionlint -color -ignore '^label "ubuntu-26\.04(-arm)?" is unknown\.'
       - name: Check result gate
-        run: sh .github/test-results.sh
+        run: python3 -S .github/scripts/test-results.py
+      - name: Check CI helpers
+        run: |
+          python3 -S .github/scripts/test-guest.py
+          python3 -S .github/scripts/test-diagnostics.py
       - name: Check Python runtime
         run: python3 -S testsuite/runtests.py --describe-tests > /dev/null
 
@@ -95,20 +91,25 @@ jobs:
           LDFLAGS="-fsanitize=address,undefined" \
           ./configure --with-rrsync --disable-md2man
       - name: Build
+        id: build
         run: make check-progs
       - name: Version
         run: ./rsync --version
       - name: Tests (non-root pipe)
-        run: RSYNC_TEST_PROFILES=pipe,nonroot,self-peer,linux,asan,no-userns ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --receipt=test-results/asan-pipe.json -j8
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: python3 -S testsuite/tools/check.py . ./rsync pipe,nonroot,self-peer,linux,asan,no-userns test-results/asan-pipe -j8
       - name: Tests (non-root TCP)
-        run: RSYNC_TEST_PROFILES=nonroot,self-peer,linux,asan,no-userns ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp --daemon-tests-only --receipt=test-results/asan-tcp.json -j8
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: python3 -S testsuite/tools/check.py . ./rsync nonroot,self-peer,linux,asan,no-userns test-results/asan-tcp --use-tcp --daemon-tests-only -j8
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           retention-days: 45
-          name: asan-receipts
-          path: test-results/*.json
+          name: asan-results
+          path: |
+            test-results/*/receipt.json
+            test-results/*/run.log
 
   coverage:
     if: ${{ inputs.coverage }}
@@ -128,33 +129,19 @@ jobs:
       - name: Configure
         run: ./configure --enable-coverage --with-rrsync
       - name: Build
+        id: build
         run: make
       - name: Version
-        run: rsync --version
+        run: ./rsync --version
       - name: Coverage (root pipe)
-        shell: bash
-        run: |
-          set -o pipefail
-          sudo env RSYNC_TEST_PROFILES=pipe,non-asan,root,self-peer,linux,no-userns make coverage 2>&1 | tee cov-pipe.log
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: sudo env RSYNC_TEST_PROFILES=pipe,non-asan,root,self-peer,linux,no-userns python3 -S .github/scripts/diagnostics.py coverage pipe
       - name: Coverage (root TCP)
-        shell: bash
-        run: |
-          set -o pipefail
-          sudo env RSYNC_TEST_PROFILES=non-asan,root,self-peer,linux,no-userns make coverage-tcp 2>&1 | tee cov-tcp.log
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: sudo env RSYNC_TEST_PROFILES=non-asan,root,self-peer,linux,no-userns python3 -S .github/scripts/diagnostics.py coverage tcp
       - name: Coverage summary
         if: always()
-        run: |
-          {
-            echo "## gcov coverage"
-            echo "### Pipe transport (\`make coverage\`)"
-            echo '```'
-            grep -E '^(lines|functions|branches|decisions):' cov-pipe.log || echo '(no summary -- see step log)'
-            echo '```'
-            echo "### TCP transport (\`make coverage-tcp\`)"
-            echo '```'
-            grep -E '^(lines|functions|branches|decisions):' cov-tcp.log || echo '(no summary -- see step log)'
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+        run: python3 -S .github/scripts/diagnostics.py coverage-summary
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -182,14 +169,7 @@ jobs:
       - name: Configure
         run: scan-build-18 ./configure --with-rrsync --disable-md2man
       - name: Analyse
-        shell: bash
-        run: |
-          set -o pipefail
-          status=0
-          scan-build-18 --status-bugs -o "$PWD/scan-report" make check-progs -j"$(nproc)" 2>&1 | tee scan-build.out || status=$?
-          echo '## scan-build gate (clang-18)' >>"$GITHUB_STEP_SUMMARY"
-          grep -E 'scan-build: .* bugs? found|scan-build: No bugs found' scan-build.out >>"$GITHUB_STEP_SUMMARY" || true
-          exit $status
+        run: python3 -S .github/scripts/diagnostics.py scan scan-build-18 --strict
       - name: Upload report
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -216,11 +196,7 @@ jobs:
       - name: Configure
         run: scan-build ./configure --with-rrsync --disable-md2man
       - name: Analyse
-        shell: bash
-        run: |
-          scan-build -o "$PWD/scan-report" make check-progs -j"$(nproc)" 2>&1 | tee scan-build.out
-          echo '## scan-build forward check' >>"$GITHUB_STEP_SUMMARY"
-          grep -E 'scan-build: .* bugs? found|scan-build: No bugs found' scan-build.out >>"$GITHUB_STEP_SUMMARY" || true
+        run: python3 -S .github/scripts/diagnostics.py scan scan-build
       - name: Upload report
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -266,59 +242,18 @@ jobs:
       - name: Configure
         run: ./configure --with-rrsync --enable-debug
       - name: Build
-        run: make check-progs   # builds rsync + the test helper programs runtests.py needs
+        id: build
+        run: make check-progs
       - name: Version
         run: ./rsync --version
 
       # Gate memory errors rather than intentional process-exit leaks
       - name: Tests
-        shell: bash
-        run: |
-          mkdir -p test-results/valgrind-logs
-          SUDO=()
-          [ "${{ matrix.privilege }}" = root ] && SUDO=(sudo -E)
-          TCP=()
-          [ "${{ matrix.transport }}" = tcp ] && TCP=(--use-tcp --daemon-tests-only)
-          "${SUDO[@]}" env RSYNC_TEST_PROFILES=${{ matrix.profiles }} scratchbase="$VALGRIND_SCRATCH" \
-            ./testsuite/runtests.py --valgrind \
-            --valgrind-opts="--leak-check=no --error-exitcode=0" \
-            "${TCP[@]}" -j2 --timeout=600 --preserve-scratch \
-            --receipt=test-results/valgrind-${{ matrix.privilege }}-${{ matrix.transport }}.json
-
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: python3 -S .github/scripts/diagnostics.py valgrind --privilege "${{ matrix.privilege }}" --transport "${{ matrix.transport }}" --profiles "${{ matrix.profiles }}"
       - name: Check memory errors
         if: always()
-        shell: bash
-        run: |
-          log_dir="$VALGRIND_SCRATCH/testtmp/valgrind-logs"
-          if [ -d "$log_dir" ]; then
-            sudo chown -R "$USER" "$log_dir"
-          fi
-          shopt -s nullglob
-          logs=("$log_dir"/valgrind.*.log)
-          if [ "${#logs[@]}" -eq 0 ]; then
-            echo "::error::no valgrind logs were produced -- the suite did not run"
-            exit 1
-          fi
-          evidence_dir=test-results/valgrind-logs
-          mkdir -p "$evidence_dir"
-          cp -- "${logs[@]}" "$evidence_dir/"
-          echo "scanned ${#logs[@]} valgrind log(s)"
-          bad=()
-          for f in "${logs[@]}"; do
-            grep -qE 'ERROR SUMMARY: [1-9][0-9]* errors' "$f" && bad+=("$f")
-          done
-          if [ "${#bad[@]}" -ne 0 ]; then
-            echo "::error::valgrind reported unsuppressed errors in ${#bad[@]} run(s)"
-            for f in "${bad[@]}"; do
-              echo "===== $f ====="
-              sed 's/==[0-9]*== //' "$f" | grep -A18 \
-                -E 'depends on uninitialised|points to uninitialised|Invalid (read|write|free)|lost in loss record|Mismatched free' \
-                | head -60
-            done
-            exit 1
-          fi
-          echo "valgrind clean: no unsuppressed errors"
-
+        run: python3 -S .github/scripts/diagnostics.py valgrind-results --privilege "${{ matrix.privilege }}" --transport "${{ matrix.transport }}"
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

@@ -78,57 +78,27 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Platform
+        run: python3 -S .github/scripts/check-platform.py ubuntu --release "${{ matrix.release }}" --arch "${{ matrix.machine }}"
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev libidn2-dev python3-cmarkgfm openssl
           sudo sysctl -w fs.protected_regular=2
           echo "/usr/local/bin" >>"$GITHUB_PATH"
-          mkdir -p "$RUNNER_TEMP/rsync-checks"
+          mkdir -p test-results
       - name: Configure
         run: ./configure --with-rrsync
       - name: Build
+        id: build
         run: make check-progs
       - name: Installation check
         if: matrix.install_smoke
-        run: |
-          set -e
-          tmp="$(mktemp -d)"
-          trap 'rm -rf "$tmp"' EXIT
-
-          make install-all DESTDIR="$tmp"
-
-          for path in \
-            /usr/local/bin/rsync \
-            /usr/local/bin/rsync-ssl \
-            /usr/local/bin/rrsync \
-            /usr/local/share/man/man1/rsync.1 \
-            /usr/local/share/man/man1/rsync-ssl.1 \
-            /usr/local/share/man/man1/rrsync.1 \
-            /usr/local/share/man/man5/rsyncd.conf.5 \
-            /etc/stunnel/rsyncd.conf
-          do
-            test -e "$tmp$path"
-          done
-
-          make uninstall-all DESTDIR="$tmp"
-
-          leftover="$(find "$tmp" -type f -print)"
-          if [ -n "$leftover" ]; then
-            printf '%s\n' "$leftover"
-            exit 1
-          fi
+        run: python3 -S .github/scripts/installcheck.py
       - name: Install
         run: sudo make install
       - name: Version
-        run: |
-          . /etc/os-release
-          printf '%s %s\n' "$ID" "$VERSION_ID"
-          uname -a
-          test "$ID" = ubuntu
-          test "$VERSION_ID" = "${{ matrix.release }}"
-          test "$(uname -m)" = "${{ matrix.machine }}"
-          ./rsync --version
+        run: ./rsync --version
       - name: Verify installed rsync-ssl
         run: |
           python3 testsuite/tools/check-rsync-ssl.py \
@@ -136,17 +106,23 @@ jobs:
             --rsync-ssl /usr/local/bin/rsync-ssl \
             --openssl /usr/bin/openssl
       - name: Tests (root pipe)
-        run: sudo sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,root,${{ matrix.profiles }}" "$RUNNER_TEMP/rsync-checks/root-pipe" -j8
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: sudo python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" "pipe,root,${{ matrix.profiles }}" "$PWD/test-results/root/pipe" -j8
       - name: Tests (protocol 30)
-        run: sudo sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,root,${{ matrix.profiles }},protocol-30" "$RUNNER_TEMP/rsync-checks/root-protocol-30" --protocol=30 -j8
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: sudo python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" "pipe,root,${{ matrix.profiles }},protocol-30" "$PWD/test-results/root/protocol-30" --protocol=30 -j8
       - name: Tests (protocol 29)
-        run: sudo sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,root,${{ matrix.profiles }},protocol-29" "$RUNNER_TEMP/rsync-checks/root-protocol-29" --protocol=29 -j8
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: sudo python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" "pipe,root,${{ matrix.profiles }},protocol-29" "$PWD/test-results/root/protocol-29" --protocol=29 -j8
       - name: Tests (root TCP)
-        run: sudo sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "root,${{ matrix.profiles }}" "$RUNNER_TEMP/rsync-checks/root-tcp" --use-tcp --daemon-tests-only -j8
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: sudo python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" "root,${{ matrix.profiles }}" "$PWD/test-results/root/tcp" --use-tcp --daemon-tests-only -j8
       - name: Tests (non-root pipe)
-        run: sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,nonroot,${{ matrix.profiles }}" "$RUNNER_TEMP/rsync-checks/nonroot-pipe" -j8
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" "pipe,nonroot,${{ matrix.profiles }}" "$PWD/test-results/nonroot/pipe" -j8
       - name: Tests (non-root TCP)
-        run: sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "nonroot,${{ matrix.profiles }}" "$RUNNER_TEMP/rsync-checks/nonroot-tcp" --use-tcp --daemon-tests-only -j8
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" "nonroot,${{ matrix.profiles }}" "$PWD/test-results/nonroot/tcp" --use-tcp --daemon-tests-only -j8
       - name: Upload binaries
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -171,8 +147,8 @@ jobs:
           if-no-files-found: error
           path: |
             config.log
-            ${{ runner.temp }}/rsync-checks/*/receipt.json
-            ${{ runner.temp }}/rsync-checks/*/run.log
+            test-results/*/*/receipt.json
+            test-results/*/*/run.log
 
   almalinux:
     if: ${{ inputs.almalinux }}
@@ -203,17 +179,23 @@ jobs:
               libidn2 libidn2-devel
           alternatives --set python3 /usr/bin/python3.9
           pip3 install commonmark
+      - name: Platform
+        run: python3 -S .github/scripts/check-platform.py almalinux --release 8 --arch x86_64
       - name: Configure
         run: ./configure --with-rrsync
       - name: Build
+        id: build
         run: make check-progs
       - name: Version
         run: ./rsync --version
       - name: Tests (root pipe)
-        run: sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" pipe,non-asan,root,self-peer,linux,no-zstd-threads,no-userns "$RUNNER_TEMP/rsync-checks/root-pipe" -j8
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" pipe,non-asan,root,self-peer,linux,no-zstd-threads,no-userns "$PWD/test-results/root/pipe" -j8
       - name: Tests (root TCP)
-        run: sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" non-asan,root,self-peer,linux,no-zstd-threads,no-userns "$RUNNER_TEMP/rsync-checks/root-tcp" --use-tcp --daemon-tests-only -j8
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" non-asan,root,self-peer,linux,no-zstd-threads,no-userns "$PWD/test-results/root/tcp" --use-tcp --daemon-tests-only -j8
       - name: Upload binaries
+        if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           retention-days: 45
@@ -233,8 +215,8 @@ jobs:
           name: almalinux-8-amd64-results
           if-no-files-found: error
           path: |
-            ${{ runner.temp }}/rsync-checks/*/run.log
-            ${{ runner.temp }}/rsync-checks/*/receipt.json
+            test-results/*/*/run.log
+            test-results/*/*/receipt.json
 
   alpine:
     if: ${{ inputs.alpine }}
@@ -267,8 +249,7 @@ jobs:
           sudo sysctl -w fs.protected_regular=2
           mkdir -p "$RUNNER_TEMP/rsync-alpine-${{ matrix.arch }}"
           docker pull --platform "${{ matrix.platform }}" "${{ matrix.image }}"
-          test "$(docker image inspect "${{ matrix.image }}" --format '{{.Os}}/{{.Architecture}}')" = '${{ matrix.platform }}'
-      - name: Build and test
+      - name: Run Alpine and collect results
         env:
           APK_ARCH: ${{ matrix.apk_arch }}
           BITS: ${{ matrix.bits }}
@@ -278,51 +259,11 @@ jobs:
             -e APK_ARCH -e BITS -e PROFILES -e RSYNC_TEST_TMP=/dev/shm \
             -v "$PWD:/source:ro" \
             -v "$RUNNER_TEMP/rsync-alpine-${{ matrix.arch }}:/results" \
-            "${{ matrix.image }}" sh -euxs <<'ALPINE'
-          apk add --no-cache \
-            acl acl-dev attr attr-dev autoconf automake bash build-base diffutils file gawk git \
-            libidn2-dev linux-headers lz4-dev musl-locales openssl-dev py3-commonmark python3 setpriv \
-            xxhash-dev zstd-dev
-          test "$(apk --print-arch)" = "$APK_ARCH"
-
-          cp -a /source /work
-          cd /work
-          git config --global --add safe.directory /work
-          ./configure --with-rrsync --enable-iconv --enable-acl-support --enable-xattr-support
-          make -j4 check-progs
-          file rsync
-          file rsync | grep -q "ELF $BITS-bit"
-          python3 -c "import struct; assert struct.calcsize('P') * 8 == $BITS"
-          ./rsync -VV | python3 -c 'import json,sys; value=json.load(sys.stdin); assert value["capabilities"]["file_bits"] == 64'
-          python3 testsuite/tools/check-features.py "$PWD/rsync" \
-            zstd lz4 xxh128 xxh3 xxh64 iconv IDN ACLs xattrs > /results/features.json
-
-          addgroup -S rsynctest
-          addgroup -S rsynctest-extra
-          adduser -S -D -h /home/rsynctest -G rsynctest rsynctest
-          addgroup rsynctest rsynctest-extra
-          mkdir -p /results/root /results/nonroot
-          chown rsynctest:rsynctest /results/nonroot
-
-          status=0
-          sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,root,$PROFILES" /results/root/pipe -j4 || status=1
-          sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,root,$PROFILES,protocol-30" /results/root/protocol-30 --protocol=30 -j4 || status=1
-          sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,root,$PROFILES,protocol-29" /results/root/protocol-29 --protocol=29 -j4 || status=1
-          sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "root,$PROFILES" /results/root/tcp --use-tcp --daemon-tests-only -j4 || status=1
-          su -m rsynctest -s /bin/sh -c '
-            export HOME=/home/rsynctest
-            status=0
-            sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,nonroot,$PROFILES" /results/nonroot/pipe -j4 || status=1
-            sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "nonroot,$PROFILES" /results/nonroot/tcp --use-tcp --daemon-tests-only -j4 || status=1
-            exit "$status"
-          ' || status=1
-
-          mkdir -p /results/bin
-          cp rsync rsync-ssl rsync.1 rsync-ssl.1 rsyncd.conf.5 rrsync.1 rrsync /results/bin/
-          cp config.log /results/
-          chmod -R a+rX /results
-          exit "$status"
-          ALPINE
+            "${{ matrix.image }}" sh -ec '
+              apk add --no-cache acl acl-dev attr attr-dev autoconf automake bash build-base diffutils gawk git \
+                libidn2-dev linux-headers lz4-dev musl-locales openssl-dev py3-commonmark python3 setpriv xxhash-dev zstd-dev
+              exec python3 -S /source/.github/scripts/guest.py alpine --output /results
+            '
       - name: Upload binaries
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

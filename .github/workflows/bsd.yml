@@ -36,7 +36,7 @@ jobs:
             sudo apt-get update -q
             sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "$@"
           }
-      - name: Build and test
+      - name: Run VM and collect results
         id: test
         uses: vmactions/freebsd-vm@c46abacb49f09938ca4e1702d15d836285d694cc # v1.5.9
         with:
@@ -47,57 +47,9 @@ jobs:
             /usr/sbin/pw groupadd rsynctest
             /usr/sbin/pw groupadd rsynctest-extra
             /usr/sbin/pw useradd rsynctest -g rsynctest -G rsynctest-extra -m -d /home/rsynctest -s /bin/sh -w no
-          run: |
-            mkdir -p test-results
-            result=$PWD/test-results/status
-            cross_device=
-            finish() {
-              status=$?
-              if [ -n "$cross_device" ]; then
-                umount "$cross_device" || status=1
-                rmdir "$cross_device" || status=1
-              fi
-              printf "%s\n" "$status" > "$result"
-              exit 0
-            }
-            trap finish EXIT
-            freebsd-version
-            uname -a
-            test "$(uname -s)" = FreeBSD
-            test "$(uname -m)" = amd64
-            case "$(uname -r)" in
-              '${{ matrix.release }}'|'${{ matrix.release }}-RELEASE'*) ;;
-              *) echo 'Unexpected FreeBSD release' >&2; exit 1 ;;
-            esac
-            cross_device=$(mktemp -d /tmp/rsync-cross-device.XXXXXX)
-            mount -t tmpfs -o size=256m,mode=1777,nosuid tmpfs "$cross_device"
-            export RSYNC_TEST_TMP=$cross_device
-            df -T . "$RSYNC_TEST_TMP"
-            CPPFLAGS="-I/usr/local/include" LDFLAGS="-L/usr/local/lib" \
-            ./configure --with-rrsync \
-              --disable-md2man --enable-iconv --enable-acl-support --enable-xattr-support \
-              --enable-roll-simd --enable-roll-asm --enable-md5-asm
-            make check-progs
-            ./rsync --version
-            python3 testsuite/tools/check-features.py "$PWD/rsync" zstd lz4 xxh128 xxh3 xxh64 iconv IDN ACLs xattrs > test-results/features.json
-            mkdir test-results/nonroot
-            chown rsynctest:rsynctest test-results/nonroot
-            export profiles=non-asan,self-peer,freebsd
-            status=0
-            make dirfd-probe || status=1
-            sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,root,$profiles" "$PWD/test-results/root/pipe" -j8 || status=1
-            sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "root,$profiles" "$PWD/test-results/root/tcp" --use-tcp --daemon-tests-only -j8 || status=1
-            su rsynctest -c '
-              set -eu
-              status=0
-              "$PWD/dirfd-probe" "$PWD/test-results/nonroot" > "$PWD/test-results/nonroot/dirfd-probe.tsv" || status=1
-              sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,nonroot,$profiles" "$PWD/test-results/nonroot/pipe" -j8 || status=1
-              sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "nonroot,$profiles" "$PWD/test-results/nonroot/tcp" --use-tcp --daemon-tests-only -j8 || status=1
-              exit "$status"
-            ' || status=1
-            exit "$status"
-      - name: Check result
-        run: test "$(cat test-results/status)" = 0
+          run: python3 -S .github/scripts/guest.py freebsd --release "${{ matrix.release }}"
+      - name: Verify guest results
+        run: python3 -S .github/scripts/guest.py check
       - name: Upload binaries
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -148,7 +100,7 @@ jobs:
             sudo apt-get update -q
             sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "$@"
           }
-      - name: Build and test
+      - name: Run VM and collect results
         id: test
         uses: vmactions/netbsd-vm@5957cf330aef2e6ddc63c604364c99ce2e02b91d # v1.5.3
         with:
@@ -159,35 +111,9 @@ jobs:
             ln -sf /usr/pkg/bin/python3.12 /usr/pkg/bin/python3
             /usr/sbin/groupadd rsynctest-extra
             /usr/sbin/useradd -m -d /home/rsynctest -g =uid -G rsynctest-extra -s /bin/sh rsynctest
-          run: |
-            mkdir -p test-results
-            result=$PWD/test-results/status
-            trap 'status=$?; printf "%s\n" "$status" > "$result"; exit 0' EXIT
-            uname -a
-            test "$(uname -s)" = NetBSD
-            test "$(uname -m)" = amd64
-            test "$(uname -r)" = '${{ matrix.release }}'
-            ./configure --with-rrsync --disable-zstd --disable-md2man --disable-xxhash --disable-lz4 --disable-idn
-            make check-progs
-            ./rsync --version
-            mkdir -p test-results/nonroot
-            chown rsynctest:rsynctest test-results/nonroot
-            export profiles=non-asan,self-peer,netbsd,no-idn,no-xxhash,no-zstd-threads
-            status=0
-            make dirfd-probe || status=1
-            sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,root,$profiles" "$PWD/test-results/root/pipe" -j8 || status=1
-            sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "root,$profiles" "$PWD/test-results/root/tcp" --use-tcp --daemon-tests-only -j8 || status=1
-            su rsynctest -c '
-              set -eu
-              status=0
-              "$PWD/dirfd-probe" "$PWD/test-results/nonroot" > "$PWD/test-results/nonroot/dirfd-probe.tsv" || status=1
-              sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,nonroot,$profiles" "$PWD/test-results/nonroot/pipe" -j8 || status=1
-              sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "nonroot,$profiles" "$PWD/test-results/nonroot/tcp" --use-tcp --daemon-tests-only -j8 || status=1
-              exit "$status"
-            ' || status=1
-            exit "$status"
-      - name: Check result
-        run: test "$(cat test-results/status)" = 0
+          run: python3 -S .github/scripts/guest.py netbsd --release "${{ matrix.release }}"
+      - name: Verify guest results
+        run: python3 -S .github/scripts/guest.py check
       - name: Upload binaries
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -237,7 +163,7 @@ jobs:
             sudo apt-get update -q
             sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "$@"
           }
-      - name: Build and test
+      - name: Run VM and collect results
         id: test
         uses: vmactions/openbsd-vm@f1ca8bc8ecc5b6ef7218e5b914836e067e1546d3 # v1.4.9
         with:
@@ -247,44 +173,9 @@ jobs:
             pkg_add -I bash autoconf%2.71 automake%1.16 xxhash zstd lz4 libidn2 libiconv git
             /usr/sbin/groupadd rsynctest-extra
             /usr/sbin/useradd -m -d /home/rsynctest -g =uid -G rsynctest-extra -s /bin/sh rsynctest
-          run: |
-            mkdir -p test-results
-            result=$PWD/test-results/status
-            trap 'status=$?; printf "%s\n" "$status" > "$result"; exit 0' EXIT
-            uname -a
-            test "$(uname -s)" = OpenBSD
-            test "$(uname -m)" = amd64
-            test "$(uname -r)" = '${{ matrix.release }}'
-            export AUTOCONF_VERSION=2.71
-            export AUTOMAKE_VERSION=1.16
-            # Match the OpenBSD port's header-only xxhash linkage
-            CPPFLAGS="-I/usr/local/include -DXXH_INLINE_ALL=1" LDFLAGS="-L/usr/local/lib" \
-              ac_cv_search_XXH64_createState= \
-              ./configure --with-rrsync --disable-md2man --enable-iconv
-            make check-progs
-            ./rsync --version
-            python3 testsuite/tools/check-features.py "$PWD/rsync" zstd lz4 xxh128 xxh3 xxh64 iconv IDN > test-results/features.json
-            mkdir test-results/nonroot
-            chown rsynctest:rsynctest test-results/nonroot
-            export profiles=non-asan,self-peer,openbsd
-            # OpenBSD rename storms can hang these races outside rsync
-            export RSYNC_EXCLUDE=acl-symlink-race,sender-symlink-target-race,sender-remove-source-secure
-            status=0
-            make dirfd-probe || status=1
-            sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,root,$profiles" "$PWD/test-results/root/pipe" -j8 || status=1
-            # Keep nested-VM loopback daemons below the observed lost-wakeup threshold
-            sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "root,$profiles" "$PWD/test-results/root/tcp" --use-tcp --daemon-tests-only -j2 || status=1
-            su rsynctest -c '
-              set -eu
-              status=0
-              "$PWD/dirfd-probe" "$PWD/test-results/nonroot" > "$PWD/test-results/nonroot/dirfd-probe.tsv" || status=1
-              sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,nonroot,$profiles" "$PWD/test-results/nonroot/pipe" -j8 || status=1
-              sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "nonroot,$profiles" "$PWD/test-results/nonroot/tcp" --use-tcp --daemon-tests-only -j2 || status=1
-              exit "$status"
-            ' || status=1
-            exit "$status"
-      - name: Check result
-        run: test "$(cat test-results/status)" = 0
+          run: python3 -S .github/scripts/guest.py openbsd --release "${{ matrix.release }}"
+      - name: Verify guest results
+        run: python3 -S .github/scripts/guest.py check
       - name: Upload binaries
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

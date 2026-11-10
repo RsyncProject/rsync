@@ -66,15 +66,49 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Platform
+        run: python3 -S .github/scripts/check-platform.py macos --release "${{ matrix.release }}" --arch "${{ matrix.arch }}"
+      - name: Install dependencies
         run: |
-          sw_vers
-          uname -a
-          test "$(uname -s)" = Darwin
-          test "$(sw_vers -productVersion | cut -d. -f1)" = '${{ matrix.release }}'
-          test "$(uname -m)" = '${{ matrix.arch }}'
-      - name: Build and test
-        uses: ./.github/actions/macos
+          brew install automake openssl xxhash zstd lz4 libidn2
+          pip3 install --user --break-system-packages commonmark
+          echo "$(brew --prefix)/bin" >>"$GITHUB_PATH"
+          mkdir -p test-results
+      - name: Configure
+        run: |
+          BREW_PREFIX=$(brew --prefix)
+          OPENSSL_PREFIX=$(brew --prefix openssl)
+          CPPFLAGS="-I${BREW_PREFIX}/include -I${OPENSSL_PREFIX}/include" \
+          LDFLAGS="-L${BREW_PREFIX}/lib -L${OPENSSL_PREFIX}/lib" \
+          ./configure --with-rrsync --enable-iconv --enable-acl-support --enable-xattr-support
+      - name: Build
+        id: build
+        run: make check-progs
+      - name: Install
+        run: sudo make install
+      - name: Version
+        run: /usr/local/bin/rsync --version
+      - name: Features
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: python3 -S testsuite/tools/check-features.py "$PWD/rsync" zstd lz4 xxh128 xxh3 xxh64 iconv IDN ACLs xattrs > "$PWD/test-results/features.json"
+      - name: Directory descriptors
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: |
+          make dirfd-probe
+          "$PWD/dirfd-probe" "$PWD/test-results" > "$PWD/test-results/dirfd-probe.tsv"
+      - name: Tests (non-root pipe)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" "pipe,non-asan,nonroot,self-peer,macos" "$PWD/test-results/nonroot/pipe" -j8
+      - name: Tests (non-root TCP)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" "non-asan,nonroot,self-peer,macos" "$PWD/test-results/nonroot/tcp" --use-tcp --daemon-tests-only -j8
+      - name: Tests (root pipe)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: sudo python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" "pipe,non-asan,root,self-peer,macos" "$PWD/test-results/root/pipe" -j8
+      - name: Tests (root TCP)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: sudo python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" "non-asan,root,self-peer,macos" "$PWD/test-results/root/tcp" --use-tcp --daemon-tests-only -j8
       - name: Upload binaries
+        if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           retention-days: 45
@@ -96,10 +130,10 @@ jobs:
           if-no-files-found: error
           path: |
             config.log
-            ${{ runner.temp }}/rsync-checks/features.json
-            ${{ runner.temp }}/rsync-checks/dirfd-probe.tsv
-            ${{ runner.temp }}/rsync-checks/*/receipt.json
-            ${{ runner.temp }}/rsync-checks/*/run.log
+            test-results/features.json
+            test-results/dirfd-probe.tsv
+            test-results/*/*/receipt.json
+            test-results/*/*/run.log
 
   cygwin:
     if: *daily
@@ -111,9 +145,80 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Build and test
-        uses: ./.github/actions/cygwin
+      - name: Install Cygwin
+        shell: pwsh
+        run: |
+          $setup = Join-Path $Env:RUNNER_TEMP 'setup-x86_64.exe'
+          $sums = Join-Path $Env:RUNNER_TEMP 'cygwin-sha512.sum'
+          $packages = 'make,autoconf,automake,gcc-core,attr,libattr-devel,python39,python39-pip,libzstd-devel,liblz4-devel,libssl-devel,libxxhash0,libxxhash-devel,libidn2-devel'
+
+          Invoke-WebRequest https://cygwin.com/setup-x86_64.exe -OutFile $setup
+          Invoke-WebRequest https://cygwin.com/sha512.sum -OutFile $sums
+
+          $sum = Select-String -LiteralPath $sums -Pattern '^[0-9a-fA-F]{128}\s+\*?setup-x86_64\.exe$' | Select-Object -First 1
+          if (-not $sum) {
+            throw 'setup-x86_64.exe is missing from Cygwin sha512.sum'
+          }
+          $expected = ($sum.Line -split '\s+')[0]
+          $actual = (Get-FileHash -LiteralPath $setup -Algorithm SHA512).Hash
+          if ($actual -ine $expected) {
+            throw 'Cygwin setup SHA-512 mismatch'
+          }
+
+          $arguments = @(
+            '--quiet-mode',
+            '--no-desktop',
+            '--no-startmenu',
+            '--no-shortcuts',
+            '--root', 'C:\tools\cygwin',
+            '--local-package-dir', (Join-Path $Env:RUNNER_TEMP 'cygwin-packages'),
+            '--site', 'https://mirrors.kernel.org/sourceware/cygwin/',
+            '--packages', $packages
+          )
+          $install = Start-Process -FilePath $setup -ArgumentList $arguments -Wait -PassThru -NoNewWindow
+          if ($install.ExitCode -ne 0) {
+            exit $install.ExitCode
+          }
+
+          $bash = 'C:\tools\cygwin\bin\bash.exe'
+          if (-not (Test-Path -LiteralPath $bash)) {
+            throw 'Cygwin setup did not install bash'
+          }
+          & $bash -lc 'command -v make aclocal gcc python3 >/dev/null'
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Cygwin setup did not install all required build tools'
+          }
+
+          echo 'C:/tools/cygwin/bin' >>$Env:GITHUB_PATH
+      - name: Install CommonMark
+        shell: pwsh
+        run: bash -c 'python3 -mpip install --user commonmark'
+      - name: Platform
+        shell: pwsh
+        run: bash -c 'python3 -S .github/scripts/check-platform.py cygwin --arch x86_64'
+      - name: Configure
+        shell: pwsh
+        run: bash -c './configure --with-rrsync'
+      - name: Build
+        id: build
+        shell: pwsh
+        run: bash -c 'make check-progs'
+      - name: Install
+        shell: pwsh
+        run: bash -c 'make install'
+      - name: Version
+        shell: pwsh
+        run: bash -c '/usr/local/bin/rsync --version'
+      - name: Tests (non-root pipe)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        shell: pwsh
+        run: bash -c 'python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync.exe" pipe,non-asan,nonroot,self-peer,cygwin "$PWD/test-results/nonroot/pipe" -j8'
+      - name: Tests (non-root TCP)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        shell: pwsh
+        run: bash -c 'python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync.exe" non-asan,nonroot,self-peer,cygwin "$PWD/test-results/nonroot/tcp" --use-tcp --daemon-tests-only -j8'
       - name: Upload binaries
+        if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           retention-days: 45
@@ -133,8 +238,8 @@ jobs:
           name: cygwin-results
           if-no-files-found: error
           path: |
-            test-results/*/run.log
-            test-results/*/receipt.json
+            test-results/*/*/run.log
+            test-results/*/*/receipt.json
 
   solaris:
     if: *weekly
@@ -154,27 +259,16 @@ jobs:
             sudo apt-get update -q
             sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "$@"
           }
-      - name: Build and test
+      - name: Run VM and collect results
         id: test
         uses: vmactions/solaris-vm@87d3c436511cef802cd1637f86f73b1a97715c8c # v1.4.1
         with:
           cache-after-prepare: true
           prepare: |
             pkg install bash automake gnu-m4 pkg://solaris/runtime/python-35 autoconf gcc git
-          run: |
-            mkdir -p test-results
-            result=$PWD/test-results/status
-            trap 'status=$?; printf "%s\n" "$status" > "$result"; exit 0' EXIT
-            uname -a
-            ./configure --with-rrsync --disable-zstd --disable-md2man --disable-xxhash --disable-lz4 --disable-idn
-            make check-progs
-            ./rsync --version
-            status=0
-            sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "pipe,non-asan,root,self-peer,solaris,no-idn,no-xxhash,no-zstd-threads" "$PWD/test-results/root/pipe" -j8 || status=1
-            sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" "non-asan,root,self-peer,solaris,no-idn,no-xxhash,no-zstd-threads" "$PWD/test-results/root/tcp" --use-tcp --daemon-tests-only -j8 || status=1
-            exit "$status"
-      - name: Check result
-        run: test "$(cat test-results/status)" = 0
+          run: python3 -S .github/scripts/guest.py solaris
+      - name: Verify guest results
+        run: python3 -S .github/scripts/guest.py check
       - name: Upload binaries
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -225,33 +319,15 @@ jobs:
       - name: Configure
         run: ./configure --with-rrsync
       - name: Build
+        id: build
         run: make check-progs
       - name: Version
         run: ./rsync --version
       - name: Validate profiles
         run: ./testsuite/runtests.py profile --rsync-bin="$PWD/rsync"
       - name: Tests (non-root pipe and TCP)
-        run: |
-          mkdir -p test-results/version-mix
-          rc=0
-          for peer in old_versions/rsync_*; do
-            chmod +x "$peer"
-            name=$(basename "$peer")
-            profile="peer-${name#rsync_}"
-            for transport in pipe tcp; do
-              set --
-              [ "$transport" = tcp ] && set -- --use-tcp --daemon-tests-only
-              echo "::group::$name ($transport)"
-              if ! ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --rsync-bin2="$PWD/$peer" \
-                    --profiles="linux,pre-3.4.3,$profile" --receipt="test-results/version-mix/$name-$transport.json" \
-                    "$@" -j 8; then
-                echo "::error::version-mix failed: $name ($transport)"
-                rc=1
-              fi
-              echo "::endgroup::"
-            done
-          done
-          exit $rc
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: python3 -S .github/scripts/versions.py
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -294,4 +370,4 @@ jobs:
       - name: Check results
         env:
           CI_RESULTS: ${{ toJSON(needs) }}
-        run: printf '%s\n' "$CI_RESULTS" | jq -er -f .github/check-results.jq
+        run: python3 -S .github/scripts/check-results.py
