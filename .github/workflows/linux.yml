@@ -180,7 +180,7 @@ jobs:
     timeout-minutes: 45
     container:
       image: almalinux:8
-    name: AlmaLinux 8
+    name: AlmaLinux 8 AMD64
     steps:
       - name: Install Git
         run: dnf -y install git
@@ -217,7 +217,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           retention-days: 45
-          name: almalinux-8-bin
+          name: almalinux-8-amd64-bin
           path: |
             rsync
             rsync-ssl
@@ -230,7 +230,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: almalinux-8-results
+          name: almalinux-8-amd64-results
           if-no-files-found: error
           path: |
             ${{ runner.temp }}/rsync-checks/*/run.log
@@ -240,7 +240,7 @@ jobs:
     if: ${{ inputs.alpine }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    name: Alpine 3.24.4 ${{ matrix.arch == 'amd64' && 'AMD64' || 'x86' }}
+    name: Alpine 3.24.4 ${{ matrix.arch == 'amd64' && 'AMD64' || 'X86-32' }}
     strategy:
       fail-fast: false
       matrix:
