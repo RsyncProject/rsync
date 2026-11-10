@@ -1,0 +1,112 @@
+name: macOS
+
+on:
+  workflow_call:
+    outputs:
+      jobs:
+        description: Job results
+        value: ${{ toJSON(jobs) }}
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: sh
+
+jobs:
+  macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - release: '15'
+            arch: arm64
+            runner: macos-15
+          - release: '15'
+            arch: x86_64
+            runner: macos-15-intel
+          - release: '26'
+            arch: arm64
+            runner: macos-26
+          - release: '26'
+            arch: x86_64
+            runner: macos-26-intel
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    name: ${{ matrix.release }} ${{ matrix.arch == 'x86_64' && 'AMD64' || 'ARM64' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Platform
+        run: python3 -S .github/scripts/check-platform.py macos --release "${{ matrix.release }}" --arch "${{ matrix.arch }}"
+      - name: Install dependencies
+        run: |
+          brew install automake openssl xxhash zstd lz4 libidn2
+          pip3 install --user --break-system-packages commonmark
+          echo "$(brew --prefix)/bin" >>"$GITHUB_PATH"
+          mkdir -p test-results
+      - name: Configure
+        run: |
+          BREW_PREFIX=$(brew --prefix)
+          OPENSSL_PREFIX=$(brew --prefix openssl)
+          CPPFLAGS="-I${BREW_PREFIX}/include -I${OPENSSL_PREFIX}/include" \
+          LDFLAGS="-L${BREW_PREFIX}/lib -L${OPENSSL_PREFIX}/lib" \
+          ./configure --with-rrsync --enable-iconv --enable-acl-support --enable-xattr-support
+      - name: Build
+        id: build
+        run: make check-progs
+      - name: Install
+        run: sudo make install
+      - name: Version
+        run: /usr/local/bin/rsync --version
+      - name: Features
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: python3 -S testsuite/tools/check-features.py "$PWD/rsync" zstd lz4 xxh128 xxh3 xxh64 iconv IDN ACLs xattrs > "$PWD/test-results/features.json"
+      - name: Directory descriptors
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: |
+          make dirfd-probe
+          "$PWD/dirfd-probe" "$PWD/test-results" > "$PWD/test-results/dirfd-probe.tsv"
+      - name: Tests (non-root pipe)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" "pipe,non-asan,nonroot,self-peer,macos" "$PWD/test-results/nonroot/pipe" -j8
+      - name: Tests (non-root TCP)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" "non-asan,nonroot,self-peer,macos" "$PWD/test-results/nonroot/tcp" --use-tcp --daemon-tests-only -j8
+      - name: Tests (root pipe)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: sudo python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" "pipe,non-asan,root,self-peer,macos" "$PWD/test-results/root/pipe" -j8
+      - name: Tests (root TCP)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: sudo python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" "non-asan,root,self-peer,macos" "$PWD/test-results/root/tcp" --use-tcp --daemon-tests-only -j8
+      - name: Upload binaries
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          retention-days: 45
+          name: macos-${{ matrix.release }}-${{ matrix.arch }}-bin
+          path: |
+            rsync
+            rsync-ssl
+            rsync.1
+            rsync-ssl.1
+            rsyncd.conf.5
+            rrsync.1
+            rrsync
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          retention-days: 45
+          name: macos-${{ matrix.release }}-${{ matrix.arch }}-results
+          if-no-files-found: error
+          path: |
+            config.log
+            test-results/features.json
+            test-results/dirfd-probe.tsv
+            test-results/*/*/receipt.json
+            test-results/*/*/run.log
+

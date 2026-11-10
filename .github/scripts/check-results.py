@@ -3,7 +3,7 @@ import os
 import sys
 
 
-def check(data, expected, direct):
+def check(data, expected):
     def require(condition, message):
         if not condition:
             raise ValueError(message)
@@ -12,9 +12,6 @@ def check(data, expected, direct):
             'Missing or unexpected job families')
     require(all(value in ('true', 'false') for value in expected.values())
             and 'true' in expected.values(), 'No valid job selection')
-    require(isinstance(direct, list) and all(isinstance(name, str) for name in direct),
-            'Invalid direct jobs')
-    require(set(direct) <= expected.keys(), 'Unknown direct job')
     messages = []
     for family, group in data.items():
         require(isinstance(group, dict), f'{family}: invalid job results')
@@ -26,10 +23,6 @@ def check(data, expected, direct):
         require(result == 'success', f'{family}: not successful')
         outputs = group.get('outputs', {})
         require(isinstance(outputs, dict), f'{family}: invalid outputs')
-        if family in direct:
-            require('jobs' not in outputs, f'{family}: direct job exported workflow results')
-            messages.append(f'{family}: {result}')
-            continue
         jobs = json.loads(outputs.get('jobs', 'null'))
         inputs = json.loads(outputs.get('inputs', '{}'))
         advisory = outputs.get('advisory')
@@ -56,8 +49,7 @@ def main():
     try:
         expected = {name.removeprefix('CI_EXPECT_').lower(): value for name, value in os.environ.items()
                     if name.startswith('CI_EXPECT_')}
-        messages = check(json.loads(os.environ['CI_RESULTS']), expected,
-                         json.loads(os.environ.get('CI_DIRECT_JOBS', '[]')))
+        messages = check(json.loads(os.environ['CI_RESULTS']), expected)
     except (KeyError, TypeError, ValueError) as error:
         print(f'CI result check failed: {error}', file=sys.stderr)
         return 1
