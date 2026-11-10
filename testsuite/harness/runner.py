@@ -827,7 +827,14 @@ def main():
                     )
                     futures[f] = testbase
 
-                for f in concurrent.futures.as_completed(futures):
+                # Poll so worker-delivered signals reach the main-thread handler
+                while futures:
+                    done, _ = concurrent.futures.wait(
+                        futures, timeout=0.25, return_when=concurrent.futures.FIRST_COMPLETED)
+                    if not done:
+                        continue
+                    f = done.pop()
+                    del futures[f]
                     result = f.result()
                     is_fail = process_result(result)
                     if cancelled.is_set() or is_fail and args.stop_on_fail:

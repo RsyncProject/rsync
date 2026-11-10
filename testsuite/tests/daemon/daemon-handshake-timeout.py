@@ -112,9 +112,8 @@ def _daemon_log_note(path, mark):
     return " [daemon log: " + " | ".join(text.splitlines()[-12:]) + "]"
 
 def observe_close(sock, expected, label, *, trickle=None, must_close=True,
-                  daemon_log=None):
-    start = time.monotonic()
-    start_wall = time.time()
+                  daemon_log=None, started=None):
+    start, start_wall = started if started is not None else (time.monotonic(), time.time())
     log_mark = _log_mark(daemon_log)
     deadline = start + expected + SLOP
     next_send = start if trickle is not None else deadline
@@ -176,11 +175,13 @@ def observe_close(sock, expected, label, *, trickle=None, must_close=True,
     return closed
 
 def stall_greeting(port, expected, label, *, daemon_log=None):
+    # The deadline starts before the daemon sends its greeting
+    started = time.monotonic(), time.time()
     sock = connect(port)
     try:
         sock.sendall(b'@RSYNCD: 31.0')
         return observe_close(sock, expected, label, trickle=b'x',
-                             daemon_log=daemon_log)
+                             daemon_log=daemon_log, started=started)
     finally:
         sock.close()
 

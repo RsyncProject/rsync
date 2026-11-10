@@ -260,7 +260,7 @@ jobs:
           path: test-results/version-mix
 
   diagnostics:
-    name: Analysis
+    name: Diagnostics
     if: &diagnostics ${{ github.event_name != 'schedule' || github.event.schedule == '42 9 * * 1' || github.event.schedule == '17 4 * * *' }}
     uses: ./.github/workflows/diagnostics.yml
     with:

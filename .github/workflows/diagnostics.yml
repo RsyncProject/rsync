@@ -1,4 +1,4 @@
-name: Analysis
+name: Diagnostics
 
 on:
   workflow_call:

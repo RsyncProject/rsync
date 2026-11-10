@@ -211,10 +211,19 @@ def test(context: TestContext):
     (tools / 'check.sh').write_text(recipe.read_text().replace(
         'set -eu\n', "set -eu\nprintf 'outer stdout\\n'\nprintf 'outer stderr\\n' >&2\n", 1))
     (fixture / 'testsuite' / 'runtests.py').write_text(
-        'import fcntl, os, sys\nfrom pathlib import Path\nfrom harness import runner\n'
+        'import fcntl, os, signal, sys\nfrom pathlib import Path\nfrom harness import runner\n'
         'output = Path(next(arg.split("=", 1)[1] for arg in sys.argv if arg.startswith("--receipt="))).parent\n'
         'held = (output / "runner.lock").open("w")\nfcntl.lockf(held, fcntl.LOCK_EX)\n'
-        '(output / "runner.pid").write_text(str(os.getpid()))\nrunner.main()\n')
+        '(output / "runner.pid").write_text(str(os.getpid()))\n'
+        # Force worker-thread delivery where signal masks are available
+        'if hasattr(signal, "pthread_sigmask"):\n'
+        '    original = runner.run_one_test\n'
+        '    def unblocked(*args, **kwargs):\n'
+        '        signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGTERM})\n'
+        '        return original(*args, **kwargs)\n'
+        '    runner.run_one_test = unblocked\n'
+        '    signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGTERM})\n'
+        'runner.main()\n')
     stalled = (
         'import fcntl, os, signal\nfrom pathlib import Path\n'
         'root = Path(os.environ["scratchdir"])\n'
