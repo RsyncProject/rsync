@@ -12,7 +12,7 @@ from harness.rsync import rsync_argv
 def rsync_wrapper(path, *options):
     command = rsync_argv(*options)
     path.write_text(f'#!{sys.executable}\nimport os, sys\ncommand = {command!r}\n'
-                    'os.execv(command[0], [*command, *sys.argv[1:]])\n')
+                    'os.execvp(command[0], [*command, *sys.argv[1:]])\n')
     path.chmod(0o755)
 
 def rrsync_shell(path, wrapper, restricted, *options):

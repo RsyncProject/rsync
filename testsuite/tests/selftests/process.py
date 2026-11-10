@@ -7,6 +7,7 @@ import sys
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from fixtures import rrsync as rrsync_fixture
 from harness import daemon, process
 from harness import Exit, TestContext, requires, run
 from harness.process import (
@@ -51,6 +52,19 @@ def test(context: TestContext):
     if rsync_argv_for(wrapped, replacement, '-a') != [
             'valgrind', '--tool=memcheck', str(replacement), '-a']:
         test_fail('the wrapped rsync executable was not replaced')
+
+    lookup = bindir / 'lookup-command'
+    lookup.write_text(f'#!{sys.executable}\nraise SystemExit(0)\n')
+    lookup.chmod(0o755)
+    wrapper = context.scratch / 'rsync-wrapper'
+    with patch.object(rrsync_fixture, 'rsync_argv', return_value=['lookup-command']):
+        rrsync_fixture.rsync_wrapper(wrapper)
+    result = process.subprocess.run(
+        [str(wrapper)], env={**process.os.environ, 'PATH': str(bindir)},
+        capture_output=True, text=True,
+    )
+    if result.returncode:
+        test_fail(f'rsync wrapper did not search PATH: {result.stderr}')
 
     source = context.scratch / 'source with spaces'
     shell = str(source / 'support' / 'lsh.sh')
