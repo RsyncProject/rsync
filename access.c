@@ -198,6 +198,11 @@ static int match_address(const char *addr, char *tok)
 	if (!addr || !*addr)
 		return 0;
 
+	for (const char * const *special = client_special_addrs; *special != NULL; special ++) {
+		if (addr == *special && strcmp(tok, *special) == 0)
+			return 1;
+	}
+
 	p = strchr(tok,'/');
 	if (p)
 		*p = '\0';
