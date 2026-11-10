@@ -8,14 +8,14 @@ from harness import metadata
 
 metadata(transports={'pipe'})
 
-helper = TOOLDIR / 't_iwildmatch'
+helper = TOOLDIR / 't_clean_fname'
 if not helper.is_file():
-    test_skipped("t_iwildmatch helper not built")
+    test_skipped("t_clean_fname helper not built")
 
 proc = subprocess.run([str(helper)], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                       timeout=30)
 if proc.returncode != 0:
-    test_fail("iwildmatch case-fold is asymmetric (pattern not folded)\n"
+    test_fail("path dot-segment collapse failed\n"
               + (proc.stdout or b'').decode('utf-8', 'replace')
               + (proc.stderr or b'').decode('utf-8', 'replace'))
 print((proc.stdout or b'').decode('utf-8', 'replace').strip())

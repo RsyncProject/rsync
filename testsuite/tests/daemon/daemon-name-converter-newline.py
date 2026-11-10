@@ -17,7 +17,7 @@ PORT = 12974
 require_tcp("the pure-Python sender needs a real TCP daemon; run with --use-tcp")
 claim_ports(PORT)
 
-base = SCRATCHDIR / 'daemon-namecvt-newline'
+base = SCRATCHDIR / 'daemon-name-converter-newline'
 rmtree(base)
 dest = base / 'module'
 makepath(dest)
@@ -74,5 +74,5 @@ if not rejected:
               f"client bytes:\n{back[:400]!r}\ndaemon log:\n{dlog}\n"
               f"converter requests: {cvt_lines!r}")
 
-print("daemon-namecvt-newline-token: daemon rejects newline-bearing "
+print("daemon-name-converter-newline: daemon rejects newline-bearing "
       "name-converter tokens")

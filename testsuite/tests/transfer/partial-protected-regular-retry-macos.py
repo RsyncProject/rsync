@@ -16,7 +16,7 @@ if platform.system() != 'Darwin':
     test_skipped('deterministic partial EACCES recovery uses dyld interposing',
                  capability='darwin_interpose')
 
-base = SCRATCHDIR / 'partial-protected-regular-retry-policy'
+base = SCRATCHDIR / 'partial-protected-regular-retry-macos'
 rmtree(base)
 src = base / 'src'
 mod = base / 'mod'

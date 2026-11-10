@@ -77,7 +77,7 @@ Option | Tests | Path depth | Auxiliary tree | Coverage
 --mkpath | mkpath | shallow | N/A | Partial
 -x, --one-file-system | none | untested | untested | Missing; needs a mount boundary
 --preallocate | preallocate | deep | N/A | Covered for allocation and delta updates
---fsync | none | untested | N/A | Missing
+--fsync | fsync-linux | shallow | N/A | Covered on Linux for successful and failed flushes
 -B, --block-size | checksum-chain-limit, compress-zlib-insert, preallocate | deep | N/A | Covered
 --max-alloc | max-alloc-zero | N/A | N/A | Covered for zero and values above the peer limit
 
@@ -150,7 +150,7 @@ Option | Tests | Coverage
 --address, --port | daemon-address-family, daemon-standalone-detach | Covered for IPv4, IPv6 and configured binding
 --password-file | daemon-auth, password-file-first-line | Covered for authentication and first-line parsing
 --nice, --no-nice | niceness | Covered for local, remote-shell, daemon and restricted-shell priorities
---early-input | daemon-early-exec-nameconv, early-input-symlink | Covered for data delivery and confined input paths
+--early-input | daemon-early-exec, early-input-symlink | Covered for data delivery and confined input paths
 --sockopts | daemon-module-options | Covered for client and daemon configuration
 --blocking-io | none | Missing
 --timeout, --contimeout | daemon-handshake-timeout, io-timeout-zero, io-timeout-bounds, remote-shell-connect-timeout | Covered for precedence, bounds and remote-shell daemon paths
@@ -159,7 +159,7 @@ Option | Tests | Coverage
 --bwlimit | partial | Partial: used but not asserted directly
 --copy-as | none | Missing and root-gated
 --iconv | iconv | Covered for names, arguments, file lists, protocol 30 link targets and invalid input; the raw-byte fixture is unavailable on macOS
--s, --secluded-args, --old-args, --trust-sender | iconv, cli-transfers | Partial: secluded and legacy argument handling are asserted; trust-sender is not isolated
+-s, --secluded-args, --old-args, --trust-sender | iconv, secluded-args-transfer, cli-transfers | Partial: secluded and legacy argument handling are asserted; trust-sender is not isolated
 
 ## Daemon parameters
 
@@ -181,19 +181,19 @@ auth digest | daemon-auth-digest-floor | Covered for minimum strength, old peers
 strict modes | daemon-auth | Covered for unsafe secrets-file modes
 refuse options | daemon-refuse, daemon-refuse-compress | Covered for names, wildcards and allow lists
 pre-xfer exec, post-xfer exec | daemon-exec | Covered for environment and abort behaviour
-early exec | daemon-early-exec-nameconv | Covered for environment and early input
+early exec | daemon-early-exec | Covered for environment and early input
 hosts allow, hosts deny | daemon-access-ip, daemon-access-hostname, daemon-chroot-acl | Covered for address, CIDR and hostname rules over TCP
 reverse lookup, forward lookup | daemon-chroot-acl, daemon-access-hostname | Covered for reverse lookup in a chroot and forward lookup enabled or disabled
 log file, transfer logging, log format | daemon-listings | Partial: configured but not asserted
 max verbosity | daemon-listings | Partial
 comment | daemon-listings, daemon-access | Covered
-numeric ids | daemon-early-exec-nameconv, daemon-namecvt-empty-response | Partial: numeric ids = no is exercised with name conversion
-fake super | chown-fake, daemon-namecvt-empty-response | Covered
+numeric ids | daemon-name-converter, daemon-name-converter-empty-response | Partial: numeric ids = no is exercised with name conversion
+fake super | chown-fake, daemon-name-converter-empty-response | Covered
 timeout | daemon-handshake-timeout | Covered with zero and precedence
 max connections, lock file | daemon-connection-limits | Covered for refusal and slot reuse
 temp dir, open noatime, ignore errors, ignore nonreadable | iconv | Partial: ignore errors is asserted
 charset | iconv | Covered for module override of the remote charset
-name converter | daemon-early-exec-nameconv, daemon-namecvt-empty-response, daemon-namecvt-newline-token | Covered for mapping, empty responses and newline-bearing requests
+name converter | daemon-name-converter, daemon-name-converter-empty-response, daemon-name-converter-newline | Covered for mapping, empty responses and newline-bearing requests
 dont compress | daemon-module-options | Partial: configured but compression choice is not asserted
 uid, gid, daemon uid, daemon gid, daemon chroot | daemon-listings, daemon-chroot-acl | Partial: transfer and access checks run but effective worker IDs are not asserted
 motd file | daemon-module-options | Covered for banner content
