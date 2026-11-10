@@ -6,6 +6,14 @@ from harness.rsync import test_fail
 
 @requires(transports={'pipe'}, tags={'harness'})
 def test(context: TestContext):
+    bare = context.scratch / 'bare.py'
+    bare.write_text("require_tcp('tcp')\n")
+    if read_requirements(bare) is not None:
+        test_fail('a test without an explicit metadata declaration was accepted')
+    broken = context.scratch / 'broken.py'
+    broken.write_text('def broken(\n')
+    if read_requirements(broken) is not None:
+        test_fail('a syntax error produced usable metadata')
     discovery = context.scratch / 'discovery'
     first = discovery / 'transfer' / 'first.py'
     second = discovery / 'daemon' / 'second.py'
@@ -69,20 +77,28 @@ def test(context: TestContext):
         test_fail('placeholder cycle was accepted')
 
     inferred = context.scratch / 'inferred.py'
-    inferred.write_text("require_tcp('tcp')\nrequire_asan('asan')\n"
+    inferred.write_text("from harness import metadata\nmetadata()\n"
+                        "require_tcp('tcp')\nrequire_asan('asan')\n"
                         "setup_chroot_inner('chroot')\n"
                         "test_skipped('root', capability='nonroot')\n")
     if read_requirements(inferred)['features'] != ('asan', 'chroot', 'nonroot', 'root', 'tcp'):
         test_fail('capability metadata was not inferred')
 
     invalid_capability = context.scratch / 'invalid-capability.py'
-    invalid_capability.write_text("test_skipped('bad', capability=1)\n")
+    invalid_capability.write_text("from harness import metadata\nmetadata()\n"
+                                  "test_skipped('bad', capability=1)\n")
     try:
         read_requirements(invalid_capability)
     except ValueError:
         pass
     else:
         test_fail('invalid capability metadata was accepted')
+
+    requirements = {test_name(path): read_requirements(path)
+                    for path in discover_tests(context.repository / 'testsuite/tests')}
+    missing = [name for name, values in requirements.items() if not values or not values['transports']]
+    if missing:
+        test_fail(f'tests without metadata: {", ".join(missing)}')
 
     invalid = (
         {'features': {''}}, {'features': 'acl'}, {'features': {'acl', 1}},

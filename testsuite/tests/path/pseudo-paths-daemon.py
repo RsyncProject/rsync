@@ -12,6 +12,9 @@ import time
 from pathlib import Path
 
 from harness.rsync import makepath, rmtree, rsync_argv, rsync_command_binary, test_fail, test_skipped
+from harness import metadata
+
+metadata(features={'proc_fd'}, transports={'pipe', 'tcp'})
 
 if not sys.platform.startswith('linux'):
     test_skipped('Namespace daemon testing is a Linux-specific feature', capability='proc_fd')

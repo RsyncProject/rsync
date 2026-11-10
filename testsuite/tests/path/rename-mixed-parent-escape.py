@@ -7,6 +7,9 @@ from harness.rsync import (
     SCRATCHDIR, TOOLDIR,
     assert_exists, assert_not_exists, rmtree, test_fail, test_skipped,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 mod = SCRATCHDIR / 'module'
 trap_outside = SCRATCHDIR / 'trap'

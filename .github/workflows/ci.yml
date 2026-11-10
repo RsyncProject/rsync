@@ -126,6 +126,15 @@ jobs:
             rsyncd.conf.5
             rrsync.1
             rrsync
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: cygwin-results
+          if-no-files-found: error
+          path: |
+            test-results/*/run.log
+            test-results/*/receipt.json
 
   solaris:
     if: *weekly
@@ -233,7 +242,6 @@ jobs:
               set --
               [ "$transport" = tcp ] && set -- --use-tcp --daemon-tests-only
               echo "::group::$name ($transport)"
-              "$peer" --version
               if ! ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --rsync-bin2="$PWD/$peer" \
                     --profiles="linux,pre-3.4.3,$profile" --receipt="test-results/version-mix/$name-$transport.json" \
                     "$@" -j 8; then

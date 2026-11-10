@@ -6,6 +6,9 @@ from harness.rsync import (
     SCRATCHDIR, claim_ports, require_tcp, start_rsyncd, test_fail,
 )
 from harness import protocol as rp
+from harness import metadata
+
+metadata(features={'tcp'}, transports={'tcp'})
 
 PORT = 12944
 require_tcp("the pure-Python sender needs a real TCP daemon; run with --use-tcp")

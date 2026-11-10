@@ -6,7 +6,7 @@ from harness.rsync import (
     CHKDIR, FROMDIR, TODIR, checkit, hands_setup, rmtree, run_rsync, start_test_daemon,
 )
 
-metadata(features={'compression', 'daemon'}, transports={'pipe', 'tcp'}, min_peer='2.6.0', mutates={'filesystem', 'process', 'socket'}, tags={'daemon', 'transfer', 'version-mix'})
+metadata(features={'compression', 'daemon'}, transports={'pipe', 'tcp'}, min_peer='3.1.1', mutates={'filesystem', 'process', 'socket'}, tags={'daemon', 'transfer', 'version-mix'})
 
 hands_setup()
 run_rsync('-av', '--exclude=foobar.baz', f'{FROMDIR}/', f'{CHKDIR}/')

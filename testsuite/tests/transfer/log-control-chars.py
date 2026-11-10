@@ -3,6 +3,9 @@
 import os
 
 from harness.rsync import SCRATCHDIR, run_rsync, test_fail, test_skipped
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 base = SCRATCHDIR / 'logctl'
 src = base / 'src'

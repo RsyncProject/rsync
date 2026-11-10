@@ -17,6 +17,8 @@ class XattrError(OSError):
     pass
 
 def _full_name(name):
+    if name.startswith(('user.', 'system.')):
+        raise ValueError('xattr names must omit the namespace prefix')
     return f'user.{name}' if LINUX_NAMESPACE else name
 
 def is_supported():

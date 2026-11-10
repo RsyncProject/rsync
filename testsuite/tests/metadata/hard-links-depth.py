@@ -9,7 +9,7 @@ from harness.rsync import (
 )
 
 src = FROMDIR
-metadata(features={'hardlinks'}, cost='expensive', mutates={'filesystem'}, tags={'metadata'})
+metadata(features={'hardlinks'}, transports={'pipe'}, cost='expensive', mutates={'filesystem'}, tags={'metadata'})
 a = os.path.join('a', 'aa', 'orig')
 b = os.path.join('b', 'bb', 'hardlink')
 

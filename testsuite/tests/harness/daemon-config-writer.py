@@ -32,6 +32,8 @@ def test(context: TestContext):
         test_fail('global override was not written')
 
     text = build_rsyncd_conf().read_text()
+    if text.count('log format =') != 1 or text.index('log format =') > text.index('[test-from]'):
+        test_fail('standard modules do not share one explicit log format')
     for section in ('test-from', 'test-to', 'test-scratch', 'test-hidden'):
         if f'[{section}]' not in text:
             test_fail(f'standard configuration omitted {section}')

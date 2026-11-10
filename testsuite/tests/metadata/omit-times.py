@@ -7,6 +7,9 @@ from harness.rsync import (
     assert_mtime_close, make_tree, rmtree, run_rsync, test_fail,
     walk_dirs, walk_files,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 src = FROMDIR
 OLD = 1_400_000_000

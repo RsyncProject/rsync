@@ -11,6 +11,9 @@ from harness.rsync import (
     FROMDIR, SCRATCHDIR, make_tree, makepath, owners_supported, rmtree, rsync_argv,
     start_test_daemon, test_fail, test_skipped, write_text_file,
 )
+from harness import metadata
+
+metadata(features={'group_auth'}, transports={'pipe', 'tcp'})
 
 if platform.system() != 'Linux':
     test_skipped("@group daemon-auth coverage is Linux-specific", capability='group_auth')

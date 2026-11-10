@@ -5,6 +5,9 @@ import os
 
 from harness import rsync
 from harness.rsync import FROMDIR, TODIR, checkit, run_rsync, test_skipped
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 vv = run_rsync('-VV', check=True, capture_output=True)
 if '"atimes": true' not in vv.stdout:

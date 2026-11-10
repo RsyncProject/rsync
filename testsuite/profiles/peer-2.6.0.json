@@ -3,21 +3,15 @@
   "protocol": 27,
   "xfail": {
     "alt-dest": "peer-feature-gap",
-    "batch-mode": "peer-feature-gap",
-    "chmod-option": "peer-feature-gap",
-    "daemon-listings": "peer-feature-gap",
     "daemon-access": "peer-feature-gap",
     "daemon-config": "peer-feature-gap",
-    "daemon-exec": "peer-feature-gap",
     "daemon-filter": "peer-feature-gap",
-    "daemon-gzip": "peer-feature-gap",
-    "daemon-munge": "peer-feature-gap",
     "daemon-refuse": "peer-feature-gap",
     "daemon-refuse-compress": "peer-feature-gap",
     "exclude-remote-shell": "peer-feature-gap",
     "files-from": "peer-feature-gap",
     "cli-transfers": "peer-feature-gap",
-    "symlink-dirlink-basis": "peer-feature-gap",
+    "daemon-root-filter": "pre-3.0.3-daemon-filter",
     "file-types": "peer-feature-gap",
     "file-types-symlink-traversal": "peer-feature-gap"
   }

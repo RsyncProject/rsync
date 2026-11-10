@@ -42,15 +42,15 @@ def build_rsyncd_conf() -> Path:
     log_format = '%i %h [%a] %m (%u) %l %f%L'
     modules = [
         ('test-from', {
-            'path': str(FROMDIR), 'log format': log_format,
+            'path': str(FROMDIR),
             'read only': 'yes', 'comment': 'r/o',
         }),
         ('test-to', {
-            'path': str(TODIR), 'log format': log_format,
+            'path': str(TODIR),
             'read only': 'no', 'comment': 'r/w',
         }),
         ('test-scratch', {
-            'path': str(SCRATCHDIR), 'log format': log_format,
+            'path': str(SCRATCHDIR),
             'read only': 'no',
         }),
         ('test-hidden', {'path': str(FROMDIR), 'list': 'no'}),
@@ -60,7 +60,8 @@ def build_rsyncd_conf() -> Path:
         global_options={
             'munge symlinks': 'no',
             'transfer logging': 'yes',
-            'exclude': '? foobar.baz',
+            'log format': log_format,
+            'exclude': 'foobar.baz',
         },
     )
 

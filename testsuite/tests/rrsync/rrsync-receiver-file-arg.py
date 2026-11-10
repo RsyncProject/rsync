@@ -10,6 +10,9 @@ from harness.rsync import (
     SCRATCHDIR, makepath, patched_rrsync, proc_self_fd_pins, rmtree,
     rsync_argv, test_fail, test_skipped,
 )
+from harness import metadata
+
+metadata(features={'proc_fd'}, transports={'pipe'})
 
 if not proc_self_fd_pins():
     test_skipped('requires /proc/self/fd directory pins', capability='proc_fd')

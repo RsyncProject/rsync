@@ -12,6 +12,9 @@ from harness.rsync import (
     FROMDIR, SCRATCHDIR, TODIR, USE_TCP, claim_ports, make_data_file, makepath, rmtree,
     rsync_argv, start_rsyncd, test_fail, test_skipped,
 )
+from harness import metadata
+
+metadata(features={'tcp'}, transports={'tcp'})
 
 KNOWN_RERR = {
     0,

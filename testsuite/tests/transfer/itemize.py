@@ -20,6 +20,9 @@ from harness.rsync import (
     v_filt,
     hardlink_symlinks_supported,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 to2dir = TMPDIR / 'to2'
 

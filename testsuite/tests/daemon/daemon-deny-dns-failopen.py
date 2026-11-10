@@ -5,6 +5,9 @@ from harness.rsync import (
     FROMDIR, SCRATCHDIR, RSYNC,
     make_tree, require_tcp, rmtree, start_test_daemon, test_fail,
 )
+from harness import metadata
+
+metadata(features={'tcp'}, transports={'tcp'})
 
 DAEMON_PORT = 12894
 require_tcp("hosts deny DNS-failure matching needs a real TCP peer")

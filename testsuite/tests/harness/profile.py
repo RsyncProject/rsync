@@ -5,6 +5,8 @@ import json
 from harness import (TestContext, applies_to_peer, discover_tests, load_profile, merge_profiles,
                      parse_peer_banner, read_requirements, requires, run, test_name)
 from harness.rsync import test_fail
+from harness.process import file_digest
+from harness.profile import load_binaries
 
 @requires(transports={'pipe'}, tags={'harness'})
 def test(context: TestContext):
@@ -27,7 +29,13 @@ def test(context: TestContext):
                       f'{", ".join(sorted(misplaced))}')
         merge_profiles([profile])
     peers = {profile.peer for profile in profiles if profile.peer}
-    archived = {path.name[len('rsync_'):] for path in (context.repository / 'old_versions').glob('rsync_*')}
+    archive = context.repository / 'old_versions'
+    archived = {path.name[len('rsync_'):] for path in archive.glob('rsync_*')}
+    if archived or (archive / 'binaries.json').exists():
+        records = load_binaries(archive)
+        recipe = file_digest(archive / 'build_static.sh')
+        if any(record['recipe'] != recipe for record in records.values()):
+            test_fail('archived binaries use a different build recipe')
     if archived and peers != archived:
         test_fail('peer profiles do not match archived binaries')
     by_name = {profile.name: profile for profile in profiles}
@@ -76,6 +84,60 @@ def test(context: TestContext):
     reject('not-applicable.json', {'not_applicable': {'tcp': ''}})
     reject('unsupported.json', {'unsupported': {'acl': ''}})
     reject('xfail.json', {'xfail': {'missing-test': 'issue-1'}})
+
+    duplicate = context.scratch / 'duplicate.json'
+    duplicate.write_text('{"unsupported": {}, "unsupported": {}}')
+    try:
+        load_profile(duplicate, tests)
+    except ValueError:
+        pass
+    else:
+        test_fail('a duplicate profile field was accepted')
+
+    archive = context.scratch / 'binaries'
+    archive.mkdir()
+    binary = archive / 'rsync_3.2.7'
+    binary.write_bytes(b'qualified fixture')
+    manifest = archive / 'binaries.json'
+    record = {'source': 'a' * 40, 'protocol': 31, 'sha256': file_digest(binary), 'recipe': 'b' * 64,
+              'compiler': 'test compiler', 'target': 'test target', 'libc': 'test libc'}
+    manifest.write_text(json.dumps({binary.name: record}))
+    if load_binaries(archive) != {binary.name: record}:
+        test_fail('a valid binary manifest changed while loading')
+
+    def reject_binary(data):
+        manifest.write_text(json.dumps(data))
+        try:
+            load_binaries(archive)
+        except ValueError:
+            return
+        test_fail(f'invalid binary manifest was accepted: {data}')
+
+    reject_binary([])
+    reject_binary({})
+    for field, value in (('source', 'g' * 40), ('sha256', '0'), ('recipe', ''),
+                         ('protocol', True), ('compiler', ''), ('unknown', True)):
+        reject_binary({binary.name: {**record, field: value}})
+    extra = archive / 'rsync_9.9.9'
+    extra.touch()
+    reject_binary({binary.name: record})
+    extra.unlink()
+    binary.write_bytes(b'changed fixture')
+    reject_binary({binary.name: record})
+    binary.write_bytes(b'qualified fixture')
+    saved = archive / 'saved'
+    binary.rename(saved)
+    binary.symlink_to(saved.name)
+    reject_binary({binary.name: record})
+    binary.unlink()
+    saved.rename(binary)
+    manifest.write_text('{"rsync_3.2.7": {}, "rsync_3.2.7": {}}')
+    try:
+        load_binaries(archive)
+    except ValueError:
+        pass
+    else:
+        test_fail('a duplicate archived peer was accepted')
 
 if __name__ == '__main__':
     run(test)

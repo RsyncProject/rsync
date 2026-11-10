@@ -9,6 +9,9 @@ from harness.rsync import (
     SCRATCHDIR, makepath, patched_rrsync, proc_self_fd_pins, rmtree, test_fail,
     test_skipped,
 )
+from harness import metadata
+
+metadata(features={'proc_fd'}, transports={'pipe'})
 
 if not proc_self_fd_pins():
     test_skipped("rrsync's inode pin needs /proc/self/fd (Linux); the "

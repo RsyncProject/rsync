@@ -6,6 +6,9 @@ from harness.rsync import (
     FROMDIR, TODIR, assert_same, make_data_file, rmtree, run_rsync,
     test_skipped,
 )
+from harness import metadata
+
+metadata(features={'xxhash'}, transports={'pipe'})
 
 vv = json.loads(run_rsync('-VV', check=True, capture_output=True).stdout)
 if 'xxh64' not in vv.get('checksum_list', []):

@@ -3,6 +3,9 @@
 import os
 import subprocess
 from harness.rsync import FROMDIR, TODIR, makepath, rmtree, rsync_argv, test_fail
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 src = FROMDIR
 dest = TODIR

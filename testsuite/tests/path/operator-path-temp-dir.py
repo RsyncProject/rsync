@@ -5,6 +5,9 @@ import subprocess
 
 from harness.mutation import plant_operator_symlink, run_symlink_matrix
 from harness.rsync import rsync_argv
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 PINNED = 1000000000
 

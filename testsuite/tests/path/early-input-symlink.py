@@ -11,6 +11,9 @@ from harness.rsync import (
     FROMDIR, SCRATCHDIR, make_tree, rmtree, rsync_argv, start_test_daemon, test_fail,
     test_skipped,
 )
+from harness import metadata
+
+metadata(features={'cross_uid'}, transports={'pipe', 'tcp'})
 
 DAEMON_PORT = 12904
 SANITY_MARKER = "EARLY_INPUT_SANITY_DELIVERED"

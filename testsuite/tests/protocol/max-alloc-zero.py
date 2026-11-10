@@ -7,6 +7,9 @@ from harness.rsync import (
     SCRATCHDIR, SRCDIR, expect_fail, rsh_cmd, rmtree, rsync_argv,
     rsync_path_arg, run_rsync, test_fail,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 base = SCRATCHDIR / 'max-alloc-zero'
 rmtree(base)

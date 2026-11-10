@@ -5,6 +5,9 @@ import os
 from harness.daemon_config import setup_chroot_inner
 from harness.process import capture_command
 from harness.rsync import rsync_argv, test_fail
+from harness import metadata
+
+metadata(features={'chroot', 'root'}, transports={'pipe', 'tcp'})
 
 base, inner, outside, src, url = setup_chroot_inner('chroot-special-inner')
 os.symlink('target', src / 'link')

@@ -12,6 +12,9 @@ import subprocess
 import sys
 
 from harness.rsync import SCRATCHDIR, SRCDIR, test_fail
+from harness import metadata
+
+metadata(transports={'pipe', 'tcp'})
 
 
 RSYNC_SSL = SRCDIR / 'rsync-ssl'

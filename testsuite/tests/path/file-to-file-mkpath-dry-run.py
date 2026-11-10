@@ -4,6 +4,9 @@ import os
 import subprocess
 
 from harness.rsync import SCRATCHDIR, makepath, rmtree, rsync_argv, test_fail
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 def itemize(*args):
     p = subprocess.run(rsync_argv('-ai', *args), capture_output=True, text=True)

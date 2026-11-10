@@ -2,6 +2,9 @@
 
 from harness.rsync import (FROMDIR, TODIR, checkit, hands_setup, make_text_file,
                       test_skipped)
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 hands_setup()
 

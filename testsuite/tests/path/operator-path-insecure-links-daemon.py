@@ -6,6 +6,9 @@ import subprocess
 from harness.mutation import find_attacker_uid
 from harness.daemon_config import write_daemon_conf
 from harness.rsync import SCRATCHDIR, rmtree, rsync_argv, start_test_daemon, test_fail, test_skipped
+from harness import metadata
+
+metadata(features={'cross_uid'}, transports={'pipe', 'tcp'})
 
 DAEMON_PORT = 12901
 CANARY = "audit_daemon_optout_canary"

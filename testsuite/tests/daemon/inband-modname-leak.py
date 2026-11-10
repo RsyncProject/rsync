@@ -9,6 +9,9 @@ from harness.rsync import (
     make_tree, require_asan, require_tcp, rmtree, rsync_argv,
     start_test_daemon, test_fail,
 )
+from harness import metadata
+
+metadata(features={'asan', 'tcp'}, transports={'tcp'})
 
 DAEMON_PORT = 12896
 require_tcp("the daemon @ERROR handshake needs a real TCP peer")

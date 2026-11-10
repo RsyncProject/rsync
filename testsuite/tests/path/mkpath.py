@@ -9,6 +9,9 @@ from harness.rsync import (
     FROMDIR, SRCDIR, TMPDIR, TODIR,
     makepath, rmtree, run_rsync, test_fail,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 makepath(FROMDIR, TODIR)
 shutil.copy2(SRCDIR / 'rsync.h', FROMDIR / 'text')

@@ -5,6 +5,9 @@ import shutil
 import time
 
 from harness.rsync import FROMDIR, TODIR, checkit, rsync_getgroups, test_fail
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 groups = rsync_getgroups()
 if not groups:

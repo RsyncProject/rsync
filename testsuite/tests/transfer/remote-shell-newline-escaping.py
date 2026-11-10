@@ -4,6 +4,9 @@ import os
 import subprocess
 
 from harness.rsync import SCRATCHDIR, rmtree, rsync_argv, test_fail, rsh_cmd
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 base = SCRATCHDIR / 'remote-shell-newline'
 rmtree(base)

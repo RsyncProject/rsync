@@ -7,6 +7,9 @@ import sys
 from pathlib import Path
 
 from harness.rsync import TMPDIR, run_rsync, test_fail, test_skipped
+from harness import metadata
+
+metadata(features={'protected_regular'}, transports={'pipe'})
 
 pr_path = Path('/proc/sys/fs/protected_regular')
 if not pr_path.is_file():

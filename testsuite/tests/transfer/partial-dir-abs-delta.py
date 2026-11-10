@@ -7,6 +7,9 @@ import subprocess
 from harness.rsync import (
     SCRATCHDIR, make_data_file, makepath, rmtree, rsync_argv, test_fail,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 src = SCRATCHDIR / 'pdsrc'
 dst = SCRATCHDIR / 'pddst'

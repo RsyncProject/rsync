@@ -11,6 +11,9 @@ from harness.rsync import (
     SCRATCHDIR, acl_get, acl_set, forced_protocol, get_rootgid, get_rootuid, get_testuid,
     rmtree, rsync_argv, run_rsync, start_test_daemon, test_fail, test_skipped,
 )
+from harness import metadata
+
+metadata(features={'linux_acl', 'protocol_30'}, transports={'pipe', 'tcp'})
 
 DAEMON_PORT = 12896
 MARKER_UID = 60001

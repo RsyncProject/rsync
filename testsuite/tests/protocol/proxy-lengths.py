@@ -7,6 +7,9 @@ import threading
 
 from harness.daemon import claim_ports, require_tcp
 from harness.rsync import SCRATCHDIR, rsync_argv, test_fail
+from harness import metadata
+
+metadata(features={'tcp'}, transports={'tcp'})
 
 def start_proxy(port, response):
     listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

@@ -10,6 +10,9 @@ from harness.rsync import (
     RSYNC, SCRATCHDIR, makepath, require_tcp, rmtree, start_test_daemon, test_fail,
     under_valgrind,
 )
+from harness import metadata
+
+metadata(features={'tcp'}, transports={'tcp'})
 
 require_tcp("raw stalled clients need a real TCP daemon; run with --use-tcp")
 

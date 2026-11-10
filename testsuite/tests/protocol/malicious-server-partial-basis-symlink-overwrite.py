@@ -13,6 +13,9 @@ from harness.rsync import (
     test_fail,
 )
 from harness import protocol as rp
+from harness import metadata
+
+metadata(features={'tcp'}, transports={'tcp'})
 
 PORT = 13153
 CF_INPLACE_PARTIAL_DIR = 1 << 6

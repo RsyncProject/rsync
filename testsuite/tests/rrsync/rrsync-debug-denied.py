@@ -16,6 +16,9 @@ if '--shell' in sys.argv:
     os.execve(wrapper, [wrapper, '-wo', root], env)
 
 from harness.rsync import RSYNC, SCRATCHDIR, makepath, patched_rrsync, rmtree, rsync_argv, test_fail
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 base = SCRATCHDIR / 'rrsync-debug-denied'
 rmtree(base)

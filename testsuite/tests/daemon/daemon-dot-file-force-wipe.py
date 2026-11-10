@@ -7,6 +7,9 @@ from harness.rsync import (
     test_fail,
 )
 from harness import protocol as rp
+from harness import metadata
+
+metadata(features={'tcp'}, transports={'tcp'})
 
 PORT = 13013
 

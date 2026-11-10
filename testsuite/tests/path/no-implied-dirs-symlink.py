@@ -4,6 +4,9 @@ import os
 import subprocess
 
 from harness.rsync import SCRATCHDIR, forced_protocol, rmtree, rsync_argv, test_fail
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 proto = forced_protocol()
 if proto is not None and proto < 30:

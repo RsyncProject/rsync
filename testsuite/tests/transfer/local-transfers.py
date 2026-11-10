@@ -4,6 +4,9 @@ import os
 import shutil
 
 from harness.rsync import FROMDIR, TMPDIR, TODIR, checkit, hands_setup, run_rsync
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 hands_setup()
 

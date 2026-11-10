@@ -9,6 +9,9 @@ from harness.rsync import (
     FROMDIR, SCRATCHDIR, make_tree, makepath, rmtree, rsync_argv, start_test_daemon, test_fail,
     test_skipped,
 )
+from harness import metadata
+
+metadata(features={'cross_uid'}, transports={'pipe', 'tcp'})
 
 DAEMON_PORT = 12903
 USER = 'tuser'

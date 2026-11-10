@@ -4,6 +4,9 @@ from harness.rsync import (
     FROMDIR, TODIR,
     assert_not_exists, assert_same, make_data_file, rmtree, run_rsync,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 src = FROMDIR
 SMALL = 500

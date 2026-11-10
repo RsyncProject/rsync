@@ -6,6 +6,9 @@ import shlex
 import subprocess
 
 from harness.rsync import SCRATCHDIR, SRCDIR, rmtree, test_fail
+from harness import metadata
+
+metadata(transports={'pipe', 'tcp'})
 
 base = SCRATCHDIR / 'rsync-ssl'
 rmtree(base)

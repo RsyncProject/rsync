@@ -8,6 +8,9 @@ from harness.rsync import (
     make_tree, rmtree, run_rsync, test_fail, test_skipped,
     walk_dirs, walk_files, xattr_dump, xattr_set, xattrs_supported,
 )
+from harness import metadata
+
+metadata(features={'xattr_runtime'}, transports={'pipe'})
 
 if not xattrs_supported():
     test_skipped("rsync built without xattr support (or no xattr tooling here)",

@@ -5,6 +5,9 @@ import subprocess
 
 from harness.rsync import (FROMDIR, SCRATCHDIR, TODIR, TOOLDIR, checkit, hands_setup,
                       set_supported_mode, test_skipped)
+from harness import metadata
+
+metadata(features={'cross_device'}, transports={'pipe'})
 
 def _fsdev(path: str) -> str:
     return subprocess.check_output(

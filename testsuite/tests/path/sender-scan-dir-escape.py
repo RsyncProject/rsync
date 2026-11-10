@@ -6,6 +6,9 @@ import time
 
 from harness.mutation import race_budget, start_path_flipper, stop_flipper
 from harness.rsync import SCRATCHDIR, rmtree, rsync_argv, rsync_supports, test_fail
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 MARKER = "XFIL-OUTSIDE-SYMLINK-TARGET-do-not-copy"
 NKEEP = 64

@@ -3,6 +3,9 @@
 import os
 
 from harness.rsync import SCRATCHDIR, assert_same, makepath, rmtree, run_rsync, test_fail
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 base = SCRATCHDIR / 'kdl'
 src = base / 'src'

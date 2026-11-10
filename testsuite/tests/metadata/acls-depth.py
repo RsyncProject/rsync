@@ -8,6 +8,9 @@ from harness.rsync import (
     make_tree, rmtree, run_rsync, test_fail, test_skipped,
     walk_dirs, walk_files,
 )
+from harness import metadata
+
+metadata(features={'linux_acl'}, transports={'pipe'})
 
 vv = run_rsync('-VV', check=True, capture_output=True).stdout
 if '"ACLs": true' not in vv:

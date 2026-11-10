@@ -9,6 +9,9 @@ from harness.rsync import (
     SCRATCHDIR, makepath, rmtree, run_rsync, rsync_argv, test_fail,
     test_skipped,
 )
+from harness import metadata
+
+metadata(features={'linux_interpose'}, transports={'pipe'})
 
 if platform.system() != 'Linux':
     test_skipped('the LD_PRELOAD linkat hook is Linux-only', capability='linux_interpose')

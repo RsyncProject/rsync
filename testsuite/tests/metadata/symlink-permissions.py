@@ -5,6 +5,9 @@ import os
 import stat
 
 from harness.rsync import FROMDIR, SCRATCHDIR, TODIR, assert_mode, run_rsync, test_fail, test_skipped
+from harness import metadata
+
+metadata(features={'symlink_mode'}, transports={'pipe'})
 
 error = 'error occurred during test of symlink access change capability: '
 notimplemented = 'symlink Unix access change is not implemented on this system'

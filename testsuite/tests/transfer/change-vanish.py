@@ -4,6 +4,9 @@ import os
 
 from harness.mutation import TARGET, assert_no_protocol_abort, run_mutating_transfer
 from harness.rsync import test_fail
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 def setup(src):
     with open(src / TARGET, 'wb') as fh:

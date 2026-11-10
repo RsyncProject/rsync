@@ -30,6 +30,9 @@ from harness.rsync import (
     RSYNC, SCRATCHDIR, assert_same, make_data_file, makepath, rmtree,
     rsync_argv, run_rsync, split_rsync_cmd, test_error, test_fail, test_skipped,
 )
+from harness import metadata
+
+metadata(features={'linux_interpose', 'native_build'}, transports={'pipe'})
 
 
 SHIM_C = r'''

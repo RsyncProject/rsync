@@ -5,6 +5,9 @@ import shlex
 import subprocess
 
 from harness.rsync import SCRATCHDIR, rmtree, rsync_argv, test_fail, test_skipped
+from harness import metadata
+
+metadata(transports={'pipe', 'tcp'})
 
 REFUSAL = 'unsafe host characters for RSYNC_CONNECT_PROG'
 

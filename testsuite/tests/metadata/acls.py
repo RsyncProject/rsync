@@ -4,6 +4,9 @@ import os
 import subprocess
 
 from harness.rsync import FROMDIR, SCRATCHDIR, TODIR, makepath, run_rsync, test_fail, test_skipped
+from harness import metadata
+
+metadata(features={'acl'}, transports={'pipe'})
 
 vv = run_rsync('-VV', check=True, capture_output=True)
 if '"ACLs": true' not in vv.stdout:

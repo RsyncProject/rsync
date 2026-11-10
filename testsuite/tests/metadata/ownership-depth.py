@@ -8,6 +8,9 @@ from harness.rsync import (
     get_rootuid, get_testuid, make_tree, rmtree, rsync_getgroups, run_rsync,
     test_fail, test_skipped, walk_dirs, walk_files,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 src = FROMDIR
 is_root = get_testuid() == get_rootuid()

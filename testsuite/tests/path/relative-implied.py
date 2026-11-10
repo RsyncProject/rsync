@@ -6,6 +6,9 @@ from harness.rsync import (
     SCRATCHDIR, TODIR,
     assert_mode, assert_same, forced_protocol, makepath, rmtree, run_rsync,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 os.umask(0o022)
 

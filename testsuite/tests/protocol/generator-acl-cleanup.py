@@ -9,6 +9,9 @@ from harness.rsync import (
     SCRATCHDIR, RSYNC,
     acls_supported, require_asan, rmtree, rsync_argv, test_fail, test_skipped,
 )
+from harness import metadata
+
+metadata(features={'asan'}, transports={'pipe'})
 
 require_asan("KI-23 real_sx ACL leak is only observable under AddressSanitizer/LSan", RSYNC)
 if not acls_supported():

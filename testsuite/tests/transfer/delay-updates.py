@@ -3,6 +3,9 @@
 import os
 
 from harness.rsync import FROMDIR, TODIR, checkit
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 FROMDIR.mkdir(parents=True, exist_ok=True)
 (FROMDIR / 'foo').write_text("1\n")

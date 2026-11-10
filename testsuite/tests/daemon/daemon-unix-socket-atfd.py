@@ -9,6 +9,9 @@ from harness.rsync import (
     SCRATCHDIR, makepath, rmtree, rsync_argv, start_test_daemon, test_fail, test_skipped,
 )
 import subprocess
+from harness import metadata
+
+metadata(transports={'pipe', 'tcp'})
 
 src = SCRATCHDIR / 'sock-src'
 dst = SCRATCHDIR / 'sock-dst'

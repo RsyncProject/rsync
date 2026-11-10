@@ -8,6 +8,9 @@ from harness.rsync import (
     FROMDIR, SCRATCHDIR, RSYNC,
     require_asan, rmtree, rsync_argv, test_fail,
 )
+from harness import metadata
+
+metadata(features={'asan'}, transports={'pipe'})
 
 require_asan("KI-25 id-0 name leak is only observable under AddressSanitizer/LSan", RSYNC)
 

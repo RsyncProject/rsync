@@ -5,6 +5,9 @@ import subprocess
 
 from harness.daemon_config import write_daemon_conf
 from harness.rsync import SCRATCHDIR, claim_free_port, rmtree, rsync_argv, test_fail
+from harness import metadata
+
+metadata(transports={'pipe', 'tcp'})
 
 base = SCRATCHDIR / 'daemon-stdin-inetd'
 rmtree(base)

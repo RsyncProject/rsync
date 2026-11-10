@@ -7,23 +7,21 @@
     "linux_interpose": "Linux-only interposition",
     "linux_nss_chroot": "Linux-only NSS chroot",
     "linux_xattr": "Linux-only xattr semantics",
+    "noatime": "Linux-only O_NOATIME",
+    "proc_fd": "Linux-only descriptor fixture",
     "protected_regular": "Linux-only protected_regular sysctl",
     "user_namespace": "Linux-only user namespaces"
   },
   "unsupported": {
     "acl": "no usable ACL fixture",
-    "atomic_flipper": "no atomic rename exchange",
     "crtimes": "no creation times",
     "directory_sgid": "no directory setgid semantics",
     "high_fd": "no descriptors above FD_SETSIZE",
     "interpose": "no supported interposition fixture",
-    "noatime": "no O_NOATIME",
     "preallocate": "no preallocation support",
-    "proc_fd": "no procfs descriptors",
     "search_only": "no race-safe search-only directory descriptors",
     "setpriv": "no setpriv launcher",
     "simd": "no SIMD test build",
-    "symlink_xattr": "no symlink xattr fixture",
     "xattr_runtime": "no user xattr fixture",
     "xattr_wire": "no xattr wire fixture"
   }

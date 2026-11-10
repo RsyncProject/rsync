@@ -13,6 +13,9 @@ from harness.rsync import (
     FROMDIR, RSYNC_PEER, SCRATCHDIR, claim_ports, make_tree, makepath, require_tcp, rmtree,
     rsync_argv, split_rsync_cmd, test_fail, test_skipped,
 )
+from harness import metadata
+
+metadata(features={'posix_detach', 'tcp'}, transports={'tcp'})
 
 if platform.system().startswith('CYGWIN'):
     test_skipped("a detached daemon orphans on cygwin's Windows process model",

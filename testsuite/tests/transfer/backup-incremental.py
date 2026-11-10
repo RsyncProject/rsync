@@ -6,6 +6,9 @@ from harness.rsync import (
     SCRATCHDIR, assert_not_exists, assert_trees_equal, make_data_file,
     make_text_file, makepath, rmtree, run_rsync, test_fail,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 base = SCRATCHDIR / 'backup-incremental'
 rmtree(base)

@@ -9,6 +9,9 @@ from harness.mutation import race_budget
 from harness.rsync import (
     SCRATCHDIR, rmtree, rsync_argv, test_fail, test_skipped, xattr_set, xattrs_supported,
 )
+from harness import metadata
+
+metadata(features={'linux_xattr', 'xattr'}, transports={'pipe'})
 
 MARKER = 'user.marker'
 N = 120

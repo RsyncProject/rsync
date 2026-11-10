@@ -3,6 +3,9 @@
 import subprocess
 
 from harness.rsync import SCRATCHDIR, TOOLDIR, rmtree, test_fail
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 testdir = SCRATCHDIR / 'relpath-test'
 rmtree(testdir)

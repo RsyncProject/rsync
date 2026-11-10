@@ -19,6 +19,9 @@ if '--shell' in sys.argv:
 from harness.rsync import (
     RSYNC, SCRATCHDIR, makepath, patched_rrsync, proc_self_fd_pins, rmtree, rsync_argv, rsync_path_arg, test_fail,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 T = 1234567890
 

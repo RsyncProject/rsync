@@ -11,7 +11,7 @@ from harness.rsync import (
 )
 from harness import metadata
 
-metadata(features={'daemon', 'exec-hooks'}, transports={'pipe', 'tcp'}, min_peer='2.6.0', mutates={'filesystem', 'process', 'socket'}, tags={'daemon', 'process', 'version-mix'})
+metadata(features={'daemon', 'exec-hooks'}, transports={'pipe', 'tcp'}, min_peer='2.6.6', mutates={'filesystem', 'process', 'socket'}, tags={'daemon', 'process', 'version-mix'})
 
 def wait_for(path, want, secs=5):
     deadline = time.monotonic() + secs

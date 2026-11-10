@@ -4,6 +4,9 @@ import time
 
 from harness import protocol as rp
 from harness.rsync import SCRATCHDIR, claim_ports, require_tcp, start_rsyncd, test_fail
+from harness import metadata
+
+metadata(features={'tcp'}, transports={'tcp'})
 
 PORTS = 12957, 12958, 12959, 12960, 12967
 require_tcp('the protocol sender requires TCP')

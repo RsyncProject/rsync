@@ -14,7 +14,6 @@ import argparse
 import concurrent.futures
 import fnmatch
 import glob
-import hashlib
 import json
 import math
 import os
@@ -28,9 +27,10 @@ import time
 from pathlib import Path
 
 from .metadata import (applies_to_peer, discover_tests, placeholder_target,
-                       read_requirements, resolve_test_path, test_name)
-from .profile import load_profile, merge_profiles, parse_peer_banner
-from .results import Exit, TestResult, verdict_of, write_receipt
+                       read_requirements, test_name)
+from .process import file_digest
+from .profile import load_binaries, load_profile, merge_profiles, parse_peer_banner
+from .results import Exit, TestResult, read_receipt, verdict_of, write_receipt
 
 _SUITE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -84,6 +84,7 @@ def parse_args():
                         'slowest first. With -j N the report also shows how '
                         'much of the run the slowest test alone accounts for.')
     parser.add_argument('--receipt', metavar='FILE', help='Write a JSON run receipt')
+    parser.add_argument('--check-receipt', metavar='FILE', help='Check a run receipt and return its exit status')
     parser.add_argument('--timeout', type=_positive_int, default=300, metavar='SECS',
                    help='Per-test timeout in seconds (default: 300)')
     parser.add_argument('--race-timeout', type=_race_seconds, default=None, metavar='SECS',
@@ -243,34 +244,12 @@ def collect_tests(suitedir, patterns):
                 raise ValueError(f'no tests match {pat!r}')
     return tests
 
-_DAEMON_API = (
-    'USE_TCP', 'require_tcp', 'start_test_daemon', 'start_rsyncd',
-    'claim_ports', 'claim_free_port', 'setup_chroot_inner',
-    'start_stdio_daemon', 'harness.protocol', 'DaemonClient', 'DaemonReceiver',
-    'rsync://', 'rsyncd',
-)
-_DAEMON_OPTION = re.compile(r'(?<![\w-])--daemon(?![\w-])')
-
 def select_daemon_tests(tests):
     keep, dropped = [], []
     for path in tests:
-        metadata = read_requirements(path)
-        if metadata and metadata['transports']:
-            if 'tcp' not in metadata['transports']:
-                dropped.append(path)
-                continue
-            if 'daemon' in metadata['tags']:
-                keep.append(path)
-                continue
-        # Tests without transport metadata need a conservative source scan
-        try:
-            with open(resolve_test_path(path), errors='replace') as f:
-                text = f.read()
-        except OSError:
-            keep.append(path)
-            continue
-        uses_daemon = any(tok in text for tok in _DAEMON_API) or bool(_DAEMON_OPTION.search(text))
-        (keep if uses_daemon else dropped).append(path)
+        requirements = read_requirements(path)
+        applicable = not requirements or not requirements['transports'] or 'tcp' in requirements['transports']
+        (keep if applicable else dropped).append(path)
     return keep, dropped
 
 def select_applicable_tests(tests, not_applicable):
@@ -340,20 +319,16 @@ def build_rsync_cmd(rsync_bin, args, scratchbase):
     return ' '.join(parts)
 
 def binary_identity(path):
-    result = subprocess.run([path, '--version'], capture_output=True, text=True)
+    try:
+        result = subprocess.run([path, '--version'], capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError) as error:
+        raise ValueError(f'cannot determine rsync version from {path}') from error
     if result.returncode:
         raise ValueError(f'cannot determine rsync version from {path}')
     try:
         return parse_peer_banner(result.stdout)
     except ValueError as error:
         raise ValueError(f'cannot determine rsync version from {path}') from error
-
-def file_digest(path):
-    digest = hashlib.sha256()
-    with open(path, 'rb') as stream:
-        for block in iter(lambda: stream.read(65536), b''):
-            digest.update(block)
-    return digest.hexdigest()
 
 def source_identity(srcdir):
     if not (Path(srcdir) / '.git').exists():
@@ -370,8 +345,10 @@ def source_identity(srcdir):
     return revision, bool(status)
 
 def run_one_test(testscript, testbase, scratchdir, base_env, timeout,
-                 srcdir, tooldir, setfacl_nodef, always_log):
+                 srcdir, tooldir, setfacl_nodef, always_log, cancelled):
     started = time.monotonic()
+    if cancelled.is_set():
+        return TestResult(testbase, Exit.ERROR, f'ERROR   {testbase} (cancelled)')
     prep_scratch(scratchdir, srcdir, tooldir, setfacl_nodef)
 
     env = base_env.copy()
@@ -393,23 +370,35 @@ def run_one_test(testscript, testbase, scratchdir, base_env, timeout,
             env=env, cwd=env.get('TOOLDIR', '.'),
             start_new_session=True,
         )
-        try:
-            result = proc.wait(timeout=timeout)
-        except subprocess.TimeoutExpired:
+        deadline = time.monotonic() + timeout
+        reason = None
+        while True:
+            if cancelled.is_set():
+                reason = 'CANCELLED: run interrupted'
+                break
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                reason = f'TIMEOUT: test took over {timeout} seconds'
+                break
             try:
-                pgid = os.getpgid(proc.pid)
-            except OSError:
-                pgid = -1
-            if pgid == proc.pid and pgid != os.getpgrp():
+                result = proc.wait(timeout=min(remaining, 0.25))
+                break
+            except subprocess.TimeoutExpired:
+                continue
+        if reason:
+            # The test can exit before its children
+            for sig in (signal.SIGTERM, signal.SIGKILL):
                 try:
-                    os.killpg(pgid, signal.SIGKILL)
-                except OSError:
-                    proc.kill()
-            else:
-                proc.kill()
-            proc.wait()
+                    os.killpg(proc.pid, sig)
+                except ProcessLookupError:
+                    pass
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    if sig == signal.SIGKILL:
+                        raise
             result = Exit.ERROR
-            log.write(f"\nTIMEOUT: test took over {timeout} seconds\n")
+            log.write(f'\n{reason}\n')
 
     output_parts = []
 
@@ -508,6 +497,31 @@ def validate_run_paths(tooldir, srcdir, rsync_bin, rsync_bin2):
         )
         sys.exit(Exit.ERROR)
 
+    archive = (Path(srcdir) / 'old_versions').resolve()
+    for binary in {rsync_bin, rsync_bin2}:
+        path = Path(binary).absolute()
+        if path.parent != archive:
+            path = path.resolve()
+        if path.parent != archive:
+            continue
+        records = load_binaries(archive)
+        if path.name not in records:
+            raise ValueError(f'not an archived peer: {path.name}')
+        record = records[path.name]
+        version = path.name[len('rsync_'):]
+        command = ['git', '--no-optional-locks', '-c', f'safe.directory={Path(srcdir).resolve()}',
+                   '-C', srcdir, 'rev-parse', '--verify', f'refs/tags/v{version}^{{commit}}']
+        try:
+            source = subprocess.check_output(command, text=True, stderr=subprocess.DEVNULL, timeout=30).strip()
+        except (OSError, subprocess.SubprocessError) as error:
+            raise ValueError(f'cannot verify source of archived peer {version}') from error
+        if source != record['source']:
+            raise ValueError(f'archived peer {version} differs from its release tag')
+        actual_version, protocol = binary_identity(binary)
+        if actual_version != version or protocol != record['protocol']:
+            raise ValueError(f'archived peer {version} differs from its declared identity')
+
+
 def print_run_header(args, tooldir, srcdir, scratchbase, rsync_cmd, rsync_peer_cmd, tls_args):
     print('=' * 60)
     print(f'{sys.argv[0]} running in {tooldir}')
@@ -536,6 +550,7 @@ def build_test_environment(args, tooldir, srcdir, suitedir, scratchbase,
         pythonpath += os.pathsep + os.environ['PYTHONPATH']
 
     env = os.environ.copy()
+    env.update({key: value for key, value in shconfig.items() if value})
     env.update({
         'PATH': path,
         'POSIXLY_CORRECT': '1',
@@ -559,7 +574,6 @@ def build_test_environment(args, tooldir, srcdir, suitedir, scratchbase,
         env.pop('race_timeout', None)
     else:
         env['race_timeout'] = str(args.race_timeout)
-    env.update({key: value for key, value in shconfig.items() if value})
     env['setfacl_nodef'] = ' '.join(setfacl_nodef) if setfacl_nodef else 'true'
     if args.log_level > 8:
         env['RUNSHFLAGS'] = '-e -x'
@@ -588,6 +602,9 @@ def configure_profiles(args, suitedir, srcdir, all_tests, tests,
         if (role == 'root') != (os.geteuid() == 0):
             raise ValueError(f'{role} profile does not match effective UID {os.geteuid()}')
     peer, profile_protocol, not_applicable, unsupported, xfail = merge_profiles(profiles)
+    if any(profile.name == 'self-peer' for profile in profiles):
+        if peer or file_digest(rsync_bin) != file_digest(rsync_bin2):
+            raise ValueError('self-peer profile requires the same executable in both roles')
     tests, excluded = select_applicable_tests(tests, not_applicable)
     excluded_names = {name for group in excluded for name in group['tests']}
     invalid = sorted(set(xfail) & excluded_names)
@@ -614,13 +631,17 @@ def configure_profiles(args, suitedir, srcdir, all_tests, tests,
             f'profile protocol {profile_protocol} does not match {actual_peer_protocol}')
     effective_protocol = min(current_protocol, actual_peer_protocol,
                              args.protocol if args.protocol is not None else current_protocol)
-    eligible = {test_name(test) for test in all_tests
-                if applies_to_peer(read_requirements(test), peer, profile_protocol)}
+    requirements = {test_name(test): read_requirements(test) for test in all_tests}
+    missing = [name for name, values in requirements.items() if not values or not values['transports']]
+    if missing:
+        raise ValueError(f'tests without transport metadata: {", ".join(sorted(missing))}')
+    eligible = {name for name, values in requirements.items()
+                if applies_to_peer(values, peer, profile_protocol)}
     invalid = sorted(set(xfail) - eligible)
     if invalid:
         raise ValueError(f'peer deviations do not apply: {", ".join(invalid)}')
     tests = [test for test in tests
-             if applies_to_peer(read_requirements(test), peer,
+             if applies_to_peer(requirements[test_name(test)], peer,
                                 effective_protocol, transport)]
     if not tests:
         raise ValueError(f'no tests apply to peer {peer}')
@@ -628,6 +649,20 @@ def configure_profiles(args, suitedir, srcdir, all_tests, tests,
 
 def main():
     args = parse_args()
+    if args.check_receipt:
+        try:
+            data = read_receipt(args.check_receipt)
+            if args.rsync_bin and data['run'].get('binary_sha256') != file_digest(args.rsync_bin):
+                raise ValueError('receipt identifies a different binary')
+            if args.profiles is not None:
+                expected = [Path(value.strip()).name for value in args.profiles.split(',') if value.strip()]
+                expected = [value[:-5] if value.endswith('.json') else value for value in expected]
+                if data['run']['profiles'] != expected:
+                    raise ValueError('receipt identifies different profiles')
+        except (OSError, ValueError) as error:
+            sys.stderr.write(f'invalid test receipt: {error}\n')
+            sys.exit(Exit.ERROR)
+        sys.exit(data['summary']['exit_code'])
     apply_environment_defaults(args)
     tooldir, srcdir, suitedir, rsync_bin, rsync_bin2 = resolve_run_paths(args)
     try:
@@ -647,27 +682,18 @@ def main():
 
     scratchbase = os.path.join(os.environ.get('scratchbase', tooldir), 'testtmp')
     os.makedirs(scratchbase, exist_ok=True)
+    os.environ['HOME'] = scratchbase
 
     shconfig = read_shconfig(os.path.join(tooldir, 'shconfig'))
     tls_args = get_tls_args(os.path.join(tooldir, 'config.h'))
     setfacl_nodef = find_setfacl_nodef(scratchbase)
     rsync_cmd = build_rsync_cmd(rsync_bin, args, scratchbase)
     rsync_peer_cmd = build_rsync_cmd(rsync_bin2, args, scratchbase)
-    validate_run_paths(tooldir, srcdir, rsync_bin, rsync_bin2)
-    identity = {}
-    if args.receipt:
-        try:
-            revision, dirty = source_identity(srcdir)
-            identity = {'source_revision': revision, 'source_dirty': dirty, 'euid': os.geteuid(),
-                        'binary_sha256': file_digest(rsync_bin), 'peer_sha256': file_digest(rsync_bin2)}
-        except OSError as error:
-            sys.stderr.write(f'runtests.py: cannot identify test inputs: {error}\n')
-            sys.exit(Exit.ERROR)
-    print_run_header(args, tooldir, srcdir, scratchbase, rsync_cmd, rsync_peer_cmd, tls_args)
-    base_env = build_test_environment(
-        args, tooldir, srcdir, suitedir, scratchbase,
-        rsync_cmd, rsync_peer_cmd, tls_args, shconfig, setfacl_nodef,
-    )
+    try:
+        validate_run_paths(tooldir, srcdir, rsync_bin, rsync_bin2)
+    except (OSError, ValueError) as error:
+        sys.stderr.write(f'runtests.py: {error}\n')
+        sys.exit(Exit.ERROR)
 
     excl = [e.strip() for e in args.exclude.split(',') if e.strip()]
     if excl:
@@ -695,6 +721,29 @@ def main():
     if not tests:
         sys.stderr.write('runtests.py: no tests selected\n')
         sys.exit(Exit.ERROR)
+    if rsync_bin != rsync_bin2:
+        try:
+            versions = [binary_identity(binary)[0] for binary in (rsync_bin, rsync_bin2)]
+        except ValueError as error:
+            sys.stderr.write(f'runtests.py: {error}\n')
+            sys.exit(Exit.ERROR)
+        if any(int(version.split('.')[0]) < 3 for version in versions):
+            tls_args = ' '.join(argument for argument in tls_args.split() if argument != '-l')
+    identity = {}
+    if args.receipt:
+        try:
+            revision, dirty = source_identity(srcdir)
+            identity = {'source_revision': revision, 'source_dirty': dirty, 'euid': os.geteuid(),
+                        'binary_sha256': file_digest(rsync_bin), 'peer_sha256': file_digest(rsync_bin2)}
+        except OSError as error:
+            sys.stderr.write(f'runtests.py: cannot identify test inputs: {error}\n')
+            sys.exit(Exit.ERROR)
+    print_run_header(args, tooldir, srcdir, scratchbase, rsync_cmd, rsync_peer_cmd, tls_args)
+    base_env = build_test_environment(
+        args, tooldir, srcdir, suitedir, scratchbase,
+        rsync_cmd, rsync_peer_cmd, tls_args, shconfig, setfacl_nodef,
+    )
+
     not_applicable_count = len({name for group in not_applicable for name in group['tests']})
     metadata_by_test = {test_name(test): read_requirements(test) for test in tests}
 
@@ -756,41 +805,50 @@ def main():
         return is_failure
 
     run_started = time.monotonic()
+    cancelled = threading.Event()
 
-    if args.parallel > 1:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=args.parallel) as executor:
-            futures = {}
+    def cancel(signum, frame):
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
+        cancelled.set()
+
+    previous = signal.signal(signal.SIGTERM, cancel)
+    try:
+        if args.parallel > 1:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=args.parallel) as executor:
+                futures = {}
+                for testscript in tests:
+                    testbase = test_name(testscript)
+                    scratchdir = os.path.join(scratchbase, testbase)
+                    timeout = timeout_for(testbase)
+                    f = executor.submit(
+                        run_one_test, testscript, testbase, scratchdir,
+                        base_env, timeout, srcdir, tooldir, setfacl_nodef,
+                        args.always_log, cancelled,
+                    )
+                    futures[f] = testbase
+
+                for f in concurrent.futures.as_completed(futures):
+                    result = f.result()
+                    is_fail = process_result(result)
+                    if cancelled.is_set() or is_fail and args.stop_on_fail:
+                        for pending in futures:
+                            pending.cancel()
+                        break
+        else:
             for testscript in tests:
                 testbase = test_name(testscript)
                 scratchdir = os.path.join(scratchbase, testbase)
                 timeout = timeout_for(testbase)
-                f = executor.submit(
-                    run_one_test, testscript, testbase, scratchdir,
+                result = run_one_test(
+                    testscript, testbase, scratchdir,
                     base_env, timeout, srcdir, tooldir, setfacl_nodef,
-                    args.always_log
+                    args.always_log, cancelled,
                 )
-                futures[f] = testbase
-
-            for f in concurrent.futures.as_completed(futures):
-                result = f.result()
                 is_fail = process_result(result)
-                if is_fail and args.stop_on_fail:
-                    for pending in futures:
-                        pending.cancel()
+                if cancelled.is_set() or is_fail and args.stop_on_fail:
                     break
-    else:
-        for testscript in tests:
-            testbase = test_name(testscript)
-            scratchdir = os.path.join(scratchbase, testbase)
-            timeout = timeout_for(testbase)
-            result = run_one_test(
-                testscript, testbase, scratchdir,
-                base_env, timeout, srcdir, tooldir, setfacl_nodef,
-                args.always_log
-            )
-            is_fail = process_result(result)
-            if is_fail and args.stop_on_fail:
-                break
+    finally:
+        signal.signal(signal.SIGTERM, previous)
 
     run_wall = time.monotonic() - run_started
 
@@ -901,7 +959,7 @@ def main():
 
     print('-' * 60)
 
-    exit_code = int(bool(failed or vg_errors))
+    exit_code = int(bool(failed or vg_errors or len(test_results) != len(tests)))
     emit_receipt(exit_code)
     print(f'overall result is {exit_code}')
     sys.exit(exit_code)

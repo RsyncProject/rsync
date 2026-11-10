@@ -6,6 +6,9 @@ from harness.rsync import (
     CHKDIR, TMPDIR, TODIR,
     checkit, cp_touch, run_rsync,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 os.chdir(TMPDIR)
 

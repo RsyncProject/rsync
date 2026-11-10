@@ -7,6 +7,9 @@ import subprocess
 from harness.rsync import (
     RSYNC, SCRATCHDIR, makepath, patched_rrsync, rmtree, rsync_argv, test_fail, rsync_path_arg,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 PULL_DATA = 'REAL-FILE-CONTENT\n'
 PUSH_DATA = 'PUSHED-FILE-CONTENT\n'

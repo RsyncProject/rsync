@@ -4,6 +4,9 @@ import os
 import subprocess
 
 from harness.rsync import SCRATCHDIR, makepath, rmtree, rsync_argv, test_fail
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 OLD = b'old destination bytes\n'
 NEW = b'new source bytes with a different length\n'

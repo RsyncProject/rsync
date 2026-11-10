@@ -68,6 +68,8 @@ PROFILES = {
 }
 WIRE_PROFILES = ('P1-full', 'P2-links', 'P5-noimplied')
 PAIRINGS = (('old', 'old'), ('new', 'old'), ('old', 'new'), ('new', 'new'))
+if RSYNC == RSYNC_PEER:
+    PAIRINGS = (('old', 'old'), ('new', 'new'))
 
 results = []
 

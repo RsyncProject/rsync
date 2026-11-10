@@ -16,6 +16,9 @@ from harness.rsync import (
     test_skipped,
 )
 from harness import protocol as rp
+from harness import metadata
+
+metadata(transports={'pipe', 'tcp'})
 
 hands_setup()
 

@@ -10,6 +10,9 @@ from harness.rsync import (
     FROMDIR, SCRATCHDIR, SRCDIR, make_tree, makepath, owners_supported, rmtree, rsync_argv,
     start_test_daemon, test_fail, write_text_file,
 )
+from harness import metadata
+
+metadata(transports={'pipe', 'tcp'})
 
 DAEMON_PORT = 12891
 

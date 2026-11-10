@@ -7,6 +7,9 @@ from harness.rsync import (
     FROMDIR, TODIR,
     forced_protocol, makepath, rmtree, rsync_argv, test_fail,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 src = FROMDIR
 

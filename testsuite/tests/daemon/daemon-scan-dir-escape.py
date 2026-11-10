@@ -6,6 +6,9 @@ from harness.rsync import (
     SCRATCHDIR, get_rootgid, get_rootuid, get_testuid, makepath, rmtree,
     run_rsync, start_test_daemon, test_fail,
 )
+from harness import metadata
+
+metadata(transports={'pipe', 'tcp'})
 
 DAEMON_PORT = 12947
 MARKER = "XFIL-OUTSIDE-MODULE-SYMLINK-TARGET"

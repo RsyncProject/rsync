@@ -7,6 +7,9 @@ from harness.rsync import (
     FROMDIR, TODIR,
     rsync_argv, rsync_ls_lR, test_fail,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 FROMDIR.mkdir(parents=True, exist_ok=True)
 name1 = FROMDIR / 'name1'

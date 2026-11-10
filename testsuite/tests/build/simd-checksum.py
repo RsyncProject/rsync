@@ -4,6 +4,9 @@ import os
 import subprocess
 
 from harness.rsync import TOOLDIR, test_fail, test_skipped
+from harness import metadata
+
+metadata(features={'simd'}, transports={'pipe'})
 
 simdtest = TOOLDIR / 'simdtest'
 if not (simdtest.is_file() and os.access(simdtest, os.X_OK)):

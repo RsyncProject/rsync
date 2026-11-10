@@ -8,6 +8,9 @@ from harness.mutation import race_budget, start_path_flipper, stop_flipper
 from harness.rsync import (
     SCRATCHDIR, patched_rrsync, proc_self_fd_pins, rmtree, test_fail, test_skipped,
 )
+from harness import metadata
+
+metadata(features={'proc_fd'}, transports={'pipe'})
 
 if not proc_self_fd_pins():
     test_skipped("rrsync's realpath-vs-exec inode-pin needs /proc/self/fd "

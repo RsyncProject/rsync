@@ -5,6 +5,9 @@ import os
 from harness.daemon_config import write_daemon_conf
 from harness.rsync import SCRATCHDIR, forced_protocol, makepath, rmtree, test_fail, test_skipped
 from harness.daemon import finish_stdio_daemon, start_stdio_daemon
+from harness import metadata
+
+metadata(features={'protocol_30'}, transports={'pipe', 'tcp'})
 
 _proto = forced_protocol()
 if _proto is not None and _proto < 30:

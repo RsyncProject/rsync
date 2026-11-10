@@ -8,6 +8,9 @@ import shutil
 import subprocess
 
 from harness.rsync import SCRATCHDIR, SRCDIR, TOOLDIR, test_fail
+from harness import metadata
+
+metadata(transports={'pipe', 'tcp'})
 
 make_vars = {}
 for line in (TOOLDIR / 'Makefile').read_text().splitlines():

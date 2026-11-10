@@ -4,6 +4,9 @@ import os
 import subprocess
 
 from harness.rsync import SCRATCHDIR, TOOLDIR, rmtree, test_fail
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 mod = SCRATCHDIR / 'module'
 trap_outside = SCRATCHDIR / 'trap'

@@ -5,6 +5,9 @@ import shutil
 import subprocess
 
 from harness.rsync import SCRATCHDIR, patched_rrsync, test_fail, test_skipped
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 true = shutil.which('true') or '/usr/bin/true'
 if not os.path.exists(true):

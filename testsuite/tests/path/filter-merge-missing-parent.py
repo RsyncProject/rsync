@@ -4,6 +4,9 @@ import os
 import subprocess
 
 from harness.rsync import TMPDIR, rsync_argv, test_fail
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 workdir = TMPDIR / 'workdir'
 (workdir / 'mod').mkdir(parents=True, exist_ok=True)

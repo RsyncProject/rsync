@@ -41,6 +41,7 @@ __pycache__
 /testdir
 /tests-dont-exist
 /testtmp
+/test-results/
 /tls
 /testrun
 /trimslash

@@ -206,13 +206,13 @@ jobs:
       - name: Configure
         run: ./configure --with-rrsync
       - name: Build
-        run: make
+        run: make check-progs
       - name: Version
         run: ./rsync --version
       - name: Tests (root pipe)
-        run: RSYNC_TEST_PROFILES=pipe,non-asan,root,self-peer,linux,no-zstd-threads,no-userns make check
+        run: sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" pipe,non-asan,root,self-peer,linux,no-zstd-threads,no-userns "$RUNNER_TEMP/rsync-checks/root-pipe" -j8
       - name: Tests (root TCP)
-        run: RSYNC_TEST_PROFILES=non-asan,root,self-peer,linux,no-zstd-threads,no-userns ./testsuite/runtests.py --rsync-bin="$PWD/rsync" --use-tcp --daemon-tests-only -j 8
+        run: sh testsuite/tools/check.sh "$PWD" "$PWD/rsync" non-asan,root,self-peer,linux,no-zstd-threads,no-userns "$RUNNER_TEMP/rsync-checks/root-tcp" --use-tcp --daemon-tests-only -j8
       - name: Upload binaries
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -226,6 +226,15 @@ jobs:
             rsyncd.conf.5
             rrsync.1
             rrsync
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: almalinux-8-results
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/rsync-checks/*/run.log
+            ${{ runner.temp }}/rsync-checks/*/receipt.json
 
   alpine:
     if: ${{ inputs.alpine }}

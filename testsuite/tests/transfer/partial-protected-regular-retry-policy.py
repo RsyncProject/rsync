@@ -7,6 +7,9 @@ import subprocess
 from harness.rsync import (
     SCRATCHDIR, rmtree, rsync_argv, test_fail, test_skipped,
 )
+from harness import metadata
+
+metadata(features={'darwin_interpose'}, transports={'pipe'})
 
 if platform.system() != 'Darwin':
     test_skipped('deterministic partial EACCES recovery uses dyld interposing',

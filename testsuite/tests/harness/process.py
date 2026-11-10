@@ -59,8 +59,8 @@ def test(context: TestContext):
     unsupported.write_text("import sys\nsys.stderr.write('unknown option\\n')\nraise SystemExit(1)\n")
     supported = context.scratch / 'supported.py'
     supported.write_text('raise SystemExit(0)\n')
-    unsupported_command = f'{sys.executable} {unsupported}'
-    supported_command = f'{sys.executable} {supported}'
+    unsupported_command = shlex.join([sys.executable, str(unsupported)])
+    supported_command = shlex.join([sys.executable, str(supported)])
     if rsync_supports(unsupported_command, '--same-flag'):
         test_fail('an unsupported option was accepted')
     if not rsync_supports(supported_command, '--same-flag'):

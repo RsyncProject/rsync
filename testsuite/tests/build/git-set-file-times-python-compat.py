@@ -4,6 +4,9 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 source_dir = Path(os.environ['srcdir'])
 script = source_dir / "support" / "git-set-file-times"

@@ -9,6 +9,9 @@ from harness.rsync import (
     RSYNC_PREFIX, SCRATCHDIR, makepath, rmtree, rsync_argv, start_test_daemon, test_fail,
     test_skipped, xattr_get, xattrs_supported,
 )
+from harness import metadata
+
+metadata(features={'nonroot', 'xattr_runtime'}, transports={'pipe', 'tcp'})
 
 DAEMON_PORT = 12904
 

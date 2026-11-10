@@ -4,6 +4,9 @@ import os
 import subprocess
 
 from harness.rsync import SCRATCHDIR, TOOLDIR, rmtree, test_fail, test_skipped
+from harness import metadata
+
+metadata(features={'symlink_mknod'}, transports={'pipe'})
 
 def run_helper(args, label):
     proc = subprocess.run([str(TOOLDIR / 't_symlink_secure'), *args])

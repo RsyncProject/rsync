@@ -6,6 +6,9 @@ from harness.daemon_config import write_daemon_conf
 from harness.rsync import (
     FROMDIR, RSYNC, SCRATCHDIR, claim_ports, make_tree, rmtree, run_rsync, start_rsyncd,
 )
+from harness import metadata
+
+metadata(transports={'pipe', 'tcp'})
 
 PORT4 = 13020
 PORT6 = 13021

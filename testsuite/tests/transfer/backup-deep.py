@@ -7,6 +7,9 @@ from harness.rsync import (
     assert_not_exists, assert_same, make_tree, rmtree, run_rsync, test_fail,
     walk_files,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 src = FROMDIR
 bak = SCRATCHDIR / 'backups'

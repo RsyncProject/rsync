@@ -26,6 +26,9 @@ import re
 from harness.rsync import (
     FROMDIR, TODIR, assert_same, rmtree, run_rsync, test_fail,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 BLOCK = 704
 C_BYTE = 100

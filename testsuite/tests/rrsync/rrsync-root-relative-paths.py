@@ -8,6 +8,9 @@ from harness.rsync import (
     RSYNC, SCRATCHDIR, makepath, patched_rrsync, rmtree, rsync_argv,
     rsync_path_arg, test_fail,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 T = 1234567890
 

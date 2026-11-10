@@ -7,6 +7,9 @@ import subprocess
 from harness.rsync import (
     SCRATCHDIR, assert_mode, check_perms, run_rsync, test_fail, test_skipped,
 )
+from harness import metadata
+
+metadata(features={'directory_sgid'}, transports={'pipe'})
 
 old_umask = os.umask(0o077)
 

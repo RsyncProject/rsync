@@ -3,6 +3,9 @@
 import os
 
 from harness.rsync import FROMDIR, TODIR, check_perms, run_rsync
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 FROMDIR.mkdir(parents=True, exist_ok=True)
 (FROMDIR / '1').write_text("#!/bin/sh\necho 'Program One!'\n")

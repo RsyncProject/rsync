@@ -5,6 +5,9 @@ from harness.rsync import (
     FROMDIR, SCRATCHDIR, forced_protocol, makepath, rmtree, run_rsync, rsync_argv,
     test_fail, test_skipped, xattr_set, xattrs_supported,
 )
+from harness import metadata
+
+metadata(features={'protocol_30', 'xattr_runtime'}, transports={'pipe'})
 
 if not xattrs_supported():
     test_skipped("needs xattr support to write an -X batch", capability='xattr_runtime')
@@ -19,11 +22,7 @@ makepath(src)
 for i in range(40):
     f = src / f'f{i:03d}'
     f.write_text('x\n')
-    try:
-        xattr_set('user.m', 'v', f)
-    except Exception as e:
-        test_skipped(f"cannot set a user xattr on a regular file here: {e}",
-                     capability='xattr_runtime')
+    xattr_set('rsync.marker', 'v', f)
 
 batch = SCRATCHDIR / 'xbatch'
 wb_dest = SCRATCHDIR / 'wb-dest'

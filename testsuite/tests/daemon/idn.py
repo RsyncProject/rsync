@@ -11,6 +11,9 @@ from harness.rsync import (
     RSYNC, SCRATCHDIR, USE_TCP, claim_ports, run_rsync,
     test_fail, test_skipped,
 )
+from harness import metadata
+
+metadata(features={'idn'}, transports={'pipe', 'tcp'})
 
 if '"IDN": true' not in run_rsync('-VV', check=True, capture_output=True).stdout:
     test_skipped("rsync built without IDN support", capability='idn')

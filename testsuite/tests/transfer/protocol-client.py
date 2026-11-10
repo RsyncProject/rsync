@@ -10,6 +10,9 @@ from harness.rsync import (
 )
 from harness import protocol as rp
 from harness import protocol_client
+from harness import metadata
+
+metadata(features={'tcp'}, transports={'tcp'})
 
 PORT = 12968
 require_tcp("the protocol client uses a raw TCP socket; run with --use-tcp")

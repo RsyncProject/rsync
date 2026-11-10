@@ -4,6 +4,9 @@ from harness.daemon_config import write_daemon_conf
 from harness.rsync import (
     SCRATCHDIR, forced_protocol, makepath, rmtree, run_rsync, start_test_daemon, test_fail,
 )
+from harness import metadata
+
+metadata(transports={'pipe', 'tcp'})
 
 base = SCRATCHDIR / 'operator-path-dir-daemon'
 rmtree(base)

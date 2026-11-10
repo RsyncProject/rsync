@@ -15,7 +15,7 @@ from harness.rsync import (
 )
 from harness import metadata
 
-metadata(features={'remote-shell', 'symlink'}, transports={'pipe', 'tcp'}, min_peer='2.6.0', mutates={'filesystem', 'process'}, tags={'compatibility', 'security', 'transfer', 'version-mix'})
+metadata(features={'remote-shell', 'symlink'}, transports={'pipe', 'tcp'}, min_peer='2.6.3', mutates={'filesystem', 'process'}, tags={'compatibility', 'security', 'transfer', 'version-mix'})
 
 os.environ['RSYNC_RSH'] = rsh_cmd()
 

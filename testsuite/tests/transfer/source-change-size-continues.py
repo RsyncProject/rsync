@@ -10,6 +10,9 @@ from harness.rsync import (
     RSYNC, SCRATCHDIR, assert_same, make_data_file, makepath, rmtree,
     rsync_argv, test_fail, test_skipped, split_rsync_cmd,
 )
+from harness import metadata
+
+metadata(features={'linux_interpose'}, transports={'pipe'})
 
 SHIM_C = r'''
 #define _GNU_SOURCE 1

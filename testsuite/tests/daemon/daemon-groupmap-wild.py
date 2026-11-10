@@ -7,6 +7,9 @@ from harness.daemon_config import write_daemon_conf
 from harness.rsync import (
     SCRATCHDIR, makepath, rmtree, rsync_argv, start_test_daemon, test_fail, test_skipped,
 )
+from harness import metadata
+
+metadata(transports={'pipe', 'tcp'})
 
 DAEMON_PORT = 12923
 

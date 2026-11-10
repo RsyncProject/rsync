@@ -4,6 +4,9 @@ import os
 
 from harness.mutation import TARGET, assert_no_protocol_abort, run_mutating_transfer
 from harness.rsync import test_fail
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 BIG = 512 * 1024
 SMALL = 4 * 1024

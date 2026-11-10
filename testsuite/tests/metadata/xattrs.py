@@ -11,6 +11,9 @@ from harness.rsync import (
     checkit, cp_touch, makepath, run_rsync, test_fail, test_skipped,
     xattr_get, xattr_set as xset, xattr_dump, xattrs_supported,
 )
+from harness import metadata
+
+metadata(features={'xattr_runtime'}, transports={'pipe'})
 
 if not xattrs_supported():
     test_skipped("Rsync is configured without xattr support (or no xattr "

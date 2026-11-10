@@ -8,6 +8,9 @@ from harness.rsync import (
     SCRATCHDIR, acl_get, acl_set, forced_protocol, rmtree, run_rsync,
     test_fail, test_skipped,
 )
+from harness import metadata
+
+metadata(features={'linux_acl', 'protocol_30'}, transports={'pipe'})
 
 NEW_UID = 60002
 STALE_UID = 60009

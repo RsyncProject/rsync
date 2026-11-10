@@ -5,6 +5,9 @@ import struct
 
 from harness.daemon_config import write_daemon_conf
 from harness.rsync import SCRATCHDIR, claim_ports, makepath, require_tcp, start_rsyncd, test_fail
+from harness import metadata
+
+metadata(features={'tcp'}, transports={'tcp'})
 
 PORT_OK = 19873
 PORT_NOHOSTS = 19874

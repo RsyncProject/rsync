@@ -5,6 +5,9 @@ import socket
 from harness.rsync import (
     SCRATCHDIR, claim_ports, require_tcp, start_rsyncd, test_fail,
 )
+from harness import metadata
+
+metadata(features={'tcp'}, transports={'tcp'})
 
 PORT = 12933
 require_tcp("PROXY protocol peer policy needs a real TCP daemon; run with --use-tcp")

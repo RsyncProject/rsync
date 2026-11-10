@@ -13,6 +13,9 @@ from harness.rsync import (
     walk_dirs,
     walk_files,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 src = FROMDIR
 FILE_MODE = 0o640

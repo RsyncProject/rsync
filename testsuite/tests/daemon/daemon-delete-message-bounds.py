@@ -20,6 +20,9 @@ from harness.rsync import (
     makepath, rmtree, rsync_argv, start_test_daemon,
     test_fail,
 )
+from harness import metadata
+
+metadata(transports={'pipe', 'tcp'})
 
 
 DAEMON_PORT = 12969
@@ -38,12 +41,15 @@ makepath(src, dst)
 # Keep the complete path below the most restrictive systems' practical limits.
 # The messages total over 1 MiB; more than twice the 512-KiB queue occupancy
 # that makes its next doubling hit (and be rejected by) --max-alloc=1m.
-deep = dst / 'runs'
-for i in range(10):
-    deep /= f'd{i}-' + 'x' * 76
-makepath(deep)
-for i in range(FILE_COUNT):
-    (deep / f'stale-{i:04d}').touch()
+def populate():
+    deep = dst / 'runs'
+    for i in range(10):
+        deep /= f'd{i}-' + 'x' * 76
+    makepath(deep)
+    for i in range(FILE_COUNT):
+        (deep / f'stale-{i:04d}').touch()
+
+populate()
 
 conf = build_rsyncd_conf()
 url = start_test_daemon(conf, DAEMON_PORT)
@@ -71,7 +77,8 @@ if len(list(backed_up.rglob('stale-*'))) != FILE_COUNT:
 # A requested deletion list is still allowed to hit --max-alloc, but reporting
 # that error must not recurse through the same full queue until the daemon
 # exhausts its stack.  Restore the files and repeat with deletion output on.
-backed_up.rename(dst / 'runs')
+rmtree(history)
+populate()
 proc = subprocess.run(
     rsync_argv(
         '-av', '--delete', '--delete-excluded', '--backup',

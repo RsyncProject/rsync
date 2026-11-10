@@ -6,6 +6,9 @@ import socket as _socket
 from harness.rsync import (
     SCRATCHDIR, assert_same, rmtree, run_rsync, test_fail, test_skipped,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 base = SCRATCHDIR / 'nested-socket'
 src = base / 'src'

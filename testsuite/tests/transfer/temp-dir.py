@@ -4,6 +4,9 @@ from harness.rsync import (
     FROMDIR, SCRATCHDIR, TODIR,
     assert_same, make_tree, rmtree, run_rsync, test_fail, walk_files,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 src = FROMDIR
 tmp = SCRATCHDIR / 'scratch-temp'

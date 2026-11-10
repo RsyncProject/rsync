@@ -8,6 +8,9 @@ from harness.rsync import (
     makepath, rmtree, rsync_argv, test_fail, test_skipped,
 )
 import subprocess
+from harness import metadata
+
+metadata(features={'backup_metadata', 'linux_acl'}, transports={'pipe'})
 
 if not acls_supported():
     test_skipped("ACLs not supported on this filesystem", capability='linux_acl')
@@ -29,7 +32,7 @@ os.utime(dest / 'd1' / 'd2' / 'file', (1_600_000_000, 1_600_000_000))
 for d in (dest / 'd1', dest / 'd1' / 'd2'):
     if not acl_set('u:0:rwx', d):
         test_skipped(f"setfacl failed on {d}", capability='linux_acl')
-    xattr_set('user.bak-cache', 'v', d)
+    xattr_set('bak-cache', 'v', d)
 
 r = subprocess.run(
     rsync_argv('-aAX', '--backup', f'--backup-dir={bak}', f'{src}/', f'{dest}/'),

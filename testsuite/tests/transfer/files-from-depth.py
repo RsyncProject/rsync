@@ -5,6 +5,9 @@ from harness.rsync import (
     assert_exists, assert_not_exists, assert_same, make_tree, rmtree,
     run_rsync,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 src = FROMDIR
 listed = ['d1/f1', 'd1/d2/d3/f3']

@@ -1,15 +1,22 @@
 #!/usr/bin/env python3
 
+from contextlib import redirect_stderr
+import errno
+import fcntl
 import hashlib
+from io import StringIO
 import json
 import os
+import shlex
 import shutil
+import signal
 import subprocess
 import sys
+import time
 from pathlib import Path
 from unittest.mock import patch
 
-from harness import TestContext, requires, run, runner
+from harness import Exit, TestContext, requires, run, runner, test_error
 from harness.rsync import rsync_command_binary, test_fail
 
 @requires(transports={'pipe'}, mutates={'filesystem', 'process'}, tags={'harness'})
@@ -22,9 +29,65 @@ def test(context: TestContext):
     command = ['sh', str(recipe), str(context.tools), binary, 'pipe,self-peer', str(output)]
     env = os.environ.copy()
     env['whichtests'] = 'must-not-run'
+    env['PYTHONUNBUFFERED'] = '1'
 
-    def invoke(args, success, message=None):
-        result = subprocess.run(args, env=env, cwd=context.scratch, capture_output=True, text=True, timeout=60)
+    def invoke(args, success, message=None, timeout=60):
+        print(f'recipe: {shlex.join(args)}', flush=True)
+        cancelled = False
+
+        def cancel(signum, frame):
+            nonlocal cancelled
+            cancelled = True
+
+        previous = signal.signal(signal.SIGTERM, cancel)
+        proc = None
+        try:
+            proc = subprocess.Popen(args, env=env, cwd=context.scratch, stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE, text=True, start_new_session=True)
+            deadline = time.monotonic() + timeout
+            while True:
+                remaining = deadline - time.monotonic()
+                if cancelled or remaining <= 0:
+                    raise subprocess.TimeoutExpired(args, timeout)
+                try:
+                    stdout, stderr = proc.communicate(timeout=min(remaining, 0.25))
+                    break
+                except subprocess.TimeoutExpired:
+                    continue
+        except BaseException as error:
+            stdout = stderr = ''
+            if proc is not None:
+                # Let the runner stop its own test groups before forcing exit
+                for sig, grace in ((signal.SIGTERM, 10), (signal.SIGKILL, 5)):
+                    try:
+                        os.killpg(proc.pid, sig)
+                    except ProcessLookupError:
+                        pass
+                    try:
+                        stdout, stderr = proc.communicate(timeout=grace)
+                    except subprocess.TimeoutExpired:
+                        if sig == signal.SIGKILL:
+                            raise
+            if isinstance(error, subprocess.TimeoutExpired):
+                reason = 'cancelled' if cancelled else f'timed out after {timeout} seconds'
+                diagnostic = f'recipe {reason}: {shlex.join(args)}\n{stdout}{stderr}'
+                output = Path(args[5])
+                for path in [output / 'run.log', *sorted(output.glob('scratch/testtmp/*/test.log'))]:
+                    try:
+                        with path.open('rb') as log:
+                            log.seek(0, os.SEEK_END)
+                            log.seek(max(0, log.tell() - 65536))
+                            diagnostic += f'\n{path.relative_to(output)} (tail):\n' + log.read(65536).decode('utf-8', 'replace')
+                    except FileNotFoundError:
+                        continue
+                test_error(diagnostic)
+            raise
+        finally:
+            signal.signal(signal.SIGTERM, previous)
+            if proc is not None:
+                proc.stdout.close()
+                proc.stderr.close()
+        result = subprocess.CompletedProcess(args, proc.returncode, stdout, stderr)
         if (result.returncode == 0) != success:
             test_fail(f'wrong recipe result: {result.returncode}\n{result.stdout}{result.stderr}')
         if message and message not in result.stdout + result.stderr:
@@ -131,6 +194,99 @@ def test(context: TestContext):
         test_fail('an incomplete run lost its failure evidence')
     if receipt['run']['source_revision'] is not None or receipt['run']['source_dirty'] is not None:
         test_fail('a non-checkout source acquired its parent revision')
+
+    (fixture / 'testsuite' / 'runtests.py').write_text(
+        "import sys\nfrom pathlib import Path\nfrom harness import runner\n"
+        "if '--check-receipt' not in sys.argv:\n"
+        "    runner.write_receipt = lambda path, data: Path(path).write_text('invalid receipt')\n"
+        "runner.main()\n")
+    invoke(['sh', str(tools / 'check.sh'), str(context.tools), binary,
+            str(profile), str(context.scratch / 'invalid-receipt'), 'second'], False,
+           'invalid test receipt')
+
+    (tools / 'check.sh').write_text(recipe.read_text().replace(
+        'set -eu\n', "set -eu\nprintf 'outer stdout\\n'\nprintf 'outer stderr\\n' >&2\n", 1))
+    (fixture / 'testsuite' / 'runtests.py').write_text(
+        'import fcntl, os, sys\nfrom pathlib import Path\nfrom harness import runner\n'
+        'output = Path(next(arg.split("=", 1)[1] for arg in sys.argv if arg.startswith("--receipt="))).parent\n'
+        'held = (output / "runner.lock").open("w")\nfcntl.lockf(held, fcntl.LOCK_EX)\n'
+        '(output / "runner.pid").write_text(str(os.getpid()))\nrunner.main()\n')
+    stalled = (
+        'import fcntl, os, signal\nfrom pathlib import Path\n'
+        'root = Path(os.environ["scratchdir"])\n'
+        'held = (root / "test.lock").open("w")\nfcntl.lockf(held, fcntl.LOCK_EX)\n'
+        '(root / "test.pid").write_text(str(os.getpid()))\n'
+        'print("test ready", flush=True)\n'
+        'signal.signal(signal.SIGTERM, signal.SIG_IGN)\n'
+        'if os.fork() == 0:\n'
+        '    held.close()\n'
+        '    held = (root / "child.lock").open("w")\n'
+        '    fcntl.lockf(held, fcntl.LOCK_EX)\n'
+        '    print("child ready", flush=True)\n    (root / "ready").touch()\n'
+        'signal.pause()\n')
+    for name in ('first', 'second'):
+        (tests / f'{name}.py').write_text(stalled)
+
+    def locked(path):
+        with path.open('r+') as held:
+            try:
+                fcntl.lockf(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError as error:
+                if error.errno in (errno.EACCES, errno.EAGAIN):
+                    return True
+                raise
+        return False
+
+    communicate = subprocess.Popen.communicate
+    for parallel in (1, 2):
+        output = context.scratch / f'timeout-{parallel}'
+        roots = [output / 'scratch' / 'testtmp' / name for name in ('first', 'second')[:parallel]]
+        expired = False
+
+        def expire(proc, input=None, timeout=None):
+            nonlocal expired
+            if not expired:
+                expired = True
+                deadline = time.monotonic() + 30
+                while not all((root / 'ready').is_file() for root in roots):
+                    if proc.poll() is not None or time.monotonic() >= deadline:
+                        raise subprocess.TimeoutExpired(proc.args, timeout)
+                    time.sleep(0.01)
+                raise subprocess.TimeoutExpired(proc.args, timeout)
+            return communicate(proc, input=input, timeout=timeout)
+
+        diagnostic = StringIO()
+        exit_code = None
+        try:
+            with patch.object(subprocess.Popen, 'communicate', expire), redirect_stderr(diagnostic):
+                try:
+                    invoke(['sh', str(tools / 'check.sh'), str(context.tools), binary,
+                            str(profile), str(output), *[root.name for root in roots], f'-j{parallel}'],
+                           False, timeout=0.01)
+                except SystemExit as error:
+                    exit_code = error.code
+            text = diagnostic.getvalue()
+            if exit_code != Exit.ERROR:
+                test_fail(f'recipe timeout was not reported as an error: {text}')
+            if not all(word in text for word in ('timed out', output.name, 'outer stdout',
+                                                 'outer stderr', 'run.log', 'test ready', 'child ready')):
+                test_fail(f'recipe timeout lost its diagnostics: {text}')
+            if locked(output / 'runner.lock') or any(
+                    locked(root / name) for root in roots for name in ('test.lock', 'child.lock')):
+                test_fail('recipe timeout left nested processes running')
+        finally:
+            for root in roots:
+                if (root / 'test.pid').exists() and any(
+                        path.is_file() and locked(path) for path in (root / 'test.lock', root / 'child.lock')):
+                    try:
+                        os.killpg(int((root / 'test.pid').read_text()), signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+            if (output / 'runner.lock').is_file() and locked(output / 'runner.lock'):
+                try:
+                    os.kill(int((output / 'runner.pid').read_text()), signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
 
 if __name__ == '__main__':
     run(test)

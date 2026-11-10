@@ -1,4 +1,5 @@
 import functools
+import hashlib
 import os
 import re
 import shlex
@@ -6,6 +7,13 @@ import subprocess
 import sys
 
 from .results import test_fail
+
+def file_digest(path):
+    digest = hashlib.sha256()
+    with open(path, 'rb') as stream:
+        for block in iter(lambda: stream.read(65536), b''):
+            digest.update(block)
+    return digest.hexdigest()
 
 def split_rsync_cmd(command: str) -> list:
     if os.path.isfile(command):

@@ -8,6 +8,9 @@ import sys
 
 from harness import protocol as rp
 from harness.rsync import SCRATCHDIR, makepath, rmtree, rsync_argv, test_fail, test_skipped
+from harness import metadata
+
+metadata(features={'nonroot'}, transports={'pipe'})
 
 CF_INPLACE_PARTIAL_DIR = 1 << 6
 FNAMECMP_PARTIAL_DIR = 0x81

@@ -68,5 +68,5 @@ verify_dirs(CHKDIR, TODIR, label="do-nothing re-run of batch")
 rmtree(TODIR)
 TODIR.mkdir()
 print("Test daemon recv --write-batch:")
-checkit(['-av', '--write-batch=BATCH', f'{FROMDIR}/', f'{url}test-to'],
+checkit(['-av', '--write-batch=BATCH', '--exclude=foobar.baz', f'{FROMDIR}/', f'{url}test-to'],
         CHKDIR, TODIR, allowed_codes=(0, 23))

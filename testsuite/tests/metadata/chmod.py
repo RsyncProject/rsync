@@ -3,6 +3,9 @@
 import os
 
 from harness.rsync import FROMDIR, TODIR, checkit, hands_setup, set_supported_mode
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 hands_setup()
 

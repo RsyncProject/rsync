@@ -7,6 +7,9 @@ from pathlib import Path
 from harness.rsync import (
     SCRATCHDIR, makepath, rmtree, rsync_argv, test_fail, test_skipped,
 )
+from harness import metadata
+
+metadata(features={'root_anchor'}, transports={'pipe'})
 
 if os.geteuid() != 0:
     test_skipped('needs root to place a transfer source directly under /', capability='root_anchor')

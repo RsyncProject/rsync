@@ -9,6 +9,9 @@ from harness.rsync import (
     claim_ports, make_tree, require_tcp, rmtree, rsync_argv, start_rsyncd,
     start_test_daemon, test_fail, test_skipped,
 )
+from harness import metadata
+
+metadata(features={'idn', 'tcp'}, transports={'tcp'})
 
 PROBE_PORT = 12896
 DAEMON_PORT = 12898

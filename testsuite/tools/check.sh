@@ -30,14 +30,37 @@ cd "$build"
 
 status=0
 unset whichtests
+pid=
+stop() {
+    trap '' TERM
+    child=${pid:-${!:-}}
+    if test -n "$child"; then
+        kill -TERM "$child" 2>/dev/null || :
+        wait "$child" 2>/dev/null || :
+    fi
+    exit 143
+}
+trap stop TERM
 scratchbase="$output/scratch" python3 -S "$source/testsuite/runtests.py" \
     "$@" \
     --srcdir="$source" --tooldir="$build" --rsync-bin="$binary" \
     --profiles="$profiles" --receipt="$output/receipt.json" \
-    > "$output/run.log" 2>&1 || status=$?
+    <&0 > "$output/run.log" 2>&1 &
+pid=$!
+wait "$pid" || status=$?
+pid=
+trap - TERM
 cat "$output/run.log"
 if ! test -s "$output/receipt.json"; then
     echo "Missing test receipt: $output/receipt.json" >&2
+    exit 2
+fi
+verified=0
+python3 -S "$source/testsuite/runtests.py" --check-receipt "$output/receipt.json" \
+    --rsync-bin="$binary" --profiles="$profiles" || verified=$?
+if test "$verified" -gt 1; then exit "$verified"; fi
+if test "$verified" -ne "$status"; then
+    echo 'Test receipt disagrees with the runner exit status' >&2
     exit 2
 fi
 exit "$status"

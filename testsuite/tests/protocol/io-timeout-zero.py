@@ -7,6 +7,9 @@ import time
 from harness.rsync import (
     SCRATCHDIR, claim_ports, rmtree, rsync_argv, test_fail, test_skipped,
 )
+from harness import metadata
+
+metadata(transports={'pipe', 'tcp'})
 
 PORT = 18367
 claim_ports(PORT)

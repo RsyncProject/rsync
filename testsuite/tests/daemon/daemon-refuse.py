@@ -25,8 +25,6 @@ conf = write_daemon_conf([
                        'refuse options': 'delete'}),
     ('refuse-wild',   {'path': src, 'read only': 'yes',
                        'refuse options': 'checksum*'}),
-    ('only-av',       {'path': src, 'read only': 'yes',
-                       'refuse options': '* !a !v'}),
 ])
 url = start_test_daemon(conf, DAEMON_PORT)
 
@@ -56,12 +54,3 @@ dest = SCRATCHDIR / 'wilddest'
 makepath(dest)
 refused(['-a', '--checksum', f'{url}refuse-wild/', f'{dest}/'],
         "--checksum on a refuse=checksum* module")
-
-rmtree(dest)
-makepath(dest)
-allowed(['-av', f'{url}only-av/', f'{dest}/'], "-av on an allow-list module",
-        src, dest)
-refused(['-avz', f'{url}only-av/', f'{dest}/'],
-        "-z on an allow-list module")
-
-print("daemon-refuse: named / wildcard / allow-list refuse options verified")

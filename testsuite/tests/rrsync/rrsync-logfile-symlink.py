@@ -5,6 +5,9 @@ import subprocess
 
 from harness.rsync import SCRATCHDIR, test_fail
 from harness.rsync import patched_rrsync
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 base = SCRATCHDIR / 'rrsync-logfile'
 restricted = base / 'restricted'

@@ -12,6 +12,10 @@ from harness.rsync import (
     SCRATCHDIR, makepath, rmtree, rsync_argv, rsync_command_binary,
     test_fail, test_skipped,
 )
+from harness import metadata
+
+metadata(features={'proc_fd'}, transports={'pipe'})
+
 if not sys.platform.startswith('linux'):
     test_skipped('Kernel pseudo-path string is a Linux-specific procfs feature', capability='proc_fd')
     raise SystemExit(0)

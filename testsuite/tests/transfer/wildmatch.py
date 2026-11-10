@@ -3,6 +3,9 @@
 import subprocess
 
 from harness.rsync import SRCDIR, TOOLDIR, test_fail
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 OPTION_SETS = [
     [],

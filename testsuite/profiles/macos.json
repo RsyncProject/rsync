@@ -5,23 +5,21 @@
     "linux_interpose": "Linux-only interposition",
     "linux_nss_chroot": "Linux-only NSS chroot",
     "linux_xattr": "Linux-only xattr semantics",
+    "noatime": "Linux-only O_NOATIME",
+    "proc_fd": "Linux-only descriptor fixture",
     "protected_regular": "Linux-only protected_regular sysctl",
     "user_namespace": "Linux-only user namespaces"
   },
   "unsupported": {
-    "backup_metadata": "no backup metadata fixture",
     "cross_device": "no writable cross-device fixture",
     "directory_sgid": "no directory setgid semantics",
-    "noatime": "no O_NOATIME",
     "preallocate": "no preallocation support",
-    "proc_fd": "no procfs descriptors",
     "raw_filename_bytes": "no raw filename bytes",
     "root_anchor": "no root-anchored source fixture",
     "setgid_semantics": "setgid differential unavailable",
     "setpriv": "no setpriv launcher",
     "simd": "no SIMD test build",
     "sparse": "no sparse-file fixture",
-    "symlink_xattr": "no symlink xattr fixture",
     "ungrantable_group": "no ungrantable group"
   }
 }

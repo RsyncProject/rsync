@@ -8,6 +8,9 @@ from harness.rsync import (
     xattrs_supported,
 )
 from harness import protocol as rp
+from harness import metadata
+
+metadata(features={'tcp'}, transports={'tcp'})
 
 PORT = 12974
 require_tcp("the pure-Python sender needs a real TCP daemon; run with --use-tcp")

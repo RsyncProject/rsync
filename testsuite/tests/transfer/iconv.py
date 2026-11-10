@@ -8,6 +8,9 @@ from harness.rsync import (
     RSYNC, RSYNC_PEER, SCRATCHDIR, makepath, rmtree, rsh_cmd, rsync_argv, rsync_path_arg,
     split_rsync_cmd, start_test_daemon, test_fail, test_skipped,
 )
+from harness import metadata
+
+metadata(features={'iconv', 'raw_filename_bytes'}, transports={'pipe', 'tcp'})
 
 UTF8_NAME = b'caf\xc3\xa9.txt'
 LATIN1_NAME = b'caf\xe9.txt'

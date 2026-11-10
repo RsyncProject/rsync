@@ -8,6 +8,9 @@ import subprocess
 from harness.rsync import (
     SCRATCHDIR, rmtree, rsync_argv, test_fail, test_skipped, xattrs_supported,
 )
+from harness import metadata
+
+metadata(features={'interpose'}, transports={'pipe'})
 
 system = platform.system()
 if system not in ('Darwin', 'Linux'):

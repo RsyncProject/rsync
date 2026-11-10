@@ -4,6 +4,9 @@ import socket
 import time
 
 from harness.rsync import SCRATCHDIR, claim_ports, require_tcp, start_rsyncd, test_fail
+from harness import metadata
+
+metadata(features={'tcp'}, transports={'tcp'})
 
 PORT = 12934
 require_tcp("raw malicious daemon client needs a real TCP daemon; run with --use-tcp")

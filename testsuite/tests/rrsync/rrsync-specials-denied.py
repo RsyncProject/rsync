@@ -8,6 +8,9 @@ from harness.rsync import (
     RSYNC, RSYNC_PREFIX, SCRATCHDIR, patched_rrsync, rmtree, rsync_argv,
     test_fail, xattr_set, xattrs_supported, rsync_path_arg,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 base = SCRATCHDIR / 'rrsync-specials'
 rmtree(base)

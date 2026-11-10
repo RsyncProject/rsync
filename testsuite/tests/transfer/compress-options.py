@@ -7,6 +7,9 @@ from harness.rsync import (
     FROMDIR, TODIR,
     assert_same, make_tree, rmtree, run_rsync, test_fail, walk_files,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 src = FROMDIR
 vv = json.loads(run_rsync('-VV', check=True, capture_output=True).stdout)

@@ -3,6 +3,9 @@
 import os
 
 from harness.rsync import SCRATCHDIR, run_rsync, test_fail
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 base = SCRATCHDIR / 'chmod_setid'
 src = base / 'src'

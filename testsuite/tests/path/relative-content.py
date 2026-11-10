@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 
 from harness.rsync import SCRATCHDIR, makepath, rmtree, run_rsync, test_fail
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 base = SCRATCHDIR / 'relcontent'
 src = base / 'src' / 'sub'

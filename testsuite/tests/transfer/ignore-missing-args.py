@@ -4,6 +4,9 @@ from harness.rsync import (
     SCRATCHDIR, makepath, rmtree, rsync_path_arg, rsh_cmd, run_rsync,
     test_fail,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 base = SCRATCHDIR / 'ignore-missing-args'
 src = base / 'src'

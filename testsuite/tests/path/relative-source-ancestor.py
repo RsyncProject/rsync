@@ -5,6 +5,9 @@ import pwd
 import subprocess
 
 from harness.rsync import SCRATCHDIR, rsync_argv, test_fail
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 real = SCRATCHDIR / 'real'
 source = real / 'My_Documents'

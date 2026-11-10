@@ -3,6 +3,9 @@
 import subprocess
 
 from harness.rsync import SCRATCHDIR, assert_same, makepath, rmtree, rsync_argv, test_fail
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 for name, alias, target in (
     ('direct', 'link', 'real'),

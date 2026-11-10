@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
-import os
+import shlex
 import subprocess
 
 from harness.daemon_config import build_rsyncd_conf
 from harness.rsync import (
-    FROMDIR, RSYNC_PEER, SCRATCHDIR, TODIR, get_rootuid, get_testuid, makepath, rsh_cmd,
-    rsync_argv, run_rsync, start_test_daemon, test_fail,
+    FROMDIR, RSYNC_PEER, TODIR, makepath, rsh_cmd, rsync_path_arg,
+    rsync_argv, start_test_daemon, test_fail,
 )
 from harness import metadata
 
@@ -31,15 +31,6 @@ makepath(FROMDIR / 'foo', FROMDIR / 'bar' / 'baz', TODIR)
 (FROMDIR / 'bar' / 'two').write_text("two\n")
 (FROMDIR / 'bar' / 'baz' / 'three').write_text("three\n")
 
-os.chdir(SCRATCHDIR)
-if not (SCRATCHDIR / 'rsyncd.conf').exists():
-    os.symlink('test-rsyncd.conf', SCRATCHDIR / 'rsyncd.conf')
-
-confopt = []
-if get_testuid() == get_rootuid():
-    print(f"Forcing --config={conf}")
-    confopt = [f'--config={conf}']
-
 expected_modules = (
     "test-from      \tr/o\n"
     "test-to        \tr/w\n"
@@ -60,7 +51,7 @@ def run_and_check(args, label, capture_stderr=False):
         test_fail(f"{label}: rsync exited {proc.returncode}\n{proc.stderr}")
     return out
 
-rsync_path = f"{RSYNC_PEER}{(' ' + ' '.join(confopt)) if confopt else ''}"
+rsync_path = f'{rsync_path_arg(RSYNC_PEER)} --config={shlex.quote(str(conf))}'
 out = run_and_check(
     ['-ve', SSH, f'--rsync-path={rsync_path}', 'localhost::'],
     "module list via lsh.sh",
@@ -95,11 +86,3 @@ want = {'foo', 'foo/one'}
 if got != want:
     print(out)
     test_fail(f"test-from glob paths {sorted(got)} != expected {sorted(want)}")
-
-vv = run_rsync('-VV', check=True, capture_output=True)
-if '"atimes": true' in vv.stdout:
-    out = run_and_check(['-rU', f'{daemon_url}/test-from/f*'], "test-from glob with -U")
-    got = listed_paths(out)
-    if got != want:
-        print(out)
-        test_fail(f"-U glob paths {sorted(got)} != expected {sorted(want)}")

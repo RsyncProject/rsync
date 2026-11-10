@@ -10,6 +10,9 @@ from harness.rsync import (
     require_tcp, rmtree, rsync_argv, start_test_daemon, test_fail, test_skipped,
     under_valgrind,
 )
+from harness import metadata
+
+metadata(features={'chroot', 'root', 'tcp'}, transports={'tcp'})
 
 if get_testuid() != get_rootuid():
     test_skipped("use chroot = yes needs root (CAP_SYS_CHROOT)", capability='root')

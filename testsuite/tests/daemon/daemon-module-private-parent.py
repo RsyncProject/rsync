@@ -8,6 +8,9 @@ from harness.daemon_config import write_daemon_conf
 from harness.rsync import (
     SCRATCHDIR, makepath, rmtree, rsync_argv, start_test_daemon, test_fail, test_skipped,
 )
+from harness import metadata
+
+metadata(features={'root'}, transports={'pipe', 'tcp'})
 
 DAEMON_PORT = 12951
 CONTENT = "served-from-under-a-private-parent\n"

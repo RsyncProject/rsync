@@ -10,6 +10,9 @@ from harness.rsync import (
     SCRATCHDIR, FROMDIR,
     makepath, rmtree, rsync_argv, test_fail, test_skipped,
 )
+from harness import metadata
+
+metadata(features={'cross_device'}, transports={'pipe'})
 
 scratch_dev = os.stat(SCRATCHDIR).st_dev
 TMPFS = None

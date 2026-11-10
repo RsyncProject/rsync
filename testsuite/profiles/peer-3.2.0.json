@@ -2,8 +2,6 @@
   "peer": "3.2.0",
   "protocol": 31,
   "xfail": {
-    "chmod-option": "peer-feature-gap",
-    "daemon-listings": "peer-feature-gap",
-    "daemon-refuse-compress": "peer-feature-gap"
+    "daemon-default-log-format": "pre-3.2.2-default-log-format"
   }
 }

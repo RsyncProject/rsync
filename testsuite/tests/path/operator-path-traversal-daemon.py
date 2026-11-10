@@ -4,6 +4,9 @@ from harness.daemon_config import write_daemon_conf
 from harness.rsync import (
     SCRATCHDIR, makepath, rmtree, run_rsync, start_test_daemon, test_fail, test_skipped,
 )
+from harness import metadata
+
+metadata(transports={'pipe', 'tcp'})
 
 if ' ' in str(SCRATCHDIR):
     test_skipped("rsyncd.conf exclude cannot represent a path containing spaces")

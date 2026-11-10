@@ -4,6 +4,9 @@ from harness.rsync import (
     FROMDIR, TODIR,
     build_symlinks, is_a_link, run_rsync, test_fail,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 build_symlinks()
 

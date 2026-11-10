@@ -7,6 +7,9 @@ import threading
 import time
 
 from harness.rsync import SCRATCHDIR, make_data_file, rmtree, rsync_argv, test_fail
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 base = SCRATCHDIR / 'growing-file'
 src = base / 'src'

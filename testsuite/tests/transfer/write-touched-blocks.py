@@ -9,6 +9,9 @@ from harness.rsync import (
     FROMDIR, RSYNC, SCRATCHDIR,
     makepath, test_fail, test_skipped
 )
+from harness import metadata
+
+metadata(features={'protocol_33'}, transports={'pipe'})
 
 rsync_args = shlex.split(str(RSYNC))
 for arg in rsync_args:

@@ -12,6 +12,9 @@ from harness.rsync import (
     rsync_path_arg,
     rsh_cmd,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 LSH = rsh_cmd()
 os.environ['RSYNC_RSH'] = LSH

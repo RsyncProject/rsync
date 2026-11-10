@@ -3,6 +3,9 @@
 import subprocess
 
 from harness.rsync import SCRATCHDIR, makepath, rmtree, rsync_argv, test_fail
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 SRC = SCRATCHDIR / 'mergerec-src'
 DST = SCRATCHDIR / 'mergerec-dst'

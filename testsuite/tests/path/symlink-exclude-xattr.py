@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 
 import os
-import subprocess
-
 from harness.daemon_config import write_daemon_conf
 from harness.rsync import (
-    SCRATCHDIR, forced_protocol, rmtree, rsync_argv, start_test_daemon, test_fail,
-    test_skipped, xattrs_supported,
+    SCRATCHDIR, forced_protocol, rmtree, run_rsync, start_test_daemon, test_fail,
+    test_skipped, xattr_get, xattr_set, xattrs_supported,
 )
+from harness import metadata
 
-if not xattrs_supported() or not hasattr(os, 'getxattr') or not hasattr(os, 'setxattr'):
-    test_skipped("user xattrs not available", capability='symlink_xattr')
+metadata(features={'protocol_30', 'xattr_runtime'}, transports={'pipe', 'tcp'})
+
+if not xattrs_supported():
+    test_skipped("user xattrs not available", capability='xattr_runtime')
 
 proto = forced_protocol()
 if proto is not None and proto < 30:
@@ -18,13 +19,7 @@ if proto is not None and proto < 30:
                  capability='protocol_30')
 
 DAEMON_PORT = 12992
-XNAME = 'user.rsync.marker'
-
-def getx(p):
-    try:
-        return os.getxattr(str(p), XNAME).decode()
-    except OSError:
-        return None
+XNAME = 'rsync.marker'
 
 base = SCRATCHDIR / 'symlink-exclude-xattr'
 rmtree(base)
@@ -36,31 +31,24 @@ pub = mod / 'pub'
 pub.mkdir()
 victim = pub / 'blocked'
 victim.write_text("DATA\n")
-try:
-    os.setxattr(str(victim), XNAME, b'ORIGINAL')
-except OSError:
-    test_skipped("cannot set user xattr on this filesystem", capability='symlink_xattr')
+xattr_set(XNAME, 'ORIGINAL', victim)
 os.symlink('pub/', mod / 'blink2')
 
 src = base / 'src'
 (src / 'blink2').mkdir(parents=True)
 sf = src / 'blink2' / 'blocked'
 sf.write_text("DATA\n")
-os.setxattr(str(sf), XNAME, b'ATTACKER')
+xattr_set(XNAME, 'ATTACKER', sf)
 
 conf = write_daemon_conf(
     [('mod', {'path': str(mod), 'read only': 'no', 'exclude': '/pub/blocked'})])
 url = start_test_daemon(conf, DAEMON_PORT)
 
-subprocess.run(
-    rsync_argv('-aX', '--keep-dirlinks', f'{src}/', f'{url}mod/'),
-    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+# Kept links can reject their own xattrs while child xattrs still transfer
+result = run_rsync('-aX', '--keep-dirlinks', f'{src}/', f'{url}mod/', check=False)
+if result.returncode not in (0, 23):
+    test_fail(f'xattr transfer exited {result.returncode}')
 
-if getx(victim) == 'ORIGINAL':
-    test_fail(
-        "the daemon refused an xattr write on an excluded leaf that stock rsync "
-        f"(3.2.7) performs: {victim} marker is still 'ORIGINAL' (expected "
-        "'ATTACKER').  The exclude is name-based ('blink2/blocked', not the "
-        "physical 'pub/blocked'); it must not block this.")
-print("daemon exclude is name-based: an xattr write on an excluded leaf via an "
-      "in-tree symlink is performed (3.2.7-equivalent)")
+marker = xattr_get(XNAME, victim)
+if marker != b'ATTACKER':
+    test_fail(f'name-based exclusion prevented the in-tree xattr update: {marker!r}')

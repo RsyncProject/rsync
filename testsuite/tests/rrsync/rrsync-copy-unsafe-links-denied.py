@@ -6,6 +6,9 @@ import subprocess
 from harness.rsync import (
     SCRATCHDIR, rmtree, rsync_argv, run_rrsync_denied, test_fail,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 SECRET = 'OUTSIDE-SECRET-readable-by-the-rrsync-account\n'
 

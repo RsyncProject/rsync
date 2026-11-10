@@ -7,6 +7,9 @@ import time
 from harness.mutation import race_budget, start_path_flipper, stop_flipper
 from harness.daemon_config import write_daemon_conf
 from harness.rsync import SCRATCHDIR, rmtree, rsync_argv, start_test_daemon, test_fail
+from harness import metadata
+
+metadata(transports={'pipe', 'tcp'})
 
 base = SCRATCHDIR / 'sender-readlink'
 mod = base / 'module'

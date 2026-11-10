@@ -8,6 +8,9 @@ import sys
 from pathlib import Path
 
 from harness.rsync import SCRATCHDIR, makepath, rmtree, rsync_argv, test_fail, test_skipped
+from harness import metadata
+
+metadata(features={'proc_fd'}, transports={'pipe'})
 
 if not sys.platform.startswith('linux'):
     test_skipped('This test requires Linux platform', capability='proc_fd')

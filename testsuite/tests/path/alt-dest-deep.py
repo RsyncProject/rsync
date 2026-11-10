@@ -5,6 +5,9 @@ import os
 from harness.rsync import (
     FROMDIR, SCRATCHDIR, TODIR, assert_exists, assert_hardlinked, assert_not_exists, assert_not_hardlinked, assert_same, make_tree, rmtree, run_rsync, walk_files, test_fail,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 src = FROMDIR
 ref = SCRATCHDIR / 'altref'

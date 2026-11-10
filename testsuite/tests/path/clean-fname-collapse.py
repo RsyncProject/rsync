@@ -3,6 +3,9 @@
 import subprocess
 
 from harness.rsync import TOOLDIR, test_fail, test_skipped
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 helper = TOOLDIR / 't_clean_fname'
 if not helper.is_file():

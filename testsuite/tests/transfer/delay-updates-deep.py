@@ -7,6 +7,9 @@ from harness.rsync import (
     assert_same, make_tree, rmtree, run_rsync, test_fail, walk_dirs,
     walk_files,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 src = FROMDIR
 deepdir = os.path.join('d1', 'd2', 'd3')

@@ -9,7 +9,7 @@ from harness.rsync import (
 )
 from harness import metadata
 
-metadata(features={'chmod', 'daemon'}, transports={'pipe', 'tcp'}, min_peer='2.6.0', mutates={'filesystem', 'process', 'socket'}, tags={'daemon', 'metadata', 'version-mix'})
+metadata(features={'chmod', 'daemon'}, transports={'pipe', 'tcp'}, min_peer='2.6.7', mutates={'filesystem', 'process', 'socket'}, tags={'daemon', 'metadata', 'version-mix'})
 
 DAEMON_PORT = 12875
 

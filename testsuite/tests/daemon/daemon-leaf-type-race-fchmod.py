@@ -67,6 +67,9 @@ from harness.rsync import (  # noqa: E402
     test_fail,
     test_skipped, split_rsync_cmd,
 )
+from harness import metadata
+
+metadata(features={'darwin', 'nonroot', 'sandbox_exec', 'tcp'}, transports={'tcp'})
 
 PORT = 13213
 SANDBOX_PROFILE = "(version 1)(allow default)(deny file-write-mode)"

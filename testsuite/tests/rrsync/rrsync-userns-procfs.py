@@ -9,6 +9,9 @@ import tempfile
 from pathlib import Path
 
 from harness.rsync import makepath, rmtree, rsync_argv, test_fail, test_skipped
+from harness import metadata
+
+metadata(features={'user_namespace'}, transports={'pipe'})
 
 if not sys.platform.startswith('linux'):
     test_skipped('rrsync-userns-procfs is Linux-specific', capability='user_namespace')

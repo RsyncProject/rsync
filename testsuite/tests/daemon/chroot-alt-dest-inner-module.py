@@ -6,6 +6,9 @@ import shutil
 from harness.daemon_config import setup_chroot_inner
 from harness.process import capture_command
 from harness.rsync import makepath, rsync_argv, test_fail
+from harness import metadata
+
+metadata(features={'chroot', 'root'}, transports={'pipe', 'tcp'})
 
 for option in ('compare', 'copy', 'link'):
     base, inner, outside, source, url = setup_chroot_inner(f'chroot-{option}-dest-inner')

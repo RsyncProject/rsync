@@ -5,6 +5,9 @@ from harness.rsync import (
     assert_exists, assert_not_exists, assert_same, make_tree, makepath, rmtree,
     run_rsync, test_fail, walk_files,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 src = FROMDIR
 

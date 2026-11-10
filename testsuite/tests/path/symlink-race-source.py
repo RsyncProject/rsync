@@ -7,6 +7,9 @@ import time
 
 from harness.mutation import race_budget, start_path_flipper, stop_flipper
 from harness.rsync import SCRATCHDIR, rmtree, rsync_argv, rsync_supports, test_fail, test_skipped
+from harness import metadata
+
+metadata(features={'dirfd_pinning'}, transports={'pipe'})
 
 _CYGWIN = platform.system().startswith('CYGWIN')
 

@@ -94,7 +94,8 @@ def case_sender_intermediate():
             d.mkdir()
             rc, o = run2(binc, ['-a'] + relflag
                          + [f'{base}/linkcomp/inner/', f'{d}/'])
-            out[role] = (d, rc, o)
+            landing = d / str(base).lstrip('/') if relflag else d
+            out[role] = (landing, rc, o)
         observe(tag, out['new'][0], out['old'][0],
                 out['new'][1], out['old'][1], out['new'][2], out['old'][2])
 

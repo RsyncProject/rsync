@@ -12,6 +12,9 @@ from harness.rsync import (
 )
 from harness import protocol as rp
 from harness import process_thread_count
+from harness import metadata
+
+metadata(features={'tcp', 'thread_count', 'zstd_threads'}, transports={'tcp'})
 
 PORT = 13120
 REQUESTED_THREADS = 256

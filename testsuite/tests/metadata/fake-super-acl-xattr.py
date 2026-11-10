@@ -9,6 +9,9 @@ from harness.rsync import (
     acls_supported, makepath, rmtree, rsync_argv,
     test_fail, test_skipped, xattrs_supported,
 )
+from harness import metadata
+
+metadata(features={'acl', 'linux_xattr', 'xattr'}, transports={'pipe'})
 
 if platform.system() != 'Linux':
     test_skipped("fake-super ACL xattrs use the Linux user.rsync.* namespace",

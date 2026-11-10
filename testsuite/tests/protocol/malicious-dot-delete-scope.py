@@ -6,6 +6,9 @@ import threading
 
 from harness import protocol as rp
 from harness.rsync import SCRATCHDIR, claim_ports, makepath, require_tcp, rmtree, rsync_argv, test_fail
+from harness import metadata
+
+metadata(features={'tcp'}, transports={'tcp'})
 
 PORTS = 13012, 13014
 require_tcp('the malicious sender requires TCP')

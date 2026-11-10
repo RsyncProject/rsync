@@ -7,6 +7,9 @@ import subprocess
 from harness.rsync import (
     SCRATCHDIR, build_patched_rsync, makepath, rmtree, test_fail,
 )
+from harness import metadata
+
+metadata(features={'native_build'}, transports={'pipe'})
 
 INT_MAX = 2147483647
 DEADLINE = 25

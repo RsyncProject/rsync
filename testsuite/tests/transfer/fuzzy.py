@@ -3,6 +3,9 @@
 from harness.rsync import (
     FROMDIR, SRCDIR, TODIR, cp_p, cp_touch, run_rsync, test_fail, verify_dirs,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 FROMDIR.mkdir(parents=True, exist_ok=True)
 TODIR.mkdir(parents=True, exist_ok=True)

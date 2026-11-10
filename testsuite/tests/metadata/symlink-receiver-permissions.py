@@ -5,6 +5,9 @@ import stat
 import struct
 
 from harness.rsync import SCRATCHDIR, makepath, run_rsync, test_fail
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 source = SCRATCHDIR / 'source'
 destination = SCRATCHDIR / 'destination'

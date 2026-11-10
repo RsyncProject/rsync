@@ -108,7 +108,10 @@ def resolve_test_path(path):
 
 def read_requirements(path) -> Optional[dict]:
     path = resolve_test_path(path)
-    tree = ast.parse(path.read_text(encoding='utf-8'), filename=str(path))
+    try:
+        tree = ast.parse(path.read_text(encoding='utf-8'), filename=str(path))
+    except SyntaxError:
+        return None
     requirements = None
     for node in tree.body:
         calls = []
@@ -130,7 +133,9 @@ def read_requirements(path) -> Optional[dict]:
         if requirements:
             break
 
-    features = set(requirements.features if requirements else ())
+    if requirements is None:
+        return None
+    features = set(requirements.features)
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
             continue
@@ -148,9 +153,7 @@ def read_requirements(path) -> Optional[dict]:
                     if not isinstance(keyword.value.value, str) or not keyword.value.value:
                         raise ValueError(f'{path}: invalid capability')
                     features.add(keyword.value.value)
-    if not requirements and not features:
-        return None
-    values = asdict(requirements or Requirements())
+    values = asdict(requirements)
     values['features'] = tuple(sorted(features))
     return values
 

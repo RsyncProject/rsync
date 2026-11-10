@@ -8,6 +8,9 @@ from harness.rsync import (
     CHKDIR, FROMDIR, OUTFILE, SRCDIR, TMPDIR, TODIR,
     checkit, cp_touch, makepath, rsync_argv, test_fail, verify_dirs,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 bakdir = TMPDIR / 'bak'
 

@@ -5,6 +5,9 @@ import platform
 import subprocess
 
 from harness.rsync import SCRATCHDIR, makepath, rmtree, rsync_argv, test_error, test_fail, test_skipped
+from harness import metadata
+
+metadata(features={'linux_interpose'}, transports={'pipe'})
 
 
 if platform.system() != 'Linux':

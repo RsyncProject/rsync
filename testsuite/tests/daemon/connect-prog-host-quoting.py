@@ -4,6 +4,9 @@ import os
 import subprocess
 
 from harness.rsync import SCRATCHDIR, rmtree, rsync_argv, test_fail, test_skipped
+from harness import metadata
+
+metadata(transports={'pipe', 'tcp'})
 
 base = SCRATCHDIR / 'connect-prog-quote'
 rmtree(base)

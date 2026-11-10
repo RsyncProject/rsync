@@ -3,6 +3,9 @@
 import subprocess
 
 from harness.rsync import SCRATCHDIR, rmtree, rsync_argv, test_fail
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 base = SCRATCHDIR.resolve() / "sender-remove-source-relative-anchor"
 source = base / "source/sub/file"

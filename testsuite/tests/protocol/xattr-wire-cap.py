@@ -9,6 +9,9 @@ from harness.rsync import (
     rsync_argv, test_fail, test_skipped, xattrs_supported,
 )
 from harness import protocol as rp
+from harness import metadata
+
+metadata(features={'protocol_30', 'tcp', 'xattr_wire'}, transports={'tcp'})
 
 if not xattrs_supported():
     test_skipped("xattr-wire-cap requires rsync and filesystem xattr support",

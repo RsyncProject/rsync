@@ -12,6 +12,9 @@ from harness.rsync import (
     SCRATCHDIR, forced_protocol, rmtree, rsync_argv, rsync_argv_for,
     rsync_command_binary, run_rsync, test_fail, test_skipped, under_valgrind,
 )
+from harness import metadata
+
+metadata(features={'search_only', 'setpriv'}, transports={'pipe'})
 
 version = json.loads(run_rsync('-VV', check=True, capture_output=True).stdout)
 search_only_dirs = version['capabilities']['search_only_dirs']

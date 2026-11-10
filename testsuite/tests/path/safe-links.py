@@ -3,6 +3,9 @@
 import os
 
 from harness.rsync import SCRATCHDIR, rmtree, run_rsync, test_fail
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 base = SCRATCHDIR / 'safe-links'
 rmtree(base)

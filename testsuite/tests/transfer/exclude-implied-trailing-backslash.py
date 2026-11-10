@@ -9,6 +9,9 @@ from harness.rsync import (
     SCRATCHDIR, claim_ports, makepath, require_asan, require_tcp, rsync_argv,
     start_rsyncd, test_fail,
 )
+from harness import metadata
+
+metadata(features={'asan', 'tcp'}, transports={'tcp'})
 
 PORT = 12954
 require_tcp("a real network rsync daemon is needed (am_server==0 per-module); "

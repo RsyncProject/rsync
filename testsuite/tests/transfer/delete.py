@@ -6,6 +6,9 @@ from harness.rsync import (
     CHKDIR, FROMDIR, TMPDIR, TODIR,
     checkit, hands_setup, makepath, rsync_argv, test_fail,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 hands_setup()
 makepath(CHKDIR, TODIR / 'extradir', TODIR / 'emptydir' / 'subdir')

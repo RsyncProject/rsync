@@ -10,6 +10,9 @@ from harness.rsync import (
     checkit, hands_setup, makepath, rsync_argv,
     run_rsync, test_fail,
 )
+from harness import metadata
+
+metadata(transports={'pipe'})
 
 deepstr = 'down/3/deep'
 deepdir = FROMDIR / deepstr

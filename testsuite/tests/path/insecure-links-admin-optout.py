@@ -8,6 +8,9 @@ from harness.daemon_config import write_daemon_conf
 from harness.rsync import (
     SCRATCHDIR, rmtree, rsync_argv, rsync_supports, start_test_daemon, test_fail, test_skipped,
 )
+from harness import metadata
+
+metadata(features={'cross_uid'}, transports={'pipe', 'tcp'})
 
 DAEMON_PORT = 12906
 MARKER = "OUT-OF-MODULE-SECRET\n"

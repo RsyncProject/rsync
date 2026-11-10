@@ -10,6 +10,9 @@ import tempfile
 from harness.rsync import (
     FROMDIR, TODIR, rmtree, rsync_argv, test_fail, test_skipped,
 )
+from harness import metadata
+
+metadata(features={'high_fd'}, transports={'pipe'})
 
 TIMEOUT = 30
 

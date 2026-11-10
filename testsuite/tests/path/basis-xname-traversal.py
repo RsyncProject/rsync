@@ -9,6 +9,9 @@ from harness.rsync import (
     SCRATCHDIR, build_patched_rsync, forced_protocol, makepath, rmtree, rsync_argv_for,
     test_fail, test_skipped,
 )
+from harness import metadata
+
+metadata(features={'native_build'}, transports={'pipe', 'tcp'})
 
 _proto = forced_protocol()
 if _proto is not None and _proto < 29:

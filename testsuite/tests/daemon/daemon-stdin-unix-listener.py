@@ -10,6 +10,9 @@ from harness.daemon_config import write_daemon_conf
 from harness.rsync import (
     SCRATCHDIR, claim_free_port, rmtree, rsync_argv, test_fail, test_skipped, under_valgrind,
 )
+from harness import metadata
+
+metadata(features={'unix_listener'}, transports={'pipe', 'tcp'})
 
 if not hasattr(socket, 'AF_UNIX'):
     test_skipped('Unix-domain sockets are unavailable', capability='unix_listener')

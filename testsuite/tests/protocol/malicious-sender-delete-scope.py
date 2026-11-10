@@ -7,6 +7,9 @@ import subprocess
 
 from harness.daemon_config import write_daemon_conf
 from harness.rsync import SCRATCHDIR, SRCDIR, makepath, rmtree, rsync_argv, test_fail, test_skipped
+from harness import metadata
+
+metadata(transports={'pipe', 'tcp'})
 
 if not (SRCDIR / 'flist.c').is_file() or not (SRCDIR / 'Makefile').is_file():
     test_skipped("malicious-sender-delete-scope: needs a writable rsync "

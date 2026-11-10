@@ -7,6 +7,9 @@ import subprocess
 from harness.rsync import (
     SCRATCHDIR, forced_protocol, rmtree, rsync_argv, test_fail, test_skipped,
 )
+from harness import metadata
+
+metadata(features={'linux_interpose', 'protocol_30'}, transports={'pipe'})
 
 if platform.system() != 'Linux':
     test_skipped('LD_PRELOAD partial EACCES recovery hook is Linux-only',

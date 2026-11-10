@@ -4,6 +4,9 @@ import subprocess
 import time
 
 from harness.rsync import SCRATCHDIR, SRCDIR, rsync_argv, rmtree, test_fail
+from harness import metadata
+
+metadata(transports={'pipe', 'tcp'})
 
 RERR_CONTIMEOUT = 35
 
