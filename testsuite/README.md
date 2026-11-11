@@ -73,7 +73,7 @@ Alpine | 3.24.4 on AMD64 and X86-32
 FreeBSD | 14.5 and 15.1 on AMD64
 NetBSD | 10.2, 11.0 and 11.1 on AMD64
 OpenBSD | 7.9 and 8.0 on AMD64
-macOS | 15 and 26 on AMD64 and ARM64
+macOS | 15 and 26 on X86-64 and ARM64
 Cygwin | AMD64 on Windows Server 2022
 Solaris | AMD64 guest using the VM action's default release
 Android | API 24 on ARM64, ARMv7 and X86-64; Termux userspace on X86-64
