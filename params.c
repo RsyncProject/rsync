@@ -271,6 +271,7 @@ static BOOL Section( FILE *InFile, BOOL (*sfunc)(char *) )
   /* We arrive here if we've met the EOF before the closing bracket. */
   if (ferror(InFile))
     return False;
+  bufr[end] = '\0';
   rprintf(FLOG, "%s Unexpected EOF in the config file: %s\n", func, bufr );
   return( False );
   } /* Section */
