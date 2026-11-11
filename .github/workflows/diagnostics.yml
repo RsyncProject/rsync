@@ -55,6 +55,7 @@ jobs:
         run: |
           python3 -S .github/scripts/test-guest.py
           python3 -S .github/scripts/test-diagnostics.py
+          python3 -S .github/scripts/test-android.py
       - name: Check Python runtime
         run: python3 -S testsuite/runtests.py --describe-tests > /dev/null
 

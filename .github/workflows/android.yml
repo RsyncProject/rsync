@@ -8,7 +8,7 @@ on:
         value: ${{ toJSON(jobs) }}
       inputs:
         description: Job selections
-        value: '{"bionic": true, "termux": true}'
+        value: '{"bionic": true, "termux": true, "emulator": true}'
 
 permissions:
   contents: read
@@ -129,3 +129,32 @@ jobs:
             --security-opt no-new-privileges \
             --mount "type=bind,source=$PWD,target=/workspace,readonly" \
             "$TERMUX_IMAGE" sh /workspace/.github/scripts/android-transfer.sh direct /workspace/rsync
+
+  emulator:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    name: Emulator API 36 X86-64
+    env:
+      ANDROID_TRIPLE: x86_64-linux-android
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y acl autoconf automake gawk
+          sudo setfacl -m "u:$(id -un):rw" /dev/kvm
+          sdkmanager 'system-images;android-36;google_apis;x86_64' emulator
+      - *build
+      - name: Tests
+        run: python3 -S .github/scripts/android-emulator.py
+      - name: Upload results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          retention-days: 45
+          name: android-emulator-results
+          if-no-files-found: error
+          path: test-results/android-emulator/

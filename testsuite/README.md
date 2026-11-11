@@ -76,10 +76,10 @@ OpenBSD | 7.9 and 8.0 on X86-64
 macOS | 15 and 26 on X86-64 and ARM64
 Cygwin | X86-64 on Windows Server 2022
 Solaris | X86-64 guest using the VM action's default release
-Android | API 24 on ARM64, ARMv7 and X86-64; Termux userspace on X86-64
+Android | API 24 Bionic on ARM64, ARMv7 and X86-64; Termux userspace and an API 36 emulator on X86-64
 
 Ubuntu, Alpine, macOS and BSD jobs run separate root and non-root pipe and TCP passes. Ubuntu and Alpine also force protocols 29 and 30. Alpine exercises musl and verifies 64-bit file offsets in its x86 process. Each Ubuntu row checks installed rsync and rsync-ssl against a local TLS daemon for trusted and rejected certificates, hostname mismatch and explicit verification opt-outs.
 
-Android jobs run local transfers with static Bionic binaries. ARM64 and ARMv7 use QEMU user mode; X86-64 executes directly. A separate job runs its X86-64 build in the pinned official Termux userspace container. These checks do not provide an Android kernel, framework or application environment; emulator qualification remains missing. Native transfers between different operating systems and release-archive qualification also remain missing.
+Android jobs run local transfers with static Bionic binaries. ARM64 and ARMv7 use QEMU user mode; X86-64 executes directly. A separate job runs its X86-64 build in the pinned official Termux userspace container. The API 36 emulator uses Google APIs image revision 7 and hardware acceleration. Transfers run as the Android shell user with SELinux enforcing and check file data, updates, deletion, permissions, timestamps, symlinks and rejection of unreadable sources. The emulator requires hard-link creation to be denied by the shell's SELinux policy; userspace jobs check successful hard-link transfers. Results retain the device identity, binary hash and emulator and transfer logs. Termux application-sandbox coverage, native transfers between different operating systems and release-archive qualification remain missing.
 
 Native passes retain logs and receipts. BSD and macOS jobs also retain dirfd-probe.tsv for directory-descriptor capability checks. The Required job rejects failed or missing selected checks. Workflow tests cover its failure and skip handling.
