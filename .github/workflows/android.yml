@@ -16,22 +16,26 @@ defaults:
 
 env:
   ANDROID_API: 24
+  TERMUX_IMAGE: termux/termux-docker@sha256:f993e5e7ef97b96af774e7062556ac51479fdccc3c3d2240748a3d04b857ce04
 
 jobs:
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    name: ${{ matrix.abi }} (build)
+    name: ${{ matrix.abi }} (Bionic)
     strategy:
       fail-fast: false
       matrix:
         include:
           - abi: arm64-v8a
             triple: aarch64-linux-android
-            qemu: qemu-aarch64-static
+            executor: qemu-aarch64-static
           - abi: armeabi-v7a
             triple: armv7a-linux-androideabi
-            qemu: qemu-arm-static
+            executor: qemu-arm-static
+          - abi: x86_64
+            triple: x86_64-linux-android
+            executor: direct
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -48,6 +52,7 @@ jobs:
           NDK="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_ROOT}"
           TC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
           export CC="$TC/${{ matrix.triple }}${ANDROID_API}-clang"
+          export CXX="$TC/${{ matrix.triple }}${ANDROID_API}-clang++"
           export AR="$TC/llvm-ar" RANLIB="$TC/llvm-ranlib" STRIP="$TC/llvm-strip"
           export CFLAGS="-O2" LDFLAGS="-static"
 
@@ -70,8 +75,8 @@ jobs:
           make -j"$(nproc)" rsync
           "$STRIP" rsync
 
-      - name: Verify binary
-        run: python3 -S .github/scripts/android.py verify --qemu "${{ matrix.qemu }}"
+      - name: Test Bionic transfer
+        run: python3 -S .github/scripts/android.py test --executor "${{ matrix.executor }}"
 
       - name: Package
         run: python3 -S .github/scripts/android.py package --abi "${{ matrix.abi }}"
@@ -81,4 +86,43 @@ jobs:
         with:
           retention-days: 45
           name: ${{ env.ARTIFACT_NAME }}
+          if-no-files-found: error
           path: dist/
+
+  termux:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    name: x86_64 (Termux userspace)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: rsync-android-x86_64
+          path: dist
+      - name: Verify artefact
+        run: |
+          set -eu
+          set -- dist/*.sha256
+          [ "$#" -eq 1 ] && [ -f "$1" ]
+          (cd dist && sha256sum -c "$(basename "$1")")
+          binary=${1%.sha256}
+          [ -f "$binary" ]
+          chmod +x "$binary"
+          echo "ANDROID_BINARY=$binary" >> "$GITHUB_ENV"
+      - name: Test Termux transfer
+        run: |
+          set -eu
+          docker pull "$TERMUX_IMAGE"
+          docker image inspect --format '{{.RepoDigests}}' "$TERMUX_IMAGE"
+          platform=$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "$TERMUX_IMAGE")
+          echo "$platform"
+          [ "$platform" = linux/amd64 ]
+          binary="/workspace/$ANDROID_BINARY"
+          docker run --rm --network none --user 1000:1000 --cap-drop ALL \
+            --pids-limit 256 --memory 1g \
+            --security-opt no-new-privileges \
+            --mount "type=bind,source=$PWD,target=/workspace,readonly" \
+            "$TERMUX_IMAGE" sh /workspace/.github/scripts/android-transfer.sh direct "$binary"

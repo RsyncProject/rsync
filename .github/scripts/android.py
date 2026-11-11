@@ -10,25 +10,20 @@ import sys
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('task', choices=['verify', 'package'])
-    parser.add_argument('--qemu')
-    parser.add_argument('--abi', choices=['arm64-v8a', 'armeabi-v7a'])
+    parser.add_argument('task', choices=['test', 'package'])
+    parser.add_argument('--executor')
+    parser.add_argument('--abi', choices=['arm64-v8a', 'armeabi-v7a', 'x86_64'])
     args = parser.parse_args()
-    if args.task == 'verify':
+    if args.task == 'test':
         description = subprocess.check_output(['file', 'rsync'], text=True, timeout=30)
         print(description, end='')
         if 'statically linked' not in description or 'dynamically linked' in description:
             raise ValueError('Android binary is not statically linked')
-        if not args.qemu:
-            parser.error('--qemu is required for binary verification')
-        try:
-            result = subprocess.run([args.qemu, './rsync', '--version'],
-                                    capture_output=True, text=True, timeout=30)
-            print('\n'.join(result.stdout.splitlines()[:3]))
-            if result.returncode:
-                print('::warning::QEMU smoke failed; native Android execution remains unverified', file=sys.stderr)
-        except (OSError, subprocess.TimeoutExpired) as error:
-            print(f'::warning::QEMU smoke unavailable: {error}', file=sys.stderr)
+        if not args.executor:
+            parser.error('--executor is required for Bionic testing')
+        script = Path(__file__).with_name('android-transfer.sh')
+        subprocess.run(['sh', script, args.executor, Path('rsync').resolve()],
+                       check=True, timeout=180)
         return 0
     if not args.abi:
         parser.error('--abi is required for packaging')
