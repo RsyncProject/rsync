@@ -177,6 +177,21 @@ int start_socket_client(char *host, int remote_argc, char *remote_argv[],
 	return ret ? ret : client_run(fd, fd, -1, argc, argv);
 }
 
+static size_t fread_retry(void *buffer, size_t length, FILE *file)
+{
+	size_t total = fread(buffer, 1, length, file);
+	while (total < length && ferror(file) && errno == EINTR) {
+		clearerr(file);
+		/* Preserve partial input across EINTR. Clang 21 does not model
+		 * the recoverable position after an interrupted stream read. */
+#ifdef __clang_analyzer__
+		__attribute__((suppress))
+#endif
+		total += fread((char *)buffer + total, 1, length - total, file);
+	}
+	return total;
+}
+
 static int exchange_protocols(int f_in, int f_out, char *buf, size_t bufsiz, int am_client)
 {
 	int remote_sub = -1;
@@ -191,9 +206,20 @@ static int exchange_protocols(int f_in, int f_out, char *buf, size_t bufsiz, int
 			 * symlinks not owned by uid 0 or our euid. */
 			int motd_fd = open_no_attacker_symlinks(motd, O_RDONLY, 0);
 			FILE *f = motd_fd >= 0 ? fdopen(motd_fd, "r") : NULL;
-			if (!f && motd_fd >= 0) close(motd_fd);
+			if (!f && motd_fd >= 0) {
+				int fdopen_errno = errno;
+				close(motd_fd);
+				rsyserr(FLOG, fdopen_errno, "failed to open motd file %s", motd);
+				return -1;
+			}
 			while (f && !feof(f)) {
-				int len = fread(buf, 1, bufsiz - 1, f);
+				int len = fread_retry(buf, bufsiz - 1, f);
+				if (ferror(f)) {
+					int read_errno = errno;
+					fclose(f);
+					rsyserr(FLOG, read_errno, "failed to read motd file %s", motd);
+					return -1;
+				}
 				if (len > 0)
 					write_buf(f_out, buf, len);
 			}
@@ -306,7 +332,11 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 		 * our euid anywhere in the path. */
 		int ei_fd = open_no_attacker_symlinks(early_input_file, O_RDONLY, 0);
 		FILE *f = ei_fd >= 0 ? fdopen(ei_fd, "rb") : NULL;
-		if (!f && ei_fd >= 0) close(ei_fd);
+		if (!f && ei_fd >= 0) {
+			int fdopen_errno = errno;
+			close(ei_fd);
+			errno = fdopen_errno;
+		}
 		if (!f || do_fstat(fileno(f), &st) < 0) {
 			rsyserr(FERROR, errno, "failed to open %s", early_input_file);
 			if (f)
@@ -331,7 +361,14 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 					free(modname);
 					return -1;
 				}
-				len = fread(line, 1, early_input_len, f);
+				len = fread_retry(line, early_input_len, f);
+				if (ferror(f)) {
+					int read_errno = errno;
+					fclose(f);
+					free(modname);
+					rsyserr(FERROR, read_errno, "failed to read early-input file %s", early_input_file);
+					return -1;
+				}
 				if (len > 0) {
 					write_buf(f_out, line, len);
 					early_input_len -= len;
