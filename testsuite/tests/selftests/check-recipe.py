@@ -254,18 +254,20 @@ def test(context: TestContext):
         return False
 
     communicate = subprocess.Popen.communicate
+    clock = time.monotonic
     for parallel in (1, 2):
         output = context.scratch / f'timeout-{parallel}'
         roots = [output / 'scratch' / 'testtmp' / name for name in ('first', 'second')[:parallel]]
         expired = False
+        started = clock()
 
         def expire(proc, input=None, timeout=None):
             nonlocal expired
             if not expired:
                 expired = True
-                deadline = time.monotonic() + 30
+                deadline = clock() + 30
                 while not all((root / 'ready').is_file() for root in roots):
-                    if proc.poll() is not None or time.monotonic() >= deadline:
+                    if proc.poll() is not None or clock() >= deadline:
                         raise subprocess.TimeoutExpired(proc.args, timeout)
                     time.sleep(0.01)
                 raise subprocess.TimeoutExpired(proc.args, timeout)
@@ -274,7 +276,8 @@ def test(context: TestContext):
         diagnostic = StringIO()
         exit_code = None
         try:
-            with patch.object(subprocess.Popen, 'communicate', expire), redirect_stderr(diagnostic):
+            with patch.object(time, 'monotonic', lambda: started + int(expired)), \
+                 patch.object(subprocess.Popen, 'communicate', expire), redirect_stderr(diagnostic):
                 try:
                     invoke([sys.executable, '-S', str(tools / 'check.py'), str(context.tools), binary,
                             str(profile), str(output), *[root.name for root in roots], f'-j{parallel}'],
