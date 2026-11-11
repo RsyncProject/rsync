@@ -2,8 +2,8 @@
   "rsync_2.6.0": {
     "source": "c1456d83a72215822732424304b1563a0a2c9d8f",
     "protocol": 27,
-    "sha256": "0cc3f96c747190aceaebf069a1449cd32a679140279a0a835fbdb4a8715757ed",
-    "recipe": "4a4a1be13acca1e17ade375c1923bb0f78a23daabf77078cb7093881301f02f8",
+    "sha256": "2c5e454c4e32146a39dd6a4942752805a5862367938bac6310c089104c0c71a8",
+    "recipe": "c26b0d536613ad8a3a185e4d9274fc6b27374c54fe47396f0fe500c7ed69f873",
     "compiler": "gcc (Debian 14.2.0-19) 14.2.0",
     "target": "x86_64-linux-gnu",
     "libc": "ldd (Debian GLIBC 2.41-12+deb13u4) 2.41"
@@ -11,8 +11,8 @@
   "rsync_3.0.0": {
     "source": "4cb6197b21d9860736c8e6d81b8eb8cac53beb5a",
     "protocol": 30,
-    "sha256": "29eb8d3b90332f748ec106014dcf24bc4a42abadf240c489f75bdb8e2e4cb849",
-    "recipe": "4a4a1be13acca1e17ade375c1923bb0f78a23daabf77078cb7093881301f02f8",
+    "sha256": "6ee0734b8cfe095ae45c32fea4b9b6f52e04983c43ce7f7f82feb984fa923839",
+    "recipe": "c26b0d536613ad8a3a185e4d9274fc6b27374c54fe47396f0fe500c7ed69f873",
     "compiler": "gcc (Debian 14.2.0-19) 14.2.0",
     "target": "x86_64-linux-gnu",
     "libc": "ldd (Debian GLIBC 2.41-12+deb13u4) 2.41"
@@ -20,8 +20,8 @@
   "rsync_3.1.0": {
     "source": "bc58313bf7f42f0993f7279299e8137e0f14f01c",
     "protocol": 31,
-    "sha256": "c9e16f1909aa3865d942d24304862f876d40e8f04d60c0458ca089c9bc0ab5a6",
-    "recipe": "4a4a1be13acca1e17ade375c1923bb0f78a23daabf77078cb7093881301f02f8",
+    "sha256": "7f90bee892bc9b6b1a5a026ec9356284a33225709c8303bfe8e1b2afa4a66383",
+    "recipe": "c26b0d536613ad8a3a185e4d9274fc6b27374c54fe47396f0fe500c7ed69f873",
     "compiler": "gcc (Debian 14.2.0-19) 14.2.0",
     "target": "x86_64-linux-gnu",
     "libc": "ldd (Debian GLIBC 2.41-12+deb13u4) 2.41"
@@ -29,8 +29,8 @@
   "rsync_3.1.3": {
     "source": "d73762eea3f15f2c56bb3fa9394ad1883c25c949",
     "protocol": 31,
-    "sha256": "5f291d9e851f81ef664855cf7e6e172f593c09dd306182811f2d51ae87636578",
-    "recipe": "4a4a1be13acca1e17ade375c1923bb0f78a23daabf77078cb7093881301f02f8",
+    "sha256": "d305a31a93cd37a73d516c74a4656fa3d369aa28dececaf03f74c123c69a5fb4",
+    "recipe": "c26b0d536613ad8a3a185e4d9274fc6b27374c54fe47396f0fe500c7ed69f873",
     "compiler": "gcc (Debian 14.2.0-19) 14.2.0",
     "target": "x86_64-linux-gnu",
     "libc": "ldd (Debian GLIBC 2.41-12+deb13u4) 2.41"
@@ -38,8 +38,8 @@
   "rsync_3.2.0": {
     "source": "c225330aaf9d6032a79317bda1bf669e90ac7212",
     "protocol": 31,
-    "sha256": "74593a560778b4b690dd58de3fc62662cefa3b167858be13b16eb3d911af78ab",
-    "recipe": "4a4a1be13acca1e17ade375c1923bb0f78a23daabf77078cb7093881301f02f8",
+    "sha256": "3d32b82acc8e81dcf2432a7800779df1abd3e0beb266f7fb51d68a2127bb772f",
+    "recipe": "c26b0d536613ad8a3a185e4d9274fc6b27374c54fe47396f0fe500c7ed69f873",
     "compiler": "gcc (Debian 14.2.0-19) 14.2.0",
     "target": "x86_64-linux-gnu",
     "libc": "ldd (Debian GLIBC 2.41-12+deb13u4) 2.41"
@@ -47,8 +47,8 @@
   "rsync_3.2.7": {
     "source": "6b5ae825db985e9d1c98576651b50c8e490ddb97",
     "protocol": 31,
-    "sha256": "8d94d40809462f62ea464321f3531d1652680a82b842ec8f8a6aaf39a9f602d0",
-    "recipe": "4a4a1be13acca1e17ade375c1923bb0f78a23daabf77078cb7093881301f02f8",
+    "sha256": "6273c0cd9573b2713ea449d13942e7b94db7f03e62f84c39fadc35fe97c4fd65",
+    "recipe": "c26b0d536613ad8a3a185e4d9274fc6b27374c54fe47396f0fe500c7ed69f873",
     "compiler": "gcc (Debian 14.2.0-19) 14.2.0",
     "target": "x86_64-linux-gnu",
     "libc": "ldd (Debian GLIBC 2.41-12+deb13u4) 2.41"
@@ -56,8 +56,8 @@
   "rsync_3.3.0": {
     "source": "6c8ca91c731b7bf2b081694bda85b7dadc2b7aff",
     "protocol": 31,
-    "sha256": "49b2969f70b4678013c72dadf0f4bc8a1e7460a3d56f5bd1514136a594381dcd",
-    "recipe": "4a4a1be13acca1e17ade375c1923bb0f78a23daabf77078cb7093881301f02f8",
+    "sha256": "1b6bb785cc887a3fddaabedb5f6568f63bc331d3ff3d23a1c62040acddd0ec89",
+    "recipe": "c26b0d536613ad8a3a185e4d9274fc6b27374c54fe47396f0fe500c7ed69f873",
     "compiler": "gcc (Debian 14.2.0-19) 14.2.0",
     "target": "x86_64-linux-gnu",
     "libc": "ldd (Debian GLIBC 2.41-12+deb13u4) 2.41"
@@ -65,8 +65,8 @@
   "rsync_3.4.0": {
     "source": "e3ee0e7319eb4250ddb76b716510fd20441da329",
     "protocol": 32,
-    "sha256": "1dbf3e7c8104ff48586208f9dd81b9cb02bbd0c6113e1365dff61ee0142a9b30",
-    "recipe": "4a4a1be13acca1e17ade375c1923bb0f78a23daabf77078cb7093881301f02f8",
+    "sha256": "123965453fbcefdadb795b0f6a6a9f02fed4140ed8d2e847db230f2450dd9093",
+    "recipe": "c26b0d536613ad8a3a185e4d9274fc6b27374c54fe47396f0fe500c7ed69f873",
     "compiler": "gcc (Debian 14.2.0-19) 14.2.0",
     "target": "x86_64-linux-gnu",
     "libc": "ldd (Debian GLIBC 2.41-12+deb13u4) 2.41"
@@ -74,8 +74,62 @@
   "rsync_3.4.1": {
     "source": "3305a7a063ab0167cab5bf7029da53abaa9fdb6e",
     "protocol": 32,
-    "sha256": "273b583ba0b2d583b41cdda164133aafa9a719ea3533b2049653d0ee10f354d3",
-    "recipe": "4a4a1be13acca1e17ade375c1923bb0f78a23daabf77078cb7093881301f02f8",
+    "sha256": "4e6caaa566dcc15a9b902650520213fdaee6a45e9e1af5ad01a0640be2780ef8",
+    "recipe": "c26b0d536613ad8a3a185e4d9274fc6b27374c54fe47396f0fe500c7ed69f873",
+    "compiler": "gcc (Debian 14.2.0-19) 14.2.0",
+    "target": "x86_64-linux-gnu",
+    "libc": "ldd (Debian GLIBC 2.41-12+deb13u4) 2.41"
+  },
+  "rsync_3.4.2": {
+    "source": "de3cc03b03be153092f266aa1117b4706947ed07",
+    "protocol": 32,
+    "sha256": "19028fc541c2afab51f65b3f6fe8acdce5550e46de13cbb411d0ab423dd40585",
+    "recipe": "c26b0d536613ad8a3a185e4d9274fc6b27374c54fe47396f0fe500c7ed69f873",
+    "compiler": "gcc (Debian 14.2.0-19) 14.2.0",
+    "target": "x86_64-linux-gnu",
+    "libc": "ldd (Debian GLIBC 2.41-12+deb13u4) 2.41"
+  },
+  "rsync_3.4.3": {
+    "source": "2c7777aaa62abeb1bca192da345e6e8c685e872a",
+    "protocol": 32,
+    "sha256": "7c30cc997b14c3c2b3e12060ded7664adcf45f6d42ef2f80ccd49ea425ea0408",
+    "recipe": "c26b0d536613ad8a3a185e4d9274fc6b27374c54fe47396f0fe500c7ed69f873",
+    "compiler": "gcc (Debian 14.2.0-19) 14.2.0",
+    "target": "x86_64-linux-gnu",
+    "libc": "ldd (Debian GLIBC 2.41-12+deb13u4) 2.41"
+  },
+  "rsync_3.4.4": {
+    "source": "f26f747b8017b321d3776becc69f330dd889fa21",
+    "protocol": 32,
+    "sha256": "e4819607178c6d10ef57880901ee9eec2d605bc5af9fb23eaf1442e20fcd91c7",
+    "recipe": "c26b0d536613ad8a3a185e4d9274fc6b27374c54fe47396f0fe500c7ed69f873",
+    "compiler": "gcc (Debian 14.2.0-19) 14.2.0",
+    "target": "x86_64-linux-gnu",
+    "libc": "ldd (Debian GLIBC 2.41-12+deb13u4) 2.41"
+  },
+  "rsync_3.5.0": {
+    "source": "471e17dc0d68233db84db11be82c9f62f4661214",
+    "protocol": 32,
+    "sha256": "c4e6e97b71e2759906693f2b3938a056ee2a2b8ab1ac9137baf42923d89da92c",
+    "recipe": "c26b0d536613ad8a3a185e4d9274fc6b27374c54fe47396f0fe500c7ed69f873",
+    "compiler": "gcc (Debian 14.2.0-19) 14.2.0",
+    "target": "x86_64-linux-gnu",
+    "libc": "ldd (Debian GLIBC 2.41-12+deb13u4) 2.41"
+  },
+  "rsync_3.5.1": {
+    "source": "04355d27b7386d7de0e6bd5e79c556223210f700",
+    "protocol": 33,
+    "sha256": "1f2d75dff7303439b2967c3b539631f838d21db47efd75cfc6d4f685c5243a13",
+    "recipe": "c26b0d536613ad8a3a185e4d9274fc6b27374c54fe47396f0fe500c7ed69f873",
+    "compiler": "gcc (Debian 14.2.0-19) 14.2.0",
+    "target": "x86_64-linux-gnu",
+    "libc": "ldd (Debian GLIBC 2.41-12+deb13u4) 2.41"
+  },
+  "rsync_3.5.2": {
+    "source": "41bbd895668767e155b2eb6da64f37afa9cb8724",
+    "protocol": 33,
+    "sha256": "84b431e7e94eb67b03f20d95bad66257681c2ebe78a2f79893db2a3cb9b6bf27",
+    "recipe": "c26b0d536613ad8a3a185e4d9274fc6b27374c54fe47396f0fe500c7ed69f873",
     "compiler": "gcc (Debian 14.2.0-19) 14.2.0",
     "target": "x86_64-linux-gnu",
     "libc": "ldd (Debian GLIBC 2.41-12+deb13u4) 2.41"

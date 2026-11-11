@@ -66,6 +66,9 @@ if [[ "$help" == *--disable-openssl* ]]; then
     echo "Using bundled hashes"
     CONF_ARGS+=(--disable-openssl)
 fi
+if [[ "$help" == *--disable-idn* ]]; then
+    CONF_ARGS+=(--disable-idn)
+fi
 
 echo ">>> configure (bundled zlib + popt, static-friendly)"
 ./configure "${CONF_ARGS[@]}" \
