@@ -107,7 +107,7 @@ jobs:
           release: ${{ matrix.release }}
           cache-after-prepare: true
           prepare: |
-            PATH=/usr/sbin:$PATH pkg_add autoconf automake python312
+            PATH=/usr/sbin:$PATH pkg_add autoconf automake git-base python312
             ln -sf /usr/pkg/bin/python3.12 /usr/pkg/bin/python3
             /usr/sbin/groupadd rsynctest-extra
             /usr/sbin/useradd -m -d /home/rsynctest -g =uid -G rsynctest-extra -s /bin/sh rsynctest
