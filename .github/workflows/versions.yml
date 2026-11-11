@@ -45,7 +45,7 @@ jobs:
       - name: Version
         run: ./rsync --version
       - name: Validate profiles
-        run: ./testsuite/runtests.py profile --rsync-bin="$PWD/rsync"
+        run: python3 -S testsuite/runtests.py profile --rsync-bin="$PWD/rsync"
       - name: Tests (non-root pipe and TCP)
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: python3 -S .github/scripts/versions.py --role "${{ matrix.role }}"
@@ -53,5 +53,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
+          retention-days: 45
           name: version-mix-${{ matrix.role }}-receipts
+          if-no-files-found: error
           path: test-results/version-mix

@@ -30,13 +30,15 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 60
     name: Cygwin
+    defaults:
+      run:
+        shell: pwsh
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
       - name: Install Cygwin
-        shell: pwsh
         run: |
           $setup = Join-Path $Env:RUNNER_TEMP 'setup-x86_64.exe'
           $sums = Join-Path $Env:RUNNER_TEMP 'cygwin-sha512.sum'
@@ -81,31 +83,23 @@ jobs:
 
           echo 'C:/tools/cygwin/bin' >>$Env:GITHUB_PATH
       - name: Install CommonMark
-        shell: pwsh
         run: bash -c 'python3 -mpip install --user commonmark'
       - name: Platform
-        shell: pwsh
         run: bash -c 'python3 -S .github/scripts/check-platform.py cygwin --arch x86_64'
       - name: Configure
-        shell: pwsh
         run: bash -c './configure --with-rrsync'
       - name: Build
         id: build
-        shell: pwsh
         run: bash -c 'make check-progs'
       - name: Install
-        shell: pwsh
         run: bash -c 'make install'
       - name: Version
-        shell: pwsh
         run: bash -c '/usr/local/bin/rsync --version'
       - name: Tests (non-root pipe)
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        shell: pwsh
         run: bash -c 'python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync.exe" pipe,non-asan,nonroot,self-peer,cygwin "$PWD/test-results/nonroot/pipe" -j8'
       - name: Tests (non-root TCP)
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        shell: pwsh
         run: bash -c 'python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync.exe" non-asan,nonroot,self-peer,cygwin "$PWD/test-results/nonroot/tcp" --use-tcp --daemon-tests-only -j8'
       - name: Upload binaries
         if: always()
@@ -113,6 +107,7 @@ jobs:
         with:
           retention-days: 45
           name: cygwin-bin
+          if-no-files-found: error
           path: |
             rsync.exe
             rsync-ssl
@@ -125,6 +120,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
+          retention-days: 45
           name: cygwin-results
           if-no-files-found: error
           path: |
@@ -150,7 +146,6 @@ jobs:
             sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "$@"
           }
       - name: Run VM and collect results
-        id: test
         uses: vmactions/solaris-vm@87d3c436511cef802cd1637f86f73b1a97715c8c # v1.4.1
         with:
           cache-after-prepare: true
@@ -165,6 +160,7 @@ jobs:
         with:
           retention-days: 45
           name: solaris-bin
+          if-no-files-found: error
           path: |
             rsync
             rsync-ssl

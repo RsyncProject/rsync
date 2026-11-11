@@ -37,7 +37,6 @@ jobs:
             sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "$@"
           }
       - name: Run VM and collect results
-        id: test
         uses: vmactions/freebsd-vm@c46abacb49f09938ca4e1702d15d836285d694cc # v1.5.9
         with:
           release: ${{ matrix.release }}
@@ -56,6 +55,7 @@ jobs:
         with:
           retention-days: 45
           name: freebsd-${{ matrix.release }}-amd64-bin
+          if-no-files-found: error
           path: |
             rsync
             rsync-ssl
@@ -101,7 +101,6 @@ jobs:
             sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "$@"
           }
       - name: Run VM and collect results
-        id: test
         uses: vmactions/netbsd-vm@5957cf330aef2e6ddc63c604364c99ce2e02b91d # v1.5.3
         with:
           release: ${{ matrix.release }}
@@ -120,6 +119,7 @@ jobs:
         with:
           retention-days: 45
           name: netbsd-${{ matrix.release }}-amd64-bin
+          if-no-files-found: error
           path: |
             rsync
             rsync-ssl
@@ -164,7 +164,6 @@ jobs:
             sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "$@"
           }
       - name: Run VM and collect results
-        id: test
         uses: vmactions/openbsd-vm@f1ca8bc8ecc5b6ef7218e5b914836e067e1546d3 # v1.4.9
         with:
           release: ${{ matrix.release }}
@@ -182,6 +181,7 @@ jobs:
         with:
           retention-days: 45
           name: openbsd-${{ matrix.release }}-amd64-bin
+          if-no-files-found: error
           path: |
             rsync
             rsync-ssl

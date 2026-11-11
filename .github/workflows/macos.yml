@@ -88,6 +88,7 @@ jobs:
         with:
           retention-days: 45
           name: macos-${{ matrix.release }}-${{ matrix.arch }}-bin
+          if-no-files-found: error
           path: |
             rsync
             rsync-ssl

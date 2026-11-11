@@ -38,37 +38,31 @@ jobs:
             arch: amd64
             machine: x86_64
             runner: ubuntu-26.04
-            install_smoke: true
             profiles: non-asan,self-peer,linux,no-userns
           - release: '24.04'
             arch: amd64
             machine: x86_64
             runner: ubuntu-24.04
-            install_smoke: true
             profiles: non-asan,self-peer,linux,no-userns
           - release: '22.04'
             arch: amd64
             machine: x86_64
             runner: ubuntu-22.04
-            install_smoke: false
             profiles: non-asan,self-peer,linux,no-zstd-threads
           - release: '26.04'
             arch: arm64
             machine: aarch64
             runner: ubuntu-26.04-arm
-            install_smoke: true
             profiles: non-asan,self-peer,linux,no-simd,no-userns
           - release: '24.04'
             arch: arm64
             machine: aarch64
             runner: ubuntu-24.04-arm
-            install_smoke: true
             profiles: non-asan,self-peer,linux,no-simd,no-userns
           - release: '22.04'
             arch: arm64
             machine: aarch64
             runner: ubuntu-22.04-arm
-            install_smoke: false
             profiles: non-asan,self-peer,linux,no-simd,no-zstd-threads
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
@@ -93,7 +87,6 @@ jobs:
         id: build
         run: make check-progs
       - name: Installation check
-        if: matrix.install_smoke
         run: python3 -S .github/scripts/installcheck.py
       - name: Install
         run: sudo make install
@@ -101,7 +94,7 @@ jobs:
         run: ./rsync --version
       - name: Verify installed rsync-ssl
         run: |
-          python3 testsuite/tools/check-rsync-ssl.py \
+          python3 -S testsuite/tools/check-rsync-ssl.py \
             --rsync /usr/local/bin/rsync \
             --rsync-ssl /usr/local/bin/rsync-ssl \
             --openssl /usr/bin/openssl
@@ -200,6 +193,7 @@ jobs:
         with:
           retention-days: 45
           name: almalinux-8-amd64-bin
+          if-no-files-found: error
           path: |
             rsync
             rsync-ssl
@@ -212,9 +206,11 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
+          retention-days: 45
           name: almalinux-8-amd64-results
           if-no-files-found: error
           path: |
+            config.log
             test-results/*/*/run.log
             test-results/*/*/receipt.json
 

@@ -75,5 +75,5 @@ jobs:
           path: |
             test-results/valgrind-logs/*.log
             test-results/*.json
-          if-no-files-found: ignore
+          if-no-files-found: error
           retention-days: 45

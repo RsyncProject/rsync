@@ -104,6 +104,7 @@ jobs:
         with:
           retention-days: 45
           name: asan-results
+          if-no-files-found: error
           path: |
             test-results/*/receipt.json
             test-results/*/run.log
@@ -145,6 +146,7 @@ jobs:
         with:
           retention-days: 45
           name: coverage-html
+          if-no-files-found: error
           path: |
             coverage
             coverage-tcp
@@ -171,6 +173,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
+          retention-days: 45
           name: scan-build-report-clang18
           path: scan-report
           if-no-files-found: ignore
@@ -198,6 +201,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
+          retention-days: 45
           name: scan-build-report-forward
           path: scan-report
           if-no-files-found: ignore
