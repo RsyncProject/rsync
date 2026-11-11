@@ -29,18 +29,20 @@ dest = base / 'dest'
 backup = base / 'backup'
 sub = backup / 'sub'
 sublink = backup / '.sublink'
-backed_up_link = ""
 
 secret = root / 'secret'
 secret.write_text(SECRET)
 
 
-def build(pre_munge_dest=False):
+def build(dest_target=None):
+    """Reset the workspace.  Call only while the flipper is stopped."""
     rmtree(base)
     for d in (src / 'sub', dest / 'sub', backup, outside):
         d.mkdir(parents=True, exist_ok=True)
 
-    dest_target = f"{SYMLINK_PREFIX}{secret}" if pre_munge_dest else f"{secret}"
+    if dest_target is None:
+        dest_target = f"{secret}"
+
     for i in range(NFILES):
         (src / 'sub' / f'f{i}').symlink_to('test')
         (dest / 'sub' / f'f{i}').symlink_to(dest_target)
@@ -83,6 +85,29 @@ def root_owned_backup_symlink():
     return ""
 
 
+def win_backup_race(dest_target):
+    """Reset the fixture on every attempt before running the flipper and checking
+    for a root-owned backup symlink, so leftovers from an earlier case can never
+    short-circuit the loop."""
+    deadline = time.monotonic() + race_budget(10.0)
+    flip = None
+    try:
+        while time.monotonic() < deadline:
+            build(dest_target=dest_target)
+            flip = start_c_flipper(sub, sublink)
+            push()
+            stop_flipper(flip)
+            flip = None
+
+            winner = root_owned_backup_symlink()
+            if winner:
+                return winner
+    finally:
+        if flip is not None:
+            stop_flipper(flip)
+    return ""
+
+
 conf = write_daemon_conf(
     [
         ('m', {'path': str(base), 'read only': 'no', 'use chroot': 'no'}),
@@ -116,70 +141,35 @@ if not (sub / 'f0').is_symlink() or os.readlink(sub / 'f0') != f'{secret}':
         f"{sub}; the backup symlink path was not exercised"
     )
 
-# 3. Race test: unmunged symlink backed up via do_symlink_at() fallback must be munged once
-deadline = time.monotonic() + race_budget(10.0)
-flip = None
-try:
-    while time.monotonic() < deadline:
-        if flip is not None:
-            stop_flipper(flip)
-            flip = None
+# 3. Race test: unmunged symlink on disk and already-munged symlink on disk
+# backed up via do_symlink_at() fallback must both end up single-munged on disk.
+for label, initial_target, expected_target in (
+    ("unmunged", f"{secret}", f"{SYMLINK_PREFIX}{secret}"),
+    ("pre-munged", f"{SYMLINK_PREFIX}{secret}-premunged", f"{SYMLINK_PREFIX}{secret}-premunged"),
+):
+    backed_up_link = win_backup_race(dest_target=initial_target)
+    if not backed_up_link:
+        test_skipped(f"race ({label}) did not produce a root-owned backup symlink (no atomic flipper?)")
 
-        backed_up_link = root_owned_backup_symlink()
-        if backed_up_link:
-            break
-
-        build(pre_munge_dest=False)
-        flip = start_c_flipper(sub, sublink)
-        push()
-finally:
-    if flip is not None:
-        stop_flipper(flip)
-
-if not backed_up_link:
-    backed_up_link = root_owned_backup_symlink()
-
-if not backed_up_link:
-    test_skipped("race did not produce a root-owned backup symlink (no atomic flipper?)")
-
-link_path = sub / backed_up_link
-target = os.readlink(link_path)
-if target != f"{SYMLINK_PREFIX}{secret}":
-    test_fail(
-        f"root-owned backup symlink target mismatch: got {target!r}, "
-        f"expected {SYMLINK_PREFIX + str(secret)!r}"
-    )
-
-# 4. Race test with an already-munged destination symlink: verify no double-munging
-backed_up_link = ""
-deadline = time.monotonic() + race_budget(10.0)
-flip = None
-try:
-    while time.monotonic() < deadline:
-        if flip is not None:
-            stop_flipper(flip)
-            flip = None
-
-        backed_up_link = root_owned_backup_symlink()
-        if backed_up_link:
-            break
-
-        build(pre_munge_dest=True)
-        flip = start_c_flipper(sub, sublink)
-        push()
-finally:
-    if flip is not None:
-        stop_flipper(flip)
-
-if not backed_up_link:
-    backed_up_link = root_owned_backup_symlink()
-
-if backed_up_link:
     target = os.readlink(sub / backed_up_link)
     if target.startswith(SYMLINK_PREFIX + SYMLINK_PREFIX):
-        test_fail(f"already-munged backup symlink was double-munged: {target!r}")
-    if target != f"{SYMLINK_PREFIX}{secret}":
+        test_fail(f"{label} backup symlink was double-munged: {target!r}")
+    if target != expected_target:
         test_fail(
-            f"already-munged backup symlink corrupted: got {target!r}, "
-            f"expected {SYMLINK_PREFIX + str(secret)!r}"
+            f"{label} root-owned backup symlink target mismatch: got {target!r}, "
+            f"expected {expected_target!r}"
         )
+
+# 4. Exact-prefix boundary test ('<' vs '<=' in munge_symlink_target()):
+# An on-disk symlink whose target is the exact string "/rsyncd-munged/" must
+# not be prefixed a second time when recreated by do_symlink_at().
+backed_up_link = win_backup_race(dest_target=SYMLINK_PREFIX)
+if not backed_up_link:
+    test_skipped("race (exact-prefix) did not produce a root-owned backup symlink (no atomic flipper?)")
+
+target = os.readlink(sub / backed_up_link)
+if target != SYMLINK_PREFIX:
+    test_fail(
+        f"already-munged exact-prefix backup symlink was double-munged or corrupted: "
+        f"got {target!r}, expected {SYMLINK_PREFIX!r}"
+    )

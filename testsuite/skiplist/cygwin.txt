@@ -13,6 +13,7 @@ acls-unpinnable
 append-abort-mid-write  # the mid-write hook is an LD_PRELOAD, Linux-only
 backup-acl-xattr-cache
 backup-dir-symlink-race
+backup-munge-symlinks
 basis-xname-traversal
 batch-file-symlink
 chown

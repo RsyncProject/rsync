@@ -215,6 +215,28 @@ static const char *fd_pin_tail(const char *p)
     return (*s == '\0' || *s == '/') ? s : NULL;
 }
 
+/* Ensure link target is prefixed when munge_symlinks is enabled.
+ * Returns the pointer to the target to use (either lnk itself or buf).
+ * On overflow, sets errno to ENAMETOOLONG and returns NULL. */
+static const char *munge_symlink_target(const char *lnk, char *buf, size_t buflen)
+{
+	if (munge_symlinks) {
+		size_t lnk_len = strlen(lnk);
+
+		/* Use < so exact matches of SYMLINK_PREFIX are not double-munged */
+		if (lnk_len < SYMLINK_PREFIX_LEN
+		 || strncmp(lnk, SYMLINK_PREFIX, SYMLINK_PREFIX_LEN) != 0) {
+			if (lnk_len + SYMLINK_PREFIX_LEN >= buflen) {
+				errno = ENAMETOOLONG;
+				return NULL;
+			}
+			snprintf(buf, buflen, "%s%s", SYMLINK_PREFIX, lnk);
+			return buf;
+		}
+	}
+	return lnk;
+}
+
 /* An EXACT pin entry, such as "/proc/self/fd/7" or "/dev/fd/7", whose target is
  * what confinement must judge.  rrsync also writes a pinned parent as
  * ".../fd/7/<leaf>", but the walk resolves the magic link itself and checks the
@@ -986,6 +1008,10 @@ int do_symlink_at(const char *lnk, const char *path)
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
 
+	lnk = munge_symlink_target(lnk, munged, sizeof munged);
+	if (!lnk)
+		return -1;
+
 #if defined O_NOFOLLOW && defined O_DIRECTORY
 	if (operator_path_resolve) {
 		/* Operator path (e.g. an absolute --backup-dir): confine the
@@ -1054,23 +1080,6 @@ int do_symlink_at(const char *lnk, const char *path)
 		return ret;
 	}
 #endif
-    /* Ensure the daemon or munge_symlinks mode never creates an unmunged
-	 * symlink on disk (e.g., via make_backup_inner() copying an unmunged
-	 * local symlink), while avoiding double-munging links already prefixed
-	 * by recv_file_entry(). */
-	if (munge_symlinks) {
-		size_t lnk_len = strlen(lnk);
-		if (lnk_len <= SYMLINK_PREFIX_LEN
-		 || strncmp(lnk, SYMLINK_PREFIX, SYMLINK_PREFIX_LEN) != 0) {
-			if (lnk_len + SYMLINK_PREFIX_LEN >= sizeof munged) {
-				errno = ENAMETOOLONG;
-				return -1;
-			}
-			snprintf(munged, sizeof munged, "%s%s", SYMLINK_PREFIX, lnk);
-			lnk = munged;
-		}
-	}
-
 	ret = symlinkat(lnk, dfd, bname);
 	e = errno;
 	if (owns) close(dfd);
@@ -4112,8 +4121,14 @@ int do_open_atfd(int dfd, const char *name, int flags, mode_t mode)
 int do_symlink_atfd(const char *lnk, int dfd, const char *name)
 {
 #ifdef AT_FDCWD
+	char munged[MAXPATHLEN];
+
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
+
+	lnk = munge_symlink_target(lnk, munged, sizeof munged);
+	if (!lnk)
+		return -1;
 
 #if defined NO_SYMLINK_XATTRS || defined NO_SYMLINK_USER_XATTRS
 	/* --fake-super: store the link target in a regular placeholder file,

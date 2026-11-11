@@ -147,34 +147,36 @@ deadline = time.monotonic() + race_budget(10.0)
 flip = None
 try:
     while time.monotonic() < deadline:
-        if flip is not None:
-            stop_flipper(flip)
-            flip = None
+        build()
+        flip = start_c_flipper(sub, sublink)
+        push()
+        stop_flipper(flip)
+        flip = None
 
         files_from = root_owned_backup_symlink()
         if files_from:
             break
-
-        build()
-        flip = start_c_flipper(sub, sublink)
-        push()
 finally:
     if flip is not None:
         stop_flipper(flip)
 
 if not files_from:
-    # The leak needs a root-owned backup symlink, which only appears when the
-    # parent-swap race makes make_backup() fall back to creating the symlink
-    # itself.  Winning that window reliably needs the atomic renameat2(EXCHANGE)
-    # flipper (Linux); on platforms that fall back to the non-atomic flipper the
-    # window may never be hit within the budget.  Can't mount the attack here, so
-    # there's nothing to assert -- skip rather than fail.
+    # Winning the parent-swap window reliably needs the atomic renameat2(EXCHANGE)
+    # flipper (Linux).  When the race does not produce a root-owned backup
+    # symlink within budget, print a notice and plant a root-owned symlink
+    # directly so leak() and the local --confine-root check below still run.
     print("race did not produce a root-owned backup symlink (no atomic flipper?)")
-    sys.exit(0)
+    build()
+    files_from = 'f0'
+    (sub / files_from).symlink_to(f'{secret}')
 
 tgt = os.readlink(sub / files_from)
 if tgt.startswith("/rsyncd-munged/"):
-    sys.exit(0)
+    print(f"raced backup symlink {files_from} was munged ({tgt}); planting unmunged symlink to test files-from confinement")
+    (sub / files_from).unlink()
+    (sub / files_from).symlink_to(f'{secret}')
+    tgt = os.readlink(sub / files_from)
+
 if os.path.realpath(tgt) != os.path.realpath(str(secret)):
     test_fail(f"setup failed: backup symlink {files_from} -> {tgt}, not the out-of-module secret")
 
