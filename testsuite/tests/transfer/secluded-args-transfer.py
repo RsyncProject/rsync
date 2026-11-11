@@ -20,7 +20,7 @@ def test(context: TestContext):
             stream.write(label + '\n')
         checkit(['-ais', f'--rsync-path={rsync_path_arg()}',
                  f'{source_host}{source}/', f'{destination_host}{destination}'],
-                context.source, context.destination)
+                source, destination)
 
     transfer('pull', 'lh:', '')
     transfer('push', '', 'lh:')
