@@ -22,6 +22,7 @@ import os, sys, re, argparse, glob, shutil, json, signal, subprocess, filecmp
 from datetime import datetime
 
 sys.path = ['packaging'] + sys.path
+from source_archive import GEN_FILES, make_archive
 
 from pkglib import (
     warn, die, cmd_run, cmd_chk, cmd_txt, cmd_txt_chk, cmd_pipe,
@@ -62,20 +63,6 @@ HTML_SRC = os.path.realpath('rsync-web')
 
 FTP_REMOTE_PATH  = '/home/ftp/pub/rsync'
 HTML_REMOTE_PATH = '/home/httpd/html/rsync'
-
-# Files that ./configure + make produce and that the release tarball / diff
-# need to bundle alongside the git-tracked source.  Mirrors the GENFILES
-# definition in Makefile.in (with rrsync.1{,.html} since we always configure
-# --with-rrsync during the release build).
-GEN_FILES = [
-    'configure.sh',
-    'aclocal.m4',
-    'config.h.in',
-    'rsync.1',     'rsync.1.html',
-    'rsync-ssl.1', 'rsync-ssl.1.html',
-    'rsyncd.conf.5', 'rsyncd.conf.5.html',
-    'rrsync.1',    'rrsync.1.html',
-]
 
 # ---------- Phase registry ----------
 
@@ -618,11 +605,7 @@ def step_7_tarball(args):
     rsync_ver_dir = os.path.join(WORK_DIR, rsync_ver)
     shutil.rmtree(a_dir)
     os.rename(b_dir, rsync_ver_dir)
-    cmd_chk(f"git archive --format=tar --prefix={rsync_ver}/ {v_ver} | "
-            f"tar -C {WORK_DIR} -xf -")
-    cmd_chk(f"support/git-set-file-times --quiet --prefix={rsync_ver_dir}/")
-    cmd_chk(['fakeroot', 'tar', '-C', WORK_DIR, '-czf', srctar_file,
-             '--exclude=.github', rsync_ver])
+    make_archive(v_ver, rsync_ver_dir, srctar_file)
 
     # Leave staging in place for the FTP refresh.
     print(f"\nCreated:\n  {srctar_file}\n  {diff_file}")
