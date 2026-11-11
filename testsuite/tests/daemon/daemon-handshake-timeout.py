@@ -20,6 +20,7 @@ require_tcp("raw stalled clients need a real TCP daemon; run with --use-tcp")
 BUILTIN = 60
 FAST = 2
 SLOP = 8
+CLOCK_DRIFT_BUDGET = 60
 
 base = SCRATCHDIR / 'daemon-handshake-timeout'
 rmtree(base)
@@ -116,19 +117,24 @@ def observe_close(sock, expected, label, *, trickle=None, must_close=True,
                   daemon_log=None, started=None):
     start, start_wall = started if started is not None else (time.monotonic(), time.time())
     log_mark = _log_mark(daemon_log)
-    deadline = start + expected + SLOP
-    next_send = start if trickle is not None else deadline
+    window = expected + SLOP
+    wall_deadline = start_wall + window
+    hard_deadline = start + window + CLOCK_DRIFT_BUDGET
+    next_send = start if trickle is not None else hard_deadline
     can_send = trickle is not None
     closed = None
     closed_mono = None
 
     while True:
         now = time.monotonic()
-        if now >= deadline:
+        now_wall = time.time()
+        if now_wall >= wall_deadline or now >= hard_deadline:
             break
-        wait = min(deadline, next_send) - now if can_send else deadline - now
+        wait = min(wall_deadline - now_wall, hard_deadline - now)
+        if can_send:
+            wait = min(wait, max(0, next_send - now))
         try:
-            readable, _, _ = select.select([sock], [], [], max(0, wait))
+            readable, _, _ = select.select([sock], [], [], wait)
         except OSError as e:
             test_fail(f"{label}: select failed before closure was observed: {e}")
 
@@ -152,8 +158,12 @@ def observe_close(sock, expected, label, *, trickle=None, must_close=True,
 
     if closed is None:
         if must_close:
-            test_fail(f"{label}: connection stayed open past {expected + SLOP:.1f}s"
-                      f"{_clock_note(time.time() - start_wall, time.monotonic() - start)}"
+            wall_elapsed = time.time() - start_wall
+            mono_elapsed = time.monotonic() - start
+            limit = (f'{window:.1f}s wall deadline' if wall_elapsed >= window
+                     else f'{window + CLOCK_DRIFT_BUDGET:.1f}s monotonic hard limit')
+            test_fail(f"{label}: connection stayed open through the {limit}"
+                      f"{_clock_note(wall_elapsed, mono_elapsed)}"
                       f"{_daemon_log_note(daemon_log, log_mark)}")
         return None
 
