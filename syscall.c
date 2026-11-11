@@ -955,6 +955,11 @@ int do_symlink(const char *lnk, const char *path)
 	RETURN_ERROR_IF_NULL(lnk);
 	RETURN_ERROR_IF_NULL(path);
 
+	char munged[MAXPATHLEN];
+	lnk = munge_symlink_target(lnk, munged, sizeof munged);
+	if (!lnk)
+		return -1;
+
 #if defined NO_SYMLINK_XATTRS || defined NO_SYMLINK_USER_XATTRS
 	/* For --fake-super, we create a normal file with mode 0600
 	 * and write the lnk into it. */
