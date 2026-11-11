@@ -137,8 +137,10 @@ def main():
     emulator = shutil.which('emulator')
     if not emulator:
         raise ValueError('Android emulator is not on PATH')
-    (args.output / 'emulator-version.log').write_text(
-        run(emulator, '-version', capture_output=True).stdout)
+    version = run(emulator, '-version', capture_output=True, check=False)
+    (args.output / 'emulator-version.log').write_text(version.stdout + version.stderr)
+    if version.returncode:
+        raise ValueError(f'Emulator version probe failed ({version.returncode}): {version.stdout}{version.stderr}')
     run(emulator, '-accel-check')
     serial = 'emulator-5560'
     def adb(*command, **kwargs):
