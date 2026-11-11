@@ -29,7 +29,7 @@ During execution, SIGTERM stops queued tests and terminates active test process 
 
 The `--use-tcp` option starts unauthenticated test daemons on loopback addresses and some fixtures enable unsafe daemon options. Other local users can reach those listeners. Use the default pipe transport on shared hosts. The `--daemon-tests-only` option limits a follow-up TCP pass to tests which can observe the transport choice.
 
-Historical binaries live in `old_versions/`. The runner's `--rsync-bin2` option selects the secondary binary and `--archived-role` identifies which side uses the archived release. The static Linux AMD64 peers omit OpenSSL and IDN support.
+Historical binaries live in `old_versions/`. The runner's `--rsync-bin2` option selects the secondary binary and `--archived-role` identifies which side uses the archived release. The static Linux X86-64 peers omit OpenSSL and IDN support.
 
 ## Writing a test
 
@@ -63,19 +63,19 @@ Individual tests use exit codes 0 for pass, 1 for failure, 2 for error and 77 fo
 
 ## CI
 
-[ci.yml](../.github/workflows/ci.yml) selects native tests, diagnostics and historical-peer checks for pull requests and master pushes. Scheduled runs divide daily and weekly work. The Versions group runs every archived release as both the primary and secondary executable over pipe and TCP. The forward Clang check on Ubuntu 26.04 runs weekly and manually as a non-blocking check; Clang 18 remains blocking.
+[ci.yml](../.github/workflows/ci.yml) selects native tests, diagnostics and historical-peer checks for pull requests and master pushes. Scheduled runs divide daily and weekly work. The Versions group runs every archived release as both the primary and secondary executable over pipe and TCP. Valgrind runs root and non-root pipe and TCP checks in its own group. The forward Clang check on Ubuntu 26.04 runs weekly and manually as a non-blocking check; Clang 18 remains blocking.
 
 Environment | Versions and architectures
 --- | ---
-Ubuntu | 22.04, 24.04 and 26.04 on AMD64 and ARM64
-AlmaLinux | 8 on AMD64
-Alpine | 3.24.4 on AMD64 and X86-32
-FreeBSD | 14.5 and 15.1 on AMD64
-NetBSD | 10.2, 11.0 and 11.1 on AMD64
-OpenBSD | 7.9 and 8.0 on AMD64
+Ubuntu | 22.04, 24.04 and 26.04 on X86-64 and ARM64
+AlmaLinux | 8 on X86-64
+Alpine | 3.24.4 on X86-64 and X86-32
+FreeBSD | 14.5 and 15.1 on X86-64
+NetBSD | 10.2, 11.0 and 11.1 on X86-64
+OpenBSD | 7.9 and 8.0 on X86-64
 macOS | 15 and 26 on X86-64 and ARM64
-Cygwin | AMD64 on Windows Server 2022
-Solaris | AMD64 guest using the VM action's default release
+Cygwin | X86-64 on Windows Server 2022
+Solaris | X86-64 guest using the VM action's default release
 Android | API 24 on ARM64, ARMv7 and X86-64; Termux userspace on X86-64
 
 Ubuntu, Alpine, macOS and BSD jobs run separate root and non-root pipe and TCP passes. Ubuntu and Alpine also force protocols 29 and 30. Alpine exercises musl and verifies 64-bit file offsets in its x86 process. Each Ubuntu row checks installed rsync and rsync-ssl against a local TLS daemon for trusted and rejected certificates, hostname mismatch and explicit verification opt-outs.

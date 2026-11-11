@@ -1,0 +1,79 @@
+name: Valgrind
+
+on:
+  workflow_call:
+    outputs:
+      jobs:
+        description: Job results
+        value: ${{ toJSON(jobs) }}
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: sh
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Root pipe
+            privilege: root
+            transport: pipe
+            profiles: pipe,non-asan,root,self-peer,linux,valgrind,no-userns
+          - name: Root TCP
+            privilege: root
+            transport: tcp
+            profiles: non-asan,root,self-peer,linux,valgrind,no-userns
+          - name: Non-root pipe
+            privilege: non-root
+            transport: pipe
+            profiles: pipe,non-asan,nonroot,self-peer,linux,valgrind,no-userns
+          - name: Non-root TCP
+            privilege: non-root
+            transport: tcp
+            profiles: non-asan,nonroot,self-peer,linux,valgrind,no-userns
+    name: ${{ matrix.name }}
+    env:
+      VALGRIND_SCRATCH: /tmp/rsync-valgrind-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.privilege }}-${{ matrix.transport }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y valgrind acl libacl1-dev attr libattr1-dev \
+            liblz4-dev libzstd-dev libxxhash-dev libidn2-dev python3-cmarkgfm openssl
+          echo "/usr/local/bin" >>"$GITHUB_PATH"
+      - name: Configure
+        run: ./configure --with-rrsync --enable-debug
+      - name: Build
+        id: build
+        run: make check-progs
+      - name: Version
+        run: ./rsync --version
+
+      # Gate memory errors rather than intentional process-exit leaks
+      - name: Tests
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: python3 -S .github/scripts/diagnostics.py valgrind --privilege "${{ matrix.privilege }}" --transport "${{ matrix.transport }}" --profiles "${{ matrix.profiles }}"
+      - name: Check memory errors
+        if: always()
+        run: python3 -S .github/scripts/diagnostics.py valgrind-results --privilege "${{ matrix.privilege }}" --transport "${{ matrix.transport }}"
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: valgrind-logs-${{ matrix.privilege }}-${{ matrix.transport }}
+          path: |
+            test-results/valgrind-logs/*.log
+            test-results/*.json
+          if-no-files-found: ignore
+          retention-days: 45

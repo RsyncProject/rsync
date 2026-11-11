@@ -22,7 +22,7 @@ jobs:
         release: ['14.5', '15.1']
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    name: FreeBSD ${{ matrix.release }} AMD64
+    name: FreeBSD ${{ matrix.release }} X86-64
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -86,7 +86,7 @@ jobs:
         release: ['10.2', '11.0', '11.1']
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    name: NetBSD ${{ matrix.release }} AMD64
+    name: NetBSD ${{ matrix.release }} X86-64
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -149,7 +149,7 @@ jobs:
         release: ['7.9', '8.0']
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    name: OpenBSD ${{ matrix.release }} AMD64
+    name: OpenBSD ${{ matrix.release }} X86-64
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
