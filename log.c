@@ -302,7 +302,10 @@ static size_t locale_char_len(const char *buf, size_t len, filter_mbstate *state
 
 	char_len = mbrtowc(&wc, buf, len, state);
 	if (char_len == (size_t)-1 || char_len == (size_t)-2
-	 || (wc >= 0xd800 && wc <= 0xdfff) || wc > 0x10ffff) {
+#ifdef __STDC_ISO_10646__
+	 || (wc >= 0xd800 && wc <= 0xdfff) || wc > 0x10ffff
+#endif
+	) {
 		memset(state, 0, sizeof *state);
 		if (MB_CUR_MAX == 1)
 			return utf8_char_len(buf, len, is_control);
