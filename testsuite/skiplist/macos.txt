@@ -13,8 +13,10 @@ append-abort-mid-write  # the mid-write hook is an LD_PRELOAD, Linux-only
 backup-acl-xattr-cache
 backup-crossdev-copy
 chmod-temp-dir
+copy-links-open-error                  # Linux interposition
 copy-xattrs-symlink-race
 daemon-auth-group
+daemon-chroot-cwd                      # Linux interposition
 dir-sgid
 fake-super-acl-xattr
 hardlinks-emlink-recovery                # LD_PRELOAD hook
@@ -38,4 +40,5 @@ sender-remove-source-root-anchor
 simd-checksum
 source-change-size-continues
 sparse
+stdio-read-errors                      # Linux interposition
 symlink-exclude-xattr

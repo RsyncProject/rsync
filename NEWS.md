@@ -7,6 +7,15 @@
   on macOS. Native configuration now proves lookup, creation,
   permission-revocation and no-follow behaviour before selecting a traversal
   descriptor. Unverified targets fail closed instead of using raceable paths.
+- Rejected config and filter files after read or stream setup errors instead
+  of accepting partial contents. MOTD and `--early-input` reads now stop on
+  I/O errors instead of looping; interrupted reads retain their data.
+- Fixed an out-of-bounds read while reporting an incomplete daemon config
+  section header.
+- Preserved sender file-open errors when closing a held directory descriptor
+  during `--copy-links` transfers.
+- Changed to `/` immediately after a module chroot, before selecting an inner
+  module directory. A failed working-directory reset aborts the connection.
 
 # NEWS for rsync 3.5.2 (4 Nov 2026)
 

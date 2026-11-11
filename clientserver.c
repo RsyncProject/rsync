@@ -1093,6 +1093,8 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 			io_printf(f_out, "@ERROR: chroot failed\n");
 			return -1;
 		}
+		if (chdir("/") < 0)
+			return path_failure(f_out, "/", True);
 		am_chrooted = 1;
 		module_chdir = module_dir;
 	}
