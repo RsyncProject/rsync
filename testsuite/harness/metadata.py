@@ -155,8 +155,11 @@ def read_requirements(path) -> Optional[dict]:
             features.add('native_build')
         elif node.func.id == 'test_skipped':
             for keyword in node.keywords:
-                if keyword.arg == 'capability' and isinstance(keyword.value, (ast.Str, ast.Num, ast.NameConstant, ast.Ellipsis, ast.Constant)):
-                    capability = ast.literal_eval(keyword.value)
+                if keyword.arg == 'capability':
+                    try:
+                        capability = ast.literal_eval(keyword.value)
+                    except (ValueError, TypeError):
+                        continue
                     if not isinstance(capability, str) or not capability:
                         raise ValueError(f'{path}: invalid capability')
                     features.add(capability)

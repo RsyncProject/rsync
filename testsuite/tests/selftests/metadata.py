@@ -101,14 +101,15 @@ def test(context: TestContext):
         test_fail('capability metadata was not inferred')
 
     invalid_capability = context.scratch / 'invalid-capability.py'
-    invalid_capability.write_text("from harness import metadata\nmetadata()\n"
-                                  "test_skipped('bad', capability=1)\n")
-    try:
-        read_requirements(invalid_capability)
-    except ValueError:
-        pass
-    else:
-        test_fail('invalid capability metadata was accepted')
+    for value in (1, True, None, [], {}, ''):
+        invalid_capability.write_text("from harness import metadata\nmetadata()\n"
+                                     f"test_skipped('bad', capability={value!r})\n")
+        try:
+            read_requirements(invalid_capability)
+        except ValueError:
+            pass
+        else:
+            test_fail(f'invalid capability metadata was accepted: {value!r}')
 
     requirements = {test_name(path): read_requirements(path)
                     for path in discover_tests(context.repository / 'testsuite/tests')}
