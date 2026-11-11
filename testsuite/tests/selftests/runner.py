@@ -165,18 +165,19 @@ def test(context: TestContext):
         return subprocess.run(args, env=nested_env, capture_output=True, text=True)
 
     binary = rsync_command_binary()
-    archived = context.repository / 'old_versions' / 'rsync_3.0.0'
     peer_profile = context.repository / 'testsuite' / 'profiles' / 'peer-3.0.0.json'
     daemon_access = next(path for path in tests if test_name(path) == 'daemon-access')
     cli_transfers = next(path for path in tests if test_name(path) == 'cli-transfers')
+    identities = {'archived': ('3.0.0', 30), 'current': ('3.5.2', 33)}
     for archived_role, primary, secondary, expected in (
-            ('primary', archived, binary, {'daemon-access'}),
-            ('secondary', binary, archived, {'daemon-access', 'cli-transfers'})):
+            ('primary', 'archived', 'current', {'daemon-access'}),
+            ('secondary', 'current', 'archived', {'daemon-access', 'cli-transfers'})):
         args = SimpleNamespace(profiles=str(peer_profile), protocol=None, use_tcp=False,
                                archived_role=archived_role)
-        configured = config.configure_profiles(
-            args, str(context.repository / 'testsuite'), str(context.repository), tests,
-            [daemon_access, cli_transfers], str(primary), str(secondary))
+        with patch.object(config, 'binary_identity', side_effect=lambda path: identities[path]):
+            configured = config.configure_profiles(
+                args, str(context.repository / 'testsuite'), str(context.repository), tests,
+                [daemon_access, cli_transfers], primary, secondary)
         if {test_name(path) for path in configured[0]} != expected:
             test_fail(f'{archived_role} role selected the wrong version-mix tests')
 
