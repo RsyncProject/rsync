@@ -62,6 +62,11 @@ jobs:
     if: *weekly
     uses: ./.github/workflows/android.yml
 
+  archive:
+    name: Archive
+    if: *weekly
+    uses: ./.github/workflows/archive.yml
+
   diagnostics:
     name: Diagnostics
     if: &diagnostics ${{ github.event_name != 'schedule' || github.event.schedule == '42 9 * * 1' }}
@@ -82,7 +87,7 @@ jobs:
   required:
     name: Required
     if: always()
-    needs: [linux, bsd, macos, other, versions, android, diagnostics, valgrind]
+    needs: [linux, bsd, macos, other, versions, android, archive, diagnostics, valgrind]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     env:
@@ -92,6 +97,7 @@ jobs:
       CI_EXPECT_OTHER: *other
       CI_EXPECT_VERSIONS: *versions
       CI_EXPECT_ANDROID: *weekly
+      CI_EXPECT_ARCHIVE: *weekly
       CI_EXPECT_DIAGNOSTICS: *diagnostics
       CI_EXPECT_VALGRIND: *valgrind
     steps:

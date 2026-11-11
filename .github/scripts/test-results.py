@@ -15,8 +15,9 @@ check = runpy.run_path(str(checker))['check']
 class Results(unittest.TestCase):
     def setUp(self):
         self.expected = dict(linux='true', diagnostics='true', bsd='false', macos='true',
-                             other='true', versions='true', android='true', valgrind='true')
+                             other='true', versions='true', android='true', archive='true', valgrind='true')
         self.data = {
+            'archive': {'result': 'success', 'outputs': {'jobs': json.dumps({'archive': {'result': 'success'}})}},
             'linux': {'result': 'success', 'outputs': {
                 'jobs': json.dumps({'ubuntu': {'result': 'success'}, 'almalinux': {'result': 'skipped'}}),
                 'inputs': json.dumps({'ubuntu': True, 'almalinux': False})}},
@@ -139,7 +140,7 @@ class Results(unittest.TestCase):
         self.reject()
 
     def test_every_family_requires_nested_results(self):
-        for name in ('linux', 'diagnostics', 'macos', 'other', 'versions', 'android', 'valgrind'):
+        for name in ('linux', 'diagnostics', 'macos', 'other', 'versions', 'android', 'archive', 'valgrind'):
             original = self.data[name]['outputs']
             with self.subTest(family=name):
                 self.data[name]['outputs'] = {}

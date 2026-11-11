@@ -8,7 +8,7 @@ import sys
 from harness import TestContext, requires, run
 from harness.results import test_fail
 
-@requires(transports={'pipe'}, mutates={'filesystem', 'process'})
+@requires(features={'git'}, transports={'pipe'}, mutates={'filesystem', 'process'})
 def test(context: TestContext):
     repository = context.scratch / 'repository'
     repository.mkdir()
