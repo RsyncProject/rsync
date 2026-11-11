@@ -8,7 +8,9 @@ from harness.filesystem import assert_not_exists, assert_same
 from harness.results import test_fail
 from harness.rsync import run_rsync
 
-metadata(features={'daemon'}, transports={'pipe', 'tcp'}, min_peer='2.6.0', tags={'daemon', 'version-mix'})
+metadata(features={'daemon'}, transports={'pipe', 'tcp'},
+         min_peer={'primary': '2.6.0', 'secondary': '3.0.3'},
+         tags={'daemon', 'version-mix'})
 
 FROMDIR.mkdir()
 (FROMDIR / 'a').write_text('excluded\n')

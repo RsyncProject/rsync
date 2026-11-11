@@ -73,22 +73,10 @@ def test(context: TestContext):
     configured = config.configure_profiles(
         args, str(context.repository / 'testsuite'), str(context.repository),
         tests, [tcp_test, ordinary_test], '', '')
-    if configured[0] != [ordinary_test] or configured[7] != [{
+    if configured[0] != [ordinary_test] or configured[6] != [{
             'capability': 'tcp', 'reasons': ['pipe transport'],
             'tests': ['daemon-access-hostname']}]:
-        test_fail(f'N/A test selection is wrong: {configured[0]}, {configured[7]}')
-    n_a_profile.write_text(json.dumps({
-        'not_applicable': {'tcp': 'pipe transport'},
-        'xfail': {'daemon-access-hostname': 'issue-1'},
-    }))
-    try:
-        config.configure_profiles(
-            args, str(context.repository / 'testsuite'), str(context.repository),
-            tests, [tcp_test, ordinary_test], '', '')
-    except ValueError:
-        pass
-    else:
-        test_fail('an expected failure was attached to an N/A test')
+        test_fail(f'N/A test selection is wrong: {configured[0]}, {configured[6]}')
     for uid in (0, 1000, 65534):
         for names in ('root', 'nonroot', 'root,nonroot', 'nonroot,root', 'linux'):
             args = SimpleNamespace(profiles=names, protocol=None, use_tcp=False)
@@ -150,7 +138,7 @@ def test(context: TestContext):
         configured = config.configure_profiles(
             args, str(context.repository / 'testsuite'), str(context.repository),
             [*tests, str(pipe_only), str(tcp_only)], [str(pipe_only), str(tcp_only)], '', '')
-        if configured[0] != expected or configured[7][-1] != {
+        if configured[0] != expected or configured[6][-1] != {
                 'capability': 'transport',
                 'reasons': [f"not applicable to {'tcp' if use_tcp else 'pipe'} transport"],
                 'tests': excluded}:
@@ -177,6 +165,21 @@ def test(context: TestContext):
         return subprocess.run(args, env=nested_env, capture_output=True, text=True)
 
     binary = rsync_command_binary()
+    archived = context.repository / 'old_versions' / 'rsync_3.0.0'
+    peer_profile = context.repository / 'testsuite' / 'profiles' / 'peer-3.0.0.json'
+    daemon_access = next(path for path in tests if test_name(path) == 'daemon-access')
+    cli_transfers = next(path for path in tests if test_name(path) == 'cli-transfers')
+    for archived_role, primary, secondary, expected in (
+            ('primary', archived, binary, {'daemon-access'}),
+            ('secondary', binary, archived, {'daemon-access', 'cli-transfers'})):
+        args = SimpleNamespace(profiles=str(peer_profile), protocol=None, use_tcp=False,
+                               archived_role=archived_role)
+        configured = config.configure_profiles(
+            args, str(context.repository / 'testsuite'), str(context.repository), tests,
+            [daemon_access, cli_transfers], str(primary), str(secondary))
+        if {test_name(path) for path in configured[0]} != expected:
+            test_fail(f'{archived_role} role selected the wrong version-mix tests')
+
     wrong_peer = context.scratch / 'different-peer'
     wrong_peer.write_text('different executable\n')
     self_args = SimpleNamespace(profiles='self-peer', protocol=None, use_tcp=False)
@@ -270,19 +273,20 @@ def test(context: TestContext):
     data = json.loads(receipt.read_text())
     if data['run']['euid'] != os.geteuid() or data['run']['profiles'] != [role]:
         test_fail('the receipt identifies the wrong privilege profile')
-    profile.write_text(json.dumps({'peer': peer, 'protocol': protocol + 1}))
-    mismatch = invoke(command)
+    profile.write_text(json.dumps({'version': peer, 'protocol': protocol + 1}))
+    mismatch = invoke(command + ['--archived-role=secondary'])
     if mismatch.returncode != Exit.ERROR or 'profile protocol' not in mismatch.stderr:
         test_fail('a mismatched peer protocol was accepted')
 
-    profile.write_text(json.dumps({'peer': peer, 'protocol': protocol,
-                                   'xfail': {'alt-dest': 'test-fixture'}}))
-    result = invoke(command)
+    profile.write_text(json.dumps({'version': peer, 'protocol': protocol}))
+    result = invoke(command + ['--archived-role=secondary'])
     if result.returncode:
         test_fail(f'nested runner failed: {result.stdout}{result.stderr}')
     data = json.loads(receipt.read_text())
     if (data['summary']['exit_code'] or data['run']['selected'] != ['cli-transfers']
-            or data['run']['peer_version'] != peer or data['run']['protocol'] != protocol
+            or data['run']['archived_version'] != peer
+            or data['run']['archived_role'] != 'secondary'
+            or data['run']['protocol'] != protocol
             or data['run']['profiles'] != [f'peer-{peer}']
             or data['summary']['verdicts'] != {'pass': 1}):
         test_fail('receipt summary or selection is wrong')
@@ -291,7 +295,7 @@ def test(context: TestContext):
             or list(context.scratch.glob(f'.{receipt.name}.*.tmp'))):
         test_fail('receipt result is wrong')
 
-    fixture = context.scratch / 'self-xfail'
+    fixture = context.scratch / 'self-profile'
     testdir = fixture / 'testsuite' / 'tests'
     testdir.mkdir(parents=True)
     profile = fixture / 'profile.json'
@@ -299,39 +303,6 @@ def test(context: TestContext):
     command = [sys.executable, str(context.repository / 'testsuite' / 'runtests.py'), 'conditional',
                f'--rsync-bin={binary}', f'--tooldir={context.tools}', f'--srcdir={fixture}',
                f'--profiles={profile}', f'--receipt={receipt}']
-    xfail = {'xfail': {'conditional': 'issue-1'}}
-    cases = (
-        (78, {}, 1, 'xfail', 'profile_error', 'pass'),
-        (78, xfail, 0, 'xfail', 'xfail', 'xfail:issue-1'),
-        (1, xfail, 0, 'fail', 'xfail', 'xfail:issue-1'),
-        (0, xfail, 1, 'pass', 'unexpected_pass', 'xfail:issue-1'),
-        (2, xfail, 1, 'error', 'profile_error', 'xfail:issue-1'),
-        (3, xfail, 1, 'error', 'profile_error', 'xfail:issue-1'),
-        (256, {}, 1, 'error', 'error', 'pass'),
-        (77, xfail, 1, 'skip', 'profile_error', 'xfail:issue-1'),
-    )
-    for code, policy, exit_code, outcome, verdict, expected in cases:
-        (testdir / 'conditional.py').write_text(f'raise SystemExit({code})\n')
-        profile.write_text(json.dumps(policy))
-        result = invoke(command)
-        if result.returncode != exit_code:
-            test_fail(f'wrong runner exit for {code}: {result.stdout}{result.stderr}')
-        data = json.loads(receipt.read_text())
-        record = data['tests'][0]
-        if (record['outcome'], record['verdict'], record['expected']) != (outcome, verdict, expected):
-            test_fail(f'wrong receipt for {code}: {record}')
-        counts = data['summary']
-        if (counts['failed'] != exit_code or counts['xfailed'] != (verdict == 'xfail')
-                or counts['passed'] != (verdict == 'pass')):
-            test_fail(f'wrong summary for {code}: {counts}')
-
-    (testdir / 'conditional.py').write_text('raise SystemExit(78)\n')
-    result = invoke(command + ['--profiles='])
-    record = json.loads(receipt.read_text())['tests'][0]
-    if (result.returncode != 1 or record['outcome'] != 'xfail'
-            or record['verdict'] != 'profile_error' or 'expected' in record):
-        test_fail('an unprofiled xfail was accepted')
-
     unsupported = ('import os\nfrom pathlib import Path\n'
                    'Path(os.environ["scratchdir"], "unsupported").write_text("fixture\\n")\n'
                    'raise SystemExit(77)\n')
@@ -340,7 +311,6 @@ def test(context: TestContext):
         ({}, True, 1, 'profile_error', 'pass'),
         (allowed, True, 0, 'unsupported', 'unsupported:fixture'),
         (allowed, False, 1, 'profile_error', 'pass'),
-        ({**allowed, **xfail}, True, 1, 'profile_error', 'xfail:issue-1'),
     )
     for policy, declared, exit_code, verdict, expected in cases:
         prefix = ("from harness import metadata\n"
@@ -364,7 +334,7 @@ def test(context: TestContext):
     selection[2:3] = ['conditional', 'ordinary']
     result = invoke(selection)
     data = json.loads(receipt.read_text())
-    if (result.returncode or data['schema'] != 2 or data['run']['selected'] != ['ordinary']
+    if (result.returncode or data['schema'] != 3 or data['run']['selected'] != ['ordinary']
             or data['run']['not_applicable'] != [{
                 'capability': 'fixture', 'reasons': ['fixture partition'],
                 'tests': ['conditional']}]
@@ -383,7 +353,7 @@ def test(context: TestContext):
         test_fail(f'applicable test was not restored to the run: {data}')
     ordinary.unlink()
 
-    profile.write_text(json.dumps(xfail))
+    profile.write_text('{}')
     cases = (
         ("raise RuntimeError('fixture failed')\n", []),
         ('import rsync_missing_fixture_module\n', []),
@@ -399,14 +369,14 @@ def test(context: TestContext):
         if not receipt.is_file():
             test_fail(f'a terminated test disappeared without a receipt: {result.stderr}')
         record = json.loads(receipt.read_text())['tests'][0]
-        if result.returncode != Exit.FAIL or record['outcome'] != 'error' or record['verdict'] != 'profile_error':
-            test_fail(f'a terminated test was accepted as an expected failure: {record}')
+        if result.returncode != Exit.FAIL or record['outcome'] != 'error' or record['verdict'] != 'error':
+            test_fail(f'a terminated test was not reported as an error: {record}')
 
     (testdir / 'conditional.py').write_text('assert False\n')
     result = invoke(command)
     record = json.loads(receipt.read_text())['tests'][0]
-    if result.returncode or record['outcome'] != 'fail' or record['verdict'] != 'xfail':
-        test_fail('an assertion failure was not retained as a test failure')
+    if result.returncode != Exit.FAIL or record['outcome'] != 'fail' or record['verdict'] != 'fail':
+        test_fail('an assertion failure was accepted')
 
     profile.write_text('{}')
     sibling = testdir / 'sibling.py'
@@ -440,10 +410,10 @@ def test(context: TestContext):
     qualified.write_text("from harness import metadata\nmetadata(transports={'pipe'}, tags={'version-mix'})\n")
     (testdir / 'conditional.py').write_text('def broken(\n')
     peer_profile = fixture / f'peer-{peer}.json'
-    peer_profile.write_text(json.dumps({'peer': peer, 'protocol': protocol}))
+    peer_profile.write_text(json.dumps({'version': peer, 'protocol': protocol}))
     selection = command.copy()
     selection[2:3] = ['conditional', 'qualified']
-    result = invoke(selection + [f'--profiles={peer_profile}'])
+    result = invoke(selection + [f'--profiles={peer_profile}', '--archived-role=secondary'])
     if result.returncode != Exit.ERROR or 'transport metadata' not in result.stderr or receipt.exists():
         test_fail('peer selection accepted an unclassified test')
     qualified.unlink()

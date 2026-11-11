@@ -18,7 +18,11 @@ from harness.rsync import rsh_cmd
 from harness.xattrs import is_supported as xattrs_supported
 from harness import metadata
 
-metadata(features={'daemon', 'filesystem-specials', 'legacy_peer', 'remote-shell'}, transports={'pipe', 'tcp'}, min_peer='3.0.0', cost='expensive', mutates={'filesystem', 'process', 'socket'}, tags={'compatibility', 'metadata', 'transfer', 'version-mix'})
+metadata(features={'daemon', 'filesystem-specials', 'legacy_peer', 'remote-shell'},
+         transports={'pipe', 'tcp'},
+         min_peer={'primary': '3.2.0', 'secondary': '3.0.0'}, cost='expensive',
+         mutates={'filesystem', 'process', 'socket'},
+         tags={'compatibility', 'metadata', 'transfer', 'version-mix'})
 
 SSH = rsh_cmd()
 DAEMON_PORT_OLD = 12931

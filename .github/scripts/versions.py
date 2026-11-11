@@ -5,14 +5,21 @@ import signal
 import subprocess
 import sys
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'testsuite'))
+from harness.profile import load_binaries
+
 
 def main():
-    argparse.ArgumentParser(description='Run historical-peer checks').parse_args()
-    output = Path('test-results/version-mix')
-    output.mkdir(parents=True)
-    peers = sorted(Path('old_versions').glob('rsync_*'))
-    if not peers:
-        raise ValueError('No historical peers found')
+    parser = argparse.ArgumentParser(description='Run historical-peer checks')
+    parser.add_argument('--role', choices=('primary', 'secondary'), required=True)
+    parser.add_argument('--current', default='rsync', help='Current rsync executable')
+    parser.add_argument('--output', default='test-results/version-mix', help='Result directory')
+    args = parser.parse_args()
+    output = Path(args.output)
+    output.mkdir(parents=True, exist_ok=True)
+    archive = Path('old_versions')
+    records = load_binaries(archive)
+    current = Path(args.current).resolve(strict=True)
     status = 0
     active = None
 
@@ -30,20 +37,30 @@ def main():
 
     previous = {sig: signal.signal(sig, cancel) for sig in (signal.SIGTERM, signal.SIGINT)}
     try:
-        for peer in peers:
+        for name in sorted(records, key=lambda value: tuple(
+                int(part) for part in value.removeprefix('rsync_').split('.'))):
+            peer = archive / name
             peer.chmod(peer.stat().st_mode | 0o111)
-            profile = 'peer-' + peer.name.removeprefix('rsync_')
+            version = peer.name.removeprefix('rsync_')
+            profile = 'peer-' + version
+            primary, secondary = ((peer.resolve(), current) if args.role == 'primary'
+                                  else (current, peer.resolve()))
             for transport in ('pipe', 'tcp'):
-                print(f'::group::{peer.name} ({transport})', flush=True)
+                label = f'{peer.name} ({args.role}, {transport})'
+                profiles = ['non-asan', 'nonroot', 'linux', profile]
+                if transport == 'pipe':
+                    profiles.insert(0, 'pipe')
+                print(f'::group::{label}', flush=True)
                 try:
-                    command = [sys.executable, '-S', 'testsuite/tools/check.py', '.', './rsync',
-                               f'linux,pre-3.4.3,{profile}', str(output / f'{peer.name}-{transport}'),
-                               f'--rsync-bin2={peer.resolve()}', '-j8']
+                    command = [sys.executable, '-S', 'testsuite/tools/check.py', '.', str(primary),
+                               ','.join(profiles),
+                               str(output / f'{peer.name}-{args.role}-{transport}'),
+                               f'--rsync-bin2={secondary}', f'--archived-role={args.role}', '-j8']
                     if transport == 'tcp':
                         command += ['--use-tcp', '--daemon-tests-only']
                     active = subprocess.Popen(command, env={**os.environ, 'PYTHONDONTWRITEBYTECODE': '1'})
                     if active.wait():
-                        print(f'::error::Version mix failed: {peer.name} ({transport})', file=sys.stderr)
+                        print(f'::error::Version mix failed: {label}', file=sys.stderr)
                         status = 1
                 finally:
                     active = None

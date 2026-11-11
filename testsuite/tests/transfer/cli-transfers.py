@@ -8,7 +8,10 @@ from harness.comparison import checkit
 from harness.results import test_fail
 from harness.rsync import rsh_cmd, rsync_argv, rsync_path_arg, run_rsync
 
-@requires(features={'remote-shell'}, transports={'pipe', 'tcp'}, min_peer='2.6.0', mutates={'environment', 'filesystem'}, tags={'compatibility', 'smoke', 'transfer', 'version-mix'})
+@requires(features={'remote-shell'}, transports={'pipe', 'tcp'},
+          min_peer={'primary': '3.2.7', 'secondary': '2.6.0'},
+          mutates={'environment', 'filesystem'},
+          tags={'compatibility', 'smoke', 'transfer', 'version-mix'})
 def test(context: TestContext):
     source_root = context.source
     destination = context.destination

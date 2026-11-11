@@ -170,7 +170,7 @@ def run_one_test(testscript, testbase, scratchdir, base_env, timeout,
 
     output_parts = []
 
-    show_log = always_log or (result not in (Exit.PASS, Exit.SKIP, Exit.XFAIL))
+    show_log = always_log or result not in (Exit.PASS, Exit.SKIP)
     if show_log:
         output_parts.append(f'----- {testbase} log follows')
         try:
@@ -204,8 +204,6 @@ def run_one_test(testscript, testbase, scratchdir, base_env, timeout,
             pass
         label = 'UNSUPPORTED' if unsupported else 'SKIP'
         output_parts.append(f'{label}    {testbase} ({skipped_reason})')
-    elif result == Exit.XFAIL:
-        output_parts.append(f'XFAIL   {testbase}')
     else:
         label = 'FAIL' if result == Exit.FAIL else 'ERROR'
         output_parts.append(f'{label}    {testbase}')
@@ -218,9 +216,10 @@ _print_lock = threading.Lock()
 def print_run_header(args, tooldir, srcdir, scratchbase, rsync_cmd, rsync_peer_cmd, tls_args):
     print('=' * 60)
     print(f'{sys.argv[0]} running in {tooldir}')
-    print(f'    rsync_bin={rsync_cmd}')
+    print(f'    primary={rsync_cmd}')
     if rsync_peer_cmd != rsync_cmd:
-        print(f'    rsync_peer={rsync_peer_cmd}')
+        print(f'    secondary={rsync_peer_cmd}')
+        print(f'    archived_role={args.archived_role}')
     print(f'    srcdir={srcdir}')
     print(f'    TLS_ARGS={tls_args}')
     print(f'    testuser={config.get_testuser()}')
@@ -277,8 +276,18 @@ def main():
     if args.check_receipt:
         try:
             data = read_receipt(args.check_receipt)
-            if args.rsync_bin and data['run'].get('binary_sha256') != file_digest(args.rsync_bin):
-                raise ValueError('receipt identifies a different binary')
+            if args.rsync_bin:
+                if data['run'].get('primary_sha256') != file_digest(args.rsync_bin):
+                    raise ValueError('receipt identifies a different primary binary')
+                if data['run'].get('primary_version') != config.binary_identity(args.rsync_bin)[0]:
+                    raise ValueError('receipt identifies a different primary version')
+            if args.rsync_bin2:
+                if data['run'].get('secondary_sha256') != file_digest(args.rsync_bin2):
+                    raise ValueError('receipt identifies a different secondary binary')
+                if data['run'].get('secondary_version') != config.binary_identity(args.rsync_bin2)[0]:
+                    raise ValueError('receipt identifies a different secondary version')
+            if args.archived_role is not None and data['run'].get('archived_role') != args.archived_role:
+                raise ValueError('receipt identifies a different archived role')
             if args.profiles is not None:
                 expected = [Path(value.strip()).name for value in args.profiles.split(',') if value.strip()]
                 expected = [value[:-5] if value.endswith('.json') else value for value in expected]
@@ -335,8 +344,8 @@ def main():
               f'{len(dropped)} test(s) that cannot observe the transport')
 
     try:
-        (tests, profiles, profile_peer, effective_protocol,
-         profile_unsupported, profile_xfail, transport,
+        (tests, profiles, profile_version, effective_protocol,
+         profile_unsupported, transport,
          not_applicable) = config.configure_profiles(
             args, suitedir, srcdir, all_tests, tests, rsync_bin, rsync_bin2)
     except (OSError, ValueError, json.JSONDecodeError) as error:
@@ -346,20 +355,24 @@ def main():
     if not tests:
         sys.stderr.write('runtests.py: no tests selected\n')
         sys.exit(Exit.ERROR)
-    if rsync_bin != rsync_bin2:
-        try:
-            versions = [config.binary_identity(binary)[0] for binary in (rsync_bin, rsync_bin2)]
-        except ValueError as error:
-            sys.stderr.write(f'runtests.py: {error}\n')
-            sys.exit(Exit.ERROR)
-        if any(int(version.split('.')[0]) < 3 for version in versions):
-            tls_args = ' '.join(argument for argument in tls_args.split() if argument != '-l')
+    try:
+        primary_version, _ = config.binary_identity(rsync_bin)
+        secondary_version = (primary_version if rsync_bin == rsync_bin2
+                             else config.binary_identity(rsync_bin2)[0])
+    except ValueError as error:
+        sys.stderr.write(f'runtests.py: {error}\n')
+        sys.exit(Exit.ERROR)
+    if any(int(version.split('.')[0]) < 3 for version in (primary_version, secondary_version)):
+        tls_args = ' '.join(argument for argument in tls_args.split() if argument != '-l')
     identity = {}
     if args.receipt:
         try:
             revision, dirty = source_identity(srcdir)
             identity = {'source_revision': revision, 'source_dirty': dirty, 'euid': os.geteuid(),
-                        'binary_sha256': file_digest(rsync_bin), 'peer_sha256': file_digest(rsync_bin2)}
+                        'primary_sha256': file_digest(rsync_bin),
+                        'secondary_sha256': file_digest(rsync_bin2),
+                        'primary_version': primary_version,
+                        'secondary_version': secondary_version}
         except OSError as error:
             sys.stderr.write(f'runtests.py: cannot identify test inputs: {error}\n')
             sys.exit(Exit.ERROR)
@@ -377,8 +390,6 @@ def main():
         return max(args.timeout, 600) if metadata.get('cost') == 'expensive' else args.timeout
 
     def expected_outcome(name, unsupported=''):
-        if name in profile_xfail:
-            return f'xfail:{profile_xfail[name]}'
         metadata = metadata_by_test.get(name) or {}
         if unsupported in profile_unsupported and unsupported in metadata.get('features', ()):
             return f'unsupported:{unsupported}'
@@ -386,7 +397,7 @@ def main():
 
     def mismatch(name, actual, unsupported=''):
         verdict = verdict_of(actual, expected_outcome(name, unsupported))
-        return verdict not in ('pass', 'xfail', 'unsupported')
+        return verdict not in ('pass', 'unsupported')
 
     test_order = {test_name(test): index for index, test in enumerate(tests)}
 
@@ -394,14 +405,13 @@ def main():
     failed = 0
     skipped = 0
     unsupported_count = 0
-    xfailed = 0
     outcomes = {}
     unsupported_outcomes = {}
     durations = {}
     test_results = {}
 
     def process_result(result):
-        nonlocal passed, failed, skipped, unsupported_count, xfailed
+        nonlocal passed, failed, skipped, unsupported_count
         with _print_lock:
             if result.output:
                 print(result.output)
@@ -419,8 +429,6 @@ def main():
             unsupported_count += 1
         elif verdict == 'skip':
             skipped += 1
-        elif verdict == 'xfail':
-            xfailed += 1
         else:
             failed += 1
         is_failure = (mismatch(result.name, outcome, result.unsupported) if profiles
@@ -504,8 +512,6 @@ def main():
     print(f'      {passed} passed')
     if failed > 0:
         print(f'      {failed} failed')
-    if xfailed > 0:
-        print(f'      {xfailed} xfailed (expected)')
     if skipped > 0:
         print(f'      {skipped} skipped')
     if unsupported_count > 0:
@@ -532,12 +538,13 @@ def main():
             records.append(record)
             verdicts[record['verdict']] = verdicts.get(record['verdict'], 0) + 1
         data = {
-            'schema': 2,
+            'schema': 3,
             'run': {
                 **identity,
-                'binary': rsync_cmd,
-                'peer': rsync_peer_cmd,
-                'peer_version': profile_peer,
+                'primary': rsync_cmd,
+                'secondary': rsync_peer_cmd,
+                'archived_version': profile_version,
+                'archived_role': args.archived_role,
                 'profiles': [profile.name for profile in profiles],
                 'protocol': effective_protocol,
                 'transport': transport,
@@ -552,7 +559,6 @@ def main():
                 'failed': failed,
                 'skipped': skipped,
                 'unsupported': unsupported_count,
-                'xfailed': xfailed,
                 'not_applicable': not_applicable_count,
                 'not_applicable_reasons': {
                     group['capability']: len(group['tests']) for group in not_applicable

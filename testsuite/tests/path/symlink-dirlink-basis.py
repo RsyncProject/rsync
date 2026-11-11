@@ -10,7 +10,10 @@ from harness.results import test_fail
 from harness.rsync import rsh_cmd, rsync_argv, rsync_path_arg
 from harness import metadata
 
-metadata(features={'remote-shell', 'symlink'}, transports={'pipe', 'tcp'}, min_peer='2.6.3', mutates={'filesystem', 'process'}, tags={'compatibility', 'security', 'transfer', 'version-mix'})
+metadata(features={'remote-shell', 'symlink'}, transports={'pipe', 'tcp'},
+         min_peer={'primary': '2.6.3', 'secondary': '3.4.3'},
+         mutates={'filesystem', 'process'},
+         tags={'compatibility', 'security', 'transfer', 'version-mix'})
 
 os.environ['RSYNC_RSH'] = rsh_cmd()
 

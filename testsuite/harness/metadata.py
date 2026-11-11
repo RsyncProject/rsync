@@ -4,14 +4,14 @@ import ast
 import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Callable, Iterable, Optional
+from typing import Callable, Iterable, Optional, Union
 
 @dataclass(frozen=True)
 class Requirements:
     features: tuple[str, ...] = ()
     protocols: tuple[int, ...] = ()
     transports: tuple[str, ...] = ()
-    min_peer: Optional[str] = None
+    min_peer: Union[str, dict[str, str], None] = None
     cost: str = 'normal'
     mutates: tuple[str, ...] = ()
     tags: tuple[str, ...] = ()
@@ -24,8 +24,14 @@ class Requirements:
             raise ValueError('protocols must be positive integers')
         if self.transports and set(self.transports) - {'pipe', 'tcp'}:
             raise ValueError('invalid transport')
-        if self.min_peer is not None and (not isinstance(self.min_peer, str)
-                                          or not re.fullmatch(r'\d+(?:\.\d+)+', self.min_peer)):
+        if isinstance(self.min_peer, dict):
+            if set(self.min_peer) != {'primary', 'secondary'}:
+                raise ValueError('role-specific minimum peers require both roles')
+            minimums = self.min_peer.values()
+        else:
+            minimums = () if self.min_peer is None else (self.min_peer,)
+        if any(not isinstance(value, str) or not re.fullmatch(r'\d+(?:\.\d+)+', value)
+               for value in minimums):
             raise ValueError('invalid minimum peer')
         if self.cost not in ('normal', 'expensive', 'stress'):
             raise ValueError('invalid cost')
@@ -157,13 +163,18 @@ def read_requirements(path) -> Optional[dict]:
     values['features'] = tuple(sorted(features))
     return values
 
-def applies_to_peer(requirements, peer, protocol, transport=None):
+def applies_to_peer(requirements, peer, protocol, transport=None, role=None):
     if not requirements or 'version-mix' not in requirements['tags']:
         return False
-    if requirements['min_peer']:
+    minimum = requirements['min_peer']
+    if isinstance(minimum, dict):
+        if role not in minimum:
+            raise ValueError('role-specific minimum peer requires an archived role')
+        minimum = minimum[role]
+    if minimum:
         current = tuple(int(part) for part in peer.split('.'))
-        minimum = tuple(int(part) for part in requirements['min_peer'].split('.'))
-        if current < minimum:
+        required = tuple(int(part) for part in minimum.split('.'))
+        if current < required:
             return False
     if requirements['protocols'] and protocol not in requirements['protocols']:
         return False

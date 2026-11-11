@@ -14,7 +14,8 @@ check = runpy.run_path(str(checker))['check']
 
 class Results(unittest.TestCase):
     def setUp(self):
-        self.expected = dict(linux='true', diagnostics='true', bsd='false', macos='true', other='true')
+        self.expected = dict(linux='true', diagnostics='true', bsd='false', macos='true',
+                             other='true', versions='true', android='true')
         self.data = {
             'linux': {'result': 'success', 'outputs': {
                 'jobs': json.dumps({'ubuntu': {'result': 'success'}, 'almalinux': {'result': 'skipped'}}),
@@ -28,9 +29,12 @@ class Results(unittest.TestCase):
             'macos': {'result': 'success', 'outputs': {
                 'jobs': json.dumps({'macos': {'result': 'success'}})}},
             'other': {'result': 'success', 'outputs': {
-                'jobs': json.dumps({'cygwin': {'result': 'success'}, 'solaris': {'result': 'skipped'},
-                                    'versions': {'result': 'success'}}),
-                'inputs': json.dumps({'cygwin': True, 'solaris': False, 'versions': True})}},
+                'jobs': json.dumps({'cygwin': {'result': 'success'}, 'solaris': {'result': 'skipped'}}),
+                'inputs': json.dumps({'cygwin': True, 'solaris': False})}},
+            'versions': {'result': 'success', 'outputs': {
+                'jobs': json.dumps({'mix': {'result': 'success'}})}},
+            'android': {'result': 'success', 'outputs': {
+                'jobs': json.dumps({'build': {'result': 'success'}})}},
         }
 
     def reject(self):
@@ -138,7 +142,7 @@ class Results(unittest.TestCase):
         self.reject()
 
     def test_every_family_requires_nested_results(self):
-        for name in ('linux', 'diagnostics', 'macos', 'other'):
+        for name in ('linux', 'diagnostics', 'macos', 'other', 'versions', 'android'):
             original = self.data[name]['outputs']
             with self.subTest(family=name):
                 self.data[name]['outputs'] = {}
@@ -150,8 +154,8 @@ class Results(unittest.TestCase):
             self.reject()
 
     def test_other_selections(self):
-        names = ('cygwin', 'solaris', 'versions')
-        for bits in range(1, 8):
+        names = ('cygwin', 'solaris')
+        for bits in range(1, 4):
             inputs = {name: bool(bits & (1 << i)) for i, name in enumerate(names)}
             jobs = {name: {'result': 'success' if inputs[name] else 'skipped'} for name in names}
             self.data['other']['outputs'] = {'jobs': json.dumps(jobs), 'inputs': json.dumps(inputs)}

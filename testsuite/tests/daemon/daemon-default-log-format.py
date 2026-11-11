@@ -8,7 +8,9 @@ from harness.filesystem import assert_same
 from harness.results import test_fail
 from harness.rsync import run_rsync
 
-metadata(features={'daemon'}, transports={'pipe'}, min_peer='2.6.0', tags={'configuration', 'daemon', 'version-mix'})
+metadata(features={'daemon'}, transports={'pipe'},
+         min_peer={'primary': '2.6.0', 'secondary': '3.2.2'},
+         tags={'configuration', 'daemon', 'version-mix'})
 
 FROMDIR.mkdir()
 (FROMDIR / 'logging-marker').write_text('contents\n')

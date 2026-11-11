@@ -76,10 +76,12 @@ def parse_args():
     parser.add_argument('--rsync-bin', default=None, metavar='PATH',
                    help='Path to rsync binary (default: ./rsync)')
     parser.add_argument('--rsync-bin2', default=None, metavar='PATH',
-                   help='Path to a second ("peer") rsync binary used for the '
+                   help='Path to the secondary rsync binary used for the '
                         'daemon side and remote-shell --rsync-path. Lets the '
                         'suite mix two rsync versions over the wire. Default: '
                         'same as --rsync-bin (no version mixing).')
+    parser.add_argument('--archived-role', choices=('primary', 'secondary'),
+                   help='Role occupied by the archived release in a version-mix run')
     parser.add_argument('--tooldir', default=None, metavar='DIR',
                    help='Tool/build directory (default: cwd)')
     parser.add_argument('--srcdir', default=None, metavar='DIR',
@@ -335,10 +337,10 @@ def validate_run_paths(tooldir, srcdir, rsync_bin, rsync_bin2):
 
 def configure_profiles(args, suitedir, srcdir, all_tests, tests,
                        rsync_bin, rsync_bin2):
+    archived_role = getattr(args, 'archived_role', None)
     requirements_by_path = {
         os.fspath(path): read_requirements(path) for path in tests
     }
-    known_tests = {test_name(test) for test in all_tests}
     profiles = []
     for item in (value.strip() for value in args.profiles.split(',')):
         if not item:
@@ -348,7 +350,7 @@ def configure_profiles(args, suitedir, srcdir, all_tests, tests,
             path = os.path.join(suitedir, 'profiles', filename)
         else:
             path = item if os.path.isabs(item) else os.path.join(srcdir, item)
-        profiles.append(load_profile(path, known_tests))
+        profiles.append(load_profile(path))
 
     if args.profiles and not profiles:
         raise ValueError('no profiles selected')
@@ -358,38 +360,38 @@ def configure_profiles(args, suitedir, srcdir, all_tests, tests,
     for role in roles:
         if (role == 'root') != (os.geteuid() == 0):
             raise ValueError(f'{role} profile does not match effective UID {os.geteuid()}')
-    peer, profile_protocol, not_applicable, unsupported, xfail = merge_profiles(profiles)
+    profile_version, profile_protocol, not_applicable, unsupported = merge_profiles(profiles)
+    if bool(profile_version) != bool(archived_role):
+        raise ValueError('version profiles require exactly one archived role')
     if any(profile.name == 'self-peer' for profile in profiles):
-        if peer or file_digest(rsync_bin) != file_digest(rsync_bin2):
+        if profile_version or archived_role or file_digest(rsync_bin) != file_digest(rsync_bin2):
             raise ValueError('self-peer profile requires the same executable in both roles')
     transport = 'tcp' if args.use_tcp else 'pipe'
     tests, excluded = select_applicable_tests(tests, not_applicable, requirements_by_path)
     tests, transport_excluded = select_transport_tests(tests, transport, requirements_by_path)
     excluded.extend(transport_excluded)
-    excluded_names = {name for group in excluded for name in group['tests']}
-    invalid = sorted(set(xfail) & excluded_names)
-    if invalid:
-        raise ValueError(f'expected failures do not apply: {", ".join(invalid)}')
     effective_protocol = args.protocol
-    if profile_protocol and not peer:
+    if profile_protocol and not profile_version:
         if args.protocol != profile_protocol:
             raise ValueError(
                 f'profile protocol {profile_protocol} does not match '
                 f'{args.protocol or "the default protocol"}')
         effective_protocol = profile_protocol
 
-    if not peer:
-        return tests, profiles, peer, effective_protocol, unsupported, xfail, transport, excluded
+    if not profile_version:
+        return tests, profiles, profile_version, effective_protocol, unsupported, transport, excluded
 
-    _, current_protocol = binary_identity(rsync_bin)
-    actual_peer, actual_peer_protocol = binary_identity(rsync_bin2)
-    if actual_peer != peer:
-        raise ValueError(f'profile peer {peer} does not match {actual_peer}')
-    if actual_peer_protocol != profile_protocol:
+    primary_version, primary_protocol = binary_identity(rsync_bin)
+    secondary_version, secondary_protocol = binary_identity(rsync_bin2)
+    archived_version = primary_version if archived_role == 'primary' else secondary_version
+    archived_protocol = primary_protocol if archived_role == 'primary' else secondary_protocol
+    if archived_version != profile_version:
+        raise ValueError(f'profile version {profile_version} does not match {archived_version}')
+    if archived_protocol != profile_protocol:
         raise ValueError(
-            f'profile protocol {profile_protocol} does not match {actual_peer_protocol}')
-    effective_protocol = min(current_protocol, actual_peer_protocol,
-                             args.protocol if args.protocol is not None else current_protocol)
+            f'profile protocol {profile_protocol} does not match {archived_protocol}')
+    effective_protocol = min(primary_protocol, secondary_protocol,
+                             args.protocol if args.protocol is not None else primary_protocol)
     for test in all_tests:
         key = os.fspath(test)
         if key not in requirements_by_path:
@@ -400,14 +402,9 @@ def configure_profiles(args, suitedir, srcdir, all_tests, tests,
     missing = [name for name, values in requirements.items() if not values or not values['transports']]
     if missing:
         raise ValueError(f'tests without transport metadata: {", ".join(sorted(missing))}')
-    eligible = {name for name, values in requirements.items()
-                if applies_to_peer(values, peer, profile_protocol)}
-    invalid = sorted(set(xfail) - eligible)
-    if invalid:
-        raise ValueError(f'peer deviations do not apply: {", ".join(invalid)}')
     tests = [test for test in tests
-             if applies_to_peer(requirements[test_name(test)], peer,
-                                effective_protocol, transport)]
+             if applies_to_peer(requirements[test_name(test)], profile_version,
+                                effective_protocol, transport, archived_role)]
     if not tests:
-        raise ValueError(f'no tests apply to peer {peer}')
-    return tests, profiles, peer, effective_protocol, unsupported, xfail, transport, excluded
+        raise ValueError(f'no tests apply to archived release {profile_version}')
+    return tests, profiles, profile_version, effective_protocol, unsupported, transport, excluded

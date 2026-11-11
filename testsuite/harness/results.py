@@ -12,7 +12,6 @@ class Exit(enum.IntEnum):
     FAIL = 1
     ERROR = 2
     SKIP = 77
-    XFAIL = 78
 
 def unique_object(pairs):
     data = {}
@@ -23,15 +22,9 @@ def unique_object(pairs):
     return data
 
 def verdict_of(outcome, expected):
-    if expected and expected.startswith('xfail'):
-        if outcome in ('fail', 'xfail'):
-            return 'xfail'
-        return 'unexpected_pass' if outcome == 'pass' else 'profile_error'
-    if outcome == 'xfail':
-        return 'profile_error'
     if expected and expected.startswith('unsupported'):
         return 'unsupported' if outcome == 'unsupported' else 'profile_error'
-    if expected == 'pass' and outcome in ('skip', 'unsupported', 'xfail'):
+    if expected == 'pass' and outcome in ('skip', 'unsupported'):
         return 'profile_error'
     return outcome
 
@@ -52,8 +45,6 @@ class TestResult:
             return 'fail'
         if self.exit_code == Exit.SKIP:
             return 'unsupported' if self.unsupported else 'skip'
-        if self.exit_code == Exit.XFAIL:
-            return 'xfail'
         return 'error'
 
     def record(self, expected=None):
@@ -90,7 +81,7 @@ def write_receipt(path, data):
 
 def read_receipt(path):
     data = json.loads(Path(path).read_text(encoding='utf-8'), object_pairs_hook=unique_object)
-    if not isinstance(data, dict) or type(data.get('schema')) is not int or data['schema'] != 2:
+    if not isinstance(data, dict) or type(data.get('schema')) is not int or data['schema'] != 3:
         raise ValueError('unsupported receipt schema')
     run, records, summary = data.get('run'), data.get('tests'), data.get('summary')
     if not isinstance(run, dict) or not isinstance(records, list) or not isinstance(summary, dict):
@@ -101,10 +92,31 @@ def read_receipt(path):
     if len(set(selected)) != len(selected) or not isinstance(profiles, list) \
             or any(not isinstance(name, str) or not name for name in profiles):
         raise ValueError('invalid test selection or profiles')
-    for field in ('binary_sha256', 'peer_sha256'):
+    for field in ('primary_sha256', 'secondary_sha256'):
         if not isinstance(run.get(field), str) or not re.fullmatch('[0-9a-f]{64}', run[field]):
             raise ValueError('invalid executable identity')
-    if 'self-peer' in profiles and run['binary_sha256'] != run['peer_sha256']:
+    for field in ('primary', 'secondary'):
+        if not isinstance(run.get(field), str) or not run[field]:
+            raise ValueError('invalid executable command')
+    for field in ('primary_version', 'secondary_version'):
+        if not isinstance(run.get(field), str) or not re.fullmatch(r'\d+(?:\.\d+)+', run[field]):
+            raise ValueError('invalid executable version')
+    archived_role, archived_version = run.get('archived_role'), run.get('archived_version')
+    if archived_role not in (None, 'primary', 'secondary') or bool(archived_role) != bool(archived_version):
+        raise ValueError('invalid archived binary identity')
+    if archived_role and (not isinstance(archived_version, str)
+                          or archived_version != run[f'{archived_role}_version']):
+        raise ValueError('archived version does not match its role')
+    version_profiles = []
+    for name in profiles:
+        match = re.fullmatch(r'peer-(\d+(?:\.\d+)+)', name)
+        if match:
+            version_profiles.append(match.group(1))
+    if (len(version_profiles) > 1 or bool(version_profiles) != bool(archived_role)
+            or (version_profiles and version_profiles[0] != archived_version)):
+        raise ValueError('archived version does not match its profile')
+    if 'self-peer' in profiles and (run['primary_sha256'] != run['secondary_sha256']
+            or run['primary_version'] != run['secondary_version'] or archived_role):
         raise ValueError('self-peer receipt identifies different executables')
     groups = run.get('not_applicable')
     if not isinstance(groups, list) or any(not isinstance(group, dict)
@@ -127,7 +139,8 @@ def read_receipt(path):
         if not isinstance(name, str) or name not in selected or bool(profiles) != ('expected' in record):
             raise ValueError('test result does not match the selected run')
         if expected is not None and (not isinstance(expected, str) or not (
-                expected == 'pass' or expected.startswith(('xfail:', 'unsupported:')) and expected.split(':', 1)[1])):
+                expected == 'pass' or expected.startswith('unsupported:')
+                and expected.split(':', 1)[1])):
             raise ValueError('invalid expected result')
         unsupported = record.get('unsupported', '')
         if not isinstance(unsupported, str):
@@ -147,11 +160,11 @@ def read_receipt(path):
     if len(set(names)) != len(names) or summary.get('verdicts') != dict(verdicts):
         raise ValueError('test result counts disagree')
     counts = {'passed': verdicts['pass'], 'skipped': verdicts['skip'],
-              'unsupported': verdicts['unsupported'], 'xfailed': verdicts['xfail']}
+              'unsupported': verdicts['unsupported']}
     counts['failed'] = len(records) - sum(counts.values())
     if any(type(summary.get(key)) is not int or summary[key] != value for key, value in counts.items()):
         raise ValueError('receipt summary disagrees with its results')
-    accepted = {'pass', 'xfail', 'unsupported'} | ({'skip'} if not profiles else set())
+    accepted = {'pass', 'unsupported'} | ({'skip'} if not profiles else set())
     failed = (set(names) != set(selected) or bool(set(verdicts) - accepted)
               or summary.get('valgrind_errors') or summary.get('mismatches'))
     if type(summary.get('exit_code')) is not int or summary['exit_code'] != int(bool(failed)):
@@ -173,7 +186,3 @@ def test_skipped(msg: str, capability: str = None) -> None:
         (scratch / 'unsupported').write_text(capability + '\n', encoding='utf-8')
     (scratch / 'whyskipped').write_text(msg.rstrip() + '\n', encoding='utf-8')
     sys.exit(Exit.SKIP)
-
-def test_xfail(msg: str) -> None:
-    sys.stderr.write(msg.rstrip() + '\n')
-    sys.exit(Exit.XFAIL)

@@ -7,7 +7,7 @@ from harness.filesystem import rmtree
 from harness.rsync import rsh_cmd, rsync_path_arg, run_rsync
 from harness import metadata
 
-metadata(features={'files-from', 'remote-shell'}, transports={'pipe', 'tcp'}, min_peer='2.6.0', mutates={'filesystem', 'process'}, tags={'compatibility', 'transfer', 'version-mix'})
+metadata(features={'files-from', 'remote-shell'}, transports={'pipe', 'tcp'}, min_peer='3.0.0', mutates={'filesystem', 'process'}, tags={'compatibility', 'transfer', 'version-mix'})
 
 SSH = rsh_cmd()
 

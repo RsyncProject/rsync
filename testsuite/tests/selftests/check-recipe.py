@@ -33,7 +33,7 @@ def test(context: TestContext):
     env['whichtests'] = 'must-not-run'
     env['PYTHONUNBUFFERED'] = '1'
 
-    def invoke(args, success, message=None, timeout=60, input=None):
+    def invoke(args, success, message=None, timeout=180, input=None):
         print(f'recipe: {shlex.join(args)}', flush=True)
         cancelled = False
 
@@ -102,7 +102,9 @@ def test(context: TestContext):
     receipt = json.loads((output / 'receipt.json').read_text())
     identity = receipt['run']
     digest = hashlib.sha256(Path(binary).read_bytes()).hexdigest()
-    if (identity['binary_sha256'] != digest or identity['peer_sha256'] != digest
+    if (identity['primary_sha256'] != digest or identity['secondary_sha256'] != digest
+            or identity['primary_version'] != identity['secondary_version']
+            or identity['archived_role'] is not None
             or identity['euid'] != os.geteuid() or identity['selected'] != ['cli-transfers']
             or receipt['summary']['verdicts'] != {'pass': 1}):
         test_fail('recipe receipt identifies the wrong run')
@@ -140,14 +142,14 @@ def test(context: TestContext):
     wrong = context.scratch / 'wrong-rsync'
     wrong.write_text(f'#!{sys.executable}\nraise SystemExit(1)\n')
     wrong.chmod(0o755)
-    invoke(attempt('wrong-binary', str(wrong)), False, '--version failed')
+    invoke(attempt('wrong-binary', str(wrong)), False, 'cannot determine rsync version')
     invoke(attempt('no-profile', profiles=''), False, 'Usage: check.py')
     invoke(attempt('empty-profiles', profiles=' , '), False, 'no profiles selected')
     invoke(attempt('no-tests', extra=('--exclude=*',)), False, 'no tests selected')
     invoke(attempt('fixed-inputs', extra=(f'--receipt={context.scratch / "elsewhere.json"}',
                                         f'--rsync-bin={wrong}', '--profiles=')), True)
     fixed = json.loads((context.scratch / 'fixed-inputs' / 'receipt.json').read_text())
-    if fixed['run']['binary_sha256'] != digest or fixed['run']['profiles'] != ['pipe', 'self-peer']:
+    if fixed['run']['primary_sha256'] != digest or fixed['run']['profiles'] != ['pipe', 'self-peer']:
         test_fail('runner arguments changed the recipe inputs')
     invoke([sys.executable, '-S', str(recipe), str(context.tools), binary, 'pipe,self-peer',
             str(context.scratch / 'long-parent' / ('directory' * 15)), 'daemon-unix-socket-atfd'], True)

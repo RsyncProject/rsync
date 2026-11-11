@@ -14,7 +14,10 @@ from harness.rsync import rsh_cmd
 from harness.xattrs import is_supported as xattrs_supported
 from harness import metadata
 
-metadata(features={'remote-shell', 'symlink'}, transports={'pipe', 'tcp'}, min_peer='3.0.0', cost='expensive', mutates={'filesystem', 'process'}, tags={'compatibility', 'security', 'transfer', 'version-mix'})
+metadata(features={'remote-shell', 'symlink'}, transports={'pipe', 'tcp'},
+         min_peer={'primary': '3.2.0', 'secondary': '3.0.0'}, cost='expensive',
+         mutates={'filesystem', 'process'},
+         tags={'compatibility', 'security', 'transfer', 'version-mix'})
 
 SSH = rsh_cmd()
 WITH_X = xattrs_supported()

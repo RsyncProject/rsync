@@ -11,7 +11,9 @@ from harness.results import test_fail, test_skipped
 from harness.rsync import rsh_cmd, rsync_argv, rsync_path_arg
 from harness import metadata
 
-metadata(features={'hardlinks', 'remote-shell'}, transports={'pipe', 'tcp'}, min_peer='2.6.0', cost='expensive', mutates={'filesystem', 'process'}, tags={'compatibility', 'metadata', 'transfer', 'version-mix'})
+metadata(features={'hardlinks', 'remote-shell'}, transports={'pipe', 'tcp'},
+         min_peer={'primary': '3.4.1', 'secondary': '2.6.0'}, cost='expensive',
+         mutates={'filesystem', 'process'}, tags={'compatibility', 'metadata', 'transfer', 'version-mix'})
 
 SSH = rsh_cmd()
 

@@ -13,7 +13,9 @@ from harness.results import test_fail
 from harness.rsync import rsync_argv
 from harness import metadata
 
-metadata(features={'daemon', 'filters'}, transports={'pipe', 'tcp'}, min_peer='2.6.0', mutates={'filesystem', 'process', 'socket'}, tags={'daemon', 'metadata', 'transfer', 'version-mix'})
+metadata(features={'daemon', 'filters'}, transports={'pipe', 'tcp'},
+         min_peer={'primary': '2.6.0', 'secondary': '3.1.0'},
+         mutates={'filesystem', 'process', 'socket'}, tags={'daemon', 'metadata', 'transfer', 'version-mix'})
 
 DAEMON_PORT = 12887
 

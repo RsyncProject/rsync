@@ -10,7 +10,9 @@ from harness.filesystem import makepath, rmtree
 from harness.results import test_fail
 from harness.rsync import run_rsync
 
-metadata(features={'alt-dest', 'daemon', 'symlink'}, transports={'pipe', 'tcp'}, min_peer='2.6.0', cost='expensive', mutates={'filesystem', 'process', 'socket'}, tags={'daemon', 'security', 'version-mix'})
+metadata(features={'alt-dest', 'daemon', 'symlink'}, transports={'pipe', 'tcp'},
+         min_peer={'primary': '3.0.0', 'secondary': '3.4.3'}, cost='expensive',
+         mutates={'filesystem', 'process', 'socket'}, tags={'daemon', 'security', 'version-mix'})
 
 base = SCRATCHDIR / 'alt-dest-symlink'
 rmtree(base)

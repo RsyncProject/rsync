@@ -11,7 +11,8 @@ from harness.filesystem import assert_exists, assert_not_exists, makepath
 from harness.results import test_fail
 from harness.rsync import run_rsync
 
-metadata(protocols={29, 30, 31, 32, 33}, transports={'pipe', 'tcp'}, min_peer='3.0.0', tags={'version-mix'})
+metadata(protocols={29, 30, 31, 32, 33}, transports={'pipe', 'tcp'},
+         min_peer={'primary': '3.0.0', 'secondary': '3.5.2'}, tags={'version-mix'})
 
 DAEMON_PORT = 12912
 

@@ -1,9 +1,4 @@
 {
-  "peer": "3.0.0",
-  "protocol": 30,
-  "xfail": {
-    "daemon-root-filter": "pre-3.0.3-daemon-filter",
-    "daemon-config": "peer-feature-gap",
-    "daemon-filter": "peer-feature-gap"
-  }
+  "version": "3.0.0",
+  "protocol": 30
 }

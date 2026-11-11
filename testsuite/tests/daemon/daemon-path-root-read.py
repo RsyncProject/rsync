@@ -37,8 +37,7 @@ out = proc.stdout or ''
 print(out)
 
 if 'Invalid argument (22)' in out or ('failed to open' in out and proc.returncode != 0):
-    from harness.results import test_xfail
-    test_xfail('#897: path=/ daemon failed to open an absolute module-root path')
+    test_fail('#897: path=/ daemon failed to open an absolute module-root path')
 
 if proc.returncode != 0:
     test_fail(f"daemon pull failed unexpectedly (rc={proc.returncode}); "

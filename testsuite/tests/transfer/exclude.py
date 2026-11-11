@@ -13,7 +13,10 @@ from harness.results import test_fail
 from harness.rsync import rsh_cmd, rsync_argv, rsync_path_arg, run_rsync
 from harness import metadata
 
-metadata(features={'filters', 'remote-shell'}, transports={'pipe', 'tcp'}, min_peer='2.6.0', mutates={'environment', 'filesystem', 'process'}, tags={'compatibility', 'transfer', 'version-mix'})
+metadata(features={'filters', 'remote-shell'}, transports={'pipe', 'tcp'},
+         min_peer={'primary': '3.2.7', 'secondary': '3.0.0'},
+         mutates={'environment', 'filesystem', 'process'},
+         tags={'compatibility', 'transfer', 'version-mix'})
 
 os.environ['CVSIGNORE'] = '*.junk'
 

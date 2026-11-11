@@ -6,7 +6,7 @@ from harness.daemon_config import write_daemon_conf
 from harness.daemon import start_test_daemon
 from harness.environment import SCRATCHDIR
 from harness.filesystem import makepath, rmtree
-from harness.results import test_fail, test_xfail
+from harness.results import test_fail
 from harness.rsync import rsync_argv
 from harness import metadata
 
@@ -40,8 +40,7 @@ out = proc.stdout or ''
 print(out)
 
 if 'invalid file mode' in out or (proc.returncode == 2 and (mod / 'ghost.txt').exists()):
-    test_xfail(
-        '#910: --delete-missing-args with --files-from rejects mode-0 entries')
+    test_fail('#910: --delete-missing-args with --files-from rejects mode-0 entries')
 
 if proc.returncode != 0:
     test_fail(f"transfer failed unexpectedly (rc={proc.returncode}); "

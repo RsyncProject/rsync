@@ -12,7 +12,8 @@ from harness.filesystem import makepath, rmtree
 from harness.results import test_fail
 from harness.rsync import rsync_argv
 
-metadata(protocols={27, 28, 29, 30, 31, 32, 33}, transports={'pipe', 'tcp'}, min_peer='2.6.0', tags={'version-mix'})
+metadata(protocols={27, 28, 29, 30, 31, 32, 33}, transports={'pipe', 'tcp'},
+         min_peer={'primary': '3.5.2', 'secondary': '2.6.0'}, tags={'version-mix'})
 
 DAEMON_PORT = 12904
 USER = 'tuser'

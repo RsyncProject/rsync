@@ -28,6 +28,16 @@ def main():
     source = Path(__file__).resolve().parents[2]
     runner = source / 'testsuite' / 'runtests.py'
     command = [sys.executable, '-S', str(runner)]
+
+    def fixed_options():
+        selected = []
+        for index, option in enumerate(options):
+            for name in ('--rsync-bin2', '--archived-role'):
+                if option == name and index + 1 < len(options):
+                    selected.extend((name, options[index + 1]))
+                elif option.startswith(name + '='):
+                    selected.append(option)
+        return selected
     env = os.environ.copy()
     env.pop('whichtests', None)
     env['scratchbase'] = str(output / 'scratch')
@@ -74,7 +84,7 @@ def main():
             print(f'Missing test receipt: {receipt}', file=sys.stderr)
             return 2
         verified = execute([*command, '--check-receipt', str(receipt),
-                            f'--rsync-bin={binary}', f'--profiles={profiles}'])
+                            f'--rsync-bin={binary}', f'--profiles={profiles}', *fixed_options()])
         if interrupted is not None:
             return 128 + interrupted
         if verified > 1:

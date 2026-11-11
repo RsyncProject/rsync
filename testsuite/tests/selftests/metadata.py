@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+from dataclasses import asdict
+
 from harness import TestContext, metadata, requires, run
 from harness.metadata import (
     applies_to_peer, discover_tests, placeholder_target, read_requirements, resolve_test_path, test_name,
@@ -50,6 +52,18 @@ def test(context: TestContext):
             or applies_to_peer(requirements, '2.6.0', 26, 'pipe')
             or applies_to_peer(requirements, '2.6.0', 27, 'socket')):
         test_fail('inapplicable peer metadata was accepted')
+
+    directional = asdict(metadata(min_peer={'primary': '3.1.0', 'secondary': '2.6.0'},
+                                  transports={'pipe'}, tags={'version-mix'}))
+    if (applies_to_peer(directional, '3.0.0', 30, 'pipe', 'primary')
+            or not applies_to_peer(directional, '3.0.0', 30, 'pipe', 'secondary')):
+        test_fail('role-specific minimum peer was ignored')
+    try:
+        applies_to_peer(directional, '3.0.0', 30, 'pipe')
+    except ValueError:
+        pass
+    else:
+        test_fail('role-specific minimum peer accepted an unspecified role')
 
     module = context.scratch / 'module.py'
     module.write_text("from harness import metadata\nmetadata(features={'acl'}, tags={'version-mix'})\n")
@@ -106,6 +120,8 @@ def test(context: TestContext):
         {'features': {''}}, {'features': 'acl'}, {'features': {'acl', 1}},
         {'protocols': {0}}, {'protocols': {True}},
         {'transports': {'socket'}}, {'min_peer': 'three'}, {'min_peer': True},
+        {'min_peer': {'primary': '3.0.0'}},
+        {'min_peer': {'primary': '3.0.0', 'secondary': 'three'}},
         {'cost': 'slow'},
     )
     for values in invalid:

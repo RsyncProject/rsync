@@ -12,11 +12,10 @@ from .results import unique_object
 @dataclass(frozen=True)
 class Profile:
     name: str
-    peer: Optional[str]
+    version: Optional[str]
     protocol: Optional[int]
     not_applicable: dict
     unsupported: dict
-    xfail: dict
 
 def _mapping(path, field, values):
     if not isinstance(values, dict):
@@ -26,30 +25,27 @@ def _mapping(path, field, values):
         raise ValueError(f'{path}: invalid {field}')
     return dict(values)
 
-def load_profile(path, tests):
+def load_profile(path):
     path = Path(path)
     data = json.loads(path.read_text(encoding='utf-8'), object_pairs_hook=unique_object)
     if not isinstance(data, dict):
         raise ValueError(f'{path}: profile must be an object')
-    if set(data) - {'peer', 'protocol', 'not_applicable', 'unsupported', 'xfail'}:
+    if set(data) - {'version', 'protocol', 'not_applicable', 'unsupported'}:
         raise ValueError(f'{path}: unknown profile field')
-    peer = data.get('peer')
-    if peer is not None and (not isinstance(peer, str) or not re.fullmatch(r'\d+(?:\.\d+)+', peer)):
-        raise ValueError(f'{path}: invalid peer')
+    version = data.get('version')
+    if version is not None and (not isinstance(version, str)
+                                or not re.fullmatch(r'\d+(?:\.\d+)+', version)):
+        raise ValueError(f'{path}: invalid version')
     protocol = data.get('protocol')
     if protocol is not None and (type(protocol) is not int or protocol <= 0):
         raise ValueError(f'{path}: invalid protocol')
-    if peer is not None and protocol is None:
-        raise ValueError(f'{path}: peer profile requires protocol')
-    if peer is not None and path.stem != f'peer-{peer}':
-        raise ValueError(f'{path}: peer does not match profile name')
+    if version is not None and protocol is None:
+        raise ValueError(f'{path}: version profile requires protocol')
+    if version is not None and path.stem != f'peer-{version}':
+        raise ValueError(f'{path}: version does not match profile name')
     not_applicable = _mapping(path, 'not_applicable', data.get('not_applicable', {}))
     unsupported = _mapping(path, 'unsupported', data.get('unsupported', {}))
-    xfail = _mapping(path, 'xfail', data.get('xfail', {}))
-    unknown = set(xfail) - set(tests)
-    if unknown:
-        raise ValueError(f'{path}: unknown tests: {", ".join(sorted(unknown))}')
-    return Profile(path.stem, peer, protocol, not_applicable, unsupported, xfail)
+    return Profile(path.stem, version, protocol, not_applicable, unsupported)
 
 def load_binaries(directory):
     directory = Path(directory)
@@ -82,16 +78,15 @@ def parse_peer_banner(text):
     return match.group(1), int(match.group(2))
 
 def merge_profiles(profiles):
-    peer = None
+    version = None
     protocol = None
     not_applicable = {}
     unsupported = set()
-    xfail = {}
     for profile in profiles:
-        if profile.peer:
-            if peer and peer != profile.peer:
-                raise ValueError(f'conflicting peers: {peer}, {profile.peer}')
-            peer = profile.peer
+        if profile.version:
+            if version and version != profile.version:
+                raise ValueError(f'conflicting versions: {version}, {profile.version}')
+            version = profile.version
         if profile.protocol:
             if protocol and protocol != profile.protocol:
                 raise ValueError(f'conflicting protocols: {protocol}, {profile.protocol}')
@@ -99,11 +94,7 @@ def merge_profiles(profiles):
         for capability, reason in profile.not_applicable.items():
             not_applicable.setdefault(capability, set()).add(reason)
         unsupported.update(profile.unsupported)
-        for test, reason in profile.xfail.items():
-            if test in xfail and xfail[test] != reason:
-                raise ValueError(f'{test}: conflicting xfail reasons')
-            xfail[test] = reason
     unsupported.difference_update(not_applicable)
     reasons = {capability: tuple(sorted(values))
                for capability, values in not_applicable.items()}
-    return peer, protocol, reasons, unsupported, xfail
+    return version, protocol, reasons, unsupported

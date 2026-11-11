@@ -29,7 +29,7 @@ During execution, SIGTERM stops queued tests and terminates active test process 
 
 The `--use-tcp` option starts unauthenticated test daemons on loopback addresses and some fixtures enable unsafe daemon options. Other local users can reach those listeners. Use the default pipe transport on shared hosts. The `--daemon-tests-only` option limits a follow-up TCP pass to tests which can observe the transport choice.
 
-Historical binaries live in `old_versions/`. The runner's `--rsync-bin2` option selects a second binary for mixed-version tests.
+Historical binaries live in `old_versions/`. The runner's `--rsync-bin2` option selects the secondary binary and `--archived-role` identifies which side uses the archived release. The static Linux AMD64 peers omit OpenSSL and IDN support.
 
 ## Writing a test
 
@@ -37,13 +37,13 @@ Tests live under testsuite/tests in the build, daemon, metadata, path, protocol,
 
 Bug fixes should include a regression which fails for the original bug. Assert the affected behaviour directly; a final source and destination comparison can miss ordering, confinement or reporting failures.
 
-Function-based tests use one `@requires(...)` decorator. Module tests use one top-level `metadata(...)` call. Declare required features, transports, protocols, peer versions, capabilities and tags. Declare any capability passed to `test_skipped()`. Use `require_tcp()` and `require_asan()` for those requirements. Security, compatibility and cost remain metadata rather than separate test groups.
+Function-based tests use one `@requires(...)` decorator. Module tests use one top-level `metadata(...)` call. Declare required features, transports, protocols, peer versions, capabilities and tags. A `min_peer` value may use separate `primary` and `secondary` floors. Declare any capability passed to `test_skipped()`. Use `require_tcp()` and `require_asan()` for those requirements. Security, compatibility and cost remain metadata rather than separate test groups.
 
 Use TestContext or the paths in harness.environment for scratch data and `write_daemon_conf()` or `build_rsyncd_conf()` for ordinary daemon configurations. Tests must tolerate parallel execution and clean up their processes, sockets and temporary files. Do not write into the source tree or use sleeps to force ordering or timestamp changes.
 
 ## Profiles and results
 
-Profiles compose by name through `--profiles`. Platform profiles describe permitted capability gaps; peer profiles record known version differences. The root and nonroot profiles must match the effective UID and cannot be combined. Peer runs select applicable tests from version-mix metadata.
+Profiles compose by name through `--profiles`. Platform profiles describe permitted capability gaps; peer profiles identify an archived version and protocol. The root and nonroot profiles must match the effective UID and cannot be combined. Peer runs select applicable tests from version-mix metadata.
 
 CI invokes [tools/check.py](tools/check.py) with Python to run composed profiles. It takes the build directory, binary, profile list and a fresh output directory, followed by runner options. Each run saves run.log, receipt.json and isolated scratch data. The launcher checks the receipt's results, executable identity and profiles before returning.
 
@@ -55,17 +55,15 @@ FAIL | The assertion failed
 ERROR | The test environment or harness failed
 SKIP | The test skipped without identifying a missing capability
 UNSUPPORTED | A declared capability was unavailable
-XFAIL | An expected failure reproduced
-UNEXPECTED_PASS | A test expected to fail passed
 PROFILE_ERROR | The result disagreed with the active profile
 
-With profiles active, an unsupported result is accepted only when the test declares the capability and the profile permits its absence. A generic skip is a profile error. Expected failures need a compatibility classification or defect reference in the profile; errors and skips do not satisfy that expectation. An unexpected pass fails the run. Without profiles, skips and unsupported results are accepted.
+With profiles active, an unsupported result is accepted only when the test declares the capability and the profile permits its absence. A generic skip is a profile error. Failures and errors always fail the run. Without profiles, skips and unsupported results are accepted.
 
-Individual tests use exit codes 0 for pass, 1 for failure, 2 for error, 77 for skip and 78 for expected failure. Receipts retain raw outcomes, profile verdicts, N/A selections, executable hashes and the effective UID. Source revision and working-tree state are recorded when Git metadata is available.
+Individual tests use exit codes 0 for pass, 1 for failure, 2 for error and 77 for skip. Receipts retain raw outcomes, profile verdicts, N/A selections, executable hashes and the effective UID. Source revision and working-tree state are recorded when Git metadata is available.
 
 ## CI
 
-[ci.yml](../.github/workflows/ci.yml) selects native tests, diagnostics and historical-peer checks for pull requests and master pushes. Scheduled runs divide daily and weekly work. The forward Clang check on Ubuntu 26.04 runs weekly and manually as a non-blocking check; Clang 18 remains blocking.
+[ci.yml](../.github/workflows/ci.yml) selects native tests, diagnostics and historical-peer checks for pull requests and master pushes. Scheduled runs divide daily and weekly work. The Versions group runs every archived release as both the primary and secondary executable over pipe and TCP. The forward Clang check on Ubuntu 26.04 runs weekly and manually as a non-blocking check; Clang 18 remains blocking.
 
 Environment | Versions and architectures
 --- | ---

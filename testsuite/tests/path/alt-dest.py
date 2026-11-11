@@ -10,7 +10,7 @@ from harness.results import test_fail
 from harness.rsync import rsh_cmd, rsync_path_arg, run_rsync
 from harness import metadata
 
-metadata(features={'alt-dest', 'remote-shell'}, transports={'pipe', 'tcp'}, min_peer='2.6.0', mutates={'filesystem', 'process'}, tags={'compatibility', 'transfer', 'version-mix'})
+metadata(features={'alt-dest', 'remote-shell'}, transports={'pipe', 'tcp'}, min_peer='3.0.0', mutates={'filesystem', 'process'}, tags={'compatibility', 'transfer', 'version-mix'})
 
 alt1dir = TMPDIR / 'alt1'
 alt2dir = TMPDIR / 'alt2'

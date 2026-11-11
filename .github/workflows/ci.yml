@@ -46,12 +46,16 @@ jobs:
 
   other:
     name: Other
-    if: &other ${{ github.event_name != 'schedule' || github.event.schedule == '42 8 * * 0,2-6' || github.event.schedule == '42 8 * * 1' || github.event.schedule == '52 8 * * 1' }}
+    if: &other ${{ github.event_name != 'schedule' || github.event.schedule == '42 8 * * 0,2-6' || github.event.schedule == '42 8 * * 1' }}
     uses: ./.github/workflows/other.yml
     with:
       cygwin: *daily
       solaris: *weekly
-      versions: ${{ github.event_name != 'schedule' || github.event.schedule == '52 8 * * 1' }}
+
+  versions:
+    name: Versions
+    if: &versions ${{ github.event_name != 'schedule' || github.event.schedule == '52 8 * * 1' }}
+    uses: ./.github/workflows/versions.yml
 
   android:
     name: Android
@@ -73,7 +77,7 @@ jobs:
   required:
     name: Required
     if: always()
-    needs: [linux, bsd, macos, other, android, diagnostics]
+    needs: [linux, bsd, macos, other, versions, android, diagnostics]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     env:
@@ -81,6 +85,7 @@ jobs:
       CI_EXPECT_BSD: *weekly
       CI_EXPECT_MACOS: *daily
       CI_EXPECT_OTHER: *other
+      CI_EXPECT_VERSIONS: *versions
       CI_EXPECT_ANDROID: *weekly
       CI_EXPECT_DIAGNOSTICS: *diagnostics
     steps:
