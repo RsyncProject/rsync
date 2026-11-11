@@ -34,7 +34,8 @@ class Results(unittest.TestCase):
             'versions': {'result': 'success', 'outputs': {
                 'jobs': json.dumps({'mix': {'result': 'success'}})}},
             'android': {'result': 'success', 'outputs': {
-                'jobs': json.dumps({'build': {'result': 'success'}})}},
+                'jobs': json.dumps({'bionic': {'result': 'success'}, 'termux': {'result': 'success'}}),
+                'inputs': json.dumps({'bionic': True, 'termux': True})}},
             'valgrind': {'result': 'success', 'outputs': {
                 'jobs': json.dumps({'test': {'result': 'success'}})}},
         }
@@ -176,6 +177,17 @@ class Results(unittest.TestCase):
             'jobs': json.dumps({name: {'result': 'skipped'} for name in names}),
             'inputs': json.dumps({name: False for name in names})}
         self.reject()
+
+    def test_android_jobs(self):
+        outputs = self.data['android']['outputs']
+        jobs = json.loads(outputs['jobs'])
+        for name in jobs:
+            for result in ('failure', 'cancelled', 'skipped', None):
+                with self.subTest(job=name, result=result):
+                    outputs['jobs'] = json.dumps({**jobs, name: {'result': result}})
+                    self.reject()
+            outputs['jobs'] = json.dumps({key: value for key, value in jobs.items() if key != name})
+            self.reject()
 
     def test_command(self):
         env = {name: value for name, value in os.environ.items() if not name.startswith('CI_EXPECT_')}

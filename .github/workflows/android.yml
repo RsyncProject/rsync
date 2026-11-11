@@ -6,6 +6,9 @@ on:
       jobs:
         description: Job results
         value: ${{ toJSON(jobs) }}
+      inputs:
+        description: Job selections
+        value: '{"bionic": true, "termux": true}'
 
 permissions:
   contents: read
@@ -16,13 +19,14 @@ defaults:
 
 env:
   ANDROID_API: 24
-  TERMUX_IMAGE: termux/termux-docker@sha256:f993e5e7ef97b96af774e7062556ac51479fdccc3c3d2240748a3d04b857ce04
 
 jobs:
-  build:
+  bionic:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     name: ${{ matrix.name }}
+    env:
+      ANDROID_TRIPLE: ${{ matrix.triple }}
     strategy:
       fail-fast: false
       matrix:
@@ -32,33 +36,16 @@ jobs:
             triple: aarch64-linux-android
             executor: qemu-aarch64-static
             packages: qemu-user-static
-            bionic: true
-            termux: false
-            upload: true
           - name: Bionic API 24 ARMv7
             abi: armeabi-v7a
             triple: armv7a-linux-androideabi
             executor: qemu-arm-static
             packages: qemu-user-static
-            bionic: true
-            termux: false
-            upload: true
           - name: Bionic API 24 X86-64
             abi: x86_64
             triple: x86_64-linux-android
             executor: direct
             packages: ''
-            bionic: true
-            termux: false
-            upload: true
-          - name: Termux X86-64
-            abi: x86_64
-            triple: x86_64-linux-android
-            executor: direct
-            packages: ''
-            bionic: false
-            termux: true
-            upload: false
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -68,14 +55,14 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y autoconf automake gawk ${{ matrix.packages }}
 
-      - name: Build
-        id: build
+      - &build
+        name: Build
         run: |
           set -eu
           NDK="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_ROOT}"
           TC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          export CC="$TC/${{ matrix.triple }}${ANDROID_API}-clang"
-          export CXX="$TC/${{ matrix.triple }}${ANDROID_API}-clang++"
+          export CC="$TC/${ANDROID_TRIPLE}${ANDROID_API}-clang"
+          export CXX="$TC/${ANDROID_TRIPLE}${ANDROID_API}-clang++"
           export AR="$TC/llvm-ar" RANLIB="$TC/llvm-ranlib" STRIP="$TC/llvm-strip"
           export CFLAGS="-O2" LDFLAGS="-static"
 
@@ -85,7 +72,7 @@ jobs:
                  rsync_cv_MKNOD_CREATES_FIFOS=yes \
                  rsync_cv_MKNOD_CREATES_SOCKETS=yes
 
-          ./configure --host=${{ matrix.triple }} --build=x86_64-pc-linux-gnu \
+          ./configure --host="$ANDROID_TRIPLE" --build=x86_64-pc-linux-gnu \
             --enable-ipv6 \
             --disable-zstd --disable-lz4 --disable-xxhash --disable-openssl --disable-idn \
             --disable-iconv --disable-iconv-open \
@@ -98,27 +85,36 @@ jobs:
           make -j"$(nproc)" rsync
           "$STRIP" rsync
 
-      - name: Test Bionic transfer
-        if: ${{ matrix.bionic }}
+      - name: Tests
         run: python3 -S .github/scripts/android.py test --executor "${{ matrix.executor }}"
 
       - name: Package
         run: python3 -S .github/scripts/android.py package --abi "${{ matrix.abi }}"
 
-      - name: Verify Termux artefact
-        if: ${{ matrix.termux }}
-        run: |
-          set -eu
-          set -- dist/*.sha256
-          [ "$#" -eq 1 ] && [ -f "$1" ]
-          (cd dist && sha256sum -c "$(basename "$1")")
-          binary=${1%.sha256}
-          [ -f "$binary" ]
-          chmod +x "$binary"
-          echo "ANDROID_BINARY=$binary" >> "$GITHUB_ENV"
+      - name: Upload binaries
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          retention-days: 45
+          name: ${{ env.ARTIFACT_NAME }}
+          if-no-files-found: error
+          path: dist/
 
-      - name: Test Termux transfer
-        if: ${{ matrix.termux }}
+  termux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    name: Termux X86-64
+    env:
+      ANDROID_TRIPLE: x86_64-linux-android
+      TERMUX_IMAGE: termux/termux-docker@sha256:f993e5e7ef97b96af774e7062556ac51479fdccc3c3d2240748a3d04b857ce04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y autoconf automake gawk
+      - *build
+      - name: Prepare Termux
         run: |
           set -eu
           docker pull "$TERMUX_IMAGE"
@@ -126,18 +122,10 @@ jobs:
           platform=$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "$TERMUX_IMAGE")
           echo "$platform"
           [ "$platform" = linux/amd64 ]
-          binary="/workspace/$ANDROID_BINARY"
+      - name: Tests
+        run: |
           docker run --rm --network none --user 1000:1000 --cap-drop ALL \
             --pids-limit 256 --memory 1g \
             --security-opt no-new-privileges \
             --mount "type=bind,source=$PWD,target=/workspace,readonly" \
-            "$TERMUX_IMAGE" sh /workspace/.github/scripts/android-transfer.sh direct "$binary"
-
-      - name: Upload binary
-        if: ${{ matrix.upload }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          retention-days: 45
-          name: ${{ env.ARTIFACT_NAME }}
-          if-no-files-found: error
-          path: dist/
+            "$TERMUX_IMAGE" sh /workspace/.github/scripts/android-transfer.sh direct /workspace/rsync
