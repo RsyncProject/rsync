@@ -2,19 +2,19 @@
 
 import errno
 import os
-import platform
 import subprocess
 
-from rsyncfns import FROMDIR, SCRATCHDIR, SRCDIR, USE_TCP, forced_protocol, rsync_argv, start_test_daemon, test_fail, test_skipped
+from harness import TestContext, requires, run
+from harness.daemon import start_test_daemon
+from harness.environment import FROMDIR, SCRATCHDIR
+from harness.results import test_fail
+from harness.rsync import forced_protocol, rsync_argv
 
 
-def test():
-    if platform.system() != 'Linux' or os.environ.get('ASAN_OPTIONS'):
-        test_skipped('open fault injection needs Linux without ASan')
-    if USE_TCP:
-        test_skipped('fault injection requires the pipe transport')
+@requires(features={'linux_interpose'}, transports={'pipe'}, mutates={'filesystem', 'process', 'socket'}, tags={'daemon', 'io'})
+def test(context: TestContext):
     library = SCRATCHDIR / 'sender-open-error.so'
-    fixture = SRCDIR / 'testsuite/sender-open-error.c'
+    fixture = context.repository / 'testsuite/fixtures/sender-open-error.c'
     build = subprocess.run(['cc', '-shared', '-fPIC', '-o', str(library), str(fixture), '-ldl'], capture_output=True, text=True)
     if build.returncode:
         test_fail(f'cannot build open hook: {build.stderr}')
@@ -47,4 +47,4 @@ def test():
 
 
 if __name__ == '__main__':
-    test()
+    run(test)

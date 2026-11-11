@@ -2,27 +2,25 @@
 
 import ctypes
 import os
-import platform
 import subprocess
 
-from rsyncfns import FROMDIR, SCRATCHDIR, SRCDIR, USE_TCP, rsync_argv, start_test_daemon, test_fail, test_skipped
+from harness import TestContext, requires, run
+from harness.daemon import start_test_daemon
+from harness.environment import SCRATCHDIR
+from harness.results import test_fail, test_skipped
+from harness.rsync import rsync_argv
 
 
-def test():
-    if platform.system() != 'Linux' or os.environ.get('ASAN_OPTIONS'):
-        test_skipped('chroot fault injection needs Linux without ASan')
-    if USE_TCP:
-        test_skipped('fault injection requires the pipe transport')
-    if 'valgrind' in rsync_argv()[0]:
-        test_skipped('Valgrind logs are outside the daemon chroot')
+@requires(features={'chroot', 'linux_interpose', 'root'}, transports={'pipe'}, mutates={'filesystem', 'process', 'socket'}, tags={'daemon'})
+def test(context: TestContext):
     pid = os.fork()
     if pid == 0:
         os._exit(0 if ctypes.CDLL(None, use_errno=True).chroot(b'/') == 0 else 1)
     _, status = os.waitpid(pid, 0)
     if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
-        test_skipped('chroot is unavailable')
+        test_skipped('chroot is unavailable', capability='chroot')
     library = SCRATCHDIR / 'chroot-cwd.so'
-    fixture = SRCDIR / 'testsuite/chroot-cwd.c'
+    fixture = context.repository / 'testsuite/fixtures/chroot-cwd.c'
     build = subprocess.run(['cc', '-shared', '-fPIC', '-o', str(library), str(fixture), '-ldl'], capture_output=True, text=True)
     if build.returncode:
         test_fail(f'cannot build chroot hook: {build.stderr}')
@@ -57,4 +55,4 @@ def test():
 
 
 if __name__ == '__main__':
-    test()
+    run(test)

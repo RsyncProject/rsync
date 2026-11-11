@@ -22,7 +22,7 @@ Option | Tests | Path depth | Auxiliary tree | Coverage
 Option | Tests | Path depth | Auxiliary tree | Coverage
 --- | --- | --- | --- | ---
 -l, --links | links, symlink-ignore | deep | N/A | Covered
--L, --copy-links | links | deep | N/A | Covered for file and directory links
+-L, --copy-links | links, copy-links-open-error | deep | N/A | Covered for file and directory links and preserved file-open errors
 -k, --copy-dirlinks | links | deep | N/A | Covered
 -K, --keep-dirlinks | symlink-dirlink-basis | deep | N/A | Covered for issue 715; unavailable without the secure path resolver
 -H, --hard-links | hard-links, hard-links-depth, hard-links-emlink | deep | outside | Covered across directories and hard-link creation failure
@@ -145,7 +145,7 @@ Option | Tests | Coverage
 --write-batch, --only-write-batch, --read-batch | batch-mode | Partial
 -e, --rsh, --rsync-path | remote-shell-transfers | Covered for remote-shell transfer and deletion
 --protocol | make check29, make check30 | Covered by forced-protocol suite runs
---daemon, --config, --detach, --no-detach | daemon-standalone-detach, daemon-stdin-inetd, daemon-stdin-local-socket, daemon-stdin-unix-listener | Covered for detached, foreground and inherited-socket startup
+--daemon, --config, --detach, --no-detach | daemon-standalone-detach, daemon-stdin-inetd, daemon-stdin-local-socket, daemon-stdin-unix-listener, daemon-config-truncation, stdio-read-errors | Covered for startup, truncated configuration and configuration read errors
 --dparam | none | Missing
 --address, --port | daemon-address-family, daemon-standalone-detach | Covered for IPv4, IPv6 and configured binding
 --password-file | daemon-auth, password-file-first-line | Covered for authentication and first-line parsing
@@ -169,7 +169,7 @@ path | daemon-access, daemon-listings | Covered with nested paths
 read only | daemon-access, daemon-listings | Covered
 write only | daemon-access | Covered
 list | daemon-access, daemon-listings | Covered for hidden but usable modules
-use chroot | sender-flist-symlink-leak, daemon-chroot-acl | Partial: the enabled case needs root
+use chroot | sender-flist-symlink-leak, daemon-chroot-acl, daemon-chroot-cwd | Covered for root-directory entry, inner-module selection and failed directory changes; requires root
 insecure links | insecure-links-admin-optout, daemon-symlink-escape-matrix | Covered for the administrative opt-out
 munge symlinks | daemon-munge | Covered for prefix addition and removal
 exclude, include | daemon-filter, daemon-listings | Covered for exclusion
@@ -181,7 +181,7 @@ auth digest | daemon-auth-digest-floor | Covered for minimum strength, old peers
 strict modes | daemon-auth | Covered for unsafe secrets-file modes
 refuse options | daemon-refuse, daemon-refuse-compress | Covered for names, wildcards and allow lists
 pre-xfer exec, post-xfer exec | daemon-exec | Covered for environment and abort behaviour
-early exec | daemon-early-exec | Covered for environment and early input
+early exec | daemon-early-exec, stdio-read-errors | Covered for environment, early input and interrupted or failed input reads
 hosts allow, hosts deny | daemon-access-ip, daemon-access-hostname, daemon-chroot-acl | Covered for address, CIDR and hostname rules over TCP
 reverse lookup, forward lookup | daemon-chroot-acl, daemon-access-hostname | Covered for reverse lookup in a chroot and forward lookup enabled or disabled
 log file, transfer logging, log format | daemon-listings | Partial: configured but not asserted
@@ -196,7 +196,7 @@ charset | iconv | Covered for module override of the remote charset
 name converter | daemon-name-converter, daemon-name-converter-empty-response, daemon-name-converter-newline | Covered for mapping, empty responses and newline-bearing requests
 dont compress | daemon-module-options | Partial: configured but compression choice is not asserted
 uid, gid, daemon uid, daemon gid, daemon chroot | daemon-listings, daemon-chroot-acl | Partial: transfer and access checks run but effective worker IDs are not asserted
-motd file | daemon-module-options | Covered for banner content
+motd file | daemon-module-options, stdio-read-errors | Covered for banner content and interrupted or failed reads
 socket options | daemon-module-options | Partial: the live socket path runs but kernel effects are not inspected
 pid file, port, address | daemon-standalone-detach, daemon-address-family | Covered for configuration and CLI paths
 proxy protocol, proxy protocol hosts | daemon-proxy-protocol, proxy-protocol-trusted-peer | Covered for enabled, disabled and trusted-peer policy

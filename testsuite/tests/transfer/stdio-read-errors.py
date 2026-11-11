@@ -2,22 +2,22 @@
 
 import errno
 import os
-import platform
 import shlex
 import signal
 import subprocess
 import sys
 
-from rsyncfns import FROMDIR, SCRATCHDIR, SRCDIR, USE_TCP, rsync_argv, start_test_daemon, test_fail, test_skipped
+from harness import TestContext, requires, run
+from harness.daemon import start_test_daemon
+from harness.environment import FROMDIR, SCRATCHDIR
+from harness.results import test_fail
+from harness.rsync import rsync_argv
 
 
-def test():
-    if platform.system() != 'Linux' or os.environ.get('ASAN_OPTIONS'):
-        test_skipped('stdio fault injection needs Linux without ASan')
-    if USE_TCP:
-        test_skipped('fault injection requires the pipe transport')
+@requires(features={'linux_interpose'}, transports={'pipe'}, mutates={'filesystem', 'process', 'socket'}, tags={'daemon', 'io'})
+def test(context: TestContext):
     library = SCRATCHDIR / 'stdio-error.so'
-    fixture = SRCDIR / 'testsuite/stdio-error.c'
+    fixture = context.repository / 'testsuite/fixtures/stdio-error.c'
     build = subprocess.run(['cc', '-shared', '-fPIC', '-o', str(library), str(fixture), '-ldl'], capture_output=True, text=True)
     if build.returncode:
         test_fail(f'cannot build stdio hook: {build.stderr}')
@@ -138,4 +138,4 @@ def test():
 
 
 if __name__ == '__main__':
-    test()
+    run(test)
