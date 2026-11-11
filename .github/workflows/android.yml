@@ -8,7 +8,7 @@ on:
         value: ${{ toJSON(jobs) }}
       inputs:
         description: Job selections
-        value: '{"bionic": true, "termux": true, "emulator": true}'
+        value: '{"bionic": true, "x86_64": true, "termux": true, "emulator": true}'
 
 permissions:
   contents: read
@@ -41,11 +41,6 @@ jobs:
             triple: armv7a-linux-androideabi
             executor: qemu-arm-static
             packages: qemu-user-static
-          - name: Bionic API 24 X86-64
-            abi: x86_64
-            triple: x86_64-linux-android
-            executor: direct
-            packages: ''
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -91,7 +86,8 @@ jobs:
       - name: Package
         run: python3 -S .github/scripts/android.py package --abi "${{ matrix.abi }}"
 
-      - name: Upload binaries
+      - &upload
+        name: Upload binaries
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           retention-days: 45
@@ -99,13 +95,12 @@ jobs:
           if-no-files-found: error
           path: dist/
 
-  termux:
+  x86_64:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    name: Termux X86-64
+    name: Bionic API 24 X86-64
     env:
       ANDROID_TRIPLE: x86_64-linux-android
-      TERMUX_IMAGE: termux/termux-docker@sha256:f993e5e7ef97b96af774e7062556ac51479fdccc3c3d2240748a3d04b857ce04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -114,28 +109,41 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y autoconf automake gawk
       - *build
-      - name: Prepare Termux
-        run: |
-          set -eu
-          docker pull "$TERMUX_IMAGE"
-          docker image inspect --format '{{.RepoDigests}}' "$TERMUX_IMAGE"
-          platform=$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "$TERMUX_IMAGE")
-          echo "$platform"
-          [ "$platform" = linux/amd64 ]
       - name: Tests
-        run: |
-          docker run --rm --network none --user 1000:1000 --cap-drop ALL \
-            --pids-limit 256 --memory 1g \
-            --security-opt no-new-privileges \
-            --mount "type=bind,source=$PWD,target=/workspace,readonly" \
-            "$TERMUX_IMAGE" sh /workspace/.github/scripts/android-transfer.sh direct /workspace/rsync
+        run: python3 -S .github/scripts/android.py test --executor direct
+      - name: Package
+        run: python3 -S .github/scripts/android.py package --abi x86_64
+      - *upload
+
+  termux:
+    needs: x86_64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    name: Termux X86-64
+    env:
+      TERMUX_IMAGE: termux/termux-docker@sha256:f993e5e7ef97b96af774e7062556ac51479fdccc3c3d2240748a3d04b857ce04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - &download
+        name: Download binary
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: rsync-android-x86_64
+          path: dist/
+      - &restore
+        name: Verify binary
+        run: python3 -S .github/scripts/android.py restore --abi x86_64
+      - name: Tests
+        run: python3 -S .github/scripts/android.py termux
 
   emulator:
+    needs: x86_64
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     name: Emulator API 36 X86-64
-    env:
-      ANDROID_TRIPLE: x86_64-linux-android
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -144,14 +152,16 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y acl autoconf automake gawk
+          sudo apt-get install -y acl
           sudo setfacl -m "u:$(id -un):rw" /dev/kvm
-          sdkmanager 'system-images;android-36;google_apis;x86_64' emulator
-      - *build
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'system-images;android-36;google_apis;x86_64' emulator
+      - *download
+      - *restore
       - name: Tests
+        id: test
         run: python3 -S .github/scripts/android-emulator.py
       - name: Upload results
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (steps.test.outcome == 'success' || steps.test.outcome == 'failure') }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           retention-days: 45

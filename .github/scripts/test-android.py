@@ -1,4 +1,4 @@
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 import hashlib
 from io import StringIO
 from pathlib import Path
@@ -11,9 +11,34 @@ from unittest.mock import Mock, patch
 
 
 android = runpy.run_path(str(Path(__file__).with_name('android-emulator.py')))
+restore_binary = runpy.run_path(str(Path(__file__).with_name('android.py')))['restore_binary']
 
 
 class Android(unittest.TestCase):
+    def test_restore(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            binary = root / 'rsync-3.5.2-android-x86_64'
+            binary.write_bytes(b'candidate')
+            digest = hashlib.sha256(binary.read_bytes()).hexdigest()
+            checksum = root / f'{binary.name}.sha256'
+            destination = root / 'rsync'
+            for value in ('not a checksum', f'{"0" * 64}  {binary.name}\n', f'{digest}  wrong-name\n'):
+                checksum.write_text(value)
+                with self.subTest(checksum=value), self.assertRaises(ValueError):
+                    restore_binary(root, 'x86_64', destination)
+                self.assertFalse(destination.exists())
+            checksum.write_text(f'{digest}  {binary.name}\n')
+            restore_binary(root, 'x86_64', destination)
+            self.assertEqual(destination.read_bytes(), binary.read_bytes())
+            with self.assertRaises(FileExistsError):
+                restore_binary(root, 'x86_64', destination)
+            binary.with_name('rsync-3.5.1-android-x86_64').write_bytes(b'other')
+            with self.assertRaises(ValueError):
+                restore_binary(root, 'x86_64', root / 'other')
+            with self.assertRaises(ValueError):
+                restore_binary(root, 'arm64-v8a', root / 'other')
+
     def device(self, changes=None):
         values = {'getprop ro.build.version.sdk': '36', 'getprop ro.product.cpu.abi': 'x86_64',
                   'getprop ro.kernel.qemu': '1', 'getenforce': 'Enforcing', 'id -u': '2000',
@@ -90,29 +115,42 @@ class Android(unittest.TestCase):
             binary = root / 'candidate rsync'
             binary.write_bytes(b'candidate')
             digest = hashlib.sha256(binary.read_bytes()).hexdigest()
-            for mismatch, failed in ((False, False), (True, False), (False, True)):
+            for mismatch, failed, cleanup_error in ((False, False, False), (True, False, False),
+                                                     (False, True, False), (True, False, True)):
                 (root / 'receipt.json').unlink(missing_ok=True)
                 calls = []
                 def adb(*args, **kwargs):
                     calls.append(args)
                     command = args[-1]
+                    if cleanup_error and command.startswith('rm -rf'):
+                        raise subprocess.CalledProcessError(1, 'adb cleanup')
+                    if args[0] == 'pull':
+                        Path(args[2]).write_bytes(b'raw\r\n\0data')
                     if command.startswith('mktemp'):
                         return SimpleNamespace(stdout='/data/local/tmp/rsync-ci.12345678\n')
                     if command.startswith('sha256sum'):
                         return SimpleNamespace(stdout=f'{"0" * 64 if mismatch else digest}  rsync\n')
-                    if failed and 'env ' in command:
-                        raise subprocess.CalledProcessError(1, args)
                     return SimpleNamespace(stdout='')
+                def fixture(command, *args, **kwargs):
+                    if failed:
+                        raise subprocess.CalledProcessError(1, 'rsync')
+                    command('cat', 'data', capture_output=True, text=False)
+                    kwargs['write_file']('sample', b'raw\r\n\0data')
+                    self.assertEqual(Path(calls[-1][1]).read_bytes(), b'raw\r\n\0data')
+                    self.assertEqual(kwargs['read_file']('sample'), b'raw\r\n\0data')
                 with patch.dict(android['check_transfer'].__globals__,
-                                check_device=lambda adb: {}, check_permissions=lambda *a: None), \
-                     patch('subprocess.run', return_value=SimpleNamespace(stdout='revision\n')):
+                                check_device=lambda adb: {}, check_permissions=lambda *a: None,
+                                transfer=fixture), \
+                     patch('subprocess.run', return_value=SimpleNamespace(stdout='revision\n')), \
+                     redirect_stderr(StringIO()):
                     if mismatch or failed:
-                        with self.assertRaises((ValueError, subprocess.CalledProcessError)):
+                        with self.assertRaises(ValueError if mismatch else subprocess.CalledProcessError):
                             android['check_transfer'](adb, binary, root)
                         self.assertFalse((root / 'receipt.json').exists())
                     else:
                         android['check_transfer'](adb, binary, root)
                         self.assertTrue((root / 'receipt.json').is_file())
+                        self.assertIn(('shell', '-T', 'cat data'), calls)
                 self.assertEqual(calls[-1], ('shell', 'rm -rf /data/local/tmp/rsync-ci.12345678'))
 
     def test_scratch(self):

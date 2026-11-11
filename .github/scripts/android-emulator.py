@@ -1,4 +1,5 @@
 import argparse
+from contextlib import redirect_stdout
 import hashlib
 import json
 import os
@@ -12,10 +13,7 @@ import sys
 import tempfile
 import time
 
-
-def run(*command, timeout=30, **kwargs):
-    kwargs.setdefault('check', True)
-    return subprocess.run(command, text=True, timeout=timeout, **kwargs)
+from android import check_transfer as transfer, run
 
 
 def wait_for_boot(adb, proc, timeout=300):
@@ -69,26 +67,39 @@ def check_transfer(adb, binary, output):
     work = adb('shell', 'mktemp -d /data/local/tmp/rsync-ci.XXXXXXXX', capture_output=True).stdout.strip()
     if not re.fullmatch(r'/data/local/tmp/rsync-ci\.[A-Za-z0-9]{8}', work):
         raise ValueError('Invalid Android scratch directory')
-    scripts = Path(__file__).parent
     try:
-        for path in (binary, scripts / 'android-transfer.sh'):
-            adb('push', str(path), f'{work}/{path.name}', timeout=60)
+        adb('push', str(binary), f'{work}/{binary.name}', timeout=60)
         digest = hashlib.sha256(binary.read_bytes()).hexdigest()
         remote = adb('shell', shlex.join(['sha256sum', f'{work}/{binary.name}']),
                      capture_output=True).stdout.split()[0]
         if digest != remote:
             raise ValueError('Android binary hash does not match the candidate')
         adb('shell', shlex.join(['chmod', '700', f'{work}/{binary.name}']))
-        with (output / 'transfer.log').open('w') as log:
-            adb('shell', shlex.join(['env', f'TMPDIR={work}', 'sh', f'{work}/android-transfer.sh',
-                                    'direct', f'{work}/{binary.name}', 'denied']),
-                stdout=log, stderr=subprocess.STDOUT, timeout=180)
+        def command(*args, **kwargs):
+            return adb('shell', '-T', shlex.join(args), **kwargs)
+        with tempfile.TemporaryDirectory(prefix='rsync-android-data-') as directory:
+            local = Path(directory) / 'data'
+            def write_file(path, data):
+                local.write_bytes(data)
+                adb('push', str(local), path, capture_output=True)
+            def read_file(path):
+                adb('pull', path, str(local), capture_output=True)
+                return local.read_bytes()
+            with (output / 'transfer.log').open('w') as log, redirect_stdout(log):
+                transfer(command, f'{work}/{binary.name}', work, hardlinks=False,
+                         write_file=write_file, read_file=read_file)
         check_permissions(adb, binary, work, output)
         receipt = {'device': device, 'binary_sha256': digest,
                    'source': run('git', 'rev-parse', 'HEAD', capture_output=True).stdout.strip()}
         (output / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
     finally:
-        adb('shell', shlex.join(['rm', '-rf', work]))
+        failed = sys.exc_info()[0] is not None
+        try:
+            adb('shell', shlex.join(['rm', '-rf', work]))
+        except (OSError, subprocess.SubprocessError) as error:
+            if not failed:
+                raise
+            print(f'Android scratch cleanup failed: {error}', file=sys.stderr)
 
 
 def check_permissions(adb, binary, work, output):
@@ -116,6 +127,8 @@ def main():
     binary = args.binary.resolve(strict=True)
     args.output.mkdir(parents=True)
     sdk = Path(os.environ['ANDROID_HOME'])
+    os.environ['PATH'] = os.pathsep.join(str(sdk / path) for path in (
+        'platform-tools', 'emulator', 'cmdline-tools/latest/bin')) + os.pathsep + os.environ.get('PATH', '')
     image = sdk / 'system-images/android-36/google_apis/x86_64/source.properties'
     properties = image.read_text()
     if 'Pkg.Revision=7' not in properties.splitlines():

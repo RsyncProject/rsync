@@ -33,8 +33,8 @@ class Results(unittest.TestCase):
             'versions': {'result': 'success', 'outputs': {
                 'jobs': json.dumps({'mix': {'result': 'success'}})}},
             'android': {'result': 'success', 'outputs': {
-                'jobs': json.dumps({name: {'result': 'success'} for name in ('bionic', 'termux', 'emulator')}),
-                'inputs': json.dumps(dict(bionic=True, termux=True, emulator=True))}},
+                'jobs': json.dumps({name: {'result': 'success'} for name in ('bionic', 'x86_64', 'termux', 'emulator')}),
+                'inputs': json.dumps(dict(bionic=True, x86_64=True, termux=True, emulator=True))}},
             'valgrind': {'result': 'success', 'outputs': {
                 'jobs': json.dumps({'test': {'result': 'success'}})}},
         }
