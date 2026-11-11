@@ -6,6 +6,9 @@ on:
       lint:
         required: true
         type: boolean
+      python_37:
+        required: true
+        type: boolean
       asan:
         required: true
         type: boolean
@@ -34,6 +37,38 @@ defaults:
     shell: sh
 
 jobs:
+  python_37:
+    if: ${{ inputs.python_37 }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    name: Python 3.7
+    container: python:3.7.17-bullseye@sha256:f36f6fe9ddb2622aab9803944cbe7e2bc50be75d624a081f7895e60e7c6b7f0a
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Configure
+        run: ./configure --disable-md2man --disable-openssl --disable-xxhash --disable-zstd --disable-lz4 --disable-idn --disable-acl-support --disable-xattr-support --with-included-popt
+      - name: Build
+        run: make -j2 check-progs
+      - name: Check helpers
+        run: |
+          python3 -B -S .github/scripts/test-android.py
+          python3 -B -S .github/scripts/test-results.py
+          python3 -B -S .github/scripts/test-guest.py
+          python3 -B -S .github/scripts/test-diagnostics.py
+      - name: Tests
+        id: test
+        run: python3 -B -S testsuite/tools/check.py . ./rsync pipe,root,self-peer,linux,non-asan,no-userns test-results/python37 metadata profile process cli-transfers runner check-recipe -j2
+      - name: Upload results
+        if: ${{ !cancelled() && (steps.test.outcome == 'success' || steps.test.outcome == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: python37-results
+          retention-days: 45
+          if-no-files-found: error
+          path: test-results/python37/
+
   lint:
     if: ${{ inputs.lint }}
     runs-on: ubuntu-24.04

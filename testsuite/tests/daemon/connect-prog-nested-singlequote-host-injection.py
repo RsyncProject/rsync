@@ -4,6 +4,7 @@ import os
 import shlex
 import subprocess
 
+from harness.filesystem import unlink_if_exists
 from harness.environment import SCRATCHDIR
 from harness.filesystem import rmtree
 from harness.results import test_fail, test_skipped
@@ -50,7 +51,7 @@ for host, why in (('-c', "looks like an option to the connect program"),
                   ('~root', "is tilde-expanded by the nested shell"),
                   ('%self', "is expanded by a nested fish, where %self is its pid"),
                   ('', "vanishes when a nested shell re-splits, shifting later args")):
-    seen.unlink(missing_ok=True)
+    unlink_if_exists(seen)
     proc = run(host, f'{probe} %H')
     if REFUSAL not in proc.stdout:
         got = seen.read_text() if seen.exists() else '(program not reached)'
@@ -63,7 +64,7 @@ for host, expect in (('example.com', 'example.com'),
                      ('host+alias', 'host+alias'),
                      ('host~alias', 'host~alias'),
                      ('[fe80::1%eth0]', 'fe80::1%eth0')):
-    seen.unlink(missing_ok=True)
+    unlink_if_exists(seen)
     proc = run(host, f'{probe} %H')
     if REFUSAL in proc.stdout:
         test_fail(f'host {host!r} is legitimate but was refused: {proc.stdout!r}')

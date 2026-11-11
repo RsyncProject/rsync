@@ -3,6 +3,7 @@
 import os
 import subprocess
 
+from harness.filesystem import unlink_if_exists
 from harness import TestContext, requires, run
 from harness.comparison import checkit
 from harness.results import test_fail
@@ -47,7 +48,7 @@ def test(context: TestContext):
         (source_root / name).touch()
     for options, overrides in ((('--old-args',), {}), ((), {'RSYNC_OLD_ARGS': '1'})):
         for name in ('one', 'two'):
-            (destination / name).unlink(missing_ok=True)
+            unlink_if_exists(destination / name)
         env = os.environ.copy()
         env.update(overrides)
         subprocess.run(rsync_argv('-ai', *options, f'--rsync-path={rsync_path_arg()}',

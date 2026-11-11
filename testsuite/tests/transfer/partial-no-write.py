@@ -3,11 +3,11 @@
 from contextlib import ExitStack
 import os
 from pathlib import Path
-import shlex
 import shutil
 import sys
 import tempfile
 
+from harness.process import quote_command
 from harness import TestContext, requires, run, environment
 from harness.comparison import checkit
 from harness.filesystem import cp_p, make_data_file, makepath
@@ -48,7 +48,7 @@ def test(context: TestContext):
                      'fi\n'
                      'shift\n'
                      'exec "$@"')
-            environment.RSYNC = shlex.join([*prefix, 'sh', '-c', probe, 'sh', str(partial), *rsync_argv_for(binary)])
+            environment.RSYNC = quote_command([*prefix, 'sh', '-c', probe, 'sh', str(partial), *rsync_argv_for(binary)])
         previous = os.getcwd()
         try:
             os.chdir(base)

@@ -7,6 +7,7 @@ import sys
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from harness.filesystem import unlink_if_exists
 from harness import config, runner
 from harness import Exit, TestContext, requires, run
 from harness.metadata import test_name
@@ -161,7 +162,7 @@ def test(context: TestContext):
     nested_env['scratchbase'] = str(context.scratch / 'nested')
 
     def invoke(args):
-        receipt.unlink(missing_ok=True)
+        unlink_if_exists(receipt)
         return subprocess.run(args, env=nested_env, capture_output=True, text=True)
 
     binary = rsync_command_binary()

@@ -22,8 +22,8 @@ class Results(unittest.TestCase):
                 'inputs': json.dumps({'ubuntu': True, 'almalinux': False})}},
             'diagnostics': {'result': 'success', 'outputs': {
                 'jobs': json.dumps({'clang_18': {'result': 'success'}, 'clang_21': {'result': 'success'},
-                                    'asan': {'result': 'skipped'}}),
-                'inputs': json.dumps({'clang_18': True, 'clang_21': True, 'asan': False})}},
+                                    'asan': {'result': 'skipped'}, 'python_37': {'result': 'success'}}),
+                'inputs': json.dumps({'clang_18': True, 'clang_21': True, 'asan': False, 'python_37': True})}},
             'bsd': {'result': 'skipped', 'outputs': {}},
             'macos': {'result': 'success', 'outputs': {
                 'jobs': json.dumps({'macos': {'result': 'success'}})}},

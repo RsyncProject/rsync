@@ -15,6 +15,12 @@ from .results import test_fail
 _SYSTEM = platform.system()
 _CYGWIN = _SYSTEM.startswith('CYGWIN')
 
+def unlink_if_exists(path):
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        pass
+
 def makepath(*paths) -> None:
     for path in paths:
         os.makedirs(path, exist_ok=True)

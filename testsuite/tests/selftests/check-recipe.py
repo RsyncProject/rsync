@@ -7,7 +7,6 @@ import hashlib
 from io import StringIO
 import json
 import os
-import shlex
 import shutil
 import signal
 import subprocess
@@ -16,6 +15,7 @@ import time
 from pathlib import Path
 from unittest.mock import patch
 
+from harness.process import quote_command
 from harness import Exit, TestContext, requires, run, runner
 from harness.results import test_error
 from harness.results import test_fail
@@ -34,7 +34,7 @@ def test(context: TestContext):
     env['PYTHONUNBUFFERED'] = '1'
 
     def invoke(args, success, message=None, timeout=180, input=None):
-        print(f'recipe: {shlex.join(args)}', flush=True)
+        print(f'recipe: {quote_command(args)}', flush=True)
         cancelled = False
 
         def cancel(signum, frame):
@@ -74,7 +74,7 @@ def test(context: TestContext):
                             raise
             if isinstance(error, subprocess.TimeoutExpired):
                 reason = 'cancelled' if cancelled else f'timed out after {timeout} seconds'
-                diagnostic = f'recipe {reason}: {shlex.join(args)}\n{stdout}{stderr}'
+                diagnostic = f'recipe {reason}: {quote_command(args)}\n{stdout}{stderr}'
                 output = Path(args[6])
                 for path in [output / 'run.log', *sorted(output.glob('scratch/testtmp/*/test.log'))]:
                     try:

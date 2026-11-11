@@ -38,10 +38,10 @@ def main():
     previous = {sig: signal.signal(sig, cancel) for sig in (signal.SIGTERM, signal.SIGINT)}
     try:
         for name in sorted(records, key=lambda value: tuple(
-                int(part) for part in value.removeprefix('rsync_').split('.'))):
+                int(part) for part in value[len('rsync_'):].split('.'))):
             peer = archive / name
             peer.chmod(peer.stat().st_mode | 0o111)
-            version = peer.name.removeprefix('rsync_')
+            version = peer.name[len('rsync_'):]
             profile = 'peer-' + version
             primary, secondary = ((peer.resolve(), current) if args.role == 'primary'
                                   else (current, peer.resolve()))

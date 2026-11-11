@@ -7,6 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from harness.process import quote_command
 from harness.environment import SCRATCHDIR
 from harness.filesystem import makepath, rmtree
 from harness.results import test_fail, test_skipped
@@ -44,7 +45,7 @@ subprocess.run([*rsync_argv('-a', f'--write-batch={batch_file}'), f'{src}/', f'{
 rmtree(dest)
 makepath(dest)
 
-rsync_base_cmd = shlex.join(rsync_argv('-a'))
+rsync_base_cmd = quote_command(rsync_argv('-a'))
 batch_path = shlex.quote(str(batch_file))
 dest_path = shlex.quote(str(dest) + '/')
 

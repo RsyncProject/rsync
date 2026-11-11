@@ -26,7 +26,10 @@ def test(context: TestContext):
                     try:
                         try:
                             client.sendall(b'@RSYNCD: 30.0\n\n')
-                            while data := client.recv(4096):
+                            while True:
+                                data = client.recv(4096)
+                                if not data:
+                                    break
                                 chunks.append(data)
                         except (BrokenPipeError, ConnectionResetError):
                             pass

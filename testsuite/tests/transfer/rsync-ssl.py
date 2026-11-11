@@ -6,6 +6,7 @@ import shlex
 import subprocess
 import sys
 
+from harness.filesystem import unlink_if_exists
 from harness.environment import SCRATCHDIR, SRCDIR
 from harness.filesystem import rmtree
 from harness.results import test_fail
@@ -62,7 +63,7 @@ if result.returncode == 0 or 'invalid rsync-ssl hostname' not in result.stdout:
     test_fail(f'crafted hostname was not rejected:\n{result.stdout}')
 
 def openssl_run(env):
-    openssl_args.unlink(missing_ok=True)
+    unlink_if_exists(openssl_args)
     invoke(SRCDIR / 'rsync-ssl', helper, env)
     return openssl_args.read_text().splitlines() if openssl_args.exists() else []
 
@@ -94,7 +95,7 @@ for name in ('RSYNC_SSL_CA_CERT', 'RSYNC_SSL_ALLOW_INSECURE_STUNNEL',
     stunnel_env.pop(name, None)
 
 def stunnel_run(env):
-    stunnel_config.unlink(missing_ok=True)
+    unlink_if_exists(stunnel_config)
     result = invoke(SRCDIR / 'rsync-ssl', helper, env)
     config = stunnel_config.read_text() if stunnel_config.exists() else ''
     return result, config
@@ -137,8 +138,8 @@ for name in ('RSYNC_SSL_TYPE', 'RSYNC_SSL_OPENSSL', 'RSYNC_SSL_STUNNEL'):
     type_env.pop(name, None)
 
 def type_run(args, expected):
-    rsync_args.unlink(missing_ok=True)
-    ssl_type.unlink(missing_ok=True)
+    unlink_if_exists(rsync_args)
+    unlink_if_exists(ssl_type)
     result = invoke(SRCDIR / 'rsync-ssl', args, type_env)
     if result.returncode:
         test_fail(f'rsync-ssl exited {result.returncode} for {args!r}:\n{result.stdout}')

@@ -2,11 +2,11 @@
 """Receiver file arguments must remain beneath a pinned parent."""
 
 import os
-import shlex
 import subprocess
 import time
 
 from fixtures.rrsync import rrsync_shell, patched_rrsync
+from harness.filesystem import unlink_if_exists
 from harness.environment import SCRATCHDIR
 from harness.filesystem import makepath, proc_self_fd_pins, rmtree
 from harness.results import test_fail, test_skipped
@@ -73,7 +73,7 @@ for option in ((), ('--inplace',)):
     transfer(source, 'dummy:existing', *option)
     check_contents(destination)
     new = restricted / 'new'
-    new.unlink(missing_ok=True)
+    unlink_if_exists(new)
     transfer(source, 'dummy:new', *option)
     check_contents(new)
 
@@ -95,8 +95,8 @@ if marker.read_text() != 'outside fixture\n':
 def gated_transfer(name, change):
     ready = base / 'ready'
     go = base / 'go'
-    ready.unlink(missing_ok=True)
-    go.unlink(missing_ok=True)
+    unlink_if_exists(ready)
+    unlink_if_exists(go)
     env = {**os.environ, 'RRSYNC_TEST_READY': str(ready), 'RRSYNC_TEST_GO': str(go)}
     proc = subprocess.Popen(command(source, f'dummy:{name}', '--inplace'),
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE,

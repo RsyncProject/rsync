@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 
+from harness.filesystem import unlink_if_exists
 from harness.environment import RSYNC, SCRATCHDIR
 from harness.filesystem import assert_same, make_data_file, makepath, rmtree
 from harness.process import split_rsync_cmd
@@ -160,8 +161,8 @@ later.write_text('later file must still transfer\n')
 shim = build_shim()
 mark = SCRATCHDIR / 'source_shrink_read.mark'
 load_mark = SCRATCHDIR / 'source_shrink_load.mark'
-mark.unlink(missing_ok=True)
-load_mark.unlink(missing_ok=True)
+unlink_if_exists(mark)
+unlink_if_exists(load_mark)
 env = os.environ.copy()
 env['LD_PRELOAD'] = str(shim)
 env['RSYNC_SHRINK_TARGET'] = str(changing.resolve())

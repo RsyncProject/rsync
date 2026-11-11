@@ -4,6 +4,7 @@ import errno
 import os
 import subprocess
 
+from harness.filesystem import unlink_if_exists
 from harness import TestContext, requires, run
 from harness.daemon import start_test_daemon
 from harness.environment import FROMDIR, SCRATCHDIR
@@ -28,7 +29,7 @@ def test(context: TestContext):
     for error, expected in ((0, 0), (errno.ENOENT, 24), (errno.EACCES, 23)):
         if error == errno.ENOENT and (forced_protocol() or 33) < 30:
             expected = 0
-        marker.unlink(missing_ok=True)
+        unlink_if_exists(marker)
         destination = SCRATCHDIR / f'destination-{error}'
         env = {**os.environ, 'LD_PRELOAD': str(library), 'LC_ALL': 'C', 'RSYNC_TEST_OPEN_FILE': 'file',
                'RSYNC_TEST_OPEN_ERRNO': str(error), 'RSYNC_TEST_OPEN_MARKER': str(marker)}

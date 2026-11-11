@@ -11,6 +11,7 @@ import tempfile
 import time
 from pathlib import Path
 
+from harness.process import quote_command
 from harness.daemon import require_tcp
 from harness.filesystem import makepath, rmtree
 from harness.results import test_fail, test_skipped
@@ -93,7 +94,7 @@ use chroot = no
         '--daemon', '--no-detach', f'--config={conf_host}',
         f'--port={port_host}', '--address=127.0.0.1',
     )
-    cmd_host = (f'{shlex.join(daemon_host_argv)} '
+    cmd_host = (f'{quote_command(daemon_host_argv)} '
                 f'> >(cat > {shlex.quote(str(out_host))}) '
                 f'2> {shlex.quote(str(err_host))} < /dev/null')
 
@@ -194,7 +195,7 @@ use chroot = no
         str(ns_rsync_bin), '--daemon', '--no-detach', f'--config={conf_ns}',
         f'--port={port_ns}', '--address=127.0.0.1',
     ]
-    cmd_ns = (f'{shlex.join(daemon_ns_argv)} '
+    cmd_ns = (f'{quote_command(daemon_ns_argv)} '
               f'> >(cat > {shlex.quote(str(out_ns))}) '
               f'2> {shlex.quote(str(err_ns))} < /dev/null')
 

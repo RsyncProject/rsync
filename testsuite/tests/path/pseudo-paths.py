@@ -8,6 +8,7 @@ import sys
 import tempfile
 from pathlib import Path
 
+from harness.process import quote_command
 from harness.environment import SCRATCHDIR
 from harness.filesystem import makepath, rmtree
 from harness.results import test_fail, test_skipped
@@ -42,7 +43,7 @@ makepath(src, dest)
 
 (src / 'transfer_me.txt').write_text('sync this\n')
 
-rsync_base_cmd = shlex.join(rsync_argv('-a'))
+rsync_base_cmd = quote_command(rsync_argv('-a'))
 src_path = shlex.quote(str(src) + '/')
 dest_path = shlex.quote(str(dest) + '/')
 
@@ -264,7 +265,7 @@ try:
     shutil.copy2(rsync_command_binary(), local_bin)
     local_bin.chmod(0o777)
 
-    cmd_prefix = shlex.join([str(local_bin), '-a'])
+    cmd_prefix = quote_command([str(local_bin), '-a'])
     s_path = shlex.quote(str(ws_src) + '/')
     d_path = shlex.quote(str(ws_dest) + '/')
 

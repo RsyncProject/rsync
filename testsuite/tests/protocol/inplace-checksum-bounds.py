@@ -13,6 +13,7 @@ import subprocess
 import threading
 import time
 
+from harness.filesystem import unlink_if_exists
 from harness import metadata
 from harness.daemon import require_tcp
 from harness.environment import FROMDIR, TODIR
@@ -189,7 +190,7 @@ finally:
     if t is not None:
         t.join(timeout=5)
     logf.close()
-    bigfile.unlink(missing_ok=True)
+    unlink_if_exists(bigfile)
 
 out_text = out_log.read_text(encoding='utf-8', errors='replace')
 print(f"sender exited with rc={rc}", flush=True)

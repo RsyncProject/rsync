@@ -68,6 +68,7 @@ jobs:
     uses: ./.github/workflows/diagnostics.yml
     with:
       lint: &regular ${{ github.event_name != 'schedule' }}
+      python_37: *regular
       asan: &instrumented ${{ github.event_name != 'schedule' || github.event.schedule == '42 9 * * 1' }}
       coverage: *instrumented
       clang_18: *regular

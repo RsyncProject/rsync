@@ -3,10 +3,14 @@ import hashlib
 import os
 from pathlib import Path
 import re
+import shlex
 import shutil
 import subprocess
 import sys
 import tempfile
+
+def quote_command(arguments):
+    return ' '.join(map(shlex.quote, arguments))
 
 
 def run(*command, timeout=30, **kwargs):

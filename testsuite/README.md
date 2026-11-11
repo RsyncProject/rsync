@@ -21,7 +21,7 @@ After the helpers are built, the runner accepts individual test names and shell 
 
 Direct runner invocations are serial unless given `-j`. Out-of-tree builds use the source path to runtests.py with `--srcdir`, `--tooldir` and `--rsync-bin`. Some mutation tests require the source directory to be configured too. The installcheck target tests the installed binary.
 
-The runner, tests and CI helpers use Python 3.9 or later and its standard library. Test subprocesses disable site packages with `-S`. Shell remains in package bootstrap, build commands and tests which exercise shell behaviour. CommonMark is a man-page build dependency. ACL and extended-attribute tests need the corresponding platform tools. Linux root permission tests require setpriv.
+The runner, tests and CI helpers use Python 3.7 or later and its standard library. CI checks Python 3.7 with the harness self-tests, CLI transfers and CI helper tests. Test subprocesses disable site packages with `-S`. Shell remains in package bootstrap, build commands and tests which exercise shell behaviour. CommonMark is a man-page build dependency. ACL and extended-attribute tests need the corresponding platform tools. Linux root permission tests require setpriv.
 
 Scratch data defaults to `testtmp/<name>/`. Failed tests retain their scratch directories. Root and non-root runs need separate scratch directories.
 

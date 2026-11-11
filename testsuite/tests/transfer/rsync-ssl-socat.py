@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 
+from harness.filesystem import unlink_if_exists
 from harness.environment import SCRATCHDIR, SRCDIR
 from harness.results import test_fail
 from harness import metadata
@@ -84,7 +85,7 @@ def fallback_env(**updates):
 
 
 def run_helper(host, **env_updates):
-    HELPER_ARGV.unlink(missing_ok=True)
+    unlink_if_exists(HELPER_ARGV)
     proc = subprocess.run(
         [str(RSYNC_SSL), '--HELPER', host, 'rsync', '--server', '--daemon', '.'],
         env=clean_env(RSYNC_SSL_TYPE='socat', RSYNC_SSL_SOCAT=str(fake_socat),
@@ -163,7 +164,7 @@ if argv != want:
 
 
 # --- default helper selection keeps existing openssl-first behaviour ---------
-OPENSSL_ARGV.unlink(missing_ok=True)
+unlink_if_exists(OPENSSL_ARGV)
 proc = subprocess.run(
     [str(RSYNC_SSL), '--HELPER', 'example.org', 'rsync', '--server',
      '--daemon', '.'],
@@ -180,7 +181,7 @@ if not openssl_argv or openssl_argv[0] != 's_client':
 
 
 # --- if openssl is unavailable, default selection prefers socat over stunnel -
-fallback_helper_argv.unlink(missing_ok=True)
+unlink_if_exists(fallback_helper_argv)
 proc = subprocess.run(
     [BASH, str(RSYNC_SSL), '--HELPER', 'fallback.example', 'rsync',
      '--server', '--daemon', '.'],

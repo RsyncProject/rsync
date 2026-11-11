@@ -8,6 +8,7 @@ import sys
 import tempfile
 from pathlib import Path
 
+from harness.process import quote_command
 from harness.filesystem import makepath, rmtree
 from harness.results import test_fail, test_skipped
 from harness.rsync import rsync_argv
@@ -57,7 +58,7 @@ if not os.environ.get('RSYNC_USERNS_PROCFS'):
     else:
         rmtree(launch_dir)
         test_fail(f'cannot locate the rsync executable in {env["RSYNC"]!r}')
-    env['RSYNC'] = shlex.join(rsync_cmd)
+    env['RSYNC'] = quote_command(rsync_cmd)
     launcher = []
     if os.geteuid() == 0:
         setpriv = shutil.which('setpriv')

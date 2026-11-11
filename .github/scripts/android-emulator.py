@@ -5,7 +5,6 @@ import json
 import os
 from pathlib import Path
 import re
-import shlex
 import shutil
 import signal
 import subprocess
@@ -13,7 +12,7 @@ import sys
 import tempfile
 import time
 
-from android import check_transfer as transfer, run
+from android import check_transfer as transfer, quote_command, run
 
 
 def wait_for_boot(adb, proc, timeout=300):
@@ -54,7 +53,7 @@ def check_device(adb):
                 'selinux': ('getenforce',), 'uid': ('id', '-u'),
                 'kernel': ('uname', '-r'), 'fingerprint': ('getprop', 'ro.build.fingerprint')}
     for name, command in commands.items():
-        values[name] = adb('shell', shlex.join(command), capture_output=True).stdout.strip()
+        values[name] = adb('shell', quote_command(command), capture_output=True).stdout.strip()
     for name, expected in dict(api='36', abi='x86_64', emulator='1', selinux='Enforcing', uid='2000').items():
         if values[name] != expected:
             raise ValueError(f'Android {name}: expected {expected}, got {values[name]!r}')
@@ -70,13 +69,13 @@ def check_transfer(adb, binary, output):
     try:
         adb('push', str(binary), f'{work}/{binary.name}', timeout=60)
         digest = hashlib.sha256(binary.read_bytes()).hexdigest()
-        remote = adb('shell', shlex.join(['sha256sum', f'{work}/{binary.name}']),
+        remote = adb('shell', quote_command(['sha256sum', f'{work}/{binary.name}']),
                      capture_output=True).stdout.split()[0]
         if digest != remote:
             raise ValueError('Android binary hash does not match the candidate')
-        adb('shell', shlex.join(['chmod', '700', f'{work}/{binary.name}']))
+        adb('shell', quote_command(['chmod', '700', f'{work}/{binary.name}']))
         def command(*args, **kwargs):
-            return adb('shell', '-T', shlex.join(args), **kwargs)
+            return adb('shell', '-T', quote_command(args), **kwargs)
         with tempfile.TemporaryDirectory(prefix='rsync-android-data-') as directory:
             local = Path(directory) / 'data'
             def write_file(path, data):
@@ -95,7 +94,7 @@ def check_transfer(adb, binary, output):
     finally:
         failed = sys.exc_info()[0] is not None
         try:
-            adb('shell', shlex.join(['rm', '-rf', work]))
+            adb('shell', quote_command(['rm', '-rf', work]))
         except (OSError, subprocess.SubprocessError) as error:
             if not failed:
                 raise
@@ -106,15 +105,15 @@ def check_permissions(adb, binary, work, output):
     with tempfile.TemporaryDirectory(prefix='rsync-unreadable-') as directory:
         private = Path(directory) / 'private'
         private.write_text('must not be copied\n')
-        adb('shell', shlex.join(['mkdir', f'{work}/unreadable', f'{work}/refused']))
+        adb('shell', quote_command(['mkdir', f'{work}/unreadable', f'{work}/refused']))
         adb('push', str(private), f'{work}/unreadable/private')
-    adb('shell', shlex.join(['chmod', '000', f'{work}/unreadable/private']))
-    result = adb('shell', shlex.join([f'{work}/{binary.name}', '-r', f'{work}/unreadable/',
+    adb('shell', quote_command(['chmod', '000', f'{work}/unreadable/private']))
+    result = adb('shell', quote_command([f'{work}/{binary.name}', '-r', f'{work}/unreadable/',
                                     f'{work}/refused/']), capture_output=True, check=False)
     (output / 'permissions.log').write_text(result.stdout + result.stderr)
     if result.returncode != 23 or 'Permission denied' not in result.stderr:
         raise ValueError('Unreadable Android source did not fail with permission denied and exit 23')
-    adb('shell', shlex.join(['test', '!', '-e', f'{work}/refused/private']))
+    adb('shell', quote_command(['test', '!', '-e', f'{work}/refused/private']))
     adb('shell', 'test -d /data/system')
     adb('shell', 'test ! -r /data/system')
 

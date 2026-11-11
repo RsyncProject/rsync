@@ -43,7 +43,7 @@ def check(data, expected):
 
 def main():
     try:
-        expected = {name.removeprefix('CI_EXPECT_').lower(): value for name, value in os.environ.items()
+        expected = {name[len('CI_EXPECT_'):].lower(): value for name, value in os.environ.items()
                     if name.startswith('CI_EXPECT_')}
         messages = check(json.loads(os.environ['CI_RESULTS']), expected)
     except (KeyError, TypeError, ValueError) as error:

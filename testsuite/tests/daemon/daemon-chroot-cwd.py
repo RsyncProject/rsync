@@ -4,6 +4,7 @@ import ctypes
 import os
 import subprocess
 
+from harness.filesystem import unlink_if_exists
 from harness import TestContext, requires, run
 from harness.daemon import start_test_daemon
 from harness.environment import SCRATCHDIR
@@ -34,7 +35,7 @@ def test(context: TestContext):
     url = start_test_daemon(config, 12920)
     for name, path, denied in (('plain', str(root), False), ('inner', f'{root}/./inner', False),
                                ('denied', f'{root}/./inner', True)):
-        marker.unlink(missing_ok=True)
+        unlink_if_exists(marker)
         config.write_text(f'use chroot = yes\n[files]\npath = {path}\n')
         env = {**os.environ, 'LD_PRELOAD': str(library), 'RSYNC_TEST_CHROOT_PATH': str(root),
                'RSYNC_TEST_CHROOT_MARKER': str(marker)}

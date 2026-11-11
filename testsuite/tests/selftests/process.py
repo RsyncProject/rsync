@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from fixtures import rrsync as rrsync_fixture
+from harness.process import quote_command
 from harness import daemon, process
 from harness import Exit, TestContext, requires, run
 from harness.process import (
@@ -42,7 +43,7 @@ def test(context: TestContext):
         test_fail('a wrapped rsync command was not preserved')
     if under_valgrind(str(bindir / 'valgrind-rsync')):
         test_fail('valgrind was inferred from an executable path')
-    if rsync_path_arg(wrapped) != shlex.join(wrapped_argv):
+    if shlex.split(rsync_path_arg(wrapped)) != wrapped_argv:
         test_fail('the remote rsync command was not quoted')
     if rsync_argv(command, '-a') != [str(binary), '--protocol=31', '-a']:
         test_fail('rsync arguments were not appended')
@@ -68,16 +69,15 @@ def test(context: TestContext):
 
     source = context.scratch / 'source with spaces'
     shell = str(source / 'support' / 'lsh.sh')
-    expected_rsh = shlex.join([shell, '--option', 'value with spaces'])
-    if rsh_cmd(shell, '--option', 'value with spaces') != expected_rsh:
+    if shlex.split(rsh_cmd(shell, '--option', 'value with spaces')) != [shell, '--option', 'value with spaces']:
         test_fail('the remote shell command was not quoted')
 
     unsupported = context.scratch / 'unsupported.py'
     unsupported.write_text("import sys\nsys.stderr.write('unknown option\\n')\nraise SystemExit(1)\n")
     supported = context.scratch / 'supported.py'
     supported.write_text('raise SystemExit(0)\n')
-    unsupported_command = shlex.join([sys.executable, str(unsupported)])
-    supported_command = shlex.join([sys.executable, str(supported)])
+    unsupported_command = quote_command([sys.executable, str(unsupported)])
+    supported_command = quote_command([sys.executable, str(supported)])
     if rsync_supports(unsupported_command, '--same-flag'):
         test_fail('an unsupported option was accepted')
     if not rsync_supports(supported_command, '--same-flag'):

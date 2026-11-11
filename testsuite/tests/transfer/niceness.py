@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 
+from harness.process import quote_command
 from harness import metadata
 from harness.daemon_config import build_rsyncd_conf
 from fixtures.rrsync import patched_rrsync
@@ -250,7 +251,7 @@ if sched_idle:
     idle_wrapper.write_text(
         idle_code + 'import sys\nos.execvp(sys.argv[1], sys.argv[1:])\n'
     )
-    idle_command = shlex.join([sys.executable, str(idle_wrapper), *shlex.split(RSYNC)])
+    idle_command = quote_command([sys.executable, str(idle_wrapper), *shlex.split(RSYNC)])
     idle_daemon_rsh = (
         f'{idle_command} --config={shlex.quote(str(conf))} --daemon'
     )

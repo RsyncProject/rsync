@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
+from harness.filesystem import unlink_if_exists
+from harness.process import quote_command
 
 import errno
 import os
-import shlex
 import signal
 import subprocess
 import sys
@@ -31,7 +32,7 @@ def test(context: TestContext):
     marker = SCRATCHDIR / 'read-error'
 
     def invoke(name, arguments, path, after, mode='eio', success=False):
-        marker.unlink(missing_ok=True)
+        unlink_if_exists(marker)
         env = {**os.environ, 'LD_PRELOAD': str(library), 'RSYNC_TEST_READ_PATH': str(path),
                'RSYNC_TEST_READ_AFTER': str(after), 'RSYNC_TEST_READ_ERROR': mode,
                'RSYNC_TEST_READ_MARKER': str(marker)}
@@ -87,7 +88,7 @@ def test(context: TestContext):
     early = SCRATCHDIR / 'early-input'
     early.write_bytes(bytes(range(256)))
     captured = SCRATCHDIR / 'early-received'
-    hook = shlex.join([sys.executable, '-S', '-c',
+    hook = quote_command([sys.executable, '-S', '-c',
                       f'import sys; from pathlib import Path; Path({str(captured)!r}).write_bytes(sys.stdin.buffer.read())'])
     config.write_text(config_text + f'early exec = {hook}\n')
     arguments = [f'--early-input={early}', f'{url}files/']

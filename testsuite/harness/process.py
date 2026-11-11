@@ -7,6 +7,9 @@ import subprocess
 import sys
 from .results import test_fail
 
+def quote_command(arguments):
+    return ' '.join(map(shlex.quote, arguments))
+
 def file_digest(path):
     digest = hashlib.sha256()
     with open(path, 'rb') as stream:
@@ -33,10 +36,10 @@ def under_valgrind(*commands: str) -> bool:
     return any(os.path.basename(split_rsync_cmd(command)[0]) == 'valgrind' for command in commands)
 
 def rsh_cmd(command: str, *options: str) -> str:
-    return shlex.join([command, *options])
+    return quote_command([command, *options])
 
 def rsync_path_arg(command: str) -> str:
-    return shlex.join(split_rsync_cmd(command))
+    return quote_command(split_rsync_cmd(command))
 
 def rsync_argv(command: str, *args: str) -> list:
     return split_rsync_cmd(command) + list(args)

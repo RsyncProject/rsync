@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from __future__ import annotations
+from harness.filesystem import unlink_if_exists
 
 import errno
 import os
@@ -222,8 +223,8 @@ victim_inode = victim.stat().st_ino
 old = module / "old"
 ready_fifo = SCRATCHDIR / "ready.fifo"
 done_fifo = SCRATCHDIR / "done.fifo"
-ready_fifo.unlink(missing_ok=True)
-done_fifo.unlink(missing_ok=True)
+unlink_if_exists(ready_fifo)
+unlink_if_exists(done_fifo)
 os.mkfifo(ready_fifo)
 os.mkfifo(done_fifo)
 

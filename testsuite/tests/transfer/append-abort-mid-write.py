@@ -26,6 +26,7 @@ import subprocess
 import sys
 import time
 
+from harness.filesystem import unlink_if_exists
 from harness.environment import RSYNC, SCRATCHDIR
 from harness.filesystem import assert_same, make_data_file, makepath, rmtree
 from harness.process import split_rsync_cmd
@@ -204,7 +205,7 @@ def abort_mid_write(mode):
     held = SCRATCHDIR / 'midwrite.held'
     release = SCRATCHDIR / 'midwrite.release'
     for p in (loaded, held, release):
-        p.unlink(missing_ok=True)
+        unlink_if_exists(p)
     env = os.environ.copy()
     env['LD_PRELOAD'] = str(shim)
     env['RSYNC_MIDWRITE_TARGET'] = str((dest / 'grow.bin').resolve())

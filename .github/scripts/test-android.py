@@ -117,7 +117,10 @@ class Android(unittest.TestCase):
             digest = hashlib.sha256(binary.read_bytes()).hexdigest()
             for mismatch, failed, cleanup_error in ((False, False, False), (True, False, False),
                                                      (False, True, False), (True, False, True)):
-                (root / 'receipt.json').unlink(missing_ok=True)
+                try:
+                    (root / 'receipt.json').unlink()
+                except FileNotFoundError:
+                    pass
                 calls = []
                 def adb(*args, **kwargs):
                     calls.append(args)
