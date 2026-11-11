@@ -23,8 +23,10 @@ chroot-link-dest-inner-module
 chroot-receiver-write-inner-module
 chroot-special-inner-module
 copy-dest-symlink-readleak
+copy-links-open-error                  # Linux interposition
 copy-xattrs-symlink-race
 daemon-auth-group
+daemon-chroot-cwd                      # Linux interposition
 daemon-chroot-munge-default
 daemon-config-symlink
 daemon-module-chdir-symlink
@@ -70,6 +72,7 @@ search-only-held-dirfd
 sender-remove-source-root-anchor
 simd-checksum
 source-change-size-continues
+stdio-read-errors                      # Linux interposition
 symlink-dest-backupdir
 symlink-race-dest
 symlink-race-relative-dest

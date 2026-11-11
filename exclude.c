@@ -1598,6 +1598,21 @@ void parse_filter_str(filter_rule_list *listp, const char *rulestr,
 	}
 }
 
+static int get_filter_char(FILE *file)
+{
+	int c = getc(file);
+	while (c == EOF && ferror(file) && errno == EINTR) {
+		clearerr(file);
+		/* EINTR leaves the unread byte in place, including on pipes.
+		 * Clang 21's stream model does not recognise this recovery. */
+#ifdef __clang_analyzer__
+		__attribute__((suppress))
+#endif
+		c = getc(file);
+	}
+	return c;
+}
+
 void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_rule *template, int xflags)
 {
 	FILE *fp;
@@ -1685,8 +1700,11 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 
 		if (fd < 0)
 			fp = NULL;
-		else if (!(fp = fdopen(fd, "rb")))
+		else if (!(fp = fdopen(fd, "rb"))) {
+			int fdopen_errno = errno;
 			close(fd);
+			errno = fdopen_errno;
+		}
 	} else
 		fp = stdin;
 
@@ -1762,11 +1780,7 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 			if (pending != EOF) {   /* a CR lookahead we could not push back */
 				ch = pending;
 				pending = EOF;
-			} else if ((ch = getc(fp)) == EOF) {
-				if (ferror(fp) && errno == EINTR) {
-					clearerr(fp);
-					continue;
-				}
+			} else if ((ch = get_filter_char(fp)) == EOF) {
 				break;
 			}
 			if (word_split && isspace(ch))
@@ -1774,9 +1788,7 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 			if (eol_nulls? !ch : (ch == '\n' || ch == '\r')) {
 				if (ch == '\r') {   /* CRLF is one line, not two */
 					int nxt;
-					while ((nxt = getc(fp)) == EOF
-					    && ferror(fp) && errno == EINTR)
-						clearerr(fp);
+					nxt = get_filter_char(fp);
 					if (nxt == EOF) {
 						if (!ferror(fp))
 							ch = EOF;   /* real end of file */
@@ -1795,6 +1807,14 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 				*s++ = ch;
 			else
 				overflow = 1;
+		}
+		if (ferror(fp)) {
+			if (named_by_file)
+				rprintf(FERROR, "failed to read filter file %s\n", rule_text(template, src_name));
+			else
+				rsyserr(FERROR, errno, "failed to read filter file %s", src_name);
+			fclose(fp);
+			exit_cleanup(RERR_FILEIO);
 		}
 		if (overflow) {
 			rprintf(FERROR, "discarding over-long filter: %s\n",

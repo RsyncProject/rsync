@@ -313,11 +313,13 @@ static int sender_open_copylinks_confined(const char *anchor, const char *relpat
 		if (n < 0) {
 			/* EINVAL: not a symlink -> the resolved target file.  Open it
 			 * O_NOFOLLOW (a raced symlink flip is still refused). */
-			fd = e == EINVAL
-			   ? openat(pdfd, bname, O_RDONLY | O_NOFOLLOW | O_BINARY | extra, 0)
-			   : -1;
+			if (e == EINVAL) {
+				fd = openat(pdfd, bname, O_RDONLY | O_NOFOLLOW | O_BINARY | extra, 0);
+				e = fd < 0 ? errno : 0;
+			} else
+				fd = -1;
 			close(pdfd);
-			if (n < 0 && e != EINVAL)
+			if (fd < 0)
 				errno = e;
 			return fd;
 		}

@@ -27,9 +27,9 @@ rsync version to be at least 3.2.0.
 
 If an arg is a `--type=SSL_TYPE` option, the script will only use
 that particular program to open an ssl connection instead of trying to find an
-openssl or stunnel executable via a simple heuristic (assuming that the
-`RSYNC_SSL_TYPE` environment variable is not set as well -- see below).  This
-option must specify one of `openssl` or `stunnel`.  The equal sign is
+openssl, socat or stunnel executable via a simple heuristic (assuming that
+the `RSYNC_SSL_TYPE` environment variable is not set as well -- see below).
+This option must specify one of `openssl`, `socat` or `stunnel`. The equal sign is
 required for this particular option.  The wrapper's option scan stops at a
 `--` argument: the `--` and everything after it are passed through to rsync
 unchanged, so a `--type=...` token after a `--` is not consumed by the
@@ -45,8 +45,8 @@ The ssl helper scripts are affected by the following environment variables:
 0.  `RSYNC_SSL_TYPE`
 
     Specifies the program type that should be used to open the ssl connection.
-    It must be one of `openssl` or `stunnel`.  The `--type=SSL_TYPE` option
-    overrides this, when specified.
+    It must be one of `openssl`, `socat` or `stunnel`. The `--type=SSL_TYPE`
+    option overrides this, when specified.
 
 0.  `RSYNC_SSL_PORT`
 
@@ -72,8 +72,8 @@ The ssl helper scripts are affected by the following environment variables:
     certificate that is used to validate the connection.  When set, the server
     certificate is verified against this CA **and** its name is checked against
     the host you are connecting to (the chain and the identity), for all of the
-    openssl, gnutls, and stunnel backends.  Set it to an empty string to disable
-    certificate validation entirely (an encrypt-only connection).
+    openssl, gnutls, socat and stunnel backends. Set it to an empty string to
+    disable certificate validation entirely (an encrypt-only connection).
 
 0.  `RSYNC_SSL_ALLOW_INSECURE_STUNNEL`
 
@@ -102,6 +102,11 @@ The ssl helper scripts are affected by the following environment variables:
     Specifies the gnutls-cli executable to run when the connection type is set
     to gnutls.  If unspecified, the $PATH is searched for "gnutls-cli".
 
+0.  `RSYNC_SSL_SOCAT`
+
+    Specifies the socat executable to run when the connection type is set to
+    socat.  If unspecified, the $PATH is searched for "socat".
+
 0.  `RSYNC_SSL_STUNNEL`
 
     Specifies the stunnel executable to run when the connection type is set to
@@ -113,6 +118,8 @@ The ssl helper scripts are affected by the following environment variables:
 >     rsync-ssl -aiv example.com::mod/ dest
 
 >     rsync-ssl --type=openssl -aiv example.com::mod/ dest
+
+>     rsync-ssl --type=socat -aiv example.com::mod/ dest
 
 >     rsync-ssl -aiv --port 9874 example.com::mod/ dest
 
@@ -132,6 +139,10 @@ rsyncd.conf](rsyncd.conf.5#SSL_TLS_Daemon_Setup).
 The stunnel backend requires stunnel 4 or newer.  It also requires
 `RSYNC_SSL_CA_CERT` unless `RSYNC_SSL_ALLOW_INSECURE_STUNNEL=1` explicitly
 opts out of server-certificate validation.
+
+The `openssl` type uses `openssl s_client`, which is retained for
+compatibility.  If your OpenSSL version's `s_client` has trouble handling
+rsync traffic, try `--type=socat` or `--type=stunnel`.
 
 This script also supports a `--type=gnutls` option, but at the time of this
 release the gnutls-cli command was dropping output, making it unusable.  If

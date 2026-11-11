@@ -78,13 +78,12 @@ extern char curr_dir[MAXPATHLEN];	/* defined below; fwd-declared for the seed */
 extern int operator_path_resolve;	/* defined below; fwd-declared for the exclude check */
 extern int filesfrom_owner_walk_override;	/* defined below; used by files-from implied dirs */
 
-/* A directory fd used only for pathname traversal, fchdir(), or as *at()
- * authority does not need read permission on Linux.  Keep the portable
- * O_RDONLY fallback for systems without O_PATH. */
+/* A traversal descriptor does not need directory read permission when
+ * configure found a flag which preserves later search-permission checks. */
 static int directory_traverse_flags(void)
 {
-#if defined O_PATH && defined O_DIRECTORY
-	return O_PATH | O_DIRECTORY;
+#if defined SEARCH_ONLY_DIRFD_FLAG && defined O_DIRECTORY
+	return SEARCH_ONLY_DIRFD_FLAG | O_DIRECTORY;
 #elif defined O_DIRECTORY
 	return O_RDONLY | O_DIRECTORY;
 #else
@@ -771,7 +770,7 @@ int open_no_attacker_symlinks(const char *path, int flags, mode_t mode)
 
 /* Open a directory for traversal or as *at()/fchdir() authority.  Unlike an
  * O_RDONLY directory endpoint, this accepts a searchable but unreadable
- * directory on Linux. */
+ * directory when the kernel provides a safe search-only descriptor. */
 int open_no_attacker_symlinks_dirfd(const char *path)
 {
 	return ona_open(path, directory_traverse_flags(), 0, NULL, 0);
