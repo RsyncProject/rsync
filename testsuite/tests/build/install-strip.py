@@ -31,6 +31,9 @@ if not source_rsync.is_file():
 builddir = SCRATCHDIR / 'build'
 builddir.mkdir()
 makefile_text = (TOOLDIR / 'Makefile').read_text()
+makefile_text, replaced = re.subn(r'(?m)^srcdir=.*$', 'srcdir=.', makefile_text, count=1)
+if replaced != 1:
+    test_fail('cannot isolate the install source directory')
 if 'install: all\n' not in makefile_text:
     test_fail('cannot isolate the install target from the shared build')
 if 'Makefile: Makefile.in config.status configure.sh config.h.in\n' not in makefile_text:

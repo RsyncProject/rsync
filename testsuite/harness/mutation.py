@@ -289,14 +289,14 @@ def assert_no_protocol_abort(result):
         test_fail(f'unexpected rsync exit {result.returncode}:\n{output}')
 
 def build_patched_rsync(name, replacements, append_cflags=None):
-    from .environment import SCRATCHDIR, SRCDIR
+    from .environment import SCRATCHDIR, SRCDIR, TOOLDIR
     if sys.platform == 'cygwin' or platform.system().startswith('CYGWIN'):
         test_skipped(f"{name}: build_patched_rsync is unreliable on Cygwin "
                      "(prebuilt-object staleness / -fno-common relink); the "
                      "patched-peer fix is validated on the POSIX targets",
                      capability='native_build')
-    if not (SRCDIR / 'Makefile').is_file():
-        test_skipped(f"{name}: needs a configured rsync source tree with a Makefile",
+    if not (TOOLDIR / 'Makefile').is_file():
+        test_skipped(f"{name}: needs a configured rsync build with a Makefile",
                      capability='native_build')
     if not shutil.which('make'):
         test_skipped(f"{name}: make(1) not on PATH", capability='native_build')
@@ -305,10 +305,12 @@ def build_patched_rsync(name, replacements, append_cflags=None):
 
     work = SCRATCHDIR / name
     rmtree(work)
+    separate_build = SRCDIR.resolve() != TOOLDIR.resolve()
+    generated = ('Makefile', 'config.status', 'config.log', 'config.h', '*.o') if separate_build else ()
     shutil.copytree(
         SRCDIR, work, symlinks=True,
         ignore=shutil.ignore_patterns(
-            'testtmp', '.git', 'auto-build-save', 'autom4te.cache', '__pycache__'))
+            'testtmp', '.git', 'auto-build-save', 'autom4te.cache', '__pycache__', *generated))
 
     for relpath, old, new in replacements:
         path = work / relpath
@@ -325,6 +327,19 @@ def build_patched_rsync(name, replacements, append_cflags=None):
     for stale in (work / 'rsync', work / 'rsync.exe'):
         if stale.exists():
             stale.unlink()
+
+    if separate_build:
+        configured = subprocess.run([str(TOOLDIR / 'config.status'), '--config'],
+                                    capture_output=True, text=True, check=True, timeout=30)
+        arguments = iter(shlex.split(configured.stdout))
+        options = []
+        for argument in arguments:
+            if argument == '--srcdir':
+                next(arguments)
+            elif not argument.startswith('--srcdir='):
+                options.append(argument)
+        subprocess.run([str(work / 'configure'), *options], cwd=work, check=True, timeout=180,
+                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
     if append_cflags:
         import re
