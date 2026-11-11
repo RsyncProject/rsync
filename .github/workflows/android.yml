@@ -22,20 +22,26 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    name: ${{ matrix.abi }} (Bionic)
+    name: ${{ matrix.name }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - abi: arm64-v8a
+          - name: ARM64 (Bionic)
+            abi: arm64-v8a
             triple: aarch64-linux-android
             executor: qemu-aarch64-static
-          - abi: armeabi-v7a
+            termux: false
+          - name: ARMv7 (Bionic)
+            abi: armeabi-v7a
             triple: armv7a-linux-androideabi
             executor: qemu-arm-static
-          - abi: x86_64
+            termux: false
+          - name: X86-64 (Bionic and Termux)
+            abi: x86_64
             triple: x86_64-linux-android
             executor: direct
+            termux: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -81,28 +87,8 @@ jobs:
       - name: Package
         run: python3 -S .github/scripts/android.py package --abi "${{ matrix.abi }}"
 
-      - name: Upload binary
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          retention-days: 45
-          name: ${{ env.ARTIFACT_NAME }}
-          if-no-files-found: error
-          path: dist/
-
-  termux:
-    needs: build
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    name: x86_64 (Termux userspace)
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: rsync-android-x86_64
-          path: dist
-      - name: Verify artefact
+      - name: Verify Termux artefact
+        if: ${{ matrix.termux }}
         run: |
           set -eu
           set -- dist/*.sha256
@@ -112,7 +98,9 @@ jobs:
           [ -f "$binary" ]
           chmod +x "$binary"
           echo "ANDROID_BINARY=$binary" >> "$GITHUB_ENV"
+
       - name: Test Termux transfer
+        if: ${{ matrix.termux }}
         run: |
           set -eu
           docker pull "$TERMUX_IMAGE"
@@ -126,3 +114,11 @@ jobs:
             --security-opt no-new-privileges \
             --mount "type=bind,source=$PWD,target=/workspace,readonly" \
             "$TERMUX_IMAGE" sh /workspace/.github/scripts/android-transfer.sh direct "$binary"
+
+      - name: Upload binary
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          retention-days: 45
+          name: ${{ env.ARTIFACT_NAME }}
+          if-no-files-found: error
+          path: dist/

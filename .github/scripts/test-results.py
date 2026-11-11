@@ -34,8 +34,7 @@ class Results(unittest.TestCase):
             'versions': {'result': 'success', 'outputs': {
                 'jobs': json.dumps({'mix': {'result': 'success'}})}},
             'android': {'result': 'success', 'outputs': {
-                'jobs': json.dumps({'build': {'result': 'success'},
-                                    'termux': {'result': 'success'}})}},
+                'jobs': json.dumps({'build': {'result': 'success'}})}},
         }
 
     def reject(self):
