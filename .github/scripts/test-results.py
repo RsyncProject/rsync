@@ -21,10 +21,9 @@ class Results(unittest.TestCase):
                 'jobs': json.dumps({'ubuntu': {'result': 'success'}, 'almalinux': {'result': 'skipped'}}),
                 'inputs': json.dumps({'ubuntu': True, 'almalinux': False})}},
             'diagnostics': {'result': 'success', 'outputs': {
-                'jobs': json.dumps({'scan_pinned': {'result': 'success'}, 'scan_latest': {'result': 'failure'},
+                'jobs': json.dumps({'clang_18': {'result': 'success'}, 'clang_21': {'result': 'success'},
                                     'asan': {'result': 'skipped'}}),
-                'inputs': json.dumps({'scan_pinned': True, 'scan_latest': True, 'asan': False}),
-                'advisory': 'scan_latest'}},
+                'inputs': json.dumps({'clang_18': True, 'clang_21': True, 'asan': False})}},
             'bsd': {'result': 'skipped', 'outputs': {}},
             'macos': {'result': 'success', 'outputs': {
                 'jobs': json.dumps({'macos': {'result': 'success'}})}},
@@ -117,31 +116,26 @@ class Results(unittest.TestCase):
             outputs['inputs'] = json.dumps(inputs)
             self.reject()
 
-    def test_advisory(self):
+    def test_diagnostics_jobs(self):
         outputs = self.data['diagnostics']['outputs']
         jobs = json.loads(outputs['jobs'])
-        for result in ('success', 'failure'):
-            jobs['scan_latest']['result'] = result
-            outputs['jobs'] = json.dumps(jobs)
-            self.assertTrue(check(self.data, self.expected))
-        for result in ('cancelled', 'skipped', None):
-            jobs['scan_latest']['result'] = result
-            outputs['jobs'] = json.dumps(jobs)
+        for name in ('clang_18', 'clang_21'):
+            for result in ('failure', 'cancelled', 'skipped', None):
+                with self.subTest(job=name, result=result):
+                    outputs['jobs'] = json.dumps({**jobs, name: {'result': result}})
+                    self.reject()
+            outputs['jobs'] = json.dumps({key: value for key, value in jobs.items() if key != name})
             self.reject()
-        jobs['scan_latest']['result'] = 'skipped'
-        outputs['inputs'] = json.dumps({'scan_pinned': True, 'scan_latest': False, 'asan': False})
-        outputs['jobs'] = json.dumps(jobs)
+        outputs['jobs'] = json.dumps({**jobs, 'clang_18': {'result': 'skipped'}})
+        outputs['inputs'] = json.dumps({'clang_18': False, 'clang_21': True, 'asan': False})
         self.assertTrue(check(self.data, self.expected))
-        jobs['scan_latest']['result'] = 'failure'
+
+    def test_failed_job_cannot_be_advisory(self):
+        outputs = self.data['diagnostics']['outputs']
+        jobs = json.loads(outputs['jobs'])
+        jobs['clang_21']['result'] = 'failure'
         outputs['jobs'] = json.dumps(jobs)
-        self.reject()
-        outputs['inputs'] = json.dumps({'scan_pinned': True, 'scan_latest': True, 'asan': False})
-        for advisory in ('', 'unknown', None, 1):
-            outputs['advisory'] = advisory
-            self.reject()
-        outputs['advisory'] = 'scan_latest'
-        jobs['scan_pinned']['result'] = 'failure'
-        outputs['jobs'] = json.dumps(jobs)
+        outputs['advisory'] = 'clang_21'
         self.reject()
 
     def test_every_family_requires_nested_results(self):
@@ -196,6 +190,13 @@ class Results(unittest.TestCase):
         command = [sys.executable, '-S', str(checker)]
         result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)
+        outputs = self.data['diagnostics']['outputs']
+        jobs = json.loads(outputs['jobs'])
+        outputs['jobs'] = json.dumps({**jobs, 'clang_21': {'result': 'failure'}})
+        result = subprocess.run(command, env={**env, 'CI_RESULTS': json.dumps(self.data)},
+                                capture_output=True, text=True, timeout=10)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('diagnostics/clang_21: failure', result.stderr)
         result = subprocess.run(command, env={**env, 'CI_RESULTS': 'not JSON'},
                                 capture_output=True, text=True, timeout=10)
         self.assertNotEqual(result.returncode, 0)

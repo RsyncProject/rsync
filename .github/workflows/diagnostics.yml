@@ -12,10 +12,10 @@ on:
       coverage:
         required: true
         type: boolean
-      scan_pinned:
+      clang_18:
         required: true
         type: boolean
-      scan_latest:
+      clang_21:
         required: true
         type: boolean
     outputs:
@@ -25,9 +25,6 @@ on:
       inputs:
         description: Job selections
         value: ${{ toJSON(inputs) }}
-      advisory:
-        description: Advisory job
-        value: scan_latest
 
 permissions:
   contents: read
@@ -151,8 +148,8 @@ jobs:
             coverage
             coverage-tcp
 
-  scan_pinned:
-    if: ${{ inputs.scan_pinned }}
+  clang_18:
+    if: ${{ inputs.clang_18 }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     name: Clang 18
@@ -165,10 +162,12 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang-18 clang-tools-18 acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev libidn2-dev libpopt-dev openssl
+      - name: Version
+        run: clang-18 --version
       - name: Configure
         run: scan-build-18 ./configure --with-rrsync --disable-md2man
       - name: Analyse
-        run: python3 -S .github/scripts/diagnostics.py scan scan-build-18 --strict
+        run: python3 -S .github/scripts/diagnostics.py scan scan-build-18
       - name: Upload report
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -178,12 +177,11 @@ jobs:
           path: scan-report
           if-no-files-found: ignore
 
-  scan_latest:
-    if: ${{ inputs.scan_latest }}
+  clang_21:
+    if: ${{ inputs.clang_21 }}
     runs-on: ubuntu-26.04
     timeout-minutes: 45
-    name: Clang (Ubuntu 26.04)
-    continue-on-error: true
+    name: Clang 21
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -192,16 +190,18 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang clang-tools acl libacl1-dev attr libattr1-dev liblz4-dev libidn2-dev libzstd-dev libxxhash-dev libpopt-dev openssl
+          sudo apt-get install -y clang-21 clang-tools-21 acl libacl1-dev attr libattr1-dev liblz4-dev libidn2-dev libzstd-dev libxxhash-dev libpopt-dev openssl
+      - name: Version
+        run: clang-21 --version
       - name: Configure
-        run: scan-build ./configure --with-rrsync --disable-md2man
+        run: scan-build-21 ./configure --with-rrsync --disable-md2man
       - name: Analyse
-        run: python3 -S .github/scripts/diagnostics.py scan scan-build
+        run: python3 -S .github/scripts/diagnostics.py scan scan-build-21
       - name: Upload report
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           retention-days: 45
-          name: scan-build-report-forward
+          name: scan-build-report-clang21
           path: scan-report
           if-no-files-found: ignore

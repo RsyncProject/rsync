@@ -63,7 +63,7 @@ Individual tests use exit codes 0 for pass, 1 for failure, 2 for error and 77 fo
 
 ## CI
 
-[ci.yml](../.github/workflows/ci.yml) selects native tests, diagnostics and historical-peer checks for pull requests and master pushes. Scheduled runs divide daily and weekly work. The Versions group runs every archived release as both the primary and secondary executable over pipe and TCP. Valgrind runs root and non-root pipe and TCP checks in its own group. The forward Clang check on Ubuntu 26.04 runs weekly and manually as a non-blocking check; Clang 18 remains blocking.
+[ci.yml](../.github/workflows/ci.yml) selects native tests, diagnostics and historical-peer checks for pull requests and master pushes. Scheduled runs divide daily and weekly work. The Versions group runs every archived release as both the primary and secondary executable over pipe and TCP. Valgrind runs root and non-root pipe and TCP checks in its own group. Clang 18 and Clang 21 are blocking checks.
 
 Environment | Versions and architectures
 --- | ---

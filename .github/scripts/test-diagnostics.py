@@ -59,17 +59,19 @@ class Diagnostics(unittest.TestCase):
             self.assertNotIn('compiler output', summary.read_text())
 
     def test_scan_flags_and_exit_status(self):
-        for tool, strict in (('scan-build-18', True), ('scan-build', False)):
-            calls = []
-            def logged(command, path):
-                calls.append(command)
-                return 17
-            argv = ['diagnostics.py', 'scan', tool, *(['--strict'] if strict else [])]
-            with patch.object(sys, 'argv', argv), patch.dict(diagnostics['main'].__globals__,
-                    {'logged': logged, 'summary': lambda *args: None}):
-                self.assertEqual(diagnostics['main'](), 17)
-            self.assertEqual(calls[0][0], tool)
-            self.assertEqual('--status-bugs' in calls[0], strict)
+        for tool in ('scan-build-18', 'scan-build-21'):
+            for status in (0, 17):
+                with self.subTest(tool=tool, status=status):
+                    calls = []
+                    def logged(command, path):
+                        calls.append(command)
+                        return status
+                    argv = ['diagnostics.py', 'scan', tool]
+                    with patch.object(sys, 'argv', argv), patch.dict(diagnostics['main'].__globals__,
+                            {'logged': logged, 'summary': lambda *args: None}):
+                        self.assertEqual(diagnostics['main'](), status)
+                    self.assertEqual(calls[0][0], tool)
+                    self.assertIn('--status-bugs', calls[0])
 
 
 if __name__ == '__main__':

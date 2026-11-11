@@ -70,8 +70,8 @@ jobs:
       lint: &regular ${{ github.event_name != 'schedule' }}
       asan: &instrumented ${{ github.event_name != 'schedule' || github.event.schedule == '42 9 * * 1' }}
       coverage: *instrumented
-      scan_pinned: *regular
-      scan_latest: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && github.event.schedule == '42 9 * * 1') }}
+      clang_18: *regular
+      clang_21: *instrumented
 
   valgrind:
     name: Valgrind

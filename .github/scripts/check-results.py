@@ -25,13 +25,10 @@ def check(data, expected):
         require(isinstance(outputs, dict), f'{family}: invalid outputs')
         jobs = json.loads(outputs.get('jobs', 'null'))
         inputs = json.loads(outputs.get('inputs', '{}'))
-        advisory = outputs.get('advisory')
         require(isinstance(jobs, dict) and jobs, f'{family}: missing job results')
         require(isinstance(inputs, dict) and all(type(value) is bool for value in inputs.values()),
                 f'{family}: invalid job selections')
         require(inputs.keys() <= jobs.keys(), f'{family}: unknown job selection')
-        require(advisory is None or isinstance(advisory, str) and advisory in jobs,
-                f'{family}: unknown advisory job')
         require(any(inputs.get(name) is not False for name in jobs), f'{family}: no jobs selected')
         for name, job in jobs.items():
             require(isinstance(job, dict), f'{family}/{name}: invalid job result')
@@ -39,8 +36,7 @@ def check(data, expected):
             if inputs.get(name) is False:
                 require(result == 'skipped', f'{family}/{name}: expected skipped')
             else:
-                require(result == 'success' or result == 'failure' and name == advisory,
-                        f'{family}/{name}: {result or "missing result"}')
+                require(result == 'success', f'{family}/{name}: {result or "missing result"}')
             messages.append(f'{family}/{name}: {result}')
     return messages
 

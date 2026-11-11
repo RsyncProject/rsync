@@ -84,8 +84,7 @@ def main():
     coverage.add_argument('transport', choices=['pipe', 'tcp'])
     sub.add_parser('coverage-summary')
     scan = sub.add_parser('scan')
-    scan.add_argument('tool', choices=['scan-build-18', 'scan-build'])
-    scan.add_argument('--strict', action='store_true')
+    scan.add_argument('tool', choices=['scan-build-18', 'scan-build-21'])
     for name in ('valgrind', 'valgrind-results'):
         command = sub.add_parser(name)
         command.add_argument('--privilege', choices=['root', 'non-root'], required=True)
@@ -105,7 +104,7 @@ def main():
             summary(f'Coverage ({transport})', Path(f'cov-{transport}.log'), r'^(lines|functions|branches|decisions):')
         return 0
     if args.task == 'scan':
-        command = [args.tool, *(['--status-bugs'] if args.strict else []), '-o', str(Path('scan-report').resolve()),
+        command = [args.tool, '--status-bugs', '-o', str(Path('scan-report').resolve()),
                    'make', 'check-progs', f'-j{len(os.sched_getaffinity(0))}']
         result = logged(command, Path('scan-build.out'))
         summary(args.tool, Path('scan-build.out'), r'scan-build: .* bugs? found|scan-build: No bugs found')
