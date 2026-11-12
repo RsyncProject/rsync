@@ -1,0 +1,253 @@
+name: Interoperability
+run-name: CI ${{ github.event.workflow_run.id }} attempt ${{ github.event.workflow_run.run_attempt }}
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [in_progress]
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: interoperability-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    name: Control-plane checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    container: python:3.7.17-bullseye@sha256:f36f6fe9ddb2622aab9803944cbe7e2bc50be75d624a081f7895e60e7c6b7f0a
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - name: Check admission, enrolment and recovery
+        run: |
+          python3 -B -S .github/scripts/test-interop-policy.py
+          python3 -B -S .github/scripts/test-interop.py
+
+  metadata:
+    name: Source
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      statuses: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - name: Validate source and publish pending status
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -B -S .github/scripts/interop-control.py metadata --root "$RUNNER_TEMP/interoperability"
+      - name: Upload source context
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: interoperability-${{ github.run_attempt }}-context
+          path: ${{ runner.temp }}/interoperability/context.json
+          if-no-files-found: error
+          retention-days: 7
+
+  workers:
+    name: Isolation (${{ matrix.slot }})
+    needs: metadata
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        slot: [a1, a2, b1, b2]
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - name: Generate enrolment recipient
+        run: python3 -B -S .github/scripts/interop_enrol.py generate ${{ matrix.slot }} --root "$RUNNER_TEMP/interoperability"
+      - name: Upload recipient key
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: interoperability-${{ github.run_attempt }}-public-${{ matrix.slot }}
+          path: ${{ runner.temp }}/interoperability/public-key.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Receive single-use key
+        run: python3 -B -S .github/scripts/interop_enrol.py receive ${{ matrix.slot }} --root "$RUNNER_TEMP/interoperability"
+      - name: Connect quarantine node
+        uses: tailscale/github-action@064b10558093f38325e838ddea35486bdc6b1d5c # v4
+        with:
+          authkey: file:${{ runner.temp }}/interoperability/enrol-key
+          hostname: ci-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.slot }}
+          version: 1.104.4
+          args: --accept-dns=false
+          retry: '1'
+          log-mode: quiet
+      - name: Remove enrolment secrets
+        if: always()
+        run: python3 -B -S .github/scripts/interop_enrol.py forget ${{ matrix.slot }} --root "$RUNNER_TEMP/interoperability"
+      - name: Start canary and check credential separation
+        run: python3 -B -S .github/scripts/interop-worker.py prepare ${{ matrix.slot }} --root "$RUNNER_TEMP/interoperability"
+      - name: Upload readiness
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: interoperability-${{ github.run_attempt }}-ready-${{ matrix.slot }}
+          path: ${{ runner.temp }}/interoperability/ready.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Check quarantine
+        run: python3 -B -S .github/scripts/interop-worker.py quarantine ${{ matrix.slot }} --root "$RUNNER_TEMP/interoperability"
+      - name: Upload quarantine result
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: interoperability-${{ github.run_attempt }}-quarantine-${{ matrix.slot }}
+          path: ${{ runner.temp }}/interoperability/quarantine.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Check cohort isolation
+        run: python3 -B -S .github/scripts/interop-worker.py exercise ${{ matrix.slot }} --root "$RUNNER_TEMP/interoperability"
+      - name: Upload isolation result
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: interoperability-${{ github.run_attempt }}-exercise-${{ matrix.slot }}
+          path: ${{ runner.temp }}/interoperability/exercise.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Check revocation
+        run: python3 -B -S .github/scripts/interop-worker.py revoked ${{ matrix.slot }} --root "$RUNNER_TEMP/interoperability"
+      - name: Upload revocation result
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: interoperability-${{ github.run_attempt }}-revoked-${{ matrix.slot }}
+          path: ${{ runner.temp }}/interoperability/revoked.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Stop canary
+        if: always()
+        run: python3 -B -S .github/scripts/interop-worker.py stop ${{ matrix.slot }} --root "$RUNNER_TEMP/interoperability"
+
+  controller:
+    name: Isolation controller
+    needs: metadata
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+      attestations: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - name: Check controller API access
+        run: python3 -B -S .github/scripts/interop-control.py preflight --root "$RUNNER_TEMP/interoperability"
+      - name: Upload API positive control
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: interoperability-${{ github.run_attempt }}-preflight
+          path: ${{ runner.temp }}/interoperability/preflight.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Issue single-use quarantine keys
+        run: python3 -B -S .github/scripts/interop-control.py broker --root "$RUNNER_TEMP/interoperability"
+      - name: Upload encrypted enrolment keys
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: interoperability-${{ github.run_attempt }}-enrol
+          path: ${{ runner.temp }}/interoperability/enrolments.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Validate quarantine membership
+        run: python3 -B -S .github/scripts/interop-control.py prepare --root "$RUNNER_TEMP/interoperability"
+      - name: Attest admission lease
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: ${{ runner.temp }}/interoperability/lease.json
+          create-storage-record: false
+      - name: Upload admission lease
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: interoperability-${{ github.run_attempt }}-lease
+          path: ${{ runner.temp }}/interoperability/lease.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Schedule quarantine probes
+        run: python3 -B -S .github/scripts/interop-control.py topology --root "$RUNNER_TEMP/interoperability"
+      - name: Upload quarantine topology
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: interoperability-${{ github.run_attempt }}-topology
+          path: ${{ runner.temp }}/interoperability/topology.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Admit isolated cohorts
+        run: python3 -B -S .github/scripts/interop-control.py admit --root "$RUNNER_TEMP/interoperability"
+      - name: Upload admission
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: interoperability-${{ github.run_attempt }}-admission
+          path: ${{ runner.temp }}/interoperability/admission.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Collect isolation results
+        run: python3 -B -S .github/scripts/interop-control.py verify --root "$RUNNER_TEMP/interoperability"
+      - name: Revoke cohort grants
+        if: always()
+        run: python3 -B -S .github/scripts/interop-control.py revoke --root "$RUNNER_TEMP/interoperability"
+      - name: Upload revocation
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: interoperability-${{ github.run_attempt }}-revocation
+          path: ${{ runner.temp }}/interoperability/revocation.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Verify revocation and remove devices
+        if: always()
+        run: python3 -B -S .github/scripts/interop-control.py finish --root "$RUNNER_TEMP/interoperability"
+      - name: Upload isolation proof
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: interoperability-${{ github.run_attempt }}-result
+          path: ${{ runner.temp }}/interoperability/result.json
+          if-no-files-found: error
+          retention-days: 7
+
+  result:
+    name: Result
+    if: always()
+    needs: [checks, metadata, workers, controller]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      statuses: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - name: Publish result for candidate revision
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INTEROPERABILITY_JOBS: ${{ toJSON(needs) }}
+        run: python3 -B -S .github/scripts/interop-control.py status --root "$RUNNER_TEMP/interoperability"

@@ -1,0 +1,35 @@
+name: Interoperability cleanup
+
+on:
+  workflow_run:
+    workflows: [Interoperability]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  cleanup:
+    if: ${{ github.event.workflow_run.conclusion != 'success' }}
+    name: Reconcile admission
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+      attestations: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - name: Validate source and retrieve bounded recovery records
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -B -S .github/scripts/interop-control.py recovery-records --root "$RUNNER_TEMP/interoperability-cleanup"
+      - name: Verify lease and reconcile resources
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -B -S .github/scripts/interop-control.py cleanup --root "$RUNNER_TEMP/interoperability-cleanup"
