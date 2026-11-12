@@ -84,10 +84,28 @@ jobs:
     if: &valgrind ${{ github.event_name != 'schedule' || github.event.schedule == '17 4 * * *' }}
     uses: ./.github/workflows/valgrind.yml
 
+  interop:
+    name: Interop
+    if: &interop ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 1122 && github.event.pull_request.head.repo.full_name == github.repository && github.actor_id == '257921855' }}
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    uses: ./.github/workflows/interop.yml
+
+  interop_control:
+    name: Interop
+    if: *interop
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    uses: ./.github/workflows/interop-control.yml
+
   required:
     name: Required
     if: always()
-    needs: [linux, bsd, macos, other, versions, android, archive, diagnostics, valgrind]
+    needs: [linux, bsd, macos, other, versions, android, archive, diagnostics, valgrind, interop, interop_control]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     env:
@@ -100,6 +118,8 @@ jobs:
       CI_EXPECT_ARCHIVE: *weekly
       CI_EXPECT_DIAGNOSTICS: *diagnostics
       CI_EXPECT_VALGRIND: *valgrind
+      CI_EXPECT_INTEROP: *interop
+      CI_EXPECT_INTEROP_CONTROL: *interop
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

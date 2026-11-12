@@ -59,6 +59,7 @@ jobs:
           python3 -B -S .github/scripts/test-diagnostics.py
           python3 -B -S .github/scripts/test-archive.py
           python3 -B -S .github/scripts/test-interop-policy.py
+          python3 -B -S .github/scripts/test-interop.py
       - name: Tests
         id: test
         run: python3 -B -S testsuite/tools/check.py . ./rsync pipe,root,self-peer,linux,non-asan,no-userns test-results/python37 metadata profile process cli-transfers runner check-recipe -j2
@@ -95,6 +96,7 @@ jobs:
           python3 -S .github/scripts/test-android.py
           python3 -S .github/scripts/test-archive.py
           python3 -S .github/scripts/test-interop-policy.py
+          python3 -S .github/scripts/test-interop.py
       - name: Check Python runtime
         run: python3 -S testsuite/runtests.py --describe-tests > /dev/null
 

@@ -65,6 +65,12 @@ Individual tests use exit codes 0 for pass, 1 for failure, 2 for error and 77 fo
 
 [ci.yml](../.github/workflows/ci.yml) selects native tests, diagnostics, archive qualification and historical-peer checks for pull requests and master pushes. Scheduled runs divide daily and weekly work. The Versions group runs every archived release as both the primary and secondary executable over pipe and TCP. Valgrind runs root and non-root pipe and TCP checks in its own group. Clang 18 and Clang 21 are blocking checks.
 
+PR #1122 also runs an interop network check in a dedicated Tailscale tailnet. Four Linux canaries form two isolated pairs. A separate controller validates their provider identities, checks quarantine denial, admits each pair on the fixture ports, collects permitted and forbidden connection results, revokes access and removes the devices. Workers must fail to exchange their OIDC token for the controller identity. The Required gate checks both workflow results.
+
+The saved result covers two live cohorts within one GitHub run. It does not exercise concurrent GitHub runs or cross-platform transfers. Canary responses contain random fixture identifiers; no rsync payloads or project credentials cross the test network. The federated identities currently accept only maintained PR #1122 runs by steadytao. Other events skip these jobs.
+
+The controller saves an admission lease before changing policy. Cleanup runs after failures and removes only that lease's grants and devices. A forcibly stopped runner can interrupt cleanup. Outstanding grants block a new proof. After cancellation or a cleanup failure, retrieve the interop lease artifact and remove its exact grants and device IDs from the test tailnet before another admission. Preserve other runs' grants. Seven-platform transfers remain gated on hosted isolation evidence and cancellation recovery.
+
 Environment | Versions and architectures
 --- | ---
 Ubuntu | 22.04, 24.04 and 26.04 on X86-64 and ARM64

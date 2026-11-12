@@ -1,0 +1,79 @@
+name: Interop
+
+on:
+  workflow_call:
+    outputs:
+      jobs:
+        description: Job results
+        value: ${{ toJSON(jobs) }}
+
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+
+jobs:
+  isolation:
+    name: Isolation (${{ matrix.slot }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        slot: [a1, a2, b1, b2]
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Connect quarantine node
+        uses: tailscale/github-action@064b10558093f38325e838ddea35486bdc6b1d5c # v4
+        with:
+          oauth-client-id: TG2FEugs2S11CNTRL-kSPCyA2cCB21CNTRL
+          audience: api.tailscale.com/TG2FEugs2S11CNTRL-kSPCyA2cCB21CNTRL
+          tags: tag:rsync-quarantine
+          hostname: rsync-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.slot }}
+          version: 1.104.4
+          args: --accept-routes=false --accept-dns=false
+          retry: '1'
+          log-mode: quiet
+      - name: Start canary and check credential separation
+        run: python3 -B -S .github/scripts/interop-worker.py prepare ${{ matrix.slot }} --root "$RUNNER_TEMP/interop"
+      - name: Publish readiness
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: interop-${{ github.run_attempt }}-ready-${{ matrix.slot }}
+          path: ${{ runner.temp }}/interop/ready.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Check quarantine
+        run: python3 -B -S .github/scripts/interop-worker.py quarantine ${{ matrix.slot }} --root "$RUNNER_TEMP/interop"
+      - name: Publish quarantine result
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: interop-${{ github.run_attempt }}-quarantine-${{ matrix.slot }}
+          path: ${{ runner.temp }}/interop/quarantine.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Check cohort isolation
+        run: python3 -B -S .github/scripts/interop-worker.py exercise ${{ matrix.slot }} --root "$RUNNER_TEMP/interop"
+      - name: Publish isolation result
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: interop-${{ github.run_attempt }}-exercise-${{ matrix.slot }}
+          path: ${{ runner.temp }}/interop/exercise.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Check revocation
+        run: python3 -B -S .github/scripts/interop-worker.py revoked ${{ matrix.slot }} --root "$RUNNER_TEMP/interop"
+      - name: Publish revocation result
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: interop-${{ github.run_attempt }}-revoked-${{ matrix.slot }}
+          path: ${{ runner.temp }}/interop/revoked.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Stop canary
+        if: always()
+        run: python3 -B -S .github/scripts/interop-worker.py stop ${{ matrix.slot }} --root "$RUNNER_TEMP/interop"
