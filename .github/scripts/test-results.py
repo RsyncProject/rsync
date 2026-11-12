@@ -50,6 +50,22 @@ class Results(unittest.TestCase):
     def test_success(self):
         self.assertTrue(check(self.data, self.expected))
 
+    def test_isolation_only(self):
+        for name in self.expected:
+            if name not in ('interop', 'interop_control'):
+                self.expected[name] = 'false'
+                self.data[name] = dict(result='skipped', outputs={})
+        self.assertTrue(check(self.data, self.expected))
+        for name in ('interop', 'interop_control'):
+            original = copy.deepcopy(self.data[name])
+            for result in ('failure', 'cancelled', 'skipped'):
+                self.data[name]['result'] = result
+                self.reject()
+            self.data[name] = copy.deepcopy(original)
+            self.data[name]['outputs'] = {}
+            self.reject()
+            self.data[name] = original
+
     def test_families(self):
         original = copy.deepcopy(self.data)
         for name in original:
