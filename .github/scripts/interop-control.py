@@ -30,6 +30,7 @@ def prepare(root, api):
     ids, ips, grants, owned = set(), set(), [], []
     for slot, node in nodes.items():
         if (node.get('slot') != slot or node.get('controller_exchange_denied') is not True
+                or node.get('preferences') != {'RouteAll': False, 'CorpDNS': False}
                 or node.get('worker_exchange_succeeded') is not True
                 or set(node.get('authority_denials', {})) != {'controller_exchange', 'acl', 'devices'}
                 or any(type(code) is not int or code not in (401, 403) for code in node['authority_denials'].values())

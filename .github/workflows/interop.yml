@@ -35,7 +35,7 @@ jobs:
           tags: tag:rsync-quarantine
           hostname: rsync-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.slot }}
           version: 1.104.4
-          args: --accept-routes=false --accept-dns=false
+          args: --accept-dns=false
           retry: '1'
           log-mode: quiet
       - name: Start canary and check credential separation

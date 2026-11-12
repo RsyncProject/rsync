@@ -85,7 +85,18 @@ def serve(root):
                 listener.close()
 
 
+def configure_network():
+    subprocess.run(['sudo', 'tailscale', 'set', '--accept-routes=false', '--accept-dns=false'],
+                   capture_output=True, timeout=15, check=True)
+    result = subprocess.run(['sudo', 'tailscale', 'debug', 'prefs'], capture_output=True, timeout=15, check=True)
+    prefs = json.loads(result.stdout)
+    if any(prefs.get(key) is not False for key in ('RouteAll', 'CorpDNS')):
+        raise ValueError('Route or DNS acceptance is still enabled')
+    return {key: prefs[key] for key in ('RouteAll', 'CorpDNS')}
+
+
 def prepare(root, slot):
+    prefs = configure_network()
     authority = worker_authority()
     result = subprocess.run(['tailscale', 'status', '--json'], capture_output=True, timeout=15, check=True)
     node = json.loads(result.stdout)['Self']
@@ -95,6 +106,7 @@ def prepare(root, slot):
     ready = dict(slot=slot, node_id=node['ID'], address=address(ips[0]), nonce=secrets.token_hex(24),
                  controller_exchange_denied=True, worker_exchange_succeeded=True)
     ready['authority_denials'] = authority
+    ready['preferences'] = prefs
     write(root, 'ready', ready)
     env = {key: os.environ[key] for key in ('PATH', 'LANG', 'RUNNER_TRACKING_ID') if key in os.environ}
     with (root / 'server.log').open('wb') as log:
