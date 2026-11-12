@@ -34,7 +34,7 @@ def check(binary, rrsync):
                 result = command([str(binary), '-rltpH', '--old-args', '--rsync-path=rsync',
                                   '-e', server.rsh(), *options, source_arg, destination_arg], server.env)
                 if result.returncode:
-                    log = (server.directory / 'sshd.log').read_text(errors='replace')
+                    log = (server.directory / 'server.log').read_text(errors='replace')
                     raise ValueError(f'{name}: rsync exited {result.returncode}: '
                                      + result.stderr.decode(errors='replace') + log)
                 if snapshot(expected) != snapshot(received):
