@@ -61,6 +61,8 @@ verify_dirs(src, wodir, label="push to wo module")
 fails(['-a', f'{url}wo/', f'{pulld}/'], "pull from a write-only module")
 
 proc = subprocess.run(rsync_argv(url), capture_output=True, text=True)
+if proc.returncode != 0:
+    test_fail(f'daemon listing exited {proc.returncode}:\n{proc.stderr}\n{proc.stdout}')
 listing = proc.stdout
 for m in ('ro', 'rw', 'wo'):
     if m not in listing:
