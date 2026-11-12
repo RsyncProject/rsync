@@ -11,10 +11,6 @@ permissions:
   contents: read
   actions: read
 
-env:
-  INTEROP_CONTROL_REF: ${{ vars.INTEROP_CONTROL_REF || 'master' }}
-  INTEROP_CONTROL_SHA: ${{ vars.INTEROP_CONTROL_SHA }}
-
 jobs:
   linux:
     name: Linux

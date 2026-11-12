@@ -206,4 +206,4 @@ listen backlog, syslog facility, syslog tag | none | Missing
 
 The interoperability test checks bytes, modes, integer timestamps, relative and dangling symlink targets, hard-link groups, deletion and checksum updates with unchanged file size and mtime. Ubuntu also exercises the fixture over restricted SSH with pinned host keys and command and path refusal checks.
 
-The CI Interoperability group defines 168 cases across seven native endpoints, including all 30 directed non-Linux pairs. Case completion, destination verification and network cleanup feed the Required gate. Seven-platform execution, fork-PR authentication, concurrent-run isolation and cancellation recovery remain subject to live staging qualification.
+The CI Interoperability group defines 168 cases across seven native endpoints, including all 30 directed non-Linux pairs. Case completion, destination verification and network cleanup feed the Required gate. Seven-platform execution, fork-PR authentication, concurrent-run isolation and cancellation recovery remain subject to live qualification.

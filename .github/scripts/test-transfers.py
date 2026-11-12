@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import runpy
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -15,6 +16,7 @@ from interop_network import NetworkError
 broker = runpy.run_path(str(Path(__file__).with_name('interop-broker.py')))
 endpoint = runpy.run_path(str(Path(__file__).with_name('interop-endpoint.py')))
 client = runpy.run_path(str(Path(__file__).with_name('interop-client.py')))
+host = runpy.run_path(str(Path(__file__).with_name('interop-host.py')))
 from harness.interoperability import PLATFORMS, seed, transfer_cases, update
 from harness.ssh import public_key
 
@@ -25,6 +27,8 @@ class Transfers(unittest.TestCase):
         self.addCleanup(self.directory.cleanup)
         self.root = Path(self.directory.name)
         self.state = dict(run_id='123', run_attempt='2', source_sha='a' * 40)
+        self.nodes = {role: dict(self.state, role=role, node_id='n' + str(index), address='100.64.0.' + str(index))
+                      for index, role in enumerate(ci.ROLES, 1)}
         self.run = dict(id=123, run_attempt=2, path='.github/workflows/ci.yml', name='CI',
                         repository=dict(id=266877886), event='pull_request', head_sha='b' * 40,
                         head_repository=dict(id=999, full_name='contributor/rsync'),
@@ -110,28 +114,6 @@ class Transfers(unittest.TestCase):
             with self.subTest(key=key), self.assertRaises(NetworkError):
                 ci.validate(dict(self.state, **{key: value}), self.state)
 
-    def test_staging_is_bound_to_one_reviewed_commit_and_ci_run(self):
-        env = dict(GITHUB_EVENT_NAME='push', GITHUB_REF='refs/heads/interop-staging-123-2', GITHUB_SHA='b' * 40)
-        with patch.dict(os.environ, env), patch.object(ci, 'api', return_value=self.run):
-            self.assertEqual(ci.identity(), self.state)
-        ci.source.cache_clear()
-        with patch.dict(os.environ, dict(env, GITHUB_SHA='c' * 40)), patch.object(ci, 'api', return_value=self.run), self.assertRaises(NetworkError):
-            ci.identity()
-
-    def test_staging_controller_cannot_be_a_different_branch_or_revision(self):
-        controller = dict(id=456, path='.github/workflows/interoperability.yml', head_branch='interop-staging-123-2',
-                          head_sha='c' * 40, event='push', repository=dict(id=266877886), run_attempt=1, status='in_progress')
-        metadata = dict(self.state, control_run_id='456', control_attempt='1', control_sha='c' * 40)
-        ci.source.cache_clear()
-        with patch.dict(os.environ, INTEROP_CONTROL_REF='interop-staging', INTEROP_CONTROL_SHA='c' * 40):
-            with patch.object(ci, 'api', side_effect=[self.run, dict(workflow_runs=[controller])]), \
-                    patch.object(ci, 'download_records', return_value={None: (metadata, b'{}')}):
-                self.assertEqual(ci.controller(), '456')
-            for field, value in dict(head_branch='interop-staging-124-2', head_sha='d' * 40,
-                                     event='pull_request', repository=dict(id=1)).items():
-                with self.subTest(field=field), patch.object(ci, 'api', return_value=dict(workflow_runs=[dict(controller, **{field: value})])), self.assertRaises(NetworkError):
-                    ci.controller()
-
     def test_enrolment_is_private_and_bound_to_the_tested_revision(self):
         enrol.generate(self.root, 'linux', self.state)
         recipient = json.loads((self.root / 'public-key.json').read_text())
@@ -181,6 +163,65 @@ class Transfers(unittest.TestCase):
         opener = type('Opener', (), {'open': lambda *_args, **_kwargs: io.BytesIO(b'not the expected package')})()
         with patch('urllib.request.build_opener', return_value=opener), self.assertRaises(NetworkError):
             client['download']('https://pkgs.tailscale.com/stable/example', self.root / 'package', '0' * 64)
+
+
+    def test_barriers_precede_copy_and_do_not_wait_for_their_own_upload(self):
+        calls = []
+        def native(root, role, phase):
+            calls.append(phase)
+            return {}
+        def barrier(kind, **kwargs):
+            calls.append(kind)
+            return {}
+        shared = dict(identity=lambda: self.state, call=native, records=barrier, write=lambda *args, **kwargs: None)
+        for phase, expected in (('transfer1', ['admitted', 'transfer1']), ('transfer2', ['next', 'transfer2']),
+                                ('next', ['transfer1', 'next'])):
+            calls.clear()
+            with self.subTest(phase=phase), patch.object(sys, 'argv', ['interop-host.py', phase, 'linux', '--root', str(self.root)]), \
+                    patch.dict(host['main'].__globals__, shared):
+                self.assertEqual(host['main'](), 0)
+            self.assertEqual(calls, expected)
+
+    def test_denial_has_healthy_controls_before_and_after(self):
+        ci.bind(self.state)
+        (self.root / 'ready.json').write_text(json.dumps(self.nodes['linux']))
+        calls = []
+        def connected(address, port):
+            calls.append((address, port))
+            return address == self.nodes['linux']['address']
+        shared = dict(published=lambda *args: dict(nodes=self.nodes), connect=connected)
+        with patch.dict(host['network'].__globals__, shared):
+            host['network'](self.root, 'linux', 'quarantine')
+        for port in (18731, 18732, 18733):
+            self.assertEqual(calls.count((self.nodes['linux']['address'], port)), 2)
+        for role, node in self.nodes.items():
+            if role != 'linux':
+                self.assertIn((node['address'], 18731), calls)
+        self.assertTrue(json.loads((self.root / 'quarantine.json').read_text())['passed'])
+
+    def test_a_dead_service_cannot_prove_network_denial(self):
+        (self.root / 'ready.json').write_text(json.dumps(self.nodes['linux']))
+        with patch.dict(host['network'].__globals__, published=lambda *args: dict(nodes=self.nodes), connect=lambda *args: False):
+            with self.assertRaisesRegex(NetworkError, 'not listening'):
+                host['network'](self.root, 'linux', 'quarantine')
+        self.assertFalse((self.root / 'quarantine.json').exists())
+
+    def test_client_checks_active_preferences_without_retaining_private_data(self):
+        (self.root / 'client.json').write_text(json.dumps(dict(command=['tailscale'], windows=False)))
+        prefs = dict(RouteAll=False, CorpDNS=False, Persist=dict(PrivateNodeKey='fixture-not-a-key'))
+        responses = [subprocess.CompletedProcess([], 0, b'{}'), subprocess.CompletedProcess([], 0, b''),
+                     subprocess.CompletedProcess([], 0, json.dumps(prefs).encode()),
+                     subprocess.CompletedProcess([], 0, b'{"Self":{"ID":"n1"}}')]
+        with patch.dict(client['connect'].__globals__, run=unittest.mock.Mock(side_effect=responses)), patch.object(subprocess, 'Popen'):
+            self.assertEqual(client['connect'](self.root, self.root / 'enrol-key', 'fixture')['ID'], 'n1')
+        self.assertNotIn('fixture-not-a-key', (self.root / 'client.json').read_text())
+        for value in (True, None, 0, 'false'):
+            broken = json.dumps(dict(prefs, CorpDNS=value)).encode()
+            results = [subprocess.CompletedProcess([], 0, b'{}'), subprocess.CompletedProcess([], 0, b''),
+                       subprocess.CompletedProcess([], 0, broken)]
+            with self.subTest(value=value), patch.dict(client['connect'].__globals__, run=unittest.mock.Mock(side_effect=results)), patch.object(subprocess, 'Popen'):
+                with self.assertRaisesRegex(NetworkError, 'still enabled'):
+                    client['connect'](self.root, self.root / 'enrol-key', 'fixture')
 
 
 if __name__ == '__main__':
