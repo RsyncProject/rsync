@@ -15,11 +15,8 @@ check = runpy.run_path(str(checker))['check']
 class Results(unittest.TestCase):
     def setUp(self):
         self.expected = dict(linux='true', diagnostics='true', bsd='false', macos='true',
-                             other='true', versions='true', android='true', archive='true', valgrind='true',
-                             interop='true', interop_control='true')
+                             other='true', versions='true', android='true', archive='true', valgrind='true')
         self.data = {
-            'interop': {'result': 'success', 'outputs': {'jobs': json.dumps({'isolation': {'result': 'success'}})}},
-            'interop_control': {'result': 'success', 'outputs': {'jobs': json.dumps({'isolation': {'result': 'success'}})}},
             'archive': {'result': 'success', 'outputs': {'jobs': json.dumps({'archive': {'result': 'success'}})}},
             'linux': {'result': 'success', 'outputs': {
                 'jobs': json.dumps({'ubuntu': {'result': 'success'}, 'almalinux': {'result': 'skipped'}}),
@@ -49,22 +46,6 @@ class Results(unittest.TestCase):
 
     def test_success(self):
         self.assertTrue(check(self.data, self.expected))
-
-    def test_isolation_only(self):
-        for name in self.expected:
-            if name not in ('interop', 'interop_control'):
-                self.expected[name] = 'false'
-                self.data[name] = dict(result='skipped', outputs={})
-        self.assertTrue(check(self.data, self.expected))
-        for name in ('interop', 'interop_control'):
-            original = copy.deepcopy(self.data[name])
-            for result in ('failure', 'cancelled', 'skipped'):
-                self.data[name]['result'] = result
-                self.reject()
-            self.data[name] = copy.deepcopy(original)
-            self.data[name]['outputs'] = {}
-            self.reject()
-            self.data[name] = original
 
     def test_families(self):
         original = copy.deepcopy(self.data)
@@ -159,8 +140,7 @@ class Results(unittest.TestCase):
         self.reject()
 
     def test_every_family_requires_nested_results(self):
-        for name in ('linux', 'diagnostics', 'macos', 'other', 'versions', 'android', 'archive', 'valgrind',
-                     'interop', 'interop_control'):
+        for name in ('linux', 'diagnostics', 'macos', 'other', 'versions', 'android', 'archive', 'valgrind'):
             original = self.data[name]['outputs']
             with self.subTest(family=name):
                 self.data[name]['outputs'] = {}

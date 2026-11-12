@@ -24,14 +24,13 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
-# Temporarily isolate PR #1122 while qualifying the network checks
 jobs:
   linux:
     name: Linux
-    if: &daily ${{ !(github.event_name == 'pull_request' && github.event.pull_request.number == 1122) && (github.event_name != 'schedule' || github.event.schedule == '42 8 * * 0,2-6' || github.event.schedule == '42 8 * * 1') }}
+    if: &daily ${{ github.event_name != 'schedule' || github.event.schedule == '42 8 * * 0,2-6' || github.event.schedule == '42 8 * * 1' }}
     uses: ./.github/workflows/linux.yml
     with:
-      ubuntu: &weekly ${{ !(github.event_name == 'pull_request' && github.event.pull_request.number == 1122) && (github.event_name != 'schedule' || github.event.schedule == '42 8 * * 1') }}
+      ubuntu: &weekly ${{ github.event_name != 'schedule' || github.event.schedule == '42 8 * * 1' }}
       almalinux: *daily
       alpine: *weekly
 
@@ -47,7 +46,7 @@ jobs:
 
   other:
     name: Other
-    if: &other ${{ !(github.event_name == 'pull_request' && github.event.pull_request.number == 1122) && (github.event_name != 'schedule' || github.event.schedule == '42 8 * * 0,2-6' || github.event.schedule == '42 8 * * 1') }}
+    if: &other ${{ github.event_name != 'schedule' || github.event.schedule == '42 8 * * 0,2-6' || github.event.schedule == '42 8 * * 1' }}
     uses: ./.github/workflows/other.yml
     with:
       cygwin: *daily
@@ -55,7 +54,7 @@ jobs:
 
   versions:
     name: Versions
-    if: &versions ${{ !(github.event_name == 'pull_request' && github.event.pull_request.number == 1122) && (github.event_name != 'schedule' || github.event.schedule == '52 8 * * 1') }}
+    if: &versions ${{ github.event_name != 'schedule' || github.event.schedule == '52 8 * * 1' }}
     uses: ./.github/workflows/versions.yml
 
   android:
@@ -70,7 +69,7 @@ jobs:
 
   diagnostics:
     name: Diagnostics
-    if: &diagnostics ${{ !(github.event_name == 'pull_request' && github.event.pull_request.number == 1122) && (github.event_name != 'schedule' || github.event.schedule == '42 9 * * 1') }}
+    if: &diagnostics ${{ github.event_name != 'schedule' || github.event.schedule == '42 9 * * 1' }}
     uses: ./.github/workflows/diagnostics.yml
     with:
       lint: &regular ${{ github.event_name != 'schedule' }}
@@ -82,31 +81,13 @@ jobs:
 
   valgrind:
     name: Valgrind
-    if: &valgrind ${{ !(github.event_name == 'pull_request' && github.event.pull_request.number == 1122) && (github.event_name != 'schedule' || github.event.schedule == '17 4 * * *') }}
+    if: &valgrind ${{ github.event_name != 'schedule' || github.event.schedule == '17 4 * * *' }}
     uses: ./.github/workflows/valgrind.yml
-
-  interop:
-    name: Interop
-    if: &interop ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 1122 && github.event.pull_request.head.repo.full_name == github.repository && github.actor_id == '257921855' }}
-    permissions:
-      contents: read
-      actions: read
-      id-token: write
-    uses: ./.github/workflows/interop.yml
-
-  interop_control:
-    name: Interop
-    if: *interop
-    permissions:
-      contents: read
-      actions: read
-      id-token: write
-    uses: ./.github/workflows/interop-control.yml
 
   required:
     name: Required
     if: always()
-    needs: [linux, bsd, macos, other, versions, android, archive, diagnostics, valgrind, interop, interop_control]
+    needs: [linux, bsd, macos, other, versions, android, archive, diagnostics, valgrind]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     env:
@@ -119,8 +100,6 @@ jobs:
       CI_EXPECT_ARCHIVE: *weekly
       CI_EXPECT_DIAGNOSTICS: *diagnostics
       CI_EXPECT_VALGRIND: *valgrind
-      CI_EXPECT_INTEROP: *interop
-      CI_EXPECT_INTEROP_CONTROL: *interop
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
