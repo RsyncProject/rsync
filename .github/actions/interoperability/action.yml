@@ -1,0 +1,160 @@
+name: Directed transfers
+description: Native SSH and daemon transfers between seven endpoints
+inputs:
+  platform:
+    required: true
+    description: Native endpoint
+  guest:
+    default: 'false'
+    description: Use the existing local VM SSH connection
+runs:
+  using: composite
+  steps:
+    - name: Install Tailscale
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INTEROP_PLATFORM: ${{ inputs.platform }}
+        INTEROP_GUEST: ${{ inputs.guest }}
+      run: python3 -B -S .github/scripts/interop-host.py install "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
+    - name: Generate enrolment recipient
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INTEROP_PLATFORM: ${{ inputs.platform }}
+        INTEROP_GUEST: ${{ inputs.guest }}
+      run: python3 -B -S .github/scripts/interop-host.py recipient "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
+    - name: Upload recipient
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: interoperability-${{ github.run_attempt }}-public-${{ inputs.platform }}
+        path: ${{ runner.temp }}/interoperability/public-key.json
+        if-no-files-found: error
+        retention-days: 7
+    - name: Join quarantine
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INTEROP_PLATFORM: ${{ inputs.platform }}
+        INTEROP_GUEST: ${{ inputs.guest }}
+      run: python3 -B -S .github/scripts/interop-host.py connect "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
+    - name: Start native fixture services
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INTEROP_PLATFORM: ${{ inputs.platform }}
+        INTEROP_GUEST: ${{ inputs.guest }}
+      run: python3 -B -S .github/scripts/interop-host.py prepare "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
+    - name: Upload endpoint identity
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: interoperability-${{ github.run_attempt }}-ready-${{ inputs.platform }}
+        path: ${{ runner.temp }}/interoperability/ready.json
+        if-no-files-found: error
+        retention-days: 7
+    - name: Check quarantine
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INTEROP_PLATFORM: ${{ inputs.platform }}
+        INTEROP_GUEST: ${{ inputs.guest }}
+      run: python3 -B -S .github/scripts/interop-host.py quarantine "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
+    - name: Upload quarantine result
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: interoperability-${{ github.run_attempt }}-quarantine-${{ inputs.platform }}
+        path: ${{ runner.temp }}/interoperability/quarantine.json
+        if-no-files-found: error
+        retention-days: 7
+    - name: Check admission
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INTEROP_PLATFORM: ${{ inputs.platform }}
+        INTEROP_GUEST: ${{ inputs.guest }}
+      run: python3 -B -S .github/scripts/interop-host.py admit "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
+    - name: Upload endpoint admission
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: interoperability-${{ github.run_attempt }}-admitted-${{ inputs.platform }}
+        path: ${{ runner.temp }}/interoperability/admitted.json
+        if-no-files-found: error
+        retention-days: 7
+    - name: Initial transfers
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INTEROP_PLATFORM: ${{ inputs.platform }}
+        INTEROP_GUEST: ${{ inputs.guest }}
+      run: python3 -B -S .github/scripts/interop-host.py transfer1 "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
+    - name: Upload initial transfer completion
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: interoperability-${{ github.run_attempt }}-transfer1-${{ inputs.platform }}
+        path: ${{ runner.temp }}/interoperability/transfer1.json
+        if-no-files-found: error
+        retention-days: 7
+    - name: Verify initial data and update sources
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INTEROP_PLATFORM: ${{ inputs.platform }}
+        INTEROP_GUEST: ${{ inputs.guest }}
+      run: python3 -B -S .github/scripts/interop-host.py next "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
+    - name: Upload update readiness
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: interoperability-${{ github.run_attempt }}-next-${{ inputs.platform }}
+        path: ${{ runner.temp }}/interoperability/next.json
+        if-no-files-found: error
+        retention-days: 7
+    - name: Checksum updates and deletion
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INTEROP_PLATFORM: ${{ inputs.platform }}
+        INTEROP_GUEST: ${{ inputs.guest }}
+      run: python3 -B -S .github/scripts/interop-host.py transfer2 "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
+    - name: Upload update completion
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: interoperability-${{ github.run_attempt }}-transfer2-${{ inputs.platform }}
+        path: ${{ runner.temp }}/interoperability/transfer2.json
+        if-no-files-found: error
+        retention-days: 7
+    - name: Verify updated native data
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INTEROP_PLATFORM: ${{ inputs.platform }}
+        INTEROP_GUEST: ${{ inputs.guest }}
+      run: python3 -B -S .github/scripts/interop-host.py verify "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
+    - name: Upload transfer result
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: interoperability-${{ github.run_attempt }}-result-${{ inputs.platform }}
+        path: ${{ runner.temp }}/interoperability/result.json
+        if-no-files-found: error
+        retention-days: 7
+    - name: Check revocation
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INTEROP_PLATFORM: ${{ inputs.platform }}
+        INTEROP_GUEST: ${{ inputs.guest }}
+      run: python3 -B -S .github/scripts/interop-host.py revoked "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
+    - name: Upload revocation result
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: interoperability-${{ github.run_attempt }}-revoked-${{ inputs.platform }}
+        path: ${{ runner.temp }}/interoperability/revoked.json
+        if-no-files-found: error
+        retention-days: 7
+    - name: Stop fixture services and leave the network
+      if: always()
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INTEROP_PLATFORM: ${{ inputs.platform }}
+        INTEROP_GUEST: ${{ inputs.guest }}
+      run: python3 -B -S .github/scripts/interop-host.py stop "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"

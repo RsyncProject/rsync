@@ -84,10 +84,18 @@ jobs:
     if: &valgrind ${{ github.event_name != 'schedule' || github.event.schedule == '17 4 * * *' }}
     uses: ./.github/workflows/valgrind.yml
 
+  interoperability:
+    name: Interoperability
+    if: &interoperability ${{ github.event_name != 'schedule' }}
+    uses: ./.github/workflows/interoperability-tests.yml
+    permissions:
+      contents: read
+      actions: read
+
   required:
     name: Required
     if: always()
-    needs: [linux, bsd, macos, other, versions, android, archive, diagnostics, valgrind]
+    needs: [linux, bsd, macos, other, versions, android, archive, diagnostics, valgrind, interoperability]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     env:
@@ -100,6 +108,7 @@ jobs:
       CI_EXPECT_ARCHIVE: *weekly
       CI_EXPECT_DIAGNOSTICS: *diagnostics
       CI_EXPECT_VALGRIND: *valgrind
+      CI_EXPECT_INTEROPERABILITY: *interoperability
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

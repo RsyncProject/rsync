@@ -1,0 +1,190 @@
+name: Interoperability
+
+on:
+  workflow_call:
+    outputs:
+      jobs:
+        description: Native endpoint and result jobs
+        value: ${{ toJSON(jobs) }}
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  INTEROP_CONTROL_REF: ${{ vars.INTEROP_CONTROL_REF || 'master' }}
+  INTEROP_CONTROL_SHA: ${{ vars.INTEROP_CONTROL_SHA }}
+
+jobs:
+  linux:
+    name: Linux
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y gcc make openssl openssh-server libacl1-dev libattr1-dev liblz4-dev libzstd-dev libxxhash-dev libidn2-dev
+      - name: Build
+        run: ./configure --disable-md2man && make -j2
+      - name: Transfers
+        uses: ./.github/actions/interoperability
+        with:
+          platform: linux
+
+  freebsd:
+    name: FreeBSD
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Prepare VM host
+        run: sudo apt-get update && sudo apt-get install -y qemu-utils qemu-system-x86 ovmf
+      - name: Build in FreeBSD
+        uses: vmactions/freebsd-vm@c46abacb49f09938ca4e1702d15d836285d694cc # v1.5.9
+        with:
+          release: '15.1'
+          copyback: 'false'
+          cache-after-prepare: true
+          prepare: pkg install -y bash autotools m4 xxhash zstd liblz4 libidn2 libiconv python3 git
+          run: CPPFLAGS=-I/usr/local/include LDFLAGS=-L/usr/local/lib ./configure --disable-md2man && make -j2
+      - name: Transfers
+        uses: ./.github/actions/interoperability
+        with:
+          platform: freebsd
+          guest: 'true'
+
+  netbsd:
+    name: NetBSD
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Prepare VM host
+        run: sudo apt-get update && sudo apt-get install -y qemu-utils qemu-system-x86 ovmf
+      - name: Build in NetBSD
+        uses: vmactions/netbsd-vm@5957cf330aef2e6ddc63c604364c99ce2e02b91d # v1.5.3
+        with:
+          release: '11.1'
+          copyback: 'false'
+          cache-after-prepare: true
+          prepare: |
+            PATH=/usr/sbin:$PATH pkg_add autoconf automake git-base python312
+            ln -sf /usr/pkg/bin/python3.12 /usr/pkg/bin/python3
+          run: ./configure --disable-md2man --disable-zstd --disable-xxhash --disable-lz4 --disable-idn && make -j2
+      - name: Transfers
+        uses: ./.github/actions/interoperability
+        with:
+          platform: netbsd
+          guest: 'true'
+
+  openbsd:
+    name: OpenBSD
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Prepare VM host
+        run: sudo apt-get update && sudo apt-get install -y qemu-utils qemu-system-x86 ovmf
+      - name: Build in OpenBSD
+        uses: vmactions/openbsd-vm@f1ca8bc8ecc5b6ef7218e5b914836e067e1546d3 # v1.4.9
+        with:
+          release: '8.0'
+          copyback: 'false'
+          cache-after-prepare: true
+          prepare: pkg_add -I bash autoconf%2.71 automake%1.16 xxhash zstd lz4 libidn2 libiconv git
+          run: CPPFLAGS='-I/usr/local/include -DXXH_INLINE_ALL=1' LDFLAGS=-L/usr/local/lib ./configure --disable-md2man && make -j2
+      - name: Transfers
+        uses: ./.github/actions/interoperability
+        with:
+          platform: openbsd
+          guest: 'true'
+
+  macos:
+    name: macOS
+    runs-on: macos-26
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install dependencies
+        run: |
+          brew install automake openssl xxhash zstd lz4 libidn2
+          echo "$(brew --prefix openssl)/bin" >>"$GITHUB_PATH"
+      - name: Build
+        run: |
+          prefix=$(brew --prefix)
+          openssl=$(brew --prefix openssl)
+          CPPFLAGS="-I$prefix/include -I$openssl/include" LDFLAGS="-L$prefix/lib -L$openssl/lib" ./configure --disable-md2man
+          make -j2
+      - name: Transfers
+        uses: ./.github/actions/interoperability
+        with:
+          platform: macos
+
+  solaris:
+    name: Solaris
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Prepare VM host
+        run: sudo apt-get update && sudo apt-get install -y qemu-utils qemu-system-x86 ovmf
+      - name: Build in Solaris
+        uses: vmactions/solaris-vm@87d3c436511cef802cd1637f86f73b1a97715c8c # v1.4.1
+        with:
+          copyback: 'false'
+          cache-after-prepare: true
+          prepare: pkg install bash automake gnu-m4 pkg://solaris/runtime/python-35 autoconf gcc git
+          run: ./configure --disable-md2man --disable-zstd --disable-xxhash --disable-lz4 --disable-idn && make -j2
+      - name: Transfers
+        uses: ./.github/actions/interoperability
+        with:
+          platform: solaris
+          guest: 'true'
+
+  cygwin:
+    name: Cygwin
+    runs-on: windows-2022
+    timeout-minutes: 75
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Cygwin
+        run: .github/scripts/install-cygwin.ps1 -OpenSSH
+      - name: Build
+        run: bash -lc './configure --disable-md2man && make -j2'
+      - name: Transfers
+        uses: ./.github/actions/interoperability
+        with:
+          platform: cygwin
+
+  result:
+    name: Result
+    if: always()
+    needs: [linux, freebsd, netbsd, openbsd, macos, solaris, cygwin]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify all endpoint results and cleanup
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INTEROP_JOBS: ${{ toJSON(needs) }}
+        run: python3 -B -S .github/scripts/interop-host.py result all --root "$RUNNER_TEMP/interoperability"

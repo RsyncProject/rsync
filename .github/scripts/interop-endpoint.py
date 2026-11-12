@@ -1,0 +1,263 @@
+import argparse
+from contextlib import ExitStack
+import ipaddress
+import json
+import os
+from pathlib import Path
+import pwd
+import re
+import signal
+import subprocess
+import sys
+import tempfile
+import time
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'testsuite'))
+from harness.interoperability import PLATFORMS, endpoint_identity, seed, snapshot, transfer_cases, update
+from harness.process import quote_command
+from harness.ssh import ProcessServer, SSHServer, client_command, command, public_key
+
+SSH_PORT, DAEMON_PORT = 18731, 18733
+
+
+def name(case):
+    if tuple(case) not in transfer_cases():
+        raise ValueError('Unknown transfer case')
+    return '-'.join(case)
+
+
+def publish(root, filename, data):
+    temporary = root / (filename + '.tmp')
+    temporary.write_text(json.dumps(data, sort_keys=True) + '\n')
+    temporary.replace(root / (filename + '.json'))
+
+
+def read(root, filename):
+    with (root / (filename + '.json')).open('rb') as stream:
+        data = stream.read(65537)
+    if len(data) > 65536:
+        raise ValueError('Endpoint record exceeds limit')
+    value = json.loads(data)
+    if not isinstance(value, dict):
+        raise ValueError('Invalid endpoint record')
+    return value
+
+
+def local_cases(role, field):
+    return [case for case in transfer_cases() if case[field] == role]
+
+
+def serve(root, role, binary, rrsync, address='127.0.0.1', revision=None):
+    try:
+        identity = endpoint_identity(binary, role)
+        if revision:
+            repository = Path(__file__).resolve().parents[2]
+            actual = subprocess.check_output(['git', '-c', 'safe.directory=' + str(repository), '-C', str(repository),
+                                               'rev-parse', 'HEAD'], text=True, timeout=10).strip()
+            if actual != revision:
+                raise ValueError('Native endpoint has a different candidate revision')
+            identity['source_sha'] = actual
+        data = root / 'data'
+        (data / 'source').mkdir(parents=True)
+        (data / 'destination').mkdir()
+        for case in local_cases(role, 0):
+            seed(data / 'source' / name(case))
+        for case in local_cases(role, 1):
+            (data / 'destination' / name(case)).mkdir()
+        seed(root / 'reference')
+        env = {key: os.environ[key] for key in ('PATH', 'RUNNER_TRACKING_ID') if key in os.environ}
+        env.update(HOME=str(root), LC_ALL='C')
+        conf = root / 'rsyncd.conf'
+        conf.write_text(f'use chroot = no\nuid = {os.geteuid()}\ngid = {os.getegid()}\n'
+                        f'log file = {root / "rsyncd.log"}\n'
+                        f'[data]\npath = {data}\nread only = no\nmunge symlinks = no\n')
+        daemon = root / 'daemon'
+        daemon.mkdir()
+        with ExitStack() as resources:
+            # Cases have disjoint trees, so the per-directory convenience lock is unnecessary.
+            overlay = address != '127.0.0.1'
+            ssh = resources.enter_context(SSHServer(root / 'ssh', data, binary, rrsync, address=address,
+                                                   port=SSH_PORT if overlay else 0, parallel=True))
+            daemon = resources.enter_context(ProcessServer([str(binary), '--daemon', '--no-detach', '--config=' + str(conf)],
+                                                          env, daemon, address, DAEMON_PORT if overlay else 0))
+            if overlay:
+                resources.enter_context(ProcessServer([ssh.sshd, '-i', '-e', '-f', str(ssh.config)],
+                                                       ssh.env, ssh.directory, address, 18732))
+            keys = {key: public_key(' '.join((root / 'ssh' / (key + '.pub')).read_text().split()[:2]))
+                    for key in ('client', 'host')}
+            publish(root, 'local', dict(identity=identity, ssh_user=ssh.user, host_key=keys['host'],
+                                       client_key=keys['client'], ssh_port=ssh.port, daemon_port=daemon.port))
+            deadline = time.monotonic() + 3000
+            while not (root / 'stop').exists():
+                if time.monotonic() >= deadline:
+                    raise ValueError('Endpoint service deadline expired')
+                time.sleep(0.1)
+        (root / 'stopped').touch()
+    except BaseException as error:
+        publish(root, 'error', dict(error=str(error) if isinstance(error, ValueError) else type(error).__name__))
+        raise
+    finally:
+        for filename in ('client', 'host'):
+            path = root / 'ssh' / filename
+            if path.exists():
+                path.unlink()
+
+
+def prepare(role, binary, rrsync, address='127.0.0.1', revision=None):
+    root = Path(tempfile.mkdtemp(prefix='rsync-interop-', dir=pwd.getpwuid(os.geteuid()).pw_dir))
+    env = {key: os.environ[key] for key in ('PATH', 'RUNNER_TRACKING_ID') if key in os.environ}
+    with (root / 'agent.log').open('wb') as log:
+        subprocess.Popen([sys.executable, '-B', '-S', str(Path(__file__).resolve()), 'serve', role, '--root', str(root),
+                          '--binary', str(binary), '--rrsync', str(rrsync), '--address', address,
+                          *(['--source-sha', revision] if revision else [])], env=env, stdin=subprocess.DEVNULL,
+                         stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+    deadline = time.monotonic() + 15
+    while not (root / 'local.json').exists():
+        if (root / 'error.json').exists():
+            raise ValueError(read(root, 'error')['error'])
+        if time.monotonic() >= deadline:
+            (root / 'stop').touch()
+            raise ValueError('Endpoint services did not start')
+        time.sleep(0.1)
+    return dict(read(root, 'local'), root=str(root), python=sys.executable, script=str(Path(__file__).resolve()))
+
+
+def configure(root, role, nodes):
+    if not isinstance(nodes, dict) or set(nodes) != set(PLATFORMS):
+        raise ValueError('Incomplete endpoint set')
+    hosts, clients, addresses, host_keys = [], [], set(), set()
+    for peer, record in nodes.items():
+        if not isinstance(record, dict) or not isinstance(record.get('identity'), dict):
+            raise ValueError('Invalid native endpoint record')
+        native = record['identity']
+        system = native.get('system', '')
+        if (native.get('platform') != peer or not isinstance(system, str)
+                or not (system.startswith('CYGWIN_') if peer == 'cygwin' else system == PLATFORMS[peer])
+                or not isinstance(native.get('binary_sha256'), str) or not re.fullmatch(r'[0-9a-f]{64}', native['binary_sha256'])
+                or not isinstance(record.get('ssh_user'), str)
+                or not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_-]*\$?', record['ssh_user'])):
+            raise ValueError('Invalid native endpoint identity')
+        address = record['address']
+        if not isinstance(address, str) or address in addresses or ipaddress.ip_address(address) not in ipaddress.ip_network('100.64.0.0/10'):
+            raise ValueError('Invalid or repeated overlay address')
+        addresses.add(address)
+        host_key = public_key(record['host_key'])
+        hosts.append(f'[{address}]:{SSH_PORT} ' + host_key)
+        host_keys.add(host_key)
+        clients.append(public_key(record['client_key']))
+    own = read(root, 'local')
+    if (nodes[role]['identity'] != own['identity'] or nodes[role]['host_key'] != own['host_key']
+            or nodes[role]['client_key'] != own['client_key'] or len(set(clients)) != len(PLATFORMS)
+            or len(host_keys) != len(PLATFORMS) or (root / 'peers.json').exists()):
+        raise ValueError('Topology replaced an endpoint identity or reused a key')
+    (root / 'ssh' / 'known_hosts').write_text('\n'.join(hosts) + '\n')
+    keys = root / 'ssh' / 'authorized_keys.tmp'
+    keys.write_text('\n'.join(clients) + '\n')
+    keys.chmod(0o600)
+    keys.replace(root / 'ssh' / 'authorized_keys')
+    publish(root, 'peers', nodes)
+
+
+def transfers(root, role, binary, phase):
+    nodes = read(root, 'peers')
+    commands = []
+    for case in transfer_cases():
+        source, destination, client, transport = case
+        if (source if client == 'push' else destination) != role:
+            continue
+        case_name = name(case)
+        source_path, destination_path = 'source/' + case_name + '/', 'destination/' + case_name + '/'
+        peer = nodes[destination if client == 'push' else source]
+        remote_path = destination_path if client == 'push' else source_path
+        if transport == 'ssh':
+            remote = f'{peer["ssh_user"]}@{peer["address"]}:{remote_path}'
+            options = ['--old-args', '--rsync-path=rsync', '-e', quote_command(client_command(root / 'ssh', SSH_PORT))]
+        else:
+            remote = f'rsync://{peer["address"]}:{DAEMON_PORT}/data/{remote_path}'
+            options = []
+        local = str(root / 'data' / (source_path if client == 'push' else destination_path)) + '/'
+        operands = [local, remote] if client == 'push' else [remote, local]
+        env = {key: os.environ[key] for key in ('PATH', 'RUNNER_TRACKING_ID') if key in os.environ}
+        result = command([str(binary), '-rltpH', *options, *(['--checksum', '--delete'] if phase == 2 else []),
+                          *operands], env, timeout=60)
+        if result.returncode:
+            raise ValueError(f'{case_name}: rsync exited {result.returncode}: '
+                             + result.stderr.decode(errors='replace')[-2048:])
+        commands.append(list(case))
+    publish(root, 'transferred-' + str(phase), dict(commands=commands))
+    return dict(commands=commands)
+
+
+def verify(root, role, phase):
+    expected = snapshot(root / 'reference')
+    verified = []
+    for case in local_cases(role, 1):
+        if snapshot(root / 'data' / 'destination' / name(case)) != expected:
+            raise ValueError(name(case) + ': transferred data or metadata differ')
+        verified.append(list(case))
+    if phase == 1:
+        for case in local_cases(role, 0):
+            update(root / 'data' / 'source' / name(case))
+        update(root / 'reference')
+    publish(root, 'verified-' + str(phase), dict(verified=verified))
+    return dict(verified=verified)
+
+
+def stop(root):
+    (root / 'stop').touch()
+    deadline = time.monotonic() + 15
+    while not (root / 'stopped').exists():
+        if (root / 'error.json').exists():
+            raise ValueError(read(root, 'error')['error'])
+        if time.monotonic() >= deadline:
+            raise ValueError('Endpoint services did not stop')
+        time.sleep(0.1)
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('phase', choices=('prepare', 'serve', 'configure', 'transfer1', 'next', 'transfer2', 'verify', 'stop'))
+    parser.add_argument('platform', choices=PLATFORMS)
+    parser.add_argument('--root', type=Path)
+    parser.add_argument('--binary', type=Path)
+    parser.add_argument('--rrsync', type=Path)
+    parser.add_argument('--address', default='127.0.0.1')
+    parser.add_argument('--source-sha')
+    args = parser.parse_args()
+    if (args.phase in ('prepare', 'serve') and (args.binary is None or args.rrsync is None)
+            or args.phase != 'prepare' and args.root is None):
+        parser.error('The phase is missing its endpoint paths')
+    if args.source_sha is not None and not re.fullmatch(r'[0-9a-f]{40}', args.source_sha):
+        parser.error('Invalid source revision')
+    def interrupted(signum, frame):
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
+        raise ValueError('Endpoint interrupted')
+    signal.signal(signal.SIGTERM, interrupted)
+    try:
+        result = {}
+        if args.phase in ('prepare', 'serve'):
+            binary, rrsync = args.binary.resolve(strict=True), args.rrsync.resolve(strict=True)
+            if args.phase == 'prepare':
+                result = prepare(args.platform, binary, rrsync, args.address, args.source_sha)
+            else:
+                serve(args.root, args.platform, binary, rrsync, args.address, args.source_sha)
+        elif args.phase == 'configure':
+            data = sys.stdin.buffer.read(65537)
+            if len(data) > 65536:
+                raise ValueError('Peer manifest exceeds limit')
+            configure(args.root, args.platform, json.loads(data))
+        elif args.phase in ('transfer1', 'transfer2'):
+            result = transfers(args.root, args.platform, args.binary.resolve(strict=True), int(args.phase[-1]))
+        elif args.phase in ('next', 'verify'):
+            result = verify(args.root, args.platform, 1 if args.phase == 'next' else 2)
+        else:
+            stop(args.root)
+        print(json.dumps(result, sort_keys=True))
+    except (OSError, ValueError, subprocess.SubprocessError) as error:
+        print('Endpoint failed: ' + str(error), file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
