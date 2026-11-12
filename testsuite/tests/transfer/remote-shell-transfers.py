@@ -10,7 +10,7 @@ from harness import environment
 from fixtures.trees import hands_setup
 from harness.comparison import checkit
 from harness.environment import FROMDIR, TODIR
-from harness.process import split_rsync_cmd
+from harness.process import quote_command, split_rsync_cmd
 from harness.results import test_skipped
 from harness.rsync import rsh_cmd, rsync_path_arg, runtest
 from harness import metadata
@@ -41,7 +41,7 @@ if compare_link_times:
     banner = subprocess.check_output(split_rsync_cmd(environment.RSYNC_PEER) + ['--version'], text=True, timeout=10)
     compare_link_times = re.search(r'(?<!no )\bsymtimes\b', ' '.join(banner.split())) is not None
     if not compare_link_times:
-        environment.TLS_ARGS = shlex.join(arg for arg in listing_args if arg not in ('-l', '--link-times'))
+        environment.TLS_ARGS = quote_command(arg for arg in listing_args if arg not in ('-l', '--link-times'))
 hands_setup()
 if compare_link_times:
     os.utime(FROMDIR / 'nolf-symlink', (1_000_000_000, 1_000_000_000), follow_symlinks=False)
