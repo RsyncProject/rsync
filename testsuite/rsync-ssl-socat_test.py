@@ -11,7 +11,7 @@ import shutil
 import subprocess
 import sys
 
-from rsyncfns import SCRATCHDIR, SRCDIR, test_fail
+from rsyncfns import SCRATCHDIR, SRCDIR, test_fail, unlink_missing_ok
 
 
 RSYNC_SSL = SRCDIR / 'rsync-ssl'
@@ -80,7 +80,7 @@ def fallback_env(**updates):
 
 
 def run_helper(host, **env_updates):
-    HELPER_ARGV.unlink(missing_ok=True)
+    unlink_missing_ok(HELPER_ARGV)
     proc = subprocess.run(
         [str(RSYNC_SSL), '--HELPER', host, 'rsync', '--server', '--daemon', '.'],
         env=clean_env(RSYNC_SSL_TYPE='socat', RSYNC_SSL_SOCAT=str(fake_socat),
@@ -159,7 +159,7 @@ if argv != want:
 
 
 # --- default helper selection keeps existing openssl-first behaviour ---------
-OPENSSL_ARGV.unlink(missing_ok=True)
+unlink_missing_ok(OPENSSL_ARGV)
 proc = subprocess.run(
     [str(RSYNC_SSL), '--HELPER', 'example.org', 'rsync', '--server',
      '--daemon', '.'],
@@ -176,7 +176,7 @@ if not openssl_argv or openssl_argv[0] != 's_client':
 
 
 # --- if openssl is unavailable, default selection prefers socat over stunnel -
-fallback_helper_argv.unlink(missing_ok=True)
+unlink_missing_ok(fallback_helper_argv)
 proc = subprocess.run(
     [BASH, str(RSYNC_SSL), '--HELPER', 'fallback.example', 'rsync',
      '--server', '--daemon', '.'],

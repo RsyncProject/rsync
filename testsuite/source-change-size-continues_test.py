@@ -22,7 +22,7 @@ import sys
 
 from rsyncfns import (
     RSYNC, SCRATCHDIR, assert_same, make_data_file, makepath, rmtree,
-    rsync_argv, test_fail, test_skipped, split_rsync_cmd,
+    rsync_argv, test_fail, test_skipped, split_rsync_cmd, unlink_missing_ok,
 )
 
 
@@ -172,8 +172,8 @@ later.write_text('later file must still transfer\n')
 shim = build_shim()
 mark = SCRATCHDIR / 'source_shrink_read.mark'
 load_mark = SCRATCHDIR / 'source_shrink_load.mark'
-mark.unlink(missing_ok=True)
-load_mark.unlink(missing_ok=True)
+unlink_missing_ok(mark)
+unlink_missing_ok(load_mark)
 env = os.environ.copy()
 env['LD_PRELOAD'] = str(shim)
 env['RSYNC_SHRINK_TARGET'] = str(changing.resolve())

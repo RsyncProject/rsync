@@ -5,7 +5,7 @@ import os
 import platform
 import subprocess
 
-from rsyncfns import FROMDIR, SCRATCHDIR, SRCDIR, forced_protocol, rsync_argv, start_test_daemon, test_fail, test_skipped
+from rsyncfns import FROMDIR, SCRATCHDIR, SRCDIR, forced_protocol, rsync_argv, start_test_daemon, test_fail, test_skipped, unlink_missing_ok
 
 
 def test():
@@ -26,7 +26,7 @@ def test():
     for error, expected in ((0, 0), (errno.ENOENT, 24), (errno.EACCES, 23)):
         if error == errno.ENOENT and (forced_protocol() or 33) < 30:
             expected = 0
-        marker.unlink(missing_ok=True)
+        unlink_missing_ok(marker)
         destination = SCRATCHDIR / f'destination-{error}'
         env = {**os.environ, 'LD_PRELOAD': str(library), 'LC_ALL': 'C', 'RSYNC_TEST_OPEN_FILE': 'file',
                'RSYNC_TEST_OPEN_ERRNO': str(error), 'RSYNC_TEST_OPEN_MARKER': str(marker)}

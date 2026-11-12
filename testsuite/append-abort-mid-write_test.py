@@ -29,6 +29,7 @@ import time
 from rsyncfns import (
     RSYNC, SCRATCHDIR, assert_same, make_data_file, makepath, rmtree,
     rsync_argv, run_rsync, split_rsync_cmd, test_fail, test_skipped,
+    unlink_missing_ok,
 )
 
 
@@ -201,7 +202,7 @@ def abort_mid_write(mode):
     held = SCRATCHDIR / 'midwrite.held'
     release = SCRATCHDIR / 'midwrite.release'
     for p in (loaded, held, release):
-        p.unlink(missing_ok=True)
+        unlink_missing_ok(p)
     env = os.environ.copy()
     env['LD_PRELOAD'] = str(shim)
     env['RSYNC_MIDWRITE_TARGET'] = str((dest / 'grow.bin').resolve())

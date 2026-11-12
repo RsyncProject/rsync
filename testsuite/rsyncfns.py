@@ -55,6 +55,20 @@ else:
         return ' '.join(shlex.quote(arg) for arg in split_command)
 
 
+# If Path.unlink doesn't accept the missing_ok argument, fall back to checking
+# the exception returned. For simplicity we check the Python version instead of
+# inspecting the signature of the function.
+if sys.version_info < (3, 8):
+    def unlink_missing_ok(file_path: Path) -> None:
+        try:
+            file_path.unlink()
+        except FileNotFoundError:
+            pass
+else:
+    def unlink_missing_ok(file_path: Path) -> None:
+        file_path.unlink(missing_ok=True)
+
+
 # --- environment -----------------------------------------------------------
 
 def _required(name: str) -> str:

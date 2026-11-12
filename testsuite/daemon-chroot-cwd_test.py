@@ -5,7 +5,7 @@ import os
 import platform
 import subprocess
 
-from rsyncfns import FROMDIR, SCRATCHDIR, SRCDIR, rsync_argv, start_test_daemon, test_fail, test_skipped
+from rsyncfns import FROMDIR, SCRATCHDIR, SRCDIR, rsync_argv, start_test_daemon, test_fail, test_skipped, unlink_missing_ok
 
 
 def test():
@@ -34,7 +34,7 @@ def test():
     url = start_test_daemon(config, 12920)
     for name, path, denied in (('plain', str(root), False), ('inner', f'{root}/./inner', False),
                                ('denied', f'{root}/./inner', True)):
-        marker.unlink(missing_ok=True)
+        unlink_missing_ok(marker)
         config.write_text(f'use chroot = yes\n[files]\npath = {path}\n')
         env = {**os.environ, 'LD_PRELOAD': str(library), 'RSYNC_TEST_CHROOT_PATH': str(root),
                'RSYNC_TEST_CHROOT_MARKER': str(marker)}

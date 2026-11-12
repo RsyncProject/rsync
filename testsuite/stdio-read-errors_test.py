@@ -7,7 +7,7 @@ import signal
 import subprocess
 import sys
 
-from rsyncfns import FROMDIR, SCRATCHDIR, SRCDIR, join_and_quote, rsync_argv, start_test_daemon, test_fail, test_skipped
+from rsyncfns import FROMDIR, SCRATCHDIR, SRCDIR, join_and_quote, rsync_argv, start_test_daemon, test_fail, test_skipped, unlink_missing_ok
 
 
 def test():
@@ -28,7 +28,7 @@ def test():
     marker = SCRATCHDIR / 'read-error'
 
     def invoke(name, arguments, path, after, mode='eio', success=False):
-        marker.unlink(missing_ok=True)
+        unlink_missing_ok(marker)
         env = {**os.environ, 'LD_PRELOAD': str(library), 'RSYNC_TEST_READ_PATH': str(path),
                'RSYNC_TEST_READ_AFTER': str(after), 'RSYNC_TEST_READ_ERROR': mode,
                'RSYNC_TEST_READ_MARKER': str(marker)}

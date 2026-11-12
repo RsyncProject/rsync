@@ -8,7 +8,7 @@ import time
 
 from rsyncfns import (
     SCRATCHDIR, makepath, patched_rrsync, proc_self_fd_pins, rmtree,
-    rsync_argv, test_fail, test_skipped,
+    rsync_argv, test_fail, test_skipped, unlink_missing_ok,
 )
 
 if not proc_self_fd_pins():
@@ -72,7 +72,7 @@ for option in ((), ('--inplace',)):
     transfer(source, 'dummy:existing', *option)
     check_contents(destination)
     new = restricted / 'new'
-    new.unlink(missing_ok=True)
+    unlink_missing_ok(new)
     transfer(source, 'dummy:new', *option)
     check_contents(new)
 
@@ -94,8 +94,8 @@ if marker.read_text() != 'outside fixture\n':
 def gated_transfer(name, change):
     ready = base / 'ready'
     go = base / 'go'
-    ready.unlink(missing_ok=True)
-    go.unlink(missing_ok=True)
+    unlink_missing_ok(ready)
+    unlink_missing_ok(go)
     env = {**os.environ, 'RRSYNC_TEST_READY': str(ready), 'RRSYNC_TEST_GO': str(go)}
     proc = subprocess.Popen(command(source, f'dummy:{name}', '--inplace'),
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE,

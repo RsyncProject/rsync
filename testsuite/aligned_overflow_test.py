@@ -11,7 +11,7 @@ import struct
 import subprocess
 import threading
 
-from rsyncfns import FROMDIR, TODIR, TOOLDIR, rmtree, test_fail
+from rsyncfns import FROMDIR, TODIR, TOOLDIR, rmtree, test_fail, unlink_missing_ok
 
 RSYNC_BIN = str(TOOLDIR / 'rsync')
 
@@ -175,7 +175,7 @@ finally:
     if t is not None:
         t.join(timeout=5)
     logf.close()
-    bigfile.unlink(missing_ok=True)
+    unlink_missing_ok(bigfile)
 
 out_text = out_log.read_text(encoding='utf-8', errors='replace')
 print(f"sender exited with rc={rc}", flush=True)

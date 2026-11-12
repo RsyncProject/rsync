@@ -26,6 +26,8 @@ import sys
 import time
 from pathlib import Path
 
+from rsyncfns import unlink_missing_ok
+
 
 def racer_main(argv: list[str]) -> int:
     if len(argv) != 5:
@@ -249,8 +251,8 @@ victim_inode = victim.stat().st_ino
 old = module / "old"
 ready_fifo = SCRATCHDIR / "ready.fifo"
 done_fifo = SCRATCHDIR / "done.fifo"
-ready_fifo.unlink(missing_ok=True)
-done_fifo.unlink(missing_ok=True)
+unlink_missing_ok(ready_fifo)
+unlink_missing_ok(done_fifo)
 os.mkfifo(ready_fifo)
 os.mkfifo(done_fifo)
 
