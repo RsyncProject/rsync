@@ -125,13 +125,15 @@ def main():
     root.mkdir(parents=True, exist_ok=True)
     try:
         context()
+        path = root / 'lease.json'
+        if not path.exists() and args.phase in ('revoke', 'finish'):
+            return 0
         api = Tailnet()
         if args.phase == 'prepare':
+            api.devices()
+            api.policy()
             prepare(root, api)
         else:
-            path = root / 'lease.json'
-            if not path.exists() and args.phase in ('revoke', 'finish'):
-                return 0
             lease = json.loads(path.read_text())
             if args.phase == 'admit':
                 admit(root, api, lease)
