@@ -36,24 +36,24 @@ def connect(ip, port, nonce=None):
                     break
                 reply += part
             if reply != nonce.encode():
-                raise ValueError('Canary identity mismatch')
+                raise NetworkError('Canary identity mismatch')
     return True
 
 
 def health(ready):
     for port in (18731, 18732):
         if not connect(ready['address'], port, ready['nonce']):
-            raise ValueError('Local canary is not listening')
+            raise NetworkError('Local canary is not listening')
 
 
 def denied(ip, port):
     if connect(ip, port):
-        raise ValueError('Forbidden TCP connection succeeded')
+        raise NetworkError('Forbidden TCP connection succeeded')
 
 
 def wait_until(value):
     if type(value) not in (int, float) or not time.time() - 5 <= value <= time.time() + 180:
-        raise ValueError('Invalid probe barrier')
+        raise NetworkError('Invalid probe barrier')
     time.sleep(max(0, value - time.time()))
 
 
@@ -97,15 +97,17 @@ def configure_network():
 
 def prepare(root, slot):
     prefs = configure_network()
-    authority = worker_authority()
+    oidc = worker_authority()
+    enrolment = json.loads((root / 'enrolment.json').read_text())
+    if any(enrolment.get(key) != value for key, value in dict(context(), slot=slot).items()):
+        raise NetworkError('Worker enrolment record is stale')
     result = subprocess.run(['tailscale', 'status', '--json'], capture_output=True, timeout=15, check=True)
     node = json.loads(result.stdout)['Self']
     ips = [ip for ip in node['TailscaleIPs'] if ':' not in ip]
     if len(ips) != 1 or not isinstance(node['ID'], str) or not node['ID']:
-        raise ValueError('Missing local Tailscale identity')
+        raise NetworkError('Missing local Tailscale identity')
     ready = dict(slot=slot, node_id=node['ID'], address=address(ips[0]), nonce=secrets.token_hex(24),
-                 controller_exchange_denied=True, worker_exchange_succeeded=True)
-    ready['authority_denials'] = authority
+                 oidc_available=oidc, key_id=enrolment['key_id'])
     ready['preferences'] = prefs
     write(root, 'ready', ready)
     env = {key: os.environ[key] for key in ('PATH', 'LANG', 'RUNNER_TRACKING_ID') if key in os.environ}
@@ -118,7 +120,7 @@ def prepare(root, slot):
     deadline = time.monotonic() + 10
     while not (root / 'listening').exists():
         if child.poll() is not None or time.monotonic() >= deadline:
-            raise ValueError('Canary did not start')
+            raise NetworkError('Canary did not start')
         time.sleep(0.1)
     health(ready)
 
@@ -128,10 +130,10 @@ def probe(root, slot, phase):
     topology = artifacts('topology')[None]
     nodes = topology['nodes']
     if set(nodes) != set(SLOTS) or nodes[slot] != ready:
-        raise ValueError('Topology does not match this worker')
+        raise NetworkError('Topology does not match this worker')
     for name, node in nodes.items():
         if node.get('slot') != name or address(node['address']) != node['address']:
-            raise ValueError('Invalid peer identity')
+            raise NetworkError('Invalid peer identity')
     peer = nodes[slot[0] + ('2' if slot[1] == '1' else '1')]
     health(ready)
     if phase == 'quarantine':
@@ -142,34 +144,34 @@ def probe(root, slot, phase):
     elif phase == 'exercise':
         release = artifacts('admission')[None]
         if release['nodes'] != nodes:
-            raise ValueError('Admission changed endpoint identities')
+            raise NetworkError('Admission changed endpoint identities')
         wait_until(release['start_at'])
         deadline = time.monotonic() + 45
         while not connect(peer['address'], 18731, peer['nonce']):
             if time.monotonic() >= deadline:
-                raise ValueError('Permitted peer connection did not succeed')
+                raise NetworkError('Permitted peer connection did not succeed')
             time.sleep(1)
         for name, node in nodes.items():
             if name[0] != slot[0]:
                 denied(node['address'], 18731)
         denied(peer['address'], 18732)
         if not connect(peer['address'], 18731, peer['nonce']):
-            raise ValueError('Permitted connection failed after denial probes')
+            raise NetworkError('Permitted connection failed after denial probes')
     else:
         release = artifacts('revocation')[None]
         wait_until(release['start_at'])
         if release['end_at'] != release['start_at'] + 90:
-            raise ValueError('Invalid revocation window')
+            raise NetworkError('Invalid revocation window')
         deadline = time.monotonic() + 45
         while connect(peer['address'], 18731):
             if time.monotonic() >= deadline:
-                raise ValueError('Revoked connection remained permitted')
+                raise NetworkError('Revoked connection remained permitted')
             time.sleep(1)
         for _ in range(3):
             denied(peer['address'], 18731)
         remaining = release['end_at'] - time.time()
         if remaining < 0:
-            raise ValueError('Revocation probe exceeded the live-listener window')
+            raise NetworkError('Revocation probe exceeded the live-listener window')
         time.sleep(remaining)
     health(ready)
     write(root, phase, dict(slot=slot, node_id=ready['node_id'], passed=True, finished_at=time.time()))
@@ -192,10 +194,10 @@ def stop(root):
     if current is None:
         return
     if current[1] != state['start']:
-        raise ValueError('Canary process identity changed')
+        raise NetworkError('Canary process identity changed')
     try:
         if os.getpgid(state['pid']) != state['pid']:
-            raise ValueError('Canary process group changed')
+            raise NetworkError('Canary process group changed')
         os.killpg(state['pid'], signal.SIGTERM)
     except ProcessLookupError:
         return
@@ -205,13 +207,13 @@ def stop(root):
         if current is None or current[0] == 'Z':
             return
         if current[1] != state['start']:
-            raise ValueError('Canary process identity changed during shutdown')
+            raise NetworkError('Canary process identity changed during shutdown')
         time.sleep(0.1)
     current = process_state(state['pid'])
     if current is None or current[0] == 'Z':
         return
     if current[1] != state['start']:
-        raise ValueError('Canary process identity changed before forced shutdown')
+        raise NetworkError('Canary process identity changed before forced shutdown')
     try:
         os.killpg(state['pid'], signal.SIGKILL)
     except ProcessLookupError:
@@ -222,7 +224,7 @@ def stop(root):
         if current is None or current[0] == 'Z':
             return
         time.sleep(0.1)
-    raise ValueError('Canary process did not stop')
+    raise NetworkError('Canary process did not stop')
 
 
 def main():
@@ -244,9 +246,9 @@ def main():
                 prepare(root, args.slot)
             else:
                 probe(root, args.slot, args.phase)
-    except (NetworkError, ValueError, KeyError, OSError, subprocess.SubprocessError) as error:
+    except (ValueError, KeyError, OSError, subprocess.SubprocessError) as error:
         detail = str(error) if isinstance(error, NetworkError) else type(error).__name__
-        print('Interop worker failed during ' + args.phase + ': ' + detail, file=sys.stderr)
+        print('Interoperability worker failed during ' + args.phase + ': ' + detail, file=sys.stderr)
         return 1
     return 0
 
