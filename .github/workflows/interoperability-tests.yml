@@ -21,7 +21,10 @@ jobs:
         with:
           persist-credentials: false
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y gcc make openssl openssh-server libacl1-dev libattr1-dev liblz4-dev libzstd-dev libxxhash-dev libidn2-dev
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc make openssl openssh-server libacl1-dev libattr1-dev liblz4-dev libzstd-dev libxxhash-dev libidn2-dev
+          sudo install -d -o root -g root -m 0755 /run/sshd
       - name: Build
         run: ./configure --disable-md2man && make -j2
       - name: Transfers
@@ -96,7 +99,11 @@ jobs:
           copyback: 'false'
           cache-after-prepare: true
           prepare: pkg_add -I bash autoconf%2.71 automake%1.16 xxhash zstd lz4 libidn2 libiconv git
-          run: CPPFLAGS='-I/usr/local/include -DXXH_INLINE_ALL=1' LDFLAGS=-L/usr/local/lib ./configure --disable-md2man && make -j2
+          run: |
+            export AUTOCONF_VERSION=2.71 AUTOMAKE_VERSION=1.16
+            export CPPFLAGS='-I/usr/local/include -DXXH_INLINE_ALL=1' LDFLAGS=-L/usr/local/lib ac_cv_search_XXH64_createState=''
+            ./configure --disable-md2man
+            make -j2
       - name: Transfers
         uses: ./.github/actions/interoperability
         with:
@@ -111,6 +118,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.27.4'
+          cache: false
       - name: Install dependencies
         run: |
           brew install automake openssl xxhash zstd lz4 libidn2
@@ -142,7 +154,7 @@ jobs:
           copyback: 'false'
           cache-after-prepare: true
           prepare: pkg install bash automake gnu-m4 pkg://solaris/runtime/python-35 autoconf gcc git
-          run: ./configure --disable-md2man --disable-zstd --disable-xxhash --disable-lz4 --disable-idn && make -j2
+          run: ./configure --disable-md2man --disable-zstd --disable-xxhash --disable-lz4 --disable-idn && make
       - name: Transfers
         uses: ./.github/actions/interoperability
         with:
@@ -163,7 +175,7 @@ jobs:
       - name: Install Cygwin
         run: .github/scripts/install-cygwin.ps1 -OpenSSH
       - name: Build
-        run: bash -lc './configure --disable-md2man && make -j2'
+        run: bash -c './configure --disable-md2man && make -j2'
       - name: Transfers
         uses: ./.github/actions/interoperability
         with:

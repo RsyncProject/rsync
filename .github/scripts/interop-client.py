@@ -19,7 +19,10 @@ SOURCE = '27047635f237d1f3e0b08c0f487674757f30d2f7'
 
 
 def run(argv, timeout=60, check=True, **options):
-    result = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout, **options)
+    try:
+        result = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout, **options)
+    except FileNotFoundError:
+        raise NetworkError('Required command not found: ' + Path(argv[0]).name) from None
     if check and result.returncode:
         raise NetworkError(Path(argv[0]).name + ' failed with exit code ' + str(result.returncode))
     return result

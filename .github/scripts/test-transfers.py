@@ -164,6 +164,11 @@ class Transfers(unittest.TestCase):
         with patch('urllib.request.build_opener', return_value=opener), self.assertRaises(NetworkError):
             client['download']('https://pkgs.tailscale.com/stable/example', self.root / 'package', '0' * 64)
 
+    def test_missing_client_tool_is_identified_without_arguments(self):
+        with patch.object(subprocess, 'run', side_effect=FileNotFoundError(2, 'not found', 'go')):
+            with self.assertRaisesRegex(NetworkError, '^Required command not found: go$'):
+                client['run'](['go', 'fixture-not-an-access-token'])
+
 
     def test_barriers_precede_copy_and_do_not_wait_for_their_own_upload(self):
         calls = []
