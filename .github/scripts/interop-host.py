@@ -10,7 +10,7 @@ import subprocess
 import sys
 import time
 
-from interop_ci import ROLES, identity, published, records, validate, write
+from interop_ci import ROLES, PeerUnavailable, identity, published, records, validate, write
 from interop_enrol import decrypt, forget, generate
 from interop_network import NetworkError, require_no_oidc
 
@@ -243,8 +243,12 @@ def main():
                       commands=commands, verified=result['verified'])
         else:
             jobs = json.loads(os.environ['INTEROP_JOBS'])
-            if set(jobs) != set(ROLES) or any(job.get('result') != 'success' for job in jobs.values()):
-                raise NetworkError('A native endpoint job did not succeed')
+            if set(jobs) != set(ROLES):
+                raise NetworkError('Incomplete endpoint job set')
+            incomplete = [role for role, job in jobs.items()
+                          if job.get('result') != 'success' or job.get('outputs', {}).get('blocked') != 'false']
+            if incomplete:
+                raise NetworkError('Failed or blocked endpoints: ' + ', '.join(incomplete))
             broker = runpy.run_path(str(Path(__file__).with_name('interop-broker.py')))
             broker['verify_cases'](records('result'), state['source_sha'])
             proof = published('result')
@@ -252,6 +256,12 @@ def main():
                 raise NetworkError('Missing verified network cleanup')
             print('Verified all 168 directed transfers and network cleanup')
     except (OSError, ValueError, KeyError, subprocess.SubprocessError) as error:
+        if isinstance(error, PeerUnavailable) and args.phase not in ('result', 'stop'):
+            write(root, 'blocked', role=args.platform, phase=args.phase, passed=False, reason=str(error))
+            with open(os.environ['GITHUB_ENV'], 'a') as stream:
+                stream.write('INTEROP_BLOCKED=true\n')
+            print('Interoperability blocked: ' + str(error))
+            return 0
         detail = str(error) if isinstance(error, NetworkError) else type(error).__name__
         print('Interoperability failed: ' + detail, file=sys.stderr)
         return 1

@@ -6,6 +6,8 @@ The 168 cases cover every directed platform pair, push and pull initiation and S
 
 The parent CI run and attempt identify each cohort. The tested revision comes from GitHub's resolved reusable-workflow commit and is checked against the native checkout. Endpoint records also contain the operating system, effective UID/GID and executable SHA-256. Required depends on all seven endpoint jobs, complete case results and confirmed network cleanup.
 
+Endpoint jobs fail for their own setup, transfer and cleanup errors. Unavailable peers or a failed controller block shared phases; the remaining checks are skipped and local cleanup still runs. Result rejects failed or blocked endpoints, missing outcomes, incomplete transfer results and unverified network cleanup.
+
 ## Authentication
 
 The Network controller uses trusted default-branch code through a workflow_run listener. It is deployed independently of the PR endpoint workflow and ignores CI runs which have not selected that workflow. Its existing OIDC identity has write access to auth_keys, policy_file, devices:core and devices:posture_attributes in the dedicated test tailnet. The posture scope is a dependency of policy-file writes. Enrolment is restricted to tag:quarantine.

@@ -14,6 +14,8 @@ permissions:
 jobs:
   linux:
     name: Linux
+    outputs:
+      blocked: ${{ steps.transfers.outputs.blocked }}
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     steps:
@@ -28,12 +30,15 @@ jobs:
       - name: Build
         run: ./configure --disable-md2man && make -j2
       - name: Transfers
+        id: transfers
         uses: ./.github/actions/interoperability
         with:
           platform: linux
 
   freebsd:
     name: FreeBSD
+    outputs:
+      blocked: ${{ steps.transfers.outputs.blocked }}
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     steps:
@@ -51,6 +56,7 @@ jobs:
           prepare: pkg install -y bash autotools m4 xxhash zstd liblz4 libidn2 libiconv python3 git
           run: CPPFLAGS=-I/usr/local/include LDFLAGS=-L/usr/local/lib ./configure --disable-md2man && make -j2
       - name: Transfers
+        id: transfers
         uses: ./.github/actions/interoperability
         with:
           platform: freebsd
@@ -58,6 +64,8 @@ jobs:
 
   netbsd:
     name: NetBSD
+    outputs:
+      blocked: ${{ steps.transfers.outputs.blocked }}
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     steps:
@@ -77,6 +85,7 @@ jobs:
             ln -sf /usr/pkg/bin/python3.12 /usr/pkg/bin/python3
           run: ./configure --disable-md2man --disable-zstd --disable-xxhash --disable-lz4 --disable-idn && make -j2
       - name: Transfers
+        id: transfers
         uses: ./.github/actions/interoperability
         with:
           platform: netbsd
@@ -84,6 +93,8 @@ jobs:
 
   openbsd:
     name: OpenBSD
+    outputs:
+      blocked: ${{ steps.transfers.outputs.blocked }}
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     steps:
@@ -105,6 +116,7 @@ jobs:
             ./configure --disable-md2man
             make -j2
       - name: Transfers
+        id: transfers
         uses: ./.github/actions/interoperability
         with:
           platform: openbsd
@@ -112,6 +124,8 @@ jobs:
 
   macos:
     name: macOS
+    outputs:
+      blocked: ${{ steps.transfers.outputs.blocked }}
     runs-on: macos-26
     timeout-minutes: 75
     steps:
@@ -134,12 +148,15 @@ jobs:
           CPPFLAGS="-I$prefix/include -I$openssl/include" LDFLAGS="-L$prefix/lib -L$openssl/lib" ./configure --disable-md2man
           make -j2
       - name: Transfers
+        id: transfers
         uses: ./.github/actions/interoperability
         with:
           platform: macos
 
   solaris:
     name: Solaris
+    outputs:
+      blocked: ${{ steps.transfers.outputs.blocked }}
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     steps:
@@ -156,6 +173,7 @@ jobs:
           prepare: pkg install bash automake gnu-m4 pkg://solaris/runtime/python-35 autoconf gcc git
           run: ./configure --disable-md2man --disable-zstd --disable-xxhash --disable-lz4 --disable-idn && make
       - name: Transfers
+        id: transfers
         uses: ./.github/actions/interoperability
         with:
           platform: solaris
@@ -163,6 +181,8 @@ jobs:
 
   cygwin:
     name: Cygwin
+    outputs:
+      blocked: ${{ steps.transfers.outputs.blocked }}
     runs-on: windows-2022
     timeout-minutes: 75
     defaults:
@@ -177,6 +197,7 @@ jobs:
       - name: Build
         run: bash -c './configure --disable-md2man && make -j2'
       - name: Transfers
+        id: transfers
         uses: ./.github/actions/interoperability
         with:
           platform: cygwin

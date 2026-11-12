@@ -7,6 +7,10 @@ inputs:
   guest:
     default: 'false'
     description: Use the existing local VM SSH connection
+outputs:
+  blocked:
+    description: A shared phase could not run
+    value: ${{ steps.outcome.outputs.blocked }}
 runs:
   using: composite
   steps:
@@ -39,6 +43,7 @@ runs:
         INTEROP_GUEST: ${{ inputs.guest }}
       run: python3 -B -S .github/scripts/interop-host.py connect "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
     - name: Start native fixture services
+      if: env.INTEROP_BLOCKED != 'true'
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
@@ -46,6 +51,7 @@ runs:
         INTEROP_GUEST: ${{ inputs.guest }}
       run: python3 -B -S .github/scripts/interop-host.py prepare "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
     - name: Upload endpoint identity
+      if: env.INTEROP_BLOCKED != 'true'
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: interoperability-${{ github.run_attempt }}-ready-${{ inputs.platform }}
@@ -53,6 +59,7 @@ runs:
         if-no-files-found: error
         retention-days: 7
     - name: Check quarantine
+      if: env.INTEROP_BLOCKED != 'true'
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
@@ -60,6 +67,7 @@ runs:
         INTEROP_GUEST: ${{ inputs.guest }}
       run: python3 -B -S .github/scripts/interop-host.py quarantine "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
     - name: Upload quarantine result
+      if: env.INTEROP_BLOCKED != 'true'
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: interoperability-${{ github.run_attempt }}-quarantine-${{ inputs.platform }}
@@ -67,6 +75,7 @@ runs:
         if-no-files-found: error
         retention-days: 7
     - name: Check admission
+      if: env.INTEROP_BLOCKED != 'true'
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
@@ -74,6 +83,7 @@ runs:
         INTEROP_GUEST: ${{ inputs.guest }}
       run: python3 -B -S .github/scripts/interop-host.py admit "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
     - name: Upload endpoint admission
+      if: env.INTEROP_BLOCKED != 'true'
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: interoperability-${{ github.run_attempt }}-admitted-${{ inputs.platform }}
@@ -81,6 +91,7 @@ runs:
         if-no-files-found: error
         retention-days: 7
     - name: Initial transfers
+      if: env.INTEROP_BLOCKED != 'true'
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
@@ -88,6 +99,7 @@ runs:
         INTEROP_GUEST: ${{ inputs.guest }}
       run: python3 -B -S .github/scripts/interop-host.py transfer1 "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
     - name: Upload initial transfer completion
+      if: env.INTEROP_BLOCKED != 'true'
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: interoperability-${{ github.run_attempt }}-transfer1-${{ inputs.platform }}
@@ -95,6 +107,7 @@ runs:
         if-no-files-found: error
         retention-days: 7
     - name: Verify initial data and update sources
+      if: env.INTEROP_BLOCKED != 'true'
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
@@ -102,6 +115,7 @@ runs:
         INTEROP_GUEST: ${{ inputs.guest }}
       run: python3 -B -S .github/scripts/interop-host.py next "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
     - name: Upload update readiness
+      if: env.INTEROP_BLOCKED != 'true'
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: interoperability-${{ github.run_attempt }}-next-${{ inputs.platform }}
@@ -109,6 +123,7 @@ runs:
         if-no-files-found: error
         retention-days: 7
     - name: Checksum updates and deletion
+      if: env.INTEROP_BLOCKED != 'true'
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
@@ -116,6 +131,7 @@ runs:
         INTEROP_GUEST: ${{ inputs.guest }}
       run: python3 -B -S .github/scripts/interop-host.py transfer2 "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
     - name: Upload update completion
+      if: env.INTEROP_BLOCKED != 'true'
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: interoperability-${{ github.run_attempt }}-transfer2-${{ inputs.platform }}
@@ -123,6 +139,7 @@ runs:
         if-no-files-found: error
         retention-days: 7
     - name: Verify updated native data
+      if: env.INTEROP_BLOCKED != 'true'
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
@@ -130,6 +147,7 @@ runs:
         INTEROP_GUEST: ${{ inputs.guest }}
       run: python3 -B -S .github/scripts/interop-host.py verify "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
     - name: Upload transfer result
+      if: env.INTEROP_BLOCKED != 'true'
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: interoperability-${{ github.run_attempt }}-result-${{ inputs.platform }}
@@ -137,6 +155,7 @@ runs:
         if-no-files-found: error
         retention-days: 7
     - name: Check revocation
+      if: env.INTEROP_BLOCKED != 'true'
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
@@ -144,10 +163,19 @@ runs:
         INTEROP_GUEST: ${{ inputs.guest }}
       run: python3 -B -S .github/scripts/interop-host.py revoked "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
     - name: Upload revocation result
+      if: env.INTEROP_BLOCKED != 'true'
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: interoperability-${{ github.run_attempt }}-revoked-${{ inputs.platform }}
         path: ${{ runner.temp }}/interoperability/revoked.json
+        if-no-files-found: error
+        retention-days: 7
+    - name: Upload blocked phase
+      if: ${{ always() && env.INTEROP_BLOCKED == 'true' }}
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: interoperability-${{ github.run_attempt }}-blocked-${{ inputs.platform }}
+        path: ${{ runner.temp }}/interoperability/blocked.json
         if-no-files-found: error
         retention-days: 7
     - name: Stop fixture services and leave the network
@@ -158,3 +186,13 @@ runs:
         INTEROP_PLATFORM: ${{ inputs.platform }}
         INTEROP_GUEST: ${{ inputs.guest }}
       run: python3 -B -S .github/scripts/interop-host.py stop "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
+    - name: Record endpoint outcome
+      id: outcome
+      if: always()
+      shell: bash
+      run: |
+        python3 - <<'PY'
+        import os
+        with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+            output.write('blocked=' + os.environ.get('INTEROP_BLOCKED', 'false') + '\n')
+        PY

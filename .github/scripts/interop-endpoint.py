@@ -52,8 +52,11 @@ def serve(root, role, binary, rrsync, address='127.0.0.1', revision=None):
         identity = endpoint_identity(binary, role)
         if revision:
             repository = Path(__file__).resolve().parents[2]
-            actual = subprocess.check_output(['git', '-c', 'safe.directory=' + str(repository), '-C', str(repository),
-                                               'rev-parse', 'HEAD'], text=True, timeout=10).strip()
+            try:
+                actual = subprocess.check_output(['git', '-c', 'safe.directory=' + str(repository), '-C', str(repository),
+                                                   'rev-parse', 'HEAD'], stderr=subprocess.PIPE, text=True, timeout=10).strip()
+            except (OSError, subprocess.SubprocessError):
+                raise ValueError('Native endpoint revision check failed') from None
             if actual != revision:
                 raise ValueError('Native endpoint has a different candidate revision')
             identity['source_sha'] = actual

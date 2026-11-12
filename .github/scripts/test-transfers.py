@@ -87,6 +87,28 @@ class Transfers(unittest.TestCase):
             self.assertEqual(ci.identity(), self.state)
             self.assertNotEqual(ci.identity()['source_sha'], self.run['head_sha'])
 
+    def test_native_revision_errors_are_identified_without_command_output(self):
+        failures = (FileNotFoundError('fixture-private-path'), subprocess.TimeoutExpired('git', 10),
+                    subprocess.CalledProcessError(128, 'git', stderr=b'fixture-private-output'))
+        for error in failures:
+            with self.subTest(error=type(error).__name__), \
+                    patch.dict(endpoint['serve'].__globals__, endpoint_identity=lambda *_: {}), \
+                    patch.object(subprocess, 'check_output', side_effect=error), \
+                    self.assertRaisesRegex(ValueError, '^Native endpoint revision check failed$'):
+                endpoint['serve'](self.root, 'linux', self.root / 'rsync', self.root / 'rrsync',
+                                  revision=self.state['source_sha'])
+            self.assertEqual(json.loads((self.root / 'error.json').read_text()),
+                             dict(error='Native endpoint revision check failed'))
+            self.assertFalse((self.root / 'data').exists())
+
+    def test_native_revision_must_match_the_candidate(self):
+        with patch.dict(endpoint['serve'].__globals__, endpoint_identity=lambda *_: {}), \
+                patch.object(subprocess, 'check_output', return_value='b' * 40 + '\n'), \
+                self.assertRaisesRegex(ValueError, 'Native endpoint has a different candidate revision'):
+            endpoint['serve'](self.root, 'linux', self.root / 'rsync', self.root / 'rrsync',
+                              revision=self.state['source_sha'])
+        self.assertFalse((self.root / 'data').exists())
+
     def test_fork_needs_no_oidc(self):
         with patch.object(ci, 'api', return_value=self.run):
             self.assertEqual(ci.identity(), self.state)
@@ -186,6 +208,70 @@ class Transfers(unittest.TestCase):
                     patch.dict(host['main'].__globals__, shared):
                 self.assertEqual(host['main'](), 0)
             self.assertEqual(calls, expected)
+
+    def test_peer_failure_records_a_blocked_phase(self):
+        environment = self.root / 'github-env'
+        ci.bind(self.state)
+        with patch.object(sys, 'argv', ['interop-host.py', 'transfer1', 'linux', '--root', str(self.root)]), \
+                patch.dict(os.environ, GITHUB_ENV=str(environment)), \
+                patch.dict(host['main'].__globals__, identity=lambda: self.state,
+                           records=unittest.mock.Mock(side_effect=ci.PeerUnavailable('Unavailable endpoints: NetBSD')),
+                           call=lambda *args: self.fail('A blocked transfer ran')):
+            self.assertEqual(host['main'](), 0)
+        self.assertEqual(environment.read_text(), 'INTEROP_BLOCKED=true\n')
+        record = json.loads((self.root / 'blocked.json').read_text())
+        self.assertEqual(record['role'], 'linux')
+        self.assertEqual(record['phase'], 'transfer1')
+        self.assertIs(record['passed'], False)
+        self.assertFalse((self.root / 'transfer1.json').exists())
+
+    def test_local_failures_are_not_blocked_results(self):
+        environment = self.root / 'github-env'
+        with patch.object(sys, 'argv', ['interop-host.py', 'transfer1', 'linux', '--root', str(self.root)]), \
+                patch.dict(os.environ, GITHUB_ENV=str(environment)), \
+                patch.dict(host['main'].__globals__, identity=lambda: self.state,
+                           records=unittest.mock.Mock(side_effect=NetworkError('Invalid receipt'))), \
+                patch('sys.stderr', new_callable=io.StringIO):
+            self.assertEqual(host['main'](), 1)
+        self.assertFalse(environment.exists())
+        self.assertFalse((self.root / 'blocked.json').exists())
+
+    def test_result_rejects_blocked_failed_and_missing_outcomes(self):
+        for role, job in (('netbsd', dict(result='success', outputs=dict(blocked='true'))),
+                          ('cygwin', dict(result='failure', outputs={})),
+                          ('linux', dict(result='success', outputs={}))):
+            jobs = {name: dict(result='success', outputs=dict(blocked='false')) for name in ci.ROLES}
+            jobs[role] = job
+            with self.subTest(role=role), patch.dict(os.environ, INTEROP_JOBS=json.dumps(jobs)), \
+                    patch.object(sys, 'argv', ['interop-host.py', 'result', 'all', '--root', str(self.root)]), \
+                    patch.dict(host['main'].__globals__, identity=lambda: self.state,
+                               records=lambda *args: self.fail('Incomplete endpoints reached receipt validation')), \
+                    patch('sys.stderr', new_callable=io.StringIO) as stderr:
+                self.assertEqual(host['main'](), 1)
+            self.assertIn(role, stderr.getvalue())
+        self.assertFalse((self.root / 'blocked.json').exists())
+
+    def test_result_requires_transfers_and_verified_cleanup(self):
+        jobs = {name: dict(result='success', outputs=dict(blocked='false')) for name in ci.ROLES}
+        valid = dict(passed=True, cleaned=True, roles=list(ci.ROLES))
+        for proof, expected in ((valid, 0), (dict(valid, passed=False), 1), (dict(valid, cleaned=False), 1),
+                                (dict(valid, roles=list(ci.ROLES)[:-1]), 1)):
+            with self.subTest(proof=proof), patch.dict(os.environ, INTEROP_JOBS=json.dumps(jobs)), \
+                    patch.object(sys, 'argv', ['interop-host.py', 'result', 'all', '--root', str(self.root)]), \
+                    patch.dict(host['main'].__globals__, identity=lambda: self.state,
+                               records=lambda *args: self.receipts(), published=lambda *args: proof), \
+                    patch('sys.stderr', new_callable=io.StringIO), patch('sys.stdout', new_callable=io.StringIO):
+                self.assertEqual(host['main'](), expected)
+
+    def test_controller_failure_still_fails_result(self):
+        jobs = {name: dict(result='success', outputs=dict(blocked='false')) for name in ci.ROLES}
+        with patch.dict(os.environ, INTEROP_JOBS=json.dumps(jobs)), \
+                patch.object(sys, 'argv', ['interop-host.py', 'result', 'all', '--root', str(self.root)]), \
+                patch.dict(host['main'].__globals__, identity=lambda: self.state, records=lambda *args: self.receipts(),
+                           published=unittest.mock.Mock(side_effect=ci.PeerUnavailable('Network controller failed'))), \
+                patch('sys.stderr', new_callable=io.StringIO):
+            self.assertEqual(host['main'](), 1)
+        self.assertFalse((self.root / 'blocked.json').exists())
 
     def test_denial_has_healthy_controls_before_and_after(self):
         ci.bind(self.state)
