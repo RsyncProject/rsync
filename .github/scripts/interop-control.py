@@ -6,7 +6,7 @@ import re
 import sys
 import time
 
-from interop_network import NetworkError, SLOTS, Tailnet, artifacts, context
+from interop_network import NetworkError, SLOTS, TAILNET_API, Tailnet, artifacts, context, validate_preflight
 from interop_policy import TAILNET, admission, update_policy
 
 
@@ -25,6 +25,7 @@ def receipts(phase, nodes):
 
 
 def prepare(root, api):
+    validate_preflight(json.loads((root / 'preflight.json').read_text()))
     nodes = artifacts('ready', SLOTS, timeout=300)
     devices = api.devices()
     ids, ips, grants, owned = set(), set(), [], []
@@ -33,7 +34,8 @@ def prepare(root, api):
                 or node.get('preferences') != {'RouteAll': False, 'CorpDNS': False}
                 or node.get('worker_exchange_succeeded') is not True
                 or set(node.get('authority_denials', {})) != {'controller_exchange', 'acl', 'devices'}
-                or any(type(code) is not int or code not in (401, 403) for code in node['authority_denials'].values())
+                or any(type(code) is not int or code not in ((401, 403) if key == 'controller_exchange' else (401, 403, 404))
+                       for key, code in node['authority_denials'].items())
                 or not isinstance(node.get('nonce'), str) or not re.fullmatch(r'[0-9a-f]{48}', node['nonce'])):
             raise ValueError('Invalid worker readiness')
         node_id, ip = node['node_id'], node['address']
@@ -118,7 +120,7 @@ def finish(root, api, lease):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('phase', choices=('prepare', 'admit', 'verify', 'revoke', 'finish'))
+    parser.add_argument('phase', choices=('preflight', 'prepare', 'admit', 'verify', 'revoke', 'finish'))
     parser.add_argument('--root', type=Path, required=True)
     args = parser.parse_args()
     root = args.root.resolve()
@@ -129,9 +131,11 @@ def main():
         if not path.exists() and args.phase in ('revoke', 'finish'):
             return 0
         api = Tailnet()
-        if args.phase == 'prepare':
+        if args.phase == 'preflight':
             api.devices()
             api.policy()
+            write(root, 'preflight', api=TAILNET_API, readable=['acl', 'devices'])
+        elif args.phase == 'prepare':
             prepare(root, api)
         else:
             lease = json.loads(path.read_text())
