@@ -93,12 +93,12 @@ assert not (ctl / 'sub' / 'intree-dropped').exists(), (
     'the in-tree .rsync-filter was not applied, so this control does not show '
     f'that merge files still work: stdout={got.stdout!r}, stderr={got.stderr!r}')
 
-# --confine-root direct, no wrapper: a source argument reached through a symlink
-# makes rsync's tracked cwd deeper than the kernel's, so a merge file's own
-# relative symlink resolves from one directory while the confinement check walks
-# from another.  Seeded lexically, a ".." that really escapes looks like it
-# landed back inside the root.  rrsync happens to reject the argument shapes
-# that reach this, so it is driven directly rather than through the wrapper.
+# Direct --confine-root test (via alias-rsh without the rrsync wrapper):
+# Reaching the source directory through a symlink ("self-alias -> .") makes
+# rsync's tracked lexical path deeper than the kernel's actual directory.
+# A naive lexical check on "outside-link -> ../aliased-secret" would think ".."
+# only stepped up from "self-alias" into "alias_root", when in reality the
+# kernel resolves ".." out of "alias_root" into the parent directory.
 alias_root = base / 'aliased'
 makepath(alias_root)
 (base / 'aliased-secret').write_text('aliased-word\n')
@@ -107,16 +107,21 @@ makepath(alias_root)
 os.symlink('.', alias_root / 'self-alias')
 os.symlink('../aliased-secret', alias_root / 'outside-link')
 (alias_root / 'intree-list').write_text('plain\n')
-
+alias_rsh = base / 'alias-rsh'
+alias_rsh.write_text(
+    '#!/bin/sh\nshift 2\nexec ' + rsync_path_arg(RSYNC)
+    + f' --confine-root={shlex.quote(str(alias_root))} "$@"\n'
+)
+alias_rsh.chmod(0o755)
 
 def confined_pull(filter_text, into):
     (alias_root / '.rsync-filter').write_text(filter_text + '\n')
     rmtree(into)
     into.mkdir(parents=True, exist_ok=True)
     return subprocess.run(
-        rsync_argv('-r', f'--confine-root={alias_root}',
-                   '--filter=:s .rsync-filter',
-                   f'{alias_root}/self-alias/', f'{into}/'),
+        rsync_argv('-r', '--filter=:s .rsync-filter',
+                   '-e', str(alias_rsh),
+                   f'ignored:{alias_root}/self-alias/', f'{into}/'),
         capture_output=True, text=True, timeout=20)
 
 
