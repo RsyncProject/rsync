@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import shutil
+import os
 from pathlib import Path
 from unittest.mock import patch
 
@@ -44,8 +44,13 @@ def test(context: TestContext):
         test_fail('checksum fixture does not preserve its quick-check attributes')
     if after['hardlinks'] != [['hardlink', 'nested/payload']] or 'obsolete' in after['entries']:
         test_fail('update fixture lost its links or deletion')
-    shutil.copytree(context.source, context.destination, symlinks=True)
-    if snapshot(context.destination) == after:
+    hardlink = context.source / 'hardlink'
+    contents = hardlink.read_bytes()
+    hardlink.unlink()
+    hardlink.write_bytes(contents)
+    hardlink.chmod(0o640)
+    os.utime(hardlink, (MTIME, MTIME))
+    if snapshot(context.source) != dict(after, hardlinks=[]):
         test_fail('fixture comparison missed split hard links')
 
 
