@@ -1,13 +1,12 @@
 import os
 from pathlib import Path
-import re
 import shutil
 import sys
 
 from harness import environment
 from harness.process import expect_fail
-from harness.results import test_fail
 from harness.rsync import rsync_argv
+from harness.ssh import write_rrsync
 
 def rsync_wrapper(path, *options):
     command = rsync_argv(*options)
@@ -23,20 +22,11 @@ def rrsync_shell(path, wrapper, restricted, *options):
     path.chmod(0o755)
 
 def patched_rrsync(workdir, rsync_path=None):
-    import re
     if rsync_path is None:
         rsync_path = shutil.which('true') or '/usr/bin/true'
     src = environment.SRCDIR / 'support' / 'rrsync'
     dst = Path(workdir) / 'rrsync-under-test'
-
-    text, n = re.subn(r"(?m)^RSYNC\s*=.*$",
-                      lambda _m: f"RSYNC = {rsync_path!r}",
-                      src.read_text())
-    if n != 1:
-        test_fail(f"patched_rrsync: expected exactly one 'RSYNC =' line in {src}, found {n}")
-    dst.write_text(text)
-    dst.chmod(0o755)
-    return dst
+    return write_rrsync(src, dst, rsync_path)
 
 def run_rrsync_denied(command, expected):
     base = environment.SCRATCHDIR / expected.replace(' ', '_').replace('/', '_')

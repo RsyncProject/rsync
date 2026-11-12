@@ -204,4 +204,4 @@ listen backlog, syslog facility, syslog tag | none | Missing
 
 ## Interoperability
 
-The interoperability test uses the shared seven-platform fixture through native daemon pushes and pulls. It checks bytes, modes, integer timestamps, relative and dangling symlink targets, hard-link groups, deletion and a checksum update whose file size and mtime stay unchanged. The transfer-fixture self-test checks the fixture and the 168-case plan, including all 30 directed non-Linux pairs. Connected SSH and daemon transfers between the seven systems remain to be implemented.
+The interoperability test uses the shared seven-platform fixture through native daemon pushes and pulls. It checks bytes, modes, integer timestamps, relative and dangling symlink targets, hard-link groups, deletion and a checksum update whose file size and mtime stay unchanged. Ubuntu runs the same fixture over real restricted SSH with pinned host keys and command and path refusal checks. The transfer-fixture self-test checks the fixture and the 168-case plan, including all 30 directed non-Linux pairs. Connected SSH and daemon transfers between the seven systems remain to be implemented.

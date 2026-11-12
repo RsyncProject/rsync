@@ -29,6 +29,8 @@ During execution, SIGTERM stops queued tests and terminates active test process 
 
 The `--use-tcp` option starts unauthenticated test daemons on loopback addresses and some fixtures enable unsafe daemon options. Other local users can reach those listeners. Use the default pipe transport on shared hosts. The `--daemon-tests-only` option limits a follow-up TCP pass to tests which can observe the transport choice.
 
+Ubuntu also runs tools/check-ssh.py against the installed binary. It requires root and OpenSSH, creates temporary host and client keys, pins the host key and restricts commands through support/rrsync. It checks transfers, deletion, checksum updates and refusals for arbitrary commands, parent-directory access and incorrect host keys. The listener is loopback-only and all keys are removed after the check.
+
 Historical binaries live in `old_versions/`. The runner's `--rsync-bin2` option selects the secondary binary and `--archived-role` identifies which side uses the archived release. The static Linux X86-64 peers omit OpenSSL and IDN support.
 
 ## Writing a test

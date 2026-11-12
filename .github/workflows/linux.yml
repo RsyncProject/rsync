@@ -77,7 +77,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev libidn2-dev python3-cmarkgfm openssl
+          sudo apt-get install acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev libidn2-dev python3-cmarkgfm openssl openssh-server
           sudo sysctl -w fs.protected_regular=2
           echo "/usr/local/bin" >>"$GITHUB_PATH"
           mkdir -p test-results
@@ -98,6 +98,9 @@ jobs:
             --rsync /usr/local/bin/rsync \
             --rsync-ssl /usr/local/bin/rsync-ssl \
             --openssl /usr/bin/openssl
+      - name: Verify restricted SSH
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: sudo python3 -S testsuite/tools/check-ssh.py --rsync /usr/local/bin/rsync --rrsync support/rrsync
       - name: Tests (root pipe)
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: sudo python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" "pipe,root,${{ matrix.profiles }}" "$PWD/test-results/root/pipe" -j8
