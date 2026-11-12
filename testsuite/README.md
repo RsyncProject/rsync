@@ -29,7 +29,7 @@ During execution, SIGTERM stops queued tests and terminates active test process 
 
 The `--use-tcp` option starts unauthenticated test daemons on loopback addresses and some fixtures enable unsafe daemon options. Other local users can reach those listeners. Use the default pipe transport on shared hosts. The `--daemon-tests-only` option limits a follow-up TCP pass to tests which can observe the transport choice.
 
-Ubuntu also runs tools/check-ssh.py against the installed binary. It requires root and OpenSSH, creates temporary host and client keys, pins the host key and restricts commands through support/rrsync. It checks transfers, deletion, checksum updates and refusals for arbitrary commands, parent-directory access and incorrect host keys. The listener is loopback-only and all keys are removed after the check.
+Ubuntu also runs tools/check-ssh.py against the installed binary. It uses OpenSSH with temporary host and client keys, pins the host key and restricts commands through support/rrsync. It checks transfers, deletion, checksum updates and refusals for arbitrary commands, parent-directory access and incorrect host keys. The listener is loopback-only and all keys are removed after the check.
 
 Historical binaries live in `old_versions/`. The runner's `--rsync-bin2` option selects the secondary binary and `--archived-role` identifies which side uses the archived release. The static Linux X86-64 peers omit OpenSSL and IDN support.
 
@@ -67,7 +67,7 @@ Individual tests use exit codes 0 for pass, 1 for failure, 2 for error and 77 fo
 
 [ci.yml](../.github/workflows/ci.yml) selects native tests, diagnostics, archive qualification and historical-peer checks for pull requests and master pushes. Scheduled runs divide daily and weekly work. The Versions group runs every archived release as both the primary and secondary executable over pipe and TCP. Valgrind runs root and non-root pipe and TCP checks in its own group. Clang 18 and Clang 21 are blocking checks.
 
-The separate Interoperability workflow follows CI runs for PRs, pushes and schedules, including fork PRs. Trusted controller code runs from the default branch. Workers have no OIDC permission and use encrypted single-use enrolment keys. The network checks exercise quarantine, two isolated pairs, revocation and cleanup. [Deployment and recovery](../.github/INTEROPERABILITY.md) describe the required identity and repository settings.
+The Interoperability group runs Linux, FreeBSD, NetBSD, OpenBSD, macOS, Solaris and Cygwin endpoints within PR CI, including fork PRs. Its 168 cases cover every directed platform pair, both client roles and SSH and daemon transports. A separate trusted controller handles network enrolment, admission and cleanup without executing candidate code. [Network access and recovery](../.github/INTEROPERABILITY.md) define the authentication and failure contracts.
 
 The interoperability test qualifies a common transfer fixture through native daemon pushes and pulls. It checks file data, modes, timestamps, hard links, symlink targets, checksum updates and deletions. The shared case plan covers all 42 directed pairs between Linux, FreeBSD, NetBSD, OpenBSD, macOS, Solaris and Cygwin, both client roles and SSH and daemon transports. Connected execution of those 168 cases remains the next stage.
 
