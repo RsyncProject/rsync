@@ -7,13 +7,15 @@
 # a follow-up --delete pass cleans up after a destination-side rename.
 
 import os
+import re
 import shlex
 import shutil
 import subprocess
 
+import rsyncfns
 from rsyncfns import (
-    FROMDIR, SRCDIR, TODIR,
-    checkit, hands_setup, runtest, test_skipped, rsync_path_arg, rsh_cmd,
+    FROMDIR, RSYNC_PEER, SRCDIR, TODIR,
+    checkit, hands_setup, runtest, test_skipped, rsync_path_arg, rsh_cmd, split_rsync_cmd,
 )
 
 
@@ -38,11 +40,16 @@ if probe.stdout.strip() != 'yes':
 
 print(f"Using remote shell: {SSH}")
 
+listing_args = shlex.split(rsyncfns.TLS_ARGS)
+compare_link_times = any(arg in ('-l', '--link-times') for arg in listing_args)
+if compare_link_times:
+    banner = subprocess.check_output(split_rsync_cmd(RSYNC_PEER) + ['--version'], text=True, timeout=10)
+    compare_link_times = re.search(r'(?<!no )\bsymtimes\b', ' '.join(banner.split())) is not None
+    if not compare_link_times:
+        rsyncfns.TLS_ARGS = shlex.join(arg for arg in listing_args if arg not in ('-l', '--link-times'))
 hands_setup()
-
-# RSYNC may be a multi-word command line; pass it through --rsync-path.
-from rsyncfns import RSYNC, RSYNC_PEER
-
+if compare_link_times:
+    os.utime(FROMDIR / 'nolf-symlink', (1_000_000_000, 1_000_000_000), follow_symlinks=False)
 
 def _basic():
     checkit(['-avH', '-e', SSH, f'--rsync-path={rsync_path_arg()}',
