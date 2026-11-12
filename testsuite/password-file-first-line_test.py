@@ -51,12 +51,17 @@ for source in ('file', 'stdin'):
         else:
             args.insert(1, '--password-file=-')
             stdin = subprocess.PIPE
-        proc = subprocess.run(rsync_argv(*args), input=contents if source == 'stdin' else None,
-                              stdin=stdin if source == 'file' else None,
+        run_kwargs = {}
+        if source == 'stdin':
+            run_kwargs['input'] = contents
+        elif source == 'file':
+            run_kwargs['stdin'] = stdin
+        proc = subprocess.run(rsync_argv(*args),
                               stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
                               text=False, timeout=20,
                               env={**os.environ, 'RSYNC_PASSWORD':
-                                   'wrong-fallback' if succeeds else PASSWORD.decode()})
+                                   'wrong-fallback' if succeeds else PASSWORD.decode()},
+                              **run_kwargs)
         passed = proc.returncode == 0
         if passed != succeeds:
             test_fail(f'{source}/{name}: expected success={succeeds}, '
