@@ -25,6 +25,65 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  linux:
+    name: Linux
+    if: &daily ${{ github.event_name != 'schedule' || github.event.schedule == '42 8 * * 0,2-6' || github.event.schedule == '42 8 * * 1' }}
+    uses: ./.github/workflows/linux.yml
+    with:
+      ubuntu: &weekly ${{ github.event_name != 'schedule' || github.event.schedule == '42 8 * * 1' }}
+      almalinux: *daily
+      alpine: *weekly
+
+  bsd:
+    name: BSD
+    if: *weekly
+    uses: ./.github/workflows/bsd.yml
+
+  macos:
+    name: macOS
+    if: *daily
+    uses: ./.github/workflows/macos.yml
+
+  other:
+    name: Other
+    if: &other ${{ github.event_name != 'schedule' || github.event.schedule == '42 8 * * 0,2-6' || github.event.schedule == '42 8 * * 1' }}
+    uses: ./.github/workflows/other.yml
+    with:
+      cygwin: *daily
+      solaris: *weekly
+
+  versions:
+    name: Versions
+    if: &versions ${{ github.event_name != 'schedule' || github.event.schedule == '52 8 * * 1' }}
+    uses: ./.github/workflows/versions.yml
+
+  android:
+    name: Android
+    if: *weekly
+    uses: ./.github/workflows/android.yml
+
+  archive:
+    name: Archive
+    if: *weekly
+    uses: ./.github/workflows/archive.yml
+
+  diagnostics:
+    name: Diagnostics
+    if: &diagnostics ${{ github.event_name != 'schedule' || github.event.schedule == '42 9 * * 1' }}
+    uses: ./.github/workflows/diagnostics.yml
+    with:
+      lint: &regular ${{ github.event_name != 'schedule' }}
+      python_37: *regular
+      asan: &instrumented ${{ github.event_name != 'schedule' || github.event.schedule == '42 9 * * 1' }}
+      coverage: *instrumented
+      clang_18: *regular
+      clang_21: *instrumented
+
+  valgrind:
+    name: Valgrind
+    if: &valgrind ${{ github.event_name != 'schedule' || github.event.schedule == '17 4 * * *' }}
+    uses: ./.github/workflows/valgrind.yml
+
   interoperability:
     name: Interoperability
     if: &interoperability ${{ github.event_name != 'schedule' }}
@@ -36,10 +95,19 @@ jobs:
   required:
     name: Required
     if: always()
-    needs: [interoperability]
+    needs: [linux, bsd, macos, other, versions, android, archive, diagnostics, valgrind, interoperability]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     env:
+      CI_EXPECT_LINUX: *daily
+      CI_EXPECT_BSD: *weekly
+      CI_EXPECT_MACOS: *daily
+      CI_EXPECT_OTHER: *other
+      CI_EXPECT_VERSIONS: *versions
+      CI_EXPECT_ANDROID: *weekly
+      CI_EXPECT_ARCHIVE: *weekly
+      CI_EXPECT_DIAGNOSTICS: *diagnostics
+      CI_EXPECT_VALGRIND: *valgrind
       CI_EXPECT_INTEROPERABILITY: *interoperability
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -49,5 +117,3 @@ jobs:
         env:
           CI_RESULTS: ${{ toJSON(needs) }}
         run: python3 -S .github/scripts/check-results.py
-      - name: Full CI required
-        run: python3 -c "raise SystemExit('Full CI is temporarily disabled')"
