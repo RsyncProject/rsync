@@ -91,7 +91,7 @@ def configure_network():
     result = subprocess.run(['sudo', 'tailscale', 'debug', 'prefs'], capture_output=True, timeout=15, check=True)
     prefs = json.loads(result.stdout)
     if any(prefs.get(key) is not False for key in ('RouteAll', 'CorpDNS')):
-        raise ValueError('Route or DNS acceptance is still enabled')
+        raise NetworkError('Route or DNS acceptance is still enabled')
     return {key: prefs[key] for key in ('RouteAll', 'CorpDNS')}
 
 
