@@ -201,3 +201,7 @@ socket options | daemon-module-options | Partial: the live socket path runs but 
 pid file, port, address | daemon-standalone-detach, daemon-address-family | Covered for configuration and CLI paths
 proxy protocol, proxy protocol hosts | daemon-proxy-protocol, proxy-protocol-trusted-peer | Covered for enabled, disabled and trusted-peer policy
 listen backlog, syslog facility, syslog tag | none | Missing
+
+## Interoperability
+
+The interoperability test uses the shared seven-platform fixture through native daemon pushes and pulls. It checks bytes, modes, integer timestamps, relative and dangling symlink targets, hard-link groups, deletion and a checksum update whose file size and mtime stay unchanged. The transfer-fixture self-test checks the fixture and the 168-case plan, including all 30 directed non-Linux pairs. Connected SSH and daemon transfers between the seven systems remain to be implemented.
