@@ -12,6 +12,7 @@ from fixtures import rrsync as rrsync_fixture
 from harness.process import quote_command
 from harness import daemon, process
 from harness.mutation import find_compiler
+from harness.mutation import run_mutating_transfer
 from harness import Exit, TestContext, requires, run
 from harness.process import (
     capture_command, expect_fail, forced_protocol, rsh_cmd, rsync_argv, rsync_argv_for, rsync_command_binary, rsync_path_arg,
@@ -120,6 +121,19 @@ def test(context: TestContext):
         test_fail('a successful command failed')
     if run_rsync(unsupported_command, check=False, capture_output=True).returncode != 1:
         test_fail('a failed command result was not returned')
+
+    mutated = []
+    output = StringIO()
+    with patch.dict(os.environ, RSYNC=supported_command), redirect_stderr(output):
+        try:
+            run_mutating_transfer(lambda source: None, lambda source: mutated.append(True), pacer_bytes=1024)
+        except SystemExit as error:
+            if error.code != Exit.FAIL or 'did not observe the pacer transfer' not in output.getvalue():
+                test_fail('an unobserved source mutation reported the wrong failure')
+        else:
+            test_fail('source mutation accepted a transfer which never started')
+    if mutated:
+        test_fail('source mutation ran before the transfer started')
 
     with patch.object(daemon.os, 'kill'), patch.object(daemon.subprocess, 'run') as run_ps:
         run_ps.return_value = SimpleNamespace(returncode=0, stdout='notrsync\n')

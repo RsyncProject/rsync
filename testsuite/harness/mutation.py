@@ -6,7 +6,6 @@ import shlex
 import shutil
 import subprocess
 import sys
-import threading
 import time
 from pathlib import Path
 from types import SimpleNamespace
@@ -249,7 +248,7 @@ def plant_operator_symlink(context, relative_anchor, kind='dir'):
             context.outside / 'sub')
 
 def run_mutating_transfer(setup, mutate, *, options=('-a',),
-                          pacer_bytes=6 * 1024 * 1024, bwlimit=1500, delay=0.6):
+                          pacer_bytes=6 * 1024 * 1024, bwlimit=1500):
     base = Path(os.environ['scratchdir']) / 'mutate'
     rmtree(base)
     source = base / 'source'
@@ -258,26 +257,40 @@ def run_mutating_transfer(setup, mutate, *, options=('-a',),
     destination.mkdir()
     make_data_file(source / 'aaa_pacer', pacer_bytes)
     setup(source)
+    tail = b'after mutation\n'
+    (source / 'zzzz_after').write_bytes(tail)
 
-    errors = []
-
-    def worker():
-        time.sleep(delay)
+    command = rsync_argv(os.environ['RSYNC'], *options, '--no-inc-recursive',
+                         f'--bwlimit={bwlimit}', f'{source}/', f'{destination}/')
+    with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) as process:
         try:
+            # The pacer starts after the non-incremental file list is complete
+            deadline = time.monotonic() + 30
+            while process.poll() is None and time.monotonic() < deadline:
+                try:
+                    writing = any(0 < path.stat().st_size < pacer_bytes
+                                  for path in destination.glob('.aaa_pacer.*'))
+                except FileNotFoundError:
+                    writing = False
+                if writing:
+                    break
+                time.sleep(0.01)
+            else:
+                test_fail('source mutation did not observe the pacer transfer')
             mutate(source)
-        except Exception as error:
-            errors.append(error)
-
-    thread = threading.Thread(target=worker)
-    thread.start()
-    result = subprocess.run(
-        rsync_argv(os.environ['RSYNC'], *options, '--no-inc-recursive',
-                   f'--bwlimit={bwlimit}', f'{source}/', f'{destination}/'),
-        capture_output=True, text=True,
-    )
-    thread.join()
-    if errors:
-        test_fail(f'test mutation failed: {errors[0]!r}')
+            stdout, stderr = process.communicate(timeout=60)
+            result = subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+        finally:
+            if process.poll() is None:
+                process.terminate()
+                try:
+                    process.communicate(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.communicate(timeout=5)
+    after = destination / 'zzzz_after'
+    if not after.is_file() or after.read_bytes() != tail:
+        test_fail('transfer did not preserve the file following the changed source')
     return result, source, destination
 
 def assert_no_protocol_abort(result):
