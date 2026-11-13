@@ -434,53 +434,25 @@ test: check
 # This depends on building rsync; if we need any helper programs it
 # should depend on them too.
 
-# We try to run the scripts with POSIX mode on, in the hope that will
-# catch Bash-isms earlier even if we're running on GNU.  Of course, we
-# might lose in the future where POSIX diverges from old sh.
-
-# `make check` runs tests in parallel by default. Override with
-# `make check CHECK_J=1` (serial) or any other value.
+# Test parallelism; CHECK_J=1 runs serially.
 CHECK_J = 8
 
-# Parallelism for `make coverage`. Defaults to the same as CHECK_J: the
-# coverage build sets -fprofile-update=atomic (atomic in-memory counters) and
-# gcc's libgcov serializes the per-source .gcda read-modify-write merge with a
-# file lock, so concurrent rsync processes (incl. the forked sender/generator/
-# receiver) accumulate exactly -- verified by a count-linearity check (a hot
-# line accumulates identically at -j1 and -P16). Override with
-# `make coverage COVERAGE_J=1` if your libgcov does not lock .gcda merges.
+# Coverage uses atomic counters and libgcov file locks. Set COVERAGE_J=1
+# with a toolchain which cannot merge counters from concurrent processes.
 COVERAGE_J = $(CHECK_J)
 
-# Output directory and extra runtests.py flags for `make coverage`. The
-# `coverage-tcp` target reuses the coverage recipe with --use-tcp (real
-# loopback rsyncd, which exercises the TCP accept/auth path and the
-# require_tcp-only tests) and a separate output directory.
+# Report directory and extra runner options for coverage targets.
 COVERAGE_DIR = coverage
 COVERAGE_RUNFLAGS =
 
-# Excluded from the coverage report so the percentages reflect rsync's own
-# runtime source.  Three buckets:
-#  (1) Bundled third-party code rsync ships but does not own: zlib/, popt/, and
-#      the named lib/ imports (PostgreSQL getaddrinfo, ISC inet_ntop/inet_pton,
-#      standalone getpass).  The other lib/*.c are rsync's own and stay in.
-#  (2) Test-helper / build-time programs that link against rsync objects but are
-#      not the rsync runtime: t_*.c, tls.c, wildtest.c, testrun.c, getgroups.c,
-#      getfsdev.c, trimslash.c, rounding.c.  These have their own main() and are
-#      either driven directly by a test (counted there) or are configure-time
-#      probes; counting them as "rsync uncovered" is noise.
-#  (3) Compile-time-dead fallbacks under this build's config.h: lib/md5.c (the
-#      reference md5 -- openssl's EVP path is used when HAVE_OPENSSL) and
-#      lib/snprintf.c (only the #include line survives under
-#      HAVE_C99_VSNPRINTF).  Covering these would mean a separate non-openssl /
-#      non-C99 build, which is out of scope for this report.
+# Exclude bundled dependencies, standalone helpers and fallbacks unused by
+# the OpenSSL and C99 coverage build.
 COVERAGE_EXCLUDE = -e '(^|/)zlib/' -e '(^|/)popt/' \
 	-e '(^|/)lib/(getaddrinfo|getpass|inet_ntop|inet_pton)\.' \
 	-e '(^|/)(t_[a-z_]+|tls|wildtest|testrun|getgroups|getfsdev|trimslash|rounding)\.c$$' \
 	-e '(^|/)lib/(md5|snprintf)\.c$$'
 
-# Build everything the test suite needs (rsync + helper programs + symlinks)
-# WITHOUT running it. Used by CI jobs that invoke testsuite/runtests.py
-# directly with options such as --rsync-bin2 and --profiles.
+# Build test prerequisites without running the suite.
 .PHONY: check-progs
 check-progs: all $(CHECK_PROGS) $(CHECK_COMPILE_OBJS) $(CHECK_SYMLINKS)
 
@@ -496,27 +468,15 @@ check29: all $(CHECK_PROGS) $(CHECK_COMPILE_OBJS) $(CHECK_SYMLINKS)
 check30: all $(CHECK_PROGS) $(CHECK_COMPILE_OBJS) $(CHECK_SYMLINKS)
 	"$(srcdir)/testsuite/runtests.py" --rsync-bin="`pwd`/rsync$(EXEEXT)" -j $(CHECK_J) --protocol=30
 
-# Whole-suite gcov coverage report (HTML, with branch + decision coverage).
-# Requires a build configured with --enable-coverage and the `gcovr` tool
-# (pip install gcovr). Runs the suite in parallel (COVERAGE_J, default CHECK_J):
-# this is safe because the coverage build uses -fprofile-update=atomic and
-# libgcov locks the per-source .gcda during its merge, so concurrent rsync
-# processes accumulate exactly (see COVERAGE_J above). Use COVERAGE_J=1 if your
-# toolchain's libgcov does not lock .gcda merges.
+# HTML branch and decision coverage; requires --enable-coverage and gcovr.
 .PHONY: coverage
 coverage: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	@case '$(CFLAGS)' in *--coverage*) ;; \
 	  *) echo "*** not a coverage build; reconfigure with --enable-coverage"; exit 1 ;; esac
 	@command -v gcovr >/dev/null 2>&1 || { echo "*** gcovr not found (pip install gcovr)"; exit 1; }
 	find . -name '*.gcda' -delete
-	@# Daemon modules with `uid = <non-root>` setuid the per-connection child
-	@# (and so the forked generator/receiver), which then cannot create or
-	@# merge .gcda files in a root-owned build dir -- silently dropping ALL
-	@# coverage from those processes.  Make every .gcno's directory
-	@# world-writable so any uid can create the sibling .gcda, and set a
-	@# default ACL of o::rw so the .gcda are world-mergeable regardless of
-	@# the creator's umask (every test process resets umask to 022 via
-	@# harness/rsync.py, so a Makefile-level `umask 0` would not survive).
+	@# Setuid daemon workers need to create and merge counters despite the
+	@# harness umask. Only run coverage in a disposable build directory.
 	@find . -name '*.gcno' -printf '%h\n' 2>/dev/null | sort -u | \
 	  while read d; do \
 	    chmod a+rwx "$$d"; \
@@ -533,27 +493,19 @@ coverage: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	  fi; \
 	  exit $$rc
 
-# Same as `make coverage` but with the daemon tests run over a real loopback
-# rsyncd (--use-tcp), into a separate report directory.
+# TCP daemon coverage in a separate report directory.
 .PHONY: coverage-tcp
 coverage-tcp:
 	$(MAKE) coverage COVERAGE_RUNFLAGS=--use-tcp COVERAGE_DIR=coverage-tcp
 
-# Comprehensive single report: run the suite under several configurations,
-# accumulating into the shared .gcda counters (NOT cleared between runs), then
-# emit one merged, rsync-scoped report. Covers the default (pipe) transport, the
-# protocol-29/30 compat branches, and the real-TCP daemon path (which also runs
-# the require_tcp-only tests). Run under sudo to additionally cover root-only
-# paths (devices, chown, use-chroot, protected-regular). Local target -- CI uses
-# the plain `coverage`/`coverage-tcp` targets.
+# Combine default-protocol, protocol-29, protocol-30 and TCP coverage.
 .PHONY: coverage-all
 coverage-all: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	@case '$(CFLAGS)' in *--coverage*) ;; \
 	  *) echo "*** not a coverage build; reconfigure with --enable-coverage"; exit 1 ;; esac
 	@command -v gcovr >/dev/null 2>&1 || { echo "*** gcovr not found (pip install gcovr)"; exit 1; }
 	find . -name '*.gcda' -delete
-	@# See the `coverage` target above for why: setuid'd daemon children must
-	@# be able to create/merge .gcda owned by a different uid.
+	@# Allow setuid workers to write counters as in the coverage target.
 	@find . -name '*.gcno' -printf '%h\n' 2>/dev/null | sort -u | \
 	  while read d; do \
 	    chmod a+rwx "$$d"; \
@@ -574,9 +526,8 @@ coverage-all: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	  fi; \
 	  exit $$rc
 
-# Coverage for the portable (non-openat2) resolver tier. Requires a SEPARATE
-# build configured with --enable-coverage --disable-openat2: its .gcno differ
-# from the openat2 build, so this report cannot be merged with the others.
+# Use a separate --enable-coverage --disable-openat2 build; its counters
+# cannot be merged with the openat2 build.
 .PHONY: coverage-fallback
 coverage-fallback:
 	$(MAKE) coverage COVERAGE_DIR=coverage-fallback
