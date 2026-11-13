@@ -2,6 +2,7 @@
 
 import os
 from shutil import copy2
+from unittest.mock import patch
 
 from harness import TestContext, requires, run
 from harness.filesystem import (
@@ -68,6 +69,21 @@ def test(context: TestContext):
     removable_file.write_text('data\n')
     rmtree(removable_file)
     assert_not_exists(removable_file)
+
+    for error in (PermissionError('blocked'), FileNotFoundError('missing child')):
+        with patch('harness.filesystem.shutil.rmtree', side_effect=error) as remove:
+            try:
+                rmtree(target)
+            except OSError:
+                pass
+            else:
+                test_fail('directory removal silently ignored a persistent failure')
+            if remove.call_count != 8:
+                test_fail('directory removal did not retain its bounded retries')
+    with patch('harness.filesystem.shutil.rmtree', side_effect=[OSError('busy'), None]) as remove:
+        rmtree(target)
+        if remove.call_count != 2:
+            test_fail('directory removal did not retry a transient failure')
 
     rmtree(root)
     assert_not_exists(root)

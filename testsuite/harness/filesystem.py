@@ -27,7 +27,7 @@ def makepath(*paths) -> None:
 
 def rmtree(path) -> None:
     path = Path(path)
-    for _ in range(8):
+    for attempt in range(8):
         try:
             mode = path.lstat().st_mode
         except FileNotFoundError:
@@ -38,10 +38,13 @@ def rmtree(path) -> None:
             else:
                 path.unlink()
             return
-        except FileNotFoundError:
-            return
         except OSError:
-            continue
+            if attempt == 7:
+                try:
+                    path.lstat()
+                except FileNotFoundError:
+                    return
+                raise
 
 def allocated_size(path) -> int:
     return os.stat(path).st_blocks * 512
