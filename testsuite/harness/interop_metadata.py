@@ -16,8 +16,16 @@ FEATURES = {
 
 
 def command(*args, **kwargs):
-    return subprocess.run(list(map(str, args)), check=True, capture_output=True, timeout=60,
-                          env=dict(os.environ, LC_ALL='C'), **kwargs).stdout
+    try:
+        return subprocess.run(list(map(str, args)), check=True, capture_output=True, timeout=60,
+                              env=dict(os.environ, LC_ALL='C'), **kwargs).stdout
+    except FileNotFoundError as error:
+        raise ValueError(f'{args[0]}: required command not found') from error
+    except subprocess.TimeoutExpired as error:
+        raise ValueError(f'{args[0]}: exceeded 60 seconds') from error
+    except subprocess.CalledProcessError as error:
+        message = (error.stderr or b'').decode('utf-8', 'replace').strip()[-2048:]
+        raise ValueError(f'{args[0]} exited {error.returncode}: {message}') from error
 
 
 def metadata_cases():
@@ -81,7 +89,11 @@ def read_acl(path, role):
         entries = [match[1] for line in text.splitlines()
                    for match in [re.fullmatch(r'\s*\d+: (.+)', line)] if match]
         return entries
-    return parse_acl(command('getfacl', *([] if role == 'solaris' else ['-n']), path).decode())
+    result = parse_acl(command('getfacl', *([] if role == 'solaris' else ['-n']), path).decode())
+    if role == 'freebsd' and path.is_dir():
+        default = parse_acl(command('getfacl', '-n', '-d', path).decode())
+        result.update({'default:' + key: value for key, value in default.items()})
+    return result
 
 
 def set_acl(path, role, phase):
@@ -100,7 +112,7 @@ def set_acl(path, role, phase):
                'mask::' + group, 'other::---']
     if phase == 1:
         entries.append('group:544:---')
-    if directory:
+    if directory and role != 'freebsd':
         entries += ['default:' + entry for entry in entries]
     if role in ('solaris', 'cygwin'):
         if role == 'solaris':
@@ -111,6 +123,8 @@ def set_acl(path, role, phase):
         if directory:
             command('setfacl', '-k', path)
         command('setfacl', '-m', ','.join(entries), path)
+        if directory and role == 'freebsd':
+            command('setfacl', '-d', '-m', ','.join(entries), path)
 
 
 def seed_metadata(root, role, kind, phase=1):

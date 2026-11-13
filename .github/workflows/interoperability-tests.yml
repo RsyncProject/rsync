@@ -170,7 +170,7 @@ jobs:
         with:
           copyback: 'false'
           cache-after-prepare: true
-          prepare: pkg install bash automake gnu-m4 pkg://solaris/runtime/python-35 autoconf gcc git
+          prepare: pkg install bash automake gnu-m4 pkg://solaris/runtime/python-35 autoconf gcc git system/file-system/ufs
           run: ./configure --disable-md2man --disable-zstd --disable-xxhash --disable-lz4 --disable-idn && make
       - name: Transfers
         id: transfers

@@ -16,6 +16,43 @@ endpoint = runpy.run_path(str(Path(__file__).with_name('interop-endpoint.py')))
 
 
 class Attributes(unittest.TestCase):
+    def test_command_failures_identify_the_tool(self):
+        failures = [FileNotFoundError(2, 'missing'),
+                    subprocess.CalledProcessError(1, ['newfs'], stderr=b'cannot format device\n'),
+                    subprocess.TimeoutExpired(['newfs'], 60)]
+        for failure in failures:
+            with self.subTest(failure=failure), patch.object(metadata.subprocess, 'run', side_effect=failure), \
+                    self.assertRaisesRegex(ValueError, 'newfs'):
+                metadata.command('newfs', '/dev/fixture')
+        with patch.object(metadata.subprocess, 'run', side_effect=failures[1]), \
+                self.assertRaisesRegex(ValueError, 'cannot format device'):
+            metadata.command('newfs', '/dev/fixture')
+
+    def test_freebsd_default_acls_are_separate(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)
+            for phase in (1, 2):
+                with self.subTest(phase=phase), patch.object(metadata, 'command') as command:
+                    metadata.set_acl(path, 'freebsd', phase)
+                    calls = [call[0] for call in command.call_args_list]
+                    self.assertEqual(calls[:2], [('setfacl', '-b', path), ('setfacl', '-k', path)])
+                    self.assertEqual(calls[2][:2], ('setfacl', '-m'))
+                    self.assertEqual(calls[3][:3], ('setfacl', '-d', '-m'))
+                    self.assertEqual(calls[2][2], calls[3][3])
+                    self.assertNotIn('default:', calls[2][2])
+                    self.assertEqual('group:544:' in calls[2][2], phase == 1)
+            access = b'user::rwx\ngroup::r-x\nother::---\n'
+            default = b'user::rwx\ngroup::---\nother::---\n'
+            with patch.object(metadata, 'command', side_effect=[access, default]) as command:
+                result = metadata.read_acl(path, 'freebsd')
+                self.assertEqual(result['group:'], 'r-x')
+                self.assertEqual(result['default:group:'], '---')
+                self.assertEqual(command.call_args_list[1][0], ('getfacl', '-n', '-d', path))
+            path.joinpath('file').touch()
+            with patch.object(metadata, 'command', return_value=access) as command:
+                metadata.read_acl(path / 'file', 'freebsd')
+                self.assertEqual(command.call_count, 1)
+
     def test_case_contract(self):
         self.assertEqual(set(metadata.FEATURES), set(PLATFORMS))
         cases = metadata.metadata_cases()
