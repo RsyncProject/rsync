@@ -111,7 +111,8 @@ def test(context: TestContext):
     if identity['source_revision'] is not None and not isinstance(identity['source_dirty'], bool):
         test_fail('source revision has no working-tree state')
     if (context.repository / '.git').exists() and shutil.which('git'):
-        git = ['git', '--no-optional-locks', '-c', f'safe.directory={context.repository.resolve()}',
+        git = ['git', '--no-optional-locks', '--git-dir=' + str(context.repository.resolve() / '.git'),
+               '--work-tree=' + str(context.repository.resolve()),
                '-C', str(context.repository)]
         revision = subprocess.run(git + ['rev-parse', 'HEAD'], capture_output=True, text=True, timeout=30)
         status = subprocess.run(git + ['status', '--porcelain'], capture_output=True, text=True, timeout=30)
@@ -125,7 +126,11 @@ def test(context: TestContext):
     for error in (FileNotFoundError('git'), subprocess.CalledProcessError(1, 'git'),
                   subprocess.TimeoutExpired('git', 30)):
         with patch.object(runner.subprocess, 'run', side_effect=error):
-            if runner.source_identity(checkout) != (None, None):
+            try:
+                runner.source_identity(checkout)
+            except ValueError:
+                pass
+            else:
                 test_fail('unavailable Git metadata was accepted')
     if not (output / 'run.log').is_file() or not (output / 'scratch' / 'testtmp').is_dir():
         test_fail('recipe did not isolate its log and scratch')

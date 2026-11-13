@@ -304,7 +304,8 @@ def validate_run_paths(tooldir, srcdir, rsync_bin, rsync_bin2):
             raise ValueError(f'not an archived peer: {path.name}')
         record = records[path.name]
         version = path.name[len('rsync_'):]
-        command = ['git', '--no-optional-locks', '-c', f'safe.directory={Path(srcdir).resolve()}',
+        command = ['git', '--no-optional-locks', '--git-dir=' + str(Path(srcdir).resolve() / '.git'),
+                   '--work-tree=' + str(Path(srcdir).resolve()),
                    '-C', srcdir, 'rev-parse', '--verify', f'refs/tags/v{version}^{{commit}}']
         try:
             source = subprocess.check_output(command, text=True, stderr=subprocess.DEVNULL, timeout=30).strip()
