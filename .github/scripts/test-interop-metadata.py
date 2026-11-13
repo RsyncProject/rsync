@@ -58,7 +58,7 @@ class Attributes(unittest.TestCase):
             path = Path(directory)
             with patch.object(metadata, 'command') as command:
                 metadata.set_acl(path, 'solaris', 1)
-                self.assertEqual(command.call_args[0][0], 'chmod')
+                self.assertEqual(command.call_args[0][0], '/usr/bin/chmod')
                 self.assertTrue(command.call_args[0][1].startswith('A=user::rwx,'))
                 self.assertIn('group:545:r-x', command.call_args[0][1])
                 self.assertIn('default:group:545:r-x', command.call_args[0][1])
@@ -81,7 +81,7 @@ class Attributes(unittest.TestCase):
                 result = metadata.read_acl(path, 'solaris')
                 self.assertEqual(result['group:545'], 'r-x')
                 self.assertEqual(result['default:group:545'], 'r-x')
-                self.assertEqual(command.call_args[0], ('ls', '-Vd', path))
+                self.assertEqual(command.call_args[0], ('/usr/bin/ls', '-Vd', path))
 
     def test_case_contract(self):
         self.assertEqual(set(metadata.FEATURES), set(PLATFORMS))

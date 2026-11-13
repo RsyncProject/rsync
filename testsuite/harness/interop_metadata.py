@@ -90,7 +90,7 @@ def read_acl(path, role):
                    for match in [re.fullmatch(r'\s*\d+: (.+)', line)] if match]
         return entries
     if role == 'solaris':
-        text = command('ls', '-Vd', path).decode()
+        text = command('/usr/bin/ls', '-Vd', path).decode()
         entries = [match[1] for line in text.splitlines()
                    for match in [re.fullmatch(r'\s*\d+:(.+)', line)] if match]
         return parse_acl('\n'.join(entries))
@@ -121,7 +121,7 @@ def set_acl(path, role, phase):
         entries += ['default:' + entry for entry in entries]
     if role == 'solaris':
         entries = [entry.replace('mask::', 'mask:').replace('other::', 'other:') for entry in entries]
-        command('chmod', 'A=' + ','.join(entries), path)
+        command('/usr/bin/chmod', 'A=' + ','.join(entries), path)
     elif role == 'cygwin':
         command('setfacl', '-s', ','.join(entries), path)
     else:
