@@ -1,0 +1,187 @@
+import json
+from functools import lru_cache
+import os
+import re
+import time
+
+from interop_network import NetworkError, decode, download_records, fetch
+from interop_policy import ROLES
+
+API = 'https://api.github.com/repos/RsyncProject/rsync'
+WORKFLOW = 'RsyncProject/rsync/.github/workflows/interoperability-tests.yml@'
+bound = None
+api_cache = {}
+
+
+class NotSelected(NetworkError):
+    pass
+
+
+class PeerUnavailable(NetworkError):
+    pass
+
+
+def api(path):
+    cached = api_cache.get(path)
+    try:
+        body, headers = fetch(API + path, os.environ['GH_TOKEN'],
+                              headers={'If-None-Match': cached[0]} if cached else {}, operation='Read CI identity')
+    except NetworkError as error:
+        if error.code == 304 and cached:
+            return cached[1]
+        raise
+    value = decode(body)
+    if headers.get('ETag'):
+        api_cache[path] = headers['ETag'], value
+    return value
+
+
+@lru_cache(maxsize=1)
+def source():
+    if os.environ.get('GITHUB_REPOSITORY_ID') != '266877886':
+        raise NetworkError('Unexpected CI repository')
+    event_name = os.environ['GITHUB_EVENT_NAME']
+    if event_name == 'workflow_run':
+        with open(os.environ['GITHUB_EVENT_PATH']) as stream:
+            event = json.load(stream)
+        upstream = event['workflow_run']
+        if event.get('action') != 'in_progress' or upstream.get('name') != 'CI':
+            raise NetworkError('Unexpected triggering workflow')
+        run_id, attempt = upstream['id'], upstream['run_attempt']
+    elif event_name in ('pull_request', 'push', 'schedule', 'workflow_dispatch'):
+        run_id, attempt = int(os.environ['GITHUB_RUN_ID']), int(os.environ['GITHUB_RUN_ATTEMPT'])
+    else:
+        raise NetworkError('Unexpected CI event')
+    if type(run_id) is not int or run_id < 1 or type(attempt) is not int or attempt < 1:
+        raise NetworkError('Invalid CI run identity')
+    run = api('/actions/runs/' + str(run_id))
+    if (run.get('name') == 'CI' and run.get('repository', {}).get('id') == 266877886
+            and run.get('path') != '.github/workflows/ci.yml'):
+        raise NotSelected('CI uses a different workflow')
+    if (run.get('path') != '.github/workflows/ci.yml' or run.get('name') != 'CI'
+            or run.get('id') != run_id or run.get('repository', {}).get('id') != 266877886 or run.get('run_attempt') != attempt
+            or run.get('event') not in ('pull_request', 'push', 'schedule', 'workflow_dispatch')):
+        raise NetworkError('CI run does not match its event')
+    references = [item for item in run.get('referenced_workflows', []) if item.get('path', '').startswith(WORKFLOW)]
+    deadline = time.monotonic() + 180
+    while not references and run.get('status') in ('queued', 'in_progress') and time.monotonic() < deadline:
+        time.sleep(5)
+        run = api('/actions/runs/' + str(run_id))
+        if run.get('run_attempt') != attempt:
+            raise NetworkError('CI attempt changed during workflow selection')
+        references = [item for item in run.get('referenced_workflows', []) if item.get('path', '').startswith(WORKFLOW)]
+    if len(references) != 1 or not re.fullmatch(r'[0-9a-f]{40}', references[0].get('sha', '')):
+        if not references:
+            raise NotSelected('CI has not selected the interoperability workflow')
+        raise NetworkError('CI has an invalid interoperability workflow selection')
+    if run.get('status') == 'completed':
+        raise NotSelected('CI has already completed')
+    return dict(run_id=str(run_id), run_attempt=str(attempt), source_sha=references[0]['sha'], head_sha=run['head_sha'])
+
+
+def identity():
+    if bound is not None:
+        return dict(bound)
+    return {key: value for key, value in source().items() if key != 'head_sha'}
+
+
+def bind(record):
+    global bound
+    state = {key: record.get(key) for key in ('run_id', 'run_attempt', 'source_sha')}
+    if (any(not isinstance(state[key], str) or not re.fullmatch(r'[1-9][0-9]*', state[key]) for key in ('run_id', 'run_attempt'))
+            or not isinstance(state['source_sha'], str) or not re.fullmatch(r'[0-9a-f]{40}', state['source_sha'])):
+        raise NetworkError('Invalid journal identity')
+    bound = state
+
+
+def artifact_name(kind, role=None):
+    return 'interoperability-' + identity()['run_attempt'] + '-' + kind + ('-' + role if role else '')
+
+
+def validate(record, state=None):
+    state = identity() if state is None else state
+    if not isinstance(record, dict) or any(record.get(key) != value for key, value in state.items()):
+        raise NetworkError('Record belongs to a different CI run, attempt or revision')
+    return record
+
+
+def records(kind, roles=ROLES, run_id=None, timeout=600):
+    state = identity()
+    expected = {artifact_name(kind, role): role for role in roles}
+    checked = [0]
+    def active():
+        if time.monotonic() - checked[0] < 30:
+            return
+        checked[0] = time.monotonic()
+        current = api('/actions/runs/' + state['run_id'])
+        if (current.get('run_attempt') != int(state['run_attempt']) or current.get('conclusion') == 'cancelled'
+                or current.get('status') == 'completed'):
+            raise NetworkError('CI was cancelled or superseded')
+        jobs = api('/actions/runs/' + state['run_id'] + '/attempts/' + state['run_attempt'] + '/jobs?per_page=100')
+        count = jobs.get('total_count')
+        if type(count) is not int or not 0 <= count <= 1000:
+            raise NetworkError('CI job listing exceeds limit')
+        listing = list(jobs.get('jobs', []))
+        for page in range(2, (count + 99) // 100 + 1):
+            listing += api('/actions/runs/' + state['run_id'] + '/attempts/' + state['run_attempt']
+                           + '/jobs?per_page=100&page=' + str(page))['jobs']
+        failed = [job['name'][len('Interoperability / '):] for job in listing
+                  if job.get('name', '').startswith('Interoperability / ') and job.get('conclusion') in (
+                      'failure', 'cancelled', 'timed_out', 'action_required')]
+        if failed:
+            raise PeerUnavailable('Unavailable endpoints: ' + ', '.join(failed))
+    return {role: validate(record, state) for role, (record, _) in
+            download_records(run_id or state['run_id'], expected, timeout, progress=active).items()}
+
+
+def find_controller(exclude=None):
+    state = source()
+    title = f"Network CI {state['run_id']} attempt {state['run_attempt']}"
+    runs = api('/actions/workflows/interoperability.yml/runs?branch=master&event=workflow_run&per_page=100')['workflow_runs']
+    for run in sorted(runs, key=lambda value: value['id']):
+        if run.get('display_title') != title or str(run['id']) == exclude:
+            continue
+        if (run.get('path') != '.github/workflows/interoperability.yml'
+                or run.get('head_branch') != 'master' or run.get('event') != 'workflow_run'
+                or run.get('repository', {}).get('id') != 266877886):
+            raise NetworkError('Controller does not match the trusted workflow revision')
+        name = 'interoperability-context-' + str(run['run_attempt'])
+        listing = api('/actions/runs/' + str(run['id']) + '/artifacts?per_page=100')
+        if type(listing.get('total_count')) is not int or not 0 <= listing['total_count'] <= 100:
+            raise NetworkError('Controller artifact listing exceeds limit')
+        matches = [item for item in listing['artifacts'] if item.get('name') == name and item.get('expired') is False]
+        if not matches:
+            continue
+        if len(matches) != 1:
+            raise NetworkError('Duplicate controller context')
+        metadata = download_records(str(run['id']), {name: None}, timeout=60)[None][0]
+        validate(metadata, {key: value for key, value in state.items() if key != 'head_sha'})
+        if (metadata.get('control_run_id') != str(run['id'])
+                or metadata.get('control_attempt') != str(run['run_attempt'])
+                or metadata.get('control_sha') != run['head_sha']):
+            raise NetworkError('Controller context has a different signing revision')
+        return run
+    return None
+
+
+def controller():
+    deadline = time.monotonic() + 1800
+    while time.monotonic() < deadline:
+        run = find_controller()
+        if run is not None:
+            if run.get('conclusion') in ('failure', 'cancelled', 'timed_out'):
+                raise PeerUnavailable('Network controller failed')
+            return str(run['id'])
+        time.sleep(5)
+    raise NetworkError('Trusted controller did not start')
+
+
+def published(kind, timeout=600):
+    return records(kind, (None,), controller(), timeout)[None]
+
+
+def write(root, kind, **data):
+    path = root / (kind + '.json')
+    temporary = path.with_suffix('.tmp')
+    temporary.write_text(json.dumps(dict(identity(), **data), sort_keys=True) + '\n')
+    temporary.replace(path)

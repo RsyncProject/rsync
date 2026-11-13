@@ -5,12 +5,14 @@ import os
 import platform
 import subprocess
 
-from rsyncfns import FROMDIR, SCRATCHDIR, SRCDIR, rsync_argv, start_test_daemon, test_fail, test_skipped
+from rsyncfns import FROMDIR, SCRATCHDIR, SRCDIR, USE_TCP, rsync_argv, start_test_daemon, test_fail, test_skipped
 
 
 def test():
     if platform.system() != 'Linux' or os.environ.get('ASAN_OPTIONS'):
         test_skipped('chroot fault injection needs Linux without ASan')
+    if USE_TCP:
+        test_skipped('fault injection requires the pipe transport')
     if 'valgrind' in rsync_argv()[0]:
         test_skipped('Valgrind logs are outside the daemon chroot')
     pid = os.fork()

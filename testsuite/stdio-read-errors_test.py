@@ -8,12 +8,14 @@ import signal
 import subprocess
 import sys
 
-from rsyncfns import FROMDIR, SCRATCHDIR, SRCDIR, rsync_argv, start_test_daemon, test_fail, test_skipped
+from rsyncfns import FROMDIR, SCRATCHDIR, SRCDIR, USE_TCP, rsync_argv, start_test_daemon, test_fail, test_skipped
 
 
 def test():
     if platform.system() != 'Linux' or os.environ.get('ASAN_OPTIONS'):
         test_skipped('stdio fault injection needs Linux without ASan')
+    if USE_TCP:
+        test_skipped('fault injection requires the pipe transport')
     library = SCRATCHDIR / 'stdio-error.so'
     fixture = SRCDIR / 'testsuite/stdio-error.c'
     build = subprocess.run(['cc', '-shared', '-fPIC', '-o', str(library), str(fixture), '-ldl'], capture_output=True, text=True)
