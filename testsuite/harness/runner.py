@@ -336,12 +336,11 @@ def main():
             print(f"Excluding {before - len(tests)} test(s) matching: "
                   f"{', '.join(excl)}")
 
-    if args.daemon_tests_only:
-        tests, dropped = config.select_daemon_tests(tests)
-        print(f'Daemon-transport tests only: running {len(tests)}, skipping '
-              f'{len(dropped)} test(s) that cannot observe the transport')
-
     try:
+        if args.daemon_tests_only:
+            tests, excluded = config.select_transport_tests(tests, 'tcp')
+            print(f'Daemon-transport tests: {len(tests)} selected, '
+                  f'{sum(len(group["tests"]) for group in excluded)} excluded')
         (tests, profiles, profile_version, effective_protocol,
          profile_unsupported, transport,
          not_applicable) = config.configure_profiles(

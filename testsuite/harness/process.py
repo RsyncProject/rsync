@@ -57,8 +57,8 @@ def run_rsync(command: str, *args: str, check: bool = True,
         test_fail(f"rsync exited {result.returncode}: {' '.join(argv)}")
     return result
 
-def capture_command(argv):
-    result = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+def capture_command(argv, *, env=None, cwd=None):
+    result = subprocess.run(argv, capture_output=True, text=True, env=env, cwd=cwd)
     return result, (result.stdout or '') + (result.stderr or '')
 
 @functools.lru_cache(maxsize=64)
@@ -106,9 +106,7 @@ def process_thread_count(pid: int) -> int:
     return -1
 
 def expect_fail(argv, text, env=None, cwd=None):
-    proc = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                          text=True, env=env, cwd=cwd)
-    out = (proc.stdout or '') + (proc.stderr or '')
+    proc, out = capture_command(argv, env=env, cwd=cwd)
     if proc.returncode == 0:
         test_fail(f"command unexpectedly succeeded: {argv!r}\n{out}")
     if text not in out:

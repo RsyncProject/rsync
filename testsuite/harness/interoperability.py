@@ -1,7 +1,7 @@
-import hashlib
 import os
 import platform
 import stat
+from .process import file_digest
 
 PLATFORMS = {'linux': 'Linux', 'freebsd': 'FreeBSD', 'netbsd': 'NetBSD', 'openbsd': 'OpenBSD',
              'macos': 'Darwin', 'solaris': 'SunOS', 'cygwin': 'CYGWIN'}
@@ -14,21 +14,13 @@ def transfer_cases():
             for client in ('push', 'pull') for transport in ('ssh', 'daemon')]
 
 
-def digest(path):
-    value = hashlib.sha256()
-    with path.open('rb') as stream:
-        for block in iter(lambda: stream.read(65536), b''):
-            value.update(block)
-    return value.hexdigest()
-
-
 def endpoint_identity(binary, expected=None):
     system = platform.system()
     kind = next((name for name, value in PLATFORMS.items() if system == value or name == 'cygwin' and system.startswith('CYGWIN_')), None)
     if kind is None or expected is not None and kind != expected:
         raise ValueError('Transfer endpoint is not the expected operating system')
     return dict(platform=kind, system=system, release=platform.release(), architecture=platform.machine(),
-                uid=os.geteuid(), gid=os.getegid(), binary_sha256=digest(binary))
+                uid=os.geteuid(), gid=os.getegid(), binary_sha256=file_digest(binary))
 
 
 def seed(root):
@@ -69,7 +61,7 @@ def snapshot(root):
             entries[name] = dict(type='directory', mode=stat.S_IMODE(info.st_mode), mtime=int(info.st_mtime))
         elif stat.S_ISREG(info.st_mode):
             entries[name] = dict(type='file', mode=stat.S_IMODE(info.st_mode), mtime=int(info.st_mtime),
-                                 size=info.st_size, sha256=digest(path))
+                                 size=info.st_size, sha256=file_digest(path))
             links.setdefault((info.st_dev, info.st_ino), []).append(name)
         else:
             raise ValueError('Unexpected object in the transfer fixture')

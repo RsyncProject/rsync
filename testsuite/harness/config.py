@@ -2,6 +2,7 @@ import argparse
 import fnmatch
 import math
 import os
+import pwd
 import shutil
 import subprocess
 import sys
@@ -139,16 +140,10 @@ def read_shconfig(path):
     return env
 
 def get_testuser():
-    for cmd in ['/usr/bin/whoami', '/usr/ucb/whoami', '/bin/whoami']:
-        if os.path.isfile(cmd):
-            try:
-                return subprocess.check_output([cmd], text=True).strip()
-            except subprocess.CalledProcessError:
-                pass
     try:
-        return subprocess.check_output(['id', '-un'], text=True).strip()
-    except (FileNotFoundError, subprocess.CalledProcessError):
-        return os.environ.get('LOGNAME', os.environ.get('USER', 'UNKNOWN'))
+        return pwd.getpwuid(os.geteuid()).pw_name
+    except KeyError:
+        return str(os.geteuid())
 
 def collect_tests(suitedir, patterns):
     legacy = sorted(Path(suitedir).glob('*_test.py'))
@@ -176,14 +171,6 @@ def collect_tests(suitedir, patterns):
             if not matched:
                 raise ValueError(f'no tests match {pat!r}')
     return tests
-
-def select_daemon_tests(tests):
-    keep, dropped = [], []
-    for path in tests:
-        requirements = read_requirements(path)
-        applicable = not requirements or not requirements['transports'] or 'tcp' in requirements['transports']
-        (keep if applicable else dropped).append(path)
-    return keep, dropped
 
 def select_applicable_tests(tests, not_applicable, requirements_by_path=None):
     selected = []

@@ -14,13 +14,22 @@ from harness import daemon, process
 from harness.mutation import find_compiler
 from harness import Exit, TestContext, requires, run
 from harness.process import (
-    forced_protocol, rsh_cmd, rsync_argv, rsync_argv_for, rsync_command_binary, rsync_path_arg,
+    capture_command, expect_fail, forced_protocol, rsh_cmd, rsync_argv, rsync_argv_for, rsync_command_binary, rsync_path_arg,
     rsync_supports, run_rsync, split_rsync_cmd, under_valgrind,
 )
 from harness.results import test_fail
 
 @requires(transports={'pipe'}, tags={'harness'})
 def test(context: TestContext):
+    command = [sys.executable, '-S', '-c',
+               'import os, sys; print(os.getcwd()); print(os.environ["VALUE"], file=sys.stderr); sys.exit(17)']
+    env = {**os.environ, 'VALUE': 'captured stderr'}
+    result, output = capture_command(command, env=env, cwd=context.scratch)
+    if result.returncode != 17 or str(context.scratch) not in output or 'captured stderr' not in output:
+        test_fail('command capture lost the status, directory or environment')
+    if expect_fail(command, 'captured stderr', env=env, cwd=context.scratch).returncode != 17:
+        test_fail('failure assertion lost the command status')
+
     build = context.scratch / 'compiler-build'
     source_root = context.scratch / 'compiler-source'
     build.mkdir()

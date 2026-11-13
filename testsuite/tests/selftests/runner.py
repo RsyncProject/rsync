@@ -17,6 +17,13 @@ from harness.rsync import rsync_command_binary
 
 @requires(features={'remote-shell'}, transports={'pipe'}, mutates={'filesystem', 'process'}, tags={'harness'})
 def test(context: TestContext):
+    with patch.object(config.pwd, 'getpwuid', return_value=SimpleNamespace(pw_name='fixture')):
+        if config.get_testuser() != 'fixture':
+            test_fail('runner did not use the effective account name')
+    with patch.object(config.pwd, 'getpwuid', side_effect=KeyError), patch.object(config.os, 'geteuid', return_value=12345):
+        if config.get_testuser() != '12345':
+            test_fail('runner invented a name for an unknown UID')
+
     checkout = context.scratch / 'identity-checkout'
     checkout.mkdir()
     (checkout / '.git').mkdir()
@@ -121,9 +128,9 @@ def test(context: TestContext):
         pass
     else:
         test_fail('an unmatched explicit test selector was accepted')
-    daemon, independent = config.select_daemon_tests(tests)
+    daemon, excluded = config.select_transport_tests(tests, 'tcp')
     daemon = {test_name(path) for path in daemon}
-    independent = {test_name(path) for path in independent}
+    independent = {name for group in excluded for name in group['tests']}
     if not {'daemon-auth', 'idn', 'protocol-refusals', 'inplace-checksum-bounds', 'daemon-access-hostname'} <= daemon:
         test_fail('daemon test selection dropped coverage')
     if not {'filter-merge-content-echo', 'runner'} <= independent:
@@ -136,7 +143,7 @@ def test(context: TestContext):
     target.write_text(daemon_call)
     alias.write_text(target.name)
     option.write_text("from harness import metadata\nmetadata(transports={'tcp'})\nargs = ['--" + "daemon']\n")
-    selected, _ = config.select_daemon_tests([str(alias), str(option)])
+    selected, _ = config.select_transport_tests([str(alias), str(option)], 'tcp')
     if selected != [str(alias), str(option)]:
         test_fail('daemon test selection missed an alias or option')
 
@@ -146,9 +153,6 @@ def test(context: TestContext):
     tcp_only.write_text("from harness import metadata\nmetadata(transports={'tcp'}, tags={'daemon'})\n")
     unclassified = context.scratch / 'unclassified.py'
     unclassified.write_text("from harness import metadata\nmetadata()\n")
-    selected, dropped = config.select_daemon_tests([str(pipe_only), str(tcp_only)])
-    if selected != [str(tcp_only)] or dropped != [str(pipe_only)]:
-        test_fail('daemon test selection ignored transport metadata')
     for use_tcp, expected, excluded in (
             (False, [str(pipe_only)], ['tcp-only']),
             (True, [str(tcp_only)], ['pipe-only'])):

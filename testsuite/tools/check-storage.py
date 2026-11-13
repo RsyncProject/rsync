@@ -19,7 +19,8 @@ import tempfile
 import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from harness.interoperability import digest, seed, snapshot, update
+from harness.interoperability import seed, snapshot, update
+from harness.process import file_digest
 from harness.process import quote_command
 from harness.ssh import ProcessServer
 
@@ -693,7 +694,7 @@ def full_filesystem(binary, root, checks):
                 raise ValueError('Full-filesystem failure discarded the resumable partial file')
             run('mount', '-o', 'remount,size=32m', destination)
             resumed = run(binary, '-rc', '--no-whole-file', '--stats', *options, str(source) + '/', str(destination) + '/')
-            if digest(target) != digest(source / 'file') or (destination / '.partial').exists():
+            if file_digest(target) != file_digest(source / 'file') or (destination / '.partial').exists():
                 raise ValueError('Full-filesystem recovery did not complete correctly')
             if label != 'atomic':
                 matched = re.search(rb'^Matched data: ([0-9,]+) bytes$', resumed.stdout, re.MULTILINE)
@@ -755,7 +756,7 @@ def main():
             copy_as(binary, root, checks)
             restricted(binary, root, checks)
             full_filesystem(binary, root, checks)
-    receipt = dict(checks=checks, binary_sha256=digest(binary), kernel=os.uname().release,
+    receipt = dict(checks=checks, binary_sha256=file_digest(binary), kernel=os.uname().release,
                    filesystem='LUKS2/ext4 and size-limited tmpfs', cleaned=True)
     (output / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
     print(json.dumps(receipt, indent=2))
