@@ -53,6 +53,36 @@ class Attributes(unittest.TestCase):
                 metadata.read_acl(path / 'file', 'freebsd')
                 self.assertEqual(command.call_count, 1)
 
+    def test_solaris_uses_current_acl_tools(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)
+            with patch.object(metadata, 'command') as command:
+                metadata.set_acl(path, 'solaris', 1)
+                self.assertEqual(command.call_args[0][0], 'chmod')
+                self.assertTrue(command.call_args[0][1].startswith('A=user::rwx,'))
+                self.assertIn('group:545:r-x', command.call_args[0][1])
+                self.assertIn('default:group:545:r-x', command.call_args[0][1])
+                self.assertEqual(command.call_args[0][2], path)
+            listing = b'''drwx------+  2 root root 512 Nov 13 13:35 fixture
+     0:user::rwx
+     1:group::---\t\t#effective:---
+     2:group:544:---\t\t#effective:---
+     3:group:545:r-x\t\t#effective:r-x
+     4:mask:r-x
+     5:other:---
+     6:default:user::rwx
+     7:default:group::---
+     8:default:group:544:---
+     9:default:group:545:r-x
+     10:default:mask:r-x
+     11:default:other:---
+'''
+            with patch.object(metadata, 'command', return_value=listing) as command:
+                result = metadata.read_acl(path, 'solaris')
+                self.assertEqual(result['group:545'], 'r-x')
+                self.assertEqual(result['default:group:545'], 'r-x')
+                self.assertEqual(command.call_args[0], ('ls', '-Vd', path))
+
     def test_case_contract(self):
         self.assertEqual(set(metadata.FEATURES), set(PLATFORMS))
         cases = metadata.metadata_cases()

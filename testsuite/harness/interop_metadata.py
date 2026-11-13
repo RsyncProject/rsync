@@ -89,7 +89,12 @@ def read_acl(path, role):
         entries = [match[1] for line in text.splitlines()
                    for match in [re.fullmatch(r'\s*\d+: (.+)', line)] if match]
         return entries
-    result = parse_acl(command('getfacl', *([] if role == 'solaris' else ['-n']), path).decode())
+    if role == 'solaris':
+        text = command('ls', '-Vd', path).decode()
+        entries = [match[1] for line in text.splitlines()
+                   for match in [re.fullmatch(r'\s*\d+:(.+)', line)] if match]
+        return parse_acl('\n'.join(entries))
+    result = parse_acl(command('getfacl', '-n', path).decode())
     if role == 'freebsd' and path.is_dir():
         default = parse_acl(command('getfacl', '-n', '-d', path).decode())
         result.update({'default:' + key: value for key, value in default.items()})
@@ -114,9 +119,10 @@ def set_acl(path, role, phase):
         entries.append('group:544:---')
     if directory and role != 'freebsd':
         entries += ['default:' + entry for entry in entries]
-    if role in ('solaris', 'cygwin'):
-        if role == 'solaris':
-            entries = [entry.replace('mask::', 'mask:').replace('other::', 'other:') for entry in entries]
+    if role == 'solaris':
+        entries = [entry.replace('mask::', 'mask:').replace('other::', 'other:') for entry in entries]
+        command('chmod', 'A=' + ','.join(entries), path)
+    elif role == 'cygwin':
         command('setfacl', '-s', ','.join(entries), path)
     else:
         command('setfacl', '-b', path)
