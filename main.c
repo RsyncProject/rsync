@@ -253,6 +253,7 @@ void read_del_stats(int f)
 static void become_copy_as_user()
 {
 	char *gname;
+	struct passwd *pw = NULL;
 	uid_t uid;
 	gid_t gid;
 
@@ -276,7 +277,6 @@ static void become_copy_as_user()
 			exit_cleanup(RERR_SYNTAX);
 		}
 	} else {
-		struct passwd *pw;
 		if ((pw = getpwuid(uid)) == NULL) {
 			rsyserr(FERROR, errno, "getpwuid failed");
 			exit_cleanup(RERR_SYNTAX);
@@ -295,7 +295,7 @@ static void become_copy_as_user()
 	}
 #endif
 #ifdef HAVE_INITGROUPS
-	if (!gname && initgroups(copy_as, gid) < 0) {
+	if (!gname && initgroups(pw->pw_name, gid) < 0) {
 		rsyserr(FERROR, errno, "initgroups failed");
 		exit_cleanup(RERR_SYNTAX);
 	}
