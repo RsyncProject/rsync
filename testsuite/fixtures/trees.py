@@ -30,7 +30,7 @@ def hands_setup() -> None:
     (environment.FROMDIR / 'empty').touch()
     (environment.FROMDIR / 'emptydir').mkdir(exist_ok=True)
 
-    (environment.FROMDIR / 'filelist').write_text(rsync_ls_lR(environment.SRCDIR))
+    (environment.FROMDIR / 'filelist').write_text(rsync_ls_lR(environment.FROMDIR))
 
     (environment.FROMDIR / 'nolf').write_text("This file has no trailing lf")
 

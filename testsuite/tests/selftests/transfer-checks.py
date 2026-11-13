@@ -10,6 +10,7 @@ import sys
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from fixtures.trees import hands_setup
 from harness import Exit, TestContext, environment, requires, run
 from harness.results import test_fail
 from harness.comparison import checkit, rsync_ls_lR
@@ -94,6 +95,29 @@ def test(context: TestContext):
             pass
         else:
             test_fail('a missing source fixture was not reported as an error')
+
+    checkout = context.scratch / 'checkout'
+    checkout.mkdir()
+    core = checkout / 'core'
+    core.write_bytes(b'transient source entry')
+    (checkout / 'fixture.c').write_text('fixture text\n')
+    run_command = subprocess.run
+    def remove_shared_entry(*args, **kwargs):
+        if kwargs.get('cwd') == checkout:
+            core.unlink()
+        return run_command(*args, **kwargs)
+
+    with patch.object(environment, 'SRCDIR', checkout), \
+            patch('harness.comparison.subprocess.run', side_effect=remove_shared_entry):
+        hands_setup()
+    if not core.exists():
+        test_fail('transfer fixture enumerated the shared checkout')
+    listing = (context.source / 'filelist').read_text()
+    entries = {line.split()[-1] for line in listing.splitlines()}
+    if not {'./empty', './emptydir'} <= entries or './core' in entries:
+        test_fail('transfer fixture listing contains the wrong entries')
+    if (context.source / 'text').read_text() != 'fixture text\n':
+        test_fail('transfer fixture lost its source text')
 
 if __name__ == '__main__':
     run(test)
