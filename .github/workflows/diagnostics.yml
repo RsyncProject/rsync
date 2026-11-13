@@ -90,7 +90,7 @@ jobs:
         run: actionlint -color -ignore '^label "ubuntu-26\.04(-arm)?" is unknown\.'
       - name: Check result gate
         run: python3 -S .github/scripts/test-results.py
-      - name: Check CI helpers
+      - name: Check helpers
         run: |
           python3 -S .github/scripts/test-guest.py
           python3 -S .github/scripts/test-diagnostics.py
@@ -138,10 +138,10 @@ jobs:
         run: ./rsync --version
       - name: Tests (non-root pipe)
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: python3 -S testsuite/tools/check.py . ./rsync pipe,nonroot,self-peer,linux,asan,no-userns test-results/asan-pipe -j8
+        run: python3 -S testsuite/tools/check.py . ./rsync pipe,nonroot,self-peer,linux,asan,no-userns test-results/nonroot/pipe -j8
       - name: Tests (non-root TCP)
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: python3 -S testsuite/tools/check.py . ./rsync nonroot,self-peer,linux,asan,no-userns test-results/asan-tcp --use-tcp --daemon-tests-only -j8
+        run: python3 -S testsuite/tools/check.py . ./rsync nonroot,self-peer,linux,asan,no-userns test-results/nonroot/tcp --use-tcp --daemon-tests-only -j8
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -150,8 +150,8 @@ jobs:
           name: asan-results
           if-no-files-found: error
           path: |
-            test-results/*/receipt.json
-            test-results/*/run.log
+            test-results/*/*/receipt.json
+            test-results/*/*/run.log
 
   coverage:
     if: ${{ inputs.coverage }}
@@ -209,7 +209,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang-21 clang-tools-21 acl libacl1-dev attr libattr1-dev liblz4-dev libidn2-dev libzstd-dev libxxhash-dev libpopt-dev openssl
-      - name: Version
+      - name: Compiler version
         run: clang-21 --version
       - name: Configure
         run: scan-build-21 ./configure --with-rrsync --disable-md2man

@@ -17,6 +17,7 @@ class Guest(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='rsync-guest-') as directory:
             output = Path(directory) / 'results'
             calls = []
+            log = StringIO()
             account = SimpleNamespace(pw_name='rsynctest', pw_uid=1000, pw_gid=1000, pw_dir='/home/rsynctest')
             def process(command, **kwargs):
                 code = 1 if failure and failure(command) else 0
@@ -29,17 +30,20 @@ class Guest(unittest.TestCase):
                  patch('pwd.getpwnam', return_value=account), patch('os.getgrouplist', return_value=[1000, 1001]), \
                  patch('os.chown'), patch('subprocess.Popen', side_effect=process), \
                  patch('subprocess.run', return_value=SimpleNamespace(returncode=0)), \
-                 redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                 redirect_stdout(log), redirect_stderr(StringIO()):
                 result = guest['main']()
-            return result, (output / 'status').read_text().strip(), calls
+            return result, (output / 'status').read_text().strip(), calls, log.getvalue()
 
     def test_native_passes(self):
         for platform in ('freebsd', 'netbsd', 'openbsd', 'solaris'):
             with self.subTest(platform=platform):
-                result, status, calls = self.run_guest(platform)
+                result, status, calls, log = self.run_guest(platform)
                 self.assertEqual((result, status), (0, '0'))
                 tests = [(command, options) for command, options in calls if 'testsuite/tools/check.py' in command]
                 self.assertEqual(len(tests), 2 if platform == 'solaris' else 4)
+                for role in ('root',) if platform == 'solaris' else ('root', 'non-root'):
+                    for transport in ('pipe', 'TCP'):
+                        self.assertIn(f'::group::Tests ({role} {transport})\n', log)
                 for command, options in tests:
                     if 'nonroot' in command[5].split(','):
                         self.assertEqual(options['user'], 1000)
@@ -56,12 +60,12 @@ class Guest(unittest.TestCase):
                     self.assertIn('--disable-idn', configure)
 
     def test_failed_pass_does_not_hide_remaining_results(self):
-        result, status, calls = self.run_guest('netbsd', lambda command: 'testsuite/tools/check.py' in command)
+        result, status, calls, _ = self.run_guest('netbsd', lambda command: 'testsuite/tools/check.py' in command)
         self.assertEqual((result, status), (0, '1'))
         self.assertEqual(sum('testsuite/tools/check.py' in command for command, _ in calls), 4)
 
     def test_failed_build_stops_tests(self):
-        result, status, calls = self.run_guest('netbsd', lambda command: command[:2] == ['make', 'check-progs'])
+        result, status, calls, _ = self.run_guest('netbsd', lambda command: command[:2] == ['make', 'check-progs'])
         self.assertEqual((result, status), (0, '1'))
         self.assertFalse(any('testsuite/tools/check.py' in command for command, _ in calls))
 
@@ -70,7 +74,7 @@ class Guest(unittest.TestCase):
             if command[0].endswith('/dirfd-probe'):
                 raise FileNotFoundError(command[0])
             return False
-        result, status, calls = self.run_guest('netbsd', missing)
+        result, status, calls, _ = self.run_guest('netbsd', missing)
         self.assertEqual((result, status), (0, '1'))
         self.assertEqual(sum('testsuite/tools/check.py' in command for command, _ in calls), 4)
 

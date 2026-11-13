@@ -23,9 +23,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Primary
+          - name: Archived primary
             role: primary
-          - name: Secondary
+          - name: Archived secondary
             role: secondary
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

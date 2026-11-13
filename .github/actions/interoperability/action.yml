@@ -191,7 +191,7 @@ runs:
       if: always()
       shell: bash
       run: |
-        python3 - <<'PY'
+        python3 -B -S - <<'PY'
         import os
         with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
             output.write('blocked=' + os.environ.get('INTEROP_BLOCKED', 'false') + '\n')

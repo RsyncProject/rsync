@@ -30,9 +30,10 @@ jobs:
           sudo apt-get install -y autoconf automake gawk fakeroot acl attr libacl1-dev libattr1-dev libxxhash-dev libzstd-dev liblz4-dev libidn2-dev libpopt-dev libssl-dev python3-cmarkgfm openssl
       - name: Prepare source
         run: ./prepare-source
+      - name: Configure
+        run: ./configure --with-rrsync
       - name: Build
         run: |
-          ./configure --with-rrsync
           make -j2
           make gen
       - name: Create archive

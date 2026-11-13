@@ -169,7 +169,8 @@ def main():
                 selected += f',protocol-{protocol}'
                 options += [f'--protocol={protocol}']
             parallel = 4 if args.platform == 'alpine' else 2 if args.platform == 'openbsd' and transport == 'tcp' else 8
-            status |= bool(command(f'Tests ({"non-root" if role == "nonroot" else role} {transport})',
+            label = f'protocol {protocol}' if protocol else 'TCP' if transport == 'tcp' else 'pipe'
+            status |= bool(command(f'Tests ({"non-root" if role == "nonroot" else role} {label})',
                                    [sys.executable, '-S', 'testsuite/tools/check.py', str(source), str(source / 'rsync'),
                                     selected, str(output / role / transport), *options, f'-j{parallel}'],
                                    required=False, account=account if role == 'nonroot' else None))

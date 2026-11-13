@@ -100,7 +100,7 @@ jobs:
             sudo apt-get update -q
             sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "$@"
           }
-      - name: Generate configure files
+      - name: Prepare source
         run: ./prepare-source
       - name: Run VM and collect results
         uses: vmactions/netbsd-vm@5957cf330aef2e6ddc63c604364c99ce2e02b91d # v1.5.3

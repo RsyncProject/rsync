@@ -49,7 +49,7 @@ jobs:
           persist-credentials: false
       - name: Prepare VM host
         run: sudo apt-get update && sudo apt-get install -y qemu-utils qemu-system-x86 ovmf
-      - name: Build in FreeBSD
+      - name: Configure and build
         uses: vmactions/freebsd-vm@c46abacb49f09938ca4e1702d15d836285d694cc # v1.5.9
         with:
           release: '15.1'
@@ -76,9 +76,9 @@ jobs:
           persist-credentials: false
       - name: Prepare VM host
         run: sudo apt-get update && sudo apt-get install -y autoconf automake qemu-utils qemu-system-x86 ovmf
-      - name: Generate configure files
+      - name: Prepare source
         run: ./prepare-source
-      - name: Build in NetBSD
+      - name: Configure and build
         uses: vmactions/netbsd-vm@5957cf330aef2e6ddc63c604364c99ce2e02b91d # v1.5.3
         with:
           release: '11.1'
@@ -116,7 +116,7 @@ jobs:
           persist-credentials: false
       - name: Prepare VM host
         run: sudo apt-get update && sudo apt-get install -y qemu-utils qemu-system-x86 ovmf
-      - name: Build in OpenBSD
+      - name: Configure and build
         uses: vmactions/openbsd-vm@f1ca8bc8ecc5b6ef7218e5b914836e067e1546d3 # v1.4.9
         with:
           release: '8.0'
@@ -179,7 +179,7 @@ jobs:
           persist-credentials: false
       - name: Prepare VM host
         run: sudo apt-get update && sudo apt-get install -y qemu-utils qemu-system-x86 ovmf
-      - name: Build in Solaris
+      - name: Configure and build
         uses: vmactions/solaris-vm@87d3c436511cef802cd1637f86f73b1a97715c8c # v1.4.1
         with:
           release: '11.4'

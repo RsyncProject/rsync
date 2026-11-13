@@ -64,7 +64,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           retention-days: 45
-          name: cygwin-bin
+          name: cygwin-amd64-bin
           if-no-files-found: error
           path: |
             rsync.exe
@@ -79,7 +79,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           retention-days: 45
-          name: cygwin-results
+          name: cygwin-amd64-results
           if-no-files-found: error
           path: |
             test-results/*/*/run.log
@@ -118,7 +118,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           retention-days: 45
-          name: solaris-bin
+          name: solaris-11.4-amd64-bin
           if-no-files-found: error
           path: |
             rsync
@@ -133,7 +133,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           retention-days: 45
-          name: solaris-results
+          name: solaris-11.4-amd64-results
           if-no-files-found: error
           path: |
             config.log
