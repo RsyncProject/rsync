@@ -42,3 +42,4 @@ source-change-size-continues
 sparse
 stdio-read-errors                      # Linux interposition
 symlink-exclude-xattr
+unstatable-intermediate-dir            # Linux interposition
