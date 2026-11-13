@@ -99,16 +99,16 @@ def build_rsync_cmd(rsync_bin, args, scratchbase):
 def source_identity(srcdir):
     if not (Path(srcdir) / '.git').exists():
         return None, None
-    command = ['git', '--no-optional-locks', '-c', f'safe.directory={Path(srcdir).resolve()}',
-               '-C', str(srcdir)]
+    command = ['git', '--no-optional-locks', '--git-dir=' + str(Path(srcdir).resolve() / '.git'),
+               '--work-tree=' + str(Path(srcdir).resolve()), '-C', str(srcdir)]
     try:
         revision = subprocess.run(command + ['rev-parse', '--verify', 'HEAD'],
                                   capture_output=True, text=True, check=True, timeout=30).stdout.strip()
         status = subprocess.run(command + ['status', '--porcelain'],
                                 capture_output=True, text=True, check=True, timeout=30).stdout
-    except (OSError, subprocess.SubprocessError):
-        return None, None
-    return revision, bool(status)
+    except (OSError, subprocess.SubprocessError) as error:
+        raise ValueError('cannot identify the source checkout') from error
+    return revision, status.splitlines()
 
 def run_one_test(testscript, testbase, scratchdir, base_env, timeout,
                  srcdir, tooldir, setfacl_nodef, always_log, cancelled):
@@ -366,12 +366,13 @@ def main():
     if args.receipt:
         try:
             revision, dirty = source_identity(srcdir)
-            identity = {'source_revision': revision, 'source_dirty': dirty, 'euid': os.geteuid(),
+            identity = {'source_revision': revision, 'source_dirty': None if dirty is None else bool(dirty),
+                        'source_changes': dirty, 'euid': os.geteuid(),
                         'primary_sha256': file_digest(rsync_bin),
                         'secondary_sha256': file_digest(rsync_bin2),
                         'primary_version': primary_version,
                         'secondary_version': secondary_version}
-        except OSError as error:
+        except (OSError, ValueError) as error:
             sys.stderr.write(f'runtests.py: cannot identify test inputs: {error}\n')
             sys.exit(Exit.ERROR)
     print_run_header(args, tooldir, srcdir, scratchbase, rsync_cmd, rsync_peer_cmd, tls_args)

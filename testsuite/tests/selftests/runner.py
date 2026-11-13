@@ -17,6 +17,23 @@ from harness.rsync import rsync_command_binary
 
 @requires(features={'remote-shell'}, transports={'pipe'}, mutates={'filesystem', 'process'}, tags={'harness'})
 def test(context: TestContext):
+    checkout = context.scratch / 'identity-checkout'
+    checkout.mkdir()
+    (checkout / '.git').mkdir()
+    with patch.object(runner.subprocess, 'run', side_effect=[SimpleNamespace(stdout='a' * 40 + '\n'),
+                                                           SimpleNamespace(stdout=' M tracked\n')]) as git:
+        revision, changes = runner.source_identity(checkout)
+    if revision != 'a' * 40 or changes != [' M tracked']:
+        test_fail('source identity discarded tracked changes')
+    if '--git-dir=' + str(checkout / '.git') not in git.call_args[0][0]:
+        test_fail('source identity relies on Git ownership discovery')
+    with patch.object(runner.subprocess, 'run', side_effect=OSError('fixture failure')):
+        try:
+            runner.source_identity(checkout)
+        except ValueError:
+            pass
+        else:
+            test_fail('Git failure silently discarded source provenance')
     args = SimpleNamespace(log_level=9, timeout=300, use_tcp=False, race_timeout=None)
     with patch.dict('os.environ', {'RSYNC_TEST_USE_TCP': '1', 'race_timeout': '5'}):
         env = runner.build_test_environment(
