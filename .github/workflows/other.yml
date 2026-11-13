@@ -139,4 +139,3 @@ jobs:
             test-results/status
             test-results/*/*/receipt.json
             test-results/*/*/run.log
-

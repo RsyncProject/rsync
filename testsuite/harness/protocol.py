@@ -755,4 +755,3 @@ class DaemonReceiver(_SocketPeer):
                 pass
         except (OSError, ProtocolError):
             pass
-
