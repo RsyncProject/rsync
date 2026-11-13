@@ -73,7 +73,9 @@ jobs:
         with:
           persist-credentials: false
       - name: Prepare VM host
-        run: sudo apt-get update && sudo apt-get install -y qemu-utils qemu-system-x86 ovmf
+        run: sudo apt-get update && sudo apt-get install -y autoconf automake qemu-utils qemu-system-x86 ovmf
+      - name: Generate configure files
+        run: ./prepare-source
       - name: Build in NetBSD
         uses: vmactions/netbsd-vm@5957cf330aef2e6ddc63c604364c99ce2e02b91d # v1.5.3
         with:
@@ -81,9 +83,12 @@ jobs:
           copyback: 'false'
           cache-after-prepare: true
           prepare: |
-            PATH=/usr/sbin:$PATH pkg_add autoconf automake git-base python312
+            PATH=/usr/sbin:$PATH pkg_add git-base python312
             ln -sf /usr/pkg/bin/python3.12 /usr/pkg/bin/python3
-          run: ./configure --disable-md2man --disable-zstd --disable-xxhash --disable-lz4 --disable-idn && make -j2
+          run: |
+            ./configure --disable-md2man --disable-zstd --disable-xxhash --disable-lz4 --disable-idn \
+              --disable-acl-support --disable-xattr-support
+            make -j2
       - name: Transfers
         id: transfers
         uses: ./.github/actions/interoperability

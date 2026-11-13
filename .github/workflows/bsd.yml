@@ -95,18 +95,20 @@ jobs:
       - name: Prepare VM host
         timeout-minutes: 10
         run: |
-          set -- qemu-utils qemu-system-x86 ovmf
+          set -- autoconf automake qemu-utils qemu-system-x86 ovmf
           sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "$@" || {
             sudo apt-get update -q
             sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "$@"
           }
+      - name: Generate configure files
+        run: ./prepare-source
       - name: Run VM and collect results
         uses: vmactions/netbsd-vm@5957cf330aef2e6ddc63c604364c99ce2e02b91d # v1.5.3
         with:
           release: ${{ matrix.release }}
           cache-after-prepare: true
           prepare: |
-            PATH=/usr/sbin:$PATH pkg_add autoconf automake git-base python312
+            PATH=/usr/sbin:$PATH pkg_add git-base python312
             ln -sf /usr/pkg/bin/python3.12 /usr/pkg/bin/python3
             /usr/sbin/groupadd rsynctest-extra
             /usr/sbin/useradd -m -d /home/rsynctest -g =uid -G rsynctest-extra -s /bin/sh rsynctest
