@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 
 import os
-import shlex
-import shutil
 import subprocess
 import sys
 
 from harness.filesystem import unlink_if_exists
 from harness.environment import RSYNC, SCRATCHDIR
 from harness.filesystem import assert_same, make_data_file, makepath, rmtree
+from harness.mutation import find_compiler
 from harness.process import split_rsync_cmd
 from harness.results import test_fail, test_skipped
 from harness.rsync import rsync_argv
@@ -111,21 +110,11 @@ ssize_t read(int fd, void *buf, size_t count)
 }
 '''
 
-def compiler():
-    cc = os.environ.get('CC')
-    if cc:
-        return shlex.split(cc)
-    for name in ('cc', 'gcc', 'clang'):
-        path = shutil.which(name)
-        if path:
-            return [path]
-    return None
-
 def build_shim():
     if not sys.platform.startswith('linux'):
         test_skipped('source-size-change regression uses LD_PRELOAD and '
                      '/proc/self/fd to synchronise the source read', capability='linux_interpose')
-    cc = compiler()
+    cc = find_compiler()
     if not cc:
         test_skipped('no C compiler available to build the source-read shim',
                      capability='linux_interpose')

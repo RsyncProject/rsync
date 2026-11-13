@@ -1,26 +1,8 @@
 #!/usr/bin/env python3
-# An --append or --inplace transfer that is aborted while the receiver is
-# writing out its buffer must leave the destination a clean prefix of the
-# source.
-#
-# When a transfer aborts, the generator sends the receiver SIGUSR1, and the
-# handler runs exit_cleanup().  For these modes that cleanup used to flush the
-# receiver's write buffer.  If the signal was handled after a write() of the
-# buffer had returned, but before flush_write_file() had counted those bytes as
-# written, the cleanup wrote them a second time.  With --append the duplicate
-# then stayed in the file for good, since later runs only add data past the
-# end.
-#
-# A signal that arrives during a slow write (FUSE, NFS) is handled exactly
-# there, as the write returns.  To reach that point deterministically, this
-# test runs rsync under a scratch-built LD_PRELOAD shim: right after the
-# receiver's first large write() to the destination file, the shim keeps every
-# signal pending and reports the receiver's pid, and the test sends SIGUSR1
-# before letting it continue.
+# Hold SIGUSR1 until the receiver's first large write returns. Cleanup must
+# leave a source prefix rather than flush the same buffer twice.
 
 import os
-import shlex
-import shutil
 import signal
 import subprocess
 import sys
@@ -29,6 +11,7 @@ import time
 from harness.filesystem import unlink_if_exists
 from harness.environment import RSYNC, SCRATCHDIR
 from harness.filesystem import assert_same, make_data_file, makepath, rmtree
+from harness.mutation import find_compiler
 from harness.process import split_rsync_cmd
 from harness.results import test_error, test_fail, test_skipped
 from harness.rsync import rsync_argv, run_rsync
@@ -139,22 +122,11 @@ ssize_t write(int fd, const void *buf, size_t count)
 '''
 
 
-def compiler():
-    cc = os.environ.get('CC')
-    if cc:
-        return shlex.split(cc)
-    for name in ('cc', 'gcc', 'clang'):
-        path = shutil.which(name)
-        if path:
-            return [path]
-    return None
-
-
 def build_shim():
     if not sys.platform.startswith('linux'):
         test_skipped('the mid-write hook is an LD_PRELOAD shim that matches '
                      'the destination fd through /proc/self/fd', capability='linux_interpose')
-    cc = compiler()
+    cc = find_compiler()
     if not cc:
         test_skipped('no C compiler available to build the mid-write shim', capability='native_build')
 

@@ -20,9 +20,7 @@ def _race_seconds(text):
         raise argparse.ArgumentTypeError(f'not a number: {text!r}')
     if not math.isfinite(secs) or secs <= 0:
         raise argparse.ArgumentTypeError(
-            f'must be a finite positive number of seconds, got {text!r}; '
-            'a zero/negative/NaN budget would make every race test pass '
-            'without running its race')
+            f'must be a finite positive number of seconds, got {text!r}')
     return secs
 
 def _positive_int(text):
@@ -39,11 +37,8 @@ def parse_args():
     parser.add_argument('tests', nargs='*', metavar='TEST',
                    help='Test names or patterns to run (default: all)')
     parser.add_argument('--exclude', default=None, metavar='LIST',
-                   help='Comma-separated test names/globs to skip entirely: '
-                        'they are not run and not reported as skipped. Useful '
-                        'for tests that cannot work in a given build/CI '
-                        'environment such as a restricted buildd chroot. '
-                        'Falls back to the RSYNC_EXCLUDE environment variable.')
+                   help='Exclude comma-separated test names or patterns '
+                        '(default: RSYNC_EXCLUDE)')
     parser.add_argument('-j', '--parallel', type=_positive_int, default=1, metavar='N',
                    help='Run up to N tests in parallel (default: 1)')
     parser.add_argument('--valgrind', action='store_true',
@@ -53,33 +48,25 @@ def parse_args():
     parser.add_argument('--preserve-scratch', action='store_true',
                    help='Keep scratch directories after tests complete')
     parser.add_argument('--log-level', type=int, choices=range(1, 11), default=1, metavar='N',
-                   help='Verbosity level 1-10 (default: 1)')
+                   help='Verbosity level 1 to 10 (default: 1)')
     parser.add_argument('--always-log', action='store_true',
                    help='Show test logs even for passing tests')
     parser.add_argument('--stop-on-fail', action='store_true',
                    help='Stop after first test failure')
     parser.add_argument('--timing', action='store_true',
-                   help='After the run, report each test\'s wall-clock time, '
-                        'slowest first. With -j N the report also shows how '
-                        'much of the run the slowest test alone accounts for.')
+                   help='Report test durations, slowest first')
     parser.add_argument('--receipt', metavar='FILE', help='Write a JSON run receipt')
     parser.add_argument('--check-receipt', metavar='FILE', help='Check a run receipt and return its exit status')
     parser.add_argument('--timeout', type=_positive_int, default=300, metavar='SECS',
                    help='Per-test timeout in seconds (default: 300)')
     parser.add_argument('--race-timeout', type=_race_seconds, default=None, metavar='SECS',
-                   help='Budget (seconds) a TOCTOU symlink-race test may spend '
-                        'trying to win its race before concluding. Overrides '
-                        'every such test\'s own default (5-15s, the suite\'s '
-                        'slowest tests: a race test always spends its whole '
-                        'budget). Lowering it speeds the suite up but weakens '
-                        'the oracle. Unset: each test keeps its default.')
+                   help='Override per-test race budgets in seconds; '
+                        'lower values weaken race coverage')
     parser.add_argument('--rsync-bin', default=None, metavar='PATH',
                    help='Path to rsync binary (default: ./rsync)')
     parser.add_argument('--rsync-bin2', default=None, metavar='PATH',
-                   help='Path to the secondary rsync binary used for the '
-                        'daemon side and remote-shell --rsync-path. Lets the '
-                        'suite mix two rsync versions over the wire. Default: '
-                        'same as --rsync-bin (no version mixing).')
+                   help='Secondary binary for daemon and remote-shell peers '
+                        '(default: --rsync-bin)')
     parser.add_argument('--archived-role', choices=('primary', 'secondary'),
                    help='Role occupied by the archived release in a version-mix run')
     parser.add_argument('--tooldir', default=None, metavar='DIR',
@@ -91,16 +78,10 @@ def parse_args():
     parser.add_argument('--profiles', default=None, metavar='LIST',
                    help='Comma-separated test profiles')
     parser.add_argument('--daemon-tests-only', action='store_true',
-                   help='Run only the tests that can reach the daemon '
-                        'transport. Intended for a --use-tcp pass that follows '
-                        'a full default-transport run: the tests this drops '
-                        'cannot observe --use-tcp.')
+                   help='Select tests which exercise daemon transports')
     parser.add_argument('--use-tcp', action='store_true',
-                   help='Run daemon tests against a real rsyncd bound to '
-                        '127.0.0.1 (non-default). The default is the secure '
-                        'stdio-pipe transport, which opens no listening '
-                        'socket; --use-tcp exposes a loopback port for the '
-                        'duration of each daemon test.')
+                   help='Use loopback TCP daemons, accessible to other local users '
+                        '(default: pipes)')
     parser.add_argument('--describe-tests', action='store_true',
                    help='Print test metadata as JSON and exit')
     return parser.parse_args()

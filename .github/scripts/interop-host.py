@@ -10,7 +10,7 @@ import subprocess
 import sys
 import time
 
-from interop_ci import ROLES, PeerUnavailable, identity, published, records, validate, write
+from interop_ci import ROLES, PeerUnavailable, identity, published, records, write
 from interop_enrol import decrypt, forget, generate
 from interop_network import NetworkError, require_no_oidc
 

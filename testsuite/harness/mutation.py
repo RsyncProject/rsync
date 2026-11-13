@@ -122,27 +122,28 @@ int main(int argc, char **argv) {
 
 _c_flipper_bin = None
 
-def _detect_cc():
+def find_compiler():
     compiler = os.environ.get('CC')
     if compiler:
-        return compiler
+        return shlex.split(compiler)
     for directory in (Path(os.environ['TOOLDIR']), Path(os.environ['srcdir'])):
         makefile = directory / 'Makefile'
         if not makefile.is_file():
             continue
         match = re.search(r'(?m)^CC\s*=\s*(.+?)\s*$', makefile.read_text())
         if match and match.group(1):
-            return match.group(1)
+            return shlex.split(match.group(1))
     for compiler in ('cc', 'gcc', 'clang'):
-        if shutil.which(compiler):
-            return compiler
+        path = shutil.which(compiler)
+        if path:
+            return [path]
     return None
 
 def compile_c_flipper():
     global _c_flipper_bin
     if _c_flipper_bin is not None:
         return _c_flipper_bin or None
-    compiler = _detect_cc()
+    compiler = find_compiler()
     scratch = Path(os.environ['scratchdir'])
     source_root = Path(os.environ['srcdir'])
     tools = Path(os.environ['TOOLDIR'])
@@ -152,7 +153,7 @@ def compile_c_flipper():
         _c_flipper_bin = ''
         return None
     source.write_text(_C_FLIPPER_SRC)
-    command = shlex.split(compiler) + [
+    command = compiler + [
         '-O2', f'-I{tools}', f'-I{source_root}', '-o', str(output), str(source),
     ]
     result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,

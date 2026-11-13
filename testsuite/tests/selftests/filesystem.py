@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 
 import os
+from shutil import copy2
 
 from harness import TestContext, requires, run
 from harness.filesystem import (
     assert_exists, assert_hardlinked, assert_is_symlink, assert_mode, assert_mtime_close,
-    assert_not_exists, assert_not_hardlinked, assert_same, cp_p, is_a_link, make_data_file, make_text_file,
+    assert_not_exists, assert_not_hardlinked, assert_same, make_data_file, make_text_file,
     make_tree, makepath, rmtree, walk_dirs, walk_files, write_text_file,
 )
 from harness.results import test_fail
@@ -20,7 +21,7 @@ def test(context: TestContext):
     data = root / 'data'
     makepath(root)
     make_text_file(source, 3)
-    cp_p(source, copy)
+    copy2(source, copy)
     assert_same(source, copy)
     assert_exists(copy)
     assert_not_exists(root / 'missing')
@@ -29,14 +30,23 @@ def test(context: TestContext):
     assert_not_hardlinked(source, copy)
     symlink.symlink_to(source.name)
     assert_is_symlink(symlink, source.name)
-    if not is_a_link(symlink):
-        test_fail('is_a_link rejected a symlink')
     source.chmod(0o600)
     assert_mode(source, 0o600)
     assert_mtime_close(source, source.stat().st_mtime)
-    make_data_file(data, 4096)
-    if data.stat().st_size != 4096:
-        test_fail('make_data_file wrote the wrong size')
+    for size in (0, 1, 4096, 65536, 65537, 131089):
+        make_data_file(data, size)
+        if data.stat().st_size != size:
+            test_fail(f'make_data_file wrote the wrong size: {size}')
+    if data.read_bytes()[:65536] == data.read_bytes()[65536:131072]:
+        test_fail('make_data_file repeated its first block')
+    try:
+        make_data_file(data, -1)
+    except ValueError:
+        pass
+    else:
+        test_fail('make_data_file accepted a negative size')
+    if data.stat().st_size != 131089:
+        test_fail('an invalid size changed an existing data file')
     fixture = write_text_file(root / 'fixture', 'fixture\n', 0o600)
     if fixture.read_text() != 'fixture\n':
         test_fail('write_text_file wrote the wrong content')

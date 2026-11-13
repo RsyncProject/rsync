@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 
 import os
-import shlex
 import subprocess
 import sys
 
 from fixtures.rrsync import rrsync_shell, rsync_wrapper, patched_rrsync
-from harness.environment import RSYNC, SCRATCHDIR
+from harness.environment import SCRATCHDIR
 from harness.filesystem import rmtree
 from harness.results import test_fail
-from harness.rsync import rsync_argv, rsync_path_arg
+from harness.rsync import rsync_argv
 from harness.xattrs import RSYNC_PREFIX, set_value as xattr_set, is_supported as xattrs_supported
 from harness import metadata
 

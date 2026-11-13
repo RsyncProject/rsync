@@ -24,10 +24,10 @@ if '--shell' in sys.argv:
 
 from harness import metadata
 from fixtures.rrsync import rsync_wrapper, patched_rrsync
-from harness.environment import RSYNC, SCRATCHDIR
+from harness.environment import SCRATCHDIR
 from harness.filesystem import makepath, rmtree
 from harness.results import test_skipped
-from harness.rsync import forced_protocol, rsync_argv, rsync_path_arg
+from harness.rsync import forced_protocol, rsync_argv
 
 metadata(protocols={29, 30, 31, 32, 33}, transports={'pipe', 'tcp'}, min_peer='3.5.2', tags={'version-mix'})
 

@@ -12,7 +12,7 @@ from harness.comparison import checkit
 from harness.environment import FROMDIR, TODIR
 from harness.process import quote_command, split_rsync_cmd
 from harness.results import test_skipped
-from harness.rsync import rsh_cmd, rsync_path_arg, runtest
+from harness.rsync import rsh_cmd, rsync_path_arg
 from harness import metadata
 
 metadata(features={'remote-shell'}, transports={'pipe', 'tcp'}, min_peer='2.6.0', mutates={'environment', 'filesystem', 'process'}, tags={'compatibility', 'transfer', 'version-mix'})
@@ -46,14 +46,8 @@ hands_setup()
 if compare_link_times:
     os.utime(FROMDIR / 'nolf-symlink', (1_000_000_000, 1_000_000_000), follow_symlinks=False)
 
-def _basic():
-    checkit(['-avH', '-e', SSH, f'--rsync-path={rsync_path_arg()}',
-             f'{FROMDIR}/', f'localhost:{TODIR}'], FROMDIR, TODIR)
-
-def _delete_after_rename():
-    shutil.move(str(TODIR / 'text'), str(TODIR / 'ThisShouldGo'))
-    checkit(['--delete', '-avH', '-e', SSH, f'--rsync-path={rsync_path_arg()}',
-             f'{FROMDIR}/', f'localhost:{TODIR}'], FROMDIR, TODIR)
-
-runtest("ssh: basic test", _basic)
-runtest("ssh: renamed file", _delete_after_rename)
+checkit(['-avH', '-e', SSH, f'--rsync-path={rsync_path_arg()}',
+         f'{FROMDIR}/', f'localhost:{TODIR}'], FROMDIR, TODIR)
+shutil.move(str(TODIR / 'text'), str(TODIR / 'ThisShouldGo'))
+checkit(['--delete', '-avH', '-e', SSH, f'--rsync-path={rsync_path_arg()}',
+         f'{FROMDIR}/', f'localhost:{TODIR}'], FROMDIR, TODIR)

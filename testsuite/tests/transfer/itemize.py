@@ -5,7 +5,7 @@ import shutil
 
 from harness.comparison import checkdiff, v_filt
 from harness.environment import FROMDIR, RSYNC, SCRATCHDIR, SRCDIR, TMPDIR, TODIR, all_plus, allspace, dots
-from harness.filesystem import cp_p, hardlink_symlinks_supported, makepath
+from harness.filesystem import hardlink_symlinks_supported, makepath
 from harness.rsync import run_rsync
 from harness import metadata
 
@@ -14,9 +14,9 @@ metadata(transports={'pipe'})
 to2dir = TMPDIR / 'to2'
 
 makepath(FROMDIR / 'foo', FROMDIR / 'bar' / 'baz')
-cp_p(SRCDIR / 'configure.ac', FROMDIR / 'foo' / 'config1')
-cp_p(SRCDIR / 'config.sub', FROMDIR / 'foo' / 'config2')
-cp_p(SRCDIR / 'rsync.h', FROMDIR / 'bar' / 'baz' / 'rsync')
+shutil.copy2(SRCDIR / 'configure.ac', FROMDIR / 'foo' / 'config1')
+shutil.copy2(SRCDIR / 'config.sub', FROMDIR / 'foo' / 'config2')
+shutil.copy2(SRCDIR / 'rsync.h', FROMDIR / 'bar' / 'baz' / 'rsync')
 os.chmod(FROMDIR / 'foo' / 'config1', 0o600)
 os.chmod(FROMDIR / 'foo' / 'config2', 0o600)
 os.chmod(FROMDIR / 'bar' / 'baz' / 'rsync', 0o600)
@@ -58,7 +58,7 @@ checkdiff(['-iplr', f'{FROMDIR}/', f'{TODIR}/'],
 
 run_rsync('-a', '-f', '-! */', f'{FROMDIR}/', str(TODIR))
 
-cp_p(SRCDIR / 'configure.ac', FROMDIR / 'foo' / 'config2')
+shutil.copy2(SRCDIR / 'configure.ac', FROMDIR / 'foo' / 'config2')
 os.chmod(FROMDIR / 'foo' / 'config2', 0o601)
 
 checkdiff(['-iplrH', f'{FROMDIR}/', f'{TODIR}/'],
@@ -68,7 +68,7 @@ checkdiff(['-iplrH', f'{FROMDIR}/', f'{TODIR}/'],
           f"hf..T.{dots} foo/extra => foo/config1\n")
 
 run_rsync('-a', '-f', '-! */', f'{FROMDIR}/', str(TODIR))
-cp_p(SRCDIR / 'config.sub', FROMDIR / 'foo' / 'config2')
+shutil.copy2(SRCDIR / 'config.sub', FROMDIR / 'foo' / 'config2')
 (TODIR / 'foo' / 'sym').unlink()
 old_umask = os.umask(0)
 try:
@@ -92,7 +92,7 @@ checkdiff(['-iplrtc', f'{FROMDIR}/', f'{TODIR}/'],
           f">fcstp{dots} foo/config2\n"
           f"cLc{T}.{dots} foo/sym -> ../bar/baz/rsync\n")
 
-cp_p(SRCDIR / 'configure.ac', FROMDIR / 'foo' / 'config2')
+shutil.copy2(SRCDIR / 'configure.ac', FROMDIR / 'foo' / 'config2')
 os.chmod(FROMDIR / 'foo' / 'config2', 0o600)
 
 checkdiff(['-vvplrH', f'{FROMDIR}/', f'{TODIR}/'],

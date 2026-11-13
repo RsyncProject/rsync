@@ -50,62 +50,22 @@ def rsync_ls_lR(directory) -> str:
 
 def checkit(args, expected_dir, actual_dir, skip_file_diff: bool = False,
             allowed_codes=(0,)) -> None:
-    expected_dir = str(expected_dir)
-    actual_dir = str(actual_dir)
-
-    failed = []
-
-    ls_from = None
-    if '--atimes' in environment.TLS_ARGS:
-        ls_from = rsync_ls_lR(expected_dir)
-
+    before = rsync_ls_lR(expected_dir) if '--atimes' in environment.TLS_ARGS else None
     print(f"Running: rsync {' '.join(args)}")
     proc = subprocess.run(rsync_argv(*args))
     if proc.returncode not in allowed_codes:
         test_fail(f"Failed: status={proc.returncode}")
     if not os.path.isdir(actual_dir):
         test_fail(f"Failed: destination directory missing: {actual_dir}")
-
-    if ls_from is None:
-        ls_from = rsync_ls_lR(expected_dir)
-    ls_to = rsync_ls_lR(actual_dir)
-
-    print("-------------")
-    print("check how the directory listings compare with diff:")
-    print()
-    if ls_from != ls_to:
-        ls_from_path = environment.TMPDIR / 'ls-from'
-        ls_to_path = environment.TMPDIR / 'ls-to'
-        ls_from_path.write_text(ls_from)
-        ls_to_path.write_text(ls_to)
-        diff = subprocess.run(
-            ['diff', '-u', str(ls_from_path), str(ls_to_path)],
-            capture_output=True, text=True,
-        )
-        sys.stdout.write(diff.stdout)
-        failed.append("dir-diff")
-
-    print("-------------")
-    print("check how the files compare with diff:")
-    print()
-    if skip_file_diff:
-        print("  === Skipping (as directed) ===")
-    else:
-        diff = subprocess.run(['diff', '-r', '-u', expected_dir, actual_dir])
-        if diff.returncode != 0:
-            failed.append("file-diff")
-
-    print("-------------")
-    if failed:
-        test_fail("Failed: " + " ".join(failed))
+    verify_dirs(expected_dir, actual_dir, skip_file_diff, expected_listing=before)
 
 def verify_dirs(expected_dir, actual_dir, skip_file_diff: bool = False,
-                label: str = '') -> None:
+                label: str = '', *, expected_listing=None) -> None:
     expected_dir = str(expected_dir)
     actual_dir = str(actual_dir)
     tag = f"{label}: " if label else ""
 
-    ls_expected = rsync_ls_lR(expected_dir)
+    ls_expected = rsync_ls_lR(expected_dir) if expected_listing is None else expected_listing
     ls_actual = rsync_ls_lR(actual_dir)
     if ls_expected != ls_actual:
         ls_expected_path = environment.TMPDIR / 'ls-from'

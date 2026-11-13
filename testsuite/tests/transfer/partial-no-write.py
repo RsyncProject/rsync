@@ -10,7 +10,7 @@ import tempfile
 from harness.process import quote_command
 from harness import TestContext, requires, run, environment
 from harness.comparison import checkit
-from harness.filesystem import cp_p, make_data_file, makepath
+from harness.filesystem import make_data_file, makepath
 from harness.results import test_error
 from harness.rsync import rsync_argv_for, rsync_command_binary
 
@@ -35,7 +35,7 @@ def test(context: TestContext):
         make_data_file(source / 'some_file', 1024 * 1024)
         (source / 'some_file').chmod(0o444)
         partial = destination / '.~tmp~' / 'some_file'
-        cp_p(source / 'some_file', partial)
+        shutil.copy2(source / 'some_file', partial)
 
         if prefix:
             probe = ('if ! test -f "$1" || ! test -r "$1"; then\n'

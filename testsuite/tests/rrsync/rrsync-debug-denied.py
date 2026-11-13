@@ -16,7 +16,7 @@ if '--shell' in sys.argv:
     os.execve(wrapper, [wrapper, '-wo', root], env)
 
 from fixtures.rrsync import rsync_wrapper, patched_rrsync
-from harness.environment import RSYNC, SCRATCHDIR
+from harness.environment import SCRATCHDIR
 from harness.filesystem import makepath, rmtree
 from harness.results import test_fail
 from harness.rsync import rsync_argv

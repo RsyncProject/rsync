@@ -1,17 +1,6 @@
 #!/usr/bin/env python3
-# Coverage of --delay-symlinks, alone and together with --delay-updates.
-#
-# The generator holds back new and changed symlinks, and generate_files()
-# creates them with create_deferred_symlinks() once the receiver's redo-phase
-# MSG_DONE says every file (including any --delay-updates renames) is in place,
-# itemizing each one only after it has been created.
-#
-# The ordering checks push through a remote shell that relays the sender's data
-# and stops partway through a large target file until the test lets it go on.
-# The symlink sorts before its target, so by the time any of the target's data
-# is sent the generator has already handled the symlink.  At the pause, the
-# link therefore exists and dangles without the option, and doesn't exist yet
-# with it -- no timing is involved.
+# Pause the target-file transfer after its preceding symlink has been processed.
+# Without --delay-symlinks the link dangles; with it the link must not exist yet.
 
 import os
 import subprocess

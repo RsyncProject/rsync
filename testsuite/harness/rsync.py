@@ -39,8 +39,3 @@ def run_rsync(*args: str, check: bool = True,
 def rsync_getgroups() -> list:
     out = subprocess.check_output([str(environment.TOOLDIR / 'getgroups')], text=True)
     return out.split()
-
-def runtest(label: str, fn, *args, **kwargs):
-    print(f"Test {label}: ", end="", flush=True)
-    fn(*args, **kwargs)
-    print("done.")

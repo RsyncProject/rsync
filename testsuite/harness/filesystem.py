@@ -43,12 +43,6 @@ def rmtree(path) -> None:
         except OSError:
             continue
 
-def is_a_link(path) -> bool:
-    return os.path.islink(path)
-
-def cp_p(source, destination) -> None:
-    shutil.copy2(source, destination)
-
 def allocated_size(path) -> int:
     return os.stat(path).st_blocks * 512
 
@@ -62,30 +56,11 @@ def set_supported_mode(path, modes) -> None:
     os.chmod(path, modes[-1])
 
 def make_data_file(path, size: int) -> None:
-    path = str(path)
-    if os.path.exists('/dev/urandom'):
-        try:
-            with open('/dev/urandom', 'rb') as source, open(path, 'wb') as destination:
-                remaining = size
-                while remaining:
-                    chunk = source.read(min(remaining, 1 << 16))
-                    if not chunk:
-                        break
-                    destination.write(chunk)
-                    remaining -= len(chunk)
-            if remaining == 0:
-                return
-        except OSError:
-            pass
-
-    path_seed = int.from_bytes(path.encode(), 'big') & 0xFFFFFFFF
-    state = (os.getpid() + path_seed) % 2147483648
+    if size < 0:
+        raise ValueError('data file size must not be negative')
     with open(path, 'wb') as output:
-        data = bytearray(size)
-        for index in range(size):
-            state = (state * 1103515245 + 12345) % 2147483648
-            data[index] = ((state >> 16) % 94) + 33
-        output.write(bytes(data))
+        for offset in range(0, size, 65536):
+            output.write(os.urandom(min(size - offset, 65536)))
 
 def make_text_file(path, lines: int = 100) -> None:
     content = ''.join(
@@ -180,8 +155,6 @@ def assert_not_exists(path, label: str = '') -> None:
     if os.path.lexists(path):
         test_fail(f'{_tag(label)}{path} exists but should not')
 
-_psf_cache = None
-
 def cp_touch(src, dst) -> None:
     shutil.copy2(src, dst)
     if os.path.isdir(dst):
@@ -190,13 +163,10 @@ def cp_touch(src, dst) -> None:
     os.utime(src, ns=(st.st_atime_ns, st.st_mtime_ns), follow_symlinks=False)
     os.utime(dst, ns=(st.st_atime_ns, st.st_mtime_ns), follow_symlinks=False)
 
+@functools.lru_cache(maxsize=1)
 def proc_self_fd_pins() -> bool:
-    global _psf_cache
-    if _psf_cache is not None:
-        return _psf_cache
     if not sys.platform.startswith(('linux', 'android')):
-        _psf_cache = False
-        return _psf_cache
+        return False
 
     def resolves(path):
         try:
@@ -210,8 +180,7 @@ def proc_self_fd_pins() -> bool:
         finally:
             os.close(fd)
 
-    _psf_cache = resolves('/') and resolves(os.path.realpath(__file__))
-    return _psf_cache
+    return resolves('/') and resolves(os.path.realpath(__file__))
 
 def acls_supported() -> bool:
     from .rsync import run_rsync

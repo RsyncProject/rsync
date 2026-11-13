@@ -2,6 +2,7 @@
 
 from contextlib import redirect_stderr
 from io import StringIO
+import os
 import shlex
 import sys
 from types import SimpleNamespace
@@ -10,6 +11,7 @@ from unittest.mock import patch
 from fixtures import rrsync as rrsync_fixture
 from harness.process import quote_command
 from harness import daemon, process
+from harness.mutation import find_compiler
 from harness import Exit, TestContext, requires, run
 from harness.process import (
     forced_protocol, rsh_cmd, rsync_argv, rsync_argv_for, rsync_command_binary, rsync_path_arg,
@@ -19,6 +21,29 @@ from harness.results import test_fail
 
 @requires(transports={'pipe'}, tags={'harness'})
 def test(context: TestContext):
+    build = context.scratch / 'compiler-build'
+    source_root = context.scratch / 'compiler-source'
+    build.mkdir()
+    source_root.mkdir()
+    with patch.dict(os.environ, CC='ccache clang -m64'):
+        if find_compiler() != ['ccache', 'clang', '-m64']:
+            test_fail('compiler options from CC were lost')
+    with patch.dict(os.environ, CC='', TOOLDIR=str(build), srcdir=str(source_root)):
+        (source_root / 'Makefile').write_text('CC = clang -m32\n')
+        if find_compiler() != ['clang', '-m32']:
+            test_fail('the source Makefile compiler was ignored')
+        (build / 'Makefile').write_text('CC = ccache gcc\n')
+        if find_compiler() != ['ccache', 'gcc']:
+            test_fail('the build Makefile compiler did not take precedence')
+        (build / 'Makefile').unlink()
+        (source_root / 'Makefile').unlink()
+        with patch('harness.mutation.shutil.which', side_effect={'clang': '/bin/clang'}.get):
+            if find_compiler() != ['/bin/clang']:
+                test_fail('the compiler on PATH was not found')
+        with patch('harness.mutation.shutil.which', return_value=None):
+            if find_compiler() is not None:
+                test_fail('a missing compiler was reported as available')
+
     bindir = context.scratch / 'bin with spaces'
     bindir.mkdir()
     binary = bindir / 'rsync'

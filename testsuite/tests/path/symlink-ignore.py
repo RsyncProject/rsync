@@ -2,7 +2,6 @@
 
 from fixtures.trees import build_symlinks
 from harness.environment import FROMDIR, TODIR
-from harness.filesystem import is_a_link
 from harness.results import test_fail
 from harness.rsync import run_rsync
 from harness import metadata
@@ -17,9 +16,9 @@ if not (TODIR / 'referent').is_file():
     test_fail("referent was not copied")
 if (TODIR / 'from').is_dir():
     test_fail("extra level of directories")
-if is_a_link(TODIR / 'dangling'):
+if (TODIR / 'dangling').is_symlink():
     test_fail("dangling symlink was copied")
-if is_a_link(TODIR / 'relative'):
+if (TODIR / 'relative').is_symlink():
     test_fail("relative symlink was copied")
-if is_a_link(TODIR / 'absolute'):
+if (TODIR / 'absolute').is_symlink():
     test_fail("absolute symlink was copied")

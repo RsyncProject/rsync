@@ -76,13 +76,16 @@ def test(context: TestContext):
         with patch('harness.comparison.rsync_argv', return_value=command):
             checkit([], context.expected, context.destination, allowed_codes=(0, 23))
 
-    (context.destination / 'file').write_text('changed\n')
+    expected_stat = (context.expected / 'file').stat()
+    changed = context.destination / 'file'
+    changed.write_text('changed!\n')
+    os.utime(changed, ns=(expected_stat.st_atime_ns, expected_stat.st_mtime_ns))
     output = StringIO()
     with patch('harness.comparison.rsync_argv', return_value=command), redirect_stderr(output):
         try:
             checkit([], context.expected, context.destination, allowed_codes=(0, 23))
         except SystemExit as error:
-            if error.code != Exit.FAIL or 'file-diff' not in output.getvalue():
+            if error.code != Exit.FAIL or 'file content differs' not in output.getvalue():
                 test_fail(f'wrong content failure: {output.getvalue()}')
         else:
             test_fail('an allowed exit code bypassed content comparison')
@@ -95,6 +98,21 @@ def test(context: TestContext):
             pass
         else:
             test_fail('a missing source fixture was not reported as an error')
+
+    events = []
+    def listing(directory):
+        events.append(('listing', str(directory)))
+        return 'unchanged metadata\n'
+    def command(argv):
+        events.append(('diff' if argv[0] == 'diff' else 'transfer',))
+        return SimpleNamespace(returncode=0)
+    with patch.object(environment, 'TLS_ARGS', '--atimes'), \
+            patch('harness.comparison.rsync_ls_lR', side_effect=listing), \
+            patch('harness.comparison.subprocess.run', side_effect=command):
+        checkit([], context.expected, context.destination)
+    if events != [('listing', str(context.expected)), ('transfer',),
+                  ('listing', str(context.destination)), ('diff',)]:
+        test_fail('access-time comparison did not preserve the source snapshot before transfer')
 
     checkout = context.scratch / 'checkout'
     checkout.mkdir()

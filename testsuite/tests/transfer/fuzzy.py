@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
+from shutil import copy2
+
 from harness.comparison import verify_dirs
 from harness.environment import FROMDIR, SRCDIR, TODIR
-from harness.filesystem import cp_p, cp_touch
+from harness.filesystem import cp_touch
 from harness.results import test_fail
 from harness.rsync import run_rsync
 from harness import metadata
@@ -12,7 +14,7 @@ metadata(transports={'pipe'})
 FROMDIR.mkdir(parents=True, exist_ok=True)
 TODIR.mkdir(parents=True, exist_ok=True)
 
-cp_p(SRCDIR / 'rsync.c', FROMDIR / 'rsync.c')
+copy2(SRCDIR / 'rsync.c', FROMDIR / 'rsync.c')
 cp_touch(FROMDIR / 'rsync.c', TODIR / 'rsync2.c')
 
 proc = run_rsync('-avvi', '--no-whole-file', '--fuzzy', '--delete-delay',

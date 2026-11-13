@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 
 import os
-import shlex
 import subprocess
 import time
 
 from harness.mutation import race_budget, start_path_flipper, stop_flipper
 from fixtures.rrsync import rrsync_shell, rsync_wrapper, patched_rrsync
-from harness.environment import RSYNC, SCRATCHDIR
+from harness.environment import SCRATCHDIR
 from harness.filesystem import makepath, proc_self_fd_pins, rmtree
 from harness.results import test_fail, test_skipped
-from harness.rsync import rsync_argv, rsync_path_arg
+from harness.rsync import rsync_argv
 from harness import metadata
 
 metadata(features={'proc_fd'}, transports={'pipe'})
