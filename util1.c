@@ -1361,7 +1361,7 @@ int change_dir(const char *dir, int set_path_only)
 				}
 				close(dfd);
 #if defined O_NOFOLLOW && defined O_DIRECTORY
-			} else if (!am_chrooted && !am_sender && !insecure_links) {
+			} else if (!am_chrooted && (confine_root || !am_sender) && !insecure_links) {
 				/* Strip the trailing slash: a symlink opened as "name/" is
 				 * always followed, so safe_open's final-component O_NOFOLLOW
 				 * must see the bare name to refuse an attacker's symlink. */
@@ -1457,7 +1457,7 @@ int change_dir(const char *dir, int set_path_only)
 				 * traversal with a plain chdir to the accumulated path, the same
 				 * legacy behaviour the per-operation sites grant under the opt-out. */
 				chdir_failed = chdir(curr_dir) != 0;
-			} else if (!am_chrooted && !am_sender && !insecure_links) {
+			} else if (!am_chrooted && (confine_root || !am_sender) && !insecure_links) {
 				/* Non-daemon receiver: confine the operator-named relative
 				 * destination like the absolute case above -- refuse a component
 				 * symlink not owned by uid 0 or our euid, closing the
