@@ -35,11 +35,12 @@ state = {}
 def serve():
     try:
         csock, _ = lsock.accept()
-        r = rp.DaemonReceiver(csock)
-        r.handshake()
-        r.send_sum_request(0, count=1, blength=0, s2length=0, remainder=0)
-        r.drain()
-        r.close()
+        with csock:
+            csock.settimeout(10)
+            r = rp.DaemonReceiver(csock)
+            r.handshake()
+            r.send_sum_request(0, count=1, blength=0, s2length=0, remainder=0)
+            r.drain()
     except Exception as exc:
         state['err'] = repr(exc)
 
@@ -50,8 +51,10 @@ try:
         rsync_argv('--no-whole-file', f'{src}/f', f'rsync://127.0.0.1:{PORT}/mod/'),
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=30)
 finally:
-    t.join(timeout=10)
     lsock.close()
+    t.join(timeout=10)
+    if t.is_alive():
+        test_fail('checksum receiver did not stop')
 
 out = (proc.stdout or '') + (proc.stderr or '')
 if state.get('err'):

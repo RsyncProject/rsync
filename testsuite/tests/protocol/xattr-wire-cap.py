@@ -45,13 +45,14 @@ state = {}
 def serve():
     try:
         csock, _ = lsock.accept()
-        r = rp.DaemonReceiver(csock)
-        r.handshake()
-        flist = (rp.FileEntry('f', mode=rp.S_IFREG | 0o644, length=8).encode()
-                 + xattr + rp.end_of_flist(0, r.protocol))
-        r.send_data(flist)
-        r.drain()
-        r.close()
+        with csock:
+            csock.settimeout(10)
+            r = rp.DaemonReceiver(csock)
+            r.handshake()
+            flist = (rp.FileEntry('f', mode=rp.S_IFREG | 0o644, length=8).encode()
+                     + xattr + rp.end_of_flist(0, r.protocol))
+            r.send_data(flist)
+            r.drain()
     except Exception as exc:
         state['err'] = repr(exc)
 
@@ -62,8 +63,10 @@ try:
         rsync_argv('-aX', f'rsync://127.0.0.1:{PORT}/x/f', str(dest) + '/'),
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=30)
 finally:
-    t.join(timeout=10)
     lsock.close()
+    t.join(timeout=10)
+    if t.is_alive():
+        test_fail('xattr sender did not stop')
 
 out = (proc.stdout or '') + (proc.stderr or '')
 if state.get('err'):

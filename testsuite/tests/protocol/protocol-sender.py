@@ -31,26 +31,24 @@ start_rsyncd(conf, PORT)
 
 SERVER_ARGS = ['--server', '-e.LsfxCIu', '.', 'mod/']
 
-def push(raw_entries):
+def push(raw_entries, expected):
     before = log.read_text(errors='replace') if log.exists() else ''
     s = rp.DaemonSender('127.0.0.1', PORT)
     s.handshake('mod', SERVER_ARGS, greeting_version=30)
-    buf = bytearray()
-    for e in raw_entries:
-        buf += e
-    buf += rp.end_of_flist(0, s.protocol)
-    s.send_data(bytes(buf))
+    s.send_data(b''.join(raw_entries) + rp.end_of_flist(0, s.protocol))
     s.drain(timeout=2.0)
     s.close()
-    for _ in range(50):
-        text = log.read_text(errors='replace')
-        if len(text) > len(before):
+    deadline = time.monotonic() + 5
+    text = ''
+    while time.monotonic() < deadline:
+        text = log.read_text(errors='replace')[len(before):]
+        if expected in text:
             break
         time.sleep(0.1)
-    return text[len(before):]
+    return text
 
 good = rp.FileEntry('hello.txt', mode=rp.S_IFREG | 0o644, length=0).encode()
-good_log = push([good])
+good_log = push([good], 'receiving file list')
 if 'receiving file list' not in good_log:
     test_fail("daemon never reached 'receiving file list' for a well-formed "
               f"push -- handshake/setup encoding is wrong.\nlog:\n{good_log}")
@@ -60,7 +58,7 @@ if 'overflow' in good_log:
 
 bad = (rp.w_byte(rp.XMIT_LONG_NAME | rp.XMIT_SAME_UID | rp.XMIT_SAME_GID)
        + rp.w_varint(0x7fffff) + b'xx')
-bad_log = push([bad])
+bad_log = push([bad], 'overflow')
 if 'overflow' not in bad_log:
     test_fail("daemon did NOT hit recv_file_entry's name-length overflow guard "
               "for an XMIT_LONG_NAME entry with a huge varint length; the flag "

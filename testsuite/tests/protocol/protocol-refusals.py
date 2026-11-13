@@ -79,11 +79,6 @@ def invalid_root(sender):
     dot = rp.FileEntry('.', mode=rp.S_IFREG | 0o644, length=100)
     other = rp.FileEntry('a', mode=rp.S_IFREG | 0o644, length=100)
     sender.send_data(dot.encode() + other.encode() + rp.end_of_flist(0, sender.protocol))
-    time.sleep(0.5)
-    try:
-        sender.send_transfer_ndx(0, rp.ITEM_TRANSFER)
-    except OSError:
-        pass
 
 check('cleared-index', PORTS[0], ['--server', '-e.LsfxCIu', '.', 'module/'],
       cleared_index, 'refusing transfer of cleared file index')
