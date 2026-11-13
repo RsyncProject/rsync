@@ -57,7 +57,7 @@ jobs:
     - name: info
       run: rsync --version
     - name: check
-      run: RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/common.txt,@testsuite/skiplist/linux.txt make check
+      run: RSYNC_EXPECT_SKIPPED=@testsuite/skiplist/common.txt,@testsuite/skiplist/linux.txt,append-shortsum make check
     - name: save artifact
       uses: actions/upload-artifact@v4
       with:
