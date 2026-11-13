@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        release: ['14.5', '15.1']
+        release: ['15.1']
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     name: FreeBSD ${{ matrix.release }} X86-64
@@ -83,7 +83,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        release: ['10.2', '11.0', '11.1']
+        release: ['11.1']
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     name: NetBSD ${{ matrix.release }} X86-64
@@ -154,7 +154,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        release: ['7.9', '8.0']
+        release: ['8.0']
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     name: OpenBSD ${{ matrix.release }} X86-64

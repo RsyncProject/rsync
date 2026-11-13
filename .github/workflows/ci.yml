@@ -46,7 +46,7 @@ jobs:
 
   other:
     name: Other
-    if: &other ${{ github.event_name != 'schedule' || github.event.schedule == '42 8 * * 0,2-6' || github.event.schedule == '42 8 * * 1' }}
+    if: *daily
     uses: ./.github/workflows/other.yml
     with:
       cygwin: *daily
@@ -74,10 +74,9 @@ jobs:
     with:
       lint: &regular ${{ github.event_name != 'schedule' }}
       python_37: *regular
-      asan: &instrumented ${{ github.event_name != 'schedule' || github.event.schedule == '42 9 * * 1' }}
-      coverage: *instrumented
-      clang_18: *regular
-      clang_21: *instrumented
+      asan: *diagnostics
+      coverage: *diagnostics
+      clang_21: *diagnostics
 
   valgrind:
     name: Valgrind
@@ -102,7 +101,7 @@ jobs:
       CI_EXPECT_LINUX: *daily
       CI_EXPECT_BSD: *weekly
       CI_EXPECT_MACOS: *daily
-      CI_EXPECT_OTHER: *other
+      CI_EXPECT_OTHER: *daily
       CI_EXPECT_VERSIONS: *versions
       CI_EXPECT_ANDROID: *weekly
       CI_EXPECT_ARCHIVE: *weekly

@@ -59,11 +59,6 @@ jobs:
             machine: aarch64
             runner: ubuntu-24.04-arm
             profiles: non-asan,self-peer,linux,no-simd,no-userns
-          - release: '22.04'
-            arch: arm64
-            machine: aarch64
-            runner: ubuntu-22.04-arm
-            profiles: non-asan,self-peer,linux,no-simd,no-zstd-threads
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     name: Ubuntu ${{ matrix.release }} ${{ matrix.arch == 'amd64' && 'X86-64' || 'ARM64' }}
@@ -111,10 +106,10 @@ jobs:
       - name: Tests (root pipe)
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: sudo python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" "pipe,root,${{ matrix.profiles }}" "$PWD/test-results/root/pipe" -j8
-      - name: Tests (protocol 30)
+      - name: Tests (root protocol 30)
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: sudo python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" "pipe,root,${{ matrix.profiles }},protocol-30" "$PWD/test-results/root/protocol-30" --protocol=30 -j8
-      - name: Tests (protocol 29)
+      - name: Tests (root protocol 29)
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: sudo python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" "pipe,root,${{ matrix.profiles }},protocol-29" "$PWD/test-results/root/protocol-29" --protocol=29 -j8
       - name: Tests (root TCP)

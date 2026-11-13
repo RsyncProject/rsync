@@ -24,9 +24,9 @@ class Results(unittest.TestCase):
                 'jobs': json.dumps({'ubuntu': {'result': 'success'}, 'almalinux': {'result': 'skipped'}}),
                 'inputs': json.dumps({'ubuntu': True, 'almalinux': False})}},
             'diagnostics': {'result': 'success', 'outputs': {
-                'jobs': json.dumps({'clang_18': {'result': 'success'}, 'clang_21': {'result': 'success'},
+                'jobs': json.dumps({'clang_21': {'result': 'success'},
                                     'asan': {'result': 'skipped'}, 'python_37': {'result': 'success'}}),
-                'inputs': json.dumps({'clang_18': True, 'clang_21': True, 'asan': False, 'python_37': True})}},
+                'inputs': json.dumps({'clang_21': True, 'asan': False, 'python_37': True})}},
             'bsd': {'result': 'skipped', 'outputs': {}},
             'macos': {'result': 'success', 'outputs': {
                 'jobs': json.dumps({'macos': {'result': 'success'}})}},
@@ -122,15 +122,14 @@ class Results(unittest.TestCase):
     def test_diagnostics_jobs(self):
         outputs = self.data['diagnostics']['outputs']
         jobs = json.loads(outputs['jobs'])
-        for name in ('clang_18', 'clang_21'):
-            for result in ('failure', 'cancelled', 'skipped', None):
-                with self.subTest(job=name, result=result):
-                    outputs['jobs'] = json.dumps({**jobs, name: {'result': result}})
-                    self.reject()
-            outputs['jobs'] = json.dumps({key: value for key, value in jobs.items() if key != name})
-            self.reject()
-        outputs['jobs'] = json.dumps({**jobs, 'clang_18': {'result': 'skipped'}})
-        outputs['inputs'] = json.dumps({'clang_18': False, 'clang_21': True, 'asan': False})
+        for result in ('failure', 'cancelled', 'skipped', None):
+            with self.subTest(result=result):
+                outputs['jobs'] = json.dumps({**jobs, 'clang_21': {'result': result}})
+                self.reject()
+        outputs['jobs'] = json.dumps({key: value for key, value in jobs.items() if key != 'clang_21'})
+        self.reject()
+        outputs['jobs'] = json.dumps({**jobs, 'clang_21': {'result': 'skipped'}})
+        outputs['inputs'] = json.dumps({'clang_21': False, 'asan': False, 'python_37': True})
         self.assertTrue(check(self.data, self.expected))
 
     def test_failed_job_cannot_be_advisory(self):

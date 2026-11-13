@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   linux:
-    name: Linux
+    name: Ubuntu 24.04 X86-64
     outputs:
       blocked: ${{ steps.transfers.outputs.blocked }}
     runs-on: ubuntu-24.04
@@ -27,8 +27,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gcc make openssl openssh-server acl attr libacl1-dev libattr1-dev liblz4-dev libzstd-dev libxxhash-dev libidn2-dev
           sudo install -d -o root -g root -m 0755 /run/sshd
+      - name: Configure
+        run: ./configure --disable-md2man
       - name: Build
-        run: ./configure --disable-md2man && make -j2
+        run: make -j2
       - name: Transfers
         id: transfers
         uses: ./.github/actions/interoperability
@@ -36,7 +38,7 @@ jobs:
           platform: linux
 
   freebsd:
-    name: FreeBSD
+    name: FreeBSD 15.1 X86-64
     outputs:
       blocked: ${{ steps.transfers.outputs.blocked }}
     runs-on: ubuntu-24.04
@@ -63,7 +65,7 @@ jobs:
           guest: 'true'
 
   netbsd:
-    name: NetBSD
+    name: NetBSD 11.1 X86-64
     outputs:
       blocked: ${{ steps.transfers.outputs.blocked }}
     runs-on: ubuntu-24.04
@@ -103,7 +105,7 @@ jobs:
           guest: 'true'
 
   openbsd:
-    name: OpenBSD
+    name: OpenBSD 8.0 X86-64
     outputs:
       blocked: ${{ steps.transfers.outputs.blocked }}
     runs-on: ubuntu-24.04
@@ -134,7 +136,7 @@ jobs:
           guest: 'true'
 
   macos:
-    name: macOS
+    name: macOS 26 ARM64
     outputs:
       blocked: ${{ steps.transfers.outputs.blocked }}
     runs-on: macos-26
@@ -152,12 +154,13 @@ jobs:
         run: |
           brew install automake openssl xxhash zstd lz4 libidn2
           echo "$(brew --prefix openssl)/bin" >>"$GITHUB_PATH"
-      - name: Build
+      - name: Configure
         run: |
           prefix=$(brew --prefix)
           openssl=$(brew --prefix openssl)
           CPPFLAGS="-I$prefix/include -I$openssl/include" LDFLAGS="-L$prefix/lib -L$openssl/lib" ./configure --disable-md2man
-          make -j2
+      - name: Build
+        run: make -j2
       - name: Transfers
         id: transfers
         uses: ./.github/actions/interoperability
@@ -165,7 +168,7 @@ jobs:
           platform: macos
 
   solaris:
-    name: Solaris
+    name: Solaris 11.4 X86-64
     outputs:
       blocked: ${{ steps.transfers.outputs.blocked }}
     runs-on: ubuntu-24.04
@@ -179,6 +182,7 @@ jobs:
       - name: Build in Solaris
         uses: vmactions/solaris-vm@87d3c436511cef802cd1637f86f73b1a97715c8c # v1.4.1
         with:
+          release: '11.4'
           copyback: 'false'
           cache-after-prepare: true
           prepare: pkg install bash automake gnu-m4 pkg://solaris/runtime/python-35 autoconf gcc git system/file-system/ufs
@@ -191,10 +195,10 @@ jobs:
           guest: 'true'
 
   cygwin:
-    name: Cygwin
+    name: Cygwin X86-64
     outputs:
       blocked: ${{ steps.transfers.outputs.blocked }}
-    runs-on: windows-2022
+    runs-on: windows-2025
     timeout-minutes: 75
     defaults:
       run:
@@ -205,8 +209,10 @@ jobs:
           persist-credentials: false
       - name: Install Cygwin
         run: .github/scripts/install-cygwin.ps1 -OpenSSH
+      - name: Configure
+        run: bash -c './configure --disable-md2man'
       - name: Build
-        run: bash -c './configure --disable-md2man && make -j2'
+        run: bash -c 'make -j2'
       - name: Transfers
         id: transfers
         uses: ./.github/actions/interoperability

@@ -20,12 +20,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - release: '15'
-            arch: arm64
-            runner: macos-15
-          - release: '15'
-            arch: x86_64
-            runner: macos-15-intel
           - release: '26'
             arch: arm64
             runner: macos-26

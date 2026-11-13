@@ -27,9 +27,9 @@ defaults:
 jobs:
   cygwin:
     if: ${{ inputs.cygwin }}
-    runs-on: windows-2022
+    runs-on: windows-2025
     timeout-minutes: 60
-    name: Cygwin
+    name: Cygwin X86-64
     defaults:
       run:
         shell: pwsh
@@ -89,7 +89,7 @@ jobs:
     if: ${{ inputs.solaris }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    name: Solaris
+    name: Solaris 11.4 X86-64
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -106,6 +106,7 @@ jobs:
       - name: Run VM and collect results
         uses: vmactions/solaris-vm@87d3c436511cef802cd1637f86f73b1a97715c8c # v1.4.1
         with:
+          release: '11.4'
           cache-after-prepare: true
           prepare: |
             pkg install bash automake gnu-m4 pkg://solaris/runtime/python-35 autoconf gcc git
