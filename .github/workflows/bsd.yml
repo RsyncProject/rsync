@@ -106,8 +106,10 @@ jobs:
         uses: vmactions/netbsd-vm@5957cf330aef2e6ddc63c604364c99ce2e02b91d # v1.5.3
         with:
           release: ${{ matrix.release }}
+          sync: tar
           cache-after-prepare: true
           prepare: |
+            export PKG_PATH="https://cdn.NetBSD.org/pub/pkgsrc/packages/NetBSD/$(uname -p)/$(uname -r)/All"
             PATH=/usr/sbin:$PATH pkg_add git-base python312
             ln -sf /usr/pkg/bin/python3.12 /usr/pkg/bin/python3
             /usr/sbin/groupadd rsynctest-extra
