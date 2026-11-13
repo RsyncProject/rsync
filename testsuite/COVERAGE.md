@@ -1,6 +1,6 @@
 # Options and daemon parameters
 
-Covered means a test directly checks the stated behaviour. Partial means the assertions leave part of that behaviour unchecked. Missing identifies an option or parameter without a focused test. Test names refer to scripts under testsuite/tests; forced-protocol suite runs are listed by their Make targets.
+Covered means a test directly checks the stated behaviour. Partial means the assertions leave part of that behaviour unchecked. Missing identifies an option or parameter without a focused test. Test names refer to scripts under testsuite/tests; check-storage refers to the [privileged Linux storage check](tools/check-storage.py). Forced-protocol suite runs are listed by their Make targets.
 
 Path depth is deep, shallow, untested or N/A. Auxiliary tree is outside, inside only, untested or N/A depending on where the relevant backup, basis, partial or temporary tree is exercised.
 
@@ -56,7 +56,7 @@ Option | Tests | Path depth | Auxiliary tree | Coverage
 --chown | ownership-depth | deep | N/A | Covered for group remapping and root-only owner remapping
 -D, --devices, --specials | devices, devices-fake | shallow | N/A | Partial and privilege-dependent
 --drop-D | rrsync-specials-denied | N/A | N/A | Covered for restricted receivers
---copy-devices, --write-devices | none | untested | N/A | Missing
+--copy-devices, --write-devices | check-storage | shallow | N/A | Covered on Linux for regular-file and device I/O, delta updates, capacity and unwritten tails, archive mode, symlink replacement, read-only refusal and daemon default refusal and opt-in
 -S, --sparse | sparse | deep | N/A | Covered with a hole at depth
 
 ## Delta, temporary, backup and basis paths
@@ -75,7 +75,7 @@ Option | Tests | Path depth | Auxiliary tree | Coverage
 -u, --update | update | deep | N/A | Covered for newer and older destinations
 -W, --whole-file, --no-whole-file | local-transfers, checksum-chain-limit | N/A | N/A | Partial: forced delta transfer is covered; explicit whole-file mode is not
 --mkpath | mkpath | shallow | N/A | Partial
--x, --one-file-system | none | untested | untested | Missing; needs a mount boundary
+-x, -xx, --one-file-system | check-storage | deep | N/A | Covered on Linux for nested mounts, same-device binds, explicit sources, followed links, negation, both recursion modes and all deletion timings
 --preallocate | preallocate | deep | N/A | Covered for allocation and delta updates
 --fsync | fsync-linux | shallow | N/A | Covered on Linux for successful and failed flushes
 -B, --block-size | checksum-chain-limit, compress-zlib-insert, preallocate | deep | N/A | Covered
@@ -157,7 +157,7 @@ Option | Tests | Coverage
 -4, -6, --ipv4, --ipv6 | daemon-address-family | Covered for daemon binding and client connection
 --stop-after, --stop-at | stop-time | Covered for future, past and duration parsing
 --bwlimit | partial | Partial: used but not asserted directly
---copy-as | none | Missing and root-gated
+--copy-as | check-storage | Covered on Linux for named and numeric users and groups, supplementary groups, numeric identities without accounts, permission refusals and local-shell sender and receiver scope
 --iconv | iconv | Covered for names, arguments, file lists, protocol 30 link targets and invalid input; the raw-byte fixture is unavailable on macOS
 -s, --secluded-args, --old-args, --trust-sender | iconv, secluded-args-transfer, cli-transfers | Partial: secluded and legacy argument handling are asserted; trust-sender is not isolated
 
@@ -210,4 +210,6 @@ The CI Interoperability group defines 168 common-transfer cases across seven nat
 
 ## Storage
 
-The Ubuntu 24.04 X86-64 storage check uses a disposable LUKS2/ext4 volume and private mount namespace. It covers transfer and metadata preservation, link-dest with xattrs, close and reopen, noexec and read-only mounts, non-root permission refusal and a foreign-owned directory symlink. Size-limited tmpfs checks ENOSPC with normal writes, partial directories, in-place updates and append verification, then checks recovery and partial-data reuse after space becomes available. Distinct data blocks expose duplication or incorrect offsets. Normal and partial-directory failures retain the original destination; in-place and append failures do not promise rollback. Receipts require mount, mapping and loop-device cleanup.
+The Ubuntu 24.04 X86-64 storage check uses a disposable LUKS2/ext4 volume and private mount namespace. It covers transfer and metadata preservation, link-dest with xattrs, close and reopen, noexec and read-only mounts, non-root permission refusal and a foreign-owned directory symlink. Size-limited tmpfs checks ENOSPC with normal writes, partial directories, in-place updates and append verification, followed by recovery and partial-data reuse after space becomes available. Distinct data blocks expose duplication or incorrect offsets. Normal and partial-directory failures retain the original destination; in-place and append failures do not promise rollback. Receipts require mount, mapping and loop-device cleanup.
+
+Filesystem-boundary cases check -x and -xx with incremental and full file lists, followed links, explicit sources and same-device bind mounts. Deletion is checked with before, during, delayed and after timing. Loop-backed device cases cover ordinary files, device-to-device copies, delta matching, implicit in-place writes, unchanged capacity and untouched tails. Private aliases confine replacement tests to fixture nodes. Read-only refusal is qualified against the kernel's open or write failure. Daemon cases check default refusal and explicit opt-in. Copy-as checks effective UID and GID through created files, default supplementary-group access, explicit-group isolation, missing accounts and operation scope across a local-shell connection.
