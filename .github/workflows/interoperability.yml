@@ -1,5 +1,5 @@
 name: Network controller
-run-name: Network CI ${{ github.event.workflow_run.id }} attempt ${{ github.event.workflow_run.run_attempt }}
+run-name: Network controller
 
 on:
   workflow_run:

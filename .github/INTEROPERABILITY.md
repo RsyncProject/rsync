@@ -38,8 +38,8 @@ Endpoint jobs have no federated identity. Controller discovery uses the parent C
 
 ## Recovery
 
-Normal cleanup revokes the recorded grant, removes owned devices and revokes issued keys. An individual failure does not prevent attempts to remove the remaining resources. Device deletion checks the recorded node identity; reassigned devices remain untouched.
+Normal cleanup revokes the recorded grant, removes owned devices and revokes issued keys. An individual failure does not prevent attempts to remove the remaining resources. Device deletion checks the recorded node identity; reassigned devices remain untouched. A failure before enrolment records that no resources need cleanup without marking the transfer checks as passed.
 
-Admission leases are attested before access is granted. Recovery verifies the original lease bytes, repository, controller workflow, signing commit, source ref and run attempt before modifying the tailnet. Failed or cancelled controller runs trigger recovery from trusted code.
+Admission leases are attested before access is granted. Failed or cancelled controller runs trigger recovery from trusted code. Recovery checks the exact controller attempt's job record and does not repeat successful cleanup. Otherwise it verifies the original lease bytes, repository, controller workflow, signing commit, source ref and run attempt before modifying the tailnet.
 
 Missing leases and provider failures require reconciliation. Partial enrolment before a lease exists remains quarantined; hostnames alone are insufficient grounds for device deletion. Cleanup failure keeps the CI result unsuccessful.
