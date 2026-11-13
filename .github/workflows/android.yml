@@ -119,14 +119,19 @@ jobs:
     needs: x86_64
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    name: Termux X86-64
-    env:
-      TERMUX_IMAGE: termux/termux-docker@sha256:f993e5e7ef97b96af774e7062556ac51479fdccc3c3d2240748a3d04b857ce04
+    name: Termux API 36 X86-64
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
+      - &emulator-dependencies
+        name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y acl libpulse0
+          sudo setfacl -m "u:$(id -un):rw" /dev/kvm
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'system-images;android-36;google_apis;x86_64' emulator
       - &download
         name: Download binary
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -137,7 +142,16 @@ jobs:
         name: Verify binary
         run: python3 -S .github/scripts/android.py restore --abi x86_64
       - name: Tests
-        run: python3 -S .github/scripts/android.py termux
+        id: test
+        run: python3 -S .github/scripts/android-emulator.py --termux --output test-results/termux
+      - name: Upload results
+        if: ${{ !cancelled() && (steps.test.outcome == 'success' || steps.test.outcome == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          retention-days: 45
+          name: android-termux-results
+          if-no-files-found: error
+          path: test-results/termux/
 
   emulator:
     needs: x86_64
@@ -149,12 +163,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y acl libpulse0
-          sudo setfacl -m "u:$(id -un):rw" /dev/kvm
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'system-images;android-36;google_apis;x86_64' emulator
+      - *emulator-dependencies
       - *download
       - *restore
       - name: Tests

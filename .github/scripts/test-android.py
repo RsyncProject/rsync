@@ -1,9 +1,11 @@
 from contextlib import redirect_stderr, redirect_stdout
 import hashlib
 from io import StringIO
+import os
 from pathlib import Path
 import runpy
 import subprocess
+import sys
 import tempfile
 from types import SimpleNamespace
 import unittest
@@ -15,6 +17,29 @@ restore_binary = runpy.run_path(str(Path(__file__).with_name('android.py')))['re
 
 
 class Android(unittest.TestCase):
+    def test_context_selection(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            binary = root / 'rsync'
+            binary.write_bytes(b'candidate')
+            image = root / 'system-images/android-36/google_apis/x86_64/source.properties'
+            image.parent.mkdir(parents=True)
+            image.write_text('Pkg.Revision=7\n')
+            def checked(adb, binary, output, *device):
+                (output / 'transfer.log').write_text('passed\n')
+            for app in (False, True):
+                shell, termux = Mock(side_effect=checked), Mock(side_effect=checked)
+                args = ['android-emulator.py', '--binary', str(binary), '--output', str(root / str(app))]
+                with self.subTest(termux=app), patch.object(sys, 'argv', args + (['--termux'] if app else [])), \
+                        patch.dict(os.environ, ANDROID_HOME=str(root)), patch('shutil.which', return_value='/emulator'), \
+                        patch('subprocess.Popen'), redirect_stdout(StringIO()), \
+                        patch.dict(android['main'].__globals__, run=Mock(return_value=SimpleNamespace(returncode=0, stdout='', stderr='')),
+                                   wait_for_boot=Mock(), stop_emulator=Mock(), check_device=Mock(return_value={}),
+                                   check_transfer=shell, check_termux=termux):
+                    android['main']()
+                self.assertEqual(termux.call_count, int(app))
+                self.assertEqual(shell.call_count, int(not app))
+
     def test_restore(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

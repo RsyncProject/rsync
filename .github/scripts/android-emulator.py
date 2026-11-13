@@ -13,6 +13,7 @@ import tempfile
 import time
 
 from android import check_transfer as transfer, quote_command, run
+from termux import check_transfer as check_termux
 
 
 def wait_for_boot(adb, proc, timeout=300):
@@ -122,6 +123,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--binary', type=Path, default=Path('rsync'))
     parser.add_argument('--output', type=Path, default=Path('test-results/android-emulator'))
+    parser.add_argument('--termux', action='store_true', help='Run in the Termux application sandbox')
     args = parser.parse_args()
     binary = args.binary.resolve(strict=True)
     args.output.mkdir(parents=True)
@@ -161,7 +163,10 @@ def main():
                                         env=env, stdout=log, stderr=subprocess.STDOUT)
                 try:
                     wait_for_boot(adb, proc)
-                    check_transfer(adb, binary, args.output)
+                    if args.termux:
+                        check_termux(adb, binary, args.output, check_device(adb))
+                    else:
+                        check_transfer(adb, binary, args.output)
                 finally:
                     stop_emulator(adb, proc)
     finally:

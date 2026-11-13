@@ -82,11 +82,15 @@ OpenBSD | 7.9 and 8.0 on X86-64
 macOS | 15 and 26 on X86-64 and ARM64
 Cygwin | X86-64 on Windows Server 2022
 Solaris | X86-64 guest using the VM action's default release
-Android | API 24 Bionic on ARM64, ARMv7 and X86-64; Termux userspace and an API 36 emulator on X86-64
+Android | API 24 Bionic on ARM64, ARMv7 and X86-64; API 36 shell and Termux application sandboxes on X86-64
 
 Ubuntu, Alpine, macOS and BSD jobs run separate root and non-root pipe and TCP passes. Ubuntu and Alpine also force protocols 29 and 30. Alpine exercises musl and verifies 64-bit file offsets in its x86 process. Each Ubuntu row checks installed rsync and rsync-ssl against a local TLS daemon for trusted and rejected certificates, hostname mismatch and explicit verification opt-outs.
 
-Android jobs run local transfers with static Bionic binaries. ARM64 and ARMv7 use QEMU user mode; X86-64 executes directly. The X86-64 binary is built once and its artefact and checksum are reused by the Termux container and emulator jobs. Transfers check file data, delta matching, updates, deletion, permissions, deliberately old timestamps and symlinks. The API 36 emulator uses Google APIs image revision 7 and hardware acceleration. It runs as the Android shell user with SELinux enforcing, requires hard-link creation to be denied and checks rejection of unreadable sources. Userspace jobs check successful hard-link transfers. Emulator results retain the device identity, binary hash and emulator and transfer logs. Termux application-sandbox coverage and native transfers between different operating systems remain missing.
+Bionic jobs run local transfers with static binaries. ARM64 and ARMv7 use QEMU user mode; X86-64 executes directly. The X86-64 binary is built once and its artefact and checksum are reused by the Termux and emulator jobs. Transfers check file data, delta matching, updates, deletion, permissions, deliberately old timestamps and symlinks. Bionic userspace jobs also check hard-link transfers.
+
+The API 36 emulator jobs use Google APIs image revision 7 and hardware acceleration with SELinux enforcing. The emulator job runs as Android shell UID 2000. The Termux job installs the checksum-pinned 0.118.3 GitHub debug APK and runs commands through its [RUN_COMMAND service](https://github.com/termux/termux-app/wiki/RUN_COMMAND-Intent). It verifies the package UID and normal application SELinux domain before executing rsync. The run-as tool stages private files and dispatches intents; it does not execute the transfer assertions.
+
+Both contexts check hard-link refusal and rejection of unreadable sources. Results retain device identity, binary hashes, emulator and transfer logs. Termux results also record the application UID, SELinux context and APK hash. Each Termux run owns its installation and removes it after the checks.
 
 The Archive job uses the release archive builder and generated release files. It extracts the archive, blocks Git and Autoconf tools, builds out of tree and runs pipe and TCP passes. The Git file-time tool is checked in checkout CI rather than the archive pass. Installation checks exercise rsync, rrsync and rsync-ssl, check manual pages and verify that uninstall retains unrelated files. The installed rrsync fixture sets its documented RSYNC value to the installed candidate. Results retain the archive, its hash, build logs and test receipts. Signing and publication remain separate operations.
 

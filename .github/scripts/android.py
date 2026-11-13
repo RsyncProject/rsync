@@ -43,7 +43,7 @@ def check_transfer(command, binary, work, executor=(), hardlinks=True, write_fil
     if hardlinks:
         linked.check_returncode()
     elif linked.returncode == 0 or 'Permission denied' not in linked.stderr:
-        raise ValueError('Expected Android shell hard-link creation to be denied')
+        raise ValueError('Expected Android hard-link creation to be denied')
     command('ln', '-s', 'data', f'{source}/dir/symbolic-link')
     write_file(f'{source}/obsolete', b'remove me\n')
     print(command(*executor, binary, '--version', capture_output=True).stdout.splitlines()[0], flush=True)
@@ -90,27 +90,6 @@ def check_transfer(command, binary, work, executor=(), hardlinks=True, write_fil
     print('Android transfer passed', flush=True)
 
 
-def test_termux():
-    image = os.environ['TERMUX_IMAGE']
-    run('docker', 'pull', image, timeout=300)
-    platform = run('docker', 'image', 'inspect', '--format', '{{.Os}}/{{.Architecture}}', image,
-                   capture_output=True).stdout.strip()
-    if platform != 'linux/amd64':
-        raise ValueError(f'Unexpected Termux image platform: {platform}')
-    container = run('docker', 'run', '--detach', '--rm', '--network', 'none', '--user', '1000:1000',
-                    '--cap-drop', 'ALL', '--pids-limit', '256', '--memory', '1g',
-                    '--security-opt', 'no-new-privileges', '--mount',
-                    f'type=bind,source={Path("rsync").resolve()},target=/workspace/rsync,readonly',
-                    image, 'sleep', '300', capture_output=True).stdout.strip()
-    try:
-        def command(*args, **kwargs):
-            return run('docker', 'exec', '-i', container, *args, **kwargs)
-        work = command('mktemp', '-d', capture_output=True).stdout.strip()
-        check_transfer(command, '/workspace/rsync', work)
-    finally:
-        run('docker', 'rm', '--force', container)
-
-
 def restore_binary(directory, abi, destination):
     binaries = list(directory.glob(f'rsync-*-android-{abi}'))
     if len(binaries) != 1:
@@ -127,13 +106,10 @@ def restore_binary(directory, abi, destination):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('task', choices=['test', 'termux', 'package', 'restore'])
+    parser.add_argument('task', choices=['test', 'package', 'restore'])
     parser.add_argument('--executor')
     parser.add_argument('--abi', choices=['arm64-v8a', 'armeabi-v7a', 'x86_64'])
     args = parser.parse_args()
-    if args.task == 'termux':
-        test_termux()
-        return 0
     if args.task == 'test':
         description = subprocess.check_output(['file', 'rsync'], text=True, timeout=30)
         print(description, end='')
