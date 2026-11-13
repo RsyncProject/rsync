@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import errno
 import os
 import platform
 import subprocess
@@ -47,8 +48,10 @@ def has_xattr(path, name):
     try:
         os.getxattr(str(path), name, follow_symlinks=False)
         return True
-    except OSError:
-        return False
+    except OSError as error:
+        if error.errno == errno.ENODATA:
+            return False
+        raise
 
 def sync(args, frm, to):
     r = subprocess.run(rsync_argv(*args, f'{frm}/', f'{to}/'),
@@ -59,7 +62,8 @@ def sync(args, frm, to):
     return r
 
 os.setxattr(sd, 'user.marker', b'initial')
-sync(['-rAX', '-M--fake-super'], src, dst)
+os.utime(src / 'f', (1000000000, 1000000000))
+sync(['-rtAX', '-M--fake-super'], src, dst)
 if not has_xattr(dst / 'f', 'user.rsync.%aacl'):
     test_fail("--fake-super -A should have stored user.rsync.%aacl on dst/f")
 if not has_xattr(dst / 'd', 'user.rsync.%dacl'):
@@ -68,11 +72,23 @@ if not has_xattr(dst / 'd', 'user.rsync.%dacl'):
 if os.getxattr(dst / 'd', 'user.marker') != b'initial':
     test_fail('fake-super backup lost an ordinary xattr')
 
-sync(['-rX', '-M--fake-super'], src, dst)
+saved_acl = os.getxattr(dst / 'f', 'user.rsync.%aacl')
+saved_default = os.getxattr(dst / 'd', 'user.rsync.%dacl')
+inode = (dst / 'f').stat().st_ino
+os.setxattr(src / 'f', 'user.marker', b'updated')
+os.setxattr(sd, 'user.marker', b'updated')
+sync(['-rtX', '-M--fake-super'], src, dst)
 if not has_xattr(dst / 'f', 'user.rsync.%aacl') or not has_xattr(dst / 'd', 'user.rsync.%dacl'):
     test_fail('an xattr-only update removed saved ACL metadata')
+if (os.getxattr(dst / 'f', 'user.rsync.%aacl') != saved_acl
+        or os.getxattr(dst / 'd', 'user.rsync.%dacl') != saved_default):
+    test_fail('an xattr-only update changed saved ACL metadata')
+if (dst / 'f').stat().st_ino != inode:
+    test_fail('the metadata-only update replaced the file')
+if any(os.getxattr(path, 'user.marker') != b'updated' for path in (dst / 'f', dst / 'd')):
+    test_fail('the metadata-only update did not update ordinary xattrs')
 
-sync(['-rAX', '--fake-super', '-M--fake-super'], dst, dst2)
+sync(['-rtAX', '--fake-super', '-M--fake-super'], dst, dst2)
 if not has_xattr(dst2 / 'f', 'user.rsync.%aacl'):
     test_fail("fake-super -> fake-super -A round-trip lost %aacl on dst2/f")
 if not has_xattr(dst2 / 'd', 'user.rsync.%dacl'):
@@ -80,7 +96,7 @@ if not has_xattr(dst2 / 'd', 'user.rsync.%dacl'):
 
 subprocess.run(['setfacl', '-k', str(sd)], check=True)
 os.removexattr(sd, 'user.marker')
-sync(['-rAX', '-M--fake-super'], src, dst)
+sync(['-rtAX', '-M--fake-super'], src, dst)
 if has_xattr(dst / 'd', 'user.rsync.%dacl'):
     test_fail("re-sync after `setfacl -k` should have removed %dacl from dst/d "
               "(del_def_xattr_acl)")
