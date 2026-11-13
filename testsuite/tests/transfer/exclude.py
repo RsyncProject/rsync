@@ -4,7 +4,6 @@ import os
 import shutil
 import subprocess
 import sys
-import time
 
 from harness.comparison import checkdiff, checkit, verify_dirs
 from harness.environment import CHKDIR, FROMDIR, SCRATCHDIR, TODIR, all_plus, allspace, dots
@@ -120,22 +119,22 @@ up1 = SCRATCHDIR / 'up1'
 up2 = SCRATCHDIR / 'up2'
 up1.mkdir()
 up2.mkdir()
-(up1 / 'dst-newness').touch()
-(up2 / 'src-newness').touch()
+old_time = 1600000000
+new_time = old_time + 10
+for directory, name in ((up1, 'dst-newness'), (up2, 'src-newness')):
+    path = directory / name
+    path.touch()
+    os.utime(path, (old_time, old_time))
 same_src = up1 / 'same-newness'
 same_dst = up2 / 'same-newness'
 same_src.touch()
 same_dst.touch()
-# Give both files the same mtime; otherwise two touch calls could straddle a
-# second boundary and --update would see the destination as newer.
-src_stat = same_src.stat()
-dst_stat = same_dst.stat()
-os.utime(same_dst, ns=(dst_stat.st_atime_ns, src_stat.st_mtime_ns))
+os.utime(same_src, (old_time, old_time))
+os.utime(same_dst, (old_time, old_time))
 (up1 / 'extra-src').touch()
 (up2 / 'extra-dest').touch()
 
 checkit(['-avv', *rpath, f'{host}{FROMDIR}/', f'{CHKDIR}/'], FROMDIR, CHKDIR)
-time.sleep(1)
 shutil.rmtree(CHKDIR / 'foo' / 'down', ignore_errors=True)
 shutil.rmtree(CHKDIR / 'mid' / 'for' / 'foo' / 'and', ignore_errors=True)
 shutil.rmtree(CHKDIR / 'new' / 'keep' / 'this', ignore_errors=True)
@@ -147,8 +146,10 @@ for f in (CHKDIR / 'bar' / 'down' / 'to' / 'foo').glob('file[235-9]'):
     f.unlink()
 (CHKDIR / 'mid' / 'for' / 'foo' / 'extra').unlink()
 
-(up1 / 'src-newness').touch()
-(up2 / 'dst-newness').touch()
+for directory, name in ((up1, 'src-newness'), (up2, 'dst-newness')):
+    path = directory / name
+    path.touch()
+    os.utime(path, (new_time, new_time))
 
 run_rsync('-av', f'--rsync-path={rsync_path_arg()}',
           '--existing', '--include=*/', '--exclude=*',
