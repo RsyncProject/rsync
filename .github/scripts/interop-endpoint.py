@@ -191,7 +191,7 @@ def copy(root, binary, peer, transport, push, local, remote_path, options, fake_
 
 def prepare_metadata(data, role, binary, identity):
     base = data / 'metadata'
-    for part in ('source', 'destination', 'restored'):
+    for part in ('source', 'destination', 'opaque', 'restored'):
         (base / part).mkdir(parents=True)
     identity['metadata'] = qualify(binary, base / 'source/backup', role)
     for kind in ('acl', 'xattr'):
@@ -240,12 +240,27 @@ def metadata_transfers(root, role, binary, nodes, phase):
                 continue
             source, destination, client, transport, kind = case
             target = root / 'data' / 'metadata/restored' / name(case)
+            opaque = root / 'data' / 'metadata/opaque' / name(case)
             options = ['-rltpA', '--numeric-ids', *(['-X'] if FEATURES[source][1] else [])]
-            result = copy(root, binary, nodes[destination], transport, False, target,
-                          'metadata/destination/' + name(case) + '/', options, fake_remote=True)
+            # Saved ACLs belong to the originating platform. The storage host
+            # must return their bytes without decoding them.
+            result = copy(root, binary, nodes[destination], transport, False, opaque,
+                          'metadata/destination/' + name(case) + '/', ['-rltXX', '--numeric-ids'])
+            if result.returncode:
+                raise ValueError(name(case) + ': opaque backup retrieval failed: ' + result.stderr.decode(errors='replace')[-2048:])
+            env = {key: os.environ[key] for key in ('PATH', 'RUNNER_TRACKING_ID') if key in os.environ}
+            result = command([str(binary), *options, '--fake-super', '-M--super',
+                              str(opaque) + '/', str(target) + '/'], env, timeout=60)
             expected = root / 'data' / 'metadata/source/backup'
-            if result.returncode or metadata_snapshot(expected, role, kind) != metadata_snapshot(target, role, kind):
-                raise ValueError(name(case) + ': cross-platform backup did not restore its original ACLs or xattrs')
+            if result.returncode:
+                raise ValueError(name(case) + ': native backup restoration failed: ' + result.stderr.decode(errors='replace')[-2048:])
+            try:
+                wanted = metadata_snapshot(expected, role, kind)
+                actual = metadata_snapshot(target, role, kind)
+            except ValueError as error:
+                raise ValueError(name(case) + ': ' + str(error)) from error
+            if wanted != actual:
+                raise ValueError(name(case) + ': restored metadata differs: ' + json.dumps(dict(expected=wanted, actual=actual), sort_keys=True))
             restored.append(list(case))
     return dict(metadata_commands=commands, metadata_restored=restored)
 

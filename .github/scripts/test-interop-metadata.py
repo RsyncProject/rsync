@@ -105,6 +105,18 @@ class Attributes(unittest.TestCase):
         self.assertIn(('netbsd', 'solaris', 'pull', 'daemon', 'acl'), cases)
         self.assertIn(('openbsd', 'cygwin', 'push', 'ssh', 'xattr'), cases)
 
+    def test_backups_are_decoded_only_on_the_origin(self):
+        case = ('linux', 'freebsd', 'push', 'ssh', 'backup')
+        copy, command = Mock(return_value=subprocess.CompletedProcess([], 0, b'', b'')), Mock(return_value=subprocess.CompletedProcess([], 0, b'', b''))
+        with patch.dict(endpoint['metadata_transfers'].__globals__, metadata_cases=lambda: [case], copy=copy,
+                        command=command, metadata_snapshot=lambda *args: {'fixture': True}):
+            result = endpoint['metadata_transfers'](Path('/fixture'), 'linux', Path('/rsync'), {'freebsd': {}}, 2)
+        self.assertEqual(copy.call_args[0][-1], ['-rltXX', '--numeric-ids'])
+        self.assertFalse(copy.call_args[1].get('fake_remote', False))
+        self.assertIn('--fake-super', command.call_args[0][0])
+        self.assertIn('-M--super', command.call_args[0][0])
+        self.assertEqual(result['metadata_restored'], [list(case)])
+
     def test_posix_acl_formats(self):
         source = '# file: fixture\nuser::rw-\ngroup::---\ngroup:545:r-- #effective:r--\nmask::r--\nother::---\n'
         value = metadata.parse_acl(source)

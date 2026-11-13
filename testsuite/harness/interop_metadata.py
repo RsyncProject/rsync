@@ -175,7 +175,7 @@ def metadata_snapshot(root, role, kind, phase=1):
                 if path.is_dir():
                     expected.update({'default:' + key: value for key, value in expected.copy().items()})
                 if acl != expected:
-                    raise ValueError(role + ': POSIX ACL entries or mask differ from the fixture')
+                    raise ValueError(f'{role}: {name}: POSIX ACL differs: expected {expected!r}, actual {acl!r}')
             else:
                 if len(acl) != 2 or not acl[0].startswith('user:daemon deny ') or not acl[1].startswith('user:daemon allow '):
                     raise ValueError('Darwin ACL order or identity differs from the fixture')
