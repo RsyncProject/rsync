@@ -18,6 +18,7 @@ endpoint = runpy.run_path(str(Path(__file__).with_name('interop-endpoint.py')))
 client = runpy.run_path(str(Path(__file__).with_name('interop-client.py')))
 host = runpy.run_path(str(Path(__file__).with_name('interop-host.py')))
 from harness.interoperability import PLATFORMS, seed, transfer_cases, update
+from harness.interop_metadata import FEATURES, metadata_cases, supported
 from harness.ssh import public_key
 
 
@@ -45,9 +46,19 @@ class Transfers(unittest.TestCase):
 
     def receipts(self):
         cases = transfer_cases()
-        return {role: dict(platform=role, identity=dict(platform=role, source_sha=self.state['source_sha']), passed=True,
+        result = {role: dict(platform=role, identity=dict(platform=role, source_sha=self.state['source_sha'],
+                             metadata=dict(acl=FEATURES[role][0], xattrs=FEATURES[role][1])), passed=True,
                            commands=[list(case) for case in cases if (case[0] if case[2] == 'push' else case[1]) == role],
                            verified=[list(case) for case in cases if case[1] == role]) for role in ci.ROLES}
+        for role, record in result.items():
+            cases = metadata_cases()
+            record.update(metadata_commands=[list(case) for case in cases if (case[0] if case[2] == 'push' else case[1]) == role],
+                          metadata_updates=[list(case) for case in cases if (case[0] if case[2] == 'push' else case[1]) == role
+                                            and case[-1] != 'backup' and supported(case)],
+                          metadata_verified=[list(case) for case in cases if case[1] == role],
+                          metadata_initial_verified=[list(case) for case in cases if case[1] == role],
+                          metadata_restored=[list(case) for case in cases if case[0] == role and case[-1] == 'backup'])
+        return result
 
     def test_complete_native_case_set(self):
         self.assertEqual(set(ci.ROLES), set(PLATFORMS))
@@ -76,6 +87,28 @@ class Transfers(unittest.TestCase):
             values = self.receipts()
             del values[role]
             with self.subTest(missing=role), self.assertRaises(NetworkError):
+                broker['verify_cases'](values, self.state['source_sha'])
+
+    def test_metadata_evidence_cannot_be_omitted_or_substituted(self):
+        for role in ci.ROLES:
+            for field in ('metadata_commands', 'metadata_updates', 'metadata_initial_verified', 'metadata_verified', 'metadata_restored'):
+                values = self.receipts()
+                del values[role][field]
+                with self.subTest(role=role, missing=field), self.assertRaises(NetworkError):
+                    broker['verify_cases'](values, self.state['source_sha'])
+                values = self.receipts()
+                cases = values[role][field]
+                if cases:
+                    cases[0] = ['unknown', *cases[0][1:]]
+                    with self.subTest(role=role, substituted=field), self.assertRaises(NetworkError):
+                        broker['verify_cases'](values, self.state['source_sha'])
+                    values = self.receipts()
+                    values[role][field].append(values[role][field][0])
+                    with self.subTest(role=role, duplicate=field), self.assertRaises(NetworkError):
+                        broker['verify_cases'](values, self.state['source_sha'])
+            values = self.receipts()
+            values[role]['identity']['metadata']['xattrs'] = not FEATURES[role][1]
+            with self.subTest(role=role, feature='xattrs'), self.assertRaises(NetworkError):
                 broker['verify_cases'](values, self.state['source_sha'])
             values = self.receipts()
             values[role]['identity']['platform'] = 'host'
@@ -168,18 +201,19 @@ class Transfers(unittest.TestCase):
                 seed(root / 'data' / 'source' / endpoint['name'](case))
             if case[1] == 'linux':
                 seed(root / 'data' / 'destination' / endpoint['name'](case))
-        result = endpoint['verify'](root, 'linux', 1)
-        self.assertEqual(len(result['verified']), 24)
-        with self.assertRaises(ValueError):
-            endpoint['verify'](root, 'linux', 2)
-        for case in transfer_cases():
-            if case[1] == 'linux':
-                update(root / 'data' / 'destination' / endpoint['name'](case))
-        self.assertEqual(len(endpoint['verify'](root, 'linux', 2)['verified']), 24)
-        first = next(case for case in transfer_cases() if case[1] == 'linux')
-        (root / 'data' / 'destination' / endpoint['name'](first) / 'space name').write_text('corrupt')
-        with self.assertRaises(ValueError):
-            endpoint['verify'](root, 'linux', 2)
+        with patch.dict(endpoint['verify'].__globals__, verify_metadata=lambda *_: []):
+            result = endpoint['verify'](root, 'linux', 1)
+            self.assertEqual(len(result['verified']), 24)
+            with self.assertRaises(ValueError):
+                endpoint['verify'](root, 'linux', 2)
+            for case in transfer_cases():
+                if case[1] == 'linux':
+                    update(root / 'data' / 'destination' / endpoint['name'](case))
+            self.assertEqual(len(endpoint['verify'](root, 'linux', 2)['verified']), 24)
+            first = next(case for case in transfer_cases() if case[1] == 'linux')
+            (root / 'data' / 'destination' / endpoint['name'](first) / 'space name').write_text('corrupt')
+            with self.assertRaises(ValueError):
+                endpoint['verify'](root, 'linux', 2)
 
     def test_client_packages_are_verified_before_execution(self):
         opener = type('Opener', (), {'open': lambda *_args, **_kwargs: io.BytesIO(b'not the expected package')})()
@@ -208,6 +242,26 @@ class Transfers(unittest.TestCase):
                     patch.dict(host['main'].__globals__, shared):
                 self.assertEqual(host['main'](), 0)
             self.assertEqual(calls, expected)
+
+    def test_result_retains_both_metadata_verification_phases(self):
+        record = self.receipts()['linux']
+        initial = list(reversed(record['metadata_verified']))
+        (self.root / 'ready.json').write_text(json.dumps(dict(identity=record['identity'], node_id='n1')))
+        (self.root / 'transfer1.json').write_text(json.dumps(dict(metadata_commands=record['metadata_commands'])))
+        (self.root / 'next.json').write_text(json.dumps(dict(metadata_verified=initial)))
+        (self.root / 'transfer2.json').write_text(json.dumps(dict(commands=record['commands'],
+            metadata_commands=record['metadata_updates'], metadata_restored=record['metadata_restored'])))
+        publish = unittest.mock.Mock()
+        final = dict(verified=record['verified'], metadata_verified=record['metadata_verified'])
+        with patch.object(sys, 'argv', ['interop-host.py', 'verify', 'linux', '--root', str(self.root)]), \
+                patch.dict(host['main'].__globals__, identity=lambda: self.state, records=lambda *args, **kwargs: {},
+                           call=lambda *args: final, write=publish):
+            self.assertEqual(host['main'](), 0)
+        self.assertEqual(publish.call_args[0][1], 'result')
+        self.assertEqual(publish.call_args[1]['metadata_initial_verified'], initial)
+        self.assertEqual(publish.call_args[1]['metadata_verified'], record['metadata_verified'])
+        self.assertEqual(publish.call_args[1]['metadata_commands'], record['metadata_commands'])
+        self.assertEqual(publish.call_args[1]['metadata_updates'], record['metadata_updates'])
 
     def test_peer_failure_records_a_blocked_phase(self):
         environment = self.root / 'github-env'

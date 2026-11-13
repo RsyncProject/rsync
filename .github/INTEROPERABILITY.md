@@ -4,6 +4,8 @@ CI / Interoperability contains Linux, FreeBSD, NetBSD, OpenBSD, macOS, Solaris a
 
 The 168 cases cover every directed platform pair, push and pull initiation and SSH and daemon transport. Separate trees prevent concurrent cases from sharing destinations. Initial copies finish before verification and source updates; checksum updates finish before destination verification. Results include data, modes, integer timestamps, symlink targets and hard-link groups.
 
+Metadata uses separate destination trees and shares read-only source fixtures until the next phase barrier. Compatible POSIX ACLs and xattrs receive initial and updated transfers. Incompatible ACLs use fake-super storage and a restore to the originating platform. Unsupported features and empty NTFS xattrs require explicit errors. Result validation checks the exact metadata case sets, destination verification and completed restores as well as each endpoint's qualified features.
+
 The parent CI run and attempt identify each cohort. The tested revision comes from GitHub's resolved reusable-workflow commit and is checked against the native checkout. Endpoint records also contain the operating system, effective UID/GID and executable SHA-256. Required depends on all seven endpoint jobs, complete case results and confirmed network cleanup.
 
 Endpoint jobs fail for their own setup, transfer and cleanup errors. Unavailable peers or a failed controller block shared phases; the remaining checks are skipped and local cleanup still runs. Result rejects failed or blocked endpoints, missing outcomes, incomplete transfer results and unverified network cleanup.

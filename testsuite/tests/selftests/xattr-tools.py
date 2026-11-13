@@ -36,6 +36,10 @@ def test(context: TestContext):
             if xattrs.get_value('marker', path) != b'value':
                 test_fail(f'{system} changed the xattr value')
             tool.assert_called_once_with(read)
-
+            tool.reset_mock()
+            xattrs.remove_value('marker', path)
+            expected = (['xattr', '-d', 'marker', str(path)] if system == 'Darwin'
+                        else ['rmextattr', '-h', 'user', 'marker', str(path)])
+            tool.assert_called_once_with(expected)
 if __name__ == '__main__':
     run(test)

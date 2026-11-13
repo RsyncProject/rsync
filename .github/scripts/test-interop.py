@@ -130,19 +130,7 @@ class Network(unittest.TestCase):
         self.assertEqual(output.read_text(), 'enabled=false\n')
         self.assertFalse((self.root / 'context.json').exists())
 
-    def test_controller_requires_all_directed_transfer_cases(self):
-        cases = [(a, b, client, transport) for a in ROLES for b in ROLES if a != b
-                 for client in ('push', 'pull') for transport in ('ssh', 'daemon')]
-        self.assertEqual(len(cases), 168)
-        results = {role: dict(identity=dict(platform=role, source_sha=self.state['source_sha']), passed=True,
-                              commands=[list(case) for case in cases if (case[0] if case[2] == 'push' else case[1]) == role],
-                              verified=[list(case) for case in cases if case[1] == role]) for role in ROLES}
-        broker['verify_cases'](results, self.state['source_sha'])
-        for field in ('commands', 'verified'):
-            broken = copy.deepcopy(results)
-            broken['linux'][field].pop()
-            with self.subTest(field=field), self.assertRaises(network.NetworkError):
-                broker['verify_cases'](broken, self.state['source_sha'])
+    def test_controller_event_is_bound_to_repository_and_workflow(self):
         for field in ('path', 'owner', 'repository'):
             event = copy.deepcopy(self.event)
             if field == 'path':

@@ -102,6 +102,22 @@ def set_value(name, value, *paths):
         else:
             raise NotImplementedError(f'xattr set on {SYSTEM}')
 
+def remove_value(name, path):
+    name, path = _full_name(name), str(path)
+    if SYSTEM == 'Linux':
+        os.removexattr(path, name)
+    elif CYGWIN:
+        _run(['setfattr', '-x', name, path])
+    elif SYSTEM == 'Darwin':
+        _run(['xattr', '-d', name, path])
+    elif SYSTEM == 'FreeBSD':
+        _run(['rmextattr', '-h', 'user', name, path])
+    elif SYSTEM == 'SunOS':
+        _run(['runat', path, '/bin/sh'], input=b'rm -- "$XNAME"\n', env={**os.environ, 'XNAME': name})
+    else:
+        raise NotImplementedError(f'xattr remove on {SYSTEM}')
+
+
 def dump_values(*paths):
     if SYSTEM == 'Linux':
         output = []

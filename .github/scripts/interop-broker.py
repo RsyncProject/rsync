@@ -11,6 +11,9 @@ from interop_enrol import seal
 from interop_network import NetworkError, Tailnet, download_records
 from interop_policy import TAILNET, admission, check_policy, update_policy
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'testsuite'))
+from harness.interop_metadata import FEATURES, metadata_cases, supported
+
 
 def load(root, kind):
     path = root / (kind + '.json')
@@ -51,6 +54,30 @@ def verify_cases(receipts, source_sha):
             collected.update(assigned)
     if commands != expected or received != expected:
         raise NetworkError('Directed transfer coverage is incomplete')
+    verify_metadata(receipts)
+
+
+def verify_metadata(receipts):
+    expected = set(metadata_cases())
+    for role, record in receipts.items():
+        acl, extended = FEATURES[role]
+        actual = record['identity'].get('metadata')
+        if (not isinstance(actual, dict) or type(actual.get('xattrs')) is not bool
+                or actual != dict(acl=acl, xattrs=extended)):
+            raise NetworkError('Endpoint did not qualify its required metadata features')
+        for field in ('metadata_commands', 'metadata_updates', 'metadata_initial_verified', 'metadata_verified', 'metadata_restored'):
+            if field in ('metadata_initial_verified', 'metadata_verified'):
+                assigned = {case for case in expected if case[1] == role}
+            elif field == 'metadata_restored':
+                assigned = {case for case in expected if case[0] == role and case[-1] == 'backup'}
+            else:
+                assigned = {case for case in expected if (case[0] if case[2] == 'push' else case[1]) == role
+                            and (field == 'metadata_commands' or case[-1] != 'backup' and supported(case))}
+            cases = record.get(field)
+            if (not isinstance(cases, list) or len(cases) != len(assigned)
+                    or any(not isinstance(case, list) or len(case) != 5 or any(not isinstance(value, str) for value in case) for case in cases)
+                    or {tuple(case) for case in cases} != assigned):
+                raise NetworkError('Missing, duplicate or incorrectly assigned metadata case')
 
 
 def prepare(root, api):

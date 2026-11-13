@@ -55,6 +55,8 @@ jobs:
         run: |
           python3 -B -S .github/scripts/test-android.py
           python3 -B -S .github/scripts/test-termux.py
+          python3 -B -S .github/scripts/test-storage.py
+          python3 -B -S .github/scripts/test-interop-metadata.py
           python3 -B -S .github/scripts/test-results.py
           python3 -B -S .github/scripts/test-guest.py
           python3 -B -S .github/scripts/test-diagnostics.py
@@ -97,6 +99,8 @@ jobs:
           python3 -S .github/scripts/test-diagnostics.py
           python3 -S .github/scripts/test-android.py
           python3 -S .github/scripts/test-termux.py
+          python3 -S .github/scripts/test-storage.py
+          python3 -S .github/scripts/test-interop-metadata.py
           python3 -S .github/scripts/test-archive.py
           python3 -S .github/scripts/test-interop-policy.py
           python3 -S .github/scripts/test-interop.py

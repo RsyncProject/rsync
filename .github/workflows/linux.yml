@@ -102,6 +102,12 @@ jobs:
       - name: Verify restricted SSH
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: sudo python3 -S testsuite/tools/check-ssh.py --rsync /usr/local/bin/rsync --rrsync support/rrsync
+      - name: Install storage dependencies
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.release == '24.04' && matrix.arch == 'amd64' }}
+        run: sudo apt-get install -y cryptsetup-bin e2fsprogs
+      - name: Storage
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.release == '24.04' && matrix.arch == 'amd64' }}
+        run: sudo python3 -B -S testsuite/tools/check-storage.py --binary "$PWD/rsync" --output "$PWD/test-results/root/storage"
       - name: Tests (root pipe)
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: sudo python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" "pipe,root,${{ matrix.profiles }}" "$PWD/test-results/root/pipe" -j8

@@ -14,6 +14,9 @@ import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'testsuite'))
 from harness.interoperability import PLATFORMS, endpoint_identity, seed, snapshot, transfer_cases, update
+from harness.interop_metadata import (FEATURES, metadata_cases, metadata_filesystem, metadata_snapshot,
+                                     qualify, seed_metadata, supported)
+from harness import xattrs
 from harness.process import quote_command
 from harness.ssh import ProcessServer, SSHServer, client_command, command, public_key
 
@@ -21,7 +24,7 @@ SSH_PORT, DAEMON_PORT = 18731, 18733
 
 
 def name(case):
-    if tuple(case) not in transfer_cases():
+    if tuple(case) not in transfer_cases() + metadata_cases():
         raise ValueError('Unknown transfer case')
     return '-'.join(case)
 
@@ -48,6 +51,7 @@ def local_cases(role, field):
 
 
 def serve(root, role, binary, rrsync, address='127.0.0.1', revision=None):
+    storage = ExitStack()
     try:
         identity = endpoint_identity(binary, role)
         if revision:
@@ -60,7 +64,7 @@ def serve(root, role, binary, rrsync, address='127.0.0.1', revision=None):
             if actual != revision:
                 raise ValueError('Native endpoint has a different candidate revision')
             identity['source_sha'] = actual
-        data = root / 'data'
+        data = storage.enter_context(metadata_filesystem(root, role))
         (data / 'source').mkdir(parents=True)
         (data / 'destination').mkdir()
         for case in local_cases(role, 0):
@@ -68,12 +72,14 @@ def serve(root, role, binary, rrsync, address='127.0.0.1', revision=None):
         for case in local_cases(role, 1):
             (data / 'destination' / name(case)).mkdir()
         seed(root / 'reference')
+        prepare_metadata(data, role, binary, identity)
         env = {key: os.environ[key] for key in ('PATH', 'RUNNER_TRACKING_ID') if key in os.environ}
         env.update(HOME=str(root), LC_ALL='C')
         conf = root / 'rsyncd.conf'
         conf.write_text(f'use chroot = no\nuid = {os.geteuid()}\ngid = {os.getegid()}\n'
                         f'log file = {root / "rsyncd.log"}\n'
-                        f'[data]\npath = {data}\nread only = no\nmunge symlinks = no\n')
+                        f'[data]\npath = {data}\nread only = no\nmunge symlinks = no\n'
+                        f'[backup]\npath = {data}\nread only = no\nmunge symlinks = no\nfake super = yes\n')
         daemon = root / 'daemon'
         daemon.mkdir()
         with ExitStack() as resources:
@@ -95,15 +101,22 @@ def serve(root, role, binary, rrsync, address='127.0.0.1', revision=None):
                 if time.monotonic() >= deadline:
                     raise ValueError('Endpoint service deadline expired')
                 time.sleep(0.1)
-        (root / 'stopped').touch()
     except BaseException as error:
         publish(root, 'error', dict(error=str(error) if isinstance(error, ValueError) else type(error).__name__))
         raise
     finally:
-        for filename in ('client', 'host'):
-            path = root / 'ssh' / filename
-            if path.exists():
-                path.unlink()
+        try:
+            storage.close()
+        except BaseException:
+            if not (root / 'error.json').exists():
+                publish(root, 'error', dict(error='Metadata filesystem cleanup failed'))
+            raise
+        finally:
+            for filename in ('client', 'host'):
+                path = root / 'ssh' / filename
+                if path.exists():
+                    path.unlink()
+    (root / 'stopped').touch()
 
 
 def prepare(role, binary, rrsync, address='127.0.0.1', revision=None):
@@ -114,7 +127,7 @@ def prepare(role, binary, rrsync, address='127.0.0.1', revision=None):
                           '--binary', str(binary), '--rrsync', str(rrsync), '--address', address,
                           *(['--source-sha', revision] if revision else [])], env=env, stdin=subprocess.DEVNULL,
                          stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
-    deadline = time.monotonic() + 15
+    deadline = time.monotonic() + 90
     while not (root / 'local.json').exists():
         if (root / 'error.json').exists():
             raise ValueError(read(root, 'error')['error'])
@@ -161,6 +174,82 @@ def configure(root, role, nodes):
     publish(root, 'peers', nodes)
 
 
+def copy(root, binary, peer, transport, push, local, remote_path, options, fake_remote=False):
+    if transport == 'ssh':
+        remote = f'{peer["ssh_user"]}@{peer["address"]}:{remote_path}'
+        protocol = ['--old-args', '--rsync-path=rsync', '-e', quote_command(client_command(root / 'ssh', SSH_PORT))]
+        if fake_remote:
+            protocol.append('-M--fake-super')
+    else:
+        module = 'backup' if fake_remote else 'data'
+        remote = f'rsync://{peer["address"]}:{DAEMON_PORT}/{module}/{remote_path}'
+        protocol = []
+    operands = [str(local) + '/', remote] if push else [remote, str(local) + '/']
+    env = {key: os.environ[key] for key in ('PATH', 'RUNNER_TRACKING_ID') if key in os.environ}
+    return command([str(binary), *options, *protocol, *operands], env, timeout=60)
+
+
+def prepare_metadata(data, role, binary, identity):
+    base = data / 'metadata'
+    for part in ('source', 'destination', 'restored'):
+        (base / part).mkdir(parents=True)
+    identity['metadata'] = qualify(binary, base / 'source/backup', role)
+    for kind in ('acl', 'xattr'):
+        seed_metadata(base / 'source' / kind, role, kind)
+    if FEATURES[role][1] and role != 'cygwin':
+        seed_metadata(base / 'source/empty-xattr', role, 'empty-xattr')
+    for case in metadata_cases():
+        if case[1] == role:
+            (base / 'destination' / name(case)).mkdir()
+
+
+def metadata_transfers(root, role, binary, nodes, phase):
+    commands, restored = [], []
+    for case in metadata_cases():
+        source, destination, client, transport, kind = case
+        if (source if client == 'push' else destination) != role:
+            continue
+        if phase == 2 and (kind == 'backup' or not supported(case)):
+            continue
+        source_path = 'metadata/source/' + kind + '/'
+        destination_path = 'metadata/destination/' + name(case) + '/'
+        peer = nodes[destination if client == 'push' else source]
+        local = root / 'data' / (source_path if client == 'push' else destination_path)
+        options = ['-rltp', '--numeric-ids', '-A' if kind in ('acl', 'backup') else '-X']
+        if kind == 'backup':
+            if FEATURES[source][1]:
+                options.append('-X')
+            if client == 'pull':
+                options.append('--fake-super')
+        result = copy(root, binary, peer, transport, client == 'push', local,
+                      destination_path if client == 'push' else source_path, options,
+                      fake_remote=kind == 'backup' and client == 'push')
+        if supported(case):
+            if result.returncode:
+                raise ValueError(name(case) + ': metadata transfer failed: ' + result.stderr.decode(errors='replace')[-2048:])
+        elif kind == 'empty-xattr' and destination == 'cygwin':
+            if result.returncode != 23 or b'Invalid argument' not in result.stderr:
+                raise ValueError(name(case) + ': empty NTFS xattr was not explicitly refused')
+        elif (result.returncode == 0
+              or (b'ACLs are not supported' if kind == 'acl' else b'extended attributes are not supported') not in result.stderr):
+            raise ValueError(name(case) + ': unsupported metadata was not explicitly refused')
+        commands.append(list(case))
+    if phase == 2:
+        for case in metadata_cases():
+            if case[0] != role or case[-1] != 'backup':
+                continue
+            source, destination, client, transport, kind = case
+            target = root / 'data' / 'metadata/restored' / name(case)
+            options = ['-rltpA', '--numeric-ids', *(['-X'] if FEATURES[source][1] else [])]
+            result = copy(root, binary, nodes[destination], transport, False, target,
+                          'metadata/destination/' + name(case) + '/', options, fake_remote=True)
+            expected = root / 'data' / 'metadata/source/backup'
+            if result.returncode or metadata_snapshot(expected, role, kind) != metadata_snapshot(target, role, kind):
+                raise ValueError(name(case) + ': cross-platform backup did not restore its original ACLs or xattrs')
+            restored.append(list(case))
+    return dict(metadata_commands=commands, metadata_restored=restored)
+
+
 def transfers(root, role, binary, phase):
     nodes = read(root, 'peers')
     commands = []
@@ -168,27 +257,51 @@ def transfers(root, role, binary, phase):
         source, destination, client, transport = case
         if (source if client == 'push' else destination) != role:
             continue
-        case_name = name(case)
-        source_path, destination_path = 'source/' + case_name + '/', 'destination/' + case_name + '/'
+        source_path, destination_path = 'source/' + name(case) + '/', 'destination/' + name(case) + '/'
         peer = nodes[destination if client == 'push' else source]
-        remote_path = destination_path if client == 'push' else source_path
-        if transport == 'ssh':
-            remote = f'{peer["ssh_user"]}@{peer["address"]}:{remote_path}'
-            options = ['--old-args', '--rsync-path=rsync', '-e', quote_command(client_command(root / 'ssh', SSH_PORT))]
-        else:
-            remote = f'rsync://{peer["address"]}:{DAEMON_PORT}/data/{remote_path}'
-            options = []
-        local = str(root / 'data' / (source_path if client == 'push' else destination_path)) + '/'
-        operands = [local, remote] if client == 'push' else [remote, local]
-        env = {key: os.environ[key] for key in ('PATH', 'RUNNER_TRACKING_ID') if key in os.environ}
-        result = command([str(binary), '-rltpH', *options, *(['--checksum', '--delete'] if phase == 2 else []),
-                          *operands], env, timeout=60)
+        result = copy(root, binary, peer, transport, client == 'push',
+                      root / 'data' / (source_path if client == 'push' else destination_path),
+                      destination_path if client == 'push' else source_path,
+                      ['-rltpH', *(['--checksum', '--delete'] if phase == 2 else [])])
         if result.returncode:
-            raise ValueError(f'{case_name}: rsync exited {result.returncode}: '
+            raise ValueError(f'{name(case)}: rsync exited {result.returncode}: '
                              + result.stderr.decode(errors='replace')[-2048:])
         commands.append(list(case))
-    publish(root, 'transferred-' + str(phase), dict(commands=commands))
-    return dict(commands=commands)
+    result = dict(commands=commands, **metadata_transfers(root, role, binary, nodes, phase))
+    publish(root, 'transferred-' + str(phase), result)
+    return result
+
+
+def verify_metadata(root, role, phase):
+    base = root / 'data' / 'metadata'
+    expected = {kind: metadata_snapshot(base / 'source' / kind, role, kind, phase)
+                for kind, available in (('acl', FEATURES[role][0]), ('xattr', FEATURES[role][1]),
+                                        ('empty-xattr', FEATURES[role][1] and role != 'cygwin')) if available}
+    verified = []
+    for case in metadata_cases():
+        if case[1] != role:
+            continue
+        target, kind = base / 'destination' / name(case), case[-1]
+        if not supported(case):
+            if kind == 'empty-xattr' and role == 'cygwin':
+                if ((target / 'directory/file').read_bytes() != b'metadata transfer\n'
+                        or 'rsync-ci-empty' in xattrs.dump_values(target / 'directory', target / 'directory/file')):
+                    raise ValueError(name(case) + ': empty NTFS xattr refusal had an unexpected result')
+            elif any(target.iterdir()):
+                raise ValueError(name(case) + ': refused metadata transfer wrote destination files')
+        elif kind == 'backup':
+            for path in (target / 'directory', target / 'directory/file'):
+                if not xattrs.get_value('rsync.%aacl', path):
+                    raise ValueError(name(case) + ': backup has no saved ACL')
+            if (target / 'directory/file').read_bytes() != b'metadata transfer\n':
+                raise ValueError(name(case) + ': backup file contents differ')
+        elif expected[kind] != metadata_snapshot(target, role, kind, phase):
+            raise ValueError(name(case) + ': destination ACLs or xattrs differ')
+        verified.append(list(case))
+    if phase == 1:
+        for kind in ('acl', 'xattr'):
+            seed_metadata(base / 'source' / kind, role, kind, 2)
+    return verified
 
 
 def verify(root, role, phase):
@@ -202,8 +315,9 @@ def verify(root, role, phase):
         for case in local_cases(role, 0):
             update(root / 'data' / 'source' / name(case))
         update(root / 'reference')
-    publish(root, 'verified-' + str(phase), dict(verified=verified))
-    return dict(verified=verified)
+    result = dict(verified=verified, metadata_verified=verify_metadata(root, role, phase))
+    publish(root, 'verified-' + str(phase), result)
+    return result
 
 
 def stop(root):

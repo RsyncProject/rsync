@@ -69,7 +69,9 @@ Individual tests use exit codes 0 for pass, 1 for failure, 2 for error and 77 fo
 
 The Interoperability group runs Linux, FreeBSD, NetBSD, OpenBSD, macOS, Solaris and Cygwin endpoints within PR CI, including fork PRs. Its 168 cases cover every directed platform pair, both client roles and SSH and daemon transports. A separate trusted controller handles network enrolment, admission and cleanup without executing candidate code. [Network access and recovery](../.github/INTEROPERABILITY.md) define the authentication and failure contracts.
 
-The interoperability test qualifies a common transfer fixture through native daemon pushes and pulls. It checks file data, modes, timestamps, hard links, symlink targets, checksum updates and deletions. The shared case plan covers all 42 directed pairs between Linux, FreeBSD, NetBSD, OpenBSD, macOS, Solaris and Cygwin, both client roles and SSH and daemon transports. Connected execution of those 168 cases remains the next stage.
+The common transfer fixture checks file data, modes, timestamps, hard links, symlink targets, checksum updates and deletions. Separate metadata cases check POSIX access and default ACLs, xattr namespace translation, updates and removals. Incompatible ACLs use fake-super storage followed by restoration on the originating platform. Empty xattrs have a separate case because NTFS rejects them. Unsupported binary features must produce an explicit refusal without writing destination files.
+
+FreeBSD and Solaris metadata transfers use dedicated UFS filesystems. Each endpoint qualifies its configured ACL and xattr support before joining the transfer stages. The Result job requires every metadata command, update, destination check and backup restoration as well as the common transfer cases and network cleanup.
 
 Environment | Versions and architectures
 --- | ---
@@ -85,6 +87,8 @@ Solaris | X86-64 guest using the VM action's default release
 Android | API 24 Bionic on ARM64, ARMv7 and X86-64; API 36 shell and Termux application sandboxes on X86-64
 
 Ubuntu, Alpine, macOS and BSD jobs run separate root and non-root pipe and TCP passes. Ubuntu and Alpine also force protocols 29 and 30. Alpine exercises musl and verifies 64-bit file offsets in its x86 process. Each Ubuntu row checks installed rsync and rsync-ssl against a local TLS daemon for trusted and rejected certificates, hostname mismatch and explicit verification opt-outs.
+
+Ubuntu 24.04 X86-64 also checks storage in a private mount namespace. A disposable LUKS2/ext4 volume exercises metadata, link-dest, close and reopen, noexec and read-only mounts. A non-root receiver checks permission refusal and a foreign-owned directory symlink. Size-limited tmpfs checks ENOSPC and recovery with normal writes, partial directories, in-place updates and append verification. Recovery checks partial-data reuse with distinct blocks so duplicated or misplaced data changes the checksum. Storage receipts are written after mount, mapping and loop-device cleanup.
 
 Bionic jobs run local transfers with static binaries. ARM64 and ARMv7 use QEMU user mode; X86-64 executes directly. The X86-64 binary is built once and its artefact and checksum are reused by the Termux and emulator jobs. Transfers check file data, delta matching, updates, deletion, permissions, deliberately old timestamps and symlinks. Bionic userspace jobs also check hard-link transfers.
 

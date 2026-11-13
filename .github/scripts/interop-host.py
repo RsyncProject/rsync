@@ -46,7 +46,7 @@ def call(root, role, phase, data=None):
             args = ['sudo', '--preserve-env=RUNNER_TRACKING_ID', *args]
     result = subprocess.run(args, input=None if data is None else json.dumps(data).encode(),
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                            timeout=1600 if phase.startswith('transfer') else 45)
+                            timeout=1600 if phase.startswith('transfer') else (120 if phase in ('prepare', 'next', 'verify') else 45))
     if result.returncode:
         raise NetworkError(f'{role} {phase} failed: ' + result.stderr.decode(errors='replace')[-2048:])
     if len(result.stdout) > 65536:
@@ -238,9 +238,14 @@ def main():
             write(root, phase, **result)
             if phase == 'verify':
                 own = json.loads((root / 'ready.json').read_text())
-                commands = json.loads((root / 'transfer2.json').read_text())['commands']
+                initial = json.loads((root / 'transfer1.json').read_text())
+                initial_check = json.loads((root / 'next.json').read_text())
+                updated = json.loads((root / 'transfer2.json').read_text())
                 write(root, 'result', identity=own['identity'], node_id=own['node_id'], passed=True,
-                      commands=commands, verified=result['verified'])
+                      commands=updated['commands'], verified=result['verified'],
+                      metadata_commands=initial['metadata_commands'], metadata_updates=updated['metadata_commands'],
+                      metadata_initial_verified=initial_check['metadata_verified'],
+                      metadata_verified=result['metadata_verified'], metadata_restored=updated['metadata_restored'])
         else:
             jobs = json.loads(os.environ['INTEROP_JOBS'])
             if set(jobs) != set(ROLES):
@@ -254,7 +259,7 @@ def main():
             proof = published('result')
             if proof.get('passed') is not True or proof.get('cleaned') is not True or proof.get('roles') != list(ROLES):
                 raise NetworkError('Missing verified network cleanup')
-            print('Verified all 168 directed transfers and network cleanup')
+            print('Verified directed transfers, metadata restoration and network cleanup')
     except (OSError, ValueError, KeyError, subprocess.SubprocessError) as error:
         if isinstance(error, PeerUnavailable) and args.phase not in ('result', 'stop'):
             write(root, 'blocked', role=args.platform, phase=args.phase, passed=False, reason=str(error))
