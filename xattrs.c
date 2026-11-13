@@ -1084,7 +1084,10 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 		else if (user_only ? !HAS_PREFIX(name, USER_PREFIX) : HAS_PREFIX(name, SYSTEM_PREFIX))
 			continue;
 #endif
-		if (am_root < 0 && name_len > RPRE_LEN && name[RPRE_LEN] == '%' && strcmp(name, XSTAT_ATTR) == 0)
+		/* Fake-super ACL records belong to -A, not the -X deletion pass. */
+		if (am_root < 0 && name_len > RPRE_LEN && name[RPRE_LEN] == '%'
+		 && (strcmp(name, XSTAT_ATTR) == 0 || strcmp(name, XACC_ACL_ATTR) == 0
+		  || strcmp(name, XDEF_ACL_ATTR) == 0))
 			continue;
 
 		for (i = 0; i < xalp->count; i++) {
