@@ -106,7 +106,7 @@ int poptReadConfigFile(poptContext con, const char * fn)
 	return (errno == ENOENT ? 0 : POPT_ERROR_ERRNO);
 
     fileLength = lseek(fd, 0, SEEK_END);
-    if (fileLength == -1 || lseek(fd, 0, 0) == -1) {
+    if (fileLength < 0 || lseek(fd, 0, 0) < 0) {
 	rc = errno;
 	(void) close(fd);
 	errno = rc;
