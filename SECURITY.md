@@ -5,12 +5,13 @@
 Version | Support
 --- | ---
 Current stable line | Security and correctness fixes
-3.2.7 LTS | Security fixes only
+3.2.x LTS | Security fixes only
 Other releases | Unsupported
 
-The `lts/3.2.7` branch receives fixes for vulnerabilities which affect rsync
-3.2.7. It does not receive new features, performance changes or general bug
-fixes except where a change is required to apply or verify a security fix.
+The `lts/3.2.7` branch is based on rsync 3.2.7 and receives fixes for
+vulnerabilities which affect that line. It does not receive new features,
+performance changes or general bug fixes except where a change is required to
+apply or verify a security fix.
 
 The Rsync Project maintainers own this branch. The line has no indefinite
 support guarantee. Its retirement date will be announced at least six months
@@ -22,6 +23,11 @@ The LTS path protections require `AT_FDCWD`, `O_NOFOLLOW` and `O_DIRECTORY`.
 Security-sensitive path operations fail with `ENOSYS` when the platform does
 not provide these primitives. `--insecure-links` deliberately restores the
 historical path handling and its symlink-race exposure.
+
+Cygwin exposes the required interfaces but its directory descriptors are
+pathname-backed rather than inode-pinned. Static symlink escapes are rejected
+but the parent-replacement race protections do not establish a privilege
+boundary on Cygwin.
 
 Restricted `rrsync` requires an inode-bound `/proc/self/fd` implementation.
 It refuses a restricted directory other than `/` when that facility is
