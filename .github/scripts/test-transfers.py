@@ -226,6 +226,17 @@ class Transfers(unittest.TestCase):
             with self.assertRaisesRegex(NetworkError, '^Required command not found: go$'):
                 client['run'](['go', 'fixture-not-an-access-token'])
 
+    def test_client_stop_tolerates_prior_controller_revocation(self):
+        (self.root / 'client.json').write_text(json.dumps(dict(command=['sudo', '/tailscale'], windows=False)))
+        (self.root / 'daemon-started').touch()
+        (self.root / 'daemon-stopped').touch()
+        result = subprocess.CompletedProcess([], 1)
+        stop = unittest.mock.Mock(return_value=result)
+        with patch.dict(client['stop'].__globals__, run=stop):
+            client['stop'](self.root)
+        stop.assert_called_once_with(['sudo', '/tailscale', 'logout'], check=False)
+        self.assertTrue((self.root / 'daemon-stop').is_file())
+
 
     def test_barriers_precede_copy_and_do_not_wait_for_their_own_upload(self):
         calls = []

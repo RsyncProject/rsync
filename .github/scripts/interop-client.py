@@ -131,7 +131,8 @@ def stop(root):
     if not client['windows'] and not (root / 'daemon-started').exists():
         return
     try:
-        run([*client['command'], 'logout'])
+        # Controller cleanup owns device removal and may revoke it first
+        run([*client['command'], 'logout'], check=False)
     finally:
         if client['windows']:
             run(['sc.exe', 'stop', 'Tailscale'], check=False)
