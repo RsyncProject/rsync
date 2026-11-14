@@ -53,17 +53,18 @@ class Attributes(unittest.TestCase):
                 metadata.read_acl(path / 'file', 'freebsd')
                 self.assertEqual(command.call_count, 1)
 
-    def test_cygwin_acl_uses_its_round_trip_group_form(self):
+    def test_posix_backups_use_the_portable_group_form(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)
-            with patch.object(metadata, 'command') as command:
-                metadata.set_acl(path, 'cygwin', 1)
-                normal = command.call_args[0][2]
-                metadata.set_acl(path, 'cygwin', 1, backup=True)
-                backup = command.call_args[0][2]
-            self.assertIn('group::---', normal)
-            self.assertIn('group::r-x', backup)
-            self.assertIn('mask::r-x', backup)
+            for role in ('linux', 'cygwin'):
+                with self.subTest(role=role), patch.object(metadata, 'command') as command:
+                    metadata.set_acl(path, role, 1)
+                    normal = command.call_args[0][2]
+                    metadata.set_acl(path, role, 1, backup=True)
+                    backup = command.call_args[0][2]
+                self.assertIn('group::---', normal)
+                self.assertIn('group::r-x', backup)
+                self.assertIn('mask::r-x', backup)
             directory_acl = {
                 'user:': 'rwx', 'group:': 'r-x', 'group:545': 'r-x', 'mask:': 'r-x', 'other:': '---',
                 'group:544': '---', 'default:user:': 'rwx', 'default:group:': 'r-x',
@@ -77,7 +78,7 @@ class Attributes(unittest.TestCase):
                       'rsync-ci-remove': b'remove on update'}
             with patch.object(metadata, 'read_acl', side_effect=[directory_acl, file_acl]), \
                     patch.object(metadata.xattrs, 'get_value', side_effect=lambda key, _: values[key]):
-                snapshot = metadata.metadata_snapshot(path, 'cygwin', 'backup')
+                snapshot = metadata.metadata_snapshot(path, 'linux', 'backup')
             self.assertEqual(snapshot['entries']['directory']['acl'], directory_acl)
 
     def test_solaris_uses_current_acl_tools(self):
