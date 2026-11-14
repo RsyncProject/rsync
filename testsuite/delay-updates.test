@@ -13,7 +13,7 @@ checkit "$RSYNC -aiv --delay-updates \"$fromdir/\" \"$todir/\"" "$fromdir" "$tod
 mkdir "$todir/.~tmp~"
 echo 2 > "$todir/.~tmp~/foo"
 touch -r .. "$todir/.~tmp~/foo" "$todir/foo"
-echo 3 > "$fromdir/foo"
+echo updated > "$fromdir/foo"
 
 checkit "$RSYNC -aiv --delay-updates \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
 
