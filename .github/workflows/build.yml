@@ -20,8 +20,16 @@ defaults:
 
 jobs:
   linux:
-    name: Linux X86-64
-    runs-on: ubuntu-24.04
+    name: Ubuntu ${{ matrix.release }} X86-64
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - release: '22.04'
+            runner: ubuntu-22.04
+          - release: '24.04'
+            runner: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -39,20 +47,83 @@ jobs:
       - name: Tests
         run: make check
       - name: Protocol 29
+        if: matrix.release == '24.04'
         run: make check29
       - name: Protocol 30
+        if: matrix.release == '24.04'
         run: make check30
       - name: Root tests
+        if: matrix.release == '24.04'
         run: sudo make check
       - name: Manuals
+        if: matrix.release == '24.04'
         run: make man
       - name: Installed form
+        if: matrix.release == '24.04'
         run: |
           destination=$(mktemp -d)
           make DESTDIR="$destination" install
           "$destination/usr/local/bin/rsync" --version
           python3 "$destination/usr/local/bin/rrsync" -h >/dev/null
           test -s "$destination/usr/local/share/man/man1/rrsync.1"
+
+  almalinux:
+    name: AlmaLinux 8 X86-64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    container:
+      image: almalinux:8@sha256:2d0f2eb2a83cc09dbc2eb92fade4dbe8f709628149e81aa00aec70630406603b
+    steps:
+      - name: Install Git
+        run: dnf -y install git
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install dependencies
+        run: |
+          dnf -y install epel-release dnf-plugins-core
+          dnf config-manager --set-enabled powertools
+          dnf -y install gcc gcc-c++ make autoconf automake m4 diffutils \
+            python39 attr libattr-devel acl libacl-devel openssl openssl-devel \
+            lz4 lz4-devel zstd libzstd-devel xxhash xxhash-devel
+          alternatives --set python3 /usr/bin/python3.9
+          groupadd rsynctest-extra
+          useradd -m -G rsynctest-extra rsynctest
+      - name: Configure
+        run: ./configure --disable-md2man --with-rrsync
+      - name: Build
+        run: make -j2
+      - name: Tests
+        run: make check
+
+  alpine_x86:
+    name: Alpine 3.24.4 X86-32
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Run Alpine
+        run: |
+          docker run --rm --platform linux/386 \
+            -v "$PWD:/source:ro" \
+            alpine@sha256:55d68c85222dd92297b0f8885354739d89f0dc17fc2f903c49dc1d9c129c3d6a \
+            sh -ec '
+              apk add --no-cache acl acl-dev attr attr-dev autoconf automake \
+                build-base diffutils libidn2-dev linux-headers lz4-dev \
+                openssl-dev popt-dev python3 xxhash-dev zstd-dev
+              addgroup -S rsynctest-extra
+              adduser -D rsynctest
+              addgroup rsynctest rsynctest-extra
+              cp -a /source /work
+              cd /work
+              ./configure --disable-md2man --with-rrsync
+              make -j2
+              make check
+            '
 
   macos:
     name: macOS ${{ matrix.arch }}
@@ -136,7 +207,7 @@ jobs:
         with:
           release: '15.1'
           cache-after-prepare: true
-          prepare: pkg install -y autotools gmake lz4 openssl xxhash zstd
+          prepare: pkg install -y autotools gmake lz4 openssl python3 xxhash zstd
           run: |
             ./configure --disable-md2man --with-rrsync
             gmake -j2
@@ -163,7 +234,7 @@ jobs:
           cache-after-prepare: true
           prepare: |
             export PKG_PATH="https://cdn.NetBSD.org/pub/pkgsrc/packages/NetBSD/$(uname -p)/$(uname -r)/All"
-            PATH=/usr/sbin:$PATH pkg_add -U autoconf automake gmake
+            PATH=/usr/sbin:$PATH pkg_add -U autoconf automake gmake python312
           run: |
             ./configure --disable-md2man --with-rrsync
             gmake -j2
@@ -211,8 +282,87 @@ jobs:
         with:
           release: '11.4'
           cache-after-prepare: true
-          prepare: pkg install autoconf automake gcc gnu-make gnu-m4
+          prepare: pkg install autoconf automake gcc gnu-make gnu-m4 pkg://solaris/runtime/python-35
           run: |
             ./configure --disable-md2man --with-rrsync
             gmake -j2
             gmake check
+
+  diagnostics:
+    name: Diagnostics / ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Fortify
+            cflags: -O2 -D_FORTIFY_SOURCE=3 -Werror=stringop-overflow
+            ldflags: ''
+            configure: ''
+          - name: ASan and UBSan
+            cflags: -O1 -g -fsanitize=address,undefined -fno-sanitize=alignment -fno-sanitize-recover=undefined -fno-omit-frame-pointer
+            ldflags: -fsanitize=address,undefined
+            configure: ''
+          - name: AVX2 assembly
+            cflags: -O2
+            ldflags: ''
+            configure: --enable-roll-asm
+    env:
+      ASAN_OPTIONS: detect_leaks=0:abort_on_error=1:verify_asan_link_order=0
+      UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y acl attr libacl1-dev libattr1-dev liblz4-dev libzstd-dev libxxhash-dev openssl
+      - name: Check AVX2
+        if: matrix.name == 'AVX2 assembly'
+        run: grep -qw avx2 /proc/cpuinfo
+      - name: Configure
+        env:
+          CFLAGS: ${{ matrix.cflags }}
+          CXXFLAGS: ${{ matrix.cflags }}
+          LDFLAGS: ${{ matrix.ldflags }}
+        run: ./configure --disable-md2man --with-rrsync ${{ matrix.configure }}
+      - name: Build
+        run: make -j2
+      - name: Tests
+        run: make check
+
+  mixed_versions:
+    name: Mixed versions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y acl attr libacl1-dev libattr1-dev liblz4-dev libzstd-dev libxxhash-dev openssl
+      - name: Build LTS
+        run: |
+          ./configure --disable-md2man --with-rrsync
+          make -j2
+      - name: Test peers
+        run: |
+          for version in 3.2.7 3.5.2; do
+            peer="$RUNNER_TEMP/rsync-$version"
+            git clone --shared --quiet "$PWD" "$peer"
+            git -C "$peer" checkout --quiet --detach "v$version"
+            (
+              cd "$peer"
+              ./configure --disable-md2man
+              make -j2
+            )
+            work=`mktemp -d "$RUNNER_TEMP/mixed-$version.XXXXXX"`
+            rmdir "$work"
+            ./testsuite/mixed-version.sh "$PWD/rsync" "$peer/rsync" "$work"
+          done
