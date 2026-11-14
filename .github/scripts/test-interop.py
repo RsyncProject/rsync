@@ -67,10 +67,10 @@ class Network(unittest.TestCase):
         self.assertEqual(output.read_text(), 'enabled=false\n')
         self.assertFalse((self.root / 'context.json').exists())
 
-    def test_recovery_uses_workflow_path_not_the_dynamic_run_title(self):
+    def test_recovery_uses_workflow_path_not_the_run_title(self):
         event = copy.deepcopy(self.event)
         event.update(action='completed', workflow=dict(path='.github/workflows/interoperability.yml'))
-        event['workflow_run'].update(name='Network CI 123 attempt 2', event='workflow_run')
+        event['workflow_run'].update(name='arbitrary title', event='workflow_run')
         (self.root / 'event.json').write_text(json.dumps(event))
         network.workflow_event()
         event['workflow_run']['event'] = 'pull_request'
@@ -84,33 +84,40 @@ class Network(unittest.TestCase):
         self.addCleanup(ci.source.cache_clear)
         run = dict(id=123, run_attempt=2, path='.github/workflows/ci.yml', name='CI', event='pull_request',
                    repository=dict(id=266877886), head_repository=dict(id=999), head_sha='b' * 40,
+                   display_title='testsuite, ci: rework tests',
                    referenced_workflows=[dict(path=ci.WORKFLOW + 'a' * 40, sha='a' * 40)])
         with patch.object(ci, 'api', return_value=run):
             self.assertEqual(ci.identity(), self.state)
         ci.source.cache_clear()
         with patch.object(ci, 'api', return_value=dict(run, referenced_workflows=[])), self.assertRaises(ci.NotSelected):
             ci.source()
+        ci.source.cache_clear()
+        with patch.object(ci, 'api', return_value=dict(run, display_title='')), self.assertRaises(network.NetworkError):
+            ci.source()
 
     def test_controller_discovery_requires_trusted_code_and_exact_attempt(self):
-        origin = dict(self.state, head_sha='b' * 40)
-        run = dict(id=456, run_attempt=1, path='.github/workflows/interoperability.yml', head_branch='master',
-                   event='workflow_run', display_title='Network CI 123 attempt 2', repository=dict(id=266877886),
-                   head_sha='c' * 40, status='in_progress')
+        origin = dict(self.state, head_sha='b' * 40, display_title='testsuite, ci: rework tests')
         metadata = dict(self.state, control_run_id='456', control_attempt='1', control_sha='c' * 40)
-        with patch.object(ci, 'source', return_value=origin), \
-                patch.object(ci, 'api', side_effect=[dict(workflow_runs=[run]),
-                    dict(total_count=1, artifacts=[dict(name='interoperability-context-1', expired=False)])]), \
-                patch.object(ci, 'download_records', return_value={None: (metadata, b'{}')}):
-            self.assertEqual(ci.controller(), '456')
+        titles = ('Network controller: testsuite, ci: rework tests', 'Network CI 123 attempt 2')
+        for title in titles:
+            run = dict(id=456, run_attempt=1, path='.github/workflows/interoperability.yml', head_branch='master',
+                       event='workflow_run', display_title=title, repository=dict(id=266877886),
+                       head_sha='c' * 40, status='in_progress')
+            with self.subTest(title=title), patch.object(ci, 'source', return_value=origin), \
+                    patch.object(ci, 'api', side_effect=[dict(workflow_runs=[run]),
+                        dict(total_count=1, artifacts=[dict(name='interoperability-context-1', expired=False)])]), \
+                    patch.object(ci, 'download_records', return_value={None: (metadata, b'{}')}):
+                self.assertEqual(ci.controller(), '456')
         for field, value in dict(head_branch='untrusted', event='pull_request', repository=dict(id=1)).items():
             with self.subTest(field=field), patch.object(ci, 'source', return_value=origin), \
                     patch.object(ci, 'api', return_value=dict(workflow_runs=[dict(run, **{field: value})])), self.assertRaises(network.NetworkError):
                 ci.controller()
 
     def test_first_controller_context_survives_a_later_duplicate(self):
-        origin = dict(self.state, head_sha='b' * 40)
+        origin = dict(self.state, head_sha='b' * 40, display_title='testsuite, ci: rework tests')
         run = dict(id=456, run_attempt=1, path='.github/workflows/interoperability.yml', head_branch='master',
-                   event='workflow_run', display_title='Network CI 123 attempt 2', repository=dict(id=266877886),
+                   event='workflow_run', display_title='Network controller: testsuite, ci: rework tests',
+                   repository=dict(id=266877886),
                    head_sha='c' * 40, status='completed', conclusion='success')
         duplicate = dict(run, id=457, conclusion='failure')
         metadata = dict(self.state, control_run_id='456', control_attempt='1', control_sha='c' * 40)
@@ -118,6 +125,23 @@ class Network(unittest.TestCase):
                 dict(workflow_runs=[duplicate, run]),
                 dict(total_count=1, artifacts=[dict(name='interoperability-context-1', expired=False)])]), \
                 patch.object(ci, 'download_records', return_value={None: (metadata, b'{}')}):
+            self.assertEqual(ci.controller(), '456')
+
+    def test_controller_title_collision_uses_the_context_identity(self):
+        origin = dict(self.state, head_sha='b' * 40, display_title='same title')
+        run = dict(run_attempt=1, path='.github/workflows/interoperability.yml', head_branch='master',
+                   event='workflow_run', display_title='Network controller: same title',
+                   repository=dict(id=266877886), head_sha='c' * 40, status='in_progress')
+        stale, current = dict(run, id=455), dict(run, id=456)
+        artifact = dict(total_count=1, artifacts=[dict(name='interoperability-context-1', expired=False)])
+        stale_metadata = dict(self.state, run_id='122', control_run_id='455',
+                              control_attempt='1', control_sha='c' * 40)
+        current_metadata = dict(self.state, control_run_id='456', control_attempt='1', control_sha='c' * 40)
+        with patch.object(ci, 'source', return_value=origin), \
+                patch.object(ci, 'api', side_effect=[dict(workflow_runs=[current, stale]), artifact, artifact]), \
+                patch.object(ci, 'download_records', side_effect=[
+                    {None: (stale_metadata, b'{}')}, {None: (current_metadata, b'{}')}]), \
+                patch.object(time, 'sleep'):
             self.assertEqual(ci.controller(), '456')
 
     def test_duplicate_controller_never_issues_another_enrolment(self):

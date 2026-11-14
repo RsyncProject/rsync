@@ -60,7 +60,8 @@ def source():
         raise NotSelected('CI uses a different workflow')
     if (run.get('path') != '.github/workflows/ci.yml' or run.get('name') != 'CI'
             or run.get('id') != run_id or run.get('repository', {}).get('id') != 266877886 or run.get('run_attempt') != attempt
-            or run.get('event') not in ('pull_request', 'push', 'schedule', 'workflow_dispatch')):
+            or run.get('event') not in ('pull_request', 'push', 'schedule', 'workflow_dispatch')
+            or not isinstance(run.get('display_title'), str) or not run['display_title']):
         raise NetworkError('CI run does not match its event')
     references = [item for item in run.get('referenced_workflows', []) if item.get('path', '').startswith(WORKFLOW)]
     deadline = time.monotonic() + 180
@@ -76,13 +77,15 @@ def source():
         raise NetworkError('CI has an invalid interoperability workflow selection')
     if run.get('status') == 'completed':
         raise NotSelected('CI has already completed')
-    return dict(run_id=str(run_id), run_attempt=str(attempt), source_sha=references[0]['sha'], head_sha=run['head_sha'])
+    return dict(run_id=str(run_id), run_attempt=str(attempt), source_sha=references[0]['sha'],
+                head_sha=run['head_sha'], display_title=run['display_title'])
 
 
 def identity():
     if bound is not None:
         return dict(bound)
-    return {key: value for key, value in source().items() if key != 'head_sha'}
+    state = source()
+    return {key: state[key] for key in ('run_id', 'run_attempt', 'source_sha')}
 
 
 def bind(record):
@@ -136,10 +139,11 @@ def records(kind, roles=ROLES, run_id=None, timeout=600):
 
 def find_controller(exclude=None):
     state = source()
-    title = f"Network CI {state['run_id']} attempt {state['run_attempt']}"
+    titles = {f"Network controller: {state['display_title']}",
+              f"Network CI {state['run_id']} attempt {state['run_attempt']}"}
     runs = api('/actions/workflows/interoperability.yml/runs?branch=master&event=workflow_run&per_page=100')['workflow_runs']
     for run in sorted(runs, key=lambda value: value['id']):
-        if run.get('display_title') != title or str(run['id']) == exclude:
+        if run.get('display_title') not in titles or str(run['id']) == exclude:
             continue
         if (run.get('path') != '.github/workflows/interoperability.yml'
                 or run.get('head_branch') != 'master' or run.get('event') != 'workflow_run'
@@ -155,7 +159,10 @@ def find_controller(exclude=None):
         if len(matches) != 1:
             raise NetworkError('Duplicate controller context')
         metadata = download_records(str(run['id']), {name: None}, timeout=60)[None][0]
-        validate(metadata, {key: value for key, value in state.items() if key != 'head_sha'})
+        try:
+            validate(metadata, {key: state[key] for key in ('run_id', 'run_attempt', 'source_sha')})
+        except NetworkError:
+            continue
         if (metadata.get('control_run_id') != str(run['id'])
                 or metadata.get('control_attempt') != str(run['run_attempt'])
                 or metadata.get('control_sha') != run['head_sha']):

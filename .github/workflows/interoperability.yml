@@ -1,5 +1,5 @@
 name: Network controller
-run-name: Network controller
+run-name: "Network controller: ${{ github.event.workflow_run.display_title }}"
 
 on:
   workflow_run:
