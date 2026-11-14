@@ -19,6 +19,8 @@ scratch = sys.argv[2]
 
 if not sys.platform.startswith("linux"):
     raise SystemExit(77)
+if not os.path.isdir("/proc/self/fd"):
+    raise SystemExit(77)
 if os.path.basename(rsync[0]) == "valgrind":
     raise SystemExit(77)
 
@@ -165,7 +167,7 @@ result = subprocess.run(
     universal_newlines=True,
 )
 if result.returncode or not os.path.isfile(shim):
-    raise SystemExit(77)
+    raise SystemExit("could not build the signal-write hook: %s" % result.stdout)
 
 for mode in ("--append", "--inplace"):
     base = os.path.join(scratch, mode[2:])
