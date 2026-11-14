@@ -84,6 +84,14 @@ jobs:
           path: |
             test-results/*/*/run.log
             test-results/*/*/receipt.json
+      - name: Restore Git
+        if: always()
+        run: |
+          $directory = 'C:\Program Files\Git\cmd'
+          if (-not (Test-Path -LiteralPath (Join-Path $directory 'git.exe'))) {
+            throw 'Runner Git is unavailable'
+          }
+          $directory >>$Env:GITHUB_PATH
 
   solaris:
     if: ${{ inputs.solaris }}

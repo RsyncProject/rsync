@@ -218,6 +218,14 @@ jobs:
         uses: ./.github/actions/interoperability
         with:
           platform: cygwin
+      - name: Restore Git
+        if: always()
+        run: |
+          $directory = 'C:\Program Files\Git\cmd'
+          if (-not (Test-Path -LiteralPath (Join-Path $directory 'git.exe'))) {
+            throw 'Runner Git is unavailable'
+          }
+          $directory >>$Env:GITHUB_PATH
 
   result:
     name: Result
