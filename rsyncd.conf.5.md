@@ -302,7 +302,9 @@ in the values of parameters.  See that section for details.
     This global parameter lists the socket peer IP addresses that are allowed
     to supply a `proxy protocol` header.  The syntax is the same token format
     used by `hosts allow`.  When `proxy protocol = true`, this list must match
-    the direct peer before rsync trusts the forwarded client address.
+    the direct peer before rsync trusts the forwarded client address. Please
+    note the special values `unix:` and `unknown:` as described in `hosts allow`
+    might be useful here.
 
 0.  `name converter`
 
@@ -852,6 +854,10 @@ in the values of parameters.  See that section for details.
       is enabled, as it is by default).  Any match will be allowed in.
     - an '@' followed by a netgroup name, which will match if the reverse DNS
       of the connecting IP is in the specified netgroup.
+    - special values. `unix:` matches when the incoming connection is from a Unix
+      domain socket; `unknown:` matches when the incoming connection's address
+      family is unknown (i.e. not AF_INET, AF_INET6, or AF_UNIX), which might
+      happen when the incoming connection is handed over from inetd-like services.
 
     If rsync was built with IDN support (look for "IDN" in `rsync --version`),
     a hostname pattern may contain non-ASCII characters: this file is read as

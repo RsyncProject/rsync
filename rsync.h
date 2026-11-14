@@ -1562,3 +1562,10 @@ const char *get_panic_action(void);
 #elif defined HAVE_MALLINFO
 #define MEM_ALLOC_INFO mallinfo
 #endif
+
+/* sentinel value for client from special address families */
+extern const char * const client_special_addrs[];
+enum {
+	CLIENT_UNKNOWN_ADDR,
+	CLIENT_UNIX_ADDR,
+};
