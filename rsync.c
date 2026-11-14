@@ -520,9 +520,18 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 #endif
 
 	if (!sxp) {
+		int sret, sdfd;
 		if (dry_run)
 			return 1;
-		if (link_stat(fname, &sx2.st, 0) < 0) {
+		/* Stat through the entry's held dir fd (like gen_entry_stat) so we
+		 * don't re-walk the full path here; link_stat_at folds in no
+		 * fake-super xattr, so only when am_root >= 0. */
+		if (am_root >= 0 && (sdfd = held_dfd_for(fname, file)) >= 0) {
+			const char *sl = strrchr(fname, '/');
+			sret = link_stat_at(sdfd, sl ? sl + 1 : fname, &sx2.st, 0);
+		} else
+			sret = link_stat(fname, &sx2.st, 0);
+		if (sret < 0) {
 			rsyserr(FERROR_XFER, errno, "stat %s failed",
 				full_fname(fname));
 			return 0;
@@ -604,19 +613,27 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	 * O_NOFOLLOW open refuses it -- otherwise the lchown would launder it. */
 	op_pin = operator_path_resolve && dfd < 0 && !symlink_optout_allowed()
 	      && (S_ISREG(new_mode) || S_ISDIR(new_mode) || S_ISFIFO(new_mode));
-	if (op_pin && am_root >= 0) {
+	if (op_pin) {
 		op_leaf_fd = do_open_at(fname, O_RDONLY | O_NONBLOCK | O_NOCTTY | O_CLOEXEC, 0);
 		/* When running as root (the uid-0 trust-laundering case) an O_RDONLY open
 		 * of a real owned reg/dir/fifo leaf never fails for permission reasons, so
 		 * ANY failure here means the leaf is being raced (a symlink refused by
 		 * O_NOFOLLOW / owner-walk -> ELOOP, or vanished mid-flip -> ENOENT):
-		 * refuse, never redirect via a re-resolvable path.  A non-root operator
-		 * cannot launder a uid-0 symlink, but can still hit a legitimate EACCES on
-		 * an owned-but-unreadable leaf; there we only treat the explicit
-		 * symlink-race signal (ELOOP) as a refusal and otherwise fall back to the
-		 * legacy path op rather than spuriously failing a real file. */
-		if (op_leaf_fd < 0 && (am_root > 0 || errno == ELOOP))
+		 * refuse, never redirect via a re-resolvable path.  --fake-super
+		 * (am_root < 0) is the same: the daemon owns the freshly-staged leaf it is
+		 * about to set %stat/ACL/xattr metadata on, so any open failure is a race
+		 * -- refuse rather than fall through to a path-based sys_lsetxattr that a
+		 * flipped parent could redirect outside the module.  A plain non-root
+		 * operator (am_root == 0) can still hit a legitimate EACCES on an
+		 * owned-but-unreadable leaf; there we only treat the explicit symlink-race
+		 * signal (ELOOP) as a refusal and otherwise fall back to the legacy path
+		 * op rather than spuriously failing a real file. */
+		if (op_leaf_fd < 0 && (am_root != 0 || errno == ELOOP))
 			op_refuse = 1;
+#if defined SUPPORT_XATTRS || defined SUPPORT_ACLS
+		if (op_leaf_fd >= 0)
+			held_fd = op_leaf_fd;	/* xattr/ACL ops below pin to this leaf fd too */
+#endif
 	}
 
 	if (inherit && S_ISDIR(new_mode) && sxp->st.st_mode & S_ISGID) {
@@ -676,8 +693,12 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 			 * the destination had the setuid or setgid bits set
 			 * (due to the side effect of the chown call). */
 			if (sxp->st.st_mode & (S_ISUID | S_ISGID)) {
-				link_stat(fname, &sxp->st,
-					  keep_dirlinks && S_ISDIR(sxp->st.st_mode));
+				if (dfd >= 0)
+					link_stat_at(dfd, leaf, &sxp->st,
+						     keep_dirlinks && S_ISDIR(sxp->st.st_mode));
+				else
+					link_stat(fname, &sxp->st,
+						  keep_dirlinks && S_ISDIR(sxp->st.st_mode));
 			}
 		}
 		if (change_uid)
@@ -744,9 +765,19 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	}
 #endif
 	if (updated & (UPDATED_MTIME|UPDATED_ATIME)) {
-		int ret = dfd >= 0 ? set_times_at(dfd, leaf, &sx2.st) : -2;
-		if (ret == -2)
-			ret = set_times(fname, &sx2.st);
+		int ret;
+#ifdef HAVE_FUTIMENS
+		if (op_leaf_fd >= 0)
+			ret = do_futimens(op_leaf_fd, &sx2.st);
+		else
+#endif
+		if (op_refuse)
+			ret = (errno = ELOOP, -1);
+		else {
+			ret = dfd >= 0 ? set_times_at(dfd, leaf, &sx2.st) : -2;
+			if (ret == -2)
+				ret = set_times(fname, &sx2.st);
+		}
 		if (ret < 0) {
 			rsyserr(FERROR_XFER, errno, "failed to set times on %s", full_fname(fname));
 			goto cleanup;
@@ -796,7 +827,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	}
   cleanup:
 #if defined SUPPORT_XATTRS || defined SUPPORT_ACLS
-	if (held_fd >= 0)
+	if (held_fd >= 0 && held_fd != op_leaf_fd)	/* may alias op_leaf_fd (cross-tree) */
 		close(held_fd);
 #endif
 	if (op_leaf_fd >= 0)
@@ -869,9 +900,15 @@ int finish_transfer(const char *fname, const char *fnametmp,
 			fnamecmp = get_backup_name(fname);
 	}
 
-	/* Change permissions before putting the file into place. */
+	/* Change permissions before putting the file into place.  An absolute
+	 * --temp-dir/--partial-dir leaves fnametmp on an operator path with no held
+	 * dirfd, so resolve its metadata through the ownership walk (op_pin); a
+	 * flipped temp-dir parent then can't redirect the chmod/chown/times/etc.
+	 * (in-tree temps keep their held dirfd, so op_pin stays off there). */
+	operator_path_resolve = 1;
 	set_file_attrs(fnametmp, file, NULL, fnamecmp,
 		       ok_to_set_time ? ATTRS_ACCURATE_TIME : ATTRS_SKIP_MTIME | ATTRS_SKIP_ATIME | ATTRS_SKIP_CRTIME);
+	operator_path_resolve = 0;
 
 	/* move tmp file over real file */
 	if (DEBUG_GTE(RECV, 1))

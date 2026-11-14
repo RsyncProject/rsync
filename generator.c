@@ -68,6 +68,7 @@ extern int inplace;
 extern int append_mode;
 extern int make_backups;
 extern int csum_length;
+extern int xfer_sum_len;
 extern int ignore_times;
 extern int size_only;
 extern OFF_T max_size;
@@ -238,7 +239,11 @@ static int read_delay_line(char *buf, int *flags_p)
 		goto invalid_data;
 	}
 	past_space++;
-	len = j - read_pos - (past_space - bp) + 1; /* count the '\0' */
+	/* Name length + NUL.  Computed from past_space directly: the old
+	 * `j - read_pos - (past_space - bp)` form was off by +1 when a '!'
+	 * prefix had advanced bp past read_pos, over-reading deldelay_buf
+	 * by one byte on a buffer-filling final entry. */
+	len = (deldelay_buf + j) - past_space + 1;
 	read_pos = j + 1;
 
 	if (len > MAXPATHLEN) {
@@ -390,8 +395,10 @@ static void do_delete_pass(void)
 	}
 	delete_in_dir(NULL, NULL, dev_zero);
 
-	if (INFO_GTE(FLIST, 2) && !am_server)
-		rprintf(FINFO, "                    \r");
+	if (INFO_GTE(FLIST, 2) && !am_server) {
+		rprintf(FINFO, "                    ");
+		rput_progress();
+	}
 }
 
 static inline int mtime_differs(STRUCT_STAT *stp, struct file_struct *file)
@@ -699,6 +706,11 @@ static void sum_sizes_sqroot(struct sum_struct *sum, int64 len)
 {
 	int32 blength;
 	int s2length;
+	/* The strong sum can be no longer than the negotiated checksum digest:
+	 * a short checksum (e.g. xxh64 = 8 bytes, when xxh128/xxh3 are absent)
+	 * makes xfer_sum_len < SUM_LENGTH, and the sender rejects an s2length
+	 * larger than xfer_sum_len (io.c). */
+	int max_s2length = MIN(SUM_LENGTH, xfer_sum_len);
 	int64 l;
 
 	if (len < 0) {
@@ -733,7 +745,7 @@ static void sum_sizes_sqroot(struct sum_struct *sum, int64 len)
 	if (protocol_version < 27) {
 		s2length = csum_length;
 	} else if (csum_length == SUM_LENGTH) {
-		s2length = SUM_LENGTH;
+		s2length = max_s2length;
 	} else {
 		int32 c;
 		int b = BLOCKSUM_BIAS;
@@ -742,7 +754,7 @@ static void sum_sizes_sqroot(struct sum_struct *sum, int64 len)
 		/* add a bit, subtract rollsum, round up. */
 		s2length = (b + 1 - 32 + 7) / 8; /* --optimize in compiler-- */
 		s2length = MAX(s2length, csum_length);
-		s2length = MIN(s2length, SUM_LENGTH);
+		s2length = MIN(s2length, max_s2length);
 	}
 
 	sum->flength	= len;
@@ -1043,7 +1055,7 @@ static int basis_link_stat(const char *path, STRUCT_STAT *stp)
 			if (dlen >= sizeof dir) { errno = ENAMETOOLONG; return -1; }
 			memcpy(dir, path, dlen);
 			dir[dlen] = '\0';
-			if ((dfd = secure_relative_open(NULL, dir, O_RDONLY | O_DIRECTORY, 0)) < 0)
+			if ((dfd = secure_relative_dirfd(NULL, dir)) < 0)
 				return -1;
 			r = link_stat_at(dfd, slash + 1, stp, 0);
 			e = errno;
