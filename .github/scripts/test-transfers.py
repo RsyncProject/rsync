@@ -182,6 +182,17 @@ class Transfers(unittest.TestCase):
         with self.assertRaises(NetworkError):
             enrol.seal(self.root, 'linux', recipient, 'key1', 'tskey-auth-fixture', dict(self.state, run_attempt='3'))
 
+    def test_enrolment_wait_matches_the_controller_startup_window(self):
+        published = unittest.mock.Mock(return_value={'recipients': {'linux': {'key_id': 'key1'}}})
+        node = {'ID': 'n1', 'TailscaleIPs': ['100.64.0.1']}
+        with patch.object(sys, 'argv', ['interop-host.py', 'connect', 'linux', '--root', str(self.root)]), \
+                patch.dict(host['main'].__globals__, identity=lambda: self.state, published=published,
+                           decrypt=unittest.mock.Mock(), forget=unittest.mock.Mock()), \
+                patch.dict(host['client'], connect=unittest.mock.Mock(return_value=node)), \
+                patch.object(host['socket'], 'socket'):
+            self.assertEqual(host['main'](), 0)
+        published.assert_called_once_with('enrol', timeout=ci.STARTUP_TIMEOUT)
+
     def test_bad_public_keys_are_refused(self):
         for value in ('', 'ssh-rsa AAAA', 'ssh-ed25519 AAAA', 'ssh-ed25519 AAAA\ncommand=evil'):
             with self.subTest(value=value), self.assertRaises(ValueError):

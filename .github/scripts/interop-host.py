@@ -10,7 +10,7 @@ import subprocess
 import sys
 import time
 
-from interop_ci import ROLES, PeerUnavailable, identity, published, records, write
+from interop_ci import ROLES, STARTUP_TIMEOUT, PeerUnavailable, identity, published, records, write
 from interop_enrol import decrypt, forget, generate
 from interop_network import NetworkError, require_no_oidc
 
@@ -188,7 +188,7 @@ def main():
         if phase == 'recipient':
             generate(root, role, state)
         elif phase == 'connect':
-            enrolment = published('enrol')['recipients'][role]
+            enrolment = published('enrol', timeout=STARTUP_TIMEOUT)['recipients'][role]
             decrypt(root, role, enrolment, state)
             try:
                 node = client['connect'](root, root / 'enrol-key', f'ci-{state["run_id"]}-{state["run_attempt"]}-{role}')

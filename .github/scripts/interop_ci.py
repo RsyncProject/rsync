@@ -10,6 +10,7 @@ from interop_policy import ROLES
 
 API = 'https://api.github.com/repos/RsyncProject/rsync'
 WORKFLOW = 'RsyncProject/rsync/.github/workflows/interoperability-tests.yml@'
+STARTUP_TIMEOUT = 1800
 bound = None
 api_cache = {}
 
@@ -242,7 +243,7 @@ def find_controller(exclude=None):
 
 
 def controller():
-    deadline = time.monotonic() + 1800
+    deadline = time.monotonic() + STARTUP_TIMEOUT
     while time.monotonic() < deadline:
         run = find_controller()
         if run is not None:

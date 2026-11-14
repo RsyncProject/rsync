@@ -6,7 +6,7 @@ import re
 import subprocess
 import sys
 
-from interop_ci import ROLES, NotSelected, bind, find_controller, identity, records, source, write
+from interop_ci import ROLES, STARTUP_TIMEOUT, NotSelected, bind, find_controller, identity, records, source, write
 from interop_enrol import seal
 from interop_network import NetworkError, Tailnet, download_records
 from interop_policy import TAILNET, admission, check_policy, update_policy
@@ -240,7 +240,7 @@ def main():
         api = Tailnet()
         if args.phase == 'broker':
             check_policy(api.policy()[0])
-            recipients, keys = records('public', timeout=1800), {}
+            recipients, keys = records('public', timeout=STARTUP_TIMEOUT), {}
             if len({record.get('public_key') for record in recipients.values()}) != len(ROLES):
                 raise NetworkError('Endpoints share an enrolment recipient')
             encrypted = {}
