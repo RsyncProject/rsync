@@ -489,6 +489,53 @@ def safe_open_logfile():
         return None
     return os.fdopen(fd, 'a')
 
+def resolve_log_path(path, dir_st):
+    """Resolve symlinks before .. and reject paths through DIR."""
+    todo = [c for c in path.split('/') if c]
+    if path.endswith('/'):
+        todo.append('.')
+    done = '//' if path.startswith('//') and not path.startswith('///') else '/'
+    hops = 0
+    while todo:
+        comp = todo.pop(0)
+        if comp == '.':
+            continue
+        if comp == '..':
+            done = os.path.dirname(done)
+            continue
+        cand = os.path.join(done, comp)
+        try:
+            st = os.lstat(cand)
+        except FileNotFoundError as e:
+            if not todo:
+                return cand
+            die("cannot resolve the -log FILE", cand + ':', e.strerror)
+        except OSError as e:
+            die("cannot resolve the -log FILE", cand + ':', e.strerror)
+        if stat.S_ISLNK(st.st_mode):
+            if st.st_uid not in (0, os.geteuid()):
+                die("untrusted symlink in -log FILE:", cand)
+            hops += 1
+            if hops > 40:
+                die("too many symlinks in the -log FILE path")
+            try:
+                target = os.readlink(cand)
+            except OSError as e:
+                die("cannot resolve the -log FILE", cand + ':', e.strerror)
+            if target.startswith('/'):
+                done = '//' if target.startswith('//') and not target.startswith('///') else '/'
+            todo = [c for c in target.split('/') if c] + (['.'] if target.endswith('/') else []) + todo
+            continue
+        if os.path.samestat(st, dir_st):
+            die("the -log FILE must be outside the restricted directory")
+        if todo:
+            try:
+                os.stat(os.path.join(cand, '.'))
+            except OSError as e:
+                die("cannot resolve the -log FILE", cand + ':', e.strerror)
+        done = cand
+    return done
+
 def main():
     if not os.path.isdir(args.dir):
         die("Restricted directory does not exist!")
@@ -527,7 +574,7 @@ def main():
         for opt in long_opts:
             if opt.startswith(('remove', 'delete')):
                 long_opts[opt] = -1
-    if args.ro:
+    if args.ro or args.log:
         long_opts['log-file'] = -1
 
     global short_disabled
@@ -671,6 +718,23 @@ def main():
     
     if args.no_overwrite:
       rsync_opts.append('--ignore-existing')
+
+    if args.log:
+        if args.dir == '/':
+            die("-log cannot be used when DIR is /")
+        resolved_log = resolve_log_path(args.log, os.stat(args.dir))
+        fd = None
+        try:
+            flags = os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NONBLOCK | getattr(os, 'O_NOFOLLOW', 0)
+            fd = os.open(resolved_log, flags, 0o644)
+            if not stat.S_ISREG(os.fstat(fd).st_mode):
+                die("-log FILE must be a regular file")
+        except OSError as e:
+            die("cannot open the -log FILE", args.log + ':', e.strerror)
+        finally:
+            if fd is not None:
+                os.close(fd)
+        rsync_opts.append('--log-file=' + args.log)
 
     if not rsync_args:
         rsync_args = [ '.' ]
@@ -1023,12 +1087,17 @@ if __name__ == '__main__':
     arg_parser.add_argument('-no-del', action='store_true', help="Disable rsync's --delete* and --remove* options.")
     arg_parser.add_argument('-no-lock', action='store_true', help="Avoid the single-run (per-user) lock check.")
     arg_parser.add_argument('-no-overwrite', action='store_true', help="Prevent overwriting existing files by enforcing --ignore-existing")
+    arg_parser.add_argument('-log', metavar='FILE', help="Log each transfer to FILE via rsync's --log-file.")
     arg_parser.add_argument('-help', '-h', action='help', help="Output this help message and exit.")
     arg_parser.add_argument('dir', metavar='DIR', help="The restricted directory to use.")
     args = arg_parser.parse_args()
     args.dir = os.path.realpath(args.dir)
     args.dir_slash = args.dir + '/'
     args.dir_slash_len = len(args.dir_slash)
+    if args.log is not None:
+        if not args.log:
+            die("empty -log FILE")
+        args.log = os.path.join(os.getcwd(), args.log)
     if args.ro:
         args.no_del = True
     elif not args.no_lock:
