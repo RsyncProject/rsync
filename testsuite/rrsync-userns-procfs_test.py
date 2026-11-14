@@ -95,7 +95,7 @@ try:
     for index, fd_root in enumerate(fd_roots):
         log_file = dest / f'rsync-{index}.log'
         proc = subprocess.run(
-            rsync_argv('-a', f'--confine-root={dest}',
+            rsync_argv('-a', f'--confine-root={root}',
                        f'--log-file={fd_root}/{dest_fd}/{log_file.name}',
                        str(src) + '/', str(dest) + '/'),
             pass_fds=(dest_fd,),

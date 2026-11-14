@@ -1113,7 +1113,8 @@ int recv_files(int f_in, int f_out, char *local_name)
 			 * partial updates rejects the unsafe peer option; otherwise (a pre-30
 			 * peer, where no in-place partial redirect is possible, or a pull
 			 * client) fall back to a safe no-basis update. */
-			if (am_daemon && inplace_partial) {
+			extern char *confine_root;
+			if ((am_daemon || confine_root) && inplace_partial) {
 				rprintf(FERROR,
 					"rsync: refusing unconfined partial basis for %s\n", fname);
 				exit_cleanup(RERR_PROTOCOL);

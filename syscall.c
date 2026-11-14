@@ -587,7 +587,7 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 					saved_errno = ENOTDIR;
 					goto out;
 				}
-				if (confine_root) {
+				if (confine_root && (operator_path_resolve || filesfrom_owner_walk_active())) {
 					/* Anonymous objects cannot be proven to reside beneath
 					 * the confinement root. */
 					saved_errno = ENOENT;
