@@ -32,6 +32,7 @@ class Transfers(unittest.TestCase):
                       for index, role in enumerate(ci.ROLES, 1)}
         self.run = dict(id=123, run_attempt=2, path='.github/workflows/ci.yml', name='CI',
                         repository=dict(id=266877886), event='pull_request', head_sha='b' * 40,
+                        display_title='testsuite, ci: rework tests',
                         head_repository=dict(id=999, full_name='contributor/rsync'),
                         referenced_workflows=[dict(path=ci.WORKFLOW + 'a' * 40, sha='a' * 40)])
         self.env = patch.dict(os.environ, dict(GITHUB_REPOSITORY_ID='266877886', GITHUB_EVENT_NAME='pull_request',
@@ -235,7 +236,8 @@ class Transfers(unittest.TestCase):
             calls.append(kind)
             return {}
         shared = dict(identity=lambda: self.state, call=native, records=barrier, write=lambda *args, **kwargs: None)
-        for phase, expected in (('transfer1', ['admitted', 'transfer1']), ('transfer2', ['next', 'transfer2']),
+        for phase, expected in (('transfer1', ['admitted', 'transfer1']), ('wait1', ['transfer1']),
+                                ('transfer2', ['next', 'transfer2']), ('wait2', ['transfer2']),
                                 ('next', ['transfer1', 'next'])):
             calls.clear()
             with self.subTest(phase=phase), patch.object(sys, 'argv', ['interop-host.py', phase, 'linux', '--root', str(self.root)]), \
@@ -289,6 +291,28 @@ class Transfers(unittest.TestCase):
             self.assertEqual(host['main'](), 1)
         self.assertFalse(environment.exists())
         self.assertFalse((self.root / 'blocked.json').exists())
+
+    def test_failed_transfer_is_published_before_the_phase_barrier(self):
+        ci.bind(self.state)
+        with patch.object(sys, 'argv', ['interop-host.py', 'transfer2', 'linux', '--root', str(self.root)]), \
+                patch.dict(host['main'].__globals__, identity=lambda: self.state, records=lambda *args, **kwargs: {},
+                           call=unittest.mock.Mock(side_effect=NetworkError('transfer failed'))), \
+                patch('sys.stderr', new_callable=io.StringIO):
+            self.assertEqual(host['main'](), 1)
+        self.assertIs(json.loads((self.root / 'transfer2.json').read_text())['failed'], True)
+
+    def test_transfer_barrier_blocks_peers_without_stopping_their_services_early(self):
+        ci.bind(self.state)
+        environment = self.root / 'github-env'
+        completed = {role: dict(self.state, failed=role == 'cygwin') for role in ci.ROLES}
+        with patch.object(sys, 'argv', ['interop-host.py', 'wait2', 'linux', '--root', str(self.root)]), \
+                patch.dict(os.environ, GITHUB_ENV=str(environment)), \
+                patch.dict(host['main'].__globals__, identity=lambda: self.state,
+                           records=unittest.mock.Mock(return_value=completed)):
+            self.assertEqual(host['main'](), 0)
+        self.assertEqual(environment.read_text(), 'INTEROP_BLOCKED=true\n')
+        blocked = json.loads((self.root / 'blocked.json').read_text())
+        self.assertEqual((blocked['phase'], blocked['passed']), ('wait2', False))
 
     def test_result_rejects_blocked_failed_and_missing_outcomes(self):
         for role, job in (('netbsd', dict(result='success', outputs=dict(blocked='true'))),

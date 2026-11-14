@@ -91,6 +91,7 @@ runs:
         if-no-files-found: error
         retention-days: 7
     - name: Initial transfers
+      id: transfer1
       if: env.INTEROP_BLOCKED != 'true'
       shell: bash
       env:
@@ -99,13 +100,21 @@ runs:
         INTEROP_GUEST: ${{ inputs.guest }}
       run: python3 -B -S .github/scripts/interop-host.py transfer1 "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
     - name: Upload initial transfer completion
-      if: env.INTEROP_BLOCKED != 'true'
+      id: transfer1_upload
+      if: ${{ always() && !cancelled() && env.INTEROP_BLOCKED != 'true' && (steps.transfer1.outcome == 'success' || steps.transfer1.outcome == 'failure') }}
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: interoperability-${{ github.run_attempt }}-transfer1-${{ inputs.platform }}
         path: ${{ runner.temp }}/interoperability/transfer1.json
         if-no-files-found: error
         retention-days: 7
+    - name: Complete initial transfer phase
+      if: ${{ always() && !cancelled() && steps.transfer1_upload.outcome == 'success' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INTEROP_PLATFORM: ${{ inputs.platform }}
+      run: python3 -B -S .github/scripts/interop-host.py wait1 "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
     - name: Verify initial data and update sources
       if: env.INTEROP_BLOCKED != 'true'
       shell: bash
@@ -123,6 +132,7 @@ runs:
         if-no-files-found: error
         retention-days: 7
     - name: Checksum updates and deletion
+      id: transfer2
       if: env.INTEROP_BLOCKED != 'true'
       shell: bash
       env:
@@ -131,13 +141,21 @@ runs:
         INTEROP_GUEST: ${{ inputs.guest }}
       run: python3 -B -S .github/scripts/interop-host.py transfer2 "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
     - name: Upload update completion
-      if: env.INTEROP_BLOCKED != 'true'
+      id: transfer2_upload
+      if: ${{ always() && !cancelled() && env.INTEROP_BLOCKED != 'true' && (steps.transfer2.outcome == 'success' || steps.transfer2.outcome == 'failure') }}
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: interoperability-${{ github.run_attempt }}-transfer2-${{ inputs.platform }}
         path: ${{ runner.temp }}/interoperability/transfer2.json
         if-no-files-found: error
         retention-days: 7
+    - name: Complete updated transfer phase
+      if: ${{ always() && !cancelled() && steps.transfer2_upload.outcome == 'success' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INTEROP_PLATFORM: ${{ inputs.platform }}
+      run: python3 -B -S .github/scripts/interop-host.py wait2 "$INTEROP_PLATFORM" --root "$RUNNER_TEMP/interoperability"
     - name: Verify updated native data
       if: env.INTEROP_BLOCKED != 'true'
       shell: bash

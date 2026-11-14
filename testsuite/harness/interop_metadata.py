@@ -113,7 +113,9 @@ def set_acl(path, role, phase):
         command('chmod', '+a', 'user:daemon allow ' + rights, path)
         return
     group = ('r-x' if phase == 1 else 'rwx') if directory else ('r--' if phase == 1 else 'rw-')
-    entries = ['user::' + ('rwx' if directory else 'rw-'), 'group::---', 'group:545:' + group,
+    # Cygwin chmod maps the mode's group bits to the owning-group ACL entry
+    owning_group = group if role == 'cygwin' else '---'
+    entries = ['user::' + ('rwx' if directory else 'rw-'), 'group::' + owning_group, 'group:545:' + group,
                'mask::' + group, 'other::---']
     if phase == 1:
         entries.append('group:544:---')
@@ -168,7 +170,8 @@ def metadata_snapshot(root, role, kind, phase=1):
             acl = read_acl(path, role)
             if FEATURES[role][0] == 'posix':
                 group = ('r-x' if phase == 1 else 'rwx') if path.is_dir() else ('r--' if phase == 1 else 'rw-')
-                expected = {'user:': 'rwx' if path.is_dir() else 'rw-', 'group:': '---', 'group:545': group,
+                owning_group = group if role == 'cygwin' else '---'
+                expected = {'user:': 'rwx' if path.is_dir() else 'rw-', 'group:': owning_group, 'group:545': group,
                             'mask:': group, 'other:': '---'}
                 if phase == 1:
                     expected['group:544'] = '---'

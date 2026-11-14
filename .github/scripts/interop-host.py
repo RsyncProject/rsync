@@ -165,7 +165,8 @@ def stop(root, role):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('phase', choices=('install', 'recipient', 'connect', 'prepare', 'forward', 'quarantine', 'admit',
-                                        'transfer1', 'next', 'transfer2', 'verify', 'revoked', 'stop', 'result'))
+                                        'transfer1', 'wait1', 'next', 'transfer2', 'wait2', 'verify',
+                                        'revoked', 'stop', 'result'))
     parser.add_argument('platform', choices=(*ROLES, 'all'))
     parser.add_argument('--root', type=Path, required=True)
     args = parser.parse_args()
@@ -230,8 +231,18 @@ def main():
             network(root, role, phase)
         elif phase in ('transfer1', 'transfer2'):
             records('admitted' if phase == 'transfer1' else 'next', timeout=600)
-            result = call(root, role, phase)
+            try:
+                result = call(root, role, phase)
+            except (OSError, ValueError, subprocess.SubprocessError):
+                write(root, phase, failed=True)
+                raise
             write(root, phase, **result)
+        elif phase in ('wait1', 'wait2'):
+            transfer = 'transfer' + phase[-1]
+            completed = records(transfer, timeout=1800)
+            failed = [name for name, record in completed.items() if record.get('failed') is True]
+            if failed:
+                raise PeerUnavailable('Failed transfer endpoints: ' + ', '.join(failed))
         elif phase in ('next', 'verify'):
             records('transfer1' if phase == 'next' else 'transfer2', timeout=1800)
             result = call(root, role, phase)

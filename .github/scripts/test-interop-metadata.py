@@ -53,6 +53,27 @@ class Attributes(unittest.TestCase):
                 metadata.read_acl(path / 'file', 'freebsd')
                 self.assertEqual(command.call_count, 1)
 
+    def test_cygwin_acl_uses_its_round_trip_group_form(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)
+            with patch.object(metadata, 'command') as command:
+                metadata.set_acl(path, 'cygwin', 1)
+            entries = command.call_args[0][2]
+            self.assertIn('group::r-x', entries)
+            self.assertIn('mask::r-x', entries)
+            directory_acl = {
+                'user:': 'rwx', 'group:': 'r-x', 'group:545': 'r-x', 'mask:': 'r-x', 'other:': '---',
+                'group:544': '---', 'default:user:': 'rwx', 'default:group:': 'r-x',
+                'default:group:545': 'r-x', 'default:mask:': 'r-x', 'default:other:': '---',
+                'default:group:544': '---'}
+            file_acl = {'user:': 'rw-', 'group:': 'r--', 'group:545': 'r--', 'mask:': 'r--',
+                        'other:': '---', 'group:544': '---'}
+            (path / 'directory').mkdir()
+            (path / 'directory/file').write_text('metadata transfer\n')
+            with patch.object(metadata, 'read_acl', side_effect=[directory_acl, file_acl]):
+                snapshot = metadata.metadata_snapshot(path, 'cygwin', 'acl')
+            self.assertEqual(snapshot['entries']['directory']['acl'], directory_acl)
+
     def test_solaris_uses_current_acl_tools(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)

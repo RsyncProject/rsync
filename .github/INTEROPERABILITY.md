@@ -8,7 +8,7 @@ Metadata uses separate destination trees and shares read-only source fixtures un
 
 The parent CI run and attempt identify each cohort. The tested revision comes from GitHub's resolved reusable-workflow commit and is checked against the native checkout. Endpoint records also contain the operating system, effective UID/GID and executable SHA-256. Required depends on all seven endpoint jobs, complete case results and confirmed network cleanup.
 
-Endpoint jobs fail for their own setup, transfer and cleanup errors. Unavailable peers or a failed controller block shared phases; the remaining checks are skipped and local cleanup still runs. Result rejects failed or blocked endpoints, missing outcomes, incomplete transfer results and unverified network cleanup.
+Endpoint jobs fail for their own setup, transfer and cleanup errors. A failed transfer is published before every endpoint completes that phase, so its services remain available to peers already using them. Unavailable peers or a failed controller block later phases; local cleanup still runs. Result rejects failed or blocked endpoints, missing outcomes, incomplete transfer results and unverified network cleanup.
 
 ## Authentication
 
