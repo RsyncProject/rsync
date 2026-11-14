@@ -154,9 +154,9 @@ client_relative = False
 # whose readlink yields the open file's real path. macOS/BSD lack the directory
 # entirely; Solaris HAS /proc/self/fd but its entries are not such symlinks (its
 # readlink does not return the path), so an isdir() check is not enough -- probe
-# the actual behaviour once against a known fd. Where it works we pin (and a
-# later readlink failure is an anomaly that fails closed); where it does not we
-# fall through to the unhardened path.
+# the actual behaviour once against a known fd. Where it works we pin and a
+# later readlink failure is an anomaly that fails closed. Restricted operation
+# is refused where it does not work.
 #
 # A correct readlink is NOT sufficient evidence that the fd pins anything, and
 # the two platforms that get this wrong fail in opposite directions:
@@ -489,6 +489,8 @@ def safe_open_logfile():
 def main():
     if not os.path.isdir(args.dir):
         die("Restricted directory does not exist!")
+    if args.dir != '/' and not HAVE_PROC_SELF_FD:
+        die('restricted rrsync requires inode-bound /proc/self/fd')
 
     # The format of the environment variables set by sshd:
     #   SSH_ORIGINAL_COMMAND:
@@ -749,11 +751,11 @@ def validated_arg(opt, arg, typ=3, wild=False):
             # through the kernel's magic link to the SAME pinned inode
             # regardless of any subsequent flip; the race is closed.
             #
-            # Linux-only (O_PATH/proc trick is Linux specific); on
-            # non-Linux fall through to the unhardened path.  For paths
-            # that don't exist yet (receiver-side new dest) os.open
-            # fails -- we skip pinning there; the new-dest race is a
-            # separate concern.
+            # Linux-only (the proc magic-link behaviour is Linux specific).
+            # main() has already refused restricted operation where this
+            # facility is unavailable. For paths that don't exist yet
+            # (receiver-side new dest) os.open fails and the existing parent
+            # is pinned instead.
             # Only a regular file or directory gets its CONTENT opened.  A
             # sender needs neither for anything else: rsync transmits a symlink
             # by its target string and skips a device/FIFO/socket under the
@@ -813,7 +815,8 @@ def validated_arg(opt, arg, typ=3, wild=False):
                 # so a parent-component flip after realpath can't redirect the
                 # new file/dir out of the tree.  Linux-only (the /proc magic
                 # link); elsewhere, or if the parent itself doesn't exist yet
-                # (a deeper -R new path), fall through unpinned as before.
+                # (a deeper -R new path), the secure server-side resolver
+                # remains responsible for creating the missing chain.
                 fd = None
                 leaf = os.path.basename(real_arg)
                 if opt in CREATE_DIR_MODE or opt in EMPTY_BASIS_OPTS:
@@ -892,16 +895,14 @@ def validated_arg(opt, arg, typ=3, wild=False):
                     if pinned != LEAF_PIN_UNUSABLE:
                         arg = pinned
             elif fd is not None:
-                # The inode-pin trick (verify + route the exec'd rsync's open via
-                # the /proc/self/fd magic link) is Linux-only.  Where /proc/self/fd
-                # does not exist at all (the BSDs, Solaris, macOS, Cygwin, or a
-                # /proc-less namespace) we cannot pin -- fall through to the
-                # unhardened path (close the fd, keep the realpath-validated arg)
-                # per the design note above.  But where /proc/self/fd DOES exist
-                # (Linux), a readlink failure is an anomaly (sandbox/seccomp), not
-                # a no-proc platform: fail CLOSED rather than silently unharden.
+                # The inode pin routes the exec'd rsync's open through the same
+                # object. main() has already refused restricted operation when
+                # that facility is unavailable. A later readlink failure is an
+                # anomaly such as a sandbox or seccomp restriction and fails
+                # closed.
                 if not HAVE_PROC_SELF_FD:
-                    os.close(fd)            # no /proc/self/fd: run unpinned
+                    os.close(fd)
+                    die('restricted rrsync requires inode-bound /proc/self/fd')
                 else:
                     try:
                         pinned_path = os.readlink('/proc/self/fd/%d' % fd)

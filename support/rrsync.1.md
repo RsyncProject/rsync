@@ -94,6 +94,10 @@ The remainder of this manpage is dedicated to using the rrsync script.
 The rrsync script validates the path arguments it is sent to try to restrict
 them to staying within the specified DIR.
 
+Restricted operation requires an inode-bound `/proc/self/fd` implementation.
+rrsync refuses a DIR other than `/` when the platform does not provide one.
+Using `/` does not establish a filesystem confinement boundary.
+
 The rrsync script rejects rsync's [`--copy-links`](rsync.1#opt) option (by
 default) so that a copy cannot dereference a symlink within the DIR to get to a
 file outside the DIR.

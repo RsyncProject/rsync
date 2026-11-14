@@ -1,0 +1,35 @@
+#!/bin/sh
+
+. "$suitedir/rsync.fns"
+
+command -v python3 >/dev/null 2>&1 || test_skipped "python3 not available"
+
+restricted="$scratchdir/restricted"
+mkdir "$restricted"
+
+run_rrsync() {
+	python3 -c 'import runpy, sys
+script, restricted = sys.argv[1:3]
+sys.platform = "netbsd"
+sys.argv = ["rrsync", "-no-lock", restricted]
+runpy.run_path(script, run_name="__main__")' \
+		"$srcdir/support/rrsync" "$1"
+}
+
+if run_rrsync "$restricted" >restricted.out 2>&1; then
+	test_fail "restricted rrsync started without inode-bound fd paths"
+fi
+if ! grep -F "restricted rrsync requires inode-bound /proc/self/fd" restricted.out; then
+	cat restricted.out
+	test_fail "restricted rrsync reported the wrong platform error"
+fi
+
+if run_rrsync / >root.out 2>&1; then
+	test_fail "unrestricted rrsync unexpectedly ran without an SSH command"
+fi
+if ! grep -F "Not invoked via sshd" root.out; then
+	cat root.out
+	test_fail "unrestricted rrsync was incorrectly refused by the platform check"
+fi
+
+exit 0
