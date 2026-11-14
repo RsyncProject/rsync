@@ -1,0 +1,150 @@
+name: Other
+
+on:
+  workflow_call:
+    inputs:
+      cygwin:
+        required: true
+        type: boolean
+      solaris:
+        required: true
+        type: boolean
+    outputs:
+      jobs:
+        description: Job results
+        value: ${{ toJSON(jobs) }}
+      inputs:
+        description: Job selections
+        value: ${{ toJSON(inputs) }}
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: sh
+
+jobs:
+  cygwin:
+    if: ${{ inputs.cygwin }}
+    runs-on: windows-2025
+    timeout-minutes: 60
+    name: Cygwin X86-64
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install Cygwin
+        run: .github/scripts/install-cygwin.ps1
+      - name: Install CommonMark
+        run: bash -c 'python3 -mpip install --user commonmark'
+      - name: Platform
+        run: bash -c 'python3 -S .github/scripts/check-platform.py cygwin --arch x86_64'
+      - name: Configure
+        run: bash -c './configure --with-rrsync'
+      - name: Build
+        id: build
+        run: bash -c 'make check-progs'
+      - name: Install
+        run: bash -c 'make install'
+      - name: Version
+        run: bash -c '/usr/local/bin/rsync --version'
+      - name: Tests (non-root pipe)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: bash -c 'python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync.exe" pipe,non-asan,nonroot,self-peer,cygwin "$PWD/test-results/nonroot/pipe" -j8'
+      - name: Tests (non-root TCP)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: bash -c 'python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync.exe" non-asan,nonroot,self-peer,cygwin "$PWD/test-results/nonroot/tcp" --use-tcp --daemon-tests-only -j8'
+      - name: Upload binaries
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          retention-days: 45
+          name: cygwin-amd64-bin
+          if-no-files-found: error
+          path: |
+            rsync.exe
+            rsync-ssl
+            rsync.1
+            rsync-ssl.1
+            rsyncd.conf.5
+            rrsync.1
+            rrsync
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          retention-days: 45
+          name: cygwin-amd64-results
+          if-no-files-found: error
+          path: |
+            test-results/*/*/run.log
+            test-results/*/*/receipt.json
+      - name: Restore Git
+        if: always()
+        run: |
+          $directory = 'C:\Program Files\Git\cmd'
+          if (-not (Test-Path -LiteralPath (Join-Path $directory 'git.exe'))) {
+            throw 'Runner Git is unavailable'
+          }
+          $directory >>$Env:GITHUB_PATH
+
+  solaris:
+    if: ${{ inputs.solaris }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    name: Solaris 11.4 X86-64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prepare VM host
+        timeout-minutes: 10
+        run: |
+          set -- qemu-utils qemu-system-x86 ovmf
+          sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "$@" || {
+            sudo apt-get update -q
+            sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "$@"
+          }
+      - name: Run VM and collect results
+        uses: vmactions/solaris-vm@87d3c436511cef802cd1637f86f73b1a97715c8c # v1.4.1
+        with:
+          release: '11.4'
+          cache-after-prepare: true
+          prepare: |
+            pkg install bash automake gnu-m4 pkg://solaris/runtime/python-35 autoconf gcc git
+          run: python3 -S .github/scripts/guest.py solaris
+      - name: Verify guest results
+        run: python3 -S .github/scripts/guest.py check
+      - name: Upload binaries
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          retention-days: 45
+          name: solaris-11.4-amd64-bin
+          if-no-files-found: error
+          path: |
+            rsync
+            rsync-ssl
+            rsync.1
+            rsync-ssl.1
+            rsyncd.conf.5
+            rrsync.1
+            rrsync
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          retention-days: 45
+          name: solaris-11.4-amd64-results
+          if-no-files-found: error
+          path: |
+            config.log
+            test-results/status
+            test-results/*/*/receipt.json
+            test-results/*/*/run.log

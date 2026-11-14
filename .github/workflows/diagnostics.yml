@@ -1,0 +1,243 @@
+name: Diagnostics
+
+on:
+  workflow_call:
+    inputs:
+      lint:
+        required: true
+        type: boolean
+      python_37:
+        required: true
+        type: boolean
+      asan:
+        required: true
+        type: boolean
+      coverage:
+        required: true
+        type: boolean
+      clang_21:
+        required: true
+        type: boolean
+    outputs:
+      jobs:
+        description: Job results
+        value: ${{ toJSON(jobs) }}
+      inputs:
+        description: Job selections
+        value: ${{ toJSON(inputs) }}
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: sh
+
+jobs:
+  python_37:
+    if: ${{ inputs.python_37 }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    name: Python 3.7
+    container: python:3.7.17-bullseye@sha256:f36f6fe9ddb2622aab9803944cbe7e2bc50be75d624a081f7895e60e7c6b7f0a
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Configure
+        run: ./configure --disable-md2man --disable-openssl --disable-xxhash --disable-zstd --disable-lz4 --disable-idn --disable-acl-support --disable-xattr-support --with-included-popt
+      - name: Build
+        run: make -j2 check-progs
+      - name: Check Python sources
+        run: |
+          python3 -B -S - <<'PY'
+          import os
+          from pathlib import Path
+          import subprocess
+
+          subprocess.run(['git', 'config', '--global', '--add',
+                          'safe.directory', str(Path.cwd())], check=True)
+          files = subprocess.check_output(
+              ['git', 'ls-files', '-z', '*.py']
+          ).split(b'\0')
+          for name in filter(None, files):
+              path = Path(os.fsdecode(name))
+              compile(path.read_bytes(), str(path), 'exec')
+          PY
+      - name: Check helpers
+        run: |
+          python3 -B -S .github/scripts/test-android.py
+          python3 -B -S .github/scripts/test-termux.py
+          python3 -B -S .github/scripts/test-storage.py
+          python3 -B -S .github/scripts/test-interop-metadata.py
+          python3 -B -S .github/scripts/test-changes.py
+          python3 -B -S .github/scripts/test-results.py
+          python3 -B -S .github/scripts/test-guest.py
+          python3 -B -S .github/scripts/test-diagnostics.py
+          python3 -B -S .github/scripts/test-archive.py
+          python3 -B -S .github/scripts/test-interop-policy.py
+          python3 -B -S .github/scripts/test-interop.py
+          python3 -B -S .github/scripts/test-transfers.py
+      - name: Tests
+        id: test
+        run: python3 -B -S testsuite/tools/check.py . ./rsync pipe,root,self-peer,linux,non-asan,no-userns test-results/python37 metadata profile process cli-transfers runner check-recipe -j2
+      - name: Upload results
+        if: ${{ !cancelled() && (steps.test.outcome == 'success' || steps.test.outcome == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: python37-results
+          retention-days: 45
+          if-no-files-found: error
+          path: test-results/python37/
+
+  lint:
+    if: ${{ inputs.lint }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    name: Workflow lint
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install actionlint
+        run: python3 -S .github/scripts/diagnostics.py install-actionlint
+      - name: Version
+        run: actionlint -version
+      - name: Check workflows
+        run: actionlint -color -ignore '^label "ubuntu-26\.04(-arm)?" is unknown\.'
+      - name: Check result gate
+        run: python3 -S .github/scripts/test-results.py
+      - name: Check helpers
+        run: |
+          python3 -S .github/scripts/test-changes.py
+          python3 -S .github/scripts/test-guest.py
+          python3 -S .github/scripts/test-diagnostics.py
+          python3 -S .github/scripts/test-android.py
+          python3 -S .github/scripts/test-termux.py
+          python3 -S .github/scripts/test-storage.py
+          python3 -S .github/scripts/test-interop-metadata.py
+          python3 -S .github/scripts/test-archive.py
+          python3 -S .github/scripts/test-interop-policy.py
+          python3 -S .github/scripts/test-interop.py
+          python3 -S .github/scripts/test-transfers.py
+      - name: Check Python runtime
+        run: python3 -S testsuite/runtests.py --describe-tests > /dev/null
+
+  asan:
+    if: ${{ inputs.asan }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    name: ASan + UBSan
+    env:
+      # Process-exit leaks are intentional; memory errors remain fatal
+      ASAN_OPTIONS: detect_leaks=0:abort_on_error=1
+      UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev libidn2-dev openssl
+          echo "/usr/local/bin" >>"$GITHUB_PATH"
+      - name: Configure
+        # Exercise release behaviour with assertions disabled
+        run: |
+          CC=clang \
+          CFLAGS="-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer -g -O1 -DNDEBUG" \
+          LDFLAGS="-fsanitize=address,undefined" \
+          ./configure --with-rrsync --disable-md2man
+      - name: Build
+        id: build
+        run: make check-progs
+      - name: Version
+        run: ./rsync --version
+      - name: Tests (non-root pipe)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: python3 -S testsuite/tools/check.py . ./rsync pipe,nonroot,self-peer,linux,asan,no-userns test-results/nonroot/pipe -j8
+      - name: Tests (non-root TCP)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: python3 -S testsuite/tools/check.py . ./rsync nonroot,self-peer,linux,asan,no-userns test-results/nonroot/tcp --use-tcp --daemon-tests-only -j8
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          retention-days: 45
+          name: asan-results
+          if-no-files-found: error
+          path: |
+            test-results/*/*/receipt.json
+            test-results/*/*/run.log
+
+  coverage:
+    if: ${{ inputs.coverage }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    name: Coverage
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev libidn2-dev python3-cmarkgfm openssl gcovr
+          echo "/usr/local/bin" >>"$GITHUB_PATH"
+      - name: Configure
+        run: ./configure --enable-coverage --with-rrsync
+      - name: Build
+        id: build
+        run: make
+      - name: Version
+        run: ./rsync --version
+      - name: Coverage (root pipe)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: sudo env RSYNC_TEST_PROFILES=pipe,non-asan,root,self-peer,linux,no-userns python3 -S .github/scripts/diagnostics.py coverage pipe
+      - name: Coverage (root TCP)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: sudo env RSYNC_TEST_PROFILES=non-asan,root,self-peer,linux,no-userns python3 -S .github/scripts/diagnostics.py coverage tcp
+      - name: Coverage summary
+        if: always()
+        run: python3 -S .github/scripts/diagnostics.py coverage-summary
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          retention-days: 45
+          name: coverage-html
+          if-no-files-found: error
+          path: |
+            coverage
+            coverage-tcp
+
+  clang_21:
+    if: ${{ inputs.clang_21 }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 45
+    name: Clang 21
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-21 clang-tools-21 acl libacl1-dev attr libattr1-dev liblz4-dev libidn2-dev libzstd-dev libxxhash-dev libpopt-dev openssl
+      - name: Compiler version
+        run: clang-21 --version
+      - name: Configure
+        run: scan-build-21 ./configure --with-rrsync --disable-md2man
+      - name: Analyse
+        run: python3 -S .github/scripts/diagnostics.py scan
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          retention-days: 45
+          name: scan-build-report-clang21
+          path: scan-report
+          if-no-files-found: ignore

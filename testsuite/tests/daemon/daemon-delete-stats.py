@@ -1,0 +1,47 @@
+#!/usr/bin/env python3
+
+import subprocess
+
+from harness.daemon_config import build_rsyncd_conf
+from harness.daemon import start_test_daemon
+from harness.environment import FROMDIR, TODIR
+from harness.filesystem import makepath, rmtree
+from harness.results import test_fail
+from harness.rsync import forced_protocol, rsync_argv
+from harness import metadata
+
+metadata(transports={'pipe', 'tcp'})
+
+DAEMON_PORT = 12899
+
+src = FROMDIR
+dst = TODIR
+
+rmtree(src)
+rmtree(dst)
+makepath(src, dst)
+
+(src / 'keep.txt').write_text("keep\n")
+(dst / 'keep.txt').write_text("keep\n")
+(dst / 'delete.txt').write_text("delete\n")
+
+url = start_test_daemon(build_rsyncd_conf(), DAEMON_PORT)
+
+proc = subprocess.run(
+    rsync_argv('-a', '--delete', '-i', '--stats', f'{src}/', f'{url}test-to/'),
+    capture_output=True,
+    text=True,
+)
+out = proc.stdout + proc.stderr
+print(out)
+
+if proc.returncode != 0:
+    test_fail(f"daemon upload delete run exited {proc.returncode}")
+
+if '*deleting   delete.txt' not in out:
+    test_fail(f"daemon upload did not itemize the deleted file:\n{out}")
+
+pv = forced_protocol()
+if pv is None or pv >= 31:
+    if 'Number of deleted files: 1 (reg: 1)' not in out:
+        test_fail(f"daemon upload did not report the deleted file in stats:\n{out}")

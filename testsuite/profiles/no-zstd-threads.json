@@ -1,0 +1,5 @@
+{
+  "unsupported": {
+    "zstd_threads": "no Zstandard worker threads"
+  }
+}

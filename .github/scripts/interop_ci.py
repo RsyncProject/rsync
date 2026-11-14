@@ -4,11 +4,13 @@ import os
 import re
 import time
 
+from changes import select as select_changes
 from interop_network import NetworkError, decode, download_records, fetch
 from interop_policy import ROLES
 
 API = 'https://api.github.com/repos/RsyncProject/rsync'
 WORKFLOW = 'RsyncProject/rsync/.github/workflows/interoperability-tests.yml@'
+STARTUP_TIMEOUT = 1800
 TIMESTAMP = r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z'
 bound = None
 api_cache = {}
@@ -22,8 +24,9 @@ class PeerUnavailable(NetworkError):
     pass
 
 
-def api(path):
-    cached = api_cache.get(path)
+def api(path, array=False):
+    key = path, array
+    cached = api_cache.get(key)
     try:
         body, headers = fetch(API + path, os.environ['GH_TOKEN'],
                               headers={'If-None-Match': cached[0]} if cached else {}, operation='Read CI identity')
@@ -31,10 +34,76 @@ def api(path):
         if error.code == 304 and cached:
             return cached[1]
         raise
-    value = decode(body)
+    if array:
+        try:
+            value = json.loads(body)
+        except ValueError:
+            raise NetworkError('Invalid JSON response') from None
+        if not isinstance(value, list):
+            raise NetworkError('Expected a JSON array')
+    else:
+        value = decode(body)
     if headers.get('ETag'):
-        api_cache[path] = headers['ETag'], value
+        api_cache[key] = headers['ETag'], value
     return value
+
+
+def pull_paths(run):
+    requests = run.get('pull_requests')
+    if not isinstance(requests, list) or len(requests) != 1:
+        return None
+    request = requests[0]
+    if not isinstance(request, dict):
+        return None
+    number = request.get('number')
+    base = request.get('base')
+    head = request.get('head')
+    if (type(number) is not int or number < 1
+            or not isinstance(base, dict) or not isinstance(head, dict)
+            or not isinstance(base.get('repo'), dict)
+            or base.get('repo', {}).get('id') != 266877886
+            or not re.fullmatch(r'[0-9a-f]{40}', base.get('sha', ''))
+            or not re.fullmatch(r'[0-9a-f]{40}', head.get('sha', ''))):
+        return None
+    current = api('/pulls/' + str(number))
+    if (not isinstance(current, dict) or current.get('number') != number
+            or not isinstance(current.get('base'), dict)
+            or not isinstance(current.get('head'), dict)
+            or not isinstance(current.get('base', {}).get('repo'), dict)
+            or current.get('base', {}).get('repo', {}).get('id') != 266877886
+            or current.get('base', {}).get('sha') != base['sha']
+            or current.get('head', {}).get('sha') != head['sha']):
+        return None
+    paths = []
+    statuses = {'added', 'removed', 'modified', 'renamed', 'copied', 'changed', 'unchanged'}
+    for page in range(1, 31):
+        files = api('/pulls/' + str(number) + '/files?per_page=100&page=' + str(page), array=True)
+        if not isinstance(files, list) or len(files) > 100:
+            return None
+        for item in files:
+            if (not isinstance(item, dict) or item.get('status') not in statuses
+                    or not isinstance(item.get('filename'), str)):
+                return None
+            if item['status'] == 'renamed':
+                if not isinstance(item.get('previous_filename'), str):
+                    return None
+                paths.append(item['previous_filename'])
+            paths.append(item['filename'])
+        if len(files) < 100:
+            return paths or None
+    return None
+
+
+def selected(run):
+    if run['event'] != 'pull_request':
+        return True
+    paths = pull_paths(run)
+    if paths is None:
+        return True
+    try:
+        return select_changes(paths)['interoperability'] is True
+    except (TypeError, ValueError):
+        return True
 
 
 @lru_cache(maxsize=1)
@@ -62,8 +131,11 @@ def source():
     if (run.get('path') != '.github/workflows/ci.yml' or run.get('name') != 'CI'
             or run.get('id') != run_id or run.get('repository', {}).get('id') != 266877886 or run.get('run_attempt') != attempt
             or run.get('event') not in ('pull_request', 'push', 'schedule', 'workflow_dispatch')
-            or not re.fullmatch(TIMESTAMP, run.get('created_at', ''))):
+            or not re.fullmatch(TIMESTAMP, run.get('created_at', ''))
+            or not isinstance(run.get('display_title'), str) or not run['display_title']):
         raise NetworkError('CI run does not match its event')
+    if not selected(run):
+        raise NotSelected('CI has not selected interoperability')
     references = [item for item in run.get('referenced_workflows', []) if item.get('path', '').startswith(WORKFLOW)]
     deadline = time.monotonic() + 180
     while not references and run.get('status') in ('queued', 'in_progress') and time.monotonic() < deadline:
@@ -79,7 +151,7 @@ def source():
     if run.get('status') == 'completed':
         raise NotSelected('CI has already completed')
     return dict(run_id=str(run_id), run_attempt=str(attempt), source_sha=references[0]['sha'],
-                head_sha=run['head_sha'], created_at=run['created_at'])
+                head_sha=run['head_sha'], display_title=run['display_title'], created_at=run['created_at'])
 
 
 def identity():
@@ -197,7 +269,7 @@ def find_controller(exclude=None):
 
 
 def controller():
-    deadline = time.monotonic() + 1800
+    deadline = time.monotonic() + STARTUP_TIMEOUT
     while time.monotonic() < deadline:
         run = find_controller()
         if run is not None:

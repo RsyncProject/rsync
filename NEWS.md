@@ -17,6 +17,17 @@
 - Changed to `/` immediately after a module chroot, before selecting an inner
   module directory. A failed working-directory reset aborts the connection.
 
+### BUILD AND TESTS:
+- Reworked test discovery, platform profiles and JSON test results. The runner
+  now lives under `testsuite/` and uses Python 3.7 or later with no third-party
+  Python packages.
+- Expanded native platform tests and historical-peer checks in both executable
+  roles. Added Android Bionic and Termux application tests and cross-platform
+  transfers over SSH and daemon connections.
+- Added installed-binary TLS checks, release-archive qualification and Linux
+  storage tests for encrypted volumes, mount boundaries, space exhaustion,
+  device transfers and `--copy-as`.
+
 # NEWS for rsync 3.5.2 (4 Nov 2026)
 
 ## Changes in this version:

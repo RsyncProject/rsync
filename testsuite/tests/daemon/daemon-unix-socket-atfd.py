@@ -1,0 +1,45 @@
+#!/usr/bin/env python3
+
+import os
+import socket
+import stat
+
+from harness.daemon_config import write_daemon_conf
+from harness.daemon import start_test_daemon
+from harness.environment import SCRATCHDIR
+from harness.filesystem import makepath, rmtree
+from harness.results import test_fail, test_skipped
+from harness.rsync import rsync_argv
+import subprocess
+from harness import metadata
+
+metadata(transports={'pipe', 'tcp'})
+
+src = SCRATCHDIR / 'sock-src'
+dst = SCRATCHDIR / 'sock-dst'
+rmtree(src)
+rmtree(dst)
+makepath(src, dst)
+s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+previous = os.getcwd()
+try:
+    os.chdir(src)
+    s.bind('s')
+except OSError as e:
+    test_skipped(f"cannot create unix-domain socket fixture: {e}")
+finally:
+    s.close()
+    os.chdir(previous)
+
+conf = write_daemon_conf([
+    ('sock', {'path': str(dst), 'read only': 'no', 'use chroot': 'no'}),
+])
+url = start_test_daemon(conf, 12935)
+proc = subprocess.run(
+    rsync_argv('-a', '--specials', f'{src}/', f'{url}sock/'),
+    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+if proc.returncode != 0:
+    test_fail(f"daemon socket-special upload failed:\n{proc.stderr}")
+if not stat.S_ISSOCK((dst / 's').lstat().st_mode):
+    test_fail("rsync did not preserve the unix-domain socket fixture")
+print("daemon-unix-socket-atfd: daemon receiver preserves unix sockets without escaping parent confinement")

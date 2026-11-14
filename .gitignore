@@ -1,5 +1,6 @@
 *.[oa]
 *~
+__pycache__/
 dummy
 ID
 Makefile
@@ -13,7 +14,6 @@ config.h.in.old
 config.log
 config.status
 aclocal.m4
-__pycache__
 /proto.h
 /proto.h-tstamp
 /rsync*.[15]
@@ -40,12 +40,14 @@ __pycache__
 /testdir
 /tests-dont-exist
 /testtmp
+/test-results/
 /tls
 /testrun
 /trimslash
 /t_unsafe
 /wildtest
 /getfsdev
+/dirfd-probe
 /simdtest
 /t_acl
 /t_chmod_secure
@@ -61,11 +63,6 @@ __pycache__
 /doc/rsync.pdf
 /doc/rsync.ps
 /support/savetransfer
-/testsuite/chown-fake.test
-/testsuite/devices-fake.test
-/testsuite/xattrs-hlink.test
-/testsuite/fleettest.json
-/fleettest-logs
 /patches
 /patches.gen
 /build

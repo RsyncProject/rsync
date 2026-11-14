@@ -1,0 +1,179 @@
+name: Android
+
+on:
+  workflow_call:
+    outputs:
+      jobs:
+        description: Job results
+        value: ${{ toJSON(jobs) }}
+      inputs:
+        description: Job selections
+        value: '{"bionic": true, "x86_64": true, "termux": true, "emulator": true}'
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: sh
+
+env:
+  ANDROID_API: 24
+
+jobs:
+  bionic:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    name: ${{ matrix.name }}
+    env:
+      ANDROID_TRIPLE: ${{ matrix.triple }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Bionic API 24 ARM64
+            abi: arm64-v8a
+            triple: aarch64-linux-android
+            executor: qemu-aarch64-static
+            packages: qemu-user-static
+          - name: Bionic API 24 ARMv7
+            abi: armeabi-v7a
+            triple: armv7a-linux-androideabi
+            executor: qemu-arm-static
+            packages: qemu-user-static
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y autoconf automake gawk ${{ matrix.packages }}
+
+      - &build
+        name: Build
+        run: |
+          set -eu
+          NDK="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_ROOT}"
+          TC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          export CC="$TC/${ANDROID_TRIPLE}${ANDROID_API}-clang"
+          export CXX="$TC/${ANDROID_TRIPLE}${ANDROID_API}-clang++"
+          export AR="$TC/llvm-ar" RANLIB="$TC/llvm-ranlib" STRIP="$TC/llvm-strip"
+          export CFLAGS="-O2" LDFLAGS="-static"
+
+          # Bionic hides lchmod and lutimes before API 36; cross-builds cannot run probes
+          export ac_cv_func_lchmod=no ac_cv_func_lutimes=no \
+                 rsync_cv_HAVE_SOCKETPAIR=yes \
+                 rsync_cv_MKNOD_CREATES_FIFOS=yes \
+                 rsync_cv_MKNOD_CREATES_SOCKETS=yes
+
+          ./configure --host="$ANDROID_TRIPLE" --build=x86_64-pc-linux-gnu \
+            --enable-ipv6 \
+            --disable-zstd --disable-lz4 --disable-xxhash --disable-openssl --disable-idn \
+            --disable-iconv --disable-iconv-open \
+            --disable-acl-support --disable-xattr-support \
+            --disable-md2man --disable-roll-simd \
+            --with-included-popt --with-included-zlib
+
+          # Generate shared headers before the parallel build
+          make proto.h
+          make -j"$(nproc)" rsync
+          "$STRIP" rsync
+
+      - name: Tests
+        run: python3 -S .github/scripts/android.py test --executor "${{ matrix.executor }}"
+
+      - name: Package
+        run: python3 -S .github/scripts/android.py package --abi "${{ matrix.abi }}"
+
+      - &upload
+        name: Upload binaries
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          retention-days: 45
+          name: ${{ env.ARTIFACT_NAME }}
+          if-no-files-found: error
+          path: dist/
+
+  x86_64:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    name: Bionic API 24 X86-64
+    env:
+      ANDROID_TRIPLE: x86_64-linux-android
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y autoconf automake gawk
+      - *build
+      - name: Tests
+        run: python3 -S .github/scripts/android.py test --executor direct
+      - name: Package
+        run: python3 -S .github/scripts/android.py package --abi x86_64
+      - *upload
+
+  termux:
+    needs: x86_64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    name: Termux API 36 X86-64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - &emulator-dependencies
+        name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y acl libpulse0
+          sudo setfacl -m "u:$(id -un):rw" /dev/kvm
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'system-images;android-36;google_apis;x86_64' emulator
+      - &download
+        name: Download binary
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: rsync-android-x86_64
+          path: dist/
+      - &restore
+        name: Verify binary
+        run: python3 -S .github/scripts/android.py restore --abi x86_64
+      - name: Tests
+        id: test
+        run: python3 -S .github/scripts/android-emulator.py --termux --output test-results/termux
+      - name: Upload results
+        if: ${{ !cancelled() && (steps.test.outcome == 'success' || steps.test.outcome == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          retention-days: 45
+          name: android-termux-results
+          if-no-files-found: error
+          path: test-results/termux/
+
+  emulator:
+    needs: x86_64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    name: Emulator API 36 X86-64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - *emulator-dependencies
+      - *download
+      - *restore
+      - name: Tests
+        id: test
+        run: python3 -S .github/scripts/android-emulator.py
+      - name: Upload results
+        if: ${{ !cancelled() && (steps.test.outcome == 'success' || steps.test.outcome == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          retention-days: 45
+          name: android-emulator-results
+          if-no-files-found: error
+          path: test-results/android-emulator/

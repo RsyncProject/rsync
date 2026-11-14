@@ -1,0 +1,214 @@
+name: BSD
+
+on:
+  workflow_call:
+    outputs:
+      jobs:
+        description: Job results
+        value: ${{ toJSON(jobs) }}
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: sh
+
+jobs:
+  freebsd:
+    strategy:
+      fail-fast: false
+      matrix:
+        release: ['15.1']
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    name: FreeBSD ${{ matrix.release }} X86-64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prepare VM host
+        timeout-minutes: 10
+        run: |
+          set -- qemu-utils qemu-system-x86 ovmf
+          sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "$@" || {
+            sudo apt-get update -q
+            sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "$@"
+          }
+      - name: Run VM and collect results
+        uses: vmactions/freebsd-vm@c46abacb49f09938ca4e1702d15d836285d694cc # v1.5.9
+        with:
+          release: ${{ matrix.release }}
+          cache-after-prepare: true
+          prepare: |
+            pkg install -y bash autotools m4 xxhash zstd liblz4 libidn2 libiconv python3 git
+            /usr/sbin/pw groupadd rsynctest
+            /usr/sbin/pw groupadd rsynctest-extra
+            /usr/sbin/pw useradd rsynctest -g rsynctest -G rsynctest-extra -m -d /home/rsynctest -s /bin/sh -w no
+          run: python3 -S .github/scripts/guest.py freebsd --release "${{ matrix.release }}"
+      - name: Verify guest results
+        run: python3 -S .github/scripts/guest.py check
+      - name: Upload binaries
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          retention-days: 45
+          name: freebsd-${{ matrix.release }}-amd64-bin
+          if-no-files-found: error
+          path: |
+            rsync
+            rsync-ssl
+            rsync.1
+            rsync-ssl.1
+            rsyncd.conf.5
+            rrsync.1
+            rrsync
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          retention-days: 45
+          name: freebsd-${{ matrix.release }}-amd64-results
+          if-no-files-found: error
+          path: |
+            config.log
+            test-results/status
+            test-results/features.json
+            test-results/nonroot/dirfd-probe.tsv
+            test-results/*/*/receipt.json
+            test-results/*/*/run.log
+
+  netbsd:
+    strategy:
+      fail-fast: false
+      matrix:
+        release: ['11.1']
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    name: NetBSD ${{ matrix.release }} X86-64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prepare VM host
+        timeout-minutes: 10
+        run: |
+          set -- autoconf automake qemu-utils qemu-system-x86 ovmf
+          sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "$@" || {
+            sudo apt-get update -q
+            sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "$@"
+          }
+      - name: Prepare source
+        run: ./prepare-source
+      - name: Run VM and collect results
+        uses: vmactions/netbsd-vm@5957cf330aef2e6ddc63c604364c99ce2e02b91d # v1.5.3
+        with:
+          release: ${{ matrix.release }}
+          sync: tar
+          cache-after-prepare: true
+          prepare: |
+            export PKG_PATH="https://cdn.NetBSD.org/pub/pkgsrc/packages/NetBSD/$(uname -p)/$(uname -r)/All"
+            for attempt in 1 2 3; do
+              PATH=/usr/sbin:$PATH pkg_add -U git-base python312 && break
+              test "$attempt" -lt 3 || exit 1
+              sleep 5
+            done
+            ln -sf /usr/pkg/bin/python3.12 /usr/pkg/bin/python3
+            /usr/sbin/groupadd rsynctest-extra
+            /usr/sbin/useradd -m -d /home/rsynctest -g =uid -G rsynctest-extra -s /bin/sh rsynctest
+          run: python3 -S .github/scripts/guest.py netbsd --release "${{ matrix.release }}"
+      - name: Verify guest results
+        run: python3 -S .github/scripts/guest.py check
+      - name: Upload binaries
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          retention-days: 45
+          name: netbsd-${{ matrix.release }}-amd64-bin
+          if-no-files-found: error
+          path: |
+            rsync
+            rsync-ssl
+            rsync.1
+            rsync-ssl.1
+            rsyncd.conf.5
+            rrsync.1
+            rrsync
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          retention-days: 45
+          name: netbsd-${{ matrix.release }}-amd64-results
+          if-no-files-found: error
+          path: |
+            config.log
+            test-results/status
+            test-results/nonroot/dirfd-probe.tsv
+            test-results/*/*/receipt.json
+            test-results/*/*/run.log
+
+  openbsd:
+    strategy:
+      fail-fast: false
+      matrix:
+        release: ['8.0']
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    name: OpenBSD ${{ matrix.release }} X86-64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prepare VM host
+        timeout-minutes: 10
+        run: |
+          set -- qemu-utils qemu-system-x86 ovmf
+          sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "$@" || {
+            sudo apt-get update -q
+            sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends "$@"
+          }
+      - name: Run VM and collect results
+        uses: vmactions/openbsd-vm@f1ca8bc8ecc5b6ef7218e5b914836e067e1546d3 # v1.4.9
+        with:
+          release: ${{ matrix.release }}
+          cache-after-prepare: true
+          prepare: |
+            pkg_add -I bash autoconf%2.71 automake%1.16 xxhash zstd lz4 libidn2 libiconv git
+            /usr/sbin/groupadd rsynctest-extra
+            /usr/sbin/useradd -m -d /home/rsynctest -g =uid -G rsynctest-extra -s /bin/sh rsynctest
+          run: python3 -S .github/scripts/guest.py openbsd --release "${{ matrix.release }}"
+      - name: Verify guest results
+        run: python3 -S .github/scripts/guest.py check
+      - name: Upload binaries
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          retention-days: 45
+          name: openbsd-${{ matrix.release }}-amd64-bin
+          if-no-files-found: error
+          path: |
+            rsync
+            rsync-ssl
+            rsync.1
+            rsync-ssl.1
+            rsyncd.conf.5
+            rrsync.1
+            rrsync
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          retention-days: 45
+          name: openbsd-${{ matrix.release }}-amd64-results
+          if-no-files-found: error
+          path: |
+            config.log
+            test-results/status
+            test-results/features.json
+            test-results/nonroot/dirfd-probe.tsv
+            test-results/*/*/receipt.json
+            test-results/*/*/run.log

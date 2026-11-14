@@ -392,11 +392,9 @@ The following are documented as out of scope for this release:
   whose parent component is *raced* from a directory to a symlink mid-resolution
   can still slip past confinement that is anchored at the process CWD (e.g. the
   sender's content open), because the descriptor is not bound to the original
-  inode.  The parent-component symlink-race tests are therefore not enforced on
-  Cygwin (see `RSYNC_EXPECT_SKIPPED` in `.github/workflows/cygwin-build.yml` and
-  the Cygwin-only xfail in `symlink-race-source_test.py`).  Cygwin is a
-  development/interoperability target, not a privilege boundary host, so this is
-  accepted for this release.
+  inode.  We therefore report `dirfd_pinning` as unsupported on Cygwin and
+  treat Cygwin as an interoperability target rather than a privilege-boundary
+  platform.
 
 * On a platform with no `mknodat()` at all -- macOS before 13 is the
   supported example, where `mknod()` and `mkfifo()` exist but neither

@@ -1,0 +1,287 @@
+name: Linux
+
+on:
+  workflow_call:
+    inputs:
+      ubuntu:
+        required: true
+        type: boolean
+      almalinux:
+        required: true
+        type: boolean
+      alpine:
+        required: true
+        type: boolean
+    outputs:
+      jobs:
+        description: Job results
+        value: ${{ toJSON(jobs) }}
+      inputs:
+        description: Job selections
+        value: ${{ toJSON(inputs) }}
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: sh
+
+jobs:
+  ubuntu:
+    if: ${{ inputs.ubuntu }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - release: '26.04'
+            arch: amd64
+            machine: x86_64
+            runner: ubuntu-26.04
+            profiles: non-asan,self-peer,linux,no-userns
+          - release: '24.04'
+            arch: amd64
+            machine: x86_64
+            runner: ubuntu-24.04
+            profiles: non-asan,self-peer,linux,no-userns
+          - release: '22.04'
+            arch: amd64
+            machine: x86_64
+            runner: ubuntu-22.04
+            profiles: non-asan,self-peer,linux,no-zstd-threads
+          - release: '26.04'
+            arch: arm64
+            machine: aarch64
+            runner: ubuntu-26.04-arm
+            profiles: non-asan,self-peer,linux,no-simd,no-userns
+          - release: '24.04'
+            arch: arm64
+            machine: aarch64
+            runner: ubuntu-24.04-arm
+            profiles: non-asan,self-peer,linux,no-simd,no-userns
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    name: Ubuntu ${{ matrix.release }} ${{ matrix.arch == 'amd64' && 'X86-64' || 'ARM64' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Platform
+        run: python3 -S .github/scripts/check-platform.py ubuntu --release "${{ matrix.release }}" --arch "${{ matrix.machine }}"
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev libidn2-dev python3-cmarkgfm openssl openssh-server
+          sudo install -d -o root -g root -m 0755 /run/sshd
+          sudo sysctl -w fs.protected_regular=2
+          echo "/usr/local/bin" >>"$GITHUB_PATH"
+          mkdir -p test-results
+      - name: Configure
+        run: ./configure --with-rrsync
+      - name: Build
+        id: build
+        run: make check-progs
+      - name: Installation check
+        run: python3 -S .github/scripts/installcheck.py
+      - name: Install
+        run: sudo make install
+      - name: Version
+        run: ./rsync --version
+      - name: Verify installed rsync-ssl
+        run: |
+          python3 -S testsuite/tools/check-rsync-ssl.py \
+            --rsync /usr/local/bin/rsync \
+            --rsync-ssl /usr/local/bin/rsync-ssl \
+            --openssl /usr/bin/openssl
+      - name: Verify restricted SSH
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: sudo python3 -S testsuite/tools/check-ssh.py --rsync /usr/local/bin/rsync --rrsync support/rrsync
+      - name: Install storage dependencies
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.release == '24.04' && matrix.arch == 'amd64' }}
+        run: sudo apt-get install -y cryptsetup-bin e2fsprogs
+      - name: Storage
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.release == '24.04' && matrix.arch == 'amd64' }}
+        run: sudo python3 -B -S testsuite/tools/check-storage.py --binary "$PWD/rsync" --output "$PWD/test-results/root/storage"
+      - name: Tests (root pipe)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: sudo python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" "pipe,root,${{ matrix.profiles }}" "$PWD/test-results/root/pipe" -j8
+      - name: Tests (root protocol 30)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: sudo python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" "pipe,root,${{ matrix.profiles }},protocol-30" "$PWD/test-results/root/protocol-30" --protocol=30 -j8
+      - name: Tests (root protocol 29)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: sudo python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" "pipe,root,${{ matrix.profiles }},protocol-29" "$PWD/test-results/root/protocol-29" --protocol=29 -j8
+      - name: Tests (root TCP)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: sudo python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" "root,${{ matrix.profiles }}" "$PWD/test-results/root/tcp" --use-tcp --daemon-tests-only -j8
+      - name: Tests (non-root pipe)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" "pipe,nonroot,${{ matrix.profiles }}" "$PWD/test-results/nonroot/pipe" -j8
+      - name: Tests (non-root TCP)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" "nonroot,${{ matrix.profiles }}" "$PWD/test-results/nonroot/tcp" --use-tcp --daemon-tests-only -j8
+      - name: Upload binaries
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          retention-days: 45
+          name: ubuntu-${{ matrix.release }}-${{ matrix.arch }}-bin
+          if-no-files-found: error
+          path: |
+            rsync
+            rsync-ssl
+            rsync.1
+            rsync-ssl.1
+            rsyncd.conf.5
+            rrsync.1
+            rrsync
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          retention-days: 45
+          name: ubuntu-${{ matrix.release }}-${{ matrix.arch }}-results
+          if-no-files-found: error
+          path: |
+            config.log
+            test-results/*/*/receipt.json
+            test-results/*/*/run.log
+
+  almalinux:
+    if: ${{ inputs.almalinux }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    container:
+      image: almalinux:8
+    name: AlmaLinux 8 X86-64
+    steps:
+      - name: Install Git
+        run: dnf -y install git
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install dependencies
+        run: |
+          # RHEL 8's default Python is too old for the test runner
+          dnf -y install epel-release
+          dnf config-manager --set-enabled powertools
+          dnf -y install gcc gcc-c++ make autoconf automake m4 \
+              python39 python39-pip diffutils \
+              openssl openssl-devel \
+              attr libattr-devel acl libacl-devel \
+              zstd libzstd-devel \
+              lz4 lz4-devel \
+              xxhash xxhash-devel \
+              libidn2 libidn2-devel
+          alternatives --set python3 /usr/bin/python3.9
+          pip3 install commonmark
+      - name: Platform
+        run: python3 -S .github/scripts/check-platform.py almalinux --release 8 --arch x86_64
+      - name: Configure
+        run: ./configure --with-rrsync
+      - name: Build
+        id: build
+        run: make check-progs
+      - name: Version
+        run: ./rsync --version
+      - name: Tests (root pipe)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" pipe,non-asan,root,self-peer,linux,no-zstd-threads,no-userns "$PWD/test-results/root/pipe" -j8
+      - name: Tests (root TCP)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: python3 -S testsuite/tools/check.py "$PWD" "$PWD/rsync" non-asan,root,self-peer,linux,no-zstd-threads,no-userns "$PWD/test-results/root/tcp" --use-tcp --daemon-tests-only -j8
+      - name: Upload binaries
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          retention-days: 45
+          name: almalinux-8-amd64-bin
+          if-no-files-found: error
+          path: |
+            rsync
+            rsync-ssl
+            rsync.1
+            rsync-ssl.1
+            rsyncd.conf.5
+            rrsync.1
+            rrsync
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          retention-days: 45
+          name: almalinux-8-amd64-results
+          if-no-files-found: error
+          path: |
+            config.log
+            test-results/*/*/run.log
+            test-results/*/*/receipt.json
+
+  alpine:
+    if: ${{ inputs.alpine }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    name: Alpine 3.24.4 ${{ matrix.arch == 'amd64' && 'X86-64' || 'X86-32' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+            apk_arch: x86_64
+            bits: 64
+            image: alpine@sha256:0f49f331d9212aff11b932863be4eb01cdf962969aa86dab7d1ee21ac6f5f52b
+            profiles: non-asan,self-peer,linux,no-simd,no-userns
+          - arch: x86
+            platform: linux/386
+            apk_arch: x86
+            bits: 32
+            image: alpine@sha256:55d68c85222dd92297b0f8885354739d89f0dc17fc2f903c49dc1d9c129c3d6a
+            profiles: non-asan,self-peer,linux,no-simd,no-userns
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prepare host
+        run: |
+          sudo sysctl -w fs.protected_regular=2
+          mkdir -p "$RUNNER_TEMP/rsync-alpine-${{ matrix.arch }}"
+          docker pull --platform "${{ matrix.platform }}" "${{ matrix.image }}"
+      - name: Run Alpine and collect results
+        env:
+          APK_ARCH: ${{ matrix.apk_arch }}
+          BITS: ${{ matrix.bits }}
+          PROFILES: ${{ matrix.profiles }}
+        run: |
+          docker run --rm -i --platform "${{ matrix.platform }}" \
+            -e APK_ARCH -e BITS -e PROFILES -e RSYNC_TEST_TMP=/dev/shm \
+            -v "$PWD:/source:ro" \
+            -v "$RUNNER_TEMP/rsync-alpine-${{ matrix.arch }}:/results" \
+            "${{ matrix.image }}" sh -ec '
+              apk add --no-cache acl acl-dev attr attr-dev autoconf automake bash build-base diffutils gawk git \
+                libidn2-dev linux-headers lz4-dev musl-locales openssl-dev py3-commonmark python3 setpriv xxhash-dev zstd-dev
+              exec python3 -S /source/.github/scripts/guest.py alpine --output /results
+            '
+      - name: Upload binaries
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          retention-days: 45
+          name: alpine-3.24.4-${{ matrix.arch }}-bin
+          if-no-files-found: error
+          path: ${{ runner.temp }}/rsync-alpine-${{ matrix.arch }}/bin
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          retention-days: 45
+          name: alpine-3.24.4-${{ matrix.arch }}-results
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/rsync-alpine-${{ matrix.arch }}/config.log
+            ${{ runner.temp }}/rsync-alpine-${{ matrix.arch }}/features.json
+            ${{ runner.temp }}/rsync-alpine-${{ matrix.arch }}/*/*/receipt.json
+            ${{ runner.temp }}/rsync-alpine-${{ matrix.arch }}/*/*/run.log

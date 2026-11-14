@@ -1,0 +1,10 @@
+{
+  "not_applicable": {
+    "darwin": "not Darwin",
+    "darwin_interpose": "no dyld interposition"
+  },
+  "unsupported": {
+    "crtimes": "no creation times",
+    "symlink_mode": "no symlink chmod"
+  }
+}

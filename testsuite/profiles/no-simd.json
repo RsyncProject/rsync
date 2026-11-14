@@ -1,0 +1,5 @@
+{
+  "unsupported": {
+    "simd": "no x86 SIMD test build"
+  }
+}
