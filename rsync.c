@@ -511,6 +511,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	int inherit;
 	int dfd = -1;            /* held dir fd for the entry's own dir, or -1 */
 	const char *leaf = NULL; /* leaf of fname relative to dfd */
+	int dirlink_dfd = -1;    /* owned fd for a followed --keep-dirlinks target */
 	int op_leaf_fd = -1;     /* O_NOFOLLOW fd pinning a cross-tree operator leaf */
 	int op_pin = 0;          /* drive chmod/chown off op_leaf_fd for a cross-tree leaf */
 	int op_refuse = 0;       /* pin open hit the symlink-race signal: refuse, don't redirect */
@@ -548,6 +549,26 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	if (dfd >= 0) {
 		const char *slash = strrchr(fname, '/');
 		leaf = slash ? slash + 1 : fname;
+	}
+
+	/* --keep-dirlinks treats an existing directory symlink as the directory it
+	 * names. Resolve that target beneath the transfer root once, then address
+	 * the target itself as "." for every metadata operation below. */
+	if (secure_relpath_active() && keep_dirlinks && S_ISDIR(new_mode)) {
+		STRUCT_STAT lst;
+		int lret = dfd >= 0 ? do_lstat_atfd(dfd, leaf, &lst)
+				    : do_lstat_at(fname, &lst);
+		if (lret == 0 && S_ISLNK(lst.st_mode)) {
+			dirlink_dfd = secure_relative_dirfd(NULL, fname);
+			if (dirlink_dfd < 0) {
+				rsyserr(FERROR_XFER, errno,
+					"failed to resolve directory link %s",
+					full_fname(fname));
+				return 0;
+			}
+			dfd = dirlink_dfd;
+			leaf = ".";
+		}
 	}
 
 #if defined SUPPORT_XATTRS || defined SUPPORT_ACLS
@@ -832,6 +853,8 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 #endif
 	if (op_leaf_fd >= 0)
 		close(op_leaf_fd);
+	if (dirlink_dfd >= 0)
+		close(dirlink_dfd);
 	if (sxp == &sx2)
 		free_stat_x(&sx2);
 	return updated;

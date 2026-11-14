@@ -59,9 +59,11 @@ srcbase="$tmpdir/src"
 ######################################################################
 
 mkdir -p "$HOME/real-dir"
+chmod 0700 "$HOME/real-dir"
 ln -s real-dir "$HOME/dir"
 
 mkdir -p "$srcbase/dir"
+chmod 0751 "$srcbase/dir"
 make_testfile "$srcbase/dir/file"
 
 # First transfer (initial): should create the file through the symlink
@@ -74,6 +76,8 @@ fi
 
 diff "$srcbase/dir/file" "$HOME/real-dir/file" >/dev/null \
     || test_fail "test 1: initial transfer content mismatch"
+check_perms "$HOME/real-dir" rwxr-x--x \
+    "test 1: directory-link target permissions"
 
 # Small modification to trigger delta transfer
 echo "appended update" >> "$srcbase/dir/file"
