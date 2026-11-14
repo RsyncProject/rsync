@@ -63,15 +63,20 @@ flip_code = (
     "        pass\n"
 )
 flip = subprocess.Popen(['python3', '-c', flip_code, str(sub), str(link)])
+attempts = 0
 try:
     deadline = time.monotonic() + race_budget(10.0)
     while time.monotonic() < deadline:
-        rmtree(sub)
+        try:
+            rmtree(sub)
+        except OSError:
+            continue
         try:
             sub.unlink()
         except OSError:
             pass
         push()
+        attempts += 1
         escaped = sorted(p.name for p in outside.iterdir()
                          if p.is_file() and not p.is_symlink())
         if escaped:
@@ -86,3 +91,6 @@ finally:
     except subprocess.TimeoutExpired:
         flip.kill()
         flip.wait()
+
+if attempts == 0:
+    test_fail('path flipper prevented every rename-race transfer attempt')
