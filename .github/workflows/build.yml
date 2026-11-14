@@ -1,125 +1,218 @@
-name: build
+name: LTS CI
 
 on:
   push:
-    branches: [ master ]
-    paths-ignore: [ .cirrus.yml ]
+    branches: [lts/3.2.7]
   pull_request:
-    branches: [ master ]
-    paths-ignore: [ .cirrus.yml ]
-  schedule:
-    - cron: '42 8 * * *'
+    branches: [lts/3.2.7]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: sh
 
 jobs:
-
-  ubuntu-build:
-    runs-on: ubuntu-20.04
+  linux:
+    name: Linux X86-64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-    - uses: actions/checkout@v2
-    - name: prep
-      run: |
-        sudo apt-get install acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev python3-cmarkgfm openssl wget
-        wget -O git-version.h https://gist.githubusercontent.com/WayneD/c11243fa374fc64d4e42f2855c8e3827/raw/rsync-git-version.h
-        echo "/usr/local/bin" >>$GITHUB_PATH
-    - name: configure
-      run: ./configure --with-rrsync
-    - name: make
-      run: make
-    - name: install
-      run: sudo make install
-    - name: info
-      run: rsync --version
-    - name: check
-      run: sudo RSYNC_EXPECT_SKIPPED=crtimes make check
-    - name: check30
-      run: sudo RSYNC_EXPECT_SKIPPED=crtimes make check30
-    - name: check29
-      run: sudo RSYNC_EXPECT_SKIPPED=crtimes make check29
-    - name: ssl file list
-      run: rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
-    - name: save artifact
-      uses: actions/upload-artifact@v2
-      with:
-        name: ubuntu-bin
-        path: |
-          rsync
-          rsync-ssl
-          rsync.1
-          rsync-ssl.1
-          rsyncd.conf.5
-          rrsync.1
-          rrsync
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y acl attr libacl1-dev libattr1-dev liblz4-dev libzstd-dev libxxhash-dev openssl python3-cmarkgfm
+      - name: Configure
+        run: ./configure --with-rrsync
+      - name: Build
+        run: make -j2
+      - name: Tests
+        run: make check
+      - name: Protocol 29
+        run: make check29
+      - name: Protocol 30
+        run: make check30
+      - name: Root tests
+        run: sudo make check
+      - name: Manuals
+        run: make man
+      - name: Installed form
+        run: |
+          destination=$(mktemp -d)
+          make DESTDIR="$destination" install
+          "$destination/usr/local/bin/rsync" --version
+          python3 "$destination/usr/local/bin/rrsync" -h >/dev/null
+          test -s "$destination/usr/local/share/man/man1/rrsync.1"
 
-  macos-build:
-    runs-on: macos-latest
+  macos:
+    name: macOS ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-26
+            arch: ARM64
+          - runner: macos-26-intel
+            arch: X86-64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
     steps:
-    - uses: actions/checkout@v2
-    - name: prep
-      run: |
-        brew install automake openssl xxhash zstd lz4 wget
-        sudo pip3 install commonmark
-        wget -O git-version.h https://gist.githubusercontent.com/WayneD/c11243fa374fc64d4e42f2855c8e3827/raw/rsync-git-version.h
-        echo "/usr/local/bin" >>$GITHUB_PATH
-    - name: configure
-      run: CPPFLAGS=-I/usr/local/opt/openssl/include/ LDFLAGS=-L/usr/local/opt/openssl/lib/ ./configure --with-rrsync
-    - name: make
-      run: make
-    - name: install
-      run: sudo make install
-    - name: info
-      run: rsync --version
-    - name: check
-      run: sudo RSYNC_EXPECT_SKIPPED=acls-default,chmod-temp-dir,chown-fake,devices-fake,dir-sgid,protected-regular,xattrs-hlink,xattrs make check
-    - name: ssl file list
-      run: rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
-    - name: save artifact
-      uses: actions/upload-artifact@v2
-      with:
-        name: macos-bin
-        path: |
-          rsync
-          rsync-ssl
-          rsync.1
-          rsync-ssl.1
-          rsyncd.conf.5
-          rrsync.1
-          rrsync
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install dependencies
+        run: brew install automake openssl xxhash zstd lz4
+      - name: Configure
+        run: |
+          prefix=$(brew --prefix)
+          openssl_prefix=$(brew --prefix openssl)
+          CPPFLAGS="-I${prefix}/include -I${openssl_prefix}/include" \
+          LDFLAGS="-L${prefix}/lib -L${openssl_prefix}/lib" \
+            ./configure --disable-md2man --with-rrsync --enable-iconv --enable-acl-support --enable-xattr-support
+      - name: Build
+        run: make -j2
+      - name: Tests
+        run: make check
 
-  cygwin-build:
-    runs-on: windows-2022
-    if: (github.event_name == 'schedule' || contains(github.event.head_commit.message, '[buildall]'))
+  cygwin:
+    name: Cygwin X86-64
+    runs-on: windows-2025
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
     steps:
-    - uses: actions/checkout@v2
-    - name: cygwin
-      run: choco install -y --no-progress cygwin cyg-get
-    - name: prep
-      run: |
-        cyg-get make autoconf automake gcc-core attr libattr-devel python39 python39-pip libzstd-devel liblz4-devel libssl-devel libxxhash0 libxxhash-devel
-        curl.exe -o git-version.h https://gist.githubusercontent.com/WayneD/c11243fa374fc64d4e42f2855c8e3827/raw/rsync-git-version.h
-        echo "C:/tools/cygwin/bin" >>$Env:GITHUB_PATH
-    - name: commonmark
-      run: bash -c 'python3 -mpip install --user commonmark'
-    - name: configure
-      run: bash -c './configure --with-rrsync'
-    - name: make
-      run: bash -c 'make'
-    - name: install
-      run: bash -c 'make install'
-    - name: info
-      run: bash -c '/usr/local/bin/rsync --version'
-    - name: check
-      run: bash -c 'RSYNC_EXPECT_SKIPPED=acls-default,acls,chown,devices,dir-sgid,protected-regular make check'
-    - name: ssl file list
-      run: bash -c 'PATH="/usr/local/bin:$PATH" rsync-ssl --no-motd download.samba.org::rsyncftp/ || true'
-    - name: save artifact
-      uses: actions/upload-artifact@v2
-      with:
-        name: cygwin-bin
-        path: |
-          rsync.exe
-          rsync-ssl
-          rsync.1
-          rsync-ssl.1
-          rsyncd.conf.5
-          rrsync.1
-          rrsync
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install Cygwin
+        run: choco install -y --no-progress cygwin cyg-get
+      - name: Install dependencies
+        run: |
+          cyg-get make autoconf automake gcc-core attr libattr-devel python39 libzstd-devel liblz4-devel libssl-devel libxxhash0 libxxhash-devel
+          'C:\tools\cygwin\bin' >>$Env:GITHUB_PATH
+      - name: Configure
+        run: bash -c './configure --disable-md2man --with-rrsync'
+      - name: Build
+        run: bash -c 'make -j2'
+      - name: Tests
+        run: bash -c 'make check'
+      - name: Restore Git
+        if: always()
+        run: |
+          $directory = 'C:\Program Files\Git\cmd'
+          if (-not (Test-Path -LiteralPath (Join-Path $directory 'git.exe'))) {
+            throw 'Runner Git is unavailable'
+          }
+          $directory >>$Env:GITHUB_PATH
+
+  freebsd:
+    name: FreeBSD 15.1 X86-64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prepare VM host
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ovmf qemu-system-x86 qemu-utils
+      - name: Build and test
+        uses: vmactions/freebsd-vm@c46abacb49f09938ca4e1702d15d836285d694cc # v1.5.9
+        with:
+          release: '15.1'
+          cache-after-prepare: true
+          prepare: pkg install -y autotools gmake lz4 openssl xxhash zstd
+          run: |
+            ./configure --disable-md2man --with-rrsync
+            gmake -j2
+            gmake check
+
+  netbsd:
+    name: NetBSD 11.1 X86-64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prepare VM host
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ovmf qemu-system-x86 qemu-utils
+      - name: Build and test
+        uses: vmactions/netbsd-vm@5957cf330aef2e6ddc63c604364c99ce2e02b91d # v1.5.3
+        with:
+          release: '11.1'
+          sync: tar
+          cache-after-prepare: true
+          prepare: |
+            export PKG_PATH="https://cdn.NetBSD.org/pub/pkgsrc/packages/NetBSD/$(uname -p)/$(uname -r)/All"
+            PATH=/usr/sbin:$PATH pkg_add -U autoconf automake gmake
+          run: |
+            ./configure --disable-md2man --with-rrsync
+            gmake -j2
+            gmake check
+
+  openbsd:
+    name: OpenBSD 8.0 X86-64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prepare VM host
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ovmf qemu-system-x86 qemu-utils
+      - name: Build and test
+        uses: vmactions/openbsd-vm@f1ca8bc8ecc5b6ef7218e5b914836e067e1546d3 # v1.4.9
+        with:
+          release: '8.0'
+          cache-after-prepare: true
+          prepare: pkg_add -I autoconf%2.71 automake%1.16 gmake lz4 openssl xxhash zstd
+          run: |
+            AUTOCONF_VERSION=2.71 AUTOMAKE_VERSION=1.16 ./configure --disable-md2man --with-rrsync
+            gmake -j2
+            gmake check
+
+  solaris:
+    name: Solaris 11.4 X86-64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prepare VM host
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ovmf qemu-system-x86 qemu-utils
+      - name: Build and test
+        uses: vmactions/solaris-vm@87d3c436511cef802cd1637f86f73b1a97715c8c # v1.4.1
+        with:
+          release: '11.4'
+          cache-after-prepare: true
+          prepare: pkg install autoconf automake gcc gnu-make gnu-m4
+          run: |
+            ./configure --disable-md2man --with-rrsync
+            gmake -j2
+            gmake check
