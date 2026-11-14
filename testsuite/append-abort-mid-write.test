@@ -2,7 +2,8 @@
 
 . "$suitedir/rsync.fns"
 
-python3 - "$RSYNC" "$scratchdir" <<'PY'
+status=0
+python3 - "$RSYNC" "$scratchdir" <<'PY' || status=$?
 import hashlib
 import os
 import shlex
@@ -241,7 +242,6 @@ for mode in ("--append", "--inplace"):
         if stream.read() != data:
             raise SystemExit("%s retry produced the wrong file" % mode)
 PY
-status=$?
 
 case $status in
 0) ;;
