@@ -48,6 +48,20 @@ jobs:
         run: ./configure --disable-md2man --disable-openssl --disable-xxhash --disable-zstd --disable-lz4 --disable-idn --disable-acl-support --disable-xattr-support --with-included-popt
       - name: Build
         run: make -j2 check-progs
+      - name: Check Python sources
+        run: |
+          python3 -B -S - <<'PY'
+          import os
+          from pathlib import Path
+          import subprocess
+
+          files = subprocess.check_output(
+              ['git', 'ls-files', '-z', '*.py']
+          ).split(b'\0')
+          for name in filter(None, files):
+              path = Path(os.fsdecode(name))
+              compile(path.read_bytes(), str(path), 'exec')
+          PY
       - name: Check helpers
         run: |
           python3 -B -S .github/scripts/test-android.py
