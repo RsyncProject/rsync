@@ -61,13 +61,14 @@ CHECK_PROGS = rsync$(EXEEXT) tls$(EXEEXT) getgroups$(EXEEXT) getfsdev$(EXEEXT) \
 	testrun$(EXEEXT) trimslash$(EXEEXT) t_unsafe$(EXEEXT) t_chmod_secure$(EXEEXT) \
 	t_rename_secure$(EXEEXT) t_symlink_secure$(EXEEXT) \
 	t_secure_relpath$(EXEEXT) t_acl$(EXEEXT) t_hashtable_overflow$(EXEEXT) \
-	t_clean_fname$(EXEEXT) t_safe_arg$(EXEEXT) wildtest$(EXEEXT)
+	t_clean_fname$(EXEEXT) t_owner_walk_fallback$(EXEEXT) \
+	t_safe_arg$(EXEEXT) t_socket_fallback$(EXEEXT) wildtest$(EXEEXT)
 
 CHECK_SYMLINKS = testsuite/chown-fake.test testsuite/devices-fake.test testsuite/xattrs-hlink.test
 
 # Objects for CHECK_PROGS to clean
-CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o t_chmod_secure.o t_rename_secure.o t_symlink_secure.o t_secure_relpath.o t_acl.o t_hashtable_overflow.o t_clean_fname.o t_safe_arg.o t_safe_arg_main.o trimslash.o wildtest.o
-CHECK_COMPILE_OBJS=syscall-no-o-directory.o authenticate-no-o-cloexec.o \
+CHECK_OBJS=tls.o testrun.o getgroups.o getfsdev.o t_stub.o t_unsafe.o t_chmod_secure.o t_rename_secure.o t_symlink_secure.o t_secure_relpath.o t_acl.o t_hashtable_overflow.o t_clean_fname.o t_owner_walk_fallback.o t_safe_arg.o t_safe_arg_main.o t_socket_fallback.o trimslash.o wildtest.o
+CHECK_COMPILE_OBJS=syscall-no-at.o syscall-no-o-directory.o syscall-socket-bind.o authenticate-no-o-cloexec.o \
 	rsync-no-o-cloexec.o clientserver-no-o-directory.o \
 	flist-no-o-directory.o generator-no-o-directory.o \
 	sender-no-o-directory.o lib/acl-no-o-directory.o access-no-inet6.o
@@ -86,6 +87,14 @@ all: Makefile rsync$(EXEEXT) stunnel-rsyncd.conf @MAKE_RRSYNC@ @MAKE_MAN@
 syscall-no-o-directory.o: syscall.c $(HEADERS)
 	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) \
 	    -DRSYNC_TEST_NO_O_DIRECTORY -c $(srcdir)/syscall.c -o $@
+
+syscall-no-at.o: syscall.c $(HEADERS)
+	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) \
+	    -DRSYNC_TEST_NO_AT_FDCWD -c $(srcdir)/syscall.c -o $@
+
+syscall-socket-bind.o: syscall.c $(HEADERS)
+	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) \
+	    -DRSYNC_TEST_SOCKET_BIND_FALLBACK -c $(srcdir)/syscall.c -o $@
 
 authenticate-no-o-cloexec.o: authenticate.c $(HEADERS)
 	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) \
@@ -242,6 +251,14 @@ t_chmod_secure$(EXEEXT): $(T_CHMOD_SECURE_OBJ)
 T_SECURE_RELPATH_OBJ = t_secure_relpath.o syscall.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o
 t_secure_relpath$(EXEEXT): $(T_SECURE_RELPATH_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_SECURE_RELPATH_OBJ) $(LIBS)
+
+T_OWNER_WALK_FALLBACK_OBJ = t_owner_walk_fallback.o syscall-no-at.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o
+t_owner_walk_fallback$(EXEEXT): $(T_OWNER_WALK_FALLBACK_OBJ)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_OWNER_WALK_FALLBACK_OBJ) $(LIBS)
+
+T_SOCKET_FALLBACK_OBJ = t_socket_fallback.o syscall-socket-bind.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o
+t_socket_fallback$(EXEEXT): $(T_SOCKET_FALLBACK_OBJ)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_SOCKET_FALLBACK_OBJ) $(LIBS)
 
 T_RENAME_SECURE_OBJ = t_rename_secure.o syscall.o util1.o util2.o t_stub.o lib/compat.o lib/snprintf.o lib/wildmatch.o lib/permstring.o
 t_rename_secure$(EXEEXT): $(T_RENAME_SECURE_OBJ)

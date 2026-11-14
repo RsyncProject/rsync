@@ -1,0 +1,8 @@
+#!/bin/sh
+
+. "$suitedir/rsync.fns"
+
+"$TOOLDIR/t_socket_fallback" \
+	|| test_fail "socket creation used an unsafe pathname fallback"
+
+exit 0

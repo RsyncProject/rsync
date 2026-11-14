@@ -384,15 +384,13 @@ static int ona_open_absolute_root(char *remaining, char *abspath, size_t abspath
  * Walks component-by-component with fstatat(AT_SYMLINK_NOFOLLOW) +
  * openat(O_NOFOLLOW), splicing a trusted symlink's target back into the path.
  * Returns the fd, or -1 (errno ELOOP on the security refusal so callers can
- * tell it apart).  Falls back to plain open() where openat/O_NOFOLLOW are
- * unavailable. */
+ * tell it apart).  Returns ENOSYS where the required directory-relative
+ * primitives are unavailable. */
 /* Core walk.  When out_abs is non-NULL and the path resolves to a directory
  * (O_DIRECTORY), the resolved absolute path is copied there -- owner_walk_parent
  * uses it to filter-check the (otherwise unchecked) leaf basename. */
 static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, size_t out_cap)
 {
-#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
-	const int dir_traverse_flags = directory_traverse_flags() | O_CLOEXEC;
 	if (!path || !*path) {
 		errno = EINVAL;
 		return -1;
@@ -402,6 +400,9 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 	 * links = yes"): restore the legacy symlink-following open. */
 	if (symlink_optout_allowed())
 		return open(path, flags, mode);
+
+#if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
+	const int dir_traverse_flags = directory_traverse_flags() | O_CLOEXEC;
 
 	const uid_t trusted_uid = geteuid();
 	int dfd = AT_FDCWD;
@@ -703,9 +704,9 @@ out:
 	errno = saved_errno;
 	return retfd;
 #else
-	/* Pre-AT_FDCWD / no O_NOFOLLOW systems: best-effort fallback. */
-	(void)out_abs; (void)out_cap;
-	return open(path, flags, mode);
+	(void)flags; (void)mode; (void)out_abs; (void)out_cap;
+	errno = ENOSYS;
+	return -1;
 #endif
 }
 
@@ -809,10 +810,26 @@ struct create_time {
 
 #define RETURN_ERROR_IF_RO_OR_LO RETURN_ERROR_IF(read_only || list_only, EROFS)
 
+#define SECURE_PATH_FALLBACK_REQUIRED() \
+	(secure_relpath_active() \
+	 || (operator_path_resolve && !symlink_optout_allowed()))
+
+static int path_fallback_unavailable(void)
+{
+#if !defined AT_FDCWD || !defined O_NOFOLLOW || !defined O_DIRECTORY
+	if (SECURE_PATH_FALLBACK_REQUIRED()) {
+		errno = ENOSYS;
+		return 1;
+	}
+#endif
+	return 0;
+}
+
 int do_unlink(const char *path)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
+	if (path_fallback_unavailable()) return -1;
 	return unlink(path);
 }
 
@@ -893,6 +910,7 @@ int do_symlink(const char *lnk, const char *path)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
+	if (path_fallback_unavailable()) return -1;
 
 #if defined NO_SYMLINK_XATTRS || defined NO_SYMLINK_USER_XATTRS
 	/* For --fake-super, we create a normal file with mode 0600
@@ -1078,6 +1096,7 @@ int do_link(const char *old_path, const char *new_path)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
+	if (path_fallback_unavailable()) return -1;
 #ifdef HAVE_LINKAT
 	return linkat(AT_FDCWD, old_path, AT_FDCWD, new_path, 0);
 #else
@@ -1096,8 +1115,8 @@ int do_link(const char *old_path, const char *new_path)
   Defence: open each parent under secure_relative_open() and use
   linkat() between the two dirfds, reusing one when the parents
   match. flags=0 matches the existing do_link() (don't follow a
-  symbolic-link old_path). Only available on systems with linkat();
-  pre-AT_FDCWD systems fall through to do_link().
+  symbolic-link old_path). A hardened transfer is refused when the
+  platform lacks linkat().
 */
 int do_link_at(const char *old_path, const char *new_path)
 {
@@ -1113,6 +1132,7 @@ int do_link_at(const char *old_path, const char *new_path)
 
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
+	if (path_fallback_unavailable()) return -1;
 
 	if (!secure_relpath_active())
 		return do_link(old_path, new_path);
@@ -1238,6 +1258,10 @@ int do_link_at(const char *old_path, const char *new_path)
 	errno = e;
 	return ret;
 #else
+	if (SECURE_PATH_FALLBACK_REQUIRED()) {
+		errno = ENOSYS;
+		return -1;
+	}
 	return do_link(old_path, new_path);
 #endif
 }
@@ -1247,6 +1271,7 @@ int do_lchown(const char *path, uid_t owner, gid_t group)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
+	if (path_fallback_unavailable()) return -1;
 #ifndef HAVE_LCHOWN
 #define lchown chown
 #endif
@@ -1336,6 +1361,7 @@ int do_mknod(const char *pathname, mode_t mode, dev_t dev)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
+	if (path_fallback_unavailable()) return -1;
 
 	/* For --fake-super, we create a normal file with mode 0600. */
 	if (am_root < 0) {
@@ -1399,9 +1425,8 @@ int do_mknod(const char *pathname, mode_t mode, dev_t dev)
   O_NOFOLLOW so a pre-planted symlink at the basename can't redirect
   the file creation -- top-level paths included (the previous code fell
   through to the bare-path do_mknod() there, whose plain open() followed
-  such a symlink). Sockets fall through to do_mknod() because their
-  bind(2) takes a path argument with no portable bindat() variant; this
-  is documented as a residual.
+  such a symlink). A nested socket is refused when bind(2) is the only
+  available creation primitive because there is no portable bindat().
 */
 int do_mknod_at(const char *pathname, mode_t mode, dev_t dev)
 {
@@ -1416,6 +1441,7 @@ int do_mknod_at(const char *pathname, mode_t mode, dev_t dev)
 
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
+	if (path_fallback_unavailable()) return -1;
 
 #if defined O_NOFOLLOW && defined O_DIRECTORY
 	if (operator_path_resolve) {
@@ -1460,8 +1486,13 @@ int do_mknod_at(const char *pathname, mode_t mode, dev_t dev)
 		return do_mknod(pathname, mode, dev);
 
 #if !defined MKNOD_CREATES_SOCKETS && defined HAVE_SYS_UN_H
-	if (S_ISSOCK(mode))
+	if (S_ISSOCK(mode)) {
+		if (strchr(pathname, '/')) {
+			errno = EOPNOTSUPP;
+			return -1;
+		}
 		return do_mknod(pathname, mode, dev);
+	}
 #endif
 
 	if (!pathname || !*pathname || *pathname == '/')
@@ -1531,6 +1562,7 @@ int do_rmdir(const char *pathname)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
+	if (path_fallback_unavailable()) return -1;
 	return rmdir(pathname);
 }
 
@@ -1606,6 +1638,7 @@ int do_open(const char *pathname, int flags, mode_t mode)
 		RETURN_ERROR_IF(dry_run, 0);
 		RETURN_ERROR_IF_RO_OR_LO;
 	}
+	if (path_fallback_unavailable()) return -1;
 
 #ifdef O_NOATIME
 	if (open_noatime)
@@ -1708,6 +1741,7 @@ int do_chmod(const char *path, mode_t mode)
 
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
+	if (path_fallback_unavailable()) return -1;
 
 	switch (switch_step) {
 #ifdef HAVE_LCHMOD
@@ -1770,6 +1804,7 @@ int do_chmod(const char *path, mode_t mode)
  * dir that becomes a FIFO is still opened.  O_NOFOLLOW rejects symlinks, not
  * type changes.  Constraining the open to the observed type would close that;
  * it is not done here. */
+#ifdef AT_FDCWD
 static int do_fchmodat_nofollow(int dfd, const char *name, mode_t mode)
 {
 #if defined AT_FDCWD && defined AT_SYMLINK_NOFOLLOW
@@ -1879,6 +1914,7 @@ static int do_fchmodat_nofollow(int dfd, const char *name, mode_t mode)
 	return 1;
 #endif
 }
+#endif
 
 /*
   Symlink-race-safe variant of do_chmod() for receiver-side use.
@@ -1984,6 +2020,7 @@ int do_rename(const char *old_path, const char *new_path)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
+	if (path_fallback_unavailable()) return -1;
 	return rename(old_path, new_path);
 }
 
@@ -2186,6 +2223,7 @@ int do_mkdir(char *path, mode_t mode)
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
 	trim_trailing_slashes(path);
+	if (path_fallback_unavailable()) return -1;
 	return mkdir(path, mode);
 }
 
@@ -2297,6 +2335,7 @@ int do_mkstemp(char *template, mode_t perms)
 
 int do_stat(const char *path, STRUCT_STAT *st)
 {
+	if (path_fallback_unavailable()) return -1;
 #ifdef USE_STAT64_FUNCS
 	return stat64(path, st);
 #else
@@ -2306,6 +2345,7 @@ int do_stat(const char *path, STRUCT_STAT *st)
 
 int do_lstat(const char *path, STRUCT_STAT *st)
 {
+	if (path_fallback_unavailable()) return -1;
 #ifdef SUPPORT_LINKS
 # ifdef USE_STAT64_FUNCS
 	return lstat64(path, st);
@@ -2332,6 +2372,10 @@ int do_lstat(const char *path, STRUCT_STAT *st)
 */
 static int do_xstat_at(const char *path, STRUCT_STAT *st, int at_flags, int (*fallback)(const char *, STRUCT_STAT *))
 {
+	if (path_fallback_unavailable()) return -1;
+#ifndef AT_FDCWD
+	(void)at_flags;
+#endif
 #ifdef AT_FDCWD
 	extern int am_daemon, am_chrooted;
 	char dirpath[MAXPATHLEN];
@@ -2434,6 +2478,7 @@ int do_setattrlist_times(const char *path, STRUCT_STAT *stp)
 
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
+	if (path_fallback_unavailable()) return -1;
 
 	/* setattrlist() takes a raw path and follows parent symlinks
 	 * (FSOPT_NOFOLLOW only blocks the final component). On a
@@ -2648,6 +2693,10 @@ int do_utimensat_at(const char *path, STRUCT_STAT *stp)
 	errno = e;
 	return ret;
 #else
+	if (SECURE_PATH_FALLBACK_REQUIRED()) {
+		errno = EOPNOTSUPP;
+		return -1;
+	}
 	return do_utimensat(path, stp);
 #endif
 }
@@ -3539,9 +3588,9 @@ int do_mkstemp_atfd(int dfd, char *filename, mode_t perms)
 int secure_mkstemp(char *template, mode_t perms, int operator_path)
 {
 #if !defined(O_NOFOLLOW) || !defined(O_DIRECTORY) || !defined(AT_FDCWD)
-	/* Fall back to regular mkstemp on old systems */
-	(void)operator_path;
-	return do_mkstemp(template, perms);
+	(void)template; (void)perms; (void)operator_path;
+	errno = ENOSYS;
+	return -1;
 #else
 	char *lastslash;
 	int dirfd = AT_FDCWD;
@@ -3692,6 +3741,12 @@ int do_open_checklinks(const char *pathname)
 	if (copy_links || copy_unsafe_links) {
 		return do_open(pathname, O_RDONLY, 0);
 	}
+#if !defined AT_FDCWD || !defined O_NOFOLLOW || !defined O_DIRECTORY
+	if (secure_relpath_active() || filesfrom_owner_walk_active()) {
+		errno = ENOSYS;
+		return -1;
+	}
+#endif
 #if defined AT_FDCWD && defined O_NOFOLLOW && defined O_DIRECTORY
 	if (am_sender && !am_daemon && files_from
 	 && !copy_dirlinks && !symlink_optout_allowed()) {
@@ -3768,7 +3823,7 @@ int open_dir_secure(const char *dirname)
 	return dfd;
 #else
 	(void)dirname;
-	errno = 0;
+	errno = secure_relpath_active() ? ENOSYS : 0;
 	return -1;
 #endif
 }
@@ -3899,13 +3954,13 @@ int held_dir_path_fd(const char *anchor, const char *dirpath)
 {
 	(void)anchor;
 	(void)dirpath;
-	errno = 0;
+	errno = ENOSYS;
 	return -1;
 }
 int get_dir_fd(const char *dirname)
 {
 	(void)dirname;
-	errno = 0;
+	errno = secure_relpath_active() ? ENOSYS : 0;
 	return -1;
 }
 #endif
@@ -4112,8 +4167,9 @@ int do_symlink_atfd(const char *lnk, int dfd, const char *name)
 #endif
 }
 
-/* S_ISSOCK is NOT supported here (no portable bindat()); the caller must
- * route sockets to do_mknod()/do_mknod_at() with a full path. */
+/* S_ISSOCK is NOT supported here (no portable bindat()); the caller routes
+ * sockets through do_mknod_at(), which permits only a top-level pathname
+ * bind in hardened mode. */
 int do_mknod_atfd(int dfd, const char *name, mode_t mode, dev_t dev)
 {
 #ifdef AT_FDCWD
@@ -4122,7 +4178,7 @@ int do_mknod_atfd(int dfd, const char *name, mode_t mode, dev_t dev)
 
 #if !defined MKNOD_CREATES_SOCKETS && defined HAVE_SYS_UN_H
 	if (S_ISSOCK(mode)) {
-		errno = EOPNOTSUPP;	/* caller falls back to do_mknod_at() */
+		errno = EOPNOTSUPP;
 		return -1;
 	}
 #endif

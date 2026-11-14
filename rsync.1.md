@@ -1272,6 +1272,10 @@ expand it.
     every directory along each operator-supplied path -- it re-exposes the
     symlink-redirection attacks the walk prevents.
 
+    A build without `AT_FDCWD`, `O_NOFOLLOW` or `O_DIRECTORY` refuses protected
+    path operations with `ENOSYS`. This option explicitly requests the legacy
+    fallback instead.
+
     The option is **local only**: it is not sent to the remote side of the
     transfer (a remote-shell peer that needs the opt-out must set it there, e.g.
     via [`--rsync-path`](#opt)), and a daemon never honours it -- a daemon that
@@ -1629,6 +1633,11 @@ expand it.
     By default, rsync generates a "non-regular file" warning for each special
     file encountered when this option is not set.  You can silence the warning
     by specifying [`--info=nonreg0`](#opt).
+
+    Some systems cannot create a socket relative to a held directory
+    descriptor. On those systems a nested socket is refused in hardened mode
+    rather than created through an unconfined pathname. A top-level socket can
+    still be created relative to the process working directory.
 
 0.  `-D`
 

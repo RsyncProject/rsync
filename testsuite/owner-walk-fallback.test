@@ -1,0 +1,8 @@
+#!/bin/sh
+
+. "$suitedir/rsync.fns"
+
+"$TOOLDIR/t_owner_walk_fallback" \
+	|| test_fail "operator-path fallback did not fail closed"
+
+exit 0

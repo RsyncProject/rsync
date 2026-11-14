@@ -424,6 +424,16 @@ enum delret {
 #undef O_DIRECTORY
 #endif
 
+#ifdef RSYNC_TEST_NO_AT_FDCWD
+#undef AT_FDCWD
+#undef HAVE_LINKAT
+#undef HAVE_UTIMENSAT
+#endif
+
+#ifdef RSYNC_TEST_SOCKET_BIND_FALLBACK
+#undef MKNOD_CREATES_SOCKETS
+#endif
+
 #ifdef HAVE_SYS_IOCTL_H
 #include <sys/ioctl.h>
 #endif
