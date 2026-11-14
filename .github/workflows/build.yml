@@ -207,9 +207,10 @@ jobs:
         with:
           release: '15.1'
           cache-after-prepare: true
-          prepare: pkg install -y autotools gmake liblz4 python3 xxhash zstd
+          prepare: pkg install -y autotools gmake libiconv liblz4 python3 xxhash zstd
           run: |
-            ./configure --disable-md2man --with-rrsync
+            CPPFLAGS=-I/usr/local/include LDFLAGS=-L/usr/local/lib \
+              ./configure --disable-md2man --enable-iconv --enable-acl-support --enable-xattr-support --with-rrsync
             gmake -j2
             gmake check
 
@@ -259,9 +260,12 @@ jobs:
         with:
           release: '8.0'
           cache-after-prepare: true
-          prepare: pkg_add -I autoconf%2.71 automake%1.16 gmake lz4 xxhash zstd
+          prepare: pkg_add -I autoconf%2.71 automake%1.16 gmake libiconv lz4 xxhash zstd
           run: |
-            AUTOCONF_VERSION=2.71 AUTOMAKE_VERSION=1.16 ./configure --disable-md2man --with-rrsync
+            AUTOCONF_VERSION=2.71 AUTOMAKE_VERSION=1.16 \
+            CPPFLAGS="-I/usr/local/include -DXXH_INLINE_ALL=1" \
+            LDFLAGS=-L/usr/local/lib ac_cv_search_XXH64_createState='' \
+              ./configure --disable-md2man --enable-iconv --with-rrsync
             gmake -j2
             gmake check
 
@@ -347,7 +351,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y acl attr libacl1-dev libattr1-dev liblz4-dev libpopt-dev libzstd-dev libxxhash-dev openssl
+          sudo apt-get install -y acl attr libacl1-dev libattr1-dev libidn2-dev liblz4-dev libpopt-dev libzstd-dev libxxhash-dev openssl
       - name: Build LTS
         run: |
           ./configure --disable-md2man --with-rrsync
