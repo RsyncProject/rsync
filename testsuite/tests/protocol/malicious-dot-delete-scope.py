@@ -44,11 +44,12 @@ def check(name, port, option, entries):
     def serve():
         try:
             client, _ = listener.accept()
-            sender = rp.DaemonReceiver(client)
-            sender.handshake()
-            sender.send_data(entries(sender) + sender.w_ndx(rp.NDX_DONE) * 3)
-            sender.drain(timeout=5)
-            sender.close()
+            with client:
+                client.settimeout(10)
+                sender = rp.DaemonReceiver(client)
+                sender.handshake()
+                sender.send_data(entries(sender) + sender.w_ndx(rp.NDX_DONE) * 3)
+                sender.drain(timeout=5)
         except Exception as exc:
             error.append(repr(exc))
 
@@ -60,8 +61,10 @@ def check(name, port, option, entries):
                        f'rsync://127.0.0.1:{port}/mod/requested', f'{destination}/'),
             capture_output=True, text=True, timeout=30)
     finally:
-        thread.join(timeout=10)
         listener.close()
+        thread.join(timeout=10)
+        if thread.is_alive():
+            test_fail(f'{name}: malicious sender did not stop')
 
     if not sentinel.exists():
         test_fail(f'{name}: a forged dot entry erased receiver-owned data')

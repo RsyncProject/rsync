@@ -39,31 +39,21 @@ def pull(label, forged_top_dir):
     def serve():
         try:
             sock, _ = listener.accept()
-            sock.settimeout(15)
-            peer = rp.DaemonReceiver(
-                sock, greeting_version=29, protocol=29,
-            )
-            peer.handshake(seed=0x12345678)
-
-            while peer._readline():
-                pass
-
-            parent_flags = rp.XMIT_TOP_DIR if forged_top_dir else 0
-            flist = (
-                rp.FileEntry(
-                    'dir', mode=rp.S_IFDIR | 0o755,
-                    extra_flags=parent_flags, protocol=29,
-                ).encode()
-                + rp.FileEntry(
-                    'dir/file', mode=rp.S_IFREG | 0o644,
-                    length=0, protocol=29,
-                ).encode()
-                + rp.end_of_flist(0, 29)
-                + rp.w_int(0)
-            )
-            peer.send_data(flist + rp.w_int(rp.NDX_DONE) * 4)
-            peer.drain(timeout=3)
-            peer.close()
+            with sock:
+                sock.settimeout(15)
+                peer = rp.DaemonReceiver(sock, greeting_version=29, protocol=29)
+                peer.handshake(seed=0x12345678)
+                while peer._readline():
+                    pass
+                parent_flags = rp.XMIT_TOP_DIR if forged_top_dir else 0
+                flist = (
+                    rp.FileEntry('dir', mode=rp.S_IFDIR | 0o755,
+                                 extra_flags=parent_flags, protocol=29).encode()
+                    + rp.FileEntry('dir/file', mode=rp.S_IFREG | 0o644,
+                                   length=0, protocol=29).encode()
+                    + rp.end_of_flist(0, 29) + rp.w_int(0))
+                peer.send_data(flist + rp.w_int(rp.NDX_DONE) * 4)
+                peer.drain(timeout=3)
         except Exception as exc:
             state['err'] = repr(exc)
 
@@ -79,8 +69,10 @@ def pull(label, forged_top_dir):
             timeout=20,
         )
     finally:
-        thread.join(timeout=8)
         listener.close()
+        thread.join(timeout=8)
+        if thread.is_alive():
+            test_fail(f'{label}: protocol-29 sender did not stop')
     return sentinel.exists(), proc, state
 
 control_survived, control_proc, control_state = pull('control', False)

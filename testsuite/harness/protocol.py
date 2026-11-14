@@ -515,45 +515,43 @@ class DaemonClient(_SocketPeer):
 
     def run_forged_transfer(self, forged_type, xname, literal_tail=b'',
                             file_csum_len=16, max_phase=2):
+        requests = 0
         try:
-            self._forged_transfer_loop(forged_type, xname, literal_tail,
-                                       file_csum_len, max_phase)
+            phase = 0
+            while True:
+                ndx = self.r_ndx()
+                if ndx == NDX_DONE:
+                    self.send_data(self.w_ndx(NDX_DONE))
+                    phase += 1
+                    if phase > max_phase:
+                        break
+                    continue
+                iflags = self.r_shortint()
+                if iflags & ITEM_BASIS_TYPE_FOLLOWS:
+                    self.r_byte()
+                if iflags & ITEM_XNAME_FOLLOWS:
+                    self.r_vstring()
+                count, blength, s2length, remainder = self.r_sum_head()
+                for _ in range(count):
+                    self.r_int()
+                    self.r_buf(s2length)
+                out = bytearray()
+                out += self.w_ndx(ndx)
+                out += w_shortint(iflags | ITEM_BASIS_TYPE_FOLLOWS | ITEM_XNAME_FOLLOWS)
+                out += w_byte(forged_type)
+                out += w_vstring(xname)
+                out += w_sum_head(count, blength, s2length, remainder)
+                if count > 0:
+                    out += w_int(-1)
+                if literal_tail:
+                    out += w_int(len(literal_tail)) + literal_tail
+                out += w_int(0)
+                out += b'\x00' * file_csum_len
+                self.send_data(bytes(out))
+                requests += 1
         except (ProtocolError, socket.timeout, OSError):
             pass
-
-    def _forged_transfer_loop(self, forged_type, xname, literal_tail,
-                              file_csum_len, max_phase):
-        phase = 0
-        while True:
-            ndx = self.r_ndx()
-            if ndx == NDX_DONE:
-                self.send_data(self.w_ndx(NDX_DONE))
-                phase += 1
-                if phase > max_phase:
-                    break
-                continue
-            iflags = self.r_shortint()
-            if iflags & ITEM_BASIS_TYPE_FOLLOWS:
-                self.r_byte()
-            if iflags & ITEM_XNAME_FOLLOWS:
-                self.r_vstring()
-            count, blength, s2length, remainder = self.r_sum_head()
-            for _ in range(count):
-                self.r_int()
-                self.r_buf(s2length)
-            out = bytearray()
-            out += self.w_ndx(ndx)
-            out += w_shortint(iflags | ITEM_BASIS_TYPE_FOLLOWS | ITEM_XNAME_FOLLOWS)
-            out += w_byte(forged_type)
-            out += w_vstring(xname)
-            out += w_sum_head(count, blength, s2length, remainder)
-            if count > 0:
-                out += w_int(-1)
-            if literal_tail:
-                out += w_int(len(literal_tail)) + literal_tail
-            out += w_int(0)
-            out += b'\x00' * file_csum_len
-            self.send_data(bytes(out))
+        return requests
 
     def recv_flist(self, preserve_links=True):
         self.send_data(w_int(0))

@@ -53,9 +53,12 @@ s.handshake('mod', ['--server', '-le.LsfxCIu', '--no-whole-file',
                     '--compare-dest=../linkparent', '.', 'dest/'],
             greeting_version=30)
 s.send_flat_flist([rp.FileEntry('f', mode=rp.S_IFREG | 0o644, length=len(SOURCE))])
-s.run_forged_transfer(rp.FNAMECMP_FUZZY + 1, b'f', literal_tail=b'X')
+requests = s.run_forged_transfer(rp.FNAMECMP_FUZZY + 1, b'f', literal_tail=b'X')
 s.drain(timeout=3.0)
 s.close()
+
+if requests != 1:
+    test_fail(f'crafted transfer reached {requests} receiver requests, expected 1')
 
 leaked = False
 for _ in range(50):

@@ -100,28 +100,32 @@ listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 listener.bind(('127.0.0.1', PROXY_PORT))
 listener.listen(1)
+listener.settimeout(10)
 
 captured = {}
 
 def serve_one():
-    conn, _ = listener.accept()
-    conn.settimeout(5)
-    data = b""
     try:
-        while b"\r\n\r\n" not in data and len(data) < 65536:
-            chunk = conn.recv(8192)
-            if not chunk:
-                break
-            data += chunk
-    except socket.timeout:
-        pass
-    captured['request'] = data
-    try:
-        conn.sendall(b"HTTP/1.0 403 Forbidden\r\n\r\n")
-        conn.shutdown(socket.SHUT_RDWR)
-    except OSError:
-        pass
-    conn.close()
+        conn, _ = listener.accept()
+        with conn:
+            conn.settimeout(5)
+            data = b''
+            try:
+                while b'\r\n\r\n' not in data and len(data) < 65536:
+                    chunk = conn.recv(8192)
+                    if not chunk:
+                        break
+                    data += chunk
+            except socket.timeout:
+                pass
+            captured['request'] = data
+            try:
+                conn.sendall(b'HTTP/1.0 403 Forbidden\r\n\r\n')
+                conn.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+    except Exception as error:
+        captured['error'] = repr(error)
 
 t = threading.Thread(target=serve_one)
 t.daemon = True
@@ -132,6 +136,10 @@ proc = run_idn(f"rsync://{idn_host}:873/whatever/",
 
 t.join(timeout=15)
 listener.close()
+if t.is_alive():
+    test_fail('IDN proxy fixture did not stop')
+if captured.get('error'):
+    test_fail(f'IDN proxy fixture failed: {captured["error"]}')
 
 if proc.returncode >= 128:
     sys.stderr.write(proc.stderr.decode('latin1'))

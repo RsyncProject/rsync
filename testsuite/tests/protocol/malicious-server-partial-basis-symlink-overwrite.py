@@ -6,7 +6,6 @@ import socket
 import struct
 import subprocess
 import threading
-import time
 
 from harness.daemon import claim_ports, require_tcp
 from harness.environment import SCRATCHDIR
@@ -48,8 +47,10 @@ lsock.settimeout(30)
 state = {}
 
 def serve():
+    csock = None
     try:
         csock, _ = lsock.accept()
+        csock.settimeout(10)
         peer = rp.DaemonReceiver(csock)
         peer.handshake(compat_flags=CF_INPLACE_PARTIAL_DIR)
         nul_run = 0
@@ -142,8 +143,7 @@ def serve():
 
         response = bytearray()
         response += peer.w_ndx(1)
-        response += rp.w_shortint(
-            rp.ITEM_TRANSFER | rp.ITEM_BASIS_TYPE_FOLLOWS)
+        response += rp.w_shortint(rp.ITEM_TRANSFER | rp.ITEM_BASIS_TYPE_FOLLOWS)
         response += rp.w_byte(FNAMECMP_PARTIAL_DIR)
         response += rp.w_sum_head(0, 0, 0, 0)
         response += rp.w_int(len(PAYLOAD)) + PAYLOAD
@@ -153,10 +153,11 @@ def serve():
         response += peer.w_ndx(rp.NDX_DONE)
         response += peer.w_ndx(rp.NDX_DONE)
         peer.send_data(response)
-        time.sleep(2)
-        peer.close()
     except Exception as exc:
         state['err'] = repr(exc)
+    finally:
+        if csock is not None:
+            csock.close()
 
 thread = threading.Thread(target=serve, daemon=True)
 thread.start()
@@ -166,8 +167,10 @@ proc = subprocess.run(
                f'rsync://127.0.0.1:{PORT}/mod/', str(dest) + '/'),
     stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=20,
 )
-thread.join(timeout=5)
 lsock.close()
+thread.join(timeout=5)
+if thread.is_alive():
+    test_fail('malicious partial-basis sender did not stop')
 
 output = (proc.stdout or '') + (proc.stderr or '')
 if state.get('err'):

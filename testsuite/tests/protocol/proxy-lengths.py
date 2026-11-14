@@ -18,23 +18,33 @@ def start_proxy(port, response):
     listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     listener.bind(('127.0.0.1', port))
     listener.listen(1)
+    listener.settimeout(5)
+    state = {'connected': False}
 
     def serve():
-        connection, _ = listener.accept()
         try:
-            connection.recv(65536)
-            connection.sendall(response)
+            connection, _ = listener.accept()
+            state['connected'] = True
+            with connection:
+                connection.settimeout(5)
+                state['request'] = connection.recv(65536)
+                connection.sendall(response)
+        except socket.timeout:
+            pass
+        except OSError as error:
+            state['error'] = repr(error)
         finally:
-            connection.close()
             listener.close()
 
-    threading.Thread(target=serve, daemon=True).start()
+    thread = threading.Thread(target=serve, daemon=True)
+    thread.start()
+    return thread, state
 
 def probe_proxy(port, host, expected):
     environment = {**os.environ, 'RSYNC_PROXY': f'127.0.0.1:{port}'}
     result = subprocess.run(
         rsync_argv(f'rsync://{host}/mod/', str(SCRATCHDIR / 'proxy-out')),
-        capture_output=True, text=True, env=environment,
+        capture_output=True, text=True, env=environment, timeout=30,
     )
     output = result.stdout + result.stderr
     if result.returncode == 0:
@@ -43,16 +53,23 @@ def probe_proxy(port, host, expected):
         test_fail(f'expected {expected!r} in proxy probe output:\n{output}')
 
 cases = (
-    (12931, 'a' * 1500 + '.invalid', b'', 'proxy CONNECT request too long'),
+    (12931, 'a' * 1500 + '.invalid', b'', 'proxy CONNECT request too long', False),
     (12932, 'example.invalid', b'HTTP/1.0 200 OK\r\n' + b'X' * 1023,
-     'proxy response header line too long'),
-    (12873, 'example.invalid', b'X' * 1023, 'proxy response line too long'),
+     'proxy response header line too long', True),
+    (12873, 'example.invalid', b'X' * 1023, 'proxy response line too long', True),
 )
 require_tcp('proxy tests require TCP')
-claim_ports(*(port for port, _, _, _ in cases))
+claim_ports(*(port for port, _, _, _, _ in cases))
 
-for port, host, response, error in cases:
-    start_proxy(port, response)
+for port, host, response, error, should_send in cases:
+    thread, state = start_proxy(port, response)
     probe_proxy(port, host, error)
+    thread.join(timeout=6)
+    if thread.is_alive():
+        test_fail(f'{error}: proxy fixture did not stop')
+    if state.get('error'):
+        test_fail(f'{error}: proxy fixture failed: {state["error"]}')
+    if bool(state.get('request')) != should_send:
+        test_fail(f'{error}: proxy request delivery was {bool(state.get("request"))}, expected {should_send}')
 
 print('oversized proxy requests and responses are rejected')

@@ -189,6 +189,8 @@ finally:
             proc.wait()
     if t is not None:
         t.join(timeout=5)
+        if t.is_alive():
+            test_fail('checksum stream drainer did not stop')
     logf.close()
     unlink_if_exists(bigfile)
 
