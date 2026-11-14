@@ -207,7 +207,7 @@ jobs:
         with:
           release: '15.1'
           cache-after-prepare: true
-          prepare: pkg install -y autotools gmake lz4 openssl python3 xxhash zstd
+          prepare: pkg install -y autotools gmake liblz4 python3 xxhash zstd
           run: |
             ./configure --disable-md2man --with-rrsync
             gmake -j2
@@ -235,8 +235,9 @@ jobs:
           prepare: |
             export PKG_PATH="https://cdn.NetBSD.org/pub/pkgsrc/packages/NetBSD/$(uname -p)/$(uname -r)/All"
             PATH=/usr/sbin:$PATH pkg_add -U autoconf automake gmake python312
+            ln -sf /usr/pkg/bin/python3.12 /usr/pkg/bin/python3
           run: |
-            ./configure --disable-md2man --with-rrsync
+            ./configure --disable-md2man --disable-xxhash --disable-zstd --disable-lz4 --with-rrsync
             gmake -j2
             gmake check
 
@@ -258,7 +259,7 @@ jobs:
         with:
           release: '8.0'
           cache-after-prepare: true
-          prepare: pkg_add -I autoconf%2.71 automake%1.16 gmake lz4 openssl xxhash zstd
+          prepare: pkg_add -I autoconf%2.71 automake%1.16 gmake lz4 xxhash zstd
           run: |
             AUTOCONF_VERSION=2.71 AUTOMAKE_VERSION=1.16 ./configure --disable-md2man --with-rrsync
             gmake -j2
@@ -284,7 +285,7 @@ jobs:
           cache-after-prepare: true
           prepare: pkg install autoconf automake gcc gnu-make gnu-m4 pkg://solaris/runtime/python-35
           run: |
-            ./configure --disable-md2man --with-rrsync
+            ./configure --disable-md2man --disable-xxhash --with-rrsync
             gmake -j2
             gmake check
 
@@ -346,7 +347,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y acl attr libacl1-dev libattr1-dev liblz4-dev libzstd-dev libxxhash-dev openssl
+          sudo apt-get install -y acl attr libacl1-dev libattr1-dev liblz4-dev libpopt-dev libzstd-dev libxxhash-dev openssl
       - name: Build LTS
         run: |
           ./configure --disable-md2man --with-rrsync
