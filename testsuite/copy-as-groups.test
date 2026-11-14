@@ -6,7 +6,6 @@ if test "`id -u`" != 0; then
 	test_skipped "Numeric copy-as group testing requires root"
 fi
 
-account=
 uid=
 gid=
 supplementary_gid=
@@ -16,7 +15,6 @@ while IFS=: read -r name unused candidate_uid candidate_gid rest; do
 	groups=`id -G "$name" 2>/dev/null` || continue
 	for group in $groups; do
 		if test "$group" != "$candidate_gid"; then
-			account=$name
 			uid=$candidate_uid
 			gid=$candidate_gid
 			supplementary_gid=$group
@@ -25,7 +23,7 @@ while IFS=: read -r name unused candidate_uid candidate_gid rest; do
 	done
 done </etc/passwd
 
-if test -z "$account"; then
+if test -z "$uid"; then
 	test_skipped "No account with a supplementary group is available"
 fi
 

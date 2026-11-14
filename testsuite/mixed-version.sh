@@ -37,6 +37,7 @@ verify()
 	test "`stat -c %i "$destination/file"`" = "`stat -c %i "$destination/hard"`"
 	test "`readlink "$destination/link"`" = sub/other
 	test "`getfattr --only-values -n user.rsync-lts "$destination/file" 2>/dev/null`" = value
+	test "`getfacl -cp "$source_dir/file"`" = "`getfacl -cp "$destination/file"`"
 }
 
 run_case()
