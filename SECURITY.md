@@ -393,10 +393,10 @@ The following are documented as out of scope for this release:
   can still slip past confinement that is anchored at the process CWD (e.g. the
   sender's content open), because the descriptor is not bound to the original
   inode.  The parent-component symlink-race tests are therefore not enforced on
-  Cygwin (see the `cygwin` test profile and the Cygwin-only xfail in
-  `symlink-race-source.py`).  Cygwin is a
-  development/interoperability target, not a privilege boundary host, so this is
-  accepted for this release.
+  Cygwin (see the `dirfd_pinning` allowance in `testsuite/profiles/cygwin.json`
+  and the Cygwin branch in `testsuite/tests/path/symlink-race-source.py`).  Cygwin
+  is a development/interoperability target, not a privilege boundary host, so
+  this is accepted for this release.
 
 * On a platform with no `mknodat()` at all -- macOS before 13 is the
   supported example, where `mknod()` and `mkfifo()` exist but neither
