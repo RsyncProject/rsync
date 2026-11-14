@@ -4,6 +4,7 @@ import os
 import re
 import time
 
+from changes import select as select_changes
 from interop_network import NetworkError, decode, download_records, fetch
 from interop_policy import ROLES
 
@@ -36,6 +37,64 @@ def api(path):
     return value
 
 
+def pull_paths(run):
+    requests = run.get('pull_requests')
+    if not isinstance(requests, list) or len(requests) != 1:
+        return None
+    request = requests[0]
+    if not isinstance(request, dict):
+        return None
+    number = request.get('number')
+    base = request.get('base')
+    head = request.get('head')
+    if (type(number) is not int or number < 1
+            or not isinstance(base, dict) or not isinstance(head, dict)
+            or not isinstance(base.get('repo'), dict)
+            or base.get('repo', {}).get('id') != 266877886
+            or not re.fullmatch(r'[0-9a-f]{40}', base.get('sha', ''))
+            or not re.fullmatch(r'[0-9a-f]{40}', head.get('sha', ''))):
+        return None
+    current = api('/pulls/' + str(number))
+    if (not isinstance(current, dict) or current.get('number') != number
+            or not isinstance(current.get('base'), dict)
+            or not isinstance(current.get('head'), dict)
+            or not isinstance(current.get('base', {}).get('repo'), dict)
+            or current.get('base', {}).get('repo', {}).get('id') != 266877886
+            or current.get('base', {}).get('sha') != base['sha']
+            or current.get('head', {}).get('sha') != head['sha']):
+        return None
+    paths = []
+    statuses = {'added', 'removed', 'modified', 'renamed', 'copied', 'changed', 'unchanged'}
+    for page in range(1, 31):
+        files = api('/pulls/' + str(number) + '/files?per_page=100&page=' + str(page))
+        if not isinstance(files, list) or len(files) > 100:
+            return None
+        for item in files:
+            if (not isinstance(item, dict) or item.get('status') not in statuses
+                    or not isinstance(item.get('filename'), str)):
+                return None
+            if item['status'] == 'renamed':
+                if not isinstance(item.get('previous_filename'), str):
+                    return None
+                paths.append(item['previous_filename'])
+            paths.append(item['filename'])
+        if len(files) < 100:
+            return paths or None
+    return None
+
+
+def selected(run):
+    if run['event'] != 'pull_request':
+        return True
+    paths = pull_paths(run)
+    if paths is None:
+        return True
+    try:
+        return select_changes(paths)['interoperability'] is True
+    except (TypeError, ValueError):
+        return True
+
+
 @lru_cache(maxsize=1)
 def source():
     if os.environ.get('GITHUB_REPOSITORY_ID') != '266877886':
@@ -63,6 +122,8 @@ def source():
             or run.get('event') not in ('pull_request', 'push', 'schedule', 'workflow_dispatch')
             or not isinstance(run.get('display_title'), str) or not run['display_title']):
         raise NetworkError('CI run does not match its event')
+    if not selected(run):
+        raise NotSelected('CI has not selected interoperability')
     references = [item for item in run.get('referenced_workflows', []) if item.get('path', '').startswith(WORKFLOW)]
     deadline = time.monotonic() + 180
     while not references and run.get('status') in ('queued', 'in_progress') and time.monotonic() < deadline:

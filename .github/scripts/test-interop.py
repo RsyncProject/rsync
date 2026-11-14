@@ -85,15 +85,70 @@ class Network(unittest.TestCase):
         run = dict(id=123, run_attempt=2, path='.github/workflows/ci.yml', name='CI', event='pull_request',
                    repository=dict(id=266877886), head_repository=dict(id=999), head_sha='b' * 40,
                    display_title='testsuite, ci: rework tests',
+                   pull_requests=[dict(number=1, base=dict(sha='c' * 40, repo=dict(id=266877886)),
+                                       head=dict(sha='d' * 40, repo=dict(id=999)))],
                    referenced_workflows=[dict(path=ci.WORKFLOW + 'a' * 40, sha='a' * 40)])
-        with patch.object(ci, 'api', return_value=run):
+        request = dict(number=1, base=dict(sha='c' * 40, repo=dict(id=266877886)),
+                       head=dict(sha='d' * 40, repo=dict(id=999)))
+        def production(path):
+            if path == '/actions/runs/123':
+                return run
+            if path == '/pulls/1':
+                return request
+            if path == '/pulls/1/files?per_page=100&page=1':
+                return [dict(status='modified', filename='receiver.c')]
+            self.fail('Unexpected API request: ' + path)
+        with patch.object(ci, 'api', side_effect=production):
             self.assertEqual(ci.identity(), self.state)
         ci.source.cache_clear()
-        with patch.object(ci, 'api', return_value=dict(run, referenced_workflows=[])), self.assertRaises(ci.NotSelected):
+        docs = dict(run, referenced_workflows=[])
+        def documentation(path):
+            if path == '/actions/runs/123':
+                return docs
+            if path == '/pulls/1':
+                return request
+            if path == '/pulls/1/files?per_page=100&page=1':
+                return [dict(status='modified', filename='README.md')]
+            self.fail('Unexpected API request: ' + path)
+        with patch.object(ci, 'api', side_effect=documentation), \
+                patch.object(time, 'sleep', side_effect=AssertionError('Unselected CI waited')), \
+                self.assertRaises(ci.NotSelected):
             ci.source()
         ci.source.cache_clear()
-        with patch.object(ci, 'api', return_value=dict(run, display_title='')), self.assertRaises(network.NetworkError):
+        without_reference = dict(run, event='push', pull_requests=[], referenced_workflows=[])
+        with patch.object(ci, 'api', return_value=without_reference), self.assertRaises(ci.NotSelected):
             ci.source()
+        ci.source.cache_clear()
+        with patch.object(ci, 'api', return_value=dict(without_reference, display_title='')), self.assertRaises(network.NetworkError):
+            ci.source()
+
+    def test_controller_uses_trusted_change_selection(self):
+        run = dict(event='pull_request', pull_requests=[dict(
+            number=1, base=dict(sha='a' * 40, repo=dict(id=266877886)),
+            head=dict(sha='b' * 40, repo=dict(id=999)))])
+        request = dict(number=1, base=dict(sha='a' * 40, repo=dict(id=266877886)),
+                       head=dict(sha='b' * 40, repo=dict(id=999)))
+        def files(items, current=request):
+            def response(path):
+                if path == '/pulls/1':
+                    return current
+                if path == '/pulls/1/files?per_page=100&page=1':
+                    return items
+                self.fail('Unexpected API request: ' + path)
+            return response
+        with patch.object(ci, 'api', side_effect=files([dict(status='modified', filename='README.md')])):
+            self.assertFalse(ci.selected(run))
+        with patch.object(ci, 'api', side_effect=files([dict(status='modified', filename='receiver.c')])):
+            self.assertTrue(ci.selected(run))
+        renamed = [dict(status='renamed', filename='README.md', previous_filename='receiver.c')]
+        with patch.object(ci, 'api', side_effect=files(renamed)):
+            self.assertTrue(ci.selected(run))
+        stale = dict(request, head=dict(sha='c' * 40, repo=dict(id=999)))
+        with patch.object(ci, 'api', side_effect=files([], stale)):
+            self.assertTrue(ci.selected(run))
+        malformed = [dict(status='renamed', filename='README.md')]
+        with patch.object(ci, 'api', side_effect=files(malformed)):
+            self.assertTrue(ci.selected(run))
 
     def test_controller_discovery_requires_trusted_code_and_exact_attempt(self):
         origin = dict(self.state, head_sha='b' * 40, display_title='testsuite, ci: rework tests')
