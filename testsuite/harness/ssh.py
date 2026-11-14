@@ -124,15 +124,17 @@ def public_key(value):
     return ' '.join(fields)
 
 
-def client_command(directory, port, known_hosts=None):
+def client_command(directory, port, known_hosts=None, attempts=1):
     directory = Path(directory)
+    if type(attempts) is not int or not 1 <= attempts <= 3:
+        raise ValueError('Invalid SSH connection attempts')
     return [shutil.which('ssh') or 'ssh', '-F', '/dev/null', '-p', str(port), '-i', str(directory / 'client'),
             '-oBatchMode=yes', '-oIdentitiesOnly=yes', '-oIdentityAgent=none',
             '-oStrictHostKeyChecking=yes', '-oGlobalKnownHostsFile=/dev/null',
             '-oUserKnownHostsFile=' + config_path(known_hosts or directory / 'known_hosts'),
             '-oPasswordAuthentication=no', '-oKbdInteractiveAuthentication=no',
             '-oClearAllForwardings=yes', '-oForwardAgent=no', '-oForwardX11=no',
-            '-oConnectTimeout=5', '-oConnectionAttempts=1', '-oLogLevel=ERROR']
+            '-oConnectTimeout=5', '-oConnectionAttempts=' + str(attempts), '-oLogLevel=ERROR']
 
 
 class SSHServer(ProcessServer):

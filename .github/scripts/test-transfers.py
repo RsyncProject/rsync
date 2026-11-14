@@ -203,6 +203,15 @@ class Transfers(unittest.TestCase):
             with self.subTest(case=case), self.assertRaises(ValueError):
                 endpoint['name'](case)
 
+    def test_interoperability_ssh_retries_connection_setup(self):
+        command = unittest.mock.Mock(return_value=subprocess.CompletedProcess([], 0, b'', b''))
+        peer = {'ssh_user': 'user', 'address': '100.64.0.2'}
+        with patch.dict(endpoint['copy'].__globals__, command=command):
+            endpoint['copy'](self.root, self.root / 'rsync', peer, 'ssh', True,
+                             self.root / 'source', 'destination', [])
+        remote_shell = command.call_args[0][0]
+        self.assertIn('ConnectionAttempts=3', remote_shell[remote_shell.index('-e') + 1])
+
     def test_native_verification_checks_initial_and_updated_data(self):
         root = self.root
         (root / 'data' / 'source').mkdir(parents=True)

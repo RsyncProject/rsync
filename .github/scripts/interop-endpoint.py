@@ -177,7 +177,8 @@ def configure(root, role, nodes):
 def copy(root, binary, peer, transport, push, local, remote_path, options, fake_remote=False):
     if transport == 'ssh':
         remote = f'{peer["ssh_user"]}@{peer["address"]}:{remote_path}'
-        protocol = ['--old-args', '--rsync-path=rsync', '-e', quote_command(client_command(root / 'ssh', SSH_PORT))]
+        protocol = ['--old-args', '--rsync-path=rsync', '-e',
+                    quote_command(client_command(root / 'ssh', SSH_PORT, attempts=3))]
         if fake_remote:
             protocol.append('-M--fake-super')
     else:
