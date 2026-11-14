@@ -16,29 +16,41 @@
 int poptDupArgv(int argc, const char **argv,
 		int * argcPtr, const char *** argvPtr)
 {
-    size_t nb = (argc + 1) * sizeof(*argv);
+    size_t argvBytes, nb;
     const char ** argv2;
     char * dst;
     int i;
 
     if (argc <= 0 || argv == NULL)	/* XXX can't happen */
 	return POPT_ERROR_NOARG;
+    if ((size_t)argc > (size_t)-1 / sizeof(*argv) - 1)
+	return POPT_ERROR_OVERFLOW;
+    argvBytes = ((size_t)argc + 1) * sizeof(*argv);
+    nb = argvBytes;
     for (i = 0; i < argc; i++) {
+	size_t argLength;
+
 	if (argv[i] == NULL)
 	    return POPT_ERROR_NOARG;
-	nb += strlen(argv[i]) + 1;
+	argLength = strlen(argv[i]);
+	if (argLength == (size_t)-1 || nb > (size_t)-1 - argLength - 1)
+	    return POPT_ERROR_OVERFLOW;
+	nb += argLength + 1;
     }
 	
     dst = malloc(nb);
     if (dst == NULL)			/* XXX can't happen */
 	return POPT_ERROR_MALLOC;
     argv2 = (void *) dst;
-    dst += (argc + 1) * sizeof(*argv);
+    dst += argvBytes;
 
     /*@-branchstate@*/
     for (i = 0; i < argc; i++) {
+	size_t argLength = strlen(argv[i]) + 1;
+
 	argv2[i] = dst;
-	dst += strlcpy(dst, argv[i], nb) + 1;
+	memcpy(dst, argv[i], argLength);
+	dst += argLength;
     }
     /*@=branchstate@*/
     argv2[argc] = NULL;
