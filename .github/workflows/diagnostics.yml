@@ -55,6 +55,8 @@ jobs:
           from pathlib import Path
           import subprocess
 
+          subprocess.run(['git', 'config', '--global', '--add',
+                          'safe.directory', str(Path.cwd())], check=True)
           files = subprocess.check_output(
               ['git', 'ls-files', '-z', '*.py']
           ).split(b'\0')
