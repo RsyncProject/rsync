@@ -298,9 +298,7 @@ static int32 simple_recv_token(int f, char **data)
 		int32 i = read_int(f);
 		if (i <= 0)
 			return i;
-		/* simple_send_token caps each literal chunk at CHUNK_SIZE;
-		 * reject anything larger so a hostile peer cannot drive the
-		 * read_buf below past our static CHUNK_SIZE buffer. */
+		/* simple_send_token caps each literal chunk at CHUNK_SIZE. */
 		if (i > CHUNK_SIZE) {
 			rprintf(FERROR, "invalid uncompressed token length %ld [%s]\n",
 				(long)i, who_am_i());

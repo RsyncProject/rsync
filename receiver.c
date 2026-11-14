@@ -25,6 +25,7 @@
 extern int dry_run;
 extern int do_xfers;
 extern int am_root;
+extern int am_daemon;
 extern int am_server;
 extern int inc_recurse;
 extern int log_before_transfer;
@@ -478,12 +479,6 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 					i, big_num(offset));
 			}
 
-			if (offset + i > total_size) {
-				rprintf(FERROR, "received more data than file length %s [%s]\n",
-					big_num(total_size), who_am_i());
-				exit_cleanup(RERR_PROTOCOL);
-			}
-
 			stats.literal_data += i;
 			cleanup_got_literal = 1;
 
@@ -506,25 +501,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 		if (i == (int)sum.count-1 && sum.remainder != 0)
 			len = sum.remainder;
 
-		if (offset + len > total_size) {
-			rprintf(FERROR, "received more data than file length %s [%s]\n",
-				big_num(total_size), who_am_i());
-			exit_cleanup(RERR_PROTOCOL);
-		}
-
 		stats.matched_data += len;
-
-		/* A block match can only be honored if we actually mapped the
-		 * basis. If we didn't (basis open failed), the sender should
-		 * never have been told a basis existed -- treat it as a protocol
-		 * inconsistency rather than silently omitting these bytes from
-		 * the verification checksum (which yields a spurious failure) or
-		 * leaving a hole in the output. */
-		if (!mapbuf) {
-			rprintf(FERROR, "got a block match with no basis file for %s [%s]\n",
-				full_fname(fname), who_am_i());
-			exit_cleanup(RERR_PROTOCOL);
-		}
 
 		if (DEBUG_GTE(DELTASUM, 3)) {
 			rprintf(FINFO,
@@ -791,7 +768,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 			 * one of them clear_file()'d by flist_sort_and_clean();
 			 * referencing that slot here yields fname == NULL and
 			 * a crash in the first deref (daemon filter check,
-			 * set_file_attrs → full_fname, …). */
+			 * set_file_attrs -> full_fname, ...). */
 			rprintf(FERROR,
 				"rsync: refusing transfer of cleared file index %d\n",
 				ndx);
@@ -993,11 +970,16 @@ int recv_files(int f_in, int f_out, char *local_name)
 				slash = strrchr(fnamecmp, '/');
 				fd1 = do_open_atfd(bdfd, slash ? slash + 1 : fnamecmp, O_RDONLY, 0);
 			} else {
-				/* A --partial-dir basis is an operator/peer path: resolve it with
-				 * the exclude-aware ownership walk so a symlinked partial-dir
-				 * can't read (and feed back as delta) a file in an excluded
-				 * subtree. */
-				if (fnamecmp_type == FNAMECMP_PARTIAL_DIR)
+				/* An operator-supplied basis -- a --partial-dir, or an
+				 * alt-dest basedir (--copy-dest/--compare-dest/--link-dest) --
+				 * is a peer/operator path: resolve it with the exclude-aware
+				 * ownership walk so a flipped foreign-owned parent symlink can't
+				 * read (and feed back as delta) an out-of-tree / excluded file.
+				 * The walk still allows the legitimate "../sibling" basis (#915)
+				 * and the operator's own uid0/euid symlinks.  A daemon keeps its
+				 * stronger confinement branch in secure_basis_open(), so only
+				 * route the alt-dest basedir read through the walk off-daemon. */
+				if ((basedir && !am_daemon) || fnamecmp_type == FNAMECMP_PARTIAL_DIR)
 					operator_path_resolve = 1;
 				fd1 = secure_basis_open(basedir, fnamecmp, O_RDONLY, 0);
 				operator_path_resolve = 0;
@@ -1005,10 +987,12 @@ int recv_files(int f_in, int f_out, char *local_name)
 		}
 		if (fnamecmp_type == FNAMECMP_PARTIAL_DIR && fd1 == -1) {
 			/* The sender may claim a partial basis even when the generator's
-			 * confined lookup rejected it.  Do not retain that path for direct
-			 * output or post-transfer cleanup.  A daemon rejects its unsafe
-			 * peer option; a pull client can safely receive a no-basis update. */
-			if (am_daemon) {
+			 * confined lookup rejected it.  Drop that path as the delta basis
+			 * and in-place output target.  A daemon that negotiated in-place
+			 * partial updates rejects the unsafe peer option; otherwise (a pre-30
+			 * peer, where no in-place partial redirect is possible, or a pull
+			 * client) fall back to a safe no-basis update. */
+			if (am_daemon && inplace_partial) {
 				rprintf(FERROR,
 					"rsync: refusing unconfined partial basis for %s\n", fname);
 				exit_cleanup(RERR_PROTOCOL);
@@ -1021,7 +1005,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 			if (fnamecmp != fname) {
 				fnamecmp = fname;
 				fnamecmp_type = FNAMECMP_FNAME;
-				fd1 = do_open_nofollow(fnamecmp, O_RDONLY);
+				fd1 = secure_relative_open(NULL, fnamecmp, O_RDONLY, 0);
 			}
 
 			if (fd1 == -1 && basis_dir[0]) {
@@ -1029,7 +1013,10 @@ int recv_files(int f_in, int f_out, char *local_name)
 				basedir = basis_dir[0];
 				fnamecmp = fname;
 				fnamecmp_type = FNAMECMP_BASIS_DIR_LOW;
+				if (!am_daemon)
+					operator_path_resolve = 1;
 				fd1 = secure_basis_open(basedir, fnamecmp, O_RDONLY, 0);
+				operator_path_resolve = 0;
 			}
 		}
 

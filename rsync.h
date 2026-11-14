@@ -178,7 +178,13 @@
 #define MAX_WIRE_XATTR_DATALEN ((int32)0x7fffffff)
 #define MAX_WIRE_ACL_COUNT     65536
 #define MAX_WIRE_NSEC          999999999
-#define MAX_WIRE_DEL_STAT      ((int32)1 << 30)
+/* MAX_WIRE_DEL_STAT is the per-category cap for read_del_stats() in main.c,
+ * which accumulates 5 wire-supplied counts into the int32 stats.deleted_files
+ * accumulator.  Capped at 2^28 so 5 * 2^28 = 1.34 GB stays under INT32_MAX
+ * (2.15 GB) with margin -- a higher cap (e.g. 2^30) would let a hostile peer
+ * supplying 3+ max-sized counts overflow the accumulator, which is signed-int
+ * UB.  2^28 is still well above any plausible real transfer's deletion count. */
+#define MAX_WIRE_DEL_STAT      ((int32)1 << 28)
 
 #define ROUND_UP_1024(siz) ((siz) & (1024-1) ? ((siz) | (1024-1)) + 1 : (siz))
 

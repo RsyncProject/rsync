@@ -2063,13 +2063,8 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			return 0;
 		max_alloc = size;
 	}
-	/* A 0 value means "as large as this build allows".  We resolve it to the
-	 * same ceiling parse_size_arg() enforces, so that --max-alloc=0 is exactly
-	 * the largest value a user could also have typed, and never a limit that
-	 * only the 0 spelling can reach.  Note that max_alloc_arg is forwarded to
-	 * the peer un-normalized (see server_options()), which is what lets each
-	 * side resolve 0 against its own SIZE_MAX -- a 64-bit client and a 32-bit
-	 * daemon each get their own ceiling from the one portable spelling. */
+	/* Resolve 0 to the parser's own ceiling while forwarding the literal 0 so
+	 * each peer chooses the ceiling appropriate to its word size. */
 	if (!max_alloc)
 		max_alloc = SIZE_ARG_MAX;
 
@@ -2387,21 +2382,26 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	}
 	if (daemon_filter_list.head && !am_sender) {
 		filter_rule_list *elp = &daemon_filter_list;
+		/* Strip the module-dir prefix to get the module-relative name, but keep a
+		 * leading "/" for a "path = /" module (module_dirlen <= 1) so an absolute
+		 * (module-rooted) filter rule still matches. */
 		if (tmpdir) {
-			char *dir;
+			char clean[MAXPATHLEN], *dir;
 			if (!*tmpdir)
 				goto options_rejected;
-			dir = tmpdir + (*tmpdir == '/' ? module_dirlen : 0);
-			clean_fname(dir, CFN_COLLAPSE_DOT_DOT_DIRS);
+			if (!sanitize_path(clean, tmpdir, "/", 0, SP_DEFAULT))
+				strlcpy(clean, tmpdir, sizeof clean);
+			dir = clean + (*clean == '/' && module_dirlen > 1 ? module_dirlen : 0);
 			if (check_filter(elp, FLOG, dir, 1) < 0)
 				goto options_rejected;
 		}
 		if (backup_dir) {
-			char *dir;
+			char clean[MAXPATHLEN], *dir;
 			if (!*backup_dir)
 				goto options_rejected;
-			dir = backup_dir + (*backup_dir == '/' ? module_dirlen : 0);
-			clean_fname(dir, CFN_COLLAPSE_DOT_DOT_DIRS);
+			if (!sanitize_path(clean, backup_dir, "/", 0, SP_DEFAULT))
+				strlcpy(clean, backup_dir, sizeof clean);
+			dir = clean + (*clean == '/' && module_dirlen > 1 ? module_dirlen : 0);
 			if (check_filter(elp, FLOG, dir, 1) < 0)
 				goto options_rejected;
 		}

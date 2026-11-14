@@ -172,6 +172,9 @@ static void hash_search(int f,struct sum_struct *s,
 	int more;
 	schar *map;
 
+	// prevent possible memory leaks
+	memset(sum2, 0, sizeof sum2);
+
 	/* want_i is used to encourage adjacent matches, allowing the RLL
 	 * coding of the output to work more efficiently. */
 	want_i = 0;
@@ -337,6 +340,7 @@ static void hash_search(int f,struct sum_struct *s,
 			 && (!updating_basis_file || s->sums[want_i].offset >= offset
 			  || s->sums[want_i].flags & SUMFLG_SAME_OFFSET)
 			 && sum == s->sums[want_i].sum1
+			 && l == s->sums[want_i].len
 			 && memcmp(sum2, sum2_at(s, want_i), s->s2length) == 0) {
 				/* we've found an adjacent match - the RLL coder
 				 * will be happy */

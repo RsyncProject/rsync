@@ -175,7 +175,7 @@ enum shell_quote_context {
  * context-aware escaping is correct for exactly one level of shell parsing,
  * and a hook such as `sh -c '... %RSYNC_USER_NAME% ...'` re-parses the word in
  * a second shell that sees the value bare.  Peer-supplied values carrying any
-	 * of these are refused instead. */
+ * of these are refused instead. */
 static int shell_unsafe_value(const char *val)
 {
 	const char *s;

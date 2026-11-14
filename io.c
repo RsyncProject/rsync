@@ -292,9 +292,6 @@ static size_t safe_read(int fd, char *buf, size_t len)
 			continue;
 		}
 
-		/*if (FD_ISSET(fd, &e_fds))
-			rprintf(FINFO, "select exception on fd %d\n", fd); */
-
 		if (FD_ISSET(fd, &r_fds)) {
 			ssize_t n = read(fd, buf + got, len - got);
 			if (DEBUG_GTE(IO, 2)) {
@@ -371,7 +368,7 @@ static void safe_write(int fd, const char *buf, size_t len)
 
 		cnt = select(fd + 1, NULL, &w_fds, NULL, &tv);
 		if (cnt <= 0) {
-			if (cnt < 0 && errno == EBADF) {
+			if (cnt < 0 && errno != EINTR && errno != EAGAIN) {
 				rsyserr(FERROR, errno, "safe_write select failed on %s", what_fd_is(fd));
 				exit_cleanup(RERR_FILEIO);
 			}
@@ -992,11 +989,16 @@ void noop_io_until_death(void)
 /* Buffer a message for the multiplexed output stream.  Is not used for (normal) MSG_DATA. */
 int send_msg(enum msgcode code, const char *buf, size_t len, int convert)
 {
+	static int growing_msg_buffer;
 	char *hdr;
 	size_t needed, pos;
 	BOOL want_debug = DEBUG_GTE(IO, 1) && convert >= 0 && (msgs2stderr == 1 || code != MSG_INFO);
 
 	if (!OUT_MULTIPLEXED)
+		return 0;
+	/* A fatal realloc_xbuf() failure is reported via rprintf(), which would
+	 * otherwise call send_msg() again and try to grow the same full buffer. */
+	if (growing_msg_buffer)
 		return 0;
 
 	if (want_debug) {
@@ -1023,7 +1025,9 @@ int send_msg(enum msgcode code, const char *buf, size_t len, int convert)
 		else { /* We sometimes allow the iobuf.msg size to increase to avoid a deadlock. */
 			size_t old_size = iobuf.msg.size;
 			restore_iobuf_size(&iobuf.msg);
+			growing_msg_buffer = 1;
 			realloc_xbuf(&iobuf.msg, iobuf.msg.size * 2);
+			growing_msg_buffer = 0;
 			if (iobuf.msg.pos + iobuf.msg.len > old_size)
 				memcpy(iobuf.msg.buf + old_size, iobuf.msg.buf, iobuf.msg.pos + iobuf.msg.len - old_size);
 		}
@@ -1344,21 +1348,7 @@ int read_line(int fd, char *buf, size_t bufsiz, int flags)
 	return s - buf;
 }
 
-/* Reverse safe_arg()'s backslash escaping of a daemon option arg, the way a
- * remote shell un-escapes args for the ssh transport.  In place; \X -> X. */
-static void unbackslash_arg(char *s)
-{
-	char *f = s, *t = s;
-	while (*f) {
-		if (*f == '\\' && f[1])
-			f++;
-		*t++ = *f++;
-	}
-	*t = '\0';
-}
-
 #define MAX_DAEMON_ARGS (MAX_ARGS * 16)
-
 void read_args(int f_in, char *mod_name, char *buf, size_t bufsiz, int rl_nulls,
 	       char ***argv_p, int *argc_p, char **request_p)
 {
@@ -1412,6 +1402,13 @@ void read_args(int f_in, char *mod_name, char *buf, size_t bufsiz, int rl_nulls,
 				dot_pos = argc;
 		}
 	}
+	/* glob_expand()/glob_match() reserve glob.argc+1 slots -- room for the
+	 * entry being added but not for this trailing NULL.  A post-dot line
+	 * whose " mod/" splits land argc on exactly maxargs (or any later
+	 * ENSURE_MEMSPACE doubling boundary) would otherwise make the next
+	 * store an 8-byte NULL write one slot past the argv allocation. */
+	if (argc >= maxargs)
+		argv = realloc_array(argv, char *, maxargs = argc + 1);
 	argv[argc] = NULL;
 
 	glob_expand(NULL, NULL, NULL, NULL);
@@ -1603,6 +1600,7 @@ static void read_a_msg(void)
 		io_error |= val;
 		if (am_receiver)
 			send_msg_int(MSG_IO_ERROR, val);
+		iobuf.in_multiplexed = 1;
 		break;
 	case MSG_IO_TIMEOUT:
 		if (msg_bytes != 4 || am_server || am_generator)
@@ -1628,17 +1626,17 @@ static void read_a_msg(void)
 		/* Support protocol-30 keep-alive method. */
 		if (msg_bytes != 0)
 			goto invalid_msg;
-		iobuf.in_multiplexed = 1;
 		if (am_sender)
 			maybe_send_keepalive(time(NULL), MSK_ALLOW_FLUSH);
+		iobuf.in_multiplexed = 1;
 		break;
 	case MSG_DELETED:
 		if (msg_bytes >= sizeof data)
 			goto overflow;
 		if (am_generator) {
 			raw_read_buf(data, msg_bytes);
-			iobuf.in_multiplexed = 1;
 			send_msg(MSG_DELETED, data, msg_bytes, 1);
+			iobuf.in_multiplexed = 1;
 			break;
 		}
 #ifdef ICONV_OPTION
@@ -1676,7 +1674,6 @@ static void read_a_msg(void)
 		} else
 #endif
 			raw_read_buf(data, msg_bytes);
-		iobuf.in_multiplexed = 1;
 		/* A directory name was sent with the trailing null */
 		if (msg_bytes > 0 && !data[msg_bytes-1])
 			log_delete(data, S_IFDIR);
@@ -1684,6 +1681,7 @@ static void read_a_msg(void)
 			data[msg_bytes] = '\0';
 			log_delete(data, S_IFREG);
 		}
+		iobuf.in_multiplexed = 1;
 		break;
 	case MSG_SUCCESS:
 		if (msg_bytes != (local_server ? 4+8+8 : 4)) {
@@ -1705,11 +1703,11 @@ static void read_a_msg(void)
 		if (msg_bytes != 4)
 			goto invalid_msg;
 		val = raw_read_int();
-		iobuf.in_multiplexed = 1;
 		if (am_generator)
 			got_flist_entry_status(FES_NO_SEND, val);
 		else
 			send_msg_int(MSG_NO_SEND, val);
+		iobuf.in_multiplexed = 1;
 		break;
 	case MSG_ERROR_SOCKET:
 	case MSG_ERROR_UTF8:

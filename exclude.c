@@ -524,7 +524,7 @@ void add_implied_include(const char *arg, int skip_daemon_module)
 				if (cp[1] == ']') {
 					if (!saw_wild)
 						cp++; /* A \] in a non-wild filter causes a problem, so drop the \ . */
-				} else if (!strchr("*[?", cp[1])) {
+				} else if (!cp[1] || !strchr("*[?", cp[1])) {
 					backslash_cnt++;
 					if (saw_wild)
 						*p++ = '\\';
@@ -1148,6 +1148,21 @@ int is_implied_parent_dir(const char *name)
 	if (!implied_filter_list.head)
 		return 0;
 
+	/* The receiver exempts its synthetic transfer-root entry from the
+	 * requested-name filter.  Treat it as parent-only unless an empty/root
+	 * source argument added the root-content rule. */
+	if ((name[0] == '.' && name[1] == '\0')
+	 || (name[0] == '/' && name[1] == '.' && name[2] == '\0')) {
+		for (ent = implied_filter_list.head; ent; ent = ent->next) {
+			if (!(ent->rflags & FILTRULE_INCLUDE))
+				continue;
+			if (strcmp(ent->pattern, "/**") == 0
+			 || strcmp(ent->pattern, "/*") == 0)
+				return 0;
+		}
+		return 1;
+	}
+
 	for (ent = implied_filter_list.head; ent; ent = ent->next) {
 		if (ent->rflags & (FILTRULE_PERDIR_MERGE | FILTRULE_CVS_IGNORE))
 			continue;
@@ -1582,6 +1597,21 @@ void parse_filter_str(filter_rule_list *listp, const char *rulestr,
 	}
 }
 
+static int get_filter_char(FILE *file)
+{
+	int c = getc(file);
+	while (c == EOF && ferror(file) && errno == EINTR) {
+		clearerr(file);
+		/* EINTR leaves the unread byte in place, including on pipes.
+		 * Clang 21's stream model does not recognise this recovery. */
+#ifdef __clang_analyzer__
+		__attribute__((suppress))
+#endif
+		c = getc(file);
+	}
+	return c;
+}
+
 void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_rule *template, int xflags)
 {
 	FILE *fp;
@@ -1613,6 +1643,13 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 	merge_depth++;
 
 	if (*fname != '-' || fname[1] || am_server) {
+		/* This path is operator- and (via per-directory merge files like
+		 * .cvsignore) sender-controlled: a planted symlink could leak a
+		 * root-readable file through the filter parser, or redirect an
+		 * --exclude-from open via a planted parent.  Refuse symlinks not
+		 * owned by uid 0 or our euid. */
+		const char *open_path;
+		int fd;
 		if (daemon_filter_list.head) {
 			char *dir;
 			strlcpy(line, fname, sizeof line);
@@ -1639,19 +1676,33 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 				merge_depth--;
 				return;
 			}
-			fp = fopen(line, "rb");
-		} else {
+			open_path = line;
+		} else
 			open_path = fname;
-        
+
+		/* Confine the open to the module root.  The ownership walk on its own
+		 * is not enough for a peer-driven merge file: a non-chrooted daemon
+		 * writes --backup-dir entries as root, so a raced backup symlink is
+		 * ROOT-owned -- exactly what open_no_attacker_symlinks() treats as
+		 * trusted -- and naming it in a dir-merge rule would read an
+		 * out-of-module file in as filter rules (their text comes back to the
+		 * peer in "Unknown filter rule" errors).
+		 *
+		 * The daemon's own "filter"/"include from"/"exclude from" parameters
+		 * are exempt: those are operator-configured and legitimately live
+		 * outside the module (/etc/rsync/excludes and the like). */
 		int save_opr = operator_path_resolve;
-		operator_path_resolve = 1;
+		if (!daemon_config_filter_file)
+			operator_path_resolve = 1;
 		fd = open_no_attacker_symlinks(open_path, O_RDONLY, 0);
 		operator_path_resolve = save_opr;
-		
+
 		if (fd < 0)
 			fp = NULL;
-		else if (!(fp = fdopen(fd, "rb")))
+		else if (!(fp = fdopen(fd, "rb"))) {
+			int fdopen_errno = errno;
 			close(fd);
+			errno = fdopen_errno;
 		}
 	} else
 		fp = stdin;
@@ -1728,11 +1779,7 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 			if (pending != EOF) {   /* a CR lookahead we could not push back */
 				ch = pending;
 				pending = EOF;
-			} else if ((ch = getc(fp)) == EOF) {
-				if (ferror(fp) && errno == EINTR) {
-					clearerr(fp);
-					continue;
-				}
+			} else if ((ch = get_filter_char(fp)) == EOF) {
 				break;
 			}
 			if (word_split && isspace(ch))
@@ -1740,9 +1787,7 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 			if (eol_nulls? !ch : (ch == '\n' || ch == '\r')) {
 				if (ch == '\r') {   /* CRLF is one line, not two */
 					int nxt;
-					while ((nxt = getc(fp)) == EOF
-					    && ferror(fp) && errno == EINTR)
-						clearerr(fp);
+					nxt = get_filter_char(fp);
 					if (nxt == EOF) {
 						if (!ferror(fp))
 							ch = EOF;   /* real end of file */
@@ -1761,6 +1806,14 @@ void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_
 				*s++ = ch;
 			else
 				overflow = 1;
+		}
+		if (ferror(fp)) {
+			if (named_by_file)
+				rprintf(FERROR, "failed to read filter file %s\n", rule_text(template, src_name));
+			else
+				rsyserr(FERROR, errno, "failed to read filter file %s", src_name);
+			fclose(fp);
+			exit_cleanup(RERR_FILEIO);
 		}
 		if (overflow) {
 			rprintf(FERROR, "discarding over-long filter: %s\n",

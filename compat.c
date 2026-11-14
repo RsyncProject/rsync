@@ -584,14 +584,8 @@ void setup_protocol(int f_out,int f_in)
 		pathname_ndx = (file_extra_cnt += PTR_EXTRA_CNT);
 	else
 		depth_ndx = ++file_extra_cnt;
-	if (preserve_uid)
-		uid_ndx = ++file_extra_cnt;
-	if (preserve_gid)
-		gid_ndx = ++file_extra_cnt;
-	if (preserve_acls && !am_sender)
-		acls_ndx = ++file_extra_cnt;
-	if (preserve_xattrs)
-		xattrs_ndx = ++file_extra_cnt;
+	/* Batch flags can enable metadata options, so assign their slots after
+	 * check_batch_flags() has restored the recorded option state. */
 
 	if (am_server)
 		set_allow_inc_recurse();
@@ -637,6 +631,15 @@ void setup_protocol(int f_out,int f_in)
 	}
 	if (read_batch)
 		check_batch_flags();
+
+	if (preserve_uid)
+		uid_ndx = ++file_extra_cnt;
+	if (preserve_gid)
+		gid_ndx = ++file_extra_cnt;
+	if (preserve_acls && !am_sender)
+		acls_ndx = ++file_extra_cnt;
+	if (preserve_xattrs)
+		xattrs_ndx = ++file_extra_cnt;
 
 	if (!saw_stderr_opt && protocol_version <= 28 && am_server)
 		msgs2stderr = 0; /* The client side may not have stderr setup for us. */
