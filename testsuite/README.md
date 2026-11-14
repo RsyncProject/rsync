@@ -56,7 +56,7 @@ With profiles active, an unsupported result is accepted only when the test decla
 
 Linux jobs cover both xattr syscall paths, nested user namespaces, older libc and OpenSSL versions, musl and 32-bit behaviour. We pin one BSD and macOS release unless another release exercises distinct rsync behaviour. Check the workflow files for exact versions.
 
-On pull requests we choose jobs from the changed paths. Documentation-only changes stop after Changes and Required. General tests and shared runner changes run the native platforms, version mixes and relevant diagnostics. We add Android, archive, Valgrind or interoperability only when their own files or shared code change. Any production, build, packaging or unknown path runs everything. Pushes to master and manual runs also run everything.
+On pull requests and pushes to master we choose jobs from the changed paths. Known documentation and static website files stop after Changes and Required. General tests and shared runner changes run the native platforms, version mixes and relevant diagnostics. We add Android, archive, Valgrind or interoperability only when their own files or shared code change. Production, build and packaging changes run everything. A path without a selection rule fails Changes. Scheduled and manual runs select the full matrix.
 
 Installed-binary checks exercise restricted SSH and local TLS with certificate and hostname verification. Archive qualification builds and tests the release source archive without Git or Autoconf, then checks installation and removal. Linux storage checks use disposable filesystems and loop devices for encrypted volumes, mount boundaries, space exhaustion, device transfers and --copy-as.
 
