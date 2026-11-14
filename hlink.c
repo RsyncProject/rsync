@@ -97,8 +97,10 @@ void idev_destroy(void)
 	hashtable_destroy(dev_tbl);
 }
 
-static int hlink_compare_gnum(int *int1, int *int2)
+static int hlink_compare_gnum(const void *item1, const void *item2)
 {
+	const int32 *int1 = item1;
+	const int32 *int2 = item2;
 	struct file_struct *f1 = hlink_flist->sorted[*int1];
 	struct file_struct *f2 = hlink_flist->sorted[*int2];
 	int32 gnum1 = F_HL_GNUM(f1);
@@ -107,7 +109,10 @@ static int hlink_compare_gnum(int *int1, int *int2)
 	if (gnum1 != gnum2)
 		return gnum1 > gnum2 ? 1 : -1;
 
-	return *int1 > *int2 ? 1 : -1;
+	if (*int1 != *int2)
+		return *int1 > *int2 ? 1 : -1;
+
+	return 0;
 }
 
 static void match_gnums(int32 *ndx_list, int ndx_count)
@@ -117,7 +122,7 @@ static void match_gnums(int32 *ndx_list, int ndx_count)
 	struct ht_int32_node *node = NULL;
 	int32 gnum, gnum_next;
 
-	qsort(ndx_list, ndx_count, sizeof ndx_list[0], (int (*)()) hlink_compare_gnum);
+	qsort(ndx_list, ndx_count, sizeof ndx_list[0], hlink_compare_gnum);
 
 	for (from = 0; from < ndx_count; from++) {
 		file = hlink_flist->sorted[ndx_list[from]];
