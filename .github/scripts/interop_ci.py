@@ -212,8 +212,7 @@ def records(kind, roles=ROLES, run_id=None, timeout=600):
 
 def find_controller(exclude=None):
     state = source()
-    titles = {f"Network controller: {state['display_title']}",
-              f"Network CI {state['run_id']} attempt {state['run_attempt']}"}
+    titles = {'Network controller', f"Network CI {state['run_id']} attempt {state['run_attempt']}"}
     runs = []
     for page in range(1, 6):
         listing = api('/actions/workflows/interoperability.yml/runs?branch=master&event=workflow_run'

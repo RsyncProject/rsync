@@ -167,7 +167,7 @@ class Network(unittest.TestCase):
         origin = dict(self.state, head_sha='b' * 40, display_title='testsuite, ci: rework tests',
                       created_at='2026-11-14T00:00:00Z')
         metadata = dict(self.state, control_run_id='456', control_attempt='1', control_sha='c' * 40)
-        titles = ('Network controller: testsuite, ci: rework tests', 'Network CI 123 attempt 2')
+        titles = ('Network controller', 'Network CI 123 attempt 2')
         for title in titles:
             run = dict(id=456, run_attempt=1, path='.github/workflows/interoperability.yml', head_branch='master',
                        event='workflow_run', display_title=title, repository=dict(id=266877886),
@@ -187,7 +187,7 @@ class Network(unittest.TestCase):
         origin = dict(self.state, head_sha='b' * 40, display_title='testsuite, ci: rework tests',
                       created_at='2026-11-14T00:00:00Z')
         run = dict(id=456, run_attempt=1, path='.github/workflows/interoperability.yml', head_branch='master',
-                   event='workflow_run', display_title='Network controller: testsuite, ci: rework tests',
+                   event='workflow_run', display_title='Network controller',
                    repository=dict(id=266877886),
                    head_sha='c' * 40, status='completed', conclusion='success',
                    created_at='2026-11-14T00:00:01Z')
@@ -205,7 +205,7 @@ class Network(unittest.TestCase):
         unrelated = [dict(id=500 + index, created_at='2026-11-14T00:00:30Z',
                           display_title='other') for index in range(20)]
         current = dict(id=456, run_attempt=1, path='.github/workflows/interoperability.yml',
-                       head_branch='master', event='workflow_run', display_title='Network controller: current',
+                       head_branch='master', event='workflow_run', display_title='Network controller',
                        repository=dict(id=266877886), head_sha='c' * 40, status='in_progress',
                        created_at='2026-11-14T00:00:21Z')
         older = dict(unrelated[0], id=455, created_at='2026-11-14T00:00:19Z')
@@ -223,7 +223,7 @@ class Network(unittest.TestCase):
         origin = dict(self.state, head_sha='b' * 40, display_title='same title',
                       created_at='2026-11-14T00:00:00Z')
         run = dict(run_attempt=1, path='.github/workflows/interoperability.yml', head_branch='master',
-                   event='workflow_run', display_title='Network controller: same title',
+                   event='workflow_run', display_title='Network controller',
                    repository=dict(id=266877886), head_sha='c' * 40, status='in_progress',
                    created_at='2026-11-14T00:00:01Z')
         stale, current = dict(run, id=455), dict(run, id=456)
