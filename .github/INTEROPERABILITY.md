@@ -1,28 +1,28 @@
 # Cross-platform transfers
 
-CI / Interoperability contains Linux, FreeBSD, NetBSD, OpenBSD, macOS, Solaris and Cygwin endpoints. Linux, macOS and Cygwin execute on hosted runners; the BSD and Solaris binaries execute inside their guests. Guest forwarding exposes fixture ports only. Administrative SSH stays local to the VM host.
+We run Linux, FreeBSD, NetBSD, OpenBSD, macOS, Solaris and Cygwin endpoints. Linux, macOS and Cygwin run directly on hosted runners; BSD and Solaris run inside guests. We expose only the fixture ports through Tailscale and keep administrative SSH local to each guest host.
 
-The 168 cases cover every directed platform pair, push and pull initiation and SSH and daemon transport. Separate trees prevent concurrent cases from sharing destinations. Initial copies finish before verification and source updates; checksum updates finish before destination verification. Results include data, modes, integer timestamps, symlink targets and hard-link groups.
+We run push and pull transfers over SSH and daemon connections for every ordered platform pair, giving 168 data cases. We use separate trees so concurrent cases never share a destination. The first phase verifies the initial transfer. The second verifies checksum updates and deletion. We compare data, modes, integer timestamps, symlink targets and hard-link groups.
 
-Metadata uses separate destination trees and shares read-only source fixtures until the next phase barrier. Compatible POSIX ACLs and xattrs receive initial and updated transfers. Fake-super backups return their saved attributes unchanged with -XX and are decoded only on the originating platform. Unsupported features and empty NTFS xattrs require explicit errors. Result validation checks the exact metadata case sets, destination verification and completed restores as well as each endpoint's qualified features.
+We test compatible POSIX ACLs and xattrs separately. We return fake-super backups unchanged with `-XX` and decode them only on their originating platform. We require explicit errors for unsupported metadata and empty NTFS xattrs.
 
-The parent CI run and attempt identify each cohort. The tested revision comes from GitHub's resolved reusable-workflow commit and is checked against the native checkout. Endpoint records also contain the operating system, effective UID/GID and executable SHA-256. Required depends on all seven endpoint jobs, complete case results and confirmed network cleanup.
+We bind every record to the parent CI run, attempt and tested revision. Endpoint records include the operating system, effective UID, effective GID and executable SHA-256. We accept the final result only after all seven endpoints complete every assigned case and we confirm network cleanup.
 
-Endpoint jobs fail for their own setup, transfer and cleanup errors. A failed transfer is published before every endpoint completes that phase, so its services remain available to peers already using them. Unavailable peers or a failed controller block later phases; local cleanup still runs. Result rejects failed or blocked endpoints, missing outcomes, incomplete transfer results and unverified network cleanup.
+We publish each phase result before waiting at the barrier, which keeps a failed endpoint available until its peers finish the current phase. We block later phases but still run local cleanup. A missing, failed or incomplete endpoint result fails the final check.
 
 ## Authentication
 
-The Network controller uses trusted default-branch code through a workflow_run listener. It is deployed independently of the PR endpoint workflow and ignores CI runs which have not selected that workflow. Its existing OIDC identity has write access to auth_keys, policy_file, devices:core and devices:posture_attributes in the dedicated test tailnet. The posture scope is a dependency of policy-file writes. Enrolment is restricted to tag:quarantine.
+The Network controller runs trusted default-branch code through a `workflow_run` listener and ignores CI runs that did not select the endpoint workflow. We configure the dedicated test tailnet outside this repository. The controller identity needs write access to `auth_keys`, `policy_file`, `devices:core` and `devices:posture_attributes`. We restrict enrolment to `tag:quarantine`.
 
-Endpoint jobs have read-only GitHub permissions and no OIDC permission. Each generates a temporary RSA recipient and receives one encrypted, single-use enrolment key. RSA-OAEP uses 3072-bit keys and SHA-256. Key files and recipient private keys are removed after enrolment. SSH private keys are removed when fixture services stop. Plaintext credentials are excluded from artefacts and job outputs.
+We give endpoint jobs read-only GitHub permissions and no OIDC permission. Each endpoint generates a temporary RSA recipient and receives one encrypted, single-use enrolment key. RSA-OAEP uses 3072-bit keys and SHA-256. We remove the enrolment files immediately and remove SSH private keys when fixture services stop. We never include plaintext credentials in artefacts or job output.
 
-Endpoints authenticate through the supported Tailscale CLI. Client package checksums and the macOS source revision are pinned in interop-client.py. Route acceptance and DNS changes are disabled and checked through the client's active preferences. SSH host keys are pinned to endpoint identities.
+We pin the Tailscale CLI in `interop-client.py` and pin SSH host keys to endpoint identities. We disable route acceptance and DNS changes and verify the active preferences.
 
-Admission permits only the cohort's registered IPv4 addresses on TCP ports 18731 and 18733. Conditional policy updates preserve other cohorts. Local service checks precede and follow denial probes. Key expiry limits unused enrolment credentials; active nodes require explicit removal.
+We admit only the cohort's registered IPv4 addresses on TCP ports 18731 and 18733. Policy updates preserve other cohorts. We check local services before and after the denial probes. Enrolment keys expire; we remove active nodes explicitly.
 
 ## Configuration
 
-The production federated identity uses these claims:
+We configure the controller identity with these claims:
 
 Field | Value
 --- | ---
@@ -34,12 +34,12 @@ event_name | workflow_run
 workflow_ref | RsyncProject/rsync/.github/workflows/interoperability*.yml@refs/heads/master
 runner_environment | github-hosted
 
-Endpoint jobs have no federated identity. Controller discovery uses the parent CI run and attempt and verifies the controller's default-branch revision. No per-PR identity, branch or repository variable is required.
+We give endpoint jobs no federated identity. We find the controller from the parent CI run and attempt. We then verify its default-branch revision. We do not need a per-PR identity, branch or repository variable.
 
 ## Recovery
 
-Normal cleanup revokes the recorded grant, removes owned devices and revokes issued keys. An individual failure does not prevent attempts to remove the remaining resources. Device deletion checks the recorded node identity; reassigned devices remain untouched. A failure before enrolment records that no resources need cleanup without marking the transfer checks as passed.
+We always try to revoke the cohort grant, remove its devices and revoke its enrolment keys. We remove a device only while its current node ID matches the lease. If a run fails before enrolment, we record that no resources need cleanup without marking transfers as passed.
 
-Admission leases are attested before access is granted. Failed or cancelled controller runs trigger recovery from trusted code. Recovery checks the exact controller attempt's job record and does not repeat successful cleanup. Otherwise it verifies the original lease bytes, repository, controller workflow, signing commit, source ref and run attempt before modifying the tailnet.
+We attest the admission lease before granting access. A failed or cancelled controller triggers the cleanup workflow. We first check whether cleanup already succeeded. Otherwise we verify the lease bytes, repository, controller workflow, signing commit, source reference and run attempt before changing the tailnet.
 
-Missing leases and provider failures require reconciliation. Partial enrolment before a lease exists remains quarantined; hostnames alone are insufficient grounds for device deletion. Cleanup failure keeps the CI result unsuccessful.
+If automated cleanup fails, we use the attested `interoperability-lease-<attempt>` artefact from the controller run to identify the cohort. We remove only the recorded grant, keys and devices while each device's node ID still matches. Without an attested lease, we compare the `interoperability-<attempt>-ready-<platform>` artefacts with quarantined node IDs before making any change. A hostname alone is not enough to delete a device.

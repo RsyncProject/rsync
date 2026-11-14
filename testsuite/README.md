@@ -13,14 +13,14 @@ make check30
 
 The first target runs the suite with the default protocol; the others force protocols 29 and 30. Make runs up to eight tests at once. Set CHECK_J to change that limit.
 
-After building the helpers with make check-progs, individual tests and filename patterns can be selected directly:
+For an in-tree build, individual tests and filename patterns can be selected after running `make check-progs`:
 ```sh
 python3 -S testsuite/runtests.py -j8 chmod-temp-dir 'xattrs*'
 python3 -S testsuite/runtests.py --help
 python3 -S testsuite/runtests.py --describe-tests
 ```
 
-The runner defaults to serial execution. Out-of-tree builds need --srcdir, --tooldir and --rsync-bin. The installcheck target uses the installed binary with the build directory's helpers.
+The runner defaults to serial execution. For an out-of-tree build, invoke `$srcdir/testsuite/runtests.py` and pass `--srcdir`, `--tooldir` and `--rsync-bin`. The `installcheck` target uses the installed binary with the build directory's helpers.
 
 Scratch directories default to `testtmp/<name>/` and are retained after failures. Root and non-root runs need separate scratch directories. SIGTERM stops queued tests and terminates active test process groups; incomplete runs fail.
 
@@ -52,9 +52,9 @@ With profiles active, an unsupported result is accepted only when the test decla
 
 ## CI
 
-[ci.yml](../.github/workflows/ci.yml) defines the platform groups and required checks. Native jobs exercise root and non-root transfers where available. Historical-peer jobs run applicable tests in both executable roles over pipe and TCP. Diagnostics include Python 3.7, Clang 21 and sanitisers. Valgrind has a separate group. Coverage reports omit daemon work after chroot because its counter files are outside the chroot.
+[ci.yml](../.github/workflows/ci.yml) defines the platform groups and required checks. Native jobs exercise root and non-root transfers where available. Historical peers run applicable tests in both executable roles over pipe and TCP. Diagnostics cover the minimum Python version, static analysis, sanitisers, coverage and Valgrind. Coverage reports omit daemon work after chroot because its counter files are outside the chroot.
 
-Ubuntu 24.04 and 26.04 exercise the older and newer xattr syscall paths on X86-64 and ARM64. One Ubuntu 22.04 job retains nested-user-namespace coverage unavailable on the newer runners. AlmaLinux 8 covers older libc and OpenSSL versions and the bundled string functions. Alpine covers musl on X86-64 and X86-32. BSD and macOS jobs use the current releases; additional versions need a distinct rsync behaviour to justify another job.
+Linux jobs cover both xattr syscall paths, nested user namespaces, older libc and OpenSSL versions, musl and 32-bit behaviour. We pin one BSD and macOS release unless another release exercises distinct rsync behaviour. Check the workflow files for exact versions.
 
 Installed-binary checks exercise restricted SSH and local TLS with certificate and hostname verification. Archive qualification builds and tests the release source archive without Git or Autoconf, then checks installation and removal. Linux storage checks use disposable filesystems and loop devices for encrypted volumes, mount boundaries, space exhaustion, device transfers and --copy-as.
 

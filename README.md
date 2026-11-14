@@ -36,11 +36,10 @@ features in your build.
 
 [1]: https://github.com/RsyncProject/rsync/blob/master/INSTALL.md
 
-Testing
+TESTING
 -------
 
-Run `make check` from a configured build directory. The
-[testsuite README](testsuite/README.md) describes test selection, profiles and CI.
+Run `make check` from a configured build directory. See the [testsuite README](testsuite/README.md) for test selection, profiles and CI.
 
 SETUP
 -----
