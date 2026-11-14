@@ -29,12 +29,14 @@ if test -z "$account"; then
 	test_skipped "No account with a supplementary group is available"
 fi
 
-protected="$scratchdir/protected"
-destination="$scratchdir/destination"
+copy_as_root=`mktemp -d "${TMPDIR:-/tmp}/rsync-copy-as.XXXXXX"` \
+	|| test_skipped "Cannot create the copy-as fixture"
+trap 'chmod -R u+rwX "$copy_as_root"; rm -rf "$copy_as_root"' 0
+chmod 0711 "$copy_as_root"
+
+protected="$copy_as_root/protected"
+destination="$copy_as_root/destination"
 makepath "$protected" "$destination"
-scratch_parent=`dirname "$scratchdir"`
-build_parent=`dirname "$scratch_parent"`
-chmod a+x "$build_parent" "$scratch_parent" "$scratchdir"
 echo accessible-via-supplementary-group >"$protected/file"
 chown root:"$supplementary_gid" "$protected" "$protected/file"
 chmod 0750 "$protected"
