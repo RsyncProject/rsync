@@ -110,6 +110,10 @@ and its development.
 BUG REPORTS
 -----------
 
+Report suspected security vulnerabilities through
+[GitHub's private reporting form](https://github.com/RsyncProject/rsync/security/advisories/new).
+See the [security policy](SECURITY.md) for details and an email contact.
+
 The [bug-tracking web page][4] has full details on bug reporting.
 
 [4]: https://rsync.samba.org/bug-tracking.html
@@ -125,8 +129,6 @@ To send a bug report, follow the instructions on the bug-tracking
 page of the web site.
 
 Alternately, email your bug report to <rsync@lists.samba.org>.
-
-For security issues please email details of the issue to <rsync.project@gmail.com>.
 
 GIT REPOSITORY
 --------------

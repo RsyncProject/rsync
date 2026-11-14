@@ -5,12 +5,19 @@
 Only the current release of the software is actively supported.  If you need
 help backporting fixes into an older release, feel free to ask.
 
-## Reporting a Vulnerability
+## Reporting a vulnerability
 
-Email your vulnerability information to rsync's maintainer:
+Report suspected vulnerabilities privately through
+[GitHub's reporting form](https://github.com/RsyncProject/rsync/security/advisories/new).
+If GitHub cannot be used, email
+[rsync.project@gmail.com](mailto:rsync.project@gmail.com).
 
-  Rsync Project <rsync.project@gmail.com>
+Include the affected version, relevant configuration, a reproducer and the
+security impact. Do not post vulnerability details in public issues, pull
+requests or mailing lists.
 
+We also track email reports in private GitHub advisories. Please discuss
+publication with us first so we can investigate and release a fix.
 
 ## Approach to platform residuals
 
