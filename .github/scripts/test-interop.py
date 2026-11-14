@@ -39,6 +39,9 @@ class Network(unittest.TestCase):
         self.addCleanup(self.environment.stop)
         ci.bind(self.state)
         self.addCleanup(setattr, ci, 'bound', None)
+        running = patch.dict(broker['main'].__globals__, check_ci=Mock())
+        running.start()
+        self.addCleanup(running.stop)
         self.devices, self.nodes = [], {}
         for index, role in enumerate(ROLES, 1):
             address = '100.64.0.' + str(index)
@@ -54,6 +57,12 @@ class Network(unittest.TestCase):
                                  GITHUB_REPOSITORY_ID='1').items():
             with self.subTest(field=field), patch.dict(os.environ, {field: value}), self.assertRaises(network.NetworkError):
                 network.workflow_event()
+
+    def test_artifact_names_keep_attempts_separate(self):
+        self.assertEqual(ci.artifact_name('enrolment'), 'interoperability-enrolment-attempt-2')
+        self.assertEqual(ci.artifact_name('ready', 'linux'), 'interoperability-ready-linux-attempt-2')
+        ci.bind(dict(self.state, run_attempt='3'))
+        self.assertEqual(ci.artifact_name('enrolment'), 'interoperability-enrolment-attempt-3')
 
     def test_unselected_ci_has_no_network_side_effects(self):
         output = self.root / 'output'
@@ -208,7 +217,7 @@ class Network(unittest.TestCase):
                        head_branch='master', event='workflow_run', display_title='Network controller',
                        repository=dict(id=266877886), head_sha='c' * 40, status='in_progress',
                        created_at='2026-11-14T00:00:21Z')
-        older = dict(unrelated[0], id=455, created_at='2026-11-14T00:00:19Z')
+        older = dict(current, id=455, created_at='2026-11-14T00:00:19Z')
         artifact = dict(total_count=1, artifacts=[dict(name='interoperability-context-1', expired=False)])
         metadata = dict(self.state, control_run_id='456', control_attempt='1', control_sha='c' * 40)
         with patch.object(ci, 'source', return_value=origin), patch.object(ci, 'api', side_effect=[
@@ -227,17 +236,36 @@ class Network(unittest.TestCase):
                    repository=dict(id=266877886), head_sha='c' * 40, status='in_progress',
                    created_at='2026-11-14T00:00:01Z')
         stale, current = dict(run, id=455), dict(run, id=456)
-        artifact = dict(total_count=1, artifacts=[dict(name='interoperability-context-1', expired=False)])
         stale_metadata = dict(self.state, run_id='122', control_run_id='455',
                               control_attempt='1', control_sha='c' * 40)
         current_metadata = dict(self.state, control_run_id='456', control_attempt='1', control_sha='c' * 40)
+        for name in ('interoperability-context-attempt-1', 'interoperability-context-1'):
+            artifact = dict(total_count=1, artifacts=[dict(name=name, expired=False)])
+            with self.subTest(name=name), patch.object(ci, 'source', return_value=origin), \
+                    patch.object(ci, 'api', side_effect=[
+                        dict(total_count=2, workflow_runs=[current, stale]), artifact, artifact]), \
+                    patch.object(ci, 'download_records', side_effect=[
+                        {None: (stale_metadata, b'{}')}, {None: (current_metadata, b'{}')}]) as download, \
+                    patch.object(time, 'sleep'):
+                self.assertEqual(ci.controller(), '456')
+            self.assertEqual(download.call_args[0][:2], ('456', {name: None}))
+
+    def test_controller_listing_rejects_invalid_or_truncated_results(self):
+        origin = dict(self.state, head_sha='b' * 40, created_at='2026-11-14T00:00:00Z')
+        recent = dict(id=500, created_at='2026-11-14T00:00:30Z', display_title='other')
+        invalid = [dict(workflow_runs=[]), dict(total_count=1, workflow_runs=None),
+                   dict(total_count=21, workflow_runs=[recent] * 21),
+                   dict(total_count=1, workflow_runs=[dict(recent, created_at='invalid')])]
+        for value in invalid:
+            with self.subTest(listing=value), patch.object(ci, 'source', return_value=origin), \
+                    patch.object(ci, 'api', return_value=value), \
+                    self.assertRaisesRegex(network.NetworkError, 'Invalid controller run listing'):
+                ci.find_controller()
         with patch.object(ci, 'source', return_value=origin), \
-                patch.object(ci, 'api', side_effect=[
-                    dict(total_count=2, workflow_runs=[current, stale]), artifact, artifact]), \
-                patch.object(ci, 'download_records', side_effect=[
-                    {None: (stale_metadata, b'{}')}, {None: (current_metadata, b'{}')}]), \
-                patch.object(time, 'sleep'):
-            self.assertEqual(ci.controller(), '456')
+                patch.object(ci, 'api', return_value=dict(total_count=101, workflow_runs=[recent] * 20)) as api, \
+                self.assertRaisesRegex(network.NetworkError, 'Controller run listing exceeds limit'):
+            ci.find_controller()
+        self.assertEqual(api.call_count, 5)
 
     def test_duplicate_controller_never_issues_another_enrolment(self):
         output = self.root / 'output'
@@ -395,6 +423,132 @@ class Network(unittest.TestCase):
                     self.assertEqual(broker['main'](), 1)
         self.assertFalse((self.root / 'result.json').exists())
 
+    def test_failed_endpoints_disable_the_controller_before_authority(self):
+        output = self.root / 'output'
+        jobs = dict(total_count=1, jobs=[dict(name='Interoperability / FreeBSD', conclusion='failure')])
+        with patch.object(sys, 'argv', ['interop-broker.py', 'metadata', '--root', str(self.root)]), \
+                patch.dict(os.environ, GITHUB_OUTPUT=str(output)), \
+                patch.object(ci, 'api', side_effect=[dict(run_attempt=2, status='in_progress'), jobs]), \
+                patch.dict(broker['main'].__globals__, check_ci=ci.check_ci,
+                           Tailnet=lambda: self.fail('Failed cohort obtained network authority')):
+            self.assertEqual(broker['main'](), 0)
+        self.assertEqual(output.read_text(), 'enabled=false\n')
+        self.assertFalse((self.root / 'context.json').exists())
+
+    def test_cancelled_key_issuance_is_cleaned_before_delivery(self):
+        api = Mock()
+        api.policy.return_value = ({}, {})
+        api.create_key.return_value = ('key1', 'tskey-auth-fixture')
+        check = Mock(side_effect=[None, None, ci.NotSelected('CI finished')])
+        recipients = {role: {'public_key': role} for role in ROLES}
+        with patch.dict(broker['main'].__globals__, Tailnet=lambda: api, check_ci=check,
+                        records=lambda *args, **kwargs: recipients, check_policy=lambda policy: None,
+                        seal=lambda *args: {'fixture': True}), patch('sys.stderr', new_callable=io.StringIO):
+            with patch.object(sys, 'argv', ['interop-broker.py', 'broker', '--root', str(self.root)]):
+                self.assertEqual(broker['main'](), 1)
+            with patch.object(sys, 'argv', ['interop-broker.py', 'finish', '--root', str(self.root)]):
+                self.assertEqual(broker['main'](), 0)
+        api.create_key.assert_called_once()
+        api.delete_key.assert_called_once_with('key1')
+        self.assertFalse((self.root / 'enrolment.json').exists())
+        self.assertEqual(json.loads((self.root / 'result.json').read_text()),
+                         dict(self.state, passed=False, cleaned=True, roles=[]))
+
+    def test_delivered_enrolment_without_a_lease_requires_reconciliation(self):
+        broker['save'](self.root, 'keys', keys={'linux': 'key1'}, pending=None)
+        (self.root / 'enrolment.json').write_text('{}')
+        api = Mock()
+        with patch.object(sys, 'argv', ['interop-broker.py', 'finish', '--root', str(self.root)]), \
+                patch.dict(broker['main'].__globals__, Tailnet=lambda: api), \
+                patch('sys.stderr', new_callable=io.StringIO) as errors:
+            self.assertEqual(broker['main'](), 1)
+        api.delete_key.assert_called_once_with('key1')
+        self.assertIn('devices need reconciliation', errors.getvalue())
+        self.assertFalse((self.root / 'result.json').exists())
+
+    def test_resource_lifecycle_through_admission_and_cleanup(self):
+        owner = self
+        class API:
+            policy_value = dict(acls=[], grants=[])
+            registered = []
+            keys = set()
+            def policy(api):
+                return api.policy_value, {}
+            def create_key(api, role, state):
+                api.keys.add(role)
+                return role, 'tskey-auth-fixture'
+            def devices(api):
+                return api.registered
+            def change(api, transform):
+                api.policy_value = transform(api.policy_value)
+                return {}
+            def delete(api, device_id):
+                api.registered = [node for node in api.registered if node['id'] != device_id]
+            def delete_key(api, key_id):
+                api.keys.remove(key_id)
+        api = API()
+        def records(kind, **kwargs):
+            if kind == 'public':
+                return {role: dict(public_key=role) for role in ROLES}
+            if kind == 'ready':
+                api.registered = copy.deepcopy(owner.devices)
+                return owner.nodes
+            if kind == 'quarantine':
+                return {role: dict(node_id=node['node_id'], passed=True) for role, node in owner.nodes.items()}
+            self.fail('Unexpected lifecycle barrier: ' + kind)
+        with patch.dict(os.environ, GITHUB_OUTPUT=str(self.root / 'output')), \
+                patch.dict(broker['main'].__globals__, Tailnet=lambda: api, records=records,
+                           source=lambda: dict(self.state, head_sha='b' * 40), find_controller=lambda **kwargs: None,
+                           seal=lambda *args: dict(encrypted=True)):
+            for phase in ('metadata', 'broker', 'prepare', 'admit', 'revoke', 'finish'):
+                with patch.object(sys, 'argv', ['interop-broker.py', phase, '--root', str(self.root)]):
+                    self.assertEqual(broker['main'](), 0, phase)
+                if phase == 'admit':
+                    self.assertEqual(len(api.policy_value['grants']), 1)
+                    self.assertEqual(len(api.registered), len(ROLES))
+            self.assertTrue((self.root / 'enrolment.json').exists())
+        self.assertEqual(api.policy_value['grants'], [])
+        self.assertEqual(api.registered, [])
+        self.assertEqual(api.keys, set())
+        self.assertEqual(json.loads((self.root / 'result.json').read_text()),
+                         dict(self.state, passed=False, cleaned=True, roles=list(ROLES)))
+
+    def test_key_cleanup_attempts_every_recorded_key(self):
+        broker['save'](self.root, 'keys', keys={'linux': 'key1', 'freebsd': 'key2'}, pending=None)
+        api = Mock()
+        api.delete_key.side_effect = [network.NetworkError('Revocation failed'), None]
+        with patch.object(sys, 'argv', ['interop-broker.py', 'finish', '--root', str(self.root)]), \
+                patch.dict(broker['main'].__globals__, Tailnet=lambda: api), \
+                patch('sys.stderr', new_callable=io.StringIO):
+            self.assertEqual(broker['main'](), 1)
+        self.assertEqual(api.delete_key.call_count, 2)
+        self.assertFalse((self.root / 'result.json').exists())
+
+    def test_first_liveness_check_does_not_assume_runner_uptime(self):
+        def downloading(*args, **kwargs):
+            kwargs['progress']()
+            self.fail('Failed endpoint was ignored on the first poll')
+        jobs = dict(total_count=1, jobs=[dict(name='Interoperability / FreeBSD', conclusion='failure')])
+        with patch.object(ci, 'api', side_effect=[dict(run_attempt=2, status='in_progress'), jobs]), \
+                patch.object(ci, 'download_records', side_effect=downloading), \
+                patch.object(time, 'monotonic', return_value=1), \
+                self.assertRaisesRegex(ci.PeerUnavailable, 'FreeBSD'):
+            ci.records('public')
+
+    def test_stopped_controller_ends_waits_but_result_remains_readable(self):
+        def downloading(*args, **kwargs):
+            kwargs['progress']()
+            return {None: (self.state, b'{}')}
+        responses = [dict(run_attempt=2, status='in_progress'), dict(total_count=0, jobs=[]),
+                     dict(status='completed')]
+        with patch.object(ci, 'api', side_effect=responses), patch.object(time, 'monotonic', return_value=1), \
+                patch.object(ci, 'download_records', side_effect=downloading), \
+                self.assertRaisesRegex(ci.PeerUnavailable, 'controller has stopped'):
+            ci.records('enrolment', (None,), '456')
+        with patch.object(ci, 'api', side_effect=responses[:2]), patch.object(time, 'monotonic', return_value=1), \
+                patch.object(ci, 'download_records', side_effect=downloading):
+            self.assertEqual(ci.records('result', (None,), '456'), {None: self.state})
+
     def test_recovery_handles_completed_and_unstarted_controllers(self):
         run = dict(id=456, run_attempt=1, path='.github/workflows/interoperability.yml', head_branch='master',
                    event='workflow_run', head_sha='c' * 40, repository=dict(id=266877886),
@@ -412,6 +566,34 @@ class Network(unittest.TestCase):
                                Tailnet=lambda: self.fail('Clean controller obtained network authority')):
                 broker['recover'](self.root)
 
+    def test_recovery_skips_only_explicitly_unattempted_key_issuance(self):
+        run = dict(id=456, run_attempt=1, path='.github/workflows/interoperability.yml', head_branch='master',
+                   event='workflow_run', head_sha='c' * 40, repository=dict(id=266877886),
+                   status='completed', conclusion='failure')
+        step = dict(name='Issue single-use enrolment keys', status='completed', conclusion='skipped')
+        job = dict(name='Admission and cleanup', run_id=456, run_attempt=1, status='completed', steps=[step])
+        variants = [(job, True), (dict(job, run_id=999), False), (dict(job, run_attempt=2), False),
+                    (dict(job, name='other'), False), (dict(job, status='in_progress'), False),
+                    (dict(job, steps=[]), False), (dict(job, steps=[step, step]), False),
+                    (dict(job, steps=[dict(step, status='in_progress')]), False)]
+        variants += [(dict(job, steps=[dict(step, conclusion=value)]), False)
+                     for value in ('success', 'failure', 'cancelled', None)]
+        for candidate, skipped in variants:
+            responses = [(json.dumps(run).encode(), {}),
+                         (json.dumps(dict(total_count=1, jobs=[candidate])).encode(), {})]
+            responses.append((b'{"total_count":0,"artifacts":[]}', {}))
+            with self.subTest(job=candidate), \
+                    patch.dict(os.environ, INTEROP_RECOVER_RUN='456', INTEROP_RECOVER_ATTEMPT='1'), \
+                    patch.object(network, 'fetch', side_effect=responses), \
+                    patch.dict(broker['recover'].__globals__,
+                               download_records=Mock(side_effect=network.NetworkError('lease required')),
+                               Tailnet=lambda: self.fail('Unverified recovery obtained network authority')):
+                if skipped:
+                    broker['recover'](self.root)
+                else:
+                    with self.assertRaisesRegex(network.NetworkError, 'lease required'):
+                        broker['recover'](self.root)
+
     def test_recovery_verifies_exact_bytes_before_any_mutation(self):
         run = dict(id=456, run_attempt=1, path='.github/workflows/interoperability.yml',
                    head_branch='master', event='workflow_run', head_sha='c' * 40, repository=dict(id=266877886),
@@ -424,16 +606,21 @@ class Network(unittest.TestCase):
             self.assertEqual(Path(argv[3]).read_bytes(), raw)
             self.assertNotIn('ACTIONS_ID_TOKEN_REQUEST_TOKEN', kwargs['env'])
             return subprocess.CompletedProcess(argv, 1)
-        responses = [(json.dumps(run).encode(), {}),
-                     (json.dumps({'total_count': 1, 'jobs': [dict(
-                         name='Admission and cleanup', run_id=456, run_attempt=1,
-                         status='completed', steps=[])]}).encode(), {})]
-        with patch.dict(os.environ, env), patch.object(network, 'fetch', side_effect=responses), \
-                patch.dict(broker['recover'].__globals__, download_records=lambda *args, **kwargs: {None: (lease, raw)},
-                           cleanup=lambda *args: self.fail('Mutation preceded attestation')), \
-                patch.object(subprocess, 'run', side_effect=verified):
-            with self.assertRaisesRegex(network.NetworkError, 'attested'):
-                broker['recover'](self.root)
+        for name in ('interoperability-lease-attempt-1', 'interoperability-lease-1'):
+            responses = [(json.dumps(run).encode(), {}),
+                         (json.dumps({'total_count': 1, 'jobs': [dict(
+                             name='Admission and cleanup', run_id=456, run_attempt=1,
+                             status='completed', steps=[])]}).encode(), {}),
+                         (json.dumps(dict(total_count=1, artifacts=[dict(name=name, expired=False)])).encode(), {})]
+            download = Mock(return_value={None: (lease, raw)})
+            with self.subTest(name=name), patch.dict(os.environ, env), \
+                    patch.object(network, 'fetch', side_effect=responses), \
+                    patch.dict(broker['recover'].__globals__, download_records=download,
+                               cleanup=lambda *args: self.fail('Mutation preceded attestation')), \
+                    patch.object(subprocess, 'run', side_effect=verified):
+                with self.assertRaisesRegex(network.NetworkError, 'attested'):
+                    broker['recover'](self.root)
+            download.assert_called_once_with('456', {name: None}, timeout=60)
 
     def test_cancelled_or_superseded_ci_aborts_rendezvous(self):
         for current in (dict(run_attempt=3), dict(run_attempt=2, conclusion='cancelled'),
@@ -473,6 +660,7 @@ class Network(unittest.TestCase):
                      (json.dumps({'total_count': 1, 'jobs': [dict(
                          name='Admission and cleanup', run_id=456, run_attempt=1,
                          status='completed', steps=[])]}).encode(), {})]
+        responses.append((b'{"total_count":0,"artifacts":[]}', {}))
         with patch.dict(os.environ, INTEROP_RECOVER_RUN='456', INTEROP_RECOVER_ATTEMPT='1'), \
                 patch.object(network, 'fetch', side_effect=responses), \
                 patch.dict(broker['recover'].__globals__, download_records=lambda *args, **kwargs: {None: (lease, json.dumps(lease).encode())},

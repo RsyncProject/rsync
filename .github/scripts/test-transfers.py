@@ -191,7 +191,7 @@ class Transfers(unittest.TestCase):
                 patch.dict(host['client'], connect=unittest.mock.Mock(return_value=node)), \
                 patch.object(host['socket'], 'socket'):
             self.assertEqual(host['main'](), 0)
-        published.assert_called_once_with('enrol', timeout=ci.STARTUP_TIMEOUT)
+        published.assert_called_once_with('enrolment', timeout=ci.STARTUP_TIMEOUT)
 
     def test_bad_public_keys_are_refused(self):
         for value in ('', 'ssh-rsa AAAA', 'ssh-ed25519 AAAA', 'ssh-ed25519 AAAA\ncommand=evil'):

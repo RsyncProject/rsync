@@ -31,7 +31,7 @@ runs:
     - name: Upload recipient
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
-        name: interoperability-${{ github.run_attempt }}-public-${{ inputs.platform }}
+        name: interoperability-public-${{ inputs.platform }}-attempt-${{ github.run_attempt }}
         path: ${{ runner.temp }}/interoperability/public-key.json
         if-no-files-found: error
         retention-days: 7
@@ -54,7 +54,7 @@ runs:
       if: env.INTEROP_BLOCKED != 'true'
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
-        name: interoperability-${{ github.run_attempt }}-ready-${{ inputs.platform }}
+        name: interoperability-ready-${{ inputs.platform }}-attempt-${{ github.run_attempt }}
         path: ${{ runner.temp }}/interoperability/ready.json
         if-no-files-found: error
         retention-days: 7
@@ -70,7 +70,7 @@ runs:
       if: env.INTEROP_BLOCKED != 'true'
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
-        name: interoperability-${{ github.run_attempt }}-quarantine-${{ inputs.platform }}
+        name: interoperability-quarantine-${{ inputs.platform }}-attempt-${{ github.run_attempt }}
         path: ${{ runner.temp }}/interoperability/quarantine.json
         if-no-files-found: error
         retention-days: 7
@@ -86,7 +86,7 @@ runs:
       if: env.INTEROP_BLOCKED != 'true'
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
-        name: interoperability-${{ github.run_attempt }}-admitted-${{ inputs.platform }}
+        name: interoperability-admitted-${{ inputs.platform }}-attempt-${{ github.run_attempt }}
         path: ${{ runner.temp }}/interoperability/admitted.json
         if-no-files-found: error
         retention-days: 7
@@ -104,7 +104,7 @@ runs:
       if: ${{ always() && !cancelled() && env.INTEROP_BLOCKED != 'true' && (steps.transfer1.outcome == 'success' || steps.transfer1.outcome == 'failure') }}
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
-        name: interoperability-${{ github.run_attempt }}-transfer1-${{ inputs.platform }}
+        name: interoperability-transfer1-${{ inputs.platform }}-attempt-${{ github.run_attempt }}
         path: ${{ runner.temp }}/interoperability/transfer1.json
         if-no-files-found: error
         retention-days: 7
@@ -127,7 +127,7 @@ runs:
       if: env.INTEROP_BLOCKED != 'true'
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
-        name: interoperability-${{ github.run_attempt }}-next-${{ inputs.platform }}
+        name: interoperability-next-${{ inputs.platform }}-attempt-${{ github.run_attempt }}
         path: ${{ runner.temp }}/interoperability/next.json
         if-no-files-found: error
         retention-days: 7
@@ -145,7 +145,7 @@ runs:
       if: ${{ always() && !cancelled() && env.INTEROP_BLOCKED != 'true' && (steps.transfer2.outcome == 'success' || steps.transfer2.outcome == 'failure') }}
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
-        name: interoperability-${{ github.run_attempt }}-transfer2-${{ inputs.platform }}
+        name: interoperability-transfer2-${{ inputs.platform }}-attempt-${{ github.run_attempt }}
         path: ${{ runner.temp }}/interoperability/transfer2.json
         if-no-files-found: error
         retention-days: 7
@@ -168,7 +168,7 @@ runs:
       if: env.INTEROP_BLOCKED != 'true'
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
-        name: interoperability-${{ github.run_attempt }}-result-${{ inputs.platform }}
+        name: interoperability-result-${{ inputs.platform }}-attempt-${{ github.run_attempt }}
         path: ${{ runner.temp }}/interoperability/result.json
         if-no-files-found: error
         retention-days: 7
@@ -184,7 +184,7 @@ runs:
       if: env.INTEROP_BLOCKED != 'true'
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
-        name: interoperability-${{ github.run_attempt }}-revoked-${{ inputs.platform }}
+        name: interoperability-revoked-${{ inputs.platform }}-attempt-${{ github.run_attempt }}
         path: ${{ runner.temp }}/interoperability/revoked.json
         if-no-files-found: error
         retention-days: 7
@@ -192,7 +192,7 @@ runs:
       if: ${{ always() && env.INTEROP_BLOCKED == 'true' }}
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
-        name: interoperability-${{ github.run_attempt }}-blocked-${{ inputs.platform }}
+        name: interoperability-blocked-${{ inputs.platform }}-attempt-${{ github.run_attempt }}
         path: ${{ runner.temp }}/interoperability/blocked.json
         if-no-files-found: error
         retention-days: 7

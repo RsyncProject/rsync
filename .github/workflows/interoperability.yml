@@ -39,84 +39,93 @@ jobs:
         if: ${{ steps.source.outputs.enabled == 'true' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: interoperability-context-${{ github.run_attempt }}
+          name: interoperability-context-attempt-${{ github.run_attempt }}
           path: ${{ runner.temp }}/interoperability/context.json
           if-no-files-found: error
           retention-days: 7
       - name: Issue single-use enrolment keys
+        id: keys
+        continue-on-error: true
         if: ${{ steps.source.outputs.enabled == 'true' }}
         run: python3 -B -S .github/scripts/interop-broker.py broker --root "$RUNNER_TEMP/interoperability"
       - name: Upload encrypted enrolment
-        if: ${{ steps.source.outputs.enabled == 'true' }}
+        if: ${{ steps.keys.outcome == 'success' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: interoperability-${{ steps.source.outputs.attempt }}-enrol
-          path: ${{ runner.temp }}/interoperability/enrol.json
+          name: interoperability-enrolment-attempt-${{ steps.source.outputs.attempt }}
+          path: ${{ runner.temp }}/interoperability/enrolment.json
           if-no-files-found: error
           retention-days: 7
 
       - name: Validate endpoint membership
-        if: ${{ steps.source.outputs.enabled == 'true' }}
+        id: membership
+        continue-on-error: true
+        if: ${{ steps.keys.outcome == 'success' }}
         run: python3 -B -S .github/scripts/interop-broker.py prepare --root "$RUNNER_TEMP/interoperability"
       - name: Attest admission lease
-        if: ${{ steps.source.outputs.enabled == 'true' }}
+        id: lease
+        if: ${{ steps.membership.outcome == 'success' }}
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: ${{ runner.temp }}/interoperability/lease.json
           create-storage-record: false
       - name: Upload admission lease
-        if: ${{ always() && steps.source.outputs.enabled == 'true' }}
+        if: ${{ always() && steps.lease.outcome == 'success' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: interoperability-lease-${{ github.run_attempt }}
+          name: interoperability-lease-attempt-${{ github.run_attempt }}
           path: ${{ runner.temp }}/interoperability/lease.json
           if-no-files-found: error
           retention-days: 7
       - name: Upload topology
-        if: ${{ steps.source.outputs.enabled == 'true' }}
+        if: ${{ steps.lease.outcome == 'success' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: interoperability-${{ steps.source.outputs.attempt }}-topology
+          name: interoperability-topology-attempt-${{ steps.source.outputs.attempt }}
           path: ${{ runner.temp }}/interoperability/topology.json
           if-no-files-found: error
           retention-days: 7
       - name: Admit the seven endpoints
-        if: ${{ steps.source.outputs.enabled == 'true' }}
+        id: admission
+        continue-on-error: true
+        if: ${{ steps.lease.outcome == 'success' }}
         run: python3 -B -S .github/scripts/interop-broker.py admit --root "$RUNNER_TEMP/interoperability"
       - name: Upload admission
-        if: ${{ steps.source.outputs.enabled == 'true' }}
+        if: ${{ steps.admission.outcome == 'success' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: interoperability-${{ steps.source.outputs.attempt }}-admission
+          name: interoperability-admission-attempt-${{ steps.source.outputs.attempt }}
           path: ${{ runner.temp }}/interoperability/admission.json
           if-no-files-found: error
           retention-days: 7
       - name: Verify directed transfer results
         continue-on-error: true
-        if: ${{ steps.source.outputs.enabled == 'true' }}
+        if: ${{ steps.admission.outcome == 'success' }}
         run: python3 -B -S .github/scripts/interop-broker.py verify --root "$RUNNER_TEMP/interoperability"
       - name: Revoke access
+        id: revoke
         continue-on-error: true
         if: ${{ always() && steps.source.outputs.enabled == 'true' }}
         run: python3 -B -S .github/scripts/interop-broker.py revoke --root "$RUNNER_TEMP/interoperability"
       - name: Upload revocation
         continue-on-error: true
-        if: ${{ always() && steps.source.outputs.enabled == 'true' }}
+        if: ${{ always() && steps.lease.outcome == 'success' && steps.revoke.outcome == 'success' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: interoperability-${{ steps.source.outputs.attempt }}-revocation
+          name: interoperability-revocation-attempt-${{ steps.source.outputs.attempt }}
           path: ${{ runner.temp }}/interoperability/revocation.json
           if-no-files-found: error
           retention-days: 7
       - name: Verify revocation and remove devices
+        id: cleanup
         if: ${{ always() && steps.source.outputs.enabled == 'true' }}
         run: python3 -B -S .github/scripts/interop-broker.py finish --root "$RUNNER_TEMP/interoperability"
       - name: Upload cleanup result
         continue-on-error: true
-        if: ${{ always() && steps.source.outputs.enabled == 'true' }}
+        if: ${{ always() && steps.cleanup.outcome == 'success' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: interoperability-${{ steps.source.outputs.attempt }}-result
+          name: interoperability-result-attempt-${{ steps.source.outputs.attempt }}
           path: ${{ runner.temp }}/interoperability/result.json
           if-no-files-found: error
           retention-days: 7
