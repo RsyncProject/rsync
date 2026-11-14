@@ -77,5 +77,11 @@ rm -rf "$todir"
 $RSYNC -aHivv --debug=HLINK5 "$name1" "$todir/"
 diff $diffopt "$name1" "$todir" || test_fail "solo copy of name1 failed"
 
+# Make sure there's nothing wrong with sending a single directory with -H
+# enabled (this has broken in 3.4.0 so far, so we need this test).
+rm -rf "$fromdir" "$todir"
+makepath "$fromdir/sym" "$todir"
+checkit "$RSYNC -aH '$fromdir/sym' '$todir'" "$fromdir" "$todir"
+
 # The script would have aborted on error, so getting here means we've won.
 exit 0

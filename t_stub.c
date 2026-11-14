@@ -26,6 +26,7 @@ int inplace = 0;
 int am_daemon = 0;
 int am_chrooted = 0;
 int insecure_links = 0;
+int copy_dirlinks = 0;
 int modify_window = 0;
 int preallocate_files = 0;
 int protect_args = 0;
@@ -39,6 +40,7 @@ int omit_link_times = 0;
 int open_noatime = 0;
 size_t max_alloc = 0; /* max_alloc is needed when combined with util2.o */
 char *partial_dir;
+char *files_from;
 char *module_dir;
 int module_dirfd = -1;
 char *confine_root;
