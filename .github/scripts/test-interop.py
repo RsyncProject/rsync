@@ -90,24 +90,26 @@ class Network(unittest.TestCase):
                    referenced_workflows=[dict(path=ci.WORKFLOW + 'a' * 40, sha='a' * 40)])
         request = dict(number=1, base=dict(sha='c' * 40, repo=dict(id=266877886)),
                        head=dict(sha='d' * 40, repo=dict(id=999)))
-        def production(path):
+        def production(path, array=False):
             if path == '/actions/runs/123':
                 return run
             if path == '/pulls/1':
                 return request
             if path == '/pulls/1/files?per_page=100&page=1':
+                self.assertTrue(array)
                 return [dict(status='modified', filename='receiver.c')]
             self.fail('Unexpected API request: ' + path)
         with patch.object(ci, 'api', side_effect=production):
             self.assertEqual(ci.identity(), self.state)
         ci.source.cache_clear()
         docs = dict(run, referenced_workflows=[])
-        def documentation(path):
+        def documentation(path, array=False):
             if path == '/actions/runs/123':
                 return docs
             if path == '/pulls/1':
                 return request
             if path == '/pulls/1/files?per_page=100&page=1':
+                self.assertTrue(array)
                 return [dict(status='modified', filename='README.md')]
             self.fail('Unexpected API request: ' + path)
         with patch.object(ci, 'api', side_effect=documentation), \
@@ -129,10 +131,11 @@ class Network(unittest.TestCase):
         request = dict(number=1, base=dict(sha='a' * 40, repo=dict(id=266877886)),
                        head=dict(sha='b' * 40, repo=dict(id=999)))
         def files(items, current=request):
-            def response(path):
+            def response(path, array=False):
                 if path == '/pulls/1':
                     return current
                 if path == '/pulls/1/files?per_page=100&page=1':
+                    self.assertTrue(array)
                     return items
                 self.fail('Unexpected API request: ' + path)
             return response
@@ -149,6 +152,16 @@ class Network(unittest.TestCase):
         malformed = [dict(status='renamed', filename='README.md')]
         with patch.object(ci, 'api', side_effect=files(malformed)):
             self.assertTrue(ci.selected(run))
+
+    def test_api_preserves_the_expected_json_shape(self):
+        ci.api_cache.clear()
+        self.addCleanup(ci.api_cache.clear)
+        expected = [dict(status='modified', filename='README.md')]
+        with patch.object(ci, 'fetch', return_value=(json.dumps(expected).encode(), {})):
+            self.assertEqual(ci.api('/pulls/1/files', array=True), expected)
+        with patch.object(ci, 'fetch', return_value=(b'[]', {})), self.assertRaisesRegex(
+                network.NetworkError, 'JSON object'):
+            ci.api('/actions/runs/1')
 
     def test_controller_discovery_requires_trusted_code_and_exact_attempt(self):
         origin = dict(self.state, head_sha='b' * 40, display_title='testsuite, ci: rework tests')

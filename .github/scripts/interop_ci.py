@@ -22,8 +22,9 @@ class PeerUnavailable(NetworkError):
     pass
 
 
-def api(path):
-    cached = api_cache.get(path)
+def api(path, array=False):
+    key = path, array
+    cached = api_cache.get(key)
     try:
         body, headers = fetch(API + path, os.environ['GH_TOKEN'],
                               headers={'If-None-Match': cached[0]} if cached else {}, operation='Read CI identity')
@@ -31,9 +32,17 @@ def api(path):
         if error.code == 304 and cached:
             return cached[1]
         raise
-    value = decode(body)
+    if array:
+        try:
+            value = json.loads(body)
+        except ValueError:
+            raise NetworkError('Invalid JSON response') from None
+        if not isinstance(value, list):
+            raise NetworkError('Expected a JSON array')
+    else:
+        value = decode(body)
     if headers.get('ETag'):
-        api_cache[path] = headers['ETag'], value
+        api_cache[key] = headers['ETag'], value
     return value
 
 
@@ -66,7 +75,7 @@ def pull_paths(run):
     paths = []
     statuses = {'added', 'removed', 'modified', 'renamed', 'copied', 'changed', 'unchanged'}
     for page in range(1, 31):
-        files = api('/pulls/' + str(number) + '/files?per_page=100&page=' + str(page))
+        files = api('/pulls/' + str(number) + '/files?per_page=100&page=' + str(page), array=True)
         if not isinstance(files, list) or len(files) > 100:
             return None
         for item in files:
