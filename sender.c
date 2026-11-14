@@ -26,6 +26,7 @@ extern int do_xfers;
 extern int open_noatime;
 extern int am_server;
 extern int am_daemon;
+extern int am_sender;
 extern int local_server;
 extern int inc_recurse;
 extern int log_before_transfer;
@@ -45,6 +46,7 @@ extern int whole_file;
 extern int allowed_lull;
 extern int copy_devices;
 extern int preserve_xattrs;
+extern int eof_reached;
 extern int protocol_version;
 extern int remove_source_files;
 extern int updating_basis_file;
@@ -63,6 +65,10 @@ extern BOOL want_progress_now;
 extern struct stats stats;
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern char num_dev_ino_buf[4 + 8 + 8];
+extern int stream_source_mode;
+extern int stream_timeout;
+extern OFF_T stream_max_size;
+extern int stream_pipe_sz;
 
 BOOL extra_flist_sending_enabled;
 
@@ -204,6 +210,11 @@ static int secure_sender_parent_fd(struct file_struct *file, const char *fname, 
 	errno = 0;
 	return -1;
 #endif
+}
+
+int is_stream()
+{
+	return stream_source_mode && am_sender && !am_server;
 }
 
 /* Go through the do_*() wrapper rather than a raw unlinkat(): it carries the
@@ -745,6 +756,17 @@ void send_files(int f_in, int f_out)
 			exit_cleanup(RERR_FILEIO);
 		}
 
+		if (is_stream()) {
+			if (!S_ISFIFO(st.st_mode)) {
+				rprintf(FERROR, "stream-source requires a named pipe (FIFO): %s\n",
+					full_fname(fname));
+				close(fd);
+				exit_cleanup(RERR_FILEIO);
+			}
+			st.st_mode = (st.st_mode & ~S_IFMT) | S_IFREG;
+			st.st_size = stream_max_size;
+		}
+
 		if (IS_DEVICE(st.st_mode)) {
 			if (!copy_devices) {
 				rprintf(FERROR, "attempt to copy device contents without --copy-devices\n");
@@ -789,6 +811,13 @@ void send_files(int f_in, int f_out)
 		set_compression(fname);
 
 		match_sums(f_xfer, s, mbuf, st.st_size);
+		/* Update the stats for right tracking. */
+		if (is_stream() && mbuf && mbuf->file_size < st.st_size) {
+			OFF_T diff = st.st_size - mbuf->file_size;
+			stats.total_size -= diff;
+			stats.total_transferred_size -= diff;
+			st.st_size = mbuf->file_size;
+		}
 		if (INFO_GTE(PROGRESS, 1))
 			end_progress(st.st_size);
 		else if (want_progress_now)

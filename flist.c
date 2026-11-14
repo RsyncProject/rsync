@@ -86,6 +86,7 @@ extern uid_t our_uid;
 extern struct stats stats;
 extern char *filesfrom_host;
 extern char *usermap, *groupmap;
+extern OFF_T stream_max_size;
 
 extern struct name_num_item *file_sum_nni;
 
@@ -1703,6 +1704,11 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 		rprintf(FINFO, "skipping file with bogus (zero) st_mode: %s\n",
 			full_fname(thisname));
 		return NULL;
+	}
+	if (is_stream() && S_ISFIFO(st.st_mode)) {
+		/* Disguise the FIFO pipe as a regular file globally */
+		st.st_mode = (st.st_mode & ~S_IFMT) | S_IFREG;
+		st.st_size = stream_max_size;
 	}
 
 	if (filter_level == NO_FILTERS)

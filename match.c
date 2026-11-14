@@ -28,6 +28,9 @@ extern int append_mode;
 extern struct name_num_item *xfer_sum_nni;
 extern int xfer_sum_len;
 
+extern int eof_reached;
+extern OFF_T stream_max_size;
+
 int updating_basis_file;
 char sender_file_sum[MAX_DIGEST_LEN];
 
@@ -74,6 +77,13 @@ static int32 *hash_table;
 #define SUM2HASH(sum) SUM2HASH2((sum)&0xFFFF,(sum)>>16)
 
 #define BIG_SUM2HASH(sum) ((sum)%tablesize)
+
+/* Return true if a stream hit EOF before reaching the expected length 'len'
+ * (map_ptr() shrinks buf->file_size to the actual bytes read on pipe EOF). */
+static int stream_early_EOF(struct map_struct *buf, OFF_T len)
+{
+	return is_stream() && buf && buf->file_size < len;
+}
 
 static void build_hash_table(struct sum_struct *s)
 {
@@ -187,16 +197,26 @@ static void hash_search(int f,struct sum_struct *s,
 	k = (int32)MIN(len, (OFF_T)s->blength);
 
 	map = (schar *)map_ptr(buf, 0, k);
+	if (stream_early_EOF(buf, len)) {
+		len = buf->file_size;
+		k = (int32)MIN(len, (OFF_T)s->blength);
+		if (DEBUG_GTE(DELTASUM, 2)) {
+			rprintf(FINFO, "stream early EOF at offset=0 len=%s k=%ld\n",
+				big_num(len), (long)k);
+		}
+	}
+
+	offset = aligned_offset = aligned_i = 0;
+
+	end = len + 1 - s->sums[s->count-1].len;
+	if (offset >= end)
+		goto finish_search;
 
 	sum = get_checksum1((char *)map, k);
 	s1 = sum & 0xFFFF;
 	s2 = sum >> 16;
 	if (DEBUG_GTE(DELTASUM, 3))
 		rprintf(FINFO, "sum=%.8x k=%ld\n", sum, (long)k);
-
-	offset = aligned_offset = aligned_i = 0;
-
-	end = len + 1 - s->sums[s->count-1].len;
 
 	if (DEBUG_GTE(DELTASUM, 3)) {
 		rprintf(FINFO, "hash search s->blength=%ld len=%s count=%s\n",
@@ -317,6 +337,8 @@ static void hash_search(int f,struct sum_struct *s,
 							backup = 0;
 						map = (schar *)map_ptr(buf, aligned_offset - backup, l + backup)
 						    + backup;
+						if (stream_early_EOF(buf, aligned_offset + l))
+							goto check_want_i;
 						sum = get_checksum1((char *)map, l);
 						if (sum != s->sums[i].sum1)
 							goto check_want_i;
@@ -352,6 +374,8 @@ static void hash_search(int f,struct sum_struct *s,
 			offset += s->sums[i].len - 1;
 			k = (int32)MIN((OFF_T)s->blength, len-offset);
 			map = (schar *)map_ptr(buf, offset, k);
+			if (stream_early_EOF(buf, len))
+				k = (int32)MIN((OFF_T)s->blength, buf->file_size-offset);
 			sum = get_checksum1((char *)map, k);
 			s1 = sum & 0xFFFF;
 			s2 = sum >> 16;
@@ -368,8 +392,16 @@ static void hash_search(int f,struct sum_struct *s,
 				OFF_T skip = MIN((OFF_T)(k - 1), end - 1 - offset);
 				if (skip > 0) {
 					offset += skip;
+					/* Anchor the map_ptr window at last_match (offset - backup) so
+					 * un-flushed literal bytes are not evicted from the sliding window,
+					 * which would force an illegal backward lseek() on a stream. */
+					backup = (int32)(offset - last_match);
+					if (backup < 0)
+						backup = 0;
 					k = (int32)MIN((OFF_T)s->blength, len-offset);
-					map = (schar *)map_ptr(buf, offset, k);
+					map = (schar *)map_ptr(buf, offset - backup, k + backup) + backup;
+					if (stream_early_EOF(buf, len))
+						k = (int32)MIN((OFF_T)s->blength, buf->file_size-offset);
 					sum = get_checksum1((char *)map, k);
 					s1 = sum & 0xFFFF;
 					s2 = sum >> 16;
@@ -389,6 +421,16 @@ static void hash_search(int f,struct sum_struct *s,
 		/* Trim off the first byte from the checksum */
 		more = offset + k < len;
 		map = (schar *)map_ptr(buf, offset - backup, k + more + backup) + backup;
+		if (stream_early_EOF(buf, len)) {
+			len = buf->file_size;
+			end = len + 1 - s->sums[s->count-1].len;
+			k = (int32)MIN((OFF_T)s->blength, len - offset);
+			more = offset + k < len;
+			if (DEBUG_GTE(DELTASUM, 2)) {
+				rprintf(FINFO, "stream early EOF at offset=%s len=%s end=%s k=%ld\n",
+					big_num(offset), big_num(len), big_num(end), (long)k);
+			}
+		}
 		s1 -= map[0] + CHAR_OFFSET;
 		s2 -= k * (map[0]+CHAR_OFFSET);
 
@@ -409,8 +451,13 @@ static void hash_search(int f,struct sum_struct *s,
 			matched(f, s, buf, offset - s->blength, -2);
 	} while (++offset < end);
 
+  finish_search:
 	matched(f, s, buf, len, -1);
-	map_ptr(buf, len-1, 1);
+	/* Ensure the map window has read through the final byte of the file.
+	 * Guard with len > 0 because an empty stream (0-byte early EOF) shrinks
+	 * len to 0, where len - 1 would pass a negative offset (-1) to map_ptr(). */
+	if (len > 0)
+		map_ptr(buf, len-1, 1);
 }
 
 
@@ -480,9 +527,40 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 	} else {
 		OFF_T j;
 		/* by doing this in pieces we avoid too many seeks */
-		for (j = last_match + CHUNK_SIZE; j < len; j += CHUNK_SIZE)
+		for (j = last_match + CHUNK_SIZE; ; j += CHUNK_SIZE) {
+			/* Pre-read the next chunk on a stream before calling matched() so
+			 * that if the pipe hits early EOF mid-chunk, buf->file_size and len
+			 * shrink before matched() tries to flush up to 'j'. */
+			if (is_stream() && buf) {
+				map_ptr(buf, last_match, (int32)MIN((OFF_T)CHUNK_SIZE, len - last_match));
+				if (buf->file_size < len)
+					len = buf->file_size;
+			}
+			if (j >= len)
+				break;
 			matched(f, s, buf, j, -2);
+		}
 		matched(f, s, buf, len, -1);
+	}
+
+	if (is_stream() && buf && !eof_reached) {
+		char extra;
+		ssize_t n;
+		wait_stream_fd(buf->fd);
+		do {
+			n = read(buf->fd, &extra, 1);
+		} while (n < 0 && errno == EINTR);
+		if (n < 0) {
+			rsyserr(FERROR, errno, "read failed on stream");
+			exit_cleanup(RERR_FILEIO);
+		}
+		if (n > 0) {
+			rprintf(FERROR,
+				"stream source exceeded --stream-max-size=%s\n",
+				big_num(stream_max_size));
+			exit_cleanup(RERR_FILEIO);
+		}
+		eof_reached = 1;
 	}
 
 	sum_end(sender_file_sum);

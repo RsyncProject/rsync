@@ -95,6 +95,7 @@ extern int default_af_hint;
 extern int stdout_format_has_i;
 extern int trust_sender_filter;
 extern int trust_sender_args;
+extern int stream_source_mode;
 extern struct stats stats;
 extern char *stdout_format;
 extern char *logfile_format;
@@ -1481,6 +1482,11 @@ static int start_client(int argc, char *argv[])
 		if (path) { /* source is remote */
 			char *dummy_host;
 			int dummy_port = 0;
+			if (stream_source_mode) {
+				rprintf(FERROR,
+					"--stream-source cannot be used with a remote source\n");
+				exit_cleanup(RERR_SYNTAX);
+			}
 			*argv = path;
 			remote_argv = argv;
 			remote_argc = argc;
@@ -1563,6 +1569,10 @@ static int start_client(int argc, char *argv[])
 		char *dummy_host;
 		int dummy_port = rsync_port;
 		int i;
+		if (stream_source_mode && argc > 1) {
+            rprintf(FERROR, "--stream-source cannot be used with multiple sources\n");
+            exit_cleanup(RERR_SYNTAX);
+        }
 		if (!argv[0][0])
 			goto invalid_empty;
 		/* For local source, extra source args must not have hostspec. */
