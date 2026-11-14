@@ -525,6 +525,33 @@ static int ona_open(const char *path, int flags, mode_t mode, char *out_abs, siz
 		/* Inspect this component without following symlinks. */
 		STRUCT_STAT lst;
 		if (fstatat(dfd, comp, &lst, AT_SYMLINK_NOFOLLOW) < 0) {
+			/* An intermediate mount container (e.g. Android's
+			 * /storage/emulated) may fail fstatat()/getattr() with
+			 * ENOENT even though the directory entry exists in VFS
+			 * and can be traversed via openat(O_DIRECTORY | O_NOFOLLOW). */
+			if (errno == ENOENT && !is_last) {
+				int next = openat(dfd, comp, dir_traverse_flags | O_NOFOLLOW);
+				if (next >= 0) {
+					if (abspath_step(abspath, sizeof abspath, comp, comp_len) < 0) {
+						saved_errno = errno;
+						close(next);
+						goto out;
+					}
+					if (!pin_transit && abspath_outside_confinement(abspath, 0)) {
+						saved_errno = ELOOP;
+						close(next);
+						goto out;
+					}
+					if (dfd_owns) close(dfd);
+					dfd = next;
+					dfd_owns = 1;
+					char *p = slash;
+					while (*p == '/') p++;
+					memmove(remaining, p, strlen(p) + 1);
+					continue;
+				}
+				errno = ENOENT;
+			}
 			/* The leaf may not exist yet (O_CREAT case). Allow it
 			 * and openat with O_NOFOLLOW so a race-planted leaf
 			 * symlink at this instant is still refused. */

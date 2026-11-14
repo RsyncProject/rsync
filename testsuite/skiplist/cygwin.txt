@@ -77,3 +77,4 @@ symlink-race-dest
 symlink-race-relative-dest
 symlink-unix-perms  # platform does not support changing symlink permissions
 temp-dir-symlink-injection
+unstatable-intermediate-dir            # Linux interposition
