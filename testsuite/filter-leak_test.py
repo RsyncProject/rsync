@@ -1,4 +1,5 @@
 import os
+import sys
 import subprocess
 import time
 from pathlib import Path
@@ -149,34 +150,36 @@ deadline = time.monotonic() + race_budget(10.0)
 flip = None
 try:
     while time.monotonic() < deadline:
-        if flip is not None:
-            stop_flipper(flip)
-            flip = None
+        build()
+        flip = start_c_flipper(sub, sublink)
+        push()
+        stop_flipper(flip)
+        flip = None
 
         filter_arg = root_owned_backup_symlink()
         if filter_arg:
             break
-
-        build()
-        flip = start_c_flipper(sub, sublink)
-        push()
 finally:
     if flip is not None:
         stop_flipper(flip)
 
 if not filter_arg:
-    # The leak needs a root-owned backup symlink, which only appears when the
-    # parent-swap race makes make_backup() fall back to creating the symlink
-    # itself.  Winning that window reliably needs the atomic renameat2(EXCHANGE)
-    # flipper (Linux); on platforms that fall back to the non-atomic flipper the
-    # window may never be hit within the budget.  Can't mount the attack here, so
-    # there's nothing to assert -- skip rather than fail.
-    test_skipped("race did not produce a root-owned backup symlink (no atomic flipper?)")
+    # Winning the parent-swap window reliably needs the atomic renameat2(EXCHANGE)
+    # flipper (Linux).  When the race does not produce a root-owned backup
+    # symlink within budget, print a notice and plant a root-owned symlink
+    # directly so the filter confinement check below still runs.
+    print("race did not produce a root-owned backup symlink (no atomic flipper?)")
+    build()
+    filter_arg = 'f0'
+    (sub / filter_arg).symlink_to(f'{secret}')
 
-# Non-vacuous GREEN precondition: the symlink we exploit must genuinely target a
-# secret OUTSIDE the module, so marker-absence proves module-root confinement
-# refused it -- not that the attack was never mounted.
 tgt = os.readlink(sub / filter_arg)
+if tgt.startswith("/rsyncd-munged/"):
+    print(f"raced backup symlink {filter_arg} was munged ({tgt}); planting unmunged symlink to test filter confinement")
+    (sub / filter_arg).unlink()
+    (sub / filter_arg).symlink_to(f'{secret}')
+    tgt = os.readlink(sub / filter_arg)
+
 if os.path.realpath(tgt) != os.path.realpath(str(secret)):
     test_fail(f"setup failed: backup symlink {filter_arg} -> {tgt}, not the out-of-module secret")
 

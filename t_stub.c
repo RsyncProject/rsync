@@ -32,6 +32,7 @@ int preallocate_files = 0;
 int sparse_files = 0;
 int protect_args = 0;
 int module_id = -1;
+int munge_symlinks = 0;
 int relative_paths = 0;
 unsigned int module_dirlen = 0;
 int preserve_xattrs = 0;
