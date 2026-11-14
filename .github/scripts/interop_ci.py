@@ -11,6 +11,7 @@ from interop_policy import ROLES
 API = 'https://api.github.com/repos/RsyncProject/rsync'
 WORKFLOW = 'RsyncProject/rsync/.github/workflows/interoperability-tests.yml@'
 STARTUP_TIMEOUT = 1800
+TIMESTAMP = r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z'
 bound = None
 api_cache = {}
 
@@ -130,6 +131,7 @@ def source():
     if (run.get('path') != '.github/workflows/ci.yml' or run.get('name') != 'CI'
             or run.get('id') != run_id or run.get('repository', {}).get('id') != 266877886 or run.get('run_attempt') != attempt
             or run.get('event') not in ('pull_request', 'push', 'schedule', 'workflow_dispatch')
+            or not re.fullmatch(TIMESTAMP, run.get('created_at', ''))
             or not isinstance(run.get('display_title'), str) or not run['display_title']):
         raise NetworkError('CI run does not match its event')
     if not selected(run):
@@ -149,7 +151,7 @@ def source():
     if run.get('status') == 'completed':
         raise NotSelected('CI has already completed')
     return dict(run_id=str(run_id), run_attempt=str(attempt), source_sha=references[0]['sha'],
-                head_sha=run['head_sha'], display_title=run['display_title'])
+                head_sha=run['head_sha'], display_title=run['display_title'], created_at=run['created_at'])
 
 
 def identity():
@@ -212,7 +214,21 @@ def find_controller(exclude=None):
     state = source()
     titles = {f"Network controller: {state['display_title']}",
               f"Network CI {state['run_id']} attempt {state['run_attempt']}"}
-    runs = api('/actions/workflows/interoperability.yml/runs?branch=master&event=workflow_run&per_page=100')['workflow_runs']
+    runs = []
+    for page in range(1, 6):
+        listing = api('/actions/workflows/interoperability.yml/runs?branch=master&event=workflow_run'
+                      + '&per_page=20&page=' + str(page))
+        batch = listing.get('workflow_runs')
+        count = listing.get('total_count')
+        if (type(count) is not int or count < 0 or not isinstance(batch, list) or len(batch) > 20
+                or any(not isinstance(run, dict)
+                       or not re.fullmatch(TIMESTAMP, run.get('created_at', '')) for run in batch)):
+            raise NetworkError('Invalid controller run listing')
+        runs.extend(run for run in batch if run['created_at'] >= state['created_at'])
+        if len(batch) < 20 or any(run['created_at'] < state['created_at'] for run in batch):
+            break
+    else:
+        raise NetworkError('Controller run listing exceeds limit')
     for run in sorted(runs, key=lambda value: value['id']):
         if run.get('display_title') not in titles or str(run['id']) == exclude:
             continue

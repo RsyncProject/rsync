@@ -84,7 +84,7 @@ class Network(unittest.TestCase):
         self.addCleanup(ci.source.cache_clear)
         run = dict(id=123, run_attempt=2, path='.github/workflows/ci.yml', name='CI', event='pull_request',
                    repository=dict(id=266877886), head_repository=dict(id=999), head_sha='b' * 40,
-                   display_title='testsuite, ci: rework tests',
+                   display_title='testsuite, ci: rework tests', created_at='2026-11-14T00:00:00Z',
                    pull_requests=[dict(number=1, base=dict(sha='c' * 40, repo=dict(id=266877886)),
                                        head=dict(sha='d' * 40, repo=dict(id=999)))],
                    referenced_workflows=[dict(path=ci.WORKFLOW + 'a' * 40, sha='a' * 40)])
@@ -164,49 +164,76 @@ class Network(unittest.TestCase):
             ci.api('/actions/runs/1')
 
     def test_controller_discovery_requires_trusted_code_and_exact_attempt(self):
-        origin = dict(self.state, head_sha='b' * 40, display_title='testsuite, ci: rework tests')
+        origin = dict(self.state, head_sha='b' * 40, display_title='testsuite, ci: rework tests',
+                      created_at='2026-11-14T00:00:00Z')
         metadata = dict(self.state, control_run_id='456', control_attempt='1', control_sha='c' * 40)
         titles = ('Network controller: testsuite, ci: rework tests', 'Network CI 123 attempt 2')
         for title in titles:
             run = dict(id=456, run_attempt=1, path='.github/workflows/interoperability.yml', head_branch='master',
                        event='workflow_run', display_title=title, repository=dict(id=266877886),
-                       head_sha='c' * 40, status='in_progress')
+                       head_sha='c' * 40, status='in_progress', created_at='2026-11-14T00:00:01Z')
             with self.subTest(title=title), patch.object(ci, 'source', return_value=origin), \
-                    patch.object(ci, 'api', side_effect=[dict(workflow_runs=[run]),
+                    patch.object(ci, 'api', side_effect=[dict(total_count=1, workflow_runs=[run]),
                         dict(total_count=1, artifacts=[dict(name='interoperability-context-1', expired=False)])]), \
                     patch.object(ci, 'download_records', return_value={None: (metadata, b'{}')}):
                 self.assertEqual(ci.controller(), '456')
         for field, value in dict(head_branch='untrusted', event='pull_request', repository=dict(id=1)).items():
             with self.subTest(field=field), patch.object(ci, 'source', return_value=origin), \
-                    patch.object(ci, 'api', return_value=dict(workflow_runs=[dict(run, **{field: value})])), self.assertRaises(network.NetworkError):
+                    patch.object(ci, 'api', return_value=dict(
+                        total_count=1, workflow_runs=[dict(run, **{field: value})])), self.assertRaises(network.NetworkError):
                 ci.controller()
 
     def test_first_controller_context_survives_a_later_duplicate(self):
-        origin = dict(self.state, head_sha='b' * 40, display_title='testsuite, ci: rework tests')
+        origin = dict(self.state, head_sha='b' * 40, display_title='testsuite, ci: rework tests',
+                      created_at='2026-11-14T00:00:00Z')
         run = dict(id=456, run_attempt=1, path='.github/workflows/interoperability.yml', head_branch='master',
                    event='workflow_run', display_title='Network controller: testsuite, ci: rework tests',
                    repository=dict(id=266877886),
-                   head_sha='c' * 40, status='completed', conclusion='success')
+                   head_sha='c' * 40, status='completed', conclusion='success',
+                   created_at='2026-11-14T00:00:01Z')
         duplicate = dict(run, id=457, conclusion='failure')
         metadata = dict(self.state, control_run_id='456', control_attempt='1', control_sha='c' * 40)
         with patch.object(ci, 'source', return_value=origin), patch.object(ci, 'api', side_effect=[
-                dict(workflow_runs=[duplicate, run]),
+                dict(total_count=2, workflow_runs=[duplicate, run]),
                 dict(total_count=1, artifacts=[dict(name='interoperability-context-1', expired=False)])]), \
                 patch.object(ci, 'download_records', return_value={None: (metadata, b'{}')}):
             self.assertEqual(ci.controller(), '456')
 
+    def test_controller_listing_is_paged_and_bounded_to_the_ci_run(self):
+        origin = dict(self.state, head_sha='b' * 40, display_title='current',
+                      created_at='2026-11-14T00:00:20Z')
+        unrelated = [dict(id=500 + index, created_at='2026-11-14T00:00:30Z',
+                          display_title='other') for index in range(20)]
+        current = dict(id=456, run_attempt=1, path='.github/workflows/interoperability.yml',
+                       head_branch='master', event='workflow_run', display_title='Network controller: current',
+                       repository=dict(id=266877886), head_sha='c' * 40, status='in_progress',
+                       created_at='2026-11-14T00:00:21Z')
+        older = dict(unrelated[0], id=455, created_at='2026-11-14T00:00:19Z')
+        artifact = dict(total_count=1, artifacts=[dict(name='interoperability-context-1', expired=False)])
+        metadata = dict(self.state, control_run_id='456', control_attempt='1', control_sha='c' * 40)
+        with patch.object(ci, 'source', return_value=origin), patch.object(ci, 'api', side_effect=[
+                dict(total_count=22, workflow_runs=unrelated),
+                dict(total_count=22, workflow_runs=[current, older]), artifact]) as api, \
+                patch.object(ci, 'download_records', return_value={None: (metadata, b'{}')}):
+            self.assertEqual(ci.controller(), '456')
+        self.assertIn('per_page=20&page=1', api.call_args_list[0][0][0])
+        self.assertIn('per_page=20&page=2', api.call_args_list[1][0][0])
+
     def test_controller_title_collision_uses_the_context_identity(self):
-        origin = dict(self.state, head_sha='b' * 40, display_title='same title')
+        origin = dict(self.state, head_sha='b' * 40, display_title='same title',
+                      created_at='2026-11-14T00:00:00Z')
         run = dict(run_attempt=1, path='.github/workflows/interoperability.yml', head_branch='master',
                    event='workflow_run', display_title='Network controller: same title',
-                   repository=dict(id=266877886), head_sha='c' * 40, status='in_progress')
+                   repository=dict(id=266877886), head_sha='c' * 40, status='in_progress',
+                   created_at='2026-11-14T00:00:01Z')
         stale, current = dict(run, id=455), dict(run, id=456)
         artifact = dict(total_count=1, artifacts=[dict(name='interoperability-context-1', expired=False)])
         stale_metadata = dict(self.state, run_id='122', control_run_id='455',
                               control_attempt='1', control_sha='c' * 40)
         current_metadata = dict(self.state, control_run_id='456', control_attempt='1', control_sha='c' * 40)
         with patch.object(ci, 'source', return_value=origin), \
-                patch.object(ci, 'api', side_effect=[dict(workflow_runs=[current, stale]), artifact, artifact]), \
+                patch.object(ci, 'api', side_effect=[
+                    dict(total_count=2, workflow_runs=[current, stale]), artifact, artifact]), \
                 patch.object(ci, 'download_records', side_effect=[
                     {None: (stale_metadata, b'{}')}, {None: (current_metadata, b'{}')}]), \
                 patch.object(time, 'sleep'):

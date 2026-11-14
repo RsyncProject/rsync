@@ -32,7 +32,7 @@ class Transfers(unittest.TestCase):
                       for index, role in enumerate(ci.ROLES, 1)}
         self.run = dict(id=123, run_attempt=2, path='.github/workflows/ci.yml', name='CI',
                         repository=dict(id=266877886), event='pull_request', head_sha='b' * 40,
-                        display_title='testsuite, ci: rework tests',
+                        display_title='testsuite, ci: rework tests', created_at='2026-11-14T00:00:00Z',
                         head_repository=dict(id=999, full_name='contributor/rsync'),
                         referenced_workflows=[dict(path=ci.WORKFLOW + 'a' * 40, sha='a' * 40)])
         self.env = patch.dict(os.environ, dict(GITHUB_REPOSITORY_ID='266877886', GITHUB_EVENT_NAME='pull_request',
