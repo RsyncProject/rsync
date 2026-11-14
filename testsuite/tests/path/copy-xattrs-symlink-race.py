@@ -97,15 +97,20 @@ flip_code = (
     "        pass\n"
 )
 flip = subprocess.Popen(['python3', '-c', flip_code, str(sub), str(link)])
+attempts = 0
 try:
     deadline = time.monotonic() + race_budget(10.0)
     while time.monotonic() < deadline:
-        rmtree(sub)
+        try:
+            rmtree(sub)
+        except OSError:
+            continue
         try:
             sub.unlink()
         except OSError:
             pass
         push()
+        attempts += 1
         marked = outside_marked()
         if marked:
             test_fail(
@@ -119,3 +124,7 @@ finally:
         flip.wait(timeout=5)
     except subprocess.TimeoutExpired:
         flip.kill()
+        flip.wait()
+
+if attempts == 0:
+    test_fail('path flipper prevented every xattr race transfer attempt')
