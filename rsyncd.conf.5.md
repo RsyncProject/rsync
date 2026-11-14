@@ -368,6 +368,15 @@ the values of parameters.  See the GLOBAL PARAMETERS section for more details.
     There are tricky ways to work around this, though, so you had better trust
     your users if you choose this combination of parameters.
 
+0.  `insecure links`
+
+    This parameter restores the historical symlink-following behaviour for the
+    module's path operations. It disables the ownership walk and path
+    confinement used by the hardened resolver. The default is false.
+
+    Enable it only for a module whose path and users are fully trusted. A
+    client cannot enable this setting through command-line options.
+
 0.  `charset`
 
     This specifies the name of the character set in which the module's
