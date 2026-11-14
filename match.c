@@ -430,6 +430,14 @@ static void hash_search(int f,struct sum_struct *s,
  **/
 void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 {
+	int sum_len = xfer_sum_len;
+
+	if (sum_len <= 0 || sum_len > (int)sizeof sender_file_sum) {
+		rprintf(FERROR, "Invalid checksum length %d [%s]\n",
+			sum_len, who_am_i());
+		exit_cleanup(RERR_PROTOCOL);
+	}
+
 	last_match = 0;
 	false_alarms = 0;
 	hash_hits = 0;
@@ -492,15 +500,15 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 	 * which case we turn the last 0 bit into a 1. */
 	if (buf && buf->status != 0) {
 		int i;
-		for (i = 0; i < xfer_sum_len && sender_file_sum[i] == 0; i++) {}
-		memset(sender_file_sum, 0, xfer_sum_len);
-		if (i == xfer_sum_len && i > 0)
+		for (i = 0; i < sum_len && sender_file_sum[i] == 0; i++) {}
+		memset(sender_file_sum, 0, sum_len);
+		if (i == sum_len && i > 0)
 			sender_file_sum[i-1]++;
 	}
 
 	if (DEBUG_GTE(DELTASUM, 2))
 		rprintf(FINFO,"sending file_sum\n");
-	write_buf(f, sender_file_sum, xfer_sum_len);
+	write_buf(f, sender_file_sum, sum_len);
 
 	if (DEBUG_GTE(DELTASUM, 2)) {
 		rprintf(FINFO, "false_alarms=%d hash_hits=%d matches=%d\n",
