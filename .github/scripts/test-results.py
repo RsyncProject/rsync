@@ -16,7 +16,9 @@ class Results(unittest.TestCase):
     def setUp(self):
         self.expected = dict(linux='true', diagnostics='true', bsd='false', macos='true',
                              other='true', versions='true', android='true', archive='true', valgrind='true', interoperability='true')
+        self.selections = dict(self.expected, asan='false', coverage='false', clang='false')
         self.data = {
+            'changes': {'result': 'success', 'outputs': {}},
             'interoperability': {'result': 'success', 'outputs': {'jobs': json.dumps({name: {'result': 'success'}
                                   for name in ('linux', 'freebsd', 'netbsd', 'openbsd', 'macos', 'solaris', 'cygwin', 'result')})}},
             'archive': {'result': 'success', 'outputs': {'jobs': json.dumps({'archive': {'result': 'success'}})}},
@@ -44,10 +46,10 @@ class Results(unittest.TestCase):
 
     def reject(self):
         with self.assertRaises((TypeError, ValueError)):
-            check(self.data, self.expected)
+            check(self.data, self.expected, self.selections)
 
     def test_success(self):
-        self.assertTrue(check(self.data, self.expected))
+        self.assertTrue(check(self.data, self.expected, self.selections))
 
     def test_families(self):
         original = copy.deepcopy(self.data)
@@ -76,15 +78,19 @@ class Results(unittest.TestCase):
             with self.subTest(disabled=name):
                 original = self.data[name]
                 self.expected[name] = 'false'
+                self.selections[name] = 'false'
                 self.data[name] = {'result': 'skipped', 'outputs': {}}
-                self.assertTrue(check(self.data, self.expected))
+                self.assertTrue(check(self.data, self.expected, self.selections))
                 self.data[name] = {'result': 'success', 'outputs': {}}
                 self.reject()
                 self.data[name] = original
                 self.expected[name] = 'false' if name == 'bsd' else 'true'
+                self.selections[name] = self.expected[name]
         self.expected = {name: 'false' for name in self.expected}
-        self.data = {name: {'result': 'skipped', 'outputs': {}} for name in self.data}
-        self.reject()
+        self.selections = {**self.selections, **self.expected}
+        self.data = {name: ({'result': 'success', 'outputs': {}} if name == 'changes'
+                            else {'result': 'skipped', 'outputs': {}}) for name in self.data}
+        self.assertTrue(check(self.data, self.expected, self.selections))
         for value in ('TRUE', '', True, 1):
             self.expected['linux'] = value
             self.reject()
@@ -130,7 +136,25 @@ class Results(unittest.TestCase):
         self.reject()
         outputs['jobs'] = json.dumps({**jobs, 'clang_21': {'result': 'skipped'}})
         outputs['inputs'] = json.dumps({'clang_21': False, 'asan': False, 'python_37': True})
-        self.assertTrue(check(self.data, self.expected))
+        self.assertTrue(check(self.data, self.expected, self.selections))
+
+    def test_change_selections_are_complete_booleans(self):
+        original = self.selections
+        for value in ({}, {'unknown': 'true'}, {**original, 'linux': ''},
+                      {**original, 'linux': True}):
+            with self.subTest(value=value):
+                self.selections = value
+                self.reject()
+        self.selections = original
+
+    def test_selected_families_must_run(self):
+        self.selections['linux'] = 'false'
+        self.reject()
+        self.selections = {name: 'true' for name in self.selections}
+        self.assertTrue(check(self.data, self.expected, self.selections, scheduled=True))
+        self.selections['asan'] = 'false'
+        with self.assertRaises(ValueError):
+            check(self.data, self.expected, self.selections, scheduled=True)
 
     def test_failed_job_cannot_be_advisory(self):
         outputs = self.data['diagnostics']['outputs']
@@ -152,13 +176,23 @@ class Results(unittest.TestCase):
             outputs['jobs'] = json.dumps({'macos': {'result': result}})
             self.reject()
 
+    def test_change_selection_is_required(self):
+        original = self.data['changes']
+        for value in ('failure', 'cancelled', 'skipped', None):
+            with self.subTest(result=value):
+                self.data['changes'] = {'result': value, 'outputs': {}}
+                self.reject()
+        self.data.pop('changes')
+        self.reject()
+        self.data['changes'] = original
+
     def test_other_selections(self):
         names = ('cygwin', 'solaris')
         for bits in range(1, 4):
             inputs = {name: bool(bits & (1 << i)) for i, name in enumerate(names)}
             jobs = {name: {'result': 'success' if inputs[name] else 'skipped'} for name in names}
             self.data['other']['outputs'] = {'jobs': json.dumps(jobs), 'inputs': json.dumps(inputs)}
-            self.assertTrue(check(self.data, self.expected))
+            self.assertTrue(check(self.data, self.expected, self.selections))
             for name in names:
                 original = jobs[name]['result']
                 invalid = ('failure', 'cancelled', 'skipped', None) if inputs[name] else ('success', 'failure')
@@ -189,6 +223,8 @@ class Results(unittest.TestCase):
         env = {name: value for name, value in os.environ.items() if not name.startswith('CI_EXPECT_')}
         env.update({f'CI_EXPECT_{name.upper()}': value for name, value in self.expected.items()})
         env['CI_RESULTS'] = json.dumps(self.data)
+        env['CI_SELECTIONS'] = json.dumps(self.selections)
+        env['GITHUB_EVENT_NAME'] = 'pull_request'
         command = [sys.executable, '-S', str(checker)]
         result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)

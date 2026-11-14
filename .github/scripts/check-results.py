@@ -3,17 +3,32 @@ import os
 import sys
 
 
-def check(data, expected):
+def check(data, expected, selections, scheduled=False):
     def require(condition, message):
         if not condition:
             raise ValueError(message)
 
-    require(isinstance(data, dict) and data.keys() == expected.keys(),
+    require(isinstance(data, dict), 'Invalid job results')
+    changes = data.get('changes')
+    require(isinstance(changes, dict) and changes.get('result') == 'success',
+            'Change selection was not successful')
+    require(set(data) == set(expected) | {'changes'},
             'Missing or unexpected job families')
-    require(all(value in ('true', 'false') for value in expected.values())
-            and 'true' in expected.values(), 'No valid job selection')
+    require(expected and all(value in ('true', 'false') for value in expected.values()),
+            'Invalid job selection')
+    require(isinstance(selections, dict)
+            and set(selections) == set(expected) | {'asan', 'coverage', 'clang'}
+            and all(value in ('true', 'false') for value in selections.values()),
+            'Invalid change selection')
+    selected_families = {name: selections[name] for name in expected}
+    if scheduled:
+        require(all(value == 'true' for value in selections.values()),
+                'Scheduled run did not select every check')
+    else:
+        require(selected_families == expected, 'Job selection differs from changed paths')
     messages = []
-    for family, group in data.items():
+    for family in expected:
+        group = data[family]
         require(isinstance(group, dict), f'{family}: invalid job results')
         result = group.get('result')
         if expected[family] == 'false':
@@ -45,7 +60,9 @@ def main():
     try:
         expected = {name[len('CI_EXPECT_'):].lower(): value for name, value in os.environ.items()
                     if name.startswith('CI_EXPECT_')}
-        messages = check(json.loads(os.environ['CI_RESULTS']), expected)
+        messages = check(json.loads(os.environ['CI_RESULTS']), expected,
+                         json.loads(os.environ['CI_SELECTIONS']),
+                         os.environ.get('GITHUB_EVENT_NAME') == 'schedule')
     except (KeyError, TypeError, ValueError) as error:
         print(f'CI result check failed: {error}', file=sys.stderr)
         return 1

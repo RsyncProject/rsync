@@ -25,67 +25,104 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      linux: ${{ steps.select.outputs.linux }}
+      bsd: ${{ steps.select.outputs.bsd }}
+      macos: ${{ steps.select.outputs.macos }}
+      other: ${{ steps.select.outputs.other }}
+      versions: ${{ steps.select.outputs.versions }}
+      android: ${{ steps.select.outputs.android }}
+      archive: ${{ steps.select.outputs.archive }}
+      diagnostics: ${{ steps.select.outputs.diagnostics }}
+      valgrind: ${{ steps.select.outputs.valgrind }}
+      interoperability: ${{ steps.select.outputs.interoperability }}
+      asan: ${{ steps.select.outputs.asan }}
+      coverage: ${{ steps.select.outputs.coverage }}
+      clang: ${{ steps.select.outputs.clang }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Select checks
+        id: select
+        run: python3 -B -S .github/scripts/changes.py
+
   linux:
     name: Linux
-    if: &daily ${{ github.event_name != 'schedule' || github.event.schedule == '42 8 * * 0,2-6' || github.event.schedule == '42 8 * * 1' }}
+    needs: changes
+    if: &linux_selected ${{ needs.changes.outputs.linux == 'true' && (github.event_name != 'schedule' || github.event.schedule == '42 8 * * 0,2-6' || github.event.schedule == '42 8 * * 1') }}
     uses: ./.github/workflows/linux.yml
     with:
-      ubuntu: &weekly ${{ github.event_name != 'schedule' || github.event.schedule == '42 8 * * 1' }}
-      almalinux: *daily
-      alpine: *weekly
+      ubuntu: &weekly_schedule ${{ github.event_name != 'schedule' || github.event.schedule == '42 8 * * 1' }}
+      almalinux: &daily_schedule ${{ github.event_name != 'schedule' || github.event.schedule == '42 8 * * 0,2-6' || github.event.schedule == '42 8 * * 1' }}
+      alpine: *weekly_schedule
 
   bsd:
     name: BSD
-    if: *weekly
+    needs: changes
+    if: &bsd_selected ${{ needs.changes.outputs.bsd == 'true' && (github.event_name != 'schedule' || github.event.schedule == '42 8 * * 1') }}
     uses: ./.github/workflows/bsd.yml
 
   macos:
     name: macOS
-    if: *daily
+    needs: changes
+    if: &macos_selected ${{ needs.changes.outputs.macos == 'true' && (github.event_name != 'schedule' || github.event.schedule == '42 8 * * 0,2-6' || github.event.schedule == '42 8 * * 1') }}
     uses: ./.github/workflows/macos.yml
 
   other:
     name: Other
-    if: *daily
+    needs: changes
+    if: &other_selected ${{ needs.changes.outputs.other == 'true' && (github.event_name != 'schedule' || github.event.schedule == '42 8 * * 0,2-6' || github.event.schedule == '42 8 * * 1') }}
     uses: ./.github/workflows/other.yml
     with:
-      cygwin: *daily
-      solaris: *weekly
+      cygwin: *daily_schedule
+      solaris: *weekly_schedule
 
   versions:
     name: Versions
-    if: &versions ${{ github.event_name != 'schedule' || github.event.schedule == '52 8 * * 1' }}
+    needs: changes
+    if: &versions_selected ${{ needs.changes.outputs.versions == 'true' && (github.event_name != 'schedule' || github.event.schedule == '52 8 * * 1') }}
     uses: ./.github/workflows/versions.yml
 
   android:
     name: Android
-    if: *weekly
+    needs: changes
+    if: &android_selected ${{ needs.changes.outputs.android == 'true' && (github.event_name != 'schedule' || github.event.schedule == '42 8 * * 1') }}
     uses: ./.github/workflows/android.yml
 
   archive:
     name: Archive
-    if: *weekly
+    needs: changes
+    if: &archive_selected ${{ needs.changes.outputs.archive == 'true' && (github.event_name != 'schedule' || github.event.schedule == '42 8 * * 1') }}
     uses: ./.github/workflows/archive.yml
 
   diagnostics:
     name: Diagnostics
-    if: &diagnostics ${{ github.event_name != 'schedule' || github.event.schedule == '42 9 * * 1' }}
+    needs: changes
+    if: &diagnostics_selected ${{ needs.changes.outputs.diagnostics == 'true' && (github.event_name != 'schedule' || github.event.schedule == '42 9 * * 1') }}
     uses: ./.github/workflows/diagnostics.yml
     with:
       lint: &regular ${{ github.event_name != 'schedule' }}
       python_37: *regular
-      asan: *diagnostics
-      coverage: *diagnostics
-      clang_21: *diagnostics
+      asan: ${{ needs.changes.outputs.asan == 'true' && (github.event_name != 'schedule' || github.event.schedule == '42 9 * * 1') }}
+      coverage: ${{ needs.changes.outputs.coverage == 'true' && (github.event_name != 'schedule' || github.event.schedule == '42 9 * * 1') }}
+      clang_21: ${{ needs.changes.outputs.clang == 'true' && (github.event_name != 'schedule' || github.event.schedule == '42 9 * * 1') }}
 
   valgrind:
     name: Valgrind
-    if: &valgrind ${{ github.event_name != 'schedule' || github.event.schedule == '17 4 * * *' }}
+    needs: changes
+    if: &valgrind_selected ${{ needs.changes.outputs.valgrind == 'true' && (github.event_name != 'schedule' || github.event.schedule == '17 4 * * *') }}
     uses: ./.github/workflows/valgrind.yml
 
   interoperability:
     name: Interoperability
-    if: &interoperability ${{ github.event_name != 'schedule' }}
+    needs: changes
+    if: &interoperability_selected ${{ needs.changes.outputs.interoperability == 'true' && github.event_name != 'schedule' }}
     uses: ./.github/workflows/interoperability-tests.yml
     permissions:
       contents: read
@@ -94,20 +131,21 @@ jobs:
   required:
     name: Required
     if: always()
-    needs: [linux, bsd, macos, other, versions, android, archive, diagnostics, valgrind, interoperability]
+    needs: [changes, linux, bsd, macos, other, versions, android, archive, diagnostics, valgrind, interoperability]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     env:
-      CI_EXPECT_LINUX: *daily
-      CI_EXPECT_BSD: *weekly
-      CI_EXPECT_MACOS: *daily
-      CI_EXPECT_OTHER: *daily
-      CI_EXPECT_VERSIONS: *versions
-      CI_EXPECT_ANDROID: *weekly
-      CI_EXPECT_ARCHIVE: *weekly
-      CI_EXPECT_DIAGNOSTICS: *diagnostics
-      CI_EXPECT_VALGRIND: *valgrind
-      CI_EXPECT_INTEROPERABILITY: *interoperability
+      CI_EXPECT_LINUX: *linux_selected
+      CI_EXPECT_BSD: *bsd_selected
+      CI_EXPECT_MACOS: *macos_selected
+      CI_EXPECT_OTHER: *other_selected
+      CI_EXPECT_VERSIONS: *versions_selected
+      CI_EXPECT_ANDROID: *android_selected
+      CI_EXPECT_ARCHIVE: *archive_selected
+      CI_EXPECT_DIAGNOSTICS: *diagnostics_selected
+      CI_EXPECT_VALGRIND: *valgrind_selected
+      CI_EXPECT_INTEROPERABILITY: *interoperability_selected
+      CI_SELECTIONS: ${{ toJSON(needs.changes.outputs) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
