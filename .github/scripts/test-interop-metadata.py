@@ -58,9 +58,12 @@ class Attributes(unittest.TestCase):
             path = Path(directory)
             with patch.object(metadata, 'command') as command:
                 metadata.set_acl(path, 'cygwin', 1)
-            entries = command.call_args[0][2]
-            self.assertIn('group::r-x', entries)
-            self.assertIn('mask::r-x', entries)
+                normal = command.call_args[0][2]
+                metadata.set_acl(path, 'cygwin', 1, backup=True)
+                backup = command.call_args[0][2]
+            self.assertIn('group::---', normal)
+            self.assertIn('group::r-x', backup)
+            self.assertIn('mask::r-x', backup)
             directory_acl = {
                 'user:': 'rwx', 'group:': 'r-x', 'group:545': 'r-x', 'mask:': 'r-x', 'other:': '---',
                 'group:544': '---', 'default:user:': 'rwx', 'default:group:': 'r-x',
@@ -70,8 +73,11 @@ class Attributes(unittest.TestCase):
                         'other:': '---', 'group:544': '---'}
             (path / 'directory').mkdir()
             (path / 'directory/file').write_text('metadata transfer\n')
-            with patch.object(metadata, 'read_acl', side_effect=[directory_acl, file_acl]):
-                snapshot = metadata.metadata_snapshot(path, 'cygwin', 'acl')
+            values = {'rsync-ci': b'first', 'rsync-ci-large': b'A' * 512,
+                      'rsync-ci-remove': b'remove on update'}
+            with patch.object(metadata, 'read_acl', side_effect=[directory_acl, file_acl]), \
+                    patch.object(metadata.xattrs, 'get_value', side_effect=lambda key, _: values[key]):
+                snapshot = metadata.metadata_snapshot(path, 'cygwin', 'backup')
             self.assertEqual(snapshot['entries']['directory']['acl'], directory_acl)
 
     def test_solaris_uses_current_acl_tools(self):

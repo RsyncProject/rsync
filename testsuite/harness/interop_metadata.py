@@ -101,7 +101,7 @@ def read_acl(path, role):
     return result
 
 
-def set_acl(path, role, phase):
+def set_acl(path, role, phase, backup=False):
     directory = path.is_dir()
     if FEATURES[role][0] == 'darwin':
         command('chmod', '-N', path)
@@ -114,7 +114,7 @@ def set_acl(path, role, phase):
         return
     group = ('r-x' if phase == 1 else 'rwx') if directory else ('r--' if phase == 1 else 'rw-')
     # Cygwin chmod maps the mode's group bits to the owning-group ACL entry
-    owning_group = group if role == 'cygwin' else '---'
+    owning_group = group if role == 'cygwin' and backup else '---'
     entries = ['user::' + ('rwx' if directory else 'rw-'), 'group::' + owning_group, 'group:545:' + group,
                'mask::' + group, 'other::---']
     if phase == 1:
@@ -146,7 +146,7 @@ def seed_metadata(root, role, kind, phase=1):
     paths = root / 'directory', root / 'directory' / 'file'
     if kind in ('acl', 'backup') and FEATURES[role][0]:
         for path in paths:
-            set_acl(path, role, phase)
+            set_acl(path, role, phase, backup=kind == 'backup')
     if kind in ('xattr', 'backup') and FEATURES[role][1]:
         for path in paths:
             xattrs.set_value('rsync-ci', 'first' if phase == 1 else 'second', path)
@@ -170,7 +170,7 @@ def metadata_snapshot(root, role, kind, phase=1):
             acl = read_acl(path, role)
             if FEATURES[role][0] == 'posix':
                 group = ('r-x' if phase == 1 else 'rwx') if path.is_dir() else ('r--' if phase == 1 else 'rw-')
-                owning_group = group if role == 'cygwin' else '---'
+                owning_group = group if role == 'cygwin' and kind == 'backup' else '---'
                 expected = {'user:': 'rwx' if path.is_dir() else 'rw-', 'group:': owning_group, 'group:545': group,
                             'mask:': group, 'other:': '---'}
                 if phase == 1:
