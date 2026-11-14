@@ -92,12 +92,15 @@ jobs:
           if-no-files-found: error
           retention-days: 7
       - name: Verify directed transfer results
+        continue-on-error: true
         if: ${{ steps.source.outputs.enabled == 'true' }}
         run: python3 -B -S .github/scripts/interop-broker.py verify --root "$RUNNER_TEMP/interoperability"
       - name: Revoke access
+        continue-on-error: true
         if: ${{ always() && steps.source.outputs.enabled == 'true' }}
         run: python3 -B -S .github/scripts/interop-broker.py revoke --root "$RUNNER_TEMP/interoperability"
       - name: Upload revocation
+        continue-on-error: true
         if: ${{ always() && steps.source.outputs.enabled == 'true' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -109,6 +112,7 @@ jobs:
         if: ${{ always() && steps.source.outputs.enabled == 'true' }}
         run: python3 -B -S .github/scripts/interop-broker.py finish --root "$RUNNER_TEMP/interoperability"
       - name: Upload cleanup result
+        continue-on-error: true
         if: ${{ always() && steps.source.outputs.enabled == 'true' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
