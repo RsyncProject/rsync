@@ -1,0 +1,50 @@
+#! /bin/sh
+
+. "$suitedir/rsync.fns"
+
+if test "`id -u`" != 0; then
+	test_skipped "Numeric copy-as group testing requires root"
+fi
+
+account=
+uid=
+gid=
+supplementary_gid=
+
+while IFS=: read -r name unused candidate_uid candidate_gid rest; do
+	test "$candidate_uid" -gt 0 2>/dev/null || continue
+	groups=`id -G "$name" 2>/dev/null` || continue
+	for group in $groups; do
+		if test "$group" != "$candidate_gid"; then
+			account=$name
+			uid=$candidate_uid
+			gid=$candidate_gid
+			supplementary_gid=$group
+			break 2
+		fi
+	done
+done </etc/passwd
+
+if test -z "$account"; then
+	test_skipped "No account with a supplementary group is available"
+fi
+
+protected="$scratchdir/protected"
+destination="$scratchdir/destination"
+makepath "$protected" "$destination"
+scratch_parent=`dirname "$scratchdir"`
+build_parent=`dirname "$scratch_parent"`
+chmod a+x "$build_parent" "$scratch_parent" "$scratchdir"
+echo accessible-via-supplementary-group >"$protected/file"
+chown root:"$supplementary_gid" "$protected" "$protected/file"
+chmod 0750 "$protected"
+chmod 0640 "$protected/file"
+chown "$uid:$gid" "$destination"
+chmod 0700 "$destination"
+
+$RSYNC -a --copy-as="$uid" "$protected/" "$destination/" \
+	|| test_fail "Numeric --copy-as did not initialise the account's groups"
+
+checkdiff "cat '$destination/file'" <<EOF
+accessible-via-supplementary-group
+EOF
