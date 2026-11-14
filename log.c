@@ -246,6 +246,41 @@ void logfile_reopen(void)
 	}
 }
 
+/* Decode one UTF-8 character when running in the 7-bit C/POSIX locale
+ * (MB_CUR_MAX == 1) where mbrtowc() rejects all bytes >= 0x80. */
+static size_t utf8_char_len(const char *buf, size_t len, int *is_control)
+{
+	const uchar *s = (const uchar *)buf;
+	uint32 cp;
+	size_t need;
+
+	if (len < 2 || s[0] < 0xc2 || s[0] > 0xf4)
+		return 0;
+	if (s[0] < 0xe0) {
+		need = 2;
+		cp = s[0] & 0x1f;
+	} else if (s[0] < 0xf0) {
+		need = 3;
+		cp = s[0] & 0x0f;
+	} else {
+		need = 4;
+		cp = s[0] & 0x07;
+	}
+	if (len < need)
+		return 0;
+	for (size_t i = 1; i < need; i++) {
+		if ((s[i] & 0xc0) != 0x80)
+			return 0;
+		cp = (cp << 6) | (s[i] & 0x3f);
+	}
+	if ((need == 3 && cp < 0x800) || (need == 3 && cp >= 0xd800 && cp <= 0xdfff)
+	 || (need == 4 && (cp < 0x10000 || cp > 0x10ffff)))
+		return 0;
+
+	*is_control = (cp >= 0x7f && cp <= 0x9f);
+	return need;
+}
+
 /* Decode one character using the active locale. Invalid or incomplete input
  * returns 0 so its bytes are filtered individually. */
 static size_t locale_char_len(const char *buf, size_t len, filter_mbstate *state,
@@ -253,10 +288,27 @@ static size_t locale_char_len(const char *buf, size_t len, filter_mbstate *state
 {
 #if defined HAVE_WCHAR_H && defined HAVE_MBRTOWC
 	wchar_t wc;
-	size_t char_len = mbrtowc(&wc, buf, len, state);
+	size_t char_len;
 
-	if (char_len == (size_t)-1 || char_len == (size_t)-2) {
+	if (MB_CUR_MAX == 1) {
+#if defined HAVE_SETLOCALE && defined LC_CTYPE
+		const char *ctype = setlocale(LC_CTYPE, NULL);
+		if (!ctype || strcmp(ctype, "C") == 0 || strcmp(ctype, "POSIX") == 0)
+			return utf8_char_len(buf, len, is_control);
+#else
+		return utf8_char_len(buf, len, is_control);
+#endif
+	}
+
+	char_len = mbrtowc(&wc, buf, len, state);
+	if (char_len == (size_t)-1 || char_len == (size_t)-2
+#ifdef __STDC_ISO_10646__
+	 || (wc >= 0xd800 && wc <= 0xdfff) || wc > 0x10ffff
+#endif
+	) {
 		memset(state, 0, sizeof *state);
+		if (MB_CUR_MAX == 1)
+			return utf8_char_len(buf, len, is_control);
 		return 0;
 	}
 	if (char_len == 0)
@@ -265,11 +317,8 @@ static size_t locale_char_len(const char *buf, size_t len, filter_mbstate *state
 		&& (wc < L' ' || (wc >= 0x7f && wc <= 0x9f));
 	return char_len;
 #else
-	(void)buf;
-	(void)len;
 	(void)state;
-	(void)is_control;
-	return 0;
+	return utf8_char_len(buf, len, is_control);
 #endif
 }
 

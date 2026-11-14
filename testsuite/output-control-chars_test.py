@@ -69,6 +69,13 @@ names = {
     'raw_csi': b'raw_\x9b_name',
     'utf8_csi': b'utf8_\xc2\x9b_name',
     'valid_utf8': b'valid_\xd8\x9b_name',
+    'sharp_s': b'sharp_\xc3\x9f_name',
+    'valid_4byte': b'four_\xf0\x9f\x92\xa9_name',
+    'inc_prefix': b'inc_\xe2\x82',
+    'bad_cont': b'badcont_\xe2\x28\xa1_name',
+    'overlong': b'overlong_\xc0\xaf_name',
+    'surrogate': b'surrogate_\xed\xa0\x80_name',
+    'above_max': b'abovemax_\xf4\x90\x80\x80_name',
     'leading_cr': b'\rleading_cr_name',
     'delete': b'delete_\x7f_name',
 }
@@ -104,6 +111,22 @@ if 'raw_csi' in created and b'\\#233' not in output:
 if (utf8_locale is not None and 'valid_utf8' in created
         and names['valid_utf8'] not in output):
     test_fail("valid UTF-8 containing a C1-range continuation byte was changed")
+if (utf8_locale is not None and 'sharp_s' in created
+        and names['sharp_s'] not in output):
+    test_fail("valid UTF-8 sharp s (0xc3 0x9f) was changed under UTF-8 locale")
+if (utf8_locale is not None and 'valid_4byte' in created
+        and names['valid_4byte'] not in output):
+    test_fail("valid 4-byte UTF-8 (f0 9f 92 a9) was changed under UTF-8 locale")
+if 'inc_prefix' in created and b'inc_\xe2\\#202\n' not in output:
+    test_fail(f"incomplete 3-byte prefix E2 82 did not escape 0x82: {output!r}")
+if 'bad_cont' in created and names['bad_cont'] not in output:
+    test_fail(f"invalid continuation E2 28 A1 was not handled properly: {output!r}")
+if 'overlong' in created and names['overlong'] not in output:
+    test_fail(f"overlong C0 AF was not handled properly: {output!r}")
+if 'surrogate' in created and b'surrogate_\xed\xa0\\#200_name' not in output:
+    test_fail(f"surrogate ED A0 80 did not escape trailing 0x80: {output!r}")
+if 'above_max' in created and b'abovemax_\xf4\\#220\\#200\\#200_name' not in output:
+    test_fail(f"above-U+10FFFF F4 90 80 80 did not escape C1 bytes: {output!r}")
 if 'leading_cr' in created and names['leading_cr'] in output:
     test_fail("leading carriage return reached terminal output")
 if 'leading_cr' in created and b'\\#015leading_cr_name' not in output:
@@ -112,6 +135,42 @@ if 'delete' in created and names['delete'] in output:
     test_fail("DEL reached terminal output")
 if 'delete' in created and b'delete_\\#177_name' not in output:
     test_fail("DEL was not escaped")
+
+# Verify C/POSIX locale (or minimal container without locale database):
+dst_c = base / 'dst-c'
+dst_c.mkdir()
+logfile_c = base / 'rsync-c.log'
+env_c = os.environ.copy()
+env_c['LC_ALL'] = 'C'
+proc_c = subprocess.run(
+    rsync_argv('-av', '--8-bit-output', f'--log-file={logfile_c}',
+               '--log-file-format=%f', str(src) + '/', str(dst_c) + '/'),
+    stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env_c)
+if proc_c.returncode != 0:
+    test_fail(f"rsync failed under C locale: {proc_c.stderr!r}")
+
+c_output = proc_c.stdout + proc_c.stderr + logfile_c.read_bytes()
+if 'sharp_s' in created and names['sharp_s'] not in c_output:
+    test_fail(f"C locale mangled valid UTF-8 sharp s: {c_output!r}")
+if 'valid_utf8' in created and names['valid_utf8'] not in c_output:
+    test_fail(f"C locale mangled valid_utf8: {c_output!r}")
+if 'valid_4byte' in created and names['valid_4byte'] not in c_output:
+    test_fail(f"C locale mangled valid 4-byte UTF-8: {c_output!r}")
+if 'utf8_csi' in created:
+    if b'\xc2\x9b' in c_output:
+        test_fail("C locale let UTF-8-encoded CSI reach output")
+    if b'\\#302\\#233' not in c_output:
+        test_fail("C locale did not escape UTF-8-encoded CSI")
+if 'inc_prefix' in created and b'inc_\xe2\\#202\n' not in c_output:
+    test_fail(f"C locale did not escape 0x82 in incomplete prefix E2 82: {c_output!r}")
+if 'bad_cont' in created and names['bad_cont'] not in c_output:
+    test_fail(f"C locale mishandled E2 28 A1: {c_output!r}")
+if 'overlong' in created and names['overlong'] not in c_output:
+    test_fail(f"C locale mishandled overlong C0 AF: {c_output!r}")
+if 'surrogate' in created and b'surrogate_\xed\xa0\\#200_name' not in c_output:
+    test_fail(f"C locale did not escape trailing 0x80 in surrogate ED A0 80: {c_output!r}")
+if 'above_max' in created and b'abovemax_\xf4\\#220\\#200\\#200_name' not in c_output:
+    test_fail(f"C locale did not escape C1 bytes in F4 90 80 80: {c_output!r}")
 
 locale_cases = 0
 locale_cases += check_locale_case(
