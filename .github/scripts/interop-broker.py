@@ -6,7 +6,7 @@ import re
 import subprocess
 import sys
 
-from interop_ci import ROLES, NotSelected, bind, find_controller, identity, records, source, write
+from interop_ci import ROLES, NotSelected, PeerUnavailable, bind, check_ci, find_controller, identity, records, source, write
 from interop_enrol import seal
 from interop_network import NetworkError, Tailnet, download_records
 from interop_policy import TAILNET, admission, check_policy, update_policy
@@ -119,7 +119,7 @@ def cleanup(api, lease):
         raise NetworkError('; '.join(errors))
 
 
-def recover(root, api):
+def recover(root):
     from interop_network import fetch, decode
     run_id = os.environ['INTEROP_RECOVER_RUN']
     attempt = os.environ['INTEROP_RECOVER_ATTEMPT']
@@ -132,9 +132,47 @@ def recover(root, api):
             or run.get('id') != int(run_id) or run.get('run_attempt') != int(attempt)
             or run.get('repository', {}).get('id') != 266877886
             or run.get('event') != 'workflow_run'
+            or run.get('status') != 'completed'
+            or run.get('conclusion') not in ('failure', 'cancelled', 'timed_out')
             or not re.fullmatch(r'[0-9a-f]{40}', run.get('head_sha', ''))):
         raise NetworkError('Recovery run is not a trusted controller')
-    name = 'interoperability-lease-' + attempt
+    body, _ = fetch('https://api.github.com/repos/RsyncProject/rsync/actions/runs/' + run_id + '/attempts/' + attempt + '/jobs',
+                    os.environ['GH_TOKEN'], operation='Read controller cleanup result')
+    listing = decode(body)
+    jobs = listing.get('jobs')
+    count = listing.get('total_count')
+    if type(count) is not int or count < 0 or not isinstance(jobs, list) or count != len(jobs):
+        raise NetworkError('Invalid controller job listing')
+    if not jobs:
+        print('Controller never started')
+        return
+    if len(jobs) != 1:
+        raise NetworkError('Unexpected controller jobs')
+    job = jobs[0]
+    if (job.get('name') == 'Admission and cleanup'
+            and job.get('run_id') == int(run_id) and job.get('run_attempt') == int(attempt)
+            and job.get('status') == 'completed'):
+        if any(step.get('name') == 'Verify revocation and remove devices' and step.get('conclusion') == 'success'
+               for step in job.get('steps', [])):
+            print('Controller cleanup already completed')
+            return
+        issuance = [step for step in job.get('steps', []) if step.get('name') == 'Issue single-use enrolment keys']
+        if (len(issuance) == 1 and issuance[0].get('status') == 'completed'
+                and issuance[0].get('conclusion') == 'skipped'):
+            print('Controller did not issue enrolment keys')
+            return
+    body, _ = fetch('https://api.github.com/repos/RsyncProject/rsync/actions/runs/' + run_id + '/artifacts?per_page=100',
+                    os.environ['GH_TOKEN'], operation='Read recovery artifacts')
+    listing = decode(body)
+    if type(listing.get('total_count')) is not int or not 0 <= listing['total_count'] <= 100:
+        raise NetworkError('Recovery artifact listing exceeds limit')
+    name = 'interoperability-lease-attempt-' + attempt
+    names = {name, 'interoperability-lease-' + attempt}
+    matches = [item for item in listing['artifacts'] if item.get('name') in names and item.get('expired') is False]
+    if len(matches) > 1:
+        raise NetworkError('Duplicate recovery lease')
+    if matches:
+        name = matches[0]['name']
     lease, raw = download_records(run_id, {name: None}, timeout=60)[None]
     path = root / 'recovery-lease.json'
     path.write_bytes(raw)
@@ -147,7 +185,7 @@ def recover(root, api):
     if (result.returncode or lease.get('control_run_id') != run_id
             or lease.get('control_attempt') != str(run['run_attempt']) or lease.get('control_sha') != run['head_sha']):
         raise NetworkError('Recovery lease is not attested by the expected controller')
-    cleanup(api, lease)
+    cleanup(Tailnet(), lease)
 
 
 def main():
@@ -159,13 +197,15 @@ def main():
     root.mkdir(mode=0o700, parents=True, exist_ok=True)
     try:
         if args.phase == 'recover':
-            recover(root, Tailnet())
+            recover(root)
             return 0
         if args.phase != 'metadata' and (root / 'context.json').exists():
             bind(load(root, 'context'))
         try:
             state = identity()
-        except NotSelected as error:
+            if args.phase not in ('revoke', 'finish'):
+                check_ci()
+        except (NotSelected, PeerUnavailable) as error:
             if args.phase != 'metadata':
                 raise
             if os.environ.get('GITHUB_OUTPUT'):
@@ -186,9 +226,9 @@ def main():
                     stream.write('enabled=true\nattempt=' + state['run_attempt'] + '\n')
             return 0
         if args.phase in ('revoke', 'finish') and not any((root / (name + '.json')).exists() for name in ('lease', 'keys')):
-            if args.phase == 'revoke':
-                return 0
-            raise NetworkError('No admission lease was created')
+            if args.phase == 'finish':
+                write(root, 'result', passed=False, cleaned=True, roles=[])
+            return 0
         api = Tailnet()
         if args.phase == 'broker':
             check_policy(api.policy()[0])
@@ -196,12 +236,16 @@ def main():
             if len({record.get('public_key') for record in recipients.values()}) != len(ROLES):
                 raise NetworkError('Endpoints share an enrolment recipient')
             encrypted = {}
+            save(root, 'keys', keys=keys, pending=None)
             for role in ROLES:
+                check_ci()
+                save(root, 'keys', keys=keys, pending=role)
                 key_id, key = api.create_key(role, state)
                 keys[role] = key_id
-                save(root, 'keys', keys=keys)
+                save(root, 'keys', keys=keys, pending=None)
                 encrypted[role] = seal(root, role, recipients[role], key_id, key, state)
-            write(root, 'enrol', recipients=encrypted)
+            check_ci()
+            write(root, 'enrolment', recipients=encrypted)
         elif args.phase == 'prepare':
             prepare(root, api)
         elif args.phase == 'admit':
@@ -210,6 +254,7 @@ def main():
             if any(record.get('passed') is not True or record.get('node_id') != lease['nodes'][role]['node_id']
                    for role, record in probes.items()):
                 raise NetworkError('Endpoint quarantine checks failed')
+            check_ci()
             policy = api.change(lambda current: update_policy(current, lease['grant']))
             write(root, 'admission', nodes=lease['nodes'], policy=policy)
         elif args.phase == 'verify':
@@ -226,20 +271,35 @@ def main():
         else:
             lease = load(root, 'lease') if (root / 'lease.json').exists() else None
             if lease:
+                passed = (root / 'verified.json').exists()
                 try:
-                    probes = records('revoked', timeout=120)
-                    if any(record.get('passed') is not True or record.get('node_id') != lease['nodes'][role]['node_id']
-                           for role, record in probes.items()):
-                        raise NetworkError('Endpoint revocation checks failed')
-                    if not (root / 'verified.json').exists():
-                        raise NetworkError('Transfers did not complete')
+                    if passed:
+                        probes = records('revoked', timeout=120)
+                        passed = all(
+                            record.get('passed') is True
+                            and record.get('node_id') == lease['nodes'][role]['node_id']
+                            for role, record in probes.items())
+                except NetworkError as error:
+                    passed = False
+                    print('Endpoint revocation was not confirmed: ' + str(error), file=sys.stderr)
                 finally:
                     cleanup(api, lease)
-                write(root, 'result', passed=True, cleaned=True, roles=list(ROLES))
+                write(root, 'result', passed=passed, cleaned=True, roles=list(ROLES))
             elif (root / 'keys.json').exists():
-                for key in load(root, 'keys')['keys'].values():
-                    api.delete_key(key)
-                raise NetworkError('Endpoint admission did not complete')
+                journal = load(root, 'keys')
+                errors = []
+                for key in journal['keys'].values():
+                    try:
+                        api.delete_key(key)
+                    except NetworkError as error:
+                        errors.append(str(error))
+                if errors:
+                    raise NetworkError('; '.join(errors))
+                if 'pending' not in journal or journal['pending'] is not None:
+                    raise NetworkError('An enrolment key request has an unknown outcome')
+                if (root / 'enrolment.json').exists():
+                    raise NetworkError('Enrolment may have been delivered; devices need reconciliation')
+                write(root, 'result', passed=False, cleaned=True, roles=[])
             else:
                 raise NetworkError('No admission lease was created')
     except (OSError, ValueError, KeyError, subprocess.SubprocessError) as error:

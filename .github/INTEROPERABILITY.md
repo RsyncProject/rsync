@@ -6,6 +6,8 @@ The 168 cases cover every directed platform pair, push and pull initiation and S
 
 The parent CI run and attempt identify each cohort. The tested revision comes from GitHub's resolved reusable-workflow commit and is checked against the native checkout. Endpoint records also contain the operating system, effective UID/GID and executable SHA-256. Required depends on all seven endpoint jobs, complete case results and confirmed network cleanup.
 
+Artefact names end in `attempt-N`. Context and lease artefacts use the controller attempt; other interoperability artefacts use the parent CI attempt. The suffix prevents a rerun from consuming records from an earlier attempt.
+
 ## Authentication
 
 The Network controller uses trusted default-branch code through a workflow_run listener. It is deployed independently of the PR endpoint workflow and ignores CI runs which have not selected that workflow. Its existing OIDC identity has write access to auth_keys, policy_file, devices:core and devices:posture_attributes in the dedicated test tailnet. The posture scope is a dependency of policy-file writes. Enrolment is restricted to tag:quarantine.
@@ -30,11 +32,13 @@ event_name | workflow_run
 workflow_ref | RsyncProject/rsync/.github/workflows/interoperability*.yml@refs/heads/master
 runner_environment | github-hosted
 
-Endpoint jobs have no federated identity. Controller discovery uses the parent CI run and attempt and verifies the controller's default-branch revision. No per-PR identity, branch or repository variable is required. Qualification covers a fork PR, all 168 cases, concurrent-run separation and cancellation recovery.
+Endpoint jobs have no federated identity. Controller discovery uses the parent CI run and attempt and verifies the controller's default-branch revision. No per-PR identity, branch or repository variable is required. The controller checks CI and endpoint liveness before obtaining authority, requesting keys and publishing enrolment.
 
 ## Recovery
 
 Normal cleanup revokes the recorded grant, removes owned devices and revokes issued keys. An individual failure does not prevent attempts to remove the remaining resources. Device deletion checks the recorded node identity; reassigned devices remain untouched.
+
+Keys created before enrolment delivery can be revoked from the local journal without an admission lease. An interrupted request with an unknown key ID or enrolment delivered without a lease requires reconciliation. A failed transfer remains failed even when resource cleanup succeeds.
 
 Admission leases are attested before access is granted. Recovery verifies the original lease bytes, repository, controller workflow, signing commit, source ref and run attempt before modifying the tailnet. Failed or cancelled controller runs trigger recovery from trusted code.
 

@@ -9,6 +9,7 @@ from interop_policy import ROLES
 
 API = 'https://api.github.com/repos/RsyncProject/rsync'
 WORKFLOW = 'RsyncProject/rsync/.github/workflows/interoperability-tests.yml@'
+TIMESTAMP = r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z'
 bound = None
 api_cache = {}
 
@@ -60,7 +61,8 @@ def source():
         raise NotSelected('CI uses a different workflow')
     if (run.get('path') != '.github/workflows/ci.yml' or run.get('name') != 'CI'
             or run.get('id') != run_id or run.get('repository', {}).get('id') != 266877886 or run.get('run_attempt') != attempt
-            or run.get('event') not in ('pull_request', 'push', 'schedule', 'workflow_dispatch')):
+            or run.get('event') not in ('pull_request', 'push', 'schedule', 'workflow_dispatch')
+            or not re.fullmatch(TIMESTAMP, run.get('created_at', ''))):
         raise NetworkError('CI run does not match its event')
     references = [item for item in run.get('referenced_workflows', []) if item.get('path', '').startswith(WORKFLOW)]
     deadline = time.monotonic() + 180
@@ -76,13 +78,15 @@ def source():
         raise NetworkError('CI has an invalid interoperability workflow selection')
     if run.get('status') == 'completed':
         raise NotSelected('CI has already completed')
-    return dict(run_id=str(run_id), run_attempt=str(attempt), source_sha=references[0]['sha'], head_sha=run['head_sha'])
+    return dict(run_id=str(run_id), run_attempt=str(attempt), source_sha=references[0]['sha'],
+                head_sha=run['head_sha'], created_at=run['created_at'])
 
 
 def identity():
     if bound is not None:
         return dict(bound)
-    return {key: value for key, value in source().items() if key != 'head_sha'}
+    state = source()
+    return {key: state[key] for key in ('run_id', 'run_attempt', 'source_sha')}
 
 
 def bind(record):
@@ -95,7 +99,7 @@ def bind(record):
 
 
 def artifact_name(kind, role=None):
-    return 'interoperability-' + identity()['run_attempt'] + '-' + kind + ('-' + role if role else '')
+    return 'interoperability-' + kind + ('-' + role if role else '') + '-attempt-' + identity()['run_attempt']
 
 
 def validate(record, state=None):
@@ -105,57 +109,85 @@ def validate(record, state=None):
     return record
 
 
+def check_ci():
+    state = identity()
+    current = api('/actions/runs/' + state['run_id'])
+    if (current.get('run_attempt') != int(state['run_attempt'])
+            or current.get('conclusion') in ('failure', 'cancelled', 'timed_out')
+            or current.get('status') == 'completed'):
+        raise NotSelected('CI has completed, was cancelled or was superseded')
+    jobs = api('/actions/runs/' + state['run_id'] + '/attempts/' + state['run_attempt'] + '/jobs?per_page=100')
+    count = jobs.get('total_count')
+    if type(count) is not int or not 0 <= count <= 1000:
+        raise NetworkError('CI job listing exceeds limit')
+    listing = list(jobs.get('jobs', []))
+    for page in range(2, (count + 99) // 100 + 1):
+        listing += api('/actions/runs/' + state['run_id'] + '/attempts/' + state['run_attempt']
+                       + '/jobs?per_page=100&page=' + str(page))['jobs']
+    failed = [job['name'][len('Interoperability / '):] for job in listing
+              if job.get('name', '').startswith('Interoperability / ') and job.get('conclusion') in (
+                  'failure', 'cancelled', 'timed_out', 'action_required')]
+    if failed:
+        raise PeerUnavailable('Unavailable endpoints: ' + ', '.join(failed))
+
+
 def records(kind, roles=ROLES, run_id=None, timeout=600):
     state = identity()
     expected = {artifact_name(kind, role): role for role in roles}
-    checked = [0]
+    checked = [None]
     def active():
-        if time.monotonic() - checked[0] < 30:
+        now = time.monotonic()
+        if checked[0] is not None and now - checked[0] < 30:
             return
-        checked[0] = time.monotonic()
-        current = api('/actions/runs/' + state['run_id'])
-        if (current.get('run_attempt') != int(state['run_attempt']) or current.get('conclusion') == 'cancelled'
-                or current.get('status') == 'completed'):
-            raise NetworkError('CI was cancelled or superseded')
-        jobs = api('/actions/runs/' + state['run_id'] + '/attempts/' + state['run_attempt'] + '/jobs?per_page=100')
-        count = jobs.get('total_count')
-        if type(count) is not int or not 0 <= count <= 1000:
-            raise NetworkError('CI job listing exceeds limit')
-        listing = list(jobs.get('jobs', []))
-        for page in range(2, (count + 99) // 100 + 1):
-            listing += api('/actions/runs/' + state['run_id'] + '/attempts/' + state['run_attempt']
-                           + '/jobs?per_page=100&page=' + str(page))['jobs']
-        failed = [job['name'][len('Interoperability / '):] for job in listing
-                  if job.get('name', '').startswith('Interoperability / ') and job.get('conclusion') in (
-                      'failure', 'cancelled', 'timed_out', 'action_required')]
-        if failed:
-            raise PeerUnavailable('Unavailable endpoints: ' + ', '.join(failed))
+        checked[0] = now
+        check_ci()
+        if run_id is not None and kind != 'result' and api('/actions/runs/' + run_id).get('status') == 'completed':
+            raise PeerUnavailable('Network controller has stopped')
     return {role: validate(record, state) for role, (record, _) in
             download_records(run_id or state['run_id'], expected, timeout, progress=active).items()}
 
 
 def find_controller(exclude=None):
     state = source()
-    title = f"Network CI {state['run_id']} attempt {state['run_attempt']}"
-    runs = api('/actions/workflows/interoperability.yml/runs?branch=master&event=workflow_run&per_page=100')['workflow_runs']
+    titles = {'Network controller', f"Network CI {state['run_id']} attempt {state['run_attempt']}"}
+    runs = []
+    for page in range(1, 6):
+        listing = api('/actions/workflows/interoperability.yml/runs?branch=master&event=workflow_run'
+                      + '&per_page=20&page=' + str(page))
+        batch = listing.get('workflow_runs')
+        count = listing.get('total_count')
+        if (type(count) is not int or count < 0 or not isinstance(batch, list) or len(batch) > 20
+                or any(not isinstance(run, dict)
+                       or not re.fullmatch(TIMESTAMP, run.get('created_at', '')) for run in batch)):
+            raise NetworkError('Invalid controller run listing')
+        runs.extend(run for run in batch if run['created_at'] >= state['created_at'])
+        if len(batch) < 20 or any(run['created_at'] < state['created_at'] for run in batch):
+            break
+    else:
+        raise NetworkError('Controller run listing exceeds limit')
     for run in sorted(runs, key=lambda value: value['id']):
-        if run.get('display_title') != title or str(run['id']) == exclude:
+        if run.get('display_title') not in titles or str(run['id']) == exclude:
             continue
         if (run.get('path') != '.github/workflows/interoperability.yml'
                 or run.get('head_branch') != 'master' or run.get('event') != 'workflow_run'
                 or run.get('repository', {}).get('id') != 266877886):
             raise NetworkError('Controller does not match the trusted workflow revision')
-        name = 'interoperability-context-' + str(run['run_attempt'])
+        names = {'interoperability-context-attempt-' + str(run['run_attempt']),
+                 'interoperability-context-' + str(run['run_attempt'])}
         listing = api('/actions/runs/' + str(run['id']) + '/artifacts?per_page=100')
         if type(listing.get('total_count')) is not int or not 0 <= listing['total_count'] <= 100:
             raise NetworkError('Controller artifact listing exceeds limit')
-        matches = [item for item in listing['artifacts'] if item.get('name') == name and item.get('expired') is False]
+        matches = [item for item in listing['artifacts'] if item.get('name') in names and item.get('expired') is False]
         if not matches:
             continue
         if len(matches) != 1:
             raise NetworkError('Duplicate controller context')
+        name = matches[0]['name']
         metadata = download_records(str(run['id']), {name: None}, timeout=60)[None][0]
-        validate(metadata, {key: value for key, value in state.items() if key != 'head_sha'})
+        try:
+            validate(metadata, {key: state[key] for key in ('run_id', 'run_attempt', 'source_sha')})
+        except NetworkError:
+            continue
         if (metadata.get('control_run_id') != str(run['id'])
                 or metadata.get('control_attempt') != str(run['run_attempt'])
                 or metadata.get('control_sha') != run['head_sha']):
