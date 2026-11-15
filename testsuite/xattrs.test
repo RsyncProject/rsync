@@ -38,7 +38,10 @@ EOF
     xls() {
 	for fn in "${@}"; do
 	    runat "$fn" "$SHELL_PATH" <<EOF
-for x in *; do echo "\$x=\`cat \$x\`"; done
+for x in user.* rsync.*; do
+    test -f "\$x" || continue
+    echo "\$x=\`cat \$x\`"
+done
 EOF
        done
     }
