@@ -150,7 +150,8 @@ jobs:
           openssl_prefix=$(brew --prefix openssl)
           CPPFLAGS="-I${prefix}/include -I${openssl_prefix}/include" \
           LDFLAGS="-L${prefix}/lib -L${openssl_prefix}/lib" \
-            ./configure --disable-md2man --with-rrsync --enable-iconv --enable-acl-support --enable-xattr-support
+            ./configure --disable-md2man --with-included-zlib=no --with-rrsync \
+              --enable-iconv --enable-acl-support --enable-xattr-support
       - name: Build
         run: make -j2
       - name: Tests
