@@ -1,4 +1,13 @@
 #!/usr/bin/env python3
+"""An rrsync restricted dir must bound the merge files the peer can name.
+
+Filter rules travel over the protocol rather than in the argv rrsync validates,
+so a dir-merge rule can name a file outside the restricted dir and have the
+server read it in as rules. Redacting the resulting diagnostics is not enough:
+an exclude-only merge (the "-" modifier) turns every line into a pattern, so
+nothing fails to parse and the client reads the file's contents off its own
+file list instead -- no error, no verbosity, and on a pull no --delete either.
+"""
 
 import os
 import shlex
@@ -17,6 +26,7 @@ if '--shell' in sys.argv:
     os.execve(wrapper, [wrapper, '-ro', '-no-lock', root], env)
 
 from fixtures.rrsync import rsync_wrapper, patched_rrsync
+from harness.process import quote_command
 from harness.environment import SCRATCHDIR
 from harness.filesystem import makepath, rmtree
 from harness.results import test_fail
@@ -32,9 +42,14 @@ sub = root / 'sub'
 dest = base / 'dest'
 makepath(sub, dest)
 
+# The secret sits beside the restricted dir, so "../" reaches it from the root.
+# Its line is the name of a file inside the root: if the server reads it as an
+# exclude list, that file silently vanishes from the transfer and the client has
+# confirmed the content without ever seeing it.
 (base / 'outside-secret').write_text('secretword\n')
 (root / 'secretword').write_bytes(b'X')
 (root / 'keep').write_bytes(b'X')
+# An ordinary in-tree merge file, for the control below.
 (sub / 'intree-dropped').write_bytes(b'X')
 (sub / 'intree-kept').write_bytes(b'X')
 (sub / '.rsync-filter').write_text('intree-dropped\n')
@@ -45,30 +60,42 @@ wrapper = patched_rrsync(base, rsync_path=str(shim))
 rsh = f'{shlex.quote(sys.executable)} {shlex.quote(os.path.abspath(__file__))} --shell'
 env = {**os.environ, 'RRSYNC_WRAPPER': str(wrapper), 'RRSYNC_ROOT': str(root)}
 
+
 def pull(filt, into):
     into.mkdir(parents=True, exist_ok=True)
     return subprocess.run(
         rsync_argv('-r', f'--filter={filt}', '-e', rsh, 'ignored:.', f'{into}/'),
         env=env, capture_output=True, text=True, timeout=20)
 
+
+# The escape: an exclude-only dir-merge naming a file outside the restricted
+# dir. No --delete and no -v are involved -- the answer is the file list.
 esc = dest / 'escape'
 got = pull(':-s ../outside-secret', esc)
 if got.returncode != 0:
     test_fail(f'confined merge transfer failed: rc={got.returncode}, stderr={got.stderr!r}')
-if not ((esc / 'secretword').exists()):
+if not (esc / 'secretword').exists():
     test_fail(f'outside merge file excluded secretword: stdout={got.stdout!r}, stderr={got.stderr!r}')
 if 'secretword' in got.stderr:
     test_fail(f"the out-of-root merge file's text reached the peer: stderr={got.stderr!r}")
 
+# Control: an ordinary in-tree .rsync-filter must still be read and obeyed.
+# Without this, refusing every merge file would pass the check above.
 ctl = dest / 'control'
 got = pull(':-s .rsync-filter', ctl)
 if got.returncode != 0:
     test_fail(f'the in-tree dir-merge failed the transfer: rc={got.returncode}, stderr={got.stderr!r}')
-if not ((ctl / 'sub' / 'intree-kept').exists()):
+if not (ctl / 'sub' / 'intree-kept').exists():
     test_fail(f'the in-tree dir-merge broke the transfer: rc={got.returncode}, stdout={got.stdout!r}, stderr={got.stderr!r}')
 if (ctl / 'sub' / 'intree-dropped').exists():
     test_fail(f'in-tree merge file was not applied: stdout={got.stdout!r}, stderr={got.stderr!r}')
 
+# Direct --confine-root test (via alias-rsh without the rrsync wrapper):
+# Reaching the source directory through a symlink ("self-alias -> .") makes
+# rsync's tracked lexical path deeper than the kernel's actual directory.
+# A naive lexical check on "outside-link -> ../aliased-secret" would think ".."
+# only stepped up from "self-alias" into "alias_root", when in reality the
+# kernel resolves ".." out of "alias_root" into the parent directory.
 alias_root = base / 'aliased'
 makepath(alias_root)
 (base / 'aliased-secret').write_text('aliased-word\n')
@@ -78,21 +105,33 @@ os.symlink('.', alias_root / 'self-alias')
 os.symlink('../aliased-secret', alias_root / 'outside-link')
 (alias_root / 'intree-list').write_text('plain\n')
 
+alias_rsh = base / 'alias-rsh'
+alias_rsh.write_text(
+    '#!/bin/sh\nshift 2\nexec ' + quote_command(rsync_argv())
+    + f' --confine-root={shlex.quote(str(alias_root))} "$@"\n'
+)
+alias_rsh.chmod(0o755)
+
+
 def confined_pull(filter_text, into):
     (alias_root / '.rsync-filter').write_text(filter_text + '\n')
     rmtree(into)
     into.mkdir(parents=True, exist_ok=True)
     return subprocess.run(
-        rsync_argv('-r', f'--confine-root={alias_root}',
-                   '--filter=:s .rsync-filter',
-                   f'{alias_root}/self-alias/', f'{into}/'),
+        rsync_argv('-r', '--filter=:s .rsync-filter',
+                   '-e', str(alias_rsh),
+                   f'ignored:{alias_root}/self-alias/', f'{into}/'),
         capture_output=True, text=True, timeout=20)
+
 
 esc2 = dest / 'aliased-escape'
 got = confined_pull('merge,- outside-link', esc2)
-if got.returncode == 0 and (not (esc2 / 'aliased-word').exists()):
+if got.returncode == 0 and not (esc2 / 'aliased-word').exists():
     test_fail(f'symlinked source read an outside merge file: stderr={got.stderr!r}')
 
+# Control: the same symlinked source arg with an in-tree merge target must still
+# work, or the check above would also pass if confinement simply broke every
+# transfer that reaches a directory through a symlink.
 ctl2 = dest / 'aliased-control'
 got = confined_pull('merge,- intree-list', ctl2)
 if not (got.returncode == 0 and (ctl2 / 'aliased-word').exists()):

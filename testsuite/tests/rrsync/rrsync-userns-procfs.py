@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""A confined fd pin must remain usable inside a Linux user namespace."""
 
 import os
 import shlex
@@ -116,7 +117,7 @@ try:
     for index, fd_root in enumerate(fd_roots):
         log_file = dest / f'rsync-{index}.log'
         proc = subprocess.run(
-            rsync_argv('-a', f'--confine-root={dest}',
+            rsync_argv('-a', f'--confine-root={root}',
                        f'--log-file={fd_root}/{dest_fd}/{log_file.name}',
                        str(src) + '/', str(dest) + '/'),
             pass_fds=(dest_fd,),
@@ -141,6 +142,7 @@ backup_dir.symlink_to(outside)
 
 (outside / 'test').write_text('existing_backup\n')
 
+# Open an FD pointing to the confined root.
 root_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
 try:
     for fd_root in fd_roots:
@@ -153,6 +155,8 @@ try:
             text=True,
         )
 
+        # The transfer must fail because rsync attempts to unlink the pre-existing target file,
+        # forcing the path-walker to evaluate the FD pin + symlink and catching the escape.
         if proc.returncode == 0:
             test_fail(f'backup to outside symlink via {fd_root} pin was not observably refused: '
                       f'rc={proc.returncode}, stderr={proc.stderr!r}')

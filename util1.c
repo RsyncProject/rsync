@@ -1313,6 +1313,7 @@ char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth, i
 int change_dir(const char *dir, int set_path_only)
 {
 	extern int am_daemon, am_chrooted, am_sender, insecure_links;
+	extern char *confine_root;
 	static int initialised, skipped_chdir;
 	unsigned int len;
 
@@ -1360,13 +1361,13 @@ int change_dir(const char *dir, int set_path_only)
 				}
 				close(dfd);
 #if defined O_NOFOLLOW && defined O_DIRECTORY
-			} else if (!am_chrooted && !am_sender && !insecure_links) {
+			} else if (!am_chrooted && (confine_root || !am_sender) && !insecure_links) {
 				/* Strip the trailing slash: a symlink opened as "name/" is
 				 * always followed, so safe_open's final-component O_NOFOLLOW
 				 * must see the bare name to refuse an attacker's symlink. */
 				char nf[MAXPATHLEN];
 				unsigned int nl = len;
-				int dfd;
+				int dfd, save_resolve = operator_path_resolve;
 				if (nl >= sizeof nf) {
 					errno = ENAMETOOLONG;
 					return 0;
@@ -1380,7 +1381,10 @@ int change_dir(const char *dir, int set_path_only)
 				 * another uid.  A real dir is opened directly.  This closes the
 				 * destination chdir TOCTOU; --insecure-links keeps the plain
 				 * chdir for an operator whose dest is a foreign-owned symlink. */
+				if (confine_root)
+					operator_path_resolve = 1;
 				dfd = open_no_attacker_symlinks_dirfd(nf);
+				operator_path_resolve = save_resolve;
 				if (dfd < 0)
 					return 0;
 				if (fchdir(dfd) != 0) {
@@ -1453,13 +1457,17 @@ int change_dir(const char *dir, int set_path_only)
 				 * traversal with a plain chdir to the accumulated path, the same
 				 * legacy behaviour the per-operation sites grant under the opt-out. */
 				chdir_failed = chdir(curr_dir) != 0;
-			} else if (!am_chrooted && !am_sender && !insecure_links) {
+			} else if (!am_chrooted && (confine_root || !am_sender) && !insecure_links) {
 				/* Non-daemon receiver: confine the operator-named relative
 				 * destination like the absolute case above -- refuse a component
 				 * symlink not owned by uid 0 or our euid, closing the
 				 * relative-dest chdir TOCTOU while still following the operator's
 				 * own symlinks.  --insecure-links keeps the plain chdir. */
+				int save_resolve = operator_path_resolve;
+				if (confine_root)
+					operator_path_resolve = 1;
 				int dfd = open_no_attacker_symlinks_dirfd(curr_dir);
+				operator_path_resolve = save_resolve;
 				if (dfd < 0)
 					chdir_failed = 1;
 				else {
