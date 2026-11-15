@@ -1,32 +1,9 @@
 # NEWS for UNRELEASED
 
-## Changes in this version:
+## 3.5 maintenance line
 
-### BUG FIXES:
-- Preserved known-name operations beneath searchable but unreadable directories
-  on macOS. Native configuration now proves lookup, creation,
-  permission-revocation and no-follow behaviour before selecting a traversal
-  descriptor. Unverified targets fail closed instead of using raceable paths.
-- Rejected config and filter files after read or stream setup errors instead
-  of accepting partial contents. MOTD and `--early-input` reads now stop on
-  I/O errors instead of looping; interrupted reads retain their data.
-- Fixed an out-of-bounds read while reporting an incomplete daemon config
-  section header.
-- Preserved sender file-open errors when closing a held directory descriptor
-  during `--copy-links` transfers.
-- Changed to `/` immediately after a module chroot, before selecting an inner
-  module directory. A failed working-directory reset aborts the connection.
-
-### BUILD AND TESTS:
-- Reworked test discovery, platform profiles and JSON test results. The runner
-  now lives under `testsuite/` and uses Python 3.7 or later with no third-party
-  Python packages.
-- Expanded native platform tests and historical-peer checks in both executable
-  roles. Added Android Bionic and Termux application tests and cross-platform
-  transfers over SSH and daemon connections.
-- Added installed-binary TLS checks, release-archive qualification and Linux
-  storage tests for encrypted volumes, mount boundaries, space exhaustion,
-  device transfers and `--copy-as`.
+Release notes for compatible fixes and incremental improvements are maintained
+in the [stable/3.5 NEWS](https://github.com/RsyncProject/rsync/blob/stable/3.5/NEWS.md).
 
 # NEWS for rsync 3.5.2 (4 Nov 2026)
 
